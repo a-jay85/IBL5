@@ -1,12 +1,8 @@
 <?php
 
-$username = "iblhoops_chibul";
-$password = "oliver23";
-$database = "iblhoops_ibl5";
-
-mysql_connect(localhost,$username,$password);
-@mysql_select_db($database) or die( "Unable to select database");
-
+require 'config.php';
+mysql_connect($dbhost,$dbuname,$dbpass);
+@mysql_select_db($dbname) or die("Unable to select database");
 
 $queryi="UPDATE ibl_team_history SET div_titles = (SELECT COUNT(*) FROM nuke_ibl_teamawards WHERE nuke_ibl_teamawards.Award like '%Div.%' and ibl_team_history.team_name = nuke_ibl_teamawards.name)";
 $resulti=mysql_query($queryi);
@@ -102,7 +98,7 @@ SET iblhoops_iblv2forums.v4_forum_stats.ast_pid= (SELECT pid FROM iblhoops_ibl5.
 	$ranking=ranking($tid, $wins, $losses);
 	$query4="UPDATE nuke_ibl_power SET ranking = $ranking WHERE TeamID = $tid;";
 	$result4=mysql_query($query4);
-        
+
 	echo "Updating $Team wins $wins and losses $losses and ranking $ranking<br>";
 }
 

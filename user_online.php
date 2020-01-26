@@ -4,15 +4,11 @@ $session=session_id();
 $time=time();
 $time_check=$time-300; //SET TIME 5 Minute
 
-$host="localhost"; // Host name
-$username="iblhoops_chibul"; // Mysql username
-$password="oliver23"; // Mysql password
-$db_name="iblhoops_ibl5"; // Database name
-$tbl_name="user_online"; // Table name
+require 'config.php';
+mysql_connect($dbhost,$dbuname,$dbpass);
+@mysql_select_db($dbname) or die("Unable to select database");
 
-// Connect to server and select databse
-mysql_connect("$host", "$username", "$password")or die("cannot connect to server");
-mysql_select_db("$db_name")or die("cannot select DB");
+$tbl_name="user_online"; // Table name
 
 $sql="SELECT * FROM $tbl_name WHERE session='$session'";
 $result=mysql_query($sql);

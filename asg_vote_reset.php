@@ -1,12 +1,8 @@
 <?php
 
-$username = "iblhoops_chibul";
-$password = "oliver23";
-$database = "iblhoops_ibl5";
-
-mysql_connect(localhost,$username,$password);
-@mysql_select_db($database) or die( "Unable to select database");
-
+require 'config.php';
+mysql_connect($dbhost,$dbuname,$dbpass);
+@mysql_select_db($dbname) or die("Unable to select database");
 
 $query1="UPDATE IBL_ASG_Votes SET East_C = NULL, East_F1 = NULL, East_F2 = NULL, East_G1 = NULL, East_G2 = NULL, West_C = NULL, West_F1 = NULL, West_F2 = NULL, West_G1 = NULL, West_G2 = NULL";
 $result1=mysql_query($query1);

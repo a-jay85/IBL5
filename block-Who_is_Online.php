@@ -1,7 +1,7 @@
 // -- DATABASE CONNECTION -->
-
-    $conn=mysql_connect("localhost","iblhoops_chibul","oliver23") or die ("can't connect to server");
-    @mysql_select_db("iblhoops_ibl5") or die ("can't select database");
+require 'config.php';
+mysql_connect($dbhost,$dbuname,$dbpass);
+@mysql_select_db($dbname) or die("Unable to select database");
 
 
 // UPDATING ONLINE USER DATABASE

@@ -18,12 +18,10 @@ if ( !defined('BLOCK_FILE') ) {
 
 global $prefix, $multilingual, $currentlang, $db;
 
-$username = "iblhoops_chibul";
-$password = "oliver23";
-$database = "iblhoops_ibl5";
+require '../config.php';
+mysql_connect($dbhost,$dbuname,$dbpass);
+@mysql_select_db($dbname) or die("Unable to select database");
 
-mysql_connect(localhost,$username,$password);
-@mysql_select_db($database) or die( "Unable to select database");
 $queryo="SELECT * FROM nuke_users WHERE user_ibl_team != '' ORDER BY user_ibl_team ASC";
 $resulto=mysql_query($queryo);
 $numo=mysql_numrows($resulto);

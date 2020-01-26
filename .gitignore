@@ -1,4 +1,5 @@
 ibl/
 phpmyadmin/
 
-**/.DS_Store
+.DS_Store
+config.php

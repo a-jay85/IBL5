@@ -1,6 +1,6 @@
 <?php
 
-include_once '../config.php';
+require '../config.php';
 mysql_connect($dbhost,$dbuname,$dbpass);
 @mysql_select_db('iblhoops_ibl5') or die( "Unable to select database");
 

@@ -18,12 +18,9 @@ if ( !defined('BLOCK_FILE') ) {
 
 global $prefix, $multilingual, $currentlang, $db;
 
-$username = "iblhoops_chibul";
-$password = "oliver23";
-$database = "iblhoops_ibl5";
-
-mysql_connect(localhost,$username,$password);
-@mysql_select_db($database) or die( "Unable to select database");
+require '../config.php';
+mysql_connect($dbhost,$dbuname,$dbpass) or die("Unable to connect");
+@mysql_select_db($dbname) or die("Unable to select database");
 
 /* DIVISIONAL STANDINGS
 $queryNLWest = "SELECT tid,team_name,leagueRecord,divGB FROM IBL_Standings WHERE division = 'NL West' ORDER BY divGB ASC";

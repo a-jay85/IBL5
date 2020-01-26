@@ -1,11 +1,8 @@
 <?php
 
-$username = "iblhoops_chibul";
-$password = "oliver23";
-$database = "iblhoops_ibl5";
-
-mysql_connect(localhost,$username,$password);
-@mysql_select_db($database) or die( "Unable to select database");
+require 'config.php';
+mysql_connect($dbhost,$dbuname,$dbpass);
+@mysql_select_db($dbname) or die("Unable to select database");
 
 $query1="SELECT * FROM nuke_iblplyr WHERE `retired` = '0'";
 $result1=mysql_query($query1);

@@ -1,11 +1,8 @@
 <?php
 
-$username = "iblhoops_chibul";
-$password = "oliver23";
-$database = "iblhoops_ibl5";
-
-mysql_connect(localhost,$username,$password);
-@mysql_select_db($database) or die( "Unable to select database");
+require 'config.php';
+mysql_connect($dbhost,$dbuname,$dbpass);
+@mysql_select_db($dbname) or die("Unable to select database");
 
 $query="SELECT * FROM nuke_ibl_power WHERE TeamID BETWEEN 1 AND 32 ORDER BY TeamID ASC";
 $result=mysql_query($query);
@@ -86,7 +83,7 @@ SET iblhoops_iblv2forums.forum_stats.ast_pid= (SELECT pid FROM iblhoops_ibl5.nuk
 	$ranking=ranking($tid, $wins, $losses);
 	$query4="UPDATE nuke_ibl_power SET ranking = $ranking WHERE TeamID = $tid;";
 	$result4=mysql_query($query4);
-        
+
 	echo "Updating $Team wins $wins and losses $losses and ranking $ranking<br>";
 }
 

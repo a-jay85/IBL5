@@ -1,11 +1,8 @@
 <?php
 
-$username = "iblhoops_chibul";
-$password = "oliver23";
-$database = "iblhoops_ibl5";
-
-mysql_connect(localhost,$username,$password);
-@mysql_select_db($database) or die( "Unable to select database");
+require '../config.php';
+mysql_connect($dbhost,$dbuname,$dbpass);
+@mysql_select_db($dbname) or die("Unable to select database");
 
 $query="SELECT * FROM nuke_iblplyr WHERE retired = 0 AND exp > 0 AND cy = 0 AND teamname <> 'Free Agents' ORDER BY ordinal ASC";
 $result=mysql_query($query);

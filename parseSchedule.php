@@ -4,12 +4,9 @@
 //#8.) From the IBL HTML, open "Schedule.htm" IN INTERNET EXPLORER. Select the entire content of this page and copy it. Then paste into A1 of the "Schedule" tab.
 //#9.) In the Schedule tab, copy Column Q and paste into the database and run it.
 
-$username = "iblhoops_chibul";
-$password = "oliver23";
-$database = "iblhoops_ibl5";
-
-mysql_connect(localhost,$username,$password);
-@mysql_select_db($database) or die( "Unable to select database");
+require 'config.php';
+mysql_connect($dbhost,$dbuname,$dbpass);
+@mysql_select_db($dbname) or die("Unable to select database");
 
 $scheduleFilePath = 'ibl/IBL/Schedule.htm';
 
@@ -32,12 +29,12 @@ function stripTrailingSpaces($var) {
 function dateExtract($rawDate) {
 	if ($rawDate != FALSE) {
 		global $rows;
-	
+
 		$month = stripLeadingZeros(date('m', strtotime($rawDate)));
 		$day = stripLeadingZeros(date('d', strtotime($rawDate)));
 		$year = date('Y', strtotime($rawDate));
 		$date = $year."-".$month."-".$day;
-		
+
 		$dateArray = array(
 			"date" => $date,
 			"year" => $year,
@@ -98,7 +95,7 @@ foreach ($rows as $row) {
 
 	$sqlQueryString = "INSERT INTO IBL_Schedule (Year,BoxID,Date,Visitor,Vscore,Home,Hscore)
 		VALUES (".$year.",".$boxID.",'".$date."','".$visitorTID."',".$vScore.",'".$homeTID."',".$hScore.")
-		
+
 		ON DUPLICATE KEY UPDATE
 		Year = ".$year.",
 		Date = '".$date."',

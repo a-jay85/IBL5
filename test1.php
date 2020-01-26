@@ -1,12 +1,8 @@
 <?php
 
-$username = "iblhoops_chibul";
-$password = "oliver23";
-$database = "iblhoops_ibl5";
-
-mysql_connect(localhost,$username,$password);
-@mysql_select_db($database) or die( "Unable to select database");
-
+require 'config.php';
+mysql_connect($dbhost,$dbuname,$dbpass);
+@mysql_select_db($dbname) or die("Unable to select database");
 
 include("header.php");
 
@@ -57,9 +53,9 @@ while ($k < $num2)
 	$wk17_score[$k]=mysql_result($result2,$k,"wk17_score");
 	$tot_score[$k]=mysql_result($result2,$k,"tot_score");
 	$player[$k]=mysql_result($result2,$k,"name");
-	
 
-	$table_echo=$table_echo."<tr><td>".$player[$k]."</td><td>".$tot_score[$k]."</td><td>".$wk1_pick[$k]."</td><td>".$wk1_score[$k]."</td><td>".$wk2_pick[$k]."</td><td>".$wk2_score[$k]."</td><td>".$wk3_pick[$k]."</td><td>".$wk3_score[$k]."</td><td>".$wk4_pick[$k]."</td><td>".$wk4_score[$k]."</td><td>".$wk5_pick[$k]."</td><td>".$wk5_score[$k]."</td><td>".$wk6_pick[$k]."</td><td>".$wk6_score[$k]."</td><td>".$wk7_pick[$k]."</td><td>".$wk7_score[$k]."</td><td>".$wk8_pick[$k]."</td><td>".$wk8_score[$k]."</td><td>".$wk9_pick[$k]."</td><td>".$wk9_score[$k]."</td><td>".$wk10_pick[$k]."</td><td>".$wk10_score[$k]."</td><td>".$wk11_pick[$k]."</td><td>".$wk11_score[$k]."</td><td>".$wk12_pick[$k]."</td><td>".$wk12_score[$k]."</td><td>".$wk13_pick[$k]."</td><td>".$wk13_score[$k]."</td><td>".$wk14_pick[$k]."</td><td>".$wk14_score[$k]."</td><td>".$wk15_pick[$k]."</td><td>".$wk15_score[$k]."</td><td>".$wk16_pick[$k]."</td><td>".$wk16_score[$k]."</td><td>".$wk17_pick[$k]."</td><td>".$wk17_score[$k]."</td></tr>";	
+
+	$table_echo=$table_echo."<tr><td>".$player[$k]."</td><td>".$tot_score[$k]."</td><td>".$wk1_pick[$k]."</td><td>".$wk1_score[$k]."</td><td>".$wk2_pick[$k]."</td><td>".$wk2_score[$k]."</td><td>".$wk3_pick[$k]."</td><td>".$wk3_score[$k]."</td><td>".$wk4_pick[$k]."</td><td>".$wk4_score[$k]."</td><td>".$wk5_pick[$k]."</td><td>".$wk5_score[$k]."</td><td>".$wk6_pick[$k]."</td><td>".$wk6_score[$k]."</td><td>".$wk7_pick[$k]."</td><td>".$wk7_score[$k]."</td><td>".$wk8_pick[$k]."</td><td>".$wk8_score[$k]."</td><td>".$wk9_pick[$k]."</td><td>".$wk9_score[$k]."</td><td>".$wk10_pick[$k]."</td><td>".$wk10_score[$k]."</td><td>".$wk11_pick[$k]."</td><td>".$wk11_score[$k]."</td><td>".$wk12_pick[$k]."</td><td>".$wk12_score[$k]."</td><td>".$wk13_pick[$k]."</td><td>".$wk13_score[$k]."</td><td>".$wk14_pick[$k]."</td><td>".$wk14_score[$k]."</td><td>".$wk15_pick[$k]."</td><td>".$wk15_score[$k]."</td><td>".$wk16_pick[$k]."</td><td>".$wk16_score[$k]."</td><td>".$wk17_pick[$k]."</td><td>".$wk17_score[$k]."</td></tr>";
 
 	$k++;
 }
@@ -79,7 +75,3 @@ CloseTable();
 include("footer.php");
 
 ?>
-
-
-
-

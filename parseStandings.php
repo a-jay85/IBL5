@@ -3,13 +3,9 @@
 //This section stores Standings values in a database table called 'IBL_Standings' so that they can be retrieved quickly.
 //The file 'block-AJstandings.php' relies on 'IBL_Standings' to automate the sidebar standings display.
 
-
-$username = "iblhoops_chibul";
-$password = "oliver23";
-$database = "iblhoops_ibl5";
-
-mysql_connect(localhost,$username,$password);
-@mysql_select_db($database) or die( "Unable to select database");
+require 'config.php';
+mysql_connect($dbhost,$dbuname,$dbpass);
+@mysql_select_db($dbname) or die("Unable to select database");
 
 $standingsFilePath = 'ibl/IBL/Standings.htm';
 
@@ -90,7 +86,7 @@ function extractStandingsValues($confVar,$divVar) {
 			$rowUpdate = mysql_query($sqlQueryString);
 			if (!$sqlQueryString) {
 				die('Invalid query: ' . mysql_error());
-			}		
+			}
 		}
 	}
 

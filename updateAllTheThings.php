@@ -11,7 +11,7 @@ libxml_use_internal_errors(true);
 //#8.) From the IBL HTML, open "Schedule.htm" IN INTERNET EXPLORER. Select the entire content of this page and copy it. Then paste into A1 of the "Schedule" tab.
 //#9.) In the Schedule tab, copy Column Q and paste into the database and run it.
 
-include_once 'config.php';
+require 'config.php';
 mysql_connect($dbhost,$dbuname,$dbpass);
 @mysql_select_db($dbname) or die("Unable to select database");
 

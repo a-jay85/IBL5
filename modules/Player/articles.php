@@ -1,11 +1,8 @@
 <?php
 
-$username = "rhjowetk";
-$password = "oliver23";
-$database = "rhjowetk_iblleague";
-
-mysql_connect(localhost,$username,$password);
-@mysql_select_db($database) or die( "Unable to select database");
+require '../../config.php';
+mysql_connect($dbhost,$dbuname,$dbpass);
+@mysql_select_db($dbname) or die("Unable to select database");
 
 $player = $_REQUEST['player'];
 $query="SELECT * FROM nuke_stories WHERE hometext LIKE '%$player%' OR bodytext LIKE '%$player%' ORDER BY time DESC";
@@ -16,7 +13,7 @@ $i=0;
 
 echo "<small>";
 
-while ($i < $num) 
+while ($i < $num)
 {
 $sid=mysql_result($result,$i,"sid");
 $title=mysql_result($result,$i,"title");

@@ -1,11 +1,8 @@
 <?php
 
-$username = "rhjowetk";
-$password = "oliver23";
-$database = "rhjowetk_iblleague";
-
-mysql_connect(localhost,$username,$password);
-@mysql_select_db($database) or die( "Unable to select database");
+require '../../config.php';
+mysql_connect($dbhost,$dbuname,$dbpass);
+@mysql_select_db($dbname) or die("Unable to select database");
 
 $player2=str_replace("%20", " ", $player);
 
@@ -20,7 +17,7 @@ $i=0;
 
 echo "<small>";
 
-while ($i < $num) 
+while ($i < $num)
 {
 $gameid=mysql_result($result,$i,"gameid");
 $winner=mysql_result($result,$i,"winner");
@@ -42,7 +39,7 @@ $result=mysql_query($query);
 $num=mysql_numrows($result);
 $i=0;
 
-while ($i < $num) 
+while ($i < $num)
 {
 $gameid=mysql_result($result,$i,"gameid");
 $winner=mysql_result($result,$i,"winner");

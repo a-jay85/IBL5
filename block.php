@@ -1,13 +1,10 @@
 <?php
 
-$username = "iblhoops_chibul";
-$password = "oliver23";
-$database = "iblhoops_ibl5";
+require 'config.php';
+mysql_connect($dbhost,$dbuname,$dbpass);
+@mysql_select_db($dbname) or die("Unable to select database");
 
 $val = $_GET['day'];
-
-mysql_connect(localhost,$username,$password);
-@mysql_select_db($database) or die( "Unable to select database");
 
 $query="SELECT * FROM `nuke_ibl_fa_offers` ORDER BY name ASC, perceivedvalue DESC";
 $result=mysql_query($query);
@@ -56,7 +53,7 @@ while ($i < $num) {
 	$offeryears=1;
 	}
 	$offertotal=($offer1+$offer2+$offer3+$offer4+$offer5+$offer6)/100;
-	
+
 	$demyrs=6;
 	if ($dem6 == 0) {
 		$demyrs=5;
@@ -74,7 +71,7 @@ while ($i < $num) {
 			$perceivedvalue=0;
   		}
   	}
-  	
+
   	$demands=($dem1+$dem2+$dem3+$dem4+$dem5+$dem6)/$demyrs*((11-$val)/10);
  	if ($nameholder == $name) {
  	} else {
@@ -90,7 +87,7 @@ while ($i < $num) {
 			}
 		}
 	}
-	
+
 	$nameholder=$name;
 	$i=$i+1;
 }
@@ -102,18 +99,18 @@ while ($i < $num) {
 	$name=mysql_result($result,$i,"name");
 	$perceivedvalue=mysql_result($result,$i,"perceivedvalue");
 	$team=mysql_result($result,$i,"team");
-	
+
 	$offer1=mysql_result($result,$i,"offer1");
 	$offer2=mysql_result($result,$i,"offer2");
 	$offer3=mysql_result($result,$i,"offer3");
 	$offer4=mysql_result($result,$i,"offer4");
 	$offer5=mysql_result($result,$i,"offer5");
 	$offer6=mysql_result($result,$i,"offer6");
-	
+
 	$MLE=mysql_result($result,$i,"MLE");
 	$LLE=mysql_result($result,$i,"LLE");
 	$random=mysql_result($result,$i,"random");
-	
+
 	echo "<TR><TD>$name</TD><TD>$team</TD><TD>$offer1</TD><TD>$offer2</TD><TD>$offer3</TD><TD>$offer4</TD><TD>$offer5</TD><TD>$offer6</TD><TD>$MLE</TD><TD>$LLE</TD><TD>$random</TD><TD>$perceivedvalue</TD></TR>";
 	$offeryears=6;
 	if ($offer6 == 0) {

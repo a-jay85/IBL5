@@ -321,10 +321,14 @@ function updateMagicNumbers ($region)
 	$limit = mysql_num_rows($result);
 
 	$i = 0;
-	while ($i+1 < $limit) {
+	while ($i < $limit) {
 		$teamName = mysql_result($result,$i,0);
 		$teamTotalWins = mysql_result($result,$i,1) + mysql_result($result,$i,3);
-		$belowTeamTotalLosses = mysql_result($result,$i+1,2) + mysql_result($result,$i+1,4);
+		if ($i+1 != $limit) {
+			$belowTeamTotalLosses = mysql_result($result,$i+1,2) + mysql_result($result,$i+1,4);
+		} else {
+			$belowTeamTotalLosses = 0; // This results in an inaccurate Magic Number for the bottom team in the $region, but prevents query errors
+		}
 		$magicNumber = 68 + 1 - $teamTotalWins - $belowTeamTotalLosses;
 
 		$sqlQueryString = "INSERT INTO IBL_Standings (

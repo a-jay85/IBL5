@@ -108,9 +108,25 @@ foreach ($rows as $row) {
 		$homeTID = mysql_result(mysql_query("SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '".$homeName."';"),0);
 	}
 
-	$sqlQueryString = "INSERT INTO IBL_Schedule (Year,BoxID,Date,Visitor,Vscore,Home,Hscore)
-		VALUES ($year,$boxID,'$date',$visitorTID,$vScore,$homeTID,$hScore)"; /*
-		ON DUPLICATE KEY UPDATE
+	$sqlQueryString = "INSERT INTO IBL_Schedule (
+		Year,
+		BoxID,
+		Date,
+		Visitor,
+		Vscore,
+		Home,
+		Hscore
+	)
+	VALUES (
+		$year,
+		$boxID,
+		'$date',
+		$visitorTID,
+		$vScore,
+		$homeTID,
+		$hScore
+	)";
+		/* ON DUPLICATE KEY UPDATE
 			Year = $year,
 			Date = '$date',
 			Visitor = $visitorTID,
@@ -124,7 +140,15 @@ foreach ($rows as $row) {
 	} // DO NOT use 'else die('Invalid query: '.mysql_error()' here -- script depends on being able to pass broken SQL strings for now.
 }
 
-unset($visitorName,$homeName,$boxLink,$hScore,$vScore,$homeName,$visitorName,$homeTID,$visitorTID);
+unset($visitorName,
+	$homeName,
+	$boxLink,
+	$hScore,
+	$vScore,
+	$homeName,
+	$visitorName,
+	$homeTID,
+	$visitorTID);
 echo 'IBL_Schedule database table has been updated.<p>';
 
 // TODO:
@@ -209,7 +233,6 @@ function extractStandingsValues($confVar,$divVar)
 				awayWins,
 				awayLosses
 			)
-
 			VALUES (
 				'".rtrim($teamName)."',
 				'".$leagueRecord."',
@@ -230,7 +253,6 @@ function extractStandingsValues($confVar,$divVar)
 				'".$awayWins."',
 				'".$awayLosses."'
 			)
-
 			ON DUPLICATE KEY UPDATE
 				leagueRecord = '".$leagueRecord."',
 				pct = '".$pct."',
@@ -267,8 +289,19 @@ function extractStandingsValues($confVar,$divVar)
 		if (!in_array($teamName, array("Atlantic", "Central", "Midwest", "Pacific", "team", ""))) {
 			$divGB = $row->childNodes->item(3)->nodeValue;
 
-			$sqlQueryString = "INSERT INTO IBL_Standings (team_name,division,divGB) VALUES ('".$teamName."','".$division."','".$divGB."')
-				ON DUPLICATE KEY UPDATE	division = '".$division."',divGB = '".$divGB."'";
+			$sqlQueryString = "INSERT INTO IBL_Standings (
+				team_name,
+				division,
+				divGB
+			)
+			VALUES (
+				'".$teamName."',
+				'".$division."',
+				'".$divGB."'
+			)
+			ON DUPLICATE KEY UPDATE
+				division = '".$division."',
+				divGB = '".$divGB."'";
 
 			if (mysql_query($sqlQueryString)) {
 				echo $sqlQueryString.'<br>';
@@ -294,8 +327,16 @@ function updateMagicNumbers ($region)
 		$belowTeamTotalLosses = mysql_result($result,$i+1,2) + mysql_result($result,$i+1,4);
 		$magicNumber = 68 + 1 - $teamTotalWins - $belowTeamTotalLosses;
 
-		$sqlQueryString = "INSERT INTO IBL_Standings (team_name,".$groupingMagicNumber.") VALUES ('".$teamName."','".$magicNumber."')
-			ON DUPLICATE KEY UPDATE ".$groupingMagicNumber." = '".$magicNumber."'";
+		$sqlQueryString = "INSERT INTO IBL_Standings (
+			team_name,
+			".$groupingMagicNumber."
+		)
+		VALUES (
+			'".$teamName."',
+			'".$magicNumber."'
+		)
+		ON DUPLICATE KEY UPDATE
+			".$groupingMagicNumber." = '".$magicNumber."'";
 
 		if (mysql_query($sqlQueryString)) {
 			echo $sqlQueryString.'<br>';
@@ -409,7 +450,7 @@ if (mysql_query($sqlQueryString)) {
 $resetExtensionQueryString = 'UPDATE nuke_ibl_team_info SET Used_Extension_This_Chunk=0';
 if (mysql_query($resetExtensionQueryString)) {
 	echo $resetExtensionQueryString.'<p>';
-	echo '<p>Contract Extension statuses have been updated.<p>';
+	echo '<p>Contract Extension usages have been reset.<p>';
 } else die('Invalid query: '.mysql_error());
 
 echo '<p>All the things have been updated!<p>';

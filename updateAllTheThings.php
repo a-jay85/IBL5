@@ -125,7 +125,7 @@ foreach ($rows as $row) {
 }
 
 unset($visitorName,$homeName,$boxLink,$hScore,$vScore,$homeName,$visitorName,$homeTID,$visitorTID);
-
+echo 'IBL_Schedule database table has been updated.<p>';
 
 // TODO:
 // Standings variables to derive from Schedule: last 10, streak
@@ -256,8 +256,9 @@ function extractStandingsValues($confVar,$divVar)
 			} else die('Invalid query: '.mysql_error());
 		}
 	}
+	echo '<p>Conference standings have been updated.<p>';
 
-	echo '<p>Updating the division games back for all teams...<p>';
+	echo '<p>Updating the division games back for all teams...<br>';
 	foreach ($divVar as $row) {
 		$teamName = $row->childNodes->item(0)->nodeValue;
 		if (in_array($teamName, array("Atlantic", "Central", "Midwest", "Pacific"))) {
@@ -274,10 +275,12 @@ function extractStandingsValues($confVar,$divVar)
 			} else die('Invalid query: '.mysql_error());
 		}
 	}
+	echo 'Division standings have been updated.<p>';
 }
 
 function updateMagicNumbers ($region)
 {
+	echo '<p>Updating the magic numbers for the '.$region.'...<br>';
 	list ($grouping,$groupingGB,$groupingMagicNumber) = groupingSort($region);
 
 	$query = "SELECT team_name,homeWins,homeLosses,awayWins,awayLosses FROM IBL_Standings WHERE ".$grouping." = '".$region."' ORDER BY pct DESC";
@@ -299,11 +302,10 @@ function updateMagicNumbers ($region)
 		} else die('Invalid query: '.mysql_error());
 		$i++;
 	}
+	echo 'Magic numbers for the '.$region.' '.$grouping.' have been updated.<p>';
 }
 
 extractStandingsValues($rowsByConference,$rowsByDivision);
-
-echo '<p>Updating the magic numbers for all teams...<p>';
 
 updateMagicNumbers('Eastern');
 updateMagicNumbers('Western');
@@ -311,6 +313,7 @@ updateMagicNumbers('Atlantic');
 updateMagicNumbers('Central');
 updateMagicNumbers('Midwest');
 updateMagicNumbers('Pacific');
+echo '<p>Magic numbers for all teams have been updated.<p>';
 
 echo '<p>The IBL_Schedule and IBL_Standings table have been updated.<p>';
 
@@ -383,6 +386,7 @@ function displayStandings($region)
 	$standingsHTML=$standingsHTML.'<tr><td colspan=10><hr></td></tr>';
 }
 
+echo '<p>Updating the Standings page...<p>';
 $standingsHTML=$standingsHTML.'<table>';
 displayStandings('Eastern');
 displayStandings('Western');
@@ -399,15 +403,17 @@ $standingsHTML=$standingsHTML.'</table>';
 $sqlQueryString = "UPDATE nuke_pages SET text='".$standingsHTML."' WHERE pid=4";
 if (mysql_query($sqlQueryString)) {
 	echo $sqlQueryString.'<p>';
+	echo '<p>Full standings page has been updated.<p>';
 } else die('Invalid query: '.mysql_error());
 
 $resetExtensionQueryString = 'UPDATE nuke_ibl_team_info SET Used_Extension_This_Chunk=0';
 if (mysql_query($resetExtensionQueryString)) {
 	echo $resetExtensionQueryString.'<p>';
+	echo '<p>Contract Extension statuses have been updated.<p>';
 } else die('Invalid query: '.mysql_error());
 
-echo 'Full standings page has been updated.<br>';
-echo 'Sidebar standings have been updated.<p>';
+echo '<p>All the things have been updated!<p>';
+
 echo '<a href="/">Return to the IBL homepage</a>';
 
 ?>

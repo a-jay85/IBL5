@@ -749,11 +749,11 @@ function team($tid)
 	}
 	if ($tid != 0 AND $yr == "") {
 		$starters_table="<table align=\"center\" border=1 cellpadding=1 cellspacing=1><tr bgcolor=$color1><td colspan=5><font color=$color2><center><b>Last Sim's Starters</b></center></font></td></tr>
-			<tr><td><center><b>PG</b><br><img src=\"./images/player/$startingPGpid.jpg\" height=\"93\" width=\"115\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingPGpid\">$startingPG</a></td>
-			<td><center><b>SG</b><br><img src=\"./images/player/$startingSGpid.jpg\" height=\"93\" width=\"115\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingSGpid\">$startingSG</a></td>
-			<td><center><b>SF</b><br><img src=\"./images/player/$startingSFpid.jpg\" height=\"93\" width=\"115\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingSFpid\">$startingSF</a></td>
-			<td><center><b>PF</b><br><img src=\"./images/player/$startingPFpid.jpg\" height=\"93\" width=\"115\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingPFpid\">$startingPF</a></td>
-			<td><center><b>C</b><br><img src=\"./images/player/$startingCpid.jpg\" height=\"93\" width=\"115\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingCpid\">$startingC</a></td></tr></table>";
+			<tr><td><center><b>PG</b><br><img src=\"./images/player/$startingPGpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingPGpid\">$startingPG</a></td>
+			<td><center><b>SG</b><br><img src=\"./images/player/$startingSGpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingSGpid\">$startingSG</a></td>
+			<td><center><b>SF</b><br><img src=\"./images/player/$startingSFpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingSFpid\">$startingSF</a></td>
+			<td><center><b>PF</b><br><img src=\"./images/player/$startingPFpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingPFpid\">$startingPF</a></td>
+			<td><center><b>C</b><br><img src=\"./images/player/$startingCpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingCpid\">$startingC</a></td></tr></table>";
 	}
 
 	// END OF INSERTION OF STARTERS
@@ -1508,7 +1508,7 @@ function team($tid)
 		$cap5=number_format($cap5/100,2);
 		$cap6=number_format($cap6/100,2);
 
-		// Begin hack to populate a MySQL table that has each team's current cap total. 
+		// Begin hack to populate a MySQL table that has each team's current cap total.
 		// Calculating cap totals for the current season is dificult at the moment. - A-Jay
 			$currentCap = $cap1;
 			$capTotalQuery = "INSERT INTO IBL_Current_Cap (tid,currentCap) VALUES ('".$tid."','".$currentCap."') ON DUPLICATE KEY UPDATE currentCap='".$currentCap."'";
@@ -3619,7 +3619,7 @@ function asg_results()
 		$query6="select count(name) as votes,name from (select West_G1 as name from IBL_ASG_Votes union all select West_G2 from IBL_ASG_Votes) as tbl group by name having count(name) > 0 order by 1 desc;";
 		$result6=mysql_query($query6);
 		$num6=mysql_num_rows($result6);
-		
+
 		//    OpenTable();
 
 		$k=0;
@@ -3926,7 +3926,7 @@ switch($op) {
 	case "drafthistory":
 	drafthistory($tid);
 	break;
-	
+
 	case "asg_voting":
 	asg_voting();
 	break;

@@ -114,6 +114,6 @@ if ($error == 0)
 	  }
 	$k++;
 	}
-	echo "Trade Offer Entered Into Database. Go back <a href='http://www.iblhoops.net/testIBL/modules.php?name=Team&op=reviewtrade'>Trade Review Page</a>";
+	echo "Trade Offer Entered Into Database. Go back <a href='http://www.iblhoops.net/ibl5/modules.php?name=Team&op=reviewtrade'>Trade Review Page</a>";
 }
 ?>

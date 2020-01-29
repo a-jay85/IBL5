@@ -63,7 +63,7 @@ $resultclear=mysql_query($queryclear);
 ?>
 
 <HTML><HEAD><TITLE>Trade Offer Processing</TITLE>
-<meta http-equiv="refresh" content="0;url=http://www.iblhoops.net/testIBL/modules.php?name=Team&op=reviewtrade">
+<meta http-equiv="refresh" content="0;url=http://www.iblhoops.net/ibl5/modules.php?name=Team&op=reviewtrade">
 </HEAD><BODY>
 Trade Offer accepted. Redirecting you to the Trade Review page...
 </BODY></HTML>

@@ -23,7 +23,7 @@ $actual_link = "$_SERVER[REQUEST_URI]";
 
 $boxstuff = "<span class=\"content\">";
 
-if ($actual_link == "/" || $actual_link == "/index.php" || $actual_link == "/testIBL/" || $actual_link == "/testIBL/index.php") {} else {
+if ($actual_link == "/" || $actual_link == "/index.php" || $actual_link == "/ibl5/" || $actual_link == "/ibl5/index.php") {} else {
 	$boxstuff .= '<a href="index.php"><img src="logocorner.jpg" border="0"></a>';
 }
 

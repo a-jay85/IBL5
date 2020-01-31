@@ -459,6 +459,6 @@ if (mysql_query($resetExtensionQueryString)) {
 
 echo '<p>All the things have been updated!<p>';
 
-echo '<a href="/">Return to the IBL homepage</a>';
+echo '<a href="index.php">Return to the IBL homepage</a>';
 
 ?>

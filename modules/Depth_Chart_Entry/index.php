@@ -407,9 +407,9 @@ function submit() {
 	if ($error == 0) {
 		$emailsubject = $Team_Name." Depth Chart - $Set_Name Offensive Set";
 		if ($emailtarget == Preseason) {
-			$recipient = 'ajaynicolas@gmail.com';
+			$recipient = 'ibldepthcharts@gmail.com';
 		} else {
-			$recipient = 'ajaynicolas@gmail.com';
+			$recipient = 'ibldepthcharts@gmail.com';
 		}
 
 		if (mail($recipient, $emailsubject, $filetext, "From: ibldepthcharts@gmail.com")) {

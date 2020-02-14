@@ -1,5 +1,6 @@
 ibl/
 phpmyadmin/
+depthcharts/
 
 .DS_Store
 config.php

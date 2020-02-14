@@ -418,7 +418,8 @@ function submit() {
 
 		if (mail($recipient, $emailsubject, $filetext, "From: ibldepthcharts@gmail.com")) {
 			echo "<center> <font color=red>Your depth chart has been submitted and e-mailed successfully. Thank you.</font></center>";
-			file_put_contents('depthcharts/'.$Team_Name.'.txt', $filetext);
+			$filename = 'depthcharts/'.$Team_Name.'.txt';
+			file_put_contents($filename, $filetext);
 		} else {
 			echo " <font color=red>Message failed to e-mail properly; please contact the commissioner.</font></center>";
 		}

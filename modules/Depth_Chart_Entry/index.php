@@ -50,7 +50,6 @@ function userinfo($username, $bypass=0, $hid=0, $url=0)
 		echo "<option value=\"3\"".($positionVar == 3 ? " SELECTED" : "").">3rd</option>";
 		echo "<option value=\"4\"".($positionVar == 4 ? " SELECTED" : "").">4th</option>";
 		echo "<option value=\"5\"".($positionVar == 5 ? " SELECTED" : "").">ok</option>";
-		echo "</select></td>";
 	}
 
 	function offdefHandler($focusVar)
@@ -158,6 +157,7 @@ function userinfo($username, $bypass=0, $hid=0, $url=0)
 			if ($pos_value <= $High1) {
 				echo "<td><select name=\"pg$depthcount\">";
 				posHandler($player_PG);
+				echo "</select></td>";
 			} else {
 				echo "<td><input type=\"hidden\" name=\"pg$depthcount\" value=\"0\">no</td>";
 			}
@@ -169,6 +169,7 @@ function userinfo($username, $bypass=0, $hid=0, $url=0)
 			if ($pos_value <= $High2) {
 				echo "<td><select name=\"sg$depthcount\">";
 				posHandler($player_SG);
+				echo "</select></td>";
 			} else {
 				echo "<td><input type=\"hidden\" name=\"sg$depthcount\" value=\"0\">no</td>";
 			}
@@ -180,6 +181,7 @@ function userinfo($username, $bypass=0, $hid=0, $url=0)
 			if ($pos_value <= $High3) {
 				echo "<td><select name=\"sf$depthcount\">";
 				posHandler($player_SF);
+				echo "</select></td>";
 			} else {
 				echo "<td><input type=\"hidden\" name=\"sf$depthcount\" value=\"0\">no</td>";
 			}
@@ -191,6 +193,7 @@ function userinfo($username, $bypass=0, $hid=0, $url=0)
 			if ($pos_value <= $High4) {
 				echo "<td><select name=\"pf$depthcount\">";
 				posHandler($player_PF);
+				echo "</select></td>";
 			} else {
 				echo "<td><input type=\"hidden\" name=\"pf$depthcount\" value=\"0\">no</td>";
 			}
@@ -202,6 +205,7 @@ function userinfo($username, $bypass=0, $hid=0, $url=0)
 			if ($pos_value <= $High5) {
 				echo "<td><select name=\"c$depthcount\">";
 				posHandler($player_C);
+				echo "</select></td>";
 			} else {
 				echo "<td><input type=\"hidden\" name=\"c$depthcount\" value=\"0\">no</td>";
 			}

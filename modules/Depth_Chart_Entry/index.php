@@ -383,8 +383,10 @@ function submit() {
 	}
 
 	$text = $text."</table>";
-	if ($activeplayers < 11) {
-		echo "<font color=red>Your lineup has not been submitted to the commissioner's office because it is an illegal lineup.  You must have at least 12 active players in your lineup; you have $activeplayers.  Please press the \"Back\" button on your browser and re-enter your lineup.</font>";
+
+	$minimumActivePlayers = 12;
+	if ($activeplayers < $minimumActivePlayers) {
+		echo "<font color=red>Your lineup has not been submitted to the commissioner's office because it is an illegal lineup.  You must have at least $minimumActivePlayers active players in your lineup; you have $activeplayers.  Please press the \"Back\" button on your browser and re-enter your lineup.</font>";
 		$error=1;
 	}
 	if ($pos_1 < 3 && $error == 0) {

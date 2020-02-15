@@ -23,7 +23,7 @@ $userpage = 1;
 $current_ibl_season=mysql_result(mysql_query("SELECT value FROM nuke_ibl_settings WHERE name = 'Current IBL Season' LIMIT 1"),0,"value");
 include("header.php");
 
-$query2="SELECT * FROM ibl_team_history WHERE teamid < 23 ORDER BY teamid ASC";
+$query2="SELECT * FROM ibl_team_history WHERE teamid != 35 ORDER BY teamid ASC"; // Grab all teams except for the Free Agents
 $result2=mysql_query($query2);
 $num2=mysql_num_rows($result2);
 
@@ -39,8 +39,8 @@ while ($k < $num2)
         $depth[$k]=mysql_result($result2,$k,"depth");
         $simdepth[$k]=mysql_result($result2,$k,"sim_depth");
 	$teamid[$k]=mysql_result($result2,$k,"teamid");
-	
-                
+
+
 	$table_echo=$table_echo."<tr><td bgcolor=#".$teamcolor1[$k]."><a href=\"modules.php?name=Team&op=team&tid=".$teamid[$k]."\"><font color=#".$teamcolor2[$k].">".$teamcity[$k]." ".$teamname[$k]."</a></td><td>".$simdepth[$k]."</td><td>".$depth[$k]."</td></tr>";
 
 	$k++;

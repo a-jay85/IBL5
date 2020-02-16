@@ -43,13 +43,6 @@ function poschange($pid)
     $player_pos = stripslashes(check_html($playerinfo['altpos'], "nohtml"));
     $player_team_name = stripslashes(check_html($playerinfo['teamname'], "nohtml"));
 
-		//    $player_loyalty = stripslashes(check_html($playerinfo['loyalty'], "nohtml"));
-		//    $player_winner = stripslashes(check_html($playerinfo['winner'], "nohtml"));
-		//    $player_playingtime = stripslashes(check_html($playerinfo['playingTime'], "nohtml"));
-		//    $player_security = stripslashes(check_html($playerinfo['security'], "nohtml"));
-		//    $player_coach = stripslashes(check_html($playerinfo['coach'], "nohtml"));
-		//    $player_tradition = stripslashes(check_html($playerinfo['tradition'], "nohtml"));
-
     include("header.php");
 
     OpenTable();

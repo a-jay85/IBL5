@@ -37,6 +37,8 @@ function menu()
 function poschange($pid)
 {
     global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
+		cookiedecode($user);
+
     $pid = intval($pid);
     $playerinfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM ".$prefix."_iblplyr WHERE pid='$pid'"));
     $player_name = stripslashes(check_html($playerinfo['name'], "nohtml"));
@@ -48,8 +50,6 @@ function poschange($pid)
     OpenTable();
 
     menu();
-
-		cookiedecode($user);
 
 		$sql2 = "SELECT * FROM ".$prefix."_users WHERE username='$cookie[1]'";
 		$result2 = $db->sql_query($sql2);

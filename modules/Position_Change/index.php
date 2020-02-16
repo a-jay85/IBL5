@@ -63,15 +63,15 @@ function poschange($pid)
 
 		if ($can_renegotiate >= 0) {
 		    if ($player_team_name == $userteam) {
-				    $active_check = $db->sql_fetchrow($db->sql_query("SELECT * FROM ".$prefix."_ibl_settings WHERE name='Pos_Change'"));
-				    $pos_active = stripslashes(check_html($active_check['value'], "nohtml"));
+				    $queryAllowPositionChanges = $db->sql_fetchrow($db->sql_query("SELECT * FROM ".$prefix."_ibl_settings WHERE name='Allow Position Changes'"));
+				    $isAllowPositionChanges = stripslashes(check_html($queryAllowPositionChanges['value'], "nohtml"));
 				    $poschange_check = $db->sql_fetchrow($db->sql_query("SELECT * FROM ".$prefix."_ibl_team_info WHERE team_name = '$player_team_name'"));
 				    $pos_five = stripslashes(check_html($poschange_check['poschanges'], "nohtml"));
 
 				    $player_check = $db->sql_fetchrow($db->sql_query("SELECT * FROM ".$prefix."_iblplyr WHERE name = '$player_name'"));
 				    $player_poschg = stripslashes(check_html($player_check['poschange'], "nohtml"));
 
-						if ($pos_active == No) {
+						if ($isAllowPositionChanges != "Yes") {
 						    echo "Sorry, the position change feature is only available between the start of H.E.A.T. and the trade deadline.";
 						} elseif ($pos_five >= 5) {
 						    echo "Sorry, your team has reached the maximum number of position changes.";

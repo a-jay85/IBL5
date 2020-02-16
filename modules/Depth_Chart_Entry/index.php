@@ -123,6 +123,7 @@ function userinfo($username, $bypass=0, $hid=0, $url=0)
 	$depthcount=1;
 
 	while ($row8 = $db->sql_fetchrow($result8)) {
+		$player_pid = $row8[pid];
 		$player_pos = $row8[altpos];
 		$player_name = $row8[name];
 		$player_staminacap = $row8[sta]+40;
@@ -151,7 +152,16 @@ function userinfo($username, $bypass=0, $hid=0, $url=0)
 		if ($player_pos == 'FC') $pos_value=8;
 		if ($player_pos == 'C') $pos_value=9;
 
-		echo "\n<tr><td>$player_pos</td><td nowrap><input type=\"hidden\" name=\"Inury$depthcount\" value=\"$player_inj\"><input type=\"hidden\" name=\"Name$depthcount\" value=\"$player_name\">$player_name</td>\n";
+		echo "\n
+				<tr>
+						<td>
+								<a href=\"./modules.php?name=Position_Change&pid=$player_pid\">$player_pos</a>
+						</td>
+						<td nowrap>
+								<input type=\"hidden\" name=\"Injury$depthcount\" value=\"$player_inj\">
+								<input type=\"hidden\" name=\"Name$depthcount\" value=\"$player_name\">
+								<a href=\"./modules.php?name=Player&pa=showpage&pid=$player_pid\">$player_name</a>
+						</td>\n";
 
 		if ($pos_value >= $Low1 && $player_inj < 15) {
 			if ($pos_value <= $High1) {
@@ -312,7 +322,7 @@ function submit() {
 ";
 		$text = $text.$a.$b.$c.$d.$e.$f.$g.$h.$z.$j.$k.$l.$m;
 
-		$injury = $_POST['Inury'.$i];
+		$injury = $_POST['Injury'.$i];
 		$aa = $_POST['Name'.$i].",";
 		$bb = $_POST['pg'.$i].",";
 		$cc = $_POST['sg'.$i].",";

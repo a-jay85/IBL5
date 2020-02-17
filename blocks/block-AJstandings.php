@@ -64,7 +64,7 @@ $content=$content.'
 $i = 0;
 while ($i < $limitEasternConference) {
 	$tid = mysql_result($resultEasternConference,$i,0);
-	$team_name = mysql_result($resultEasternConference,$i,1);
+	$team_name = trim(mysql_result($resultEasternConference,$i,1));
 	$leagueRecord = mysql_result($resultEasternConference,$i,2);
 	$confGB = mysql_result($resultEasternConference,$i,3);
 
@@ -80,7 +80,7 @@ $content=$content.'
 $i = 0;
 while ($i < $limitWesternConference) {
 	$tid = mysql_result($resultWesternConference,$i,0);
-	$team_name = mysql_result($resultWesternConference,$i,1);
+	$team_name = trim(mysql_result($resultWesternConference,$i,1));
 	$leagueRecord = mysql_result($resultWesternConference,$i,2);
 	$confGB = mysql_result($resultWesternConference,$i,3);
 

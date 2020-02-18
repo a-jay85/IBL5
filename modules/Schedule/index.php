@@ -93,11 +93,11 @@ function chunk ($chunk_start_date, $chunk_end_date, $j) {
 
 		if ($date == $datebase)
 		{
-			echo "<tr bgcolor=$bgcolor><td>$date</td><td><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$vname</a></td><td align=right>$VScore</td><td><a href=\"modules.php?name=Team&op=team&tid=$home\">$hname</a></td><td align=right>$HScore</td><td><a href=\"IBLv4/box$boxid.htm\">View</a></td></tr>";
+			echo "<tr bgcolor=$bgcolor><td>$date</td><td><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$vname</a></td><td align=right>$VScore</td><td><a href=\"modules.php?name=Team&op=team&tid=$home\">$hname</a></td><td align=right>$HScore</td><td><a href=\"ibl/IBL/box$boxid.htm\">View</a></td></tr>";
 		}else{
 			echo "<tr><td></td><td></td><td></td><td></td><td></td><td></td></tr>";
 			echo "<tr bgcolor=$bgcolor2><td><font color=\"FFFFFF\"><b>Date</td><td><font color=\"FFFFFF\"><b>Visitor</td><td><font color=\"FFFFFF\"><b>Score</td><td><font color=\"FFFFFF\"><b>Home</td><td><font color=\"FFFFFF\"><b>Score</td><td><font color=\"FFFFFF\"><b>Box Score</td></tr>";
-			echo "<tr bgcolor=$bgcolor><td>$date</td><td><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$vname</a></td><td align=right>$VScore</td><td><a href=\"modules.php?name=Team&op=team&tid=$home\">$hname</a></td><td align=right>$HScore</td><td><a href=\"IBLv4/box$boxid.htm\">View</a></td></tr>";
+			echo "<tr bgcolor=$bgcolor><td>$date</td><td><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$vname</a></td><td align=right>$VScore</td><td><a href=\"modules.php?name=Team&op=team&tid=$home\">$hname</a></td><td align=right>$HScore</td><td><a href=\"ibl/IBL/box$boxid.htm\">View</a></td></tr>";
 			$datebase=$date;
 			$z++;
 		}

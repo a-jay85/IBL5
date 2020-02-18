@@ -58,10 +58,53 @@ while (!feof($scoFile)) {
         $gameBLK = substr($line,107+$x,2);
         $gamePF = substr($line,109+$x,2);
 
-        $entryUpdateQuery = "INSERT INTO IBL_Box_Scores (Date,name,pos,pid,visitorTID,homeTID,gameMIN,game2GM,game2GA,gameFTM,gameFTA,game3GM,game3GA,gameORB,gameDRB,gameAST,gameSTL,gameTOV,gameBLK,gamePF)
-            VALUES ('$date','$name','$pos',$pid,$visitorTID,$homeTID,$gameMIN,$game2GM,$game2GA,$gameFTM,$gameFTA,$game3GM,$game3GA,$gameORB,$gameDRB,$gameAST,$gameSTL,$gameTOV,$gameBLK,$gamePF)";
+        $entryUpdateQuery = "INSERT INTO IBL_Box_Scores (
+            Date,
+            name,
+            pos,
+            pid,
+            visitorTID,
+            homeTID,
+            gameMIN,
+            game2GM,
+            game2GA,
+            gameFTM,
+            gameFTA,
+            game3GM,
+            game3GA,
+            gameORB,
+            gameDRB,
+            gameAST,
+            gameSTL,
+            gameTOV,
+            gameBLK,
+            gamePF
+        )
+        VALUES (
+            '$date',
+            '$name',
+            '$pos',
+            $pid,
+            $visitorTID,
+            $homeTID,
+            $gameMIN,
+            $game2GM,
+            $game2GA,
+            $gameFTM,
+            $gameFTA,
+            $game3GM,
+            $game3GA,
+            $gameORB,
+            $gameDRB,
+            $gameAST,
+            $gameSTL,
+            $gameTOV,
+            $gameBLK,
+            $gamePF
+        )";
         if ($name != NULL || $name != '') {
             if (mysql_query($entryUpdateQuery)) {
+                $entryUpdateQuery = str_replace(array('.', ' ', "\n", "\t", "\r"), '', $entryUpdateQuery);
                 echo $entryUpdateQuery.'<br>';
             }
         }

@@ -7,7 +7,7 @@ mysql_connect($dbhost,$dbuname,$dbpass);
 $stringCurrentSimYear = "SELECT value FROM nuke_ibl_settings WHERE name = 'Current IBL Season';";
 $queryCurrentSimYear = mysql_query($stringCurrentSimYear);
 
-$scoFile = fopen("IBLv4.sco", "rb");
+$scoFile = fopen("IBL5.sco", "rb");
 fseek($scoFile,1030000);
 
 if (mysql_query('TRUNCATE TABLE IBL_Box_Scores')) echo 'TRUNCATE TABLE IBL_Box_Scores<p>';

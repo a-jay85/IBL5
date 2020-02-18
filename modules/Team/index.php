@@ -944,7 +944,7 @@ function team($tid)
 
 		// ==== INSERT TEAM OFFENSE AND DEFENSE TOTALS ====
 
-		$queryTeamOffenseTotals="SELECT * FROM ibl_team_offense_stats WHERE team = '$team_name' AND year = '0'";
+		$queryTeamOffenseTotals="SELECT * FROM ibl_team_offense_stats WHERE team = '$team_name' AND year = '1989'";
 		$resultTeamOffenseTotals=mysql_query($queryTeamOffenseTotals);
 		$numTeamOffenseTotals=mysql_numrows($resultTeamOffenseTotals);
 
@@ -974,7 +974,7 @@ function team($tid)
 		$t++;
 		}
 
-		$queryTeamDefenseTotals="SELECT * FROM ibl_team_defense_stats WHERE team = '$team_name' AND year = '0'";
+		$queryTeamDefenseTotals="SELECT * FROM ibl_team_defense_stats WHERE team = '$team_name' AND year = '1989'";
 		$resultTeamDefenseTotals=mysql_query($queryTeamDefenseTotals);
 		$numTeamDefenseTotals=mysql_numrows($resultTeamDefenseTotals);
 
@@ -1200,7 +1200,7 @@ function team($tid)
 
 		$table_averages=$table_averages."</tbody><tfoot>";
 
-		$queryTeamOffenseTotals="SELECT * FROM ibl_team_offense_stats WHERE team = '$team_name' AND year = '0'";
+		$queryTeamOffenseTotals="SELECT * FROM ibl_team_offense_stats WHERE team = '$team_name' AND year = '1989'";
 		$resultTeamOffenseTotals=mysql_query($queryTeamOffenseTotals);
 		$numTeamOffenseTotals=mysql_numrows($resultTeamOffenseTotals);
 
@@ -1267,7 +1267,7 @@ function team($tid)
 			$t++;
 		}
 
-		$queryTeamDefenseTotals="SELECT * FROM ibl_team_defense_stats WHERE team = '$team_name' AND year = '0'";
+		$queryTeamDefenseTotals="SELECT * FROM ibl_team_defense_stats WHERE team = '$team_name' AND year = '1989'";
 		$resultTeamDefenseTotals=mysql_query($queryTeamDefenseTotals);
 		$numTeamDefenseTotals=mysql_numrows($resultTeamDefenseTotals);
 

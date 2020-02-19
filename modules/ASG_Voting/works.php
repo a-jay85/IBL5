@@ -20,7 +20,7 @@ require_once("mainfile.php");
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 $userpage = 1;
-$current_ibl_season=mysql_result(mysql_query("SELECT value FROM nuke_ibl_settings WHERE name = 'Current IBL Season' LIMIT 1"),0,"value");
+$current_ibl_season=mysql_result(mysql_query("SELECT value FROM nuke_ibl_settings WHERE name = 'Current IBL Season Ending Year' LIMIT 1"),0,"value");
 include("header.php");
 
 OpenTable();
@@ -33,15 +33,15 @@ while($row = mysql_fetch_assoc($result))
     $ppg = floatval($row['stats_3gm']*3 + ($row['stats_fgm']-$row['stats_3gm'])*2+ $row['stats_ftm']) / intval($row['stats_gm']);
     $ppg = round($ppg,1);
     $rpg = floatval($row['stats_orb'] + $row['stats_drb']) / intval($row['stats_gm']);
-    $rpg = round($rpg,1); 
+    $rpg = round($rpg,1);
     $apg = floatval($row['stats_ast']) / intval($row['stats_gm']);
-    $apg = round($apg,1); 
+    $apg = round($apg,1);
     $spg = floatval($row['stats_stl']) / intval($row['stats_gm']);
-    $spg = round($spg,1); 
+    $spg = round($spg,1);
     $tpg = floatval($row['stats_to']) / intval($row['stats_gm']);
-    $tpg = round($tpg,1); 
+    $tpg = round($tpg,1);
     $bpg = floatval($row['stats_blk']) / intval($row['stats_gm']);
-    $bpg = round($bpg,1); 
+    $bpg = round($bpg,1);
     $fgp = floatval($row['stats_fgm']) / intval($row['stats_fga']);
     $fgp = round($fgp,3);
     $ftp = floatval($row['stats_ftm']) / intval($row['stats_fta']);
@@ -49,7 +49,7 @@ while($row = mysql_fetch_assoc($result))
     $tpp = floatval($row['stats_3gm']) / intval($row['stats_3ga']);
     $tpp = round($tpp,3);
     $dd .= "<option value='".$row['name']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl, , ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp</option>";
-} 
+}
 
 
 echo"<label for=\'ECCenters[]\'>Select One (1) Eastern Conference Center:</label><br>
@@ -64,15 +64,15 @@ while($row = mysql_fetch_assoc($result1))
     $ppg = floatval($row['stats_3gm']*3 + ($row['stats_fgm']-$row['stats_3gm'])*2+ $row['stats_ftm']) / intval($row['stats_gm']);
     $ppg = round($ppg,1);
     $rpg = floatval($row['stats_orb'] + $row['stats_drb']) / intval($row['stats_gm']);
-    $rpg = round($rpg,1); 
+    $rpg = round($rpg,1);
     $apg = floatval($row['stats_ast']) / intval($row['stats_gm']);
-    $apg = round($apg,1); 
+    $apg = round($apg,1);
     $spg = floatval($row['stats_stl']) / intval($row['stats_gm']);
-    $spg = round($spg,1); 
+    $spg = round($spg,1);
     $tpg = floatval($row['stats_to']) / intval($row['stats_gm']);
-    $tpg = round($tpg,1); 
+    $tpg = round($tpg,1);
     $bpg = floatval($row['stats_blk']) / intval($row['stats_gm']);
-    $bpg = round($bpg,1); 
+    $bpg = round($bpg,1);
     $fgp = floatval($row['stats_fgm']) / intval($row['stats_fga']);
     $fgp = round($fgp,3);
     $ftp = floatval($row['stats_ftm']) / intval($row['stats_fta']);
@@ -80,7 +80,7 @@ while($row = mysql_fetch_assoc($result1))
     $tpp = floatval($row['stats_3gm']) / intval($row['stats_3ga']);
     $tpp = round($tpp,3);
     $ff .= "<option value='".$row['name']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl, , ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp</option>";
-} 
+}
 
 
 echo"<label for=\'ECForwards[]\'>Select Two (2) Eastern Conference Forwards:</label><br>
@@ -95,15 +95,15 @@ while($row = mysql_fetch_assoc($result1))
     $ppg = floatval($row['stats_3gm']*3 + ($row['stats_fgm']-$row['stats_3gm'])*2+ $row['stats_ftm']) / intval($row['stats_gm']);
     $ppg = round($ppg,1);
     $rpg = floatval($row['stats_orb'] + $row['stats_drb']) / intval($row['stats_gm']);
-    $rpg = round($rpg,1); 
+    $rpg = round($rpg,1);
     $apg = floatval($row['stats_ast']) / intval($row['stats_gm']);
-    $apg = round($apg,1); 
+    $apg = round($apg,1);
     $spg = floatval($row['stats_stl']) / intval($row['stats_gm']);
-    $spg = round($spg,1); 
+    $spg = round($spg,1);
     $tpg = floatval($row['stats_to']) / intval($row['stats_gm']);
-    $tpg = round($tpg,1); 
+    $tpg = round($tpg,1);
     $bpg = floatval($row['stats_blk']) / intval($row['stats_gm']);
-    $bpg = round($bpg,1); 
+    $bpg = round($bpg,1);
     $fgp = floatval($row['stats_fgm']) / intval($row['stats_fga']);
     $fgp = round($fgp,3);
     $ftp = floatval($row['stats_ftm']) / intval($row['stats_fta']);
@@ -111,7 +111,7 @@ while($row = mysql_fetch_assoc($result1))
     $tpp = floatval($row['stats_3gm']) / intval($row['stats_3ga']);
     $tpp = round($tpp,3);
     $hh .= "<option value='".$row['name']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl, , ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp</option>";
-} 
+}
 
 
 echo"<label for=\'ECGuards[]\'>Select Two (2) Eastern Conference Guards:</label><br>

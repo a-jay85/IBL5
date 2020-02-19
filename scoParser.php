@@ -4,7 +4,7 @@ require 'config.php';
 mysql_connect($dbhost,$dbuname,$dbpass);
 @mysql_select_db($dbname) or die( "Unable to select database");
 
-$stringCurrentSimYear = "SELECT value FROM nuke_ibl_settings WHERE name = 'Current IBL Season';";
+$stringCurrentSimYear = "SELECT value FROM nuke_ibl_settings WHERE name = 'Current IBL Season Ending Year';";
 $queryCurrentSimYear = mysql_query($stringCurrentSimYear);
 
 $scoFile = fopen("IBL5.sco", "rb");

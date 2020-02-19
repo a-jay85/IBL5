@@ -20,7 +20,7 @@ require_once("mainfile.php");
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 $userpage = 1;
-$current_ibl_season=mysql_result(mysql_query("SELECT value FROM nuke_ibl_settings WHERE name = 'Current IBL Season' LIMIT 1"),0,"value");
+$current_ibl_season=mysql_result(mysql_query("SELECT value FROM nuke_ibl_settings WHERE name = 'Current IBL Season Ending Year' LIMIT 1"),0,"value");
 include("header.php");
 
 $query1="select count(name) as votes,name from (select East_C as name from IBL_ASG_Votes) as tbl group by name having count(name) > 0 order by 1 desc;";
@@ -67,8 +67,8 @@ while ($k < $num1)
 
 	$player[$k]=mysql_result($result1,$k, "name");
 	$votes[$k]=mysql_result($result1,$k);
-	
-	$table_echo=$table_echo."<tr><td>".$player[$k]."</td><td>".$votes[$k]."</td></tr>";	
+
+	$table_echo=$table_echo."<tr><td>".$player[$k]."</td><td>".$votes[$k]."</td></tr>";
 
 	$k++;
 }
@@ -84,8 +84,8 @@ while ($h < $num2)
 
 	$player[$h]=mysql_result($result2,$h, "name");
 	$votes[$h]=mysql_result($result2,$h);
-	
-	$table_echo1=$table_echo1."<tr><td>".$player[$h]."</td><td>".$votes[$h]."</td></tr>";	
+
+	$table_echo1=$table_echo1."<tr><td>".$player[$h]."</td><td>".$votes[$h]."</td></tr>";
 
 	$h++;
 }
@@ -98,8 +98,8 @@ while ($i < $num3)
 
 	$player[$i]=mysql_result($result3,$i, "name");
 	$votes[$i]=mysql_result($result3,$i);
-	
-	$table_echo2=$table_echo2."<tr><td>".$player[$i]."</td><td>".$votes[$i]."</td></tr>";	
+
+	$table_echo2=$table_echo2."<tr><td>".$player[$i]."</td><td>".$votes[$i]."</td></tr>";
 
 	$i++;
 }
@@ -112,8 +112,8 @@ while ($m < $num4)
 
 	$player[$m]=mysql_result($result4,$m, "name");
 	$votes[$m]=mysql_result($result4,$m);
-	
-	$table_echo3=$table_echo3."<tr><td>".$player[$m]."</td><td>".$votes[$m]."</td></tr>";	
+
+	$table_echo3=$table_echo3."<tr><td>".$player[$m]."</td><td>".$votes[$m]."</td></tr>";
 
 	$m++;
 }
@@ -126,8 +126,8 @@ while ($n < $num5)
 
 	$player[$n]=mysql_result($result5,$n, "name");
 	$votes[$n]=mysql_result($result5,$n);
-	
-	$table_echo4=$table_echo4."<tr><td>".$player[$n]."</td><td>".$votes[$n]."</td></tr>";	
+
+	$table_echo4=$table_echo4."<tr><td>".$player[$n]."</td><td>".$votes[$n]."</td></tr>";
 
 	$n++;
 }
@@ -140,8 +140,8 @@ while ($o < $num6)
 
 	$player[$o]=mysql_result($result6,$o, "name");
 	$votes[$o]=mysql_result($result6,$o);
-	
-	$table_echo5=$table_echo5."<tr><td>".$player[$o]."</td><td>".$votes[$o]."</td></tr>";	
+
+	$table_echo5=$table_echo5."<tr><td>".$player[$o]."</td><td>".$votes[$o]."</td></tr>";
 
 	$o++;
 }

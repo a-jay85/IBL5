@@ -41,7 +41,7 @@ function tradeoffer($username, $bypass=0, $hid=0, $url=0)
 
 	include("header.php");
 
-	$query="SELECT * FROM nuke_ibl_settings WHERE name = 'Current IBL Season' ";
+	$query="SELECT * FROM nuke_ibl_settings WHERE name = 'Current IBL Season Ending Year' ";
 	$result=mysql_query($query);
 	$current_ibl_season=mysql_result($result,0,"value");
 

@@ -20,7 +20,7 @@ require_once("mainfile.php");
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 $userpage = 1;
-$current_ibl_season=mysql_result(mysql_query("SELECT value FROM nuke_ibl_settings WHERE name = 'Current IBL Season' LIMIT 1"),0,"value");
+$current_ibl_season=mysql_result(mysql_query("SELECT value FROM nuke_ibl_settings WHERE name = 'Current IBL Season Ending Year' LIMIT 1"),0,"value");
 include("header.php");
 
 function userinfo($username, $bypass=0, $hid=0, $url=0) {
@@ -51,15 +51,15 @@ while($row = mysql_fetch_assoc($result))
     $ppg = floatval($row['stats_3gm']*3 + ($row['stats_fgm']-$row['stats_3gm'])*2+ $row['stats_ftm']) / intval($row['stats_gm']);
     $ppg = round($ppg,1);
     $rpg = floatval($row['stats_orb'] + $row['stats_drb']) / intval($row['stats_gm']);
-    $rpg = round($rpg,1); 
+    $rpg = round($rpg,1);
     $apg = floatval($row['stats_ast']) / intval($row['stats_gm']);
-    $apg = round($apg,1); 
+    $apg = round($apg,1);
     $spg = floatval($row['stats_stl']) / intval($row['stats_gm']);
-    $spg = round($spg,1); 
+    $spg = round($spg,1);
     $tpg = floatval($row['stats_to']) / intval($row['stats_gm']);
-    $tpg = round($tpg,1); 
+    $tpg = round($tpg,1);
     $bpg = floatval($row['stats_blk']) / intval($row['stats_gm']);
-    $bpg = round($bpg,1); 
+    $bpg = round($bpg,1);
     $fgp = floatval($row['stats_fgm']) / intval($row['stats_fga']);
     $fgp = round($fgp,3);
     $ftp = floatval($row['stats_ftm']) / intval($row['stats_fta']);
@@ -67,7 +67,7 @@ while($row = mysql_fetch_assoc($result))
     $tpp = floatval($row['stats_3gm']) / intval($row['stats_3ga']);
     $tpp = round($tpp,3);
     $dd .= "<option value='".$row['name']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl, , ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp</option>";
-} 
+}
 
 $query1 = "SELECT * FROM nuke_iblplyr where (pos = 'PF' or pos = 'SF') and (tid = '1' or tid = '26' or tid = '4' or tid = '3' or tid = '21' or tid = '2' or tid = '24' or tid = '29' or tid = '6' or tid = '27' or tid = '9' or tid = '7' or tid = '10' or tid = '5' or tid = '8' or tid = '31') and teamname != 'Retired' order by teamname";
 $result1 = mysql_query($query1);
@@ -76,15 +76,15 @@ while($row = mysql_fetch_assoc($result1))
     $ppg = floatval($row['stats_3gm']*3 + ($row['stats_fgm']-$row['stats_3gm'])*2+ $row['stats_ftm']) / intval($row['stats_gm']);
     $ppg = round($ppg,1);
     $rpg = floatval($row['stats_orb'] + $row['stats_drb']) / intval($row['stats_gm']);
-    $rpg = round($rpg,1); 
+    $rpg = round($rpg,1);
     $apg = floatval($row['stats_ast']) / intval($row['stats_gm']);
-    $apg = round($apg,1); 
+    $apg = round($apg,1);
     $spg = floatval($row['stats_stl']) / intval($row['stats_gm']);
-    $spg = round($spg,1); 
+    $spg = round($spg,1);
     $tpg = floatval($row['stats_to']) / intval($row['stats_gm']);
-    $tpg = round($tpg,1); 
+    $tpg = round($tpg,1);
     $bpg = floatval($row['stats_blk']) / intval($row['stats_gm']);
-    $bpg = round($bpg,1); 
+    $bpg = round($bpg,1);
     $fgp = floatval($row['stats_fgm']) / intval($row['stats_fga']);
     $fgp = round($fgp,3);
     $ftp = floatval($row['stats_ftm']) / intval($row['stats_fta']);
@@ -92,7 +92,7 @@ while($row = mysql_fetch_assoc($result1))
     $tpp = floatval($row['stats_3gm']) / intval($row['stats_3ga']);
     $tpp = round($tpp,3);
     $ff .= "<option value='".$row['name']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl, , ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp</option>";
-} 
+}
 
 $query2 = "SELECT * FROM nuke_iblplyr where (pos = 'PG' or pos = 'SG') and (tid = '1' or tid = '26' or tid = '4' or tid = '3' or tid = '21' or tid = '2' or tid = '24' or tid = '29' or tid = '6' or tid = '27' or tid = '9' or tid = '7' or tid = '10' or tid = '5' or tid = '8' or tid = '31') and teamname != 'Retired' order by teamname";
 $result2 = mysql_query($query2);
@@ -101,15 +101,15 @@ while($row = mysql_fetch_assoc($result2))
     $ppg = floatval($row['stats_3gm']*3 + ($row['stats_fgm']-$row['stats_3gm'])*2+ $row['stats_ftm']) / intval($row['stats_gm']);
     $ppg = round($ppg,1);
     $rpg = floatval($row['stats_orb'] + $row['stats_drb']) / intval($row['stats_gm']);
-    $rpg = round($rpg,1); 
+    $rpg = round($rpg,1);
     $apg = floatval($row['stats_ast']) / intval($row['stats_gm']);
-    $apg = round($apg,1); 
+    $apg = round($apg,1);
     $spg = floatval($row['stats_stl']) / intval($row['stats_gm']);
-    $spg = round($spg,1); 
+    $spg = round($spg,1);
     $tpg = floatval($row['stats_to']) / intval($row['stats_gm']);
-    $tpg = round($tpg,1); 
+    $tpg = round($tpg,1);
     $bpg = floatval($row['stats_blk']) / intval($row['stats_gm']);
-    $bpg = round($bpg,1); 
+    $bpg = round($bpg,1);
     $fgp = floatval($row['stats_fgm']) / intval($row['stats_fga']);
     $fgp = round($fgp,3);
     $ftp = floatval($row['stats_ftm']) / intval($row['stats_fta']);
@@ -117,7 +117,7 @@ while($row = mysql_fetch_assoc($result2))
     $tpp = floatval($row['stats_3gm']) / intval($row['stats_3ga']);
     $tpp = round($tpp,3);
     $hh .= "<option value='".$row['name']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl, , ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp</option>";
-} 
+}
 
 $query3 = "SELECT * FROM nuke_iblplyr where pos = 'C' and (tid = '11' or tid = '25' or tid = '30' or tid = '13' or tid = '14' or tid = '15' or tid = '12' or tid = '32' or tid = '16' or tid = '17' or tid = '22' or tid = '20' or tid = '19' or tid = '23' or tid = '18' or tid = '28') and teamname != 'Retired' order by teamname";
 $result3 = mysql_query($query3);
@@ -126,15 +126,15 @@ while($row = mysql_fetch_assoc($result3))
     $ppg = floatval($row['stats_3gm']*3 + ($row['stats_fgm']-$row['stats_3gm'])*2+ $row['stats_ftm']) / intval($row['stats_gm']);
     $ppg = round($ppg,1);
     $rpg = floatval($row['stats_orb'] + $row['stats_drb']) / intval($row['stats_gm']);
-    $rpg = round($rpg,1); 
+    $rpg = round($rpg,1);
     $apg = floatval($row['stats_ast']) / intval($row['stats_gm']);
-    $apg = round($apg,1); 
+    $apg = round($apg,1);
     $spg = floatval($row['stats_stl']) / intval($row['stats_gm']);
-    $spg = round($spg,1); 
+    $spg = round($spg,1);
     $tpg = floatval($row['stats_to']) / intval($row['stats_gm']);
-    $tpg = round($tpg,1); 
+    $tpg = round($tpg,1);
     $bpg = floatval($row['stats_blk']) / intval($row['stats_gm']);
-    $bpg = round($bpg,1); 
+    $bpg = round($bpg,1);
     $fgp = floatval($row['stats_fgm']) / intval($row['stats_fga']);
     $fgp = round($fgp,3);
     $ftp = floatval($row['stats_ftm']) / intval($row['stats_fta']);
@@ -142,7 +142,7 @@ while($row = mysql_fetch_assoc($result3))
     $tpp = floatval($row['stats_3gm']) / intval($row['stats_3ga']);
     $tpp = round($tpp,3);
     $ii .= "<option value='".$row['name']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl, , ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp</option>";
-} 
+}
 
 $query4 = "SELECT * FROM nuke_iblplyr where (pos = 'PF' or pos = 'SF') and (tid = '11' or tid = '25' or tid = '30' or tid = '13' or tid = '14' or tid = '15' or tid = '12' or tid = '32' or tid = '16' or tid = '17' or tid = '22' or tid = '20' or tid = '19' or tid = '23' or tid = '18' or tid = '28') and teamname != 'Retired' order by teamname";
 $result4 = mysql_query($query4);
@@ -151,15 +151,15 @@ while($row = mysql_fetch_assoc($result4))
     $ppg = floatval($row['stats_3gm']*3 + ($row['stats_fgm']-$row['stats_3gm'])*2+ $row['stats_ftm']) / intval($row['stats_gm']);
     $ppg = round($ppg,1);
     $rpg = floatval($row['stats_orb'] + $row['stats_drb']) / intval($row['stats_gm']);
-    $rpg = round($rpg,1); 
+    $rpg = round($rpg,1);
     $apg = floatval($row['stats_ast']) / intval($row['stats_gm']);
-    $apg = round($apg,1); 
+    $apg = round($apg,1);
     $spg = floatval($row['stats_stl']) / intval($row['stats_gm']);
-    $spg = round($spg,1); 
+    $spg = round($spg,1);
     $tpg = floatval($row['stats_to']) / intval($row['stats_gm']);
-    $tpg = round($tpg,1); 
+    $tpg = round($tpg,1);
     $bpg = floatval($row['stats_blk']) / intval($row['stats_gm']);
-    $bpg = round($bpg,1); 
+    $bpg = round($bpg,1);
     $fgp = floatval($row['stats_fgm']) / intval($row['stats_fga']);
     $fgp = round($fgp,3);
     $ftp = floatval($row['stats_ftm']) / intval($row['stats_fta']);
@@ -167,7 +167,7 @@ while($row = mysql_fetch_assoc($result4))
     $tpp = floatval($row['stats_3gm']) / intval($row['stats_3ga']);
     $tpp = round($tpp,3);
     $jj .= "<option value='".$row['name']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl, , ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp</option>";
-} 
+}
 
 $query5 = "SELECT * FROM nuke_iblplyr where (pos = 'PG' or pos = 'SG') and (tid = '11' or tid = '25' or tid = '30' or tid = '13' or tid = '14' or tid = '15' or tid = '12' or tid = '32' or tid = '16' or tid = '17' or tid = '22' or tid = '20' or tid = '19' or tid = '23' or tid = '18' or tid = '28') and teamname != 'Retired' order by teamname";
 $result5 = mysql_query($query5);
@@ -176,15 +176,15 @@ while($row = mysql_fetch_assoc($result5))
     $ppg = floatval($row['stats_3gm']*3 + ($row['stats_fgm']-$row['stats_3gm'])*2+ $row['stats_ftm']) / intval($row['stats_gm']);
     $ppg = round($ppg,1);
     $rpg = floatval($row['stats_orb'] + $row['stats_drb']) / intval($row['stats_gm']);
-    $rpg = round($rpg,1); 
+    $rpg = round($rpg,1);
     $apg = floatval($row['stats_ast']) / intval($row['stats_gm']);
-    $apg = round($apg,1); 
+    $apg = round($apg,1);
     $spg = floatval($row['stats_stl']) / intval($row['stats_gm']);
-    $spg = round($spg,1); 
+    $spg = round($spg,1);
     $tpg = floatval($row['stats_to']) / intval($row['stats_gm']);
-    $tpg = round($tpg,1); 
+    $tpg = round($tpg,1);
     $bpg = floatval($row['stats_blk']) / intval($row['stats_gm']);
-    $bpg = round($bpg,1); 
+    $bpg = round($bpg,1);
     $fgp = floatval($row['stats_fgm']) / intval($row['stats_fga']);
     $fgp = round($fgp,3);
     $ftp = floatval($row['stats_ftm']) / intval($row['stats_fta']);
@@ -192,7 +192,7 @@ while($row = mysql_fetch_assoc($result5))
     $tpp = floatval($row['stats_3gm']) / intval($row['stats_3ga']);
     $tpp = round($tpp,3);
     $kk .= "<option value='".$row['name']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl, , ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp</option>";
-} 
+}
 
 echo "<select name=\"ECC\">
   <option value=\"\">Select Your Eastern Conference Center...</option>

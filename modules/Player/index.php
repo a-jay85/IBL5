@@ -2611,13 +2611,13 @@ if ($spec == 0) {
                 <td class=\"gamelog\">".((2*$row[game2GM])+(3*$row[game3GM])+$row[gameFTM])."</td>
                 <td class=\"gamelog\">".($row[game2GM]+$row[game3GM])."</td>
                 <td class=\"gamelog\">".($row[game2GA]+$row[game3GA])."</td>
-                <td class=\"gamelog\">".round(($row[game2GM]+$row[game3GM])*100/($row[game2GA]+$row[game3GA]),1)."</td>
+                <td class=\"gamelog\">".number_format(($row[game2GM]+$row[game3GM])/($row[game2GA]+$row[game3GA]), 3, '.', '')."</td>
                 <td class=\"gamelog\">$row[gameFTM]</td>
                 <td class=\"gamelog\">$row[gameFTA]</td>
-                <td class=\"gamelog\">".round($row[gameFTM]*100/$row[gameFTA],1)."</td>
+                <td class=\"gamelog\">".number_format($row[gameFTM]/$row[gameFTA], 3, '.', '')."</td>
                 <td class=\"gamelog\">$row[game3GM]</td>
                 <td class=\"gamelog\">$row[game3GA]</td>
-                <td class=\"gamelog\">".round($row[game3GM]*100/$row[game3GA],1)."</td>
+                <td class=\"gamelog\">".number_format($row[game3GM]/$row[game3GA], 3, '.', '')."</td>
                 <td class=\"gamelog\">$row[gameORB]</td>
                 <td class=\"gamelog\">$row[gameDRB]</td>
                 <td class=\"gamelog\">".($row[gameORB]+$row[gameDRB])."</td>

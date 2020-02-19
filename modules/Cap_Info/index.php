@@ -20,7 +20,7 @@ require_once("mainfile.php");
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 $userpage = 1;
-$current_ibl_season=mysql_result(mysql_query("SELECT value FROM nuke_ibl_settings WHERE name = 'Current IBL Season' LIMIT 1"),0,"value");
+$current_ibl_season=mysql_result(mysql_query("SELECT value FROM nuke_ibl_settings WHERE name = 'Current IBL Season Ending Year' LIMIT 1"),0,"value");
 include("header.php");
 
 
@@ -46,7 +46,7 @@ while ($k < $num2)
 	$teamsalary5[$k]=0;
 	$teamsalary6[$k]=0;
 	$teamslotsfa[$k]=15;
-	
+
 	$team_array = get_salary ($teamid[$k], $teamname[$k], $current_ibl_season);
 	$team_array1 = get_salary1 ($teamid[$k], $teamname[$k], $current_ibl_season);
 
@@ -58,7 +58,7 @@ while ($k < $num2)
 	$teamsalary6[$k]=7000-$team_array[6]["salary"];
 
 	$teamslotsfa[$k]=$teamslotsfa[$k]-$team_array1[1]["roster"];
-                
+
 	$table_echo=$table_echo."<tr><td bgcolor=#".$teamcolor1[$k]."><a href=\"modules.php?name=Team&op=team&tid=".$teamid[$k]."\"><font color=#".$teamcolor2[$k].">".$teamcity[$k]." ".$teamname[$k]."</a></td><td".$capnote1.">".$teamsalary1[$k]."</td><td".$capnote2.">".$teamsalary2[$k]."</td><td".$capnote3.">".$teamsalary3[$k]."</td><td".$capnote4.">".$teamsalary4[$k]."</td><td".$capnote5.">".$teamsalary5[$k]."</td><td".$capnote6.">".$teamsalary6[$k]."</td><td>".$teamslotsfa[$k]."</td></tr>";
 
 	$k++;
@@ -106,7 +106,7 @@ function get_salary ($tid, $team_name, $current_ibl_season)
 	$query3="SELECT * FROM nuke_iblplyr WHERE retired=0 AND tid = $tid AND cy <> cyt";
 	$result3=mysql_query($query3);
 	$num3=mysql_num_rows($result3);
-	
+
 	$i = 0;
 	while ($i < $num3)
 	{
@@ -163,7 +163,7 @@ function get_salary1 ($tid, $team_name, $current_ibl_season)
 	$query3="SELECT * FROM nuke_iblplyr WHERE retired=0 AND tid = $tid AND droptime = 0 and name not like '%Buyout%' and cy <> cyt";
 	$result3=mysql_query($query3);
 	$num3=mysql_num_rows($result3);
-	
+
 	$i = 0;
 	while ($i < $num3)
 	{

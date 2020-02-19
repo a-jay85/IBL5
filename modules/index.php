@@ -1526,7 +1526,7 @@ $table_chunk=$table_chunk."<table  align=\"center\" class=\"sortable\">
 ";
 /* ======================CHUNK STATS */
 
-$current_ijbl_season=mysql_result(mysql_query("SELECT * FROM nuke_ibl_settings WHERE name = 'Current IBL Season' "),0,"value");
+$current_ibl_season=mysql_result(mysql_query("SELECT * FROM nuke_ibl_settings WHERE name = 'Current IBL Season Ending Year' "),0,"value");
 
 $max_chunk_query="SELECT MAX(chunk) as maxchunk FROM nuke_iblplyr_chunk WHERE active = 1 AND Season = '$current_ibl_season' ";
 $max_chunk_result=mysql_query($max_chunk_query);

@@ -6,7 +6,7 @@ mysql_connect($dbhost,$dbuname,$dbpass);
 
 $queryCurrentYear = 'SELECT value FROM nuke_ibl_settings WHERE name = "Current IBL Season Ending Year"';
 $resultCurrentYear = mysql_query($queryCurrentYear);
-$freeagentyear=mysql_result($resultCurrentYear, 0)+1;
+$freeagentyear=mysql_result($resultCurrentYear, 0);
 
 $tid = $_REQUEST['tid'];
 $yr = $_REQUEST['yr'];

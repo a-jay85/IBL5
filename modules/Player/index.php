@@ -2476,7 +2476,7 @@ echo "<tr><td bgcolor=#0000cc align=center><b><font color=#ffffff>ARTICLES MENTI
 
 $urlwanted=str_replace(" ", "%20", $player_name);
 
-$arttext=readfile("online/articles.php?player=$urlwanted");
+$arttext=readfile("http://iblhoops.net/ibl5/online/articles.php?player=$urlwanted"); // Relative URL paths don't seem to work for this
 
 echo "$arttext";
 

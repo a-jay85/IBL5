@@ -4,3 +4,4 @@ depthcharts/
 
 .DS_Store
 config.php
+error_log

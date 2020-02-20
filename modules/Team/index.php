@@ -867,7 +867,7 @@ function team($tid)
 	if ($tid != 0) {
 		$table_totals=$table_totals."
 			<table align=\"center\" class=\"sortable\">
-			<thead><tr bgcolor=$color1><th><font color=$color2>Pos</font></th><td colspan=3><font color=$color2>Player</font></th><th><font color=$color2>g</font></th><th><font color=$color2>gs</font></th><th><font color=$color2>min</font></th><th><font color=$color2>fgm</font></th><th><font color=$color2>fga</font></th><th><font color=$color2>ftm</font></th><th><font color=$color2>fta</font></th><th><font color=$color2>3gm</font></th><th><font color=$color2>3ga</font></th><th><font color=$color2>orb</font></th><th><font color=$color2>reb</font></th><th><font color=$color2>ast</font></th><th><font color=$color2>stl</font></th><th><font color=$color2>to</font></th><th><font color=$color2>blk</font></th><th><font color=$color2>pf</font></th><th><font color=$color2>pts</font></th></tr></thead><tbody>";
+			<thead><tr bgcolor=$color1><th><font color=$color2>Pos</font></th><th colspan=3><font color=$color2>Player</font></th><th><font color=$color2>g</font></th><th><font color=$color2>gs</font></th><th><font color=$color2>min</font></th><th><font color=$color2>fgm</font></th><th><font color=$color2>fga</font></th><th><font color=$color2>ftm</font></th><th><font color=$color2>fta</font></th><th><font color=$color2>3gm</font></th><th><font color=$color2>3ga</font></th><th><font color=$color2>orb</font></th><th><font color=$color2>reb</font></th><th><font color=$color2>ast</font></th><th><font color=$color2>stl</font></th><th><font color=$color2>to</font></th><th><font color=$color2>blk</font></th><th><font color=$color2>pf</font></th><th><font color=$color2>pts</font></th></tr></thead><tbody>";
 
 		$i=0;
 
@@ -1005,7 +1005,7 @@ function team($tid)
 		$table_totals=$table_totals."</tfoot></table>";
 
 		$table_averages=$table_averages."<table align=\"center\" class=\"sortable\">
-			<thead><tr bgcolor=$color1><th><font color=$color2>Pos</font></th><td colspan=3><font color=$color2>Player</font></th><th><font color=$color2>g</font></th><th><font color=$color2>gs</font></th><th><font color=$color2>min</font></th><th><font color=$color2>fgp</font></th><th><font color=$color2>ftp</font></th><th><font color=$color2>3gp</font></th><th><font color=$color2>orb</font></th><th><font color=$color2>reb</font></th><th><font color=$color2>ast</font></th><th><font color=$color2>stl</font></th><th><font color=$color2>to</font></th><th><font color=$color2>blk</font></th><th><font color=$color2>pf</font></th><th><font color=$color2>pts</font></th></th></tr></thead><tbody>";
+			<thead><tr bgcolor=$color1><th><font color=$color2>Pos</font></th><th colspan=3><font color=$color2>Player</font></th><th><font color=$color2>g</font></th><th><font color=$color2>gs</font></th><th><font color=$color2>min</font></th><th><font color=$color2>fgp</font></th><th><font color=$color2>ftp</font></th><th><font color=$color2>3gp</font></th><th><font color=$color2>orb</font></th><th><font color=$color2>reb</font></th><th><font color=$color2>ast</font></th><th><font color=$color2>stl</font></th><th><font color=$color2>to</font></th><th><font color=$color2>blk</font></th><th><font color=$color2>pf</font></th><th><font color=$color2>pts</font></th></th></tr></thead><tbody>";
 
 		/* =======================AVERAGES */
 
@@ -1349,7 +1349,7 @@ function team($tid)
 			$max_chunk_result=mysql_query($max_chunk_query);
 			$row = mysql_fetch_assoc($max_chunk_result);
 
-			$table_chunk=$table_chunk."<tr bgcolor=$color1><th><font color=$color2>Pos</font></th><td colspan=3><font color=$color2>Player</font></th><th><font color=$color2>g</font></th><th><font color=$color2>gs</font></th><th><font color=$color2>min</font></th><th><font color=$color2>fgp</font></th><th><font color=$color2>ftp</font></th><th><font color=$color2>3gp</font></th><th><font color=$color2>orb</font></th><th><font color=$color2>reb</font></th><th><font color=$color2>ast</font></th><th><font color=$color2>stl</font></th><th><font color=$color2>to</font></th><th><font color=$color2>blk</font></th><th><font color=$color2>pf</font></th><th><font color=$color2>pts</font></th></tr></thead><tbody>";
+			$table_chunk=$table_chunk."<tr bgcolor=$color1><th><font color=$color2>Pos</font></th><th colspan=3><font color=$color2>Player</font></th><th><font color=$color2>g</font></th><th><font color=$color2>gs</font></th><th><font color=$color2>min</font></th><th><font color=$color2>fgp</font></th><th><font color=$color2>ftp</font></th><th><font color=$color2>3gp</font></th><th><font color=$color2>orb</font></th><th><font color=$color2>reb</font></th><th><font color=$color2>ast</font></th><th><font color=$color2>stl</font></th><th><font color=$color2>to</font></th><th><font color=$color2>blk</font></th><th><font color=$color2>pf</font></th><th><font color=$color2>pts</font></th></tr></thead><tbody>";
 
 			$query_chunk="SELECT * FROM nuke_iblplyr_chunk WHERE chunk = $row[maxchunk] AND tid = $tid AND Season = '$current_ibl_season' ORDER BY ordinal ASC";
 			$result_chunk=mysql_query($query_chunk);
@@ -1431,7 +1431,7 @@ function team($tid)
 
 	if ($yr == "") {
 		$table_contracts=$table_contracts."<table align=\"center\" class=\"sortable\">
-			<thead><tr bgcolor=$color1><th><font color=$color2>Pos</font></th><td colspan=3><font color=$color2>Player</font></th><th><font color=$color2>Bird</font></th><th><font color=$color2>Year1</font></th><th><font color=$color2>Year2</font></th><th><font color=$color2>Year3</font></th><th><font color=$color2>Year4</font></th><th><font color=$color2>Year5</font></th><th><font color=$color2>Year6</font></th><td bgcolor=#000000 width=3></th><th><font color=$color2>Talent</font></th><th><font color=$color2>Skill</font></th><th><font color=$color2>Intang</font></th><th><font color=$color2>Clutch</font></th><th><font color=$color2>Consistency</font></th></tr></thead><tbody>";
+			<thead><tr bgcolor=$color1><th><font color=$color2>Pos</font></th><th colspan=3><font color=$color2>Player</font></th><th><font color=$color2>Bird</font></th><th><font color=$color2>Year1</font></th><th><font color=$color2>Year2</font></th><th><font color=$color2>Year3</font></th><th><font color=$color2>Year4</font></th><th><font color=$color2>Year5</font></th><th><font color=$color2>Year6</font></th><td bgcolor=#000000 width=3></th><th><font color=$color2>Talent</font></th><th><font color=$color2>Skill</font></th><th><font color=$color2>Intang</font></th><th><font color=$color2>Clutch</font></th><th><font color=$color2>Consistency</font></th></tr></thead><tbody>";
 
 		/* =======================CONTRACTS ET AL */
 

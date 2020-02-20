@@ -120,7 +120,8 @@ SET iblhoops_iblv2forums.forum_stats.ast_pid = (SELECT pid FROM iblhoops_ibl5.nu
 	$i++;
 }
 
-function record ($tid) {
+function record($tid)
+{
 	$query = "SELECT * FROM IBL_Schedule WHERE (Visitor = $tid OR Home = $tid) AND BoxID > 0 ORDER BY Date ASC";
 	$result = mysql_query($query);
 	$num = mysql_numrows($result);
@@ -165,7 +166,8 @@ function record ($tid) {
 	return array($wins, $losses, $gb, $homewin, $homeloss, $visitorwin, $visitorloss);
 }
 
-function last ($tid) {
+function last($tid)
+{
 	$query = "SELECT * FROM IBL_Schedule WHERE (Visitor = $tid OR Home = $tid) AND BoxID > 0 ORDER BY Date DESC limit 10";
 	$result = mysql_query($query);
 	$num = mysql_numrows($result);
@@ -200,7 +202,8 @@ function last ($tid) {
 }
 
 
-function ranking ($tid, $wins, $losses) {
+function ranking($tid, $wins, $losses)
+{
 	$query = "SELECT * FROM IBL_Schedule WHERE Visitor = $tid AND BoxID > 0 ORDER BY Date ASC";
 	$result = mysql_query($query);
 	$num = mysql_numrows($result);

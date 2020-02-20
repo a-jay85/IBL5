@@ -44,13 +44,15 @@ while ($i < $num) {
 	$query6 = "UPDATE ibl_team_history SET sim_depth = 'No Depth Chart'";
 	$result6 = mysql_query($query6);
 
-
+	// Update teams' total wins in ibl_team_history by summing up a team's wins in nuke_iblteam_win_loss
 	$query8 = "UPDATE ibl_team_history a SET totwins = (SELECT SUM(b.wins) FROM nuke_iblteam_win_loss AS b WHERE a.team_name = b.currentname)";
 	$result8 = mysql_query($query8);
 
+	// Update teams' total losses in ibl_team_history by summing up a team's losses in nuke_iblteam_win_loss
 	$query9 = "UPDATE ibl_team_history a SET totloss = (SELECT SUM(b.losses) FROM nuke_iblteam_win_loss AS b WHERE a.team_name = b.currentname)";
 	$result9 = mysql_query($query9);
 
+	// Update teams' win percentage in ibl_team_history
 	$query10 = "UPDATE ibl_team_history a SET winpct = a.totwins / (a.totwins + a.totloss)";
 	$result10 = mysql_query($query10);
 
@@ -158,7 +160,7 @@ function record ($tid) {
 		}
 		$i++;
 	}
-	$gb = ($wins/2)-($losses/2);
+	$gb = ($wins / 2) - ($losses / 2);
 
 	return array($wins, $losses, $gb, $homewin, $homeloss, $visitorwin, $visitorloss);
 }

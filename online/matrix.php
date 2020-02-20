@@ -17,55 +17,50 @@ Use this locator to see exactly who has your draft pick.
 
 $i=0;
 
-while ($i < $num)
-{
-$teamid=mysql_result($result,$i,"teamid");
-$team_city=mysql_result($result,$i,"team_city");
-$team_name=mysql_result($result,$i,"team_name");
-$color1=mysql_result($result,$i,"color1");
-$color2=mysql_result($result,$i,"color2");
+while ($i < $num) {
+    $teamid=mysql_result($result,$i,"teamid");
+    $team_city=mysql_result($result,$i,"team_city");
+    $team_name=mysql_result($result,$i,"team_name");
+    $color1=mysql_result($result,$i,"color1");
+    $color2=mysql_result($result,$i,"color2");
 
-$j=0;
-$k=0;
+    $j=0;
+    $k=0;
 
-$query2="SELECT * FROM ibl_draft_picks WHERE teampick = '$team_name' ORDER BY year, round ASC";
-$result2=mysql_query($query2);
-$num2=mysql_numrows($result2);
+    $query2="SELECT * FROM ibl_draft_picks WHERE teampick = '$team_name' ORDER BY year, round ASC";
+    $result2=mysql_query($query2);
+    $num2=mysql_numrows($result2);
 
-echo "<TR><TD bgcolor=#$color1><CENTER><a href=\"../modules.php?name=Team&op=team&tid=$teamid\"><font color=#$color2>$team_city $team_name</font></a></CENTER></TD>";
+    echo "<TR><TD bgcolor=#$color1><CENTER><a href=\"../modules.php?name=Team&op=team&tid=$teamid\"><font color=#$color2>$team_city $team_name</font></a></CENTER></TD>";
 
-while ($j < $num2)
-{
+    while ($j < $num2) {
 
-$ownerofpick=mysql_result($result2,$j,"ownerofpick");
-$year=mysql_result($result2,$j,"year");
-$round=mysql_result($result2,$j,"round");
+        $ownerofpick=mysql_result($result2,$j,"ownerofpick");
+        $year=mysql_result($result2,$j,"year");
+        $round=mysql_result($result2,$j,"round");
 
-if ($round==1)
-{
-if ($k==1)
-{
-echo "<TD bgcolor=#cccccc><center>$ownerofpick</center></TD>";
-} else {
-echo "<TD bgcolor=#cccccc><center>$ownerofpick</center></TD>";
-}
+        if ($round==1) {
+            if ($k==1) {
+                echo "<TD bgcolor=#cccccc><center>$ownerofpick</center></TD>";
+            } else {
+                echo "<TD bgcolor=#cccccc><center>$ownerofpick</center></TD>";
+            }
 
-if ($ownerofpick==$team_name)
-{
-$k=0;
-} else {
-$k=1;
-}
-} else {
-echo "<TD><center>$ownerofpick</center></TD>";
-}
+            if ($ownerofpick==$team_name) {
+                $k=0;
+            } else {
+                $k=1;
+            }
+        } else {
+            echo "<TD><center>$ownerofpick</center></TD>";
+        }
 
-$j=$j+1;
-}
+        $j=$j+1;
+    }
 
-echo "</TR>
-";
-$i=$i+1;
+    echo "</TR>
+    ";
+    $i=$i+1;
 }
 
 echo "</TABLE></HTML>";

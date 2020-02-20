@@ -139,7 +139,7 @@ function record($tid)
 		$HScore = mysql_result($result, $i, "HScore");
 
 		//Next line accounts for tied games and does nothing when it happens.
-		if ($VScore === $HScore) {} else {
+		if ($VScore !== $HScore) {
 			if ($tid == $visitor) {
 				if ($VScore > $HScore) {
 					$wins = $wins + 1;
@@ -181,11 +181,11 @@ function last($tid)
 		$HScore = mysql_result($result, $i, "HScore");
 
 		//Next line accounts for tied games and does nothing when it happens.
-		if ($VScore === $HScore) {} else {
+		if ($VScore !== $HScore) {
 			if ($tid == $visitor) {
 				if ($VScore > $HScore) {
 					$lastwins = $lastwins+1;
-				}else{
+				} else {
 					$lastlosses = $lastlosses+1;
 				}
 			} else {
@@ -222,11 +222,11 @@ function ranking($tid, $wins, $losses)
 		$opploss = mysql_result($result2, 0, "loss");
 
 		//Next line accounts for tied games and does nothing when it happens.
-		if ($VScore === $HScore) {} else {
+		if ($VScore !== $HScore) {
 			if ($VScore > $HScore) {
-				$winpoints = $winpoints+$oppwins;
+				$winpoints = $winpoints + $oppwins;
 			} else {
-				$losspoints = $losspoints+$opploss;
+				$losspoints = $losspoints + $opploss;
 			}
 		}
 		$i++;
@@ -248,7 +248,7 @@ function ranking($tid, $wins, $losses)
 		$opploss = mysql_result($result2,0,"loss");
 
 		//Next line accounts for tied games and does nothing when it happens.
-		if ($VScore === $HScore) {} else {
+		if ($VScore !== $HScore) {
 			if ($VScore > $HScore) {
 				$losspoints = $losspoints + $opploss;
 			} else {

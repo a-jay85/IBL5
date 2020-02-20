@@ -8,6 +8,8 @@ $query="SELECT * FROM nuke_ibl_team_info WHERE teamid != 35 ORDER BY teamid ASC"
 $result=mysql_query($query);
 $num=mysql_numrows($result);
 
+$seasonYear = mysql_result(mysql_query("SELECT value FROM nuke_ibl_settings WHERE name = 'Current IBL Season Ending Year'"), 0);
+
 echo "<HTML><HEAD><TITLE>Draft Pick Matrix</TITLE></HEAD>
     <BODY>
         <CENTER>
@@ -15,21 +17,21 @@ echo "<HTML><HEAD><TITLE>Draft Pick Matrix</TITLE></HEAD>
             Use this locator to see exactly who has your draft pick.
             <TABLE BORDER=1>
                 <TR>
-                    <TD ROWSPAN=2><CENTER>Team City <br>and Name</CENTER></TD>
-                    <TD COLSPAN=2><CENTER>This Season</CENTER></TD>
-                    <TD COLSPAN=2><CENTER>Next Season</CENTER></TD>
-                    <TD COLSPAN=2><CENTER>Two Seasons Out</CENTER></TD>
-                    <TD COLSPAN=2><CENTER>Three Seasons Out</CENTER></TD>
+                    <TD ROWSPAN=2><CENTER>Team</CENTER></TD>
+                    <TD COLSPAN=2><CENTER>$seasonYear</CENTER></TD>
+                    <TD COLSPAN=2><CENTER>".($seasonYear+1)."</CENTER></TD>
+                    <TD COLSPAN=2><CENTER>".($seasonYear+2)."</CENTER></TD>
+                    <TD COLSPAN=2><CENTER>".($seasonYear+3)."</CENTER></TD>
                 </TR>
                 <TR>
-                    <TD bgcolor=#FFFFFF><CENTER>Rd 1</CENTER></TD>
-                    <TD><CENTER>Rd 2</CENTER></TD>
-                    <TD bgcolor=#FFFFFF><CENTER>Rd 1</CENTER></TD>
-                    <TD><CENTER>Rd 2</CENTER></TD>
-                    <TD bgcolor=#FFFFFF><CENTER>Rd 1</CENTER></TD>
-                    <TD><CENTER>Rd 2</CENTER></TD>
-                    <TD bgcolor=#FFFFFF><CENTER>Rd 1</CENTER></TD>
-                    <TD><CENTER>Rd 2</CENTER></TD>
+                    <TD><CENTER>Round 1</CENTER></TD>
+                    <TD><CENTER>Round 2</CENTER></TD>
+                    <TD><CENTER>Round 1</CENTER></TD>
+                    <TD><CENTER>Round 2</CENTER></TD>
+                    <TD><CENTER>Round 1</CENTER></TD>
+                    <TD><CENTER>Round 2</CENTER></TD>
+                    <TD><CENTER>Round 1</CENTER></TD>
+                    <TD><CENTER>Round 2</CENTER></TD>
                 </TR>
 ";
 

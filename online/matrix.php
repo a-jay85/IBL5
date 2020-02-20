@@ -8,12 +8,30 @@ $query="SELECT * FROM nuke_ibl_team_info ORDER BY teamid ASC";
 $result=mysql_query($query);
 $num=mysql_numrows($result);
 
-echo "<HTML><HEAD><TITLE>Draft Pick Matrix</TITLE></HEAD><BODY>
-<CENTER><H2>Dude, Where's My Pick?</H2>
-Use this locator to see exactly who has your draft pick.
-<TABLE BORDER=1><TR><TD ROWSPAN=2><CENTER>Team City <br>and Name</CENTER></TD><TD COLSPAN=2><CENTER>This Season</CENTER></TD><TD COLSPAN=2><CENTER>Next Season</CENTER></TD><TD COLSPAN=2><CENTER>Two Seasons Out</CENTER></TD></TR>
-<TR><TD bgcolor=#cccccc><CENTER>Rd 1</CENTER></TD><TD><CENTER>Rd 2</CENTER></TD><TD bgcolor=#cccccc><CENTER>Rd 1</CENTER></TD><TD><CENTER>Rd 2</CENTER></TD><TD bgcolor=#cccccc><CENTER>Rd 1</CENTER></TD><TD><CENTER>Rd 2</CENTER></TD></TR>
-</CENTER>";
+echo "<HTML><HEAD><TITLE>Draft Pick Matrix</TITLE></HEAD>
+    <BODY>
+        <CENTER>
+            <H2>Dude, Where's My Pick?</H2>
+            Use this locator to see exactly who has your draft pick.
+            <TABLE BORDER=1>
+                <TR>
+                    <TD ROWSPAN=2><CENTER>Team City <br>and Name</CENTER></TD>
+                    <TD COLSPAN=2><CENTER>This Season</CENTER></TD>
+                    <TD COLSPAN=2><CENTER>Next Season</CENTER></TD>
+                    <TD COLSPAN=2><CENTER>Two Seasons Out</CENTER></TD>
+                    <TD COLSPAN=2><CENTER>Three Seasons Out</CENTER></TD>
+                </TR>
+                <TR>
+                    <TD bgcolor=#FFFFFF><CENTER>Rd 1</CENTER></TD>
+                    <TD><CENTER>Rd 2</CENTER></TD>
+                    <TD bgcolor=#FFFFFF><CENTER>Rd 1</CENTER></TD>
+                    <TD><CENTER>Rd 2</CENTER></TD>
+                    <TD bgcolor=#FFFFFF><CENTER>Rd 1</CENTER></TD>
+                    <TD><CENTER>Rd 2</CENTER></TD>
+                    <TD bgcolor=#FFFFFF><CENTER>Rd 1</CENTER></TD>
+                    <TD><CENTER>Rd 2</CENTER></TD>
+                </TR>
+";
 
 $i=0;
 
@@ -39,31 +57,21 @@ while ($i < $num) {
         $year=mysql_result($result2,$j,"year");
         $round=mysql_result($result2,$j,"round");
 
-        if ($round==1) {
-            if ($k==1) {
-                echo "<TD bgcolor=#cccccc><center>$ownerofpick</center></TD>";
-            } else {
-                echo "<TD bgcolor=#cccccc><center>$ownerofpick</center></TD>";
-            }
-
-            if ($ownerofpick==$team_name) {
-                $k=0;
-            } else {
-                $k=1;
-            }
+        if ($ownerofpick != $team_name) {
+            echo "<TD bgcolor=#FF0000><center>$ownerofpick</center></TD>";
         } else {
-            echo "<TD><center>$ownerofpick</center></TD>";
+            echo "<TD bgcolor=#cccccc><center>$ownerofpick</center></TD>";
         }
 
-        $j=$j+1;
+        $j++;
     }
 
     echo "</TR>
     ";
-    $i=$i+1;
+    $i++;
 }
 
-echo "</TABLE></HTML>";
+echo "</TABLE></CENTER></HTML>";
 
 mysql_close();
 

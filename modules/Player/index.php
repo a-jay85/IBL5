@@ -2567,7 +2567,7 @@ if ($spec == 0) {
     $currentSeasonEndingYear = mysql_result(mysql_query("SELECT value FROM nuke_ibl_settings WHERE name = 'Current IBL Season Ending Year'"),0);
     $currentSeasonStaringYear = $currentSeasonEndingYear-1;
 
-    $query="SELECT * FROM IBL_Box_Scores WHERE Date BETWEEN '$currentSeasonStaringYear-11-01' AND '$currentSeasonEndingYear-04-01' AND pid = $pid ORDER BY Date ASC";
+    $query="SELECT * FROM ibl_box_scores WHERE Date BETWEEN '$currentSeasonStaringYear-11-01' AND '$currentSeasonEndingYear-04-01' AND pid = $pid ORDER BY Date ASC";
     $result=mysql_query($query);
     $num=mysql_numrows($result);
 

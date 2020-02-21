@@ -10,7 +10,7 @@ $queryCurrentSimYear = mysql_query($stringCurrentSimYear);
 $scoFile = fopen("IBL5.sco", "rb");
 fseek($scoFile,1030000);
 
-if (mysql_query('TRUNCATE TABLE IBL_Box_Scores')) echo 'TRUNCATE TABLE IBL_Box_Scores<p>';
+if (mysql_query('TRUNCATE TABLE ibl_box_scores')) echo 'TRUNCATE TABLE ibl_box_scores<p>';
 
 while (!feof($scoFile)) {
     $CurrentSimYear = mysql_result($queryCurrentSimYear, 0);
@@ -58,7 +58,7 @@ while (!feof($scoFile)) {
         $gameBLK = substr($line,107+$x,2);
         $gamePF = substr($line,109+$x,2);
 
-        $entryUpdateQuery = "INSERT INTO IBL_Box_Scores (
+        $entryUpdateQuery = "INSERT INTO ibl_box_scores (
             Date,
             name,
             pos,
@@ -111,7 +111,7 @@ while (!feof($scoFile)) {
     }
 }
 
-$newChunkEndDate = mysql_result(mysql_query('SELECT Date FROM IBL_Box_Scores ORDER BY Date DESC LIMIT 1'),0);
+$newChunkEndDate = mysql_result(mysql_query('SELECT Date FROM ibl_box_scores ORDER BY Date DESC LIMIT 1'),0);
 $lastChunkStartDate = mysql_result(mysql_query("SELECT value FROM nuke_ibl_settings WHERE name='Chunk Start Date' LIMIT 1;"),0);
 $lastChunkEndDate = mysql_result(mysql_query("SELECT value FROM nuke_ibl_settings WHERE name='Chunk End Date' LIMIT 1;"),0);
 

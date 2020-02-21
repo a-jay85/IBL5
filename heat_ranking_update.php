@@ -88,7 +88,7 @@ SET iblhoops_iblv2forums.forum_stats.ast_pid= (SELECT pid FROM iblhoops_ibl5.nuk
 }
 
 function record ($tid) {
-	$query="SELECT * FROM IBL_Schedule WHERE (Visitor = $tid OR Home = $tid) AND BoxID > 0 ORDER BY Date ASC";
+	$query="SELECT * FROM ibl_schedule WHERE (Visitor = $tid OR Home = $tid) AND BoxID > 0 ORDER BY Date ASC";
 	$result=mysql_query($query);
 	$num=mysql_numrows($result);
 	$wins=0;
@@ -132,7 +132,7 @@ function record ($tid) {
 }
 
 function last ($tid) {
-	$query="SELECT * FROM IBL_Schedule WHERE (Visitor = $tid OR Home = $tid) AND BoxID > 0 ORDER BY Date DESC limit 10";
+	$query="SELECT * FROM ibl_schedule WHERE (Visitor = $tid OR Home = $tid) AND BoxID > 0 ORDER BY Date DESC limit 10";
 	$result=mysql_query($query);
 	$num=mysql_numrows($result);
 	$lastwins=0;
@@ -164,7 +164,7 @@ function last ($tid) {
 
 
 function ranking ($tid, $wins, $losses) {
-	$query="SELECT * FROM IBL_Schedule WHERE Visitor = $tid AND BoxID > 0 ORDER BY Date ASC";
+	$query="SELECT * FROM ibl_schedule WHERE Visitor = $tid AND BoxID > 0 ORDER BY Date ASC";
 	$result=mysql_query($query);
 	$num=mysql_numrows($result);
 	$winpoints=0;
@@ -189,7 +189,7 @@ function ranking ($tid, $wins, $losses) {
 		$i++;
 	}
 
-	$query="SELECT * FROM IBL_Schedule WHERE Home = $tid AND BoxID > 0 ORDER BY Date ASC";
+	$query="SELECT * FROM ibl_schedule WHERE Home = $tid AND BoxID > 0 ORDER BY Date ASC";
 	$result=mysql_query($query);
 	$num=mysql_numrows($result);
 	$i = 0;

@@ -5,7 +5,7 @@ error_reporting(E_ALL & ~E_NOTICE);
 libxml_use_internal_errors(true);
 
 //*****************************************************************************
-//*** IBL_SCHEDULE DB UPDATE
+//*** ibl_schedule DB UPDATE
 //*****************************************************************************
 //This section automates the following steps from Gates' simming instructions:
 //#8.) From the IBL HTML, open "Schedule.htm" IN INTERNET EXPLORER. Select the entire content of this page and copy it. Then paste into A1 of the "Schedule" tab.
@@ -65,8 +65,8 @@ function groupingSort($region)
 	return array ($grouping, $groupingGB, $groupingMagicNumber);
 }
 
-echo 'Updating the IBL_Schedule database table...<p>';
-if (mysql_query('TRUNCATE TABLE IBL_Schedule')) echo 'TRUNCATE TABLE IBL_Schedule<p>';
+echo 'Updating the ibl_schedule database table...<p>';
+if (mysql_query('TRUNCATE TABLE ibl_schedule')) echo 'TRUNCATE TABLE ibl_schedule<p>';
 
 foreach ($rows as $row) {
 	$checkThirdCell = $row->childNodes->item(2)->nodeValue;
@@ -108,7 +108,7 @@ foreach ($rows as $row) {
 		$homeTID = mysql_result(mysql_query("SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '".$homeName."';"),0);
 	}
 
-	$sqlQueryString = "INSERT INTO IBL_Schedule (
+	$sqlQueryString = "INSERT INTO ibl_schedule (
 		Year,
 		BoxID,
 		Date,
@@ -149,7 +149,7 @@ unset($visitorName,
 	$visitorName,
 	$homeTID,
 	$visitorTID);
-echo 'IBL_Schedule database table has been updated.<p>';
+echo 'ibl_schedule database table has been updated.<p>';
 
 // TODO:
 // Standings variables to derive from Schedule: last 10, streak
@@ -360,7 +360,7 @@ updateMagicNumbers('Midwest');
 updateMagicNumbers('Pacific');
 echo '<p>Magic numbers for all teams have been updated.<p>';
 
-echo '<p>The IBL_Schedule and IBL_Standings table have been updated.<p>';
+echo '<p>The ibl_schedule and IBL_Standings table have been updated.<p>';
 
 //*****************************************************************************
 //*** STANDINGS PAGE UPDATE

@@ -470,7 +470,7 @@ function schedule($tid)
 //DISPLAY TOP MENU
 //=============================
 	displaytopmenu($tid);
-	$query="SELECT * FROM `IBL_Schedule` WHERE Visitor = $tid OR Home = $tid ORDER BY Date ASC";
+	$query="SELECT * FROM `ibl_schedule` WHERE Visitor = $tid OR Home = $tid ORDER BY Date ASC";
 	$result=mysql_query($query);
 	$num=mysql_numrows($result);
 	$year=mysql_result($result,0,"Year");
@@ -510,7 +510,7 @@ function schedule($tid)
 
 function boxscore ($year, $month, $tid, $wins, $losses, $wstreak, $lstreak)
 {
-	$query="SELECT * FROM `IBL_Schedule` WHERE (Visitor = $tid AND Date BETWEEN '$year-$month-01' AND '$year-$month-31') OR (Home = $tid AND Date BETWEEN '$year-$month-01' AND '$year-$month-31') ORDER BY Date ASC";
+	$query="SELECT * FROM `ibl_schedule` WHERE (Visitor = $tid AND Date BETWEEN '$year-$month-01' AND '$year-$month-31') OR (Home = $tid AND Date BETWEEN '$year-$month-01' AND '$year-$month-31') ORDER BY Date ASC";
 	$result=mysql_query($query);
 	$num=mysql_numrows($result);
 	$i = 0;

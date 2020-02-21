@@ -49,8 +49,8 @@ function boxIDextract($boxHREF) {
 	return $boxID;
 }
 
-echo 'Updating IBL_Schedule database table...'
-mysql_query('TRUNCATE TABLE IBL_Schedule');
+echo 'Updating ibl_schedule database table...'
+mysql_query('TRUNCATE TABLE ibl_schedule');
 
 foreach ($rows as $row) {
 	$checkSecondCell = $row->childNodes->item(1)->nodeValue;
@@ -93,7 +93,7 @@ foreach ($rows as $row) {
 		$homeTID = mysql_result(mysql_query("SELECT teamid FROM ibl_team_history WHERE team_name = '".$homeName."';"),0);
 	}
 
-	$sqlQueryString = "INSERT INTO IBL_Schedule (Year,BoxID,Date,Visitor,Vscore,Home,Hscore)
+	$sqlQueryString = "INSERT INTO ibl_schedule (Year,BoxID,Date,Visitor,Vscore,Home,Hscore)
 		VALUES (".$year.",".$boxID.",'".$date."','".$visitorTID."',".$vScore.",'".$homeTID."',".$hScore.")
 
 		ON DUPLICATE KEY UPDATE

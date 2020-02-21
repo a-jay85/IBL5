@@ -11,8 +11,11 @@ $Player_Name = $_POST['playername'];
 $Player_Pos = $_POST['playerpos'];
 $Pos = $_POST['pos'];
 
+$acceptablePositions = array('PG', 'G', 'SG', 'GF', 'SF', 'F', 'PF', 'FC', 'C');
 
-echo "Message from the commissioner's office: <font color=#0000cc>Your position change has been submitted and approved. $Player_Name is now a $Pos. </font></br>";
+if (in_array($Pos, $acceptablePositions)) {
+echo "Message from the commissioner's office:<br><font color=#0000cc>Your position change has been submitted and approved. $Player_Name is now a $Pos.</font></br>";
+echo "<a href=\"javascript:history.go(-1)\">GO BACK</a>";
 
 $timestamp=date('Y-m-d H:i:s',time());
 
@@ -49,6 +52,9 @@ $resultseason1=mysql_query($queryseason1);
 
 $queryseason2="UPDATE nuke_iblplyr SET poschange = '1' WHERE name = '$Player_Name'";
 $resultseason2=mysql_query($queryseason2);
-
+} else {
+    echo "Message from the commissioner's office: <font color=#FF0000>Your position change has been DECLINED: that was not a valid position.</font><p>";
+    echo "<a href=\"javascript:history.go(-1)\">GO BACK</a>";
+}
 
 ?>

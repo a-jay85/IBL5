@@ -19,11 +19,11 @@ if (!in_array($playerNewPosition, $acceptablePositions)) {
 } else {
     // ==== UPDATE NUMBER OF POSITION CHANGES USED AND ALT POSITION IN DATABASE ====
 
-    $queryseason = "UPDATE nuke_ibl_team_info SET poschanges = poschanges + 1 WHERE team_name = '$teamName'";
-    $queryseason1 = "UPDATE nuke_iblplyr SET altpos = '$playerNewPosition' WHERE name = '$playerName'";
-    $queryseason2 = "UPDATE nuke_iblplyr SET poschange = '1' WHERE name = '$playerName'";
+    $querySetNewPlayerPosition = "UPDATE nuke_iblplyr SET altpos = '$playerNewPosition' WHERE name = '$playerName'";
+    $queryIncrementTeamPositionChanges = "UPDATE nuke_ibl_team_info SET poschanges = poschanges + 1 WHERE team_name = '$teamName'";
+    $queryIncrementPlayerPositionChanges = "UPDATE nuke_iblplyr SET poschange = '1' WHERE name = '$playerName'";
 
-    if (mysql_query($queryseason) AND mysql_query($queryseason1) AND mysql_query($queryseason2)) {
+    if (mysql_query($querySetNewPlayerPosition) AND mysql_query($queryIncrementTeamPositionChanges) AND mysql_query($queryIncrementPlayerPositionChanges)) {
         // ==== PUT ANNOUNCEMENT INTO DATABASE ON NEWS PAGE
 
         $querycat = "SELECT * FROM nuke_stories_cat WHERE title = 'Position Changes'";

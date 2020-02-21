@@ -25,12 +25,12 @@ $pagetitle = "- $module_name";
 include("header.php");
 OpenTable();
 
-$min_date_query="SELECT MIN(Date) as mindate FROM IBL_Schedule";
+$min_date_query="SELECT MIN(Date) as mindate FROM ibl_schedule";
 $min_date_result=mysql_query($min_date_query);
 $row = mysql_fetch_assoc($min_date_result);
 $min_date=$row[mindate];
 
-$max_date_query="SELECT MAX(Date) as maxdate FROM IBL_Schedule";
+$max_date_query="SELECT MAX(Date) as maxdate FROM ibl_schedule";
 $max_date_result=mysql_query($max_date_query);
 $row2 = mysql_fetch_assoc($max_date_result);
 $max_date=$row2[maxdate];
@@ -59,7 +59,7 @@ while ($chunk_start_date < $max_date)
 	include("footer.php");
 
 function chunk ($chunk_start_date, $chunk_end_date, $j) {
-	$query="SELECT * FROM IBL_Schedule WHERE Date BETWEEN '$chunk_start_date' AND '$chunk_end_date' ORDER BY SchedID ASC";
+	$query="SELECT * FROM ibl_schedule WHERE Date BETWEEN '$chunk_start_date' AND '$chunk_end_date' ORDER BY SchedID ASC";
 	$result=mysql_query($query);
 	$num=mysql_numrows($result);
 	$date_base=mysql_result($result,0,"Date");

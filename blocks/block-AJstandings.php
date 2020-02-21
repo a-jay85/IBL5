@@ -23,28 +23,28 @@ mysql_connect($dbhost,$dbuname,$dbpass) or die("Unable to connect");
 @mysql_select_db($dbname) or die("Unable to select database");
 
 /* DIVISIONAL STANDINGS
-$queryNLWest = "SELECT tid,team_name,leagueRecord,divGB FROM IBL_Standings WHERE division = 'NL West' ORDER BY divGB ASC";
+$queryNLWest = "SELECT tid,team_name,leagueRecord,divGB FROM ibl_standings WHERE division = 'NL West' ORDER BY divGB ASC";
 $resultNLWest = mysql_query($queryNLWest);
 $limitNLWest = mysql_num_rows($resultNLWest);
 
-$queryNLEast = "SELECT tid,team_name,leagueRecord,divGB FROM IBL_Standings WHERE division = 'NL East' ORDER BY divGB ASC";
+$queryNLEast = "SELECT tid,team_name,leagueRecord,divGB FROM ibl_standings WHERE division = 'NL East' ORDER BY divGB ASC";
 $resultNLEast = mysql_query($queryNLEast);
 $limitNLEast = mysql_num_rows($resultNLEast);
 
-$queryALWest = "SELECT tid,team_name,leagueRecord,divGB FROM IBL_Standings WHERE division = 'AL West' ORDER BY divGB ASC";
+$queryALWest = "SELECT tid,team_name,leagueRecord,divGB FROM ibl_standings WHERE division = 'AL West' ORDER BY divGB ASC";
 $resultALWest = mysql_query($queryALWest);
 $limitALWest = mysql_num_rows($resultALWest);
 
-$queryALEast = "SELECT tid,team_name,leagueRecord,divGB FROM IBL_Standings WHERE division = 'AL East' ORDER BY divGB ASC";
+$queryALEast = "SELECT tid,team_name,leagueRecord,divGB FROM ibl_standings WHERE division = 'AL East' ORDER BY divGB ASC";
 $resultALEast = mysql_query($queryALEast);
 $limitALEast = mysql_num_rows($resultALEast);
 */
 
-$queryEasternConference = "SELECT tid,team_name,leagueRecord,confGB FROM IBL_Standings WHERE conference = 'Eastern' ORDER BY confGB ASC";
+$queryEasternConference = "SELECT tid,team_name,leagueRecord,confGB FROM ibl_standings WHERE conference = 'Eastern' ORDER BY confGB ASC";
 $resultEasternConference = mysql_query($queryEasternConference);
 $limitEasternConference = mysql_num_rows($resultEasternConference);
 
-$queryWesternConference = "SELECT tid,team_name,leagueRecord,confGB FROM IBL_Standings WHERE conference = 'Western' ORDER BY confGB ASC";
+$queryWesternConference = "SELECT tid,team_name,leagueRecord,confGB FROM ibl_standings WHERE conference = 'Western' ORDER BY confGB ASC";
 $resultWesternConference = mysql_query($queryWesternConference);
 $limitWesternConference = mysql_num_rows($resultWesternConference);
 

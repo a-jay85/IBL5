@@ -58,7 +58,7 @@ $pagetitle = "- $module_name";
 	include("footer.php");
 
 function record ($tid) {
-	$query="SELECT * FROM IBL_Schedule WHERE (Visitor = $tid OR Home = $tid) AND BoxID > 0 ORDER BY Date ASC";
+	$query="SELECT * FROM ibl_schedule WHERE (Visitor = $tid OR Home = $tid) AND BoxID > 0 ORDER BY Date ASC";
 	$result=mysql_query($query);
 	$num=mysql_numrows($result);
 	$wins=0;
@@ -97,7 +97,7 @@ function record ($tid) {
 
 function chunks ()
 {
-	$max_chunk_query="SELECT MIN(date) as date FROM IBL_Schedule";
+	$max_chunk_query="SELECT MIN(date) as date FROM ibl_schedule";
 	$max_chunk_result=mysql_query($max_chunk_query);
 	$row = mysql_fetch_assoc($max_chunk_result);
 	$date=$row[date];

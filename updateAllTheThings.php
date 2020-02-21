@@ -156,10 +156,10 @@ echo 'ibl_schedule database table has been updated.<p>';
 // New variables: rival conf w/l, >.500 w/l, <.500 w/l
 
 //*****************************************************************************
-//*** IBL_STANDINGS DB UPDATE
+//*** ibl_standings DB UPDATE
 //*****************************************************************************
-//This section stores Standings values in a database table called 'IBL_Standings' so that they can be retrieved quickly.
-//The file 'block-AJstandings.php' relies on 'IBL_Standings' to automate the sidebar standings display.
+//This section stores Standings values in a database table called 'ibl_standings' so that they can be retrieved quickly.
+//The file 'block-AJstandings.php' relies on 'ibl_standings' to automate the sidebar standings display.
 
 $standingsFilePath = 'ibl/IBL/Standings.htm';
 
@@ -183,7 +183,7 @@ function extractLosses($var)
 	return $var;
 }
 
-echo '<p>Updating the IBL_Standings database table...<p>';
+echo '<p>Updating the ibl_standings database table...<p>';
 
 function extractStandingsValues($confVar,$divVar)
 {
@@ -213,7 +213,7 @@ function extractStandingsValues($confVar,$divVar)
 
 			$gamesUnplayed = 68 - $homeWins - $homeLosses - $awayWins - $awayLosses; // TODO: make number of games in season dynamic
 
-			$sqlQueryString = "INSERT INTO IBL_Standings (
+			$sqlQueryString = "INSERT INTO ibl_standings (
 				team_name,
 				leagueRecord,
 				pct,
@@ -289,7 +289,7 @@ function extractStandingsValues($confVar,$divVar)
 		if (!in_array($teamName, array("Atlantic", "Central", "Midwest", "Pacific", "team", ""))) {
 			$divGB = $row->childNodes->item(3)->nodeValue;
 
-			$sqlQueryString = "INSERT INTO IBL_Standings (
+			$sqlQueryString = "INSERT INTO ibl_standings (
 				team_name,
 				division,
 				divGB
@@ -316,7 +316,7 @@ function updateMagicNumbers ($region)
 	echo '<p>Updating the magic numbers for the '.$region.'...<br>';
 	list ($grouping,$groupingGB,$groupingMagicNumber) = groupingSort($region);
 
-	$query = "SELECT team_name,homeWins,homeLosses,awayWins,awayLosses FROM IBL_Standings WHERE ".$grouping." = '".$region."' ORDER BY pct DESC";
+	$query = "SELECT team_name,homeWins,homeLosses,awayWins,awayLosses FROM ibl_standings WHERE ".$grouping." = '".$region."' ORDER BY pct DESC";
 	$result = mysql_query($query);
 	$limit = mysql_num_rows($result);
 
@@ -331,7 +331,7 @@ function updateMagicNumbers ($region)
 		}
 		$magicNumber = 68 + 1 - $teamTotalWins - $belowTeamTotalLosses;
 
-		$sqlQueryString = "INSERT INTO IBL_Standings (
+		$sqlQueryString = "INSERT INTO ibl_standings (
 			team_name,
 			".$groupingMagicNumber."
 		)
@@ -360,7 +360,7 @@ updateMagicNumbers('Midwest');
 updateMagicNumbers('Pacific');
 echo '<p>Magic numbers for all teams have been updated.<p>';
 
-echo '<p>The ibl_schedule and IBL_Standings table have been updated.<p>';
+echo '<p>The ibl_schedule and ibl_standings table have been updated.<p>';
 
 //*****************************************************************************
 //*** STANDINGS PAGE UPDATE
@@ -382,7 +382,7 @@ function displayStandings($region)
 
 	list ($grouping,$groupingGB,$groupingMagicNumber) = groupingSort($region);
 
-	$query = "SELECT tid,team_name,leagueRecord,pct,".$groupingGB.",confRecord,divRecord,homeRecord,awayRecord,gamesUnplayed,".$groupingMagicNumber." FROM IBL_Standings WHERE ".$grouping." = '".$region."' ORDER BY ".$groupingGB." ASC";
+	$query = "SELECT tid,team_name,leagueRecord,pct,".$groupingGB.",confRecord,divRecord,homeRecord,awayRecord,gamesUnplayed,".$groupingMagicNumber." FROM ibl_standings WHERE ".$grouping." = '".$region."' ORDER BY ".$groupingGB." ASC";
 	$result = mysql_query($query);
 	$limit = mysql_num_rows($result);
 

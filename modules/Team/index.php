@@ -1511,7 +1511,7 @@ function team($tid)
 		// Begin hack to populate a MySQL table that has each team's current cap total.
 		// Calculating cap totals for the current season is dificult at the moment. - A-Jay
 			$currentCap = $cap1;
-			$capTotalQuery = "INSERT INTO IBL_Current_Cap (tid,currentCap) VALUES ('".$tid."','".$currentCap."') ON DUPLICATE KEY UPDATE currentCap='".$currentCap."'";
+			$capTotalQuery = "INSERT INTO ibl_current_cap (tid,currentCap) VALUES ('".$tid."','".$currentCap."') ON DUPLICATE KEY UPDATE currentCap='".$currentCap."'";
 			$capTotalQueryExec = mysql_query($capTotalQuery);
 		// End salary cap hack.
 

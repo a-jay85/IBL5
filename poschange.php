@@ -28,7 +28,7 @@ if (in_array($playerNewPosition, $acceptablePositions)) {
     $positionChanges=mysql_result($resultcat,0,"counter");
     $catid=mysql_result($resultcat,0,"catid");
 
-    $positionChanges=$positionChanges+1;
+    $positionChanges++;
 
     // ==== PUT ANNOUNCEMENT INTO DATABASE ON NEWS PAGE
 

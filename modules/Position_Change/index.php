@@ -175,7 +175,20 @@ function poschange($pid)
 						    <option value=\"PF\">PF</option>
 						    <option value=\"FC\">FC</option>
 						    </select></td></tr>";
-		    }
+		    } else {
+		        echo "<select name=\"pos\">
+						    <option value=\"\">Select...</option>
+						    <option value=\"PG\">PG</option>
+						    <option value=\"G\">G</option>
+						    <option value=\"SG\">SG</option>
+						    <option value=\"GF\">GF</option>
+						    <option value=\"SF\">SF</option>
+						    <option value=\"F\">F</option>
+						    <option value=\"PF\">PF</option>
+						    <option value=\"FC\">FC</option>
+						    <option value=\"C\">C</option>
+						    </select></td></tr>";
+			}
 
 		    echo "
 						</ul></td></tr>

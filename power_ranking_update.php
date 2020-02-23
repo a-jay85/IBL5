@@ -19,7 +19,48 @@ while ($i < $num) {
 	$Team = mysql_result($result, $i, "Team");
 
 	// Update nuke_ibl_power with each team's season win/loss info
-	list ($wins, $losses, $gb, $homewin, $homeloss, $visitorwin, $visitorloss) = record($tid);
+	$queryGames = "SELECT * FROM ibl_schedule WHERE (Visitor = $tid OR Home = $tid) AND BoxID > 0 ORDER BY Date ASC";
+	$resultGames = mysql_query($queryGames);
+	$numGames = mysql_numrows($resultGames);
+
+	$wins = 0;
+	$losses = 0;
+	$homewin = 0;
+	$homeloss = 0;
+	$visitorwin = 0;
+	$visitorloss = 0;
+
+	$j = 0;
+	while ($j < $numGames) {
+		$visitor = mysql_result($resultGames, $j, "Visitor");
+		$VScore = mysql_result($resultGames, $j, "VScore");
+		$home = mysql_result($resultGames, $j, "Home");
+		$HScore = mysql_result($resultGames, $j, "HScore");
+
+		if ($VScore !== $HScore) { // Ignore tied games since they're usually 0-0 games that haven't yet occurred
+			if ($tid == $visitor) {
+				if ($VScore > $HScore) {
+					$wins++;
+					$visitorwin++;
+
+				} else {
+					$losses++;
+					$visitorloss++;
+				}
+			} else {
+				if ($VScore > $HScore) {
+					$losses++;
+					$homeloss++;
+				} else {
+					$wins++;
+					$homewin++;
+				}
+			}
+		}
+		$j++;
+	}
+	$gb = ($wins / 2) - ($losses / 2);
+
 	$query3 = "UPDATE nuke_ibl_power SET
 		win = $wins,
 		loss = $losses,
@@ -127,53 +168,6 @@ SET iblhoops_iblv2forums.forum_stats.ast_pid = (SELECT pid FROM iblhoops_ibl5.nu
 	echo "Updating $Team wins $wins and losses $losses and ranking $ranking<br>";
 
 	$i++;
-}
-
-function record($tid)
-{
-	$queryGames = "SELECT * FROM ibl_schedule WHERE (Visitor = $tid OR Home = $tid) AND BoxID > 0 ORDER BY Date ASC";
-	$resultGames = mysql_query($queryGames);
-	$numGames = mysql_numrows($resultGames);
-
-	$wins = 0;
-	$losses = 0;
-	$homewin = 0;
-	$homeloss = 0;
-	$visitorwin = 0;
-	$visitorloss = 0;
-
-	$j = 0;
-	while ($j < $numGames) {
-		$visitor = mysql_result($resultGames, $j, "Visitor");
-		$VScore = mysql_result($resultGames, $j, "VScore");
-		$home = mysql_result($resultGames, $j, "Home");
-		$HScore = mysql_result($resultGames, $j, "HScore");
-
-		if ($VScore !== $HScore) { // Ignore tied games since they're usually 0-0 games that haven't yet occurred
-			if ($tid == $visitor) {
-				if ($VScore > $HScore) {
-					$wins++;
-					$visitorwin++;
-
-				} else {
-					$losses++;
-					$visitorloss++;
-				}
-			} else {
-				if ($VScore > $HScore) {
-					$losses++;
-					$homeloss++;
-				} else {
-					$wins++;
-					$homewin++;
-				}
-			}
-		}
-		$j++;
-	}
-	$gb = ($wins / 2) - ($losses / 2);
-
-	return array($wins, $losses, $gb, $homewin, $homeloss, $visitorwin, $visitorloss);
 }
 
 function last($tid)

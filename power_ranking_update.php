@@ -168,12 +168,12 @@ SET iblhoops_iblv2forums.forum_stats.pts_pid = (SELECT pid FROM iblhoops_ibl5.nu
 
 	// Update teams' forum info block with their leading rebounder's name
 	$query16 = "UPDATE iblhoops_iblv2forums.forum_stats, iblhoops_ibl5.nuke_iblplyr
-SET iblhoops_iblv2forums. forum_stats.reb_lead = (SELECT name FROM iblhoops_ibl5.nuke_iblplyr WHERE iblhoops_iblv2forums. forum_stats.teamname = iblhoops_ibl5.nuke_iblplyr.teamname order by (stats_orb+stats_drb)/stats_gm desc limit 1)";
+SET iblhoops_iblv2forums.forum_stats.reb_lead = (SELECT name FROM iblhoops_ibl5.nuke_iblplyr WHERE iblhoops_iblv2forums. forum_stats.teamname = iblhoops_ibl5.nuke_iblplyr.teamname order by (stats_orb+stats_drb)/stats_gm desc limit 1)";
 	$result16 = mysql_query($query16);
 
 	// Update teams' forum info block with their leading rebounder's average rebounds per game
 	$query17 = "UPDATE iblhoops_iblv2forums.forum_stats, iblhoops_ibl5.nuke_iblplyr
-SET iblhoops_iblv2forums. forum_stats.reb_num = (select round((stats_orb+stats_drb)/stats_gm, 1) FROM iblhoops_ibl5.nuke_iblplyr WHERE iblhoops_iblv2forums. forum_stats.teamname = iblhoops_ibl5.nuke_iblplyr.teamname order by (stats_orb+stats_drb)/stats_gm desc limit 1)";
+SET iblhoops_iblv2forums.forum_stats.reb_num = (select round((stats_orb+stats_drb)/stats_gm, 1) FROM iblhoops_ibl5.nuke_iblplyr WHERE iblhoops_iblv2forums. forum_stats.teamname = iblhoops_ibl5.nuke_iblplyr.teamname order by (stats_orb+stats_drb)/stats_gm desc limit 1)";
 	$result17 = mysql_query($query17);
 
 	// Update teams' forum info block with their leading rebounder's player id
@@ -184,12 +184,12 @@ SET iblhoops_iblv2forums.forum_stats.reb_pid = (SELECT pid from iblhoops_ibl5.nu
 
 	// Update teams' forum info block with their leading assister's name
 	$query20 = "UPDATE iblhoops_iblv2forums.forum_stats, iblhoops_ibl5.nuke_iblplyr
-SET iblhoops_iblv2forums. forum_stats.ast_lead = (SELECT name FROM iblhoops_ibl5.nuke_iblplyr WHERE iblhoops_iblv2forums. forum_stats.teamname = iblhoops_ibl5.nuke_iblplyr.teamname order by (stats_ast/stats_gm) desc limit 1)";
+SET iblhoops_iblv2forums.forum_stats.ast_lead = (SELECT name FROM iblhoops_ibl5.nuke_iblplyr WHERE iblhoops_iblv2forums. forum_stats.teamname = iblhoops_ibl5.nuke_iblplyr.teamname order by (stats_ast/stats_gm) desc limit 1)";
 	$result20 = mysql_query($query20);
 
 	// Update teams' forum info block with their leading assister's average assists per game
 	$query21 = "UPDATE iblhoops_iblv2forums.forum_stats, iblhoops_ibl5.nuke_iblplyr
-SET iblhoops_iblv2forums. forum_stats.ast_num = (select round((stats_ast)/stats_gm, 1) FROM iblhoops_ibl5.nuke_iblplyr WHERE iblhoops_iblv2forums. forum_stats.teamname = iblhoops_ibl5.nuke_iblplyr.teamname order by stats_ast/stats_gm desc limit 1)";
+SET iblhoops_iblv2forums.forum_stats.ast_num = (select round((stats_ast)/stats_gm, 1) FROM iblhoops_ibl5.nuke_iblplyr WHERE iblhoops_iblv2forums. forum_stats.teamname = iblhoops_ibl5.nuke_iblplyr.teamname order by stats_ast/stats_gm desc limit 1)";
 	$result21 = mysql_query($query21);
 
 	// Update teams' forum info block with their leading assister's player id

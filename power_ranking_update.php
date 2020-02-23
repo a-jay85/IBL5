@@ -18,6 +18,7 @@ while ($i < $num) {
 	$tid = mysql_result($result, $i, "TeamID");
 	$Team = mysql_result($result, $i, "Team");
 
+	// Update nuke_ibl_power with each team's season win/loss info
 	list ($wins, $losses, $gb, $homewin, $homeloss, $visitorwin, $visitorloss) = record($tid);
 	$query3 = "UPDATE nuke_ibl_power SET
 		win = $wins,
@@ -30,6 +31,7 @@ while ($i < $num) {
 		WHERE TeamID = $tid;";
 	$result3 = mysql_query($query3);
 
+	// Update nuke_iblteam_win_loss with each team's season win/loss info
 	$query3a = "UPDATE nuke_iblteam_win_loss a, nuke_ibl_power b SET
 		a.wins = b.win,
 		a.losses = b.loss
@@ -145,8 +147,7 @@ function record($tid)
 		$home = mysql_result($result, $i, "Home");
 		$HScore = mysql_result($result, $i, "HScore");
 
-		//Next line accounts for tied games and does nothing when it happens.
-		if ($VScore !== $HScore) {
+		if ($VScore !== $HScore) { // Ignore tied games since they're usually 0-0 games that haven't yet occurred
 			if ($tid == $visitor) {
 				if ($VScore > $HScore) {
 					$wins = $wins + 1;
@@ -226,8 +227,7 @@ function ranking($tid, $wins, $losses)
 		$oppwins = mysql_result($result2, 0, "win");
 		$opploss = mysql_result($result2, 0, "loss");
 
-		//Next line accounts for tied games and does nothing when it happens.
-		if ($VScore !== $HScore) {
+		if ($VScore !== $HScore) { // Ignore tied games since they're usually 0-0 games that haven't yet occurred
 			if ($VScore > $HScore) {
 				$winpoints = $winpoints + $oppwins;
 			} else {
@@ -252,8 +252,7 @@ function ranking($tid, $wins, $losses)
 		$oppwins = mysql_result($result2,0,"win");
 		$opploss = mysql_result($result2,0,"loss");
 
-		//Next line accounts for tied games and does nothing when it happens.
-		if ($VScore !== $HScore) {
+		if ($VScore !== $HScore) { // Ignore tied games since they're usually 0-0 games that haven't yet occurred
 			if ($VScore > $HScore) {
 				$losspoints = $losspoints + $opploss;
 			} else {

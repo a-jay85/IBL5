@@ -32,11 +32,11 @@ while ($i < $num) {
 	$result3 = mysql_query($query3);
 
 	// Update nuke_iblteam_win_loss with each team's season win/loss info
-	$query3a = "UPDATE nuke_iblteam_win_loss a, nuke_ibl_power b SET
+	$query4 = "UPDATE nuke_iblteam_win_loss a, nuke_ibl_power b SET
 		a.wins = b.win,
 		a.losses = b.loss
 		WHERE a.currentname = b.Team AND a.year = '".$currentYear."';";
-	$result3a = mysql_query($query3a);
+	$result4 = mysql_query($query4);
 
 	// Update nuke_ibl_power with the wins and losses in each team's last 10 games
 	list ($lastwins, $lastlosses) = last($tid);
@@ -58,16 +58,16 @@ while ($i < $num) {
 	$query9 = "UPDATE ibl_team_history a SET totloss = (SELECT SUM(b.losses) FROM nuke_iblteam_win_loss AS b WHERE a.team_name = b.currentname)";
 	$result9 = mysql_query($query9);
 
-	// Update teams' win percentage in ibl_team_history
-	$query10 = "UPDATE ibl_team_history a SET winpct = a.totwins / (a.totwins + a.totloss)";
+	// Update teams' win totals in ibl_team_history
+	$query10 = "UPDATE ibl_team_history a, nuke_ibl_power b SET a.totwins = a.totwins + b.win where a.teamid = b.TeamID";
 	$result10 = mysql_query($query10);
 
-	// Update teams' win totals in ibl_team_history
-	$query11 = "UPDATE ibl_team_history a, nuke_ibl_power b SET a.totwins = a.totwins + b.win where a.teamid = b.TeamID";
+	// Update teams' loss totals in ibl_team_history
+	$query11 = "UPDATE ibl_team_history a, nuke_ibl_power b SET a.totloss = a.totloss + b.loss where a.teamid = b.TeamID";
 	$result11 = mysql_query($query11);
 
-	// Update teams' loss totals in ibl_team_history
-	$query12 = "UPDATE ibl_team_history a, nuke_ibl_power b SET a.totloss = a.totloss + b.loss where a.teamid = b.TeamID";
+	// Update teams' win percentage in ibl_team_history
+	$query12 = "UPDATE ibl_team_history a SET winpct = a.totwins / (a.totwins + a.totloss)";
 	$result12 = mysql_query($query12);
 
 

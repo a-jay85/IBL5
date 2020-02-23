@@ -13,7 +13,6 @@ $resultCurrentYear = mysql_query($queryCurrentYear);
 $currentYear=mysql_result($resultCurrentYear, 0);
 
 $i = 0;
-
 while ($i < $num) {
 	$tid = mysql_result($result, $i, "TeamID");
 	$Team = mysql_result($result, $i, "Team");
@@ -47,7 +46,7 @@ while ($i < $num) {
 					$losses++;
 					$visitorloss++;
 				}
-			} else {
+			} elseif ($tid == $home) {
 				if ($VScore > $HScore) {
 					$losses++;
 					$homeloss++;
@@ -59,6 +58,7 @@ while ($i < $num) {
 		}
 		$j++;
 	}
+
 	$gb = ($wins / 2) - ($losses / 2);
 
 	$query3 = "UPDATE nuke_ibl_power SET

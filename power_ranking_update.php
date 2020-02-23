@@ -18,7 +18,7 @@ while ($i < $num) {
 	$Team = mysql_result($result, $i, "Team");
 
 	// Update nuke_ibl_power with each team's season win/loss info
-	$queryGames = "SELECT * FROM ibl_schedule WHERE (Visitor = $tid OR Home = $tid) AND BoxID > 0 ORDER BY Date ASC";
+	$queryGames = "SELECT * FROM ibl_schedule WHERE (Visitor = $tid OR Home = $tid) AND (BoxID > 0 AND BoxID != 100000) ORDER BY Date ASC";
 	$resultGames = mysql_query($queryGames);
 	$numGames = mysql_numrows($resultGames);
 

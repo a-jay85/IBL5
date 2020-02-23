@@ -28,6 +28,8 @@ while ($i < $num) {
 	$homeloss = 0;
 	$visitorwin = 0;
 	$visitorloss = 0;
+	$winpoints = 0;
+	$losspoints = 0;
 
 	$j = 0;
 	while ($j < $numGames) {
@@ -38,21 +40,36 @@ while ($i < $num) {
 
 		if ($VScore !== $HScore) { // Ignore tied games since they're usually 0-0 games that haven't yet occurred
 			if ($tid == $visitor) {
+				// Get opponent's win/loss info for calculating power rankings
+				$queryOpponentWinLoss = "SELECT * FROM nuke_ibl_power WHERE TeamID = $home";
+				$resultOpponentWinLoss = mysql_query($queryOpponentWinLoss);
+				$opponentWins = mysql_result($resultOpponentWinLoss, 0, "win");
+				$opponentLosses = mysql_result($resultOpponentWinLoss, 0, "loss");
+
 				if ($VScore > $HScore) {
 					$wins++;
 					$visitorwin++;
-
+					$winpoints = $winpoints + $opponentWins;
 				} else {
 					$losses++;
 					$visitorloss++;
+					$losspoints = $losspoints + $opponentLosses;
 				}
 			} elseif ($tid == $home) {
+				// Get opponent's win/loss info for calculating power rankings
+				$queryOpponentWinLoss = "SELECT * FROM nuke_ibl_power WHERE TeamID = $visitor";
+				$resultOpponentWinLoss = mysql_query($queryOpponentWinLoss);
+				$opponentWins = mysql_result($resultOpponentWinLoss, 0, "win");
+				$opponentLosses = mysql_result($resultOpponentWinLoss, 0, "loss");
+
 				if ($VScore > $HScore) {
 					$losses++;
 					$homeloss++;
+					$losspoints = $losspoints + $opponentLosses;
 				} else {
 					$wins++;
 					$homewin++;
+					$winpoints = $winpoints + $opponentWins;
 				}
 			}
 		}
@@ -60,6 +77,10 @@ while ($i < $num) {
 	}
 
 	$gb = ($wins / 2) - ($losses / 2);
+
+	$winpoints = $winpoints + $wins;
+	$losspoints = $losspoints + $losses;
+	$ranking = round(($winpoints / ($winpoints + $losspoints)) * 100, 1);
 
 	$query3 = "UPDATE nuke_ibl_power SET
 		win = $wins,
@@ -161,7 +182,6 @@ SET iblhoops_iblv2forums.forum_stats.ast_pid = (SELECT pid FROM iblhoops_ibl5.nu
 
 
 	// Update power ranking list with each team's power ranking score
-	$ranking = ranking($tid, $wins, $losses);
 	$query4 = "UPDATE nuke_ibl_power SET ranking = $ranking WHERE TeamID = $tid;";
 	$result4 = mysql_query($query4);
 
@@ -204,69 +224,5 @@ function last($tid)
 		$i++;
 	}
 	return array($lastwins, $lastlosses);
-}
-
-function ranking($tid, $wins, $losses)
-{
-	$query = "SELECT * FROM ibl_schedule WHERE Visitor = $tid AND BoxID > 0 ORDER BY Date ASC";
-	$result = mysql_query($query);
-	$num = mysql_numrows($result);
-
-	$winpoints = 0;
-	$losspoints = 0;
-
-	$i = 0;
-	while ($i < $num) {
-		$visitor = mysql_result($result, $i, "Visitor");
-		$VScore = mysql_result($result, $i, "VScore");
-		$home = mysql_result($result, $i, "Home");
-		$HScore = mysql_result($result, $i, "HScore");
-
-		$query2 = "SELECT * FROM nuke_ibl_power WHERE TeamID = $home";
-		$result2 = mysql_query($query2);
-		$oppwins = mysql_result($result2, 0, "win");
-		$opploss = mysql_result($result2, 0, "loss");
-
-		if ($VScore !== $HScore) { // Ignore tied games since they're usually 0-0 games that haven't yet occurred
-			if ($VScore > $HScore) {
-				$winpoints = $winpoints + $oppwins;
-			} else {
-				$losspoints = $losspoints + $opploss;
-			}
-		}
-		$i++;
-	}
-
-	$query = "SELECT * FROM ibl_schedule WHERE Home = $tid AND BoxID > 0 ORDER BY Date ASC";
-	$result = mysql_query($query);
-	$num = mysql_numrows($result);
-
-	$i = 0;
-	while ($i < $num) {
-		$visitor = mysql_result($result, $i, "Visitor");
-		$VScore = mysql_result($result, $i, "VScore");
-		$home = mysql_result($result, $i, "Home");
-		$HScore = mysql_result($result, $i, "HScore");
-
-		$query2 = "SELECT * FROM nuke_ibl_power WHERE TeamID = $visitor";
-		$result2 = mysql_query($query2);
-		$oppwins = mysql_result($result2,0,"win");
-		$opploss = mysql_result($result2,0,"loss");
-
-		if ($VScore !== $HScore) { // Ignore tied games since they're usually 0-0 games that haven't yet occurred
-			if ($VScore > $HScore) {
-				$losspoints = $losspoints + $opploss;
-			} else {
-				$winpoints = $winpoints + $oppwins;
-			}
-		}
-		$i++;
-	}
-
-	$winpoints = $winpoints + $wins;
-	$losspoints = $losspoints + $losses;
-
-	$ranking = round(($winpoints / ($winpoints + $losspoints)) * 100, 1);
-	return $ranking;
 }
 ?>

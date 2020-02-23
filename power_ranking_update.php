@@ -17,7 +17,6 @@ while ($i < $num) {
 	$tid = mysql_result($result, $i, "TeamID");
 	$Team = mysql_result($result, $i, "Team");
 
-	// Update nuke_ibl_power with each team's season win/loss info
 	$queryGames = "SELECT * FROM ibl_schedule WHERE (Visitor = $tid OR Home = $tid) AND (BoxID > 0 AND BoxID != 100000) ORDER BY Date ASC";
 	$resultGames = mysql_query($queryGames);
 	$numGames = mysql_numrows($resultGames);
@@ -30,6 +29,8 @@ while ($i < $num) {
 	$visitorloss = 0;
 	$winpoints = 0;
 	$losspoints = 0;
+	$winsInLast10Games = 0;
+	$lossesInLast10Games = 0;
 
 	$j = 0;
 	while ($j < $numGames) {
@@ -50,10 +51,16 @@ while ($i < $num) {
 					$wins++;
 					$visitorwin++;
 					$winpoints = $winpoints + $opponentWins;
+					if ($j >= $numGames - 10) {
+						$winsInLast10Games++;
+					}
 				} else {
 					$losses++;
 					$visitorloss++;
 					$losspoints = $losspoints + $opponentLosses;
+					if ($j >= $numGames - 10) {
+						$lossesInLast10Games++;
+					}
 				}
 			} elseif ($tid == $home) {
 				// Get opponent's win/loss info for calculating power rankings
@@ -66,10 +73,16 @@ while ($i < $num) {
 					$losses++;
 					$homeloss++;
 					$losspoints = $losspoints + $opponentLosses;
+					if ($j >= $numGames - 10) {
+						$lossesInLast10Games++;
+					}
 				} else {
 					$wins++;
 					$homewin++;
 					$winpoints = $winpoints + $opponentWins;
+					if ($j >= $numGames - 10) {
+						$winsInLast10Games++;
+					}
 				}
 			}
 		}
@@ -82,6 +95,7 @@ while ($i < $num) {
 	$losspoints = $losspoints + $losses;
 	$ranking = round(($winpoints / ($winpoints + $losspoints)) * 100, 1);
 
+	// Update nuke_ibl_power with each team's season win/loss info
 	$query3 = "UPDATE nuke_ibl_power SET
 		win = $wins,
 		loss = $losses,
@@ -101,10 +115,9 @@ while ($i < $num) {
 	$result4 = mysql_query($query4);
 
 	// Update nuke_ibl_power with the wins and losses in each team's last 10 games
-	list ($lastwins, $lastlosses) = last($tid);
 	$query5 = "UPDATE nuke_ibl_power SET
-		last_win = $lastwins,
-		last_loss = $lastlosses
+		last_win = $winsInLast10Games,
+		last_loss = $lossesInLast10Games
 		WHERE TeamID = $tid;";
 	$result5 = mysql_query($query5);
 
@@ -188,41 +201,5 @@ SET iblhoops_iblv2forums.forum_stats.ast_pid = (SELECT pid FROM iblhoops_ibl5.nu
 	echo "Updating $Team wins $wins and losses $losses and ranking $ranking<br>";
 
 	$i++;
-}
-
-function last($tid)
-{
-	$query = "SELECT * FROM ibl_schedule WHERE (Visitor = $tid OR Home = $tid) AND (BoxID > 0 AND BoxID != 100000) ORDER BY Date DESC limit 10";
-	$result = mysql_query($query);
-	$num = mysql_numrows($result);
-
-	$lastwins = 0;
-	$lastlosses = 0;
-
-	$i = 0;
-	while ($i < $num) {
-		$visitor = mysql_result($result, $i, "Visitor");
-		$VScore = mysql_result($result, $i, "VScore");
-		$home = mysql_result($result, $i, "Home");
-		$HScore = mysql_result($result, $i, "HScore");
-
-		if ($VScore !== $HScore) { // Ignore tied games since they're usually 0-0 games that haven't yet occurred
-			if ($tid == $visitor) {
-				if ($VScore > $HScore) {
-					$lastwins++;
-				} else {
-					$lastlosses++;
-				}
-			} elseif ($tid == $home) {
-				if ($VScore > $HScore) {
-					$lastlosses++;
-				} else {
-					$lastwins++;
-				}
-			}
-		}
-		$i++;
-	}
-	return array($lastwins, $lastlosses);
 }
 ?>

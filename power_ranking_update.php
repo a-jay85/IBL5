@@ -150,20 +150,20 @@ function record($tid)
 		if ($VScore !== $HScore) { // Ignore tied games since they're usually 0-0 games that haven't yet occurred
 			if ($tid == $visitor) {
 				if ($VScore > $HScore) {
-					$wins = $wins + 1;
-					$visitorwin = $visitorwin + 1;
+					$wins++;
+					$visitorwin++;
 
 				} else {
-					$losses = $losses + 1;
-					$visitorloss = $visitorloss + 1;
+					$losses++;
+					$visitorloss++;
 				}
 			} else {
 				if ($VScore > $HScore) {
-					$losses = $losses + 1;
-					$homeloss = $homeloss + 1;
+					$losses++;
+					$homeloss++;
 				} else {
-					$wins = $wins + 1;
-					$homewin = $homewin + 1;
+					$wins++;
+					$homewin++;
 				}
 			}
 		}
@@ -191,15 +191,15 @@ function last($tid)
 		if ($VScore !== $HScore) { // Ignore tied games since they're usually 0-0 games that haven't yet occurred
 			if ($tid == $visitor) {
 				if ($VScore > $HScore) {
-					$lastwins = $lastwins+1;
+					$lastwins++;
 				} else {
-					$lastlosses = $lastlosses+1;
+					$lastlosses++;
 				}
 			} elseif ($tid == $home) {
 				if ($VScore > $HScore) {
-					$lastlosses = $lastlosses+1;
+					$lastlosses++;
 				} else {
-					$lastwins = $lastwins+1;
+					$lastwins++;
 				}
 			}
 		}

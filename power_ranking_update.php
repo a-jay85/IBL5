@@ -171,7 +171,7 @@ function record($tid)
 
 function last($tid)
 {
-	$query = "SELECT * FROM ibl_schedule WHERE (Visitor = $tid OR Home = $tid) AND BoxID > 0 ORDER BY Date DESC limit 10";
+	$query = "SELECT * FROM ibl_schedule WHERE (Visitor = $tid OR Home = $tid) AND (BoxID > 0 AND BoxID != 100000) ORDER BY Date DESC limit 10";
 	$result = mysql_query($query);
 	$num = mysql_numrows($result);
 	$lastwins = 0;
@@ -183,8 +183,7 @@ function last($tid)
 		$home = mysql_result($result, $i, "Home");
 		$HScore = mysql_result($result, $i, "HScore");
 
-		//Next line accounts for tied games and does nothing when it happens.
-		if ($VScore !== $HScore) {
+		if ($VScore !== $HScore) { // Ignore tied games since they're usually 0-0 games that haven't yet occurred
 			if ($tid == $visitor) {
 				if ($VScore > $HScore) {
 					$lastwins = $lastwins+1;

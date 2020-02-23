@@ -171,7 +171,7 @@ function record($tid)
 
 function last($tid)
 {
-	$query = "SELECT * FROM IBL_Schedule WHERE (Visitor = $tid OR Home = $tid) AND BoxID > 0 ORDER BY Date DESC limit 10";
+	$query = "SELECT * FROM ibl_schedule WHERE (Visitor = $tid OR Home = $tid) AND BoxID > 0 ORDER BY Date DESC limit 10";
 	$result = mysql_query($query);
 	$num = mysql_numrows($result);
 	$lastwins = 0;

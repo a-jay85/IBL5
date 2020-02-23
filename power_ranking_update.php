@@ -190,7 +190,7 @@ function last($tid)
 				} else {
 					$lastlosses = $lastlosses+1;
 				}
-			} else {
+			} elseif ($tid == $home) {
 				if ($VScore > $HScore) {
 					$lastlosses = $lastlosses+1;
 				} else {

@@ -121,9 +121,15 @@ while ($i < $num) {
 		WHERE TeamID = $tid;";
 	$result5 = mysql_query($query5);
 
-	// Reset Depth Chart sent status
-	$query6 = "UPDATE ibl_team_history SET sim_depth = 'No Depth Chart'";
+	// Update power ranking list with each team's power ranking score
+	$query6 = "UPDATE nuke_ibl_power SET ranking = $ranking WHERE TeamID = $tid;";
 	$result6 = mysql_query($query6);
+
+	echo "Updating $Team wins $wins and losses $losses and ranking $ranking<br>";
+
+	// Reset Depth Chart sent status
+	$query7 = "UPDATE ibl_team_history SET sim_depth = 'No Depth Chart'";
+	$result7 = mysql_query($query7);
 
 	// Update teams' total wins in ibl_team_history by summing up a team's wins in nuke_iblteam_win_loss
 	$query8 = "UPDATE ibl_team_history a SET totwins = (SELECT SUM(b.wins) FROM nuke_iblteam_win_loss AS b WHERE a.team_name = b.currentname)";
@@ -192,13 +198,6 @@ SET iblhoops_iblv2forums. forum_stats.ast_num = (select round((stats_ast)/stats_
 	$query22 = "UPDATE iblhoops_iblv2forums.forum_stats, iblhoops_ibl5.nuke_iblplyr
 SET iblhoops_iblv2forums.forum_stats.ast_pid = (SELECT pid FROM iblhoops_ibl5.nuke_iblplyr WHERE iblhoops_iblv2forums. forum_stats.teamname = iblhoops_ibl5.nuke_iblplyr.teamname order by (stats_ast/stats_gm) desc limit 1)";
 	$result22 = mysql_query($query22);
-
-
-	// Update power ranking list with each team's power ranking score
-	$query4 = "UPDATE nuke_ibl_power SET ranking = $ranking WHERE TeamID = $tid;";
-	$result4 = mysql_query($query4);
-
-	echo "Updating $Team wins $wins and losses $losses and ranking $ranking<br>";
 
 	$i++;
 }

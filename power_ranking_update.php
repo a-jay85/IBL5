@@ -134,12 +134,14 @@ function record($tid)
 	$query = "SELECT * FROM ibl_schedule WHERE (Visitor = $tid OR Home = $tid) AND BoxID > 0 ORDER BY Date ASC";
 	$result = mysql_query($query);
 	$num = mysql_numrows($result);
+
 	$wins = 0;
 	$losses = 0;
 	$homewin = 0;
 	$homeloss = 0;
 	$visitorwin = 0;
 	$visitorloss = 0;
+
 	$i = 0;
 	while ($i < $num) {
 		$visitor = mysql_result($result, $i, "Visitor");
@@ -179,8 +181,10 @@ function last($tid)
 	$query = "SELECT * FROM ibl_schedule WHERE (Visitor = $tid OR Home = $tid) AND (BoxID > 0 AND BoxID != 100000) ORDER BY Date DESC limit 10";
 	$result = mysql_query($query);
 	$num = mysql_numrows($result);
+
 	$lastwins = 0;
 	$lastlosses = 0;
+
 	$i = 0;
 	while ($i < $num) {
 		$visitor = mysql_result($result, $i, "Visitor");
@@ -213,8 +217,10 @@ function ranking($tid, $wins, $losses)
 	$query = "SELECT * FROM ibl_schedule WHERE Visitor = $tid AND BoxID > 0 ORDER BY Date ASC";
 	$result = mysql_query($query);
 	$num = mysql_numrows($result);
+
 	$winpoints = 0;
 	$losspoints = 0;
+
 	$i = 0;
 	while ($i < $num) {
 		$visitor = mysql_result($result, $i, "Visitor");
@@ -240,6 +246,7 @@ function ranking($tid, $wins, $losses)
 	$query = "SELECT * FROM ibl_schedule WHERE Home = $tid AND BoxID > 0 ORDER BY Date ASC";
 	$result = mysql_query($query);
 	$num = mysql_numrows($result);
+
 	$i = 0;
 	while ($i < $num) {
 		$visitor = mysql_result($result, $i, "Visitor");
@@ -264,6 +271,7 @@ function ranking($tid, $wins, $losses)
 
 	$winpoints = $winpoints + $wins;
 	$losspoints = $losspoints + $losses;
+
 	$ranking = round(($winpoints / ($winpoints + $losspoints)) * 100, 1);
 	return $ranking;
 }

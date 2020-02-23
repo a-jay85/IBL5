@@ -131,9 +131,9 @@ SET iblhoops_iblv2forums.forum_stats.ast_pid = (SELECT pid FROM iblhoops_ibl5.nu
 
 function record($tid)
 {
-	$query = "SELECT * FROM ibl_schedule WHERE (Visitor = $tid OR Home = $tid) AND BoxID > 0 ORDER BY Date ASC";
-	$result = mysql_query($query);
-	$num = mysql_numrows($result);
+	$queryGames = "SELECT * FROM ibl_schedule WHERE (Visitor = $tid OR Home = $tid) AND BoxID > 0 ORDER BY Date ASC";
+	$resultGames = mysql_query($queryGames);
+	$numGames = mysql_numrows($resultGames);
 
 	$wins = 0;
 	$losses = 0;
@@ -142,12 +142,12 @@ function record($tid)
 	$visitorwin = 0;
 	$visitorloss = 0;
 
-	$i = 0;
-	while ($i < $num) {
-		$visitor = mysql_result($result, $i, "Visitor");
-		$VScore = mysql_result($result, $i, "VScore");
-		$home = mysql_result($result, $i, "Home");
-		$HScore = mysql_result($result, $i, "HScore");
+	$j = 0;
+	while ($j < $numGames) {
+		$visitor = mysql_result($resultGames, $j, "Visitor");
+		$VScore = mysql_result($resultGames, $j, "VScore");
+		$home = mysql_result($resultGames, $j, "Home");
+		$HScore = mysql_result($resultGames, $j, "HScore");
 
 		if ($VScore !== $HScore) { // Ignore tied games since they're usually 0-0 games that haven't yet occurred
 			if ($tid == $visitor) {
@@ -169,7 +169,7 @@ function record($tid)
 				}
 			}
 		}
-		$i++;
+		$j++;
 	}
 	$gb = ($wins / 2) - ($losses / 2);
 

@@ -8,6 +8,10 @@ $query = "SELECT * FROM nuke_ibl_power WHERE TeamID BETWEEN 1 AND 32 ORDER BY Te
 $result = mysql_query($query);
 $num = mysql_numrows($result);
 
+$queryCurrentYear = 'SELECT value FROM nuke_ibl_settings WHERE name = "Current IBL Season Ending Year"';
+$resultCurrentYear = mysql_query($queryCurrentYear);
+$currentYear=mysql_result($resultCurrentYear, 0);
+
 $i = 0;
 
 while ($i < $num) {
@@ -29,7 +33,7 @@ while ($i < $num) {
 	$query3a = "UPDATE nuke_iblteam_win_loss a, nuke_ibl_power b SET
 		a.wins = b.win,
 		a.losses = b.loss
-		WHERE a.currentname = b.Team AND a.year = '2004';";
+		WHERE a.currentname = b.Team AND a.year = '".$currentYear."';";
 	$result3a = mysql_query($query3a);
 
 	// Update nuke_ibl_power with the wins and losses in each team's last 10 games

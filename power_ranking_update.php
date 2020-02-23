@@ -32,7 +32,7 @@ while ($i < $num) {
 		WHERE a.currentname = b.Team AND a.year = '2004';";
 	$result3a = mysql_query($query3a);
 
-
+	// Update nuke_ibl_power with the wins and losses in each team's last 10 games
 	list ($lastwins, $lastlosses) = last($tid);
 	$query5 = "UPDATE nuke_ibl_power SET
 		last_win = $lastwins,
@@ -56,61 +56,64 @@ while ($i < $num) {
 	$query10 = "UPDATE ibl_team_history a SET winpct = a.totwins / (a.totwins + a.totloss)";
 	$result10 = mysql_query($query10);
 
+	// Update teams' win totals in ibl_team_history
 	$query11 = "UPDATE ibl_team_history a, nuke_ibl_power b SET a.totwins = a.totwins + b.win where a.teamid = b.TeamID";
 	$result11 = mysql_query($query11);
 
+	// Update teams' loss totals in ibl_team_history
 	$query12 = "UPDATE ibl_team_history a, nuke_ibl_power b SET a.totloss = a.totloss + b.loss where a.teamid = b.TeamID";
 	$result12 = mysql_query($query12);
 
 
+	// Update teams' forum info block with their leading scorer's name
 	$query13 = "UPDATE iblhoops_iblv2forums.forum_stats, iblhoops_ibl5.nuke_iblplyr
 SET iblhoops_iblv2forums.forum_stats.pts_lead = (SELECT name FROM iblhoops_ibl5.nuke_iblplyr WHERE iblhoops_iblv2forums.forum_stats.teamname = iblhoops_ibl5.nuke_iblplyr.teamname order by ((stats_fgm-stats_3gm) * 2 + stats_3gm * 3 +stats_ftm) / stats_gm DESC LIMIT 1)";
 	$result13 = mysql_query($query13);
 
+	// Update teams' forum info block with their leading scorer's average points per game
 	$query14 = "UPDATE iblhoops_iblv2forums.forum_stats, iblhoops_ibl5.nuke_iblplyr
 SET iblhoops_iblv2forums.forum_stats.pts_num = (SELECT round(((stats_fgm - stats_3gm) * 2 + stats_3gm * 3 + stats_ftm) / stats_gm, 1) FROM iblhoops_ibl5.nuke_iblplyr WHERE iblhoops_iblv2forums.forum_stats.teamname = iblhoops_ibl5.nuke_iblplyr.teamname ORDER BY ((stats_fgm-stats_3gm) * 2 + stats_3gm * 3 + stats_ftm) / stats_gm DESC LIMIT 1)";
 	$result14 = mysql_query($query14);
 
+	// Update teams' forum info block with their leading scorer's player id
 	$query15 = "UPDATE iblhoops_iblv2forums.forum_stats, iblhoops_ibl5.nuke_iblplyr
 SET iblhoops_iblv2forums.forum_stats.pts_pid = (SELECT pid FROM iblhoops_ibl5.nuke_iblplyr WHERE iblhoops_iblv2forums.forum_stats.teamname = iblhoops_ibl5.nuke_iblplyr.teamname ORDER BY ((stats_fgm - stats_3gm) * 2 + stats_3gm * 3 + stats_ftm) / stats_gm DESC LIMIT 1)";
 	$result15 = mysql_query($query15);
 
 
-
-
-
-
-
-
-
-
+	// Update teams' forum info block with their leading rebounder's name
 	$query16 = "UPDATE iblhoops_iblv2forums.forum_stats, iblhoops_ibl5.nuke_iblplyr
 SET iblhoops_iblv2forums. forum_stats.reb_lead = (SELECT name FROM iblhoops_ibl5.nuke_iblplyr WHERE iblhoops_iblv2forums. forum_stats.teamname = iblhoops_ibl5.nuke_iblplyr.teamname order by (stats_orb+stats_drb)/stats_gm desc limit 1)";
 	$result16 = mysql_query($query16);
 
+	// Update teams' forum info block with their leading rebounder's average rebounds per game
 	$query17 = "UPDATE iblhoops_iblv2forums.forum_stats, iblhoops_ibl5.nuke_iblplyr
 SET iblhoops_iblv2forums. forum_stats.reb_num = (select round((stats_orb+stats_drb)/stats_gm, 1) FROM iblhoops_ibl5.nuke_iblplyr WHERE iblhoops_iblv2forums. forum_stats.teamname = iblhoops_ibl5.nuke_iblplyr.teamname order by (stats_orb+stats_drb)/stats_gm desc limit 1)";
 	$result17 = mysql_query($query17);
 
+	// Update teams' forum info block with their leading rebounder's player id
 	$query18 = "UPDATE iblhoops_iblv2forums.forum_stats, iblhoops_ibl5.nuke_iblplyr
 SET iblhoops_iblv2forums.forum_stats.reb_pid = (SELECT pid from iblhoops_ibl5.nuke_iblplyr WHERE iblhoops_iblv2forums. forum_stats.teamname = iblhoops_ibl5.nuke_iblplyr.teamname order by (stats_orb+stats_drb)/stats_gm desc limit 1)";
 	$result18 = mysql_query($query18);
 
 
-
+	// Update teams' forum info block with their leading assister's name
 	$query20 = "UPDATE iblhoops_iblv2forums.forum_stats, iblhoops_ibl5.nuke_iblplyr
 SET iblhoops_iblv2forums. forum_stats.ast_lead = (SELECT name FROM iblhoops_ibl5.nuke_iblplyr WHERE iblhoops_iblv2forums. forum_stats.teamname = iblhoops_ibl5.nuke_iblplyr.teamname order by (stats_ast/stats_gm) desc limit 1)";
 	$result20 = mysql_query($query20);
 
+	// Update teams' forum info block with their leading assister's average assists per game
 	$query21 = "UPDATE iblhoops_iblv2forums.forum_stats, iblhoops_ibl5.nuke_iblplyr
 SET iblhoops_iblv2forums. forum_stats.ast_num = (select round((stats_ast)/stats_gm, 1) FROM iblhoops_ibl5.nuke_iblplyr WHERE iblhoops_iblv2forums. forum_stats.teamname = iblhoops_ibl5.nuke_iblplyr.teamname order by stats_ast/stats_gm desc limit 1)";
 	$result21 = mysql_query($query21);
 
+	// Update teams' forum info block with their leading assister's player id
 	$query22 = "UPDATE iblhoops_iblv2forums.forum_stats, iblhoops_ibl5.nuke_iblplyr
 SET iblhoops_iblv2forums.forum_stats.ast_pid = (SELECT pid FROM iblhoops_ibl5.nuke_iblplyr WHERE iblhoops_iblv2forums. forum_stats.teamname = iblhoops_ibl5.nuke_iblplyr.teamname order by (stats_ast/stats_gm) desc limit 1)";
 	$result22 = mysql_query($query22);
 
 
+	// Update power ranking list with each team's power ranking score
 	$ranking = ranking($tid, $wins, $losses);
 	$query4 = "UPDATE nuke_ibl_power SET ranking = $ranking WHERE TeamID = $tid;";
 	$result4 = mysql_query($query4);
@@ -201,7 +204,6 @@ function last($tid)
 	return array($lastwins, $lastlosses);
 }
 
-
 function ranking($tid, $wins, $losses)
 {
 	$query = "SELECT * FROM IBL_Schedule WHERE Visitor = $tid AND BoxID > 0 ORDER BY Date ASC";
@@ -257,6 +259,7 @@ function ranking($tid, $wins, $losses)
 		}
 		$i++;
 	}
+
 	$winpoints = $winpoints + $wins;
 	$losspoints = $losspoints + $losses;
 	$ranking = round(($winpoints / ($winpoints + $losspoints)) * 100, 1);

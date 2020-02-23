@@ -15,7 +15,7 @@ $currentYear=mysql_result($resultCurrentYear, 0);
 $i = 0;
 while ($i < $num) {
 	$tid = mysql_result($result, $i, "TeamID");
-	$Team = mysql_result($result, $i, "Team");
+	$teamName = mysql_result($result, $i, "Team");
 
 	$queryGames = "SELECT * FROM ibl_schedule WHERE (Visitor = $tid OR Home = $tid) AND (BoxID > 0 AND BoxID != 100000) ORDER BY Date ASC";
 	$resultGames = mysql_query($queryGames);
@@ -23,63 +23,61 @@ while ($i < $num) {
 
 	$wins = 0;
 	$losses = 0;
-	$homewin = 0;
-	$homeloss = 0;
-	$visitorwin = 0;
-	$visitorloss = 0;
-	$winpoints = 0;
-	$losspoints = 0;
+	$homeWins = 0;
+	$homeLosses = 0;
+	$awayWins = 0;
+	$awayLosses = 0;
+	$winPoints = 0;
+	$lossPoints = 0;
 	$winsInLast10Games = 0;
 	$lossesInLast10Games = 0;
 
 	$j = 0;
 	while ($j < $numGames) {
-		$visitor = mysql_result($resultGames, $j, "Visitor");
-		$VScore = mysql_result($resultGames, $j, "VScore");
-		$home = mysql_result($resultGames, $j, "Home");
-		$HScore = mysql_result($resultGames, $j, "HScore");
+		$awayTeam = mysql_result($resultGames, $j, "Visitor");
+		$awayTeamScore = mysql_result($resultGames, $j, "VScore");
+		$homeTeam = mysql_result($resultGames, $j, "Home");
+		$homeTeamScore = mysql_result($resultGames, $j, "HScore");
 
-		if ($VScore !== $HScore) { // Ignore tied games since they're usually 0-0 games that haven't yet occurred
-			if ($tid == $visitor) {
-				// Get opponent's win/loss info for calculating power rankings
-				$queryOpponentWinLoss = "SELECT * FROM nuke_ibl_power WHERE TeamID = $home";
+		if ($awayTeamScore !== $homeTeamScore) { // Ignore tied games since they're usually 0-0 games that haven't yet occurred
+			if ($tid == $awayTeam) {
+				$queryOpponentWinLoss = "SELECT * FROM nuke_ibl_power WHERE TeamID = $homeTeam";
 				$resultOpponentWinLoss = mysql_query($queryOpponentWinLoss);
 				$opponentWins = mysql_result($resultOpponentWinLoss, 0, "win");
 				$opponentLosses = mysql_result($resultOpponentWinLoss, 0, "loss");
 
-				if ($VScore > $HScore) {
+				if ($awayTeamScore > $homeTeamScore) {
 					$wins++;
-					$visitorwin++;
-					$winpoints = $winpoints + $opponentWins;
+					$awayWins++;
+					$winPoints = $winPoints + $opponentWins;
 					if ($j >= $numGames - 10) {
 						$winsInLast10Games++;
 					}
 				} else {
 					$losses++;
-					$visitorloss++;
-					$losspoints = $losspoints + $opponentLosses;
+					$awayLosses++;
+					$lossPoints = $lossPoints + $opponentLosses;
 					if ($j >= $numGames - 10) {
 						$lossesInLast10Games++;
 					}
 				}
-			} elseif ($tid == $home) {
-				// Get opponent's win/loss info for calculating power rankings
-				$queryOpponentWinLoss = "SELECT * FROM nuke_ibl_power WHERE TeamID = $visitor";
+			} elseif ($tid == $homeTeam) {
+				$queryOpponentWinLoss = "SELECT * FROM nuke_ibl_power WHERE TeamID = $awayTeam";
 				$resultOpponentWinLoss = mysql_query($queryOpponentWinLoss);
 				$opponentWins = mysql_result($resultOpponentWinLoss, 0, "win");
 				$opponentLosses = mysql_result($resultOpponentWinLoss, 0, "loss");
 
-				if ($VScore > $HScore) {
+				if ($awayTeamScore > $homeTeamScore) {
 					$losses++;
-					$homeloss++;
-					$losspoints = $losspoints + $opponentLosses;
+					$homeLosses++;
+					$lossPoints = $lossPoints + $opponentLosses;
 					if ($j >= $numGames - 10) {
 						$lossesInLast10Games++;
 					}
 				} else {
 					$wins++;
-					$homewin++;
-					$winpoints = $winpoints + $opponentWins;
+					$homeWins++;
+					$winPoints = $winPoints + $opponentWins;
 					if ($j >= $numGames - 10) {
 						$winsInLast10Games++;
 					}
@@ -91,19 +89,19 @@ while ($i < $num) {
 
 	$gb = ($wins / 2) - ($losses / 2);
 
-	$winpoints = $winpoints + $wins;
-	$losspoints = $losspoints + $losses;
-	$ranking = round(($winpoints / ($winpoints + $losspoints)) * 100, 1);
+	$winPoints = $winPoints + $wins;
+	$lossPoints = $lossPoints + $losses;
+	$ranking = round(($winPoints / ($winPoints + $lossPoints)) * 100, 1);
 
 	// Update nuke_ibl_power with each team's season win/loss info
 	$query3 = "UPDATE nuke_ibl_power SET
 		win = $wins,
 		loss = $losses,
 		gb = $gb,
-		home_win = $homewin,
-		home_loss = $homeloss,
-		road_win = $visitorwin,
-		road_loss = $visitorloss
+		home_win = $homeWins,
+		home_loss = $homeLosses,
+		road_win = $awayWins,
+		road_loss = $awayLosses
 		WHERE TeamID = $tid;";
 	$result3 = mysql_query($query3);
 
@@ -125,7 +123,7 @@ while ($i < $num) {
 	$query6 = "UPDATE nuke_ibl_power SET ranking = $ranking WHERE TeamID = $tid;";
 	$result6 = mysql_query($query6);
 
-	echo "Updating $Team wins $wins and losses $losses and ranking $ranking<br>";
+	echo "Updating $teamName wins $wins and losses $losses and ranking $ranking<br>";
 
 	// Reset Depth Chart sent status
 	$query7 = "UPDATE ibl_team_history SET sim_depth = 'No Depth Chart'";

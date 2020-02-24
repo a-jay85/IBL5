@@ -4,7 +4,7 @@ require 'config.php';
 mysql_connect($dbhost,$dbuname,$dbpass);
 @mysql_select_db($dbname) or die( "Unable to select database");
 
-$query = "SELECT TeamID, Team
+$query = "SELECT TeamID, Team, streak_type, streak
 	FROM nuke_ibl_power
 	WHERE TeamID
 	BETWEEN 1 AND 32
@@ -22,6 +22,7 @@ $i = 0;
 while ($i < $num) {
 	$tid = mysql_result($result, $i, "TeamID");
 	$teamName = mysql_result($result, $i, "Team");
+	$streakType = mysql_result($result, $i, "streak_type");
 
 	$queryGames = "SELECT Visitor, Vscore, Home, HScore
 		FROM ibl_schedule
@@ -41,6 +42,7 @@ while ($i < $num) {
 	$lossPoints = 0;
 	$winsInLast10Games = 0;
 	$lossesInLast10Games = 0;
+	$streak = 0;
 
 	$j = 0;
 	while ($j < $numGames) {
@@ -48,7 +50,6 @@ while ($i < $num) {
 		$awayTeamScore = mysql_result($resultGames, $j, "VScore");
 		$homeTeam = mysql_result($resultGames, $j, "Home");
 		$homeTeamScore = mysql_result($resultGames, $j, "HScore");
-
 		if ($awayTeamScore !== $homeTeamScore) { // Ignore tied games since they're usually 0-0 games that haven't yet occurred
 			if ($tid == $awayTeam) {
 				$queryOpponentWinLoss = "SELECT win, loss
@@ -65,12 +66,24 @@ while ($i < $num) {
 					if ($j >= $numGames - 10) {
 						$winsInLast10Games++;
 					}
+					if ($streak_type = "W") {
+						$streak++;
+					} elseif ($streak_type = "L" OR $streak_type = "") {
+						$streakType = "W";
+						$streak = 1;
+					}
 				} else {
 					$losses++;
 					$awayLosses++;
 					$lossPoints = $lossPoints + $opponentLosses;
 					if ($j >= $numGames - 10) {
 						$lossesInLast10Games++;
+					}
+					if ($streak_type = "L") {
+						$streak++;
+					} elseif ($streak_type = "W" OR $streak_type = "") {
+						$streakType = "L";
+						$streak = 1;
 					}
 				}
 			} elseif ($tid == $homeTeam) {
@@ -88,12 +101,24 @@ while ($i < $num) {
 					if ($j >= $numGames - 10) {
 						$lossesInLast10Games++;
 					}
+					if ($streak_type == "L") {
+						$streak++;
+					} elseif ($streak_type = "W" OR $streak_type = "") {
+						$streakType = "L";
+						$streak = 1;
+					}
 				} else {
 					$wins++;
 					$homeWins++;
 					$winPoints = $winPoints + $opponentWins;
 					if ($j >= $numGames - 10) {
 						$winsInLast10Games++;
+					}
+					if ($streak_type == "W") {
+						$streak++;
+					} elseif ($streak_type = "L" OR $streak_type = "") {
+						$streakType = "W";
+						$streak = 1;
 					}
 				}
 			}
@@ -118,11 +143,13 @@ while ($i < $num) {
 			road_loss = $awayLosses,
 			last_win = $winsInLast10Games,
 			last_loss = $lossesInLast10Games,
+			streak_type = '".$streakType."',
+			streak = $streak,
 			ranking = $ranking
 		WHERE TeamID = $tid;";
 	$result3 = mysql_query($query3);
 
-	echo "Updating $teamName wins $wins and losses $losses and ranking $ranking<br>";
+	echo "Updating $teamName: $wins wins, $losses losses, ranking score = $ranking, streak = $streakType$streak<br>";
 
 	// Reset Depth Chart sent status
 	$query7 = "UPDATE ibl_team_history SET sim_depth = 'No Depth Chart'";

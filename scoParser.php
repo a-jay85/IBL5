@@ -4,22 +4,33 @@ require 'config.php';
 mysql_connect($dbhost,$dbuname,$dbpass);
 @mysql_select_db($dbname) or die( "Unable to select database");
 
-$stringCurrentSimYear = "SELECT value FROM nuke_ibl_settings WHERE name = 'Current IBL Season Ending Year';";
-$queryCurrentSimYear = mysql_query($stringCurrentSimYear);
+$stringCurrentEndingYear = "SELECT value FROM nuke_ibl_settings WHERE name = 'Current IBL Season Ending Year';";
+$queryCurrentEndingYear = mysql_query($stringCurrentEndingYear);
+$currentEndingYear = mysql_result($queryCurrentEndingYear, 0);
+$currentStartingYear = $currentEndingYear-1;
 
-$stringSeasonPhase = "SELECT value FROM nuke_ibl_settings WHERE name = 'Season Phase';";
+$stringSeasonPhase = "SELECT value FROM nuke_ibl_settings WHERE name = 'Current Season Phase';";
 $querySeasonPhase = mysql_query($stringSeasonPhase);
 $seasonPhase = mysql_result($querySeasonPhase, 0);
 
 $scoFile = fopen("IBL5.sco", "rb");
 fseek($scoFile,1030000);
 
-if (mysql_query('TRUNCATE TABLE ibl_box_scores')) {
-    echo 'TRUNCATE TABLE ibl_box_scores<p>';
+if ($seasonPhase == "HEAT") {
+    $stringDeleteCurrentSeasonBoxScores = "DELETE FROM `ibl_box_scores` WHERE `Date` BETWEEN '$currentStartingYear-10-01' AND '$currentEndingYear-07-01';";
+} else {
+    $stringDeleteCurrentSeasonBoxScores = "DELETE FROM `ibl_box_scores` WHERE `Date` BETWEEN '$currentStartingYear-11-01' AND '$currentEndingYear-07-01';";
 }
 
+if (mysql_query($stringDeleteCurrentSeasonBoxScores)) {
+    echo $stringDeleteCurrentSeasonBoxScores."<p>";
+}
+
+// if (mysql_query('TRUNCATE TABLE ibl_box_scores')) {
+//     echo 'TRUNCATE TABLE ibl_box_scores<p>';
+// }
+
 while (!feof($scoFile)) {
-    $CurrentSimYear = mysql_result($queryCurrentSimYear, 0);
     $line = fgets($scoFile,2001);
 
     $gameMonth = sprintf("%02u",substr($line,0,2)+10); // sprintf() prepends 0 if the result isn't in double-digits
@@ -28,7 +39,7 @@ while (!feof($scoFile)) {
     } elseif ($gameMonth == 22) {
         $gameMonth = sprintf("%02u",$gameMonth-17); // TODO: not have to hack the Playoffs to be in May
     } elseif ($gameMonth > 10) {
-        $CurrentSimYear = --$CurrentSimYear;
+        $gameYear = $currentStartingYear;
         if ($seasonPhase == "HEAT") {
             $gameMonth = 10; // Puts HEAT games in October
         }
@@ -48,7 +59,7 @@ while (!feof($scoFile)) {
     $homeQ4pts = substr($line,52,3);
     $homeOTpts = substr($line,55,3);
 
-    $date = $CurrentSimYear.'-'.$gameMonth.'-'.$gameDay;
+    $date = $gameYear.'-'.$gameMonth.'-'.$gameDay;
 
     for ($i = 0; $i < 30; $i++) {
         $x = $i*53; // 53 = amount of characters to skip to get to the next player's/team's data line

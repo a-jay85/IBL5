@@ -4,7 +4,7 @@ require 'config.php';
 mysql_connect($dbhost,$dbuname,$dbpass);
 @mysql_select_db($dbname) or die( "Unable to select database");
 
-$stringCurrentEndingYear = "SELECT value FROM nuke_ibl_settings WHERE name = 'Current IBL Season Ending Year';";
+$stringCurrentEndingYear = "SELECT value FROM nuke_ibl_settings WHERE name = 'Current Season Ending Year';";
 $queryCurrentEndingYear = mysql_query($stringCurrentEndingYear);
 $currentEndingYear = mysql_result($queryCurrentEndingYear, 0);
 $currentStartingYear = $currentEndingYear-1;

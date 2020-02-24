@@ -4,7 +4,7 @@ require 'config.php';
 mysql_connect($dbhost,$dbuname,$dbpass);
 @mysql_select_db($dbname) or die("Unable to select database");
 
-$queryCurrentYear = 'SELECT value FROM nuke_ibl_settings WHERE name = "Current IBL Season Ending Year"';
+$queryCurrentYear = 'SELECT value FROM nuke_ibl_settings WHERE name = "Current Season Ending Year"';
 $resultCurrentYear = mysql_query($queryCurrentYear);
 $freeagentyear=mysql_result($resultCurrentYear, 0);
 

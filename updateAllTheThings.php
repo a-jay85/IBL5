@@ -414,10 +414,12 @@ function displayStandings($region)
 		$gamesUnplayed = mysql_result($result,$i,9);
 		$magicNumber = mysql_result($result,$i,10);
 
-		$queryLast10Games = "SELECT last_win, last_loss FROM nuke_ibl_power WHERE TeamID = $tid";
+		$queryLast10Games = "SELECT last_win, last_loss, streak_type, streak FROM nuke_ibl_power WHERE TeamID = $tid";
 		$resultLast10Games = mysql_query($queryLast10Games);
 		$winsInLast10Games = mysql_result($resultLast10Games,0,0);
 		$lossesInLast10Games = mysql_result($resultLast10Games,0,1);
+		$streakType = mysql_result($resultLast10Games,0,2);
+		$streak = mysql_result($resultLast10Games,0,3);
 
 		$standingsHTML=$standingsHTML.'<tr><td><a href="modules.php?name=Team&op=team&tid='.$tid.'">'.$team_name.'</td>
 			<td>'.$leagueRecord.'</td>
@@ -430,7 +432,7 @@ function displayStandings($region)
 			<td>'.$homeRecord.'</td>
 			<td>'.$awayRecord.'</td>
 			<td>'.$winsInLast10Games.'-'.$lossesInLast10Games.'</td>
-			<td></td></tr>';
+			<td>'.$streakType.' '.$streak.'</td></tr>';
 		$i++;
 	}
 	$standingsHTML=$standingsHTML.'<tr><td colspan=10><hr></td></tr>';

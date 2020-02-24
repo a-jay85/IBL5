@@ -379,7 +379,7 @@ $numTeams = mysql_numrows($resultTeams);
 
 $queryCurrentYear = 'SELECT value
 	FROM nuke_ibl_settings
-	WHERE name = "Current IBL Season Ending Year"';
+	WHERE name = "Current Season Ending Year"';
 $resultCurrentYear = mysql_query($queryCurrentYear);
 $currentYear=mysql_result($resultCurrentYear, 0);
 

@@ -8,7 +8,7 @@ $query="SELECT * FROM nuke_ibl_team_info WHERE teamid != 35 ORDER BY teamid ASC"
 $result=mysql_query($query);
 $num=mysql_numrows($result);
 
-$seasonYear = mysql_result(mysql_query("SELECT value FROM nuke_ibl_settings WHERE name = 'Current IBL Season Ending Year'"), 0);
+$seasonYear = mysql_result(mysql_query("SELECT value FROM nuke_ibl_settings WHERE name = 'Current Season Ending Year'"), 0);
 
 echo "<HTML><HEAD><TITLE>Draft Pick Matrix</TITLE></HEAD>
     <BODY>

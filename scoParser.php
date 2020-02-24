@@ -33,6 +33,7 @@ if (mysql_query($stringDeleteCurrentSeasonBoxScores)) {
 while (!feof($scoFile)) {
     $line = fgets($scoFile,2001);
 
+    $gameYear = $currentEndingYear;
     $gameMonth = sprintf("%02u",substr($line,0,2)+10); // sprintf() prepends 0 if the result isn't in double-digits
     if ($gameMonth > 12 AND $gameMonth != 22) { // if $gameMonth === 22, it's the Playoffs
         $gameMonth = sprintf("%02u",$gameMonth-12);

@@ -129,7 +129,7 @@ while (!feof($scoFile)) {
         )";
         if ($name != NULL || $name != '') {
             if (mysql_query($entryUpdateQuery)) {
-                $entryUpdateQuery = str_replace(array('.', ' ', "\n", "\t", "\r"), '', $entryUpdateQuery);
+                $entryUpdateQuery = str_replace(array("\n", "\t", "\r"), '', $entryUpdateQuery);
                 echo $entryUpdateQuery.'<br>';
             }
         }

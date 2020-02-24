@@ -7,6 +7,10 @@ mysql_connect($dbhost,$dbuname,$dbpass);
 $stringCurrentSimYear = "SELECT value FROM nuke_ibl_settings WHERE name = 'Current IBL Season Ending Year';";
 $queryCurrentSimYear = mysql_query($stringCurrentSimYear);
 
+$stringSeasonPhase = "SELECT value FROM nuke_ibl_settings WHERE name = 'Season Phase';";
+$querySeasonPhase = mysql_query($stringSeasonPhase);
+$seasonPhase = mysql_result($querySeasonPhase, 0);
+
 $scoFile = fopen("IBL5.sco", "rb");
 fseek($scoFile,1030000);
 
@@ -25,6 +29,9 @@ while (!feof($scoFile)) {
         $gameMonth = sprintf("%02u",$gameMonth-17); // TODO: not have to hack the Playoffs to be in May
     } elseif ($gameMonth > 10) {
         $CurrentSimYear = --$CurrentSimYear;
+        if ($seasonPhase == "HEAT") {
+            $gameMonth = 10; // Puts HEAT games in October
+        }
     }
     $gameDay = sprintf("%02u",substr($line,2,2)+1);
     $gameOfThatDay = substr($line,4,2)+1;

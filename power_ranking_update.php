@@ -148,7 +148,7 @@ while ($i < $num) {
 		WHERE TeamID = $tid;";
 	$result3 = mysql_query($query3);
 
-	echo "Updating $teamName: $wins wins, $losses losses, ranking score = $ranking, streak = $streakType$streak<br>";
+	echo "Updating $teamName: $wins wins, $losses losses, $gb games back, $homeWins home wins, $homeLosses home losses, $awayWins away wins, $awayLosses away losses, streak = $streakType$streak, ranking score = $ranking<br>";
 
 	// Reset Depth Chart sent status
 	$query7 = "UPDATE ibl_team_history SET sim_depth = 'No Depth Chart'";

@@ -10,16 +10,22 @@ $queryCurrentSimYear = mysql_query($stringCurrentSimYear);
 $scoFile = fopen("IBL5.sco", "rb");
 fseek($scoFile,1030000);
 
-if (mysql_query('TRUNCATE TABLE ibl_box_scores')) echo 'TRUNCATE TABLE ibl_box_scores<p>';
+if (mysql_query('TRUNCATE TABLE ibl_box_scores')) {
+    echo 'TRUNCATE TABLE ibl_box_scores<p>';
+}
 
 while (!feof($scoFile)) {
     $CurrentSimYear = mysql_result($queryCurrentSimYear, 0);
     $line = fgets($scoFile,2001);
 
     $gameMonth = sprintf("%02u",substr($line,0,2)+10); // sprintf() prepends 0 if the result isn't in double-digits
-    if ($gameMonth > 12 AND $gameMonth != 22) $gameMonth = sprintf("%02u",$gameMonth-12); // if $gameMonth === 22, it's the Playoffs
-    if ($gameMonth == 22) $gameMonth = sprintf("%02u",$gameMonth-17); // TODO: not have to hack the Playoffs to be in May
-    if ($gameMonth > 10) $CurrentSimYear = --$CurrentSimYear;
+    if ($gameMonth > 12 AND $gameMonth != 22) { // if $gameMonth === 22, it's the Playoffs
+        $gameMonth = sprintf("%02u",$gameMonth-12);
+    } elseif ($gameMonth == 22) {
+        $gameMonth = sprintf("%02u",$gameMonth-17); // TODO: not have to hack the Playoffs to be in May
+    } elseif ($gameMonth > 10) {
+        $CurrentSimYear = --$CurrentSimYear;
+    }
     $gameDay = sprintf("%02u",substr($line,2,2)+1);
     $gameOfThatDay = substr($line,4,2)+1;
     $visitorTID = substr($line,6,2)+1;

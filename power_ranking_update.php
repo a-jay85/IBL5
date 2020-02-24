@@ -22,7 +22,6 @@ $i = 0;
 while ($i < $num) {
 	$tid = mysql_result($result, $i, "TeamID");
 	$teamName = mysql_result($result, $i, "Team");
-	$streakType = mysql_result($result, $i, "streak_type");
 
 	$queryGames = "SELECT Visitor, Vscore, Home, HScore
 		FROM ibl_schedule
@@ -66,12 +65,12 @@ while ($i < $num) {
 					if ($j >= $numGames - 10) {
 						$winsInLast10Games++;
 					}
-					if ($streak_type = "W") {
+					if ($streakType == "W") {
 						$streak++;
-					} elseif ($streak_type = "L" OR $streak_type = "") {
-						$streakType = "W";
+					} else {
 						$streak = 1;
 					}
+					$streakType = "W";
 				} else {
 					$losses++;
 					$awayLosses++;
@@ -79,12 +78,12 @@ while ($i < $num) {
 					if ($j >= $numGames - 10) {
 						$lossesInLast10Games++;
 					}
-					if ($streak_type = "L") {
+					if ($streakType == "L") {
 						$streak++;
-					} elseif ($streak_type = "W" OR $streak_type = "") {
-						$streakType = "L";
+					} else {
 						$streak = 1;
 					}
+					$streakType = "L";
 				}
 			} elseif ($tid == $homeTeam) {
 				$queryOpponentWinLoss = "SELECT win, loss
@@ -101,12 +100,12 @@ while ($i < $num) {
 					if ($j >= $numGames - 10) {
 						$lossesInLast10Games++;
 					}
-					if ($streak_type == "L") {
+					if ($streakType = "L") {
 						$streak++;
-					} elseif ($streak_type = "W" OR $streak_type = "") {
-						$streakType = "L";
+					} else {
 						$streak = 1;
 					}
+					$streakType == "L";
 				} else {
 					$wins++;
 					$homeWins++;
@@ -114,12 +113,12 @@ while ($i < $num) {
 					if ($j >= $numGames - 10) {
 						$winsInLast10Games++;
 					}
-					if ($streak_type == "W") {
+					if ($streakType == "W") {
 						$streak++;
-					} elseif ($streak_type = "L" OR $streak_type = "") {
-						$streakType = "W";
+					} else {
 						$streak = 1;
 					}
+					$streakType = "W";
 				}
 			}
 		}

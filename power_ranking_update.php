@@ -107,7 +107,7 @@ while ($i < $num) {
 	$lossPoints = $lossPoints + $losses;
 	$ranking = round(($winPoints / ($winPoints + $lossPoints)) * 100, 1);
 
-	// Update nuke_ibl_power with each team's season win/loss info
+	// Update nuke_ibl_power with each team's win/loss info and current power ranking score
 	$query3 = "UPDATE nuke_ibl_power
 		SET win = $wins,
 			loss = $losses,
@@ -115,9 +115,18 @@ while ($i < $num) {
 			home_win = $homeWins,
 			home_loss = $homeLosses,
 			road_win = $awayWins,
-			road_loss = $awayLosses
+			road_loss = $awayLosses,
+			last_win = $winsInLast10Games,
+			last_loss = $lossesInLast10Games,
+			ranking = $ranking
 		WHERE TeamID = $tid;";
 	$result3 = mysql_query($query3);
+
+	echo "Updating $teamName wins $wins and losses $losses and ranking $ranking<br>";
+
+	// Reset Depth Chart sent status
+	$query7 = "UPDATE ibl_team_history SET sim_depth = 'No Depth Chart'";
+	$result7 = mysql_query($query7);
 
 	// Update nuke_iblteam_win_loss with each team's season win/loss info
 	$query4 = "UPDATE nuke_iblteam_win_loss a, nuke_ibl_power b
@@ -125,23 +134,6 @@ while ($i < $num) {
 			a.losses = b.loss
 		WHERE a.currentname = b.Team AND a.year = '".$currentYear."';";
 	$result4 = mysql_query($query4);
-
-	// Update nuke_ibl_power with the wins and losses in each team's last 10 games
-	$query5 = "UPDATE nuke_ibl_power
-		SET last_win = $winsInLast10Games,
-			last_loss = $lossesInLast10Games
-		WHERE TeamID = $tid;";
-	$result5 = mysql_query($query5);
-
-	// Update power ranking list with each team's power ranking score
-	$query6 = "UPDATE nuke_ibl_power SET ranking = $ranking WHERE TeamID = $tid;";
-	$result6 = mysql_query($query6);
-
-	echo "Updating $teamName wins $wins and losses $losses and ranking $ranking<br>";
-
-	// Reset Depth Chart sent status
-	$query7 = "UPDATE ibl_team_history SET sim_depth = 'No Depth Chart'";
-	$result7 = mysql_query($query7);
 
 	// Update teams' total wins in ibl_team_history by summing up a team's wins in nuke_iblteam_win_loss
 	$query8 = "UPDATE ibl_team_history a

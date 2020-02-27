@@ -296,7 +296,7 @@ function submit() {
 	$filetext = "Name,PG,SG,SF,PF,C,ACTIVE,MIN,OF,DF,OI,DI
 ";
 
-	$activeplayers=0;
+	$activePlayers=0;
 	$pos_1=0;
 	$pos_2=0;
 	$pos_3=0;
@@ -384,7 +384,7 @@ function submit() {
 
 		$i++;
 
-		if ($dc_insert6 == 1) $activeplayers=$activeplayers+1;
+		if ($dc_insert6 == 1) $activePlayers=$activePlayers+1;
 		if ($dc_insert1 > 0 && $injury == 0) $pos_1=$pos_1+1;
 		if ($dc_insert2 > 0 && $injury == 0) $pos_2=$pos_2+1;
 		if ($dc_insert3 > 0 && $injury == 0) $pos_3=$pos_3+1;
@@ -394,29 +394,38 @@ function submit() {
 
 	$text = $text."</table>";
 
-	$minimumActivePlayers = 12;
-	if ($activeplayers < $minimumActivePlayers) {
-		echo "<font color=red>Your lineup has not been submitted to the commissioner's office because it is an illegal lineup.  You must have at least $minimumActivePlayers active players in your lineup; you have $activeplayers.  Please press the \"Back\" button on your browser and re-enter your lineup.</font>";
+	$minActivePlayers = 12;
+	$maxActivePlayers = 12;
+	if ($activePlayers < $minActivePlayers) {
+		echo "<font color=red>Your lineup has not been submitted to the commissioner's office because it is an illegal lineup.<br>
+			You must have at least $minActivePlayers active players in your lineup; you have $activePlayers.<br>
+			Please press the \"Back\" button on your browser and activate " . ($minActivePlayers - $activePlayers) . " player(s).</font><p>";
+		$error=1;
+	}
+	if ($activePlayers > $maxActivePlayers) {
+		echo "<font color=red>Your lineup has not been submitted to the commissioner's office because it is an illegal lineup. <br>
+		You can't have more than $maxActivePlayers active players in your lineup; you have $activePlayers.<br>
+			Please press the \"Back\" button on your browser and deactivate " . ($activePlayers - $maxActivePlayers) . " player(s).</font><p>";
 		$error=1;
 	}
 	if ($pos_1 < 3 && $error == 0) {
-		echo "<font color=red>Your lineup has not been submitted to the commissioner's office because it is an illegal lineup.  You must have at least 3 players entered in PG slot; you have $pos_1.  Please press the \"Back\" button on your browser and re-enter your lineup.</font>";
+		echo "<font color=red>Your lineup has not been submitted to the commissioner's office because it is an illegal lineup. You must have at least 3 players entered in PG slot; you have $pos_1. Please press the \"Back\" button on your browser and re-enter your lineup.</font>";
 		$error=1;
 	}
 	if ($pos_2 < 3 && $error == 0) {
-		echo "<font color=red>Your lineup has not been submitted to the commissioner's office because it is an illegal lineup.  You must have at least 3 players entered in SG slot; you have $pos_2.  Please press the \"Back\" button on your browser and re-enter your lineup.</font>";
+		echo "<font color=red>Your lineup has not been submitted to the commissioner's office because it is an illegal lineup. You must have at least 3 players entered in SG slot; you have $pos_2. Please press the \"Back\" button on your browser and re-enter your lineup.</font>";
 		$error=1;
 	}
 	if ($pos_3 < 3 && $error == 0) {
-		echo "<font color=red>Your lineup has not been submitted to the commissioner's office because it is an illegal lineup.  You must have at least 3 players entered in SF slot; you have $pos_3.  Please press the \"Back\" button on your browser and re-enter your lineup.</font>";
+		echo "<font color=red>Your lineup has not been submitted to the commissioner's office because it is an illegal lineup. You must have at least 3 players entered in SF slot; you have $pos_3. Please press the \"Back\" button on your browser and re-enter your lineup.</font>";
 		$error=1;
 	}
 	if ($pos_4 < 3 && $error == 0) {
-		echo "<font color=red>Your lineup has not been submitted to the commissioner's office because it is an illegal lineup.  You must have at least 3 players entered in PF slot; you have $pos_4.  Please press the \"Back\" button on your browser and re-enter your lineup.</font>";
+		echo "<font color=red>Your lineup has not been submitted to the commissioner's office because it is an illegal lineup. You must have at least 3 players entered in PF slot; you have $pos_4. Please press the \"Back\" button on your browser and re-enter your lineup.</font>";
 		$error=1;
 	}
 	if ($pos_5 < 3 && $error == 0) {
-		echo "<font color=red>Your lineup has not been submitted to the commissioner's office because it is an illegal lineup.  You must have at least 3 players entered in C slot; you have $pos_5.  Please press the \"Back\" button on your browser and re-enter your lineup.</font>";
+		echo "<font color=red>Your lineup has not been submitted to the commissioner's office because it is an illegal lineup. You must have at least 3 players entered in C slot; you have $pos_5. Please press the \"Back\" button on your browser and re-enter your lineup.</font>";
 		$error=1;
 	}
 

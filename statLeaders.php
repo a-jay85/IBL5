@@ -110,7 +110,7 @@ echo "\t<tr>\n";
 echo "\t\t<td align=center>\n";
 echo "\n";
 
-$top10StealsQuery = "SELECT `name`, `date`, `gameAST` AS steals
+$top10StealsQuery = "SELECT `name`, `date`, `gameSTL` AS steals
     FROM ibl_box_scores
     WHERE pid != 0
     ORDER BY steals DESC LIMIT 10;";

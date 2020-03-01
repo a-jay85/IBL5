@@ -13,7 +13,7 @@ $top10PointsRows = mysql_num_rows($top10PointsResult);
 
 echo "<table>\n";
 echo "\t<tr>\n";
-echo "\t\t<td>\n";
+echo "\t\t<td align=center>\n";
 echo "\n";
 
 echo "<table border=1>\n";
@@ -39,7 +39,7 @@ echo "<p>\n";
 
 echo "\n";
 echo "\t\t</td>\n";
-echo "\t\t<td>\n";
+echo "\t\t<td align=center>\n";
 echo "\n";
 
 $top10ReboundsQuery = "SELECT `name`, `date`, (`gameORB` + `gameDRB`) AS rebounds
@@ -72,7 +72,7 @@ echo "<p>\n";
 
 echo "\n";
 echo "\t\t</td>\n";
-echo "\t\t<td>\n";
+echo "\t\t<td align=center>\n";
 echo "\n";
 
 $top10AssistsQuery = "SELECT `name`, `date`, `gameAST` AS assists
@@ -175,7 +175,7 @@ echo "\n";
 echo "\t\t</td>\n";
 echo "\t</tr>\n";
 echo "\t<tr>\n";
-echo "\t\t<td>\n";
+echo "\t\t<td align=center>\n";
 echo "\n";
 
 $top10FGMQuery = "SELECT `name`, `date`, (`game2GM` + `game3GM`) AS FGM

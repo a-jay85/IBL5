@@ -14,7 +14,7 @@ if (is_null($_POST['rookie_cy3'])) {
 	$rookieOptionYear = 3;
 }
 
-$recipient = 'ajaynicolas@gmail.com';
+$recipient = 'ibldepthcharts@gmail.com';
 $emailsubject = "Rookie Extension Option - ".$Player_Name;
 $filetext = $Team_Name." exercise the rookie extension option on ".$Player_Name." in the amount of ".$ExtensionAmount." in year ".$rookieOptionYear.".";
 

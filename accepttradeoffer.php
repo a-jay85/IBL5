@@ -53,7 +53,7 @@ $querystor="INSERT INTO nuke_stories (catid,aid,title,time,hometext,topic,inform
 $resultstor=mysql_query($querystor);
 
 if (isset($resultstor)) {
-	$recipient = 'ajaynicolas@gmail.com';
+	$recipient = 'ibldepthcharts@gmail.com';
 	mail($recipient, $storytitle, $storytext, "From: ibldepthcharts@gmail.com");
 }
 

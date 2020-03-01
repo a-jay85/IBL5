@@ -8,7 +8,7 @@ $Team_Name = $_POST['teamname'];
 $Player_Name = $_POST['playername'];
 $Position = $_POST['NewPos'];
 
-$recipient = 'ajaynicolas@gmail.com';
+$recipient = 'ibldepthcharts@gmail.com';
 $emailsubject = "Position Migration - ".$Player_Name;
 $filetext = $Team_Name." migrates ".$Player_Name." to ".$Position.".";
 

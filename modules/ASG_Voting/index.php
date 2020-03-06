@@ -51,7 +51,7 @@ function userinfo($username, $bypass=0, $hid=0, $url=0) {
 echo "
       <form name=\"ASGVote\" method=\"post\" action=\"ASGVote.php\"><center><img src=\"online/teamgrfx/$teamlogo.jpg\"><br><br>";
 
-$query = "SELECT * FROM nuke_iblplyr where pos = 'C' and (tid = '1' or tid = '26' or tid = '4' or tid = '3' or tid = '21' or tid = '2' or tid = '24' or tid = '29' or tid = '6' or tid = '27' or tid = '9' or tid = '7' or tid = '10' or tid = '5' or tid = '8' or tid = '31') and teamname != 'Retired' and stats_gm > '10' order by ((stats_3gm*3)+stats_ftm+(stats_fgm-stats_3gm)*2)/stats_gm desc";
+$query = "SELECT * FROM nuke_iblplyr where pos = 'C' and (tid = '1' or tid = '2' or tid = '3' or tid = '4' or tid = '5' or tid = '6' or tid = '7' or tid = '8' or tid = '9' or tid = '10' or tid = '11' or tid = '12') and teamname != 'Retired' and stats_gm > '10' order by name";
 $result = mysql_query($query);
 while($row = mysql_fetch_assoc($result))
 {
@@ -75,10 +75,10 @@ while($row = mysql_fetch_assoc($result))
     $tpp = round($tpp,3);
     $gm = floatval($row['stats_gm']);
     $gs = floatval($row['stats_gs']);
-    $dd .= "<option value='".$row['name']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl,  ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp, ".$gm." gm, ".$gs." gs</option>";
+    $dd .= "<option value='".$row['name'].", ".$row['teamname']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl,  ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp, ".$gm." gm, ".$gs." gs</option>";
 } 
 
-$query1 = "SELECT * FROM nuke_iblplyr where (pos = 'PF' or pos = 'SF') and (tid = '1' or tid = '26' or tid = '4' or tid = '3' or tid = '21' or tid = '2' or tid = '24' or tid = '29' or tid = '6' or tid = '27' or tid = '9' or tid = '7' or tid = '10' or tid = '5' or tid = '8' or tid = '31') and teamname != 'Retired' order by name";
+$query1 = "SELECT * FROM nuke_iblplyr where (pos = 'PF' or pos = 'SF') and (tid = '1' or tid = '2' or tid = '3' or tid = '4' or tid = '5' or tid = '6' or tid = '7' or tid = '8' or tid = '9' or tid = '10' or tid = '11' or tid = '12') and teamname != 'Retired' order by name";
 $result1 = mysql_query($query1);
 while($row = mysql_fetch_assoc($result1))
 {
@@ -102,10 +102,10 @@ while($row = mysql_fetch_assoc($result1))
     $tpp = round($tpp,3);
     $gm = floatval($row['stats_gm']);
     $gs = floatval($row['stats_gs']);
-    $ff .= "<option value='".$row['name']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl,  ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp, ".$gm." gm, ".$gs." gs</option>";
+    $ff .= "<option value='".$row['name'].", ".$row['teamname']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl,  ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp, ".$gm." gm, ".$gs." gs</option>";
 } 
 
-$query2 = "SELECT * FROM nuke_iblplyr where (pos = 'PG' or pos = 'SG') and (tid = '1' or tid = '26' or tid = '4' or tid = '3' or tid = '21' or tid = '2' or tid = '24' or tid = '29' or tid = '6' or tid = '27' or tid = '9' or tid = '7' or tid = '10' or tid = '5' or tid = '8' or tid = '31') and teamname != 'Retired' order by teamname";
+$query2 = "SELECT * FROM nuke_iblplyr where (pos = 'PG' or pos = 'SG') and (tid = '1' or tid = '2' or tid = '3' or tid = '4' or tid = '5' or tid = '6' or tid = '7' or tid = '8' or tid = '9' or tid = '10' or tid = '11' or tid = '12') and teamname != 'Retired' order by name";
 $result2 = mysql_query($query2);
 while($row = mysql_fetch_assoc($result2))
 {
@@ -129,10 +129,10 @@ while($row = mysql_fetch_assoc($result2))
     $tpp = round($tpp,3);
     $gm = floatval($row['stats_gm']);
     $gs = floatval($row['stats_gs']);
-    $hh .= "<option value='".$row['name']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl,  ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp, ".$gm." gm, ".$gs." gs</option>";
+    $hh .= "<option value='".$row['name'].", ".$row['teamname']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl,  ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp, ".$gm." gm, ".$gs." gs</option>";
 } 
 
-$query3 = "SELECT * FROM nuke_iblplyr where pos = 'C' and (tid = '11' or tid = '25' or tid = '30' or tid = '13' or tid = '14' or tid = '15' or tid = '12' or tid = '32' or tid = '16' or tid = '17' or tid = '22' or tid = '20' or tid = '19' or tid = '23' or tid = '18' or tid = '28') and teamname != 'Retired' order by teamname";
+$query3 = "SELECT * FROM nuke_iblplyr where pos = 'C' and (tid = '13' or tid = '14' or tid = '15' or tid = '16' or tid = '17' or tid = '18' or tid = '19' or tid = '20' or tid = '21' or tid = '22' or tid = '23' or tid = '24') and teamname != 'Retired' order by name";
 $result3 = mysql_query($query3);
 while($row = mysql_fetch_assoc($result3))
 {
@@ -156,10 +156,10 @@ while($row = mysql_fetch_assoc($result3))
     $tpp = round($tpp,3);
     $gm = floatval($row['stats_gm']);
     $gs = floatval($row['stats_gs']);
-    $ii .= "<option value='".$row['name']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl,  ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp, ".$gm." gm, ".$gs." gs</option>";
+    $ii .= "<option value='".$row['name'].", ".$row['teamname']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl,  ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp, ".$gm." gm, ".$gs." gs</option>";
 } 
 
-$query4 = "SELECT * FROM nuke_iblplyr where (pos = 'PF' or pos = 'SF') and (tid = '11' or tid = '25' or tid = '30' or tid = '13' or tid = '14' or tid = '15' or tid = '12' or tid = '32' or tid = '16' or tid = '17' or tid = '22' or tid = '20' or tid = '19' or tid = '23' or tid = '18' or tid = '28') and teamname != 'Retired' order by teamname";
+$query4 = "SELECT * FROM nuke_iblplyr where (pos = 'PF' or pos = 'SF') and (tid = '13' or tid = '14' or tid = '15' or tid = '16' or tid = '17' or tid = '18' or tid = '19' or tid = '20' or tid = '21' or tid = '22' or tid = '23' or tid = '24') and teamname != 'Retired' order by name";
 $result4 = mysql_query($query4);
 while($row = mysql_fetch_assoc($result4))
 {
@@ -183,10 +183,10 @@ while($row = mysql_fetch_assoc($result4))
     $tpp = round($tpp,3);
     $gm = floatval($row['stats_gm']);
     $gs = floatval($row['stats_gs']);
-    $jj .= "<option value='".$row['name']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl,  ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp, ".$gm." gm, ".$gs." gs</option>";
+    $jj .= "<option value='".$row['name'].", ".$row['teamname']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl,  ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp, ".$gm." gm, ".$gs." gs</option>";
 } 
 
-$query5 = "SELECT * FROM nuke_iblplyr where (pos = 'PG' or pos = 'SG') and (tid = '11' or tid = '25' or tid = '30' or tid = '13' or tid = '14' or tid = '15' or tid = '12' or tid = '32' or tid = '16' or tid = '17' or tid = '22' or tid = '20' or tid = '19' or tid = '23' or tid = '18' or tid = '28') and teamname != 'Retired' order by teamname";
+$query5 = "SELECT * FROM nuke_iblplyr where (pos = 'PG' or pos = 'SG') and (tid = '13' or tid = '14' or tid = '15' or tid = '16' or tid = '17' or tid = '18' or tid = '19' or tid = '20' or tid = '21' or tid = '22' or tid = '23' or tid = '24') and teamname != 'Retired' order by name";
 $result5 = mysql_query($query5);
 while($row = mysql_fetch_assoc($result5))
 {
@@ -210,7 +210,7 @@ while($row = mysql_fetch_assoc($result5))
     $tpp = round($tpp,3);
     $gm = floatval($row['stats_gm']);
     $gs = floatval($row['stats_gs']);
-    $kk .= "<option value='".$row['name']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl,  ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp, ".$gm." gm, ".$gs." gs</option>";
+    $kk .= "<option value='".$row['name'].", ".$row['teamname']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl,  ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp, ".$gm." gm, ".$gs." gs</option>";
 } 
 
 echo "<select name=\"ECC\">

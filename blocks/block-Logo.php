@@ -19,11 +19,16 @@ if ( !defined('BLOCK_FILE') ) {
 
 global $cat, $language, $prefix, $multilingual, $currentlang, $db;
 
-$actual_link = "$_SERVER[REQUEST_URI]";
+$actual_url = "$_SERVER[REQUEST_URI]";
 
 $boxstuff = "<span class=\"content\">";
 
-if ($actual_link == "/" || $actual_link == "/index.php" || $actual_link == "/ibl5/" || $actual_link == "/ibl5/index.php") {} else {
+if (
+    $actual_url == "/" ||
+    $actual_url == "/index.php" ||
+    $actual_url == "/ibl5/" ||
+    $actual_url == "/ibl5/index.php"
+) {} else {
 	$boxstuff .= '<a href="index.php"><img src="logocorner.jpg" border="0"></a>';
 }
 

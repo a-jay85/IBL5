@@ -465,12 +465,12 @@ while ($i < $numTeams) {
 					if ($j >= $numGames - 10) {
 						$lossesInLast10Games++;
 					}
-					if ($streakType = "L") {
+					if ($streakType == "L") {
 						$streak++;
 					} else {
 						$streak = 1;
 					}
-					$streakType == "L";
+					$streakType = "L";
 				} else {
 					$wins++;
 					$homeWins++;

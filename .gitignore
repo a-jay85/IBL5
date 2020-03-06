@@ -1,6 +1,7 @@
 ibl/
 phpmyadmin/
 depthcharts/
+backups/
 
 .DS_Store
 config.php

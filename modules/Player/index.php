@@ -68,26 +68,54 @@ function leaderboards()
 
     // TODO: continue refactoring this function to take up waaay less lines
 
-    foreach(array('Regular Season Totals', 'Regular Season Averages', 'Playoff Totals', 'Playoff Averages', 'H.E.A.T. Totals', 'H.E.A.T. Averages')
-        as $key => $value) {
-            echo "  <option value=\"$value\"";
-            if ($boards_type == $value) echo ' SELECTED';
-            echo ">$value</option>";
+    $typeArray = array(
+        'Reg' => 'Regular Season Totals',
+        'Rav' => 'Regular Season Averages',
+        'Ply' => 'Playoff Totals',
+        'PLA' => 'Playoff Averages',
+        'HET' => 'H.E.A.T. Totals',
+        'HEA' => 'H.E.A.T. Averages'
+    );
+
+    foreach ($typeArray as $key => $value) {
+        echo "  <option value=\"$key\"";
+        if ($boards_type == $key) {
+            echo ' SELECTED';
+        }
+        echo ">$value</option>";
     }
 
     echo "</select></td><td>
           Category: <select name=\"sort_cat\">";
 
-    $sort_cat_array = array('pts' => 'Points', 'games' => 'Games', 'minutes' => 'Minutes', 'fgm' => 'Field Goals Made',
-        'fga' => 'Field Goals Attempted', 'fgpct' => 'FG Percentage (avgs only)', 'ftm' => 'Free Throws Made',
-        'fta' => 'Free Throws Attempted', 'ftpct' => 'FT Percentage (avgs only)','tgm' => 'Three-Pointers Made',
-        'tga' => 'Three-Pointers Attempted','tpct' => '3P Percentage (avgs only)', 'orb' => 'Offensive Rebounds',
-        'reb' => 'Total Rebounds', 'ast' => 'Assists','stl' => 'Steals', 'tvr' => 'Turnovers', 'blk' => 'Blocked Shots', 'pf' => 'Personal Fouls');
+    $sort_cat_array = array(
+        'pts' => 'Points',
+        'games' => 'Games',
+        'minutes' => 'Minutes',
+        'fgm' => 'Field Goals Made',
+        'fga' => 'Field Goals Attempted',
+        'fgpct' => 'FG Percentage (avgs only)',
+        'ftm' => 'Free Throws Made',
+        'fta' => 'Free Throws Attempted',
+        'ftpct' => 'FT Percentage (avgs only)',
+        'tgm' => 'Three-Pointers Made',
+        'tga' => 'Three-Pointers Attempted',
+        'tpct' => '3P Percentage (avgs only)',
+        'orb' => 'Offensive Rebounds',
+        'reb' => 'Total Rebounds',
+        'ast' => 'Assists',
+        'stl' => 'Steals',
+        'tvr' => 'Turnovers',
+        'blk' => 'Blocked Shots',
+        'pf' => 'Personal Fouls'
+    );
 
-    foreach($sort_cat_array as $key => $value) {
-            echo "  <option value=\"$value\"";
-            if ($sort_cat == $value) echo ' SELECTED';
-            echo ">$value</option>";
+    foreach ($sort_cat_array as $key => $value) {
+        echo "  <option value=\"$value\"";
+        if ($sort_cat == $value) {
+            echo ' SELECTED';
+        }
+        echo ">$value</option>";
     }
 
     echo "</select></td><td>
@@ -114,67 +142,67 @@ function leaderboards()
     // ===== RUN QUERY IF FORM HAS BEEN SUBMITTED
 
     if ($submitted != NULL) {
-        $tableforquery="nuke_iblplyr";
+        $tableforquery = "nuke_iblplyr";
 
         if ($boards_type == 'Reg') {
-            $tableforquery="nuke_iblplyr";
-            $restriction2="car_gm > 0 ";
+            $tableforquery = "nuke_iblplyr";
+            $restriction2 = "car_gm > 0 ";
         }
 
         if ($boards_type == 'Rav') {
-            $tableforquery="ibl_season_career_avgs";
-            $restriction2="games > 0";
+            $tableforquery = "ibl_season_career_avgs";
+            $restriction2 = "games > 0";
         }
 
         if ($boards_type == 'Ply') {
-            $tableforquery="ibl_playoff_career_totals";
-            $restriction2="games > 0";
+            $tableforquery = "ibl_playoff_career_totals";
+            $restriction2 = "games > 0";
         }
 
         if ($boards_type == 'PLA') {
-            $tableforquery="ibl_playoff_career_avgs";
-            $restriction2="games > 0";
+            $tableforquery = "ibl_playoff_career_avgs";
+            $restriction2 = "games > 0";
         }
 
         if ($boards_type == 'HET') {
-            $tableforquery="ibl_heat_career_totals";
-            $restriction2="games > 0";
+            $tableforquery = "ibl_heat_career_totals";
+            $restriction2 = "games > 0";
         }
 
         if ($boards_type == 'HEA') {
-            $tableforquery="ibl_heat_career_avgs";
-            $restriction2="games > 0";
+            $tableforquery = "ibl_heat_career_avgs";
+            $restriction2 = "games > 0";
         }
 
         if ($active == 1) {
-            $restriction1=" retired = '0' AND ";
+            $restriction1 = " retired = '0' AND ";
         }
 
-        $sortby="pts";
-        foreach($sort_cat_array as $key => $value) {
+        $sortby = "pts";
+        foreach ($sort_cat_array as $key => $value) {
             if ($sort_cat == $value) {
                 $sortby = $key;
             }
         }
 
         if ($tableforquery == "nuke_iblplyr") {
-            $sortby="car_".$sortby;
+            $sortby = "car_".$sortby;
             if ($sort_cat == 'GM') {
-                 $sortby="car_gm";
+                 $sortby = "car_gm";
             }
             if ($sort_cat == 'MIN') {
-                $sortby="car_min";
+                $sortby = "car_min";
             }
             if ($sort_cat == 'TVR') {
-                $sortby="car_to";
+                $sortby = "car_to";
             }
         }
 
-        $query="SELECT * FROM $tableforquery WHERE $restriction1 $restriction2 ORDER BY $sortby DESC";
-        $result=mysql_query($query);
-        $num=mysql_numrows($result);
+        $query = "SELECT * FROM $tableforquery WHERE $restriction1 $restriction2 ORDER BY $sortby DESC";
+        $result = mysql_query($query);
+        $num = mysql_numrows($result);
 
-      echo "<center><table><tr><th colspan=18><center>Leaderboards Display</center></th></tr>
+      echo "<center><table><tr><th colspan=21><center>Leaderboards Display</center></th></tr>
             <tr><th><center>Rank</th></center><th><center>Name</center></th><th><center>Gm</center></th>
             <th><center>Min</center></th><th><center>FGM</a></center></th><th><center>FGA</center></th>
             <th><center>FG%</center><th><center>FTM</center></th><th><center>FTA</center></th>
@@ -186,21 +214,20 @@ function leaderboards()
         // ========== FILL ROWS
 
         if ($display == 0) {
-            $numstop=$num;
+            $numstop = $num;
         } else {
-            $numstop=$display;
+            $numstop = $display;
         }
 
         if ($display == NULL) {
-            $numstop=$num;
+            $numstop = $num;
         } else {
-            $numstop=$display;
+            $numstop = $display;
         }
 
-        $i=0;
+        $i = 0;
 
         while ($i < $numstop) {
-
             $retired=0;
             if ($tableforquery == "nuke_iblplyr") {
                 $retired=mysql_result($result,$i,"retired");
@@ -210,10 +237,13 @@ function leaderboards()
                 $min=number_format(mysql_result($result,$i,"car_min"));
                 $fgm=number_format(mysql_result($result,$i,"car_fgm"));
                 $fga=number_format(mysql_result($result,$i,"car_fga"));
+                $fgpct = number_format($fgm / $fga, 3);
                 $ftm=number_format(mysql_result($result,$i,"car_ftm"));
                 $fta=number_format(mysql_result($result,$i,"car_fta"));
+                $ftpct = number_format($ftm / $fta, 3);
                 $tgm=number_format(mysql_result($result,$i,"car_tgm"));
                 $tga=number_format(mysql_result($result,$i,"car_tga"));
+                $tpct = number_format($tgm / $tga, 3);
                 $orb=number_format(mysql_result($result,$i,"car_orb"));
                 $reb=number_format(mysql_result($result,$i,"car_reb"));
                 $ast=number_format(mysql_result($result,$i,"car_ast"));
@@ -224,7 +254,11 @@ function leaderboards()
                 $pts=number_format(mysql_result($result,$i,"car_pts"));
             }
 
-            if ($tableforquery == "ibl_season_career_avgs") {
+            if (
+                $tableforquery == "ibl_season_career_avgs" OR
+                $tableforquery == "ibl_heat_career_avgs" OR
+                $tableforquery == "ibl_playoff_career_avgs"
+            ) {
                 $plyr_name=mysql_result($result,$i,"name");
                 $pid=mysql_result($result,$i,"pid");
                 $gm=number_format(mysql_result($result,$i,"games"));
@@ -248,17 +282,23 @@ function leaderboards()
                 $pts=(mysql_result($result,$i,"pts"));
             }
 
-            if ($tableforquery == "ibl_heat_career_totals") {
+            if (
+                $tableforquery == "ibl_heat_career_totals" OR
+                $tableforquery == "ibl_playoff_career_totals"
+            ) {
                 $plyr_name=mysql_result($result,$i,"name");
                 $pid=mysql_result($result,$i,"pid");
                 $gm=number_format(mysql_result($result,$i,"games"));
                 $min=number_format(mysql_result($result,$i,"minutes"));
                 $fgm=number_format(mysql_result($result,$i,"fgm"));
                 $fga=number_format(mysql_result($result,$i,"fga"));
+                $fgpct = number_format($fgm / $fga, 3);
                 $ftm=number_format(mysql_result($result,$i,"ftm"));
                 $fta=number_format(mysql_result($result,$i,"fta"));
+                $ftpct = number_format($ftm / $fta, 3);
                 $tgm=number_format(mysql_result($result,$i,"tgm"));
                 $tga=number_format(mysql_result($result,$i,"tga"));
+                $tpct = number_format($tgm / $tga, 3);
                 $orb=number_format(mysql_result($result,$i,"orb"));
                 $reb=number_format(mysql_result($result,$i,"reb"));
                 $ast=number_format(mysql_result($result,$i,"ast"));
@@ -267,93 +307,24 @@ function leaderboards()
                 $blk=number_format(mysql_result($result,$i,"blk"));
                 $pf=number_format(mysql_result($result,$i,"pf"));
                 $pts=number_format(mysql_result($result,$i,"pts"));
-            }
-
-            if ($tableforquery == "ibl_playoff_career_totals") {
-                $plyr_name=mysql_result($result,$i,"name");
-                $pid=mysql_result($result,$i,"pid");
-                $gm=number_format(mysql_result($result,$i,"games"));
-                $min=number_format(mysql_result($result,$i,"minutes"));
-                $fgm=number_format(mysql_result($result,$i,"fgm"));
-                $fga=number_format(mysql_result($result,$i,"fga"));
-                $ftm=number_format(mysql_result($result,$i,"ftm"));
-                $fta=number_format(mysql_result($result,$i,"fta"));
-                $tgm=number_format(mysql_result($result,$i,"tgm"));
-                $tga=number_format(mysql_result($result,$i,"tga"));
-                $orb=number_format(mysql_result($result,$i,"orb"));
-                $reb=number_format(mysql_result($result,$i,"reb"));
-                $ast=number_format(mysql_result($result,$i,"ast"));
-                $stl=number_format(mysql_result($result,$i,"stl"));
-                $to=number_format(mysql_result($result,$i,"tvr"));
-                $blk=number_format(mysql_result($result,$i,"blk"));
-                $pf=number_format(mysql_result($result,$i,"pf"));
-                $pts=number_format(mysql_result($result,$i,"pts"));
-            }
-
-            if ($tableforquery == "ibl_heat_career_avgs") {
-                $plyr_name=mysql_result($result,$i,"name");
-                $pid=mysql_result($result,$i,"pid");
-                $gm=number_format(mysql_result($result,$i,"games"));
-                $min=(mysql_result($result,$i,"minutes"));
-                $fgm=(mysql_result($result,$i,"fgm"));
-                $fga=(mysql_result($result,$i,"fga"));
-                $fgpct=(mysql_result($result,$i,"fgpct"));
-                $ftm=(mysql_result($result,$i,"ftm"));
-                $fta=(mysql_result($result,$i,"fta"));
-                $ftpct=(mysql_result($result,$i,"ftpct"));
-                $tgm=(mysql_result($result,$i,"tgm"));
-                $tga=(mysql_result($result,$i,"tga"));
-                $tpct=(mysql_result($result,$i,"tpct"));
-                $orb=(mysql_result($result,$i,"orb"));
-                $reb=(mysql_result($result,$i,"reb"));
-                $ast=(mysql_result($result,$i,"ast"));
-                $stl=(mysql_result($result,$i,"stl"));
-                $to=(mysql_result($result,$i,"tvr"));
-                $blk=(mysql_result($result,$i,"blk"));
-                $pf=(mysql_result($result,$i,"pf"));
-                $pts=(mysql_result($result,$i,"pts"));
-            }
-
-            if ($tableforquery == "ibl_playoff_career_avgs") {
-                $plyr_name=mysql_result($result,$i,"name");
-                $pid=mysql_result($result,$i,"pid");
-                $gm=number_format(mysql_result($result,$i,"games"));
-                $min=(mysql_result($result,$i,"minutes"));
-                $fgm=(mysql_result($result,$i,"fgm"));
-                $fga=(mysql_result($result,$i,"fga"));
-                $fgpct=(mysql_result($result,$i,"fgpct"));
-                $ftm=(mysql_result($result,$i,"ftm"));
-                $fta=(mysql_result($result,$i,"fta"));
-                $ftpct=(mysql_result($result,$i,"ftpct"));
-                $tgm=(mysql_result($result,$i,"tgm"));
-                $tga=(mysql_result($result,$i,"tga"));
-                $tpct=(mysql_result($result,$i,"tpct"));
-                $orb=(mysql_result($result,$i,"orb"));
-                $reb=(mysql_result($result,$i,"reb"));
-                $ast=(mysql_result($result,$i,"ast"));
-                $stl=(mysql_result($result,$i,"stl"));
-                $to=(mysql_result($result,$i,"tvr"));
-                $blk=(mysql_result($result,$i,"blk"));
-                $pf=(mysql_result($result,$i,"pf"));
-                $pts=(mysql_result($result,$i,"pts"));
             }
 
             $i++;
 
             echo "<tr><td><center>$i</center></td><td><center><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$plyr_name";
 
-            if ($retired == 1) echo "*";
+            if ($retired == 1) {
+                echo "*";
+            }
 
             echo "</center></td><td><center>$gm</center></td><td><center>$min</center></td><td><center>$fgm</center></td>
                 <td><center>$fga</center></td><td><center>$fgpct</center></td><td><center>$ftm</center></td><td><center>$fta</center></td>
                 <td><center>$ftpct</center><td><center>$tgm</center></td><td><center>$tga</center></td><td><center>$tpct</center></td>
                 <td><center>$orb</center></td><td><center>$reb</center></td><td><center>$ast</center></td><td><center>$stl</center></td>
                 <td><center>$to</center></td><td><center>$blk</center></td><td><center>$pf</center></td><td><center>$pts</center></td></tr>";
-
         }
 
         echo "</table></center></td></tr>";
-
     }
 
     CloseTable();

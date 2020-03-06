@@ -556,11 +556,11 @@ function boxscore ($year, $month, $tid, $wins, $losses, $wstreak, $lstreak)
 		}
 		(($i % 2)==0) ? $bgcolor="FFFFFF" : $bgcolor="EEEEEE";
 		if ($VScore > $HScore){
-			echo "<tr bgcolor=$bgcolor><td>$date</td><td><b>$vname</b></td><td><b><font color=$winlosscolor>$VScore</font></b></td><td>$hname</b></td><td><b><font color=$winlosscolor>$HScore</font></b></td><td><a href=\"./ibl/IBL/box$boxid.htm\">View</a></td><td>$wins - $losses</td><td>$streak</td></tr>";
+			echo "<tr bgcolor=$bgcolor><td>$date</td><td><b><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$vname</a></b></td><td><b><font color=$winlosscolor>$VScore</font></b></td><td><a href=\"modules.php?name=Team&op=team&tid=$home\">$hname</a></td><td><b><font color=$winlosscolor>$HScore</font></b></td><td><a href=\"./ibl/IBL/box$boxid.htm\">View</a></td><td>$wins - $losses</td><td>$streak</td></tr>";
 		} else if ($VScore < $HScore) {
-			echo "<tr bgcolor=$bgcolor><td>$date</td><td>$vname</b></td><td><b><font color=$winlosscolor>$VScore</font></b></td><td><b>$hname</b></td><td><b><font color=$winlosscolor>$HScore</font></b></td><td><a href=\"./ibl/IBL/box$boxid.htm\">View</a></td><td>$wins - $losses</td><td>$streak</td></tr>";
+			echo "<tr bgcolor=$bgcolor><td>$date</td><td><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$vname</a></td><td><b><font color=$winlosscolor>$VScore</font></b></td><td><b><a href=\"modules.php?name=Team&op=team&tid=$home\">$hname</a></b></td><td><b><font color=$winlosscolor>$HScore</font></b></td><td><a href=\"./ibl/IBL/box$boxid.htm\">View</a></td><td>$wins - $losses</td><td>$streak</td></tr>";
 		} else {
-			echo "<tr><td>$date</td><td>$vname</b></td><td></td><td>$hname</td><td></td><td></td></tr>";
+			echo "<tr><td>$date</td><td><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$vname</a></td><td></td><td><a href=\"modules.php?name=Team&op=team&tid=$home\">$hname</a></td><td></td><td></td></tr>";
 		}
 		$i++;
 	}

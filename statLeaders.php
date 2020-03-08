@@ -34,8 +34,6 @@ function seasonHighTable($queryForStat, $statName, $playerOrTeam)
         $isPlayer = 'pid != 0';
     } elseif ($playerOrTeam == 'team') {
         $isPlayer = 'pid = 0';
-    } else {
-
     }
 
     $query = "SELECT `name`, `date`, " . $queryForStat . " AS `" . $statName . "`

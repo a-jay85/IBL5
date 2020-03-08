@@ -4,18 +4,6 @@ require 'config.php';
 mysql_connect($dbhost,$dbuname,$dbpass);
 @mysql_select_db($dbname) or die("Unable to select database");
 
-$arrayStatQueries = array(
-    '(`game2GM`*2) + `gameFTM` + (`game3GM`*3)',
-    '(`gameORB` + `gameDRB`)',
-    '`gameAST`',
-    '`gameSTL`',
-    '`gameBLK`',
-    '`gameTOV`',
-    '(`game2GM` + `game3GM`)',
-    '`gameFTM`',
-    '`game3GM`'
-);
-
 $arrayStatNames = array(
     'POINTS',
     'REBOUNDS',
@@ -26,6 +14,18 @@ $arrayStatNames = array(
     'Field Goals Made',
     'Free Throws Made',
     'Three Pointers Made'
+);
+
+$arrayStatQueries = array(
+    '(`game2GM`*2) + `gameFTM` + (`game3GM`*3)',
+    '(`gameORB` + `gameDRB`)',
+    '`gameAST`',
+    '`gameSTL`',
+    '`gameBLK`',
+    '`gameTOV`',
+    '(`game2GM` + `game3GM`)',
+    '`gameFTM`',
+    '`game3GM`'
 );
 
 function seasonHighTable($queryForStat, $statName, $playerOrTeam)

@@ -9,7 +9,7 @@ echo "<H1>Players' Season Highs<H1>";
 $top10PointsQuery = "SELECT `name`, `date`, (`game2GM`*2) + `gameFTM` + (`game3GM`*3) AS points
     FROM ibl_box_scores
     WHERE pid != 0
-    ORDER BY points DESC, date ASC LIMIT 10;";
+    ORDER BY points DESC, date ASC LIMIT 15;";
 $top10PointsResult = mysql_query($top10PointsQuery);
 $top10PointsRows = mysql_num_rows($top10PointsResult);
 
@@ -47,7 +47,7 @@ echo "\n";
 $top10ReboundsQuery = "SELECT `name`, `date`, (`gameORB` + `gameDRB`) AS rebounds
     FROM ibl_box_scores
     WHERE pid != 0
-    ORDER BY rebounds DESC, date ASC LIMIT 10;";
+    ORDER BY rebounds DESC, date ASC LIMIT 15;";
 $top10ReboundsResult = mysql_query($top10ReboundsQuery);
 $top10ReboundsRows = mysql_num_rows($top10ReboundsResult);
 
@@ -80,7 +80,7 @@ echo "\n";
 $top10AssistsQuery = "SELECT `name`, `date`, `gameAST` AS assists
     FROM ibl_box_scores
     WHERE pid != 0
-    ORDER BY assists DESC, date ASC LIMIT 10;";
+    ORDER BY assists DESC, date ASC LIMIT 15;";
 $top10AssistsResult = mysql_query($top10AssistsQuery);
 $top10AssistsRows = mysql_num_rows($top10AssistsResult);
 
@@ -115,7 +115,7 @@ echo "\n";
 $top10StealsQuery = "SELECT `name`, `date`, `gameSTL` AS steals
     FROM ibl_box_scores
     WHERE pid != 0
-    ORDER BY steals DESC, date ASC LIMIT 10;";
+    ORDER BY steals DESC, date ASC LIMIT 15;";
 $top10StealsResult = mysql_query($top10StealsQuery);
 $top10StealsRows = mysql_num_rows($top10StealsResult);
 
@@ -148,7 +148,7 @@ echo "\n";
 $top10BlocksQuery = "SELECT `name`, `date`, `gameBLK` AS blocks
     FROM ibl_box_scores
     WHERE pid != 0
-    ORDER BY blocks DESC, date ASC LIMIT 10;";
+    ORDER BY blocks DESC, date ASC LIMIT 15;";
 $top10BlocksResult = mysql_query($top10BlocksQuery);
 $top10BlocksRows = mysql_num_rows($top10BlocksResult);
 
@@ -183,7 +183,7 @@ echo "\n";
 $top10FGMQuery = "SELECT `name`, `date`, (`game2GM` + `game3GM`) AS FGM
     FROM ibl_box_scores
     WHERE pid != 0
-    ORDER BY FGM DESC, date ASC LIMIT 10;";
+    ORDER BY FGM DESC, date ASC LIMIT 15;";
 $top10FGMResult = mysql_query($top10FGMQuery);
 $top10FGMRows = mysql_num_rows($top10FGMResult);
 
@@ -216,7 +216,7 @@ echo "\n";
 $top10FTMQuery = "SELECT `name`, `date`, `gameFTM` AS FTM
     FROM ibl_box_scores
     WHERE pid != 0
-    ORDER BY FTM DESC, date ASC LIMIT 10;";
+    ORDER BY FTM DESC, date ASC LIMIT 15;";
 $top10FTMResult = mysql_query($top10FTMQuery);
 $top10FTMRows = mysql_num_rows($top10FTMResult);
 
@@ -249,7 +249,7 @@ echo "\n";
 $top103GMQuery = "SELECT `name`, `date`, `game3GM` AS 3GM
     FROM ibl_box_scores
     WHERE pid != 0
-    ORDER BY 3GM DESC, date ASC LIMIT 10;";
+    ORDER BY 3GM DESC, date ASC LIMIT 15;";
 $top103GMResult = mysql_query($top103GMQuery);
 $top103GMRows = mysql_num_rows($top103GMResult);
 
@@ -292,7 +292,7 @@ function teamname ($teamid)
 $top10PointsQuery = "SELECT `name`, `date`, (`game2GM`*2) + `gameFTM` + (`game3GM`*3) AS points
     FROM ibl_box_scores
     WHERE pid = 0
-    ORDER BY points DESC, date ASC LIMIT 10;";
+    ORDER BY points DESC, date ASC LIMIT 15;";
 $top10PointsResult = mysql_query($top10PointsQuery);
 $top10PointsRows = mysql_num_rows($top10PointsResult);
 
@@ -330,7 +330,7 @@ echo "\n";
 $top10ReboundsQuery = "SELECT `name`, `date`, (`gameORB` + `gameDRB`) AS rebounds
     FROM ibl_box_scores
     WHERE pid = 0
-    ORDER BY rebounds DESC, date ASC LIMIT 10;";
+    ORDER BY rebounds DESC, date ASC LIMIT 15;";
 $top10ReboundsResult = mysql_query($top10ReboundsQuery);
 $top10ReboundsRows = mysql_num_rows($top10ReboundsResult);
 
@@ -363,7 +363,7 @@ echo "\n";
 $top10AssistsQuery = "SELECT `name`, `date`, `gameAST` AS assists
     FROM ibl_box_scores
     WHERE pid = 0
-    ORDER BY assists DESC, date ASC LIMIT 10;";
+    ORDER BY assists DESC, date ASC LIMIT 15;";
 $top10AssistsResult = mysql_query($top10AssistsQuery);
 $top10AssistsRows = mysql_num_rows($top10AssistsResult);
 
@@ -398,7 +398,7 @@ echo "\n";
 $top10StealsQuery = "SELECT `name`, `date`, `gameSTL` AS steals
     FROM ibl_box_scores
     WHERE pid = 0
-    ORDER BY steals DESC, date ASC LIMIT 10;";
+    ORDER BY steals DESC, date ASC LIMIT 15;";
 $top10StealsResult = mysql_query($top10StealsQuery);
 $top10StealsRows = mysql_num_rows($top10StealsResult);
 
@@ -431,7 +431,7 @@ echo "\n";
 $top10BlocksQuery = "SELECT `name`, `date`, `gameBLK` AS blocks
     FROM ibl_box_scores
     WHERE pid = 0
-    ORDER BY blocks DESC, date ASC LIMIT 10;";
+    ORDER BY blocks DESC, date ASC LIMIT 15;";
 $top10BlocksResult = mysql_query($top10BlocksQuery);
 $top10BlocksRows = mysql_num_rows($top10BlocksResult);
 
@@ -466,7 +466,7 @@ echo "\n";
 $top10FGMQuery = "SELECT `name`, `date`, (`game2GM` + `game3GM`) AS FGM
     FROM ibl_box_scores
     WHERE pid = 0
-    ORDER BY FGM DESC, date ASC LIMIT 10;";
+    ORDER BY FGM DESC, date ASC LIMIT 15;";
 $top10FGMResult = mysql_query($top10FGMQuery);
 $top10FGMRows = mysql_num_rows($top10FGMResult);
 
@@ -499,7 +499,7 @@ echo "\n";
 $top10FTMQuery = "SELECT `name`, `date`, `gameFTM` AS FTM
     FROM ibl_box_scores
     WHERE pid = 0
-    ORDER BY FTM DESC, date ASC LIMIT 10;";
+    ORDER BY FTM DESC, date ASC LIMIT 15;";
 $top10FTMResult = mysql_query($top10FTMQuery);
 $top10FTMRows = mysql_num_rows($top10FTMResult);
 
@@ -532,7 +532,7 @@ echo "\n";
 $top103GMQuery = "SELECT `name`, `date`, `game3GM` AS 3GM
     FROM ibl_box_scores
     WHERE pid = 0
-    ORDER BY 3GM DESC, date ASC LIMIT 10;";
+    ORDER BY 3GM DESC, date ASC LIMIT 15;";
 $top103GMResult = mysql_query($top103GMQuery);
 $top103GMRows = mysql_num_rows($top103GMResult);
 

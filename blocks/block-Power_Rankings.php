@@ -41,7 +41,7 @@ while ($i < $num)
 	}else{
 		$bgcolor="EEEEEE";
 	}
-	$content = $content."<tr bgcolor=$bgcolor><td align=right valign=top>$i.</td><td align=center>$Team</td><td align=right valign=top>$ranking</td></tr>";
+	$content = $content."<tr bgcolor=$bgcolor><td align=right valign=top>$i.</td><td align=center><a href=\"modules.php?name=Team&op=team&tid=$tid\">$Team</a></td><td align=right valign=top>$ranking</td></tr>";
 }
 
 $content=$content."<tr><td colspan=3><center><a href=\"modules.php?name=Power_Rankings\"><font color=#aaaaaa><i>-- Full Power Rankings --</i></font></a></center></table>";

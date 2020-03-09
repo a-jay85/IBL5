@@ -1349,7 +1349,7 @@ function team($tid)
 			$max_chunk_result=mysql_query($max_chunk_query);
 			$row = mysql_fetch_assoc($max_chunk_result);
 
-			$table_chunk=$table_chunk."<tr bgcolor=$color1><th><font color=$color2>Pos</font></th><th colspan=3><font color=$color2>Player</font></th><th><font color=$color2>g</font></th><th><font color=$color2>gs</font></th><th><font color=$color2>min</font></th><th><font color=$color2>fgp</font></th><th><font color=$color2>ftp</font></th><th><font color=$color2>3gp</font></th><th><font color=$color2>orb</font></th><th><font color=$color2>reb</font></th><th><font color=$color2>ast</font></th><th><font color=$color2>stl</font></th><th><font color=$color2>to</font></th><th><font color=$color2>blk</font></th><th><font color=$color2>pf</font></th><th><font color=$color2>pts</font></th></tr></thead><tbody>";
+			$table_chunk=$table_chunk."<tr bgcolor=$color1><th><font color=$color2>Pos</font></th><th colspan=3><font color=$color2>Player</font></th><th><font color=$color2>g</font></th><th><font color=$color2>gs</font></th><th><font color=$color2>min</font></th><th><font color=$color2>fgm</font></th><th><font color=$color2>fga</font></th><th><font color=$color2>fgp</font></th><th><font color=$color2>ftm</font></th><th><font color=$color2>fta</font></th><th><font color=$color2>ftp</font></th><th><font color=$color2>3gm</font></th><th><font color=$color2>3ga</font></th><th><font color=$color2>3gp</font></th><th><font color=$color2>orb</font></th><th><font color=$color2>reb</font></th><th><font color=$color2>ast</font></th><th><font color=$color2>stl</font></th><th><font color=$color2>to</font></th><th><font color=$color2>blk</font></th><th><font color=$color2>pf</font></th><th><font color=$color2>pts</font></th></tr></thead><tbody>";
 
 			$query_chunk="SELECT * FROM nuke_iblplyr_chunk WHERE chunk = $row[maxchunk] AND tid = $tid AND Season = '$current_ibl_season' ORDER BY ordinal ASC";
 			$result_chunk=mysql_query($query_chunk);
@@ -1367,13 +1367,10 @@ function team($tid)
 				$stats_min=mysql_result($result_chunk,$i,"stats_min");
 				$stats_fgm=mysql_result($result_chunk,$i,"stats_fgm");
 				$stats_fga=mysql_result($result_chunk,$i,"stats_fga");
-				@$stats_fgp=number_format(($stats_fgm/$stats_fga),3);
 				$stats_ftm=mysql_result($result_chunk,$i,"stats_ftm");
 				$stats_fta=mysql_result($result_chunk,$i,"stats_fta");
-				@$stats_ftp=number_format(($stats_ftm/$stats_fta),3);
 				$stats_tgm=mysql_result($result_chunk,$i,"stats_3gm");
 				$stats_tga=mysql_result($result_chunk,$i,"stats_3ga");
-				@$stats_tgp=number_format(($stats_tgm/$stats_tga),3);
 				$stats_orb=mysql_result($result_chunk,$i,"stats_orb");
 				$stats_drb=mysql_result($result_chunk,$i,"stats_drb");
 				$stats_ast=mysql_result($result_chunk,$i,"stats_ast");
@@ -1385,6 +1382,15 @@ function team($tid)
 				$stats_pts=2*$stats_fgm+$stats_ftm+$stats_tgm;
 
 				@$stats_mpg=number_format(($stats_min/$stats_gm),1);
+				@$stats_fgm=number_format(($stats_fgm/$stats_gm),1);
+				@$stats_fga=number_format(($stats_fga/$stats_gm),1);
+				@$stats_fgp=number_format(($stats_fgm/$stats_fga),3);
+				@$stats_ftm=number_format(($stats_ftm/$stats_gm),1);
+				@$stats_fta=number_format(($stats_fta/$stats_gm),1);
+				@$stats_ftp=number_format(($stats_ftm/$stats_fta),3);
+				@$stats_tgm=number_format(($stats_tgm/$stats_gm),1);
+				@$stats_tga=number_format(($stats_tga/$stats_gm),1);
+				@$stats_tgp=number_format(($stats_tgm/$stats_tga),3);
 				@$stats_opg=number_format(($stats_orb/$stats_gm),1);
 				@$stats_rpg=number_format(($stats_reb/$stats_gm),1);
 				@$stats_apg=number_format(($stats_ast/$stats_gm),1);
@@ -1400,9 +1406,21 @@ function team($tid)
 				$table_chunk=$table_chunk."<td><center>$stats_gm</center></td><td>$stats_gs</td><td><center>";
 				$table_chunk=$table_chunk.$stats_mpg;
 				$table_chunk=$table_chunk."</center></td><td><center>";
+				$table_chunk=$table_chunk.$stats_fgm;
+				$table_chunk=$table_chunk."</center></td><td><center>";
+				$table_chunk=$table_chunk.$stats_fga;
+				$table_chunk=$table_chunk."</center></td><td><center>";
 				$table_chunk=$table_chunk.$stats_fgp;
 				$table_chunk=$table_chunk."</center></td><td><center>";
+				$table_chunk=$table_chunk.$stats_ftm;
+				$table_chunk=$table_chunk."</center></td><td><center>";
+				$table_chunk=$table_chunk.$stats_fta;
+				$table_chunk=$table_chunk."</center></td><td><center>";
 				$table_chunk=$table_chunk.$stats_ftp;
+				$table_chunk=$table_chunk."</center></td><td><center>";
+				$table_chunk=$table_chunk.$stats_tgm;
+				$table_chunk=$table_chunk."</center></td><td><center>";
+				$table_chunk=$table_chunk.$stats_tga;
 				$table_chunk=$table_chunk."</center></td><td><center>";
 				$table_chunk=$table_chunk.$stats_tgp;
 				$table_chunk=$table_chunk."</center></td><td><center>";

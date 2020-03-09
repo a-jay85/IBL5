@@ -61,7 +61,7 @@ function tradeoffer($username, $bypass=0, $hid=0, $url=0)
 	echo "<hr>
 		<form name=\"Trade_Offer\" method=\"post\" action=\"./maketradeoffer.php\">
 		<input type=\"hidden\" name=\"Team_Name\" value=\"$teamlogo\">
-		<center><img src=\"online/teamgrfx/$teamlogo.jpg\"><br><table border=1 cellspacing=0 cellpadding=0><tr><th colspan=4><center>TRADING MENU</center></th></tr><tr><td valign=top>
+		<center><img src=\"images/logo/$tid.jpg\"><br><table border=1 cellspacing=0 cellpadding=0><tr><th colspan=4><center>TRADING MENU</center></th></tr><tr><td valign=top>
 		<table border=0 bordercolor=red cellspacing=3 cellp ing=3>
 		<tr><td valign=top colspan=4><center><B><u>$userinfo[user_ibl_team]</u></b></center></td></tr><tr><td valign=top><b>Select</td><td valign=top><b>Pos</td><td valign=top><b>Name</td><td valign=top><b>Salary</td>";
 

@@ -246,6 +246,16 @@ echo "<center> An e-mail regarding this extension has been successfully sent to 
          echo " Message failed to e-mail properly; please notify the commissioner of the error and the amounts you offered.</center>";
 }
 
+// ==== UPDATE PLAYER DATABASE WITH NEW CONTRACT INFORMATION ====
+
+$queryContractUpdate = "UPDATE nuke_iblplyr
+    SET cy2 = $Offer_1,
+        cy3 = $Offer_2,
+        cy4 = $Offer_3,
+        cy5 = $Offer_4,
+        cy6 = $Offer_5
+    WHERE name = '$Player_Name'";
+$resultContractUpdate = mysql_query($queryContractUpdate);
 
 // ==== MARK THE EXTENSION AS USED FOR THIS SEASON ====
 

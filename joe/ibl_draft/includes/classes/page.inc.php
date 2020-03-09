@@ -191,9 +191,9 @@ order by pick_id
 limit 1";
     $row = mysql_fetch_array(mysql_query($statement));
     if ($row['pick_id']) {
-      $pick = $row['pick_id']%32;
+      $pick = $row['pick_id']%24;
       if($pick == 0) {
-	$pick = 32;
+	$pick = 24;
       }
       list($hour, $min, $sec) = explode(":", $row['on_clock']);
       if ($settings->get_value(kSettingPickTimeLimit)) {
@@ -211,7 +211,7 @@ limit 1";
 	$_SESSION['dinged_pick'][$row['pick_id']] = $_SESSION['dinged_pick'][$row['pick_id']] + 1;
       }
       $html .= '
-On the clock: '.$row['team_name'].' (round '.ceil(($row['pick_id'])/32).', pick '.$pick.',
+On the clock: '.$row['team_name'].' (round '.ceil(($row['pick_id'])/24).', pick '.$pick.',
 <span style="'.$style.'">'.$hour.':'.$min.'</span>)';
       $this->on_clock = $row['team_name'];
       $this->on_clock_team_id = $row['team_id'];

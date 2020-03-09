@@ -50,7 +50,7 @@ function userinfo($username, $bypass=0, $hid=0, $url=0) {
 echo "
       <form name=\"EOYVote\" method=\"post\" action=\"EOYVote.php\"><center><img src=\"online/teamgrfx/$teamlogo.jpg\"><br><br>";
 
-$query = "SELECT * FROM nuke_iblplyr where teamname != 'Retired' and stats_gm >= '10' order by ((stats_3gm*3)+stats_ftm+(stats_fgm-stats_3gm)*2)/stats_gm desc";
+$query = "SELECT * FROM nuke_iblplyr where teamname != 'Retired' and stats_gm >= '10' order by name";
 $result = mysql_query($query);
 while($row = mysql_fetch_assoc($result))
 {
@@ -74,10 +74,10 @@ while($row = mysql_fetch_assoc($result))
     $tpp = round($tpp,3);
     $gm = floatval($row['stats_gm']);
     $gs = floatval($row['stats_gs']);
-    $dd .= "<option value='".$row['name']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl,  ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp, ".$gm." gm, ".$gs." gs</option>";
+    $dd .= "<option value='".$row['name'].", ".$row['teamname']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl,  ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp, ".$gm." gm, ".$gs." gs</option>";
 } 
 
-$query1 = "SELECT * FROM nuke_iblplyr where teamname != 'Retired' and stats_gs <= '25' and stats_gm >= '10'order by ((stats_3gm*3)+stats_ftm+(stats_fgm-stats_3gm)*2)/stats_gm desc";
+$query1 = "SELECT * FROM nuke_iblplyr where teamname != 'Retired' and stats_min/stats_gm >= 15 and stats_gs/stats_gm <= '.5' order by name";
 $result1 = mysql_query($query1);
 while($row = mysql_fetch_assoc($result1))
 {
@@ -101,10 +101,10 @@ while($row = mysql_fetch_assoc($result1))
     $tpp = round($tpp,3);
     $gm = floatval($row['stats_gm']);
     $gs = floatval($row['stats_gs']);
-    $ff .= "<option value='".$row['name']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl,  ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp, ".$gm." gm, ".$gs." gs</option>";
+    $ff .= "<option value='".$row['name'].", ".$row['teamname']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl,  ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp, ".$gm." gm, ".$gs." gs</option>";
 } 
 
-$query2 = "SELECT * FROM nuke_iblplyr where teamname != 'Retired' and exp = '1' and stats_gm >= '10' order by ((stats_3gm*3)+stats_ftm+(stats_fgm-stats_3gm)*2)/stats_gm desc";
+$query2 = "SELECT * FROM nuke_iblplyr where teamname != 'Retired' and exp = '1' and stats_gm >= '10' order by name";
 $result2 = mysql_query($query2);
 while($row = mysql_fetch_assoc($result2))
 {
@@ -128,7 +128,7 @@ while($row = mysql_fetch_assoc($result2))
     $tpp = round($tpp,3);
     $gm = floatval($row['stats_gm']);
     $gs = floatval($row['stats_gs']);
-    $hh .= "<option value='".$row['name']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl,  ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp, ".$gm." gm, ".$gs." gs</option>";
+    $hh .= "<option value='".$row['name'].", ".$row['teamname']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl,  ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp, ".$gm." gm, ".$gs." gs</option>";
 } 
 
 $query3 = "SELECT * from nuke_ibl_team_info where teamid != '35' order by owner_name";
@@ -136,7 +136,7 @@ $result3 = mysql_query($query3);
 while($row = mysql_fetch_assoc($result3))
 {
 
-    $ii .= "<option value='".$row['owner_name']."'>".$row['owner_name'].", ".$row['team_city']." ".$row['team_name']."</option>";
+    $ii .= "<option value='".$row['owner_name'].", ".$row['team_city']."'>".$row['owner_name'].", ".$row['team_city']." ".$row['team_name']."</option>";
 
 } 
 

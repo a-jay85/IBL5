@@ -43,13 +43,13 @@ class table_list {
     }
     $_SESSION['current_page'][$this->interface_id] = $this->page;
 
-    // Retrieve the records per page, set it to 32 if not set
+    // Retrieve the records per page, set it to 24 if not set
     $this->records_per_page = $_POST['records_per_page'];
     if (!$this->records_per_page) {
       $this->records_per_page = $_COOKIE['records_per_page_'.$this->interface_id];
     }
     if (!$this->records_per_page) {
-      $this->records_per_page = 32;
+      $this->records_per_page = 24;
     }
     setcookie('records_per_page_'.$this->interface_id, $this->records_per_page, time()+60*60*24*360*10);
     $this->queries = array();
@@ -447,7 +447,7 @@ class table_list {
     <td class="pages">Rows Per Page:</td>
     <td class="pages">
       <select name="records_per_page" onchange="document.'.$id.'.submit()">';
-    $options = array(5, 10, 25, 32, 50, 100, 200, 300, 400, 500, 1000, 2000, 5000);
+    $options = array(5, 10, 24, 32, 50, 100, 200, 300, 400, 500, 1000, 2000, 5000);
     foreach($options as $value) {
       if ($value == $this->records_per_page) {
 	$selected = " selected";

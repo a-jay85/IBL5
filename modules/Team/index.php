@@ -306,8 +306,14 @@ function leaguestats()
 		$team_off_pf=mysql_result($resultTeamOffenseTotals,$t,"pf");
 		$team_off_pts=$team_off_fgm+$team_off_fgm+$team_off_ftm+$team_off_tgm;
 
+		@$team_off_avgfgm=number_format($team_off_fgm/$team_off_games,2);
+		@$team_off_avgfga=number_format($team_off_fga/$team_off_games,2);
 		@$team_off_fgp=number_format($team_off_fgm/$team_off_fga,3);
+		@$team_off_avgftm=number_format($team_off_ftm/$team_off_games,2);
+		@$team_off_avgfta=number_format($team_off_fta/$team_off_games,2);
 		@$team_off_ftp=number_format($team_off_ftm/$team_off_fta,3);
+		@$team_off_avgtgm=number_format($team_off_tgm/$team_off_games,2);
+		@$team_off_avgtga=number_format($team_off_tga/$team_off_games,2);
 		@$team_off_tgp=number_format($team_off_tgm/$team_off_tga,3);
 		@$team_off_avgorb=number_format($team_off_orb/$team_off_games,2);
 		@$team_off_avgreb=number_format($team_off_reb/$team_off_games,2);
@@ -335,9 +341,45 @@ function leaguestats()
 		$lg_off_pf=$lg_off_pf+$team_off_pf;
 		$lg_off_pts=$lg_off_pts+$team_off_pts;
 
-		$offense_totals=$offense_totals."<tr><td bgcolor=\"$teamcolor1\"><a href=\"modules.php?name=Team&op=team&tid=$tid\"><font color=\"$teamcolor2\">$teamcity $team_off_name Offense</font></a></td><td>$team_off_games</td><td>$team_off_fgm</td><td>$team_off_fga</td><td>$team_off_ftm</td><td>$team_off_fta</td><td>$team_off_tgm</td><td>$team_off_tga</td><td>$team_off_orb</td><td>$team_off_reb</td><td>$team_off_ast</td><td>$team_off_stl</td><td>$team_off_tvr</td><td>$team_off_blk</td><td>$team_off_pf</td><td>$team_off_pts</td></tr>";
+		$offense_totals=$offense_totals."<tr>
+			<td bgcolor=\"$teamcolor1\"><a href=\"modules.php?name=Team&op=team&tid=$tid\"><font color=\"$teamcolor2\">$teamcity $team_off_name Offense</font></a></td>
+			<td>$team_off_games</td>
+			<td>$team_off_fgm</td>
+			<td>$team_off_fga</td>
+			<td>$team_off_ftm</td>
+			<td>$team_off_fta</td>
+			<td>$team_off_tgm</td>
+			<td>$team_off_tga</td>
+			<td>$team_off_orb</td>
+			<td>$team_off_reb</td>
+			<td>$team_off_ast</td>
+			<td>$team_off_stl</td>
+			<td>$team_off_tvr</td>
+			<td>$team_off_blk</td>
+			<td>$team_off_pf</td>
+			<td>$team_off_pts</td>
+		</tr>";
 
-		$offense_averages=$offense_averages."<tr><td bgcolor=\"$teamcolor1\"><a href=\"modules.php?name=Team&op=team&tid=$tid\"><font color=\"$teamcolor2\">$teamcity $team_off_name Offense</font></a></td><td>$team_off_fgp</td><td>$team_off_ftp</td><td>$team_off_tgp</td><td>$team_off_avgorb</td><td>$team_off_avgreb</td><td>$team_off_avgast</td><td>$team_off_avgstl</td><td>$team_off_avgtvr</td><td>$team_off_avgblk</td><td>$team_off_avgpf</td><td>$team_off_avgpts</td></tr>";
+		$offense_averages=$offense_averages."<tr>
+			<td bgcolor=\"$teamcolor1\"><a href=\"modules.php?name=Team&op=team&tid=$tid\"><font color=\"$teamcolor2\">$teamcity $team_off_name Offense</font></a></td>
+			<td>$team_off_avgfgm</td>
+			<td>$team_off_avgfga</td>
+			<td>$team_off_fgp</td>
+			<td>$team_off_avgftm</td>
+			<td>$team_off_avgfta</td>
+			<td>$team_off_ftp</td>
+			<td>$team_off_avgtgm</td>
+			<td>$team_off_avgtga</td>
+			<td>$team_off_tgp</td>
+			<td>$team_off_avgorb</td>
+			<td>$team_off_avgreb</td>
+			<td>$team_off_avgast</td>
+			<td>$team_off_avgstl</td>
+			<td>$team_off_avgtvr</td>
+			<td>$team_off_avgblk</td>
+			<td>$team_off_avgpf</td>
+			<td>$team_off_avgpts</td>
+		</tr>";
 
 		$t++;
 	}
@@ -379,8 +421,14 @@ function leaguestats()
 		$team_def_pf=mysql_result($resultTeamDefenseTotals,$t,"pf");
 		$team_def_pts=$team_def_fgm+$team_def_fgm+$team_def_ftm+$team_def_tgm;
 
+		@$team_def_avgfgm=number_format($team_def_fgm/$team_def_games,2);
+		@$team_def_avgfga=number_format($team_def_fga/$team_def_games,2);
 		@$team_def_fgp=number_format($team_def_fgm/$team_def_fga,3);
+		@$team_def_avgftm=number_format($team_def_ftm/$team_def_games,2);
+		@$team_def_avgfta=number_format($team_def_fta/$team_def_games,2);
 		@$team_def_ftp=number_format($team_def_ftm/$team_def_fta,3);
+		@$team_def_avgtgm=number_format($team_def_tgm/$team_def_games,2);
+		@$team_def_avgtga=number_format($team_def_tga/$team_def_games,2);
 		@$team_def_tgp=number_format($team_def_tgm/$team_def_tga,3);
 		@$team_def_avgorb=number_format($team_def_orb/$team_def_games,2);
 		@$team_def_avgreb=number_format($team_def_reb/$team_def_games,2);
@@ -391,15 +439,57 @@ function leaguestats()
 		@$team_def_avgpf=number_format($team_def_pf/$team_def_games,2);
 		@$team_def_avgpts=number_format($team_def_pts/$team_def_games,2);
 
-		$defense_totals=$defense_totals."<tr><td bgcolor=\"$teamcolor1\"><a href=\"modules.php?name=Team&op=team&tid=$tid\"><font color=\"$teamcolor2\">$teamcity $team_def_name Defense</font></a></td><td>$team_def_games</td><td>$team_def_fgm</td><td>$team_def_fga</td><td>$team_def_ftm</td><td>$team_def_fta</td><td>$team_def_tgm</td><td>$team_def_tga</td><td>$team_def_orb</td><td>$team_def_reb</td><td>$team_def_ast</td><td>$team_def_stl</td><td>$team_def_tvr</td><td>$team_def_blk</td><td>$team_def_pf</td><td>$team_def_pts</td></tr>";
+		$defense_totals=$defense_totals."<tr>
+			<td bgcolor=\"$teamcolor1\"><a href=\"modules.php?name=Team&op=team&tid=$tid\"><font color=\"$teamcolor2\">$teamcity $team_def_name Defense</font></a></td>
+			<td>$team_def_games</td>
+			<td>$team_def_fgm</td>
+			<td>$team_def_fga</td>
+			<td>$team_def_ftm</td>
+			<td>$team_def_fta</td>
+			<td>$team_def_tgm</td>
+			<td>$team_def_tga</td>
+			<td>$team_def_orb</td>
+			<td>$team_def_reb</td>
+			<td>$team_def_ast</td>
+			<td>$team_def_stl</td>
+			<td>$team_def_tvr</td>
+			<td>$team_def_blk</td>
+			<td>$team_def_pf</td>
+			<td>$team_def_pts</td>
+		</tr>";
 
-		$defense_averages=$defense_averages."<tr><td bgcolor=\"$teamcolor1\"><a href=\"modules.php?name=Team&op=team&tid=$tid\"><font color=\"$teamcolor2\">$teamcity $team_def_name Defense</font></a><td>$team_def_fgp</td><td>$team_def_ftp</td><td>$team_def_tgp</td><td>$team_def_avgorb</td><td>$team_def_avgreb</td><td>$team_def_avgast</td><td>$team_def_avgstl</td><td>$team_def_avgtvr</td><td>$team_def_avgblk</td><td>$team_def_avgpf</td><td>$team_def_avgpts</td></tr>";
+		$defense_averages=$defense_averages."<tr>
+			<td bgcolor=\"$teamcolor1\"><a href=\"modules.php?name=Team&op=team&tid=$tid\"><font color=\"$teamcolor2\">$teamcity $team_def_name Defense</font></a></td>
+			<td>$team_def_avgfgm</td>
+			<td>$team_def_avgfga</td>
+			<td>$team_def_fgp</td>
+			<td>$team_def_avgftm</td>
+			<td>$team_def_avgfta</td>
+			<td>$team_def_ftp</td>
+			<td>$team_def_avgtgm</td>
+			<td>$team_def_avgtga</td>
+			<td>$team_def_tgp</td>
+			<td>$team_def_avgorb</td>
+			<td>$team_def_avgreb</td>
+			<td>$team_def_avgast</td>
+			<td>$team_def_avgstl</td>
+			<td>$team_def_avgtvr</td>
+			<td>$team_def_avgblk</td>
+			<td>$team_def_avgpf</td>
+			<td>$team_def_avgpts</td>
+		</tr>";
 
 		$t++;
 	}
 
+	@$lg_off_avgfgm=number_format($lg_off_fgm/$lg_off_games,2);
+	@$lg_off_avgfga=number_format($lg_off_fga/$lg_off_games,2);
 	@$lg_off_fgp=number_format($lg_off_fgm/$lg_off_fga,3);
+	@$lg_off_avgftm=number_format($lg_off_ftm/$lg_off_games,2);
+	@$lg_off_avgfta=number_format($lg_off_fta/$lg_off_games,2);
 	@$lg_off_ftp=number_format($lg_off_ftm/$lg_off_fta,3);
+	@$lg_off_avgtgm=number_format($lg_off_tgm/$lg_off_games,2);
+	@$lg_off_avgtga=number_format($lg_off_tga/$lg_off_games,2);
 	@$lg_off_tgp=number_format($lg_off_tgm/$lg_off_tga,3);
 	@$lg_off_avgorb=number_format($lg_off_orb/$lg_off_games,2);
 	@$lg_off_avgreb=number_format($lg_off_reb/$lg_off_games,2);
@@ -410,9 +500,45 @@ function leaguestats()
 	@$lg_off_avgpf=number_format($lg_off_pf/$lg_off_games,2);
 	@$lg_off_avgpts=number_format($lg_off_pts/$lg_off_games,2);
 
-	$league_totals="<tr><td><b>LEAGUE TOTALS</td><td>$lg_off_games</td><td>$lg_off_fgm</td><td>$lg_off_fga</td><td>$lg_off_ftm</td><td>$lg_off_fta</td><td>$lg_off_tgm</td><td>$lg_off_tga</td><td>$lg_off_orb</td><td>$lg_off_reb</td><td>$lg_off_ast</td><td>$lg_off_stl</td><td>$lg_off_tvr</td><td>$lg_off_blk</td><td>$lg_off_pf</td><td>$lg_off_pts</td></tr>";
+	$league_totals="<tr style=\"font-weight:bold\">
+		<td>LEAGUE TOTALS</td>
+		<td>$lg_off_games</td>
+		<td>$lg_off_fgm</td>
+		<td>$lg_off_fga</td>
+		<td>$lg_off_ftm</td>
+		<td>$lg_off_fta</td>
+		<td>$lg_off_tgm</td>
+		<td>$lg_off_tga</td>
+		<td>$lg_off_orb</td>
+		<td>$lg_off_reb</td>
+		<td>$lg_off_ast</td>
+		<td>$lg_off_stl</td>
+		<td>$lg_off_tvr</td>
+		<td>$lg_off_blk</td>
+		<td>$lg_off_pf</td>
+		<td>$lg_off_pts</td>
+	</tr>";
 
-	$league_averages="<tr><td>LEAGUE AVERAGES</td><td>$lg_off_fgp</td><td>$lg_off_ftp</td><td>$lg_off_tgp</td><td>$lg_off_avgorb</td><td>$lg_off_avgreb</td><td>$lg_off_avgast</td><td>$lg_off_avgstl</td><td>$lg_off_avgtvr</td><td>$lg_off_avgblk</td><td>$lg_off_avgpf</td><td>$lg_off_avgpts</td></tr>";
+	$league_averages="<tr style=\"font-weight:bold\">
+		<td>LEAGUE AVERAGES</td>
+		<td>$lg_off_avgfgm</td>
+		<td>$lg_off_avgfga</td>
+		<td>$lg_off_fgp</td>
+		<td>$lg_off_avgftm</td>
+		<td>$lg_off_avgfta</td>
+		<td>$lg_off_ftp</td>
+		<td>$lg_off_avgtgm</td>
+		<td>$lg_off_avgtga</td>
+		<td>$lg_off_tgp</td>
+		<td>$lg_off_avgorb</td>
+		<td>$lg_off_avgreb</td>
+		<td>$lg_off_avgast</td>
+		<td>$lg_off_avgstl</td>
+		<td>$lg_off_avgtvr</td>
+		<td>$lg_off_avgblk</td>
+		<td>$lg_off_avgpf</td>
+		<td>$lg_off_avgpts</td>
+	</tr>";
 
 	echo "<center>
 		<h1>League-wide Statistics</h1>
@@ -433,14 +559,14 @@ function leaguestats()
 
 		<h2>Team Offense Averages</h2>
 		<table class=\"sortable\">
-		<thead><tr><th>Team</th><th>FGP</th><th>FTP</th><th>3GP</th><th>ORB</th><th>REB</th><th>AST</th><th>STL</th><th>TVR</th><th>BLK</th><th>PF</th><th>PTS</th></tr></thead>
+		<thead><tr><th>Team</th><th>FGM</th><th>FGA</th><th>FGP</th><th>FTM</th><th>FTA</th><th>FTP</th><th>3GM</th><th>3GA</th><th>3GP</th><th>ORB</th><th>REB</th><th>AST</th><th>STL</th><th>TVR</th><th>BLK</th><th>PF</th><th>PTS</th></tr></thead>
 		<tbody>$offense_averages</tbody>
 		<tfoot>$league_averages</tfoot>
 		</table>
 
 		<h2>Team Defense Averages</h2>
 		<table class=\"sortable\">
-		<thead><tr><th>Team</th><th>FGP</th><th>FTP</th><th>3GP</th><th>ORB</th><th>REB</th><th>AST</th><th>STL</th><th>TVR</th><th>BLK</th><th>PF</th><th>PTS</th></tr></thead>
+		<thead><tr><th>Team</th><th>FGM</th><th>FGA</th><th>FGP</th><th>FTM</th><th>FTA</th><th>FTP</th><th>3GM</th><th>3GA</th><th>3GP</th><th>ORB</th><th>REB</th><th>AST</th><th>STL</th><th>TVR</th><th>BLK</th><th>PF</th><th>PTS</th></tr></thead>
 		<tbody>$defense_averages</tbody>
 		<tfoot>$league_averages</tfoot>
 		</table>";

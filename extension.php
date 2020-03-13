@@ -4,6 +4,8 @@ require 'config.php';
 mysql_connect($dbhost,$dbuname,$dbpass);
 @mysql_select_db($dbname) or die("Unable to select database");
 
+require 'discordWebhooks.php';
+
 echo "<HTML><HEAD><TITLE>Contract Extension Offer Result</TITLE></HEAD><BODY>";
 
 $Team_Name = $_POST['teamname'];
@@ -231,6 +233,8 @@ $resultstor=mysql_query($querystor);
 
 $storytitle=$Player_Name." extends his contract with the ".$Team_Name;
 $hometext=$Player_Name." today accepted a contract extension offer from the ".$Team_Name." worth $Offer_in_Millions million dollars over ".$Offer_Years." years.";
+
+postToDiscordChannel('#extensions', $hometext);
 
   echo "<table bgcolor=#cccccc><tr><td><b>Response from $Player_Name:</b> I accept your extension offer of $Offer_in_Millions million dollars over $Offer_Years years.  Thank you! (Can't believe you gave me that much...sucker!)</td></tr></table>
   Note from the commissioner's office: <font color=#cc0000>Please note that you have used up your successful extension for this season and may not make any more extension attempts.</font><br>";

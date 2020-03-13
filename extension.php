@@ -198,6 +198,8 @@ $modifier = 1+$modfactor5+$modfactor1+$modfacto2+$modfactor4+modfactor6;
 $storytitle=$Player_Name." turns down an extension offer from the ".$Team_Name;
 $hometext=$Player_Name." today rejected a contract extension offer from the ".$Team_Name." worth $Offer_in_Millions million dollars over ".$Offer_Years." years.";
 
+postToDiscordChannel('#extensions', $hometext);
+
   echo "<table bgcolor=#cccccc><tr><td><b>Response from $Player_Name:</b> While I appreciate your offer of $Offer_in_Millions million dollars over $Offer_Years years, it kinda sucks, and isn't what I'm looking for. You're gonna have to try harder if you want me to stick around this dump!</td></tr></table>
   Note from the commissioner's office: <font color=#cc0000>Please note that you will be able to make another attempt next Chunk as you have not yet used up your successful extension for this season.</font><br>";
 

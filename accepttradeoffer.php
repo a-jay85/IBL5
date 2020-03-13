@@ -4,6 +4,8 @@ require 'config.php';
 mysql_connect($dbhost,$dbuname,$dbpass);
 @mysql_select_db($dbname) or die("Unable to select database");
 
+require 'discordWebhooks.php';
+
 $offer_id = $_POST['offer'];
 
 $query0="SELECT * FROM nuke_ibl_trade_info WHERE tradeofferid = '$offer_id'";
@@ -55,6 +57,8 @@ $resultstor=mysql_query($querystor);
 if (isset($resultstor)) {
 	$recipient = 'ibldepthcharts@gmail.com';
 	mail($recipient, $storytitle, $storytext, "From: ibldepthcharts@gmail.com");
+
+	postToDiscordChannel('#trades', $storytext);
 }
 
 $queryclear="DELETE FROM nuke_ibl_trade_info WHERE `tradeofferid` = '$offer_id'";

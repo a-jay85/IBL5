@@ -20,6 +20,8 @@ require_once("mainfile.php");
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
+require 'discordWebhooks.php';
+
 $pagetitle = "- Team Pages";
 
 function waivers($user)
@@ -151,6 +153,9 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
 
                 $querystor="INSERT INTO nuke_stories (catid,aid,title,time,hometext,topic,informant,counter,alanguage) VALUES ('$catid','Associated Press','$storytitle','$timestamp','$hometext','$topicid','Associated Press','0','english')";
                 $resultstor=mysql_query($querystor);
+
+                postToDiscordChannel('#waiver-wire', $hometext);
+
                 $errortext="Your waiver move should now be processed. $playername has been cut to waivers.";
             }
         } else if ($Type_Of_Action == 'add') {
@@ -212,6 +217,8 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
                 if (isset($resultstor)) {
                     $recipient = 'ibldepthcharts@gmail.com';
                     mail($recipient, $storytitle, $hometext, "From: ibldepthcharts@gmail.com");
+
+                    postToDiscordChannel('#waiver-wire', $hometext);
                 }
 
                 $errortext="Your waiver move should now be processed. $playername has been signed from waivers and added to your roster.";

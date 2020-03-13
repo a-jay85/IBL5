@@ -181,6 +181,8 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
                 } else {
                     $cy2=35;
                 }
+            } else {
+                $cy2 = $cy1;
             }
             if ($Healthy_Roster_Slots < 4 and $TotalSalary + $cy2 > 7000) { // TODO: Change 7000 to hard cap variable
                 $errortext="You have 12 or more healthy players and this signing will put you over $70 million. Therefore you cannot make this signing.";

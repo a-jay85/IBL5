@@ -71,6 +71,8 @@ function userinfo($username, $bypass=0, $hid=0, $url=0)
 
 	OpenTable();
 	$teamlogo = $userinfo[user_ibl_team];
+	$queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$teamlogo'";
+	$tid = mysql_result(mysql_query($queryTeamID), 0);
 
 	$sql7 = "SELECT * FROM ".$prefix."_ibl_offense_sets WHERE TeamName = '$teamlogo' ORDER BY SetNumber ASC";
 	$result7 = $db->sql_query($sql7);
@@ -118,7 +120,7 @@ function userinfo($username, $bypass=0, $hid=0, $url=0)
 	echo "<hr>
 		<form name=\"Depth_Chart\" method=\"post\" action=\"modules.php?name=Depth_Chart_Entry&op=submit\">
 		<input type=\"hidden\" name=\"Team_Name\" value=\"$teamlogo\"><input type=\"hidden\" name=\"Set_Name\" value=\"$offense_name\">
-		<center><img src=\"online/teamgrfx/$teamlogo.jpg\"><br><table><tr><th colspan=14><center>DEPTH CHART ENTRY - Offensive Set: $offense_name</center></th></tr>
+		<center><img src=\"images/logo/$tid.jpg\"><br><table><tr><th colspan=14><center>DEPTH CHART ENTRY - Offensive Set: $offense_name</center></th></tr>
 		<tr><th>Pos</th><th>Player</th><th>$Slot1</th><th>$Slot2</th><th>$Slot3</th><th>$Slot4</th><th>$Slot5</th><th>active</th><th>min</th><th>OF</th><th>DF</th><th>OI</th><th>DI</th><th>BH</th></tr>";
 	$depthcount=1;
 

@@ -46,9 +46,11 @@ function userinfo($username, $bypass=0, $hid=0, $url=0) {
 
     OpenTable();
     $teamlogo = $userinfo[user_ibl_team];
+	$queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$teamlogo'";
+	$tid = mysql_result(mysql_query($queryTeamID), 0);
 
 echo "
-      <form name=\"EOYVote\" method=\"post\" action=\"EOYVote.php\"><center><img src=\"online/teamgrfx/$teamlogo.jpg\"><br><br>";
+      <form name=\"EOYVote\" method=\"post\" action=\"EOYVote.php\"><center><img src=\"images/logo/$tid.jpg\"><br><br>";
 
 $query = "SELECT * FROM nuke_iblplyr where teamname != 'Retired' and stats_gm >= '10' order by name";
 $result = mysql_query($query);
@@ -57,15 +59,15 @@ while($row = mysql_fetch_assoc($result))
     $ppg = floatval($row['stats_3gm']*3 + ($row['stats_fgm']-$row['stats_3gm'])*2+ $row['stats_ftm']) / intval($row['stats_gm']);
     $ppg = round($ppg,1);
     $rpg = floatval($row['stats_orb'] + $row['stats_drb']) / intval($row['stats_gm']);
-    $rpg = round($rpg,1); 
+    $rpg = round($rpg,1);
     $apg = floatval($row['stats_ast']) / intval($row['stats_gm']);
-    $apg = round($apg,1); 
+    $apg = round($apg,1);
     $spg = floatval($row['stats_stl']) / intval($row['stats_gm']);
-    $spg = round($spg,1); 
+    $spg = round($spg,1);
     $tpg = floatval($row['stats_to']) / intval($row['stats_gm']);
-    $tpg = round($tpg,1); 
+    $tpg = round($tpg,1);
     $bpg = floatval($row['stats_blk']) / intval($row['stats_gm']);
-    $bpg = round($bpg,1); 
+    $bpg = round($bpg,1);
     $fgp = floatval($row['stats_fgm']) / intval($row['stats_fga']);
     $fgp = round($fgp,3);
     $ftp = floatval($row['stats_ftm']) / intval($row['stats_fta']);
@@ -75,7 +77,7 @@ while($row = mysql_fetch_assoc($result))
     $gm = floatval($row['stats_gm']);
     $gs = floatval($row['stats_gs']);
     $dd .= "<option value='".$row['name'].", ".$row['teamname']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl,  ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp, ".$gm." gm, ".$gs." gs</option>";
-} 
+}
 
 $query1 = "SELECT * FROM nuke_iblplyr where teamname != 'Retired' and stats_min/stats_gm >= 15 and stats_gs/stats_gm <= '.5' order by name";
 $result1 = mysql_query($query1);
@@ -84,15 +86,15 @@ while($row = mysql_fetch_assoc($result1))
     $ppg = floatval($row['stats_3gm']*3 + ($row['stats_fgm']-$row['stats_3gm'])*2+ $row['stats_ftm']) / intval($row['stats_gm']);
     $ppg = round($ppg,1);
     $rpg = floatval($row['stats_orb'] + $row['stats_drb']) / intval($row['stats_gm']);
-    $rpg = round($rpg,1); 
+    $rpg = round($rpg,1);
     $apg = floatval($row['stats_ast']) / intval($row['stats_gm']);
-    $apg = round($apg,1); 
+    $apg = round($apg,1);
     $spg = floatval($row['stats_stl']) / intval($row['stats_gm']);
-    $spg = round($spg,1); 
+    $spg = round($spg,1);
     $tpg = floatval($row['stats_to']) / intval($row['stats_gm']);
-    $tpg = round($tpg,1); 
+    $tpg = round($tpg,1);
     $bpg = floatval($row['stats_blk']) / intval($row['stats_gm']);
-    $bpg = round($bpg,1); 
+    $bpg = round($bpg,1);
     $fgp = floatval($row['stats_fgm']) / intval($row['stats_fga']);
     $fgp = round($fgp,3);
     $ftp = floatval($row['stats_ftm']) / intval($row['stats_fta']);
@@ -102,7 +104,7 @@ while($row = mysql_fetch_assoc($result1))
     $gm = floatval($row['stats_gm']);
     $gs = floatval($row['stats_gs']);
     $ff .= "<option value='".$row['name'].", ".$row['teamname']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl,  ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp, ".$gm." gm, ".$gs." gs</option>";
-} 
+}
 
 $query2 = "SELECT * FROM nuke_iblplyr where teamname != 'Retired' and exp = '1' and stats_gm >= '10' order by name";
 $result2 = mysql_query($query2);
@@ -111,15 +113,15 @@ while($row = mysql_fetch_assoc($result2))
     $ppg = floatval($row['stats_3gm']*3 + ($row['stats_fgm']-$row['stats_3gm'])*2+ $row['stats_ftm']) / intval($row['stats_gm']);
     $ppg = round($ppg,1);
     $rpg = floatval($row['stats_orb'] + $row['stats_drb']) / intval($row['stats_gm']);
-    $rpg = round($rpg,1); 
+    $rpg = round($rpg,1);
     $apg = floatval($row['stats_ast']) / intval($row['stats_gm']);
-    $apg = round($apg,1); 
+    $apg = round($apg,1);
     $spg = floatval($row['stats_stl']) / intval($row['stats_gm']);
-    $spg = round($spg,1); 
+    $spg = round($spg,1);
     $tpg = floatval($row['stats_to']) / intval($row['stats_gm']);
-    $tpg = round($tpg,1); 
+    $tpg = round($tpg,1);
     $bpg = floatval($row['stats_blk']) / intval($row['stats_gm']);
-    $bpg = round($bpg,1); 
+    $bpg = round($bpg,1);
     $fgp = floatval($row['stats_fgm']) / intval($row['stats_fga']);
     $fgp = round($fgp,3);
     $ftp = floatval($row['stats_ftm']) / intval($row['stats_fta']);
@@ -129,7 +131,7 @@ while($row = mysql_fetch_assoc($result2))
     $gm = floatval($row['stats_gm']);
     $gs = floatval($row['stats_gs']);
     $hh .= "<option value='".$row['name'].", ".$row['teamname']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl,  ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp, ".$gm." gm, ".$gs." gs</option>";
-} 
+}
 
 $query3 = "SELECT * from nuke_ibl_team_info where teamid != '35' order by owner_name";
 $result3 = mysql_query($query3);
@@ -138,7 +140,7 @@ while($row = mysql_fetch_assoc($result3))
 
     $ii .= "<option value='".$row['owner_name'].", ".$row['team_city']."'>".$row['owner_name'].", ".$row['team_city']." ".$row['team_name']."</option>";
 
-} 
+}
 
 echo "<select name=\"MVP1\">
   <option value=\"\">Select Your First Choice for Most Valuable Player...</option>
@@ -194,13 +196,13 @@ echo "<select name=\"MVP1\">
 <select name=\"GM2\">
   <option value=\"\">Select Your Second Choice for GM of the Year...</option>
   <option value=\"$ii\">$ii</option>
-  
+
 </select><br><br>
 
 <select name=\"GM3\">
   <option value=\"\">Select Your First Choice for GM of the Year...</option>
   <option value=\"$ii\">$ii</option>
-  
+
 </select>
 
 </td></tr>

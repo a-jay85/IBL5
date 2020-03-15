@@ -293,7 +293,7 @@ function tradereview($username, $bypass=0, $hid=0, $url=0)
 
 	$teamlogo = $userinfo[user_ibl_team];
 
-	$tid=mysql_result(mysql_query("SELECT * FROM nuke_ibl_team_info WHERE team_name = '$teamlogo' LIMIT 1"),0,"teamid");
+	$tid = mysql_result(mysql_query("SELECT * FROM nuke_ibl_team_info WHERE team_name = '$teamlogo' LIMIT 1"), 0, "teamid");
 
 	displaytopmenu($tid);
 
@@ -340,7 +340,7 @@ function tradereview($username, $bypass=0, $hid=0, $url=0)
 
 	// END BOOKMARK
 
-	echo "<hr><center><img src=\"online/teamgrfx/$teamlogo.jpg\"><br>";
+	echo "<hr><center><img src=\"images/logo/$tid.jpg\"><br>";
 
 	$sql3 = "SELECT * FROM nuke_ibl_trade_info ORDER BY tradeofferid ASC";
 	$result3 = $db->sql_query($sql3);

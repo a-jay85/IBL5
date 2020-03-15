@@ -2443,13 +2443,15 @@ function editset($username, $bypass=0, $hid=0, $url=0)
 
 	OpenTable();
 
-	displaytopmenu($tid);
-
 	// === GRAB TEAM INFORMATION FOR LOGGED-IN USER===
 
 	$teamlogo = $userinfo[user_ibl_team];
+	$queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$teamlogo'";
+	$tid = mysql_result(mysql_query($queryTeamID), 0);
 
-	echo "<hr><center><img src=\"online/teamgrfx/$teamlogo.jpg\"><br>";
+	displaytopmenu($tid);
+
+	echo "<hr><center><img src=\"images/logo/$tid.jpg\"><br>";
 
 	$sql3 = "SELECT * FROM nuke_ibl_offense_sets WHERE TeamName = '$teamlogo' ORDER BY SetNumber ASC ";
 	$result3 = $db->sql_query($sql3);
@@ -3001,9 +3003,11 @@ function trainingpage($username)
 
 
 	$teamlogo = $userinfo[user_ibl_team];
+	$queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$teamlogo'";
+	$tid = mysql_result(mysql_query($queryTeamID), 0);
 
 	echo "<hr>
-	<center><img src=\"online/teamgrfx/$teamlogo.jpg\"><br>
+	<center><img src=\"images/logo/$tid.jpg\"><br>
 ";
 
 $Team_Name = $_POST['Team_Name'];
@@ -3434,7 +3438,9 @@ function asg_voting()
 		if ($teamlogo == "") {
 			echo "Sorry, you must be logged in to vote.<br>";
 		} else {
-			echo "<form name=\"ASGVote\" method=\"post\" action=\"./ASGVote.php\"><center><img src=\"online/teamgrfx/$teamlogo.jpg\"><br><br>";
+			$queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$teamlogo'";
+			$tid = mysql_result(mysql_query($queryTeamID), 0);
+			echo "<form name=\"ASGVote\" method=\"post\" action=\"./ASGVote.php\"><center><img src=\"images/logo/$tid.jpg\"><br><br>";
 			$query = "SELECT * FROM nuke_iblplyr where pos = 'C' and (tid = '1' or tid = '26' or tid = '4' or tid = '3' or tid = '21' or tid = '2' or tid = '24' or tid = '29' or tid = '6' or tid = '27' or tid = '9' or tid = '7' or tid = '10' or tid = '5' or tid = '8' or tid = '31') and teamname != 'Retired' and stats_gm > '10' order by (((stats_3gm*3)+stats_ftm+(stats_fgm-stats_3gm)*2)+stats_orb+stats_drb+(2*stats_ast)+(2*stats_stl)+(2*stats_blk)-((stats_fga-stats_fgm)+(stats_fta-stats_ftm)+stats_to+stats_pf))/stats_gm desc";
 			$result = mysql_query($query);
 			while($row = mysql_fetch_assoc($result)) {
@@ -3674,7 +3680,9 @@ function eoy_voting()
 		if ($teamlogo == "") {
 			echo "Sorry, you must be logged in to vote.<br>";
 		} else {
-			echo "<form name=\"EOYVote\" method=\"post\" action=\"./EOYVote.php\"><center><img src=\"online/teamgrfx/$teamlogo.jpg\"><br><br>";
+			$queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$teamlogo'";
+			$tid = mysql_result(mysql_query($queryTeamID), 0);
+			echo "<form name=\"EOYVote\" method=\"post\" action=\"./EOYVote.php\"><center><img src=\"images/logo/$tid.jpg\"><br><br>";
 			$query = "SELECT * FROM nuke_iblplyr where teamname != 'Retired' and stats_gm >= '55' and (stats_min/stats_gm) >= 24 order by (((stats_3gm*3)+stats_ftm+(stats_fgm-stats_3gm)*2)+stats_orb+stats_drb+(2*stats_ast)+(2*stats_stl)+(2*stats_blk)-((stats_fga-stats_fgm)+(stats_fta-stats_ftm)+stats_to+stats_pf))/stats_gm desc";
 
 			$result = mysql_query($query);

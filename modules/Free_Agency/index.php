@@ -87,6 +87,8 @@ function display($nullset) {
 	$userinfo = $db->sql_fetchrow($result2);
 
 	$userteam = stripslashes(check_html($userinfo['user_ibl_team'], "nohtml"));
+	$queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$userteam'";
+	$tid = mysql_result(mysql_query($queryTeamID), 0);
 
 	// TODO: MAKE THIS DYNAMIC OMG
 	$freeagentyear=2015;
@@ -144,7 +146,7 @@ function display($nullset) {
 
 	$rosterspots=15;
 
-	echo "<table border=1 cellspacing=0><tr><td align=center colspan=32><img src=\"online/teamgrfx/$userteam.jpg\"></td></tr>";
+	echo "<table border=1 cellspacing=0><tr><td align=center colspan=32><img src=\"images/logo/$tid.jpg\"></td></tr>";
 
 	// ==== DISPLAY PLAYERS CURRENTLY UNDER CONTRACT FOR TEAM
 
@@ -1447,7 +1449,7 @@ function rookieoption($pid) {
 			<input type=\"hidden\" name=\"playername\" value=\"$player_name\">
 			<input type=\"hidden\" name=\"rookie_cy4\" value=\"$rookie_cy4\">
 			<input type=\"submit\" value=\"Activate Rookie Extension\"></form>";
-		} 
+		}
 	} else {
 		// --- 2nd Round Rookie Options (AJN) ---
 		if ($player_exp == 1) {

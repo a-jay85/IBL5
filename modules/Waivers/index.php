@@ -232,11 +232,13 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
 
     OpenTable();
 
+    $teamlogo = $userinfo[user_ibl_team];
+	$queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$teamlogo'";
+	$tid = mysql_result(mysql_query($queryTeamID), 0);
+
     displaytopmenu($tid);
 
     echo "<center><font color=red><b>$errortext</b></font></center>";
-
-    $teamlogo = $userinfo[user_ibl_team];
     $sql7 = "SELECT * FROM nuke_ibl_team_info ORDER BY teamid ASC ";
     $result7 = $db->sql_query($sql7);
 
@@ -265,7 +267,7 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
     echo "<hr><form name=\"Waiver_Move\" method=\"post\" action=\"\"><input type=\"hidden\" name=\"Team_Name\" value=\"$teamlogo\">";
     echo "<input type=\"hidden\" name=\"Action\" value=\"$action\">";
 
-    echo "<center><img src=\"online/teamgrfx/$teamlogo.jpg\"><br><table border=1 cellspacing=0 cellpadding=0><tr><th colspan=3><center>WAIVER WIRE - YOUR TEAM CURRENTLY HAS $rosterslots EMPTY ROSTER SPOTS and $healthyrosterslots HEALTHY ROSTER SPOTS</center></th></tr>
+    echo "<center><img src=\"images/logo/$tid.jpg\"><br><table border=1 cellspacing=0 cellpadding=0><tr><th colspan=3><center>WAIVER WIRE - YOUR TEAM CURRENTLY HAS $rosterslots EMPTY ROSTER SPOTS and $healthyrosterslots HEALTHY ROSTER SPOTS</center></th></tr>
         <tr><td valign=top><center><B><u>$userinfo[user_ibl_team]</u></b></center>
         <select name=\"Player_ID\"><option value=\"\">Select player...</option>";
 

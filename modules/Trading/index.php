@@ -50,6 +50,7 @@ function tradeoffer($username, $bypass=0, $hid=0, $url=0)
 	displaytopmenu($tid);
 
 	$teamlogo = $userinfo[user_ibl_team];
+	$tid = mysql_result(mysql_query("SELECT * FROM nuke_ibl_team_info WHERE team_name = '$teamlogo' LIMIT 1"), 0, "teamid");
 	$sql7 = "SELECT * FROM nuke_ibl_team_info ORDER BY teamid ASC ";
 	$result7 = $db->sql_query($sql7);
 

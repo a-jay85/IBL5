@@ -64,7 +64,7 @@ function tradeoffer($username, $bypass=0, $hid=0, $url=0)
 		<form name=\"Trade_Offer\" method=\"post\" action=\"./maketradeoffer.php\">
 		<input type=\"hidden\" name=\"Team_Name\" value=\"$teamlogo\">
 		<center><img src=\"images/logo/$tid.jpg\"><br><table border=1 cellspacing=0 cellpadding=0><tr><th colspan=4><center>TRADING MENU</center></th></tr><tr><td valign=top>
-		<table border=0 bordercolor=red cellspacing=3 cellp ing=3>
+		<table cellspacing=3>
 		<tr><td valign=top colspan=4><center><B><u>$userinfo[user_ibl_team]</u></b></center></td></tr><tr><td valign=top><b>Select</td><td valign=top><b>Pos</td><td valign=top><b>Name</td><td valign=top><b>Salary</td>";
 
 	$k=0;
@@ -137,7 +137,7 @@ function tradeoffer($username, $bypass=0, $hid=0, $url=0)
 		$k++;
 	}
 
-	echo "</table></td><td valign=top><table border=0 bordercolor=blue cellspacing=3 cellpadding=3><tr><td valign=top colspan=4><input type=\"hidden\" name=\"half\" value=\"$k\"><input type=\"hidden\" name=\"Team_Name2\" value=\"$partner\">
+	echo "</table></td><td valign=top><table cellspacing=3><tr><td valign=top colspan=4><input type=\"hidden\" name=\"half\" value=\"$k\"><input type=\"hidden\" name=\"Team_Name2\" value=\"$partner\">
 	<center><B><U>$partner</U></B></center></td></tr><tr><td valign=top><b>Select</td><td valign=top><b>Pos</td><td valign=top><b>Name</td><td valign=top><b>Salary</td>";
 
 	$sql9 = "SELECT * FROM nuke_iblplyr WHERE teamname='$partner' AND retired = '0' ORDER BY ordinal ASC ";
@@ -219,7 +219,7 @@ function tradeoffer($username, $bypass=0, $hid=0, $url=0)
 	}
 
 	$k--;
-	echo "</table></td><td valign=top><table border=0 bordercolor=green cellspacing=0 cellpadding=0><tr><input type=\"hidden\" name=\"counterfields\" value=\"$k\"><td valign=top><center><b><u>Make Trade Offer To...</u></b></center>";
+	echo "</table></td><td valign=top><table><tr><input type=\"hidden\" name=\"counterfields\" value=\"$k\"><td valign=top><center><b><u>Make Trade Offer To...</u></b></center>";
 
 	while($row7 = $db->sql_fetchrow($result7)) {
 		$team_name = $row7[team_name];
@@ -350,7 +350,7 @@ function tradereview($username, $bypass=0, $hid=0, $url=0)
 
 	$tradeworkingonnow=0;
 
-	echo "<table><tr><td valign=top>REVIEW TRADE OFFERS";
+	echo "<table><th><tr><td valign=top>REVIEW TRADE OFFERS";
 
 	while($row3 = $db->sql_fetchrow($result3)) {
 		$isinvolvedintrade=0;
@@ -378,13 +378,13 @@ function tradereview($username, $bypass=0, $hid=0, $url=0)
 		if ($isinvolvedintrade == 1) {
 			if ($offerid == $tradeworkingonnow) {
 			} else {
-				echo "</td></tr></table><table border=1 cellpadding=0 cellspacing=0 valign=top align=center><tr><td><b><u>TRADE OFFER</u></b><br><table align=right border=1 cellspacing=0 cellpadding=0><tr><td valign=center>";
+				echo "</td></tr></th></table><table border=1 valign=top align=center><tr><td><b><u>TRADE OFFER</u></b><br><table align=right border=1 cellspacing=0 cellpadding=0><tr><td valign=center>";
 				if ($hashammer == 1) {
-					echo "<form name=\"tradeaccept\" method=\"post\" action=\"./accepttradeoffer.php\"><input type=\"hidden\" name=\"offer\" value=\"$offerid\"><input type=\"submit\" value=\"Accept\"></form>";
+					echo "<form name=\"tradeaccept\" method=\"post\" action=\"accepttradeoffer.php\"><input type=\"hidden\" name=\"offer\" value=\"$offerid\"><input type=\"submit\" value=\"Accept\"></form>";
 				} else {
 					echo "(Awaiting Approval)";
 				}
-				echo "</td><td valign=center><form name=\"tradereject\" method=\"post\" action=\"./rejecttradeoffer.php\"><input type=\"hidden\" name=\"offer\" value=\"$offerid\"><input type=\"submit\" value=\"Reject\"></form></td></tr></table>";
+				echo "</td><td valign=center><form name=\"tradereject\" method=\"post\" action=\"rejecttradeoffer.php\"><input type=\"hidden\" name=\"offer\" value=\"$offerid\"><input type=\"submit\" value=\"Reject\"></form></td></tr></table>";
 			}
 
 			if ($itemtype == 0) {
@@ -439,12 +439,12 @@ function tradereview($username, $bypass=0, $hid=0, $url=0)
 	</td></tr></table>";
 	*/
 
-	echo "</td></tr><tr><td colspan=2>
+	echo "</td></tr><tr><td colspan=2><center>
 		<a href=\"./modules.php?name=Waivers&action=drop\">Drop a player to Waivers</a>
 		<br>
 		<a href=\"./modules.php?name=Waivers&action=add\">Add a player from Waivers</a>
 		<br>
-		</td></tr></table>";
+		</center></td></tr></table>";
 
 	CloseTable();
 	include("footer.php");

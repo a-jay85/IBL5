@@ -429,15 +429,6 @@ function tradereview($username, $bypass=0, $hid=0, $url=0)
 			echo "<a href=\"./modules.php?name=Trading&op=offertrade&partner=$team_name\">$team_city $team_name</a><br>";
 		}
 	}
-	/* -----NOSY'S NEW CODE FOR MULTI-TEAM TRADES-----
-	echo "</td><td bgcolor=#bbbbbb>ALPHA TESTING - NEW TRADE AREA - DO NOT USE YET! $new_trade_form </td></tr>
-	<tr><td colspan=2>
-	<a href=\"./modules.php?name=Waivers&action=drop\">Drop a player to Waivers</a>
-	<br>
-	<a href=\"./modules.php?name=Waivers&action=add\">Add a player from Waivers</a>
-	<br>
-	</td></tr></table>";
-	*/
 
 	echo "</td></tr><tr><td colspan=2><center>
 		<a href=\"./modules.php?name=Waivers&action=drop\">Drop a player to Waivers</a>

@@ -463,16 +463,13 @@ function reviewtrade($user)
 		}
 		include("footer.php");
 	} elseif (is_user($user)) {
+		$queryAllowTrades = "SELECT * FROM nuke_ibl_settings WHERE name = 'Allow Trades' ";
+		$resultAllowTrades = mysql_query($queryAllowTrades);
+		$allow_trades = mysql_result($resultAllowTrades, 0, "value");
 
-		$query="SELECT * FROM nuke_ibl_settings WHERE name = 'Allow Trades' ";
-		$result=mysql_query($query);
-
-		$allow_trades=mysql_result($result,0,"value");
-		$query2="SELECT * FROM nuke_ibl_settings WHERE name = 'Allow Waiver Moves' ";
-		$result2=mysql_query($query2);
-
-		$allow_trades=mysql_result($result,0,"value");
-		$allow_waiver_moves=mysql_result($result2,0,"value");
+		$queryAllowWaiverMoves = "SELECT * FROM nuke_ibl_settings WHERE name = 'Allow Waiver Moves' ";
+		$resultAllowWaiverMoves = mysql_query($queryAllowWaiverMoves);
+		$allow_waiver_moves = mysql_result($resultAllowWaiverMoves, 0, "value");
 
 		if ($allow_trades == 'Yes') {
 			global $cookie;

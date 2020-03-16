@@ -149,6 +149,7 @@ unset($visitorName,
 	$visitorName,
 	$homeTID,
 	$visitorTID);
+
 echo 'ibl_schedule database table has been updated.<p>';
 
 // TODO:
@@ -211,7 +212,7 @@ function extractStandingsValues($confVar,$divVar)
 			$awayWins = extractWins($awayRecord);
 			$awayLosses = extractLosses($awayRecord);
 
-			$gamesUnplayed = 68 - $homeWins - $homeLosses - $awayWins - $awayLosses; // TODO: make number of games in season dynamic
+			$gamesUnplayed = 82 - $homeWins - $homeLosses - $awayWins - $awayLosses; // TODO: make number of games in season dynamic
 
 			$sqlQueryString = "INSERT INTO ibl_standings (
 				team_name,

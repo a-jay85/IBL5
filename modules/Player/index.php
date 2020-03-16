@@ -744,7 +744,7 @@ function awards()
 
     // ========= SEARCH PARAMETERS
 
-    echo "Please enter your search parameters Partial matches on a name or award are okay and are <b>not</b> case sensitive (e.g., entering \"Dard\" will match with \"Darden\" and \"Bedard\").
+    echo "Partial matches on a name or award are okay and are <b>not</b> case sensitive (e.g., entering \"Dard\" will match with \"Darden\" and \"Bedard\").<p>
 
         <form name=\"Search\" method=\"post\" action=\"modules.php?name=Player&pa=awards\">
         <table border=1><tr><td>

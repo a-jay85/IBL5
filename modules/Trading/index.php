@@ -479,12 +479,12 @@ function reviewtrade($user)
 			include ("header.php");
 			OpenTable();
 			displaytopmenu($tid);
-			echo "Sorry, but players may not be traded at the present time.";
+			echo "Sorry, but trades are not allowed right now.";
 			if ($allow_waiver_moves == 'Yes') {
 				echo "<br>
-				Players may still be <a href=\"./modules.php?name=Waivers&action=add\">Added From Waivers</a> or they may be <a href=\"./modules.php?name=Waivers&action=drop\">Dropped to Waivers</a>.";
+				Players may still be <a href=\"modules.php?name=Waivers&action=add\">Added From Waivers</a> or they may be <a href=\"modules.php?name=Waivers&action=drop\">Dropped to Waivers</a>.";
 			} else {
-				echo "<br>Please note that the waiver wire has also closed.";
+				echo "<br>The waiver wire is also closed.";
 			}
 			CloseTable();
 			include ("footer.php");

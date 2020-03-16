@@ -52,7 +52,7 @@ function tradeoffer($username, $bypass=0, $hid=0, $url=0)
 
 	displaytopmenu($tid);
 
-	$sql7 = "SELECT * FROM nuke_ibl_team_info ORDER BY teamid ASC ";
+	$sql7 = "SELECT * FROM nuke_ibl_team_info ORDER BY team_city ASC ";
 	$result7 = $db->sql_query($sql7);
 
 	$sql8 = "SELECT * FROM nuke_iblplyr WHERE teamname='$userinfo[user_ibl_team]' AND retired = '0' ORDER BY ordinal ASC ";
@@ -370,7 +370,7 @@ function tradereview($username, $bypass=0, $hid=0, $url=0)
 
 	echo "</td><td valign=top><center><b><u>Make Trade Offer To...</u></b></center>";
 
-	$sql7 = "SELECT * FROM nuke_ibl_team_info ORDER BY team_name ASC ";
+	$sql7 = "SELECT * FROM nuke_ibl_team_info ORDER BY team_city ASC ";
 	$result7 = $db->sql_query($sql7);
 
 	while($row7 = $db->sql_fetchrow($result7)) {

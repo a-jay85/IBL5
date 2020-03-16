@@ -294,53 +294,8 @@ function tradereview($username, $bypass=0, $hid=0, $url=0)
 	OpenTable();
 
 	$teamlogo = $userinfo[user_ibl_team];
-
 	$tid = mysql_result(mysql_query("SELECT * FROM nuke_ibl_team_info WHERE team_name = '$teamlogo' LIMIT 1"), 0, "teamid");
-
 	displaytopmenu($tid);
-
-	// BOOKMARK = NEW TRADING AREA
-
-	include("capandtrade.php");
-	include("teamcap.php");
-
-	$get_action=$_POST["action"];
-	$get_team_from=$_POST["team_from"];
-	$get_team_to=$_POST["team_to"];
-	$get_trade_id=$_POST["trade_id"];
-	$get_item_id=$_POST["item_id"];
-	$get_item_type=$_POST["item_type"];
-
-	if ($get_trade_id != 0) {
-		// DISPLAY TRADE CURRENTLY REVIEWING
-		$querytext="SELECT * FROM ibl_trade_approval WHERE trade_id = '$get_trade_id' AND team_id = '$tid' ";
-		$mine_result=mysql_query($querytext);
-		if (mysql_num_rows($mine_result) > 0) {
-			// THIS PLAYER IS INVOLVED IN THE TRADE. ALLOW HIM TO VIEW IT.
-			$result_teams=mysql_query("SELECT * FROM ibl_trade_approval WHERE trade_id = '$get_trade_id' ");
-			$num_teams=mysql_num_rows($result_teams);
-			for ($l=0;$l<$num_teams;$l++) {
-				$this_team_id=mysql_result($result_teams,$l,"team_id");
-				$this_team_approved=mysql_result($result_teams,$l,"approval");
-			}
-		}
-	}
-
-	// GET LIST OF OTHER TEAMS - NEW OFFERS
-
-	$sql7 = "SELECT * FROM nuke_ibl_team_info WHERE teamid != '$tid' AND teamid != 0 ORDER BY team_name ASC ";
-	$result7 = $db->sql_query($sql7);
-
-	while($row7 = $db->sql_fetchrow($result7)) {
-		$team_name = $row7[team_name];
-		$team_city = $row7[team_city];
-		$team_id = $row7[teamid];
-		$team_dropdown=$team_dropdown."<option value=\"teamid\">$team_name</option>";
-	}
-
-	$new_trade_form="<form name=\"New Trade\" method=\"post\" action=\"\"><input type=\"hidden\" name=\"action\" value=\"new trade\"><input type=\"hidden\" name=\"team_from\" value=\"$tid\"><input type=\"submit\" value=\"Propose New Trade to...\"><select name=\"team_to\">$team_dropdown</select></form>";
-
-	// END BOOKMARK
 
 	echo "<hr><center><img src=\"images/logo/$tid.jpg\"><br>";
 

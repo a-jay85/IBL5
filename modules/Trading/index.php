@@ -41,9 +41,9 @@ function tradeoffer($username, $bypass=0, $hid=0, $url=0)
 
 	include("header.php");
 
-	$query="SELECT * FROM nuke_ibl_settings WHERE name = 'Current Season Ending Year' ";
-	$result=mysql_query($query);
-	$current_ibl_season=mysql_result($result,0,"value");
+	$query = "SELECT * FROM nuke_ibl_settings WHERE name = 'Current Season Ending Year' ";
+	$result = mysql_query($query);
+	$current_ibl_season = mysql_result($result,0,"value");
 
 	OpenTable();
 
@@ -57,7 +57,7 @@ function tradeoffer($username, $bypass=0, $hid=0, $url=0)
 
 	$sql8 = "SELECT * FROM nuke_iblplyr WHERE teamname='$userinfo[user_ibl_team]' AND retired = '0' ORDER BY ordinal ASC ";
 	$result8 = $db->sql_query($sql8);
-	$sql8a = "SELECT * FROM ibl_draft_picks WHERE ownerofpick='$userinfo[user_ibl_team]' ORDER BY year,round ASC ";
+	$sql8a = "SELECT * FROM ibl_draft_picks WHERE ownerofpick='$userinfo[user_ibl_team]' ORDER BY year, round ASC ";
 	$result8a = $db->sql_query($sql8a);
 
 	echo "<hr>
@@ -91,7 +91,7 @@ function tradeoffer($username, $bypass=0, $hid=0, $url=0)
 									<b>Salary</b>
 								</td>";
 
-	$k=0;
+	$k = 0;
 	$total_salary_teama = 0;
 	while($row8 = $db->sql_fetchrow($result8)) {
 		$player_pos = $row8[pos];
@@ -102,12 +102,12 @@ function tradeoffer($username, $bypass=0, $hid=0, $url=0)
 		$player_contract = $row8["cy$contract_year"];
 
 		//ARRAY TO BUILD FUTURE SALARY
-		$i=$contract_year;
-		$z=0;
+		$i = $contract_year;
+		$z = 0;
 		while ($i < 7) {
-			$future_salary_array['player'][$z]=$future_salary_array['player'][$z]+$row8["cy$i"];
-			if ($row8["cy$i"]>0) {
-				$future_salary_array['hold'][$z]=$future_salary_array['hold'][$z]+1;
+			$future_salary_array['player'][$z] = $future_salary_array['player'][$z] + $row8["cy$i"];
+			if ($row8["cy$i"] > 0) {
+				$future_salary_array['hold'][$z] = $future_salary_array['hold'][$z] + 1;
 			}
 			$i++;
 			$z++;
@@ -149,36 +149,36 @@ function tradeoffer($username, $bypass=0, $hid=0, $url=0)
 		$k++;
 	}
 
-	while($row8a = $db->sql_fetchrow($result8a)) {
+	while ($row8a = $db->sql_fetchrow($result8a)) {
 		$pick_year = $row8a[year];
 		$pick_team = $row8a[teampick];
 		$pick_round = $row8a[round];
 		$pick_id = $row8a[pickid];
 
-		$y=$pick_year-$current_ibl_season+1;
-		if ($pick_round==1) {
-			$future_salary_array['picks'][$y]=$future_salary_array['picks'][$y]+75;
-			$future_salary_array['hold'][$y]=$future_salary_array['hold'][$y]+1;
+		$y = $pick_year - $current_ibl_season + 1;
+		if ($pick_round == 1) {
+			$future_salary_array['picks'][$y] = $future_salary_array['picks'][$y] + 75;
+			$future_salary_array['hold'][$y] = $future_salary_array['hold'][$y] + 1;
 			//$future_salary_array[$y]=$future_salary_array[$y]+321;
 			//$future_roster_sports[$y]=$future_roster_sports[$y]+1;
 			$y=$y+1;
-			$future_salary_array['picks'][$y]=$future_salary_array['picks'][$y]+75;
-			$future_salary_array['hold'][$y]=$future_salary_array['hold'][$y]+1;
+			$future_salary_array['picks'][$y] = $future_salary_array['picks'][$y] + 75;
+			$future_salary_array['hold'][$y] = $future_salary_array['hold'][$y] + 1;
 			//$future_salary_array[$y]=$future_salary_array[$y]+345;
 			//$future_roster_sports[$y]=$future_roster_sports[$y]+1;
 			$y=$y+1;
-			$future_salary_array['picks'][$y]=$future_salary_array['picks'][$y]+75;
-			$future_salary_array['hold'][$y]=$future_salary_array['hold'][$y]+1;
+			$future_salary_array['picks'][$y] = $future_salary_array['picks'][$y] + 75;
+			$future_salary_array['hold'][$y] = $future_salary_array['hold'][$y] + 1;
 			//$future_salary_array[$y]=$future_salary_array[$y]+369;
 			//$future_roster_sports[$y]=$future_roster_sports[$y]+1;
 		} else {
-			$future_salary_array['picks'][$y]=$future_salary_array['picks'][$y]+75;
-			$future_salary_array['hold'][$y]=$future_salary_array['hold'][$y]+1;
+			$future_salary_array['picks'][$y] = $future_salary_array['picks'][$y] + 75;
+			$future_salary_array['hold'][$y] = $future_salary_array['hold'][$y] + 1;
 			//$future_salary_array[$y]=$future_salary_array[$y]+35;
 			//$future_roster_sports[$y]=$future_roster_sports[$y]+1;
 			$y=$y+1;
-			$future_salary_array['picks'][$y]=$future_salary_array['picks'][$y]+75;
-			$future_salary_array['hold'][$y]=$future_salary_array['hold'][$y]+1;
+			$future_salary_array['picks'][$y] = $future_salary_array['picks'][$y] + 75;
+			$future_salary_array['hold'][$y] = $future_salary_array['hold'][$y] + 1;
 			//$future_salary_array[$y]=$future_salary_array[$y]+51;
 			//$future_roster_sports[$y]=$future_roster_sports[$y]+1;
 		}
@@ -222,14 +222,14 @@ function tradeoffer($username, $bypass=0, $hid=0, $url=0)
 						<b>Salary</b>
 					</td>";
 
-	$sql9 = "SELECT * FROM nuke_iblplyr WHERE teamname='$partner' AND retired = '0' ORDER BY ordinal ASC ";
+	$sql9 = "SELECT * FROM nuke_iblplyr WHERE teamname = '$partner' AND retired = '0' ORDER BY ordinal ASC ";
 	$result9 = $db->sql_query($sql9);
-	$sql9a = "SELECT * FROM ibl_draft_picks WHERE ownerofpick='$partner' ORDER BY year,round ASC ";
+	$sql9a = "SELECT * FROM ibl_draft_picks WHERE ownerofpick = '$partner' ORDER BY year, round ASC ";
 
 	$result9a = $db->sql_query($sql9a);
 	$total_salary_teamb = 0;
 	$roster_hold_teamb = (15 - mysql_numrows($result9)) * 75;
-	while($row9 = $db->sql_fetchrow($result9)) {
+	while ($row9 = $db->sql_fetchrow($result9)) {
 		$player_pos = $row9[pos];
 		$player_name = $row9[name];
 		$player_pid = $row9[pid];
@@ -238,14 +238,14 @@ function tradeoffer($username, $bypass=0, $hid=0, $url=0)
 		$player_contract = $row9["cy$contract_year"];
 
 		//ARRAY TO BUILD FUTURE SALARY
-		$i=$contract_year;
-		$z=0;
+		$i = $contract_year;
+		$z = 0;
 		while ($i < 7) {
 			//$future_salary_arrayb[$z]=$future_salary_arrayb[$z]+$row9["cy$i"];
-			$future_salary_arrayb['player'][$z]=$future_salary_arrayb['player'][$z]+$row9["cy$i"];
-			if ($row9["cy$i"]>0) {
+			$future_salary_arrayb['player'][$z] = $future_salary_arrayb['player'][$z] + $row9["cy$i"];
+			if ($row9["cy$i"] > 0) {
 				//$future_roster_sportsb[$z]=$future_roster_sportsb[$z]+1;
-				$future_salary_arrayb['hold'][$z]=$future_salary_arrayb['hold'][$z]+1;
+				$future_salary_arrayb['hold'][$z] = $future_salary_arrayb['hold'][$z] + 1;
 			}
 			$i++;
 			$z++;
@@ -253,12 +253,32 @@ function tradeoffer($username, $bypass=0, $hid=0, $url=0)
 
 		//END OF ARRAY
 
-		echo "<input type=\"hidden\" name=\"index$k\" value=\"$player_pid\"><input type=\"hidden\" name=\"contract$k\" value=\"$player_contract\"><input type=\"hidden\" name=\"type$k\" value=\"1\">";
+		echo "<input type=\"hidden\" name=\"index$k\" value=\"$player_pid\">
+			<input type=\"hidden\" name=\"contract$k\" value=\"$player_contract\">
+			<input type=\"hidden\" name=\"type$k\" value=\"1\">";
 		if ($bird_years > -1) {
-			echo"<tr><td><center><input type=\"checkbox\" name=\"check$k\"></center></td><td>$player_pos</td><td>$player_name</td><td align=\"right\">$player_contract</td></tr>";
+			echo "<tr>
+				<td align=center>
+					<input type=\"checkbox\" name=\"check$k\">
+				</td>
+				<td>
+					$player_pos
+				</td>
+				<td>
+					$player_name
+				</td>
+				<td align=\"right\">
+					$player_contract
+				</td>
+			</tr>";
 		} else {
-			echo"<tr><td>$player_pos</td> <td>$player_name</td><td>$player_contract</td></tr>";
+			echo "<tr>
+				<td>$player_pos</td>
+				<td>$player_name</td>
+				<td>$player_contract</td>
+			</tr>";
 		}
+
 	$k++;
 	}
 
@@ -268,30 +288,30 @@ function tradeoffer($username, $bypass=0, $hid=0, $url=0)
 		$pick_round = $row9a[round];
 		$pick_id = $row9a[pickid];
 
-		$y=$pick_year-$current_ibl_season+1;
-		if ($pick_round==1) {
-			$future_salary_arrayb['picks'][$y]=$future_salary_arrayb['picks'][$y]+75;
-			$future_salary_arrayb['hold'][$y]=$future_salary_arrayb['hold'][$y]+1;
+		$y = $pick_year - $current_ibl_season + 1;
+		if ($pick_round == 1) {
+			$future_salary_arrayb['picks'][$y] = $future_salary_arrayb['picks'][$y] + 75;
+			$future_salary_arrayb['hold'][$y] = $future_salary_arrayb['hold'][$y] + 1;
 			//$future_salary_array[$y]=$future_salary_array[$y]+321;
 			//$future_roster_sports[$y]=$future_roster_sports[$y]+1;
 			$y=$y+1;
-			$future_salary_arrayb['picks'][$y]=$future_salary_arrayb['picks'][$y]+75;
-			$future_salary_arrayb['hold'][$y]=$future_salary_arrayb['hold'][$y]+1;
+			$future_salary_arrayb['picks'][$y] = $future_salary_arrayb['picks'][$y] + 75;
+			$future_salary_arrayb['hold'][$y] = $future_salary_arrayb['hold'][$y] + 1;
 			//$future_salary_array[$y]=$future_salary_array[$y]+345;
 			//$future_roster_sports[$y]=$future_roster_sports[$y]+1;
-			$y=$y+1;
-			$future_salary_arrayb['picks'][$y]=$future_salary_arrayb['picks'][$y]+75;
-			$future_salary_arrayb['hold'][$y]=$future_salary_arrayb['hold'][$y]+1;
+			$y = $y + 1;
+			$future_salary_arrayb['picks'][$y] = $future_salary_arrayb['picks'][$y] + 75;
+			$future_salary_arrayb['hold'][$y] = $future_salary_arrayb['hold'][$y] + 1;
 			//$future_salary_array[$y]=$future_salary_array[$y]+369;
 			//$future_roster_sports[$y]=$future_roster_sports[$y]+1;
 		} else {
-			$future_salary_arrayb['picks'][$y]=$future_salary_arrayb['picks'][$y]+75;
-			$future_salary_arrayb['hold'][$y]=$future_salary_arrayb['hold'][$y]+1;
+			$future_salary_arrayb['picks'][$y] = $future_salary_arrayb['picks'][$y] + 75;
+			$future_salary_arrayb['hold'][$y] = $future_salary_arrayb['hold'][$y] + 1;
 			//$future_salary_array[$y]=$future_salary_array[$y]+35;
 			//$future_roster_sports[$y]=$future_roster_sports[$y]+1;
 			$y=$y+1;
-			$future_salary_arrayb['picks'][$y]=$future_salary_arrayb['picks'][$y]+75;
-			$future_salary_arrayb['hold'][$y]=$future_salary_arrayb['hold'][$y]+1;
+			$future_salary_arrayb['picks'][$y] = $future_salary_arrayb['picks'][$y] + 75;
+			$future_salary_arrayb['hold'][$y] = $future_salary_arrayb['hold'][$y] + 1;
 			//$future_salary_array[$y]=$future_salary_array[$y]+51;
 			//$future_roster_sports[$y]=$future_roster_sports[$y]+1;
 		}

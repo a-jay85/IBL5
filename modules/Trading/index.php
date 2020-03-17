@@ -324,8 +324,10 @@ function tradeoffer($username, $bypass=0, $hid=0, $url=0)
 		$team_city = $row7[team_city];
 		$team_id = $row7[teamid];
 
-		//-------Deadline Code---------
-		echo "<a href=\"./modules.php?name=Trading&op=offertrade&partner=$team_name\">$team_city $team_name</a><br>";
+		if ($team_name != 'Free Agents') {
+			//------Trade Deadline Code---------
+			echo "<a href=\"modules.php?name=Trading&op=offertrade&partner=$team_name\">$team_city $team_name</a><br>";
+		}
 	}
 
 	echo "</td></tr></table>";

@@ -61,11 +61,35 @@ function tradeoffer($username, $bypass=0, $hid=0, $url=0)
 	$result8a = $db->sql_query($sql8a);
 
 	echo "<hr>
-		<form name=\"Trade_Offer\" method=\"post\" action=\"./maketradeoffer.php\">
+		<form name=\"Trade_Offer\" method=\"post\" action=\"maketradeoffer.php\">
 		<input type=\"hidden\" name=\"Team_Name\" value=\"$teamlogo\">
-		<center><img src=\"images/logo/$tid.jpg\"><br><table border=1 cellspacing=0 cellpadding=0><tr><th colspan=4><center>TRADING MENU</center></th></tr><tr><td valign=top>
-		<table cellspacing=3>
-		<tr><td valign=top colspan=4><center><B><u>$userinfo[user_ibl_team]</u></b></center></td></tr><tr><td valign=top><b>Select</td><td valign=top><b>Pos</td><td valign=top><b>Name</td><td valign=top><b>Salary</td>";
+		<center>
+			<img src=\"images/logo/$tid.jpg\"><br>
+			<table border=1 cellspacing=0 cellpadding=5>
+				<tr>
+					<th colspan=4><center>TRADING MENU</center></th>
+				</tr>
+				<tr>
+					<td valign=top>
+						<table cellspacing=3>
+							<tr>
+								<td valign=top colspan=4>
+									<center><b><u>$teamlogo</u></b></center>
+								</td>
+							</tr>
+							<tr>
+								<td valign=top>
+									<b>Select</b>
+								</td>
+								<td valign=top>
+									<b>Pos</b>
+								</td>
+								<td valign=top>
+									<b>Name</b>
+								</td>
+								<td valign=top>
+									<b>Salary</b>
+								</td>";
 
 	$k=0;
 	$total_salary_teama = 0;
@@ -91,11 +115,36 @@ function tradeoffer($username, $bypass=0, $hid=0, $url=0)
 
 		//END OF ARRAY
 
-		echo "<input type=\"hidden\" name=\"index$k\" value=\"$player_pid\"><input type=\"hidden\" name=\"contract$k\" value=\"$player_contract\"><input type=\"hidden\" name=\"type$k\" value=\"1\">";
+		echo "<input type=\"hidden\" name=\"index$k\" value=\"$player_pid\">
+			<input type=\"hidden\" name=\"contract$k\" value=\"$player_contract\">
+			<input type=\"hidden\" name=\"type$k\" value=\"1\">";
 		if ($bird_years > -1) {
-			echo"<tr><td wdith=20><input type=\"checkbox\" name=\"check$k\"></td> <td>$player_pos</td> <td>$player_name</td><td>$player_contract</td></tr>";
+			echo "<tr>
+				<td align=\"center\">
+					<input type=\"checkbox\" name=\"check$k\">
+				</td>
+				<td>
+					$player_pos
+				</td>
+				<td>
+					$player_name
+				</td>
+				<td align=\"right\">
+					$player_contract
+				</td>
+			</tr>";
 		} else {
-			echo"<tr><td>$player_pos</td> <td>$player_name</td><td>$player_contract</td></tr>";
+			echo "<tr>
+				<td>
+					$player_pos
+				</td>
+				<td>
+					$player_name
+				</td>
+				<td align=\"right\">
+					$player_contract
+				</td>
+			</tr>";
 		}
 		$k++;
 	}
@@ -105,6 +154,7 @@ function tradeoffer($username, $bypass=0, $hid=0, $url=0)
 		$pick_team = $row8a[teampick];
 		$pick_round = $row8a[round];
 		$pick_id = $row8a[pickid];
+
 		$y=$pick_year-$current_ibl_season+1;
 		if ($pick_round==1) {
 			$future_salary_array['picks'][$y]=$future_salary_array['picks'][$y]+75;
@@ -133,12 +183,44 @@ function tradeoffer($username, $bypass=0, $hid=0, $url=0)
 			//$future_roster_sports[$y]=$future_roster_sports[$y]+1;
 		}
 
-		echo "<tr><td wdith=20><input type=\"hidden\" name=\"index$k\" value=\"$pick_id\"><input type=\"hidden\" name=\"type$k\" value=\"0\"><input type=\"checkbox\" name=\"check$k\"></td> <td colspan=3>$pick_year $pick_team Round $pick_round</td></tr>";
+		echo "<tr>
+			<td align=\"center\">
+				<input type=\"hidden\" name=\"index$k\" value=\"$pick_id\">
+				<input type=\"hidden\" name=\"type$k\" value=\"0\">
+				<input type=\"checkbox\" name=\"check$k\">
+			</td>
+			<td colspan=3>
+				$pick_year $pick_team Round $pick_round
+			</td>
+		</tr>";
+
 		$k++;
 	}
 
-	echo "</table></td><td valign=top><table cellspacing=3><tr><td valign=top colspan=4><input type=\"hidden\" name=\"half\" value=\"$k\"><input type=\"hidden\" name=\"Team_Name2\" value=\"$partner\">
-	<center><B><U>$partner</U></B></center></td></tr><tr><td valign=top><b>Select</td><td valign=top><b>Pos</td><td valign=top><b>Name</td><td valign=top><b>Salary</td>";
+	echo "</table>
+		</td>
+		<td valign=top>
+			<table cellspacing=3>
+				<tr>
+					<td valign=top align=center colspan=4>
+						<input type=\"hidden\" name=\"half\" value=\"$k\">
+						<input type=\"hidden\" name=\"Team_Name2\" value=\"$partner\">
+						<b><u>$partner</u></b>
+					</td>
+				</tr>
+				<tr>
+					<td valign=top>
+						<b>Select</b>
+					</td>
+					<td valign=top>
+						<b>Pos</b>
+					</td>
+					<td valign=top>
+						<b>Name</b>
+					</td>
+					<td valign=top>
+						<b>Salary</b>
+					</td>";
 
 	$sql9 = "SELECT * FROM nuke_iblplyr WHERE teamname='$partner' AND retired = '0' ORDER BY ordinal ASC ";
 	$result9 = $db->sql_query($sql9);
@@ -173,7 +255,7 @@ function tradeoffer($username, $bypass=0, $hid=0, $url=0)
 
 		echo "<input type=\"hidden\" name=\"index$k\" value=\"$player_pid\"><input type=\"hidden\" name=\"contract$k\" value=\"$player_contract\"><input type=\"hidden\" name=\"type$k\" value=\"1\">";
 		if ($bird_years > -1) {
-			echo"<tr><td wdith=20><input type=\"checkbox\" name=\"check$k\"></td> <td>$player_pos</td> <td>$player_name</td><td>$player_contract</td></tr>";
+			echo"<tr><td><center><input type=\"checkbox\" name=\"check$k\"></center></td><td>$player_pos</td><td>$player_name</td><td align=\"right\">$player_contract</td></tr>";
 		} else {
 			echo"<tr><td>$player_pos</td> <td>$player_name</td><td>$player_contract</td></tr>";
 		}
@@ -214,12 +296,28 @@ function tradeoffer($username, $bypass=0, $hid=0, $url=0)
 			//$future_roster_sports[$y]=$future_roster_sports[$y]+1;
 		}
 
-		echo "<tr><td wdith=20><input type=\"hidden\" name=\"index$k\" value=\"$pick_id\"><input type=\"hidden\" name=\"type$k\" value=\"0\"><input type=\"checkbox\" name=\"check$k\"></td> <td colspan=3>$pick_year $pick_team Round $pick_round</td></tr>";
+		echo "<tr>
+			<td align=\"center\">
+				<input type=\"hidden\" name=\"index$k\" value=\"$pick_id\">
+				<input type=\"hidden\" name=\"type$k\" value=\"0\">
+				<input type=\"checkbox\" name=\"check$k\">
+			</td>
+			<td colspan=3>
+				$pick_year $pick_team Round $pick_round
+			</td>
+		</tr>";
+
 		$k++;
 	}
 
 	$k--;
-	echo "</table></td><td valign=top><table><tr><input type=\"hidden\" name=\"counterfields\" value=\"$k\"><td valign=top><center><b><u>Make Trade Offer To...</u></b></center>";
+	echo "</table>
+		</td>
+		<td valign=top>
+			<table>
+				<tr>
+					<input type=\"hidden\" name=\"counterfields\" value=\"$k\">
+					<td valign=top><center><b><u>Make Trade Offer To...</u></b></center>";
 
 	while($row7 = $db->sql_fetchrow($result7)) {
 		$team_name = $row7[team_name];
@@ -231,22 +329,22 @@ function tradeoffer($username, $bypass=0, $hid=0, $url=0)
 	}
 
 	echo "</td></tr></table>";
-	$z=0;
-	while ($z<6) {
-		$pass_future_salary_player[$z]=$pass_future_salary_array[$z]+$future_salary_array['player'][$z];
-		$pass_future_salary_hold[$z]=$pass_future_salary_array[$z]+$future_salary_array['hold'][$z];
-		$pass_future_salary_picks[$z]=$pass_future_salary_array[$z]+$future_salary_array['picks'][$z];
-		$pass_future_salary_playerb[$z]=$pass_future_salary_arrayb[$z];
-		$pass_future_salary_holdb[$z]=$pass_future_salary_arrayb[$z]+$future_salary_arrayb['hold'][$z];
-		$pass_future_salary_picksb[$z]=$pass_future_salary_arrayb[$z]+$future_salary_arrayb['picks'][$z];
-		$future_salary_array['player'][$z]=$future_salary_array['player'][$z];
-		$future_salary_arrayb['player'][$z]=$future_salary_arrayb['player'][$z];
+	$z = 0;
+	while ($z < 6) {
+		$pass_future_salary_player[$z] = $pass_future_salary_array[$z] + $future_salary_array['player'][$z];
+		$pass_future_salary_hold[$z] = $pass_future_salary_array[$z] + $future_salary_array['hold'][$z];
+		$pass_future_salary_picks[$z] = $pass_future_salary_array[$z] + $future_salary_array['picks'][$z];
+		$pass_future_salary_playerb[$z] = $pass_future_salary_arrayb[$z];
+		$pass_future_salary_holdb[$z] = $pass_future_salary_arrayb[$z] + $future_salary_arrayb['hold'][$z];
+		$pass_future_salary_picksb[$z] = $pass_future_salary_arrayb[$z] + $future_salary_arrayb['picks'][$z];
+		$future_salary_array['player'][$z] = $future_salary_array['player'][$z];
+		$future_salary_arrayb['player'][$z] = $future_salary_arrayb['player'][$z];
 		echo "<tr><td><b>
 			Total Year: $current_ibl_season:
-			Salary: $".$future_salary_array['player'][$z]."</td>";
-		echo "<td><b>
-			Salary: $".$future_salary_arrayb['player'][$z]."</td>";
-			$current_ibl_season=$current_ibl_season+1;
+			Salary: $".$future_salary_array['player'][$z]."</b></td>";
+		echo "<td align=right><b>
+			Salary: $".$future_salary_arrayb['player'][$z]."</b></td>";
+			$current_ibl_season++;
 		$z++;
 	}
 
@@ -262,7 +360,7 @@ function tradeoffer($username, $bypass=0, $hid=0, $url=0)
 		<input type=\"hidden\" name=\"pass_future_salary_playerb\" value=\"".htmlspecialchars($pass_future_salary_playerb)."\">
 		<input type=\"hidden\" name=\"pass_future_salary_holdb\" value=\"".htmlspecialchars($pass_future_salary_holdb)."\">
 		<input type=\"hidden\" name=\"pass_future_salary_picksb\" value=\"".htmlspecialchars($pass_future_salary_picksb)."\">
-		<tr><td colspan=3><center>
+		<tr><td colspan=3 align=center>
 		<input type=\"submit\" value=\"Make Trade Offer\"></td></tr></form></center></table></td></tr></table></center>";
 
 	CloseTable();
@@ -281,7 +379,7 @@ function tradereview($username, $bypass=0, $hid=0, $url=0)
 
 	// ==== PICKUP LOGGED-IN USER INFO
 
-	$sql2 = "SELECT * FROM ".$user_prefix."_users WHERE username='$username'";
+	$sql2 = "SELECT * FROM ".$user_prefix."_users WHERE username = '$username'";
 	$result2 = $db->sql_query($sql2);
 	$num = $db->sql_numrows($result2);
 	$userinfo = $db->sql_fetchrow($result2);
@@ -303,43 +401,66 @@ function tradereview($username, $bypass=0, $hid=0, $url=0)
 	$result3 = $db->sql_query($sql3);
 	$num3 = $db->sql_numrows($result3);
 
-	$tradeworkingonnow=0;
+	$tradeworkingonnow = 0;
 
-	echo "<table><th><tr><td valign=top>REVIEW TRADE OFFERS";
+	echo "<table>
+		<th>
+			<tr>
+				<td valign=top>REVIEW TRADE OFFERS";
 
 	while($row3 = $db->sql_fetchrow($result3)) {
-		$isinvolvedintrade=0;
-		$hashammer=0;
+		$isinvolvedintrade = 0;
+		$hashammer = 0;
 		$offerid = $row3[tradeofferid];
 		$itemid = $row3[itemid];
 
 		// For itemtype (1 = player, 0 = pick)
-
 		$itemtype = $row3[itemtype];
 		$from = $row3[from];
 		$to = $row3[to];
 		$approval = $row3[approval];
 
 		if ($from == $teamlogo) {
-			$isinvolvedintrade=1;
+			$isinvolvedintrade = 1;
 		}
 		if ($to == $teamlogo) {
-			$isinvolvedintrade=1;
+			$isinvolvedintrade = 1;
 		}
 		if ($approval == $teamlogo) {
-			$hashammer=1;
+			$hashammer = 1;
 		}
 
 		if ($isinvolvedintrade == 1) {
 			if ($offerid == $tradeworkingonnow) {
 			} else {
-				echo "</td></tr></th></table><table border=1 valign=top align=center><tr><td><b><u>TRADE OFFER</u></b><br><table align=right border=1 cellspacing=0 cellpadding=0><tr><td valign=center>";
+				echo "				</td>
+							</tr>
+						</th>
+					</table>
+					<table border=1 valign=top align=center>
+						<tr>
+							<td>
+								<b><u>TRADE OFFER</u></b><br>
+								<table align=right border=1 cellspacing=0 cellpadding=0>
+									<tr>
+										<td valign=center>";
 				if ($hashammer == 1) {
-					echo "<form name=\"tradeaccept\" method=\"post\" action=\"accepttradeoffer.php\"><input type=\"hidden\" name=\"offer\" value=\"$offerid\"><input type=\"submit\" value=\"Accept\"></form>";
+					echo "<form name=\"tradeaccept\" method=\"post\" action=\"accepttradeoffer.php\">
+						<input type=\"hidden\" name=\"offer\" value=\"$offerid\">
+						<input type=\"submit\" value=\"Accept\">
+					</form>";
 				} else {
 					echo "(Awaiting Approval)";
 				}
-				echo "</td><td valign=center><form name=\"tradereject\" method=\"post\" action=\"rejecttradeoffer.php\"><input type=\"hidden\" name=\"offer\" value=\"$offerid\"><input type=\"submit\" value=\"Reject\"></form></td></tr></table>";
+				echo "</td>
+						<td valign=center>
+							<form name=\"tradereject\" method=\"post\" action=\"rejecttradeoffer.php\">
+								<input type=\"hidden\" name=\"offer\" value=\"$offerid\">
+								<input type=\"submit\" value=\"Reject\">
+							</form>
+						</td>
+					</tr>
+				</table>";
 			}
 
 			if ($itemtype == 0) {
@@ -368,7 +489,8 @@ function tradereview($username, $bypass=0, $hid=0, $url=0)
 		}
 	}
 
-	echo "</td><td valign=top><center><b><u>Make Trade Offer To...</u></b></center>";
+	echo "</td>
+		<td valign=top><center><b><u>Make Trade Offer To...</u></b></center>";
 
 	$sql7 = "SELECT * FROM nuke_ibl_team_info ORDER BY team_city ASC ";
 	$result7 = $db->sql_query($sql7);
@@ -378,19 +500,16 @@ function tradereview($username, $bypass=0, $hid=0, $url=0)
 		$team_city = $row7[team_city];
 		$team_id = $row7[teamid];
 
-		if ($team_name == 'Free Agents') {
-		} else {
+		if ($team_name != 'Free Agents') {
 			//------Trade Deadline Code---------
-			echo "<a href=\"./modules.php?name=Trading&op=offertrade&partner=$team_name\">$team_city $team_name</a><br>";
+			echo "<a href=\"modules.php?name=Trading&op=offertrade&partner=$team_name\">$team_city $team_name</a><br>";
 		}
 	}
 
-	echo "</td></tr><tr><td colspan=2><center>
-		<a href=\"./modules.php?name=Waivers&action=drop\">Drop a player to Waivers</a>
-		<br>
-		<a href=\"./modules.php?name=Waivers&action=add\">Add a player from Waivers</a>
-		<br>
-		</center></td></tr></table>";
+	echo "</td></tr><tr><td colspan=2 align=center>
+		<a href=\"modules.php?name=Waivers&action=drop\">Drop a player to Waivers</a><br>
+		<a href=\"modules.php?name=Waivers&action=add\">Add a player from Waivers</a><br>
+		</td></tr></table>";
 
 	CloseTable();
 	include("footer.php");

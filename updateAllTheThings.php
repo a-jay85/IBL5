@@ -330,7 +330,7 @@ function updateMagicNumbers ($region)
 		} else {
 			$belowTeamTotalLosses = 0; // This results in an inaccurate Magic Number for the bottom team in the $region, but prevents query errors
 		}
-		$magicNumber = 68 + 1 - $teamTotalWins - $belowTeamTotalLosses;
+		$magicNumber = 82 + 1 - $teamTotalWins - $belowTeamTotalLosses; // TODO: Make number of games in a season dynamic
 
 		$sqlQueryString = "INSERT INTO ibl_standings (
 			team_name,

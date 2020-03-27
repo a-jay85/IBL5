@@ -24,16 +24,16 @@ function menu()
 	include("footer.php");
 }
 
-function tradeoffer($username, $bypass=0, $hid=0, $url=0)
+function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 {
 	global $user, $cookie, $sitename, $prefix, $user_prefix, $db, $admin, $broadcast_msg, $my_headlines, $module_name, $subscription_url, $partner;
 	$sql = "SELECT * FROM ".$prefix."_bbconfig";
 	$result = $db->sql_query($sql);
-	while ( $row = $db->sql_fetchrow($result) ) {
+	while ($row = $db->sql_fetchrow($result)) {
 		$board_config[$row['config_name']] = $row['config_value'];
 	}
 
-	$sql2 = "SELECT * FROM ".$user_prefix."_users WHERE username='$username'";
+	$sql2 = "SELECT * FROM ".$user_prefix."_users WHERE username = '$username'";
 	$result2 = $db->sql_query($sql2);
 	$num = $db->sql_numrows($result2);
 	$userinfo = $db->sql_fetchrow($result2);
@@ -43,7 +43,7 @@ function tradeoffer($username, $bypass=0, $hid=0, $url=0)
 
 	$query = "SELECT * FROM nuke_ibl_settings WHERE name = 'Current Season Ending Year' ";
 	$result = mysql_query($query);
-	$current_ibl_season = mysql_result($result,0,"value");
+	$current_ibl_season = mysql_result($result, 0, "value");
 
 	OpenTable();
 
@@ -55,9 +55,9 @@ function tradeoffer($username, $bypass=0, $hid=0, $url=0)
 	$sql7 = "SELECT * FROM nuke_ibl_team_info ORDER BY team_city ASC ";
 	$result7 = $db->sql_query($sql7);
 
-	$sql8 = "SELECT * FROM nuke_iblplyr WHERE teamname='$userinfo[user_ibl_team]' AND retired = '0' ORDER BY ordinal ASC ";
+	$sql8 = "SELECT * FROM nuke_iblplyr WHERE teamname = '$userinfo[user_ibl_team]' AND retired = '0' ORDER BY ordinal ASC ";
 	$result8 = $db->sql_query($sql8);
-	$sql8a = "SELECT * FROM ibl_draft_picks WHERE ownerofpick='$userinfo[user_ibl_team]' ORDER BY year, round ASC ";
+	$sql8a = "SELECT * FROM ibl_draft_picks WHERE ownerofpick = '$userinfo[user_ibl_team]' ORDER BY year, round ASC ";
 	$result8a = $db->sql_query($sql8a);
 
 	echo "<hr>
@@ -390,12 +390,12 @@ function tradeoffer($username, $bypass=0, $hid=0, $url=0)
 	include("footer.php");
 }
 
-function tradereview($username, $bypass=0, $hid=0, $url=0)
+function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
 {
 	global $user, $cookie, $sitename, $prefix, $user_prefix, $db, $admin, $broadcast_msg, $my_headlines, $module_name, $subscription_url, $attrib, $step, $player;
 	$sql = "SELECT * FROM ".$prefix."_bbconfig";
 	$result = $db->sql_query($sql);
-	while ( $row = $db->sql_fetchrow($result) ) {
+	while ($row = $db->sql_fetchrow($result)) {
 		$board_config[$row['config_name']] = $row['config_value'];
 	}
 
@@ -405,7 +405,7 @@ function tradereview($username, $bypass=0, $hid=0, $url=0)
 	$result2 = $db->sql_query($sql2);
 	$num = $db->sql_numrows($result2);
 	$userinfo = $db->sql_fetchrow($result2);
-	if(!$bypass) cookiedecode($user);
+	if (!$bypass) cookiedecode($user);
 
 	// ===== END OF INFO PICKUP
 
@@ -507,7 +507,7 @@ function tradereview($username, $bypass=0, $hid=0, $url=0)
 
 				echo "The $from send $plyrpos $plyrname to the $to.<br>";
 			}
-			$tradeworkingonnow=$offerid;
+			$tradeworkingonnow = $offerid;
 		}
 	}
 

@@ -133,21 +133,25 @@ while (!feof($scoFile)) {
     }
 }
 
-$newChunkEndDate = mysql_result(mysql_query('SELECT Date FROM ibl_box_scores ORDER BY Date DESC LIMIT 1'),0);
-$lastChunkStartDate = mysql_result(mysql_query("SELECT value FROM nuke_ibl_settings WHERE name='Chunk Start Date' LIMIT 1;"),0);
-$lastChunkEndDate = mysql_result(mysql_query("SELECT value FROM nuke_ibl_settings WHERE name='Chunk End Date' LIMIT 1;"),0);
+$queryLastSimDates = mysql_query("SELECT * FROM ibl_sim_dates ORDER BY Sim DESC LIMIT 1");
+$lastSimNumber = mysql_result($queryLastSimDates, 0, "Sim");
+$lastSimStartDate = mysql_result($queryLastSimDates, 0, "Start Date");
+$lastSimEndDate = mysql_result($queryLastSimDates, 0, "End Date");
+$newSimEndDate = mysql_result(mysql_query('SELECT Date FROM ibl_box_scores ORDER BY Date DESC LIMIT 1'),0);
 
-if ($lastChunkEndDate != $newChunkEndDate) {
-    $dtObjNewChunkEndDate = date_create($lastChunkEndDate);
-    date_modify($dtObjNewChunkEndDate,'+1 day');
-    $newChunkStartDate = date_format($dtObjNewChunkEndDate,'Y-m-d');
+if ($lastSimEndDate != $newSimEndDate) {
+    $dateObjectForNewSimEndDate = date_create($lastSimEndDate);
+    date_modify($dateObjectForNewSimEndDate, '+1 day');
+    $newSimStartDate = date_format($dateObjectForNewSimEndDate, 'Y-m-d');
+    $newSimNumber = $lastSimNumber + 1;
 
-    $setNewChunkStartDate = mysql_query("UPDATE nuke_ibl_settings SET value='$newChunkStartDate' WHERE name='Chunk Start Date';");
-    $setNewChunkEndDate = mysql_query("UPDATE nuke_ibl_settings SET value='$newChunkEndDate' WHERE name='Chunk End Date';");
+    $insertNewSimDates = mysql_query("INSERT INTO ibl_sim_dates (`Sim`, `Start Date`, `End Date`) VALUES ('$newSimNumber', '$newSimStartDate', '$newSimEndDate');");
 
-    if ($setNewChunkEndDate AND $setNewChunkStartDate) {
-        echo "<p>Added box scores from $newChunkStartDate through $newChunkEndDate.";
+    if ($insertNewSimDates) {
+        echo "<p>Added box scores from $newSimStartDate through $newSimEndDate.";
     } else die('Invalid query: '.mysql_error());
-} else echo "<p>Looks like new box scores haven't been added.<br>Chunk Start/End Dates will stay set to $lastChunkStartDate and $lastChunkEndDate.";
+} else {
+    echo "<p>Looks like new box scores haven't been added.<br>Sim Start/End Dates will stay set to $lastSimStartDate and $lastSimEndDate.";
+}
 
 ?>

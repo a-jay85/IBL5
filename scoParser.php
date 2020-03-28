@@ -26,9 +26,7 @@ if (mysql_query($stringDeleteCurrentSeasonBoxScores)) {
     echo $stringDeleteCurrentSeasonBoxScores."<p>";
 }
 
-// if (mysql_query('TRUNCATE TABLE ibl_box_scores')) {
-//     echo 'TRUNCATE TABLE ibl_box_scores<p>';
-// }
+echo "[scoParser works silently now]<br>";
 
 while (!feof($scoFile)) {
     $line = fgets($scoFile,2001);
@@ -130,7 +128,6 @@ while (!feof($scoFile)) {
         if ($name != NULL || $name != '') {
             if (mysql_query($entryUpdateQuery)) {
                 $entryUpdateQuery = str_replace(array("\n", "\t", "\r"), '', $entryUpdateQuery);
-                echo $entryUpdateQuery.'<br>';
             }
         }
     }

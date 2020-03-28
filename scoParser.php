@@ -26,7 +26,7 @@ if (mysql_query($stringDeleteCurrentSeasonBoxScores)) {
     echo $stringDeleteCurrentSeasonBoxScores."<p>";
 }
 
-echo "[scoParser works silently now]<br>";
+echo "<i>[scoParser works silently now]</i><br>";
 
 while (!feof($scoFile)) {
     $line = fgets($scoFile,2001);
@@ -133,25 +133,39 @@ while (!feof($scoFile)) {
     }
 }
 
-$queryLastSimDates = mysql_query("SELECT * FROM ibl_sim_dates ORDER BY Sim DESC LIMIT 1");
-$lastSimNumber = mysql_result($queryLastSimDates, 0, "Sim");
-$lastSimStartDate = mysql_result($queryLastSimDates, 0, "Start Date");
-$lastSimEndDate = mysql_result($queryLastSimDates, 0, "End Date");
 $newSimEndDate = mysql_result(mysql_query('SELECT Date FROM ibl_box_scores ORDER BY Date DESC LIMIT 1'),0);
 
-if ($lastSimEndDate != $newSimEndDate) {
-    $dateObjectForNewSimEndDate = date_create($lastSimEndDate);
-    date_modify($dateObjectForNewSimEndDate, '+1 day');
-    $newSimStartDate = date_format($dateObjectForNewSimEndDate, 'Y-m-d');
-    $newSimNumber = $lastSimNumber + 1;
+$queryLastSimDates = mysql_query("SELECT * FROM ibl_sim_dates ORDER BY Sim DESC LIMIT 1");
+
+if (mysql_num_rows($queryLastSimDates) != 0) {
+    $lastSimNumber = mysql_result($queryLastSimDates, 0, "Sim");
+    $lastSimStartDate = mysql_result($queryLastSimDates, 0, "Start Date");
+    $lastSimEndDate = mysql_result($queryLastSimDates, 0, "End Date");
+
+    if ($lastSimEndDate != $newSimEndDate) {
+        $dateObjectForNewSimEndDate = date_create($lastSimEndDate);
+        date_modify($dateObjectForNewSimEndDate, '+1 day');
+        $newSimStartDate = date_format($dateObjectForNewSimEndDate, 'Y-m-d');
+
+        $newSimNumber = $lastSimNumber + 1;
+
+        $insertNewSimDates = mysql_query("INSERT INTO ibl_sim_dates (`Sim`, `Start Date`, `End Date`) VALUES ('$newSimNumber', '$newSimStartDate', '$newSimEndDate');");
+    } else {
+        echo "<p>Looks like new box scores haven't been added.<br>Sim Start/End Dates will stay set to $lastSimStartDate and $lastSimEndDate.";
+        die();
+    }
+} else {
+    $newSimNumber = 1;
+    $newSimStartDate = mysql_result(mysql_query('SELECT Date FROM ibl_box_scores ORDER BY Date ASC LIMIT 1'),0);
 
     $insertNewSimDates = mysql_query("INSERT INTO ibl_sim_dates (`Sim`, `Start Date`, `End Date`) VALUES ('$newSimNumber', '$newSimStartDate', '$newSimEndDate');");
-
-    if ($insertNewSimDates) {
-        echo "<p>Added box scores from $newSimStartDate through $newSimEndDate.";
-    } else die('Invalid query: '.mysql_error());
-} else {
-    echo "<p>Looks like new box scores haven't been added.<br>Sim Start/End Dates will stay set to $lastSimStartDate and $lastSimEndDate.";
 }
+
+if ($insertNewSimDates) {
+    echo "<p>Added box scores from $newSimStartDate through $newSimEndDate.";
+} else {
+    die('Invalid query: '.mysql_error());
+}
+
 
 ?>

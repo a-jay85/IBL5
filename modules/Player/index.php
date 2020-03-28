@@ -1182,7 +1182,7 @@ echo "
 echo "                  <tr><td colspan=2><hr></td></tr>";
 
 
-echo "                  <tr><td colspan=2><center>PLAYER MENU</center><b><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">Player Overview</a> | <a href=\"modules.php?name=Player&pa=showpage&pid=$pid&spec=1\">Bio (Awards, News)</a> | <a href=\"modules.php?name=Player&pa=showpage&pid=$pid&spec=2\">One-on-one Results</a> | <a href=\"modules.php?name=Player&pa=showpage&pid=$pid&spec=10\">Last Sim Stats</a> | <a href=\"modules.php?name=Player&pa=showpage&pid=$pid&spec=0\"><font color=\"red\">*NEW* GAME LOG *NEW*</font></a>
+echo "                  <tr><td colspan=2><center>PLAYER MENU</center><b><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">Player Overview</a> | <a href=\"modules.php?name=Player&pa=showpage&pid=$pid&spec=1\">Bio (Awards, News)</a> | <a href=\"modules.php?name=Player&pa=showpage&pid=$pid&spec=2\">One-on-one Results</a> | <a href=\"modules.php?name=Player&pa=showpage&pid=$pid&spec=10\">Season Sim Stats</a> | <a href=\"modules.php?name=Player&pa=showpage&pid=$pid&spec=0\"><font color=\"red\">*NEW* GAME LOG *NEW*</font></a>
 <br><a href=\"modules.php?name=Player&pa=showpage&pid=$pid&spec=3\">Regular-Season Totals</a> | <a href=\"modules.php?name=Player&pa=showpage&pid=$pid&spec=4\">Regular-Season Averages</a> | <a href=\"modules.php?name=Player&pa=showpage&pid=$pid&spec=5\">Playoff Totals</a> | <a href=\"modules.php?name=Player&pa=showpage&pid=$pid&spec=6\">Playoff Averages</a> | <a href=\"modules.php?name=Player&pa=showpage&pid=$pid&spec=7\">H.E.A.T. Totals</a> | <a href=\"modules.php?name=Player&pa=showpage&pid=$pid&spec=8\">H.E.A.T. Averages</a> | <a href=\"modules.php?name=Player&pa=showpage&pid=$pid&spec=9\">Ratings and Salary History</a> </td></tr>
                     <tr><td colspan=3><hr></td></tr>
 ";
@@ -1244,177 +1244,138 @@ echo "                  <center><table><tr align=center><td><b>Talent</b></td><t
 
 echo "</table><table>";
 
-// CHUNK STATS
+// SIM STATS
 
 if ($spec == 10) {
 
+    echo "<table align=center border=1 cellpadding=3 cellspacing=0 style=\"text-align: center\">
+        <tr>
+            <td colspan=16><b><font class=\"content\">Sim Averages</font></b></td>
+        </tr>
+        <tr style=\"font-weight: bold\">
+            <td>sim</td>
+            <td>g</td>
+            <td>min</td>
+            <td>FGP</td>
+            <td>FTP</td>
+            <td>3GP</td>
+            <td>orb</td>
+            <td>reb</td>
+            <td>ast</td>
+            <td>stl</td>
+            <td>to</td>
+            <td>blk</td>
+            <td>pf</td>
+            <td>pts</td>
+        </tr>
+    ";
 
-// GET PAST STATS
+    $resultSimDates = $db->sql_query("SELECT *
+        FROM ibl_sim_dates
+        ORDER BY sim ASC");
+    while ($simDates = $db->sql_fetchrow($resultSimDates)) {
+        $simNumber = $simDates['Sim'];
+        $simStartDate = $simDates['Start Date'];
+        $simEndDate = $simDates['End Date'];
 
-$car_gm=0;
-$car_min=0;
-$car_fgm=0;
-$car_fga=0;
-$car_ftm=0;
-$car_fta=0;
-$car_3gm=0;
-$car_3ga=0;
-$car_orb=0;
-$car_drb=0;
-$car_reb=0;
-$car_ast=0;
-$car_stl=0;
-$car_blk=0;
-$car_tvr=0;
-$car_pf=0;
-$car_pts=0;
+        $resultPlayerSimBoxScores = $db->sql_query("SELECT *
+            FROM ibl_box_scores
+            WHERE pid = $pid
+            AND Date BETWEEN '$simStartDate' AND '$simEndDate'
+            ORDER BY Date ASC");
 
-echo "<table border=1 cellspacing=0><tr><td colspan=16><center><b><font class=\"content\">Sim Averages</font></b></center></td></tr>
-        <tr><td>sim</td><td>team</td><td>g</td><td>min</td><td>FGP</td><td>FTP</td><td>3GP</td><td>orb</td><td>reb</td><td>ast</td><td>stl</td><td>to</td><td>blk</td><td>pf</td><td>pts</td><td>qa</td></tr>
-";
+        $numberOfGamesPlayedInSim = mysql_num_rows($resultPlayerSimBoxScores);
+        $simTotalMIN = 0;
+        $simTotal2GM = 0;
+        $simTotal2GA = 0;
+        $simTotalFTM = 0;
+        $simTotalFTA = 0;
+        $simTotal3GM = 0;
+        $simTotal3GA = 0;
+        $simTotalORB = 0;
+        $simTotalDRB = 0;
+        $simTotalAST = 0;
+        $simTotalSTL = 0;
+        $simTotalTOV = 0;
+        $simTotalBLK = 0;
+        $simTotalPF = 0;
+        $simTotalPTS = 0;
 
-    $result44 = $db->sql_query("SELECT * FROM ".$prefix."_iblplyr_chunk WHERE pid=$pid AND active = 1 ORDER BY chunk ASC");
-    while ($row44 = $db->sql_fetchrow($result44)) {
+        while ($row = mysql_fetch_assoc($resultPlayerSimBoxScores)) {
+            $simTotalMIN += $row['gameMIN'];
+            $simTotal2GM += $row['game2GM'];
+            $simTotal2GA += $row['game2GA'];
+            $simTotalFTM += $row['gameFTM'];
+            $simTotalFTA += $row['gameFTA'];
+            $simTotal3GM += $row['game3GM'];
+            $simTotal3GA += $row['game3GA'];
+            $simTotalORB += $row['gameORB'];
+            $simTotalDRB += $row['gameDRB'];
+            $simTotalAST += $row['gameAST'];
+            $simTotalSTL += $row['gameSTL'];
+            $simTotalTOV += $row['gameTOV'];
+            $simTotalBLK += $row['gameBLK'];
+            $simTotalPF += $row['gamePF'];
+            $simTotalPTS += (2 * $row['game2GM']) + $row['gameFTM'] + (3 * $row['game3GM']);
+        }
 
+        @$simAverageMIN = $simTotalMIN / $numberOfGamesPlayedInSim;
+        @$simAverage2GM = $simTotal2GM / $numberOfGamesPlayedInSim;
+        @$simAverage2GA = $simTotal2GA / $numberOfGamesPlayedInSim;
+        @$simAverage2GP = $simTotal2GM / $simTotal2GA;
+        @$simAverageFTM = $simTotalFTM / $numberOfGamesPlayedInSim;
+        @$simAverageFTA = $simTotalFTA / $numberOfGamesPlayedInSim;
+        @$simAverageFTP = $simTotalFTM / $simTotalFTA;
+        @$simAverage3GM = $simTotal3GM / $numberOfGamesPlayedInSim;
+        @$simAverage3GA = $simTotal3GA / $numberOfGamesPlayedInSim;
+        @$simAverage3GP = $simTotal3GM / $simTotal3GA;
+        @$simAverageFGP = ($simTotal2GM + $simTotal3GM) / ($simTotal2GA + $simTotal3GA);
+        @$simAverageORB = $simTotalORB / $numberOfGamesPlayedInSim;
+        @$simAverageDRB = $simTotalDRB / $numberOfGamesPlayedInSim;
+        @$simAverageREB = ($simTotalORB + $simTotalDRB) / $numberOfGamesPlayedInSim;
+        @$simAverageAST = $simTotalAST / $numberOfGamesPlayedInSim;
+        @$simAverageSTL = $simTotalSTL / $numberOfGamesPlayedInSim;
+        @$simAverageTOV = $simTotalTOV / $numberOfGamesPlayedInSim;
+        @$simAverageBLK = $simTotalBLK / $numberOfGamesPlayedInSim;
+        @$simAveragePF = $simTotalPF / $numberOfGamesPlayedInSim;
+        @$simAveragePTS = $simTotalPTS / $numberOfGamesPlayedInSim;
 
-    $hist_chunk = stripslashes(check_html($row44['chunk'], "nohtml"));
-    $hist_team = stripslashes(check_html($row44['teamname'], "nohtml"));
-    $hist_tid = stripslashes(check_html($row44['teamid'], "nohtml"));
-    $hist_gm = stripslashes(check_html($row44['stats_gm'], "nohtml"));
-    $hist_min = stripslashes(check_html($row44['stats_min'], "nohtml"));
-    $hist_fgm = stripslashes(check_html($row44['stats_fgm'], "nohtml"));
-    $hist_fga = stripslashes(check_html($row44['stats_fga'], "nohtml"));
-@$hist_fgp=($hist_fgm/$hist_fga);
-    $hist_ftm = stripslashes(check_html($row44['stats_ftm'], "nohtml"));
-    $hist_fta = stripslashes(check_html($row44['stats_fta'], "nohtml"));
-@$hist_ftp=($hist_ftm/$hist_fta);
-    $hist_tgm = stripslashes(check_html($row44['stats_3gm'], "nohtml"));
-    $hist_tga = stripslashes(check_html($row44['stats_3ga'], "nohtml"));
-@$hist_tgp=($hist_tgm/$hist_tga);
-    $hist_orb = stripslashes(check_html($row44['stats_orb'], "nohtml"));
-    $hist_drb = stripslashes(check_html($row44['stats_drb'], "nohtml"));
-@$hist_reb=$hist_orb+$hist_drb;
-    $hist_ast = stripslashes(check_html($row44['stats_ast'], "nohtml"));
-    $hist_stl = stripslashes(check_html($row44['stats_stl'], "nohtml"));
-    $hist_tvr = stripslashes(check_html($row44['stats_to'], "nohtml"));
-    $hist_blk = stripslashes(check_html($row44['stats_blk'], "nohtml"));
-    $hist_pf = stripslashes(check_html($row44['stats_pf'], "nohtml"));
-    $hist_qa = stripslashes(check_html($row44['qa'], "nohtml"));
-    $hist_pts = $hist_fgm+$hist_fgm+$hist_ftm+$hist_tgm;
+        echo "      <td>$simNumber</td>
+        <td>$numberOfGamesPlayedInSim</td><td>";
+        printf('%01.1f', $simAverageMIN);
+        echo "</td><td>";
+        printf('%01.3f', $simAverageFGP);
+        echo "</td><td>";
+        printf('%01.3f', $simAverageFTP);
+        echo "</td><td>";
+        printf('%01.3f', $simAverage3GP);
+        echo "</td><td>";
+        printf('%01.1f', $simAverageORB);
+        echo "</td><td>";
+        printf('%01.1f', $simAverageREB);
+        echo "</td><td>";
+        printf('%01.1f', $simAverageAST);
+        echo "</td><td>";
+        printf('%01.1f', $simAverageSTL);
+        echo "</td><td>";
+        printf('%01.1f', $simAverageTOV);
+        echo "</td><td>";
+        printf('%01.1f', $simAverageBLK);
+        echo "</td><td>";
+        printf('%01.1f', $simAveragePF);
+        echo "</td><td>";
+        printf('%01.1f', $simAveragePTS);
+        echo "</td></tr>";
 
-@$hist_mpg=($hist_min/$hist_gm);
-@$hist_opg=($hist_orb/$hist_gm);
-@$hist_rpg=($hist_reb/$hist_gm);
-@$hist_apg=($hist_ast/$hist_gm);
-@$hist_spg=($hist_stl/$hist_gm);
-@$hist_tpg=($hist_tvr/$hist_gm);
-@$hist_bpg=($hist_blk/$hist_gm);
-@$hist_fpg=($hist_pf/$hist_gm);
-@$hist_ppg=($hist_pts/$hist_gm);
+        // TODO: Add Season Averages to the bottom of this table for easy comparison between sim and season stats
+    }
 
-if ($hist_year % 2)
-{
-echo "      <tr align=center bgcolor=$bgcolor>";
-} else {
-echo "      <tr align=center bgcolor=$bgcolor>";
-}
-echo "      <td><center>$hist_chunk</center></td><td><center>$hist_team</center></td><td><center>$hist_gm</center></td><td><center>";
-printf('%01.1f', $hist_mpg);
-echo "</center></td><td><center>";
-printf('%01.3f', $hist_fgp);
-echo "</center></td><td><center>";
-printf('%01.3f', $hist_ftp);
-echo "</center></td><td><center>";
-printf('%01.3f', $hist_tgp);
-echo "</center></td><td><center>";
-printf('%01.1f', $hist_opg);
-echo "</center></td><td><center>";
-printf('%01.1f', $hist_rpg);
-echo "</center></td><td><center>";
-printf('%01.1f', $hist_apg);
-echo "</center></td><td><center>";
-printf('%01.1f', $hist_spg);
-echo "</center></td><td><center>";
-printf('%01.1f', $hist_tpg);
-echo "</center></td><td><center>";
-printf('%01.1f', $hist_bpg);
-echo "</center></td><td><center>";
-printf('%01.1f', $hist_fpg);
-echo "</center></td><td><center>";
-printf('%01.1f', $hist_ppg);
-echo "</center></td><td>$hist_qa</td></tr>";
-
-
-$car_gm=$car_gm+$hist_gm;
-$car_min=$car_min+$hist_min;
-$car_fgm=$car_fgm+$hist_fgm;
-$car_fga=$car_fga+$hist_fga;
-$car_ftm=$car_ftm+$hist_ftm;
-$car_fta=$car_fta+$hist_fta;
-$car_3gm=$car_3gm+$hist_tgm;
-$car_3ga=$car_3ga+$hist_tga;
-$car_orb=$car_orb+$hist_orb;
-$car_reb=$car_reb+$hist_reb;
-$car_ast=$car_ast+$hist_ast;
-$car_stl=$car_stl+$hist_stl;
-$car_blk=$car_blk+$hist_blk;
-$car_tvr=$car_tvr+$hist_tvr;
-$car_pf=$car_pf+$hist_pf;
-$car_pts=$car_pts+$hist_pts;
-$car_qa=$car_qa+($hist_qa*$hist_gm);
-
-}
-
-
-@$car_fgp=$car_fgm/$car_fga;
-@$car_ftp=$car_ftm/$car_fta;
-@$car_tgp=$car_3gm/$car_3ga;
-@$car_avgm=$car_min/$car_gm;
-@$car_avgo=$car_orb/$car_gm;
-@$car_avgr=$car_reb/$car_gm;
-@$car_avga=$car_ast/$car_gm;
-@$car_avgs=$car_stl/$car_gm;
-@$car_avgb=$car_blk/$car_gm;
-@$car_avgt=$car_tvr/$car_gm;
-@$car_avgf=$car_pf/$car_gm;
-@$car_avgp=$car_pts/$car_gm;
-@$car_avqa=$car_qa/$car_gm;
-
-
-echo "      <tr><td colspan=2><b>SeasonAverages</td><td><center><b>$car_gm</center></td><td><center><b>";
-printf('%01.1f', $car_avgm);
-echo "</center></td><td><center><b>";
-printf('%01.3f', $car_fgp);
-echo "</center></td><td><center><b>";
-printf('%01.3f', $car_ftp);
-echo "</center></td><td><center><b>";
-printf('%01.3f', $car_tgp);
-echo "</center></td><td><center><b>";
-printf('%01.1f', $car_avgo);
-echo "</center></td><td><center><b>";
-printf('%01.1f', $car_avgr);
-echo "</center></td><td><center><b>";
-printf('%01.1f', $car_avga);
-echo "</center></td><td><center><b>";
-printf('%01.1f', $car_avgs);
-echo "</center></td><td><center><b>";
-printf('%01.1f', $car_avgt);
-echo "</center></td><td><center><b>";
-printf('%01.1f', $car_avgb);
-echo "</center></td><td><center><b>";
-printf('%01.1f', $car_avgf);
-echo "</center></td><td><center><b>";
-printf('%01.1f', $car_avgp);
-echo "</center></td><td><center><b>";
-printf('%01.1f', $car_avqa);
-echo "</center></td></tr></table>";
-
+    echo "</table>";
 }
 
 // CAREER TOTALS
 
 if ($spec == 3) {
-
 
 // GET PAST STATS
 

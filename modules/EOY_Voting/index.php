@@ -138,7 +138,7 @@ $result3 = mysql_query($query3);
 while($row = mysql_fetch_assoc($result3))
 {
 
-    $ii .= "<option value='".$row['owner_name'].", ".$row['team_city']."'>".$row['owner_name'].", ".$row['team_city']." ".$row['team_name']."</option>";
+    $ii .= "<option value='".$row['owner_name'].", ".$row['team_name']."'>".$row['owner_name'].", ".$row['team_city']." ".$row['team_name']."</option>";
 
 }
 

@@ -1649,7 +1649,7 @@ function team($tid)
 			        @$simAverage3GP = number_format(($simTotal3GM / $simTotal3GA),3);
 			        @$simAverageFGM = number_format((($simTotal2GM + $simTotal3GM) / $numberOfGamesPlayedInSim),1);
 			        @$simAverageFGA = number_format((($simTotal2GA + $simTotal3GA) / $numberOfGamesPlayedInSim),1);
-			        @$simAverageFGP = number_format((($simTotal2GM + $simTotal3GM) / ($simTotal2GA + $simTotal3GA)),1);
+			        @$simAverageFGP = number_format((($simTotal2GM + $simTotal3GM) / ($simTotal2GA + $simTotal3GA)),3);
 			        @$simAverageORB = number_format(($simTotalORB / $numberOfGamesPlayedInSim),1);
 			        @$simAverageDRB = number_format(($simTotalDRB / $numberOfGamesPlayedInSim),1);
 			        @$simAverageREB = number_format((($simTotalORB + $simTotalDRB) / $numberOfGamesPlayedInSim),1);

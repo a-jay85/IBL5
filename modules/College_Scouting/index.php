@@ -207,8 +207,46 @@ function userinfo($username, $bypass=0, $hid=0, $url=0) {
 
     echo "<hr>
     <center><img src=\"images/logo/$tid.jpg\"><br>
-    <table><tr><th colspan=26><centerWelcome to the 1985 IBL Draft<br><br><br>SCOUTING CENTRAL - $teamlogo Scouting - $scoutingpoints Scout Points Remaining<br><a href=\"http://college.ibl.net\">Main College Page</a> | <a href=\"http://college.ibl.net/draftdeclarants.php\">College Draft Declarants Page</a></center></th></tr>
-    <tr><th>Draft</th><th>Pos</th><th>Name</th><th>College</th><th>Age</th><th>fga</th><th>fgp</th><th>fta</th><th>ftp</th><th>tga</th><th>tgp</th><th>orb</th><th>drb</th><th>ast</th><th>stl</th><th>to</th><th>blk</th><th>oo</th><th>do</th><th>po</th><th>to</th><th>od</th><th>dd</th><th>pd</th><th>td</th><th>Tal</th><th>Skl</th><th>Int</th><th>Stamina</th></tr>";
+	<table>
+		<tr>
+			<th colspan=26>
+				<center>Welcome to the 1989 IBL Draft<br><br><br>SCOUTING CENTRAL - $teamlogo Scouting - $scoutingpoints Scout Points Remaining<br><a href=\"http://college.ibl.net\">Main College Page</a> | <a href=\"http://college.ibl.net/draftdeclarants.php\">College Draft Declarants Page</a></center>
+			</th>
+		</tr>
+	</table>
+
+    <table class=\"sortable\">
+    	<tr>
+			<th>Draft</th>
+			<th>Pos</th>
+			<th>Name</th>
+			<th>College</th>
+			<th>Age</th>
+			<th>fga</th>
+			<th>fgp</th>
+			<th>fta</th>
+			<th>ftp</th>
+			<th>tga</th>
+			<th>tgp</th>
+			<th>orb</th>
+			<th>drb</th>
+			<th>ast</th>
+			<th>stl</th>
+			<th>to</th>
+			<th>blk</th>
+			<th>oo</th>
+			<th>do</th>
+			<th>po</th>
+			<th>to</th>
+			<th>od</th>
+			<th>dd</th>
+			<th>pd</th>
+			<th>td</th>
+			<th>Tal</th>
+			<th>Skl</th>
+			<th>Int</th>
+			<th>Stamina</th>
+		</tr>";
 
 echo "<form name='draft_form' action='online/draft_selection.php' method='POST'>";
 echo "<input type='hidden' name='teamname' value='$teamlogo'>";
@@ -224,7 +262,7 @@ echo "<input type='hidden' name='draft_pick' value='$draft_pick'>";
 
     $i = 0;
     while($row3 = $db->sql_fetchrow($result3)) {
-	(($i % 2)==0) ? $bgcolor="FFFFFF" : $bgcolor="EEEEEE";
+	(($i % 2)==0) ? $bgcolor="EEEEEE" : $bgcolor="EEEEEE";
     $i++;
 
 	$player_pos = $row3[pos];
@@ -767,6 +805,8 @@ echo"</tr>
 ";
 
 }
+
+echo "</table>";
 
 // ========
 // END GENERAL DECLARANTS

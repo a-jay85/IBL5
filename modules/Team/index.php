@@ -1575,100 +1575,140 @@ function team($tid)
 			$max_chunk_result=mysql_query($max_chunk_query);
 			$row = mysql_fetch_assoc($max_chunk_result);
 
-			$table_chunk=$table_chunk."<tr bgcolor=$color1><th><font color=$color2>Pos</font></th><th colspan=3><font color=$color2>Player</font></th><th><font color=$color2>g</font></th><th><font color=$color2>gs</font></th><th><font color=$color2>min</font></th><th><font color=$color2>fgm</font></th><th><font color=$color2>fga</font></th><th><font color=$color2>fgp</font></th><th><font color=$color2>ftm</font></th><th><font color=$color2>fta</font></th><th><font color=$color2>ftp</font></th><th><font color=$color2>3gm</font></th><th><font color=$color2>3ga</font></th><th><font color=$color2>3gp</font></th><th><font color=$color2>orb</font></th><th><font color=$color2>reb</font></th><th><font color=$color2>ast</font></th><th><font color=$color2>stl</font></th><th><font color=$color2>to</font></th><th><font color=$color2>blk</font></th><th><font color=$color2>pf</font></th><th><font color=$color2>pts</font></th></tr></thead><tbody>";
+			$table_chunk=$table_chunk."<tr bgcolor=$color1><th><font color=$color2>Pos</font></th><th colspan=3><font color=$color2>Player</font></th><th><font color=$color2>g</font></th><th><font color=$color2>min</font></th><th><font color=$color2>fgm</font></th><th><font color=$color2>fga</font></th><th><font color=$color2>fgp</font></th><th><font color=$color2>ftm</font></th><th><font color=$color2>fta</font></th><th><font color=$color2>ftp</font></th><th><font color=$color2>3gm</font></th><th><font color=$color2>3ga</font></th><th><font color=$color2>3gp</font></th><th><font color=$color2>orb</font></th><th><font color=$color2>reb</font></th><th><font color=$color2>ast</font></th><th><font color=$color2>stl</font></th><th><font color=$color2>to</font></th><th><font color=$color2>blk</font></th><th><font color=$color2>pf</font></th><th><font color=$color2>pts</font></th></tr></thead><tbody>";
 
-			$query_chunk="SELECT * FROM nuke_iblplyr_chunk WHERE chunk = $row[maxchunk] AND tid = $tid AND Season = '$current_ibl_season' ORDER BY ordinal ASC";
-			$result_chunk=mysql_query($query_chunk);
-			$num_chunk=mysql_numrows($result_chunk);
+			$queryLastSimDates = mysql_query("SELECT *
+		        FROM ibl_sim_dates
+		        ORDER BY sim DESC
+				LIMIT 1");
+			$arrayLastSimDates = mysql_fetch_assoc($queryLastSimDates);
 
-			$i=0;
+			$simNumber = $arrayLastSimDates['Sim'];
+			$simStartDate = $arrayLastSimDates['Start Date'];
+			$simEndDate = $arrayLastSimDates['End Date'];
 
-			while ($i < $num_chunk) {
-				$name=mysql_result($result_chunk,$i,"name");
-				$pos=mysql_result($result_chunk,$i,"pos"); // the field it's pulling from should be "altpos", but the spreadsheet isn't inserting that field properly.
-				$pid=mysql_result($result_chunk,$i,"pid");
+			$playersOnTeam = mysql_query("SELECT pid
+		        FROM nuke_iblplyr
+		        WHERE tid = $tid
+		        ORDER BY name ASC");
+			$numberOfPlayersOnTeam = mysql_num_rows($playersOnTeam);
 
-				$stats_gm=mysql_result($result_chunk,$i,"stats_gm");
-				$stats_gs=mysql_result($result_chunk,$i,"stats_gs");
-				$stats_min=mysql_result($result_chunk,$i,"stats_min");
-				$stats_fgm=mysql_result($result_chunk,$i,"stats_fgm");
-				$stats_fga=mysql_result($result_chunk,$i,"stats_fga");
-				$stats_ftm=mysql_result($result_chunk,$i,"stats_ftm");
-				$stats_fta=mysql_result($result_chunk,$i,"stats_fta");
-				$stats_tgm=mysql_result($result_chunk,$i,"stats_3gm");
-				$stats_tga=mysql_result($result_chunk,$i,"stats_3ga");
-				$stats_orb=mysql_result($result_chunk,$i,"stats_orb");
-				$stats_drb=mysql_result($result_chunk,$i,"stats_drb");
-				$stats_ast=mysql_result($result_chunk,$i,"stats_ast");
-				$stats_stl=mysql_result($result_chunk,$i,"stats_stl");
-				$stats_to=mysql_result($result_chunk,$i,"stats_to");
-				$stats_blk=mysql_result($result_chunk,$i,"stats_blk");
-				$stats_pf=mysql_result($result_chunk,$i,"stats_pf");
-				$stats_reb=$stats_orb+$stats_drb;
-				$stats_pts=2*$stats_fgm+$stats_ftm+$stats_tgm;
+			$i = 0;
+			while ($i < $numberOfPlayersOnTeam) {
+				$pid = mysql_result($playersOnTeam, $i);
 
-				@$stats_mpg=number_format(($stats_min/$stats_gm),1);
-				@$stats_fgm=number_format(($stats_fgm/$stats_gm),1);
-				@$stats_fga=number_format(($stats_fga/$stats_gm),1);
-				@$stats_fgp=number_format(($stats_fgm/$stats_fga),3);
-				@$stats_ftm=number_format(($stats_ftm/$stats_gm),1);
-				@$stats_fta=number_format(($stats_fta/$stats_gm),1);
-				@$stats_ftp=number_format(($stats_ftm/$stats_fta),3);
-				@$stats_tgm=number_format(($stats_tgm/$stats_gm),1);
-				@$stats_tga=number_format(($stats_tga/$stats_gm),1);
-				@$stats_tgp=number_format(($stats_tgm/$stats_tga),3);
-				@$stats_opg=number_format(($stats_orb/$stats_gm),1);
-				@$stats_rpg=number_format(($stats_reb/$stats_gm),1);
-				@$stats_apg=number_format(($stats_ast/$stats_gm),1);
-				@$stats_spg=number_format(($stats_stl/$stats_gm),1);
-				@$stats_tpg=number_format(($stats_to/$stats_gm),1);
-				@$stats_bpg=number_format(($stats_blk/$stats_gm),1);
-				@$stats_fpg=number_format(($stats_pf/$stats_gm),1);
-				@$stats_ppg=number_format(($stats_pts/$stats_gm),1);
+				// TODO: refactor this so that I'm not cutting and pasting the Player module's Sim Stats code
+				$resultPlayerSimBoxScores = $db->sql_query("SELECT *
+		            FROM ibl_box_scores
+		            WHERE pid = $pid
+		            AND Date BETWEEN '$simStartDate' AND '$simEndDate'
+		            ORDER BY Date ASC");
+
+		        $numberOfGamesPlayedInSim = mysql_num_rows($resultPlayerSimBoxScores);
+				$simTotalMIN = 0;
+				$simTotal2GM = 0;
+				$simTotal2GA = 0;
+				$simTotalFTM = 0;
+				$simTotalFTA = 0;
+				$simTotal3GM = 0;
+				$simTotal3GA = 0;
+				$simTotalORB = 0;
+				$simTotalDRB = 0;
+				$simTotalAST = 0;
+				$simTotalSTL = 0;
+				$simTotalTOV = 0;
+				$simTotalBLK = 0;
+				$simTotalPF = 0;
+				$simTotalPTS = 0;
+
+		        while ($row = mysql_fetch_assoc($resultPlayerSimBoxScores)) {
+					$name = $row['name'];
+					$pos = $row['pos'];
+
+		            $simTotalMIN += $row['gameMIN'];
+		            $simTotal2GM += $row['game2GM'];
+		            $simTotal2GA += $row['game2GA'];
+		            $simTotalFTM += $row['gameFTM'];
+		            $simTotalFTA += $row['gameFTA'];
+		            $simTotal3GM += $row['game3GM'];
+		            $simTotal3GA += $row['game3GA'];
+		            $simTotalORB += $row['gameORB'];
+		            $simTotalDRB += $row['gameDRB'];
+		            $simTotalAST += $row['gameAST'];
+		            $simTotalSTL += $row['gameSTL'];
+		            $simTotalTOV += $row['gameTOV'];
+		            $simTotalBLK += $row['gameBLK'];
+		            $simTotalPF += $row['gamePF'];
+		            $simTotalPTS += (2 * $row['game2GM']) + $row['gameFTM'] + (3 * $row['game3GM']);
+		        }
+
+		        @$simAverageMIN = number_format(($simTotalMIN / $numberOfGamesPlayedInSim),1);
+		        @$simAverage2GM = $simTotal2GM / $numberOfGamesPlayedInSim;
+		        @$simAverage2GA = $simTotal2GA / $numberOfGamesPlayedInSim;
+		        @$simAverage2GP = number_format(($simTotal2GM / $simTotal2GA),3);
+		        @$simAverageFTM = number_format(($simTotalFTM / $numberOfGamesPlayedInSim),1);
+		        @$simAverageFTA = number_format(($simTotalFTA / $numberOfGamesPlayedInSim),1);
+		        @$simAverageFTP = number_format(($simTotalFTM / $simTotalFTA),3);
+		        @$simAverage3GM = number_format(($simTotal3GM / $numberOfGamesPlayedInSim),1);
+		        @$simAverage3GA = number_format(($simTotal3GA / $numberOfGamesPlayedInSim),1);
+		        @$simAverage3GP = number_format(($simTotal3GM / $simTotal3GA),3);
+		        @$simAverageFGM = number_format((($simTotal2GM + $simTotal3GM) / $numberOfGamesPlayedInSim),1);
+		        @$simAverageFGA = number_format((($simTotal2GA + $simTotal3GA) / $numberOfGamesPlayedInSim),1);
+		        @$simAverageFGP = number_format((($simTotal2GM + $simTotal3GM) / ($simTotal2GA + $simTotal3GA)),1);
+		        @$simAverageORB = number_format(($simTotalORB / $numberOfGamesPlayedInSim),1);
+		        @$simAverageDRB = number_format(($simTotalDRB / $numberOfGamesPlayedInSim),1);
+		        @$simAverageREB = number_format((($simTotalORB + $simTotalDRB) / $numberOfGamesPlayedInSim),1);
+		        @$simAverageAST = number_format(($simTotalAST / $numberOfGamesPlayedInSim),1);
+		        @$simAverageSTL = number_format(($simTotalSTL / $numberOfGamesPlayedInSim),1);
+		        @$simAverageTOV = number_format(($simTotalTOV / $numberOfGamesPlayedInSim),1);
+		        @$simAverageBLK = number_format(($simTotalBLK / $numberOfGamesPlayedInSim),1);
+		        @$simAveragePF = number_format(($simTotalPF / $numberOfGamesPlayedInSim),1);
+		        @$simAveragePTS = number_format(($simTotalPTS / $numberOfGamesPlayedInSim),1);
 
 				(($i % 2)==0) ? $bgcolor="FFFFFF" : $bgcolor="EEEEEE";
 
 				$table_chunk=$table_chunk."<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>";
-				$table_chunk=$table_chunk."<td><center>$stats_gm</center></td><td>$stats_gs</td><td><center>";
-				$table_chunk=$table_chunk.$stats_mpg;
+				$table_chunk=$table_chunk."<td><center>$numberOfGamesPlayedInSim</center></td><td><center>";
+				$table_chunk=$table_chunk.$simAverageMIN;
 				$table_chunk=$table_chunk."</center></td><td><center>";
-				$table_chunk=$table_chunk.$stats_fgm;
+				$table_chunk=$table_chunk.$simAverageFGM;
 				$table_chunk=$table_chunk."</center></td><td><center>";
-				$table_chunk=$table_chunk.$stats_fga;
+				$table_chunk=$table_chunk.$simAverageFGA;
 				$table_chunk=$table_chunk."</center></td><td><center>";
-				$table_chunk=$table_chunk.$stats_fgp;
+				$table_chunk=$table_chunk.$simAverageFGP;
 				$table_chunk=$table_chunk."</center></td><td><center>";
-				$table_chunk=$table_chunk.$stats_ftm;
+				$table_chunk=$table_chunk.$simAverageFTM;
 				$table_chunk=$table_chunk."</center></td><td><center>";
-				$table_chunk=$table_chunk.$stats_fta;
+				$table_chunk=$table_chunk.$simAverageFTA;
 				$table_chunk=$table_chunk."</center></td><td><center>";
-				$table_chunk=$table_chunk.$stats_ftp;
+				$table_chunk=$table_chunk.$simAverageFTP;
 				$table_chunk=$table_chunk."</center></td><td><center>";
-				$table_chunk=$table_chunk.$stats_tgm;
+				$table_chunk=$table_chunk.$simAverage3GM;
 				$table_chunk=$table_chunk."</center></td><td><center>";
-				$table_chunk=$table_chunk.$stats_tga;
+				$table_chunk=$table_chunk.$simAverage3GA;
 				$table_chunk=$table_chunk."</center></td><td><center>";
-				$table_chunk=$table_chunk.$stats_tgp;
+				$table_chunk=$table_chunk.$simAverage3GP;
 				$table_chunk=$table_chunk."</center></td><td><center>";
-				$table_chunk=$table_chunk.$stats_opg;
+				$table_chunk=$table_chunk.$simAverageORB;
 				$table_chunk=$table_chunk."</center></td><td><center>";
-				$table_chunk=$table_chunk.$stats_rpg;
+				$table_chunk=$table_chunk.$simAverageREB;
 				$table_chunk=$table_chunk."</center></td><td><center>";
-				$table_chunk=$table_chunk.$stats_apg;
+				$table_chunk=$table_chunk.$simAverageAST;
 				$table_chunk=$table_chunk."</center></td><td><center>";
-				$table_chunk=$table_chunk.$stats_spg;
+				$table_chunk=$table_chunk.$simAverageSTL;
 				$table_chunk=$table_chunk."</center></td><td><center>";
-				$table_chunk=$table_chunk.$stats_tpg;
+				$table_chunk=$table_chunk.$simAverageTOV;
 				$table_chunk=$table_chunk."</center></td><td><center>";
-				$table_chunk=$table_chunk.$stats_bpg;
+				$table_chunk=$table_chunk.$simAverageBLK;
 				$table_chunk=$table_chunk."</center></td><td><center>";
-				$table_chunk=$table_chunk.$stats_fpg;
+				$table_chunk=$table_chunk.$simAveragePF;
 				$table_chunk=$table_chunk."</center></td><td><center>";
-				$table_chunk=$table_chunk.$stats_ppg;
+				$table_chunk=$table_chunk.$simAveragePTS;
 				$table_chunk=$table_chunk."</center></td></tr>";
 
 				$i++;
 			}
+
 			$table_chunk=$table_chunk."</tbody></table>";
 		} // END OF IF $yr == "" BRACE TO REMOVE PER CHUNK STUFF
 	} // END OF TID != 0 brace - inserted so that Free Agents won't clog up the page with season averages and totals when those are almost always zeros.

@@ -1565,11 +1565,11 @@ function team($tid)
 		$table_averages=$table_averages."</tfoot></table>";
 
 		if ($yr == "") {
-			$table_chunk=$table_chunk."<table align=\"center\" class=\"sortable\"><thead>";
+			$table_simAverages=$table_simAverages."<table align=\"center\" class=\"sortable\"><thead>";
 
 			/* ======================CHUNK STATS */
 
-			$table_chunk=$table_chunk."<tr bgcolor=$color1><th><font color=$color2>Pos</font></th><th colspan=3><font color=$color2>Player</font></th><th><font color=$color2>g</font></th><th><font color=$color2>min</font></th><th><font color=$color2>fgm</font></th><th><font color=$color2>fga</font></th><th><font color=$color2>fgp</font></th><th><font color=$color2>ftm</font></th><th><font color=$color2>fta</font></th><th><font color=$color2>ftp</font></th><th><font color=$color2>3gm</font></th><th><font color=$color2>3ga</font></th><th><font color=$color2>3gp</font></th><th><font color=$color2>orb</font></th><th><font color=$color2>reb</font></th><th><font color=$color2>ast</font></th><th><font color=$color2>stl</font></th><th><font color=$color2>to</font></th><th><font color=$color2>blk</font></th><th><font color=$color2>pf</font></th><th><font color=$color2>pts</font></th></tr></thead><tbody>";
+			$table_simAverages=$table_simAverages."<tr bgcolor=$color1><th><font color=$color2>Pos</font></th><th colspan=3><font color=$color2>Player</font></th><th><font color=$color2>g</font></th><th><font color=$color2>min</font></th><th><font color=$color2>fgm</font></th><th><font color=$color2>fga</font></th><th><font color=$color2>fgp</font></th><th><font color=$color2>ftm</font></th><th><font color=$color2>fta</font></th><th><font color=$color2>ftp</font></th><th><font color=$color2>3gm</font></th><th><font color=$color2>3ga</font></th><th><font color=$color2>3gp</font></th><th><font color=$color2>orb</font></th><th><font color=$color2>reb</font></th><th><font color=$color2>ast</font></th><th><font color=$color2>stl</font></th><th><font color=$color2>to</font></th><th><font color=$color2>blk</font></th><th><font color=$color2>pf</font></th><th><font color=$color2>pts</font></th></tr></thead><tbody>";
 
 			$queryLastSimDates = mysql_query("SELECT *
 		        FROM ibl_sim_dates
@@ -1662,50 +1662,50 @@ function team($tid)
 
 					(($i % 2)==0) ? $bgcolor="FFFFFF" : $bgcolor="EEEEEE";
 
-					$table_chunk=$table_chunk."<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>";
-					$table_chunk=$table_chunk."<td><center>$numberOfGamesPlayedInSim</center></td><td><center>";
-					$table_chunk=$table_chunk.$simAverageMIN;
-					$table_chunk=$table_chunk."</center></td><td><center>";
-					$table_chunk=$table_chunk.$simAverageFGM;
-					$table_chunk=$table_chunk."</center></td><td><center>";
-					$table_chunk=$table_chunk.$simAverageFGA;
-					$table_chunk=$table_chunk."</center></td><td><center>";
-					$table_chunk=$table_chunk.$simAverageFGP;
-					$table_chunk=$table_chunk."</center></td><td><center>";
-					$table_chunk=$table_chunk.$simAverageFTM;
-					$table_chunk=$table_chunk."</center></td><td><center>";
-					$table_chunk=$table_chunk.$simAverageFTA;
-					$table_chunk=$table_chunk."</center></td><td><center>";
-					$table_chunk=$table_chunk.$simAverageFTP;
-					$table_chunk=$table_chunk."</center></td><td><center>";
-					$table_chunk=$table_chunk.$simAverage3GM;
-					$table_chunk=$table_chunk."</center></td><td><center>";
-					$table_chunk=$table_chunk.$simAverage3GA;
-					$table_chunk=$table_chunk."</center></td><td><center>";
-					$table_chunk=$table_chunk.$simAverage3GP;
-					$table_chunk=$table_chunk."</center></td><td><center>";
-					$table_chunk=$table_chunk.$simAverageORB;
-					$table_chunk=$table_chunk."</center></td><td><center>";
-					$table_chunk=$table_chunk.$simAverageREB;
-					$table_chunk=$table_chunk."</center></td><td><center>";
-					$table_chunk=$table_chunk.$simAverageAST;
-					$table_chunk=$table_chunk."</center></td><td><center>";
-					$table_chunk=$table_chunk.$simAverageSTL;
-					$table_chunk=$table_chunk."</center></td><td><center>";
-					$table_chunk=$table_chunk.$simAverageTOV;
-					$table_chunk=$table_chunk."</center></td><td><center>";
-					$table_chunk=$table_chunk.$simAverageBLK;
-					$table_chunk=$table_chunk."</center></td><td><center>";
-					$table_chunk=$table_chunk.$simAveragePF;
-					$table_chunk=$table_chunk."</center></td><td><center>";
-					$table_chunk=$table_chunk.$simAveragePTS;
-					$table_chunk=$table_chunk."</center></td></tr>";
+					$table_simAverages=$table_simAverages."<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>";
+					$table_simAverages=$table_simAverages."<td><center>$numberOfGamesPlayedInSim</center></td><td><center>";
+					$table_simAverages=$table_simAverages.$simAverageMIN;
+					$table_simAverages=$table_simAverages."</center></td><td><center>";
+					$table_simAverages=$table_simAverages.$simAverageFGM;
+					$table_simAverages=$table_simAverages."</center></td><td><center>";
+					$table_simAverages=$table_simAverages.$simAverageFGA;
+					$table_simAverages=$table_simAverages."</center></td><td><center>";
+					$table_simAverages=$table_simAverages.$simAverageFGP;
+					$table_simAverages=$table_simAverages."</center></td><td><center>";
+					$table_simAverages=$table_simAverages.$simAverageFTM;
+					$table_simAverages=$table_simAverages."</center></td><td><center>";
+					$table_simAverages=$table_simAverages.$simAverageFTA;
+					$table_simAverages=$table_simAverages."</center></td><td><center>";
+					$table_simAverages=$table_simAverages.$simAverageFTP;
+					$table_simAverages=$table_simAverages."</center></td><td><center>";
+					$table_simAverages=$table_simAverages.$simAverage3GM;
+					$table_simAverages=$table_simAverages."</center></td><td><center>";
+					$table_simAverages=$table_simAverages.$simAverage3GA;
+					$table_simAverages=$table_simAverages."</center></td><td><center>";
+					$table_simAverages=$table_simAverages.$simAverage3GP;
+					$table_simAverages=$table_simAverages."</center></td><td><center>";
+					$table_simAverages=$table_simAverages.$simAverageORB;
+					$table_simAverages=$table_simAverages."</center></td><td><center>";
+					$table_simAverages=$table_simAverages.$simAverageREB;
+					$table_simAverages=$table_simAverages."</center></td><td><center>";
+					$table_simAverages=$table_simAverages.$simAverageAST;
+					$table_simAverages=$table_simAverages."</center></td><td><center>";
+					$table_simAverages=$table_simAverages.$simAverageSTL;
+					$table_simAverages=$table_simAverages."</center></td><td><center>";
+					$table_simAverages=$table_simAverages.$simAverageTOV;
+					$table_simAverages=$table_simAverages."</center></td><td><center>";
+					$table_simAverages=$table_simAverages.$simAverageBLK;
+					$table_simAverages=$table_simAverages."</center></td><td><center>";
+					$table_simAverages=$table_simAverages.$simAveragePF;
+					$table_simAverages=$table_simAverages."</center></td><td><center>";
+					$table_simAverages=$table_simAverages.$simAveragePTS;
+					$table_simAverages=$table_simAverages."</center></td></tr>";
 				} else {}
 
 				$i++;
 			}
 
-			$table_chunk=$table_chunk."</tbody></table>";
+			$table_simAverages=$table_simAverages."</tbody></table>";
 		} // END OF IF $yr == "" BRACE TO REMOVE PER CHUNK STUFF
 	} // END OF TID != 0 brace - inserted so that Free Agents won't clog up the page with season averages and totals when those are almost always zeros.
 
@@ -1889,7 +1889,7 @@ function team($tid)
 	if ($display == "chunk") {
 		$showing="Chunk Averages";
 		$tabs=$tabs."<td bgcolor=#BBBBBB><a href=\"modules.php?name=Team&op=team&tid=$tid&display=chunk$insertyear\">Sim Averages</a></td>";
-		$table_output=$table_chunk;
+		$table_output=$table_simAverages;
 	} else $tabs=$tabs."<td><a href=\"modules.php?name=Team&op=team&tid=$tid&display=chunk$insertyear\">Sim Averages</a></td>";
 	if ($display == "contracts") {
 		$showing="Contracts";

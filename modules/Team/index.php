@@ -1569,12 +1569,6 @@ function team($tid)
 
 			/* ======================CHUNK STATS */
 
-			$current_ibl_season=mysql_result(mysql_query("SELECT * FROM nuke_ibl_settings WHERE name = 'Current Season Ending Year' "),0,"value");
-
-			$max_chunk_query="SELECT MAX(chunk) as maxchunk FROM nuke_iblplyr_chunk WHERE active = 1 AND Season = '$current_ibl_season' ";
-			$max_chunk_result=mysql_query($max_chunk_query);
-			$row = mysql_fetch_assoc($max_chunk_result);
-
 			$table_chunk=$table_chunk."<tr bgcolor=$color1><th><font color=$color2>Pos</font></th><th colspan=3><font color=$color2>Player</font></th><th><font color=$color2>g</font></th><th><font color=$color2>min</font></th><th><font color=$color2>fgm</font></th><th><font color=$color2>fga</font></th><th><font color=$color2>fgp</font></th><th><font color=$color2>ftm</font></th><th><font color=$color2>fta</font></th><th><font color=$color2>ftp</font></th><th><font color=$color2>3gm</font></th><th><font color=$color2>3ga</font></th><th><font color=$color2>3gp</font></th><th><font color=$color2>orb</font></th><th><font color=$color2>reb</font></th><th><font color=$color2>ast</font></th><th><font color=$color2>stl</font></th><th><font color=$color2>to</font></th><th><font color=$color2>blk</font></th><th><font color=$color2>pf</font></th><th><font color=$color2>pts</font></th></tr></thead><tbody>";
 
 			$queryLastSimDates = mysql_query("SELECT *
@@ -1621,90 +1615,92 @@ function team($tid)
 				$simTotalPF = 0;
 				$simTotalPTS = 0;
 
-		        while ($row = mysql_fetch_assoc($resultPlayerSimBoxScores)) {
-					$name = $row['name'];
-					$pos = $row['pos'];
+				if ($numberOfGamesPlayedInSim > 0) {
+			        while ($row = mysql_fetch_assoc($resultPlayerSimBoxScores)) {
+						$name = $row['name'];
+						$pos = $row['pos'];
 
-		            $simTotalMIN += $row['gameMIN'];
-		            $simTotal2GM += $row['game2GM'];
-		            $simTotal2GA += $row['game2GA'];
-		            $simTotalFTM += $row['gameFTM'];
-		            $simTotalFTA += $row['gameFTA'];
-		            $simTotal3GM += $row['game3GM'];
-		            $simTotal3GA += $row['game3GA'];
-		            $simTotalORB += $row['gameORB'];
-		            $simTotalDRB += $row['gameDRB'];
-		            $simTotalAST += $row['gameAST'];
-		            $simTotalSTL += $row['gameSTL'];
-		            $simTotalTOV += $row['gameTOV'];
-		            $simTotalBLK += $row['gameBLK'];
-		            $simTotalPF += $row['gamePF'];
-		            $simTotalPTS += (2 * $row['game2GM']) + $row['gameFTM'] + (3 * $row['game3GM']);
-		        }
+			            $simTotalMIN += $row['gameMIN'];
+			            $simTotal2GM += $row['game2GM'];
+			            $simTotal2GA += $row['game2GA'];
+			            $simTotalFTM += $row['gameFTM'];
+			            $simTotalFTA += $row['gameFTA'];
+			            $simTotal3GM += $row['game3GM'];
+			            $simTotal3GA += $row['game3GA'];
+			            $simTotalORB += $row['gameORB'];
+			            $simTotalDRB += $row['gameDRB'];
+			            $simTotalAST += $row['gameAST'];
+			            $simTotalSTL += $row['gameSTL'];
+			            $simTotalTOV += $row['gameTOV'];
+			            $simTotalBLK += $row['gameBLK'];
+			            $simTotalPF += $row['gamePF'];
+			            $simTotalPTS += (2 * $row['game2GM']) + $row['gameFTM'] + (3 * $row['game3GM']);
+			        }
 
-		        @$simAverageMIN = number_format(($simTotalMIN / $numberOfGamesPlayedInSim),1);
-		        @$simAverage2GM = $simTotal2GM / $numberOfGamesPlayedInSim;
-		        @$simAverage2GA = $simTotal2GA / $numberOfGamesPlayedInSim;
-		        @$simAverage2GP = number_format(($simTotal2GM / $simTotal2GA),3);
-		        @$simAverageFTM = number_format(($simTotalFTM / $numberOfGamesPlayedInSim),1);
-		        @$simAverageFTA = number_format(($simTotalFTA / $numberOfGamesPlayedInSim),1);
-		        @$simAverageFTP = number_format(($simTotalFTM / $simTotalFTA),3);
-		        @$simAverage3GM = number_format(($simTotal3GM / $numberOfGamesPlayedInSim),1);
-		        @$simAverage3GA = number_format(($simTotal3GA / $numberOfGamesPlayedInSim),1);
-		        @$simAverage3GP = number_format(($simTotal3GM / $simTotal3GA),3);
-		        @$simAverageFGM = number_format((($simTotal2GM + $simTotal3GM) / $numberOfGamesPlayedInSim),1);
-		        @$simAverageFGA = number_format((($simTotal2GA + $simTotal3GA) / $numberOfGamesPlayedInSim),1);
-		        @$simAverageFGP = number_format((($simTotal2GM + $simTotal3GM) / ($simTotal2GA + $simTotal3GA)),1);
-		        @$simAverageORB = number_format(($simTotalORB / $numberOfGamesPlayedInSim),1);
-		        @$simAverageDRB = number_format(($simTotalDRB / $numberOfGamesPlayedInSim),1);
-		        @$simAverageREB = number_format((($simTotalORB + $simTotalDRB) / $numberOfGamesPlayedInSim),1);
-		        @$simAverageAST = number_format(($simTotalAST / $numberOfGamesPlayedInSim),1);
-		        @$simAverageSTL = number_format(($simTotalSTL / $numberOfGamesPlayedInSim),1);
-		        @$simAverageTOV = number_format(($simTotalTOV / $numberOfGamesPlayedInSim),1);
-		        @$simAverageBLK = number_format(($simTotalBLK / $numberOfGamesPlayedInSim),1);
-		        @$simAveragePF = number_format(($simTotalPF / $numberOfGamesPlayedInSim),1);
-		        @$simAveragePTS = number_format(($simTotalPTS / $numberOfGamesPlayedInSim),1);
+			        @$simAverageMIN = number_format(($simTotalMIN / $numberOfGamesPlayedInSim),1);
+			        @$simAverage2GM = $simTotal2GM / $numberOfGamesPlayedInSim;
+			        @$simAverage2GA = $simTotal2GA / $numberOfGamesPlayedInSim;
+			        @$simAverage2GP = number_format(($simTotal2GM / $simTotal2GA),3);
+			        @$simAverageFTM = number_format(($simTotalFTM / $numberOfGamesPlayedInSim),1);
+			        @$simAverageFTA = number_format(($simTotalFTA / $numberOfGamesPlayedInSim),1);
+			        @$simAverageFTP = number_format(($simTotalFTM / $simTotalFTA),3);
+			        @$simAverage3GM = number_format(($simTotal3GM / $numberOfGamesPlayedInSim),1);
+			        @$simAverage3GA = number_format(($simTotal3GA / $numberOfGamesPlayedInSim),1);
+			        @$simAverage3GP = number_format(($simTotal3GM / $simTotal3GA),3);
+			        @$simAverageFGM = number_format((($simTotal2GM + $simTotal3GM) / $numberOfGamesPlayedInSim),1);
+			        @$simAverageFGA = number_format((($simTotal2GA + $simTotal3GA) / $numberOfGamesPlayedInSim),1);
+			        @$simAverageFGP = number_format((($simTotal2GM + $simTotal3GM) / ($simTotal2GA + $simTotal3GA)),1);
+			        @$simAverageORB = number_format(($simTotalORB / $numberOfGamesPlayedInSim),1);
+			        @$simAverageDRB = number_format(($simTotalDRB / $numberOfGamesPlayedInSim),1);
+			        @$simAverageREB = number_format((($simTotalORB + $simTotalDRB) / $numberOfGamesPlayedInSim),1);
+			        @$simAverageAST = number_format(($simTotalAST / $numberOfGamesPlayedInSim),1);
+			        @$simAverageSTL = number_format(($simTotalSTL / $numberOfGamesPlayedInSim),1);
+			        @$simAverageTOV = number_format(($simTotalTOV / $numberOfGamesPlayedInSim),1);
+			        @$simAverageBLK = number_format(($simTotalBLK / $numberOfGamesPlayedInSim),1);
+			        @$simAveragePF = number_format(($simTotalPF / $numberOfGamesPlayedInSim),1);
+			        @$simAveragePTS = number_format(($simTotalPTS / $numberOfGamesPlayedInSim),1);
 
-				(($i % 2)==0) ? $bgcolor="FFFFFF" : $bgcolor="EEEEEE";
+					(($i % 2)==0) ? $bgcolor="FFFFFF" : $bgcolor="EEEEEE";
 
-				$table_chunk=$table_chunk."<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>";
-				$table_chunk=$table_chunk."<td><center>$numberOfGamesPlayedInSim</center></td><td><center>";
-				$table_chunk=$table_chunk.$simAverageMIN;
-				$table_chunk=$table_chunk."</center></td><td><center>";
-				$table_chunk=$table_chunk.$simAverageFGM;
-				$table_chunk=$table_chunk."</center></td><td><center>";
-				$table_chunk=$table_chunk.$simAverageFGA;
-				$table_chunk=$table_chunk."</center></td><td><center>";
-				$table_chunk=$table_chunk.$simAverageFGP;
-				$table_chunk=$table_chunk."</center></td><td><center>";
-				$table_chunk=$table_chunk.$simAverageFTM;
-				$table_chunk=$table_chunk."</center></td><td><center>";
-				$table_chunk=$table_chunk.$simAverageFTA;
-				$table_chunk=$table_chunk."</center></td><td><center>";
-				$table_chunk=$table_chunk.$simAverageFTP;
-				$table_chunk=$table_chunk."</center></td><td><center>";
-				$table_chunk=$table_chunk.$simAverage3GM;
-				$table_chunk=$table_chunk."</center></td><td><center>";
-				$table_chunk=$table_chunk.$simAverage3GA;
-				$table_chunk=$table_chunk."</center></td><td><center>";
-				$table_chunk=$table_chunk.$simAverage3GP;
-				$table_chunk=$table_chunk."</center></td><td><center>";
-				$table_chunk=$table_chunk.$simAverageORB;
-				$table_chunk=$table_chunk."</center></td><td><center>";
-				$table_chunk=$table_chunk.$simAverageREB;
-				$table_chunk=$table_chunk."</center></td><td><center>";
-				$table_chunk=$table_chunk.$simAverageAST;
-				$table_chunk=$table_chunk."</center></td><td><center>";
-				$table_chunk=$table_chunk.$simAverageSTL;
-				$table_chunk=$table_chunk."</center></td><td><center>";
-				$table_chunk=$table_chunk.$simAverageTOV;
-				$table_chunk=$table_chunk."</center></td><td><center>";
-				$table_chunk=$table_chunk.$simAverageBLK;
-				$table_chunk=$table_chunk."</center></td><td><center>";
-				$table_chunk=$table_chunk.$simAveragePF;
-				$table_chunk=$table_chunk."</center></td><td><center>";
-				$table_chunk=$table_chunk.$simAveragePTS;
-				$table_chunk=$table_chunk."</center></td></tr>";
+					$table_chunk=$table_chunk."<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>";
+					$table_chunk=$table_chunk."<td><center>$numberOfGamesPlayedInSim</center></td><td><center>";
+					$table_chunk=$table_chunk.$simAverageMIN;
+					$table_chunk=$table_chunk."</center></td><td><center>";
+					$table_chunk=$table_chunk.$simAverageFGM;
+					$table_chunk=$table_chunk."</center></td><td><center>";
+					$table_chunk=$table_chunk.$simAverageFGA;
+					$table_chunk=$table_chunk."</center></td><td><center>";
+					$table_chunk=$table_chunk.$simAverageFGP;
+					$table_chunk=$table_chunk."</center></td><td><center>";
+					$table_chunk=$table_chunk.$simAverageFTM;
+					$table_chunk=$table_chunk."</center></td><td><center>";
+					$table_chunk=$table_chunk.$simAverageFTA;
+					$table_chunk=$table_chunk."</center></td><td><center>";
+					$table_chunk=$table_chunk.$simAverageFTP;
+					$table_chunk=$table_chunk."</center></td><td><center>";
+					$table_chunk=$table_chunk.$simAverage3GM;
+					$table_chunk=$table_chunk."</center></td><td><center>";
+					$table_chunk=$table_chunk.$simAverage3GA;
+					$table_chunk=$table_chunk."</center></td><td><center>";
+					$table_chunk=$table_chunk.$simAverage3GP;
+					$table_chunk=$table_chunk."</center></td><td><center>";
+					$table_chunk=$table_chunk.$simAverageORB;
+					$table_chunk=$table_chunk."</center></td><td><center>";
+					$table_chunk=$table_chunk.$simAverageREB;
+					$table_chunk=$table_chunk."</center></td><td><center>";
+					$table_chunk=$table_chunk.$simAverageAST;
+					$table_chunk=$table_chunk."</center></td><td><center>";
+					$table_chunk=$table_chunk.$simAverageSTL;
+					$table_chunk=$table_chunk."</center></td><td><center>";
+					$table_chunk=$table_chunk.$simAverageTOV;
+					$table_chunk=$table_chunk."</center></td><td><center>";
+					$table_chunk=$table_chunk.$simAverageBLK;
+					$table_chunk=$table_chunk."</center></td><td><center>";
+					$table_chunk=$table_chunk.$simAveragePF;
+					$table_chunk=$table_chunk."</center></td><td><center>";
+					$table_chunk=$table_chunk.$simAveragePTS;
+					$table_chunk=$table_chunk."</center></td></tr>";
+				} else {}
 
 				$i++;
 			}

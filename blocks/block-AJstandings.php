@@ -22,6 +22,8 @@ require 'config.php';
 mysql_connect($dbhost,$dbuname,$dbpass) or die("Unable to connect");
 @mysql_select_db($dbname) or die("Unable to select database");
 
+include "/sharedFunctions.php";
+
 /* DIVISIONAL STANDINGS
 $queryNLWest = "SELECT tid,team_name,leagueRecord,divGB FROM ibl_standings WHERE division = 'NL West' ORDER BY divGB ASC";
 $resultNLWest = mysql_query($queryNLWest);
@@ -48,8 +50,9 @@ $queryWesternConference = "SELECT tid,team_name,leagueRecord,confGB FROM ibl_sta
 $resultWesternConference = mysql_query($queryWesternConference);
 $limitWesternConference = mysql_num_rows($resultWesternConference);
 
-$lastChunkStartDate = mysql_result(mysql_query("SELECT value FROM nuke_ibl_settings WHERE name='Chunk Start Date' LIMIT 1;"),0);
-$lastChunkEndDate = mysql_result(mysql_query("SELECT value FROM nuke_ibl_settings WHERE name='Chunk End Date' LIMIT 1;"),0);
+$arrayLastSimDates = getLastSimDatesArray();
+$lastChunkStartDate = $arrayLastSimDates["Start Date"];
+$lastChunkEndDate = $arrayLastSimDates["End Date"];
 
 $content=$content.'<table width=150>';
 $content=$content."<center><u>Recent Sim Dates:</u></center>";

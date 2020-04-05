@@ -7,7 +7,7 @@ $time_check=$time-600; //SET TIME 10 Minute
 $host="localhost"; // Host name
 $username="iblhoops"; // Mysql username
 $password="Oliver!1"; // Mysql password
-$db_name="iblhoops_ibl5"; // Database name
+$db_name="iblhoops_iblleague"; // Database name
 $tbl_name="user_online"; // Table name
 
 // Connect to server and select databse

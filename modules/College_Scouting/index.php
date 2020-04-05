@@ -47,7 +47,7 @@ function userinfo($username, $bypass=0, $hid=0, $url=0) {
 		if ($attrib != NULL) {
 			if ($player != NULL) {
 
-				$sql4 = "SELECT * FROM nuke_scout_points_spent WHERE name LIKE '%$player%' AND teamname = '$userinfo[user_ibl_team]' ORDER BY name DESC";
+				$sql4 = "SELECT * FROM nuke_scout_points_spent WHERE name = '$player' AND teamname = '$userinfo[user_ibl_team]' ORDER BY name DESC ";
 				$result4 = $db->sql_query($sql4);
 				$num4 = $db->sql_numrows($result4);
 				$row4 = $db->sql_fetchrow($result4);
@@ -202,53 +202,12 @@ function userinfo($username, $bypass=0, $hid=0, $url=0) {
 	$draft_round=mysql_result($draft_result,0,"round");
 	$draft_pick=mysql_result($draft_result,0,"pick");
 
-		$queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$teamlogo'";
-	$tid = mysql_result(mysql_query($queryTeamID), 0);
-
     echo "<hr>
-    <center><img src=\"images/logo/$tid.jpg\"><br>
-	<table>
-		<tr>
-			<th colspan=26>
-				<center>Welcome to the 1989 IBL Draft<br><br><br>SCOUTING CENTRAL - $teamlogo Scouting - $scoutingpoints Scout Points Remaining<br><a href=\"http://college.ibl.net\">Main College Page</a> | <a href=\"http://college.ibl.net/draftdeclarants.php\">College Draft Declarants Page</a></center>
-			</th>
-		</tr>
-	</table>
+    <center><img src=\"online/teamgrfx/$teamlogo.jpg\"><br>
+    <table><tr><th colspan=26><centerWelcome to the 1985 IBL Draft<br><br><br>SCOUTING CENTRAL - $teamlogo Scouting - $scoutingpoints Scout Points Remaining<br><a href=\"http://college.ibl.net\">Main College Page</a> | <a href=\"http://college.ibl.net/draftdeclarants.php\">College Draft Declarants Page</a></center></th></tr>
+    <tr><th>Draft</th><th>Pos</th><th>Name</th><th>College</th><th>Age</th><th>fga</th><th>fgp</th><th>fta</th><th>ftp</th><th>tga</th><th>tgp</th><th>orb</th><th>drb</th><th>ast</th><th>stl</th><th>to</th><th>blk</th><th>oo</th><th>do</th><th>po</th><th>to</th><th>od</th><th>dd</th><th>pd</th><th>td</th><th>Tal</th><th>Skl</th><th>Int</th><th>Stamina</th></tr>";
 
-    <table class=\"sortable\">
-    	<tr>
-			<th>Draft</th>
-			<th>Pos</th>
-			<th>Name</th>
-			<th>College</th>
-			<th>Age</th>
-			<th>fga</th>
-			<th>fgp</th>
-			<th>fta</th>
-			<th>ftp</th>
-			<th>tga</th>
-			<th>tgp</th>
-			<th>orb</th>
-			<th>drb</th>
-			<th>ast</th>
-			<th>stl</th>
-			<th>to</th>
-			<th>blk</th>
-			<th>oo</th>
-			<th>do</th>
-			<th>po</th>
-			<th>to</th>
-			<th>od</th>
-			<th>dd</th>
-			<th>pd</th>
-			<th>td</th>
-			<th>Tal</th>
-			<th>Skl</th>
-			<th>Int</th>
-			<th>Stamina</th>
-		</tr>";
-
-echo "<form name='draft_form' action='online/draft_selection.php' method='POST'>";
+echo "<form name='draft_form' action='http://www.iblhoops.net/online/draft_selection.php' method='POST'>";
 echo "<input type='hidden' name='teamname' value='$teamlogo'>";
 echo "<input type='hidden' name='draft_round' value='$draft_round'>";
 echo "<input type='hidden' name='draft_pick' value='$draft_pick'>";
@@ -257,13 +216,10 @@ echo "<input type='hidden' name='draft_pick' value='$draft_pick'>";
 // START GENERAL DECLARANTS
 // ==========
 
-    $sql3 = "SELECT * FROM nuke_scout_rookieratings WHERE invite = '' ORDER BY drafted, name";
+    $sql3 = "SELECT * FROM nuke_scout_rookieratings WHERE invite = '' ORDER BY ranking DESC";
     $result3 = $db->sql_query($sql3);
 
-    $i = 0;
     while($row3 = $db->sql_fetchrow($result3)) {
-	(($i % 2)==0) ? $bgcolor="EEEEEE" : $bgcolor="EEEEEE";
-    $i++;
 
 	$player_pos = $row3[pos];
 	$player_name = $row3[name];
@@ -297,62 +253,35 @@ echo "<input type='hidden' name='draft_pick' value='$draft_pick'>";
 
 // === GRAB SCOUTING POINT EXPENDITURES ===
 
-    $sqlscouted = "SELECT * FROM nuke_scout_points_spent WHERE name LIKE '%$row3[name]%' AND teamname = '$teamlogo' ORDER BY name ASC ";
+    $sqlscouted = "SELECT * FROM nuke_scout_points_spent WHERE name = '$row3[name]' AND teamname = '$teamlogo' ORDER BY name ASC ";
     $resultscouted = $db->sql_query($sqlscouted);
     $numscouted = $db->sql_numrows($resultscouted);
     $rowscouted = $db->sql_fetchrow($resultscouted);
 
-// MASKED RATINGS
-	// $splayer_sta = $rowscouted[sta];
-	// $splayer_fga = $rowscouted[fga];
-	// $splayer_fgp = $rowscouted[fgp];
-	// $splayer_fta = $rowscouted[fta];
-	// $splayer_ftp = $rowscouted[ftp];
-	// $splayer_tga = $rowscouted[tga];
-	// $splayer_tgp = $rowscouted[tgp];
-	// $splayer_orb = $rowscouted[orb];
-	// $splayer_drb = $rowscouted[drb];
-	// $splayer_ast = $rowscouted[ast];
-	// $splayer_stl = $rowscouted[stl];
-	// $splayer_tvr = $rowscouted[tvr];
-	// $splayer_blk = $rowscouted[blk];
-	// $splayer_offo = $rowscouted[offo];
-	// $splayer_offd = $rowscouted[offd];
-	// $splayer_offp = $rowscouted[offp];
-	// $splayer_offt = $rowscouted[offt];
-	// $splayer_defo = $rowscouted[defo];
-	// $splayer_defd = $rowscouted[defd];
-	// $splayer_defp = $rowscouted[defp];
-	// $splayer_deft = $rowscouted[deft];
-	// $splayer_tal = $rowscouted[tal];
-	// $splayer_skl = $rowscouted[skl];
-	// $splayer_int = $rowscouted[int];
-
-// UNMASKED RATINGS
-	$splayer_sta = 2;
-	$splayer_fga = 3;
-	$splayer_fgp = 2;
-	$splayer_fta = 3;
-	$splayer_ftp = 2;
-	$splayer_tga = 3;
-	$splayer_tgp = 2;
-	$splayer_orb = 3;
-	$splayer_drb = 3;
-	$splayer_ast = 3;
-	$splayer_stl = 3;
-	$splayer_tvr = 3;
-	$splayer_blk = 3;
-	$splayer_offo = 3;
-	$splayer_offd = 3;
-	$splayer_offp = 3;
-	$splayer_offt = 3;
-	$splayer_defo = 3;
-	$splayer_defd = 3;
-	$splayer_defp = 3;
-	$splayer_deft = 3;
-	$splayer_tal = 2;
-	$splayer_skl = 2;
-	$splayer_int = 2;
+	$splayer_sta = $rowscouted[sta];
+	$splayer_fga = $rowscouted[fga];
+	$splayer_fgp = $rowscouted[fgp];
+	$splayer_fta = $rowscouted[fta];
+	$splayer_ftp = $rowscouted[ftp];
+	$splayer_tga = $rowscouted[tga];
+	$splayer_tgp = $rowscouted[tgp];
+	$splayer_orb = $rowscouted[orb];
+	$splayer_drb = $rowscouted[drb];
+	$splayer_ast = $rowscouted[ast];
+	$splayer_stl = $rowscouted[stl];
+	$splayer_tvr = $rowscouted[tvr];
+	$splayer_blk = $rowscouted[blk];
+	$splayer_offo = $rowscouted[offo];
+	$splayer_offd = $rowscouted[offd];
+	$splayer_offp = $rowscouted[offp];
+	$splayer_offt = $rowscouted[offt];
+	$splayer_defo = $rowscouted[defo];
+	$splayer_defd = $rowscouted[defd];
+	$splayer_defp = $rowscouted[defp];
+	$splayer_deft = $rowscouted[deft];
+	$splayer_tal = $rowscouted[tal];
+	$splayer_skl = $rowscouted[skl];
+	$splayer_int = $rowscouted[int];
 
 	$display_pos = $player_pos;
 	$display_name = $player_name;
@@ -360,164 +289,164 @@ echo "<input type='hidden' name='draft_pick' value='$draft_pick'>";
 // ===== BEGIN CODE FOR MASKING THE 1-100 RATINGS
 
 if ($splayer_fga == 2) {
-	$display_fga = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=fga&player=$display_name\">" . ceil($player_fga/10) . "/10</a>";
+	$display_fga = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=fga&player=$display_name\">" . ceil($player_fga/10) . "/10</a>";
 } else if ($splayer_fga == 3) {
 	$display_fga = $player_fga;
 } else {
 	if ($player_fga < 20) {
-	$display_fga = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=fga&player=$display_name\">F</a>";
+	$display_fga = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=fga&player=$display_name\">F</a>";
 	} else if ($player_fga < 40) {
-	$display_fga = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=fga&player=$display_name\">D</a>";
+	$display_fga = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=fga&player=$display_name\">D</a>";
 	} else if ($player_fga < 60) {
-	$display_fga = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=fga&player=$display_name\">C</a>";
+	$display_fga = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=fga&player=$display_name\">C</a>";
 	} else if ($player_fga < 80) {
-	$display_fga = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=fga&player=$display_name\">B</a>";
+	$display_fga = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=fga&player=$display_name\">B</a>";
 	} else {
-	$display_fga = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=fga&player=$display_name\">A</a>";
+	$display_fga = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=fga&player=$display_name\">A</a>";
 	}
 }
 
 if ($splayer_fta == 2) {
-	$display_fta = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=fta&player=$display_name\">" . ceil($player_fta/10) . "/10</a>";
+	$display_fta = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=fta&player=$display_name\">" . ceil($player_fta/10) . "/10</a>";
 } else if ($splayer_fta == 3) {
 	$display_fta = $player_fta;
 } else {
 	if ($player_fta < 20) {
-	$display_fta = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=fta&player=$display_name\">F</a>";
+	$display_fta = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=fta&player=$display_name\">F</a>";
 	} else if ($player_fta < 40) {
-	$display_fta = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=fta&player=$display_name\">D</a>";
+	$display_fta = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=fta&player=$display_name\">D</a>";
 	} else if ($player_fta < 60) {
-	$display_fta = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=fta&player=$display_name\">C</a>";
+	$display_fta = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=fta&player=$display_name\">C</a>";
 	} else if ($player_fta < 80) {
-	$display_fta = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=fta&player=$display_name\">B</a>";
+	$display_fta = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=fta&player=$display_name\">B</a>";
 	} else {
-	$display_fta = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=fta&player=$display_name\">A</a>";
+	$display_fta = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=fta&player=$display_name\">A</a>";
 	}
 }
 
 if ($splayer_tga == 2) {
-	$display_tga = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=tga&player=$display_name\">" . ceil($player_tga/10) . "/10</a>";
+	$display_tga = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=tga&player=$display_name\">" . ceil($player_tga/10) . "/10</a>";
 } else if ($splayer_tga == 3) {
 	$display_tga = $player_tga;
 } else {
 	if ($player_tga < 20) {
-	$display_tga = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=tga&player=$display_name\">F</a>";
+	$display_tga = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=tga&player=$display_name\">F</a>";
 	} else if ($player_tga < 40) {
-	$display_tga = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=tga&player=$display_name\">D</a>";
+	$display_tga = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=tga&player=$display_name\">D</a>";
 	} else if ($player_tga < 60) {
-	$display_tga = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=tga&player=$display_name\">C</a>";
+	$display_tga = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=tga&player=$display_name\">C</a>";
 	} else if ($player_tga < 80) {
-	$display_tga = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=tga&player=$display_name\">B</a>";
+	$display_tga = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=tga&player=$display_name\">B</a>";
 	} else {
-	$display_tga = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=tga&player=$display_name\">A</a>";
+	$display_tga = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=tga&player=$display_name\">A</a>";
 	}
 }
 
 if ($splayer_orb == 2) {
-	$display_orb = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=orb&player=$display_name\">" . ceil($player_orb/10) . "/10</a>";
+	$display_orb = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=orb&player=$display_name\">" . ceil($player_orb/10) . "/10</a>";
 } else if ($splayer_orb == 3) {
 	$display_orb = $player_orb;
 } else {
 	if ($player_orb < 20) {
-	$display_orb = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=orb&player=$display_name\">F</a>";
+	$display_orb = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=orb&player=$display_name\">F</a>";
 	} else if ($player_orb < 40) {
-	$display_orb = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=orb&player=$display_name\">D</a>";
+	$display_orb = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=orb&player=$display_name\">D</a>";
 	} else if ($player_orb < 60) {
-	$display_orb = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=orb&player=$display_name\">C</a>";
+	$display_orb = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=orb&player=$display_name\">C</a>";
 	} else if ($player_orb < 80) {
-	$display_orb = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=orb&player=$display_name\">B</a>";
+	$display_orb = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=orb&player=$display_name\">B</a>";
 	} else {
-	$display_orb = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=orb&player=$display_name\">A</a>";
+	$display_orb = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=orb&player=$display_name\">A</a>";
 	}
 }
 
 if ($splayer_drb == 2) {
-	$display_drb = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=drb&player=$display_name\">" . ceil($player_drb/10) . "/10</a>";
+	$display_drb = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=drb&player=$display_name\">" . ceil($player_drb/10) . "/10</a>";
 } else if ($splayer_drb == 3) {
 	$display_drb = $player_drb;
 } else {
 	if ($player_drb < 20) {
-	$display_drb = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=drb&player=$display_name\">F</a>";
+	$display_drb = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=drb&player=$display_name\">F</a>";
 	} else if ($player_drb < 40) {
-	$display_drb = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=drb&player=$display_name\">D</a>";
+	$display_drb = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=drb&player=$display_name\">D</a>";
 	} else if ($player_drb < 60) {
-	$display_drb = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=drb&player=$display_name\">C</a>";
+	$display_drb = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=drb&player=$display_name\">C</a>";
 	} else if ($player_drb < 80) {
-	$display_drb = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=drb&player=$display_name\">B</a>";
+	$display_drb = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=drb&player=$display_name\">B</a>";
 	} else {
-	$display_drb = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=drb&player=$display_name\">A</a>";
+	$display_drb = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=drb&player=$display_name\">A</a>";
 	}
 }
 
 if ($splayer_ast == 2) {
-	$display_ast = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=ast&player=$display_name\">" . ceil($player_ast/10) . "/10</a>";
+	$display_ast = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=ast&player=$display_name\">" . ceil($player_ast/10) . "/10</a>";
 } else if ($splayer_ast == 3) {
 	$display_ast = $player_ast;
 } else {
 	if ($player_ast < 20) {
-	$display_ast = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=ast&player=$display_name\">F</a>";
+	$display_ast = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=ast&player=$display_name\">F</a>";
 	} else if ($player_ast < 40) {
-	$display_ast = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=ast&player=$display_name\">D</a>";
+	$display_ast = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=ast&player=$display_name\">D</a>";
 	} else if ($player_ast < 60) {
-	$display_ast = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=ast&player=$display_name\">C</a>";
+	$display_ast = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=ast&player=$display_name\">C</a>";
 	} else if ($player_ast < 80) {
-	$display_ast = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=ast&player=$display_name\">B</a>";
+	$display_ast = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=ast&player=$display_name\">B</a>";
 	} else {
-	$display_ast = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=ast&player=$display_name\">A</a>";
+	$display_ast = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=ast&player=$display_name\">A</a>";
 	}
 }
 
 if ($splayer_stl == 2) {
-	$display_stl = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=stl&player=$display_name\">" . ceil($player_stl/10) . "/10</a>";
+	$display_stl = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=stl&player=$display_name\">" . ceil($player_stl/10) . "/10</a>";
 } else if ($splayer_stl == 3) {
 	$display_stl = $player_stl;
 } else {
 	if ($player_stl < 20) {
-	$display_stl = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=stl&player=$display_name\">F</a>";
+	$display_stl = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=stl&player=$display_name\">F</a>";
 	} else if ($player_stl < 40) {
-	$display_stl = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=stl&player=$display_name\">D</a>";
+	$display_stl = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=stl&player=$display_name\">D</a>";
 	} else if ($player_stl < 60) {
-	$display_stl = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=stl&player=$display_name\">C</a>";
+	$display_stl = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=stl&player=$display_name\">C</a>";
 	} else if ($player_stl < 80) {
-	$display_stl = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=stl&player=$display_name\">B</a>";
+	$display_stl = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=stl&player=$display_name\">B</a>";
 	} else {
-	$display_stl = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=stl&player=$display_name\">A</a>";
+	$display_stl = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=stl&player=$display_name\">A</a>";
 	}
 }
 
 if ($splayer_tvr == 2) {
-	$display_tvr = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=tvr&player=$display_name\">" . ceil($player_tvr/10) . "/10</a>";
+	$display_tvr = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=tvr&player=$display_name\">" . ceil($player_tvr/10) . "/10</a>";
 } else if ($splayer_tvr == 3) {
 	$display_tvr = $player_tvr;
 } else {
 	if ($player_tvr < 20) {
-	$display_tvr = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=tvr&player=$display_name\">F</a>";
+	$display_tvr = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=tvr&player=$display_name\">F</a>";
 	} else if ($player_tvr < 40) {
-	$display_tvr = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=tvr&player=$display_name\">D</a>";
+	$display_tvr = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=tvr&player=$display_name\">D</a>";
 	} else if ($player_tvr < 60) {
-	$display_tvr = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=tvr&player=$display_name\">C</a>";
+	$display_tvr = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=tvr&player=$display_name\">C</a>";
 	} else if ($player_tvr < 80) {
-	$display_tvr = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=tvr&player=$display_name\">B</a>";
+	$display_tvr = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=tvr&player=$display_name\">B</a>";
 	} else {
-	$display_tvr = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=tvr&player=$display_name\">A</a>";
+	$display_tvr = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=tvr&player=$display_name\">A</a>";
 	}
 }
 
 if ($splayer_blk == 2) {
-	$display_blk = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=blk&player=$display_name\">" . ceil($player_blk/10) . "/10</a>";
+	$display_blk = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=blk&player=$display_name\">" . ceil($player_blk/10) . "/10</a>";
 } else if ($splayer_blk == 3) {
 	$display_blk = $player_blk;
 } else {
 	if ($player_blk < 20) {
-	$display_blk = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=blk&player=$display_name\">F</a>";
+	$display_blk = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=blk&player=$display_name\">F</a>";
 	} else if ($player_blk < 40) {
-	$display_blk = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=blk&player=$display_name\">D</a>";
+	$display_blk = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=blk&player=$display_name\">D</a>";
 	} else if ($player_blk < 60) {
-	$display_blk = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=blk&player=$display_name\">C</a>";
+	$display_blk = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=blk&player=$display_name\">C</a>";
 	} else if ($player_blk < 80) {
-	$display_blk = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=blk&player=$display_name\">B</a>";
+	$display_blk = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=blk&player=$display_name\">B</a>";
 	} else {
-	$display_blk = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=blk&player=$display_name\">A</a>";
+	$display_blk = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=blk&player=$display_name\">A</a>";
 	}
 }
 
@@ -528,15 +457,15 @@ if ($splayer_fgp == 2) {
 	$display_fgp = $player_fgp;
 } else {
 	if ($player_fgp < 41) {
-	$display_fgp = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=fgp&player=$display_name\">F</a>";
+	$display_fgp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=fgp&player=$display_name\">F</a>";
 	} else if ($player_fgp < 44) {
-	$display_fgp = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=fgp&player=$display_name\">D</a>";
+	$display_fgp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=fgp&player=$display_name\">D</a>";
 	} else if ($player_fgp < 47) {
-	$display_fgp = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=fgp&player=$display_name\">C</a>";
+	$display_fgp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=fgp&player=$display_name\">C</a>";
 	} else if ($player_fgp < 50) {
-	$display_fgp = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=fgp&player=$display_name\">B</a>";
+	$display_fgp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=fgp&player=$display_name\">B</a>";
 	} else {
-	$display_fgp = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=fgp&player=$display_name\">A</a>";
+	$display_fgp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=fgp&player=$display_name\">A</a>";
 	}
 }
 
@@ -544,15 +473,15 @@ if ($splayer_ftp == 2) {
 	$display_ftp = $player_ftp;
 } else {
 	if ($player_ftp < 69) {
-	$display_ftp = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=ftp&player=$display_name\">F</a>";
+	$display_ftp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=ftp&player=$display_name\">F</a>";
 	} else if ($player_ftp < 73) {
-	$display_ftp = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=ftp&player=$display_name\">D</a>";
+	$display_ftp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=ftp&player=$display_name\">D</a>";
 	} else if ($player_ftp < 77) {
-	$display_ftp = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=ftp&player=$display_name\">C</a>";
+	$display_ftp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=ftp&player=$display_name\">C</a>";
 	} else if ($player_ftp < 81) {
-	$display_ftp = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=ftp&player=$display_name\">B</a>";
+	$display_ftp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=ftp&player=$display_name\">B</a>";
 	} else {
-	$display_ftp = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=ftp&player=$display_name\">A</a>";
+	$display_ftp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=ftp&player=$display_name\">A</a>";
 	}
 }
 
@@ -560,15 +489,15 @@ if ($splayer_tgp == 2) {
 	$display_tgp = $player_tgp;
 } else {
 	if ($player_tgp < 28) {
-	$display_tgp = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=tgp&player=$display_name\">F</a>";
+	$display_tgp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=tgp&player=$display_name\">F</a>";
 	} else if ($player_tgp < 32) {
-	$display_tgp = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=tgp&player=$display_name\">D</a>";
+	$display_tgp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=tgp&player=$display_name\">D</a>";
 	} else if ($player_tgp < 36) {
-	$display_tgp = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=tgp&player=$display_name\">C</a>";
+	$display_tgp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=tgp&player=$display_name\">C</a>";
 	} else if ($player_tgp < 40) {
-	$display_tgp = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=tgp&player=$display_name\">B</a>";
+	$display_tgp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=tgp&player=$display_name\">B</a>";
 	} else {
-	$display_tgp = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=tgp&player=$display_name\">A</a>";
+	$display_tgp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=tgp&player=$display_name\">A</a>";
 	}
 }
 
@@ -576,15 +505,15 @@ if ($splayer_sta == 2) {
 	$display_sta = $player_sta;
 } else {
 	if ($player_sta < 11) {
-	$display_sta = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=sta&player=$display_name\">F</a>";
+	$display_sta = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=sta&player=$display_name\">F</a>";
 	} else if ($player_sta < 16) {
-	$display_sta = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=sta&player=$display_name\">D</a>";
+	$display_sta = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=sta&player=$display_name\">D</a>";
 	} else if ($player_sta < 20) {
-	$display_sta = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=sta&player=$display_name\">C</a>";
+	$display_sta = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=sta&player=$display_name\">C</a>";
 	} else if ($player_sta < 25) {
-	$display_sta = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=sta&player=$display_name\">B</a>";
+	$display_sta = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=sta&player=$display_name\">B</a>";
 	} else {
-	$display_sta = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=sta&player=$display_name\">A</a>";
+	$display_sta = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=sta&player=$display_name\">A</a>";
 	}
 }
 // === END CODE FOR MASKING SHOOTING PERCENTAGES
@@ -597,39 +526,39 @@ if ($splayer_sta == 2) {
 
 if ($splayer_offo == 2) {
 	if ($player_offo < 3) {
-	$display_offo = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=offo&player=$display_name\">D</a>";
+	$display_offo = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=offo&player=$display_name\">D</a>";
 	} else if ($player_offo < 6) {
-	$display_offo = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=offo&player=$display_name\">C</a>";
+	$display_offo = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=offo&player=$display_name\">C</a>";
 	} else if ($player_offo < 8) {
-	$display_offo = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=offo&player=$display_name\">B</a>";
+	$display_offo = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=offo&player=$display_name\">B</a>";
 	} else {
-	$display_offo = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=offo&player=$display_name\">A</a>";
+	$display_offo = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=offo&player=$display_name\">A</a>";
 	}
 } else if ($splayer_offo == 3) {
 	$display_offo = $player_offo;
 } else {
 	if ($Total_Off < 10) {
-	$display_Off = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=offo&player=$display_name\">F</a>";
+	$display_Off = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=offo&player=$display_name\">F</a>";
 	} else if ($Total_Off < 17) {
-	$display_Off = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=offo&player=$display_name\">D</a>";
+	$display_Off = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=offo&player=$display_name\">D</a>";
 	} else if ($Total_Off < 24) {
-	$display_Off = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=offo&player=$display_name\">C</a>";
+	$display_Off = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=offo&player=$display_name\">C</a>";
 	} else if ($Total_Off < 30) {
-	$display_Off = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=offo&player=$display_name\">B</a>";
+	$display_Off = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=offo&player=$display_name\">B</a>";
 	} else {
-	$display_Off = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=offo&player=$display_name\">A</a>";
+	$display_Off = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=offo&player=$display_name\">A</a>";
 	}
 }
 
 if ($splayer_offd == 2) {
 	if ($player_offd < 3) {
-	$display_offd = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=offd&player=$display_name\">D</a>";
+	$display_offd = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=offd&player=$display_name\">D</a>";
 	} else if ($player_offd < 6) {
-	$display_offd = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=offd&player=$display_name\">C</a>";
+	$display_offd = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=offd&player=$display_name\">C</a>";
 	} else if ($player_offd < 8) {
-	$display_offd = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=offd&player=$display_name\">B</a>";
+	$display_offd = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=offd&player=$display_name\">B</a>";
 	} else {
-	$display_offd = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=offd&player=$display_name\">A</a>";
+	$display_offd = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=offd&player=$display_name\">A</a>";
 	}
 } else if ($splayer_offd == 3) {
 	$display_offd = $player_offd;
@@ -638,13 +567,13 @@ if ($splayer_offd == 2) {
 
 if ($splayer_offp == 2) {
 	if ($player_offp < 3) {
-	$display_offp = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=offp&player=$display_name\">D</a>";
+	$display_offp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=offp&player=$display_name\">D</a>";
 	} else if ($player_offp < 6) {
-	$display_offp = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=offp&player=$display_name\">C</a>";
+	$display_offp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=offp&player=$display_name\">C</a>";
 	} else if ($player_offp < 8) {
-	$display_offp = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=offp&player=$display_name\">B</a>";
+	$display_offp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=offp&player=$display_name\">B</a>";
 	} else {
-	$display_offp = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=offp&player=$display_name\">A</a>";
+	$display_offp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=offp&player=$display_name\">A</a>";
 	}
 } else if ($splayer_offp == 3) {
 	$display_offp = $player_offp;
@@ -653,13 +582,13 @@ if ($splayer_offp == 2) {
 
 if ($splayer_offt == 2) {
 	if ($player_offt < 3) {
-	$display_offt = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=offt&player=$display_name\">D</a>";
+	$display_offt = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=offt&player=$display_name\">D</a>";
 	} else if ($player_offt < 6) {
-	$display_offt = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=offt&player=$display_name\">C</a>";
+	$display_offt = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=offt&player=$display_name\">C</a>";
 	} else if ($player_offt < 8) {
-	$display_offt = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=offt&player=$display_name\">B</a>";
+	$display_offt = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=offt&player=$display_name\">B</a>";
 	} else {
-	$display_offt = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=offt&player=$display_name\">A</a>";
+	$display_offt = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=offt&player=$display_name\">A</a>";
 	}
 } else if ($splayer_offt == 3) {
 	$display_offt = $player_offt;
@@ -668,39 +597,39 @@ if ($splayer_offt == 2) {
 
 if ($splayer_defo == 2) {
 	if ($player_defo < 3) {
-	$display_defo = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=defo&player=$display_name\">D</a>";
+	$display_defo = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=defo&player=$display_name\">D</a>";
 	} else if ($player_defo < 6) {
-	$display_defo = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=defo&player=$display_name\">C</a>";
+	$display_defo = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=defo&player=$display_name\">C</a>";
 	} else if ($player_defo < 8) {
-	$display_defo = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=defo&player=$display_name\">B</a>";
+	$display_defo = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=defo&player=$display_name\">B</a>";
 	} else {
-	$display_defo = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=defo&player=$display_name\">A</a>";
+	$display_defo = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=defo&player=$display_name\">A</a>";
 	}
 } else if ($splayer_defo == 3) {
 	$display_defo = $player_defo;
 } else {
 	if ($Total_Def < 10) {
-	$display_Def = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=defo&player=$display_name\">F</a>";
+	$display_Def = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=defo&player=$display_name\">F</a>";
 	} else if ($Total_Def < 17) {
-	$display_Def = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=defo&player=$display_name\">D</a>";
+	$display_Def = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=defo&player=$display_name\">D</a>";
 	} else if ($Total_Def < 24) {
-	$display_Def = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=defo&player=$display_name\">C</a>";
+	$display_Def = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=defo&player=$display_name\">C</a>";
 	} else if ($Total_Def < 30) {
-	$display_Def = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=defo&player=$display_name\">B</a>";
+	$display_Def = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=defo&player=$display_name\">B</a>";
 	} else {
-	$display_Def = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=defo&player=$display_name\">A</a>";
+	$display_Def = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=defo&player=$display_name\">A</a>";
 	}
 }
 
 if ($splayer_defd == 2) {
 	if ($player_defd < 3) {
-	$display_defd = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=defd&player=$display_name\">D</a>";
+	$display_defd = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=defd&player=$display_name\">D</a>";
 	} else if ($player_defd < 6) {
-	$display_defd = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=defd&player=$display_name\">C</a>";
+	$display_defd = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=defd&player=$display_name\">C</a>";
 	} else if ($player_defd < 8) {
-	$display_defd = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=defd&player=$display_name\">B</a>";
+	$display_defd = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=defd&player=$display_name\">B</a>";
 	} else {
-	$display_defd = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=defd&player=$display_name\">A</a>";
+	$display_defd = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=defd&player=$display_name\">A</a>";
 	}
 } else if ($splayer_defd == 3) {
 	$display_defd = $player_defd;
@@ -709,13 +638,13 @@ if ($splayer_defd == 2) {
 
 if ($splayer_defp == 2) {
 	if ($player_defp < 3) {
-	$display_defp = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=defp&player=$display_name\">D</a>";
+	$display_defp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=defp&player=$display_name\">D</a>";
 	} else if ($player_defp < 6) {
-	$display_defp = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=defp&player=$display_name\">C</a>";
+	$display_defp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=defp&player=$display_name\">C</a>";
 	} else if ($player_defp < 8) {
-	$display_defp = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=defp&player=$display_name\">B</a>";
+	$display_defp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=defp&player=$display_name\">B</a>";
 	} else {
-	$display_defp = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=defp&player=$display_name\">A</a>";
+	$display_defp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=defp&player=$display_name\">A</a>";
 	}
 } else if ($splayer_defp == 3) {
 	$display_defp = $player_defp;
@@ -724,13 +653,13 @@ if ($splayer_defp == 2) {
 
 if ($splayer_deft == 2) {
 	if ($player_deft < 3) {
-	$display_deft = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=deft&player=$display_name\">D</a>";
+	$display_deft = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=deft&player=$display_name\">D</a>";
 	} else if ($player_deft < 6) {
-	$display_deft = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=deft&player=$display_name\">C</a>";
+	$display_deft = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=deft&player=$display_name\">C</a>";
 	} else if ($player_deft < 8) {
-	$display_deft = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=deft&player=$display_name\">B</a>";
+	$display_deft = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=deft&player=$display_name\">B</a>";
 	} else {
-	$display_deft = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=deft&player=$display_name\">A</a>";
+	$display_deft = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=deft&player=$display_name\">A</a>";
 	}
 } else if ($splayer_deft == 3) {
 	$display_deft = $player_deft;
@@ -747,22 +676,22 @@ if ($splayer_tal == 2) {
 	$display_int = $player_int;
 } else {
 	if ($Total_Pot < 5) {
-	$display_Pot = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=tal&player=$display_name\">F</a>";
+	$display_Pot = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=tal&player=$display_name\">F</a>";
 	} else if ($Total_Pot < 8) {
-	$display_Pot = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=tal&player=$display_name\">D</a>";
+	$display_Pot = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=tal&player=$display_name\">D</a>";
 	} else if ($Total_Pot < 11) {
-	$display_Pot = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=tal&player=$display_name\">C</a>";
+	$display_Pot = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=tal&player=$display_name\">C</a>";
 	} else if ($Total_Pot < 14) {
-	$display_Pot = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=tal&player=$display_name\">B</a>";
+	$display_Pot = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=tal&player=$display_name\">B</a>";
 	} else {
-	$display_Pot = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=tal&player=$display_name\">A</a>";
+	$display_Pot = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=tal&player=$display_name\">A</a>";
 	}
 }
 
 if ($teamlogo == $draft_team && $player_drafted == 0){
-	echo "<tr bgcolor = $bgcolor><td><input type='radio' name='player' value='$player_name'><td>$player_pos</td><td nowrap>";
+	echo "<tr><td><input type='radio' name='player' value='$player_name'><td>$player_pos</td><td nowrap>";
 }else{
-	echo "<tr bgcolor = $bgcolor><td><td>$player_pos</td><td nowrap>";
+	echo "<tr><td><td>$player_pos</td><td nowrap>";
 }
 
 // ====
@@ -805,8 +734,6 @@ echo"</tr>
 ";
 
 }
-
-echo "</table>";
 
 // ========
 // END GENERAL DECLARANTS
@@ -892,164 +819,164 @@ echo"<tr><th colspan=28><center>Players Your Team has invited</th></tr>
 // ===== BEGIN CODE FOR MASKING THE 1-100 RATINGS
 
 if ($splayer_fga == 2) {
-	$display_fga = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=fga&player=$display_name\">" . ceil($player_fga/10) . "/10</a>";
+	$display_fga = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=fga&player=$display_name\">" . ceil($player_fga/10) . "/10</a>";
 } else if ($splayer_fga == 3) {
 	$display_fga = $player_fga;
 } else {
 	if ($player_fga < 20) {
-	$display_fga = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=fga&player=$display_name\">F</a>";
+	$display_fga = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=fga&player=$display_name\">F</a>";
 	} else if ($player_fga < 40) {
-	$display_fga = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=fga&player=$display_name\">D</a>";
+	$display_fga = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=fga&player=$display_name\">D</a>";
 	} else if ($player_fga < 60) {
-	$display_fga = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=fga&player=$display_name\">C</a>";
+	$display_fga = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=fga&player=$display_name\">C</a>";
 	} else if ($player_fga < 80) {
-	$display_fga = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=fga&player=$display_name\">B</a>";
+	$display_fga = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=fga&player=$display_name\">B</a>";
 	} else {
-	$display_fga = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=fga&player=$display_name\">A</a>";
+	$display_fga = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=fga&player=$display_name\">A</a>";
 	}
 }
 
 if ($splayer_fta == 2) {
-	$display_fta = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=fta&player=$display_name\">" . ceil($player_fta/10) . "/10</a>";
+	$display_fta = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=fta&player=$display_name\">" . ceil($player_fta/10) . "/10</a>";
 } else if ($splayer_fta == 3) {
 	$display_fta = $player_fta;
 } else {
 	if ($player_fta < 20) {
-	$display_fta = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=fta&player=$display_name\">F</a>";
+	$display_fta = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=fta&player=$display_name\">F</a>";
 	} else if ($player_fta < 40) {
-	$display_fta = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=fta&player=$display_name\">D</a>";
+	$display_fta = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=fta&player=$display_name\">D</a>";
 	} else if ($player_fta < 60) {
-	$display_fta = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=fta&player=$display_name\">C</a>";
+	$display_fta = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=fta&player=$display_name\">C</a>";
 	} else if ($player_fta < 80) {
-	$display_fta = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=fta&player=$display_name\">B</a>";
+	$display_fta = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=fta&player=$display_name\">B</a>";
 	} else {
-	$display_fta = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=fta&player=$display_name\">A</a>";
+	$display_fta = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=fta&player=$display_name\">A</a>";
 	}
 }
 
 if ($splayer_tga == 2) {
-	$display_tga = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=tga&player=$display_name\">" . ceil($player_tga/10) . "/10</a>";
+	$display_tga = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=tga&player=$display_name\">" . ceil($player_tga/10) . "/10</a>";
 } else if ($splayer_tga == 3) {
 	$display_tga = $player_tga;
 } else {
 	if ($player_tga < 20) {
-	$display_tga = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=tga&player=$display_name\">F</a>";
+	$display_tga = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=tga&player=$display_name\">F</a>";
 	} else if ($player_tga < 40) {
-	$display_tga = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=tga&player=$display_name\">D</a>";
+	$display_tga = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=tga&player=$display_name\">D</a>";
 	} else if ($player_tga < 60) {
-	$display_tga = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=tga&player=$display_name\">C</a>";
+	$display_tga = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=tga&player=$display_name\">C</a>";
 	} else if ($player_tga < 80) {
-	$display_tga = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=tga&player=$display_name\">B</a>";
+	$display_tga = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=tga&player=$display_name\">B</a>";
 	} else {
-	$display_tga = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=tga&player=$display_name\">A</a>";
+	$display_tga = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=tga&player=$display_name\">A</a>";
 	}
 }
 
 if ($splayer_orb == 2) {
-	$display_orb = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=orb&player=$display_name\">" . ceil($player_orb/10) . "/10</a>";
+	$display_orb = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=orb&player=$display_name\">" . ceil($player_orb/10) . "/10</a>";
 } else if ($splayer_orb == 3) {
 	$display_orb = $player_orb;
 } else {
 	if ($player_orb < 20) {
-	$display_orb = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=orb&player=$display_name\">F</a>";
+	$display_orb = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=orb&player=$display_name\">F</a>";
 	} else if ($player_orb < 40) {
-	$display_orb = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=orb&player=$display_name\">D</a>";
+	$display_orb = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=orb&player=$display_name\">D</a>";
 	} else if ($player_orb < 60) {
-	$display_orb = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=orb&player=$display_name\">C</a>";
+	$display_orb = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=orb&player=$display_name\">C</a>";
 	} else if ($player_orb < 80) {
-	$display_orb = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=orb&player=$display_name\">B</a>";
+	$display_orb = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=orb&player=$display_name\">B</a>";
 	} else {
-	$display_orb = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=orb&player=$display_name\">A</a>";
+	$display_orb = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=orb&player=$display_name\">A</a>";
 	}
 }
 
 if ($splayer_drb == 2) {
-	$display_drb = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=drb&player=$display_name\">" . ceil($player_drb/10) . "/10</a>";
+	$display_drb = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=drb&player=$display_name\">" . ceil($player_drb/10) . "/10</a>";
 } else if ($splayer_drb == 3) {
 	$display_drb = $player_drb;
 } else {
 	if ($player_drb < 20) {
-	$display_drb = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=drb&player=$display_name\">F</a>";
+	$display_drb = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=drb&player=$display_name\">F</a>";
 	} else if ($player_drb < 40) {
-	$display_drb = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=drb&player=$display_name\">D</a>";
+	$display_drb = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=drb&player=$display_name\">D</a>";
 	} else if ($player_drb < 60) {
-	$display_drb = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=drb&player=$display_name\">C</a>";
+	$display_drb = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=drb&player=$display_name\">C</a>";
 	} else if ($player_drb < 80) {
-	$display_drb = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=drb&player=$display_name\">B</a>";
+	$display_drb = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=drb&player=$display_name\">B</a>";
 	} else {
-	$display_drb = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=drb&player=$display_name\">A</a>";
+	$display_drb = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=drb&player=$display_name\">A</a>";
 	}
 }
 
 if ($splayer_ast == 2) {
-	$display_ast = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=ast&player=$display_name\">" . ceil($player_ast/10) . "/10</a>";
+	$display_ast = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=ast&player=$display_name\">" . ceil($player_ast/10) . "/10</a>";
 } else if ($splayer_ast == 3) {
 	$display_ast = $player_ast;
 } else {
 	if ($player_ast < 20) {
-	$display_ast = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=ast&player=$display_name\">F</a>";
+	$display_ast = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=ast&player=$display_name\">F</a>";
 	} else if ($player_ast < 40) {
-	$display_ast = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=ast&player=$display_name\">D</a>";
+	$display_ast = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=ast&player=$display_name\">D</a>";
 	} else if ($player_ast < 60) {
-	$display_ast = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=ast&player=$display_name\">C</a>";
+	$display_ast = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=ast&player=$display_name\">C</a>";
 	} else if ($player_ast < 80) {
-	$display_ast = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=ast&player=$display_name\">B</a>";
+	$display_ast = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=ast&player=$display_name\">B</a>";
 	} else {
-	$display_ast = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=ast&player=$display_name\">A</a>";
+	$display_ast = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=ast&player=$display_name\">A</a>";
 	}
 }
 
 if ($splayer_stl == 2) {
-	$display_stl = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=stl&player=$display_name\">" . ceil($player_stl/10) . "/10</a>";
+	$display_stl = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=stl&player=$display_name\">" . ceil($player_stl/10) . "/10</a>";
 } else if ($splayer_stl == 3) {
 	$display_stl = $player_stl;
 } else {
 	if ($player_stl < 20) {
-	$display_stl = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=stl&player=$display_name\">F</a>";
+	$display_stl = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=stl&player=$display_name\">F</a>";
 	} else if ($player_stl < 40) {
-	$display_stl = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=stl&player=$display_name\">D</a>";
+	$display_stl = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=stl&player=$display_name\">D</a>";
 	} else if ($player_stl < 60) {
-	$display_stl = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=stl&player=$display_name\">C</a>";
+	$display_stl = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=stl&player=$display_name\">C</a>";
 	} else if ($player_stl < 80) {
-	$display_stl = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=stl&player=$display_name\">B</a>";
+	$display_stl = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=stl&player=$display_name\">B</a>";
 	} else {
-	$display_stl = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=stl&player=$display_name\">A</a>";
+	$display_stl = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=stl&player=$display_name\">A</a>";
 	}
 }
 
 if ($splayer_tvr == 2) {
-	$display_tvr = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=tvr&player=$display_name\">" . ceil($player_tvr/10) . "/10</a>";
+	$display_tvr = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=tvr&player=$display_name\">" . ceil($player_tvr/10) . "/10</a>";
 } else if ($splayer_tvr == 3) {
 	$display_tvr = $player_tvr;
 } else {
 	if ($player_tvr < 20) {
-	$display_tvr = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=tvr&player=$display_name\">F</a>";
+	$display_tvr = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=tvr&player=$display_name\">F</a>";
 	} else if ($player_tvr < 40) {
-	$display_tvr = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=tvr&player=$display_name\">D</a>";
+	$display_tvr = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=tvr&player=$display_name\">D</a>";
 	} else if ($player_tvr < 60) {
-	$display_tvr = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=tvr&player=$display_name\">C</a>";
+	$display_tvr = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=tvr&player=$display_name\">C</a>";
 	} else if ($player_tvr < 80) {
-	$display_tvr = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=tvr&player=$display_name\">B</a>";
+	$display_tvr = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=tvr&player=$display_name\">B</a>";
 	} else {
-	$display_tvr = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=tvr&player=$display_name\">A</a>";
+	$display_tvr = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=tvr&player=$display_name\">A</a>";
 	}
 }
 
 if ($splayer_blk == 2) {
-	$display_blk = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=blk&player=$display_name\">" . ceil($player_blk/10) . "/10</a>";
+	$display_blk = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=blk&player=$display_name\">" . ceil($player_blk/10) . "/10</a>";
 } else if ($splayer_blk == 3) {
 	$display_blk = $player_blk;
 } else {
 	if ($player_blk < 20) {
-	$display_blk = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=blk&player=$display_name\">F</a>";
+	$display_blk = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=blk&player=$display_name\">F</a>";
 	} else if ($player_blk < 40) {
-	$display_blk = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=blk&player=$display_name\">D</a>";
+	$display_blk = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=blk&player=$display_name\">D</a>";
 	} else if ($player_blk < 60) {
-	$display_blk = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=blk&player=$display_name\">C</a>";
+	$display_blk = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=blk&player=$display_name\">C</a>";
 	} else if ($player_blk < 80) {
-	$display_blk = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=blk&player=$display_name\">B</a>";
+	$display_blk = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=blk&player=$display_name\">B</a>";
 	} else {
-	$display_blk = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=blk&player=$display_name\">A</a>";
+	$display_blk = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=blk&player=$display_name\">A</a>";
 	}
 }
 
@@ -1060,15 +987,15 @@ if ($splayer_fgp == 2) {
 	$display_fgp = $player_fgp;
 } else {
 	if ($player_fgp < 41) {
-	$display_fgp = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=fgp&player=$display_name\">F</a>";
+	$display_fgp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=fgp&player=$display_name\">F</a>";
 	} else if ($player_fgp < 44) {
-	$display_fgp = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=fgp&player=$display_name\">D</a>";
+	$display_fgp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=fgp&player=$display_name\">D</a>";
 	} else if ($player_fgp < 47) {
-	$display_fgp = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=fgp&player=$display_name\">C</a>";
+	$display_fgp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=fgp&player=$display_name\">C</a>";
 	} else if ($player_fgp < 50) {
-	$display_fgp = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=fgp&player=$display_name\">B</a>";
+	$display_fgp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=fgp&player=$display_name\">B</a>";
 	} else {
-	$display_fgp = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=fgp&player=$display_name\">A</a>";
+	$display_fgp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=fgp&player=$display_name\">A</a>";
 	}
 }
 
@@ -1076,15 +1003,15 @@ if ($splayer_ftp == 2) {
 	$display_ftp = $player_ftp;
 } else {
 	if ($player_ftp < 69) {
-	$display_ftp = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=ftp&player=$display_name\">F</a>";
+	$display_ftp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=ftp&player=$display_name\">F</a>";
 	} else if ($player_ftp < 73) {
-	$display_ftp = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=ftp&player=$display_name\">D</a>";
+	$display_ftp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=ftp&player=$display_name\">D</a>";
 	} else if ($player_ftp < 77) {
-	$display_ftp = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=ftp&player=$display_name\">C</a>";
+	$display_ftp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=ftp&player=$display_name\">C</a>";
 	} else if ($player_ftp < 81) {
-	$display_ftp = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=ftp&player=$display_name\">B</a>";
+	$display_ftp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=ftp&player=$display_name\">B</a>";
 	} else {
-	$display_ftp = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=ftp&player=$display_name\">A</a>";
+	$display_ftp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=ftp&player=$display_name\">A</a>";
 	}
 }
 
@@ -1092,15 +1019,15 @@ if ($splayer_tgp == 2) {
 	$display_tgp = $player_tgp;
 } else {
 	if ($player_tgp < 28) {
-	$display_tgp = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=tgp&player=$display_name\">F</a>";
+	$display_tgp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=tgp&player=$display_name\">F</a>";
 	} else if ($player_tgp < 32) {
-	$display_tgp = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=tgp&player=$display_name\">D</a>";
+	$display_tgp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=tgp&player=$display_name\">D</a>";
 	} else if ($player_tgp < 36) {
-	$display_tgp = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=tgp&player=$display_name\">C</a>";
+	$display_tgp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=tgp&player=$display_name\">C</a>";
 	} else if ($player_tgp < 40) {
-	$display_tgp = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=tgp&player=$display_name\">B</a>";
+	$display_tgp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=tgp&player=$display_name\">B</a>";
 	} else {
-	$display_tgp = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=tgp&player=$display_name\">A</a>";
+	$display_tgp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=tgp&player=$display_name\">A</a>";
 	}
 }
 
@@ -1108,15 +1035,15 @@ if ($splayer_sta == 2) {
 	$display_sta = $player_sta;
 } else {
 	if ($player_sta < 11) {
-	$display_sta = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=sta&player=$display_name\">F</a>";
+	$display_sta = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=sta&player=$display_name\">F</a>";
 	} else if ($player_sta < 16) {
-	$display_sta = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=sta&player=$display_name\">D</a>";
+	$display_sta = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=sta&player=$display_name\">D</a>";
 	} else if ($player_sta < 20) {
-	$display_sta = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=sta&player=$display_name\">C</a>";
+	$display_sta = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=sta&player=$display_name\">C</a>";
 	} else if ($player_sta < 25) {
-	$display_sta = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=sta&player=$display_name\">B</a>";
+	$display_sta = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=sta&player=$display_name\">B</a>";
 	} else {
-	$display_sta = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=sta&player=$display_name\">A</a>";
+	$display_sta = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=sta&player=$display_name\">A</a>";
 	}
 }
 // === END CODE FOR MASKING SHOOTING PERCENTAGES
@@ -1129,39 +1056,39 @@ if ($splayer_sta == 2) {
 
 if ($splayer_offo == 2) {
 	if ($player_offo < 3) {
-	$display_offo = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=offo&player=$display_name\">D</a>";
+	$display_offo = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=offo&player=$display_name\">D</a>";
 	} else if ($player_offo < 6) {
-	$display_offo = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=offo&player=$display_name\">C</a>";
+	$display_offo = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=offo&player=$display_name\">C</a>";
 	} else if ($player_offo < 8) {
-	$display_offo = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=offo&player=$display_name\">B</a>";
+	$display_offo = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=offo&player=$display_name\">B</a>";
 	} else {
-	$display_offo = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=offo&player=$display_name\">A</a>";
+	$display_offo = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=offo&player=$display_name\">A</a>";
 	}
 } else if ($splayer_offo == 3) {
 	$display_offo = $player_offo;
 } else {
 	if ($Total_Off < 10) {
-	$display_Off = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=offo&player=$display_name\">F</a>";
+	$display_Off = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=offo&player=$display_name\">F</a>";
 	} else if ($Total_Off < 17) {
-	$display_Off = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=offo&player=$display_name\">D</a>";
+	$display_Off = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=offo&player=$display_name\">D</a>";
 	} else if ($Total_Off < 24) {
-	$display_Off = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=offo&player=$display_name\">C</a>";
+	$display_Off = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=offo&player=$display_name\">C</a>";
 	} else if ($Total_Off < 30) {
-	$display_Off = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=offo&player=$display_name\">B</a>";
+	$display_Off = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=offo&player=$display_name\">B</a>";
 	} else {
-	$display_Off = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=offo&player=$display_name\">A</a>";
+	$display_Off = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=offo&player=$display_name\">A</a>";
 	}
 }
 
 if ($splayer_offd == 2) {
 	if ($player_offd < 3) {
-	$display_offd = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=offd&player=$display_name\">D</a>";
+	$display_offd = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=offd&player=$display_name\">D</a>";
 	} else if ($player_offd < 6) {
-	$display_offd = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=offd&player=$display_name\">C</a>";
+	$display_offd = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=offd&player=$display_name\">C</a>";
 	} else if ($player_offd < 8) {
-	$display_offd = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=offd&player=$display_name\">B</a>";
+	$display_offd = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=offd&player=$display_name\">B</a>";
 	} else {
-	$display_offd = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=offd&player=$display_name\">A</a>";
+	$display_offd = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=offd&player=$display_name\">A</a>";
 	}
 } else if ($splayer_offd == 3) {
 	$display_offd = $player_offd;
@@ -1170,13 +1097,13 @@ if ($splayer_offd == 2) {
 
 if ($splayer_offp == 2) {
 	if ($player_offp < 3) {
-	$display_offp = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=offp&player=$display_name\">D</a>";
+	$display_offp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=offp&player=$display_name\">D</a>";
 	} else if ($player_offp < 6) {
-	$display_offp = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=offp&player=$display_name\">C</a>";
+	$display_offp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=offp&player=$display_name\">C</a>";
 	} else if ($player_offp < 8) {
-	$display_offp = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=offp&player=$display_name\">B</a>";
+	$display_offp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=offp&player=$display_name\">B</a>";
 	} else {
-	$display_offp = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=offp&player=$display_name\">A</a>";
+	$display_offp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=offp&player=$display_name\">A</a>";
 	}
 } else if ($splayer_offp == 3) {
 	$display_offp = $player_offp;
@@ -1185,13 +1112,13 @@ if ($splayer_offp == 2) {
 
 if ($splayer_offt == 2) {
 	if ($player_offt < 3) {
-	$display_offt = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=offt&player=$display_name\">D</a>";
+	$display_offt = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=offt&player=$display_name\">D</a>";
 	} else if ($player_offt < 6) {
-	$display_offt = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=offt&player=$display_name\">C</a>";
+	$display_offt = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=offt&player=$display_name\">C</a>";
 	} else if ($player_offt < 8) {
-	$display_offt = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=offt&player=$display_name\">B</a>";
+	$display_offt = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=offt&player=$display_name\">B</a>";
 	} else {
-	$display_offt = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=offt&player=$display_name\">A</a>";
+	$display_offt = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=offt&player=$display_name\">A</a>";
 	}
 } else if ($splayer_offt == 3) {
 	$display_offt = $player_offt;
@@ -1200,39 +1127,39 @@ if ($splayer_offt == 2) {
 
 if ($splayer_defo == 2) {
 	if ($player_defo < 3) {
-	$display_defo = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=defo&player=$display_name\">D</a>";
+	$display_defo = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=defo&player=$display_name\">D</a>";
 	} else if ($player_defo < 6) {
-	$display_defo = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=defo&player=$display_name\">C</a>";
+	$display_defo = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=defo&player=$display_name\">C</a>";
 	} else if ($player_defo < 8) {
-	$display_defo = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=defo&player=$display_name\">B</a>";
+	$display_defo = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=defo&player=$display_name\">B</a>";
 	} else {
-	$display_defo = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=defo&player=$display_name\">A</a>";
+	$display_defo = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=defo&player=$display_name\">A</a>";
 	}
 } else if ($splayer_defo == 3) {
 	$display_defo = $player_defo;
 } else {
 	if ($Total_Def < 10) {
-	$display_Def = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=defo&player=$display_name\">F</a>";
+	$display_Def = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=defo&player=$display_name\">F</a>";
 	} else if ($Total_Def < 17) {
-	$display_Def = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=defo&player=$display_name\">D</a>";
+	$display_Def = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=defo&player=$display_name\">D</a>";
 	} else if ($Total_Def < 24) {
-	$display_Def = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=defo&player=$display_name\">C</a>";
+	$display_Def = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=defo&player=$display_name\">C</a>";
 	} else if ($Total_Def < 30) {
-	$display_Def = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=defo&player=$display_name\">B</a>";
+	$display_Def = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=defo&player=$display_name\">B</a>";
 	} else {
-	$display_Def = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=defo&player=$display_name\">A</a>";
+	$display_Def = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=defo&player=$display_name\">A</a>";
 	}
 }
 
 if ($splayer_defd == 2) {
 	if ($player_defd < 3) {
-	$display_defd = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=defd&player=$display_name\">D</a>";
+	$display_defd = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=defd&player=$display_name\">D</a>";
 	} else if ($player_defd < 6) {
-	$display_defd = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=defd&player=$display_name\">C</a>";
+	$display_defd = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=defd&player=$display_name\">C</a>";
 	} else if ($player_defd < 8) {
-	$display_defd = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=defd&player=$display_name\">B</a>";
+	$display_defd = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=defd&player=$display_name\">B</a>";
 	} else {
-	$display_defd = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=defd&player=$display_name\">A</a>";
+	$display_defd = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=defd&player=$display_name\">A</a>";
 	}
 } else if ($splayer_defd == 3) {
 	$display_defd = $player_defd;
@@ -1241,13 +1168,13 @@ if ($splayer_defd == 2) {
 
 if ($splayer_defp == 2) {
 	if ($player_defp < 3) {
-	$display_defp = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=defp&player=$display_name\">D</a>";
+	$display_defp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=defp&player=$display_name\">D</a>";
 	} else if ($player_defp < 6) {
-	$display_defp = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=defp&player=$display_name\">C</a>";
+	$display_defp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=defp&player=$display_name\">C</a>";
 	} else if ($player_defp < 8) {
-	$display_defp = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=defp&player=$display_name\">B</a>";
+	$display_defp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=defp&player=$display_name\">B</a>";
 	} else {
-	$display_defp = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=defp&player=$display_name\">A</a>";
+	$display_defp = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=defp&player=$display_name\">A</a>";
 	}
 } else if ($splayer_defp == 3) {
 	$display_defp = $player_defp;
@@ -1256,13 +1183,13 @@ if ($splayer_defp == 2) {
 
 if ($splayer_deft == 2) {
 	if ($player_deft < 3) {
-	$display_deft = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=deft&player=$display_name\">D</a>";
+	$display_deft = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=deft&player=$display_name\">D</a>";
 	} else if ($player_deft < 6) {
-	$display_deft = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=deft&player=$display_name\">C</a>";
+	$display_deft = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=deft&player=$display_name\">C</a>";
 	} else if ($player_deft < 8) {
-	$display_deft = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=deft&player=$display_name\">B</a>";
+	$display_deft = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=deft&player=$display_name\">B</a>";
 	} else {
-	$display_deft = "<a href=\"modules.php?name=College_Scouting&step=2&attrib=deft&player=$display_name\">A</a>";
+	$display_deft = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=2&attrib=deft&player=$display_name\">A</a>";
 	}
 } else if ($splayer_deft == 3) {
 	$display_deft = $player_deft;
@@ -1279,15 +1206,15 @@ if ($splayer_tal == 2) {
 	$display_int = $player_int;
 } else {
 	if ($Total_Pot < 5) {
-	$display_Pot = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=tal&player=$display_name\">F</a>";
+	$display_Pot = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=tal&player=$display_name\">F</a>";
 	} else if ($Total_Pot < 8) {
-	$display_Pot = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=tal&player=$display_name\">D</a>";
+	$display_Pot = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=tal&player=$display_name\">D</a>";
 	} else if ($Total_Pot < 11) {
-	$display_Pot = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=tal&player=$display_name\">C</a>";
+	$display_Pot = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=tal&player=$display_name\">C</a>";
 	} else if ($Total_Pot < 14) {
-	$display_Pot = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=tal&player=$display_name\">B</a>";
+	$display_Pot = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=tal&player=$display_name\">B</a>";
 	} else {
-	$display_Pot = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=tal&player=$display_name\">A</a>";
+	$display_Pot = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=tal&player=$display_name\">A</a>";
 	}
 }
 
@@ -1535,15 +1462,15 @@ echo"<tr><th colspan=28><center>Players Invited by Other Teams (cannot be scoute
 	}
 
 	if ($player_sta < 11) {
-	$display_sta = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=sta&player=$display_name\">F</a>";
+	$display_sta = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=sta&player=$display_name\">F</a>";
 	} else if ($player_sta < 16) {
-	$display_sta = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=sta&player=$display_name\">D</a>";
+	$display_sta = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=sta&player=$display_name\">D</a>";
 	} else if ($player_sta < 20) {
-	$display_sta = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=sta&player=$display_name\">C</a>";
+	$display_sta = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=sta&player=$display_name\">C</a>";
 	} else if ($player_sta < 25) {
-	$display_sta = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=sta&player=$display_name\">B</a>";
+	$display_sta = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=sta&player=$display_name\">B</a>";
 	} else {
-	$display_sta = "<a href=\"modules.php?name=College_Scouting&step=1&attrib=sta&player=$display_name\">A</a>";
+	$display_sta = "<a href=\"http://www.iblhoops.net/modules.php?name=College_Scouting&step=1&attrib=sta&player=$display_name\">A</a>";
 	}
 
 // === END CODE FOR MASKING SHOOTING PERCENTAGES

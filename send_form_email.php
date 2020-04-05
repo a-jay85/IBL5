@@ -111,7 +111,7 @@ $headers = 'From: '.$email_from."\r\n".
 <!-- include your own success html here -->
  
 
-Thank you for your interest in the IBL. Please post a message in the <a href='/iblforum/forumdisplay.php?57-Guest-Forum'>Guest Forum</a> to confirm your interest and officially join the waiting list. We will review your application and be in touch with you very soon about current and/or future openings.
+Thank you for your interest in the IBL. Please post a message in the <a href='http://www.iblhoops.net/iblforum/forumdisplay.php?57-Guest-Forum'>Guest Forum</a> to confirm your interest and officially join the waiting list. We will review your application and be in touch with you very soon about current and/or future openings.
  
 <?php
 }

@@ -1,8 +1,12 @@
 <?php
 
-require 'config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
+$username = "iblhoops";
+$password = "Underthedome19!";
+$database = "iblhoops_ibl5";
+
+mysql_connect(localhost,$username,$password);
+@mysql_select_db($database) or die( "Unable to select database");
+
 
 include("header.php");
 
@@ -159,7 +163,7 @@ $result1=mysql_query($query1);
 $query2="UPDATE IBL_EOY_Votes SET MVP_2 = '$MVP2' WHERE team_name = '$Team_Name'";
 $result2=mysql_query($query2);
 
-$query3="UPDATE IBL_EOY_Votes SET MVP_3 = '$MVP3' WHERE team_name = '$Team_Name'";
+$query3="UPDATE UPDATE IBL_EOY_Votes SET MVP_3 = '$MVP3' WHERE team_name = '$Team_Name'";
 $result3=mysql_query($query3);
 
 $query4="UPDATE IBL_EOY_Votes SET Six_1 = '$Six1' WHERE team_name = '$Team_Name'";

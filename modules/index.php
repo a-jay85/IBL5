@@ -26,10 +26,12 @@ get_lang($module_name);
 
 $pagetitle = "- Team Pages";
 
-echo "<script src='./jslib/sorttable.js'></script>";
+echo "<script src="sorttable.js"></script>"
+
 
 function displaytopmenu($tid)
 {
+
     $queryteam="SELECT * FROM nuke_ibl_team_info WHERE teamid = '$tid' ";
     $resultteam=mysql_query($queryteam);
 
@@ -51,6 +53,8 @@ echo "</tr></table>";
 echo "<hr>";
 
 // Use double-slashes to disable the Offense Set Editor and Training Preference links during season.
+
+
 }
 
 /************************************************************************/
@@ -59,6 +63,7 @@ echo "<hr>";
 
 function drafthistory($tid)
 {
+
     global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
 
     include("header.php");
@@ -89,10 +94,10 @@ echo "$teamname Draft History<table><tr><th>Player</th><th>Pos</th><th>Year</th>
 
     if ($player_retired == 1)
     {
-    echo "<tr><td><a href=\"modules.php?name=Player&pa=showpage&pid=$player_pid\">$player_name</a> (retired)</td><td>$player_pos</td><td>$player_draftyear</td><td>$player_draftround</td><td>$player_draftpickno</td></tr>
+    echo "<tr><td><a href=\"http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$player_pid\">$player_name</a> (retired)</td><td>$player_pos</td><td>$player_draftyear</td><td>$player_draftround</td><td>$player_draftpickno</td></tr>
 ";
     } else {
-    echo "<tr><td><a href=\"modules.php?name=Player&pa=showpage&pid=$player_pid\">$player_name</a></td><td>$player_pos</td><td>$player_draftyear</td><td>$player_draftround</td><td>$player_draftpickno</td></tr>
+    echo "<tr><td><a href=\"http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$player_pid\">$player_name</a></td><td>$player_pos</td><td>$player_draftyear</td><td>$player_draftround</td><td>$player_draftpickno</td></tr>
 ";
     }
 
@@ -143,7 +148,7 @@ function tradeoffer($username, $bypass=0, $hid=0, $url=0) {
     $result8a = $db->sql_query($sql8a);
 
     echo "<hr>
-    <form name=\"Trade_Offer\" method=\"post\" action=\"../maketradeoffer.php\">
+    <form name=\"Trade_Offer\" method=\"post\" action=\"http://www.iblhoops.net/maketradeoffer.php\">
     <input type=\"hidden\" name=\"Team_Name\" value=\"$teamlogo\">
     <center><img src=\"online/teamgrfx/$teamlogo.jpg\"><br><table border=1 cellspacing=0 cellpadding=0><tr><th colspan=3><center>TRADING MENU</center></th></tr>
 <tr><td valign=top><center><B><u>$userinfo[user_ibl_team]</u></b></center>";
@@ -230,7 +235,7 @@ echo "<input type=\"hidden\" name=\"counterfields\" value=\"$k\"></td><td valign
 
 
 //-------Deadline Code---------
-        echo "<a href=\"modules.php?name=Team&op=offertrade&partner=$team_name\">$team_city $team_name</a><br>";
+        echo "<a href=\"http://www.iblhoops.net/modules.php?name=Team&op=offertrade&partner=$team_name\">$team_city $team_name</a><br>";
     }
 
 echo "</td></tr><tr><td colspan=3><center><input type=\"submit\" value=\"Make Trade Offer\"></td></tr></form></center></table></center>";
@@ -325,11 +330,11 @@ echo "<table><tr><td valign=top>REVIEW TRADE OFFERS";
           echo "</td></tr></table><table width=595 border=1 cellpadding=0 cellspacing=0 valign=top align=center><tr><td><b><u>TRADE OFFER</u></b><br><table align=right border=1 cellspacing=0 cellpadding=0><tr><td valign=center>";
           if ($hashammer == 1)
             {
-            echo "<form name=\"tradeaccept\" method=\"post\" action=\"../accepttradeoffer.php\"><input type=\"hidden\" name=\"offer\" value=\"$offerid\"><input type=\"submit\" value=\"Accept\"></form>";
+            echo "<form name=\"tradeaccept\" method=\"post\" action=\"http://www.iblhoops.net/accepttradeoffer.php\"><input type=\"hidden\" name=\"offer\" value=\"$offerid\"><input type=\"submit\" value=\"Accept\"></form>";
             } else {
             echo "(Awaiting Approval)";
             }
-            echo "</td><td valign=center><form name=\"tradereject\" method=\"post\" action=\"../rejecttradeoffer.php\"><input type=\"hidden\" name=\"offer\" value=\"$offerid\"><input type=\"submit\" value=\"Reject\"></form></td></tr></table>
+            echo "</td><td valign=center><form name=\"tradereject\" method=\"post\" action=\"http://www.iblhoops.net/rejecttradeoffer.php\"><input type=\"hidden\" name=\"offer\" value=\"$offerid\"><input type=\"submit\" value=\"Reject\"></form></td></tr></table>
                 ";
           }
 
@@ -376,16 +381,16 @@ echo "</td><td valign=top><center><b><u>Make Trade Offer To...</u></b></center>"
  {
  } else {
 //------Trade Deadline Code---------
-        echo "<a href=\"modules.php?name=Team&op=offertrade&partner=$team_name\">$team_city $team_name</a><br>";
+        echo "<a href=\"http://www.iblhoops.net/modules.php?name=Team&op=offertrade&partner=$team_name\">$team_city $team_name</a><br>";
  }
 
 }
 
 echo "</td></tr>
 <tr><td>
-<a href=\"modules.php?name=Team&op=waivers&action=drop\">Drop a player to Waivers</a>
+<a href=\"http://www.iblhoops.net/modules.php?name=Team&op=waivers&action=drop\">Drop a player to Waivers</a>
 <br>
-<a href=\"modules.php?name=Team&op=waivers&action=add\">Add a player from Waivers</a>
+<a href=\"http://www.iblhoops.net/modules.php?name=Team&op=waivers&action=add\">Add a player from Waivers</a>
 <br>
 </td></tr></table>";
 
@@ -547,14 +552,14 @@ function schedule($tid) {
 
 
     displaytopmenu($tid);
-    $query="SELECT * FROM `ibl_schedule` WHERE Visitor = $tid OR Home = $tid ORDER BY Date ASC";
+    $query="SELECT * FROM `IBL_Schedule` WHERE Visitor = $tid OR Home = $tid ORDER BY Date ASC";
     $result=mysql_query($query);
     $num=mysql_numrows($result);
     $year=mysql_result($result,0,"Year");
     $year1=$year+1;
     $wins=0;
     $losses=0;
-    echo "<img src=\"../images/logo/$tid.jpg\">
+    echo "<img src=\"http://www.iblhoops.net/images/logo/$tid.jpg\">
       <table><tr><td valign=top>
       <table width=600 border=1>
       <tr bgcolor=$color1><td colspan=26><font color=$color2 size=\"12\"><b><center>Team Schedule</center></b></font></td></tr>
@@ -582,7 +587,7 @@ function schedule($tid) {
 
 function boxscore ($year, $month, $tid, $wins, $losses, $wstreak, $lstreak) {
 
-	$query="SELECT * FROM `ibl_schedule` WHERE (Visitor = $tid AND Date BETWEEN '$year-$month-01' AND '$year-$month-31') OR (Home = $tid AND Date BETWEEN '$year-$month-01' AND '$year-$month-31') ORDER BY Date ASC";
+	$query="SELECT * FROM `IBL_Schedule` WHERE (Visitor = $tid AND Date BETWEEN '$year-$month-01' AND '$year-$month-31') OR (Home = $tid AND Date BETWEEN '$year-$month-01' AND '$year-$month-31') ORDER BY Date ASC";
 	$result=mysql_query($query);
 	$num=mysql_numrows($result);
 	$i = 0;
@@ -637,9 +642,9 @@ function boxscore ($year, $month, $tid, $wins, $losses, $wstreak, $lstreak) {
 		}
 
 		if ($VScore > $HScore){
-			echo "<tr bgcolor=$bgcolor><td>$date</td><td><b>$vname</b></td><td><b><font color=$winlosscolor>$VScore</font></b></td><td>$hname</b></td><td><b><font color=$winlosscolor>$HScore</font></b></td><td><a href=\"../ibl/IBL/box$boxid.htm\">View</a></td><td>$wins - $losses</td><td>$streak</td></tr>";
+			echo "<tr bgcolor=$bgcolor><td>$date</td><td><b>$vname</b></td><td><b><font color=$winlosscolor>$VScore</font></b></td><td>$hname</b></td><td><b><font color=$winlosscolor>$HScore</font></b></td><td><a href=\"http://www.iblhoops.net/ibl/IBL/box$boxid.htm\">View</a></td><td>$wins - $losses</td><td>$streak</td></tr>";
 		}else if ($VScore < $HScore) {
-			echo "<tr bgcolor=$bgcolor><td>$date</td><td>$vname</b></td><td><b><font color=$winlosscolor>$VScore</font></b></td><td><b>$hname</b></td><td><b><font color=$winlosscolor>$HScore</font></b></td><td><a href=\"../ibl/IBL/box$boxid.htm\">View</a></td><td>$wins - $losses</td><td>$streak</td></tr>";
+			echo "<tr bgcolor=$bgcolor><td>$date</td><td>$vname</b></td><td><b><font color=$winlosscolor>$VScore</font></b></td><td><b>$hname</b></td><td><b><font color=$winlosscolor>$HScore</font></b></td><td><a href=\"http://www.iblhoops.net/ibl/IBL/box$boxid.htm\">View</a></td><td>$wins - $losses</td><td>$streak</td></tr>";
 		}else{
 			echo "<tr><td>$date</td><td>$vname</b></td><td></td><td>$hname</td><td></td><td></td></tr>";
 		}
@@ -746,7 +751,7 @@ if ($tid == 0) // Team 0 is the Free Agents; we want a query that will pick up a
 }
 
     echo "<table><tr><td valign=top>
-      <img src=\"../images/logo/$tid.jpg\">
+      <img src=\"http://www.iblhoops.net/images/logo/$tid.jpg\">
       ";
 
 /* =================== INSERT STARTERS =========== */
@@ -816,11 +821,11 @@ if ($tid != 0 AND $yr == "")
 {
 
 $starters_table="<table align=\"center\" border=1 cellpadding=1 cellspacing=1><tr bgcolor=$color1><td colspan=5><font color=$color2><center><b>Last Chunk's Starters</b></center></font></td></tr>
-<tr><td><center><b>Starting PG</b><br><img src=\"../images/player/$startingPGpid.jpg\"><br><a href=\"modules.php?name=Player&pa=showpage&pid=$startingPGpid\">$startingPG</a></td>
-<td><center><b>Starting SG</b><br><img src=\"../images/player/$startingSGpid.jpg\"><br><a href=\"modules.php?name=Player&pa=showpage&pid=$startingSGpid\">$startingSG</a></td>
-<td><center><b>Starting SF</b><br><img src=\"../images/player/$startingSFpid.jpg\"><br><a href=\"modules.php?name=Player&pa=showpage&pid=$startingSFpid\">$startingSF</a></td>
-<td><center><b>Starting PF</b><br><img src=\"../images/player/$startingPFpid.jpg\"><br><a href=\"modules.php?name=Player&pa=showpage&pid=$startingPFpid\">$startingPF</a></td>
-<td><center><b>Starting C</b><br><img src=\"../images/player/$startingCpid.jpg\"><br><a href=\"modules.php?name=Player&pa=showpage&pid=$startingCpid\">$startingC</a></td></tr></table>
+<tr><td><center><b>Starting PG</b><br><img src=\"http://www.iblhoops.net/images/player/$startingPGpid.jpg\"><br><a href=\"http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$startingPGpid\">$startingPG</a></td>
+<td><center><b>Starting SG</b><br><img src=\"http://www.iblhoops.net/images/player/$startingSGpid.jpg\"><br><a href=\"http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$startingSGpid\">$startingSG</a></td>
+<td><center><b>Starting SF</b><br><img src=\"http://www.iblhoops.net/images/player/$startingSFpid.jpg\"><br><a href=\"http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$startingSFpid\">$startingSF</a></td>
+<td><center><b>Starting PF</b><br><img src=\"http://www.iblhoops.net/images/player/$startingPFpid.jpg\"><br><a href=\"http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$startingPFpid\">$startingPF</a></td>
+<td><center><b>Starting C</b><br><img src=\"http://www.iblhoops.net/images/player/$startingCpid.jpg\"><br><a href=\"http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$startingCpid\">$startingC</a></td></tr></table>
 ";
 
 }
@@ -925,18 +930,18 @@ $cyt=mysql_result($result,$i,"cyt");
 
 if ($tid == 0)
 {
-    $table_ratings=$table_ratings."      <tr bgcolor=$bgcolor><td>$pos</td><td><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td>$age</td><td>$r_sta</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$r_foul</td><td>$inj</td></tr>
+    $table_ratings=$table_ratings."      <tr bgcolor=$bgcolor><td>$pos</td><td><a href=\"http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td>$age</td><td>$r_sta</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$r_foul</td><td>$inj</td></tr>
 ";
 } else {
 if ($p_ord > 959)
 {
-    $table_ratings=$table_ratings."      <tr bgcolor=$bgcolor><td>$pos</td><td>(<a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name)*</a></td><td>$age</td><td>$r_sta</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$r_foul</td><td>$inj</td></tr>
+    $table_ratings=$table_ratings."      <tr bgcolor=$bgcolor><td>$pos</td><td>(<a href=\"http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pid\">$name)*</a></td><td>$age</td><td>$r_sta</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$r_foul</td><td>$inj</td></tr>
 ";
 } elseif ($r_bird == 0) {
-    $table_ratings=$table_ratings."      <tr bgcolor=$bgcolor><td>$pos</td><td><i><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</i></a></td><td>$age</td><td>$r_sta</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$r_foul</td><td>$inj</td></tr>
+    $table_ratings=$table_ratings."      <tr bgcolor=$bgcolor><td>$pos</td><td><i><a href=\"http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pid\">$name</i></a></td><td>$age</td><td>$r_sta</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$r_foul</td><td>$inj</td></tr>
 ";
 } else if ($fayr == "" OR $yearoffreeagency == $fayr) {
-   $table_ratings=$table_ratings."      <tr bgcolor=$bgcolor><td>$pos</td><td><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td>$age</td><td>$r_sta</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$r_foul</td><td>$inj</td></tr>
+   $table_ratings=$table_ratings."      <tr bgcolor=$bgcolor><td>$pos</td><td><a href=\"http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td>$age</td><td>$r_sta</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$r_foul</td><td>$inj</td></tr>
 ";
 }
 }
@@ -1031,15 +1036,15 @@ $stats_pts=2*$stats_fgm+$stats_ftm+$stats_tgm;
 
 if ($tid == 0)
 {
-$table_totals=$table_totals."      <tr bgcolor=$bgcolor><td><center>$pos</center></td><td colspan=3><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td><center>$stats_gm</center></td><td><center>$stats_gs</center></td><td><center>$stats_min</center></td><td><center>$stats_fgm</center></td><td><center>$stats_fga</center></td><td><center>$stats_ftm</center></td><td><center>$stats_fta</center></td><td><center>$stats_tgm</center></td><td><center>$stats_tga</center></td><td><center>$stats_orb</center></td><td><center>$stats_reb</center></td><td><center>$stats_ast</center></td><td><center>$stats_stl</center></td><td><center>$stats_to</center></td><td><center>$stats_blk</center></td><td><center>$stats_pf</center></td><td><center>$stats_pts</center></td></tr>
+$table_totals=$table_totals."      <tr bgcolor=$bgcolor><td><center>$pos</center></td><td colspan=3><a href=\"http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td><center>$stats_gm</center></td><td><center>$stats_gs</center></td><td><center>$stats_min</center></td><td><center>$stats_fgm</center></td><td><center>$stats_fga</center></td><td><center>$stats_ftm</center></td><td><center>$stats_fta</center></td><td><center>$stats_tgm</center></td><td><center>$stats_tga</center></td><td><center>$stats_orb</center></td><td><center>$stats_reb</center></td><td><center>$stats_ast</center></td><td><center>$stats_stl</center></td><td><center>$stats_to</center></td><td><center>$stats_blk</center></td><td><center>$stats_pf</center></td><td><center>$stats_pts</center></td></tr>
 ";
 } else {
 if ($p_ord > 959)
 {
-$table_totals=$table_totals."      <tr bgcolor=$bgcolor><td><center>$pos</center></td><td colspan=3><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">($name)*</a></td><td><center>$stats_gm</center></td><td><center>$stats_gs</center></td><td><center>$stats_min</center></td><td><center>$stats_fgm</center></td><td><center>$stats_fga</center></td><td><center>$stats_ftm</center></td><td><center>$stats_fta</center></td><td><center>$stats_tgm</center></td><td><center>$stats_tga</center></td><td><center>$stats_orb</center></td><td><center>$stats_reb</center></td><td><center>$stats_ast</center></td><td><center>$stats_stl</center></td><td><center>$stats_to</center></td><td><center>$stats_blk</center></td><td><center>$stats_pf</center></td><td><center>$stats_pts</center></td></tr>
+$table_totals=$table_totals."      <tr bgcolor=$bgcolor><td><center>$pos</center></td><td colspan=3><a href=\"http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pid\">($name)*</a></td><td><center>$stats_gm</center></td><td><center>$stats_gs</center></td><td><center>$stats_min</center></td><td><center>$stats_fgm</center></td><td><center>$stats_fga</center></td><td><center>$stats_ftm</center></td><td><center>$stats_fta</center></td><td><center>$stats_tgm</center></td><td><center>$stats_tga</center></td><td><center>$stats_orb</center></td><td><center>$stats_reb</center></td><td><center>$stats_ast</center></td><td><center>$stats_stl</center></td><td><center>$stats_to</center></td><td><center>$stats_blk</center></td><td><center>$stats_pf</center></td><td><center>$stats_pts</center></td></tr>
 ";
 } else if ($fayr == "" OR $yearoffreeagency == $fayr) {
-$table_totals=$table_totals."      <tr bgcolor=$bgcolor><td><center>$pos</center></td><td colspan=3><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td><center>$stats_gm</center></td><td><center>$stats_gs</center></td><td><center>$stats_min</center></td><td><center>$stats_fgm</center></td><td><center>$stats_fga</center></td><td><center>$stats_ftm</center></td><td><center>$stats_fta</center></td><td><center>$stats_tgm</center></td><td><center>$stats_tga</center></td><td><center>$stats_orb</center></td><td><center>$stats_reb</center></td><td><center>$stats_ast</center></td><td><center>$stats_stl</center></td><td><center>$stats_to</center></td><td><center>$stats_blk</center></td><td><center>$stats_pf</center></td><td><center>$stats_pts</center></td></tr>
+$table_totals=$table_totals."      <tr bgcolor=$bgcolor><td><center>$pos</center></td><td colspan=3><a href=\"http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td><center>$stats_gm</center></td><td><center>$stats_gs</center></td><td><center>$stats_min</center></td><td><center>$stats_fgm</center></td><td><center>$stats_fga</center></td><td><center>$stats_ftm</center></td><td><center>$stats_fta</center></td><td><center>$stats_tgm</center></td><td><center>$stats_tga</center></td><td><center>$stats_orb</center></td><td><center>$stats_reb</center></td><td><center>$stats_ast</center></td><td><center>$stats_stl</center></td><td><center>$stats_to</center></td><td><center>$stats_blk</center></td><td><center>$stats_pf</center></td><td><center>$stats_pts</center></td></tr>
 ";
 }
 }
@@ -1526,7 +1531,7 @@ $table_chunk=$table_chunk."<table  align=\"center\" class=\"sortable\">
 ";
 /* ======================CHUNK STATS */
 
-$current_ibl_season=mysql_result(mysql_query("SELECT * FROM nuke_ibl_settings WHERE name = 'Current Season Ending Year' "),0,"value");
+$current_ijbl_season=mysql_result(mysql_query("SELECT * FROM nuke_ibl_settings WHERE name = 'Current IBL Season' "),0,"value");
 
 $max_chunk_query="SELECT MAX(chunk) as maxchunk FROM nuke_iblplyr_chunk WHERE active = 1 AND Season = '$current_ibl_season' ";
 $max_chunk_result=mysql_query($max_chunk_query);
@@ -1590,7 +1595,7 @@ while ($i < $num_chunk)
 	}
 
 
-$table_chunk=$table_chunk."<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>";
+$table_chunk=$table_chunk."<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>";
 $table_chunk=$table_chunk."<td><center>$stats_gm</center></td><td>$stats_gs</td><td><center>";
 $table_chunk=$table_chunk.$stats_mpg;
 $table_chunk=$table_chunk."</center></td><td><center>";
@@ -1776,17 +1781,17 @@ $Consistency=mysql_result($result,$i,"Consistency");
 if ($tid == 0)
 {
 $table_contracts=$table_contracts."
-<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td>$bird</td><td>$con1</td><td>$con2</td><td>$con3</td><td>$con4</td><td>$con5</td><td>$con6</td><td bgcolor=#000000></td><td>$talent</td><td>$skill</td><td>$intangibles</td><td>$Clutch</td><td>$Consistency</td></tr>
+<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td>$bird</td><td>$con1</td><td>$con2</td><td>$con3</td><td>$con4</td><td>$con5</td><td>$con6</td><td bgcolor=#000000></td><td>$talent</td><td>$skill</td><td>$intangibles</td><td>$Clutch</td><td>$Consistency</td></tr>
 ";
 } else {
 if ($p_ord > 959)
 {
 $table_contracts=$table_contracts."
-<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">($name)*</a></td><td>$bird</td><td>$con1</td><td>$con2</td><td>$con3</td><td>$con4</td><td>$con5</td><td>$con6</td><td bgcolor=#000000></td><td>$talent</td><td>$skill</td><td>$intangibles</td><td>$Clutch</td><td>$Consistency</td></tr>
+<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pid\">($name)*</a></td><td>$bird</td><td>$con1</td><td>$con2</td><td>$con3</td><td>$con4</td><td>$con5</td><td>$con6</td><td bgcolor=#000000></td><td>$talent</td><td>$skill</td><td>$intangibles</td><td>$Clutch</td><td>$Consistency</td></tr>
 ";
 } else {
 $table_contracts=$table_contracts."
-<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td>$bird</td><td>$con1</td><td>$con2</td><td>$con3</td><td>$con4</td><td>$con5</td><td>$con6</td><td bgcolor=#000000></td><td>$talent</td><td>$skill</td><td>$intangibles</td><td>$Clutch</td><td>$Consistency</td></tr>
+<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td>$bird</td><td>$con1</td><td>$con2</td><td>$con3</td><td>$con4</td><td>$con5</td><td>$con6</td><td bgcolor=#000000></td><td>$talent</td><td>$skill</td><td>$intangibles</td><td>$Clutch</td><td>$Consistency</td></tr>
 ";
 }
 }
@@ -1991,8 +1996,8 @@ $output=$output."<tr bgcolor=\"#$color1\"><td align=\"center\">
 <font color=\"#$color2\"><b>Owner Information</b></font>
 </td></tr>
 <tr><td>
-<b>Owner Nickname:</b> <a href=\"modules.php?name=Your_Account&op=userinfo&username=$username\">$username</a><br>
-<a href=\"modules.php?name=Private_Messages&mode=post&u=$user_id\">Send Private Message</a><br>
+<b>Owner Nickname:</b> <a href=\"http://www.iblhoops.net/modules.php?name=Your_Account&op=userinfo&username=$username\">$username</a><br>
+<a href=\"http://www.iblhoops.net/modules.php?name=Private_Messages&mode=post&u=$user_id\">Send Private Message</a><br>
 <b>Year Joined</b>: $date_started<br>
 <b>Last Site Visit:</b> $visitdate<br>
 </td></tr>";
@@ -2019,7 +2024,7 @@ while ($dec < $numdec)
 $dec_year=mysql_result($resultdec,$dec,"year");
 $dec_Award=mysql_result($resultdec,$dec,"Award");
 
-$output=$output."<table border=0 cellpadding=0 cellspacing=0><tr><td><img height=25 src=\"../images/banners/gmoy_trophy.gif\"></td><td>$dec_year $dec_Award</td></tr></table>";
+$output=$output."<table border=0 cellpadding=0 cellspacing=0><tr><td><img height=25 src=\"http://www.iblhoops.net/images/banners/gmoy_trophy.gif\"></td><td>$dec_year $dec_Award</td></tr></table>";
 
 $dec++;
 }
@@ -2048,7 +2053,7 @@ $losses=mysql_result($resultwl,$h,"losses");
 $wintot=$wintot+$wins;
 $lostot=$lostot+$losses;
 @$winpct=number_format($wins/($wins+$losses),3);
-$output=$output."<a href=\"modules.php?name=Team&op=team&tid=$tid&yr=$yearwl\">$yearwl $namewl</a>: $wins-$losses ($winpct)<br>
+$output=$output."<a href=\"http://www.iblhoops.net/modules.php?name=Team&op=team&tid=$tid&yr=$yearwl\">$yearwl $namewl</a>: $wins-$losses ($winpct)<br>
 ";
 
 
@@ -2266,7 +2271,7 @@ function viewinjuries()
     $pos=mysql_result($result,$i,"pos");
     $inj=mysql_result($result,$i,"injured");
 
-    echo "      <tr><td>$pos</td><td><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td><a href=\"modules.php?name=Team&op=team&tid=$tid\">$team</a></td><td>$inj</td></tr>
+    echo "      <tr><td>$pos</td><td><a href=\"http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td><a href=\"http://www.iblhoops.net/modules.php?name=Team&op=team&tid=$tid\">$team</a></td><td>$inj</td></tr>
 ";
 
     $i++;
@@ -2399,7 +2404,7 @@ $SetToWorkOn = $_POST['SelectedSet'];
 
 echo "<table align=center valign=top><tr><th><center>Gameplan Review - $teamlogo</center></th></tr>
 <tr><td><center>
-<form name=\"Set_Editor\" method=\"post\" action=\"modules.php?name=Team&op=seteditor\"><select name=\"SelectedSet\">";
+<form name=\"Set_Editor\" method=\"post\" action=\"http://www.iblhoops.net/modules.php?name=Team&op=seteditor\"><select name=\"SelectedSet\">";
 
 $i=0;
 
@@ -2486,33 +2491,33 @@ echo "<td>OK</td>";
   {
   echo "<td>OK</td>";
   } else {
-  echo "<td>OK - <a href=\"modules.php?name=Team&op=changeset&action=remove&set=$SetToWorkOn&type=low&position=1\">Remove</a></td>";
+  echo "<td>OK - <a href=\"http://www.iblhoops.net/modules.php?name=Team&op=changeset&action=remove&set=$SetToWorkOn&type=low&position=1\">Remove</a></td>";
   }
 } else if ($check1 == 3 ) {
   if ($low1+1 == $high1)
   {
   echo "<td>OK</td>";
   } else {
-  echo "<td>OK - <a href=\"modules.php?name=Team&op=changeset&action=remove&set=$SetToWorkOn&type=high&position=1\">Remove</a></td>";
+  echo "<td>OK - <a href=\"http://www.iblhoops.net/modules.php?name=Team&op=changeset&action=remove&set=$SetToWorkOn&type=high&position=1\">Remove</a></td>";
   }
 } else if ($check1 == 4 ) {
   if ($totalslots < 22)
   {
-  echo "<td>-- <a href=\"modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=low&position=1\">Add</a></td>";
+  echo "<td>-- <a href=\"http://www.iblhoops.net/modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=low&position=1\">Add</a></td>";
   } else {
   echo "<td>--</td>";
   }
 } else if ($check1 == 5 ) {
   if ($totalslots < 22)
   {
-  echo "<td>-- <a href=\"modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=high&position=1\">Add</a></td>";
+  echo "<td>-- <a href=\"http://www.iblhoops.net/modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=high&position=1\">Add</a></td>";
   } else {
   echo "<td>--</td>";
   }
 } else if ($check1 == 6 ) {
   if ($totalslots < 22)
   {
-  echo "<td>-- <a href=\"modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=low&position=1\">Add</a></td>";
+  echo "<td>-- <a href=\"http://www.iblhoops.net/modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=low&position=1\">Add</a></td>";
   } else {
   echo "<td>--</td>";
   }
@@ -2529,33 +2534,33 @@ echo "<td>OK</td>";
   {
   echo "<td>OK</td>";
   } else {
-  echo "<td>OK - <a href=\"modules.php?name=Team&op=changeset&action=remove&set=$SetToWorkOn&type=low&position=2\">Remove</a></td>";
+  echo "<td>OK - <a href=\"http://www.iblhoops.net/modules.php?name=Team&op=changeset&action=remove&set=$SetToWorkOn&type=low&position=2\">Remove</a></td>";
   }
 } else if ($check2 == 3 ) {
   if ($low2+1 == $high2)
   {
   echo "<td>OK</td>";
   } else {
-  echo "<td>OK - <a href=\"modules.php?name=Team&op=changeset&action=remove&set=$SetToWorkOn&type=high&position=2\">Remove</a></td>";
+  echo "<td>OK - <a href=\"http://www.iblhoops.net/modules.php?name=Team&op=changeset&action=remove&set=$SetToWorkOn&type=high&position=2\">Remove</a></td>";
   }
 } else if ($check2 == 4 ) {
   if ($totalslots < 22)
   {
-  echo "<td>-- <a href=\"modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=low&position=2\">Add</a></td>";
+  echo "<td>-- <a href=\"http://www.iblhoops.net/modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=low&position=2\">Add</a></td>";
   } else {
   echo "<td>--</td>";
   }
 } else if ($check2 == 5 ) {
   if ($totalslots < 22)
   {
-  echo "<td>-- <a href=\"modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=high&position=2\">Add</a></td>";
+  echo "<td>-- <a href=\"http://www.iblhoops.net/modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=high&position=2\">Add</a></td>";
   } else {
   echo "<td>--</td>";
   }
 } else if ($check2 == 6 ) {
   if ($totalslots < 22)
   {
-  echo "<td>-- <a href=\"modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=low&position=1\">Add</a></td>";
+  echo "<td>-- <a href=\"http://www.iblhoops.net/modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=low&position=1\">Add</a></td>";
   } else {
   echo "<td>--</td>";
   }
@@ -2572,33 +2577,33 @@ echo "<td>OK</td>";
   {
   echo "<td>OK</td>";
   } else {
-  echo "<td>OK - <a href=\"modules.php?name=Team&op=changeset&action=remove&set=$SetToWorkOn&type=low&position=3\">Remove</a></td>";
+  echo "<td>OK - <a href=\"http://www.iblhoops.net/modules.php?name=Team&op=changeset&action=remove&set=$SetToWorkOn&type=low&position=3\">Remove</a></td>";
   }
 } else if ($check3 == 3 ) {
   if ($low3+1 == $high3)
   {
   echo "<td>OK</td>";
   } else {
-  echo "<td>OK - <a href=\"modules.php?name=Team&op=changeset&action=remove&set=$SetToWorkOn&type=high&position=3\">Remove</a></td>";
+  echo "<td>OK - <a href=\"http://www.iblhoops.net/modules.php?name=Team&op=changeset&action=remove&set=$SetToWorkOn&type=high&position=3\">Remove</a></td>";
   }
 } else if ($check3 == 4 ) {
   if ($totalslots < 22)
   {
-  echo "<td>-- <a href=\"modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=low&position=3\">Add</a></td>";
+  echo "<td>-- <a href=\"http://www.iblhoops.net/modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=low&position=3\">Add</a></td>";
   } else {
   echo "<td>--</td>";
   }
 } else if ($check3 == 5 ) {
   if ($totalslots < 22)
   {
-  echo "<td>-- <a href=\"modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=high&position=3\">Add</a></td>";
+  echo "<td>-- <a href=\"http://www.iblhoops.net/modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=high&position=3\">Add</a></td>";
   } else {
   echo "<td>--</td>";
   }
 } else if ($check3 == 6 ) {
   if ($totalslots < 22)
   {
-  echo "<td>-- <a href=\"modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=low&position=1\">Add</a></td>";
+  echo "<td>-- <a href=\"http://www.iblhoops.net/modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=low&position=1\">Add</a></td>";
   } else {
   echo "<td>--</td>";
   }
@@ -2615,33 +2620,33 @@ echo "<td>OK</td>";
   {
   echo "<td>OK</td>";
   } else {
-  echo "<td>OK - <a href=\"modules.php?name=Team&op=changeset&action=remove&set=$SetToWorkOn&type=low&position=4\">Remove</a></td>";
+  echo "<td>OK - <a href=\"http://www.iblhoops.net/modules.php?name=Team&op=changeset&action=remove&set=$SetToWorkOn&type=low&position=4\">Remove</a></td>";
   }
 } else if ($check4 == 3 ) {
   if ($low4+1 == $high4)
   {
   echo "<td>OK</td>";
   } else {
-  echo "<td>OK - <a href=\"modules.php?name=Team&op=changeset&action=remove&set=$SetToWorkOn&type=high&position=4\">Remove</a></td>";
+  echo "<td>OK - <a href=\"http://www.iblhoops.net/modules.php?name=Team&op=changeset&action=remove&set=$SetToWorkOn&type=high&position=4\">Remove</a></td>";
   }
 } else if ($check4 == 4 ) {
   if ($totalslots < 22)
   {
-  echo "<td>-- <a href=\"modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=low&position=4\">Add</a></td>";
+  echo "<td>-- <a href=\"http://www.iblhoops.net/modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=low&position=4\">Add</a></td>";
   } else {
   echo "<td>--</td>";
   }
 } else if ($check4 == 5 ) {
   if ($totalslots < 22)
   {
-  echo "<td>-- <a href=\"modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=high&position=4\">Add</a></td>";
+  echo "<td>-- <a href=\"http://www.iblhoops.net/modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=high&position=4\">Add</a></td>";
   } else {
   echo "<td>--</td>";
   }
 } else if ($check4 == 6 ) {
   if ($totalslots < 22)
   {
-  echo "<td>-- <a href=\"modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=low&position=1\">Add</a></td>";
+  echo "<td>-- <a href=\"http://www.iblhoops.net/modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=low&position=1\">Add</a></td>";
   } else {
   echo "<td>--</td>";
   }
@@ -2658,33 +2663,33 @@ echo "<td>OK</td>";
   {
   echo "<td>OK</td>";
   } else {
-  echo "<td>OK - <a href=\"modules.php?name=Team&op=changeset&action=remove&set=$SetToWorkOn&type=low&position=5\">Remove</a></td>";
+  echo "<td>OK - <a href=\"http://www.iblhoops.net/modules.php?name=Team&op=changeset&action=remove&set=$SetToWorkOn&type=low&position=5\">Remove</a></td>";
   }
 } else if ($check5 == 3 ) {
   if ($low5+1 == $high5)
   {
   echo "<td>OK</td>";
   } else {
-  echo "<td>OK - <a href=\"modules.php?name=Team&op=changeset&action=remove&set=$SetToWorkOn&type=high&position=5\">Remove</a></td>";
+  echo "<td>OK - <a href=\"http://www.iblhoops.net/modules.php?name=Team&op=changeset&action=remove&set=$SetToWorkOn&type=high&position=5\">Remove</a></td>";
   }
 } else if ($check5 == 4 ) {
   if ($totalslots < 22)
   {
-  echo "<td>-- <a href=\"modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=low&position=5\">Add</a></td>";
+  echo "<td>-- <a href=\"http://www.iblhoops.net/modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=low&position=5\">Add</a></td>";
   } else {
   echo "<td>--</td>";
   }
 } else if ($check5 == 5 ) {
   if ($totalslots < 22)
   {
-  echo "<td>-- <a href=\"modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=high&position=5\">Add</a></td>";
+  echo "<td>-- <a href=\"http://www.iblhoops.net/modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=high&position=5\">Add</a></td>";
   } else {
   echo "<td>--</td>";
   }
 } else if ($check5 == 6 ) {
   if ($totalslots < 22)
   {
-  echo "<td>-- <a href=\"modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=low&position=1\">Add</a></td>";
+  echo "<td>-- <a href=\"http://www.iblhoops.net/modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=low&position=1\">Add</a></td>";
   } else {
   echo "<td>--</td>";
   }
@@ -2741,7 +2746,7 @@ while ($k < $num5)
 $playername=mysql_result($result5,$k,"name");
 $pid=mysql_result($result5,$k,"pid");
 
-echo "<a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$playername</a> | ";
+echo "<a href=\"http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pid\">$playername</a> | ";
 
 $k++;
 }
@@ -2906,7 +2911,7 @@ function changesetgo($username, $action, $set, $type, $position) {
 	    echo "Your change has been made; please click the button to view changes.";
 		//echo "You can't make changes to the editor once the season starts but can only view your game plans.";
 
-            echo"<form name=\"Set_Editor\" method=\"post\" action=\"modules.php?name=Team&op=seteditor\">
+            echo"<form name=\"Set_Editor\" method=\"post\" action=\"http://www.iblhoops.net/modules.php?name=Team&op=seteditor\">
                  <input type=\"hidden\" name=\"SelectedSet\" value=\"$set\"><input type=\"submit\" value=\"Return to Set Editor\"></form>";
 	    CloseTable();
 
@@ -3079,7 +3084,7 @@ $rosterslots=15;
     }
 
     echo "<hr>
-    <form name=\"Waiver_Move\" method=\"post\" action=\"../waivermove.php\">
+    <form name=\"Waiver_Move\" method=\"post\" action=\"http://www.iblhoops.net/waivermove.php\">
     <input type=\"hidden\" name=\"Team_Name\" value=\"$teamlogo\">";
 
     if ($action == 'drop')
@@ -3394,7 +3399,7 @@ if ($Team_Name != NULL )
 	$numtr = $db->sql_numrows($resulttr);
 	$i = 0;
 
-	echo "<form name = \"Training\" method=\"post\" action=\"modules.php?name=Team&op=training\">
+	echo "<form name = \"Training\" method=\"post\" action=\"http://www.iblhoops.net/modules.php?name=Team&op=training\">
 	<input type=\"hidden\" name=\"Team_Name\" value=\"$teamlogo\">
 	<table border=1><tr>";
 

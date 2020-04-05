@@ -1,8 +1,11 @@
 <?php
 
-require 'config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
+$username = "iblhoops_chibul";
+$password = "oliver23";
+$database = "iblhoops_iblleague";
+
+mysql_connect(localhost,$username,$password);
+@mysql_select_db($database) or die( "Unable to select database");
 
 $query0="SELECT * FROM nuke_ibl_trade_autocounter ORDER BY `counter` DESC";
 $result0=mysql_query($query0);
@@ -114,6 +117,6 @@ if ($error == 0)
 	  }
 	$k++;
 	}
-	echo "Trade Offer Entered Into Database. Go back <a href='modules.php?name=Team&op=reviewtrade'>Trade Review Page</a>";
+	echo "Trade Offer Entered Into Database. Go back <a href='http://www.iblhoops.net/modules.php?name=Team&op=reviewtrades'>Trade Review Page</a>";
 }
 ?>

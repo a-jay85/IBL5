@@ -1,8 +1,11 @@
 <?php
 
-require 'config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die( "Unable to select database");
+$username = "iblhoops_chibul";
+$password = "oliver23";
+$database = "iblhoops_iblleague";
+
+mysql_connect(localhost,$username,$password);
+@mysql_select_db($database) or die( "Unable to select database");
 
 $query1="SELECT * FROM nuke_ibl_team_info";
 $result1=mysql_query($query1);
@@ -14,7 +17,7 @@ echo "<HTML><HEAD><TITLE>UPDATE</TITLE></HEAD><BODY>";
 
 while ($i < $num1) {
 	$teamname = mysql_result($result1,$i,"team_name");
-	$query2="SELECT * FROM nuke_iblteam_win_loss WHERE currentname = '$teamname' ORDER BY year DESC LIMIT 5";
+	$query2="SELECT * FROM nuke_iblteam_win_loss WHERE currentname = '$teamname' ORDER BY year DESC LIMIT 7";
 	$result2=mysql_query($query2);
 	$num2=mysql_numrows($result2);
 	$j=0;

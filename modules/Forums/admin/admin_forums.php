@@ -988,7 +988,7 @@ if( $total_categories = $db->sql_numrows($q_categories) )
                         'U_CAT_DELETE' => append_sid("admin_forums.$phpEx?mode=deletecat&amp;" . POST_CAT_URL . "=$cat_id"),
                         'U_CAT_MOVE_UP' => append_sid("admin_forums.$phpEx?mode=cat_order&amp;move=-15&amp;" . POST_CAT_URL . "=$cat_id"),
                         'U_CAT_MOVE_DOWN' => append_sid("admin_forums.$phpEx?mode=cat_order&amp;move=15&amp;" . POST_CAT_URL . "=$cat_id"),
-                        'U_VIEWCAT' => ("modules.php?name=Forums&file=index&c=$cat_id"))
+                        'U_VIEWCAT' => ("../../../modules.php?name=Forums&file=index&c=$cat_id"))
                 );
 
                 for($j = 0; $j < $total_forums; $j++)
@@ -1005,7 +1005,7 @@ if( $total_categories = $db->sql_numrows($q_categories) )
                                         'NUM_TOPICS' => $forum_rows[$j]['forum_topics'],
                                         'NUM_POSTS' => $forum_rows[$j]['forum_posts'],
 
-                                        'U_VIEWFORUM' => ("modules.php?name=Forums&file=viewforum&f=$forum_id"),
+                                        'U_VIEWFORUM' => ("../../../modules.php?name=Forums&file=viewforum&f=$forum_id"),
                                         'U_FORUM_EDIT' => append_sid("admin_forums.$phpEx?mode=editforum&amp;" . POST_FORUM_URL . "=$forum_id"),
                                         'U_FORUM_DELETE' => append_sid("admin_forums.$phpEx?mode=deleteforum&amp;" . POST_FORUM_URL . "=$forum_id"),
                                         'U_FORUM_MOVE_UP' => append_sid("admin_forums.$phpEx?mode=forum_order&amp;move=-15&amp;" . POST_FORUM_URL . "=$forum_id"),

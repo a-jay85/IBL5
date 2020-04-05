@@ -12,15 +12,18 @@
 /************************************************************************/
 
 if ( !defined('BLOCK_FILE') ) {
-    Header("Location: ./index.php");
+    Header("Location: ../index.php");
     die();
 }
 
 global $prefix, $multilingual, $currentlang, $db;
 
-require 'config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
+$username = "iblhoops_chibul";
+$password = "oliver23";
+$database = "iblhoops_iblleague";
+
+mysql_connect(localhost,$username,$password);
+@mysql_select_db($database) or die( "Unable to select database");
 
 $query="SELECT * FROM nuke_iblplyr WHERE retired = 0 ORDER BY ordinal ASC";
 $result=mysql_query($query);
@@ -1088,39 +1091,39 @@ $pf4 = sprintf('%4.1f', $pf4);
 $pf5 = sprintf('%4.1f', $pf5);
 
 
-$content = $content."<center><table border=1 bordercolor=#000066><tr><td><table><tr><td colspan=2><center><img src=\"./images/player/$pid1.jpg\" height=\"90\" width=\"65\"> <img src=\"./images/logo/new$tid1.png\"></center></td></tr><tr><td bgcolor=#000066 colspan=2><b><font color=#ffffff>Points</td></tr><tr><td><b><a href=modules.php?name=Player&pa=showpage&pid=$pid1><font color=#000066>$name1</font></a><br><font color=#000066>$teamname1</font></td><td valign=top>$ppg1</td></tr>";
-$content = $content."<tr><td><a href=modules.php?name=Player&pa=showpage&pid=$pid2><font color=#000066>$name2</font></a><br><font color=#000066>$teamname2</font></td><td valign=top>$ppg2</td></tr>";
-$content = $content."<tr><td><a href=modules.php?name=Player&pa=showpage&pid=$pid3><font color=#000066>$name3</font></a><br><font color=#000066>$teamname3</font></td><td valign=top>$ppg3</td></tr>";
-$content = $content."<tr><td><a href=modules.php?name=Player&pa=showpage&pid=$pid4><font color=#000066>$name4</font></a><br><font color=#000066>$teamname4</font></td><td valign=top>$ppg4</td></tr>";
-$content = $content."<tr><td><a href=modules.php?name=Player&pa=showpage&pid=$pid5><font color=#000066>$name5</font></a><br><font color=#000066>$teamname5</font></td><td valign=top>$ppg5</td></tr>";
+$content = $content."<center><table border=1 bordercolor=#000066><tr><td><table><tr><td colspan=2><img src=\"http://www.iblhoops.net/images/player/$pid1.jpg\"> <img src=\"http://www.iblhoops.net/images/logo/new$tid1.png\"></td></tr><tr><td bgcolor=#000066 colspan=2><b><font color=#ffffff>Points</td></tr><tr><td><b><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pid1><font color=#000066>$name1</font></a><br><font color=#000066>$teamname1</font></td><td valign=top>$ppg1</td></tr>";
+$content = $content."<tr><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pid2><font color=#000066>$name2</font></a><br><font color=#000066>$teamname2</font></td><td valign=top>$ppg2</td></tr>";
+$content = $content."<tr><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pid3><font color=#000066>$name3</font></a><br><font color=#000066>$teamname3</font></td><td valign=top>$ppg3</td></tr>";
+$content = $content."<tr><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pid4><font color=#000066>$name4</font></a><br><font color=#000066>$teamname4</font></td><td valign=top>$ppg4</td></tr>";
+$content = $content."<tr><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pid5><font color=#000066>$name5</font></a><br><font color=#000066>$teamname5</font></td><td valign=top>$ppg5</td></tr>";
 $content = $content."</table></td>";
 
-$content = $content."<td><table><tr><td colspan=2><center><img src=\"./images/player/$pidreb1.jpg\" height=\"90\" width=\"65\"> <img src=\"./images/logo/new$tidreb1.png\"></center></td></tr><tr><td bgcolor=#000066 colspan=2><b><font color=#ffffff>Rebounds</td></tr><tr><td><b><a href=modules.php?name=Player&pa=showpage&pid=$pidreb1><font color=#000066>$name_reb1</font></a><br><font color=#000066>$teamname_reb1</font></td><td valign=top>$reb1</td></tr>";
-$content = $content."<tr><td><a href=modules.php?name=Player&pa=showpage&pid=$pidreb2><font color=#000066>$name_reb2</font></a><br><font color=#000066>$teamname_reb2</font></td><td valign=top>$reb2</td></tr>";
-$content = $content."<tr><td><a href=modules.php?name=Player&pa=showpage&pid=$pidreb3><font color=#000066>$name_reb3</font></a><br><font color=#000066>$teamname_reb3</font></td><td valign=top>$reb3</td></tr>";
-$content = $content."<tr><td><a href=modules.php?name=Player&pa=showpage&pid=$pidreb4><font color=#000066>$name_reb4</font></a><br><font color=#000066>$teamname_reb4</font></td><td valign=top>$reb4</td></tr>";
-$content = $content."<tr><td><a href=modules.php?name=Player&pa=showpage&pid=$pidreb5><font color=#000066>$name_reb5</font></a><br><font color=#000066>$teamname_reb5</font></td><td valign=top>$reb5</td></tr>";
+$content = $content."<td><table><tr><td colspan=2><img src=\"http://www.iblhoops.net/images/player/$pidreb1.jpg\"> <img src=\"http://www.iblhoops.net/images/logo/new$tidreb1.png\"></td></tr><tr><td bgcolor=#000066 colspan=2><b><font color=#ffffff>Rebounds</td></tr><tr><td><b><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pidreb1><font color=#000066>$name_reb1</font></a><br><font color=#000066>$teamname_reb1</font></td><td valign=top>$reb1</td></tr>";
+$content = $content."<tr><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pidreb2><font color=#000066>$name_reb2</font></a><br><font color=#000066>$teamname_reb2</font></td><td valign=top>$reb2</td></tr>";
+$content = $content."<tr><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pidreb3><font color=#000066>$name_reb3</font></a><br><font color=#000066>$teamname_reb3</font></td><td valign=top>$reb3</td></tr>";
+$content = $content."<tr><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pidreb4><font color=#000066>$name_reb4</font></a><br><font color=#000066>$teamname_reb4</font></td><td valign=top>$reb4</td></tr>";
+$content = $content."<tr><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pidreb5><font color=#000066>$name_reb5</font></a><br><font color=#000066>$teamname_reb5</font></td><td valign=top>$reb5</td></tr>";
 $content = $content."</table></td>";
 
-$content = $content."<td><table><tr><td colspan=2><center><img src=\"./images/player/$pidast1.jpg\" height=\"90\" width=\"65\"> <img src=\"./images/logo/new$tidast1.png\"></center></td></tr><tr><td bgcolor=#000066 colspan=2><b><font color=#ffffff>Assists</td></tr><tr><td><b><a href=modules.php?name=Player&pa=showpage&pid=$pidast1><font color=#000066>$name_ast1</font></a><br><font color=#000066>$teamname_ast1</font></td><td valign=top>$ast1</td></tr>";
-$content = $content."<tr><td><a href=modules.php?name=Player&pa=showpage&pid=$pidast2><font color=#000066>$name_ast2</font></a><br><font color=#000066>$teamname_ast2</font></td><td valign=top>$ast2</td></tr>";
-$content = $content."<tr><td><a href=modules.php?name=Player&pa=showpage&pid=$pidast3><font color=#000066>$name_ast3</font></a><br><font color=#000066>$teamname_ast3</font></td><td valign=top>$ast3</td></tr>";
-$content = $content."<tr><td><a href=modules.php?name=Player&pa=showpage&pid=$pidast4><font color=#000066>$name_ast4</font></a><br><font color=#000066>$teamname_ast4</font></td><td valign=top>$ast4</td></tr>";
-$content = $content."<tr><td><a href=modules.php?name=Player&pa=showpage&pid=$pidast5><font color=#000066>$name_ast5</font></a><br><font color=#000066>$teamname_ast5</font></td><td valign=top>$ast5</td></tr>";
+$content = $content."<td><table><tr><td colspan=2><img src=\"http://www.iblhoops.net/images/player/$pidast1.jpg\"> <img src=\"http://www.iblhoops.net/images/logo/new$tidast1.png\"></td></tr><tr><td bgcolor=#000066 colspan=2><b><font color=#ffffff>Assists</td></tr><tr><td><b><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pidast1><font color=#000066>$name_ast1</font></a><br><font color=#000066>$teamname_ast1</font></td><td valign=top>$ast1</td></tr>";
+$content = $content."<tr><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pidast2><font color=#000066>$name_ast2</font></a><br><font color=#000066>$teamname_ast2</font></td><td valign=top>$ast2</td></tr>";
+$content = $content."<tr><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pidast3><font color=#000066>$name_ast3</font></a><br><font color=#000066>$teamname_ast3</font></td><td valign=top>$ast3</td></tr>";
+$content = $content."<tr><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pidast4><font color=#000066>$name_ast4</font></a><br><font color=#000066>$teamname_ast4</font></td><td valign=top>$ast4</td></tr>";
+$content = $content."<tr><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pidast5><font color=#000066>$name_ast5</font></a><br><font color=#000066>$teamname_ast5</font></td><td valign=top>$ast5</td></tr>";
 $content = $content."</table></td>";
 
-$content = $content."<td><table><tr><td colspan=2><center><img src=\"./images/player/$pidstl1.jpg\" height=\"90\" width=\"65\"> <img src=\"./images/logo/new$tidstl1.png\"></center></td></tr><tr><td bgcolor=#000066 colspan=2><b><font color=#ffffff>Steals</td></tr><tr><td><b><a href=modules.php?name=Player&pa=showpage&pid=$pidstl1><font color=#000066>$name_stl1</font></a><br><font color=#000066>$teamname_stl1</font></td><td valign=top>$stl1</td></tr>";
-$content = $content."<tr><td><a href=modules.php?name=Player&pa=showpage&pid=$pidstl2><font color=#000066>$name_stl2</font></a><br><font color=#000066>$teamname_stl2</font></td><td valign=top>$stl2</td></tr>";
-$content = $content."<tr><td><a href=modules.php?name=Player&pa=showpage&pid=$pidstl3><font color=#000066>$name_stl3</font></a><br><font color=#000066>$teamname_stl3</font></td><td valign=top>$stl3</td></tr>";
-$content = $content."<tr><td><a href=modules.php?name=Player&pa=showpage&pid=$pidstl4><font color=#000066>$name_stl4</font></a><br><font color=#000066>$teamname_stl4</font></td><td valign=top>$stl4</td></tr>";
-$content = $content."<tr><td><a href=modules.php?name=Player&pa=showpage&pid=$pidstl5><font color=#000066>$name_stl5</font></a><br><font color=#000066>$teamname_stl5</font></td><td valign=top>$stl5</td></tr>";
+$content = $content."<td><table><tr><td colspan=2><img src=\"http://www.iblhoops.net/images/player/$pidstl1.jpg\"> <img src=\"http://www.iblhoops.net/images/logo/new$tidstl1.png\"></td></tr><tr><td bgcolor=#000066 colspan=2><b><font color=#ffffff>Steals</td></tr><tr><td><b><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pidstl1><font color=#000066>$name_stl1</font></a><br><font color=#000066>$teamname_stl1</font></td><td valign=top>$stl1</td></tr>";
+$content = $content."<tr><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pidstl2><font color=#000066>$name_stl2</font></a><br><font color=#000066>$teamname_stl2</font></td><td valign=top>$stl2</td></tr>";
+$content = $content."<tr><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pidstl3><font color=#000066>$name_stl3</font></a><br><font color=#000066>$teamname_stl3</font></td><td valign=top>$stl3</td></tr>";
+$content = $content."<tr><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pidstl4><font color=#000066>$name_stl4</font></a><br><font color=#000066>$teamname_stl4</font></td><td valign=top>$stl4</td></tr>";
+$content = $content."<tr><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pidstl5><font color=#000066>$name_stl5</font></a><br><font color=#000066>$teamname_stl5</font></td><td valign=top>$stl5</td></tr>";
 $content = $content."</table></td>";
 
-$content = $content."<td><table><tr><td colspan=2><center><img src=\"./images/player/$pidblk1.jpg\" height=\"90\" width=\"65\"> <img src=\"./images/logo/new$tidblk1.png\"></center></td></tr><tr><td bgcolor=#000066 colspan=2><b><font color=#ffffff>Blocks</td></tr><tr><td><b><a href=modules.php?name=Player&pa=showpage&pid=$pidblk1><font color=#000066>$name_blk1</font></a><br><font color=#000066>$teamname_blk1</font></td><td valign=top>$blk1</td></tr>";
-$content = $content."<tr><td><a href=modules.php?name=Player&pa=showpage&pid=$pidblk2><font color=#000066>$name_blk2</font></a><br><font color=#000066>$teamname_blk2</font></td><td valign=top>$blk2</td></tr>";
-$content = $content."<tr><td><a href=modules.php?name=Player&pa=showpage&pid=$pidblk3><font color=#000066>$name_blk3</font></a><br><font color=#000066>$teamname_blk3</font></td><td valign=top>$blk3</td></tr>";
-$content = $content."<tr><td><a href=modules.php?name=Player&pa=showpage&pid=$pidblk4><font color=#000066>$name_blk4</font></a><br><font color=#000066>$teamname_blk4</font></td><td valign=top>$blk4</td></tr>";
-$content = $content."<tr><td><a href=modules.php?name=Player&pa=showpage&pid=$pidblk5><font color=#000066>$name_blk5</font></a><br><font color=#000066>$teamname_blk5</font></td><td valign=top>$blk5</td></tr>";
+$content = $content."<td><table><tr><td colspan=2><img src=\"http://www.iblhoops.net/images/player/$pidblk1.jpg\"> <img src=\"http://www.iblhoops.net/images/logo/new$tidblk1.png\"></td></tr><tr><td bgcolor=#000066 colspan=2><b><font color=#ffffff>Blocks</td></tr><tr><td><b><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pidblk1><font color=#000066>$name_blk1</font></a><br><font color=#000066>$teamname_blk1</font></td><td valign=top>$blk1</td></tr>";
+$content = $content."<tr><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pidblk2><font color=#000066>$name_blk2</font></a><br><font color=#000066>$teamname_blk2</font></td><td valign=top>$blk2</td></tr>";
+$content = $content."<tr><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pidblk3><font color=#000066>$name_blk3</font></a><br><font color=#000066>$teamname_blk3</font></td><td valign=top>$blk3</td></tr>";
+$content = $content."<tr><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pidblk4><font color=#000066>$name_blk4</font></a><br><font color=#000066>$teamname_blk4</font></td><td valign=top>$blk4</td></tr>";
+$content = $content."<tr><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pidblk5><font color=#000066>$name_blk5</font></a><br><font color=#000066>$teamname_blk5</font></td><td valign=top>$blk5</td></tr>";
 $content = $content."</table></td></tr></table>";
 
 ?>

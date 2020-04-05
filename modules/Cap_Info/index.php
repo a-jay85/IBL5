@@ -20,186 +20,168 @@ require_once("mainfile.php");
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 $userpage = 1;
-
-$currentSeasonEndingYear = mysql_result(mysql_query("SELECT value FROM nuke_ibl_settings WHERE name = 'Current Season Ending Year' LIMIT 1"), 0, "value");
-
+$current_ibl_season=mysql_result(mysql_query("SELECT value FROM nuke_ibl_settings WHERE name = 'Current IBL Season' LIMIT 1"),0,"value");
 include("header.php");
 
-$queryTeamInfo = "SELECT * FROM nuke_ibl_team_info WHERE teamid != 35 ORDER BY teamid ASC";
-$resultTeamInfo = mysql_query($queryTeamInfo);
-$numberOfTeams = mysql_num_rows($resultTeamInfo);
+
+$query2="SELECT * FROM nuke_ibl_team_info WHERE teamid != 35 ORDER BY teamid ASC";
+$result2=mysql_query($query2);
+$num2=mysql_num_rows($result2);
 
 OpenTable();
 
-$i = 0;
-while ($i < $numberOfTeams) {
-	$teamid[$i] = mysql_result($resultTeamInfo, $i, "teamid");
-	$teamname[$i] = mysql_result($resultTeamInfo, $i, "team_name");
-	$teamcity[$i] = mysql_result($resultTeamInfo, $i, "team_city");
-	$teamcolor1[$i] = mysql_result($resultTeamInfo, $i, "color1");
-	$teamcolor2[$i] = mysql_result($resultTeamInfo, $i, "color2");
+$k=0;
+while ($k < $num2)
+{
+	$teamname[$k]=mysql_result($result2,$k,"team_name");
+	$teamcity[$k]=mysql_result($result2,$k,"team_city");
+	$teamcolor1[$k]=mysql_result($result2,$k,"color1");
+	$teamcolor2[$k]=mysql_result($result2,$k,"color2");
+	$teamid[$k]=mysql_result($result2,$k,"teamid");
 
-	$teamTotalSalaryYear1[$i] = 0;
-	$teamTotalSalaryYear2[$i] = 0;
-	$teamTotalSalaryYear3[$i] = 0;
-	$teamTotalSalaryYear4[$i] = 0;
-	$teamTotalSalaryYear5[$i] = 0;
-	$teamTotalSalaryYear6[$i] = 0;
-	$teamFreeAgencySlots[$i] = 15;
+	$teamsalary1[$k]=0;
+	$teamsalary2[$k]=0;
+	$teamsalary3[$k]=0;
+	$teamsalary4[$k]=0;
+	$teamsalary5[$k]=0;
+	$teamsalary6[$k]=0;
+	$teamslotsfa[$k]=15;
+	
+	$team_array = get_salary ($teamid[$k], $teamname[$k], $current_ibl_season);
+	$team_array1 = get_salary1 ($teamid[$k], $teamname[$k], $current_ibl_season);
 
-	$team_array = get_salary($teamid[$i], $teamname[$i], $currentSeasonEndingYear);
-	$team_array1 = get_salary1($teamid[$i], $teamname[$i], $currentSeasonEndingYear);
+	$teamsalary1[$k]=7000-$team_array[1]["salary"];
+	$teamsalary2[$k]=7000-$team_array[2]["salary"];
+	$teamsalary3[$k]=7000-$team_array[3]["salary"];
+	$teamsalary4[$k]=7000-$team_array[4]["salary"];
+	$teamsalary5[$k]=7000-$team_array[5]["salary"];
+	$teamsalary6[$k]=7000-$team_array[6]["salary"];
 
-	$teamTotalSalaryYear1[$i] = 7000 - $team_array[1]["salary"];
-	$teamTotalSalaryYear2[$i] = 7000 - $team_array[2]["salary"];
-	$teamTotalSalaryYear3[$i] = 7000 - $team_array[3]["salary"];
-	$teamTotalSalaryYear4[$i] = 7000 - $team_array[4]["salary"];
-	$teamTotalSalaryYear5[$i] = 7000 - $team_array[5]["salary"];
-	$teamTotalSalaryYear6[$i] = 7000 - $team_array[6]["salary"];
+	$teamslotsfa[$k]=$teamslotsfa[$k]-$team_array1[1]["roster"];
+                
+	$table_echo=$table_echo."<tr><td bgcolor=#".$teamcolor1[$k]."><a href=\"http://www.iblhoops.net/modules.php?name=Team&op=team&tid=".$teamid[$k]."\"><font color=#".$teamcolor2[$k].">".$teamcity[$k]." ".$teamname[$k]."</a></td><td".$capnote1.">".$teamsalary1[$k]."</td><td".$capnote2.">".$teamsalary2[$k]."</td><td".$capnote3.">".$teamsalary3[$k]."</td><td".$capnote4.">".$teamsalary4[$k]."</td><td".$capnote5.">".$teamsalary5[$k]."</td><td".$capnote6.">".$teamsalary6[$k]."</td><td>".$teamslotsfa[$k]."</td></tr>";
 
-	$teamFreeAgencySlots[$i] = $teamFreeAgencySlots[$i] - $team_array1[1]["roster"];
-
-	$table_echo = $table_echo . "<tr>
-		<td bgcolor=#" . $teamcolor1[$i] . ">
-			<a href=\"modules.php?name=Team&op=team&tid=" . $teamid[$i] . "&display=contracts\">
-				<font color=#" . $teamcolor2[$i] . ">" . $teamcity[$i] . " " . $teamname[$i] . "
-			</a>
-		</td>
-		<td>" . $teamTotalSalaryYear1[$i] . "</td>
-		<td>" . $teamTotalSalaryYear2[$i] . "</td>
-		<td>" . $teamTotalSalaryYear3[$i] . "</td>
-		<td>" . $teamTotalSalaryYear4[$i] . "</td>
-		<td>" . $teamTotalSalaryYear5[$i] . "</td>
-		<td>" . $teamTotalSalaryYear6[$i] . "</td>
-		<td><center>" . $teamFreeAgencySlots[$i] . "</center></td>
-	</tr>";
-
-	$i++;
+	$k++;
 }
 
-$text = $text . "<table class=\"sortable\" border=1>
-	<tr>
-		<th>Team</th>
-		<th>" . ($currentSeasonEndingYear + 1) . "</th>
-		<th>" . ($currentSeasonEndingYear + 2) . "</th>
-		<th>" . ($currentSeasonEndingYear + 3) . "</th>
-		<th>" . ($currentSeasonEndingYear + 4) . "</th>
-		<th>" . ($currentSeasonEndingYear + 5) . "</th>
-		<th>" . ($currentSeasonEndingYear + 6) . "</th>
-		<th>FA Slots</th>
-	</tr>
-	$table_echo
-</table>";
+$text=$text."<table class=\"sortable\" border=1>
+		  <tr><th>Team</th><th>Year 1</th><th>Year 2</th><th>Year 3</th><th>Year 4</th><th>Year 5</th><th>Year 6</th><th>FA Slots</th></tr>$table_echo</table>";
 echo $text;
 
 CloseTable();
 include("footer.php");
 
-function get_salary ($tid, $team_name, $currentSeasonEndingYear)
+function get_salary ($tid, $team_name, $current_ibl_season)
 {
-	// $querypicks = "SELECT * FROM ibl_draft_picks WHERE ownerofpick = '$team_name' ORDER BY year, round ASC";
-	// $resultpicks = mysql_query($querypicks);
-	// $numpicks = mysql_num_rows($resultpicks);
-	// $hh = 0;
-	//
-	// while ($hh < $numpicks)	{
-	// 	$teampick = mysql_result($resultpicks, $hh, "teampick");
-	// 	$year = mysql_result($resultpicks, $hh, "year");
-	// 	$round = mysql_result($resultpicks, $hh, "round");
-	// 	$j = $year - $currentSeasonEndingYear + 1;
-	//
-	// 	if ($round == 1) {
-	// 		$contract_amt[$j]["salary"] = $contract_amt[$j]["salary"];
-	// 		$contract_amt[$j]["roster"] = $contract_amt[$j]["roster"];
-	// 		$j++;
-	// 		$contract_amt[$j]["salary"] = $contract_amt[$j]["salary"];
-	// 		$contract_amt[$j]["roster"] = $contract_amt[$j]["roster"];
-	// 		$j++;
-	// 		$contract_amt[$j]["salary"] = $contract_amt[$j]["salary"];
-	// 		$contract_amt[$j]["roster"] = $contract_amt[$j]["roster"];
-	// 	} else {
-	// 		$contract_amt[$j]["salary"] = $contract_amt[$j]["salary"];
-	// 		$contract_amt[$j]["roster"] = $contract_amt[$j]["roster"];
-	// 		$j++;
-	// 		$contract_amt[$j]["salary"] = $contract_amt[$j]["salary"];
-	// 		$contract_amt[$j]["roster"] = $contract_amt[$j]["roster"];
-	// 	}
-	// 	$hh++;
-	// }
+	$querypicks="SELECT * FROM ibl_draft_picks WHERE ownerofpick = '$team_name' ORDER BY year, round ASC";
+	$resultpicks=mysql_query($querypicks);
+	$numpicks=mysql_num_rows($resultpicks);
+	$hh=0;
 
-	$queryPlayersUnderContractAfterThisSeason = "SELECT * FROM nuke_iblplyr WHERE retired = 0 AND tid = $tid AND cy <> cyt";
-	$resultPlayersUnderContractAfterThisSeason = mysql_query($queryPlayersUnderContractAfterThisSeason);
-	$numberOfPlayersUnderContractAfterThisSeason = mysql_num_rows($resultPlayersUnderContractAfterThisSeason);
-
+	while ($hh < $numpicks)
+	{
+		$teampick=mysql_result($resultpicks,$hh,"teampick");
+		$year=mysql_result($resultpicks,$hh,"year");
+		$round=mysql_result($resultpicks,$hh,"round");
+		$j=$year-$current_ibl_season+1;
+		if ($round == 1)
+		{
+			$contract_amt[$j]["salary"]=$contract_amt[$j]["salary"];
+			$contract_amt[$j]["roster"] = $contract_amt[$j]["roster"];
+			$j++;
+			$contract_amt[$j]["salary"]=$contract_amt[$j]["salary"];
+			$contract_amt[$j]["roster"] = $contract_amt[$j]["roster"];
+			$j++;
+			$contract_amt[$j]["salary"]=$contract_amt[$j]["salary"];
+			$contract_amt[$j]["roster"] = $contract_amt[$j]["roster"];
+		}else{
+			$contract_amt[$j]["salary"]=$contract_amt[$j]["salary"];
+			$contract_amt[$j]["roster"] = $contract_amt[$j]["roster"];
+			$j++;
+			$contract_amt[$j]["salary"]=$contract_amt[$j]["salary"];
+			$contract_amt[$j]["roster"] = $contract_amt[$j]["roster"];
+		}
+		$hh++;
+	}
+	$query3="SELECT * FROM nuke_iblplyr WHERE retired=0 AND tid = $tid AND cy <> cyt";
+	$result3=mysql_query($query3);
+	$num3=mysql_num_rows($result3);
+	
 	$i = 0;
-	while ($i < $numberOfPlayersUnderContractAfterThisSeason) {
+	while ($i < $num3)
+	{
 		$j = 1;
-		$yearUnderContract = mysql_result($resultPlayersUnderContractAfterThisSeason, $i, "cy");
-		$totalYearsUnderContract = mysql_result($resultPlayersUnderContractAfterThisSeason, $i, "cyt");
-
-		while ($yearUnderContract < $totalYearsUnderContract) {
-			$yearUnderContract = $yearUnderContract + 1;
-			$contract_current_year[$yearUnderContract] = "cy" . $yearUnderContract;
-			$contract_amt[$j]["salary"] = $contract_amt[$j]["salary"] + mysql_result($resultPlayersUnderContractAfterThisSeason, $i, $contract_current_year[$yearUnderContract]);
-			$contract_amt[$j]["roster"]++;
+		$contract_year = mysql_result($result3,$i,"cy");
+		$contract_year_total = mysql_result($result3,$i,"cyt");
+		while ($contract_year < $contract_year_total)
+		{
+			$contract_year = $contract_year+1;
+			$contract_current_year[$contract_year] = "cy".$contract_year;
+			$contract_amt[$j]["salary"] = $contract_amt[$j]["salary"]+mysql_result($result3,$i,$contract_current_year[$contract_year]);
+			$contract_amt[$j]["roster"] = $contract_amt[$j]["roster"]+1;
 			$j++;
 		}
 		$i++;
 	}
 	return $contract_amt;
+
+
 }
 
-function get_salary1 ($tid, $team_name, $currentSeasonEndingYear)
+function get_salary1 ($tid, $team_name, $current_ibl_season)
 {
-	// $querypicks = "SELECT * FROM ibl_draft_picks WHERE ownerofpick = '$team_name' ORDER BY year, round ASC";
-	// $resultpicks = mysql_query($querypicks);
-	// $numpicks = mysql_num_rows($resultpicks);
-	// $hh = 0;
-	//
-	// while ($hh < $numpicks) {
-	// 	$teampick = mysql_result($resultpicks, $hh, "teampick");
-	// 	$year = mysql_result($resultpicks, $hh, "year");
-	// 	$round = mysql_result($resultpicks, $hh, "round");
-	// 	$j = $year - $currentSeasonEndingYear + 1;
-	// 	if ($round == 1) {
-	// 		$contract_amt[$j]["salary"] = $contract_amt[$j]["salary"];
-	// 		$contract_amt[$j]["roster"] = $contract_amt[$j]["roster"];
-	// 		$j++;
-	// 		$contract_amt[$j]["salary"] = $contract_amt[$j]["salary"];
-	// 		$contract_amt[$j]["roster"] = $contract_amt[$j]["roster"];
-	// 		$j++;
-	// 		$contract_amt[$j]["salary"] = $contract_amt[$j]["salary"];
-	// 		$contract_amt[$j]["roster"] = $contract_amt[$j]["roster"];
-	// 	} else {
-	// 		$contract_amt[$j]["salary"] = $contract_amt[$j]["salary"];
-	// 		$contract_amt[$j]["roster"] = $contract_amt[$j]["roster"];
-	// 		$j++;
-	// 		$contract_amt[$j]["salary"] = $contract_amt[$j]["salary"];
-	// 		$contract_amt[$j]["roster"] = $contract_amt[$j]["roster"];
-	// 	}
-	// 	$hh++;
-	// }
+	$querypicks="SELECT * FROM ibl_draft_picks WHERE ownerofpick = '$team_name' ORDER BY year, round ASC";
+	$resultpicks=mysql_query($querypicks);
+	$numpicks=mysql_num_rows($resultpicks);
+	$hh=0;
 
-	$queryPlayersUnderContractAfterThisSeason = "SELECT * FROM nuke_iblplyr WHERE retired = 0 AND tid = $tid AND droptime = 0 AND name NOT LIKE '%Buyout%' AND cy <> cyt";
-	$resultPlayersUnderContractAfterThisSeason = mysql_query($queryPlayersUnderContractAfterThisSeason);
-	$numberOfPlayersUnderContractAfterThisSeason = mysql_num_rows($resultPlayersUnderContractAfterThisSeason);
-
+	while ($hh < $numpicks)
+	{
+		$teampick=mysql_result($resultpicks,$hh,"teampick");
+		$year=mysql_result($resultpicks,$hh,"year");
+		$round=mysql_result($resultpicks,$hh,"round");
+		$j=$year-$current_ibl_season+1;
+		if ($round == 1)
+		{
+			$contract_amt[$j]["salary"]=$contract_amt[$j]["salary"];
+			$contract_amt[$j]["roster"] = $contract_amt[$j]["roster"];
+			$j++;
+			$contract_amt[$j]["salary"]=$contract_amt[$j]["salary"];
+			$contract_amt[$j]["roster"] = $contract_amt[$j]["roster"];
+			$j++;
+			$contract_amt[$j]["salary"]=$contract_amt[$j]["salary"];
+			$contract_amt[$j]["roster"] = $contract_amt[$j]["roster"];
+		}else{
+			$contract_amt[$j]["salary"]=$contract_amt[$j]["salary"];
+			$contract_amt[$j]["roster"] = $contract_amt[$j]["roster"];
+			$j++;
+			$contract_amt[$j]["salary"]=$contract_amt[$j]["salary"];
+			$contract_amt[$j]["roster"] = $contract_amt[$j]["roster"];
+		}
+		$hh++;
+	}
+	$query3="SELECT * FROM nuke_iblplyr WHERE retired=0 AND tid = $tid AND droptime = 0 and name not like '%Buyout%' and cy <> cyt";
+	$result3=mysql_query($query3);
+	$num3=mysql_num_rows($result3);
+	
 	$i = 0;
-	while ($i < $numberOfPlayersUnderContractAfterThisSeason) {
+	while ($i < $num3)
+	{
 		$j = 1;
-		$yearUnderContract = mysql_result($resultPlayersUnderContractAfterThisSeason, $i, "cy");
-		$totalYearsUnderContract = mysql_result($resultPlayersUnderContractAfterThisSeason, $i, "cyt");
-
-		while ($yearUnderContract < $totalYearsUnderContract) {
-			$yearUnderContract = $yearUnderContract + 1;
-			$contract_current_year[$yearUnderContract] = "cy" . $yearUnderContract;
-			$contract_amt[$j]["salary"] = $contract_amt[$j]["salary"] + mysql_result($resultPlayersUnderContractAfterThisSeason, $i, $contract_current_year[$yearUnderContract]);
-			$contract_amt[$j]["roster"]++;
+		$contract_year = mysql_result($result3,$i,"cy");
+		$contract_year_total = mysql_result($result3,$i,"cyt");
+		while ($contract_year < $contract_year_total)
+		{
+			$contract_year = $contract_year+1;
+			$contract_current_year[$contract_year] = "cy".$contract_year;
+			$contract_amt[$j]["salary"] = $contract_amt[$j]["salary"]+mysql_result($result3,$i,$contract_current_year[$contract_year]);
+			$contract_amt[$j]["roster"] = $contract_amt[$j]["roster"]+1;
 			$j++;
 		}
 		$i++;
 	}
 	return $contract_amt;
-}
 
+
+}
 ?>

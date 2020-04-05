@@ -1,8 +1,14 @@
 <?php
 
-require '../config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
+
+$username = "iblhoops_chibul";
+$password = "oliver23";
+$database = "iblhoops_iblleague";
+
+
+mysql_connect(localhost,$username,$password);
+@mysql_select_db($database) or die( "Unable to select database");
+
 
 $queryfirstyear="SELECT draftyear FROM nuke_iblplyr ORDER BY draftyear ASC";
 $resultfirstyear=mysql_query($queryfirstyear);
@@ -78,7 +84,7 @@ echo "<tr bgcolor=#e6e7e2>";
 }
 
 
-echo "<td>$round</td><td>$draftpickno</td><td><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td>$draftedby</td><td><img height=50 src=\"../images/player/$pid.jpg\"></td><td><a href=\"http://college.ijbl.net/rosters/roster$collegid.htm\">$college</a></td></tr>
+echo "<td>$round</td><td>$draftpickno</td><td><a href=\"http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td>$draftedby</td><td><img height=50 src=\"http://www.iblhoops.net/images/player/$pid.jpg\"></td><td><a href=\"http://college.ijbl.net/rosters/roster$collegid.htm\">$college</a></td></tr>
 ";
 
 

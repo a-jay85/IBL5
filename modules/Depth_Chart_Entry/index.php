@@ -40,7 +40,7 @@ function userinfo($username, $bypass=0, $hid=0, $url=0)
 	if(!$bypass) cookiedecode($user);
 	include("header.php");
 
-	// === CODE TO INSERT IBL DEPTH CHART ===
+	// === CODE TO INSERT ibl DEPTH CHART ===
 
 	function posHandler($positionVar)
 	{
@@ -50,6 +50,7 @@ function userinfo($username, $bypass=0, $hid=0, $url=0)
 		echo "<option value=\"3\"".($positionVar == 3 ? " SELECTED" : "").">3rd</option>";
 		echo "<option value=\"4\"".($positionVar == 4 ? " SELECTED" : "").">4th</option>";
 		echo "<option value=\"5\"".($positionVar == 5 ? " SELECTED" : "").">ok</option>";
+		echo "</select></td>";
 	}
 
 	function offdefHandler($focusVar)
@@ -71,8 +72,6 @@ function userinfo($username, $bypass=0, $hid=0, $url=0)
 
 	OpenTable();
 	$teamlogo = $userinfo[user_ibl_team];
-	$queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$teamlogo'";
-	$tid = mysql_result(mysql_query($queryTeamID), 0);
 
 	$sql7 = "SELECT * FROM ".$prefix."_ibl_offense_sets WHERE TeamName = '$teamlogo' ORDER BY SetNumber ASC";
 	$result7 = $db->sql_query($sql7);
@@ -120,12 +119,11 @@ function userinfo($username, $bypass=0, $hid=0, $url=0)
 	echo "<hr>
 		<form name=\"Depth_Chart\" method=\"post\" action=\"modules.php?name=Depth_Chart_Entry&op=submit\">
 		<input type=\"hidden\" name=\"Team_Name\" value=\"$teamlogo\"><input type=\"hidden\" name=\"Set_Name\" value=\"$offense_name\">
-		<center><img src=\"images/logo/$tid.jpg\"><br><table><tr><th colspan=14><center>DEPTH CHART ENTRY - Offensive Set: $offense_name</center></th></tr>
+		<center><img src=\"online/teamgrfx/$teamlogo.jpg\"><br><table><tr><th colspan=14><center>DEPTH CHART ENTRY - Offensive Set: $offense_name</center></th></tr>
 		<tr><th>Pos</th><th>Player</th><th>$Slot1</th><th>$Slot2</th><th>$Slot3</th><th>$Slot4</th><th>$Slot5</th><th>active</th><th>min</th><th>OF</th><th>DF</th><th>OI</th><th>DI</th><th>BH</th></tr>";
 	$depthcount=1;
 
 	while ($row8 = $db->sql_fetchrow($result8)) {
-		$player_pid = $row8[pid];
 		$player_pos = $row8[altpos];
 		$player_name = $row8[name];
 		$player_staminacap = $row8[sta]+40;
@@ -154,22 +152,12 @@ function userinfo($username, $bypass=0, $hid=0, $url=0)
 		if ($player_pos == 'FC') $pos_value=8;
 		if ($player_pos == 'C') $pos_value=9;
 
-		echo "\n
-				<tr>
-						<td>
-								<a href=\"./modules.php?name=Position_Change&pid=$player_pid\">$player_pos</a>
-						</td>
-						<td nowrap>
-								<input type=\"hidden\" name=\"Injury$depthcount\" value=\"$player_inj\">
-								<input type=\"hidden\" name=\"Name$depthcount\" value=\"$player_name\">
-								<a href=\"./modules.php?name=Player&pa=showpage&pid=$player_pid\">$player_name</a>
-						</td>\n";
+		echo "\n<tr><td>$player_pos</td><td nowrap><input type=\"hidden\" name=\"Inury$depthcount\" value=\"$player_inj\"><input type=\"hidden\" name=\"Name$depthcount\" value=\"$player_name\">$player_name</td>\n";
 
 		if ($pos_value >= $Low1 && $player_inj < 15) {
 			if ($pos_value <= $High1) {
 				echo "<td><select name=\"pg$depthcount\">";
 				posHandler($player_PG);
-				echo "</select></td>";
 			} else {
 				echo "<td><input type=\"hidden\" name=\"pg$depthcount\" value=\"0\">no</td>";
 			}
@@ -181,7 +169,6 @@ function userinfo($username, $bypass=0, $hid=0, $url=0)
 			if ($pos_value <= $High2) {
 				echo "<td><select name=\"sg$depthcount\">";
 				posHandler($player_SG);
-				echo "</select></td>";
 			} else {
 				echo "<td><input type=\"hidden\" name=\"sg$depthcount\" value=\"0\">no</td>";
 			}
@@ -193,7 +180,6 @@ function userinfo($username, $bypass=0, $hid=0, $url=0)
 			if ($pos_value <= $High3) {
 				echo "<td><select name=\"sf$depthcount\">";
 				posHandler($player_SF);
-				echo "</select></td>";
 			} else {
 				echo "<td><input type=\"hidden\" name=\"sf$depthcount\" value=\"0\">no</td>";
 			}
@@ -205,7 +191,6 @@ function userinfo($username, $bypass=0, $hid=0, $url=0)
 			if ($pos_value <= $High4) {
 				echo "<td><select name=\"pf$depthcount\">";
 				posHandler($player_PF);
-				echo "</select></td>";
 			} else {
 				echo "<td><input type=\"hidden\" name=\"pf$depthcount\" value=\"0\">no</td>";
 			}
@@ -217,7 +202,6 @@ function userinfo($username, $bypass=0, $hid=0, $url=0)
 			if ($pos_value <= $High5) {
 				echo "<td><select name=\"c$depthcount\">";
 				posHandler($player_C);
-				echo "</select></td>";
 			} else {
 				echo "<td><input type=\"hidden\" name=\"c$depthcount\" value=\"0\">no</td>";
 			}
@@ -260,13 +244,13 @@ function userinfo($username, $bypass=0, $hid=0, $url=0)
 	echo "<tr><th colspan=14><input type=\"radio\" name=\"emailtarget\" value=\"Normal\" checked> Submit Depth Chart? <input type=\"submit\" value=\"Submit\"></th></tr></form></table></center>";
 	CloseTable();
 
-	// === END INSERT OF IBL DEPTH CHART ===
+	// === END INSERT OF ibl DEPTH CHART ===
 
 	include("footer.php");
 }
 
 function main($user) {
-	global $stop;
+	global $stop, $module_name, $redirect, $mode, $t, $f, $gfx_chk;
 	if (!is_user($user)) {
 		include("header.php");
 		OpenTable();
@@ -275,7 +259,26 @@ function main($user) {
 		echo "<br>";
 		if (!is_user($user)) {
 			OpenTable();
-			loginbox();
+			mt_srand ((double)microtime()*1000000);
+			$maxran = 1000000;
+			$random_num = mt_rand(0, $maxran);
+			echo "<form action=\"modules.php?name=$module_name\" method=\"post\">"
+				."<b>"._USERLOGIN."</b><br><br>"
+				."<table border=\"0\"><tr><td>"
+				.""._NICKNAME.":</td><td><input type=\"text\" name=\"username\" size=\"15\" maxlength=\"25\"></td></tr>"
+				."<tr><td>"._PASSWORD.":</td><td><input type=\"password\" name=\"user_password\" size=\"15\" maxlength=\"20\"></td></tr>";
+			if (extension_loaded("gd") AND ($gfx_chk == 2 OR $gfx_chk == 4 OR $gfx_chk == 5 OR $gfx_chk == 7)) {
+				echo "<tr><td colspan='2'>"._SECURITYCODE.": <img src='modules.php?name=$module_name&op=gfx&random_num=$random_num' border='1' alt='"._SECURITYCODE."' title='"._SECURITYCODE."'></td></tr>"
+					."<tr><td colspan='2'>"._TYPESECCODE.": <input type=\"text\" NAME=\"gfx_check\" SIZE=\"7\" MAXLENGTH=\"6\"></td></tr>"
+					."<input type=\"hidden\" name=\"random_num\" value=\"$random_num\">";
+			}
+			echo "</table><input type=\"hidden\" name=\"redirect\" value=$redirect>"
+				."<input type=\"hidden\" name=\"mode\" value=$mode>"
+				."<input type=\"hidden\" name=\"f\" value=$f>"
+				."<input type=\"hidden\" name=\"t\" value=$t>"
+				."<input type=\"hidden\" name=\"op\" value=\"login\">"
+				."<input type=\"submit\" value=\""._LOGIN."\"></form><br>"
+				."<center><font class=\"content\">[ <a href=\"modules.php?name=$module_name&amp;op=pass_lost\">"._PASSWORDLOST."</a> | <a href=\"modules.php?name=$module_name&amp;op=new_user\">"._REGNEWUSER."</a> ]</font></center>";
 			CloseTable();
 		}
 		include("footer.php");
@@ -298,7 +301,7 @@ function submit() {
 	$filetext = "Name,PG,SG,SF,PF,C,ACTIVE,MIN,OF,DF,OI,DI
 ";
 
-	$activePlayers=0;
+	$activeplayers=0;
 	$pos_1=0;
 	$pos_2=0;
 	$pos_3=0;
@@ -324,7 +327,7 @@ function submit() {
 ";
 		$text = $text.$a.$b.$c.$d.$e.$f.$g.$h.$z.$j.$k.$l.$m;
 
-		$injury = $_POST['Injury'.$i];
+		$injury = $_POST['Inury'.$i];
 		$aa = $_POST['Name'.$i].",";
 		$bb = $_POST['pg'.$i].",";
 		$cc = $_POST['sg'.$i].",";
@@ -353,7 +356,7 @@ function submit() {
 		$dc_insertA=$_POST['OI'.$i];
 		$dc_insertB=$_POST['DI'.$i];
 		$dc_insertC=$_POST['BH'.$i];
-		$dc_insertkey=addslashes($_POST['Name'.$i]);
+		$dc_insertkey=$_POST['Name'.$i];
 
 		$updatequery1="UPDATE ".$prefix."_iblplyr SET dc_PGDepth = '$dc_insert1' WHERE name = '$dc_insertkey'";
 		$updatequery2="UPDATE ".$prefix."_iblplyr SET dc_SGDepth = '$dc_insert2' WHERE name = '$dc_insertkey'";
@@ -386,7 +389,7 @@ function submit() {
 
 		$i++;
 
-		if ($dc_insert6 == 1) $activePlayers=$activePlayers+1;
+		if ($dc_insert6 == 1) $activeplayers=$activeplayers+1;
 		if ($dc_insert1 > 0 && $injury == 0) $pos_1=$pos_1+1;
 		if ($dc_insert2 > 0 && $injury == 0) $pos_2=$pos_2+1;
 		if ($dc_insert3 > 0 && $injury == 0) $pos_3=$pos_3+1;
@@ -395,39 +398,28 @@ function submit() {
 	}
 
 	$text = $text."</table>";
-
-	$minActivePlayers = 12;
-	$maxActivePlayers = 12;
-	if ($activePlayers < $minActivePlayers) {
-		echo "<font color=red>Your lineup has not been submitted to the commissioner's office because it is an illegal lineup.<br>
-			You must have at least $minActivePlayers active players in your lineup; you have $activePlayers.<br>
-			Please press the \"Back\" button on your browser and activate " . ($minActivePlayers - $activePlayers) . " player(s).</font><p>";
-		$error=1;
-	}
-	if ($activePlayers > $maxActivePlayers) {
-		echo "<font color=red>Your lineup has not been submitted to the commissioner's office because it is an illegal lineup. <br>
-		You can't have more than $maxActivePlayers active players in your lineup; you have $activePlayers.<br>
-			Please press the \"Back\" button on your browser and deactivate " . ($activePlayers - $maxActivePlayers) . " player(s).</font><p>";
+	if ($activeplayers < 11) {
+		echo "<font color=red>Your lineup has not been submitted to the commissioner's office because it is an illegal lineup.  You must have at least 12 active players in your lineup; you have $activeplayers.  Please press the \"Back\" button on your browser and re-enter your lineup.</font>";
 		$error=1;
 	}
 	if ($pos_1 < 3 && $error == 0) {
-		echo "<font color=red>Your lineup has not been submitted to the commissioner's office because it is an illegal lineup. You must have at least 3 players entered in PG slot; you have $pos_1. Please press the \"Back\" button on your browser and re-enter your lineup.</font>";
+		echo "<font color=red>Your lineup has not been submitted to the commissioner's office because it is an illegal lineup.  You must have at least 3 players entered in PG slot; you have $pos_1.  Please press the \"Back\" button on your browser and re-enter your lineup.</font>";
 		$error=1;
 	}
 	if ($pos_2 < 3 && $error == 0) {
-		echo "<font color=red>Your lineup has not been submitted to the commissioner's office because it is an illegal lineup. You must have at least 3 players entered in SG slot; you have $pos_2. Please press the \"Back\" button on your browser and re-enter your lineup.</font>";
+		echo "<font color=red>Your lineup has not been submitted to the commissioner's office because it is an illegal lineup.  You must have at least 3 players entered in SG slot; you have $pos_2.  Please press the \"Back\" button on your browser and re-enter your lineup.</font>";
 		$error=1;
 	}
 	if ($pos_3 < 3 && $error == 0) {
-		echo "<font color=red>Your lineup has not been submitted to the commissioner's office because it is an illegal lineup. You must have at least 3 players entered in SF slot; you have $pos_3. Please press the \"Back\" button on your browser and re-enter your lineup.</font>";
+		echo "<font color=red>Your lineup has not been submitted to the commissioner's office because it is an illegal lineup.  You must have at least 3 players entered in SF slot; you have $pos_3.  Please press the \"Back\" button on your browser and re-enter your lineup.</font>";
 		$error=1;
 	}
 	if ($pos_4 < 3 && $error == 0) {
-		echo "<font color=red>Your lineup has not been submitted to the commissioner's office because it is an illegal lineup. You must have at least 3 players entered in PF slot; you have $pos_4. Please press the \"Back\" button on your browser and re-enter your lineup.</font>";
+		echo "<font color=red>Your lineup has not been submitted to the commissioner's office because it is an illegal lineup.  You must have at least 3 players entered in PF slot; you have $pos_4.  Please press the \"Back\" button on your browser and re-enter your lineup.</font>";
 		$error=1;
 	}
 	if ($pos_5 < 3 && $error == 0) {
-		echo "<font color=red>Your lineup has not been submitted to the commissioner's office because it is an illegal lineup. You must have at least 3 players entered in C slot; you have $pos_5. Please press the \"Back\" button on your browser and re-enter your lineup.</font>";
+		echo "<font color=red>Your lineup has not been submitted to the commissioner's office because it is an illegal lineup.  You must have at least 3 players entered in C slot; you have $pos_5.  Please press the \"Back\" button on your browser and re-enter your lineup.</font>";
 		$error=1;
 	}
 
@@ -440,9 +432,7 @@ function submit() {
 		}
 
 		if (mail($recipient, $emailsubject, $filetext, "From: ibldepthcharts@gmail.com")) {
-			echo "<center> <font color=red>Your depth chart has been submitted and e-mailed successfully. Thank you.</font></center>";
-			$filename = 'depthcharts/'.$Team_Name.'.txt';
-			file_put_contents($filename, $filetext);
+			echo "<center> <font color=red>Your depth chart has been submitted and e-mailed successfully.  Thank you. </font></center>";
 		} else {
 			echo " <font color=red>Message failed to e-mail properly; please contact the commissioner.</font></center>";
 		}

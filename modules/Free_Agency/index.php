@@ -27,55 +27,6 @@ get_lang($module_name);
 
 $pagetitle = "- Free Agency System";
 
-/*
-function main($user) {
-	global $stop, $module_name, $redirect, $mode, $t, $f, $gfx_chk;
-	if(!is_user($user)) {
-		include("header.php");
-		if ($stop) {
-			OpenTable();
-			echo "<center><font class=\"title\"><b>"._LOGININCOR."</b></font></center>\n";
-			CloseTable();
-			echo "<br>\n";
-		} else {
-			OpenTable();
-			echo "<center><font class=\"title\"><b>"._USERREGLOGIN."</b></font></center>\n";
-			CloseTable();
-			echo "<br>\n";
-		}
-		if (!is_user($user)) {
-			OpenTable();
-			mt_srand ((double)microtime()*1000000);
-			$maxran = 1000000;
-			$random_num = mt_rand(0, $maxran);
-			echo "<form action=\"modules.php?name=$module_name\" method=\"post\">\n"
-			."<b>"._USERLOGIN."</b><br><br>\n"
-			."<table border=\"0\"><tr><td>\n"
-			.""._NICKNAME.":</td><td><input type=\"text\" name=\"username\" size=\"15\" maxlength=\"25\"></td></tr>\n"
-			."<tr><td>"._PASSWORD.":</td><td><input type=\"password\" name=\"user_password\" size=\"15\" maxlength=\"20\"></td></tr>\n";
-			if (extension_loaded("gd") AND ($gfx_chk == 2 OR $gfx_chk == 4 OR $gfx_chk == 5 OR $gfx_chk == 7)) {
-				echo "<tr><td colspan='2'>"._SECURITYCODE.": <img src='?gfx=gfx&random_num=$random_num' border='1' alt='"._SECURITYCODE."' title='"._SECURITYCODE."'></td></tr>\n"
-				."<tr><td colspan='2'>"._TYPESECCODE.": <input type=\"text\" NAME=\"gfx_check\" SIZE=\"7\" MAXLENGTH=\"6\"></td></tr>\n"
-				."<input type=\"hidden\" name=\"random_num\" value=\"$random_num\">\n";
-			}
-			echo "</table><input type=\"hidden\" name=\"redirect\" value=\"$redirect\">\n"
-			."<input type=\"hidden\" name=\"mode\" value=$mode>\n"
-			."<input type=\"hidden\" name=\"f\" value=$f>\n"
-			."<input type=\"hidden\" name=\"t\" value=$t>\n"
-			."<input type=\"hidden\" name=\"op\" value=\"login\">\n"
-			."<input type=\"submit\" value=\""._LOGIN."\"></form><br>\n\n"
-			."<center><font class=\"content\">[ <a href=\"modules.php?name=$module_name&amp;op=pass_lost\">"._PASSWORDLOST."</a> | <a href=\"modules.php?name=$module_name&amp;op=new_user\">"._REGNEWUSER."</a> ]</font></center>\n";
-			CloseTable();
-		}
-		include("footer.php");
-	} elseif (is_user($user)) {
-		global $cookie;
-		cookiedecode($user);
-		userinfo($cookie[1]);
-	}
-}
-*/
-
 function display($nullset) {
 	global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
 	include("header.php");
@@ -87,11 +38,8 @@ function display($nullset) {
 	$userinfo = $db->sql_fetchrow($result2);
 
 	$userteam = stripslashes(check_html($userinfo['user_ibl_team'], "nohtml"));
-	$queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$userteam'";
-	$tid = mysql_result(mysql_query($queryTeamID), 0);
 
-	// TODO: MAKE THIS DYNAMIC OMG
-	$freeagentyear=2015;
+	$freeagentyear=2003;
 
 	/*
 	// ==== COMPUTE PLAYER SALARIES FOR NEXT YEAR TO GET SOFT AND HARD CAP NUMBERS
@@ -146,7 +94,7 @@ function display($nullset) {
 
 	$rosterspots=15;
 
-	echo "<table border=1 cellspacing=0><tr><td align=center colspan=32><img src=\"images/logo/$tid.jpg\"></td></tr>";
+	echo "<table border=1 cellspacing=0><tr><td align=center colspan=32><img src=\"online/teamgrfx/$userteam.jpg\"></td></tr>";
 
 	// ==== DISPLAY PLAYERS CURRENTLY UNDER CONTRACT FOR TEAM
 
@@ -269,7 +217,7 @@ function display($nullset) {
 			if ($rookiemigration == 1) echo "<a href=\"modules.php?name=Free_Agency&pa=positionmigration&pid=$pid\">Migrate Position</a>";
 			if ($ordinal > 960) $name=$name."*";
 
-			echo "</td><td>$pos</td><td><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td><a href=\"modules.php?name=Team&op=team&tid=$tid\">$team</a></td><td>$age</td><td>$r_sta</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$contract1</td><td>$contract2</td><td>$contract3</td><td>$contract4</td><td>$contract5</td><td>$contract6</td></tr>";
+			echo "</td><td>$pos</td><td><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td><a href=\"team.php?tid=$tid\">$team</a></td><td>$age</td><td>$r_sta</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$contract1</td><td>$contract2</td><td>$contract3</td><td>$contract4</td><td>$contract5</td><td>$contract6</td></tr>";
 
 			$conttot1=$conttot1+$contract1;
 			$conttot2=$conttot2+$contract2;
@@ -339,7 +287,7 @@ function display($nullset) {
 			$r_totoff=$r_oo+$r_do+$r_po+$r_to;
 			$r_totdef=$r_od+$r_dd+$r_pd+$r_td;
 
-			echo "      <tr><td><a href=\"modules.php?name=Free_Agency&pa=negotiate&pid=$pid\">Negotiate</a></td><td>$pos</td><td><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td><a href=\"modules.php?name=Team&op=team&tid=$tid\">$team</a></td><td>$age</td><td>$r_sta</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$offer1</td><td>$offer2</td><td>$offer3</td><td>$offer4</td><td>$offer5</td><td>$offer6</td></tr>";
+			echo "      <tr><td><a href=\"modules.php?name=Free_Agency&pa=negotiate&pid=$pid\">Negotiate</a></td><td>$pos</td><td><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td><a href=\"team.php?tid=$tid\">$team</a></td><td>$age</td><td>$r_sta</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$offer1</td><td>$offer2</td><td>$offer3</td><td>$offer4</td><td>$offer5</td><td>$offer6</td></tr>";
 
 			$conttot1=$conttot1+$offer1;
 			$conttot2=$conttot2+$offer2;
@@ -471,7 +419,7 @@ function display($nullset) {
 
 			// ==== END NOTE BIRD RIGHTS
 
-			echo "</a></td><td><a href=\"modules.php?name=Team&op=team&tid=$tid\">$team</a></td><td>$age</td><td>$r_sta</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$dem1</td><td>$dem2</td><td>$dem3</td><td>$dem4</td><td>$dem5</td><td>$dem6</td></tr>";
+			echo "</a></td><td><a href=\"team.php?tid=$tid\">$team</a></td><td>$age</td><td>$r_sta</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$dem1</td><td>$dem2</td><td>$dem3</td><td>$dem4</td><td>$dem5</td><td>$dem6</td></tr>";
 		} else {}
 	}
 
@@ -539,7 +487,7 @@ function display($nullset) {
 
 			if ($rosterspots <= 15) echo "<a href=\"modules.php?name=Free_Agency&pa=negotiate&pid=$pid\">Negotiate</a>";
 
-			echo "</td><td>$pos</td><td><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td><a href=\"modules.php?name=Team&op=team&tid=$tid\">$team</a></td><td>$age</td><td>$r_sta</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$dem1</td><td>$dem2</td><td>$dem3</td><td>$dem4</td><td>$dem5</td><td>$dem6</td></tr>";
+			echo "</td><td>$pos</td><td><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td><a href=\"team.php?tid=$tid\">$team</a></td><td>$age</td><td>$r_sta</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$dem1</td><td>$dem2</td><td>$dem3</td><td>$dem4</td><td>$dem5</td><td>$dem6</td></tr>";
 		} else {}
 	}
 
@@ -738,7 +686,7 @@ function negotiate($pid) {
 			$capnumber2 = $capnumber2-$capcy6;
 		}
 		if ($capcy == 5) {
-		$capnumber = $capnumber-$capcy6;
+			$capnumber = $capnumber-$capcy6;
 		}
 
 		if ($capcy != $capcyt && $ordinal <= 960) $rosterspots=$rosterspots-1;
@@ -1449,7 +1397,7 @@ function rookieoption($pid) {
 			<input type=\"hidden\" name=\"playername\" value=\"$player_name\">
 			<input type=\"hidden\" name=\"rookie_cy4\" value=\"$rookie_cy4\">
 			<input type=\"submit\" value=\"Activate Rookie Extension\"></form>";
-		}
+		} 
 	} else {
 		// --- 2nd Round Rookie Options (AJN) ---
 		if ($player_exp == 1) {

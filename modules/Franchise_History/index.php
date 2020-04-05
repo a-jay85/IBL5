@@ -20,6 +20,7 @@ require_once("mainfile.php");
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 $userpage = 1;
+$current_ibl_season=mysql_result(mysql_query("SELECT value FROM nuke_ibl_settings WHERE name = 'Current IBL Season' LIMIT 1"),0,"value");
 include("header.php");
 
 $query2="SELECT * FROM ibl_team_history WHERE teamid != 35 ORDER BY teamid ASC";
@@ -44,9 +45,9 @@ while ($k < $num2)
         $conf[$k] = mysql_result($result2,$k,"conf_titles");
         $ibl[$k] = mysql_result($result2,$k,"ibl_titles");
         $heat[$k] = mysql_result($result2,$k,"heat_titles");
-
-
-	$table_echo=$table_echo."<tr><td bgcolor=#".$teamcolor1[$k]."><a href=\"modules.php?name=Team&op=team&tid=".$teamid[$k]."\"><font color=#".$teamcolor2[$k].">".$teamcity[$k]." ".$teamname[$k]."</a></td><td>".$totwins[$k]."</td><td>".$totloss[$k]."</td><td>".$pct[$k]."</td><td>".$heat[$k]."</td><td>".$playoffs[$k]."</td><td>".$div[$k]."</td><td>".$conf[$k]."</td><td>".$ibl[$k]."</td></tr>";
+	
+                
+	$table_echo=$table_echo."<tr><td bgcolor=#".$teamcolor1[$k]."><a href=\"http://www.iblhoops.net/modules.php?name=Team&op=team&tid=".$teamid[$k]."\"><font color=#".$teamcolor2[$k].">".$teamcity[$k]." ".$teamname[$k]."</a></td><td>".$totwins[$k]."</td><td>".$totloss[$k]."</td><td>".$pct[$k]."</td><td>".$heat[$k]."</td><td>".$playoffs[$k]."</td><td>".$div[$k]."</td><td>".$conf[$k]."</td><td>".$ibl[$k]."</td></tr>";
 
 	$k++;
 }

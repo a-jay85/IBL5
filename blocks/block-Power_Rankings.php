@@ -18,9 +18,12 @@ if ( !defined('BLOCK_FILE') ) {
 
 global $prefix, $multilingual, $currentlang, $db;
 
-require 'config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
+$username = "iblhoops_chibul";
+$password = "oliver23";
+$database = "iblhoops_iblleague";
+
+mysql_connect(localhost,$username,$password);
+@mysql_select_db($database) or die( "Unable to select database");
 
 $query="SELECT * FROM nuke_ibl_power WHERE TeamID BETWEEN 1 AND 32 ORDER BY ranking DESC";
 $result=mysql_query($query);
@@ -41,9 +44,9 @@ while ($i < $num)
 	}else{
 		$bgcolor="EEEEEE";
 	}
-	$content = $content."<tr bgcolor=$bgcolor><td align=right valign=top>$i.</td><td align=center><a href=\"modules.php?name=Team&op=team&tid=$tid\">$Team</a></td><td align=right valign=top>$ranking</td></tr>";
+	$content = $content."<tr bgcolor=$bgcolor><td align=right valign=top>$i.</td><td align=center>$Team</td><td align=right valign=top>$ranking</td></tr>";
 }
 
-$content=$content."<tr><td colspan=3><center><a href=\"modules.php?name=Power_Rankings\"><font color=#aaaaaa><i>-- Full Power Rankings --</i></font></a></center></table>";
+$content=$content."<tr><td colspan=3><a href=\"http://www.iblhoops.net/modules.php?name=Power_Rankings\"><font color=#aaaaaa><i>Click here for complete power rankings</i></font></a></table>";
 
 ?>

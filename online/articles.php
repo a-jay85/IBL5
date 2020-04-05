@@ -1,8 +1,11 @@
 <?php
 
-require '../config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
+$username = "iblhoops_chibul";
+$password = "oliver23";
+$database = "iblhoops_iblleague";
+
+mysql_connect(localhost,$username,$password);
+@mysql_select_db($database) or die( "Unable to select database");
 
 $player = $_REQUEST['player'];
 $query="SELECT * FROM nuke_stories WHERE hometext LIKE '%$player%' OR bodytext LIKE '%$player%' ORDER BY time DESC";
@@ -20,7 +23,7 @@ $title=mysql_result($result,$i,"title");
 $time=mysql_result($result,$i,"time");
 
 echo "
-* <a href=\"modules.php?name=News&file=article&sid=$sid&mode=&order=0&thold=0\">$title</a> ($time)<br>";
+* <a href=\"http://www.iblhoops.net/modules.php?name=News&file=article&sid=$sid&mode=&order=0&thold=0\">$title</a> ($time)<br>";
 
 $i++;
 }

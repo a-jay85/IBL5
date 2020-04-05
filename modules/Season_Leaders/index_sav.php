@@ -78,7 +78,7 @@ $pagetitle = "Season Stats";
 	$result=mysql_query($query);
 	$num=mysql_numrows($result);
 
-	echo "<form name=\"Leaderboards\" method=\"post\" action=\"modules.php?name=Season_Leaders\">";
+	echo "<form name=\"Leaderboards\" method=\"post\" action=\"http://www.iblhoops.net/modules.php?name=Season_Leaders\">";
 	echo "<table border=1>";
 	echo "<tr><td><b>Team</td><td><select name=\"team\">";
 	team_option($team);
@@ -156,7 +156,7 @@ $pagetitle = "Season Stats";
 		}
 
 		$i++;
-		echo "<tr bgcolor=$bgcolor><td>$i.</td><td>$yr</td><td><a href=modules.php?name=Player&pa=showpage&pid=$pid>$name</a></td><td><a href=modules.php?name=Team&op=team&tid=$teamid>$teamname</a></td><td>$stats_gm</td><td align=right>$stats_mpg</td><td align=right>$stats_fgmpg</td><td align=right>$stats_fgapg</td><td align=right>$stats_fgp</td><td align=right>$stats_ftmpg</td><td align=right>$stats_ftapg</td><td align=right>$stats_ftp</td><td align=right>$stats_tgmpg</td><td align=right>$stats_tgapg</td><td align=right>$stats_tgp</td><td align=right>$stats_orbpg</td><td align=right>$stats_rpg</td><td align=right>$stats_apg</td><td align=right>$stats_spg</td><td align=right>$stats_tpg</td><td align=right>$stats_bpg</td><td align=right>$stats_fpg</td><td align=right>$stats_ppg</td><td>$qa</td></tr>";
+		echo "<tr bgcolor=$bgcolor><td>$i.</td><td>$yr</td><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pid>$name</a></td><td><a href=http://www.iblhoops.net/modules.php?name=Team&op=team&tid=$teamid>$teamname</a></td><td>$stats_gm</td><td align=right>$stats_mpg</td><td align=right>$stats_fgmpg</td><td align=right>$stats_fgapg</td><td align=right>$stats_fgp</td><td align=right>$stats_ftmpg</td><td align=right>$stats_ftapg</td><td align=right>$stats_ftp</td><td align=right>$stats_tgmpg</td><td align=right>$stats_tgapg</td><td align=right>$stats_tgp</td><td align=right>$stats_orbpg</td><td align=right>$stats_rpg</td><td align=right>$stats_apg</td><td align=right>$stats_spg</td><td align=right>$stats_tpg</td><td align=right>$stats_bpg</td><td align=right>$stats_fpg</td><td align=right>$stats_ppg</td><td>$qa</td></tr>";
 
 	}
 

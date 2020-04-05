@@ -1,8 +1,12 @@
 <?php
 
-require '../config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
+$username = "iblhoops_chibul";
+$password = "oliver23";
+$database = "iblhoops_iblleague";
+
+mysql_connect(localhost,$username,$password);
+@mysql_select_db($database) or die( "Unable to select database");
+
 
 $player2=str_replace("%20", " ", $pa);
 

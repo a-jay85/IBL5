@@ -1,8 +1,11 @@
 <?php
 
-require '../config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
+$username = "iblhoops_chibul";
+$password = "oliver23";
+$database = "iblhoops_iblleague";
+
+mysql_connect(localhost,$username,$password);
+@mysql_select_db($database) or die( "Unable to select database");
 
 if ($id == NULL)
 {
@@ -265,13 +268,13 @@ echo "<html><head><title>IBL Player Page: $name</title></head><body>
 if ($retired > 0)
 {
 echo "Retired</b></td></tr>
-      <tr><td colspan=2><img align=center src=\"../images/player/$id.jpg\"></td><th>Awards</th></tr>
+      <tr><td colspan=2><img align=center src=\"http://www.iblhoops.net/images/player/$id.jpg\"></td><th>Awards</th></tr>
     <hr>
       <table>
 ";
 } else {
 echo "<a href=\"team.php?tid=$tid\">$team</a></b></td></tr>
-      <tr><td rowspan=6 colspan=2 valign=center><img align=center src=\"../images/player/$id.jpg\"></td><th colspan=2><center>ATTRIBUTES</center></th><th colspan=2><center>CONTRACT</center></th><th colspan=2><center>PREFERENCES</center></th><th><center>RATINGS</center></th></tr>
+      <tr><td rowspan=6 colspan=2 valign=center><img align=center src=\"http://www.iblhoops.net/images/player/$id.jpg\"></td><th colspan=2><center>ATTRIBUTES</center></th><th colspan=2><center>CONTRACT</center></th><th colspan=2><center>PREFERENCES</center></th><th><center>RATINGS</center></th></tr>
       <tr><td><b>Talent:</b></td><td>$talent</td><td><b>Year 1:</b></td><td$contract_code1>$cy1</td><td><b>Loyalty:</b></td><td>$loyalty</td><td rowspan=8 bgcolor=#000000>
         <table bgcolor=#ffffff align=center valign=center cellpadding=0 cellspacing=0 border=1>
           <tr><td><b>2ga</b></td><td>$r_2ga</td><td><b>orb</b></td><td>$r_orb</td><td bgcolor=#dddddd><b>oo</b></td><td bgcolor=#dddddd>$r_oo</td></tr>

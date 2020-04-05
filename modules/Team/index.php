@@ -24,8 +24,6 @@ require_once("mainfile.php");
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
-include "./sharedFunctions.php";
-
 $pagetitle = "- Team Pages";
 
 /*
@@ -211,8 +209,12 @@ $k++;
 
 //////////
 
-function drafthistory($tid)
-{
+/************************************************************************/
+/* BEGIN DRAFT HISTORY FUNCTION                                         */
+/************************************************************************/
+
+function drafthistory($tid) {
+
 	global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
 
 	include("header.php");
@@ -240,20 +242,609 @@ function drafthistory($tid)
 		$player_retired = $rowd[retired];
 
 		if ($player_retired == 1) {
-			echo "<tr><td><a href=\"./modules.php?name=Player&pa=showpage&pid=$player_pid\">$player_name</a> (retired)</td><td>$player_pos</td><td>$player_draftyear</td><td>$player_draftround</td><td>$player_draftpickno</td></tr>";
+			echo "<tr><td><a href=\"../modules.php?name=Player&pa=showpage&pid=$player_pid\">$player_name</a> (retired)</td><td>$player_pos</td><td>$player_draftyear</td><td>$player_draftround</td><td>$player_draftpickno</td></tr>";
 		} else {
-			echo "<tr><td><a href=\"./modules.php?name=Player&pa=showpage&pid=$player_pid\">$player_name</a></td><td>$player_pos</td><td>$player_draftyear</td><td>$player_draftround</td><td>$player_draftpickno</td></tr>";
+			echo "<tr><td><a href=\"../modules.php?name=Player&pa=showpage&pid=$player_pid\">$player_name</a></td><td>$player_pos</td><td>$player_draftyear</td><td>$player_draftround</td><td>$player_draftpickno</td></tr>";
 		}
 	}
 
-	echo "</table>";
+	echo "</table";
 
 	CloseTable();
 	include("footer.php");
 }
 
-function leaguestats()
-{
+/************************************************************************/
+/* BEGIN TRADE OFFER FUNCTION                                           */
+/************************************************************************/
+
+function tradeoffer($username, $bypass=0, $hid=0, $url=0) {
+	global $user, $cookie, $sitename, $prefix, $user_prefix, $db, $admin, $broadcast_msg, $my_headlines, $module_name, $subscription_url, $partner;
+	$sql = "SELECT * FROM ".$prefix."_bbconfig";
+	$result = $db->sql_query($sql);
+	while ( $row = $db->sql_fetchrow($result) ) {
+		$board_config[$row['config_name']] = $row['config_value'];
+	}
+
+	$sql2 = "SELECT * FROM ".$user_prefix."_users WHERE username='$username'";
+	$result2 = $db->sql_query($sql2);
+	$num = $db->sql_numrows($result2);
+	$userinfo = $db->sql_fetchrow($result2);
+	if(!$bypass) cookiedecode($user);
+
+	include("header.php");
+
+	$query="SELECT * FROM nuke_ibl_settings WHERE name = 'Current IBL Season' ";
+	$result=mysql_query($query);
+	$current_ibl_season=mysql_result($result,0,"value");
+
+// === CODE TO INSERT TRADE STUFF ===
+
+	OpenTable();
+
+	displaytopmenu($tid);
+
+	$teamlogo = $userinfo[user_ibl_team];
+	$sql7 = "SELECT * FROM nuke_ibl_team_info ORDER BY teamid ASC ";
+	$result7 = $db->sql_query($sql7);
+
+	$sql8 = "SELECT * FROM nuke_iblplyr WHERE teamname='$userinfo[user_ibl_team]' AND retired = '0' ORDER BY ordinal ASC ";
+	$result8 = $db->sql_query($sql8);
+	$sql8a = "SELECT * FROM ibl_draft_picks WHERE ownerofpick='$userinfo[user_ibl_team]' ORDER BY year,round ASC ";
+	$result8a = $db->sql_query($sql8a);
+
+	echo "<hr>
+		<form name=\"Trade_Offer\" method=\"post\" action=\"../maketradeoffer.php\">
+		<input type=\"hidden\" name=\"Team_Name\" value=\"$teamlogo\">
+		<center><img src=\"online/teamgrfx/$teamlogo.jpg\"><br><table border=1 cellspacing=0 cellpadding=0><tr><th colspan=4><center>TRADING MENU</center></th></tr><tr><td valign=top>
+		<table border=0 bordercolor=red cellspacing=3 cellp ing=3>
+		<tr><td valign=top colspan=4><center><B><u>$userinfo[user_ibl_team]</u></b></center></td></tr><tr><td valign=top><b>Select</td><td valign=top><b>Pos</td><td valign=top><b>Name</td><td valign=top><b>Salary</td>";
+
+	$k=0;
+	$total_salary_teama = 0;
+	while($row8 = $db->sql_fetchrow($result8)) {
+		$player_pos = $row8[pos];
+		$player_name = $row8[name];
+		$player_pid = $row8[pid];
+		$contract_year = $row8[cy];
+		$bird_years = $row8[bird];
+		$player_contract = $row8["cy$contract_year"];
+
+		//ARRAY TO BUILD FUTURE SALARY
+		$i=$contract_year;
+		$z=0;
+		while ($i < 7) {
+			$future_salary_array['player'][$z]=$future_salary_array['player'][$z]+$row8["cy$i"];
+			if ($row8["cy$i"]>0) {
+				$future_salary_array['hold'][$z]=$future_salary_array['hold'][$z]+1;
+			}
+			$i++;
+			$z++;
+		}
+
+		//END OF ARRAY
+
+		echo "<input type=\"hidden\" name=\"index$k\" value=\"$player_pid\"><input type=\"hidden\" name=\"contract$k\" value=\"$player_contract\"><input type=\"hidden\" name=\"type$k\" value=\"1\">";
+		if ($bird_years > -1) {
+			echo"<tr><td wdith=20><input type=\"checkbox\" name=\"check$k\"></td> <td>$player_pos</td> <td>$player_name</td><td>$player_contract</td></tr>";
+		} else {
+			echo"<tr><td>$player_pos</td> <td>$player_name</td><td>$player_contract</td></tr>";
+		}
+		$k++;
+	}
+
+	while($row8a = $db->sql_fetchrow($result8a)) {
+		$pick_year = $row8a[year];
+		$pick_team = $row8a[teampick];
+		$pick_round = $row8a[round];
+		$pick_id = $row8a[pickid];
+		$y=$pick_year-$current_ibl_season+1;
+		if ($pick_round==1) {
+			$future_salary_array['picks'][$y]=$future_salary_array['picks'][$y]+75;
+			$future_salary_array['hold'][$y]=$future_salary_array['hold'][$y]+1;
+			//$future_salary_array[$y]=$future_salary_array[$y]+321;
+			//$future_roster_sports[$y]=$future_roster_sports[$y]+1;
+			$y=$y+1;
+			$future_salary_array['picks'][$y]=$future_salary_array['picks'][$y]+75;
+			$future_salary_array['hold'][$y]=$future_salary_array['hold'][$y]+1;
+			//$future_salary_array[$y]=$future_salary_array[$y]+345;
+			//$future_roster_sports[$y]=$future_roster_sports[$y]+1;
+			$y=$y+1;
+			$future_salary_array['picks'][$y]=$future_salary_array['picks'][$y]+75;
+			$future_salary_array['hold'][$y]=$future_salary_array['hold'][$y]+1;
+			//$future_salary_array[$y]=$future_salary_array[$y]+369;
+			//$future_roster_sports[$y]=$future_roster_sports[$y]+1;
+		} else {
+			$future_salary_array['picks'][$y]=$future_salary_array['picks'][$y]+75;
+			$future_salary_array['hold'][$y]=$future_salary_array['hold'][$y]+1;
+			//$future_salary_array[$y]=$future_salary_array[$y]+35;
+			//$future_roster_sports[$y]=$future_roster_sports[$y]+1;
+			$y=$y+1;
+			$future_salary_array['picks'][$y]=$future_salary_array['picks'][$y]+75;
+			$future_salary_array['hold'][$y]=$future_salary_array['hold'][$y]+1;
+			//$future_salary_array[$y]=$future_salary_array[$y]+51;
+			//$future_roster_sports[$y]=$future_roster_sports[$y]+1;
+		}
+
+		echo "<tr><td wdith=20><input type=\"hidden\" name=\"index$k\" value=\"$pick_id\"><input type=\"hidden\" name=\"type$k\" value=\"0\"><input type=\"checkbox\" name=\"check$k\"></td> <td colspan=3>$pick_year $pick_team Round $pick_round</td></tr>";
+		$k++;
+	}
+
+	echo "</table></td><td valign=top><table border=0 bordercolor=blue cellspacing=3 cellpadding=3><tr><td valign=top colspan=4><input type=\"hidden\" name=\"half\" value=\"$k\"><input type=\"hidden\" name=\"Team_Name2\" value=\"$partner\">
+	<center><B><U>$partner</U></B></center></td></tr><tr><td valign=top><b>Select</td><td valign=top><b>Pos</td><td valign=top><b>Name</td><td valign=top><b>Salary</td>";
+
+	$sql9 = "SELECT * FROM nuke_iblplyr WHERE teamname='$partner' AND retired = '0' ORDER BY ordinal ASC ";
+	$result9 = $db->sql_query($sql9);
+	$sql9a = "SELECT * FROM ibl_draft_picks WHERE ownerofpick='$partner' ORDER BY year,round ASC ";
+
+	$result9a = $db->sql_query($sql9a);
+	$total_salary_teamb = 0;
+	$roster_hold_teamb = (15 - mysql_numrows($result9)) * 75;
+	while($row9 = $db->sql_fetchrow($result9)) {
+		$player_pos = $row9[pos];
+		$player_name = $row9[name];
+		$player_pid = $row9[pid];
+		$contract_year = $row9[cy];
+		$bird_years = $row9[bird];
+		$player_contract = $row9["cy$contract_year"];
+
+		//ARRAY TO BUILD FUTURE SALARY
+		$i=$contract_year;
+		$z=0;
+		while ($i < 7) {
+			//$future_salary_arrayb[$z]=$future_salary_arrayb[$z]+$row9["cy$i"];
+			$future_salary_arrayb['player'][$z]=$future_salary_arrayb['player'][$z]+$row9["cy$i"];
+			if ($row9["cy$i"]>0) {
+				//$future_roster_sportsb[$z]=$future_roster_sportsb[$z]+1;
+				$future_salary_arrayb['hold'][$z]=$future_salary_arrayb['hold'][$z]+1;
+			}
+			$i++;
+			$z++;
+		}
+
+		//END OF ARRAY
+
+		echo "<input type=\"hidden\" name=\"index$k\" value=\"$player_pid\"><input type=\"hidden\" name=\"contract$k\" value=\"$player_contract\"><input type=\"hidden\" name=\"type$k\" value=\"1\">";
+		if ($bird_years > -1) {
+			echo"<tr><td wdith=20><input type=\"checkbox\" name=\"check$k\"></td> <td>$player_pos</td> <td>$player_name</td><td>$player_contract</td></tr>";
+		} else {
+			echo"<tr><td>$player_pos</td> <td>$player_name</td><td>$player_contract</td></tr>";
+		}
+	$k++;
+	}
+
+	while($row9a = $db->sql_fetchrow($result9a)) {
+		$pick_year = $row9a[year];
+		$pick_team = $row9a[teampick];
+		$pick_round = $row9a[round];
+		$pick_id = $row9a[pickid];
+
+		$y=$pick_year-$current_ibl_season+1;
+		if ($pick_round==1) {
+			$future_salary_arrayb['picks'][$y]=$future_salary_arrayb['picks'][$y]+75;
+			$future_salary_arrayb['hold'][$y]=$future_salary_arrayb['hold'][$y]+1;
+			//$future_salary_array[$y]=$future_salary_array[$y]+321;
+			//$future_roster_sports[$y]=$future_roster_sports[$y]+1;
+			$y=$y+1;
+			$future_salary_arrayb['picks'][$y]=$future_salary_arrayb['picks'][$y]+75;
+			$future_salary_arrayb['hold'][$y]=$future_salary_arrayb['hold'][$y]+1;
+			//$future_salary_array[$y]=$future_salary_array[$y]+345;
+			//$future_roster_sports[$y]=$future_roster_sports[$y]+1;
+			$y=$y+1;
+			$future_salary_arrayb['picks'][$y]=$future_salary_arrayb['picks'][$y]+75;
+			$future_salary_arrayb['hold'][$y]=$future_salary_arrayb['hold'][$y]+1;
+			//$future_salary_array[$y]=$future_salary_array[$y]+369;
+			//$future_roster_sports[$y]=$future_roster_sports[$y]+1;
+		} else {
+			$future_salary_arrayb['picks'][$y]=$future_salary_arrayb['picks'][$y]+75;
+			$future_salary_arrayb['hold'][$y]=$future_salary_arrayb['hold'][$y]+1;
+			//$future_salary_array[$y]=$future_salary_array[$y]+35;
+			//$future_roster_sports[$y]=$future_roster_sports[$y]+1;
+			$y=$y+1;
+			$future_salary_arrayb['picks'][$y]=$future_salary_arrayb['picks'][$y]+75;
+			$future_salary_arrayb['hold'][$y]=$future_salary_arrayb['hold'][$y]+1;
+			//$future_salary_array[$y]=$future_salary_array[$y]+51;
+			//$future_roster_sports[$y]=$future_roster_sports[$y]+1;
+		}
+
+		echo "<tr><td wdith=20><input type=\"hidden\" name=\"index$k\" value=\"$pick_id\"><input type=\"hidden\" name=\"type$k\" value=\"0\"><input type=\"checkbox\" name=\"check$k\"></td> <td colspan=3>$pick_year $pick_team Round $pick_round</td></tr>";
+		$k++;
+	}
+
+	$k--;
+	echo "</table></td><td valign=top><table border=0 bordercolor=green cellspacing=0 cellpadding=0><tr><input type=\"hidden\" name=\"counterfields\" value=\"$k\"><td valign=top><center><b><u>Make Trade Offer To...</u></b></center>";
+
+	while($row7 = $db->sql_fetchrow($result7)) {
+		$team_name = $row7[team_name];
+		$team_city = $row7[team_city];
+		$team_id = $row7[teamid];
+
+		//-------Deadline Code---------
+		echo "<a href=\"../modules.php?name=Team&op=offertrade&partner=$team_name\">$team_city $team_name</a><br>";
+	}
+
+	echo "</td></tr></table>";
+	$z=0;
+	while ($z<6) {
+		$pass_future_salary_player[$z]=$pass_future_salary_array[$z]+$future_salary_array['player'][$z];
+		$pass_future_salary_hold[$z]=$pass_future_salary_array[$z]+$future_salary_array['hold'][$z];
+		$pass_future_salary_picks[$z]=$pass_future_salary_array[$z]+$future_salary_array['picks'][$z];
+		$pass_future_salary_playerb[$z]=$pass_future_salary_arrayb[$z];
+		$pass_future_salary_holdb[$z]=$pass_future_salary_arrayb[$z]+$future_salary_arrayb['hold'][$z];
+		$pass_future_salary_picksb[$z]=$pass_future_salary_arrayb[$z]+$future_salary_arrayb['picks'][$z];
+		$future_salary_array['player'][$z]=$future_salary_array['player'][$z];
+		$future_salary_arrayb['player'][$z]=$future_salary_arrayb['player'][$z];
+		echo "<tr><td><b>
+			Total Year: $current_ibl_season:
+			Salary: $".$future_salary_array['player'][$z]."</td>";
+		echo "<td><b>
+			Salary: $".$future_salary_arrayb['player'][$z]."</td>";
+			$current_ibl_season=$current_ibl_season+1;
+		$z++;
+	}
+
+	$pass_future_salary_player = implode(",", $pass_future_salary_player);
+	$pass_future_salary_hold = implode(",", $pass_future_salary_hold);
+	$pass_future_salary_picks = implode(",", $pass_future_salary_picks);
+	$pass_future_salary_playerb = implode(",", $pass_future_salary_playerb);
+	$pass_future_salary_holdb = implode(",", $pass_future_salary_holdb);
+	$pass_future_salary_picksb = implode(",", $pass_future_salary_picksb);
+	echo "<input type=\"hidden\" name=\"pass_future_salary_player\" value=\"".htmlspecialchars($pass_future_salary_player)."\">
+		<input type=\"hidden\" name=\"pass_future_salary_hold\" value=\"".htmlspecialchars($pass_future_salary_hold)."\">
+		<input type=\"hidden\" name=\"pass_future_salary_picks\" value=\"".htmlspecialchars($pass_future_salary_picks)."\">
+		<input type=\"hidden\" name=\"pass_future_salary_playerb\" value=\"".htmlspecialchars($pass_future_salary_playerb)."\">
+		<input type=\"hidden\" name=\"pass_future_salary_holdb\" value=\"".htmlspecialchars($pass_future_salary_holdb)."\">
+		<input type=\"hidden\" name=\"pass_future_salary_picksb\" value=\"".htmlspecialchars($pass_future_salary_picksb)."\">
+		<tr><td colspan=3><center>
+		<input type=\"submit\" value=\"Make Trade Offer\"></td></tr></form></center></table></td></tr></table></center>";
+
+	CloseTable();
+
+	// === END INSERT OF TRADE STUFF ===
+
+	include("footer.php");
+}
+
+/************************************************************************/
+/* END TRADE INFO FUNCTION                                              */
+/************************************************************************/
+
+/************************************************************************/
+/* BEGIN TRADE REVIEW FUNCTION                                          */
+/************************************************************************/
+
+function tradereview($username, $bypass=0, $hid=0, $url=0) {
+	global $user, $cookie, $sitename, $prefix, $user_prefix, $db, $admin, $broadcast_msg, $my_headlines, $module_name, $subscription_url, $attrib, $step, $player;
+	$sql = "SELECT * FROM ".$prefix."_bbconfig";
+	$result = $db->sql_query($sql);
+	while ( $row = $db->sql_fetchrow($result) ) {
+		$board_config[$row['config_name']] = $row['config_value'];
+	}
+
+	// ==== PICKUP LOGGED-IN USER INFO
+
+	$sql2 = "SELECT * FROM ".$user_prefix."_users WHERE username='$username'";
+	$result2 = $db->sql_query($sql2);
+	$num = $db->sql_numrows($result2);
+	$userinfo = $db->sql_fetchrow($result2);
+	if(!$bypass) cookiedecode($user);
+
+	// ===== END OF INFO PICKUP
+
+	include("header.php");
+
+	OpenTable();
+
+	$teamlogo = $userinfo[user_ibl_team];
+
+	$tid=mysql_result(mysql_query("SELECT * FROM nuke_ibl_team_info WHERE team_name = '$teamlogo' LIMIT 1"),0,"teamid");
+
+	displaytopmenu($tid);
+
+	// BOOKMARK = NEW TRADING AREA
+
+	include("capandtrade.php");
+	include("teamcap.php");
+
+	$get_action=$_POST["action"];
+	$get_team_from=$_POST["team_from"];
+	$get_team_to=$_POST["team_to"];
+	$get_trade_id=$_POST["trade_id"];
+	$get_item_id=$_POST["item_id"];
+	$get_item_type=$_POST["item_type"];
+
+	if ($get_trade_id != 0) {
+		// DISPLAY TRADE CURRENTLY REVIEWING
+		$querytext="SELECT * FROM ibl_trade_approval WHERE trade_id = '$get_trade_id' AND team_id = '$tid' ";
+		$mine_result=mysql_query($querytext);
+		if (mysql_num_rows($mine_result) > 0) {
+			// THIS PLAYER IS INVOLVED IN THE TRADE. ALLOW HIM TO VIEW IT.
+			$result_teams=mysql_query("SELECT * FROM ibl_trade_approval WHERE trade_id = '$get_trade_id' ");
+			$num_teams=mysql_num_rows($result_teams);
+			for ($l=0;$l<$num_teams;$l++) {
+				$this_team_id=mysql_result($result_teams,$l,"team_id");
+				$this_team_approved=mysql_result($result_teams,$l,"approval");
+			}
+		}
+	}
+
+	// GET LIST OF OTHER TEAMS - NEW OFFERS
+
+	$sql7 = "SELECT * FROM nuke_ibl_team_info WHERE teamid != '$tid' AND teamid != 0 ORDER BY team_name ASC ";
+	$result7 = $db->sql_query($sql7);
+
+	while($row7 = $db->sql_fetchrow($result7)) {
+		$team_name = $row7[team_name];
+		$team_city = $row7[team_city];
+		$team_id = $row7[teamid];
+		$team_dropdown=$team_dropdown."<option value=\"teamid\">$team_name</option>";
+	}
+
+	$new_trade_form="<form name=\"New Trade\" method=\"post\" action=\"\"><input type=\"hidden\" name=\"action\" value=\"new trade\"><input type=\"hidden\" name=\"team_from\" value=\"$tid\"><input type=\"submit\" value=\"Propose New Trade to...\"><select name=\"team_to\">$team_dropdown</select></form>";
+
+	// END BOOKMARK
+
+	echo "<hr><center><img src=\"online/teamgrfx/$teamlogo.jpg\"><br>";
+
+	$sql3 = "SELECT * FROM nuke_ibl_trade_info ORDER BY tradeofferid ASC";
+	$result3 = $db->sql_query($sql3);
+	$num3 = $db->sql_numrows($result3);
+
+	$tradeworkingonnow=0;
+
+	echo "<table><tr><td valign=top>REVIEW TRADE OFFERS";
+
+	while($row3 = $db->sql_fetchrow($result3)) {
+		$isinvolvedintrade=0;
+		$hashammer=0;
+		$offerid = $row3[tradeofferid];
+		$itemid = $row3[itemid];
+
+		// For itemtype (1 = player, 0 = pick)
+
+		$itemtype = $row3[itemtype];
+		$from = $row3[from];
+		$to = $row3[to];
+		$approval = $row3[approval];
+
+		if ($from == $teamlogo) {
+			$isinvolvedintrade=1;
+		}
+		if ($to == $teamlogo) {
+			$isinvolvedintrade=1;
+		}
+		if ($approval == $teamlogo) {
+			$hashammer=1;
+		}
+
+		if ($isinvolvedintrade == 1) {
+			if ($offerid == $tradeworkingonnow) {
+			} else {
+				echo "</td></tr></table><table border=1 cellpadding=0 cellspacing=0 valign=top align=center><tr><td><b><u>TRADE OFFER</u></b><br><table align=right border=1 cellspacing=0 cellpadding=0><tr><td valign=center>";
+				if ($hashammer == 1) {
+					echo "<form name=\"tradeaccept\" method=\"post\" action=\"../accepttradeoffer.php\"><input type=\"hidden\" name=\"offer\" value=\"$offerid\"><input type=\"submit\" value=\"Accept\"></form>";
+				} else {
+					echo "(Awaiting Approval)";
+				}
+				echo "</td><td valign=center><form name=\"tradereject\" method=\"post\" action=\"../rejecttradeoffer.php\"><input type=\"hidden\" name=\"offer\" value=\"$offerid\"><input type=\"submit\" value=\"Reject\"></form></td></tr></table>";
+			}
+
+			if ($itemtype == 0) {
+				$sqlgetpick = "SELECT * FROM ibl_draft_picks WHERE pickid = '$itemid'";
+				$resultgetpick = $db->sql_query($sqlgetpick);
+				$numsgetpick = $db->sql_numrows($resultsgetpick);
+				$rowsgetpick = $db->sql_fetchrow($resultgetpick);
+
+				$pickteam = $rowsgetpick[teampick];
+				$pickyear = $rowsgetpick[year];
+				$pickround = $rowsgetpick[round];
+
+				echo "The $from send the $pickteam $pickyear Round $pickround draft pick to the $to.<br>";
+			} else {
+				$sqlgetplyr = "SELECT * FROM nuke_iblplyr WHERE pid = '$itemid'";
+				$resultgetplyr = $db->sql_query($sqlgetplyr);
+				$numsgetplyr = $db->sql_numrows($resultsgetplyr);
+				$rowsgetplyr = $db->sql_fetchrow($resultgetplyr);
+
+				$plyrname = $rowsgetplyr[name];
+				$plyrpos = $rowsgetplyr[pos];
+
+				echo "The $from send $plyrpos $plyrname to the $to.<br>";
+			}
+			$tradeworkingonnow=$offerid;
+		}
+	}
+
+	echo "</td><td valign=top><center><b><u>Make Trade Offer To...</u></b></center>";
+
+	$sql7 = "SELECT * FROM nuke_ibl_team_info ORDER BY team_name ASC ";
+	$result7 = $db->sql_query($sql7);
+
+	while($row7 = $db->sql_fetchrow($result7)) {
+		$team_name = $row7[team_name];
+		$team_city = $row7[team_city];
+		$team_id = $row7[teamid];
+
+		if ($team_name == 'Free Agents') {
+		} else {
+			//------Trade Deadline Code---------
+			echo "<a href=\"../modules.php?name=Team&op=offertrade&partner=$team_name\">$team_city $team_name</a><br>";
+		}
+	}
+	/* -----NOSY'S NEW CODE FOR MULTI-TEAM TRADES-----
+	echo "</td><td bgcolor=#bbbbbb>ALPHA TESTING - NEW TRADE AREA - DO NOT USE YET! $new_trade_form </td></tr>
+	<tr><td colspan=2>
+	<a href=\"../modules.php?name=Waivers&action=drop\">Drop a player to Waivers</a>
+	<br>
+	<a href=\"../modules.php?name=Waivers&action=add\">Add a player from Waivers</a>
+	<br>
+	</td></tr></table>";
+	*/
+
+	echo "</td></tr><tr><td colspan=2>
+		<a href=\"../modules.php?name=Waivers&action=drop\">Drop a player to Waivers</a>
+		<br>
+		<a href=\"../modules.php?name=Waivers&action=add\">Add a player from Waivers</a>
+		<br>
+		</td></tr></table>";
+
+	CloseTable();
+	include("footer.php");
+}
+
+/************************************************************************/
+/* END TRADE REVIEW FUNCTION                                            */
+/************************************************************************/
+
+/************************************************************************/
+/* BEGIN TRADE REVIEW CALL                                              */
+/************************************************************************/
+
+function reviewtrade($user) {
+	global $stop, $module_name, $redirect, $mode, $t, $f, $gfx_chk;
+	if(!is_user($user)) {
+		include("header.php");
+		if ($stop) {
+			OpenTable();
+			displaytopmenu($tid);
+
+			echo "<center><font class=\"title\"><b>"._LOGININCOR."</b></font></center>\n";
+			CloseTable();
+			echo "<br>\n";
+		} else {
+			OpenTable();
+			displaytopmenu($tid);
+			echo "<center><font class=\"title\"><b>"._USERREGLOGIN."</b></font></center>\n";
+			CloseTable();
+			echo "<br>\n";
+		}
+		if (!is_user($user)) {
+			OpenTable();
+			displaytopmenu($tid);
+
+			mt_srand ((double)microtime()*1000000);
+			$maxran = 1000000;
+			$random_num = mt_rand(0, $maxran);
+			echo "<form action=\"modules.php?name=$module_name\" method=\"post\">\n"
+				."<b>"._USERLOGIN."</b><br><br>\n"
+				."<table border=\"0\"><tr><td>\n"
+				.""._NICKNAME.":</td><td><input type=\"text\" name=\"username\" size=\"15\" maxlength=\"25\"></td></tr>\n"
+				."<tr><td>"._PASSWORD.":</td><td><input type=\"password\" name=\"user_password\" size=\"15\" maxlength=\"20\"></td></tr>\n";
+			if (extension_loaded("gd") AND ($gfx_chk == 2 OR $gfx_chk == 4 OR $gfx_chk == 5 OR $gfx_chk == 7)) {
+				echo "<tr><td colspan='2'>"._SECURITYCODE.": <img src='modules.php?name=$module_name&op=gfx&random_num=$random_num' border='1' alt='"._SECURITYCODE."' title='"._SECURITYCODE."'></td></tr>\n"
+					."<tr><td colspan='2'>"._TYPESECCODE.": <input type=\"text\" NAME=\"gfx_check\" SIZE=\"7\" MAXLENGTH=\"6\"></td></tr>\n"
+					."<input type=\"hidden\" name=\"random_num\" value=\"$random_num\">\n";
+			}
+			echo "</table><input type=\"hidden\" name=\"redirect\" value=$redirect>\n"
+				."<input type=\"hidden\" name=\"mode\" value=$mode>\n"
+				."<input type=\"hidden\" name=\"f\" value=$f>\n"
+				."<input type=\"hidden\" name=\"t\" value=$t>\n"
+				."<input type=\"hidden\" name=\"op\" value=\"login\">\n"
+				."<input type=\"submit\" value=\""._LOGIN."\"></form><br>\n\n"
+				."<center><font class=\"content\">[ <a href=\"modules.php?name=$module_name&amp;op=pass_lost\">"._PASSWORDLOST."</a> | <a href=\"modules.php?name=$module_name&amp;op=new_user\">"._REGNEWUSER."</a> ]</font></center>\n";
+			CloseTable();
+		}
+		include("footer.php");
+	} elseif (is_user($user)) {
+
+		$query="SELECT * FROM nuke_ibl_settings WHERE name = 'Allow Trades' ";
+		$result=mysql_query($query);
+
+		$allow_trades=mysql_result($result,0,"value");
+		$query2="SELECT * FROM nuke_ibl_settings WHERE name = 'Allow Waiver Moves' ";
+		$result2=mysql_query($query2);
+
+		$allow_trades=mysql_result($result,0,"value");
+		$allow_waiver_moves=mysql_result($result2,0,"value");
+
+		if ($allow_trades == 'Yes') {
+			global $cookie;
+			cookiedecode($user);
+			tradereview($cookie[1]);
+		} else {
+			include ("header.php");
+			OpenTable();
+			displaytopmenu($tid);
+			echo "Sorry, but players may not be traded at the present time.";
+			if ($allow_waiver_moves == 'Yes') {
+				echo "<br>
+				Players may still be <a href=\"../modules.php?name=Waivers&action=add\">Added From Waivers</a> or they may be <a href=\"../modules.php?name=Waivers&action=drop\">Dropped to Waivers</a>.";
+			} else {
+				echo "<br>Please note that the waiver wire has also closed.";
+			}
+			CloseTable();
+			include ("footer.php");
+		}
+	}
+}
+
+/************************************************************************/
+/* END TRADE REVIEW CALL                                                */
+/************************************************************************/
+
+/************************************************************************/
+/* BEGIN TRADE OFFER CALL                                               */
+/************************************************************************/
+
+function offertrade($user) {
+	global $stop, $module_name, $redirect, $mode, $t, $f, $gfx_chk;
+	if(!is_user($user)) {
+		include("header.php");
+		if ($stop) {
+			OpenTable();
+			displaytopmenu($tid);
+			echo "<center><font class=\"title\"><b>"._LOGININCOR."</b></font></center>\n";
+			CloseTable();
+			echo "<br>\n";
+		} else {
+			OpenTable();
+			displaytopmenu($tid);
+			echo "<center><font class=\"title\"><b>"._USERREGLOGIN."</b></font></center>\n";
+			CloseTable();
+			echo "<br>\n";
+		}
+		if (!is_user($user)) {
+			OpenTable();
+			displaytopmenu($tid);
+			mt_srand ((double)microtime()*1000000);
+			$maxran = 1000000;
+			$random_num = mt_rand(0, $maxran);
+			echo "<form action=\"modules.php?name=$module_name\" method=\"post\">\n"
+				."<b>"._USERLOGIN."</b><br><br>\n"
+				."<table border=\"0\"><tr><td>\n"
+				.""._NICKNAME.":</td><td><input type=\"text\" name=\"username\" size=\"15\" maxlength=\"25\"></td></tr>\n"
+				."<tr><td>"._PASSWORD.":</td><td><input type=\"password\" name=\"user_password\" size=\"15\" maxlength=\"20\"></td></tr>\n";
+			if (extension_loaded("gd") AND ($gfx_chk == 2 OR $gfx_chk == 4 OR $gfx_chk == 5 OR $gfx_chk == 7)) {
+				echo "<tr><td colspan='2'>"._SECURITYCODE.": <img src='modules.php?name=$module_name&op=gfx&random_num=$random_num' border='1' alt='"._SECURITYCODE."' title='"._SECURITYCODE."'></td></tr>\n"
+					."<tr><td colspan='2'>"._TYPESECCODE.": <input type=\"text\" NAME=\"gfx_check\" SIZE=\"7\" MAXLENGTH=\"6\"></td></tr>\n"
+					."<input type=\"hidden\" name=\"random_num\" value=\"$random_num\">\n";
+			}
+			echo "</table><input type=\"hidden\" name=\"redirect\" value=$redirect>\n"
+				."<input type=\"hidden\" name=\"mode\" value=$mode>\n"
+				."<input type=\"hidden\" name=\"f\" value=$f>\n"
+				."<input type=\"hidden\" name=\"t\" value=$t>\n"
+				."<input type=\"hidden\" name=\"op\" value=\"login\">\n"
+				."<input type=\"submit\" value=\""._LOGIN."\"></form><br>\n\n"
+				."<center><font class=\"content\">[ <a href=\"modules.php?name=$module_name&amp;op=pass_lost\">"._PASSWORDLOST."</a> | <a href=\"modules.php?name=$module_name&amp;op=new_user\">"._REGNEWUSER."</a> ]</font></center>\n";
+			CloseTable();
+		}
+		include("footer.php");
+	} elseif (is_user($user)) {
+		global $cookie;
+		cookiedecode($user);
+		tradeoffer($cookie[1]);
+	}
+}
+/*****************************************************/
+/* END TRADE OFFER CALL                              */
+/*****************************************************/
+
+/*****************************************************/
+/* BEGIN TEAM OFFENSE AND DEFENSE STATS              */
+/*****************************************************/
+
+function leaguestats() {
+
 	include("header.php");
 	OpenTable();
 
@@ -308,14 +899,8 @@ function leaguestats()
 		$team_off_pf=mysql_result($resultTeamOffenseTotals,$t,"pf");
 		$team_off_pts=$team_off_fgm+$team_off_fgm+$team_off_ftm+$team_off_tgm;
 
-		@$team_off_avgfgm=number_format($team_off_fgm/$team_off_games,2);
-		@$team_off_avgfga=number_format($team_off_fga/$team_off_games,2);
 		@$team_off_fgp=number_format($team_off_fgm/$team_off_fga,3);
-		@$team_off_avgftm=number_format($team_off_ftm/$team_off_games,2);
-		@$team_off_avgfta=number_format($team_off_fta/$team_off_games,2);
 		@$team_off_ftp=number_format($team_off_ftm/$team_off_fta,3);
-		@$team_off_avgtgm=number_format($team_off_tgm/$team_off_games,2);
-		@$team_off_avgtga=number_format($team_off_tga/$team_off_games,2);
 		@$team_off_tgp=number_format($team_off_tgm/$team_off_tga,3);
 		@$team_off_avgorb=number_format($team_off_orb/$team_off_games,2);
 		@$team_off_avgreb=number_format($team_off_reb/$team_off_games,2);
@@ -343,45 +928,9 @@ function leaguestats()
 		$lg_off_pf=$lg_off_pf+$team_off_pf;
 		$lg_off_pts=$lg_off_pts+$team_off_pts;
 
-		$offense_totals=$offense_totals."<tr>
-			<td bgcolor=\"$teamcolor1\"><a href=\"modules.php?name=Team&op=team&tid=$tid\"><font color=\"$teamcolor2\">$teamcity $team_off_name Offense</font></a></td>
-			<td>$team_off_games</td>
-			<td>$team_off_fgm</td>
-			<td>$team_off_fga</td>
-			<td>$team_off_ftm</td>
-			<td>$team_off_fta</td>
-			<td>$team_off_tgm</td>
-			<td>$team_off_tga</td>
-			<td>$team_off_orb</td>
-			<td>$team_off_reb</td>
-			<td>$team_off_ast</td>
-			<td>$team_off_stl</td>
-			<td>$team_off_tvr</td>
-			<td>$team_off_blk</td>
-			<td>$team_off_pf</td>
-			<td>$team_off_pts</td>
-		</tr>";
+		$offense_totals=$offense_totals."<tr><td bgcolor=\"$teamcolor1\"><a href=\"modules.php?name=Team&op=team&tid=$tid\"><font color=\"$teamcolor2\">$teamcity $team_off_name Offense</font></a></td><td>$team_off_games</td><td>$team_off_fgm</td><td>$team_off_fga</td><td>$team_off_ftm</td><td>$team_off_fta</td><td>$team_off_tgm</td><td>$team_off_tga</td><td>$team_off_orb</td><td>$team_off_reb</td><td>$team_off_ast</td><td>$team_off_stl</td><td>$team_off_tvr</td><td>$team_off_blk</td><td>$team_off_pf</td><td>$team_off_pts</td></tr>";
 
-		$offense_averages=$offense_averages."<tr>
-			<td bgcolor=\"$teamcolor1\"><a href=\"modules.php?name=Team&op=team&tid=$tid\"><font color=\"$teamcolor2\">$teamcity $team_off_name Offense</font></a></td>
-			<td>$team_off_avgfgm</td>
-			<td>$team_off_avgfga</td>
-			<td>$team_off_fgp</td>
-			<td>$team_off_avgftm</td>
-			<td>$team_off_avgfta</td>
-			<td>$team_off_ftp</td>
-			<td>$team_off_avgtgm</td>
-			<td>$team_off_avgtga</td>
-			<td>$team_off_tgp</td>
-			<td>$team_off_avgorb</td>
-			<td>$team_off_avgreb</td>
-			<td>$team_off_avgast</td>
-			<td>$team_off_avgstl</td>
-			<td>$team_off_avgtvr</td>
-			<td>$team_off_avgblk</td>
-			<td>$team_off_avgpf</td>
-			<td>$team_off_avgpts</td>
-		</tr>";
+		$offense_averages=$offense_averages."<tr><td bgcolor=\"$teamcolor1\"><a href=\"modules.php?name=Team&op=team&tid=$tid\"><font color=\"$teamcolor2\">$teamcity $team_off_name Offense</font></a></td><td>$team_off_fgp</td><td>$team_off_ftp</td><td>$team_off_tgp</td><td>$team_off_avgorb</td><td>$team_off_avgreb</td><td>$team_off_avgast</td><td>$team_off_avgstl</td><td>$team_off_avgtvr</td><td>$team_off_avgblk</td><td>$team_off_avgpf</td><td>$team_off_avgpts</td></tr>";
 
 		$t++;
 	}
@@ -423,14 +972,8 @@ function leaguestats()
 		$team_def_pf=mysql_result($resultTeamDefenseTotals,$t,"pf");
 		$team_def_pts=$team_def_fgm+$team_def_fgm+$team_def_ftm+$team_def_tgm;
 
-		@$team_def_avgfgm=number_format($team_def_fgm/$team_def_games,2);
-		@$team_def_avgfga=number_format($team_def_fga/$team_def_games,2);
 		@$team_def_fgp=number_format($team_def_fgm/$team_def_fga,3);
-		@$team_def_avgftm=number_format($team_def_ftm/$team_def_games,2);
-		@$team_def_avgfta=number_format($team_def_fta/$team_def_games,2);
 		@$team_def_ftp=number_format($team_def_ftm/$team_def_fta,3);
-		@$team_def_avgtgm=number_format($team_def_tgm/$team_def_games,2);
-		@$team_def_avgtga=number_format($team_def_tga/$team_def_games,2);
 		@$team_def_tgp=number_format($team_def_tgm/$team_def_tga,3);
 		@$team_def_avgorb=number_format($team_def_orb/$team_def_games,2);
 		@$team_def_avgreb=number_format($team_def_reb/$team_def_games,2);
@@ -441,57 +984,15 @@ function leaguestats()
 		@$team_def_avgpf=number_format($team_def_pf/$team_def_games,2);
 		@$team_def_avgpts=number_format($team_def_pts/$team_def_games,2);
 
-		$defense_totals=$defense_totals."<tr>
-			<td bgcolor=\"$teamcolor1\"><a href=\"modules.php?name=Team&op=team&tid=$tid\"><font color=\"$teamcolor2\">$teamcity $team_def_name Defense</font></a></td>
-			<td>$team_def_games</td>
-			<td>$team_def_fgm</td>
-			<td>$team_def_fga</td>
-			<td>$team_def_ftm</td>
-			<td>$team_def_fta</td>
-			<td>$team_def_tgm</td>
-			<td>$team_def_tga</td>
-			<td>$team_def_orb</td>
-			<td>$team_def_reb</td>
-			<td>$team_def_ast</td>
-			<td>$team_def_stl</td>
-			<td>$team_def_tvr</td>
-			<td>$team_def_blk</td>
-			<td>$team_def_pf</td>
-			<td>$team_def_pts</td>
-		</tr>";
+		$defense_totals=$defense_totals."<tr><td bgcolor=\"$teamcolor1\"><a href=\"modules.php?name=Team&op=team&tid=$tid\"><font color=\"$teamcolor2\">$teamcity $team_def_name Defense</font></a></td><td>$team_def_games</td><td>$team_def_fgm</td><td>$team_def_fga</td><td>$team_def_ftm</td><td>$team_def_fta</td><td>$team_def_tgm</td><td>$team_def_tga</td><td>$team_def_orb</td><td>$team_def_reb</td><td>$team_def_ast</td><td>$team_def_stl</td><td>$team_def_tvr</td><td>$team_def_blk</td><td>$team_def_pf</td><td>$team_def_pts</td></tr>";
 
-		$defense_averages=$defense_averages."<tr>
-			<td bgcolor=\"$teamcolor1\"><a href=\"modules.php?name=Team&op=team&tid=$tid\"><font color=\"$teamcolor2\">$teamcity $team_def_name Defense</font></a></td>
-			<td>$team_def_avgfgm</td>
-			<td>$team_def_avgfga</td>
-			<td>$team_def_fgp</td>
-			<td>$team_def_avgftm</td>
-			<td>$team_def_avgfta</td>
-			<td>$team_def_ftp</td>
-			<td>$team_def_avgtgm</td>
-			<td>$team_def_avgtga</td>
-			<td>$team_def_tgp</td>
-			<td>$team_def_avgorb</td>
-			<td>$team_def_avgreb</td>
-			<td>$team_def_avgast</td>
-			<td>$team_def_avgstl</td>
-			<td>$team_def_avgtvr</td>
-			<td>$team_def_avgblk</td>
-			<td>$team_def_avgpf</td>
-			<td>$team_def_avgpts</td>
-		</tr>";
+		$defense_averages=$defense_averages."<tr><td bgcolor=\"$teamcolor1\"><a href=\"modules.php?name=Team&op=team&tid=$tid\"><font color=\"$teamcolor2\">$teamcity $team_def_name Defense</font></a><td>$team_def_fgp</td><td>$team_def_ftp</td><td>$team_def_tgp</td><td>$team_def_avgorb</td><td>$team_def_avgreb</td><td>$team_def_avgast</td><td>$team_def_avgstl</td><td>$team_def_avgtvr</td><td>$team_def_avgblk</td><td>$team_def_avgpf</td><td>$team_def_avgpts</td></tr>";
 
 		$t++;
 	}
 
-	@$lg_off_avgfgm=number_format($lg_off_fgm/$lg_off_games,2);
-	@$lg_off_avgfga=number_format($lg_off_fga/$lg_off_games,2);
 	@$lg_off_fgp=number_format($lg_off_fgm/$lg_off_fga,3);
-	@$lg_off_avgftm=number_format($lg_off_ftm/$lg_off_games,2);
-	@$lg_off_avgfta=number_format($lg_off_fta/$lg_off_games,2);
 	@$lg_off_ftp=number_format($lg_off_ftm/$lg_off_fta,3);
-	@$lg_off_avgtgm=number_format($lg_off_tgm/$lg_off_games,2);
-	@$lg_off_avgtga=number_format($lg_off_tga/$lg_off_games,2);
 	@$lg_off_tgp=number_format($lg_off_tgm/$lg_off_tga,3);
 	@$lg_off_avgorb=number_format($lg_off_orb/$lg_off_games,2);
 	@$lg_off_avgreb=number_format($lg_off_reb/$lg_off_games,2);
@@ -502,45 +1003,9 @@ function leaguestats()
 	@$lg_off_avgpf=number_format($lg_off_pf/$lg_off_games,2);
 	@$lg_off_avgpts=number_format($lg_off_pts/$lg_off_games,2);
 
-	$league_totals="<tr style=\"font-weight:bold\">
-		<td>LEAGUE TOTALS</td>
-		<td>$lg_off_games</td>
-		<td>$lg_off_fgm</td>
-		<td>$lg_off_fga</td>
-		<td>$lg_off_ftm</td>
-		<td>$lg_off_fta</td>
-		<td>$lg_off_tgm</td>
-		<td>$lg_off_tga</td>
-		<td>$lg_off_orb</td>
-		<td>$lg_off_reb</td>
-		<td>$lg_off_ast</td>
-		<td>$lg_off_stl</td>
-		<td>$lg_off_tvr</td>
-		<td>$lg_off_blk</td>
-		<td>$lg_off_pf</td>
-		<td>$lg_off_pts</td>
-	</tr>";
+	$league_totals="<tr><td><b>LEAGUE TOTALS</td><td>$lg_off_games</td><td>$lg_off_fgm</td><td>$lg_off_fga</td><td>$lg_off_ftm</td><td>$lg_off_fta</td><td>$lg_off_tgm</td><td>$lg_off_tga</td><td>$lg_off_orb</td><td>$lg_off_reb</td><td>$lg_off_ast</td><td>$lg_off_stl</td><td>$lg_off_tvr</td><td>$lg_off_blk</td><td>$lg_off_pf</td><td>$lg_off_pts</td></tr>";
 
-	$league_averages="<tr style=\"font-weight:bold\">
-		<td>LEAGUE AVERAGES</td>
-		<td>$lg_off_avgfgm</td>
-		<td>$lg_off_avgfga</td>
-		<td>$lg_off_fgp</td>
-		<td>$lg_off_avgftm</td>
-		<td>$lg_off_avgfta</td>
-		<td>$lg_off_ftp</td>
-		<td>$lg_off_avgtgm</td>
-		<td>$lg_off_avgtga</td>
-		<td>$lg_off_tgp</td>
-		<td>$lg_off_avgorb</td>
-		<td>$lg_off_avgreb</td>
-		<td>$lg_off_avgast</td>
-		<td>$lg_off_avgstl</td>
-		<td>$lg_off_avgtvr</td>
-		<td>$lg_off_avgblk</td>
-		<td>$lg_off_avgpf</td>
-		<td>$lg_off_avgpts</td>
-	</tr>";
+	$league_averages="<tr><td>LEAGUE AVERAGES</td><td>$lg_off_fgp</td><td>$lg_off_ftp</td><td>$lg_off_tgp</td><td>$lg_off_avgorb</td><td>$lg_off_avgreb</td><td>$lg_off_avgast</td><td>$lg_off_avgstl</td><td>$lg_off_avgtvr</td><td>$lg_off_avgblk</td><td>$lg_off_avgpf</td><td>$lg_off_avgpts</td></tr>";
 
 	echo "<center>
 		<h1>League-wide Statistics</h1>
@@ -561,14 +1026,14 @@ function leaguestats()
 
 		<h2>Team Offense Averages</h2>
 		<table class=\"sortable\">
-		<thead><tr><th>Team</th><th>FGM</th><th>FGA</th><th>FGP</th><th>FTM</th><th>FTA</th><th>FTP</th><th>3GM</th><th>3GA</th><th>3GP</th><th>ORB</th><th>REB</th><th>AST</th><th>STL</th><th>TVR</th><th>BLK</th><th>PF</th><th>PTS</th></tr></thead>
+		<thead><tr><th>Team</th><th>FGP</th><th>FTP</th><th>3GP</th><th>ORB</th><th>REB</th><th>AST</th><th>STL</th><th>TVR</th><th>BLK</th><th>PF</th><th>PTS</th></tr></thead>
 		<tbody>$offense_averages</tbody>
 		<tfoot>$league_averages</tfoot>
 		</table>
 
 		<h2>Team Defense Averages</h2>
 		<table class=\"sortable\">
-		<thead><tr><th>Team</th><th>FGM</th><th>FGA</th><th>FGP</th><th>FTM</th><th>FTA</th><th>FTP</th><th>3GM</th><th>3GA</th><th>3GP</th><th>ORB</th><th>REB</th><th>AST</th><th>STL</th><th>TVR</th><th>BLK</th><th>PF</th><th>PTS</th></tr></thead>
+		<thead><tr><th>Team</th><th>FGP</th><th>FTP</th><th>3GP</th><th>ORB</th><th>REB</th><th>AST</th><th>STL</th><th>TVR</th><th>BLK</th><th>PF</th><th>PTS</th></tr></thead>
 		<tbody>$defense_averages</tbody>
 		<tfoot>$league_averages</tfoot>
 		</table>";
@@ -577,8 +1042,19 @@ function leaguestats()
 	include("footer.php");
 }
 
-function schedule($tid)
-{
+/******************************************************/
+/* END TEAM OFFENSE AND DEFENSE STATS                 */
+/******************************************************/
+
+/******************************************************/
+/* END TRADE OFFER CALL                               */
+/******************************************************/
+
+/******************************************************/
+/* BEGIN TEAM SCHEDULE PAGE FUNCTION                  */
+/******************************************************/
+
+function schedule($tid) {
 	global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
 	$tid = intval($tid);
 	include("header.php");
@@ -598,14 +1074,14 @@ function schedule($tid)
 //DISPLAY TOP MENU
 //=============================
 	displaytopmenu($tid);
-	$query="SELECT * FROM `ibl_schedule` WHERE Visitor = $tid OR Home = $tid ORDER BY Date ASC";
+	$query="SELECT * FROM `IBL_Schedule` WHERE Visitor = $tid OR Home = $tid ORDER BY Date ASC";
 	$result=mysql_query($query);
 	$num=mysql_numrows($result);
 	$year=mysql_result($result,0,"Year");
 	$year1=$year+1;
 	$wins=0;
 	$losses=0;
-	echo "<img src=\"./images/logo/$tid.jpg\">
+	echo "<img src=\"../images/logo/$tid.jpg\">
 		<table><tr><td valign=top>
 		<table width=600 border=1>
 		<tr bgcolor=$color1><td colspan=26><font color=$color2 size=\"12\"><b><center>Team Schedule</center></b></font></td></tr>
@@ -636,9 +1112,8 @@ function schedule($tid)
 	include("footer.php");
 }
 
-function boxscore ($year, $month, $tid, $wins, $losses, $wstreak, $lstreak)
-{
-	$query="SELECT * FROM `ibl_schedule` WHERE (Visitor = $tid AND Date BETWEEN '$year-$month-01' AND '$year-$month-31') OR (Home = $tid AND Date BETWEEN '$year-$month-01' AND '$year-$month-31') ORDER BY Date ASC";
+function boxscore ($year, $month, $tid, $wins, $losses, $wstreak, $lstreak) {
+	$query="SELECT * FROM `IBL_Schedule` WHERE (Visitor = $tid AND Date BETWEEN '$year-$month-01' AND '$year-$month-31') OR (Home = $tid AND Date BETWEEN '$year-$month-01' AND '$year-$month-31') ORDER BY Date ASC";
 	$result=mysql_query($query);
 	$num=mysql_numrows($result);
 	$i = 0;
@@ -684,27 +1159,29 @@ function boxscore ($year, $month, $tid, $wins, $losses, $wstreak, $lstreak)
 		}
 		(($i % 2)==0) ? $bgcolor="FFFFFF" : $bgcolor="EEEEEE";
 		if ($VScore > $HScore){
-			echo "<tr bgcolor=$bgcolor><td>$date</td><td><b><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$vname</a></b></td><td><b><font color=$winlosscolor>$VScore</font></b></td><td><a href=\"modules.php?name=Team&op=team&tid=$home\">$hname</a></td><td><b><font color=$winlosscolor>$HScore</font></b></td><td><a href=\"./ibl/IBL/box$boxid.htm\">View</a></td><td>$wins - $losses</td><td>$streak</td></tr>";
+			echo "<tr bgcolor=$bgcolor><td>$date</td><td><b>$vname</b></td><td><b><font color=$winlosscolor>$VScore</font></b></td><td>$hname</b></td><td><b><font color=$winlosscolor>$HScore</font></b></td><td><a href=\"../ibl/IBL/box$boxid.htm\">View</a></td><td>$wins - $losses</td><td>$streak</td></tr>";
 		} else if ($VScore < $HScore) {
-			echo "<tr bgcolor=$bgcolor><td>$date</td><td><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$vname</a></td><td><b><font color=$winlosscolor>$VScore</font></b></td><td><b><a href=\"modules.php?name=Team&op=team&tid=$home\">$hname</a></b></td><td><b><font color=$winlosscolor>$HScore</font></b></td><td><a href=\"./ibl/IBL/box$boxid.htm\">View</a></td><td>$wins - $losses</td><td>$streak</td></tr>";
+			echo "<tr bgcolor=$bgcolor><td>$date</td><td>$vname</b></td><td><b><font color=$winlosscolor>$VScore</font></b></td><td><b>$hname</b></td><td><b><font color=$winlosscolor>$HScore</font></b></td><td><a href=\"../ibl/IBL/box$boxid.htm\">View</a></td><td>$wins - $losses</td><td>$streak</td></tr>";
 		} else {
-			echo "<tr><td>$date</td><td><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$vname</a></td><td></td><td><a href=\"modules.php?name=Team&op=team&tid=$home\">$hname</a></td><td></td><td></td></tr>";
+			echo "<tr><td>$date</td><td>$vname</b></td><td></td><td>$hname</td><td></td><td></td></tr>";
 		}
 		$i++;
 	}
 	return array($wins,$losses,$wstreak,$lstreak);
 }
 
-function teamname ($teamid)
-{
+function teamname ($teamid) {
 	$query="SELECT * FROM nuke_ibl_team_info WHERE teamid = $teamid";
 	$result=mysql_query($query);
 	$name=mysql_result($result, 0, "team_name");
 	return $name;
 }
 
-function finances($tid)
-{
+/**********************************************************************/
+/* BEGIN FINANCIAL TRACKER                                            */
+/**********************************************************************/
+
+function finances($tid) {
 	global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
 
 	$tid = intval($tid);
@@ -740,7 +1217,7 @@ function finances($tid)
 
 	displaytopmenu($tid);
 
-	echo "<table valign=top align=center><tr><td align=center valign=top><img src=\"./images/logo/$tid.jpg\"></td></tr>
+	echo "<table valign=top align=center><tr><td align=center valign=top><img src=\"../images/logo/$tid.jpg\"></td></tr>
 		<tr bgcolor=$color1><td><font color=$color2><b><center>$team_city $team_name Finances (Cap Space)</center></b></font></td></tr>
 		<tr><td align=center><table border=1 cellpadding=0><tr>$bottom_output</tr></table></td></tr>";
 	echo $output[$yr];
@@ -750,8 +1227,11 @@ function finances($tid)
 	include("footer.php");
 }
 
-function team($tid)
-{
+/************************************************************************/
+/* BEGIN TEAM PAGE FUNCTION                                             */
+/************************************************************************/
+
+function team($tid) {
 	global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
 	$tid = intval($tid);
 
@@ -800,18 +1280,16 @@ function team($tid)
 	//GET CONTRACT AMOUNTS CORRECT
 	//=============================
 
-	$queryfaon="SELECT * FROM nuke_modules WHERE mid = '83' ORDER BY title ASC"; // THIS CHECKS IF FA IS ACTIVE AND HIDES FA PLAYERS IF IT IS
+	$queryfaon="SELECT * FROM nuke_modules WHERE mid = '83' ORDER BY title ASC";
 	$resultfaon=mysql_query($queryfaon);
 	$numfaon=mysql_numrows($resultfaon);
 	$faon=mysql_result($resultfaon,0,"active");
 
 	if ($tid == 0) { // Team 0 is the Free Agents; we want a query that will pick up all of their players.
 		if ($faon==0) {
-			$query="SELECT * FROM nuke_iblplyr WHERE ordinal > '959' AND retired = 0 ORDER BY ordinal ASC";
-//			$query="SELECT * FROM nuke_iblplyr WHERE tid = 0 AND retired = 0 AND in_euro = '0' ORDER BY ordinal ASC";
+			$query="SELECT * FROM nuke_iblplyr WHERE ordinal > '959' AND retired = 0 AND in_euro = '0' ORDER BY ordinal ASC";
 		} else {
-			$query="SELECT * FROM nuke_iblplyr WHERE ordinal > '959' AND retired = 0 AND cyt != cy ORDER BY ordinal ASC";
-//			$query="SELECT * FROM nuke_iblplyr WHERE tid = 0 AND retired = 0 AND cyt != cy AND in_euro = '0' ORDER BY ordinal ASC";
+			$query="SELECT * FROM nuke_iblplyr WHERE ordinal > '959' AND retired = 0 AND cyt != cy AND in_euro = '0' ORDER BY ordinal ASC";
 		}
 		$result=mysql_query($query);
 		$num=mysql_numrows($result);
@@ -831,7 +1309,7 @@ function team($tid)
 		$num=mysql_numrows($result);
 	}
 
-	echo "<table><tr><td align=center valign=top><img src=\"./images/logo/$tid.jpg\">";
+	echo "<table><tr><td align=center valign=top><img src=\"../images/logo/$tid.jpg\">";
 
 	/* =================== INSERT STARTERS =========== */
 
@@ -877,11 +1355,11 @@ function team($tid)
 	}
 	if ($tid != 0 AND $yr == "") {
 		$starters_table="<table align=\"center\" border=1 cellpadding=1 cellspacing=1><tr bgcolor=$color1><td colspan=5><font color=$color2><center><b>Last Sim's Starters</b></center></font></td></tr>
-			<tr><td><center><b>PG</b><br><img src=\"./images/player/$startingPGpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingPGpid\">$startingPG</a></td>
-			<td><center><b>SG</b><br><img src=\"./images/player/$startingSGpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingSGpid\">$startingSG</a></td>
-			<td><center><b>SF</b><br><img src=\"./images/player/$startingSFpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingSFpid\">$startingSF</a></td>
-			<td><center><b>PF</b><br><img src=\"./images/player/$startingPFpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingPFpid\">$startingPF</a></td>
-			<td><center><b>C</b><br><img src=\"./images/player/$startingCpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingCpid\">$startingC</a></td></tr></table>";
+			<tr><td><center><b>PG</b><br><img src=\"../images/player/$startingPGpid.jpg\"><br><a href=\"../modules.php?name=Player&pa=showpage&pid=$startingPGpid\">$startingPG</a></td>
+			<td><center><b>SG</b><br><img src=\"../images/player/$startingSGpid.jpg\"><br><a href=\"../modules.php?name=Player&pa=showpage&pid=$startingSGpid\">$startingSG</a></td>
+			<td><center><b>SF</b><br><img src=\"../images/player/$startingSFpid.jpg\"><br><a href=\"../modules.php?name=Player&pa=showpage&pid=$startingSFpid\">$startingSF</a></td>
+			<td><center><b>PF</b><br><img src=\"../images/player/$startingPFpid.jpg\"><br><a href=\"../modules.php?name=Player&pa=showpage&pid=$startingPFpid\">$startingPF</a></td>
+			<td><center><b>C</b><br><img src=\"../images/player/$startingCpid.jpg\"><br><a href=\"../modules.php?name=Player&pa=showpage&pid=$startingCpid\">$startingC</a></td></tr></table>";
 	}
 
 	// END OF INSERTION OF STARTERS
@@ -975,16 +1453,14 @@ function team($tid)
 		(($i % 2)==0) ? $bgcolor="FFFFFF" : $bgcolor="EEEEEE";
 
 		if ($tid == 0) {
-			$table_ratings=$table_ratings."<tr bgcolor=$bgcolor><td>$pos</td><td><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td>$age</td><td>$r_sta</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$r_foul</td><td>$inj</td></tr>";
+			$table_ratings=$table_ratings."<tr bgcolor=$bgcolor><td>$pos</td><td><a href=\"../modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td>$age</td><td>$r_sta</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$r_foul</td><td>$inj</td></tr>";
 		} else {
 			if ($p_ord > 959) {
-				$table_ratings=$table_ratings."<tr bgcolor=$bgcolor><td>$pos</td><td>(<a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name)*</a></td><td>$age</td><td>$r_sta</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$r_foul</td><td>$inj</td></tr>";
-			} else if ($r_bird == 0) {
-				$table_ratings=$table_ratings."<tr bgcolor=$bgcolor><td>$pos</td><td><i><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</i></a></td><td>$age</td><td>$r_sta</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$r_foul</td><td>$inj</td></tr>";
-			} else if ($cy == $cyt) {
-				$table_ratings=$table_ratings."<tr bgcolor=$bgcolor><td>$pos</td><td><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a>^</td><td>$age</td><td>$r_sta</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$r_foul</td><td>$inj</td></tr>";
-			} else {
-				$table_ratings=$table_ratings."<tr bgcolor=$bgcolor><td>$pos</td><td><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td>$age</td><td>$r_sta</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$r_foul</td><td>$inj</td></tr>";
+				$table_ratings=$table_ratings."<tr bgcolor=$bgcolor><td>$pos</td><td>(<a href=\"../modules.php?name=Player&pa=showpage&pid=$pid\">$name)*</a></td><td>$age</td><td>$r_sta</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$r_foul</td><td>$inj</td></tr>";
+			} elseif ($r_bird == 0) {
+				$table_ratings=$table_ratings."<tr bgcolor=$bgcolor><td>$pos</td><td><i><a href=\"../modules.php?name=Player&pa=showpage&pid=$pid\">$name</i></a></td><td>$age</td><td>$r_sta</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$r_foul</td><td>$inj</td></tr>";
+			} else if ($fayr == "" OR $yearoffreeagency == $fayr) {
+					$table_ratings=$table_ratings."<tr bgcolor=$bgcolor><td>$pos</td><td><a href=\"../modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td>$age</td><td>$r_sta</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$r_foul</td><td>$inj</td></tr>";
 			}
 		}
 	$i++;
@@ -995,7 +1471,7 @@ function team($tid)
 	if ($tid != 0) {
 		$table_totals=$table_totals."
 			<table align=\"center\" class=\"sortable\">
-			<thead><tr bgcolor=$color1><th><font color=$color2>Pos</font></th><th colspan=3><font color=$color2>Player</font></th><th><font color=$color2>g</font></th><th><font color=$color2>gs</font></th><th><font color=$color2>min</font></th><th><font color=$color2>fgm</font></th><th><font color=$color2>fga</font></th><th><font color=$color2>ftm</font></th><th><font color=$color2>fta</font></th><th><font color=$color2>3gm</font></th><th><font color=$color2>3ga</font></th><th><font color=$color2>orb</font></th><th><font color=$color2>reb</font></th><th><font color=$color2>ast</font></th><th><font color=$color2>stl</font></th><th><font color=$color2>to</font></th><th><font color=$color2>blk</font></th><th><font color=$color2>pf</font></th><th><font color=$color2>pts</font></th></tr></thead><tbody>";
+			<thead><tr bgcolor=$color1><th><font color=$color2>Pos</font></th><td colspan=3><font color=$color2>Player</font></th><th><font color=$color2>g</font></th><th><font color=$color2>gs</font></th><th><font color=$color2>min</font></th><th><font color=$color2>fgm</font></th><th><font color=$color2>fga</font></th><th><font color=$color2>ftm</font></th><th><font color=$color2>fta</font></th><th><font color=$color2>3gm</font></th><th><font color=$color2>3ga</font></th><th><font color=$color2>orb</font></th><th><font color=$color2>reb</font></th><th><font color=$color2>ast</font></th><th><font color=$color2>stl</font></th><th><font color=$color2>to</font></th><th><font color=$color2>blk</font></th><th><font color=$color2>pf</font></th><th><font color=$color2>pts</font></th></tr></thead><tbody>";
 
 		$i=0;
 
@@ -1055,14 +1531,13 @@ function team($tid)
 			(($i % 2)==0) ? $bgcolor="FFFFFF" : $bgcolor="EEEEEE";
 
 			if ($tid == 0) {
-				$table_totals=$table_totals."<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td><center>$stats_gm</center></td><td><center>$stats_gs</center></td><td><center>$stats_min</center></td><td><center>$stats_fgm</center></td><td><center>$stats_fga</center></td><td><center>$stats_ftm</center></td><td><center>$stats_fta</center></td><td><center>$stats_tgm</center></td><td><center>$stats_tga</center></td><td><center>$stats_orb</center></td><td><center>$stats_reb</center></td><td><center>$stats_ast</center></td><td><center>$stats_stl</center></td><td><center>$stats_to</center></td><td><center>$stats_blk</center></td><td><center>$stats_pf</center></td><td><center>$stats_pts</center></td></tr>";
+				$table_totals=$table_totals."<tr bgcolor=$bgcolor><td><center>$pos</center></td><td colspan=3><a href=\"../modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td><center>$stats_gm</center></td><td><center>$stats_gs</center></td><td><center>$stats_min</center></td><td><center>$stats_fgm</center></td><td><center>$stats_fga</center></td><td><center>$stats_ftm</center></td><td><center>$stats_fta</center></td><td><center>$stats_tgm</center></td><td><center>$stats_tga</center></td><td><center>$stats_orb</center></td><td><center>$stats_reb</center></td><td><center>$stats_ast</center></td><td><center>$stats_stl</center></td><td><center>$stats_to</center></td><td><center>$stats_blk</center></td><td><center>$stats_pf</center></td><td><center>$stats_pts</center></td></tr>";
 			} else {
 				if ($p_ord > 959) {
-					$table_totals=$table_totals."<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">($name)*</a></td><td><center>$stats_gm</center></td><td><center>$stats_gs</center></td><td><center>$stats_min</center></td><td><center>$stats_fgm</center></td><td><center>$stats_fga</center></td><td><center>$stats_ftm</center></td><td><center>$stats_fta</center></td><td><center>$stats_tgm</center></td><td><center>$stats_tga</center></td><td><center>$stats_orb</center></td><td><center>$stats_reb</center></td><td><center>$stats_ast</center></td><td><center>$stats_stl</center></td><td><center>$stats_to</center></td><td><center>$stats_blk</center></td><td><center>$stats_pf</center></td><td><center>$stats_pts</center></td></tr>";
-				} else if ($fayr == "" OR $yearoffreeagency == $fayr) {
-					$table_totals=$table_totals."<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td><center>$stats_gm</center></td><td><center>$stats_gs</center></td><td><center>$stats_min</center></td><td><center>$stats_fgm</center></td><td><center>$stats_fga</center></td><td><center>$stats_ftm</center></td><td><center>$stats_fta</center></td><td><center>$stats_tgm</center></td><td><center>$stats_tga</center></td><td><center>$stats_orb</center></td><td><center>$stats_reb</center></td><td><center>$stats_ast</center></td><td><center>$stats_stl</center></td><td><center>$stats_to</center></td><td><center>$stats_blk</center></td><td><center>$stats_pf</center></td><td><center>$stats_pts</center></td></tr>";
-				} else if ($cy == $cyt) {
-					$table_totals=$table_totals."<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name^</a></td><td><center>$stats_gm</center></td><td><center>$stats_gs</center></td><td><center>$stats_min</center></td><td><center>$stats_fgm</center></td><td><center>$stats_fga</center></td><td><center>$stats_ftm</center></td><td><center>$stats_fta</center></td><td><center>$stats_tgm</center></td><td><center>$stats_tga</center></td><td><center>$stats_orb</center></td><td><center>$stats_reb</center></td><td><center>$stats_ast</center></td><td><center>$stats_stl</center></td><td><center>$stats_to</center></td><td><center>$stats_blk</center></td><td><center>$stats_pf</center></td><td><center>$stats_pts</center></td></tr>";
+					$table_totals=$table_totals."<tr bgcolor=$bgcolor><td><center>$pos</center></td><td colspan=3><a href=\"../modules.php?name=Player&pa=showpage&pid=$pid\">($name)*</a></td><td><center>$stats_gm</center></td><td><center>$stats_gs</center></td><td><center>$stats_min</center></td><td><center>$stats_fgm</center></td><td><center>$stats_fga</center></td><td><center>$stats_ftm</center></td><td><center>$stats_fta</center></td><td><center>$stats_tgm</center></td><td><center>$stats_tga</center></td><td><center>$stats_orb</center></td><td><center>$stats_reb</center></td><td><center>$stats_ast</center></td><td><center>$stats_stl</center></td><td><center>$stats_to</center></td><td><center>$stats_blk</center></td><td><center>$stats_pf</center></td><td><center>$stats_pts</center></td></tr>";
+				} else
+				if ($fayr == "" OR $yearoffreeagency == $fayr) {
+					$table_totals=$table_totals."<tr bgcolor=$bgcolor><td><center>$pos</center></td><td colspan=3><a href=\"../modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td><center>$stats_gm</center></td><td><center>$stats_gs</center></td><td><center>$stats_min</center></td><td><center>$stats_fgm</center></td><td><center>$stats_fga</center></td><td><center>$stats_ftm</center></td><td><center>$stats_fta</center></td><td><center>$stats_tgm</center></td><td><center>$stats_tga</center></td><td><center>$stats_orb</center></td><td><center>$stats_reb</center></td><td><center>$stats_ast</center></td><td><center>$stats_stl</center></td><td><center>$stats_to</center></td><td><center>$stats_blk</center></td><td><center>$stats_pf</center></td><td><center>$stats_pts</center></td></tr>";
 				}
 			}
 		$i++;
@@ -1072,7 +1547,7 @@ function team($tid)
 
 		// ==== INSERT TEAM OFFENSE AND DEFENSE TOTALS ====
 
-		$queryTeamOffenseTotals="SELECT * FROM ibl_team_offense_stats WHERE team = '$team_name' AND year = '1989'";
+		$queryTeamOffenseTotals="SELECT * FROM ibl_team_offense_stats WHERE team = '$team_name' AND year = '0'";
 		$resultTeamOffenseTotals=mysql_query($queryTeamOffenseTotals);
 		$numTeamOffenseTotals=mysql_numrows($resultTeamOffenseTotals);
 
@@ -1102,7 +1577,7 @@ function team($tid)
 		$t++;
 		}
 
-		$queryTeamDefenseTotals="SELECT * FROM ibl_team_defense_stats WHERE team = '$team_name' AND year = '1989'";
+		$queryTeamDefenseTotals="SELECT * FROM ibl_team_defense_stats WHERE team = '$team_name' AND year = '0'";
 		$resultTeamDefenseTotals=mysql_query($queryTeamDefenseTotals);
 		$numTeamDefenseTotals=mysql_numrows($resultTeamDefenseTotals);
 
@@ -1133,33 +1608,7 @@ function team($tid)
 		$table_totals=$table_totals."</tfoot></table>";
 
 		$table_averages=$table_averages."<table align=\"center\" class=\"sortable\">
-			<thead>
-				<tr bgcolor=$color1>
-					<th><font color=$color2>Pos</font></th>
-					<th colspan=3><font color=$color2>Player</font></th>
-					<th><font color=$color2>g</font></th>
-					<th><font color=$color2>gs</font></th>
-					<th><font color=$color2>min</font></th>
-					<th><font color=$color2>fgm</font></th>
-					<th><font color=$color2>fga</font></th>
-					<th><font color=$color2>fgp</font></th>
-					<th><font color=$color2>ftm</font></th>
-					<th><font color=$color2>fta</font></th>
-					<th><font color=$color2>ftp</font></th>
-					<th><font color=$color2>3gm</font></th>
-					<th><font color=$color2>3ga</font></th>
-					<th><font color=$color2>3gp</font></th>
-					<th><font color=$color2>orb</font></th>
-					<th><font color=$color2>reb</font></th>
-					<th><font color=$color2>ast</font></th>
-					<th><font color=$color2>stl</font></th>
-					<th><font color=$color2>to</font></th>
-					<th><font color=$color2>blk</font></th>
-					<th><font color=$color2>pf</font></th>
-					<th><font color=$color2>pts</font></th>
-				</tr>
-			</thead>
-		<tbody>";
+			<thead><tr bgcolor=$color1><th><font color=$color2>Pos</font></th><td colspan=3><font color=$color2>Player</font></th><th><font color=$color2>g</font></th><th><font color=$color2>gs</font></th><th><font color=$color2>min</font></th><th><font color=$color2>fgp</font></th><th><font color=$color2>ftp</font></th><th><font color=$color2>3gp</font></th><th><font color=$color2>orb</font></th><th><font color=$color2>reb</font></th><th><font color=$color2>ast</font></th><th><font color=$color2>stl</font></th><th><font color=$color2>to</font></th><th><font color=$color2>blk</font></th><th><font color=$color2>pf</font></th><th><font color=$color2>pts</font></th></th></tr></thead><tbody>";
 
 		/* =======================AVERAGES */
 
@@ -1248,14 +1697,8 @@ function team($tid)
 				$stats_reb=mysql_result($result,$i,"reb");
 				$stats_pts=2*$stats_fgm+$stats_ftm+$stats_tgm;
 			}
-			@$stats_fgm=number_format(($stats_fgm/$stats_gm),1);
-			@$stats_fga=number_format(($stats_fga/$stats_gm),1);
 			@$stats_fgp=number_format(($stats_fgm/$stats_fga),3);
-			@$stats_ftm=number_format(($stats_ftm/$stats_gm),1);
-			@$stats_fta=number_format(($stats_fta/$stats_gm),1);
 			@$stats_ftp=number_format(($stats_ftm/$stats_fta),3);
-			@$stats_tgm=number_format(($stats_tgm/$stats_gm),1);
-			@$stats_tga=number_format(($stats_tga/$stats_gm),1);
 			@$stats_tgp=number_format(($stats_tgm/$stats_tga),3);
 			@$stats_mpg=number_format(($stats_min/$stats_gm),1);
 			@$stats_opg=number_format(($stats_orb/$stats_gm),1);
@@ -1271,24 +1714,12 @@ function team($tid)
 
 			if ($tid == 0) {
 				$table_averages=$table_averages."<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>";
-				$table_averages=$table_averages."<td><center>$stats_gm</center></td><td><center>$stats_gs</center></td><td><center>";
+				$table_averages=$table_averages."<td><center>$stats_gm</center></td><td>$stats_gs</td><td><center>";
 				$table_averages=$table_averages.$stats_mpg;
-				$table_averages=$table_averages."</center></td><td><center>";
-				$table_averages=$table_averages.$stats_fgm;
-				$table_averages=$table_averages."</center></td><td><center>";
-				$table_averages=$table_averages.$stats_fga;
 				$table_averages=$table_averages."</center></td><td><center>";
 				$table_averages=$table_averages.$stats_fgp;
 				$table_averages=$table_averages."</center></td><td><center>";
-				$table_averages=$table_averages.$stats_ftm;
-				$table_averages=$table_averages."</center></td><td><center>";
-				$table_averages=$table_averages.$stats_fta;
-				$table_averages=$table_averages."</center></td><td><center>";
 				$table_averages=$table_averages.$stats_ftp;
-				$table_averages=$table_averages."</center></td><td><center>";
-				$table_averages=$table_averages.$stats_tgm;
-				$table_averages=$table_averages."</center></td><td><center>";
-				$table_averages=$table_averages.$stats_tga;
 				$table_averages=$table_averages."</center></td><td><center>";
 				$table_averages=$table_averages.$stats_tgp;
 				$table_averages=$table_averages."</center></td><td><center>";
@@ -1307,61 +1738,16 @@ function team($tid)
 				$table_averages=$table_averages.$stats_fpg;
 				$table_averages=$table_averages."</center></td><td><center>";
 				$table_averages=$table_averages.$stats_ppg;
-				$table_averages=$table_averages."</center></td>";
-				// $table_averages=$table_averages."<td>$stats_PER</td><td>$stats_Magic_Metric</td><td>$stats_Game_Score</td>"; // NOT IMPLEMENTED AT ALL
-				$table_averages=$table_averages."</tr>";
+				$table_averages=$table_averages."</center></td><td>$stats_PER</td><td>$stats_Magic_Metric</td><td>$stats_Game_Score</td></tr>";
 			} else {
 				if ($p_ord > 959) {
 					$table_averages=$table_averages."<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">($name)*</a></td>";
-					$table_averages=$table_averages."<td><center>$stats_gm</center></td><td><center>$stats_gs</center></td><td><center>";
+					$table_averages=$table_averages."<td><center>$stats_gm</center></td><td>$stats_gs</td><td><center>";
 					$table_averages=$table_averages.$stats_mpg;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_fgm;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_fga;
 					$table_averages=$table_averages."</center></td><td><center>";
 					$table_averages=$table_averages.$stats_fgp;
 					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_ftm;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_fta;
-					$table_averages=$table_averages."</center></td><td><center>";
 					$table_averages=$table_averages.$stats_ftp;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_tgm;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_tga;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_tgp;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_bpg;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_fpg;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_ppg;
-					$table_averages=$table_averages."</center></td>";
-					// $table_averages=$table_averages."<td>$stats_PER</td><td>$stats_Magic_Metric</td><td>$stats_Game_Score</td>"; // NOT IMPLEMENTED AT ALL
-					$table_averages=$table_averages."</tr>";
-				} else if ($fayr == "" OR $yearoffreeagency == $fayr) {
-					$table_averages=$table_averages."<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>";
-					$table_averages=$table_averages."<td><center>$stats_gm</center></td><td><center>$stats_gs</center></td><td><center>";
-					$table_averages=$table_averages.$stats_mpg;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_fgm;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_fga;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_fgp;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_ftm;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_fta;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_ftp;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_tgm;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_tga;
 					$table_averages=$table_averages."</center></td><td><center>";
 					$table_averages=$table_averages.$stats_tgp;
 					$table_averages=$table_averages."</center></td><td><center>";
@@ -1380,9 +1766,34 @@ function team($tid)
 					$table_averages=$table_averages.$stats_fpg;
 					$table_averages=$table_averages."</center></td><td><center>";
 					$table_averages=$table_averages.$stats_ppg;
-					$table_averages=$table_averages."</center></td>";
-					// $table_averages=$table_averages."<td>$stats_PER</td><td>$stats_Magic_Metric</td><td>$stats_Game_Score</td>"; // NOT IMPLEMENTED AT ALL
-					$table_averages=$table_averages."</tr>";
+					$table_averages=$table_averages."</center></td><td>$stats_PER</td><td>$stats_Magic_Metric</td><td>$stats_Game_Score</td></tr>";
+				} else if ($fayr == "" OR $yearoffreeagency == $fayr) {
+					$table_averages=$table_averages."<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>";
+					$table_averages=$table_averages."<td><center>$stats_gm</center></td><td>$stats_gs</td><td><center>";
+					$table_averages=$table_averages.$stats_mpg;
+					$table_averages=$table_averages."</center></td><td><center>";
+					$table_averages=$table_averages.$stats_fgp;
+					$table_averages=$table_averages."</center></td><td><center>";
+					$table_averages=$table_averages.$stats_ftp;
+					$table_averages=$table_averages."</center></td><td><center>";
+					$table_averages=$table_averages.$stats_tgp;
+					$table_averages=$table_averages."</center></td><td><center>";
+					$table_averages=$table_averages.$stats_opg;
+					$table_averages=$table_averages."</center></td><td><center>";
+					$table_averages=$table_averages.$stats_rpg;
+					$table_averages=$table_averages."</center></td><td><center>";
+					$table_averages=$table_averages.$stats_apg;
+					$table_averages=$table_averages."</center></td><td><center>";
+					$table_averages=$table_averages.$stats_spg;
+					$table_averages=$table_averages."</center></td><td><center>";
+					$table_averages=$table_averages.$stats_tpg;
+					$table_averages=$table_averages."</center></td><td><center>";
+					$table_averages=$table_averages.$stats_bpg;
+					$table_averages=$table_averages."</center></td><td><center>";
+					$table_averages=$table_averages.$stats_fpg;
+					$table_averages=$table_averages."</center></td><td><center>";
+					$table_averages=$table_averages.$stats_ppg;
+					$table_averages=$table_averages."</center></td><td>$stats_PER</td><td>$stats_Magic_Metric</td><td>$stats_Game_Score</td></tr>";
 				}
 			}
 			$i++;
@@ -1392,7 +1803,7 @@ function team($tid)
 
 		$table_averages=$table_averages."</tbody><tfoot>";
 
-		$queryTeamOffenseTotals="SELECT * FROM ibl_team_offense_stats WHERE team = '$team_name' AND year = '1989'";
+		$queryTeamOffenseTotals="SELECT * FROM ibl_team_offense_stats WHERE team = '$team_name' AND year = '0'";
 		$resultTeamOffenseTotals=mysql_query($queryTeamOffenseTotals);
 		$numTeamOffenseTotals=mysql_numrows($resultTeamOffenseTotals);
 
@@ -1419,12 +1830,6 @@ function team($tid)
 			$team_off_pf=mysql_result($resultTeamOffenseTotals,$t,"pf");
 			$team_off_pts=$team_off_fgm+$team_off_fgm+$team_off_ftm+$team_off_tgm;
 
-			@$team_off_avgfgm=number_format(($team_off_fgm/$team_off_games),1);
-			@$team_off_avgfga=number_format(($team_off_fga/$team_off_games),1);
-			@$team_off_avgftm=number_format(($team_off_ftm/$team_off_games),1);
-			@$team_off_avgfta=number_format(($team_off_fta/$team_off_games),1);
-			@$team_off_avgtgm=number_format(($team_off_tgm/$team_off_games),1);
-			@$team_off_avgtga=number_format(($team_off_tga/$team_off_games),1);
 			@$team_off_avgmin=number_format(($team_off_minutes/$team_off_games),1);
 			@$team_off_avgorb=number_format(($team_off_orb/$team_off_games),1);
 			@$team_off_avgreb=number_format(($team_off_reb/$team_off_games),1);
@@ -1439,21 +1844,9 @@ function team($tid)
 				$table_averages=$table_averages."<tr><td colspan=4><b>$team_name Offense</td><td><b><center>$team_off_games</center></td><td><b>$team_off_games</td><td><center><b>";
 				$table_averages=$table_averages.$team_off_avgmin;
 				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_off_avgfgm;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_off_avgfga;
-				$table_averages=$table_averages."</center></td><td><center><b>";
 				$table_averages=$table_averages.$team_off_fgp;
 				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_off_avgftm;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_off_avgfta;
-				$table_averages=$table_averages."</center></td><td><center><b>";
 				$table_averages=$table_averages.$team_off_ftp;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_off_avgtgm;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_off_avgtga;
 				$table_averages=$table_averages."</center></td><td><center><b>";
 				$table_averages=$table_averages.$team_off_tgp;
 				$table_averages=$table_averages."</center></td><td><center><b>";
@@ -1477,7 +1870,7 @@ function team($tid)
 			$t++;
 		}
 
-		$queryTeamDefenseTotals="SELECT * FROM ibl_team_defense_stats WHERE team = '$team_name' AND year = '1989'";
+		$queryTeamDefenseTotals="SELECT * FROM ibl_team_defense_stats WHERE team = '$team_name' AND year = '0'";
 		$resultTeamDefenseTotals=mysql_query($queryTeamDefenseTotals);
 		$numTeamDefenseTotals=mysql_numrows($resultTeamDefenseTotals);
 
@@ -1504,12 +1897,6 @@ function team($tid)
 			$team_def_pf=mysql_result($resultTeamDefenseTotals,$t,"pf");
 			$team_def_pts=$team_def_fgm+$team_def_fgm+$team_def_ftm+$team_def_tgm;
 
-			@$team_def_avgfgm=number_format(($team_def_fgm/$team_def_games),1);
-			@$team_def_avgfga=number_format(($team_def_fga/$team_def_games),1);
-			@$team_def_avgftm=number_format(($team_def_ftm/$team_def_games),1);
-			@$team_def_avgfta=number_format(($team_def_fta/$team_def_games),1);
-			@$team_def_avgtgm=number_format(($team_def_tgm/$team_def_games),1);
-			@$team_def_avgtga=number_format(($team_def_tga/$team_def_games),1);
 			@$team_def_avgmin=number_format(($team_def_minutes/$team_def_games),1);
 			@$team_def_avgorb=number_format(($team_def_orb/$team_def_games),1);
 			@$team_def_avgreb=number_format(($team_def_reb/$team_def_games),1);
@@ -1524,21 +1911,9 @@ function team($tid)
 				$table_averages=$table_averages."<tr><td colspan=4><b>$team_name Defense</td><td><center><b>$team_def_games</center></td><td><b>$team_def_games</td><td><center><b>";
 				$table_averages=$table_averages.$team_def_avgmin;
 				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_def_avgfgm;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_def_avgfga;
-				$table_averages=$table_averages."</center></td><td><center><b>";
 				$table_averages=$table_averages.$team_def_fgp;
 				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_def_avgftm;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_def_avgfta;
-				$table_averages=$table_averages."</center></td><td><center><b>";
 				$table_averages=$table_averages.$team_def_ftp;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_def_avgtgm;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_def_avgtga;
 				$table_averages=$table_averages."</center></td><td><center><b>";
 				$table_averages=$table_averages.$team_def_tgp;
 				$table_averages=$table_averages."</center></td><td><center><b>";
@@ -1567,148 +1942,99 @@ function team($tid)
 		$table_averages=$table_averages."</tfoot></table>";
 
 		if ($yr == "") {
-			$table_simAverages=$table_simAverages."<table align=\"center\" class=\"sortable\"><thead>";
+			$table_chunk=$table_chunk."<table align=\"center\" class=\"sortable\"><thead>";
 
 			/* ======================CHUNK STATS */
 
-			$table_simAverages=$table_simAverages."<tr bgcolor=$color1><th><font color=$color2>Pos</font></th><th colspan=3><font color=$color2>Player</font></th><th><font color=$color2>g</font></th><th><font color=$color2>min</font></th><th><font color=$color2>fgm</font></th><th><font color=$color2>fga</font></th><th><font color=$color2>fgp</font></th><th><font color=$color2>ftm</font></th><th><font color=$color2>fta</font></th><th><font color=$color2>ftp</font></th><th><font color=$color2>3gm</font></th><th><font color=$color2>3ga</font></th><th><font color=$color2>3gp</font></th><th><font color=$color2>orb</font></th><th><font color=$color2>reb</font></th><th><font color=$color2>ast</font></th><th><font color=$color2>stl</font></th><th><font color=$color2>to</font></th><th><font color=$color2>blk</font></th><th><font color=$color2>pf</font></th><th><font color=$color2>pts</font></th></tr></thead><tbody>";
+			$current_ibl_season=mysql_result(mysql_query("SELECT * FROM nuke_ibl_settings WHERE name = 'Current IBL Season' "),0,"value");
 
-			$arrayLastSimDates = getLastSimDatesArray();
-			
-			$simStartDate = $arrayLastSimDates['Start Date'];
-			$simEndDate = $arrayLastSimDates['End Date'];
+			$max_chunk_query="SELECT MAX(chunk) as maxchunk FROM nuke_iblplyr_chunk WHERE active = 1 AND Season = '$current_ibl_season' ";
+			$max_chunk_result=mysql_query($max_chunk_query);
+			$row = mysql_fetch_assoc($max_chunk_result);
 
-			$playersOnTeam = mysql_query("SELECT pid
-		        FROM nuke_iblplyr
-		        WHERE tid = $tid
-		        ORDER BY name ASC");
-			$numberOfPlayersOnTeam = mysql_num_rows($playersOnTeam);
+			$table_chunk=$table_chunk."<tr bgcolor=$color1><th><font color=$color2>Pos</font></th><td colspan=3><font color=$color2>Player</font></th><th><font color=$color2>g</font></th><th><font color=$color2>gs</font></th><th><font color=$color2>min</font></th><th><font color=$color2>fgp</font></th><th><font color=$color2>ftp</font></th><th><font color=$color2>3gp</font></th><th><font color=$color2>orb</font></th><th><font color=$color2>reb</font></th><th><font color=$color2>ast</font></th><th><font color=$color2>stl</font></th><th><font color=$color2>to</font></th><th><font color=$color2>blk</font></th><th><font color=$color2>pf</font></th><th><font color=$color2>pts</font></th></tr></thead><tbody>";
 
-			$i = 0;
-			while ($i < $numberOfPlayersOnTeam) {
-				$pid = mysql_result($playersOnTeam, $i);
+			$query_chunk="SELECT * FROM nuke_iblplyr_chunk WHERE chunk = $row[maxchunk] AND tid = $tid AND Season = '$current_ibl_season' ORDER BY ordinal ASC";
+			$result_chunk=mysql_query($query_chunk);
+			$num_chunk=mysql_numrows($result_chunk);
 
-				// TODO: refactor this so that I'm not cutting and pasting the Player module's Sim Stats code
-				$resultPlayerSimBoxScores = $db->sql_query("SELECT *
-		            FROM ibl_box_scores
-		            WHERE pid = $pid
-		            AND Date BETWEEN '$simStartDate' AND '$simEndDate'
-		            ORDER BY Date ASC");
+			$i=0;
 
-		        $numberOfGamesPlayedInSim = mysql_num_rows($resultPlayerSimBoxScores);
-				$simTotalMIN = 0;
-				$simTotal2GM = 0;
-				$simTotal2GA = 0;
-				$simTotalFTM = 0;
-				$simTotalFTA = 0;
-				$simTotal3GM = 0;
-				$simTotal3GA = 0;
-				$simTotalORB = 0;
-				$simTotalDRB = 0;
-				$simTotalAST = 0;
-				$simTotalSTL = 0;
-				$simTotalTOV = 0;
-				$simTotalBLK = 0;
-				$simTotalPF = 0;
-				$simTotalPTS = 0;
+			while ($i < $num_chunk) {
+				$name=mysql_result($result_chunk,$i,"name");
+				$pos=mysql_result($result_chunk,$i,"altpos");
+				$pid=mysql_result($result_chunk,$i,"pid");
 
-				if ($numberOfGamesPlayedInSim > 0) {
-			        while ($row = mysql_fetch_assoc($resultPlayerSimBoxScores)) {
-						$name = $row['name'];
-						$pos = $row['pos'];
+				$stats_gm=mysql_result($result_chunk,$i,"stats_gm");
+				$stats_gs=mysql_result($result_chunk,$i,"stats_gs");
+				$stats_min=mysql_result($result_chunk,$i,"stats_min");
+				$stats_fgm=mysql_result($result_chunk,$i,"stats_fgm");
+				$stats_fga=mysql_result($result_chunk,$i,"stats_fga");
+				@$stats_fgp=number_format(($stats_fgm/$stats_fga),3);
+				$stats_ftm=mysql_result($result_chunk,$i,"stats_ftm");
+				$stats_fta=mysql_result($result_chunk,$i,"stats_fta");
+				@$stats_ftp=number_format(($stats_ftm/$stats_fta),3);
+				$stats_tgm=mysql_result($result_chunk,$i,"stats_3gm");
+				$stats_tga=mysql_result($result_chunk,$i,"stats_3ga");
+				@$stats_tgp=number_format(($stats_tgm/$stats_tga),3);
+				$stats_orb=mysql_result($result_chunk,$i,"stats_orb");
+				$stats_drb=mysql_result($result_chunk,$i,"stats_drb");
+				$stats_ast=mysql_result($result_chunk,$i,"stats_ast");
+				$stats_stl=mysql_result($result_chunk,$i,"stats_stl");
+				$stats_to=mysql_result($result_chunk,$i,"stats_to");
+				$stats_blk=mysql_result($result_chunk,$i,"stats_blk");
+				$stats_pf=mysql_result($result_chunk,$i,"stats_pf");
+				$stats_reb=$stats_orb+$stats_drb;
+				$stats_pts=2*$stats_fgm+$stats_ftm+$stats_tgm;
 
-			            $simTotalMIN += $row['gameMIN'];
-			            $simTotal2GM += $row['game2GM'];
-			            $simTotal2GA += $row['game2GA'];
-			            $simTotalFTM += $row['gameFTM'];
-			            $simTotalFTA += $row['gameFTA'];
-			            $simTotal3GM += $row['game3GM'];
-			            $simTotal3GA += $row['game3GA'];
-			            $simTotalORB += $row['gameORB'];
-			            $simTotalDRB += $row['gameDRB'];
-			            $simTotalAST += $row['gameAST'];
-			            $simTotalSTL += $row['gameSTL'];
-			            $simTotalTOV += $row['gameTOV'];
-			            $simTotalBLK += $row['gameBLK'];
-			            $simTotalPF += $row['gamePF'];
-			            $simTotalPTS += (2 * $row['game2GM']) + $row['gameFTM'] + (3 * $row['game3GM']);
-			        }
+				@$stats_mpg=number_format(($stats_min/$stats_gm),1);
+				@$stats_opg=number_format(($stats_orb/$stats_gm),1);
+				@$stats_rpg=number_format(($stats_reb/$stats_gm),1);
+				@$stats_apg=number_format(($stats_ast/$stats_gm),1);
+				@$stats_spg=number_format(($stats_stl/$stats_gm),1);
+				@$stats_tpg=number_format(($stats_to/$stats_gm),1);
+				@$stats_bpg=number_format(($stats_blk/$stats_gm),1);
+				@$stats_fpg=number_format(($stats_pf/$stats_gm),1);
+				@$stats_ppg=number_format(($stats_pts/$stats_gm),1);
 
-			        @$simAverageMIN = number_format(($simTotalMIN / $numberOfGamesPlayedInSim),1);
-			        @$simAverage2GM = $simTotal2GM / $numberOfGamesPlayedInSim;
-			        @$simAverage2GA = $simTotal2GA / $numberOfGamesPlayedInSim;
-			        @$simAverage2GP = number_format(($simTotal2GM / $simTotal2GA),3);
-			        @$simAverageFTM = number_format(($simTotalFTM / $numberOfGamesPlayedInSim),1);
-			        @$simAverageFTA = number_format(($simTotalFTA / $numberOfGamesPlayedInSim),1);
-			        @$simAverageFTP = number_format(($simTotalFTM / $simTotalFTA),3);
-			        @$simAverage3GM = number_format(($simTotal3GM / $numberOfGamesPlayedInSim),1);
-			        @$simAverage3GA = number_format(($simTotal3GA / $numberOfGamesPlayedInSim),1);
-			        @$simAverage3GP = number_format(($simTotal3GM / $simTotal3GA),3);
-			        @$simAverageFGM = number_format((($simTotal2GM + $simTotal3GM) / $numberOfGamesPlayedInSim),1);
-			        @$simAverageFGA = number_format((($simTotal2GA + $simTotal3GA) / $numberOfGamesPlayedInSim),1);
-			        @$simAverageFGP = number_format((($simTotal2GM + $simTotal3GM) / ($simTotal2GA + $simTotal3GA)),3);
-			        @$simAverageORB = number_format(($simTotalORB / $numberOfGamesPlayedInSim),1);
-			        @$simAverageDRB = number_format(($simTotalDRB / $numberOfGamesPlayedInSim),1);
-			        @$simAverageREB = number_format((($simTotalORB + $simTotalDRB) / $numberOfGamesPlayedInSim),1);
-			        @$simAverageAST = number_format(($simTotalAST / $numberOfGamesPlayedInSim),1);
-			        @$simAverageSTL = number_format(($simTotalSTL / $numberOfGamesPlayedInSim),1);
-			        @$simAverageTOV = number_format(($simTotalTOV / $numberOfGamesPlayedInSim),1);
-			        @$simAverageBLK = number_format(($simTotalBLK / $numberOfGamesPlayedInSim),1);
-			        @$simAveragePF = number_format(($simTotalPF / $numberOfGamesPlayedInSim),1);
-			        @$simAveragePTS = number_format(($simTotalPTS / $numberOfGamesPlayedInSim),1);
+				(($i % 2)==0) ? $bgcolor="FFFFFF" : $bgcolor="EEEEEE";
 
-					(($i % 2)==0) ? $bgcolor="FFFFFF" : $bgcolor="EEEEEE";
-
-					$table_simAverages=$table_simAverages."<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>";
-					$table_simAverages=$table_simAverages."<td><center>$numberOfGamesPlayedInSim</center></td><td><center>";
-					$table_simAverages=$table_simAverages.$simAverageMIN;
-					$table_simAverages=$table_simAverages."</center></td><td><center>";
-					$table_simAverages=$table_simAverages.$simAverageFGM;
-					$table_simAverages=$table_simAverages."</center></td><td><center>";
-					$table_simAverages=$table_simAverages.$simAverageFGA;
-					$table_simAverages=$table_simAverages."</center></td><td><center>";
-					$table_simAverages=$table_simAverages.$simAverageFGP;
-					$table_simAverages=$table_simAverages."</center></td><td><center>";
-					$table_simAverages=$table_simAverages.$simAverageFTM;
-					$table_simAverages=$table_simAverages."</center></td><td><center>";
-					$table_simAverages=$table_simAverages.$simAverageFTA;
-					$table_simAverages=$table_simAverages."</center></td><td><center>";
-					$table_simAverages=$table_simAverages.$simAverageFTP;
-					$table_simAverages=$table_simAverages."</center></td><td><center>";
-					$table_simAverages=$table_simAverages.$simAverage3GM;
-					$table_simAverages=$table_simAverages."</center></td><td><center>";
-					$table_simAverages=$table_simAverages.$simAverage3GA;
-					$table_simAverages=$table_simAverages."</center></td><td><center>";
-					$table_simAverages=$table_simAverages.$simAverage3GP;
-					$table_simAverages=$table_simAverages."</center></td><td><center>";
-					$table_simAverages=$table_simAverages.$simAverageORB;
-					$table_simAverages=$table_simAverages."</center></td><td><center>";
-					$table_simAverages=$table_simAverages.$simAverageREB;
-					$table_simAverages=$table_simAverages."</center></td><td><center>";
-					$table_simAverages=$table_simAverages.$simAverageAST;
-					$table_simAverages=$table_simAverages."</center></td><td><center>";
-					$table_simAverages=$table_simAverages.$simAverageSTL;
-					$table_simAverages=$table_simAverages."</center></td><td><center>";
-					$table_simAverages=$table_simAverages.$simAverageTOV;
-					$table_simAverages=$table_simAverages."</center></td><td><center>";
-					$table_simAverages=$table_simAverages.$simAverageBLK;
-					$table_simAverages=$table_simAverages."</center></td><td><center>";
-					$table_simAverages=$table_simAverages.$simAveragePF;
-					$table_simAverages=$table_simAverages."</center></td><td><center>";
-					$table_simAverages=$table_simAverages.$simAveragePTS;
-					$table_simAverages=$table_simAverages."</center></td></tr>";
-				} else {}
+				$table_chunk=$table_chunk."<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"../modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>";
+				$table_chunk=$table_chunk."<td><center>$stats_gm</center></td><td>$stats_gs</td><td><center>";
+				$table_chunk=$table_chunk.$stats_mpg;
+				$table_chunk=$table_chunk."</center></td><td><center>";
+				$table_chunk=$table_chunk.$stats_fgp;
+				$table_chunk=$table_chunk."</center></td><td><center>";
+				$table_chunk=$table_chunk.$stats_ftp;
+				$table_chunk=$table_chunk."</center></td><td><center>";
+				$table_chunk=$table_chunk.$stats_tgp;
+				$table_chunk=$table_chunk."</center></td><td><center>";
+				$table_chunk=$table_chunk.$stats_opg;
+				$table_chunk=$table_chunk."</center></td><td><center>";
+				$table_chunk=$table_chunk.$stats_rpg;
+				$table_chunk=$table_chunk."</center></td><td><center>";
+				$table_chunk=$table_chunk.$stats_apg;
+				$table_chunk=$table_chunk."</center></td><td><center>";
+				$table_chunk=$table_chunk.$stats_spg;
+				$table_chunk=$table_chunk."</center></td><td><center>";
+				$table_chunk=$table_chunk.$stats_tpg;
+				$table_chunk=$table_chunk."</center></td><td><center>";
+				$table_chunk=$table_chunk.$stats_bpg;
+				$table_chunk=$table_chunk."</center></td><td><center>";
+				$table_chunk=$table_chunk.$stats_fpg;
+				$table_chunk=$table_chunk."</center></td><td><center>";
+				$table_chunk=$table_chunk.$stats_ppg;
+				$table_chunk=$table_chunk."</center></td></tr>";
 
 				$i++;
 			}
-
-			$table_simAverages=$table_simAverages."</tbody></table>";
+			$table_chunk=$table_chunk."</tbody></table>";
 		} // END OF IF $yr == "" BRACE TO REMOVE PER CHUNK STUFF
 	} // END OF TID != 0 brace - inserted so that Free Agents won't clog up the page with season averages and totals when those are almost always zeros.
 
 	if ($yr == "") {
 		$table_contracts=$table_contracts."<table align=\"center\" class=\"sortable\">
-			<thead><tr bgcolor=$color1><th><font color=$color2>Pos</font></th><th colspan=3><font color=$color2>Player</font></th><th><font color=$color2>Bird</font></th><th><font color=$color2>Year1</font></th><th><font color=$color2>Year2</font></th><th><font color=$color2>Year3</font></th><th><font color=$color2>Year4</font></th><th><font color=$color2>Year5</font></th><th><font color=$color2>Year6</font></th><td bgcolor=#000000 width=3></th><th><font color=$color2>Talent</font></th><th><font color=$color2>Skill</font></th><th><font color=$color2>Intang</font></th><th><font color=$color2>Clutch</font></th><th><font color=$color2>Consistency</font></th></tr></thead><tbody>";
+			<thead><tr bgcolor=$color1><th><font color=$color2>Pos</font></th><td colspan=3><font color=$color2>Player</font></th><th><font color=$color2>Bird</font></th><th><font color=$color2>Year1</font></th><th><font color=$color2>Year2</font></th><th><font color=$color2>Year3</font></th><th><font color=$color2>Year4</font></th><th><font color=$color2>Year5</font></th><th><font color=$color2>Year6</font></th><td bgcolor=#000000 width=3></th><th><font color=$color2>Talent</font></th><th><font color=$color2>Skill</font></th><th><font color=$color2>Intang</font></th><th><font color=$color2>Clutch</font></th><th><font color=$color2>Consistency</font></th></tr></thead><tbody>";
 
 		/* =======================CONTRACTS ET AL */
 
@@ -1760,14 +2086,12 @@ function team($tid)
 			(($i % 2)==0) ? $bgcolor="FFFFFF" : $bgcolor="EEEEEE";
 
 			if ($tid == 0) {
-				$table_contracts=$table_contracts."<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td>$bird</td><td>$con1</td><td>$con2</td><td>$con3</td><td>$con4</td><td>$con5</td><td>$con6</td><td bgcolor=#000000></td><td>$talent</td><td>$skill</td><td>$intangibles</td><td>$Clutch</td><td>$Consistency</td></tr>";
+				$table_contracts=$table_contracts."<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"../modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td>$bird</td><td>$con1</td><td>$con2</td><td>$con3</td><td>$con4</td><td>$con5</td><td>$con6</td><td bgcolor=#000000></td><td>$talent</td><td>$skill</td><td>$intangibles</td><td>$Clutch</td><td>$Consistency</td></tr>";
 			} else {
 				if ($p_ord > 959) {
-					$table_contracts=$table_contracts."<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">($name)*</a></td><td>$bird</td><td>$con1</td><td>$con2</td><td>$con3</td><td>$con4</td><td>$con5</td><td>$con6</td><td bgcolor=#000000></td><td>$talent</td><td>$skill</td><td>$intangibles</td><td>$Clutch</td><td>$Consistency</td></tr>";
-				} else if ($cy == $cyt) {
-					$table_contracts=$table_contracts."<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name^</a></td><td>$bird</td><td>$con1</td><td>$con2</td><td>$con3</td><td>$con4</td><td>$con5</td><td>$con6</td><td bgcolor=#000000></td><td>$talent</td><td>$skill</td><td>$intangibles</td><td>$Clutch</td><td>$Consistency</td></tr>";
+					$table_contracts=$table_contracts."<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"../modules.php?name=Player&pa=showpage&pid=$pid\">($name)*</a></td><td>$bird</td><td>$con1</td><td>$con2</td><td>$con3</td><td>$con4</td><td>$con5</td><td>$con6</td><td bgcolor=#000000></td><td>$talent</td><td>$skill</td><td>$intangibles</td><td>$Clutch</td><td>$Consistency</td></tr>";
 				} else {
-					$table_contracts=$table_contracts."<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td>$bird</td><td>$con1</td><td>$con2</td><td>$con3</td><td>$con4</td><td>$con5</td><td>$con6</td><td bgcolor=#000000></td><td>$talent</td><td>$skill</td><td>$intangibles</td><td>$Clutch</td><td>$Consistency</td></tr>";
+					$table_contracts=$table_contracts."<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"../modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td>$bird</td><td>$con1</td><td>$con2</td><td>$con3</td><td>$con4</td><td>$con5</td><td>$con6</td><td bgcolor=#000000></td><td>$talent</td><td>$skill</td><td>$intangibles</td><td>$Clutch</td><td>$Consistency</td></tr>";
 				}
 			}
 			$cap1=$cap1+$con1;
@@ -1785,10 +2109,10 @@ function team($tid)
 		$cap5=number_format($cap5/100,2);
 		$cap6=number_format($cap6/100,2);
 
-		// Begin hack to populate a MySQL table that has each team's current cap total.
+		// Begin hack to populate a MySQL table that has each team's current cap total. 
 		// Calculating cap totals for the current season is dificult at the moment. - A-Jay
 			$currentCap = $cap1;
-			$capTotalQuery = "INSERT INTO ibl_current_cap (tid,currentCap) VALUES ('".$tid."','".$currentCap."') ON DUPLICATE KEY UPDATE currentCap='".$currentCap."'";
+			$capTotalQuery = "INSERT INTO IBL_Current_Cap (tid,currentCap) VALUES ('".$tid."','".$currentCap."') ON DUPLICATE KEY UPDATE currentCap='".$currentCap."'";
 			$capTotalQueryExec = mysql_query($capTotalQuery);
 		// End salary cap hack.
 
@@ -1886,7 +2210,7 @@ function team($tid)
 	if ($display == "chunk") {
 		$showing="Chunk Averages";
 		$tabs=$tabs."<td bgcolor=#BBBBBB><a href=\"modules.php?name=Team&op=team&tid=$tid&display=chunk$insertyear\">Sim Averages</a></td>";
-		$table_output=$table_simAverages;
+		$table_output=$table_chunk;
 	} else $tabs=$tabs."<td><a href=\"modules.php?name=Team&op=team&tid=$tid&display=chunk$insertyear\">Sim Averages</a></td>";
 	if ($display == "contracts") {
 		$showing="Contracts";
@@ -1912,8 +2236,16 @@ function team($tid)
 	include("footer.php");
 }
 
-function team_info_right ($team_name, $color1, $color2, $owner_name, $tid)
-{
+/**************************************************/
+/* END TEAM PAGE FUNCTION                         */
+/**************************************************/
+
+/**************************************************/
+/* BEGIN FUNCTION TO DISPLAY TEAM INFO BAR ON THE */
+/* RIGHT HAND SIDE OF THE TEAM PAGE               */
+/**************************************************/
+
+function team_info_right ($team_name, $color1, $color2, $owner_name, $tid) {
 
 	// ==== GET OWNER INFO
 
@@ -1991,7 +2323,7 @@ function team_info_right ($team_name, $color1, $color2, $owner_name, $tid)
 			if ($championships % 5 == 0) {
 				$ibl_banner=$ibl_banner."<tr><td align=\"center\"><table><tr>";
 			}
-			$ibl_banner=$ibl_banner."<td><table><tr bgcolor=$color1><td valign=top height=80 width=120 background=\"./images/banners/banner1.gif\"><font color=#$color2>
+			$ibl_banner=$ibl_banner."<td><table><tr bgcolor=$color1><td valign=top height=80 width=120 background=\"../images/banners/banner1.gif\"><font color=#$color2>
 				<center><b>$banneryear<br>
 				$bannername<br>IBL Champions</b></center></td></tr></table></td>";
 
@@ -2014,7 +2346,7 @@ function team_info_right ($team_name, $color1, $color2, $owner_name, $tid)
 				$conf_banner=$conf_banner."<tr><td align=\"center\"><table><tr>";
 			}
 
-			$conf_banner=$conf_banner."<td><table><tr bgcolor=$color1><td valign=top height=80 width=120 background=\"./images/banners/banner2.gif\"><font color=#$color2>
+			$conf_banner=$conf_banner."<td><table><tr bgcolor=$color1><td valign=top height=80 width=120 background=\"../images/banners/banner2.gif\"><font color=#$color2>
 				<center><b>$banneryear<br>
 				$bannername<br>";
 			if ($bannertype == 2) {
@@ -2150,7 +2482,7 @@ function team_info_right ($team_name, $color1, $color2, $owner_name, $tid)
 		$wintot=$wintot+$wins;
 		$lostot=$lostot+$losses;
 		@$winpct=number_format($wins/($wins+$losses),3);
-		$output=$output."<a href=\"./modules.php?name=Team&op=team&tid=$tid&yr=$yearwl\">$yearwl $namewl</a>: $wins-$losses ($winpct)<br>";
+		$output=$output."<a href=\"../modules.php?name=Team&op=team&tid=$tid&yr=$yearwl\">$yearwl $namewl</a>: $wins-$losses ($winpct)<br>";
 
 		$h++;
 	}
@@ -2180,7 +2512,7 @@ function team_info_right ($team_name, $color1, $color2, $owner_name, $tid)
 		$wintot=$wintot+$wins;
 		$lostot=$lostot+$losses;
 		@$winpct=number_format($wins/($wins+$losses),3);
-		$output=$output."<a href=\"./modules.php?name=Team&op=team&tid=$tid&yr=$yearwl\">$yearwl $namewl</a>: $wins-$losses ($winpct)<br>";
+		$output=$output."<a href=\"../modules.php?name=Team&op=team&tid=$tid&yr=$yearwl\">$yearwl $namewl</a>: $wins-$losses ($winpct)<br>";
 
 		$h++;
 	}
@@ -2345,8 +2677,16 @@ function team_info_right ($team_name, $color1, $color2, $owner_name, $tid)
 	return $ultimate_output;
 }
 
-function viewinjuries($tid)
-{
+/************************************************/
+/* END FUNCTION TO DISPLAY TEAM INFO BAR ON THE */
+/* RIGHT HAND SIDE OF THE TEAM PAGE             */
+/************************************************/
+
+/************************************************/
+/* BEGIN DISPLAY INJURED PLAYERS                */
+/************************************************/
+
+function viewinjuries($tid) {
 	include("header.php");
 	OpenTable();
 
@@ -2400,7 +2740,7 @@ function viewinjuries($tid)
 			$j++;
 		}
 
-		echo "<tr bgcolor=$bgcolor><td>$pos</td><td><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td bgcolor=\"#$pick_team_color1\"><a href=\"./modules.php?name=Team&op=team&tid=$tid\"><font color=\"#$pick_team_color2\">$pick_team_city $team</font></a></td><td>$inj</td></tr>";
+		echo "<tr bgcolor=$bgcolor><td>$pos</td><td><a href=\"../modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td bgcolor=\"#$pick_team_color1\"><a href=\"../modules.php?name=Team&op=team&tid=$tid\"><font color=\"#$pick_team_color2\">$pick_team_city $team</font></a></td><td>$inj</td></tr>";
 
 		$i++;
 	}
@@ -2411,8 +2751,11 @@ function viewinjuries($tid)
 	include("footer.php");
 }
 
-function menu()
-{
+/************************************************************************/
+/* END DISPLAY INJURED PLAYERS                                          */
+/************************************************************************/
+
+function menu() {
 	global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
 	$tid = intval($tid);
 
@@ -2425,24 +2768,48 @@ function menu()
 	include("footer.php");
 }
 
-function seteditor($user)
-{
+function seteditor($user) {
 	global $stop, $module_name, $redirect, $mode, $t, $f, $gfx_chk;
 	if(!is_user($user)) {
 		include("header.php");
 		if ($stop) {
 			OpenTable();
+			displaytopmenu($tid);
+
 			echo "<center><font class=\"title\"><b>"._LOGININCOR."</b></font></center>\n";
 			CloseTable();
+			echo "<br>\n";
 		} else {
 			OpenTable();
+			displaytopmenu($tid);
 			echo "<center><font class=\"title\"><b>"._USERREGLOGIN."</b></font></center>\n";
 			CloseTable();
+			echo "<br>\n";
 		}
 		if (!is_user($user)) {
 			OpenTable();
 			displaytopmenu($tid);
-			loginbox();
+
+			mt_srand ((double)microtime()*1000000);
+			$maxran = 1000000;
+			$random_num = mt_rand(0, $maxran);
+			echo "<form action=\"modules.php?name=$module_name\" method=\"post\">\n"
+				."<b>"._USERLOGIN."</b><br><br>\n"
+				."<table border=\"0\"><tr><td>\n"
+				.""._NICKNAME.":</td><td><input type=\"text\" name=\"username\" size=\"15\" maxlength=\"25\"></td></tr>\n"
+				."<tr><td>"._PASSWORD.":</td><td><input type=\"password\" name=\"user_password\" size=\"15\" maxlength=\"20\"></td></tr>\n";
+			if (extension_loaded("gd") AND ($gfx_chk == 2 OR $gfx_chk == 4 OR $gfx_chk == 5 OR $gfx_chk == 7)) {
+				echo "<tr><td colspan='2'>"._SECURITYCODE.": <img src='modules.php?name=$module_name&op=gfx&random_num=$random_num' border='1' alt='"._SECURITYCODE."' title='"._SECURITYCODE."'></td></tr>\n"
+					."<tr><td colspan='2'>"._TYPESECCODE.": <input type=\"text\" NAME=\"gfx_check\" SIZE=\"7\" MAXLENGTH=\"6\"></td></tr>\n"
+					."<input type=\"hidden\" name=\"random_num\" value=\"$random_num\">\n";
+			}
+			echo "</table><input type=\"hidden\" name=\"redirect\" value=$redirect>\n"
+				."<input type=\"hidden\" name=\"mode\" value=$mode>\n"
+				."<input type=\"hidden\" name=\"f\" value=$f>\n"
+				."<input type=\"hidden\" name=\"t\" value=$t>\n"
+				."<input type=\"hidden\" name=\"op\" value=\"login\">\n"
+				."<input type=\"submit\" value=\""._LOGIN."\"></form><br>\n\n"
+				."<center><font class=\"content\">[ <a href=\"modules.php?name=$module_name&amp;op=pass_lost\">"._PASSWORDLOST."</a> | <a href=\"modules.php?name=$module_name&amp;op=new_user\">"._REGNEWUSER."</a> ]</font></center>\n";
 			CloseTable();
 		}
 		include("footer.php");
@@ -2453,8 +2820,11 @@ function seteditor($user)
 	}
 }
 
-function editset($username, $bypass=0, $hid=0, $url=0)
-{
+/************************************************************************/
+/* BEGIN OFFENSIVE SET EDITOR                                           */
+/************************************************************************/
+
+function editset($username, $bypass=0, $hid=0, $url=0) {
 	global $user, $cookie, $sitename, $prefix, $user_prefix, $db, $admin, $broadcast_msg, $my_headlines, $module_name, $subscription_url, $attrib, $step, $player;
 	$sql = "SELECT * FROM ".$prefix."_bbconfig";
 	$result = $db->sql_query($sql);
@@ -2476,15 +2846,13 @@ function editset($username, $bypass=0, $hid=0, $url=0)
 
 	OpenTable();
 
+	displaytopmenu($tid);
+
 	// === GRAB TEAM INFORMATION FOR LOGGED-IN USER===
 
 	$teamlogo = $userinfo[user_ibl_team];
-	$queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$teamlogo'";
-	$tid = mysql_result(mysql_query($queryTeamID), 0);
 
-	displaytopmenu($tid);
-
-	echo "<hr><center><img src=\"images/logo/$tid.jpg\"><br>";
+	echo "<hr><center><img src=\"online/teamgrfx/$teamlogo.jpg\"><br>";
 
 	$sql3 = "SELECT * FROM nuke_ibl_offense_sets WHERE TeamName = '$teamlogo' ORDER BY SetNumber ASC ";
 	$result3 = $db->sql_query($sql3);
@@ -2494,7 +2862,7 @@ function editset($username, $bypass=0, $hid=0, $url=0)
 
 	echo "<table align=center valign=top><tr><th><center>Gameplan Review - $teamlogo</center></th></tr>
 		<tr><td><center>
-		<form name=\"Set_Editor\" method=\"post\" action=\"./modules.php?name=Team&op=seteditor\"><select name=\"SelectedSet\">";
+		<form name=\"Set_Editor\" method=\"post\" action=\"../modules.php?name=Team&op=seteditor\"><select name=\"SelectedSet\">";
 
 	$i=0;
 
@@ -2570,29 +2938,29 @@ function editset($username, $bypass=0, $hid=0, $url=0)
 				if ($low1+1 == $high1) {
 					echo "<td>OK</td>";
 				} else {
-					echo "<td>OK - <a href=\"./modules.php?name=Team&op=changeset&action=remove&set=$SetToWorkOn&type=low&position=1\">Remove</a></td>";
+					echo "<td>OK - <a href=\"../modules.php?name=Team&op=changeset&action=remove&set=$SetToWorkOn&type=low&position=1\">Remove</a></td>";
 				}
 			} else if ($check1 == 3 ) {
 				if ($low1+1 == $high1) {
 					echo "<td>OK</td>";
 				} else {
-					echo "<td>OK - <a href=\"./modules.php?name=Team&op=changeset&action=remove&set=$SetToWorkOn&type=high&position=1\">Remove</a></td>";
+					echo "<td>OK - <a href=\"../modules.php?name=Team&op=changeset&action=remove&set=$SetToWorkOn&type=high&position=1\">Remove</a></td>";
 				}
 			} else if ($check1 == 4 ) {
 				if ($totalslots < 22) {
-					echo "<td>-- <a href=\"./modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=low&position=1\">Add</a></td>";
+					echo "<td>-- <a href=\"../modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=low&position=1\">Add</a></td>";
 				} else {
 					echo "<td>--</td>";
 				}
 			} else if ($check1 == 5 ) {
 				if ($totalslots < 22) {
-					echo "<td>-- <a href=\"./modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=high&position=1\">Add</a></td>";
+					echo "<td>-- <a href=\"../modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=high&position=1\">Add</a></td>";
 				} else {
 					echo "<td>--</td>";
 				}
 			} else if ($check1 == 6 ) {
 				if ($totalslots < 22) {
-					echo "<td>-- <a href=\"./modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=low&position=1\">Add</a></td>";
+					echo "<td>-- <a href=\"../modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=low&position=1\">Add</a></td>";
 				} else {
 					echo "<td>--</td>";
 				}
@@ -2607,29 +2975,29 @@ function editset($username, $bypass=0, $hid=0, $url=0)
 				if ($low2+1 == $high2) {
 					echo "<td>OK</td>";
 				} else {
-					echo "<td>OK - <a href=\"./modules.php?name=Team&op=changeset&action=remove&set=$SetToWorkOn&type=low&position=2\">Remove</a></td>";
+					echo "<td>OK - <a href=\"../modules.php?name=Team&op=changeset&action=remove&set=$SetToWorkOn&type=low&position=2\">Remove</a></td>";
 				}
 			} else if ($check2 == 3 ) {
 				if ($low2+1 == $high2) {
 					echo "<td>OK</td>";
 				} else {
-					echo "<td>OK - <a href=\"./modules.php?name=Team&op=changeset&action=remove&set=$SetToWorkOn&type=high&position=2\">Remove</a></td>";
+					echo "<td>OK - <a href=\"../modules.php?name=Team&op=changeset&action=remove&set=$SetToWorkOn&type=high&position=2\">Remove</a></td>";
 				}
 			} else if ($check2 == 4 ) {
 				if ($totalslots < 22) {
-					echo "<td>-- <a href=\"./modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=low&position=2\">Add</a></td>";
+					echo "<td>-- <a href=\"../modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=low&position=2\">Add</a></td>";
 				} else {
 					echo "<td>--</td>";
 				}
 			} else if ($check2 == 5 ) {
 				if ($totalslots < 22) {
-					echo "<td>-- <a href=\"./modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=high&position=2\">Add</a></td>";
+					echo "<td>-- <a href=\"../modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=high&position=2\">Add</a></td>";
 				} else {
 					echo "<td>--</td>";
 				}
 			} else if ($check2 == 6 ) {
 				if ($totalslots < 22) {
-					echo "<td>-- <a href=\"./modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=low&position=1\">Add</a></td>";
+					echo "<td>-- <a href=\"../modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=low&position=1\">Add</a></td>";
 				} else {
 					echo "<td>--</td>";
 				}
@@ -2645,29 +3013,29 @@ function editset($username, $bypass=0, $hid=0, $url=0)
 				if ($low3+1 == $high3) {
 					echo "<td>OK</td>";
 				} else {
-					echo "<td>OK - <a href=\"./modules.php?name=Team&op=changeset&action=remove&set=$SetToWorkOn&type=low&position=3\">Remove</a></td>";
+					echo "<td>OK - <a href=\"../modules.php?name=Team&op=changeset&action=remove&set=$SetToWorkOn&type=low&position=3\">Remove</a></td>";
 				}
 			} else if ($check3 == 3 ) {
 				if ($low3+1 == $high3) {
 					echo "<td>OK</td>";
 				} else {
-					echo "<td>OK - <a href=\"./modules.php?name=Team&op=changeset&action=remove&set=$SetToWorkOn&type=high&position=3\">Remove</a></td>";
+					echo "<td>OK - <a href=\"../modules.php?name=Team&op=changeset&action=remove&set=$SetToWorkOn&type=high&position=3\">Remove</a></td>";
 				}
 			} else if ($check3 == 4 ) {
 				if ($totalslots < 22) {
-					echo "<td>-- <a href=\"./modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=low&position=3\">Add</a></td>";
+					echo "<td>-- <a href=\"../modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=low&position=3\">Add</a></td>";
 				} else {
 					echo "<td>--</td>";
 				}
 			} else if ($check3 == 5 ) {
 				if ($totalslots < 22) {
-					echo "<td>-- <a href=\"./modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=high&position=3\">Add</a></td>";
+					echo "<td>-- <a href=\"../modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=high&position=3\">Add</a></td>";
 				} else {
 					echo "<td>--</td>";
 				}
 			} else if ($check3 == 6 ) {
 				if ($totalslots < 22) {
-					echo "<td>-- <a href=\"./modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=low&position=1\">Add</a></td>";
+					echo "<td>-- <a href=\"../modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=low&position=1\">Add</a></td>";
 				} else {
 					echo "<td>--</td>";
 				}
@@ -2682,29 +3050,29 @@ function editset($username, $bypass=0, $hid=0, $url=0)
 				if ($low4+1 == $high4) {
 					echo "<td>OK</td>";
 				} else {
-					echo "<td>OK - <a href=\"./modules.php?name=Team&op=changeset&action=remove&set=$SetToWorkOn&type=low&position=4\">Remove</a></td>";
+					echo "<td>OK - <a href=\"../modules.php?name=Team&op=changeset&action=remove&set=$SetToWorkOn&type=low&position=4\">Remove</a></td>";
 				}
 			} else if ($check4 == 3 ) {
 				if ($low4+1 == $high4) {
 					echo "<td>OK</td>";
 				} else {
-					echo "<td>OK - <a href=\"./modules.php?name=Team&op=changeset&action=remove&set=$SetToWorkOn&type=high&position=4\">Remove</a></td>";
+					echo "<td>OK - <a href=\"../modules.php?name=Team&op=changeset&action=remove&set=$SetToWorkOn&type=high&position=4\">Remove</a></td>";
 				}
 			} else if ($check4 == 4 ) {
 				if ($totalslots < 22) {
-					echo "<td>-- <a href=\"./modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=low&position=4\">Add</a></td>";
+					echo "<td>-- <a href=\"../modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=low&position=4\">Add</a></td>";
 				} else {
 					echo "<td>--</td>";
 				}
 			} else if ($check4 == 5 ) {
 				if ($totalslots < 22) {
-					echo "<td>-- <a href=\"./modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=high&position=4\">Add</a></td>";
+					echo "<td>-- <a href=\"../modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=high&position=4\">Add</a></td>";
 				} else {
 					echo "<td>--</td>";
 				}
 			} else if ($check4 == 6 ) {
 				if ($totalslots < 22) {
-					echo "<td>-- <a href=\"./modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=low&position=1\">Add</a></td>";
+					echo "<td>-- <a href=\"../modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=low&position=1\">Add</a></td>";
 				} else {
 					echo "<td>--</td>";
 				}
@@ -2720,29 +3088,29 @@ function editset($username, $bypass=0, $hid=0, $url=0)
 				if ($low5+1 == $high5) {
 					echo "<td>OK</td>";
 				} else {
-					echo "<td>OK - <a href=\"./modules.php?name=Team&op=changeset&action=remove&set=$SetToWorkOn&type=low&position=5\">Remove</a></td>";
+					echo "<td>OK - <a href=\"../modules.php?name=Team&op=changeset&action=remove&set=$SetToWorkOn&type=low&position=5\">Remove</a></td>";
 				}
 			} else if ($check5 == 3 ) {
 				if ($low5+1 == $high5) {
 					echo "<td>OK</td>";
 				} else {
-					echo "<td>OK - <a href=\"./modules.php?name=Team&op=changeset&action=remove&set=$SetToWorkOn&type=high&position=5\">Remove</a></td>";
+					echo "<td>OK - <a href=\"../modules.php?name=Team&op=changeset&action=remove&set=$SetToWorkOn&type=high&position=5\">Remove</a></td>";
 				}
 			} else if ($check5 == 4 ) {
 				if ($totalslots < 22) {
-					echo "<td>-- <a href=\"./modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=low&position=5\">Add</a></td>";
+					echo "<td>-- <a href=\"../modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=low&position=5\">Add</a></td>";
 				} else {
 					echo "<td>--</td>";
 				}
 			} else if ($check5 == 5 ) {
 				if ($totalslots < 22) {
-					echo "<td>-- <a href=\"./modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=high&position=5\">Add</a></td>";
+					echo "<td>-- <a href=\"../modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=high&position=5\">Add</a></td>";
 				} else {
 					echo "<td>--</td>";
 				}
 			} else if ($check5 == 6 ) {
 				if ($totalslots < 22) {
-					echo "<td>-- <a href=\"./modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=low&position=1\">Add</a></td>";
+					echo "<td>-- <a href=\"../modules.php?name=Team&op=changeset&action=add&set=$SetToWorkOn&type=low&position=1\">Add</a></td>";
 				} else {
 					echo "<td>--</td>";
 				}
@@ -2796,7 +3164,7 @@ function editset($username, $bypass=0, $hid=0, $url=0)
 				$playername=mysql_result($result5,$k,"name");
 				$pid=mysql_result($result5,$k,"pid");
 
-				echo "<a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$playername</a> | ";
+				echo "<a href=\"../modules.php?name=Player&pa=showpage&pid=$pid\">$playername</a> | ";
 
 				$k++;
 			}
@@ -2813,24 +3181,56 @@ function editset($username, $bypass=0, $hid=0, $url=0)
 	include("footer.php");
 }
 
-function changeset($user)
-{
+/************************************************************************/
+/* END OFFENSIVE SET EDITOR                                             */
+/************************************************************************/
+
+/************************************************************************/
+/* BEGIN OFFENSE SET CALL                                               */
+/************************************************************************/
+
+function changeset($user) {
 	global $stop, $module_name, $redirect, $mode, $t, $f, $gfx_chk, $action, $set, $type, $position;
 	if(!is_user($user)) {
 	include("header.php");
 	if ($stop) {
 		OpenTable();
+		displaytopmenu($tid);
+
 		echo "<center><font class=\"title\"><b>"._LOGININCOR."</b></font></center>\n";
 		CloseTable();
+		echo "<br>\n";
 	} else {
 		OpenTable();
+		displaytopmenu($tid);
 		echo "<center><font class=\"title\"><b>"._USERREGLOGIN."</b></font></center>\n";
 		CloseTable();
+		echo "<br>\n";
 	}
 	if (!is_user($user)) {
 		OpenTable();
 		displaytopmenu($tid);
-		loginbox();
+
+		mt_srand ((double)microtime()*1000000);
+		$maxran = 1000000;
+		$random_num = mt_rand(0, $maxran);
+		echo "<form action=\"modules.php?name=$module_name\" method=\"post\">\n"
+			."<b>"._USERLOGIN."</b><br><br>\n"
+			."<table border=\"0\"><tr><td>\n"
+			.""._NICKNAME.":</td><td><input type=\"text\" name=\"username\" size=\"15\" maxlength=\"25\"></td></tr>\n"
+			."<tr><td>"._PASSWORD.":</td><td><input type=\"password\" name=\"user_password\" size=\"15\" maxlength=\"20\"></td></tr>\n";
+		if (extension_loaded("gd") AND ($gfx_chk == 2 OR $gfx_chk == 4 OR $gfx_chk == 5 OR $gfx_chk == 7)) {
+			echo "<tr><td colspan='2'>"._SECURITYCODE.": <img src='modules.php?name=$module_name&op=gfx&random_num=$random_num' border='1' alt='"._SECURITYCODE."' title='"._SECURITYCODE."'></td></tr>\n"
+				."<tr><td colspan='2'>"._TYPESECCODE.": <input type=\"text\" NAME=\"gfx_check\" SIZE=\"7\" MAXLENGTH=\"6\"></td></tr>\n"
+				."<input type=\"hidden\" name=\"random_num\" value=\"$random_num\">\n";
+		}
+		echo "</table><input type=\"hidden\" name=\"redirect\" value=$redirect>\n"
+			."<input type=\"hidden\" name=\"mode\" value=$mode>\n"
+			."<input type=\"hidden\" name=\"f\" value=$f>\n"
+			."<input type=\"hidden\" name=\"t\" value=$t>\n"
+			."<input type=\"hidden\" name=\"op\" value=\"login\">\n"
+			."<input type=\"submit\" value=\""._LOGIN."\"></form><br>\n\n"
+			."<center><font class=\"content\">[ <a href=\"modules.php?name=$module_name&amp;op=pass_lost\">"._PASSWORDLOST."</a> | <a href=\"modules.php?name=$module_name&amp;op=new_user\">"._REGNEWUSER."</a> ]</font></center>\n";
 		CloseTable();
 	}
 	include("footer.php");
@@ -2841,8 +3241,15 @@ function changeset($user)
 	}
 }
 
-function changesetgo($username, $action, $set, $type, $position)
-{
+/************************************************************************/
+/* END OFFENSE SET EDIT CALL                                            */
+/************************************************************************/
+
+/************************************************************************/
+/* BEGIN CHANGE OFFENSIVE SET                                           */
+/************************************************************************/
+
+function changesetgo($username, $action, $set, $type, $position) {
 	global $user, $cookie, $sitename, $prefix, $user_prefix, $db, $admin, $broadcast_msg, $my_headlines, $module_name, $subscription_url;
 	$sql = "SELECT * FROM ".$prefix."_bbconfig";
 	$result = $db->sql_query($sql);
@@ -2911,7 +3318,7 @@ function changesetgo($username, $action, $set, $type, $position)
 	echo "Your change has been made; please click the button to view changes.";
 	//echo "You can't make changes to the editor once the season starts but can only view your game plans.";
 
-	echo "<form name=\"Set_Editor\" method=\"post\" action=\"./modules.php?name=Team&op=seteditor\">
+	echo "<form name=\"Set_Editor\" method=\"post\" action=\"../modules.php?name=Team&op=seteditor\">
 		<input type=\"hidden\" name=\"SelectedSet\" value=\"$set\"><input type=\"submit\" value=\"Return to Set Editor\"></form>";
 	CloseTable();
 }
@@ -2920,8 +3327,7 @@ function changesetgo($username, $action, $set, $type, $position)
 	/* END CHANGE OFFENSE SET                                               */
 	/************************************************************************/
 
-function OffenseSetPositionCheck($Slot, $Low, $High)
-{
+function OffenseSetPositionCheck($Slot, $Low, $High) {
 	//echo "Slot:$Slot<br>Low:$Low<br>High:$High<br><br>";
 	if ($Low > $High) {
 		return 6;
@@ -2951,6 +3357,10 @@ function OffenseSetPositionCheck($Slot, $Low, $High)
 
 	return 0;
 }
+
+/************************************************************************/
+/* BEGIN DISPLAY TRAINING PREFERENCES                                   */
+/************************************************************************/
 
 /*
 function viewtraining($user) {
@@ -3036,11 +3446,9 @@ function trainingpage($username)
 
 
 	$teamlogo = $userinfo[user_ibl_team];
-	$queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$teamlogo'";
-	$tid = mysql_result(mysql_query($queryTeamID), 0);
 
 	echo "<hr>
-	<center><img src=\"images/logo/$tid.jpg\"><br>
+	<center><img src=\"online/teamgrfx/$teamlogo.jpg\"><br>
 ";
 
 $Team_Name = $_POST['Team_Name'];
@@ -3207,7 +3615,7 @@ if ($Team_Name != NULL )
 	$numtr = $db->sql_numrows($resulttr);
 	$i = 0;
 
-	echo "<form name = \"Training\" method=\"post\" action=\"./modules.php?name=Team&op=training\">
+	echo "<form name = \"Training\" method=\"post\" action=\"../modules.php?name=Team&op=training\">
 	<input type=\"hidden\" name=\"Team_Name\" value=\"$teamlogo\">
 	<table border=1><tr>";
 
@@ -3294,8 +3702,7 @@ As a reminder, you should enter between 1 and 7 for each training value.  It is 
 }
 */
 
-function financialdisplay($matrix,$yr,$tid)
-{
+function financialdisplay($matrix,$yr,$tid) {
 	$financial_result=$matrix;
 	$contract_matrix=$financial_result[0];
 
@@ -3379,8 +3786,7 @@ function financialdisplay($matrix,$yr,$tid)
 	return $returning;
 }
 
-function standings ($team)
-{
+function standings ($team) {
 	$query="SELECT * FROM nuke_ibl_power WHERE Team = '$team'";
 	$result=mysql_query($query);
 	$num=mysql_numrows($result);
@@ -3437,9 +3843,11 @@ function standings ($team)
 	return $standings;
 }
 
+/************************************************************************/
+/* END DISPLAY TRAINING PREFERENCES                                     */
+/************************************************************************/
 
-function asg_voting()
-{
+function asg_voting() {
 	global $user, $cookie, $sitename, $prefix, $user_prefix, $db, $admin, $broadcast_msg, $my_headlines, $module_name, $useset, $subscription_url;
 	$sql = "SELECT * FROM ".$prefix."_bbconfig";
 	$result = $db->sql_query($sql);
@@ -3471,9 +3879,7 @@ function asg_voting()
 		if ($teamlogo == "") {
 			echo "Sorry, you must be logged in to vote.<br>";
 		} else {
-			$queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$teamlogo'";
-			$tid = mysql_result(mysql_query($queryTeamID), 0);
-			echo "<form name=\"ASGVote\" method=\"post\" action=\"./ASGVote.php\"><center><img src=\"images/logo/$tid.jpg\"><br><br>";
+			echo "<form name=\"ASGVote\" method=\"post\" action=\"../ASGVote.php\"><center><img src=\"online/teamgrfx/$teamlogo.jpg\"><br><br>";
 			$query = "SELECT * FROM nuke_iblplyr where pos = 'C' and (tid = '1' or tid = '26' or tid = '4' or tid = '3' or tid = '21' or tid = '2' or tid = '24' or tid = '29' or tid = '6' or tid = '27' or tid = '9' or tid = '7' or tid = '10' or tid = '5' or tid = '8' or tid = '31') and teamname != 'Retired' and stats_gm > '10' order by (((stats_3gm*3)+stats_ftm+(stats_fgm-stats_3gm)*2)+stats_orb+stats_drb+(2*stats_ast)+(2*stats_stl)+(2*stats_blk)-((stats_fga-stats_fgm)+(stats_fta-stats_ftm)+stats_to+stats_pf))/stats_gm desc";
 			$result = mysql_query($query);
 			while($row = mysql_fetch_assoc($result)) {
@@ -3679,8 +4085,7 @@ function asg_voting()
 	}
 }
 
-function eoy_voting()
-{
+function eoy_voting() {
 	global $user, $cookie, $sitename, $prefix, $user_prefix, $db, $admin, $broadcast_msg, $my_headlines, $module_name, $useset, $subscription_url;
 	$sql = "SELECT * FROM ".$prefix."_bbconfig";
 	$result = $db->sql_query($sql);
@@ -3713,9 +4118,7 @@ function eoy_voting()
 		if ($teamlogo == "") {
 			echo "Sorry, you must be logged in to vote.<br>";
 		} else {
-			$queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$teamlogo'";
-			$tid = mysql_result(mysql_query($queryTeamID), 0);
-			echo "<form name=\"EOYVote\" method=\"post\" action=\"./EOYVote.php\"><center><img src=\"images/logo/$tid.jpg\"><br><br>";
+			echo "<form name=\"EOYVote\" method=\"post\" action=\"../EOYVote.php\"><center><img src=\"online/teamgrfx/$teamlogo.jpg\"><br><br>";
 			$query = "SELECT * FROM nuke_iblplyr where teamname != 'Retired' and stats_gm >= '55' and (stats_min/stats_gm) >= 24 order by (((stats_3gm*3)+stats_ftm+(stats_fgm-stats_3gm)*2)+stats_orb+stats_drb+(2*stats_ast)+(2*stats_stl)+(2*stats_blk)-((stats_fga-stats_fgm)+(stats_fta-stats_ftm)+stats_to+stats_pf))/stats_gm desc";
 
 			$result = mysql_query($query);
@@ -3861,8 +4264,7 @@ function eoy_voting()
 	}
 }
 
-function asg_results()
-{
+function asg_results() {
 	global $user, $cookie, $sitename, $prefix, $user_prefix, $db, $admin, $broadcast_msg, $my_headlines, $module_name, $useset, $subscription_url;
 	$sql = "SELECT * FROM ".$prefix."_bbconfig";
 	$result = $db->sql_query($sql);
@@ -3886,25 +4288,25 @@ function asg_results()
 	if (($user !== 'chibul') && ($user != 'Joe') && ($user != 'eggman')) {
 		echo "Sorry, only the IBL Executive Staff may view this page.<br>";
 	} else {
-		$query1="select count(name) as votes,name from (select East_C as name from IBL_ASG_Votes) as tbl group by name having count(name) > 0 order by 1 desc;";
+		$query1="select count(name) as votes,name from (select East_C as name from nuke_asg_votes) as tbl group by name having count(name) > 0 order by 1 desc;";
 		$result1=mysql_query($query1);
 		$num1=mysql_num_rows($result1);
-		$query2="select count(name) as votes,name from (select East_F1 as name from IBL_ASG_Votes union all select East_F2 from IBL_ASG_Votes) as tbl group by name having count(name) > 0 order by 1 desc;";
+		$query2="select count(name) as votes,name from (select East_F1 as name from nuke_asg_votes union all select East_F2 from nuke_asg_votes) as tbl group by name having count(name) > 0 order by 1 desc;";
 		$result2=mysql_query($query2);
 		$num2=mysql_num_rows($result2);
-		$query3="select count(name) as votes,name from (select East_G1 as name from IBL_ASG_Votes union all select East_G2 from IBL_ASG_Votes) as tbl group by name having count(name) > 0 order by 1 desc;";
+		$query3="select count(name) as votes,name from (select East_G1 as name from nuke_asg_votes union all select East_G2 from nuke_asg_votes) as tbl group by name having count(name) > 0 order by 1 desc;";
 		$result3=mysql_query($query3);
 		$num3=mysql_num_rows($result3);
-		$query4="select count(name) as votes,name from (select West_C as name from IBL_ASG_Votes) as tbl group by name having count(name) > 0 order by 1 desc;";
+		$query4="select count(name) as votes,name from (select West_C as name from nuke_asg_votes) as tbl group by name having count(name) > 0 order by 1 desc;";
 		$result4=mysql_query($query4);
 		$num4=mysql_num_rows($result4);
-		$query5="select count(name) as votes,name from (select West_F1 as name from IBL_ASG_Votes union all select West_F2 from IBL_ASG_Votes) as tbl group by name having count(name) > 0 order by 1 desc;";
+		$query5="select count(name) as votes,name from (select West_F1 as name from nuke_asg_votes union all select West_F2 from nuke_asg_votes) as tbl group by name having count(name) > 0 order by 1 desc;";
 		$result5=mysql_query($query5);
 		$num5=mysql_num_rows($result5);
-		$query6="select count(name) as votes,name from (select West_G1 as name from IBL_ASG_Votes union all select West_G2 from IBL_ASG_Votes) as tbl group by name having count(name) > 0 order by 1 desc;";
+		$query6="select count(name) as votes,name from (select West_G1 as name from nuke_asg_votes union all select West_G2 from nuke_asg_votes) as tbl group by name having count(name) > 0 order by 1 desc;";
 		$result6=mysql_query($query6);
 		$num6=mysql_num_rows($result6);
-
+		
 		//    OpenTable();
 
 		$k=0;
@@ -3974,8 +4376,7 @@ function asg_results()
 	}
 }
 
-function eoy_results()
-{
+function eoy_results() {
 	global $user, $cookie, $sitename, $prefix, $user_prefix, $db, $admin, $broadcast_msg, $my_headlines, $module_name, $useset, $subscription_url;
 	$sql = "SELECT * FROM ".$prefix."_bbconfig";
 	$result = $db->sql_query($sql);
@@ -3999,32 +4400,32 @@ function eoy_results()
 	if (($user !== 'chibul') && ($user != 'Joe') && ($user != 'eggman'))  {
 		echo "Sorry, only the IBL Executive Staff may view this page.<br>";
 	} else {
-		$query1="select sum(score) as votes,name from (select MVP_1 as name, 3 as score from IBL_EOY_Votes union all select MVP_2 as name, 2 as score from IBL_EOY_Votes union all select MVP_3 as name, 1 as score from IBL_EOY_Votes) as tbl group by name;";
+		$query1="select sum(score) as votes,name from (select MVP_1 as name, 3 as score from nuke_eoy_votes union all select MVP_2 as name, 2 as score from nuke_eoy_votes union all select MVP_3 as name, 1 as score from nuke_eoy_votes) as tbl group by name;";
 		$result1=mysql_query($query1);
 		$num1=mysql_num_rows($result1);
-		$query15="select sum(score) as votes,name from (select MVP_1 as name, 1 as score from IBL_EOY_Votes) as tbl group by name;";
+		$query15="select sum(score) as votes,name from (select MVP_1 as name, 1 as score from nuke_eoy_votes) as tbl group by name;";
 		$result15=mysql_query($query15);
 		$num15=mysql_num_rows($result15);
 
-		$query2="select sum(score) as votes,name from (select Six_1 as name, 3 as score from IBL_EOY_Votes union all select Six_2 as name, 2 as score from IBL_EOY_Votes union all select Six_3 as name, 1 as score from IBL_EOY_Votes) as tbl group by name;";
+		$query2="select sum(score) as votes,name from (select Six_1 as name, 3 as score from nuke_eoy_votes union all select Six_2 as name, 2 as score from nuke_eoy_votes union all select Six_3 as name, 1 as score from nuke_eoy_votes) as tbl group by name;";
 		$result2=mysql_query($query2);
 		$num2=mysql_num_rows($result2);
-		$query3="select sum(score) as votes,name from (select ROY_1 as name, 3 as score from IBL_EOY_Votes union all select ROY_2 as name, 2 as score from IBL_EOY_Votes union all select ROY_3 as name, 1 as score from IBL_EOY_Votes) as tbl group by name;";
+		$query3="select sum(score) as votes,name from (select ROY_1 as name, 3 as score from nuke_eoy_votes union all select ROY_2 as name, 2 as score from nuke_eoy_votes union all select ROY_3 as name, 1 as score from nuke_eoy_votes) as tbl group by name;";
 		$result3=mysql_query($query3);
 		$num3=mysql_num_rows($result3);
-		$query4="select sum(score) as votes,name from (select GM_1 as name, 3 as score from IBL_EOY_Votes union all select GM_2 as name, 2 as score from IBL_EOY_Votes union all select GM_3 as name, 1 as score from IBL_EOY_Votes) as tbl group by name;";
+		$query4="select sum(score) as votes,name from (select GM_1 as name, 3 as score from nuke_eoy_votes union all select GM_2 as name, 2 as score from nuke_eoy_votes union all select GM_3 as name, 1 as score from nuke_eoy_votes) as tbl group by name;";
 		$result4=mysql_query($query4);
 		$num4=mysql_num_rows($result4);
-		$query5="select count(name) as votes,name from (select MVP_1 as name from IBL_EOY_Votes) as tbl group by name having count(name) > 0 order by 1 desc;";
+		$query5="select count(name) as votes,name from (select MVP_1 as name from nuke_eoy_votes) as tbl group by name having count(name) > 0 order by 1 desc;";
 		$result5=mysql_query($query5);
 		$num5=mysql_num_rows($result5);
-		$query6="select count(name) as votes,name from (select Six_1 as name from IBL_EOY_Votes) as tbl group by name having count(name) > 0 order by 1 desc;";
+		$query6="select count(name) as votes,name from (select Six_1 as name from nuke_eoy_votes) as tbl group by name having count(name) > 0 order by 1 desc;";
 		$result6=mysql_query($query6);
 		$num6=mysql_num_rows($result6);
-		$query7="select count(name) as votes,name from (select ROY_1 as name from IBL_EOY_Votes) as tbl group by name having count(name) > 0 order by 1 desc;";
+		$query7="select count(name) as votes,name from (select ROY_1 as name from nuke_eoy_votes) as tbl group by name having count(name) > 0 order by 1 desc;";
 		$result7=mysql_query($query7);
 		$num7=mysql_num_rows($result7);
-		$query8="select count(name) as votes,name from (select GM_1 as name from IBL_EOY_Votes) as tbl group by name having count(name) > 0 order by 1 desc;";
+		$query8="select count(name) as votes,name from (select GM_1 as name from nuke_eoy_votes) as tbl group by name having count(name) > 0 order by 1 desc;";
 		$result8=mysql_query($query8);
 		$num8=mysql_num_rows($result8);
 
@@ -4123,8 +4524,7 @@ function eoy_results()
 	}
 }
 
-function eoy_voters()
-{
+function eoy_voters() {
 	include("header.php");
 	$query2="SELECT * FROM ibl_team_history WHERE teamid != 35 ORDER BY teamid ASC";
 	$result2=mysql_query($query2);
@@ -4140,7 +4540,7 @@ function eoy_voters()
 		$eoy_vote[$k]=mysql_result($result2,$k,"eoy_vote");
 		$teamid[$k]=mysql_result($result2,$k,"teamid");
 
-		$table_echo=$table_echo."<tr><td bgcolor=#".$teamcolor1[$k]."><a href=\"./modules.php?name=Team&op=team&tid=".$teamid[$k]."\"><font color=#".$teamcolor2[$k].">".$teamcity[$k]." ".$teamname[$k]."</a></td><td>".$eoy_vote[$k]."</td></tr>";
+		$table_echo=$table_echo."<tr><td bgcolor=#".$teamcolor1[$k]."><a href=\"../modules.php?name=Team&op=team&tid=".$teamid[$k]."\"><font color=#".$teamcolor2[$k].">".$teamcity[$k]." ".$teamname[$k]."</a></td><td>".$eoy_vote[$k]."</td></tr>";
 		$k++;
 	}
 	$text=$text."<table class=\"sortable\" border=1><tr><th>Team</th><th>Vote Received</th></tr>$table_echo</table>";
@@ -4149,8 +4549,7 @@ function eoy_voters()
 	include("footer.php");
 }
 
-function asg_voters()
-{
+function asg_voters() {
 	include("header.php");
 	$query2="SELECT * FROM ibl_team_history WHERE teamid != 35 ORDER BY teamid ASC";
 	$result2=mysql_query($query2);
@@ -4166,7 +4565,7 @@ function asg_voters()
 		$asg_vote[$k]=mysql_result($result2,$k,"asg_vote");
 		$teamid[$k]=mysql_result($result2,$k,"teamid");
 
-		$table_echo=$table_echo."<tr><td bgcolor=#".$teamcolor1[$k]."><a href=\"./modules.php?name=Team&op=team&tid=".$teamid[$k]."\"><font color=#".$teamcolor2[$k].">".$teamcity[$k]." ".$teamname[$k]."</a></td><td>".$asg_vote[$k]."</td></tr>";
+		$table_echo=$table_echo."<tr><td bgcolor=#".$teamcolor1[$k]."><a href=\"../modules.php?name=Team&op=team&tid=".$teamid[$k]."\"><font color=#".$teamcolor2[$k].">".$teamcity[$k]." ".$teamname[$k]."</a></td><td>".$asg_vote[$k]."</td></tr>";
 		$k++;
 	}
 	$text=$text."<table class=\"sortable\" border=1><tr><th>Team</th><th>Vote Received</th></tr>$table_echo</table>";
@@ -4204,14 +4603,26 @@ switch($op) {
 	schedule($tid);
 	break;
 
+	case "reviewtrades":
+	reviewtrade($user);
+	break;
+
 	case "injuries":
 	viewinjuries($tid);
+	break;
+
+	case "offertrade":
+	offertrade($user);
 	break;
 
 	case "drafthistory":
 	drafthistory($tid);
 	break;
 
+	case "waivers":
+	echo "<A HREF=\"./modules.php?name=Waivers\">Moved!</A>";
+	break;
+	
 	case "asg_voting":
 	asg_voting();
 	break;

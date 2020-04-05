@@ -1,8 +1,11 @@
 <?php
 
-require 'config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
+$username = "iblhoops_chibul";
+$password = "oliver23";
+$database = "iblhoops_iblleague";
+
+mysql_connect(localhost,$username,$password);
+@mysql_select_db($database) or die( "Unable to select database");
 
 $query="SELECT * FROM nuke_ibl_power WHERE TeamID BETWEEN 1 AND 32 ORDER BY TeamID ASC";
 $result=mysql_query($query);
@@ -26,7 +29,7 @@ while ($i < $num)
 }
 
 function record ($tid) {
-	$query="SELECT * FROM ibl_schedule WHERE (Visitor = $tid OR Home = $tid) AND BoxID > 0 ORDER BY Date ASC";
+	$query="SELECT * FROM IBL_Schedule WHERE (Visitor = $tid OR Home = $tid) AND BoxID > 0 ORDER BY Date ASC";
 	$result=mysql_query($query);
 	$num=mysql_numrows($result);
 	$wins=0;
@@ -58,7 +61,7 @@ function record ($tid) {
 }
 
 function ranking ($tid, $wins, $losses) {
-	$query="SELECT * FROM ibl_schedule WHERE Visitor = $tid AND BoxID > 0 ORDER BY Date ASC";
+	$query="SELECT * FROM IBL_Schedule WHERE Visitor = $tid AND BoxID > 0 ORDER BY Date ASC";
 	$result=mysql_query($query);
 	$num=mysql_numrows($result);
 	$winpoints=0;
@@ -83,7 +86,7 @@ function ranking ($tid, $wins, $losses) {
 		$i++;
 	}
 
-	$query="SELECT * FROM ibl_schedule WHERE Home = $tid AND BoxID > 0 ORDER BY Date ASC";
+	$query="SELECT * FROM IBL_Schedule WHERE Home = $tid AND BoxID > 0 ORDER BY Date ASC";
 	$result=mysql_query($query);
 	$num=mysql_numrows($result);
 	$i = 0;

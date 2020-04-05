@@ -1,8 +1,11 @@
 <?php
 
-require '../config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db('iblhoops_ibl5') or die( "Unable to select database");
+$username = "iblhoops_chibul";
+$password = "oliver23";
+$database = "iblhoops_iblleague";
+
+mysql_connect(localhost,$username,$password);
+@mysql_select_db($database) or die( "Unable to select database");
 
 $query="SELECT * FROM nuke_iblplyr WHERE retired = 0 ORDER BY ordinal ASC";
 $result=mysql_query($query);

@@ -1,8 +1,12 @@
 <?php
 
-require '../config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
+$username = "iblhoops_chibul";
+$password = "oliver23";
+$database = "iblhoops_iblleague";
+
+mysql_connect(localhost,$username,$password);
+@mysql_select_db($database) or die( "Unable to select database");
+
 
 $team = $_POST['team'];
 $position = $_POST['position'];
@@ -45,7 +49,7 @@ $query="SELECT * FROM nuke_iblplyr WHERE retired = 0 $argument ORDER BY $sort DE
 $result=mysql_query($query);
 $num=mysql_numrows($result);
 
-echo "<form name=\"Leaderboards\" method=\"post\" action=\"../online/chunk_data.php\">";
+echo "<form name=\"Leaderboards\" method=\"post\" action=\"http://www.iblhoops.net/online/chunk_data.php\">";
 echo "<table border=1>";
 echo "<tr><td><b>Team</td><td><select name=\"team\">";
 team_option($team);
@@ -122,7 +126,7 @@ while ($i < $num)
 	}
 
 	$i++;
-	echo "<tr bgcolor=$bgcolor><td>$i.</td><td><a href=modules.php?name=Player&pa=showpage&pid=$pid>$name</a></td><td>$pos</td><td><a href=modules.php?name=Team&op=team&tid=$teamid>$teamname</a></td><td>$stats_gm</td><td align=right>$stats_mpg</td><td align=right>$stats_fgmpg</td><td align=right>$stats_ftapg</td><td align=right>$stats_fgp</td><td align=right>$stats_ftmpg</td><td align=right>$stats_ftapg</td><td align=right>$stats_ftp</td><td align=right>$stats_tgmpg</td><td align=right>$stats_tgapg</td><td align=right>$stats_tgp</td><td align=right>$stats_orbpg</td><td align=right>$stats_rpg</td><td align=right>$stats_apg</td><td align=right>$stats_spg</td><td align=right>$stats_tpg</td><td align=right>$stats_bpg</td><td align=right>$stats_fpg</td><td align=right>$stats_ppg</td><td>$qa</td></tr>";
+	echo "<tr bgcolor=$bgcolor><td>$i.</td><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pid>$name</a></td><td>$pos</td><td><a href=http://www.iblhoops.net/modules.php?name=Team&op=team&tid=$teamid>$teamname</a></td><td>$stats_gm</td><td align=right>$stats_mpg</td><td align=right>$stats_fgmpg</td><td align=right>$stats_ftapg</td><td align=right>$stats_fgp</td><td align=right>$stats_ftmpg</td><td align=right>$stats_ftapg</td><td align=right>$stats_ftp</td><td align=right>$stats_tgmpg</td><td align=right>$stats_tgapg</td><td align=right>$stats_tgp</td><td align=right>$stats_orbpg</td><td align=right>$stats_rpg</td><td align=right>$stats_apg</td><td align=right>$stats_spg</td><td align=right>$stats_tpg</td><td align=right>$stats_bpg</td><td align=right>$stats_fpg</td><td align=right>$stats_ppg</td><td>$qa</td></tr>";
 
 }
 

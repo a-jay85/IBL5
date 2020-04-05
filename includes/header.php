@@ -32,7 +32,7 @@ function head() {
 	echo "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\">\n";
 	echo "<html>\n";
 	echo "<head>\n";
-        echo "<script src="./jslib/sorttable.js"></script>\n";
+        echo "<script src="http://www.iblhoops.net/jslib/sorttable.js"></script>\n";
 	echo "<title>$sitename $pagetitle</title>\n";
 	include("includes/meta.php");
 	include("includes/javascript.php");

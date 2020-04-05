@@ -4,9 +4,12 @@
 //#8.) From the IBL HTML, open "Schedule.htm" IN INTERNET EXPLORER. Select the entire content of this page and copy it. Then paste into A1 of the "Schedule" tab.
 //#9.) In the Schedule tab, copy Column Q and paste into the database and run it.
 
-require 'config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
+$username = "iblhoops_chibul";
+$password = "oliver23";
+$database = "iblhoops_iblleague";
+
+mysql_connect(localhost,$username,$password);
+@mysql_select_db($database) or die( "Unable to select database");
 
 $scheduleFilePath = 'ibl/IBL/Schedule.htm';
 
@@ -29,12 +32,12 @@ function stripTrailingSpaces($var) {
 function dateExtract($rawDate) {
 	if ($rawDate != FALSE) {
 		global $rows;
-
+	
 		$month = stripLeadingZeros(date('m', strtotime($rawDate)));
 		$day = stripLeadingZeros(date('d', strtotime($rawDate)));
 		$year = date('Y', strtotime($rawDate));
 		$date = $year."-".$month."-".$day;
-
+		
 		$dateArray = array(
 			"date" => $date,
 			"year" => $year,
@@ -49,8 +52,8 @@ function boxIDextract($boxHREF) {
 	return $boxID;
 }
 
-echo 'Updating ibl_schedule database table...'
-mysql_query('TRUNCATE TABLE ibl_schedule');
+echo 'Updating IBL_Schedule database table...'
+mysql_query('TRUNCATE TABLE IBL_Schedule');
 
 foreach ($rows as $row) {
 	$checkSecondCell = $row->childNodes->item(1)->nodeValue;
@@ -93,9 +96,9 @@ foreach ($rows as $row) {
 		$homeTID = mysql_result(mysql_query("SELECT teamid FROM ibl_team_history WHERE team_name = '".$homeName."';"),0);
 	}
 
-	$sqlQueryString = "INSERT INTO ibl_schedule (Year,BoxID,Date,Visitor,Vscore,Home,Hscore)
+	$sqlQueryString = "INSERT INTO IBL_Schedule (Year,BoxID,Date,Visitor,Vscore,Home,Hscore)
 		VALUES (".$year.",".$boxID.",'".$date."','".$visitorTID."',".$vScore.",'".$homeTID."',".$hScore.")
-
+		
 		ON DUPLICATE KEY UPDATE
 		Year = ".$year.",
 		Date = '".$date."',

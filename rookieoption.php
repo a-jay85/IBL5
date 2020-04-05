@@ -1,8 +1,11 @@
 <?php
 
-require 'config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
+$username = "iblhoops_chibul";
+$password = "oliver23";
+$database = "iblhoops_iblleague";
+
+mysql_connect(localhost,$username,$password);
+@mysql_select_db($database) or die( "Unable to select database");
 
 $Team_Name = $_POST['teamname'];
 $Player_Name = $_POST['playername'];
@@ -28,7 +31,7 @@ $resultrookieoption=mysql_query($queryrookieoption);
 
 echo "<html><head><title>Rookie Option Page</title></head><body>
 
-Your rookie option has been updated in the database and should show on the Free Agency page immediately.  Please <a href=\"modules.php?name=Free_Agency\">click here to return to the Free Agency Screen</a>.<br><br>
+Your rookie option has been updated in the database and should show on the Free Agency page immediately.  Please <a href=\"../modules.php?name=Free_Agency\">click here to return to the Free Agency Screen</a>.<br><br>
 ";
 
 if (mail($recipient, $emailsubject, $filetext, "From: rookieoption@iblhoops.net"))

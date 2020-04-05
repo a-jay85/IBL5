@@ -1,8 +1,11 @@
 <?php
 
-require 'config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
+$username = "iblhoops_chibul";
+$password = "oliver23";
+$database = "iblhoops_iblleague";
+
+mysql_connect(localhost,$username,$password);
+@mysql_select_db($database) or die( "Unable to select database");
 
 $query="SELECT * FROM nuke_ibl_power WHERE TeamID BETWEEN 1 AND 32 ORDER BY TeamID ASC";
 $result=mysql_query($query);
@@ -32,16 +35,16 @@ while ($i < $num)
 
 
 
-	$query13="UPDATE iblhoops_iblv2forums.forum_stats, iblhoops_ibl5.nuke_iblplyr
-SET iblhoops_iblv2forums.forum_stats.pts_lead = (SELECT name FROM iblhoops_ibl5.nuke_iblplyr WHERE iblhoops_iblv2forums.forum_stats.teamname = iblhoops_ibl5.nuke_iblplyr.teamname order by ((stats_fgm-stats_3gm)*2+stats_3gm*3+stats_ftm)/stats_gm desc limit 1)";
+	$query13="UPDATE iblhoops_iblv2forums.forum_stats, iblhoops_iblleague.nuke_iblplyr
+SET iblhoops_iblv2forums.forum_stats.pts_lead = (SELECT name FROM iblhoops_iblleague.nuke_iblplyr WHERE iblhoops_iblv2forums.forum_stats.teamname = iblhoops_iblleague.nuke_iblplyr.teamname order by ((stats_fgm-stats_3gm)*2+stats_3gm*3+stats_ftm)/stats_gm desc limit 1)";
 	$result13=mysql_query($query13);
 
-	$query14="UPDATE iblhoops_iblv2forums.forum_stats, iblhoops_ibl5.nuke_iblplyr
-SET iblhoops_iblv2forums.forum_stats.pts_num = (SELECT round(((stats_fgm-stats_3gm)*2+stats_3gm*3+stats_ftm)/stats_gm, 1)FROM iblhoops_ibl5.nuke_iblplyr WHERE iblhoops_iblv2forums.forum_stats.teamname = iblhoops_ibl5.nuke_iblplyr.teamname order by ((stats_fgm-stats_3gm)*2+stats_3gm*3+stats_ftm)/stats_gm desc limit 1)";
+	$query14="UPDATE iblhoops_iblv2forums.forum_stats, iblhoops_iblleague.nuke_iblplyr
+SET iblhoops_iblv2forums.forum_stats.pts_num = (SELECT round(((stats_fgm-stats_3gm)*2+stats_3gm*3+stats_ftm)/stats_gm, 1)FROM iblhoops_iblleague.nuke_iblplyr WHERE iblhoops_iblv2forums.forum_stats.teamname = iblhoops_iblleague.nuke_iblplyr.teamname order by ((stats_fgm-stats_3gm)*2+stats_3gm*3+stats_ftm)/stats_gm desc limit 1)";
 	$result14=mysql_query($query14);
 
-	$query15="UPDATE iblhoops_iblv2forums.forum_stats, iblhoops_ibl5.nuke_iblplyr
-SET iblhoops_iblv2forums.forum_stats.pts_pid= (SELECT pid FROM iblhoops_ibl5.nuke_iblplyr WHERE iblhoops_iblv2forums.forum_stats.teamname = iblhoops_ibl5.nuke_iblplyr.teamname order by ((stats_fgm-stats_3gm)*2+stats_3gm*3+stats_ftm)/stats_gm desc limit 1)";
+	$query15="UPDATE iblhoops_iblv2forums.forum_stats, iblhoops_iblleague.nuke_iblplyr
+SET iblhoops_iblv2forums.forum_stats.pts_pid= (SELECT pid FROM iblhoops_iblleague.nuke_iblplyr WHERE iblhoops_iblv2forums.forum_stats.teamname = iblhoops_iblleague.nuke_iblplyr.teamname order by ((stats_fgm-stats_3gm)*2+stats_3gm*3+stats_ftm)/stats_gm desc limit 1)";
 	$result15=mysql_query($query15);
 
 
@@ -53,42 +56,42 @@ SET iblhoops_iblv2forums.forum_stats.pts_pid= (SELECT pid FROM iblhoops_ibl5.nuk
 
 
 
-	$query16="UPDATE iblhoops_iblv2forums.forum_stats, iblhoops_ibl5.nuke_iblplyr
-SET iblhoops_iblv2forums. forum_stats.reb_lead = (SELECT name FROM iblhoops_ibl5.nuke_iblplyr WHERE iblhoops_iblv2forums. forum_stats.teamname = iblhoops_ibl5.nuke_iblplyr.teamname order by (stats_orb+stats_drb)/stats_gm desc limit 1)";
+	$query16="UPDATE iblhoops_iblv2forums.forum_stats, iblhoops_iblleague.nuke_iblplyr
+SET iblhoops_iblv2forums. forum_stats.reb_lead = (SELECT name FROM iblhoops_iblleague.nuke_iblplyr WHERE iblhoops_iblv2forums. forum_stats.teamname = iblhoops_iblleague.nuke_iblplyr.teamname order by (stats_orb+stats_drb)/stats_gm desc limit 1)";
 	$result16=mysql_query($query16);
 
-	$query17="UPDATE iblhoops_iblv2forums.forum_stats, iblhoops_ibl5.nuke_iblplyr
-SET iblhoops_iblv2forums. forum_stats.reb_num = (select round((stats_orb+stats_drb)/stats_gm, 1) FROM iblhoops_ibl5.nuke_iblplyr WHERE iblhoops_iblv2forums. forum_stats.teamname = iblhoops_ibl5.nuke_iblplyr.teamname order by (stats_orb+stats_drb)/stats_gm desc limit 1)";
+	$query17="UPDATE iblhoops_iblv2forums.forum_stats, iblhoops_iblleague.nuke_iblplyr
+SET iblhoops_iblv2forums. forum_stats.reb_num = (select round((stats_orb+stats_drb)/stats_gm, 1) FROM iblhoops_iblleague.nuke_iblplyr WHERE iblhoops_iblv2forums. forum_stats.teamname = iblhoops_iblleague.nuke_iblplyr.teamname order by (stats_orb+stats_drb)/stats_gm desc limit 1)";
 	$result17=mysql_query($query17);
 
-	$query18="UPDATE iblhoops_iblv2forums.forum_stats, iblhoops_ibl5.nuke_iblplyr
-SET iblhoops_iblv2forums.forum_stats.reb_pid= (SELECT pid from iblhoops_ibl5.nuke_iblplyr WHERE iblhoops_iblv2forums. forum_stats.teamname = iblhoops_ibl5.nuke_iblplyr.teamname order by (stats_orb+stats_drb)/stats_gm desc limit 1)";
+	$query18="UPDATE iblhoops_iblv2forums.forum_stats, iblhoops_iblleague.nuke_iblplyr
+SET iblhoops_iblv2forums.forum_stats.reb_pid= (SELECT pid from iblhoops_iblleague.nuke_iblplyr WHERE iblhoops_iblv2forums. forum_stats.teamname = iblhoops_iblleague.nuke_iblplyr.teamname order by (stats_orb+stats_drb)/stats_gm desc limit 1)";
 	$result18=mysql_query($query18);
 
 
 
-	$query20="UPDATE iblhoops_iblv2forums.forum_stats, iblhoops_ibl5.nuke_iblplyr
-SET iblhoops_iblv2forums. forum_stats.ast_lead = (SELECT name FROM iblhoops_ibl5.nuke_iblplyr WHERE iblhoops_iblv2forums. forum_stats.teamname = iblhoops_ibl5.nuke_iblplyr.teamname order by (stats_ast/stats_gm) desc limit 1)";
+	$query20="UPDATE iblhoops_iblv2forums.forum_stats, iblhoops_iblleague.nuke_iblplyr
+SET iblhoops_iblv2forums. forum_stats.ast_lead = (SELECT name FROM iblhoops_iblleague.nuke_iblplyr WHERE iblhoops_iblv2forums. forum_stats.teamname = iblhoops_iblleague.nuke_iblplyr.teamname order by (stats_ast/stats_gm) desc limit 1)";
 	$result20=mysql_query($query20);
 
-	$query21="UPDATE iblhoops_iblv2forums.forum_stats, iblhoops_ibl5.nuke_iblplyr
-SET iblhoops_iblv2forums. forum_stats.ast_num = (select round((stats_ast)/stats_gm, 1) FROM iblhoops_ibl5.nuke_iblplyr WHERE iblhoops_iblv2forums. forum_stats.teamname = iblhoops_ibl5.nuke_iblplyr.teamname order by stats_ast/stats_gm desc limit 1)";
+	$query21="UPDATE iblhoops_iblv2forums.forum_stats, iblhoops_iblleague.nuke_iblplyr
+SET iblhoops_iblv2forums. forum_stats.ast_num = (select round((stats_ast)/stats_gm, 1) FROM iblhoops_iblleague.nuke_iblplyr WHERE iblhoops_iblv2forums. forum_stats.teamname = iblhoops_iblleague.nuke_iblplyr.teamname order by stats_ast/stats_gm desc limit 1)";
 	$result21=mysql_query($query21);
 
-	$query22="UPDATE iblhoops_iblv2forums.forum_stats, iblhoops_ibl5.nuke_iblplyr
-SET iblhoops_iblv2forums.forum_stats.ast_pid= (SELECT pid FROM iblhoops_ibl5.nuke_iblplyr WHERE iblhoops_iblv2forums. forum_stats.teamname = iblhoops_ibl5.nuke_iblplyr.teamname order by (stats_ast/stats_gm) desc limit 1)";
+	$query22="UPDATE iblhoops_iblv2forums.forum_stats, iblhoops_iblleague.nuke_iblplyr
+SET iblhoops_iblv2forums.forum_stats.ast_pid= (SELECT pid FROM iblhoops_iblleague.nuke_iblplyr WHERE iblhoops_iblv2forums. forum_stats.teamname = iblhoops_iblleague.nuke_iblplyr.teamname order by (stats_ast/stats_gm) desc limit 1)";
 	$result22=mysql_query($query22);
 
 
 	$ranking=ranking($tid, $wins, $losses);
 	$query4="UPDATE nuke_ibl_power SET ranking = $ranking WHERE TeamID = $tid;";
 	$result4=mysql_query($query4);
-
+        
 	echo "Updating $Team wins $wins and losses $losses and ranking $ranking<br>";
 }
 
 function record ($tid) {
-	$query="SELECT * FROM ibl_schedule WHERE (Visitor = $tid OR Home = $tid) AND BoxID > 0 ORDER BY Date ASC";
+	$query="SELECT * FROM IBL_Schedule WHERE (Visitor = $tid OR Home = $tid) AND BoxID > 0 ORDER BY Date ASC";
 	$result=mysql_query($query);
 	$num=mysql_numrows($result);
 	$wins=0;
@@ -132,7 +135,7 @@ function record ($tid) {
 }
 
 function last ($tid) {
-	$query="SELECT * FROM ibl_schedule WHERE (Visitor = $tid OR Home = $tid) AND BoxID > 0 ORDER BY Date DESC limit 10";
+	$query="SELECT * FROM IBL_Schedule WHERE (Visitor = $tid OR Home = $tid) AND BoxID > 0 ORDER BY Date DESC limit 10";
 	$result=mysql_query($query);
 	$num=mysql_numrows($result);
 	$lastwins=0;
@@ -164,7 +167,7 @@ function last ($tid) {
 
 
 function ranking ($tid, $wins, $losses) {
-	$query="SELECT * FROM ibl_schedule WHERE Visitor = $tid AND BoxID > 0 ORDER BY Date ASC";
+	$query="SELECT * FROM IBL_Schedule WHERE Visitor = $tid AND BoxID > 0 ORDER BY Date ASC";
 	$result=mysql_query($query);
 	$num=mysql_numrows($result);
 	$winpoints=0;
@@ -189,7 +192,7 @@ function ranking ($tid, $wins, $losses) {
 		$i++;
 	}
 
-	$query="SELECT * FROM ibl_schedule WHERE Home = $tid AND BoxID > 0 ORDER BY Date ASC";
+	$query="SELECT * FROM IBL_Schedule WHERE Home = $tid AND BoxID > 0 ORDER BY Date ASC";
 	$result=mysql_query($query);
 	$num=mysql_numrows($result);
 	$i = 0;

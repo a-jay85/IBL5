@@ -12,26 +12,23 @@
 /* the Free Software Foundation; either version 2 of the License.       */
 /************************************************************************/
 
-if (!defined('MODULE_FILE')) {
-    die ("You can't access this file directly...");
-}
+if (!eregi("modules.php", $_SERVER['PHP_SELF'])) die ("You can't access this file directly...");
 
 require_once("mainfile.php");
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
-require 'discordWebhooks.php';
-
 $pagetitle = "- Team Pages";
 
 function waivers($user)
 {
-    global $stop, $action;
+    global $stop, $module_name, $redirect, $mode, $t, $f, $gfx_chk, $action;
     if (!is_user($user)) {
         include("header.php");
         if ($stop) {
             OpenTable();
             displaytopmenu($tid);
+
             echo "<center><font class=\"title\"><b>"._LOGININCOR."</b></font></center>\n";
             CloseTable();
             echo "<br>\n";
@@ -44,13 +41,35 @@ function waivers($user)
         }
         if (!is_user($user)) {
             OpenTable();
-            loginbox();
+            displaytopmenu($tid);
+
+            mt_srand ((double)microtime()*1000000);
+            $maxran = 1000000;
+            $random_num = mt_rand(0, $maxran);
+            echo "<form action=\"modules.php?name=$module_name\" method=\"post\">\n"
+                ."<b>"._USERLOGIN."</b><br><br>\n"
+                ."<table border=\"0\"><tr><td>\n"
+                .""._NICKNAME.":</td><td><input type=\"text\" name=\"username\" size=\"15\" maxlength=\"25\"></td></tr>\n"
+                ."<tr><td>"._PASSWORD.":</td><td><input type=\"password\" name=\"user_password\" size=\"15\" maxlength=\"20\"></td></tr>\n";
+            if (extension_loaded("gd") AND ($gfx_chk == 2 OR $gfx_chk == 4 OR $gfx_chk == 5 OR $gfx_chk == 7)) {
+                echo "<tr><td colspan='2'>"._SECURITYCODE.": <img src='modules.php?name=$module_name&op=gfx&random_num=$random_num' border='1' alt='"._SECURITYCODE."' title='"._SECURITYCODE."'></td></tr>\n"
+                    ."<tr><td colspan='2'>"._TYPESECCODE.": <input type=\"text\" NAME=\"gfx_check\" SIZE=\"7\" MAXLENGTH=\"6\"></td></tr>\n"
+                    ."<input type=\"hidden\" name=\"random_num\" value=\"$random_num\">\n";
+            }
+            echo "</table><input type=\"hidden\" name=\"redirect\" value=$redirect>\n"
+                ."<input type=\"hidden\" name=\"mode\" value=$mode>\n"
+                ."<input type=\"hidden\" name=\"f\" value=$f>\n"
+                ."<input type=\"hidden\" name=\"t\" value=$t>\n"
+                ."<input type=\"hidden\" name=\"op\" value=\"login\">\n"
+                ."<input type=\"submit\" value=\""._LOGIN."\"></form><br>\n\n"
+                ."<center><font class=\"content\">[ <a href=\"modules.php?name=$module_name&amp;op=pass_lost\">"._PASSWORDLOST."</a> | <a href=\"modules.php?name=$module_name&amp;op=new_user\">"._REGNEWUSER."</a> ]</font></center>\n";
             CloseTable();
         }
         include("footer.php");
     } elseif (is_user($user)) {
         $query="SELECT * FROM nuke_ibl_settings WHERE name = 'Allow Waiver Moves' ";
         $result=mysql_query($query);
+
         $allow_waivers=mysql_result($result,0,"value");
 
         if ($allow_waivers == 'Yes') {
@@ -120,15 +139,10 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
         $waiverresult=mysql_query($waiverquery);
         $playername=mysql_result($waiverresult,0,"name");
         $players_team=mysql_result($waiverresult,0,"tid");
-        $cy1=mysql_result($waiverresult,0,"cy1");
         $cy2=mysql_result($waiverresult,0,"cy2");
-        $cy3=mysql_result($waiverresult,0,"cy3");
-        $cy4=mysql_result($waiverresult,0,"cy4");
-        $cy5=mysql_result($waiverresult,0,"cy5");
-        $cy6=mysql_result($waiverresult,0,"cy6");
         $player_exp = mysql_result($waiverresult,0,"exp");
         if ($Type_Of_Action == 'drop') {
-            if ($Roster_Slots > 2 and $TotalSalary > 7000) { // TODO: Change 7000 to hard cap variable
+            if ($Roster_Slots > 2 and $TotalSalary > 7000) {
                 $errortext= "You have 12 players and are over $70 mill hard cap.  Therefore you can't drop a player!";
             } else {
                 $queryi = "UPDATE nuke_iblplyr SET `ordinal` = '1000', `droptime` = '$Timestamp' WHERE `pid` = '$Player_to_Process' LIMIT 1;";
@@ -153,13 +167,10 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
 
                 $querystor="INSERT INTO nuke_stories (catid,aid,title,time,hometext,topic,informant,counter,alanguage) VALUES ('$catid','Associated Press','$storytitle','$timestamp','$hometext','$topicid','Associated Press','0','english')";
                 $resultstor=mysql_query($querystor);
-
-                postToDiscordChannel('#waiver-wire', $hometext);
-
                 $errortext="Your waiver move should now be processed. $playername has been cut to waivers.";
             }
         } else if ($Type_Of_Action == 'add') {
-            if ($cy2 == '' AND $cy2 == 0 AND $cy3 == '' AND $cy3 == 0 AND $cy4 == '' AND $cy4 == 0 AND $cy5 == '' AND $cy5 == 0 AND $cy6 == '' AND $cy6 == 0) {
+            if ($cy2 == '' OR $cy2 == 0) {
                 if ($player_exp > 9) {
                     $cy2=103;
                 } elseif ($player_exp > 8) {
@@ -181,12 +192,10 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
                 } else {
                     $cy2=35;
                 }
-            } else {
-                $cy2 = $cy1;
             }
-            if ($Healthy_Roster_Slots < 4 and $TotalSalary + $cy2 > 7000) { // TODO: Change 7000 to hard cap variable
+            if ($Healthy_Roster_Slots < 4 and $TotalSalary + $cy2 > 7000) {
                 $errortext="You have 12 or more healthy players and this signing will put you over $70 million. Therefore you cannot make this signing.";
-            } elseif ($Healthy_Roster_Slots > 3 and $TotalSalary + $cy2 > 7000 and $cy2 > 103) { // TODO: Change 7000 to hard cap variable
+            } elseif ($Healthy_Roster_Slots > 3 and $TotalSalary + $cy2 > 7000 and $cy2 > 103) {
                 $errortext="You are over the hard cap and therefore can only sign players who are making veteran minimum contract!";
             } elseif ($Healthy_Roster_Slots < 1) {
                 $errortext="You have full roster of 15 players. You can't sign another player at this time!";
@@ -215,14 +224,6 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
 
                 $querystor="INSERT INTO nuke_stories (catid,aid,title,time,hometext,topic,informant,counter,alanguage) VALUES ('$catid','Associated Press','$storytitle','$timestamp','$hometext','$topicid','Associated Press','0','english')";
                 $resultstor=mysql_query($querystor);
-
-                if (isset($resultstor)) {
-                    $recipient = 'ibldepthcharts@gmail.com';
-                    mail($recipient, $storytitle, $hometext, "From: ibldepthcharts@gmail.com");
-
-                    postToDiscordChannel('#waiver-wire', $hometext);
-                }
-
                 $errortext="Your waiver move should now be processed. $playername has been signed from waivers and added to your roster.";
             }
         } // END OF IF/ELSE BRACE FOR TYPE OF ACTION IS DROP OR ADD
@@ -232,13 +233,11 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
 
     OpenTable();
 
-    $teamlogo = $userinfo[user_ibl_team];
-	$queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$teamlogo'";
-	$tid = mysql_result(mysql_query($queryTeamID), 0);
-
     displaytopmenu($tid);
 
     echo "<center><font color=red><b>$errortext</b></font></center>";
+
+    $teamlogo = $userinfo[user_ibl_team];
     $sql7 = "SELECT * FROM nuke_ibl_team_info ORDER BY teamid ASC ";
     $result7 = $db->sql_query($sql7);
 
@@ -260,14 +259,14 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
         $sql8 = "SELECT * FROM nuke_iblplyr WHERE teamname='$userinfo[user_ibl_team]' AND retired = '0' AND ordinal < '961' ORDER BY ordinal ASC ";
         $result8 = $db->sql_query($sql8);
     } else {
-        $sql8 = "SELECT * FROM nuke_iblplyr WHERE ordinal > '959' AND retired = '0' ORDER BY ordinal ASC ";
+        $sql8 = "SELECT * FROM nuke_iblplyr WHERE ordinal > '960' AND retired = '0' AND in_euro = '0' ORDER BY ordinal ASC ";
         $result8 = $db->sql_query($sql8);
     }
 
     echo "<hr><form name=\"Waiver_Move\" method=\"post\" action=\"\"><input type=\"hidden\" name=\"Team_Name\" value=\"$teamlogo\">";
     echo "<input type=\"hidden\" name=\"Action\" value=\"$action\">";
 
-    echo "<center><img src=\"images/logo/$tid.jpg\"><br><table border=1 cellspacing=0 cellpadding=0><tr><th colspan=3><center>WAIVER WIRE - YOUR TEAM CURRENTLY HAS $rosterslots EMPTY ROSTER SPOTS and $healthyrosterslots HEALTHY ROSTER SPOTS</center></th></tr>
+    echo "<center><img src=\"online/teamgrfx/$teamlogo.jpg\"><br><table border=1 cellspacing=0 cellpadding=0><tr><th colspan=3><center>WAIVER WIRE - YOUR TEAM CURRENTLY HAS $rosterslots EMPTY ROSTER SPOTS and $healthyrosterslots HEALTHY ROSTER SPOTS</center></th></tr>
         <tr><td valign=top><center><B><u>$userinfo[user_ibl_team]</u></b></center>
         <select name=\"Player_ID\"><option value=\"\">Select player...</option>";
 
@@ -284,7 +283,7 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
         $player_exp = $row8[exp];
         $zcy2 = $row8[$xcyy];
 
-        if ($zcy2 == '' AND $zcy2 == 0) {
+        if ($zcy2 == '' OR $zcy2 == 0) {
             if ($player_exp > 9) {
                 $zcy2=103;
             } elseif ($player_exp > 8) {

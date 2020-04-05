@@ -82,7 +82,7 @@ function chunkstats()
 	$result=mysql_query($query);
 	$num=mysql_numrows($result);
 
-	echo "<form name=\"Leaderboards\" method=\"post\" action=\"modules.php?name=Chunk_Stats&op=chunk\">";
+	echo "<form name=\"Leaderboards\" method=\"post\" action=\"http://www.iblhoops.net/modules.php?name=Chunk_Stats&op=chunk\">";
 	echo "<table border=1>";
 	echo "<tr><td><b>Sim</td><td><select name=\"chunk\">";
 	chunk_option($row[maxchunk],$chunk);
@@ -158,7 +158,7 @@ function chunkstats()
 		}
 
 		$i++;
-		echo "<tr bgcolor=$bgcolor><td>$i.</td><td><a href=modules.php?name=Player&pa=showpage&pid=$pid>$name</a></td><td>$pos</td><td><a href=modules.php?name=Team&op=team&tid=$teamid>$teamname</a></td><td>$chunknumber</td><td>$stats_gm</td><td align=right>$stats_mpg</td><td align=right>$stats_fgmpg</td><td align=right>$stats_fgapg</td><td align=right>$stats_fgp</td><td align=right>$stats_ftmpg</td><td align=right>$stats_ftapg</td><td align=right>$stats_ftp</td><td align=right>$stats_tgmpg</td><td align=right>$stats_tgapg</td><td align=right>$stats_tgp</td><td align=right>$stats_orbpg</td><td align=right>$stats_rpg</td><td align=right>$stats_apg</td><td align=right>$stats_spg</td><td align=right>$stats_tpg</td><td align=right>$stats_bpg</td><td align=right>$stats_fpg</td><td align=right>$stats_ppg</td><td align=right>$qa</td></tr>";
+		echo "<tr bgcolor=$bgcolor><td>$i.</td><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pid>$name</a></td><td>$pos</td><td><a href=http://www.iblhoops.net/modules.php?name=Team&op=team&tid=$teamid>$teamname</a></td><td>$chunknumber</td><td>$stats_gm</td><td align=right>$stats_mpg</td><td align=right>$stats_fgmpg</td><td align=right>$stats_fgapg</td><td align=right>$stats_fgp</td><td align=right>$stats_ftmpg</td><td align=right>$stats_ftapg</td><td align=right>$stats_ftp</td><td align=right>$stats_tgmpg</td><td align=right>$stats_tgapg</td><td align=right>$stats_tgp</td><td align=right>$stats_orbpg</td><td align=right>$stats_rpg</td><td align=right>$stats_apg</td><td align=right>$stats_spg</td><td align=right>$stats_tpg</td><td align=right>$stats_bpg</td><td align=right>$stats_fpg</td><td align=right>$stats_ppg</td><td align=right>$qa</td></tr>";
 
 	}
 
@@ -212,7 +212,7 @@ function seasonstats()
 	$result=mysql_query($query);
 	$num=mysql_numrows($result);
 
-	echo "<form name=\"Leaderboards\" method=\"post\" action=\"modules.php?name=Season_Leader&op=season\">";
+	echo "<form name=\"Leaderboards\" method=\"post\" action=\"http://www.iblhoops.net/modules.php?name=Season_Leader&op=season\">";
 	echo "<table border=1>";
 	echo "<tr><td><b>Team</td><td><select name=\"team\">";
 	team_option($team);
@@ -289,7 +289,7 @@ function seasonstats()
 		}
 
 		$i++;
-		echo "<tr bgcolor=$bgcolor><td>$i.</td><td><a href=modules.php?name=Player&pa=showpage&pid=$pid>$name</a></td><td>$pos</td><td><a href=modules.php?name=Team&op=team&tid=$teamid>$teamname</a></td><td>$stats_gm</td><td align=right>$stats_mpg</td><td align=right>$stats_fgmpg</td><td align=right>$stats_fgapg</td><td align=right>$stats_fgp</td><td align=right>$stats_ftmpg</td><td align=right>$stats_ftapg</td><td align=right>$stats_ftp</td><td align=right>$stats_tgmpg</td><td align=right>$stats_tgapg</td><td align=right>$stats_tgp</td><td align=right>$stats_orbpg</td><td align=right>$stats_rpg</td><td align=right>$stats_apg</td><td align=right>$stats_spg</td><td align=right>$stats_tpg</td><td align=right>$stats_bpg</td><td align=right>$stats_fpg</td><td align=right>$stats_ppg</td><td>$qa</td></tr>";
+		echo "<tr bgcolor=$bgcolor><td>$i.</td><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pid>$name</a></td><td>$pos</td><td><a href=http://www.iblhoops.net/modules.php?name=Team&op=team&tid=$teamid>$teamname</a></td><td>$stats_gm</td><td align=right>$stats_mpg</td><td align=right>$stats_fgmpg</td><td align=right>$stats_fgapg</td><td align=right>$stats_fgp</td><td align=right>$stats_ftmpg</td><td align=right>$stats_ftapg</td><td align=right>$stats_ftp</td><td align=right>$stats_tgmpg</td><td align=right>$stats_tgapg</td><td align=right>$stats_tgp</td><td align=right>$stats_orbpg</td><td align=right>$stats_rpg</td><td align=right>$stats_apg</td><td align=right>$stats_spg</td><td align=right>$stats_tpg</td><td align=right>$stats_bpg</td><td align=right>$stats_fpg</td><td align=right>$stats_ppg</td><td>$qa</td></tr>";
 
 	}
 

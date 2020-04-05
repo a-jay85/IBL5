@@ -5,13 +5,13 @@ error_reporting(E_ALL & ~E_NOTICE);
 libxml_use_internal_errors(true);
 
 //*****************************************************************************
-//*** ibl_schedule DB UPDATE
+//*** IBL_SCHEDULE DB UPDATE
 //*****************************************************************************
 //This section automates the following steps from Gates' simming instructions:
 //#8.) From the IBL HTML, open "Schedule.htm" IN INTERNET EXPLORER. Select the entire content of this page and copy it. Then paste into A1 of the "Schedule" tab.
 //#9.) In the Schedule tab, copy Column Q and paste into the database and run it.
 
-require 'config.php';
+include_once 'config.php';
 mysql_connect($dbhost,$dbuname,$dbpass);
 @mysql_select_db($dbname) or die("Unable to select database");
 
@@ -65,8 +65,8 @@ function groupingSort($region)
 	return array ($grouping, $groupingGB, $groupingMagicNumber);
 }
 
-echo 'Updating the ibl_schedule database table...<p>';
-if (mysql_query('TRUNCATE TABLE ibl_schedule')) echo 'TRUNCATE TABLE ibl_schedule<p>';
+echo 'Updating the IBL_Schedule database table...<p>';
+if (mysql_query('TRUNCATE TABLE IBL_Schedule')) echo 'TRUNCATE TABLE IBL_Schedule<p>';
 
 foreach ($rows as $row) {
 	$checkThirdCell = $row->childNodes->item(2)->nodeValue;
@@ -108,25 +108,9 @@ foreach ($rows as $row) {
 		$homeTID = mysql_result(mysql_query("SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '".$homeName."';"),0);
 	}
 
-	$sqlQueryString = "INSERT INTO ibl_schedule (
-		Year,
-		BoxID,
-		Date,
-		Visitor,
-		Vscore,
-		Home,
-		Hscore
-	)
-	VALUES (
-		$year,
-		$boxID,
-		'$date',
-		$visitorTID,
-		$vScore,
-		$homeTID,
-		$hScore
-	)";
-		/* ON DUPLICATE KEY UPDATE
+	$sqlQueryString = "INSERT INTO IBL_Schedule (Year,BoxID,Date,Visitor,Vscore,Home,Hscore)
+		VALUES ($year,$boxID,'$date',$visitorTID,$vScore,$homeTID,$hScore)"; /*
+		ON DUPLICATE KEY UPDATE
 			Year = $year,
 			Date = '$date',
 			Visitor = $visitorTID,
@@ -140,27 +124,18 @@ foreach ($rows as $row) {
 	} // DO NOT use 'else die('Invalid query: '.mysql_error()' here -- script depends on being able to pass broken SQL strings for now.
 }
 
-unset($visitorName,
-	$homeName,
-	$boxLink,
-	$hScore,
-	$vScore,
-	$homeName,
-	$visitorName,
-	$homeTID,
-	$visitorTID);
+unset($visitorName,$homeName,$boxLink,$hScore,$vScore,$homeName,$visitorName,$homeTID,$visitorTID);
 
-echo 'ibl_schedule database table has been updated.<p>';
 
 // TODO:
 // Standings variables to derive from Schedule: last 10, streak
 // New variables: rival conf w/l, >.500 w/l, <.500 w/l
 
 //*****************************************************************************
-//*** ibl_standings DB UPDATE
+//*** IBL_STANDINGS DB UPDATE
 //*****************************************************************************
-//This section stores Standings values in a database table called 'ibl_standings' so that they can be retrieved quickly.
-//The file 'block-AJstandings.php' relies on 'ibl_standings' to automate the sidebar standings display.
+//This section stores Standings values in a database table called 'IBL_Standings' so that they can be retrieved quickly.
+//The file 'block-AJstandings.php' relies on 'IBL_Standings' to automate the sidebar standings display.
 
 $standingsFilePath = 'ibl/IBL/Standings.htm';
 
@@ -184,7 +159,7 @@ function extractLosses($var)
 	return $var;
 }
 
-echo '<p>Updating the ibl_standings database table...<p>';
+echo '<p>Updating the IBL_Standings database table...<p>';
 
 function extractStandingsValues($confVar,$divVar)
 {
@@ -212,9 +187,9 @@ function extractStandingsValues($confVar,$divVar)
 			$awayWins = extractWins($awayRecord);
 			$awayLosses = extractLosses($awayRecord);
 
-			$gamesUnplayed = 82 - $homeWins - $homeLosses - $awayWins - $awayLosses; // TODO: make number of games in season dynamic
+			$gamesUnplayed = 68 - $homeWins - $homeLosses - $awayWins - $awayLosses; // TODO: make number of games in season dynamic
 
-			$sqlQueryString = "INSERT INTO ibl_standings (
+			$sqlQueryString = "INSERT INTO IBL_Standings (
 				team_name,
 				leagueRecord,
 				pct,
@@ -234,6 +209,7 @@ function extractStandingsValues($confVar,$divVar)
 				awayWins,
 				awayLosses
 			)
+
 			VALUES (
 				'".rtrim($teamName)."',
 				'".$leagueRecord."',
@@ -254,6 +230,7 @@ function extractStandingsValues($confVar,$divVar)
 				'".$awayWins."',
 				'".$awayLosses."'
 			)
+
 			ON DUPLICATE KEY UPDATE
 				leagueRecord = '".$leagueRecord."',
 				pct = '".$pct."',
@@ -279,9 +256,8 @@ function extractStandingsValues($confVar,$divVar)
 			} else die('Invalid query: '.mysql_error());
 		}
 	}
-	echo '<p>Conference standings have been updated.<p>';
 
-	echo '<p>Updating the division games back for all teams...<br>';
+	echo '<p>Updating the division games back for all teams...<p>';
 	foreach ($divVar as $row) {
 		$teamName = $row->childNodes->item(0)->nodeValue;
 		if (in_array($teamName, array("Atlantic", "Central", "Midwest", "Pacific"))) {
@@ -290,68 +266,44 @@ function extractStandingsValues($confVar,$divVar)
 		if (!in_array($teamName, array("Atlantic", "Central", "Midwest", "Pacific", "team", ""))) {
 			$divGB = $row->childNodes->item(3)->nodeValue;
 
-			$sqlQueryString = "INSERT INTO ibl_standings (
-				team_name,
-				division,
-				divGB
-			)
-			VALUES (
-				'".$teamName."',
-				'".$division."',
-				'".$divGB."'
-			)
-			ON DUPLICATE KEY UPDATE
-				division = '".$division."',
-				divGB = '".$divGB."'";
+			$sqlQueryString = "INSERT INTO IBL_Standings (team_name,division,divGB) VALUES ('".$teamName."','".$division."','".$divGB."')
+				ON DUPLICATE KEY UPDATE	division = '".$division."',divGB = '".$divGB."'";
 
 			if (mysql_query($sqlQueryString)) {
 				echo $sqlQueryString.'<br>';
 			} else die('Invalid query: '.mysql_error());
 		}
 	}
-	echo 'Division standings have been updated.<p>';
 }
 
 function updateMagicNumbers ($region)
 {
-	echo '<p>Updating the magic numbers for the '.$region.'...<br>';
 	list ($grouping,$groupingGB,$groupingMagicNumber) = groupingSort($region);
 
-	$query = "SELECT team_name,homeWins,homeLosses,awayWins,awayLosses FROM ibl_standings WHERE ".$grouping." = '".$region."' ORDER BY pct DESC";
+	$query = "SELECT team_name,homeWins,homeLosses,awayWins,awayLosses FROM IBL_Standings WHERE ".$grouping." = '".$region."' ORDER BY pct DESC";
 	$result = mysql_query($query);
 	$limit = mysql_num_rows($result);
 
 	$i = 0;
-	while ($i < $limit) {
+	while ($i+1 < $limit) {
 		$teamName = mysql_result($result,$i,0);
 		$teamTotalWins = mysql_result($result,$i,1) + mysql_result($result,$i,3);
-		if ($i+1 != $limit) {
-			$belowTeamTotalLosses = mysql_result($result,$i+1,2) + mysql_result($result,$i+1,4);
-		} else {
-			$belowTeamTotalLosses = 0; // This results in an inaccurate Magic Number for the bottom team in the $region, but prevents query errors
-		}
-		$magicNumber = 82 + 1 - $teamTotalWins - $belowTeamTotalLosses; // TODO: Make number of games in a season dynamic
+		$belowTeamTotalLosses = mysql_result($result,$i+1,2) + mysql_result($result,$i+1,4);
+		$magicNumber = 68 + 1 - $teamTotalWins - $belowTeamTotalLosses;
 
-		$sqlQueryString = "INSERT INTO ibl_standings (
-			team_name,
-			".$groupingMagicNumber."
-		)
-		VALUES (
-			'".$teamName."',
-			'".$magicNumber."'
-		)
-		ON DUPLICATE KEY UPDATE
-			".$groupingMagicNumber." = '".$magicNumber."'";
+		$sqlQueryString = "INSERT INTO IBL_Standings (team_name,".$groupingMagicNumber.") VALUES ('".$teamName."','".$magicNumber."')
+			ON DUPLICATE KEY UPDATE ".$groupingMagicNumber." = '".$magicNumber."'";
 
 		if (mysql_query($sqlQueryString)) {
 			echo $sqlQueryString.'<br>';
 		} else die('Invalid query: '.mysql_error());
 		$i++;
 	}
-	echo 'Magic numbers for the '.$region.' '.$grouping.' have been updated.<p>';
 }
 
 extractStandingsValues($rowsByConference,$rowsByDivision);
+
+echo '<p>Updating the magic numbers for all teams...<p>';
 
 updateMagicNumbers('Eastern');
 updateMagicNumbers('Western');
@@ -359,208 +311,8 @@ updateMagicNumbers('Atlantic');
 updateMagicNumbers('Central');
 updateMagicNumbers('Midwest');
 updateMagicNumbers('Pacific');
-echo '<p>Magic numbers for all teams have been updated.<p>';
 
-echo '<p>The ibl_schedule and ibl_standings table have been updated.<p>';
-
-//*****************************************************************************
-//*** POWER RANKINGS UPDATE
-//*****************************************************************************
-//This section updates nuke_ibl_power. This replaces power_ranking_update.php.
-
-echo '<p>Updating the nuke_ibl_power database table...<p>';
-
-$queryTeams = "SELECT TeamID, Team, streak_type, streak
-	FROM nuke_ibl_power
-	WHERE TeamID
-	BETWEEN 1 AND 32
-	ORDER BY TeamID ASC";
-$resultTeams = mysql_query($queryTeams);
-$numTeams = mysql_numrows($resultTeams);
-
-$queryCurrentYear = 'SELECT value
-	FROM nuke_ibl_settings
-	WHERE name = "Current Season Ending Year"';
-$resultCurrentYear = mysql_query($queryCurrentYear);
-$currentYear=mysql_result($resultCurrentYear, 0);
-
-$i = 0;
-while ($i < $numTeams) {
-	$tid = mysql_result($resultTeams, $i, "TeamID");
-	$teamName = mysql_result($resultTeams, $i, "Team");
-
-	$queryGames = "SELECT Visitor, Vscore, Home, HScore
-		FROM ibl_schedule
-		WHERE (Visitor = $tid OR Home = $tid)
-		AND (BoxID > 0 AND BoxID != 100000)
-		ORDER BY Date ASC";
-	$resultGames = mysql_query($queryGames);
-	$numGames = mysql_numrows($resultGames);
-
-	$wins = 0;
-	$losses = 0;
-	$homeWins = 0;
-	$homeLosses = 0;
-	$awayWins = 0;
-	$awayLosses = 0;
-	$winPoints = 0;
-	$lossPoints = 0;
-	$winsInLast10Games = 0;
-	$lossesInLast10Games = 0;
-	$streak = 0;
-
-	$j = 0;
-	while ($j < $numGames) {
-		$awayTeam = mysql_result($resultGames, $j, "Visitor");
-		$awayTeamScore = mysql_result($resultGames, $j, "VScore");
-		$homeTeam = mysql_result($resultGames, $j, "Home");
-		$homeTeamScore = mysql_result($resultGames, $j, "HScore");
-		if ($awayTeamScore !== $homeTeamScore) { // Ignore tied games since they're usually 0-0 games that haven't yet occurred
-			if ($tid == $awayTeam) {
-				$queryOpponentWinLoss = "SELECT win, loss
-					FROM nuke_ibl_power
-					WHERE TeamID = $homeTeam";
-				$resultOpponentWinLoss = mysql_query($queryOpponentWinLoss);
-				$opponentWins = mysql_result($resultOpponentWinLoss, 0, "win");
-				$opponentLosses = mysql_result($resultOpponentWinLoss, 0, "loss");
-
-				if ($awayTeamScore > $homeTeamScore) {
-					$wins++;
-					$awayWins++;
-					$winPoints = $winPoints + $opponentWins;
-					if ($j >= $numGames - 10) {
-						$winsInLast10Games++;
-					}
-					if ($streakType == "W") {
-						$streak++;
-					} else {
-						$streak = 1;
-					}
-					$streakType = "W";
-				} else {
-					$losses++;
-					$awayLosses++;
-					$lossPoints = $lossPoints + $opponentLosses;
-					if ($j >= $numGames - 10) {
-						$lossesInLast10Games++;
-					}
-					if ($streakType == "L") {
-						$streak++;
-					} else {
-						$streak = 1;
-					}
-					$streakType = "L";
-				}
-			} elseif ($tid == $homeTeam) {
-				$queryOpponentWinLoss = "SELECT win, loss
-					FROM nuke_ibl_power
-					WHERE TeamID = $awayTeam";
-				$resultOpponentWinLoss = mysql_query($queryOpponentWinLoss);
-				$opponentWins = mysql_result($resultOpponentWinLoss, 0, "win");
-				$opponentLosses = mysql_result($resultOpponentWinLoss, 0, "loss");
-
-				if ($awayTeamScore > $homeTeamScore) {
-					$losses++;
-					$homeLosses++;
-					$lossPoints = $lossPoints + $opponentLosses;
-					if ($j >= $numGames - 10) {
-						$lossesInLast10Games++;
-					}
-					if ($streakType == "L") {
-						$streak++;
-					} else {
-						$streak = 1;
-					}
-					$streakType = "L";
-				} else {
-					$wins++;
-					$homeWins++;
-					$winPoints = $winPoints + $opponentWins;
-					if ($j >= $numGames - 10) {
-						$winsInLast10Games++;
-					}
-					if ($streakType == "W") {
-						$streak++;
-					} else {
-						$streak = 1;
-					}
-					$streakType = "W";
-				}
-			}
-		}
-		$j++;
-	}
-
-	$gb = ($wins / 2) - ($losses / 2);
-
-	$winPoints = $winPoints + $wins;
-	$lossPoints = $lossPoints + $losses;
-	$ranking = round(($winPoints / ($winPoints + $lossPoints)) * 100, 1);
-
-	// Update nuke_ibl_power with each team's win/loss info and current power ranking score
-	$query3 = "UPDATE nuke_ibl_power
-		SET win = $wins,
-			loss = $losses,
-			gb = $gb,
-			home_win = $homeWins,
-			home_loss = $homeLosses,
-			road_win = $awayWins,
-			road_loss = $awayLosses,
-			last_win = $winsInLast10Games,
-			last_loss = $lossesInLast10Games,
-			streak_type = '".$streakType."',
-			streak = $streak,
-			ranking = $ranking
-		WHERE TeamID = $tid;";
-	$result3 = mysql_query($query3);
-
-	echo "Updating $teamName: $wins wins, $losses losses, $gb games back, $homeWins home wins, $homeLosses home losses, $awayWins away wins, $awayLosses away losses, streak = $streakType$streak, ranking score = $ranking<br>";
-
-	// Reset Depth Chart sent status
-	$query7 = "UPDATE ibl_team_history SET sim_depth = 'No Depth Chart'";
-	$result7 = mysql_query($query7);
-
-	// Update nuke_iblteam_win_loss with each team's season win/loss info
-	$query4 = "UPDATE nuke_iblteam_win_loss a, nuke_ibl_power b
-		SET a.wins = b.win,
-			a.losses = b.loss
-		WHERE a.currentname = b.Team AND a.year = '".$currentYear."';";
-	$result4 = mysql_query($query4);
-
-	// Update teams' total wins in ibl_team_history by summing up a team's wins in nuke_iblteam_win_loss
-	$query8 = "UPDATE ibl_team_history a
-		SET totwins = (SELECT SUM(b.wins)
-		FROM nuke_iblteam_win_loss AS b
-		WHERE a.team_name = b.currentname)";
-	$result8 = mysql_query($query8);
-
-	// Update teams' total losses in ibl_team_history by summing up a team's losses in nuke_iblteam_win_loss
-	$query9 = "UPDATE ibl_team_history a
-		SET totloss = (SELECT SUM(b.losses)
-		FROM nuke_iblteam_win_loss AS b
-		WHERE a.team_name = b.currentname)";
-	$result9 = mysql_query($query9);
-
-	// Update teams' win totals in ibl_team_history
-	$query10 = "UPDATE ibl_team_history a, nuke_ibl_power b
-		SET a.totwins = a.totwins + b.win
-		WHERE a.teamid = b.TeamID";
-	$result10 = mysql_query($query10);
-
-	// Update teams' loss totals in ibl_team_history
-	$query11 = "UPDATE ibl_team_history a, nuke_ibl_power b
-		SET a.totloss = a.totloss + b.loss
-		WHERE a.teamid = b.TeamID";
-	$result11 = mysql_query($query11);
-
-	// Update teams' win percentage in ibl_team_history
-	$query12 = "UPDATE ibl_team_history a SET winpct = a.totwins / (a.totwins + a.totloss)";
-	$result12 = mysql_query($query12);
-
-	$i++;
-}
-
-echo '<p>Power Rankings have been updated.<p>';
+echo '<p>The IBL_Schedule and IBL_Standings table have been updated.<p>';
 
 //*****************************************************************************
 //*** STANDINGS PAGE UPDATE
@@ -582,7 +334,7 @@ function displayStandings($region)
 
 	list ($grouping,$groupingGB,$groupingMagicNumber) = groupingSort($region);
 
-	$query = "SELECT tid,team_name,leagueRecord,pct,".$groupingGB.",confRecord,divRecord,homeRecord,awayRecord,gamesUnplayed,".$groupingMagicNumber." FROM ibl_standings WHERE ".$grouping." = '".$region."' ORDER BY ".$groupingGB." ASC";
+	$query = "SELECT tid,team_name,leagueRecord,pct,".$groupingGB.",confRecord,divRecord,homeRecord,awayRecord,gamesUnplayed,".$groupingMagicNumber." FROM IBL_Standings WHERE ".$grouping." = '".$region."' ORDER BY ".$groupingGB." ASC";
 	$result = mysql_query($query);
 	$limit = mysql_num_rows($result);
 
@@ -614,13 +366,6 @@ function displayStandings($region)
 		$gamesUnplayed = mysql_result($result,$i,9);
 		$magicNumber = mysql_result($result,$i,10);
 
-		$queryLast10Games = "SELECT last_win, last_loss, streak_type, streak FROM nuke_ibl_power WHERE TeamID = $tid";
-		$resultLast10Games = mysql_query($queryLast10Games);
-		$winsInLast10Games = mysql_result($resultLast10Games,0,0);
-		$lossesInLast10Games = mysql_result($resultLast10Games,0,1);
-		$streakType = mysql_result($resultLast10Games,0,2);
-		$streak = mysql_result($resultLast10Games,0,3);
-
 		$standingsHTML=$standingsHTML.'<tr><td><a href="modules.php?name=Team&op=team&tid='.$tid.'">'.$team_name.'</td>
 			<td>'.$leagueRecord.'</td>
 			<td>'.$pct.'</td>
@@ -631,14 +376,13 @@ function displayStandings($region)
 			<td>'.$divRecord.'</td>
 			<td>'.$homeRecord.'</td>
 			<td>'.$awayRecord.'</td>
-			<td>'.$winsInLast10Games.'-'.$lossesInLast10Games.'</td>
-			<td>'.$streakType.' '.$streak.'</td></tr>';
+			<td></td>
+			<td></td></tr>';
 		$i++;
 	}
 	$standingsHTML=$standingsHTML.'<tr><td colspan=10><hr></td></tr>';
 }
 
-echo '<p>Updating the Standings page...<p>';
 $standingsHTML=$standingsHTML.'<table>';
 displayStandings('Eastern');
 displayStandings('Western');
@@ -655,17 +399,15 @@ $standingsHTML=$standingsHTML.'</table>';
 $sqlQueryString = "UPDATE nuke_pages SET text='".$standingsHTML."' WHERE pid=4";
 if (mysql_query($sqlQueryString)) {
 	echo $sqlQueryString.'<p>';
-	echo '<p>Full standings page has been updated.<p>';
 } else die('Invalid query: '.mysql_error());
 
 $resetExtensionQueryString = 'UPDATE nuke_ibl_team_info SET Used_Extension_This_Chunk=0';
 if (mysql_query($resetExtensionQueryString)) {
 	echo $resetExtensionQueryString.'<p>';
-	echo '<p>Contract Extension usages have been reset.<p>';
 } else die('Invalid query: '.mysql_error());
 
-echo '<p>All the things have been updated!<p>';
-
-echo '<a href="index.php">Return to the IBL homepage</a>';
+echo 'Full standings page has been updated.<br>';
+echo 'Sidebar standings have been updated.<p>';
+echo '<a href="/">Return to the IBL homepage</a>';
 
 ?>

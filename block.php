@@ -1,10 +1,13 @@
 <?php
 
-require 'config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
+$username = "iblhoops_chibul";
+$password = "oliver23";
+$database = "iblhoops_iblleague";
 
 $val = $_GET['day'];
+
+mysql_connect(localhost,$username,$password);
+@mysql_select_db($database) or die( "Unable to select database");
 
 $query="SELECT * FROM `nuke_ibl_fa_offers` ORDER BY name ASC, perceivedvalue DESC";
 $result=mysql_query($query);
@@ -53,7 +56,7 @@ while ($i < $num) {
 	$offeryears=1;
 	}
 	$offertotal=($offer1+$offer2+$offer3+$offer4+$offer5+$offer6)/100;
-
+	
 	$demyrs=6;
 	if ($dem6 == 0) {
 		$demyrs=5;
@@ -71,7 +74,7 @@ while ($i < $num) {
 			$perceivedvalue=0;
   		}
   	}
-
+  	
   	$demands=($dem1+$dem2+$dem3+$dem4+$dem5+$dem6)/$demyrs*((11-$val)/10);
  	if ($nameholder == $name) {
  	} else {
@@ -87,7 +90,7 @@ while ($i < $num) {
 			}
 		}
 	}
-
+	
 	$nameholder=$name;
 	$i=$i+1;
 }
@@ -99,18 +102,18 @@ while ($i < $num) {
 	$name=mysql_result($result,$i,"name");
 	$perceivedvalue=mysql_result($result,$i,"perceivedvalue");
 	$team=mysql_result($result,$i,"team");
-
+	
 	$offer1=mysql_result($result,$i,"offer1");
 	$offer2=mysql_result($result,$i,"offer2");
 	$offer3=mysql_result($result,$i,"offer3");
 	$offer4=mysql_result($result,$i,"offer4");
 	$offer5=mysql_result($result,$i,"offer5");
 	$offer6=mysql_result($result,$i,"offer6");
-
+	
 	$MLE=mysql_result($result,$i,"MLE");
 	$LLE=mysql_result($result,$i,"LLE");
 	$random=mysql_result($result,$i,"random");
-
+	
 	echo "<TR><TD>$name</TD><TD>$team</TD><TD>$offer1</TD><TD>$offer2</TD><TD>$offer3</TD><TD>$offer4</TD><TD>$offer5</TD><TD>$offer6</TD><TD>$MLE</TD><TD>$LLE</TD><TD>$random</TD><TD>$perceivedvalue</TD></TR>";
 	$offeryears=6;
 	if ($offer6 == 0) {
@@ -133,31 +136,39 @@ while ($i < $num) {
 echo "</TABLE><hr> <h2>SQL QUERY BOX</h2><br> <FORM><TEXTAREA COLS=125 ROWS=20>$code</TEXTAREA> <hr> <h2>ACCEPTED OFFERS IN HTML FORMAT (FOR NEWS ARTICLE)</h2><br> <TEXTAREA COLS=125 ROWS=20>$text</TEXTAREA> <hr> <h2>ALL OFFERS IN HTML FORMAT (FOR NEWS ARTICLE EXTENDED TEXT)</h2><br> <TEXTAREA COLS=125 ROWS=20>$exttext</TEXTAREA></FORM> <hr> </HTML>";
 
 function getteamid ($teamname) {
-	if($teamname == 'Amigos') return 1;
-	if($teamname == 'Stars') return 2;
-	if($teamname == 'Muskies') return 3;
-	if($teamname == 'Warriors') return 4;
-	if($teamname == 'Pistons') return 5;
-	if($teamname == 'Supersonics') return 6;
-	if($teamname == 'Braves') return 7;
-	if($teamname == 'Pacers') return 8;
-	if($teamname == 'Spirits') return 9;
-	if($teamname == 'Steam Rollers') return 10;
-	if($teamname == 'Huskies') return 11;
-	if($teamname == 'Clippers') return 12;
-	if($teamname == 'Lakers') return 13;
-	if($teamname == 'Oaks') return 14;
-	if($teamname == 'Trailblazers') return 15;
-	if($teamname == 'Hawks') return 16;
-	if($teamname == 'Spurs') return 17;
-	if($teamname == 'Nets') return 18;
-	if($teamname == 'Bulls') return 19;
-	if($teamname == 'Cavaliers') return 20;
-	if($teamname == 'Colonels') return 21;
-	if($teamname == 'Bucks') return 22;
-	if($teamname == 'Chaparrals') return 23;
-	if($teamname == 'Sails') return 24;
-	return 0;
+	if($teamname == '76ers') { return 1;
+} if($teamname == 'Celtics') { return 2;
+} if($teamname == 'Knicks') { return 3;
+} if($teamname == 'Nets') { return 4;
+} if($teamname == 'Bucks') { return 5;
+} if($teamname == 'Bulls') { return 6;
+} if($teamname == 'Cavaliers') { return 7;
+} if($teamname == 'Hawks') { return 8;
+} if($teamname == 'Pacers') { return 9;
+} if($teamname == 'Pistons') { return 10;
+} if($teamname == 'Jazz') { return 11;
+} if($teamname == 'Mavericks') { return 12;
+} if($teamname == 'Nuggets') { return 13;
+} if($teamname == 'Rockets') { return 14;
+} if($teamname == 'Spurs') { return 15;
+} if($teamname == 'Clippers') { return 16;
+} if($teamname == 'Kings') { return 17;
+} if($teamname == 'Lakers') { return 18;
+} if($teamname == 'Suns') { return 19;
+} if($teamname == 'Warriors') { return 20;
+} if($teamname == 'Bullets') { return 21;
+} if($teamname == 'Supersonics') { return 22;
+} if($teamname == 'Trailblazers') { return 23;
+} if($teamname == 'Heat') { return 24;
+} if($teamname == 'Hornets') { return 25;
+} if($teamname == 'Magic') { return 26;
+} if($teamname == 'Raptors') { return 27;
+} if($teamname == 'Grizzlies') { return 28;
+} if($teamname == 'Bobcats') { return 29;
+} if($teamname == 'Timberwolves') { return 30;
+} if($teamname == 'Tigers') { return 31;
+} if($teamname == 'Thunder') { return 32;
+} return 0;
 }
 
 ?>

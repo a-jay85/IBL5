@@ -1,11 +1,15 @@
 <?php
 
-//This section stores Standings values in a database table called 'ibl_standings' so that they can be retrieved quickly.
-//The file 'block-AJstandings.php' relies on 'ibl_standings' to automate the sidebar standings display.
+//This section stores Standings values in a database table called 'IBL_Standings' so that they can be retrieved quickly.
+//The file 'block-AJstandings.php' relies on 'IBL_Standings' to automate the sidebar standings display.
 
-require 'config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
+
+$username = "iblhoops_chibul";
+$password = "oliver23";
+$database = "iblhoops_iblleague";
+
+mysql_connect(localhost,$username,$password);
+@mysql_select_db($database) or die( "Unable to select database");
 
 $standingsFilePath = 'ibl/IBL/Standings.htm';
 
@@ -60,7 +64,7 @@ function extractStandingsValues($confVar,$divVar) {
 			$awayWins = extractWins($awayRecord);
 			$awayLosses = extractLosses($awayRecord);
 
-			$sqlQueryString = "INSERT INTO ibl_standings (team_name,leagueRecord,pct,confGB,confRecord,divRecord,homeRecord,awayRecord,
+			$sqlQueryString = "INSERT INTO IBL_Standings (team_name,leagueRecord,pct,confGB,confRecord,divRecord,homeRecord,awayRecord,
 				confWins,confLosses,divWins,divLosses,homeWins,homeLosses,awayWins,awayLosses)
 				VALUES ('".$teamName."','".$leagueRecord."','".$pct."','".$confGB."','".$confRecord."','".$divRecord."','".$homeRecord."','".$awayRecord."',
 				'".$confWins."','".$confLosses."','".$divWins."','".$divLosses."','".$homeWins."','".$homeLosses."','".$awayWins."','".$awayLosses."')
@@ -86,7 +90,7 @@ function extractStandingsValues($confVar,$divVar) {
 			$rowUpdate = mysql_query($sqlQueryString);
 			if (!$sqlQueryString) {
 				die('Invalid query: ' . mysql_error());
-			}
+			}		
 		}
 	}
 
@@ -97,7 +101,7 @@ function extractStandingsValues($confVar,$divVar) {
 		if (!in_array($teamName, array("Atlantic", "Central", "Midwest", "Pacific", "team", ""))) {
 			$divGB = $row->childNodes->item(3)->nodeValue;
 
-			$sqlQueryString = "INSERT INTO ibl_standings (team_name,divGB)
+			$sqlQueryString = "INSERT INTO IBL_Standings (team_name,divGB)
 				VALUES ('".$teamName."','".$divGB."')
 
 				ON DUPLICATE KEY UPDATE
@@ -115,6 +119,6 @@ function extractStandingsValues($confVar,$divVar) {
 extractStandingsValues($rowsByConference,$rowsByDivision);
 
 echo '<p>';
-echo 'ibl_standings table has successfully been updated.';
+echo 'IBL_Standings table has successfully been updated.';
 
 ?>

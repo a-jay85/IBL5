@@ -1,6 +1,6 @@
 <?php
 // PHP permanent URL redirection test
-header("Location: http://www.iblhoops.net/ibl5/", true, 301);
+header("Location: /ibl5/index.php", true, 302);
 exit();
 /************************************************************************/
 /* PHP-NUKE: Advanced Content Management System                         */

@@ -22,7 +22,7 @@ require 'config.php';
 mysql_connect($dbhost,$dbuname,$dbpass) or die("Unable to connect");
 @mysql_select_db($dbname) or die("Unable to select database");
 
-include "/sharedFunctions.php";
+include_once $_SERVER['DOCUMENT_ROOT'] . "/sharedFunctions.php";
 
 /* DIVISIONAL STANDINGS
 $queryNLWest = "SELECT tid,team_name,leagueRecord,divGB FROM ibl_standings WHERE division = 'NL West' ORDER BY divGB ASC";

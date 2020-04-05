@@ -1,8 +1,11 @@
 <?php
 
-require 'config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
+$username = "iblhoops_chibul";
+$password = "oliver23";
+$database = "iblhoops_iblleague";
+
+mysql_connect(localhost,$username,$password);
+@mysql_select_db($database) or die( "Unable to select database");
 
 echo "<HTML><HEAD><TITLE>Free Agency Offer Entry</TITLE></HEAD><BODY>";
 
@@ -589,7 +592,7 @@ VALUES ( '$Player_Name', '$Team_Name', '$Offer_1', '$Offer_2', '$Offer_3', '$Off
 
 $resultchunk=mysql_query($querychunk);
 
-echo "Your offer is legal, and has been entered into the system.  It should show up immediately.  Please <a href=\"modules.php?name=Free_Agency\">click here to return to the Free Agency main page</a> (your offer should now be visible).</br>";
+echo "Your offer is legal, and has been entered into the system.  It should show up immediately.  Please <a href=\"http://www.iblhoops.net/modules.php?name=Free_Agency\">click here to return to the Free Agency main page</a> (your offer should now be visible).</br>";
 
 } else {
 

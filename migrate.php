@@ -1,8 +1,12 @@
 <?php
 
-require 'config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
+$username = "iblhoops_chibul";
+$password = "oliver23";
+$database = "iblhoops_iblleague";
+
+
+mysql_connect(localhost,$username,$password);
+@mysql_select_db($database) or die( "Unable to select database");
 
 $Team_Name = $_POST['teamname'];
 $Player_Name = $_POST['playername'];
@@ -17,7 +21,7 @@ $resultmigrate=mysql_query($querymigrate);
 
 echo "<html><head><title>Position Migration Processing</title></head><body>
 
-Your position migration request has been processed and updated in the database.  It should show up on the Free Agency page immediately.  Please <a href=\"modules.php?name=Free_Agency\">click here to return to the Free Agency Screen</a>.<br><br>
+Your position migration request has been processed and updated in the database.  It should show up on the Free Agency page immediately.  Please <a href=\"http://www.iblhoops.net/modules.php?name=Free_Agency\">click here to return to the Free Agency Screen</a>.<br><br>
 ";
 
 if (mail($recipient, $emailsubject, $filetext, "From: migration@iblhoops.net"))

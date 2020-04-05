@@ -18,9 +18,12 @@ if ( !defined('BLOCK_FILE') ) {
 
 global $prefix, $multilingual, $currentlang, $db;
 
-require 'config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
+$username = "iblhoops_chibul";
+$password = "oliver23";
+$database = "iblhoops_iblleague";
+
+mysql_connect(localhost,$username,$password);
+@mysql_select_db($database) or die( "Unable to select database");
 
 $max_chunk_query="SELECT MAX(chunk) as maxchunk FROM nuke_iblplyr_chunk WHERE active = 1";
 $max_chunk_result=mysql_query($max_chunk_query);
@@ -43,40 +46,40 @@ $c = all_chunk("C", $row);
 $content = $content."<center><table><tr>";
 $content = $content.$pg.$sg.$sf.$pf.$c."</tr></table>";
 /*
-$content = $content."<table><tr><td><table><tr><td bgcolor=#660000><b><font color=#ffffff>Name:</td><td bgcolor=#660000><b><font color=#ffffff>Points</td></tr><tr><td><b><a href=modules.php?name=Player&pa=showpage&pid=$pid1>$name1</a><br>$teamname1</td><td>$ppg1</td></tr>";
-$content = $content."<tr><td><a href=modules.php?name=Player&pa=showpage&pid=$pid2>$name2</a><br>$teamname2</td><td>$ppg2</td></tr>";
-$content = $content."<tr><td><a href=modules.php?name=Player&pa=showpage&pid=$pid3>$name3</a><br>$teamname3</td><td>$ppg3</td></tr>";
-$content = $content."<tr><td><a href=modules.php?name=Player&pa=showpage&pid=$pid4>$name4</a><br>$teamname4</td><td>$ppg4</td></tr>";
-$content = $content."<tr><td><a href=modules.php?name=Player&pa=showpage&pid=$pid5>$name5</a><br>$teamname5</td><td>$ppg5</td></tr>";
-$content = $content."<tr><td><img src=\"../images/player/$pid1.jpg\"></td></tr></table></td>";
+$content = $content."<table><tr><td><table><tr><td bgcolor=#660000><b><font color=#ffffff>Name:</td><td bgcolor=#660000><b><font color=#ffffff>Points</td></tr><tr><td><b><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pid1>$name1</a><br>$teamname1</td><td>$ppg1</td></tr>";
+$content = $content."<tr><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pid2>$name2</a><br>$teamname2</td><td>$ppg2</td></tr>";
+$content = $content."<tr><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pid3>$name3</a><br>$teamname3</td><td>$ppg3</td></tr>";
+$content = $content."<tr><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pid4>$name4</a><br>$teamname4</td><td>$ppg4</td></tr>";
+$content = $content."<tr><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pid5>$name5</a><br>$teamname5</td><td>$ppg5</td></tr>";
+$content = $content."<tr><td><img src=\"http://www.iblhoops.net/images/player/$pid1.jpg\"></td></tr></table></td>";
 
-$content = $content."<td><table><tr><td bgcolor=#660000><b><font color=#ffffff>Name:</td><td bgcolor=#660000><b><font color=#ffffff>Rebounds</td></tr><tr><td><b><a href=modules.php?name=Player&pa=showpage&pid=$pidreb1>$name_reb1</a><br>$teamname_reb1</td><td>$reb1</td></tr>";
-$content = $content."<tr><td><a href=modules.php?name=Player&pa=showpage&pid=$pidreb2>$name_reb2</a><br>$teamname_reb2</td><td>$reb2</td></tr>";
-$content = $content."<tr><td><a href=modules.php?name=Player&pa=showpage&pid=$pidreb3>$name_reb3</a><br>$teamname_reb3</td><td>$reb3</td></tr>";
-$content = $content."<tr><td><a href=modules.php?name=Player&pa=showpage&pid=$pidreb4>$name_reb4</a><br>$teamname_reb4</td><td>$reb4</td></tr>";
-$content = $content."<tr><td><a href=modules.php?name=Player&pa=showpage&pid=$pidreb5>$name_reb5</a><br>$teamname_reb5</td><td>$reb5</td></tr>";
-$content = $content."<tr><td><img src=\"../images/player/$pidreb1.jpg\"></td></tr></table></td>";
+$content = $content."<td><table><tr><td bgcolor=#660000><b><font color=#ffffff>Name:</td><td bgcolor=#660000><b><font color=#ffffff>Rebounds</td></tr><tr><td><b><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pidreb1>$name_reb1</a><br>$teamname_reb1</td><td>$reb1</td></tr>";
+$content = $content."<tr><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pidreb2>$name_reb2</a><br>$teamname_reb2</td><td>$reb2</td></tr>";
+$content = $content."<tr><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pidreb3>$name_reb3</a><br>$teamname_reb3</td><td>$reb3</td></tr>";
+$content = $content."<tr><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pidreb4>$name_reb4</a><br>$teamname_reb4</td><td>$reb4</td></tr>";
+$content = $content."<tr><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pidreb5>$name_reb5</a><br>$teamname_reb5</td><td>$reb5</td></tr>";
+$content = $content."<tr><td><img src=\"http://www.iblhoops.net/images/player/$pidreb1.jpg\"></td></tr></table></td>";
 
-$content = $content."<td><table><tr><td bgcolor=#660000><b><font color=#ffffff>Name:</td><td bgcolor=#660000><b><font color=#ffffff>Assists</td></tr><tr><td><b><a href=modules.php?name=Player&pa=showpage&pid=$pidast1>$name_ast1</a><br>$teamname_ast1</td><td>$ast1</td></tr>";
-$content = $content."<tr><td><a href=modules.php?name=Player&pa=showpage&pid=$pidast2>$name_ast2</a><br>$teamname_ast2</td><td>$ast2</td></tr>";
-$content = $content."<tr><td><a href=modules.php?name=Player&pa=showpage&pid=$pidast3>$name_ast3</a><br>$teamname_ast3</td><td>$ast3</td></tr>";
-$content = $content."<tr><td><a href=modules.php?name=Player&pa=showpage&pid=$pidast4>$name_ast4</a><br>$teamname_ast4</td><td>$ast4</td></tr>";
-$content = $content."<tr><td><a href=modules.php?name=Player&pa=showpage&pid=$pidast5>$name_ast5</a><br>$teamname_ast5</td><td>$ast5</td></tr>";
-$content = $content."<tr><td><img src=\"../images/player/$pidast1.jpg\"></td></tr></table></td>";
+$content = $content."<td><table><tr><td bgcolor=#660000><b><font color=#ffffff>Name:</td><td bgcolor=#660000><b><font color=#ffffff>Assists</td></tr><tr><td><b><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pidast1>$name_ast1</a><br>$teamname_ast1</td><td>$ast1</td></tr>";
+$content = $content."<tr><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pidast2>$name_ast2</a><br>$teamname_ast2</td><td>$ast2</td></tr>";
+$content = $content."<tr><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pidast3>$name_ast3</a><br>$teamname_ast3</td><td>$ast3</td></tr>";
+$content = $content."<tr><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pidast4>$name_ast4</a><br>$teamname_ast4</td><td>$ast4</td></tr>";
+$content = $content."<tr><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pidast5>$name_ast5</a><br>$teamname_ast5</td><td>$ast5</td></tr>";
+$content = $content."<tr><td><img src=\"http://www.iblhoops.net/images/player/$pidast1.jpg\"></td></tr></table></td>";
 
-$content = $content."<td><table><tr><td bgcolor=#660000><b><font color=#ffffff>Name:</td><td bgcolor=#660000><b><font color=#ffffff>Steals</td></tr><tr><td><b><a href=modules.php?name=Player&pa=showpage&pid=$pidstl1>$name_stl1</a><br>$teamname_stl1</td><td>$stl1</td></tr>";
-$content = $content."<tr><td><a href=modules.php?name=Player&pa=showpage&pid=$pidstl2>$name_stl2</a><br>$teamname_stl2</td><td>$stl2</td></tr>";
-$content = $content."<tr><td><a href=modules.php?name=Player&pa=showpage&pid=$pidstl3>$name_stl3</a><br>$teamname_stl3</td><td>$stl3</td></tr>";
-$content = $content."<tr><td><a href=modules.php?name=Player&pa=showpage&pid=$pidstl4>$name_stl4</a><br>$teamname_stl4</td><td>$stl4</td></tr>";
-$content = $content."<tr><td><a href=modules.php?name=Player&pa=showpage&pid=$pidstl5>$name_stl5</a><br>$teamname_stl5</td><td>$stl5</td></tr>";
-$content = $content."<tr><td><img src=\"../images/player/$pidstl1.jpg\"></td></tr></table></td>";
+$content = $content."<td><table><tr><td bgcolor=#660000><b><font color=#ffffff>Name:</td><td bgcolor=#660000><b><font color=#ffffff>Steals</td></tr><tr><td><b><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pidstl1>$name_stl1</a><br>$teamname_stl1</td><td>$stl1</td></tr>";
+$content = $content."<tr><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pidstl2>$name_stl2</a><br>$teamname_stl2</td><td>$stl2</td></tr>";
+$content = $content."<tr><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pidstl3>$name_stl3</a><br>$teamname_stl3</td><td>$stl3</td></tr>";
+$content = $content."<tr><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pidstl4>$name_stl4</a><br>$teamname_stl4</td><td>$stl4</td></tr>";
+$content = $content."<tr><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pidstl5>$name_stl5</a><br>$teamname_stl5</td><td>$stl5</td></tr>";
+$content = $content."<tr><td><img src=\"http://www.iblhoops.net/images/player/$pidstl1.jpg\"></td></tr></table></td>";
 
-$content = $content."<td><table><tr><td bgcolor=#660000><b><font color=#ffffff>Name:</td><td bgcolor=#660000><b><font color=#ffffff>Blocks</td></tr><tr><td><b><a href=modules.php?name=Player&pa=showpage&pid=$pidblk1>$name_blk1</a><br>$teamname_blk1</td><td>$blk1</td></tr>";
-$content = $content."<tr><td><a href=modules.php?name=Player&pa=showpage&pid=$pidblk2>$name_blk2</a><br>$teamname_blk2</td><td>$blk2</td></tr>";
-$content = $content."<tr><td><a href=modules.php?name=Player&pa=showpage&pid=$pidblk3>$name_blk3</a><br>$teamname_blk3</td><td>$blk3</td></tr>";
-$content = $content."<tr><td><a href=modules.php?name=Player&pa=showpage&pid=$pidblk4>$name_blk4</a><br>$teamname_blk4</td><td>$blk4</td></tr>";
-$content = $content."<tr><td><a href=modules.php?name=Player&pa=showpage&pid=$pidblk5>$name_blk5</a><br>$teamname_blk5</td><td>$blk5</td></tr>";
-$content = $content."<tr><td><img src=\"../images/player/$pidblk1.jpg\"></td></tr></table></td></tr></table>";
+$content = $content."<td><table><tr><td bgcolor=#660000><b><font color=#ffffff>Name:</td><td bgcolor=#660000><b><font color=#ffffff>Blocks</td></tr><tr><td><b><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pidblk1>$name_blk1</a><br>$teamname_blk1</td><td>$blk1</td></tr>";
+$content = $content."<tr><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pidblk2>$name_blk2</a><br>$teamname_blk2</td><td>$blk2</td></tr>";
+$content = $content."<tr><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pidblk3>$name_blk3</a><br>$teamname_blk3</td><td>$blk3</td></tr>";
+$content = $content."<tr><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pidblk4>$name_blk4</a><br>$teamname_blk4</td><td>$blk4</td></tr>";
+$content = $content."<tr><td><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pidblk5>$name_blk5</a><br>$teamname_blk5</td><td>$blk5</td></tr>";
+$content = $content."<tr><td><img src=\"http://www.iblhoops.net/images/player/$pidblk1.jpg\"></td></tr></table></td></tr></table>";
 */
 function all_chunk ($pos, $row)
 {
@@ -130,8 +133,8 @@ function all_chunk ($pos, $row)
 
 	if ($pospoc == $pos)
 	{
-	$all_chunk_player = "<td><table border=3 bordercolor=#FFD700><tbody><tr><td colspan=2><img src=\"../images/player/$pid.jpg\"> <img width=65 height=90 src=\"../images/logo/new$tid.gif\"></td>
-	<tr><td colspan=2><b><a href=modules.php?name=Player&pa=showpage&pid=$pid><font color=#006666>$name</font></a></td></tr>
+	$all_chunk_player = "<td><table border=3 bordercolor=#FFD700><tbody><tr><td colspan=2><img src=\"http://www.iblhoops.net/images/player/$pid.jpg\"> <img width=65 height=90 src=\"http://www.iblhoops.net/images/logo/new$tid.gif\"></td>
+	<tr><td colspan=2><b><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pid><font color=#006666>$name</font></a></td></tr>
 	<tr><td bgcolor=#006666 colspan=2><b><center><font color=#ffffff>$pos</font></center></b></td></tr>
 	<td><font color=#006666>Points:</font></td><td align=right><font color=#006666>$stats_ppg</font></td></tr>
 	<td><font color=#006666>Rebounds:</font></td><td align=right><font color=#006666>$stats_reb</font></td></tr>
@@ -139,8 +142,8 @@ function all_chunk ($pos, $row)
 	<td><font color=#006666>Steals:</font></td><td align=right><font color=#006666>$stats_stl</font></td></tr>
 	<td><font color=#006666>Blocks:</font></td><td align=right><font color=#006666>$stats_blk</font></td></tr></table></td>";
 	}else{
-	$all_chunk_player = "<td><table border=1 bordercolor=#006666><tbody><tr><td colspan=2><img src=\"../images/player/$pid.jpg\"> <img width=65 height=90 src=\"../images/logo/new$tid.gif\"></td>
-	<tr><td colspan=2><b><a href=modules.php?name=Player&pa=showpage&pid=$pid><font color=#006666>$name</font></a></td></tr>
+	$all_chunk_player = "<td><table border=1 bordercolor=#006666><tbody><tr><td colspan=2><img src=\"http://www.iblhoops.net/images/player/$pid.jpg\"> <img width=65 height=90 src=\"http://www.iblhoops.net/images/logo/new$tid.gif\"></td>
+	<tr><td colspan=2><b><a href=http://www.iblhoops.net/modules.php?name=Player&pa=showpage&pid=$pid><font color=#006666>$name</font></a></td></tr>
 	<tr><td bgcolor=#006666 colspan=2><b><center><font color=#ffffff>$pos</font></center></b></td></tr>
 	<td><font color=#006666>Points:</font></td><td align=right><font color=#006666>$stats_ppg</font></td></tr>
 	<td><font color=#006666>Rebounds:</font></td><td align=right><font color=#006666>$stats_reb</font></td></tr>

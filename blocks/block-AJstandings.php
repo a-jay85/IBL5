@@ -51,14 +51,14 @@ $resultWesternConference = mysql_query($queryWesternConference);
 $limitWesternConference = mysql_num_rows($resultWesternConference);
 
 $arrayLastSimDates = getLastSimDatesArray();
-$lastChunkStartDate = $arrayLastSimDates["Start Date"];
-$lastChunkEndDate = $arrayLastSimDates["End Date"];
+$lastSimStartDate = $arrayLastSimDates["Start Date"];
+$lastSimEndDate = $arrayLastSimDates["End Date"];
 
 $content=$content.'<table width=150>';
 $content=$content."<center><u>Recent Sim Dates:</u></center>";
-$content=$content."<center><strong>$lastChunkStartDate</strong></center>";
+$content=$content."<center><strong>$lastSimStartDate</strong></center>";
 $content=$content."<center>-to-</center>";
-$content=$content."<center><strong>$lastChunkEndDate</strong></center>";
+$content=$content."<center><strong>$lastSimEndDate</strong></center>";
 $content=$content.'<tr><td colspan=2><hr></td></tr>';
 $content=$content.'
 <tr><td colspan=2><center><font color=#fd004d><b>Eastern Conference</b></font></center></td></tr>

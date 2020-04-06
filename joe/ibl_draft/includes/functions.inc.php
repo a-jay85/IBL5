@@ -19,6 +19,7 @@
 
 function make_pick($pick_id, $player_id, $recursive = false) {
   global $settings;
+  require 'discordWebhooks.php';
   if ($pick_id) {
     $statement = "select * from pick where player_id = '$player_id'";
     // Make sure that the player has not already been picked
@@ -56,6 +57,8 @@ limit 1";
 	  $message .= '
 
 '.$row['team_name'].' is on the clock.';
+      // Post pick details to Discord
+      postToDiscordChannel('#draft-picks', $message);
 	  // Store the e-mail of the team that's on the clock for the notice below
 	  if ($row['team_email_prefs'] == kOptionNoEmail) {
 	    $clock_email = '';

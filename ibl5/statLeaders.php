@@ -4,6 +4,8 @@ require 'config.php';
 mysql_connect($dbhost,$dbuname,$dbpass);
 @mysql_select_db($dbname) or die("Unable to select database");
 
+include_once "sharedFunctions.php";
+
 $arrayStatNames = array(
     'POINTS',
     'REBOUNDS',
@@ -28,18 +30,30 @@ $arrayStatQueries = array(
     '`game3GM`'
 );
 
-function seasonHighTable($queryForStat, $statName, $playerOrTeam)
+$seasonPhase = $_GET['seasonPhase'];
+
+function seasonHighTable($queryForStat, $statName, $playerOrTeam, $seasonPhase)
 {
     if ($playerOrTeam == 'player') {
         $isPlayer = 'pid != 0';
     } elseif ($playerOrTeam == 'team') {
         $isPlayer = 'pid = 0';
     }
+    if ($seasonPhase == "playoffs") {
+        $lastSimDatesArray = getLastSimDatesArray();
+        $playoffYear = substr($lastSimDatesArray['End Date'], 0, 4);
 
-    $query = "SELECT `name`, `date`, " . $queryForStat . " AS `" . $statName . "`
-        FROM ibl_box_scores
-        WHERE " . $isPlayer . "
-        ORDER BY `" . $statName . "` DESC, date ASC LIMIT 15;";
+        $query = "SELECT `name`, `date`, " . $queryForStat . " AS `" . $statName . "`
+            FROM ibl_box_scores
+            WHERE " . $isPlayer . "
+            AND date > '" . $playoffYear . "-04-30'
+            ORDER BY `" . $statName . "` DESC, date ASC LIMIT 15;";
+    } else {
+        $query = "SELECT `name`, `date`, " . $queryForStat . " AS `" . $statName . "`
+            FROM ibl_box_scores
+            WHERE " . $isPlayer . "
+            ORDER BY `" . $statName . "` DESC, date ASC LIMIT 15;";
+    }
     $result = mysql_query($query);
     $numRows = mysql_num_rows($result);
 
@@ -92,27 +106,27 @@ $playerOrTeam = 'player';
 echo "<table cellpadding=5>\n";
 
 startTableRow();
-seasonHighTable(reset($arrayStatQueries), reset($arrayStatNames), $playerOrTeam);
+seasonHighTable(reset($arrayStatQueries), reset($arrayStatNames), $playerOrTeam, $seasonPhase);
 nextTableColumn();
-seasonHighTable(next($arrayStatQueries), next($arrayStatNames), $playerOrTeam);
+seasonHighTable(next($arrayStatQueries), next($arrayStatNames), $playerOrTeam, $seasonPhase);
 nextTableColumn();
-seasonHighTable(next($arrayStatQueries), next($arrayStatNames), $playerOrTeam);
+seasonHighTable(next($arrayStatQueries), next($arrayStatNames), $playerOrTeam, $seasonPhase);
 endTableRow();
 
 startTableRow();
-seasonHighTable(next($arrayStatQueries), next($arrayStatNames), $playerOrTeam);
+seasonHighTable(next($arrayStatQueries), next($arrayStatNames), $playerOrTeam, $seasonPhase);
 nextTableColumn();
-seasonHighTable(next($arrayStatQueries), next($arrayStatNames), $playerOrTeam);
+seasonHighTable(next($arrayStatQueries), next($arrayStatNames), $playerOrTeam, $seasonPhase);
 nextTableColumn();
-seasonHighTable(next($arrayStatQueries), next($arrayStatNames), $playerOrTeam);
+seasonHighTable(next($arrayStatQueries), next($arrayStatNames), $playerOrTeam, $seasonPhase);
 endTableRow();
 
 startTableRow();
-seasonHighTable(next($arrayStatQueries), next($arrayStatNames), $playerOrTeam);
+seasonHighTable(next($arrayStatQueries), next($arrayStatNames), $playerOrTeam, $seasonPhase);
 nextTableColumn();
-seasonHighTable(next($arrayStatQueries), next($arrayStatNames), $playerOrTeam);
+seasonHighTable(next($arrayStatQueries), next($arrayStatNames), $playerOrTeam, $seasonPhase);
 nextTableColumn();
-seasonHighTable(next($arrayStatQueries), next($arrayStatNames), $playerOrTeam);
+seasonHighTable(next($arrayStatQueries), next($arrayStatNames), $playerOrTeam, $seasonPhase);
 endTableRow();
 
 echo "</table>\n\n";
@@ -123,27 +137,27 @@ $playerOrTeam = 'team';
 echo "<table cellpadding=5>\n";
 
 startTableRow();
-seasonHighTable(reset($arrayStatQueries), reset($arrayStatNames), $playerOrTeam);
+seasonHighTable(reset($arrayStatQueries), reset($arrayStatNames), $playerOrTeam, $seasonPhase);
 nextTableColumn();
-seasonHighTable(next($arrayStatQueries), next($arrayStatNames), $playerOrTeam);
+seasonHighTable(next($arrayStatQueries), next($arrayStatNames), $playerOrTeam, $seasonPhase);
 nextTableColumn();
-seasonHighTable(next($arrayStatQueries), next($arrayStatNames), $playerOrTeam);
+seasonHighTable(next($arrayStatQueries), next($arrayStatNames), $playerOrTeam, $seasonPhase);
 endTableRow();
 
 startTableRow();
-seasonHighTable(next($arrayStatQueries), next($arrayStatNames), $playerOrTeam);
+seasonHighTable(next($arrayStatQueries), next($arrayStatNames), $playerOrTeam, $seasonPhase);
 nextTableColumn();
-seasonHighTable(next($arrayStatQueries), next($arrayStatNames), $playerOrTeam);
+seasonHighTable(next($arrayStatQueries), next($arrayStatNames), $playerOrTeam, $seasonPhase);
 nextTableColumn();
-seasonHighTable(next($arrayStatQueries), next($arrayStatNames), $playerOrTeam);
+seasonHighTable(next($arrayStatQueries), next($arrayStatNames), $playerOrTeam, $seasonPhase);
 endTableRow();
 
 startTableRow();
-seasonHighTable(next($arrayStatQueries), next($arrayStatNames), $playerOrTeam);
+seasonHighTable(next($arrayStatQueries), next($arrayStatNames), $playerOrTeam, $seasonPhase);
 nextTableColumn();
-seasonHighTable(next($arrayStatQueries), next($arrayStatNames), $playerOrTeam);
+seasonHighTable(next($arrayStatQueries), next($arrayStatNames), $playerOrTeam, $seasonPhase);
 nextTableColumn();
-seasonHighTable(next($arrayStatQueries), next($arrayStatNames), $playerOrTeam);
+seasonHighTable(next($arrayStatQueries), next($arrayStatNames), $playerOrTeam, $seasonPhase);
 endTableRow();
 
 echo "</table>\n\n";

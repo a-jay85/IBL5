@@ -52,7 +52,7 @@ function userinfo($username, $bypass=0, $hid=0, $url=0) {
 echo "
       <form name=\"EOYVote\" method=\"post\" action=\"EOYVote.php\"><center><img src=\"images/logo/$tid.jpg\"><br><br>";
 
-$query = "SELECT * FROM nuke_iblplyr where teamname != 'Retired' and stats_gm >= '10' order by name";
+$query = "SELECT * FROM nuke_iblplyr where teamname != 'Retired' and stats_gm >= '50' and stats_min/stats_gm >= '30' order by name";
 $result = mysql_query($query);
 while($row = mysql_fetch_assoc($result))
 {

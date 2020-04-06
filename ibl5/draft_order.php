@@ -2,13 +2,13 @@
 
 $username = "iblhoops_joe";
 $password = "celtics";
-$database = "iblhoops_ibldraft2";
+$database = "iblhoops_v4draft";
 
 mysql_connect(localhost,$username,$password);
 @mysql_select_db($database) or die( "Unable to select database");
 
 
-$querya="load data local infile 'spreadsheets/draft_order.csv' into table excel FIELDS TERMINATED BY ',' ENCLOSED BY '\"' ESCAPED BY '\\' (pick, team, tid)";
+$querya="load data local infile 'http://www.iblhoops.net/ibl5/spreadsheets/draft_order.csv' into table excel FIELDS TERMINATED BY ',' ENCLOSED BY '\"' ESCAPED BY '\\' (pick, team, tid)";
 $resulta=mysql_query($querya);
 
 $queryb="update excel a, team b set a.tid = b.team_id where a.team = b.full_name";

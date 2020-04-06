@@ -1,0 +1,9 @@
+ibl/
+phpmyadmin/
+depthcharts/
+backups/
+
+.DS_Store
+config.php
+discordWebhooks.php
+error_log

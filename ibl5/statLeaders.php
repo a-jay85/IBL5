@@ -96,11 +96,16 @@ function endTableRow ()
     echo "\t</tr>\n";
 }
 
+if ($seasonPhase == "playoffs") {
+    $phase = "Playoff";
+} else {
+    $phase = "Season";
+}
 
-echo "<html><head><title>Season Stat Leaders</title></head>\n\n";
+echo "<html><head><title>$phase Stat Leaders</title></head>\n\n";
 echo "<body>\n\n";
 
-echo "<H1>Players' Season Highs<H1>\n\n";
+echo "<H1>Players' $phase Highs<H1>\n\n";
 $playerOrTeam = 'player';
 
 echo "<table cellpadding=5>\n";
@@ -131,7 +136,7 @@ endTableRow();
 
 echo "</table>\n\n";
 
-echo "<H1>Teams' Season Highs</H1>\n\n";
+echo "<H1>Teams' $phase Highs</H1>\n\n";
 $playerOrTeam = 'team';
 
 echo "<table cellpadding=5>\n";

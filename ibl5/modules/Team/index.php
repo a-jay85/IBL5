@@ -24,7 +24,7 @@ require_once("mainfile.php");
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
-include "./sharedFunctions.php";
+include_once "sharedFunctions.php";
 
 $pagetitle = "- Team Pages";
 
@@ -1574,7 +1574,7 @@ function team($tid)
 			$table_simAverages=$table_simAverages."<tr bgcolor=$color1><th><font color=$color2>Pos</font></th><th colspan=3><font color=$color2>Player</font></th><th><font color=$color2>g</font></th><th><font color=$color2>min</font></th><th><font color=$color2>fgm</font></th><th><font color=$color2>fga</font></th><th><font color=$color2>fgp</font></th><th><font color=$color2>ftm</font></th><th><font color=$color2>fta</font></th><th><font color=$color2>ftp</font></th><th><font color=$color2>3gm</font></th><th><font color=$color2>3ga</font></th><th><font color=$color2>3gp</font></th><th><font color=$color2>orb</font></th><th><font color=$color2>reb</font></th><th><font color=$color2>ast</font></th><th><font color=$color2>stl</font></th><th><font color=$color2>to</font></th><th><font color=$color2>blk</font></th><th><font color=$color2>pf</font></th><th><font color=$color2>pts</font></th></tr></thead><tbody>";
 
 			$arrayLastSimDates = getLastSimDatesArray();
-			
+
 			$simStartDate = $arrayLastSimDates['Start Date'];
 			$simEndDate = $arrayLastSimDates['End Date'];
 

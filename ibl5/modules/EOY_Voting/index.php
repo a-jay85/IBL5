@@ -200,7 +200,7 @@ echo "<select name=\"MVP1\">
 </select><br><br>
 
 <select name=\"GM3\">
-  <option value=\"\">Select Your First Choice for GM of the Year...</option>
+  <option value=\"\">Select Your Third Choice for GM of the Year...</option>
   <option value=\"$ii\">$ii</option>
 
 </select>

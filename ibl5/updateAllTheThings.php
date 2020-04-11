@@ -27,13 +27,13 @@ function extractDate($rawDate)
 {
 	if ($rawDate != FALSE) {
 		if (substr($rawDate,0,4) === "Post") {
-			$rawDate = substr_replace($rawDate,'May',0,4); // TODO: recognize "Post" instead of hacking it into May
+			$rawDate = substr_replace($rawDate, 'May', 0, 4); // TODO: recognize "Post" instead of hacking it into May
 		}
 
-		$month = ltrim(date('m', strtotime($rawDate)),'0');
-		$day = ltrim(date('d', strtotime($rawDate)),'0');
+		$month = ltrim(date('m', strtotime($rawDate)), '0');
+		$day = ltrim(date('d', strtotime($rawDate)), '0');
 		$year = date('Y', strtotime($rawDate));
-		$date = $year."-".$month."-".$day;
+		$date = $year . "-" . $month . "-" . $day;
 
 		$dateArray = array(
 			"date" => $date,
@@ -136,7 +136,7 @@ foreach ($rows as $row) {
 		"; */
 
 	if (mysql_query($sqlQueryString)) {
-		echo $sqlQueryString.'<br>';
+		echo $sqlQueryString . '<br>';
 	} // DO NOT use 'else die('Invalid query: '.mysql_error()' here -- script depends on being able to pass broken SQL strings for now.
 }
 
@@ -174,19 +174,19 @@ $rowsByDivision = $getRows->item(0)->childNodes->item(1)->childNodes->item(0)->c
 
 function extractWins($var)
 {
-	$var = rtrim(substr($var,0,2),'-');
+	$var = rtrim(substr($var, 0, 2),'-');
 	return $var;
 }
 
 function extractLosses($var)
 {
-	$var = ltrim(substr($var,-2,2),'-');
+	$var = ltrim(substr($var, -2, 2), '-');
 	return $var;
 }
 
 echo '<p>Updating the ibl_standings database table...<p>';
 
-function extractStandingsValues($confVar,$divVar)
+function extractStandingsValues($confVar, $divVar)
 {
 	echo '<p>Updating the conference standings for all teams...<p>';
 	foreach ($confVar as $row) {
@@ -275,8 +275,8 @@ function extractStandingsValues($confVar,$divVar)
 			";
 
 			if (mysql_query($sqlQueryString)) {
-				echo $sqlQueryString.'<br>';
-			} else die('Invalid query: '.mysql_error());
+				echo $sqlQueryString . '<br>';
+			} else die('Invalid query: ' . mysql_error());
 		}
 	}
 	echo '<p>Conference standings have been updated.<p>';
@@ -296,17 +296,17 @@ function extractStandingsValues($confVar,$divVar)
 				divGB
 			)
 			VALUES (
-				'".$teamName."',
-				'".$division."',
-				'".$divGB."'
+				'$teamName',
+				'$division',
+				'$divGB'
 			)
 			ON DUPLICATE KEY UPDATE
-				division = '".$division."',
-				divGB = '".$divGB."'";
+				division = '$division',
+				divGB = '$divGB'";
 
 			if (mysql_query($sqlQueryString)) {
-				echo $sqlQueryString.'<br>';
-			} else die('Invalid query: '.mysql_error());
+				echo $sqlQueryString . '<br>';
+			} else die('Invalid query: ' . mysql_error());
 		}
 	}
 	echo 'Division standings have been updated.<p>';
@@ -314,19 +314,22 @@ function extractStandingsValues($confVar,$divVar)
 
 function updateMagicNumbers ($region)
 {
-	echo '<p>Updating the magic numbers for the '.$region.'...<br>';
-	list ($grouping,$groupingGB,$groupingMagicNumber) = groupingSort($region);
+	echo "<p>Updating the magic numbers for the $region...<br>";
+	list ($grouping, $groupingGB, $groupingMagicNumber) = groupingSort($region);
 
-	$query = "SELECT team_name,homeWins,homeLosses,awayWins,awayLosses FROM ibl_standings WHERE ".$grouping." = '".$region."' ORDER BY pct DESC";
+	$query = "SELECT team_name, homeWins, homeLosses, awayWins, awayLosses
+		FROM ibl_standings
+		WHERE $grouping = '$region'
+		ORDER BY pct DESC";
 	$result = mysql_query($query);
 	$limit = mysql_num_rows($result);
 
 	$i = 0;
 	while ($i < $limit) {
-		$teamName = mysql_result($result,$i,0);
-		$teamTotalWins = mysql_result($result,$i,1) + mysql_result($result,$i,3);
-		if ($i+1 != $limit) {
-			$belowTeamTotalLosses = mysql_result($result,$i+1,2) + mysql_result($result,$i+1,4);
+		$teamName = mysql_result($result, $i, 0);
+		$teamTotalWins = mysql_result($result, $i, 1) + mysql_result($result, $i, 3);
+		if ($i + 1 != $limit) {
+			$belowTeamTotalLosses = mysql_result($result, $i + 1, 2) + mysql_result($result, $i + 1, 4);
 		} else {
 			$belowTeamTotalLosses = 0; // This results in an inaccurate Magic Number for the bottom team in the $region, but prevents query errors
 		}
@@ -334,24 +337,24 @@ function updateMagicNumbers ($region)
 
 		$sqlQueryString = "INSERT INTO ibl_standings (
 			team_name,
-			".$groupingMagicNumber."
+			$groupingMagicNumber
 		)
 		VALUES (
-			'".$teamName."',
-			'".$magicNumber."'
+			'$teamName',
+			'$magicNumber'
 		)
 		ON DUPLICATE KEY UPDATE
-			".$groupingMagicNumber." = '".$magicNumber."'";
+			$groupingMagicNumber = '$magicNumber'";
 
 		if (mysql_query($sqlQueryString)) {
-			echo $sqlQueryString.'<br>';
-		} else die('Invalid query: '.mysql_error());
+			echo $sqlQueryString . '<br>';
+		} else die('Invalid query: ' . mysql_error());
 		$i++;
 	}
-	echo 'Magic numbers for the '.$region.' '.$grouping.' have been updated.<p>';
+	echo "Magic numbers for the $region $grouping have been updated.<p>";
 }
 
-extractStandingsValues($rowsByConference,$rowsByDivision);
+extractStandingsValues($rowsByConference, $rowsByDivision);
 
 updateMagicNumbers('Eastern');
 updateMagicNumbers('Western');
@@ -509,7 +512,7 @@ while ($i < $numTeams) {
 			road_loss = $awayLosses,
 			last_win = $winsInLast10Games,
 			last_loss = $lossesInLast10Games,
-			streak_type = '".$streakType."',
+			streak_type = '$streakType',
 			streak = $streak,
 			ranking = $ranking
 		WHERE TeamID = $tid;";
@@ -583,7 +586,9 @@ function displayStandings($region)
 
 	list ($grouping,$groupingGB,$groupingMagicNumber) = groupingSort($region);
 
-	$query = "SELECT tid,team_name,leagueRecord,pct,".$groupingGB.",confRecord,divRecord,homeRecord,awayRecord,gamesUnplayed,".$groupingMagicNumber." FROM ibl_standings WHERE ".$grouping." = '".$region."' ORDER BY ".$groupingGB." ASC";
+	$query = "SELECT tid, team_name, leagueRecord, pct, $groupingGB, confRecord, divRecord, homeRecord, awayRecord, gamesUnplayed, $groupingMagicNumber
+		FROM ibl_standings
+		WHERE $grouping = '$region' ORDER BY $groupingGB ASC";
 	$result = mysql_query($query);
 	$limit = mysql_num_rows($result);
 
@@ -603,24 +608,24 @@ function displayStandings($region)
 
 	$i = 0;
 	while ($i < $limit) {
-		$tid = mysql_result($result,$i,0);
-		$team_name = mysql_result($result,$i,1);
-		$leagueRecord = mysql_result($result,$i,2);
-		$pct = mysql_result($result,$i,3);
-		$GB = mysql_result($result,$i,4);
-		$confRecord = mysql_result($result,$i,5);
-		$divRecord = mysql_result($result,$i,6);
-		$homeRecord = mysql_result($result,$i,7);
-		$awayRecord = mysql_result($result,$i,8);
-		$gamesUnplayed = mysql_result($result,$i,9);
-		$magicNumber = mysql_result($result,$i,10);
+		$tid = mysql_result($result, $i, 0);
+		$team_name = mysql_result($result, $i, 1);
+		$leagueRecord = mysql_result($result, $i, 2);
+		$pct = mysql_result($result, $i, 3);
+		$GB = mysql_result($result, $i, 4);
+		$confRecord = mysql_result($result, $i, 5);
+		$divRecord = mysql_result($result, $i, 6);
+		$homeRecord = mysql_result($result, $i, 7);
+		$awayRecord = mysql_result($result, $i, 8);
+		$gamesUnplayed = mysql_result($result, $i, 9);
+		$magicNumber = mysql_result($result, $i, 10);
 
 		$queryLast10Games = "SELECT last_win, last_loss, streak_type, streak FROM nuke_ibl_power WHERE TeamID = $tid";
 		$resultLast10Games = mysql_query($queryLast10Games);
-		$winsInLast10Games = mysql_result($resultLast10Games,0,0);
-		$lossesInLast10Games = mysql_result($resultLast10Games,0,1);
-		$streakType = mysql_result($resultLast10Games,0,2);
-		$streak = mysql_result($resultLast10Games,0,3);
+		$winsInLast10Games = mysql_result($resultLast10Games, 0, 0);
+		$lossesInLast10Games = mysql_result($resultLast10Games, 0, 1);
+		$streakType = mysql_result($resultLast10Games, 0, 2);
+		$streak = mysql_result($resultLast10Games, 0, 3);
 
 		$standingsHTML=$standingsHTML.'<tr><td><a href="modules.php?name=Team&op=team&tid='.$tid.'">'.$team_name.'</td>
 			<td>'.$leagueRecord.'</td>
@@ -653,17 +658,17 @@ displayStandings('Midwest');
 displayStandings('Pacific');
 $standingsHTML=$standingsHTML.'</table>';
 
-$sqlQueryString = "UPDATE nuke_pages SET text='".$standingsHTML."' WHERE pid=4";
+$sqlQueryString = "UPDATE nuke_pages SET text='$standingsHTML' WHERE pid = 4";
 if (mysql_query($sqlQueryString)) {
 	echo $sqlQueryString.'<p>';
 	echo '<p>Full standings page has been updated.<p>';
-} else die('Invalid query: '.mysql_error());
+} else die('Invalid query: ' . mysql_error());
 
-$resetExtensionQueryString = 'UPDATE nuke_ibl_team_info SET Used_Extension_This_Chunk=0';
+$resetExtensionQueryString = 'UPDATE nuke_ibl_team_info SET Used_Extension_This_Chunk = 0';
 if (mysql_query($resetExtensionQueryString)) {
-	echo $resetExtensionQueryString.'<p>';
+	echo $resetExtensionQueryString . '<p>';
 	echo '<p>Contract Extension usages have been reset.<p>';
-} else die('Invalid query: '.mysql_error());
+} else die('Invalid query: ' . mysql_error());
 
 echo '<p>All the things have been updated!<p>';
 

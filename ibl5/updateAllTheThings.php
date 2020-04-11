@@ -393,6 +393,7 @@ while ($i < $numTeams) {
 		FROM ibl_schedule
 		WHERE (Visitor = $tid OR Home = $tid)
 		AND (BoxID > 0 AND BoxID != 100000)
+		AND Date BETWEEN '" . ($currentYear - 1) . "-10-31' AND '$currentYear-04-30'
 		ORDER BY Date ASC";
 	$resultGames = mysql_query($queryGames);
 	$numGames = mysql_numrows($resultGames);

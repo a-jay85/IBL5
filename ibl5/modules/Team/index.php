@@ -2192,54 +2192,54 @@ function team_info_right ($team_name, $color1, $color2, $owner_name, $tid)
 
 	// POST-SEASON RESULTS
 
-	$queryplayoffs="SELECT * FROM ibl_playoff_results ORDER BY year DESC";
-	$resultplayoffs=mysql_query($queryplayoffs);
-	$numplayoffs=mysql_num_rows($resultplayoffs);
+	$queryplayoffs = "SELECT * FROM ibl_playoff_results ORDER BY year DESC";
+	$resultplayoffs = mysql_query($queryplayoffs);
+	$numplayoffs = mysql_num_rows($resultplayoffs);
 
-	$pp=0;
-	$totalplayoffwins=0;
-	$totalplayofflosses=0;
-	$first_round_victories=0;
-	$second_round_victories=0;
-	$third_round_victories=0;
-	$fourth_round_victories=0;
-	$first_round_losses=0;
-	$second_round_losses=0;
-	$third_round_losses=0;
-	$fourth_round_losses=0;
+	$pp = 0;
+	$totalplayoffwins = 0;
+	$totalplayofflosses = 0;
+	$first_round_victories = 0;
+	$second_round_victories = 0;
+	$third_round_victories = 0;
+	$fourth_round_victories = 0;
+	$first_round_losses = 0;
+	$second_round_losses = 0;
+	$third_round_losses = 0;
+	$fourth_round_losses = 0;
 
-	$round_one_output="";
-	$round_two_output="";
-	$round_three_output="";
-	$round_four_output="";
+	$round_one_output = "";
+	$round_two_output = "";
+	$round_three_output = "";
+	$round_four_output = "";
 
-	$first_wins=0;
-	$second_wins=0;
-	$third_wins=0;
-	$fourth_wins=0;
+	$first_wins = 0;
+	$second_wins = 0;
+	$third_wins = 0;
+	$fourth_wins = 0;
 
 	while ($pp < $numplayoffs) {
-		$playoffround=mysql_result($resultplayoffs,$pp,"round");
-		$playoffyear=mysql_result($resultplayoffs,$pp,"year");
-		$playoffwinner=mysql_result($resultplayoffs,$pp,"winner");
-		$playoffloser=mysql_result($resultplayoffs,$pp,"loser");
-		$playoffloser_games=mysql_result($resultplayoffs,$pp,"loser_games");
+		$playoffround = mysql_result($resultplayoffs,$pp,"round");
+		$playoffyear = mysql_result($resultplayoffs,$pp,"year");
+		$playoffwinner = mysql_result($resultplayoffs,$pp,"winner");
+		$playoffloser = mysql_result($resultplayoffs,$pp,"loser");
+		$playoffloser_games = mysql_result($resultplayoffs,$pp,"loser_games");
 
 		if ($playoffround == 1) {
 			if ($playoffwinner == $team_name) {
-				$totalplayoffwins=$totalplayoffwins+4;
-				$totalplayofflosses=$totalplayofflosses+$playoffloser_games;
-				$first_wins=$first_wins+4;
-				$first_losses=$first_losses+$playoffloser_games;
+				$totalplayoffwins = $totalplayoffwins + 3;
+				$totalplayofflosses = $totalplayofflosses + $playoffloser_games;
+				$first_wins = $first_wins + 3;
+				$first_losses = $first_losses + $playoffloser_games;
 				$first_round_victories++;
-				$round_one_output=$round_one_output."$playoffyear - $team_name 4, $playoffloser $playoffloser_games<br>";
+				$round_one_output = $round_one_output . "$playoffyear - $team_name 3, $playoffloser $playoffloser_games<br>";
 			} else if ($playoffloser == $team_name) {
-				$totalplayofflosses=$totalplayofflosses+4;
-				$totalplayoffwins=$totalplayoffwins+$playoffloser_games;
-				$first_losses=$first_losses+4;
-				$first_wins=$first_wins+$playoffloser_games;
+				$totalplayofflosses = $totalplayofflosses + 3;
+				$totalplayoffwins = $totalplayoffwins + $playoffloser_games;
+				$first_losses = $first_losses + 3;
+				$first_wins = $first_wins + $playoffloser_games;
 				$first_round_losses++;
-				$round_one_output=$round_one_output."$playoffyear - $playoffwinner 4, $team_name $playoffloser_games<br>";
+				$round_one_output = $round_one_output . "$playoffyear - $playoffwinner 3, $team_name $playoffloser_games<br>";
 			}
 		} else if ($playoffround == 2) {
 			if ($playoffwinner == $team_name) {

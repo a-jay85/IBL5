@@ -2620,36 +2620,36 @@ function negotiate($pid)
 
     $can_renegotiate = 0;
 
-  if ($player_cy == 1) {
-  if ($player_cy2 != 0) {
-  } else {
-  $can_renegotiate = 1;
-  }
-} else if ($player_cy == 2) {
-  if ($player_cy3 != 0) {
-  } else {
-  $can_renegotiate = 1;
-  }
-} else if ($player_cy == 3) {
-  if ($player_cy4 != 0) {
-  } else {
-  $can_renegotiate = 1;
-  }
-} else if ($player_cy == 4) {
-  if ($player_cy5 != 0) {
-  } else {
-  $can_renegotiate = 1;
-  }
-} else if ($player_cy == 5) {
-  if ($player_cy6 != 0) {
-  } else {
-  $can_renegotiate = 1;
-  }
-} else if ($player_cy == 6) {
-  $can_renegotiate = 1;
-} else {
-$contract_display = "not under contract";
-}
+    if ($player_cy == 1) {
+        if ($player_cy2 != 0) {
+        } else {
+          $can_renegotiate = 1;
+        }
+    } else if ($player_cy == 2) {
+        if ($player_cy3 != 0) {
+        } else {
+            $can_renegotiate = 1;
+        }
+    } else if ($player_cy == 3) {
+        if ($player_cy4 != 0) {
+        } else {
+            $can_renegotiate = 1;
+        }
+    } else if ($player_cy == 4) {
+        if ($player_cy5 != 0) {
+        } else {
+            $can_renegotiate = 1;
+        }
+    } else if ($player_cy == 5) {
+        if ($player_cy6 != 0) {
+        } else {
+            $can_renegotiate = 1;
+        }
+    } else if ($player_cy == 6) {
+        $can_renegotiate = 1;
+    } else {
+        $contract_display = "not under contract";
+    }
 
 // END CONTRACT CHECKER
 

@@ -1078,12 +1078,19 @@ if ($player_exp == 4)
   }
 }
 
-if ($can_renegotiate == 1) {
-  if ($player_team_name == $userteam) {
-echo "<table align=right bgcolor=#ff0000><tr><td align=center><a href=\"modules.php?name=Player&pa=negotiate&pid=$pid\">RENEGOTIATE<BR>CONTRACT</a></td></tr></table>";
-  } else {
-  }
-} else {
+$queryHasUsedExtensionThisSeason = "SELECT Used_Extension_This_Season
+    FROM nuke_ibl_team_info
+    WHERE team_name = '" . $userinfo['user_ibl_team'] . "';";
+$hasUsedExtensionThisSeason = mysql_result(mysql_query($queryHasUsedExtensionThisSeason), 0);
+
+var_dump($hasUsedExtensionThisSeason);
+
+if ($hasUsedExtensionThisSeason == 0) {
+    if ($can_renegotiate == 1) {
+        if ($player_team_name == $userteam) {
+            echo "<table align=right bgcolor=#ff0000><tr><td align=center><a href=\"modules.php?name=Player&pa=negotiate&pid=$pid\">RENEGOTIATE<BR>CONTRACT</a></td></tr></table>";
+        }
+    }
 }
 
 // RENEGOTIATION BUTTON END

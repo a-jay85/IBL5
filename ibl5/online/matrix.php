@@ -22,8 +22,11 @@ echo "<HTML><HEAD><TITLE>Draft Pick Matrix</TITLE></HEAD>
                     <TD COLSPAN=2><CENTER>".($seasonYear+1)."</CENTER></TD>
                     <TD COLSPAN=2><CENTER>".($seasonYear+2)."</CENTER></TD>
                     <TD COLSPAN=2><CENTER>".($seasonYear+3)."</CENTER></TD>
+                    <TD COLSPAN=2><CENTER>".($seasonYear+4)."</CENTER></TD>
                 </TR>
                 <TR>
+                    <TD><CENTER>Round 1</CENTER></TD>
+                    <TD><CENTER>Round 2</CENTER></TD>
                     <TD><CENTER>Round 1</CENTER></TD>
                     <TD><CENTER>Round 2</CENTER></TD>
                     <TD><CENTER>Round 1</CENTER></TD>

@@ -1083,8 +1083,6 @@ $queryHasUsedExtensionThisSeason = "SELECT Used_Extension_This_Season
     WHERE team_name = '" . $userinfo['user_ibl_team'] . "';";
 $hasUsedExtensionThisSeason = mysql_result(mysql_query($queryHasUsedExtensionThisSeason), 0);
 
-var_dump($hasUsedExtensionThisSeason);
-
 if ($hasUsedExtensionThisSeason == 0) {
     if ($can_renegotiate == 1) {
         if ($player_team_name == $userteam) {

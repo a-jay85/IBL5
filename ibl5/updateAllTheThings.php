@@ -520,10 +520,6 @@ while ($i < $numTeams) {
 
 	echo "Updating $teamName: $wins wins, $losses losses, $gb games back, $homeWins home wins, $homeLosses home losses, $awayWins away wins, $awayLosses away losses, streak = $streakType$streak, ranking score = $ranking<br>";
 
-	// Reset Depth Chart sent status
-	$query7 = "UPDATE ibl_team_history SET sim_depth = 'No Depth Chart'";
-	$result7 = mysql_query($query7);
-
 	// Update nuke_iblteam_win_loss with each team's season win/loss info
 	$query4 = "UPDATE nuke_iblteam_win_loss a, nuke_ibl_power b
 		SET a.wins = b.win,
@@ -565,6 +561,10 @@ while ($i < $numTeams) {
 }
 
 echo '<p>Power Rankings have been updated.<p>';
+
+// Reset the sim's Depth Chart sent status
+$query7 = "UPDATE ibl_team_history SET sim_depth = 'No Depth Chart'";
+$result7 = mysql_query($query7);
 
 //*****************************************************************************
 //*** STANDINGS PAGE UPDATE

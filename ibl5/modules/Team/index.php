@@ -1593,6 +1593,7 @@ function team($tid)
 		            FROM ibl_box_scores
 		            WHERE pid = $pid
 		            AND Date BETWEEN '$simStartDate' AND '$simEndDate'
+					AND gameMIN > 0
 		            ORDER BY Date ASC");
 
 		        $numberOfGamesPlayedInSim = mysql_num_rows($resultPlayerSimBoxScores);

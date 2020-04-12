@@ -541,18 +541,6 @@ while ($i < $numTeams) {
 		WHERE a.team_name = b.currentname)";
 	$result9 = mysql_query($query9);
 
-	// // Update teams' win totals in ibl_team_history
-	// $query10 = "UPDATE ibl_team_history a, nuke_ibl_power b
-	// 	SET a.totwins = a.totwins + b.win
-	// 	WHERE a.teamid = b.TeamID";
-	// $result10 = mysql_query($query10);
-	//
-	// // Update teams' loss totals in ibl_team_history
-	// $query11 = "UPDATE ibl_team_history a, nuke_ibl_power b
-	// 	SET a.totloss = a.totloss + b.loss
-	// 	WHERE a.teamid = b.TeamID";
-	// $result11 = mysql_query($query11);
-
 	// Update teams' win percentage in ibl_team_history
 	$query12 = "UPDATE ibl_team_history a SET winpct = a.totwins / (a.totwins + a.totloss)";
 	$result12 = mysql_query($query12);

@@ -78,37 +78,37 @@ function userinfo($username, $bypass=0, $hid=0, $url=0)
 	$result7 = $db->sql_query($sql7);
 	$num7 = $db->sql_numrows($result7);
 
-	$sql8 = "SELECT * FROM ".$prefix."_iblplyr WHERE teamname = '$teamlogo' AND retired = '0' ORDER BY ordinal ASC";
-	$result8 = $db->sql_query($sql8);
+	$queryPlayersOnTeam = "SELECT * FROM ".$prefix."_iblplyr WHERE teamname = '$teamlogo' AND retired = '0' ORDER BY ordinal ASC";
+	$playersOnTeam = $db->sql_query($queryPlayersOnTeam);
 
 	if ($useset == NULL) $useset=1;
 
-	$sql9 = "SELECT * FROM ".$prefix."_ibl_offense_sets WHERE TeamName = '$teamlogo' AND SetNumber = '$useset'";
-	$result9 = $db->sql_query($sql9);
-	$row9 = $db->sql_fetchrow($result9);
+	$querySelectedOffenseSet = "SELECT * FROM ".$prefix."_ibl_offense_sets WHERE TeamName = '$teamlogo' AND SetNumber = '$useset'";
+	$resultSelectedOffenseSet = $db->sql_query($querySelectedOffenseSet);
+	$offenseSet = $db->sql_fetchrow($resultSelectedOffenseSet);
 
-	$offense_name = $row9[offense_name];
-	$Slot1 = $row9[PG_Depth_Name];
-	$Slot2 = $row9[SG_Depth_Name];
-	$Slot3 = $row9[SF_Depth_Name];
-	$Slot4 = $row9[PF_Depth_Name];
-	$Slot5 = $row9[C_Depth_Name];
+	$offense_name = $offenseSet[offense_name];
+	$Slot1 = $offenseSet[PG_Depth_Name];
+	$Slot2 = $offenseSet[SG_Depth_Name];
+	$Slot3 = $offenseSet[SF_Depth_Name];
+	$Slot4 = $offenseSet[PF_Depth_Name];
+	$Slot5 = $offenseSet[C_Depth_Name];
 
-	$Low1 = $row9[PG_Low_Range];
-	$Low2 = $row9[SG_Low_Range];
-	$Low3 = $row9[SF_Low_Range];
-	$Low4 = $row9[PF_Low_Range];
-	$Low5 = $row9[C_Low_Range];
+	$Low1 = $offenseSet[PG_Low_Range];
+	$Low2 = $offenseSet[SG_Low_Range];
+	$Low3 = $offenseSet[SF_Low_Range];
+	$Low4 = $offenseSet[PF_Low_Range];
+	$Low5 = $offenseSet[C_Low_Range];
 
-	$High1 = $row9[PG_High_Range];
-	$High2 = $row9[SG_High_Range];
-	$High3 = $row9[SF_High_Range];
-	$High4 = $row9[PF_High_Range];
-	$High5 = $row9[C_High_Range];
-
-	$i=0;
+	$High1 = $offenseSet[PG_High_Range];
+	$High2 = $offenseSet[SG_High_Range];
+	$High3 = $offenseSet[SF_High_Range];
+	$High4 = $offenseSet[PF_High_Range];
+	$High5 = $offenseSet[C_High_Range];
 
 	echo "SELECT OFFENSIVE SET TO USE: ";
+
+	$i = 0;
 
 	while ($i < 3) {
 		$name_of_set=mysql_result($result7,$i,"offense_name");
@@ -122,37 +122,37 @@ function userinfo($username, $bypass=0, $hid=0, $url=0)
 		<input type=\"hidden\" name=\"Team_Name\" value=\"$teamlogo\"><input type=\"hidden\" name=\"Set_Name\" value=\"$offense_name\">
 		<center><img src=\"images/logo/$tid.jpg\"><br><table><tr><th colspan=14><center>DEPTH CHART ENTRY - Offensive Set: $offense_name</center></th></tr>
 		<tr><th>Pos</th><th>Player</th><th>$Slot1</th><th>$Slot2</th><th>$Slot3</th><th>$Slot4</th><th>$Slot5</th><th>active</th><th>min</th><th>OF</th><th>DF</th><th>OI</th><th>DI</th><th>BH</th></tr>";
-	$depthcount=1;
+	$depthcount = 1;
 
-	while ($row8 = $db->sql_fetchrow($result8)) {
-		$player_pid = $row8[pid];
-		$player_pos = $row8[altpos];
-		$player_name = $row8[name];
-		$player_staminacap = $row8[sta]+40;
+	while ($player = $db->sql_fetchrow($playersOnTeam)) {
+		$player_pid = $player[pid];
+		$player_pos = $player[altpos];
+		$player_name = $player[name];
+		$player_staminacap = $player[sta]+40;
 		if ($player_staminacap > 40) $player_staminacap = 40;
-		$player_PG = $row8[dc_PGDepth];
-		$player_SG = $row8[dc_SGDepth];
-		$player_SF = $row8[dc_SFDepth];
-		$player_PF = $row8[dc_PFDepth];
-		$player_C = $row8[dc_CDepth];
-		$player_active = $row8[dc_active];
-		$player_min = $row8[dc_minutes];
-		$player_of = $row8[dc_of];
-		$player_df = $row8[dc_df];
-		$player_oi = $row8[dc_oi];
-		$player_di = $row8[dc_di];
-		$player_bh = $row8[dc_bh];
-		$player_inj = $row8[injured];
+		$player_PG = $player[dc_PGDepth];
+		$player_SG = $player[dc_SGDepth];
+		$player_SF = $player[dc_SFDepth];
+		$player_PF = $player[dc_PFDepth];
+		$player_C = $player[dc_CDepth];
+		$player_active = $player[dc_active];
+		$player_min = $player[dc_minutes];
+		$player_of = $player[dc_of];
+		$player_df = $player[dc_df];
+		$player_oi = $player[dc_oi];
+		$player_di = $player[dc_di];
+		$player_bh = $player[dc_bh];
+		$player_inj = $player[injured];
 
-		if ($player_pos == 'PG') $pos_value=1;
-		if ($player_pos == 'G') $pos_value=2;
-		if ($player_pos == 'SG') $pos_value=3;
-		if ($player_pos == 'GF') $pos_value=4;
-		if ($player_pos == 'SF') $pos_value=5;
-		if ($player_pos == 'F') $pos_value=6;
-		if ($player_pos == 'PF') $pos_value=7;
-		if ($player_pos == 'FC') $pos_value=8;
-		if ($player_pos == 'C') $pos_value=9;
+		if ($player_pos == 'PG') $pos_value = 1;
+		if ($player_pos == 'G') $pos_value = 2;
+		if ($player_pos == 'SG') $pos_value = 3;
+		if ($player_pos == 'GF') $pos_value = 4;
+		if ($player_pos == 'SF') $pos_value = 5;
+		if ($player_pos == 'F') $pos_value = 6;
+		if ($player_pos == 'PF') $pos_value = 7;
+		if ($player_pos == 'FC') $pos_value = 8;
+		if ($player_pos == 'C') $pos_value = 9;
 
 		echo "\n
 				<tr>
@@ -293,142 +293,194 @@ function submit() {
 	$Set_Name = $_POST['Set_Name'];
 	$Team_Name = $_POST['Team_Name'];
 	$emailtarget = $_POST['emailtarget'];
-	$text = "$Team_Name Depth Chart Submission<br><table>";
-	$text = $text."<tr><td><b>Name</td><td><b>PG</td><td><b>SG</td><td><b>SF</td><td><b>PF</td><td><b>C</td><td><b>Active</td><td><b>Min</td><td><b>OF</td><td><b>DF</td><td><b>OI</td><td><b>DI</td><td><b>BH</td></tr>";
+	$html = "$Team_Name Depth Chart Submission<br><table>";
+	$html = $html."<tr>
+		<td><b>Name</td>
+		<td><b>PG</td>
+		<td><b>SG</td>
+		<td><b>SF</td>
+		<td><b>PF</td>
+		<td><b>C</td>
+		<td><b>Active</td>
+		<td><b>Min</td>
+		<td><b>OF</td>
+		<td><b>DF</td>
+		<td><b>OI</td>
+		<td><b>DI</td>
+		<td><b>BH</td>
+	</tr>";
 	$filetext = "Name,PG,SG,SF,PF,C,ACTIVE,MIN,OF,DF,OI,DI
 ";
 
-	$activePlayers=0;
-	$pos_1=0;
-	$pos_2=0;
-	$pos_3=0;
-	$pos_4=0;
-	$pos_5=0;
+	$activePlayers = 0;
+	$pos_1 = 0;
+	$pos_2 = 0;
+	$pos_3 = 0;
+	$pos_4 = 0;
+	$pos_5 = 0;
+	$hasStarterAtMultiplePositions = FALSE;
 
-	$i=1;
-	$injury_Sum = 0;
-	while ($i < 16) {
-		$a = "<tr><td>".$_POST['Name'.$i]."</td>";
-		$b = "<td>".$_POST['pg'.$i]."</td>";
-		$c = "<td>".$_POST['sg'.$i]."</td>";
-		$d = "<td>".$_POST['sf'.$i]."</td>";
-		$e = "<td>".$_POST['pf'.$i]."</td>";
-		$f = "<td>".$_POST['c'.$i]."</td>";
-		$g = "<td>".$_POST['active'.$i]."</td>";
-		$h = "<td>".$_POST['min'.$i]."</td>";
-		$z = "<td>".$_POST['OF'.$i]."</td>";
-		$j = "<td>".$_POST['DF'.$i]."</td>";
-		$k = "<td>".$_POST['OI'.$i]."</td>";
-		$l = "<td>".$_POST['DI'.$i]."</td>";
-		$m = "<td>".$_POST['BH'.$i]."</td></tr>
-";
-		$text = $text.$a.$b.$c.$d.$e.$f.$g.$h.$z.$j.$k.$l.$m;
+	$i = 1;
+	while ($i <= 15) {
+		$startingPositionCount = 0;
 
-		$injury = $_POST['Injury'.$i];
-		$aa = $_POST['Name'.$i].",";
-		$bb = $_POST['pg'.$i].",";
-		$cc = $_POST['sg'.$i].",";
-		$dd = $_POST['sf'.$i].",";
-		$ee = $_POST['pf'.$i].",";
-		$ff = $_POST['c'.$i].",";
-		$gg = $_POST['active'.$i].",";
-		$hh = $_POST['min'.$i].",";
-		$zz = $_POST['OF'.$i].",";
-		$jj = $_POST['DF'.$i].",";
-		$kk = $_POST['OI'.$i].",";
-		$ll = $_POST['DI'.$i].",";
-		$mm = $_POST['BH'.$i]."
+		$a = "<tr><td>" . $_POST['Name' . $i] . "</td>";
+		$b = "<td>" . $_POST['pg' . $i] . "</td>";
+		$c = "<td>" . $_POST['sg' . $i] . "</td>";
+		$d = "<td>" . $_POST['sf' . $i] . "</td>";
+		$e = "<td>" . $_POST['pf' . $i] . "</td>";
+		$f = "<td>" . $_POST['c' . $i] . "</td>";
+		$g = "<td>" . $_POST['active' . $i] . "</td>";
+		$h = "<td>" . $_POST['min' . $i] . "</td>";
+		$z = "<td>" . $_POST['OF' . $i] . "</td>";
+		$j = "<td>" . $_POST['DF' . $i] . "</td>";
+		$k = "<td>" . $_POST['OI' . $i] . "</td>";
+		$l = "<td>" . $_POST['DI' . $i] . "</td>";
+		$m = "<td>" . $_POST['BH' . $i] . "</td></tr>
 ";
+
+		$html = $html.$a.$b.$c.$d.$e.$f.$g.$h.$z.$j.$k.$l.$m;
+
+		$injury = $_POST['Injury' . $i];
+		$aa = $_POST['Name' . $i] . ",";
+		$bb = $_POST['pg' . $i] . ",";
+		$cc = $_POST['sg' . $i] . ",";
+		$dd = $_POST['sf' . $i] . ",";
+		$ee = $_POST['pf' . $i] . ",";
+		$ff = $_POST['c' . $i] . ",";
+		$gg = $_POST['active' . $i] . ",";
+		$hh = $_POST['min' . $i] . ",";
+		$zz = $_POST['OF' . $i] . ",";
+		$jj = $_POST['DF' . $i] . ",";
+		$kk = $_POST['OI' . $i] . ",";
+		$ll = $_POST['DI' . $i] . ",";
+		$mm = $_POST['BH' . $i] . "
+";
+
 		$filetext = $filetext.$aa.$bb.$cc.$dd.$ee.$ff.$gg.$hh.$zz.$jj.$kk.$ll.$mm;
 
-		$dc_insert1=$_POST['pg'.$i];
-		$dc_insert2=$_POST['sg'.$i];
-		$dc_insert3=$_POST['sf'.$i];
-		$dc_insert4=$_POST['pf'.$i];
-		$dc_insert5=$_POST['c'.$i];
-		$dc_insert6=$_POST['active'.$i];
-		$dc_insert7=$_POST['min'.$i];
-		$dc_insert8=$_POST['OF'.$i];
-		$dc_insert9=$_POST['DF'.$i];
-		$dc_insertA=$_POST['OI'.$i];
-		$dc_insertB=$_POST['DI'.$i];
-		$dc_insertC=$_POST['BH'.$i];
-		$dc_insertkey=addslashes($_POST['Name'.$i]);
+		$dc_insert1 = $_POST['pg' . $i];
+		$dc_insert2 = $_POST['sg' . $i];
+		$dc_insert3 = $_POST['sf' . $i];
+		$dc_insert4 = $_POST['pf' . $i];
+		$dc_insert5 = $_POST['c' . $i];
+		$dc_insert6 = $_POST['active' . $i];
+		$dc_insert7 = $_POST['min' . $i];
+		$dc_insert8 = $_POST['OF' . $i];
+		$dc_insert9 = $_POST['DF' . $i];
+		$dc_insertA = $_POST['OI' . $i];
+		$dc_insertB = $_POST['DI' . $i];
+		$dc_insertC = $_POST['BH' . $i];
+		$dc_insertkey = addslashes($_POST['Name' . $i]);
 
-		$updatequery1="UPDATE ".$prefix."_iblplyr SET dc_PGDepth = '$dc_insert1' WHERE name = '$dc_insertkey'";
-		$updatequery2="UPDATE ".$prefix."_iblplyr SET dc_SGDepth = '$dc_insert2' WHERE name = '$dc_insertkey'";
-		$updatequery3="UPDATE ".$prefix."_iblplyr SET dc_SFDepth = '$dc_insert3' WHERE name = '$dc_insertkey'";
-		$updatequery4="UPDATE ".$prefix."_iblplyr SET dc_PFDepth = '$dc_insert4' WHERE name = '$dc_insertkey'";
-		$updatequery5="UPDATE ".$prefix."_iblplyr SET dc_CDepth = '$dc_insert5' WHERE name = '$dc_insertkey'";
-		$updatequery6="UPDATE ".$prefix."_iblplyr SET dc_active = '$dc_insert6' WHERE name = '$dc_insertkey'";
-		$updatequery7="UPDATE ".$prefix."_iblplyr SET dc_minutes = '$dc_insert7' WHERE name = '$dc_insertkey'";
-		$updatequery8="UPDATE ".$prefix."_iblplyr SET dc_of = '$dc_insert8' WHERE name = '$dc_insertkey'";
-		$updatequery9="UPDATE ".$prefix."_iblplyr SET dc_df = '$dc_insert9' WHERE name = '$dc_insertkey'";
-		$updatequeryA="UPDATE ".$prefix."_iblplyr SET dc_oi = '$dc_insertA' WHERE name = '$dc_insertkey'";
-		$updatequeryB="UPDATE ".$prefix."_iblplyr SET dc_di = '$dc_insertB' WHERE name = '$dc_insertkey'";
-		$updatequeryC="UPDATE ".$prefix."_iblplyr SET dc_bh = '$dc_insertC' WHERE name = '$dc_insertkey'";
-		$updatequeryD="UPDATE ibl_team_history SET depth = NOW() + INTERVAL 2 HOUR WHERE team_name = '$Team_Name'";
-		$updatequeryF="UPDATE ibl_team_history SET sim_depth = NOW() + INTERVAL 2 HOUR WHERE team_name = '$Team_Name'";
-		$executeupdate1=mysql_query($updatequery1);
-		$executeupdate2=mysql_query($updatequery2);
-		$executeupdate3=mysql_query($updatequery3);
-		$executeupdate4=mysql_query($updatequery4);
-		$executeupdate5=mysql_query($updatequery5);
-		$executeupdate6=mysql_query($updatequery6);
-		$executeupdate7=mysql_query($updatequery7);
-		$executeupdate8=mysql_query($updatequery8);
-		$executeupdate9=mysql_query($updatequery9);
-		$executeupdateA=mysql_query($updatequeryA);
-		$executeupdateB=mysql_query($updatequeryB);
-		$executeupdateC=mysql_query($updatequeryC);
-		$executeupdateD=mysql_query($updatequeryD);
-		$executeupdateF=mysql_query($updatequeryF);
+		$updatequery1 = "UPDATE " . $prefix . "_iblplyr SET dc_PGDepth = '$dc_insert1' WHERE name = '$dc_insertkey'";
+		$updatequery2 = "UPDATE " . $prefix . "_iblplyr SET dc_SGDepth = '$dc_insert2' WHERE name = '$dc_insertkey'";
+		$updatequery3 = "UPDATE " . $prefix . "_iblplyr SET dc_SFDepth = '$dc_insert3' WHERE name = '$dc_insertkey'";
+		$updatequery4 = "UPDATE " . $prefix . "_iblplyr SET dc_PFDepth = '$dc_insert4' WHERE name = '$dc_insertkey'";
+		$updatequery5 = "UPDATE " . $prefix . "_iblplyr SET dc_CDepth = '$dc_insert5' WHERE name = '$dc_insertkey'";
+		$updatequery6 = "UPDATE " . $prefix . "_iblplyr SET dc_active = '$dc_insert6' WHERE name = '$dc_insertkey'";
+		$updatequery7 = "UPDATE " . $prefix . "_iblplyr SET dc_minutes = '$dc_insert7' WHERE name = '$dc_insertkey'";
+		$updatequery8 = "UPDATE " . $prefix . "_iblplyr SET dc_of = '$dc_insert8' WHERE name = '$dc_insertkey'";
+		$updatequery9 = "UPDATE " . $prefix . "_iblplyr SET dc_df = '$dc_insert9' WHERE name = '$dc_insertkey'";
+		$updatequeryA = "UPDATE " . $prefix . "_iblplyr SET dc_oi = '$dc_insertA' WHERE name = '$dc_insertkey'";
+		$updatequeryB = "UPDATE " . $prefix . "_iblplyr SET dc_di = '$dc_insertB' WHERE name = '$dc_insertkey'";
+		$updatequeryC = "UPDATE " . $prefix . "_iblplyr SET dc_bh = '$dc_insertC' WHERE name = '$dc_insertkey'";
+		$updatequeryD = "UPDATE ibl_team_history SET depth = NOW() + INTERVAL 2 HOUR WHERE team_name = '$Team_Name'";
+		$updatequeryF = "UPDATE ibl_team_history SET sim_depth = NOW() + INTERVAL 2 HOUR WHERE team_name = '$Team_Name'";
+		$executeupdate1 = mysql_query($updatequery1);
+		$executeupdate2 = mysql_query($updatequery2);
+		$executeupdate3 = mysql_query($updatequery3);
+		$executeupdate4 = mysql_query($updatequery4);
+		$executeupdate5 = mysql_query($updatequery5);
+		$executeupdate6 = mysql_query($updatequery6);
+		$executeupdate7 = mysql_query($updatequery7);
+		$executeupdate8 = mysql_query($updatequery8);
+		$executeupdate9 = mysql_query($updatequery9);
+		$executeupdateA = mysql_query($updatequeryA);
+		$executeupdateB = mysql_query($updatequeryB);
+		$executeupdateC = mysql_query($updatequeryC);
+		$executeupdateD = mysql_query($updatequeryD);
+		$executeupdateF = mysql_query($updatequeryF);
+
+		if ($dc_insert6 == 1) $activePlayers = $activePlayers + 1;
+		if ($dc_insert1 > 0 && $injury == 0) $pos_1 = $pos_1 + 1;
+		if ($dc_insert2 > 0 && $injury == 0) $pos_2 = $pos_2 + 1;
+		if ($dc_insert3 > 0 && $injury == 0) $pos_3 = $pos_3 + 1;
+		if ($dc_insert4 > 0 && $injury == 0) $pos_4 = $pos_4 + 1;
+		if ($dc_insert5 > 0 && $injury == 0) $pos_5 = $pos_5 + 1;
+
+		// Check whether a player is listed at multiple starting positions
+		if ($_POST['pg' . $i] == 1) $startingPositionCount++;
+		if ($_POST['sg' . $i] == 1) $startingPositionCount++;
+		if ($_POST['sf' . $i] == 1) $startingPositionCount++;
+		if ($_POST['pf' . $i] == 1) $startingPositionCount++;
+		if ($_POST['c' . $i] == 1) $startingPositionCount++;
+
+		if ($startingPositionCount > 1) {
+			$hasStarterAtMultiplePositions = TRUE;
+			$nameOfProblemStarter = $_POST['Name' . $i];
+		}
 
 		$i++;
-
-		if ($dc_insert6 == 1) $activePlayers=$activePlayers+1;
-		if ($dc_insert1 > 0 && $injury == 0) $pos_1=$pos_1+1;
-		if ($dc_insert2 > 0 && $injury == 0) $pos_2=$pos_2+1;
-		if ($dc_insert3 > 0 && $injury == 0) $pos_3=$pos_3+1;
-		if ($dc_insert4 > 0 && $injury == 0) $pos_4=$pos_4+1;
-		if ($dc_insert5 > 0 && $injury == 0) $pos_5=$pos_5+1;
 	}
 
-	$text = $text."</table>";
+	$html = $html."</table>";
 
 	$minActivePlayers = 12;
 	$maxActivePlayers = 12;
 	if ($activePlayers < $minActivePlayers) {
-		echo "<font color=red>Your lineup has not been submitted to the commissioner's office because it is an illegal lineup.<br>
-			You must have at least $minActivePlayers active players in your lineup; you have $activePlayers.<br>
-			Please press the \"Back\" button on your browser and activate " . ($minActivePlayers - $activePlayers) . " player(s).</font><p>";
-		$error=1;
+		echo "<center><u>Your lineup has <b>not</b> been submitted:</u><br>
+			<font color=red><b>You must have at least $minActivePlayers active players in your lineup; you have $activePlayers.</b></font><p>
+			Please press the \"Back\" button on your browser and activate " . ($minActivePlayers - $activePlayers) . " player(s).</center><p>";
+		$error = 1;
 	}
 	if ($activePlayers > $maxActivePlayers) {
-		echo "<font color=red>Your lineup has not been submitted to the commissioner's office because it is an illegal lineup. <br>
-		You can't have more than $maxActivePlayers active players in your lineup; you have $activePlayers.<br>
-			Please press the \"Back\" button on your browser and deactivate " . ($activePlayers - $maxActivePlayers) . " player(s).</font><p>";
-		$error=1;
+		echo "<center><u>Your lineup has <b>not</b> been submitted:</u><br>
+		<font color=red><b>You can't have more than $maxActivePlayers active players in your lineup; you have $activePlayers.</b></font><p>
+			Please press the \"Back\" button on your browser and deactivate " . ($activePlayers - $maxActivePlayers) . " player(s).</center><p>";
+		$error = 1;
 	}
 	if ($pos_1 < 3 && $error == 0) {
-		echo "<font color=red>Your lineup has not been submitted to the commissioner's office because it is an illegal lineup. You must have at least 3 players entered in PG slot; you have $pos_1. Please press the \"Back\" button on your browser and re-enter your lineup.</font>";
-		$error=1;
+		echo "<center><u>Your lineup has <b>not</b> been submitted:</u><br>
+			<font color=red><b>You must have at least 3 players entered in PG slot – you have $pos_1.</b></font><p>
+
+			Please click the \"Back\" button on your browser and fix your lineup.</center><p>";
+		$error = 1;
 	}
 	if ($pos_2 < 3 && $error == 0) {
-		echo "<font color=red>Your lineup has not been submitted to the commissioner's office because it is an illegal lineup. You must have at least 3 players entered in SG slot; you have $pos_2. Please press the \"Back\" button on your browser and re-enter your lineup.</font>";
-		$error=1;
+		echo "<center><u>Your lineup has <b>not</b> been submitted:</u><br>
+			<font color=red><b>You must have at least 3 players entered in SG slot – you have $pos_2.</b></font><p>
+
+			Please click the \"Back\" button on your browser and fix your lineup.</center><p>";
+		$error = 1;
 	}
 	if ($pos_3 < 3 && $error == 0) {
-		echo "<font color=red>Your lineup has not been submitted to the commissioner's office because it is an illegal lineup. You must have at least 3 players entered in SF slot; you have $pos_3. Please press the \"Back\" button on your browser and re-enter your lineup.</font>";
-		$error=1;
+		echo "<center><u>Your lineup has <b>not</b> been submitted:</u><br>
+			<font color=red><b>You must have at least 3 players entered in SF slot – you have $pos_3.</b></font><p>
+
+			Please click the \"Back\" button on your browser and fix your lineup.</center><p>";
+		$error = 1;
 	}
 	if ($pos_4 < 3 && $error == 0) {
-		echo "<font color=red>Your lineup has not been submitted to the commissioner's office because it is an illegal lineup. You must have at least 3 players entered in PF slot; you have $pos_4. Please press the \"Back\" button on your browser and re-enter your lineup.</font>";
-		$error=1;
+		echo "<center><u>Your lineup has <b>not</b> been submitted:</u><br>
+			<font color=red><b>You must have at least 3 players entered in PF slot – you have $pos_4.</b></font><p>
+
+			Please click the \"Back\" button on your browser and fix your lineup.</center><p>";
+		$error = 1;
 	}
 	if ($pos_5 < 3 && $error == 0) {
-		echo "<font color=red>Your lineup has not been submitted to the commissioner's office because it is an illegal lineup. You must have at least 3 players entered in C slot; you have $pos_5. Please press the \"Back\" button on your browser and re-enter your lineup.</font>";
-		$error=1;
+		echo "<center><u>Your lineup has <b>not</b> been submitted:</u><br>
+			<font color=red><b>You must have at least 3 players entered in C slot – you have $pos_5.</b></font><p>
+
+			Please click the \"Back\" button on your browser and fix your lineup.</center><p>";
+		$error = 1;
+	}
+	if ($hasStarterAtMultiplePositions == TRUE) {
+		echo "<center><u>Your lineup has <b>not</b> been submitted:</u><br>
+			<font color=red><b>$nameOfProblemStarter is listed at more than one position in the starting lineup.</b></font><p>
+
+			Please click the \"Back\" button on your browser and ensure they are only starting at one position.</center><p>";
+		$error = 1;
 	}
 
 	if ($error == 0) {
@@ -440,15 +492,15 @@ function submit() {
 		}
 
 		if (mail($recipient, $emailsubject, $filetext, "From: ibldepthcharts@gmail.com")) {
-			echo "<center> <font color=red>Your depth chart has been submitted and e-mailed successfully. Thank you.</font></center>";
+			echo "<center><u>Your depth chart has been submitted and e-mailed successfully. Thank you.</u></center><p>";
 			$filename = 'depthcharts/'.$Team_Name.'.txt';
 			file_put_contents($filename, $filetext);
 		} else {
-			echo " <font color=red>Message failed to e-mail properly; please contact the commissioner.</font></center>";
+			echo "<font color=red>Message failed to e-mail properly; please contact the commissioner.</font></center><p>";
 		}
 	}
 
-	echo "<br>$text";
+	echo "<br>$html";
 	// DISPLAYS DEPTH CHART
 
 	CloseTable();

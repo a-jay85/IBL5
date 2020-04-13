@@ -1915,7 +1915,6 @@ function team($tid)
 
 function team_info_right ($team_name, $color1, $color2, $owner_name, $tid)
 {
-
 	// ==== GET OWNER INFO
 
 	$queryo="SELECT * FROM nuke_users WHERE user_ibl_team = '$team_name' ORDER BY user_id DESC";
@@ -1933,8 +1932,7 @@ function team_info_right ($team_name, $color1, $color2, $owner_name, $tid)
 	$date_started=mysql_result($resulto,0,"date_started");
 	$visitdate=date(r,$user_lastvisit);
 
-	$output="<table bgcolor=#eeeeee width=210>";
-
+	$output="<table bgcolor=#eeeeee width=220>";
 	$output=$output."<tr bgcolor=\"#$color1\"><td align=\"center\">
 		<font color=\"#$color2\"><b>Current Season</b></font>
 		</td></tr>
@@ -2141,7 +2139,7 @@ function team_info_right ($team_name, $color1, $color2, $owner_name, $tid)
 	$lostot=0;
 
 	$output=$output."<tr bgcolor=\"#$color1\"><td align=center><font color=\"#$color2\"><b>Regular Season History</b></font></td></tr>
-		<tr><td><div id=\"History-R\" style=\"overflow:auto; height:150px\">";
+		<tr><td><div id=\"History-R\" style=\"overflow:auto\">";
 
 	while ($h < $numwl) {
 		$yearwl=mysql_result($resultwl,$h,"year");
@@ -2171,7 +2169,7 @@ function team_info_right ($team_name, $color1, $color2, $owner_name, $tid)
 	$lostot=0;
 
 	$output=$output."<tr bgcolor=\"#$color1\"><td align=center><font color=\"#$color2\"><b>H.E.A.T. History</b></font></td></tr>
-		<tr><td><div id=\"History-R\" style=\"overflow:auto; height:150px\">";
+		<tr><td><div id=\"History-R\" style=\"overflow:auto\">";
 
 	while ($h < $numwl)	{
 		$yearwl=mysql_result($resultwl,$h,"year");
@@ -2310,28 +2308,28 @@ function team_info_right ($team_name, $color1, $color2, $owner_name, $tid)
 	if ($round_one_output != "") {
 		$output=$output."<tr bgcolor=\"#$color1\"><td align=center><font color=\"#$color2\"><b>First-Round Playoff Results</b></font></td></tr>
 			<tr><td>
-			<div id=\"History-P1\" style=\"overflow:auto; height:150px\">".$round_one_output."</div></td></tr>
+			<div id=\"History-P1\" style=\"overflow:auto\">".$round_one_output."</div></td></tr>
 			<tr><td><b>Totals:</b> $first_wins - $first_losses ($firstpct)<br>
 			<b>Series:</b> $first_round_victories - $first_round_losses ($r1wlpct)</td></tr>";
 	}
 	if ($round_two_output != "") {
 		$output=$output."<tr bgcolor=\"#$color1\"><td align=center><font color=\"#$color2\"><b>Conference Semis Playoff Results</b></font></td></tr>
 			<tr><td>
-			<div id=\"History-P2\" style=\"overflow:auto; height:150px\">".$round_two_output."</div></td></tr>
+			<div id=\"History-P2\" style=\"overflow:auto\">".$round_two_output."</div></td></tr>
 			<tr><td><b>Totals:</b> $second_wins - $second_losses ($secondpct)<br>
 			<b>Series:</b> $second_round_victories - $second_round_losses ($r2wlpct)</td></tr>";
 	}
 	if ($round_three_output != "") {
 		$output=$output."<tr bgcolor=\"#$color1\"><td align=center><font color=\"#$color2\"><b>Conference Finals Playoff Results</b></font></td></tr>
 			<tr><td>
-			<div id=\"History-P3\" style=\"overflow:auto; height:150px\">".$round_three_output."</div></td></tr>
+			<div id=\"History-P3\" style=\"overflow:auto\">".$round_three_output."</div></td></tr>
 			<tr><td><b>Totals:</b> $third_wins - $third_losses ($thirdpct)<br>
 			<b>Series:</b> $third_round_victories - $third_round_losses ($r3wlpct)</td></tr>";
 	}
 	if ($round_four_output != "") {
 		$output=$output."<tr bgcolor=\"#$color1\"><td align=center><font color=\"#$color2\"><b>IBL Finals Playoff Results</b></font></td></tr>
 			<tr><td>
-			<div id=\"History-P4\" style=\"overflow:auto; height:150px\">".$round_four_output."</div></td></tr>
+			<div id=\"History-P4\" style=\"overflow:auto\">".$round_four_output."</div></td></tr>
 			<tr><td><b>Totals:</b> $fourth_wins - $fourth_losses ($fourthpct)<br>
 			<b>Series:</b> $fourth_round_victories - $fourth_round_losses ($r4wlpct)</td></tr>";
 	}

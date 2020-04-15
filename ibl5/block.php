@@ -133,30 +133,30 @@ while ($i < $num) {
 echo "</TABLE><hr> <h2>SQL QUERY BOX</h2><br> <FORM><TEXTAREA COLS=125 ROWS=20>$code</TEXTAREA> <hr> <h2>ACCEPTED OFFERS IN HTML FORMAT (FOR NEWS ARTICLE)</h2><br> <TEXTAREA COLS=125 ROWS=20>$text</TEXTAREA> <hr> <h2>ALL OFFERS IN HTML FORMAT (FOR NEWS ARTICLE EXTENDED TEXT)</h2><br> <TEXTAREA COLS=125 ROWS=20>$exttext</TEXTAREA></FORM> <hr> </HTML>";
 
 function getteamid ($teamname) {
-	if($teamname == 'Amigos') return 1;
-	if($teamname == 'Stars') return 2;
-	if($teamname == 'Muskies') return 3;
-	if($teamname == 'Warriors') return 4;
-	if($teamname == 'Pistons') return 5;
-	if($teamname == 'Supersonics') return 6;
-	if($teamname == 'Braves') return 7;
-	if($teamname == 'Pacers') return 8;
-	if($teamname == 'Spirits') return 9;
-	if($teamname == 'Steam Rollers') return 10;
-	if($teamname == 'Huskies') return 11;
-	if($teamname == 'Clippers') return 12;
-	if($teamname == 'Lakers') return 13;
-	if($teamname == 'Oaks') return 14;
-	if($teamname == 'Trailblazers') return 15;
-	if($teamname == 'Hawks') return 16;
+	if($teamname == 'Celtics') return 1;
+	if($teamname == 'Heat') return 2;
+	if($teamname == 'Knicks') return 3;
+	if($teamname == 'Nets') return 4;
+	if($teamname == 'Magic') return 5;
+	if($teamname == 'Bucks') return 6;
+	if($teamname == 'Bulls') return 7;
+	if($teamname == 'Pelicans') return 8;
+	if($teamname == 'Hawks') return 9;
+	if($teamname == 'Hornets') return 10;
+	if($teamname == 'Pacers') return 11;
+	if($teamname == 'Raptors') return 12;
+	if($teamname == 'Jazz') return 13;
+	if($teamname == 'Timberwolves') return 14;
+	if($teamname == 'Nuggets') return 15;
+	if($teamname == 'Thunder') return 16;
 	if($teamname == 'Spurs') return 17;
-	if($teamname == 'Nets') return 18;
-	if($teamname == 'Bulls') return 19;
-	if($teamname == 'Cavaliers') return 20;
-	if($teamname == 'Colonels') return 21;
-	if($teamname == 'Bucks') return 22;
-	if($teamname == 'Chaparrals') return 23;
-	if($teamname == 'Sails') return 24;
+	if($teamname == 'Trailblazers') return 18;
+	if($teamname == 'Clippers') return 19;
+	if($teamname == 'Grizzlies') return 20;
+	if($teamname == 'Lakers') return 21;
+	if($teamname == 'Supersonics') return 22;
+	if($teamname == 'Suns') return 23;
+	if($teamname == 'Warriors') return 24;
 	return 0;
 }
 

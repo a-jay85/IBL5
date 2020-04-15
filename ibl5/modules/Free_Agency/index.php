@@ -91,7 +91,7 @@ function display($nullset) {
 	$tid = mysql_result(mysql_query($queryTeamID), 0);
 
 	// TODO: MAKE THIS DYNAMIC OMG
-	$freeagentyear=2015;
+	$freeagentyear=1989;
 
 	/*
 	// ==== COMPUTE PLAYER SALARIES FOR NEXT YEAR TO GET SOFT AND HARD CAP NUMBERS

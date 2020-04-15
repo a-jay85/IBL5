@@ -1052,7 +1052,7 @@ if ($player_nickname != NULL)
 echo "- Nickname: \"$player_nickname\" ";
 }
 
-echo "(<a href=\"online/team.php?tid=$player_team_id\">$player_team_name</a>)</font><hr>
+echo "(<a href=\"modules.php?name=Team&op=team&tid=$player_team_id\">$player_team_name</a>)</font><hr>
 
 <table><tr><td valign=center><img src=\"images/player/$pid.jpg\"></td><td>";
 
@@ -1439,7 +1439,7 @@ echo "      <tr align=center>";
 } else {
 echo "      <tr align=center>";
 }
-echo "      <td><center>$hist_year</center></td><td><center><a href=\"online/team.php?tid=$hist_tid&yr=$hist_year\">$hist_team</a></center></td><td><center>$hist_gm</center></td><td><center>$hist_min</center></td><td><center>$hist_fgm-$hist_fga</center></td><td><center>$hist_ftm-$hist_fta</center></td><td><center>$hist_tgm-$hist_tga</center></td><td><center>$hist_orb</center></td><td><center>$hist_reb</center></td><td><center>$hist_ast</center></td><td><center>$hist_stl</center></td><td><center>$hist_tvr</center></td><td><center>$hist_blk</center></td><td><center>$hist_pf</center></td><td><center>$hist_pts</td></tr>
+echo "      <td><center>$hist_year</center></td><td><center><a href=\"modules.php?name=Team&op=team&tid=$hist_tid&yr=$hist_year\">$hist_team</a></center></td><td><center>$hist_gm</center></td><td><center>$hist_min</center></td><td><center>$hist_fgm-$hist_fga</center></td><td><center>$hist_ftm-$hist_fta</center></td><td><center>$hist_tgm-$hist_tga</center></td><td><center>$hist_orb</center></td><td><center>$hist_reb</center></td><td><center>$hist_ast</center></td><td><center>$hist_stl</center></td><td><center>$hist_tvr</center></td><td><center>$hist_blk</center></td><td><center>$hist_pf</center></td><td><center>$hist_pts</td></tr>
 ";
 
 $car_gm=$car_gm+$hist_gm;

@@ -920,8 +920,8 @@ function negotiate($pid) {
 			<INPUT TYPE=\"text\" NAME=\"offeryear5\" SIZE=\"4\" VALUE=\"$prefill5\"></td><td>
 			<INPUT TYPE=\"text\" NAME=\"offeryear6\" SIZE=\"4\" VALUE=\"$prefill6\"></td>";
 		} else { // Limit undrafted rookie FA contracts to two years
-			echo "<INPUT TYPE=\"text\" NAME=\"offeryear3\" SIZE=\"4\" VALUE=\"$prefill3\"></td><td>
-			<INPUT TYPE=\"text\" NAME=\"offeryear4\" SIZE=\"4\" VALUE=\"$prefill4\"></td>";
+			echo "<INPUT TYPE=\"text\" NAME=\"offeryear1\" SIZE=\"4\" VALUE=\"$prefill3\"></td><td>
+			<INPUT TYPE=\"text\" NAME=\"offeryear2\" SIZE=\"4\" VALUE=\"$prefill4\"></td>";
 		}
 		echo "<input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
 		<input type=\"hidden\" name=\"dem2\" value=\"$dem2\">

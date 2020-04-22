@@ -2324,7 +2324,7 @@ if ($spec == 9) {
 $rowcolor=0;
 
 echo "      <table border=1 cellspacing=0 class=\"sortable\><tr><td colspan=24><center><b><font  class=\"content\">(Past) Career Ratings by Year</font></b></center></td></tr>
-        <tr><td>year</td><td>2ga</td><td>2gp</td><td>fta</td><td>ftp</td><td>3ga</td><td>3gp</td><td>orb</td><td>drb</td><td>ast</td><td>stl</td><td>tvr</td><td>blk</td><td>oo</td><td>do</td><td>po</td><td>to</td><td>od</td><td>dd</td><td>pd</td><td>td</td><td>Off</td><td>Def</td><td>Salary</td></tr>";
+        <tr><td>year</td><td>2ga</td><td>2gp</td><td>fta</td><td>ftp</td><td>3ga</td><td>3gp</td><td>orb</td><td>drb</td><td>ast</td><td>stl</td><td>blk</td><td>tvr</td><td>oo</td><td>do</td><td>po</td><td>to</td><td>od</td><td>dd</td><td>pd</td><td>td</td><td>Off</td><td>Def</td><td>Salary</td></tr>";
 
 
 $totalsalary=0;
@@ -2343,8 +2343,8 @@ $totalsalary=0;
     $r_drb = stripslashes(check_html($row44['r_drb'], "nohtml"));
     $r_ast = stripslashes(check_html($row44['r_ast'], "nohtml"));
     $r_stl = stripslashes(check_html($row44['r_stl'], "nohtml"));
-    $r_tvr = stripslashes(check_html($row44['r_tvr'], "nohtml"));
     $r_blk = stripslashes(check_html($row44['r_blk'], "nohtml"));
+    $r_tvr = stripslashes(check_html($row44['r_tvr'], "nohtml"));
     $r_oo = stripslashes(check_html($row44['r_oo'], "nohtml"));
     $r_do = stripslashes(check_html($row44['r_do'], "nohtml"));
     $r_po = stripslashes(check_html($row44['r_po'], "nohtml"));
@@ -2367,7 +2367,7 @@ $rowcolor=1;
 echo "      <tr align=center>";
 $rowcolor=0;
 }
-echo "      <td><center>$r_year</center></td><td><center>$r_2ga</center></td><td><center>$r_2gp</center></td><td><center>$r_fta</center></td><td><center>$r_ftp</center></td><td><center>$r_3ga</center></td><td><center>$r_3gp</center></td><td><center>$r_orb</center></td><td><center>$r_drb</center></td><td><center>$r_ast</center></td><td><center>$r_stl</center></td><td><center>$r_tvr</center></td><td><center>$r_blk</center></td><td><center>$r_oo</center></td><td><center>$r_do</center></td><td><center>$r_po</center></td><td><center>$r_to</center></td><td><center>$r_od</center></td><td><center>$r_dd</center></td><td><center>$r_pd</center></td><td><center>$r_td</center></td><td><center>$r_Off</center></td><td><center>$r_Def</center></td><td><center>$salary</center></td></tr>
+echo "      <td><center>$r_year</center></td><td><center>$r_2ga</center></td><td><center>$r_2gp</center></td><td><center>$r_fta</center></td><td><center>$r_ftp</center></td><td><center>$r_3ga</center></td><td><center>$r_3gp</center></td><td><center>$r_orb</center></td><td><center>$r_drb</center></td><td><center>$r_ast</center></td><td><center>$r_stl</center></td><td><center>$r_blk</center></td><td><center>$r_tvr</center></td><td><center>$r_oo</center></td><td><center>$r_do</center></td><td><center>$r_po</center></td><td><center>$r_to</center></td><td><center>$r_od</center></td><td><center>$r_dd</center></td><td><center>$r_pd</center></td><td><center>$r_td</center></td><td><center>$r_Off</center></td><td><center>$r_Def</center></td><td><center>$salary</center></td></tr>
 ";
 
 }

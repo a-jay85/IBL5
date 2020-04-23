@@ -38,8 +38,7 @@ while ($i < $num0) {
 		$queryk="SELECT * FROM nuke_iblplyr WHERE pid = '$itemid'";
 		$resultk=mysql_query($queryk);
 
-		$storytext = $storytext."The $from send ".mysql_result($resultk,0,"pos")." ".mysql_result($resultk,0,"name")." to the $to.<br>
-		";
+		$storytext = $storytext."The $from send ".mysql_result($resultk,0,"pos")." ".mysql_result($resultk,0,"name")." to the $to.<br>";
 
 		$queryi="UPDATE nuke_iblplyr SET `teamname` = '$to', `tid` = '$tid' WHERE `pid` = '$itemid' LIMIT 1";
 		$resulti=mysql_query($queryi);

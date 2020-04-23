@@ -78,7 +78,7 @@ function userinfo($username, $bypass=0, $hid=0, $url=0)
 	$result7 = $db->sql_query($sql7);
 	$num7 = $db->sql_numrows($result7);
 
-	$queryPlayersOnTeam = "SELECT * FROM ".$prefix."_iblplyr WHERE teamname = '$teamlogo' AND retired = '0' ORDER BY ordinal ASC";
+	$queryPlayersOnTeam = "SELECT * FROM ".$prefix."_iblplyr WHERE teamname = '$teamlogo' AND tid = $tid AND retired = '0' ORDER BY ordinal ASC";
 	$playersOnTeam = $db->sql_query($queryPlayersOnTeam);
 
 	if ($useset == NULL) $useset=1;

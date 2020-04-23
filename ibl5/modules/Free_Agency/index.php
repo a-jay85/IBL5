@@ -261,7 +261,7 @@ function display($nullset) {
 
 			// ==== CHECK FOR ROOKIE MIGRATION POSSIBILITY
 			$rookiemigration = 0;
-			if ($draftround != 0 && $exp == 0) $rookiemigration=1;
+			if ($exp == 0) $rookiemigration = 1;
 
 			echo "      <tr><td>";
 

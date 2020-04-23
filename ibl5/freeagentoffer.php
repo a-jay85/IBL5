@@ -369,6 +369,12 @@ echo "Sorry, you must enter an amount greater than zero in the first year of a f
 $nooffer=1;
 }
 
+if ($Offer_1 < $Minimum) {
+    echo "Sorry, you must enter an amount greater than the Veteran's Minimum in the first year of a free agency offer.<br>
+        Your offer in Year 1 was <b>$Offer_1</b>, but should be at least <b>$Minimum</b>.<br>";
+    $nooffer = 1;
+}
+
 // ===== BIRD RIGHTS TREATMENT
 
 if ($player_team == $Team_Name) {

@@ -84,7 +84,7 @@ while (!feof($scoFile)) {
         $gameBLK = substr($line,107+$x,2);
         $gamePF = substr($line,109+$x,2);
 
-        $entryUpdateQuery = "INSERT INTO ibl_box_scores (
+        $entryInsertQuery = "INSERT INTO ibl_box_scores (
             Date,
             name,
             pos,
@@ -129,8 +129,8 @@ while (!feof($scoFile)) {
             $gamePF
         )";
         if ($name != NULL || $name != '') {
-            if (mysql_query($entryUpdateQuery)) {
-                $entryUpdateQuery = str_replace(array("\n", "\t", "\r"), '', $entryUpdateQuery);
+            if (mysql_query($entryInsertQuery)) {
+                $entryInsertQuery = str_replace(array("\n", "\t", "\r"), '', $entryInsertQuery);
             }
         }
     }

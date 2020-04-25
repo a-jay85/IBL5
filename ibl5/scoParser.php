@@ -42,6 +42,9 @@ while (!feof($scoFile)) {
         if ($seasonPhase == "HEAT") {
             $gameMonth = 10; // Puts HEAT games in October
         }
+        if ($seasonPhase == "Preseason") {
+            $gameMonth = 9; // Puts preseason games in September
+        }
     }
     $gameDay = sprintf("%02u",substr($line,2,2)+1);
     $gameOfThatDay = substr($line,4,2)+1;

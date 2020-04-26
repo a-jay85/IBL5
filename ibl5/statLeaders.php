@@ -39,19 +39,27 @@ function seasonHighTable($queryForStat, $statName, $playerOrTeam, $seasonPhase)
     } elseif ($playerOrTeam == 'team') {
         $isPlayer = 'pid = 0';
     }
-    if ($seasonPhase == "playoffs") {
-        $lastSimDatesArray = getLastSimDatesArray();
-        $playoffYear = substr($lastSimDatesArray['End Date'], 0, 4);
 
+    $playoffYear = getCurrentSeasonEndingYear();
+    $seasonStartingYear = $playoffYear - 1;
+
+    if ($seasonPhase == "Playoffs") {
         $query = "SELECT `name`, `date`, " . $queryForStat . " AS `" . $statName . "`
             FROM ibl_box_scores
             WHERE " . $isPlayer . "
-            AND date > '" . $playoffYear . "-04-30'
+            AND date >= '" . $playoffYear . "-05-01'
+            ORDER BY `" . $statName . "` DESC, date ASC LIMIT 15;";
+    } elseif ($seasonPhase == "Preseason") {
+        $query = "SELECT `name`, `date`, " . $queryForStat . " AS `" . $statName . "`
+            FROM ibl_box_scores
+            WHERE " . $isPlayer . "
+            AND date >= '" . $seasonStartingYear . "-09-01'
             ORDER BY `" . $statName . "` DESC, date ASC LIMIT 15;";
     } else {
         $query = "SELECT `name`, `date`, " . $queryForStat . " AS `" . $statName . "`
             FROM ibl_box_scores
             WHERE " . $isPlayer . "
+            AND date >= '" . $seasonStartingYear . "-10-01'
             ORDER BY `" . $statName . "` DESC, date ASC LIMIT 15;";
     }
     $result = mysql_query($query);

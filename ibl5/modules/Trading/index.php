@@ -55,7 +55,12 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 	$sql7 = "SELECT * FROM nuke_ibl_team_info ORDER BY team_city ASC ";
 	$result7 = $db->sql_query($sql7);
 
-	$sql8 = "SELECT * FROM nuke_iblplyr WHERE teamname = '$userinfo[user_ibl_team]' AND retired = '0' ORDER BY ordinal ASC ";
+	$sql8 = "SELECT *
+		FROM nuke_iblplyr
+		WHERE teamname = '$userinfo[user_ibl_team]'
+		AND ordinal <= 960
+		AND retired = '0'
+		ORDER BY ordinal ASC ";
 	$result8 = $db->sql_query($sql8);
 	$sql8a = "SELECT * FROM ibl_draft_picks WHERE ownerofpick = '$userinfo[user_ibl_team]' ORDER BY year, round ASC ";
 	$result8a = $db->sql_query($sql8a);
@@ -222,7 +227,12 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 						<b>Salary</b>
 					</td>";
 
-	$sql9 = "SELECT * FROM nuke_iblplyr WHERE teamname = '$partner' AND retired = '0' ORDER BY ordinal ASC ";
+	$sql9 = "SELECT *
+		FROM nuke_iblplyr
+		WHERE teamname = '$partner'
+		AND ordinal <= 960
+		AND retired = '0'
+		ORDER BY ordinal ASC ";
 	$result9 = $db->sql_query($sql9);
 	$sql9a = "SELECT * FROM ibl_draft_picks WHERE ownerofpick = '$partner' ORDER BY year, round ASC ";
 

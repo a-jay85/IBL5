@@ -14,7 +14,7 @@ $querySeasonPhase = mysql_query($stringSeasonPhase);
 $seasonPhase = mysql_result($querySeasonPhase, 0);
 
 $scoFile = fopen("IBL5.sco", "rb");
-fseek($scoFile,1030000);
+fseek($scoFile,1000000);
 
 if ($seasonPhase == "HEAT") {
     $stringDeleteCurrentSeasonBoxScores = "DELETE FROM `ibl_box_scores` WHERE `Date` BETWEEN '$currentStartingYear-10-01' AND '$currentEndingYear-07-01';";

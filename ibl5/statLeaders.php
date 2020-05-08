@@ -59,7 +59,7 @@ function seasonHighTable($queryForStat, $statName, $playerOrTeam, $seasonPhase)
         $query = "SELECT `name`, `date`, " . $queryForStat . " AS `" . $statName . "`
             FROM ibl_box_scores
             WHERE " . $isPlayer . "
-            AND date >= '" . $seasonStartingYear . "-10-01'
+            AND date >= '" . $seasonStartingYear . "-11-01'
             ORDER BY `" . $statName . "` DESC, date ASC LIMIT 15;";
     }
     $result = mysql_query($query);

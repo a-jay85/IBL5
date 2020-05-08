@@ -57,19 +57,19 @@ function seasonHighTable($queryForStat, $statName, $playerOrTeam, $seasonPhase)
         $query = "SELECT `name`, `date`, " . $queryForStat . " AS `" . $statName . "`
             FROM ibl_box_scores
             WHERE " . $isPlayer . "
-            AND date >= '" . $seasonStartingYear . "-09-01'
+            AND date BETWEEN '" . $seasonStartingYear . "-09-01' AND '" . $seasonStartingYear . "-09-30'
             ORDER BY `" . $statName . "` DESC, date ASC LIMIT 15;";
     } elseif ($seasonPhase == "HEAT") {
         $query = "SELECT `name`, `date`, " . $queryForStat . " AS `" . $statName . "`
             FROM ibl_box_scores
             WHERE " . $isPlayer . "
-            AND date >= '" . $seasonStartingYear . "-10-01'
+            AND date BETWEEN '" . $seasonStartingYear . "-10-01' AND '" . $seasonStartingYear . "-10-31'
             ORDER BY `" . $statName . "` DESC, date ASC LIMIT 15;";
     } else {
         $query = "SELECT `name`, `date`, " . $queryForStat . " AS `" . $statName . "`
             FROM ibl_box_scores
             WHERE " . $isPlayer . "
-            AND date >= '" . $seasonStartingYear . "-11-01'
+            AND date BETWEEN '" . $seasonStartingYear . "-11-01' AND '" . $playoffYear . "-04-30'
             ORDER BY `" . $statName . "` DESC, date ASC LIMIT 15;";
     }
     $result = mysql_query($query);

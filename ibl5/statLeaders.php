@@ -114,14 +114,6 @@ function endTableRow ()
     echo "\t</tr>\n";
 }
 
-if ($seasonPhase == "playoffs") {
-    $phase = "Playoff";
-    echo "<a href=\"statLeaders.php\"><i>(Click to switch to Season Highs)</i></a><p>";
-} else {
-    $phase = "Season";
-    echo "<a href=\"statLeaders.php?seasonPhase=playoffs\"><i>(Click to switch to Playoff Highs)</i></a><p>";
-}
-
 echo "<html><head><title>$seasonPhase Stat Leaders</title></head>\n\n";
 echo "<body>\n\n";
 

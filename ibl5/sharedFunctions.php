@@ -19,3 +19,13 @@ function getCurrentSeasonEndingYear()
 
     return mysql_result($queryCurrentSeasonEndingYear, 0);
 }
+
+function getCurrentSeasonPhase()
+{
+    $queryCurrentSeasonPhase = mysql_query("SELECT value
+        FROM nuke_ibl_settings
+        WHERE name = 'Current Season Phase'
+        LIMIT 1");
+
+    return mysql_result($queryCurrentSeasonPhase, 0);
+}

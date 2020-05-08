@@ -30,7 +30,11 @@ $arrayStatQueries = array(
     '`game3GM`'
 );
 
-$seasonPhase = $_GET['seasonPhase'];
+if ($_GET['seasonPhase'] == NULL) {
+    $seasonPhase = getCurrentSeasonPhase();
+} else {
+    $seasonPhase = $_GET['seasonPhase'];
+}
 
 function seasonHighTable($queryForStat, $statName, $playerOrTeam, $seasonPhase)
 {
@@ -118,10 +122,10 @@ if ($seasonPhase == "playoffs") {
     echo "<a href=\"statLeaders.php?seasonPhase=playoffs\"><i>(Click to switch to Playoff Highs)</i></a><p>";
 }
 
-echo "<html><head><title>$phase Stat Leaders</title></head>\n\n";
+echo "<html><head><title>$seasonPhase Stat Leaders</title></head>\n\n";
 echo "<body>\n\n";
 
-echo "<H1>Players' $phase Highs<H1>\n\n";
+echo "<H1>Players' $seasonPhase Highs<H1>\n\n";
 
 $playerOrTeam = 'player';
 
@@ -153,7 +157,7 @@ endTableRow();
 
 echo "</table>\n\n";
 
-echo "<H1>Teams' $phase Highs</H1>\n\n";
+echo "<H1>Teams' $seasonPhase Highs</H1>\n\n";
 $playerOrTeam = 'team';
 
 echo "<table cellpadding=5>\n";

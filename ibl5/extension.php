@@ -255,15 +255,15 @@ if ($nooffer == 0) {
         }
 
         // ==== UPDATE PLAYER DATABASE WITH NEW CONTRACT INFORMATION ====
-
-        $queryContractUpdate = "UPDATE nuke_iblplyr
-            SET cy2 = $Offer_1,
-                cy3 = $Offer_2,
-                cy4 = $Offer_3,
-                cy5 = $Offer_4,
-                cy6 = $Offer_5
-            WHERE name = '$Player_Name'";
-        $resultContractUpdate = mysql_query($queryContractUpdate);
+        // TODO: this is broken; it needs to take the player's current salary for the season and write it into cy1 too
+        // $queryContractUpdate = "UPDATE nuke_iblplyr
+        //     SET cy2 = $Offer_1,
+        //         cy3 = $Offer_2,
+        //         cy4 = $Offer_3,
+        //         cy5 = $Offer_4,
+        //         cy6 = $Offer_5
+        //     WHERE name = '$Player_Name'";
+        // $resultContractUpdate = mysql_query($queryContractUpdate);
 
         // ==== MARK THE EXTENSION AS USED FOR THIS SEASON ====
 

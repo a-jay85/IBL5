@@ -2583,7 +2583,7 @@ function negotiate($pid)
 {
     global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
     $pid = intval($pid);
-    $playerinfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM ".$prefix."_iblplyr WHERE pid='$pid'"));
+    $playerinfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM ".$prefix."_iblplyr WHERE pid = '$pid'"));
     $player_name = stripslashes(check_html($playerinfo['name'], "nohtml"));
     $player_pos = stripslashes(check_html($playerinfo['altpos'], "nohtml"));
     $player_team_name = stripslashes(check_html($playerinfo['teamname'], "nohtml"));
@@ -2600,11 +2600,11 @@ function negotiate($pid)
 
     menu();
 
-// RENEGOTIATION STUFF
+    // RENEGOTIATION STUFF
 
     cookiedecode($user);
 
-    $sql2 = "SELECT * FROM ".$prefix."_users WHERE username='$cookie[1]'";
+    $sql2 = "SELECT * FROM ".$prefix."_users WHERE username = '$cookie[1]'";
     $result2 = $db->sql_query($sql2);
     $num2 = $db->sql_numrows($result2);
     $userinfo = $db->sql_fetchrow($result2);
@@ -2621,14 +2621,14 @@ function negotiate($pid)
     $player_cy5 = stripslashes(check_html($playerinfo['cy5'], "nohtml"));
     $player_cy6 = stripslashes(check_html($playerinfo['cy6'], "nohtml"));
 
-// CONTRACT CHECKER
+    // CONTRACT CHECKER
 
     $can_renegotiate = 0;
 
     if ($player_cy == 1) {
         if ($player_cy2 != 0) {
         } else {
-          $can_renegotiate = 1;
+            $can_renegotiate = 1;
         }
     } else if ($player_cy == 2) {
         if ($player_cy3 != 0) {
@@ -2656,405 +2656,386 @@ function negotiate($pid)
         $contract_display = "not under contract";
     }
 
-// END CONTRACT CHECKER
+    // END CONTRACT CHECKER
 
-echo "<b>$player_pos $player_name</b> - Contract Demands:
-<br>";
+    echo "<b>$player_pos $player_name</b> - Contract Demands:
+    <br>";
 
-if ($player_pos == 'PG')
-{
- $adjpos="'G', 'PG'";
-}
-if ($player_pos == 'G')
-{
- $adjpos="'PG', 'SG', 'G'";
-}
-if ($player_pos == 'SG')
-{
- $adjpos="'G', 'GF', 'SG'";
-}
-if ($player_pos == 'GF')
-{
- $adjpos="'SG', 'SF', 'GF'";
-}
-if ($player_pos == 'SF')
-{
- $adjpos="'GF', 'F', 'SF'";
-}
-if ($player_pos == 'F')
-{
- $adjpos="'SF', 'PF', 'F'";
-}
-if ($player_pos == 'PF')
-{
- $adjpos="'F', 'FC', 'PF'";
-}
-if ($player_pos == 'FC')
-{
- $adjpos="'PF', 'FC', 'C'";
-}
-if ($player_pos == 'C')
-{
- $adjpos="'FC', 'C'";
-}
-
-
-if ($can_renegotiate == 1) {
-  if ($player_team_name == $userteam) {
-
-// Assign player stats to variables
-    $negotiatingPlayerFGA = intval($playerinfo['r_fga']);
-    $negotiatingPlayerFGP = intval($playerinfo['r_fgp']);
-    $negotiatingPlayerFTA = intval($playerinfo['r_fta']);
-    $negotiatingPlayerFTP = intval($playerinfo['r_ftp']);
-    $negotiatingPlayerTGA = intval($playerinfo['r_tga']);
-    $negotiatingPlayerTGP = intval($playerinfo['r_tgp']);
-    $negotiatingPlayerORB = intval($playerinfo['r_orb']);
-    $negotiatingPlayerDRB = intval($playerinfo['r_drb']);
-    $negotiatingPlayerAST = intval($playerinfo['r_ast']);
-    $negotiatingPlayerSTL = intval($playerinfo['r_stl']);
-    $negotiatingPlayerTOV = intval($playerinfo['r_to']);
-    $negotiatingPlayerBLK = intval($playerinfo['r_blk']);
-    $negotiatingPlayerFOUL = intval($playerinfo['r_foul']);
-    $negotiatingPlayerOO = intval($playerinfo['oo']);
-    $negotiatingPlayerOD = intval($playerinfo['od']);
-    $negotiatingPlayerDO = intval($playerinfo['do']);
-    $negotiatingPlayerDD = intval($playerinfo['dd']);
-    $negotiatingPlayerPO = intval($playerinfo['po']);
-    $negotiatingPlayerPD = intval($playerinfo['pd']);
-    $negotiatingPlayerTO = intval($playerinfo['to']);
-    $negotiatingPlayerTD = intval($playerinfo['td']);
-
-// Pull max values of each stat category
-    $marketMaxFGA = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_fga) FROM ".$prefix."_iblplyr"));
-    $marketMaxFGP = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_fgp) FROM ".$prefix."_iblplyr"));
-    $marketMaxFTA = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_fta) FROM ".$prefix."_iblplyr"));
-    $marketMaxFTP = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_ftp) FROM ".$prefix."_iblplyr"));
-    $marketMaxTGA = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_tga) FROM ".$prefix."_iblplyr"));
-    $marketMaxTGP = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_tgp) FROM ".$prefix."_iblplyr"));
-    $marketMaxORB = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_orb) FROM ".$prefix."_iblplyr"));
-    $marketMaxDRB = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_drb) FROM ".$prefix."_iblplyr"));
-    $marketMaxAST = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_ast) FROM ".$prefix."_iblplyr"));
-    $marketMaxSTL = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_stl) FROM ".$prefix."_iblplyr"));
-    $marketMaxTOV = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_to) FROM ".$prefix."_iblplyr"));
-    $marketMaxBLK = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_blk) FROM ".$prefix."_iblplyr"));
-    $marketMaxFOUL = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_foul) FROM ".$prefix."_iblplyr"));
-    $marketMaxOO = $db->sql_fetchrow($db->sql_query("SELECT MAX(oo) FROM ".$prefix."_iblplyr"));
-    $marketMaxOD = $db->sql_fetchrow($db->sql_query("SELECT MAX(od) FROM ".$prefix."_iblplyr"));
-    $marketMaxDO = $db->sql_fetchrow($db->sql_query("SELECT MAX(do) FROM ".$prefix."_iblplyr"));
-    $marketMaxDD = $db->sql_fetchrow($db->sql_query("SELECT MAX(dd) FROM ".$prefix."_iblplyr"));
-    $marketMaxPO = $db->sql_fetchrow($db->sql_query("SELECT MAX(po) FROM ".$prefix."_iblplyr"));
-    $marketMaxPD = $db->sql_fetchrow($db->sql_query("SELECT MAX(pd) FROM ".$prefix."_iblplyr"));
-    $marketMaxTO = $db->sql_fetchrow($db->sql_query("SELECT MAX(to) FROM ".$prefix."_iblplyr"));
-    $marketMaxTD = $db->sql_fetchrow($db->sql_query("SELECT MAX(td) FROM ".$prefix."_iblplyr"));
-
-// Determine raw score for each stat
-    $rawFGA = $negotiatingPlayerFGA/intval($marketMaxFGA[0])*100;
-    $rawFGP = $negotiatingPlayerFGP/intval($marketMaxFGP[0])*100;
-    $rawFTA = $negotiatingPlayerFTA/intval($marketMaxFTA[0])*100;
-    $rawFTP = $negotiatingPlayerFTP/intval($marketMaxFTP[0])*100;
-    $rawTGA = $negotiatingPlayerTGA/intval($marketMaxTGA[0])*100;
-    $rawTGP = $negotiatingPlayerTGP/intval($marketMaxTGP[0])*100;
-    $rawORB = $negotiatingPlayerORB/intval($marketMaxORB[0])*100;
-    $rawDRB = $negotiatingPlayerDRB/intval($marketMaxDRB[0])*100;
-    $rawAST = $negotiatingPlayerAST/intval($marketMaxAST[0])*100;
-    $rawSTL = $negotiatingPlayerSTL/intval($marketMaxSTL[0])*100;
-    $rawTOV = $negotiatingPlayerTOV/intval($marketMaxTOV[0])*100;
-    $rawBLK = $negotiatingPlayerBLK/intval($marketMaxBLK[0])*100;
-    $rawFOUL = $negotiatingPlayerFOUL/intval($marketMaxFOUL[0])*100;
-    $rawOO = $negotiatingPlayerOO/intval($marketMaxOO[0])*100;
-    $rawOD = $negotiatingPlayerOD/intval($marketMaxOD[0])*100;
-    $rawDO = $negotiatingPlayerDO/intval($marketMaxDO[0])*100;
-    $rawDD = $negotiatingPlayerDD/intval($marketMaxDD[0])*100;
-    $rawPO = $negotiatingPlayerPO/intval($marketMaxPO[0])*100;
-    $rawPD = $negotiatingPlayerPD/intval($marketMaxPD[0])*100;
-    $rawTO = $negotiatingPlayerTO/intval($marketMaxTO[0])*100;
-    $rawTD = $negotiatingPlayerTD/intval($marketMaxTD[0])*100;
-    $totalRawScore = $rawFGA+$rawFGP+$rawFTA+$rawFTP+$rawTGA+$rawTGP+$rawORB+$rawDRB+$rawAST+$rawSTL+$rawTOV+$rawBLK+$rawFOUL+$rawOO+$rawOD+$rawDO+$rawDD+$rawPO+$rawPD+$rawTO+$rawTD;
-//    var_dump($totalRawScore);
-    $adjustedScore = $totalRawScore-700; // MJ's 87-88 season numbers = 1414 raw score! Sam Mack's was 702. So I cut the score down by 700.
-    $demandsFactor = 3; // I got this number by trial-and-error until the first-round picks of the dispersal draft demanded around a max.
-    $avgDemands = $adjustedScore*$demandsFactor;
-    $totalDemands = $avgDemands*5;
-    $baseDemands = $totalDemands/6;
-    $maxRaise = round($baseDemands*0.1);
-
-    $dem1 = $baseDemands;
-    $dem2 = $baseDemands+$maxRaise;
-    $dem3 = $baseDemands+$maxRaise*2;
-    $dem4 = $baseDemands+$maxRaise*3;
-    $dem5 = $baseDemands+$maxRaise*4;
-    $dem6 = 0;
-/*
-// Old way to determine demands here
-    $demands = $db->sql_fetchrow($db->sql_query("SELECT * FROM ".$prefix."_ibl_demands WHERE name='$player_name'"));
-    $dem1 = stripslashes(check_html($demands['dem1'], "nohtml"));
-    $dem2 = stripslashes(check_html($demands['dem2'], "nohtml"));
-    $dem3 = stripslashes(check_html($demands['dem3'], "nohtml"));
-    $dem4 = stripslashes(check_html($demands['dem4'], "nohtml"));
-    $dem5 = stripslashes(check_html($demands['dem5'], "nohtml"));
-// The sixth year is zero for extensions only; remove the line below and uncomment the regular line in the FA module.
-    $dem6 = 0;
-//    $dem6 = stripslashes(check_html($demands['dem6'], "nohtml"));
-*/
-    $teamfactors = $db->sql_fetchrow($db->sql_query("SELECT * FROM ".$prefix."_ibl_team_info WHERE team_name='$userteam'"));
-    $tf_wins = stripslashes(check_html($teamfactors['Contract_Wins'], "nohtml"));
-    $tf_loss = stripslashes(check_html($teamfactors['Contract_Losses'], "nohtml"));
-    $tf_trdw = stripslashes(check_html($teamfactors['Contract_AvgW'], "nohtml"));
-    $tf_trdl = stripslashes(check_html($teamfactors['Contract_AvgL'], "nohtml"));
-    $tf_coach = stripslashes(check_html($teamfactors['Contract_Coach'], "nohtml"));
-
-    $millionsatposition = $db->sql_query("SELECT * FROM ".$prefix."_iblplyr WHERE teamname='$userteam' AND pos IN ($adjpos) AND name!='$player_name'");
-// LOOP TO GET MILLIONS COMMITTED AT POSITION
-
-$tf_millions = 0;
-
-    while ($millionscounter = $db->sql_fetchrow($millionsatposition)) {
-
-    $millionscy = stripslashes(check_html($millionscounter['cy'], "nohtml"));
-    $millionscy1 = stripslashes(check_html($millionscounter['cy1'], "nohtml"));
-    $millionscy2 = stripslashes(check_html($millionscounter['cy2'], "nohtml"));
-    $millionscy3 = stripslashes(check_html($millionscounter['cy3'], "nohtml"));
-    $millionscy4 = stripslashes(check_html($millionscounter['cy4'], "nohtml"));
-    $millionscy5 = stripslashes(check_html($millionscounter['cy5'], "nohtml"));
-    $millionscy6 = stripslashes(check_html($millionscounter['cy6'], "nohtml"));
-
-
-// FOR AN EXTENSION, LOOK AT SALARY COMMITTED NEXT YEAR, NOT THIS YEAR
-
-if ($millionscy == 1) {
-$tf_millions = $tf_millions+$millionscy2;
-}
-if ($millionscy == 2) {
-$tf_millions = $tf_millions+$millionscy3;
-}
-if ($millionscy == 3) {
-$tf_millions = $tf_millions+$millionscy4;
-}
-if ($millionscy == 4) {
-$tf_millions = $tf_millions+$millionscy5;
-}
-if ($millionscy == 5) {
-$tf_millions = $tf_millions+$millionscy6;
-}
-
-
-}
-
-
-$demyrs = 6;
-if ($dem6 == 0){
-  $demyrs = 5;
-  if ($dem5 == 0){
-    $demyrs = 4;
-    if ($dem4 == 0){
-        $demyrs = 3;
-        if ($dem3 == 0){
-          $demyrs = 2;
-          if ($dem2 == 0){
-            $demyrs = 1;
-          }
-        }
+    if ($player_pos == 'PG') {
+        $adjpos = "'G', 'PG'";
     }
-  }
-}
+    if ($player_pos == 'G') {
+        $adjpos = "'PG', 'SG', 'G'";
+    }
+    if ($player_pos == 'SG') {
+        $adjpos = "'G', 'GF', 'SG'";
+    }
+    if ($player_pos == 'GF') {
+        $adjpos = "'SG', 'SF', 'GF'";
+    }
+    if ($player_pos == 'SF') {
+        $adjpos = "'GF', 'F', 'SF'";
+    }
+    if ($player_pos == 'F') {
+        $adjpos = "'SF', 'PF', 'F'";
+    }
+    if ($player_pos == 'PF') {
+        $adjpos = "'F', 'FC', 'PF'";
+    }
+    if ($player_pos == 'FC') {
+        $adjpos = "'PF', 'FC', 'C'";
+    }
+    if ($player_pos == 'C') {
+        $adjpos = "'FC', 'C'";
+    }
 
-//$modfactor1 = (0.0005*($tf_wins-$tf_losses)*($player_winner-1));
-$PFWFactor = (0.025*($tf_wins-$tf_loss)/($tf_wins+$tf_loss)*($player_winner-1));
-//$modfactor2 = (0.00125*($tf_trdw-$tf_trdl)*($player_tradition-1));
-$traditionFactor = (0.025*($tf_trdw-$tf_trdl)/($tf_trdw+$tf_trdl)*($player_tradition-1));
-//$modfactor3 = (.01*($tf_coach)*($player_coach=1));
-//$coachFactor = (0.0025*($tf_coach)*($player_coach-1));
-//$modfactor4 = (.025*($player_loyalty-1));
-$loyaltyFactor = (0.025*($player_loyalty-1));
-//$modfactor5 = (.01*($demyrs-1)-0.025)*($player_security-1);
-//$securityFactor = (0.01*$demyrs-0.025)*($player_security-1);
-//$modfactor6 = -(.0035*$tf_millions/100-0.028)*($player_playingtime-1);
-$PTFactor = (($tf_millions*-0.00005)+0.025)*($player_playingtime-1);
+    if ($can_renegotiate == 1) {
+        if ($player_team_name == $userteam) {
 
-$modifier = 1+$PFWFactor+$traditionFactor+$coachFactor+$loyaltyFactor+$securityFactor+$PTFactor;
-//echo "Wins: $tf_wins<br>Loses: $tf_loss<br>Tradition Wins: $tf_trdw<br> Tradition Loses: $tf_trdl<br>Coach: $tf_coach<br>Loyalty: $player_loyalty<br>Play Time: $tf_millions<br>ModW: $modfactor1<br>ModT: $modfactor2<br>ModC: $modfactor3<br>ModL: $modfactor4<br>ModS: $modfactor5<br>ModP: $modfactor6<br>Mod: $modifier<br>Demand 1: $dem1<br>Demand 2: $dem2<br>Demand 3: $dem3<br>Demand 4: $dem4<br>Demand 5: $dem5<br>";
+            // Assign player stats to variables
+            $negotiatingPlayerFGA = intval($playerinfo['r_fga']);
+            $negotiatingPlayerFGP = intval($playerinfo['r_fgp']);
+            $negotiatingPlayerFTA = intval($playerinfo['r_fta']);
+            $negotiatingPlayerFTP = intval($playerinfo['r_ftp']);
+            $negotiatingPlayerTGA = intval($playerinfo['r_tga']);
+            $negotiatingPlayerTGP = intval($playerinfo['r_tgp']);
+            $negotiatingPlayerORB = intval($playerinfo['r_orb']);
+            $negotiatingPlayerDRB = intval($playerinfo['r_drb']);
+            $negotiatingPlayerAST = intval($playerinfo['r_ast']);
+            $negotiatingPlayerSTL = intval($playerinfo['r_stl']);
+            $negotiatingPlayerTOV = intval($playerinfo['r_to']);
+            $negotiatingPlayerBLK = intval($playerinfo['r_blk']);
+            $negotiatingPlayerFOUL = intval($playerinfo['r_foul']);
+            $negotiatingPlayerOO = intval($playerinfo['oo']);
+            $negotiatingPlayerOD = intval($playerinfo['od']);
+            $negotiatingPlayerDO = intval($playerinfo['do']);
+            $negotiatingPlayerDD = intval($playerinfo['dd']);
+            $negotiatingPlayerPO = intval($playerinfo['po']);
+            $negotiatingPlayerPD = intval($playerinfo['pd']);
+            $negotiatingPlayerTO = intval($playerinfo['to']);
+            $negotiatingPlayerTD = intval($playerinfo['td']);
 
-$dem1 = round($dem1/$modifier);
-$dem2 = round($dem2/$modifier);
-$dem3 = round($dem3/$modifier);
-$dem4 = round($dem4/$modifier);
-$dem5 = round($dem5/$modifier);
-// The sixth year is zero for extensions only; remove the line below and uncomment the regular line in the FA module.
-$dem6=0;
-// $dem6 = round($dem6/$modifier);
+            // Pull max values of each stat category
+            $marketMaxFGA = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_fga) FROM " . $prefix . "_iblplyr"));
+            $marketMaxFGP = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_fgp) FROM " . $prefix . "_iblplyr"));
+            $marketMaxFTA = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_fta) FROM " . $prefix . "_iblplyr"));
+            $marketMaxFTP = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_ftp) FROM " . $prefix . "_iblplyr"));
+            $marketMaxTGA = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_tga) FROM " . $prefix . "_iblplyr"));
+            $marketMaxTGP = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_tgp) FROM " . $prefix . "_iblplyr"));
+            $marketMaxORB = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_orb) FROM " . $prefix . "_iblplyr"));
+            $marketMaxDRB = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_drb) FROM " . $prefix . "_iblplyr"));
+            $marketMaxAST = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_ast) FROM " . $prefix . "_iblplyr"));
+            $marketMaxSTL = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_stl) FROM " . $prefix . "_iblplyr"));
+            $marketMaxTOV = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_to) FROM " . $prefix . "_iblplyr"));
+            $marketMaxBLK = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_blk) FROM " . $prefix . "_iblplyr"));
+            $marketMaxFOUL = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_foul) FROM " . $prefix . "_iblplyr"));
+            $marketMaxOO = $db->sql_fetchrow($db->sql_query("SELECT MAX(oo) FROM " . $prefix . "_iblplyr"));
+            $marketMaxOD = $db->sql_fetchrow($db->sql_query("SELECT MAX(od) FROM " . $prefix . "_iblplyr"));
+            $marketMaxDO = $db->sql_fetchrow($db->sql_query("SELECT MAX(do) FROM " . $prefix . "_iblplyr"));
+            $marketMaxDD = $db->sql_fetchrow($db->sql_query("SELECT MAX(dd) FROM " . $prefix . "_iblplyr"));
+            $marketMaxPO = $db->sql_fetchrow($db->sql_query("SELECT MAX(po) FROM " . $prefix . "_iblplyr"));
+            $marketMaxPD = $db->sql_fetchrow($db->sql_query("SELECT MAX(pd) FROM " . $prefix . "_iblplyr"));
+            $marketMaxTO = $db->sql_fetchrow($db->sql_query("SELECT MAX(to) FROM " . $prefix . "_iblplyr"));
+            $marketMaxTD = $db->sql_fetchrow($db->sql_query("SELECT MAX(td) FROM " . $prefix . "_iblplyr"));
 
-$demtot = round(($dem1+$dem2+$dem3+$dem4+$dem5+$dem6)/100,2);
-$demavg = ($dem1+$dem2+$dem3+$dem4+$dem5+$dem6)/$demyrs;
+            // Determine raw score for each stat
+            $rawFGA = $negotiatingPlayerFGA / intval($marketMaxFGA[0]) * 100;
+            $rawFGP = $negotiatingPlayerFGP / intval($marketMaxFGP[0]) * 100;
+            $rawFTA = $negotiatingPlayerFTA / intval($marketMaxFTA[0]) * 100;
+            $rawFTP = $negotiatingPlayerFTP / intval($marketMaxFTP[0]) * 100;
+            $rawTGA = $negotiatingPlayerTGA / intval($marketMaxTGA[0]) * 100;
+            $rawTGP = $negotiatingPlayerTGP / intval($marketMaxTGP[0]) * 100;
+            $rawORB = $negotiatingPlayerORB / intval($marketMaxORB[0]) * 100;
+            $rawDRB = $negotiatingPlayerDRB / intval($marketMaxDRB[0]) * 100;
+            $rawAST = $negotiatingPlayerAST / intval($marketMaxAST[0]) * 100;
+            $rawSTL = $negotiatingPlayerSTL / intval($marketMaxSTL[0]) * 100;
+            $rawTOV = $negotiatingPlayerTOV / intval($marketMaxTOV[0]) * 100;
+            $rawBLK = $negotiatingPlayerBLK / intval($marketMaxBLK[0]) * 100;
+            $rawFOUL = $negotiatingPlayerFOUL / intval($marketMaxFOUL[0]) * 100;
+            $rawOO = $negotiatingPlayerOO / intval($marketMaxOO[0]) * 100;
+            $rawOD = $negotiatingPlayerOD / intval($marketMaxOD[0]) * 100;
+            $rawDO = $negotiatingPlayerDO / intval($marketMaxDO[0]) * 100;
+            $rawDD = $negotiatingPlayerDD / intval($marketMaxDD[0]) * 100;
+            $rawPO = $negotiatingPlayerPO / intval($marketMaxPO[0]) * 100;
+            $rawPD = $negotiatingPlayerPD / intval($marketMaxPD[0]) * 100;
+            $rawTO = $negotiatingPlayerTO / intval($marketMaxTO[0]) * 100;
+            $rawTD = $negotiatingPlayerTD / intval($marketMaxTD[0]) * 100;
+            $totalRawScore = $rawFGA + $rawFGP + $rawFTA + $rawFTP + $rawTGA + $rawTGP + $rawORB + $rawDRB + $rawAST + $rawSTL + $rawTOV + $rawBLK + $rawFOUL +
+                $rawOO + $rawOD + $rawDO + $rawDD + $rawPO + $rawPD + $rawTO + $rawTD;
+            //    var_dump($totalRawScore);
+            $adjustedScore = $totalRawScore - 700; // MJ's 87-88 season numbers = 1414 raw score! Sam Mack's was 702. So I cut the score down by 700.
+            $demandsFactor = 3; // I got this number by trial-and-error until the first-round picks of the dispersal draft demanded around a max.
+            $avgDemands = $adjustedScore * $demandsFactor;
+            $totalDemands = $avgDemands * 5;
+            $baseDemands = $totalDemands / 6;
+            $maxRaise = round($baseDemands * 0.1);
 
-$demand_display = $dem1;
-if ($dem2 == 0) {
-} else {
-$demand_display = $demand_display."</td><td>".$dem2;
-}
-if ($dem3 == 0) {
-} else {
-$demand_display = $demand_display."</td><td>".$dem3;
-}
-if ($dem4 == 0) {
-} else {
-$demand_display = $demand_display."</td><td>".$dem4;
-}
-if ($dem5 == 0) {
-} else {
-$demand_display = $demand_display."</td><td>".$dem5;
-}
-if ($dem6 == 0) {
-} else {
-$demand_display = $demand_display."</td><td>".$dem6;
-}
+            $dem1 = $baseDemands;
+            $dem2 = $baseDemands+$maxRaise;
+            $dem3 = $baseDemands+$maxRaise * 2;
+            $dem4 = $baseDemands+$maxRaise * 3;
+            $dem5 = $baseDemands+$maxRaise * 4;
+            $dem6 = 0;
+            /*
+            // Old way to determine demands here
+                $demands = $db->sql_fetchrow($db->sql_query("SELECT * FROM ".$prefix."_ibl_demands WHERE name='$player_name'"));
+                $dem1 = stripslashes(check_html($demands['dem1'], "nohtml"));
+                $dem2 = stripslashes(check_html($demands['dem2'], "nohtml"));
+                $dem3 = stripslashes(check_html($demands['dem3'], "nohtml"));
+                $dem4 = stripslashes(check_html($demands['dem4'], "nohtml"));
+                $dem5 = stripslashes(check_html($demands['dem5'], "nohtml"));
+            // The sixth year is zero for extensions only; remove the line below and uncomment the regular line in the FA module.
+                $dem6 = 0;
+            //    $dem6 = stripslashes(check_html($demands['dem6'], "nohtml"));
+            */
+            $teamfactors = $db->sql_fetchrow($db->sql_query("SELECT * FROM " . $prefix . "_ibl_team_info WHERE team_name = '$userteam'"));
+            $tf_wins = stripslashes(check_html($teamfactors['Contract_Wins'], "nohtml"));
+            $tf_loss = stripslashes(check_html($teamfactors['Contract_Losses'], "nohtml"));
+            $tf_trdw = stripslashes(check_html($teamfactors['Contract_AvgW'], "nohtml"));
+            $tf_trdl = stripslashes(check_html($teamfactors['Contract_AvgL'], "nohtml"));
+            $tf_coach = stripslashes(check_html($teamfactors['Contract_Coach'], "nohtml"));
 
-// LOOP TO GET HARD CAP SPACE
+            $millionsatposition = $db->sql_query("SELECT * FROM " . $prefix . "_iblplyr WHERE teamname = '$userteam' AND pos IN ($adjpos) AND name != '$player_name'");
+            // LOOP TO GET MILLIONS COMMITTED AT POSITION
 
-$capnumber = 7000;
+            $tf_millions = 0;
 
-    $capquery = "SELECT * FROM ".$prefix."_iblplyr WHERE teamname='$userteam' AND retired = '0'";
-    $capresult = $db->sql_query($capquery);
-    while($capdecrementer = $db->sql_fetchrow($capresult)) {
+            while ($millionscounter = $db->sql_fetchrow($millionsatposition)) {
 
-    $capcy = stripslashes(check_html($capdecrementer['cy'], "nohtml"));
-    $capcy1 = stripslashes(check_html($capdecrementer['cy1'], "nohtml"));
-    $capcy2 = stripslashes(check_html($capdecrementer['cy2'], "nohtml"));
-    $capcy3 = stripslashes(check_html($capdecrementer['cy3'], "nohtml"));
-    $capcy4 = stripslashes(check_html($capdecrementer['cy4'], "nohtml"));
-    $capcy5 = stripslashes(check_html($capdecrementer['cy5'], "nohtml"));
-    $capcy6 = stripslashes(check_html($capdecrementer['cy6'], "nohtml"));
+                $millionscy = stripslashes(check_html($millionscounter['cy'], "nohtml"));
+                $millionscy1 = stripslashes(check_html($millionscounter['cy1'], "nohtml"));
+                $millionscy2 = stripslashes(check_html($millionscounter['cy2'], "nohtml"));
+                $millionscy3 = stripslashes(check_html($millionscounter['cy3'], "nohtml"));
+                $millionscy4 = stripslashes(check_html($millionscounter['cy4'], "nohtml"));
+                $millionscy5 = stripslashes(check_html($millionscounter['cy5'], "nohtml"));
+                $millionscy6 = stripslashes(check_html($millionscounter['cy6'], "nohtml"));
 
-// LOOK AT SALARY COMMITTED NEXT YEAR, NOT THIS YEAR
+                // FOR AN EXTENSION, LOOK AT SALARY COMMITTED NEXT YEAR, NOT THIS YEAR
 
-if ($capcy == 1) {
-$capnumber = $capnumber-$capcy2;
-}
-if ($capcy == 2) {
-$capnumber = $capnumber-$capcy3;
-}
-if ($capcy == 3) {
-$capnumber = $capnumber-$capcy4;
-}
-if ($capcy == 4) {
-$capnumber = $capnumber-$capcy5;
-}
-if ($capcy == 5) {
-$capnumber = $capnumber-$capcy6;
-}
+                if ($millionscy == 1) {
+                    $tf_millions = $tf_millions+$millionscy2;
+                }
+                if ($millionscy == 2) {
+                    $tf_millions = $tf_millions+$millionscy3;
+                }
+                if ($millionscy == 3) {
+                    $tf_millions = $tf_millions+$millionscy4;
+                }
+                if ($millionscy == 4) {
+                    $tf_millions = $tf_millions+$millionscy5;
+                }
+                if ($millionscy == 5) {
+                    $tf_millions = $tf_millions+$millionscy6;
+                }
+            }
 
-}
+            $demyrs = 6;
+            if ($dem6 == 0) {
+                $demyrs = 5;
+                if ($dem5 == 0) {
+                    $demyrs = 4;
+                    if ($dem4 == 0) {
+                        $demyrs = 3;
+                        if ($dem3 == 0) {
+                            $demyrs = 2;
+                            if ($dem2 == 0) {
+                                $demyrs = 1;
+                            }
+                        }
+                    }
+                }
+            }
 
-// END LOOP
+            //$modfactor1 = (0.0005*($tf_wins-$tf_losses)*($player_winner-1));
+            $PFWFactor = (0.025 * ($tf_wins - $tf_loss) / ($tf_wins + $tf_loss) * ($player_winner - 1));
+            //$modfactor2 = (0.00125*($tf_trdw-$tf_trdl)*($player_tradition-1));
+            $traditionFactor = (0.025 * ($tf_trdw - $tf_trdl) / ($tf_trdw + $tf_trdl) * ($player_tradition - 1));
+            //$modfactor3 = (.01*($tf_coach)*($player_coach=1));
+            //$coachFactor = (0.0025*($tf_coach)*($player_coach-1));
+            //$modfactor4 = (.025*($player_loyalty-1));
+            $loyaltyFactor = (0.025 * ($player_loyalty - 1));
+            //$modfactor5 = (.01*($demyrs-1)-0.025)*($player_security-1);
+            //$securityFactor = (0.01*$demyrs-0.025)*($player_security-1);
+            //$modfactor6 = -(.0035*$tf_millions/100-0.028)*($player_playingtime-1);
+            $PTFactor = (($tf_millions * -0.00005) + 0.025) * ($player_playingtime - 1);
 
-// ======= BEGIN HTML OUTPUT FOR RENEGOTIATION FUNCTION ======
+            $modifier = 1 + $PFWFactor + $traditionFactor + $coachFactor + $loyaltyFactor + $securityFactor + $PTFactor;
+            //echo "Wins: $tf_wins<br>Loses: $tf_loss<br>Tradition Wins: $tf_trdw<br> Tradition Loses: $tf_trdl<br>Coach: $tf_coach<br>Loyalty: $player_loyalty<br>Play Time: $tf_millions<br>ModW: $modfactor1<br>ModT: $modfactor2<br>ModC: $modfactor3<br>ModL: $modfactor4<br>ModS: $modfactor5<br>ModP: $modfactor6<br>Mod: $modifier<br>Demand 1: $dem1<br>Demand 2: $dem2<br>Demand 3: $dem3<br>Demand 4: $dem4<br>Demand 5: $dem5<br>";
 
-    $fa_activecheck = $db->sql_fetchrow($db->sql_query("SELECT * FROM ".$prefix."_modules WHERE title='Free_Agency'"));
-    $fa_active = stripslashes(check_html($fa_activecheck['active'], "nohtml"));
+            $dem1 = round($dem1 / $modifier);
+            $dem2 = round($dem2 / $modifier);
+            $dem3 = round($dem3 / $modifier);
+            $dem4 = round($dem4 / $modifier);
+            $dem5 = round($dem5 / $modifier);
+            // The sixth year is zero for extensions only; remove the line below and uncomment the regular line in the FA module.
+            $dem6 = 0;
+            // $dem6 = round($dem6/$modifier);
 
-if ($fa_active == 1)
-{
-echo "Sorry, the contract extension feature is not available during free agency.";
-} else {
+            $demtot = round(($dem1 + $dem2 + $dem3 + $dem4 + $dem5 + $dem6) / 100, 2);
+            $demavg = ($dem1 + $dem2 + $dem3 + $dem4 + $dem5 + $dem6) / $demyrs;
 
-echo "<form name=\"ExtensionOffer\" method=\"post\" action=\"extension.php\">";
+            $demand_display = $dem1;
+            if ($dem2 == 0) {
+            } else {
+                $demand_display = $demand_display . "</td><td>" . $dem2;
+            }
+            if ($dem3 == 0) {
+            } else {
+                $demand_display = $demand_display . "</td><td>" . $dem3;
+            }
+            if ($dem4 == 0) {
+            } else {
+                $demand_display = $demand_display . "</td><td>" . $dem4;
+            }
+            if ($dem5 == 0) {
+            } else {
+                $demand_display = $demand_display . "</td><td>" . $dem5;
+            }
+            if ($dem6 == 0) {
+            } else {
+                $demand_display = $demand_display . "</td><td>" . $dem6;
+            }
 
-$maxyr1=1063;
-if ($player_exp > 6) {
-$maxyr1=1275;
-}
-if ($player_exp > 9) {
-$maxyr1=1361;
-}
+            // LOOP TO GET HARD CAP SPACE
+
+            $capnumber = 7000;
+
+            $capquery = "SELECT * FROM ".$prefix."_iblplyr WHERE teamname='$userteam' AND retired = '0'";
+            $capresult = $db->sql_query($capquery);
+            while($capdecrementer = $db->sql_fetchrow($capresult)) {
+
+                $capcy = stripslashes(check_html($capdecrementer['cy'], "nohtml"));
+                $capcy1 = stripslashes(check_html($capdecrementer['cy1'], "nohtml"));
+                $capcy2 = stripslashes(check_html($capdecrementer['cy2'], "nohtml"));
+                $capcy3 = stripslashes(check_html($capdecrementer['cy3'], "nohtml"));
+                $capcy4 = stripslashes(check_html($capdecrementer['cy4'], "nohtml"));
+                $capcy5 = stripslashes(check_html($capdecrementer['cy5'], "nohtml"));
+                $capcy6 = stripslashes(check_html($capdecrementer['cy6'], "nohtml"));
+
+                // LOOK AT SALARY COMMITTED NEXT YEAR, NOT THIS YEAR
+
+                if ($capcy == 1) {
+                    $capnumber = $capnumber - $capcy2;
+                }
+                if ($capcy == 2) {
+                    $capnumber = $capnumber - $capcy3;
+                }
+                if ($capcy == 3) {
+                    $capnumber = $capnumber - $capcy4;
+                }
+                if ($capcy == 4) {
+                    $capnumber = $capnumber - $capcy5;
+                }
+                if ($capcy == 5) {
+                    $capnumber = $capnumber - $capcy6;
+                }
+            }
+
+            // ======= BEGIN HTML OUTPUT FOR RENEGOTIATION FUNCTION ======
+
+            $fa_activecheck = $db->sql_fetchrow($db->sql_query("SELECT * FROM ".$prefix."_modules WHERE title='Free_Agency'"));
+            $fa_active = stripslashes(check_html($fa_activecheck['active'], "nohtml"));
+
+            if ($fa_active == 1) {
+                echo "Sorry, the contract extension feature is not available during free agency.";
+            } else {
+                echo "<form name=\"ExtensionOffer\" method=\"post\" action=\"extension.php\">";
+
+                $maxyr1 = 1063;
+                if ($player_exp > 6) {
+                    $maxyr1 = 1275;
+                }
+                if ($player_exp > 9) {
+                    $maxyr1 = 1361;
+                }
 
 
-echo "Here are my contract demands (note that if you offer the max and I refuse, it means I am opting for Free Agency at the end of the season):
-<table cellspacing=0 border=1><tr><td>My demands are:</td><td>$demand_display</td></tr>
-<tr><td>Please enter your offer in this row:</td><td>
-";
+                echo "Here are my contract demands (note that if you offer the max and I refuse, it means I am opting for Free Agency at the end of the season):
+                <table cellspacing=0 border=1><tr><td>My demands are:</td><td>$demand_display</td></tr>
+                <tr><td>Please enter your offer in this row:</td><td>
+                ";
 
-if ($dem1 < $maxyr1) {
-echo "<INPUT TYPE=\"text\" NAME=\"offeryear1\" SIZE=\"4\" VALUE=\"$dem1\"></td><td>
-<INPUT TYPE=\"text\" NAME=\"offeryear2\" SIZE=\"4\" VALUE=\"$dem2\"></td><td>
-<INPUT TYPE=\"text\" NAME=\"offeryear3\" SIZE=\"4\" VALUE=\"$dem3\"></td><td>
-<INPUT TYPE=\"text\" NAME=\"offeryear4\" SIZE=\"4\" VALUE=\"$dem4\"></td><td>
-<INPUT TYPE=\"text\" NAME=\"offeryear5\" SIZE=\"4\" VALUE=\"$dem5\"></td></tr>
-";
-} else {
+                if ($dem1 < $maxyr1) {
+                    echo "<INPUT TYPE=\"text\" NAME=\"offeryear1\" SIZE=\"4\" VALUE=\"$dem1\"></td><td>
+                    <INPUT TYPE=\"text\" NAME=\"offeryear2\" SIZE=\"4\" VALUE=\"$dem2\"></td><td>
+                    <INPUT TYPE=\"text\" NAME=\"offeryear3\" SIZE=\"4\" VALUE=\"$dem3\"></td><td>
+                    <INPUT TYPE=\"text\" NAME=\"offeryear4\" SIZE=\"4\" VALUE=\"$dem4\"></td><td>
+                    <INPUT TYPE=\"text\" NAME=\"offeryear5\" SIZE=\"4\" VALUE=\"$dem5\"></td></tr>
+                    ";
+                } else {
 
-$maxraise=round($maxyr1*0.1);
-$maxyr2=0;
-$maxyr3=0;
-$maxyr4=0;
-$maxyr5=0;
+                    $maxraise = round($maxyr1 * 0.1);
+                    $maxyr2 = 0;
+                    $maxyr3 = 0;
+                    $maxyr4 = 0;
+                    $maxyr5 = 0;
 
-  if ($dem2 != 0) {
-    $maxyr2=$maxyr1+$maxraise;
-  }
-  if ($dem3 != 0) {
-    $maxyr3=$maxyr2+$maxraise;
-  }
-  if ($dem4 != 0) {
-    $maxyr4=$maxyr3+$maxraise;
-  }
-  if ($dem5 != 0) {
-    $maxyr5=$maxyr4+$maxraise;
-  }
+                    if ($dem2 != 0) {
+                        $maxyr2 = $maxyr1 + $maxraise;
+                    }
+                    if ($dem3 != 0) {
+                        $maxyr3 = $maxyr2 + $maxraise;
+                    }
+                    if ($dem4 != 0) {
+                        $maxyr4 = $maxyr3 + $maxraise;
+                    }
+                    if ($dem5 != 0) {
+                        $maxyr5 = $maxyr4 + $maxraise;
+                    }
 
+                    echo "<INPUT TYPE=\"text\" NAME=\"offeryear1\" SIZE=\"4\" VALUE=\"$maxyr1\"></td><td>
+                    <INPUT TYPE=\"text\" NAME=\"offeryear2\" SIZE=\"4\" VALUE=\"$maxyr2\"></td><td>
+                    <INPUT TYPE=\"text\" NAME=\"offeryear3\" SIZE=\"4\" VALUE=\"$maxyr3\"></td><td>
+                    <INPUT TYPE=\"text\" NAME=\"offeryear4\" SIZE=\"4\" VALUE=\"$maxyr4\"></td><td>
+                    <INPUT TYPE=\"text\" NAME=\"offeryear5\" SIZE=\"4\" VALUE=\"$maxyr5\"></td></tr>
+                    ";
+                }
 
-echo "<INPUT TYPE=\"text\" NAME=\"offeryear1\" SIZE=\"4\" VALUE=\"$maxyr1\"></td><td>
-<INPUT TYPE=\"text\" NAME=\"offeryear2\" SIZE=\"4\" VALUE=\"$maxyr2\"></td><td>
-<INPUT TYPE=\"text\" NAME=\"offeryear3\" SIZE=\"4\" VALUE=\"$maxyr3\"></td><td>
-<INPUT TYPE=\"text\" NAME=\"offeryear4\" SIZE=\"4\" VALUE=\"$maxyr4\"></td><td>
-<INPUT TYPE=\"text\" NAME=\"offeryear5\" SIZE=\"4\" VALUE=\"$maxyr5\"></td></tr>
-";
-}
+                echo "<tr><td colspan=6><b>Notes/Reminders:</b> <ul>
+                <li>You have $capnumber in cap space available; the amount you offer in year 1 cannot exceed this.</li>
+                <li>Based on my years of service, the maximum amount you can offer me in year 1 is $maxyr1.</li>
+                <li>Enter \"0\" for years you do not want to offer a contract.</li>
+                <li>Contract extensions must be at least three years in length.</li>
+                <li>The amounts offered each year must equal or exceed the previous year.</li>
+                ";
 
+                if ($player_bird > 2) {
+                    echo "<li>Because this player has Bird Rights, you may add no more than 12.5% of your the amount you offer in the first year as a raise between years (for instance, if you offer 500 in Year 1, you cannot offer a raise of more than 75 between any two subsequent years.)</li>
+                    ";
+                } else {
+                    echo "<li>Because this player does not have Bird Rights, you may add no more than 10% of your the amount you offer in the first year as a raise between years (for instance, if you offer 500 in Year 1, you cannot offer a raise of more than 50 between any two subsequent years.)</li>
+                    ";
+                }
 
-echo "<tr><td colspan=6><b>Notes/Reminders:</b> <ul>
-<li>You have $capnumber in cap space available; the amount you offer in year 1 cannot exceed this.</li>
-<li>Based on my years of service, the maximum amount you can offer me in year 1 is $maxyr1.</li>
-<li>Enter \"0\" for years you do not want to offer a contract.</li>
-<li>Contract extensions must be at least three years in length.</li>
-<li>The amounts offered each year must equal or exceed the previous year.</li>
-";
+                echo "<li>For reference, \"100\" entered in the fields above corresponds to 1 million dollars; the 50 million dollar soft cap thus means you have 5000 to play with. When re-signing your own players, you can go over the soft cap and up to the hard cap (7000).</li>
+                </ul></td></tr>
+                <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
+                <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
+                <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
+                <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
+                <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
+                <input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
+                <input type=\"hidden\" name=\"maxyr1\" value=\"$maxyr1\">
+                <input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
+                <input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
+                <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
+                <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
+                </table>
+                ";
 
-if ($player_bird > 2){
-echo "<li>Because this player has Bird Rights, you may add no more than 12.5% of your the amount you offer in the first year as a raise between years (for instance, if you offer 500 in Year 1, you cannot offer a raise of more than 75 between any two subsequent years.)</li>
-";
-} else {
-echo "<li>Because this player does not have Bird Rights, you may add no more than 10% of your the amount you offer in the first year as a raise between years (for instance, if you offer 500 in Year 1, you cannot offer a raise of more than 50 between any two subsequent years.)</li>
-";
-}
-echo "<li>For reference, \"100\" entered in the fields above corresponds to 1 million dollars; the 50 million dollar soft cap thus means you have 5000 to play with. When re-signing your own players, you can go over the soft cap and up to the hard cap (7000).</li>
-</ul></td></tr>
-<input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-<input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-<input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-<input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-<input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-<input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
-<input type=\"hidden\" name=\"maxyr1\" value=\"$maxyr1\">
-<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
-<input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
-<input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
-<input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
-<input type=\"hidden\" name=\"playername\" value=\"$player_name\">
-</table>
-";
+                echo "<input type=\"submit\" value=\"Offer Extension!\">
+                </form>
 
-echo "<input type=\"submit\" value=\"Offer Extension!\">
-</form>
+                ";
+            }
 
-";
-}
-
-  } else {
-echo "Sorry, this player is not on your team.";
-  }
-} else {
-echo "Sorry, this player is not eligible for a contract extension at this time.";
-}
+        } else {
+            echo "Sorry, this player is not on your team.";
+        }
+    } else {
+        echo "Sorry, this player is not eligible for a contract extension at this time.";
+    }
 
 
 // RENEGOTIATION STUFF END

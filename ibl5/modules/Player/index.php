@@ -2808,19 +2808,19 @@ function negotiate($pid)
                 // FOR AN EXTENSION, LOOK AT SALARY COMMITTED NEXT YEAR, NOT THIS YEAR
 
                 if ($millionscy == 1) {
-                    $tf_millions = $tf_millions+$millionscy2;
+                    $tf_millions = $tf_millions + $millionscy2;
                 }
                 if ($millionscy == 2) {
-                    $tf_millions = $tf_millions+$millionscy3;
+                    $tf_millions = $tf_millions + $millionscy3;
                 }
                 if ($millionscy == 3) {
-                    $tf_millions = $tf_millions+$millionscy4;
+                    $tf_millions = $tf_millions + $millionscy4;
                 }
                 if ($millionscy == 4) {
-                    $tf_millions = $tf_millions+$millionscy5;
+                    $tf_millions = $tf_millions + $millionscy5;
                 }
                 if ($millionscy == 5) {
-                    $tf_millions = $tf_millions+$millionscy6;
+                    $tf_millions = $tf_millions + $millionscy6;
                 }
             }
 
@@ -2928,7 +2928,7 @@ function negotiate($pid)
 
             // ======= BEGIN HTML OUTPUT FOR RENEGOTIATION FUNCTION ======
 
-            $fa_activecheck = $db->sql_fetchrow($db->sql_query("SELECT * FROM ".$prefix."_modules WHERE title='Free_Agency'"));
+            $fa_activecheck = $db->sql_fetchrow($db->sql_query("SELECT * FROM ".$prefix."_modules WHERE title = 'Free_Agency'"));
             $fa_active = stripslashes(check_html($fa_activecheck['active'], "nohtml"));
 
             if ($fa_active == 1) {

@@ -2626,23 +2626,23 @@ function negotiate($pid)
     $can_renegotiate = 0;
 
     if ($yearOfCurrentContract == 1) {
-        if ($salaryIn2ndYearOfCurrentContract = 0) {
+        if ($salaryIn2ndYearOfCurrentContract == 0) {
             $can_renegotiate = 1;
         }
     } elseif ($yearOfCurrentContract == 2) {
-        if ($salaryIn3rdYearOfCurrentContract = 0) {
+        if ($salaryIn3rdYearOfCurrentContract == 0) {
             $can_renegotiate = 1;
         }
     } elseif ($yearOfCurrentContract == 3) {
-        if ($salaryIn4thYearOfCurrentContract = 0) {
+        if ($salaryIn4thYearOfCurrentContract == 0) {
             $can_renegotiate = 1;
         }
     } elseif ($yearOfCurrentContract == 4) {
-        if ($salaryIn5thYearOfCurrentContract = 0) {
+        if ($salaryIn5thYearOfCurrentContract == 0) {
             $can_renegotiate = 1;
         }
     } elseif ($yearOfCurrentContract == 5) {
-        if ($salaryIn6thYearOfCurrentContract = 0) {
+        if ($salaryIn6thYearOfCurrentContract == 0) {
             $can_renegotiate = 1;
         }
     } elseif ($yearOfCurrentContract == 6) {

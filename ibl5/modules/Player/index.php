@@ -2626,31 +2626,26 @@ function negotiate($pid)
     $can_renegotiate = 0;
 
     if ($yearOfCurrentContract == 1) {
-        if ($salaryIn2ndYearOfCurrentContract != 0) {
-        } else {
+        if ($salaryIn2ndYearOfCurrentContract = 0) {
             $can_renegotiate = 1;
         }
-    } else if ($yearOfCurrentContract == 2) {
-        if ($salaryIn3rdYearOfCurrentContract != 0) {
-        } else {
+    } elseif ($yearOfCurrentContract == 2) {
+        if ($salaryIn3rdYearOfCurrentContract = 0) {
             $can_renegotiate = 1;
         }
-    } else if ($yearOfCurrentContract == 3) {
-        if ($salaryIn4thYearOfCurrentContract != 0) {
-        } else {
+    } elseif ($yearOfCurrentContract == 3) {
+        if ($salaryIn4thYearOfCurrentContract = 0) {
             $can_renegotiate = 1;
         }
-    } else if ($yearOfCurrentContract == 4) {
-        if ($salaryIn5thYearOfCurrentContract != 0) {
-        } else {
+    } elseif ($yearOfCurrentContract == 4) {
+        if ($salaryIn5thYearOfCurrentContract = 0) {
             $can_renegotiate = 1;
         }
-    } else if ($yearOfCurrentContract == 5) {
-        if ($salaryIn6thYearOfCurrentContract != 0) {
-        } else {
+    } elseif ($yearOfCurrentContract == 5) {
+        if ($salaryIn6thYearOfCurrentContract = 0) {
             $can_renegotiate = 1;
         }
-    } else if ($yearOfCurrentContract == 6) {
+    } elseif ($yearOfCurrentContract == 6) {
         $can_renegotiate = 1;
     } else {
         $contract_display = "not under contract";

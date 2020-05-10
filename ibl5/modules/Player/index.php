@@ -3026,7 +3026,7 @@ echo "<li>Because this player has Bird Rights, you may add no more than 12.5% of
 echo "<li>Because this player does not have Bird Rights, you may add no more than 10% of your the amount you offer in the first year as a raise between years (for instance, if you offer 500 in Year 1, you cannot offer a raise of more than 50 between any two subsequent years.)</li>
 ";
 }
-echo "<li>For reference, \"100\" entered in the fields above corresponds to 1 million dollars; the 55 million dollar soft cap thus means you have 5500 to play with. When re-signing your own players, you can go over the soft cap and up to the hard cap (7500).</li>
+echo "<li>For reference, \"100\" entered in the fields above corresponds to 1 million dollars; the 50 million dollar soft cap thus means you have 5000 to play with. When re-signing your own players, you can go over the soft cap and up to the hard cap (7000).</li>
 </ul></td></tr>
 <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
 <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">

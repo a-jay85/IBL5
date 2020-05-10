@@ -941,30 +941,30 @@ function showpage($pid,$spec) {
 
 
     $player_bird = stripslashes(check_html($playerinfo['bird'], "nohtml"));
-    $player_cy = stripslashes(check_html($playerinfo['cy'], "nohtml"));
-    $player_cy1 = stripslashes(check_html($playerinfo['cy1'], "nohtml"));
-    $player_cy2 = stripslashes(check_html($playerinfo['cy2'], "nohtml"));
-    $player_cy3 = stripslashes(check_html($playerinfo['cy3'], "nohtml"));
-    $player_cy4 = stripslashes(check_html($playerinfo['cy4'], "nohtml"));
-    $player_cy5 = stripslashes(check_html($playerinfo['cy5'], "nohtml"));
-    $player_cy6 = stripslashes(check_html($playerinfo['cy6'], "nohtml"));
+    $yearOfCurrentContract = stripslashes(check_html($playerinfo['cy'], "nohtml"));
+    $salaryIn1stYearOfCurrentContract = stripslashes(check_html($playerinfo['cy1'], "nohtml"));
+    $salaryIn2ndYearOfCurrentContract = stripslashes(check_html($playerinfo['cy2'], "nohtml"));
+    $salaryIn3rdYearOfCurrentContract = stripslashes(check_html($playerinfo['cy3'], "nohtml"));
+    $salaryIn4thYearOfCurrentContract = stripslashes(check_html($playerinfo['cy4'], "nohtml"));
+    $salaryIn5thYearOfCurrentContract = stripslashes(check_html($playerinfo['cy5'], "nohtml"));
+    $salaryIn6thYearOfCurrentContract = stripslashes(check_html($playerinfo['cy6'], "nohtml"));
 
 // CONTRACT FORMATTER
 
 $can_renegotiate = 0;
 
-if ($player_cy == 1) {
-$contract_display = $player_cy1;
-  if ($player_cy2 != 0) {
-    $contract_display = $contract_display."/".$player_cy2;
-    if ($player_cy3 != 0) {
-        $contract_display = $contract_display."/".$player_cy3;
-        if ($player_cy4 != 0) {
-          $contract_display = $contract_display."/".$player_cy4;
-          if ($player_cy5 != 0) {
-            $contract_display = $contract_display."/".$player_cy5;
-            if ($player_cy6 != 0) {
-              $contract_display = $contract_display."/".$player_cy6;
+if ($yearOfCurrentContract == 1) {
+$contract_display = $salaryIn1stYearOfCurrentContract;
+  if ($salaryIn2ndYearOfCurrentContract != 0) {
+    $contract_display = $contract_display."/".$salaryIn2ndYearOfCurrentContract;
+    if ($salaryIn3rdYearOfCurrentContract != 0) {
+        $contract_display = $contract_display."/".$salaryIn3rdYearOfCurrentContract;
+        if ($salaryIn4thYearOfCurrentContract != 0) {
+          $contract_display = $contract_display."/".$salaryIn4thYearOfCurrentContract;
+          if ($salaryIn5thYearOfCurrentContract != 0) {
+            $contract_display = $contract_display."/".$salaryIn5thYearOfCurrentContract;
+            if ($salaryIn6thYearOfCurrentContract != 0) {
+              $contract_display = $contract_display."/".$salaryIn6thYearOfCurrentContract;
             } else {
             }
           } else {
@@ -976,16 +976,16 @@ $contract_display = $player_cy1;
   } else {
   $can_renegotiate = 1;
   }
-} else if ($player_cy == 2) {
-  $contract_display = $player_cy2;
-  if ($player_cy3 != 0) {
-    $contract_display = $contract_display."/".$player_cy3;
-    if ($player_cy4 != 0) {
-        $contract_display = $contract_display."/".$player_cy4;
-        if ($player_cy5 != 0) {
-          $contract_display = $contract_display."/".$player_cy5;
-          if ($player_cy6 != 0) {
-            $contract_display = $contract_display."/".$player_cy6;
+} else if ($yearOfCurrentContract == 2) {
+  $contract_display = $salaryIn2ndYearOfCurrentContract;
+  if ($salaryIn3rdYearOfCurrentContract != 0) {
+    $contract_display = $contract_display."/".$salaryIn3rdYearOfCurrentContract;
+    if ($salaryIn4thYearOfCurrentContract != 0) {
+        $contract_display = $contract_display."/".$salaryIn4thYearOfCurrentContract;
+        if ($salaryIn5thYearOfCurrentContract != 0) {
+          $contract_display = $contract_display."/".$salaryIn5thYearOfCurrentContract;
+          if ($salaryIn6thYearOfCurrentContract != 0) {
+            $contract_display = $contract_display."/".$salaryIn6thYearOfCurrentContract;
           } else {
           }
         } else {
@@ -995,14 +995,14 @@ $contract_display = $player_cy1;
   } else {
   $can_renegotiate = 1;
   }
-} else if ($player_cy == 3) {
-  $contract_display = $player_cy3;
-  if ($player_cy4 != 0) {
-    $contract_display = $contract_display."/".$player_cy4;
-    if ($player_cy5 != 0) {
-        $contract_display = $contract_display."/".$player_cy5;
-        if ($player_cy6 != 0) {
-          $contract_display = $contract_display."/".$player_cy6;
+} else if ($yearOfCurrentContract == 3) {
+  $contract_display = $salaryIn3rdYearOfCurrentContract;
+  if ($salaryIn4thYearOfCurrentContract != 0) {
+    $contract_display = $contract_display."/".$salaryIn4thYearOfCurrentContract;
+    if ($salaryIn5thYearOfCurrentContract != 0) {
+        $contract_display = $contract_display."/".$salaryIn5thYearOfCurrentContract;
+        if ($salaryIn6thYearOfCurrentContract != 0) {
+          $contract_display = $contract_display."/".$salaryIn6thYearOfCurrentContract;
         } else {
         }
     } else {
@@ -1010,26 +1010,26 @@ $contract_display = $player_cy1;
   } else {
   $can_renegotiate = 1;
   }
-} else if ($player_cy == 4) {
-  $contract_display = $player_cy4;
-  if ($player_cy5 != 0) {
-    $contract_display = $contract_display."/".$player_cy5;
-    if ($player_cy6 != 0) {
-        $contract_display = $contract_display."/".$player_cy6;
+} else if ($yearOfCurrentContract == 4) {
+  $contract_display = $salaryIn4thYearOfCurrentContract;
+  if ($salaryIn5thYearOfCurrentContract != 0) {
+    $contract_display = $contract_display."/".$salaryIn5thYearOfCurrentContract;
+    if ($salaryIn6thYearOfCurrentContract != 0) {
+        $contract_display = $contract_display."/".$salaryIn6thYearOfCurrentContract;
     } else {
     }
   } else {
   $can_renegotiate = 1;
   }
-} else if ($player_cy == 5) {
-  $contract_display = $player_cy5;
-  if ($player_cy6 != 0) {
-    $contract_display = $contract_display."/".$player_cy6;
+} else if ($yearOfCurrentContract == 5) {
+  $contract_display = $salaryIn5thYearOfCurrentContract;
+  if ($salaryIn6thYearOfCurrentContract != 0) {
+    $contract_display = $contract_display."/".$salaryIn6thYearOfCurrentContract;
   } else {
   $can_renegotiate = 1;
   }
-} else if ($player_cy == 6) {
-  $contract_display = $player_cy6;
+} else if ($yearOfCurrentContract == 6) {
+  $contract_display = $salaryIn6thYearOfCurrentContract;
   $can_renegotiate = 1;
 } else {
 $contract_display = "not under contract";
@@ -1070,7 +1070,7 @@ if ($player_exp == 4)
 {
   if ($player_draft_round == 1)
   {
-    if (2*$player_cy3 == $player_cy4 and $player_cy4 <> 0)
+    if (2*$salaryIn3rdYearOfCurrentContract == $salaryIn4thYearOfCurrentContract and $salaryIn4thYearOfCurrentContract <> 0)
     {
 		echo "<table align=right bgcolor=#ff0000><tr><td align=center>ROOKIE OPTION<br>USED; RENEGOTIATION<br>IMPOSSIBLE</td></tr></table>";
 		$can_renegotiate = 0;
@@ -2613,44 +2613,44 @@ function negotiate($pid)
 
     $player_exp = stripslashes(check_html($playerinfo['exp'], "nohtml"));
     $player_bird = stripslashes(check_html($playerinfo['bird'], "nohtml"));
-    $player_cy = stripslashes(check_html($playerinfo['cy'], "nohtml"));
-    $player_cy1 = stripslashes(check_html($playerinfo['cy1'], "nohtml"));
-    $player_cy2 = stripslashes(check_html($playerinfo['cy2'], "nohtml"));
-    $player_cy3 = stripslashes(check_html($playerinfo['cy3'], "nohtml"));
-    $player_cy4 = stripslashes(check_html($playerinfo['cy4'], "nohtml"));
-    $player_cy5 = stripslashes(check_html($playerinfo['cy5'], "nohtml"));
-    $player_cy6 = stripslashes(check_html($playerinfo['cy6'], "nohtml"));
+    $yearOfCurrentContract = stripslashes(check_html($playerinfo['cy'], "nohtml"));
+    $salaryIn1stYearOfCurrentContract = stripslashes(check_html($playerinfo['cy1'], "nohtml"));
+    $salaryIn2ndYearOfCurrentContract = stripslashes(check_html($playerinfo['cy2'], "nohtml"));
+    $salaryIn3rdYearOfCurrentContract = stripslashes(check_html($playerinfo['cy3'], "nohtml"));
+    $salaryIn4thYearOfCurrentContract = stripslashes(check_html($playerinfo['cy4'], "nohtml"));
+    $salaryIn5thYearOfCurrentContract = stripslashes(check_html($playerinfo['cy5'], "nohtml"));
+    $salaryIn6thYearOfCurrentContract = stripslashes(check_html($playerinfo['cy6'], "nohtml"));
 
     // CONTRACT CHECKER
 
     $can_renegotiate = 0;
 
-    if ($player_cy == 1) {
-        if ($player_cy2 != 0) {
+    if ($yearOfCurrentContract == 1) {
+        if ($salaryIn2ndYearOfCurrentContract != 0) {
         } else {
             $can_renegotiate = 1;
         }
-    } else if ($player_cy == 2) {
-        if ($player_cy3 != 0) {
+    } else if ($yearOfCurrentContract == 2) {
+        if ($salaryIn3rdYearOfCurrentContract != 0) {
         } else {
             $can_renegotiate = 1;
         }
-    } else if ($player_cy == 3) {
-        if ($player_cy4 != 0) {
+    } else if ($yearOfCurrentContract == 3) {
+        if ($salaryIn4thYearOfCurrentContract != 0) {
         } else {
             $can_renegotiate = 1;
         }
-    } else if ($player_cy == 4) {
-        if ($player_cy5 != 0) {
+    } else if ($yearOfCurrentContract == 4) {
+        if ($salaryIn5thYearOfCurrentContract != 0) {
         } else {
             $can_renegotiate = 1;
         }
-    } else if ($player_cy == 5) {
-        if ($player_cy6 != 0) {
+    } else if ($yearOfCurrentContract == 5) {
+        if ($salaryIn6thYearOfCurrentContract != 0) {
         } else {
             $can_renegotiate = 1;
         }
-    } else if ($player_cy == 6) {
+    } else if ($yearOfCurrentContract == 6) {
         $can_renegotiate = 1;
     } else {
         $contract_display = "not under contract";

@@ -2186,8 +2186,7 @@ function team_info_right ($team_name, $color1, $color2, $owner_name, $tid)
 	@$wlpct=number_format($wintot/($wintot+$lostot),3);
 
 	$output=$output."</div></td></tr>
-		<tr bgcolor=\"#$color1\"><td align=center><font color=\"#$color2\"><b>All-Time H.E.A.T. Franchise Record</b></font></td></tr>
-		<tr><td>$wintot - $lostot ($wlpct Percentage)</td></tr>";
+		<tr><td><b>Totals:</b> $wintot - $lostot ($wlpct)</td></tr>";
 
 	// POST-SEASON RESULTS
 

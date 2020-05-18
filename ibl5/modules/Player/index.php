@@ -259,27 +259,27 @@ function leaderboards()
                 $tableforquery == "ibl_heat_career_avgs" OR
                 $tableforquery == "ibl_playoff_career_avgs"
             ) {
-                $plyr_name=mysql_result($result,$i,"name");
-                $pid=mysql_result($result,$i,"pid");
-                $gm=number_format(mysql_result($result,$i,"games"));
-                $min=(mysql_result($result,$i,"minutes"));
-                $fgm=(mysql_result($result,$i,"fgm"));
-                $fga=(mysql_result($result,$i,"fga"));
-                $fgpct=(mysql_result($result,$i,"fgpct"));
-                $ftm=(mysql_result($result,$i,"ftm"));
-                $fta=(mysql_result($result,$i,"fta"));
-                $ftpct=(mysql_result($result,$i,"ftpct"));
-                $tgm=(mysql_result($result,$i,"tgm"));
-                $tga=(mysql_result($result,$i,"tga"));
-                $tpct=(mysql_result($result,$i,"tpct"));
-                $orb=(mysql_result($result,$i,"orb"));
-                $reb=(mysql_result($result,$i,"reb"));
-                $ast=(mysql_result($result,$i,"ast"));
-                $stl=(mysql_result($result,$i,"stl"));
-                $to=(mysql_result($result,$i,"tvr"));
-                $blk=(mysql_result($result,$i,"blk"));
-                $pf=(mysql_result($result,$i,"pf"));
-                $pts=(mysql_result($result,$i,"pts"));
+                $plyr_name = mysql_result($result, $i, "name");
+                $pid = mysql_result($result, $i, "pid");
+                $gm = number_format(mysql_result($result, $i, "games"));
+                $min = number_format(mysql_result($result, $i, "minutes"), 1);
+                $fgm = number_format(mysql_result($result, $i, "fgm"), 1);
+                $fga = number_format(mysql_result($result, $i, "fga"), 1);
+                $fgpct = number_format(mysql_result($result, $i, "fgpct"), 3);
+                $ftm = number_format(mysql_result($result, $i, "ftm"), 1);
+                $fta = number_format(mysql_result($result, $i, "fta"), 1);
+                $ftpct = number_format(mysql_result($result, $i, "ftpct"), 3);
+                $tgm = number_format(mysql_result($result, $i, "tgm"), 1);
+                $tga = number_format(mysql_result($result, $i, "tga"), 1);
+                $tpct = number_format(mysql_result($result, $i, "tpct"), 3);
+                $orb = number_format(mysql_result($result, $i, "orb"), 1);
+                $reb = number_format(mysql_result($result, $i, "reb"), 1);
+                $ast = number_format(mysql_result($result, $i, "ast"), 1);
+                $stl = number_format(mysql_result($result, $i, "stl"), 1);
+                $to = number_format(mysql_result($result, $i, "tvr"), 1);
+                $blk = number_format(mysql_result($result, $i, "blk"), 1);
+                $pf = number_format(mysql_result($result, $i, "pf"), 1);
+                $pts = number_format(mysql_result($result, $i, "pts"), 1);
             }
 
             if (

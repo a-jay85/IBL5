@@ -251,7 +251,8 @@ if ($nooffer == 0) {
         if (mail($recipient, $emailsubject, $filetext, "From: ibldepthcharts@gmail.com")) {
             echo "<center> An e-mail regarding this extension has been successfully sent to the commissioner's office.  Thank you. </center>";
         } else {
-            echo " Message failed to e-mail properly; please notify the commissioner of the error and the amounts you offered.</center>";
+            echo " Message failed to e-mail properly; please notify the commissioner of the error with the following amounts you offered:</center><br>
+            " . $Offer_1 . " " . $Offer_2 . " " . $Offer_3 . " " . $Offer_4 . " " . $Offer_5;
         }
 
         // ==== UPDATE PLAYER DATABASE WITH NEW CONTRACT INFORMATION ====

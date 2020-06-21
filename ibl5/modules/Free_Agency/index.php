@@ -22,6 +22,8 @@
 if (!eregi("modules.php", $_SERVER['PHP_SELF'])) die ("You can't access this file directly...");
 
 require_once("mainfile.php");
+include_once "sharedFunctions.php";
+
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
@@ -90,8 +92,7 @@ function display($nullset) {
 	$queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$userteam'";
 	$tid = mysql_result(mysql_query($queryTeamID), 0);
 
-	// TODO: MAKE THIS DYNAMIC OMG
-	$freeagentyear=1989;
+	$currentSeasonEndingYear = getCurrentSeasonEndingYear();
 
 	/*
 	// ==== COMPUTE PLAYER SALARIES FOR NEXT YEAR TO GET SOFT AND HARD CAP NUMBERS
@@ -165,7 +166,7 @@ function display($nullset) {
 
 		$yearoffreeagency=$draftyear+$exp+$cyt-$cy;
 
-		if ($yearoffreeagency != $freeagentyear) {
+		if ($yearoffreeagency != $currentSeasonEndingYear) {
 			$name = stripslashes(check_html($teamlist['name'], "nohtml"));
 			$team = stripslashes(check_html($teamlist['teamname'], "nohtml"));
 			$tid = stripslashes(check_html($teamlist['tid'], "nohtml"));
@@ -417,7 +418,7 @@ function display($nullset) {
 		$cyt = stripslashes(check_html($teamlist['cyt'], "nohtml"));
 		$yearoffreeagency=$draftyear+$exp+$cyt-$cy;
 
-		if ($yearoffreeagency == $freeagentyear) {
+		if ($yearoffreeagency == $currentSeasonEndingYear) {
 			$name = stripslashes(check_html($teamlist['name'], "nohtml"));
 			$team = stripslashes(check_html($teamlist['teamname'], "nohtml"));
 			$tid = stripslashes(check_html($teamlist['tid'], "nohtml"));
@@ -492,7 +493,7 @@ function display($nullset) {
 		$cyt = stripslashes(check_html($teamlist['cyt'], "nohtml"));
 		$yearoffreeagency = $draftyear + $exp + $cyt - $cy;
 
-		if ($yearoffreeagency == $freeagentyear) {
+		if ($yearoffreeagency == $currentSeasonEndingYear) {
 			$name = stripslashes(check_html($teamlist['name'], "nohtml"));
 			$team = stripslashes(check_html($teamlist['teamname'], "nohtml"));
 			$tid = stripslashes(check_html($teamlist['tid'], "nohtml"));
@@ -1641,7 +1642,7 @@ function teamdisplay($pid) {
 	$showcapteam = $db->sql_query("SELECT * FROM ".$prefix."_ibl_team_info WHERE teamid>'0' ORDER BY teamid ASC");
 
 	while ($teamcaplist = $db->sql_fetchrow($showcapteam)) {
-		$freeagentyear=2002;
+		$currentSeasonEndingYear = getCurrentSeasonEndingYear();
 
 		$capteam = stripslashes(check_html($teamcaplist['team_name'], "nohtml"));
 		$HasMLE = stripslashes(check_html($teamcaplist['HasMLE'], "nohtml"));
@@ -1667,7 +1668,7 @@ function teamdisplay($pid) {
 
 			$yearoffreeagency=$draftyear+$exp+$cyt-$cy;
 
-			if ($yearoffreeagency != $freeagentyear) {
+			if ($yearoffreeagency != $currentSeasonEndingYear) {
 				// === MATCH UP CONTRACT AMOUNTS WITH FUTURE YEARS BASED ON CURRENT YEAR OF CONTRACT
 
 				$millionscy = stripslashes(check_html($teamlist['cy'], "nohtml"));

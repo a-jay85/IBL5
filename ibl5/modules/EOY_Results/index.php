@@ -20,7 +20,6 @@ require_once("mainfile.php");
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 $userpage = 1;
-$current_ibl_season=mysql_result(mysql_query("SELECT value FROM nuke_ibl_settings WHERE name = 'Current Season Ending Year' LIMIT 1"),0,"value");
 include("header.php");
 
 $query1="select sum(score) as votes,name from (select MVP_1 as name, 3 as score from IBL_EOY_Votes union all select MVP_2 as name, 2 as score from IBL_EOY_Votes union all select MVP_3 as name, 1 as score from IBL_EOY_Votes) as tbl group by name;";

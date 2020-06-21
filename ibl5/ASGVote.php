@@ -22,8 +22,37 @@ $WCF2 = $_POST['WCF2'];
 $WCG1 = $_POST['WCG1'];
 $WCG2 = $_POST['WCG2'];
 
-
-if ($ECC == "") {
+if (strpos($WCC,$Team_Name) !== false) {
+echo "Sorry, you cannot vote for your own player. Try again.<br>";
+}
+else if (strpos($WCF1,$Team_Name) !== false) {
+echo "Sorry, you cannot vote for your own player. Try again.<br>";
+}
+else if (strpos($WCF2,$Team_Name) !== false) {
+echo "Sorry, you cannot vote for your own player. Try again.<br>";
+}
+else if (strpos($WCG1,$Team_Name) !== false) {
+echo "Sorry, you cannot vote for your own player. Try again.<br>";
+}
+else if (strpos($WCG2,$Team_Name) !== false) {
+echo "Sorry, you cannot vote for your own player. Try again.<br>";
+}
+else if (strpos($ECC,$Team_Name) !== false) {
+echo "Sorry, you cannot vote for your own player. Try again.<br>";
+}
+else if (strpos($ECF1,$Team_Name) !== false) {
+echo "Sorry, you cannot vote for your own player. Try again.<br>";
+}
+else if (strpos($ECF2,$Team_Name) !== false) {
+echo "Sorry, you cannot vote for your own player. Try again.<br>";
+}
+else if (strpos($ECG1,$Team_Name) !== false) {
+echo "Sorry, you cannot vote for your own player. Try again.<br>";
+}
+else if (strpos($ECG2,$Team_Name) !== false) {
+echo "Sorry, you cannot vote for your own player. Try again.<br>";
+}
+else if ($ECC == "") {
 echo "Sorry, you must select an Eastern Conference Center. Try again.<br>";
 }
 else if ($ECF1 == "") {
@@ -65,6 +94,7 @@ echo "Sorry, you have selected the same player for both Western Conference Forwa
 else if ($WCG1 == $WCG2) {
 echo "Sorry, you have selected the same player for both Western Conference Guard slots. Try again.<br>";
 }
+
 else {
 
 echo "The $Team_Name vote has been recorded.</br><br>

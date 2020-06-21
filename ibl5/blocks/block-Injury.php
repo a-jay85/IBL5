@@ -57,8 +57,8 @@ while ($j < $numo) {
         AND retired = '0'
         AND injured = '0'
         AND droptime = '0'
-        AND name NOT LIKE '%Buyout%'
-        ORDER BY ordinal ASC ";
+        AND ordinal < 960
+        AND name NOT LIKE '%Buyout%'"; // "ordinal < 960" excludes waived players from this query
 	$result1 = mysql_query($sql);
 	$num1 = mysql_numrows($result1);
 
@@ -67,8 +67,7 @@ while ($j < $numo) {
         WHERE teamname = '$user_team'
         AND retired = '0'
         AND injured > '0'
-        AND active = '1'
-        ORDER BY ordinal ASC ";
+        AND active = '1'";
 	$result2 = mysql_query($sql2);
 	$num2 = mysql_numrows($result2);
 

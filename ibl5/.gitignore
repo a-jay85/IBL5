@@ -4,6 +4,7 @@ depthcharts/
 backups/
 
 .DS_Store
+.ftpquota
 config.php
 discordWebhooks.php
 error_log

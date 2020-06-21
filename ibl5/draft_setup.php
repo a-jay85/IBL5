@@ -56,14 +56,111 @@ $resulto=mysql_query($queryo);
 $queryp="alter table nuke_scout_rookieratings drop column drafted";
 $resultp=mysql_query($queryp);
 
-$queryq="alter table nuke_scout_rookieratings ADD intan int(11)";
-$resultq=mysql_query($queryq);
 
-$queryr="update nuke_scout_rookieratings set intan = `int`";
-$resultr=mysql_query($queryr);
+$querys1="alter table nuke_scout_rookieratings ADD player_oo int(11)";
+$results1=mysql_query($querys1);
 
-$querys="alter table nuke_scout_rookieratings drop `int`";
-$results=mysql_query($querys);
+$querys2="update nuke_scout_rookieratings set player_oo = `offo`";
+$results2=mysql_query($querys2);
+
+$querys3="alter table nuke_scout_rookieratings drop `offo`";
+$results3=mysql_query($querys3);
+
+$querys4="alter table nuke_scout_rookieratings ADD player_do int(11)";
+$results4=mysql_query($querys4);
+
+$querys5="update nuke_scout_rookieratings set player_do = `offd`";
+$results5=mysql_query($querys5);
+
+$querys6="alter table nuke_scout_rookieratings drop `offd`";
+$results6=mysql_query($querys6);
+
+$querys7="alter table nuke_scout_rookieratings ADD player_po int(11)";
+$results7=mysql_query($querys7);
+
+$querys8="update nuke_scout_rookieratings set player_po = `offp`";
+$results8=mysql_query($querys8);
+
+$querys9="alter table nuke_scout_rookieratings drop `offp`";
+$results9=mysql_query($querys9);
+
+$querys10="alter table nuke_scout_rookieratings ADD player_to int(11)";
+$results10=mysql_query($querys10);
+
+$querys11="update nuke_scout_rookieratings set player_to = `offt`";
+$results11=mysql_query($querys11);
+
+$querys12="alter table nuke_scout_rookieratings drop `offt`";
+$results12=mysql_query($querys12);
+
+$querys13="alter table nuke_scout_rookieratings ADD player_od int(11)";
+$results13=mysql_query($querys13);
+
+$querys14="update nuke_scout_rookieratings set player_od = `defo`";
+$results14=mysql_query($querys14);
+
+$querys15="alter table nuke_scout_rookieratings drop `defo`";
+$results15=mysql_query($querys15);
+
+$querys16="alter table nuke_scout_rookieratings ADD player_dd int(11)";
+$results16=mysql_query($querys16);
+
+$querys17="update nuke_scout_rookieratings set player_dd = `defd`";
+$results17=mysql_query($querys17);
+
+$querys18="alter table nuke_scout_rookieratings drop `defd`";
+$results18=mysql_query($querys18);
+
+$querys19="alter table nuke_scout_rookieratings ADD player_pd int(11)";
+$results19=mysql_query($querys19);
+
+$querys20="update nuke_scout_rookieratings set player_pd = `defp`";
+$results20=mysql_query($querys20);
+
+$querys21="alter table nuke_scout_rookieratings drop `defp`";
+$results21=mysql_query($querys21);
+
+$querys22="alter table nuke_scout_rookieratings ADD player_td int(11)";
+$results22=mysql_query($querys22);
+
+$querys23="update nuke_scout_rookieratings set player_td = `deft`";
+$results23=mysql_query($querys23);
+
+$querys24="alter table nuke_scout_rookieratings drop `deft`";
+$results24=mysql_query($querys24);
+
+$querys25="alter table nuke_scout_rookieratings ADD player_tal int(11)";
+$results25=mysql_query($querys25);
+
+$querys26="update nuke_scout_rookieratings set player_tal = `tal`";
+$results26=mysql_query($querys26);
+
+$querys27="alter table nuke_scout_rookieratings drop `tal`";
+$results27=mysql_query($querys27);
+
+$querys28="alter table nuke_scout_rookieratings ADD player_skl int(11)";
+$results28=mysql_query($querys28);
+
+$querys29="update nuke_scout_rookieratings set player_skl = `skl`";
+$results29=mysql_query($querys29);
+
+$querys30="alter table nuke_scout_rookieratings drop `skl`";
+$results30=mysql_query($querys30);
+
+$querys31="alter table nuke_scout_rookieratings ADD player_intan int(11)";
+$results31=mysql_query($querys31);
+
+$querys32="update nuke_scout_rookieratings set player_intan = `int`";
+$results32=mysql_query($querys32);
+
+$querys33="alter table nuke_scout_rookieratings drop `int`";
+$results33=mysql_query($querys33);
+
+
+
+
+
+
 
 $queryt="alter table nuke_scout_rookieratings ADD player_id int(2)";
 $resultt=mysql_query($queryt);
@@ -187,10 +284,10 @@ $resultfff=mysql_query($queryfff);
 $queryggg="alter table nuke_scout_rookieratings drop stl";
 $resultggg=mysql_query($queryggg);
 
-$queryhhh="alter table nuke_scout_rookieratings ADD player_to  varchar(2)";
+$queryhhh="alter table nuke_scout_rookieratings ADD player_tvr  varchar(2)";
 $resulthhh=mysql_query($queryhhh);
 
-$queryiii="update nuke_scout_rookieratings set player_to = tvr";
+$queryiii="update nuke_scout_rookieratings set player_tvr = tvr";
 $resultiii=mysql_query($queryiii);
 
 $queryjjj="alter table nuke_scout_rookieratings drop tvr";
@@ -205,56 +302,6 @@ $resultlll=mysql_query($querylll);
 $querymmm="alter table nuke_scout_rookieratings drop blk";
 $resultmmm=mysql_query($querymmm);
 
-$querynnn="alter table nuke_scout_rookieratings ADD player_off  varchar(2)";
-$resultnnn=mysql_query($querynnn);
-
-$queryooo="alter table nuke_scout_rookieratings ADD player_def  varchar(2)";
-$resultooo=mysql_query($queryooo);
-
-$queryppp="alter table nuke_scout_rookieratings ADD player_tsi  varchar(2)";
-$resultppp=mysql_query($queryppp);
-
-$queryrrr="update nuke_scout_rookieratings set player_off = offo+offd+offp+offt";
-$resultrrr=mysql_query($queryrrr);
-
-$querysss="update nuke_scout_rookieratings set player_def = defo+defd+defp+deft";
-$resultsss=mysql_query($querysss);
-
-$queryttt="update nuke_scout_rookieratings set player_tsi = tal+skl+intan";
-$resultttt=mysql_query($queryttt);
-
-$queryuuu="alter table nuke_scout_rookieratings drop offo";
-$resultuuu=mysql_query($queryuuu);
-
-$queryvvv="alter table nuke_scout_rookieratings drop offd";
-$resultvvv=mysql_query($queryvvv);
-
-$querywww="alter table nuke_scout_rookieratings drop offp";
-$resultwww=mysql_query($querywww);
-
-$queryxxx="alter table nuke_scout_rookieratings drop offt";
-$resultxxx=mysql_query($queryxxx);
-
-$queryyyy="alter table nuke_scout_rookieratings drop defo";
-$resultyyy=mysql_query($queryyyy);
-
-$queryzzz="alter table nuke_scout_rookieratings drop defd";
-$resultzzz=mysql_query($queryzzz);
-
-$query1="alter table nuke_scout_rookieratings drop defp";
-$result1=mysql_query($query1);
-
-$query2="alter table nuke_scout_rookieratings drop deft";
-$result2=mysql_query($query2);
-
-$query3="alter table nuke_scout_rookieratings drop tal";
-$result3=mysql_query($query3);
-
-$query4="alter table nuke_scout_rookieratings drop skl";
-$result4=mysql_query($query4);
-
-$query5="alter table nuke_scout_rookieratings drop intan";
-$result5=mysql_query($query5);
 
 $query6="update nuke_scout_rookieratings set position_id = '5' where position_id = 'C'";
 $result6=mysql_query($query6);

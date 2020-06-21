@@ -4,11 +4,13 @@ require '../config.php';
 mysql_connect($dbhost,$dbuname,$dbpass);
 @mysql_select_db($dbname) or die("Unable to select database");
 
+include_once "../sharedFunctions.php";
+
 $query="SELECT * FROM nuke_ibl_team_info WHERE teamid != 35 ORDER BY teamid ASC";
 $result=mysql_query($query);
 $num=mysql_numrows($result);
 
-$seasonYear = mysql_result(mysql_query("SELECT value FROM nuke_ibl_settings WHERE name = 'Current Season Ending Year'"), 0);
+$currentSeasonEndingYear = getCurrentSeasonEndingYear();
 
 echo "<HTML><HEAD><TITLE>Draft Pick Matrix</TITLE></HEAD>
     <BODY>
@@ -18,11 +20,11 @@ echo "<HTML><HEAD><TITLE>Draft Pick Matrix</TITLE></HEAD>
             <TABLE BORDER=1>
                 <TR>
                     <TD ROWSPAN=2><CENTER>Team</CENTER></TD>
-                    <TD COLSPAN=2><CENTER>$seasonYear</CENTER></TD>
-                    <TD COLSPAN=2><CENTER>".($seasonYear+1)."</CENTER></TD>
-                    <TD COLSPAN=2><CENTER>".($seasonYear+2)."</CENTER></TD>
-                    <TD COLSPAN=2><CENTER>".($seasonYear+3)."</CENTER></TD>
-                    <TD COLSPAN=2><CENTER>".($seasonYear+4)."</CENTER></TD>
+                    <TD COLSPAN=2><CENTER>$currentSeasonEndingYear</CENTER></TD>
+                    <TD COLSPAN=2><CENTER>" . ($currentSeasonEndingYear + 1) . "</CENTER></TD>
+                    <TD COLSPAN=2><CENTER>" . ($currentSeasonEndingYear + 2) . "</CENTER></TD>
+                    <TD COLSPAN=2><CENTER>" . ($currentSeasonEndingYear + 3) . "</CENTER></TD>
+                    <TD COLSPAN=2><CENTER>" . ($currentSeasonEndingYear + 4) . "</CENTER></TD>
                 </TR>
                 <TR>
                     <TD><CENTER>Round 1</CENTER></TD>

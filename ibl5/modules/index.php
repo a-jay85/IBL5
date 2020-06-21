@@ -21,6 +21,8 @@ if (!eregi("modules.php", $_SERVER['PHP_SELF'])) {
 }
 
 require_once("mainfile.php");
+include_once "sharedFunctions.php";
+
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
@@ -1526,9 +1528,9 @@ $table_chunk=$table_chunk."<table  align=\"center\" class=\"sortable\">
 ";
 /* ======================CHUNK STATS */
 
-$current_ibl_season=mysql_result(mysql_query("SELECT * FROM nuke_ibl_settings WHERE name = 'Current Season Ending Year' "),0,"value");
+$currentSeasonEndingYear = getCurrentSeasonEndingYear();
 
-$max_chunk_query="SELECT MAX(chunk) as maxchunk FROM nuke_iblplyr_chunk WHERE active = 1 AND Season = '$current_ibl_season' ";
+$max_chunk_query="SELECT MAX(chunk) as maxchunk FROM nuke_iblplyr_chunk WHERE active = 1 AND Season = '$currentSeasonEndingYear' ";
 $max_chunk_result=mysql_query($max_chunk_query);
 $row = mysql_fetch_assoc($max_chunk_result);
 
@@ -1539,7 +1541,7 @@ $table_chunk=$table_chunk."
 
 
 
-$query_chunk="SELECT * FROM nuke_iblplyr_chunk WHERE chunk = $row[maxchunk] AND tid = $tid AND Season = '$current_ibl_season' ORDER BY ordinal ASC";
+$query_chunk="SELECT * FROM nuke_iblplyr_chunk WHERE chunk = $row[maxchunk] AND tid = $tid AND Season = '$currentSeasonEndingYear' ORDER BY ordinal ASC";
 $result_chunk=mysql_query($query_chunk);
 $num_chunk=mysql_numrows($result_chunk);
 

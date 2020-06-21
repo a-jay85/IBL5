@@ -4,14 +4,14 @@ require 'config.php';
 mysql_connect($dbhost,$dbuname,$dbpass);
 @mysql_select_db($dbname) or die( "Unable to select database");
 
+include_once "sharedFunctions.php";
+
 $stringCurrentEndingYear = "SELECT value FROM nuke_ibl_settings WHERE name = 'Current Season Ending Year';";
 $queryCurrentEndingYear = mysql_query($stringCurrentEndingYear);
 $currentEndingYear = mysql_result($queryCurrentEndingYear, 0);
 $currentStartingYear = $currentEndingYear-1;
 
-$stringSeasonPhase = "SELECT value FROM nuke_ibl_settings WHERE name = 'Current Season Phase';";
-$querySeasonPhase = mysql_query($stringSeasonPhase);
-$seasonPhase = mysql_result($querySeasonPhase, 0);
+$seasonPhase = getCurrentSeasonPhase();
 
 $scoFile = fopen("IBL5.sco", "rb");
 fseek($scoFile,1000000);

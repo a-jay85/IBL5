@@ -51,11 +51,24 @@ $j = 0;
 while ($j < $numo) {
 	$user_team = mysql_result($resulto, $j, "user_ibl_team");
 
-	$sql = "SELECT * FROM nuke_iblplyr WHERE teamname = '$user_team' AND retired = '0' AND injured = '0' and droptime = '0' and name NOT LIKE '%Buyout%' ORDER BY ordinal ASC ";
+	$sql = "SELECT *
+        FROM nuke_iblplyr
+        WHERE teamname = '$user_team'
+        AND retired = '0'
+        AND injured = '0'
+        AND droptime = '0'
+        AND name NOT LIKE '%Buyout%'
+        ORDER BY ordinal ASC ";
 	$result1 = mysql_query($sql);
 	$num1 = mysql_numrows($result1);
 
-	$sql2 = "SELECT * FROM nuke_iblplyr WHERE teamname='$user_team' AND retired = '0' AND injured > '0' AND active = '1' ORDER BY ordinal ASC ";
+	$sql2 = "SELECT *
+        FROM nuke_iblplyr
+        WHERE teamname = '$user_team'
+        AND retired = '0'
+        AND injured > '0'
+        AND active = '1'
+        ORDER BY ordinal ASC ";
 	$result2 = mysql_query($sql2);
 	$num2 = mysql_numrows($result2);
 

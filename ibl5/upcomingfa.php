@@ -4,20 +4,20 @@ require 'config.php';
 mysql_connect($dbhost,$dbuname,$dbpass);
 @mysql_select_db($dbname) or die("Unable to select database");
 
-$queryCurrentYear = 'SELECT value FROM nuke_ibl_settings WHERE name = "Current Season Ending Year"';
-$resultCurrentYear = mysql_query($queryCurrentYear);
-$freeagentyear=mysql_result($resultCurrentYear, 0);
+include_once "sharedFunctions.php";
+
+$currentSeasonEndingYear = getCurrentSeasonEndingYear();
 
 $tid = $_REQUEST['tid'];
 $yr = $_REQUEST['yr'];
 
 if ($tid == NULL) {
-    if ($freeagentyear != NULL) {
+    if ($currentSeasonEndingYear != NULL) {
         // === CODE FOR FREE AGENTS
 
-        echo "<html><head><title>Upcoming Free Agents List ($freeagentyear)</title></head><body>
+        echo "<html><head><title>Upcoming Free Agents List ($currentSeasonEndingYear)</title></head><body>
             <style>th{ font-size: 9pt; font-family:Arial; color: white; background-color: navy}td      { text-align: Left; font-size: 9pt; font-family:Arial; color:black; }.tdp { font-weight: bold; text-align: Left; font-size: 9pt; color:black; } </style>
-            <center><h2>Players Currently to be Free Agents at the end of the $freeagentyear Season</h2>
+            <center><h2>Players Currently to be Free Agents at the end of the $currentSeasonEndingYear Season</h2>
             <table border=1 cellspacing=1><tr><th colspan=27><center>Player Ratings</center></th></tr>
             <tr><th>Pos</th><th>Player</th><th>Team</th><th>Age</th><th>Sta</th><th>2ga</th><th>2g%</th><th>fta</th><th>ft%</th><th>3ga</th><th>3g%</th><th>orb</th><th>drb</th><th>ast</th><th>stl</th><th>to</th><th>blk</th><th>foul</th><th>o-o</th><th>d-o</th><th>p-o</th><th>t-o</th><th>o-d</th><th>d-d</th><th>p-d</th><th>t-d</th><th>Inj</th></tr>";
 
@@ -35,7 +35,7 @@ if ($tid == NULL) {
 
             $yearoffreeagency=$draftyear+$exp+$cyt-$cy;
 
-            if ($yearoffreeagency == $freeagentyear) {
+            if ($yearoffreeagency == $currentSeasonEndingYear) {
                 $name=mysql_result($result,$i,"name");
                 $team=mysql_result($result,$i,"teamname");
                 $tid=mysql_result($result,$i,"tid");

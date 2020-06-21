@@ -4,9 +4,9 @@ require 'config.php';
 mysql_connect($dbhost,$dbuname,$dbpass);
 @mysql_select_db($dbname) or die( "Unable to select database");
 
-$stringCurrentSimYear = "SELECT value FROM nuke_ibl_settings WHERE name = 'Current Season Ending Year';";
-$queryCurrentSimYear = mysql_query($stringCurrentSimYear);
-$CurrentSimYear = mysql_result($queryCurrentSimYear, 0);
+include_once "sharedFunctions.php";
+
+$currentSeasonEndingYear = getCurrentSeasonEndingYear();
 
 $stringTeamIDsNames = "SELECT teamid,team_name FROM nuke_ibl_team_info ORDER BY teamid ASC;";
 $queryTeamIDsNames = mysql_query($stringTeamIDsNames);
@@ -187,7 +187,7 @@ while (!feof($plrFile)) {
 
     $heightFT = floor($heightInches / 12);
     $heightIN = $heightInches % 12;
-    $draftYear = $CurrentSimYear - $exp;
+    $draftYear = $currentSeasonEndingYear - $exp;
     if ($rlPF != 0) $minsPerPF = round($rlMIN / $rlPF);
 
     if ($ordinal <= 1440) {

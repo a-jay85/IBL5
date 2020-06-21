@@ -15,6 +15,8 @@ require 'config.php';
 mysql_connect($dbhost,$dbuname,$dbpass);
 @mysql_select_db($dbname) or die("Unable to select database");
 
+include_once "sharedFunctions.php";
+
 $scheduleFilePath = 'ibl/IBL/Schedule.htm';
 
 $schedule = new DOMDocument();
@@ -381,11 +383,7 @@ $queryTeams = "SELECT TeamID, Team, streak_type, streak
 $resultTeams = mysql_query($queryTeams);
 $numTeams = mysql_numrows($resultTeams);
 
-$queryCurrentYear = 'SELECT value
-	FROM nuke_ibl_settings
-	WHERE name = "Current Season Ending Year"';
-$resultCurrentYear = mysql_query($queryCurrentYear);
-$currentYear=mysql_result($resultCurrentYear, 0);
+$currentSeasonEndingYear = getCurrentSeasonEndingYear();
 
 $i = 0;
 while ($i < $numTeams) {
@@ -396,7 +394,7 @@ while ($i < $numTeams) {
 		FROM ibl_schedule
 		WHERE (Visitor = $tid OR Home = $tid)
 		AND (BoxID > 0 AND BoxID != 100000)
-		AND Date BETWEEN '" . ($currentYear - 1) . "-10-31' AND '$currentYear-04-30'
+		AND Date BETWEEN '" . ($currentSeasonEndingYear - 1) . "-10-31' AND '$currentSeasonEndingYear-04-30'
 		ORDER BY Date ASC";
 	$resultGames = mysql_query($queryGames);
 	$numGames = mysql_numrows($resultGames);
@@ -524,7 +522,7 @@ while ($i < $numTeams) {
 	$query4 = "UPDATE nuke_iblteam_win_loss a, nuke_ibl_power b
 		SET a.wins = b.win,
 			a.losses = b.loss
-		WHERE a.currentname = b.Team AND a.year = '".$currentYear."';";
+		WHERE a.currentname = b.Team AND a.year = '".$currentSeasonEndingYear."';";
 	$result4 = mysql_query($query4);
 
 	// Update teams' total wins in ibl_team_history by summing up a team's wins in nuke_iblteam_win_loss

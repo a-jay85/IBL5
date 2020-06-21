@@ -4,14 +4,10 @@ require 'config.php';
 mysql_connect($dbhost,$dbuname,$dbpass);
 @mysql_select_db($dbname) or die( "Unable to select database");
 
-$stringCurrentSimYear = "SELECT value FROM nuke_ibl_settings WHERE name = 'Current Season Ending Year';";
-$queryCurrentSimYear = mysql_query($stringCurrentSimYear);
-
 $trnFile = fopen("IBLv4.trn", "rb");
 $seasonDaysElapsed = fgets($trnFile,18);
 
 while (!feof($trnFile)) {
-    $CurrentSimYear = mysql_result($queryCurrentSimYear, 0);
     $line = fgets($trnFile,129);
 
     $gameMonth = sprintf("%02u",substr($line,0,2));
@@ -59,4 +55,4 @@ while (!feof($trnFile)) {
     }
 }
 
-echo '<br>end tnrParser script.';
+echo '<br>end trnParser script.';

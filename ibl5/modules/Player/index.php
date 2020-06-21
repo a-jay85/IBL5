@@ -21,6 +21,8 @@ if (!eregi("modules.php", $_SERVER['PHP_SELF'])) {
 }
 
 require_once("mainfile.php");
+include_once "sharedFunctions.php";
+
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
@@ -2502,8 +2504,8 @@ function teamname ($teamid)
 }
 
 if ($spec == 0) {
-    $currentSeasonEndingYear = mysql_result(mysql_query("SELECT value FROM nuke_ibl_settings WHERE name = 'Current Season Ending Year'"),0);
-    $currentSeasonStaringYear = $currentSeasonEndingYear-1;
+    $currentSeasonEndingYear = getCurrentSeasonEndingYear();
+    $currentSeasonStaringYear = $currentSeasonEndingYear - 1;
 
     $query="SELECT * FROM ibl_box_scores WHERE Date BETWEEN '$currentSeasonStaringYear-10-01' AND '$currentSeasonEndingYear-07-01' AND pid = $pid ORDER BY Date ASC";
     $result=mysql_query($query);

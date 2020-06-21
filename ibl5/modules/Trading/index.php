@@ -5,6 +5,8 @@ if (!eregi("modules.php", $_SERVER['PHP_SELF'])) {
 }
 
 require_once("mainfile.php");
+include_once "sharedFunctions.php";
+
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
@@ -41,9 +43,7 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 
 	include("header.php");
 
-	$query = "SELECT * FROM nuke_ibl_settings WHERE name = 'Current Season Ending Year' ";
-	$result = mysql_query($query);
-	$current_ibl_season = mysql_result($result, 0, "value");
+	$currentSeasonEndingYear = getCurrentSeasonEndingYear();
 
 	OpenTable();
 
@@ -160,7 +160,7 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 		$pick_round = $row8a[round];
 		$pick_id = $row8a[pickid];
 
-		$y = $pick_year - $current_ibl_season + 1;
+		$y = $pick_year - $currentSeasonEndingYear + 1;
 		if ($pick_round == 1) {
 			$future_salary_array['picks'][$y] = $future_salary_array['picks'][$y] + 75;
 			$future_salary_array['hold'][$y] = $future_salary_array['hold'][$y] + 1;
@@ -298,7 +298,7 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 		$pick_round = $row9a[round];
 		$pick_id = $row9a[pickid];
 
-		$y = $pick_year - $current_ibl_season + 1;
+		$y = $pick_year - $currentSeasonEndingYear + 1;
 		if ($pick_round == 1) {
 			$future_salary_arrayb['picks'][$y] = $future_salary_arrayb['picks'][$y] + 75;
 			$future_salary_arrayb['hold'][$y] = $future_salary_arrayb['hold'][$y] + 1;
@@ -372,11 +372,10 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 		$future_salary_array['player'][$z] = $future_salary_array['player'][$z];
 		$future_salary_arrayb['player'][$z] = $future_salary_arrayb['player'][$z];
 		echo "<tr><td><b>
-			Total Year: $current_ibl_season:
+			Total Year: " . ($currentSeasonEndingYear + $z) . ":
 			Salary: $".$future_salary_array['player'][$z]."</b></td>";
 		echo "<td align=right><b>
 			Salary: $".$future_salary_arrayb['player'][$z]."</b></td>";
-			$current_ibl_season++;
 		$z++;
 	}
 

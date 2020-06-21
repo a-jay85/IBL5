@@ -6,20 +6,17 @@ mysql_connect($dbhost,$dbuname,$dbpass);
 
 include_once "sharedFunctions.php";
 
-$stringCurrentEndingYear = "SELECT value FROM nuke_ibl_settings WHERE name = 'Current Season Ending Year';";
-$queryCurrentEndingYear = mysql_query($stringCurrentEndingYear);
-$currentEndingYear = mysql_result($queryCurrentEndingYear, 0);
-$currentStartingYear = $currentEndingYear-1;
-
+$currentSeasonEndingYear = getCurrentSeasonEndingYear();
+$currentSeasonStartingYear = $currentSeasonEndingYear - 1;
 $seasonPhase = getCurrentSeasonPhase();
 
 $scoFile = fopen("IBL5.sco", "rb");
 fseek($scoFile,1000000);
 
 if ($seasonPhase == "HEAT") {
-    $stringDeleteCurrentSeasonBoxScores = "DELETE FROM `ibl_box_scores` WHERE `Date` BETWEEN '$currentStartingYear-10-01' AND '$currentEndingYear-07-01';";
+    $stringDeleteCurrentSeasonBoxScores = "DELETE FROM `ibl_box_scores` WHERE `Date` BETWEEN '$currentSeasonStartingYear-10-01' AND '$currentSeasonEndingYear-07-01';";
 } else {
-    $stringDeleteCurrentSeasonBoxScores = "DELETE FROM `ibl_box_scores` WHERE `Date` BETWEEN '$currentStartingYear-11-01' AND '$currentEndingYear-07-01';";
+    $stringDeleteCurrentSeasonBoxScores = "DELETE FROM `ibl_box_scores` WHERE `Date` BETWEEN '$currentSeasonStartingYear-11-01' AND '$currentSeasonEndingYear-07-01';";
 }
 
 if (mysql_query($stringDeleteCurrentSeasonBoxScores)) {
@@ -31,14 +28,14 @@ echo "<i>[scoParser works silently now]</i><br>";
 while (!feof($scoFile)) {
     $line = fgets($scoFile,2001);
 
-    $gameYear = $currentEndingYear;
+    $gameYear = $currentSeasonEndingYear;
     $gameMonth = sprintf("%02u",substr($line,0,2)+10); // sprintf() prepends 0 if the result isn't in double-digits
     if ($gameMonth > 12 AND $gameMonth != 22) { // if $gameMonth === 22, it's the Playoffs
         $gameMonth = sprintf("%02u",$gameMonth-12);
     } elseif ($gameMonth == 22) {
         $gameMonth = sprintf("%02u",$gameMonth-17); // TODO: not have to hack the Playoffs to be in May
     } elseif ($gameMonth > 10) {
-        $gameYear = $currentStartingYear;
+        $gameYear = $currentSeasonStartingYear;
         if ($seasonPhase == "HEAT") {
             $gameMonth = 10; // Puts HEAT games in October
         }

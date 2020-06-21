@@ -17,6 +17,8 @@ if (!defined('MODULE_FILE')) {
 }
 
 require_once("mainfile.php");
+include_once "sharedFunctions.php";
+
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
@@ -26,18 +28,18 @@ poschange($pid);
 
 function menu()
 {
-		echo "<center><b>
-<a href=\"modules.php?name=Player&pa=search\">Player Search</a>  |
-<a href=\"modules.php?name=Player&pa=awards\">Awards Search</a> |
-<a href=\"modules.php?name=One-On-One\">One-On-One Game</a> |
-<a href=\"modules.php?name=Player&pa=Leaderboards\">Career Leaderboards</a> (All Types)
-</b><hr>";
+	echo "<center><b>
+		<a href=\"modules.php?name=Player&pa=search\">Player Search</a>  |
+		<a href=\"modules.php?name=Player&pa=awards\">Awards Search</a> |
+		<a href=\"modules.php?name=One-On-One\">One-On-One Game</a> |
+		<a href=\"modules.php?name=Player&pa=Leaderboards\">Career Leaderboards</a> (All Types)
+		</b><hr>";
 }
 
 function poschange($pid)
 {
     global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
-		cookiedecode($user);
+	cookiedecode($user);
 
     $pid = intval($pid);
     $playerinfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM ".$prefix."_iblplyr WHERE pid='$pid'"));
@@ -51,6 +53,9 @@ function poschange($pid)
 
     menu();
 
+	$seasonPhase = getCurrentSeasonPhase();
+
+	if ($seasonPhase != "Free Agency") {
 		$sql2 = "SELECT * FROM ".$prefix."_users WHERE username='$cookie[1]'";
 		$result2 = $db->sql_query($sql2);
 		$num2 = $db->sql_numrows($result2);
@@ -60,7 +65,7 @@ function poschange($pid)
 
 		echo "<b>$player_pos $player_name</b> - Position Change:<br>";
 
-    if ($player_team_name == $userteam) {
+		if ($player_team_name == $userteam) {
 		    echo "<form name=\"PositionChange\" method=\"post\" action=\"poschange.php\">";
 
 		    echo "Please change my position to one in which I can better dominate the IBL:
@@ -70,141 +75,145 @@ function poschange($pid)
 
 		    if ($player_pos == PG) {
 		        echo "<select name=\"pos\">
-		    				<option value=\"\">Select...</option>
-						    <option value=\"G\">G</option>
-						    <option value=\"SG\">SG</option>
-						    <option value=\"GF\">GF</option>
-						    <option value=\"SF\">SF</option>
-						    <option value=\"F\">F</option>
-						    <option value=\"PF\">PF</option>
-						    <option value=\"F\">FC</option>
-						    <option value=\"C\">C</option>
-								select></td></tr>";
+					<option value=\"\">Select...</option>
+				    <option value=\"G\">G</option>
+				    <option value=\"SG\">SG</option>
+				    <option value=\"GF\">GF</option>
+				    <option value=\"SF\">SF</option>
+				    <option value=\"F\">F</option>
+				    <option value=\"PF\">PF</option>
+				    <option value=\"F\">FC</option>
+				    <option value=\"C\">C</option>
+				</select></td></tr>";
 		    } elseif ($player_pos == G) {
 		        echo "<select name=\"pos\">
-						    <option value=\"PG\">PG</option>
-						    <option value=\"SG\">SG</option>
-						    <option value=\"GF\">GF</option>
-						    <option value=\"SF\">SF</option>
-						    <option value=\"F\">F</option>
-						    <option value=\"PF\">PF</option>
-						    <option value=\"FC\">FC</option>
-						    <option value=\"C\">C</option>
-						    </select></td></tr>";
+					<option value=\"\">Select...</option>
+				    <option value=\"PG\">PG</option>
+				    <option value=\"SG\">SG</option>
+				    <option value=\"GF\">GF</option>
+				    <option value=\"SF\">SF</option>
+				    <option value=\"F\">F</option>
+				    <option value=\"PF\">PF</option>
+				    <option value=\"FC\">FC</option>
+				    <option value=\"C\">C</option>
+			    </select></td></tr>";
 		    } elseif ($player_pos == SG) {
 		        echo "<select name=\"pos\">
-						    <option value=\"\">Select...</option>
-						    <option value=\"PG\">PG</option>
-						    <option value=\"G\">G</option>
-						    <option value=\"GF\">GF</option>
-						    <option value=\"SF\">SF</option>
-						    <option value=\"F\">F</option>
-						    <option value=\"PF\">PF</option>
-						    <option value=\"FC\">FC</option>
-						    <option value=\"C\">C</option>
-						    </select></td></tr>";
-			  } elseif ($player_pos == GF) {
+				    <option value=\"\">Select...</option>
+				    <option value=\"PG\">PG</option>
+				    <option value=\"G\">G</option>
+				    <option value=\"GF\">GF</option>
+				    <option value=\"SF\">SF</option>
+				    <option value=\"F\">F</option>
+				    <option value=\"PF\">PF</option>
+				    <option value=\"FC\">FC</option>
+				    <option value=\"C\">C</option>
+			    </select></td></tr>";
+			} elseif ($player_pos == GF) {
 		        echo "<select name=\"pos\">
-						    <option value=\"\">Select...</option>
-						    <option value=\"PG\">PG</option>
-						    <option value=\"G\">G</option>
-						    <option value=\"SG\">SG</option>
-						    <option value=\"SF\">SF</option>
-						    <option value=\"F\">F</option>
-						    <option value=\"PF\">PF</option>
-						    <option value=\"FC\">FC</option>
-						    <option value=\"C\">C</option>
-						    </select></td></tr>";
+				    <option value=\"\">Select...</option>
+				    <option value=\"PG\">PG</option>
+				    <option value=\"G\">G</option>
+				    <option value=\"SG\">SG</option>
+				    <option value=\"SF\">SF</option>
+				    <option value=\"F\">F</option>
+				    <option value=\"PF\">PF</option>
+				    <option value=\"FC\">FC</option>
+				    <option value=\"C\">C</option>
+			    </select></td></tr>";
 		    } elseif ($player_pos == SF) {
 		        echo "<select name=\"pos\">
-						    <option value=\"\">Select...</option>
-						    <option value=\"PG\">PG</option>
-						    <option value=\"G\">G</option>
-						    <option value=\"SG\">SG</option>
-						    <option value=\"GF\">GF</option>
-						    <option value=\"F\">F</option>
-						    <option value=\"PF\">PF</option>
-						    <option value=\"FC\">FC</option>
-						    <option value=\"C\">C</option>
-						    </select></td></tr>";
+				    <option value=\"\">Select...</option>
+				    <option value=\"PG\">PG</option>
+				    <option value=\"G\">G</option>
+				    <option value=\"SG\">SG</option>
+				    <option value=\"GF\">GF</option>
+				    <option value=\"F\">F</option>
+				    <option value=\"PF\">PF</option>
+				    <option value=\"FC\">FC</option>
+				    <option value=\"C\">C</option>
+			    </select></td></tr>";
 		    } elseif ($player_pos == F) {
 		        echo "<select name=\"pos\">
-						    <option value=\"\">Select...</option>
-						    <option value=\"PG\">PG</option>
-						    <option value=\"G\">G</option>
-						    <option value=\"SG\">SG</option>
-						    <option value=\"GF\">GF</option>
-						    <option value=\"SF\">SF</option>
-						    <option value=\"PF\">PF</option>
-						    <option value=\"FC\">FC</option>
-						    <option value=\"C\">C</option>
-						    </select></td></tr>";
+				    <option value=\"\">Select...</option>
+				    <option value=\"PG\">PG</option>
+				    <option value=\"G\">G</option>
+				    <option value=\"SG\">SG</option>
+				    <option value=\"GF\">GF</option>
+				    <option value=\"SF\">SF</option>
+				    <option value=\"PF\">PF</option>
+				    <option value=\"FC\">FC</option>
+				    <option value=\"C\">C</option>
+			    </select></td></tr>";
 		    } elseif ($player_pos == PF) {
 		        echo "<select name=\"pos\">
-						    <option value=\"\">Select...</option>
-						    <option value=\"PG\">PG</option>
-						    <option value=\"G\">G</option>
-						    <option value=\"SG\">SG</option>
-						    <option value=\"GF\">GF</option>
-						    <option value=\"SF\">SF</option>
-						    <option value=\"F\">F</option>
-						    <option value=\"FC\">FC</option>
-						    <option value=\"C\">C</option>
-						    </select></td></tr>";
+				    <option value=\"\">Select...</option>
+				    <option value=\"PG\">PG</option>
+				    <option value=\"G\">G</option>
+				    <option value=\"SG\">SG</option>
+				    <option value=\"GF\">GF</option>
+				    <option value=\"SF\">SF</option>
+				    <option value=\"F\">F</option>
+				    <option value=\"FC\">FC</option>
+				    <option value=\"C\">C</option>
+			    </select></td></tr>";
 		    } elseif ($player_pos == FC) {
 		        echo "<select name=\"pos\">
-						    <option value=\"\">Select...</option>
-						    <option value=\"PG\">PG</option>
-						    <option value=\"G\">G</option>
-						    <option value=\"SG\">SG</option>
-						    <option value=\"GF\">GF</option>
-						    <option value=\"SF\">SF</option>
-						    <option value=\"F\">F</option>
-						    <option value=\"PF\">PF</option>
-						    <option value=\"C\">C</option>
-						    </select></td></tr>";
+				    <option value=\"\">Select...</option>
+				    <option value=\"PG\">PG</option>
+				    <option value=\"G\">G</option>
+				    <option value=\"SG\">SG</option>
+				    <option value=\"GF\">GF</option>
+				    <option value=\"SF\">SF</option>
+				    <option value=\"F\">F</option>
+				    <option value=\"PF\">PF</option>
+				    <option value=\"C\">C</option>
+			    </select></td></tr>";
 		    } elseif ($player_pos == C) {
 		        echo "<select name=\"pos\">
-						    <option value=\"\">Select...</option>
-						    <option value=\"PG\">PG</option>
-						    <option value=\"G\">G</option>
-						    <option value=\"SG\">SG</option>
-						    <option value=\"GF\">GF</option>
-						    <option value=\"SF\">SF</option>
-						    <option value=\"F\">F</option>
-						    <option value=\"PF\">PF</option>
-						    <option value=\"FC\">FC</option>
-						    </select></td></tr>";
+				    <option value=\"\">Select...</option>
+				    <option value=\"PG\">PG</option>
+				    <option value=\"G\">G</option>
+				    <option value=\"SG\">SG</option>
+				    <option value=\"GF\">GF</option>
+				    <option value=\"SF\">SF</option>
+				    <option value=\"F\">F</option>
+				    <option value=\"PF\">PF</option>
+				    <option value=\"FC\">FC</option>
+			    </select></td></tr>";
 		    } else {
 		        echo "<select name=\"pos\">
-						    <option value=\"\">Select...</option>
-						    <option value=\"PG\">PG</option>
-						    <option value=\"G\">G</option>
-						    <option value=\"SG\">SG</option>
-						    <option value=\"GF\">GF</option>
-						    <option value=\"SF\">SF</option>
-						    <option value=\"F\">F</option>
-						    <option value=\"PF\">PF</option>
-						    <option value=\"FC\">FC</option>
-						    <option value=\"C\">C</option>
-						    </select></td></tr>";
+				    <option value=\"\">Select...</option>
+				    <option value=\"PG\">PG</option>
+				    <option value=\"G\">G</option>
+				    <option value=\"SG\">SG</option>
+				    <option value=\"GF\">GF</option>
+				    <option value=\"SF\">SF</option>
+				    <option value=\"F\">F</option>
+				    <option value=\"PF\">PF</option>
+				    <option value=\"FC\">FC</option>
+				    <option value=\"C\">C</option>
+			    </select></td></tr>";
 			}
 
 		    echo "
-						</ul></td></tr>
-						<p>
-						<input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
-						<input type=\"hidden\" name=\"playername\" value=\"$player_name\">
-						<input type=\"hidden\" name=\"playerpos\" value=\"$player_pos\">
-						</table>
-						<p>
-						<input type=\"submit\" value=\"Change Position!\">
-						</form>
+				</ul></td></tr>
+				<p>
+				<input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+				<input type=\"hidden\" name=\"playername\" value=\"$player_name\">
+				<input type=\"hidden\" name=\"playerpos\" value=\"$player_pos\">
+				</table>
+				<p>
+				<input type=\"submit\" value=\"Change Position!\">
+				</form>
 
 				";
 		} else {
-    echo "Sorry, this player is not on your team.";
+		    echo "Sorry, this player is not on your team.";
 		}
+	} else {
+		echo "Sorry, position changes are <b>not</b> available during Free Agency.";
+	}
 
     CloseTable();
 

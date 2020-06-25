@@ -45,7 +45,7 @@ position.position_id = player.position_id";
 	$subject = $settings->get_value(kSettingLeagueName)." Draft Selection Notification: Round $round Pick $pick";
 	$message = "With pick $pick_id of the 1989 IBL Draft, **" . $row['team_name'] . "** selects **" . $row['position_name'] . " " . $row['player_name'] . "!**";
 	// Who is on the clock?
-	$statement = "select pick.pick_id, team.team_id, team_email, team_name, team_email_prefs
+	$statement = "select pick.pick_id, team.team_id, team_email, team_name, team_email_prefs, team_discord_id
 from pick, team
 where pick.team_id = team.team_id
 and pick.player_id is NULL
@@ -56,7 +56,7 @@ limit 1";
 	  $on_clock = $row['team_id'];
 	  $message .= '
 
-**' . $row['team_name'] . '** is on the clock!';
+**<@!' . $row['team_discord_id'] . '>** is on the clock!';
       // Post pick details to Discord
       postToDiscordChannel('#draft-picks', $message);
 	  // Store the e-mail of the team that's on the clock for the notice below

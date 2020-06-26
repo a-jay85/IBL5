@@ -19,7 +19,7 @@
 
 function make_pick($pick_id, $player_id, $recursive = false) {
   global $settings;
-  require 'discordWebhooks.php';
+  require $_SERVER['DOCUMENT_ROOT'] . '/discordWebhooks.php';
   if ($pick_id) {
     $statement = "select * from pick where player_id = '$player_id'";
     // Make sure that the player has not already been picked

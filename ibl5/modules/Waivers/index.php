@@ -179,46 +179,44 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
                 $errortext = "Your waiver move should now be processed. $playername has been cut to waivers.";
             }
         } else if ($Type_Of_Action == 'add') {
-            if ($cy2 == '' AND $cy2 == 0 AND $cy3 == '' AND $cy3 == 0 AND $cy4 == '' AND $cy4 == 0 AND $cy5 == '' AND $cy5 == 0 AND $cy6 == '' AND $cy6 == 0) {
+            if ($cy1 == '' OR $cy1 == 0) {
                 if ($player_exp > 9) {
-                    $cy2 = 103;
+                    $cy1 = 103;
                 } elseif ($player_exp > 8) {
-                    $cy2 = 100;
+                    $cy1 = 100;
                 } elseif ($player_exp > 7) {
-                    $cy2 = 89;
+                    $cy1 = 89;
                 } elseif ($player_exp > 6) {
-                    $cy2 = 82;
+                    $cy1 = 82;
                 } elseif ($player_exp > 5) {
-                    $cy2 = 76;
+                    $cy1 = 76;
                 } elseif ($player_exp > 4) {
-                    $cy2 = 70;
+                    $cy1 = 70;
                 } elseif ($player_exp > 3) {
-                    $cy2 = 64;
+                    $cy1 = 64;
                 } elseif ($player_exp > 2) {
-                    $cy2 = 61;
+                    $cy1 = 61;
                 } elseif ($player_exp > 1) {
-                    $cy2 = 51;
+                    $cy1 = 51;
                 } else {
-                    $cy2 = 35;
+                    $cy1 = 35;
                 }
-            } else {
-                $cy2 = $cy1;
             }
-            
-            if ($Healthy_Roster_Slots < 4 and $TotalSalary + $cy2 > 7000) { // TODO: Change 7000 to hard cap variable
+
+            if ($Healthy_Roster_Slots < 4 AND $TotalSalary + $cy1 > 7000) { // TODO: Change 7000 to hard cap variable
                 $errortext = "You have 12 or more healthy players and this signing will put you over $70 million. Therefore you cannot make this signing.";
-            } elseif ($Healthy_Roster_Slots > 3 and $TotalSalary + $cy2 > 7000 and $cy2 > 103) { // TODO: Change 7000 to hard cap variable
-                $errortext = "You are over the hard cap and therefore can only sign players who are making veteran minimum contract!";
+            } elseif ($Healthy_Roster_Slots > 3 AND $TotalSalary + $cy1 > 7000 AND $cy1 > 103) { // TODO: Change 7000 to hard cap variable
+                $errortext = "You are over the hard cap and therefore can only sign players who are making veteran minimum!";
             } elseif ($Healthy_Roster_Slots < 1) {
                 $errortext = "You have full roster of 15 players. You can't sign another player at this time!";
             } else {
-                $queryi = "UPDATE nuke_iblplyr SET `ordinal` = '800', `cy` = 1, `cy1` = $cy2, `teamname` = '$Team_Offering', `tid` = '$teamid' WHERE `pid` = '$Player_to_Process' LIMIT 1;";
+                $queryi = "UPDATE nuke_iblplyr SET `ordinal` = '800', `cy` = 1, `cy1` = $cy1, `teamname` = '$Team_Offering', `tid` = '$teamid' WHERE `pid` = '$Player_to_Process' LIMIT 1;";
                 $resulti = mysql_query($queryi);
                 $Roster_Slots++;
 
                 $topicid = 33;
                 $storytitle = $Team_Offering . " make waiver additions";
-                $hometext = "The " . $Team_Offering . " sign " . $playername . " from waivers for $cy2.";
+                $hometext = "The " . $Team_Offering . " sign " . $playername . " from waivers for $cy1.";
 
                 // ==== PUT ANNOUNCEMENT INTO DATABASE ON NEWS PAGE
 

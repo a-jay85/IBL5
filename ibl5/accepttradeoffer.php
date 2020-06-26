@@ -4,7 +4,7 @@ require 'config.php';
 mysql_connect($dbhost,$dbuname,$dbpass);
 @mysql_select_db($dbname) or die("Unable to select database");
 
-require 'discordWebhooks.php';
+require $_SERVER['DOCUMENT_ROOT'] . '/discordWebhooks.php';
 
 $offer_id = $_POST['offer'];
 

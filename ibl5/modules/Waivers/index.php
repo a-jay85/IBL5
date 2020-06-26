@@ -127,6 +127,7 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
         $cy5 = mysql_result($waiverresult, 0, "cy5");
         $cy6 = mysql_result($waiverresult, 0, "cy6");
         $player_exp = mysql_result($waiverresult, 0, "exp");
+
         if ($Type_Of_Action == 'drop') {
             if ($Roster_Slots > 2 and $TotalSalary > 7000) { // TODO: Change 7000 to hard cap variable
                 $errortext = "You have 12 players and are over $70 mill hard cap.  Therefore you can't drop a player!";
@@ -203,6 +204,7 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
             } else {
                 $cy2 = $cy1;
             }
+            
             if ($Healthy_Roster_Slots < 4 and $TotalSalary + $cy2 > 7000) { // TODO: Change 7000 to hard cap variable
                 $errortext = "You have 12 or more healthy players and this signing will put you over $70 million. Therefore you cannot make this signing.";
             } elseif ($Healthy_Roster_Slots > 3 and $TotalSalary + $cy2 > 7000 and $cy2 > 103) { // TODO: Change 7000 to hard cap variable

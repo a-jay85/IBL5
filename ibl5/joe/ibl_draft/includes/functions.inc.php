@@ -43,7 +43,12 @@ position.position_id = player.position_id";
 	$round = floor(($pick_id-1)/24)+1;
 	$pick = (($pick_id-1)%24)+1;
 	$subject = $settings->get_value(kSettingLeagueName)." Draft Selection Notification: Round $round Pick $pick";
-	$message = "With pick $pick_id of the 1989 IBL Draft, **" . $row['team_name'] . "** selects **" . $row['position_name'] . " " . $row['player_name'] . "!**";
+    $queryCurrentSeasonEndingYear = mysql_query('SELECT value
+        FROM iblhoops_ibl5.`nuke_ibl_settings`
+        WHERE name = "Current Season Ending Year"
+        LIMIT 1');
+    $currentSeasonEndingYear = mysql_result($queryCurrentSeasonEndingYear, 0);
+	$message = "With pick $pick_id of the $currentSeasonEndingYear IBL Draft, **" . $row['team_name'] . "** selects **" . $row['position_name'] . " " . $row['player_name'] . "!**";
 	// Who is on the clock?
 	$statement = "select pick.pick_id, team.team_id, team_email, team_name, team_email_prefs, team_discord_id
 from pick, team

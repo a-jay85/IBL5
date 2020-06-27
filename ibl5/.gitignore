@@ -6,5 +6,6 @@ backups/
 .DS_Store
 .ftpquota
 config.php
+config.inc.php
 discordWebhooks.php
 error_log

@@ -2224,19 +2224,19 @@ function team_info_right ($team_name, $color1, $color2, $owner_name, $tid)
 
 		if ($playoffround == 1) {
 			if ($playoffwinner == $team_name) {
-				$totalplayoffwins = $totalplayoffwins + 3;
+				$totalplayoffwins = $totalplayoffwins + 4;
 				$totalplayofflosses = $totalplayofflosses + $playoffloser_games;
-				$first_wins = $first_wins + 3;
+				$first_wins = $first_wins + 4;
 				$first_losses = $first_losses + $playoffloser_games;
 				$first_round_victories++;
-				$round_one_output = $round_one_output . "$playoffyear - $team_name 3, $playoffloser $playoffloser_games<br>";
+				$round_one_output = $round_one_output . "$playoffyear - $team_name 4, $playoffloser $playoffloser_games<br>";
 			} else if ($playoffloser == $team_name) {
-				$totalplayofflosses = $totalplayofflosses + 3;
+				$totalplayofflosses = $totalplayofflosses + 4;
 				$totalplayoffwins = $totalplayoffwins + $playoffloser_games;
-				$first_losses = $first_losses + 3;
+				$first_losses = $first_losses + 4;
 				$first_wins = $first_wins + $playoffloser_games;
 				$first_round_losses++;
-				$round_one_output = $round_one_output . "$playoffyear - $playoffwinner 3, $team_name $playoffloser_games<br>";
+				$round_one_output = $round_one_output . "$playoffyear - $playoffwinner 4, $team_name $playoffloser_games<br>";
 			}
 		} else if ($playoffround == 2) {
 			if ($playoffwinner == $team_name) {

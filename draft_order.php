@@ -1,11 +1,9 @@
 <?php
 
-$username = "iblhoops";
-$password = "Underthedome19!";
-$database = "iblhoops_ibldraft";
-
-mysql_connect(localhost,$username,$password);
-@mysql_select_db($database) or die( "Unable to select database");
+require 'config.php';
+$dbname = "iblhoops_ibldraft";
+mysql_connect($dbhost,$dbuname,$dbpass);
+@mysql_select_db($dbname) or die("Unable to select database");
 
 
 $querya="load data local infile 'http://www.iblhoops.net/spreadsheets/draft_order.csv' into table excel FIELDS TERMINATED BY ',' ENCLOSED BY '\"' ESCAPED BY '\\' (pick, team, tid)";

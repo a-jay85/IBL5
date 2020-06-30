@@ -1,11 +1,9 @@
 <?php
 
-$username = "iblhoops";
-$password = "Underthedome19!";
-$database = "iblhoops_v4draft";
-
-mysql_connect(localhost,$username,$password);
-@mysql_select_db($database) or die( "Unable to select database");
+require 'config.php';
+$dbname = "iblhoops_v4draft";
+mysql_connect($dbhost,$dbuname,$dbpass);
+@mysql_select_db($dbname) or die("Unable to select database");
 
 
 $querya="truncate table chat";

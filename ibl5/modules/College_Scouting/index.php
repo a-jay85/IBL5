@@ -262,7 +262,7 @@ echo "<input type='hidden' name='draft_pick' value='$draft_pick'>";
 
     $i = 0;
     while($row3 = $db->sql_fetchrow($result3)) {
-	(($i % 2)==0) ? $bgcolor="EEEEEE" : $bgcolor="EEEEEE";
+	(($i % 2)==0) ? $bgcolor="EEEEEE" : $bgcolor="DDDDDD";
     $i++;
 
 	$player_pos = $row3[pos];

@@ -293,7 +293,24 @@ echo "<input type='hidden' name='draft_pick' value='$draft_pick'>";
 	$player_tal = $row3[tal];
 	$player_skl = $row3[skl];
 	$player_int = $row3[int];
-	$player_drafted = $row3[drafted];
+
+	$draftedPlayersQuery = "SELECT iblhoops_draft.player.`player_name`
+FROM   iblhoops_draft.pick
+       INNER JOIN iblhoops_draft.player
+               ON iblhoops_draft.pick.player_id =
+                  iblhoops_draft.player.player_id;";
+	$draftedResult = mysql_query($draftedPlayersQuery);
+
+	$j = 0;
+	while ($draftedPlayersArray[$j] = mysql_result($draftedResult, $j)) {
+		$j++;
+	}
+
+	if (in_array($player_name, $draftedPlayersArray)) {
+		$player_drafted = 1;
+	} else {
+		$player_drafted = 0;
+	}
 
 // === GRAB SCOUTING POINT EXPENDITURES ===
 

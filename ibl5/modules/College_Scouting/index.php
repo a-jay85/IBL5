@@ -308,6 +308,9 @@ FROM   iblhoops_draft.pick
 
 	if (in_array($player_name, $draftedPlayersArray)) {
 		$player_drafted = 1;
+		mysql_query("UPDATE nuke_scout_rookieratings
+SET drafted = 1
+WHERE name = '$player_name';"); // This query should really be executed in the Draft-O-Matic when the player is drafted, but this works for now.
 	} else {
 		$player_drafted = 0;
 	}

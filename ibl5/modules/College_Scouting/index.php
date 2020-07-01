@@ -778,7 +778,9 @@ if ($splayer_tal == 2) {
 
 if ($teamlogo == $draft_team && $player_drafted == 0){
 	echo "<tr bgcolor = $bgcolor><td><input type='radio' name='player' value='$player_name'><td>$player_pos</td><td nowrap>";
-}else{
+} elseif ($player_drafted == 1) {
+	echo "<tr style=\"color: #BBBBBB\"><td><td>$player_pos</td><td nowrap>";
+} else {
 	echo "<tr bgcolor = $bgcolor><td><td>$player_pos</td><td nowrap>";
 }
 

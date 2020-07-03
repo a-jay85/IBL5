@@ -103,8 +103,14 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 		$player_name = $row8[name];
 		$player_pid = $row8[pid];
 		$contract_year = $row8[cy];
+		if (getCurrentSeasonPhase() == "Draft") {
+			$contract_year++;
+		}
 		$bird_years = $row8[bird];
 		$player_contract = $row8["cy$contract_year"];
+		if ($contract_year == 7) {
+			$player_contract = 0;
+		}
 
 		//ARRAY TO BUILD FUTURE SALARY
 		$i = $contract_year;
@@ -125,8 +131,13 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 			<input type=\"hidden\" name=\"type$k\" value=\"1\">";
 		if ($bird_years > -1) {
 			echo "<tr>
-				<td align=\"center\">
-					<input type=\"checkbox\" name=\"check$k\">
+				<td align=\"center\">";
+			if ($player_contract != 0) {
+				echo "<input type=\"checkbox\" name=\"check$k\">";
+			} else {
+				echo "<input type=\"hidden\" name=\"check$k\">";
+			}
+			echo "
 				</td>
 				<td>
 					$player_pos
@@ -244,8 +255,14 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 		$player_name = $row9[name];
 		$player_pid = $row9[pid];
 		$contract_year = $row9[cy];
+		if (getCurrentSeasonPhase() == "Draft") {
+			$contract_year++;
+		}
 		$bird_years = $row9[bird];
 		$player_contract = $row9["cy$contract_year"];
+		if ($contract_year == 7) {
+			$player_contract = 0;
+		}
 
 		//ARRAY TO BUILD FUTURE SALARY
 		$i = $contract_year;
@@ -268,8 +285,13 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 			<input type=\"hidden\" name=\"type$k\" value=\"1\">";
 		if ($bird_years > -1) {
 			echo "<tr>
-				<td align=center>
-					<input type=\"checkbox\" name=\"check$k\">
+				<td align=center>";
+			if ($player_contract != 0) {
+				echo "<input type=\"checkbox\" name=\"check$k\">";
+			} else {
+				echo "<input type=\"hidden\" name=\"check$k\">";
+			}
+			echo "
 				</td>
 				<td>
 					$player_pos

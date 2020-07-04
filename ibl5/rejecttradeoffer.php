@@ -12,7 +12,7 @@ $resultclear=mysql_query($queryclear);
 ?>
 
 <HTML><HEAD><TITLE>Trade Offer Processing</TITLE>
-<meta http-equiv="refresh" content="0;url=modules.php?name=Team&op=reviewtrades">
+<meta http-equiv="refresh" content="0;url=modules.php?name=Trading&op=reviewtrade">
 </HEAD><BODY>
 Trade Offer Rejected.  Redirecting you to trade review page...
 </BODY></HTML>

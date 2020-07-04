@@ -656,6 +656,22 @@ if (mysql_query($resetExtensionQueryString)) {
 	echo '<p>Contract Extension usages have been reset.<p>';
 } else die('Invalid query: ' . mysql_error());
 
+if (getCurrentSeasonPhase() == "Playoffs") {
+	echo '<p>Re-applying postseason trades made during the playoffs...</p>';
+
+	$postseasonTradeQueueQuery = "SELECT * FROM ibl_trade_queue;";
+	$postseasonTradeQueueResult = mysql_query($postseasonTradeQueueQuery);
+	$i = 0;
+	while ($i < mysql_num_rows($postseasonTradeQueueResult)) {
+		$queuedTradeQuery = mysql_result($postseasonTradeQueueResult, $i);
+		if (mysql_query($queuedTradeQuery)) {
+			echo $queuedTradeQuery . "<br>\n";
+		}
+		$i++;
+	}
+	echo '<p>Postseason trades have been re-applied!';
+}
+
 echo '<p>All the things have been updated!<p>';
 
 echo '<a href="index.php">Return to the IBL homepage</a>';

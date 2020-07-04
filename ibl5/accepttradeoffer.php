@@ -5,6 +5,7 @@ mysql_connect($dbhost,$dbuname,$dbpass);
 @mysql_select_db($dbname) or die("Unable to select database");
 
 require $_SERVER['DOCUMENT_ROOT'] . '/discordWebhooks.php';
+include_once 'sharedFunctions.php';
 
 $offer_id = $_POST['offer'];
 
@@ -41,6 +42,11 @@ while ($i < $num0) {
 
 		$queryi = 'UPDATE nuke_iblplyr SET `teamname` = "' . $to . '", `tid` = ' . $tid . ' WHERE `pid` = ' . $itemid . ' LIMIT 1;';
 		$resulti = mysql_query($queryi);
+	}
+
+	if (getCurrentSeasonPhase() == "Playoffs") {
+		$queryInsert = "INSERT INTO ibl_trade_queue (query) VALUES ('$queryi');";
+		mysql_query("$queryInsert");
 	}
 
 	$i++;

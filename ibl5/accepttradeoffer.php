@@ -68,7 +68,9 @@ VALUES      ('2',
              'Associated Press',
              '0',
              'english') ";
-$resultstor = mysql_query($querystor);
+if ($_SERVER['SERVER_NAME'] != "localhost") { // This prevents email and Discord notifs from going out while testing locally.
+	$resultstor = mysql_query($querystor);
+}
 
 if (isset($resultstor)) {
 	$recipient = 'ibldepthcharts@gmail.com';

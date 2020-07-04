@@ -114,6 +114,6 @@ if ($error == 0)
 	  }
 	$k++;
 	}
-	echo "Trade Offer Entered Into Database. Go back <a href='modules.php?name=Team&op=reviewtrade'>Trade Review Page</a>";
+	echo "Trade Offer Entered Into Database. Go back <a href='modules.php?name=Trading&op=reviewtrade'>Trade Review Page</a>";
 }
 ?>

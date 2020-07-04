@@ -4,6 +4,8 @@ require 'config.php';
 mysql_connect($dbhost,$dbuname,$dbpass);
 @mysql_select_db($dbname) or die("Unable to select database");
 
+require $_SERVER['DOCUMENT_ROOT'] . '/discordWebhooks.php';
+
 $Team_Name = $_POST['teamname'];
 $Player_Name = $_POST['playername'];
 if (is_null($_POST['rookie_cy3'])) {
@@ -30,6 +32,8 @@ echo "<html><head><title>Rookie Option Page</title></head><body>
 
 Your rookie option has been updated in the database and should show on the Free Agency page immediately.  Please <a href=\"modules.php?name=Free_Agency\">click here to return to the Free Agency Screen</a>.<br><br>
 ";
+
+postToDiscordChannel('#rookie-options', $filetext);
 
 if (mail($recipient, $emailsubject, $filetext, "From: rookieoption@iblhoops.net"))
 {

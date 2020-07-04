@@ -1514,7 +1514,7 @@ function rookieoption($pid) {
 
 			echo "<img align=left src=\"images/player/$pid.jpg\">";
 
-			echo "You may exercise the rookie extension option on $player_pos $player_name.  His contract amount in his fourth year will be $rookie_cy4.  However, by exercising this option, you will not be allowed to use a regular contract extension during the final season of his contract, thereby guaranteeing that he will become a free agent after that fourth year.<form name=\"RookieExtend\" method=\"post\" action=\"../rookieoption.php\">
+			echo "You may exercise the rookie extension option on $player_pos $player_name.  His contract amount in his fourth year will be $rookie_cy4.  However, by exercising this option, you will not be allowed to use a regular contract extension during the final season of his contract, thereby guaranteeing that he will become a free agent after that fourth year.<form name=\"RookieExtend\" method=\"post\" action=\"rookieoption.php\">
 			<input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
 			<input type=\"hidden\" name=\"playername\" value=\"$player_name\">
 			<input type=\"hidden\" name=\"rookie_cy4\" value=\"$rookie_cy4\">
@@ -1528,7 +1528,7 @@ function rookieoption($pid) {
 
 				echo "<img align=left src=\"images/player/$pid.jpg\">";
 
-				echo "You may exercise the rookie extension option on $player_pos $player_name.  His contract amount in his third year will be $rookie_cy3.  However, by exercising this option, you will not be allowed to use a regular contract extension during the final season of his contract, thereby guaranteeing that he will become a free agent after that third year.<form name=\"RookieExtend\" method=\"post\" action=\"../rookieoption.php\">
+				echo "You may exercise the rookie extension option on $player_pos $player_name.  His contract amount in his third year will be $rookie_cy3.  However, by exercising this option, you will not be allowed to use a regular contract extension during the final season of his contract, thereby guaranteeing that he will become a free agent after that third year.<form name=\"RookieExtend\" method=\"post\" action=\"rookieoption.php\">
 				<input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
 				<input type=\"hidden\" name=\"playername\" value=\"$player_name\">
 				<input type=\"hidden\" name=\"rookie_cy3\" value=\"$rookie_cy3\">

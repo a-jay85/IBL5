@@ -27,7 +27,7 @@ while ($i < $num0) {
 		$resultj = mysql_query($queryj);
 		$storytext = $storytext . "The $from send the " . mysql_result($resultj, 0, "year") . " " . mysql_result($resultj, 0, "teampick") . " Round " . mysql_result($resultj, 0, "round") . " draft pick to the $to.<br>";
 
-		$queryi = "UPDATE ibl_draft_picks SET `ownerofpick` = '$to' WHERE `pickid` = '$itemid' LIMIT 1";
+		$queryi = 'UPDATE ibl_draft_picks SET `ownerofpick` = "' . $to . '" WHERE `pickid` = ' . $itemid . ' LIMIT 1;';
 		$resulti = mysql_query($queryi);
 	} else {
 		$queryj = "SELECT * FROM nuke_ibl_team_info WHERE team_name = '$to'";
@@ -39,7 +39,7 @@ while ($i < $num0) {
 
 		$storytext = $storytext . "The $from send " . mysql_result($resultk, 0, "pos") . " " . mysql_result($resultk, 0, "name") . " to the $to.<br>";
 
-		$queryi = "UPDATE nuke_iblplyr SET `teamname` = '$to', `tid` = '$tid' WHERE `pid` = '$itemid' LIMIT 1";
+		$queryi = 'UPDATE nuke_iblplyr SET `teamname` = "' . $to . '", `tid` = ' . $tid . ' WHERE `pid` = ' . $itemid . ' LIMIT 1;';
 		$resulti = mysql_query($queryi);
 	}
 

@@ -252,23 +252,22 @@ function display($nullset) {
 				$contract1 = $millionscy6;
 			}
 
-			// ==== NOTE EXTENSION OFFER FOR ROOKIES FINISHING THEIR SECOND YEAR OF SERVICE
-
-			$rookieextensioneligible=0;
-			if ($draftround == 1 && $exp == 2 && $millionscy4 == 0) $rookieextensioneligible = 1;
-
-			// --- 2nd Round Rookie Options (AJN) ---
-			if ($draftround == 2 && $exp == 1 && $millionscy3 == 0) $rookieextensioneligible = 1;
-
-			// ==== CHECK FOR ROOKIE MIGRATION POSSIBILITY
-			$rookiemigration = 0;
-			if ($exp == 0) $rookiemigration = 1;
-
 			echo "      <tr><td>";
 
-			if ($rookieextensioneligible == 1) echo "<a href=\"modules.php?name=Free_Agency&pa=rookieoption&pid=$pid\">Rookie Option</a>";
-			if ($rookiemigration == 1) echo "<a href=\"modules.php?name=Free_Agency&pa=positionmigration&pid=$pid\">Migrate Position</a>";
-			if ($ordinal > 960) $name=$name."*";
+			// ==== ROOKIE OPTIONS
+			if (($draftround == 1 && $exp == 2 && $millionscy4 == 0) OR
+				($draftround == 2 && $exp == 1 && $millionscy3 == 0)) {
+				echo "<a href=\"modules.php?name=Free_Agency&pa=rookieoption&pid=$pid\">Rookie Option</a>";
+			}
+
+			// ==== CHECK FOR ROOKIE POSITION MIGRATION POSSIBILITY
+			if ($exp == 0) {
+				echo "<a href=\"modules.php?name=Free_Agency&pa=positionmigration&pid=$pid\">Migrate Position</a>";
+			}
+
+			if ($ordinal > 960) {
+				$name=$name."*";
+			}
 
 			echo "</td><td>$pos</td><td><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td><a href=\"modules.php?name=Team&op=team&tid=$tid\">$team</a></td><td>$age</td><td>$r_sta</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$contract1</td><td>$contract2</td><td>$contract3</td><td>$contract4</td><td>$contract5</td><td>$contract6</td></tr>";
 
@@ -280,7 +279,7 @@ function display($nullset) {
 			$conttot6=$conttot6+$contract6;
 
 			$rosterspots--;
-		} else {}
+		}
 	}
 
 	echo "<tr><td colspan=26 align=right><b><i>$userteam Total Committed Contracts</i></b></td><td><b><i>$conttot1</i></b></td><td><b><i>$conttot2</i></b></td><td><b><i>$conttot3</i></b></td><td><b><i>$conttot4</i></b></td><td><b><i>$conttot5</i></b></td><td><b><i>$conttot6</i></b></td></tr>";

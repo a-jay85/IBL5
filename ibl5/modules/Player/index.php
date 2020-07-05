@@ -1074,8 +1074,9 @@ if (($player_exp == 4 AND $player_draft_round == 1 AND 2 * $salaryIn3rdYearOfCur
 		$can_renegotiate = 0;
 }
 
-if ((($player_draft_round == 1 && $player_exp == 2) OR ($player_draft_round == 2 && $player_exp == 1)) AND getCurrentSeasonPhase() == "Free Agency") {
-    echo "<table align=right bgcolor=#ffbb00><tr><td align=center><a href=\"modules.php?name=Free_Agency&pa=rookieoption&pid=$pid\">ROOKIE<BR>OPTION</a></td></tr></table>";
+if ((($player_draft_round == 1 && $player_exp == 2) OR ($player_draft_round == 2 && $player_exp == 1)) AND
+    getCurrentSeasonPhase() == "Free Agency") {
+        echo "<table align=right bgcolor=#ffbb00><tr><td align=center><a href=\"modules.php?name=Free_Agency&pa=rookieoption&pid=$pid\">ROOKIE<BR>OPTION</a></td></tr></table>";
 }
 
 $queryHasUsedExtensionThisSeason = "SELECT Used_Extension_This_Season
@@ -1083,32 +1084,19 @@ $queryHasUsedExtensionThisSeason = "SELECT Used_Extension_This_Season
     WHERE team_name = '" . $userinfo['user_ibl_team'] . "';";
 $hasUsedExtensionThisSeason = mysql_result(mysql_query($queryHasUsedExtensionThisSeason), 0);
 
-if ($hasUsedExtensionThisSeason == 0) {
-    if ($can_renegotiate == 1) {
-        if ($player_team_name == $userteam) {
-            echo "<table align=right bgcolor=#ff0000><tr><td align=center><a href=\"modules.php?name=Player&pa=negotiate&pid=$pid\">RENEGOTIATE<BR>CONTRACT</a></td></tr></table>";
-        }
-    }
+if ($hasUsedExtensionThisSeason == 0 AND
+    $can_renegotiate == 1 AND
+    $player_team_name == $userteam) {
+        echo "<table align=right bgcolor=#ff0000><tr><td align=center><a href=\"modules.php?name=Player&pa=negotiate&pid=$pid\">RENEGOTIATE<BR>CONTRACT</a></td></tr></table>";
 }
 
 // RENEGOTIATION BUTTON END
 
 // POSITION CHANGE BUTTON START
 
-cookiedecode($user);
-
-$sql2 = "SELECT * FROM ".$prefix."_users WHERE username='$cookie[1]'";
-$result2 = $db->sql_query($sql2);
-$num2 = $db->sql_numrows($result2);
-$userinfo = $db->sql_fetchrow($result2);
-
 $userteam = stripslashes(check_html($userinfo['user_ibl_team'], "nohtml"));
-if ($can_renegotiate >= 0) {
-  if ($player_team_name == $userteam) {
-echo "<table align=right bgcolor=#ffff00><tr><td align=center><a href=\"modules.php?name=Position_Change&pid=$pid\">CHANGE<BR>POSITION</a></td></tr></table>";
-  } else {
-  }
-} else {
+if ($can_renegotiate >= 0 AND $player_team_name == $userteam) {
+    echo "<table align=right bgcolor=#ffff00><tr><td align=center><a href=\"modules.php?name=Position_Change&pid=$pid\">CHANGE<BR>POSITION</a></td></tr></table>";
 }
 
 // POSITION CHANGE BUTTON END

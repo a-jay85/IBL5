@@ -8,23 +8,18 @@ require $_SERVER['DOCUMENT_ROOT'] . '/discordWebhooks.php';
 
 $Team_Name = $_POST['teamname'];
 $Player_Name = $_POST['playername'];
-if (is_null($_POST['rookie_cy3'])) {
-	$ExtensionAmount = $_POST['rookie_cy4'];
-	$rookieOptionYear = 4;
-} else {
-	$ExtensionAmount = $_POST['rookie_cy3'];
-	$rookieOptionYear = 3;
-}
+$ExtensionAmount = $_POST['rookieOptionValue'];
+$Player_Exp = $_POST['player_exp'];
 
 $recipient = 'ibldepthcharts@gmail.com';
 $emailsubject = "Rookie Extension Option - ".$Player_Name;
-$filetext = $Team_Name . " exercise the rookie extension option on " . $Player_Name . " in the amount of " . $ExtensionAmount . " in year " . $rookieOptionYear . ".";
+$filetext = $Team_Name . " exercise the rookie extension option on " . $Player_Name . " in the amount of " . $ExtensionAmount . ".";
 
-if (is_null($_POST['rookie_cy3'])) {
+if ($Player_Exp == 2) {
 	$queryrookieoption="UPDATE nuke_iblplyr SET cy4 = '$ExtensionAmount' WHERE name = '$Player_Name'";
-} else {
+} elseif ($Player_Exp == 1) {
 	$queryrookieoption="UPDATE nuke_iblplyr SET cy3 = '$ExtensionAmount' WHERE name = '$Player_Name'";
-}
+} else die("This player's experience doesn't match their rookie status; please let the commish know about this error.");
 
 $resultrookieoption = mysql_query($queryrookieoption);
 

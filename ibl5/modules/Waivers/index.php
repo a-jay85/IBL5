@@ -20,6 +20,7 @@ require_once("mainfile.php");
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
+require $_SERVER['DOCUMENT_ROOT'] . '/sharedFunctions.php';
 require $_SERVER['DOCUMENT_ROOT'] . '/discordWebhooks.php';
 
 $pagetitle = "- Team Pages";
@@ -49,11 +50,7 @@ function waivers($user)
         }
         include("footer.php");
     } elseif (is_user($user)) {
-        $query = "SELECT * FROM nuke_ibl_settings WHERE name = 'Allow Waiver Moves'";
-        $result = mysql_query($query);
-        $allow_waivers = mysql_result($result, 0, "value");
-
-        if ($allow_waivers == 'Yes') {
+        if (getCurrentSeasonPhase() != "Free Agency") {
             global $cookie;
             cookiedecode($user);
             waiverexecute($cookie[1], $action);

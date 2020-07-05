@@ -1073,7 +1073,8 @@ if (($player_exp == 4 AND $player_draft_round == 1 AND 2 * $salaryIn3rdYearOfCur
 		$can_renegotiate = 0;
 }
 
-if ((($player_draft_round == 1 && $player_exp == 2) OR ($player_draft_round == 2 && $player_exp == 1)) AND
+if ((($player_draft_round == 1 && $player_exp == 2 && $salaryIn4thYearOfCurrentContract == 0) OR
+    ($player_draft_round == 2 && $player_exp == 1 && $salaryIn3rdYearOfCurrentContract == 0)) AND
     getCurrentSeasonPhase() == "Free Agency") {
         echo "<table align=right bgcolor=#ffbb00><tr><td align=center><a href=\"modules.php?name=Free_Agency&pa=rookieoption&pid=$pid\">ROOKIE<BR>OPTION</a></td></tr></table>";
 }

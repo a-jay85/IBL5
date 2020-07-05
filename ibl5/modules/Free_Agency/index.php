@@ -1506,38 +1506,30 @@ function rookieoption($pid) {
 	$player_team_name = stripslashes(check_html($playerinfo['teamname'], "nohtml"));
 	$player_draftround = stripslashes(check_html($playerinfo['draftround'], "nohtml"));
 	$player_exp = stripslashes(check_html($playerinfo['exp'], "nohtml"));
-	$player_cy3 = stripslashes(check_html($playerinfo['cy3'], "nohtml"));
 
-	if ($player_exp == 2) {
-		if ($player_draftround == 1) {
-			$rookie_cy4 = 2*$player_cy3;
-
-			echo "<img align=left src=\"images/player/$pid.jpg\">";
-
-			echo "You may exercise the rookie extension option on $player_pos $player_name.  His contract amount in his fourth year will be $rookie_cy4.  However, by exercising this option, you will not be allowed to use a regular contract extension during the final season of his contract, thereby guaranteeing that he will become a free agent after that fourth year.<form name=\"RookieExtend\" method=\"post\" action=\"rookieoption.php\">
-			<input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
-			<input type=\"hidden\" name=\"playername\" value=\"$player_name\">
-			<input type=\"hidden\" name=\"rookie_cy4\" value=\"$rookie_cy4\">
-			<input type=\"submit\" value=\"Activate Rookie Extension\"></form>";
-		}
+	if ($player_exp == 2 AND $player_draftround == 1) {
+		$finalYearOfRookieContract = stripslashes(check_html($playerinfo['cy3'], "nohtml"));
+	} elseif ($player_exp == 1 AND $player_draftround == 2) {
+		$finalYearOfRookieContract = stripslashes(check_html($playerinfo['cy2'], "nohtml"));
 	} else {
-		// --- 2nd Round Rookie Options (AJN) ---
-		if ($player_exp == 1) {
-			if ($player_draftround == 2) {
-				$rookie_cy3 = 102;
-
-				echo "<img align=left src=\"images/player/$pid.jpg\">";
-
-				echo "You may exercise the rookie extension option on $player_pos $player_name.  His contract amount in his third year will be $rookie_cy3.  However, by exercising this option, you will not be allowed to use a regular contract extension during the final season of his contract, thereby guaranteeing that he will become a free agent after that third year.<form name=\"RookieExtend\" method=\"post\" action=\"rookieoption.php\">
-				<input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
-				<input type=\"hidden\" name=\"playername\" value=\"$player_name\">
-				<input type=\"hidden\" name=\"rookie_cy3\" value=\"$rookie_cy3\">
-				<input type=\"submit\" value=\"Activate Rookie Extension\"></form>";
-			}
-		} else {
-			echo "Sorry, $player_pos $player_name is not eligible for a rookie extension.  Only first-round draft picks are eligible for rookie extensions and only just prior to their third year of service.";
-		}
+		echo "Sorry, $player_pos $player_name is not eligible for a rookie extension. Only draft picks are eligible for rookie extensions and only just prior to the last year of their rookie contract.";
 	}
+
+	$rookieOptionValue = 2 * $finalYearOfRookieContract;
+
+	echo "<img align=left src=\"images/player/$pid.jpg\">
+
+	You may exercise the rookie extension option on <b>$player_pos $player_name</b>.<br>
+	His contract value the season after this one will be <b>$rookieOptionValue</b>.<br>
+	However, by exercising this option, <b>you can't use an in-season contract extension on them next season</b>.<br>
+	<b>They will become a free agent</b>.<br>
+
+	<form name=\"RookieExtend\" method=\"post\" action=\"rookieoption.php\">
+	<input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+	<input type=\"hidden\" name=\"playername\" value=\"$player_name\">
+	<input type=\"hidden\" name=\"rookieOptionValue\" value=\"$rookieOptionValue\">
+	<input type=\"hidden\" name=\"player_exp\" value=\"$player_exp\">
+	<input type=\"submit\" value=\"Activate Rookie Extension\"></form>";
 }
 // === END OF NEGOTIATE FUNCTION ===
 

@@ -180,7 +180,7 @@ if ($nooffer == 0) {
     //$modfactor5 = (.01*($Offer_Years)-0.025)*($player_security-1);
     $modfactor6 = -(.0025 * $tf_millions / 100 - 0.025) * ($player_playingtime - 1);
 
-    $modifier = 1 + $modfactor5 + $modfactor1 + $modfacto2 + $modfactor4 + modfactor6;
+    $modifier = 1 + $modfactor1 + $modfactor2 + $modfactor4 + $modfactor5 + $modfactor6;
 
     @$Offer_Value = $Offer_Total / $Offer_Years;
 

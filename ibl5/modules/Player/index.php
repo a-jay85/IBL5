@@ -1068,16 +1068,10 @@ $num2 = $db->sql_numrows($result2);
 $userinfo = $db->sql_fetchrow($result2);
 
 $userteam = stripslashes(check_html($userinfo['user_ibl_team'], "nohtml"));
-if ($player_exp == 4)
-{
-  if ($player_draft_round == 1)
-  {
-    if (2*$salaryIn3rdYearOfCurrentContract == $salaryIn4thYearOfCurrentContract and $salaryIn4thYearOfCurrentContract <> 0)
-    {
+if (($player_exp == 4 AND $player_draft_round == 1 AND 2 * $salaryIn3rdYearOfCurrentContract == $salaryIn4thYearOfCurrentContract AND $salaryIn4thYearOfCurrentContract <> 0) OR
+    ($player_exp == 3 AND $player_draft_round == 2 AND 2 * $salaryIn2ndYearOfCurrentContract == $salaryIn3rdYearOfCurrentContract AND $salaryIn3rdYearOfCurrentContract <> 0)) {
 		echo "<table align=right bgcolor=#ff0000><tr><td align=center>ROOKIE OPTION<br>USED; RENEGOTIATION<br>IMPOSSIBLE</td></tr></table>";
 		$can_renegotiate = 0;
-    }
-  }
 }
 
 $queryHasUsedExtensionThisSeason = "SELECT Used_Extension_This_Season

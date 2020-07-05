@@ -1049,9 +1049,8 @@ $contract_display = "not under contract";
 	echo "<table><tr><td valign=top>
 <font class=\"title\">$player_pos $player_name ";
 
-if ($player_nickname != NULL)
-{
-echo "- Nickname: \"$player_nickname\" ";
+if ($player_nickname != NULL) {
+    echo "- Nickname: \"$player_nickname\" ";
 }
 
 echo "(<a href=\"modules.php?name=Team&op=team&tid=$player_team_id\">$player_team_name</a>)</font><hr>
@@ -1421,11 +1420,10 @@ echo " <tr><td valign=top>
     $hist_pf = stripslashes(check_html($row44['pf'], "nohtml"));
     $hist_pts = $hist_fgm+$hist_fgm+$hist_ftm+$hist_tgm;
 
-if ($hist_year % 2)
-{
-echo "      <tr align=center>";
+if ($hist_year % 2) {
+    echo "      <tr align=center>";
 } else {
-echo "      <tr align=center>";
+    echo "      <tr align=center>";
 }
 echo "      <td><center>$hist_year</center></td><td><center><a href=\"modules.php?name=Team&op=team&tid=$hist_tid&yr=$hist_year\">$hist_team</a></center></td><td><center>$hist_gm</center></td><td><center>$hist_min</center></td><td><center>$hist_fgm-$hist_fga</center></td><td><center>$hist_ftm-$hist_fta</center></td><td><center>$hist_tgm-$hist_tga</center></td><td><center>$hist_orb</center></td><td><center>$hist_reb</center></td><td><center>$hist_ast</center></td><td><center>$hist_stl</center></td><td><center>$hist_tvr</center></td><td><center>$hist_blk</center></td><td><center>$hist_pf</center></td><td><center>$hist_pts</td></tr>
 ";
@@ -1451,17 +1449,14 @@ $car_pts=$car_pts+$hist_pts;
 
 // CURRENT YEAR TOTALS
 
-if ($player_retired > 0)
-{
+if ($player_retired > 0) {
 } else {
-
-if ($year % 2)
-{
-echo "      <tr align=center>";
-} else {
-echo "      <tr align=center>";
-}
-echo "      <td><center>$year</center></td><td><center>$player_team_name</center></td><td><center>$stats_gm</center></td><td><center>$stats_min</center></td><td><center>$stats_fgm-$stats_fga</center></td><td><center>$stats_ftm-$stats_fta</center></td><td><center>$stats_tgm-$stats_tga</center></td><td><center>$stats_orb</center></td><td><center>$stats_reb</center></td><td><center>$stats_ast</center></td><td><center>$stats_stl</center></td><td><center>$stats_to</center></td><td><center>$stats_blk</center></td><td><center>$stats_pf</center></td><td><center>$stats_pts</td></tr>
+    if ($year % 2) {
+        echo "      <tr align=center>";
+    } else {
+        echo "      <tr align=center>";
+    }
+    echo "      <td><center>$year</center></td><td><center>$player_team_name</center></td><td><center>$stats_gm</center></td><td><center>$stats_min</center></td><td><center>$stats_fgm-$stats_fga</center></td><td><center>$stats_ftm-$stats_fta</center></td><td><center>$stats_tgm-$stats_tga</center></td><td><center>$stats_orb</center></td><td><center>$stats_reb</center></td><td><center>$stats_ast</center></td><td><center>$stats_stl</center></td><td><center>$stats_to</center></td><td><center>$stats_blk</center></td><td><center>$stats_pf</center></td><td><center>$stats_pts</td></tr>
 ";
 }
 $car_gm=$car_gm+$stats_gm;
@@ -2263,13 +2258,12 @@ $worlds_header_done_yet=1;
     $world_pf = stripslashes(check_html($row45['pf'], "nohtml"));
 $world_pts=$world_fgm+$world_fgm+$world_ftm+$world_tgm;
 
-if ($world_color == 1)
-{
-echo "      <tr align=center>";
-$world_color=0;
+if ($world_color == 1) {
+    echo "      <tr align=center>";
+    $world_color=0;
 } else {
-echo "      <tr align=center>";
-$world_color=1;
+    echo "      <tr align=center>";
+    $world_color=1;
 }
 echo "      <td><center>$world_year</center></td><td><center>$world_gm</center></td><td><center>$world_min</center></td><td><center>$world_fgm - $world_fga</center></td><td><center>$world_ftm - $world_fta</center></td><td><center>$world_tgm - $world_tga</center></td><td><center>$world_orb</center></td><td><center>$world_reb</center></td><td><center>$world_ast</center></td><td><center>$world_stl</center></td><td><center>$world_tvr</center></td><td><center>$world_blk</center></td><td><center>$world_pf</center></td><td><center>$world_pts</td></tr>
 ";
@@ -2293,9 +2287,8 @@ $cw_pts=$cw_pts+$world_pts;
 
 }
 
-if ($worlds_header_done_yet == 1)
-{
-echo "      <tr ><td>Career Totals</td><td><center>$cw_gm</center></td><td><center>$cw_min</center></td><td><center>$cw_fgm - $cw_fga</center></td><td><center>$cw_ftm - $cw_fta</center></td><td><center>$cw_tgm - $cw_tga</center></td><td><center>$cw_orb</center></td><td><center>$cw_reb</center></td><td><center>$cw_ast</center></td><td><center>$cw_stl</center></td><td><center>$cw_tvr</center></td><td><center>$cw_blk</center></td><td><center>$cw_pf</center></td><td><center>$cw_pts</td></tr></table>
+if ($worlds_header_done_yet == 1) {
+    echo "      <tr ><td>Career Totals</td><td><center>$cw_gm</center></td><td><center>$cw_min</center></td><td><center>$cw_fgm - $cw_fga</center></td><td><center>$cw_ftm - $cw_fta</center></td><td><center>$cw_tgm - $cw_tga</center></td><td><center>$cw_orb</center></td><td><center>$cw_reb</center></td><td><center>$cw_ast</center></td><td><center>$cw_stl</center></td><td><center>$cw_tvr</center></td><td><center>$cw_blk</center></td><td><center>$cw_pf</center></td><td><center>$cw_pts</td></tr></table>
 ";
 }
 
@@ -2347,13 +2340,12 @@ $totalsalary=0;
 
 $totalsalary=$totalsalary+$salary;
 
-if ($rowcolor == 0)
-{
-echo "      <tr align=center>";
-$rowcolor=1;
+if ($rowcolor == 0) {
+    echo "      <tr align=center>";
+    $rowcolor=1;
 } else {
-echo "      <tr align=center>";
-$rowcolor=0;
+    echo "      <tr align=center>";
+    $rowcolor=0;
 }
 echo "      <td><center>$r_year</center></td><td><center>$r_2ga</center></td><td><center>$r_2gp</center></td><td><center>$r_fta</center></td><td><center>$r_ftp</center></td><td><center>$r_3ga</center></td><td><center>$r_3gp</center></td><td><center>$r_orb</center></td><td><center>$r_drb</center></td><td><center>$r_ast</center></td><td><center>$r_stl</center></td><td><center>$r_blk</center></td><td><center>$r_tvr</center></td><td><center>$r_oo</center></td><td><center>$r_do</center></td><td><center>$r_po</center></td><td><center>$r_to</center></td><td><center>$r_od</center></td><td><center>$r_dd</center></td><td><center>$r_pd</center></td><td><center>$r_td</center></td><td><center>$r_Off</center></td><td><center>$r_Def</center></td><td><center>$salary</center></td></tr>
 ";
@@ -2379,7 +2371,7 @@ if ($spec == 1) {
     $awardsresult = $db->sql_query($awardsquery);
     $awardswon = $db->sql_numrows($awardsquery);
 
-echo "<table border=1 cellspacing=0 cellpadding=0 valign=top><tr><td bgcolor=#0000cc align=center><b><font color=#ffffff>AWARDS</font></b></td></tr>";
+    echo "<table border=1 cellspacing=0 cellpadding=0 valign=top><tr><td bgcolor=#0000cc align=center><b><font color=#ffffff>AWARDS</font></b></td></tr>";
 
     while ($awardsrow = $db->sql_fetchrow($awardsquery)) {
 
@@ -2434,21 +2426,20 @@ $i=0;
 
 echo "<small>";
 
-while ($i < $num)
-{
-$gameid=mysql_result($result,$i,"gameid");
-$winner=mysql_result($result,$i,"winner");
-$loser=mysql_result($result,$i,"loser");
-$winscore=mysql_result($result,$i,"winscore");
-$lossscore=mysql_result($result,$i,"lossscore");
+while ($i < $num) {
+    $gameid=mysql_result($result,$i,"gameid");
+    $winner=mysql_result($result,$i,"winner");
+    $loser=mysql_result($result,$i,"loser");
+    $winscore=mysql_result($result,$i,"winscore");
+    $lossscore=mysql_result($result,$i,"lossscore");
 
-echo "
+    echo "
 * def. $loser, $winscore-$lossscore (# $gameid)<br>
 ";
 
-$wins++;
+    $wins++;
 
-$i++;
+    $i++;
 }
 
 $query="SELECT * FROM nuke_one_on_one WHERE loser = '$player2' ORDER BY gameid ASC";
@@ -2456,21 +2447,20 @@ $result=mysql_query($query);
 $num=mysql_numrows($result);
 $i=0;
 
-while ($i < $num)
-{
-$gameid=mysql_result($result,$i,"gameid");
-$winner=mysql_result($result,$i,"winner");
-$loser=mysql_result($result,$i,"loser");
-$winscore=mysql_result($result,$i,"winscore");
-$lossscore=mysql_result($result,$i,"lossscore");
+while ($i < $num) {
+    $gameid=mysql_result($result,$i,"gameid");
+    $winner=mysql_result($result,$i,"winner");
+    $loser=mysql_result($result,$i,"loser");
+    $winscore=mysql_result($result,$i,"winscore");
+    $lossscore=mysql_result($result,$i,"lossscore");
 
-echo "
+    echo "
 * lost to $winner, $lossscore-$winscore (# $gameid)<br>
 ";
 
-$losses++;
+    $losses++;
 
-$i++;
+    $i++;
 }
 
 echo "<b><center>Record: $wins - $losses</center></b></small><br>";

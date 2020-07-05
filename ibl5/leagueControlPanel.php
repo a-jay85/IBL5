@@ -14,24 +14,31 @@ echo "
 echo "<FORM action=\"leagueControlPanel.php\" method=\"POST\">
     <INPUT type='submit' name='query' value='Reset All Contract Extensions'><p>
     <INPUT type='submit' name='query' value='Reset All MLEs/LLEs'><p>
+    <INPUT type='submit' name='query' value='Set all undefined player positions'><p>
 </FORM>\n";
 
 if (isset($_POST['query'])) {
     switch ($_POST[query]) {
         case 'Reset All Contract Extensions':
             $queryString = "UPDATE nuke_ibl_team_info SET Used_Extension_This_Season = 0;";
-            $logText = "All teams' contract extensions have been reset.";
+            $successText = "All teams' contract extensions have been reset.";
             break;
         case 'Reset All MLEs/LLEs':
             $queryString = "UPDATE nuke_ibl_team_info SET HasMLE = 1, HasLLE = 1;";
-            $logText = "All teams' MLEs and LLEs have been reset.";
+            $successText = "All teams' MLEs and LLEs have been reset.";
+            break;
+        case 'Set all undefined player positions':
+            $queryString = "UPDATE nuke_iblplyr SET altpos = pos WHERE altpos = \"\"";
+            $successText = "All undefined player positions have been set.";
             break;
     }
 
     if (mysql_query($queryString)) {
         echo $queryString . "\n";
         echo "<p>\n";
-        echo "<b>" . $logText . "</b>";
+        echo "<b>" . $successText . "</b>";
+    } else {
+        echo "Oops, something went wrong. Let A-Jay know what you were trying to do and he'll look into it.";
     };
 }
 

@@ -255,10 +255,10 @@ function display($nullset) {
 			// ==== NOTE EXTENSION OFFER FOR ROOKIES FINISHING THEIR SECOND YEAR OF SERVICE
 
 			$rookieextensioneligible=0;
-			if ($draftround == 1 && $exp == 2) $rookieextensioneligible=1;
+			if ($draftround == 1 && $exp == 2 && $millionscy4 == 0) $rookieextensioneligible = 1;
 
 			// --- 2nd Round Rookie Options (AJN) ---
-			if ($draftround == 2 && $exp == 1) $rookieextensioneligible=1;
+			if ($draftround == 2 && $exp == 1 && $millionscy3 == 0) $rookieextensioneligible = 1;
 
 			// ==== CHECK FOR ROOKIE MIGRATION POSSIBILITY
 			$rookiemigration = 0;

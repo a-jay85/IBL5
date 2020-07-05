@@ -34,7 +34,7 @@ if (isset($_POST['query'])) {
     }
 
     if (mysql_query($queryString)) {
-        echo $queryString . "\n";
+        echo "<code>" . $queryString . "</code>\n";
         echo "<p>\n";
         echo "<b>" . $successText . "</b>";
     } else {

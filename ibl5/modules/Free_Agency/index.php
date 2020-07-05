@@ -1524,7 +1524,7 @@ function rookieoption($pid) {
 		// --- 2nd Round Rookie Options (AJN) ---
 		if ($player_exp == 1) {
 			if ($player_draftround == 2) {
-				$rookie_cy3 = 120;
+				$rookie_cy3 = 102;
 
 				echo "<img align=left src=\"images/player/$pid.jpg\">";
 

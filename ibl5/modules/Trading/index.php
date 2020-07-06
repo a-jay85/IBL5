@@ -255,6 +255,9 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 		$player_name = $row9[name];
 		$player_pid = $row9[pid];
 		$contract_year = $row9[cy];
+		if ($contract_year == 0) {
+			$contract_year = 1;
+		}
 		if (getCurrentSeasonPhase() == "Draft") {
 			$contract_year++;
 		}

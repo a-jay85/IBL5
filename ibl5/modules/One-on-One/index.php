@@ -16,6 +16,7 @@ if (!defined('MODULE_FILE')) {
 	die ("You can't access this file directly...");
 }
 
+require $_SERVER['DOCUMENT_ROOT'] . '/discordWebhooks.php';
 require_once("mainfile.php");
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
@@ -880,6 +881,11 @@ $playbyplay=$playbyplay."<table border=1><tr><td colspan=11><font color=#ff0000>
 ";
 
 echo "$playbyplay";
+
+$discordText = "**$gamewinner $gamewinscore, $gameloser $gamelossscore**<br>
+*(Game played by $owner, Game #$gameid)*";
+
+postToDiscordChannel('#1v1-games', $discordText);
 
 $querygetgameid="SELECT * FROM nuke_one_on_one";
 $resultgetgameid=mysql_query($querygetgameid);

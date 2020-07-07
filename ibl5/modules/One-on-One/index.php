@@ -909,7 +909,7 @@ echo "GAME ID: $gameid";
 $discordText = "";
 $bang = "";
 if (abs($score1 - $score2) <= 3) {
-	$bang = "BANG! BANG! OH WHAT A SHOT FROM $gamewinner!!!\n";
+	$bang = "__**BANG! BANG! OH WHAT A SHOT FROM $gamewinner!!!**__\n";
 }
 if ($score1 > $score2) {
 	$gamewinner = $p1_name;

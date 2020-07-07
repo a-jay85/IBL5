@@ -910,7 +910,7 @@ $discordText = "";
 $bang = "";
 
 if ($score1 > $score2) {
-	$gamewinner = $p1_name;
+	$gamewinner = strtoupper($p1_name);
 	if (abs($score1 - $score2) <= 3) {
 		$bang = "__**BANG! BANG! OH WHAT A SHOT FROM $gamewinner!!!**__\n";
 	}
@@ -918,7 +918,7 @@ if ($score1 > $score2) {
 	$discordText .= "**$p1_name $score1**, $p2_name $score2
 	*(Game played by $owner, Game #$gameid)*";
 } else {
-	$gamewinner = $p2_name;
+	$gamewinner = strtoupper($p2_name);
 	if (abs($score1 - $score2) <= 3) {
 		$bang = "__**BANG! BANG! OH WHAT A SHOT FROM $gamewinner!!!**__\n";
 	}

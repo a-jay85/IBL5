@@ -908,22 +908,26 @@ echo "GAME ID: $gameid";
 
 $discordText = "";
 $bang = "";
-if (abs($score1 - $score2) <= 3) {
-	$bang = "__**BANG! BANG! OH WHAT A SHOT FROM $gamewinner!!!**__\n";
-}
+
 if ($score1 > $score2) {
 	$gamewinner = $p1_name;
+	if (abs($score1 - $score2) <= 3) {
+		$bang = "__**BANG! BANG! OH WHAT A SHOT FROM $gamewinner!!!**__\n";
+	}
 	$discordText .= $bang;
 	$discordText .= "**$p1_name $score1**, $p2_name $score2
 	*(Game played by $owner, Game #$gameid)*";
 } else {
 	$gamewinner = $p2_name;
+	if (abs($score1 - $score2) <= 3) {
+		$bang = "__**BANG! BANG! OH WHAT A SHOT FROM $gamewinner!!!**__\n";
+	}
 	$discordText .= $bang;
 	$discordText .= "$p1_name $score1, **$p2_name $score2**
 	*(Game played by $owner, Game #$gameid)*";
 }
 
-postToDiscordChannel('#1v1-games', $discordText);
+// postToDiscordChannel('#1v1-games', $discordText);
 }
 
 function printgame ($gameid)

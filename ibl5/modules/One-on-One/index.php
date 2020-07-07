@@ -913,13 +913,13 @@ if (abs($score1 - $score2) <= 3) {
 }
 if ($score1 > $score2) {
 	$gamewinner = $p1_name;
-	$discordText = $discordText . $bang;
-	$discordText = "**$p1_name $score1**, $p2_name $score2
+	$discordText .= $bang;
+	$discordText .= "**$p1_name $score1**, $p2_name $score2
 	*(Game played by $owner, Game #$gameid)*";
 } else {
 	$gamewinner = $p2_name;
-	$discordText = $discordText . $bang;
-	$discordText = "$p1_name $score1, **$p2_name $score2**
+	$discordText .= $bang;
+	$discordText .= "$p1_name $score1, **$p2_name $score2**
 	*(Game played by $owner, Game #$gameid)*";
 }
 

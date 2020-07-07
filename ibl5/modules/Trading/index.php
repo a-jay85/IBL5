@@ -103,10 +103,7 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 		$player_name = $row8[name];
 		$player_pid = $row8[pid];
 		$contract_year = $row8[cy];
-		if ($contract_year == 0) {
-			$contract_year = 1;
-		}
-		if (getCurrentSeasonPhase() == "Draft") {
+		if (getCurrentSeasonPhase() == "Draft" OR getCurrentSeasonPhase() == "Free Agency") {
 			$contract_year++;
 		}
 		$bird_years = $row8[bird];
@@ -258,10 +255,7 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 		$player_name = $row9[name];
 		$player_pid = $row9[pid];
 		$contract_year = $row9[cy];
-		if ($contract_year == 0) {
-			$contract_year = 1;
-		}
-		if (getCurrentSeasonPhase() == "Draft") {
+		if (getCurrentSeasonPhase() == "Draft" OR getCurrentSeasonPhase() == "Free Agency") {
 			$contract_year++;
 		}
 		$bird_years = $row9[bird];

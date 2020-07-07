@@ -906,7 +906,7 @@ $resultinsert=mysql_query($queryinsertgame);
 
 echo "GAME ID: $gameid";
 
-$discordText = "**$p1_name $score1, $p2_name $score2**<br>
+$discordText = "**$p1_name $score1, $p2_name $score2**
 *(Game played by $owner, Game #$gameid)*";
 
 postToDiscordChannel('#1v1-games', $discordText);

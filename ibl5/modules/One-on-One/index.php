@@ -927,7 +927,7 @@ if ($score1 > $score2) {
 	*(Game played by $owner, Game #$gameid)*";
 }
 
-// postToDiscordChannel('#1v1-games', $discordText);
+postToDiscordChannel('#1v1-games', $discordText);
 }
 
 function printgame ($gameid)

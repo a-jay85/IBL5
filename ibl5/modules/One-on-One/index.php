@@ -882,11 +882,6 @@ $playbyplay=$playbyplay."<table border=1><tr><td colspan=11><font color=#ff0000>
 
 echo "$playbyplay";
 
-$discordText = "**$gamewinner $gamewinscore, $gameloser $gamelossscore**<br>
-*(Game played by $owner, Game #$gameid)*";
-
-postToDiscordChannel('#1v1-games', $discordText);
-
 $querygetgameid="SELECT * FROM nuke_one_on_one";
 $resultgetgameid=mysql_query($querygetgameid);
 $gameid=mysql_numrows($resultgetgameid)+1;
@@ -910,6 +905,11 @@ $queryinsertgame="INSERT INTO nuke_one_on_one (gameid,playbyplay,winner,loser,wi
 $resultinsert=mysql_query($queryinsertgame);
 
 echo "GAME ID: $gameid";
+
+$discordText = "**$p1_name $score1, $p2_name $score2**<br>
+*(Game played by $owner, Game #$gameid)*";
+
+postToDiscordChannel('#1v1-games', $discordText);
 }
 
 function printgame ($gameid)

@@ -423,7 +423,15 @@ function display($nullset) {
 		}
 	}
 
-	echo "<tr><td colspan=26 align=right><b><i>$userteam Total Committed Plus Offered Contracts</i></b></td><td><b><i>$conttot1</i></b></td><td><b><i>$conttot2</i></b></td><td><b><i>$conttot3</i></b></td><td><b><i>$conttot4</i></b></td><td><b><i>$conttot5</i></b></td><td><b><i>$conttot6</i></b></td></tr>";
+	echo "<tr>
+		<td colspan=26 align=right><b><i>$userteam Total Committed Plus Offered Contracts</i></b></td>
+		<td><b><i>$conttot1</i></b></td>
+		<td><b><i>$conttot2</i></b></td>
+		<td><b><i>$conttot3</i></b></td>
+		<td><b><i>$conttot4</i></b></td>
+		<td><b><i>$conttot5</i></b></td>
+		<td><b><i>$conttot6</i></b></td>
+	</tr>";
 
 	// ==== END INSERT OF PLAYERS WITH OFFERS
 
@@ -447,25 +455,49 @@ function display($nullset) {
 	$HasMLE = stripslashes(check_html($exceptioninfo['HasMLE'], "nohtml"));
 	$HasLLE = stripslashes(check_html($exceptioninfo['HasLLE'], "nohtml"));
 
-	echo "          <tr><td colspan=32><hr></td></tr>";
-	echo "                <tr bgcolor=#cc0000><td colspan=4><font color=white><b>Remaining Soft Cap Space Year 1:</b> $softcap </font></td><td colspan=14><font color=white><b>Remaining Hard Cap Space Year 1: </b>$hardcap </font></td><td colspan=14><font color=white><b>Remaining Roster Slots: </b>$rosterspots1 </font></td></tr>";
-	echo "                <tr bgcolor=#cc0000><td colspan=4><font color=white><b>Remaining Soft Cap Space Year 2:</b> $softcap2 </font></td><td colspan=14><font color=white><b>Remaining Hard Cap Space Year 2: </b>$hardcap2 </font></td><td colspan=14><font color=white><b>Remaining Roster Slots: </b>$rosterspots2 </font></td></tr>";
-	echo "                <tr bgcolor=#cc0000><td colspan=4><font color=white><b>Remaining Soft Cap Space Year 3:</b> $softcap3 </font></td><td colspan=14><font color=white><b>Remaining Hard Cap Space Year 3: </b>$hardcap3 </font></td><td colspan=14><font color=white><b>Remaining Roster Slots: </b>$rosterspots3 </font></td></tr>";
-	echo "                <tr bgcolor=#cc0000><td colspan=4><font color=white><b>Remaining Soft Cap Space Year 4:</b> $softcap4 </font></td><td colspan=14><font color=white><b>Remaining Hard Cap Space Year 4: </b>$hardcap4 </font></td><td colspan=14><font color=white><b>Remaining Roster Slots: </b>$rosterspots4 </font></td></tr>";
-	echo "                <tr bgcolor=#cc0000><td colspan=4><font color=white><b>Remaining Soft Cap Space Year 5:</b> $softcap5 </font></td><td colspan=14><font color=white><b>Remaining Hard Cap Space Year 5: </b>$hardcap5 </font></td><td colspan=14><font color=white><b>Remaining Roster Slots: </b>$rosterspots5 </font></td></tr>";
-	echo "                <tr bgcolor=#cc0000><td colspan=4><font color=white><b>Remaining Soft Cap Space Year 6:</b> $softcap6 </font></td><td colspan=14><font color=white><b>Remaining Hard Cap Space Year 6: </b>$hardcap6 </font></td><td colspan=14><font color=white><b>Remaining Roster Slots: </b>$rosterspots6 </font></td></tr>";
-	echo "                <tr bgcolor=#cc0000><td colspan=32><font color=white><b>";
+	echo "<tr bgcolor=#cc0000>
+		<td colspan=18 bgcolor=#eeeeee></td>
+		<td colspan=8 align=right><font color=white><b>Soft Cap Space</b></font></td>
+		<td>$softcap</td>
+		<td>$softcap2</td>
+		<td>$softcap3</td>
+		<td>$softcap4</td>
+		<td>$softcap5</td>
+		<td>$softcap6</td>
+	</tr>";
+	echo "<tr bgcolor=#cc0000>
+		<td colspan=18 bgcolor=#eeeeee></td>
+		<td colspan=8 align=right><font color=white><b>Hard Cap Space</b></font></td>
+		<td>$hardcap</td>
+		<td>$hardcap2</td>
+		<td>$hardcap3</td>
+		<td>$hardcap4</td>
+		<td>$hardcap5</td>
+		<td>$hardcap6</td>
+	</tr>";
+	echo "<tr bgcolor=#cc0000>
+		<td colspan=18 bgcolor=#eeeeee></td>
+		<td colspan=8 align=right><font color=white><b>Empty Roster Slots</b></font></td>
+		<td>$rosterspots1</td>
+		<td>$rosterspots2</td>
+		<td>$rosterspots3</td>
+		<td>$rosterspots4</td>
+		<td>$rosterspots5</td>
+		<td>$rosterspots6</td>
+	</tr>";
+
+	echo "<tr bgcolor=#cc0000><td colspan=32><font color=white><b>";
 
 	if ($HasMLE == 1) {
-		echo "Your team has access to the Mid-Level Exception (MLE) and has not yet successfully signed a player with it (though it may have been offered to one of the players listed as having an outstanding offer above).</b></font></td></tr>";
+		echo "Your team has access to the Mid-Level Exception (MLE) and hasn't signed a player with it (but you may have offered it to someone above).</b></font></td></tr>";
 	} else {
-		echo "Your team does not have access to the Mid-Level Exception; either you have already used it or you did not qualify for it based on your cap space at the start of free agency.</b></font></td></tr>";
+		echo "Your team does NOT have access to the Mid-Level Exception – you either used it or didn't have sufficient cap space at the start of free agency.</b></font></td></tr>";
 	}
 
 	echo "                <tr bgcolor=#cc0000><td colspan=32><font color=white><b>";
 
 	if ($HasLLE == 1) {
-		echo "Your team has access to the Lower-Level Exception (LLE) and has not yet successfully signed a player with it (though it may have been offered to one of the players listed as having an outstanding offer above).</b></font></td></tr>";
+		echo "Your team has access to the Lower-Level Exception (LLE) and hasn't signed a player with it (but you may have offered it to someone above).</b></font></td></tr>";
 	} else {
 		echo "Your team does not have access to the Lower-Level Exception; you have already used it to sign a free agent.</b></font></td></tr>";
 	}

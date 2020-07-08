@@ -145,7 +145,12 @@ function display($nullset) {
 	$conttot5=0;
 	$conttot6=0;
 
-	$rosterspots=15;
+	$rosterspots1 = 15;
+	$rosterspots2 = 15;
+	$rosterspots3 = 15;
+	$rosterspots4 = 15;
+	$rosterspots5 = 15;
+	$rosterspots6 = 15;
 
 	echo "<table border=1 cellspacing=0><tr><td align=center colspan=32><img src=\"images/logo/$tid.jpg\"></td></tr>";
 
@@ -225,6 +230,25 @@ function display($nullset) {
 				$contract4 = $millionscy4;
 				$contract5 = $millionscy5;
 				$contract6 = $millionscy6;
+
+				if ($millionscy1 != 0) {
+					$rosterspots1 -= 1;
+				}
+				if ($millionscy2 != 0) {
+					$rosterspots2 -= 1;
+				}
+				if ($millionscy3 != 0) {
+					$rosterspots3 -= 1;
+				}
+				if ($millionscy4 != 0) {
+					$rosterspots4 -= 1;
+				}
+				if ($millionscy5 != 0) {
+					$rosterspots5 -= 1;
+				}
+				if ($millionscy6 != 0) {
+					$rosterspots6 -= 1;
+				}
 			}
 			if ($millionscy == 1) {
 				$contract1 = $millionscy2;
@@ -232,24 +256,74 @@ function display($nullset) {
 				$contract3 = $millionscy4;
 				$contract4 = $millionscy5;
 				$contract5 = $millionscy6;
+
+				if ($millionscy2 != 0) {
+					$rosterspots1 -= 1;
+				}
+				if ($millionscy3 != 0) {
+					$rosterspots2 -= 1;
+				}
+				if ($millionscy4 != 0) {
+					$rosterspots3 -= 1;
+				}
+				if ($millionscy5 != 0) {
+					$rosterspots4 -= 1;
+				}
+				if ($millionscy6 != 0) {
+					$rosterspots5 -= 1;
+				}
 			}
 			if ($millionscy == 2) {
 				$contract1 = $millionscy3;
 				$contract2 = $millionscy4;
 				$contract3 = $millionscy5;
 				$contract4 = $millionscy6;
+
+				if ($millionscy3 != 0) {
+					$rosterspots1 -= 1;
+				}
+				if ($millionscy4 != 0) {
+					$rosterspots2 -= 1;
+				}
+				if ($millionscy5 != 0) {
+					$rosterspots3 -= 1;
+				}
+				if ($millionscy6 != 0) {
+					$rosterspots4 -= 1;
+				}
 			}
 			if ($millionscy == 3) {
 				$contract1 = $millionscy4;
 				$contract2 = $millionscy5;
 				$contract3 = $millionscy6;
+
+				if ($millionscy4 != 0) {
+					$rosterspots1 -= 1;
+				}
+				if ($millionscy5 != 0) {
+					$rosterspots2 -= 1;
+				}
+				if ($millionscy6 != 0) {
+					$rosterspots3 -= 1;
+				}
 			}
 			if ($millionscy == 4) {
 				$contract1 = $millionscy5;
 				$contract2 = $millionscy6;
+
+				if ($millionscy5 != 0) {
+					$rosterspots1 -= 1;
+				}
+				if ($millionscy6 != 0) {
+					$rosterspots2 -= 1;
+				}
 			}
 			if ($millionscy == 5) {
 				$contract1 = $millionscy6;
+
+				if ($millionscy6 != 0) {
+					$rosterspots1 -= 1;
+				}
 			}
 
 			echo "      <tr><td>";
@@ -277,8 +351,6 @@ function display($nullset) {
 			$conttot4=$conttot4+$contract4;
 			$conttot5=$conttot5+$contract5;
 			$conttot6=$conttot6+$contract6;
-
-			$rosterspots--;
 		}
 	}
 
@@ -376,12 +448,12 @@ function display($nullset) {
 	$HasLLE = stripslashes(check_html($exceptioninfo['HasLLE'], "nohtml"));
 
 	echo "          <tr><td colspan=32><hr></td></tr>";
-	echo "                <tr bgcolor=#cc0000><td colspan=4><font color=white><b>Remaining Soft Cap Space Year 1:</b> $softcap </font></td><td colspan=14><font color=white><b>Remaining Hard Cap Space Year 1: </b>$hardcap </font></td><td colspan=14><font color=white><b>Remaining Roster Slots: </b>$rosterspots </font></td></tr>";
-	echo "                <tr bgcolor=#cc0000><td colspan=4><font color=white><b>Remaining Soft Cap Space Year 2:</b> $softcap2 </font></td><td colspan=14><font color=white><b>Remaining Hard Cap Space Year 2: </b>$hardcap2 </font></td><td colspan=14><font color=white><b>Remaining Roster Slots: </b>$rosterspots </font></td></tr>";
-	echo "                <tr bgcolor=#cc0000><td colspan=4><font color=white><b>Remaining Soft Cap Space Year 3:</b> $softcap3 </font></td><td colspan=14><font color=white><b>Remaining Hard Cap Space Year 3: </b>$hardcap3 </font></td><td colspan=14><font color=white><b>Remaining Roster Slots: </b>$rosterspots </font></td></tr>";
-	echo "                <tr bgcolor=#cc0000><td colspan=4><font color=white><b>Remaining Soft Cap Space Year 4:</b> $softcap4 </font></td><td colspan=14><font color=white><b>Remaining Hard Cap Space Year 4: </b>$hardcap4 </font></td><td colspan=14><font color=white><b>Remaining Roster Slots: </b>$rosterspots </font></td></tr>";
-	echo "                <tr bgcolor=#cc0000><td colspan=4><font color=white><b>Remaining Soft Cap Space Year 5:</b> $softcap5 </font></td><td colspan=14><font color=white><b>Remaining Hard Cap Space Year 5: </b>$hardcap5 </font></td><td colspan=14><font color=white><b>Remaining Roster Slots: </b>$rosterspots </font></td></tr>";
-	echo "                <tr bgcolor=#cc0000><td colspan=4><font color=white><b>Remaining Soft Cap Space Year 6:</b> $softcap6 </font></td><td colspan=14><font color=white><b>Remaining Hard Cap Space Year 6: </b>$hardcap6 </font></td><td colspan=14><font color=white><b>Remaining Roster Slots: </b>$rosterspots </font></td></tr>";
+	echo "                <tr bgcolor=#cc0000><td colspan=4><font color=white><b>Remaining Soft Cap Space Year 1:</b> $softcap </font></td><td colspan=14><font color=white><b>Remaining Hard Cap Space Year 1: </b>$hardcap </font></td><td colspan=14><font color=white><b>Remaining Roster Slots: </b>$rosterspots1 </font></td></tr>";
+	echo "                <tr bgcolor=#cc0000><td colspan=4><font color=white><b>Remaining Soft Cap Space Year 2:</b> $softcap2 </font></td><td colspan=14><font color=white><b>Remaining Hard Cap Space Year 2: </b>$hardcap2 </font></td><td colspan=14><font color=white><b>Remaining Roster Slots: </b>$rosterspots2 </font></td></tr>";
+	echo "                <tr bgcolor=#cc0000><td colspan=4><font color=white><b>Remaining Soft Cap Space Year 3:</b> $softcap3 </font></td><td colspan=14><font color=white><b>Remaining Hard Cap Space Year 3: </b>$hardcap3 </font></td><td colspan=14><font color=white><b>Remaining Roster Slots: </b>$rosterspots3 </font></td></tr>";
+	echo "                <tr bgcolor=#cc0000><td colspan=4><font color=white><b>Remaining Soft Cap Space Year 4:</b> $softcap4 </font></td><td colspan=14><font color=white><b>Remaining Hard Cap Space Year 4: </b>$hardcap4 </font></td><td colspan=14><font color=white><b>Remaining Roster Slots: </b>$rosterspots4 </font></td></tr>";
+	echo "                <tr bgcolor=#cc0000><td colspan=4><font color=white><b>Remaining Soft Cap Space Year 5:</b> $softcap5 </font></td><td colspan=14><font color=white><b>Remaining Hard Cap Space Year 5: </b>$hardcap5 </font></td><td colspan=14><font color=white><b>Remaining Roster Slots: </b>$rosterspots5 </font></td></tr>";
+	echo "                <tr bgcolor=#cc0000><td colspan=4><font color=white><b>Remaining Soft Cap Space Year 6:</b> $softcap6 </font></td><td colspan=14><font color=white><b>Remaining Hard Cap Space Year 6: </b>$hardcap6 </font></td><td colspan=14><font color=white><b>Remaining Roster Slots: </b>$rosterspots6 </font></td></tr>";
 	echo "                <tr bgcolor=#cc0000><td colspan=32><font color=white><b>";
 
 	if ($HasMLE == 1) {

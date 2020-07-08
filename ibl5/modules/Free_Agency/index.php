@@ -1506,6 +1506,12 @@ function rookieoption($pid) {
 	$player_draftround = stripslashes(check_html($playerinfo['draftround'], "nohtml"));
 	$player_exp = stripslashes(check_html($playerinfo['exp'], "nohtml"));
 
+	if ($userteam != $player_team_name) {
+		echo "$player_pos $player_name is not on your team.<br>
+		<a href=\"javascript:history.back()\">Go Back</a>";
+		return;
+	}
+
 	if ($player_exp == 2 AND $player_draftround == 1) {
 		$finalYearOfRookieContract = stripslashes(check_html($playerinfo['cy3'], "nohtml"));
 	} elseif ($player_exp == 1 AND $player_draftround == 2) {

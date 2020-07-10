@@ -491,7 +491,7 @@ function display($nullset) {
 	if ($HasMLE == 1) {
 		echo "Your team has access to the Mid-Level Exception (MLE) and hasn't signed a player with it (but you may have offered it to someone above).</b></font></td></tr>";
 	} else {
-		echo "Your team does NOT have access to the Mid-Level Exception – you either used it or didn't have sufficient cap space at the start of free agency.</b></font></td></tr>";
+		echo "Your team does NOT have access to the Mid-Level Exception - you either used it or didn't have sufficient cap space at the start of free agency.</b></font></td></tr>";
 	}
 
 	echo "                <tr bgcolor=#cc0000><td colspan=32><font color=white><b>";

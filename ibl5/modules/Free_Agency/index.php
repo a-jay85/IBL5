@@ -519,7 +519,7 @@ function display() {
 		<tr><td><b>Negotiate</b></td><td><b>Pos</b></td><td><b>Player</b></td><td><b>Team</b></td><td><b>Age</b></td><td><b>Sta</b></td><td><b>2ga</b></td><td><b>2g%</b></td><td><b>fta</b></td><td><b>ft%</b></td><td><b>3ga</b></td><td><b>3g%</b></td><td><b>orb</b></td><td><b>drb</b></td><td><b>ast</b></td><td><b>stl</b></td><td><b>to</b></td><td><b>blk</b></td><td><b>oo</b></td><td><b>do</b></td><td><b>po</b></td><td><b>to</b></td><td><b>od</b></td><td><b>dd</b></td><td><b>pd</b></td><td><b>td</b></td><td><b>Yr1</b></td><td><b>Yr2</b></td><td><b>Yr3</b></td><td><b>Yr4</b></td><td><b>Yr5</b></td><td><b>Yr6</b></td></tr>
 	";
 
-	$showteam = $db->sql_query("SELECT * FROM ".$prefix."_iblplyr WHERE teamname='$userteam' AND retired='0' ORDER BY ordinal ASC");
+	$showteam = $db->sql_query("SELECT * FROM ".$prefix."_iblplyr WHERE teamname='$userteam' AND retired='0' AND ordinal < 960 ORDER BY ordinal ASC");
 	while ($teamlist = $db->sql_fetchrow($showteam)) {
 		$draftyear = stripslashes(check_html($teamlist['draftyear'], "nohtml"));
 		$exp = stripslashes(check_html($teamlist['exp'], "nohtml"));

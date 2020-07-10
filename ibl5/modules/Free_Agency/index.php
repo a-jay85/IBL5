@@ -571,7 +571,13 @@ function display() {
 			$r_totoff=$r_oo+$r_do+$r_po+$r_to;
 			$r_totdef=$r_od+$r_dd+$r_pd+$r_td;
 
-			echo "      <tr><td><a href=\"modules.php?name=Free_Agency&pa=negotiate&pid=$pid\">Negotiate</a></td><td>$pos</td><td><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">";
+			echo "      <tr><td>";
+
+			if ($rosterspots1 > 0) {
+				echo "<a href=\"modules.php?name=Free_Agency&pa=negotiate&pid=$pid\">Negotiate</a>";
+			}
+
+			echo "</td><td>$pos</td><td><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">";
 
 			// ==== NOTE PLAYERS ON TEAM WITH BIRD RIGHTS
 
@@ -647,7 +653,9 @@ function display() {
 
 			echo "      <tr><td>";
 
-			if ($rosterspots <= 15) echo "<a href=\"modules.php?name=Free_Agency&pa=negotiate&pid=$pid\">Negotiate</a>";
+			if ($rosterspots1 > 0) {
+				echo "<a href=\"modules.php?name=Free_Agency&pa=negotiate&pid=$pid\">Negotiate</a>";
+			}
 
 			echo "</td>
 				<td>$pos</td>

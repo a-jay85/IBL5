@@ -419,7 +419,25 @@ function display($nullset) {
 			$conttot4=$conttot4+$offer4;
 			$conttot5=$conttot5+$offer5;
 			$conttot6=$conttot6+$offer6;
-			$rosterspots=$rosterspots-1;
+
+			if ($offer1 != 0) {
+				$rosterspots1 -= 1;
+			}
+			if ($offer2 != 0) {
+				$rosterspots2 -= 1;
+			}
+			if ($offer3 != 0) {
+				$rosterspots3 -= 1;
+			}
+			if ($offer4 != 0) {
+				$rosterspots4 -= 1;
+			}
+			if ($offer5 != 0) {
+				$rosterspots5 -= 1;
+			}
+			if ($offer6 != 0) {
+				$rosterspots6 -= 1;
+			}
 		}
 	}
 

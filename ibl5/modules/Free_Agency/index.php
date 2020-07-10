@@ -1834,8 +1834,10 @@ function teamdisplay($pid) {
 				$conttot5=$conttot5+$contract5;
 				$conttot6=$conttot6+$contract6;
 
-				if ($ordinal > 960) {} else $rosterspots=$rosterspots-1;
-			} else {}
+				if ($ordinal <= 960) {
+					$rosterspots -= 1;
+				}
+			}
 		}
 		// ==== END LIST OF PLAYERS CURRENTLY UNDER CONTRACT
 

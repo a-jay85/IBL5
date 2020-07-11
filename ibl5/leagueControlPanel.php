@@ -6,8 +6,11 @@ mysql_connect($dbhost,$dbuname,$dbpass);
 
 require $_SERVER['DOCUMENT_ROOT'] . '/sharedFunctions.php';
 
+$queryString = "";
+$successText = "";
+
 if (isset($_POST['query'])) {
-    switch ($_POST[query]) {
+    switch ($_POST['query']) {
         case 'Set Season Phase':
             if(isset($_POST['SeasonPhase'])) {
                 $queryString = "UPDATE nuke_ibl_settings SET value = '{$_POST['SeasonPhase']}' WHERE name = 'Current Season Phase';";
@@ -63,7 +66,7 @@ if ($querySuccessful = TRUE) {
     echo "<code>" . $queryString . "</code>\n";
     echo "<p>\n";
     echo "<b>" . $successText . "</b>";
-} else {
+} elseif ($querySuccessful = FALSE) {
     echo "Oops, something went wrong. Let A-Jay know what you were trying to do and he'll look into it.";
 };
 

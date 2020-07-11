@@ -208,7 +208,7 @@ if ($nooffer == 0) {
         $filetext = $Player_Name . " refuses an extension offer from the " . $Team_Name . " of " . $Offer_Total . " for " . $Offer_Years." years.
         For reference purposes: the offer was " . $Offer_1 . " " . $Offer_2 . " " . $Offer_3 . " " . $Offer_4 . " " . $Offer_5 . " and the offer value was thus considered to be " . $Offer_Value . "; the player wanted an offer with a value of " . $Demands_Value;
 
-        if (mail($recipient, $emailsubject, $filetext, "From: ibldepthcharts@gmail.com"))
+        if (mail($recipient, $emailsubject, $filetext, "From: rejected-extensions@iblhoops.net"))
         {
         }
 
@@ -248,7 +248,7 @@ if ($nooffer == 0) {
         $filetext = $Player_Name." accepts an extension offer from the " . $Team_Name . " of " . $Offer_Total . " for " . $Offer_Years . " years.
             For reference purposes: the offer was " . $Offer_1 . " " . $Offer_2 . " " . $Offer_3 . " " . $Offer_4 . " " . $Offer_5 . " and the offer value was thus considered to be " . $Offer_Value . "; the player wanted an offer with a value of " . $Demands_Value;
 
-        if (mail($recipient, $emailsubject, $filetext, "From: ibldepthcharts@gmail.com")) {
+        if (mail($recipient, $emailsubject, $filetext, "From: accepted-extensions@iblhoops.net")) {
             echo "<center> An e-mail regarding this extension has been successfully sent to the commissioner's office.  Thank you. </center>";
         } else {
             echo " Message failed to e-mail properly; please notify the commissioner of the error with the following amounts you offered:</center><br>

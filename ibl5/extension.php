@@ -268,7 +268,7 @@ if ($nooffer == 0) {
                 cy4 = $Offer_3,
                 cy5 = $Offer_4,
                 cy6 = $Offer_5
-            WHERE name = '$Player_Name'";
+            WHERE name = '$Player_Name';";
         $resultContractUpdate = mysql_query($queryContractUpdate);
 
         // ==== MARK THE EXTENSION AS USED FOR THIS SEASON ====

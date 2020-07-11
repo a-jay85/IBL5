@@ -4,6 +4,10 @@ require 'config.php';
 mysql_connect($dbhost,$dbuname,$dbpass);
 @mysql_select_db($dbname) or die("Unable to select database");
 
+require 'sharedFunctions.php';
+
+$currentSeasonPhase = getCurrentSeasonPhase();
+
 echo "
 <HTML>
 <HEAD>
@@ -12,6 +16,15 @@ echo "
 <BODY>";
 
 echo "<FORM action=\"leagueControlPanel.php\" method=\"POST\">
+    <select name=\"SeasonPhase\">
+        <option value = \"Preseason\"" . ($currentSeasonPhase == "Preseason" ? " SELECTED" : "") . ">Preseason</option>
+        <option value = \"HEAT\"" . ($currentSeasonPhase == "HEAT" ? " SELECTED" : "") . ">HEAT</option>
+        <option value = \"Regular Season\"" . ($currentSeasonPhase == "Regular Season" ? " SELECTED" : "") . ">Regular Season</option>
+        <option value = \"Playoffs\"" . ($currentSeasonPhase == "Playoffs" ? " SELECTED" : "") . ">Playoffs</option>
+        <option value = \"Draft\"" . ($currentSeasonPhase == "Draft" ? " SELECTED" : "") . ">Draft</option>
+        <option value = \"Free Agency\"" . ($currentSeasonPhase == "Free Agency" ? " SELECTED" : "") . ">Free Agency</option>
+    </select>
+    <INPUT type='submit' name='query' value='Set Season Phase'><p>
     <INPUT type='submit' name='query' value='Reset All Contract Extensions'><p>
     <INPUT type='submit' name='query' value='Reset All MLEs/LLEs'><p>
     <INPUT type='submit' name='query' value='Set all undefined player positions'><p>
@@ -19,6 +32,12 @@ echo "<FORM action=\"leagueControlPanel.php\" method=\"POST\">
 
 if (isset($_POST['query'])) {
     switch ($_POST[query]) {
+        case 'Set Season Phase':
+            if(isset($_POST['SeasonPhase'])) {
+                $queryString = "UPDATE nuke_ibl_settings SET value = '{$_POST['SeasonPhase']}' WHERE name = 'Current Season Phase';";
+            }
+            $successText = "Season Phase has been set to {$_POST['SeasonPhase']}.";
+            break;
         case 'Reset All Contract Extensions':
             $queryString = "UPDATE nuke_ibl_team_info SET Used_Extension_This_Season = 0;";
             $successText = "All teams' contract extensions have been reset.";
@@ -38,6 +57,7 @@ if (isset($_POST['query'])) {
         echo "<p>\n";
         echo "<b>" . $successText . "</b>";
     } else {
+        echo $_POST['SeasonPhase'];
         echo "Oops, something went wrong. Let A-Jay know what you were trying to do and he'll look into it.";
     };
 }

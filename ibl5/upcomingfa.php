@@ -25,7 +25,8 @@ if ($tid == NULL) {
         $result=mysql_query($query);
         $num=mysql_numrows($result);
 
-        $j=0;
+        $i = 0;
+        $j = 0;
 
         while ($i < $num) {
             $draftyear=mysql_result($result,$i,"draftyear");

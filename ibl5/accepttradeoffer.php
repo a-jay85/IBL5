@@ -73,7 +73,7 @@ $resultstor = mysql_query($querystor);
 
 if (isset($resultstor)) {
 	$recipient = 'ibldepthcharts@gmail.com';
-	mail($recipient, $storytitle, $storytext, "From: ibldepthcharts@gmail.com");
+	mail($recipient, $storytitle, $storytext, "From: trades@iblhoops.net");
 
 	postToDiscordChannel('#trades', $storytext);
 }

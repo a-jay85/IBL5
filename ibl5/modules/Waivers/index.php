@@ -253,7 +253,7 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
 
                 if (isset($resultstor)) {
                     $recipient = 'ibldepthcharts@gmail.com';
-                    mail($recipient, $storytitle, $hometext, "From: ibldepthcharts@gmail.com");
+                    mail($recipient, $storytitle, $hometext, "From: waivers@iblhoops.net");
 
                     postToDiscordChannel('#waiver-wire', $hometext);
                 }

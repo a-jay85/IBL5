@@ -78,7 +78,19 @@ while ($i < $num) {
  		if ($perceivedvalue > $demands) {
  			echo " <TR><TD>$name</TD><TD>$team</TD><TD>$offer1</TD><TD>$offer2</TD><TD>$offer3</TD><TD>$offer4</TD><TD>$offer5</TD><TD>$offer6</TD><TD>$MLE</TD><TD>$LLE</TD></TR>";
 			$text=$text.$name." accepts the ".$team." offer of a ".$offeryears."-year deal worth a total of ".$offertotal." million dollars.<br> ";
-			$code=$code."UPDATE `nuke_iblplyr` SET `cy` = '0', `cy1` = '".$offer1."', `cy2` = '".$offer2."', `cy3` = '".$offer3."', `cy4` = '".$offer4."', `cy5` = '".$offer5."', `cy6` = '".$offer6."', `teamname` = '".$team."', `cyt` = '".$offeryears."', `tid` = '".getteamid($team)."' WHERE `name` = '".$name."' LIMIT 1;";
+			$code = $code . "UPDATE `nuke_iblplyr`
+				SET `cy` = '0',
+					`cy1` = '" . $offer1 . "',
+					`cy2` = '" . $offer2 . "',
+					`cy3` = '" . $offer3 . "',
+					`cy4` = '" . $offer4 . "',
+					`cy5` = '" . $offer5 . "',
+					`cy6` = '" . $offer6 . "',
+					`teamname` = '" . $team . "',
+					`cyt` = '" . $offeryears . "',
+					`tid` = '" . getteamid($team) . "'
+				WHERE `name` = '" . $name . "'
+				LIMIT 1;";
 			if ($MLE == 1) {
 				$code=$code."UPDATE `nuke_ibl_team_info` SET `HasMLE` = '0' WHERE `team_name` = '".$team."' LIMIT 1;";
 			}

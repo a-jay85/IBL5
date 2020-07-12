@@ -140,7 +140,7 @@ function display() {
 	$rosterspots5 = 15;
 	$rosterspots6 = 15;
 
-	echo "<table border=1 cellspacing=0><tr><td align=center colspan=32><img src=\"images/logo/$tid.jpg\"></td></tr>";
+	echo "<table border=1 cellspacing=0><tr><td align=center colspan=36><img src=\"images/logo/$tid.jpg\"></td></tr>";
 
 	// ==== DISPLAY PLAYERS CURRENTLY UNDER CONTRACT FOR TEAM
 
@@ -148,6 +148,7 @@ function display() {
 		<tr bgcolor=#0000cc>
 			<td colspan=25><center><b><font color=white>$userteam Players Under Contract</font></b></center></td>
 			<td colspan=6><center><b><font color=white>Contract Commitment</font></b></center></td>
+			<td colspan=5><center><b><font color=white>Demand Factors</font></b></center></td>
 		</tr>
 		<tr>
 			<td><b>Options</b></td>
@@ -181,6 +182,11 @@ function display() {
 			<td><b>Yr4</b></td>
 			<td><b>Yr5</b></td>
 			<td><b>Yr6</b></td>
+			<td><b>Loy</b></td>
+			<td><b>PFW</b></td>
+			<td><b>PT</b></td>
+			<td><b>Sec</b></td>
+			<td><b>Trad</b></td>
 		</tr>
 	";
 
@@ -225,6 +231,12 @@ function display() {
 			$r_dd = stripslashes(check_html($teamlist['dd'], "nohtml"));
 			$r_pd = stripslashes(check_html($teamlist['pd'], "nohtml"));
 			$r_td = stripslashes(check_html($teamlist['td'], "nohtml"));
+
+			$loy = $teamlist['loyalty'];
+			$pfw = $teamlist['winner'];
+			$pt = $teamlist['playingTime'];
+			$sec = $teamlist['security'];
+			$trad = $teamlist['tradition'];
 
 			// === MATCH UP CONTRACT AMOUNTS WITH FUTURE YEARS BASED ON CURRENT YEAR OF CONTRACT
 
@@ -394,6 +406,11 @@ function display() {
 				<td>$contract4</td>
 				<td>$contract5</td>
 				<td>$contract6</td>
+				<td>$loy</td>
+				<td>$pfw</td>
+				<td>$pt</td>
+				<td>$sec</td>
+				<td>$trad</td>
 			</tr>";
 
 			$conttot1=$conttot1+$contract1;
@@ -423,6 +440,7 @@ function display() {
 		<tr bgcolor=#0000cc>
 			<td colspan=25><center><b><font color=white>$userteam Outstanding Contract Offers</font></b></center></td>
 			<td colspan=6><center><b><font color=white>Contract Amount Offered</font></b></center></td>
+			<td colspan=5><center><b><font color=white>Demand Factors</font></b></center></td>
 		</tr>
 		<tr>
 			<td><b>Negotiate</b></td>
@@ -456,6 +474,11 @@ function display() {
 			<td><b>Yr4</b></td>
 			<td><b>Yr5</b></td>
 			<td><b>Yr6</b></td>
+			<td><b>Loy</b></td>
+			<td><b>PFW</b></td>
+			<td><b>PT</b></td>
+			<td><b>Sec</b></td>
+			<td><b>Trad</b></td>
 		</tr>
 	";
 	$showteam = $db->sql_query("SELECT * FROM ".$prefix."_iblplyr WHERE retired='0' ORDER BY ordinal ASC");
@@ -502,6 +525,12 @@ function display() {
 			$r_pd = stripslashes(check_html($teamlist['pd'], "nohtml"));
 			$r_td = stripslashes(check_html($teamlist['td'], "nohtml"));
 
+			$loy = $teamlist['loyalty'];
+			$pfw = $teamlist['winner'];
+			$pt = $teamlist['playingTime'];
+			$sec = $teamlist['security'];
+			$trad = $teamlist['tradition'];
+
 			echo "      <tr>
 				<td><a href=\"modules.php?name=Free_Agency&pa=negotiate&pid=$pid\">Negotiate</a></td>
 				<td>$pos</td>
@@ -534,6 +563,11 @@ function display() {
 				<td>$offer4</td>
 				<td>$offer5</td>
 				<td>$offer6</td>
+				<td>$loy</td>
+				<td>$pfw</td>
+				<td>$pt</td>
+				<td>$sec</td>
+				<td>$trad</td>
 			</tr>";
 
 			$conttot1=$conttot1+$offer1;
@@ -627,7 +661,7 @@ function display() {
 		<td>$rosterspots6</td>
 	</tr>";
 
-	echo "<tr bgcolor=#cc0000><td colspan=32><font color=white><b>";
+	echo "<tr bgcolor=#cc0000><td colspan=36><font color=white><b>";
 
 	if ($HasMLE == 1) {
 		echo "Your team has access to the Mid-Level Exception (MLE) and hasn't signed a player with it (but you may have offered it to someone above).</b></font></td></tr>";
@@ -635,7 +669,7 @@ function display() {
 		echo "Your team does NOT have access to the Mid-Level Exception - you either used it or didn't have sufficient cap space at the start of free agency.</b></font></td></tr>";
 	}
 
-	echo "                <tr bgcolor=#cc0000><td colspan=32><font color=white><b>";
+	echo "                <tr bgcolor=#cc0000><td colspan=36><font color=white><b>";
 
 	if ($HasLLE == 1) {
 		echo "Your team has access to the Lower-Level Exception (LLE) and hasn't signed a player with it (but you may have offered it to someone above).</b></font></td></tr>";
@@ -644,7 +678,7 @@ function display() {
 	}
 
 	echo "
-					<tr><td colspan=32><hr></td></tr>
+					<tr><td colspan=36><hr></td></tr>
 	";
 
 	// ==== INSERT LIST OF FREE AGENTS FROM TEAM
@@ -653,6 +687,7 @@ function display() {
 		<tr bgcolor=0000cc>
 			<td colspan=25><center><font color=white><b>$userteam Unsigned Free Agents</b> (Note: * and <i>italicized</i> indicates player has Bird Rights)</i></font></center></td>
 			<td colspan=6><center><font color=white><b>Contract Amount Sought</b></font></center></td>
+			<td colspan=5><center><b><font color=white>Demand Factors</font></b></center></td>
 		</tr>
 		<tr>
 			<td><b>Negotiate</b></td>
@@ -686,6 +721,11 @@ function display() {
 			<td><b>Yr4</b></td>
 			<td><b>Yr5</b></td>
 			<td><b>Yr6</b></td>
+			<td><b>Loy</b></td>
+			<td><b>PFW</b></td>
+			<td><b>PT</b></td>
+			<td><b>Sec</b></td>
+			<td><b>Trad</b></td>
 		</tr>
 	";
 
@@ -738,6 +778,12 @@ function display() {
 			$r_pd = stripslashes(check_html($teamlist['pd'], "nohtml"));
 			$r_td = stripslashes(check_html($teamlist['td'], "nohtml"));
 
+			$loy = $teamlist['loyalty'];
+			$pfw = $teamlist['winner'];
+			$pt = $teamlist['playingTime'];
+			$sec = $teamlist['security'];
+			$trad = $teamlist['tradition'];
+
 			echo "      <tr><td>";
 
 			if ($rosterspots1 > 0) {
@@ -783,6 +829,11 @@ function display() {
 				<td>$dem4</td>
 				<td>$dem5</td>
 				<td>$dem6</td>
+				<td>$loy</td>
+				<td>$pfw</td>
+				<td>$pt</td>
+				<td>$sec</td>
+				<td>$trad</td>
 			</tr>";
 		} else {}
 	}
@@ -795,6 +846,7 @@ function display() {
 		<tr bgcolor=#0000cc>
 			<td colspan=25><center><b><font color=white>All Other Free Agents</font></b></center></td>
 			<td colspan=6><center><b><font color=white>Contract Amount Sought</font></b></center></td>
+			<td colspan=5><center><b><font color=white>Demand Factors</font></b></center></td>
 		</tr>
 		<tr>
 			<td><b>Negotiate</b></td>
@@ -828,6 +880,11 @@ function display() {
 			<td><b>Yr4</b></td>
 			<td><b>Yr5</b></td>
 			<td><b>Yr6</b></td>
+			<td><b>Loy</b></td>
+			<td><b>PFW</b></td>
+			<td><b>PT</b></td>
+			<td><b>Sec</b></td>
+			<td><b>Trad</b></td>
 		</tr>
 	";
 
@@ -879,6 +936,12 @@ function display() {
 			$r_pd = stripslashes(check_html($teamlist['pd'], "nohtml"));
 			$r_td = stripslashes(check_html($teamlist['td'], "nohtml"));
 
+			$loy = $teamlist['loyalty'];
+			$pfw = $teamlist['winner'];
+			$pt = $teamlist['playingTime'];
+			$sec = $teamlist['security'];
+			$trad = $teamlist['tradition'];
+
 			echo "      <tr><td>";
 
 			if ($rosterspots1 > 0) {
@@ -927,7 +990,13 @@ function display() {
 				<td></td>
 				<td></td>";
 			}
-			echo "</tr>";
+			echo "
+				<td>$loy</td>
+				<td>$pfw</td>
+				<td>$pt</td>
+				<td>$sec</td>
+				<td>$trad</td>
+			</tr>";
 		} else {}
 	}
 

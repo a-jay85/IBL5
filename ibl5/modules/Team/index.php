@@ -891,7 +891,7 @@ function team($tid)
 	$table_ratings="<table  align=\"center\" class=\"sortable\">
 		<colgroup span=2><colgroup span=2><colgroup span=6><colgroup span=6><colgroup span=4><colgroup span=4><colgroup span=1>
 		<thead bgcolor=$color1><tr bgcolor=$color1>
-		<th><font color=$color2>Pos</font></th><th><font color=$color2>Player</font></th><th><font color=$color2>Age</font></th><th><font color=$color2>Sta</font></th>
+		<th><font color=$color2>Pos</font></th><th><font color=$color2>Player</font></th><th><font color=$color2>Age</font></th>
 		<th><font color=$color2>2ga</font></th><th><font color=$color2>2g%</font></th><th><font color=$color2>fta</font></th><th><font color=$color2>ft%</font></th><th><font color=$color2>3ga</font></th><th><font color=$color2>3g%</font></th>
 		<th><font color=$color2>orb</font></th><th><font color=$color2>drb</font></th><th><font color=$color2>ast</font></th><th><font color=$color2>stl</font></th><th><font color=$color2>tvr</font></th><th><font color=$color2>blk</font></th>
 		<th><font color=$color2>oo</font></th><th><font color=$color2>do</font></th><th><font color=$color2>po</font></th><th><font color=$color2>to</font></th><th><font color=$color2>od</font></th><th><font color=$color2>dd</font></th><th><font color=$color2>pd</font></th><th><font color=$color2>td</font></th>
@@ -923,7 +923,6 @@ function team($tid)
 			$r_stl=mysql_result($result,$i,"r_stl");
 			$r_blk=mysql_result($result,$i,"r_blk");
 			$r_tvr=mysql_result($result,$i,"r_to");
-			$r_sta=mysql_result($result,$i,"sta");
 			$r_foul=mysql_result($result,$i,"r_foul");
 			$r_totoff=mysql_result($result,$i,"oo")+mysql_result($result,$i,"do")+mysql_result($result,$i,"po")+mysql_result($result,$i,"to");
 			$r_totdef=mysql_result($result,$i,"od")+mysql_result($result,$i,"dd")+mysql_result($result,$i,"pd")+mysql_result($result,$i,"td");
@@ -975,16 +974,16 @@ function team($tid)
 		(($i % 2)==0) ? $bgcolor="FFFFFF" : $bgcolor="EEEEEE";
 
 		if ($tid == 0) {
-			$table_ratings=$table_ratings."<tr bgcolor=$bgcolor><td>$pos</td><td><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td>$age</td><td>$r_sta</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$r_foul</td><td>$inj</td></tr>";
+			$table_ratings=$table_ratings."<tr bgcolor=$bgcolor><td>$pos</td><td><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td>$age</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$r_foul</td><td>$inj</td></tr>";
 		} else {
 			if ($p_ord > 959) {
-				$table_ratings=$table_ratings."<tr bgcolor=$bgcolor><td>$pos</td><td>(<a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name)*</a></td><td>$age</td><td>$r_sta</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$r_foul</td><td>$inj</td></tr>";
+				$table_ratings=$table_ratings."<tr bgcolor=$bgcolor><td>$pos</td><td>(<a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name)*</a></td><td>$age</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$r_foul</td><td>$inj</td></tr>";
 			} else if ($r_bird == 0) {
-				$table_ratings=$table_ratings."<tr bgcolor=$bgcolor><td>$pos</td><td><i><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</i></a></td><td>$age</td><td>$r_sta</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$r_foul</td><td>$inj</td></tr>";
+				$table_ratings=$table_ratings."<tr bgcolor=$bgcolor><td>$pos</td><td><i><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</i></a></td><td>$age</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$r_foul</td><td>$inj</td></tr>";
 			} else if ($cy == $cyt) {
-				$table_ratings=$table_ratings."<tr bgcolor=$bgcolor><td>$pos</td><td><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a>^</td><td>$age</td><td>$r_sta</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$r_foul</td><td>$inj</td></tr>";
+				$table_ratings=$table_ratings."<tr bgcolor=$bgcolor><td>$pos</td><td><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a>^</td><td>$age</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$r_foul</td><td>$inj</td></tr>";
 			} else {
-				$table_ratings=$table_ratings."<tr bgcolor=$bgcolor><td>$pos</td><td><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td>$age</td><td>$r_sta</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$r_foul</td><td>$inj</td></tr>";
+				$table_ratings=$table_ratings."<tr bgcolor=$bgcolor><td>$pos</td><td><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td>$age</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$r_foul</td><td>$inj</td></tr>";
 			}
 		}
 	$i++;

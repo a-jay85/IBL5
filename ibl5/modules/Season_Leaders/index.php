@@ -227,23 +227,29 @@ function team_option ($team_selected)
 //	}
 //}
 
-function year_option ($year_selected)
+function year_option($year_selected)
 {
-	$arr = array("1997", "1998", "1999", "2000", "2001", "2002");
-	$num=sizeof($arr);
-	echo "<option value=''>All</option>";
-	$i=0;
-	while ($i < $num)
-	{
-		$year=$arr[$i];
-
+	$years = mysql_query("SELECT DISTINCT year FROM nuke_iblhist;");
+	$yearsArray = array();
+	$i = 0;
+	while ($i < mysql_num_rows($years)) {
+		$yearsArray[] = mysql_result($years, $i);
 		$i++;
-		if ($year_selected == $year)
-		{
+	}
+
+	echo "<option value=''>All</option>";
+
+	$i = 0;
+	while ($i < sizeof($yearsArray)) {
+		$year = $yearsArray[$i];
+
+		if ($year_selected == $year) {
 			echo "<option value='$year' SELECTED>$year</option>";
-		}else{
+		} else {
 			echo "<option value='$year'>$year</option>";
 		}
+
+		$i++;
 	}
 }
 

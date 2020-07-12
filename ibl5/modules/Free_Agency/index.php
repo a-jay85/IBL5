@@ -145,8 +145,8 @@ function display() {
 	// ==== DISPLAY PLAYERS CURRENTLY UNDER CONTRACT FOR TEAM
 
 	echo "
-		<tr bgcolor=#0000cc><td colspan=26><center><b><font color=white>$userteam Players Under Contract</font></b></center></td><td colspan=6><center><b><font color=white>Contract Commitment</font></b></center></td></tr>
-		<tr><td><b>Options</b></td><td><b>Pos</b></td><td><b>Player</b></td><td><b>Team</b></td><td><b>Age</b></td><td><b>Sta</b></td><td><b>2ga</b></td><td><b>2g%</b></td><td><b>fta</b></td><td><b>ft%</b></td><td><b>3ga</b></td><td><b>3g%</b></td><td><b>orb</b></td><td><b>drb</b></td><td><b>ast</b></td><td><b>stl</b></td><td><b>to</b></td><td><b>blk</b></td><td><b>oo</b></td><td><b>do</b></td><td><b>po</b></td><td><b>to</b></td><td><b>od</b></td><td><b>dd</b></td><td><b>pd</b></td><td><b>td</b></td><td><b>Yr1</b></td><td><b>Yr2</b></td><td><b>Yr3</b></td><td><b>Yr4</b></td><td><b>Yr5</b></td><td><b>Yr6</b></td></tr>
+		<tr bgcolor=#0000cc><td colspan=25><center><b><font color=white>$userteam Players Under Contract</font></b></center></td><td colspan=6><center><b><font color=white>Contract Commitment</font></b></center></td></tr>
+		<tr><td><b>Options</b></td><td><b>Pos</b></td><td><b>Player</b></td><td><b>Team</b></td><td><b>Age</b></td><td><b>2ga</b></td><td><b>2g%</b></td><td><b>fta</b></td><td><b>ft%</b></td><td><b>3ga</b></td><td><b>3g%</b></td><td><b>orb</b></td><td><b>drb</b></td><td><b>ast</b></td><td><b>stl</b></td><td><b>to</b></td><td><b>blk</b></td><td><b>oo</b></td><td><b>do</b></td><td><b>po</b></td><td><b>to</b></td><td><b>od</b></td><td><b>dd</b></td><td><b>pd</b></td><td><b>td</b></td><td><b>Yr1</b></td><td><b>Yr2</b></td><td><b>Yr3</b></td><td><b>Yr4</b></td><td><b>Yr5</b></td><td><b>Yr6</b></td></tr>
 	";
 
 	$showteam = $db->sql_query("SELECT * FROM ".$prefix."_iblplyr WHERE teamname='$userteam' AND retired='0' ORDER BY ordinal ASC");
@@ -181,7 +181,6 @@ function display() {
 			$r_stl = stripslashes(check_html($teamlist['r_stl'], "nohtml"));
 			$r_blk = stripslashes(check_html($teamlist['r_blk'], "nohtml"));
 			$r_tvr = stripslashes(check_html($teamlist['r_to'], "nohtml"));
-			$r_sta = stripslashes(check_html($teamlist['sta'], "nohtml"));
 			$r_foul = stripslashes(check_html($teamlist['r_drb'], "nohtml"));
 			$r_oo = stripslashes(check_html($teamlist['oo'], "nohtml"));
 			$r_do = stripslashes(check_html($teamlist['do'], "nohtml"));
@@ -329,7 +328,7 @@ function display() {
 				$name=$name."*";
 			}
 
-			echo "</td><td>$pos</td><td><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td><a href=\"modules.php?name=Team&op=team&tid=$tid\">$team</a></td><td>$age</td><td>$r_sta</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$contract1</td><td>$contract2</td><td>$contract3</td><td>$contract4</td><td>$contract5</td><td>$contract6</td></tr>";
+			echo "</td><td>$pos</td><td><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td><a href=\"modules.php?name=Team&op=team&tid=$tid\">$team</a></td><td>$age</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$contract1</td><td>$contract2</td><td>$contract3</td><td>$contract4</td><td>$contract5</td><td>$contract6</td></tr>";
 
 			$conttot1=$conttot1+$contract1;
 			$conttot2=$conttot2+$contract2;
@@ -340,15 +339,15 @@ function display() {
 		}
 	}
 
-	echo "<tr><td colspan=26 align=right><b><i>$userteam Total Committed Contracts</i></b></td><td><b><i>$conttot1</i></b></td><td><b><i>$conttot2</i></b></td><td><b><i>$conttot3</i></b></td><td><b><i>$conttot4</i></b></td><td><b><i>$conttot5</i></b></td><td><b><i>$conttot6</i></b></td></tr>";
+	echo "<tr><td colspan=25 align=right><b><i>$userteam Total Committed Contracts</i></b></td><td><b><i>$conttot1</i></b></td><td><b><i>$conttot2</i></b></td><td><b><i>$conttot3</i></b></td><td><b><i>$conttot4</i></b></td><td><b><i>$conttot5</i></b></td><td><b><i>$conttot6</i></b></td></tr>";
 
 	// ==== END LIST OF PLAYERS CURRENTLY UNDER CONTRACT
 
 	// ==== INSERT LIST OF PLAYERS WITH OFFERS
 
 	echo "
-		<tr bgcolor=#0000cc><td colspan=26><center><b><font color=white>$userteam Outstanding Contract Offers</font></b></center></td><td colspan=6><center><b><font color=white>Contract Amount Offered</font></b></center></td></tr>
-		<tr><td><b>Negotiate</b></td><td><b>Pos</b></td><td><b>Player</b></td><td><b>Team</b></td><td><b>Age</b></td><td><b>Sta</b></td><td><b>2ga</b></td><td><b>2g%</b></td><td><b>fta</b></td><td><b>ft%</b></td><td><b>3ga</b></td><td><b>3g%</b></td><td><b>orb</b></td><td><b>drb</b></td><td><b>ast</b></td><td><b>stl</b></td><td><b>to</b></td><td><b>blk</b></td><td><b>oo</b></td><td><b>do</b></td><td><b>po</b></td><td><b>to</b></td><td><b>od</b></td><td><b>dd</b></td><td><b>pd</b></td><td><b>td</b></td><td><b>Yr1</b></td><td><b>Yr2</b></td><td><b>Yr3</b></td><td><b>Yr4</b></td><td><b>Yr5</b></td><td><b>Yr6</b></td></tr>
+		<tr bgcolor=#0000cc><td colspan=25><center><b><font color=white>$userteam Outstanding Contract Offers</font></b></center></td><td colspan=6><center><b><font color=white>Contract Amount Offered</font></b></center></td></tr>
+		<tr><td><b>Negotiate</b></td><td><b>Pos</b></td><td><b>Player</b></td><td><b>Team</b></td><td><b>Age</b></td><td><b>2ga</b></td><td><b>2g%</b></td><td><b>fta</b></td><td><b>ft%</b></td><td><b>3ga</b></td><td><b>3g%</b></td><td><b>orb</b></td><td><b>drb</b></td><td><b>ast</b></td><td><b>stl</b></td><td><b>to</b></td><td><b>blk</b></td><td><b>oo</b></td><td><b>do</b></td><td><b>po</b></td><td><b>to</b></td><td><b>od</b></td><td><b>dd</b></td><td><b>pd</b></td><td><b>td</b></td><td><b>Yr1</b></td><td><b>Yr2</b></td><td><b>Yr3</b></td><td><b>Yr4</b></td><td><b>Yr5</b></td><td><b>Yr6</b></td></tr>
 	";
 	$showteam = $db->sql_query("SELECT * FROM ".$prefix."_iblplyr WHERE retired='0' ORDER BY ordinal ASC");
 	while ($teamlist = $db->sql_fetchrow($showteam)) {
@@ -384,7 +383,6 @@ function display() {
 			$r_stl = stripslashes(check_html($teamlist['r_stl'], "nohtml"));
 			$r_blk = stripslashes(check_html($teamlist['r_blk'], "nohtml"));
 			$r_tvr = stripslashes(check_html($teamlist['r_to'], "nohtml"));
-			$r_sta = stripslashes(check_html($teamlist['sta'], "nohtml"));
 			$r_foul = stripslashes(check_html($teamlist['r_drb'], "nohtml"));
 			$r_oo = stripslashes(check_html($teamlist['oo'], "nohtml"));
 			$r_do = stripslashes(check_html($teamlist['do'], "nohtml"));
@@ -395,7 +393,7 @@ function display() {
 			$r_pd = stripslashes(check_html($teamlist['pd'], "nohtml"));
 			$r_td = stripslashes(check_html($teamlist['td'], "nohtml"));
 
-			echo "      <tr><td><a href=\"modules.php?name=Free_Agency&pa=negotiate&pid=$pid\">Negotiate</a></td><td>$pos</td><td><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td><a href=\"modules.php?name=Team&op=team&tid=$tid\">$team</a></td><td>$age</td><td>$r_sta</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$offer1</td><td>$offer2</td><td>$offer3</td><td>$offer4</td><td>$offer5</td><td>$offer6</td></tr>";
+			echo "      <tr><td><a href=\"modules.php?name=Free_Agency&pa=negotiate&pid=$pid\">Negotiate</a></td><td>$pos</td><td><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td><a href=\"modules.php?name=Team&op=team&tid=$tid\">$team</a></td><td>$age</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$offer1</td><td>$offer2</td><td>$offer3</td><td>$offer4</td><td>$offer5</td><td>$offer6</td></tr>";
 
 			$conttot1=$conttot1+$offer1;
 			$conttot2=$conttot2+$offer2;
@@ -426,7 +424,7 @@ function display() {
 	}
 
 	echo "<tr>
-		<td colspan=26 align=right><b><i>$userteam Total Committed Plus Offered Contracts</i></b></td>
+		<td colspan=25 align=right><b><i>$userteam Total Committed Plus Offered Contracts</i></b></td>
 		<td><b><i>$conttot1</i></b></td>
 		<td><b><i>$conttot2</i></b></td>
 		<td><b><i>$conttot3</i></b></td>
@@ -458,7 +456,7 @@ function display() {
 	$HasLLE = stripslashes(check_html($exceptioninfo['HasLLE'], "nohtml"));
 
 	echo "<tr bgcolor=#cc0000>
-		<td colspan=18 bgcolor=#eeeeee></td>
+		<td colspan=17 bgcolor=#eeeeee></td>
 		<td colspan=8 align=right><font color=white><b>Soft Cap Space</b></font></td>
 		<td>$softcap</td>
 		<td>$softcap2</td>
@@ -468,7 +466,7 @@ function display() {
 		<td>$softcap6</td>
 	</tr>";
 	echo "<tr bgcolor=#cc0000>
-		<td colspan=18 bgcolor=#eeeeee></td>
+		<td colspan=17 bgcolor=#eeeeee></td>
 		<td colspan=8 align=right><font color=white><b>Hard Cap Space</b></font></td>
 		<td>$hardcap</td>
 		<td>$hardcap2</td>
@@ -478,7 +476,7 @@ function display() {
 		<td>$hardcap6</td>
 	</tr>";
 	echo "<tr bgcolor=#cc0000>
-		<td colspan=18 bgcolor=#eeeeee></td>
+		<td colspan=17 bgcolor=#eeeeee></td>
 		<td colspan=8 align=right><font color=white><b>Empty Roster Slots</b></font></td>
 		<td>$rosterspots1</td>
 		<td>$rosterspots2</td>
@@ -511,8 +509,8 @@ function display() {
 	// ==== INSERT LIST OF FREE AGENTS FROM TEAM
 
 	echo "
-		<tr bgcolor=0000cc><td colspan=26><center><font color=white><b>$userteam Unsigned Free Agents</b> (Note: * and <i>italicized</i> indicates player has Bird Rights)</i></font></center></td><td colspan=6><center><font color=white><b>Contract Amount Sought</b></font></center></td></tr>
-		<tr><td><b>Negotiate</b></td><td><b>Pos</b></td><td><b>Player</b></td><td><b>Team</b></td><td><b>Age</b></td><td><b>Sta</b></td><td><b>2ga</b></td><td><b>2g%</b></td><td><b>fta</b></td><td><b>ft%</b></td><td><b>3ga</b></td><td><b>3g%</b></td><td><b>orb</b></td><td><b>drb</b></td><td><b>ast</b></td><td><b>stl</b></td><td><b>to</b></td><td><b>blk</b></td><td><b>oo</b></td><td><b>do</b></td><td><b>po</b></td><td><b>to</b></td><td><b>od</b></td><td><b>dd</b></td><td><b>pd</b></td><td><b>td</b></td><td><b>Yr1</b></td><td><b>Yr2</b></td><td><b>Yr3</b></td><td><b>Yr4</b></td><td><b>Yr5</b></td><td><b>Yr6</b></td></tr>
+		<tr bgcolor=0000cc><td colspan=25><center><font color=white><b>$userteam Unsigned Free Agents</b> (Note: * and <i>italicized</i> indicates player has Bird Rights)</i></font></center></td><td colspan=6><center><font color=white><b>Contract Amount Sought</b></font></center></td></tr>
+		<tr><td><b>Negotiate</b></td><td><b>Pos</b></td><td><b>Player</b></td><td><b>Team</b></td><td><b>Age</b></td><td><b>2ga</b></td><td><b>2g%</b></td><td><b>fta</b></td><td><b>ft%</b></td><td><b>3ga</b></td><td><b>3g%</b></td><td><b>orb</b></td><td><b>drb</b></td><td><b>ast</b></td><td><b>stl</b></td><td><b>to</b></td><td><b>blk</b></td><td><b>oo</b></td><td><b>do</b></td><td><b>po</b></td><td><b>to</b></td><td><b>od</b></td><td><b>dd</b></td><td><b>pd</b></td><td><b>td</b></td><td><b>Yr1</b></td><td><b>Yr2</b></td><td><b>Yr3</b></td><td><b>Yr4</b></td><td><b>Yr5</b></td><td><b>Yr6</b></td></tr>
 	";
 
 	$showteam = $db->sql_query("SELECT * FROM ".$prefix."_iblplyr WHERE teamname='$userteam' AND retired='0' AND ordinal < 960 ORDER BY ordinal ASC");
@@ -554,7 +552,6 @@ function display() {
 			$r_stl = stripslashes(check_html($teamlist['r_stl'], "nohtml"));
 			$r_blk = stripslashes(check_html($teamlist['r_blk'], "nohtml"));
 			$r_tvr = stripslashes(check_html($teamlist['r_to'], "nohtml"));
-			$r_sta = stripslashes(check_html($teamlist['sta'], "nohtml"));
 			$r_foul = stripslashes(check_html($teamlist['r_drb'], "nohtml"));
 			$r_oo = stripslashes(check_html($teamlist['oo'], "nohtml"));
 			$r_do = stripslashes(check_html($teamlist['do'], "nohtml"));
@@ -581,7 +578,7 @@ function display() {
 
 			// ==== END NOTE BIRD RIGHTS
 
-			echo "</a></td><td><a href=\"modules.php?name=Team&op=team&tid=$tid\">$team</a></td><td>$age</td><td>$r_sta</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$dem1</td><td>$dem2</td><td>$dem3</td><td>$dem4</td><td>$dem5</td><td>$dem6</td></tr>";
+			echo "</a></td><td><a href=\"modules.php?name=Team&op=team&tid=$tid\">$team</a></td><td>$age</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$dem1</td><td>$dem2</td><td>$dem3</td><td>$dem4</td><td>$dem5</td><td>$dem6</td></tr>";
 		} else {}
 	}
 
@@ -590,8 +587,8 @@ function display() {
 	// ==== INSERT ALL OTHER FREE AGENTS
 
 	echo "
-		<tr bgcolor=#0000cc><td colspan=26><center><b><font color=white>All Other Free Agents</font></b></center></td><td colspan=6><center><b><font color=white>Contract Amount Sought</font></b></center></td></tr>
-		<tr><td><b>Negotiate</b></td><td><b>Pos</b></td><td><b>Player</b></td><td><b>Team</b></td><td><b>Age</b></td><td><b>Sta</b></td><td><b>2ga</b></td><td><b>2g%</b></td><td><b>fta</b></td><td><b>ft%</b></td><td><b>3ga</b></td><td><b>3g%</b></td><td><b>orb</b></td><td><b>drb</b></td><td><b>ast</b></td><td><b>stl</b></td><td><b>to</b></td><td><b>blk</b></td><td><b>oo</b></td><td><b>do</b></td><td><b>po</b></td><td><b>to</b></td><td><b>od</b></td><td><b>dd</b></td><td><b>pd</b></td><td><b>td</b></td><td><b>Yr1</b></td><td><b>Yr2</b></td><td><b>Yr3</b></td><td><b>Yr4</b></td><td><b>Yr5</b></td><td><b>Yr6</b></td></tr>
+		<tr bgcolor=#0000cc><td colspan=25><center><b><font color=white>All Other Free Agents</font></b></center></td><td colspan=6><center><b><font color=white>Contract Amount Sought</font></b></center></td></tr>
+		<tr><td><b>Negotiate</b></td><td><b>Pos</b></td><td><b>Player</b></td><td><b>Team</b></td><td><b>Age</b></td><td><b>2ga</b></td><td><b>2g%</b></td><td><b>fta</b></td><td><b>ft%</b></td><td><b>3ga</b></td><td><b>3g%</b></td><td><b>orb</b></td><td><b>drb</b></td><td><b>ast</b></td><td><b>stl</b></td><td><b>to</b></td><td><b>blk</b></td><td><b>oo</b></td><td><b>do</b></td><td><b>po</b></td><td><b>to</b></td><td><b>od</b></td><td><b>dd</b></td><td><b>pd</b></td><td><b>td</b></td><td><b>Yr1</b></td><td><b>Yr2</b></td><td><b>Yr3</b></td><td><b>Yr4</b></td><td><b>Yr5</b></td><td><b>Yr6</b></td></tr>
 	";
 
 	$showteam = $db->sql_query("SELECT * FROM ".$prefix."_iblplyr WHERE teamname!='$userteam' AND retired='0' ORDER BY ordinal ASC");
@@ -632,7 +629,6 @@ function display() {
 			$r_stl = stripslashes(check_html($teamlist['r_stl'], "nohtml"));
 			$r_blk = stripslashes(check_html($teamlist['r_blk'], "nohtml"));
 			$r_tvr = stripslashes(check_html($teamlist['r_to'], "nohtml"));
-			$r_sta = stripslashes(check_html($teamlist['sta'], "nohtml"));
 			$r_foul = stripslashes(check_html($teamlist['r_drb'], "nohtml"));
 			$r_oo = stripslashes(check_html($teamlist['oo'], "nohtml"));
 			$r_do = stripslashes(check_html($teamlist['do'], "nohtml"));
@@ -654,7 +650,6 @@ function display() {
 				<td><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>
 				<td><a href=\"modules.php?name=Team&op=team&tid=$tid\">$team</a></td>
 				<td>$age</td>
-				<td>$r_sta</td>
 				<td>$r_2ga</td>
 				<td>$r_2gp</td>
 				<td>$r_fta</td>

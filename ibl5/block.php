@@ -4,6 +4,8 @@ require 'config.php';
 mysql_connect($dbhost,$dbuname,$dbpass);
 @mysql_select_db($dbname) or die("Unable to select database");
 
+require $_SERVER['DOCUMENT_ROOT'] . '/sharedFunctions.php';
+
 $val = $_GET['day'];
 
 $query="SELECT * FROM `nuke_ibl_fa_offers` ORDER BY name ASC, perceivedvalue DESC";
@@ -16,6 +18,7 @@ $i=0;
 while ($i < $num) {
 	$name=mysql_result($result,$i,"name");
 	$team=mysql_result($result,$i,"team");
+	$tid = getTidFromTeamname($team);
 	$perceivedvalue=mysql_result($result,$i,"perceivedvalue");
 
 	$offer1=mysql_result($result,$i,"offer1");
@@ -88,7 +91,7 @@ while ($i < $num) {
 					`cy6` = '" . $offer6 . "',
 					`teamname` = '" . $team . "',
 					`cyt` = '" . $offeryears . "',
-					`tid` = '" . getteamid($team) . "'
+					`tid` = $tid
 				WHERE `name` = '" . $name . "'
 				LIMIT 1;";
 			if ($MLE == 1) {
@@ -143,33 +146,5 @@ while ($i < $num) {
 }
 
 echo "</TABLE><hr> <h2>SQL QUERY BOX</h2><br> <FORM><TEXTAREA COLS=125 ROWS=20>$code</TEXTAREA> <hr> <h2>ACCEPTED OFFERS IN HTML FORMAT (FOR NEWS ARTICLE)</h2><br> <TEXTAREA COLS=125 ROWS=20>$text</TEXTAREA> <hr> <h2>ALL OFFERS IN HTML FORMAT (FOR NEWS ARTICLE EXTENDED TEXT)</h2><br> <TEXTAREA COLS=125 ROWS=20>$exttext</TEXTAREA></FORM> <hr> </HTML>";
-
-function getteamid ($teamname) {
-	if($teamname == 'Celtics') return 1;
-	if($teamname == 'Heat') return 2;
-	if($teamname == 'Knicks') return 3;
-	if($teamname == 'Nets') return 4;
-	if($teamname == 'Magic') return 5;
-	if($teamname == 'Bucks') return 6;
-	if($teamname == 'Bulls') return 7;
-	if($teamname == 'Pelicans') return 8;
-	if($teamname == 'Hawks') return 9;
-	if($teamname == 'Hornets') return 10;
-	if($teamname == 'Pacers') return 11;
-	if($teamname == 'Raptors') return 12;
-	if($teamname == 'Jazz') return 13;
-	if($teamname == 'Timberwolves') return 14;
-	if($teamname == 'Nuggets') return 15;
-	if($teamname == 'Thunder') return 16;
-	if($teamname == 'Spurs') return 17;
-	if($teamname == 'Trailblazers') return 18;
-	if($teamname == 'Clippers') return 19;
-	if($teamname == 'Grizzlies') return 20;
-	if($teamname == 'Lakers') return 21;
-	if($teamname == 'Supersonics') return 22;
-	if($teamname == 'Suns') return 23;
-	if($teamname == 'Warriors') return 24;
-	return 0;
-}
 
 ?>

@@ -146,7 +146,7 @@ function display() {
 
 	echo "
 		<tr bgcolor=#0000cc>
-			<td colspan=25><center><b><font color=white>$userteam Players Under Contract</font></b></center></td>
+			<td colspan=29><center><b><font color=white>$userteam Players Under Contract</font></b></center></td>
 			<td colspan=6><center><b><font color=white>Contract Commitment</font></b></center></td>
 			<td colspan=5><center><b><font color=white>Demand Factors</font></b></center></td>
 		</tr>
@@ -168,6 +168,7 @@ function display() {
 			<td><b>stl</b></td>
 			<td><b>to</b></td>
 			<td><b>blk</b></td>
+			<td><b>foul</b></td>
 			<td><b>oo</b></td>
 			<td><b>do</b></td>
 			<td><b>po</b></td>
@@ -176,6 +177,9 @@ function display() {
 			<td><b>dd</b></td>
 			<td><b>pd</b></td>
 			<td><b>td</b></td>
+			<td><b>T</b></td>
+			<td><b>S</b></td>
+			<td><b>I</b></td>
 			<td><b>Yr1</b></td>
 			<td><b>Yr2</b></td>
 			<td><b>Yr3</b></td>
@@ -222,7 +226,7 @@ function display() {
 			$r_stl = stripslashes(check_html($teamlist['r_stl'], "nohtml"));
 			$r_blk = stripslashes(check_html($teamlist['r_blk'], "nohtml"));
 			$r_tvr = stripslashes(check_html($teamlist['r_to'], "nohtml"));
-			$r_foul = stripslashes(check_html($teamlist['r_drb'], "nohtml"));
+			$r_foul = stripslashes(check_html($teamlist['r_foul'], "nohtml"));
 			$r_oo = stripslashes(check_html($teamlist['oo'], "nohtml"));
 			$r_do = stripslashes(check_html($teamlist['do'], "nohtml"));
 			$r_po = stripslashes(check_html($teamlist['po'], "nohtml"));
@@ -231,6 +235,10 @@ function display() {
 			$r_dd = stripslashes(check_html($teamlist['dd'], "nohtml"));
 			$r_pd = stripslashes(check_html($teamlist['pd'], "nohtml"));
 			$r_td = stripslashes(check_html($teamlist['td'], "nohtml"));
+
+			$talent = $teamlist['talent'];
+			$skill = $teamlist['skill'];
+			$intangibles = $teamlist['intangibles'];
 
 			$loy = $teamlist['loyalty'];
 			$pfw = $teamlist['winner'];
@@ -392,6 +400,7 @@ function display() {
 				<td>$r_stl</td>
 				<td>$r_tvr</td>
 				<td>$r_blk</td>
+				<td>$r_foul</td>
 				<td>$r_oo</td>
 				<td>$r_do</td>
 				<td>$r_po</td>
@@ -400,6 +409,9 @@ function display() {
 				<td>$r_dd</td>
 				<td>$r_pd</td>
 				<td>$r_td</td>
+				<td>$talent</td>
+				<td>$skill</td>
+				<td>$intangibles</td>
 				<td>$contract1</td>
 				<td>$contract2</td>
 				<td>$contract3</td>
@@ -423,7 +435,7 @@ function display() {
 	}
 
 	echo "<tr>
-		<td colspan=25 align=right><b><i>$userteam Total Committed Contracts</i></b></td>
+		<td colspan=29 align=right><b><i>$userteam Total Committed Contracts</i></b></td>
 		<td><b><i>$conttot1</i></b></td>
 		<td><b><i>$conttot2</i></b></td>
 		<td><b><i>$conttot3</i></b></td>
@@ -438,7 +450,7 @@ function display() {
 
 	echo "
 		<tr bgcolor=#0000cc>
-			<td colspan=25><center><b><font color=white>$userteam Outstanding Contract Offers</font></b></center></td>
+			<td colspan=29><center><b><font color=white>$userteam Outstanding Contract Offers</font></b></center></td>
 			<td colspan=6><center><b><font color=white>Contract Amount Offered</font></b></center></td>
 			<td colspan=5><center><b><font color=white>Demand Factors</font></b></center></td>
 		</tr>
@@ -460,6 +472,7 @@ function display() {
 			<td><b>stl</b></td>
 			<td><b>to</b></td>
 			<td><b>blk</b></td>
+			<td><b>foul</b></td>
 			<td><b>oo</b></td>
 			<td><b>do</b></td>
 			<td><b>po</b></td>
@@ -468,6 +481,9 @@ function display() {
 			<td><b>dd</b></td>
 			<td><b>pd</b></td>
 			<td><b>td</b></td>
+			<td><b>T</b></td>
+			<td><b>S</b></td>
+			<td><b>I</b></td>
 			<td><b>Yr1</b></td>
 			<td><b>Yr2</b></td>
 			<td><b>Yr3</b></td>
@@ -515,7 +531,7 @@ function display() {
 			$r_stl = stripslashes(check_html($teamlist['r_stl'], "nohtml"));
 			$r_blk = stripslashes(check_html($teamlist['r_blk'], "nohtml"));
 			$r_tvr = stripslashes(check_html($teamlist['r_to'], "nohtml"));
-			$r_foul = stripslashes(check_html($teamlist['r_drb'], "nohtml"));
+			$r_foul = stripslashes(check_html($teamlist['r_foul'], "nohtml"));
 			$r_oo = stripslashes(check_html($teamlist['oo'], "nohtml"));
 			$r_do = stripslashes(check_html($teamlist['do'], "nohtml"));
 			$r_po = stripslashes(check_html($teamlist['po'], "nohtml"));
@@ -524,6 +540,10 @@ function display() {
 			$r_dd = stripslashes(check_html($teamlist['dd'], "nohtml"));
 			$r_pd = stripslashes(check_html($teamlist['pd'], "nohtml"));
 			$r_td = stripslashes(check_html($teamlist['td'], "nohtml"));
+
+			$talent = $teamlist['talent'];
+			$skill = $teamlist['skill'];
+			$intangibles = $teamlist['intangibles'];
 
 			$loy = $teamlist['loyalty'];
 			$pfw = $teamlist['winner'];
@@ -549,6 +569,7 @@ function display() {
 				<td>$r_stl</td>
 				<td>$r_tvr</td>
 				<td>$r_blk</td>
+				<td>$r_foul</td>
 				<td>$r_oo</td>
 				<td>$r_do</td>
 				<td>$r_po</td>
@@ -557,6 +578,9 @@ function display() {
 				<td>$r_dd</td>
 				<td>$r_pd</td>
 				<td>$r_td</td>
+				<td>$talent</td>
+				<td>$skill</td>
+				<td>$intangibles</td>
 				<td>$offer1</td>
 				<td>$offer2</td>
 				<td>$offer3</td>
@@ -599,7 +623,7 @@ function display() {
 	}
 
 	echo "<tr>
-		<td colspan=25 align=right><b><i>$userteam Total Committed Plus Offered Contracts</i></b></td>
+		<td colspan=29 align=right><b><i>$userteam Total Committed Plus Offered Contracts</i></b></td>
 		<td><b><i>$conttot1</i></b></td>
 		<td><b><i>$conttot2</i></b></td>
 		<td><b><i>$conttot3</i></b></td>
@@ -631,7 +655,7 @@ function display() {
 	$HasLLE = stripslashes(check_html($exceptioninfo['HasLLE'], "nohtml"));
 
 	echo "<tr bgcolor=#cc0000>
-		<td colspan=17 bgcolor=#eeeeee></td>
+		<td colspan=21 bgcolor=#eeeeee></td>
 		<td colspan=8 align=right><font color=white><b>Soft Cap Space</b></font></td>
 		<td>$softcap</td>
 		<td>$softcap2</td>
@@ -641,7 +665,7 @@ function display() {
 		<td>$softcap6</td>
 	</tr>";
 	echo "<tr bgcolor=#cc0000>
-		<td colspan=17 bgcolor=#eeeeee></td>
+		<td colspan=21 bgcolor=#eeeeee></td>
 		<td colspan=8 align=right><font color=white><b>Hard Cap Space</b></font></td>
 		<td>$hardcap</td>
 		<td>$hardcap2</td>
@@ -651,7 +675,7 @@ function display() {
 		<td>$hardcap6</td>
 	</tr>";
 	echo "<tr bgcolor=#cc0000>
-		<td colspan=17 bgcolor=#eeeeee></td>
+		<td colspan=21 bgcolor=#eeeeee></td>
 		<td colspan=8 align=right><font color=white><b>Empty Roster Slots</b></font></td>
 		<td>$rosterspots1</td>
 		<td>$rosterspots2</td>
@@ -661,7 +685,7 @@ function display() {
 		<td>$rosterspots6</td>
 	</tr>";
 
-	echo "<tr bgcolor=#cc0000><td colspan=36><font color=white><b>";
+	echo "<tr bgcolor=#cc0000><td colspan=35><font color=white><b>";
 
 	if ($HasMLE == 1) {
 		echo "Your team has access to the Mid-Level Exception (MLE) and hasn't signed a player with it (but you may have offered it to someone above).</b></font></td></tr>";
@@ -669,7 +693,7 @@ function display() {
 		echo "Your team does NOT have access to the Mid-Level Exception - you either used it or didn't have sufficient cap space at the start of free agency.</b></font></td></tr>";
 	}
 
-	echo "                <tr bgcolor=#cc0000><td colspan=36><font color=white><b>";
+	echo "                <tr bgcolor=#cc0000><td colspan=35><font color=white><b>";
 
 	if ($HasLLE == 1) {
 		echo "Your team has access to the Lower-Level Exception (LLE) and hasn't signed a player with it (but you may have offered it to someone above).</b></font></td></tr>";
@@ -678,14 +702,14 @@ function display() {
 	}
 
 	echo "
-					<tr><td colspan=36><hr></td></tr>
+					<tr><td colspan=40><hr></td></tr>
 	";
 
 	// ==== INSERT LIST OF FREE AGENTS FROM TEAM
 
 	echo "
 		<tr bgcolor=0000cc>
-			<td colspan=25><center><font color=white><b>$userteam Unsigned Free Agents</b> (Note: * and <i>italicized</i> indicates player has Bird Rights)</i></font></center></td>
+			<td colspan=29><center><font color=white><b>$userteam Unsigned Free Agents</b> (Note: * and <i>italicized</i> indicates player has Bird Rights)</i></font></center></td>
 			<td colspan=6><center><font color=white><b>Contract Amount Sought</b></font></center></td>
 			<td colspan=5><center><b><font color=white>Demand Factors</font></b></center></td>
 		</tr>
@@ -707,6 +731,7 @@ function display() {
 			<td><b>stl</b></td>
 			<td><b>to</b></td>
 			<td><b>blk</b></td>
+			<td><b>foul</b></td>
 			<td><b>oo</b></td>
 			<td><b>do</b></td>
 			<td><b>po</b></td>
@@ -715,6 +740,9 @@ function display() {
 			<td><b>dd</b></td>
 			<td><b>pd</b></td>
 			<td><b>td</b></td>
+			<td><b>T</b></td>
+			<td><b>S</b></td>
+			<td><b>I</b></td>
 			<td><b>Yr1</b></td>
 			<td><b>Yr2</b></td>
 			<td><b>Yr3</b></td>
@@ -768,7 +796,7 @@ function display() {
 			$r_stl = stripslashes(check_html($teamlist['r_stl'], "nohtml"));
 			$r_blk = stripslashes(check_html($teamlist['r_blk'], "nohtml"));
 			$r_tvr = stripslashes(check_html($teamlist['r_to'], "nohtml"));
-			$r_foul = stripslashes(check_html($teamlist['r_drb'], "nohtml"));
+			$r_foul = stripslashes(check_html($teamlist['r_foul'], "nohtml"));
 			$r_oo = stripslashes(check_html($teamlist['oo'], "nohtml"));
 			$r_do = stripslashes(check_html($teamlist['do'], "nohtml"));
 			$r_po = stripslashes(check_html($teamlist['po'], "nohtml"));
@@ -777,6 +805,10 @@ function display() {
 			$r_dd = stripslashes(check_html($teamlist['dd'], "nohtml"));
 			$r_pd = stripslashes(check_html($teamlist['pd'], "nohtml"));
 			$r_td = stripslashes(check_html($teamlist['td'], "nohtml"));
+
+			$talent = $teamlist['talent'];
+			$skill = $teamlist['skill'];
+			$intangibles = $teamlist['intangibles'];
 
 			$loy = $teamlist['loyalty'];
 			$pfw = $teamlist['winner'];
@@ -815,6 +847,7 @@ function display() {
 				<td>$r_stl</td>
 				<td>$r_tvr</td>
 				<td>$r_blk</td>
+				<td>$r_foul</td>
 				<td>$r_oo</td>
 				<td>$r_do</td>
 				<td>$r_po</td>
@@ -823,6 +856,9 @@ function display() {
 				<td>$r_dd</td>
 				<td>$r_pd</td>
 				<td>$r_td</td>
+				<td>$talent</td>
+				<td>$skill</td>
+				<td>$intangibles</td>
 				<td>$dem1</td>
 				<td>$dem2</td>
 				<td>$dem3</td>
@@ -844,7 +880,7 @@ function display() {
 
 	echo "
 		<tr bgcolor=#0000cc>
-			<td colspan=25><center><b><font color=white>All Other Free Agents</font></b></center></td>
+			<td colspan=29><center><b><font color=white>All Other Free Agents</font></b></center></td>
 			<td colspan=6><center><b><font color=white>Contract Amount Sought</font></b></center></td>
 			<td colspan=5><center><b><font color=white>Demand Factors</font></b></center></td>
 		</tr>
@@ -866,6 +902,7 @@ function display() {
 			<td><b>stl</b></td>
 			<td><b>to</b></td>
 			<td><b>blk</b></td>
+			<td><b>foul</b></td>
 			<td><b>oo</b></td>
 			<td><b>do</b></td>
 			<td><b>po</b></td>
@@ -874,6 +911,9 @@ function display() {
 			<td><b>dd</b></td>
 			<td><b>pd</b></td>
 			<td><b>td</b></td>
+			<td><b>T</b></td>
+			<td><b>S</b></td>
+			<td><b>I</b></td>
 			<td><b>Yr1</b></td>
 			<td><b>Yr2</b></td>
 			<td><b>Yr3</b></td>
@@ -926,7 +966,7 @@ function display() {
 			$r_stl = stripslashes(check_html($teamlist['r_stl'], "nohtml"));
 			$r_blk = stripslashes(check_html($teamlist['r_blk'], "nohtml"));
 			$r_tvr = stripslashes(check_html($teamlist['r_to'], "nohtml"));
-			$r_foul = stripslashes(check_html($teamlist['r_drb'], "nohtml"));
+			$r_foul = stripslashes(check_html($teamlist['r_foul'], "nohtml"));
 			$r_oo = stripslashes(check_html($teamlist['oo'], "nohtml"));
 			$r_do = stripslashes(check_html($teamlist['do'], "nohtml"));
 			$r_po = stripslashes(check_html($teamlist['po'], "nohtml"));
@@ -935,6 +975,10 @@ function display() {
 			$r_dd = stripslashes(check_html($teamlist['dd'], "nohtml"));
 			$r_pd = stripslashes(check_html($teamlist['pd'], "nohtml"));
 			$r_td = stripslashes(check_html($teamlist['td'], "nohtml"));
+
+			$talent = $teamlist['talent'];
+			$skill = $teamlist['skill'];
+			$intangibles = $teamlist['intangibles'];
 
 			$loy = $teamlist['loyalty'];
 			$pfw = $teamlist['winner'];
@@ -965,6 +1009,7 @@ function display() {
 				<td>$r_stl</td>
 				<td>$r_tvr</td>
 				<td>$r_blk</td>
+				<td>$r_foul</td>
 				<td>$r_oo</td>
 				<td>$r_do</td>
 				<td>$r_po</td>
@@ -972,7 +1017,10 @@ function display() {
 				<td>$r_od</td>
 				<td>$r_dd</td>
 				<td>$r_pd</td>
-				<td>$r_td</td>";
+				<td>$r_td</td>
+				<td>$talent</td>
+				<td>$skill</td>
+				<td>$intangibles</td>";
 			if ($exp > 0) {
 				echo "<td>$dem1</td>
 				<td>$dem2</td>

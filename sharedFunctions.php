@@ -29,3 +29,13 @@ function getCurrentSeasonPhase()
 
     return mysql_result($queryCurrentSeasonPhase, 0);
 }
+
+function getTidFromTeamname($teamname)
+{
+    $queryTidFromTeamname = mysql_query("SELECT teamid
+        FROM nuke_ibl_team_info
+        WHERE team_name = '$teamname'
+        LIMIT 1;");
+
+    return mysql_result($queryTidFromTeamname, 0);
+}

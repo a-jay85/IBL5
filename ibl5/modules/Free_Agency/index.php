@@ -191,8 +191,6 @@ function display() {
 			$r_dd = stripslashes(check_html($teamlist['dd'], "nohtml"));
 			$r_pd = stripslashes(check_html($teamlist['pd'], "nohtml"));
 			$r_td = stripslashes(check_html($teamlist['td'], "nohtml"));
-			$r_totoff=$r_oo+$r_do+$r_po+$r_to;
-			$r_totdef=$r_od+$r_dd+$r_pd+$r_td;
 
 			// === MATCH UP CONTRACT AMOUNTS WITH FUTURE YEARS BASED ON CURRENT YEAR OF CONTRACT
 
@@ -396,8 +394,6 @@ function display() {
 			$r_dd = stripslashes(check_html($teamlist['dd'], "nohtml"));
 			$r_pd = stripslashes(check_html($teamlist['pd'], "nohtml"));
 			$r_td = stripslashes(check_html($teamlist['td'], "nohtml"));
-			$r_totoff=$r_oo+$r_do+$r_po+$r_to;
-			$r_totdef=$r_od+$r_dd+$r_pd+$r_td;
 
 			echo "      <tr><td><a href=\"modules.php?name=Free_Agency&pa=negotiate&pid=$pid\">Negotiate</a></td><td>$pos</td><td><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td><a href=\"modules.php?name=Team&op=team&tid=$tid\">$team</a></td><td>$age</td><td>$r_sta</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$offer1</td><td>$offer2</td><td>$offer3</td><td>$offer4</td><td>$offer5</td><td>$offer6</td></tr>";
 
@@ -568,8 +564,6 @@ function display() {
 			$r_dd = stripslashes(check_html($teamlist['dd'], "nohtml"));
 			$r_pd = stripslashes(check_html($teamlist['pd'], "nohtml"));
 			$r_td = stripslashes(check_html($teamlist['td'], "nohtml"));
-			$r_totoff=$r_oo+$r_do+$r_po+$r_to;
-			$r_totdef=$r_od+$r_dd+$r_pd+$r_td;
 
 			echo "      <tr><td>";
 
@@ -648,8 +642,6 @@ function display() {
 			$r_dd = stripslashes(check_html($teamlist['dd'], "nohtml"));
 			$r_pd = stripslashes(check_html($teamlist['pd'], "nohtml"));
 			$r_td = stripslashes(check_html($teamlist['td'], "nohtml"));
-			$r_totoff=$r_oo+$r_do+$r_po+$r_to;
-			$r_totdef=$r_od+$r_dd+$r_pd+$r_td;
 
 			echo "      <tr><td>";
 

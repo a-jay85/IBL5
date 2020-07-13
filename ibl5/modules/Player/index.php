@@ -1102,13 +1102,57 @@ if ($can_renegotiate >= 0 AND $player_team_name == $userteam) {
 
 // POSITION CHANGE BUTTON END
 
-        echo "<font class=\"content\">Age: $player_age | Height: $player_ht_ft-$player_ht_in | Weight: $player_wt | College: <a href=\"http://college.iblhoops.net/rosters/roster$player_collegeid.htm\">$player_college</a>
-                    <br><i>Drafted by the $player_drafted_by with the # $player_draft_pick pick of round $player_draft_round in the <a href=\"online/draft.php?year=$player_draft_year\">$player_draft_year Draft</a></i>
-                    <br><center><table><tr><td align=center><b>2ga</b></td><td align=center><b>2gp</b></td><td align=center><b>fta</b></td><td align=center><b>ftp</b></td><td align=center><b>3ga</b></td><td align=center><b>3gp</b></td><td align=center><b>orb</b></td><td align=center><b>drb</b></td><td align=center><b>ast</b></td><td align=center><b>stl</b></td><td align=center><b>blk</b></td><td align=center><b>tvr</b></td><td align=center><b>oo</b></td><td align=center><b>do</b></td><td align=center><b>po</b></td><td align=center><b>to</b></td><td align=center><b>od</b></td><td align=center><b>dd</b></td><td align=center><b>pd</b></td><td align=center><b>td</b></td><td align=center><b>foul</b></td></tr>
-                    <tr><td align=center>$player_rating_2ga</td><td align=center>$player_rating_2gp</td><td align=center>$player_rating_fta</td><td align=center>$player_rating_ftp</td><td align=center>$player_rating_3ga</td><td align=center>$player_rating_3gp</td><td align=center>$player_rating_orb</td><td align=center>$player_rating_drb</td><td align=center>$player_rating_ast</td><td align=center>$player_rating_stl</td><td align=center>$player_rating_blk</td><td align=center>$player_rating_tvr</td><td align=center>$player_rating_oo</td><td align=center>$player_rating_do</td><td align=center>$player_rating_po</td><td align=center>$player_rating_to</td><td align=center>$player_rating_od</td><td align=center>$player_rating_dd</td><td align=center>$player_rating_pd</td><td align=center>$player_rating_td</td><td align=center>$player_rating_foul</td></tr></table>
-                    </center>
-
-                    <b>BIRD YEARS:</b> $player_bird | <b>Remaining Contract:</b> $contract_display </td>";
+        echo "<font class=\"content\">Age: $player_age | Height: $player_ht_ft-$player_ht_in | Weight: $player_wt | College: <a href=\"http://college.iblhoops.net/rosters/roster$player_collegeid.htm\">$player_college</a><br>
+            <i>Drafted by the $player_drafted_by with the # $player_draft_pick pick of round $player_draft_round in the <a href=\"online/draft.php?year=$player_draft_year\">$player_draft_year Draft</a></i><br>
+            <center><table>
+                <tr>
+                    <td align=center><b>2ga</b></td>
+                    <td align=center><b>2gp</b></td>
+                    <td align=center><b>fta</b></td>
+                    <td align=center><b>ftp</b></td>
+                    <td align=center><b>3ga</b></td>
+                    <td align=center><b>3gp</b></td>
+                    <td align=center><b>orb</b></td>
+                    <td align=center><b>drb</b></td>
+                    <td align=center><b>ast</b></td>
+                    <td align=center><b>stl</b></td>
+                    <td align=center><b>blk</b></td>
+                    <td align=center><b>tvr</b></td>
+                    <td align=center><b>oo</b></td>
+                    <td align=center><b>do</b></td>
+                    <td align=center><b>po</b></td>
+                    <td align=center><b>to</b></td>
+                    <td align=center><b>od</b></td>
+                    <td align=center><b>dd</b></td>
+                    <td align=center><b>pd</b></td>
+                    <td align=center><b>td</b></td>
+                    <td align=center><b>foul</b></td>
+                </tr>
+                <tr>
+                    <td align=center>$player_rating_2ga</td>
+                    <td align=center>$player_rating_2gp</td>
+                    <td align=center>$player_rating_fta</td>
+                    <td align=center>$player_rating_ftp</td>
+                    <td align=center>$player_rating_3ga</td>
+                    <td align=center>$player_rating_3gp</td>
+                    <td align=center>$player_rating_orb</td>
+                    <td align=center>$player_rating_drb</td>
+                    <td align=center>$player_rating_ast</td>
+                    <td align=center>$player_rating_stl</td>
+                    <td align=center>$player_rating_blk</td>
+                    <td align=center>$player_rating_tvr</td>
+                    <td align=center>$player_rating_oo</td>
+                    <td align=center>$player_rating_do</td>
+                    <td align=center>$player_rating_po</td>
+                    <td align=center>$player_rating_to</td>
+                    <td align=center>$player_rating_od</td>
+                    <td align=center>$player_rating_dd</td>
+                    <td align=center>$player_rating_pd</td>
+                    <td align=center>$player_rating_td</td>
+                    <td align=center>$player_rating_foul</td>
+                </tr>
+            </table></center>
+        <b>BIRD YEARS:</b> $player_bird | <b>Remaining Contract:</b> $contract_display </td>";
 
 if ($spec == NULL) {
 

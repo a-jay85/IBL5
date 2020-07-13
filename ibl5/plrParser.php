@@ -12,7 +12,7 @@ $stringTeamIDsNames = "SELECT teamid,team_name FROM nuke_ibl_team_info ORDER BY 
 $queryTeamIDsNames = mysql_query($stringTeamIDsNames);
 $numRowsTeamIDsNames = mysql_num_rows($queryTeamIDsNames);
 
-$plrFile = fopen("IBLv4.plr", "rb");
+$plrFile = fopen("IBL5.plr", "rb");
 while (!feof($plrFile)) {
     $line = fgets($plrFile);
 
@@ -191,7 +191,7 @@ while (!feof($plrFile)) {
     if ($rlPF != 0) $minsPerPF = round($rlMIN / $rlPF);
 
     if ($ordinal <= 1440) {
-        $playerUpdateQuery = "UPDATE `nuke_iblplyr`
+        $playerUpdateQuery = "UPDATE `nuke_iblplyr__test`
             SET
             `ordinal` = $ordinal,
             `name` = '$name',
@@ -324,7 +324,7 @@ while (!feof($plrFile)) {
             $sideOfTheBall = 'defense';
         }
 
-        $teamUpdateQuery = 'UPDATE `ibl_team_'.$sideOfTheBall.'_stats`
+        $teamUpdateQuery = 'UPDATE `ibl_team_'.$sideOfTheBall.'_stats__test`
             SET
             `games` = '.$seasonGP.',
             `minutes` = '.($seasonGP*48).',
@@ -352,7 +352,7 @@ $i = 0;
 while ($i < $numRowsTeamIDsNames) {
     $teamname = mysql_result($queryTeamIDsNames, $i, 'team_name');
     $teamID = mysql_result($queryTeamIDsNames, $i, 'teamid');
-    $teamnameUpdateQuery = "UPDATE `nuke_iblplyr` SET `teamname` = '$teamname' WHERE `tid` = $teamID;";
+    $teamnameUpdateQuery = "UPDATE `nuke_iblplyr__test` SET `teamname` = '$teamname' WHERE `tid` = $teamID;";
     if (mysql_query($teamnameUpdateQuery)) echo $teamnameUpdateQuery.'<br>';
     $i++;
 }

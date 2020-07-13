@@ -1116,8 +1116,9 @@ if ($can_renegotiate >= 0 AND $player_team_name == $userteam) {
                     <td align=center><b>drb</b></td>
                     <td align=center><b>ast</b></td>
                     <td align=center><b>stl</b></td>
-                    <td align=center><b>blk</b></td>
                     <td align=center><b>tvr</b></td>
+                    <td align=center><b>blk</b></td>
+                    <td align=center><b>foul</b></td>
                     <td align=center><b>oo</b></td>
                     <td align=center><b>do</b></td>
                     <td align=center><b>po</b></td>
@@ -1126,7 +1127,6 @@ if ($can_renegotiate >= 0 AND $player_team_name == $userteam) {
                     <td align=center><b>dd</b></td>
                     <td align=center><b>pd</b></td>
                     <td align=center><b>td</b></td>
-                    <td align=center><b>foul</b></td>
                 </tr>
                 <tr>
                     <td align=center>$player_rating_2ga</td>
@@ -1139,8 +1139,9 @@ if ($can_renegotiate >= 0 AND $player_team_name == $userteam) {
                     <td align=center>$player_rating_drb</td>
                     <td align=center>$player_rating_ast</td>
                     <td align=center>$player_rating_stl</td>
-                    <td align=center>$player_rating_blk</td>
                     <td align=center>$player_rating_tvr</td>
+                    <td align=center>$player_rating_blk</td>
+                    <td align=center>$player_rating_foul</td>
                     <td align=center>$player_rating_oo</td>
                     <td align=center>$player_rating_do</td>
                     <td align=center>$player_rating_po</td>
@@ -1149,7 +1150,6 @@ if ($can_renegotiate >= 0 AND $player_team_name == $userteam) {
                     <td align=center>$player_rating_dd</td>
                     <td align=center>$player_rating_pd</td>
                     <td align=center>$player_rating_td</td>
-                    <td align=center>$player_rating_foul</td>
                 </tr>
             </table></center>
         <b>BIRD YEARS:</b> $player_bird | <b>Remaining Contract:</b> $contract_display </td>";

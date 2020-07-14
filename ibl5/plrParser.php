@@ -447,7 +447,6 @@ while (!feof($plrFile)) {
             `tid` = $tid,
             `peak` = $peak,
             `pos` = '$pos',
-            `sta` = 40,
             `oo` = $ratingOO,
             `od` = $ratingOD,
             `do` = $ratingDO,

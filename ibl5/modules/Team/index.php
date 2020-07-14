@@ -907,6 +907,7 @@ function team($tid)
 				<th><font color=$color2>stl</font></th>
 				<th><font color=$color2>tvr</font></th>
 				<th><font color=$color2>blk</font></th>
+				<th><font color=$color2>foul</font></th>
 				<th><font color=$color2>oo</font></th>
 				<th><font color=$color2>do</font></th>
 				<th><font color=$color2>po</font></th>
@@ -915,7 +916,6 @@ function team($tid)
 				<th><font color=$color2>dd</font></th>
 				<th><font color=$color2>pd</font></th>
 				<th><font color=$color2>td</font></th>
-				<th><font color=$color2>Foul</font></th>
 				<th><font color=$color2>Inj</font></th>
 			</tr>
 		</thead>
@@ -995,7 +995,7 @@ function team($tid)
 
 		(($i % 2)==0) ? $bgcolor="FFFFFF" : $bgcolor="EEEEEE";
 
-		if ($tid == 0) {
+		if ($tid == 0) { // TODO: refactor this to merely modify the cell containing $name and not the entire table row
 			$table_ratings = $table_ratings . "<tr bgcolor=$bgcolor>
 				<td>$pos</td>
 				<td><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>
@@ -1012,6 +1012,7 @@ function team($tid)
 				<td>$r_stl</td>
 				<td>$r_tvr</td>
 				<td>$r_blk</td>
+				<td>$r_foul</td>
 				<td>$r_oo</td>
 				<td>$r_do</td>
 				<td>$r_po</td>
@@ -1020,7 +1021,6 @@ function team($tid)
 				<td>$r_dd</td>
 				<td>$r_pd</td>
 				<td>$r_td</td>
-				<td>$r_foul</td>
 				<td>$inj</td>
 			</tr>";
 		} else {
@@ -1041,6 +1041,7 @@ function team($tid)
 					<td>$r_stl</td>
 					<td>$r_tvr</td>
 					<td>$r_blk</td>
+					<td>$r_foul</td>
 					<td>$r_oo</td>
 					<td>$r_do</td>
 					<td>$r_po</td>
@@ -1049,7 +1050,6 @@ function team($tid)
 					<td>$r_dd</td>
 					<td>$r_pd</td>
 					<td>$r_td</td>
-					<td>$r_foul</td>
 					<td>$inj</td>
 				</tr>";
 			} else if ($r_bird == 0) {
@@ -1069,6 +1069,7 @@ function team($tid)
 					<td>$r_stl</td>
 					<td>$r_tvr</td>
 					<td>$r_blk</td>
+					<td>$r_foul</td>
 					<td>$r_oo</td>
 					<td>$r_do</td>
 					<td>$r_po</td>
@@ -1077,7 +1078,6 @@ function team($tid)
 					<td>$r_dd</td>
 					<td>$r_pd</td>
 					<td>$r_td</td>
-					<td>$r_foul</td>
 					<td>$inj</td>
 				</tr>";
 			} else if ($cy == $cyt) {
@@ -1097,6 +1097,7 @@ function team($tid)
 					<td>$r_stl</td>
 					<td>$r_tvr</td>
 					<td>$r_blk</td>
+					<td>$r_foul</td>
 					<td>$r_oo</td>
 					<td>$r_do</td>
 					<td>$r_po</td>
@@ -1105,7 +1106,6 @@ function team($tid)
 					<td>$r_dd</td>
 					<td>$r_pd</td>
 					<td>$r_td</td>
-					<td>$r_foul</td>
 					<td>$inj</td>
 				</tr>";
 			} else {
@@ -1125,6 +1125,7 @@ function team($tid)
 					<td>$r_stl</td>
 					<td>$r_tvr</td>
 					<td>$r_blk</td>
+					<td>$r_foul</td>
 					<td>$r_oo</td>
 					<td>$r_do</td>
 					<td>$r_po</td>
@@ -1133,7 +1134,6 @@ function team($tid)
 					<td>$r_dd</td>
 					<td>$r_pd</td>
 					<td>$r_td</td>
-					<td>$r_foul</td>
 					<td>$inj</td>
 				</tr>";
 			}

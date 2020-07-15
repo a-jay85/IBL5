@@ -1391,7 +1391,6 @@ function showpage($pid,$spec) {
     $player_ht_in = stripslashes(check_html($playerinfo['htin'], "nohtml"));
     $player_wt = stripslashes(check_html($playerinfo['wt'], "nohtml"));
     $player_age = stripslashes(check_html($playerinfo['age'], "nohtml"));
-    $player_nation = stripslashes(check_html($playerinfo['nation'], "nohtml"));
     $player_drafted_by = stripslashes(check_html($playerinfo['draftedby'], "nohtml"));
     $player_draft_pick = stripslashes(check_html($playerinfo['draftpickno'], "nohtml"));
     $player_draft_round = stripslashes(check_html($playerinfo['draftround'], "nohtml"));

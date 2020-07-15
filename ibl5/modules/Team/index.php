@@ -808,10 +808,10 @@ function team($tid)
 	if ($tid == 0) { // Team 0 is the Free Agents; we want a query that will pick up all of their players.
 		if ($faon==0) {
 			$query="SELECT * FROM nuke_iblplyr WHERE ordinal > '959' AND retired = 0 ORDER BY ordinal ASC";
-//			$query="SELECT * FROM nuke_iblplyr WHERE tid = 0 AND retired = 0 AND in_euro = '0' ORDER BY ordinal ASC";
+//			$query="SELECT * FROM nuke_iblplyr WHERE tid = 0 AND retired = 0 ORDER BY ordinal ASC";
 		} else {
 			$query="SELECT * FROM nuke_iblplyr WHERE ordinal > '959' AND retired = 0 AND cyt != cy ORDER BY ordinal ASC";
-//			$query="SELECT * FROM nuke_iblplyr WHERE tid = 0 AND retired = 0 AND cyt != cy AND in_euro = '0' ORDER BY ordinal ASC";
+//			$query="SELECT * FROM nuke_iblplyr WHERE tid = 0 AND retired = 0 AND cyt != cy ORDER BY ordinal ASC";
 		}
 		$result=mysql_query($query);
 		$num=mysql_numrows($result);

@@ -1287,9 +1287,9 @@ function team($tid) {
 
 	if ($tid == 0) { // Team 0 is the Free Agents; we want a query that will pick up all of their players.
 		if ($faon==0) {
-			$query="SELECT * FROM nuke_iblplyr WHERE ordinal > '959' AND retired = 0 AND in_euro = '0' ORDER BY ordinal ASC";
+			$query="SELECT * FROM nuke_iblplyr WHERE ordinal > '959' AND retired = 0 ORDER BY ordinal ASC";
 		} else {
-			$query="SELECT * FROM nuke_iblplyr WHERE ordinal > '959' AND retired = 0 AND cyt != cy AND in_euro = '0' ORDER BY ordinal ASC";
+			$query="SELECT * FROM nuke_iblplyr WHERE ordinal > '959' AND retired = 0 AND cyt != cy ORDER BY ordinal ASC";
 		}
 		$result=mysql_query($query);
 		$num=mysql_numrows($result);
@@ -2109,7 +2109,7 @@ function team($tid) {
 		$cap5=number_format($cap5/100,2);
 		$cap6=number_format($cap6/100,2);
 
-		// Begin hack to populate a MySQL table that has each team's current cap total. 
+		// Begin hack to populate a MySQL table that has each team's current cap total.
 		// Calculating cap totals for the current season is dificult at the moment. - A-Jay
 			$currentCap = $cap1;
 			$capTotalQuery = "INSERT INTO IBL_Current_Cap (tid,currentCap) VALUES ('".$tid."','".$currentCap."') ON DUPLICATE KEY UPDATE currentCap='".$currentCap."'";
@@ -4306,7 +4306,7 @@ function asg_results() {
 		$query6="select count(name) as votes,name from (select West_G1 as name from nuke_asg_votes union all select West_G2 from nuke_asg_votes) as tbl group by name having count(name) > 0 order by 1 desc;";
 		$result6=mysql_query($query6);
 		$num6=mysql_num_rows($result6);
-		
+
 		//    OpenTable();
 
 		$k=0;
@@ -4622,7 +4622,7 @@ switch($op) {
 	case "waivers":
 	echo "<A HREF=\"./modules.php?name=Waivers\">Moved!</A>";
 	break;
-	
+
 	case "asg_voting":
 	asg_voting();
 	break;

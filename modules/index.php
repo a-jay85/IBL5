@@ -726,9 +726,9 @@ if ($tid == 0) // Team 0 is the Free Agents; we want a query that will pick up a
 {
     if ($faon==0)
     {
-      $query="SELECT * FROM nuke_iblplyr WHERE ordinal > '959' AND retired = 0 AND in_euro = '0' ORDER BY ordinal ASC";
+      $query="SELECT * FROM nuke_iblplyr WHERE ordinal > '959' AND retired = 0 ORDER BY ordinal ASC";
     } else {
-      $query="SELECT * FROM nuke_iblplyr WHERE ordinal > '959' AND retired = 0 AND cyt != cy AND in_euro = '0' ORDER BY ordinal ASC";
+      $query="SELECT * FROM nuke_iblplyr WHERE ordinal > '959' AND retired = 0 AND cyt != cy ORDER BY ordinal ASC";
     }
     $result=mysql_query($query);
     $num=mysql_numrows($result);
@@ -3078,7 +3078,7 @@ $rosterslots=15;
 
     } else {
 
-      $sql8 = "SELECT * FROM nuke_iblplyr WHERE ordinal > '960' AND retired = '0' AND in_euro = '0' ORDER BY ordinal ASC ";
+      $sql8 = "SELECT * FROM nuke_iblplyr WHERE ordinal > '960' AND retired = '0' ORDER BY ordinal ASC ";
       $result8 = $db->sql_query($sql8);
 
     }

@@ -259,7 +259,7 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
         $sql8 = "SELECT * FROM nuke_iblplyr WHERE teamname='$userinfo[user_ibl_team]' AND retired = '0' AND ordinal < '961' ORDER BY ordinal ASC ";
         $result8 = $db->sql_query($sql8);
     } else {
-        $sql8 = "SELECT * FROM nuke_iblplyr WHERE ordinal > '960' AND retired = '0' AND in_euro = '0' ORDER BY ordinal ASC ";
+        $sql8 = "SELECT * FROM nuke_iblplyr WHERE ordinal > '960' AND retired = '0' ORDER BY ordinal ASC ";
         $result8 = $db->sql_query($sql8);
     }
 

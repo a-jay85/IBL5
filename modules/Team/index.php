@@ -3865,7 +3865,7 @@ function asg_voting() {
 	$num2 = $db->sql_numrows($result2);
 	$userinfo = $db->sql_fetchrow($result2);
 	$teamlogo = stripslashes(check_html($userinfo['user_ibl_team'], "nohtml"));
-	$sql3 = "SELECT * FROM ".$prefix."_ibl_settings WHERE sid='23'";
+	$sql3 = "SELECT * FROM " . $prefix . "_ibl_settings WHERE name = 'ASG Voting'";
 	$result3 = $db->sql_query($sql3);
 	$num3 = $db->sql_numrows($result3);
 	$info = $db->sql_fetchrow($result3);
@@ -4104,7 +4104,7 @@ function eoy_voting() {
 	$userinfo = $db->sql_fetchrow($result2);
 	$teamlogo = stripslashes(check_html($userinfo['user_ibl_team'], "nohtml"));
 
-	$sql3 = "SELECT * FROM ".$prefix."_ibl_settings WHERE sid='24'";
+	$sql3 = "SELECT * FROM " . $prefix . "_ibl_settings WHERE name = 'EOY Voting'";
 	$result3 = $db->sql_query($sql3);
 	$num3 = $db->sql_numrows($result3);
 	$info = $db->sql_fetchrow($result3);

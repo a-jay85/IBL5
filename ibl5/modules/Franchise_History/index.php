@@ -26,6 +26,16 @@ $query2="SELECT * FROM ibl_team_history WHERE teamid != 35 ORDER BY teamid ASC";
 $result2=mysql_query($query2);
 $num2=mysql_num_rows($result2);
 
+function getNumberOfTitles($teamname, $titleName)
+{
+	$queryCountTitles = "SELECT COUNT(name)
+	FROM nuke_ibl_teamawards
+	WHERE name = '$teamname'
+	AND Award LIKE '%$titleName%';";
+
+	return mysql_result(mysql_query($queryCountTitles), 0);
+}
+
 OpenTable();
 
 $k=0;
@@ -46,7 +56,17 @@ while ($k < $num2)
         $heat[$k] = mysql_result($result2,$k,"heat_titles");
 
 
-	$table_echo=$table_echo."<tr><td bgcolor=#".$teamcolor1[$k]."><a href=\"modules.php?name=Team&op=team&tid=".$teamid[$k]."\"><font color=#".$teamcolor2[$k].">".$teamcity[$k]." ".$teamname[$k]."</a></td><td>".$totwins[$k]."</td><td>".$totloss[$k]."</td><td>".$pct[$k]."</td><td>".$heat[$k]."</td><td>".$playoffs[$k]."</td><td>".$div[$k]."</td><td>".$conf[$k]."</td><td>".$ibl[$k]."</td></tr>";
+	$table_echo .= "<tr>
+		<td bgcolor=#" . $teamcolor1[$k] . "><a href=\"modules.php?name=Team&op=team&tid=" . $teamid[$k] . "\"><font color=#" . $teamcolor2[$k] . ">" . $teamcity[$k] . " " . $teamname[$k] . "</a></td>
+		<td>" . $totwins[$k] . "</td>
+		<td>" . $totloss[$k] . "</td>
+		<td>" . $pct[$k] . "</td>
+		<td>" . getNumberOfTitles($teamname[$k], 'HEAT') . "</td>
+		<td>" . $playoffs[$k] . "</td>
+		<td>" . getNumberOfTitles($teamname[$k], 'Division') . "</td>
+		<td>" . getNumberOfTitles($teamname[$k], 'Conference') . "</td>
+		<td>" . getNumberOfTitles($teamname[$k], 'IBL') . "</td>
+	</tr>";
 
 	$k++;
 }

@@ -16,16 +16,19 @@ if (!defined('MODULE_FILE')) {
 	die ("You can't access this file directly...");
 }
 
+require $_SERVER['DOCUMENT_ROOT'] . '/sharedFunctions.php';
 require_once("mainfile.php");
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
 $pagetitle = "- $module_name";
 
+$currentSeasonEndingYear = getCurrentSeasonEndingYear();
+
 include("header.php");
 
 OpenTable();
-echo "<center><font class=\"storytitle\">1990 IBL Power Rankings</font></center>\n\n";
+echo "<center><font class=\"storytitle\">" . ($currentSeasonEndingYear - 1) . "-$currentSeasonEndingYear IBL Power Rankings</font></center>\n\n";
 echo "<p>\n\n";
 
 $query = "SELECT * FROM nuke_ibl_power WHERE TeamID BETWEEN 1 AND 32 ORDER BY ranking DESC";

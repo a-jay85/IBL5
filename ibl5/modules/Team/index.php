@@ -997,150 +997,47 @@ function team($tid)
 
 		(($i % 2)==0) ? $bgcolor="FFFFFF" : $bgcolor="EEEEEE";
 
-		if ($tid == 0) { // TODO: refactor this to merely modify the cell containing $name and not the entire table row
-			$table_ratings = $table_ratings . "<tr bgcolor=$bgcolor>
-				<td>$pos</td>
-				<td><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>
-				<td>$age</td>
-				<td>$r_2ga</td>
-				<td>$r_2gp</td>
-				<td>$r_fta</td>
-				<td>$r_ftp</td>
-				<td>$r_3ga</td>
-				<td>$r_3gp</td>
-				<td>$r_orb</td>
-				<td>$r_drb</td>
-				<td>$r_ast</td>
-				<td>$r_stl</td>
-				<td>$r_tvr</td>
-				<td>$r_blk</td>
-				<td>$r_foul</td>
-				<td>$r_oo</td>
-				<td>$r_do</td>
-				<td>$r_po</td>
-				<td>$r_to</td>
-				<td>$r_od</td>
-				<td>$r_dd</td>
-				<td>$r_pd</td>
-				<td>$r_td</td>
-				<td>$inj</td>
-			</tr>";
+		$table_ratings .= "<tr bgcolor=$bgcolor>
+			<td>$pos</td>";
+
+		if ($tid == 0) {
+			$table_ratings .= "<td><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>";
+		} elseif ($p_ord > 959) { // On waivers
+			$table_ratings .= "<td>(<a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name)*</a></td>";
+		} elseif ($r_bird == 0) { // Waiver wire pickup
+			$table_ratings .= "<td><i><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</i></a></td>";
+		} elseif ($cy == $cyt) { // Eligible for FA this offseason
+			$table_ratings .= "<td><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a>^</td>";
 		} else {
-			if ($p_ord > 959) {
-				$table_ratings=$table_ratings."<tr bgcolor=$bgcolor>
-					<td>$pos</td>
-					<td>(<a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name)*</a></td>
-					<td>$age</td>
-					<td>$r_2ga</td>
-					<td>$r_2gp</td>
-					<td>$r_fta</td>
-					<td>$r_ftp</td>
-					<td>$r_3ga</td>
-					<td>$r_3gp</td>
-					<td>$r_orb</td>
-					<td>$r_drb</td>
-					<td>$r_ast</td>
-					<td>$r_stl</td>
-					<td>$r_tvr</td>
-					<td>$r_blk</td>
-					<td>$r_foul</td>
-					<td>$r_oo</td>
-					<td>$r_do</td>
-					<td>$r_po</td>
-					<td>$r_to</td>
-					<td>$r_od</td>
-					<td>$r_dd</td>
-					<td>$r_pd</td>
-					<td>$r_td</td>
-					<td>$inj</td>
-				</tr>";
-			} else if ($r_bird == 0) {
-				$table_ratings=$table_ratings."<tr bgcolor=$bgcolor>
-					<td>$pos</td>
-					<td><i><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</i></a></td>
-					<td>$age</td>
-					<td>$r_2ga</td>
-					<td>$r_2gp</td>
-					<td>$r_fta</td>
-					<td>$r_ftp</td>
-					<td>$r_3ga</td>
-					<td>$r_3gp</td>
-					<td>$r_orb</td>
-					<td>$r_drb</td>
-					<td>$r_ast</td>
-					<td>$r_stl</td>
-					<td>$r_tvr</td>
-					<td>$r_blk</td>
-					<td>$r_foul</td>
-					<td>$r_oo</td>
-					<td>$r_do</td>
-					<td>$r_po</td>
-					<td>$r_to</td>
-					<td>$r_od</td>
-					<td>$r_dd</td>
-					<td>$r_pd</td>
-					<td>$r_td</td>
-					<td>$inj</td>
-				</tr>";
-			} else if ($cy == $cyt) {
-				$table_ratings=$table_ratings."<tr bgcolor=$bgcolor>
-					<td>$pos</td>
-					<td><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a>^</td>
-					<td>$age</td>
-					<td>$r_2ga</td>
-					<td>$r_2gp</td>
-					<td>$r_fta</td>
-					<td>$r_ftp</td>
-					<td>$r_3ga</td>
-					<td>$r_3gp</td>
-					<td>$r_orb</td>
-					<td>$r_drb</td>
-					<td>$r_ast</td>
-					<td>$r_stl</td>
-					<td>$r_tvr</td>
-					<td>$r_blk</td>
-					<td>$r_foul</td>
-					<td>$r_oo</td>
-					<td>$r_do</td>
-					<td>$r_po</td>
-					<td>$r_to</td>
-					<td>$r_od</td>
-					<td>$r_dd</td>
-					<td>$r_pd</td>
-					<td>$r_td</td>
-					<td>$inj</td>
-				</tr>";
-			} else {
-				$table_ratings=$table_ratings."<tr bgcolor=$bgcolor>
-					<td>$pos</td>
-					<td><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>
-					<td>$age</td>
-					<td>$r_2ga</td>
-					<td>$r_2gp</td>
-					<td>$r_fta</td>
-					<td>$r_ftp</td>
-					<td>$r_3ga</td>
-					<td>$r_3gp</td>
-					<td>$r_orb</td>
-					<td>$r_drb</td>
-					<td>$r_ast</td>
-					<td>$r_stl</td>
-					<td>$r_tvr</td>
-					<td>$r_blk</td>
-					<td>$r_foul</td>
-					<td>$r_oo</td>
-					<td>$r_do</td>
-					<td>$r_po</td>
-					<td>$r_to</td>
-					<td>$r_od</td>
-					<td>$r_dd</td>
-					<td>$r_pd</td>
-					<td>$r_td</td>
-					<td>$inj</td>
-				</tr>";
-			}
+			$table_ratings .= "<td><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>";
 		}
-	$i++;
+
+		$table_ratings .= "<td>$age</td>
+			<td>$r_2ga</td>
+			<td>$r_2gp</td>
+			<td>$r_fta</td>
+			<td>$r_ftp</td>
+			<td>$r_3ga</td>
+			<td>$r_3gp</td>
+			<td>$r_orb</td>
+			<td>$r_drb</td>
+			<td>$r_ast</td>
+			<td>$r_stl</td>
+			<td>$r_tvr</td>
+			<td>$r_blk</td>
+			<td>$r_foul</td>
+			<td>$r_oo</td>
+			<td>$r_do</td>
+			<td>$r_po</td>
+			<td>$r_to</td>
+			<td>$r_od</td>
+			<td>$r_dd</td>
+			<td>$r_pd</td>
+			<td>$r_td</td>
+			<td>$inj</td>
+		</tr>";
+
+		$i++;
 	}
 
 	$table_ratings=$table_ratings."</tbody></table>";

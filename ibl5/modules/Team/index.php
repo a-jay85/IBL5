@@ -853,23 +853,23 @@ function team($tid)
 		if (mysql_result($result,$s,"PGDepth")==1) {
 			$startingPG=mysql_result($result,$s,"name");
 			$startingPGpid=mysql_result($result,$s,"pid");
-		} else {}
+		}
 		if (mysql_result($result,$s,"SGDepth") == 1) {
 			$startingSG=mysql_result($result,$s,"name");
 			$startingSGpid=mysql_result($result,$s,"pid");
-		} else {}
+		}
 		if (mysql_result($result,$s,"SFDepth") == 1) {
 			$startingSF=mysql_result($result,$s,"name");
 			$startingSFpid=mysql_result($result,$s,"pid");
-		} else {}
+		}
 		if (mysql_result($result,$s,"PFDepth") == 1) {
 			$startingPF=mysql_result($result,$s,"name");
 			$startingPFpid=mysql_result($result,$s,"pid");
-		} else {}
+		}
 		if (mysql_result($result,$s,"CDepth") == 1) {
 			$startingC=mysql_result($result,$s,"name");
 			$startingCpid=mysql_result($result,$s,"pid");
-		} else {}
+		}
 		$s++;
 	}
 	if ($yr != "") {

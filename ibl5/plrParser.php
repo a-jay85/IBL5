@@ -180,7 +180,7 @@ while (!feof($plrFile)) {
     $seasonFGM = $season2GM + $season3GM;
     $seasonFGA = $season2GA + $season3GA;
 
-    $careerFGM = $career2GM + $season3GM;
+    $careerFGM = $career2GM + $career3GM;
     $careerFGA = $career2GA + $career3GA;
     $careerPTS = $season2GM*2 + $seasonFTM + $season3GM*3 + $career2GM*2 + $careerFTM + $career3GM*3;
     $careerREB = $seasonORB + $seasonDRB + $careerORB + $careerDRB;

@@ -135,10 +135,10 @@ function get_salary ($tid, $team_name, $currentSeasonEndingYear)
 
 	$i = 0;
 	while ($i < $numberOfPlayersUnderContractAfterThisSeason) {
-		$j = 1;
 		$yearUnderContract = mysql_result($resultPlayersUnderContractAfterThisSeason, $i, "cy");
 		$totalYearsUnderContract = mysql_result($resultPlayersUnderContractAfterThisSeason, $i, "cyt");
 
+		$j = 1;
 		while ($yearUnderContract < $totalYearsUnderContract) {
 			$yearUnderContract = $yearUnderContract + 1;
 			$contract_current_year[$yearUnderContract] = "cy" . $yearUnderContract;
@@ -188,10 +188,10 @@ function get_salary1 ($tid, $team_name, $currentSeasonEndingYear)
 
 	$i = 0;
 	while ($i < $numberOfPlayersUnderContractAfterThisSeason) {
-		$j = 1;
 		$yearUnderContract = mysql_result($resultPlayersUnderContractAfterThisSeason, $i, "cy");
 		$totalYearsUnderContract = mysql_result($resultPlayersUnderContractAfterThisSeason, $i, "cyt");
 
+		$j = 1;
 		while ($yearUnderContract < $totalYearsUnderContract) {
 			$yearUnderContract = $yearUnderContract + 1;
 			$contract_current_year[$yearUnderContract] = "cy" . $yearUnderContract;

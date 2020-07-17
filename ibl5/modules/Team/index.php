@@ -1004,8 +1004,6 @@ function team($tid)
 			$table_ratings .= "<td><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>";
 		} elseif ($p_ord > 959) { // On waivers
 			$table_ratings .= "<td>(<a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name)*</a></td>";
-		} elseif ($r_bird == 0) { // Waiver wire pickup
-			$table_ratings .= "<td><i><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</i></a></td>";
 		} elseif ($cy == $cyt) { // Eligible for FA this offseason
 			$table_ratings .= "<td><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a>^</td>";
 		} else {

@@ -14,7 +14,7 @@ $num=mysql_numrows($result);
 
 echo "<script src=\"http://www.iblhoops.net/jslib/sorttable.js\"></script>
 <center>
-<h1>OFFSEASON MOVEMENT</h1>
+<h1> PLAYER TRANSACTIONS SINCE LAST SEASON</h1>
 <i>Click the headings to sort the table</i>
 <table border=1 class=\"sortable\">
 	<tr>

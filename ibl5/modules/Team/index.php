@@ -1038,14 +1038,36 @@ function team($tid)
 		$i++;
 	}
 
-	$table_ratings=$table_ratings."</tbody></table>";
+	$table_ratings .= "</tbody></table>";
 
 	if ($tid != 0) {
-		$table_totals=$table_totals."
-			<table align=\"center\" class=\"sortable\">
-			<thead><tr bgcolor=$color1><th><font color=$color2>Pos</font></th><th colspan=3><font color=$color2>Player</font></th><th><font color=$color2>g</font></th><th><font color=$color2>gs</font></th><th><font color=$color2>min</font></th><th><font color=$color2>fgm</font></th><th><font color=$color2>fga</font></th><th><font color=$color2>ftm</font></th><th><font color=$color2>fta</font></th><th><font color=$color2>3gm</font></th><th><font color=$color2>3ga</font></th><th><font color=$color2>orb</font></th><th><font color=$color2>reb</font></th><th><font color=$color2>ast</font></th><th><font color=$color2>stl</font></th><th><font color=$color2>to</font></th><th><font color=$color2>blk</font></th><th><font color=$color2>pf</font></th><th><font color=$color2>pts</font></th></tr></thead><tbody>";
+		$table_totals .= "<table align=\"center\" class=\"sortable\">
+			<thead>
+				<tr bgcolor=$color1>
+					<th><font color=$color2>Pos</font></th>
+					<th colspan=3><font color=$color2>Player</font></th>
+					<th><font color=$color2>g</font></th>
+					<th><font color=$color2>gs</font></th>
+					<th><font color=$color2>min</font></th>
+					<th><font color=$color2>fgm</font></th>
+					<th><font color=$color2>fga</font></th>
+					<th><font color=$color2>ftm</font></th>
+					<th><font color=$color2>fta</font></th>
+					<th><font color=$color2>3gm</font></th>
+					<th><font color=$color2>3ga</font></th>
+					<th><font color=$color2>orb</font></th>
+					<th><font color=$color2>reb</font></th>
+					<th><font color=$color2>ast</font></th>
+					<th><font color=$color2>stl</font></th>
+					<th><font color=$color2>to</font></th>
+					<th><font color=$color2>blk</font></th>
+					<th><font color=$color2>pf</font></th>
+					<th><font color=$color2>pts</font></th>
+				</tr>
+			</thead>
+		<tbody>";
 
-		$i=0;
+		$i = 0;
 
 		/* =======================STATS */
 
@@ -1167,7 +1189,26 @@ function team($tid)
 			$team_off_pts=$team_off_fgm+$team_off_fgm+$team_off_ftm+$team_off_tgm;
 
 			if ($yr == "") {
-				$table_totals=$table_totals."<tr><td colspan=4><b>$team_name Offense</td><td><center><b>$team_off_games</center></td><td><center><b>$team_off_games</center></td><td><center><b>$team_off_minutes</center></td><td><center><b>$team_off_fgm</center></td><td><center><b>$team_off_fga</b></center></td><td><center><b>$team_off_ftm</center></td><td><center><b>$team_off_fta</b></center></td><td><center><b>$team_off_tgm</center></td><td><center><b>$team_off_tga</b></center></td><td><center><b>$team_off_orb</center></td><td><center><b>$team_off_reb</center></td><td><center><b>$team_off_ast</center></td><td><center><b>$team_off_stl</center></td><td><center><b>$team_off_tvr</center></td><td><center><b>$team_off_blk</center></td><td><center><b>$team_off_pf</center></td><td><center><b>$team_off_pts</center></td></tr>";
+				$table_totals .= "<tr>
+					<td colspan=4><b>$team_name Offense</td>
+					<td><center><b>$team_off_games</center></td>
+					<td><center><b>$team_off_games</center></td>
+					<td><center><b>$team_off_minutes</center></td>
+					<td><center><b>$team_off_fgm</center></td>
+					<td><center><b>$team_off_fga</b></center></td>
+					<td><center><b>$team_off_ftm</center></td>
+					<td><center><b>$team_off_fta</b></center></td>
+					<td><center><b>$team_off_tgm</center></td>
+					<td><center><b>$team_off_tga</b></center></td>
+					<td><center><b>$team_off_orb</center></td>
+					<td><center><b>$team_off_reb</center></td>
+					<td><center><b>$team_off_ast</center></td>
+					<td><center><b>$team_off_stl</center></td>
+					<td><center><b>$team_off_tvr</center></td>
+					<td><center><b>$team_off_blk</center></td>
+					<td><center><b>$team_off_pf</center></td>
+					<td><center><b>$team_off_pts</center></td>
+				</tr>";
 			}
 		$t++;
 		}
@@ -1196,13 +1237,36 @@ function team($tid)
 			$team_def_pf=mysql_result($resultTeamDefenseTotals,$t,"pf");
 			$team_def_pts=$team_def_fgm+$team_def_fgm+$team_def_ftm+$team_def_tgm;
 
-			if ($yr == "") $table_totals=$table_totals."      <tr><td colspan=4><b>$team_name Defense</td><td><center><b>$team_def_games</center></td><td><center><b>$team_def_games</center></td><td><center><b>$team_def_minutes</center></td><td><center><b>$team_def_fgm</center></td><td><center><b>$team_def_fga</b></center></td><td><center><b>$team_def_ftm</center></td><td><center><b>$team_def_fta</b></center></td><td><center><b>$team_def_tgm</b></center></td><td><center><b>$team_def_tga</b></center></td><td><center><b>$team_def_orb</center></td><td><center><b>$team_def_reb</center></td><td><center><b>$team_def_ast</center></td><td><center><b>$team_def_stl</center></td><td><center><b>$team_def_tvr</center></td><td><center><b>$team_def_blk</center></td><td><center><b>$team_def_pf</center></td><td><center><b>$team_def_pts</center></td></tr>";
+			if ($yr == "") {
+				$table_totals .= "<tr>
+					<td colspan=4><b>$team_name Defense</td>
+					<td><center><b>$team_def_games</center></td>
+					<td><center><b>$team_def_games</center></td>
+					<td><center><b>$team_def_minutes</center></td>
+					<td><center><b>$team_def_fgm</center></td>
+					<td><center><b>$team_def_fga</b></center></td>
+					<td><center><b>$team_def_ftm</center></td>
+					<td><center><b>$team_def_fta</b></center></td>
+					<td><center><b>$team_def_tgm</b></center></td>
+					<td><center><b>$team_def_tga</b></center></td>
+					<td><center><b>$team_def_orb</center></td>
+					<td><center><b>$team_def_reb</center></td>
+					<td><center><b>$team_def_ast</center></td>
+					<td><center><b>$team_def_stl</center></td>
+					<td><center><b>$team_def_tvr</center></td>
+					<td><center><b>$team_def_blk</center></td>
+					<td><center><b>$team_def_pf</center></td>
+					<td><center><b>$team_def_pts</center></td>
+				</tr>";
+			}
+
 			$t++;
 		}
 
-		$table_totals=$table_totals."</tfoot></table>";
+		$table_totals .= "</tfoot>
+			</table>";
 
-		$table_averages=$table_averages."<table align=\"center\" class=\"sortable\">
+		$table_averages .= "<table align=\"center\" class=\"sortable\">
 			<thead>
 				<tr bgcolor=$color1>
 					<th><font color=$color2>Pos</font></th>

@@ -1,10 +1,14 @@
 <?php
 
-require '../config.php';
+require $_SERVER['DOCUMENT_ROOT'] . '/sharedFunctions.php';
+require $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 mysql_connect($dbhost,$dbuname,$dbpass);
 @mysql_select_db($dbname) or die("Unable to select database");
 
-$query="SELECT a.name, a.teamid, a.team, b.tid, b.teamname FROM nuke_iblhist a, nuke_iblplyr b WHERE a.pid = b.pid AND a.year = 1990 AND a.teamid != b.tid ORDER BY b.tid";
+$currentSeasonEndingYear = getCurrentSeasonEndingYear();
+$previousSeasonEndingYear = $currentSeasonEndingYear - 1;
+
+$query="SELECT a.name, a.teamid, a.team, b.tid, b.teamname FROM nuke_iblhist a, nuke_iblplyr b WHERE a.pid = b.pid AND a.year = $previousSeasonEndingYear AND a.teamid != b.tid ORDER BY b.teamname";
 $result=mysql_query($query);
 $num=mysql_numrows($result);
 echo "<table border=1><tr><td>";
@@ -24,7 +28,7 @@ echo "</table></td><td width=50></td><td>";
 echo "<table border=1><tr><td colspan=3><b>LOSSES</td></tr><tr><td><b>Player</td><td><b>Old Team</td><td><b>New Team</td></tr>";
 
 
-$query2="SELECT a.name, a.teamid, a.team, b.tid, b.teamname FROM nuke_iblhist a, nuke_iblplyr b WHERE a.pid = b.pid AND a.year = 1990 AND a.teamid != b.tid ORDER BY a.teamid";
+$query2="SELECT a.name, a.teamid, a.team, b.tid, b.teamname FROM nuke_iblhist a, nuke_iblplyr b WHERE a.pid = b.pid AND a.year = $previousSeasonEndingYear AND a.teamid != b.tid ORDER BY a.team";
 $result2=mysql_query($query2);
 $num2=mysql_numrows($result2);
 $j=0;

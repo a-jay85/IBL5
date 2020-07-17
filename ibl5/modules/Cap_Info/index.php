@@ -62,25 +62,25 @@ while ($i < $numberOfTeams) {
 
 	$teamFreeAgencySlots[$i] = $teamFreeAgencySlots[$i] - $team_array1[1]["roster"];
 
-	$table_echo = $table_echo . "<tr>
-		<td bgcolor=#" . $teamcolor1[$i] . ">
-			<a href=\"modules.php?name=Team&op=team&tid=" . $teamid[$i] . "&display=contracts\">
-				<font color=#" . $teamcolor2[$i] . ">" . $teamcity[$i] . " " . $teamname[$i] . "
+	$table_echo .= "<tr>
+		<td bgcolor=#$teamcolor1[$i]>
+			<a href=\"modules.php?name=Team&op=team&tid=$teamid[$i]&display=contracts\">
+				<font color=#$teamcolor2[$i]>$teamcity[$i] $teamname[$i]
 			</a>
 		</td>
-		<td>" . $teamTotalSalaryYear1[$i] . "</td>
-		<td>" . $teamTotalSalaryYear2[$i] . "</td>
-		<td>" . $teamTotalSalaryYear3[$i] . "</td>
-		<td>" . $teamTotalSalaryYear4[$i] . "</td>
-		<td>" . $teamTotalSalaryYear5[$i] . "</td>
-		<td>" . $teamTotalSalaryYear6[$i] . "</td>
-		<td><center>" . $teamFreeAgencySlots[$i] . "</center></td>
+		<td>$teamTotalSalaryYear1[$i]</td>
+		<td>$teamTotalSalaryYear2[$i]</td>
+		<td>$teamTotalSalaryYear3[$i]</td>
+		<td>$teamTotalSalaryYear4[$i]</td>
+		<td>$teamTotalSalaryYear5[$i]</td>
+		<td>$teamTotalSalaryYear6[$i]</td>
+		<td><center>$teamFreeAgencySlots[$i]</center></td>
 	</tr>";
 
 	$i++;
 }
 
-$text = $text . "<table class=\"sortable\" border=1>
+$text .= "<table class=\"sortable\" border=1>
 	<tr>
 		<th>Team</th>
 		<th>" . ($currentSeasonEndingYear + 1) . "</th>

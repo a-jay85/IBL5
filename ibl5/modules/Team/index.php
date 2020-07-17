@@ -1104,21 +1104,43 @@ function team($tid)
 
 			(($i % 2)==0) ? $bgcolor="FFFFFF" : $bgcolor="EEEEEE";
 
+			$table_totals .= "<tr bgcolor=$bgcolor>
+				<td>$pos</td>";
+
 			if ($tid == 0) {
-				$table_totals=$table_totals."<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td><center>$stats_gm</center></td><td><center>$stats_gs</center></td><td><center>$stats_min</center></td><td><center>$stats_fgm</center></td><td><center>$stats_fga</center></td><td><center>$stats_ftm</center></td><td><center>$stats_fta</center></td><td><center>$stats_tgm</center></td><td><center>$stats_tga</center></td><td><center>$stats_orb</center></td><td><center>$stats_reb</center></td><td><center>$stats_ast</center></td><td><center>$stats_stl</center></td><td><center>$stats_to</center></td><td><center>$stats_blk</center></td><td><center>$stats_pf</center></td><td><center>$stats_pts</center></td></tr>";
+				$table_totals .= "<td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>";
+			} elseif ($p_ord > 959) {
+				$table_totals .= "<td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">($name)*</a></td>";
+			} elseif ($cy == $cyt) {
+				$table_totals .= "<td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name^</a></td>";
 			} else {
-				if ($p_ord > 959) {
-					$table_totals=$table_totals."<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">($name)*</a></td><td><center>$stats_gm</center></td><td><center>$stats_gs</center></td><td><center>$stats_min</center></td><td><center>$stats_fgm</center></td><td><center>$stats_fga</center></td><td><center>$stats_ftm</center></td><td><center>$stats_fta</center></td><td><center>$stats_tgm</center></td><td><center>$stats_tga</center></td><td><center>$stats_orb</center></td><td><center>$stats_reb</center></td><td><center>$stats_ast</center></td><td><center>$stats_stl</center></td><td><center>$stats_to</center></td><td><center>$stats_blk</center></td><td><center>$stats_pf</center></td><td><center>$stats_pts</center></td></tr>";
-				} else if ($fayr == "" OR $yearoffreeagency == $fayr) {
-					$table_totals=$table_totals."<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td><center>$stats_gm</center></td><td><center>$stats_gs</center></td><td><center>$stats_min</center></td><td><center>$stats_fgm</center></td><td><center>$stats_fga</center></td><td><center>$stats_ftm</center></td><td><center>$stats_fta</center></td><td><center>$stats_tgm</center></td><td><center>$stats_tga</center></td><td><center>$stats_orb</center></td><td><center>$stats_reb</center></td><td><center>$stats_ast</center></td><td><center>$stats_stl</center></td><td><center>$stats_to</center></td><td><center>$stats_blk</center></td><td><center>$stats_pf</center></td><td><center>$stats_pts</center></td></tr>";
-				} else if ($cy == $cyt) {
-					$table_totals=$table_totals."<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name^</a></td><td><center>$stats_gm</center></td><td><center>$stats_gs</center></td><td><center>$stats_min</center></td><td><center>$stats_fgm</center></td><td><center>$stats_fga</center></td><td><center>$stats_ftm</center></td><td><center>$stats_fta</center></td><td><center>$stats_tgm</center></td><td><center>$stats_tga</center></td><td><center>$stats_orb</center></td><td><center>$stats_reb</center></td><td><center>$stats_ast</center></td><td><center>$stats_stl</center></td><td><center>$stats_to</center></td><td><center>$stats_blk</center></td><td><center>$stats_pf</center></td><td><center>$stats_pts</center></td></tr>";
-				}
+				$table_totals .= "<td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>";
 			}
-		$i++;
+
+			$table_totals .= "<td><center>$stats_gm</center></td>
+				<td><center>$stats_gs</center></td>
+				<td><center>$stats_min</center></td>
+				<td><center>$stats_fgm</center></td>
+				<td><center>$stats_fga</center></td>
+				<td><center>$stats_ftm</center></td>
+				<td><center>$stats_fta</center></td>
+				<td><center>$stats_tgm</center></td>
+				<td><center>$stats_tga</center></td>
+				<td><center>$stats_orb</center></td>
+				<td><center>$stats_reb</center></td>
+				<td><center>$stats_ast</center></td>
+				<td><center>$stats_stl</center></td>
+				<td><center>$stats_to</center></td>
+				<td><center>$stats_blk</center></td>
+				<td><center>$stats_pf</center></td>
+				<td><center>$stats_pts</center></td>
+			</tr>";
+
+			$i++;
 		}
 
-		$table_totals=$table_totals."</tbody><tfoot>";
+		$table_totals .= "</tbody>
+			<tfoot>";
 
 		// ==== INSERT TEAM OFFENSE AND DEFENSE TOTALS ====
 

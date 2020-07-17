@@ -29,6 +29,10 @@ if (isset($_POST['query'])) {
             $queryString = "UPDATE nuke_iblplyr SET altpos = pos WHERE altpos = \"\"";
             $successText = "All undefined player positions have been set.";
             break;
+        case 'Set all players on waivers to Free Agents and reset their Bird years':
+            $queryString = "UPDATE nuke_iblplyr SET teamname = 'Free Agents', bird = 0 WHERE retired != 1 AND ordinal >= 960;";
+            $successText = "All players currently on waivers have their teamname set to Free Agents and 0 Bird years.";
+            break;
     }
 
     if (mysql_query($queryString)) {
@@ -60,6 +64,7 @@ echo "<FORM action=\"leagueControlPanel.php\" method=\"POST\">
     <INPUT type='submit' name='query' value='Reset All Contract Extensions'><p>
     <INPUT type='submit' name='query' value='Reset All MLEs/LLEs'><p>
     <INPUT type='submit' name='query' value='Set all undefined player positions'><p>
+    <INPUT type='submit' name='query' value='Set all players on waivers to Free Agents and reset their Bird years'><p>
 </FORM>\n";
 
 if ($querySuccessful = TRUE) {

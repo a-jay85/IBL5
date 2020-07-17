@@ -1403,122 +1403,43 @@ function team($tid)
 
 			(($i % 2)==0) ? $bgcolor="FFFFFF" : $bgcolor="EEEEEE";
 
+			$table_averages .= "<tr bgcolor=$bgcolor>
+				<td>$pos</td>";
+
 			if ($tid == 0) {
-				$table_averages=$table_averages."<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>";
-				$table_averages=$table_averages."<td><center>$stats_gm</center></td><td><center>$stats_gs</center></td><td><center>";
-				$table_averages=$table_averages.$stats_mpg;
-				$table_averages=$table_averages."</center></td><td><center>";
-				$table_averages=$table_averages.$stats_fgm;
-				$table_averages=$table_averages."</center></td><td><center>";
-				$table_averages=$table_averages.$stats_fga;
-				$table_averages=$table_averages."</center></td><td><center>";
-				$table_averages=$table_averages.$stats_fgp;
-				$table_averages=$table_averages."</center></td><td><center>";
-				$table_averages=$table_averages.$stats_ftm;
-				$table_averages=$table_averages."</center></td><td><center>";
-				$table_averages=$table_averages.$stats_fta;
-				$table_averages=$table_averages."</center></td><td><center>";
-				$table_averages=$table_averages.$stats_ftp;
-				$table_averages=$table_averages."</center></td><td><center>";
-				$table_averages=$table_averages.$stats_tgm;
-				$table_averages=$table_averages."</center></td><td><center>";
-				$table_averages=$table_averages.$stats_tga;
-				$table_averages=$table_averages."</center></td><td><center>";
-				$table_averages=$table_averages.$stats_tgp;
-				$table_averages=$table_averages."</center></td><td><center>";
-				$table_averages=$table_averages.$stats_opg;
-				$table_averages=$table_averages."</center></td><td><center>";
-				$table_averages=$table_averages.$stats_rpg;
-				$table_averages=$table_averages."</center></td><td><center>";
-				$table_averages=$table_averages.$stats_apg;
-				$table_averages=$table_averages."</center></td><td><center>";
-				$table_averages=$table_averages.$stats_spg;
-				$table_averages=$table_averages."</center></td><td><center>";
-				$table_averages=$table_averages.$stats_tpg;
-				$table_averages=$table_averages."</center></td><td><center>";
-				$table_averages=$table_averages.$stats_bpg;
-				$table_averages=$table_averages."</center></td><td><center>";
-				$table_averages=$table_averages.$stats_fpg;
-				$table_averages=$table_averages."</center></td><td><center>";
-				$table_averages=$table_averages.$stats_ppg;
-				$table_averages=$table_averages."</center></td>";
-				// $table_averages=$table_averages."<td>$stats_PER</td><td>$stats_Magic_Metric</td><td>$stats_Game_Score</td>"; // NOT IMPLEMENTED AT ALL
-				$table_averages=$table_averages."</tr>";
+				$table_averages .= "<td colspan=3><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>";
 			} else {
 				if ($p_ord > 959) {
-					$table_averages=$table_averages."<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">($name)*</a></td>";
-					$table_averages=$table_averages."<td><center>$stats_gm</center></td><td><center>$stats_gs</center></td><td><center>";
-					$table_averages=$table_averages.$stats_mpg;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_fgm;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_fga;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_fgp;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_ftm;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_fta;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_ftp;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_tgm;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_tga;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_tgp;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_bpg;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_fpg;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_ppg;
-					$table_averages=$table_averages."</center></td>";
-					// $table_averages=$table_averages."<td>$stats_PER</td><td>$stats_Magic_Metric</td><td>$stats_Game_Score</td>"; // NOT IMPLEMENTED AT ALL
-					$table_averages=$table_averages."</tr>";
-				} else if ($fayr == "" OR $yearoffreeagency == $fayr) {
-					$table_averages=$table_averages."<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>";
-					$table_averages=$table_averages."<td><center>$stats_gm</center></td><td><center>$stats_gs</center></td><td><center>";
-					$table_averages=$table_averages.$stats_mpg;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_fgm;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_fga;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_fgp;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_ftm;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_fta;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_ftp;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_tgm;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_tga;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_tgp;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_opg;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_rpg;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_apg;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_spg;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_tpg;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_bpg;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_fpg;
-					$table_averages=$table_averages."</center></td><td><center>";
-					$table_averages=$table_averages.$stats_ppg;
-					$table_averages=$table_averages."</center></td>";
-					// $table_averages=$table_averages."<td>$stats_PER</td><td>$stats_Magic_Metric</td><td>$stats_Game_Score</td>"; // NOT IMPLEMENTED AT ALL
-					$table_averages=$table_averages."</tr>";
+					$table_averages=$table_averages."<td colspan=3><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">($name)*</a></td>";
+				} elseif ($cy == $cyt) {
+					$table_averages=$table_averages."<td colspan=3><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name^</a></td>";
+				}  else {
+					$table_averages=$table_averages."<td colspan=3><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>";
 				}
 			}
+
+			$table_averages .= "<td><center>$stats_gm</center></td>
+				<td><center>$stats_gs</center></td>
+				<td><center>$stats_mpg</center></td>
+				<td><center>$stats_fgm</center></td>
+				<td><center>$stats_fga</center></td>
+				<td><center>$stats_fgp</center></td>
+				<td><center>$stats_ftm</center></td>
+				<td><center>$stats_fta</center></td>
+				<td><center>$stats_ftp</center></td>
+				<td><center>$stats_tgm</center></td>
+				<td><center>$stats_tga</center></td>
+				<td><center>$stats_tgp</center></td>
+				<td><center>$stats_opg</center></td>
+				<td><center>$stats_rpg</center></td>
+				<td><center>$stats_apg</center></td>
+				<td><center>$stats_spg</center></td>
+				<td><center>$stats_tpg</center></td>
+				<td><center>$stats_bpg</center></td>
+				<td><center>$stats_fpg</center></td>
+				<td><center>$stats_ppg</center></td>
+			</tr>";
+
 			$i++;
 		}
 

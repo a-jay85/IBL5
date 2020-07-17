@@ -50,6 +50,7 @@ while ($i < $numberOfTeams) {
 	$teamFreeAgencySlots[$i] = 15;
 
 	$team_array = get_salary($teamid[$i], $teamname[$i], $currentSeasonEndingYear);
+	echo $teamid[$i] . "     "; var_dump($team_array); echo "<p>";
 	$team_array1 = get_salary1($teamid[$i], $teamname[$i], $currentSeasonEndingYear);
 
 	$teamTotalSalaryYear1[$i] = 7000 - $team_array[1]["salary"];
@@ -182,7 +183,7 @@ function get_salary1 ($tid, $team_name, $currentSeasonEndingYear)
 	// 	$hh++;
 	// }
 
-	$queryPlayersUnderContractAfterThisSeason = "SELECT * FROM nuke_iblplyr WHERE retired = 0 AND tid = $tid AND droptime = 0 AND name NOT LIKE '%Buyout%' AND cy <> cyt";
+	$queryPlayersUnderContractAfterThisSeason = "SELECT * FROM nuke_iblplyr WHERE retired = 0 AND tid = $tid AND cy <> cyt AND droptime = 0 AND name NOT LIKE '%Buyout%'";
 	$resultPlayersUnderContractAfterThisSeason = mysql_query($queryPlayersUnderContractAfterThisSeason);
 	$numberOfPlayersUnderContractAfterThisSeason = mysql_num_rows($resultPlayersUnderContractAfterThisSeason);
 
@@ -194,8 +195,6 @@ function get_salary1 ($tid, $team_name, $currentSeasonEndingYear)
 		$j = 1;
 		while ($yearUnderContract < $totalYearsUnderContract) {
 			$yearUnderContract = $yearUnderContract + 1;
-			$contract_current_year[$yearUnderContract] = "cy" . $yearUnderContract;
-			$contract_amt[$j]["salary"] = $contract_amt[$j]["salary"] + mysql_result($resultPlayersUnderContractAfterThisSeason, $i, $contract_current_year[$yearUnderContract]);
 			$contract_amt[$j]["roster"]++;
 			$j++;
 		}

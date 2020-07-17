@@ -50,7 +50,6 @@ while ($i < $numberOfTeams) {
 	$teamFreeAgencySlots[$i] = 15;
 
 	$team_array = get_salary($teamid[$i], $teamname[$i], $currentSeasonEndingYear);
-	echo $teamid[$i] . "     "; var_dump($team_array); echo "<p>";
 	$team_array1 = get_salary1($teamid[$i], $teamname[$i], $currentSeasonEndingYear);
 
 	$teamTotalSalaryYear1[$i] = 7000 - $team_array[1]["salary"];

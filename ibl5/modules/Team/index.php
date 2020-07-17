@@ -952,8 +952,6 @@ function team($tid)
 			$r_blk=mysql_result($result,$i,"r_blk");
 			$r_tvr=mysql_result($result,$i,"r_to");
 			$r_foul=mysql_result($result,$i,"r_foul");
-			$r_totoff=mysql_result($result,$i,"oo")+mysql_result($result,$i,"do")+mysql_result($result,$i,"po")+mysql_result($result,$i,"to");
-			$r_totdef=mysql_result($result,$i,"od")+mysql_result($result,$i,"dd")+mysql_result($result,$i,"pd")+mysql_result($result,$i,"td");
 			$r_oo=mysql_result($result,$i,"oo");
 			$r_do=mysql_result($result,$i,"do");
 			$r_po=mysql_result($result,$i,"po");
@@ -987,8 +985,6 @@ function team($tid)
 			$r_stl=mysql_result($result,$i,"r_stl");
 			$r_blk=mysql_result($result,$i,"r_blk");
 			$r_tvr=mysql_result($result,$i,"r_tvr");
-			$r_totoff=mysql_result($result,$i,"r_oo")+mysql_result($result,$i,"r_do")+mysql_result($result,$i,"r_po")+mysql_result($result,$i,"r_to");
-			$r_totdef=mysql_result($result,$i,"r_od")+mysql_result($result,$i,"r_dd")+mysql_result($result,$i,"r_pd")+mysql_result($result,$i,"r_td");
 			$r_oo=mysql_result($result,$i,"r_oo");
 			$r_do=mysql_result($result,$i,"r_do");
 			$r_po=mysql_result($result,$i,"r_po");

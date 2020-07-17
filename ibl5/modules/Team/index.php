@@ -1491,43 +1491,29 @@ function team($tid)
 			@$team_off_avgpts=number_format(($team_off_pts/$team_off_games),1);
 
 			if ($yr == "") {
-				$table_averages=$table_averages."<tr><td colspan=4><b>$team_name Offense</td><td><b><center>$team_off_games</center></td><td><b>$team_off_games</td><td><center><b>";
-				$table_averages=$table_averages.$team_off_avgmin;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_off_avgfgm;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_off_avgfga;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_off_fgp;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_off_avgftm;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_off_avgfta;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_off_ftp;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_off_avgtgm;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_off_avgtga;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_off_tgp;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_off_avgorb;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_off_avgreb;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_off_avgast;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_off_avgstl;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_off_avgtvr;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_off_avgblk;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_off_avgpf;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_off_avgpts;
-				$table_averages=$table_averages."</center></td></tr>";
+				$table_averages .= "<tr>
+					<td colspan=4><b>$team_name Offense</td>
+					<td><b><center>$team_off_games</center></td>
+					<td><b><center>$team_off_games</center></td>
+					<td><center><b>$team_off_avgmin</center></td>
+					<td><center><b>$team_off_avgfgm</center></td>
+					<td><center><b>$team_off_avgfga</center></td>
+					<td><center><b>$team_off_fgp</center></td>
+					<td><center><b>$team_off_avgftm</center></td>
+					<td><center><b>$team_off_avgfta</center></td>
+					<td><center><b>$team_off_ftp</center></td>
+					<td><center><b>$team_off_avgtgm</center></td>
+					<td><center><b>$team_off_avgtga</center></td>
+					<td><center><b>$team_off_tgp</center></td>
+					<td><center><b>$team_off_avgorb</center></td>
+					<td><center><b>$team_off_avgreb</center></td>
+					<td><center><b>$team_off_avgast</center></td>
+					<td><center><b>$team_off_avgstl</center></td>
+					<td><center><b>$team_off_avgtvr</center></td>
+					<td><center><b>$team_off_avgblk</center></td>
+					<td><center><b>$team_off_avgpf</center></td>
+					<td><center><b>$team_off_avgpts</center></td>
+				</tr>";
 			}
 			$t++;
 		}
@@ -1576,50 +1562,37 @@ function team($tid)
 			@$team_def_avgpts=number_format(($team_def_pts/$team_def_games),1);
 
 			if ($yr == "") {
-				$table_averages=$table_averages."<tr><td colspan=4><b>$team_name Defense</td><td><center><b>$team_def_games</center></td><td><b>$team_def_games</td><td><center><b>";
-				$table_averages=$table_averages.$team_def_avgmin;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_def_avgfgm;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_def_avgfga;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_def_fgp;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_def_avgftm;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_def_avgfta;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_def_ftp;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_def_avgtgm;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_def_avgtga;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_def_tgp;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_def_avgorb;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_def_avgreb;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_def_avgast;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_def_avgstl;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_def_avgtvr;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_def_avgblk;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_def_avgpf;
-				$table_averages=$table_averages."</center></td><td><center><b>";
-				$table_averages=$table_averages.$team_def_avgpts;
-				$table_averages=$table_averages."</center></td></tr>";
+				$table_averages .= "<tr>
+					<td colspan=4><b>$team_name Defense</td>
+					<td><center><b>$team_def_games</center></td>
+					<td><b>$team_def_games</td>
+					<td><center><b>$team_def_avgmin</center></td>
+					<td><center><b>$team_def_avgfgm</center></td>
+					<td><center><b>$team_def_avgfga</center></td>
+					<td><center><b>$team_def_fgp</center></td>
+					<td><center><b>$team_def_avgftm</center></td>
+					<td><center><b>$team_def_avgfta</center></td>
+					<td><center><b>$team_def_ftp</center></td>
+					<td><center><b>$team_def_avgtgm</center></td>
+					<td><center><b>$team_def_avgtga</center></td>
+					<td><center><b>$team_def_tgp</center></td>
+					<td><center><b>$team_def_avgorb</center></td>
+					<td><center><b>$team_def_avgreb</center></td>
+					<td><center><b>$team_def_avgast</center></td>
+					<td><center><b>$team_def_avgstl</center></td>
+					<td><center><b>$team_def_avgtvr</center></td>
+					<td><center><b>$team_def_avgblk</center></td>
+					<td><center><b>$team_def_avgpf</center></td>
+					<td><center><b>$team_def_avgpts</center></td>
+				</tr>";
 			}
 		$t++;
 		}
 
-		$thischunk=$row[maxchunk];
+		$thischunk = $row[maxchunk];
 
-		$table_averages=$table_averages."</tfoot></table>";
+		$table_averages .= "</tfoot>
+			</table>";
 
 		if ($yr == "") {
 			$table_simAverages=$table_simAverages."<table align=\"center\" class=\"sortable\"><thead>";
@@ -1715,60 +1688,64 @@ function team($tid)
 
 					(($i % 2)==0) ? $bgcolor="FFFFFF" : $bgcolor="EEEEEE";
 
-					$table_simAverages=$table_simAverages."<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>";
-					$table_simAverages=$table_simAverages."<td><center>$numberOfGamesPlayedInSim</center></td><td><center>";
-					$table_simAverages=$table_simAverages.$simAverageMIN;
-					$table_simAverages=$table_simAverages."</center></td><td><center>";
-					$table_simAverages=$table_simAverages.$simAverageFGM;
-					$table_simAverages=$table_simAverages."</center></td><td><center>";
-					$table_simAverages=$table_simAverages.$simAverageFGA;
-					$table_simAverages=$table_simAverages."</center></td><td><center>";
-					$table_simAverages=$table_simAverages.$simAverageFGP;
-					$table_simAverages=$table_simAverages."</center></td><td><center>";
-					$table_simAverages=$table_simAverages.$simAverageFTM;
-					$table_simAverages=$table_simAverages."</center></td><td><center>";
-					$table_simAverages=$table_simAverages.$simAverageFTA;
-					$table_simAverages=$table_simAverages."</center></td><td><center>";
-					$table_simAverages=$table_simAverages.$simAverageFTP;
-					$table_simAverages=$table_simAverages."</center></td><td><center>";
-					$table_simAverages=$table_simAverages.$simAverage3GM;
-					$table_simAverages=$table_simAverages."</center></td><td><center>";
-					$table_simAverages=$table_simAverages.$simAverage3GA;
-					$table_simAverages=$table_simAverages."</center></td><td><center>";
-					$table_simAverages=$table_simAverages.$simAverage3GP;
-					$table_simAverages=$table_simAverages."</center></td><td><center>";
-					$table_simAverages=$table_simAverages.$simAverageORB;
-					$table_simAverages=$table_simAverages."</center></td><td><center>";
-					$table_simAverages=$table_simAverages.$simAverageREB;
-					$table_simAverages=$table_simAverages."</center></td><td><center>";
-					$table_simAverages=$table_simAverages.$simAverageAST;
-					$table_simAverages=$table_simAverages."</center></td><td><center>";
-					$table_simAverages=$table_simAverages.$simAverageSTL;
-					$table_simAverages=$table_simAverages."</center></td><td><center>";
-					$table_simAverages=$table_simAverages.$simAverageTOV;
-					$table_simAverages=$table_simAverages."</center></td><td><center>";
-					$table_simAverages=$table_simAverages.$simAverageBLK;
-					$table_simAverages=$table_simAverages."</center></td><td><center>";
-					$table_simAverages=$table_simAverages.$simAveragePF;
-					$table_simAverages=$table_simAverages."</center></td><td><center>";
-					$table_simAverages=$table_simAverages.$simAveragePTS;
-					$table_simAverages=$table_simAverages."</center></td></tr>";
-				} else {}
+					$table_simAverages .= "<tr bgcolor=$bgcolor>
+						<td>$pos</td>
+						<td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>
+						<td><center>$numberOfGamesPlayedInSim</center></td>
+						<td><center>$simAverageMIN</center></td>
+						<td><center>$simAverageFGM</center></td>
+						<td><center>$simAverageFGA</center></td>
+						<td><center>$simAverageFGP</center></td>
+						<td><center>$simAverageFTM</center></td>
+						<td><center>$simAverageFTA</center></td>
+						<td><center>$simAverageFTP</center></td>
+						<td><center>$simAverage3GM</center></td>
+						<td><center>$simAverage3GA</center></td>
+						<td><center>$simAverage3GP</center></td>
+						<td><center>$simAverageORB</center></td>
+						<td><center>$simAverageREB</center></td>
+						<td><center>$simAverageAST</center></td>
+						<td><center>$simAverageSTL</center></td>
+						<td><center>$simAverageTOV</center></td>
+						<td><center>$simAverageBLK</center></td>
+						<td><center>$simAveragePF</center></td>
+						<td><center>$simAveragePTS</center></td>
+					</tr>";
+				}
 
 				$i++;
 			}
 
-			$table_simAverages=$table_simAverages."</tbody></table>";
+			$table_simAverages .= "</tbody>
+				</table>";
 		} // END OF IF $yr == "" BRACE TO REMOVE PER CHUNK STUFF
 	} // END OF TID != 0 brace - inserted so that Free Agents won't clog up the page with season averages and totals when those are almost always zeros.
 
 	if ($yr == "") {
 		$table_contracts=$table_contracts."<table align=\"center\" class=\"sortable\">
-			<thead><tr bgcolor=$color1><th><font color=$color2>Pos</font></th><th colspan=3><font color=$color2>Player</font></th><th><font color=$color2>Bird</font></th><th><font color=$color2>Year1</font></th><th><font color=$color2>Year2</font></th><th><font color=$color2>Year3</font></th><th><font color=$color2>Year4</font></th><th><font color=$color2>Year5</font></th><th><font color=$color2>Year6</font></th><td bgcolor=#000000 width=3></th><th><font color=$color2>Talent</font></th><th><font color=$color2>Skill</font></th><th><font color=$color2>Intang</font></th><th><font color=$color2>Clutch</font></th><th><font color=$color2>Consistency</font></th></tr></thead><tbody>";
+			<thead>
+				<tr bgcolor=$color1>
+					<th><font color=$color2>Pos</font></th>
+					<th colspan=3><font color=$color2>Player</font></th>
+					<th><font color=$color2>Bird</font></th>
+					<th><font color=$color2>Year1</font></th>
+					<th><font color=$color2>Year2</font></th>
+					<th><font color=$color2>Year3</font></th>
+					<th><font color=$color2>Year4</font></th>
+					<th><font color=$color2>Year5</font></th>
+					<th><font color=$color2>Year6</font></th><td bgcolor=#000000 width=3></th>
+					<th><font color=$color2>Talent</font></th>
+					<th><font color=$color2>Skill</font></th>
+					<th><font color=$color2>Intang</font></th>
+					<th><font color=$color2>Clutch</font></th>
+					<th><font color=$color2>Consistency</font></th>
+				</tr>
+			</thead>
+		<tbody>";
 
 		/* =======================CONTRACTS ET AL */
 
-		$i=0;
+		$i = 0;
 		while ($i < $num) {
 			$name=mysql_result($result,$i,"name");
 			$pos=mysql_result($result,$i,"altpos");
@@ -1815,17 +1792,32 @@ function team($tid)
 
 			(($i % 2)==0) ? $bgcolor="FFFFFF" : $bgcolor="EEEEEE";
 
+			$table_contracts .= "<tr bgcolor=$bgcolor><td>$pos</td>";
+
 			if ($tid == 0) {
-				$table_contracts=$table_contracts."<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td>$bird</td><td>$con1</td><td>$con2</td><td>$con3</td><td>$con4</td><td>$con5</td><td>$con6</td><td bgcolor=#000000></td><td>$talent</td><td>$skill</td><td>$intangibles</td><td>$Clutch</td><td>$Consistency</td></tr>";
+				$table_contracts=$table_contracts."<td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>";
+			} elseif ($p_ord > 959) {
+				$table_contracts=$table_contracts."<td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">($name)*</a></td>";
+			} elseif ($cy == $cyt) {
+				$table_contracts=$table_contracts."<td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name^</a></td>";
 			} else {
-				if ($p_ord > 959) {
-					$table_contracts=$table_contracts."<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">($name)*</a></td><td>$bird</td><td>$con1</td><td>$con2</td><td>$con3</td><td>$con4</td><td>$con5</td><td>$con6</td><td bgcolor=#000000></td><td>$talent</td><td>$skill</td><td>$intangibles</td><td>$Clutch</td><td>$Consistency</td></tr>";
-				} else if ($cy == $cyt) {
-					$table_contracts=$table_contracts."<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name^</a></td><td>$bird</td><td>$con1</td><td>$con2</td><td>$con3</td><td>$con4</td><td>$con5</td><td>$con6</td><td bgcolor=#000000></td><td>$talent</td><td>$skill</td><td>$intangibles</td><td>$Clutch</td><td>$Consistency</td></tr>";
-				} else {
-					$table_contracts=$table_contracts."<tr bgcolor=$bgcolor><td>$pos</td><td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td>$bird</td><td>$con1</td><td>$con2</td><td>$con3</td><td>$con4</td><td>$con5</td><td>$con6</td><td bgcolor=#000000></td><td>$talent</td><td>$skill</td><td>$intangibles</td><td>$Clutch</td><td>$Consistency</td></tr>";
-				}
+				$table_contracts=$table_contracts."<td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>";
 			}
+
+			$table_contracts .= "<td>$bird</td>
+				<td>$con1</td>
+				<td>$con2</td>
+				<td>$con3</td>
+				<td>$con4</td>
+				<td>$con5</td>
+				<td>$con6</td><td bgcolor=#000000></td>
+				<td>$talent</td>
+				<td>$skill</td>
+				<td>$intangibles</td>
+				<td>$Clutch</td>
+				<td>$Consistency</td>
+			</tr>";
+
 			$cap1=$cap1+$con1;
 			$cap2=$cap2+$con2;
 			$cap3=$cap3+$con3;
@@ -1848,23 +1840,31 @@ function team($tid)
 			$capTotalQueryExec = mysql_query($capTotalQuery);
 		// End salary cap hack.
 
-		$table_contracts=$table_contracts."</tbody><tfoot>
-			<tr><td></td><td colspan=3><b>Cap Totals</td><td></td><td><b>";
-			$table_contracts=$table_contracts.$cap1;
-			$table_contracts=$table_contracts."</td><td><b>";
-			$table_contracts=$table_contracts.$cap2;
-			$table_contracts=$table_contracts."</td><td><b>";
-			$table_contracts=$table_contracts.$cap3;
-			$table_contracts=$table_contracts."</td><td><b>";
-			$table_contracts=$table_contracts.$cap4;
-			$table_contracts=$table_contracts."</td><td><b>";
-			$table_contracts=$table_contracts.$cap5;
-			$table_contracts=$table_contracts."</td><td><b>";
-			$table_contracts=$table_contracts.$cap6;
-			$table_contracts=$table_contracts."</td><td bgcolor=#000000></td><td></td><td></td><td></td><td></td><td></td></tr>
-			<tr><td colspan=17><i>Note:</i> Players whose names appear in parenthesis and with a trailing asterisk are waived players that still count against the salary cap.</td></tr></tfoot></table>";
+		$table_contracts .= "</tbody>
+			<tfoot>
+				<tr>
+					<td></td>
+					<td colspan=3><b>Cap Totals</td>
+					<td></td>
+					<td><b>$cap1</td>
+					<td><b>$cap2</td>
+					<td><b>$cap3</td>
+					<td><b>$cap4</td>
+					<td><b>$cap5</td>
+					<td><b>$cap6</td><td bgcolor=#000000></td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td></td>
+				</tr>
+				<tr>
+					<td colspan=17><i>Note:</i> Players whose names appear in parenthesis and with a trailing asterisk are waived players that still count against the salary cap.</td>
+				</tr>
+			</tfoot>
+		</table>";
 
-	} else {} // END OF IF YEAR EQUAL NULL STATEMENT FROM BEFORE CHUNK AVERAGES
+	} // END OF IF YEAR EQUAL NULL STATEMENT FROM BEFORE CHUNK AVERAGES
 
 	$table_draftpicks=$table_draftpicks."<table align=\"center\">";
 

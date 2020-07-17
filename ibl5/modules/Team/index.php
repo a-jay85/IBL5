@@ -823,7 +823,7 @@ function team($tid)
 		if ($yr != "") {
 			$query="SELECT * FROM nuke_iblhist WHERE teamid = '$tid' AND year = '$yr' ORDER BY name ASC";
 		} else if ($faon==0) {
-			$query="SELECT * FROM nuke_iblplyr WHERE tid = '$tid' AND retired = 0 ORDER BY name ASC";
+			$query="SELECT * FROM nuke_iblplyr WHERE tid = '$tid' AND retired = 0 ORDER BY PGDepth ASC";
 		} else {
 			$query="SELECT * FROM nuke_iblplyr WHERE tid = '$tid' AND retired = 0 AND cyt != cy ORDER BY name ASC";
 		}
@@ -876,12 +876,18 @@ function team($tid)
 		echo "<center><h1>$yr $team_name</h1></center>";
 	}
 	if ($tid != 0 AND $yr == "") {
-		$starters_table="<table align=\"center\" border=1 cellpadding=1 cellspacing=1><tr bgcolor=$color1><td colspan=5><font color=$color2><center><b>Last Sim's Starters</b></center></font></td></tr>
-			<tr><td><center><b>PG</b><br><img src=\"./images/player/$startingPGpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingPGpid\">$startingPG</a></td>
-			<td><center><b>SG</b><br><img src=\"./images/player/$startingSGpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingSGpid\">$startingSG</a></td>
-			<td><center><b>SF</b><br><img src=\"./images/player/$startingSFpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingSFpid\">$startingSF</a></td>
-			<td><center><b>PF</b><br><img src=\"./images/player/$startingPFpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingPFpid\">$startingPF</a></td>
-			<td><center><b>C</b><br><img src=\"./images/player/$startingCpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingCpid\">$startingC</a></td></tr></table>";
+		$starters_table="<table align=\"center\" border=1 cellpadding=1 cellspacing=1>
+			<tr bgcolor=$color1>
+				<td colspan=5><font color=$color2><center><b>Last Sim's Starters</b></center></font></td>
+			</tr>
+			<tr>
+				<td><center><b>PG</b><br><img src=\"./images/player/$startingPGpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingPGpid\">$startingPG</a></td>
+				<td><center><b>SG</b><br><img src=\"./images/player/$startingSGpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingSGpid\">$startingSG</a></td>
+				<td><center><b>SF</b><br><img src=\"./images/player/$startingSFpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingSFpid\">$startingSF</a></td>
+				<td><center><b>PF</b><br><img src=\"./images/player/$startingPFpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingPFpid\">$startingPF</a></td>
+				<td><center><b>C</b><br><img src=\"./images/player/$startingCpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingCpid\">$startingC</a></td>
+			</tr>
+		</table>";
 	}
 
 	// END OF INSERTION OF STARTERS

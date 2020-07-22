@@ -4,7 +4,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/config.php';
 mysql_connect($dbhost, $dbuname, $dbpass);
 @mysql_select_db($dbname) or die("Unable to select database");
 
-require $_SERVER['DOCUMENT_ROOT'] . '/discordWebhooks.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/discordWebhooks.php';
 
 $Team_Name = $_POST['teamname'];
 $Player_Name = $_POST['playername'];

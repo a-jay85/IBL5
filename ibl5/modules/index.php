@@ -21,7 +21,7 @@ if (!eregi("modules.php", $_SERVER['PHP_SELF'])) {
 }
 
 require_once("mainfile.php");
-include_once "sharedFunctions.php";
+require_once $_SERVER['DOCUMENT_ROOT'] . '/sharedFunctions.php';
 
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);

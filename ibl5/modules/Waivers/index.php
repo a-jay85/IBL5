@@ -20,7 +20,7 @@ require_once("mainfile.php");
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
-require $_SERVER['DOCUMENT_ROOT'] . '/sharedFunctions.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/sharedFunctions.php';
 require $_SERVER['DOCUMENT_ROOT'] . '/discordWebhooks.php';
 
 $pagetitle = "- Team Pages";

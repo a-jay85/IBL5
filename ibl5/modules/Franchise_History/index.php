@@ -65,7 +65,7 @@ while ($k < $num2)
 		<td>" . $playoffs[$k] . "</td>
 		<td>" . getNumberOfTitles($teamname[$k], 'Division') . "</td>
 		<td>" . getNumberOfTitles($teamname[$k], 'Conference') . "</td>
-		<td>" . getNumberOfTitles($teamname[$k], 'IBL') . "</td>
+		<td>" . getNumberOfTitles($teamname[$k], 'IBL Champions') . "</td>
 	</tr>";
 
 	$k++;

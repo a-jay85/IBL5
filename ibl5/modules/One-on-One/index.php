@@ -125,7 +125,7 @@ Review Old Game (Input Game ID): <input type=\"text\" name=\"gameid\" size=\"11\
 
 // ===== PRINT THE RESULTS OF AN OLD GAME
 
-if ($gameid == NULL)
+if ($gameid == NULL AND $_GET['gameid'] == NULL)
 {
 // ===== IF VALUES ARE FOUND FOR P1 AND P2, AND THEY ARE DIFFERENT, RUN THE GAME
 
@@ -154,7 +154,10 @@ rungame($player1, $player2, $ownerplaying);
 // ===== ABOVE DISPLAYS A NEW GAME; ELSE PRINT THE OLD GAME RESULTS
 
 } else {
-printgame ($gameid);
+	if ($_GET['gameid'] != NULL) {
+		$gameid = intval($_GET['gameid']);
+	}
+	printgame($gameid);
 }
 
     CloseTable();
@@ -917,7 +920,8 @@ if ($score1 > $score2) {
 	}
 	$discordText .= $bang;
 	$discordText .= "**$p1_name $score1**, $p2_name $score2
-	*(Game played by $owner, Game #$gameid)*";
+	*(Game played by $owner, Game #$gameid)*
+	http://$_SERVER[HTTP_HOST]$_SERVER[PHP_SELF]?name=One-on-One&gameid=$gameid";
 } else {
 	$gamewinner = strtoupper($p2_name);
 	if (abs($score1 - $score2) <= 3) {
@@ -925,7 +929,8 @@ if ($score1 > $score2) {
 	}
 	$discordText .= $bang;
 	$discordText .= "$p1_name $score1, **$p2_name $score2**
-	*(Game played by $owner, Game #$gameid)*";
+	*(Game played by $owner, Game #$gameid)*
+	http://$_SERVER[HTTP_HOST]$_SERVER[PHP_SELF]?name=One-on-One&gameid=$gameid";
 }
 
 postToDiscordChannel('#1v1-games', $discordText);

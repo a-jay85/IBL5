@@ -164,16 +164,6 @@ echo 'ibl_schedule database table has been updated.<p>';
 //This section stores Standings values in a database table called 'ibl_standings' so that they can be retrieved quickly.
 //The file 'block-AJstandings.php' relies on 'ibl_standings' to automate the sidebar standings display.
 
-$standingsFilePath = 'ibl/IBL/Standings.htm';
-
-$standings = new DOMDocument();
-$standings->loadHTMLFile($standingsFilePath);
-$standings->preserveWhiteSpace = false;
-
-$getRows = $standings->getElementsByTagName('tr');
-$rowsByConference = $getRows->item(0)->childNodes->item(0)->childNodes->item(0)->childNodes;
-$rowsByDivision = $getRows->item(0)->childNodes->item(1)->childNodes->item(0)->childNodes;
-
 function extractWins($var)
 {
 	$var = rtrim(substr($var, 0, 2),'-');
@@ -188,10 +178,21 @@ function extractLosses($var)
 
 echo '<p>Updating the ibl_standings database table...<p>';
 
-function extractStandingsValues($confVar, $divVar)
+function extractStandingsValues()
 {
 	echo '<p>Updating the conference standings for all teams...<p>';
-	foreach ($confVar as $row) {
+
+	$standingsFilePath = 'ibl/IBL/Standings.htm';
+
+	$standings = new DOMDocument();
+	$standings->loadHTMLFile($standingsFilePath);
+	$standings->preserveWhiteSpace = false;
+
+	$getRows = $standings->getElementsByTagName('tr');
+	$rowsByConference = $getRows->item(0)->childNodes->item(0)->childNodes->item(0)->childNodes;
+	$rowsByDivision = $getRows->item(0)->childNodes->item(1)->childNodes->item(0)->childNodes;
+
+	foreach ($rowsByConference as $row) {
 		$teamName = $row->childNodes->item(0)->nodeValue;
 		if (in_array($teamName, array("Eastern", "Western"))) {
 			$conference = $teamName;
@@ -284,7 +285,7 @@ function extractStandingsValues($confVar, $divVar)
 	echo '<p>Conference standings have been updated.<p>';
 
 	echo '<p>Updating the division games back for all teams...<br>';
-	foreach ($divVar as $row) {
+	foreach ($rowsByDivision as $row) {
 		$teamName = $row->childNodes->item(0)->nodeValue;
 		if (in_array($teamName, array("Atlantic", "Central", "Midwest", "Pacific"))) {
 			$division = $teamName;
@@ -356,7 +357,7 @@ function updateMagicNumbers ($region)
 	echo "Magic numbers for the $region $grouping have been updated.<p>";
 }
 
-extractStandingsValues($rowsByConference, $rowsByDivision);
+extractStandingsValues();
 
 updateMagicNumbers('Eastern');
 updateMagicNumbers('Western');

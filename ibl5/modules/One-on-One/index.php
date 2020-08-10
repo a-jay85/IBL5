@@ -920,8 +920,8 @@ if ($score1 > $score2) {
 	}
 	$discordText .= $bang;
 	$discordText .= "**$p1_name $score1**, $p2_name $score2
-	*(Game played by $owner, Game #$gameid)*
-	http://$_SERVER[HTTP_HOST]$_SERVER[PHP_SELF]?name=One-on-One&gameid=$gameid";
+	*(Game played by $owner)*
+http://$_SERVER[HTTP_HOST]$_SERVER[PHP_SELF]?name=One-on-One&gameid=$gameid";
 } else {
 	$gamewinner = strtoupper($p2_name);
 	if (abs($score1 - $score2) <= 3) {
@@ -929,8 +929,8 @@ if ($score1 > $score2) {
 	}
 	$discordText .= $bang;
 	$discordText .= "$p1_name $score1, **$p2_name $score2**
-	*(Game played by $owner, Game #$gameid)*
-	http://$_SERVER[HTTP_HOST]$_SERVER[PHP_SELF]?name=One-on-One&gameid=$gameid";
+	*(Game played by $owner)*
+http://$_SERVER[HTTP_HOST]$_SERVER[PHP_SELF]?name=One-on-One&gameid=$gameid";
 }
 
 postToDiscordChannel('#1v1-games', $discordText);

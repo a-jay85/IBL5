@@ -615,7 +615,7 @@ function displayStandings($region)
 
 	list ($grouping,$groupingGB,$groupingMagicNumber) = assignGroupingsFor($region);
 
-	$query = "SELECT tid, team_name, leagueRecord, pct, $groupingGB, confRecord, divRecord, homeRecord, awayRecord, gamesUnplayed, $groupingMagicNumber
+	$query = "SELECT tid, team_name, leagueRecord, pct, $groupingGB, confRecord, divRecord, homeRecord, awayRecord, gamesUnplayed, $groupingMagicNumber, clinchedConference, clinchedDivision
 		FROM ibl_standings
 		WHERE $grouping = '$region' ORDER BY $groupingGB ASC";
 	$result = mysql_query($query);
@@ -648,6 +648,13 @@ function displayStandings($region)
 		$awayRecord = mysql_result($result, $i, 8);
 		$gamesUnplayed = mysql_result($result, $i, 9);
 		$magicNumber = mysql_result($result, $i, 10);
+		$clinchedConference = mysql_result($result, $i, 11);
+		$clinchedDivision = mysql_result($result, $i, 12);
+	    if ($clinchedConference == 1) {
+	        $team_name = "<b>Z</b>-" . $team_name;
+	    } elseif ($clinchedDivision == 1) {
+	        $team_name = "<b>Y</b>-" . $team_name;
+	    }
 
 		$queryLast10Games = "SELECT last_win, last_loss, streak_type, streak FROM nuke_ibl_power WHERE TeamID = $tid";
 		$resultLast10Games = mysql_query($queryLast10Games);

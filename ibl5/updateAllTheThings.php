@@ -177,6 +177,7 @@ function extractLosses($var)
 }
 
 echo '<p>Updating the ibl_standings database table...<p>';
+if (mysql_query('TRUNCATE TABLE ibl_standings')) echo 'TRUNCATE TABLE ibl_standings<p>';
 
 function extractStandingsValues()
 {

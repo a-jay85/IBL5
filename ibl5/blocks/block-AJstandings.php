@@ -42,14 +42,6 @@ $resultALEast = mysql_query($queryALEast);
 $limitALEast = mysql_num_rows($resultALEast);
 */
 
-$queryEasternConference = "SELECT tid,team_name,leagueRecord,confGB FROM ibl_standings WHERE conference = 'Eastern' ORDER BY confGB ASC";
-$resultEasternConference = mysql_query($queryEasternConference);
-$limitEasternConference = mysql_num_rows($resultEasternConference);
-
-$queryWesternConference = "SELECT tid,team_name,leagueRecord,confGB FROM ibl_standings WHERE conference = 'Western' ORDER BY confGB ASC";
-$resultWesternConference = mysql_query($queryWesternConference);
-$limitWesternConference = mysql_num_rows($resultWesternConference);
-
 $arrayLastSimDates = getLastSimDatesArray();
 $lastSimStartDate = $arrayLastSimDates["Start Date"];
 $lastSimEndDate = $arrayLastSimDates["End Date"];
@@ -60,6 +52,11 @@ $content=$content."<center><strong>$lastSimStartDate</strong></center>";
 $content=$content."<center>-to-</center>";
 $content=$content."<center><strong>$lastSimEndDate</strong></center>";
 $content=$content.'<tr><td colspan=2><hr></td></tr>';
+
+$queryEasternConference = "SELECT tid,team_name,leagueRecord,confGB FROM ibl_standings WHERE conference = 'Eastern' ORDER BY confGB ASC";
+$resultEasternConference = mysql_query($queryEasternConference);
+$limitEasternConference = mysql_num_rows($resultEasternConference);
+
 $content=$content.'
 <tr><td colspan=2><center><font color=#fd004d><b>Eastern Conference</b></font></center></td></tr>
 <tr bgcolor=#006cb3><td><center><font color=#ffffff><b>Team (W-L)</b></font></center></td><td><center><font color=#ffffff><b>GB</b></font></center></td></tr>';
@@ -74,6 +71,10 @@ while ($i < $limitEasternConference) {
 	$content=$content.'<tr><td nowrap><a href="modules.php?name=Team&op=team&tid='.$tid.'">'.$team_name.'</a> ('.$leagueRecord.')</td><td>'.$confGB.'</td></tr>';
 	$i++;
 }
+
+$queryWesternConference = "SELECT tid,team_name,leagueRecord,confGB FROM ibl_standings WHERE conference = 'Western' ORDER BY confGB ASC";
+$resultWesternConference = mysql_query($queryWesternConference);
+$limitWesternConference = mysql_num_rows($resultWesternConference);
 
 $content=$content.'
 <tr><td colspan=2><hr></td></tr>

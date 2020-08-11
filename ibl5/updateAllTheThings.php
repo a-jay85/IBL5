@@ -316,6 +316,44 @@ function extractStandingsValues()
 	echo 'Division standings have been updated.<p>';
 }
 
+function checkIfRegionIsClinched($region)
+{
+	list ($grouping, $groupingGB, $groupingMagicNumber) = assignGroupingsFor($region);
+	echo "<p>Checking if the $region $grouping has been clinched...<br>";
+
+	$queryWinningestTeam = "SELECT team_name, homeWins, awayWins
+		FROM ibl_standings
+		WHERE $grouping = '$region'
+		ORDER BY homeWins + awayWins DESC
+		LIMIT 1;";
+	$resultWinningestTeam = mysql_query($queryWinningestTeam);
+	$winningestTeamName = mysql_result($resultWinningestTeam, 0, "team_name");
+	$winningestTeamWins = mysql_result($resultWinningestTeam, 0, "homeWins") + mysql_result($resultWinningestTeam, 0, "awayWins");
+
+	$queryLeastLosingestTeam = "SELECT homeLosses, awayLosses
+		FROM ibl_standings
+		WHERE $grouping = '$region'
+			AND team_name != '$winningestTeamName'
+		ORDER BY homeLosses + awayLosses ASC
+		LIMIT 1;";
+	$resultLeastLosingestTeam = mysql_query($queryLeastLosingestTeam);
+	$leastLosingestTeamLosses = mysql_result($resultLeastLosingestTeam, 0, "homeLosses") + mysql_result($resultLeastLosingestTeam, 0, "awayLosses");
+
+	$magicNumber = 82 + 1 - $winningestTeamWins - $leastLosingestTeamLosses;
+
+	if ($magicNumber <= 0) {
+		$querySetTeamToClinched = "UPDATE ibl_standings
+			SET clinched" . ucfirst($grouping) . " = 1
+			WHERE team_name = '$winningestTeamName';";
+
+		if (mysql_query($querySetTeamToClinched)) {
+			echo "The $winningestTeamName have clinched the $region $grouping!";
+		};
+	} else {
+		echo "Nope: the $region $grouping is still up for grabs!<p>";
+	}
+}
+
 function updateMagicNumbers ($region)
 {
 	echo "<p>Updating the magic numbers for the $region...<br>";
@@ -355,6 +393,9 @@ function updateMagicNumbers ($region)
 		} else die('Invalid query: ' . mysql_error());
 		$i++;
 	}
+
+	checkIfRegionIsClinched($region);
+
 	echo "Magic numbers for the $region $grouping have been updated.<p>";
 }
 

@@ -52,7 +52,7 @@ function extractBoxID($boxHREF)
 	return $boxID;
 }
 
-function groupingSort($region)
+function assignGroupingsFor($region)
 {
 	if (in_array($region, array("Eastern", "Western"))) {
 		$grouping = 'conference';
@@ -318,7 +318,7 @@ function extractStandingsValues()
 function updateMagicNumbers ($region)
 {
 	echo "<p>Updating the magic numbers for the $region...<br>";
-	list ($grouping, $groupingGB, $groupingMagicNumber) = groupingSort($region);
+	list ($grouping, $groupingGB, $groupingMagicNumber) = assignGroupingsFor($region);
 
 	$query = "SELECT team_name, homeWins, homeLosses, awayWins, awayLosses
 		FROM ibl_standings
@@ -571,7 +571,7 @@ function displayStandings($region)
 {
 	global $standingsHTML;
 
-	list ($grouping,$groupingGB,$groupingMagicNumber) = groupingSort($region);
+	list ($grouping,$groupingGB,$groupingMagicNumber) = assignGroupingsFor($region);
 
 	$query = "SELECT tid, team_name, leagueRecord, pct, $groupingGB, confRecord, divRecord, homeRecord, awayRecord, gamesUnplayed, $groupingMagicNumber
 		FROM ibl_standings

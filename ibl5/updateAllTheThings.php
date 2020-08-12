@@ -320,23 +320,23 @@ function checkIfRegionIsClinched($region)
 	list ($grouping, $groupingGB, $groupingMagicNumber) = assignGroupingsFor($region);
 	echo "<p>Checking if the $region $grouping has been clinched...<br>";
 
-	$queryWinningestTeam = "SELECT team_name, homeWins, awayWins
+	$queryWinningestTeam = "SELECT team_name, homeWins + awayWins AS wins
 		FROM ibl_standings
 		WHERE $grouping = '$region'
-		ORDER BY homeWins + awayWins DESC
+		ORDER BY wins DESC
 		LIMIT 1;";
 	$resultWinningestTeam = mysql_query($queryWinningestTeam);
 	$winningestTeamName = mysql_result($resultWinningestTeam, 0, "team_name");
-	$winningestTeamWins = mysql_result($resultWinningestTeam, 0, "homeWins") + mysql_result($resultWinningestTeam, 0, "awayWins");
+	$winningestTeamWins = mysql_result($resultWinningestTeam, 0, "wins");
 
-	$queryLeastLosingestTeam = "SELECT homeLosses, awayLosses
+	$queryLeastLosingestTeam = "SELECT homeLosses + awayLosses AS losses
 		FROM ibl_standings
 		WHERE $grouping = '$region'
 			AND team_name != '$winningestTeamName'
-		ORDER BY homeLosses + awayLosses ASC
+		ORDER BY losses ASC
 		LIMIT 1;";
 	$resultLeastLosingestTeam = mysql_query($queryLeastLosingestTeam);
-	$leastLosingestTeamLosses = mysql_result($resultLeastLosingestTeam, 0, "homeLosses") + mysql_result($resultLeastLosingestTeam, 0, "awayLosses");
+	$leastLosingestTeamLosses = mysql_result($resultLeastLosingestTeam, 0, "losses");
 
 	$magicNumber = 82 + 1 - $winningestTeamWins - $leastLosingestTeamLosses;
 

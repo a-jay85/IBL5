@@ -106,8 +106,8 @@ foreach ($rows as $row) {
 			} else $boxID = 100000;
 		}
 
-		$visitorTID = mysql_result(mysql_query("SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '".$visitorName."';"),0);
-		$homeTID = mysql_result(mysql_query("SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '".$homeName."';"),0);
+		$visitorTID = getTidFromTeamname($visitorName);
+		$homeTID = getTidFromTeamname($homeName);
 	}
 
 	$sqlQueryString = "INSERT INTO ibl_schedule (

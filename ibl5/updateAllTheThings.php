@@ -395,7 +395,7 @@ function updateMagicNumbers($region)
 
 	checkIfRegionIsClinched($region);
 
-	echo "Magic numbers for the $region $grouping have been updated.<p>";
+	echo "<p>Magic numbers for the $region $grouping have been updated.<p>";
 }
 
 extractStandingsValues();

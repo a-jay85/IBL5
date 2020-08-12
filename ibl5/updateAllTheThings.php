@@ -190,11 +190,11 @@ function extractStandingsValues()
 
 	foreach ($rowsByConference as $row) {
 		$teamName = $row->childNodes->item(0)->nodeValue;
-		$tid = getTidFromTeamname($teamName);
 		if (in_array($teamName, array("Eastern", "Western"))) {
 			$conference = $teamName;
 		}
 		if (!in_array($teamName, array("Eastern", "Western", "team", ""))) {
+			$tid = getTidFromTeamname($teamName);
 			$leagueRecord = $row->childNodes->item(1)->nodeValue;
 			$pct = $row->childNodes->item(2)->nodeValue;
 			$confGB = $row->childNodes->item(3)->nodeValue;

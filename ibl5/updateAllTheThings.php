@@ -74,11 +74,6 @@ foreach ($rows as $row) {
 	$checkThirdCell = $row->childNodes->item(2)->nodeValue;
 	$checkSecondCell = $row->childNodes->item(1)->nodeValue;
 	$checkFirstCell = $row->childNodes->item(0)->nodeValue;
-	$vScore = "";
-	$hScore = "";
-	$visitorTID = "";
-	$homeTID = "";
-	$boxID = "";
 
 	if ($checkSecondCell === NULL /*AND substr($checkFirstCell,0,4) !== "Post"*/) {
 		$fullDate = extractDate($row->textContent);
@@ -140,17 +135,17 @@ foreach ($rows as $row) {
 	if (mysql_query($sqlQueryString)) {
 		echo $sqlQueryString . '<br>';
 	} // DO NOT use 'else die('Invalid query: '.mysql_error()' here -- script depends on being able to pass broken SQL strings for now.
-}
 
-unset($visitorName,
-	$homeName,
-	$boxLink,
-	$hScore,
-	$vScore,
-	$homeName,
-	$visitorName,
-	$homeTID,
-	$visitorTID);
+	unset($visitorName,
+		$homeName,
+		$boxLink,
+		$hScore,
+		$vScore,
+		$homeName,
+		$visitorName,
+		$homeTID,
+		$visitorTID);
+}
 
 echo 'ibl_schedule database table has been updated.<p>';
 

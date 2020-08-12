@@ -53,7 +53,7 @@ $content=$content."<center>-to-</center>";
 $content=$content."<center><strong>$lastSimEndDate</strong></center>";
 $content=$content.'<tr><td colspan=2><hr></td></tr>';
 
-$queryEasternConference = "SELECT tid,team_name,leagueRecord,confGB,clinchedConference,clinchedDivision FROM ibl_standings WHERE conference = 'Eastern' ORDER BY confGB ASC";
+$queryEasternConference = "SELECT tid,team_name,leagueRecord,confGB,clinchedConference,clinchedDivision,clinchedPlayoffs FROM ibl_standings WHERE conference = 'Eastern' ORDER BY confGB ASC";
 $resultEasternConference = mysql_query($queryEasternConference);
 $limitEasternConference = mysql_num_rows($resultEasternConference);
 
@@ -69,17 +69,20 @@ while ($i < $limitEasternConference) {
 	$confGB = mysql_result($resultEasternConference,$i,3);
 	$clinchedConference = mysql_result($resultEasternConference,$i,4);
 	$clinchedDivision = mysql_result($resultEasternConference,$i,5);
+	$clinchedPlayoffs = mysql_result($resultEasternConference,$i,6);
     if ($clinchedConference == 1) {
         $team_name = "<b>Z</b>-" . $team_name;
     } elseif ($clinchedDivision == 1) {
         $team_name = "<b>Y</b>-" . $team_name;
+    } elseif ($clinchedPlayoffs == 1) {
+        $team_name = "<b>X</b>-" . $team_name;
     }
 
 	$content=$content.'<tr><td nowrap><a href="modules.php?name=Team&op=team&tid='.$tid.'">'.$team_name.'</a> ('.$leagueRecord.')</td><td>'.$confGB.'</td></tr>';
 	$i++;
 }
 
-$queryWesternConference = "SELECT tid,team_name,leagueRecord,confGB,clinchedConference,clinchedDivision FROM ibl_standings WHERE conference = 'Western' ORDER BY confGB ASC";
+$queryWesternConference = "SELECT tid,team_name,leagueRecord,confGB,clinchedConference,clinchedDivision,clinchedPlayoffs FROM ibl_standings WHERE conference = 'Western' ORDER BY confGB ASC";
 $resultWesternConference = mysql_query($queryWesternConference);
 $limitWesternConference = mysql_num_rows($resultWesternConference);
 
@@ -96,10 +99,13 @@ while ($i < $limitWesternConference) {
 	$confGB = mysql_result($resultWesternConference,$i,3);
 	$clinchedConference = mysql_result($resultWesternConference,$i,4);
 	$clinchedDivision = mysql_result($resultWesternConference,$i,5);
+	$clinchedPlayoffs = mysql_result($resultWesternConference,$i,6);
     if ($clinchedConference == 1) {
         $team_name = "<b>Z</b>-" . $team_name;
     } elseif ($clinchedDivision == 1) {
         $team_name = "<b>Y</b>-" . $team_name;
+    } elseif ($clinchedPlayoffs == 1) {
+        $team_name = "<b>X</b>-" . $team_name;
     }
 
 	$content=$content.'<tr><td nowrap><a href="modules.php?name=Team&op=team&tid='.$tid.'">'.$team_name.'</a> ('.$leagueRecord.')</td><td>'.$confGB.'</td></tr>';

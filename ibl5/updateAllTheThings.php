@@ -353,6 +353,57 @@ function checkIfRegionIsClinched($region)
 	}
 }
 
+function checkIfPlayoffsClinched($conference)
+{
+	echo "<p>Checking if any teams have clinched playoff spots in the $conference Conference...<br>";
+
+	$queryEightWinningestTeams = "SELECT team_name, homeWins + awayWins AS wins
+		FROM ibl_standings
+		WHERE conference = '$conference'
+		ORDER BY wins DESC
+		LIMIT 8;";
+	$resultEightWinningestTeams = mysql_query($queryEightWinningestTeams);
+
+	$queryFourLosingestTeams = "SELECT homeLosses + awayLosses AS losses
+		FROM ibl_standings
+		WHERE conference = '$conference'
+		ORDER BY losses DESC
+		LIMIT 4;";
+	$resultFourLosingestTeams = mysql_query($queryFourLosingestTeams);
+
+	$i = 0;
+	while ($i < 8) {
+		$contendingTeamName = mysql_result($resultEightWinningestTeams, $i, "team_name");
+		$contendingTeamWins = mysql_result($resultEightWinningestTeams, $i, "wins");
+		$teamsEliminated = 0;
+
+		$j = 0;
+		while ($j < 4) {
+			$bottomTeamLosses = mysql_result($resultFourLosingestTeams, $j, "losses");
+
+			$magicNumber = 82 + 1 - $contendingTeamWins - $bottomTeamLosses;
+
+			if ($magicNumber <= 0) {
+				$teamsEliminated++;
+			}
+
+			$j++;
+		}
+
+		if ($teamsEliminated == 4) {
+			$querySetTeamToClinched = "UPDATE ibl_standings
+				SET clinchedPlayoffs = 1
+				WHERE team_name = '$contendingTeamName';";
+
+			if (mysql_query($querySetTeamToClinched)) {
+				echo "The $contendingTeamName have clinched a playoff spot!<br>";
+			};
+		}
+
+		$i++;
+	}
+}
+
 function updateMagicNumbers($region)
 {
 	echo "<p>Updating the magic numbers for the $region...<br>";
@@ -394,6 +445,9 @@ function updateMagicNumbers($region)
 	}
 
 	checkIfRegionIsClinched($region);
+	if ($grouping == 'conference') {
+		checkIfPlayoffsClinched($region);
+	}
 
 	echo "<p>Magic numbers for the $region $grouping have been updated.<p>";
 }
@@ -614,7 +668,7 @@ function displayStandings($region)
 
 	list ($grouping, $groupingGB, $groupingMagicNumber) = assignGroupingsFor($region);
 
-	$query = "SELECT tid, team_name, leagueRecord, pct, $groupingGB, confRecord, divRecord, homeRecord, awayRecord, gamesUnplayed, $groupingMagicNumber, clinchedConference, clinchedDivision
+	$query = "SELECT tid, team_name, leagueRecord, pct, $groupingGB, confRecord, divRecord, homeRecord, awayRecord, gamesUnplayed, $groupingMagicNumber, clinchedConference, clinchedDivision, clinchedPlayoffs
 		FROM ibl_standings
 		WHERE $grouping = '$region' ORDER BY $groupingGB ASC";
 	$result = mysql_query($query);
@@ -649,10 +703,13 @@ function displayStandings($region)
 		$magicNumber = mysql_result($result, $i, 10);
 		$clinchedConference = mysql_result($result, $i, 11);
 		$clinchedDivision = mysql_result($result, $i, 12);
+		$clinchedPlayoffs = mysql_result($result, $i, 13);
 	    if ($clinchedConference == 1) {
 	        $team_name = "<b>Z</b>-" . $team_name;
 	    } elseif ($clinchedDivision == 1) {
 	        $team_name = "<b>Y</b>-" . $team_name;
+	    } elseif ($clinchedPlayoffs == 1) {
+	        $team_name = "<b>X</b>-" . $team_name;
 	    }
 
 		$queryLast10Games = "SELECT last_win, last_loss, streak_type, streak FROM nuke_ibl_power WHERE TeamID = $tid";

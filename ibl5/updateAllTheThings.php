@@ -349,7 +349,7 @@ function checkIfRegionIsClinched($region)
 	}
 }
 
-function updateMagicNumbers ($region)
+function updateMagicNumbers($region)
 {
 	echo "<p>Updating the magic numbers for the $region...<br>";
 	list ($grouping, $groupingGB, $groupingMagicNumber) = assignGroupingsFor($region);
@@ -608,7 +608,7 @@ function displayStandings($region)
 {
 	global $standingsHTML;
 
-	list ($grouping,$groupingGB,$groupingMagicNumber) = assignGroupingsFor($region);
+	list ($grouping, $groupingGB, $groupingMagicNumber) = assignGroupingsFor($region);
 
 	$query = "SELECT tid, team_name, leagueRecord, pct, $groupingGB, confRecord, divRecord, homeRecord, awayRecord, gamesUnplayed, $groupingMagicNumber, clinchedConference, clinchedDivision
 		FROM ibl_standings
@@ -616,8 +616,8 @@ function displayStandings($region)
 	$result = mysql_query($query);
 	$limit = mysql_num_rows($result);
 
-	$standingsHTML=$standingsHTML.'<tr><td colspan=10><font color=#fd004d><b>'.$region.' '.ucfirst($grouping).'</b></font></td></tr>';
-	$standingsHTML=$standingsHTML.'<tr bgcolor=#006cb3><td><font color=#ffffff><b>Team</b></font></td>
+	$standingsHTML .= '<tr><td colspan=10><font color=#fd004d><b>' . $region . ' ' . ucfirst($grouping) . '</b></font></td></tr>';
+	$standingsHTML .= '<tr bgcolor=#006cb3><td><font color=#ffffff><b>Team</b></font></td>
 		<td><font color=#ffffff><b>W-L</b></font></td>
 		<td><font color=#ffffff><b>Pct</b></font></td>
 		<td><center><font color=#ffffff><b>GB</b></font></center></td>
@@ -658,40 +658,40 @@ function displayStandings($region)
 		$streakType = mysql_result($resultLast10Games, 0, 2);
 		$streak = mysql_result($resultLast10Games, 0, 3);
 
-		$standingsHTML=$standingsHTML.'<tr><td><a href="modules.php?name=Team&op=team&tid='.$tid.'">'.$team_name.'</td>
-			<td>'.$leagueRecord.'</td>
-			<td>'.$pct.'</td>
-			<td><center>'.$GB.'</center></td>
-			<td><center>'.$magicNumber.'</center></td>
-			<td>'.$gamesUnplayed.'</td>
-			<td>'.$confRecord.'</td>
-			<td>'.$divRecord.'</td>
-			<td>'.$homeRecord.'</td>
-			<td>'.$awayRecord.'</td>
-			<td>'.$winsInLast10Games.'-'.$lossesInLast10Games.'</td>
-			<td>'.$streakType.' '.$streak.'</td></tr>';
+		$standingsHTML .= '<tr><td><a href="modules.php?name=Team&op=team&tid=' . $tid . '">' . $team_name . '</td>
+			<td>' . $leagueRecord . '</td>
+			<td>' . $pct . '</td>
+			<td><center>' . $GB . '</center></td>
+			<td><center>' . $magicNumber . '</center></td>
+			<td>' . $gamesUnplayed . '</td>
+			<td>' . $confRecord . '</td>
+			<td>' . $divRecord . '</td>
+			<td>' . $homeRecord . '</td>
+			<td>' . $awayRecord . '</td>
+			<td>' . $winsInLast10Games . '-' . $lossesInLast10Games . '</td>
+			<td>' . $streakType . ' ' . $streak . '</td></tr>';
 		$i++;
 	}
-	$standingsHTML=$standingsHTML.'<tr><td colspan=10><hr></td></tr>';
+	$standingsHTML .= '<tr><td colspan=10><hr></td></tr>';
 }
 
 echo '<p>Updating the Standings page...<p>';
-$standingsHTML=$standingsHTML.'<table>';
+$standingsHTML .= '<table>';
 displayStandings('Eastern');
 displayStandings('Western');
-$standingsHTML=$standingsHTML.'</table>';
-$standingsHTML=$standingsHTML.'<p>';
+$standingsHTML .= '</table>';
+$standingsHTML .= '<p>';
 
-$standingsHTML=$standingsHTML.'<table>';
+$standingsHTML .= '<table>';
 displayStandings('Atlantic');
 displayStandings('Central');
 displayStandings('Midwest');
 displayStandings('Pacific');
-$standingsHTML=$standingsHTML.'</table>';
+$standingsHTML .= '</table>';
 
-$sqlQueryString = "UPDATE nuke_pages SET text='$standingsHTML' WHERE pid = 4";
+$sqlQueryString = "UPDATE nuke_pages SET text = '$standingsHTML' WHERE pid = 4";
 if (mysql_query($sqlQueryString)) {
-	echo $sqlQueryString.'<p>';
+	echo $sqlQueryString . '<p>';
 	echo '<p>Full standings page has been updated.<p>';
 } else die('Invalid query: ' . mysql_error());
 

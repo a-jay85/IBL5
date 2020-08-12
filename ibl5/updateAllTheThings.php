@@ -74,11 +74,6 @@ foreach ($rows as $row) {
 	$checkThirdCell = $row->childNodes->item(2)->nodeValue;
 	$checkSecondCell = $row->childNodes->item(1)->nodeValue;
 	$checkFirstCell = $row->childNodes->item(0)->nodeValue;
-	$vScore = "";
-	$hScore = "";
-	$visitorTID = "";
-	$homeTID = "";
-	$boxID = "";
 
 	if ($checkSecondCell === NULL /*AND substr($checkFirstCell,0,4) !== "Post"*/) {
 		$fullDate = extractDate($row->textContent);

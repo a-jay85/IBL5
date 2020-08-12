@@ -190,6 +190,7 @@ function extractStandingsValues()
 
 	foreach ($rowsByConference as $row) {
 		$teamName = $row->childNodes->item(0)->nodeValue;
+		$tid = getTidFromTeamname($teamName);
 		if (in_array($teamName, array("Eastern", "Western"))) {
 			$conference = $teamName;
 		}
@@ -214,6 +215,7 @@ function extractStandingsValues()
 			$gamesUnplayed = 82 - $homeWins - $homeLosses - $awayWins - $awayLosses; // TODO: make number of games in season dynamic
 
 			$sqlQueryString = "INSERT INTO ibl_standings (
+				tid,
 				team_name,
 				leagueRecord,
 				pct,
@@ -234,6 +236,7 @@ function extractStandingsValues()
 				awayLosses
 			)
 			VALUES (
+				'".$tid."',
 				'".rtrim($teamName)."',
 				'".$leagueRecord."',
 				'".$pct."',
@@ -254,6 +257,7 @@ function extractStandingsValues()
 				'".$awayLosses."'
 			)
 			ON DUPLICATE KEY UPDATE
+				tid = '".$tid."',
 				leagueRecord = '".$leagueRecord."',
 				pct = '".$pct."',
 				gamesUnplayed = '".$gamesUnplayed."',

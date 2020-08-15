@@ -6,30 +6,6 @@ mysql_connect($dbhost,$dbuname,$dbpass);
 
 require_once $_SERVER['DOCUMENT_ROOT'] . '/sharedFunctions.php';
 
-echo "<h1>JSB .sco File Parser</h1>
-<h2>Uploader</h2>
-<form enctype=\"multipart/form-data\" action=\"scoParser.php\" method=\"POST\">
-    <input type=\"hidden\" name=\"MAX_FILE_SIZE\" value=\"14000000\" />
-    <label for=\"scoFile\">Upload Old Season's .sco: </label><input name=\"scoFile\" type=\"file\" /><p>
-    <label for=\"seasonPhase\">Season Phase for Uploaded .sco: </label><select name=\"seasonPhase\">
-        <option value = \"Preseason\">Preseason</option>
-        <option value = \"HEAT\">HEAT</option>
-        <option value = \"Regular Season/Playoffs\">Regular Season</option>
-    </select><p>
-    <label for=\"seasonEndingYear\">Season <b><u>Ending</u></b> Year for Uploaded .sco: </label><input type=\"text\" name=\"seasonEndingYear\" maxlength=4 minlength=4 size=4 /><br>
-    <i>e.g. HEAT before the 1990-1991 season</i> = <code>1991</code><br>
-    <i>e.g. 1984-1985 Preseason or Regular Season</i> = <code>1985</code><p>
-    <input type=\"submit\" value=\"Parse Uploaded .sco File\" />
-</form>
-<hr>
-<br>";
-
-if ($_FILES['scoFile']['tmp_name']) {
-    $uploadedFilePath = $_FILES['scoFile']['tmp_name'];
-    $seasonEndingYear = $_POST['seasonEndingYear'];
-    $seasonPhase = $_POST['seasonPhase'];
-}
-
 function scoParser($uploadedFilePath, $seasonEndingYear, $seasonPhase)
 {
     $scoFilePath = ($uploadedFilePath) ? $uploadedFilePath : "IBL5.sco";
@@ -203,6 +179,30 @@ function scoParser($uploadedFilePath, $seasonEndingYear, $seasonPhase)
     } else {
         die('Invalid query: '.mysql_error());
     }
+}
+
+echo "<h1>JSB .sco File Parser</h1>
+<h2>Uploader</h2>
+<form enctype=\"multipart/form-data\" action=\"scoParser.php\" method=\"POST\">
+    <input type=\"hidden\" name=\"MAX_FILE_SIZE\" value=\"14000000\" />
+    <label for=\"scoFile\">Upload Old Season's .sco: </label><input name=\"scoFile\" type=\"file\" /><p>
+    <label for=\"seasonPhase\">Season Phase for Uploaded .sco: </label><select name=\"seasonPhase\">
+        <option value = \"Preseason\">Preseason</option>
+        <option value = \"HEAT\">HEAT</option>
+        <option value = \"Regular Season/Playoffs\">Regular Season</option>
+    </select><p>
+    <label for=\"seasonEndingYear\">Season <b><u>Ending</u></b> Year for Uploaded .sco: </label><input type=\"text\" name=\"seasonEndingYear\" maxlength=4 minlength=4 size=4 /><br>
+    <i>e.g. HEAT before the 1990-1991 season</i> = <code>1991</code><br>
+    <i>e.g. 1984-1985 Preseason or Regular Season</i> = <code>1985</code><p>
+    <input type=\"submit\" value=\"Parse Uploaded .sco File\" />
+</form>
+<hr>
+<br>";
+
+if ($_FILES['scoFile']['tmp_name']) {
+    $uploadedFilePath = $_FILES['scoFile']['tmp_name'];
+    $seasonEndingYear = $_POST['seasonEndingYear'];
+    $seasonPhase = $_POST['seasonPhase'];
 }
 
 scoParser($uploadedFilePath, $seasonEndingYear, $seasonPhase);

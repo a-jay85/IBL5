@@ -660,7 +660,7 @@ $result7 = mysql_query($query7);
 #15.) On the admin page, click "Blocks". Scroll down to IBL Standings, and click the edit function. Same thing as before - scroll down to the box of text, click HTML, delete all text within.
 #16.) On the Standings tab, copy from U2:U47. Paste into this box, hit update, and save changes.
 
-$standingsHTML = "";
+$standingsHTML = "<script src=\"sorttable.js\"></script>";
 
 function displayStandings($region)
 {
@@ -668,14 +668,16 @@ function displayStandings($region)
 
 	list ($grouping, $groupingGB, $groupingMagicNumber) = assignGroupingsFor($region);
 
-	$query = "SELECT tid, team_name, leagueRecord, pct, $groupingGB, confRecord, divRecord, homeRecord, awayRecord, gamesUnplayed, $groupingMagicNumber, clinchedConference, clinchedDivision, clinchedPlayoffs
+	$query = "SELECT tid, team_name, leagueRecord, pct, $groupingGB, confRecord, divRecord, homeRecord, awayRecord, gamesUnplayed, $groupingMagicNumber, clinchedConference, clinchedDivision, clinchedPlayoffs, (homeWins + homeLosses) AS homeGames, (awayWins + awayLosses) AS awayGames
 		FROM ibl_standings
 		WHERE $grouping = '$region' ORDER BY $groupingGB ASC";
 	$result = mysql_query($query);
 	$limit = mysql_num_rows($result);
 
-	$standingsHTML .= '<tr><td colspan=10><font color=#fd004d><b>' . $region . ' ' . ucfirst($grouping) . '</b></font></td></tr>';
-	$standingsHTML .= '<tr bgcolor=#006cb3><td><font color=#ffffff><b>Team</b></font></td>
+	$standingsHTML .= '<font color=#fd004d><b>' . $region . ' ' . ucfirst($grouping) . '</b></font>';
+	$standingsHTML .= '<table class="sortable">';
+	$standingsHTML .= '<tr>
+		<td><font color=#ffffff><b>Team</b></font></td>
 		<td><font color=#ffffff><b>W-L</b></font></td>
 		<td><font color=#ffffff><b>Pct</b></font></td>
 		<td><center><font color=#ffffff><b>GB</b></font></center></td>
@@ -685,8 +687,11 @@ function displayStandings($region)
 		<td><font color=#ffffff><b>Div.</b></font></td>
 		<td><font color=#ffffff><b>Home</b></font></td>
 		<td><font color=#ffffff><b>Away</b></font></td>
+		<td><center><font color=#ffffff><b>Home<br>Played</b></font></center></td>
+		<td><center><font color=#ffffff><b>Away<br>Played</b></font></center></td>
 		<td><font color=#ffffff><b>Last 10</b></font></td>
-		<td><font color=#ffffff><b>Streak</b></font></td></tr>';
+		<td><font color=#ffffff><b>Streak</b></font></td>
+	</tr>';
 
 	$i = 0;
 	while ($i < $limit) {
@@ -704,6 +709,8 @@ function displayStandings($region)
 		$clinchedConference = mysql_result($result, $i, 11);
 		$clinchedDivision = mysql_result($result, $i, 12);
 		$clinchedPlayoffs = mysql_result($result, $i, 13);
+		$homeGames = mysql_result($result, $i, "homeGames");
+		$awayGames = mysql_result($result, $i, "awayGames");
 	    if ($clinchedConference == 1) {
 	        $team_name = "<b>Z</b>-" . $team_name;
 	    } elseif ($clinchedDivision == 1) {
@@ -729,26 +736,24 @@ function displayStandings($region)
 			<td>' . $divRecord . '</td>
 			<td>' . $homeRecord . '</td>
 			<td>' . $awayRecord . '</td>
+			<td><center>' . $homeGames . '</center></td>
+			<td><center>' . $awayGames . '</center></td>
 			<td>' . $winsInLast10Games . '-' . $lossesInLast10Games . '</td>
 			<td>' . $streakType . ' ' . $streak . '</td></tr>';
 		$i++;
 	}
-	$standingsHTML .= '<tr><td colspan=10><hr></td></tr>';
+	$standingsHTML .= '<tr><td colspan=10><hr></td></tr></table>';
 }
 
 echo '<p>Updating the Standings page...<p>';
-$standingsHTML .= '<table>';
 displayStandings('Eastern');
 displayStandings('Western');
-$standingsHTML .= '</table>';
 $standingsHTML .= '<p>';
 
-$standingsHTML .= '<table>';
 displayStandings('Atlantic');
 displayStandings('Central');
 displayStandings('Midwest');
 displayStandings('Pacific');
-$standingsHTML .= '</table>';
 
 $sqlQueryString = "UPDATE nuke_pages SET text = '$standingsHTML' WHERE pid = 4";
 if (mysql_query($sqlQueryString)) {

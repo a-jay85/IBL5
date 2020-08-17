@@ -821,11 +821,11 @@ function team($tid)
 		$num=mysql_numrows($result);
 	} else { // If not Free Agents, use the code below instead.
 		if ($yr != "") {
-			$query="SELECT * FROM nuke_iblhist WHERE teamid = '$tid' AND year = '$yr' ORDER BY active DESC, name ASC";
+			$query="SELECT * FROM nuke_iblhist WHERE teamid = '$tid' AND year = '$yr' ORDER BY name ASC";
 		} else if ($faon==0) {
-			$query="SELECT * FROM nuke_iblplyr WHERE tid = '$tid' AND retired = 0 ORDER BY active DESC, name ASC";
+			$query="SELECT * FROM nuke_iblplyr WHERE tid = '$tid' AND retired = 0 ORDER BY name ASC";
 		} else {
-			$query="SELECT * FROM nuke_iblplyr WHERE tid = '$tid' AND retired = 0 AND cyt != cy ORDER BY active DESC, name ASC";
+			$query="SELECT * FROM nuke_iblplyr WHERE tid = '$tid' AND retired = 0 AND cyt != cy ORDER BY name ASC";
 		}
 		$result=mysql_query($query);
 		$num=mysql_numrows($result);

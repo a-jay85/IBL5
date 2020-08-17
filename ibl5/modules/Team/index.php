@@ -2204,7 +2204,7 @@ function team_info_right ($team_name, $color1, $color2, $owner_name, $tid)
 		$wintot=$wintot+$wins;
 		$lostot=$lostot+$losses;
 		@$winpct=number_format($wins/($wins+$losses),3);
-		$output=$output."<a href=\"./modules.php?name=Team&op=team&tid=$tid&yr=$yearwl\">$yearwl $namewl</a>: $wins-$losses ($winpct)<br>";
+		$output=$output."<a href=\"./modules.php?name=Team&op=team&tid=$tid&yr=$yearwl\">" . ($yearwl - 1) . "-$yearwl $namewl</a>: $wins-$losses ($winpct)<br>";
 
 		$h++;
 	}

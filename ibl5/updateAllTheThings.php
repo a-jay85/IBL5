@@ -489,7 +489,7 @@ while ($i < $numTeams) {
 	$queryGames = "SELECT Visitor, Vscore, Home, HScore
 		FROM ibl_schedule
 		WHERE (Visitor = $tid OR Home = $tid)
-		AND (BoxID > 0 AND BoxID != 100000)
+		AND (BoxID > 0 AND BoxID < 100000)
 		AND Date BETWEEN '" . ($currentSeasonEndingYear - 1) . "-10-31' AND '$currentSeasonEndingYear-04-30'
 		ORDER BY Date ASC";
 	$resultGames = mysql_query($queryGames);
@@ -612,7 +612,7 @@ while ($i < $numTeams) {
 		WHERE TeamID = $tid;";
 	$result3 = mysql_query($query3);
 
-	echo "Updating $teamName: $wins wins, $losses losses, $gb games back, $homeWins home wins, $homeLosses home losses, $awayWins away wins, $awayLosses away losses, streak = $streakType$streak, ranking score = $ranking<br>";
+	echo "Updating $teamName: $wins wins, $losses losses, $gb games back, $homeWins home wins, $homeLosses home losses, $awayWins away wins, $awayLosses away losses, streak = $streakType$streak, last 10 = $winsInLast10Games-$lossesInLast10Games, ranking score = $ranking<br>";
 
 	// Update nuke_iblteam_win_loss with each team's season win/loss info
 	$query4 = "UPDATE nuke_iblteam_win_loss a, nuke_ibl_power b

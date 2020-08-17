@@ -742,7 +742,7 @@ function displayStandings($region)
 			<td>' . $streakType . ' ' . $streak . '</td></tr>';
 		$i++;
 	}
-	$standingsHTML .= '<tr><td colspan=10><hr></td></tr></table>';
+	$standingsHTML .= '<tr><td colspan=10><hr></td></tr></table><p>';
 }
 
 echo '<p>Updating the Standings page...<p>';

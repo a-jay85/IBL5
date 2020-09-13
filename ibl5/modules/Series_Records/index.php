@@ -170,7 +170,7 @@ function displaySeriesRecords($tid)
 					$pointer++;
 				} else {
 					echo "<td align=\"center\">0 - 0</td>";
-					mysql_data_seek($resultSeriesRecords, $pointer);
+					mysql_data_seek($resultSeriesRecords, $pointer); // Bring the pointer back since no record was found
 				}
 			}
 			$tidColumn++;

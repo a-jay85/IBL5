@@ -43,7 +43,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 	OpenTable();
 	displaytopmenu($tid);
 
-
+	seriesRecords();
 
 	CloseTable();
 	include("footer.php");
@@ -68,6 +68,36 @@ function main($user) {
 		cookiedecode($user);
 		userinfo($cookie[1]);
 	}
+}
+
+function seriesRecords()
+{
+	$numteams = mysql_result(mysql_query("SELECT MAX(Visitor) FROM ibl_schedule;"), 0);
+
+	echo "<table border=1>
+		<tr>
+			<th>vs.</th>";
+	$i = 1;
+	while ($i <= $numteams) {
+		echo "<th><img src=\"images/logo/new$i.png\" width=50 height=50></th>";
+		$i++;
+	}
+	echo "</tr>";
+
+	$tidRow = 1;
+	while ($tidRow <= $numteams) {
+		echo "<tr>
+			<td>teamname$tidRow</td>";
+		$tidColumn = 1;
+		while ($tidColumn <= $numteams) {
+			echo "<td>$tidRow vs. $tidColumn</td>";
+			$tidColumn++;
+		}
+		echo "</tr>";
+		$tidRow++;
+	}
+
+	echo "</table>";
 }
 
 switch($op) {

@@ -193,10 +193,8 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
                     $cy1 = 64;
                 } elseif ($player_exp > 2) {
                     $cy1 = 61;
-                } elseif ($player_exp > 1) {
-                    $cy1 = 51;
                 } else {
-                    $cy1 = 35;
+                    $cy1 = 51;
                 }
             }
 
@@ -340,10 +338,8 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
                 $zcy2 = 64;
             } elseif ($player_exp > 2) {
                 $zcy2 = 61;
-            } elseif ($player_exp > 1) {
-                $zcy2 = 51;
             } else {
-                $zcy2 = 35;
+                $zcy2 = 51;
             }
         }
         $nocheckbox = 0;

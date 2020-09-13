@@ -70,6 +70,16 @@ function main($user) {
 	}
 }
 
+function queryTeamInfo()
+{
+	$query = "SELECT teamid, team_city, team_name, color1, color2
+		FROM nuke_ibl_team_info
+		WHERE teamid != 99 AND teamid != 35
+		ORDER BY teamid ASC;";
+	$result = mysql_query($query);
+	return $result;
+}
+
 function querySeriesRecords()
 {
 	$query = "SELECT self, opponent, SUM(wins) AS wins, SUM(losses) AS losses
@@ -111,33 +121,54 @@ function displaySeriesRecords()
 
 	echo "<table border=1>
 		<tr>
-			<th>vs.</th>";
+			<th>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&rarr;&rarr;<br>
+			vs.<br>
+			&uarr;</th>";
 	$i = 1;
 	while ($i <= $numteams) {
-		echo "<th align=\"center\"><img src=\"images/logo/new$i.png\" width=50 height=50></th>";
+		echo "<th align=\"center\">
+			<a href=\"modules.php?name=Team&op=team&tid=$i\">
+				<img src=\"images/logo/new$i.png\" width=50 height=50>
+			</a>
+		</th>";
 		$i++;
 	}
 	echo "</tr>";
 
-	$result = querySeriesRecords();
+	$resultSeriesRecords = querySeriesRecords();
+	$resultTeamInfo = queryTeamInfo();
 
 	$pointer = 0;
 	$tidRow = 1;
 	while ($tidRow <= $numteams) {
+		$team = mysql_fetch_assoc($resultTeamInfo);
 		echo "<tr>
-			<td>teamname$tidRow</td>";
+			<td bgcolor=$team[color1]>
+				<a href=\"modules.php?name=Team&op=team&tid=$team[teamid]\">
+					<font color=\"$team[color2]\">
+						$team[team_city] $team[team_name]
+					</font>
+				</a>
+			</td>";
 		$tidColumn = 1;
 		while ($tidColumn <= $numteams) {
 			if ($tidRow == $tidColumn) {
 				echo "<td align=\"center\">x</td>";
 			} else {
-				$row = mysql_fetch_assoc($result);
+				$row = mysql_fetch_assoc($resultSeriesRecords);
 				if ($row['self'] == $tidRow AND $row['opponent'] == $tidColumn) {
-					echo "<td align=\"center\">$row[wins] - $row[losses]</td>";
+					if ($row['wins'] > $row['losses']) {
+						$bgcolor = "#8f8";
+					} elseif ($row['wins'] < $row['losses']) {
+						$bgcolor = "#f88";
+					} else {
+						$bgcolor = "#bbb";
+					}
+					echo "<td align=\"center\" bgcolor=\"$bgcolor\">$row[wins] - $row[losses]</td>";
 					$pointer++;
 				} else {
 					echo "<td align=\"center\">0 - 0</td>";
-					mysql_data_seek($result, $pointer);
+					mysql_data_seek($resultSeriesRecords, $pointer);
 				}
 			}
 			$tidColumn++;

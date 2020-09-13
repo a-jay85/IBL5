@@ -43,7 +43,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 	OpenTable();
 	displaytopmenu($tid);
 
-	displaySeriesRecords();
+	displaySeriesRecords($tid);
 
 	CloseTable();
 	include("footer.php");
@@ -115,7 +115,7 @@ function querySeriesRecords()
 	return $result;
 }
 
-function displaySeriesRecords()
+function displaySeriesRecords($tid)
 {
 	$numteams = mysql_result(mysql_query("SELECT MAX(Visitor) FROM ibl_schedule;"), 0);
 
@@ -143,15 +143,15 @@ function displaySeriesRecords()
 		echo "<tr>
 			<td bgcolor=$team[color1]>
 				<a href=\"modules.php?name=Team&op=team&tid=$team[teamid]\">
-					<font color=\"$team[color2]\">
+					<font color=\"$team[color2]\">", ($tid == $tidRow ? "<b>" : ""), "
 						$team[team_city] $team[team_name]
-					</font>
+					</font>", ($tid == $tidRow ? "</b>" : ""), "
 				</a>
 			</td>";
 		$tidColumn = 1;
 		while ($tidColumn <= $numteams) {
 			if ($tidRow == $tidColumn) {
-				echo "<td align=\"center\">x</td>";
+				echo "<td align=\"center\">", ($tid == $tidRow ? "<b>" : ""), "x", ($tid == $tidRow ? "</b>" : ""), "</td>";
 			} else {
 				$row = mysql_fetch_assoc($resultSeriesRecords);
 				if ($row['self'] == $tidRow AND $row['opponent'] == $tidColumn) {
@@ -162,7 +162,11 @@ function displaySeriesRecords()
 					} else {
 						$bgcolor = "#bbb";
 					}
-					echo "<td align=\"center\" bgcolor=\"$bgcolor\">$row[wins] - $row[losses]</td>";
+					echo "<td align=\"center\" bgcolor=\"$bgcolor\">",
+						(($tid == $tidRow OR $tid == $tidColumn) ? "<b>" : ""),
+						"$row[wins] - $row[losses]",
+						(($tid == $tidRow OR $tid == $tidColumn) ? "</b>" : ""),
+					"</td>";
 					$pointer++;
 				} else {
 					echo "<td align=\"center\">0 - 0</td>";

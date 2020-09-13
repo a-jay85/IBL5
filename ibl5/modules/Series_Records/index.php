@@ -43,7 +43,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 	OpenTable();
 	displaytopmenu($tid);
 
-	seriesRecords();
+	displaySeriesRecords();
 
 	CloseTable();
 	include("footer.php");
@@ -70,7 +70,42 @@ function main($user) {
 	}
 }
 
-function seriesRecords()
+function querySeriesRecords()
+{
+	$query = "SELECT self, opponent, SUM(wins) AS wins, SUM(losses) AS losses
+				FROM (
+					SELECT home AS self, visitor AS opponent, COUNT(*) AS wins, 0 AS losses
+					FROM ibl_schedule
+					WHERE HScore > VScore
+					GROUP BY self, opponent
+
+					UNION ALL
+
+					SELECT visitor AS self, home AS opponent, COUNT(*) AS wins, 0 AS losses
+					FROM ibl_schedule
+					WHERE VScore > HScore
+					GROUP BY self, opponent
+
+					UNION ALL
+
+					SELECT home AS self, visitor AS opponent, 0 AS wins, COUNT(*) AS losses
+					FROM ibl_schedule
+					WHERE HScore < VScore
+					GROUP BY self, opponent
+
+					UNION ALL
+
+					SELECT visitor AS self, home AS opponent, 0 AS wins, COUNT(*) AS losses
+					FROM ibl_schedule
+					WHERE VScore < HScore
+					GROUP BY self, opponent
+				) t
+				GROUP BY self, opponent;";
+	$result = mysql_query($query);
+	return $result;
+}
+
+function displaySeriesRecords()
 {
 	$numteams = mysql_result(mysql_query("SELECT MAX(Visitor) FROM ibl_schedule;"), 0);
 
@@ -79,18 +114,32 @@ function seriesRecords()
 			<th>vs.</th>";
 	$i = 1;
 	while ($i <= $numteams) {
-		echo "<th><img src=\"images/logo/new$i.png\" width=50 height=50></th>";
+		echo "<th align=\"center\"><img src=\"images/logo/new$i.png\" width=50 height=50></th>";
 		$i++;
 	}
 	echo "</tr>";
 
+	$result = querySeriesRecords();
+
+	$pointer = 0;
 	$tidRow = 1;
 	while ($tidRow <= $numteams) {
 		echo "<tr>
 			<td>teamname$tidRow</td>";
 		$tidColumn = 1;
 		while ($tidColumn <= $numteams) {
-			echo "<td>$tidRow vs. $tidColumn</td>";
+			if ($tidRow == $tidColumn) {
+				echo "<td align=\"center\">x</td>";
+			} else {
+				$row = mysql_fetch_assoc($result);
+				if ($row['self'] == $tidRow AND $row['opponent'] == $tidColumn) {
+					echo "<td align=\"center\">$row[wins] - $row[losses]</td>";
+					$pointer++;
+				} else {
+					echo "<td align=\"center\">0 - 0</td>";
+					mysql_data_seek($result, $pointer);
+				}
+			}
 			$tidColumn++;
 		}
 		echo "</tr>";

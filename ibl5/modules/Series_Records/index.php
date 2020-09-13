@@ -119,7 +119,7 @@ function displaySeriesRecords()
 {
 	$numteams = mysql_result(mysql_query("SELECT MAX(Visitor) FROM ibl_schedule;"), 0);
 
-	echo "<table border=1>
+	echo "<table border=1 class=\"sortable\">
 		<tr>
 			<th>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&rarr;&rarr;<br>
 			vs.<br>
@@ -127,9 +127,7 @@ function displaySeriesRecords()
 	$i = 1;
 	while ($i <= $numteams) {
 		echo "<th align=\"center\">
-			<a href=\"modules.php?name=Team&op=team&tid=$i\">
-				<img src=\"images/logo/new$i.png\" width=50 height=50>
-			</a>
+			<img src=\"images/logo/new$i.png\" width=50 height=50>
 		</th>";
 		$i++;
 	}

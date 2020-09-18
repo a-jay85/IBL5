@@ -775,8 +775,9 @@ if (getCurrentSeasonPhase() == "Playoffs") {
 	$i = 0;
 	while ($i < mysql_num_rows($postseasonTradeQueueResult)) {
 		$queuedTradeQuery = mysql_result($postseasonTradeQueueResult, $i);
+		$tradeLine = mysql_result($postseasonTradeQueueResult, $i, 1);
 		if (mysql_query($queuedTradeQuery)) {
-			echo $queuedTradeQuery . "<br>\n";
+			echo $tradeLine . "\n";
 		}
 		$i++;
 	}

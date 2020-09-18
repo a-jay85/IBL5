@@ -91,5 +91,5 @@ $resultclear = mysql_query($queryclear);
 <HTML><HEAD><TITLE>Trade Offer Processing</TITLE>
 <meta http-equiv="refresh" content="2;url=modules.php?name=Trading&op=reviewtrade">
 </HEAD><BODY>
-Trade Offer accepted. Redirecting you to the Trade Review page...
+Trade Offer accepted! Redirecting you to the Trade Review page...
 </BODY></HTML>

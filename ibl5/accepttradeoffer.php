@@ -4,7 +4,8 @@ require 'config.php';
 mysql_connect($dbhost,$dbuname,$dbpass);
 @mysql_select_db($dbname) or die("Unable to select database");
 
-require_once $_SERVER['DOCUMENT_ROOT'] . '/discordWebhooks.php';
+require $_SERVER['DOCUMENT_ROOT'] . '/discordWebhooks.php';
+include_once 'sharedFunctions.php';
 
 $offer_id = $_POST['offer'];
 
@@ -27,9 +28,8 @@ while ($i < $num0) {
 		$resultj = mysql_query($queryj);
 		$storytext = $storytext . "The $from send the " . mysql_result($resultj, 0, "year") . " " . mysql_result($resultj, 0, "teampick") . " Round " . mysql_result($resultj, 0, "round") . " draft pick to the $to.<br>";
 
-		$queryi = "UPDATE ibl_draft_picks SET `ownerofpick` = '$to' WHERE `pickid` = '$itemid' LIMIT 1";
+		$queryi = 'UPDATE ibl_draft_picks SET `ownerofpick` = "' . $to . '" WHERE `pickid` = ' . $itemid . ' LIMIT 1;';
 		$resulti = mysql_query($queryi);
-
 	} else {
 		$queryj = "SELECT * FROM nuke_ibl_team_info WHERE team_name = '$to'";
 		$resultj = mysql_query($queryj);
@@ -40,8 +40,13 @@ while ($i < $num0) {
 
 		$storytext = $storytext . "The $from send " . mysql_result($resultk, 0, "pos") . " " . mysql_result($resultk, 0, "name") . " to the $to.<br>";
 
-		$queryi = "UPDATE nuke_iblplyr SET `teamname` = '$to', `tid` = '$tid' WHERE `pid` = '$itemid' LIMIT 1";
+		$queryi = 'UPDATE nuke_iblplyr SET `teamname` = "' . $to . '", `tid` = ' . $tid . ' WHERE `pid` = ' . $itemid . ' LIMIT 1;';
 		$resulti = mysql_query($queryi);
+	}
+
+	if (getCurrentSeasonPhase() == "Playoffs") {
+		$queryInsert = "INSERT INTO ibl_trade_queue (query) VALUES ('$queryi');";
+		mysql_query("$queryInsert");
 	}
 
 	$i++;
@@ -69,7 +74,9 @@ VALUES      ('2',
              'Associated Press',
              '0',
              'english') ";
-$resultstor = mysql_query($querystor);
+if ($_SERVER['SERVER_NAME'] != "localhost") { // This prevents email and Discord notifs from going out while testing locally.
+	$resultstor = mysql_query($querystor);
+}
 
 if (isset($resultstor)) {
 	$recipient = 'ibldepthcharts@gmail.com';

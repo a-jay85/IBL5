@@ -404,12 +404,12 @@ function submit() {
 		$executeupdateD = mysql_query($updatequeryD);
 		$executeupdateF = mysql_query($updatequeryF);
 
-		if ($dc_insert6 == 1) $activePlayers = $activePlayers + 1;
-		if ($dc_insert1 > 0 && $injury == 0) $pos_1 = $pos_1 + 1;
-		if ($dc_insert2 > 0 && $injury == 0) $pos_2 = $pos_2 + 1;
-		if ($dc_insert3 > 0 && $injury == 0) $pos_3 = $pos_3 + 1;
-		if ($dc_insert4 > 0 && $injury == 0) $pos_4 = $pos_4 + 1;
-		if ($dc_insert5 > 0 && $injury == 0) $pos_5 = $pos_5 + 1;
+		if ($dc_insert6 == 1) $activePlayers++;
+		if ($dc_insert1 > 0 && $injury == 0) $pos_1++;
+		if ($dc_insert2 > 0 && $injury == 0) $pos_2++;
+		if ($dc_insert3 > 0 && $injury == 0) $pos_3++;
+		if ($dc_insert4 > 0 && $injury == 0) $pos_4++;
+		if ($dc_insert5 > 0 && $injury == 0) $pos_5++;
 
 		// Check whether a player is listed at multiple starting positions
 		if ($_POST['pg' . $i] == 1) $startingPositionCount++;

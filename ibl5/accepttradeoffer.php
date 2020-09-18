@@ -74,11 +74,9 @@ VALUES      ('2',
              'Associated Press',
              '0',
              'english') ";
-if ($_SERVER['SERVER_NAME'] != "localhost") { // This prevents email and Discord notifs from going out while testing locally.
-	$resultstor = mysql_query($querystor);
-}
+$resultstor = mysql_query($querystor);
 
-if (isset($resultstor)) {
+if (isset($resultstor) AND $_SERVER['SERVER_NAME'] != "localhost") {
 	$recipient = 'ibldepthcharts@gmail.com';
 	mail($recipient, $storytitle, $storytext, "From: trades@iblhoops.net");
 

@@ -26,7 +26,8 @@ while ($i < $num0) {
 	if ($itemtype == 0) {
 		$queryj = "SELECT * FROM ibl_draft_picks WHERE `pickid` = '$itemid'";
 		$resultj = mysql_query($queryj);
-		$storytext .= "The $from send the " . mysql_result($resultj, 0, "year") . " " . mysql_result($resultj, 0, "teampick") . " Round " . mysql_result($resultj, 0, "round") . " draft pick to the $to.<br>";
+		$tradeLine = "The $from send the " . mysql_result($resultj, 0, "year") . " " . mysql_result($resultj, 0, "teampick") . " Round " . mysql_result($resultj, 0, "round") . " draft pick to the $to.<br>";
+		$storytext .= $tradeLine;
 
 		$queryi = 'UPDATE ibl_draft_picks SET `ownerofpick` = "' . $to . '" WHERE `pickid` = ' . $itemid . ' LIMIT 1;';
 		$resulti = mysql_query($queryi);
@@ -38,14 +39,15 @@ while ($i < $num0) {
 		$queryk = "SELECT * FROM nuke_iblplyr WHERE pid = '$itemid'";
 		$resultk = mysql_query($queryk);
 
-		$storytext .= "The $from send " . mysql_result($resultk, 0, "pos") . " " . mysql_result($resultk, 0, "name") . " to the $to.<br>";
+		$tradeLine = "The $from send " . mysql_result($resultk, 0, "pos") . " " . mysql_result($resultk, 0, "name") . " to the $to.<br>";
+		$storytext .= $tradeLine;
 
 		$queryi = 'UPDATE nuke_iblplyr SET `teamname` = "' . $to . '", `tid` = ' . $tid . ' WHERE `pid` = ' . $itemid . ' LIMIT 1;';
 		$resulti = mysql_query($queryi);
 	}
 
 	if (getCurrentSeasonPhase() == "Playoffs") {
-		$queryInsert = "INSERT INTO ibl_trade_queue (query) VALUES ('$queryi');";
+		$queryInsert = "INSERT INTO ibl_trade_queue (query, tradeline) VALUES ('$queryi', '$tradeLine');";
 		mysql_query("$queryInsert");
 	}
 

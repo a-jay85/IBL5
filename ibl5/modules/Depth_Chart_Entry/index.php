@@ -19,6 +19,8 @@
 if (!eregi("modules.php", $_SERVER['PHP_SELF'])) die ("You can't access this file directly...");
 
 require_once("mainfile.php");
+require_once $_SERVER['DOCUMENT_ROOT'] . '/sharedFunctions.php';
+
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 $userpage = 1;
@@ -426,8 +428,17 @@ function submit() {
 
 	$html = $html."</table>";
 
-	$minActivePlayers = 12;
-	$maxActivePlayers = 12;
+	$seasonPhase = getCurrentSeasonPhase();
+	if ($seasonPhase != 'Playoffs') {
+		$minActivePlayers = 12;
+		$maxActivePlayers = 15;
+		$minPositionDepth = 3;
+	} else {
+		$minActivePlayers = 10;
+		$maxActivePlayers = 15;
+		$minPositionDepth = 2;
+	}
+
 	if ($activePlayers < $minActivePlayers) {
 		echo "<center><u>Your lineup has <b>not</b> been submitted:</u><br>
 			<font color=red><b>You must have at least $minActivePlayers active players in your lineup; you have $activePlayers.</b></font><p>
@@ -440,37 +451,37 @@ function submit() {
 			Please press the \"Back\" button on your browser and deactivate " . ($activePlayers - $maxActivePlayers) . " player(s).</center><p>";
 		$error = 1;
 	}
-	if ($pos_1 < 3 && $error == 0) {
+	if ($pos_1 < $minPositionDepth && $error == 0) {
 		echo "<center><u>Your lineup has <b>not</b> been submitted:</u><br>
-			<font color=red><b>You must have at least 3 players entered in PG slot – you have $pos_1.</b></font><p>
+			<font color=red><b>You must have at least $minPositionDepth players entered in PG slot &mdash; you have $pos_1.</b></font><p>
 
 			Please click the \"Back\" button on your browser and fix your lineup.</center><p>";
 		$error = 1;
 	}
-	if ($pos_2 < 3 && $error == 0) {
+	if ($pos_2 < $minPositionDepth && $error == 0) {
 		echo "<center><u>Your lineup has <b>not</b> been submitted:</u><br>
-			<font color=red><b>You must have at least 3 players entered in SG slot – you have $pos_2.</b></font><p>
+			<font color=red><b>You must have at least $minPositionDepth players entered in SG slot &mdash; you have $pos_2.</b></font><p>
 
 			Please click the \"Back\" button on your browser and fix your lineup.</center><p>";
 		$error = 1;
 	}
-	if ($pos_3 < 3 && $error == 0) {
+	if ($pos_3 < $minPositionDepth && $error == 0) {
 		echo "<center><u>Your lineup has <b>not</b> been submitted:</u><br>
-			<font color=red><b>You must have at least 3 players entered in SF slot – you have $pos_3.</b></font><p>
+			<font color=red><b>You must have at least $minPositionDepth players entered in SF slot &mdash; you have $pos_3.</b></font><p>
 
 			Please click the \"Back\" button on your browser and fix your lineup.</center><p>";
 		$error = 1;
 	}
-	if ($pos_4 < 3 && $error == 0) {
+	if ($pos_4 < $minPositionDepth && $error == 0) {
 		echo "<center><u>Your lineup has <b>not</b> been submitted:</u><br>
-			<font color=red><b>You must have at least 3 players entered in PF slot – you have $pos_4.</b></font><p>
+			<font color=red><b>You must have at least $minPositionDepth players entered in PF slot &mdash; you have $pos_4.</b></font><p>
 
 			Please click the \"Back\" button on your browser and fix your lineup.</center><p>";
 		$error = 1;
 	}
-	if ($pos_5 < 3 && $error == 0) {
+	if ($pos_5 < $minPositionDepth && $error == 0) {
 		echo "<center><u>Your lineup has <b>not</b> been submitted:</u><br>
-			<font color=red><b>You must have at least 3 players entered in C slot – you have $pos_5.</b></font><p>
+			<font color=red><b>You must have at least $minPositionDepth players entered in C slot &mdash; you have $pos_5.</b></font><p>
 
 			Please click the \"Back\" button on your browser and fix your lineup.</center><p>";
 		$error = 1;

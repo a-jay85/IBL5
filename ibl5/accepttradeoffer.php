@@ -5,7 +5,7 @@ mysql_connect($dbhost,$dbuname,$dbpass);
 @mysql_select_db($dbname) or die("Unable to select database");
 
 require $_SERVER['DOCUMENT_ROOT'] . '/discordWebhooks.php';
-include_once 'sharedFunctions.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/sharedFunctions.php';
 
 $offer_id = $_POST['offer'];
 

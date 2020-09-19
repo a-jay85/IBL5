@@ -782,7 +782,7 @@ if (getCurrentSeasonPhase() == "Playoffs") {
 		$i++;
 	}
 	echo '<p>Postseason trades have been re-applied!';
-} elseif (getCurrentSeasonPhase() == "HEAT") {
+} elseif (getCurrentSeasonPhase() == "Preseason") {
 	if (mysql_query("TRUNCATE TABLE ibl_trade_queue;")) {
 		echo "<p>TRUNCATE TABLE ibl_trade_queue;";
 	}

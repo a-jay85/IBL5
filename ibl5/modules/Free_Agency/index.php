@@ -140,11 +140,7 @@ function display() {
 	$rosterspots5 = 15;
 	$rosterspots6 = 15;
 
-	echo "<center><table border=1 cellspacing=0>
-		<tr>
-			<td align=center colspan=36><img src=\"images/logo/$tid.jpg\"></td>
-		</tr>
-	</table></center>";
+	echo "<center><img src=\"images/logo/$tid.jpg\"></center><p>";
 
 	// ==== DISPLAY PLAYERS CURRENTLY UNDER CONTRACT FOR TEAM
 
@@ -460,7 +456,9 @@ function display() {
 				<td><b><i>$conttot6</i></b></td>
 			</tr>
 		</tfoot>
-	</table>";
+	</table>
+
+	<p>";
 
 	// ==== END LIST OF PLAYERS CURRENTLY UNDER CONTRACT
 
@@ -734,13 +732,16 @@ function display() {
 	echo "</tfoot>
 	</table>
 
-	<hr>";
+	<p>
+	<hr>
+	<p>";
 
 	// ==== INSERT LIST OF FREE AGENTS FROM TEAM
 
 	echo "<table border=1 cellspacing=0 class=\"sortable\">
 		<caption style=\"background-color: #0000cc\">
-			<center><b><font color=white>$userteam Unsigned Free Agents</b> (Note: * and <i>italicized</i> indicates player has Bird Rights)</font></b></center>
+			<center><b><font color=white>$userteam Unsigned Free Agents</b><br>
+			(Note: * and <i>italicized</i> indicates player has Bird Rights)</font></b></center>
 		</caption>
 		<colgroup>
 			<col span=5>
@@ -915,7 +916,9 @@ function display() {
 		}
 	}
 
-	echo "</table>";
+	echo "</table>
+
+	<p>";
 
 	// ==== END INSERT OF LIST OF FREE AGENTS FROM TEAM
 

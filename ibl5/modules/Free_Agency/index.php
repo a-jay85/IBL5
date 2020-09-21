@@ -466,55 +466,65 @@ function display() {
 
 	// ==== INSERT LIST OF PLAYERS WITH OFFERS
 
-	echo "
-		<tr bgcolor=#0000cc>
-			<td colspan=29><center><b><font color=white>$userteam Outstanding Contract Offers</font></b></center></td>
-			<td colspan=6><center><b><font color=white>Contract Amount Offered</font></b></center></td>
-			<td colspan=5><center><b><font color=white>Demand Factors</font></b></center></td>
-		</tr>
-		<tr>
-			<td><b>Negotiate</b></td>
-			<td><b>Pos</b></td>
-			<td><b>Player</b></td>
-			<td><b>Team</b></td>
-			<td><b>Age</b></td>
-			<td><b>2ga</b></td>
-			<td><b>2g%</b></td>
-			<td><b>fta</b></td>
-			<td><b>ft%</b></td>
-			<td><b>3ga</b></td>
-			<td><b>3g%</b></td>
-			<td><b>orb</b></td>
-			<td><b>drb</b></td>
-			<td><b>ast</b></td>
-			<td><b>stl</b></td>
-			<td><b>to</b></td>
-			<td><b>blk</b></td>
-			<td><b>foul</b></td>
-			<td><b>oo</b></td>
-			<td><b>do</b></td>
-			<td><b>po</b></td>
-			<td><b>to</b></td>
-			<td><b>od</b></td>
-			<td><b>dd</b></td>
-			<td><b>pd</b></td>
-			<td><b>td</b></td>
-			<td><b>T</b></td>
-			<td><b>S</b></td>
-			<td><b>I</b></td>
-			<td><b>Yr1</b></td>
-			<td><b>Yr2</b></td>
-			<td><b>Yr3</b></td>
-			<td><b>Yr4</b></td>
-			<td><b>Yr5</b></td>
-			<td><b>Yr6</b></td>
-			<td><b>Loy</b></td>
-			<td><b>PFW</b></td>
-			<td><b>PT</b></td>
-			<td><b>Sec</b></td>
-			<td><b>Trad</b></td>
-		</tr>
-	";
+	echo "<table border=1 cellspacing=0 class=\"sortable\">
+		<caption style=\"background-color: #0000cc\">
+			<center><b><font color=white>$userteam Outstanding Contract Offers</font></b></center>
+		</caption>
+		<colgroup>
+			<col span=5>
+			<col span=6 style=\"background-color: #ddd\">
+			<col span=7>
+			<col span=8 style=\"background-color: #ddd\">
+			<col span=3>
+			<col span=6 style=\"background-color: #ddd\">
+			<col span=5>
+		</colgroup>
+		<thead>
+			<tr>
+				<td><b>Negotiate</b></td>
+				<td><b>Pos</b></td>
+				<td><b>Player</b></td>
+				<td><b>Team</b></td>
+				<td><b>Age</b></td>
+				<td><b>2ga</b></td>
+				<td><b>2g%</b></td>
+				<td><b>fta</b></td>
+				<td><b>ft%</b></td>
+				<td><b>3ga</b></td>
+				<td><b>3g%</b></td>
+				<td><b>orb</b></td>
+				<td><b>drb</b></td>
+				<td><b>ast</b></td>
+				<td><b>stl</b></td>
+				<td><b>to</b></td>
+				<td><b>blk</b></td>
+				<td><b>foul</b></td>
+				<td><b>oo</b></td>
+				<td><b>do</b></td>
+				<td><b>po</b></td>
+				<td><b>to</b></td>
+				<td><b>od</b></td>
+				<td><b>dd</b></td>
+				<td><b>pd</b></td>
+				<td><b>td</b></td>
+				<td><b>T</b></td>
+				<td><b>S</b></td>
+				<td><b>I</b></td>
+				<td><b>Yr1</b></td>
+				<td><b>Yr2</b></td>
+				<td><b>Yr3</b></td>
+				<td><b>Yr4</b></td>
+				<td><b>Yr5</b></td>
+				<td><b>Yr6</b></td>
+				<td><b>Loy</b></td>
+				<td><b>PFW</b></td>
+				<td><b>PT</b></td>
+				<td><b>Sec</b></td>
+				<td><b>Trad</b></td>
+			</tr>
+		</thead>
+		<tbody>";
+
 	$showteam = $db->sql_query("SELECT * FROM ".$prefix."_iblplyr WHERE retired='0' ORDER BY ordinal ASC");
 	while ($teamlist = $db->sql_fetchrow($showteam)) {
 		$name = stripslashes(check_html($teamlist['name'], "nohtml"));
@@ -569,7 +579,7 @@ function display() {
 			$sec = $teamlist['security'];
 			$trad = $teamlist['tradition'];
 
-			echo "      <tr>
+			echo "<tr>
 				<td><a href=\"modules.php?name=Free_Agency&pa=negotiate&pid=$pid\">Negotiate</a></td>
 				<td>$pos</td>
 				<td><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>
@@ -640,15 +650,17 @@ function display() {
 		}
 	}
 
-	echo "<tr>
-		<td colspan=29 align=right><b><i>$userteam Total Committed Plus Offered Contracts</i></b></td>
-		<td><b><i>$conttot1</i></b></td>
-		<td><b><i>$conttot2</i></b></td>
-		<td><b><i>$conttot3</i></b></td>
-		<td><b><i>$conttot4</i></b></td>
-		<td><b><i>$conttot5</i></b></td>
-		<td><b><i>$conttot6</i></b></td>
-	</tr>";
+	echo "</tbody>
+		<tfoot>
+			<tr>
+				<td colspan=29 align=right><b><i>$userteam Total Committed Plus Offered Contracts</i></b></td>
+				<td><b><i>$conttot1</i></b></td>
+				<td><b><i>$conttot2</i></b></td>
+				<td><b><i>$conttot3</i></b></td>
+				<td><b><i>$conttot4</i></b></td>
+				<td><b><i>$conttot5</i></b></td>
+				<td><b><i>$conttot6</i></b></td>
+			</tr>";
 
 	// ==== END INSERT OF PLAYERS WITH OFFERS
 
@@ -719,61 +731,71 @@ function display() {
 		echo "Your team does not have access to the Lower-Level Exception; you have already used it to sign a free agent.</b></font></td></tr>";
 	}
 
-	echo "
-					<tr><td colspan=40><hr></td></tr>
-	";
+	echo "</tfoot>
+	</table>
+
+	<hr>";
 
 	// ==== INSERT LIST OF FREE AGENTS FROM TEAM
 
-	echo "
-		<tr bgcolor=0000cc>
-			<td colspan=29><center><font color=white><b>$userteam Unsigned Free Agents</b> (Note: * and <i>italicized</i> indicates player has Bird Rights)</i></font></center></td>
-			<td colspan=6><center><font color=white><b>Contract Amount Sought</b></font></center></td>
-			<td colspan=5><center><b><font color=white>Demand Factors</font></b></center></td>
-		</tr>
-		<tr>
-			<td><b>Negotiate</b></td>
-			<td><b>Pos</b></td>
-			<td><b>Player</b></td>
-			<td><b>Team</b></td>
-			<td><b>Age</b></td>
-			<td><b>2ga</b></td>
-			<td><b>2g%</b></td>
-			<td><b>fta</b></td>
-			<td><b>ft%</b></td>
-			<td><b>3ga</b></td>
-			<td><b>3g%</b></td>
-			<td><b>orb</b></td>
-			<td><b>drb</b></td>
-			<td><b>ast</b></td>
-			<td><b>stl</b></td>
-			<td><b>to</b></td>
-			<td><b>blk</b></td>
-			<td><b>foul</b></td>
-			<td><b>oo</b></td>
-			<td><b>do</b></td>
-			<td><b>po</b></td>
-			<td><b>to</b></td>
-			<td><b>od</b></td>
-			<td><b>dd</b></td>
-			<td><b>pd</b></td>
-			<td><b>td</b></td>
-			<td><b>T</b></td>
-			<td><b>S</b></td>
-			<td><b>I</b></td>
-			<td><b>Yr1</b></td>
-			<td><b>Yr2</b></td>
-			<td><b>Yr3</b></td>
-			<td><b>Yr4</b></td>
-			<td><b>Yr5</b></td>
-			<td><b>Yr6</b></td>
-			<td><b>Loy</b></td>
-			<td><b>PFW</b></td>
-			<td><b>PT</b></td>
-			<td><b>Sec</b></td>
-			<td><b>Trad</b></td>
-		</tr>
-	";
+	echo "<table border=1 cellspacing=0 class=\"sortable\">
+		<caption style=\"background-color: #0000cc\">
+			<center><b><font color=white>$userteam Unsigned Free Agents</b> (Note: * and <i>italicized</i> indicates player has Bird Rights)</font></b></center>
+		</caption>
+		<colgroup>
+			<col span=5>
+			<col span=6 style=\"background-color: #ddd\">
+			<col span=7>
+			<col span=8 style=\"background-color: #ddd\">
+			<col span=3>
+			<col span=6 style=\"background-color: #ddd\">
+			<col span=5>
+		</colgroup>
+		<thead>
+			<tr>
+				<td><b>Negotiate</b></td>
+				<td><b>Pos</b></td>
+				<td><b>Player</b></td>
+				<td><b>Team</b></td>
+				<td><b>Age</b></td>
+				<td><b>2ga</b></td>
+				<td><b>2g%</b></td>
+				<td><b>fta</b></td>
+				<td><b>ft%</b></td>
+				<td><b>3ga</b></td>
+				<td><b>3g%</b></td>
+				<td><b>orb</b></td>
+				<td><b>drb</b></td>
+				<td><b>ast</b></td>
+				<td><b>stl</b></td>
+				<td><b>to</b></td>
+				<td><b>blk</b></td>
+				<td><b>foul</b></td>
+				<td><b>oo</b></td>
+				<td><b>do</b></td>
+				<td><b>po</b></td>
+				<td><b>to</b></td>
+				<td><b>od</b></td>
+				<td><b>dd</b></td>
+				<td><b>pd</b></td>
+				<td><b>td</b></td>
+				<td><b>T</b></td>
+				<td><b>S</b></td>
+				<td><b>I</b></td>
+				<td><b>Yr1</b></td>
+				<td><b>Yr2</b></td>
+				<td><b>Yr3</b></td>
+				<td><b>Yr4</b></td>
+				<td><b>Yr5</b></td>
+				<td><b>Yr6</b></td>
+				<td><b>Loy</b></td>
+				<td><b>PFW</b></td>
+				<td><b>PT</b></td>
+				<td><b>Sec</b></td>
+				<td><b>Trad</b></td>
+			</tr>
+		</thead>
+		<tbody>";
 
 	$showteam = $db->sql_query("SELECT * FROM ".$prefix."_iblplyr WHERE teamname='$userteam' AND retired='0' AND ordinal < 960 ORDER BY ordinal ASC");
 	while ($teamlist = $db->sql_fetchrow($showteam)) {
@@ -834,7 +856,8 @@ function display() {
 			$sec = $teamlist['security'];
 			$trad = $teamlist['tradition'];
 
-			echo "      <tr><td>";
+			echo "<tr>
+				<td>";
 
 			if ($rosterspots1 > 0) {
 				echo "<a href=\"modules.php?name=Free_Agency&pa=negotiate&pid=$pid\">Negotiate</a>";
@@ -846,7 +869,7 @@ function display() {
 
 			if ($bird > 2) echo "*<i>";
 			echo "$name";
-			if ($bird > 2) echo "*</i>";
+			if ($bird > 2) echo "</i>*";
 
 			// ==== END NOTE BIRD RIGHTS
 
@@ -889,62 +912,73 @@ function display() {
 				<td>$sec</td>
 				<td>$trad</td>
 			</tr>";
-		} else {}
+		}
 	}
+
+	echo "</table>";
 
 	// ==== END INSERT OF LIST OF FREE AGENTS FROM TEAM
 
 	// ==== INSERT ALL OTHER FREE AGENTS
 
-	echo "
-		<tr bgcolor=#0000cc>
-			<td colspan=29><center><b><font color=white>All Other Free Agents</font></b></center></td>
-			<td colspan=6><center><b><font color=white>Contract Amount Sought</font></b></center></td>
-			<td colspan=5><center><b><font color=white>Demand Factors</font></b></center></td>
-		</tr>
-		<tr>
-			<td><b>Negotiate</b></td>
-			<td><b>Pos</b></td>
-			<td><b>Player</b></td>
-			<td><b>Team</b></td>
-			<td><b>Age</b></td>
-			<td><b>2ga</b></td>
-			<td><b>2g%</b></td>
-			<td><b>fta</b></td>
-			<td><b>ft%</b></td>
-			<td><b>3ga</b></td>
-			<td><b>3g%</b></td>
-			<td><b>orb</b></td>
-			<td><b>drb</b></td>
-			<td><b>ast</b></td>
-			<td><b>stl</b></td>
-			<td><b>to</b></td>
-			<td><b>blk</b></td>
-			<td><b>foul</b></td>
-			<td><b>oo</b></td>
-			<td><b>do</b></td>
-			<td><b>po</b></td>
-			<td><b>to</b></td>
-			<td><b>od</b></td>
-			<td><b>dd</b></td>
-			<td><b>pd</b></td>
-			<td><b>td</b></td>
-			<td><b>T</b></td>
-			<td><b>S</b></td>
-			<td><b>I</b></td>
-			<td><b>Yr1</b></td>
-			<td><b>Yr2</b></td>
-			<td><b>Yr3</b></td>
-			<td><b>Yr4</b></td>
-			<td><b>Yr5</b></td>
-			<td><b>Yr6</b></td>
-			<td><b>Loy</b></td>
-			<td><b>PFW</b></td>
-			<td><b>PT</b></td>
-			<td><b>Sec</b></td>
-			<td><b>Trad</b></td>
-		</tr>
-	";
+	echo "<table border=1 cellspacing=0 class=\"sortable\">
+		<caption style=\"background-color: #0000cc\">
+			<center><b><font color=white>All Other Free Agents</font></b></center>
+		</caption>
+		<colgroup>
+			<col span=5>
+			<col span=6 style=\"background-color: #ddd\">
+			<col span=7>
+			<col span=8 style=\"background-color: #ddd\">
+			<col span=3>
+			<col span=6 style=\"background-color: #ddd\">
+			<col span=5>
+		</colgroup>
+		<thead>
+			<tr>
+				<td><b>Negotiate</b></td>
+				<td><b>Pos</b></td>
+				<td><b>Player</b></td>
+				<td><b>Team</b></td>
+				<td><b>Age</b></td>
+				<td><b>2ga</b></td>
+				<td><b>2g%</b></td>
+				<td><b>fta</b></td>
+				<td><b>ft%</b></td>
+				<td><b>3ga</b></td>
+				<td><b>3g%</b></td>
+				<td><b>orb</b></td>
+				<td><b>drb</b></td>
+				<td><b>ast</b></td>
+				<td><b>stl</b></td>
+				<td><b>to</b></td>
+				<td><b>blk</b></td>
+				<td><b>foul</b></td>
+				<td><b>oo</b></td>
+				<td><b>do</b></td>
+				<td><b>po</b></td>
+				<td><b>to</b></td>
+				<td><b>od</b></td>
+				<td><b>dd</b></td>
+				<td><b>pd</b></td>
+				<td><b>td</b></td>
+				<td><b>T</b></td>
+				<td><b>S</b></td>
+				<td><b>I</b></td>
+				<td><b>Yr1</b></td>
+				<td><b>Yr2</b></td>
+				<td><b>Yr3</b></td>
+				<td><b>Yr4</b></td>
+				<td><b>Yr5</b></td>
+				<td><b>Yr6</b></td>
+				<td><b>Loy</b></td>
+				<td><b>PFW</b></td>
+				<td><b>PT</b></td>
+				<td><b>Sec</b></td>
+				<td><b>Trad</b></td>
+			</tr>
+		</thead>
+		<tbody>";
 
 	$showteam = $db->sql_query("SELECT * FROM ".$prefix."_iblplyr WHERE teamname!='$userteam' AND retired='0' ORDER BY ordinal ASC");
 	while ($teamlist = $db->sql_fetchrow($showteam)) {
@@ -1004,7 +1038,8 @@ function display() {
 			$sec = $teamlist['security'];
 			$trad = $teamlist['tradition'];
 
-			echo "      <tr><td>";
+			echo "<tr>
+				<td>";
 
 			if ($rosterspots1 > 0) {
 				echo "<a href=\"modules.php?name=Free_Agency&pa=negotiate&pid=$pid\">Negotiate</a>";
@@ -1039,6 +1074,7 @@ function display() {
 				<td>$talent</td>
 				<td>$skill</td>
 				<td>$intangibles</td>";
+
 			if ($exp > 0) {
 				echo "<td>$dem1</td>
 				<td>$dem2</td>
@@ -1056,6 +1092,7 @@ function display() {
 				<td></td>
 				<td></td>";
 			}
+
 			echo "
 				<td>$loy</td>
 				<td>$pfw</td>
@@ -1063,7 +1100,7 @@ function display() {
 				<td>$sec</td>
 				<td>$trad</td>
 			</tr>";
-		} else {}
+		}
 	}
 
 	// ==== END INSERT OF ALL OTHER FREE AGENTS

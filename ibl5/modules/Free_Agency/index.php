@@ -1106,6 +1106,9 @@ function display() {
 	// ==== END INSERT OF ALL OTHER FREE AGENTS
 
 	echo "</table>";
+
+	CloseTable();
+	include("footer.php");
 }
 
 // === START NEGOTIATE FUNCTION ===

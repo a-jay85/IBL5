@@ -140,59 +140,72 @@ function display() {
 	$rosterspots5 = 15;
 	$rosterspots6 = 15;
 
-	echo "<table border=1 cellspacing=0><tr><td align=center colspan=36><img src=\"images/logo/$tid.jpg\"></td></tr>";
+	echo "<center><table border=1 cellspacing=0>
+		<tr>
+			<td align=center colspan=36><img src=\"images/logo/$tid.jpg\"></td>
+		</tr>
+	</table></center>";
 
 	// ==== DISPLAY PLAYERS CURRENTLY UNDER CONTRACT FOR TEAM
 
-	echo "
-		<tr bgcolor=#0000cc>
-			<td colspan=29><center><b><font color=white>$userteam Players Under Contract</font></b></center></td>
-			<td colspan=6><center><b><font color=white>Contract Commitment</font></b></center></td>
-			<td colspan=5><center><b><font color=white>Demand Factors</font></b></center></td>
-		</tr>
-		<tr>
-			<td><b>Options</b></td>
-			<td><b>Pos</b></td>
-			<td><b>Player</b></td>
-			<td><b>Team</b></td>
-			<td><b>Age</b></td>
-			<td><b>2ga</b></td>
-			<td><b>2g%</b></td>
-			<td><b>fta</b></td>
-			<td><b>ft%</b></td>
-			<td><b>3ga</b></td>
-			<td><b>3g%</b></td>
-			<td><b>orb</b></td>
-			<td><b>drb</b></td>
-			<td><b>ast</b></td>
-			<td><b>stl</b></td>
-			<td><b>to</b></td>
-			<td><b>blk</b></td>
-			<td><b>foul</b></td>
-			<td><b>oo</b></td>
-			<td><b>do</b></td>
-			<td><b>po</b></td>
-			<td><b>to</b></td>
-			<td><b>od</b></td>
-			<td><b>dd</b></td>
-			<td><b>pd</b></td>
-			<td><b>td</b></td>
-			<td><b>T</b></td>
-			<td><b>S</b></td>
-			<td><b>I</b></td>
-			<td><b>Yr1</b></td>
-			<td><b>Yr2</b></td>
-			<td><b>Yr3</b></td>
-			<td><b>Yr4</b></td>
-			<td><b>Yr5</b></td>
-			<td><b>Yr6</b></td>
-			<td><b>Loy</b></td>
-			<td><b>PFW</b></td>
-			<td><b>PT</b></td>
-			<td><b>Sec</b></td>
-			<td><b>Trad</b></td>
-		</tr>
-	";
+	echo "<table border=1 cellspacing=0 class=\"sortable\">
+		<caption style=\"background-color: #0000cc\">
+			<center><b><font color=white>$userteam Players Under Contract</font></b></center>
+		</caption>
+		<colgroup>
+			<col span=5>
+			<col span=6 style=\"background-color: #ddd\">
+			<col span=7>
+			<col span=8 style=\"background-color: #ddd\">
+			<col span=3>
+			<col span=6 style=\"background-color: #ddd\">
+			<col span=5>
+		</colgroup>
+		<thead>
+			<tr>
+				<td><b>Options</b></td>
+				<td><b>Pos</b></td>
+				<td><b>Player</b></td>
+				<td><b>Team</b></td>
+				<td><b>Age</b></td>
+				<td><b>2ga</b></td>
+				<td><b>2g%</b></td>
+				<td><b>fta</b></td>
+				<td><b>ft%</b></td>
+				<td><b>3ga</b></td>
+				<td><b>3g%</b></td>
+				<td><b>orb</b></td>
+				<td><b>drb</b></td>
+				<td><b>ast</b></td>
+				<td><b>stl</b></td>
+				<td><b>to</b></td>
+				<td><b>blk</b></td>
+				<td><b>foul</b></td>
+				<td><b>oo</b></td>
+				<td><b>do</b></td>
+				<td><b>po</b></td>
+				<td><b>to</b></td>
+				<td><b>od</b></td>
+				<td><b>dd</b></td>
+				<td><b>pd</b></td>
+				<td><b>td</b></td>
+				<td><b>T</b></td>
+				<td><b>S</b></td>
+				<td><b>I</b></td>
+				<td><b>Yr1</b></td>
+				<td><b>Yr2</b></td>
+				<td><b>Yr3</b></td>
+				<td><b>Yr4</b></td>
+				<td><b>Yr5</b></td>
+				<td><b>Yr6</b></td>
+				<td><b>Loy</b></td>
+				<td><b>PFW</b></td>
+				<td><b>PT</b></td>
+				<td><b>Sec</b></td>
+				<td><b>Trad</b></td>
+			</tr>
+		</thead>
+		<tbody>";
 
 	$showteam = $db->sql_query("SELECT * FROM ".$prefix."_iblplyr WHERE teamname='$userteam' AND retired='0' ORDER BY ordinal ASC");
 	while ($teamlist = $db->sql_fetchrow($showteam)) {
@@ -366,7 +379,8 @@ function display() {
 				}
 			}
 
-			echo "      <tr><td>";
+			echo "<tr>
+				<td>";
 
 			// ==== ROOKIE OPTIONS
 			if (($draftround == 1 && $exp == 2 && $millionscy4 == 0) OR
@@ -380,7 +394,7 @@ function display() {
 			}
 
 			if ($ordinal > 960) {
-				$name=$name."*";
+				$name .= "*";
 			}
 
 			echo "</td>
@@ -425,24 +439,28 @@ function display() {
 				<td>$trad</td>
 			</tr>";
 
-			$conttot1=$conttot1+$contract1;
-			$conttot2=$conttot2+$contract2;
-			$conttot3=$conttot3+$contract3;
-			$conttot4=$conttot4+$contract4;
-			$conttot5=$conttot5+$contract5;
-			$conttot6=$conttot6+$contract6;
+			$conttot1 += $contract1;
+			$conttot2 += $contract2;
+			$conttot3 += $contract3;
+			$conttot4 += $contract4;
+			$conttot5 += $contract5;
+			$conttot6 += $contract6;
 		}
 	}
 
-	echo "<tr>
-		<td colspan=29 align=right><b><i>$userteam Total Committed Contracts</i></b></td>
-		<td><b><i>$conttot1</i></b></td>
-		<td><b><i>$conttot2</i></b></td>
-		<td><b><i>$conttot3</i></b></td>
-		<td><b><i>$conttot4</i></b></td>
-		<td><b><i>$conttot5</i></b></td>
-		<td><b><i>$conttot6</i></b></td>
-	</tr>";
+	echo "</tbody>
+		<tfoot>
+			<tr>
+				<td colspan=29 align=right><b><i>$userteam Total Committed Contracts</i></b></td>
+				<td><b><i>$conttot1</i></b></td>
+				<td><b><i>$conttot2</i></b></td>
+				<td><b><i>$conttot3</i></b></td>
+				<td><b><i>$conttot4</i></b></td>
+				<td><b><i>$conttot5</i></b></td>
+				<td><b><i>$conttot6</i></b></td>
+			</tr>
+		</tfoot>
+	</table>";
 
 	// ==== END LIST OF PLAYERS CURRENTLY UNDER CONTRACT
 

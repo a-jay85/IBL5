@@ -44,7 +44,7 @@ while ($i < $num) {
 	$bgcolor = "$teamcolor1";
 
 	$content .= "<tr>
-        <td align=right valign=top>$i.</td>
+        <td align=right valign=top>" . ($i + 1) . ".</td>
         <td bgcolor=$bgcolor align=center><a href=\"modules.php?name=Team&op=team&tid=$tid\"><font color=#$teamcolor2>$Team</font></a></td>
         <td align=right valign=top>$ranking</td>
     </tr>";

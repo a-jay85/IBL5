@@ -297,7 +297,7 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
         $result8 = $db->sql_query($sql8);
     }
 
-    echo "<hr><form name=\"Waiver_Move\" method=\"post\" action=\"\"><input type=\"hidden\" name=\"Team_Name\" value=\"$teamlogo\">";
+    echo "<form name=\"Waiver_Move\" method=\"post\" action=\"\"><input type=\"hidden\" name=\"Team_Name\" value=\"$teamlogo\">";
     echo "<input type=\"hidden\" name=\"Action\" value=\"$action\">";
 
     echo "<center><img src=\"images/logo/$tid.jpg\"><br><table border=1 cellspacing=0 cellpadding=0>

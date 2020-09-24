@@ -22,7 +22,6 @@ require 'config.php';
 mysql_connect($dbhost,$dbuname,$dbpass);
 @mysql_select_db($dbname) or die("Unable to select database");
 
-$query="SELECT * FROM nuke_ibl_power WHERE TeamID BETWEEN 1 AND 32 ORDER BY ranking DESC";
 $result=mysql_query($query);
 $num=mysql_numrows($result);
 $i=0;
@@ -35,6 +34,10 @@ while ($i < $num)
 	$wins=mysql_result($result,$i,"win");
 	$losses=mysql_result($result,$i,"loss");
 	$i++;
+$query = "SELECT TeamID, Team, ranking, win, loss, color1, color2
+    FROM nuke_ibl_power rankings
+    INNER JOIN nuke_ibl_team_info info USING (teamid)
+    ORDER BY ranking DESC;";
 
 	if(($i % 2)==0) {
 		$bgcolor="FFFFFF";

@@ -11,7 +11,7 @@
 /* the Free Software Foundation; either version 2 of the License.       */
 /************************************************************************/
 
-if ( !defined('BLOCK_FILE') ) {
+if (!defined('BLOCK_FILE')) {
     Header("Location: ../index.php");
     die();
 }
@@ -19,25 +19,25 @@ if ( !defined('BLOCK_FILE') ) {
 global $prefix, $multilingual, $currentlang, $db;
 
 require 'config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
+mysql_connect($dbhost, $dbuname, $dbpass);
 @mysql_select_db($dbname) or die("Unable to select database");
 
-$result=mysql_query($query);
-$num=mysql_numrows($result);
-$i=0;
-$content=$content."<table width=150>";
-while ($i < $num)
-{
-	$tid=mysql_result($result,$i,"TeamID");
-	$Team=mysql_result($result,$i,"Team");
-	$ranking=mysql_result($result,$i,"ranking");
-	$wins=mysql_result($result,$i,"win");
-	$losses=mysql_result($result,$i,"loss");
-	$i++;
 $query = "SELECT TeamID, Team, ranking, win, loss, color1, color2
     FROM nuke_ibl_power rankings
     INNER JOIN nuke_ibl_team_info info USING (teamid)
     ORDER BY ranking DESC;";
+$result = mysql_query($query);
+$num = mysql_numrows($result);
+
+$content .= "<table width=150>";
+
+$i = 0;
+while ($i < $num) {
+	$tid = mysql_result($result, $i, "TeamID");
+	$Team = mysql_result($result, $i, "Team");
+	$ranking = mysql_result($result, $i, "ranking");
+	$wins = mysql_result($result, $i, "win");
+	$losses = mysql_result($result, $i, "loss");
 	$teamcolor1 = mysql_result($result, $i, "color1");
 	$teamcolor2 = mysql_result($result, $i, "color2");
 
@@ -48,8 +48,13 @@ $query = "SELECT TeamID, Team, ranking, win, loss, color1, color2
         <td bgcolor=$bgcolor align=center><a href=\"modules.php?name=Team&op=team&tid=$tid\"><font color=#$teamcolor2>$Team</font></a></td>
         <td align=right valign=top>$ranking</td>
     </tr>";
+
+	$i++;
 }
 
-$content=$content."<tr><td colspan=3><center><a href=\"modules.php?name=Power_Rankings\"><font color=#aaaaaa><i>-- Full Power Rankings --</i></font></a></center></table>";
+$content .= "<tr>
+    <td colspan=3><center><a href=\"modules.php?name=Power_Rankings\"><font color=#aaaaaa><i>-- Full Power Rankings --</i></font></a></center></td>
+</tr>
+</table>";
 
 ?>

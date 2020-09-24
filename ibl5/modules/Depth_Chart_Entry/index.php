@@ -40,7 +40,13 @@ function userinfo($username, $bypass=0, $hid=0, $url=0)
 	$num = $db->sql_numrows($result2);
 	$userinfo = $db->sql_fetchrow($result2);
 	if(!$bypass) cookiedecode($user);
+
+	$teamlogo = $userinfo[user_ibl_team];
+	$tid = getTidFromTeamname($teamlogo);
+
 	include("header.php");
+	OpenTable();
+	displaytopmenu($tid);
 
 	// === CODE TO INSERT IBL DEPTH CHART ===
 
@@ -70,11 +76,6 @@ function userinfo($username, $bypass=0, $hid=0, $url=0)
 		echo "<option value=\"-1\"".($settingVar == -1 ? " SELECTED" : "").">-1</option>";
 		echo "<option value=\"-2\"".($settingVar == -2 ? " SELECTED" : "").">-2</option>";
 	}
-
-	OpenTable();
-	$teamlogo = $userinfo[user_ibl_team];
-	$queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$teamlogo'";
-	$tid = mysql_result(mysql_query($queryTeamID), 0);
 
 	$sql7 = "SELECT * FROM ".$prefix."_ibl_offense_sets WHERE TeamName = '$teamlogo' ORDER BY SetNumber ASC";
 	$result7 = $db->sql_query($sql7);

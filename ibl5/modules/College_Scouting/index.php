@@ -21,6 +21,8 @@ if (!eregi("modules.php", $_SERVER['PHP_SELF'])) {
 }
 
 require_once("mainfile.php");
+require_once $_SERVER['DOCUMENT_ROOT'] . '/sharedFunctions.php';
+
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 $userpage = 1;
@@ -186,12 +188,15 @@ function userinfo($username, $bypass=0, $hid=0, $url=0) {
 
 //=== END PICK UP AND MODIFY PLAYER BEING SCOUTED
 
-
     OpenTable();
+
+    $teamlogo = $userinfo[user_ibl_team];
+	$tid = getTidFromTeamname($teamlogo);
+
+	displaytopmenu($tid);
 
 // ========== DISPLAY ROOKIES
 
-    $teamlogo = $userinfo[user_ibl_team];
     $scoutingpoints = $userinfo[scoutingpoints];
 
 	$draft_sql = "SELECT * from nuke_ibl_draft WHERE player = '' ORDER BY round ASC, pick ASC";

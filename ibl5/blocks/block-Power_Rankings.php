@@ -38,13 +38,16 @@ $query = "SELECT TeamID, Team, ranking, win, loss, color1, color2
     FROM nuke_ibl_power rankings
     INNER JOIN nuke_ibl_team_info info USING (teamid)
     ORDER BY ranking DESC;";
+	$teamcolor1 = mysql_result($result, $i, "color1");
+	$teamcolor2 = mysql_result($result, $i, "color2");
 
-	if(($i % 2)==0) {
-		$bgcolor="FFFFFF";
-	}else{
-		$bgcolor="EEEEEE";
-	}
-	$content = $content."<tr bgcolor=$bgcolor><td align=right valign=top>$i.</td><td align=center><a href=\"modules.php?name=Team&op=team&tid=$tid\">$Team</a></td><td align=right valign=top>$ranking</td></tr>";
+	$bgcolor = "$teamcolor1";
+
+	$content .= "<tr>
+        <td align=right valign=top>$i.</td>
+        <td bgcolor=$bgcolor align=center><a href=\"modules.php?name=Team&op=team&tid=$tid\"><font color=#$teamcolor2>$Team</font></a></td>
+        <td align=right valign=top>$ranking</td>
+    </tr>";
 }
 
 $content=$content."<tr><td colspan=3><center><a href=\"modules.php?name=Power_Rankings\"><font color=#aaaaaa><i>-- Full Power Rankings --</i></font></a></center></table>";

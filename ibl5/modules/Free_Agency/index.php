@@ -77,8 +77,9 @@ function display() {
 	$userinfo = $db->sql_fetchrow($result2);
 
 	$userteam = stripslashes(check_html($userinfo['user_ibl_team'], "nohtml"));
-	$queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$userteam'";
-	$tid = mysql_result(mysql_query($queryTeamID), 0);
+	$tid = getTidFromTeamname($userteam);
+
+	displaytopmenu($tid);
 
 	$currentSeasonEndingYear = getCurrentSeasonEndingYear();
 

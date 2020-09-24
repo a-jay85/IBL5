@@ -36,12 +36,16 @@ while ($k < $num2) {
 	$teamcolor2[$k] = mysql_result($result2, $k, "color2");
     $depth[$k] = mysql_result($result2, $k, "depth");
     $simdepth[$k] = mysql_result($result2, $k, "sim_depth");
+	$asg_vote[$k] = mysql_result($result2, $k, "asg_vote");
+	$eoy_vote[$k] = mysql_result($result2, $k, "eoy_vote");
 	$teamid[$k] = mysql_result($result2, $k, "teamid");
 
 	$table_echo .= "<tr>
 		<td bgcolor=#" . $teamcolor1[$k] . "><a href=\"modules.php?name=Team&op=team&tid=" . $teamid[$k] . "\"><font color=#" . $teamcolor2[$k] . ">" . $teamcity[$k] . " " . $teamname[$k] . "</a></td>
 		<td>" . $simdepth[$k] . "</td>
 		<td>" . $depth[$k] . "</td>
+		<td>" . $asg_vote[$k] . "</td>
+		<td>" . $eoy_vote[$k] . "</td>
 	</tr>";
 
 	$k++;
@@ -50,8 +54,10 @@ while ($k < $num2) {
 $text .= "<table class=\"sortable\" border=1>
 	<tr>
 	  	<th>Team</th>
-		<th>Sim Depth Chart Received</th>
-		<th>Last Depth Chart Received</th>
+		<th>Sim Depth Chart</th>
+		<th>Last Depth Chart</th>
+		<th>ASG Ballot</th>
+		<th>EOY Ballot</th>
 	</tr>$table_echo
 </table>";
 

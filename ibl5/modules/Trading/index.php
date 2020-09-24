@@ -65,8 +65,7 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 	$sql8a = "SELECT * FROM ibl_draft_picks WHERE ownerofpick = '$userinfo[user_ibl_team]' ORDER BY year, round ASC ";
 	$result8a = $db->sql_query($sql8a);
 
-	echo "<hr>
-		<form name=\"Trade_Offer\" method=\"post\" action=\"maketradeoffer.php\">
+	echo "<form name=\"Trade_Offer\" method=\"post\" action=\"maketradeoffer.php\">
 		<input type=\"hidden\" name=\"Team_Name\" value=\"$teamlogo\">
 		<center>
 			<img src=\"images/logo/$tid.jpg\"><br>
@@ -448,7 +447,7 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
 	$tid = mysql_result(mysql_query("SELECT * FROM nuke_ibl_team_info WHERE team_name = '$teamlogo' LIMIT 1"), 0, "teamid");
 	displaytopmenu($tid);
 
-	echo "<hr><center><img src=\"images/logo/$tid.jpg\"><br>";
+	echo "<center><img src=\"images/logo/$tid.jpg\"><br>";
 
 	$sql3 = "SELECT * FROM nuke_ibl_trade_info ORDER BY tradeofferid ASC";
 	$result3 = $db->sql_query($sql3);

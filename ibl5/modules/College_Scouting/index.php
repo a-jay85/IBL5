@@ -210,8 +210,7 @@ function userinfo($username, $bypass=0, $hid=0, $url=0) {
 		$queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$teamlogo'";
 	$tid = mysql_result(mysql_query($queryTeamID), 0);
 
-    echo "<hr>
-    <center><img src=\"images/logo/$tid.jpg\"><br>
+    echo "<center><img src=\"images/logo/$tid.jpg\"><br>
 	<table>
 		<tr>
 			<th colspan=26>

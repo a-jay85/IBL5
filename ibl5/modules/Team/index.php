@@ -2167,7 +2167,7 @@ function team_info_right ($team_name, $color1, $color2, $owner_name, $tid)
 	//==================
 
 	$owner_award_code = $team_name."";
-	$querydec="SELECT * FROM nuke_ibl_teamawards WHERE name LIKE '$owner_award_code' ORDER BY year ASC";
+	$querydec="SELECT * FROM nuke_ibl_teamawards WHERE name LIKE '$owner_award_code' ORDER BY year DESC";
 	$resultdec=mysql_query($querydec);
 	$numdec=mysql_num_rows($resultdec);
 	if ($numdec > 0) $dec=0;

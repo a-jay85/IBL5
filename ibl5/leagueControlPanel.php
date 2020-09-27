@@ -33,7 +33,7 @@ if (isset($_POST['query'])) {
             $successText = "All undefined player positions have been set.";
             break;
         case 'Set all players on waivers to Free Agents and reset their Bird years':
-            $queryString = "UPDATE nuke_iblplyr SET teamname = 'Free Agents', tid = 0, bird = 0 WHERE retired != 1 AND ordinal >= 960;";
+            $queryString = "UPDATE nuke_iblplyr SET teamname = 'Free Agents', bird = 0 WHERE retired != 1 AND ordinal >= 960;";
             $successText = "All players currently on waivers have their teamname set to Free Agents and 0 Bird years.";
             break;
         case 'Set Free Agency factors for PFW':

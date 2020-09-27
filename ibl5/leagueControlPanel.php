@@ -67,12 +67,12 @@ echo "<FORM action=\"leagueControlPanel.php\" method=\"POST\">
     <INPUT type='submit' name='query' value='Set all players on waivers to Free Agents and reset their Bird years'><p>
 </FORM>\n";
 
-if ($querySuccessful = TRUE) {
-    echo "<code>" . $queryString . "</code>\n";
-    echo "<p>\n";
+if ($querySuccessful == TRUE) {
+    echo "<code>" . $queryString . "</code>";
+    echo "<p>";
     echo "<b>" . $successText . "</b>";
-} elseif ($querySuccessful = FALSE) {
     echo "Oops, something went wrong. Let A-Jay know what you were trying to do and he'll look into it.";
+} else {
 };
 
 echo "

@@ -15,7 +15,7 @@ $currentSeasonEndingYear = getCurrentSeasonEndingYear();
 if (isset($_POST['query'])) {
     switch ($_POST['query']) {
         case 'Set Season Phase':
-            if(isset($_POST['SeasonPhase'])) {
+            if (isset($_POST['SeasonPhase'])) {
                 $queryString = "UPDATE nuke_ibl_settings SET value = '{$_POST['SeasonPhase']}' WHERE name = 'Current Season Phase';";
             }
             $successText = "Season Phase has been set to {$_POST['SeasonPhase']}.";
@@ -52,6 +52,9 @@ if (isset($_POST['query'])) {
 
     if (mysql_query($queryString)) {
         $querySuccessful = TRUE;
+        if (isset($_POST['SeasonPhase'])) {
+            $currentSeasonPhase = $_POST['SeasonPhase'];
+        }
     } else {
         $querySuccessful = FALSE;
     };

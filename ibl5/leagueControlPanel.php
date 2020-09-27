@@ -67,7 +67,10 @@ echo "
 </HEAD>
 <BODY>";
 
-echo "<FORM action=\"leagueControlPanel.php\" method=\"POST\">
+echo "<A HREF=\"asg_vote_reset.php\">Reset All-Star Voting</A><p>
+<A HREF=\"eoy_vote_reset.php\">Reset End of the Year Voting</A><p>
+
+<FORM action=\"leagueControlPanel.php\" method=\"POST\">
     <select name=\"SeasonPhase\">
         <option value = \"Preseason\"" . ($currentSeasonPhase == "Preseason" ? " SELECTED" : "") . ">Preseason</option>
         <option value = \"HEAT\"" . ($currentSeasonPhase == "HEAT" ? " SELECTED" : "") . ">HEAT</option>

@@ -767,7 +767,7 @@ if (mysql_query($resetExtensionQueryString)) {
 	echo '<p>Contract Extension usages have been reset.<p>';
 } else die('Invalid query: ' . mysql_error());
 
-if (getCurrentSeasonPhase() == "Playoffs") {
+if (getCurrentSeasonPhase() == "Playoffs" OR getCurrentSeasonPhase() == "Draft" OR getCurrentSeasonPhase() == "Free Agency") {
 	echo '<p>Re-applying postseason trades made during the playoffs...</p>';
 
 	$postseasonTradeQueueQuery = "SELECT * FROM ibl_trade_queue;";

@@ -89,6 +89,8 @@ Draft is stopped.';
 	    $message .= '
 
 Draft is complete.';
+      // Post pick details to Discord
+      postToDiscordChannel('#draft-picks', $message);
 	  }
 	}
 	// Also send notifications to those who wish to receive them
@@ -131,7 +133,7 @@ team_id != '".kAdminUser."' and team_email_prefs != ".kOptionNoEmail;
 	$statement = "delete from selection where player_id = '$player_id'";
 	mysql_query($statement);
       }
-      
+
       // Delete the player from anyone's queue
       // Re-grab the player to make sure we don't have a race condition
       $statement = "select * from pick where pick_id = '$pick_id'";
@@ -140,7 +142,7 @@ team_id != '".kAdminUser."' and team_email_prefs != ".kOptionNoEmail;
       $player_id = $row['player_id'];
       $statement = "delete from selection where player_id = '$player_id'";
       mysql_query($statement);
-      
+
       // Find the team that made this pick and process their queue accordingly
       $statement = "select team.team_id, team.team_multipos, player.position_id from
 pick, team, player
@@ -208,7 +210,7 @@ order by pick.pick_id";
   $col[] = "team.team_id";
   $wheres[] = "team.team_id = pick.team_id";
   $wheres[] = "pick.player_id is NULL";
-  
+
   $statement = "select ".implode(",",$col)." from (".implode(",",$tables).")
 where ".implode(" and ",$wheres)."
 order by pick.pick_id limit 1";
@@ -248,7 +250,7 @@ function process_expired_picks() {
   $wheres[] = "team.team_id = pick.team_id";
   $wheres[] = "pick.player_id is NULL";
   $col[] = "pick.pick_time";
-  $col[] = "if(team.team_clock_adj != '0', 
+  $col[] = "if(team.team_clock_adj != '0',
 time_to_sec(timediff(date_add(pick.pick_time, interval (".$limit."*team.team_clock_adj) minute), '".date("Y-m-d H:i:s")."')),
 -1) time_left";
   $col[] = "team.team_clock_adj";

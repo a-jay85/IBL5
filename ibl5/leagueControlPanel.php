@@ -82,7 +82,9 @@ echo "<FORM action=\"leagueControlPanel.php\" method=\"POST\">
     <INPUT type='submit' name='query' value='Set all undefined player positions'><p>
     <INPUT type='submit' name='query' value='Set all players on waivers to Free Agents and reset their Bird years'><p>
     <INPUT type='submit' name='query' value='Set Free Agency factors for PFW'><p>
-</FORM>";
+</FORM>
+
+<A HREF=\"tradition.php\">Set Free Agency factors for Tradition</A><p>";
 
 if ($querySuccessful == TRUE) {
     echo "<code>" . $queryString . "</code>";

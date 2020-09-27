@@ -88,6 +88,8 @@ if ($querySuccessful == TRUE) {
     echo "<code>" . $queryString . "</code>";
     echo "<p>";
     echo "<b>" . $successText . "</b>";
+} elseif (!isset($_POST['query'])) {
+    // Do/display nothing on an initial page load
 } else {
     echo "Oops, something went wrong:<p>
     <FONT color=red>$failureText</FONT><p>

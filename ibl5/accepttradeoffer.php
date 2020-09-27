@@ -46,7 +46,7 @@ while ($i < $num0) {
 		$resulti = mysql_query($queryi);
 	}
 
-	if (getCurrentSeasonPhase() == "Playoffs") {
+	if (getCurrentSeasonPhase() == "Playoffs" OR getCurrentSeasonPhase() == "Draft" OR getCurrentSeasonPhase() == "Free Agency") {
 		$queryInsert = "INSERT INTO ibl_trade_queue (query, tradeline) VALUES ('$queryi', '$tradeLine');";
 		mysql_query("$queryInsert");
 	}

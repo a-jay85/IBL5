@@ -9,6 +9,8 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/sharedFunctions.php';
 $queryString = "";
 $successText = "";
 
+$currentSeasonPhase = getCurrentSeasonPhase();
+
 if (isset($_POST['query'])) {
     switch ($_POST['query']) {
         case 'Set Season Phase':
@@ -41,8 +43,6 @@ if (isset($_POST['query'])) {
         $querySuccessful = FALSE;
     };
 }
-
-$currentSeasonPhase = getCurrentSeasonPhase();
 
 echo "
 <HTML>

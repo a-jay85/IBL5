@@ -20,11 +20,10 @@ echo "<html><head><title>Position Migration Processing</title></head><body>
 Your position migration request has been processed and updated in the database.  It should show up on the Free Agency page immediately.  Please <a href=\"modules.php?name=Free_Agency\">click here to return to the Free Agency Screen</a>.<br><br>
 ";
 
-if (mail($recipient, $emailsubject, $filetext, "From: migration@iblhoops.net"))
-{
-echo "<center> An e-mail regarding this extension has been successfully sent to the commissioner's office.  Thank you. </center>";
+if (mail($recipient, $emailsubject, $filetext, "From: migration@iblhoops.net")) {
+    echo "<center> An e-mail regarding this extension has been successfully sent to the commissioner's office.  Thank you. </center>";
 } else {
-         echo " Message failed to e-mail properly; please notify the commissioner of the error.</center>";
+    echo " Message failed to e-mail properly; please notify the commissioner of the error.</center>";
 }
 
 ?>

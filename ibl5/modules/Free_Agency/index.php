@@ -799,7 +799,7 @@ function display() {
 		</thead>
 		<tbody>";
 
-	$showteam = $db->sql_query("SELECT * FROM ".$prefix."_iblplyr WHERE teamname='$userteam' AND retired='0' AND ordinal < 960 ORDER BY ordinal ASC");
+	$showteam = $db->sql_query("SELECT * FROM ".$prefix."_iblplyr WHERE teamname='$userteam' AND retired='0' ORDER BY ordinal ASC");
 	while ($teamlist = $db->sql_fetchrow($showteam)) {
 		$draftyear = stripslashes(check_html($teamlist['draftyear'], "nohtml"));
 		$exp = stripslashes(check_html($teamlist['exp'], "nohtml"));

@@ -67,10 +67,7 @@ echo "
 </HEAD>
 <BODY>";
 
-echo "<A HREF=\"asg_vote_reset.php\">Reset All-Star Voting</A><p>
-<A HREF=\"eoy_vote_reset.php\">Reset End of the Year Voting</A><p>
-
-<FORM action=\"leagueControlPanel.php\" method=\"POST\">
+echo "<FORM action=\"leagueControlPanel.php\" method=\"POST\">
     <select name=\"SeasonPhase\">
         <option value = \"Preseason\"" . ($currentSeasonPhase == "Preseason" ? " SELECTED" : "") . ">Preseason</option>
         <option value = \"HEAT\"" . ($currentSeasonPhase == "HEAT" ? " SELECTED" : "") . ">HEAT</option>
@@ -79,15 +76,46 @@ echo "<A HREF=\"asg_vote_reset.php\">Reset All-Star Voting</A><p>
         <option value = \"Draft\"" . ($currentSeasonPhase == "Draft" ? " SELECTED" : "") . ">Draft</option>
         <option value = \"Free Agency\"" . ($currentSeasonPhase == "Free Agency" ? " SELECTED" : "") . ">Free Agency</option>
     </select>
-    <INPUT type='submit' name='query' value='Set Season Phase'><p>
-    <INPUT type='submit' name='query' value='Reset All Contract Extensions'><p>
-    <INPUT type='submit' name='query' value='Reset All MLEs/LLEs'><p>
-    <INPUT type='submit' name='query' value='Set all undefined player positions'><p>
-    <INPUT type='submit' name='query' value='Set all players on waivers to Free Agents and reset their Bird years'><p>
-    <INPUT type='submit' name='query' value='Set Free Agency factors for PFW'><p>
-</FORM>
+    <INPUT type='submit' name='query' value='Set Season Phase'><p>";
 
-<A HREF=\"tradition.php\">Set Free Agency factors for Tradition</A><p>";
+switch ($currentSeasonPhase) {
+    case 'Preseason':
+        echo "<A HREF=\"updateAllTheThings.php\">Update All The Things</A><p>
+            <A HREF=\"scoParser.php\">Run scoParser.php</A><p>";
+        break;
+    case 'HEAT':
+        echo "<A HREF=\"updateAllTheThings.php\">Update All The Things</A><p>
+            <A HREF=\"scoParser.php\">Run scoParser.php</A><p>
+            <A HREF=\"heatupdateboth.php\">Update HEAT Leaderboards</A><p>";
+        break;
+    case 'Regular Season':
+        echo "<A HREF=\"updateAllTheThings.php\">Update All The Things</A><p>
+            <A HREF=\"scoParser.php\">Run scoParser.php</A><p>
+            <A HREF=\"asg_vote_reset.php\">Reset All-Star Voting</A><p>
+            <A HREF=\"eoy_vote_reset.php\">Reset End of the Year Voting</A><p>";
+        break;
+    case 'Playoffs':
+        echo "<A HREF=\"updateAllTheThings.php\">Update All The Things</A><p>
+            <A HREF=\"scoParser.php\">Run scoParser.php</A><p>
+            <A HREF=\"eoy_vote_reset.php\">Reset End of the Year Voting</A><p>";
+        break;
+    case 'Draft':
+        echo "<A HREF=\"playoffupdate.php\">Playoff Leaderboard Update #1</A><p>
+            <A HREF=\"playofflbupdate.php\">Playoff Leaderboard Update #2</A><p>
+            <A HREF=\"seasonlbupdate.php\">Season Leaderboard Update</A><p>
+            <A HREF=\"history_update.php\">IBL History Update</A><p>";
+        break;
+    case 'Free Agency':
+        echo "<INPUT type='submit' name='query' value='Reset All Contract Extensions'><p>
+            <INPUT type='submit' name='query' value='Reset All MLEs/LLEs'><p>
+            <INPUT type='submit' name='query' value='Set all undefined player positions'><p>
+            <INPUT type='submit' name='query' value='Set Free Agency factors for PFW'><p>
+            <A HREF=\"tradition.php\">Set Free Agency factors for Tradition</A><p>
+            <INPUT type='submit' name='query' value='Set all players on waivers to Free Agents and reset their Bird years'><p>";
+        break;
+}
+
+echo "</FORM><p><hr><p>";
 
 if ($querySuccessful == TRUE) {
     echo "<code>" . $queryString . "</code>";

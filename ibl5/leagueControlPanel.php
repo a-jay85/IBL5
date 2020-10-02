@@ -48,6 +48,14 @@ if (isset($_POST['query'])) {
                     The FA demands formula requires the current season to be finished before calculating factors.";
             }
             break;
+        case 'Deactivate Player and Season Leaders modules for Trivia':
+            $queryString = "UPDATE nuke_modules SET active = 0 WHERE title = 'Player' OR title = 'Season_Leaders';";
+            $successText = "Player and Season Leaders modules have been deactivated.";
+            break;
+        case 'Activate Player and Season Leaders modules after Trivia':
+            $queryString = "UPDATE nuke_modules SET active = 1 WHERE title = 'Player' OR title = 'Season_Leaders';";
+            $successText = "Player and Season Leaders modules have been activated.";
+            break;
     }
 
     if (mysql_query($queryString)) {
@@ -111,7 +119,9 @@ switch ($currentSeasonPhase) {
             <INPUT type='submit' name='query' value='Set all undefined player positions'><p>
             <INPUT type='submit' name='query' value='Set Free Agency factors for PFW'><p>
             <A HREF=\"tradition.php\">Set Free Agency factors for Tradition</A><p>
-            <INPUT type='submit' name='query' value='Set all players on waivers to Free Agents and reset their Bird years'><p>";
+            <INPUT type='submit' name='query' value='Set all players on waivers to Free Agents and reset their Bird years'><p>
+            <INPUT type='submit' name='query' value='Deactivate Player and Season Leaders modules for Trivia'><p>
+            <INPUT type='submit' name='query' value='Activate Player and Season Leaders modules after Trivia'><p>";
         break;
 }
 

@@ -1447,12 +1447,14 @@ function negotiate($pid) {
 			echo "<INPUT TYPE=\"text\" NAME=\"offeryear1\" SIZE=\"4\" VALUE=\"$prefill3\"></td><td>
 			<INPUT TYPE=\"text\" NAME=\"offeryear2\" SIZE=\"4\" VALUE=\"$prefill4\"></td>";
 		}
+		$amendedCapSpaceYear1 = $capnumber + $offer1;
 		echo "<input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
 		<input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
 		<input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
 		<input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
 		<input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
 		<input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
+		<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
 		<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
 		<input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
 		<input type=\"hidden\" name=\"capnumber3\" value=\"$capnumber3\">
@@ -1482,6 +1484,7 @@ function negotiate($pid) {
 		<input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
 		<input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
 		<input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
+		<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
 		<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
 		<input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
 		<input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
@@ -1503,6 +1506,7 @@ function negotiate($pid) {
 		<input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
 		<input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
 		<input type=\"hidden\" name=\"offeryear2\" value=\"$maxstartsat2\">
+		<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
 		<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
 		<input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
 		<input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
@@ -1527,6 +1531,7 @@ function negotiate($pid) {
 			<input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
 			<input type=\"hidden\" name=\"offeryear2\" value=\"$maxstartsat2\">
 			<input type=\"hidden\" name=\"offeryear3\" value=\"$maxstartsat3\">
+			<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
 			<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
 			<input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
 			<input type=\"hidden\" name=\"capnumber3\" value=\"$capnumber3\">
@@ -1552,6 +1557,7 @@ function negotiate($pid) {
 			<input type=\"hidden\" name=\"offeryear2\" value=\"$maxstartsat2\">
 			<input type=\"hidden\" name=\"offeryear3\" value=\"$maxstartsat3\">
 			<input type=\"hidden\" name=\"offeryear4\" value=\"$maxstartsat4\">
+			<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
 			<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
 			<input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
 			<input type=\"hidden\" name=\"capnumber3\" value=\"$capnumber3\">
@@ -1579,6 +1585,7 @@ function negotiate($pid) {
 			<input type=\"hidden\" name=\"offeryear3\" value=\"$maxstartsat3\">
 			<input type=\"hidden\" name=\"offeryear4\" value=\"$maxstartsat4\">
 			<input type=\"hidden\" name=\"offeryear5\" value=\"$maxstartsat5\">
+			<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
 			<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
 			<input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
 			<input type=\"hidden\" name=\"capnumber3\" value=\"$capnumber3\">
@@ -1608,6 +1615,7 @@ function negotiate($pid) {
 			<input type=\"hidden\" name=\"offeryear4\" value=\"$maxstartsat4\">
 			<input type=\"hidden\" name=\"offeryear5\" value=\"$maxstartsat5\">
 			<input type=\"hidden\" name=\"offeryear6\" value=\"$maxstartsat6\">
+			<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
 			<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
 			<input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
 			<input type=\"hidden\" name=\"capnumber3\" value=\"$capnumber3\">
@@ -1642,6 +1650,7 @@ function negotiate($pid) {
 			<input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
 			<input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
 			<input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
+			<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
 			<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
 			<input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
 			<input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
@@ -1663,6 +1672,7 @@ function negotiate($pid) {
 			<input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
 			<input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
 			<input type=\"hidden\" name=\"offeryear2\" value=\"$maxstartsatbird2\">
+			<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
 			<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
 			<input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
 			<input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
@@ -1686,6 +1696,7 @@ function negotiate($pid) {
 			<input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
 			<input type=\"hidden\" name=\"offeryear2\" value=\"$maxstartsatbird2\">
 			<input type=\"hidden\" name=\"offeryear3\" value=\"$maxstartsatbird3\">
+			<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
 			<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
 			<input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
 			<input type=\"hidden\" name=\"capnumber3\" value=\"$capnumber3\">
@@ -1711,6 +1722,7 @@ function negotiate($pid) {
 			<input type=\"hidden\" name=\"offeryear2\" value=\"$maxstartsatbird2\">
 			<input type=\"hidden\" name=\"offeryear3\" value=\"$maxstartsatbird3\">
 			<input type=\"hidden\" name=\"offeryear4\" value=\"$maxstartsatbird4\">
+			<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
 			<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
 			<input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
 			<input type=\"hidden\" name=\"capnumber3\" value=\"$capnumber3\">
@@ -1738,6 +1750,7 @@ function negotiate($pid) {
 			<input type=\"hidden\" name=\"offeryear3\" value=\"$maxstartsatbird3\">
 			<input type=\"hidden\" name=\"offeryear4\" value=\"$maxstartsatbird4\">
 			<input type=\"hidden\" name=\"offeryear5\" value=\"$maxstartsatbird5\">
+			<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
 			<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
 			<input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
 			<input type=\"hidden\" name=\"capnumber3\" value=\"$capnumber3\">
@@ -1767,6 +1780,7 @@ function negotiate($pid) {
 			<input type=\"hidden\" name=\"offeryear4\" value=\"$maxstartsatbird4\">
 			<input type=\"hidden\" name=\"offeryear5\" value=\"$maxstartsatbird5\">
 			<input type=\"hidden\" name=\"offeryear6\" value=\"$maxstartsatbird6\">
+			<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
 			<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
 			<input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
 			<input type=\"hidden\" name=\"capnumber3\" value=\"$capnumber3\">
@@ -1801,6 +1815,7 @@ function negotiate($pid) {
 				<input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
 				<input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
 				<input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
+				<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
 				<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
 				<input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
 				<input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
@@ -1819,6 +1834,7 @@ function negotiate($pid) {
 				<input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
 				<input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
 				<input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
+				<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
 				<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
 				<input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
 				<input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
@@ -1838,6 +1854,7 @@ function negotiate($pid) {
 					<input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
 					<input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
 					<input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
+					<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
 					<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
 					<input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
 					<input type=\"hidden\" name=\"capnumber3\" value=\"$capnumber3\">
@@ -1858,6 +1875,7 @@ function negotiate($pid) {
 					<input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
 					<input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
 					<input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
+					<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
 					<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
 					<input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
 					<input type=\"hidden\" name=\"capnumber3\" value=\"$capnumber3\">
@@ -1879,6 +1897,7 @@ function negotiate($pid) {
 					<input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
 					<input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
 					<input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
+					<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
 					<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
 					<input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
 					<input type=\"hidden\" name=\"capnumber3\" value=\"$capnumber3\">
@@ -1901,6 +1920,7 @@ function negotiate($pid) {
 					<input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
 					<input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
 					<input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
+					<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
 					<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
 					<input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
 					<input type=\"hidden\" name=\"capnumber3\" value=\"$capnumber3\">
@@ -1936,6 +1956,7 @@ function negotiate($pid) {
 				<input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
 				<input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
 				<input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
+				<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
 				<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
 				<input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
 				<input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
@@ -1960,6 +1981,7 @@ function negotiate($pid) {
 		<input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
 		<input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
 		<input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
+		<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
 		<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
 		<input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
 		<input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
@@ -1975,7 +1997,7 @@ function negotiate($pid) {
 	echo "
 		<tr><td colspan=8><b>Notes/Reminders:</b> <ul>
 		<li>The maximum contract permitted for me (based on my years of service) starts at $maxstartsat in Year 1.
-		<li>You have <b>$capnumber</b> in <b>soft cap</b> space available; the amount you offer in year 1 cannot exceed this unless you are using one of the exceptions.</li>
+		<li>You have <b>$amendedCapSpaceYear1</b> in <b>soft cap</b> space available; the amount you offer in year 1 cannot exceed this unless you are using one of the exceptions.</li>
 		<li>You have <b>$capnumber2</b> in <b>soft cap</b> space available; the amount you offer in year 2 cannot exceed this unless you are using one of the exceptions.</li>
 		<li>You have <b>$capnumber3</b> in <b>soft cap</b> space available; the amount you offer in year 3 cannot exceed this unless you are using one of the exceptions.</li>
 		<li>You have <b>$capnumber4</b> in <b>soft cap</b> space available; the amount you offer in year 4 cannot exceed this unless you are using one of the exceptions.</li>

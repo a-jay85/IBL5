@@ -391,13 +391,13 @@ $Offer_max_increase = round($Offer_1*0.1,0);
 
 // ==== CHECK FOR ILLEGAL OFFERS THAT ARE OVER THE SALARY CAP
 if ($Bird_Years < 3) {
-  if ($Offer_1 > $Cap_Space) {
-    if ($MLE_Years > 0) {
-    } else {
-  echo "Sorry, you do not have sufficient cap space under the soft cap to make the offer.  You offered $Offer_1 in the first year of the contract, which is more than $Cap_Space, the amount of cap space you have available.<br>";
-  $nooffer=1;
-  }
-  }
+    if ($Offer_1 > $Cap_Space) {
+        if ($MLE_Years > 0) {
+        } else {
+            echo "Sorry, you do not have sufficient cap space under the soft cap to make the offer.  You offered $Offer_1 in the first year of the contract, which is more than $Cap_Space, the amount of cap space you have available.<br>";
+            $nooffer = 1;
+        }
+    }
 } else {
   $Hard_Cap_Space=$Cap_Space+2000;
   $Hard_Cap_Space2=$Cap_Space2+2000;

@@ -10,6 +10,7 @@ $Team_Name = $_POST['teamname'];
 $Player_Name = $_POST['playername'];
 $Demands_Years = $_POST['demyrs'];
 $Demands_Total = $_POST['demtot']*100;
+$amendedCapSpaceYear1 = $_POST['amendedCapSpaceYear1'];
 $Cap_Space = $_POST['capnumber'];
 $Cap_Space2 = $_POST['capnumber2'];
 $Cap_Space3 = $_POST['capnumber3'];
@@ -391,7 +392,7 @@ $Offer_max_increase = round($Offer_1*0.1,0);
 
 // ==== CHECK FOR ILLEGAL OFFERS THAT ARE OVER THE SALARY CAP
 if ($Bird_Years < 3) {
-    if ($Offer_1 > $Cap_Space) {
+    if ($Offer_1 > $amendedCapSpaceYear1) {
         if ($MLE_Years > 0) {
         } else {
             echo "Sorry, you do not have sufficient cap space under the soft cap to make the offer.  You offered $Offer_1 in the first year of the contract, which is more than $Cap_Space, the amount of cap space you have available.<br>";

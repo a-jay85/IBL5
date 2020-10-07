@@ -206,7 +206,7 @@ if ($nooffer == 0) {
         $recipient = 'ibldepthcharts@gmail.com';
         $emailsubject = "Unsuccessful Extension - " . $Player_Name;
         $filetext = $Player_Name . " refuses an extension offer from the " . $Team_Name . " of " . $Offer_Total . " for " . $Offer_Years." years.
-        For reference purposes: the offer was " . $Offer_1 . " " . $Offer_2 . " " . $Offer_3 . " " . $Offer_4 . " " . $Offer_5 . " and the offer value was thus considered to be " . $Offer_Value . "; the player wanted an offer with a value of " . $Demands_Value;
+        For reference purposes: the offer was " . $Offer_1 . " " . $Offer_2 . " " . $Offer_3 . " " . $Offer_4 . " " . $Offer_5 . " and the offer value was thus considered to be " . $Offer_Value . ".";
 
         if (mail($recipient, $emailsubject, $filetext, "From: rejected-extensions@iblhoops.net"))
         {

@@ -39,3 +39,13 @@ function getTidFromTeamname($teamname)
 
     return mysql_result($queryTidFromTeamname, 0);
 }
+
+function getWaiverWireStatus()
+{
+    $queryWaiverWireStatus = mysql_query("SELECT value
+        FROM nuke_ibl_settings
+        WHERE name = 'Allow Waiver Moves'
+        LIMIT 1");
+
+    return mysql_result($queryWaiverWireStatus, 0);
+}

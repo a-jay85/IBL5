@@ -2962,7 +2962,7 @@ function negotiate($pid)
                     $maxyr1 = 1275;
                 }
                 if ($player_exp > 9) {
-                    $maxyr1 = 1361;
+                    $maxyr1 = 1451;
                 }
 
 

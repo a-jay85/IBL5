@@ -50,7 +50,13 @@ function waivers($user)
         }
         include("footer.php");
     } elseif (is_user($user)) {
-        if (getCurrentSeasonPhase() != "Free Agency") {
+        $currentSeasonPhase = getCurrentSeasonPhase();
+        $allowWaiverMoves = getWaiverWireStatus();
+
+        if (($currentSeasonPhase == "Preseason" AND $allowWaiverMoves == "Yes")
+            OR $currentSeasonPhase == "HEAT"
+            OR $currentSeasonPhase == "Regular Season"
+            OR $currentSeasonPhase == "Playoffs") {
             global $cookie;
             cookiedecode($user);
             waiverexecute($cookie[1], $action);

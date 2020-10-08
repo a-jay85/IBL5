@@ -11,6 +11,7 @@ $successText = "";
 
 $currentSeasonPhase = getCurrentSeasonPhase();
 $currentSeasonEndingYear = getCurrentSeasonEndingYear();
+$waiverWireStatus = getWaiverWireStatus();
 
 if (isset($_POST['query'])) {
     switch ($_POST['query']) {
@@ -19,6 +20,12 @@ if (isset($_POST['query'])) {
                 $queryString = "UPDATE nuke_ibl_settings SET value = '{$_POST['SeasonPhase']}' WHERE name = 'Current Season Phase';";
             }
             $successText = "Season Phase has been set to {$_POST['SeasonPhase']}.";
+            break;
+        case 'Set Waiver Wire Status':
+            if (isset($_POST['Waivers'])) {
+                $queryString = "UPDATE nuke_ibl_settings SET value = '{$_POST['Waivers']}' WHERE name = 'Allow Waiver Moves';";
+            }
+            $successText = "Waiver Wire Status has been set to {$_POST['Waivers']}.";
             break;
         case 'Reset All Contract Extensions':
             $queryString = "UPDATE nuke_ibl_team_info SET Used_Extension_This_Season = 0;";
@@ -63,6 +70,9 @@ if (isset($_POST['query'])) {
         if (isset($_POST['SeasonPhase'])) {
             $currentSeasonPhase = $_POST['SeasonPhase'];
         }
+        if (isset($_POST['Waivers'])) {
+            $waiverWireStatus = $_POST['Waivers'];
+        }
     } else {
         $querySuccessful = FALSE;
     };
@@ -88,7 +98,12 @@ echo "<FORM action=\"leagueControlPanel.php\" method=\"POST\">
 
 switch ($currentSeasonPhase) {
     case 'Preseason':
-        echo "<A HREF=\"updateAllTheThings.php\">Update All The Things</A><p>
+        echo "<select name=\"Waivers\">
+                <option value = \"Yes\"" . ($waiverWireStatus == "Yes" ? " SELECTED" : "") . ">Yes</option>
+                <option value = \"No\"" . ($waiverWireStatus == "No" ? " SELECTED" : "") . ">No</option>
+            </select>
+            <INPUT type='submit' name='query' value='Set Waiver Wire Status'><p>
+            <A HREF=\"updateAllTheThings.php\">Update All The Things</A><p>
             <A HREF=\"scoParser.php\">Run scoParser.php</A><p>";
         break;
     case 'HEAT':

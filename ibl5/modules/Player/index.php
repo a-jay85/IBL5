@@ -1045,6 +1045,8 @@ $contract_display = "not under contract";
 
     menu();
 
+    $seasonPhase = getCurrentSeasonPhase();
+
 	echo "<table><tr><td valign=top>
 <font class=\"title\">$player_pos $player_name ";
 
@@ -1074,7 +1076,7 @@ if (($player_exp == 4 AND $player_draft_round == 1 AND 2 * $salaryIn3rdYearOfCur
 
 if ((($player_draft_round == 1 && $player_exp == 2 && $salaryIn4thYearOfCurrentContract == 0) OR
     ($player_draft_round == 2 && $player_exp == 1 && $salaryIn3rdYearOfCurrentContract == 0)) AND
-    getCurrentSeasonPhase() == "Free Agency" AND
+    $seasonPhase == "Free Agency" AND
     $userteam == $player_team_name) {
         echo "<table align=right bgcolor=#ffbb00><tr><td align=center><a href=\"modules.php?name=Free_Agency&pa=rookieoption&pid=$pid\">ROOKIE<BR>OPTION</a></td></tr></table>";
 }
@@ -2526,7 +2528,11 @@ if ($spec == 0) {
     $currentSeasonEndingYear = getCurrentSeasonEndingYear();
     $currentSeasonStaringYear = $currentSeasonEndingYear - 1;
 
-    $query="SELECT * FROM ibl_box_scores WHERE Date BETWEEN '$currentSeasonStaringYear-10-01' AND '$currentSeasonEndingYear-07-01' AND pid = $pid ORDER BY Date ASC";
+    if ($seasonPhase == "Preseason") {
+        $query = "SELECT * FROM ibl_box_scores WHERE Date BETWEEN '$currentSeasonStaringYear-09-01' AND '$currentSeasonEndingYear-07-01' AND pid = $pid ORDER BY Date ASC";
+    } else {
+        $query = "SELECT * FROM ibl_box_scores WHERE Date BETWEEN '$currentSeasonStaringYear-10-01' AND '$currentSeasonEndingYear-07-01' AND pid = $pid ORDER BY Date ASC";
+    }
     $result=mysql_query($query);
     $num=mysql_numrows($result);
 

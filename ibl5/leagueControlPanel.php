@@ -94,7 +94,8 @@ echo "<FORM action=\"leagueControlPanel.php\" method=\"POST\">
         <option value = \"Draft\"" . ($currentSeasonPhase == "Draft" ? " SELECTED" : "") . ">Draft</option>
         <option value = \"Free Agency\"" . ($currentSeasonPhase == "Free Agency" ? " SELECTED" : "") . ">Free Agency</option>
     </select>
-    <INPUT type='submit' name='query' value='Set Season Phase'><p>";
+    <INPUT type='submit' name='query' value='Set Season Phase'><p>
+    <A HREF=\"statLeaders.php\">Season Highs</A><p>";
 
 switch ($currentSeasonPhase) {
     case 'Preseason':

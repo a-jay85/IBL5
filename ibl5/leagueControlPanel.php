@@ -110,7 +110,8 @@ switch ($currentSeasonPhase) {
     case 'HEAT':
         echo "<A HREF=\"updateAllTheThings.php\">Update All The Things</A><p>
             <A HREF=\"scoParser.php\">Run scoParser.php</A><p>
-            <A HREF=\"heatupdateboth.php\">Update HEAT Leaderboards</A><p>";
+            <A HREF=\"heatupdateboth.php\">Update HEAT Leaderboards</A><p>
+            <A HREF=\"history_update.php\">IBL History Update</A><p>";
         break;
     case 'Regular Season':
         echo "<A HREF=\"updateAllTheThings.php\">Update All The Things</A><p>

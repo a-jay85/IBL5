@@ -390,8 +390,6 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 		$pass_future_salary_playerb[$z] = $pass_future_salary_arrayb[$z];
 		$pass_future_salary_holdb[$z] = $pass_future_salary_arrayb[$z] + $future_salary_arrayb['hold'][$z];
 		$pass_future_salary_picksb[$z] = $pass_future_salary_arrayb[$z] + $future_salary_arrayb['picks'][$z];
-		$future_salary_array['player'][$z] = $future_salary_array['player'][$z];
-		$future_salary_arrayb['player'][$z] = $future_salary_arrayb['player'][$z];
 		echo "<tr><td><b>
 			Total Year: " . ($currentSeasonEndingYear + $z) . ":
 			Salary: $".$future_salary_array['player'][$z]."</b></td>";

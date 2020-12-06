@@ -58,7 +58,6 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 	$sql8 = "SELECT *
 		FROM nuke_iblplyr
 		WHERE teamname = '$userinfo[user_ibl_team]'
-		AND ordinal <= 960
 		AND retired = '0'
 		ORDER BY ordinal ASC ";
 	$result8 = $db->sql_query($sql8);
@@ -240,7 +239,6 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 	$sql9 = "SELECT *
 		FROM nuke_iblplyr
 		WHERE teamname = '$partner'
-		AND ordinal <= 960
 		AND retired = '0'
 		ORDER BY ordinal ASC ";
 	$result9 = $db->sql_query($sql9);

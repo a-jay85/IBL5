@@ -137,7 +137,12 @@ switch ($currentSeasonPhase) {
     case 'Playoffs':
         echo "<A HREF=\"updateAllTheThings.php\">Update All The Things</A><p>
             <A HREF=\"scoParser.php\">Run scoParser.php</A><p>
-            <A HREF=\"eoy_vote_reset.php\">Reset End of the Year Voting</A><p>";
+            <A HREF=\"eoy_vote_reset.php\">Reset End of the Year Voting</A><p>
+            <select name=\"Trades\">
+                <option value = \"Yes\"" . ($allowTradesStatus == "Yes" ? " SELECTED" : "") . ">Yes</option>
+                <option value = \"No\"" . ($allowTradesStatus == "No" ? " SELECTED" : "") . ">No</option>
+            </select>
+            <INPUT type='submit' name='query' value='Set Allow Trades Status'>";
         break;
     case 'Draft':
         echo "<A HREF=\"playoffupdate.php\">Playoff Leaderboard Update #1</A><p>

@@ -49,3 +49,13 @@ function getWaiverWireStatus()
 
     return mysql_result($queryWaiverWireStatus, 0);
 }
+
+function getAllowTradesStatus()
+{
+    $queryAllowTradesStatus = mysql_query("SELECT value
+        FROM nuke_ibl_settings
+        WHERE name = 'Allow Trades'
+        LIMIT 1");
+
+    return mysql_result($queryAllowTradesStatus, 0);
+}

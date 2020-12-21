@@ -40,8 +40,8 @@ team.team_id = pick.team_id and
 player.player_id = pick.player_id and
 position.position_id = player.position_id";
 	$row = mysql_fetch_array(mysql_query($statement));
-	$round = floor(($pick_id-1)/24)+1;
-	$pick = (($pick_id-1)%24)+1;
+	$round = floor(($pick_id-1)/26)+1;
+	$pick = (($pick_id-1)%26)+1;
 	$subject = $settings->get_value(kSettingLeagueName)." Draft Selection Notification: Round $round Pick $pick";
     $queryCurrentSeasonEndingYear = mysql_query('SELECT value
         FROM iblhoops_ibl5.`nuke_ibl_settings`
@@ -233,7 +233,7 @@ function height_convert($inches) {
 }
 
 function calculate_pick($pick) {
-  return (floor(($pick-1)/24)+1).' - '.((($pick-1)%24)+1).' ('.$pick.')';
+  return (floor(($pick-1)/26)+1).' - '.((($pick-1)%26)+1).' ('.$pick.')';
 }
 
 function process_expired_picks() {

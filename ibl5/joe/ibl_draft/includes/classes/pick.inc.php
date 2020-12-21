@@ -37,8 +37,8 @@ class pick {
       header("Location: selections.php");
       exit;
     }
-    $round = floor(($this->data['pick_id']-1)/24)+1;
-    $pick = (($this->data['pick_id']-1)%24)+1;
+    $round = floor(($this->data['pick_id']-1)/26)+1;
+    $pick = (($this->data['pick_id']-1)%26)+1;
     $html .= '
 <h3>Edit Pick</h3>
 <p>In the event of a trade, use this page to change the team that is making this pick.</p>

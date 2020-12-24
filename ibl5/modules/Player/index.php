@@ -1088,6 +1088,8 @@ $hasUsedExtensionThisSeason = mysql_result(mysql_query($queryHasUsedExtensionThi
 
 if ($hasUsedExtensionThisSeason == 0 AND
     $can_renegotiate == 1 AND
+    getCurrentSeasonPhase() != 'Draft' AND
+    getCurrentSeasonPhase() != 'Free Agency' AND
     $player_team_name == $userteam) {
         echo "<table align=right bgcolor=#ff0000><tr><td align=center><a href=\"modules.php?name=Player&pa=negotiate&pid=$pid\">RENEGOTIATE<BR>CONTRACT</a></td></tr></table>";
 }

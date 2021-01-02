@@ -62,7 +62,7 @@ function theindex($new_topic="0") {
 		CloseTable();
 		echo "<br>";
 	}
-	$result = $db->sql_query("SELECT sid, catid, aid, title, time, hometext, bodytext, comments, counter, topic, informant, notes, acomm, score, ratings FROM ".$prefix."_stories $qdb $querylang ORDER BY sid DESC limit $storynum");
+	$result = $db->sql_query("SELECT sid, catid, aid, title, time, hometext, bodytext, comments, counter, topic, informant, notes, acomm, score, ratings FROM ".$prefix."_stories $qdb $querylang AND catid != 14 ORDER BY sid DESC limit $storynum"); // catid != 14 hides Position Change stories
 	while ($row = $db->sql_fetchrow($result)) {
 		$s_sid = intval($row['sid']);
 		$catid = intval($row['catid']);

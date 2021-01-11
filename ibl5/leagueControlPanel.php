@@ -115,7 +115,9 @@ switch ($currentSeasonPhase) {
             </select>
             <INPUT type='submit' name='query' value='Set Waiver Wire Status'><p>
             <A HREF=\"updateAllTheThings.php\">Update All The Things</A><p>
-            <A HREF=\"scoParser.php\">Run scoParser.php</A><p>";
+            <A HREF=\"scoParser.php\">Run scoParser.php</A><p>
+            <INPUT type='submit' name='query' value='Deactivate Player and Season Leaders modules for Trivia'><p>
+            <INPUT type='submit' name='query' value='Activate Player and Season Leaders modules after Trivia'><p>";
         break;
     case 'HEAT':
         echo "<A HREF=\"updateAllTheThings.php\">Update All The Things</A><p>

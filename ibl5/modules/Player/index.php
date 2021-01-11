@@ -1081,7 +1081,7 @@ if ((((($player_draft_round == 1 && $player_exp == 2 && $salaryIn4thYearOfCurren
         ($player_draft_round == 2 && $player_exp == 2 && $salaryIn3rdYearOfCurrentContract == 0)) AND
         ($seasonPhase == "Preseason" OR $seasonPhase == "HEAT")) AND
     $userteam == $player_team_name) {
-        echo "<table align=right bgcolor=#ffbb00><tr><td align=center><a href=\"modules.php?name=Free_Agency&pa=rookieoption&pid=$pid\">ROOKIE<BR>OPTION</a></td></tr></table>";
+        echo "<table align=right bgcolor=#ffbb00><tr><td align=center><a href=\"modules.php?name=Player&pa=rookieoption&pid=$pid\">ROOKIE<BR>OPTION</a></td></tr></table>";
 }
 
 $queryHasUsedExtensionThisSeason = "SELECT Used_Extension_This_Season
@@ -3071,6 +3071,67 @@ function negotiate($pid)
     include("footer.php");
 }
 
+function rookieoption($pid) {
+	global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
+	$pid = intval($pid);
+
+	cookiedecode($user);
+
+	$sql2 = "SELECT * FROM ".$prefix."_users WHERE username='$cookie[1]'";
+	$result2 = $db->sql_query($sql2);
+	$num2 = $db->sql_numrows($result2);
+	$userinfo = $db->sql_fetchrow($result2);
+
+	$userteam = stripslashes(check_html($userinfo['user_ibl_team'], "nohtml"));
+
+	$playerinfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM ".$prefix."_iblplyr WHERE pid='$pid'"));
+
+	$player_name = stripslashes(check_html($playerinfo['name'], "nohtml"));
+	$player_pos = stripslashes(check_html($playerinfo['altpos'], "nohtml"));
+	$player_team_name = stripslashes(check_html($playerinfo['teamname'], "nohtml"));
+	$player_draftround = stripslashes(check_html($playerinfo['draftround'], "nohtml"));
+	$player_exp = stripslashes(check_html($playerinfo['exp'], "nohtml"));
+
+	if ($userteam != $player_team_name) {
+		echo "$player_pos $player_name is not on your team.<br>
+		<a href=\"javascript:history.back()\">Go Back</a>";
+		return;
+	}
+
+    $seasonPhase = getCurrentSeasonPhase();
+
+	if (($seasonPhase == "Free Agency" AND $player_exp == 2 AND $player_draftround == 1) OR
+        (($seasonPhase == "Preseason" OR $seasonPhase == "HEAT") AND $player_exp == 3 AND $player_draftround == 1)) {
+		$finalYearOfRookieContract = stripslashes(check_html($playerinfo['cy3'], "nohtml"));
+	} elseif (($seasonPhase == "Free Agency" AND $player_exp == 1 AND $player_draftround == 2) OR
+        (($seasonPhase == "Preseason" OR $seasonPhase == "HEAT") AND $player_exp == 2 AND $player_draftround == 2)) {
+		$finalYearOfRookieContract = stripslashes(check_html($playerinfo['cy2'], "nohtml"));
+	} else {
+		echo "Sorry, $player_pos $player_name is not eligible for a rookie option.<p>
+
+        Only draft picks are eligible for rookie options, and the option must be exercised
+        before the final season of their rookie contract is underway.<p>
+		<a href=\"javascript:history.back()\">Go Back</a>";
+        return;
+	}
+
+	$rookieOptionValue = 2 * $finalYearOfRookieContract;
+
+	echo "<img align=left src=\"images/player/$pid.jpg\">
+
+	You may exercise the rookie extension option on <b>$player_pos $player_name</b>.<br>
+	His contract value the season after this one will be <b>$rookieOptionValue</b>.<br>
+	However, by exercising this option, <b>you can't use an in-season contract extension on them next season</b>.<br>
+	<b>They will become a free agent</b>.<br>
+
+	<form name=\"RookieExtend\" method=\"post\" action=\"rookieoption.php\">
+	<input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+	<input type=\"hidden\" name=\"playername\" value=\"$player_name\">
+	<input type=\"hidden\" name=\"rookieOptionValue\" value=\"$rookieOptionValue\">
+	<input type=\"hidden\" name=\"player_exp\" value=\"$player_exp\">
+	<input type=\"submit\" value=\"Activate Rookie Extension\"></form>";
+}
+
 switch($pa) {
 
     case "negotiate":
@@ -3080,6 +3141,10 @@ switch($pa) {
     case "poschange":
     poschange($pid);
     break;
+
+	case "rookieoption":
+	rookieoption($pid);
+	break;
 
     case "awards":
     awards();

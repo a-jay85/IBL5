@@ -402,8 +402,6 @@ function submit() {
 		$executeupdateA = mysql_query($updatequeryA);
 		$executeupdateB = mysql_query($updatequeryB);
 		$executeupdateC = mysql_query($updatequeryC);
-		$executeupdateD = mysql_query($updatequeryD);
-		$executeupdateF = mysql_query($updatequeryF);
 
 		if ($dc_insert6 == 1) $activePlayers++;
 		if ($dc_insert1 > 0 && $injury == 0) $pos_1++;
@@ -504,6 +502,9 @@ function submit() {
 		}
 
 		if (mail($recipient, $emailsubject, $filetext, "From: ibldepthcharts@gmail.com")) {
+			$executeupdateD = mysql_query($updatequeryD);
+			$executeupdateF = mysql_query($updatequeryF);
+			
 			echo "<center><u>Your depth chart has been submitted and e-mailed successfully. Thank you.</u></center><p>";
 			$filename = 'depthcharts/'.$Team_Name.'.txt';
 			file_put_contents($filename, $filetext);

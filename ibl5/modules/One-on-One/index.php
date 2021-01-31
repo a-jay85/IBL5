@@ -340,7 +340,7 @@ function runpossession($off_player_2ga, $off_player_2gp, $off_player_fta, $off_p
       			return 1;
       		}
     	} else {
-      		if (shootball ($off_player_3gp, $off_player_oo, $def_player_od)) {
+      		if (shootball($off_player_3gp, $off_player_oo, $def_player_od)) {
       			return 5;
       		} else {
       			return 4;
@@ -360,7 +360,7 @@ function runpossession($off_player_2ga, $off_player_2gp, $off_player_fta, $off_p
       			return 1;
       		}
     	} else {
-      		if (shootball ($off_player_2gp, $off_player_oo, $def_player_od)) {
+      		if (shootball($off_player_2gp, $off_player_oo, $def_player_od)) {
       			return 8;
       		} else {
       			return 7;
@@ -380,7 +380,7 @@ function runpossession($off_player_2ga, $off_player_2gp, $off_player_fta, $off_p
       			return 1;
       		}
     	} else {
-      		if (shootball ($off_player_2gp, $off_player_do, $def_player_dd)) {
+      		if (shootball($off_player_2gp, $off_player_do, $def_player_dd)) {
       			return 11;
       		} else {
       			return 10;
@@ -400,7 +400,7 @@ function runpossession($off_player_2ga, $off_player_2gp, $off_player_fta, $off_p
       			return 1;
       		}
     	} else {
-      		if (shootball ($off_player_2gp, $off_player_po, $def_player_pd)) {
+      		if (shootball($off_player_2gp, $off_player_po, $def_player_pd)) {
       			return 14;
       		} else {
       			return 13;

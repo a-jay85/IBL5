@@ -280,7 +280,7 @@ function rebound($offrebound, $defrebound)
 
 function selectshottype($outside, $drive, $post, $twochance, $threechance)
 {
-    $shotselection = $oustide + $drive + $post; // TODO: Fix this typo
+    $shotselection = $outside + $drive + $post;
     $shottype = rand(0, $shotselection - 1);
     if ($shottype < $outside) {
     	$twoorthree = $twochance + $threechance;

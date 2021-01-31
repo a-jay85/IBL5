@@ -202,7 +202,7 @@ function stealcheck($stealrating, $turnoverrating)
     	$steal = $steal + 1;
     }
 
-    if ($steal == 2) {
+    if ($steal == 3) {
     	return 1;
     } else {
     	return 0;

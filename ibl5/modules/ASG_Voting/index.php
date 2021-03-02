@@ -217,52 +217,52 @@ while($row = mysql_fetch_assoc($result5))
 
 echo "<select name=\"ECC\">
   <option value=\"\">Select Your Eastern Conference Center...</option>
-  <option value=\"$dd\">$dd</option>
+  $dd
 </select><br><br>
 
 <select name=\"ECF1\">
   <option value=\"\">Select Your First Eastern Conference Forward...</option>
-  <option value=\"$ff\">$ff</option>
+  $ff
 </select><br><br>
 
 <select name=\"ECF2\">
   <option value=\"\">Select Your Second Eastern Conference Forward...</option>
-  <option value=\"$ff\">$ff</option>
+  $ff
 </select><br><br>
 
 <select name=\"ECG1\">
   <option value=\"\">Select Your First Eastern Conference Guard...</option>
-  <option value=\"$hh\">$hh</option>
+  $hh<
 </select><br><br>
 
 <select name=\"ECG2\">
   <option value=\"\">Select Your Second Eastern Conference Guard...</option>
-  <option value=\"$hh\">$hh</option>
-</select><br><br>
+  $hh
+</select><br><br><br>
 
 <select name=\"WCC\">
   <option value=\"\">Select Your Western Conference Center...</option>
-  <option value=\"$ii\">$ii</option>
+  $ii
 </select><br><br>
 
 <select name=\"WCF1\">
   <option value=\"\">Select Your First Western Conference Forward...</option>
-  <option value=\"$jj\">$jj</option>
+  $jj
 </select><br><br>
 
 <select name=\"WCF2\">
   <option value=\"\">Select Your Second Western Conference Forward...</option>
-  <option value=\"$jj\">$jj</option>
+  $jj
 </select><br><br>
 
 <select name=\"WCG1\">
   <option value=\"\">Select Your First Western Conference Guard...</option>
-  <option value=\"$kk\">$kk</option>
+  $kk
 </select><br><br>
 
 <select name=\"WCG2\">
   <option value=\"\">Select Your Second Western Conference Guard...</option>
-  <option value=\"$kk\">$kk</option>
+  $kk
 </select>
 
 

@@ -47,6 +47,10 @@ function userinfo($username, $bypass=0, $hid=0, $url=0) {
 // === CODE TO INSERT IBL DEPTH CHART ===
 
     OpenTable();
+
+	$easternConferenceTids = array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 25);
+	$westernConferenceTids = array(13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 26);
+
     $teamlogo = $userinfo[user_ibl_team];
 	$queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$teamlogo'";
 	$tid = mysql_result(mysql_query($queryTeamID), 0);

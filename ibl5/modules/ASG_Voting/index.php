@@ -56,10 +56,31 @@ function userinfo($username, $bypass=0, $hid=0, $url=0) {
 		return $tidsFormattedForQuery;
 	}
 
-	function getAllStarCandidates($positions, $conferenceTids) {
+	function getAllStarCandidates($positions, $conferenceTids, $formName) {
 		$query = "SELECT * FROM nuke_iblplyr where pos IN ($positions) and tid IN ('" . formatTidsForSqlQuery($conferenceTids) . "') and retired != 1 and stats_gm > '14' order by name";
 		$result = mysql_query($query);
+
+		$output = "<table class=\"sortable\">
+			<tbody>
+				<tr>
+					<th>Vote</th>
+					<th>Name</th>
+					<th>pts</th>
+					<th>reb</th>
+					<th>ast</th>
+					<th>stl</th>
+					<th>to</th>
+					<th>blk</th>
+					<th>fgp</th>
+					<th>ftp</th>
+					<th>3gp</th>
+					<th>gm</th>
+					<th>gs</th>
+				</tr>";
+
 		while ($row = mysql_fetch_assoc($result)) {
+			$name = $row['name'];
+			$teamname = $row['teamname'];
 			$ppg = floatval($row['stats_3gm'] * 3 + ($row['stats_fgm'] - $row['stats_3gm']) * 2 + $row['stats_ftm']) / intval($row['stats_gm']);
 			$ppg = round($ppg,1);
 			$rpg = floatval($row['stats_orb'] + $row['stats_drb']) / intval($row['stats_gm']);
@@ -80,8 +101,26 @@ function userinfo($username, $bypass=0, $hid=0, $url=0) {
 			$tpp = round($tpp,3);
 			$gm = floatval($row['stats_gm']);
 			$gs = floatval($row['stats_gs']);
-			$output .= "<option value='".$row['name'].", ".$row['teamname']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl,  ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp, ".$gm." gm, ".$gs." gs</option>";
+
+			$output .= "<tr>
+					<td><input type=\"checkbox\" name=\"$formName\" value=\"$name, $teamname\"></td>
+					<td>$name, $teamname</td>
+					<td>$ppg</td>
+					<td>$rpg</td>
+					<td>$apg</td>
+					<td>$spg</td>
+					<td>$tpg</td>
+					<td>$bpg</td>
+					<td>$fgp</td>
+					<td>$ftp</td>
+					<td>$tpp</td>
+					<td>$gm</td>
+					<td>$gs</td>
+				</tr>";
 		}
+
+		$output .= "</tbody>
+			</table><br><br>";
 
 		return $output;
 	}
@@ -92,70 +131,36 @@ function userinfo($username, $bypass=0, $hid=0, $url=0) {
 
 	echo "<form name=\"ASGVote\" method=\"post\" action=\"ASGVote.php\"><img src=\"images/logo/$tid.jpg\"><br><br>";
 
-	$easternConferenceCenters .= getAllStarCandidates("'C'", $easternConferenceTids);
-	$easternConferenceForwards .= getAllStarCandidates("'SF', 'PF'", $easternConferenceTids);
-	$easternConferenceGuards .= getAllStarCandidates("'PG', 'SG'", $easternConferenceTids);
+	$easternConferenceCenters .= getAllStarCandidates("'C'", $easternConferenceTids, 'ECC');
+	$easternConferenceForwards .= getAllStarCandidates("'SF', 'PF'", $easternConferenceTids, 'ECF[]');
+	$easternConferenceGuards .= getAllStarCandidates("'PG', 'SG'", $easternConferenceTids, 'ECG[]');
 
-	$westernConferenceCenters .= getAllStarCandidates("'C'", $westernConferenceTids);
-	$westernConferenceForwards .= getAllStarCandidates("'SF', 'PF'", $westernConferenceTids);
-	$westernConferenceGuards .= getAllStarCandidates("'PG', 'SG'", $westernConferenceTids);
+	$westernConferenceCenters .= getAllStarCandidates("'C'", $westernConferenceTids, 'WCC');
+	$westernConferenceForwards .= getAllStarCandidates("'SF', 'PF'", $westernConferenceTids, 'WCF[]');
+	$westernConferenceGuards .= getAllStarCandidates("'PG', 'SG'", $westernConferenceTids, 'WCG[]');
 
-	echo "<select name=\"ECC\">
-	  <option value=\"\">Select Your Eastern Conference Center...</option>
-	  $easternConferenceCenters
-	</select><br><br>
+	echo "Select ONE Eastern Conference Center...
+		$easternConferenceCenters
 
-	<select name=\"ECF1\">
-	  <option value=\"\">Select Your First Eastern Conference Forward...</option>
-	  $easternConferenceForwards
-	</select><br><br>
+		Select TWO Eastern Conference Forwards...
+		$easternConferenceForwards
 
-	<select name=\"ECF2\">
-	  <option value=\"\">Select Your Second Eastern Conference Forward...</option>
-	  $easternConferenceForwards
-	</select><br><br>
+		Select TWO Eastern Conference Guard...
+		$easternConferenceGuards
 
-	<select name=\"ECG1\">
-	  <option value=\"\">Select Your First Eastern Conference Guard...</option>
-	  $easternConferenceGuards
-	</select><br><br>
+		Select ONE Western Conference Center...
+		$westernConferenceCenters
 
-	<select name=\"ECG2\">
-	  <option value=\"\">Select Your Second Eastern Conference Guard...</option>
-	  $easternConferenceGuards
-	</select><br><br><br>
+		Select TWO Western Conference Forwards...
+		$westernConferenceForwards
 
-	<select name=\"WCC\">
-	  <option value=\"\">Select Your Western Conference Center...</option>
-	  $westernConferenceCenters
-	</select><br><br>
+		Select TWO Western Conference Guards...
+		$westernConferenceGuards
 
-	<select name=\"WCF1\">
-	  <option value=\"\">Select Your First Western Conference Forward...</option>
-	  $westernConferenceForwards
-	</select><br><br>
+		<input type=\"hidden\" name=\"teamname\" value=\"$teamlogo\">
+		</table>
 
-	<select name=\"WCF2\">
-	  <option value=\"\">Select Your Second Western Conference Forward...</option>
-	  $westernConferenceForwards
-	</select><br><br>
-
-	<select name=\"WCG1\">
-	  <option value=\"\">Select Your First Western Conference Guard...</option>
-	  $westernConferenceGuards
-	</select><br><br>
-
-	<select name=\"WCG2\">
-	  <option value=\"\">Select Your Second Western Conference Guard...</option>
-	  $westernConferenceGuards
-	</select>
-
-	</td></tr>
-
-	<input type=\"hidden\" name=\"teamname\" value=\"$teamlogo\">
-	</table>
-
-	<center><input type=\"submit\" value=\"Submit Votes!\"></center>
+		<center><input type=\"submit\" value=\"Submit Votes!\"></center>
 	</form>";
 
     CloseTable();

@@ -131,11 +131,11 @@ function userinfo($username, $bypass=0, $hid=0, $url=0) {
 
 	echo "<form name=\"ASGVote\" method=\"post\" action=\"ASGVote.php\"><img src=\"images/logo/$tid.jpg\"><br><br>";
 
-	$easternConferenceCenters .= getAllStarCandidates("'C'", $easternConferenceTids, 'ECC');
+	$easternConferenceCenters .= getAllStarCandidates("'C'", $easternConferenceTids, 'ECC[]');
 	$easternConferenceForwards .= getAllStarCandidates("'SF', 'PF'", $easternConferenceTids, 'ECF[]');
 	$easternConferenceGuards .= getAllStarCandidates("'PG', 'SG'", $easternConferenceTids, 'ECG[]');
 
-	$westernConferenceCenters .= getAllStarCandidates("'C'", $westernConferenceTids, 'WCC');
+	$westernConferenceCenters .= getAllStarCandidates("'C'", $westernConferenceTids, 'WCC[]');
 	$westernConferenceForwards .= getAllStarCandidates("'SF', 'PF'", $westernConferenceTids, 'WCF[]');
 	$westernConferenceGuards .= getAllStarCandidates("'PG', 'SG'", $westernConferenceTids, 'WCG[]');
 

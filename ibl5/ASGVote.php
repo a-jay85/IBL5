@@ -23,34 +23,34 @@ $WCG1 = $_POST['WCG1'];
 $WCG2 = $_POST['WCG2'];
 
 if (strpos($WCC,$Team_Name) !== false) {
-echo "Sorry, you cannot vote for your own player. Try again.<br>";
+echo "Sorry, you cannot vote for your own player (C $WCC). Try again.<br>";
 }
 else if (strpos($WCF1,$Team_Name) !== false) {
-echo "Sorry, you cannot vote for your own player. Try again.<br>";
+echo "Sorry, you cannot vote for your own player (F $WCF1). Try again.<br>";
 }
 else if (strpos($WCF2,$Team_Name) !== false) {
-echo "Sorry, you cannot vote for your own player. Try again.<br>";
+echo "Sorry, you cannot vote for your own player (F $WCF2). Try again.<br>";
 }
 else if (strpos($WCG1,$Team_Name) !== false) {
-echo "Sorry, you cannot vote for your own player. Try again.<br>";
+echo "Sorry, you cannot vote for your own player (G $WCG1). Try again.<br>";
 }
 else if (strpos($WCG2,$Team_Name) !== false) {
-echo "Sorry, you cannot vote for your own player. Try again.<br>";
+echo "Sorry, you cannot vote for your own player (G $WCG2). Try again.<br>";
 }
 else if (strpos($ECC,$Team_Name) !== false) {
-echo "Sorry, you cannot vote for your own player. Try again.<br>";
+echo "Sorry, you cannot vote for your own player (C $ECC). Try again.<br>";
 }
 else if (strpos($ECF1,$Team_Name) !== false) {
-echo "Sorry, you cannot vote for your own player. Try again.<br>";
+echo "Sorry, you cannot vote for your own player (F $ECF1). Try again.<br>";
 }
 else if (strpos($ECF2,$Team_Name) !== false) {
-echo "Sorry, you cannot vote for your own player. Try again.<br>";
+echo "Sorry, you cannot vote for your own player (F $ECF2). Try again.<br>";
 }
 else if (strpos($ECG1,$Team_Name) !== false) {
-echo "Sorry, you cannot vote for your own player. Try again.<br>";
+echo "Sorry, you cannot vote for your own player (G $ECG1). Try again.<br>";
 }
 else if (strpos($ECG2,$Team_Name) !== false) {
-echo "Sorry, you cannot vote for your own player. Try again.<br>";
+echo "Sorry, you cannot vote for your own player (G $ECG2). Try again.<br>";
 }
 else if ($ECC == "") {
 echo "Sorry, you must select an Eastern Conference Center. Try again.<br>";

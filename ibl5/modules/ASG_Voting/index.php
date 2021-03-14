@@ -28,7 +28,7 @@ $userpage = 1;
 
 //include("modules/$module_name/navbar.php");
 
-function userinfo($username, $bypass=0, $hid=0, $url=0) {
+function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
     global $user, $cookie, $sitename, $prefix, $user_prefix, $db, $admin, $broadcast_msg, $my_headlines, $module_name, $useset, $subscription_url;
     $sql = "SELECT * FROM " . $prefix . "_bbconfig";
     $result = $db->sql_query($sql);
@@ -57,7 +57,13 @@ function userinfo($username, $bypass=0, $hid=0, $url=0) {
 	}
 
 	function getAllStarCandidates($positions, $conferenceTids, $formName) {
-		$query = "SELECT * FROM nuke_iblplyr where pos IN ($positions) and tid IN ('" . formatTidsForSqlQuery($conferenceTids) . "') and retired != 1 and stats_gm > '14' order by name";
+		$query = "SELECT *
+			FROM nuke_iblplyr
+			WHERE pos IN ($positions)
+				AND tid IN ('" . formatTidsForSqlQuery($conferenceTids) . "')
+				AND retired != 1
+				AND stats_gm > '14'
+			ORDER BY name";
 		$result = mysql_query($query);
 
 		$output = "<table class=\"sortable\">
@@ -126,7 +132,9 @@ function userinfo($username, $bypass=0, $hid=0, $url=0) {
 	}
 
     $teamlogo = $userinfo[user_ibl_team];
-	$queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$teamlogo'";
+	$queryTeamID = "SELECT teamid
+		FROM nuke_ibl_team_info
+		WHERE team_name = '$teamlogo'";
 	$tid = mysql_result(mysql_query($queryTeamID), 0);
 
 	echo "<form name=\"ASGVote\" method=\"post\" action=\"ASGVote.php\"><img src=\"images/logo/$tid.jpg\"><br><br>";
@@ -185,26 +193,26 @@ function main($user) {
 		}
 		if (!is_user($user)) {
 		    OpenTable();
-		    mt_srand ((double)microtime()*1000000);
+		    mt_srand ((double)microtime() * 1000000);
 		    $maxran = 1000000;
 		    $random_num = mt_rand(0, $maxran);
 		    echo "<form action=\"modules.php?name=$module_name\" method=\"post\">\n"
-			."<b>"._USERLOGIN."</b><br><br>\n"
+			."<b>" . _USERLOGIN . "</b><br><br>\n"
 			."<table border=\"0\"><tr><td>\n"
-			.""._NICKNAME.":</td><td><input type=\"text\" name=\"username\" size=\"15\" maxlength=\"25\"></td></tr>\n"
-			."<tr><td>"._PASSWORD.":</td><td><input type=\"password\" name=\"user_password\" size=\"15\" maxlength=\"20\"></td></tr>\n";
+			."" . _NICKNAME . ":</td><td><input type=\"text\" name=\"username\" size=\"15\" maxlength=\"25\"></td></tr>\n"
+			."<tr><td>" . _PASSWORD . ":</td><td><input type=\"password\" name=\"user_password\" size=\"15\" maxlength=\"20\"></td></tr>\n";
 		    if (extension_loaded("gd") AND ($gfx_chk == 2 OR $gfx_chk == 4 OR $gfx_chk == 5 OR $gfx_chk == 7)) {
-			echo "<tr><td colspan='2'>"._SECURITYCODE.": <img src='modules.php?name=$module_name&op=gfx&random_num=$random_num' border='1' alt='"._SECURITYCODE."' title='"._SECURITYCODE."'></td></tr>\n"
-			    ."<tr><td colspan='2'>"._TYPESECCODE.": <input type=\"text\" NAME=\"gfx_check\" SIZE=\"7\" MAXLENGTH=\"6\"></td></tr>\n"
-			    ."<input type=\"hidden\" name=\"random_num\" value=\"$random_num\">\n";
+				echo "<tr><td colspan='2'>"._SECURITYCODE.": <img src='modules.php?name=$module_name&op=gfx&random_num=$random_num' border='1' alt='"._SECURITYCODE."' title='"._SECURITYCODE."'></td></tr>\n"
+				    ."<tr><td colspan='2'>"._TYPESECCODE.": <input type=\"text\" NAME=\"gfx_check\" SIZE=\"7\" MAXLENGTH=\"6\"></td></tr>\n"
+				    ."<input type=\"hidden\" name=\"random_num\" value=\"$random_num\">\n";
 		    }
 		    echo "</table><input type=\"hidden\" name=\"redirect\" value=$redirect>\n"
-			."<input type=\"hidden\" name=\"mode\" value=$mode>\n"
-			."<input type=\"hidden\" name=\"f\" value=$f>\n"
-			."<input type=\"hidden\" name=\"t\" value=$t>\n"
-			."<input type=\"hidden\" name=\"op\" value=\"login\">\n"
-			."<input type=\"submit\" value=\""._LOGIN."\"></form><br>\n\n"
-			."<center><font class=\"content\">[ <a href=\"modules.php?name=$module_name&amp;op=pass_lost\">"._PASSWORDLOST."</a> | <a href=\"modules.php?name=$module_name&amp;op=new_user\">"._REGNEWUSER."</a> ]</font></center>\n";
+				."<input type=\"hidden\" name=\"mode\" value=$mode>\n"
+				."<input type=\"hidden\" name=\"f\" value=$f>\n"
+				."<input type=\"hidden\" name=\"t\" value=$t>\n"
+				."<input type=\"hidden\" name=\"op\" value=\"login\">\n"
+				."<input type=\"submit\" value=\""._LOGIN."\"></form><br>\n\n"
+				."<center><font class=\"content\">[ <a href=\"modules.php?name=$module_name&amp;op=pass_lost\">"._PASSWORDLOST."</a> | <a href=\"modules.php?name=$module_name&amp;op=new_user\">"._REGNEWUSER."</a> ]</font></center>\n";
 		    CloseTable();
 		}
 		include("footer.php");

@@ -11,15 +11,15 @@ echo "<HTML><HEAD><TITLE>ASG Voting Result</TITLE></HEAD><BODY>";
 
 $Team_Name = $_POST['teamname'];
 $ECC = $_POST['ECC'];
-$ECF1 = $_POST['ECF1'];
-$ECF2 = $_POST['ECF2'];
-$ECG1 = $_POST['ECG1'];
-$ECG2 = $_POST['ECG2'];
+$ECF1 = $_POST['ECF'][0];
+$ECF2 = $_POST['ECF'][1];
+$ECG1 = $_POST['ECG'][0];
+$ECG2 = $_POST['ECG'][1];
 $WCC = $_POST['WCC'];
-$WCF1 = $_POST['WCF1'];
-$WCF2 = $_POST['WCF2'];
-$WCG1 = $_POST['WCG1'];
-$WCG2 = $_POST['WCG2'];
+$WCF1 = $_POST['WCF'][0];
+$WCF2 = $_POST['WCF'][1];
+$WCG1 = $_POST['WCG'][0];
+$WCG2 = $_POST['WCG'][1];
 
 if (strpos($WCC,$Team_Name) !== false) {
 echo "Sorry, you cannot vote for your own player (C $WCC). Try again.<br>";

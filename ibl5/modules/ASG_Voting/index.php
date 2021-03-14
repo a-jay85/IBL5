@@ -153,8 +153,6 @@ function userinfo($username, $bypass=0, $hid=0, $url=0) {
 	</td></tr>
 
 	<input type=\"hidden\" name=\"teamname\" value=\"$teamlogo\">
-	<input type=\"hidden\" name=\"playername\" value=\"$player_name\">
-	<input type=\"hidden\" name=\"playerpos\" value=\"$player_pos\">
 	</table>
 
 	<center><input type=\"submit\" value=\"Submit Votes!\"></center>

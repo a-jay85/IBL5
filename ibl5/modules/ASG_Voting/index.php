@@ -87,6 +87,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 					<th>pts</th>
 				</tr>";
 
+		$i = 0;
 		while ($row = mysql_fetch_assoc($result)) {
 			$name = $row['name'];
 			$teamname = $row['teamname'];
@@ -115,7 +116,9 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 			$gm = floatval($row['stats_gm']);
 			$gs = floatval($row['stats_gs']);
 
-			$output .= "<tr>
+			(($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
+
+			$output .= "<tr bgcolor=$bgcolor>
 					<td><center><input type=\"checkbox\" name=\"$formName\" value=\"$name, $teamname\"></center></td>
 					<td>$name, $teamname</td>
 					<td>$gm</td>
@@ -132,6 +135,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 					<td>$pfg</td>
 					<td>$ppg</td>
 				</tr>";
+			$i++;
 		}
 
 		$output .= "</tbody>

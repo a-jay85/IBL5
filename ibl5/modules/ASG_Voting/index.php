@@ -71,17 +71,19 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 				<tr>
 					<th>Vote</th>
 					<th>Name</th>
-					<th>pts</th>
+					<th>gm</th>
+					<th>gs</th>
+					<th>min</th>
+					<th>fgp</th>
+					<th>ftp</th>
+					<th>3gp</th>
 					<th>reb</th>
 					<th>ast</th>
 					<th>stl</th>
 					<th>to</th>
 					<th>blk</th>
-					<th>fgp</th>
-					<th>ftp</th>
-					<th>3gp</th>
-					<th>gm</th>
-					<th>gs</th>
+					<th>pf</th>
+					<th>pts</th>
 				</tr>";
 
 		while ($row = mysql_fetch_assoc($result)) {
@@ -99,29 +101,35 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 			$tpg = round($tpg,1);
 			$bpg = floatval($row['stats_blk']) / intval($row['stats_gm']);
 			$bpg = round($bpg,1);
+			$pfg = floatval($row['stats_pf']) / intval($row['stats_gm']);
+			$pfg = round($pfg,1);
 			$fgp = floatval($row['stats_fgm']) / intval($row['stats_fga']);
 			$fgp = round($fgp,3);
 			$ftp = floatval($row['stats_ftm']) / intval($row['stats_fta']);
 			$ftp = round($ftp,3);
 			$tpp = floatval($row['stats_3gm']) / intval($row['stats_3ga']);
 			$tpp = round($tpp,3);
+			$mpg = floatval($row['stats_min']) / intval($row['stats_gm']);
+			$mpg = round($mpg,1);
 			$gm = floatval($row['stats_gm']);
 			$gs = floatval($row['stats_gs']);
 
 			$output .= "<tr>
-					<td><input type=\"checkbox\" name=\"$formName\" value=\"$name, $teamname\"></td>
+					<td><center><input type=\"checkbox\" name=\"$formName\" value=\"$name, $teamname\"></center></td>
 					<td>$name, $teamname</td>
-					<td>$ppg</td>
+					<td>$gm</td>
+					<td>$gs</td>
+					<td>$mpg</td>
+					<td>$fgp</td>
+					<td>$ftp</td>
+					<td>$tpp</td>
 					<td>$rpg</td>
 					<td>$apg</td>
 					<td>$spg</td>
 					<td>$tpg</td>
 					<td>$bpg</td>
-					<td>$fgp</td>
-					<td>$ftp</td>
-					<td>$tpp</td>
-					<td>$gm</td>
-					<td>$gs</td>
+					<td>$pfg</td>
+					<td>$ppg</td>
 				</tr>";
 		}
 

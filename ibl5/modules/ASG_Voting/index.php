@@ -22,6 +22,7 @@ if (!eregi("modules.php", $_SERVER['PHP_SELF'])) {
 }
 
 require_once("mainfile.php");
+require_once $_SERVER['DOCUMENT_ROOT'] . '/sharedFunctions.php';
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 $userpage = 1;
@@ -140,10 +141,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 	}
 
     $teamlogo = $userinfo[user_ibl_team];
-	$queryTeamID = "SELECT teamid
-		FROM nuke_ibl_team_info
-		WHERE team_name = '$teamlogo'";
-	$tid = mysql_result(mysql_query($queryTeamID), 0);
+	$tid = getTidFromTeamname($teamlogo);
 
 	echo "<form name=\"ASGVote\" method=\"post\" action=\"ASGVote.php\"><img src=\"images/logo/$tid.jpg\"><br><br>";
 

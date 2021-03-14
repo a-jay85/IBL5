@@ -10,12 +10,12 @@ include("header.php");
 echo "<HTML><HEAD><TITLE>ASG Voting Result</TITLE></HEAD><BODY>";
 
 $Team_Name = $_POST['teamname'];
-$ECC = $_POST['ECC'];
+$ECC = $_POST['ECC'][0];
 $ECF1 = $_POST['ECF'][0];
 $ECF2 = $_POST['ECF'][1];
 $ECG1 = $_POST['ECG'][0];
 $ECG2 = $_POST['ECG'][1];
-$WCC = $_POST['WCC'];
+$WCC = $_POST['WCC'][0];
 $WCF1 = $_POST['WCF'][0];
 $WCF2 = $_POST['WCF'][1];
 $WCG1 = $_POST['WCG'][0];
@@ -92,6 +92,25 @@ echo "Sorry, you have selected the same player for both Western Conference Forwa
 }
 else if ($WCG1 == $WCG2) {
 echo "Sorry, you have selected the same player for both Western Conference Guard slots. Try again.<br>";
+}
+
+else if (count($_POST['ECC']) > 1) {
+    echo "Oops, you've selected more than one Eastern Conference Center. Please go back and only select ONE.";
+}
+else if (count($_POST['ECF']) > 2) {
+    echo "Oops, you've selected more than two Eastern Conference Forwards. Please go back and only select TWO.";
+}
+else if (count($_POST['ECG']) > 2) {
+    echo "Oops, you've selected more than two Eastern Conference Guards. Please go back and only select TWO.";
+}
+else if (count($_POST['WCC']) > 1) {
+    echo "Oops, you've selected more than one Western Conference Center. Please go back and only select ONE.";
+}
+else if (count($_POST['WCF']) > 2) {
+    echo "Oops, you've selected more than two Western Conference Forwards. Please go back and only select TWO.";
+}
+else if (count($_POST['WCG']) > 2) {
+    echo "Oops, you've selected more than two Western Conference Guards. Please go back and only select TWO.";
 }
 
 else {

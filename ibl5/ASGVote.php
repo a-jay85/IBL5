@@ -10,7 +10,6 @@ include("header.php");
 echo "<HTML><HEAD><TITLE>ASG Voting Result</TITLE></HEAD><BODY>";
 
 $Team_Name = $_POST['teamname'];
-$Pos = $_POST['pos'];
 $ECC = $_POST['ECC'];
 $ECF1 = $_POST['ECF1'];
 $ECF2 = $_POST['ECF2'];

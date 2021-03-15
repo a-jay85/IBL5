@@ -57,7 +57,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 		return $tidsFormattedForQuery;
 	}
 
-	function getAllStarCandidates($positions, $conferenceTids, $formName) {
+	function getAllStarCandidates($positions, $conferenceTids, $votingCategory) {
 		$query = "SELECT *
 			FROM nuke_iblplyr
 			WHERE pos IN ($positions)
@@ -68,8 +68,8 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 		$result = mysql_query($query);
 
 		echo "<SCRIPT>
-			function ShowAndHide$formName() {
-			    var x = document.getElementById('$formName');
+			function ShowAndHide$votingCategory() {
+			    var x = document.getElementById('$votingCategory');
 			    if (x.style.display == 'none') {
 			        x.style.display = 'block';
 			    } else {
@@ -78,7 +78,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 			}
 		</SCRIPT>";
 
-		$output = "<table id=\"$formName\" style=\"display:none\" class=\"sortable\">
+		$output = "<table id=\"$votingCategory\" style=\"display:none\" class=\"sortable\">
 			<tbody>
 				<tr>
 					<th>Vote</th>
@@ -119,7 +119,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 			(($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
 
 			$output .= "<tr bgcolor=$bgcolor>
-					<td><center><input type=\"checkbox\" name=\"" . $formName . "[]\" value=\"$name, $teamname\"></center></td>
+					<td><center><input type=\"checkbox\" name=\"" . $votingCategory . "[]\" value=\"$name, $teamname\"></center></td>
 					<td>$name, $teamname</td>
 					<td>$gm</td>
 					<td>$gs</td>

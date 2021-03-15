@@ -49,22 +49,38 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 
     OpenTable();
 
-	$easternConferenceTids = array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 25);
-	$westernConferenceTids = array(13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 26);
 
 	function formatTidsForSqlQuery($conferenceTids) {
 		$tidsFormattedForQuery = join("','",$conferenceTids);
 		return $tidsFormattedForQuery;
 	}
 
-	function getAllStarCandidates($positions, $conferenceTids, $votingCategory) {
-		$query = "SELECT *
-			FROM nuke_iblplyr
-			WHERE pos IN ($positions)
-				AND tid IN ('" . formatTidsForSqlQuery($conferenceTids) . "')
-				AND retired != 1
-				AND stats_gm > '14'
-			ORDER BY name";
+	function getCandidates($votingCategory) {
+			$easternConferenceTids = array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 25);
+			$westernConferenceTids = array(13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 26);
+
+			if (strpos($votingCategory, 'EC') !== false) {
+				$conferenceTids = $easternConferenceTids;
+			} elseif (strpos($votingCategory, 'WC') !== false) {
+				$conferenceTids = $westernConferenceTids;
+			}
+
+			if (strpos($votingCategory, 'CC') !== false) {
+				$positions = "'C'";
+			} elseif (strpos($votingCategory, 'CF') !== false) {
+				$positions = "'SF', 'PF'";
+			} elseif (strpos($votingCategory, 'CG') !== false) {
+				$positions = "'PG', 'SG'";
+			}
+
+			$query = "SELECT *
+				FROM nuke_iblplyr
+				WHERE pos IN ($positions)
+					AND tid IN ('" . formatTidsForSqlQuery($conferenceTids) . "')
+					AND retired != 1
+					AND stats_gm > '14'
+				ORDER BY name";
+
 		$result = mysql_query($query);
 
 		echo "<SCRIPT>

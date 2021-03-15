@@ -69,12 +69,12 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 
 		echo "<SCRIPT>
 			function ShowAndHide$votingCategory() {
-			    var x = document.getElementById('$votingCategory');
-			    if (x.style.display == 'none') {
-			        x.style.display = 'block';
-			    } else {
-			        x.style.display = 'none';
-			    }
+				var x = document.getElementById('$votingCategory');
+				if (x.style.display == 'none') {
+					x.style.display = 'block';
+				} else {
+					x.style.display = 'none';
+				}
 			}
 		</SCRIPT>";
 

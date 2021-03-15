@@ -102,30 +102,19 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 		while ($row = mysql_fetch_assoc($result)) {
 			$name = $row['name'];
 			$teamname = $row['teamname'];
-			$ppg = floatval($row['stats_3gm'] * 3 + ($row['stats_fgm'] - $row['stats_3gm']) * 2 + $row['stats_ftm']) / intval($row['stats_gm']);
-			$ppg = round($ppg,1);
-			$rpg = floatval($row['stats_orb'] + $row['stats_drb']) / intval($row['stats_gm']);
-			$rpg = round($rpg,1);
-			$apg = floatval($row['stats_ast']) / intval($row['stats_gm']);
-			$apg = round($apg,1);
-			$spg = floatval($row['stats_stl']) / intval($row['stats_gm']);
-			$spg = round($spg,1);
-			$tpg = floatval($row['stats_to']) / intval($row['stats_gm']);
-			$tpg = round($tpg,1);
-			$bpg = floatval($row['stats_blk']) / intval($row['stats_gm']);
-			$bpg = round($bpg,1);
-			$pfg = floatval($row['stats_pf']) / intval($row['stats_gm']);
-			$pfg = round($pfg,1);
-			$fgp = floatval($row['stats_fgm']) / intval($row['stats_fga']);
-			$fgp = round($fgp,3);
-			$ftp = floatval($row['stats_ftm']) / intval($row['stats_fta']);
-			$ftp = round($ftp,3);
-			$tpp = floatval($row['stats_3gm']) / intval($row['stats_3ga']);
-			$tpp = round($tpp,3);
-			$mpg = floatval($row['stats_min']) / intval($row['stats_gm']);
-			$mpg = round($mpg,1);
-			$gm = floatval($row['stats_gm']);
-			$gs = floatval($row['stats_gs']);
+			$gm = $row['stats_gm'];
+			$gs = $row['stats_gs'];
+			$mpg = number_format(($row['stats_min'] / $row['stats_gm']), 1);
+			$fgp = number_format(($row['stats_fgm'] / $row['stats_fga']), 3);
+			$ftp = number_format(($row['stats_ftm'] / $row['stats_fta']), 3);
+			$tpp = number_format(($row['stats_3gm'] / $row['stats_3ga']), 3);
+			$rpg = number_format((($row['stats_orb'] + $row['stats_drb']) / $row['stats_gm']), 1);
+			$apg = number_format(($row['stats_ast'] / $row['stats_gm']), 1);
+			$spg = number_format(($row['stats_stl'] / $row['stats_gm']), 1);
+			$tpg = number_format(($row['stats_to'] / $row['stats_gm']), 1);
+			$bpg = number_format(($row['stats_blk'] / $row['stats_gm']), 1);
+			$pfg = number_format(($row['stats_pf'] / $row['stats_gm']), 1);
+			$ppg = number_format(((($row['stats_3gm'] * 3) + (($row['stats_fgm'] - $row['stats_3gm']) * 2) + $row['stats_ftm']) / $row['stats_gm']), 1);
 
 			(($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
 

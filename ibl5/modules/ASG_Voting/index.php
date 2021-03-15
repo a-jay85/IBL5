@@ -22,329 +22,240 @@ if (!eregi("modules.php", $_SERVER['PHP_SELF'])) {
 }
 
 require_once("mainfile.php");
+require_once $_SERVER['DOCUMENT_ROOT'] . '/sharedFunctions.php';
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 $userpage = 1;
 
 //include("modules/$module_name/navbar.php");
 
-function userinfo($username, $bypass=0, $hid=0, $url=0) {
+function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
     global $user, $cookie, $sitename, $prefix, $user_prefix, $db, $admin, $broadcast_msg, $my_headlines, $module_name, $useset, $subscription_url;
-    $sql = "SELECT * FROM ".$prefix."_bbconfig";
+    $sql = "SELECT * FROM " . $prefix . "_bbconfig";
     $result = $db->sql_query($sql);
-    while ( $row = $db->sql_fetchrow($result) )
-    {
-    $board_config[$row['config_name']] = $row['config_value'];
+    while ($row = $db->sql_fetchrow($result)) {
+    	$board_config[$row['config_name']] = $row['config_value'];
     }
-    $sql2 = "SELECT * FROM ".$user_prefix."_users WHERE username='$username'";
+    $sql2 = "SELECT * FROM " . $user_prefix . "_users WHERE username = '$username'";
     $result2 = $db->sql_query($sql2);
     $num = $db->sql_numrows($result2);
     $userinfo = $db->sql_fetchrow($result2);
-    if(!$bypass) cookiedecode($user);
+    if (!$bypass) {
+		cookiedecode($user);
+	}
     include("header.php");
 
 // === CODE TO INSERT IBL DEPTH CHART ===
 
     OpenTable();
+
+	$easternConferenceTids = array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 25);
+	$westernConferenceTids = array(13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 26);
+
+	function formatTidsForSqlQuery($conferenceTids) {
+		$tidsFormattedForQuery = join("','",$conferenceTids);
+		return $tidsFormattedForQuery;
+	}
+
+	function getAllStarCandidates($positions, $conferenceTids, $formName) {
+		$query = "SELECT *
+			FROM nuke_iblplyr
+			WHERE pos IN ($positions)
+				AND tid IN ('" . formatTidsForSqlQuery($conferenceTids) . "')
+				AND retired != 1
+				AND stats_gm > '14'
+			ORDER BY name";
+		$result = mysql_query($query);
+
+		echo "<SCRIPT>
+			function ShowAndHide$formName() {
+			    var x = document.getElementById('$formName');
+			    if (x.style.display == 'none') {
+			        x.style.display = 'block';
+			    } else {
+			        x.style.display = 'none';
+			    }
+			}
+		</SCRIPT>";
+
+		$output = "<table id=\"$formName\" style=\"display:none\" class=\"sortable\">
+			<tbody>
+				<tr>
+					<th>Vote</th>
+					<th>Name</th>
+					<th>gm</th>
+					<th>gs</th>
+					<th>min</th>
+					<th>fgp</th>
+					<th>ftp</th>
+					<th>3gp</th>
+					<th>reb</th>
+					<th>ast</th>
+					<th>stl</th>
+					<th>to</th>
+					<th>blk</th>
+					<th>pf</th>
+					<th>pts</th>
+				</tr>";
+
+		$i = 0;
+		while ($row = mysql_fetch_assoc($result)) {
+			$name = $row['name'];
+			$teamname = $row['teamname'];
+			$gm = $row['stats_gm'];
+			$gs = $row['stats_gs'];
+			$mpg = number_format(($row['stats_min'] / $row['stats_gm']), 1);
+			$fgp = number_format(($row['stats_fgm'] / $row['stats_fga']), 3);
+			$ftp = number_format(($row['stats_ftm'] / $row['stats_fta']), 3);
+			$tpp = number_format(($row['stats_3gm'] / $row['stats_3ga']), 3);
+			$rpg = number_format((($row['stats_orb'] + $row['stats_drb']) / $row['stats_gm']), 1);
+			$apg = number_format(($row['stats_ast'] / $row['stats_gm']), 1);
+			$spg = number_format(($row['stats_stl'] / $row['stats_gm']), 1);
+			$tpg = number_format(($row['stats_to'] / $row['stats_gm']), 1);
+			$bpg = number_format(($row['stats_blk'] / $row['stats_gm']), 1);
+			$pfg = number_format(($row['stats_pf'] / $row['stats_gm']), 1);
+			$ppg = number_format(((($row['stats_3gm'] * 3) + (($row['stats_fgm'] - $row['stats_3gm']) * 2) + $row['stats_ftm']) / $row['stats_gm']), 1);
+
+			(($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
+
+			$output .= "<tr bgcolor=$bgcolor>
+					<td><center><input type=\"checkbox\" name=\"" . $formName . "[]\" value=\"$name, $teamname\"></center></td>
+					<td>$name, $teamname</td>
+					<td>$gm</td>
+					<td>$gs</td>
+					<td>$mpg</td>
+					<td>$fgp</td>
+					<td>$ftp</td>
+					<td>$tpp</td>
+					<td>$rpg</td>
+					<td>$apg</td>
+					<td>$spg</td>
+					<td>$tpg</td>
+					<td>$bpg</td>
+					<td>$pfg</td>
+					<td>$ppg</td>
+				</tr>";
+			$i++;
+		}
+
+		$output .= "</tbody>
+			</table><br><br>";
+
+		return $output;
+	}
+
     $teamlogo = $userinfo[user_ibl_team];
-	$queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$teamlogo'";
-	$tid = mysql_result(mysql_query($queryTeamID), 0);
+	$tid = getTidFromTeamname($teamlogo);
 
-echo "
-      <form name=\"ASGVote\" method=\"post\" action=\"ASGVote.php\"><center><img src=\"images/logo/$tid.jpg\"><br><br>";
+	echo "<form name=\"ASGVote\" method=\"post\" action=\"ASGVote.php\">
+		<center>
+			<img src=\"images/logo/$tid.jpg\"><br><br>";
 
-$query = "SELECT * FROM nuke_iblplyr where pos = 'C' and (tid = '1' or tid = '2' or tid = '3' or tid = '4' or tid = '5' or tid = '6' or tid = '7' or tid = '8' or tid = '9' or tid = '10' or tid = '11' or tid = '12') and retired != 1 and stats_gm > '14' order by name";
-$result = mysql_query($query);
-while($row = mysql_fetch_assoc($result))
-{
-    $ppg = floatval($row['stats_3gm']*3 + ($row['stats_fgm']-$row['stats_3gm'])*2+ $row['stats_ftm']) / intval($row['stats_gm']);
-    $ppg = round($ppg,1);
-    $rpg = floatval($row['stats_orb'] + $row['stats_drb']) / intval($row['stats_gm']);
-    $rpg = round($rpg,1);
-    $apg = floatval($row['stats_ast']) / intval($row['stats_gm']);
-    $apg = round($apg,1);
-    $spg = floatval($row['stats_stl']) / intval($row['stats_gm']);
-    $spg = round($spg,1);
-    $tpg = floatval($row['stats_to']) / intval($row['stats_gm']);
-    $tpg = round($tpg,1);
-    $bpg = floatval($row['stats_blk']) / intval($row['stats_gm']);
-    $bpg = round($bpg,1);
-    $fgp = floatval($row['stats_fgm']) / intval($row['stats_fga']);
-    $fgp = round($fgp,3);
-    $ftp = floatval($row['stats_ftm']) / intval($row['stats_fta']);
-    $ftp = round($ftp,3);
-    $tpp = floatval($row['stats_3gm']) / intval($row['stats_3ga']);
-    $tpp = round($tpp,3);
-    $gm = floatval($row['stats_gm']);
-    $gs = floatval($row['stats_gs']);
-    $dd .= "<option value='".$row['name'].", ".$row['teamname']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl,  ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp, ".$gm." gm, ".$gs." gs</option>";
-}
+	echo "<input type=\"submit\" value=\"Submit Votes!\">";
 
-$query1 = "SELECT * FROM nuke_iblplyr where (pos = 'PF' or pos = 'SF') and (tid = '1' or tid = '2' or tid = '3' or tid = '4' or tid = '5' or tid = '6' or tid = '7' or tid = '8' or tid = '9' or tid = '10' or tid = '11' or tid = '12') and retired != 1 and stats_gm > '14' order by name";
-$result1 = mysql_query($query1);
-while($row = mysql_fetch_assoc($result1))
-{
-    $ppg = floatval($row['stats_3gm']*3 + ($row['stats_fgm']-$row['stats_3gm'])*2+ $row['stats_ftm']) / intval($row['stats_gm']);
-    $ppg = round($ppg,1);
-    $rpg = floatval($row['stats_orb'] + $row['stats_drb']) / intval($row['stats_gm']);
-    $rpg = round($rpg,1);
-    $apg = floatval($row['stats_ast']) / intval($row['stats_gm']);
-    $apg = round($apg,1);
-    $spg = floatval($row['stats_stl']) / intval($row['stats_gm']);
-    $spg = round($spg,1);
-    $tpg = floatval($row['stats_to']) / intval($row['stats_gm']);
-    $tpg = round($tpg,1);
-    $bpg = floatval($row['stats_blk']) / intval($row['stats_gm']);
-    $bpg = round($bpg,1);
-    $fgp = floatval($row['stats_fgm']) / intval($row['stats_fga']);
-    $fgp = round($fgp,3);
-    $ftp = floatval($row['stats_ftm']) / intval($row['stats_fta']);
-    $ftp = round($ftp,3);
-    $tpp = floatval($row['stats_3gm']) / intval($row['stats_3ga']);
-    $tpp = round($tpp,3);
-    $gm = floatval($row['stats_gm']);
-    $gs = floatval($row['stats_gs']);
-    $ff .= "<option value='".$row['name'].", ".$row['teamname']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl,  ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp, ".$gm." gm, ".$gs." gs</option>";
-}
+	$easternConferenceCenters .= getAllStarCandidates("'C'", $easternConferenceTids, 'ECC');
+	$easternConferenceForwards .= getAllStarCandidates("'SF', 'PF'", $easternConferenceTids, 'ECF');
+	$easternConferenceGuards .= getAllStarCandidates("'PG', 'SG'", $easternConferenceTids, 'ECG');
 
-$query2 = "SELECT * FROM nuke_iblplyr where (pos = 'PG' or pos = 'SG') and (tid = '1' or tid = '2' or tid = '3' or tid = '4' or tid = '5' or tid = '6' or tid = '7' or tid = '8' or tid = '9' or tid = '10' or tid = '11' or tid = '12') and retired != 1 and stats_gm > '14' order by name";
-$result2 = mysql_query($query2);
-while($row = mysql_fetch_assoc($result2))
-{
-    $ppg = floatval($row['stats_3gm']*3 + ($row['stats_fgm']-$row['stats_3gm'])*2+ $row['stats_ftm']) / intval($row['stats_gm']);
-    $ppg = round($ppg,1);
-    $rpg = floatval($row['stats_orb'] + $row['stats_drb']) / intval($row['stats_gm']);
-    $rpg = round($rpg,1);
-    $apg = floatval($row['stats_ast']) / intval($row['stats_gm']);
-    $apg = round($apg,1);
-    $spg = floatval($row['stats_stl']) / intval($row['stats_gm']);
-    $spg = round($spg,1);
-    $tpg = floatval($row['stats_to']) / intval($row['stats_gm']);
-    $tpg = round($tpg,1);
-    $bpg = floatval($row['stats_blk']) / intval($row['stats_gm']);
-    $bpg = round($bpg,1);
-    $fgp = floatval($row['stats_fgm']) / intval($row['stats_fga']);
-    $fgp = round($fgp,3);
-    $ftp = floatval($row['stats_ftm']) / intval($row['stats_fta']);
-    $ftp = round($ftp,3);
-    $tpp = floatval($row['stats_3gm']) / intval($row['stats_3ga']);
-    $tpp = round($tpp,3);
-    $gm = floatval($row['stats_gm']);
-    $gs = floatval($row['stats_gs']);
-    $hh .= "<option value='".$row['name'].", ".$row['teamname']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl,  ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp, ".$gm." gm, ".$gs." gs</option>";
-}
+	$westernConferenceCenters .= getAllStarCandidates("'C'", $westernConferenceTids, 'WCC');
+	$westernConferenceForwards .= getAllStarCandidates("'SF', 'PF'", $westernConferenceTids, 'WCF');
+	$westernConferenceGuards .= getAllStarCandidates("'PG', 'SG'", $westernConferenceTids, 'WCG');
 
-$query3 = "SELECT * FROM nuke_iblplyr where pos = 'C' and (tid = '13' or tid = '14' or tid = '15' or tid = '16' or tid = '17' or tid = '18' or tid = '19' or tid = '20' or tid = '21' or tid = '22' or tid = '23' or tid = '24') and retired != 1 and stats_gm > '14' order by name";
-$result3 = mysql_query($query3);
-while($row = mysql_fetch_assoc($result3))
-{
-    $ppg = floatval($row['stats_3gm']*3 + ($row['stats_fgm']-$row['stats_3gm'])*2+ $row['stats_ftm']) / intval($row['stats_gm']);
-    $ppg = round($ppg,1);
-    $rpg = floatval($row['stats_orb'] + $row['stats_drb']) / intval($row['stats_gm']);
-    $rpg = round($rpg,1);
-    $apg = floatval($row['stats_ast']) / intval($row['stats_gm']);
-    $apg = round($apg,1);
-    $spg = floatval($row['stats_stl']) / intval($row['stats_gm']);
-    $spg = round($spg,1);
-    $tpg = floatval($row['stats_to']) / intval($row['stats_gm']);
-    $tpg = round($tpg,1);
-    $bpg = floatval($row['stats_blk']) / intval($row['stats_gm']);
-    $bpg = round($bpg,1);
-    $fgp = floatval($row['stats_fgm']) / intval($row['stats_fga']);
-    $fgp = round($fgp,3);
-    $ftp = floatval($row['stats_ftm']) / intval($row['stats_fta']);
-    $ftp = round($ftp,3);
-    $tpp = floatval($row['stats_3gm']) / intval($row['stats_3ga']);
-    $tpp = round($tpp,3);
-    $gm = floatval($row['stats_gm']);
-    $gs = floatval($row['stats_gs']);
-    $ii .= "<option value='".$row['name'].", ".$row['teamname']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl,  ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp, ".$gm." gm, ".$gs." gs</option>";
-}
+	echo "<div onclick=\"ShowAndHideECC()\">
+			<h2>Select ONE Eastern Conference Center:</h2>
+			<i>Tap/click here to reveal/hide nominees</i>
+		</div>
+		$easternConferenceCenters
 
-$query4 = "SELECT * FROM nuke_iblplyr where (pos = 'PF' or pos = 'SF') and (tid = '13' or tid = '14' or tid = '15' or tid = '16' or tid = '17' or tid = '18' or tid = '19' or tid = '20' or tid = '21' or tid = '22' or tid = '23' or tid = '24') and retired != 1 and stats_gm > '14' order by name";
-$result4 = mysql_query($query4);
-while($row = mysql_fetch_assoc($result4))
-{
-    $ppg = floatval($row['stats_3gm']*3 + ($row['stats_fgm']-$row['stats_3gm'])*2+ $row['stats_ftm']) / intval($row['stats_gm']);
-    $ppg = round($ppg,1);
-    $rpg = floatval($row['stats_orb'] + $row['stats_drb']) / intval($row['stats_gm']);
-    $rpg = round($rpg,1);
-    $apg = floatval($row['stats_ast']) / intval($row['stats_gm']);
-    $apg = round($apg,1);
-    $spg = floatval($row['stats_stl']) / intval($row['stats_gm']);
-    $spg = round($spg,1);
-    $tpg = floatval($row['stats_to']) / intval($row['stats_gm']);
-    $tpg = round($tpg,1);
-    $bpg = floatval($row['stats_blk']) / intval($row['stats_gm']);
-    $bpg = round($bpg,1);
-    $fgp = floatval($row['stats_fgm']) / intval($row['stats_fga']);
-    $fgp = round($fgp,3);
-    $ftp = floatval($row['stats_ftm']) / intval($row['stats_fta']);
-    $ftp = round($ftp,3);
-    $tpp = floatval($row['stats_3gm']) / intval($row['stats_3ga']);
-    $tpp = round($tpp,3);
-    $gm = floatval($row['stats_gm']);
-    $gs = floatval($row['stats_gs']);
-    $jj .= "<option value='".$row['name'].", ".$row['teamname']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl,  ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp, ".$gm." gm, ".$gs." gs</option>";
-}
+		<div onclick=\"ShowAndHideECF()\">
+			<h2>Select TWO Eastern Conference Forwards:</h2>
+			<i>Tap/click here to reveal/hide nominees</i>
+		</div>
+		$easternConferenceForwards
 
-$query5 = "SELECT * FROM nuke_iblplyr where (pos = 'PG' or pos = 'SG') and (tid = '13' or tid = '14' or tid = '15' or tid = '16' or tid = '17' or tid = '18' or tid = '19' or tid = '20' or tid = '21' or tid = '22' or tid = '23' or tid = '24') and retired != 1 and stats_gm > '14' order by name";
-$result5 = mysql_query($query5);
-while($row = mysql_fetch_assoc($result5))
-{
-    $ppg = floatval($row['stats_3gm']*3 + ($row['stats_fgm']-$row['stats_3gm'])*2+ $row['stats_ftm']) / intval($row['stats_gm']);
-    $ppg = round($ppg,1);
-    $rpg = floatval($row['stats_orb'] + $row['stats_drb']) / intval($row['stats_gm']);
-    $rpg = round($rpg,1);
-    $apg = floatval($row['stats_ast']) / intval($row['stats_gm']);
-    $apg = round($apg,1);
-    $spg = floatval($row['stats_stl']) / intval($row['stats_gm']);
-    $spg = round($spg,1);
-    $tpg = floatval($row['stats_to']) / intval($row['stats_gm']);
-    $tpg = round($tpg,1);
-    $bpg = floatval($row['stats_blk']) / intval($row['stats_gm']);
-    $bpg = round($bpg,1);
-    $fgp = floatval($row['stats_fgm']) / intval($row['stats_fga']);
-    $fgp = round($fgp,3);
-    $ftp = floatval($row['stats_ftm']) / intval($row['stats_fta']);
-    $ftp = round($ftp,3);
-    $tpp = floatval($row['stats_3gm']) / intval($row['stats_3ga']);
-    $tpp = round($tpp,3);
-    $gm = floatval($row['stats_gm']);
-    $gs = floatval($row['stats_gs']);
-    $kk .= "<option value='".$row['name'].", ".$row['teamname']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl,  ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp, ".$gm." gm, ".$gs." gs</option>";
-}
+		<div onclick=\"ShowAndHideECG()\">
+			<h2>Select TWO Eastern Conference Guards:</h2>
+			<i>Tap/click here to reveal/hide nominees</i>
+		</div>
+		$easternConferenceGuards
 
-echo "<select name=\"ECC\">
-  <option value=\"\">Select Your Eastern Conference Center...</option>
-  <option value=\"$dd\">$dd</option>
-</select><br><br>
+		<div onclick=\"ShowAndHideWCC()\">
+			<h2>Select ONE Western Conference Center:</h2>
+			<i>Tap/click here to reveal/hide nominees</i>
+		</div>
+		$westernConferenceCenters
 
-<select name=\"ECF1\">
-  <option value=\"\">Select Your First Eastern Conference Forward...</option>
-  <option value=\"$ff\">$ff</option>
-</select><br><br>
+		<div onclick=\"ShowAndHideWCF()\">
+			<h2>Select TWO Western Conference Forwards:</h2>
+			<i>Tap/click here to reveal/hide nominees</i>
+		</div>
+		$westernConferenceForwards
 
-<select name=\"ECF2\">
-  <option value=\"\">Select Your Second Eastern Conference Forward...</option>
-  <option value=\"$ff\">$ff</option>
-</select><br><br>
+		<div onclick=\"ShowAndHideWCG()\">
+			<h2>Select TWO Western Conference Guards:</h2>
+			<i>Tap/click here to reveal/hide nominees</i>
+		</div>
+		$westernConferenceGuards
 
-<select name=\"ECG1\">
-  <option value=\"\">Select Your First Eastern Conference Guard...</option>
-  <option value=\"$hh\">$hh</option>
-</select><br><br>
+		<input type=\"hidden\" name=\"teamname\" value=\"$teamlogo\">
 
-<select name=\"ECG2\">
-  <option value=\"\">Select Your Second Eastern Conference Guard...</option>
-  <option value=\"$hh\">$hh</option>
-</select><br><br>
-
-<select name=\"WCC\">
-  <option value=\"\">Select Your Western Conference Center...</option>
-  <option value=\"$ii\">$ii</option>
-</select><br><br>
-
-<select name=\"WCF1\">
-  <option value=\"\">Select Your First Western Conference Forward...</option>
-  <option value=\"$jj\">$jj</option>
-</select><br><br>
-
-<select name=\"WCF2\">
-  <option value=\"\">Select Your Second Western Conference Forward...</option>
-  <option value=\"$jj\">$jj</option>
-</select><br><br>
-
-<select name=\"WCG1\">
-  <option value=\"\">Select Your First Western Conference Guard...</option>
-  <option value=\"$kk\">$kk</option>
-</select><br><br>
-
-<select name=\"WCG2\">
-  <option value=\"\">Select Your Second Western Conference Guard...</option>
-  <option value=\"$kk\">$kk</option>
-</select>
-
-
-
-
-</td></tr>
-
-
-
-
-
-
-
-<input type=\"hidden\" name=\"teamname\" value=\"$teamlogo\">
-<input type=\"hidden\" name=\"playername\" value=\"$player_name\">
-<input type=\"hidden\" name=\"playerpos\" value=\"$player_pos\">
-</table>
-
-<center><input type=\"submit\" value=\"Submit Votes!\"></center>
-</form>
-
-";
-
-
-
+		<input type=\"submit\" value=\"Submit Votes!\">
+	</center>
+	</form>";
 
     CloseTable();
-
 
     include("footer.php");
 }
 
 function main($user) {
     global $stop, $module_name, $redirect, $mode, $t, $f, $gfx_chk;
-    if(!is_user($user)) {
-	include("header.php");
-	if ($stop) {
-	    OpenTable();
-	    echo "<center><font class=\"title\"><b>"._LOGININCOR."</b></font></center>\n";
-	    CloseTable();
-	    echo "<br>\n";
-	} else {
-	    OpenTable();
-	    echo "<center><font class=\"title\"><b>"._USERREGLOGIN."</b></font></center>\n";
-	    CloseTable();
-	    echo "<br>\n";
-	}
-	if (!is_user($user)) {
-	    OpenTable();
-	    mt_srand ((double)microtime()*1000000);
-	    $maxran = 1000000;
-	    $random_num = mt_rand(0, $maxran);
-	    echo "<form action=\"modules.php?name=$module_name\" method=\"post\">\n"
-		."<b>"._USERLOGIN."</b><br><br>\n"
-		."<table border=\"0\"><tr><td>\n"
-		.""._NICKNAME.":</td><td><input type=\"text\" name=\"username\" size=\"15\" maxlength=\"25\"></td></tr>\n"
-		."<tr><td>"._PASSWORD.":</td><td><input type=\"password\" name=\"user_password\" size=\"15\" maxlength=\"20\"></td></tr>\n";
-	    if (extension_loaded("gd") AND ($gfx_chk == 2 OR $gfx_chk == 4 OR $gfx_chk == 5 OR $gfx_chk == 7)) {
-		echo "<tr><td colspan='2'>"._SECURITYCODE.": <img src='modules.php?name=$module_name&op=gfx&random_num=$random_num' border='1' alt='"._SECURITYCODE."' title='"._SECURITYCODE."'></td></tr>\n"
-		    ."<tr><td colspan='2'>"._TYPESECCODE.": <input type=\"text\" NAME=\"gfx_check\" SIZE=\"7\" MAXLENGTH=\"6\"></td></tr>\n"
-		    ."<input type=\"hidden\" name=\"random_num\" value=\"$random_num\">\n";
-	    }
-	    echo "</table><input type=\"hidden\" name=\"redirect\" value=$redirect>\n"
-		."<input type=\"hidden\" name=\"mode\" value=$mode>\n"
-		."<input type=\"hidden\" name=\"f\" value=$f>\n"
-		."<input type=\"hidden\" name=\"t\" value=$t>\n"
-		."<input type=\"hidden\" name=\"op\" value=\"login\">\n"
-		."<input type=\"submit\" value=\""._LOGIN."\"></form><br>\n\n"
-		."<center><font class=\"content\">[ <a href=\"modules.php?name=$module_name&amp;op=pass_lost\">"._PASSWORDLOST."</a> | <a href=\"modules.php?name=$module_name&amp;op=new_user\">"._REGNEWUSER."</a> ]</font></center>\n";
-	    CloseTable();
-	}
-	include("footer.php");
+    if (!is_user($user)) {
+		include("header.php");
+		if ($stop) {
+		    OpenTable();
+		    echo "<center><font class=\"title\"><b>" . _LOGININCOR . "</b></font></center>\n";
+		    CloseTable();
+		    echo "<br>\n";
+		} else {
+		    OpenTable();
+		    echo "<center><font class=\"title\"><b>" . _USERREGLOGIN . "</b></font></center>\n";
+		    CloseTable();
+		    echo "<br>\n";
+		}
+		if (!is_user($user)) {
+		    OpenTable();
+		    mt_srand ((double)microtime() * 1000000);
+		    $maxran = 1000000;
+		    $random_num = mt_rand(0, $maxran);
+		    echo "<form action=\"modules.php?name=$module_name\" method=\"post\">\n"
+			."<b>" . _USERLOGIN . "</b><br><br>\n"
+			."<table border=\"0\"><tr><td>\n"
+			."" . _NICKNAME . ":</td><td><input type=\"text\" name=\"username\" size=\"15\" maxlength=\"25\"></td></tr>\n"
+			."<tr><td>" . _PASSWORD . ":</td><td><input type=\"password\" name=\"user_password\" size=\"15\" maxlength=\"20\"></td></tr>\n";
+		    if (extension_loaded("gd") AND ($gfx_chk == 2 OR $gfx_chk == 4 OR $gfx_chk == 5 OR $gfx_chk == 7)) {
+				echo "<tr><td colspan='2'>"._SECURITYCODE.": <img src='modules.php?name=$module_name&op=gfx&random_num=$random_num' border='1' alt='"._SECURITYCODE."' title='"._SECURITYCODE."'></td></tr>\n"
+				    ."<tr><td colspan='2'>"._TYPESECCODE.": <input type=\"text\" NAME=\"gfx_check\" SIZE=\"7\" MAXLENGTH=\"6\"></td></tr>\n"
+				    ."<input type=\"hidden\" name=\"random_num\" value=\"$random_num\">\n";
+		    }
+		    echo "</table><input type=\"hidden\" name=\"redirect\" value=$redirect>\n"
+				."<input type=\"hidden\" name=\"mode\" value=$mode>\n"
+				."<input type=\"hidden\" name=\"f\" value=$f>\n"
+				."<input type=\"hidden\" name=\"t\" value=$t>\n"
+				."<input type=\"hidden\" name=\"op\" value=\"login\">\n"
+				."<input type=\"submit\" value=\""._LOGIN."\"></form><br>\n\n"
+				."<center><font class=\"content\">[ <a href=\"modules.php?name=$module_name&amp;op=pass_lost\">"._PASSWORDLOST."</a> | <a href=\"modules.php?name=$module_name&amp;op=new_user\">"._REGNEWUSER."</a> ]</font></center>\n";
+		    CloseTable();
+		}
+		include("footer.php");
     } elseif (is_user($user)) {
         global $cookie;
         cookiedecode($user);
         userinfo($cookie[1]);
     }
-
 }
 
 switch($op) {
-
     default:
 	main($user);
 	break;

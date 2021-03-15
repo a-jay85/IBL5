@@ -49,6 +49,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 
     OpenTable();
 
+	$seasonPhase = getCurrentSeasonPhase();
 
 	function formatTidsForSqlQuery($conferenceTids) {
 		$tidsFormattedForQuery = join("','",$conferenceTids);
@@ -56,6 +57,8 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 	}
 
 	function getCandidates($votingCategory) {
+		$seasonPhase = getCurrentSeasonPhase();
+		if ($seasonPhase == "Regular Season") {
 			$easternConferenceTids = array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 25);
 			$westernConferenceTids = array(13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 26);
 
@@ -80,6 +83,40 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 					AND retired != 1
 					AND stats_gm > '14'
 				ORDER BY name";
+		} else {
+			$mvpQuery = "SELECT *
+				FROM nuke_iblplyr
+				WHERE retired != 1
+					AND stats_gm >= '50'
+					AND stats_min/stats_gm >= '30'
+				ORDER BY name";
+			$sixthManQuery = "SELECT *
+				FROM nuke_iblplyr
+				WHERE retired != 1
+					AND stats_min/stats_gm >= 15
+					AND stats_gs/stats_gm <= '.5'
+				ORDER BY name";
+			$royQuery = "SELECT *
+				FROM nuke_iblplyr
+				WHERE retired != 1
+					AND exp = '1'
+					AND stats_gm >= '10'
+				ORDER BY name";
+			$gmQuery = "SELECT *
+			 	FROM nuke_ibl_team_info
+				WHERE teamid != '35'
+				ORDER BY owner_name";
+
+			if (strpos($votingCategory, 'MVP') !== false) {
+				$query = $mvpQuery;
+			} elseif (strpos($votingCategory, 'Six') !== false) {
+				$query = $sixthManQuery;
+			} elseif (strpos($votingCategory, 'ROY') !== false) {
+				$query = $royQuery;
+			} elseif (strpos($votingCategory, 'GM') !== false) {
+				$query = $gmQuery;
+			}
+		}
 
 		$result = mysql_query($query);
 
@@ -160,60 +197,70 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 		return $output;
 	}
 
+	if ($seasonPhase == "Regular Season") {
+		$formName = "ASGVote";
+	} else {
+		$formName = "EOYVote";
+	}
+
     $teamlogo = $userinfo[user_ibl_team];
 	$tid = getTidFromTeamname($teamlogo);
 
-	echo "<form name=\"ASGVote\" method=\"post\" action=\"ASGVote.php\">
+	echo "<form name=\"$formName\" method=\"post\" action=\"$formName.php\">
 		<center>
 			<img src=\"images/logo/$tid.jpg\"><br><br>";
 
 	echo "<input type=\"submit\" value=\"Submit Votes!\">";
 
-	$easternConferenceCenters .= getAllStarCandidates("'C'", $easternConferenceTids, 'ECC');
-	$easternConferenceForwards .= getAllStarCandidates("'SF', 'PF'", $easternConferenceTids, 'ECF');
-	$easternConferenceGuards .= getAllStarCandidates("'PG', 'SG'", $easternConferenceTids, 'ECG');
+	if ($seasonPhase == "Regular Season") {
+		$easternConferenceCenters .= getCandidates('ECC');
+		$easternConferenceForwards .= getCandidates('ECF');
+		$easternConferenceGuards .= getCandidates('ECG');
 
-	$westernConferenceCenters .= getAllStarCandidates("'C'", $westernConferenceTids, 'WCC');
-	$westernConferenceForwards .= getAllStarCandidates("'SF', 'PF'", $westernConferenceTids, 'WCF');
-	$westernConferenceGuards .= getAllStarCandidates("'PG', 'SG'", $westernConferenceTids, 'WCG');
+		$westernConferenceCenters .= getCandidates('WCC');
+		$westernConferenceForwards .= getCandidates('WCF');
+		$westernConferenceGuards .= getCandidates('WCG');
 
-	echo "<div onclick=\"ShowAndHideECC()\">
-			<h2>Select ONE Eastern Conference Center:</h2>
-			<i>Tap/click here to reveal/hide nominees</i>
-		</div>
-		$easternConferenceCenters
+		echo "<div onclick=\"ShowAndHideECC()\">
+				<h2>Select ONE Eastern Conference Center:</h2>
+				<i>Tap/click here to reveal/hide nominees</i>
+			</div>
+			$easternConferenceCenters
 
-		<div onclick=\"ShowAndHideECF()\">
-			<h2>Select TWO Eastern Conference Forwards:</h2>
-			<i>Tap/click here to reveal/hide nominees</i>
-		</div>
-		$easternConferenceForwards
+			<div onclick=\"ShowAndHideECF()\">
+				<h2>Select TWO Eastern Conference Forwards:</h2>
+				<i>Tap/click here to reveal/hide nominees</i>
+			</div>
+			$easternConferenceForwards
 
-		<div onclick=\"ShowAndHideECG()\">
-			<h2>Select TWO Eastern Conference Guards:</h2>
-			<i>Tap/click here to reveal/hide nominees</i>
-		</div>
-		$easternConferenceGuards
+			<div onclick=\"ShowAndHideECG()\">
+				<h2>Select TWO Eastern Conference Guards:</h2>
+				<i>Tap/click here to reveal/hide nominees</i>
+			</div>
+			$easternConferenceGuards
 
-		<div onclick=\"ShowAndHideWCC()\">
-			<h2>Select ONE Western Conference Center:</h2>
-			<i>Tap/click here to reveal/hide nominees</i>
-		</div>
-		$westernConferenceCenters
+			<div onclick=\"ShowAndHideWCC()\">
+				<h2>Select ONE Western Conference Center:</h2>
+				<i>Tap/click here to reveal/hide nominees</i>
+			</div>
+			$westernConferenceCenters
 
-		<div onclick=\"ShowAndHideWCF()\">
-			<h2>Select TWO Western Conference Forwards:</h2>
-			<i>Tap/click here to reveal/hide nominees</i>
-		</div>
-		$westernConferenceForwards
+			<div onclick=\"ShowAndHideWCF()\">
+				<h2>Select TWO Western Conference Forwards:</h2>
+				<i>Tap/click here to reveal/hide nominees</i>
+			</div>
+			$westernConferenceForwards
 
-		<div onclick=\"ShowAndHideWCG()\">
-			<h2>Select TWO Western Conference Guards:</h2>
-			<i>Tap/click here to reveal/hide nominees</i>
-		</div>
-		$westernConferenceGuards
+			<div onclick=\"ShowAndHideWCG()\">
+				<h2>Select TWO Western Conference Guards:</h2>
+				<i>Tap/click here to reveal/hide nominees</i>
+			</div>
+			$westernConferenceGuards";
+	} else {
 
-		<input type=\"hidden\" name=\"teamname\" value=\"$teamlogo\">
+	}
+
+	echo "<input type=\"hidden\" name=\"teamname\" value=\"$teamlogo\">
 
 		<input type=\"submit\" value=\"Submit Votes!\">
 	</center>

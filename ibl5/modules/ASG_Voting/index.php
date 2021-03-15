@@ -67,7 +67,18 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 			ORDER BY name";
 		$result = mysql_query($query);
 
-		$output = "<table class=\"sortable\">
+		echo "<SCRIPT>
+			function ShowAndHide$formName() {
+			    var x = document.getElementById('$formName');
+			    if (x.style.display == 'none') {
+			        x.style.display = 'block';
+			    } else {
+			        x.style.display = 'none';
+			    }
+			}
+		</SCRIPT>";
+
+		$output = "<table id=\"$formName\" style=\"display:none\" class=\"sortable\">
 			<tbody>
 				<tr>
 					<th>Vote</th>
@@ -119,7 +130,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 			(($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
 
 			$output .= "<tr bgcolor=$bgcolor>
-					<td><center><input type=\"checkbox\" name=\"$formName\" value=\"$name, $teamname\"></center></td>
+					<td><center><input type=\"checkbox\" name=\"" . $formName . "[]\" value=\"$name, $teamname\"></center></td>
 					<td>$name, $teamname</td>
 					<td>$gm</td>
 					<td>$gs</td>
@@ -147,38 +158,60 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
     $teamlogo = $userinfo[user_ibl_team];
 	$tid = getTidFromTeamname($teamlogo);
 
-	echo "<form name=\"ASGVote\" method=\"post\" action=\"ASGVote.php\"><img src=\"images/logo/$tid.jpg\"><br><br>";
+	echo "<form name=\"ASGVote\" method=\"post\" action=\"ASGVote.php\">
+		<center>
+			<img src=\"images/logo/$tid.jpg\"><br><br>";
 
-	$easternConferenceCenters .= getAllStarCandidates("'C'", $easternConferenceTids, 'ECC[]');
-	$easternConferenceForwards .= getAllStarCandidates("'SF', 'PF'", $easternConferenceTids, 'ECF[]');
-	$easternConferenceGuards .= getAllStarCandidates("'PG', 'SG'", $easternConferenceTids, 'ECG[]');
+	echo "<input type=\"submit\" value=\"Submit Votes!\">";
 
-	$westernConferenceCenters .= getAllStarCandidates("'C'", $westernConferenceTids, 'WCC[]');
-	$westernConferenceForwards .= getAllStarCandidates("'SF', 'PF'", $westernConferenceTids, 'WCF[]');
-	$westernConferenceGuards .= getAllStarCandidates("'PG', 'SG'", $westernConferenceTids, 'WCG[]');
+	$easternConferenceCenters .= getAllStarCandidates("'C'", $easternConferenceTids, 'ECC');
+	$easternConferenceForwards .= getAllStarCandidates("'SF', 'PF'", $easternConferenceTids, 'ECF');
+	$easternConferenceGuards .= getAllStarCandidates("'PG', 'SG'", $easternConferenceTids, 'ECG');
 
-	echo "Select ONE Eastern Conference Center...
+	$westernConferenceCenters .= getAllStarCandidates("'C'", $westernConferenceTids, 'WCC');
+	$westernConferenceForwards .= getAllStarCandidates("'SF', 'PF'", $westernConferenceTids, 'WCF');
+	$westernConferenceGuards .= getAllStarCandidates("'PG', 'SG'", $westernConferenceTids, 'WCG');
+
+	echo "<div onclick=\"ShowAndHideECC()\">
+			<h2>Select ONE Eastern Conference Center:</h2>
+			<i>Tap/click here to reveal/hide nominees</i>
+		</div>
 		$easternConferenceCenters
 
-		Select TWO Eastern Conference Forwards...
+		<div onclick=\"ShowAndHideECF()\">
+			<h2>Select TWO Eastern Conference Forwards:</h2>
+			<i>Tap/click here to reveal/hide nominees</i>
+		</div>
 		$easternConferenceForwards
 
-		Select TWO Eastern Conference Guard...
+		<div onclick=\"ShowAndHideECG()\">
+			<h2>Select TWO Eastern Conference Guards:</h2>
+			<i>Tap/click here to reveal/hide nominees</i>
+		</div>
 		$easternConferenceGuards
 
-		Select ONE Western Conference Center...
+		<div onclick=\"ShowAndHideWCC()\">
+			<h2>Select ONE Western Conference Center:</h2>
+			<i>Tap/click here to reveal/hide nominees</i>
+		</div>
 		$westernConferenceCenters
 
-		Select TWO Western Conference Forwards...
+		<div onclick=\"ShowAndHideWCF()\">
+			<h2>Select TWO Western Conference Forwards:</h2>
+			<i>Tap/click here to reveal/hide nominees</i>
+		</div>
 		$westernConferenceForwards
 
-		Select TWO Western Conference Guards...
+		<div onclick=\"ShowAndHideWCG()\">
+			<h2>Select TWO Western Conference Guards:</h2>
+			<i>Tap/click here to reveal/hide nominees</i>
+		</div>
 		$westernConferenceGuards
 
 		<input type=\"hidden\" name=\"teamname\" value=\"$teamlogo\">
-		</table>
 
-		<center><input type=\"submit\" value=\"Submit Votes!\"></center>
+		<input type=\"submit\" value=\"Submit Votes!\">
+	</center>
 	</form>";
 
     CloseTable();

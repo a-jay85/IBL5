@@ -53,34 +53,16 @@ else if (strpos($ECB2, $Team_Name) !== false) {
 }
 
 // MISSING VOTES
-else if ($ECF1 == "") {
+else if ($ECF1 == "" OR $ECF2 == "" OR $ECF3 == "") {
     echo "Sorry, you must select THREE Eastern Conference Frontcourt Players. Try again.<br>";
 }
-else if ($ECF2 == "") {
-    echo "Sorry, you must select THREE Eastern Conference Frontcourt Players. Try again.<br>";
-}
-else if ($ECF3 == "") {
-    echo "Sorry, you must select THREE Eastern Conference Frontcourt Players. Try again.<br>";
-}
-else if ($ECB1 == "") {
+else if ($ECB1 == "" OR $ECB2 == "") {
     echo "Sorry, you must select TWO Eastern Conference Backcourt Players. Try again.<br>";
 }
-else if ($ECB2 == "") {
-    echo "Sorry, you must select TWO Eastern Conference Backcourt Players. Try again.<br>";
-}
-else if ($WCF1 == "") {
+else if ($WCF1 == "" OR $WCF2 == "" OR $WCF3 == "") {
     echo "Sorry, you must select THREE Western Conference Frontcourt Players. Try again.<br>";
 }
-else if ($WCF2 == "") {
-    echo "Sorry, you must select THREE Western Conference Frontcourt Players. Try again.<br>";
-}
-else if ($WCF3 == "") {
-    echo "Sorry, you must select THREE Western Conference Frontcourt Players. Try again.<br>";
-}
-else if ($WCB1 == "") {
-    echo "Sorry, you must select TWO Western Conference Backcourt Players. Try again.<br>";
-}
-else if ($WCB2 == "") {
+else if ($WCB1 == "" OR $WCB2 == "") {
     echo "Sorry, you must select TWO Western Conference Backcourt Players. Try again.<br>";
 }
 

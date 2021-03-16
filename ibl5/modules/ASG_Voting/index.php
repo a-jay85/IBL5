@@ -90,7 +90,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 					AND stats_gm >= '50'
 					AND stats_min/stats_gm >= '30'
 				ORDER BY name";
-			$sixthManQuery = "SELECT *
+			$sixthQuery = "SELECT *
 				FROM nuke_iblplyr
 				WHERE retired != 1
 					AND stats_min/stats_gm >= 15
@@ -110,7 +110,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 			if (strpos($votingCategory, 'MVP') !== false) {
 				$query = $mvpQuery;
 			} elseif (strpos($votingCategory, 'Six') !== false) {
-				$query = $sixthManQuery;
+				$query = $sixthQuery;
 			} elseif (strpos($votingCategory, 'ROY') !== false) {
 				$query = $royQuery;
 			} elseif (strpos($votingCategory, 'GM') !== false) {

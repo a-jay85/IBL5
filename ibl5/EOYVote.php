@@ -9,19 +9,18 @@ include("header.php");
 echo "<HTML><HEAD><TITLE>End of Year Voting Result</TITLE></HEAD><BODY>";
 
 $Team_Name = $_POST['teamname'];
-$Pos = $_POST['pos'];
-$MVP1 = $_POST['MVP1'];
-$MVP2 = $_POST['MVP2'];
-$MVP3 = $_POST['MVP3'];
-$Six1 = $_POST['Six1'];
-$Six2 = $_POST['Six2'];
-$Six3 = $_POST['Six3'];
-$ROY1 = $_POST['ROY1'];
-$ROY2 = $_POST['ROY2'];
-$ROY3 = $_POST['ROY3'];
-$GM1 = $_POST['GM1'];
-$GM2 = $_POST['GM2'];
-$GM3 = $_POST['GM3'];
+$MVP1 = $_POST['MVP'][1];
+$MVP2 = $_POST['MVP'][2];
+$MVP3 = $_POST['MVP'][3];
+$Six1 = $_POST['Six'][1];
+$Six2 = $_POST['Six'][2];
+$Six3 = $_POST['Six'][3];
+$ROY1 = $_POST['ROY'][1];
+$ROY2 = $_POST['ROY'][2];
+$ROY3 = $_POST['ROY'][3];
+$GM1 = $_POST['GM'][1];
+$GM2 = $_POST['GM'][2];
+$GM3 = $_POST['GM'][3];
 
 if (strpos($MVP1,$Team_Name) !== false) {
 echo "Sorry, you cannot vote for your own player. Try again.<br>";

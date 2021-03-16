@@ -68,11 +68,9 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 				$conferenceTids = $westernConferenceTids;
 			}
 
-			if (strpos($votingCategory, 'CC') !== false) {
-				$positions = "'C'";
-			} elseif (strpos($votingCategory, 'CF') !== false) {
-				$positions = "'SF', 'PF'";
-			} elseif (strpos($votingCategory, 'CG') !== false) {
+			if (strpos($votingCategory, 'CF') !== false) {
+				$positions = "'C', 'SF', 'PF'";
+			} elseif (strpos($votingCategory, 'CB') !== false) {
 				$positions = "'PG', 'SG'";
 			}
 
@@ -246,49 +244,35 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 	echo "<input type=\"submit\" value=\"Submit Votes!\">";
 
 	if ($seasonPhase == "Regular Season") {
-		$easternConferenceCenters .= getCandidates('ECC');
-		$easternConferenceForwards .= getCandidates('ECF');
-		$easternConferenceGuards .= getCandidates('ECG');
+		$easternConferenceFrontcourt .= getCandidates('ECF');
+		$easternConferenceBackcourt .= getCandidates('ECB');
 
-		$westernConferenceCenters .= getCandidates('WCC');
-		$westernConferenceForwards .= getCandidates('WCF');
-		$westernConferenceGuards .= getCandidates('WCG');
+		$westernConferenceFrontcourt .= getCandidates('WCF');
+		$westernConferenceBackcourt .= getCandidates('WCB');
 
-		echo "<div onclick=\"ShowAndHideECC()\">
-				<h2>Select ONE Eastern Conference Center:</h2>
+		echo "<div onclick=\"ShowAndHideECF()\">
+				<h2>Select THREE Eastern Conference Frontcourt Players:</h2>
 				<i>Tap/click here to reveal/hide nominees</i>
 			</div>
-			$easternConferenceCenters
+			$easternConferenceFrontcourt
 
-			<div onclick=\"ShowAndHideECF()\">
-				<h2>Select TWO Eastern Conference Forwards:</h2>
+			<div onclick=\"ShowAndHideECB()\">
+				<h2>Select TWO Eastern Conference Backcourt Players:</h2>
 				<i>Tap/click here to reveal/hide nominees</i>
 			</div>
-			$easternConferenceForwards
-
-			<div onclick=\"ShowAndHideECG()\">
-				<h2>Select TWO Eastern Conference Guards:</h2>
-				<i>Tap/click here to reveal/hide nominees</i>
-			</div>
-			$easternConferenceGuards
-
-			<div onclick=\"ShowAndHideWCC()\">
-				<h2>Select ONE Western Conference Center:</h2>
-				<i>Tap/click here to reveal/hide nominees</i>
-			</div>
-			$westernConferenceCenters
+			$easternConferenceBackcourt
 
 			<div onclick=\"ShowAndHideWCF()\">
-				<h2>Select TWO Western Conference Forwards:</h2>
+				<h2>Select THREE Western Conference Frontcourt Players:</h2>
 				<i>Tap/click here to reveal/hide nominees</i>
 			</div>
-			$westernConferenceForwards
+			$westernConferenceFrontcourt
 
-			<div onclick=\"ShowAndHideWCG()\">
-				<h2>Select TWO Western Conference Guards:</h2>
+			<div onclick=\"ShowAndHideWCB()\">
+				<h2>Select TWO Western Conference Backcourt Players:</h2>
 				<i>Tap/click here to reveal/hide nominees</i>
 			</div>
-			$westernConferenceGuards";
+			$westernConferenceBackcourt";
 	} else {
 		$mostValuablePlayers .= getCandidates('MVP');
 		$sixthPersons .= getCandidates('Six');

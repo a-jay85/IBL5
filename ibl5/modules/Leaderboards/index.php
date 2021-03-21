@@ -28,17 +28,6 @@ get_lang($module_name);
 
 $pagetitle = "- Player Archives";
 
-function showmenu()
-{
-    include("header.php");
-    OpenTable();
-
-    menu();
-
-    CloseTable();
-    include("footer.php");
-}
-
 function menu()
 {
     echo "<center><b>
@@ -48,8 +37,6 @@ function menu()
     <a href=\"modules.php?name=Player&pa=Leaderboards\">Career Leaderboards</a> (All Types)
     </b><hr>";
 }
-
-// TODO: Make leaderboards() its own module
 
 function leaderboards()
 {

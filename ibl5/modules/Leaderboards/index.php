@@ -47,7 +47,7 @@ function leaderboards()
     menu();
 
     $boards_type = $_POST['boards_type'];
-    $display = intval($_POST['display']);
+    $limit = intval($_POST['limit']);
     $active = $_POST['active'];
     $sort_cat = $_POST['sort_cat'];
     $submitted = $_POST['submitted'];
@@ -123,7 +123,7 @@ function leaderboards()
     }
 
     echo "</select></td>
-          <td>Limit: <input type=\"number\" name=\"display\" size=\"4\" value=\"$display\"> Records</td><td>
+          <td>Limit: <input type=\"number\" name=\"limit\" size=\"4\" value=\"$limit\"> Records</td><td>
           <input type=\"hidden\" name=\"submitted\" value=\"1\">
           <input type=\"submit\" value=\"Display Leaderboards\"></form>
           </td></tr></table>";
@@ -188,8 +188,8 @@ function leaderboards()
         }
 
         $query = "SELECT * FROM $tableforquery WHERE $restriction1 $restriction2 ORDER BY $sortby DESC";
-        if ($display != NULL AND is_int($display)) {
-            $query .= " LIMIT $display";
+        if ($limit != NULL AND is_int($limit)) {
+            $query .= " LIMIT $limit";
         }
         $result = mysql_query($query);
         $num = mysql_numrows($result);

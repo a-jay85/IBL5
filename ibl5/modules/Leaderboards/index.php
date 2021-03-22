@@ -47,7 +47,7 @@ function leaderboards()
     menu();
 
     $boards_type = $_POST['boards_type'];
-    $display = $_POST['display'];
+    $display = intval($_POST['display']);
     $active = $_POST['active'];
     $sort_cat = $_POST['sort_cat'];
     $submitted = $_POST['submitted'];
@@ -123,7 +123,7 @@ function leaderboards()
     }
 
     echo "</select></td>
-          <td>Limit: <input type=\"text\" name=\"display\" size=\"4\" value=\"$display\"> Records</td><td>
+          <td>Limit: <input type=\"number\" name=\"display\" size=\"4\" value=\"$display\"> Records</td><td>
           <input type=\"hidden\" name=\"submitted\" value=\"1\">
           <input type=\"submit\" value=\"Display Leaderboards\"></form>
           </td></tr></table>";
@@ -188,6 +188,9 @@ function leaderboards()
         }
 
         $query = "SELECT * FROM $tableforquery WHERE $restriction1 $restriction2 ORDER BY $sortby DESC";
+        if ($display != NULL AND is_int($display)) {
+            $query .= " LIMIT $display";
+        }
         $result = mysql_query($query);
         $num = mysql_numrows($result);
 
@@ -202,21 +205,9 @@ function leaderboards()
 
         // ========== FILL ROWS
 
-        if ($display == 0) {
-            $numstop = $num;
-        } else {
-            $numstop = $display;
-        }
-
-        if ($display == NULL) {
-            $numstop = $num;
-        } else {
-            $numstop = $display;
-        }
-
         $i = 0;
 
-        while ($i < $numstop) {
+        while ($i < $num) {
             $retired=0;
             if ($tableforquery == "nuke_iblplyr") {
                 $retired=mysql_result($result,$i,"retired");

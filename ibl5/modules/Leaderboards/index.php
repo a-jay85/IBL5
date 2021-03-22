@@ -34,7 +34,7 @@ function menu()
     <a href=\"modules.php?name=Player&pa=search\">Player Search</a>  |
     <a href=\"modules.php?name=Player&pa=awards\">Awards Search</a> |
     <a href=\"modules.php?name=One-on-One\">One-on-One Game</a> |
-    <a href=\"modules.php?name=Player&pa=Leaderboards\">Career Leaderboards</a> (All Types)
+    <a href=\"modules.php?name=Leaderboards\">Career Leaderboards</a> (All Types)
     </b><hr>";
 }
 
@@ -52,7 +52,7 @@ function leaderboards()
     $sort_cat = $_POST['sort_cat'];
     $submitted = $_POST['submitted'];
 
-    echo "<form name=\"Leaderboards\" method=\"post\" action=\"modules.php?name=Player&pa=Leaderboards\">
+    echo "<form name=\"Leaderboards\" method=\"post\" action=\"modules.php?name=Leaderboards\">
         <center><table><tr><td>Type: <select name=\"boards_type\">";
 
     // TODO: continue refactoring this function to take up waaay less lines

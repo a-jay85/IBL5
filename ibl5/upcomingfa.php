@@ -18,8 +18,41 @@ if ($tid == NULL) {
         echo "<html><head><title>Upcoming Free Agents List ($currentSeasonEndingYear)</title></head><body>
             <style>th{ font-size: 9pt; font-family:Arial; color: white; background-color: navy}td      { text-align: Left; font-size: 9pt; font-family:Arial; color:black; }.tdp { font-weight: bold; text-align: Left; font-size: 9pt; color:black; } </style>
             <center><h2>Players Currently to be Free Agents at the end of the $currentSeasonEndingYear Season</h2>
-            <table border=1 cellspacing=1><tr><th colspan=27><center>Player Ratings</center></th></tr>
-            <tr><th>Pos</th><th>Player</th><th>Team</th><th>Age</th><th>Sta</th><th>2ga</th><th>2g%</th><th>fta</th><th>ft%</th><th>3ga</th><th>3g%</th><th>orb</th><th>drb</th><th>ast</th><th>stl</th><th>to</th><th>blk</th><th>foul</th><th>o-o</th><th>d-o</th><th>p-o</th><th>t-o</th><th>o-d</th><th>d-d</th><th>p-d</th><th>t-d</th><th>Inj</th></tr>";
+            <table border=1 cellspacing=1><tr><th colspan=33><center>Player Ratings</center></th></tr>
+            <tr><th>Pos</th>
+                <th>Player</th>
+                <th>Team</th>
+                <th>Age</th>
+                <th>Sta</th>
+                <th>2ga</th>
+                <th>2g%</th>
+                <th>fta</th>
+                <th>ft%</th>
+                <th>3ga</th>
+                <th>3g%</th>
+                <th>orb</th>
+                <th>drb</th>
+                <th>ast</th>
+                <th>stl</th>
+                <th>to</th>
+                <th>blk</th>
+                <th>foul</th>
+                <th>o-o</th>
+                <th>d-o</th>
+                <th>p-o</th>
+                <th>t-o</th>
+                <th>o-d</th>
+                <th>d-d</th>
+                <th>p-d</th>
+                <th>t-d</th>
+                <th>Inj</th>
+                <th>Loy</th>
+                <th>PFW</th>
+                <th>PT</th>
+                <th>Sec</th>
+                <th>Cch</th>
+                <th>Trad</th>
+            </tr>";
 
         $query="SELECT * FROM nuke_iblplyr WHERE retired = 0 ORDER BY ordinal ASC";
         $result=mysql_query($query);
@@ -70,6 +103,12 @@ if ($tid == NULL) {
                 $r_pd=mysql_result($result,$i,"pd");
                 $r_td=mysql_result($result,$i,"td");
                 $r_foul=mysql_result($result,$i,"r_foul");
+                $loyalty=mysql_result($result,$i,"loyalty");
+                $playForWinner=mysql_result($result,$i,"winner");
+                $playingTime=mysql_result($result,$i,"playingTime");
+                $security=mysql_result($result,$i,"security");
+                $coach=mysql_result($result,$i,"coach");
+                $tradition=mysql_result($result,$i,"tradition");
 
                 if ($j == 0) {
                     echo "      <tr bgcolor=#ffffff align=center>";
@@ -78,7 +117,40 @@ if ($tid == NULL) {
                     echo "      <tr bgcolor=#e6e7e2 align=center>";
                     $j=0;
                 }
-                echo "      <td>$pos</td><td><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td><a href=\"team.php?tid=$tid\">$team</a></td><td>$age</td><td>$r_sta</td><td>$r_2ga</td><td>$r_2gp</td><td>$r_fta</td><td>$r_ftp</td><td>$r_3ga</td><td>$r_3gp</td><td>$r_orb</td><td>$r_drb</td><td>$r_ast</td><td>$r_stl</td><td>$r_tvr</td><td>$r_blk</td><td>$r_foul</td><td>$r_oo</td><td>$r_do</td><td>$r_po</td><td>$r_to</td><td>$r_od</td><td>$r_dd</td><td>$r_pd</td><td>$r_td</td><td>$inj</td></tr>
+                echo "<td>$pos</td>
+                    <td><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>
+                    <td><a href=\"team.php?tid=$tid\">$team</a></td>
+                    <td>$age</td>
+                    <td>$r_sta</td>
+                    <td>$r_2ga</td>
+                    <td>$r_2gp</td>
+                    <td>$r_fta</td>
+                    <td>$r_ftp</td>
+                    <td>$r_3ga</td>
+                    <td>$r_3gp</td>
+                    <td>$r_orb</td>
+                    <td>$r_drb</td>
+                    <td>$r_ast</td>
+                    <td>$r_stl</td>
+                    <td>$r_tvr</td>
+                    <td>$r_blk</td>
+                    <td>$r_foul</td>
+                    <td>$r_oo</td>
+                    <td>$r_do</td>
+                    <td>$r_po</td>
+                    <td>$r_to</td>
+                    <td>$r_od</td>
+                    <td>$r_dd</td>
+                    <td>$r_pd</td>
+                    <td>$r_td</td>
+                    <td>$inj</td>
+                    <td>$loyalty</td>
+                    <td>$playForWinner</td>
+                    <td>$playingTime</td>
+                    <td>$security</td>
+                    <td>$coach</td>
+                    <td>$tradition</td>
+                </tr>
                 ";
             }
 

@@ -29,7 +29,8 @@ function extractDate($rawDate)
 {
 	if ($rawDate != FALSE) {
 		if (substr($rawDate,0,4) === "Post") {
-			$rawDate = substr_replace($rawDate, 'May', 0, 4); // TODO: recognize "Post" instead of hacking it into May
+			$rawDate = substr_replace($rawDate, 'June', 0, 4); // TODO: recognize "Post" instead of hacking it into June
+			var_dump($rawDate);
 		}
 
 		$month = ltrim(date('m', strtotime($rawDate)), '0');
@@ -490,7 +491,7 @@ while ($i < $numTeams) {
 		FROM ibl_schedule
 		WHERE (Visitor = $tid OR Home = $tid)
 		AND (BoxID > 0 AND BoxID < 100000)
-		AND Date BETWEEN '" . ($currentSeasonEndingYear - 1) . "-10-31' AND '$currentSeasonEndingYear-04-30'
+		AND Date BETWEEN '" . ($currentSeasonEndingYear - 1) . "-10-31' AND '$currentSeasonEndingYear-05-30'
 		ORDER BY Date ASC";
 	$resultGames = mysql_query($queryGames);
 	$numGames = mysql_numrows($resultGames);

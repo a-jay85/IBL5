@@ -43,7 +43,7 @@ function scoParser($uploadedFilePath, $seasonEndingYear, $seasonPhase)
         if ($gameMonth > 12 AND $gameMonth != 22) { // if $gameMonth === 22, it's the Playoffs
             $gameMonth = sprintf("%02u",$gameMonth-12);
         } elseif ($gameMonth == 22) {
-            $gameMonth = sprintf("%02u",$gameMonth-17); // TODO: not have to hack the Playoffs to be in May
+            $gameMonth = sprintf("%02u",$gameMonth-16); // TODO: not have to hack the Playoffs to be in June
         } elseif ($gameMonth > 10) {
             $gameYear = $currentSeasonStartingYear;
             if ($seasonPhase == "HEAT") {

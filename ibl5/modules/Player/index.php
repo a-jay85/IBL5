@@ -204,7 +204,7 @@ function leaderboards()
         $result = mysql_query($query);
         $num = mysql_numrows($result);
 
-      echo "<center><table><tr><th colspan=21><center>Leaderboards Display</center></th></tr>
+      echo "<center><h2>Leaderboards Display</h2><p><table class=\"sortable\">
             <tr><th><center>Rank</th></center><th><center>Name</center></th><th><center>Gm</center></th>
             <th><center>Min</center></th><th><center>FGM</a></center></th><th><center>FGA</center></th>
             <th><center>FG%</center><th><center>FTM</center></th><th><center>FTA</center></th>
@@ -239,13 +239,13 @@ function leaderboards()
                 $min=number_format(mysql_result($result,$i,"car_min"));
                 $fgm=number_format(mysql_result($result,$i,"car_fgm"));
                 $fga=number_format(mysql_result($result,$i,"car_fga"));
-                $fgpct = number_format($fgm / $fga, 3);
+                $fgpct = number_format(mysql_result($result,$i,"car_fgm") / mysql_result($result,$i,"car_fga"), 3);
                 $ftm=number_format(mysql_result($result,$i,"car_ftm"));
                 $fta=number_format(mysql_result($result,$i,"car_fta"));
-                $ftpct = number_format($ftm / $fta, 3);
+                $ftpct = number_format(mysql_result($result,$i,"car_ftm") / mysql_result($result,$i,"car_fta"), 3);
                 $tgm=number_format(mysql_result($result,$i,"car_tgm"));
                 $tga=number_format(mysql_result($result,$i,"car_tga"));
-                $tpct = number_format($tgm / $tga, 3);
+                $tpct = number_format(mysql_result($result,$i,"car_tgm") / mysql_result($result,$i,"car_tga"), 3);
                 $orb=number_format(mysql_result($result,$i,"car_orb"));
                 $reb=number_format(mysql_result($result,$i,"car_reb"));
                 $ast=number_format(mysql_result($result,$i,"car_ast"));

@@ -5,6 +5,7 @@ mysql_connect($dbhost, $dbuname, $dbpass);
 @mysql_select_db($dbname) or die("Unable to select database");
 
 require_once $_SERVER['DOCUMENT_ROOT'] . '/discordWebhooks.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/sharedFunctions.php';
 
 $Team_Name = $_POST['teamname'];
 $Player_Name = $_POST['playername'];
@@ -12,13 +13,17 @@ $ExtensionAmount = $_POST['rookieOptionValue'];
 $player_exp = $_POST['player_exp'];
 $player_draftround = $_POST['player_draftround'];
 
+$seasonPhase = getCurrentSeasonPhase();
+
 $recipient = 'ibldepthcharts@gmail.com';
 $emailsubject = "Rookie Extension Option - ".$Player_Name;
 $filetext = $Team_Name . " exercise the rookie extension option on " . $Player_Name . " in the amount of " . $ExtensionAmount . ".";
 
-if ($Player_Exp == 2) {
+if (($seasonPhase == "Free Agency" AND $player_exp == 2 AND $player_draftround == 1) OR
+	(($seasonPhase == "Preseason" OR $seasonPhase == "HEAT") AND $player_exp == 3 AND $player_draftround == 1)) {
 	$queryrookieoption="UPDATE nuke_iblplyr SET cy4 = '$ExtensionAmount' WHERE name = '$Player_Name'";
-} elseif ($Player_Exp == 1) {
+} elseif (($seasonPhase == "Free Agency" AND $player_exp == 1 AND $player_draftround == 2) OR
+	(($seasonPhase == "Preseason" OR $seasonPhase == "HEAT") AND $player_exp == 2 AND $player_draftround == 2)) {
 	$queryrookieoption="UPDATE nuke_iblplyr SET cy3 = '$ExtensionAmount' WHERE name = '$Player_Name'";
 } else die("This player's experience doesn't match their rookie status; please let the commish know about this error.");
 

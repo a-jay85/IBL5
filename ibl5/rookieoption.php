@@ -9,7 +9,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/discordWebhooks.php';
 $Team_Name = $_POST['teamname'];
 $Player_Name = $_POST['playername'];
 $ExtensionAmount = $_POST['rookieOptionValue'];
-$Player_Exp = $_POST['player_exp'];
+$player_exp = $_POST['player_exp'];
 
 $recipient = 'ibldepthcharts@gmail.com';
 $emailsubject = "Rookie Extension Option - ".$Player_Name;

@@ -3129,6 +3129,7 @@ function rookieoption($pid) {
 	<input type=\"hidden\" name=\"playername\" value=\"$player_name\">
 	<input type=\"hidden\" name=\"rookieOptionValue\" value=\"$rookieOptionValue\">
 	<input type=\"hidden\" name=\"player_exp\" value=\"$player_exp\">
+	<input type=\"hidden\" name=\"player_draftround\" value=\"$player_draftround\">
 	<input type=\"submit\" value=\"Activate Rookie Extension\"></form>";
 }
 

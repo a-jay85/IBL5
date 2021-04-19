@@ -14,6 +14,7 @@ $player_exp = $_POST['player_exp'];
 $player_draftround = $_POST['player_draftround'];
 
 $seasonPhase = getCurrentSeasonPhase();
+$tid = getTidFromTeamname($Team_Name);
 
 $recipient = 'ibldepthcharts@gmail.com';
 $emailsubject = "Rookie Extension Option - ".$Player_Name;
@@ -31,9 +32,13 @@ $resultrookieoption = mysql_query($queryrookieoption);
 
 echo "<html><head><title>Rookie Option Page</title></head><body>
 
-Your rookie option has been updated in the database and should show on the Free Agency page immediately.<br>
-Please <a href=\"modules.php?name=Free_Agency\">click here to return to the Free Agency Screen</a>.<br><br>
-";
+Your rookie option has been updated in the database and should reflect on your team pages immediately.<br>";
+
+if ($seasonPhase == "Free Agency") {
+	echo "Please <a href=\"modules.php?name=Free_Agency\">click here to return to the Free Agency Screen</a>.";
+} else {
+	echo "Please <a href=\"modules.php?name=Team&op=team&tid=$tid\">click here to return to your team page</a>.";
+}
 
 postToDiscordChannel('#rookie-options', $filetext);
 

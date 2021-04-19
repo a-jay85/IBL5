@@ -1074,16 +1074,6 @@ if (($player_exp == 4 AND $player_draft_round == 1 AND 2 * $salaryIn3rdYearOfCur
 		$can_renegotiate = 0;
 }
 
-if ((((($player_draft_round == 1 && $player_exp == 2 && $salaryIn4thYearOfCurrentContract == 0) OR
-        ($player_draft_round == 2 && $player_exp == 1 && $salaryIn3rdYearOfCurrentContract == 0)) AND
-        $seasonPhase == "Free Agency") OR
-    (($player_draft_round == 1 && $player_exp == 3 && $salaryIn4thYearOfCurrentContract == 0) OR
-        ($player_draft_round == 2 && $player_exp == 2 && $salaryIn3rdYearOfCurrentContract == 0)) AND
-        ($seasonPhase == "Preseason" OR $seasonPhase == "HEAT")) AND
-    $userteam == $player_team_name) {
-        echo "<table align=right bgcolor=#ffbb00><tr><td align=center><a href=\"modules.php?name=Player&pa=rookieoption&pid=$pid\">ROOKIE<BR>OPTION</a></td></tr></table>";
-}
-
 $queryHasUsedExtensionThisSeason = "SELECT Used_Extension_This_Season
     FROM nuke_ibl_team_info
     WHERE team_name = '" . $userinfo['user_ibl_team'] . "';";
@@ -1098,6 +1088,16 @@ if ($hasUsedExtensionThisSeason == 0 AND
 }
 
 // RENEGOTIATION BUTTON END
+
+if ((((($player_draft_round == 1 && $player_exp == 2 && $salaryIn4thYearOfCurrentContract == 0) OR
+        ($player_draft_round == 2 && $player_exp == 1 && $salaryIn3rdYearOfCurrentContract == 0)) AND
+        $seasonPhase == "Free Agency") OR
+    (($player_draft_round == 1 && $player_exp == 3 && $salaryIn4thYearOfCurrentContract == 0) OR
+        ($player_draft_round == 2 && $player_exp == 2 && $salaryIn3rdYearOfCurrentContract == 0)) AND
+        ($seasonPhase == "Preseason" OR $seasonPhase == "HEAT")) AND
+    $userteam == $player_team_name) {
+        echo "<table align=right bgcolor=#ffbb00><tr><td align=center><a href=\"modules.php?name=Player&pa=rookieoption&pid=$pid\">ROOKIE<BR>OPTION</a></td></tr></table>";
+}
 
 // POSITION CHANGE BUTTON START
 

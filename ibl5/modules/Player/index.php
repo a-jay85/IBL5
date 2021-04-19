@@ -294,13 +294,13 @@ function leaderboards()
                 $min=number_format(mysql_result($result,$i,"minutes"));
                 $fgm=number_format(mysql_result($result,$i,"fgm"));
                 $fga=number_format(mysql_result($result,$i,"fga"));
-                $fgpct = number_format($fgm / $fga, 3);
+                $fgpct = number_format((mysql_result($result,$i,"fgm")) / (mysql_result($result,$i,"fga")), 3);
                 $ftm=number_format(mysql_result($result,$i,"ftm"));
                 $fta=number_format(mysql_result($result,$i,"fta"));
-                $ftpct = number_format($ftm / $fta, 3);
+                $ftpct = number_format((mysql_result($result,$i,"ftm")) / (mysql_result($result,$i,"fta")), 3);
                 $tgm=number_format(mysql_result($result,$i,"tgm"));
                 $tga=number_format(mysql_result($result,$i,"tga"));
-                $tpct = number_format($tgm / $tga, 3);
+                $tpct = number_format((mysql_result($result,$i,"tgm")) / (mysql_result($result,$i,"tga")), 3);
                 $orb=number_format(mysql_result($result,$i,"orb"));
                 $reb=number_format(mysql_result($result,$i,"reb"));
                 $ast=number_format(mysql_result($result,$i,"ast"));

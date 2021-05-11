@@ -109,15 +109,13 @@ echo "<FORM action=\"leagueControlPanel.php\" method=\"POST\">
 
 switch ($currentSeasonPhase) {
     case 'Preseason':
-        echo "<select name=\"Waivers\">
+        echo "<A HREF=\"updateAllTheThings.php\">Update All The Things</A><p>
+            <A HREF=\"scoParser.php\">Run scoParser.php</A><p>
+            <select name=\"Waivers\">
                 <option value = \"Yes\"" . ($waiverWireStatus == "Yes" ? " SELECTED" : "") . ">Yes</option>
                 <option value = \"No\"" . ($waiverWireStatus == "No" ? " SELECTED" : "") . ">No</option>
             </select>
-            <INPUT type='submit' name='query' value='Set Waiver Wire Status'><p>
-            <A HREF=\"updateAllTheThings.php\">Update All The Things</A><p>
-            <A HREF=\"scoParser.php\">Run scoParser.php</A><p>
-            <INPUT type='submit' name='query' value='Deactivate Player and Season Leaders modules for Trivia'><p>
-            <INPUT type='submit' name='query' value='Activate Player and Season Leaders modules after Trivia'><p>";
+            <INPUT type='submit' name='query' value='Set Waiver Wire Status'><p>";
         break;
     case 'HEAT':
         echo "<A HREF=\"updateAllTheThings.php\">Update All The Things</A><p>
@@ -134,7 +132,7 @@ switch ($currentSeasonPhase) {
                 <option value = \"Yes\"" . ($allowTradesStatus == "Yes" ? " SELECTED" : "") . ">Yes</option>
                 <option value = \"No\"" . ($allowTradesStatus == "No" ? " SELECTED" : "") . ">No</option>
             </select>
-            <INPUT type='submit' name='query' value='Set Allow Trades Status'>";
+            <INPUT type='submit' name='query' value='Set Allow Trades Status'><p>";
         break;
     case 'Playoffs':
         echo "<A HREF=\"updateAllTheThings.php\">Update All The Things</A><p>
@@ -144,7 +142,7 @@ switch ($currentSeasonPhase) {
                 <option value = \"Yes\"" . ($allowTradesStatus == "Yes" ? " SELECTED" : "") . ">Yes</option>
                 <option value = \"No\"" . ($allowTradesStatus == "No" ? " SELECTED" : "") . ">No</option>
             </select>
-            <INPUT type='submit' name='query' value='Set Allow Trades Status'>";
+            <INPUT type='submit' name='query' value='Set Allow Trades Status'><p>";
         break;
     case 'Draft':
         echo "<A HREF=\"playoffupdate.php\">Playoff Leaderboard Update #1</A><p>
@@ -158,13 +156,13 @@ switch ($currentSeasonPhase) {
             <INPUT type='submit' name='query' value='Set all undefined player positions'><p>
             <INPUT type='submit' name='query' value='Set Free Agency factors for PFW'><p>
             <A HREF=\"tradition.php\">Set Free Agency factors for Tradition</A><p>
-            <INPUT type='submit' name='query' value='Set all players on waivers to Free Agents and reset their Bird years'><p>
-            <INPUT type='submit' name='query' value='Deactivate Player and Season Leaders modules for Trivia'><p>
-            <INPUT type='submit' name='query' value='Activate Player and Season Leaders modules after Trivia'><p>";
+            <INPUT type='submit' name='query' value='Set all players on waivers to Free Agents and reset their Bird years'><p>";
         break;
 }
 
-echo "</FORM><p><hr><p>";
+echo "<INPUT type='submit' name='query' value='Deactivate Player and Season Leaders modules for Trivia'><p>
+    <INPUT type='submit' name='query' value='Activate Player and Season Leaders modules after Trivia'><p>
+    </FORM><p><hr><p>";
 
 if ($querySuccessful == TRUE) {
     echo "<code>" . $queryString . "</code>";

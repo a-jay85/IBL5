@@ -97,17 +97,17 @@ function userinfo($username, $bypass=0, $hid=0, $url=0)
 	$Slot4 = $offenseSet[PF_Depth_Name];
 	$Slot5 = $offenseSet[C_Depth_Name];
 
-	$Low1 = $offenseSet[PG_Low_Range];
-	$Low2 = $offenseSet[SG_Low_Range];
-	$Low3 = $offenseSet[SF_Low_Range];
-	$Low4 = $offenseSet[PF_Low_Range];
-	$Low5 = $offenseSet[C_Low_Range];
+	$Low1 = 1;
+	$Low2 = 1;
+	$Low3 = 1;
+	$Low4 = 1;
+	$Low5 = 1;
 
-	$High1 = $offenseSet[PG_High_Range];
-	$High2 = $offenseSet[SG_High_Range];
-	$High3 = $offenseSet[SF_High_Range];
-	$High4 = $offenseSet[PF_High_Range];
-	$High5 = $offenseSet[C_High_Range];
+	$High1 = 9;
+	$High2 = 9;
+	$High3 = 9;
+	$High4 = 9;
+	$High5 = 9;
 
 	echo "SELECT OFFENSIVE SET TO USE: ";
 

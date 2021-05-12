@@ -858,7 +858,7 @@ function showpage($pid,$spec) {
     $playerinfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM ".$prefix."_iblplyr WHERE pid='$pid'"));
     $player_name = stripslashes(check_html($playerinfo['name'], "nohtml"));
     $player_nickname = stripslashes(check_html($playerinfo['nickname'], "nohtml"));
-    $player_pos = stripslashes(check_html($playerinfo['altpos'], "nohtml"));
+    $player_pos = stripslashes(check_html($playerinfo['pos'], "nohtml"));
     $player_team_name = stripslashes(check_html($playerinfo['teamname'], "nohtml"));
     $player_team_id = stripslashes(check_html($playerinfo['tid'], "nohtml"));
     $player_ht_ft = stripslashes(check_html($playerinfo['htft'], "nohtml"));
@@ -2617,7 +2617,7 @@ function negotiate($pid)
     $pid = intval($pid);
     $playerinfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM ".$prefix."_iblplyr WHERE pid = '$pid'"));
     $player_name = stripslashes(check_html($playerinfo['name'], "nohtml"));
-    $player_pos = stripslashes(check_html($playerinfo['altpos'], "nohtml"));
+    $player_pos = stripslashes(check_html($playerinfo['pos'], "nohtml"));
     $player_team_name = stripslashes(check_html($playerinfo['teamname'], "nohtml"));
 
     $player_loyalty = stripslashes(check_html($playerinfo['loyalty'], "nohtml"));
@@ -3087,7 +3087,7 @@ function rookieoption($pid) {
 	$playerinfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM ".$prefix."_iblplyr WHERE pid='$pid'"));
 
 	$player_name = stripslashes(check_html($playerinfo['name'], "nohtml"));
-	$player_pos = stripslashes(check_html($playerinfo['altpos'], "nohtml"));
+	$player_pos = stripslashes(check_html($playerinfo['pos'], "nohtml"));
 	$player_team_name = stripslashes(check_html($playerinfo['teamname'], "nohtml"));
 	$player_draftround = stripslashes(check_html($playerinfo['draftround'], "nohtml"));
 	$player_exp = stripslashes(check_html($playerinfo['exp'], "nohtml"));

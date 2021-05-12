@@ -319,7 +319,7 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
 
     while ($row8 = $db->sql_fetchrow($result8)) {
         $wait_time = '';
-        $player_pos = $row8[altpos];
+        $player_pos = $row8[pos];
         $player_name = $row8[name];
         $player_pid = $row8[pid];
         $cy = $row8[cy];

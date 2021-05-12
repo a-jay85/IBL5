@@ -937,7 +937,7 @@ function team($tid)
 			$name=mysql_result($result,$i,"name");
 			$team=mysql_result($result,$i,"teamname");
 			$pid=mysql_result($result,$i,"pid");
-			$pos=mysql_result($result,$i,"altpos");
+			$pos=mysql_result($result,$i,"pos");
 			$p_ord=mysql_result($result,$i,"ordinal");
 			$age=mysql_result($result,$i,"age");
 			$inj=mysql_result($result,$i,"injured");
@@ -1076,7 +1076,7 @@ function team($tid)
 
 		while ($i < $num) {
 			$name=mysql_result($result,$i,"name");
-			$pos=mysql_result($result,$i,"altpos");
+			$pos=mysql_result($result,$i,"pos");
 			$p_ord=mysql_result($result,$i,"ordinal");
 			$pid=mysql_result($result,$i,"pid");
 
@@ -1324,7 +1324,7 @@ function team($tid)
 
 		while ($i < $num) {
 			$name=mysql_result($result,$i,"name");
-			$pos=mysql_result($result,$i,"altpos");
+			$pos=mysql_result($result,$i,"pos");
 			$p_ord=mysql_result($result,$i,"ordinal");
 			$pid=mysql_result($result,$i,"pid");
 
@@ -1751,7 +1751,7 @@ function team($tid)
 		$i = 0;
 		while ($i < $num) {
 			$name=mysql_result($result,$i,"name");
-			$pos=mysql_result($result,$i,"altpos");
+			$pos=mysql_result($result,$i,"pos");
 			$p_ord=mysql_result($result,$i,"ordinal");
 			$pid=mysql_result($result,$i,"pid");
 			$cy=mysql_result($result,$i,"cy");

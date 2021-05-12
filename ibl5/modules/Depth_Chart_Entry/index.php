@@ -129,7 +129,7 @@ function userinfo($username, $bypass=0, $hid=0, $url=0)
 
 	while ($player = $db->sql_fetchrow($playersOnTeam)) {
 		$player_pid = $player[pid];
-		$player_pos = $player[altpos];
+		$player_pos = $player[pos];
 		$player_name = $player[name];
 		$player_staminacap = $player[sta]+40;
 		if ($player_staminacap > 40) $player_staminacap = 40;

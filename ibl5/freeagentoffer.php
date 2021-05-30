@@ -133,9 +133,9 @@ $Offer_Avg = ($Offer_1+$Offer_2+$Offer_3+$Offer_4+$Offer_5+$Offer_6)/$yrsinoffer
 $queryposition="SELECT * FROM nuke_iblplyr WHERE `name` ='$Player_Name'";
 $resultposition=mysql_query($queryposition);
 
-$player_pos = mysql_result($resultposition,0,"altpos");
+$player_pos = mysql_result($resultposition,0,"pos");
 
-$querymillions="SELECT * FROM nuke_iblplyr WHERE `teamname`='$Team_Name' AND `altpos`='$player_pos' AND `name`!='$Player_Name'";
+$querymillions="SELECT * FROM nuke_iblplyr WHERE `teamname`='$Team_Name' AND `pos`='$player_pos' AND `name`!='$Player_Name'";
 $resultmillions=mysql_query($querymillions);
 $nummillions=mysql_numrows($resultmillions);
 
@@ -226,7 +226,7 @@ if ($player_pos == 'C')
 }
 
 
-$querymillions="SELECT * FROM nuke_iblplyr WHERE `teamname`='$Team_Name' AND `altpos`='$adjpos1' AND `name`!='$player_name'";
+$querymillions="SELECT * FROM nuke_iblplyr WHERE `teamname`='$Team_Name' AND `pos`='$adjpos1' AND `name`!='$player_name'";
 $resultmillions=mysql_query($querymillions);
 $nummillions=mysql_numrows($resultmillions);
 $i=0;
@@ -264,7 +264,7 @@ $tf_millions = $tf_millions+$millionscy6;
 $i++;
 }
 
-$querymillions="SELECT * FROM nuke_iblplyr WHERE `teamname`='$Team_Name' AND `altpos`='$adjpos2' AND `name`!='$player_name'";
+$querymillions="SELECT * FROM nuke_iblplyr WHERE `teamname`='$Team_Name' AND `pos`='$adjpos2' AND `name`!='$player_name'";
 $resultmillions=mysql_query($querymillions);
 $nummillions=mysql_numrows($resultmillions);
 $i=0;

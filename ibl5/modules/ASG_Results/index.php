@@ -46,28 +46,10 @@ $num6=mysql_num_rows($result6);
 
 
 OpenTable();
-$k=0;
 $h=0;
 $i=0;
-$m=0;
 $n=0;
 $o=0;
-while ($k < $num1)
-
-{
-
-	$player[$k]=mysql_result($result1,$k, "name");
-	$votes[$k]=mysql_result($result1,$k);
-
-	$table_echo=$table_echo."<tr><td>".$player[$k]."</td><td>".$votes[$k]."</td></tr>";
-
-	$k++;
-}
-
-
-
-$text=$text."<table class=\"sortable\" border=1>
-		  <tr><th>Player</th><th> Votes</th></tr>$table_echo</table><br><br>";
 
 while ($h < $num2)
 
@@ -96,20 +78,6 @@ while ($i < $num3)
 }
 $text2=$text2."<table class=\"sortable\" border=1>
 		  <tr><th>Player</th><th> Votes</th></tr>$table_echo2</table><br><br>";
-
-while ($m < $num4)
-
-{
-
-	$player[$m]=mysql_result($result4,$m, "name");
-	$votes[$m]=mysql_result($result4,$m);
-
-	$table_echo3=$table_echo3."<tr><td>".$player[$m]."</td><td>".$votes[$m]."</td></tr>";
-
-	$m++;
-}
-$text3=$text3."<table class=\"sortable\" border=1>
-		  <tr><th>Player</th><th> Votes</th></tr>$table_echo3</table><br><br>";
 
 while ($n < $num5)
 

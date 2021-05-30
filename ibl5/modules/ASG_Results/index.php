@@ -22,11 +22,7 @@ get_lang($module_name);
 $userpage = 1;
 include("header.php");
 
-$query1="select count(name) as votes,name from (select East_C as name from IBL_ASG_Votes) as tbl group by name having count(name) > 0 order by 1 desc;";
-$result1=mysql_query($query1);
-$num1=mysql_num_rows($result1);
-
-$query2="select count(name) as votes,name from (select East_F1 as name from IBL_ASG_Votes union all select East_F2 from IBL_ASG_Votes) as tbl group by name having count(name) > 0 order by 1 desc;";
+$query2="select count(name) as votes,name from (select East_F1 as name from IBL_ASG_Votes union all select East_F2 from IBL_ASG_Votes union all select East_C from IBL_ASG_Votes) as tbl group by name having count(name) > 0 order by 1 desc;";
 $result2=mysql_query($query2);
 $num2=mysql_num_rows($result2);
 
@@ -34,11 +30,7 @@ $query3="select count(name) as votes,name from (select East_G1 as name from IBL_
 $result3=mysql_query($query3);
 $num3=mysql_num_rows($result3);
 
-$query4="select count(name) as votes,name from (select West_C as name from IBL_ASG_Votes) as tbl group by name having count(name) > 0 order by 1 desc;";
-$result4=mysql_query($query4);
-$num4=mysql_num_rows($result4);
-
-$query5="select count(name) as votes,name from (select West_F1 as name from IBL_ASG_Votes union all select West_F2 from IBL_ASG_Votes) as tbl group by name having count(name) > 0 order by 1 desc;";
+$query5="select count(name) as votes,name from (select West_F1 as name from IBL_ASG_Votes union all select West_F2 from IBL_ASG_Votes union all select West_C from IBL_ASG_Votes) as tbl group by name having count(name) > 0 order by 1 desc;";
 $result5=mysql_query($query5);
 $num5=mysql_num_rows($result5);
 
@@ -148,17 +140,13 @@ $text5=$text5."<table class=\"sortable\" border=1>
 		  <tr><th>Player</th><th> Votes</th></tr>$table_echo5</table><br><br>";
 
 
-echo "<b>Eastern Conference Center</b>";
-echo $text;
-echo "<b>Eastern Conference Forward</b>";
+echo "<b>Eastern Conference Frontcourt</b>";
 echo $text1;
-echo "<b>Eastern Conference Guard</b>";
+echo "<b>Eastern Conference Backcourt</b>";
 echo $text2;
-echo "<b>Western Conference Center</b>";
-echo $text3;
-echo "<b>Western Conference Forward</b>";
+echo "<b>Western Conference Frontcourt</b>";
 echo $text4;
-echo "<b>Western Conference Guard</b>";
+echo "<b>Western Conference Backcourt</b>";
 echo $text5;
 CloseTable();
 

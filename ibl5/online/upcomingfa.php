@@ -47,7 +47,7 @@ echo "
       $team = stripslashes(check_html($teamlist['teamname'], "nohtml"));
       $tid = stripslashes(check_html($teamlist['tid'], "nohtml"));
       $pid = stripslashes(check_html($teamlist['pid'], "nohtml"));
-      $pos = stripslashes(check_html($teamlist['altpos'], "nohtml"));
+      $pos = stripslashes(check_html($teamlist['pos'], "nohtml"));
       $age = stripslashes(check_html($teamlist['age'], "nohtml"));
       $inj = stripslashes(check_html($teamlist['injured'], "nohtml"));
       $bird = stripslashes(check_html($teamlist['bird'], "nohtml"));
@@ -137,7 +137,7 @@ echo "
       $team = stripslashes(check_html($teamlist['teamname'], "nohtml"));
       $tid = stripslashes(check_html($teamlist['tid'], "nohtml"));
       $pid = stripslashes(check_html($teamlist['pid'], "nohtml"));
-      $pos = stripslashes(check_html($teamlist['altpos'], "nohtml"));
+      $pos = stripslashes(check_html($teamlist['pos'], "nohtml"));
       $age = stripslashes(check_html($teamlist['age'], "nohtml"));
       $inj = stripslashes(check_html($teamlist['injured'], "nohtml"));
 

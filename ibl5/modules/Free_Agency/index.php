@@ -219,7 +219,7 @@ function display() {
 			$team = stripslashes(check_html($teamlist['teamname'], "nohtml"));
 			$tid = stripslashes(check_html($teamlist['tid'], "nohtml"));
 			$pid = stripslashes(check_html($teamlist['pid'], "nohtml"));
-			$pos = stripslashes(check_html($teamlist['altpos'], "nohtml"));
+			$pos = stripslashes(check_html($teamlist['pos'], "nohtml"));
 			$age = stripslashes(check_html($teamlist['age'], "nohtml"));
 			$inj = stripslashes(check_html($teamlist['injured'], "nohtml"));
 			$draftround = stripslashes(check_html($teamlist['draftround'], "nohtml"));
@@ -533,7 +533,7 @@ function display() {
 			$team = stripslashes(check_html($teamlist['teamname'], "nohtml"));
 			$tid = stripslashes(check_html($teamlist['tid'], "nohtml"));
 			$pid = stripslashes(check_html($teamlist['pid'], "nohtml"));
-			$pos = stripslashes(check_html($teamlist['altpos'], "nohtml"));
+			$pos = stripslashes(check_html($teamlist['pos'], "nohtml"));
 			$age = stripslashes(check_html($teamlist['age'], "nohtml"));
 			$inj = stripslashes(check_html($teamlist['injured'], "nohtml"));
 
@@ -812,7 +812,7 @@ function display() {
 			$team = stripslashes(check_html($teamlist['teamname'], "nohtml"));
 			$tid = stripslashes(check_html($teamlist['tid'], "nohtml"));
 			$pid = stripslashes(check_html($teamlist['pid'], "nohtml"));
-			$pos = stripslashes(check_html($teamlist['altpos'], "nohtml"));
+			$pos = stripslashes(check_html($teamlist['pos'], "nohtml"));
 			$age = stripslashes(check_html($teamlist['age'], "nohtml"));
 			$inj = stripslashes(check_html($teamlist['injured'], "nohtml"));
 			$bird = stripslashes(check_html($teamlist['bird'], "nohtml"));
@@ -997,7 +997,7 @@ function display() {
 			$team = stripslashes(check_html($teamlist['teamname'], "nohtml"));
 			$tid = stripslashes(check_html($teamlist['tid'], "nohtml"));
 			$pid = stripslashes(check_html($teamlist['pid'], "nohtml"));
-			$pos = stripslashes(check_html($teamlist['altpos'], "nohtml"));
+			$pos = stripslashes(check_html($teamlist['pos'], "nohtml"));
 			$age = stripslashes(check_html($teamlist['age'], "nohtml"));
 			$inj = stripslashes(check_html($teamlist['injured'], "nohtml"));
 
@@ -1137,7 +1137,7 @@ function negotiate($pid) {
 	$playerinfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM ".$prefix."_iblplyr WHERE pid='$pid'"));
 
 	$player_name = stripslashes(check_html($playerinfo['name'], "nohtml"));
-	$player_pos = stripslashes(check_html($playerinfo['altpos'], "nohtml"));
+	$player_pos = stripslashes(check_html($playerinfo['pos'], "nohtml"));
 	$player_team_name = stripslashes(check_html($playerinfo['teamname'], "nohtml"));
 	$player_loyalty = stripslashes(check_html($playerinfo['loyalty'], "nohtml"));
 	$player_winner = stripslashes(check_html($playerinfo['winner'], "nohtml"));

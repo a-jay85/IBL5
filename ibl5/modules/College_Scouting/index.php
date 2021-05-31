@@ -29,19 +29,20 @@ $userpage = 1;
 
 //include("modules/$module_name/navbar.php");
 
-function userinfo($username, $bypass=0, $hid=0, $url=0) {
-    global $user, $cookie, $sitename, $prefix, $user_prefix, $db, $admin, $broadcast_msg, $my_headlines, $module_name, $subscription_url, $attrib, $step, $player;
-    $sql = "SELECT * FROM ".$prefix."_bbconfig";
-    $result = $db->sql_query($sql);
-    while ( $row = $db->sql_fetchrow($result) )
-    {
-    $board_config[$row['config_name']] = $row['config_value'];
-    }
-    $sql2 = "SELECT * FROM ".$user_prefix."_users WHERE username='$username'";
-    $result2 = $db->sql_query($sql2);
-    $num = $db->sql_numrows($result2);
-    $userinfo = $db->sql_fetchrow($result2);
-    if(!$bypass) cookiedecode($user);
+function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
+{
+	global $user, $cookie, $sitename, $prefix, $user_prefix, $db, $admin, $broadcast_msg, $my_headlines, $module_name, $useset, $subscription_url;
+	$sql = "SELECT * FROM ".$prefix."_bbconfig";
+	$result = $db->sql_query($sql);
+	while ($row = $db->sql_fetchrow($result))	{
+		$board_config[$row['config_name']] = $row['config_value'];
+	}
+	$sql2 = "SELECT * FROM " . $user_prefix . "_users WHERE username = '$username'";
+	$result2 = $db->sql_query($sql2);
+	$num = $db->sql_numrows($result2);
+	$userinfo = $db->sql_fetchrow($result2);
+	if (!$bypass) cookiedecode($user);
+
     include("header.php");
 
 //=== TRACK CLICKS TO PICK UP AND MODIFY PLAYER BEING SCOUTED

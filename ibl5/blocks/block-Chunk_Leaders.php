@@ -58,7 +58,7 @@ function displayColumnLastSimStatLeaders($array, $statName, $content)
     $content = $content."<td>
         <table><tr><td colspan=2>
         <center><a href=modules.php?name=Player&pa=showpage&pid=" . $array[1]["pid"] . "><img src=\"./images/player/" . $array[1]["pid"] . ".jpg\" height=\"90\" width=\"65\"></a>&nbsp;
-        <a href=modules.php?name=Team&op=team&tid=" . $array[1]["tid"] . "><img src=\"./images/logo/new" . $array[1]["tid"] . ".png\"></a></center></td></tr>
+        <a href=modules.php?name=Team&op=team&tid=" . $array[1]["tid"] . "><img src=\"./images/logo/new" . $array[1]["tid"] . ".png\" height=\"75\" width=\"75\"></a></center></td></tr>
         <tr><td bgcolor=#000066 colspan=2><b><font color=#ffffff>$statName Per Game</td></tr>";
     $content = $content."<tr><td><b><a href=modules.php?name=Player&pa=showpage&pid=" . $array[1]["pid"] . "><font color=#000066>" . $array[1]["name"] . "</font></a><br>
     <font color=#000066><a href=modules.php?name=Team&op=team&tid=" . $array[1]["tid"] . ">" . $array[1]["teamname"] . "</a></font></td>

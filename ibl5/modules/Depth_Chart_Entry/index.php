@@ -25,6 +25,8 @@ $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 $userpage = 1;
 
+$pagetitle = " - Depth Chart Entry";
+
 //include("modules/$module_name/navbar.php");
 
 function userinfo($username, $bypass=0, $hid=0, $url=0)
@@ -504,7 +506,7 @@ function submit() {
 		if (mail($recipient, $emailsubject, $filetext, "From: ibldepthcharts@gmail.com")) {
 			$executeupdateD = mysql_query($updatequeryD);
 			$executeupdateF = mysql_query($updatequeryF);
-			
+
 			echo "<center><u>Your depth chart has been submitted and e-mailed successfully. Thank you.</u></center><p>";
 			$filename = 'depthcharts/'.$Team_Name.'.txt';
 			file_put_contents($filename, $filetext);

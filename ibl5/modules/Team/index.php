@@ -611,35 +611,35 @@ function schedule($tid)
 		<tr bgcolor=$color1><td colspan=26><font color=$color2 size=\"12\"><b><center>Team Schedule</center></b></font></td></tr>
 		<tr bgcolor=$color2><td colspan=26><font color=$color1><b><center>November</center></b></font></td></tr>
 		<tr bgcolor=$color2><td><font color=$color1><b>Date</font></td><td><font color=$color1><b>Visitor</font></td><td><font color=$color1><b>Score</font></td><td><font color=$color1><b>Home</font></td><td><font color=$color1><b>Score</font></td><td><font color=$color1><b>Box Score</font></td><td><font color=$color1><b>Record</font></td><td><font color=$color1><b>Streak</font></td></tr>";
-	list ($wins, $losses, $wstreak, $lstreak)=boxscore ($year,'11',$tid,$wins,$losses,$wstreak,$lstreak);
+	list ($wins, $losses, $winStreak, $lossStreak) = boxscore($year, '11', $tid, $wins, $losses, $winStreak, $lossStreak);
 	echo "<tr bgcolor=$color1><td colspan=26><font color=$color2><b><center>December</center></b></font></td></tr>
 		<tr bgcolor=$color1><td><font color=$color2><b>Date</font></td><td><font color=$color2><b>Visitor</font></td><td><font color=$color2><b>Score</font></td><td><font color=$color2><b>Home</font></td><td><font color=$color2><b>Score</font></td><td><font color=$color2><b>Box Score</b></font></td><td><font color=$color2><b>Record</font></td><td><font color=$color2><b>Streak</font></td></tr>";
-	list ($wins, $losses, $wstreak, $lstreak)=boxscore ($year,'12',$tid,$wins,$losses,$wstreak,$lstreak);
+	list ($wins, $losses, $winStreak, $lossStreak) = boxscore($year, '12', $tid, $wins, $losses, $winStreak, $lossStreak);
 	echo "<tr bgcolor=$color2><td colspan=26><font color=$color1><b><center>January</center></b></font></td></tr>
 		<tr bgcolor=$color2><td><font color=$color1><b>Date</font></td><td><font color=$color1><b>Visitor</font></td><td><font color=$color1><b>Score</font></td><td><font color=$color1><b>Home</font></td><td><font color=$color1><b>Score</font></td><td><font color=$color1><b>Box Score</b></font></td><td><font color=$color1><b>Record</font></td><td><font color=$color1><b>Streak</font></td></tr>";
-	list ($wins, $losses, $wstreak, $lstreak)=boxscore ($year1,'01',$tid,$wins,$losses,$wstreak,$lstreak);
+	list ($wins, $losses, $winStreak, $lossStreak) = boxscore($year1, '01',$tid, $wins, $losses, $winStreak, $lossStreak);
 	echo "<tr bgcolor=$color1><td colspan=26><font color=$color2><b><center>February</center></b></font></td></tr>
 		<tr bgcolor=$color1><td><font color=$color2><b>Date</font></td><td><font color=$color2><b>Visitor</font></td><td><font color=$color2><b>Score</font></td><td><font color=$color2><b>Home</font></td><td><font color=$color2><b>Score</font></td><td><font color=$color2><b>Box Score</b></font></td><td><font color=$color2><b>Record</font></td><td><font color=$color2><b>Streak</font></td></tr>";
-	list ($wins, $losses, $wstreak, $lstreak)=boxscore ($year1,'02',$tid,$wins,$losses,$wstreak,$lstreak);
+	list ($wins, $losses, $winStreak, $lossStreak) = boxscore($year1, '02',$tid, $wins, $losses, $winStreak, $lossStreak);
 	echo "<tr bgcolor=$color2><td colspan=26><font color=$color1><b><center>March</center></b></font></td></tr>
 		<tr bgcolor=$color2><td><font color=$color1><b>Date</font></td><td><font color=$color1><b>Visitor</font></td><td><font color=$color1><b>Score</font></td><td><font color=$color1><b>Home</font></td><td><font color=$color1><b>Score</font></td><td><font color=$color1><b>Box Score</b></font></td><td><font color=$color1><b>Record</font></td><td><font color=$color1><b>Streak</font></td></tr>";
-	list ($wins, $losses, $wstreak, $lstreak)=boxscore ($year1,'03',$tid,$wins,$losses,$wstreak,$lstreak);
+	list ($wins, $losses, $winStreak, $lossStreak) = boxscore($year1, '03',$tid, $wins, $losses, $winStreak, $lossStreak);
 	echo "<tr bgcolor=$color1><td colspan=26><font color=$color2><b><center>April</center></b></font></td></tr>
 		<tr bgcolor=$color1><td><font color=$color2><b>Date</font></td><td><font color=$color2><b>Visitor</font></td><td><font color=$color2><b>Score</font></td><td><font color=$color2><b>Home</font></td><td><font color=$color2><b>Score</font></td><td><font color=$color2><b>Box Score</b></font></td><td><font color=$color2><b>Record</font></td><td><font color=$color2><b>Streak</font></td></tr>";
-	list ($wins, $losses, $wstreak, $lstreak)=boxscore ($year1,'04',$tid,$wins,$losses,$wstreak,$lstreak);
+	list ($wins, $losses, $winStreak, $lossStreak) = boxscore($year1, '04',$tid, $wins, $losses, $winStreak, $lossStreak);
 	echo "<tr bgcolor=$color1><td colspan=26><font color=$color2><b><center>May</center></b></font></td></tr>
 		<tr bgcolor=$color1><td><font color=$color2><b>Date</font></td><td><font color=$color2><b>Visitor</font></td><td><font color=$color2><b>Score</font></td><td><font color=$color2><b>Home</font></td><td><font color=$color2><b>Score</font></td><td><font color=$color2><b>Box Score</b></font></td><td><font color=$color2><b>Record</font></td><td><font color=$color2><b>Streak</font></td></tr>";
-	list ($wins, $losses, $wstreak, $lstreak)=boxscore ($year1,'05',$tid,$wins,$losses,$wstreak,$lstreak);
+	list ($wins, $losses, $winStreak, $lossStreak) = boxscore($year1, '05',$tid, $wins, $losses, $winStreak, $lossStreak);
 	echo "<tr bgcolor=$color2><td colspan=26><font color=$color1><b><center>Playoffs</center></b></font></td></tr>
 		<tr bgcolor=$color2><td><font color=$color1><b>Date</font></td><td><font color=$color1><b>Visitor</font></td><td><font color=$color1><b>Score</font></td><td><font color=$color1><b>Home</font></td><td><font color=$color1><b>Score</font></td><td><font color=$color1><b>Box Score</b></font></td><td><font color=$color1><b>Record</font></td><td><font color=$color1><b>Streak</font></td></tr>";
-	list ($wins, $losses, $wstreak, $lstreak)=boxscore ($year1,'06',$tid,$wins,$losses,$wstreak,$lstreak);
+	list ($wins, $losses, $winStreak, $lossStreak) = boxscore($year1, '06',$tid, $wins, $losses, $winStreak, $lossStreak);
 	CloseTable();
 
 	CloseTable();
 	include("footer.php");
 }
 
-function boxscore($year, $month, $tid, $wins, $losses, $wstreak, $lstreak)
+function boxscore($year, $month, $tid, $wins, $losses, $winStreak, $lossStreak)
 {
 	$query = "SELECT *
 		FROM `ibl_schedule`
@@ -653,92 +653,87 @@ function boxscore($year, $month, $tid, $wins, $losses, $wstreak, $lstreak)
 	while ($i < $num) {
 		$date = mysql_result($result, $i, "Date");
 		$visitor = mysql_result($result, $i, "Visitor");
-		$VScore = mysql_result($result, $i, "VScore");
+		$visitorScore = mysql_result($result, $i, "VScore");
 		$home = mysql_result($result, $i, "Home");
-		$HScore = mysql_result($result, $i, "HScore");
-		$boxid = mysql_result($result, $i, "BoxID");
-		$SchedID = mysql_result($result, $i, "SchedID");
-		$vname = teamname($visitor);
-		$hname = teamname($home);
+		$homeScore = mysql_result($result, $i, "HScore");
+		$boxID = mysql_result($result, $i, "BoxID");
 
-		if ($tid == $visitor) {
-			if ($VScore > $HScore) {
-				$wins++;
-				$wstreak++;
-				$lstreak = 0;
-				$winlosscolor = "green";
-			} else {
-				$losses++;
-				$lstreak++;
-				$wstreak = 0;
-				$winlosscolor = "red";
-			}
-		} else {
-			if ($VScore > $HScore) {
-				$losses++;
-				$lstreak++;
-				$wstreak = 0;
-				$winlosscolor = "red";
-			} else {
-				$wins++;
-				$wstreak++;
-				$lstreak = 0;
-				$winlosscolor = "green";
-			}
-		}
+		$visitorTeamname = getTeamnameFromTid($visitor);
+		$homeTeamname = getTeamnameFromTid($home);
 
-		if ($wstreak > $lstreak) {
-			$streak = "W $wstreak";
-		} else {
-			$streak = "L $lstreak";
-		}
-
-		(($i % 2) == 0) ? $bgcolor="FFFFFF" : $bgcolor="EEEEEE";
-
-		if ($VScore > $HScore) {
-			echo "<tr bgcolor=$bgcolor>
-				<td>$date</td>
-				<td><b><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$vname</a></b></td>
-				<td><b><font color=$winlosscolor>$VScore</font></b></td>
-				<td><a href=\"modules.php?name=Team&op=team&tid=$home\">$hname</a></td>
-				<td><b><font color=$winlosscolor>$HScore</font></b></td>
-				<td><a href=\"./ibl/IBL/box$boxid.htm\">View</a></td>
-				<td>$wins - $losses</td>
-				<td>$streak</td>
-			</tr>";
-		} else if ($VScore < $HScore) {
-			echo "<tr bgcolor=$bgcolor>
-				<td>$date</td>
-				<td><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$vname</a></td>
-				<td><b><font color=$winlosscolor>$VScore</font></b></td>
-				<td><b><a href=\"modules.php?name=Team&op=team&tid=$home\">$hname</a></b></td>
-				<td><b><font color=$winlosscolor>$HScore</font></b></td>
-				<td><a href=\"./ibl/IBL/box$boxid.htm\">View</a></td>
-				<td>$wins - $losses</td>
-				<td>$streak</td>
-			</tr>";
-		} else {
+		if ($visitorScore == $homeScore) {
 			echo "<tr>
 				<td>$date</td>
-				<td><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$vname</a></td>
+				<td><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$visitorTeamname</a></td>
 				<td></td>
-				<td><a href=\"modules.php?name=Team&op=team&tid=$home\">$hname</a></td>
+				<td><a href=\"modules.php?name=Team&op=team&tid=$home\">$homeTeamname</a></td>
 				<td></td>
 				<td></td>
 			</tr>";
+		} else {
+			if ($tid == $visitor) {
+				if ($visitorScore > $homeScore) {
+					$wins++;
+					$winStreak++;
+					$lossStreak = 0;
+					$winlosscolor = "green";
+				} else {
+					$losses++;
+					$lossStreak++;
+					$winStreak = 0;
+					$winlosscolor = "red";
+				}
+			} else {
+				if ($visitorScore > $homeScore) {
+					$losses++;
+					$lossStreak++;
+					$winStreak = 0;
+					$winlosscolor = "red";
+				} else {
+					$wins++;
+					$winStreak++;
+					$lossStreak = 0;
+					$winlosscolor = "green";
+				}
+			}
+
+			if ($winStreak > $lossStreak) {
+				$streak = "W $winStreak";
+			} else {
+				$streak = "L $lossStreak";
+			}
+
+			(($i % 2) == 0) ? $bgcolor="FFFFFF" : $bgcolor="EEEEEE";
+
+			if ($visitorScore > $homeScore) {
+				echo "<tr bgcolor=$bgcolor>
+					<td>$date</td>
+					<td><b><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$visitorTeamname</a></b></td>
+					<td><b><font color=$winlosscolor>$visitorScore</font></b></td>
+					<td><a href=\"modules.php?name=Team&op=team&tid=$home\">$homeTeamname</a></td>
+					<td><b><font color=$winlosscolor>$homeScore</font></b></td>
+					<td><a href=\"./ibl/IBL/box$boxID.htm\">View</a></td>
+					<td>$wins - $losses</td>
+					<td>$streak</td>
+				</tr>";
+			} else if ($visitorScore < $homeScore) {
+				echo "<tr bgcolor=$bgcolor>
+					<td>$date</td>
+					<td><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$visitorTeamname</a></td>
+					<td><b><font color=$winlosscolor>$visitorScore</font></b></td>
+					<td><b><a href=\"modules.php?name=Team&op=team&tid=$home\">$homeTeamname</a></b></td>
+					<td><b><font color=$winlosscolor>$homeScore</font></b></td>
+					<td><a href=\"./ibl/IBL/box$boxID.htm\">View</a></td>
+					<td>$wins - $losses</td>
+					<td>$streak</td>
+				</tr>";
+			}
 		}
 
 		$i++;
 	}
-	return array($wins, $losses, $wstreak, $lstreak);
-}
 
-function teamname ($teamid)
-{
-	$query="SELECT * FROM nuke_ibl_team_info WHERE teamid = $teamid";
-	$result=mysql_query($query);
-	$name=mysql_result($result, 0, "team_name");
-	return $name;
+	return array($wins, $losses, $winStreak, $lossStreak);
 }
 
 function finances($tid)

@@ -3030,7 +3030,7 @@ function negotiate($pid)
                 <li>The amounts offered each year must equal or exceed the previous year.</li>
                 ";
 
-                if ($player_bird > 2) {
+                if ($player_bird >= 3) {
                     echo "<li>Because this player has Bird Rights, you may add no more than 12.5% of your the amount you offer in the first year as a raise between years (for instance, if you offer 500 in Year 1, you cannot offer a raise of more than 75 between any two subsequent years.)</li>
                     ";
                 } else {

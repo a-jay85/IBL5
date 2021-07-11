@@ -2990,8 +2990,12 @@ function negotiate($pid)
                     <INPUT TYPE=\"text\" NAME=\"offeryear5\" SIZE=\"4\" VALUE=\"$dem5\"></td></tr>
                     ";
                 } else {
+                    if ($player_bird >= 3) {
+                        $maxraise = round($maxyr1 * 0.125);
+                    } else {
+                        $maxraise = round($maxyr1 * 0.1);
+                    }
 
-                    $maxraise = round($maxyr1 * 0.1);
                     $maxyr2 = 0;
                     $maxyr3 = 0;
                     $maxyr4 = 0;

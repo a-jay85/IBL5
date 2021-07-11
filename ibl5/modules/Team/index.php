@@ -639,63 +639,98 @@ function schedule($tid)
 	include("footer.php");
 }
 
-function boxscore ($year, $month, $tid, $wins, $losses, $wstreak, $lstreak)
+function boxscore($year, $month, $tid, $wins, $losses, $wstreak, $lstreak)
 {
-	$query="SELECT * FROM `ibl_schedule` WHERE (Visitor = $tid AND Date BETWEEN '$year-$month-01' AND '$year-$month-31') OR (Home = $tid AND Date BETWEEN '$year-$month-01' AND '$year-$month-31') ORDER BY Date ASC";
-	$result=mysql_query($query);
-	$num=mysql_numrows($result);
+	$query = "SELECT *
+		FROM `ibl_schedule`
+		WHERE (Visitor = $tid AND Date BETWEEN '$year-$month-01' AND '$year-$month-31')
+			OR (Home = $tid AND Date BETWEEN '$year-$month-01' AND '$year-$month-31')
+		ORDER BY Date ASC";
+	$result = mysql_query($query);
+	$num = mysql_numrows($result);
 	$i = 0;
+
 	while ($i < $num) {
-		$date=mysql_result($result,$i,"Date");
-		$visitor=mysql_result($result,$i,"Visitor");
-		$VScore=mysql_result($result,$i,"VScore");
-		$home=mysql_result($result,$i,"Home");
-		$HScore=mysql_result($result,$i,"HScore");
-		$boxid=mysql_result($result,$i,"BoxID");
-		$SchedID=mysql_result($result,$i,"SchedID");
-		$vname=teamname($visitor);
-		$hname=teamname($home);
+		$date = mysql_result($result, $i, "Date");
+		$visitor = mysql_result($result, $i, "Visitor");
+		$VScore = mysql_result($result, $i, "VScore");
+		$home = mysql_result($result, $i, "Home");
+		$HScore = mysql_result($result, $i, "HScore");
+		$boxid = mysql_result($result, $i, "BoxID");
+		$SchedID = mysql_result($result, $i, "SchedID");
+		$vname = teamname($visitor);
+		$hname = teamname($home);
+
 		if ($tid == $visitor) {
 			if ($VScore > $HScore) {
-				$wins=$wins+1;
-				$winlosscolor="green";
-				$wstreak=1+$wstreak;
-				$lstreak=0;
+				$wins++;
+				$wstreak++;
+				$lstreak = 0;
+				$winlosscolor = "green";
 			} else {
-				$losses=$losses+1;
-				$winlosscolor="red";
-				$wstreak=0;
-				$lstreak=1+$lstreak;
+				$losses++;
+				$lstreak++;
+				$wstreak = 0;
+				$winlosscolor = "red";
 			}
 		} else {
 			if ($VScore > $HScore) {
-				$losses=$losses+1;
-				$winlosscolor="red";
-				$wstreak=0;
-				$lstreak=1+$lstreak;
+				$losses++;
+				$lstreak++;
+				$wstreak = 0;
+				$winlosscolor = "red";
 			} else {
-				$wins=$wins+1;
-				$winlosscolor="green";
-				$wstreak=1+$wstreak;
-				$lstreak=0;
+				$wins++;
+				$wstreak++;
+				$lstreak = 0;
+				$winlosscolor = "green";
 			}
 		}
+
 		if ($wstreak > $lstreak) {
-			$streak="W $wstreak";
+			$streak = "W $wstreak";
 		} else {
-			$streak="L $lstreak";
+			$streak = "L $lstreak";
 		}
-		(($i % 2)==0) ? $bgcolor="FFFFFF" : $bgcolor="EEEEEE";
-		if ($VScore > $HScore){
-			echo "<tr bgcolor=$bgcolor><td>$date</td><td><b><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$vname</a></b></td><td><b><font color=$winlosscolor>$VScore</font></b></td><td><a href=\"modules.php?name=Team&op=team&tid=$home\">$hname</a></td><td><b><font color=$winlosscolor>$HScore</font></b></td><td><a href=\"./ibl/IBL/box$boxid.htm\">View</a></td><td>$wins - $losses</td><td>$streak</td></tr>";
+
+		(($i % 2) == 0) ? $bgcolor="FFFFFF" : $bgcolor="EEEEEE";
+
+		if ($VScore > $HScore) {
+			echo "<tr bgcolor=$bgcolor>
+				<td>$date</td>
+				<td><b><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$vname</a></b></td>
+				<td><b><font color=$winlosscolor>$VScore</font></b></td>
+				<td><a href=\"modules.php?name=Team&op=team&tid=$home\">$hname</a></td>
+				<td><b><font color=$winlosscolor>$HScore</font></b></td>
+				<td><a href=\"./ibl/IBL/box$boxid.htm\">View</a></td>
+				<td>$wins - $losses</td>
+				<td>$streak</td>
+			</tr>";
 		} else if ($VScore < $HScore) {
-			echo "<tr bgcolor=$bgcolor><td>$date</td><td><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$vname</a></td><td><b><font color=$winlosscolor>$VScore</font></b></td><td><b><a href=\"modules.php?name=Team&op=team&tid=$home\">$hname</a></b></td><td><b><font color=$winlosscolor>$HScore</font></b></td><td><a href=\"./ibl/IBL/box$boxid.htm\">View</a></td><td>$wins - $losses</td><td>$streak</td></tr>";
+			echo "<tr bgcolor=$bgcolor>
+				<td>$date</td>
+				<td><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$vname</a></td>
+				<td><b><font color=$winlosscolor>$VScore</font></b></td>
+				<td><b><a href=\"modules.php?name=Team&op=team&tid=$home\">$hname</a></b></td>
+				<td><b><font color=$winlosscolor>$HScore</font></b></td>
+				<td><a href=\"./ibl/IBL/box$boxid.htm\">View</a></td>
+				<td>$wins - $losses</td>
+				<td>$streak</td>
+			</tr>";
 		} else {
-			echo "<tr><td>$date</td><td><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$vname</a></td><td></td><td><a href=\"modules.php?name=Team&op=team&tid=$home\">$hname</a></td><td></td><td></td></tr>";
+			echo "<tr>
+				<td>$date</td>
+				<td><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$vname</a></td>
+				<td></td>
+				<td><a href=\"modules.php?name=Team&op=team&tid=$home\">$hname</a></td>
+				<td></td>
+				<td></td>
+			</tr>";
 		}
+
 		$i++;
 	}
-	return array($wins,$losses,$wstreak,$lstreak);
+	return array($wins, $losses, $wstreak, $lstreak);
 }
 
 function teamname ($teamid)

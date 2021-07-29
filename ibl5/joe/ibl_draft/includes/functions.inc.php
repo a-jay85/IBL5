@@ -88,7 +88,7 @@ Draft is stopped.';
 	  } else {
 	    $message .= '
 
-Draft is complete.';
+Draft is complete!';
       // Post pick details to Discord
       postToDiscordChannel('#draft-picks', $message);
 	  }

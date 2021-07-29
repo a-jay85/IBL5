@@ -4,11 +4,12 @@ require 'config.php';
 mysql_connect($dbhost,$dbuname,$dbpass);
 @mysql_select_db($dbname) or die( "Unable to select database");
 
-$trnFile = fopen("IBLv4.trn", "rb");
+$trnFile = fopen("IBL5.trn", "rb");
 $seasonDaysElapsed = fgets($trnFile,18);
 
 while (!feof($trnFile)) {
     $line = fgets($trnFile,129);
+    echo $line . "<br>";
 
     $gameMonth = sprintf("%02u",substr($line,0,2));
     if ($gameMonth == 0) break;
@@ -25,7 +26,7 @@ while (!feof($trnFile)) {
     		$injuryDetails = substr($line,22,32);
     		break;
 
-    	case 2: //trade
+    	case 2: //trade TODO: break this one line into sub-transactions
     		$tradeType = substr($line,10,1);
     		switch ($tradeType) {
 

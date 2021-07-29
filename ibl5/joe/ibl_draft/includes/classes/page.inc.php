@@ -191,9 +191,9 @@ order by pick_id
 limit 1";
     $row = mysql_fetch_array(mysql_query($statement));
     if ($row['pick_id']) {
-      $pick = $row['pick_id']%26;
+      $pick = $row['pick_id']%28;
       if($pick == 0) {
-	$pick = 26;
+	$pick = 28;
       }
       list($hour, $min, $sec) = explode(":", $row['on_clock']);
       if ($settings->get_value(kSettingPickTimeLimit)) {
@@ -211,7 +211,7 @@ limit 1";
 	$_SESSION['dinged_pick'][$row['pick_id']] = $_SESSION['dinged_pick'][$row['pick_id']] + 1;
       }
       $html .= '
-On the clock: '.$row['team_name'].' (round '.ceil(($row['pick_id'])/26).', pick '.$pick.',
+On the clock: '.$row['team_name'].' (round '.ceil(($row['pick_id'])/28).', pick '.$pick.',
 <span style="'.$style.'">'.$hour.':'.$min.'</span>)';
       $this->on_clock = $row['team_name'];
       $this->on_clock_team_id = $row['team_id'];
@@ -933,7 +933,7 @@ where ".implode(" and ",$wheres);
         <select name="bpa_max_experience">
           <option value="">No Limit</option>';
     $i = 1;
-    while ($i<=26) {
+    while ($i<=28) {
       $html .= '
           <option value="'.$i.'">'.$i.'</option>';
       $i++;

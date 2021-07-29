@@ -88,7 +88,7 @@ Draft is stopped.';
 	  } else {
 	    $message .= '
 
-Draft is complete.';
+Draft is complete!';
       // Post pick details to Discord
       postToDiscordChannel('#draft-picks', $message);
 	  }
@@ -238,6 +238,7 @@ function calculate_pick($pick) {
 
 function process_expired_picks() {
   global $settings;
+  require_once $_SERVER['DOCUMENT_ROOT'] . '/discordWebhooks.php';
   $limit = $settings->get_value(kSettingPickTimeLimit);
   if (!$limit) {
     // No limit, nothing to do
@@ -263,6 +264,30 @@ limit 1";
     $team = new team($row['team_id']);
     $team->lower_pick_limit();
     // Pick has expired!
+    if ($discordPosted !== TRUE) {
+        $statement = "select pick.pick_id, team.team_id, team_email, team_name, team_email_prefs, team_discord_id
+    from pick, team
+    where pick.team_id = team.team_id
+    and pick.player_id is NULL
+    order by pick_id
+    limit 2";
+        $result = mysql_query($statement);
+        $skippedTeam = mysql_fetch_array($result);
+        // $message .= $row[team_name];
+        $message .= '<@!' . $skippedTeam['team_discord_id'] . '>\'s pick **has been skipped** – their pick clock **expired**.
+
+*They are still allowed to make their pick when they choose to.*
+
+';
+        $teamOnTheClock = mysql_fetch_array($result);
+        $on_clock = $teamOnTheClock['team_id'];
+        $message .= '**<@!' . $teamOnTheClock['team_discord_id'] . '>** is now on the clock!';
+
+        // Post skip details to Discord
+        if (postToDiscordChannel('#draft-picks', $message)) {
+            $discordPosted = TRUE;
+        };
+    }
     $old_start = $row['pick_time'];
     $limit = $limit * $row['team_clock_adj'];
     if ($settings->get_value(kSettingExpiredPick) == kExpireMakePick) {

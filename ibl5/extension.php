@@ -85,7 +85,7 @@ if ($UsedExtensionSeason == 1) {
 
 // ==== CHECK FOR OFFERS OVER THE MAX ALLOWED
 if ($Offer_1 > $Offer_Max) {
-    echo "Sorry, this offer is over the maximum allowed offer for a player with his years of service.<br>";
+    echo "Sorry, this offer is over the maximum allowed offer for a player with their years of service.<br>";
     $nooffer = 1;
 }
 
@@ -235,7 +235,7 @@ if ($nooffer == 0) {
     } else {
         $Offer_in_Millions = $Offer_Total / 100;
 
-        $storytitle = $Player_Name . " extends his contract with the " . $Team_Name;
+        $storytitle = $Player_Name . " extends their contract with the " . $Team_Name;
         $hometext = $Player_Name . " today accepted a contract extension offer from the " . $Team_Name . " worth $Offer_in_Millions million dollars over " . $Offer_Years . " years.";
 
         postToDiscordChannel('#extensions', $hometext);

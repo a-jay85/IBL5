@@ -3124,7 +3124,7 @@ function rookieoption($pid) {
 	echo "<img align=left src=\"images/player/$pid.jpg\">
 
 	You may exercise the rookie extension option on <b>$player_pos $player_name</b>.<br>
-	His contract value the season after this one will be <b>$rookieOptionValue</b>.<br>
+	Their contract value the season after this one will be <b>$rookieOptionValue</b>.<br>
 	However, by exercising this option, <b>you can't use an in-season contract extension on them next season</b>.<br>
 	<b>They will become a free agent</b>.<br>
 

@@ -45,7 +45,7 @@ postToDiscordChannel('#rookie-options', $filetext);
 if (mail($recipient, $emailsubject, $filetext, "From: rookieoption@iblhoops.net")) {
 	$rookieOptionInMillions = $ExtensionAmount/100;
 	$timestamp = date('Y-m-d H:i:s',time());
-	$storytitle = $Player_Name . " extends his contract with the " . $Team_Name;
+	$storytitle = $Player_Name . " extends their contract with the " . $Team_Name;
 	$hometext = $Team_Name . " exercise the rookie extension option on " . $Player_Name . " in the amount of " . $rookieOptionInMillions . " million dollars.";
 
 	$querytopic = "SELECT * FROM nuke_topics WHERE topicname = '$Team_Name'";

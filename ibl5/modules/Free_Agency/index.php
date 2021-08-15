@@ -2069,7 +2069,7 @@ function positionmigration($pid) {
 
 				echo "<img align=left src=\"images/player/$pid.jpg\">";
 
-				echo "You may migrate $player_name from his current position.  Once you choose a new position, it cannot be undone.
+				echo "You may migrate $player_name from their current position.  Once you choose a new position, it cannot be undone.
 					<form name=\"Migrate\" method=\"post\" action=\"migrate.php\">
 					<input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
 					<input type=\"hidden\" name=\"playername\" value=\"$player_name\">

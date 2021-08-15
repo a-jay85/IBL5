@@ -432,11 +432,11 @@ function submit() {
 	$seasonPhase = getCurrentSeasonPhase();
 	if ($seasonPhase != 'Playoffs') {
 		$minActivePlayers = 12;
-		$maxActivePlayers = 15;
+		$maxActivePlayers = 12;
 		$minPositionDepth = 3;
 	} else {
 		$minActivePlayers = 10;
-		$maxActivePlayers = 15;
+		$maxActivePlayers = 12;
 		$minPositionDepth = 2;
 	}
 

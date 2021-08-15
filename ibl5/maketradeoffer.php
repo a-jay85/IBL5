@@ -45,7 +45,7 @@ while ($j < $Fields_Counter)
 	if ($Check == "on")
 	{
 		$Total_SalaryB=$Total_SalaryB+$Salary;
-		echo "Total Trade Salary His Team: $$Total_SalaryB<br>";
+		echo "Total Trade Salary Their Team: $$Total_SalaryB<br>";
 	}
 	$j++;
 }

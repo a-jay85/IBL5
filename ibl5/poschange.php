@@ -30,9 +30,9 @@ if (!in_array($playerNewPosition, $acceptablePositions)) {
         $resultcat = mysql_query($querycat);
         $catid = mysql_result($resultcat,0,"catid");
 
-        $storytitle = $playerName." changes his position with the ".$teamName;
+        $storytitle = $playerName." changes their position with the ".$teamName;
         $timestamp = date('Y-m-d H:i:s',time());
-        $hometext = $playerName." today changed his position with the ".$teamName." from " .$playerOldPosition. " to " .$playerNewPosition. ".";
+        $hometext = $playerName." today changed their position with the ".$teamName." from " .$playerOldPosition. " to " .$playerNewPosition. ".";
 
         $querytopic = "SELECT * FROM nuke_topics WHERE topicname = '$teamName'";
         $resulttopic = mysql_query($querytopic);

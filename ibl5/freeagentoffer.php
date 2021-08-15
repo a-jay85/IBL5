@@ -450,7 +450,7 @@ if ($Bird_Years < 3) {
 
   if ($nooffer == 0) {
 	  if ($Offer_1 > $Year1_Max) {
-		echo "Sorry, you tried to offer a contract larger than the maximum allowed for this player based on his years of service.  The maximum you are allowed to offer this player is $Year1_Max in the first year of his contract.<br>";
+		echo "Sorry, you tried to offer a contract larger than the maximum allowed for this player based on their years of service.  The maximum you are allowed to offer this player is $Year1_Max in the first year of their contract.<br>";
 		$nooffer=1;
 	  }
 }

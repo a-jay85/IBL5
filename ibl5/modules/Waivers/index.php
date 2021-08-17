@@ -202,6 +202,7 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
                 } else {
                     $cy1 = 51;
                 }
+                $newWaiverContract = TRUE;
             }
 
             if ($Healthy_Roster_Slots < 4 AND $TotalSalary + $cy1 > 7000) { // TODO: Change 7000 to hard cap variable
@@ -211,7 +212,12 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
             } elseif ($Healthy_Roster_Slots < 1) {
                 $errortext = "You have full roster of 15 players. You can't sign another player at this time!";
             } else {
-                $queryi = "UPDATE nuke_iblplyr SET `ordinal` = '800', `cy` = 1, `cy1` = $cy1, `teamname` = '$Team_Offering', `tid` = '$teamid' WHERE `pid` = '$Player_to_Process' LIMIT 1;";
+                $queryi = "UPDATE nuke_iblplyr SET `ordinal` = '800', `bird` = 0, ";
+                if ($freshContract == TRUE) {
+                    $queryi .= "`cy1` = $cy1, `cy` = 1, ";
+                }
+                $queryi = "`teamname` = '$Team_Offering', `tid` = '$teamid' WHERE `pid` = '$Player_to_Process' LIMIT 1;";
+
                 $resulti = mysql_query($queryi);
                 $Roster_Slots++;
 

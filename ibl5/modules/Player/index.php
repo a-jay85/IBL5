@@ -1101,10 +1101,9 @@ if ((((($player_draft_round == 1 && $player_exp == 2 && $salaryIn4thYearOfCurren
 
 // POSITION CHANGE BUTTON START
 
-$userteam = stripslashes(check_html($userinfo['user_ibl_team'], "nohtml"));
-if ($can_renegotiate >= 0 AND $player_team_name == $userteam) {
-    echo "<table align=right bgcolor=#ffff00><tr><td align=center><a href=\"modules.php?name=Position_Change&pid=$pid\">CHANGE<BR>POSITION</a></td></tr></table>";
-}
+// if ($can_renegotiate >= 0 AND $player_team_name == $userteam) {
+//     echo "<table align=right bgcolor=#ffff00><tr><td align=center><a href=\"modules.php?name=Position_Change&pid=$pid\">CHANGE<BR>POSITION</a></td></tr></table>";
+// }
 
 // POSITION CHANGE BUTTON END
 

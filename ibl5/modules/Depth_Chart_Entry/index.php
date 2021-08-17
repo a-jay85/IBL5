@@ -162,7 +162,7 @@ function userinfo($username, $bypass=0, $hid=0, $url=0)
 		echo "\n
 				<tr>
 						<td>
-								<a href=\"./modules.php?name=Position_Change&pid=$player_pid\">$player_pos</a>
+								$player_pos
 						</td>
 						<td nowrap>
 								<input type=\"hidden\" name=\"Injury$depthcount\" value=\"$player_inj\">

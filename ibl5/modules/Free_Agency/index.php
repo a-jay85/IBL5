@@ -386,9 +386,9 @@ function display() {
 			}
 
 			// ==== CHECK FOR ROOKIE POSITION MIGRATION POSSIBILITY
-			if ($exp == 0) {
-				echo "<a href=\"modules.php?name=Free_Agency&pa=positionmigration&pid=$pid\">Migrate Position</a>";
-			}
+			// if ($exp == 0) {
+			// 	echo "<a href=\"modules.php?name=Free_Agency&pa=positionmigration&pid=$pid\">Migrate Position</a>";
+			// }
 
 			if ($ordinal > 960) {
 				$name .= "*";

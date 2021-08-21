@@ -44,6 +44,7 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 	include("header.php");
 
 	$currentSeasonEndingYear = getCurrentSeasonEndingYear();
+	$seasonPhase = getCurrentSeasonPhase();
 
 	OpenTable();
 
@@ -101,7 +102,7 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 		$player_name = $row8[name];
 		$player_pid = $row8[pid];
 		$contract_year = $row8[cy];
-		if (getCurrentSeasonPhase() == "Draft" OR getCurrentSeasonPhase() == "Free Agency") {
+		if ($seasonPhase == "Playoffs" OR $seasonPhase == "Draft" OR $seasonPhase == "Free Agency") {
 			$contract_year++;
 		}
 		$bird_years = $row8[bird];

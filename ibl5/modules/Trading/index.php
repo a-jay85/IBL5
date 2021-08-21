@@ -56,7 +56,7 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 	$queryListOfAllTeams = "SELECT * FROM nuke_ibl_team_info ORDER BY team_city ASC ";
 	$resultListOfAllTeams = $db->sql_query($queryListOfAllTeams);
 
-	$queryOfferingTeamPlayers = "SELECT *
+	$queryOfferingTeamPlayers = "SELECT pos, name, pid, cy, cy1, cy2, cy3, cy4, cy5, cy6
 		FROM nuke_iblplyr
 		WHERE teamname = '$userinfo[user_ibl_team]'
 		AND retired = '0'

@@ -86,18 +86,10 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 								</td>
 							</tr>
 							<tr>
-								<td valign=top>
-									<b>Select</b>
-								</td>
-								<td valign=top>
-									<b>Pos</b>
-								</td>
-								<td valign=top>
-									<b>Name</b>
-								</td>
-								<td valign=top>
-									<b>Salary</b>
-								</td>";
+								<td valign=top><b>Select</b></td>
+								<td valign=top><b>Pos</b></td>
+								<td valign=top><b>Name</b></td>
+								<td valign=top><b>Salary</b></td>";
 
 	$k = 0;
 	while($rowOfferingTeamPlayers = $db->sql_fetchrow($resultOfferingTeamPlayers)) {

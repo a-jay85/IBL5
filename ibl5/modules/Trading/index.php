@@ -53,17 +53,21 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 
 	displaytopmenu($tid);
 
-	$sql7 = "SELECT * FROM nuke_ibl_team_info ORDER BY team_city ASC ";
-	$result7 = $db->sql_query($sql7);
+	$queryListOfAllTeams = "SELECT * FROM nuke_ibl_team_info ORDER BY team_city ASC ";
+	$resultListOfAllTeams = $db->sql_query($queryListOfAllTeams);
 
-	$sql8 = "SELECT *
+	$queryOfferingTeamPlayers = "SELECT *
 		FROM nuke_iblplyr
 		WHERE teamname = '$userinfo[user_ibl_team]'
 		AND retired = '0'
 		ORDER BY ordinal ASC ";
-	$result8 = $db->sql_query($sql8);
-	$sql8a = "SELECT * FROM ibl_draft_picks WHERE ownerofpick = '$userinfo[user_ibl_team]' ORDER BY year, round ASC ";
-	$result8a = $db->sql_query($sql8a);
+	$resultOfferingTeamPlayers = $db->sql_query($queryOfferingTeamPlayers);
+
+	$queryOfferingTeamDraftPicks = "SELECT *
+		FROM ibl_draft_picks
+		WHERE ownerofpick = '$userinfo[user_ibl_team]'
+		ORDER BY year, round ASC ";
+	$resultOfferingTeamDraftPicks = $db->sql_query($queryOfferingTeamDraftPicks);
 
 	echo "<form name=\"Trade_Offer\" method=\"post\" action=\"maketradeoffer.php\">
 		<input type=\"hidden\" name=\"Team_Name\" value=\"$teamlogo\">
@@ -96,30 +100,27 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 								</td>";
 
 	$k = 0;
-	$total_salary_teama = 0;
-	while($row8 = $db->sql_fetchrow($result8)) {
-		$player_pos = $row8[pos];
-		$player_name = $row8[name];
-		$player_pid = $row8[pid];
-		$contract_year = $row8[cy];
+	while($rowOfferingTeamPlayers = $db->sql_fetchrow($resultOfferingTeamPlayers)) {
+		$player_pos = $rowOfferingTeamPlayers[pos];
+		$player_name = $rowOfferingTeamPlayers[name];
+		$player_pid = $rowOfferingTeamPlayers[pid];
+		$contract_year = $rowOfferingTeamPlayers[cy];
 		if ($seasonPhase == "Playoffs" OR $seasonPhase == "Draft" OR $seasonPhase == "Free Agency") {
 			$contract_year++;
 		}
-		$bird_years = $row8[bird];
-		$player_contract = $row8["cy$contract_year"];
+		$player_contract = $rowOfferingTeamPlayers["cy$contract_year"];
 		if ($contract_year == 7) {
 			$player_contract = 0;
 		}
 
 		//ARRAY TO BUILD FUTURE SALARY
-		$i = $contract_year;
 		$z = 0;
-		while ($i < 7) {
-			$future_salary_array['player'][$z] = $future_salary_array['player'][$z] + $row8["cy$i"];
-			if ($row8["cy$i"] > 0) {
-				$future_salary_array['hold'][$z] = $future_salary_array['hold'][$z] + 1;
+		while ($contract_year < 7) {
+			$future_salary_array['player'][$z] = $future_salary_array['player'][$z] + $rowOfferingTeamPlayers["cy$contract_year"];
+			if ($rowOfferingTeamPlayers["cy$contract_year"] > 0) {
+				$future_salary_array['hold'][$z]++;
 			}
-			$i++;
+			$contract_year++;
 			$z++;
 		}
 
@@ -127,73 +128,54 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 
 		echo "<input type=\"hidden\" name=\"index$k\" value=\"$player_pid\">
 			<input type=\"hidden\" name=\"contract$k\" value=\"$player_contract\">
-			<input type=\"hidden\" name=\"type$k\" value=\"1\">";
-		if ($bird_years > -1) {
-			echo "<tr>
-				<td align=\"center\">";
-			if ($player_contract != 0) {
-				echo "<input type=\"checkbox\" name=\"check$k\">";
-			} else {
-				echo "<input type=\"hidden\" name=\"check$k\">";
-			}
-			echo "
-				</td>
-				<td>
-					$player_pos
-				</td>
-				<td>
-					$player_name
-				</td>
-				<td align=\"right\">
-					$player_contract
-				</td>
-			</tr>";
+			<input type=\"hidden\" name=\"type$k\" value=\"1\">
+		<tr>";
+
+		if ($player_contract != 0) {
+			echo "<td align=\"center\"><input type=\"checkbox\" name=\"check$k\"></td>";
 		} else {
-			echo "<tr>
-				<td>
-					$player_pos
-				</td>
-				<td>
-					$player_name
-				</td>
-				<td align=\"right\">
-					$player_contract
-				</td>
-			</tr>";
+			echo "<td align=\"center\"><input type=\"hidden\" name=\"check$k\"></td>";
 		}
+
+		echo "
+			<td>$player_pos</td>
+			<td>$player_name</td>
+			<td align=\"right\">$player_contract</td>
+		</tr>";
+
 		$k++;
 	}
 
-	while ($row8a = $db->sql_fetchrow($result8a)) {
-		$pick_year = $row8a[year];
-		$pick_team = $row8a[teampick];
-		$pick_round = $row8a[round];
-		$pick_id = $row8a[pickid];
+	while ($rowOfferingTeamDraftPicks = $db->sql_fetchrow($resultOfferingTeamDraftPicks)) {
+		$pick_year = $rowOfferingTeamDraftPicks[year];
+		$pick_team = $rowOfferingTeamDraftPicks[teampick];
+		$pick_round = $rowOfferingTeamDraftPicks[round];
+		$pick_id = $rowOfferingTeamDraftPicks[pickid];
 
 		$y = $pick_year - $currentSeasonEndingYear + 1;
 		if ($pick_round == 1) {
 			$future_salary_array['picks'][$y] = $future_salary_array['picks'][$y] + 75;
-			$future_salary_array['hold'][$y] = $future_salary_array['hold'][$y] + 1;
+			$future_salary_array['hold'][$y]++;
 			//$future_salary_array[$y]=$future_salary_array[$y]+321;
 			//$future_roster_sports[$y]=$future_roster_sports[$y]+1;
-			$y=$y+1;
+			$y++;
 			$future_salary_array['picks'][$y] = $future_salary_array['picks'][$y] + 75;
-			$future_salary_array['hold'][$y] = $future_salary_array['hold'][$y] + 1;
+			$future_salary_array['hold'][$y]++;
 			//$future_salary_array[$y]=$future_salary_array[$y]+345;
 			//$future_roster_sports[$y]=$future_roster_sports[$y]+1;
-			$y=$y+1;
+			$y++;
 			$future_salary_array['picks'][$y] = $future_salary_array['picks'][$y] + 75;
-			$future_salary_array['hold'][$y] = $future_salary_array['hold'][$y] + 1;
+			$future_salary_array['hold'][$y]++;
 			//$future_salary_array[$y]=$future_salary_array[$y]+369;
 			//$future_roster_sports[$y]=$future_roster_sports[$y]+1;
 		} else {
 			$future_salary_array['picks'][$y] = $future_salary_array['picks'][$y] + 75;
-			$future_salary_array['hold'][$y] = $future_salary_array['hold'][$y] + 1;
+			$future_salary_array['hold'][$y]++;
 			//$future_salary_array[$y]=$future_salary_array[$y]+35;
 			//$future_roster_sports[$y]=$future_roster_sports[$y]+1;
-			$y=$y+1;
+			$y++;
 			$future_salary_array['picks'][$y] = $future_salary_array['picks'][$y] + 75;
-			$future_salary_array['hold'][$y] = $future_salary_array['hold'][$y] + 1;
+			$future_salary_array['hold'][$y]++;
 			//$future_salary_array[$y]=$future_salary_array[$y]+51;
 			//$future_roster_sports[$y]=$future_roster_sports[$y]+1;
 		}
@@ -224,40 +206,36 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 					</td>
 				</tr>
 				<tr>
-					<td valign=top>
-						<b>Select</b>
-					</td>
-					<td valign=top>
-						<b>Pos</b>
-					</td>
-					<td valign=top>
-						<b>Name</b>
-					</td>
-					<td valign=top>
-						<b>Salary</b>
-					</td>";
+					<td valign=top><b>Select</b></td>
+					<td valign=top><b>Pos</b></td>
+					<td valign=top><b>Name</b></td>
+					<td valign=top><b>Salary</b></td>
+				</tr>";
 
-	$sql9 = "SELECT *
+	$queryOtherTeamPlayers = "SELECT *
 		FROM nuke_iblplyr
 		WHERE teamname = '$partner'
 		AND retired = '0'
 		ORDER BY ordinal ASC ";
-	$result9 = $db->sql_query($sql9);
-	$sql9a = "SELECT * FROM ibl_draft_picks WHERE ownerofpick = '$partner' ORDER BY year, round ASC ";
+	$resultOtherTeamPlayers = $db->sql_query($queryOtherTeamPlayers);
 
-	$result9a = $db->sql_query($sql9a);
-	$total_salary_teamb = 0;
-	$roster_hold_teamb = (15 - mysql_numrows($result9)) * 75;
-	while ($row9 = $db->sql_fetchrow($result9)) {
-		$player_pos = $row9[pos];
-		$player_name = $row9[name];
-		$player_pid = $row9[pid];
-		$contract_year = $row9[cy];
+	$queryOtherTeamDraftPicks = "SELECT *
+		FROM ibl_draft_picks
+		WHERE ownerofpick = '$partner'
+		ORDER BY year, round ASC ";
+	$resultOtherTeamDraftPicks = $db->sql_query($queryOtherTeamDraftPicks);
+
+	$roster_hold_teamb = (15 - mysql_numrows($resultOtherTeamPlayers)) * 75;
+	while ($rowOtherTeamPlayers = $db->sql_fetchrow($resultOtherTeamPlayers)) {
+		$player_pos = $rowOtherTeamPlayers[pos];
+		$player_name = $rowOtherTeamPlayers[name];
+		$player_pid = $rowOtherTeamPlayers[pid];
+		$contract_year = $rowOtherTeamPlayers[cy];
 		if (getCurrentSeasonPhase() == "Draft" OR getCurrentSeasonPhase() == "Free Agency") {
 			$contract_year++;
 		}
-		$bird_years = $row9[bird];
-		$player_contract = $row9["cy$contract_year"];
+		$bird_years = $rowOtherTeamPlayers[bird];
+		$player_contract = $rowOtherTeamPlayers["cy$contract_year"];
 		if ($contract_year == 7) {
 			$player_contract = 0;
 		}
@@ -266,9 +244,9 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 		$i = $contract_year;
 		$z = 0;
 		while ($i < 7) {
-			//$future_salary_arrayb[$z]=$future_salary_arrayb[$z]+$row9["cy$i"];
-			$future_salary_arrayb['player'][$z] = $future_salary_arrayb['player'][$z] + $row9["cy$i"];
-			if ($row9["cy$i"] > 0) {
+			//$future_salary_arrayb[$z]=$future_salary_arrayb[$z]+$rowOtherTeamPlayers["cy$i"];
+			$future_salary_arrayb['player'][$z] = $future_salary_arrayb['player'][$z] + $rowOtherTeamPlayers["cy$i"];
+			if ($rowOtherTeamPlayers["cy$i"] > 0) {
 				//$future_roster_sportsb[$z]=$future_roster_sportsb[$z]+1;
 				$future_salary_arrayb['hold'][$z] = $future_salary_arrayb['hold'][$z] + 1;
 			}
@@ -280,43 +258,29 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 
 		echo "<input type=\"hidden\" name=\"index$k\" value=\"$player_pid\">
 			<input type=\"hidden\" name=\"contract$k\" value=\"$player_contract\">
-			<input type=\"hidden\" name=\"type$k\" value=\"1\">";
-		if ($bird_years > -1) {
-			echo "<tr>
-				<td align=center>";
-			if ($player_contract != 0) {
-				echo "<input type=\"checkbox\" name=\"check$k\">";
-			} else {
-				echo "<input type=\"hidden\" name=\"check$k\">";
-			}
-			echo "
-				</td>
-				<td>
-					$player_pos
-				</td>
-				<td>
-					$player_name
-				</td>
-				<td align=\"right\">
-					$player_contract
-				</td>
-			</tr>";
+			<input type=\"hidden\" name=\"type$k\" value=\"1\">
+		<tr>";
+
+		if ($player_contract != 0) {
+			echo "<td align=center><input type=\"checkbox\" name=\"check$k\"></td>";
 		} else {
-			echo "<tr>
-				<td>$player_pos</td>
-				<td>$player_name</td>
-				<td>$player_contract</td>
-			</tr>";
+			echo "<td align=center><input type=\"hidden\" name=\"check$k\"></td>";
 		}
 
-	$k++;
+		echo "
+			<td>$player_pos</td>
+			<td>$player_name</td>
+			<td align=\"right\">$player_contract</td>
+		</tr>";
+
+		$k++;
 	}
 
-	while($row9a = $db->sql_fetchrow($result9a)) {
-		$pick_year = $row9a[year];
-		$pick_team = $row9a[teampick];
-		$pick_round = $row9a[round];
-		$pick_id = $row9a[pickid];
+	while($rowOtherTeamDraftPicks = $db->sql_fetchrow($resultOtherTeamDraftPicks)) {
+		$pick_year = $rowOtherTeamDraftPicks[year];
+		$pick_team = $rowOtherTeamDraftPicks[teampick];
+		$pick_round = $rowOtherTeamDraftPicks[round];
+		$pick_id = $rowOtherTeamDraftPicks[pickid];
 
 		$y = $pick_year - $currentSeasonEndingYear + 1;
 		if ($pick_round == 1) {
@@ -324,12 +288,12 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 			$future_salary_arrayb['hold'][$y] = $future_salary_arrayb['hold'][$y] + 1;
 			//$future_salary_array[$y]=$future_salary_array[$y]+321;
 			//$future_roster_sports[$y]=$future_roster_sports[$y]+1;
-			$y=$y+1;
+			$y++;
 			$future_salary_arrayb['picks'][$y] = $future_salary_arrayb['picks'][$y] + 75;
 			$future_salary_arrayb['hold'][$y] = $future_salary_arrayb['hold'][$y] + 1;
 			//$future_salary_array[$y]=$future_salary_array[$y]+345;
 			//$future_roster_sports[$y]=$future_roster_sports[$y]+1;
-			$y = $y + 1;
+			$y++;
 			$future_salary_arrayb['picks'][$y] = $future_salary_arrayb['picks'][$y] + 75;
 			$future_salary_arrayb['hold'][$y] = $future_salary_arrayb['hold'][$y] + 1;
 			//$future_salary_array[$y]=$future_salary_array[$y]+369;
@@ -339,7 +303,7 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 			$future_salary_arrayb['hold'][$y] = $future_salary_arrayb['hold'][$y] + 1;
 			//$future_salary_array[$y]=$future_salary_array[$y]+35;
 			//$future_roster_sports[$y]=$future_roster_sports[$y]+1;
-			$y=$y+1;
+			$y++;
 			$future_salary_arrayb['picks'][$y] = $future_salary_arrayb['picks'][$y] + 75;
 			$future_salary_arrayb['hold'][$y] = $future_salary_arrayb['hold'][$y] + 1;
 			//$future_salary_array[$y]=$future_salary_array[$y]+51;
@@ -369,10 +333,9 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 					<input type=\"hidden\" name=\"counterfields\" value=\"$k\">
 					<td valign=top><center><b><u>Make Trade Offer To...</u></b></center>";
 
-	while($row7 = $db->sql_fetchrow($result7)) {
-		$team_name = $row7[team_name];
-		$team_city = $row7[team_city];
-		$team_id = $row7[teamid];
+	while ($rowInListOfAllTeams = $db->sql_fetchrow($resultListOfAllTeams)) {
+		$team_name = $rowInListOfAllTeams[team_name];
+		$team_city = $rowInListOfAllTeams[team_city];
 
 		if ($team_name != 'Free Agents') {
 			//------Trade Deadline Code---------
@@ -391,9 +354,9 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 		$pass_future_salary_picksb[$z] = $pass_future_salary_arrayb[$z] + $future_salary_arrayb['picks'][$z];
 		echo "<tr><td><b>
 			Total Year: " . ($currentSeasonEndingYear + $z) . ":
-			Salary: $".$future_salary_array['player'][$z]."</b></td>";
+			Salary: $" . $future_salary_array['player'][$z] . "</b></td>";
 		echo "<td align=right><b>
-			Salary: $".$future_salary_arrayb['player'][$z]."</b></td>";
+			Salary: $" . $future_salary_arrayb['player'][$z] . "</b></td>";
 		$z++;
 	}
 
@@ -403,12 +366,12 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 	$pass_future_salary_playerb = implode(",", $pass_future_salary_playerb);
 	$pass_future_salary_holdb = implode(",", $pass_future_salary_holdb);
 	$pass_future_salary_picksb = implode(",", $pass_future_salary_picksb);
-	echo "<input type=\"hidden\" name=\"pass_future_salary_player\" value=\"".htmlspecialchars($pass_future_salary_player)."\">
-		<input type=\"hidden\" name=\"pass_future_salary_hold\" value=\"".htmlspecialchars($pass_future_salary_hold)."\">
-		<input type=\"hidden\" name=\"pass_future_salary_picks\" value=\"".htmlspecialchars($pass_future_salary_picks)."\">
-		<input type=\"hidden\" name=\"pass_future_salary_playerb\" value=\"".htmlspecialchars($pass_future_salary_playerb)."\">
-		<input type=\"hidden\" name=\"pass_future_salary_holdb\" value=\"".htmlspecialchars($pass_future_salary_holdb)."\">
-		<input type=\"hidden\" name=\"pass_future_salary_picksb\" value=\"".htmlspecialchars($pass_future_salary_picksb)."\">
+	echo "<input type=\"hidden\" name=\"pass_future_salary_player\" value=\"" . htmlspecialchars($pass_future_salary_player) . "\">
+		<input type=\"hidden\" name=\"pass_future_salary_hold\" value=\"" . htmlspecialchars($pass_future_salary_hold) . "\">
+		<input type=\"hidden\" name=\"pass_future_salary_picks\" value=\"" . htmlspecialchars($pass_future_salary_picks) . "\">
+		<input type=\"hidden\" name=\"pass_future_salary_playerb\" value=\"" . htmlspecialchars($pass_future_salary_playerb) . "\">
+		<input type=\"hidden\" name=\"pass_future_salary_holdb\" value=\"" . htmlspecialchars($pass_future_salary_holdb) . "\">
+		<input type=\"hidden\" name=\"pass_future_salary_picksb\" value=\"" . htmlspecialchars($pass_future_salary_picksb) . "\">
 		<tr><td colspan=3 align=center>
 		<input type=\"submit\" value=\"Make Trade Offer\"></td></tr></form></center></table></td></tr></table></center>";
 
@@ -420,7 +383,7 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
 {
 	global $user, $cookie, $sitename, $prefix, $user_prefix, $db, $admin, $broadcast_msg, $my_headlines, $module_name, $subscription_url, $attrib, $step, $player;
-	$sql = "SELECT * FROM ".$prefix."_bbconfig";
+	$sql = "SELECT * FROM " . $prefix . "_bbconfig";
 	$result = $db->sql_query($sql);
 	while ($row = $db->sql_fetchrow($result)) {
 		$board_config[$row['config_name']] = $row['config_value'];
@@ -428,7 +391,7 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
 
 	// ==== PICKUP LOGGED-IN USER INFO
 
-	$sql2 = "SELECT * FROM ".$user_prefix."_users WHERE username = '$username'";
+	$sql2 = "SELECT * FROM " . $user_prefix."_users WHERE username = '$username'";
 	$result2 = $db->sql_query($sql2);
 	$num = $db->sql_numrows($result2);
 	$userinfo = $db->sql_fetchrow($result2);
@@ -457,7 +420,7 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
 			<tr>
 				<td valign=top>REVIEW TRADE OFFERS";
 
-	while($row3 = $db->sql_fetchrow($result3)) {
+	while ($row3 = $db->sql_fetchrow($result3)) {
 		$isinvolvedintrade = 0;
 		$hashammer = 0;
 		$offerid = $row3[tradeofferid];
@@ -541,13 +504,12 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
 	echo "</td>
 		<td valign=top><center><b><u>Make Trade Offer To...</u></b></center>";
 
-	$sql7 = "SELECT * FROM nuke_ibl_team_info ORDER BY team_city ASC ";
-	$result7 = $db->sql_query($sql7);
+	$queryListOfAllTeams = "SELECT * FROM nuke_ibl_team_info ORDER BY team_city ASC ";
+	$resultListOfAllTeams = $db->sql_query($queryListOfAllTeams);
 
-	while($row7 = $db->sql_fetchrow($result7)) {
-		$team_name = $row7[team_name];
-		$team_city = $row7[team_city];
-		$team_id = $row7[teamid];
+	while($rowInListOfAllTeams = $db->sql_fetchrow($resultListOfAllTeams)) {
+		$team_name = $rowInListOfAllTeams[team_name];
+		$team_city = $rowInListOfAllTeams[team_city];
 
 		if ($team_name != 'Free Agents') {
 			//------Trade Deadline Code---------
@@ -555,10 +517,15 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
 		}
 	}
 
-	echo "</td></tr><tr><td colspan=2 align=center>
-		<a href=\"modules.php?name=Waivers&action=drop\">Drop a player to Waivers</a><br>
-		<a href=\"modules.php?name=Waivers&action=add\">Add a player from Waivers</a><br>
-		</td></tr></table>";
+	echo "</td>
+		</tr>
+		<tr>
+			<td colspan=2 align=center>
+				<a href=\"modules.php?name=Waivers&action=drop\">Drop a player to Waivers</a><br>
+				<a href=\"modules.php?name=Waivers&action=add\">Add a player from Waivers</a><br>
+			</td>
+		</tr>
+	</table>";
 
 	CloseTable();
 	include("footer.php");
@@ -567,7 +534,7 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
 function reviewtrade($user)
 {
 	global $stop, $module_name, $redirect, $mode, $t, $f, $gfx_chk;
-	if(!is_user($user)) {
+	if (!is_user($user)) {
 		include("header.php");
 		if ($stop) {
 			OpenTable();
@@ -618,7 +585,7 @@ function reviewtrade($user)
 function offertrade($user)
 {
 	global $stop, $module_name, $redirect, $mode, $t, $f, $gfx_chk;
-	if(!is_user($user)) {
+	if (!is_user($user)) {
 		include("header.php");
 		if ($stop) {
 			OpenTable();
@@ -644,7 +611,6 @@ function offertrade($user)
 }
 
 switch($op) {
-
 	case "reviewtrade":
 	reviewtrade($user);
 	break;

@@ -26,6 +26,56 @@ function menu()
 	include("footer.php");
 }
 
+function buildTeamFutureSalary ($resultTeamPlayers)
+{
+	$k = 0;
+	while($rowTeamPlayers = mysql_fetch_assoc($resultTeamPlayers)) {
+		$seasonPhase = getCurrentSeasonPhase();
+		$player_pos = $rowTeamPlayers["pos"];
+		$player_name = $rowTeamPlayers["name"];
+		$player_pid = $rowTeamPlayers["pid"];
+		$contract_year = $rowTeamPlayers["cy"];
+		if ($seasonPhase == "Playoffs" OR $seasonPhase == "Draft" OR $seasonPhase == "Free Agency") {
+			$contract_year++;
+		}
+		$player_contract = $rowTeamPlayers["cy$contract_year"];
+		if ($contract_year == 7) {
+			$player_contract = 0;
+		}
+
+		$i = 0;
+		while ($contract_year < 7) {
+			$future_salary_array['player'][$i] = $future_salary_array['player'][$i] + $rowTeamPlayers["cy$contract_year"];
+			if ($rowTeamPlayers["cy$contract_year"] > 0) {
+				$future_salary_array['hold'][$i]++;
+			}
+			$contract_year++;
+			$i++;
+		}
+
+		echo "<input type=\"hidden\" name=\"index$k\" value=\"$player_pid\">
+			<input type=\"hidden\" name=\"contract$k\" value=\"$player_contract\">
+			<input type=\"hidden\" name=\"type$k\" value=\"1\">
+		<tr>";
+
+		if ($player_contract != 0) {
+			echo "<td align=\"center\"><input type=\"checkbox\" name=\"check$k\"></td>";
+		} else {
+			echo "<td align=\"center\"><input type=\"hidden\" name=\"check$k\"></td>";
+		}
+
+		echo "
+			<td>$player_pos</td>
+			<td>$player_name</td>
+			<td align=\"right\">$player_contract</td>
+		</tr>";
+
+		$k++;
+	}
+
+	return $future_salary_array;
+}
+
 function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 {
 	global $user, $cookie, $sitename, $prefix, $user_prefix, $db, $admin, $broadcast_msg, $my_headlines, $module_name, $subscription_url, $partner;
@@ -44,7 +94,6 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 	include("header.php");
 
 	$currentSeasonEndingYear = getCurrentSeasonEndingYear();
-	$seasonPhase = getCurrentSeasonPhase();
 
 	OpenTable();
 
@@ -91,52 +140,7 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 								<td valign=top><b>Name</b></td>
 								<td valign=top><b>Salary</b></td>";
 
-	$k = 0;
-	while($rowOfferingTeamPlayers = $db->sql_fetchrow($resultOfferingTeamPlayers)) {
-		$player_pos = $rowOfferingTeamPlayers[pos];
-		$player_name = $rowOfferingTeamPlayers[name];
-		$player_pid = $rowOfferingTeamPlayers[pid];
-		$contract_year = $rowOfferingTeamPlayers[cy];
-		if ($seasonPhase == "Playoffs" OR $seasonPhase == "Draft" OR $seasonPhase == "Free Agency") {
-			$contract_year++;
-		}
-		$player_contract = $rowOfferingTeamPlayers["cy$contract_year"];
-		if ($contract_year == 7) {
-			$player_contract = 0;
-		}
-
-		//ARRAY TO BUILD FUTURE SALARY
-		$z = 0;
-		while ($contract_year < 7) {
-			$future_salary_array['player'][$z] = $future_salary_array['player'][$z] + $rowOfferingTeamPlayers["cy$contract_year"];
-			if ($rowOfferingTeamPlayers["cy$contract_year"] > 0) {
-				$future_salary_array['hold'][$z]++;
-			}
-			$contract_year++;
-			$z++;
-		}
-
-		//END OF ARRAY
-
-		echo "<input type=\"hidden\" name=\"index$k\" value=\"$player_pid\">
-			<input type=\"hidden\" name=\"contract$k\" value=\"$player_contract\">
-			<input type=\"hidden\" name=\"type$k\" value=\"1\">
-		<tr>";
-
-		if ($player_contract != 0) {
-			echo "<td align=\"center\"><input type=\"checkbox\" name=\"check$k\"></td>";
-		} else {
-			echo "<td align=\"center\"><input type=\"hidden\" name=\"check$k\"></td>";
-		}
-
-		echo "
-			<td>$player_pos</td>
-			<td>$player_name</td>
-			<td align=\"right\">$player_contract</td>
-		</tr>";
-
-		$k++;
-	}
+	$future_salary_array = buildTeamFutureSalary($resultOfferingTeamPlayers);
 
 	while ($rowOfferingTeamDraftPicks = $db->sql_fetchrow($resultOfferingTeamDraftPicks)) {
 		$pick_year = $rowOfferingTeamDraftPicks[year];
@@ -218,55 +222,8 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 	$resultOtherTeamDraftPicks = $db->sql_query($queryOtherTeamDraftPicks);
 
 	$roster_hold_teamb = (15 - mysql_numrows($resultOtherTeamPlayers)) * 75;
-	while ($rowOtherTeamPlayers = $db->sql_fetchrow($resultOtherTeamPlayers)) {
-		$player_pos = $rowOtherTeamPlayers[pos];
-		$player_name = $rowOtherTeamPlayers[name];
-		$player_pid = $rowOtherTeamPlayers[pid];
-		$contract_year = $rowOtherTeamPlayers[cy];
-		if (getCurrentSeasonPhase() == "Draft" OR getCurrentSeasonPhase() == "Free Agency") {
-			$contract_year++;
-		}
-		$bird_years = $rowOtherTeamPlayers[bird];
-		$player_contract = $rowOtherTeamPlayers["cy$contract_year"];
-		if ($contract_year == 7) {
-			$player_contract = 0;
-		}
 
-		//ARRAY TO BUILD FUTURE SALARY
-		$i = $contract_year;
-		$z = 0;
-		while ($i < 7) {
-			//$future_salary_arrayb[$z]=$future_salary_arrayb[$z]+$rowOtherTeamPlayers["cy$i"];
-			$future_salary_arrayb['player'][$z] = $future_salary_arrayb['player'][$z] + $rowOtherTeamPlayers["cy$i"];
-			if ($rowOtherTeamPlayers["cy$i"] > 0) {
-				//$future_roster_sportsb[$z]=$future_roster_sportsb[$z]+1;
-				$future_salary_arrayb['hold'][$z] = $future_salary_arrayb['hold'][$z] + 1;
-			}
-			$i++;
-			$z++;
-		}
-
-		//END OF ARRAY
-
-		echo "<input type=\"hidden\" name=\"index$k\" value=\"$player_pid\">
-			<input type=\"hidden\" name=\"contract$k\" value=\"$player_contract\">
-			<input type=\"hidden\" name=\"type$k\" value=\"1\">
-		<tr>";
-
-		if ($player_contract != 0) {
-			echo "<td align=center><input type=\"checkbox\" name=\"check$k\"></td>";
-		} else {
-			echo "<td align=center><input type=\"hidden\" name=\"check$k\"></td>";
-		}
-
-		echo "
-			<td>$player_pos</td>
-			<td>$player_name</td>
-			<td align=\"right\">$player_contract</td>
-		</tr>";
-
-		$k++;
-	}
+	$future_salary_arrayb = buildTeamFutureSalary($resultOtherTeamPlayers);
 
 	while($rowOtherTeamDraftPicks = $db->sql_fetchrow($resultOtherTeamDraftPicks)) {
 		$pick_year = $rowOtherTeamDraftPicks[year];

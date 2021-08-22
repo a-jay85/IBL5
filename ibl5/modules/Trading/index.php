@@ -216,7 +216,7 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 					<td valign=top><b>Salary</b></td>
 				</tr>";
 
-	$queryOtherTeamPlayers = "SELECT *
+	$queryOtherTeamPlayers = "SELECT pos, name, pid, cy, cy1, cy2, cy3, cy4, cy5, cy6
 		FROM nuke_iblplyr
 		WHERE teamname = '$partner'
 		AND retired = '0'
@@ -415,7 +415,7 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
 	echo "</td>
 		<td valign=top><center><b><u>Make Trade Offer To...</u></b></center>";
 
-	$queryListOfAllTeams = "SELECT * FROM nuke_ibl_team_info ORDER BY team_city ASC ";
+	$queryListOfAllTeams = "SELECT team_name, team_city FROM nuke_ibl_team_info ORDER BY team_city ASC ";
 	$resultListOfAllTeams = $db->sql_query($queryListOfAllTeams);
 
 	while($rowInListOfAllTeams = $db->sql_fetchrow($resultListOfAllTeams)) {

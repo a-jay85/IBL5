@@ -159,19 +159,16 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 	$tid = getTidFromTeamname($teamlogo);
 	displaytopmenu($tid);
 
-	$queryListOfAllTeams = "SELECT * FROM nuke_ibl_team_info ORDER BY team_city ASC ";
-	$resultListOfAllTeams = $db->sql_query($queryListOfAllTeams);
-
 	$queryOfferingTeamPlayers = "SELECT pos, name, pid, cy, cy1, cy2, cy3, cy4, cy5, cy6
 		FROM nuke_iblplyr
-		WHERE teamname = '$userinfo[user_ibl_team]'
+		WHERE teamname = '$teamlogo'
 		AND retired = '0'
 		ORDER BY ordinal ASC ";
 	$resultOfferingTeamPlayers = $db->sql_query($queryOfferingTeamPlayers);
 
 	$queryOfferingTeamDraftPicks = "SELECT *
 		FROM ibl_draft_picks
-		WHERE ownerofpick = '$userinfo[user_ibl_team]'
+		WHERE ownerofpick = '$teamlogo'
 		ORDER BY year, round ASC ";
 	$resultOfferingTeamDraftPicks = $db->sql_query($queryOfferingTeamDraftPicks);
 
@@ -247,12 +244,13 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 					<input type=\"hidden\" name=\"counterfields\" value=\"$k\">
 					<td valign=top><center><b><u>Make Trade Offer To...</u></b></center>";
 
+	$queryListOfAllTeams = "SELECT team_name, team_city FROM nuke_ibl_team_info ORDER BY team_city ASC";
+	$resultListOfAllTeams = $db->sql_query($queryListOfAllTeams);
 	while ($rowInListOfAllTeams = $db->sql_fetchrow($resultListOfAllTeams)) {
 		$team_name = $rowInListOfAllTeams[team_name];
 		$team_city = $rowInListOfAllTeams[team_city];
 
 		if ($team_name != 'Free Agents') {
-			//------Trade Deadline Code---------
 			echo "<a href=\"modules.php?name=Trading&op=offertrade&partner=$team_name\">$team_city $team_name</a><br>";
 		}
 	}

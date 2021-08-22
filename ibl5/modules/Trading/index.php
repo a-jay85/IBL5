@@ -156,8 +156,7 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 	OpenTable();
 
 	$teamlogo = $userinfo[user_ibl_team];
-	$tid = mysql_result(mysql_query("SELECT * FROM nuke_ibl_team_info WHERE team_name = '$teamlogo' LIMIT 1"), 0, "teamid");
-
+	$tid = getTidFromTeamname($teamlogo);
 	displaytopmenu($tid);
 
 	$queryListOfAllTeams = "SELECT * FROM nuke_ibl_team_info ORDER BY team_city ASC ";
@@ -319,7 +318,7 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
 	OpenTable();
 
 	$teamlogo = $userinfo[user_ibl_team];
-	$tid = mysql_result(mysql_query("SELECT * FROM nuke_ibl_team_info WHERE team_name = '$teamlogo' LIMIT 1"), 0, "teamid");
+	$tid = getTidFromTeamname($teamlogo);
 	displaytopmenu($tid);
 
 	echo "<center><img src=\"images/logo/$tid.jpg\"><br>";

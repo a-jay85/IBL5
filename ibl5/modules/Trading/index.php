@@ -26,9 +26,8 @@ function menu()
 	include("footer.php");
 }
 
-function buildTeamFutureSalary ($resultTeamPlayers)
+function buildTeamFutureSalary ($resultTeamPlayers, $k)
 {
-	$k = 0;
 	while($rowTeamPlayers = mysql_fetch_assoc($resultTeamPlayers)) {
 		$seasonPhase = getCurrentSeasonPhase();
 		$player_pos = $rowTeamPlayers["pos"];
@@ -73,11 +72,14 @@ function buildTeamFutureSalary ($resultTeamPlayers)
 		$k++;
 	}
 
+	$future_salary_array['k'] = $k;
+
 	return $future_salary_array;
 }
 
 function buildTeamFuturePicks ($resultTeamPicks, $future_salary_array)
 {
+	$k = $future_salary_array['k'];
 	while ($rowTeamDraftPicks = mysql_fetch_assoc($resultTeamPicks)) {
 		$currentSeasonEndingYear = getCurrentSeasonEndingYear();
 		$pick_year = $rowTeamDraftPicks["year"];
@@ -125,8 +127,9 @@ function buildTeamFuturePicks ($resultTeamPicks, $future_salary_array)
 		</tr>";
 
 		$k++;
-		$future_salary_array['k'] = $k;
 	}
+
+	$future_salary_array['k'] = $k;
 
 	return $future_salary_array;
 }
@@ -195,8 +198,9 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 								<td valign=top><b>Name</b></td>
 								<td valign=top><b>Salary</b></td>";
 
-	$future_salary_array = buildTeamFutureSalary($resultOfferingTeamPlayers);
+	$future_salary_array = buildTeamFutureSalary($resultOfferingTeamPlayers, 0);
 	$future_salary_array = buildTeamFuturePicks($resultOfferingTeamDraftPicks, $future_salary_array);
+	$k = $future_salary_array['k'];  // pull $k value out to populate $Fields_Counter in maketradeoffer.php
 
 	echo "</table>
 		</td>
@@ -231,7 +235,7 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 
 	$roster_hold_teamb = (15 - mysql_numrows($resultOtherTeamPlayers)) * 75;
 
-	$future_salary_arrayb = buildTeamFutureSalary($resultOtherTeamPlayers);
+	$future_salary_arrayb = buildTeamFutureSalary($resultOtherTeamPlayers, $k);
 	$future_salary_arrayb = buildTeamFuturePicks($resultOtherTeamDraftPicks, $future_salary_arrayb);
 	$k = $future_salary_arrayb['k'];  // pull $k value out to populate $Fields_Counter in maketradeoffer.php
 

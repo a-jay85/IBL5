@@ -1,7 +1,7 @@
 <?php
 // TODO: Prevent broken SQL strings from being sent in schedule parser
 
-error_reporting(E_ALL & ~E_NOTICE);
+error_reporting(E_ALL);
 libxml_use_internal_errors(true);
 
 //*****************************************************************************
@@ -190,128 +190,134 @@ function extractStandingsValues()
 	$rowsByDivision = $getRows->item(0)->childNodes->item(1)->childNodes->item(0)->childNodes;
 
 	foreach ($rowsByConference as $row) {
-		$teamName = $row->childNodes->item(0)->nodeValue;
-		if (in_array($teamName, array("Eastern", "Western"))) {
-			$conference = $teamName;
+		if (!is_null($row->childNodes)) {
+			$teamName = $row->childNodes->item(0)->nodeValue;
+			if (in_array($teamName, array("Eastern", "Western"))) {
+				$conference = $teamName;
+			}
+			if (!in_array($teamName, array("Eastern", "Western", "team", ""))) {
+				$tid = getTidFromTeamname($teamName);
+				$leagueRecord = $row->childNodes->item(1)->nodeValue;
+				$pct = $row->childNodes->item(2)->nodeValue;
+				$confGB = $row->childNodes->item(3)->nodeValue;
+				$confRecord = $row->childNodes->item(4)->nodeValue;
+				$divRecord = $row->childNodes->item(5)->nodeValue;
+				$homeRecord = $row->childNodes->item(6)->nodeValue;
+				$awayRecord = $row->childNodes->item(7)->nodeValue;
+
+				$confWins = extractWins($confRecord);
+				$confLosses = extractLosses($confRecord);
+				$divWins = extractWins($divRecord);
+				$divLosses = extractLosses($divRecord);
+				$homeWins = extractWins($homeRecord);
+				$homeLosses = extractLosses($homeRecord);
+				$awayWins = extractWins($awayRecord);
+				$awayLosses = extractLosses($awayRecord);
+
+				$gamesUnplayed = 82 - $homeWins - $homeLosses - $awayWins - $awayLosses; // TODO: make number of games in season dynamic
+
+				$sqlQueryString = "INSERT INTO ibl_standings (
+					tid,
+					team_name,
+					leagueRecord,
+					pct,
+					gamesUnplayed,
+					conference,
+					confGB,
+					confRecord,
+					divRecord,
+					homeRecord,
+					awayRecord,
+					confWins,
+					confLosses,
+					divWins,
+					divLosses,
+					homeWins,
+					homeLosses,
+					awayWins,
+					awayLosses
+				)
+				VALUES (
+					'".$tid."',
+					'".rtrim($teamName)."',
+					'".$leagueRecord."',
+					'".$pct."',
+					'".$gamesUnplayed."',
+					'".$conference."',
+					'".$confGB."',
+					'".$confRecord."',
+					'".$divRecord."',
+					'".$homeRecord."',
+					'".$awayRecord."',
+					'".$confWins."',
+					'".$confLosses."',
+					'".$divWins."',
+					'".$divLosses."',
+					'".$homeWins."',
+					'".$homeLosses."',
+					'".$awayWins."',
+					'".$awayLosses."'
+				)
+				ON DUPLICATE KEY UPDATE
+					tid = '".$tid."',
+					leagueRecord = '".$leagueRecord."',
+					pct = '".$pct."',
+					gamesUnplayed = '".$gamesUnplayed."',
+					conference = '".$conference."',
+					confGB = '".$confGB."',
+					confRecord = '".$confRecord."',
+					divRecord = '".$divRecord."',
+					homeRecord = '".$homeRecord."',
+					awayRecord = '".$awayRecord."',
+					confWins = '".$confWins."',
+					confLosses = '".$confLosses."',
+					divWins = '".$divWins."',
+					divlosses = '".$divLosses."',
+					homeWins = '".$homeWins."',
+					homeLosses = '".$homeLosses."',
+					awayWins = '".$awayWins."',
+					awayLosses = '".$awayLosses."'
+				";
+
+				if (mysql_query($sqlQueryString)) {
+					echo $sqlQueryString . '<br>';
+				} else die('Invalid query: ' . mysql_error());
+			}
 		}
-		if (!in_array($teamName, array("Eastern", "Western", "team", ""))) {
-			$tid = getTidFromTeamname($teamName);
-			$leagueRecord = $row->childNodes->item(1)->nodeValue;
-			$pct = $row->childNodes->item(2)->nodeValue;
-			$confGB = $row->childNodes->item(3)->nodeValue;
-			$confRecord = $row->childNodes->item(4)->nodeValue;
-			$divRecord = $row->childNodes->item(5)->nodeValue;
-			$homeRecord = $row->childNodes->item(6)->nodeValue;
-			$awayRecord = $row->childNodes->item(7)->nodeValue;
 
-			$confWins = extractWins($confRecord);
-			$confLosses = extractLosses($confRecord);
-			$divWins = extractWins($divRecord);
-			$divLosses = extractLosses($divRecord);
-			$homeWins = extractWins($homeRecord);
-			$homeLosses = extractLosses($homeRecord);
-			$awayWins = extractWins($awayRecord);
-			$awayLosses = extractLosses($awayRecord);
-
-			$gamesUnplayed = 82 - $homeWins - $homeLosses - $awayWins - $awayLosses; // TODO: make number of games in season dynamic
-
-			$sqlQueryString = "INSERT INTO ibl_standings (
-				tid,
-				team_name,
-				leagueRecord,
-				pct,
-				gamesUnplayed,
-				conference,
-				confGB,
-				confRecord,
-				divRecord,
-				homeRecord,
-				awayRecord,
-				confWins,
-				confLosses,
-				divWins,
-				divLosses,
-				homeWins,
-				homeLosses,
-				awayWins,
-				awayLosses
-			)
-			VALUES (
-				'".$tid."',
-				'".rtrim($teamName)."',
-				'".$leagueRecord."',
-				'".$pct."',
-				'".$gamesUnplayed."',
-				'".$conference."',
-				'".$confGB."',
-				'".$confRecord."',
-				'".$divRecord."',
-				'".$homeRecord."',
-				'".$awayRecord."',
-				'".$confWins."',
-				'".$confLosses."',
-				'".$divWins."',
-				'".$divLosses."',
-				'".$homeWins."',
-				'".$homeLosses."',
-				'".$awayWins."',
-				'".$awayLosses."'
-			)
-			ON DUPLICATE KEY UPDATE
-				tid = '".$tid."',
-				leagueRecord = '".$leagueRecord."',
-				pct = '".$pct."',
-				gamesUnplayed = '".$gamesUnplayed."',
-				conference = '".$conference."',
-				confGB = '".$confGB."',
-				confRecord = '".$confRecord."',
-				divRecord = '".$divRecord."',
-				homeRecord = '".$homeRecord."',
-				awayRecord = '".$awayRecord."',
-				confWins = '".$confWins."',
-				confLosses = '".$confLosses."',
-				divWins = '".$divWins."',
-				divlosses = '".$divLosses."',
-				homeWins = '".$homeWins."',
-				homeLosses = '".$homeLosses."',
-				awayWins = '".$awayWins."',
-				awayLosses = '".$awayLosses."'
-			";
-
-			if (mysql_query($sqlQueryString)) {
-				echo $sqlQueryString . '<br>';
-			} else die('Invalid query: ' . mysql_error());
-		}
 	}
 	echo '<p>Conference standings have been updated.<p>';
 
 	echo '<p>Updating the division games back for all teams...<br>';
 	foreach ($rowsByDivision as $row) {
-		$teamName = $row->childNodes->item(0)->nodeValue;
-		if (in_array($teamName, array("Atlantic", "Central", "Midwest", "Pacific"))) {
-			$division = $teamName;
-		}
-		if (!in_array($teamName, array("Atlantic", "Central", "Midwest", "Pacific", "team", ""))) {
-			$divGB = $row->childNodes->item(3)->nodeValue;
+		if (!is_null($row->childNodes)) {
+			$teamName = $row->childNodes->item(0)->nodeValue;
+			if (in_array($teamName, array("Atlantic", "Central", "Midwest", "Pacific"))) {
+				$division = $teamName;
+			}
+			if (!in_array($teamName, array("Atlantic", "Central", "Midwest", "Pacific", "team", ""))) {
+				$divGB = $row->childNodes->item(3)->nodeValue;
 
-			$sqlQueryString = "INSERT INTO ibl_standings (
-				team_name,
-				division,
-				divGB
-			)
-			VALUES (
-				'$teamName',
-				'$division',
-				'$divGB'
-			)
-			ON DUPLICATE KEY UPDATE
-				division = '$division',
-				divGB = '$divGB'";
+				$sqlQueryString = "INSERT INTO ibl_standings (
+					team_name,
+					division,
+					divGB
+				)
+				VALUES (
+					'$teamName',
+					'$division',
+					'$divGB'
+				)
+				ON DUPLICATE KEY UPDATE
+					division = '$division',
+					divGB = '$divGB'";
 
-			if (mysql_query($sqlQueryString)) {
-				echo $sqlQueryString . '<br>';
-			} else die('Invalid query: ' . mysql_error());
+				if (mysql_query($sqlQueryString)) {
+					echo $sqlQueryString . '<br>';
+				} else die('Invalid query: ' . mysql_error());
+			}
 		}
+
 	}
 	echo 'Division standings have been updated.<p>';
 }

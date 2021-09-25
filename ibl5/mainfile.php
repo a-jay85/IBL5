@@ -69,23 +69,23 @@ if (!function_exists("floatval")) {
         return (float)$inputval;
     }
 }
-if ($phpver >= '4.0.4pl1' && isset($_SERVER['HTTP_USER_AGENT']) && strstr($_SERVER['HTTP_USER_AGENT'],'compatible')) {
-	if (extension_loaded('zlib')) {
-    	@ob_end_clean();
-    	ob_start('ob_gzhandler');
-  	}
-} elseif ($phpver > '4.0' && isset($_SERVER['HTTP_ACCEPT_ENCODING']) && !empty($_SERVER['HTTP_ACCEPT_ENCODING'])) {
-  	if (strstr($_SERVER['HTTP_ACCEPT_ENCODING'], 'gzip')) {
-    	if (extension_loaded('zlib')) {
-      		$do_gzip_compress = true;
-      		ob_start(array('ob_gzhandler',5));
-      		ob_implicit_flush(0);
-      		if (ereg("MSIE", $_SERVER['HTTP_USER_AGENT'])) {
-				header('Content-Encoding: gzip');
-      		}
-    	}
-  	}
-}
+// if ($phpver >= '4.0.4pl1' && isset($_SERVER['HTTP_USER_AGENT']) && strstr($_SERVER['HTTP_USER_AGENT'],'compatible')) {
+// 	if (extension_loaded('zlib')) {
+//     	@ob_end_clean();
+//     	ob_start('ob_gzhandler');
+//   	}
+// } elseif ($phpver > '4.0' && isset($_SERVER['HTTP_ACCEPT_ENCODING']) && !empty($_SERVER['HTTP_ACCEPT_ENCODING'])) {
+//   	if (strstr($_SERVER['HTTP_ACCEPT_ENCODING'], 'gzip')) {
+//     	if (extension_loaded('zlib')) {
+//       		$do_gzip_compress = true;
+//       		ob_start(array('ob_gzhandler',5));
+//       		ob_implicit_flush(0);
+//       		if (ereg("MSIE", $_SERVER['HTTP_USER_AGENT'])) {
+// 				header('Content-Encoding: gzip');
+//       		}
+//     	}
+//   	}
+// }
 
 if (!ini_get('register_globals')) {
 	@import_request_variables("GPC", "");

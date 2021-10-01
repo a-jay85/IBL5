@@ -211,7 +211,7 @@ $k++;
 
 function drafthistory($tid)
 {
-	global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
+	global $db;
 
 	include("header.php");
 	OpenTable();
@@ -577,7 +577,7 @@ function leaguestats()
 
 function schedule($tid)
 {
-	global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
+	global $db;
 	$tid = intval($tid);
 	include("header.php");
 	OpenTable();
@@ -736,7 +736,7 @@ function boxscore($year, $month, $tid, $wins, $losses, $winStreak, $lossStreak)
 
 function finances($tid)
 {
-	global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
+	global $db;
 
 	$tid = intval($tid);
 	$yr = $_REQUEST['yr'];
@@ -783,7 +783,7 @@ function finances($tid)
 
 function team($tid)
 {
-	global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
+	global $db;
 	$tid = intval($tid);
 
 	$yr = $_REQUEST['yr'];
@@ -2496,7 +2496,6 @@ function viewinjuries($tid)
 
 function menu()
 {
-	global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
 	$tid = intval($tid);
 
 	include("header.php");
@@ -2510,7 +2509,7 @@ function menu()
 
 function seteditor($user)
 {
-	global $stop, $module_name, $redirect, $mode, $t, $f, $gfx_chk;
+	global $stop;
 	if(!is_user($user)) {
 		include("header.php");
 		if ($stop) {
@@ -2538,7 +2537,7 @@ function seteditor($user)
 
 function editset($username, $bypass=0, $hid=0, $url=0)
 {
-	global $user, $cookie, $sitename, $prefix, $user_prefix, $db, $admin, $broadcast_msg, $my_headlines, $module_name, $subscription_url, $attrib, $step, $player;
+	global $user, $prefix, $user_prefix, $db;
 	$sql = "SELECT * FROM ".$prefix."_bbconfig";
 	$result = $db->sql_query($sql);
 	while ( $row = $db->sql_fetchrow($result) ) {
@@ -2898,7 +2897,7 @@ function editset($username, $bypass=0, $hid=0, $url=0)
 
 function changeset($user)
 {
-	global $stop, $module_name, $redirect, $mode, $t, $f, $gfx_chk, $action, $set, $type, $position;
+	global $stop, $action, $set, $type, $position;
 	if(!is_user($user)) {
 	include("header.php");
 	if ($stop) {
@@ -2926,7 +2925,7 @@ function changeset($user)
 
 function changesetgo($username, $action, $set, $type, $position)
 {
-	global $user, $cookie, $sitename, $prefix, $user_prefix, $db, $admin, $broadcast_msg, $my_headlines, $module_name, $subscription_url;
+	global $user, $prefix, $user_prefix, $db;
 	$sql = "SELECT * FROM ".$prefix."_bbconfig";
 	$result = $db->sql_query($sql);
 	while ( $row = $db->sql_fetchrow($result) )	{
@@ -3092,7 +3091,7 @@ function viewtraining($user) {
 function trainingpage($username)
 
 {
-	global $user, $cookie, $sitename, $prefix, $user_prefix, $db, $admin, $broadcast_msg, $my_headlines, $module_name, $subscription_url;
+	global $user, $cookie, $prefix, $user_prefix, $db;
 	$sql = "SELECT * FROM ".$prefix."_bbconfig";
 	$result = $db->sql_query($sql);
 	while ( $row = $db->sql_fetchrow($result) )
@@ -3523,7 +3522,7 @@ function standings ($team)
 
 function asg_voting()
 {
-	global $user, $cookie, $sitename, $prefix, $user_prefix, $db, $admin, $broadcast_msg, $my_headlines, $module_name, $useset, $subscription_url;
+	global $user, $cookie, $prefix, $user_prefix, $db;
 	$sql = "SELECT * FROM ".$prefix."_bbconfig";
 	$result = $db->sql_query($sql);
 	while ( $row = $db->sql_fetchrow($result) )	{
@@ -3764,7 +3763,7 @@ function asg_voting()
 
 function eoy_voting()
 {
-	global $user, $cookie, $sitename, $prefix, $user_prefix, $db, $admin, $broadcast_msg, $my_headlines, $module_name, $useset, $subscription_url;
+	global $user, $cookie, $prefix, $user_prefix, $db;
 	$sql = "SELECT * FROM ".$prefix."_bbconfig";
 	$result = $db->sql_query($sql);
 	while ( $row = $db->sql_fetchrow($result) ) {
@@ -3946,7 +3945,7 @@ function eoy_voting()
 
 function asg_results()
 {
-	global $user, $cookie, $sitename, $prefix, $user_prefix, $db, $admin, $broadcast_msg, $my_headlines, $module_name, $useset, $subscription_url;
+	global $user, $cookie, $prefix, $user_prefix, $db;
 	$sql = "SELECT * FROM ".$prefix."_bbconfig";
 	$result = $db->sql_query($sql);
 	while ( $row = $db->sql_fetchrow($result) )	{
@@ -4059,7 +4058,7 @@ function asg_results()
 
 function eoy_results()
 {
-	global $user, $cookie, $sitename, $prefix, $user_prefix, $db, $admin, $broadcast_msg, $my_headlines, $module_name, $useset, $subscription_url;
+	global $user, $cookie, $prefix, $user_prefix, $db;
 	$sql = "SELECT * FROM ".$prefix."_bbconfig";
 	$result = $db->sql_query($sql);
 	while ( $row = $db->sql_fetchrow($result) ) {

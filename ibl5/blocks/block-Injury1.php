@@ -18,10 +18,6 @@ if ( !defined('BLOCK_FILE') ) {
 
 global $prefix, $multilingual, $currentlang, $db;
 
-require 'config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
-
 $queryo="SELECT * FROM nuke_users WHERE user_ibl_team != '' ORDER BY user_ibl_team ASC";
 $resulto=mysql_query($queryo);
 $numo=mysql_numrows($resulto);

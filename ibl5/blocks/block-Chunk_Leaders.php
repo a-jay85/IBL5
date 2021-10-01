@@ -19,10 +19,6 @@ if ( !defined('BLOCK_FILE') ) {
 global $prefix, $multilingual, $currentlang, $db;
 $content=$content."<center><a href=modules.php?name=Chunk_Stats&op=chunk>Sim Stats Search Engine</a></center><br>";
 
-require 'config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
-
 function getLastSimStatLeaders($statName, $query)
 {
     $queryLastSimDates = mysql_query("SELECT * FROM ibl_sim_dates ORDER BY Sim DESC LIMIT 1");

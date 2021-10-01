@@ -20,9 +20,6 @@ if (!eregi("modules.php", $_SERVER['PHP_SELF'])) {
     die ("You can't access this file directly...");
 }
 
-require_once("mainfile.php");
-require_once $_SERVER['DOCUMENT_ROOT'] . '/sharedFunctions.php';
-
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
@@ -1528,7 +1525,7 @@ $table_chunk=$table_chunk."<table  align=\"center\" class=\"sortable\">
 ";
 /* ======================CHUNK STATS */
 
-$currentSeasonEndingYear = getCurrentSeasonEndingYear();
+$currentSeasonEndingYear = Shared::getCurrentSeasonEndingYear();
 
 $max_chunk_query="SELECT MAX(chunk) as maxchunk FROM nuke_iblplyr_chunk WHERE active = 1 AND Season = '$currentSeasonEndingYear' ";
 $max_chunk_result=mysql_query($max_chunk_query);

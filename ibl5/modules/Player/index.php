@@ -20,9 +20,6 @@ if (!eregi("modules.php", $_SERVER['PHP_SELF'])) {
     die ("You can't access this file directly...");
 }
 
-require_once("mainfile.php");
-require_once $_SERVER['DOCUMENT_ROOT'] . '/sharedFunctions.php';
-
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
@@ -1045,7 +1042,7 @@ $contract_display = "not under contract";
 
     menu();
 
-    $seasonPhase = getCurrentSeasonPhase();
+    $seasonPhase = Shared::getCurrentSeasonPhase();
 
 	echo "<table><tr><td valign=top>
 <font class=\"title\">$player_pos $player_name ";
@@ -1079,10 +1076,11 @@ $queryHasUsedExtensionThisSeason = "SELECT Used_Extension_This_Season
     WHERE team_name = '" . $userinfo['user_ibl_team'] . "';";
 $hasUsedExtensionThisSeason = mysql_result(mysql_query($queryHasUsedExtensionThisSeason), 0);
 
+$currentSeasonPhase = Shared::getCurrentSeasonPhase();
 if ($hasUsedExtensionThisSeason == 0 AND
     $can_renegotiate == 1 AND
-    getCurrentSeasonPhase() != 'Draft' AND
-    getCurrentSeasonPhase() != 'Free Agency' AND
+    $currentSeasonPhase != 'Draft' AND
+    $currentSeasonPhase != 'Free Agency' AND
     $player_team_name == $userteam) {
         echo "<table align=right bgcolor=#ff0000><tr><td align=center><a href=\"modules.php?name=Player&pa=negotiate&pid=$pid\">RENEGOTIATE<BR>CONTRACT</a></td></tr></table>";
 }
@@ -2529,7 +2527,7 @@ function teamname ($teamid)
 }
 
 if ($spec == 0) {
-    $currentSeasonEndingYear = getCurrentSeasonEndingYear();
+    $currentSeasonEndingYear = Shared::getCurrentSeasonEndingYear();
     $currentSeasonStaringYear = $currentSeasonEndingYear - 1;
 
     if ($seasonPhase == "Preseason") {
@@ -3101,7 +3099,7 @@ function rookieoption($pid) {
 		return;
 	}
 
-    $seasonPhase = getCurrentSeasonPhase();
+    $seasonPhase = Shared::getCurrentSeasonPhase();
 
 	if (($seasonPhase == "Free Agency" AND $player_exp == 2 AND $player_draftround == 1) OR
         (($seasonPhase == "Preseason" OR $seasonPhase == "HEAT") AND $player_exp == 3 AND $player_draftround == 1)) {

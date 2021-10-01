@@ -1,17 +1,13 @@
 <?php
 
-require 'config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die( "Unable to select database");
-
-require_once $_SERVER['DOCUMENT_ROOT'] . '/sharedFunctions.php';
+require 'mainfile.php';
 
 function scoParser($uploadedFilePath, $seasonEndingYear, $seasonPhase)
 {
     $scoFilePath = ($uploadedFilePath) ? $uploadedFilePath : "IBL5.sco";
-    $currentSeasonEndingYear = ($seasonEndingYear) ? $seasonEndingYear : getCurrentSeasonEndingYear();
+    $currentSeasonEndingYear = ($seasonEndingYear) ? $seasonEndingYear : Shared::getCurrentSeasonEndingYear();
     $currentSeasonStartingYear = $currentSeasonEndingYear - 1;
-    $seasonPhase = ($seasonPhase) ? $seasonPhase : getCurrentSeasonPhase();
+    $seasonPhase = ($seasonPhase) ? $seasonPhase : Shared::getCurrentSeasonPhase();
 
     echo "<h2>Parse Log</h2>
         <b>Parsing .sco file for the $currentSeasonStartingYear-$currentSeasonEndingYear $seasonPhase...</b><p>";

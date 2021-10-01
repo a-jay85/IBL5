@@ -15,7 +15,6 @@
 if (!eregi("modules.php", $_SERVER['PHP_SELF'])) die ("You can't access this file directly...");
 
 require_once("mainfile.php");
-require_once $_SERVER['DOCUMENT_ROOT'] . '/sharedFunctions.php';
 
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
@@ -37,7 +36,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 	}
 
 	$teamlogo = $userinfo[user_ibl_team];
-	$tid = getTidFromTeamname($teamlogo);
+	$tid = Shared::getTidFromTeamname($teamlogo);
 
 	include("header.php");
 	OpenTable();

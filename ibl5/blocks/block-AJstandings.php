@@ -22,8 +22,6 @@ require 'config.php';
 mysql_connect($dbhost,$dbuname,$dbpass) or die("Unable to connect");
 @mysql_select_db($dbname) or die("Unable to select database");
 
-require_once $_SERVER['DOCUMENT_ROOT'] . '/sharedFunctions.php';
-
 /* DIVISIONAL STANDINGS
 $queryNLWest = "SELECT tid,team_name,leagueRecord,divGB FROM ibl_standings WHERE division = 'NL West' ORDER BY divGB ASC";
 $resultNLWest = mysql_query($queryNLWest);
@@ -42,7 +40,7 @@ $resultALEast = mysql_query($queryALEast);
 $limitALEast = mysql_num_rows($resultALEast);
 */
 
-$arrayLastSimDates = getLastSimDatesArray();
+$arrayLastSimDates = Shared::getLastSimDatesArray();
 $lastSimStartDate = $arrayLastSimDates["Start Date"];
 $lastSimEndDate = $arrayLastSimDates["End Date"];
 

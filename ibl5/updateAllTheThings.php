@@ -12,10 +12,9 @@ libxml_use_internal_errors(true);
 //#9.) In the Schedule tab, copy Column Q and paste into the database and run it.
 
 require 'config.php';
+require 'mainfile.php';
 mysql_connect($dbhost,$dbuname,$dbpass);
 @mysql_select_db($dbname) or die("Unable to select database");
-
-require_once $_SERVER['DOCUMENT_ROOT'] . '/sharedFunctions.php';
 
 $scheduleFilePath = 'ibl/IBL/Schedule.htm';
 
@@ -102,8 +101,8 @@ foreach ($rows as $row) {
 			} else $boxID = 100000;
 		}
 
-		$visitorTID = getTidFromTeamname($visitorName);
-		$homeTID = getTidFromTeamname($homeName);
+		$visitorTID = Shared::getTidFromTeamname($visitorName);
+		$homeTID = Shared::getTidFromTeamname($homeName);
 	}
 
 	$sqlQueryString = "INSERT INTO ibl_schedule (
@@ -196,7 +195,7 @@ function extractStandingsValues()
 				$conference = $teamName;
 			}
 			if (!in_array($teamName, array("Eastern", "Western", "team", ""))) {
-				$tid = getTidFromTeamname($teamName);
+				$tid = Shared::getTidFromTeamname($teamName);
 				$leagueRecord = $row->childNodes->item(1)->nodeValue;
 				$pct = $row->childNodes->item(2)->nodeValue;
 				$confGB = $row->childNodes->item(3)->nodeValue;
@@ -486,7 +485,7 @@ $queryTeams = "SELECT TeamID, Team, streak_type, streak
 $resultTeams = mysql_query($queryTeams);
 $numTeams = mysql_numrows($resultTeams);
 
-$currentSeasonEndingYear = getCurrentSeasonEndingYear();
+$currentSeasonEndingYear = Shared::getCurrentSeasonEndingYear();
 
 $i = 0;
 while ($i < $numTeams) {
@@ -774,7 +773,8 @@ if (mysql_query($resetExtensionQueryString)) {
 	echo '<p>Contract Extension usages have been reset.<p>';
 } else die('Invalid query: ' . mysql_error());
 
-if (getCurrentSeasonPhase() == "Playoffs" OR getCurrentSeasonPhase() == "Draft" OR getCurrentSeasonPhase() == "Free Agency") {
+$currentSeasonPhase = Shared::getCurrentSeasonPhase();
+if ($currentSeasonPhase == "Playoffs" OR $currentSeasonPhase == "Draft" OR $currentSeasonPhase == "Free Agency") {
 	echo '<p>Re-applying postseason trades made during the playoffs...</p>';
 
 	$postseasonTradeQueueQuery = "SELECT * FROM ibl_trade_queue;";
@@ -789,7 +789,7 @@ if (getCurrentSeasonPhase() == "Playoffs" OR getCurrentSeasonPhase() == "Draft" 
 		$i++;
 	}
 	echo '<p>Postseason trades have been re-applied!';
-} elseif (getCurrentSeasonPhase() == "Preseason") {
+} elseif ($currentSeasonPhase == "Preseason") {
 	if (mysql_query("TRUNCATE TABLE ibl_trade_queue;")) {
 		echo "<p>TRUNCATE TABLE ibl_trade_queue;";
 	}

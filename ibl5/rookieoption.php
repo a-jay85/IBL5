@@ -1,11 +1,8 @@
 <?php
 
-require $_SERVER['DOCUMENT_ROOT'] . '/config.php';
-mysql_connect($dbhost, $dbuname, $dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
+require 'mainfile.php';
 
 require_once $_SERVER['DOCUMENT_ROOT'] . '/discordWebhooks.php';
-require_once $_SERVER['DOCUMENT_ROOT'] . '/sharedFunctions.php';
 
 $Team_Name = $_POST['teamname'];
 $Player_Name = $_POST['playername'];
@@ -13,8 +10,8 @@ $ExtensionAmount = $_POST['rookieOptionValue'];
 $player_exp = $_POST['player_exp'];
 $player_draftround = $_POST['player_draftround'];
 
-$seasonPhase = getCurrentSeasonPhase();
-$tid = getTidFromTeamname($Team_Name);
+$seasonPhase = Shared::getCurrentSeasonPhase();
+$tid = Shared::getTidFromTeamname($Team_Name);
 
 $recipient = 'ibldepthcharts@gmail.com';
 $emailsubject = "Rookie Extension Option - ".$Player_Name;

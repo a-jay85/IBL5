@@ -1,10 +1,6 @@
 <?php
 
-require 'config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
-
-require_once $_SERVER['DOCUMENT_ROOT'] . '/sharedFunctions.php';
+require 'mainfile.php';
 
 $arrayStatNames = array(
     'POINTS',
@@ -31,7 +27,7 @@ $arrayStatQueries = array(
 );
 
 if ($_GET['seasonPhase'] == NULL) {
-    $seasonPhase = getCurrentSeasonPhase();
+    $seasonPhase = Shared::getCurrentSeasonPhase();
 } else {
     $seasonPhase = $_GET['seasonPhase'];
 }
@@ -44,7 +40,7 @@ function seasonHighTable($queryForStat, $statName, $playerOrTeam, $seasonPhase)
         $isPlayer = 'pid = 0';
     }
 
-    $playoffYear = getCurrentSeasonEndingYear();
+    $playoffYear = Shared::getCurrentSeasonEndingYear();
     $seasonStartingYear = $playoffYear - 1;
 
     if ($seasonPhase == "Playoffs") {

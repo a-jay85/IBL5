@@ -18,10 +18,6 @@ if ( !defined('BLOCK_FILE') ) {
 
 global $prefix, $multilingual, $currentlang, $db;
 
-require 'config.php';
-mysql_connect($dbhost,$dbuname,$dbpass) or die("Unable to connect");
-@mysql_select_db($dbname) or die("Unable to select database");
-
 /* DIVISIONAL STANDINGS
 $queryNLWest = "SELECT tid,team_name,leagueRecord,divGB FROM ibl_standings WHERE division = 'NL West' ORDER BY divGB ASC";
 $resultNLWest = mysql_query($queryNLWest);

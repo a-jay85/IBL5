@@ -1,9 +1,5 @@
 <?php
 
-require '../../config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
-
 $player2=str_replace("%20", " ", $player);
 
 $query="SELECT * FROM nuke_one_on_one WHERE winner = '$player2' ORDER BY gameid ASC";

@@ -1,12 +1,8 @@
 <?php
 
-require 'config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die( "Unable to select database");
+require 'mainfile.php';
 
-require_once $_SERVER['DOCUMENT_ROOT'] . '/sharedFunctions.php';
-
-$currentSeasonEndingYear = getCurrentSeasonEndingYear();
+$currentSeasonEndingYear = Shared::getCurrentSeasonEndingYear();
 
 $stringTeamIDsNames = "SELECT teamid,team_name FROM nuke_ibl_team_info ORDER BY teamid ASC;";
 $queryTeamIDsNames = mysql_query($stringTeamIDsNames);

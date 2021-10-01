@@ -17,7 +17,6 @@ if (!defined('MODULE_FILE')) {
 }
 
 require_once("mainfile.php");
-require_once $_SERVER['DOCUMENT_ROOT'] . '/sharedFunctions.php';
 
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
@@ -53,7 +52,7 @@ function poschange($pid)
 
     menu();
 
-	$seasonPhase = getCurrentSeasonPhase();
+	$seasonPhase = Shared::getCurrentSeasonPhase();
 
 	if ($seasonPhase != "Free Agency") {
 		$sql2 = "SELECT * FROM ".$prefix."_users WHERE username='$cookie[1]'";

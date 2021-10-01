@@ -4,9 +4,6 @@ if (!eregi("modules.php", $_SERVER['PHP_SELF'])) {
 	die ("You can't access this file directly...");
 }
 
-require_once("mainfile.php");
-require_once $_SERVER['DOCUMENT_ROOT'] . '/sharedFunctions.php';
-
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
@@ -29,7 +26,7 @@ function menu()
 function buildTeamFutureSalary ($resultTeamPlayers, $k)
 {
 	while($rowTeamPlayers = mysql_fetch_assoc($resultTeamPlayers)) {
-		$seasonPhase = getCurrentSeasonPhase();
+		$seasonPhase = Shared::getCurrentSeasonPhase();
 		$player_pos = $rowTeamPlayers["pos"];
 		$player_name = $rowTeamPlayers["name"];
 		$player_pid = $rowTeamPlayers["pid"];
@@ -81,7 +78,7 @@ function buildTeamFuturePicks ($resultTeamPicks, $future_salary_array)
 {
 	$k = $future_salary_array['k'];
 	while ($rowTeamDraftPicks = mysql_fetch_assoc($resultTeamPicks)) {
-		$currentSeasonEndingYear = getCurrentSeasonEndingYear();
+		$currentSeasonEndingYear = Shared::getCurrentSeasonEndingYear();
 		$pick_year = $rowTeamDraftPicks["year"];
 		$pick_team = $rowTeamDraftPicks["teampick"];
 		$pick_round = $rowTeamDraftPicks["round"];
@@ -151,12 +148,12 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 
 	include("header.php");
 
-	$currentSeasonEndingYear = getCurrentSeasonEndingYear();
+	$currentSeasonEndingYear = Shared::getCurrentSeasonEndingYear();
 
 	OpenTable();
 
 	$teamlogo = $userinfo[user_ibl_team];
-	$tid = getTidFromTeamname($teamlogo);
+	$tid = Shared::getTidFromTeamname($teamlogo);
 	displaytopmenu($tid);
 
 	$queryOfferingTeamPlayers = "SELECT pos, name, pid, cy, cy1, cy2, cy3, cy4, cy5, cy6
@@ -316,7 +313,7 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
 	OpenTable();
 
 	$teamlogo = $userinfo[user_ibl_team];
-	$tid = getTidFromTeamname($teamlogo);
+	$tid = Shared::getTidFromTeamname($teamlogo);
 	displaytopmenu($tid);
 
 	echo "<center><img src=\"images/logo/$tid.jpg\"><br>";
@@ -465,8 +462,8 @@ function reviewtrade($user)
 		}
 		include("footer.php");
 	} elseif (is_user($user)) {
-		$allow_trades = getAllowTradesStatus();
-		$allow_waiver_moves = getWaiverWireStatus();
+		$allow_trades = Shared::getAllowTradesStatus();
+		$allow_waiver_moves = Shared::getWaiverWireStatus();
 
 		if ($allow_trades == 'Yes') {
 			global $cookie;

@@ -21,9 +21,6 @@
 
 if (!eregi("modules.php", $_SERVER['PHP_SELF'])) die ("You can't access this file directly...");
 
-require_once("mainfile.php");
-require_once $_SERVER['DOCUMENT_ROOT'] . '/sharedFunctions.php';
-
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
@@ -77,11 +74,11 @@ function display() {
 	$userinfo = $db->sql_fetchrow($result2);
 
 	$userteam = stripslashes(check_html($userinfo['user_ibl_team'], "nohtml"));
-	$tid = getTidFromTeamname($userteam);
+	$tid = Shared::getTidFromTeamname($userteam);
 
 	displaytopmenu($tid);
 
-	$currentSeasonEndingYear = getCurrentSeasonEndingYear();
+	$currentSeasonEndingYear = Shared::getCurrentSeasonEndingYear();
 
 	/*
 	// ==== COMPUTE PLAYER SALARIES FOR NEXT YEAR TO GET SOFT AND HARD CAP NUMBERS
@@ -2133,7 +2130,7 @@ function teamdisplay($pid) {
 	$showcapteam = $db->sql_query("SELECT * FROM ".$prefix."_ibl_team_info WHERE teamid>'0' ORDER BY teamid ASC");
 
 	while ($teamcaplist = $db->sql_fetchrow($showcapteam)) {
-		$currentSeasonEndingYear = getCurrentSeasonEndingYear();
+		$currentSeasonEndingYear = Shared::getCurrentSeasonEndingYear();
 
 		$capteam = stripslashes(check_html($teamcaplist['team_name'], "nohtml"));
 		$HasMLE = stripslashes(check_html($teamcaplist['HasMLE'], "nohtml"));

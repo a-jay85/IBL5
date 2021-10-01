@@ -1,12 +1,6 @@
 <?php
 
-require_once $_SERVER['DOCUMENT_ROOT'] . '/sharedFunctions.php';
-require $_SERVER['DOCUMENT_ROOT'] . '/config.php';
-
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
-
-$currentSeasonEndingYear = getCurrentSeasonEndingYear();
+$currentSeasonEndingYear = Shared::getCurrentSeasonEndingYear();
 $previousSeasonEndingYear = $currentSeasonEndingYear - 1;
 
 $query="SELECT a.name, a.teamid, a.team, b.tid, b.teamname FROM nuke_iblhist a, nuke_iblplyr b WHERE a.pid = b.pid AND a.year = $previousSeasonEndingYear AND a.teamid != b.tid ORDER BY b.teamname";

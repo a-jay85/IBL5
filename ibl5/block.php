@@ -4,8 +4,6 @@ require 'config.php';
 mysql_connect($dbhost,$dbuname,$dbpass);
 @mysql_select_db($dbname) or die("Unable to select database");
 
-require_once $_SERVER['DOCUMENT_ROOT'] . '/sharedFunctions.php';
-
 $val = $_GET['day'];
 
 $query="SELECT * FROM `nuke_ibl_fa_offers` ORDER BY name ASC, perceivedvalue DESC";
@@ -18,7 +16,7 @@ $i=0;
 while ($i < $num) {
 	$name=mysql_result($result,$i,"name");
 	$team=mysql_result($result,$i,"team");
-	$tid = getTidFromTeamname($team);
+	$tid = Shared::getTidFromTeamname($team);
 	$perceivedvalue=mysql_result($result,$i,"perceivedvalue");
 
 	$offer1=mysql_result($result,$i,"offer1");

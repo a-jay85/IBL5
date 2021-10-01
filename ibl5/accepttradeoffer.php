@@ -1,11 +1,8 @@
 <?php
 
-require 'config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
+require 'mainfile.php';
 
 require $_SERVER['DOCUMENT_ROOT'] . '/discordWebhooks.php';
-require_once $_SERVER['DOCUMENT_ROOT'] . '/sharedFunctions.php';
 
 $offer_id = $_POST['offer'];
 
@@ -46,7 +43,8 @@ while ($i < $num0) {
 		$resulti = mysql_query($queryi);
 	}
 
-	if (getCurrentSeasonPhase() == "Playoffs" OR getCurrentSeasonPhase() == "Draft" OR getCurrentSeasonPhase() == "Free Agency") {
+	$currentSeasonPhase = Shared::getCurrentSeasonPhase();
+	if ($currentSeasonPhase == "Playoffs" OR $currentSeasonPhase == "Draft" OR $currentSeasonPhase == "Free Agency") {
 		$queryInsert = "INSERT INTO ibl_trade_queue (query, tradeline) VALUES ('$queryi', '$tradeLine');";
 		mysql_query("$queryInsert");
 	}

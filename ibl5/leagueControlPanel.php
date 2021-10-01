@@ -1,18 +1,14 @@
 <?php
 
-require 'config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
-
-require_once $_SERVER['DOCUMENT_ROOT'] . '/sharedFunctions.php';
+require 'mainfile.php';
 
 $queryString = "";
 $successText = "";
 
-$currentSeasonPhase = getCurrentSeasonPhase();
-$currentSeasonEndingYear = getCurrentSeasonEndingYear();
-$waiverWireStatus = getWaiverWireStatus();
-$allowTradesStatus = getAllowTradesStatus();
+$currentSeasonPhase = Shared::getCurrentSeasonPhase();
+$currentSeasonEndingYear = Shared::getCurrentSeasonEndingYear();
+$waiverWireStatus = Shared::getWaiverWireStatus();
+$allowTradesStatus = Shared::getAllowTradesStatus();
 
 if (isset($_POST['query'])) {
     switch ($_POST['query']) {

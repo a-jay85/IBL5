@@ -4,10 +4,6 @@ $session=session_id();
 $time=time();
 $time_check=$time-300; //SET TIME 5 Minute
 
-require 'config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
-
 $tbl_name="user_online"; // Table name
 
 $sql="SELECT * FROM $tbl_name WHERE session='$session'";

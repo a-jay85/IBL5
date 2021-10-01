@@ -16,11 +16,9 @@ if (!defined('MODULE_FILE')) {
     die ("You can't access this file directly...");
 }
 
-require_once("mainfile.php");
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
-require_once $_SERVER['DOCUMENT_ROOT'] . '/sharedFunctions.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/discordWebhooks.php';
 
 $pagetitle = "- Team Pages";
@@ -50,8 +48,8 @@ function waivers($user)
         }
         include("footer.php");
     } elseif (is_user($user)) {
-        $currentSeasonPhase = getCurrentSeasonPhase();
-        $allowWaiverMoves = getWaiverWireStatus();
+        $currentSeasonPhase = Shared::getCurrentSeasonPhase();
+        $allowWaiverMoves = Shared::getWaiverWireStatus();
 
         if (($currentSeasonPhase == "Preseason" AND $allowWaiverMoves == "Yes")
             OR $currentSeasonPhase == "HEAT"

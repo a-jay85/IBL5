@@ -1,12 +1,8 @@
 <?php
 
-require 'config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
+require 'mainfile.php';
 
-require_once $_SERVER['DOCUMENT_ROOT'] . '/sharedFunctions.php';
-
-$currentSeasonEndingYear = getCurrentSeasonEndingYear();
+$currentSeasonEndingYear = Shared::getCurrentSeasonEndingYear();
 
 $tid = $_REQUEST['tid'];
 $yr = $_REQUEST['yr'];

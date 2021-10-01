@@ -1,16 +1,10 @@
 <?php
 
-require '../config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
-
-require_once $_SERVER['DOCUMENT_ROOT'] . '/sharedFunctions.php';
-
 $query="SELECT * FROM nuke_ibl_team_info WHERE teamid != 35 ORDER BY teamid ASC";
 $result=mysql_query($query);
 $num=mysql_numrows($result);
 
-$currentSeasonEndingYear = getCurrentSeasonEndingYear();
+$currentSeasonEndingYear = Shared::getCurrentSeasonEndingYear();
 
 echo "<HTML><HEAD><TITLE>Draft Pick Matrix</TITLE></HEAD>
     <BODY>

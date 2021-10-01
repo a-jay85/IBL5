@@ -21,8 +21,6 @@ if (!eregi("modules.php", $_SERVER['PHP_SELF'])) {
 	die ("You can't access this file directly...");
 }
 
-require_once("mainfile.php");
-require_once $_SERVER['DOCUMENT_ROOT'] . '/sharedFunctions.php';
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 $userpage = 1;
@@ -49,7 +47,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 
     OpenTable();
 
-	$seasonPhase = getCurrentSeasonPhase();
+	$seasonPhase = Shared::getCurrentSeasonPhase();
 
 	function formatTidsForSqlQuery($conferenceTids) {
 		$tidsFormattedForQuery = join("','",$conferenceTids);
@@ -57,7 +55,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 	}
 
 	function getCandidates($votingCategory) {
-		$seasonPhase = getCurrentSeasonPhase();
+		$seasonPhase = Shared::getCurrentSeasonPhase();
 		if ($seasonPhase == "Regular Season") {
 			$easternConferenceTids = array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 25);
 			$westernConferenceTids = array(13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 26);
@@ -235,7 +233,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 	}
 
     $teamlogo = $userinfo[user_ibl_team];
-	$tid = getTidFromTeamname($teamlogo);
+	$tid = Shared::getTidFromTeamname($teamlogo);
 
 	echo "<form name=\"$formName\" method=\"post\" action=\"$formName.php\">
 		<center>

@@ -18,10 +18,6 @@ if (!defined('BLOCK_FILE')) {
 
 global $prefix, $multilingual, $currentlang, $db;
 
-require 'config.php';
-mysql_connect($dbhost, $dbuname, $dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
-
 $query = "SELECT TeamID, Team, ranking, win, loss, color1, color2
     FROM nuke_ibl_power rankings
     INNER JOIN nuke_ibl_team_info info USING (teamid)

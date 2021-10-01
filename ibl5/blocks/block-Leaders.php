@@ -18,10 +18,6 @@ if ( !defined('BLOCK_FILE') ) {
 
 global $prefix, $multilingual, $currentlang, $db;
 
-require 'config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
-
 $query="SELECT * FROM nuke_iblplyr WHERE retired = 0 ORDER BY ordinal ASC";
 $result=mysql_query($query);
 $num=mysql_numrows($result);

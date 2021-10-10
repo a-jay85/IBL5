@@ -2,8 +2,6 @@
 
 require 'mainfile.php';
 
-require_once $_SERVER['DOCUMENT_ROOT'] . '/discordWebhooks.php';
-
 $Team_Name = $_POST['teamname'];
 $Player_Name = $_POST['playername'];
 $ExtensionAmount = $_POST['rookieOptionValue'];
@@ -37,7 +35,7 @@ if ($seasonPhase == "Free Agency") {
 	echo "Please <a href=\"modules.php?name=Team&op=team&tid=$tid\">click here to return to your team page</a>.";
 }
 
-postToDiscordChannel('#rookie-options', $filetext);
+Discord::postToChannel('#rookie-options', $filetext);
 
 if (mail($recipient, $emailsubject, $filetext, "From: rookieoption@iblhoops.net")) {
 	$rookieOptionInMillions = $ExtensionAmount/100;

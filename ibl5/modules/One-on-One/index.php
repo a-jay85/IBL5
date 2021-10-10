@@ -16,7 +16,6 @@ if (!defined('MODULE_FILE')) {
 	die ("You can't access this file directly...");
 }
 
-require_once $_SERVER['DOCUMENT_ROOT'] . '/discordWebhooks.php';
 require_once("mainfile.php");
 
 $module_name = basename(dirname(__FILE__));
@@ -891,7 +890,7 @@ function rungame($p1, $p2, $owner)
 		$discordText .= "$p1_name $score1, **$p2_name $score2**\n\t*(Game played by $owner)*\nhttp://$_SERVER[HTTP_HOST]$_SERVER[PHP_SELF]?name=One-on-One&gameid=$gameid";
 	}
 
-	postToDiscordChannel('#1v1-games', $discordText);
+	Discord::postToChannel('#1v1-games', $discordText);
 }
 
 function printgame($gameid)

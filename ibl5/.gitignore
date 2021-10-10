@@ -7,5 +7,5 @@ backups/
 .ftpquota
 config.php
 config.inc.php
-discordWebhooks.php
+classes/Discord.php
 error_log

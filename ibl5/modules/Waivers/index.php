@@ -19,8 +19,6 @@ if (!defined('MODULE_FILE')) {
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
-require_once $_SERVER['DOCUMENT_ROOT'] . '/discordWebhooks.php';
-
 $pagetitle = "- Team Pages";
 
 function waivers($user)
@@ -175,7 +173,7 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
                          'english') ";
                 $resultstor = mysql_query($querystor);
 
-                postToDiscordChannel('#waiver-wire', $hometext);
+                Discord::postToChannel('#waiver-wire', $hometext);
 
                 $errortext = "Your waiver move should now be processed. $playername has been cut to waivers.";
             }
@@ -263,7 +261,7 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
                     $recipient = 'ibldepthcharts@gmail.com';
                     mail($recipient, $storytitle, $hometext, "From: waivers@iblhoops.net");
 
-                    postToDiscordChannel('#waiver-wire', $hometext);
+                    Discord::postToChannel('#waiver-wire', $hometext);
                 }
 
                 $errortext = "Your waiver move should now be processed. $playername has been signed from waivers and added to your roster.";

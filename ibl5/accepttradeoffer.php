@@ -2,8 +2,6 @@
 
 require 'mainfile.php';
 
-require $_SERVER['DOCUMENT_ROOT'] . '/discordWebhooks.php';
-
 $offer_id = $_POST['offer'];
 
 $query0 = "SELECT * FROM nuke_ibl_trade_info WHERE tradeofferid = '$offer_id'";
@@ -79,9 +77,9 @@ $resultstor = mysql_query($querystor);
 if (isset($resultstor) AND $_SERVER['SERVER_NAME'] != "localhost") {
 	$recipient = 'ibldepthcharts@gmail.com';
 	mail($recipient, $storytitle, $storytext, "From: trades@iblhoops.net");
-
-	postToDiscordChannel('#trades', $storytext);
 }
+
+Discord::postToChannel('#trades', $storytext);
 
 $queryclear = "DELETE FROM nuke_ibl_trade_info WHERE `tradeofferid` = '$offer_id'";
 $resultclear = mysql_query($queryclear);

@@ -1,10 +1,6 @@
 <?php
 
-require 'config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
-
-require_once $_SERVER['DOCUMENT_ROOT'] . '/discordWebhooks.php';
+require 'mainfile.php';
 
 echo "<HTML><HEAD><TITLE>Contract Extension Offer Result</TITLE></HEAD><BODY>";
 
@@ -198,7 +194,7 @@ if ($nooffer == 0) {
         $storytitle = $Player_Name." turns down an extension offer from the ".$Team_Name;
         $hometext = $Player_Name." today rejected a contract extension offer from the ".$Team_Name." worth $Offer_in_Millions million dollars over ".$Offer_Years." years.";
 
-        postToDiscordChannel('#extensions', $hometext);
+        Discord::postToChannel('#extensions', $hometext);
 
         echo "<table bgcolor=#cccccc><tr><td><b>Response from $Player_Name:</b> While I appreciate your offer of $Offer_in_Millions million dollars over $Offer_Years years, it kinda sucks, and isn't what I'm looking for. You're gonna have to try harder if you want me to stick around this dump!</td></tr></table>
         Note from the commissioner's office: <font color=#cc0000>Please note that you will be able to make another attempt next Chunk as you have not yet used up your successful extension for this season.</font><br>";
@@ -238,7 +234,7 @@ if ($nooffer == 0) {
         $storytitle = $Player_Name . " extends their contract with the " . $Team_Name;
         $hometext = $Player_Name . " today accepted a contract extension offer from the " . $Team_Name . " worth $Offer_in_Millions million dollars over " . $Offer_Years . " years.";
 
-        postToDiscordChannel('#extensions', $hometext);
+        Discord::postToChannel('#extensions', $hometext);
 
         echo "<table bgcolor=#cccccc><tr><td><b>Response from $Player_Name:</b> I accept your extension offer of $Offer_in_Millions million dollars over $Offer_Years years.  Thank you! (Can't believe you gave me that much...sucker!)</td></tr></table>
         Note from the commissioner's office: <font color=#cc0000>Please note that you have used up your successful extension for this season and may not make any more extension attempts.</font><br>";

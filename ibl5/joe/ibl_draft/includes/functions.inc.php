@@ -19,7 +19,7 @@
 
 function make_pick($pick_id, $player_id, $recursive = false) {
   global $settings;
-  require_once $_SERVER['DOCUMENT_ROOT'] . '/discordWebhooks.php';
+  require_once $_SERVER['DOCUMENT_ROOT'] . '/mainfile.php';
   if ($pick_id) {
     $statement = "select * from pick where player_id = '$player_id'";
     // Make sure that the player has not already been picked
@@ -63,7 +63,7 @@ limit 1";
 
 **<@!' . $row['team_discord_id'] . '>** is on the clock!';
       // Post pick details to Discord
-      postToDiscordChannel('#draft-picks', $message);
+      Discord::postToChannel('#draft-picks', $message);
 	  // Store the e-mail of the team that's on the clock for the notice below
 	  if ($row['team_email_prefs'] == kOptionNoEmail) {
 	    $clock_email = '';
@@ -90,7 +90,7 @@ Draft is stopped.';
 
 Draft is complete!';
       // Post pick details to Discord
-      postToDiscordChannel('#draft-picks', $message);
+      Discord::postToChannel('#draft-picks', $message);
 	  }
 	}
 	// Also send notifications to those who wish to receive them
@@ -238,7 +238,7 @@ function calculate_pick($pick) {
 
 function process_expired_picks() {
   global $settings;
-  require_once $_SERVER['DOCUMENT_ROOT'] . '/discordWebhooks.php';
+  require_once $_SERVER['DOCUMENT_ROOT'] . '/mainfile.php';
   $limit = $settings->get_value(kSettingPickTimeLimit);
   if (!$limit) {
     // No limit, nothing to do
@@ -284,7 +284,7 @@ limit 1";
         $message .= '**<@!' . $teamOnTheClock['team_discord_id'] . '>** is now on the clock!';
 
         // Post skip details to Discord
-        if (postToDiscordChannel('#draft-picks', $message)) {
+        if (Discord::postToChannel('#draft-picks', $message)) {
             $discordPosted = TRUE;
         };
     }

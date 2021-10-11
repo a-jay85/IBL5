@@ -35,19 +35,19 @@ if ($row['radminsuper'] == 1) {
 		{
 			case french :
 			// French Text
-			$strNoTablesFound	= "Aucune table n'a été trouvée dans cette base.";
+			$strNoTablesFound	= "Aucune table n'a ï¿½tï¿½ trouvï¿½e dans cette base.";
 			$strHost		= "Serveur";
-			$strDatabase		= "Base de données";
+			$strDatabase		= "Base de donnï¿½es";
 			$strTableStructure	= "Structure de la table";
 			$strDumpingData		= "Contenu de la table";
 			$strError		= "Erreur";
-			$strSQLQuery		= "requête SQL";
-			$strMySQLSaid		= "MySQL a répondu:";
+			$strSQLQuery		= "requï¿½te SQL";
+			$strMySQLSaid		= "MySQL a rï¿½pondu:";
 			$strBack		= "Retour";
 			$strFileName		= "Sauvegarde BD";
-			$strName		= "Sauvegarde de la base de données";
-			$strDone		= "effectuée le";
-			$strat			= "à";
+			$strName		= "Sauvegarde de la base de donnï¿½es";
+			$strDone		= "effectuï¿½e le";
+			$strat			= "ï¿½";
 			$strby			= "par";
 			$date_jour = date ("d-m-Y");
 			break;
@@ -79,11 +79,11 @@ if ($row['radminsuper'] == 1) {
 
 		// doing some DOS-CRLF magic...
 		$client = $_SERVER["HTTP_USER_AGENT"];
-		if(ereg('[^(]*\((.*)\)[^)]*',$client,$regs))
+		if(mb_ereg('[^(]*\((.*)\)[^)]*',$client,$regs))
 		{
 			$os = $regs[1];
 			// this looks better under WinX
-			if (eregi("Win",$os))
+			if (mb_eregi("Win",$os))
 			$crlf="\r\n";
 		}
 
@@ -126,7 +126,7 @@ if ($row['radminsuper'] == 1) {
 					else
 					$schema_insert .= " '',";
 				}
-				$schema_insert = ereg_replace(",$", "", $schema_insert);
+				$schema_insert = mb_ereg_replace(",$", "", $schema_insert);
 				$schema_insert .= ")";
 				$handler(trim($schema_insert));
 				$i++;
@@ -155,7 +155,7 @@ if ($row['radminsuper'] == 1) {
 				$schema_create .= " $row[Extra]";
 				$schema_create .= ",$crlf";
 			}
-			$schema_create = ereg_replace(",".$crlf."$", "", $schema_create);
+			$schema_create = mb_ereg_replace(",".$crlf."$", "", $schema_create);
 			$result = mysql_db_query($db, "SHOW KEYS FROM $table") or mysql_die();
 			while($row = mysql_fetch_array($result))
 			{

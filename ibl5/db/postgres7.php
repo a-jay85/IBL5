@@ -54,7 +54,7 @@ class sql_db
 
 		if( $sqlserver )
 		{
-			if( ereg(":", $sqlserver) )
+			if( mb_ereg(":", $sqlserver) )
 			{
 				list($sqlserver, $sqlport) = split(":", $sqlserver);
 				$this->connect_string .= "host=$sqlserver port=$sqlport ";

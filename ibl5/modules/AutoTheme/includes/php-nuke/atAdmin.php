@@ -23,7 +23,7 @@
 // ----------------------------------------------------------------------
 
 if (!defined('ADMIN_FILE')) {
-	if (!eregi("admin.php", $_SERVER['PHP_SELF'])) {
+	if (!mb_eregi("admin.php", $_SERVER['PHP_SELF'])) {
 		die ("Access Denied");
 	}
 }

@@ -210,7 +210,7 @@ function get_table_def_postgresql($table, $crlf)
 
                 $schema_create .= '        ' . $row['field'] . ' ' . $row['type'];
 
-                if (eregi('char', $row['type']))
+                if (mb_eregi('char', $row['type']))
                 {
                         if ($row['lengthvar'] > 0)
                         {
@@ -218,7 +218,7 @@ function get_table_def_postgresql($table, $crlf)
                         }
                 }
 
-                if (eregi('numeric', $row['type']))
+                if (mb_eregi('numeric', $row['type']))
                 {
                         $schema_create .= '(';
                         $schema_create .= sprintf("%s,%s", (($row['lengthvar'] >> 16) & 0xffff), (($row['lengthvar'] - 4) & 0xffff));
@@ -288,7 +288,7 @@ function get_table_def_postgresql($table, $crlf)
         {
                 while(list($idx_name, $props) = each($index_rows))
                 {
-                        $props['column_names'] = ereg_replace(", $", "" , $props['column_names']);
+                        $props['column_names'] = mb_ereg_replace(", $", "" , $props['column_names']);
                         $index_create .= 'CREATE ' . $props['unique'] . " INDEX $idx_name ON $table (" . $props['column_names'] . ");$crlf";
                 }
         }
@@ -328,8 +328,8 @@ function get_table_def_postgresql($table, $crlf)
                 $schema_create .= '        CONSTRAINT ' . $row['index_name'] . ' CHECK ' . $row['rcsrc'] . ",$crlf";
         }
 
-        $schema_create = ereg_replace(',' . $crlf . '$', '', $schema_create);
-        $index_create = ereg_replace(',' . $crlf . '$', '', $index_create);
+        $schema_create = mb_ereg_replace(',' . $crlf . '$', '', $schema_create);
+        $index_create = mb_ereg_replace(',' . $crlf . '$', '', $index_create);
 
         $schema_create .= "$crlf);$crlf";
 
@@ -400,7 +400,7 @@ function get_table_def_mysql($table, $crlf)
         //
         // Drop the last ',$crlf' off ;)
         //
-        $schema_create = ereg_replace(',' . $crlf . '$', "", $schema_create);
+        $schema_create = mb_ereg_replace(',' . $crlf . '$', "", $schema_create);
 
         //
         // Get any Indexed fields from the database...
@@ -509,13 +509,13 @@ function get_table_content_postgresql($table, $handler)
                 for($i = 0; $i < $i_num_fields; $i++)
                 {
                         $strVal = $row[$aryName[$i]];
-                        if (eregi("char|text|bool", $aryType[$i]))
+                        if (mb_eregi("char|text|bool", $aryType[$i]))
                         {
                                 $strQuote = "'";
                                 $strEmpty = "";
                                 $strVal = addslashes($strVal);
                         }
-                        elseif (eregi("date|timestamp", $aryType[$i]))
+                        elseif (mb_eregi("date|timestamp", $aryType[$i]))
                         {
 				if (empty($strVal))
                                 {
@@ -542,10 +542,10 @@ function get_table_content_postgresql($table, $handler)
 
                 }
 
-                $schema_vals = ereg_replace(",$", "", $schema_vals);
-                $schema_vals = ereg_replace("^ ", "", $schema_vals);
-                $schema_fields = ereg_replace(",$", "", $schema_fields);
-                $schema_fields = ereg_replace("^ ", "", $schema_fields);
+                $schema_vals = mb_ereg_replace(",$", "", $schema_vals);
+                $schema_vals = mb_ereg_replace("^ ", "", $schema_vals);
+                $schema_fields = mb_ereg_replace(",$", "", $schema_fields);
+                $schema_fields = mb_ereg_replace("^ ", "", $schema_fields);
 
                 //
                 // Take the ordered fields and their associated data and build it
@@ -706,7 +706,7 @@ if( isset($HTTP_GET_VARS['perform']) || isset($HTTP_POST_VARS['perform']) )
 
                         if(!empty($additional_tables))
                         {
-                                if(ereg(",", $additional_tables))
+                                if(mb_ereg(",", $additional_tables))
                                 {
                                         $additional_tables = split(",", $additional_tables);
 
@@ -976,7 +976,7 @@ if( isset($HTTP_GET_VARS['perform']) || isset($HTTP_POST_VARS['perform']) )
 
                                                         $result = $db->sql_query($sql);
 
-                                                        if(!$result && ( !(SQL_LAYER == 'postgresql' && eregi("drop table", $sql) ) ) )
+                                                        if(!$result && ( !(SQL_LAYER == 'postgresql' && mb_eregi("drop table", $sql) ) ) )
                                                         {
                                                                 message_die(GENERAL_ERROR, "Error importing backup file", "", __LINE__, __FILE__, $sql);
                                                         }

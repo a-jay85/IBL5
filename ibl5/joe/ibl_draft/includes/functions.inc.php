@@ -19,7 +19,6 @@
 
 function make_pick($pick_id, $player_id, $recursive = false) {
   global $settings;
-  require_once $_SERVER['DOCUMENT_ROOT'] . '/mainfile.php';
   if ($pick_id) {
     $statement = "select * from pick where player_id = '$player_id'";
     // Make sure that the player has not already been picked
@@ -238,7 +237,6 @@ function calculate_pick($pick) {
 
 function process_expired_picks() {
   global $settings;
-  require_once $_SERVER['DOCUMENT_ROOT'] . '/mainfile.php';
   $limit = $settings->get_value(kSettingPickTimeLimit);
   if (!$limit) {
     // No limit, nothing to do

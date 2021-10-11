@@ -105,7 +105,7 @@ function atGetModType()
 {
     $type = "";
 
-    if (eregi("admin.php", $_SERVER['PHP_SELF'])) {
+    if (mb_eregi("admin.php", $_SERVER['PHP_SELF'])) {
         $type = "admin";
     }
     elseif (atGetModName() == "Your_Account") {

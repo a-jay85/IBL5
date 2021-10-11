@@ -698,7 +698,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
 			$url = filter($row['url'], "nohtml");
 			$url = urlencode($url);
 			$description = filter($row['description']);
-			$xdescription = eregi_replace("<a href=\"http://", "<a href=\"index.php?url=http://", $description);
+			$xdescription = mb_eregi_replace("<a href=\"http://", "<a href=\"index.php?url=http://", $description);
 			$modifysubmitter = filter($row['modifysubmitter'], "nohtml");
 			$row2 = $db->sql_fetchrow($db->sql_query("SELECT cid, sid, title, url, description, submitter from " . $prefix . "_links_links where lid='$lid'"));
 			$origcid = intval($row2['cid']);
@@ -707,7 +707,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
 			$origurl = filter($row2['url'], "nohtml");
 			$origurl = urlencode($origurl);
 			$origdescription = filter($row2['description']);
-			$xorigdescription = eregi_replace("<a href=\"http://", "<a href=\"index.php?url=http://", $xorigdescription);
+			$xorigdescription = mb_eregi_replace("<a href=\"http://", "<a href=\"index.php?url=http://", $xorigdescription);
 			$owner = filter($row2['submitter'], "nohtml");
 			$result3 = $db->sql_query("SELECT title from " . $prefix . "_links_categories where cid='$cid'");
 			$result5 = $db->sql_query("SELECT title from " . $prefix . "_links_categories where cid='$origcid'");
@@ -938,7 +938,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
 				$db->sql_query("delete from " . $prefix . "_links_links where cid='$cid'");
 			} else {
 				$db->sql_query("delete from " . $prefix . "_links_links where cid='$cid'");
-				// suppression des liens de catégories filles
+				// suppression des liens de catï¿½gories filles
 				$result2 = $db->sql_query("SELECT cid from " . $prefix . "_links_categories where parentid='$cid'");
 				while ($row2 = $db->sql_fetchrow($result2)) {
 					$cid2 = intval($row2['cid']);

@@ -12,7 +12,7 @@
 /* the Free Software Foundation; either version 2 of the License.       */
 /************************************************************************/
 
-if (!eregi("modules.php", $_SERVER['PHP_SELF'])) die ("You can't access this file directly...");
+if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) die ("You can't access this file directly...");
 
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);

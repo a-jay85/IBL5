@@ -80,7 +80,7 @@ if (!function_exists("floatval")) {
 //       		$do_gzip_compress = true;
 //       		ob_start(array('ob_gzhandler',5));
 //       		ob_implicit_flush(0);
-//       		if (ereg("MSIE", $_SERVER['HTTP_USER_AGENT'])) {
+//       		if (mb_ereg("MSIE", $_SERVER['HTTP_USER_AGENT'])) {
 // 				header('Content-Encoding: gzip');
 //       		}
 //     	}
@@ -138,34 +138,34 @@ $htmltags .= "[ <a href=\"javascript:history.go(-1)\"><b>Go Back</b></a> ]</cent
 
 if (!defined('ADMIN_FILE')) {
  foreach ($_GET as $sec_key => $secvalue) {
- if((eregi("<[^>]*script*\"?[^>]*", $secvalue)) ||
-  (eregi("<[^>]*object*\"?[^>]*", $secvalue)) ||
-  (eregi("<[^>]*iframe*\"?[^>]*", $secvalue)) ||
-  (eregi("<[^>]*applet*\"?[^>]*", $secvalue)) ||
-  (eregi("<[^>]*meta*\"?[^>]*", $secvalue)) ||
-  (eregi("<[^>]*style*\"?[^>]*", $secvalue)) ||
-  (eregi("<[^>]*form*\"?[^>]*", $secvalue)) ||
-  (eregi("<[^>]*img*\"?[^>]*", $secvalue)) ||
-  (eregi("<[^>]*onmouseover *\"?[^>]*", $secvalue)) ||
-  (eregi("<[^>]*body *\"?[^>]*", $secvalue)) ||
-  (eregi("\([^>]*\"?[^)]*\)", $secvalue)) ||
-  (eregi("\"", $secvalue)) ||
-  (eregi("forum_admin", $sec_key)) ||
-  (eregi("inside_mod", $sec_key)))
+ if((mb_eregi("<[^>]*script*\"?[^>]*", $secvalue)) ||
+  (mb_eregi("<[^>]*object*\"?[^>]*", $secvalue)) ||
+  (mb_eregi("<[^>]*iframe*\"?[^>]*", $secvalue)) ||
+  (mb_eregi("<[^>]*applet*\"?[^>]*", $secvalue)) ||
+  (mb_eregi("<[^>]*meta*\"?[^>]*", $secvalue)) ||
+  (mb_eregi("<[^>]*style*\"?[^>]*", $secvalue)) ||
+  (mb_eregi("<[^>]*form*\"?[^>]*", $secvalue)) ||
+  (mb_eregi("<[^>]*img*\"?[^>]*", $secvalue)) ||
+  (mb_eregi("<[^>]*onmouseover *\"?[^>]*", $secvalue)) ||
+  (mb_eregi("<[^>]*body *\"?[^>]*", $secvalue)) ||
+  (mb_eregi("\([^>]*\"?[^)]*\)", $secvalue)) ||
+  (mb_eregi("\"", $secvalue)) ||
+  (mb_eregi("forum_admin", $sec_key)) ||
+  (mb_eregi("inside_mod", $sec_key)))
   {
    die ($htmltags);
   }
 }
 
  foreach ($_POST as $secvalue) {
-  if ((eregi("<[^>]*iframe*\"?[^>]*", $secvalue)) ||
-  (eregi("<[^>]*object*\"?[^>]*", $secvalue)) ||
-  (eregi("<[^>]*applet*\"?[^>]*", $secvalue)) ||
-  (eregi("<[^>]*meta*\"?[^>]*", $secvalue)) ||
-  (eregi("<[^>]*onmouseover*\"?[^>]*", $secvalue)) ||
-  (eregi("<[^>]script*\"?[^>]*", $secvalue)) ||
-  (eregi("<[^>]*body*\"?[^>]*", $secvalue)) ||
-  (eregi("<[^>]style*\"?[^>]*", $secvalue))) {
+  if ((mb_eregi("<[^>]*iframe*\"?[^>]*", $secvalue)) ||
+  (mb_eregi("<[^>]*object*\"?[^>]*", $secvalue)) ||
+  (mb_eregi("<[^>]*applet*\"?[^>]*", $secvalue)) ||
+  (mb_eregi("<[^>]*meta*\"?[^>]*", $secvalue)) ||
+  (mb_eregi("<[^>]*onmouseover*\"?[^>]*", $secvalue)) ||
+  (mb_eregi("<[^>]script*\"?[^>]*", $secvalue)) ||
+  (mb_eregi("<[^>]*body*\"?[^>]*", $secvalue)) ||
+  (mb_eregi("<[^>]style*\"?[^>]*", $secvalue))) {
    die ($htmltags);
   }
  }
@@ -883,15 +883,15 @@ function check_words($Message) {
 			$Replace = $CensorReplace;
 			if ($CensorMode == 1) {
 				for ($i = 0; $i < count($CensorList); $i++) {
-					$EditedMessage = eregi_replace("$CensorList[$i]([^a-zA-Z0-9])","$Replace\\1",$EditedMessage);
+					$EditedMessage = mb_eregi_replace("$CensorList[$i]([^a-zA-Z0-9])","$Replace\\1",$EditedMessage);
 				}
 			} elseif ($CensorMode == 2) {
 				for ($i = 0; $i < count($CensorList); $i++) {
-					$EditedMessage = eregi_replace("(^|[^[:alnum:]])$CensorList[$i]","\\1$Replace",$EditedMessage);
+					$EditedMessage = mb_eregi_replace("(^|[^[:alnum:]])$CensorList[$i]","\\1$Replace",$EditedMessage);
 				}
 			} elseif ($CensorMode == 3) {
 				for ($i = 0; $i < count($CensorList); $i++) {
-					$EditedMessage = eregi_replace("$CensorList[$i]","$Replace",$EditedMessage);
+					$EditedMessage = mb_eregi_replace("$CensorList[$i]","$Replace",$EditedMessage);
 				}
 			}
 		}
@@ -955,16 +955,16 @@ function check_html ($str, $strip="") {
 	if ($strip == "nohtml")
 	$AllowableHTML=array('');
 	$str = stripslashes($str);
-	$str = eregi_replace("<[[:space:]]*([^>]*)[[:space:]]*>",'<\\1>', $str);
+	$str = mb_eregi_replace("<[[:space:]]*([^>]*)[[:space:]]*>",'<\\1>', $str);
 	// Delete all spaces from html tags .
-	$str = eregi_replace("<a[^>]*href[[:space:]]*=[[:space:]]*\"?[[:space:]]*([^\" >]*)[[:space:]]*\"?[^>]*>",'<a href="\\1">', $str);
+	$str = mb_eregi_replace("<a[^>]*href[[:space:]]*=[[:space:]]*\"?[[:space:]]*([^\" >]*)[[:space:]]*\"?[^>]*>",'<a href="\\1">', $str);
 	// Delete all attribs from Anchor, except an href, double quoted.
-	$str = eregi_replace("<[[:space:]]* img[[:space:]]*([^>]*)[[:space:]]*>", '', $str);
+	$str = mb_eregi_replace("<[[:space:]]* img[[:space:]]*([^>]*)[[:space:]]*>", '', $str);
 	// Delete all img tags
-	$str = eregi_replace("<a[^>]*href[[:space:]]*=[[:space:]]*\"?javascript[[:punct:]]*\"?[^>]*>", '', $str);
+	$str = mb_eregi_replace("<a[^>]*href[[:space:]]*=[[:space:]]*\"?javascript[[:punct:]]*\"?[^>]*>", '', $str);
 	// Delete javascript code from a href tags -- Zhen-Xjell @ http://nukecops.com
 	$tmp = "";
-	while (ereg("<(/?[[:alpha:]]*)[[:space:]]*([^>]*)>",$str,$reg)) {
+	while (mb_ereg("<(/?[[:alpha:]]*)[[:space:]]*([^>]*)>",$str,$reg)) {
 		$i = strpos($str,$reg[0]);
 		$l = strlen($reg[0]);
 		if ($reg[1][0] == "/") $tag = strtolower(substr($reg[1],1));
@@ -976,7 +976,7 @@ function check_html ($str, $strip="") {
 			# Place here the double quote fix function.
 			$attrb_list=delQuotes($reg[2]);
 			// A VER
-			//$attrb_list = ereg_replace("&","&amp;",$attrb_list);
+			//$attrb_list = mb_ereg_replace("&","&amp;",$attrb_list);
 			$tag = "<$tag" . $attrb_list . ">";
 		} # Attribs in tag allowed
 		else $tag = "";
@@ -987,7 +987,7 @@ function check_html ($str, $strip="") {
 	return $str;
 	exit;
 	/* Squash PHP tags unconditionally */
-	$str = ereg_replace("<\?","",$str);
+	$str = mb_ereg_replace("<\?","",$str);
 	return $str;
 }
 
@@ -1215,10 +1215,10 @@ function headlines($bid, $cenbox=0) {
 			$items = explode("</item>",$string);
 			$content = "<font class=\"content\">";
 			for ($i=0;$i<10;$i++) {
-				$link = ereg_replace(".*<link>","",$items[$i]);
-				$link = ereg_replace("</link>.*","",$link);
-				$title2 = ereg_replace(".*<title>","",$items[$i]);
-				$title2 = ereg_replace("</title>.*","",$title2);
+				$link = mb_ereg_replace(".*<link>","",$items[$i]);
+				$link = mb_ereg_replace("</link>.*","",$link);
+				$title2 = mb_ereg_replace(".*<title>","",$items[$i]);
+				$title2 = mb_ereg_replace("</title>.*","",$title2);
 				$title2 = stripslashes($title2);
 				if (empty($items[$i]) AND $cont != 1) {
 					$content = "";
@@ -1415,7 +1415,7 @@ function removecrlf($str) {
 }
 
 function validate_mail($email) {
-  if(strlen($email) < 7 || !eregi("^[_\.0-9a-z-]+@([0-9a-z][0-9a-z-]+\.)+[a-z]{2,6}$",$email)) {
+  if(strlen($email) < 7 || !mb_eregi("^[_\.0-9a-z-]+@([0-9a-z][0-9a-z-]+\.)+[a-z]{2,6}$",$email)) {
      OpenTable();
      echo _ERRORINVEMAIL;
      CloseTable();
@@ -1566,8 +1566,8 @@ function redir($content) {
 			$pos = $endpos+1;
 		} else {
 			if (!strcasecmp(strtok($tag," "),"A")) {
-				if (eregi("HREF[ \t\n\r\v]*=[ \t\n\r\v]*\"([^\"]*)\"",$tag,$regs));
-				else if (eregi("HREF[ \t\n\r\v]*=[ \t\n\r\v]*([^ \t\n\r\v]*)",$tag,$regs));
+				if (mb_eregi("HREF[ \t\n\r\v]*=[ \t\n\r\v]*\"([^\"]*)\"",$tag,$regs));
+				else if (mb_eregi("HREF[ \t\n\r\v]*=[ \t\n\r\v]*([^ \t\n\r\v]*)",$tag,$regs));
 				else $regs[1] = "";
 				if ($regs[1]) {
 					$location = $regs[1];

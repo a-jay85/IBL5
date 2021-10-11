@@ -38,6 +38,9 @@ include "includes/classes/widget.inc.php";
 // Functions
 include "includes/functions.inc.php";
 
+// IBL-specific
+include $_SERVER['DOCUMENT_ROOT'] . '/mainfile.php';
+
 // In PHP 5.2 or higher we don't need to bring this in
 if (!function_exists('json_encode')) {
   require_once 'includes/jsonwrapper_inner.php';

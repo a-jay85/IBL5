@@ -1,6 +1,6 @@
 <?php
 
-if (!eregi("modules.php", $_SERVER["PHP_SELF"])) {
+if (!mb_eregi("modules.php", $_SERVER["PHP_SELF"])) {
     die("You can't access this file directly...");
 }
 
@@ -23,7 +23,7 @@ function nav($main_up=0) {
     global $module_name, $articlecomm;
     $handle=opendir('themes');
     while ($file = readdir($handle)) {
-	if ( (!ereg("[.]",$file)) ) {
+	if ( (!mb_ereg("[.]",$file)) ) {
 		$thmcount++;
 	}
     }

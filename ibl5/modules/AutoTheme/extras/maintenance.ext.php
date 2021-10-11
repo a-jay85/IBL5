@@ -25,7 +25,7 @@ function at_maintenance($vars)
     $maintenance = atAutoGetVar("maintenance");
     $template = $maintenance['template'];
     
-    if (atISAdminUser() || eregi($GLOBALS['admin_file'], $_SERVER['PHP_SELF'])) {
+    if (atISAdminUser() || mb_eregi($GLOBALS['admin_file'], $_SERVER['PHP_SELF'])) {
     	return;
     }        
     if (!$template) {

@@ -90,7 +90,7 @@ while($file = @readdir($dir))
 		{
 			$smiley_images[] = $file;
 		}
-		else if( eregi('.pak$', $file) )
+		else if( mb_eregi('.pak$', $file) )
 		{	
 			$smiley_paks[] = $file;
 		}

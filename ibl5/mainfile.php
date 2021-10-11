@@ -87,10 +87,6 @@ if (!function_exists("floatval")) {
 //   	}
 // }
 
-if (!ini_get('register_globals')) {
-	@import_request_variables("GPC", "");
-}
-
 // This block of code makes sure $admin and $user are COOKIES
 if((isset($admin) && $admin != $_COOKIE['admin']) OR (isset($user) && $user != $_COOKIE['user'])) {
 	die("Illegal Operation");

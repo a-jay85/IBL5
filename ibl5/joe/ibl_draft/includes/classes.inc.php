@@ -34,12 +34,10 @@ include "includes/classes/position.inc.php";
 include "includes/classes/settings.inc.php";
 include "includes/classes/player.inc.php";
 include "includes/classes/widget.inc.php";
+include "includes/classes/Discord.php";
 
 // Functions
 include "includes/functions.inc.php";
-
-// // IBL-specific
-// include '/mainfile.php';
 
 // In PHP 5.2 or higher we don't need to bring this in
 if (!function_exists('json_encode')) {

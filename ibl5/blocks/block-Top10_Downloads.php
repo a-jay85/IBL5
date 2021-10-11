@@ -24,7 +24,7 @@ $result = $db->sql_query("SELECT lid, title FROM ".$prefix."_downloads_downloads
 while ($row = $db->sql_fetchrow($result)) {
     $lid = intval($row['lid']);
     $title = filter($row['title'], "nohtml");
-    $title2 = ereg_replace("_", " ", $title);
+    $title2 = mb_ereg_replace("_", " ", $title);
     $content .= "<strong><big>&middot;</big></strong>&nbsp;$a: <a href=\"modules.php?name=Downloads&amp;d_op=viewdownloaddetails&amp;lid=$lid&amp;title=$title\">$title2</a><br>";
     $a++;
 }

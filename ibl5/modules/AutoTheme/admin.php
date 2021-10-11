@@ -771,10 +771,10 @@ function AutoTheme_admin_import($var)
 					foreach ($thememod as $name => $value) {
                     	$key = str_replace("area", "Area", $name);
 
-                    	if (eregi("block", $key)) {
+                    	if (mb_eregi("block", $key)) {
                         	$temp[$key] = $value;
                     	}
-                    	elseif (eregi("Area", $key)) {
+                    	elseif (mb_eregi("Area", $key)) {
                         	$block[$key] = (string)(int)$value;
                     	}
                 	}

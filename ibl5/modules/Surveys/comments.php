@@ -42,8 +42,8 @@ function format_url($comment) {
 			$pos = $endpos+1;
 		} else {
 			if (!strcasecmp(strtok($tag," "),"A")) {
-				if (eregi("HREF[ \t\n\r\v]*=[ \t\n\r\v]*\"([^\"]*)\"",$tag,$regs));
-				else if (eregi("HREF[ \t\n\r\v]*=[ \t\n\r\v]*([^ \t\n\r\v]*)",$tag,$regs));
+				if (mb_eregi("HREF[ \t\n\r\v]*=[ \t\n\r\v]*\"([^\"]*)\"",$tag,$regs));
+				else if (mb_eregi("HREF[ \t\n\r\v]*=[ \t\n\r\v]*([^ \t\n\r\v]*)",$tag,$regs));
 				else $regs[1] = "";
 				if ($regs[1]) {
 					$location = $regs[1];
@@ -269,8 +269,8 @@ function DisplayKids ($tid, $mode, $order=0, $thold=0, $level=0, $dummy=0, $tblw
 					}
 				}
 				$comments++;
-				if (!eregi("[a-z0-9]",$r_name)) $r_name = $anonymous;
-				if (!eregi("[a-z0-9]",$r_subject)) $r_subject = "["._NOSUBJECT."]";
+				if (!mb_eregi("[a-z0-9]",$r_name)) $r_name = $anonymous;
+				if (!mb_eregi("[a-z0-9]",$r_subject)) $r_subject = "["._NOSUBJECT."]";
 				// enter hex color between first two appostrophe for second alt bgcolor
 				$r_bgcolor = ($dummy%2)?"":"#E6E6D2";
 				echo "<a name=\"$r_tid\">";
@@ -333,8 +333,8 @@ function DisplayKids ($tid, $mode, $order=0, $thold=0, $level=0, $dummy=0, $tblw
 			$r_score = intval($row['score']);
 			$r_reason = intval($row['reason']);
 			if($r_score >= $thold) {
-				if (!eregi("[a-z0-9]",$r_name)) $r_name = $anonymous;
-				if (!eregi("[a-z0-9]",$r_subject)) $r_subject = "["._NOSUBJECT."]";
+				if (!mb_eregi("[a-z0-9]",$r_name)) $r_name = $anonymous;
+				if (!mb_eregi("[a-z0-9]",$r_subject)) $r_subject = "["._NOSUBJECT."]";
 				echo "<a name=\"$r_tid\">";
 				echo "<hr><table width=99% border=0><tr bgcolor=\"$bgcolor1\"><td>";
 				formatTimestamp($r_date);
@@ -362,7 +362,7 @@ function DisplayKids ($tid, $mode, $order=0, $thold=0, $level=0, $dummy=0, $tblw
 				}
 				$row_url2 = $db->sql_fetchrow($db->sql_query("SELECT user_website FROM ".$prefix."_users WHERE username='$r_name'"));
 				$url = filter($row_url2['user_website'], "nohtml");
-				if ($url != "http://" AND !empty($url) AND eregi("http://", $url)) { echo "<a href=\"$url\" target=\"new\">$url</a> "; }
+				if ($url != "http://" AND !empty($url) AND mb_eregi("http://", $url)) { echo "<a href=\"$url\" target=\"new\">$url</a> "; }
 				echo "</font></td></tr><tr><td>";
 				if((isset($userinfo['commentmax'])) && (strlen($r_comment) > $userinfo['commentmax'])) echo substr($r_comment, 0, $userinfo['commentmax'])."<br><br><b><a href=\"modules.php?name=$module_name&file=comments&pollID=$r_pollID&tid=$r_tid&mode=$mode&order=$order&thold=$thold\">"._READREST."</a></b>";
 				elseif(strlen($r_comment) > $commentlimit) echo substr("$r_comment", 0, $commentlimit)."<br><br><b><a href=\"modules.php?name=$module_name&amp;file=comments&amp;pollID=$r_pollID&amp;tid=$r_tid&amp;mode=$mode&amp;order=$order&amp;thold=$thold\">"._READREST."</a></b>";
@@ -391,8 +391,8 @@ function DisplayKids ($tid, $mode, $order=0, $thold=0, $level=0, $dummy=0, $tblw
 				  echo "<ul>";
 				}
 				$comments++;
-				if (!eregi("[a-z0-9]",$r_name)) $r_name = $anonymous;
-				if (!eregi("[a-z0-9]",$r_subject)) $r_subject = "["._NOSUBJECT."]";
+				if (!mb_eregi("[a-z0-9]",$r_name)) $r_name = $anonymous;
+				if (!mb_eregi("[a-z0-9]",$r_subject)) $r_subject = "["._NOSUBJECT."]";
 				formatTimestamp($r_date);
 				echo "<li><font class=\"content\"><a href=\"modules.php?name=$module_name&amp;file=comments&amp;op=showreply&amp;tid=$r_tid&amp;pollID=$r_pollID&amp;pid=$r_pid&amp;mode=$mode&amp;order=$order&amp;thold=$thold#$r_tid\">$r_subject</a> "._BY." $r_name "._ON." $datetime</font><br>";
 				DisplayKids($r_tid, $mode, $order, $thold, $level+1, $dummy+1);
@@ -429,8 +429,8 @@ function DisplayBabies ($tid, $level=0, $dummy=0) {
 			}
 		}
 		$comments++;
-		if (!eregi("[a-z0-9]",$r_name)) { $r_name = $anonymous; }
-		if (!eregi("[a-z0-9]",$r_subject)) { $r_subject = "["._NOSUBJECT."]"; }
+		if (!mb_eregi("[a-z0-9]",$r_name)) { $r_name = $anonymous; }
+		if (!mb_eregi("[a-z0-9]",$r_subject)) { $r_subject = "["._NOSUBJECT."]"; }
 		formatTimestamp($r_date);
 		echo "<a href=\"modules.php?name=$module_name&amp;file=comments&amp;op=showreply&amp;tid=$r_tid&amp;mode=$mode&amp;order=$order&amp;thold=$thold\">$r_subject</a><font class=\"content\"> "._BY." $r_name "._ON." $datetime<br>";
 		DisplayBabies($r_tid, $level+1, $dummy+1);

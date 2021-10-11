@@ -197,7 +197,7 @@ function atLoadRunningConfig()
         $matchlen = 0;
         if ($_SERVER['QUERY_STRING']) {
             foreach ($template[$modtemplate] as $ops => $vals) {
-                if ((strlen($ops) > $matchlen) && eregi($ops, $_SERVER['QUERY_STRING'])) {
+                if ((strlen($ops) > $matchlen) && mb_eregi($ops, $_SERVER['QUERY_STRING'])) {
                     $modops = $ops;
                     $matchlen = strlen($modops);
                 }
@@ -232,7 +232,7 @@ function atLoadRunningConfig()
     }
     atRunningSetVar("modops", $modops);
 
-    if (eregi("xhtml", $template['dtd'])) {
+    if (mb_eregi("xhtml", $template['dtd'])) {
 		$xhtml = 1;
 	}
 	else {
@@ -711,10 +711,10 @@ function atGetPlatform()
         $platform = "CPG-Nuke";
     }
     if (defined('PROJECT_VERSION')) {
-	    if (eregi('osCommerce', PROJECT_VERSION)) {
+	    if (mb_eregi('osCommerce', PROJECT_VERSION)) {
 	    	$platform = "osCommerce";
 	    }
-	    if (eregi('CRE', PROJECT_VERSION)) {
+	    if (mb_eregi('CRE', PROJECT_VERSION)) {
 	    	$platform = "CRE";
 	    }
     }
@@ -1246,7 +1246,7 @@ function atLoadExtraCommands($dir)
 
     if ($handle = @opendir($dir)) {
         while (false !== ($file = @readdir($handle))) {
-            if (eregi(".cmd.php", $file)) {
+            if (mb_eregi(".cmd.php", $file)) {
                 $extracmd = array();
 
                 $parts = explode(".", $file);
@@ -1265,7 +1265,7 @@ function atLoadExtraCommands($dir)
     }
     if ($handle = @opendir($dir.$platform)) {
         while (false !== ($file = @readdir($handle))) {
-            if (eregi(".cmd.php", $file)) {
+            if (mb_eregi(".cmd.php", $file)) {
                 $extracmd = array();
 
                 $parts = explode(".", $file);
@@ -1294,7 +1294,7 @@ function atExtraScan($dir)
 
     if ($handle = @opendir($dir.$platform)) {
         while (false !== ($file = @readdir($handle))) {
-            if (eregi(".ext.php", $file)) {
+            if (mb_eregi(".ext.php", $file)) {
                 $parts = explode(".", $file);
                 $name = $parts[0];
                 $loaded[$name] = 1;
@@ -1306,7 +1306,7 @@ function atExtraScan($dir)
     }
     if ($handle = @opendir($dir)) {
         while (false !== ($file = @readdir($handle))) {
-            if (eregi(".ext.php", $file)) {
+            if (mb_eregi(".ext.php", $file)) {
                 $parts = explode(".", $file);
                 $name = $parts[0];
                 if (!$loaded[$name]) {
@@ -1667,7 +1667,7 @@ function at_listfiles($dir, $ext)
 
     if ($handle = @opendir($dir)) {
         while (false !== ($item = @readdir($handle))) {
-            if (@!is_dir($dir . $item) && eregi(".$ext", $item)) {
+            if (@!is_dir($dir . $item) && mb_eregi(".$ext", $item)) {
                 $filelist[] = $item;
             }
             elseif (@is_dir("$dir/$item") && $item !== '.' && $item !== '..') {

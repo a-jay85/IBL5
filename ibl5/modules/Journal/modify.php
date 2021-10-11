@@ -122,7 +122,7 @@ $sql = "SELECT * FROM ".$prefix."_journal WHERE jid = '$jid'";
             closedir($handle);
             asort($filelist);
             while (list ($key, $file) = each ($filelist)) {
-			    if (!ereg(".gif|.jpg",$file)) { }
+			    if (!mb_ereg(".gif|.jpg",$file)) { }
 			    elseif ($file == "." || $file == "..") {
                     $a = 1;
                 } else {
@@ -233,7 +233,7 @@ $sql = "SELECT * FROM ".$prefix."_journal WHERE jid = '$jid'";
             closedir($handle);
             asort($filelist);
             while (list ($key, $file) = each ($filelist)) {
-			    if (!ereg(".gif|.jpg",$file)) { }
+			    if (!mb_ereg(".gif|.jpg",$file)) { }
 			    elseif ($file == "." || $file == "..") {
                     $a = 1;
                 } else {

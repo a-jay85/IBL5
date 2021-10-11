@@ -846,7 +846,7 @@ for($i = 0; $i < $total_posts; $i++)
         $poster_posts = ( $postrow[$i]['user_id'] != ANONYMOUS ) ? $lang['Posts'] . ': ' . $postrow[$i]['user_posts'] : '';
 
         $poster_from = ( $postrow[$i]['user_from'] && $postrow[$i]['user_id'] != ANONYMOUS ) ? $lang['Location'] . ': ' . $postrow[$i]['user_from'] : '';
-        $poster_from = ereg_replace(".gif", "", $poster_from);
+        $poster_from = mb_ereg_replace(".gif", "", $poster_from);
         $poster_joined = ( $postrow[$i]['user_id'] != ANONYMOUS ) ? $lang['Joined'] . ': ' . $postrow[$i]['user_regdate'] : '';
 
 	$poster_avatar = '';

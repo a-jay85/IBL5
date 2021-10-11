@@ -227,14 +227,14 @@ switch($op) {
 							$informant = "<a href=\"modules.php?name=Your_Account&amp;op=userinfo&amp;username=$informant\">$informant</a>";
 						}
 						if (!empty($query) AND $query != "*") {
-							if (eregi(quotemeta($query),$title)) {
+							if (mb_eregi(quotemeta($query),$title)) {
 								$a = 1;
 							}
 							$text = "$hometext$bodytext";
-							if (eregi(quotemeta($query),$text)) {
+							if (mb_eregi(quotemeta($query),$text)) {
 								$a = 2;
 							}
-							if (eregi(quotemeta($query),$text) AND eregi(quotemeta($query),$title)) {
+							if (mb_eregi(quotemeta($query),$text) AND mb_eregi(quotemeta($query),$title)) {
 								$a = 3;
 							}
 							if ($a == 1) {

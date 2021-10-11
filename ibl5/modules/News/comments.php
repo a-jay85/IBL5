@@ -41,8 +41,8 @@ function format_url($comment) {
 			$pos = $endpos+1;
 		} else {
 			if (!strcasecmp(strtok($tag," "),"A")) {
-				if (eregi("HREF[ \t\n\r\v]*=[ \t\n\r\v]*\"([^\"]*)\"",$tag,$regs));
-				else if (eregi("HREF[ \t\n\r\v]*=[ \t\n\r\v]*([^ \t\n\r\v]*)",$tag,$regs));
+				if (mb_eregi("HREF[ \t\n\r\v]*=[ \t\n\r\v]*\"([^\"]*)\"",$tag,$regs));
+				else if (mb_eregi("HREF[ \t\n\r\v]*=[ \t\n\r\v]*([^ \t\n\r\v]*)",$tag,$regs));
 				else $regs[1] = "";
 				if ($regs[1]) {
 					$location = $regs[1];
@@ -279,8 +279,8 @@ function DisplayKids ($tid, $mode, $order=0, $thold=0, $level=0, $dummy=0, $tblw
 					}
 				}
 				$comments++;
-				if (!eregi("[a-z0-9]",$r_name)) $r_name = $anonymous;
-				if (!eregi("[a-z0-9]",$r_subject)) $r_subject = "["._NOSUBJECT."]";
+				if (!mb_eregi("[a-z0-9]",$r_name)) $r_name = $anonymous;
+				if (!mb_eregi("[a-z0-9]",$r_subject)) $r_subject = "["._NOSUBJECT."]";
 				// HIJO enter hex color between first two appostrophe for second alt bgcolor
 				$r_bgcolor = ($dummy%2)?"":"#E6E6D2";
 				echo "<a name=\"$r_tid\">";
@@ -346,8 +346,8 @@ function DisplayKids ($tid, $mode, $order=0, $thold=0, $level=0, $dummy=0, $tblw
 			$r_score = intval($row['score']);
 			$r_reason = intval($row['reason']);
 			if($r_score >= $thold) {
-				if (!eregi("[a-z0-9]",$r_name)) $r_name = $anonymous;
-				if (!eregi("[a-z0-9]",$r_subject)) $r_subject = "["._NOSUBJECT."]";
+				if (!mb_eregi("[a-z0-9]",$r_name)) $r_name = $anonymous;
+				if (!mb_eregi("[a-z0-9]",$r_subject)) $r_subject = "["._NOSUBJECT."]";
 				echo "<a name=\"$r_tid\">";
 				echo "<hr><table width=\"99%\" border=\"0\"><tr bgcolor=\"$bgcolor1\"><td>";
 				formatTimestamp($r_date);
@@ -414,8 +414,8 @@ function DisplayKids ($tid, $mode, $order=0, $thold=0, $level=0, $dummy=0, $tblw
 					}
 				}
 				$comments++;
-				if (!eregi("[a-z0-9]",$r_name)) $r_name = $anonymous;
-				if (!eregi("[a-z0-9]",$r_subject)) $r_subject = "["._NOSUBJECT."]";
+				if (!mb_eregi("[a-z0-9]",$r_name)) $r_name = $anonymous;
+				if (!mb_eregi("[a-z0-9]",$r_subject)) $r_subject = "["._NOSUBJECT."]";
 				formatTimestamp($r_date);
 				$options = "";
 				$options .= "&mode=".$mode;
@@ -454,8 +454,8 @@ function DisplayBabies ($tid, $level=0, $dummy=0) {
 		  echo "<ul>";
 		}
 		$comments++;
-		if (!eregi("[a-z0-9]",$r_name)) { $r_name = $anonymous; }
-		if (!eregi("[a-z0-9]",$r_subject)) { $r_subject = "["._NOSUBJECT."]"; }
+		if (!mb_eregi("[a-z0-9]",$r_name)) { $r_name = $anonymous; }
+		if (!mb_eregi("[a-z0-9]",$r_subject)) { $r_subject = "["._NOSUBJECT."]"; }
 		formatTimestamp($r_date);
                 $options = "";
       	        $options .= "&mode=".$mode;

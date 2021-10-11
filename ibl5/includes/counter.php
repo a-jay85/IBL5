@@ -27,27 +27,27 @@ global $prefix, $db;
 
 /* Get the Browser data */
 
-if ((ereg("Nav", $_SERVER["HTTP_USER_AGENT"])) || (ereg("Gold", $_SERVER["HTTP_USER_AGENT"])) || (ereg("X11", $_SERVER["HTTP_USER_AGENT"])) || (ereg("Mozilla", $_SERVER["HTTP_USER_AGENT"])) || (ereg("Netscape", $_SERVER["HTTP_USER_AGENT"])) AND (!ereg("MSIE", $_SERVER["HTTP_USER_AGENT"])) AND (!ereg("Konqueror", $_SERVER["HTTP_USER_AGENT"])) AND (!ereg("Yahoo", $_SERVER["HTTP_USER_AGENT"])) AND (!ereg("Firefox", $_SERVER["HTTP_USER_AGENT"]))) $browser = "Netscape";
-elseif(ereg("Firefox", $_SERVER["HTTP_USER_AGENT"])) $browser = "FireFox";
-elseif(ereg("MSIE", $_SERVER["HTTP_USER_AGENT"])) $browser = "MSIE";
-elseif(ereg("Lynx", $_SERVER["HTTP_USER_AGENT"])) $browser = "Lynx";
-elseif(ereg("Opera", $_SERVER["HTTP_USER_AGENT"])) $browser = "Opera";
-elseif(ereg("WebTV", $_SERVER["HTTP_USER_AGENT"])) $browser = "WebTV";
-elseif(ereg("Konqueror", $_SERVER["HTTP_USER_AGENT"])) $browser = "Konqueror";
-elseif((eregi("bot", $_SERVER["HTTP_USER_AGENT"])) || (ereg("Google", $_SERVER["HTTP_USER_AGENT"])) || (ereg("Slurp", $_SERVER["HTTP_USER_AGENT"])) || (ereg("Scooter", $_SERVER["HTTP_USER_AGENT"])) || (eregi("Spider", $_SERVER["HTTP_USER_AGENT"])) || (eregi("Infoseek", $_SERVER["HTTP_USER_AGENT"]))) $browser = "Bot";
+if ((mb_ereg("Nav", $_SERVER["HTTP_USER_AGENT"])) || (mb_ereg("Gold", $_SERVER["HTTP_USER_AGENT"])) || (mb_ereg("X11", $_SERVER["HTTP_USER_AGENT"])) || (mb_ereg("Mozilla", $_SERVER["HTTP_USER_AGENT"])) || (mb_ereg("Netscape", $_SERVER["HTTP_USER_AGENT"])) AND (!mb_ereg("MSIE", $_SERVER["HTTP_USER_AGENT"])) AND (!mb_ereg("Konqueror", $_SERVER["HTTP_USER_AGENT"])) AND (!mb_ereg("Yahoo", $_SERVER["HTTP_USER_AGENT"])) AND (!mb_ereg("Firefox", $_SERVER["HTTP_USER_AGENT"]))) $browser = "Netscape";
+elseif(mb_ereg("Firefox", $_SERVER["HTTP_USER_AGENT"])) $browser = "FireFox";
+elseif(mb_ereg("MSIE", $_SERVER["HTTP_USER_AGENT"])) $browser = "MSIE";
+elseif(mb_ereg("Lynx", $_SERVER["HTTP_USER_AGENT"])) $browser = "Lynx";
+elseif(mb_ereg("Opera", $_SERVER["HTTP_USER_AGENT"])) $browser = "Opera";
+elseif(mb_ereg("WebTV", $_SERVER["HTTP_USER_AGENT"])) $browser = "WebTV";
+elseif(mb_ereg("Konqueror", $_SERVER["HTTP_USER_AGENT"])) $browser = "Konqueror";
+elseif((mb_eregi("bot", $_SERVER["HTTP_USER_AGENT"])) || (mb_ereg("Google", $_SERVER["HTTP_USER_AGENT"])) || (mb_ereg("Slurp", $_SERVER["HTTP_USER_AGENT"])) || (mb_ereg("Scooter", $_SERVER["HTTP_USER_AGENT"])) || (mb_eregi("Spider", $_SERVER["HTTP_USER_AGENT"])) || (mb_eregi("Infoseek", $_SERVER["HTTP_USER_AGENT"]))) $browser = "Bot";
 else $browser = "Other";
 
 /* Get the Operating System data */
 
-if(ereg("Win", $_SERVER["HTTP_USER_AGENT"])) $os = "Windows";
-elseif((ereg("Mac", $_SERVER["HTTP_USER_AGENT"])) || (ereg("PPC", $_SERVER["HTTP_USER_AGENT"]))) $os = "Mac";
-elseif(ereg("Linux", $_SERVER["HTTP_USER_AGENT"])) $os = "Linux";
-elseif(ereg("FreeBSD", $_SERVER["HTTP_USER_AGENT"])) $os = "FreeBSD";
-elseif(ereg("SunOS", $_SERVER["HTTP_USER_AGENT"])) $os = "SunOS";
-elseif(ereg("IRIX", $_SERVER["HTTP_USER_AGENT"])) $os = "IRIX";
-elseif(ereg("BeOS", $_SERVER["HTTP_USER_AGENT"])) $os = "BeOS";
-elseif(ereg("OS/2", $_SERVER["HTTP_USER_AGENT"])) $os = "OS/2";
-elseif(ereg("AIX", $_SERVER["HTTP_USER_AGENT"])) $os = "AIX";
+if(mb_ereg("Win", $_SERVER["HTTP_USER_AGENT"])) $os = "Windows";
+elseif((mb_ereg("Mac", $_SERVER["HTTP_USER_AGENT"])) || (mb_ereg("PPC", $_SERVER["HTTP_USER_AGENT"]))) $os = "Mac";
+elseif(mb_ereg("Linux", $_SERVER["HTTP_USER_AGENT"])) $os = "Linux";
+elseif(mb_ereg("FreeBSD", $_SERVER["HTTP_USER_AGENT"])) $os = "FreeBSD";
+elseif(mb_ereg("SunOS", $_SERVER["HTTP_USER_AGENT"])) $os = "SunOS";
+elseif(mb_ereg("IRIX", $_SERVER["HTTP_USER_AGENT"])) $os = "IRIX";
+elseif(mb_ereg("BeOS", $_SERVER["HTTP_USER_AGENT"])) $os = "BeOS";
+elseif(mb_ereg("OS/2", $_SERVER["HTTP_USER_AGENT"])) $os = "OS/2";
+elseif(mb_ereg("AIX", $_SERVER["HTTP_USER_AGENT"])) $os = "AIX";
 else $os = "Other";
 
 /* Save on the databases the obtained values */

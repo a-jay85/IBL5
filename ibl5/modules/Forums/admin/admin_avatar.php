@@ -164,7 +164,7 @@ switch( $mode )
 			while( $file = @readdir($avatar_dir) )
 			{
 				// This is where the script will filter out any file that doesn't match the patterns
-				if( $file != "." && $file != ".." && ereg("\.(gif|jpg|jpeg|png)$",$file) )
+				if( $file != "." && $file != ".." && mb_ereg("\.(gif|jpg|jpeg|png)$",$file) )
 				{
 					$stats = stat($real_avatar_dir.'/'.$file);
 

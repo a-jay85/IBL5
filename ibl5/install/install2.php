@@ -128,7 +128,7 @@ function populate_db( &$database, $sqlfile='nuke.sql') {
  */
 function split_sql($sql) {
 	$sql = trim($sql);
-	$sql = ereg_replace("\n#[^\n]*\n", "\n", $sql);
+	$sql = mb_ereg_replace("\n#[^\n]*\n", "\n", $sql);
 
 	$buffer = array();
 	$ret = array();

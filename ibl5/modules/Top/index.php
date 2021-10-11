@@ -242,7 +242,7 @@ if ($db->sql_numrows($result13) > 0) {
 		if($hits>0) {
 			$row_res = $db->sql_fetchrow($db->sql_query("SELECT title FROM ".$prefix."_downloads_categories WHERE cid='$cid'"));
 			$ctitle = filter($row_res['title'], "nohtml");
-			$utitle = ereg_replace(" ", "_", $title);
+			$utitle = mb_ereg_replace(" ", "_", $title);
 			echo "<strong><big>&middot;</big></strong>&nbsp;$lugar: <a href=\"modules.php?name=Downloads&amp;d_op=viewdownloaddetails&amp;lid=$lid&amp;ttitle=$utitle\">$title</a> ("._CATEGORY.": $ctitle) - ($hits "._LDOWNLOADS.")<br>\n";
 			$lugar++;
 		}

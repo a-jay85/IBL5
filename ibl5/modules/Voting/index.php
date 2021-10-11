@@ -17,7 +17,7 @@
 /*                                                                      */
 /************************************************************************/
 
-if (!eregi("modules.php", $_SERVER['PHP_SELF'])) {
+if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
 	die ("You can't access this file directly...");
 }
 

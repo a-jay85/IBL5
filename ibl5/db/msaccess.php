@@ -154,7 +154,7 @@ class sql_db
 				}
 
 			}
-			else if( eregi("^INSERT ", $query) )
+			else if( mb_eregi("^INSERT ", $query) )
 			{
 				$this->result = odbc_exec($this->db_connect_id, $query);
 

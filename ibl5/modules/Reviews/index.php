@@ -195,7 +195,7 @@ function preview_review($date, $title, $text, $reviewer, $email, $score, $cover,
 		$error = 1;
 		echo ""._CHECKNAME."<br>";
 	} else if (!empty($reviewer) && !empty($email))
-	if (!(eregi("^[0-9a-z]([-_.]?[0-9a-z])*@[0-9a-z]([-.]?[0-9a-z])*\\.[a-z]{2,3}$",$email))) {
+	if (!(mb_eregi("^[0-9a-z]([-_.]?[0-9a-z])*@[0-9a-z]([-.]?[0-9a-z])*\\.[a-z]{2,3}$",$email))) {
 		$error = 1;
 		/* eregi checks for a valid email! works nicely for me! */
 		echo ""._INVALIDEMAIL."<br>";
@@ -203,7 +203,7 @@ function preview_review($date, $title, $text, $reviewer, $email, $score, $cover,
 	if (($url_title != "" && $url =="") || ($url_title == "" && $url != "")) {
 		$error = 1;
 		echo ""._INVALIDLINK."<br>";
-	} else if (($url != "") && (!(eregi('(^http[s]*:[/]+)(.*)', $url))))
+	} else if (($url != "") && (!(mb_eregi('(^http[s]*:[/]+)(.*)', $url))))
 	$url = "http://" . $url;
 	/* If the user ommited the http, this nifty eregi will add it */
 	if (isset($error) AND ($error == 1))

@@ -57,7 +57,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
 		if ($submitter == "") {
 			$submitter = _NONE;
 		}
-		$homepage = ereg_replace("http://","",$homepage);
+		$homepage = mb_ereg_replace("http://","",$homepage);
 		$homepage2 = urlencode($homepage);
 		$url2 = urlencode($url);
 		echo "<table width='100%' border='0' align='center'><tr><td>";
@@ -225,7 +225,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
 				echo "<option value=\"$cid2\">$ctitle2</option>";
 			}
 			echo "</select></td></tr>"
-			."<tr><td>".ereg_replace(":", ":<br>",""._DESCRIPTION255."")."</td><td><textarea name=\"description\" cols=\"70\" rows=\"15\"></textarea></td></tr>"
+			."<tr><td>".mb_ereg_replace(":", ":<br>",""._DESCRIPTION255."")."</td><td><textarea name=\"description\" cols=\"70\" rows=\"15\"></textarea></td></tr>"
 			."<tr><td>" . _AUTHORNAME . ":</td><td><input type=\"text\" name=\"name\" size=\"30\" maxlength=\"60\"></td></tr>"
 			."<tr><td>" . _AUTHOREMAIL . ":</td><td><input type=\"text\" name=\"email\" size=\"30\" maxlength=\"60\"></td></tr>"
 			."<tr><td>" . _FILESIZE . ":</td><td><input type=\"text\" name=\"filesize\" size=\"12\" maxlength=\"11\"> (" . _INBYTES . ")</td></tr>"
@@ -682,7 +682,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
 			$url = filter($row['url'], "nohtml");
 			$url = urlencode($url);
 			$description = filter($row['description']);
-			$xdescription = eregi_replace("<a href=\"http://", "<a href=\"index.php?url=http://", $description);
+			$xdescription = mb_eregi_replace("<a href=\"http://", "<a href=\"index.php?url=http://", $description);
 			$modifysubmitter = $row['modifysubmitter'];
 			$name = $row['name'];
 			$email = filter($row['email'], "nohtml");
@@ -697,7 +697,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
 			$origurl = filter($row2['url'], "nohtml");
 			$origurl = urlencode($origurl);
 			$origdescription = filter($row2['description']);
-			$xorigdescription = eregi_replace("<a href=\"http://", "<a href=\"index.php?url=http://", $origdescription);
+			$xorigdescription = mb_eregi_replace("<a href=\"http://", "<a href=\"index.php?url=http://", $origdescription);
 			$origname = $row2['name'];
 			$origemail = filter($row2['email'], "nohtml");
 			$owner = $row2['submitter'];
@@ -945,7 +945,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
 				$db->sql_query("delete from " . $prefix . "_downloads_downloads where cid='$cid'");
 			} else {
 				$db->sql_query("delete from " . $prefix . "_downloads_downloads where cid='$cid'");
-				// suppression des liens de catégories filles
+				// suppression des liens de catï¿½gories filles
 				$result2 = $db->sql_query("SELECT cid from " . $prefix . "_downloads_categories where parentid='$cid'");
 				while ($row2 = $db->sql_fetchrow($result2)) {
 					$cid2 = intval($row2['cid']);

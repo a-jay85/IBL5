@@ -95,7 +95,7 @@ function theindex($catid) {
 	}
 	if ($httpref==1) {
 		$referer = $_SERVER['HTTP_REFERER'];
-		if ($referer=="" OR ereg("unknown", $referer) OR eregi($nukeurl,$referer)) {
+		if ($referer=="" OR mb_ereg("unknown", $referer) OR mb_eregi($nukeurl,$referer)) {
 		} else {
 			$db->sql_query("insert into ".$prefix."_referer values (NULL, '$referer')");
 		}

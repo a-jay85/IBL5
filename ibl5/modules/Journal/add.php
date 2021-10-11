@@ -117,7 +117,7 @@ $tempcount = 0;
 }
 asort($filelist);
 while (list ($key, $file) = each ($filelist)) {
-    if (!ereg(".gif|.jpg",$file)) { }
+    if (!mb_ereg(".gif|.jpg",$file)) { }
     elseif ($file == "." || $file == "..") {
         $a=1;
     } else {

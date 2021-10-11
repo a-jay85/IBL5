@@ -10,7 +10,7 @@ $engArray = array();
 
 while (!feof($engFile)) {
     $line = fgets($engFile);
-    if (!eregi('   ',$line)) {
+    if (!mb_eregi('   ',$line)) {
 	    preg_match("/(.*), (.*)/", $line, $tempArray);
 	    $key = (string)$tempArray[1];
 	    $value = (int)$tempArray[2];
@@ -18,4 +18,4 @@ while (!feof($engFile)) {
     }
 }
 
-if (eregi('engParser.php',$_SERVER['REQUEST_URI'])) var_dump($engArray);
+if (mb_eregi('engParser.php',$_SERVER['REQUEST_URI'])) var_dump($engArray);

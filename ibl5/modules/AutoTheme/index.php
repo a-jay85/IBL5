@@ -22,7 +22,7 @@
 //
 // ----------------------------------------------------------------------
 
-if (!eregi("index.php|modules.php", $_SERVER['PHP_SELF'])) {
+if (!mb_eregi("index.php|modules.php", $_SERVER['PHP_SELF'])) {
     die ("Access Denied");
 }
 include("header.php");

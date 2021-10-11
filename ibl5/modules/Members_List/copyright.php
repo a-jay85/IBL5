@@ -41,7 +41,7 @@ function show_copyright() {
     if ($module_version == "") { $module_version = "N/A"; }
     if ($module_description == "") { $module_description = "N/A"; }
     $module_name = basename(dirname(__FILE__));
-    $module_name = eregi_replace("_", " ", $module_name);
+    $module_name = mb_eregi_replace("_", " ", $module_name);
     echo "<html>\n"
         ."<body bgcolor=\"#F6F6EB\" link=\"#363636\" alink=\"#363636\" vlink=\"#363636\">\n"
         ."<title>$module_name: Copyright Information</title>\n"

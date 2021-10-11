@@ -106,7 +106,7 @@ if ( !defined('MODULE_FILE') )
                 $editdel = 1;
             }
         } else {
-            if (eregi($forwhat, $username)) {
+            if (mb_eregi($forwhat, $username)) {
                 $editdel = 2;
             }
         }

@@ -299,7 +299,7 @@ if ($row['radminsuper'] == 1) {
 
 	function grp_add($name, $description, $points) {
 		global $prefix, $db, $admin_file;
-		if (!is_numeric($points) || ereg("-", $points)) {
+		if (!is_numeric($points) || mb_ereg("-", $points)) {
 			include("header.php");
 			GraphicAdmin();
 			title("" . _GROUPSADMIN . "");

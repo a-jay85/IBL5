@@ -222,7 +222,7 @@ else
 				{
 					for($i = 1; $i < count($forward_match); $i++)
 					{
-						if( !ereg("sid=", $forward_match[$i]) )
+						if( !mb_ereg("sid=", $forward_match[$i]) )
 						{
 							if( $forward_page != '' )
 							{

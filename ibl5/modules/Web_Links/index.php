@@ -1034,7 +1034,7 @@ function search($query, $min, $orderby, $show) {
 				$title3 = filter($row3['title'], "nohtml");
 				$parentid3 = intval($row3['parentid']);
 				if ($parentid3>0) $title3 = getparent($parentid3,$title3);
-				$title3 = ereg_replace($query1, "<b>$query1</b>", $title3);
+				$title3 = mb_ereg_replace($query1, "<b>$query1</b>", $title3);
 				echo "<strong><big>&middot;</big></strong>&nbsp;<a href=\"modules.php?name=$module_name&amp;l_op=viewlink&amp;cid=$cid\">$title3</a> ($numrows)<br>";
 			}
 			echo "<br><table width=\"100%\" bgcolor=\"$bgcolor2\"><tr><td><font class=\"option\"><b>"._LINKS."</b></font></td></tr></table>";
@@ -1059,7 +1059,7 @@ function search($query, $min, $orderby, $show) {
 				$totalcomments = intval($row['totalcomments']);
 				$linkratingsummary = number_format($linkratingsummary, $mainvotedecimal);
 				$transfertitle = str_replace (" ", "_", $title);
-				$title = ereg_replace($query1, "<b>$query1</b>", $title);
+				$title = mb_ereg_replace($query1, "<b>$query1</b>", $title);
 				if (is_admin($admin)) {
 			    	echo "<a href=\"".$admin_file.".php?op=LinksModLink&amp;lid=$lid\"><img src=\"modules/$module_name/images/lwin.gif\" border=\"0\" alt=\""._EDIT."\"></a>&nbsp;&nbsp;";
 				} else {
@@ -1069,7 +1069,7 @@ function search($query, $min, $orderby, $show) {
 				newlinkgraphic($datetime, $time);
 				popgraphic($hits);
 				echo "<br>";
-				$description = ereg_replace($the_query, "<b>$the_query</b>", $description);
+				$description = mb_ereg_replace($the_query, "<b>$the_query</b>", $description);
 				echo ""._DESCRIPTION.": $description<br>";
 				setlocale (LC_TIME, $locale);
 				ereg ("([0-9]{4})-([0-9]{1,2})-([0-9]{1,2}) ([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})", $time, $datetime);
@@ -1168,7 +1168,7 @@ function viewlinkeditorial($lid) {
 	$lid = intval(trim($lid));
 	$result = $db->sql_query("SELECT adminid, editorialtimestamp, editorialtext, editorialtitle FROM ".$prefix."_links_editorials WHERE linkid = '$lid'");
 	$recordexist = $db->sql_numrows($result);
-	$transfertitle = ereg_replace ("_", " ", $ttitle);
+	$transfertitle = mb_ereg_replace( ("_", " ", $ttitle);
 	$displaytitle = $transfertitle;
 	echo "<br>";
 	OpenTable();
@@ -1223,7 +1223,7 @@ function viewlinkcomments($lid) {
 	echo "<br>";
 	$result = $db->sql_query("SELECT ratinguser, rating, ratingcomments, ratingtimestamp FROM ".$prefix."_links_votedata WHERE ratinglid = '$lid' AND ratingcomments != '' ORDER BY ratingtimestamp DESC");
 	$totalcomments = $db->sql_numrows($result);
-	$transfertitle = ereg_replace ("_", " ", $ttitle);
+	$transfertitle = mb_ereg_replace( ("_", " ", $ttitle);
 	$displaytitle = $transfertitle;
 	OpenTable();
 	echo "<center><font class=\"option\"><b>"._LINKPROFILE.": ".htmlentities($displaytitle)."</b></font><br><br>";
@@ -2064,7 +2064,7 @@ function completevotefooter($lid, $ratinguser) {
 		echo "<center><font class=\"content\">".WEAPPREACIATE." $sitename!<br><a href=\"$url\">"._RETURNTO." $ttitle</a></font><center><br><br>";
 		$row2 = $db->sql_fetchrow($db->sql_query("SELECT title FROM ".$prefix."_links_links where lid='$lid'"));
 		$title = filter($row2['title'], "nohtml");
-		$ttitle = ereg_replace (" ", "_", $title);
+		$ttitle = mb_ereg_replace( (" ", "_", $title);
 	}
 	echo "<center>";
 	linkinfomenu($lid);

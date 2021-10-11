@@ -308,8 +308,8 @@ function Add($title, $url, $auth_name, $cat, $description, $email, $filesize, $v
     if (!empty($email)) { 
     $email = validate_mail(filter($email, "nohtml", 1));
     }
-    $filesize = ereg_replace("\.","",$filesize);
-    $filesize = ereg_replace("\,","",$filesize);
+    $filesize = mb_ereg_replace("\.","",$filesize);
+    $filesize = mb_ereg_replace("\,","",$filesize);
     $cat[0] = intval($cat[0]);
     $cat[1] = intval($cat[1]);
     $num_new = $db->sql_numrows($db->sql_query("SELECT * FROM ".$prefix."_downloads_newdownload WHERE title='$title' OR url='$url' OR description='$description'"));
@@ -1212,7 +1212,7 @@ function search($query, $min, $orderby, $show) {
     	        $title3 = filter($title3, "nohtml");
     	        $parentid3 = intval($parentid3);
     	        if ($parentid3>0) $title3 = getparent($parentid3,$title3);
-    	        $title3 = ereg_replace($query, "<b>$query</b>", $title3);
+    	        $title3 = mb_ereg_replace($query, "<b>$query</b>", $title3);
     	        echo "<strong><big>&middot;</big></strong>&nbsp;<a href=\"modules.php?name=$module_name&amp;d_op=viewdownload&amp;cid=$cid\">$title3</a> ($numrows)<br>";
 	    }
 	    echo "<br><table width=\"100%\" bgcolor=\"$bgcolor2\"><tr><td><font class=\"option\"><b>"._UDOWNLOADS."</b></font></td></tr></table>";
@@ -1235,7 +1235,7 @@ function search($query, $min, $orderby, $show) {
 			$url = filter($url, "nohtml");
             $description = filter($description);	    
 			$transfertitle = str_replace (" ", "_", $title);
-			$title = ereg_replace($query1, "<b>$query1</b>", $title);
+			$title = mb_ereg_replace($query1, "<b>$query1</b>", $title);
     		global $prefix, $db, $admin;
 		if (is_admin($admin)) {
 		    echo "<a href=\"".$admin_file.".php?op=DownloadsModDownload&amp;lid=$lid\"><img src=\"modules/$module_name/images/lwin.gif\" border=\"0\" alt=\""._EDIT."\"></a>&nbsp;&nbsp;";
@@ -1247,7 +1247,7 @@ function search($query, $min, $orderby, $show) {
     		popgraphic($hits);
 		detecteditorial($lid, $transfertitle, 1);
 		echo "<br>";	    
-		$description = ereg_replace($the_query, "<b>$the_query</b>", $description);
+		$description = mb_ereg_replace($the_query, "<b>$the_query</b>", $description);
 		echo "<b>"._DESCRIPTION.":</b> $description<br>";
 		setlocale (LC_TIME, $locale);
 		ereg ("([0-9]{4})-([0-9]{1,2})-([0-9]{1,2}) ([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})", $time, $datetime);
@@ -1352,7 +1352,7 @@ function viewdownloadeditorial($lid) {
     $result=$db->sql_query("SELECT adminid, editorialtimestamp, editorialtext, editorialtitle FROM ".$prefix."_downloads_editorials WHERE downloadid = '$lid'");
     $recordexist = $db->sql_numrows($result);
     $ttitle = htmlentities($ttitle);
-    $transfertitle = ereg_replace ("_", " ", $ttitle);
+    $transfertitle = mb_ereg_replace( ("_", " ", $ttitle);
     $displaytitle = stripslashes($transfertitle);
     echo "<br>";
     OpenTable();
@@ -1410,7 +1410,7 @@ function viewdownloadcomments($lid) {
     $result=$db->sql_query("SELECT ratinguser, rating, ratingcomments, ratingtimestamp FROM ".$prefix."_downloads_votedata WHERE ratinglid = '$lid' AND ratingcomments != '' ORDER BY ratingtimestamp DESC");
     $totalcomments = $db->sql_numrows($result);
     $ttitle = htmlentities($ttitle);
-    $transfertitle = ereg_replace ("_", " ", $ttitle);
+    $transfertitle = mb_ereg_replace( ("_", " ", $ttitle);
     $displaytitle = stripslashes($transfertitle);
     OpenTable();
     echo "<center><font class=\"option\"><b>"._DOWNLOADPROFILE.": $displaytitle</b></font><br><br>";
@@ -1649,7 +1649,7 @@ function viewdownloaddetails($lid) {
     	if ($ovvchartheight[$rcounter]==0) $ovvchartheight[$rcounter]=1;
     }
     $ttitle = htmlentities($ttitle);
-    $transfertitle = ereg_replace ("_", " ", $ttitle);
+    $transfertitle = mb_ereg_replace( ("_", " ", $ttitle);
     $displaytitle = stripslashes($transfertitle);
     $res = $db->sql_query("SELECT title, name, email, description, filesize, version, homepage FROM ".$prefix."_downloads_downloads WHERE lid='$lid'");
     list($title, $auth_name, $email, $description, $filesize, $version, $homepage) = $db->sql_fetchrow($res);
@@ -1673,8 +1673,8 @@ function viewdownloaddetails($lid) {
 	if (empty($email)) {
 	    $auth_name = "$auth_name";
 	} else {
-	    $email = ereg_replace("@"," <i>at</i> ",$email);
-	    $email = ereg_replace("\."," <i>dot</i> ",$email);
+	    $email = mb_ereg_replace("@"," <i>at</i> ",$email);
+	    $email = mb_ereg_replace("\."," <i>dot</i> ",$email);
 	    $auth_name = "$auth_name ($email)";
 	}
     }
@@ -2265,7 +2265,7 @@ function completevotefooter($lid, $ratinguser) {
 	echo "<center><font class=\"content\">".WEAPPREACIATE." $sitename!<br><a href=\"$url\">"._RETURNTO." $ttitle</a></font><center><br><br>";
         $result=$db->sql_query("SELECT title FROM ".$prefix."_downloads_downloads WHERE lid='$lid'");
         list($title)=$db->sql_fetchrow($result);
-        $ttitle = ereg_replace (" ", "_", $title);
+        $ttitle = mb_ereg_replace( (" ", "_", $title);
     }
     echo "<center>";
     downloadinfomenu($lid);

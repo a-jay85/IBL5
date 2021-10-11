@@ -75,7 +75,7 @@ function language_select($default, $select_name = "language", $dirname="modules/
         $lang = array();
         while ( $file = @readdir($dir) )
         {
-                if ( ereg("^lang_", $file) && !is_file($dirname . "/" . $file) && !is_link($dirname . "/" . $file) )
+                if ( mb_ereg("^lang_", $file) && !is_file($dirname . "/" . $file) && !is_link($dirname . "/" . $file) )
                 {
                         $filename = trim(str_replace("lang_", "", $file));
                         $displayname = preg_replace("/^(.*?)_(.*)$/", "\\1 [ \\2 ]", $filename);

@@ -1,5 +1,5 @@
 <?php
-if (eregi("block-Donations.php",$PHP_SELF)) {
+if (mb_eregi("block-Donations.php",$PHP_SELF)) {
     Header("Location: index.php");
     die();
 }

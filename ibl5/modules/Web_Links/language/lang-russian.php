@@ -204,4 +204,4 @@ define("_COMPLETEVOTE5","ќценка не выбрана - голос не засчитан");
 define("_COMPLETEVOTE6","“олько один голос с IP адреса разрешен каждый $outsidewaitdays дн€(дней).");
 define("_LINKSDATESTRING","%d/%m/%Y");
 
-?>
+?>

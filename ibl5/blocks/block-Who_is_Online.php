@@ -14,7 +14,7 @@
 
 if ( !defined('BLOCK_FILE') ) {
     Header("Location: ../index.php");
-    die();
+    fdie();
 }
 
 global $user, $cookie, $prefix, $db, $user_prefix;
@@ -40,7 +40,7 @@ $guest_online_num = $db->sql_numrows($db->sql_query("SELECT * FROM ".$prefix."_s
 $member_online_num = $db->sql_numrows($db->sql_query("SELECT * FROM ".$prefix."_session WHERE guest='0'"));
 
 $who_online_num = $guest_online_num + $member_online_num;
-$who_online = "<div align=\"center\"><span class=\"content\">"._CURRENTLY." $guest_online_num "._GUESTS." $member_online_num "._MEMBERS."<br>";
+$who_online = "<div style='padding:10px'><div align=\"center\"><span class=\"content\">"._CURRENTLY." $guest_online_num "._GUESTS." $member_online_num "._MEMBERS."<br>";
 
 $content = "$who_online";
 
@@ -67,5 +67,5 @@ if (is_user($user)) {
 } else {
     $content .= "<br>"._YOUAREANON."</span></div>";
 }
-
+$content .= "</div>";
 ?>

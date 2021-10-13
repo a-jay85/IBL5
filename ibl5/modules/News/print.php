@@ -1,4 +1,8 @@
 <?php
+if(!strpos($_SERVER['PHP_SELF'], 'admin.php')) {
+	#show right panel:
+	define('INDEX_FILE', true);
+}
 
 /************************************************************************/
 /* PHP-NUKE: Web Portal System                                          */
@@ -20,7 +24,7 @@ $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
 if(!isset($sid)) {
-	exit();
+	fdie();
 }
 
 function PrintPage($sid) {
@@ -65,7 +69,7 @@ function PrintPage($sid) {
 	    </td></tr></table>
 	    </body>
 	    </html>";
-	die();
+	fdie();
 }
 
 PrintPage($sid);

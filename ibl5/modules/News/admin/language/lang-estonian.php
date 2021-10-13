@@ -103,7 +103,7 @@ define("_USERPROFILE","Kasutaja profiil");
 define("_EMAILUSER","E-mail kasutajale");
 define("_SENDPM","Saada privaatne sõnum");
 
-define("_PUBLISHON","Publish on");
+define("_PUBLISHON","Publish on");
 define("_SCHEDULENEWS","Schedule News");
 define("_PROFILE","Profile");
 define("_USERNEWS","News Sent by");

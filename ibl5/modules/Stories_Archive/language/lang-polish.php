@@ -33,3 +33,4 @@ define("_ARCHIVESINDEX","Wykaz archiwum artyku³ów");
 define("_ALLSTORIESARCH","Wszystkie artyku³y");
 define("_NEXTPAGE","Nastêpna strona");
 define("_PREVIOUSPAGE","Poprzednia strona");
+

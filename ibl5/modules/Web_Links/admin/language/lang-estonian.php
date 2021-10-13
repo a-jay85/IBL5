@@ -108,6 +108,6 @@ define("_EZATTACHEDTOCAT","selle kategooria alla");
 define("_EZBROKENLINKS","Vigased lingid");
 define("_LINKAPPROVEDMSG", "Sinu saadetud veebileht, meie linkide andmebaasis, on nüüd heaks kiidetud.");
 
-define("_OWNERISADMIN","Administration");
+define("_OWNERISADMIN","Administration");
 
 ?>

@@ -60,6 +60,6 @@ define("_FINDMORE","... más");
 define("_DIDNOTFIND","¿No encontraste lo que estabas buscando?");
 define("_ENCYCLOPEDIA","Enciclopedia");
 define("_SEARCHINSTORY","Buscar todos los Comentarios en el Artículo");
-define("_SEARCHCHARACTERS","<center><b>Search System Error</b><br><br>Your query should be at least 3 characters long to be processed.<br>Please, fix the problem and try again...</center>");
+define("_SEARCHCHARACTERS","<center><b>Search System Error</b><br><br>Your query should be at least 3 characters long to be processed.<br>Please, fix the problem and try again...</center>");
 
 ?>

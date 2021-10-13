@@ -215,7 +215,7 @@ function drafthistory($tid)
 
 	include("header.php");
 	OpenTable();
-	displaytopmenu($tid);
+	Shared::displaytopmenu($tid);
 
 	$sqlc = "SELECT * FROM nuke_ibl_team_info WHERE teamid = $tid";
 	$resultc = $db->sql_query($sqlc);
@@ -595,7 +595,7 @@ function schedule($tid)
 //=============================
 //DISPLAY TOP MENU
 //=============================
-	displaytopmenu($tid);
+	Shared::displaytopmenu($tid);
 	$query="SELECT * FROM `ibl_schedule` WHERE Visitor = $tid OR Home = $tid ORDER BY Date ASC";
 	$result=mysql_query($query);
 	$num=mysql_numrows($result);
@@ -769,7 +769,7 @@ function finances($tid)
 
 	OpenTable();
 
-	displaytopmenu($tid);
+	Shared::displaytopmenu($tid);
 
 	echo "<table valign=top align=center><tr><td align=center valign=top><img src=\"./images/logo/$tid.jpg\"></td></tr>
 		<tr bgcolor=$color1><td><font color=$color2><b><center>$team_city $team_name Finances (Cap Space)</center></b></font></td></tr>
@@ -825,7 +825,7 @@ function team($tid)
 	//DISPLAY TOP MENU
 	//=============================
 
-	displaytopmenu($tid);
+	Shared::displaytopmenu($tid);
 
 	//=============================
 	//GET CONTRACT AMOUNTS CORRECT
@@ -2433,7 +2433,7 @@ function viewinjuries($tid)
 	include("header.php");
 	OpenTable();
 
-	displaytopmenu($tid);
+	Shared::displaytopmenu($tid);
 
 	$query="SELECT * FROM nuke_iblplyr WHERE injured > 0 AND retired = 0 ORDER BY ordinal ASC";
 
@@ -2501,7 +2501,7 @@ function menu()
 	include("header.php");
 	OpenTable();
 
-	displaytopmenu($tid);
+	Shared::displaytopmenu($tid);
 
 	CloseTable();
 	include("footer.php");
@@ -2523,7 +2523,7 @@ function seteditor($user)
 		}
 		if (!is_user($user)) {
 			OpenTable();
-			displaytopmenu($tid);
+			Shared::displaytopmenu($tid);
 			loginbox();
 			CloseTable();
 		}
@@ -2564,7 +2564,7 @@ function editset($username, $bypass=0, $hid=0, $url=0)
 	$queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$teamlogo'";
 	$tid = mysql_result(mysql_query($queryTeamID), 0);
 
-	displaytopmenu($tid);
+	Shared::displaytopmenu($tid);
 
 	echo "<hr><center><img src=\"images/logo/$tid.jpg\"><br>";
 
@@ -2911,7 +2911,7 @@ function changeset($user)
 	}
 	if (!is_user($user)) {
 		OpenTable();
-		displaytopmenu($tid);
+		Shared::displaytopmenu($tid);
 		loginbox();
 		CloseTable();
 	}
@@ -2940,7 +2940,7 @@ function changesetgo($username, $action, $set, $type, $position)
 	include("header.php");
 
 	OpenTable();
-	displaytopmenu($tid);
+	Shared::displaytopmenu($tid);
 
 	// === CODE TO CHANGE SET ===
 
@@ -3041,21 +3041,21 @@ function viewtraining($user) {
 	include("header.php");
 	if ($stop) {
 		OpenTable();
-			displaytopmenu($tid);
+			Shared::displaytopmenu($tid);
 
 		echo "<center><font class=\"title\"><b>"._LOGININCOR."</b></font></center>\n";
 		CloseTable();
 		echo "<br>\n";
 	} else {
 		OpenTable();
-			displaytopmenu($tid);
+			Shared::displaytopmenu($tid);
 		echo "<center><font class=\"title\"><b>"._USERREGLOGIN."</b></font></center>\n";
 		CloseTable();
 		echo "<br>\n";
 	}
 	if (!is_user($user)) {
 		OpenTable();
-			displaytopmenu($tid);
+			Shared::displaytopmenu($tid);
 
 		mt_srand ((double)microtime()*1000000);
 		$maxran = 1000000;
@@ -3112,7 +3112,7 @@ function trainingpage($username)
 	include("header.php");
 
 	OpenTable();
-	displaytopmenu($tid);
+	Shared::displaytopmenu($tid);
 
 // === GRAB TEAM INFORMATION FOR LOGGED-IN USER===
 

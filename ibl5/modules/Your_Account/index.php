@@ -51,7 +51,7 @@ function confirmNewUser($username, $user_email, $user_password, $user_password2,
 	include("header.php");
 	include("config.php");
 	$username = substr(htmlspecialchars(str_replace("\'", "'", trim($username))), 0, 25);
-	$username = rtrim($username, "\\");
+	$username = rtrim($username, "\\");	
 	$username = str_replace("'", "\'", $username);
 	$user_email = filter($user_email, "nohtml");
 	$user_viewemail = "0";
@@ -139,7 +139,7 @@ function finishNewUser($username, $user_email, $user_password, $random_num, $gfx
 		$new_password = md5($user_password);
 		$new_password = htmlspecialchars(stripslashes($new_password));
 		$username = substr(htmlspecialchars(str_replace("\'", "'", trim($username))), 0, 25);
-		$username = rtrim($username, "\\");
+		$username = rtrim($username, "\\");	
 		$username = str_replace("'", "\'", $username);
 		$user_email = filter($user_email, "nohtml", 1);
 		$result = $db->sql_query("INSERT INTO ".$user_prefix."_users_temp (user_id, username, user_email, user_password, user_regdate, check_num, time) VALUES (NULL, '$username', '$user_email', '$new_password', '$user_regdate', '$check_num', '$time')");
@@ -168,7 +168,7 @@ function finishNewUser($username, $user_email, $user_password, $random_num, $gfx
 function activate($username, $check_num) {
 	global $db, $user_prefix, $module_name, $language, $prefix;
 	$username = substr(htmlspecialchars(str_replace("\'", "'", trim($username))), 0, 25);
-	$username = rtrim($username, "\\");
+	$username = rtrim($username, "\\");	
 	$username = str_replace("'", "\'", $username);
 	$past = time()-86400;
 	$db->sql_query("DELETE FROM ".$user_prefix."_users_temp WHERE time < $past");
@@ -217,7 +217,7 @@ function activate($username, $check_num) {
 function userinfo($username, $bypass=0, $hid=0, $url=0) {
 	global $articlecomm, $user, $cookie, $sitename, $prefix, $user_prefix, $db, $admin, $broadcast_msg, $my_headlines, $module_name, $subscription_url, $admin_file;
 	$username = substr(htmlspecialchars(str_replace("\'", "'", trim($username))), 0, 25);
-	$username = rtrim($username, "\\");
+	$username = rtrim($username, "\\");	
 	$username = str_replace("'", "\'", $username);
 	$sql = "SELECT * FROM ".$prefix."_bbconfig";
 	$result = $db->sql_query($sql);
@@ -237,7 +237,7 @@ function userinfo($username, $bypass=0, $hid=0, $url=0) {
 	include("header.php");
 	OpenTable();
 	echo "<center>";
-	if ($username != '') // SecurityReason.com Fix 2005 [sp3x]
+	if ($username != '') // SecurityReason.com Fix 2005 [sp3x] 
 	if((isset($cookie[1])) AND (strtolower($username) == strtolower($cookie[1])) AND ($userinfo['user_password'] == $cookie[2])) {
 		echo "<font class=\"option\">".htmlentities($username).", "._WELCOMETO." $sitename!</font><br><br>";
 		echo "<font class=\"content\">"._THISISYOURPAGE."</font></center><br><br>";
@@ -255,8 +255,8 @@ function userinfo($username, $bypass=0, $hid=0, $url=0) {
 	    $userinfo['user_website'] = '';
 	}
     }
-	if ($userinfo['user_avatar_type'] == 1) {
-		$userinfo['user_avatar'] = $board_config['avatar_path']."/".$userinfo['user_avatar'];
+	if ($userinfo['user_avatar_type'] == 1) { 
+		$userinfo['user_avatar'] = $board_config['avatar_path']."/".$userinfo['user_avatar']; 
 	} elseif ($userinfo['user_avatar_type'] == 2) {
 		$userinfo['user_avatar'] = $userinfo['user_avatar'];
 	} else {
@@ -383,7 +383,7 @@ function userinfo($username, $bypass=0, $hid=0, $url=0) {
 			} else {
 				echo "<center>[ <a href=\"".$admin_file.".php?op=modifyUser&chng_uid=".$userinfo['username']."\">"._EDITUSER."</a> ]</center>";
 			}
-			if ($userinfo['karma'] == 0) {
+			if ($userinfo['karma'] == 0) { 
 				$karma = _KARMAGOOD;
 				$karma_help = _KARMAGOODHLP;
 				$change_karma = "<a href=\"modules.php?name=$module_name&op=change_karma&user_id=".$userinfo['user_id']."&karma=1\"><img src=\"images/karma/1.gif\" border=\"0\" alt=\""._KARMALOW."\" title=\""._KARMALOW."\" hspace=\"5\"></a>";
@@ -779,7 +779,7 @@ function logout() {
 function mail_password($username, $code) {
 	global $sitename, $adminmail, $nukeurl, $user_prefix, $db, $module_name;
 	$username = substr(htmlspecialchars(str_replace("\'", "'", trim($username))), 0, 25);
-	$username = rtrim($username, "\\");
+	$username = rtrim($username, "\\");	
 	$username = str_replace("'", "\'", $username);
 	$sql = "SELECT user_email, user_password FROM ".$user_prefix."_users WHERE username='$username'";
 	$result = $db->sql_query($sql);
@@ -1136,12 +1136,12 @@ function edituser() {
 		{
 			$board_config[$row['config_name']] = $row['config_value'];
 		}
-		if ($userinfo['user_avatar_type'] == 1) {
-			$userinfo['user_avatar'] = $board_config['avatar_path']."/".$userinfo['user_avatar'];
-		} elseif ($userinfo['user_avatar_type'] == 2) {
-			$userinfo['user_avatar'] = $userinfo['user_avatar'];
+		if ($userinfo['user_avatar_type'] == 1) { 
+			$userinfo['user_avatar'] = $board_config['avatar_path']."/".$userinfo['user_avatar']; 
+		} elseif ($userinfo['user_avatar_type'] == 2) { 
+			$userinfo['user_avatar'] = $userinfo['user_avatar']; 
 		} else {
-			$userinfo['user_avatar'] = $board_config['avatar_gallery_path']."/".$userinfo['user_avatar'];
+			$userinfo['user_avatar'] = $board_config['avatar_gallery_path']."/".$userinfo['user_avatar']; 
 		}
 		echo "<tr><td bgcolor='$bgcolor3' colspan='2' align='center'>"
 		."<BR><b><h5>Avatar control panel</h5></b>"
@@ -1323,7 +1323,7 @@ function chgtheme() {
 		$row = $db->sql_fetchrow($db->sql_query("SELECT overwrite_theme from ".$prefix."_config"));
 		$overwrite_theme = intval($row['overwrite_theme']);
 		if ($overwrite_theme != 1) {
-			Header("Location: modules.php?name=$module_name");
+			Header("Location: modules.php?name=$module_name");	
 			die();
 		}
 		include ("header.php");
@@ -1399,7 +1399,7 @@ function savetheme($user_id, $theme) {
 	$row = $db->sql_fetchrow($db->sql_query("SELECT overwrite_theme from ".$prefix."_config"));
 	$overwrite_theme = intval($row['overwrite_theme']);
 	if ($overwrite_theme != 1) {
-		Header("Location: modules.php?name=$module_name");
+		Header("Location: modules.php?name=$module_name");	
 		die();
 	}
 	cookiedecode($user);
@@ -1512,8 +1512,8 @@ function avatarlist($avatarcategory) {
 	getusrinfo($user);
 	include("header.php");
 	if ((is_user($user)) AND (strtolower($userinfo['username']) == strtolower($cookie[1])) AND ($userinfo['user_password'] == $cookie[2])) { // SecurityReason Fix 2005 - sp3x -> check if we are user if not then Access Denied
-	$avatarcatname = mb_ereg_replace( ("_", "&nbsp;", $avatarcategory);
-	$avatarcategory = htmlspecialchars($avatarcategory); //SecurityReason Fix 2005 - sp3x
+	$avatarcatname = ereg_replace ("_", "&nbsp;", $avatarcategory);
+	$avatarcategory = htmlspecialchars($avatarcategory); //SecurityReason Fix 2005 - sp3x 
 	title("".$avatarcategory." Avatar Gallery");
 	Opentable();
 	nav();
@@ -1565,16 +1565,16 @@ function avatarlist($avatarcategory) {
 } else die("Access Denied");
 }
 
-function avatarsave($avatar, $category) {
-   global $user_prefix, $db, $module_name, $user, $cookie, $prefix;
-   $sql = "SELECT * FROM ".$prefix."_bbconfig WHERE config_name = 'allow_avatar_local'";
-   $result = $db->sql_query($sql);
-   if ($row = $db->sql_fetchrow($result))
-   {
-      $allow_avatar_local = $row['config_value'];
-   }
-   else { $allow_avatar_local = 0; }
-   if (is_user($user) AND $allow_avatar_local) {
+function avatarsave($avatar, $category) { 
+   global $user_prefix, $db, $module_name, $user, $cookie, $prefix; 
+   $sql = "SELECT * FROM ".$prefix."_bbconfig WHERE config_name = 'allow_avatar_local'"; 
+   $result = $db->sql_query($sql); 
+   if ($row = $db->sql_fetchrow($result)) 
+   { 
+      $allow_avatar_local = $row['config_value']; 
+   } 
+   else { $allow_avatar_local = 0; } 
+   if (is_user($user) AND $allow_avatar_local) { 
 		getusrinfo($user);
 		cookiedecode($user);
 		include("header.php");
@@ -1583,31 +1583,31 @@ function avatarsave($avatar, $category) {
 		nav();
 		CloseTable();
 		OpenTable();
-		$category = stripslashes(check_html($category,"nohtml"));
-		if(preg_match('/(\.gif$|\.png$|\.jpg|\.jpeg)$/is', $avatar) AND file_exists("modules/Forums/images/avatars/$category/$avatar"))
-		{
+		$category = stripslashes(check_html($category,"nohtml")); 
+		if(preg_match('/(\.gif$|\.png$|\.jpg|\.jpeg)$/is', $avatar) AND file_exists("modules/Forums/images/avatars/$category/$avatar")) 
+		{ 
 		$newavatar=$category."/".$avatar;
 		$db->sql_query("UPDATE ".$user_prefix."_users SET user_avatar='$newavatar', user_avatar_type='3' WHERE user_id = '".intval($cookie[0])."'");
 		echo "<center><font class=\"content\">Avatar for ".$cookie[1]." Saved!</center></font><br><br>";
 		if (mb_ereg("(http)", $newavatar)) { echo "<center>Your New Avatar:<br><br><IMG alt=\"\" src=\"$newavatar\"><br><br> [ <a href=\"modules.php?name=$module_name&amp;op=edituser\">Back to Profile</a> | <a href=\"modules.php?name=$module_name\">Done</a> ]<br><br></center>"; } elseif ($newavatar) { echo "<center>Your New Avatar:<br><br><IMG alt=\"\" src=\"modules/Forums/images/avatars/$newavatar\"><br><br>[ <a href=\"modules.php?name=$module_name&amp;op=edituser\">Back to Profile</a> | <a href=\"modules.php?name=$module_name\">Done</a> ]<br><br></center>"; }
-		} else {
-		   echo "<center><b>Error:</b> Wrong avatar format! Avatars can only be gif, jpg, or png format.<br />"._GOBACK."</center>";
-		}
+		} else { 
+		   echo "<center><b>Error:</b> Wrong avatar format! Avatars can only be gif, jpg, or png format.<br />"._GOBACK."</center>"; 
+		} 
 		CloseTable();
 		include("footer.php");
 	}
 }
 
 function avatarlinksave($avatar) {
-	global $user_prefix, $db, $module_name, $user, $cookie, $prefix;
-	$sql = "SELECT * FROM ".$prefix."_bbconfig WHERE config_name = 'allow_avatar_remote'";
-	$result = $db->sql_query($sql);
-	if ($row = $db->sql_fetchrow($result))
-	{
-	  $allow_avatar_remote = $row['config_value'];
-	}
-	else { $allow_avatar_remote = 0; }
-	if (is_user($user) AND $allow_avatar_remote) {
+	global $user_prefix, $db, $module_name, $user, $cookie, $prefix; 
+	$sql = "SELECT * FROM ".$prefix."_bbconfig WHERE config_name = 'allow_avatar_remote'"; 
+	$result = $db->sql_query($sql); 
+	if ($row = $db->sql_fetchrow($result)) 
+	{ 
+	  $allow_avatar_remote = $row['config_value']; 
+	} 
+	else { $allow_avatar_remote = 0; } 
+	if (is_user($user) AND $allow_avatar_remote) { 
 		getusrinfo($user);
 		cookiedecode($user);
 		include("header.php");
@@ -1616,15 +1616,15 @@ function avatarlinksave($avatar) {
 		nav();
 		CloseTable();
 		OpenTable();
-		if( !preg_match("#^http:\/\/#i", $avatar) ){
-		$avatar = "http://" . $avatar;}
+		if( !preg_match("#^http:\/\/#i", $avatar) ){ 
+		$avatar = "http://" . $avatar;} 
 		if(preg_match("#^(http:\/\/[a-z0-9\-]+?\.([a-z0-9\-]+\.)*[a-z]+\/.*?\.(gif|jpg|png)$)#is", $avatar) && !mb_eregi(".php",$avatar) && !mb_eregi(".js",$avatar) && !mb_eregi(".cgi",$avatar)){
 		$db->sql_query("UPDATE ".$user_prefix."_users SET user_avatar='$avatar', user_avatar_type='2' WHERE user_id = '".intval($cookie[0])."'");
 		echo "<center><font class=\"content\">Avatar for ".$cookie[1]." Saved!</center></font><br><br>";
 		if (mb_ereg("(http)", $avatar)) { echo "<center>Your New Avatar:<br><br><IMG alt=\"\" src=\"$avatar\"><br><br>[ <a href=\"modules.php?name=$module_name&amp;op=edituser\">Back to Profile</a> | <a href=\"modules.php?name=$module_name\">Done</a> ]<br><br></center>"; } elseif ($avatar) { echo "<center>Your New Avatar:<br><br><IMG alt=\"\" src=\"modules/Forums/images/avatars/$avatar\"><br><br>[ <a href=\"modules.php?name=$module_name&amp;op=edituser\">Back to Profile</a> | <a href=\"modules.php?name=$module_name\">Done</a> ]<br><br></center>"; }
-		} else {
-		  echo "<center><b>Error:</b> Wrong avatar format! Avatars can only be gif, jpg, or png format.<br />"._GOBACK."</center>";
-		}
+		} else { 
+		  echo "<center><b>Error:</b> Wrong avatar format! Avatars can only be gif, jpg, or png format.<br />"._GOBACK."</center>"; 
+		} 
 		CloseTable();
 		include("footer.php");
 	}
@@ -1831,10 +1831,9 @@ switch($op) {
 	pass_lost();
 	break;
 
-    case "new_user":
-    Header("Refresh: 0; url=index.php");
-    break;
-
+	case "new_user":
+	new_user();
+	break;
 
         case "my_headlines":
 	  if (is_user($user)) {

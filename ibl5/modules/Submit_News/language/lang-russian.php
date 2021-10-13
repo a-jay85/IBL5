@@ -69,4 +69,4 @@ define("_ALLSTORIESARCH","Все статьи");
 define("_NEXTPAGE","Следующая страница");
 define("_PREVIOUSPAGE","Предыдущая страница");
 
-?>
+?>

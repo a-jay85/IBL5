@@ -1,7 +1,4 @@
-<link rel="shortcut icon" href="/favicon.ico">
-<script src="jslib/sorttable.js"></script>
 <?php
-
 /************************************************************************/
 /* PHP-NUKE: Advanced Content Management System                         */
 /* ============================================                         */

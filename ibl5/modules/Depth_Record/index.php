@@ -27,7 +27,7 @@ $result2 = mysql_query($query2);
 $num2 = mysql_num_rows($result2);
 
 OpenTable();
-displaytopmenu($tid);
+Shared::displaytopmenu($tid);
 
 $k = 0;
 while ($k < $num2) {

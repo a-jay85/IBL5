@@ -39,7 +39,6 @@ echo "<link>$nukeurl</link>\n";
 echo "<description>".htmlentities($backend_title)."</description>\n";
 echo "<language>$backend_language</language>\n\n";
 
-
 while ($row = $db->sql_fetchrow($result)) {
 	$rsid = intval($row['sid']);
 	$rtitle = filter($row['title'], "nohtml");
@@ -52,4 +51,5 @@ while ($row = $db->sql_fetchrow($result)) {
 }
 echo "</channel>\n";
 echo "</rss>";
+
 ?>

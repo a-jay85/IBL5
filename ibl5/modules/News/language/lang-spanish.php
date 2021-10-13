@@ -119,7 +119,7 @@ define("_YOURATEDARTICLE","Tu voto fue");
 define("_COMMENTSMODERATION","Sistema de Moderación de Comentarios");
 define("_MODERATE","Moderar");
 define("_CLICKTOMODERATE","Por favor selecciona los valores de moderación para cada comentario de este artículo, luego haz click en el botón <i>Moderar</i> ubicado abajo para guardar tus preferencias de moderación. Sé justo en cada valoración, ésto contribuirá y beneficiará a todos los lectores. Gracias.");
-define("_COMMENTSSYSTEM","Comments System");
+define("_COMMENTSSYSTEM","Comments System");
 define("_COMMENTPOSTERROR","<b>Error saving your comment...</b><br><br><b>ERROR:</b> The title or the main text of your comment are empty.<br>Please go back and correct the problem, then try again.");
 
 ?>

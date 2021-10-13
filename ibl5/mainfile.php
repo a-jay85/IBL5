@@ -259,7 +259,11 @@ $start_time = $mtime;
 $pagetitle = "";
 
 // Error reporting, to be set in config.php
-error_reporting(E_ALL^E_NOTICE);
+if ($_SERVER['SERVER_NAME'] != "localhost") {
+    error_reporting(0);
+} else {
+    error_reporting(E_ALL);
+}
 if ($display_errors == 1) {
   @ini_set('display_errors', 1);
 } else {

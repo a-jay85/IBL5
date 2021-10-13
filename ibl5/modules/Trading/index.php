@@ -17,7 +17,7 @@ function menu()
 	include("header.php");
 	OpenTable();
 
-	displaytopmenu($tid);
+	Shared::displaytopmenu($tid);
 
 	CloseTable();
 	include("footer.php");
@@ -154,7 +154,7 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 
 	$teamlogo = $userinfo[user_ibl_team];
 	$tid = Shared::getTidFromTeamname($teamlogo);
-	displaytopmenu($tid);
+	Shared::displaytopmenu($tid);
 
 	$queryOfferingTeamPlayers = "SELECT pos, name, pid, cy, cy1, cy2, cy3, cy4, cy5, cy6
 		FROM nuke_iblplyr
@@ -314,7 +314,7 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
 
 	$teamlogo = $userinfo[user_ibl_team];
 	$tid = Shared::getTidFromTeamname($teamlogo);
-	displaytopmenu($tid);
+	Shared::displaytopmenu($tid);
 
 	echo "<center><img src=\"images/logo/$tid.jpg\"><br>";
 
@@ -456,7 +456,7 @@ function reviewtrade($user)
 		}
 		if (!is_user($user)) {
 			OpenTable();
-			displaytopmenu($tid);
+			Shared::displaytopmenu($tid);
 			loginbox();
 			CloseTable();
 		}
@@ -472,7 +472,7 @@ function reviewtrade($user)
 		} else {
 			include ("header.php");
 			OpenTable();
-			displaytopmenu($tid);
+			Shared::displaytopmenu($tid);
 			echo "Sorry, but trades are not allowed right now.";
 			if ($allow_waiver_moves == 'Yes') {
 				echo "<br>
@@ -502,7 +502,7 @@ function offertrade($user)
 		}
 		if (!is_user($user)) {
 			OpenTable();
-			displaytopmenu($tid);
+			Shared::displaytopmenu($tid);
 			loginbox();
 			CloseTable();
 		}

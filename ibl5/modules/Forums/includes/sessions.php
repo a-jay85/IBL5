@@ -588,7 +588,7 @@ function append_sid($url, $non_html_amp = false)
 	{
     	    $url = str_replace("?", "&", $url); // As we are already in nuke, change the ? to &
     	    $url = str_replace(".php", "", $url); 		//  Strip the .php from all the files,
-	    $url = "modules.php?name=Forums&file=$url";
+	    $url = "../../../modules.php?name=Forums&file=$url";
 	}
 	else if ((mb_ereg("privmsg", $url)) && (!mb_ereg("highlight=privmsg", $url)))
 	{
@@ -624,7 +624,7 @@ function append_sid($url, $non_html_amp = false)
 function admin_sid($url, $non_html_amp = false)
 {
 	global $SID;
-        $url = "modules.php?name=Forums&file=$url";
+        $url = "../../../modules.php?name=Forums&file=$url";
 
 	if ( !empty($SID) && !preg_match('#sid=#', $url) )
 	{

@@ -103,7 +103,7 @@ define("_USERPROFILE","Perfil del Usuario");
 define("_EMAILUSER","Enviar Email");
 define("_SENDPM","Enviar Mensaje Privado");
 
-define("_PUBLISHON","Publish on");
+define("_PUBLISHON","Publish on");
 define("_SCHEDULENEWS","Schedule News");
 define("_PROFILE","Profile");
 define("_USERNEWS","News Sent by");

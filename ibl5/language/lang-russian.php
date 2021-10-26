@@ -840,7 +840,7 @@ function translate($phrase) {
     }
     return $tmp;
 }
-define("_HTMLNOTALLOWED2","HTML code isn't allowed here.");
+define("_HTMLNOTALLOWED2","HTML code isn't allowed here.");
 define("_ERRORINVEMAIL","ERROR: Invalid Email");
 
 ?>

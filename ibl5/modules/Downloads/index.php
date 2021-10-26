@@ -32,7 +32,7 @@ require_once("mainfile.php");
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 $pagetitle = "- "._UDOWNLOADS."";
-require_once("modules/$module_name/d_config.php");
+include_secure("modules/$module_name/d_config.php");
 define('INDEX_FILE', true);
 
 // ALTERED BY PALADIN - 170102 - Start
@@ -1352,7 +1352,7 @@ function viewdownloadeditorial($lid) {
     $result=$db->sql_query("SELECT adminid, editorialtimestamp, editorialtext, editorialtitle FROM ".$prefix."_downloads_editorials WHERE downloadid = '$lid'");
     $recordexist = $db->sql_numrows($result);
     $ttitle = htmlentities($ttitle);
-    $transfertitle = mb_ereg_replace( ("_", " ", $ttitle);
+    $transfertitle = ereg_replace ("_", " ", $ttitle);
     $displaytitle = stripslashes($transfertitle);
     echo "<br>";
     OpenTable();
@@ -1410,7 +1410,7 @@ function viewdownloadcomments($lid) {
     $result=$db->sql_query("SELECT ratinguser, rating, ratingcomments, ratingtimestamp FROM ".$prefix."_downloads_votedata WHERE ratinglid = '$lid' AND ratingcomments != '' ORDER BY ratingtimestamp DESC");
     $totalcomments = $db->sql_numrows($result);
     $ttitle = htmlentities($ttitle);
-    $transfertitle = mb_ereg_replace( ("_", " ", $ttitle);
+    $transfertitle = ereg_replace ("_", " ", $ttitle);
     $displaytitle = stripslashes($transfertitle);
     OpenTable();
     echo "<center><font class=\"option\"><b>"._DOWNLOADPROFILE.": $displaytitle</b></font><br><br>";
@@ -1649,7 +1649,7 @@ function viewdownloaddetails($lid) {
     	if ($ovvchartheight[$rcounter]==0) $ovvchartheight[$rcounter]=1;
     }
     $ttitle = htmlentities($ttitle);
-    $transfertitle = mb_ereg_replace( ("_", " ", $ttitle);
+    $transfertitle = ereg_replace ("_", " ", $ttitle);
     $displaytitle = stripslashes($transfertitle);
     $res = $db->sql_query("SELECT title, name, email, description, filesize, version, homepage FROM ".$prefix."_downloads_downloads WHERE lid='$lid'");
     list($title, $auth_name, $email, $description, $filesize, $version, $homepage) = $db->sql_fetchrow($res);
@@ -2265,7 +2265,7 @@ function completevotefooter($lid, $ratinguser) {
 	echo "<center><font class=\"content\">".WEAPPREACIATE." $sitename!<br><a href=\"$url\">"._RETURNTO." $ttitle</a></font><center><br><br>";
         $result=$db->sql_query("SELECT title FROM ".$prefix."_downloads_downloads WHERE lid='$lid'");
         list($title)=$db->sql_fetchrow($result);
-        $ttitle = mb_ereg_replace( (" ", "_", $title);
+        $ttitle = ereg_replace (" ", "_", $title);
     }
     echo "<center>";
     downloadinfomenu($lid);

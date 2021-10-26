@@ -56,11 +56,11 @@ title(_FEEDBACKTITLE);
 info_box("note", _FEEDBACKNOTE);
 echo "<br>";
 $form_block = "
-	<table border=\"0\" width=\"100%\">
+	<table border=\"0\" width=\"80%\">
     <tr><td nowrap><FORM METHOD=\"post\" ACTION=\"modules.php?name=$module_name\">
     <strong>"._YOURNAME.":</strong></td><td><INPUT type=\"text\" NAME=\"sender_name\" VALUE=\"$sender_name\" SIZE=30></td></tr>
     <tr><td nowrap><strong>"._YOUREMAIL.":</strong></td><td><INPUT type=\"text\" NAME=\"sender_email\" VALUE=\"$sender_email\" SIZE=30></td></tr>
-    <tr><td><strong>"._MESSAGE.":</strong></td><td><TEXTAREA NAME=\"message\" COLS=60 ROWS=10 WRAP=virtual>$message</TEXTAREA><br>
+    <tr><td><strong>"._MESSAGE.":</strong></td><td><TEXTAREA NAME=\"message\" COLS=60 ROWS=10 WRAP=virtual style='width: 399px;'>$message</TEXTAREA><br>
     <i>"._HTMLNOTALLOWED2."</i></td></tr>
     <tr><td>&nbsp;</td><td><INPUT type=\"hidden\" name=\"opi\" value=\"ds\">
     <INPUT TYPE=\"submit\" NAME=\"submit\" VALUE=\""._SEND."\">

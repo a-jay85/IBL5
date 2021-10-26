@@ -1168,7 +1168,7 @@ function viewlinkeditorial($lid) {
 	$lid = intval(trim($lid));
 	$result = $db->sql_query("SELECT adminid, editorialtimestamp, editorialtext, editorialtitle FROM ".$prefix."_links_editorials WHERE linkid = '$lid'");
 	$recordexist = $db->sql_numrows($result);
-	$transfertitle = mb_ereg_replace( ("_", " ", $ttitle);
+	$transfertitle = ereg_replace ("_", " ", $ttitle);
 	$displaytitle = $transfertitle;
 	echo "<br>";
 	OpenTable();
@@ -1223,7 +1223,7 @@ function viewlinkcomments($lid) {
 	echo "<br>";
 	$result = $db->sql_query("SELECT ratinguser, rating, ratingcomments, ratingtimestamp FROM ".$prefix."_links_votedata WHERE ratinglid = '$lid' AND ratingcomments != '' ORDER BY ratingtimestamp DESC");
 	$totalcomments = $db->sql_numrows($result);
-	$transfertitle = mb_ereg_replace( ("_", " ", $ttitle);
+	$transfertitle = ereg_replace ("_", " ", $ttitle);
 	$displaytitle = $transfertitle;
 	OpenTable();
 	echo "<center><font class=\"option\"><b>"._LINKPROFILE.": ".htmlentities($displaytitle)."</b></font><br><br>";
@@ -2064,7 +2064,7 @@ function completevotefooter($lid, $ratinguser) {
 		echo "<center><font class=\"content\">".WEAPPREACIATE." $sitename!<br><a href=\"$url\">"._RETURNTO." $ttitle</a></font><center><br><br>";
 		$row2 = $db->sql_fetchrow($db->sql_query("SELECT title FROM ".$prefix."_links_links where lid='$lid'"));
 		$title = filter($row2['title'], "nohtml");
-		$ttitle = mb_ereg_replace( (" ", "_", $title);
+		$ttitle = ereg_replace (" ", "_", $title);
 	}
 	echo "<center>";
 	linkinfomenu($lid);

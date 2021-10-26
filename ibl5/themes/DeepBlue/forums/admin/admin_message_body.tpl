@@ -1,7 +1,9 @@
 
-<br /><br />
+<br />
+<br />
 
-<table width="100%" cellpadding="4" cellspacing="1" border="0" class="forumline">
+<table width="100%" cellpadding="4" cellspacing="1" border="0"
+	class="forumline">
 	<tr>
 		<th class="thHead" align="center">{MESSAGE_TITLE}</th>
 	</tr>

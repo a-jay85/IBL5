@@ -14,7 +14,7 @@
 
 if ( !defined('BLOCK_FILE') ) {
     Header("Location: ../index.php");
-    die();
+    fdie();
 }
 
 global $cat, $language, $prefix, $multilingual, $currentlang, $db;
@@ -29,28 +29,28 @@ global $cat, $language, $prefix, $multilingual, $currentlang, $db;
     if ($numrows == 0) {
 	return;
     } else {
-	$boxstuff = "<span class=\"content\">";
+	//$boxstuff = "<span class=\"content\">";
 	while ($row = $db->sql_fetchrow($result)) {
 	    $catid = intval($row['catid']);
 	    $title = filter($row['title'], "nohtml");
 	    $numrows = $db->sql_numrows($db->sql_query("SELECT * FROM ".$prefix."_stories WHERE catid='$catid' $querylang LIMIT 1"));
 	    if ($numrows > 0) {
 		if ($cat == 0 AND !$a) {
-		    $boxstuff .= "<strong><big>&middot;</big></strong>&nbsp;<b>"._ALLCATEGORIES."</b><br>";
+		    //$boxstuff .= "<li>"._ALLCATEGORIES."</li>";
 		    $a = 1;
 		} elseif ($cat != 0 AND !$a) {
-		    $boxstuff .= "<strong><big>&middot;</big></strong>&nbsp;<a href=\"modules.php?name=News\">"._ALLCATEGORIES."</a><br>";
+		    $boxstuff .= "<li><a href=\"modules.php?name=News\">"._ALLCATEGORIES."</li>";
 		    $a = 1;
 		}
 		
 		if ($cat == $catid) {
-		    $boxstuff .= "<strong><big>&middot;</big></strong>&nbsp;<b>$title</b><br>";
+		    $boxstuff .= "<li>$title</li>";
 		} else {
-		    $boxstuff .= "<strong><big>&middot;</big></strong>&nbsp;<a href=\"modules.php?name=News&amp;file=categories&amp;op=newindex&amp;catid=$catid\">$title</a><br>";
+		    $boxstuff .= "<li><a href=\"modules.php?name=News&amp;file=categories&amp;op=newindex&amp;catid=$catid\">$title</li>";
 		}
 	    }
 	}
-	$boxstuff .= "</span>";
+	//$boxstuff .= "</span>";
 	$content = $boxstuff;
     }
 

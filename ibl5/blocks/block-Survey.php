@@ -14,7 +14,7 @@
 
 if ( !defined('BLOCK_FILE') ) {
     Header("Location: ../index.php");
-    die();
+    fdie();
 }
 
 global $prefix, $multilingual, $currentlang, $db, $boxTitle, $content, $pollcomm, $user, $cookie, $userinfo;
@@ -85,10 +85,10 @@ if ($pollID == 0 || empty($pollID)) {
     $r_options .= "&amp;order=".$order;
     $r_options .= "&amp;thold=".$thold;
     // Quake - end
-	$content .= "<br><span class=\"content\"><a href=\"modules.php?name=Surveys&amp;op=results&amp;pollID=".$pollID.$r_options."\"><strong>"._RESULTS."</strong></a><br><a href=\"modules.php?name=Surveys\"><strong>"._POLLS."</strong></a><br>";
+	$content .= "<br><span class=\"content\"><a href=\"modules.php?name=Surveys&amp;op=results&amp;pollID=".$pollID.$r_options."\"><strong>"._RESULTS."</strong></a> | <a href=\"modules.php?name=Surveys\"><strong>"._POLLS."</strong></a><br>";
 	if ($pollcomm) {
 		$numcom = $db->sql_numrows($db->sql_query("SELECT * FROM ".$prefix."_pollcomments WHERE pollID='$pollID'"));
-		$content .= "<br>"._VOTES.": <strong>".intval($sum)."</strong> <br> "._PCOMMENTS." <strong>".intval($numcom)."</strong>\n\n";
+		//$content .= "<br>"._VOTES.": <strong>".intval($sum)."</strong> | "._PCOMMENTS." <strong>".intval($numcom)."</strong>\n\n";
 	} else {
 		$content .= "<br>"._VOTES." <strong>".intval($sum)."</strong>\n\n";
 	}

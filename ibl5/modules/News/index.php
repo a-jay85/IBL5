@@ -62,7 +62,7 @@ function theindex($new_topic="0") {
 		CloseTable();
 		echo "<br>";
 	}
-	$result = $db->sql_query("SELECT sid, catid, aid, title, time, hometext, bodytext, comments, counter, topic, informant, notes, acomm, score, ratings FROM ".$prefix."_stories $qdb $querylang AND catid != 14 ORDER BY sid DESC limit $storynum"); // catid != 14 hides Position Change stories
+	$result = $db->sql_query("SELECT sid, catid, aid, title, time, hometext, bodytext, comments, counter, topic, informant, notes, acomm, score, ratings FROM ".$prefix."_stories $qdb $querylang ORDER BY sid DESC limit $storynum");
 	while ($row = $db->sql_fetchrow($result)) {
 		$s_sid = intval($row['sid']);
 		$catid = intval($row['catid']);
@@ -94,8 +94,8 @@ function theindex($new_topic="0") {
 		if (isset($userinfo['umode'])) { $r_options .= "&amp;mode=".$userinfo['umode']; }
 		if (isset($userinfo['uorder'])) { $r_options .= "&amp;order=".$userinfo['uorder']; }
 		if (isset($userinfo['thold'])) { $r_options .= "&amp;thold=".$userinfo['thold']; }
-		$story_link = "<a href=\"modules.php?name=News&amp;file=article&amp;sid=$s_sid$r_options\">";
-		$morelink = "(";
+		$story_link = "<a class='readmore' href=\"modules.php?name=News&amp;file=article&amp;sid=$s_sid$r_options\">";
+		$morelink = " ";
 		if ($fullcount > 0 OR $c_count > 0 OR $articlecomm == 0 OR $acomm == 1) {
 			$morelink .= "$story_link<b>"._READMORE."</b></a> | ";
 		} else {
@@ -109,7 +109,7 @@ function theindex($new_topic="0") {
 		if ($catid != 0) {
 			$row3 = $db->sql_fetchrow($db->sql_query("SELECT title FROM ".$prefix."_stories_cat WHERE catid='$catid'"));
 			$title1 = filter($row3['title'], "nohtml");
-			$title = "<a href=\"modules.php?name=News&amp;file=categories&amp;op=newindex&amp;catid=$catid\"><font class=\"storycat\">$title1</font></a>: $title";
+			$title = "<a  class='readmore' href=\"modules.php?name=News&amp;file=categories&amp;op=newindex&amp;catid=$catid\"><font class=\"storycat\">$title1</font></a>: $title";
 			$morelink .= " | <a href=\"modules.php?name=News&amp;file=categories&amp;op=newindex&amp;catid=$catid\">$title1</a>";
 		}
 		if ($score != 0) {
@@ -118,7 +118,7 @@ function theindex($new_topic="0") {
 			$rated = 0;
 		}
 		$morelink .= " | "._SCORE." $rated";
-		$morelink .= ")";
+		$morelink .= " ";
 		$morelink = str_replace(" |  | ", " | ", $morelink);
 		themeindex($aid, $informant, $datetime, $title, $counter, $topic, $hometext, $notes, $morelink, $topicname, $topicimage, $topictext);
 	}
@@ -152,7 +152,7 @@ function rate_article($sid, $score, $random_num="0", $gfx_check) {
 			echo "<input type=\"submit\" value=\""._CASTMYVOTE."\"></font></center></form>";
 			CloseTable();
 			include("footer.php");
-			die();
+			fdie();
 		} else {
 			$score = intval($score);
 			$sid = intval($sid);
@@ -161,13 +161,13 @@ function rate_article($sid, $score, $random_num="0", $gfx_check) {
 				if ($score < 1) { $score = 1; }
 				if ($score != 1 AND $score != 2 AND $score != 3 AND $score != 4 AND $score != 5) {
 					Header("Location: index.php");
-					die();
+					fdie();
 				}
 				$ip = $_SERVER['REMOTE_ADDR'];
 				$num = $db->sql_numrows($db->sql_query("SELECT * FROM ".$prefix."_stories WHERE sid='$sid' AND rating_ip='$ip'"));
 				if ($num != 0) {
 					Header("Location: modules.php?name=News&op=rate_complete&sid=$sid&rated=1");
-					die();
+					fdie();
 				}
 				if (isset($ratecookie)) {
 					$rcookie = base64_decode($ratecookie);
@@ -181,7 +181,7 @@ function rate_article($sid, $score, $random_num="0", $gfx_check) {
 				}
 				if ($a == 1) {
 					Header("Location: modules.php?name=News&op=rate_complete&sid=$sid&rated=1");
-					die();
+					fdie();
 				} else {
 					$ip = $_SERVER['REMOTE_ADDR'];
 					$result = $db->sql_query("update ".$prefix."_stories set score=score+$score, ratings=ratings+1, rating_ip='$ip' where sid='$sid'");
@@ -273,5 +273,6 @@ switch ($op) {
 	break;
 
 }
+
 
 ?>

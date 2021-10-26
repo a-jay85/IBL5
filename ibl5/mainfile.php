@@ -1077,7 +1077,7 @@ function formatAidHeader($aid) {
 
 if(!defined('FORUM_ADMIN')) {
   $ThemeSel = get_theme();
-  include_secure("themes/$ThemeSel/theme.php");
+  include_once("themes/$ThemeSel/theme.php");
 }
 
 if(!function_exists("themepreview")) {

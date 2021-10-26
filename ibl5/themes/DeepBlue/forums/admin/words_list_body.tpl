@@ -3,7 +3,9 @@
 
 <P>{L_WORDS_TEXT}</p>
 
-<form method="post" action="{S_WORDS_ACTION}"><table cellspacing="1" cellpadding="4" border="0" align="center" class="forumline">
+<form method="post" action="{S_WORDS_ACTION}">
+<table cellspacing="1" cellpadding="4" border="0" align="center"
+	class="forumline">
 	<tr>
 		<th class="thCornerL">{L_WORD}</th>
 		<th class="thTop">{L_REPLACEMENT}</th>
@@ -18,6 +20,8 @@
 	</tr>
 	<!-- END words -->
 	<tr>
-		<td colspan="5" align="center" class="catBottom">{S_HIDDEN_FIELDS}<input type="submit" name="add" value="{L_ADD_WORD}" class="mainoption" /></td>
+		<td colspan="5" align="center" class="catBottom">{S_HIDDEN_FIELDS}<input
+			type="submit" name="add" value="{L_ADD_WORD}" class="mainoption" /></td>
 	</tr>
-</table></form>
+</table>
+</form>

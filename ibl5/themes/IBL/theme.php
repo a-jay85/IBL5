@@ -1,7 +1,11 @@
 <?php
 
 $lnkcolor = "#336699";
-$bgcolor1 = "#EEEEEE";
+if ($_SERVER['SERVER_NAME'] != "localhost") {
+    $bgcolor1 = "#EEEEEE";
+} else {
+    $bgcolor1 = "#BBBBBB";
+}
 $bgcolor2 = "#CCCCCC";
 $bgcolor3 = "#AAAAAA";
 $textcolor1 = "#000000";

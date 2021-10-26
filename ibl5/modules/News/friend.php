@@ -1,5 +1,8 @@
 <?php
-
+if(!strpos($_SERVER['PHP_SELF'], 'admin.php')) {
+	#show right panel:
+	define('INDEX_FILE', true);
+}
 /************************************************************************/
 /* PHP-NUKE: Web Portal System                                          */
 /* ===========================                                          */
@@ -23,13 +26,13 @@ $pagetitle = "- "._RECOMMEND."";
 
 if (!is_user($user)) {
 	Header("Location: modules.php?name=$module_name&file=article&sid=$sid");
-	die();	
+	fdie();	
 }
 
 function FriendSend($sid) {
 	global $user, $cookie, $prefix, $db, $user_prefix, $module_name;
 	$sid = intval($sid);
-	if(!isset($sid)) { exit(); }
+	if(!isset($sid)) { fdie(); }
 	include ("header.php");
 	$row = $db->sql_fetchrow($db->sql_query("SELECT title FROM ".$prefix."_stories WHERE sid='$sid'"));
 	$title = filter($row['title'], "nohtml");

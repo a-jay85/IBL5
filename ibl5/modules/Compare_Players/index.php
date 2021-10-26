@@ -40,7 +40,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 
 	include("header.php");
 	OpenTable();
-	displaytopmenu($tid);
+	Shared::displaytopmenu($tid);
 
 	comparePlayers();
 

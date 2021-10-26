@@ -15,8 +15,9 @@
 
 //-->
 
-<div align="center"><span class="copyright">Powered by phpBB {PHPBB_VERSION} &copy; 
-  2001-2003 <a href="http://www.phpbb.com/" target="_phpbb" class="copyright">phpBB 
-  Group</a><br />
-  {TRANSLATION_INFO}<br>
-  BBtoNuke 2.0.7 phpBB Port by NukeCops &copy; 2004 <a href="http://www.toms-home.com/" target="_blank" class="copyright">NukeCops</a></span></div>
+<div align="center"><span class="copyright">Powered by phpBB
+{PHPBB_VERSION} &copy; 2001-2003 <a href="http://www.phpbb.com/"
+	target="_phpbb" class="copyright">phpBB Group</a><br />
+{TRANSLATION_INFO}<br>
+BBtoNuke 2.0.7 phpBB Port by NukeCops &copy; 2004 <a
+	href="http://www.toms-home.com/" target="_blank" class="copyright">NukeCops</a></span></div>

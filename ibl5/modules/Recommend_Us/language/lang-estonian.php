@@ -34,6 +34,6 @@ define("_FREFERENCE","Teade meie Portaalist on saadetud nimele");
 define("_THANKSREC","Tänan, et sa soovitasid meid!");
 define("_SECURITYCODEERROR","<b>VIGA:</b> Turva kood mille kirjutasid oli vale...<br>Palun kirjuta täpselt sama kood mida all pool kuvatakse:");
 
-define("_SENDSITEERROR","<b>Error sending the recommendation...</b><br><br><b>ERROR:</b> One or more required fields are empty.<br>Please go back and correct the problem, then try again.");
+define("_SENDSITEERROR","<b>Error sending the recommendation...</b><br><br><b>ERROR:</b> One or more required fields are empty.<br>Please go back and correct the problem, then try again.");
 
 ?>

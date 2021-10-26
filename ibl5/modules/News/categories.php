@@ -68,8 +68,8 @@ function theindex($catid) {
 		if (isset($userinfo['umode'])) { $r_options .= "&amp;mode=".$userinfo['umode']; }
 		if (isset($userinfo['uorder'])) { $r_options .= "&amp;order=".$userinfo['uorder']; }
 		if (isset($userinfo['thold'])) { $r_options .= "&amp;thold=".$userinfo['thold']; }
-		$story_link = "<a href=\"modules.php?name=News&amp;file=article&amp;sid=$s_sid$r_options\">";
-		$morelink = "(";
+		$story_link = "<a class='readmore' href=\"modules.php?name=News&amp;file=article&amp;sid=$s_sid$r_options\">";
+		$morelink = " ";
 		if ($fullcount > 0 OR $c_count > 0 OR $articlecomm == 0 OR $acomm == 1) {
 			$morelink .= "$story_link<b>"._READMORE."</b></a> | ";
 		} else {
@@ -85,7 +85,7 @@ function theindex($catid) {
 			$rated = 0;
 		}
 		$morelink .= " | "._SCORE." $rated";
-		$morelink .= ")";
+		$morelink .= " ";
 		$morelink = str_replace(" |  | ", " | ", $morelink);
 		$sid = intval($s_sid);
 		$row2 = $db->sql_fetchrow($db->sql_query("select title from ".$prefix."_stories_cat where catid='$catid'"));

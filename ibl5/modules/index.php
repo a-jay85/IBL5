@@ -37,7 +37,7 @@ function drafthistory($tid)
 
     include("header.php");
     OpenTable();
-    displaytopmenu($tid);
+    Shared::displaytopmenu($tid);
 
     $sqlc = "SELECT * FROM nuke_ibl_team_info WHERE teamid = $tid";
     $resultc = $db->sql_query($sqlc);
@@ -104,7 +104,7 @@ function tradeoffer($username, $bypass=0, $hid=0, $url=0) {
 
     OpenTable();
 
-    displaytopmenu($tid);
+    Shared::displaytopmenu($tid);
 
     $teamlogo = $userinfo[user_ibl_team];
     $sql7 = "SELECT * FROM nuke_ibl_team_info ORDER BY teamid ASC ";
@@ -245,7 +245,7 @@ function tradereview($username, $bypass=0, $hid=0, $url=0) {
 
     OpenTable();
 
-    displaytopmenu($tid);
+    Shared::displaytopmenu($tid);
 
 // === GRAB TEAM INFORMATION FOR LOGGED-IN USER===
 
@@ -381,21 +381,21 @@ function reviewtrade($user) {
 	include("header.php");
 	if ($stop) {
 	    OpenTable();
-            displaytopmenu($tid);
+            Shared::displaytopmenu($tid);
 
 	    echo "<center><font class=\"title\"><b>"._LOGININCOR."</b></font></center>\n";
 	    CloseTable();
 	    echo "<br>\n";
 	} else {
 	    OpenTable();
-            displaytopmenu($tid);
+            Shared::displaytopmenu($tid);
 	    echo "<center><font class=\"title\"><b>"._USERREGLOGIN."</b></font></center>\n";
 	    CloseTable();
 	    echo "<br>\n";
 	}
 	if (!is_user($user)) {
 	    OpenTable();
-            displaytopmenu($tid);
+            Shared::displaytopmenu($tid);
 
 	    mt_srand ((double)microtime()*1000000);
 	    $maxran = 1000000;
@@ -441,20 +441,20 @@ function offertrade($user) {
 	include("header.php");
 	if ($stop) {
 	    OpenTable();
-            displaytopmenu($tid);
+            Shared::displaytopmenu($tid);
 	    echo "<center><font class=\"title\"><b>"._LOGININCOR."</b></font></center>\n";
 	    CloseTable();
 	    echo "<br>\n";
 	} else {
 	    OpenTable();
-	    displaytopmenu($tid);
+	    Shared::displaytopmenu($tid);
 	    echo "<center><font class=\"title\"><b>"._USERREGLOGIN."</b></font></center>\n";
 	    CloseTable();
 	    echo "<br>\n";
 	}
 	if (!is_user($user)) {
 	    OpenTable();
-	    displaytopmenu($tid);
+	    Shared::displaytopmenu($tid);
 	    mt_srand ((double)microtime()*1000000);
 	    $maxran = 1000000;
 	    $random_num = mt_rand(0, $maxran);
@@ -520,7 +520,7 @@ function schedule($tid) {
 //=============================
 
 
-    displaytopmenu($tid);
+    Shared::displaytopmenu($tid);
     $query="SELECT * FROM `ibl_schedule` WHERE Visitor = $tid OR Home = $tid ORDER BY Date ASC";
     $result=mysql_query($query);
     $num=mysql_numrows($result);
@@ -680,7 +680,7 @@ function team($tid) {
 //DISPLAY TOP MENU
 //=============================
 
-    displaytopmenu($tid);
+    Shared::displaytopmenu($tid);
 
 //=============================
 //GET CONTRACT AMOUNTS CORRECT
@@ -2217,7 +2217,7 @@ function viewinjuries()
     include("header.php");
     OpenTable();
 
-    displaytopmenu($tid);
+    Shared::displaytopmenu($tid);
 
     $query="SELECT * FROM nuke_iblplyr WHERE injured > 0 AND retired = 0 ORDER BY ordinal ASC";
 
@@ -2266,7 +2266,7 @@ function menu()
     include("header.php");
     OpenTable();
 
-displaytopmenu($tid);
+Shared::displaytopmenu($tid);
 
     CloseTable();
     include("footer.php");
@@ -2280,21 +2280,21 @@ function seteditor($user) {
 	include("header.php");
 	if ($stop) {
 	    OpenTable();
-            displaytopmenu($tid);
+            Shared::displaytopmenu($tid);
 
 	    echo "<center><font class=\"title\"><b>"._LOGININCOR."</b></font></center>\n";
 	    CloseTable();
 	    echo "<br>\n";
 	} else {
 	    OpenTable();
-            displaytopmenu($tid);
+            Shared::displaytopmenu($tid);
 	    echo "<center><font class=\"title\"><b>"._USERREGLOGIN."</b></font></center>\n";
 	    CloseTable();
 	    echo "<br>\n";
 	}
 	if (!is_user($user)) {
 	    OpenTable();
-            displaytopmenu($tid);
+            Shared::displaytopmenu($tid);
 
 	    mt_srand ((double)microtime()*1000000);
 	    $maxran = 1000000;
@@ -2354,7 +2354,7 @@ function editset($username, $bypass=0, $hid=0, $url=0) {
 
     OpenTable();
 
-    displaytopmenu($tid);
+    Shared::displaytopmenu($tid);
 
 // === GRAB TEAM INFORMATION FOR LOGGED-IN USER===
 
@@ -2750,21 +2750,21 @@ function changeset($user) {
 	include("header.php");
 	if ($stop) {
 	    OpenTable();
-            displaytopmenu($tid);
+            Shared::displaytopmenu($tid);
 
 	    echo "<center><font class=\"title\"><b>"._LOGININCOR."</b></font></center>\n";
 	    CloseTable();
 	    echo "<br>\n";
 	} else {
 	    OpenTable();
-            displaytopmenu($tid);
+            Shared::displaytopmenu($tid);
 	    echo "<center><font class=\"title\"><b>"._USERREGLOGIN."</b></font></center>\n";
 	    CloseTable();
 	    echo "<br>\n";
 	}
 	if (!is_user($user)) {
 	    OpenTable();
-            displaytopmenu($tid);
+            Shared::displaytopmenu($tid);
 
 	    mt_srand ((double)microtime()*1000000);
 	    $maxran = 1000000;
@@ -2822,7 +2822,7 @@ function changesetgo($username, $action, $set, $type, $position) {
     include("header.php");
 
 	    OpenTable();
-            displaytopmenu($tid);
+            Shared::displaytopmenu($tid);
 
 // === CODE TO CHANGE SET ===
 
@@ -2942,21 +2942,21 @@ function waivers($user) {
 	include("header.php");
 	if ($stop) {
 	    OpenTable();
-            displaytopmenu($tid);
+            Shared::displaytopmenu($tid);
 
 	    echo "<center><font class=\"title\"><b>"._LOGININCOR."</b></font></center>\n";
 	    CloseTable();
 	    echo "<br>\n";
 	} else {
 	    OpenTable();
-            displaytopmenu($tid);
+            Shared::displaytopmenu($tid);
 	    echo "<center><font class=\"title\"><b>"._USERREGLOGIN."</b></font></center>\n";
 	    CloseTable();
 	    echo "<br>\n";
 	}
 	if (!is_user($user)) {
 	    OpenTable();
-            displaytopmenu($tid);
+            Shared::displaytopmenu($tid);
 
 	    mt_srand ((double)microtime()*1000000);
 	    $maxran = 1000000;
@@ -3016,7 +3016,7 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0) {
 
     OpenTable();
 
-    displaytopmenu($tid);
+    Shared::displaytopmenu($tid);
 
     $teamlogo = $userinfo[user_ibl_team];
     $sql7 = "SELECT * FROM nuke_ibl_team_info ORDER BY teamid ASC ";
@@ -3174,21 +3174,21 @@ function viewtraining($user) {
 	include("header.php");
 	if ($stop) {
 	    OpenTable();
-            displaytopmenu($tid);
+            Shared::displaytopmenu($tid);
 
 	    echo "<center><font class=\"title\"><b>"._LOGININCOR."</b></font></center>\n";
 	    CloseTable();
 	    echo "<br>\n";
 	} else {
 	    OpenTable();
-            displaytopmenu($tid);
+            Shared::displaytopmenu($tid);
 	    echo "<center><font class=\"title\"><b>"._USERREGLOGIN."</b></font></center>\n";
 	    CloseTable();
 	    echo "<br>\n";
 	}
 	if (!is_user($user)) {
 	    OpenTable();
-            displaytopmenu($tid);
+            Shared::displaytopmenu($tid);
 
 	    mt_srand ((double)microtime()*1000000);
 	    $maxran = 1000000;
@@ -3245,7 +3245,7 @@ function trainingpage($username)
     include("header.php");
 
     OpenTable();
-    displaytopmenu($tid);
+    Shared::displaytopmenu($tid);
 
 // === GRAB TEAM INFORMATION FOR LOGGED-IN USER===
 

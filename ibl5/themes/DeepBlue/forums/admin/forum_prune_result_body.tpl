@@ -3,7 +3,9 @@
 
 <p>{L_PRUNE_RESULT}</p>
 
-<table cellspacing="1" cellpadding="4" border="0" align="center" class="forumline">
+<table
+	cellspacing="1" cellpadding="4" border="0" align="center"
+	class="forumline">
 	<tr>
 		<th class="thCornerL">{L_FORUM}</th>
 		<th class="thTop">{L_TOPICS_PRUNED}</th>

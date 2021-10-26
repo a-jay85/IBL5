@@ -193,7 +193,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
     $teamlogo = $userinfo[user_ibl_team];
 	$tid = Shared::getTidFromTeamname($teamlogo);
 
-	displaytopmenu($tid);
+	Shared::displaytopmenu($tid);
 
 // ========== DISPLAY ROOKIES
 

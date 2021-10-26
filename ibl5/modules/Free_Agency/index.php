@@ -76,7 +76,7 @@ function display() {
 	$userteam = stripslashes(check_html($userinfo['user_ibl_team'], "nohtml"));
 	$tid = Shared::getTidFromTeamname($userteam);
 
-	displaytopmenu($tid);
+	Shared::displaytopmenu($tid);
 
 	$currentSeasonEndingYear = Shared::getCurrentSeasonEndingYear();
 

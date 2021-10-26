@@ -1,13 +1,9 @@
 <?php
 
 $lnkcolor = "#336699";
-if ($_SERVER['SERVER_NAME'] != "localhost") {
-    $bgcolor1 = "#eeeeee";
-} else {
-    $bgcolor1 = "#bbb";
-}
-$bgcolor2 = "#cccccc";
-$bgcolor3 = "#aaaaaa";
+$bgcolor1 = "#F6F6EB";
+$bgcolor2 = "#D8D8C4";
+$bgcolor3 = "#B7B78B";
 $textcolor1 = "#000000";
 $textcolor2 = "#000000";
 $theme_home = "Web_Links";
@@ -73,7 +69,6 @@ function themeheader() {
 	$topics_list .= "<option $sel value=\"$topicid\">$topics</option>\n";
 	$sel = "";
     }
-    // This is the old logo/search bar code. Uncomment out to put the logo/search back in the theme.
     // echo "<center><a href=\"index.php\"><img src=\"themes/Sand_Journey/images/LogoLeft.gif\" alt=\"Welcome to $sitename\" title=\"Welcome to $sitename\" border=\"0\"></a><br><br></center>"
 	// ."<table cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" border=\"0\" align=\"center\" bgcolor=\"$bgcolor1\"><tr><td align=\"center\">"
 	// ."<form action=\"modules.php?name=Search\" method=\"post\">"
@@ -81,7 +76,7 @@ function themeheader() {
 	// ."</select>"
 	// ."</form>"
 	// ."</td></tr></table>"
-	// ."<br>"
+	// ."<br>";
 	echo "<table border=\"0 cellpadding=\"4\" cellspacing=\"0\" width=\"100%\" align=\"center\">\n"
 	."<tr><td bgcolor=\"$bgcolor2\" align=\"left\" width=\"20%\">&nbsp;$bienvenida</td>"
 	."<td bgcolor=\"$bgcolor2\" align=\"center\" width=\"60%\"><a href=\"index.php\">Home</a> | <a href=\"modules.php?name=Submit_News\">Submit News</a> | <a href=\"modules.php?name=Your_Account\">Your Account</a> | <a href=\"modules.php?name=Content\">Content</a> | <a href=\"modules.php?name=Topics\">Topics</a> | <a href=\"modules.php?name=Top\">Top 10</a></td>\n"
@@ -107,9 +102,11 @@ function themeheader() {
 
 function themefooter() {
     global $bgcolor1, $bgcolor2, $bgcolor3;
+    if (defined('INDEX_FILE')) {
 	echo "</td><td>&nbsp;&nbsp;</td><td valign=\"top\" bgcolor=$bgcolor1>";
 	blocks("right");
 	echo "</td>";
+    }
     echo "</td></tr></table></td></tr></table>";
     echo "<center>";
     footmsg();
@@ -174,7 +171,7 @@ function themearticle ($aid, $informant, $datetime, $title, $thetext, $topic, $t
 
 function themesidebox($title, $content) {
     global $bgcolor1, $bgcolor2, $bgcolor3;
-    echo "<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\" width=\"160\" bgcolor=\"$bgcolor3\">\n"
+    echo "<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\" width=\"150\" bgcolor=\"$bgcolor3\">\n"
 	."<tr><td>\n"
         ."<table width=\"100%\" border=\"0\" cellspacing=\"1\" cellpadding=\"3\">\n"
 	."<tr><td bgcolor=$bgcolor2>"

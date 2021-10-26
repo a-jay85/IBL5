@@ -28,13 +28,13 @@ function waivers($user)
         include("header.php");
         if ($stop) {
             OpenTable();
-            displaytopmenu($tid);
+            Shared::displaytopmenu($tid);
             echo "<center><font class=\"title\"><b>" . _LOGININCOR . "</b></font></center>\n";
             CloseTable();
             echo "<br>\n";
         } else {
             OpenTable();
-            displaytopmenu($tid);
+            Shared::displaytopmenu($tid);
             echo "<center><font class=\"title\"><b>" . _USERREGLOGIN . "</b></font></center>\n";
             CloseTable();
             echo "<br>\n";
@@ -59,7 +59,7 @@ function waivers($user)
         } else {
             include ("header.php");
             OpenTable();
-            displaytopmenu($tid);
+            Shared::displaytopmenu($tid);
             echo "Sorry, but players may not be added from or dropped to waivers at the present time.";
             CloseTable();
             include ("footer.php");
@@ -277,7 +277,7 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
 	$queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$teamlogo'";
 	$tid = mysql_result(mysql_query($queryTeamID), 0);
 
-    displaytopmenu($tid);
+    Shared::displaytopmenu($tid);
 
     echo "<center><font color=red><b>$errortext</b></font></center>";
     $sql7 = "SELECT * FROM nuke_ibl_team_info ORDER BY teamid ASC ";

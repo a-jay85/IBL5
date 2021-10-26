@@ -14,7 +14,7 @@
 
 if ( !defined('BLOCK_FILE') ) {
 	Header("Location: ../index.php");
-	die();
+	fdie();
 }
 
 global $prefix, $db, $admin, $language, $currentlang;
@@ -51,7 +51,8 @@ if (file_exists("themes/$ThemeSel/module.php")) {
 
     /* Now we make the Modules block with the correspondent links */
 
-    $content .= "<strong><big>&middot;</big></strong>&nbsp;<a href=\"index.php\">"._HOME."</a><br>\n";
+    $content .= "<li><a href=\"index.php\">"._HOME."</a></li>";
+    //$content .= "<strong><big>&middot;</big></strong>&nbsp;<a href=\"/pixel\">PIXEL ADS</a><br>\n";
     $result3 = $db->sql_query("SELECT title, custom_title, view FROM " . $prefix . "_modules WHERE active='1' AND title!='$def_module' AND inmenu='1' ORDER BY custom_title ASC");
     while ($row3 = $db->sql_fetchrow($result3)) {
 	$m_title = filter($row3['title'], "nohtml");
@@ -63,14 +64,13 @@ if (file_exists("themes/$ThemeSel/module.php")) {
 	}
 	if ($m_title != $main_module) {
 	    if ((is_admin($admin) AND $view == 2) OR $view != 2) {
-		$content .= "<strong><big>&middot;</big></strong>&nbsp;<a href=\"modules.php?name=$m_title\">$m_title2</a><br>\n";
+		$content .= "<li><a href=\"modules.php?name=$m_title\">$m_title2</li>";
 	    }
 	}
     }
-
     /* If you're Admin you and only you can see Inactive modules and test it */
     /* If you copied a new module is the /modules/ directory, it will be added to the database */
-
+    
     if (is_admin($admin)) {
 	$handle=opendir('modules');
 	while ($file = readdir($handle)) {
@@ -102,16 +102,16 @@ if (file_exists("themes/$ThemeSel/module.php")) {
 		$mn_title2 = $custom_title;
 	    }
 	    if ($mn_title2 != "") {
-		$content .= "<strong><big>&middot;</big></strong>&nbsp;<a href=\"modules.php?name=$mn_title\">$mn_title2</a><br>\n";
+		$content .= "<li><a href=\"modules.php?name=$mn_title\">$mn_title2</a></li>";
 		$dummy = 1;
 	    } else {
 		$a = 1;
 	    }
 	}
 	if ($a == 1 AND $dummy != 1) {
-    	    $content .= "<strong><big>&middot;</big></strong>&nbsp;<i>"._NONE."</i><br>\n";
+    	    $content .= "<li>"._NONE."</li>";
 	}
-	$content .= "<br><center><b>"._NOACTIVEMODULES."</b><br>";
+	$content .= "<li>"._NOACTIVEMODULES."</li>";
 	$content .= "<font class=\"tiny\">"._FORADMINTESTS."</font></center><br>";
 	$result6 = $db->sql_query("SELECT title, custom_title FROM ".$prefix."_modules WHERE active='0' ORDER BY title ASC");
 	while ($row6 = $db->sql_fetchrow($result6)) {
@@ -122,14 +122,14 @@ if (file_exists("themes/$ThemeSel/module.php")) {
 		$mn_title2 = $custom_title;
 	    }
 	    if (!empty($mn_title2)) {
-		$content .= "<strong><big>&middot;</big></strong>&nbsp;<a href=\"modules.php?name=$mn_title\">$mn_title2</a><br>\n";
+		$content .= "<li><a href=\"modules.php?name=$mn_title\">$mn_title2</li>";
 		$dummy = 1;
 	    } else {
 		$a = 1;
 	    }
 	}
 	if ($a == 1 AND $dummy != 1) {
-    	    $content .= "<strong><big>&middot;</big></strong>&nbsp;<i>"._NONE."</i><br>\n";
+    	    $content .= "<li>"._NONE."</li>";
 	}
     }
 

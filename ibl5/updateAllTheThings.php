@@ -370,12 +370,12 @@ function checkIfPlayoffsClinched($conference)
 		LIMIT 8;";
 	$resultEightWinningestTeams = mysql_query($queryEightWinningestTeams);
 
-	$queryFourLosingestTeams = "SELECT homeLosses + awayLosses AS losses
+	$querySixLosingestTeams = "SELECT homeLosses + awayLosses AS losses
 		FROM ibl_standings
 		WHERE conference = '$conference'
 		ORDER BY losses DESC
-		LIMIT 4;";
-	$resultFourLosingestTeams = mysql_query($queryFourLosingestTeams);
+		LIMIT 6;";
+	$resultSixLosingestTeams = mysql_query($querySixLosingestTeams);
 
 	$i = 0;
 	while ($i < 8) {
@@ -384,8 +384,8 @@ function checkIfPlayoffsClinched($conference)
 		$teamsEliminated = 0;
 
 		$j = 0;
-		while ($j < 4) {
-			$bottomTeamLosses = mysql_result($resultFourLosingestTeams, $j, "losses");
+		while ($j < 6) {
+			$bottomTeamLosses = mysql_result($resultSixLosingestTeams, $j, "losses");
 
 			$magicNumber = 82 + 1 - $contendingTeamWins - $bottomTeamLosses;
 
@@ -396,7 +396,7 @@ function checkIfPlayoffsClinched($conference)
 			$j++;
 		}
 
-		if ($teamsEliminated == 4) {
+		if ($teamsEliminated == 6) {
 			$querySetTeamToClinched = "UPDATE ibl_standings
 				SET clinchedPlayoffs = 1
 				WHERE team_name = '$contendingTeamName';";

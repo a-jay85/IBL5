@@ -261,7 +261,7 @@ function userinfo($username, $bypass=0, $hid=0, $url=0)
 		$depthcount++;
 	}
 
-	echo "<tr><th colspan=14><input type=\"radio\" name=\"emailtarget\" value=\"Normal\" checked> Submit Depth Chart? <input type=\"submit\" value=\"Submit\"></th></tr></form></table></center>";
+	echo "<tr><th colspan=14><input type=\"radio\" checked> Submit Depth Chart? <input type=\"submit\" value=\"Submit\"></th></tr></form></table></center>";
 	CloseTable();
 
 	// === END INSERT OF IBL DEPTH CHART ===
@@ -296,7 +296,6 @@ function submit() {
 
 	$Set_Name = $_POST['Set_Name'];
 	$Team_Name = $_POST['Team_Name'];
-	$emailtarget = $_POST['emailtarget'];
 	$html = "$Team_Name Depth Chart Submission<br><table>";
 	$html = $html."<tr>
 		<td><b>Name</td>
@@ -496,11 +495,7 @@ function submit() {
 
 	if ($error == 0) {
 		$emailsubject = $Team_Name." Depth Chart - $Set_Name Offensive Set";
-		if ($emailtarget == Preseason) {
-			$recipient = 'ibldepthcharts@gmail.com';
-		} else {
-			$recipient = 'ibldepthcharts@gmail.com';
-		}
+		$recipient = 'ibldepthcharts@gmail.com';
 
 		if (mail($recipient, $emailsubject, $filetext, "From: ibldepthcharts@gmail.com")) {
 			$executeupdateD = mysql_query($updatequeryD);

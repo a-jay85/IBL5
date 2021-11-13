@@ -388,8 +388,8 @@ function submit() {
 		$updatequeryA = "UPDATE " . $prefix . "_iblplyr SET dc_oi = '$dc_insertA' WHERE name = '$dc_insertkey'";
 		$updatequeryB = "UPDATE " . $prefix . "_iblplyr SET dc_di = '$dc_insertB' WHERE name = '$dc_insertkey'";
 		$updatequeryC = "UPDATE " . $prefix . "_iblplyr SET dc_bh = '$dc_insertC' WHERE name = '$dc_insertkey'";
-		$updatequeryD = "UPDATE ibl_team_history SET depth = NOW() + INTERVAL 2 HOUR WHERE team_name = '$Team_Name'";
-		$updatequeryF = "UPDATE ibl_team_history SET sim_depth = NOW() + INTERVAL 2 HOUR WHERE team_name = '$Team_Name'";
+		$updatequeryD = "UPDATE ibl_team_history SET depth = NOW() WHERE team_name = '$Team_Name'";
+		$updatequeryF = "UPDATE ibl_team_history SET sim_depth = NOW() WHERE team_name = '$Team_Name'";
 		$executeupdate1 = mysql_query($updatequery1);
 		$executeupdate2 = mysql_query($updatequery2);
 		$executeupdate3 = mysql_query($updatequery3);

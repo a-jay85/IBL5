@@ -496,16 +496,18 @@ function submit() {
 	if ($error == 0) {
 		$emailsubject = $Team_Name." Depth Chart - $Set_Name Offensive Set";
 		$recipient = 'ibldepthcharts@gmail.com';
+		$filename = 'depthcharts/'.$Team_Name.'.txt';
 
-		if (mail($recipient, $emailsubject, $filetext, "From: ibldepthcharts@gmail.com")) {
+		if (file_put_contents($filename, $filetext)) {
 			$executeupdateD = mysql_query($updatequeryD);
 			$executeupdateF = mysql_query($updatequeryF);
+			if ($_SERVER['SERVER_NAME'] != "localhost") {
+				mail($recipient, $emailsubject, $filetext, "From: ibldepthcharts@gmail.com");
+			}
 
 			echo "<center><u>Your depth chart has been submitted and e-mailed successfully. Thank you.</u></center><p>";
-			$filename = 'depthcharts/'.$Team_Name.'.txt';
-			file_put_contents($filename, $filetext);
 		} else {
-			echo "<font color=red>Message failed to e-mail properly; please contact the commissioner.</font></center><p>";
+			echo "<font color=red>Depth chart failed to save properly; please contact the commissioner.</font></center><p>";
 		}
 	}
 

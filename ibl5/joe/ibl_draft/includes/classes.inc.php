@@ -40,9 +40,9 @@ include "includes/classes/Discord.php";
 include "includes/functions.inc.php";
 
 // In PHP 5.2 or higher we don't need to bring this in
-if (!function_exists('json_encode')) {
-  require_once 'includes/jsonwrapper_inner.php';
- }
+//if (!function_exists('json_encode')) {
+  //require_once 'includes/jsonwrapper_inner.php';
+// }
 
 // Connection to the database, install if the file does not exist yet
 if (!file_exists("includes/config.inc.php")) {

@@ -10,7 +10,15 @@ $query="SELECT * FROM `nuke_ibl_fa_offers` ORDER BY name ASC, perceivedvalue DES
 $result=mysql_query($query);
 $num=mysql_numrows($result);
 
-echo "<HTML><HEAD><TITLE>Free Agent Processing</TITLE></HEAD> <BODY> <TABLE BORDER=1><TR><TD COLSPAN=8>Free Agent Signings</TD><TD>MLE</TD><TD>LLE</TD></TR> ";
+echo "<HTML>
+	<HEAD><TITLE>Free Agent Processing</TITLE></HEAD>
+	<BODY>
+		<TABLE BORDER=1>
+			<TR>
+				<TD COLSPAN=8>Free Agent Signings</TD>
+				<TD>MLE</TD>
+				<TD>LLE</TD>
+			</TR>";
 
 $i=0;
 while ($i < $num) {

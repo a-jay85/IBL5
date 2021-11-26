@@ -811,7 +811,7 @@ concat('<a href=\"show_player.php?player_id=', player.player_id, '\">', player.p
       $list->set_class("zero_priority");
     }
     $login->get_columns($col, $list, false);
-    $list->clear_order_by();
+    //$list->clear_order_by();
     $list->add_order_by('selection_priority');
 
     if (!$team_id) {

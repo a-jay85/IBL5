@@ -413,36 +413,36 @@ if ($Bird_Years < 3) {
 		$nooffer=1;
 	  }
   }
-  if ($nooffer == 0) {
-	  if (($Offer_2 > $Hard_Cap_Space2) AND ($Offer_2 > 0)){
-		echo "Sorry, you do not have sufficient cap space under the Hard Cap to make the offer.  You offered $Offer_2 in the second year of the contract, which is more than $Hard_Cap_Space2, the amount of cap space you have available.<br>";
-		$nooffer=1;
-	  }
-  }
-  if ($nooffer == 0) {
-	  if ($Offer_3 > $Hard_Cap_Space3) {
-		echo "Sorry, you do not have sufficient cap space under the Hard Cap to make the offer.  You offered $Offer_3 in the third year of the contract, which is more than $Hard_Cap_Space3, the amount of cap space you have available.<br>";
-		$nooffer=1;
-	  }
-  }
-  if ($nooffer == 0) {
-	  if ($Offer_4 > $Hard_Cap_Space4) {
-		echo "Sorry, you do not have sufficient cap space under the Hard Cap to make the offer.  You offered $Offer_4 in the fourth year of the contract, which is more than $Hard_Cap_Space4, the amount of cap space you have available.<br>";
-		$nooffer=1;
-      }
-  }
-  if ($nooffer == 0) {
-	  if ($Offer_5 > $Hard_Cap_Space5) {
-		echo "Sorry, you do not have sufficient cap space under the Hard Cap to make the offer.  You offered $Offer_5 in the fifth year of the contract, which is more than $Hard_Cap_Space5, the amount of cap space you have available.<br>";
-		$nooffer=1;
-	  }
-  }
-  if ($nooffer == 0) {
-	  if ($Offer_6 > $Hard_Cap_Space6) {
-		echo "Sorry, you do not have sufficient cap space under the Hard Cap to make the offer.  You offered $Offer_6 in the sixth year of the contract, which is more than $Hard_Cap_Space6, the amount of cap space you have available.<br>";
-		$nooffer=1;
-	  }
-  }
+//  if ($nooffer == 0) {
+//	  if (($Offer_2 > $Hard_Cap_Space2) AND ($Offer_2 > 0)){
+//		echo "Sorry, you do not have sufficient cap space under the Hard Cap to make the offer.  You offered $Offer_2 in the second year of the contract, which is more than $Hard_Cap_Space2, the amount of cap space you have available.<br>";
+//		$nooffer=1;
+//	  }
+//  }
+//  if ($nooffer == 0) {
+//	  if ($Offer_3 > $Hard_Cap_Space3) {
+//		echo "Sorry, you do not have sufficient cap space under the Hard Cap to make the offer.  You offered $Offer_3 in the third year of the contract, which is more than $Hard_Cap_Space3, the amount of cap space you have available.<br>";
+//		$nooffer=1;
+//	  }
+//  }
+//  if ($nooffer == 0) {
+//	  if ($Offer_4 > $Hard_Cap_Space4) {
+//		echo "Sorry, you do not have sufficient cap space under the Hard Cap to make the offer.  You offered $Offer_4 in the fourth year of the contract, which is more than $Hard_Cap_Space4, the amount of cap space you have available.<br>";
+//		$nooffer=1;
+//      }
+//  }
+//  if ($nooffer == 0) {
+//	  if ($Offer_5 > $Hard_Cap_Space5) {
+//		echo "Sorry, you do not have sufficient cap space under the Hard Cap to make the offer.  You offered $Offer_5 in the fifth year of the contract, which is more than $Hard_Cap_Space5, the amount of cap space you have available.<br>";
+//		$nooffer=1;
+//	  }
+//  }
+//  if ($nooffer == 0) {
+//	  if ($Offer_6 > $Hard_Cap_Space6) {
+//		echo "Sorry, you do not have sufficient cap space under the Hard Cap to make the offer.  You offered $Offer_6 in the sixth year of the contract, which is more than $Hard_Cap_Space6, the amount of cap space you have available.<br>";
+//		$nooffer=1;
+//	  }
+//  }
 
 }
 
@@ -552,36 +552,36 @@ if ($nooffer == 0) {
 	  $nooffer=1;
 	}
 }
-if ($nooffer == 0) {
-	if (($Offer_2 > $Hard_Cap_Space2) AND ($Offer_2 > 0)){
-	  echo "Sorry, you do not have sufficient cap space under the Hard Cap to make the offer.  You offered $Offer_2 in the second year of the contract, which is more than $Hard_Cap_Space2, the amount of hard cap space you have available.<br>";
-	  $nooffer=1;
-	}
-}
-if ($nooffer == 0) {
-	if ($Offer_3 > $Hard_Cap_Space3) {
-	  echo "Sorry, you do not have sufficient cap space under the Hard Cap to make the offer.  You offered $Offer_3 in the third year of the contract, which is more than $Hard_Cap_Space3, the amount of hard cap space you have available.<br>";
-	  $nooffer=1;
-	}
-}
-if ($nooffer == 0) {
-	if ($Offer_4 > $Hard_Cap_Space4) {
-	  echo "Sorry, you do not have sufficient cap space under the Hard Cap to make the offer.  You offered $Offer_4 in the fourth year of the contract, which is more than $Hard_Cap_Space4, the amount of hard cap space you have available.<br>";
-	  $nooffer=1;
-	}
-}
-if ($nooffer == 0) {
-	if ($Offer_5 > $Hard_Cap_Space5) {
-	  echo "Sorry, you do not have sufficient cap space under the Hard Cap to make the offer.  You offered $Offer_5 in the fifth year of the contract, which is more than $Hard_Cap_Space5, the amount of hard cap space you have available.<br>";
-	  $nooffer=1;
-	}
-}
-if ($nooffer == 0) {
-	if ($Offer_6 > $Hard_Cap_Space6) {
-	  echo "Sorry, you do not have sufficient cap space under the Hard Cap to make the offer.  You offered $Offer_6 in the sixth year of the contract, which is more than $Hard_Cap_Space6, the amount of hard cap space you have available.<br>";
-	  $nooffer=1;
-	}
-}
+// if ($nooffer == 0) {
+//	if (($Offer_2 > $Hard_Cap_Space2) AND ($Offer_2 > 0)){
+//	  echo "Sorry, you do not have sufficient cap space under the Hard Cap to make the offer.  You offered $Offer_2 in the second year of the contract, which is more than $Hard_Cap_Space2, the amount of hard cap space you have available.<br>";
+//	  $nooffer=1;
+//	}
+//}
+//if ($nooffer == 0) {
+//	if ($Offer_3 > $Hard_Cap_Space3) {
+//	  echo "Sorry, you do not have sufficient cap space under the Hard Cap to make the offer.  You offered $Offer_3 in the third year of the contract, which is more than $Hard_Cap_Space3, the amount of hard cap space you have available.<br>";
+//	  $nooffer=1;
+//	}
+//}
+//if ($nooffer == 0) {
+//	if ($Offer_4 > $Hard_Cap_Space4) {
+//	  echo "Sorry, you do not have sufficient cap space under the Hard Cap to make the offer.  You offered $Offer_4 in the fourth year of the contract, which is more than $Hard_Cap_Space4, the amount of hard cap space you have available.<br>";
+//	  $nooffer=1;
+//	}
+//}
+//if ($nooffer == 0) {
+//	if ($Offer_5 > $Hard_Cap_Space5) {
+//	  echo "Sorry, you do not have sufficient cap space under the Hard Cap to make the offer.  You offered $Offer_5 in the fifth year of the contract, which is more than $Hard_Cap_Space5, the amount of hard cap space you have available.<br>";
+//	  $nooffer=1;
+//	}
+//}
+//if ($nooffer == 0) {
+//	if ($Offer_6 > $Hard_Cap_Space6) {
+//	  echo "Sorry, you do not have sufficient cap space under the Hard Cap to make the offer.  You offered $Offer_6 in the sixth year of the contract, which is more than $Hard_Cap_Space6, the amount of hard cap space you have available.<br>";
+//	  $nooffer=1;
+//	}
+//}
 // ==== IF OFFER IS LEGIT, PROCESS OFFER ====
 
 if ($nooffer == 0) {

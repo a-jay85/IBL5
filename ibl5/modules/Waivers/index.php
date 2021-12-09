@@ -212,7 +212,7 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
                 if ($newWaiverContract == TRUE) {
                     $queryi .= "`cy1` = $cy1, `cy` = 1, ";
                 }
-                $queryi = "`teamname` = '$Team_Offering', `tid` = '$teamid' WHERE `pid` = '$Player_to_Process' LIMIT 1;";
+                $queryi .= "`teamname` = '$Team_Offering', `tid` = '$teamid' WHERE `pid` = '$Player_to_Process' LIMIT 1;";
 
                 $resulti = mysql_query($queryi);
                 $Roster_Slots++;

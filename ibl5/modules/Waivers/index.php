@@ -209,7 +209,7 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
                 $errortext = "You have full roster of 15 players. You can't sign another player at this time!";
             } else {
                 $queryi = "UPDATE nuke_iblplyr SET `ordinal` = '800', `bird` = 0, ";
-                if ($freshContract == TRUE) {
+                if ($newWaiverContract == TRUE) {
                     $queryi .= "`cy1` = $cy1, `cy` = 1, ";
                 }
                 $queryi = "`teamname` = '$Team_Offering', `tid` = '$teamid' WHERE `pid` = '$Player_to_Process' LIMIT 1;";

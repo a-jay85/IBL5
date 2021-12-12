@@ -208,11 +208,17 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
             } elseif ($Healthy_Roster_Slots < 1) {
                 $errortext = "You have full roster of 15 players. You can't sign another player at this time!";
             } else {
-                $queryi = "UPDATE nuke_iblplyr SET `ordinal` = '800', `bird` = 0, ";
+                $queryi = "UPDATE nuke_iblplyr
+                    SET `ordinal` = '800',
+                        `bird` = 0, ";
                 if ($newWaiverContract == TRUE) {
-                    $queryi .= "`cy1` = $cy1, `cy` = 1, ";
+                    $queryi .= "`cy1` = $cy1,
+                                `cy` = 1, ";
                 }
-                $queryi .= "`teamname` = '$Team_Offering', `tid` = '$teamid' WHERE `pid` = '$Player_to_Process' LIMIT 1;";
+                $queryi .= "`teamname` = '$Team_Offering',
+                            `tid` = '$teamid'
+                    WHERE `pid` = '$Player_to_Process'
+                    LIMIT 1;";
 
                 if (mysql_query($queryi)) {
                     $Roster_Slots++;

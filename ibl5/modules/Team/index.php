@@ -606,7 +606,7 @@ function schedule($tid)
 	echo "<center>
 		<img src=\"./images/logo/$tid.jpg\">
 		<table width=600 border=1>
-			<tr bgcolor=$color1><td colspan=26><font color=$color2><b><center>Team Schedule</center></b></font></td></tr>
+			<tr bgcolor=$color1><td colspan=26><center><font color=$color2><h1>Team Schedule</h1><p><i>games highlighted in yellow are projected to be run next sim (7 days)</i></font></center></td></tr>
 			<tr bgcolor=$color2><td colspan=26><font color=$color1><b><center>November</center></b></font></td></tr>
 			<tr bgcolor=$color2><td><font color=$color1><b>Date</font></td><td><font color=$color1><b>Visitor</font></td><td><font color=$color1><b>Score</font></td><td><font color=$color1><b>Home</font></td><td><font color=$color1><b>Score</font></td><td><font color=$color1><b>Box Score</font></td><td><font color=$color1><b>Record</font></td><td><font color=$color1><b>Streak</font></td></tr>";
 	list ($wins, $losses, $winStreak, $lossStreak) = boxscore($year, '11', $tid, $wins, $losses, $winStreak, $lossStreak);
@@ -652,6 +652,11 @@ function boxscore($year, $month, $tid, $wins, $losses, $winStreak, $lossStreak)
 	$teamSeasonRecordsQuery = "SELECT tid, leagueRecord FROM ibl_standings ORDER BY tid ASC;";
 	$teamSeasonRecordsResult = mysql_query($teamSeasonRecordsQuery);
 
+	$arrayLastSimDates = Shared::getLastSimDatesArray();
+	$lastSimStartDate = date_create($arrayLastSimDates["Start Date"]);
+	$lastSimEndDate = date_create($arrayLastSimDates["End Date"]);
+	$projectedNextSimEndDate = date_format(date_add($lastSimEndDate, date_interval_create_from_date_string('7 days')), 'Y-m-d');
+
 	while ($i < $num) {
 		$date = mysql_result($result, $i, "Date");
 		$visitor = mysql_result($result, $i, "Visitor");
@@ -666,11 +671,17 @@ function boxscore($year, $month, $tid, $wins, $losses, $winStreak, $lossStreak)
 		$homeRecord = mysql_result($teamSeasonRecordsResult, $home-1, "leagueRecord");
 
 		if ($visitorScore == $homeScore) {
-			echo "<tr>
-				<td>$date</td>
+		if ($date <= $projectedNextSimEndDate) {
+				echo "<tr bgcolor=#DDDD00>";
+			} else {
+				echo "<tr>";
+			}
+			echo "<td>$date</td>
 				<td><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$visitorTeamname ($visitorRecord)</a></td>
 				<td></td>
 				<td><a href=\"modules.php?name=Team&op=team&tid=$home\">$homeTeamname ($homeRecord)</a></td>
+				<td></td>
+				<td></td>
 				<td></td>
 				<td></td>
 			</tr>";

@@ -603,8 +603,8 @@ function schedule($tid)
 	$year1=$year+1;
 	$wins=0;
 	$losses=0;
-	echo "<img src=\"./images/logo/$tid.jpg\">
-		<table><tr><td valign=top>
+	echo "<center>
+		<img src=\"./images/logo/$tid.jpg\">
 		<table width=600 border=1>
 			<tr bgcolor=$color1><td colspan=26><font color=$color2><b><center>Team Schedule</center></b></font></td></tr>
 			<tr bgcolor=$color2><td colspan=26><font color=$color1><b><center>November</center></b></font></td></tr>
@@ -631,6 +631,7 @@ function schedule($tid)
 	echo "<tr bgcolor=$color1><td colspan=26><font color=$color2><b><center>Playoffs</center></b></font></td></tr>
 		<tr bgcolor=$color1><td><font color=$color2><b>Date</font></td><td><font color=$color2><b>Visitor</font></td><td><font color=$color2><b>Score</font></td><td><font color=$color2><b>Home</font></td><td><font color=$color2><b>Score</font></td><td><font color=$color2><b>Box Score</b></font></td><td><font color=$color2><b>Record</font></td><td><font color=$color2><b>Streak</font></td></tr>";
 	list ($wins, $losses, $winStreak, $lossStreak) = boxscore($year1, '06',$tid, $wins, $losses, $winStreak, $lossStreak);
+	echo "</center>";
 	CloseTable();
 
 	CloseTable();

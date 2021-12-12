@@ -214,57 +214,60 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
                 }
                 $queryi .= "`teamname` = '$Team_Offering', `tid` = '$teamid' WHERE `pid` = '$Player_to_Process' LIMIT 1;";
 
-                $resulti = mysql_query($queryi);
-                $Roster_Slots++;
+                if (mysql_query($queryi)) {
+                    $Roster_Slots++;
 
-                $topicid = 33;
-                $storytitle = $Team_Offering . " make waiver additions";
-                $hometext = "The " . $Team_Offering . " sign " . $playername . " from waivers for $cy1.";
+                    $topicid = 33;
+                    $storytitle = $Team_Offering . " make waiver additions";
+                    $hometext = "The " . $Team_Offering . " sign " . $playername . " from waivers for $cy1.";
 
-                // ==== PUT ANNOUNCEMENT INTO DATABASE ON NEWS PAGE
+                    // ==== PUT ANNOUNCEMENT INTO DATABASE ON NEWS PAGE
 
-                $timestamp = date('Y-m-d H:i:s', time());
+                    $timestamp = date('Y-m-d H:i:s', time());
 
-                $querycat = "SELECT * FROM nuke_stories_cat WHERE title = 'Waiver Pool Moves'";
-                $resultcat = mysql_query($querycat);
-                $WPMoves = mysql_result($resultcat, 0, "counter");
-                $catid = mysql_result($resultcat, 0, "catid");
+                    $querycat = "SELECT * FROM nuke_stories_cat WHERE title = 'Waiver Pool Moves'";
+                    $resultcat = mysql_query($querycat);
+                    $WPMoves = mysql_result($resultcat, 0, "counter");
+                    $catid = mysql_result($resultcat, 0, "catid");
 
-                $WPMoves = $WPMoves + 1;
+                    $WPMoves = $WPMoves + 1;
 
-                $querycat2 = "UPDATE nuke_stories_cat SET counter = $WPMoves WHERE title = 'Waiver Pool Moves'";
-                $resultcat2 = mysql_query($querycat2);
+                    $querycat2 = "UPDATE nuke_stories_cat SET counter = $WPMoves WHERE title = 'Waiver Pool Moves'";
+                    $resultcat2 = mysql_query($querycat2);
 
-                $querystor = "INSERT INTO nuke_stories
-                        (catid,
-                         aid,
-                         title,
-                         time,
-                         hometext,
-                         topic,
-                         informant,
-                         counter,
-                         alanguage)
-                    VALUES
-                        ('$catid',
-                         'Associated Press',
-                         '$storytitle',
-                         '$timestamp',
-                         '$hometext',
-                         '$topicid',
-                         'Associated Press',
-                         '0',
-                         'english')";
-                $resultstor = mysql_query($querystor);
+                    $querystor = "INSERT INTO nuke_stories
+                            (catid,
+                             aid,
+                             title,
+                             time,
+                             hometext,
+                             topic,
+                             informant,
+                             counter,
+                             alanguage)
+                        VALUES
+                            ('$catid',
+                             'Associated Press',
+                             '$storytitle',
+                             '$timestamp',
+                             '$hometext',
+                             '$topicid',
+                             'Associated Press',
+                             '0',
+                             'english')";
+                    $resultstor = mysql_query($querystor);
 
-                if (isset($resultstor)) {
                     $recipient = 'ibldepthcharts@gmail.com';
                     mail($recipient, $storytitle, $hometext, "From: waivers@iblhoops.net");
 
                     Discord::postToChannel('#waiver-wire', $hometext);
+
+                    $errortext = "Your waiver move should now be processed. $playername has been signed from waivers and added to your roster.";
+                } else {
+                    $errortext = "Oops, something went wrong. Post what you were trying to do in <A HREF=\"https://discord.com/channels/666986450889474053/671435182502576169\">#site-bugs-and-to-do</A> and we'll fix it asap. Sorry!";
                 }
 
-                $errortext = "Your waiver move should now be processed. $playername has been signed from waivers and added to your roster.";
+
             }
         } // END OF IF/ELSE BRACE FOR TYPE OF ACTION IS DROP OR ADD
     } // IF ELSE BRACE FOR IF TYPE OF ACTION FIELD IS NOT NULL; I.E., DROP OR ADD

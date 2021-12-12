@@ -146,7 +146,7 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
                 $WPMoves = mysql_result($resultcat, 0, "counter");
                 $catid = mysql_result($resultcat, 0, "catid");
 
-                $WPMoves = $WPMoves + 1;
+                $WPMoves++;
 
                 $querycat2 = "UPDATE nuke_stories_cat SET counter = $WPMoves WHERE title = 'Waiver Pool Moves'";
                 $resultcat2 = mysql_query($querycat2);

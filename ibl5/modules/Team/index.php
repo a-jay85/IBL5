@@ -648,6 +648,9 @@ function boxscore($year, $month, $tid, $wins, $losses, $winStreak, $lossStreak)
 	$num = mysql_numrows($result);
 	$i = 0;
 
+	$teamSeasonRecordsQuery = "SELECT tid, leagueRecord FROM ibl_standings ORDER BY tid ASC;";
+	$teamSeasonRecordsResult = mysql_query($teamSeasonRecordsQuery);
+
 	while ($i < $num) {
 		$date = mysql_result($result, $i, "Date");
 		$visitor = mysql_result($result, $i, "Visitor");
@@ -658,13 +661,15 @@ function boxscore($year, $month, $tid, $wins, $losses, $winStreak, $lossStreak)
 
 		$visitorTeamname = Shared::getTeamnameFromTid($visitor);
 		$homeTeamname = Shared::getTeamnameFromTid($home);
+		$visitorRecord = mysql_result($teamSeasonRecordsResult, $visitor-1, "leagueRecord");
+		$homeRecord = mysql_result($teamSeasonRecordsResult, $home-1, "leagueRecord");
 
 		if ($visitorScore == $homeScore) {
 			echo "<tr>
 				<td>$date</td>
-				<td><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$visitorTeamname</a></td>
+				<td><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$visitorTeamname ($visitorRecord)</a></td>
 				<td></td>
-				<td><a href=\"modules.php?name=Team&op=team&tid=$home\">$homeTeamname</a></td>
+				<td><a href=\"modules.php?name=Team&op=team&tid=$home\">$homeTeamname ($homeRecord)</a></td>
 				<td></td>
 				<td></td>
 			</tr>";

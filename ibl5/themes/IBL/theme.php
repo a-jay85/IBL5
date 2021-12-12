@@ -108,11 +108,11 @@ function themeheader() {
 
 function themefooter() {
     global $bgcolor1, $bgcolor2, $bgcolor3;
-    if (defined('INDEX_FILE')) {
+    // if (defined('INDEX_FILE')) {
     	echo "</td><td>&nbsp;&nbsp;</td><td valign=\"top\" bgcolor=$bgcolor1>";
     	blocks("right");
     	echo "</td>";
-    }
+    // }
     echo "</td></tr></table></td></tr></table>";
     echo "<center>";
     footmsg();

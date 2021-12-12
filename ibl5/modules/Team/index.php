@@ -584,25 +584,25 @@ function schedule($tid)
 //============================
 // GRAB TEAM COLORS, ET AL
 //============================
-	$queryteam="SELECT * FROM nuke_ibl_team_info WHERE teamid = '$tid' ";
-	$resultteam=mysql_query($queryteam);
-	$teamid=mysql_result($resultteam,0,"teamid");
-	$team_city=mysql_result($resultteam,0,"team_city");
-	$team_name=mysql_result($resultteam,0,"team_name");
-	$coach_pts=mysql_result($resultteam,0,"Contract_Coach");
-	$color1=mysql_result($resultteam,0,"color1");
-	$color2=mysql_result($resultteam,0,"color2");
+	$queryteam = "SELECT * FROM nuke_ibl_team_info WHERE teamid = '$tid';";
+	$resultteam = mysql_query($queryteam);
+	$teamid = mysql_result($resultteam, 0, "teamid");
+	$team_city = mysql_result($resultteam, 0, "team_city");
+	$team_name = mysql_result($resultteam, 0, "team_name");
+	$coach_pts = mysql_result($resultteam, 0, "Contract_Coach");
+	$color1 = mysql_result($resultteam, 0, "color1");
+	$color2 = mysql_result($resultteam, 0, "color2");
 //=============================
 //DISPLAY TOP MENU
 //=============================
 	Shared::displaytopmenu($tid);
-	$query="SELECT * FROM `ibl_schedule` WHERE Visitor = $tid OR Home = $tid ORDER BY Date ASC";
-	$result=mysql_query($query);
-	$num=mysql_numrows($result);
-	$year=mysql_result($result,0,"Year");
-	$year1=$year+1;
-	$wins=0;
-	$losses=0;
+	$query = "SELECT * FROM `ibl_schedule` WHERE Visitor = $tid OR Home = $tid ORDER BY Date ASC;";
+	$result = mysql_query($query);
+	$num = mysql_numrows($result);
+	$year = mysql_result($result, 0, "Year");
+	$year1 = $year + 1;
+	$wins = 0;
+	$losses = 0;
 	echo "<center>
 		<img src=\"./images/logo/$tid.jpg\">
 		<table width=600 border=1>

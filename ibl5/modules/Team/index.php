@@ -625,11 +625,11 @@ function schedule($tid)
 	echo "<tr bgcolor=$color1><td colspan=26><font color=$color2><b><center>April</center></b></font></td></tr>
 		<tr bgcolor=$color1><td><font color=$color2><b>Date</font></td><td><font color=$color2><b>Visitor</font></td><td><font color=$color2><b>Score</font></td><td><font color=$color2><b>Home</font></td><td><font color=$color2><b>Score</font></td><td><font color=$color2><b>Box Score</b></font></td><td><font color=$color2><b>Record</font></td><td><font color=$color2><b>Streak</font></td></tr>";
 	list ($wins, $losses, $winStreak, $lossStreak) = boxscore($year1, '04',$tid, $wins, $losses, $winStreak, $lossStreak);
-	echo "<tr bgcolor=$color1><td colspan=26><font color=$color2><b><center>May</center></b></font></td></tr>
-		<tr bgcolor=$color1><td><font color=$color2><b>Date</font></td><td><font color=$color2><b>Visitor</font></td><td><font color=$color2><b>Score</font></td><td><font color=$color2><b>Home</font></td><td><font color=$color2><b>Score</font></td><td><font color=$color2><b>Box Score</b></font></td><td><font color=$color2><b>Record</font></td><td><font color=$color2><b>Streak</font></td></tr>";
-	list ($wins, $losses, $winStreak, $lossStreak) = boxscore($year1, '05',$tid, $wins, $losses, $winStreak, $lossStreak);
-	echo "<tr bgcolor=$color2><td colspan=26><font color=$color1><b><center>Playoffs</center></b></font></td></tr>
+	echo "<tr bgcolor=$color2><td colspan=26><font color=$color1><b><center>May</center></b></font></td></tr>
 		<tr bgcolor=$color2><td><font color=$color1><b>Date</font></td><td><font color=$color1><b>Visitor</font></td><td><font color=$color1><b>Score</font></td><td><font color=$color1><b>Home</font></td><td><font color=$color1><b>Score</font></td><td><font color=$color1><b>Box Score</b></font></td><td><font color=$color1><b>Record</font></td><td><font color=$color1><b>Streak</font></td></tr>";
+	list ($wins, $losses, $winStreak, $lossStreak) = boxscore($year1, '05',$tid, $wins, $losses, $winStreak, $lossStreak);
+	echo "<tr bgcolor=$color1><td colspan=26><font color=$color2><b><center>Playoffs</center></b></font></td></tr>
+		<tr bgcolor=$color1><td><font color=$color2><b>Date</font></td><td><font color=$color2><b>Visitor</font></td><td><font color=$color2><b>Score</font></td><td><font color=$color2><b>Home</font></td><td><font color=$color2><b>Score</font></td><td><font color=$color2><b>Box Score</b></font></td><td><font color=$color2><b>Record</font></td><td><font color=$color2><b>Streak</font></td></tr>";
 	list ($wins, $losses, $winStreak, $lossStreak) = boxscore($year1, '06',$tid, $wins, $losses, $winStreak, $lossStreak);
 	CloseTable();
 

@@ -403,15 +403,5 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
 }
 
 waivers($user, $action);
-/*
-switch($op) {
-    case "waivers":
-    waivers($user, $action);
-    break;
 
-    default:
-    menu();
-    break;
-}
-*/
 ?>

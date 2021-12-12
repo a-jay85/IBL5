@@ -146,6 +146,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 						<th>min</th>
 						<th>fgp</th>
 						<th>ftp</th>
+						<th>3gm</th>
 						<th>3gp</th>
 						<th>reb</th>
 						<th>ast</th>
@@ -171,6 +172,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 				$mpg = number_format(($row['stats_min'] / $row['stats_gm']), 1);
 				$fgp = number_format(($row['stats_fgm'] / $row['stats_fga']), 3);
 				$ftp = number_format(($row['stats_ftm'] / $row['stats_fta']), 3);
+				$threePointersPerGame = number_format(($row['stats_3gm'] / $row['stats_gm']), 1);
 				$tpp = number_format(($row['stats_3gm'] / $row['stats_3ga']), 3);
 				$rpg = number_format((($row['stats_orb'] + $row['stats_drb']) / $row['stats_gm']), 1);
 				$apg = number_format(($row['stats_ast'] / $row['stats_gm']), 1);
@@ -203,6 +205,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 							<td>$mpg</td>
 							<td>$fgp</td>
 							<td>$ftp</td>
+							<td>$threePointersPerGame</td>
 							<td>$tpp</td>
 							<td>$rpg</td>
 							<td>$apg</td>

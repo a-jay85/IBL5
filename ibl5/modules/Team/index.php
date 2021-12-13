@@ -671,7 +671,7 @@ function boxscore($year, $month, $tid, $wins, $losses, $winStreak, $lossStreak)
 		$homeRecord = mysql_result($teamSeasonRecordsResult, $home-1, "leagueRecord");
 
 		if ($visitorScore == $homeScore) {
-		if ($date <= $projectedNextSimEndDate) {
+			if ($date <= $projectedNextSimEndDate) {
 				echo "<tr bgcolor=#DDDD00>";
 			} else {
 				echo "<tr>";

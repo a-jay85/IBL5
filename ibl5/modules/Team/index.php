@@ -723,9 +723,9 @@ function boxscore($year, $month, $tid, $wins, $losses, $winStreak, $lossStreak)
 			if ($visitorScore > $homeScore) {
 				echo "<tr bgcolor=$bgcolor>
 					<td>$date</td>
-					<td><b><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$visitorTeamname</a></b></td>
+					<td><b><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$visitorTeamname ($visitorRecord)</a></b></td>
 					<td><b><font color=$winlosscolor>$visitorScore</font></b></td>
-					<td><a href=\"modules.php?name=Team&op=team&tid=$home\">$homeTeamname</a></td>
+					<td><a href=\"modules.php?name=Team&op=team&tid=$home\">$homeTeamname ($homeRecord)</a></td>
 					<td><b><font color=$winlosscolor>$homeScore</font></b></td>
 					<td><a href=\"./ibl/IBL/box$boxID.htm\">View</a></td>
 					<td>$wins - $losses</td>
@@ -734,9 +734,9 @@ function boxscore($year, $month, $tid, $wins, $losses, $winStreak, $lossStreak)
 			} else if ($visitorScore < $homeScore) {
 				echo "<tr bgcolor=$bgcolor>
 					<td>$date</td>
-					<td><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$visitorTeamname</a></td>
+					<td><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$visitorTeamname ($visitorRecord)</a></td>
 					<td><b><font color=$winlosscolor>$visitorScore</font></b></td>
-					<td><b><a href=\"modules.php?name=Team&op=team&tid=$home\">$homeTeamname</a></b></td>
+					<td><b><a href=\"modules.php?name=Team&op=team&tid=$home\">$homeTeamname ($homeRecord)</a></b></td>
 					<td><b><font color=$winlosscolor>$homeScore</font></b></td>
 					<td><a href=\"./ibl/IBL/box$boxID.htm\">View</a></td>
 					<td>$wins - $losses</td>

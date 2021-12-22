@@ -655,7 +655,14 @@ function boxscore($year, $month, $tid, $wins, $losses, $winStreak, $lossStreak)
 	$arrayLastSimDates = Shared::getLastSimDatesArray();
 	$lastSimStartDate = date_create($arrayLastSimDates["Start Date"]);
 	$lastSimEndDate = date_create($arrayLastSimDates["End Date"]);
-	$projectedNextSimEndDate = date_format(date_add($lastSimEndDate, date_interval_create_from_date_string('7 days')), 'Y-m-d');
+	$projectedNextSimEndDate = date_add($lastSimEndDate, date_interval_create_from_date_string('7 days'));
+
+	// override $projectedNextSimEndDate to account for the blank week at end of HEAT
+	$currentSeasonEndingYear = Shared::getCurrentSeasonEndingYear();
+	$currentSeasonBeginningYear = $currentSeasonEndingYear - 1;
+	if ($projectedNextSimEndDate >= date_create("$currentSeasonBeginningYear-10-23") AND $projectedNextSimEndDate < date_create("$currentSeasonBeginningYear-11-01")) {
+		$projectedNextSimEndDate = date_create("$currentSeasonBeginningYear-11-08");
+	}
 
 	while ($i < $num) {
 		$date = mysql_result($result, $i, "Date");
@@ -671,7 +678,7 @@ function boxscore($year, $month, $tid, $wins, $losses, $winStreak, $lossStreak)
 		$homeRecord = mysql_result($teamSeasonRecordsResult, $home-1, "leagueRecord");
 
 		if ($visitorScore == $homeScore) {
-			if ($date <= $projectedNextSimEndDate) {
+			if (date_create($date) <= $projectedNextSimEndDate) {
 				echo "<tr bgcolor=#DDDD00>";
 			} else {
 				echo "<tr>";

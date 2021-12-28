@@ -20,7 +20,7 @@ global $prefix, $multilingual, $currentlang, $db;
 
 $query="SELECT * FROM nuke_iblplyr WHERE retired = 0 ORDER BY ordinal ASC";
 $result=mysql_query($query);
-$num=mysql_numrows($result);
+$num=mysql_num_rows($result);
 $i=0;
 $name1 = "";
 $name2 = "";

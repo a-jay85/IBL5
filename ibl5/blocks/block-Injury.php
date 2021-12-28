@@ -20,7 +20,7 @@ global $prefix, $multilingual, $currentlang, $db;
 
 $queryo = "SELECT * FROM nuke_users WHERE user_ibl_team != '' ORDER BY user_ibl_team ASC";
 $resulto = mysql_query($queryo);
-$numo = mysql_numrows($resulto);
+$numo = mysql_num_rows($resulto);
 
 $content = "<table border=0>
     <tr>
@@ -56,7 +56,7 @@ while ($j < $numo) {
         AND ordinal < 960
         AND name NOT LIKE '%Buyout%'"; // "ordinal < 960" excludes waived players from this query
 	$result1 = mysql_query($sql);
-	$num1 = mysql_numrows($result1);
+	$num1 = mysql_num_rows($result1);
 
 	$sql2 = "SELECT *
         FROM nuke_iblplyr
@@ -65,7 +65,7 @@ while ($j < $numo) {
         AND injured > '0'
         AND active = '1'";
 	$result2 = mysql_query($sql2);
-	$num2 = mysql_numrows($result2);
+	$num2 = mysql_num_rows($result2);
 
 	if ($num2 > 0) {
 		$new_lineups = 'Yes';

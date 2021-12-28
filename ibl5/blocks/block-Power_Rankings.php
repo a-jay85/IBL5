@@ -23,7 +23,7 @@ $query = "SELECT TeamID, Team, ranking, win, loss, color1, color2
     INNER JOIN nuke_ibl_team_info info USING (teamid)
     ORDER BY ranking DESC;";
 $result = mysql_query($query);
-$num = mysql_numrows($result);
+$num = mysql_num_rows($result);
 
 $content .= "<table width=150>";
 

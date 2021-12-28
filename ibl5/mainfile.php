@@ -218,7 +218,9 @@ if(empty($admin_file)) {
 }
 
 define('NUKE_FILE', true);
-$row = $db->sql_fetchrow($db->sql_query("SELECT * FROM ".$prefix."_config"));
+// the following line is commented out because sql_fetchrow depends on PHP's deprecated functionality and use an illegal offset.
+// $row = $db->sql_fetchrow($db->sql_query("SELECT * FROM ".$prefix."_config"));
+$row = mysqli_fetch_array($db->sql_query("SELECT * FROM ".$prefix."_config"));
 $sitename = filter($row['sitename'], "nohtml");
 $nukeurl = filter($row['nukeurl'], "nohtml");
 $site_logo = filter($row['site_logo'], "nohtml");

@@ -89,7 +89,6 @@ if (!defined("SQL_LAYER")) {
 			}
 			if ($this->query_result) {
 				unset($this->row[$this->query_result]);
-					error_log($query);
 				unset($this->rowset[$this->query_result]);
 				return $this->query_result;
 			} else {

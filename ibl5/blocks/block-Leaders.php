@@ -18,9 +18,9 @@ if ( !defined('BLOCK_FILE') ) {
 
 global $prefix, $multilingual, $currentlang, $db;
 
-$query="SELECT * FROM nuke_iblplyr WHERE retired = 0 ORDER BY ordinal ASC";
-$result=mysql_query($query);
-$num=mysql_num_rows($result);
+$query="SELECT * FROM nuke_iblplyr WHERE retired = 0 AND name NOT LIKE \"%Buyouts%\" ORDER BY ordinal ASC";
+$result=$db->sql_query($query);
+$num=$db->sql_numrows($result);
 $i=0;
 $name1 = "";
 $name2 = "";
@@ -37,32 +37,32 @@ $ppg5 = 0;
 while ($i < $num)
 {
 
-	$name=mysql_result($result,$i,"name");
-	$p_ord=mysql_result($result,$i,"ordinal");
-	$pid=mysql_result($result,$i,"pid");
-	$tid=mysql_result($result,$i,"tid");
-	$teamname=mysql_result($result,$i,"teamname");
+	$name=$db->sql_result($result,$i,"name");
+	$p_ord=$db->sql_result($result,$i,"ordinal");
+	$pid=$db->sql_result($result,$i,"pid");
+	$tid=$db->sql_result($result,$i,"tid");
+	$teamname=$db->sql_result($result,$i,"teamname");
 
-	$stats_gm=mysql_result($result,$i,"stats_gm");
-	$stats_fgm=mysql_result($result,$i,"stats_fgm");
-	$stats_fga=mysql_result($result,$i,"stats_fga");
-	$stats_ftm=mysql_result($result,$i,"stats_ftm");
-	$stats_fta=mysql_result($result,$i,"stats_fta");
-	$stats_tgm=mysql_result($result,$i,"stats_3gm");
-	$stats_tga=mysql_result($result,$i,"stats_3ga");
+	$stats_gm=$db->sql_result($result,$i,"stats_gm");
+	$stats_fgm=$db->sql_result($result,$i,"stats_fgm");
+	$stats_fga=$db->sql_result($result,$i,"stats_fga");
+	$stats_ftm=$db->sql_result($result,$i,"stats_ftm");
+	$stats_fta=$db->sql_result($result,$i,"stats_fta");
+	$stats_tgm=$db->sql_result($result,$i,"stats_3gm");
+	$stats_tga=$db->sql_result($result,$i,"stats_3ga");
 
-	$stats_orb=mysql_result($result,$i,"stats_orb");
-	$stats_drb=mysql_result($result,$i,"stats_drb");
+	$stats_orb=$db->sql_result($result,$i,"stats_orb");
+	$stats_drb=$db->sql_result($result,$i,"stats_drb");
 
-	$stats_ast=mysql_result($result,$i,"stats_ast");
+	$stats_ast=$db->sql_result($result,$i,"stats_ast");
 
-	$stats_stl=mysql_result($result,$i,"stats_stl");
+	$stats_stl=$db->sql_result($result,$i,"stats_stl");
 
-	$stats_blk=mysql_result($result,$i,"stats_blk");
+	$stats_blk=$db->sql_result($result,$i,"stats_blk");
 
-	$stats_to=mysql_result($result,$i,"stats_to");
+	$stats_to=$db->sql_result($result,$i,"stats_to");
 
-	$stats_pf=mysql_result($result,$i,"stats_pf");
+	$stats_pf=$db->sql_result($result,$i,"stats_pf");
 
 	$stats_reb=$stats_orb+$stats_drb;
 	$stats_pts=2*$stats_fgm+$stats_ftm+$stats_tgm;

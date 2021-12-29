@@ -16,17 +16,18 @@ if ( !defined('BLOCK_FILE') ) {
     die();
 }
 
-global $prefix, $multilingual, $currentlang, $db;
 $content=$content."<center><a href=modules.php?name=Chunk_Stats&op=chunk>Sim Stats Search Engine</a></center><br>";
 
 function getLastSimStatLeaders($statName, $query)
 {
-    $queryLastSimDates = mysql_query("SELECT * FROM ibl_sim_dates ORDER BY Sim DESC LIMIT 1");
-    $lastSimNumber = mysql_result($queryLastSimDates, 0, "Sim");
-    $lastSimStartDate = mysql_result($queryLastSimDates, 0, "Start Date");
-    $lastSimEndDate = mysql_result($queryLastSimDates, 0, "End Date");
+    global $db;
 
-    $querySimStatLeaders = mysql_query("SELECT players.name, boxes.pid, teamname, players.tid, CAST(FORMAT(($query / COUNT(players.NAME)), 1) AS DECIMAL(3,1)) as `$statName`
+    $queryLastSimDates = $db->sql_query("SELECT * FROM ibl_sim_dates ORDER BY Sim DESC LIMIT 1");
+    $lastSimNumber = $db->sql_result($queryLastSimDates, 0, "Sim");
+    $lastSimStartDate = $db->sql_result($queryLastSimDates, 0, "Start Date");
+    $lastSimEndDate = $db->sql_result($queryLastSimDates, 0, "End Date");
+
+    $querySimStatLeaders = $db->sql_query("SELECT players.name, boxes.pid, teamname, players.tid, CAST(FORMAT(($query / COUNT(players.NAME)), 1) AS DECIMAL(3,1)) as `$statName`
         FROM ibl_box_scores boxes
         INNER JOIN nuke_iblplyr players USING(pid)
         WHERE Date BETWEEN '$lastSimStartDate' AND '$lastSimEndDate'
@@ -35,8 +36,9 @@ function getLastSimStatLeaders($statName, $query)
         LIMIT 5;");
 
     $i = 1;
-    while ($i <= mysql_num_rows($querySimStatLeaders)) {
-        $row = mysql_fetch_assoc($querySimStatLeaders);
+    $numrows = $db->sql_numrows($querySimStatLeaders);
+    while ($i <= $numrows) {
+        $row = $db->sql_fetch_assoc($querySimStatLeaders);
         $array[$i]["name"] = $row["name"];
         $array[$i]["pid"] = $row["pid"];
         $array[$i]["teamname"] = $row["teamname"];

@@ -31,6 +31,7 @@ $pagetitle = " - Depth Chart Entry";
 function userinfo($username, $bypass=0, $hid=0, $url=0)
 	{
 	global $user, $cookie, $sitename, $prefix, $user_prefix, $db, $admin, $broadcast_msg, $my_headlines, $module_name, $useset, $subscription_url;
+
 	$sql = "SELECT * FROM ".$prefix."_bbconfig";
 	$result = $db->sql_query($sql);
 	while ( $row = $db->sql_fetchrow($result) )	{
@@ -115,7 +116,7 @@ function userinfo($username, $bypass=0, $hid=0, $url=0)
 	$i = 0;
 
 	while ($i < 3) {
-		$name_of_set=mysql_result($result7,$i,"offense_name");
+		$name_of_set=$db->sql_result($result7,$i,"offense_name");
 		$i++;
 
 		echo "<a href=\"modules.php?name=Depth_Chart_Entry&useset=$i\">$name_of_set</a> | ";
@@ -291,6 +292,8 @@ function main($user) {
 }
 
 function submit() {
+	global $db;
+
     include("header.php");
     OpenTable();
 
@@ -390,18 +393,18 @@ function submit() {
 		$updatequeryC = "UPDATE " . $prefix . "_iblplyr SET dc_bh = '$dc_insertC' WHERE name = '$dc_insertkey'";
 		$updatequeryD = "UPDATE ibl_team_history SET depth = NOW() WHERE team_name = '$Team_Name'";
 		$updatequeryF = "UPDATE ibl_team_history SET sim_depth = NOW() WHERE team_name = '$Team_Name'";
-		$executeupdate1 = mysql_query($updatequery1);
-		$executeupdate2 = mysql_query($updatequery2);
-		$executeupdate3 = mysql_query($updatequery3);
-		$executeupdate4 = mysql_query($updatequery4);
-		$executeupdate5 = mysql_query($updatequery5);
-		$executeupdate6 = mysql_query($updatequery6);
-		$executeupdate7 = mysql_query($updatequery7);
-		$executeupdate8 = mysql_query($updatequery8);
-		$executeupdate9 = mysql_query($updatequery9);
-		$executeupdateA = mysql_query($updatequeryA);
-		$executeupdateB = mysql_query($updatequeryB);
-		$executeupdateC = mysql_query($updatequeryC);
+		$executeupdate1 = $db->sql_query($updatequery1);
+		$executeupdate2 = $db->sql_query($updatequery2);
+		$executeupdate3 = $db->sql_query($updatequery3);
+		$executeupdate4 = $db->sql_query($updatequery4);
+		$executeupdate5 = $db->sql_query($updatequery5);
+		$executeupdate6 = $db->sql_query($updatequery6);
+		$executeupdate7 = $db->sql_query($updatequery7);
+		$executeupdate8 = $db->sql_query($updatequery8);
+		$executeupdate9 = $db->sql_query($updatequery9);
+		$executeupdateA = $db->sql_query($updatequeryA);
+		$executeupdateB = $db->sql_query($updatequeryB);
+		$executeupdateC = $db->sql_query($updatequeryC);
 
 		if ($dc_insert6 == 1) $activePlayers++;
 		if ($dc_insert1 > 0 && $injury == 0) $pos_1++;
@@ -488,9 +491,9 @@ function submit() {
 		$filename = 'depthcharts/'.$Team_Name.'.txt';
 
 		if (file_put_contents($filename, $filetext)) {
-			$executeupdateD = mysql_query($updatequeryD);
-			$executeupdateF = mysql_query($updatequeryF);
-			
+			$executeupdateD = $db->sql_query($updatequeryD);
+			$executeupdateF = $db->sql_query($updatequeryF);
+
 			if ($_SERVER['SERVER_NAME'] != "localhost") {
 				mail($recipient, $emailsubject, $filetext, "From: ibldepthcharts@gmail.com");
 			}

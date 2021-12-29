@@ -48,8 +48,8 @@ $content=$content."<center><strong>$lastSimEndDate</strong></center>";
 $content=$content.'<tr><td colspan=2><hr></td></tr>';
 
 $queryEasternConference = "SELECT tid,team_name,leagueRecord,confGB,clinchedConference,clinchedDivision,clinchedPlayoffs FROM ibl_standings WHERE conference = 'Eastern' ORDER BY confGB ASC";
-$resultEasternConference = mysql_query($queryEasternConference);
-$limitEasternConference = mysql_num_rows($resultEasternConference);
+$resultEasternConference = $db->sql_query($queryEasternConference);
+$limitEasternConference = $db->sql_numrows($resultEasternConference);
 
 $content=$content.'
 <tr><td colspan=2><center><font color=#fd004d><b>Eastern Conference</b></font></center></td></tr>
@@ -57,13 +57,13 @@ $content=$content.'
 
 $i = 0;
 while ($i < $limitEasternConference) {
-	$tid = mysql_result($resultEasternConference,$i,0);
-	$team_name = trim(mysql_result($resultEasternConference,$i,1));
-	$leagueRecord = mysql_result($resultEasternConference,$i,2);
-	$confGB = mysql_result($resultEasternConference,$i,3);
-	$clinchedConference = mysql_result($resultEasternConference,$i,4);
-	$clinchedDivision = mysql_result($resultEasternConference,$i,5);
-	$clinchedPlayoffs = mysql_result($resultEasternConference,$i,6);
+	$tid = $db->sql_result($resultEasternConference,$i,0);
+	$team_name = trim($db->sql_result($resultEasternConference,$i,1));
+	$leagueRecord = $db->sql_result($resultEasternConference,$i,2);
+	$confGB = $db->sql_result($resultEasternConference,$i,3);
+	$clinchedConference = $db->sql_result($resultEasternConference,$i,4);
+	$clinchedDivision = $db->sql_result($resultEasternConference,$i,5);
+	$clinchedPlayoffs = $db->sql_result($resultEasternConference,$i,6);
     if ($clinchedConference == 1) {
         $team_name = "<b>Z</b>-" . $team_name;
     } elseif ($clinchedDivision == 1) {
@@ -77,8 +77,8 @@ while ($i < $limitEasternConference) {
 }
 
 $queryWesternConference = "SELECT tid,team_name,leagueRecord,confGB,clinchedConference,clinchedDivision,clinchedPlayoffs FROM ibl_standings WHERE conference = 'Western' ORDER BY confGB ASC";
-$resultWesternConference = mysql_query($queryWesternConference);
-$limitWesternConference = mysql_num_rows($resultWesternConference);
+$resultWesternConference = $db->sql_query($queryWesternConference);
+$limitWesternConference = $db->sql_numrows($resultWesternConference);
 
 $content=$content.'
 <tr><td colspan=2><hr></td></tr>
@@ -87,13 +87,13 @@ $content=$content.'
 
 $i = 0;
 while ($i < $limitWesternConference) {
-	$tid = mysql_result($resultWesternConference,$i,0);
-	$team_name = trim(mysql_result($resultWesternConference,$i,1));
-	$leagueRecord = mysql_result($resultWesternConference,$i,2);
-	$confGB = mysql_result($resultWesternConference,$i,3);
-	$clinchedConference = mysql_result($resultWesternConference,$i,4);
-	$clinchedDivision = mysql_result($resultWesternConference,$i,5);
-	$clinchedPlayoffs = mysql_result($resultWesternConference,$i,6);
+	$tid = $db->sql_result($resultWesternConference,$i,0);
+	$team_name = trim($db->sql_result($resultWesternConference,$i,1));
+	$leagueRecord = $db->sql_result($resultWesternConference,$i,2);
+	$confGB = $db->sql_result($resultWesternConference,$i,3);
+	$clinchedConference = $db->sql_result($resultWesternConference,$i,4);
+	$clinchedDivision = $db->sql_result($resultWesternConference,$i,5);
+	$clinchedPlayoffs = $db->sql_result($resultWesternConference,$i,6);
     if ($clinchedConference == 1) {
         $team_name = "<b>Z</b>-" . $team_name;
     } elseif ($clinchedDivision == 1) {
@@ -113,10 +113,10 @@ $content=$content.'
 
 $i = 0;
 while ($i < $limitNLWest) {
-	$tid = mysql_result($resultNLWest,$i,0);
-	$team_name = mysql_result($resultNLWest,$i,1);
-	$leagueRecord = mysql_result($resultNLWest,$i,2);
-	$divGB = mysql_result($resultNLWest,$i,3);
+	$tid = $db->sql_result($resultNLWest,$i,0);
+	$team_name = $db->sql_result($resultNLWest,$i,1);
+	$leagueRecord = $db->sql_result($resultNLWest,$i,2);
+	$divGB = $db->sql_result($resultNLWest,$i,3);
 
 	$content=$content.'<tr><td nowrap><a href="modules.php?name=Team&op=team&tid='.$tid.'">'.$team_name.'</a> ('.$leagueRecord.')</td><td>'.$divGB.'</td></tr>';
 	$i++;
@@ -129,10 +129,10 @@ $content=$content.'
 
 $i = 0;
 while ($i < $limitNLEast) {
-	$tid = mysql_result($resultNLEast,$i,0);
-	$team_name = mysql_result($resultNLEast,$i,1);
-	$leagueRecord = mysql_result($resultNLEast,$i,2);
-	$divGB = mysql_result($resultNLEast,$i,3);
+	$tid = $db->sql_result($resultNLEast,$i,0);
+	$team_name = $db->sql_result($resultNLEast,$i,1);
+	$leagueRecord = $db->sql_result($resultNLEast,$i,2);
+	$divGB = $db->sql_result($resultNLEast,$i,3);
 
 	$content=$content.'<tr><td nowrap><a href="modules.php?name=Team&op=team&tid='.$tid.'">'.$team_name.'</a> ('.$leagueRecord.')</td><td>'.$divGB.'</td></tr>';
 	$i++;
@@ -145,10 +145,10 @@ $content=$content.'
 
 $i = 0;
 while ($i < $limitALWest) {
-	$tid = mysql_result($resultALWest,$i,0);
-	$team_name = mysql_result($resultALWest,$i,1);
-	$leagueRecord = mysql_result($resultALWest,$i,2);
-	$divGB = mysql_result($resultALWest,$i,3);
+	$tid = $db->sql_result($resultALWest,$i,0);
+	$team_name = $db->sql_result($resultALWest,$i,1);
+	$leagueRecord = $db->sql_result($resultALWest,$i,2);
+	$divGB = $db->sql_result($resultALWest,$i,3);
 
 	$content=$content.'<tr><td nowrap><a href="modules.php?name=Team&op=team&tid='.$tid.'">'.$team_name.'</a> ('.$leagueRecord.')</td><td>'.$divGB.'</td></tr>';
 	$i++;
@@ -161,10 +161,10 @@ $content=$content.'
 
 $i = 0;
 while ($i < $limitALEast) {
-	$tid = mysql_result($resultALEast,$i,0);
-	$team_name = mysql_result($resultALEast,$i,1);
-	$leagueRecord = mysql_result($resultALEast,$i,2);
-	$divGB = mysql_result($resultALEast,$i,3);
+	$tid = $db->sql_result($resultALEast,$i,0);
+	$team_name = $db->sql_result($resultALEast,$i,1);
+	$leagueRecord = $db->sql_result($resultALEast,$i,2);
+	$divGB = $db->sql_result($resultALEast,$i,3);
 
 	$content=$content.'<tr><td nowrap><a href="modules.php?name=Team&op=team&tid='.$tid.'">'.$team_name.'</a> ('.$leagueRecord.')</td><td>'.$divGB.'</td></tr>';
 	$i++;

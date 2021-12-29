@@ -51,7 +51,9 @@ class Shared
 
     public static function getTidFromTeamname($teamname)
     {
-        $queryTidFromTeamname = $db->sql_query("SELECT teamid
+        global $db;
+
+    	$queryTidFromTeamname = $db->sql_query("SELECT teamid
             FROM nuke_ibl_team_info
             WHERE team_name = '$teamname'
             LIMIT 1;");
@@ -83,9 +85,10 @@ class Shared
         return $db->sql_result($queryAllowTradesStatus, 0);
     }
 
-    public static function displaytopmenu($tid) {
+    public static function displaytopmenu($tid)
+    {
         global $db;
-        
+
     	$queryteam="SELECT * FROM nuke_ibl_team_info WHERE teamid = '$tid' ";
     	$resultteam=$db->sql_query($queryteam);
     	$color1=$db->sql_result($resultteam,0,"color1");

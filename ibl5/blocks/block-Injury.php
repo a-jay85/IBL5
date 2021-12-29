@@ -19,8 +19,8 @@ if (!defined('BLOCK_FILE')) {
 global $prefix, $multilingual, $currentlang, $db;
 
 $queryo = "SELECT * FROM nuke_users WHERE user_ibl_team != '' ORDER BY user_ibl_team ASC";
-$resulto = mysql_query($queryo);
-$numo = mysql_num_rows($resulto);
+$resulto = $db->sql_query($queryo);
+$numo = $db->sql_numrows($resulto);
 
 $content = "<table border=0>
     <tr>
@@ -45,7 +45,7 @@ $content = "<table border=0>
 
 $j = 0;
 while ($j < $numo) {
-	$user_team = mysql_result($resulto, $j, "user_ibl_team");
+	$user_team = $db->sql_result($resulto, $j, "user_ibl_team");
 
 	$sql = "SELECT *
         FROM nuke_iblplyr
@@ -55,8 +55,8 @@ while ($j < $numo) {
         AND droptime = '0'
         AND ordinal < 960
         AND name NOT LIKE '%Buyout%'"; // "ordinal < 960" excludes waived players from this query
-	$result1 = mysql_query($sql);
-	$num1 = mysql_num_rows($result1);
+	$result1 = $db->sql_query($sql);
+	$num1 = $db->sql_numrows($result1);
 
 	$sql2 = "SELECT *
         FROM nuke_iblplyr
@@ -64,8 +64,8 @@ while ($j < $numo) {
         AND retired = '0'
         AND injured > '0'
         AND active = '1'";
-	$result2 = mysql_query($sql2);
-	$num2 = mysql_num_rows($result2);
+	$result2 = $db->sql_query($sql2);
+	$num2 = $db->sql_numrows($result2);
 
 	if ($num2 > 0) {
 		$new_lineups = 'Yes';
@@ -86,8 +86,8 @@ while ($j < $numo) {
 		$waivers_needed = 0;
 	}
 	$sql3 = "SELECT chart FROM nuke_ibl_team_info WHERE team_name = '$user_team'";
-	$result3 = mysql_query($sql3);
-	$chart = mysql_result($result3, 0, "chart");
+	$result3 = $db->sql_query($sql3);
+	$chart = $db->sql_result($result3, 0, "chart");
 
 	if ($waivers_needed > 0 || $new_lineups == 'Yes' && $chart == 0) {
 		$content .= "<tr><td>$user_team</td><td>$healthy</td><td>$waivers_needed</td><td>$new_lineups</td></tr>";

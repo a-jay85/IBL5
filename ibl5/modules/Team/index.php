@@ -38,24 +38,24 @@ if ($Type_Of_Action != NULL)
 {
 
 $queryt="SELECT * FROM nuke_ibl_team_info WHERE team_name = '$Team_Offering' ";
-$resultt=mysql_query($queryt);
+$resultt=$db->sql_query($queryt);
 
-$teamid=mysql_result($resultt,0,"teamid");
+$teamid=$db->sql_result($resultt,0,"teamid");
 
 $Timestamp = intval(time());
 
 // ADD TEAM TOTAL SALARY FOR THIS YEAR
 
 $querysalary="SELECT * FROM nuke_iblplyr WHERE teamname = '$Team_Offering' AND retired = 0 ";
-$results=mysql_query($querysalary);
-$num=mysql_numrows($results);
+$results=$db->sql_query($querysalary);
+$num=$db->sql_numrows($results);
 $z=0;
 
 while($z < $num)
 	{
-		$cy=mysql_result($results,$z,"cy");
+		$cy=$db->sql_result($results,$z,"cy");
 		$cyy = "cy$cy";
-		$cy2=mysql_result($results,$z,"$cyy");
+		$cy2=$db->sql_result($results,$z,"$cyy");
 		$TotalSalary = $TotalSalary + $cy2;
 		$z++;
 	}
@@ -72,9 +72,9 @@ $Salary=$_POST['cy'.$k];
 $Index=$_POST['index'.$k];
 $Check=$_POST['check'.$k];
 $queryn="SELECT * FROM nuke_iblplyr WHERE pid = '$Index' ";
-$resultn=mysql_query($queryn);
-$playername=mysql_result($resultn,0,"name");
-$players_team=mysql_result($resultn,0,"tid");
+$resultn=$db->sql_query($queryn);
+$playername=$db->sql_result($resultn,0,"name");
+$players_team=$db->sql_result($resultn,0,"tid");
 
 if ($Check == "on")
 	{
@@ -88,7 +88,7 @@ if ($Check == "on")
 		} else {
 
 			$queryi = "UPDATE nuke_iblplyr SET `ordinal` = '1000', `droptime` = '$Timestamp' WHERE `pid` = '$Index' LIMIT 1;";
-			$resulti=mysql_query($queryi);
+			$resulti=$db->sql_query($queryi);
 
 			$topicid=32;
 			$storytitle=$Team_Offering." make waiver cuts";
@@ -98,17 +98,17 @@ if ($Check == "on")
 			$timestamp=date('Y-m-d H:i:s',time());
 
 			$querycat="SELECT * FROM nuke_stories_cat WHERE title = 'Waiver Pool Moves'";
-			$resultcat=mysql_query($querycat);
-			$WPMoves=mysql_result($resultcat,0,"counter");
-			$catid=mysql_result($resultcat,0,"catid");
+			$resultcat=$db->sql_query($querycat);
+			$WPMoves=$db->sql_result($resultcat,0,"counter");
+			$catid=$db->sql_result($resultcat,0,"catid");
 
 			$WPMoves=$WPMoves+1;
 
 			$querycat2="UPDATE nuke_stories_cat SET counter = $WPMoves WHERE title = 'Waiver Pool Moves'";
-			$resultcat2=mysql_query($querycat2);
+			$resultcat2=$db->sql_query($querycat2);
 
 			$querystor="INSERT INTO nuke_stories (catid,aid,title,time,hometext,topic,informant,counter,alanguage) VALUES ('$catid','Associated Press','$storytitle','$timestamp','$hometext','$topicid','Associated Press','0','english')";
-			$resultstor=mysql_query($querystor);
+			$resultstor=$db->sql_query($querystor);
 			echo "<html><head><title>Waiver Processing</title>
 			</head>
 			<body>
@@ -121,7 +121,7 @@ if ($Check == "on")
 		if ($players_team == $teamid)
 		{
 			$queryi = "UPDATE nuke_iblplyr SET `ordinal` = '800', `teamname` = '$Team_Offering', `tid` = '$teamid' WHERE `pid` = '$Index' LIMIT 1;";
-			$resulti=mysql_query($queryi);
+			$resulti=$db->sql_query($queryi);
 			$Roster_Slots++;
 
 			$topicid=33;
@@ -133,17 +133,17 @@ if ($Check == "on")
 			$timestamp=date('Y-m-d H:i:s',time());
 
 			$querycat="SELECT * FROM nuke_stories_cat WHERE title = 'Waiver Pool Moves'";
-			$resultcat=mysql_query($querycat);
-			$WPMoves=mysql_result($resultcat,0,"counter");
-			$catid=mysql_result($resultcat,0,"catid");
+			$resultcat=$db->sql_query($querycat);
+			$WPMoves=$db->sql_result($resultcat,0,"counter");
+			$catid=$db->sql_result($resultcat,0,"catid");
 
 			$WPMoves=$WPMoves+1;
 
 			$querycat2="UPDATE nuke_stories_cat SET counter = $WPMoves WHERE title = 'Waiver Pool Moves'";
-			$resultcat2=mysql_query($querycat2);
+			$resultcat2=$db->sql_query($querycat2);
 
 			$querystor="INSERT INTO nuke_stories (catid,aid,title,time,hometext,topic,informant,counter,alanguage) VALUES ('$catid','Associated Press','$storytitle','$timestamp','$hometext','$topicid','Associated Press','0','english')";
-			$resultstor=mysql_query($querystor);
+			$resultstor=$db->sql_query($querystor);
 			echo "<html><head><title>Waiver Processing</title>
 			</head>
 			<body>
@@ -167,7 +167,7 @@ if ($Check == "on")
 			} else {
 
 				$queryi = "UPDATE nuke_iblplyr SET `ordinal` = '800', `cy` = '1', `cy1` = '$Salary', `teamname` = '$Team_Offering', `tid` = '$teamid' WHERE `pid` = '$Index' LIMIT 1;";
-				$resulti=mysql_query($queryi);
+				$resulti=$db->sql_query($queryi);
 				$Roster_Slots++;
 
 				$topicid=33;
@@ -179,17 +179,17 @@ if ($Check == "on")
 				$timestamp=date('Y-m-d H:i:s',time());
 
 				$querycat="SELECT * FROM nuke_stories_cat WHERE title = 'Waiver Pool Moves'";
-				$resultcat=mysql_query($querycat);
-				$WPMoves=mysql_result($resultcat,0,"counter");
-				$catid=mysql_result($resultcat,0,"catid");
+				$resultcat=$db->sql_query($querycat);
+				$WPMoves=$db->sql_result($resultcat,0,"counter");
+				$catid=$db->sql_result($resultcat,0,"catid");
 
 				$WPMoves=$WPMoves+1;
 
 				$querycat2="UPDATE nuke_stories_cat SET counter = $WPMoves WHERE title = 'Waiver Pool Moves'";
-				$resultcat2=mysql_query($querycat2);
+				$resultcat2=$db->sql_query($querycat2);
 
 				$querystor="INSERT INTO nuke_stories (catid,aid,title,time,hometext,topic,informant,counter,alanguage) VALUES ('$catid','Associated Press','$storytitle','$timestamp','$hometext','$topicid','Associated Press','0','english')";
-				$resultstor=mysql_query($querystor);
+				$resultstor=$db->sql_query($querystor);
 			echo "<html><head><title>Waiver Processing</title>
 				</head>
 				<body>
@@ -252,32 +252,34 @@ function drafthistory($tid)
 
 function leaguestats()
 {
+	global $db;
+
 	include("header.php");
 	OpenTable();
 
 	$queryteam="SELECT * FROM nuke_ibl_team_info";
-	$resultteam=mysql_query($queryteam);
-	$numteams=mysql_num_rows($resultteam);
+	$resultteam=$db->sql_query($queryteam);
+	$numteams=$db->sql_numrows($resultteam);
 
 	$n=0;
 	while ($n < $numteams) {
-		$teamid[$n]=mysql_result($resultteam,$n,"teamid");
-		$team_city[$n]=mysql_result($resultteam,$n,"team_city");
-		$team_name[$n]=mysql_result($resultteam,$n,"team_name");
-		$coach_pts[$n]=mysql_result($resultteam,$n,"Contract_Coach");
-		$color1[$n]=mysql_result($resultteam,$n,"color1");
-		$color2[$n]=mysql_result($resultteam,$n,"color2");
+		$teamid[$n]=$db->sql_result($resultteam,$n,"teamid");
+		$team_city[$n]=$db->sql_result($resultteam,$n,"team_city");
+		$team_name[$n]=$db->sql_result($resultteam,$n,"team_name");
+		$coach_pts[$n]=$db->sql_result($resultteam,$n,"Contract_Coach");
+		$color1[$n]=$db->sql_result($resultteam,$n,"color1");
+		$color2[$n]=$db->sql_result($resultteam,$n,"color2");
 		$n++;
 	}
 
 	$queryTeamOffenseTotals="SELECT * FROM ibl_team_offense_stats ORDER BY team ASC";
-	$resultTeamOffenseTotals=mysql_query($queryTeamOffenseTotals);
-	$numTeamOffenseTotals=mysql_numrows($resultTeamOffenseTotals);
+	$resultTeamOffenseTotals=$db->sql_query($queryTeamOffenseTotals);
+	$numTeamOffenseTotals=$db->sql_numrows($resultTeamOffenseTotals);
 
 	$t=0;
 
 	while ($t < $numTeamOffenseTotals) {
-		$team_off_name=mysql_result($resultTeamOffenseTotals,$t,"team");
+		$team_off_name=$db->sql_result($resultTeamOffenseTotals,$t,"team");
 		$m=0;
 		while ($m < $n) {
 			if ($team_off_name == $team_name[$m]) {
@@ -289,21 +291,21 @@ function leaguestats()
 			$m++;
 		}
 
-		$team_off_games=mysql_result($resultTeamOffenseTotals,$t,"games");
-		$team_off_minutes=mysql_result($resultTeamOffenseTotals,$t,"minutes");
-		$team_off_fgm=mysql_result($resultTeamOffenseTotals,$t,"fgm");
-		$team_off_fga=mysql_result($resultTeamOffenseTotals,$t,"fga");
-		$team_off_ftm=mysql_result($resultTeamOffenseTotals,$t,"ftm");
-		$team_off_fta=mysql_result($resultTeamOffenseTotals,$t,"fta");
-		$team_off_tgm=mysql_result($resultTeamOffenseTotals,$t,"tgm");
-		$team_off_tga=mysql_result($resultTeamOffenseTotals,$t,"tga");
-		$team_off_orb=mysql_result($resultTeamOffenseTotals,$t,"orb");
-		$team_off_reb=mysql_result($resultTeamOffenseTotals,$t,"reb");
-		$team_off_ast=mysql_result($resultTeamOffenseTotals,$t,"ast");
-		$team_off_stl=mysql_result($resultTeamOffenseTotals,$t,"stl");
-		$team_off_tvr=mysql_result($resultTeamOffenseTotals,$t,"tvr");
-		$team_off_blk=mysql_result($resultTeamOffenseTotals,$t,"blk");
-		$team_off_pf=mysql_result($resultTeamOffenseTotals,$t,"pf");
+		$team_off_games=$db->sql_result($resultTeamOffenseTotals,$t,"games");
+		$team_off_minutes=$db->sql_result($resultTeamOffenseTotals,$t,"minutes");
+		$team_off_fgm=$db->sql_result($resultTeamOffenseTotals,$t,"fgm");
+		$team_off_fga=$db->sql_result($resultTeamOffenseTotals,$t,"fga");
+		$team_off_ftm=$db->sql_result($resultTeamOffenseTotals,$t,"ftm");
+		$team_off_fta=$db->sql_result($resultTeamOffenseTotals,$t,"fta");
+		$team_off_tgm=$db->sql_result($resultTeamOffenseTotals,$t,"tgm");
+		$team_off_tga=$db->sql_result($resultTeamOffenseTotals,$t,"tga");
+		$team_off_orb=$db->sql_result($resultTeamOffenseTotals,$t,"orb");
+		$team_off_reb=$db->sql_result($resultTeamOffenseTotals,$t,"reb");
+		$team_off_ast=$db->sql_result($resultTeamOffenseTotals,$t,"ast");
+		$team_off_stl=$db->sql_result($resultTeamOffenseTotals,$t,"stl");
+		$team_off_tvr=$db->sql_result($resultTeamOffenseTotals,$t,"tvr");
+		$team_off_blk=$db->sql_result($resultTeamOffenseTotals,$t,"blk");
+		$team_off_pf=$db->sql_result($resultTeamOffenseTotals,$t,"pf");
 		$team_off_pts=$team_off_fgm+$team_off_fgm+$team_off_ftm+$team_off_tgm;
 
 		@$team_off_avgfgm=number_format($team_off_fgm/$team_off_games,2);
@@ -385,14 +387,14 @@ function leaguestats()
 	}
 
 	$queryTeamDefenseTotals="SELECT * FROM ibl_team_defense_stats ORDER BY team ASC";
-	$resultTeamDefenseTotals=mysql_query($queryTeamDefenseTotals);
-	$numTeamDefenseTotals=mysql_numrows($resultTeamDefenseTotals);
+	$resultTeamDefenseTotals=$db->sql_query($queryTeamDefenseTotals);
+	$numTeamDefenseTotals=$db->sql_numrows($resultTeamDefenseTotals);
 
 	$t=0;
 
 	while ($t < $numTeamDefenseTotals) {
 
-		$team_def_name=mysql_result($resultTeamDefenseTotals,$t,"team");
+		$team_def_name=$db->sql_result($resultTeamDefenseTotals,$t,"team");
 		$m=0;
 		while ($m < $n) {
 			if ($team_def_name == $team_name[$m]) {
@@ -404,21 +406,21 @@ function leaguestats()
 			$m++;
 		}
 
-		$team_def_games=mysql_result($resultTeamDefenseTotals,$t,"games");
-		$team_def_minutes=mysql_result($resultTeamDefenseTotals,$t,"minutes");
-		$team_def_fgm=mysql_result($resultTeamDefenseTotals,$t,"fgm");
-		$team_def_fga=mysql_result($resultTeamDefenseTotals,$t,"fga");
-		$team_def_ftm=mysql_result($resultTeamDefenseTotals,$t,"ftm");
-		$team_def_fta=mysql_result($resultTeamDefenseTotals,$t,"fta");
-		$team_def_tgm=mysql_result($resultTeamDefenseTotals,$t,"tgm");
-		$team_def_tga=mysql_result($resultTeamDefenseTotals,$t,"tga");
-		$team_def_orb=mysql_result($resultTeamDefenseTotals,$t,"orb");
-		$team_def_reb=mysql_result($resultTeamDefenseTotals,$t,"reb");
-		$team_def_ast=mysql_result($resultTeamDefenseTotals,$t,"ast");
-		$team_def_stl=mysql_result($resultTeamDefenseTotals,$t,"stl");
-		$team_def_tvr=mysql_result($resultTeamDefenseTotals,$t,"tvr");
-		$team_def_blk=mysql_result($resultTeamDefenseTotals,$t,"blk");
-		$team_def_pf=mysql_result($resultTeamDefenseTotals,$t,"pf");
+		$team_def_games=$db->sql_result($resultTeamDefenseTotals,$t,"games");
+		$team_def_minutes=$db->sql_result($resultTeamDefenseTotals,$t,"minutes");
+		$team_def_fgm=$db->sql_result($resultTeamDefenseTotals,$t,"fgm");
+		$team_def_fga=$db->sql_result($resultTeamDefenseTotals,$t,"fga");
+		$team_def_ftm=$db->sql_result($resultTeamDefenseTotals,$t,"ftm");
+		$team_def_fta=$db->sql_result($resultTeamDefenseTotals,$t,"fta");
+		$team_def_tgm=$db->sql_result($resultTeamDefenseTotals,$t,"tgm");
+		$team_def_tga=$db->sql_result($resultTeamDefenseTotals,$t,"tga");
+		$team_def_orb=$db->sql_result($resultTeamDefenseTotals,$t,"orb");
+		$team_def_reb=$db->sql_result($resultTeamDefenseTotals,$t,"reb");
+		$team_def_ast=$db->sql_result($resultTeamDefenseTotals,$t,"ast");
+		$team_def_stl=$db->sql_result($resultTeamDefenseTotals,$t,"stl");
+		$team_def_tvr=$db->sql_result($resultTeamDefenseTotals,$t,"tvr");
+		$team_def_blk=$db->sql_result($resultTeamDefenseTotals,$t,"blk");
+		$team_def_pf=$db->sql_result($resultTeamDefenseTotals,$t,"pf");
 		$team_def_pts=$team_def_fgm+$team_def_fgm+$team_def_ftm+$team_def_tgm;
 
 		@$team_def_avgfgm=number_format($team_def_fgm/$team_def_games,2);
@@ -578,28 +580,29 @@ function leaguestats()
 function schedule($tid)
 {
 	global $db;
+
 	$tid = intval($tid);
 	include("header.php");
 	OpenTable();
-//============================
-// GRAB TEAM COLORS, ET AL
-//============================
+	//============================
+	// GRAB TEAM COLORS, ET AL
+	//============================
 	$queryteam = "SELECT * FROM nuke_ibl_team_info WHERE teamid = '$tid';";
-	$resultteam = mysql_query($queryteam);
-	$teamid = mysql_result($resultteam, 0, "teamid");
-	$team_city = mysql_result($resultteam, 0, "team_city");
-	$team_name = mysql_result($resultteam, 0, "team_name");
-	$coach_pts = mysql_result($resultteam, 0, "Contract_Coach");
-	$color1 = mysql_result($resultteam, 0, "color1");
-	$color2 = mysql_result($resultteam, 0, "color2");
-//=============================
-//DISPLAY TOP MENU
-//=============================
+	$resultteam = $db->sql_query($queryteam);
+	$teamid = $db->sql_result($resultteam, 0, "teamid");
+	$team_city = $db->sql_result($resultteam, 0, "team_city");
+	$team_name = $db->sql_result($resultteam, 0, "team_name");
+	$coach_pts = $db->sql_result($resultteam, 0, "Contract_Coach");
+	$color1 = $db->sql_result($resultteam, 0, "color1");
+	$color2 = $db->sql_result($resultteam, 0, "color2");
+	//=============================
+	//DISPLAY TOP MENU
+	//=============================
 	Shared::displaytopmenu($tid);
 	$query = "SELECT * FROM `ibl_schedule` WHERE Visitor = $tid OR Home = $tid ORDER BY Date ASC;";
-	$result = mysql_query($query);
-	$num = mysql_numrows($result);
-	$year = mysql_result($result, 0, "Year");
+	$result = $db->sql_query($query);
+	$num = $db->sql_numrows($result);
+	$year = $db->sql_result($result, 0, "Year");
 	$year1 = $year + 1;
 	$wins = 0;
 	$losses = 0;
@@ -640,17 +643,19 @@ function schedule($tid)
 
 function boxscore($year, $month, $tid, $wins, $losses, $winStreak, $lossStreak)
 {
+	global $db;
+
 	$query = "SELECT *
 		FROM `ibl_schedule`
 		WHERE (Visitor = $tid AND Date BETWEEN '$year-$month-01' AND '$year-$month-31')
 			OR (Home = $tid AND Date BETWEEN '$year-$month-01' AND '$year-$month-31')
 		ORDER BY Date ASC";
-	$result = mysql_query($query);
-	$num = mysql_numrows($result);
+	$result = $db->sql_query($query);
+	$num = $db->sql_numrows($result);
 	$i = 0;
 
 	$teamSeasonRecordsQuery = "SELECT tid, leagueRecord FROM ibl_standings ORDER BY tid ASC;";
-	$teamSeasonRecordsResult = mysql_query($teamSeasonRecordsQuery);
+	$teamSeasonRecordsResult = $db->sql_query($teamSeasonRecordsQuery);
 
 	$arrayLastSimDates = Shared::getLastSimDatesArray();
 	$lastSimStartDate = date_create($arrayLastSimDates["Start Date"]);
@@ -665,17 +670,17 @@ function boxscore($year, $month, $tid, $wins, $losses, $winStreak, $lossStreak)
 	}
 
 	while ($i < $num) {
-		$date = mysql_result($result, $i, "Date");
-		$visitor = mysql_result($result, $i, "Visitor");
-		$visitorScore = mysql_result($result, $i, "VScore");
-		$home = mysql_result($result, $i, "Home");
-		$homeScore = mysql_result($result, $i, "HScore");
-		$boxID = mysql_result($result, $i, "BoxID");
+		$date = $db->sql_result($result, $i, "Date");
+		$visitor = $db->sql_result($result, $i, "Visitor");
+		$visitorScore = $db->sql_result($result, $i, "VScore");
+		$home = $db->sql_result($result, $i, "Home");
+		$homeScore = $db->sql_result($result, $i, "HScore");
+		$boxID = $db->sql_result($result, $i, "BoxID");
 
 		$visitorTeamname = Shared::getTeamnameFromTid($visitor);
 		$homeTeamname = Shared::getTeamnameFromTid($home);
-		$visitorRecord = mysql_result($teamSeasonRecordsResult, $visitor-1, "leagueRecord");
-		$homeRecord = mysql_result($teamSeasonRecordsResult, $home-1, "leagueRecord");
+		$visitorRecord = $db->sql_result($teamSeasonRecordsResult, $visitor-1, "leagueRecord");
+		$homeRecord = $db->sql_result($teamSeasonRecordsResult, $home-1, "leagueRecord");
 
 		if ($visitorScore == $homeScore) {
 			if (date_create($date) <= $projectedNextSimEndDate) {
@@ -766,19 +771,19 @@ function finances($tid)
 	$yr = $_REQUEST['yr'];
 
 	$queryteam="SELECT * FROM nuke_ibl_team_info WHERE teamid = '$tid' ";
-	$resultteam=mysql_query($queryteam);
+	$resultteam=$db->sql_query($queryteam);
 
-	$teamid=mysql_result($resultteam,0,"teamid");
-	$team_city=mysql_result($resultteam,0,"team_city");
-	$team_name=mysql_result($resultteam,0,"team_name");
-	$coach_pts=mysql_result($resultteam,0,"Contract_Coach");
-	$color1=mysql_result($resultteam,0,"color1");
-	$color2=mysql_result($resultteam,0,"color2");
-	$owner_name=mysql_result($resultteam,0,"owner_name");
-	$owner_email=mysql_result($resultteam,0,"owner_email");
-	$icq=mysql_result($resultteam,0,"icq");
-	$aim=mysql_result($resultteam,0,"aim");
-	$msn=mysql_result($resultteam,0,"msn");
+	$teamid=$db->sql_result($resultteam,0,"teamid");
+	$team_city=$db->sql_result($resultteam,0,"team_city");
+	$team_name=$db->sql_result($resultteam,0,"team_name");
+	$coach_pts=$db->sql_result($resultteam,0,"Contract_Coach");
+	$color1=$db->sql_result($resultteam,0,"color1");
+	$color2=$db->sql_result($resultteam,0,"color2");
+	$owner_name=$db->sql_result($resultteam,0,"owner_name");
+	$owner_email=$db->sql_result($resultteam,0,"owner_email");
+	$icq=$db->sql_result($resultteam,0,"icq");
+	$aim=$db->sql_result($resultteam,0,"aim");
+	$msn=$db->sql_result($resultteam,0,"msn");
 
 	include("teamcap.php");
 	include("header.php");
@@ -808,6 +813,7 @@ function finances($tid)
 function team($tid)
 {
 	global $db;
+
 	$tid = intval($tid);
 
 	$yr = $_REQUEST['yr'];
@@ -824,20 +830,20 @@ function team($tid)
 	//============================
 
 	$queryteam="SELECT * FROM nuke_ibl_team_info WHERE teamid = '$tid' ";
-	$resultteam=mysql_query($queryteam);
+	$resultteam=$db->sql_query($queryteam);
 
-	$teamid=mysql_result($resultteam,0,"teamid");
-	$team_city=mysql_result($resultteam,0,"team_city");
-	$team_name=mysql_result($resultteam,0,"team_name");
-	$coach_pts=mysql_result($resultteam,0,"Contract_Coach");
-	$color1=mysql_result($resultteam,0,"color1");
-	$color2=mysql_result($resultteam,0,"color2");
-	$owner_name=mysql_result($resultteam,0,"owner_name");
-	$owner_email=mysql_result($resultteam,0,"owner_email");
-	$icq=mysql_result($resultteam,0,"icq");
-	$aim=mysql_result($resultteam,0,"aim");
-	$msn=mysql_result($resultteam,0,"msn");
-	$Extension=mysql_result($resultteam,0,"Used_Extension_This_Season");
+	$teamid=$db->sql_result($resultteam,0,"teamid");
+	$team_city=$db->sql_result($resultteam,0,"team_city");
+	$team_name=$db->sql_result($resultteam,0,"team_name");
+	$coach_pts=$db->sql_result($resultteam,0,"Contract_Coach");
+	$color1=$db->sql_result($resultteam,0,"color1");
+	$color2=$db->sql_result($resultteam,0,"color2");
+	$owner_name=$db->sql_result($resultteam,0,"owner_name");
+	$owner_email=$db->sql_result($resultteam,0,"owner_email");
+	$icq=$db->sql_result($resultteam,0,"icq");
+	$aim=$db->sql_result($resultteam,0,"aim");
+	$msn=$db->sql_result($resultteam,0,"msn");
+	$Extension=$db->sql_result($resultteam,0,"Used_Extension_This_Season");
 
 	if ($Extension == 0) {
 		$Extension_Text="contract extension still available";
@@ -856,24 +862,24 @@ function team($tid)
 	//=============================
 
 	$queryfaon="SELECT * FROM nuke_modules WHERE mid = '83' ORDER BY title ASC"; // THIS CHECKS IF FA IS ACTIVE AND HIDES FA PLAYERS IF IT IS
-	$resultfaon=mysql_query($queryfaon);
-	$numfaon=mysql_numrows($resultfaon);
-	$faon=mysql_result($resultfaon,0,"active");
+	$resultfaon=$db->sql_query($queryfaon);
+	$numfaon=$db->sql_numrows($resultfaon);
+	$faon=$db->sql_result($resultfaon,0,"active");
 
 	if ($tid == 0) { // Team 0 is the Free Agents; we want a query that will pick up all of their players.
 		if ($faon==0) {
 			$query="SELECT * FROM nuke_iblplyr WHERE ordinal > '959' AND retired = 0 ORDER BY ordinal ASC";
-//			$query="SELECT * FROM nuke_iblplyr WHERE tid = 0 AND retired = 0 ORDER BY ordinal ASC";
+			//			$query="SELECT * FROM nuke_iblplyr WHERE tid = 0 AND retired = 0 ORDER BY ordinal ASC";
 		} else {
 			$query="SELECT * FROM nuke_iblplyr WHERE ordinal > '959' AND retired = 0 AND cyt != cy ORDER BY ordinal ASC";
-//			$query="SELECT * FROM nuke_iblplyr WHERE tid = 0 AND retired = 0 AND cyt != cy ORDER BY ordinal ASC";
+			//			$query="SELECT * FROM nuke_iblplyr WHERE tid = 0 AND retired = 0 AND cyt != cy ORDER BY ordinal ASC";
 		}
-		$result=mysql_query($query);
-		$num=mysql_numrows($result);
+		$result=$db->sql_query($query);
+		$num=$db->sql_numrows($result);
 	} else if ($tid == "-1") { // SHOW ENTIRE LEAGUE
 		$query="SELECT * FROM nuke_iblplyr WHERE retired = 0 AND name NOT LIKE '%Buyouts' ORDER BY ordinal ASC";
-		$result=mysql_query($query);
-		$num=mysql_numrows($result);
+		$result=$db->sql_query($query);
+		$num=$db->sql_numrows($result);
 	} else { // If not Free Agents, use the code below instead.
 		if ($yr != "") {
 			$query="SELECT * FROM nuke_iblhist WHERE teamid = '$tid' AND year = '$yr' ORDER BY name ASC";
@@ -882,8 +888,8 @@ function team($tid)
 		} else {
 			$query="SELECT * FROM nuke_iblplyr WHERE tid = '$tid' AND retired = 0 AND cyt != cy ORDER BY name ASC";
 		}
-		$result=mysql_query($query);
-		$num=mysql_numrows($result);
+		$result=$db->sql_query($query);
+		$num=$db->sql_numrows($result);
 	}
 
 	echo "<table><tr><td align=center valign=top><img src=\"./images/logo/$tid.jpg\">";
@@ -905,25 +911,25 @@ function team($tid)
 	$s=0;
 
 	while ($s < $num) {
-		if (mysql_result($result,$s,"PGDepth")==1) {
-			$startingPG=mysql_result($result,$s,"name");
-			$startingPGpid=mysql_result($result,$s,"pid");
+		if ($db->sql_result($result,$s,"PGDepth")==1) {
+			$startingPG=$db->sql_result($result,$s,"name");
+			$startingPGpid=$db->sql_result($result,$s,"pid");
 		}
-		if (mysql_result($result,$s,"SGDepth") == 1) {
-			$startingSG=mysql_result($result,$s,"name");
-			$startingSGpid=mysql_result($result,$s,"pid");
+		if ($db->sql_result($result,$s,"SGDepth") == 1) {
+			$startingSG=$db->sql_result($result,$s,"name");
+			$startingSGpid=$db->sql_result($result,$s,"pid");
 		}
-		if (mysql_result($result,$s,"SFDepth") == 1) {
-			$startingSF=mysql_result($result,$s,"name");
-			$startingSFpid=mysql_result($result,$s,"pid");
+		if ($db->sql_result($result,$s,"SFDepth") == 1) {
+			$startingSF=$db->sql_result($result,$s,"name");
+			$startingSFpid=$db->sql_result($result,$s,"pid");
 		}
-		if (mysql_result($result,$s,"PFDepth") == 1) {
-			$startingPF=mysql_result($result,$s,"name");
-			$startingPFpid=mysql_result($result,$s,"pid");
+		if ($db->sql_result($result,$s,"PFDepth") == 1) {
+			$startingPF=$db->sql_result($result,$s,"name");
+			$startingPFpid=$db->sql_result($result,$s,"pid");
 		}
-		if (mysql_result($result,$s,"CDepth") == 1) {
-			$startingC=mysql_result($result,$s,"name");
-			$startingCpid=mysql_result($result,$s,"pid");
+		if ($db->sql_result($result,$s,"CDepth") == 1) {
+			$startingC=$db->sql_result($result,$s,"name");
+			$startingCpid=$db->sql_result($result,$s,"pid");
 		}
 		$s++;
 	}
@@ -986,68 +992,68 @@ function team($tid)
 
 	while ($i < $num) {
 		if ($yr == "") {
-			$name=mysql_result($result,$i,"name");
-			$team=mysql_result($result,$i,"teamname");
-			$pid=mysql_result($result,$i,"pid");
-			$pos=mysql_result($result,$i,"pos");
-			$p_ord=mysql_result($result,$i,"ordinal");
-			$age=mysql_result($result,$i,"age");
-			$inj=mysql_result($result,$i,"injured");
+			$name=$db->sql_result($result,$i,"name");
+			$team=$db->sql_result($result,$i,"teamname");
+			$pid=$db->sql_result($result,$i,"pid");
+			$pos=$db->sql_result($result,$i,"pos");
+			$p_ord=$db->sql_result($result,$i,"ordinal");
+			$age=$db->sql_result($result,$i,"age");
+			$inj=$db->sql_result($result,$i,"injured");
 
-			$r_2ga=mysql_result($result,$i,"r_fga");
-			$r_2gp=mysql_result($result,$i,"r_fgp");
-			$r_fta=mysql_result($result,$i,"r_fta");
-			$r_ftp=mysql_result($result,$i,"r_ftp");
-			$r_3ga=mysql_result($result,$i,"r_tga");
-			$r_3gp=mysql_result($result,$i,"r_tgp");
-			$r_orb=mysql_result($result,$i,"r_orb");
-			$r_drb=mysql_result($result,$i,"r_drb");
-			$r_ast=mysql_result($result,$i,"r_ast");
-			$r_stl=mysql_result($result,$i,"r_stl");
-			$r_blk=mysql_result($result,$i,"r_blk");
-			$r_tvr=mysql_result($result,$i,"r_to");
-			$r_foul=mysql_result($result,$i,"r_foul");
-			$r_oo=mysql_result($result,$i,"oo");
-			$r_do=mysql_result($result,$i,"do");
-			$r_po=mysql_result($result,$i,"po");
-			$r_to=mysql_result($result,$i,"to");
-			$r_od=mysql_result($result,$i,"od");
-			$r_dd=mysql_result($result,$i,"dd");
-			$r_pd=mysql_result($result,$i,"pd");
-			$r_td=mysql_result($result,$i,"td");
-			$r_bird=mysql_result($result,$i,"bird");
+			$r_2ga=$db->sql_result($result,$i,"r_fga");
+			$r_2gp=$db->sql_result($result,$i,"r_fgp");
+			$r_fta=$db->sql_result($result,$i,"r_fta");
+			$r_ftp=$db->sql_result($result,$i,"r_ftp");
+			$r_3ga=$db->sql_result($result,$i,"r_tga");
+			$r_3gp=$db->sql_result($result,$i,"r_tgp");
+			$r_orb=$db->sql_result($result,$i,"r_orb");
+			$r_drb=$db->sql_result($result,$i,"r_drb");
+			$r_ast=$db->sql_result($result,$i,"r_ast");
+			$r_stl=$db->sql_result($result,$i,"r_stl");
+			$r_blk=$db->sql_result($result,$i,"r_blk");
+			$r_tvr=$db->sql_result($result,$i,"r_to");
+			$r_foul=$db->sql_result($result,$i,"r_foul");
+			$r_oo=$db->sql_result($result,$i,"oo");
+			$r_do=$db->sql_result($result,$i,"do");
+			$r_po=$db->sql_result($result,$i,"po");
+			$r_to=$db->sql_result($result,$i,"to");
+			$r_od=$db->sql_result($result,$i,"od");
+			$r_dd=$db->sql_result($result,$i,"dd");
+			$r_pd=$db->sql_result($result,$i,"pd");
+			$r_td=$db->sql_result($result,$i,"td");
+			$r_bird=$db->sql_result($result,$i,"bird");
 
-			$draftyear=mysql_result($result,$i,"draftyear");
-			$exp=mysql_result($result,$i,"exp");
-			$cy=mysql_result($result,$i,"cy");
-			$cyt=mysql_result($result,$i,"cyt");
+			$draftyear=$db->sql_result($result,$i,"draftyear");
+			$exp=$db->sql_result($result,$i,"exp");
+			$cy=$db->sql_result($result,$i,"cy");
+			$cyt=$db->sql_result($result,$i,"cyt");
 
 			$yearoffreeagency=$draftyear+$exp+$cyt-$cy;
 		} else {
-			$name=mysql_result($result,$i,"name");
-			$team=mysql_result($result,$i,"team");
-			$pid=mysql_result($result,$i,"pid");
+			$name=$db->sql_result($result,$i,"name");
+			$team=$db->sql_result($result,$i,"team");
+			$pid=$db->sql_result($result,$i,"pid");
 
-			$r_2ga=mysql_result($result,$i,"r_2ga");
-			$r_2gp=mysql_result($result,$i,"r_2gp");
-			$r_fta=mysql_result($result,$i,"r_fta");
-			$r_ftp=mysql_result($result,$i,"r_ftp");
-			$r_3ga=mysql_result($result,$i,"r_3ga");
-			$r_3gp=mysql_result($result,$i,"r_3gp");
-			$r_orb=mysql_result($result,$i,"r_orb");
-			$r_drb=mysql_result($result,$i,"r_drb");
-			$r_ast=mysql_result($result,$i,"r_ast");
-			$r_stl=mysql_result($result,$i,"r_stl");
-			$r_blk=mysql_result($result,$i,"r_blk");
-			$r_tvr=mysql_result($result,$i,"r_tvr");
-			$r_oo=mysql_result($result,$i,"r_oo");
-			$r_do=mysql_result($result,$i,"r_do");
-			$r_po=mysql_result($result,$i,"r_po");
-			$r_to=mysql_result($result,$i,"r_to");
-			$r_od=mysql_result($result,$i,"r_od");
-			$r_dd=mysql_result($result,$i,"r_dd");
-			$r_pd=mysql_result($result,$i,"r_pd");
-			$r_td=mysql_result($result,$i,"r_td");
+			$r_2ga=$db->sql_result($result,$i,"r_2ga");
+			$r_2gp=$db->sql_result($result,$i,"r_2gp");
+			$r_fta=$db->sql_result($result,$i,"r_fta");
+			$r_ftp=$db->sql_result($result,$i,"r_ftp");
+			$r_3ga=$db->sql_result($result,$i,"r_3ga");
+			$r_3gp=$db->sql_result($result,$i,"r_3gp");
+			$r_orb=$db->sql_result($result,$i,"r_orb");
+			$r_drb=$db->sql_result($result,$i,"r_drb");
+			$r_ast=$db->sql_result($result,$i,"r_ast");
+			$r_stl=$db->sql_result($result,$i,"r_stl");
+			$r_blk=$db->sql_result($result,$i,"r_blk");
+			$r_tvr=$db->sql_result($result,$i,"r_tvr");
+			$r_oo=$db->sql_result($result,$i,"r_oo");
+			$r_do=$db->sql_result($result,$i,"r_do");
+			$r_po=$db->sql_result($result,$i,"r_po");
+			$r_to=$db->sql_result($result,$i,"r_to");
+			$r_od=$db->sql_result($result,$i,"r_od");
+			$r_dd=$db->sql_result($result,$i,"r_dd");
+			$r_pd=$db->sql_result($result,$i,"r_pd");
+			$r_td=$db->sql_result($result,$i,"r_td");
 		}
 
 		(($i % 2)==0) ? $bgcolor="FFFFFF" : $bgcolor="EEEEEE";
@@ -1127,53 +1133,53 @@ function team($tid)
 		/* =======================STATS */
 
 		while ($i < $num) {
-			$name=mysql_result($result,$i,"name");
-			$pos=mysql_result($result,$i,"pos");
-			$p_ord=mysql_result($result,$i,"ordinal");
-			$pid=mysql_result($result,$i,"pid");
+			$name=$db->sql_result($result,$i,"name");
+			$pos=$db->sql_result($result,$i,"pos");
+			$p_ord=$db->sql_result($result,$i,"ordinal");
+			$pid=$db->sql_result($result,$i,"pid");
 
-			$draftyear=mysql_result($result,$i,"draftyear");
-			$exp=mysql_result($result,$i,"exp");
-			$cy=mysql_result($result,$i,"cy");
-			$cyt=mysql_result($result,$i,"cyt");
+			$draftyear=$db->sql_result($result,$i,"draftyear");
+			$exp=$db->sql_result($result,$i,"exp");
+			$cy=$db->sql_result($result,$i,"cy");
+			$cyt=$db->sql_result($result,$i,"cyt");
 
 			$yearoffreeagency=$draftyear+$exp+$cyt-$cy;
 
 			if ($yr == "") {
-				$stats_gm=mysql_result($result,$i,"stats_gm");
-				$stats_gs=mysql_result($result,$i,"stats_gs");
-				$stats_min=mysql_result($result,$i,"stats_min");
-				$stats_fgm=mysql_result($result,$i,"stats_fgm");
-				$stats_fga=mysql_result($result,$i,"stats_fga");
-				$stats_ftm=mysql_result($result,$i,"stats_ftm");
-				$stats_fta=mysql_result($result,$i,"stats_fta");
-				$stats_tgm=mysql_result($result,$i,"stats_3gm");
-				$stats_tga=mysql_result($result,$i,"stats_3ga");
-				$stats_orb=mysql_result($result,$i,"stats_orb");
-				$stats_drb=mysql_result($result,$i,"stats_drb");
-				$stats_ast=mysql_result($result,$i,"stats_ast");
-				$stats_stl=mysql_result($result,$i,"stats_stl");
-				$stats_to=mysql_result($result,$i,"stats_to");
-				$stats_blk=mysql_result($result,$i,"stats_blk");
-				$stats_pf=mysql_result($result,$i,"stats_pf");
+				$stats_gm=$db->sql_result($result,$i,"stats_gm");
+				$stats_gs=$db->sql_result($result,$i,"stats_gs");
+				$stats_min=$db->sql_result($result,$i,"stats_min");
+				$stats_fgm=$db->sql_result($result,$i,"stats_fgm");
+				$stats_fga=$db->sql_result($result,$i,"stats_fga");
+				$stats_ftm=$db->sql_result($result,$i,"stats_ftm");
+				$stats_fta=$db->sql_result($result,$i,"stats_fta");
+				$stats_tgm=$db->sql_result($result,$i,"stats_3gm");
+				$stats_tga=$db->sql_result($result,$i,"stats_3ga");
+				$stats_orb=$db->sql_result($result,$i,"stats_orb");
+				$stats_drb=$db->sql_result($result,$i,"stats_drb");
+				$stats_ast=$db->sql_result($result,$i,"stats_ast");
+				$stats_stl=$db->sql_result($result,$i,"stats_stl");
+				$stats_to=$db->sql_result($result,$i,"stats_to");
+				$stats_blk=$db->sql_result($result,$i,"stats_blk");
+				$stats_pf=$db->sql_result($result,$i,"stats_pf");
 				$stats_reb=$stats_orb+$stats_drb;
 				$stats_pts=2*$stats_fgm+$stats_ftm+$stats_tgm;
 			} else {
-				$stats_gm=mysql_result($result,$i,"gm");
-				$stats_min=mysql_result($result,$i,"min");
-				$stats_fgm=mysql_result($result,$i,"fgm");
-				$stats_fga=mysql_result($result,$i,"fga");
-				$stats_ftm=mysql_result($result,$i,"ftm");
-				$stats_fta=mysql_result($result,$i,"fta");
-				$stats_tgm=mysql_result($result,$i,"3gm");
-				$stats_tga=mysql_result($result,$i,"3ga");
-				$stats_orb=mysql_result($result,$i,"orb");
-				$stats_ast=mysql_result($result,$i,"ast");
-				$stats_stl=mysql_result($result,$i,"stl");
-				$stats_to=mysql_result($result,$i,"tvr");
-				$stats_blk=mysql_result($result,$i,"blk");
-				$stats_pf=mysql_result($result,$i,"pf");
-				$stats_reb=mysql_result($result,$i,"reb");
+				$stats_gm=$db->sql_result($result,$i,"gm");
+				$stats_min=$db->sql_result($result,$i,"min");
+				$stats_fgm=$db->sql_result($result,$i,"fgm");
+				$stats_fga=$db->sql_result($result,$i,"fga");
+				$stats_ftm=$db->sql_result($result,$i,"ftm");
+				$stats_fta=$db->sql_result($result,$i,"fta");
+				$stats_tgm=$db->sql_result($result,$i,"3gm");
+				$stats_tga=$db->sql_result($result,$i,"3ga");
+				$stats_orb=$db->sql_result($result,$i,"orb");
+				$stats_ast=$db->sql_result($result,$i,"ast");
+				$stats_stl=$db->sql_result($result,$i,"stl");
+				$stats_to=$db->sql_result($result,$i,"tvr");
+				$stats_blk=$db->sql_result($result,$i,"blk");
+				$stats_pf=$db->sql_result($result,$i,"pf");
+				$stats_reb=$db->sql_result($result,$i,"reb");
 				$stats_pts=2*$stats_fgm+$stats_ftm+$stats_tgm;
 			}
 
@@ -1220,27 +1226,27 @@ function team($tid)
 		// ==== INSERT TEAM OFFENSE AND DEFENSE TOTALS ====
 
 		$queryTeamOffenseTotals="SELECT * FROM ibl_team_offense_stats WHERE team = '$team_name' AND year = '1989'";
-		$resultTeamOffenseTotals=mysql_query($queryTeamOffenseTotals);
-		$numTeamOffenseTotals=mysql_numrows($resultTeamOffenseTotals);
+		$resultTeamOffenseTotals=$db->sql_query($queryTeamOffenseTotals);
+		$numTeamOffenseTotals=$db->sql_numrows($resultTeamOffenseTotals);
 
 		$t=0;
 
 		while ($t < $numTeamOffenseTotals) {
-			$team_off_games=mysql_result($resultTeamOffenseTotals,$t,"games");
-			$team_off_minutes=mysql_result($resultTeamOffenseTotals,$t,"minutes");
-			$team_off_fgm=mysql_result($resultTeamOffenseTotals,$t,"fgm");
-			$team_off_fga=mysql_result($resultTeamOffenseTotals,$t,"fga");
-			$team_off_ftm=mysql_result($resultTeamOffenseTotals,$t,"ftm");
-			$team_off_fta=mysql_result($resultTeamOffenseTotals,$t,"fta");
-			$team_off_tgm=mysql_result($resultTeamOffenseTotals,$t,"tgm");
-			$team_off_tga=mysql_result($resultTeamOffenseTotals,$t,"tga");
-			$team_off_orb=mysql_result($resultTeamOffenseTotals,$t,"orb");
-			$team_off_reb=mysql_result($resultTeamOffenseTotals,$t,"reb");
-			$team_off_ast=mysql_result($resultTeamOffenseTotals,$t,"ast");
-			$team_off_stl=mysql_result($resultTeamOffenseTotals,$t,"stl");
-			$team_off_tvr=mysql_result($resultTeamOffenseTotals,$t,"tvr");
-			$team_off_blk=mysql_result($resultTeamOffenseTotals,$t,"blk");
-			$team_off_pf=mysql_result($resultTeamOffenseTotals,$t,"pf");
+			$team_off_games=$db->sql_result($resultTeamOffenseTotals,$t,"games");
+			$team_off_minutes=$db->sql_result($resultTeamOffenseTotals,$t,"minutes");
+			$team_off_fgm=$db->sql_result($resultTeamOffenseTotals,$t,"fgm");
+			$team_off_fga=$db->sql_result($resultTeamOffenseTotals,$t,"fga");
+			$team_off_ftm=$db->sql_result($resultTeamOffenseTotals,$t,"ftm");
+			$team_off_fta=$db->sql_result($resultTeamOffenseTotals,$t,"fta");
+			$team_off_tgm=$db->sql_result($resultTeamOffenseTotals,$t,"tgm");
+			$team_off_tga=$db->sql_result($resultTeamOffenseTotals,$t,"tga");
+			$team_off_orb=$db->sql_result($resultTeamOffenseTotals,$t,"orb");
+			$team_off_reb=$db->sql_result($resultTeamOffenseTotals,$t,"reb");
+			$team_off_ast=$db->sql_result($resultTeamOffenseTotals,$t,"ast");
+			$team_off_stl=$db->sql_result($resultTeamOffenseTotals,$t,"stl");
+			$team_off_tvr=$db->sql_result($resultTeamOffenseTotals,$t,"tvr");
+			$team_off_blk=$db->sql_result($resultTeamOffenseTotals,$t,"blk");
+			$team_off_pf=$db->sql_result($resultTeamOffenseTotals,$t,"pf");
 			$team_off_pts=$team_off_fgm+$team_off_fgm+$team_off_ftm+$team_off_tgm;
 
 			if ($yr == "") {
@@ -1269,27 +1275,27 @@ function team($tid)
 		}
 
 		$queryTeamDefenseTotals="SELECT * FROM ibl_team_defense_stats WHERE team = '$team_name' AND year = '1989'";
-		$resultTeamDefenseTotals=mysql_query($queryTeamDefenseTotals);
-		$numTeamDefenseTotals=mysql_numrows($resultTeamDefenseTotals);
+		$resultTeamDefenseTotals=$db->sql_query($queryTeamDefenseTotals);
+		$numTeamDefenseTotals=$db->sql_numrows($resultTeamDefenseTotals);
 
 		$t=0;
 
 		while ($t < $numTeamDefenseTotals) {
-			$team_def_games=mysql_result($resultTeamDefenseTotals,$t,"games");
-			$team_def_minutes=mysql_result($resultTeamDefenseTotals,$t,"minutes");
-			$team_def_fgm=mysql_result($resultTeamDefenseTotals,$t,"fgm");
-			$team_def_fga=mysql_result($resultTeamDefenseTotals,$t,"fga");
-			$team_def_ftm=mysql_result($resultTeamDefenseTotals,$t,"ftm");
-			$team_def_fta=mysql_result($resultTeamDefenseTotals,$t,"fta");
-			$team_def_tgm=mysql_result($resultTeamDefenseTotals,$t,"tgm");
-			$team_def_tga=mysql_result($resultTeamDefenseTotals,$t,"tga");
-			$team_def_orb=mysql_result($resultTeamDefenseTotals,$t,"orb");
-			$team_def_reb=mysql_result($resultTeamDefenseTotals,$t,"reb");
-			$team_def_ast=mysql_result($resultTeamDefenseTotals,$t,"ast");
-			$team_def_stl=mysql_result($resultTeamDefenseTotals,$t,"stl");
-			$team_def_tvr=mysql_result($resultTeamDefenseTotals,$t,"tvr");
-			$team_def_blk=mysql_result($resultTeamDefenseTotals,$t,"blk");
-			$team_def_pf=mysql_result($resultTeamDefenseTotals,$t,"pf");
+			$team_def_games=$db->sql_result($resultTeamDefenseTotals,$t,"games");
+			$team_def_minutes=$db->sql_result($resultTeamDefenseTotals,$t,"minutes");
+			$team_def_fgm=$db->sql_result($resultTeamDefenseTotals,$t,"fgm");
+			$team_def_fga=$db->sql_result($resultTeamDefenseTotals,$t,"fga");
+			$team_def_ftm=$db->sql_result($resultTeamDefenseTotals,$t,"ftm");
+			$team_def_fta=$db->sql_result($resultTeamDefenseTotals,$t,"fta");
+			$team_def_tgm=$db->sql_result($resultTeamDefenseTotals,$t,"tgm");
+			$team_def_tga=$db->sql_result($resultTeamDefenseTotals,$t,"tga");
+			$team_def_orb=$db->sql_result($resultTeamDefenseTotals,$t,"orb");
+			$team_def_reb=$db->sql_result($resultTeamDefenseTotals,$t,"reb");
+			$team_def_ast=$db->sql_result($resultTeamDefenseTotals,$t,"ast");
+			$team_def_stl=$db->sql_result($resultTeamDefenseTotals,$t,"stl");
+			$team_def_tvr=$db->sql_result($resultTeamDefenseTotals,$t,"tvr");
+			$team_def_blk=$db->sql_result($resultTeamDefenseTotals,$t,"blk");
+			$team_def_pf=$db->sql_result($resultTeamDefenseTotals,$t,"pf");
 			$team_def_pts=$team_def_fgm+$team_def_fgm+$team_def_ftm+$team_def_tgm;
 
 			if ($yr == "") {
@@ -1358,16 +1364,16 @@ function team($tid)
 			} else {
 				$per_query="SELECT * FROM ibl_per_calculator ";
 			}
-			$per_result=mysql_query($per_query);
-			$per_rows=mysql_numrows($per_result);
+			$per_result=$db->sql_query($per_query);
+			$per_rows=$db->sql_numrows($per_result);
 
 			$per=0;
 			while ($per < $per_rows) {
-				$PER_array[$per]['name']=mysql_result($per_result,$per,"player_name");
-				$PER_array[$per]['pid']=mysql_result($per_result,$per,"player_id");
-				$PER_array[$per]['PER']=mysql_result($per_result,$per,"PER");
-				$PER_array[$per]['MM']=mysql_result($per_result,$per,"Magic_Metric");
-				$PER_array[$per]['GS']=mysql_result($per_result,$per,"Game_Score");
+				$PER_array[$per]['name']=$db->sql_result($per_result,$per,"player_name");
+				$PER_array[$per]['pid']=$db->sql_result($per_result,$per,"player_id");
+				$PER_array[$per]['PER']=$db->sql_result($per_result,$per,"PER");
+				$PER_array[$per]['MM']=$db->sql_result($per_result,$per,"Magic_Metric");
+				$PER_array[$per]['GS']=$db->sql_result($per_result,$per,"Game_Score");
 
 				$per++;
 			}
@@ -1375,15 +1381,15 @@ function team($tid)
 		$i=0;
 
 		while ($i < $num) {
-			$name=mysql_result($result,$i,"name");
-			$pos=mysql_result($result,$i,"pos");
-			$p_ord=mysql_result($result,$i,"ordinal");
-			$pid=mysql_result($result,$i,"pid");
+			$name=$db->sql_result($result,$i,"name");
+			$pos=$db->sql_result($result,$i,"pos");
+			$p_ord=$db->sql_result($result,$i,"ordinal");
+			$pid=$db->sql_result($result,$i,"pid");
 
-			$draftyear=mysql_result($result,$i,"draftyear");
-			$exp=mysql_result($result,$i,"exp");
-			$cy=mysql_result($result,$i,"cy");
-			$cyt=mysql_result($result,$i,"cyt");
+			$draftyear=$db->sql_result($result,$i,"draftyear");
+			$exp=$db->sql_result($result,$i,"exp");
+			$cy=$db->sql_result($result,$i,"cy");
+			$cyt=$db->sql_result($result,$i,"cyt");
 
 			$yearoffreeagency=$draftyear+$exp+$cyt-$cy;
 
@@ -1401,40 +1407,40 @@ function team($tid)
 					}
 					$pc++;
 				}
-				$stats_gm=mysql_result($result,$i,"stats_gm");
-				$stats_gs=mysql_result($result,$i,"stats_gs");
-				$stats_min=mysql_result($result,$i,"stats_min");
-				$stats_fgm=mysql_result($result,$i,"stats_fgm");
-				$stats_fga=mysql_result($result,$i,"stats_fga");
-				$stats_ftm=mysql_result($result,$i,"stats_ftm");
-				$stats_fta=mysql_result($result,$i,"stats_fta");
-				$stats_tgm=mysql_result($result,$i,"stats_3gm");
-				$stats_tga=mysql_result($result,$i,"stats_3ga");
-				$stats_orb=mysql_result($result,$i,"stats_orb");
-				$stats_drb=mysql_result($result,$i,"stats_drb");
-				$stats_ast=mysql_result($result,$i,"stats_ast");
-				$stats_stl=mysql_result($result,$i,"stats_stl");
-				$stats_to=mysql_result($result,$i,"stats_to");
-				$stats_blk=mysql_result($result,$i,"stats_blk");
-				$stats_pf=mysql_result($result,$i,"stats_pf");
+				$stats_gm=$db->sql_result($result,$i,"stats_gm");
+				$stats_gs=$db->sql_result($result,$i,"stats_gs");
+				$stats_min=$db->sql_result($result,$i,"stats_min");
+				$stats_fgm=$db->sql_result($result,$i,"stats_fgm");
+				$stats_fga=$db->sql_result($result,$i,"stats_fga");
+				$stats_ftm=$db->sql_result($result,$i,"stats_ftm");
+				$stats_fta=$db->sql_result($result,$i,"stats_fta");
+				$stats_tgm=$db->sql_result($result,$i,"stats_3gm");
+				$stats_tga=$db->sql_result($result,$i,"stats_3ga");
+				$stats_orb=$db->sql_result($result,$i,"stats_orb");
+				$stats_drb=$db->sql_result($result,$i,"stats_drb");
+				$stats_ast=$db->sql_result($result,$i,"stats_ast");
+				$stats_stl=$db->sql_result($result,$i,"stats_stl");
+				$stats_to=$db->sql_result($result,$i,"stats_to");
+				$stats_blk=$db->sql_result($result,$i,"stats_blk");
+				$stats_pf=$db->sql_result($result,$i,"stats_pf");
 				$stats_reb=$stats_orb+$stats_drb;
 				$stats_pts=2*$stats_fgm+$stats_ftm+$stats_tgm;
 			} else {
-				$stats_gm=mysql_result($result,$i,"gm");
-				$stats_min=mysql_result($result,$i,"min");
-				$stats_fgm=mysql_result($result,$i,"fgm");
-				$stats_fga=mysql_result($result,$i,"fga");
-				$stats_ftm=mysql_result($result,$i,"ftm");
-				$stats_fta=mysql_result($result,$i,"fta");
-				$stats_tgm=mysql_result($result,$i,"3gm");
-				$stats_tga=mysql_result($result,$i,"3ga");
-				$stats_orb=mysql_result($result,$i,"orb");
-				$stats_ast=mysql_result($result,$i,"ast");
-				$stats_stl=mysql_result($result,$i,"stl");
-				$stats_to=mysql_result($result,$i,"tvr");
-				$stats_blk=mysql_result($result,$i,"blk");
-				$stats_pf=mysql_result($result,$i,"pf");
-				$stats_reb=mysql_result($result,$i,"reb");
+				$stats_gm=$db->sql_result($result,$i,"gm");
+				$stats_min=$db->sql_result($result,$i,"min");
+				$stats_fgm=$db->sql_result($result,$i,"fgm");
+				$stats_fga=$db->sql_result($result,$i,"fga");
+				$stats_ftm=$db->sql_result($result,$i,"ftm");
+				$stats_fta=$db->sql_result($result,$i,"fta");
+				$stats_tgm=$db->sql_result($result,$i,"3gm");
+				$stats_tga=$db->sql_result($result,$i,"3ga");
+				$stats_orb=$db->sql_result($result,$i,"orb");
+				$stats_ast=$db->sql_result($result,$i,"ast");
+				$stats_stl=$db->sql_result($result,$i,"stl");
+				$stats_to=$db->sql_result($result,$i,"tvr");
+				$stats_blk=$db->sql_result($result,$i,"blk");
+				$stats_pf=$db->sql_result($result,$i,"pf");
+				$stats_reb=$db->sql_result($result,$i,"reb");
 				$stats_pts=2*$stats_fgm+$stats_ftm+$stats_tgm;
 			}
 			@$stats_fgm=number_format(($stats_fgm/$stats_gm),1);
@@ -1503,30 +1509,30 @@ function team($tid)
 		$table_averages=$table_averages."</tbody><tfoot>";
 
 		$queryTeamOffenseTotals="SELECT * FROM ibl_team_offense_stats WHERE team = '$team_name' AND year = '1989'";
-		$resultTeamOffenseTotals=mysql_query($queryTeamOffenseTotals);
-		$numTeamOffenseTotals=mysql_numrows($resultTeamOffenseTotals);
+		$resultTeamOffenseTotals=$db->sql_query($queryTeamOffenseTotals);
+		$numTeamOffenseTotals=$db->sql_numrows($resultTeamOffenseTotals);
 
 		$t=0;
 
 		while ($t < $numTeamOffenseTotals) {
-			$team_off_games=mysql_result($resultTeamOffenseTotals,$t,"games");
-			$team_off_minutes=mysql_result($resultTeamOffenseTotals,$t,"minutes");
-			$team_off_fgm=mysql_result($resultTeamOffenseTotals,$t,"fgm");
-			$team_off_fga=mysql_result($resultTeamOffenseTotals,$t,"fga");
+			$team_off_games=$db->sql_result($resultTeamOffenseTotals,$t,"games");
+			$team_off_minutes=$db->sql_result($resultTeamOffenseTotals,$t,"minutes");
+			$team_off_fgm=$db->sql_result($resultTeamOffenseTotals,$t,"fgm");
+			$team_off_fga=$db->sql_result($resultTeamOffenseTotals,$t,"fga");
 			@$team_off_fgp=number_format(($team_off_fgm/$team_off_fga),3);
-			$team_off_ftm=mysql_result($resultTeamOffenseTotals,$t,"ftm");
-			$team_off_fta=mysql_result($resultTeamOffenseTotals,$t,"fta");
+			$team_off_ftm=$db->sql_result($resultTeamOffenseTotals,$t,"ftm");
+			$team_off_fta=$db->sql_result($resultTeamOffenseTotals,$t,"fta");
 			@$team_off_ftp=number_format(($team_off_ftm/$team_off_fta),3);
-			$team_off_tgm=mysql_result($resultTeamOffenseTotals,$t,"tgm");
-			$team_off_tga=mysql_result($resultTeamOffenseTotals,$t,"tga");
+			$team_off_tgm=$db->sql_result($resultTeamOffenseTotals,$t,"tgm");
+			$team_off_tga=$db->sql_result($resultTeamOffenseTotals,$t,"tga");
 			@$team_off_tgp=number_format(($team_off_tgm/$team_off_tga),3);
-			$team_off_orb=mysql_result($resultTeamOffenseTotals,$t,"orb");
-			$team_off_reb=mysql_result($resultTeamOffenseTotals,$t,"reb");
-			$team_off_ast=mysql_result($resultTeamOffenseTotals,$t,"ast");
-			$team_off_stl=mysql_result($resultTeamOffenseTotals,$t,"stl");
-			$team_off_tvr=mysql_result($resultTeamOffenseTotals,$t,"tvr");
-			$team_off_blk=mysql_result($resultTeamOffenseTotals,$t,"blk");
-			$team_off_pf=mysql_result($resultTeamOffenseTotals,$t,"pf");
+			$team_off_orb=$db->sql_result($resultTeamOffenseTotals,$t,"orb");
+			$team_off_reb=$db->sql_result($resultTeamOffenseTotals,$t,"reb");
+			$team_off_ast=$db->sql_result($resultTeamOffenseTotals,$t,"ast");
+			$team_off_stl=$db->sql_result($resultTeamOffenseTotals,$t,"stl");
+			$team_off_tvr=$db->sql_result($resultTeamOffenseTotals,$t,"tvr");
+			$team_off_blk=$db->sql_result($resultTeamOffenseTotals,$t,"blk");
+			$team_off_pf=$db->sql_result($resultTeamOffenseTotals,$t,"pf");
 			$team_off_pts=$team_off_fgm+$team_off_fgm+$team_off_ftm+$team_off_tgm;
 
 			@$team_off_avgfgm=number_format(($team_off_fgm/$team_off_games),1);
@@ -1574,30 +1580,30 @@ function team($tid)
 		}
 
 		$queryTeamDefenseTotals="SELECT * FROM ibl_team_defense_stats WHERE team = '$team_name' AND year = '1989'";
-		$resultTeamDefenseTotals=mysql_query($queryTeamDefenseTotals);
-		$numTeamDefenseTotals=mysql_numrows($resultTeamDefenseTotals);
+		$resultTeamDefenseTotals=$db->sql_query($queryTeamDefenseTotals);
+		$numTeamDefenseTotals=$db->sql_numrows($resultTeamDefenseTotals);
 
 		$t=0;
 
 		while ($t < $numTeamDefenseTotals) {
-			$team_def_games=mysql_result($resultTeamDefenseTotals,$t,"games");
-			$team_def_minutes=mysql_result($resultTeamDefenseTotals,$t,"minutes");
-			$team_def_fgm=mysql_result($resultTeamDefenseTotals,$t,"fgm");
-			$team_def_fga=mysql_result($resultTeamDefenseTotals,$t,"fga");
+			$team_def_games=$db->sql_result($resultTeamDefenseTotals,$t,"games");
+			$team_def_minutes=$db->sql_result($resultTeamDefenseTotals,$t,"minutes");
+			$team_def_fgm=$db->sql_result($resultTeamDefenseTotals,$t,"fgm");
+			$team_def_fga=$db->sql_result($resultTeamDefenseTotals,$t,"fga");
 			@$team_def_fgp=number_format(($team_def_fgm/$team_def_fga),3);
-			$team_def_ftm=mysql_result($resultTeamDefenseTotals,$t,"ftm");
-			$team_def_fta=mysql_result($resultTeamDefenseTotals,$t,"fta");
+			$team_def_ftm=$db->sql_result($resultTeamDefenseTotals,$t,"ftm");
+			$team_def_fta=$db->sql_result($resultTeamDefenseTotals,$t,"fta");
 			@$team_def_ftp=number_format(($team_def_ftm/$team_def_fta),3);
-			$team_def_tgm=mysql_result($resultTeamDefenseTotals,$t,"tgm");
-			$team_def_tga=mysql_result($resultTeamDefenseTotals,$t,"tga");
+			$team_def_tgm=$db->sql_result($resultTeamDefenseTotals,$t,"tgm");
+			$team_def_tga=$db->sql_result($resultTeamDefenseTotals,$t,"tga");
 			@$team_def_tgp=number_format(($team_def_tgm/$team_def_tga),3);
-			$team_def_orb=mysql_result($resultTeamDefenseTotals,$t,"orb");
-			$team_def_reb=mysql_result($resultTeamDefenseTotals,$t,"reb");
-			$team_def_ast=mysql_result($resultTeamDefenseTotals,$t,"ast");
-			$team_def_stl=mysql_result($resultTeamDefenseTotals,$t,"stl");
-			$team_def_tvr=mysql_result($resultTeamDefenseTotals,$t,"tvr");
-			$team_def_blk=mysql_result($resultTeamDefenseTotals,$t,"blk");
-			$team_def_pf=mysql_result($resultTeamDefenseTotals,$t,"pf");
+			$team_def_orb=$db->sql_result($resultTeamDefenseTotals,$t,"orb");
+			$team_def_reb=$db->sql_result($resultTeamDefenseTotals,$t,"reb");
+			$team_def_ast=$db->sql_result($resultTeamDefenseTotals,$t,"ast");
+			$team_def_stl=$db->sql_result($resultTeamDefenseTotals,$t,"stl");
+			$team_def_tvr=$db->sql_result($resultTeamDefenseTotals,$t,"tvr");
+			$team_def_blk=$db->sql_result($resultTeamDefenseTotals,$t,"blk");
+			$team_def_pf=$db->sql_result($resultTeamDefenseTotals,$t,"pf");
 			$team_def_pts=$team_def_fgm+$team_def_fgm+$team_def_ftm+$team_def_tgm;
 
 			@$team_def_avgfgm=number_format(($team_def_fgm/$team_def_games),1);
@@ -1661,15 +1667,15 @@ function team($tid)
 			$simStartDate = $arrayLastSimDates['Start Date'];
 			$simEndDate = $arrayLastSimDates['End Date'];
 
-			$playersOnTeam = mysql_query("SELECT pid
+			$playersOnTeam = $db->sql_query("SELECT pid
 		        FROM nuke_iblplyr
 		        WHERE tid = $tid
 		        ORDER BY name ASC");
-			$numberOfPlayersOnTeam = mysql_num_rows($playersOnTeam);
+			$numberOfPlayersOnTeam = $db->sql_numrows($playersOnTeam);
 
 			$i = 0;
 			while ($i < $numberOfPlayersOnTeam) {
-				$pid = mysql_result($playersOnTeam, $i);
+				$pid = $db->sql_result($playersOnTeam, $i);
 
 				// TODO: refactor this so that I'm not cutting and pasting the Player module's Sim Stats code
 				$resultPlayerSimBoxScores = $db->sql_query("SELECT *
@@ -1679,7 +1685,7 @@ function team($tid)
 					AND gameMIN > 0
 		            ORDER BY Date ASC");
 
-		        $numberOfGamesPlayedInSim = mysql_num_rows($resultPlayerSimBoxScores);
+		        $numberOfGamesPlayedInSim = $db->sql_numrows($resultPlayerSimBoxScores);
 				$simTotalMIN = 0;
 				$simTotal2GM = 0;
 				$simTotal2GA = 0;
@@ -1697,7 +1703,7 @@ function team($tid)
 				$simTotalPTS = 0;
 
 				if ($numberOfGamesPlayedInSim > 0) {
-			        while ($row = mysql_fetch_assoc($resultPlayerSimBoxScores)) {
+			        while ($row = $db->sql_fetch_assoc($resultPlayerSimBoxScores)) {
 						$name = $row['name'];
 						$pos = $row['pos'];
 
@@ -1802,12 +1808,12 @@ function team($tid)
 
 		$i = 0;
 		while ($i < $num) {
-			$name=mysql_result($result,$i,"name");
-			$pos=mysql_result($result,$i,"pos");
-			$p_ord=mysql_result($result,$i,"ordinal");
-			$pid=mysql_result($result,$i,"pid");
-			$cy=mysql_result($result,$i,"cy");
-			$cyt=mysql_result($result,$i,"cyt");
+			$name=$db->sql_result($result,$i,"name");
+			$pos=$db->sql_result($result,$i,"pos");
+			$p_ord=$db->sql_result($result,$i,"ordinal");
+			$pid=$db->sql_result($result,$i,"pid");
+			$cy=$db->sql_result($result,$i,"cy");
+			$cyt=$db->sql_result($result,$i,"cyt");
 			if ($faon == 0) {
 				$year1=$cy;
 				$year2=$cy+1;
@@ -1824,26 +1830,26 @@ function team($tid)
 				$year6=$cy+6;
 			}
 			if ($cy==0) {
-				$year1 < 7 ? $con1=mysql_result($result,$i,"cy1") : $con1=0;
-				$year2 < 7 ? $con2=mysql_result($result,$i,"cy2") : $con2=0;
-				$year3 < 7 ? $con3=mysql_result($result,$i,"cy3") : $con3=0;
-				$year4 < 7 ? $con4=mysql_result($result,$i,"cy4") : $con4=0;
-				$year5 < 7 ? $con5=mysql_result($result,$i,"cy5") : $con5=0;
-				$year6 < 7 ? $con6=mysql_result($result,$i,"cy6") : $con6=0;
+				$year1 < 7 ? $con1=$db->sql_result($result,$i,"cy1") : $con1=0;
+				$year2 < 7 ? $con2=$db->sql_result($result,$i,"cy2") : $con2=0;
+				$year3 < 7 ? $con3=$db->sql_result($result,$i,"cy3") : $con3=0;
+				$year4 < 7 ? $con4=$db->sql_result($result,$i,"cy4") : $con4=0;
+				$year5 < 7 ? $con5=$db->sql_result($result,$i,"cy5") : $con5=0;
+				$year6 < 7 ? $con6=$db->sql_result($result,$i,"cy6") : $con6=0;
 			} else {
-				$year1 < 7 ? $con1=mysql_result($result,$i,"cy$year1") : $con1=0;
-				$year2 < 7 ? $con2=mysql_result($result,$i,"cy$year2") : $con2=0;
-				$year3 < 7 ? $con3=mysql_result($result,$i,"cy$year3") : $con3=0;
-				$year4 < 7 ? $con4=mysql_result($result,$i,"cy$year4") : $con4=0;
-				$year5 < 7 ? $con5=mysql_result($result,$i,"cy$year5") : $con5=0;
-				$year6 < 7 ? $con6=mysql_result($result,$i,"cy$year6") : $con6=0;
+				$year1 < 7 ? $con1=$db->sql_result($result,$i,"cy$year1") : $con1=0;
+				$year2 < 7 ? $con2=$db->sql_result($result,$i,"cy$year2") : $con2=0;
+				$year3 < 7 ? $con3=$db->sql_result($result,$i,"cy$year3") : $con3=0;
+				$year4 < 7 ? $con4=$db->sql_result($result,$i,"cy$year4") : $con4=0;
+				$year5 < 7 ? $con5=$db->sql_result($result,$i,"cy$year5") : $con5=0;
+				$year6 < 7 ? $con6=$db->sql_result($result,$i,"cy$year6") : $con6=0;
 			}
-			$bird=mysql_result($result,$i,"bird");
-			$talent=mysql_result($result,$i,"talent");
-			$skill=mysql_result($result,$i,"skill");
-			$intangibles=mysql_result($result,$i,"intangibles");
-			$Clutch=mysql_result($result,$i,"Clutch");
-			$Consistency=mysql_result($result,$i,"Consistency");
+			$bird=$db->sql_result($result,$i,"bird");
+			$talent=$db->sql_result($result,$i,"talent");
+			$skill=$db->sql_result($result,$i,"skill");
+			$intangibles=$db->sql_result($result,$i,"intangibles");
+			$Clutch=$db->sql_result($result,$i,"Clutch");
+			$Consistency=$db->sql_result($result,$i,"Consistency");
 
 			(($i % 2)==0) ? $bgcolor="FFFFFF" : $bgcolor="EEEEEE";
 
@@ -1892,7 +1898,7 @@ function team($tid)
 		// Calculating cap totals for the current season is dificult at the moment. - A-Jay
 			$currentCap = $cap1;
 			$capTotalQuery = "INSERT INTO ibl_current_cap (tid,currentCap) VALUES ('".$tid."','".$currentCap."') ON DUPLICATE KEY UPDATE currentCap='".$currentCap."'";
-			$capTotalQueryExec = mysql_query($capTotalQuery);
+			$capTotalQueryExec = $db->sql_query($capTotalQuery);
 		// End salary cap hack.
 
 		$table_contracts .= "</tbody>
@@ -1926,30 +1932,30 @@ function team($tid)
 	// PUT DRAFT PICKS BELOW SALARY PRINTOUT
 
 	$querypicks="SELECT * FROM ibl_draft_picks WHERE ownerofpick = '$team_name' ORDER BY year, round ASC";
-	$resultpicks=mysql_query($querypicks);
-	$numpicks=mysql_num_rows($resultpicks);
+	$resultpicks=$db->sql_query($querypicks);
+	$numpicks=$db->sql_numrows($resultpicks);
 
 	$hh=0;
 
 	$query_all_team_colors="SELECT * FROM nuke_ibl_team_info ORDER BY teamid ASC";
-	$colors=mysql_query($query_all_team_colors);
-	$num_all_team_colors=mysql_num_rows($colors);
+	$colors=$db->sql_query($query_all_team_colors);
+	$num_all_team_colors=$db->sql_numrows($colors);
 
 	$i=0;
 	while ($i < $num_all_team_colors) {
-		$color_array[$i]['team_id']=mysql_result($colors,$i,"teamid");
-		$color_array[$i]['team_city']=mysql_result($colors,$i,"team_city");
-		$color_array[$i]['team_name']=mysql_result($colors,$i,"team_name");
-		$color_array[$i]['color1']=mysql_result($colors,$i,"color1");
-		$color_array[$i]['color2']=mysql_result($colors,$i,"color2");
+		$color_array[$i]['team_id']=$db->sql_result($colors,$i,"teamid");
+		$color_array[$i]['team_city']=$db->sql_result($colors,$i,"team_city");
+		$color_array[$i]['team_name']=$db->sql_result($colors,$i,"team_name");
+		$color_array[$i]['color1']=$db->sql_result($colors,$i,"color1");
+		$color_array[$i]['color2']=$db->sql_result($colors,$i,"color2");
 		$i++;
 	}
 
 	while ($hh < $numpicks)	{
-		$ownerofpick=mysql_result($resultpicks,$hh,"ownerofpick");
-		$teampick=mysql_result($resultpicks,$hh,"teampick");
-		$year=mysql_result($resultpicks,$hh,"year");
-		$round=mysql_result($resultpicks,$hh,"round");
+		$ownerofpick=$db->sql_result($resultpicks,$hh,"ownerofpick");
+		$teampick=$db->sql_result($resultpicks,$hh,"teampick");
+		$year=$db->sql_result($resultpicks,$hh,"year");
+		$round=$db->sql_result($resultpicks,$hh,"round");
 
 		$j=0;
 			while ($j < $i) {
@@ -2025,21 +2031,23 @@ function team($tid)
 
 function team_info_right ($team_name, $color1, $color2, $owner_name, $tid)
 {
+	global $db;
+
 	// ==== GET OWNER INFO
 
 	$queryo="SELECT * FROM nuke_users WHERE user_ibl_team = '$team_name' ORDER BY user_id DESC";
-	$resulto=mysql_query($queryo);
-	$numo=mysql_num_rows($resulto);
+	$resulto=$db->sql_query($queryo);
+	$numo=$db->sql_numrows($resulto);
 
 	$query1="SELECT * FROM nuke_ibl_team_info WHERE teamid = $tid";
-	$result1=mysql_query($query1);
+	$result1=$db->sql_query($query1);
 
-	$coaching=mysql_result($result1,0,"Contract_Coach");
+	$coaching=$db->sql_result($result1,0,"Contract_Coach");
 
-	$user_id=mysql_result($resulto,0,"user_id");
-	$username=mysql_result($resulto,0,"username");
-	$user_lastvisit=mysql_result($resulto,0,"user_lastvisit");
-	$date_started=mysql_result($resulto,0,"date_started");
+	$user_id=$db->sql_result($resulto,0,"user_id");
+	$username=$db->sql_result($resulto,0,"username");
+	$user_lastvisit=$db->sql_result($resulto,0,"user_lastvisit");
+	$date_started=$db->sql_result($resulto,0,"date_started");
 	$visitdate=date(r,$user_lastvisit);
 
 	$output="<table bgcolor=#eeeeee width=220>";
@@ -2056,16 +2064,16 @@ function team_info_right ($team_name, $color1, $color2, $owner_name, $tid)
 
 	$owner_award_code = $owner_name." (".$team_name.")";
 	$querydec="SELECT * FROM nuke_ibl_gmhistory WHERE name LIKE '$owner_award_code' ORDER BY year ASC";
-	$resultdec=mysql_query($querydec);
-	$numdec=mysql_num_rows($resultdec);
+	$resultdec=$db->sql_query($querydec);
+	$numdec=$db->sql_numrows($resultdec);
 	if ($numdec > 0) $dec=0;
 	$output=$output."<tr bgcolor=\"#$color1\"><td align=\"center\">
 		<font color=\"#$color2\"><b>GM History</b></font>
 		</td></tr>
 		<tr><td>";
 	while ($dec < $numdec) {
-		$dec_year=mysql_result($resultdec,$dec,"year");
-		$dec_Award=mysql_result($resultdec,$dec,"Award");
+		$dec_year=$db->sql_result($resultdec,$dec,"year");
+		$dec_Award=$db->sql_result($resultdec,$dec,"Award");
 		$output=$output."<table border=0 cellpadding=0 cellspacing=0><tr><td>$dec_year $dec_Award</td></tr></table>";
 		$dec++;
 	}
@@ -2074,8 +2082,8 @@ function team_info_right ($team_name, $color1, $color2, $owner_name, $tid)
 	// CHAMPIONSHIP BANNERS
 
 	$querybanner="SELECT * FROM nuke_iblbanners WHERE currentname = '$team_name' ORDER BY year ASC";
-	$resultbanner=mysql_query($querybanner);
-	$numbanner=mysql_num_rows($resultbanner);
+	$resultbanner=$db->sql_query($querybanner);
+	$numbanner=$db->sql_numrows($resultbanner);
 
 	$j=0;
 
@@ -2092,9 +2100,9 @@ function team_info_right ($team_name, $color1, $color2, $owner_name, $tid)
 	$div_banner="";
 
 	while ($j < $numbanner)	{
-		$banneryear=mysql_result($resultbanner,$j,"year");
-		$bannername=mysql_result($resultbanner,$j,"bannername");
-		$bannertype=mysql_result($resultbanner,$j,"bannertype");
+		$banneryear=$db->sql_result($resultbanner,$j,"year");
+		$bannername=$db->sql_result($resultbanner,$j,"bannername");
+		$bannertype=$db->sql_result($resultbanner,$j,"bannertype");
 
 		if ($bannertype == 1) {
 			if ($championships % 5 == 0) {
@@ -2223,16 +2231,16 @@ function team_info_right ($team_name, $color1, $color2, $owner_name, $tid)
 
 	$owner_award_code = $team_name."";
 	$querydec="SELECT * FROM nuke_ibl_teamawards WHERE name LIKE '$owner_award_code' ORDER BY year DESC";
-	$resultdec=mysql_query($querydec);
-	$numdec=mysql_num_rows($resultdec);
+	$resultdec=$db->sql_query($querydec);
+	$numdec=$db->sql_numrows($resultdec);
 	if ($numdec > 0) $dec=0;
 	$output=$output."<tr bgcolor=\"#$color1\"><td align=\"center\">
 		<font color=\"#$color2\"><b>Team Accomplishments</b></font>
 		</td></tr>
 		<tr><td>";
 	while ($dec < $numdec) {
-		$dec_year=mysql_result($resultdec,$dec,"year");
-		$dec_Award=mysql_result($resultdec,$dec,"Award");
+		$dec_year=$db->sql_result($resultdec,$dec,"year");
+		$dec_Award=$db->sql_result($resultdec,$dec,"Award");
 		$output=$output."<table border=0 cellpadding=0 cellspacing=0><tr><td>$dec_year $dec_Award</td></tr></table>";
 		$dec++;
 	}
@@ -2241,8 +2249,8 @@ function team_info_right ($team_name, $color1, $color2, $owner_name, $tid)
 	// REGULAR SEASON RESULTS
 
 	$querywl="SELECT * FROM nuke_iblteam_win_loss WHERE currentname = '$team_name' ORDER BY year DESC";
-	$resultwl=mysql_query($querywl);
-	$numwl=mysql_num_rows($resultwl);
+	$resultwl=$db->sql_query($querywl);
+	$numwl=$db->sql_numrows($resultwl);
 
 	$h=0;
 	$wintot=0;
@@ -2252,10 +2260,10 @@ function team_info_right ($team_name, $color1, $color2, $owner_name, $tid)
 		<tr><td><div id=\"History-R\" style=\"overflow:auto\">";
 
 	while ($h < $numwl) {
-		$yearwl=mysql_result($resultwl,$h,"year");
-		$namewl=mysql_result($resultwl,$h,"namethatyear");
-		$wins=mysql_result($resultwl,$h,"wins");
-		$losses=mysql_result($resultwl,$h,"losses");
+		$yearwl=$db->sql_result($resultwl,$h,"year");
+		$namewl=$db->sql_result($resultwl,$h,"namethatyear");
+		$wins=$db->sql_result($resultwl,$h,"wins");
+		$losses=$db->sql_result($resultwl,$h,"losses");
 		$wintot=$wintot+$wins;
 		$lostot=$lostot+$losses;
 		@$winpct=number_format($wins/($wins+$losses),3);
@@ -2271,8 +2279,8 @@ function team_info_right ($team_name, $color1, $color2, $owner_name, $tid)
 	// HEAT SEASON RESULTS
 
 	$querywl="SELECT * FROM nuke_heat_win_loss WHERE currentname = '$team_name' ORDER BY year DESC";
-	$resultwl=mysql_query($querywl);
-	$numwl=mysql_num_rows($resultwl);
+	$resultwl=$db->sql_query($querywl);
+	$numwl=$db->sql_numrows($resultwl);
 	$h=0;
 	$wintot=0;
 	$lostot=0;
@@ -2281,10 +2289,10 @@ function team_info_right ($team_name, $color1, $color2, $owner_name, $tid)
 		<tr><td><div id=\"History-R\" style=\"overflow:auto\">";
 
 	while ($h < $numwl)	{
-		$yearwl=mysql_result($resultwl,$h,"year");
-		$namewl=mysql_result($resultwl,$h,"namethatyear");
-		$wins=mysql_result($resultwl,$h,"wins");
-		$losses=mysql_result($resultwl,$h,"losses");
+		$yearwl=$db->sql_result($resultwl,$h,"year");
+		$namewl=$db->sql_result($resultwl,$h,"namethatyear");
+		$wins=$db->sql_result($resultwl,$h,"wins");
+		$losses=$db->sql_result($resultwl,$h,"losses");
 		$wintot=$wintot+$wins;
 		$lostot=$lostot+$losses;
 		@$winpct=number_format($wins/($wins+$losses),3);
@@ -2300,8 +2308,8 @@ function team_info_right ($team_name, $color1, $color2, $owner_name, $tid)
 	// POST-SEASON RESULTS
 
 	$queryplayoffs = "SELECT * FROM ibl_playoff_results ORDER BY year DESC";
-	$resultplayoffs = mysql_query($queryplayoffs);
-	$numplayoffs = mysql_num_rows($resultplayoffs);
+	$resultplayoffs = $db->sql_query($queryplayoffs);
+	$numplayoffs = $db->sql_numrows($resultplayoffs);
 
 	$pp = 0;
 	$totalplayoffwins = 0;
@@ -2326,11 +2334,11 @@ function team_info_right ($team_name, $color1, $color2, $owner_name, $tid)
 	$fourth_wins = 0;
 
 	while ($pp < $numplayoffs) {
-		$playoffround = mysql_result($resultplayoffs,$pp,"round");
-		$playoffyear = mysql_result($resultplayoffs,$pp,"year");
-		$playoffwinner = mysql_result($resultplayoffs,$pp,"winner");
-		$playoffloser = mysql_result($resultplayoffs,$pp,"loser");
-		$playoffloser_games = mysql_result($resultplayoffs,$pp,"loser_games");
+		$playoffround = $db->sql_result($resultplayoffs,$pp,"round");
+		$playoffyear = $db->sql_result($resultplayoffs,$pp,"year");
+		$playoffwinner = $db->sql_result($resultplayoffs,$pp,"winner");
+		$playoffloser = $db->sql_result($resultplayoffs,$pp,"loser");
+		$playoffloser_games = $db->sql_result($resultplayoffs,$pp,"loser_games");
 
 		if ($playoffround == 1) {
 			if ($playoffwinner == $team_name) {
@@ -2454,6 +2462,8 @@ function team_info_right ($team_name, $color1, $color2, $owner_name, $tid)
 
 function viewinjuries($tid)
 {
+	global $db;
+
 	include("header.php");
 	OpenTable();
 
@@ -2461,8 +2471,8 @@ function viewinjuries($tid)
 
 	$query="SELECT * FROM nuke_iblplyr WHERE injured > 0 AND retired = 0 ORDER BY ordinal ASC";
 
-	$result=mysql_query($query);
-	$num=mysql_numrows($result);
+	$result=$db->sql_query($query);
+	$num=$db->sql_numrows($result);
 
 	echo "<center><h2>INJURED PLAYERS</h2></center>
 		<table><tr><td valign=top>
@@ -2470,16 +2480,16 @@ function viewinjuries($tid)
 		<tr><th>Pos</th><th>Player</th><th>Team</th><th>Days Injured</th>";
 
 	$query_all_team_colors="SELECT * FROM nuke_ibl_team_info ORDER BY teamid ASC";
-	$colors=mysql_query($query_all_team_colors);
-	$num_all_team_colors=mysql_num_rows($colors);
+	$colors=$db->sql_query($query_all_team_colors);
+	$num_all_team_colors=$db->sql_numrows($colors);
 
 	$k=0;
 	while ($k < $num_all_team_colors) {
-		$color_array[$k]['team_id']=mysql_result($colors,$k,"teamid");
-		$color_array[$k]['team_city']=mysql_result($colors,$k,"team_city");
-		$color_array[$k]['team_name']=mysql_result($colors,$k,"team_name");
-		$color_array[$k]['color1']=mysql_result($colors,$k,"color1");
-		$color_array[$k]['color2']=mysql_result($colors,$k,"color2");
+		$color_array[$k]['team_id']=$db->sql_result($colors,$k,"teamid");
+		$color_array[$k]['team_city']=$db->sql_result($colors,$k,"team_city");
+		$color_array[$k]['team_name']=$db->sql_result($colors,$k,"team_name");
+		$color_array[$k]['color1']=$db->sql_result($colors,$k,"color1");
+		$color_array[$k]['color2']=$db->sql_result($colors,$k,"color2");
 		$k++;
 	}
 
@@ -2488,12 +2498,12 @@ function viewinjuries($tid)
 	while ($i < $num) {
 		(($i % 2)==0) ? $bgcolor="FFFFFF" : $bgcolor="DDDDDD";
 
-		$name=mysql_result($result,$i,"name");
-		$team=mysql_result($result,$i,"teamname");
-		$pid=mysql_result($result,$i,"pid");
-		$tid=mysql_result($result,$i,"tid");
-		$pos=mysql_result($result,$i,"pos");
-		$inj=mysql_result($result,$i,"injured");
+		$name=$db->sql_result($result,$i,"name");
+		$team=$db->sql_result($result,$i,"teamname");
+		$pid=$db->sql_result($result,$i,"pid");
+		$tid=$db->sql_result($result,$i,"tid");
+		$pos=$db->sql_result($result,$i,"pos");
+		$inj=$db->sql_result($result,$i,"injured");
 
 		$j=0;
 		while ($j < $k) {
@@ -2562,6 +2572,7 @@ function seteditor($user)
 function editset($username, $bypass=0, $hid=0, $url=0)
 {
 	global $user, $prefix, $user_prefix, $db;
+
 	$sql = "SELECT * FROM ".$prefix."_bbconfig";
 	$result = $db->sql_query($sql);
 	while ( $row = $db->sql_fetchrow($result) ) {
@@ -2586,7 +2597,7 @@ function editset($username, $bypass=0, $hid=0, $url=0)
 
 	$teamlogo = $userinfo[user_ibl_team];
 	$queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$teamlogo'";
-	$tid = mysql_result(mysql_query($queryTeamID), 0);
+	$tid = $db->sql_result($db->sql_query($queryTeamID), 0);
 
 	Shared::displaytopmenu($tid);
 
@@ -2605,8 +2616,8 @@ function editset($username, $bypass=0, $hid=0, $url=0)
 	$i=0;
 
 	while ($i < 3) {
-		$name_of_set=mysql_result($result3,$i,"offense_name");
-		$setnumbervalue=mysql_result($result3,$i,"SetNumber");
+		$name_of_set=$db->sql_result($result3,$i,"offense_name");
+		$setnumbervalue=$db->sql_result($result3,$i,"SetNumber");
 
 		if ($SetToWorkOn == $setnumbervalue) {
 			echo "	<option value=\"$setnumbervalue\" SELECTED>$name_of_set</option>";
@@ -2623,23 +2634,23 @@ function editset($username, $bypass=0, $hid=0, $url=0)
 		$result4 = $db->sql_query($sql4);
 		$num4 = $db->sql_numrows($result4);
 
-		$name1=mysql_result($result4,0,"PG_Depth_Name");
-		$name2=mysql_result($result4,0,"SG_Depth_Name");
-		$name3=mysql_result($result4,0,"SF_Depth_Name");
-		$name4=mysql_result($result4,0,"PF_Depth_Name");
-		$name5=mysql_result($result4,0,"C_Depth_Name");
+		$name1=$db->sql_result($result4,0,"PG_Depth_Name");
+		$name2=$db->sql_result($result4,0,"SG_Depth_Name");
+		$name3=$db->sql_result($result4,0,"SF_Depth_Name");
+		$name4=$db->sql_result($result4,0,"PF_Depth_Name");
+		$name5=$db->sql_result($result4,0,"C_Depth_Name");
 
-		$low1=mysql_result($result4,0,"PG_Low_Range");;
-		$low2=mysql_result($result4,0,"SG_Low_Range");
-		$low3=mysql_result($result4,0,"SF_Low_Range");
-		$low4=mysql_result($result4,0,"PF_Low_Range");
-		$low5=mysql_result($result4,0,"C_Low_Range");
+		$low1=$db->sql_result($result4,0,"PG_Low_Range");;
+		$low2=$db->sql_result($result4,0,"SG_Low_Range");
+		$low3=$db->sql_result($result4,0,"SF_Low_Range");
+		$low4=$db->sql_result($result4,0,"PF_Low_Range");
+		$low5=$db->sql_result($result4,0,"C_Low_Range");
 
-		$high1=mysql_result($result4,0,"PG_High_Range");
-		$high2=mysql_result($result4,0,"SG_High_Range");
-		$high3=mysql_result($result4,0,"SF_High_Range");
-		$high4=mysql_result($result4,0,"PF_High_Range");
-		$high5=mysql_result($result4,0,"C_High_Range");
+		$high1=$db->sql_result($result4,0,"PG_High_Range");
+		$high2=$db->sql_result($result4,0,"SG_High_Range");
+		$high3=$db->sql_result($result4,0,"SF_High_Range");
+		$high4=$db->sql_result($result4,0,"PF_High_Range");
+		$high5=$db->sql_result($result4,0,"C_High_Range");
 
 		$totalslots = $high1+$high2+$high3+$high4+$high5-$low1-$low2-$low3-$low4-$low5+5;
 
@@ -2899,8 +2910,8 @@ function editset($username, $bypass=0, $hid=0, $url=0)
 			$k=0;
 
 			while ($k < $num5) {
-				$playername=mysql_result($result5,$k,"name");
-				$pid=mysql_result($result5,$k,"pid");
+				$playername=$db->sql_result($result5,$k,"name");
+				$pid=$db->sql_result($result5,$k,"pid");
 
 				echo "<a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$playername</a> | ";
 
@@ -2991,7 +3002,7 @@ function changesetgo($username, $action, $set, $type, $position)
 	$sqla = "SELECT * FROM nuke_ibl_offense_sets WHERE `TeamName` = '$teamlogo' AND `SetNumber` = '$set'";
 	$resulta = $db->sql_query($sqla);
 
-	$newtarget=mysql_result($resulta,0,"$query_loc");
+	$newtarget=$db->sql_result($resulta,0,"$query_loc");
 
 	if ($action == 'add') {
 		if ($type == 'low') {
@@ -3143,7 +3154,7 @@ function trainingpage($username)
 
 	$teamlogo = $userinfo[user_ibl_team];
 	$queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$teamlogo'";
-	$tid = mysql_result(mysql_query($queryTeamID), 0);
+	$tid = $db->sql_result($db->sql_query($queryTeamID), 0);
 
 	echo "<hr>
 	<center><img src=\"images/logo/$tid.jpg\"><br>
@@ -3319,30 +3330,30 @@ if ($Team_Name != NULL )
 
 	while ($i < $numtr)
 	{
-		$training_pref_set=mysql_result($resulttr,$i,"training_set");
-		$fga=mysql_result($resulttr,$i,"2ga");
-		$fgp=mysql_result($resulttr,$i,"2gp");
-		$fta=mysql_result($resulttr,$i,"fta");
-		$ftp=mysql_result($resulttr,$i,"ftp");
-		$tga=mysql_result($resulttr,$i,"3ga");
-		$tgp=mysql_result($resulttr,$i,"3gp");
-		$orb=mysql_result($resulttr,$i,"orb");
-		$drb=mysql_result($resulttr,$i,"drb");
-		$ast=mysql_result($resulttr,$i,"ast");
-		$stl=mysql_result($resulttr,$i,"stl");
-		$tvr=mysql_result($resulttr,$i,"tvr");
-		$blk=mysql_result($resulttr,$i,"blk");
+		$training_pref_set=$db->sql_result($resulttr,$i,"training_set");
+		$fga=$db->sql_result($resulttr,$i,"2ga");
+		$fgp=$db->sql_result($resulttr,$i,"2gp");
+		$fta=$db->sql_result($resulttr,$i,"fta");
+		$ftp=$db->sql_result($resulttr,$i,"ftp");
+		$tga=$db->sql_result($resulttr,$i,"3ga");
+		$tgp=$db->sql_result($resulttr,$i,"3gp");
+		$orb=$db->sql_result($resulttr,$i,"orb");
+		$drb=$db->sql_result($resulttr,$i,"drb");
+		$ast=$db->sql_result($resulttr,$i,"ast");
+		$stl=$db->sql_result($resulttr,$i,"stl");
+		$tvr=$db->sql_result($resulttr,$i,"tvr");
+		$blk=$db->sql_result($resulttr,$i,"blk");
 
-		$oo=mysql_result($resulttr,$i,"oo");
-		$do=mysql_result($resulttr,$i,"do");
-		$po=mysql_result($resulttr,$i,"po");
-		$to=mysql_result($resulttr,$i,"to");
-		$od=mysql_result($resulttr,$i,"od");
-		$dd=mysql_result($resulttr,$i,"dd");
-		$pd=mysql_result($resulttr,$i,"pd");
-		$td=mysql_result($resulttr,$i,"td");
-		$Foul=mysql_result($resulttr,$i,"Foul");
-		$Sta=mysql_result($resulttr,$i,"Sta");
+		$oo=$db->sql_result($resulttr,$i,"oo");
+		$do=$db->sql_result($resulttr,$i,"do");
+		$po=$db->sql_result($resulttr,$i,"po");
+		$to=$db->sql_result($resulttr,$i,"to");
+		$od=$db->sql_result($resulttr,$i,"od");
+		$dd=$db->sql_result($resulttr,$i,"dd");
+		$pd=$db->sql_result($resulttr,$i,"pd");
+		$td=$db->sql_result($resulttr,$i,"td");
+		$Foul=$db->sql_result($resulttr,$i,"Foul");
+		$Sta=$db->sql_result($resulttr,$i,"Sta");
 
 
 
@@ -3402,6 +3413,8 @@ As a reminder, you should enter between 1 and 7 for each training value.  It is 
 
 function financialdisplay($matrix,$yr,$tid)
 {
+	global $db;
+
 	$financial_result=$matrix;
 	$contract_matrix=$financial_result[0];
 
@@ -3420,12 +3433,12 @@ function financialdisplay($matrix,$yr,$tid)
 
 	// NEW CBA FINANCIAL PLANNER
 	$iteration=1;
-	$cap_amount[1]=mysql_result(mysql_query("SELECT value FROM nuke_ibl_settings WHERE name = 'Hard_Cap_Year_1' "),0,"value");
-	$cap_amount[2]=mysql_result(mysql_query("SELECT value FROM nuke_ibl_settings WHERE name = 'Hard_Cap_Year_2' "),0,"value");
-	$cap_amount[3]=mysql_result(mysql_query("SELECT value FROM nuke_ibl_settings WHERE name = 'Hard_Cap_Year_3' "),0,"value");
-	$cap_amount[4]=mysql_result(mysql_query("SELECT value FROM nuke_ibl_settings WHERE name = 'Hard_Cap_Year_4' "),0,"value");
-	$cap_amount[5]=mysql_result(mysql_query("SELECT value FROM nuke_ibl_settings WHERE name = 'Hard_Cap_Year_5' "),0,"value");
-	$cap_amount[6]=mysql_result(mysql_query("SELECT value FROM nuke_ibl_settings WHERE name = 'Hard_Cap_Year_6' "),0,"value");
+	$cap_amount[1]=$db->sql_result($db->sql_query("SELECT value FROM nuke_ibl_settings WHERE name = 'Hard_Cap_Year_1' "),0,"value");
+	$cap_amount[2]=$db->sql_result($db->sql_query("SELECT value FROM nuke_ibl_settings WHERE name = 'Hard_Cap_Year_2' "),0,"value");
+	$cap_amount[3]=$db->sql_result($db->sql_query("SELECT value FROM nuke_ibl_settings WHERE name = 'Hard_Cap_Year_3' "),0,"value");
+	$cap_amount[4]=$db->sql_result($db->sql_query("SELECT value FROM nuke_ibl_settings WHERE name = 'Hard_Cap_Year_4' "),0,"value");
+	$cap_amount[5]=$db->sql_result($db->sql_query("SELECT value FROM nuke_ibl_settings WHERE name = 'Hard_Cap_Year_5' "),0,"value");
+	$cap_amount[6]=$db->sql_result($db->sql_query("SELECT value FROM nuke_ibl_settings WHERE name = 'Hard_Cap_Year_6' "),0,"value");
 
 	while ($season_min < $season_max) {
 		$cap_space=$cap_amount[$iteration];
@@ -3487,30 +3500,32 @@ function financialdisplay($matrix,$yr,$tid)
 
 function standings ($team)
 {
+	global $db;
+
 	$query="SELECT * FROM nuke_ibl_power WHERE Team = '$team'";
-	$result=mysql_query($query);
-	$num=mysql_numrows($result);
-	$Team=mysql_result($result,0,"Team");
-	$win=mysql_result($result,$i,"win");
-	$loss=mysql_result($result,$i,"loss");
-	$gb=mysql_result($result,0,"gb");
-	$division=mysql_result($result,0,"Division");
-	$conference=mysql_result($result,0,"Conference");
-	$home_win=mysql_result($result,0,"home_win");
-	$home_loss=mysql_result($result,0,"home_loss");
-	$road_win=mysql_result($result,0,"road_win");
-	$road_loss=mysql_result($result,0,"road_loss");
-	$last_win=mysql_result($result,0,"last_win");
-	$last_loss=mysql_result($result,0,"last_loss");
+	$result=$db->sql_query($query);
+	$num=$db->sql_numrows($result);
+	$Team=$db->sql_result($result,0,"Team");
+	$win=$db->sql_result($result,$i,"win");
+	$loss=$db->sql_result($result,$i,"loss");
+	$gb=$db->sql_result($result,0,"gb");
+	$division=$db->sql_result($result,0,"Division");
+	$conference=$db->sql_result($result,0,"Conference");
+	$home_win=$db->sql_result($result,0,"home_win");
+	$home_loss=$db->sql_result($result,0,"home_loss");
+	$road_win=$db->sql_result($result,0,"road_win");
+	$road_loss=$db->sql_result($result,0,"road_loss");
+	$last_win=$db->sql_result($result,0,"last_win");
+	$last_loss=$db->sql_result($result,0,"last_loss");
 
 	$query2="SELECT * FROM nuke_ibl_power WHERE Division = '$division' ORDER BY gb DESC";
-	$result2=mysql_query($query2);
-	$num=mysql_numrows($result2);
+	$result2=$db->sql_query($query2);
+	$num=$db->sql_numrows($result2);
 	$i=0;
-	$gbbase=mysql_result($result2,$i,"gb");
+	$gbbase=$db->sql_result($result2,$i,"gb");
 	$gb=$gbbase-$gb;
 	while ($i < $num) {
-		$Team2=mysql_result($result2,$i,"Team");
+		$Team2=$db->sql_result($result2,$i,"Team");
 		if ($Team2 == $Team) {
 			$Div_Pos=$i+1;
 		}
@@ -3518,11 +3533,11 @@ function standings ($team)
 	}
 
 	$query3="SELECT * FROM nuke_ibl_power WHERE Conference = '$conference' ORDER BY gb DESC";
-	$result3=mysql_query($query3);
-	$num=mysql_numrows($result3);
+	$result3=$db->sql_query($query3);
+	$num=$db->sql_numrows($result3);
 	$i=0;
 	while ($i < $num) {
-		$Team3=mysql_result($result3,$i,"Team");
+		$Team3=$db->sql_result($result3,$i,"Team");
 		if ($Team3 == $Team) {
 			$Conf_Pos=$i+1;
 		}
@@ -3578,11 +3593,11 @@ function asg_voting()
 			echo "Sorry, you must be logged in to vote.<br>";
 		} else {
 			$queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$teamlogo'";
-			$tid = mysql_result(mysql_query($queryTeamID), 0);
+			$tid = $db->sql_result($db->sql_query($queryTeamID), 0);
 			echo "<form name=\"ASGVote\" method=\"post\" action=\"./ASGVote.php\"><center><img src=\"images/logo/$tid.jpg\"><br><br>";
 			$query = "SELECT * FROM nuke_iblplyr where pos = 'C' and (tid = '1' or tid = '26' or tid = '4' or tid = '3' or tid = '21' or tid = '2' or tid = '24' or tid = '29' or tid = '6' or tid = '27' or tid = '9' or tid = '7' or tid = '10' or tid = '5' or tid = '8' or tid = '31') and teamname != 'Retired' and stats_gm > '10' order by (((stats_3gm*3)+stats_ftm+(stats_fgm-stats_3gm)*2)+stats_orb+stats_drb+(2*stats_ast)+(2*stats_stl)+(2*stats_blk)-((stats_fga-stats_fgm)+(stats_fta-stats_ftm)+stats_to+stats_pf))/stats_gm desc";
-			$result = mysql_query($query);
-			while($row = mysql_fetch_assoc($result)) {
+			$result = $db->sql_query($query);
+			while($row = $db->sql_fetch_assoc($result)) {
 				$ppg = floatval($row['stats_3gm']*3 + ($row['stats_fgm']-$row['stats_3gm'])*2+ $row['stats_ftm']) / intval($row['stats_gm']);
 				$ppg = round($ppg,1);
 				$rpg = floatval($row['stats_orb'] + $row['stats_drb']) / intval($row['stats_gm']);
@@ -3606,8 +3621,8 @@ function asg_voting()
 				$dd .= "<option value='".$row['name'].", ".$row['teamname']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl,  ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp, ".$gm." gm, ".$gs." gs</option>";
 			}
 			$query1 = "SELECT * FROM nuke_iblplyr where (pos = 'PF' or pos = 'SF') and (tid = '1' or tid = '26' or tid = '4' or tid = '3' or tid = '21' or tid = '2' or tid = '24' or tid = '29' or tid = '6' or tid = '27' or tid = '9' or tid = '7' or tid = '10' or tid = '5' or tid = '8' or tid = '31') and teamname != 'Retired' order by (((stats_3gm*3)+stats_ftm+(stats_fgm-stats_3gm)*2)+stats_orb+stats_drb+(2*stats_ast)+(2*stats_stl)+(2*stats_blk)-((stats_fga-stats_fgm)+(stats_fta-stats_ftm)+stats_to+stats_pf))/stats_gm desc";
-			$result1 = mysql_query($query1);
-			while($row = mysql_fetch_assoc($result1)) {
+			$result1 = $db->sql_query($query1);
+			while($row = $db->sql_fetch_assoc($result1)) {
 				$ppg = floatval($row['stats_3gm']*3 + ($row['stats_fgm']-$row['stats_3gm'])*2+ $row['stats_ftm']) / intval($row['stats_gm']);
 				$ppg = round($ppg,1);
 				$rpg = floatval($row['stats_orb'] + $row['stats_drb']) / intval($row['stats_gm']);
@@ -3631,8 +3646,8 @@ function asg_voting()
 				$ff .= "<option value='".$row['name'].", ".$row['teamname']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl,  ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp, ".$gm." gm, ".$gs." gs</option>";
 			}
 			$query2 = "SELECT * FROM nuke_iblplyr where (pos = 'PG' or pos = 'SG') and (tid = '1' or tid = '26' or tid = '4' or tid = '3' or tid = '21' or tid = '2' or tid = '24' or tid = '29' or tid = '6' or tid = '27' or tid = '9' or tid = '7' or tid = '10' or tid = '5' or tid = '8' or tid = '31') and teamname != 'Retired' order by (((stats_3gm*3)+stats_ftm+(stats_fgm-stats_3gm)*2)+stats_orb+stats_drb+(2*stats_ast)+(2*stats_stl)+(2*stats_blk)-((stats_fga-stats_fgm)+(stats_fta-stats_ftm)+stats_to+stats_pf))/stats_gm desc";
-			$result2 = mysql_query($query2);
-			while($row = mysql_fetch_assoc($result2)) {
+			$result2 = $db->sql_query($query2);
+			while($row = $db->sql_fetch_assoc($result2)) {
 				$ppg = floatval($row['stats_3gm']*3 + ($row['stats_fgm']-$row['stats_3gm'])*2+ $row['stats_ftm']) / intval($row['stats_gm']);
 				$ppg = round($ppg,1);
 				$rpg = floatval($row['stats_orb'] + $row['stats_drb']) / intval($row['stats_gm']);
@@ -3656,8 +3671,8 @@ function asg_voting()
 				$hh .= "<option value='".$row['name'].", ".$row['teamname']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl,  ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp, ".$gm." gm, ".$gs." gs</option>";
 			}
 			$query3 = "SELECT * FROM nuke_iblplyr where pos = 'C' and (tid = '11' or tid = '25' or tid = '30' or tid = '13' or tid = '14' or tid = '15' or tid = '12' or tid = '32' or tid = '16' or tid = '17' or tid = '22' or tid = '20' or tid = '19' or tid = '23' or tid = '18' or tid = '28') and teamname != 'Retired' order by (((stats_3gm*3)+stats_ftm+(stats_fgm-stats_3gm)*2)+stats_orb+stats_drb+(2*stats_ast)+(2*stats_stl)+(2*stats_blk)-((stats_fga-stats_fgm)+(stats_fta-stats_ftm)+stats_to+stats_pf))/stats_gm desc";
-			$result3 = mysql_query($query3);
-			while($row = mysql_fetch_assoc($result3)) {
+			$result3 = $db->sql_query($query3);
+			while($row = $db->sql_fetch_assoc($result3)) {
 				$ppg = floatval($row['stats_3gm']*3 + ($row['stats_fgm']-$row['stats_3gm'])*2+ $row['stats_ftm']) / intval($row['stats_gm']);
 				$ppg = round($ppg,1);
 				$rpg = floatval($row['stats_orb'] + $row['stats_drb']) / intval($row['stats_gm']);
@@ -3681,8 +3696,8 @@ function asg_voting()
 				$ii .= "<option value='".$row['name'].", ".$row['teamname']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl,  ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp, ".$gm." gm, ".$gs." gs</option>";
 			}
 			$query4 = "SELECT * FROM nuke_iblplyr where (pos = 'PF' or pos = 'SF') and (tid = '11' or tid = '25' or tid = '30' or tid = '13' or tid = '14' or tid = '15' or tid = '12' or tid = '32' or tid = '16' or tid = '17' or tid = '22' or tid = '20' or tid = '19' or tid = '23' or tid = '18' or tid = '28') and teamname != 'Retired' order by (((stats_3gm*3)+stats_ftm+(stats_fgm-stats_3gm)*2)+stats_orb+stats_drb+(2*stats_ast)+(2*stats_stl)+(2*stats_blk)-((stats_fga-stats_fgm)+(stats_fta-stats_ftm)+stats_to+stats_pf))/stats_gm desc";
-			$result4 = mysql_query($query4);
-			while($row = mysql_fetch_assoc($result4)) {
+			$result4 = $db->sql_query($query4);
+			while($row = $db->sql_fetch_assoc($result4)) {
 				$ppg = floatval($row['stats_3gm']*3 + ($row['stats_fgm']-$row['stats_3gm'])*2+ $row['stats_ftm']) / intval($row['stats_gm']);
 				$ppg = round($ppg,1);
 				$rpg = floatval($row['stats_orb'] + $row['stats_drb']) / intval($row['stats_gm']);
@@ -3706,8 +3721,8 @@ function asg_voting()
 				$jj .= "<option value='".$row['name'].", ".$row['teamname']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl,  ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp, ".$gm." gm, ".$gs." gs</option>";
 			}
 			$query5 = "SELECT * FROM nuke_iblplyr where (pos = 'PG' or pos = 'SG') and (tid = '11' or tid = '25' or tid = '30' or tid = '13' or tid = '14' or tid = '15' or tid = '12' or tid = '32' or tid = '16' or tid = '17' or tid = '22' or tid = '20' or tid = '19' or tid = '23' or tid = '18' or tid = '28') and teamname != 'Retired' order by (((stats_3gm*3)+stats_ftm+(stats_fgm-stats_3gm)*2)+stats_orb+stats_drb+(2*stats_ast)+(2*stats_stl)+(2*stats_blk)-((stats_fga-stats_fgm)+(stats_fta-stats_ftm)+stats_to+stats_pf))/stats_gm desc";
-			$result5 = mysql_query($query5);
-			while($row = mysql_fetch_assoc($result5)) {
+			$result5 = $db->sql_query($query5);
+			while($row = $db->sql_fetch_assoc($result5)) {
 				$ppg = floatval($row['stats_3gm']*3 + ($row['stats_fgm']-$row['stats_3gm'])*2+ $row['stats_ftm']) / intval($row['stats_gm']);
 				$ppg = round($ppg,1);
 				$rpg = floatval($row['stats_orb'] + $row['stats_drb']) / intval($row['stats_gm']);
@@ -3820,12 +3835,12 @@ function eoy_voting()
 			echo "Sorry, you must be logged in to vote.<br>";
 		} else {
 			$queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$teamlogo'";
-			$tid = mysql_result(mysql_query($queryTeamID), 0);
+			$tid = $db->sql_result($db->sql_query($queryTeamID), 0);
 			echo "<form name=\"EOYVote\" method=\"post\" action=\"./EOYVote.php\"><center><img src=\"images/logo/$tid.jpg\"><br><br>";
 			$query = "SELECT * FROM nuke_iblplyr where teamname != 'Retired' and stats_gm >= '55' and (stats_min/stats_gm) >= 24 order by (((stats_3gm*3)+stats_ftm+(stats_fgm-stats_3gm)*2)+stats_orb+stats_drb+(2*stats_ast)+(2*stats_stl)+(2*stats_blk)-((stats_fga-stats_fgm)+(stats_fta-stats_ftm)+stats_to+stats_pf))/stats_gm desc";
 
-			$result = mysql_query($query);
-			while($row = mysql_fetch_assoc($result)) {
+			$result = $db->sql_query($query);
+			while($row = $db->sql_fetch_assoc($result)) {
 				$ppg = floatval($row['stats_3gm']*3 + ($row['stats_fgm']-$row['stats_3gm'])*2+ $row['stats_ftm']) / intval($row['stats_gm']);
 				$ppg = round($ppg,1);
 				$rpg = floatval($row['stats_orb'] + $row['stats_drb']) / intval($row['stats_gm']);
@@ -3849,8 +3864,8 @@ function eoy_voting()
 				$dd .= "<option value='".$row['name'].", ".$row['teamname']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl,  ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp, ".$gm." gm, ".$gs." gs</option>";
 			}
 			$query1 = "SELECT * FROM nuke_iblplyr where teamname != 'Retired' and (stats_gs/stats_gm) <= '0.5' and stats_gm > '55' order by (((stats_3gm*3)+stats_ftm+(stats_fgm-stats_3gm)*2)+stats_orb+stats_drb+(2*stats_ast)+(2*stats_stl)+(2*stats_blk)-((stats_fga-stats_fgm)+(stats_fta-stats_ftm)+stats_to+stats_pf))/stats_gm desc";
-			$result1 = mysql_query($query1);
-			while($row = mysql_fetch_assoc($result1)) {
+			$result1 = $db->sql_query($query1);
+			while($row = $db->sql_fetch_assoc($result1)) {
 				$ppg = floatval($row['stats_3gm']*3 + ($row['stats_fgm']-$row['stats_3gm'])*2+ $row['stats_ftm']) / intval($row['stats_gm']);
 				$ppg = round($ppg,1);
 				$rpg = floatval($row['stats_orb'] + $row['stats_drb']) / intval($row['stats_gm']);
@@ -3874,8 +3889,8 @@ function eoy_voting()
 				$ff .= "<option value='".$row['name'].", ".$row['teamname']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl,  ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp, ".$gm." gm, ".$gs." gs</option>";
 			}
 			$query2 = "SELECT * FROM nuke_iblplyr where teamname != 'Retired' and exp = '1' and stats_gm >= '55' and (stats_min/stats_gm) >= 24 order by (((stats_3gm*3)+stats_ftm+(stats_fgm-stats_3gm)*2)+stats_orb+stats_drb+(2*stats_ast)+(2*stats_stl)+(2*stats_blk)-((stats_fga-stats_fgm)+(stats_fta-stats_ftm)+stats_to+stats_pf))/stats_gm desc";
-			$result2 = mysql_query($query2);
-			while($row = mysql_fetch_assoc($result2)) {
+			$result2 = $db->sql_query($query2);
+			while($row = $db->sql_fetch_assoc($result2)) {
 				$ppg = floatval($row['stats_3gm']*3 + ($row['stats_fgm']-$row['stats_3gm'])*2+ $row['stats_ftm']) / intval($row['stats_gm']);
 				$ppg = round($ppg,1);
 				$rpg = floatval($row['stats_orb'] + $row['stats_drb']) / intval($row['stats_gm']);
@@ -3899,8 +3914,8 @@ function eoy_voting()
 				$hh .= "<option value='".$row['name'].", ".$row['teamname']."'>".$row['name'].", ".$row['teamname'].", ".$ppg." pts, ".$rpg." reb, ".$apg." ast, ".$spg." stl,  ".$tpg." to, ".$bpg." blk, ".$fgp." fgp, ".$ftp." ftp, ".$tpp." 3gp, ".$gm." gm, ".$gs." gs</option>";
 			}
 			$query3 = "SELECT * from nuke_ibl_team_info where teamid != '35' order by owner_name";
-			$result3 = mysql_query($query3);
-			while($row = mysql_fetch_assoc($result3)) {
+			$result3 = $db->sql_query($query3);
+			while($row = $db->sql_fetch_assoc($result3)) {
 				$ii .= "<option value='".$row['owner_name'].", ".$row['team_city']." ".$row['team_name']."'>".$row['owner_name'].", ".$row['team_city']." ".$row['team_name']."</option>";
 			}
 			echo "
@@ -3993,23 +4008,23 @@ function asg_results()
 		echo "Sorry, only the IBL Executive Staff may view this page.<br>";
 	} else {
 		$query1="select count(name) as votes,name from (select East_C as name from IBL_ASG_Votes) as tbl group by name having count(name) > 0 order by 1 desc;";
-		$result1=mysql_query($query1);
-		$num1=mysql_num_rows($result1);
+		$result1=$db->sql_query($query1);
+		$num1=$db->sql_numrows($result1);
 		$query2="select count(name) as votes,name from (select East_F1 as name from IBL_ASG_Votes union all select East_F2 from IBL_ASG_Votes) as tbl group by name having count(name) > 0 order by 1 desc;";
-		$result2=mysql_query($query2);
-		$num2=mysql_num_rows($result2);
+		$result2=$db->sql_query($query2);
+		$num2=$db->sql_numrows($result2);
 		$query3="select count(name) as votes,name from (select East_G1 as name from IBL_ASG_Votes union all select East_G2 from IBL_ASG_Votes) as tbl group by name having count(name) > 0 order by 1 desc;";
-		$result3=mysql_query($query3);
-		$num3=mysql_num_rows($result3);
+		$result3=$db->sql_query($query3);
+		$num3=$db->sql_numrows($result3);
 		$query4="select count(name) as votes,name from (select West_C as name from IBL_ASG_Votes) as tbl group by name having count(name) > 0 order by 1 desc;";
-		$result4=mysql_query($query4);
-		$num4=mysql_num_rows($result4);
+		$result4=$db->sql_query($query4);
+		$num4=$db->sql_numrows($result4);
 		$query5="select count(name) as votes,name from (select West_F1 as name from IBL_ASG_Votes union all select West_F2 from IBL_ASG_Votes) as tbl group by name having count(name) > 0 order by 1 desc;";
-		$result5=mysql_query($query5);
-		$num5=mysql_num_rows($result5);
+		$result5=$db->sql_query($query5);
+		$num5=$db->sql_numrows($result5);
 		$query6="select count(name) as votes,name from (select West_G1 as name from IBL_ASG_Votes union all select West_G2 from IBL_ASG_Votes) as tbl group by name having count(name) > 0 order by 1 desc;";
-		$result6=mysql_query($query6);
-		$num6=mysql_num_rows($result6);
+		$result6=$db->sql_query($query6);
+		$num6=$db->sql_numrows($result6);
 
 		//    OpenTable();
 
@@ -4020,44 +4035,44 @@ function asg_results()
 		$n=0;
 		$o=0;
 		while ($k < $num1) {
-			$player[$k]=mysql_result($result1,$k, "name");
-			$votes[$k]=mysql_result($result1,$k);
+			$player[$k]=$db->sql_result($result1,$k, "name");
+			$votes[$k]=$db->sql_result($result1,$k);
 			$table_echo=$table_echo."<tr><td>".$player[$k]."</td><td>".$votes[$k]."</td></tr>";
 			$k++;
 		}
 
 		$text=$text."<table class=\"sortable\" border=1><tr><th>Player</th><th> Votes</th></tr>$table_echo</table><br><br>";
 		while ($h < $num2) {
-			$player[$h]=mysql_result($result2,$h, "name");
-			$votes[$h]=mysql_result($result2,$h);
+			$player[$h]=$db->sql_result($result2,$h, "name");
+			$votes[$h]=$db->sql_result($result2,$h);
 			$table_echo1=$table_echo1."<tr><td>".$player[$h]."</td><td>".$votes[$h]."</td></tr>";
 			$h++;
 		}
 		$text1=$text1."<table class=\"sortable\" border=1><tr><th>Player</th><th> Votes</th></tr>$table_echo1</table><br><br>";
 		while ($i < $num3) {
-			$player[$i]=mysql_result($result3,$i, "name");
-			$votes[$i]=mysql_result($result3,$i);
+			$player[$i]=$db->sql_result($result3,$i, "name");
+			$votes[$i]=$db->sql_result($result3,$i);
 			$table_echo2=$table_echo2."<tr><td>".$player[$i]."</td><td>".$votes[$i]."</td></tr>";
 			$i++;
 		}
 		$text2=$text2."<table class=\"sortable\" border=1><tr><th>Player</th><th> Votes</th></tr>$table_echo2</table><br><br>";
 		while ($m < $num4) {
-			$player[$m]=mysql_result($result4,$m, "name");
-			$votes[$m]=mysql_result($result4,$m);
+			$player[$m]=$db->sql_result($result4,$m, "name");
+			$votes[$m]=$db->sql_result($result4,$m);
 			$table_echo3=$table_echo3."<tr><td>".$player[$m]."</td><td>".$votes[$m]."</td></tr>";
 			$m++;
 		}
 		$text3=$text3."<table class=\"sortable\" border=1><tr><th>Player</th><th> Votes</th></tr>$table_echo3</table><br><br>";
 		while ($n < $num5) {
-			$player[$n]=mysql_result($result5,$n, "name");
-			$votes[$n]=mysql_result($result5,$n);
+			$player[$n]=$db->sql_result($result5,$n, "name");
+			$votes[$n]=$db->sql_result($result5,$n);
 			$table_echo4=$table_echo4."<tr><td>".$player[$n]."</td><td>".$votes[$n]."</td></tr>";
 			$n++;
 		}
 		$text4=$text4."<table class=\"sortable\" border=1><tr><th>Player</th><th> Votes</th></tr>$table_echo4</table><br><br>";
 		while ($o < $num6) {
-			$player[$o]=mysql_result($result6,$o, "name");
-			$votes[$o]=mysql_result($result6,$o);
+			$player[$o]=$db->sql_result($result6,$o, "name");
+			$votes[$o]=$db->sql_result($result6,$o);
 			$table_echo5=$table_echo5."<tr><td>".$player[$o]."</td><td>".$votes[$o]."</td></tr>";
 			$o++;
 		}
@@ -4106,33 +4121,33 @@ function eoy_results()
 		echo "Sorry, only the IBL Executive Staff may view this page.<br>";
 	} else {
 		$query1="select sum(score) as votes,name from (select MVP_1 as name, 3 as score from IBL_EOY_Votes union all select MVP_2 as name, 2 as score from IBL_EOY_Votes union all select MVP_3 as name, 1 as score from IBL_EOY_Votes) as tbl group by name;";
-		$result1=mysql_query($query1);
-		$num1=mysql_num_rows($result1);
+		$result1=$db->sql_query($query1);
+		$num1=$db->sql_numrows($result1);
 		$query15="select sum(score) as votes,name from (select MVP_1 as name, 1 as score from IBL_EOY_Votes) as tbl group by name;";
-		$result15=mysql_query($query15);
-		$num15=mysql_num_rows($result15);
+		$result15=$db->sql_query($query15);
+		$num15=$db->sql_numrows($result15);
 
 		$query2="select sum(score) as votes,name from (select Six_1 as name, 3 as score from IBL_EOY_Votes union all select Six_2 as name, 2 as score from IBL_EOY_Votes union all select Six_3 as name, 1 as score from IBL_EOY_Votes) as tbl group by name;";
-		$result2=mysql_query($query2);
-		$num2=mysql_num_rows($result2);
+		$result2=$db->sql_query($query2);
+		$num2=$db->sql_numrows($result2);
 		$query3="select sum(score) as votes,name from (select ROY_1 as name, 3 as score from IBL_EOY_Votes union all select ROY_2 as name, 2 as score from IBL_EOY_Votes union all select ROY_3 as name, 1 as score from IBL_EOY_Votes) as tbl group by name;";
-		$result3=mysql_query($query3);
-		$num3=mysql_num_rows($result3);
+		$result3=$db->sql_query($query3);
+		$num3=$db->sql_numrows($result3);
 		$query4="select sum(score) as votes,name from (select GM_1 as name, 3 as score from IBL_EOY_Votes union all select GM_2 as name, 2 as score from IBL_EOY_Votes union all select GM_3 as name, 1 as score from IBL_EOY_Votes) as tbl group by name;";
-		$result4=mysql_query($query4);
-		$num4=mysql_num_rows($result4);
+		$result4=$db->sql_query($query4);
+		$num4=$db->sql_numrows($result4);
 		$query5="select count(name) as votes,name from (select MVP_1 as name from IBL_EOY_Votes) as tbl group by name having count(name) > 0 order by 1 desc;";
-		$result5=mysql_query($query5);
-		$num5=mysql_num_rows($result5);
+		$result5=$db->sql_query($query5);
+		$num5=$db->sql_numrows($result5);
 		$query6="select count(name) as votes,name from (select Six_1 as name from IBL_EOY_Votes) as tbl group by name having count(name) > 0 order by 1 desc;";
-		$result6=mysql_query($query6);
-		$num6=mysql_num_rows($result6);
+		$result6=$db->sql_query($query6);
+		$num6=$db->sql_numrows($result6);
 		$query7="select count(name) as votes,name from (select ROY_1 as name from IBL_EOY_Votes) as tbl group by name having count(name) > 0 order by 1 desc;";
-		$result7=mysql_query($query7);
-		$num7=mysql_num_rows($result7);
+		$result7=$db->sql_query($query7);
+		$num7=$db->sql_numrows($result7);
 		$query8="select count(name) as votes,name from (select GM_1 as name from IBL_EOY_Votes) as tbl group by name having count(name) > 0 order by 1 desc;";
-		$result8=mysql_query($query8);
-		$num8=mysql_num_rows($result8);
+		$result8=$db->sql_query($query8);
+		$num8=$db->sql_numrows($result8);
 
 		OpenTable();
 		$k=0;
@@ -4145,8 +4160,8 @@ function eoy_results()
 		$z=0;
 
 		while ($k < $num1) {
-			$player[$k]=mysql_result($result1,$k, "name");
-			$votes[$k]=mysql_result($result1,$k);
+			$player[$k]=$db->sql_result($result1,$k, "name");
+			$votes[$k]=$db->sql_result($result1,$k);
 
 			$table_echo=$table_echo."<tr><td>".$player[$k]."</td><td>".$votes[$k]."</td></tr>";
 			$k++;
@@ -4155,53 +4170,53 @@ function eoy_results()
 		$text=$text."<table class=\"sortable\" border=1><tr><th>Player</th><th> Score</th></tr>$table_echo</table><br><br>";
 
 		while ($h < $num2) {
-			$player[$h]=mysql_result($result2,$h, "name");
-			$votes[$h]=mysql_result($result2,$h);
+			$player[$h]=$db->sql_result($result2,$h, "name");
+			$votes[$h]=$db->sql_result($result2,$h);
 			$table_echo1=$table_echo1."<tr><td>".$player[$h]."</td><td>".$votes[$h]."</td></tr>";
 			$h++;
 		}
 		$text1=$text1."<table class=\"sortable\" border=1><tr><th>Player</th><th> Score</th></tr>$table_echo1</table><br><br>";
 		while ($i < $num3) {
-			$player[$i]=mysql_result($result3,$i, "name");
-			$votes[$i]=mysql_result($result3,$i);
+			$player[$i]=$db->sql_result($result3,$i, "name");
+			$votes[$i]=$db->sql_result($result3,$i);
 			$table_echo2=$table_echo2."<tr><td>".$player[$i]."</td><td>".$votes[$i]."</td></tr>";
 			$i++;
 		}
 		$text2=$text2."<table class=\"sortable\" border=1><tr><th>Player</th><th> Score</th></tr>$table_echo2</table><br><br>";
 		while ($m < $num4) {
-			$player[$m]=mysql_result($result4,$m, "name");
-			$votes[$m]=mysql_result($result4,$m);
+			$player[$m]=$db->sql_result($result4,$m, "name");
+			$votes[$m]=$db->sql_result($result4,$m);
 			$table_echo3=$table_echo3."<tr><td>".$player[$m]."</td><td>".$votes[$m]."</td></tr>";
 			$m++;
 		}
 		$text3=$text3."<table class=\"sortable\" border=1><tr><th>GM</th><th> Score</th></tr>$table_echo3</table><br><br>";
 		while ($w < $num5) {
-			$player[$w]=mysql_result($result5,$w, "name");
-			$votes[$w]=mysql_result($result5,$w);
+			$player[$w]=$db->sql_result($result5,$w, "name");
+			$votes[$w]=$db->sql_result($result5,$w);
 			$table_echo5=$table_echo5."<tr><td>".$player[$w]."</td><td>".$votes[$w]."</td></tr>";
 			$w++;
 		}
 
 		$text5=$text5."<table class=\"sortable\" border=1><tr><th>Player</th><th> Votes</th></tr>$table_echo5</table><br><br>";
 		while ($x < $num6) {
-			$player[$x]=mysql_result($result6,$x, "name");
-			$votes[$x]=mysql_result($result6,$x);
+			$player[$x]=$db->sql_result($result6,$x, "name");
+			$votes[$x]=$db->sql_result($result6,$x);
 			$table_echo6=$table_echo6."<tr><td>".$player[$x]."</td><td>".$votes[$x]."</td></tr>";
 			$x++;
 		}
 
 		$text6=$text6."<table class=\"sortable\" border=1><tr><th>Player</th><th> Votes</th></tr>$table_echo6</table><br><br>";
 		while ($y < $num7) {
-			$player[$y]=mysql_result($result7,$y, "name");
-			$votes[$y]=mysql_result($result7,$y);
+			$player[$y]=$db->sql_result($result7,$y, "name");
+			$votes[$y]=$db->sql_result($result7,$y);
 			$table_echo7=$table_echo7."<tr><td>".$player[$y]."</td><td>".$votes[$y]."</td></tr>";
 			$y++;
 		}
 
 		$text7=$text7."<table class=\"sortable\" border=1><tr><th>Player</th><th> Votes</th></tr>$table_echo7</table><br><br>";
 		while ($z < $num8) {
-			$player[$z]=mysql_result($result8,$z, "name");
-			$votes[$z]=mysql_result($result8,$z);
+			$player[$z]=$db->sql_result($result8,$z, "name");
+			$votes[$z]=$db->sql_result($result8,$z);
 			$table_echo8=$table_echo8."<tr><td>".$player[$z]."</td><td>".$votes[$z]."</td></tr>";
 			$z++;
 		}
@@ -4231,20 +4246,22 @@ function eoy_results()
 
 function eoy_voters()
 {
+	global $db;
+
 	include("header.php");
 	$query2="SELECT * FROM ibl_team_history WHERE teamid != 35 ORDER BY teamid ASC";
-	$result2=mysql_query($query2);
-	$num2=mysql_num_rows($result2);
+	$result2=$db->sql_query($query2);
+	$num2=$db->sql_numrows($result2);
 
 	OpenTable();
 	$k=0;
 	while ($k < $num2) {
-		$teamname[$k]=mysql_result($result2,$k,"team_name");
-		$teamcity[$k]=mysql_result($result2,$k,"team_city");
-		$teamcolor1[$k]=mysql_result($result2,$k,"color1");
-		$teamcolor2[$k]=mysql_result($result2,$k,"color2");
-		$eoy_vote[$k]=mysql_result($result2,$k,"eoy_vote");
-		$teamid[$k]=mysql_result($result2,$k,"teamid");
+		$teamname[$k]=$db->sql_result($result2,$k,"team_name");
+		$teamcity[$k]=$db->sql_result($result2,$k,"team_city");
+		$teamcolor1[$k]=$db->sql_result($result2,$k,"color1");
+		$teamcolor2[$k]=$db->sql_result($result2,$k,"color2");
+		$eoy_vote[$k]=$db->sql_result($result2,$k,"eoy_vote");
+		$teamid[$k]=$db->sql_result($result2,$k,"teamid");
 
 		$table_echo=$table_echo."<tr><td bgcolor=#".$teamcolor1[$k]."><a href=\"./modules.php?name=Team&op=team&tid=".$teamid[$k]."\"><font color=#".$teamcolor2[$k].">".$teamcity[$k]." ".$teamname[$k]."</a></td><td>".$eoy_vote[$k]."</td></tr>";
 		$k++;
@@ -4257,20 +4274,22 @@ function eoy_voters()
 
 function asg_voters()
 {
+	global $db;
+
 	include("header.php");
 	$query2="SELECT * FROM ibl_team_history WHERE teamid != 35 ORDER BY teamid ASC";
-	$result2=mysql_query($query2);
-	$num2=mysql_num_rows($result2);
+	$result2=$db->sql_query($query2);
+	$num2=$db->sql_numrows($result2);
 
 	OpenTable();
 	$k=0;
 	while ($k < $num2) {
-		$teamname[$k]=mysql_result($result2,$k,"team_name");
-		$teamcity[$k]=mysql_result($result2,$k,"team_city");
-		$teamcolor1[$k]=mysql_result($result2,$k,"color1");
-		$teamcolor2[$k]=mysql_result($result2,$k,"color2");
-		$asg_vote[$k]=mysql_result($result2,$k,"asg_vote");
-		$teamid[$k]=mysql_result($result2,$k,"teamid");
+		$teamname[$k]=$db->sql_result($result2,$k,"team_name");
+		$teamcity[$k]=$db->sql_result($result2,$k,"team_city");
+		$teamcolor1[$k]=$db->sql_result($result2,$k,"color1");
+		$teamcolor2[$k]=$db->sql_result($result2,$k,"color2");
+		$asg_vote[$k]=$db->sql_result($result2,$k,"asg_vote");
+		$teamid[$k]=$db->sql_result($result2,$k,"teamid");
 
 		$table_echo=$table_echo."<tr><td bgcolor=#".$teamcolor1[$k]."><a href=\"./modules.php?name=Team&op=team&tid=".$teamid[$k]."\"><font color=#".$teamcolor2[$k].">".$teamcity[$k]." ".$teamname[$k]."</a></td><td>".$asg_vote[$k]."</td></tr>";
 		$k++;

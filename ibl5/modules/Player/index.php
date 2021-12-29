@@ -2518,14 +2518,6 @@ echo "<b><center>Record: $wins - $losses</center></b></small><br>";
 
 // GAME LOG
 
-function teamname ($teamid)
-{
-    $query="SELECT * FROM nuke_ibl_team_info WHERE teamid = $teamid";
-    $result=mysql_query($query);
-    $name=mysql_result($result, 0, "team_name");
-    return $name;
-}
-
 if ($spec == 0) {
     $currentSeasonEndingYear = Shared::getCurrentSeasonEndingYear();
     $currentSeasonStaringYear = $currentSeasonEndingYear - 1;
@@ -2572,8 +2564,8 @@ if ($spec == 0) {
             </style>
             <tr>
                 <td class=\"gamelog\">$row[Date]</td>
-                <td class=\"gamelog\">".teamname($row[visitorTID])."</td>
-                <td class=\"gamelog\">".teamname($row[homeTID])."</td>
+                <td class=\"gamelog\">".Shared::getTeamnameFromTid($row[visitorTID])."</td>
+                <td class=\"gamelog\">".Shared::getTeamnameFromTid($row[homeTID])."</td>
                 <td class=\"gamelog\">$row[gameMIN]</td>
                 <td class=\"gamelog\">".((2*$row[game2GM])+(3*$row[game3GM])+$row[gameFTM])."</td>
                 <td class=\"gamelog\">".($row[game2GM]+$row[game3GM])."</td>

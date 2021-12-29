@@ -201,8 +201,8 @@ if(!$dbname) {
 
 /* FOLLOWING TWO LINES ARE DEPRECATED BUT ARE HERE FOR OLD MODULES COMPATIBILITY */
 /* PLEASE START USING THE NEW SQL ABSTRACTION LAYER. SEE MODULES DOC FOR DETAILS */
-@require_once(INCLUDE_PATH."includes/sql_layer.php");
-$dbi = sql_connect($dbhost, $dbuname, $dbpass, $dbname);
+// @require_once(INCLUDE_PATH."includes/sql_layer.php");
+// $dbi = sql_connect($dbhost, $dbuname, $dbpass, $dbname);
 
 @require_once(INCLUDE_PATH."includes/ipban.php");
 if (file_exists(INCLUDE_PATH."includes/custom_files/custom_mainfile.php")) {

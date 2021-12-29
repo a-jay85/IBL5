@@ -22,20 +22,20 @@ $query = "SELECT TeamID, Team, ranking, win, loss, color1, color2
     FROM nuke_ibl_power rankings
     INNER JOIN nuke_ibl_team_info info USING (teamid)
     ORDER BY ranking DESC;";
-$result = mysql_query($query);
-$num = mysql_num_rows($result);
+$result = $db->sql_query($query);
+$num = $db->sql_numrows($result);
 
 $content .= "<table width=150>";
 
 $i = 0;
 while ($i < $num) {
-	$tid = mysql_result($result, $i, "TeamID");
-	$Team = mysql_result($result, $i, "Team");
-	$ranking = mysql_result($result, $i, "ranking");
-	$wins = mysql_result($result, $i, "win");
-	$losses = mysql_result($result, $i, "loss");
-	$teamcolor1 = mysql_result($result, $i, "color1");
-	$teamcolor2 = mysql_result($result, $i, "color2");
+	$tid = $db->sql_result($result, $i, "TeamID");
+	$Team = $db->sql_result($result, $i, "Team");
+	$ranking = $db->sql_result($result, $i, "ranking");
+	$wins = $db->sql_result($result, $i, "win");
+	$losses = $db->sql_result($result, $i, "loss");
+	$teamcolor1 = $db->sql_result($result, $i, "color1");
+	$teamcolor2 = $db->sql_result($result, $i, "color2");
 
 	$bgcolor = "$teamcolor1";
 

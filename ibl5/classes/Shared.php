@@ -3,108 +3,122 @@ class Shared
 {
     public static function getLastSimDatesArray()
     {
-        $queryLastSimDates = mysql_query("SELECT *
+        global $db;
+
+        $queryLastSimDates = $db->sql_query("SELECT *
             FROM ibl_sim_dates
             ORDER BY sim DESC
             LIMIT 1");
 
-        return mysql_fetch_assoc($queryLastSimDates);
+        return $db->sql_fetch_assoc($queryLastSimDates);
     }
 
     public static function getCurrentSeasonEndingYear()
     {
-        $queryCurrentSeasonEndingYear = mysql_query("SELECT value
+        global $db;
+
+        $queryCurrentSeasonEndingYear = $db->sql_query("SELECT value
             FROM nuke_ibl_settings
             WHERE name = 'Current Season Ending Year'
             LIMIT 1");
 
-        return mysql_result($queryCurrentSeasonEndingYear, 0);
+        return $db->sql_result($queryCurrentSeasonEndingYear, 0);
     }
 
     public static function getCurrentSeasonPhase()
     {
-        $queryCurrentSeasonPhase = mysql_query("SELECT value
+        global $db;
+
+        $queryCurrentSeasonPhase = $db->sql_query("SELECT value
             FROM nuke_ibl_settings
             WHERE name = 'Current Season Phase'
             LIMIT 1");
 
-        return mysql_result($queryCurrentSeasonPhase, 0);
+        return $db->sql_result($queryCurrentSeasonPhase, 0);
     }
 
     public static function getTeamnameFromTid($tid)
     {
-    	$queryTeamnameFromTid = mysql_query("SELECT team_name
+        global $db;
+
+    	$queryTeamnameFromTid = $db->sql_query("SELECT team_name
             FROM nuke_ibl_team_info
             WHERE teamid = $tid
             LIMIT 1;");
 
-        return mysql_result($queryTeamnameFromTid, 0);
+        return $db->sql_result($queryTeamnameFromTid, 0);
     }
 
     public static function getTidFromTeamname($teamname)
     {
-        $queryTidFromTeamname = mysql_query("SELECT teamid
+        $queryTidFromTeamname = $db->sql_query("SELECT teamid
             FROM nuke_ibl_team_info
             WHERE team_name = '$teamname'
             LIMIT 1;");
 
-        return mysql_result($queryTidFromTeamname, 0);
+        return $db->sql_result($queryTidFromTeamname, 0);
     }
 
     public static function getWaiverWireStatus()
     {
-        $queryWaiverWireStatus = mysql_query("SELECT value
+        global $db;
+
+        $queryWaiverWireStatus = $db->sql_query("SELECT value
             FROM nuke_ibl_settings
             WHERE name = 'Allow Waiver Moves'
             LIMIT 1");
 
-        return mysql_result($queryWaiverWireStatus, 0);
+        return $db->sql_result($queryWaiverWireStatus, 0);
     }
 
     public static function getAllowTradesStatus()
     {
-        $queryAllowTradesStatus = mysql_query("SELECT value
+        global $db;
+
+        $queryAllowTradesStatus = $db->sql_query("SELECT value
             FROM nuke_ibl_settings
             WHERE name = 'Allow Trades'
             LIMIT 1");
 
-        return mysql_result($queryAllowTradesStatus, 0);
+        return $db->sql_result($queryAllowTradesStatus, 0);
     }
 
     public static function displaytopmenu($tid) {
+        global $db;
+        
     	$queryteam="SELECT * FROM nuke_ibl_team_info WHERE teamid = '$tid' ";
-    	$resultteam=mysql_query($queryteam);
-    	$color1=mysql_result($resultteam,0,"color1");
-    	$color2=mysql_result($resultteam,0,"color2");
+    	$resultteam=$db->sql_query($queryteam);
+    	$color1=$db->sql_result($resultteam,0,"color1");
+    	$color2=$db->sql_result($resultteam,0,"color2");
 
     	echo "<table width=600 border=0><tr>";
 
     	$teamCityQuery = "SELECT `team_city`,`team_name`,`teamid` FROM `nuke_ibl_team_info` ORDER BY `team_city` ASC";
-    	$teamCityResult = mysql_query($teamCityQuery);
+    	$teamCityResult = $db->sql_query($teamCityQuery);
     	$teamNameQuery = "SELECT `team_city`,`team_name`,`teamid` FROM `nuke_ibl_team_info` ORDER BY `team_name` ASC";
-    	$teamNameResult = mysql_query($teamNameQuery);
+    	$teamNameResult = $db->sql_query($teamNameQuery);
     	$teamIDQuery = "SELECT `team_city`,`team_name`,`teamid` FROM `nuke_ibl_team_info` ORDER BY `teamid` ASC";
-    	$teamIDResult = mysql_query($teamIDQuery);
+    	$teamIDResult = $db->sql_query($teamIDQuery);
 
     	echo '<p>';
     	echo '<b> Team Pages: </b>';
     	echo '<select name="teamSelectCity" onchange="location = this.options[this.selectedIndex].value;">';
     	echo '<option value="">Location</option>';
-    	while ($row = mysql_fetch_assoc($teamCityResult)) {
+    	while ($row = $db->sql_fetch_assoc($teamCityResult)) {
     		echo '<option value="./modules.php?name=Team&op=team&tid='.$row["teamid"].'">'.$row["team_city"].'	'.$row["team_name"].'</option>';
     	}
     	echo '</select>';
 
     	echo '<select name="teamSelectName" onchange="location = this.options[this.selectedIndex].value;">';
     	echo '<option value="">Namesake</option>';
-    	while ($row = mysql_fetch_assoc($teamNameResult)) {
+    	while ($row = $db->sql_fetch_assoc($teamNameResult)) {
     		echo '<option value="./modules.php?name=Team&op=team&tid='.$row["teamid"].'">'.$row["team_name"].'</option>';
     	}
     	echo '</select>';
 
     	echo '<select name="teamSelectID" onchange="location = this.options[this.selectedIndex].value;">';
     	echo '<option value="">ID#</option>';
-    	while ($row = mysql_fetch_assoc($teamIDResult)) {
+    	while ($row = $db->sql_fetch_assoc($teamIDResult)) {
     		echo '<option value="./modules.php?name=Team&op=team&tid='.$row["teamid"].'">'.$row["teamid"].'	'.$row["team_city"].'	'.$row["team_name"].'</option>';
     	}
     	echo '</select>';

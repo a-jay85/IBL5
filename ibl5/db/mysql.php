@@ -194,6 +194,18 @@ if (!defined("SQL_LAYER")) {
 			}
 		}
 
+		function sql_fetch_assoc($query_id = 0)
+		{
+			if (!$query_id) {
+				$query_id = $this->query_result;
+			}
+			if ($query_id) {
+				return mysqli_fetch_assoc($query_id);
+			} else {
+				return false;
+			}
+		}
+
 		function sql_fetchfield($field, $rownum = -1, $query_id = 0)
 		{
 			if (!$query_id) {

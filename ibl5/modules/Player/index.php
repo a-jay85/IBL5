@@ -51,6 +51,7 @@ function menu()
 function leaderboards()
 {
     global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
+
     include("header.php");
     OpenTable();
 
@@ -198,8 +199,8 @@ function leaderboards()
         }
 
         $query = "SELECT * FROM $tableforquery WHERE $restriction1 $restriction2 ORDER BY $sortby DESC";
-        $result = mysql_query($query);
-        $num = mysql_numrows($result);
+        $result = $db->sql_query($query);
+        $num = $db->sql_numrows($result);
 
       echo "<center><h2>Leaderboards Display</h2><p><table class=\"sortable\">
             <tr><th><center>Rank</th></center><th><center>Name</center></th><th><center>Gm</center></th>
@@ -229,28 +230,28 @@ function leaderboards()
         while ($i < $numstop) {
             $retired=0;
             if ($tableforquery == "nuke_iblplyr") {
-                $retired=mysql_result($result,$i,"retired");
-                $plyr_name=mysql_result($result,$i,"name");
-                $pid=mysql_result($result,$i,"pid");
-                $gm=number_format(mysql_result($result,$i,"car_gm"));
-                $min=number_format(mysql_result($result,$i,"car_min"));
-                $fgm=number_format(mysql_result($result,$i,"car_fgm"));
-                $fga=number_format(mysql_result($result,$i,"car_fga"));
-                $fgpct = number_format(mysql_result($result,$i,"car_fgm") / mysql_result($result,$i,"car_fga"), 3);
-                $ftm=number_format(mysql_result($result,$i,"car_ftm"));
-                $fta=number_format(mysql_result($result,$i,"car_fta"));
-                $ftpct = number_format(mysql_result($result,$i,"car_ftm") / mysql_result($result,$i,"car_fta"), 3);
-                $tgm=number_format(mysql_result($result,$i,"car_tgm"));
-                $tga=number_format(mysql_result($result,$i,"car_tga"));
-                $tpct = number_format(mysql_result($result,$i,"car_tgm") / mysql_result($result,$i,"car_tga"), 3);
-                $orb=number_format(mysql_result($result,$i,"car_orb"));
-                $reb=number_format(mysql_result($result,$i,"car_reb"));
-                $ast=number_format(mysql_result($result,$i,"car_ast"));
-                $stl=number_format(mysql_result($result,$i,"car_stl"));
-                $to=number_format(mysql_result($result,$i,"car_to"));
-                $blk=number_format(mysql_result($result,$i,"car_blk"));
-                $pf=number_format(mysql_result($result,$i,"car_pf"));
-                $pts=number_format(mysql_result($result,$i,"car_pts"));
+                $retired=$db->sql_result($result,$i,"retired");
+                $plyr_name=$db->sql_result($result,$i,"name");
+                $pid=$db->sql_result($result,$i,"pid");
+                $gm=number_format($db->sql_result($result,$i,"car_gm"));
+                $min=number_format($db->sql_result($result,$i,"car_min"));
+                $fgm=number_format($db->sql_result($result,$i,"car_fgm"));
+                $fga=number_format($db->sql_result($result,$i,"car_fga"));
+                $fgpct = number_format($db->sql_result($result,$i,"car_fgm") / $db->sql_result($result,$i,"car_fga"), 3);
+                $ftm=number_format($db->sql_result($result,$i,"car_ftm"));
+                $fta=number_format($db->sql_result($result,$i,"car_fta"));
+                $ftpct = number_format($db->sql_result($result,$i,"car_ftm") / $db->sql_result($result,$i,"car_fta"), 3);
+                $tgm=number_format($db->sql_result($result,$i,"car_tgm"));
+                $tga=number_format($db->sql_result($result,$i,"car_tga"));
+                $tpct = number_format($db->sql_result($result,$i,"car_tgm") / $db->sql_result($result,$i,"car_tga"), 3);
+                $orb=number_format($db->sql_result($result,$i,"car_orb"));
+                $reb=number_format($db->sql_result($result,$i,"car_reb"));
+                $ast=number_format($db->sql_result($result,$i,"car_ast"));
+                $stl=number_format($db->sql_result($result,$i,"car_stl"));
+                $to=number_format($db->sql_result($result,$i,"car_to"));
+                $blk=number_format($db->sql_result($result,$i,"car_blk"));
+                $pf=number_format($db->sql_result($result,$i,"car_pf"));
+                $pts=number_format($db->sql_result($result,$i,"car_pts"));
             }
 
             if (
@@ -258,54 +259,54 @@ function leaderboards()
                 $tableforquery == "ibl_heat_career_avgs" OR
                 $tableforquery == "ibl_playoff_career_avgs"
             ) {
-                $plyr_name = mysql_result($result, $i, "name");
-                $pid = mysql_result($result, $i, "pid");
-                $gm = number_format(mysql_result($result, $i, "games"));
-                $min = number_format(mysql_result($result, $i, "minutes"), 1);
-                $fgm = number_format(mysql_result($result, $i, "fgm"), 1);
-                $fga = number_format(mysql_result($result, $i, "fga"), 1);
-                $fgpct = number_format(mysql_result($result, $i, "fgpct"), 3);
-                $ftm = number_format(mysql_result($result, $i, "ftm"), 1);
-                $fta = number_format(mysql_result($result, $i, "fta"), 1);
-                $ftpct = number_format(mysql_result($result, $i, "ftpct"), 3);
-                $tgm = number_format(mysql_result($result, $i, "tgm"), 1);
-                $tga = number_format(mysql_result($result, $i, "tga"), 1);
-                $tpct = number_format(mysql_result($result, $i, "tpct"), 3);
-                $orb = number_format(mysql_result($result, $i, "orb"), 1);
-                $reb = number_format(mysql_result($result, $i, "reb"), 1);
-                $ast = number_format(mysql_result($result, $i, "ast"), 1);
-                $stl = number_format(mysql_result($result, $i, "stl"), 1);
-                $to = number_format(mysql_result($result, $i, "tvr"), 1);
-                $blk = number_format(mysql_result($result, $i, "blk"), 1);
-                $pf = number_format(mysql_result($result, $i, "pf"), 1);
-                $pts = number_format(mysql_result($result, $i, "pts"), 1);
+                $plyr_name = $db->sql_result($result, $i, "name");
+                $pid = $db->sql_result($result, $i, "pid");
+                $gm = number_format($db->sql_result($result, $i, "games"));
+                $min = number_format($db->sql_result($result, $i, "minutes"), 1);
+                $fgm = number_format($db->sql_result($result, $i, "fgm"), 1);
+                $fga = number_format($db->sql_result($result, $i, "fga"), 1);
+                $fgpct = number_format($db->sql_result($result, $i, "fgpct"), 3);
+                $ftm = number_format($db->sql_result($result, $i, "ftm"), 1);
+                $fta = number_format($db->sql_result($result, $i, "fta"), 1);
+                $ftpct = number_format($db->sql_result($result, $i, "ftpct"), 3);
+                $tgm = number_format($db->sql_result($result, $i, "tgm"), 1);
+                $tga = number_format($db->sql_result($result, $i, "tga"), 1);
+                $tpct = number_format($db->sql_result($result, $i, "tpct"), 3);
+                $orb = number_format($db->sql_result($result, $i, "orb"), 1);
+                $reb = number_format($db->sql_result($result, $i, "reb"), 1);
+                $ast = number_format($db->sql_result($result, $i, "ast"), 1);
+                $stl = number_format($db->sql_result($result, $i, "stl"), 1);
+                $to = number_format($db->sql_result($result, $i, "tvr"), 1);
+                $blk = number_format($db->sql_result($result, $i, "blk"), 1);
+                $pf = number_format($db->sql_result($result, $i, "pf"), 1);
+                $pts = number_format($db->sql_result($result, $i, "pts"), 1);
             }
 
             if (
                 $tableforquery == "ibl_heat_career_totals" OR
                 $tableforquery == "ibl_playoff_career_totals"
             ) {
-                $plyr_name=mysql_result($result,$i,"name");
-                $pid=mysql_result($result,$i,"pid");
-                $gm=number_format(mysql_result($result,$i,"games"));
-                $min=number_format(mysql_result($result,$i,"minutes"));
-                $fgm=number_format(mysql_result($result,$i,"fgm"));
-                $fga=number_format(mysql_result($result,$i,"fga"));
-                $fgpct = number_format((mysql_result($result,$i,"fgm")) / (mysql_result($result,$i,"fga")), 3);
-                $ftm=number_format(mysql_result($result,$i,"ftm"));
-                $fta=number_format(mysql_result($result,$i,"fta"));
-                $ftpct = number_format((mysql_result($result,$i,"ftm")) / (mysql_result($result,$i,"fta")), 3);
-                $tgm=number_format(mysql_result($result,$i,"tgm"));
-                $tga=number_format(mysql_result($result,$i,"tga"));
-                $tpct = number_format((mysql_result($result,$i,"tgm")) / (mysql_result($result,$i,"tga")), 3);
-                $orb=number_format(mysql_result($result,$i,"orb"));
-                $reb=number_format(mysql_result($result,$i,"reb"));
-                $ast=number_format(mysql_result($result,$i,"ast"));
-                $stl=number_format(mysql_result($result,$i,"stl"));
-                $to=number_format(mysql_result($result,$i,"tvr"));
-                $blk=number_format(mysql_result($result,$i,"blk"));
-                $pf=number_format(mysql_result($result,$i,"pf"));
-                $pts=number_format(mysql_result($result,$i,"pts"));
+                $plyr_name=$db->sql_result($result,$i,"name");
+                $pid=$db->sql_result($result,$i,"pid");
+                $gm=number_format($db->sql_result($result,$i,"games"));
+                $min=number_format($db->sql_result($result,$i,"minutes"));
+                $fgm=number_format($db->sql_result($result,$i,"fgm"));
+                $fga=number_format($db->sql_result($result,$i,"fga"));
+                $fgpct = number_format(($db->sql_result($result,$i,"fgm")) / ($db->sql_result($result,$i,"fga")), 3);
+                $ftm=number_format($db->sql_result($result,$i,"ftm"));
+                $fta=number_format($db->sql_result($result,$i,"fta"));
+                $ftpct = number_format(($db->sql_result($result,$i,"ftm")) / ($db->sql_result($result,$i,"fta")), 3);
+                $tgm=number_format($db->sql_result($result,$i,"tgm"));
+                $tga=number_format($db->sql_result($result,$i,"tga"));
+                $tpct = number_format(($db->sql_result($result,$i,"tgm")) / ($db->sql_result($result,$i,"tga")), 3);
+                $orb=number_format($db->sql_result($result,$i,"orb"));
+                $reb=number_format($db->sql_result($result,$i,"reb"));
+                $ast=number_format($db->sql_result($result,$i,"ast"));
+                $stl=number_format($db->sql_result($result,$i,"stl"));
+                $to=number_format($db->sql_result($result,$i,"tvr"));
+                $blk=number_format($db->sql_result($result,$i,"blk"));
+                $pf=number_format($db->sql_result($result,$i,"pf"));
+                $pts=number_format($db->sql_result($result,$i,"pts"));
             }
 
             $i++;
@@ -333,6 +334,7 @@ function leaderboards()
 function search()
 {
     global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
+
     include("header.php");
     OpenTable();
 
@@ -649,8 +651,8 @@ function search()
     // =============== EXECUTE QUERY
 
     if ($form_submitted_check==1) {
-        $result=mysql_query($query);
-        @$num=mysql_numrows($result);
+        $result=$db->sql_query($query);
+        @$num=$db->sql_numrows($result);
     }
 
     echo "<table border=1 cellpadding=0 cellspacing=0>
@@ -666,46 +668,46 @@ function search()
         $i=0;
 
         while ($i < $num) {
-            $retired=mysql_result($result,$i,"retired");
-            $name=mysql_result($result,$i,"name");
-            $pos=mysql_result($result,$i,"pos");
-            $pid=mysql_result($result,$i,"pid");
-            $tid=mysql_result($result,$i,"tid");
-            $age=mysql_result($result,$i,"age");
-            $teamname=mysql_result($result,$i,"teamname");
-            $college=mysql_result($result,$i,"college");
-            $collegeid=mysql_result($result,$i,"collegeid");
-            $exp=mysql_result($result,$i,"exp");
-            $bird=mysql_result($result,$i,"bird");
+            $retired=$db->sql_result($result,$i,"retired");
+            $name=$db->sql_result($result,$i,"name");
+            $pos=$db->sql_result($result,$i,"pos");
+            $pid=$db->sql_result($result,$i,"pid");
+            $tid=$db->sql_result($result,$i,"tid");
+            $age=$db->sql_result($result,$i,"age");
+            $teamname=$db->sql_result($result,$i,"teamname");
+            $college=$db->sql_result($result,$i,"college");
+            $collegeid=$db->sql_result($result,$i,"collegeid");
+            $exp=$db->sql_result($result,$i,"exp");
+            $bird=$db->sql_result($result,$i,"bird");
 
-            $r_sta=mysql_result($result,$i,"sta");
-            $r_fga=mysql_result($result,$i,"r_fga");
-            $r_fgp=mysql_result($result,$i,"r_fgp");
-            $r_fta=mysql_result($result,$i,"r_fta");
-            $r_ftp=mysql_result($result,$i,"r_ftp");
-            $r_tga=mysql_result($result,$i,"r_tga");
-            $r_tgp=mysql_result($result,$i,"r_tgp");
-            $r_orb=mysql_result($result,$i,"r_orb");
-            $r_drb=mysql_result($result,$i,"r_drb");
-            $r_ast=mysql_result($result,$i,"r_ast");
-            $r_stl=mysql_result($result,$i,"r_stl");
-            $r_tvr=mysql_result($result,$i,"r_to");
-            $r_blk=mysql_result($result,$i,"r_blk");
-            $r_foul=mysql_result($result,$i,"r_foul");
-            $oo=mysql_result($result,$i,"oo");
-            $do=mysql_result($result,$i,"do");
-            $po=mysql_result($result,$i,"po");
-            $to=mysql_result($result,$i,"to");
-            $od=mysql_result($result,$i,"od");
-            $dd=mysql_result($result,$i,"dd");
-            $pd=mysql_result($result,$i,"pd");
-            $td=mysql_result($result,$i,"td");
+            $r_sta=$db->sql_result($result,$i,"sta");
+            $r_fga=$db->sql_result($result,$i,"r_fga");
+            $r_fgp=$db->sql_result($result,$i,"r_fgp");
+            $r_fta=$db->sql_result($result,$i,"r_fta");
+            $r_ftp=$db->sql_result($result,$i,"r_ftp");
+            $r_tga=$db->sql_result($result,$i,"r_tga");
+            $r_tgp=$db->sql_result($result,$i,"r_tgp");
+            $r_orb=$db->sql_result($result,$i,"r_orb");
+            $r_drb=$db->sql_result($result,$i,"r_drb");
+            $r_ast=$db->sql_result($result,$i,"r_ast");
+            $r_stl=$db->sql_result($result,$i,"r_stl");
+            $r_tvr=$db->sql_result($result,$i,"r_to");
+            $r_blk=$db->sql_result($result,$i,"r_blk");
+            $r_foul=$db->sql_result($result,$i,"r_foul");
+            $oo=$db->sql_result($result,$i,"oo");
+            $do=$db->sql_result($result,$i,"do");
+            $po=$db->sql_result($result,$i,"po");
+            $to=$db->sql_result($result,$i,"to");
+            $od=$db->sql_result($result,$i,"od");
+            $dd=$db->sql_result($result,$i,"dd");
+            $pd=$db->sql_result($result,$i,"pd");
+            $td=$db->sql_result($result,$i,"td");
 
-            $Clutch=mysql_result($result,$i,"Clutch");
-            $Consistency=mysql_result($result,$i,"Consistency");
-            $talent=mysql_result($result,$i,"talent");
-            $skill=mysql_result($result,$i,"skill");
-            $intangibles=mysql_result($result,$i,"intangibles");
+            $Clutch=$db->sql_result($result,$i,"Clutch");
+            $Consistency=$db->sql_result($result,$i,"Consistency");
+            $talent=$db->sql_result($result,$i,"talent");
+            $skill=$db->sql_result($result,$i,"skill");
+            $intangibles=$db->sql_result($result,$i,"intangibles");
 
             if ($i % 2) echo "<tr bgcolor=#ffffff>";
                 else echo "<tr bgcolor=#e6e7e2>";
@@ -729,6 +731,7 @@ function search()
 function awards()
 {
     global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
+
     include("header.php");
 
     OpenTable();
@@ -817,8 +820,8 @@ function awards()
 
     // =============== EXECUTE QUERY
 
-    $result=mysql_query($query);
-    @$num=mysql_numrows($result);
+    $result=$db->sql_query($query);
+    @$num=$db->sql_numrows($result);
 
     echo "<table border=1 cellpadding=0 cellspacing=0>
         <tr><td colspan=3><center><i>Search Results</i></center></td></tr>
@@ -829,9 +832,9 @@ function awards()
     $i=0;
 
     while ($i < $num) {
-        $a_name=mysql_result($result,$i,"name");
-        $a_Award=mysql_result($result,$i,"Award");
-        $a_year=mysql_result($result,$i,"year");
+        $a_name=$db->sql_result($result,$i,"name");
+        $a_Award=$db->sql_result($result,$i,"Award");
+        $a_year=$db->sql_result($result,$i,"year");
         if ($i % 2) {
             echo "<tr bgcolor=#ffffff>";
         } else {
@@ -850,6 +853,7 @@ function awards()
 
 function showpage($pid,$spec) {
     global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
+
     $pid = intval($pid);
     $spec = intval($spec);
     $playerinfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM ".$prefix."_iblplyr WHERE pid='$pid'"));
@@ -1074,7 +1078,7 @@ if (($player_exp == 4 AND $player_draft_round == 1 AND 2 * $salaryIn3rdYearOfCur
 $queryHasUsedExtensionThisSeason = "SELECT Used_Extension_This_Season
     FROM nuke_ibl_team_info
     WHERE team_name = '" . $userinfo['user_ibl_team'] . "';";
-$hasUsedExtensionThisSeason = mysql_result(mysql_query($queryHasUsedExtensionThisSeason), 0);
+$hasUsedExtensionThisSeason = $db->sql_result($db->sql_query($queryHasUsedExtensionThisSeason), 0);
 
 $currentSeasonPhase = Shared::getCurrentSeasonPhase();
 if ($hasUsedExtensionThisSeason == 0 AND
@@ -1325,7 +1329,7 @@ if ($spec == 10) {
             AND Date BETWEEN '$simStartDate' AND '$simEndDate'
             ORDER BY Date ASC");
 
-        $numberOfGamesPlayedInSim = mysql_num_rows($resultPlayerSimBoxScores);
+        $numberOfGamesPlayedInSim = $db->sql_numrows($resultPlayerSimBoxScores);
         $simTotalMIN = 0;
         $simTotal2GM = 0;
         $simTotal2GA = 0;
@@ -1342,7 +1346,7 @@ if ($spec == 10) {
         $simTotalPF = 0;
         $simTotalPTS = 0;
 
-        while ($row = mysql_fetch_assoc($resultPlayerSimBoxScores)) {
+        while ($row = $db->sql_fetch_assoc($resultPlayerSimBoxScores)) {
             $simTotalMIN += $row['gameMIN'];
             $simTotal2GM += $row['game2GM'];
             $simTotal2GA += $row['game2GA'];
@@ -2463,8 +2467,8 @@ echo "<tr><td bgcolor=#0000cc align=center><b><font color=#ffffff>ONE-ON-ONE RES
 $player2=str_replace("%20", " ", $player_name);
 
 $query="SELECT * FROM nuke_one_on_one WHERE winner = '$player2' ORDER BY gameid ASC";
-$result=mysql_query($query);
-$num=mysql_numrows($result);
+$result=$db->sql_query($query);
+$num=$db->sql_numrows($result);
 
 $wins=0;
 $losses=0;
@@ -2474,11 +2478,11 @@ $i=0;
 echo "<small>";
 
 while ($i < $num) {
-    $gameid=mysql_result($result,$i,"gameid");
-    $winner=mysql_result($result,$i,"winner");
-    $loser=mysql_result($result,$i,"loser");
-    $winscore=mysql_result($result,$i,"winscore");
-    $lossscore=mysql_result($result,$i,"lossscore");
+    $gameid=$db->sql_result($result,$i,"gameid");
+    $winner=$db->sql_result($result,$i,"winner");
+    $loser=$db->sql_result($result,$i,"loser");
+    $winscore=$db->sql_result($result,$i,"winscore");
+    $lossscore=$db->sql_result($result,$i,"lossscore");
 
     echo "
 * def. $loser, $winscore-$lossscore (# $gameid)<br>
@@ -2490,16 +2494,16 @@ while ($i < $num) {
 }
 
 $query="SELECT * FROM nuke_one_on_one WHERE loser = '$player2' ORDER BY gameid ASC";
-$result=mysql_query($query);
-$num=mysql_numrows($result);
+$result=$db->sql_query($query);
+$num=$db->sql_numrows($result);
 $i=0;
 
 while ($i < $num) {
-    $gameid=mysql_result($result,$i,"gameid");
-    $winner=mysql_result($result,$i,"winner");
-    $loser=mysql_result($result,$i,"loser");
-    $winscore=mysql_result($result,$i,"winscore");
-    $lossscore=mysql_result($result,$i,"lossscore");
+    $gameid=$db->sql_result($result,$i,"gameid");
+    $winner=$db->sql_result($result,$i,"winner");
+    $loser=$db->sql_result($result,$i,"loser");
+    $winscore=$db->sql_result($result,$i,"winscore");
+    $lossscore=$db->sql_result($result,$i,"lossscore");
 
     echo "
 * lost to $winner, $lossscore-$winscore (# $gameid)<br>
@@ -2527,8 +2531,8 @@ if ($spec == 0) {
     } else {
         $query = "SELECT * FROM ibl_box_scores WHERE Date BETWEEN '$currentSeasonStaringYear-10-01' AND '$currentSeasonEndingYear-07-01' AND pid = $pid ORDER BY Date ASC";
     }
-    $result=mysql_query($query);
-    $num=mysql_numrows($result);
+    $result=$db->sql_query($query);
+    $num=$db->sql_numrows($result);
 
     echo '<p><H1><center>GAME LOG</center></H1><p><table class=\"sortable\" width="100%">
           <tr>
@@ -2557,7 +2561,7 @@ if ($spec == 0) {
           </tr>
     ';
     $i = 0;
-    while ($row = mysql_fetch_assoc($result)) {
+    while ($row = $db->sql_fetch_assoc($result)) {
         echo "<style>
                 td {}
                 .gamelog {text-align: center;}
@@ -2603,6 +2607,7 @@ echo "</td></tr></table></table>";
 function negotiate($pid)
 {
     global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
+
     $pid = intval($pid);
     $playerinfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM ".$prefix."_iblplyr WHERE pid = '$pid'"));
     $player_name = stripslashes(check_html($playerinfo['name'], "nohtml"));
@@ -3066,6 +3071,7 @@ function negotiate($pid)
 
 function rookieoption($pid) {
 	global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
+
 	$pid = intval($pid);
 
 	cookiedecode($user);

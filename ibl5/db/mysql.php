@@ -168,8 +168,11 @@ if (!defined("SQL_LAYER")) {
 				$query_id = $this->query_result;
 			}
 			if ($query_id) {
-				$this->row[$query_id] = @mysqli_fetch_array($query_id);
-				return $this->row[$query_id];
+				// Original PHP-Nuke implementation method is commented out.
+				// It has been simplified for PHP 7+ since mysqli_fetch_array always returns objects and not resources.
+				// $this->row[$query_id] = @mysqli_fetch_array($query_id);
+				// return $this->row[$query_id];
+				return mysqli_fetch_array($query_id);
 			} else {
 				return false;
 			}

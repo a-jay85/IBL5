@@ -22,7 +22,7 @@
 if (!defined("SQL_LAYER")) {
 	define("SQL_LAYER","mysql");
 
-	class sql_db
+	class MySQL
 	{
 		var $db_connect_id;
 		var $query_result;
@@ -33,7 +33,7 @@ if (!defined("SQL_LAYER")) {
 		//
 		// Constructor
 		//
-		function sql_db($sqlserver, $sqluser, $sqlpassword, $database, $persistency = true)
+		function __construct($sqlserver, $sqluser, $sqlpassword, $database, $persistency = true)
 		{
 			$this->persistency = $persistency;
 			$this->user = $sqluser;
@@ -234,13 +234,15 @@ if (!defined("SQL_LAYER")) {
 		}
 
 		// copy/pasted this function from the top comment of https://www.php.net/manual/en/class.mysqli-result.php
-		function sql_result($res, $row, $field=0) {
+		function sql_result($res, $row, $field=0)
+		{
 		    $res->data_seek($row);
 		    $datarow = $res->fetch_array();
 		    return $datarow[$field];
 		}
 
-		function sql_rowseek($rownum, $query_id = 0){
+		function sql_rowseek($rownum, $query_id = 0)
+		{
 			if (!$query_id) {
 				$query_id = $this->query_result;
 			}

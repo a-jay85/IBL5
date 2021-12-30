@@ -54,7 +54,8 @@ if (defined('FORUM_ADMIN')) {
 switch($dbtype) {
 
 	case 'MySQL':
-		include("".$the_include."/mysql.php");
+        // commented out since mysql.php has been moved to /classes and is now autoloaded
+		// include("".$the_include."/mysql.php");
 		break;
 
 	case 'mysql4':
@@ -84,14 +85,18 @@ switch($dbtype) {
 	case 'mssql-odbc':
 		include("".$the_include."/mssql-odbc.php");
 		break;
-	
+
 	case 'db2':
 		include("".$the_include."/db2.php");
 		break;
 
 }
 
-$db = new sql_db($dbhost, $dbuname, $dbpass, $dbname, false);
+if ($dbtype = 'MySQL') {
+    $db = new MySQL($dbhost, $dbuname, $dbpass, $dbname, false);
+} else {
+    $db = new sql_db($dbhost, $dbuname, $dbpass, $dbname, false);
+}
 if(!$db->db_connect_id) {
     die("<br><br><center><img src=images/logo.gif><br><br><b>There seems to be a problem with the $dbtype server, sorry for the inconvenience.<br><br>We should be back shortly.</center></b>");
 }

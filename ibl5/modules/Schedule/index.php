@@ -60,12 +60,29 @@ while ($chunk_start_date < $max_date)
 
 function chunk ($chunk_start_date, $chunk_end_date, $j)
 {
+	//TODO: unify this code with the Team module's boxscore function
+
 	$query = "SELECT *
 		FROM ibl_schedule
 		WHERE Date BETWEEN '$chunk_start_date' AND '$chunk_end_date'
 		ORDER BY SchedID ASC";
 	$result = mysql_query($query);
 	$num = mysql_numrows($result);
+
+	$teamSeasonRecordsQuery = "SELECT tid, leagueRecord FROM ibl_standings ORDER BY tid ASC;";
+	$teamSeasonRecordsResult = mysql_query($teamSeasonRecordsQuery);
+
+	$arrayLastSimDates = Shared::getLastSimDatesArray();
+	$lastSimStartDate = date_create($arrayLastSimDates["Start Date"]);
+	$lastSimEndDate = date_create($arrayLastSimDates["End Date"]);
+	$projectedNextSimEndDate = date_add($lastSimEndDate, date_interval_create_from_date_string('7 days'));
+
+	// override $projectedNextSimEndDate to account for the blank week at end of HEAT
+	$currentSeasonEndingYear = Shared::getCurrentSeasonEndingYear();
+	$currentSeasonBeginningYear = $currentSeasonEndingYear - 1;
+	if ($projectedNextSimEndDate >= date_create("$currentSeasonBeginningYear-10-23") AND $projectedNextSimEndDate < date_create("$currentSeasonBeginningYear-11-01")) {
+		$projectedNextSimEndDate = date_create("$currentSeasonBeginningYear-11-08");
+	}
 
 	echo "<table width=\"500\" cellpadding=\"6\" cellspacing=\"0\" border=\"1\" align=center>";
 
@@ -74,14 +91,15 @@ function chunk ($chunk_start_date, $chunk_end_date, $j)
 	while ($i < $num) {
 		$date = mysql_result($result, $i, "Date");
 		$visitor = mysql_result($result, $i, "Visitor");
-		$VScore = mysql_result($result, $i, "VScore");
+		$visitorScore = mysql_result($result, $i, "VScore");
 		$home = mysql_result($result, $i, "Home");
-		$HScore = mysql_result($result, $i, "HScore");
+		$homeScore = mysql_result($result, $i, "HScore");
 		$boxid = mysql_result($result, $i, "BoxID");
-		$SchedID = mysql_result($result, $i, "SchedID");
 
-		$vname = teamname($visitor);
-		$hname = teamname($home);
+		$visitorTeamname = Shared::getTeamnameFromTid($visitor);
+		$homeTeamname = Shared::getTeamnameFromTid($home);
+		$visitorRecord = mysql_result($teamSeasonRecordsResult, $visitor-1, "leagueRecord");
+		$homeRecord = mysql_result($teamSeasonRecordsResult, $home-1, "leagueRecord");
 
 		if (($i % 2) == 0) {
 			$bgcolor = "FFFFFF";
@@ -95,13 +113,27 @@ function chunk ($chunk_start_date, $chunk_end_date, $j)
 			$bgcolor2 = "C00000";
 		}
 
+		if ($visitorScore == $homeScore AND date_create($date) <= $projectedNextSimEndDate) {
+			$bgcolor = "DDDD00";
+		}
+
+		if ($visitorScore > $homeScore) {
+			$visitorTeamname = '<b>' . $visitorTeamname . '</b>';
+			$visitorRecord = '<b>' . $visitorRecord . '</b>';
+			$visitorScore = '<b>' . $visitorScore . '</b>';
+		} elseif ($homeScore > $visitorScore) {
+			$homeTeamname = '<b>' . $homeTeamname . '</b>';
+			$homeRecord = '<b>' . $homeRecord . '</b>';
+			$homeScore = '<b>' . $homeScore . '</b>';
+		}
+
 		if ($date == $datebase) {
 			echo "<tr bgcolor=$bgcolor>
 				<td>$date</td>
-				<td><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$vname</a></td>
-				<td align=right>$VScore</td>
-				<td><a href=\"modules.php?name=Team&op=team&tid=$home\">$hname</a></td>
-				<td align=right>$HScore</td>
+				<td><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$visitorTeamname ($visitorRecord)</a></td>
+				<td align=right>$visitorScore</td>
+				<td><a href=\"modules.php?name=Team&op=team&tid=$home\">$homeTeamname ($homeRecord)</a></td>
+				<td align=right>$homeScore</td>
 				<td><a href=\"ibl/IBL/box$boxid.htm\">View</a></td>
 			</tr>";
 		} else {
@@ -118,10 +150,10 @@ function chunk ($chunk_start_date, $chunk_end_date, $j)
 			</tr>";
 			echo "<tr bgcolor=$bgcolor>
 				<td>$date</td>
-				<td><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$vname</a></td>
-				<td align=right>$VScore</td>
-				<td><a href=\"modules.php?name=Team&op=team&tid=$home\">$hname</a></td>
-				<td align=right>$HScore</td>
+				<td><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$visitorTeamname ($visitorRecord)</a></td>
+				<td align=right>$visitorScore</td>
+				<td><a href=\"modules.php?name=Team&op=team&tid=$home\">$homeTeamname ($homeRecord)</a></td>
+				<td align=right>$homeScore</td>
 				<td><a href=\"ibl/IBL/box$boxid.htm\">View</a></td>
 			</tr>";
 			$datebase = $date;

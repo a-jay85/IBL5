@@ -645,6 +645,8 @@ function boxscore($year, $month, $tid, $wins, $losses, $winStreak, $lossStreak)
 {
 	global $db;
 
+	//TODO: unify this code with the Schedule module's chunk function
+
 	$query = "SELECT *
 		FROM `ibl_schedule`
 		WHERE (Visitor = $tid AND Date BETWEEN '$year-$month-01' AND '$year-$month-31')

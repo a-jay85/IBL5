@@ -212,10 +212,11 @@ $k++;
 function drafthistory($tid)
 {
 	global $db;
+	$shared = new Shared($db);
 
 	include("header.php");
 	OpenTable();
-	Shared::displaytopmenu($tid);
+	$shared->displaytopmenu($tid);
 
 	$sqlc = "SELECT * FROM nuke_ibl_team_info WHERE teamid = $tid";
 	$resultc = $db->sql_query($sqlc);
@@ -580,6 +581,7 @@ function leaguestats()
 function schedule($tid)
 {
 	global $db;
+	$shared = new Shared($db);
 
 	$tid = intval($tid);
 	include("header.php");
@@ -598,7 +600,7 @@ function schedule($tid)
 	//=============================
 	//DISPLAY TOP MENU
 	//=============================
-	Shared::displaytopmenu($tid);
+	$shared->displaytopmenu($tid);
 	$query = "SELECT * FROM `ibl_schedule` WHERE Visitor = $tid OR Home = $tid ORDER BY Date ASC;";
 	$result = $db->sql_query($query);
 	$num = $db->sql_numrows($result);
@@ -644,6 +646,7 @@ function schedule($tid)
 function boxscore($year, $month, $tid, $wins, $losses, $winStreak, $lossStreak)
 {
 	global $db;
+	$shared = new Shared($db);
 
 	//TODO: unify this code with the Schedule module's chunk function
 
@@ -659,13 +662,13 @@ function boxscore($year, $month, $tid, $wins, $losses, $winStreak, $lossStreak)
 	$teamSeasonRecordsQuery = "SELECT tid, leagueRecord FROM ibl_standings ORDER BY tid ASC;";
 	$teamSeasonRecordsResult = $db->sql_query($teamSeasonRecordsQuery);
 
-	$arrayLastSimDates = Shared::getLastSimDatesArray();
+	$arrayLastSimDates = $shared->getLastSimDatesArray();
 	$lastSimStartDate = date_create($arrayLastSimDates["Start Date"]);
 	$lastSimEndDate = date_create($arrayLastSimDates["End Date"]);
 	$projectedNextSimEndDate = date_add($lastSimEndDate, date_interval_create_from_date_string('7 days'));
 
 	// override $projectedNextSimEndDate to account for the blank week at end of HEAT
-	$currentSeasonEndingYear = Shared::getCurrentSeasonEndingYear();
+	$currentSeasonEndingYear = $shared->getCurrentSeasonEndingYear();
 	$currentSeasonBeginningYear = $currentSeasonEndingYear - 1;
 	if ($projectedNextSimEndDate >= date_create("$currentSeasonBeginningYear-10-23") AND $projectedNextSimEndDate < date_create("$currentSeasonBeginningYear-11-01")) {
 		$projectedNextSimEndDate = date_create("$currentSeasonBeginningYear-11-08");
@@ -679,8 +682,8 @@ function boxscore($year, $month, $tid, $wins, $losses, $winStreak, $lossStreak)
 		$homeScore = $db->sql_result($result, $i, "HScore");
 		$boxID = $db->sql_result($result, $i, "BoxID");
 
-		$visitorTeamname = Shared::getTeamnameFromTid($visitor);
-		$homeTeamname = Shared::getTeamnameFromTid($home);
+		$visitorTeamname = $shared->getTeamnameFromTid($visitor);
+		$homeTeamname = $shared->getTeamnameFromTid($home);
 		$visitorRecord = $db->sql_result($teamSeasonRecordsResult, $visitor-1, "leagueRecord");
 		$homeRecord = $db->sql_result($teamSeasonRecordsResult, $home-1, "leagueRecord");
 
@@ -768,6 +771,7 @@ function boxscore($year, $month, $tid, $wins, $losses, $winStreak, $lossStreak)
 function finances($tid)
 {
 	global $db;
+	$shared = new Shared($db);
 
 	$tid = intval($tid);
 	$yr = $_REQUEST['yr'];
@@ -800,7 +804,7 @@ function finances($tid)
 
 	OpenTable();
 
-	Shared::displaytopmenu($tid);
+	$shared->displaytopmenu($tid);
 
 	echo "<table valign=top align=center><tr><td align=center valign=top><img src=\"./images/logo/$tid.jpg\"></td></tr>
 		<tr bgcolor=$color1><td><font color=$color2><b><center>$team_city $team_name Finances (Cap Space)</center></b></font></td></tr>
@@ -815,6 +819,7 @@ function finances($tid)
 function team($tid)
 {
 	global $db;
+	$shared = new Shared($db);
 
 	$tid = intval($tid);
 
@@ -857,7 +862,7 @@ function team($tid)
 	//DISPLAY TOP MENU
 	//=============================
 
-	Shared::displaytopmenu($tid);
+	$shared->displaytopmenu($tid);
 
 	//=============================
 	//GET CONTRACT AMOUNTS CORRECT
@@ -1664,7 +1669,7 @@ function team($tid)
 
 			$table_simAverages=$table_simAverages."<tr bgcolor=$color1><th><font color=$color2>Pos</font></th><th colspan=3><font color=$color2>Player</font></th><th><font color=$color2>g</font></th><th><font color=$color2>min</font></th><th><font color=$color2>fgm</font></th><th><font color=$color2>fga</font></th><th><font color=$color2>fgp</font></th><th><font color=$color2>ftm</font></th><th><font color=$color2>fta</font></th><th><font color=$color2>ftp</font></th><th><font color=$color2>3gm</font></th><th><font color=$color2>3ga</font></th><th><font color=$color2>3gp</font></th><th><font color=$color2>orb</font></th><th><font color=$color2>reb</font></th><th><font color=$color2>ast</font></th><th><font color=$color2>stl</font></th><th><font color=$color2>to</font></th><th><font color=$color2>blk</font></th><th><font color=$color2>pf</font></th><th><font color=$color2>pts</font></th></tr></thead><tbody>";
 
-			$arrayLastSimDates = Shared::getLastSimDatesArray();
+			$arrayLastSimDates = $shared->getLastSimDatesArray();
 
 			$simStartDate = $arrayLastSimDates['Start Date'];
 			$simEndDate = $arrayLastSimDates['End Date'];
@@ -2465,11 +2470,12 @@ function team_info_right ($team_name, $color1, $color2, $owner_name, $tid)
 function viewinjuries($tid)
 {
 	global $db;
+	$shared = new Shared($db);
 
 	include("header.php");
 	OpenTable();
 
-	Shared::displaytopmenu($tid);
+	$shared->displaytopmenu($tid);
 
 	$query="SELECT * FROM nuke_iblplyr WHERE injured > 0 AND retired = 0 ORDER BY ordinal ASC";
 
@@ -2532,12 +2538,15 @@ function viewinjuries($tid)
 
 function menu()
 {
+	global $db;
+	$shared = new Shared($db);
+
 	$tid = intval($tid);
 
 	include("header.php");
 	OpenTable();
 
-	Shared::displaytopmenu($tid);
+	$shared->displaytopmenu($tid);
 
 	CloseTable();
 	include("footer.php");
@@ -2545,7 +2554,9 @@ function menu()
 
 function seteditor($user)
 {
-	global $stop;
+	global $db, $stop;
+	$shared = new Shared($db);
+
 	if(!is_user($user)) {
 		include("header.php");
 		if ($stop) {
@@ -2559,7 +2570,7 @@ function seteditor($user)
 		}
 		if (!is_user($user)) {
 			OpenTable();
-			Shared::displaytopmenu($tid);
+			$shared->displaytopmenu($tid);
 			loginbox();
 			CloseTable();
 		}
@@ -2574,6 +2585,7 @@ function seteditor($user)
 function editset($username, $bypass=0, $hid=0, $url=0)
 {
 	global $user, $prefix, $user_prefix, $db;
+	$shared = new Shared($db);
 
 	$sql = "SELECT * FROM ".$prefix."_bbconfig";
 	$result = $db->sql_query($sql);
@@ -2601,7 +2613,7 @@ function editset($username, $bypass=0, $hid=0, $url=0)
 	$queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$teamlogo'";
 	$tid = $db->sql_result($db->sql_query($queryTeamID), 0);
 
-	Shared::displaytopmenu($tid);
+	$shared->displaytopmenu($tid);
 
 	echo "<hr><center><img src=\"images/logo/$tid.jpg\"><br>";
 
@@ -2934,7 +2946,9 @@ function editset($username, $bypass=0, $hid=0, $url=0)
 
 function changeset($user)
 {
-	global $stop, $action, $set, $type, $position;
+	global $db, $stop, $action, $set, $type, $position;
+	$shared = new Shared($db);
+
 	if(!is_user($user)) {
 	include("header.php");
 	if ($stop) {
@@ -2948,7 +2962,7 @@ function changeset($user)
 	}
 	if (!is_user($user)) {
 		OpenTable();
-		Shared::displaytopmenu($tid);
+		$shared->displaytopmenu($tid);
 		loginbox();
 		CloseTable();
 	}
@@ -2963,6 +2977,8 @@ function changeset($user)
 function changesetgo($username, $action, $set, $type, $position)
 {
 	global $user, $prefix, $user_prefix, $db;
+	$shared = new Shared($db);
+
 	$sql = "SELECT * FROM ".$prefix."_bbconfig";
 	$result = $db->sql_query($sql);
 	while ( $row = $db->sql_fetchrow($result) )	{
@@ -2977,7 +2993,7 @@ function changesetgo($username, $action, $set, $type, $position)
 	include("header.php");
 
 	OpenTable();
-	Shared::displaytopmenu($tid);
+	$shared->displaytopmenu($tid);
 
 	// === CODE TO CHANGE SET ===
 
@@ -3078,21 +3094,21 @@ function viewtraining($user) {
 	include("header.php");
 	if ($stop) {
 		OpenTable();
-			Shared::displaytopmenu($tid);
+			$shared->displaytopmenu($tid);
 
 		echo "<center><font class=\"title\"><b>"._LOGININCOR."</b></font></center>\n";
 		CloseTable();
 		echo "<br>\n";
 	} else {
 		OpenTable();
-			Shared::displaytopmenu($tid);
+			$shared->displaytopmenu($tid);
 		echo "<center><font class=\"title\"><b>"._USERREGLOGIN."</b></font></center>\n";
 		CloseTable();
 		echo "<br>\n";
 	}
 	if (!is_user($user)) {
 		OpenTable();
-			Shared::displaytopmenu($tid);
+			$shared->displaytopmenu($tid);
 
 		mt_srand ((double)microtime()*1000000);
 		$maxran = 1000000;
@@ -3149,7 +3165,7 @@ function trainingpage($username)
 	include("header.php");
 
 	OpenTable();
-	Shared::displaytopmenu($tid);
+	$shared->displaytopmenu($tid);
 
 // === GRAB TEAM INFORMATION FOR LOGGED-IN USER===
 

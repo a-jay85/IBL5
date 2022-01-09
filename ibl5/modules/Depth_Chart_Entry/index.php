@@ -18,7 +18,7 @@
 
 if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) die ("You can't access this file directly...");
 
-require_once("mainfile.php");
+
 
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
@@ -32,6 +32,8 @@ function userinfo($username, $bypass=0, $hid=0, $url=0)
 	{
 	global $user, $cookie, $sitename, $prefix, $user_prefix, $db, $admin, $broadcast_msg, $my_headlines, $module_name, $useset, $subscription_url;
 
+	$shared = new Shared($db);
+
 	$sql = "SELECT * FROM ".$prefix."_bbconfig";
 	$result = $db->sql_query($sql);
 	while ( $row = $db->sql_fetchrow($result) )	{
@@ -44,11 +46,11 @@ function userinfo($username, $bypass=0, $hid=0, $url=0)
 	if(!$bypass) cookiedecode($user);
 
 	$teamlogo = $userinfo[user_ibl_team];
-	$tid = Shared::getTidFromTeamname($teamlogo);
+	$tid = $shared->getTidFromTeamname($teamlogo);
 
 	include("header.php");
 	OpenTable();
-	Shared::displaytopmenu($tid);
+	$shared->displaytopmenu($tid);
 
 	// === CODE TO INSERT IBL DEPTH CHART ===
 
@@ -430,7 +432,7 @@ function submit() {
 
 	$html = $html."</table>";
 
-	$seasonPhase = Shared::getCurrentSeasonPhase();
+	$seasonPhase = $shared->getCurrentSeasonPhase();
 	if ($seasonPhase != 'Playoffs') {
 		$minActivePlayers = 12;
 		$maxActivePlayers = 12;

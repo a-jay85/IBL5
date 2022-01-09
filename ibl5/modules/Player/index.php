@@ -853,6 +853,7 @@ function awards()
 
 function showpage($pid,$spec) {
     global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
+	$shared = new Shared($db);
 
     $pid = intval($pid);
     $spec = intval($spec);
@@ -1046,7 +1047,7 @@ $contract_display = "not under contract";
 
     menu();
 
-    $seasonPhase = Shared::getCurrentSeasonPhase();
+    $seasonPhase = $shared->getCurrentSeasonPhase();
 
 	echo "<table><tr><td valign=top>
 <font class=\"title\">$player_pos $player_name ";
@@ -1080,7 +1081,7 @@ $queryHasUsedExtensionThisSeason = "SELECT Used_Extension_This_Season
     WHERE team_name = '" . $userinfo['user_ibl_team'] . "';";
 $hasUsedExtensionThisSeason = $db->sql_result($db->sql_query($queryHasUsedExtensionThisSeason), 0);
 
-$currentSeasonPhase = Shared::getCurrentSeasonPhase();
+$currentSeasonPhase = $shared->getCurrentSeasonPhase();
 if ($hasUsedExtensionThisSeason == 0 AND
     $can_renegotiate == 1 AND
     $currentSeasonPhase != 'Draft' AND
@@ -2523,7 +2524,7 @@ echo "<b><center>Record: $wins - $losses</center></b></small><br>";
 // GAME LOG
 
 if ($spec == 0) {
-    $currentSeasonEndingYear = Shared::getCurrentSeasonEndingYear();
+    $currentSeasonEndingYear = $shared->getCurrentSeasonEndingYear();
     $currentSeasonStaringYear = $currentSeasonEndingYear - 1;
 
     if ($seasonPhase == "Preseason") {
@@ -2568,8 +2569,8 @@ if ($spec == 0) {
             </style>
             <tr>
                 <td class=\"gamelog\">$row[Date]</td>
-                <td class=\"gamelog\">".Shared::getTeamnameFromTid($row[visitorTID])."</td>
-                <td class=\"gamelog\">".Shared::getTeamnameFromTid($row[homeTID])."</td>
+                <td class=\"gamelog\">".$shared->getTeamnameFromTid($row[visitorTID])."</td>
+                <td class=\"gamelog\">".$shared->getTeamnameFromTid($row[homeTID])."</td>
                 <td class=\"gamelog\">$row[gameMIN]</td>
                 <td class=\"gamelog\">".((2*$row[game2GM])+(3*$row[game3GM])+$row[gameFTM])."</td>
                 <td class=\"gamelog\">".($row[game2GM]+$row[game3GM])."</td>
@@ -3071,6 +3072,7 @@ function negotiate($pid)
 
 function rookieoption($pid) {
 	global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
+	$shared = new Shared($db);
 
 	$pid = intval($pid);
 
@@ -3097,7 +3099,7 @@ function rookieoption($pid) {
 		return;
 	}
 
-    $seasonPhase = Shared::getCurrentSeasonPhase();
+    $seasonPhase = $shared->getCurrentSeasonPhase();
 
 	if (($seasonPhase == "Free Agency" AND $player_exp == 2 AND $player_draftround == 1) OR
         (($seasonPhase == "Preseason" OR $seasonPhase == "HEAT") AND $player_exp == 3 AND $player_draftround == 1)) {

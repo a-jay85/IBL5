@@ -821,10 +821,10 @@ function awards()
 
     // ============== GET POST DATA
 
-    $as_name = $_POST['aw_name'];
-    $as_Award = $_POST['aw_Award'];
-    $as_year = $_POST['aw_year'];
-    $as_sortby = $_POST['aw_sortby'];
+    $as_name = stripslashes(check_html($_POST['aw_name'], "nohtml"));
+    $as_Award = stripslashes(check_html($_POST['aw_Award'], "nohtml"));
+    $as_year = stripslashes(check_html($_POST['aw_year'], "nohtml"));
+    $as_sortby = stripslashes(check_html($_POST['aw_sortby'], "nohtml"));
 
     // ========= SEARCH PARAMETERS
 

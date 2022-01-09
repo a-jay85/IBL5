@@ -1,127 +1,119 @@
 <?php
+
 class Shared
 {
-    public static function getLastSimDatesArray()
-    {
-        global $db;
+    protected $db;
 
-        $queryLastSimDates = $db->sql_query("SELECT *
+    public function __construct($db)
+    {
+        $this->db = $db;
+    }
+
+    public function getLastSimDatesArray()
+    {
+        $queryLastSimDates = $this->db->sql_query("SELECT *
             FROM ibl_sim_dates
             ORDER BY sim DESC
             LIMIT 1");
 
-        return $db->sql_fetch_assoc($queryLastSimDates);
+        return $this->db->sql_fetch_assoc($queryLastSimDates);
     }
 
-    public static function getCurrentSeasonEndingYear()
+    public function getCurrentSeasonEndingYear()
     {
-        global $db;
-
-        $queryCurrentSeasonEndingYear = $db->sql_query("SELECT value
+        $queryCurrentSeasonEndingYear = $this->db->sql_query("SELECT value
             FROM nuke_ibl_settings
             WHERE name = 'Current Season Ending Year'
             LIMIT 1");
 
-        return $db->sql_result($queryCurrentSeasonEndingYear, 0);
+        return $this->db->sql_result($queryCurrentSeasonEndingYear, 0);
     }
 
-    public static function getCurrentSeasonPhase()
+    public function getCurrentSeasonPhase()
     {
-        global $db;
-
-        $queryCurrentSeasonPhase = $db->sql_query("SELECT value
+        $queryCurrentSeasonPhase = $this->db->sql_query("SELECT value
             FROM nuke_ibl_settings
             WHERE name = 'Current Season Phase'
             LIMIT 1");
 
-        return $db->sql_result($queryCurrentSeasonPhase, 0);
+        return $this->db->sql_result($queryCurrentSeasonPhase, 0);
     }
 
-    public static function getTeamnameFromTid($tid)
+    public function getTeamnameFromTid($tid)
     {
-        global $db;
-
-    	$queryTeamnameFromTid = $db->sql_query("SELECT team_name
+    	$queryTeamnameFromTid = $this->db->sql_query("SELECT team_name
             FROM nuke_ibl_team_info
             WHERE teamid = $tid
             LIMIT 1;");
 
-        return $db->sql_result($queryTeamnameFromTid, 0);
+        return $this->db->sql_result($queryTeamnameFromTid, 0);
     }
 
-    public static function getTidFromTeamname($teamname)
+    public function getTidFromTeamname($teamname)
     {
-        global $db;
-
-    	$queryTidFromTeamname = $db->sql_query("SELECT teamid
+    	$queryTidFromTeamname = $this->db->sql_query("SELECT teamid
             FROM nuke_ibl_team_info
             WHERE team_name = '$teamname'
             LIMIT 1;");
 
-        return $db->sql_result($queryTidFromTeamname, 0);
+        return $this->db->sql_result($queryTidFromTeamname, 0);
     }
 
-    public static function getWaiverWireStatus()
+    public function getWaiverWireStatus()
     {
-        global $db;
-
-        $queryWaiverWireStatus = $db->sql_query("SELECT value
+        $queryWaiverWireStatus = $this->db->sql_query("SELECT value
             FROM nuke_ibl_settings
             WHERE name = 'Allow Waiver Moves'
             LIMIT 1");
 
-        return $db->sql_result($queryWaiverWireStatus, 0);
+        return $this->db->sql_result($queryWaiverWireStatus, 0);
     }
 
-    public static function getAllowTradesStatus()
+    public function getAllowTradesStatus()
     {
-        global $db;
-
-        $queryAllowTradesStatus = $db->sql_query("SELECT value
+        $queryAllowTradesStatus = $this->db->sql_query("SELECT value
             FROM nuke_ibl_settings
             WHERE name = 'Allow Trades'
             LIMIT 1");
 
-        return $db->sql_result($queryAllowTradesStatus, 0);
+        return $this->db->sql_result($queryAllowTradesStatus, 0);
     }
 
-    public static function displaytopmenu($tid)
+    public function displaytopmenu($tid)
     {
-        global $db;
-
     	$queryteam="SELECT * FROM nuke_ibl_team_info WHERE teamid = '$tid' ";
-    	$resultteam=$db->sql_query($queryteam);
-    	$color1=$db->sql_result($resultteam,0,"color1");
-    	$color2=$db->sql_result($resultteam,0,"color2");
+    	$resultteam=$this->db->sql_query($queryteam);
+    	$color1=$this->db->sql_result($resultteam,0,"color1");
+    	$color2=$this->db->sql_result($resultteam,0,"color2");
 
     	echo "<table width=600 border=0><tr>";
 
     	$teamCityQuery = "SELECT `team_city`,`team_name`,`teamid` FROM `nuke_ibl_team_info` ORDER BY `team_city` ASC";
-    	$teamCityResult = $db->sql_query($teamCityQuery);
+    	$teamCityResult = $this->db->sql_query($teamCityQuery);
     	$teamNameQuery = "SELECT `team_city`,`team_name`,`teamid` FROM `nuke_ibl_team_info` ORDER BY `team_name` ASC";
-    	$teamNameResult = $db->sql_query($teamNameQuery);
+    	$teamNameResult = $this->db->sql_query($teamNameQuery);
     	$teamIDQuery = "SELECT `team_city`,`team_name`,`teamid` FROM `nuke_ibl_team_info` ORDER BY `teamid` ASC";
-    	$teamIDResult = $db->sql_query($teamIDQuery);
+    	$teamIDResult = $this->db->sql_query($teamIDQuery);
 
     	echo '<p>';
     	echo '<b> Team Pages: </b>';
     	echo '<select name="teamSelectCity" onchange="location = this.options[this.selectedIndex].value;">';
     	echo '<option value="">Location</option>';
-    	while ($row = $db->sql_fetch_assoc($teamCityResult)) {
+    	while ($row = $this->db->sql_fetch_assoc($teamCityResult)) {
     		echo '<option value="./modules.php?name=Team&op=team&tid='.$row["teamid"].'">'.$row["team_city"].'	'.$row["team_name"].'</option>';
     	}
     	echo '</select>';
 
     	echo '<select name="teamSelectName" onchange="location = this.options[this.selectedIndex].value;">';
     	echo '<option value="">Namesake</option>';
-    	while ($row = $db->sql_fetch_assoc($teamNameResult)) {
+    	while ($row = $this->db->sql_fetch_assoc($teamNameResult)) {
     		echo '<option value="./modules.php?name=Team&op=team&tid='.$row["teamid"].'">'.$row["team_name"].'</option>';
     	}
     	echo '</select>';
 
     	echo '<select name="teamSelectID" onchange="location = this.options[this.selectedIndex].value;">';
     	echo '<option value="">ID#</option>';
-    	while ($row = $db->sql_fetch_assoc($teamIDResult)) {
+    	while ($row = $this->db->sql_fetch_assoc($teamIDResult)) {
     		echo '<option value="./modules.php?name=Team&op=team&tid='.$row["teamid"].'">'.$row["teamid"].'	'.$row["team_city"].'	'.$row["team_name"].'</option>';
     	}
     	echo '</select>';

@@ -202,14 +202,31 @@ function leaderboards()
         $result = $db->sql_query($query);
         $num = $db->sql_numrows($result);
 
-      echo "<center><h2>Leaderboards Display</h2><p><table class=\"sortable\">
-            <tr><th><center>Rank</th></center><th><center>Name</center></th><th><center>Gm</center></th>
-            <th><center>Min</center></th><th><center>FGM</a></center></th><th><center>FGA</center></th>
-            <th><center>FG%</center><th><center>FTM</center></th><th><center>FTA</center></th>
-            <th><center>FT%</center><th><center>3PTM</center></th><th><center>3PTA</center></th>
-            <th><center>3P%</center><th><center>ORB</center></th><th><center>REB</center></th>
-            <th><center>AST</center></th><th><center>STL</center></th><th><center>TVR</center></th>
-            <th><center>BLK</center></th><th><center>FOULS</center></th><th><center>PTS</center></th></tr>";
+        echo "<center><h2>Leaderboards Display</h2><p>
+            <table class=\"sortable\">
+                <tr>
+                    <th><center>Rank</center></th>
+                    <th><center>Name</center></th>
+                    <th><center>Gm</center></th>
+                    <th><center>Min</center></th>
+                    <th><center>FGM</center></th>
+                    <th><center>FGA</center></th>
+                    <th><center>FG%</center></th>
+                    <th><center>FTM</center></th>
+                    <th><center>FTA</center></th>
+                    <th><center>FT%</center></th>
+                    <th><center>3PTM</center></th>
+                    <th><center>3PTA</center></th>
+                    <th><center>3P%</center></th>
+                    <th><center>ORB</center></th>
+                    <th><center>REB</center></th>
+                    <th><center>AST</center></th>
+                    <th><center>STL</center></th>
+                    <th><center>TVR</center></th>
+                    <th><center>BLK</center></th>
+                    <th><center>FOULS</center></th>
+                    <th><center>PTS</center></th>
+                </tr>";
 
         // ========== FILL ROWS
 
@@ -228,30 +245,30 @@ function leaderboards()
         $i = 0;
 
         while ($i < $numstop) {
-            $retired=0;
+            $retired = 0;
             if ($tableforquery == "nuke_iblplyr") {
-                $retired=$db->sql_result($result,$i,"retired");
-                $plyr_name=$db->sql_result($result,$i,"name");
-                $pid=$db->sql_result($result,$i,"pid");
-                $gm=number_format($db->sql_result($result,$i,"car_gm"));
-                $min=number_format($db->sql_result($result,$i,"car_min"));
-                $fgm=number_format($db->sql_result($result,$i,"car_fgm"));
-                $fga=number_format($db->sql_result($result,$i,"car_fga"));
-                $fgpct = number_format($db->sql_result($result,$i,"car_fgm") / $db->sql_result($result,$i,"car_fga"), 3);
-                $ftm=number_format($db->sql_result($result,$i,"car_ftm"));
-                $fta=number_format($db->sql_result($result,$i,"car_fta"));
-                $ftpct = number_format($db->sql_result($result,$i,"car_ftm") / $db->sql_result($result,$i,"car_fta"), 3);
-                $tgm=number_format($db->sql_result($result,$i,"car_tgm"));
-                $tga=number_format($db->sql_result($result,$i,"car_tga"));
-                $tpct = number_format($db->sql_result($result,$i,"car_tgm") / $db->sql_result($result,$i,"car_tga"), 3);
-                $orb=number_format($db->sql_result($result,$i,"car_orb"));
-                $reb=number_format($db->sql_result($result,$i,"car_reb"));
-                $ast=number_format($db->sql_result($result,$i,"car_ast"));
-                $stl=number_format($db->sql_result($result,$i,"car_stl"));
-                $to=number_format($db->sql_result($result,$i,"car_to"));
-                $blk=number_format($db->sql_result($result,$i,"car_blk"));
-                $pf=number_format($db->sql_result($result,$i,"car_pf"));
-                $pts=number_format($db->sql_result($result,$i,"car_pts"));
+                $retired = $db->sql_result($result, $i, "retired");
+                $plyr_name = $db->sql_result($result, $i, "name");
+                $pid = $db->sql_result($result, $i, "pid");
+                $gm = number_format($db->sql_result($result, $i, "car_gm"));
+                $min = number_format($db->sql_result($result, $i, "car_min"));
+                $fgm = number_format($db->sql_result($result, $i, "car_fgm"));
+                $fga = number_format($db->sql_result($result, $i, "car_fga"));
+                $fgpct = number_format($db->sql_result($result, $i, "car_fgm") / $db->sql_result($result, $i, "car_fga"), 3);
+                $ftm = number_format($db->sql_result($result, $i, "car_ftm"));
+                $fta = number_format($db->sql_result($result, $i, "car_fta"));
+                $ftpct = number_format($db->sql_result($result, $i, "car_ftm") / $db->sql_result($result, $i, "car_fta"), 3);
+                $tgm = number_format($db->sql_result($result, $i, "car_tgm"));
+                $tga = number_format($db->sql_result($result, $i, "car_tga"));
+                $tpct = number_format($db->sql_result($result, $i, "car_tgm") / $db->sql_result($result, $i, "car_tga"), 3);
+                $orb = number_format($db->sql_result($result, $i, "car_orb"));
+                $reb = number_format($db->sql_result($result, $i, "car_reb"));
+                $ast = number_format($db->sql_result($result, $i, "car_ast"));
+                $stl = number_format($db->sql_result($result, $i, "car_stl"));
+                $to = number_format($db->sql_result($result, $i, "car_to"));
+                $blk = number_format($db->sql_result($result, $i, "car_blk"));
+                $pf = number_format($db->sql_result($result, $i, "car_pf"));
+                $pts = number_format($db->sql_result($result, $i, "car_pts"));
             }
 
             if (
@@ -286,42 +303,60 @@ function leaderboards()
                 $tableforquery == "ibl_heat_career_totals" OR
                 $tableforquery == "ibl_playoff_career_totals"
             ) {
-                $plyr_name=$db->sql_result($result,$i,"name");
-                $pid=$db->sql_result($result,$i,"pid");
-                $gm=number_format($db->sql_result($result,$i,"games"));
-                $min=number_format($db->sql_result($result,$i,"minutes"));
-                $fgm=number_format($db->sql_result($result,$i,"fgm"));
-                $fga=number_format($db->sql_result($result,$i,"fga"));
-                $fgpct = number_format(($db->sql_result($result,$i,"fgm")) / ($db->sql_result($result,$i,"fga")), 3);
-                $ftm=number_format($db->sql_result($result,$i,"ftm"));
-                $fta=number_format($db->sql_result($result,$i,"fta"));
-                $ftpct = number_format(($db->sql_result($result,$i,"ftm")) / ($db->sql_result($result,$i,"fta")), 3);
-                $tgm=number_format($db->sql_result($result,$i,"tgm"));
-                $tga=number_format($db->sql_result($result,$i,"tga"));
-                $tpct = number_format(($db->sql_result($result,$i,"tgm")) / ($db->sql_result($result,$i,"tga")), 3);
-                $orb=number_format($db->sql_result($result,$i,"orb"));
-                $reb=number_format($db->sql_result($result,$i,"reb"));
-                $ast=number_format($db->sql_result($result,$i,"ast"));
-                $stl=number_format($db->sql_result($result,$i,"stl"));
-                $to=number_format($db->sql_result($result,$i,"tvr"));
-                $blk=number_format($db->sql_result($result,$i,"blk"));
-                $pf=number_format($db->sql_result($result,$i,"pf"));
-                $pts=number_format($db->sql_result($result,$i,"pts"));
+                $plyr_name = $db->sql_result($result, $i, "name");
+                $pid = $db->sql_result($result, $i, "pid");
+                $gm = number_format($db->sql_result($result, $i, "games"));
+                $min = number_format($db->sql_result($result, $i, "minutes"));
+                $fgm = number_format($db->sql_result($result, $i, "fgm"));
+                $fga = number_format($db->sql_result($result, $i, "fga"));
+                $fgpct = number_format(($db->sql_result($result, $i, "fgm")) / ($db->sql_result($result, $i, "fga")), 3);
+                $ftm = number_format($db->sql_result($result, $i, "ftm"));
+                $fta = number_format($db->sql_result($result, $i, "fta"));
+                $ftpct = number_format(($db->sql_result($result, $i, "ftm")) / ($db->sql_result($result, $i, "fta")), 3);
+                $tgm = number_format($db->sql_result($result, $i, "tgm"));
+                $tga = number_format($db->sql_result($result, $i, "tga"));
+                $tpct = number_format(($db->sql_result($result, $i, "tgm")) / ($db->sql_result($result, $i, "tga")), 3);
+                $orb = number_format($db->sql_result($result, $i, "orb"));
+                $reb = number_format($db->sql_result($result, $i, "reb"));
+                $ast = number_format($db->sql_result($result, $i, "ast"));
+                $stl = number_format($db->sql_result($result, $i, "stl"));
+                $to = number_format($db->sql_result($result, $i, "tvr"));
+                $blk = number_format($db->sql_result($result, $i, "blk"));
+                $pf = number_format($db->sql_result($result, $i, "pf"));
+                $pts = number_format($db->sql_result($result, $i, "pts"));
             }
 
             $i++;
 
-            echo "<tr><td><center>$i</center></td><td><center><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$plyr_name";
+            echo "<tr>
+                <td><center>$i</center></td>
+                <td><center><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$plyr_name";
 
             if ($retired == 1) {
                 echo "*";
             }
 
-            echo "</center></td><td><center>$gm</center></td><td><center>$min</center></td><td><center>$fgm</center></td>
-                <td><center>$fga</center></td><td><center>$fgpct</center></td><td><center>$ftm</center></td><td><center>$fta</center></td>
-                <td><center>$ftpct</center><td><center>$tgm</center></td><td><center>$tga</center></td><td><center>$tpct</center></td>
-                <td><center>$orb</center></td><td><center>$reb</center></td><td><center>$ast</center></td><td><center>$stl</center></td>
-                <td><center>$to</center></td><td><center>$blk</center></td><td><center>$pf</center></td><td><center>$pts</center></td></tr>";
+            echo "</center></td>
+                <td><center>$gm</center></td>
+                <td><center>$min</center></td>
+                <td><center>$fgm</center></td>
+                <td><center>$fga</center></td>
+                <td><center>$fgpct</center></td>
+                <td><center>$ftm</center></td>
+                <td><center>$fta</center></td>
+                <td><center>$ftpct</center></td>
+                <td><center>$tgm</center></td>
+                <td><center>$tga</center></td>
+                <td><center>$tpct</center></td>
+                <td><center>$orb</center></td>
+                <td><center>$reb</center></td>
+                <td><center>$ast</center></td>
+                <td><center>$stl</center></td>
+                <td><center>$to</center></td>
+                <td><center>$blk</center></td>
+                <td><center>$pf</center></td>
+                <td><center>$pts</center></td>
+            </tr>";
         }
 
         echo "</table></center></td></tr>";

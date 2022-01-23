@@ -12,6 +12,8 @@
 /* the Free Software Foundation; either version 2 of the License.       */
 /************************************************************************/
 
+$sharedFunctions = new Shared($db);
+
 if (!defined('MODULE_FILE')) {
 	die ("You can't access this file directly...");
 }
@@ -21,7 +23,7 @@ get_lang($module_name);
 
 $pagetitle = "- $module_name";
 
-$currentSeasonEndingYear = Shared::getCurrentSeasonEndingYear();
+$currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
 
 include("header.php");
 
@@ -30,8 +32,8 @@ echo "<center><font class=\"storytitle\">" . ($currentSeasonEndingYear - 1) . "-
 echo "<p>\n\n";
 
 $query = "SELECT * FROM nuke_ibl_power WHERE TeamID BETWEEN 1 AND 32 ORDER BY ranking DESC";
-$result = mysql_query($query);
-$num = mysql_numrows($result);
+$result = $db->sql_query($query);
+$num = $db->sql_numrows($result);
 
 echo "<table width=\"500\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\" align=center>\n";
 echo "<tr>\n";
@@ -57,15 +59,15 @@ echo "</tr>\n";
 
 $i = 0;
 while ($i < $num) {
-	$tid = mysql_result($result, $i, "TeamID");
-	$Team = mysql_result($result, $i, "Team");
-	$ranking = mysql_result($result, $i, "ranking");
-	$wins = mysql_result($result, $i, "win");
-	$losses = mysql_result($result, $i, "loss");
-	$homeWins = mysql_result($result, $i, "home_win");
-	$homeLosses = mysql_result($result, $i, "home_loss");
-	$awayWins = mysql_result($result, $i, "road_win");
-	$awayLosses = mysql_result($result, $i, "road_loss");
+	$tid = $db->sql_result($result, $i, "TeamID");
+	$Team = $db->sql_result($result, $i, "Team");
+	$ranking = $db->sql_result($result, $i, "ranking");
+	$wins = $db->sql_result($result, $i, "win");
+	$losses = $db->sql_result($result, $i, "loss");
+	$homeWins = $db->sql_result($result, $i, "home_win");
+	$homeLosses = $db->sql_result($result, $i, "home_loss");
+	$awayWins = $db->sql_result($result, $i, "road_win");
+	$awayLosses = $db->sql_result($result, $i, "road_loss");
 
 	$i++;
 

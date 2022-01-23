@@ -16,8 +16,6 @@ if (!defined('MODULE_FILE')) {
 	die ("You can't access this file directly...");
 }
 
-require_once("mainfile.php");
-
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
@@ -38,6 +36,9 @@ function menu()
 function poschange($pid)
 {
     global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
+
+	$sharedFunctions = new Shared($db);
+
 	cookiedecode($user);
 
     $pid = intval($pid);
@@ -52,7 +53,7 @@ function poschange($pid)
 
     menu();
 
-	$seasonPhase = Shared::getCurrentSeasonPhase();
+	$seasonPhase = $sharedFunctions->getCurrentSeasonPhase();
 
 	if ($seasonPhase != "Free Agency") {
 		$sql2 = "SELECT * FROM ".$prefix."_users WHERE username='$cookie[1]'";

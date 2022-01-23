@@ -960,7 +960,7 @@ function awards()
 
 function showpage($pid,$spec) {
     global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
-	$shared = new Shared($db);
+	$sharedFunctions = new Shared($db);
 
     $pid = intval($pid);
     $spec = intval($spec);
@@ -1143,7 +1143,7 @@ function showpage($pid,$spec) {
 
     menu();
 
-    $seasonPhase = $shared->getCurrentSeasonPhase();
+    $seasonPhase = $sharedFunctions->getCurrentSeasonPhase();
 
 	echo "<table>
         <tr>
@@ -1185,7 +1185,7 @@ function showpage($pid,$spec) {
         WHERE team_name = '" . $userinfo['user_ibl_team'] . "';";
     $hasUsedExtensionThisSeason = $db->sql_result($db->sql_query($queryHasUsedExtensionThisSeason), 0);
 
-    $currentSeasonPhase = $shared->getCurrentSeasonPhase();
+    $currentSeasonPhase = $sharedFunctions->getCurrentSeasonPhase();
     if ($hasUsedExtensionThisSeason == 0 AND
         $can_renegotiate == 1 AND
         $currentSeasonPhase != 'Draft' AND
@@ -2993,7 +2993,7 @@ function showpage($pid,$spec) {
     }
 
     if ($spec == 0) {
-        $currentSeasonEndingYear = $shared->getCurrentSeasonEndingYear();
+        $currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
         $currentSeasonStaringYear = $currentSeasonEndingYear - 1;
 
         if ($seasonPhase == "Preseason") {
@@ -3038,8 +3038,8 @@ function showpage($pid,$spec) {
                 </style>
                 <tr>
                     <td class=\"gamelog\">$row[Date]</td>
-                    <td class=\"gamelog\">".$shared->getTeamnameFromTid($row[visitorTID])."</td>
-                    <td class=\"gamelog\">".$shared->getTeamnameFromTid($row[homeTID])."</td>
+                    <td class=\"gamelog\">".$sharedFunctions->getTeamnameFromTid($row[visitorTID])."</td>
+                    <td class=\"gamelog\">".$sharedFunctions->getTeamnameFromTid($row[homeTID])."</td>
                     <td class=\"gamelog\">$row[gameMIN]</td>
                     <td class=\"gamelog\">".((2*$row[game2GM])+(3*$row[game3GM])+$row[gameFTM])."</td>
                     <td class=\"gamelog\">".($row[game2GM]+$row[game3GM])."</td>
@@ -3530,7 +3530,7 @@ function negotiate($pid)
 
 function rookieoption($pid) {
 	global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
-	$shared = new Shared($db);
+	$sharedFunctions = new Shared($db);
 
 	$pid = intval($pid);
 
@@ -3557,7 +3557,7 @@ function rookieoption($pid) {
 		return;
 	}
 
-    $seasonPhase = $shared->getCurrentSeasonPhase();
+    $seasonPhase = $sharedFunctions->getCurrentSeasonPhase();
 
 	if (($seasonPhase == "Free Agency" AND $player_exp == 2 AND $player_draftround == 1) OR
         (($seasonPhase == "Preseason" OR $seasonPhase == "HEAT") AND

@@ -17,7 +17,7 @@ if ( !defined('BLOCK_FILE') ) {
 }
 
 global $prefix, $multilingual, $currentlang, $db;
-$shared = new Shared($db);
+$sharedFunctions = new Shared($db);
 
 /* DIVISIONAL STANDINGS
 $queryNLWest = "SELECT tid,team_name,leagueRecord,divGB FROM ibl_standings WHERE division = 'NL West' ORDER BY divGB ASC";
@@ -37,7 +37,7 @@ $resultALEast = mysql_query($queryALEast);
 $limitALEast = mysql_num_rows($resultALEast);
 */
 
-$arrayLastSimDates = $shared->getLastSimDatesArray();
+$arrayLastSimDates = $sharedFunctions->getLastSimDatesArray();
 $lastSimStartDate = $arrayLastSimDates["Start Date"];
 $lastSimEndDate = $arrayLastSimDates["End Date"];
 

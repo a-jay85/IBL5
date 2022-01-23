@@ -1,14 +1,15 @@
 <?php
 
 require 'mainfile.php';
+$sharedFunctions = new Shared($db);
 
 $queryString = "";
 $successText = "";
 
-$currentSeasonPhase = Shared::getCurrentSeasonPhase();
-$currentSeasonEndingYear = Shared::getCurrentSeasonEndingYear();
-$waiverWireStatus = Shared::getWaiverWireStatus();
-$allowTradesStatus = Shared::getAllowTradesStatus();
+$currentSeasonPhase = $sharedFunctions->getCurrentSeasonPhase();
+$currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
+$waiverWireStatus = $sharedFunctions->getWaiverWireStatus();
+$allowTradesStatus = $sharedFunctions->getAllowTradesStatus();
 
 if (isset($_POST['query'])) {
     switch ($_POST['query']) {
@@ -68,7 +69,7 @@ if (isset($_POST['query'])) {
             break;
     }
 
-    if (mysql_query($queryString)) {
+    if ($db->sql_query($queryString)) {
         $querySuccessful = TRUE;
         if (isset($_POST['SeasonPhase'])) {
             $currentSeasonPhase = $_POST['SeasonPhase'];

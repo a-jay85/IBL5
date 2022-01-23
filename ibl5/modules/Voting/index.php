@@ -54,7 +54,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 		return $tidsFormattedForQuery;
 	}
 
-	function getCandidates($votingCategory) {
+	function getCandidates($votingCategory, $voterTeamName) {
 		$seasonPhase = Shared::getCurrentSeasonPhase();
 		if ($seasonPhase == "Regular Season") {
 			$easternConferenceTids = array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 25);
@@ -190,12 +190,28 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 
 			$output .= "<tr bgcolor=$bgcolor>";
 
-			if ($seasonPhase == "Regular Season") {
-				$output .= "<td><center><input type=\"checkbox\" name=\"" . $votingCategory . "[]\" value=\"$name, $teamname\"></center></td>";
+			if (!function_exists('str_contains')) {
+			    function str_contains($haystack, $needle) {
+			        return $needle !== '' && mb_strpos($haystack, $needle) !== false;
+			    }
+			}
+
+			if (!str_contains($teamname, $voterTeamName)) {
+				if ($seasonPhase == "Regular Season") {
+					$output .= "<td><center><input type=\"checkbox\" name=\"" . $votingCategory . "[]\" value=\"$name, $teamname\"></center></td>";
+				} else {
+					$output .= "<td><center><input type=\"radio\" name=\"" . $votingCategory . "[1]\" value=\"$name, $teamname\"></center></td>
+								<td><center><input type=\"radio\" name=\"" . $votingCategory . "[2]\" value=\"$name, $teamname\"></center></td>
+								<td><center><input type=\"radio\" name=\"" . $votingCategory . "[3]\" value=\"$name, $teamname\"></center></td>";
+				}
 			} else {
-				$output .= "<td><center><input type=\"radio\" name=\"" . $votingCategory . "[1]\" value=\"$name, $teamname\"></center></td>
-							<td><center><input type=\"radio\" name=\"" . $votingCategory . "[2]\" value=\"$name, $teamname\"></center></td>
-							<td><center><input type=\"radio\" name=\"" . $votingCategory . "[3]\" value=\"$name, $teamname\"></center></td>";
+				if ($seasonPhase == "Regular Season") {
+					$output .= "<td></td>";
+				} else {
+					$output .= "<td></td>
+								<td></td>
+								<td></td>";
+				}
 			}
 
 			if ($votingCategory != "GM") {
@@ -235,8 +251,8 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 		$formName = "EOYVote";
 	}
 
-    $teamlogo = $userinfo[user_ibl_team];
-	$tid = Shared::getTidFromTeamname($teamlogo);
+    $voterTeamName = $userinfo[user_ibl_team];
+	$tid = Shared::getTidFromTeamname($voterTeamName);
 
 	echo "<form name=\"$formName\" method=\"post\" action=\"$formName.php\">
 		<center>
@@ -245,11 +261,11 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 	echo "<input type=\"submit\" value=\"Submit Votes!\">";
 
 	if ($seasonPhase == "Regular Season") {
-		$easternConferenceFrontcourt .= getCandidates('ECF');
-		$easternConferenceBackcourt .= getCandidates('ECB');
+		$easternConferenceFrontcourt .= getCandidates('ECF', $voterTeamName);
+		$easternConferenceBackcourt .= getCandidates('ECB', $voterTeamName);
 
-		$westernConferenceFrontcourt .= getCandidates('WCF');
-		$westernConferenceBackcourt .= getCandidates('WCB');
+		$westernConferenceFrontcourt .= getCandidates('WCF', $voterTeamName);
+		$westernConferenceBackcourt .= getCandidates('WCB', $voterTeamName);
 
 		echo "<div onclick=\"ShowAndHideECF()\">
 				<h2>Select THREE Eastern Conference Frontcourt Players:</h2>
@@ -275,10 +291,10 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 			</div>
 			$westernConferenceBackcourt";
 	} else {
-		$mostValuablePlayers .= getCandidates('MVP');
-		$sixthPersons .= getCandidates('Six');
-		$rookiesOfTheYear .= getCandidates('ROY');
-		$generalManagers .= getCandidates('GM');
+		$mostValuablePlayers .= getCandidates('MVP', $voterTeamName);
+		$sixthPersons .= getCandidates('Six', $voterTeamName);
+		$rookiesOfTheYear .= getCandidates('ROY', $voterTeamName);
+		$generalManagers .= getCandidates('GM', $voterTeamName);
 
 		echo "<div onclick=\"ShowAndHideMVP()\">
 				<h2>Select your top THREE choices for Most Valuable Player:</h2>
@@ -305,7 +321,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 			$generalManagers";
 	}
 
-	echo "<input type=\"hidden\" name=\"teamname\" value=\"$teamlogo\">
+	echo "<input type=\"hidden\" name=\"teamname\" value=\"$voterTeamName\">
 
 		<input type=\"submit\" value=\"Submit Votes!\">
 	</center>

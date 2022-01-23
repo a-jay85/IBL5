@@ -16,12 +16,14 @@ if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
 	die ("You can't access this file directly...");
 }
 
+$sharedFunctions = new Shared($db);
+
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 $userpage = 1;
 include("header.php");
 
-$currentSeasonEndingYear = Shared::getCurrentSeasonEndingYear();
+$currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
 $fiveSeasonsAgoEndingYear = $currentSeasonEndingYear - 4;
 
 $query2 = "SELECT *,
@@ -35,42 +37,32 @@ WHERE teamid != 35
 AND year BETWEEN $fiveSeasonsAgoEndingYear AND $currentSeasonEndingYear
 GROUP BY currentname
 ORDER BY teamid ASC;";
-$result2 = mysql_query($query2);
-$num2 = mysql_num_rows($result2);
-
-function getNumberOfTitles($teamname, $titleName)
-{
-	$queryCountTitles = "SELECT COUNT(name)
-	FROM nuke_ibl_teamawards
-	WHERE name = '$teamname'
-	AND Award LIKE '%$titleName%';";
-
-	return mysql_result(mysql_query($queryCountTitles), 0);
-}
+$result2 = $db->sql_query($query2);
+$num2 = $db->sql_numrows($result2);
 
 OpenTable();
 
 $k = 0;
 while ($k < $num2) {
-	$teamid[$k] = mysql_result($result2, $k, "teamid");
-	$teamname[$k] = mysql_result($result2, $k, "team_name");
-	$teamcity[$k] = mysql_result($result2, $k, "team_city");
-	$teamcolor1[$k] = mysql_result($result2, $k, "color1");
-	$teamcolor2[$k] = mysql_result($result2, $k, "color2");
+	$teamid[$k] = $db->sql_result($result2, $k, "teamid");
+	$teamname[$k] = $db->sql_result($result2, $k, "team_name");
+	$teamcity[$k] = $db->sql_result($result2, $k, "team_city");
+	$teamcolor1[$k] = $db->sql_result($result2, $k, "color1");
+	$teamcolor2[$k] = $db->sql_result($result2, $k, "color2");
 
-    $totwins[$k] = mysql_result($result2, $k, "totwins");
-    $totloss[$k] = mysql_result($result2, $k, "totloss");
-    $pct[$k] = mysql_result($result2, $k, "winpct");
+    $totwins[$k] = $db->sql_result($result2, $k, "totwins");
+    $totloss[$k] = $db->sql_result($result2, $k, "totloss");
+    $pct[$k] = $db->sql_result($result2, $k, "winpct");
 
-	$lastFiveSeasonsWins[$k] = mysql_result($result2, $k, "five_season_wins");
-	$lastFiveSeasonsLosses[$k] = mysql_result($result2, $k, "five_season_losses");
-	$lastFiveSeasonsWinPct[$k] = mysql_result($result2, $k, "five_season_winpct");
+	$lastFiveSeasonsWins[$k] = $db->sql_result($result2, $k, "five_season_wins");
+	$lastFiveSeasonsLosses[$k] = $db->sql_result($result2, $k, "five_season_losses");
+	$lastFiveSeasonsWinPct[$k] = $db->sql_result($result2, $k, "five_season_winpct");
 
-    $playoffs[$k] = mysql_result($result2, $k, "playoffs");
-    $heat[$k] = mysql_result($result2, $k, "heat_titles");
-    $div[$k] = mysql_result($result2, $k, "div_titles");
-    $conf[$k] = mysql_result($result2, $k, "conf_titles");
-    $ibl[$k] = mysql_result($result2, $k, "ibl_titles");
+    $playoffs[$k] = $db->sql_result($result2, $k, "playoffs");
+    $heat[$k] = $db->sql_result($result2, $k, "heat_titles");
+    $div[$k] = $db->sql_result($result2, $k, "div_titles");
+    $conf[$k] = $db->sql_result($result2, $k, "conf_titles");
+    $ibl[$k] = $db->sql_result($result2, $k, "ibl_titles");
 
 	$table_echo .= "<tr>
 		<td bgcolor=#" . $teamcolor1[$k] . "><a href=\"modules.php?name=Team&op=team&tid=" . $teamid[$k] . "\"><font color=#" . $teamcolor2[$k] . ">" . $teamcity[$k] . " " . $teamname[$k] . "</a></td>
@@ -81,10 +73,10 @@ while ($k < $num2) {
 		<td bgcolor=#ddd>" . $lastFiveSeasonsLosses[$k] . "</td>
 		<td bgcolor=#ddd>" . $lastFiveSeasonsWinPct[$k] . "</td>
 		<td>" . $playoffs[$k] . "</td>
-		<td>" . getNumberOfTitles($teamname[$k], 'HEAT') . "</td>
-		<td>" . getNumberOfTitles($teamname[$k], 'Division') . "</td>
-		<td>" . getNumberOfTitles($teamname[$k], 'Conference') . "</td>
-		<td>" . getNumberOfTitles($teamname[$k], 'IBL Champions') . "</td>
+		<td>" . $sharedFunctions->getNumberOfTitles($teamname[$k], 'HEAT') . "</td>
+		<td>" . $sharedFunctions->getNumberOfTitles($teamname[$k], 'Division') . "</td>
+		<td>" . $sharedFunctions->getNumberOfTitles($teamname[$k], 'Conference') . "</td>
+		<td>" . $sharedFunctions->getNumberOfTitles($teamname[$k], 'IBL Champions') . "</td>
 	</tr>";
 
 	$k++;

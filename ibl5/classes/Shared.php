@@ -39,6 +39,16 @@ class Shared
         return $this->db->sql_result($queryCurrentSeasonPhase, 0);
     }
 
+    public function getNumberOfTitles($teamname, $titleName)
+    {
+    	$queryNumberOfTitles = $this->db->sql_query("SELECT COUNT(name)
+        	FROM nuke_ibl_teamawards
+        	WHERE name = '$teamname'
+        	AND Award LIKE '%$titleName%';");
+
+    	return $this->db->sql_result($queryNumberOfTitles, 0);
+    }
+
     public function getTeamnameFromTid($tid)
     {
     	$queryTeamnameFromTid = $this->db->sql_query("SELECT team_name

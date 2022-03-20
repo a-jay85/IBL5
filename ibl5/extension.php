@@ -68,10 +68,10 @@ if ($Offer_1 == 0) {
 }
 
 // ==== CHECK FOR ILLEGAL OFFERS THAT ARE OVER THE SALARY CAP
-if ($Offer_1 > $Cap_Space) {
-    echo "Sorry, you do not have sufficient cap space to make the offer.  You offered $Offer_1 in the first year of the contract, which is more than $Cap_Space, the amount of cap space you have available.<br>";
-    $nooffer = 1;
-}
+// if ($Offer_1 > $Cap_Space) {
+//     echo "Sorry, you do not have sufficient cap space to make the offer.  You offered $Offer_1 in the first year of the contract, which is more than $Cap_Space, the amount of cap space you have available.<br>";
+//     $nooffer = 1;
+// }
 
 // ==== CHECK FOR ILLEGAL OFFERS DUE TO USE OF EXTENSION THIS SEASON
 if ($UsedExtensionSeason == 1) {

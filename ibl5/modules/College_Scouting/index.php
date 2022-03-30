@@ -31,6 +31,8 @@ $userpage = 1;
 function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 {
 	global $user, $cookie, $sitename, $prefix, $user_prefix, $db, $admin, $broadcast_msg, $my_headlines, $module_name, $useset, $subscription_url;
+	$sharedFunctions = new Shared($db);
+
 	$sql = "SELECT * FROM ".$prefix."_bbconfig";
 	$result = $db->sql_query($sql);
 	while ($row = $db->sql_fetchrow($result))	{
@@ -191,24 +193,24 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
     OpenTable();
 
     $teamlogo = $userinfo[user_ibl_team];
-	$tid = Shared::getTidFromTeamname($teamlogo);
+	$tid = $sharedFunctions->getTidFromTeamname($teamlogo);
 
-	Shared::displaytopmenu($tid);
+	$sharedFunctions->displaytopmenu($tid);
 
 // ========== DISPLAY ROOKIES
 
     $scoutingpoints = $userinfo[scoutingpoints];
 
 	$draft_sql = "SELECT * from nuke_ibl_draft WHERE player = '' ORDER BY round ASC, pick ASC";
-	$draft_result = mysql_query($draft_sql);
+	$draft_result = $db->sql_query($draft_sql);
 
-	$draft_team=mysql_result($draft_result,0,"team");
-	$draft_player=mysql_result($draft_result,0,"player");
-	$draft_round=mysql_result($draft_result,0,"round");
-	$draft_pick=mysql_result($draft_result,0,"pick");
+	$draft_team=$db->sql_result($draft_result,0,"team");
+	$draft_player=$db->sql_result($draft_result,0,"player");
+	$draft_round=$db->sql_result($draft_result,0,"round");
+	$draft_pick=$db->sql_result($draft_result,0,"pick");
 
 		$queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$teamlogo'";
-	$tid = mysql_result(mysql_query($queryTeamID), 0);
+	$tid = $db->sql_result($db->sql_query($queryTeamID), 0);
 
     echo "<center><img src=\"images/logo/$tid.jpg\"><br>
 	<table>
@@ -303,16 +305,16 @@ FROM   iblhoops_draft.pick
        INNER JOIN iblhoops_draft.player
                ON iblhoops_draft.pick.player_id =
                   iblhoops_draft.player.player_id;";
-	$draftedResult = mysql_query($draftedPlayersQuery);
+	$draftedResult = $db->sql_query($draftedPlayersQuery);
 
 	$j = 0;
-	while ($draftedPlayersArray[$j] = mysql_result($draftedResult, $j)) {
+	while ($draftedPlayersArray[$j] = $db->sql_result($draftedResult, $j)) {
 		$j++;
 	}
 
 	if (in_array($player_name, $draftedPlayersArray)) {
 		$player_drafted = 1;
-		mysql_query("UPDATE nuke_scout_rookieratings
+		$db->sql_query("UPDATE nuke_scout_rookieratings
 SET drafted = 1
 WHERE name = '$player_name';"); // This query should really be executed in the Draft-O-Matic when the player is drafted, but this works for now.
 	} else {

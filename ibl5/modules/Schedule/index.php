@@ -26,13 +26,13 @@ include("header.php");
 OpenTable();
 
 $min_date_query="SELECT MIN(Date) as mindate FROM ibl_schedule";
-$min_date_result=mysql_query($min_date_query);
-$row = mysql_fetch_assoc($min_date_result);
+$min_date_result=$db->sql_query($min_date_query);
+$row = $db->sql_fetch_assoc($min_date_result);
 $min_date=$row[mindate];
 
 $max_date_query="SELECT MAX(Date) as maxdate FROM ibl_schedule";
-$max_date_result=mysql_query($max_date_query);
-$row2 = mysql_fetch_assoc($max_date_result);
+$max_date_result=$db->sql_query($max_date_query);
+$row2 = $db->sql_fetch_assoc($max_date_result);
 $max_date=$row2[maxdate];
 $max_date=fnc_date_calc($max_date,0);
 
@@ -62,23 +62,26 @@ function chunk ($chunk_start_date, $chunk_end_date, $j)
 {
 	//TODO: unify this code with the Team module's boxscore function
 
+	global $db;
+	$sharedFunctions = new Shared($db);
+
 	$query = "SELECT *
 		FROM ibl_schedule
 		WHERE Date BETWEEN '$chunk_start_date' AND '$chunk_end_date'
 		ORDER BY SchedID ASC";
-	$result = mysql_query($query);
-	$num = mysql_numrows($result);
+	$result = $db->sql_query($query);
+	$num = $db->sql_numrows($result);
 
 	$teamSeasonRecordsQuery = "SELECT tid, leagueRecord FROM ibl_standings ORDER BY tid ASC;";
-	$teamSeasonRecordsResult = mysql_query($teamSeasonRecordsQuery);
+	$teamSeasonRecordsResult = $db->sql_query($teamSeasonRecordsQuery);
 
-	$arrayLastSimDates = Shared::getLastSimDatesArray();
+	$arrayLastSimDates = $sharedFunctions->getLastSimDatesArray();
 	$lastSimStartDate = date_create($arrayLastSimDates["Start Date"]);
 	$lastSimEndDate = date_create($arrayLastSimDates["End Date"]);
 	$projectedNextSimEndDate = date_add($lastSimEndDate, date_interval_create_from_date_string('7 days'));
 
 	// override $projectedNextSimEndDate to account for the blank week at end of HEAT
-	$currentSeasonEndingYear = Shared::getCurrentSeasonEndingYear();
+	$currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
 	$currentSeasonBeginningYear = $currentSeasonEndingYear - 1;
 	if ($projectedNextSimEndDate >= date_create("$currentSeasonBeginningYear-10-23") AND $projectedNextSimEndDate < date_create("$currentSeasonBeginningYear-11-01")) {
 		$projectedNextSimEndDate = date_create("$currentSeasonBeginningYear-11-08");
@@ -89,17 +92,17 @@ function chunk ($chunk_start_date, $chunk_end_date, $j)
 	$i = 0;
 	$z = 0;
 	while ($i < $num) {
-		$date = mysql_result($result, $i, "Date");
-		$visitor = mysql_result($result, $i, "Visitor");
-		$visitorScore = mysql_result($result, $i, "VScore");
-		$home = mysql_result($result, $i, "Home");
-		$homeScore = mysql_result($result, $i, "HScore");
-		$boxid = mysql_result($result, $i, "BoxID");
+		$date = $db->sql_result($result, $i, "Date");
+		$visitor = $db->sql_result($result, $i, "Visitor");
+		$visitorScore = $db->sql_result($result, $i, "VScore");
+		$home = $db->sql_result($result, $i, "Home");
+		$homeScore = $db->sql_result($result, $i, "HScore");
+		$boxid = $db->sql_result($result, $i, "BoxID");
 
-		$visitorTeamname = Shared::getTeamnameFromTid($visitor);
-		$homeTeamname = Shared::getTeamnameFromTid($home);
-		$visitorRecord = mysql_result($teamSeasonRecordsResult, $visitor-1, "leagueRecord");
-		$homeRecord = mysql_result($teamSeasonRecordsResult, $home-1, "leagueRecord");
+		$visitorTeamname = $sharedFunctions->getTeamnameFromTid($visitor);
+		$homeTeamname = $sharedFunctions->getTeamnameFromTid($home);
+		$visitorRecord = $db->sql_result($teamSeasonRecordsResult, $visitor-1, "leagueRecord");
+		$homeRecord = $db->sql_result($teamSeasonRecordsResult, $home-1, "leagueRecord");
 
 		if (($i % 2) == 0) {
 			$bgcolor = "FFFFFF";
@@ -167,8 +170,8 @@ function chunk ($chunk_start_date, $chunk_end_date, $j)
 
 function teamname ($teamid) {
 	$query="SELECT * FROM nuke_ibl_team_info WHERE teamid = $teamid";
-	$result=mysql_query($query);
-	$name=mysql_result($result, 0, "team_name");
+	$result=$db->sql_query($query);
+	$name=$db->sql_result($result, 0, "team_name");
 	return $name;
 }
 

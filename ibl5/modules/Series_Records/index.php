@@ -21,6 +21,8 @@ $userpage = 1;
 function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 {
 	global $user, $cookie, $sitename, $prefix, $user_prefix, $db, $admin, $broadcast_msg, $my_headlines, $module_name, $useset, $subscription_url;
+	$sharedFunctions = new Shared($db);
+
 	$sql = "SELECT * FROM " . $prefix . "_bbconfig";
 	$result = $db->sql_query($sql);
 	while ($row = $db->sql_fetchrow($result)) {
@@ -34,11 +36,11 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 	}
 
 	$teamlogo = $userinfo[user_ibl_team];
-	$tid = Shared::getTidFromTeamname($teamlogo);
+	$tid = $sharedFunctions->getTidFromTeamname($teamlogo);
 
 	include("header.php");
 	OpenTable();
-	Shared::displaytopmenu($tid);
+	$sharedFunctions->displaytopmenu($tid);
 
 	displaySeriesRecords($tid);
 
@@ -69,16 +71,20 @@ function main($user) {
 
 function queryTeamInfo()
 {
+	global $db;
+
 	$query = "SELECT teamid, team_city, team_name, color1, color2
 		FROM nuke_ibl_team_info
 		WHERE teamid != 99 AND teamid != 35
 		ORDER BY teamid ASC;";
-	$result = mysql_query($query);
+	$result = $db->sql_query($query);
 	return $result;
 }
 
 function querySeriesRecords()
 {
+	global $db;
+
 	$query = "SELECT self, opponent, SUM(wins) AS wins, SUM(losses) AS losses
 				FROM (
 					SELECT home AS self, visitor AS opponent, COUNT(*) AS wins, 0 AS losses
@@ -108,13 +114,15 @@ function querySeriesRecords()
 					GROUP BY self, opponent
 				) t
 				GROUP BY self, opponent;";
-	$result = mysql_query($query);
+	$result = $db->sql_query($query);
 	return $result;
 }
 
 function displaySeriesRecords($tid)
 {
-	$numteams = mysql_result(mysql_query("SELECT MAX(Visitor) FROM ibl_schedule;"), 0);
+	global $db;
+
+	$numteams = $db->sql_result($db->sql_query("SELECT MAX(Visitor) FROM ibl_schedule;"), 0);
 
 	echo "<table border=1 class=\"sortable\">
 		<tr>
@@ -136,7 +144,7 @@ function displaySeriesRecords($tid)
 	$pointer = 0;
 	$tidRow = 1;
 	while ($tidRow <= $numteams) {
-		$team = mysql_fetch_assoc($resultTeamInfo);
+		$team = $db->sql_fetch_assoc($resultTeamInfo);
 		echo "<tr>
 			<td bgcolor=$team[color1]>
 				<a href=\"modules.php?name=Team&op=team&tid=$team[teamid]\">
@@ -150,7 +158,7 @@ function displaySeriesRecords($tid)
 			if ($tidRow == $tidColumn) {
 				echo "<td align=\"center\">", ($tid == $tidRow ? "<b>" : ""), "x", ($tid == $tidRow ? "</b>" : ""), "</td>";
 			} else {
-				$row = mysql_fetch_assoc($resultSeriesRecords);
+				$row = $db->sql_fetch_assoc($resultSeriesRecords);
 				if ($row['self'] == $tidRow AND $row['opponent'] == $tidColumn) {
 					if ($row['wins'] > $row['losses']) {
 						$bgcolor = "#8f8";
@@ -167,7 +175,7 @@ function displaySeriesRecords($tid)
 					$pointer++;
 				} else {
 					echo "<td align=\"center\">0 - 0</td>";
-					mysql_data_seek($resultSeriesRecords, $pointer); // Bring the pointer back since no record was found
+					mysqli_data_seek($resultSeriesRecords, $pointer); // Bring the pointer back since no record was found
 				}
 			}
 			$tidColumn++;

@@ -23,6 +23,8 @@ $userpage = 1;
 function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 {
 	global $user, $cookie, $sitename, $prefix, $user_prefix, $db, $admin, $broadcast_msg, $my_headlines, $module_name, $useset, $subscription_url;
+	$sharedFunctions = new Shared($db);
+
 	$sql = "SELECT * FROM " . $prefix . "_bbconfig";
 	$result = $db->sql_query($sql);
 	while ($row = $db->sql_fetchrow($result)) {
@@ -36,11 +38,11 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 	}
 
 	$teamlogo = $userinfo[user_ibl_team];
-	$tid = Shared::getTidFromTeamname($teamlogo);
+	$tid = $sharedFunctions->getTidFromTeamname($teamlogo);
 
 	include("header.php");
 	OpenTable();
-	Shared::displaytopmenu($tid);
+	$sharedFunctions->displaytopmenu($tid);
 
 	comparePlayers();
 
@@ -349,15 +351,17 @@ function comparePlayers()
 
 function getPlayerNamesArray()
 {
+	global $db;
+
 	$query = "SELECT name
 		FROM nuke_iblplyr
 		WHERE ordinal != 0
 		ORDER BY name ASC;";
-	$result = mysql_query($query);
-	$numRows = mysql_num_rows($result);
+	$result = $db->sql_query($query);
+	$numRows = $db->sql_numrows($result);
 	$i = 0;
 	while ($i < $numRows) {
-		$array[$i] = mysql_result($result, $i);
+		$array[$i] = $db->sql_result($result, $i);
 		$i++;
 	}
 	return $array;
@@ -365,12 +369,14 @@ function getPlayerNamesArray()
 
 function getPlayerInfoArrayFromName($playerName)
 {
+	global $db;
+	
 	$query = "SELECT *
 		FROM nuke_iblplyr
 		WHERE name = '$playerName'
 		LIMIT 1;";
-	$result = mysql_query($query);
-	$array = mysql_fetch_assoc($result);
+	$result = $db->sql_query($query);
+	$array = $db->sql_fetch_assoc($result);
 	return $array;
 }
 

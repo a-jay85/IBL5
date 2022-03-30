@@ -29,6 +29,8 @@ $userpage = 1;
 
 function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
     global $user, $cookie, $sitename, $prefix, $user_prefix, $db, $admin, $broadcast_msg, $my_headlines, $module_name, $useset, $subscription_url;
+	$sharedFunctions = new Shared($db);
+
     $sql = "SELECT * FROM " . $prefix . "_bbconfig";
     $result = $db->sql_query($sql);
     while ($row = $db->sql_fetchrow($result)) {
@@ -47,7 +49,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 
     OpenTable();
 
-	$seasonPhase = Shared::getCurrentSeasonPhase();
+	$seasonPhase = $sharedFunctions->getCurrentSeasonPhase();
 
 	function formatTidsForSqlQuery($conferenceTids) {
 		$tidsFormattedForQuery = join("','",$conferenceTids);
@@ -55,7 +57,11 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 	}
 
 	function getCandidates($votingCategory, $voterTeamName) {
-		$seasonPhase = Shared::getCurrentSeasonPhase();
+		global $db;
+
+		$sharedFunctions = new Shared($db);
+
+		$seasonPhase = $sharedFunctions->getCurrentSeasonPhase();
 		if ($seasonPhase == "Regular Season") {
 			$easternConferenceTids = array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 25);
 			$westernConferenceTids = array(13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 26);
@@ -114,7 +120,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 			}
 		}
 
-		$result = mysql_query($query);
+		$result = $db->sql_query($query);
 
 		echo "<SCRIPT>
 			function ShowAndHide$votingCategory() {
@@ -163,7 +169,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 		}
 
 		$i = 0;
-		while ($row = mysql_fetch_assoc($result)) {
+		while ($row = $db->sql_fetch_assoc($result)) {
 			if ($votingCategory != "GM") {
 				$name = $row['name'];
 				$teamname = $row['teamname'];
@@ -252,7 +258,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 	}
 
     $voterTeamName = $userinfo[user_ibl_team];
-	$tid = Shared::getTidFromTeamname($voterTeamName);
+	$tid = $sharedFunctions->getTidFromTeamname($voterTeamName);
 
 	echo "<form name=\"$formName\" method=\"post\" action=\"$formName.php\">
 		<center>

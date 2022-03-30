@@ -23,18 +23,20 @@ $pagetitle = "- Team Pages";
 
 function waivers($user)
 {
-    global $stop, $action;
+    global $db, $stop, $action;
+    $sharedFunctions = new Shared($db);
+
     if (!is_user($user)) {
         include("header.php");
         if ($stop) {
             OpenTable();
-            Shared::displaytopmenu($tid);
+            $sharedFunctions->displaytopmenu($tid);
             echo "<center><font class=\"title\"><b>" . _LOGININCOR . "</b></font></center>\n";
             CloseTable();
             echo "<br>\n";
         } else {
             OpenTable();
-            Shared::displaytopmenu($tid);
+            $sharedFunctions->displaytopmenu($tid);
             echo "<center><font class=\"title\"><b>" . _USERREGLOGIN . "</b></font></center>\n";
             CloseTable();
             echo "<br>\n";
@@ -46,8 +48,8 @@ function waivers($user)
         }
         include("footer.php");
     } elseif (is_user($user)) {
-        $currentSeasonPhase = Shared::getCurrentSeasonPhase();
-        $allowWaiverMoves = Shared::getWaiverWireStatus();
+        $currentSeasonPhase = $sharedFunctions->getCurrentSeasonPhase();
+        $allowWaiverMoves = $sharedFunctions->getWaiverWireStatus();
 
         if (($currentSeasonPhase == "Preseason" AND $allowWaiverMoves == "Yes")
             OR $currentSeasonPhase == "HEAT"
@@ -59,7 +61,7 @@ function waivers($user)
         } else {
             include ("header.php");
             OpenTable();
-            Shared::displaytopmenu($tid);
+            $sharedFunctions->displaytopmenu($tid);
             echo "Sorry, but players may not be added from or dropped to waivers at the present time.";
             CloseTable();
             include ("footer.php");
@@ -70,6 +72,8 @@ function waivers($user)
 function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
 {
     global $user, $cookie, $sitename, $prefix, $user_prefix, $db, $admin, $broadcast_msg, $my_headlines, $module_name, $subscription_url, $partner, $action;
+    $sharedFunctions = new Shared($db);
+
     $sql = "SELECT * FROM " . $prefix . "_bbconfig";
     $result = $db->sql_query($sql);
     while ($row = $db->sql_fetchrow($result)) $board_config[$row['config_name']] = $row['config_value'];
@@ -91,22 +95,22 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
 
     if ($Type_Of_Action == 'add' OR $Type_Of_Action == 'drop') {
         $queryt = "SELECT * FROM nuke_ibl_team_info WHERE team_name = '$Team_Offering'";
-        $resultt = mysql_query($queryt);
+        $resultt = $db->sql_query($queryt);
 
-        $teamid = mysql_result($resultt, 0, "teamid");
+        $teamid = $db->sql_result($resultt, 0, "teamid");
 
         $Timestamp = intval(time());
 
         // ADD TEAM TOTAL SALARY FOR THIS YEAR
 
         $querysalary = "SELECT * FROM nuke_iblplyr WHERE teamname = '$Team_Offering' AND retired = 0";
-        $results = mysql_query($querysalary);
-        $num = mysql_numrows($results);
+        $results = $db->sql_query($querysalary);
+        $num = $db->sql_numrows($results);
         $z = 0;
         while ($z < $num) {
-            $cy = mysql_result($results, $z, "cy");
+            $cy = $db->sql_result($results, $z, "cy");
             $xcyx = "cy$cy";
-            $cy2 = mysql_result($results, $z, "$xcyx");
+            $cy2 = $db->sql_result($results, $z, "$xcyx");
             $TotalSalary = $TotalSalary + $cy2;
             $z++;
         }
@@ -116,23 +120,23 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
         $k = 0;
 
         $waiverquery = "SELECT * FROM nuke_iblplyr WHERE pid = '$Player_to_Process'";
-        $waiverresult = mysql_query($waiverquery);
-        $playername = mysql_result($waiverresult, 0, "name");
-        $players_team = mysql_result($waiverresult, 0, "tid");
-        $cy1 = mysql_result($waiverresult, 0, "cy1");
-        $cy2 = mysql_result($waiverresult, 0, "cy2");
-        $cy3 = mysql_result($waiverresult, 0, "cy3");
-        $cy4 = mysql_result($waiverresult, 0, "cy4");
-        $cy5 = mysql_result($waiverresult, 0, "cy5");
-        $cy6 = mysql_result($waiverresult, 0, "cy6");
-        $player_exp = mysql_result($waiverresult, 0, "exp");
+        $waiverresult = $db->sql_query($waiverquery);
+        $playername = $db->sql_result($waiverresult, 0, "name");
+        $players_team = $db->sql_result($waiverresult, 0, "tid");
+        $cy1 = $db->sql_result($waiverresult, 0, "cy1");
+        $cy2 = $db->sql_result($waiverresult, 0, "cy2");
+        $cy3 = $db->sql_result($waiverresult, 0, "cy3");
+        $cy4 = $db->sql_result($waiverresult, 0, "cy4");
+        $cy5 = $db->sql_result($waiverresult, 0, "cy5");
+        $cy6 = $db->sql_result($waiverresult, 0, "cy6");
+        $player_exp = $db->sql_result($waiverresult, 0, "exp");
 
         if ($Type_Of_Action == 'drop') {
             if ($Roster_Slots > 2 and $TotalSalary > 7000) { // TODO: Change 7000 to hard cap variable
                 $errortext = "You have 12 players and are over $70 mill hard cap.  Therefore you can't drop a player!";
             } else {
                 $queryi = "UPDATE nuke_iblplyr SET `ordinal` = '1000', `droptime` = '$Timestamp' WHERE `pid` = '$Player_to_Process' LIMIT 1;";
-                $resulti = mysql_query($queryi);
+                $resulti = $db->sql_query($queryi);
 
                 $topicid = 32;
                 $storytitle = $Team_Offering . " make waiver cuts";
@@ -142,14 +146,14 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
                 $timestamp = date('Y-m-d H:i:s',time());
 
                 $querycat = "SELECT * FROM nuke_stories_cat WHERE title = 'Waiver Pool Moves'";
-                $resultcat = mysql_query($querycat);
-                $WPMoves = mysql_result($resultcat, 0, "counter");
-                $catid = mysql_result($resultcat, 0, "catid");
+                $resultcat = $db->sql_query($querycat);
+                $WPMoves = $db->sql_result($resultcat, 0, "counter");
+                $catid = $db->sql_result($resultcat, 0, "catid");
 
                 $WPMoves++;
 
                 $querycat2 = "UPDATE nuke_stories_cat SET counter = $WPMoves WHERE title = 'Waiver Pool Moves'";
-                $resultcat2 = mysql_query($querycat2);
+                $resultcat2 = $db->sql_query($querycat2);
 
                 $querystor = "INSERT INTO nuke_stories
                         (catid,
@@ -171,7 +175,7 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
                          'Associated Press',
                          '0',
                          'english') ";
-                $resultstor = mysql_query($querystor);
+                $resultstor = $db->sql_query($querystor);
 
                 Discord::postToChannel('#waiver-wire', $hometext);
 
@@ -220,7 +224,7 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
                     WHERE `pid` = '$Player_to_Process'
                     LIMIT 1;";
 
-                if (mysql_query($queryi)) {
+                if ($db->sql_query($queryi)) {
                     $Roster_Slots++;
 
                     $topicid = 33;
@@ -232,14 +236,14 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
                     $timestamp = date('Y-m-d H:i:s', time());
 
                     $querycat = "SELECT * FROM nuke_stories_cat WHERE title = 'Waiver Pool Moves'";
-                    $resultcat = mysql_query($querycat);
-                    $WPMoves = mysql_result($resultcat, 0, "counter");
-                    $catid = mysql_result($resultcat, 0, "catid");
+                    $resultcat = $db->sql_query($querycat);
+                    $WPMoves = $db->sql_result($resultcat, 0, "counter");
+                    $catid = $db->sql_result($resultcat, 0, "catid");
 
                     $WPMoves++;
 
                     $querycat2 = "UPDATE nuke_stories_cat SET counter = $WPMoves WHERE title = 'Waiver Pool Moves'";
-                    $resultcat2 = mysql_query($querycat2);
+                    $resultcat2 = $db->sql_query($querycat2);
 
                     $querystor = "INSERT INTO nuke_stories
                             (catid,
@@ -261,7 +265,7 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
                              'Associated Press',
                              '0',
                              'english')";
-                    $resultstor = mysql_query($querystor);
+                    $resultstor = $db->sql_query($querystor);
 
                     $recipient = 'ibldepthcharts@gmail.com';
                     mail($recipient, $storytitle, $hometext, "From: waivers@iblhoops.net");
@@ -284,9 +288,9 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
 
     $teamlogo = $userinfo[user_ibl_team];
 	$queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$teamlogo'";
-	$tid = mysql_result(mysql_query($queryTeamID), 0);
+	$tid = $db->sql_result($db->sql_query($queryTeamID), 0);
 
-    Shared::displaytopmenu($tid);
+    $sharedFunctions->displaytopmenu($tid);
 
     echo "<center><font color=red><b>$errortext</b></font></center>";
     $sql7 = "SELECT * FROM nuke_ibl_team_info ORDER BY teamid ASC ";

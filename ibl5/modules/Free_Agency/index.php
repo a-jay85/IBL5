@@ -65,6 +65,8 @@ function userinfo($username, $bypass=0, $hid=0, $url=0)
 
 function display() {
 	global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
+	$sharedFunctions = new Shared($db);
+
 	include("header.php");
 	OpenTable();
 
@@ -74,11 +76,11 @@ function display() {
 	$userinfo = $db->sql_fetchrow($result2);
 
 	$userteam = stripslashes(check_html($userinfo['user_ibl_team'], "nohtml"));
-	$tid = Shared::getTidFromTeamname($userteam);
+	$tid = $sharedFunctions->getTidFromTeamname($userteam);
 
-	Shared::displaytopmenu($tid);
+	$sharedFunctions->displaytopmenu($tid);
 
-	$currentSeasonEndingYear = Shared::getCurrentSeasonEndingYear();
+	$currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
 
 	/*
 	// ==== COMPUTE PLAYER SALARIES FOR NEXT YEAR TO GET SOFT AND HARD CAP NUMBERS
@@ -2118,6 +2120,8 @@ function positionmigration($pid) {
 
 function teamdisplay($pid) {
 	global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
+	$sharedFunctions = new Shared($db);
+	
 	$pid = intval($pid);
 
 	cookiedecode($user);
@@ -2130,7 +2134,7 @@ function teamdisplay($pid) {
 	$showcapteam = $db->sql_query("SELECT * FROM ".$prefix."_ibl_team_info WHERE teamid>'0' ORDER BY teamid ASC");
 
 	while ($teamcaplist = $db->sql_fetchrow($showcapteam)) {
-		$currentSeasonEndingYear = Shared::getCurrentSeasonEndingYear();
+		$currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
 
 		$capteam = stripslashes(check_html($teamcaplist['team_name'], "nohtml"));
 		$HasMLE = stripslashes(check_html($teamcaplist['HasMLE'], "nohtml"));

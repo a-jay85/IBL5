@@ -12,12 +12,14 @@ $pagetitle = "- Team Pages";
 function menu()
 {
 	global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
+	$sharedFunctions = new Shared($db);
+
 	$tid = intval($tid);
 
 	include("header.php");
 	OpenTable();
 
-	Shared::displaytopmenu($tid);
+	$sharedFunctions->displaytopmenu($tid);
 
 	CloseTable();
 	include("footer.php");
@@ -25,8 +27,10 @@ function menu()
 
 function buildTeamFutureSalary ($resultTeamPlayers, $k)
 {
-	while($rowTeamPlayers = mysql_fetch_assoc($resultTeamPlayers)) {
-		$seasonPhase = Shared::getCurrentSeasonPhase();
+	$sharedFunctions = new Shared($db);
+
+	while($rowTeamPlayers = $db->sql_fetch_assoc($resultTeamPlayers)) {
+		$seasonPhase = $sharedFunctions->getCurrentSeasonPhase();
 		$player_pos = $rowTeamPlayers["pos"];
 		$player_name = $rowTeamPlayers["name"];
 		$player_pid = $rowTeamPlayers["pid"];
@@ -76,9 +80,11 @@ function buildTeamFutureSalary ($resultTeamPlayers, $k)
 
 function buildTeamFuturePicks ($resultTeamPicks, $future_salary_array)
 {
+	$sharedFunctions = new Shared($db);
+
 	$k = $future_salary_array['k'];
-	while ($rowTeamDraftPicks = mysql_fetch_assoc($resultTeamPicks)) {
-		$currentSeasonEndingYear = Shared::getCurrentSeasonEndingYear();
+	while ($rowTeamDraftPicks = $db->sql_fetch_assoc($resultTeamPicks)) {
+		$currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
 		$pick_year = $rowTeamDraftPicks["year"];
 		$pick_team = $rowTeamDraftPicks["teampick"];
 		$pick_round = $rowTeamDraftPicks["round"];
@@ -134,6 +140,8 @@ function buildTeamFuturePicks ($resultTeamPicks, $future_salary_array)
 function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 {
 	global $user, $cookie, $sitename, $prefix, $user_prefix, $db, $admin, $broadcast_msg, $my_headlines, $module_name, $subscription_url, $partner;
+	$sharedFunctions = new Shared($db);
+
 	$sql = "SELECT * FROM ".$prefix."_bbconfig";
 	$result = $db->sql_query($sql);
 	while ($row = $db->sql_fetchrow($result)) {
@@ -148,13 +156,13 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 
 	include("header.php");
 
-	$currentSeasonEndingYear = Shared::getCurrentSeasonEndingYear();
+	$currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
 
 	OpenTable();
 
 	$teamlogo = $userinfo[user_ibl_team];
-	$tid = Shared::getTidFromTeamname($teamlogo);
-	Shared::displaytopmenu($tid);
+	$tid = $sharedFunctions->getTidFromTeamname($teamlogo);
+	$sharedFunctions->displaytopmenu($tid);
 
 	$queryOfferingTeamPlayers = "SELECT pos, name, pid, cy, cy1, cy2, cy3, cy4, cy5, cy6
 		FROM nuke_iblplyr
@@ -226,7 +234,7 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 		ORDER BY year, round ASC ";
 	$resultOtherTeamDraftPicks = $db->sql_query($queryOtherTeamDraftPicks);
 
-	$roster_hold_teamb = (15 - mysql_numrows($resultOtherTeamPlayers)) * 75;
+	$roster_hold_teamb = (15 - $db->sql_numrows($resultOtherTeamPlayers)) * 75;
 
 	$future_salary_arrayb = buildTeamFutureSalary($resultOtherTeamPlayers, $k);
 	$future_salary_arrayb = buildTeamFuturePicks($resultOtherTeamDraftPicks, $future_salary_arrayb);
@@ -292,6 +300,8 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
 {
 	global $user, $cookie, $sitename, $prefix, $user_prefix, $db, $admin, $broadcast_msg, $my_headlines, $module_name, $subscription_url, $attrib, $step, $player;
+	$sharedFunctions = new Shared($db);
+
 	$sql = "SELECT * FROM " . $prefix . "_bbconfig";
 	$result = $db->sql_query($sql);
 	while ($row = $db->sql_fetchrow($result)) {
@@ -313,8 +323,8 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
 	OpenTable();
 
 	$teamlogo = $userinfo[user_ibl_team];
-	$tid = Shared::getTidFromTeamname($teamlogo);
-	Shared::displaytopmenu($tid);
+	$tid = $sharedFunctions->getTidFromTeamname($teamlogo);
+	$sharedFunctions->displaytopmenu($tid);
 
 	echo "<center><img src=\"images/logo/$tid.jpg\"><br>";
 
@@ -442,7 +452,9 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
 
 function reviewtrade($user)
 {
-	global $stop, $module_name, $redirect, $mode, $t, $f, $gfx_chk;
+	global $db, $stop, $module_name, $redirect, $mode, $t, $f, $gfx_chk;
+	$sharedFunctions = new Shared($db);
+
 	if (!is_user($user)) {
 		include("header.php");
 		if ($stop) {
@@ -456,14 +468,14 @@ function reviewtrade($user)
 		}
 		if (!is_user($user)) {
 			OpenTable();
-			Shared::displaytopmenu($tid);
+			$sharedFunctions->displaytopmenu($tid);
 			loginbox();
 			CloseTable();
 		}
 		include("footer.php");
 	} elseif (is_user($user)) {
-		$allow_trades = Shared::getAllowTradesStatus();
-		$allow_waiver_moves = Shared::getWaiverWireStatus();
+		$allow_trades = $sharedFunctions->getAllowTradesStatus();
+		$allow_waiver_moves = $sharedFunctions->getWaiverWireStatus();
 
 		if ($allow_trades == 'Yes') {
 			global $cookie;
@@ -472,7 +484,7 @@ function reviewtrade($user)
 		} else {
 			include ("header.php");
 			OpenTable();
-			Shared::displaytopmenu($tid);
+			$sharedFunctions->displaytopmenu($tid);
 			echo "Sorry, but trades are not allowed right now.";
 			if ($allow_waiver_moves == 'Yes') {
 				echo "<br>
@@ -488,7 +500,9 @@ function reviewtrade($user)
 
 function offertrade($user)
 {
-	global $stop, $module_name, $redirect, $mode, $t, $f, $gfx_chk;
+	global $db, $stop, $module_name, $redirect, $mode, $t, $f, $gfx_chk;
+	$sharedFunctions = new Shared($db);
+
 	if (!is_user($user)) {
 		include("header.php");
 		if ($stop) {
@@ -502,7 +516,7 @@ function offertrade($user)
 		}
 		if (!is_user($user)) {
 			OpenTable();
-			Shared::displaytopmenu($tid);
+			$sharedFunctions->displaytopmenu($tid);
 			loginbox();
 			CloseTable();
 		}

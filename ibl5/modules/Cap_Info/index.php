@@ -16,27 +16,29 @@ if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
 	die ("You can't access this file directly...");
 }
 
+$sharedFunctions = new Shared($db);
+
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 $userpage = 1;
 
-$currentSeasonEndingYear = Shared::getCurrentSeasonEndingYear();
+$currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
 
 include("header.php");
 
 $queryTeamInfo = "SELECT * FROM nuke_ibl_team_info WHERE teamid != 35 ORDER BY teamid ASC";
-$resultTeamInfo = mysql_query($queryTeamInfo);
-$numberOfTeams = mysql_num_rows($resultTeamInfo);
+$resultTeamInfo = $db->sql_query($queryTeamInfo);
+$numberOfTeams = $db->sql_numrows($resultTeamInfo);
 
 OpenTable();
 
 $i = 0;
 while ($i < $numberOfTeams) {
-	$teamid[$i] = mysql_result($resultTeamInfo, $i, "teamid");
-	$teamname[$i] = mysql_result($resultTeamInfo, $i, "team_name");
-	$teamcity[$i] = mysql_result($resultTeamInfo, $i, "team_city");
-	$teamcolor1[$i] = mysql_result($resultTeamInfo, $i, "color1");
-	$teamcolor2[$i] = mysql_result($resultTeamInfo, $i, "color2");
+	$teamid[$i] = $db->sql_result($resultTeamInfo, $i, "teamid");
+	$teamname[$i] = $db->sql_result($resultTeamInfo, $i, "team_name");
+	$teamcity[$i] = $db->sql_result($resultTeamInfo, $i, "team_city");
+	$teamcolor1[$i] = $db->sql_result($resultTeamInfo, $i, "color1");
+	$teamcolor2[$i] = $db->sql_result($resultTeamInfo, $i, "color2");
 
 	$teamTotalSalaryYear1[$i] = 0;
 	$teamTotalSalaryYear2[$i] = 0;
@@ -96,15 +98,17 @@ include("footer.php");
 
 function get_salary ($tid, $team_name, $currentSeasonEndingYear)
 {
+	global $db;
+	
 	// $querypicks = "SELECT * FROM ibl_draft_picks WHERE ownerofpick = '$team_name' ORDER BY year, round ASC";
-	// $resultpicks = mysql_query($querypicks);
-	// $numpicks = mysql_num_rows($resultpicks);
+	// $resultpicks = $db->sql_query($querypicks);
+	// $numpicks = $db->sql_numrows($resultpicks);
 	// $hh = 0;
 	//
 	// while ($hh < $numpicks)	{
-	// 	$teampick = mysql_result($resultpicks, $hh, "teampick");
-	// 	$year = mysql_result($resultpicks, $hh, "year");
-	// 	$round = mysql_result($resultpicks, $hh, "round");
+	// 	$teampick = $db->sql_result($resultpicks, $hh, "teampick");
+	// 	$year = $db->sql_result($resultpicks, $hh, "year");
+	// 	$round = $db->sql_result($resultpicks, $hh, "round");
 	// 	$j = $year - $currentSeasonEndingYear + 1;
 	//
 	// 	if ($round == 1) {
@@ -127,19 +131,19 @@ function get_salary ($tid, $team_name, $currentSeasonEndingYear)
 	// }
 
 	$queryPlayersUnderContractAfterThisSeason = "SELECT * FROM nuke_iblplyr WHERE retired = 0 AND tid = $tid AND cy <> cyt";
-	$resultPlayersUnderContractAfterThisSeason = mysql_query($queryPlayersUnderContractAfterThisSeason);
-	$numberOfPlayersUnderContractAfterThisSeason = mysql_num_rows($resultPlayersUnderContractAfterThisSeason);
+	$resultPlayersUnderContractAfterThisSeason = $db->sql_query($queryPlayersUnderContractAfterThisSeason);
+	$numberOfPlayersUnderContractAfterThisSeason = $db->sql_numrows($resultPlayersUnderContractAfterThisSeason);
 
 	$i = 0;
 	while ($i < $numberOfPlayersUnderContractAfterThisSeason) {
-		$yearUnderContract = mysql_result($resultPlayersUnderContractAfterThisSeason, $i, "cy");
-		$totalYearsUnderContract = mysql_result($resultPlayersUnderContractAfterThisSeason, $i, "cyt");
+		$yearUnderContract = $db->sql_result($resultPlayersUnderContractAfterThisSeason, $i, "cy");
+		$totalYearsUnderContract = $db->sql_result($resultPlayersUnderContractAfterThisSeason, $i, "cyt");
 
 		$j = 1;
 		while ($yearUnderContract < $totalYearsUnderContract) {
 			$yearUnderContract = $yearUnderContract + 1;
 			$contract_current_year[$yearUnderContract] = "cy" . $yearUnderContract;
-			$contract_amt[$j]["salary"] = $contract_amt[$j]["salary"] + mysql_result($resultPlayersUnderContractAfterThisSeason, $i, $contract_current_year[$yearUnderContract]);
+			$contract_amt[$j]["salary"] = $contract_amt[$j]["salary"] + $db->sql_result($resultPlayersUnderContractAfterThisSeason, $i, $contract_current_year[$yearUnderContract]);
 			$contract_amt[$j]["roster"]++;
 			$j++;
 		}
@@ -150,15 +154,16 @@ function get_salary ($tid, $team_name, $currentSeasonEndingYear)
 
 function get_salary1 ($tid, $team_name, $currentSeasonEndingYear)
 {
+	global $db;
 	// $querypicks = "SELECT * FROM ibl_draft_picks WHERE ownerofpick = '$team_name' ORDER BY year, round ASC";
-	// $resultpicks = mysql_query($querypicks);
-	// $numpicks = mysql_num_rows($resultpicks);
+	// $resultpicks = $db->sql_query($querypicks);
+	// $numpicks = $db->sql_numrows($resultpicks);
 	// $hh = 0;
 	//
 	// while ($hh < $numpicks) {
-	// 	$teampick = mysql_result($resultpicks, $hh, "teampick");
-	// 	$year = mysql_result($resultpicks, $hh, "year");
-	// 	$round = mysql_result($resultpicks, $hh, "round");
+	// 	$teampick = $db->sql_result($resultpicks, $hh, "teampick");
+	// 	$year = $db->sql_result($resultpicks, $hh, "year");
+	// 	$round = $db->sql_result($resultpicks, $hh, "round");
 	// 	$j = $year - $currentSeasonEndingYear + 1;
 	// 	if ($round == 1) {
 	// 		$contract_amt[$j]["salary"] = $contract_amt[$j]["salary"];
@@ -180,13 +185,13 @@ function get_salary1 ($tid, $team_name, $currentSeasonEndingYear)
 	// }
 
 	$queryPlayersUnderContractAfterThisSeason = "SELECT * FROM nuke_iblplyr WHERE retired = 0 AND tid = $tid AND cy <> cyt AND droptime = 0 AND name NOT LIKE '%Buyout%'";
-	$resultPlayersUnderContractAfterThisSeason = mysql_query($queryPlayersUnderContractAfterThisSeason);
-	$numberOfPlayersUnderContractAfterThisSeason = mysql_num_rows($resultPlayersUnderContractAfterThisSeason);
+	$resultPlayersUnderContractAfterThisSeason = $db->sql_query($queryPlayersUnderContractAfterThisSeason);
+	$numberOfPlayersUnderContractAfterThisSeason = $db->sql_numrows($resultPlayersUnderContractAfterThisSeason);
 
 	$i = 0;
 	while ($i < $numberOfPlayersUnderContractAfterThisSeason) {
-		$yearUnderContract = mysql_result($resultPlayersUnderContractAfterThisSeason, $i, "cy");
-		$totalYearsUnderContract = mysql_result($resultPlayersUnderContractAfterThisSeason, $i, "cyt");
+		$yearUnderContract = $db->sql_result($resultPlayersUnderContractAfterThisSeason, $i, "cy");
+		$totalYearsUnderContract = $db->sql_result($resultPlayersUnderContractAfterThisSeason, $i, "cyt");
 
 		$j = 1;
 		while ($yearUnderContract < $totalYearsUnderContract) {

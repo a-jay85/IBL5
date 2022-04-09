@@ -2413,7 +2413,7 @@ function team_info_right ($team_name, $color1, $color2, $owner_name, $tid)
 	@$firstpct=number_format($first_wins/($first_wins+$first_losses),3);
 	@$secondpct=number_format($second_wins/($second_wins+$second_losses),3);
 	@$thirdpct=number_format($third_wins/($third_wins+$third_losses),3);
-	@$fourthpct=number_format($fourth_wins/($fourth_wins+$first_losses),3);
+	@$fourthpct=number_format($fourth_wins/($fourth_wins+$fourth_losses),3);
 
 	if ($round_one_output != "") {
 		$output=$output."<tr bgcolor=\"#$color1\"><td align=center><font color=\"#$color2\"><b>First-Round Playoff Results</b></font></td></tr>

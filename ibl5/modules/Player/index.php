@@ -189,13 +189,13 @@ function leaderboards()
 
         if ($tableforquery == "nuke_iblplyr") {
             $sortby = "car_".$sortby;
-            if ($sort_cat == 'GM') {
+            if ($sort_cat == 'Games') {
                  $sortby = "car_gm";
             }
-            if ($sort_cat == 'MIN') {
+            if ($sort_cat == 'Minutes') {
                 $sortby = "car_min";
             }
-            if ($sort_cat == 'TVR') {
+            if ($sort_cat == 'Turnovers') {
                 $sortby = "car_to";
             }
         }

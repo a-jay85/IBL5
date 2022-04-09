@@ -159,7 +159,9 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 	$queryOfferingTeamPlayers = "SELECT pos, name, pid, cy, cy1, cy2, cy3, cy4, cy5, cy6
 		FROM nuke_iblplyr
 		WHERE teamname = '$teamlogo'
+		AND tid = $tid
 		AND retired = '0'
+		AND name NOT LIKE '%Buyouts%'
 		ORDER BY ordinal ASC ";
 	$resultOfferingTeamPlayers = $db->sql_query($queryOfferingTeamPlayers);
 
@@ -212,11 +214,14 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 					<td valign=top><b>Name</b></td>
 					<td valign=top><b>Salary</b></td>
 				</tr>";
-
+				
+	$partnerTid = Shared::getTidFromTeamname($partner);
 	$queryOtherTeamPlayers = "SELECT pos, name, pid, cy, cy1, cy2, cy3, cy4, cy5, cy6
 		FROM nuke_iblplyr
 		WHERE teamname = '$partner'
+		AND tid = $partnerTid
 		AND retired = '0'
+		AND name NOT LIKE '%Buyouts%'
 		ORDER BY ordinal ASC ";
 	$resultOtherTeamPlayers = $db->sql_query($queryOtherTeamPlayers);
 

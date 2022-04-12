@@ -1938,6 +1938,9 @@ function showpage($pid,$spec) {
         }
 
         // CURRENT YEAR AVERAGES
+        $retired = mysql_result(mysql_query("SELECT retired
+            FROM nuke_iblplyr
+            WHERE pid=$pid;"), 0);
 
         if ($retired != 1) {
             echo "<tr align=center>

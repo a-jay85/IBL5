@@ -1761,24 +1761,24 @@ function showpage($pid,$spec) {
                 <td><center>$stats_pf</center></td>
                 <td><center>$stats_pts</td>
             </tr>";
-        }
 
-        $car_gm = $car_gm + $stats_gm;
-        $car_min = $car_min + $stats_min;
-        $car_fgm = $car_fgm + $stats_fgm;
-        $car_fga = $car_fga + $stats_fga;
-        $car_ftm = $car_ftm + $stats_ftm;
-        $car_fta = $car_fta + $stats_fta;
-        $car_3gm = $car_3gm + $stats_tgm;
-        $car_3ga = $car_3ga + $stats_tga;
-        $car_orb = $car_orb + $stats_orb;
-        $car_reb = $car_reb + $stats_reb;
-        $car_ast = $car_ast + $stats_ast;
-        $car_stl = $car_stl + $stats_stl;
-        $car_blk = $car_blk + $stats_blk;
-        $car_tvr = $car_tvr + $stats_to;
-        $car_pf = $car_pf + $stats_pf;
-        $car_pts = $car_pts + $stats_pts;
+            $car_gm = $car_gm + $stats_gm;
+            $car_min = $car_min + $stats_min;
+            $car_fgm = $car_fgm + $stats_fgm;
+            $car_fga = $car_fga + $stats_fga;
+            $car_ftm = $car_ftm + $stats_ftm;
+            $car_fta = $car_fta + $stats_fta;
+            $car_3gm = $car_3gm + $stats_tgm;
+            $car_3ga = $car_3ga + $stats_tga;
+            $car_orb = $car_orb + $stats_orb;
+            $car_reb = $car_reb + $stats_reb;
+            $car_ast = $car_ast + $stats_ast;
+            $car_stl = $car_stl + $stats_stl;
+            $car_blk = $car_blk + $stats_blk;
+            $car_tvr = $car_tvr + $stats_to;
+            $car_pf = $car_pf + $stats_pf;
+            $car_pts = $car_pts + $stats_pts;
+        }
 
         @$car_fgp = $car_fgm / $car_fga;
         @$car_ftp = $car_ftm / $car_fta;
@@ -1973,24 +1973,24 @@ function showpage($pid,$spec) {
             echo "</center></td><td><center>";
             printf('%01.1f', $stats_ppg);
             echo "</center></td></tr>";
-        }
 
-        $car_gm = $car_gm + $stats_gm;
-        $car_min = $car_min + $stats_min;
-        $car_fgm = $car_fgm + $stats_fgm;
-        $car_fga = $car_fga + $stats_fga;
-        $car_ftm = $car_ftm + $stats_ftm;
-        $car_fta = $car_fta + $stats_fta;
-        $car_3gm = $car_3gm + $stats_tgm;
-        $car_3ga = $car_3ga + $stats_tga;
-        $car_orb = $car_orb + $stats_orb;
-        $car_reb = $car_reb + $stats_reb;
-        $car_ast = $car_ast + $stats_ast;
-        $car_stl = $car_stl + $stats_stl;
-        $car_blk = $car_blk + $stats_blk;
-        $car_tvr = $car_tvr + $stats_to;
-        $car_pf = $car_pf + $stats_pf;
-        $car_pts = $car_pts + $stats_pts;
+            $car_gm = $car_gm + $stats_gm;
+            $car_min = $car_min + $stats_min;
+            $car_fgm = $car_fgm + $stats_fgm;
+            $car_fga = $car_fga + $stats_fga;
+            $car_ftm = $car_ftm + $stats_ftm;
+            $car_fta = $car_fta + $stats_fta;
+            $car_3gm = $car_3gm + $stats_tgm;
+            $car_3ga = $car_3ga + $stats_tga;
+            $car_orb = $car_orb + $stats_orb;
+            $car_reb = $car_reb + $stats_reb;
+            $car_ast = $car_ast + $stats_ast;
+            $car_stl = $car_stl + $stats_stl;
+            $car_blk = $car_blk + $stats_blk;
+            $car_tvr = $car_tvr + $stats_to;
+            $car_pf = $car_pf + $stats_pf;
+            $car_pts = $car_pts + $stats_pts;
+        }
 
         @$car_fgp = $car_fgm/$car_fga;
         @$car_ftp = $car_ftm/$car_fta;

@@ -250,27 +250,70 @@ function leaderboards()
             $retired = 0;
             if ($tableforquery == "nuke_iblplyr") {
                 $retired = $db->sql_result($result, $i, "retired");
-                $plyr_name = $db->sql_result($result, $i, "name");
-                $pid = $db->sql_result($result, $i, "pid");
-                $gm = number_format($db->sql_result($result, $i, "car_gm"));
-                $min = number_format($db->sql_result($result, $i, "car_min"));
-                $fgm = number_format($db->sql_result($result, $i, "car_fgm"));
-                $fga = number_format($db->sql_result($result, $i, "car_fga"));
-                $fgpct = number_format($db->sql_result($result, $i, "car_fgm") / $db->sql_result($result, $i, "car_fga"), 3);
-                $ftm = number_format($db->sql_result($result, $i, "car_ftm"));
-                $fta = number_format($db->sql_result($result, $i, "car_fta"));
-                $ftpct = number_format($db->sql_result($result, $i, "car_ftm") / $db->sql_result($result, $i, "car_fta"), 3);
-                $tgm = number_format($db->sql_result($result, $i, "car_tgm"));
-                $tga = number_format($db->sql_result($result, $i, "car_tga"));
-                $tpct = number_format($db->sql_result($result, $i, "car_tgm") / $db->sql_result($result, $i, "car_tga"), 3);
-                $orb = number_format($db->sql_result($result, $i, "car_orb"));
-                $reb = number_format($db->sql_result($result, $i, "car_reb"));
-                $ast = number_format($db->sql_result($result, $i, "car_ast"));
-                $stl = number_format($db->sql_result($result, $i, "car_stl"));
-                $to = number_format($db->sql_result($result, $i, "car_to"));
-                $blk = number_format($db->sql_result($result, $i, "car_blk"));
-                $pf = number_format($db->sql_result($result, $i, "car_pf"));
-                $pts = number_format($db->sql_result($result, $i, "car_pts"));
+                if ($retired == 0) {
+                    $plyr_name = $db->sql_result($result, $i, "name");
+                    $pid = $db->sql_result($result, $i, "pid");
+                    $gm = number_format($db->sql_result($result, $i, "car_gm"));
+                    $min = number_format($db->sql_result($result, $i, "car_min"));
+                    $fgm = number_format($db->sql_result($result, $i, "car_fgm"));
+                    $fga = number_format($db->sql_result($result, $i, "car_fga"));
+                    $fgpct = number_format($db->sql_result($result, $i, "car_fgm") / $db->sql_result($result, $i, "car_fga"), 3);
+                    $ftm = number_format($db->sql_result($result, $i, "car_ftm"));
+                    $fta = number_format($db->sql_result($result, $i, "car_fta"));
+                    $ftpct = number_format($db->sql_result($result, $i, "car_ftm") / $db->sql_result($result, $i, "car_fta"), 3);
+                    $tgm = number_format($db->sql_result($result, $i, "car_tgm"));
+                    $tga = number_format($db->sql_result($result, $i, "car_tga"));
+                    $tpct = number_format($db->sql_result($result, $i, "car_tgm") / $db->sql_result($result, $i, "car_tga"), 3);
+                    $orb = number_format($db->sql_result($result, $i, "car_orb"));
+                    $reb = number_format($db->sql_result($result, $i, "car_reb"));
+                    $ast = number_format($db->sql_result($result, $i, "car_ast"));
+                    $stl = number_format($db->sql_result($result, $i, "car_stl"));
+                    $to = number_format($db->sql_result($result, $i, "car_to"));
+                    $blk = number_format($db->sql_result($result, $i, "car_blk"));
+                    $pf = number_format($db->sql_result($result, $i, "car_pf"));
+                    $pts = number_format($db->sql_result($result, $i, "car_pts"));
+                } else {
+                    $plyr_name = $db->sql_result($result, $i, "name");
+                    $pid = $db->sql_result($result, $i, "pid");
+                    $result_iblhist = $db->sql_query("SELECT
+                        sum(gm) as gm,
+                        sum(min) as min,
+                        sum(fgm) as fgm,
+                        sum(fga) as fga,
+                        sum(ftm) as ftm,
+                        sum(fta) as fta,
+                        sum(3gm) as 3gm,
+                        sum(3ga) as 3ga,
+                        sum(orb) as orb,
+                        sum(reb) as reb,
+                        sum(ast) as ast,
+                        sum(stl) as stl,
+                        sum(blk) as blk,
+                        sum(tvr) as tvr,
+                        sum(pf) as pf,
+                        sum(ftm) + sum(3gm) + (2 * sum(fgm)) as pts
+                        FROM nuke_iblhist
+                        WHERE pid = $pid;");
+                    $gm = number_format($db->sql_result($result_iblhist, 0, "gm"));
+                    $min = number_format($db->sql_result($result_iblhist, 0, "min"));
+                    $fgm = number_format($db->sql_result($result_iblhist, 0, "fgm"));
+                    $fga = number_format($db->sql_result($result_iblhist, 0, "fga"));
+                    $fgpct = number_format($db->sql_result($result_iblhist, 0, "fgm") / $db->sql_result($result_iblhist, 0, "fga"), 3);
+                    $ftm = number_format($db->sql_result($result_iblhist, 0, "ftm"));
+                    $fta = number_format($db->sql_result($result_iblhist, 0, "fta"));
+                    $ftpct = number_format($db->sql_result($result_iblhist, 0, "ftm") / $db->sql_result($result_iblhist, 0, "fta"), 3);
+                    $tgm = number_format($db->sql_result($result_iblhist, 0, "3gm"));
+                    $tga = number_format($db->sql_result($result_iblhist, 0, "3ga"));
+                    $tpct = number_format($db->sql_result($result_iblhist, 0, "3gm") / $db->sql_result($result_iblhist, 0, "3ga"), 3);
+                    $orb = number_format($db->sql_result($result_iblhist, 0, "orb"));
+                    $reb = number_format($db->sql_result($result_iblhist, 0, "reb"));
+                    $ast = number_format($db->sql_result($result_iblhist, 0, "ast"));
+                    $stl = number_format($db->sql_result($result_iblhist, 0, "stl"));
+                    $to = number_format($db->sql_result($result_iblhist, 0, "tvr"));
+                    $blk = number_format($db->sql_result($result_iblhist, 0, "blk"));
+                    $pf = number_format($db->sql_result($result_iblhist, 0, "pf"));
+                    $pts = number_format($db->sql_result($result_iblhist, 0, "pts"));
+                }
             }
 
             if (

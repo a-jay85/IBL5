@@ -3385,9 +3385,9 @@ function negotiate($pid)
             //$coachFactor = (0.0025*($tf_coach)*($player_coach-1));
             //$modfactor4 = (.025*($player_loyalty-1));
             $loyaltyFactor = (0.025 * ($player_loyalty - 1));
-            //$modfactor5 = (.01*($demyrs-1)-0.025)*($player_security-1);
+            $modfactor5 = (.01*($demyrs-1)-0.025)*($player_security-1);
             //$securityFactor = (0.01*$demyrs-0.025)*($player_security-1);
-            //$modfactor6 = -(.0035*$tf_millions/100-0.028)*($player_playingtime-1);
+            $modfactor6 = -(.0035*$tf_millions/100-0.028)*($player_playingtime-1);
             $PTFactor = (($tf_millions * -0.00005) + 0.025) * ($player_playingtime - 1);
 
             $modifier = 1 + $PFWFactor + $traditionFactor + $coachFactor + $loyaltyFactor + $securityFactor + $PTFactor;

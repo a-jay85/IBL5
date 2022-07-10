@@ -1,8 +1,6 @@
 <?php
 
-require 'config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
+require 'mainfile.php';
 
 echo "<HTML><HEAD><TITLE>Free Agency Offer Entry</TITLE></HEAD><BODY>";
 
@@ -131,13 +129,13 @@ $Offer_Avg = ($Offer_1+$Offer_2+$Offer_3+$Offer_4+$Offer_5+$Offer_6)/$yrsinoffer
 // LOOP TO GET MILLIONS COMMITTED AT POSITION
 
 $queryposition="SELECT * FROM nuke_iblplyr WHERE `name` ='$Player_Name'";
-$resultposition=mysql_query($queryposition);
+$resultposition=$db->sql_query($queryposition);
 
-$player_pos = mysql_result($resultposition,0,"pos");
+$player_pos = $db->sql_result($resultposition,0,"pos");
 
 $querymillions="SELECT * FROM nuke_iblplyr WHERE `teamname`='$Team_Name' AND `pos`='$player_pos' AND `name`!='$Player_Name'";
-$resultmillions=mysql_query($querymillions);
-$nummillions=mysql_numrows($resultmillions);
+$resultmillions=$db->sql_query($querymillions);
+$nummillions=$db->sql_numrows($resultmillions);
 
 $tf_millions = 0;
 $i=0;
@@ -145,13 +143,13 @@ $i=0;
     while ($i < $nummillions)
   {
 
-    $millionscy = mysql_result($resultmillions,$i,"cy");
-    $millionscy1 = mysql_result($resultmillions,$i,"cy1");
-    $millionscy2 = mysql_result($resultmillions,$i,"cy2");
-    $millionscy3 = mysql_result($resultmillions,$i,"cy3");
-    $millionscy4 = mysql_result($resultmillions,$i,"cy4");
-    $millionscy5 = mysql_result($resultmillions,$i,"cy5");
-    $millionscy6 = mysql_result($resultmillions,$i,"cy6");
+    $millionscy = $db->sql_result($resultmillions,$i,"cy");
+    $millionscy1 = $db->sql_result($resultmillions,$i,"cy1");
+    $millionscy2 = $db->sql_result($resultmillions,$i,"cy2");
+    $millionscy3 = $db->sql_result($resultmillions,$i,"cy3");
+    $millionscy4 = $db->sql_result($resultmillions,$i,"cy4");
+    $millionscy5 = $db->sql_result($resultmillions,$i,"cy5");
+    $millionscy6 = $db->sql_result($resultmillions,$i,"cy6");
 
 // LOOK AT SALARY COMMITTED NEXT YEAR, NOT THIS YEAR
 
@@ -227,19 +225,19 @@ if ($player_pos == 'C')
 
 
 $querymillions="SELECT * FROM nuke_iblplyr WHERE `teamname`='$Team_Name' AND `pos`='$adjpos1' AND `name`!='$player_name'";
-$resultmillions=mysql_query($querymillions);
-$nummillions=mysql_numrows($resultmillions);
+$resultmillions=$db->sql_query($querymillions);
+$nummillions=$db->sql_numrows($resultmillions);
 $i=0;
     while ($i < $nummillions)
   {
 
-    $millionscy = mysql_result($resultmillions,$i,"cy");
-    $millionscy1 = mysql_result($resultmillions,$i,"cy1");
-    $millionscy2 = mysql_result($resultmillions,$i,"cy2");
-    $millionscy3 = mysql_result($resultmillions,$i,"cy3");
-    $millionscy4 = mysql_result($resultmillions,$i,"cy4");
-    $millionscy5 = mysql_result($resultmillions,$i,"cy5");
-    $millionscy6 = mysql_result($resultmillions,$i,"cy6");
+    $millionscy = $db->sql_result($resultmillions,$i,"cy");
+    $millionscy1 = $db->sql_result($resultmillions,$i,"cy1");
+    $millionscy2 = $db->sql_result($resultmillions,$i,"cy2");
+    $millionscy3 = $db->sql_result($resultmillions,$i,"cy3");
+    $millionscy4 = $db->sql_result($resultmillions,$i,"cy4");
+    $millionscy5 = $db->sql_result($resultmillions,$i,"cy5");
+    $millionscy6 = $db->sql_result($resultmillions,$i,"cy6");
 
 // LOOK AT SALARY COMMITTED NEXT YEAR, NOT THIS YEAR
 
@@ -265,19 +263,19 @@ $i++;
 }
 
 $querymillions="SELECT * FROM nuke_iblplyr WHERE `teamname`='$Team_Name' AND `pos`='$adjpos2' AND `name`!='$player_name'";
-$resultmillions=mysql_query($querymillions);
-$nummillions=mysql_numrows($resultmillions);
+$resultmillions=$db->sql_query($querymillions);
+$nummillions=$db->sql_numrows($resultmillions);
 $i=0;
     while ($i < $nummillions)
   {
 
-    $millionscy = mysql_result($resultmillions,$i,"cy");
-    $millionscy1 = mysql_result($resultmillions,$i,"cy1");
-    $millionscy2 = mysql_result($resultmillions,$i,"cy2");
-    $millionscy3 = mysql_result($resultmillions,$i,"cy3");
-    $millionscy4 = mysql_result($resultmillions,$i,"cy4");
-    $millionscy5 = mysql_result($resultmillions,$i,"cy5");
-    $millionscy6 = mysql_result($resultmillions,$i,"cy6");
+    $millionscy = $db->sql_result($resultmillions,$i,"cy");
+    $millionscy1 = $db->sql_result($resultmillions,$i,"cy1");
+    $millionscy2 = $db->sql_result($resultmillions,$i,"cy2");
+    $millionscy3 = $db->sql_result($resultmillions,$i,"cy3");
+    $millionscy4 = $db->sql_result($resultmillions,$i,"cy4");
+    $millionscy5 = $db->sql_result($resultmillions,$i,"cy5");
+    $millionscy6 = $db->sql_result($resultmillions,$i,"cy6");
 
 // LOOK AT SALARY COMMITTED NEXT YEAR, NOT THIS YEAR
 
@@ -312,24 +310,24 @@ if ($tf_millions > 2000) {
 }
 
 $query1="SELECT * FROM nuke_ibl_team_info WHERE team_name = '$Team_Name'";
-$result1=mysql_query($query1);
+$result1=$db->sql_query($query1);
 
-$tf_wins=mysql_result($result1,0,"Contract_Wins");
-$tf_loss=mysql_result($result1,0,"Contract_Losses");
-$tf_trdw=mysql_result($result1,0,"Contract_AvgW");
-$tf_trdl=mysql_result($result1,0,"Contract_AvgL");
-$tf_coach=mysql_result($result1,0,"Contract_Coach");
+$tf_wins=$db->sql_result($result1,0,"Contract_Wins");
+$tf_loss=$db->sql_result($result1,0,"Contract_Losses");
+$tf_trdw=$db->sql_result($result1,0,"Contract_AvgW");
+$tf_trdl=$db->sql_result($result1,0,"Contract_AvgL");
+$tf_coach=$db->sql_result($result1,0,"Contract_Coach");
 
 $queryteam="SELECT * FROM nuke_iblplyr WHERE name = '$Player_Name'";
-$resultteam=mysql_query($queryteam);
+$resultteam=$db->sql_query($queryteam);
 
-    $player_team = mysql_result($resultteam,0,"teamname");
-    $player_winner = mysql_result($resultteam,0,"winner");
-    $player_tradition = mysql_result($resultteam,0,"tradition");
-    $player_coach = mysql_result($resultteam,0,"coach");
-    $player_security = mysql_result($resultteam,0,"security");
-    $player_loyalty = mysql_result($resultteam,0,"loyalty");
-    $player_playingtime = mysql_result($resultteam,0,"playingTime");
+    $player_team = $db->sql_result($resultteam,0,"teamname");
+    $player_winner = $db->sql_result($resultteam,0,"winner");
+    $player_tradition = $db->sql_result($resultteam,0,"tradition");
+    $player_coach = $db->sql_result($resultteam,0,"coach");
+    $player_security = $db->sql_result($resultteam,0,"security");
+    $player_loyalty = $db->sql_result($resultteam,0,"loyalty");
+    $player_playingtime = $db->sql_result($resultteam,0,"playingTime");
 
 //$modfactor1 = (0.000433*($tf_wins-$tf_loss)*($player_winner-1));
 $modfactor1 = (0.000153*($tf_wins-$tf_loss)*($player_winner-1));
@@ -589,12 +587,12 @@ if ($nooffer == 0) {
 // ==== ENTER OFFER INTO DATABASE (OR UPDATE IF OFFER ALREADY EXISTS) ====
 
 $querydrop="DELETE FROM `nuke_ibl_fa_offers` WHERE `name` = '$Player_Name' AND `team` = '$Team_Name' LIMIT 1";
-$resultdrop=mysql_query($querydrop);
+$resultdrop=$db->sql_query($querydrop);
 
 $querychunk="INSERT INTO `nuke_ibl_fa_offers` ( `name` , `team` , `offer1` , `offer2` , `offer3` , `offer4` , `offer5` , `offer6` , `modifier` , `random` , `perceivedvalue` , `MLE` , `LLE` )
 VALUES ( '$Player_Name', '$Team_Name', '$Offer_1', '$Offer_2', '$Offer_3', '$Offer_4', '$Offer_5', '$Offer_6', '$modifier', '$random', '$perceivedvalue', '$MLE', '$LLE' )";
 
-$resultchunk=mysql_query($querychunk);
+$resultchunk=$db->sql_query($querychunk);
 
 echo "Your offer is legal, and has been entered into the system.  It should show up immediately.  Please <a href=\"modules.php?name=Free_Agency\">click here to return to the Free Agency main page</a> (your offer should now be visible).</br>";
 

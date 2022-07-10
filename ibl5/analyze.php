@@ -370,7 +370,7 @@ function main() {
                 <TD>dbtype</TD><TD>$dbtype</TD>
                 </TR>
                 </TABLE>
-                <BR><BR><B>Could not connect to your MySQL Database, visit <a href=\"http://castlecops.com\">CastleCops</a> for support..</B><BR><BR><STRONG>MySQL Error:</STRONG><i> ".mysql_error()."</i>");
+                <BR><BR><B>Could not connect to your MySQL Database, visit <a href=\"http://castlecops.com\">CastleCops</a> for support..</B><BR><BR><STRONG>MySQL Error:</STRONG><i> ".$db->sql_error()."</i>");
 	
 	mysql_select_db("$dbname") or die("
                 <B>Your config.php values</B>
@@ -394,7 +394,7 @@ function main() {
                 <TR bgcolor=#FFFF99>
                 <TD>dbtype</TD><TD>$dbtype</TD>
                 </TR>
-                </TABLE><BR><BR><B>Could not select your database. Visit <a href=\"http://castlecops.com\">CastleCops</a> for support..</B><BR><BR><STRONG>MySQL Error:</STRONG><i> ".mysql_error()."</i>");
+                </TABLE><BR><BR><B>Could not select your database. Visit <a href=\"http://castlecops.com\">CastleCops</a> for support..</B><BR><BR><STRONG>MySQL Error:</STRONG><i> ".$db->sql_error()."</i>");
 }
 
 function secchk() {
@@ -763,12 +763,12 @@ function verchk() {
 	global $sitename, $prefix, $user_prefix, $dbtype, $dbname, $dbuname, $dbpass, $dbhost, $Default_Theme, $language, $locale, $Version_Num, $sitekey, $NCsitename, $NCVersion_Num, $SERVER_NAME, $NClanguage, $NClocale, $NCsitekey, $dbi, $NCDefault_Theme, $NCFver;
 
 	$sql = "DESCRIBE ".$prefix."_config";
-	$NCresult = mysql_num_rows(mysql_query($sql));
+	$NCresult = $db->sql_numrows($db->sql_query($sql));
 
 	if ($NCresult > 2) {
 		$sql = "select sitename, Default_Theme, Version_Num, locale, language from ".$prefix."_config";
-		$result = mysql_query($sql);
-			if (mysql_num_rows($result)) {
+		$result = $db->sql_query($sql);
+			if ($db->sql_numrows($result)) {
 				while (list($sitename, $Default_Theme, $Version_Num, $locale, $language) = mysql_fetch_row($result)) {
 				$NCsitename = $sitename;
 				$NCDefault_Theme = $Default_Theme;
@@ -780,16 +780,16 @@ function verchk() {
 		mysql_free_result($result);
 	} elseif ($NCresult = 2) { 
 		$sql = "select config_value from ".$prefix."_config where config_name='sitename'";
-		$result = mysql_query($sql);
-		if (mysql_num_rows($result)) {
+		$result = $db->sql_query($sql);
+		if ($db->sql_numrows($result)) {
 		        while (list($config_value) = mysql_fetch_row($result)) {
                 	        $NCsitename = $config_value;
 			}
                 }
 		mysql_free_result($result);
 		$sql = "select config_value from ".$prefix."_config where config_name='default_lang'";
-		$result = mysql_query($sql);
-		if (mysql_num_rows($result)) {
+		$result = $db->sql_query($sql);
+		if ($db->sql_numrows($result)) {
 			while (list($config_value) = mysql_fetch_row($result)) {
 				$NClanguage = $config_value;
 			}
@@ -798,15 +798,15 @@ function verchk() {
 	}
 
 	$sqlNew = "select config_value from ".$prefix."_config where config_name='version'";
-	$resultNew = mysql_query($sqlNew);
+	$resultNew = $db->sql_query($sqlNew);
 	if ($resultNew) {
-		list($config_value) = mysql_fetch_row(mysql_query($sqlNew));
+		list($config_value) = mysql_fetch_row($db->sql_query($sqlNew));
 			$NCFver = $config_value;
 	} else {
 		$sqlToo = "select config_value from ".$prefix."_bbconfig where config_name='version'";
-		$resultToo = mysql_query($sqlToo);
+		$resultToo = $db->sql_query($sqlToo);
 		if ($resultToo) {
-			list($config_value) = mysql_fetch_row(mysql_query($sqlToo));
+			list($config_value) = mysql_fetch_row($db->sql_query($sqlToo));
 			$NCFver = $config_value;
 		}
 	}
@@ -816,10 +816,10 @@ function bulk() {
 	global $prefix, $user_prefix, $dbtype, $dbname, $dbuname, $dbpass, $dbhost, $Default_Theme, $language, $locale, $Version_Num, $sitekey, $NCsitename, $NCVersion_Num, $SERVER_NAME, $NClanguage, $NClocale, $NCsitekey, $dbi, $NCDefault_Theme, $NCFver; 
 
 	$sql = "select bc.config_value, bt.style_name, bt.template_name from ".$prefix."_bbthemes bt, ".$prefix."_bbconfig bc where bc.config_name='default_style' and bc.config_value=bt.themes_id";
-	$result = mysql_query($sql);
+	$result = $db->sql_query($sql);
 	if ($result<1) { 
 		$sql = "select bc.config_value, bt.style_name, bt.template_name from ".$prefix."_themes bt, ".$prefix."_config bc where bc.config_name='default_style' and bc.config_value=bt.themes_id";
-		$result = mysql_query($sql);
+		$result = $db->sql_query($sql);
 	}
 
         echo "<B>MySQL Connection Transcript for $NCsitename</B>"
@@ -975,14 +975,14 @@ function modchk() {
         global $NCsitename, $NCVersion_Num, $SERVER_NAME, $NClanguage, $NClocale, $NCsitekey, $dbi;
 
 	$sql = "select main_module from ".$prefix."_main";
-	$result = mysql_query($sql);
+	$result = $db->sql_query($sql);
 	while (list($main_module) = mysql_fetch_row($result)) {
 		$NCmain_module = $main_module;
 	}
 	mysql_free_result($result);
 
 	$sql = "select title, active, view from ".$prefix."_modules group by title asc";
-	$result = mysql_query($sql);
+	$result = $db->sql_query($sql);
         if ($result) {
                 echo "<B>Module Data for $NCsitename</B>"
                 . "<TABLE cellspacing=\"1\" cellpadding=\"3\" cellspacing=\"2\" border=\"1\">"
@@ -995,7 +995,7 @@ function modchk() {
 			if ($view > '2') {
 	            		$NCview = $NCview - 2;
 				$sql2 = "select groupName from ".$prefix."_users_groups where groupID = $NCview";
-		                $result2 = mysql_query($sql2);
+		                $result2 = $db->sql_query($sql2);
                 		if ($result2) {
 		                        while (list($groupName) = mysql_fetch_row($result2)) {
                 	                	$NCview = "$groupName";
@@ -1026,7 +1026,7 @@ function blkchk() {
 
 	// Following code for Block Data was supplied by chatserv but I adapted it to work with NSN_Groups permissions if exist.
         $sql = "select title, active, view from ".$prefix."_blocks group by title asc";
-        $result = mysql_query($sql);
+        $result = $db->sql_query($sql);
         if ($result) {
                 echo "<B>Block Data for $NCsitename</B>"
                 . "<TABLE cellspacing=\"1\" cellpadding=\"3\" cellspacing=\"2\" border=\"1\">"
@@ -1038,7 +1038,7 @@ function blkchk() {
 			if ($view > '3') {
                                 $NCView = $NCView - 3;
                                 $sql2 = "select groupName from ".$prefix."_users_groups where groupID = $NCView";
-                                $result2 = mysql_query($sql2);
+                                $result2 = $db->sql_query($sql2);
                                 if ($result2) {
                                         while (list($groupName) = mysql_fetch_row($result2)) {
                                                 $NCView = "$groupName";
@@ -1068,7 +1068,7 @@ function ranks() {
         global $NCsitename, $NCVersion_Num, $SERVER_NAME, $NClanguage, $NClocale, $NCsitekey, $dbi;
 
         $sql = "select u.username, u.user_id, r.rank_title, u.user_level from ".$prefix."_users u, ".$prefix."_bbranks r where r.rank_id=u.user_rank";
-        $result = mysql_query($sql);
+        $result = $db->sql_query($sql);
         if ($result) {
                 echo "<B>Member Special Ranks for $NCsitename</B>"
                 . "<TABLE cellspacing=\"1\" cellpadding=\"3\" cellspacing=\"2\" border=\"1\">"
@@ -1089,7 +1089,7 @@ function ranks() {
         }
 
 	$sql = "select u.uname, u.uid, r.rank_title, u.user_level from ".$prefix."_users u, ".$prefix."_bbranks r where r.rank_id=u.user_rank";
-	$result = mysql_query($sql);
+	$result = $db->sql_query($sql);
 	if ($result) {
 	        echo "<B>Member Special Ranks for $NCsitename</B>"
 	        . "<TABLE cellspacing=\"1\" cellpadding=\"3\" cellspacing=\"2\" border=\"1\">"
@@ -1115,7 +1115,7 @@ function admins() {
         global $NCsitename, $NCVersion_Num, $SERVER_NAME, $NClanguage, $NClocale, $NCsitekey, $dbi;
 
 	$sql = "select uname, uid, user_level from ".$prefix."_users where user_level = '2'";
-	$result = mysql_query($sql);
+	$result = $db->sql_query($sql);
         if ($result) {
                 echo "<B>Catch-All Administrators for $NCsitename</B>"
                 . "<TABLE cellspacing=\"1\" cellpadding=\"3\" cellspacing=\"2\" border=\"1\">"
@@ -1135,7 +1135,7 @@ function admins() {
         }
 
         $sql = "select username, user_id, user_level from ".$prefix."_users where user_level = '2'";
-        $result = mysql_query($sql);
+        $result = $db->sql_query($sql);
         if ($result) {
                 echo "<B>Catch-All Administrators for $NCsitename</B>"
                 . "<TABLE cellspacing=\"1\" cellpadding=\"3\" cellspacing=\"2\" border=\"1\">"
@@ -1160,7 +1160,7 @@ function mods() {
         global $NCsitename, $NCVersion_Num, $SERVER_NAME, $NClanguage, $NClocale, $NCsitekey, $dbi;
 
         $sql = "select uname, uid, user_level from ".$prefix."_users where user_level = '3'";
-        $result = mysql_query($sql);
+        $result = $db->sql_query($sql);
         if ($result) {
                 echo "<B>Catch-All Moderators for $NCsitename</B>"
                 . "<TABLE cellspacing=\"1\" cellpadding=\"3\" cellspacing=\"2\" border=\"1\">"
@@ -1180,7 +1180,7 @@ function mods() {
         }
 
         $sql = "select username, user_id, user_level from ".$prefix."_users where user_level = '3'";
-        $result = mysql_query($sql);
+        $result = $db->sql_query($sql);
         if ($result) {
                 echo "<B>Catch-All Moderators for $NCsitename</B>"
                 . "<TABLE cellspacing=\"1\" cellpadding=\"3\" cellspacing=\"2\" border=\"1\">"
@@ -1207,7 +1207,7 @@ function tables() {
 	$result = mysql_list_tables($dbname);
 	if (!$result) {
         	print "DB Error, could not list tables\n";
-	        print 'MySQL Error: ' . mysql_error();
+	        print 'MySQL Error: ' . $db->sql_error();
 	}
 	if ($result) {
                 echo "<B>PHP-Nuke Show Tables for $NCsitename</B>"
@@ -1217,14 +1217,14 @@ function tables() {
 	        while ($row = mysql_fetch_row($result)) {
 			echo "<TR bgcolor=#FFFF99><TD align=center>$i</TD><TD>$row[0]</TD>";
 			$sql2 = "DESCRIBE $row[0]";
-			$result2 = mysql_num_rows(mysql_query($sql2));
+			$result2 = $db->sql_numrows($db->sql_query($sql2));
 			if ($result2) { 
 				echo "<TD align=right>$result2</TD>"; 
 			} else { 
 				$result2 = "0"; 
 			}
 			$sql3 = "SELECT COUNT(*) as nccount FROM ".$row[0];
-			$result3 = mysql_query($sql3);
+			$result3 = $db->sql_query($sql3);
 			while (list($nccount) = mysql_fetch_row($result3)) {
 				if ($nccount) {
 					echo "<TD align=right>$nccount</TD>";
@@ -1455,12 +1455,12 @@ global $prefix, $dbtype, $dbname, $dbuname, $dbpass, $dbhost, $dbi;
 
 if ($_SERVER['SERVER_NAME'] != "castlecops.com") {
 	$sql = "update ".$prefix."_bbconfig set config_value='0' where config_name='gzip_compress'";
-        $result = mysql_query($sql);
+        $result = $db->sql_query($sql);
 	if ($result) {
 		echo "GZIP Compression Setting has been disabled in Nuke Cops bbtonuke port<BR><BR>";
 	} else {
 	        $sql2 = "update ".$prefix."_config set config_value='0' where config_name='gzip_compress'";
-		$result2 = mysql_query($sql2);
+		$result2 = $db->sql_query($sql2);
 		if ($result2) {
 			echo "GZIP Compression Setting has been disabled<BR><BR>";
 		} else {

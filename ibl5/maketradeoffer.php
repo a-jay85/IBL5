@@ -1,15 +1,13 @@
 <?php
 
-require 'config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
+require 'mainfile.php';
 
 $query0="SELECT * FROM nuke_ibl_trade_autocounter ORDER BY `counter` DESC";
-$result0=mysql_query($query0);
-$tradeofferid = mysql_result($result0,0,"counter")+1;
+$result0=$db->sql_query($query0);
+$tradeofferid = $db->sql_result($result0,0,"counter")+1;
 
 $query0a="INSERT INTO nuke_ibl_trade_autocounter ( `counter` ) VALUES ( '$tradeofferid') ";
-$result0a=mysql_query($query0a);
+$result0a=$db->sql_query($query0a);
 
 $Team_Offering = $_POST['Team_Name'];
 $Team_Receiving = $_POST['Team_Name2'];
@@ -97,7 +95,7 @@ if ($error == 0)
 	if ($Check == "on")
 	  {
 	  $queryi = "INSERT INTO nuke_ibl_trade_info ( `tradeofferid` , `itemid` , `itemtype` , `from` , `to` , `approval` ) VALUES ( '$tradeofferid', '$Index', '$Type', '$Team_Offering', '$Team_Receiving' , '$Team_Receiving' )";
-	  $resulti=mysql_query($queryi);
+	  $resulti=$db->sql_query($queryi);
 	  }
 	$k++;
 	}
@@ -110,7 +108,7 @@ if ($error == 0)
 	if ($Check == "on")
 	  {
 	  $queryi = "INSERT INTO nuke_ibl_trade_info ( `tradeofferid` , `itemid` , `itemtype` , `from` , `to` , `approval` ) VALUES ( '$tradeofferid', '$Index', '$Type', '$Team_Receiving', '$Team_Offering' , '$Team_Receiving' )";
-	  $resulti=mysql_query($queryi);
+	  $resulti=$db->sql_query($queryi);
 	  }
 	$k++;
 	}

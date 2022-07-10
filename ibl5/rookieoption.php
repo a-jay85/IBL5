@@ -1,6 +1,7 @@
 <?php
 
 require 'mainfile.php';
+$sharedFunctions = new Shared($db);
 
 $Team_Name = $_POST['teamname'];
 $Player_Name = $_POST['playername'];
@@ -8,8 +9,8 @@ $ExtensionAmount = $_POST['rookieOptionValue'];
 $player_exp = $_POST['player_exp'];
 $player_draftround = $_POST['player_draftround'];
 
-$seasonPhase = Shared::getCurrentSeasonPhase();
-$tid = Shared::getTidFromTeamname($Team_Name);
+$seasonPhase = $sharedFunctions->getCurrentSeasonPhase();
+$tid = $sharedFunctions->getTidFromTeamname($Team_Name);
 
 $recipient = 'ibldepthcharts@gmail.com';
 $emailsubject = "Rookie Extension Option - ".$Player_Name;
@@ -23,7 +24,7 @@ if (($seasonPhase == "Free Agency" AND $player_exp == 2 AND $player_draftround =
 	$queryrookieoption="UPDATE nuke_iblplyr SET cy3 = '$ExtensionAmount' WHERE name = '$Player_Name'";
 } else die("This player's experience doesn't match their rookie status; please let the commish know about this error.");
 
-$resultrookieoption = mysql_query($queryrookieoption);
+$resultrookieoption = $db->sql_query($queryrookieoption);
 
 echo "<html><head><title>Rookie Option Page</title></head><body>
 
@@ -44,16 +45,16 @@ if (mail($recipient, $emailsubject, $filetext, "From: rookieoption@iblhoops.net"
 	$hometext = $Team_Name . " exercise the rookie extension option on " . $Player_Name . " in the amount of " . $rookieOptionInMillions . " million dollars.";
 
 	$querytopic = "SELECT * FROM nuke_topics WHERE topicname = '$Team_Name'";
-	$resulttopic = mysql_query($querytopic);
-	$topicid = mysql_result($resulttopic, 0, "topicid");
+	$resulttopic = $db->sql_query($querytopic);
+	$topicid = $db->sql_result($resulttopic, 0, "topicid");
 
 	$querycat = "SELECT * FROM nuke_stories_cat WHERE title = 'Rookie Extension'";
-	$resultcat = mysql_query($querycat);
-	$RookieExtensions = mysql_result($resultcat, 0, "counter");
-	$catid = mysql_result($resultcat, 0, "catid");
+	$resultcat = $db->sql_query($querycat);
+	$RookieExtensions = $db->sql_result($resultcat, 0, "counter");
+	$catid = $db->sql_result($resultcat, 0, "catid");
 
 	$querycat2 = "UPDATE nuke_stories_cat SET counter = $RookieExtensions WHERE title = 'Rookie Extension'";
-	$resultcat2 = mysql_query($querycat2);
+	$resultcat2 = $db->sql_query($querycat2);
 
 	$querystor = "INSERT INTO nuke_stories
             (catid,
@@ -74,7 +75,7 @@ VALUES      ('$catid',
              'Associated Press',
              '0',
              'english')";
-	$resultstor = mysql_query($querystor);
+	$resultstor = $db->sql_query($querystor);
 
 	echo "<center>An e-mail regarding this extension has been successfully sent to the commissioner's office. Thank you.</center>";
 } else {

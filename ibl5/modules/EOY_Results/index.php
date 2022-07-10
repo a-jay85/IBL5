@@ -23,25 +23,25 @@ $userpage = 1;
 include("header.php");
 
 $query1="select sum(score) as votes,name from (select MVP_1 as name, 3 as score from IBL_EOY_Votes union all select MVP_2 as name, 2 as score from IBL_EOY_Votes union all select MVP_3 as name, 1 as score from IBL_EOY_Votes) as tbl group by name;";
-$result1=mysql_query($query1);
-$num1=mysql_num_rows($result1);
+$result1=$db->sql_query($query1);
+$num1=$db->sql_numrows($result1);
 
 $query15="select sum(score) as votes,name from (select MVP_1 as name, 1 as score from IBL_EOY_Votes) as tbl group by name;";
-$result15=mysql_query($query15);
-$num15=mysql_num_rows($result15);
+$result15=$db->sql_query($query15);
+$num15=$db->sql_numrows($result15);
 
 
 $query2="select sum(score) as votes,name from (select Six_1 as name, 3 as score from IBL_EOY_Votes union all select Six_2 as name, 2 as score from IBL_EOY_Votes union all select Six_3 as name, 1 as score from IBL_EOY_Votes) as tbl group by name;";
-$result2=mysql_query($query2);
-$num2=mysql_num_rows($result2);
+$result2=$db->sql_query($query2);
+$num2=$db->sql_numrows($result2);
 
 $query3="select sum(score) as votes,name from (select ROY_1 as name, 3 as score from IBL_EOY_Votes union all select ROY_2 as name, 2 as score from IBL_EOY_Votes union all select ROY_3 as name, 1 as score from IBL_EOY_Votes) as tbl group by name;";
-$result3=mysql_query($query3);
-$num3=mysql_num_rows($result3);
+$result3=$db->sql_query($query3);
+$num3=$db->sql_numrows($result3);
 
 $query4="select sum(score) as votes,name from (select GM_1 as name, 3 as score from IBL_EOY_Votes union all select GM_2 as name, 2 as score from IBL_EOY_Votes union all select GM_3 as name, 1 as score from IBL_EOY_Votes) as tbl group by name;";
-$result4=mysql_query($query4);
-$num4=mysql_num_rows($result4);
+$result4=$db->sql_query($query4);
+$num4=$db->sql_numrows($result4);
 
 
 
@@ -61,8 +61,8 @@ while ($k < $num1)
 
 {
 
-	$player[$k]=mysql_result($result1,$k, "name");
-	$votes[$k]=mysql_result($result1,$k);
+	$player[$k]=$db->sql_result($result1,$k, "name");
+	$votes[$k]=$db->sql_result($result1,$k);
 
 
 	$table_echo=$table_echo."<tr><td>".$player[$k]."</td><td>".$votes[$k]."</td></tr>";
@@ -82,8 +82,8 @@ while ($h < $num2)
 
 {
 
-	$player[$h]=mysql_result($result2,$h, "name");
-	$votes[$h]=mysql_result($result2,$h);
+	$player[$h]=$db->sql_result($result2,$h, "name");
+	$votes[$h]=$db->sql_result($result2,$h);
 
 	$table_echo1=$table_echo1."<tr><td>".$player[$h]."</td><td>".$votes[$h]."</td></tr>";
 
@@ -96,8 +96,8 @@ while ($i < $num3)
 
 {
 
-	$player[$i]=mysql_result($result3,$i, "name");
-	$votes[$i]=mysql_result($result3,$i);
+	$player[$i]=$db->sql_result($result3,$i, "name");
+	$votes[$i]=$db->sql_result($result3,$i);
 
 	$table_echo2=$table_echo2."<tr><td>".$player[$i]."</td><td>".$votes[$i]."</td></tr>";
 
@@ -110,8 +110,8 @@ while ($m < $num4)
 
 {
 
-	$player[$m]=mysql_result($result4,$m, "name");
-	$votes[$m]=mysql_result($result4,$m);
+	$player[$m]=$db->sql_result($result4,$m, "name");
+	$votes[$m]=$db->sql_result($result4,$m);
 
 	$table_echo3=$table_echo3."<tr><td>".$player[$m]."</td><td>".$votes[$m]."</td></tr>";
 

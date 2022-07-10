@@ -29,13 +29,15 @@ $queryWesternBackcourt = "select count(name) as votes,name from (select West_G1 
 
 function displayVotingResultsTable($query)
 {
+	global $db;
+
 	$i = 0;
-	$result = mysql_query($query);
-	$num_rows = mysql_num_rows($result);
+	$result = $db->sql_query($query);
+	$num_rows = $db->sql_numrows($result);
 
 	while ($i < $num_rows) {
-		$player[$i] = mysql_result($result, $i, "name");
-		$votes[$i] = mysql_result($result, $i);
+		$player[$i] = $db->sql_result($result, $i, "name");
+		$votes[$i] = $db->sql_result($result, $i);
 
 		$row .= "<tr><td>" . $player[$i] . "</td><td>" . $votes[$i] . "</td></tr>";
 

@@ -1,8 +1,9 @@
 <?php
 
 require 'mainfile.php';
+$sharedFunctions = new Shared($db);
 
-$currentSeasonEndingYear = Shared::getCurrentSeasonEndingYear();
+$currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
 
 $tid = $_REQUEST['tid'];
 $yr = $_REQUEST['yr'];
@@ -51,60 +52,60 @@ if ($tid == NULL) {
             </tr>";
 
         $query="SELECT * FROM nuke_iblplyr WHERE retired = 0 ORDER BY ordinal ASC";
-        $result=mysql_query($query);
-        $num=mysql_numrows($result);
+        $result=$db->sql_query($query);
+        $num=$db->sql_numrows($result);
 
         $i = 0;
         $j = 0;
 
         while ($i < $num) {
-            $draftyear=mysql_result($result,$i,"draftyear");
-            $exp=mysql_result($result,$i,"exp");
-            $cy=mysql_result($result,$i,"cy");
-            $cyt=mysql_result($result,$i,"cyt");
+            $draftyear=$db->sql_result($result,$i,"draftyear");
+            $exp=$db->sql_result($result,$i,"exp");
+            $cy=$db->sql_result($result,$i,"cy");
+            $cyt=$db->sql_result($result,$i,"cyt");
 
             $yearoffreeagency=$draftyear+$exp+$cyt-$cy;
 
             if ($yearoffreeagency == $currentSeasonEndingYear) {
-                $name=mysql_result($result,$i,"name");
-                $team=mysql_result($result,$i,"teamname");
-                $tid=mysql_result($result,$i,"tid");
-                $pid=mysql_result($result,$i,"pid");
-                $pos=mysql_result($result,$i,"pos");
-                $age=mysql_result($result,$i,"age");
-                $inj=mysql_result($result,$i,"injured");
+                $name=$db->sql_result($result,$i,"name");
+                $team=$db->sql_result($result,$i,"teamname");
+                $tid=$db->sql_result($result,$i,"tid");
+                $pid=$db->sql_result($result,$i,"pid");
+                $pos=$db->sql_result($result,$i,"pos");
+                $age=$db->sql_result($result,$i,"age");
+                $inj=$db->sql_result($result,$i,"injured");
 
-                $r_2ga=mysql_result($result,$i,"r_fga");
-                $r_2gp=mysql_result($result,$i,"r_fgp");
-                $r_fta=mysql_result($result,$i,"r_fta");
-                $r_ftp=mysql_result($result,$i,"r_ftp");
-                $r_3ga=mysql_result($result,$i,"r_tga");
-                $r_3gp=mysql_result($result,$i,"r_tgp");
-                $r_orb=mysql_result($result,$i,"r_orb");
-                $r_drb=mysql_result($result,$i,"r_drb");
-                $r_ast=mysql_result($result,$i,"r_ast");
-                $r_stl=mysql_result($result,$i,"r_stl");
-                $r_blk=mysql_result($result,$i,"r_blk");
-                $r_tvr=mysql_result($result,$i,"r_to");
-                $r_sta=mysql_result($result,$i,"sta");
-                $r_foul=mysql_result($result,$i,"r_foul");
-                $r_totoff=mysql_result($result,$i,"oo")+mysql_result($result,$i,"do")+mysql_result($result,$i,"po")+mysql_result($result,$i,"to");
-                $r_totdef=mysql_result($result,$i,"od")+mysql_result($result,$i,"dd")+mysql_result($result,$i,"pd")+mysql_result($result,$i,"td");
-                $r_oo=mysql_result($result,$i,"oo");
-                $r_do=mysql_result($result,$i,"do");
-                $r_po=mysql_result($result,$i,"po");
-                $r_to=mysql_result($result,$i,"to");
-                $r_od=mysql_result($result,$i,"od");
-                $r_dd=mysql_result($result,$i,"dd");
-                $r_pd=mysql_result($result,$i,"pd");
-                $r_td=mysql_result($result,$i,"td");
-                $r_foul=mysql_result($result,$i,"r_foul");
-                $loyalty=mysql_result($result,$i,"loyalty");
-                $playForWinner=mysql_result($result,$i,"winner");
-                $playingTime=mysql_result($result,$i,"playingTime");
-                $security=mysql_result($result,$i,"security");
-                $coach=mysql_result($result,$i,"coach");
-                $tradition=mysql_result($result,$i,"tradition");
+                $r_2ga=$db->sql_result($result,$i,"r_fga");
+                $r_2gp=$db->sql_result($result,$i,"r_fgp");
+                $r_fta=$db->sql_result($result,$i,"r_fta");
+                $r_ftp=$db->sql_result($result,$i,"r_ftp");
+                $r_3ga=$db->sql_result($result,$i,"r_tga");
+                $r_3gp=$db->sql_result($result,$i,"r_tgp");
+                $r_orb=$db->sql_result($result,$i,"r_orb");
+                $r_drb=$db->sql_result($result,$i,"r_drb");
+                $r_ast=$db->sql_result($result,$i,"r_ast");
+                $r_stl=$db->sql_result($result,$i,"r_stl");
+                $r_blk=$db->sql_result($result,$i,"r_blk");
+                $r_tvr=$db->sql_result($result,$i,"r_to");
+                $r_sta=$db->sql_result($result,$i,"sta");
+                $r_foul=$db->sql_result($result,$i,"r_foul");
+                $r_totoff=$db->sql_result($result,$i,"oo")+$db->sql_result($result,$i,"do")+$db->sql_result($result,$i,"po")+$db->sql_result($result,$i,"to");
+                $r_totdef=$db->sql_result($result,$i,"od")+$db->sql_result($result,$i,"dd")+$db->sql_result($result,$i,"pd")+$db->sql_result($result,$i,"td");
+                $r_oo=$db->sql_result($result,$i,"oo");
+                $r_do=$db->sql_result($result,$i,"do");
+                $r_po=$db->sql_result($result,$i,"po");
+                $r_to=$db->sql_result($result,$i,"to");
+                $r_od=$db->sql_result($result,$i,"od");
+                $r_dd=$db->sql_result($result,$i,"dd");
+                $r_pd=$db->sql_result($result,$i,"pd");
+                $r_td=$db->sql_result($result,$i,"td");
+                $r_foul=$db->sql_result($result,$i,"r_foul");
+                $loyalty=$db->sql_result($result,$i,"loyalty");
+                $playForWinner=$db->sql_result($result,$i,"winner");
+                $playingTime=$db->sql_result($result,$i,"playingTime");
+                $security=$db->sql_result($result,$i,"security");
+                $coach=$db->sql_result($result,$i,"coach");
+                $tradition=$db->sql_result($result,$i,"tradition");
 
                 if ($j == 0) {
                     echo "      <tr bgcolor=#ffffff align=center>";

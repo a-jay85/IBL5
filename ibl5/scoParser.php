@@ -1,13 +1,16 @@
 <?php
 
 require 'mainfile.php';
+$sharedFunctions = new Shared($db);
 
 function scoParser($uploadedFilePath, $seasonEndingYear, $seasonPhase)
 {
+	global $db, $sharedFunctions;
+
     $scoFilePath = ($uploadedFilePath) ? $uploadedFilePath : "IBL5.sco";
-    $currentSeasonEndingYear = ($seasonEndingYear) ? $seasonEndingYear : Shared::getCurrentSeasonEndingYear();
+    $currentSeasonEndingYear = ($seasonEndingYear) ? $seasonEndingYear : $sharedFunctions->getCurrentSeasonEndingYear();
     $currentSeasonStartingYear = $currentSeasonEndingYear - 1;
-    $seasonPhase = ($seasonPhase) ? $seasonPhase : Shared::getCurrentSeasonPhase();
+    $seasonPhase = ($seasonPhase) ? $seasonPhase : $sharedFunctions->getCurrentSeasonPhase();
 
     echo "<h2>Parse Log</h2>
         <b>Parsing .sco file for the $currentSeasonStartingYear-$currentSeasonEndingYear $seasonPhase...</b><p>";
@@ -24,7 +27,7 @@ function scoParser($uploadedFilePath, $seasonEndingYear, $seasonPhase)
         $stringDeleteCurrentSeasonBoxScores = "DELETE FROM `ibl_box_scores` WHERE `Date` BETWEEN '$currentSeasonStartingYear-11-01' AND '$currentSeasonEndingYear-07-01';";
     }
 
-    if (mysql_query($stringDeleteCurrentSeasonBoxScores)) {
+    if ($db->sql_query($stringDeleteCurrentSeasonBoxScores)) {
         echo $stringDeleteCurrentSeasonBoxScores."<p>";
     }
 
@@ -132,7 +135,7 @@ function scoParser($uploadedFilePath, $seasonEndingYear, $seasonPhase)
                 $gamePF
             )";
             if ($name != NULL || $name != '') {
-                if (mysql_query($entryInsertQuery)) {
+                if ($db->sql_query($entryInsertQuery)) {
                     $numberOfLinesProcessed++;
                     // $entryInsertQuery = str_replace(array("\n", "\t", "\r"), '', $entryInsertQuery); // LOG LINES
                     // echo $entryInsertQuery . "<br>";
@@ -141,14 +144,14 @@ function scoParser($uploadedFilePath, $seasonEndingYear, $seasonPhase)
         }
     }
 
-    $newSimEndDate = mysql_result(mysql_query('SELECT Date FROM ibl_box_scores ORDER BY Date DESC LIMIT 1'),0);
+    $newSimEndDate = $db->sql_result($db->sql_query('SELECT Date FROM ibl_box_scores ORDER BY Date DESC LIMIT 1'),0);
 
-    $queryLastSimDates = mysql_query("SELECT * FROM ibl_sim_dates ORDER BY Sim DESC LIMIT 1");
+    $queryLastSimDates = $db->sql_query("SELECT * FROM ibl_sim_dates ORDER BY Sim DESC LIMIT 1");
 
-    if (mysql_num_rows($queryLastSimDates) != 0) {
-        $lastSimNumber = mysql_result($queryLastSimDates, 0, "Sim");
-        $lastSimStartDate = mysql_result($queryLastSimDates, 0, "Start Date");
-        $lastSimEndDate = mysql_result($queryLastSimDates, 0, "End Date");
+    if ($db->sql_numrows($queryLastSimDates) != 0) {
+        $lastSimNumber = $db->sql_result($queryLastSimDates, 0, "Sim");
+        $lastSimStartDate = $db->sql_result($queryLastSimDates, 0, "Start Date");
+        $lastSimEndDate = $db->sql_result($queryLastSimDates, 0, "End Date");
 
         if ($lastSimEndDate != $newSimEndDate) {
             $dateObjectForNewSimEndDate = date_create($lastSimEndDate);
@@ -157,7 +160,7 @@ function scoParser($uploadedFilePath, $seasonEndingYear, $seasonPhase)
 
             $newSimNumber = $lastSimNumber + 1;
 
-            $insertNewSimDates = mysql_query("INSERT INTO ibl_sim_dates (`Sim`, `Start Date`, `End Date`) VALUES ('$newSimNumber', '$newSimStartDate', '$newSimEndDate');");
+            $insertNewSimDates = $db->sql_query("INSERT INTO ibl_sim_dates (`Sim`, `Start Date`, `End Date`) VALUES ('$newSimNumber', '$newSimStartDate', '$newSimEndDate');");
         } else {
             echo "<p>Number of .sco lines processed: $numberOfLinesProcessed
             <p>Looks like new box scores haven't been added.<br>Sim Start/End Dates will stay set to $lastSimStartDate and $lastSimEndDate.";
@@ -165,15 +168,15 @@ function scoParser($uploadedFilePath, $seasonEndingYear, $seasonPhase)
         }
     } else {
         $newSimNumber = 1;
-        $newSimStartDate = mysql_result(mysql_query('SELECT Date FROM ibl_box_scores ORDER BY Date ASC LIMIT 1'),0);
+        $newSimStartDate = $db->sql_result($db->sql_query('SELECT Date FROM ibl_box_scores ORDER BY Date ASC LIMIT 1'),0);
 
-        $insertNewSimDates = mysql_query("INSERT INTO ibl_sim_dates (`Sim`, `Start Date`, `End Date`) VALUES ('$newSimNumber', '$newSimStartDate', '$newSimEndDate');");
+        $insertNewSimDates = $db->sql_query("INSERT INTO ibl_sim_dates (`Sim`, `Start Date`, `End Date`) VALUES ('$newSimNumber', '$newSimStartDate', '$newSimEndDate');");
     }
 
     if ($insertNewSimDates) {
         echo "<p>Added box scores from $newSimStartDate through $newSimEndDate.";
     } else {
-        die('Invalid query: '.mysql_error());
+        die('Invalid query: '.$db->sql_error());
     }
 }
 

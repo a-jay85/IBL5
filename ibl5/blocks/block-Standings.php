@@ -37,22 +37,25 @@ $content=$content.$stanidings;
 
 $content=$content."<tr><td colspan=2><a href=\"http://www.ijbl.net/modules.php?name=Content&pa=showpage&pid=81\"><font color=#aaaaaa><i>Click here for complete standings</i></font></a></td></tr></table>";
 
-function standings ($division) {
+function standings ($division)
+{
+	global $db;
+
 	$query="SELECT * FROM nuke_ibl_power WHERE Division = '$division' ORDER BY gb DESC";
-	$result=mysql_query($query);
-	$num=mysql_numrows($result);
+	$result=$db->sql_query($query);
+	$num=$db->sql_numrows($result);
 	$i=0;
-	$gbbase=mysql_result($result,$i,"gb");
+	$gbbase=$db->sql_result($result,$i,"gb");
 
 	$stangings="<tr><td colspan=2><center><font color=#bb0000><b>$division Division</b></font></center></td></tr>
 	<tr bgcolor=#0000cc><td><center><font color=#ffffff><b>Team (W-L)</b></font></center></td><td><center><font color=#ffffff><b>GB</b></font></center></td></tr>";
 	while ($i < $num)
 	{
-		$tid=mysql_result($result,$i,"TeamID");
-		$Team=mysql_result($result,$i,"Team");
-		$win=mysql_result($result,$i,"win");
-		$loss=mysql_result($result,$i,"loss");
-		$gb=mysql_result($result,$i,"gb");
+		$tid=$db->sql_result($result,$i,"TeamID");
+		$Team=$db->sql_result($result,$i,"Team");
+		$win=$db->sql_result($result,$i,"win");
+		$loss=$db->sql_result($result,$i,"loss");
+		$gb=$db->sql_result($result,$i,"gb");
 		$gb=$gbbase-$gb;
 		if(($i % 2)==0) {
 			$bgcolor="FFFFFF";

@@ -29,8 +29,8 @@ function chunkstats()
 	echo "<center><font class=\"storytitle\">Sim Stats</font></center><br><br>";
 
 	$max_chunk_query = "SELECT MAX(chunk) as maxchunk FROM nuke_iblplyr_chunk";
-	$max_chunk_result = mysql_query($max_chunk_query);
-	$row = mysql_fetch_assoc($max_chunk_result);
+	$max_chunk_result = $db->sql_query($max_chunk_query);
+	$row = $db->sql_fetch_assoc($max_chunk_result);
 
 	$chunk = $_POST['chunk'];
 	$team = $_POST['team'];
@@ -126,36 +126,36 @@ function chunkstats()
 		</tr>";
 
 	$query = "SELECT * FROM nuke_iblplyr_chunk WHERE $argument AND qa !=0 ORDER BY $sort DESC";
-	$result = mysql_query($query);
-	$num = mysql_numrows($result);
+	$result = $db->sql_query($query);
+	$num = $db->sql_numrows($result);
 
 	while ($i < $num) {
-		$pid = mysql_result($result, $i, "pid");
-		$pos = mysql_result($result, $i, "pos");
-		$name = mysql_result($result, $i, "name");
-		$teamname = mysql_result($result, $i, "teamname");
-		$teamid = mysql_result($result, $i, "tid");
-		$chunknumber = mysql_result($result, $i, "chunk");
-		$qa = mysql_result($result, $i, "qa");
-		$stats_gm = mysql_result($result, $i, "stats_gm");
-		$stats_min = mysql_result($result, $i, "stats_min");
-		$stats_fgm = mysql_result($result, $i, "stats_fgm");
-		$stats_fga = mysql_result($result, $i, "stats_fga");
+		$pid = $db->sql_result($result, $i, "pid");
+		$pos = $db->sql_result($result, $i, "pos");
+		$name = $db->sql_result($result, $i, "name");
+		$teamname = $db->sql_result($result, $i, "teamname");
+		$teamid = $db->sql_result($result, $i, "tid");
+		$chunknumber = $db->sql_result($result, $i, "chunk");
+		$qa = $db->sql_result($result, $i, "qa");
+		$stats_gm = $db->sql_result($result, $i, "stats_gm");
+		$stats_min = $db->sql_result($result, $i, "stats_min");
+		$stats_fgm = $db->sql_result($result, $i, "stats_fgm");
+		$stats_fga = $db->sql_result($result, $i, "stats_fga");
 		@$stats_fgp = number_format(($stats_fgm / $stats_fga * 100), 1);
-		$stats_ftm = mysql_result($result, $i, "stats_ftm");
-		$stats_fta = mysql_result($result, $i, "stats_fta");
+		$stats_ftm = $db->sql_result($result, $i, "stats_ftm");
+		$stats_fta = $db->sql_result($result, $i, "stats_fta");
 		@$stats_ftp = number_format(($stats_ftm / $stats_fta * 100), 1);
-		$stats_tgm = mysql_result($result, $i, "stats_3gm");
-		$stats_tga = mysql_result($result, $i, "stats_3ga");
+		$stats_tgm = $db->sql_result($result, $i, "stats_3gm");
+		$stats_tga = $db->sql_result($result, $i, "stats_3ga");
 		@$stats_tgp = number_format(($stats_tgm / $stats_tga * 100), 1);
-		$stats_orb = mysql_result($result, $i, "stats_orb");
-		$stats_drb = mysql_result($result, $i, "stats_drb");
+		$stats_orb = $db->sql_result($result, $i, "stats_orb");
+		$stats_drb = $db->sql_result($result, $i, "stats_drb");
 		$stats_reb = $stats_orb + $stats_drb;
-		$stats_ast = mysql_result($result, $i, "stats_ast");
-		$stats_stl = mysql_result($result, $i, "stats_stl");
-		$stats_to = mysql_result($result, $i, "stats_to");
-		$stats_blk = mysql_result($result, $i, "stats_blk");
-		$stats_pf = mysql_result($result, $i, "stats_pf");
+		$stats_ast = $db->sql_result($result, $i, "stats_ast");
+		$stats_stl = $db->sql_result($result, $i, "stats_stl");
+		$stats_to = $db->sql_result($result, $i, "stats_to");
+		$stats_blk = $db->sql_result($result, $i, "stats_blk");
+		$stats_pf = $db->sql_result($result, $i, "stats_pf");
 		$stats_pts = 2 * $stats_fgm + $stats_ftm + $stats_tgm;
 
 		@$stats_mpg = number_format(($stats_min / $stats_gm), 1);
@@ -258,8 +258,8 @@ function seasonstats()
 	}
 
 	$query="SELECT * FROM nuke_iblplyr WHERE retired = 0 $argument ORDER BY $sort DESC";
-	$result=mysql_query($query);
-	$num=mysql_numrows($result);
+	$result=$db->sql_query($query);
+	$num=$db->sql_numrows($result);
 
 	echo "<form name=\"Leaderboards\" method=\"post\" action=\"modules.php?name=Chunk_Stats&op=season\">";
 	echo "<table border=1>";
@@ -278,32 +278,32 @@ function seasonstats()
 
 	while ($i < $num)
 	{
-		$pid=mysql_result($result,$i,"pid");
-		$pos=mysql_result($result,$i,"pos");
-		$name=mysql_result($result,$i,"name");
-		$teamname=mysql_result($result,$i,"teamname");
-		$teamid=mysql_result($result,$i,"tid");
-		//$chunknumber=mysql_result($result,$i,"chunk");
-		//$qa=mysql_result($result,$i,"qa");
-		$stats_gm=mysql_result($result,$i,"stats_gm");
-		$stats_min=mysql_result($result,$i,"stats_min");
-		$stats_fgm=mysql_result($result,$i,"stats_fgm");
-		$stats_fga=mysql_result($result,$i,"stats_fga");
+		$pid=$db->sql_result($result,$i,"pid");
+		$pos=$db->sql_result($result,$i,"pos");
+		$name=$db->sql_result($result,$i,"name");
+		$teamname=$db->sql_result($result,$i,"teamname");
+		$teamid=$db->sql_result($result,$i,"tid");
+		//$chunknumber=$db->sql_result($result,$i,"chunk");
+		//$qa=$db->sql_result($result,$i,"qa");
+		$stats_gm=$db->sql_result($result,$i,"stats_gm");
+		$stats_min=$db->sql_result($result,$i,"stats_min");
+		$stats_fgm=$db->sql_result($result,$i,"stats_fgm");
+		$stats_fga=$db->sql_result($result,$i,"stats_fga");
 		@$stats_fgp=number_format(($stats_fgm/$stats_fga*100),1);
-		$stats_ftm=mysql_result($result,$i,"stats_ftm");
-		$stats_fta=mysql_result($result,$i,"stats_fta");
+		$stats_ftm=$db->sql_result($result,$i,"stats_ftm");
+		$stats_fta=$db->sql_result($result,$i,"stats_fta");
 		@$stats_ftp=number_format(($stats_ftm/$stats_fta*100),1);
-		$stats_tgm=mysql_result($result,$i,"stats_3gm");
-		$stats_tga=mysql_result($result,$i,"stats_3ga");
+		$stats_tgm=$db->sql_result($result,$i,"stats_3gm");
+		$stats_tga=$db->sql_result($result,$i,"stats_3ga");
 		@$stats_tgp=number_format(($stats_tgm/$stats_tga*100),1);
-		$stats_orb=mysql_result($result,$i,"stats_orb");
-		$stats_drb=mysql_result($result,$i,"stats_drb");
+		$stats_orb=$db->sql_result($result,$i,"stats_orb");
+		$stats_drb=$db->sql_result($result,$i,"stats_drb");
 		$stats_reb=$stats_orb+$stats_drb;
-		$stats_ast=mysql_result($result,$i,"stats_ast");
-		$stats_stl=mysql_result($result,$i,"stats_stl");
-		$stats_to=mysql_result($result,$i,"stats_to");
-		$stats_blk=mysql_result($result,$i,"stats_blk");
-		$stats_pf=mysql_result($result,$i,"stats_pf");
+		$stats_ast=$db->sql_result($result,$i,"stats_ast");
+		$stats_stl=$db->sql_result($result,$i,"stats_stl");
+		$stats_to=$db->sql_result($result,$i,"stats_to");
+		$stats_blk=$db->sql_result($result,$i,"stats_blk");
+		$stats_pf=$db->sql_result($result,$i,"stats_pf");
 		$stats_pts=2*$stats_fgm+$stats_ftm+$stats_tgm;
 
 
@@ -364,14 +364,16 @@ function chunk_option ($num, $chunk_selected)
 
 function team_option ($team_selected)
 {
+	global $db;
+
 	$query = "SELECT * FROM nuke_ibl_power WHERE TeamID BETWEEN 1 AND 32 ORDER BY TeamID ASC";
-	$result = mysql_query($query);
-	$num = mysql_numrows($result);
+	$result = $db->sql_query($query);
+	$num = $db->sql_numrows($result);
 	echo "<option value=0>All</option>";
 	$i = 0;
 	while ($i < $num) {
-		$tid = mysql_result($result,$i,"TeamID");
-		$Team = mysql_result($result,$i,"Team");
+		$tid = $db->sql_result($result,$i,"TeamID");
+		$Team = $db->sql_result($result,$i,"Team");
 
 		$i++;
 		if ($team_selected == $tid) {

@@ -19,23 +19,23 @@ if ( !defined('BLOCK_FILE') ) {
 global $prefix, $multilingual, $currentlang, $db;
 
 $queryo="SELECT * FROM nuke_users WHERE user_ibl_team != '' ORDER BY user_ibl_team ASC";
-$resulto=mysql_query($queryo);
-$numo=mysql_numrows($resulto);
+$resulto=$db->sql_query($queryo);
+$numo=$db->sql_numrows($resulto);
 
 $content = "<table border=0><tr><td colspan=4><b>The following teams need to submit a new lineup or sign player(s) from waivers due to injury:</b></td></tr><tr><td bgcolor=#000066><font color=#ffffff><b>TEAM NAME</td><td bgcolor=#000066><font color=#ffffff><b>HEALTHY PLAYERS</td><td bgcolor=#000066><font color=#ffffff><b>WAIVERS NEEDED</td><td bgcolor=#000066><font color=#ffffff><b>NEW LINEUP NEEDED</td></tr>";
 
 $j=0;
 while ($j < $numo)
 {
-	$user_team=mysql_result($resulto,$j,"user_ibl_team");
+	$user_team=$db->sql_result($resulto,$j,"user_ibl_team");
 
 	$sql="SELECT * FROM nuke_iblplyr WHERE teamname='$user_team' AND retired = '0' AND ordinal < '961' AND injured = '0' ORDER BY ordinal ASC ";
-	$result1 = mysql_query($sql);
-	$num1=mysql_numrows($result1);
+	$result1 = $db->sql_query($sql);
+	$num1=$db->sql_numrows($result1);
 
 	$sql2="SELECT * FROM nuke_iblplyr WHERE teamname='$user_team' AND retired = '0' AND ordinal < '961' AND injured = '0' AND active = '1' ORDER BY ordinal ASC ";
-	$result2 = mysql_query($sql2);
-	$num2=mysql_numrows($result2);
+	$result2 = $db->sql_query($sql2);
+	$num2=$db->sql_numrows($result2);
 
 	if ($num2<12)
 	{
@@ -59,8 +59,8 @@ while ($j < $numo)
 		$waivers_needed=0;
 	}
 	$sql3="SELECT chart FROM nuke_ibl_team_info WHERE team_name='$user_team'";
-	$result3 = mysql_query($sql3);
-	$chart = mysql_result($result3,0,"chart");
+	$result3 = $db->sql_query($sql3);
+	$chart = $db->sql_result($result3,0,"chart");
 
 	if ($waivers_needed>0 || $new_lineups=='Yes' && $chart == 0)
 	{

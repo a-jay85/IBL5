@@ -13,8 +13,7 @@ libxml_use_internal_errors(true);
 
 require 'config.php';
 require 'mainfile.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
+$sharedFunctions = new Shared($db);
 
 $scheduleFilePath = 'ibl/IBL/Schedule.htm';
 
@@ -68,7 +67,7 @@ function assignGroupingsFor($region)
 }
 
 echo 'Updating the ibl_schedule database table...<p>';
-if (mysql_query('TRUNCATE TABLE ibl_schedule')) echo 'TRUNCATE TABLE ibl_schedule<p>';
+if ($db->sql_query('TRUNCATE TABLE ibl_schedule')) echo 'TRUNCATE TABLE ibl_schedule<p>';
 
 foreach ($rows as $row) {
 	$checkThirdCell = $row->childNodes->item(2)->nodeValue;
@@ -101,8 +100,8 @@ foreach ($rows as $row) {
 			} else $boxID = 100000;
 		}
 
-		$visitorTID = Shared::getTidFromTeamname($visitorName);
-		$homeTID = Shared::getTidFromTeamname($homeName);
+		$visitorTID = $sharedFunctions->getTidFromTeamname($visitorName);
+		$homeTID = $sharedFunctions->getTidFromTeamname($homeName);
 	}
 
 	$sqlQueryString = "INSERT INTO ibl_schedule (
@@ -132,9 +131,9 @@ foreach ($rows as $row) {
 			Hscore = $hScore
 		"; */
 
-	if (mysql_query($sqlQueryString)) {
+	if ($db->sql_query($sqlQueryString)) {
 		echo $sqlQueryString . '<br>';
-	} // DO NOT use 'else die('Invalid query: '.mysql_error()' here -- script depends on being able to pass broken SQL strings for now.
+	} // DO NOT use 'else die('Invalid query: '.$db->sql_error()' here -- script depends on being able to pass broken SQL strings for now.
 
 	unset($visitorName,
 		$homeName,
@@ -172,10 +171,12 @@ function extractLosses($var)
 }
 
 echo '<p>Updating the ibl_standings database table...<p>';
-if (mysql_query('TRUNCATE TABLE ibl_standings')) echo 'TRUNCATE TABLE ibl_standings<p>';
+if ($db->sql_query('TRUNCATE TABLE ibl_standings')) echo 'TRUNCATE TABLE ibl_standings<p>';
 
 function extractStandingsValues()
 {
+	global $db, $sharedFunctions;
+
 	echo '<p>Updating the conference standings for all teams...<p>';
 
 	$standingsFilePath = 'ibl/IBL/Standings.htm';
@@ -195,7 +196,7 @@ function extractStandingsValues()
 				$conference = $teamName;
 			}
 			if (!in_array($teamName, array("Eastern", "Western", "team", ""))) {
-				$tid = Shared::getTidFromTeamname($teamName);
+				$tid = $sharedFunctions->getTidFromTeamname($teamName);
 				$leagueRecord = $row->childNodes->item(1)->nodeValue;
 				$pct = $row->childNodes->item(2)->nodeValue;
 				$confGB = $row->childNodes->item(3)->nodeValue;
@@ -278,9 +279,9 @@ function extractStandingsValues()
 					awayLosses = '".$awayLosses."'
 				";
 
-				if (mysql_query($sqlQueryString)) {
+				if ($db->sql_query($sqlQueryString)) {
 					echo $sqlQueryString . '<br>';
-				} else die('Invalid query: ' . mysql_error());
+				} else die('Invalid query: ' . $db->sql_error());
 			}
 		}
 
@@ -311,9 +312,9 @@ function extractStandingsValues()
 					division = '$division',
 					divGB = '$divGB'";
 
-				if (mysql_query($sqlQueryString)) {
+				if ($db->sql_query($sqlQueryString)) {
 					echo $sqlQueryString . '<br>';
-				} else die('Invalid query: ' . mysql_error());
+				} else die('Invalid query: ' . $db->sql_error());
 			}
 		}
 
@@ -323,6 +324,8 @@ function extractStandingsValues()
 
 function checkIfRegionIsClinched($region)
 {
+	global $db, $sharedFunctions;
+
 	list ($grouping, $groupingGB, $groupingMagicNumber) = assignGroupingsFor($region);
 	echo "<p>Checking if the $region $grouping has been clinched...<br>";
 
@@ -331,9 +334,9 @@ function checkIfRegionIsClinched($region)
 		WHERE $grouping = '$region'
 		ORDER BY wins DESC
 		LIMIT 1;";
-	$resultWinningestTeam = mysql_query($queryWinningestTeam);
-	$winningestTeamName = mysql_result($resultWinningestTeam, 0, "team_name");
-	$winningestTeamWins = mysql_result($resultWinningestTeam, 0, "wins");
+	$resultWinningestTeam = $db->sql_query($queryWinningestTeam);
+	$winningestTeamName = $db->sql_result($resultWinningestTeam, 0, "team_name");
+	$winningestTeamWins = $db->sql_result($resultWinningestTeam, 0, "wins");
 
 	$queryLeastLosingestTeam = "SELECT homeLosses + awayLosses AS losses
 		FROM ibl_standings
@@ -341,8 +344,8 @@ function checkIfRegionIsClinched($region)
 			AND team_name != '$winningestTeamName'
 		ORDER BY losses ASC
 		LIMIT 1;";
-	$resultLeastLosingestTeam = mysql_query($queryLeastLosingestTeam);
-	$leastLosingestTeamLosses = mysql_result($resultLeastLosingestTeam, 0, "losses");
+	$resultLeastLosingestTeam = $db->sql_query($queryLeastLosingestTeam);
+	$leastLosingestTeamLosses = $db->sql_result($resultLeastLosingestTeam, 0, "losses");
 
 	$magicNumber = 82 + 1 - $winningestTeamWins - $leastLosingestTeamLosses;
 
@@ -351,7 +354,7 @@ function checkIfRegionIsClinched($region)
 			SET clinched" . ucfirst($grouping) . " = 1
 			WHERE team_name = '$winningestTeamName';";
 
-		if (mysql_query($querySetTeamToClinched)) {
+		if ($db->sql_query($querySetTeamToClinched)) {
 			echo "The $winningestTeamName have clinched the $region $grouping!";
 		};
 	} else {
@@ -361,6 +364,8 @@ function checkIfRegionIsClinched($region)
 
 function checkIfPlayoffsClinched($conference)
 {
+	global $db, $sharedFunctions;
+
 	echo "<p>Checking if any teams have clinched playoff spots in the $conference Conference...<br>";
 
 	$queryEightWinningestTeams = "SELECT team_name, homeWins + awayWins AS wins
@@ -368,24 +373,24 @@ function checkIfPlayoffsClinched($conference)
 		WHERE conference = '$conference'
 		ORDER BY wins DESC
 		LIMIT 8;";
-	$resultEightWinningestTeams = mysql_query($queryEightWinningestTeams);
+	$resultEightWinningestTeams = $db->sql_query($queryEightWinningestTeams);
 
 	$querySixLosingestTeams = "SELECT homeLosses + awayLosses AS losses
 		FROM ibl_standings
 		WHERE conference = '$conference'
 		ORDER BY losses DESC
 		LIMIT 6;";
-	$resultSixLosingestTeams = mysql_query($querySixLosingestTeams);
+	$resultSixLosingestTeams = $db->sql_query($querySixLosingestTeams);
 
 	$i = 0;
 	while ($i < 8) {
-		$contendingTeamName = mysql_result($resultEightWinningestTeams, $i, "team_name");
-		$contendingTeamWins = mysql_result($resultEightWinningestTeams, $i, "wins");
+		$contendingTeamName = $db->sql_result($resultEightWinningestTeams, $i, "team_name");
+		$contendingTeamWins = $db->sql_result($resultEightWinningestTeams, $i, "wins");
 		$teamsEliminated = 0;
 
 		$j = 0;
 		while ($j < 6) {
-			$bottomTeamLosses = mysql_result($resultSixLosingestTeams, $j, "losses");
+			$bottomTeamLosses = $db->sql_result($resultSixLosingestTeams, $j, "losses");
 
 			$magicNumber = 82 + 1 - $contendingTeamWins - $bottomTeamLosses;
 
@@ -401,7 +406,7 @@ function checkIfPlayoffsClinched($conference)
 				SET clinchedPlayoffs = 1
 				WHERE team_name = '$contendingTeamName';";
 
-			if (mysql_query($querySetTeamToClinched)) {
+			if ($db->sql_query($querySetTeamToClinched)) {
 				echo "The $contendingTeamName have clinched a playoff spot!<br>";
 			};
 		}
@@ -412,6 +417,8 @@ function checkIfPlayoffsClinched($conference)
 
 function updateMagicNumbers($region)
 {
+	global $db, $sharedFunctions;
+
 	echo "<p>Updating the magic numbers for the $region...<br>";
 	list ($grouping, $groupingGB, $groupingMagicNumber) = assignGroupingsFor($region);
 
@@ -419,15 +426,15 @@ function updateMagicNumbers($region)
 		FROM ibl_standings
 		WHERE $grouping = '$region'
 		ORDER BY pct DESC";
-	$result = mysql_query($query);
-	$limit = mysql_num_rows($result);
+	$result = $db->sql_query($query);
+	$limit = $db->sql_numrows($result);
 
 	$i = 0;
 	while ($i < $limit) {
-		$teamName = mysql_result($result, $i, 0);
-		$teamTotalWins = mysql_result($result, $i, 1) + mysql_result($result, $i, 3);
+		$teamName = $db->sql_result($result, $i, 0);
+		$teamTotalWins = $db->sql_result($result, $i, 1) + $db->sql_result($result, $i, 3);
 		if ($i + 1 != $limit) {
-			$belowTeamTotalLosses = mysql_result($result, $i + 1, 2) + mysql_result($result, $i + 1, 4);
+			$belowTeamTotalLosses = $db->sql_result($result, $i + 1, 2) + $db->sql_result($result, $i + 1, 4);
 		} else {
 			$belowTeamTotalLosses = 0; // This results in an inaccurate Magic Number for the bottom team in the $region, but prevents query errors
 		}
@@ -444,9 +451,9 @@ function updateMagicNumbers($region)
 		ON DUPLICATE KEY UPDATE
 			$groupingMagicNumber = '$magicNumber'";
 
-		if (mysql_query($sqlQueryString)) {
+		if ($db->sql_query($sqlQueryString)) {
 			echo $sqlQueryString . '<br>';
-		} else die('Invalid query: ' . mysql_error());
+		} else die('Invalid query: ' . $db->sql_error());
 		$i++;
 	}
 
@@ -482,15 +489,15 @@ $queryTeams = "SELECT TeamID, Team, streak_type, streak
 	WHERE TeamID
 	BETWEEN 1 AND 32
 	ORDER BY TeamID ASC";
-$resultTeams = mysql_query($queryTeams);
-$numTeams = mysql_numrows($resultTeams);
+$resultTeams = $db->sql_query($queryTeams);
+$numTeams = $db->sql_numrows($resultTeams);
 
-$currentSeasonEndingYear = Shared::getCurrentSeasonEndingYear();
+$currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
 
 $i = 0;
 while ($i < $numTeams) {
-	$tid = mysql_result($resultTeams, $i, "TeamID");
-	$teamName = mysql_result($resultTeams, $i, "Team");
+	$tid = $db->sql_result($resultTeams, $i, "TeamID");
+	$teamName = $db->sql_result($resultTeams, $i, "Team");
 
 	$queryGames = "SELECT Visitor, Vscore, Home, HScore
 		FROM ibl_schedule
@@ -498,8 +505,8 @@ while ($i < $numTeams) {
 		AND (BoxID > 0 AND BoxID < 100000)
 		AND Date BETWEEN '" . ($currentSeasonEndingYear - 1) . "-10-31' AND '$currentSeasonEndingYear-05-30'
 		ORDER BY Date ASC";
-	$resultGames = mysql_query($queryGames);
-	$numGames = mysql_numrows($resultGames);
+	$resultGames = $db->sql_query($queryGames);
+	$numGames = $db->sql_numrows($resultGames);
 
 	$wins = 0;
 	$losses = 0;
@@ -515,18 +522,18 @@ while ($i < $numTeams) {
 
 	$j = 0;
 	while ($j < $numGames) {
-		$awayTeam = mysql_result($resultGames, $j, "Visitor");
-		$awayTeamScore = mysql_result($resultGames, $j, "VScore");
-		$homeTeam = mysql_result($resultGames, $j, "Home");
-		$homeTeamScore = mysql_result($resultGames, $j, "HScore");
+		$awayTeam = $db->sql_result($resultGames, $j, "Visitor");
+		$awayTeamScore = $db->sql_result($resultGames, $j, "VScore");
+		$homeTeam = $db->sql_result($resultGames, $j, "Home");
+		$homeTeamScore = $db->sql_result($resultGames, $j, "HScore");
 		if ($awayTeamScore !== $homeTeamScore) { // Ignore tied games since they're usually 0-0 games that haven't yet occurred
 			if ($tid == $awayTeam) {
 				$queryOpponentWinLoss = "SELECT win, loss
 					FROM nuke_ibl_power
 					WHERE TeamID = $homeTeam";
-				$resultOpponentWinLoss = mysql_query($queryOpponentWinLoss);
-				$opponentWins = mysql_result($resultOpponentWinLoss, 0, "win");
-				$opponentLosses = mysql_result($resultOpponentWinLoss, 0, "loss");
+				$resultOpponentWinLoss = $db->sql_query($queryOpponentWinLoss);
+				$opponentWins = $db->sql_result($resultOpponentWinLoss, 0, "win");
+				$opponentLosses = $db->sql_result($resultOpponentWinLoss, 0, "loss");
 
 				if ($awayTeamScore > $homeTeamScore) {
 					$wins++;
@@ -559,9 +566,9 @@ while ($i < $numTeams) {
 				$queryOpponentWinLoss = "SELECT win, loss
 					FROM nuke_ibl_power
 					WHERE TeamID = $awayTeam";
-				$resultOpponentWinLoss = mysql_query($queryOpponentWinLoss);
-				$opponentWins = mysql_result($resultOpponentWinLoss, 0, "win");
-				$opponentLosses = mysql_result($resultOpponentWinLoss, 0, "loss");
+				$resultOpponentWinLoss = $db->sql_query($queryOpponentWinLoss);
+				$opponentWins = $db->sql_result($resultOpponentWinLoss, 0, "win");
+				$opponentLosses = $db->sql_result($resultOpponentWinLoss, 0, "loss");
 
 				if ($awayTeamScore > $homeTeamScore) {
 					$losses++;
@@ -616,7 +623,7 @@ while ($i < $numTeams) {
 			streak = $streak,
 			ranking = $ranking
 		WHERE TeamID = $tid;";
-	$result3 = mysql_query($query3);
+	$result3 = $db->sql_query($query3);
 
 	echo "Updating $teamName: $wins wins, $losses losses, $gb games back, $homeWins home wins, $homeLosses home losses, $awayWins away wins, $awayLosses away losses, streak = $streakType$streak, last 10 = $winsInLast10Games-$lossesInLast10Games, ranking score = $ranking<br>";
 
@@ -625,25 +632,25 @@ while ($i < $numTeams) {
 		SET a.wins = b.win,
 			a.losses = b.loss
 		WHERE a.currentname = b.Team AND a.year = '".$currentSeasonEndingYear."';";
-	$result4 = mysql_query($query4);
+	$result4 = $db->sql_query($query4);
 
 	// Update teams' total wins in ibl_team_history by summing up a team's wins in nuke_iblteam_win_loss
 	$query8 = "UPDATE ibl_team_history a
 		SET totwins = (SELECT SUM(b.wins)
 		FROM nuke_iblteam_win_loss AS b
 		WHERE a.team_name = b.currentname)";
-	$result8 = mysql_query($query8);
+	$result8 = $db->sql_query($query8);
 
 	// Update teams' total losses in ibl_team_history by summing up a team's losses in nuke_iblteam_win_loss
 	$query9 = "UPDATE ibl_team_history a
 		SET totloss = (SELECT SUM(b.losses)
 		FROM nuke_iblteam_win_loss AS b
 		WHERE a.team_name = b.currentname)";
-	$result9 = mysql_query($query9);
+	$result9 = $db->sql_query($query9);
 
 	// Update teams' win percentage in ibl_team_history
 	$query12 = "UPDATE ibl_team_history a SET winpct = a.totwins / (a.totwins + a.totloss)";
-	$result12 = mysql_query($query12);
+	$result12 = $db->sql_query($query12);
 
 	$i++;
 }
@@ -652,7 +659,7 @@ echo '<p>Power Rankings have been updated.<p>';
 
 // Reset the sim's Depth Chart sent status
 $query7 = "UPDATE ibl_team_history SET sim_depth = 'No Depth Chart'";
-$result7 = mysql_query($query7);
+$result7 = $db->sql_query($query7);
 
 //*****************************************************************************
 //*** STANDINGS PAGE UPDATE
@@ -670,15 +677,15 @@ $standingsHTML = "<script src=\"sorttable.js\"></script>";
 
 function displayStandings($region)
 {
-	global $standingsHTML;
+	global $db, $sharedFunctions, $standingsHTML;
 
 	list ($grouping, $groupingGB, $groupingMagicNumber) = assignGroupingsFor($region);
 
 	$query = "SELECT tid, team_name, leagueRecord, pct, $groupingGB, confRecord, divRecord, homeRecord, awayRecord, gamesUnplayed, $groupingMagicNumber, clinchedConference, clinchedDivision, clinchedPlayoffs, (homeWins + homeLosses) AS homeGames, (awayWins + awayLosses) AS awayGames
 		FROM ibl_standings
 		WHERE $grouping = '$region' ORDER BY $groupingGB ASC";
-	$result = mysql_query($query);
-	$limit = mysql_num_rows($result);
+	$result = $db->sql_query($query);
+	$limit = $db->sql_numrows($result);
 
 	$standingsHTML .= '<font color=#fd004d><b>' . $region . ' ' . ucfirst($grouping) . '</b></font>';
 	$standingsHTML .= '<table class="sortable">';
@@ -701,22 +708,22 @@ function displayStandings($region)
 
 	$i = 0;
 	while ($i < $limit) {
-		$tid = mysql_result($result, $i, 0);
-		$team_name = mysql_result($result, $i, 1);
-		$leagueRecord = mysql_result($result, $i, 2);
-		$pct = mysql_result($result, $i, 3);
-		$GB = mysql_result($result, $i, 4);
-		$confRecord = mysql_result($result, $i, 5);
-		$divRecord = mysql_result($result, $i, 6);
-		$homeRecord = mysql_result($result, $i, 7);
-		$awayRecord = mysql_result($result, $i, 8);
-		$gamesUnplayed = mysql_result($result, $i, 9);
-		$magicNumber = mysql_result($result, $i, 10);
-		$clinchedConference = mysql_result($result, $i, 11);
-		$clinchedDivision = mysql_result($result, $i, 12);
-		$clinchedPlayoffs = mysql_result($result, $i, 13);
-		$homeGames = mysql_result($result, $i, "homeGames");
-		$awayGames = mysql_result($result, $i, "awayGames");
+		$tid = $db->sql_result($result, $i, 0);
+		$team_name = $db->sql_result($result, $i, 1);
+		$leagueRecord = $db->sql_result($result, $i, 2);
+		$pct = $db->sql_result($result, $i, 3);
+		$GB = $db->sql_result($result, $i, 4);
+		$confRecord = $db->sql_result($result, $i, 5);
+		$divRecord = $db->sql_result($result, $i, 6);
+		$homeRecord = $db->sql_result($result, $i, 7);
+		$awayRecord = $db->sql_result($result, $i, 8);
+		$gamesUnplayed = $db->sql_result($result, $i, 9);
+		$magicNumber = $db->sql_result($result, $i, 10);
+		$clinchedConference = $db->sql_result($result, $i, 11);
+		$clinchedDivision = $db->sql_result($result, $i, 12);
+		$clinchedPlayoffs = $db->sql_result($result, $i, 13);
+		$homeGames = $db->sql_result($result, $i, "homeGames");
+		$awayGames = $db->sql_result($result, $i, "awayGames");
 	    if ($clinchedConference == 1) {
 	        $team_name = "<b>Z</b>-" . $team_name;
 	    } elseif ($clinchedDivision == 1) {
@@ -726,11 +733,11 @@ function displayStandings($region)
 	    }
 
 		$queryLast10Games = "SELECT last_win, last_loss, streak_type, streak FROM nuke_ibl_power WHERE TeamID = $tid";
-		$resultLast10Games = mysql_query($queryLast10Games);
-		$winsInLast10Games = mysql_result($resultLast10Games, 0, 0);
-		$lossesInLast10Games = mysql_result($resultLast10Games, 0, 1);
-		$streakType = mysql_result($resultLast10Games, 0, 2);
-		$streak = mysql_result($resultLast10Games, 0, 3);
+		$resultLast10Games = $db->sql_query($queryLast10Games);
+		$winsInLast10Games = $db->sql_result($resultLast10Games, 0, 0);
+		$lossesInLast10Games = $db->sql_result($resultLast10Games, 0, 1);
+		$streakType = $db->sql_result($resultLast10Games, 0, 2);
+		$streak = $db->sql_result($resultLast10Games, 0, 3);
 
 		$standingsHTML .= '<tr><td><a href="modules.php?name=Team&op=team&tid=' . $tid . '">' . $team_name . '</td>
 			<td>' . $leagueRecord . '</td>
@@ -762,35 +769,35 @@ displayStandings('Midwest');
 displayStandings('Pacific');
 
 $sqlQueryString = "UPDATE nuke_pages SET text = '$standingsHTML' WHERE pid = 4";
-if (mysql_query($sqlQueryString)) {
+if ($db->sql_query($sqlQueryString)) {
 	echo $sqlQueryString . '<p>';
 	echo '<p>Full standings page has been updated.<p>';
-} else die('Invalid query: ' . mysql_error());
+} else die('Invalid query: ' . $db->sql_error());
 
 $resetExtensionQueryString = 'UPDATE nuke_ibl_team_info SET Used_Extension_This_Chunk = 0';
-if (mysql_query($resetExtensionQueryString)) {
+if ($db->sql_query($resetExtensionQueryString)) {
 	echo $resetExtensionQueryString . '<p>';
 	echo '<p>Contract Extension usages have been reset.<p>';
-} else die('Invalid query: ' . mysql_error());
+} else die('Invalid query: ' . $db->sql_error());
 
-$currentSeasonPhase = Shared::getCurrentSeasonPhase();
+$currentSeasonPhase = $sharedFunctions->getCurrentSeasonPhase();
 if ($currentSeasonPhase == "Playoffs" OR $currentSeasonPhase == "Draft" OR $currentSeasonPhase == "Free Agency") {
 	echo '<p>Re-applying postseason trades made during the playoffs...</p>';
 
 	$postseasonTradeQueueQuery = "SELECT * FROM ibl_trade_queue;";
-	$postseasonTradeQueueResult = mysql_query($postseasonTradeQueueQuery);
+	$postseasonTradeQueueResult = $db->sql_query($postseasonTradeQueueQuery);
 	$i = 0;
-	while ($i < mysql_num_rows($postseasonTradeQueueResult)) {
-		$queuedTradeQuery = mysql_result($postseasonTradeQueueResult, $i);
-		$tradeLine = mysql_result($postseasonTradeQueueResult, $i, 1);
-		if (mysql_query($queuedTradeQuery)) {
+	while ($i < $db->sql_numrows($postseasonTradeQueueResult)) {
+		$queuedTradeQuery = $db->sql_result($postseasonTradeQueueResult, $i);
+		$tradeLine = $db->sql_result($postseasonTradeQueueResult, $i, 1);
+		if ($db->sql_query($queuedTradeQuery)) {
 			echo $tradeLine . "\n";
 		}
 		$i++;
 	}
 	echo '<p>Postseason trades have been re-applied!';
 } elseif ($currentSeasonPhase == "Preseason") {
-	if (mysql_query("TRUNCATE TABLE ibl_trade_queue;")) {
+	if ($db->sql_query("TRUNCATE TABLE ibl_trade_queue;")) {
 		echo "<p>TRUNCATE TABLE ibl_trade_queue;";
 	}
 }

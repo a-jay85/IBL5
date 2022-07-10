@@ -1,7 +1,12 @@
-*
 .ftpquota
 error_log
 !/ibl5
 !sharedFunctions.php
 config.php
 config.inc.php
+discordWebhooks (not CURL).php
+depthcharts
+/ibl
+/ibl5/vendor
+/ibl5/themes
+/ibl5/joe/ibl_draft/includes/classes/Discord.php

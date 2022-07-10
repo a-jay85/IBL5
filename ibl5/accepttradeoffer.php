@@ -1,50 +1,51 @@
 <?php
 
 require 'mainfile.php';
+$sharedFunctions = new Shared($db);
 
 $offer_id = $_POST['offer'];
 
 $query0 = "SELECT * FROM nuke_ibl_trade_info WHERE tradeofferid = '$offer_id'";
-$result0 = mysql_query($query0);
-$num0 = mysql_numrows($result0);
+$result0 = $db->sql_query($query0);
+$num0 = $db->sql_numrows($result0);
 
 $i = 0;
 
 $storytext = "";
 
 while ($i < $num0) {
-	$itemid = mysql_result($result0, $i, "itemid");
-	$itemtype = mysql_result($result0, $i, "itemtype");
-	$from = mysql_result($result0, $i, "from");
-	$to = mysql_result($result0, $i, "to");
+	$itemid = $db->sql_result($result0, $i, "itemid");
+	$itemtype = $db->sql_result($result0, $i, "itemtype");
+	$from = $db->sql_result($result0, $i, "from");
+	$to = $db->sql_result($result0, $i, "to");
 
 	if ($itemtype == 0) {
 		$queryj = "SELECT * FROM ibl_draft_picks WHERE `pickid` = '$itemid'";
-		$resultj = mysql_query($queryj);
-		$tradeLine = "The $from send the " . mysql_result($resultj, 0, "year") . " " . mysql_result($resultj, 0, "teampick") . " Round " . mysql_result($resultj, 0, "round") . " draft pick to the $to.<br>";
+		$resultj = $db->sql_query($queryj);
+		$tradeLine = "The $from send the " . $db->sql_result($resultj, 0, "year") . " " . $db->sql_result($resultj, 0, "teampick") . " Round " . $db->sql_result($resultj, 0, "round") . " draft pick to the $to.<br>";
 		$storytext .= $tradeLine;
 
 		$queryi = 'UPDATE ibl_draft_picks SET `ownerofpick` = "' . $to . '" WHERE `pickid` = ' . $itemid . ' LIMIT 1;';
-		$resulti = mysql_query($queryi);
+		$resulti = $db->sql_query($queryi);
 	} else {
 		$queryj = "SELECT * FROM nuke_ibl_team_info WHERE team_name = '$to'";
-		$resultj = mysql_query($queryj);
-		$tid = mysql_result($resultj, 0, "teamid");
+		$resultj = $db->sql_query($queryj);
+		$tid = $db->sql_result($resultj, 0, "teamid");
 
 		$queryk = "SELECT * FROM nuke_iblplyr WHERE pid = '$itemid'";
-		$resultk = mysql_query($queryk);
+		$resultk = $db->sql_query($queryk);
 
-		$tradeLine = "The $from send " . mysql_result($resultk, 0, "pos") . " " . mysql_result($resultk, 0, "name") . " to the $to.<br>";
+		$tradeLine = "The $from send " . $db->sql_result($resultk, 0, "pos") . " " . $db->sql_result($resultk, 0, "name") . " to the $to.<br>";
 		$storytext .= $tradeLine;
 
 		$queryi = 'UPDATE nuke_iblplyr SET `teamname` = "' . $to . '", `tid` = ' . $tid . ' WHERE `pid` = ' . $itemid . ' LIMIT 1;';
-		$resulti = mysql_query($queryi);
+		$resulti = $db->sql_query($queryi);
 	}
 
-	$currentSeasonPhase = Shared::getCurrentSeasonPhase();
+	$currentSeasonPhase = $sharedFunctions->getCurrentSeasonPhase();
 	if ($currentSeasonPhase == "Playoffs" OR $currentSeasonPhase == "Draft" OR $currentSeasonPhase == "Free Agency") {
 		$queryInsert = "INSERT INTO ibl_trade_queue (query, tradeline) VALUES ('$queryi', '$tradeLine');";
-		mysql_query("$queryInsert");
+		$db->sql_query("$queryInsert");
 	}
 
 	$i++;
@@ -72,7 +73,7 @@ VALUES      ('2',
              'Associated Press',
              '0',
              'english') ";
-$resultstor = mysql_query($querystor);
+$resultstor = $db->sql_query($querystor);
 
 if (isset($resultstor) AND $_SERVER['SERVER_NAME'] != "localhost") {
 	$recipient = 'ibldepthcharts@gmail.com';
@@ -82,7 +83,7 @@ if (isset($resultstor) AND $_SERVER['SERVER_NAME'] != "localhost") {
 Discord::postToChannel('#trades', $storytext);
 
 $queryclear = "DELETE FROM nuke_ibl_trade_info WHERE `tradeofferid` = '$offer_id'";
-$resultclear = mysql_query($queryclear);
+$resultclear = $db->sql_query($queryclear);
 
 ?>
 

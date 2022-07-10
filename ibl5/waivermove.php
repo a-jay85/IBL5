@@ -1,8 +1,6 @@
 <?php
 
-require 'config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
+require 'mainfile.php';
 
 $Team_Offering = $_POST['Team_Name'];
 $Fields_Counter = $_POST['counterfields'];
@@ -11,24 +9,24 @@ $Healthy_Roster_Slots = $_POST['healthyrosterslots'];
 $Type_Of_Action = $_POST['Action'];
 
 $queryt="SELECT * FROM nuke_ibl_team_info WHERE team_name = '$Team_Offering' ";
-$resultt=mysql_query($queryt);
+$resultt=$db->sql_query($queryt);
 
-$teamid=mysql_result($resultt,0,"teamid");
+$teamid=$db->sql_result($resultt,0,"teamid");
 
 $Timestamp = intval(time());
 
 // ADD TEAM TOTAL SALARY FOR THIS YEAR
 
 $querysalary="SELECT * FROM nuke_iblplyr WHERE teamname = '$Team_Offering' AND retired = 0 ";
-$results=mysql_query($querysalary);
-$num=mysql_numrows($results);
+$results=$db->sql_query($querysalary);
+$num=$db->sql_numrows($results);
 $z=0;
 
 while($z < $num)
 	{
-		$cy=mysql_result($results,$z,"cy");
+		$cy=$db->sql_result($results,$z,"cy");
 		$cyy = "cy$cy";
-		$cy2=mysql_result($results,$z,"$cyy");
+		$cy2=$db->sql_result($results,$z,"$cyy");
 		$TotalSalary = $TotalSalary + $cy2;
 		$z++;
 	}
@@ -44,9 +42,9 @@ $Salary=$_POST['cy'.$k];
 $Index=$_POST['index'.$k];
 $Check=$_POST['check'.$k];
 $queryn="SELECT * FROM nuke_iblplyr WHERE pid = '$Index' ";
-$resultn=mysql_query($queryn);
-$playername=mysql_result($resultn,0,"name");
-$players_team=mysql_result($resultn,0,"tid");
+$resultn=$db->sql_query($queryn);
+$playername=$db->sql_result($resultn,0,"name");
+$players_team=$db->sql_result($resultn,0,"tid");
 
 if ($Check == "on")
   {
@@ -60,7 +58,7 @@ if ($Check == "on")
 		}else{
 
 		  $queryi = "UPDATE nuke_iblplyr SET `ordinal` = '1000', `droptime` = '$Timestamp' WHERE `pid` = '$Index' LIMIT 1;";
-		  $resulti=mysql_query($queryi);
+		  $resulti=$db->sql_query($queryi);
 
 		  $topicid=32;
 		  $storytitle=$Team_Offering." make waiver cuts";
@@ -70,17 +68,17 @@ if ($Check == "on")
 		  $timestamp=date('Y-m-d H:i:s',time());
 
 		  $querycat="SELECT * FROM nuke_stories_cat WHERE title = 'Waiver Pool Moves'";
-		  $resultcat=mysql_query($querycat);
-		  $WPMoves=mysql_result($resultcat,0,"counter");
-		  $catid=mysql_result($resultcat,0,"catid");
+		  $resultcat=$db->sql_query($querycat);
+		  $WPMoves=$db->sql_result($resultcat,0,"counter");
+		  $catid=$db->sql_result($resultcat,0,"catid");
 
 		  $WPMoves=$WPMoves+1;
 
 		  $querycat2="UPDATE nuke_stories_cat SET counter = $WPMoves WHERE title = 'Waiver Pool Moves'";
-		  $resultcat2=mysql_query($querycat2);
+		  $resultcat2=$db->sql_query($querycat2);
 
 		  $querystor="INSERT INTO nuke_stories (catid,aid,title,time,hometext,topic,informant,counter,alanguage) VALUES ('$catid','Associated Press','$storytitle','$timestamp','$hometext','$topicid','Associated Press','0','english')";
-		  $resultstor=mysql_query($querystor);
+		  $resultstor=$db->sql_query($querystor);
 		  echo "<html><head><title>Waiver Processing</title>
 			</head>
 			<body>
@@ -92,7 +90,7 @@ if ($Check == "on")
 	  if ($players_team == $teamid)
 		{
 		  $queryi = "UPDATE nuke_iblplyr SET `ordinal` = '800', `teamname` = '$Team_Offering', `tid` = '$teamid' WHERE `pid` = '$Index' LIMIT 1;";
-		  $resulti=mysql_query($queryi);
+		  $resulti=$db->sql_query($queryi);
 		  $Roster_Slots++;
 
 		  $topicid=33;
@@ -104,17 +102,17 @@ if ($Check == "on")
 		  $timestamp=date('Y-m-d H:i:s',time());
 
 		  $querycat="SELECT * FROM nuke_stories_cat WHERE title = 'Waiver Pool Moves'";
-		  $resultcat=mysql_query($querycat);
-		  $WPMoves=mysql_result($resultcat,0,"counter");
-		  $catid=mysql_result($resultcat,0,"catid");
+		  $resultcat=$db->sql_query($querycat);
+		  $WPMoves=$db->sql_result($resultcat,0,"counter");
+		  $catid=$db->sql_result($resultcat,0,"catid");
 
 		  $WPMoves=$WPMoves+1;
 
 		  $querycat2="UPDATE nuke_stories_cat SET counter = $WPMoves WHERE title = 'Waiver Pool Moves'";
-		  $resultcat2=mysql_query($querycat2);
+		  $resultcat2=$db->sql_query($querycat2);
 
 		  $querystor="INSERT INTO nuke_stories (catid,aid,title,time,hometext,topic,informant,counter,alanguage) VALUES ('$catid','Associated Press','$storytitle','$timestamp','$hometext','$topicid','Associated Press','0','english')";
-		  $resultstor=mysql_query($querystor);
+		  $resultstor=$db->sql_query($querystor);
 		  echo "<html><head><title>Waiver Processing</title>
 			</head>
 			<body>
@@ -138,7 +136,7 @@ if ($Check == "on")
 		  } else {
 
 			  $queryi = "UPDATE nuke_iblplyr SET `ordinal` = '800', `cy` = '1', `cy1` = '$Salary', `teamname` = '$Team_Offering', `tid` = '$teamid' WHERE `pid` = '$Index' LIMIT 1;";
-			  $resulti=mysql_query($queryi);
+			  $resulti=$db->sql_query($queryi);
 			  $Roster_Slots++;
 
 			 $topicid=33;
@@ -151,17 +149,17 @@ if ($Check == "on")
 			  $timestamp=date('Y-m-d H:i:s',time());
 
 			  $querycat="SELECT * FROM nuke_stories_cat WHERE title = 'Waiver Pool Moves'";
-			  $resultcat=mysql_query($querycat);
-			  $WPMoves=mysql_result($resultcat,0,"counter");
-			  $catid=mysql_result($resultcat,0,"catid");
+			  $resultcat=$db->sql_query($querycat);
+			  $WPMoves=$db->sql_result($resultcat,0,"counter");
+			  $catid=$db->sql_result($resultcat,0,"catid");
 
 			  $WPMoves=$WPMoves+1;
 
 			  $querycat2="UPDATE nuke_stories_cat SET counter = $WPMoves WHERE title = 'Waiver Pool Moves'";
-			  $resultcat2=mysql_query($querycat2);
+			  $resultcat2=$db->sql_query($querycat2);
 
 			  $querystor="INSERT INTO nuke_stories (catid,aid,title,time,hometext,topic,informant,counter,alanguage) VALUES ('$catid','The Associated Press','$storytitle','$timestamp','$hometext','$topicid','The Associated Press','0','english')";
-			  $resultstor=mysql_query($querystor);
+			  $resultstor=$db->sql_query($querystor);
 			  echo "<html><head><title>Waiver Processing</title>
 				</head>
 				<body>

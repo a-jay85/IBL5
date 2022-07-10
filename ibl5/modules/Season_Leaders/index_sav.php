@@ -75,8 +75,8 @@ $pagetitle = "Season Stats";
 
 
 	$query="SELECT * FROM nuke_iblhist where name is not null $argument ORDER BY $sort DESC";
-	$result=mysql_query($query);
-	$num=mysql_numrows($result);
+	$result=$db->sql_query($query);
+	$num=$db->sql_numrows($result);
 
 	echo "<form name=\"Leaderboards\" method=\"post\" action=\"modules.php?name=Season_Leaders\">";
 	echo "<table border=1>";
@@ -95,33 +95,33 @@ $pagetitle = "Season Stats";
 
 	while ($i < $num)
 	{
-		$pid=mysql_result($result,$i,"pid");
-		$pos=mysql_result($result,$i,"pos");
-		$name=mysql_result($result,$i,"name");
-                $yr=mysql_result($result,$i,"year");
-		$teamname=mysql_result($result,$i,"team");
-		$teamid=mysql_result($result,$i,"teamid");
-		//$chunknumber=mysql_result($result,$i,"chunk");
-		//$qa=mysql_result($result,$i,"qa");
-		$stats_gm=mysql_result($result,$i,"gm");
-		$stats_min=mysql_result($result,$i,"min");
-		$stats_fgm=mysql_result($result,$i,"fgm");
-		$stats_fga=mysql_result($result,$i,"fga");
+		$pid=$db->sql_result($result,$i,"pid");
+		$pos=$db->sql_result($result,$i,"pos");
+		$name=$db->sql_result($result,$i,"name");
+                $yr=$db->sql_result($result,$i,"year");
+		$teamname=$db->sql_result($result,$i,"team");
+		$teamid=$db->sql_result($result,$i,"teamid");
+		//$chunknumber=$db->sql_result($result,$i,"chunk");
+		//$qa=$db->sql_result($result,$i,"qa");
+		$stats_gm=$db->sql_result($result,$i,"gm");
+		$stats_min=$db->sql_result($result,$i,"min");
+		$stats_fgm=$db->sql_result($result,$i,"fgm");
+		$stats_fga=$db->sql_result($result,$i,"fga");
 		@$stats_fgp=number_format(($stats_fgm/$stats_fga*100),1);
-		$stats_ftm=mysql_result($result,$i,"ftm");
-		$stats_fta=mysql_result($result,$i,"fta");
+		$stats_ftm=$db->sql_result($result,$i,"ftm");
+		$stats_fta=$db->sql_result($result,$i,"fta");
 		@$stats_ftp=number_format(($stats_ftm/$stats_fta*100),1);
-		$stats_tgm=mysql_result($result,$i,"3gm");
-		$stats_tga=mysql_result($result,$i,"3ga");
+		$stats_tgm=$db->sql_result($result,$i,"3gm");
+		$stats_tga=$db->sql_result($result,$i,"3ga");
 		@$stats_tgp=number_format(($stats_tgm/$stats_tga*100),1);
-		$stats_orb=mysql_result($result,$i,"orb");
-		$stats_reb=mysql_result($result,$i,"reb");
+		$stats_orb=$db->sql_result($result,$i,"orb");
+		$stats_reb=$db->sql_result($result,$i,"reb");
 		$stats_drb=$stats_reb-$stats_orb;
-		$stats_ast=mysql_result($result,$i,"ast");
-		$stats_stl=mysql_result($result,$i,"stl");
-		$stats_to=mysql_result($result,$i,"tvr");
-		$stats_blk=mysql_result($result,$i,"blk");
-		$stats_pf=mysql_result($result,$i,"pf");
+		$stats_ast=$db->sql_result($result,$i,"ast");
+		$stats_stl=$db->sql_result($result,$i,"stl");
+		$stats_to=$db->sql_result($result,$i,"tvr");
+		$stats_blk=$db->sql_result($result,$i,"blk");
+		$stats_pf=$db->sql_result($result,$i,"pf");
 		$stats_pts=2*$stats_fgm+$stats_ftm+$stats_tgm;
 
 
@@ -167,15 +167,17 @@ $pagetitle = "Season Stats";
 
 function team_option ($team_selected)
 {
+	global $db;
+
 	$query="SELECT * FROM nuke_ibl_power WHERE TeamID BETWEEN 1 AND 32 ORDER BY TeamID ASC";
-	$result=mysql_query($query);
-	$num=mysql_numrows($result);
+	$result=$db->sql_query($query);
+	$num=$db->sql_numrows($result);
 	echo "<option value=0>All</option>";
 	$i=0;
 	while ($i < $num)
 	{
-		$tid=mysql_result($result,$i,"TeamID");
-		$Team=mysql_result($result,$i,"Team");
+		$tid=$db->sql_result($result,$i,"TeamID");
+		$Team=$db->sql_result($result,$i,"Team");
 
 		$i++;
 		if ($team_selected == $Team)
@@ -190,13 +192,13 @@ function team_option ($team_selected)
 //function year_option ($year_selected)
 //{
 //	$query="SELECT distinct year FROM nuke_iblhist WHERE teamid BETWEEN 1 AND 32 ORDER BY teamid ASC";
-//	$result=mysql_query($query);
-//	$num=mysql_numrows($result);
+//	$result=$db->sql_query($query);
+//	$num=$db->sql_numrows($result);
 //	echo "<option value=0>All</option>";
 //	$i=0;
 //	while ($i < $num)
 //	{
-//		$year=mysql_result($result,$i,"year");
+//		$year=$db->sql_result($result,$i,"year");
 //
 //		$i++;
 //		if ($year_selected == $year)

@@ -1,13 +1,11 @@
 <?php
 
-require 'config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
+require 'mainfile.php';
 
 $offer_id = $_POST['offer'];
 
 $queryclear="DELETE FROM nuke_ibl_trade_info WHERE `tradeofferid` = '$offer_id'";
-$resultclear=mysql_query($queryclear);
+$resultclear=$db->sql_query($queryclear);
 
 ?>
 

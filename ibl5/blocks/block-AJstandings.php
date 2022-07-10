@@ -21,20 +21,20 @@ $sharedFunctions = new Shared($db);
 
 /* DIVISIONAL STANDINGS
 $queryNLWest = "SELECT tid,team_name,leagueRecord,divGB FROM ibl_standings WHERE division = 'NL West' ORDER BY divGB ASC";
-$resultNLWest = mysql_query($queryNLWest);
-$limitNLWest = mysql_num_rows($resultNLWest);
+$resultNLWest = $db->sql_query($queryNLWest);
+$limitNLWest = $db->sql_numrows($resultNLWest);
 
 $queryNLEast = "SELECT tid,team_name,leagueRecord,divGB FROM ibl_standings WHERE division = 'NL East' ORDER BY divGB ASC";
-$resultNLEast = mysql_query($queryNLEast);
-$limitNLEast = mysql_num_rows($resultNLEast);
+$resultNLEast = $db->sql_query($queryNLEast);
+$limitNLEast = $db->sql_numrows($resultNLEast);
 
 $queryALWest = "SELECT tid,team_name,leagueRecord,divGB FROM ibl_standings WHERE division = 'AL West' ORDER BY divGB ASC";
-$resultALWest = mysql_query($queryALWest);
-$limitALWest = mysql_num_rows($resultALWest);
+$resultALWest = $db->sql_query($queryALWest);
+$limitALWest = $db->sql_numrows($resultALWest);
 
 $queryALEast = "SELECT tid,team_name,leagueRecord,divGB FROM ibl_standings WHERE division = 'AL East' ORDER BY divGB ASC";
-$resultALEast = mysql_query($queryALEast);
-$limitALEast = mysql_num_rows($resultALEast);
+$resultALEast = $db->sql_query($queryALEast);
+$limitALEast = $db->sql_numrows($resultALEast);
 */
 
 $arrayLastSimDates = $sharedFunctions->getLastSimDatesArray();

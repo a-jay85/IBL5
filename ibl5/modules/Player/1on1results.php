@@ -3,8 +3,8 @@
 $player2=str_replace("%20", " ", $player);
 
 $query="SELECT * FROM nuke_one_on_one WHERE winner = '$player2' ORDER BY gameid ASC";
-$result=mysql_query($query);
-$num=mysql_numrows($result);
+$result=$db->sql_query($query);
+$num=$db->sql_numrows($result);
 
 $wins=0;
 $losses=0;
@@ -15,11 +15,11 @@ echo "<small>";
 
 while ($i < $num)
 {
-$gameid=mysql_result($result,$i,"gameid");
-$winner=mysql_result($result,$i,"winner");
-$loser=mysql_result($result,$i,"loser");
-$winscore=mysql_result($result,$i,"winscore");
-$lossscore=mysql_result($result,$i,"lossscore");
+$gameid=$db->sql_result($result,$i,"gameid");
+$winner=$db->sql_result($result,$i,"winner");
+$loser=$db->sql_result($result,$i,"loser");
+$winscore=$db->sql_result($result,$i,"winscore");
+$lossscore=$db->sql_result($result,$i,"lossscore");
 
 echo "
 * def. $loser, $winscore-$lossscore (# $gameid)<br>
@@ -31,17 +31,17 @@ $i++;
 }
 
 $query="SELECT * FROM nuke_one_on_one WHERE loser = '$player2' ORDER BY gameid ASC";
-$result=mysql_query($query);
-$num=mysql_numrows($result);
+$result=$db->sql_query($query);
+$num=$db->sql_numrows($result);
 $i=0;
 
 while ($i < $num)
 {
-$gameid=mysql_result($result,$i,"gameid");
-$winner=mysql_result($result,$i,"winner");
-$loser=mysql_result($result,$i,"loser");
-$winscore=mysql_result($result,$i,"winscore");
-$lossscore=mysql_result($result,$i,"lossscore");
+$gameid=$db->sql_result($result,$i,"gameid");
+$winner=$db->sql_result($result,$i,"winner");
+$loser=$db->sql_result($result,$i,"loser");
+$winscore=$db->sql_result($result,$i,"winscore");
+$lossscore=$db->sql_result($result,$i,"lossscore");
 
 echo "
 * lost to $winner, $winscore-$lossscore (# $gameid)<br>
@@ -54,6 +54,6 @@ $i++;
 
 echo "<b><center>Record: $wins - $losses</center></b></small><br>";
 
-mysql_close();
+$db->sql_close();
 
 ?>

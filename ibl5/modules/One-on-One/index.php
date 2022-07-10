@@ -70,13 +70,13 @@ function oneonone()
     Player One: <select name=\"pid1\">";
 
     $query = "SELECT * FROM nuke_iblplyr WHERE retired = '0' ORDER BY name ASC";
-    $result = mysql_query($query);
-    $num = mysql_numrows($result);
+    $result = $db->sql_query($query);
+    $num = $db->sql_numrows($result);
 
     $i = 0;
     while ($i < $num) {
-		$playername = mysql_result($result, $i, "name");
-		$pida = mysql_result($result, $i, "pid");
+		$playername = $db->sql_result($result, $i, "name");
+		$pida = $db->sql_result($result, $i, "pid");
 		if ($pida == $player1) {
 			echo "<option value=\"$pida\" SELECTED>$playername</option>";
 		} else {
@@ -88,8 +88,8 @@ function oneonone()
     echo "</select> | Player Two: <select name=\"pid2\">";
     $i = 0;
     while ($i < $num) {
-		$playername = mysql_result($result, $i, "name");
-		$pida = mysql_result($result, $i, "pid");
+		$playername = $db->sql_result($result, $i, "name");
+		$pida = $db->sql_result($result, $i, "pid");
 		if ($pida == $player2) {
 			echo "<option value=\"$pida\" SELECTED>$playername</option>";
 		} else {
@@ -321,7 +321,7 @@ function runpossession($off_player_2ga, $off_player_2gp, $off_player_fta, $off_p
    		return 1;
    	}
 
-  	if (stealcheck($def_player_steal, $off_player_tvr)) {
+  	if (stealcheck($def_player_stl, $off_player_tvr)) {
   		return 2;
   	}
 
@@ -546,50 +546,52 @@ function stealtext()
 
 function rungame($p1, $p2, $owner)
 {
+	global $db;
+
 	$query1 = "SELECT * FROM nuke_iblplyr WHERE pid = $p1";
-	$result1 = mysql_query($query1);
+	$result1 = $db->sql_query($query1);
 
-	$p1_name = mysql_result($result1, 0, "name");
-	$p1_oo = mysql_result($result1, 0, "oo");
-	$p1_do = mysql_result($result1, 0, "do");
-	$p1_po = mysql_result($result1, 0, "po");
-	$p1_od = mysql_result($result1, 0, "od");
-	$p1_dd = mysql_result($result1, 0, "dd");
-	$p1_pd = mysql_result($result1, 0, "pd");
+	$p1_name = $db->sql_result($result1, 0, "name");
+	$p1_oo = $db->sql_result($result1, 0, "oo");
+	$p1_do = $db->sql_result($result1, 0, "do");
+	$p1_po = $db->sql_result($result1, 0, "po");
+	$p1_od = $db->sql_result($result1, 0, "od");
+	$p1_dd = $db->sql_result($result1, 0, "dd");
+	$p1_pd = $db->sql_result($result1, 0, "pd");
 
-	$p1_2ga = mysql_result($result1, 0, "r_fga");
-	$p1_2gp = mysql_result($result1, 0, "r_fgp");
-	$p1_fta = mysql_result($result1, 0, "r_fta");
-	$p1_3ga = mysql_result($result1, 0, "r_tga");
-	$p1_3gp = mysql_result($result1, 0, "r_tgp");
-	$p1_orb = mysql_result($result1, 0, "r_orb");
-	$p1_drb = mysql_result($result1, 0, "r_drb");
-	$p1_stl = mysql_result($result1, 0, "r_stl");
-	$p1_tvr = mysql_result($result1, 0, "r_to");
-	$p1_blk = mysql_result($result1, 0, "r_blk");
-	$p1_foul = mysql_result($result1, 0, "r_foul");
+	$p1_2ga = $db->sql_result($result1, 0, "r_fga");
+	$p1_2gp = $db->sql_result($result1, 0, "r_fgp");
+	$p1_fta = $db->sql_result($result1, 0, "r_fta");
+	$p1_3ga = $db->sql_result($result1, 0, "r_tga");
+	$p1_3gp = $db->sql_result($result1, 0, "r_tgp");
+	$p1_orb = $db->sql_result($result1, 0, "r_orb");
+	$p1_drb = $db->sql_result($result1, 0, "r_drb");
+	$p1_stl = $db->sql_result($result1, 0, "r_stl");
+	$p1_tvr = $db->sql_result($result1, 0, "r_to");
+	$p1_blk = $db->sql_result($result1, 0, "r_blk");
+	$p1_foul = $db->sql_result($result1, 0, "r_foul");
 
 	$query2 = "SELECT * FROM nuke_iblplyr WHERE pid = $p2";
-	$result2 = mysql_query($query2);
+	$result2 = $db->sql_query($query2);
 
-	$p2_name = mysql_result($result2, 0, "name");
-	$p2_oo = mysql_result($result2, 0, "oo");
-	$p2_do = mysql_result($result2, 0, "do");
-	$p2_po = mysql_result($result2, 0, "po");
-	$p2_od = mysql_result($result2, 0, "od");
-	$p2_dd = mysql_result($result2, 0, "dd");
-	$p2_pd = mysql_result($result2, 0, "pd");
-	$p2_2ga = mysql_result($result2, 0, "r_fga");
-	$p2_2gp = mysql_result($result2, 0, "r_fgp");
-	$p2_3ga = mysql_result($result2, 0, "r_tga");
-	$p2_3gp = mysql_result($result2, 0, "r_tgp");
-	$p2_fta = mysql_result($result2, 0, "r_fta");
-	$p2_orb = mysql_result($result2, 0, "r_orb");
-	$p2_drb = mysql_result($result2, 0, "r_drb");
-	$p2_stl = mysql_result($result2, 0, "r_stl");
-	$p2_tvr = mysql_result($result2, 0, "r_to");
-	$p2_blk = mysql_result($result2, 0, "r_blk");
-	$p2_foul = mysql_result($result2, 0, "r_foul");
+	$p2_name = $db->sql_result($result2, 0, "name");
+	$p2_oo = $db->sql_result($result2, 0, "oo");
+	$p2_do = $db->sql_result($result2, 0, "do");
+	$p2_po = $db->sql_result($result2, 0, "po");
+	$p2_od = $db->sql_result($result2, 0, "od");
+	$p2_dd = $db->sql_result($result2, 0, "dd");
+	$p2_pd = $db->sql_result($result2, 0, "pd");
+	$p2_2ga = $db->sql_result($result2, 0, "r_fga");
+	$p2_2gp = $db->sql_result($result2, 0, "r_fgp");
+	$p2_3ga = $db->sql_result($result2, 0, "r_tga");
+	$p2_3gp = $db->sql_result($result2, 0, "r_tgp");
+	$p2_fta = $db->sql_result($result2, 0, "r_fta");
+	$p2_orb = $db->sql_result($result2, 0, "r_orb");
+	$p2_drb = $db->sql_result($result2, 0, "r_drb");
+	$p2_stl = $db->sql_result($result2, 0, "r_stl");
+	$p2_tvr = $db->sql_result($result2, 0, "r_to");
+	$p2_blk = $db->sql_result($result2, 0, "r_blk");
+	$p2_foul = $db->sql_result($result2, 0, "r_foul");
 
 	$p1_stats_fgm = 0;
 	$p1_stats_fga = 0;
@@ -849,8 +851,8 @@ function rungame($p1, $p2, $owner)
 	echo "$playbyplay";
 
 	$querygetgameid = "SELECT * FROM nuke_one_on_one";
-	$resultgetgameid = mysql_query($querygetgameid);
-	$gameid = mysql_numrows($resultgetgameid) + 1;
+	$resultgetgameid = $db->sql_query($querygetgameid);
+	$gameid = $db->sql_numrows($resultgetgameid) + 1;
 
 	if ($score1 > $score2) {
 		$winner = addslashes($p1_name);
@@ -867,7 +869,7 @@ function rungame($p1, $p2, $owner)
 	$playbyplay2 = addslashes($playbyplay);
 
 	$queryinsertgame = "INSERT INTO nuke_one_on_one (gameid, playbyplay, winner, loser, winscore, lossscore, owner) VALUES ('$gameid', '$playbyplay2', '$winner', '$loser', '$winscore', '$lossscore', '$owner')";
-	$resultinsert = mysql_query($queryinsertgame);
+	$resultinsert = $db->sql_query($queryinsertgame);
 
 	echo "GAME ID: $gameid";
 
@@ -895,15 +897,17 @@ function rungame($p1, $p2, $owner)
 
 function printgame($gameid)
 {
-	$querygetgameid = "SELECT * FROM nuke_one_on_one WHERE gameid = '$gameid'";
-	$resultgetgameid = mysql_query($querygetgameid);
+	global $db;
 
-	$gametext = stripslashes(mysql_result($resultgetgameid, 0, "playbyplay"));
-	$gamewinner = stripslashes(mysql_result($resultgetgameid, 0, "winner"));
-	$gameloser = stripslashes(mysql_result($resultgetgameid, 0, "loser"));
-	$gamewinscore = stripslashes(mysql_result($resultgetgameid, 0, "winscore"));
-	$gamelossscore = stripslashes(mysql_result($resultgetgameid, 0, "lossscore"));
-	$owner = stripslashes(mysql_result($resultgetgameid, 0, "owner"));
+	$querygetgameid = "SELECT * FROM nuke_one_on_one WHERE gameid = '$gameid'";
+	$resultgetgameid = $db->sql_query($querygetgameid);
+
+	$gametext = stripslashes($db->sql_result($resultgetgameid, 0, "playbyplay"));
+	$gamewinner = stripslashes($db->sql_result($resultgetgameid, 0, "winner"));
+	$gameloser = stripslashes($db->sql_result($resultgetgameid, 0, "loser"));
+	$gamewinscore = stripslashes($db->sql_result($resultgetgameid, 0, "winscore"));
+	$gamelossscore = stripslashes($db->sql_result($resultgetgameid, 0, "lossscore"));
+	$owner = stripslashes($db->sql_result($resultgetgameid, 0, "owner"));
 
 	echo "<center><h2>Replay of Game Number $gameid<br>$gamewinner $gamewinscore, $gameloser $gamelossscore<br><small>(Game played by $owner)</small></h2></center> $gametext";
 }

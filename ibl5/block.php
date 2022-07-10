@@ -1,12 +1,13 @@
 <?php
 
 require_once("mainfile.php");
+$sharedFunctions = new Shared($db);
 
 $val = $_GET['day'];
 
 $query="SELECT * FROM `nuke_ibl_fa_offers` ORDER BY name ASC, perceivedvalue DESC";
-$result=mysql_query($query);
-$num=mysql_numrows($result);
+$result=$db->sql_query($query);
+$num=$db->sql_numrows($result);
 
 echo "<HTML>
 	<HEAD><TITLE>Free Agent Processing</TITLE></HEAD>
@@ -20,32 +21,32 @@ echo "<HTML>
 
 $i=0;
 while ($i < $num) {
-	$name=mysql_result($result,$i,"name");
-	$team=mysql_result($result,$i,"team");
-	$tid = Shared::getTidFromTeamname($team);
-	$perceivedvalue=mysql_result($result,$i,"perceivedvalue");
+	$name=$db->sql_result($result,$i,"name");
+	$team=$db->sql_result($result,$i,"team");
+	$tid = $sharedFunctions->getTidFromTeamname($team);
+	$perceivedvalue=$db->sql_result($result,$i,"perceivedvalue");
 
-	$offer1=mysql_result($result,$i,"offer1");
-	$offer2=mysql_result($result,$i,"offer2");
-	$offer3=mysql_result($result,$i,"offer3");
-	$offer4=mysql_result($result,$i,"offer4");
-	$offer5=mysql_result($result,$i,"offer5");
-	$offer6=mysql_result($result,$i,"offer6");
+	$offer1=$db->sql_result($result,$i,"offer1");
+	$offer2=$db->sql_result($result,$i,"offer2");
+	$offer3=$db->sql_result($result,$i,"offer3");
+	$offer4=$db->sql_result($result,$i,"offer4");
+	$offer5=$db->sql_result($result,$i,"offer5");
+	$offer6=$db->sql_result($result,$i,"offer6");
 
-	$MLE=mysql_result($result,$i,"MLE");
-	$LLE=mysql_result($result,$i,"LLE");
-	$random=mysql_result($result,$i,"random");
+	$MLE=$db->sql_result($result,$i,"MLE");
+	$LLE=$db->sql_result($result,$i,"LLE");
+	$random=$db->sql_result($result,$i,"random");
 
 	$query2="SELECT * FROM `nuke_ibl_demands` WHERE name = '$name'";
-	$result2=mysql_query($query2);
-	$num2=mysql_numrows($result2);
+	$result2=$db->sql_query($query2);
+	$num2=$db->sql_numrows($result2);
 
-	$dem1=mysql_result($result2,0,"dem1");
-	$dem2=mysql_result($result2,0,"dem2");
-	$dem3=mysql_result($result2,0,"dem3");
-	$dem4=mysql_result($result2,0,"dem4");
-	$dem5=mysql_result($result2,0,"dem5");
-	$dem6=mysql_result($result2,0,"dem6");
+	$dem1=$db->sql_result($result2,0,"dem1");
+	$dem2=$db->sql_result($result2,0,"dem2");
+	$dem3=$db->sql_result($result2,0,"dem3");
+	$dem4=$db->sql_result($result2,0,"dem4");
+	$dem5=$db->sql_result($result2,0,"dem5");
+	$dem6=$db->sql_result($result2,0,"dem6");
 
 	$offeryears=6;
 	if ($offer6 == 0) {
@@ -115,20 +116,20 @@ $i=0;
 echo "<TR><TD COLSPAN=8>ALL OFFERS MADE</TD><TD>MLE</TD><TD>LLE</TD><TD>RANDOM</TD></TR> ";
 
 while ($i < $num) {
-	$name=mysql_result($result,$i,"name");
-	$perceivedvalue=mysql_result($result,$i,"perceivedvalue");
-	$team=mysql_result($result,$i,"team");
+	$name=$db->sql_result($result,$i,"name");
+	$perceivedvalue=$db->sql_result($result,$i,"perceivedvalue");
+	$team=$db->sql_result($result,$i,"team");
 
-	$offer1=mysql_result($result,$i,"offer1");
-	$offer2=mysql_result($result,$i,"offer2");
-	$offer3=mysql_result($result,$i,"offer3");
-	$offer4=mysql_result($result,$i,"offer4");
-	$offer5=mysql_result($result,$i,"offer5");
-	$offer6=mysql_result($result,$i,"offer6");
+	$offer1=$db->sql_result($result,$i,"offer1");
+	$offer2=$db->sql_result($result,$i,"offer2");
+	$offer3=$db->sql_result($result,$i,"offer3");
+	$offer4=$db->sql_result($result,$i,"offer4");
+	$offer5=$db->sql_result($result,$i,"offer5");
+	$offer6=$db->sql_result($result,$i,"offer6");
 
-	$MLE=mysql_result($result,$i,"MLE");
-	$LLE=mysql_result($result,$i,"LLE");
-	$random=mysql_result($result,$i,"random");
+	$MLE=$db->sql_result($result,$i,"MLE");
+	$LLE=$db->sql_result($result,$i,"LLE");
+	$random=$db->sql_result($result,$i,"random");
 
 	echo "<TR><TD>$name</TD><TD>$team</TD><TD>$offer1</TD><TD>$offer2</TD><TD>$offer3</TD><TD>$offer4</TD><TD>$offer5</TD><TD>$offer6</TD><TD>$MLE</TD><TD>$LLE</TD><TD>$random</TD><TD>$perceivedvalue</TD></TR>";
 	$offeryears=6;

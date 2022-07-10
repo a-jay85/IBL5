@@ -1,8 +1,6 @@
 <?php
 
-require 'config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
+require 'mainfile.php';
 
 include("header.php");
 
@@ -112,37 +110,37 @@ else {
     // ==== UPDATE SELECTED VOTES IN DATABASE ====
 
     $query1 = "UPDATE IBL_ASG_Votes SET East_C = '$ECF3' WHERE team_name = '$Team_Name'"; //TODO: rename these database columns to match
-    $result1 = mysql_query($query1);
+    $result1 = $db->sql_query($query1);
 
     $query2 = "UPDATE IBL_ASG_Votes SET East_F1 = '$ECF1' WHERE team_name = '$Team_Name'";
-    $result2 = mysql_query($query2);
+    $result2 = $db->sql_query($query2);
 
     $query3 = "UPDATE IBL_ASG_Votes SET East_F2 = '$ECF2' WHERE team_name = '$Team_Name'";
-    $result3 = mysql_query($query3);
+    $result3 = $db->sql_query($query3);
 
     $query4 = "UPDATE IBL_ASG_Votes SET East_G1 = '$ECB1' WHERE team_name = '$Team_Name'";
-    $result4 = mysql_query($query4);
+    $result4 = $db->sql_query($query4);
 
     $query5 = "UPDATE IBL_ASG_Votes SET East_G2 = '$ECB2' WHERE team_name = '$Team_Name'";
-    $result5 = mysql_query($query5);
+    $result5 = $db->sql_query($query5);
 
     $query6 = "UPDATE IBL_ASG_Votes SET West_C = '$WCF3' WHERE team_name = '$Team_Name'";
-    $result6 = mysql_query($query6);
+    $result6 = $db->sql_query($query6);
 
     $query7 = "UPDATE IBL_ASG_Votes SET West_F1 = '$WCF1' WHERE team_name = '$Team_Name'";
-    $result7 = mysql_query($query7);
+    $result7 = $db->sql_query($query7);
 
     $query8 = "UPDATE IBL_ASG_Votes SET West_F2 = '$WCF2' WHERE team_name = '$Team_Name'";
-    $result8 = mysql_query($query8);
+    $result8 = $db->sql_query($query8);
 
     $query9 = "UPDATE IBL_ASG_Votes SET West_G1 = '$WCB1' WHERE team_name = '$Team_Name'";
-    $result9 = mysql_query($query9);
+    $result9 = $db->sql_query($query9);
 
     $query10 = "UPDATE IBL_ASG_Votes SET West_G2 = '$WCB2' WHERE team_name = '$Team_Name'";
-    $result10 = mysql_query($query10);
+    $result10 = $db->sql_query($query10);
 
     $query11 = "UPDATE ibl_team_history SET asg_vote = NOW() + INTERVAL 2 HOUR WHERE team_name = '$Team_Name'";
-    $result11 = mysql_query($query11);
+    $result11 = $db->sql_query($query11);
 }
 
 include("footer.php");

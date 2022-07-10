@@ -19,13 +19,13 @@ if ( !defined('BLOCK_FILE') ) {
 global $prefix, $multilingual, $currentlang, $db;
 
 $max_chunk_query="SELECT MAX(chunk) as maxchunk FROM nuke_iblplyr_chunk WHERE active = 1";
-$max_chunk_result=mysql_query($max_chunk_query);
-$row = mysql_fetch_assoc($max_chunk_result);
+$max_chunk_result=$db->sql_query($max_chunk_query);
+$row = $db->sql_fetch_assoc($max_chunk_result);
 
 
 //$query2="SELECT * FROM nuke_iblplyr_chunk WHERE chunk = $row[maxchunk] ORDER BY pid ASC";
-//$result2 = mysql_query($query2);
-//$new_name=mysql_result($result2,0,"name");
+//$result2 = $db->sql_query($query2);
+//$new_name=$db->sql_result($result2,0,"name");
 
 
 $pg = all_chunk("PG", $row);
@@ -76,33 +76,35 @@ $content = $content."<tr><td><img src=\"../images/player/$pidblk1.jpg\"></td></t
 */
 function all_chunk ($pos, $row)
 {
+	global $db;
+
 	$querypoc="SELECT * FROM nuke_iblplyr_chunk WHERE chunk = $row[maxchunk] ORDER BY qa DESC";
-	$resultpoc=mysql_query($querypoc);
-	$pospoc=mysql_result($resultpoc,0,"pos");
+	$resultpoc=$db->sql_query($querypoc);
+	$pospoc=$db->sql_result($resultpoc,0,"pos");
 
 	$query="SELECT * FROM nuke_iblplyr_chunk WHERE chunk = $row[maxchunk] AND pos = '$pos' ORDER BY qa DESC";
-	$result=mysql_query($query);
-	$name=mysql_result($result,0,"name");
-	$pid=mysql_result($result,0,"pid");
-	$tid=mysql_result($result,0,"tid");
-	$teamname=mysql_result($result,0,"teamname");
+	$result=$db->sql_query($query);
+	$name=$db->sql_result($result,0,"name");
+	$pid=$db->sql_result($result,0,"pid");
+	$tid=$db->sql_result($result,0,"tid");
+	$teamname=$db->sql_result($result,0,"teamname");
 
-	$stats_gm=mysql_result($result,0,"stats_gm");
-	$stats_fgm=mysql_result($result,0,"stats_fgm");
-	$stats_fga=mysql_result($result,0,"stats_fga");
-	$stats_ftm=mysql_result($result,0,"stats_ftm");
-	$stats_fta=mysql_result($result,0,"stats_fta");
-	$stats_tgm=mysql_result($result,0,"stats_3gm");
-	$stats_tga=mysql_result($result,0,"stats_3ga");
+	$stats_gm=$db->sql_result($result,0,"stats_gm");
+	$stats_fgm=$db->sql_result($result,0,"stats_fgm");
+	$stats_fga=$db->sql_result($result,0,"stats_fga");
+	$stats_ftm=$db->sql_result($result,0,"stats_ftm");
+	$stats_fta=$db->sql_result($result,0,"stats_fta");
+	$stats_tgm=$db->sql_result($result,0,"stats_3gm");
+	$stats_tga=$db->sql_result($result,0,"stats_3ga");
 
-	$stats_orb=mysql_result($result,0,"stats_orb");
-	$stats_drb=mysql_result($result,0,"stats_drb");
+	$stats_orb=$db->sql_result($result,0,"stats_orb");
+	$stats_drb=$db->sql_result($result,0,"stats_drb");
 
-	$stats_ast=mysql_result($result,0,"stats_ast");
+	$stats_ast=$db->sql_result($result,0,"stats_ast");
 
-	$stats_stl=mysql_result($result,0,"stats_stl");
+	$stats_stl=$db->sql_result($result,0,"stats_stl");
 
-	$stats_blk=mysql_result($result,0,"stats_blk");
+	$stats_blk=$db->sql_result($result,0,"stats_blk");
 
 	$stats_reb=$stats_orb+$stats_drb;
 	$stats_pts=2*$stats_fgm+$stats_ftm+$stats_tgm;

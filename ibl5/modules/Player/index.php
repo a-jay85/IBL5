@@ -1588,7 +1588,7 @@ function showpage($pid,$spec) {
                 AND Date BETWEEN '$simStartDate' AND '$simEndDate'
                 ORDER BY Date ASC");
 
-            $numberOfGamesPlayedInSim = mysql_num_rows($resultPlayerSimBoxScores);
+            $numberOfGamesPlayedInSim = $db->sql_numrows($resultPlayerSimBoxScores);
             $simTotalMIN = 0;
             $simTotal2GM = 0;
             $simTotal2GA = 0;
@@ -1605,7 +1605,7 @@ function showpage($pid,$spec) {
             $simTotalPF = 0;
             $simTotalPTS = 0;
 
-            while ($row = mysql_fetch_assoc($resultPlayerSimBoxScores)) {
+            while ($row = $db->sql_fetch_assoc($resultPlayerSimBoxScores)) {
                 $simTotalMIN += $row['gameMIN'];
                 $simTotal2GM += $row['game2GM'];
                 $simTotal2GA += $row['game2GA'];
@@ -1982,7 +1982,7 @@ function showpage($pid,$spec) {
         }
 
         // CURRENT YEAR AVERAGES
-        $retired = mysql_result(mysql_query("SELECT retired
+        $retired = $db->sql_result($db->sql_query("SELECT retired
             FROM nuke_iblplyr
             WHERE pid=$pid;"), 0);
 
@@ -3029,14 +3029,6 @@ function showpage($pid,$spec) {
     }
 
     // GAME LOG
-
-    function teamname ($teamid)
-    {
-        $query = "SELECT * FROM nuke_ibl_team_info WHERE teamid = $teamid";
-        $result = mysql_query($query);
-        $name = mysql_result($result, 0, "team_name");
-        return $name;
-    }
 
     if ($spec == 0) {
         $currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();

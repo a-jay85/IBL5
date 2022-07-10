@@ -1,8 +1,6 @@
 <?php
 
-require 'config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
+require 'mainfile.php';
 
 $Team_Name = $_POST['teamname'];
 $Player_Name = $_POST['playername'];
@@ -13,7 +11,7 @@ $emailsubject = "Position Migration - ".$Player_Name;
 $filetext = $Team_Name." migrates ".$Player_Name." to ".$Position.".";
 
 $querymigrate="UPDATE nuke_iblplyr SET altpos = '$Position' WHERE name = '$Player_Name'";
-$resultmigrate=mysql_query($querymigrate);
+$resultmigrate=$db->sql_query($querymigrate);
 
 echo "<html><head><title>Position Migration Processing</title></head><body>
 

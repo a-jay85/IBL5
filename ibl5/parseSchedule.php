@@ -4,9 +4,7 @@
 //#8.) From the IBL HTML, open "Schedule.htm" IN INTERNET EXPLORER. Select the entire content of this page and copy it. Then paste into A1 of the "Schedule" tab.
 //#9.) In the Schedule tab, copy Column Q and paste into the database and run it.
 
-require 'config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
+require 'mainfile.php';
 
 $scheduleFilePath = 'ibl/IBL/Schedule.htm';
 
@@ -49,8 +47,8 @@ function boxIDextract($boxHREF) {
 	return $boxID;
 }
 
-echo 'Updating ibl_schedule database table...'
-mysql_query('TRUNCATE TABLE ibl_schedule');
+echo 'Updating ibl_schedule database table...';
+$db->sql_query('TRUNCATE TABLE ibl_schedule');
 
 foreach ($rows as $row) {
 	$checkSecondCell = $row->childNodes->item(1)->nodeValue;
@@ -89,8 +87,8 @@ foreach ($rows as $row) {
 		}
 
 		// Looks up a team's ID#.
-		$visitorTID = mysql_result(mysql_query("SELECT teamid FROM ibl_team_history WHERE team_name = '".$visitorName."';"),0);
-		$homeTID = mysql_result(mysql_query("SELECT teamid FROM ibl_team_history WHERE team_name = '".$homeName."';"),0);
+		$visitorTID = $db->sql_result($db->sql_query("SELECT teamid FROM ibl_team_history WHERE team_name = '".$visitorName."';"),0);
+		$homeTID = $db->sql_result($db->sql_query("SELECT teamid FROM ibl_team_history WHERE team_name = '".$homeName."';"),0);
 	}
 
 	$sqlQueryString = "INSERT INTO ibl_schedule (Year,BoxID,Date,Visitor,Vscore,Home,Hscore)
@@ -105,9 +103,9 @@ foreach ($rows as $row) {
 		Hscore = ".$hScore."
 	";
 
-	$rowUpdate = mysql_query($sqlQueryString);
+	$rowUpdate = $db->sql_query($sqlQueryString);
 	if (!$sqlQueryString) {
-		die('Invalid query: ' . mysql_error());
+		die('Invalid query: ' . $db->sql_error());
 	}
 
 	unset($boxLink);

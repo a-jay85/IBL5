@@ -1,8 +1,6 @@
 <?php
 
-require 'config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
+require 'mainfile.php';
 
 echo "<HTML><HEAD><TITLE>Free Agency Offer Deletion</TITLE></HEAD><BODY>";
 
@@ -12,7 +10,7 @@ $playername = $_POST['playername'];
 // ==== ENTER OFFER INTO DATABASE ====
 
 $querychunk="DELETE FROM `nuke_ibl_fa_offers` WHERE `name` = '$playername' AND `team` = '$teamname'";
-$resultchunk=mysql_query($querychunk);
+$resultchunk=$db->sql_query($querychunk);
 
 echo "Your offers have been deleted.  This should show up immediately.  Please <a href=\"modules.php?name=Free_Agency\">click here to return to the Free Agency main page</a> (your offer should now be gone).</br>";
 

@@ -11,7 +11,7 @@ $pagetitle = "- Team Pages";
 
 function menu()
 {
-	global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
+	global $db;
 	$sharedFunctions = new Shared($db);
 
 	$tid = intval($tid);
@@ -27,6 +27,7 @@ function menu()
 
 function buildTeamFutureSalary ($resultTeamPlayers, $k)
 {
+	global $db;
 	$sharedFunctions = new Shared($db);
 
 	while($rowTeamPlayers = $db->sql_fetch_assoc($resultTeamPlayers)) {
@@ -80,6 +81,7 @@ function buildTeamFutureSalary ($resultTeamPlayers, $k)
 
 function buildTeamFuturePicks ($resultTeamPicks, $future_salary_array)
 {
+	global $db;
 	$sharedFunctions = new Shared($db);
 
 	$k = $future_salary_array['k'];
@@ -139,7 +141,7 @@ function buildTeamFuturePicks ($resultTeamPicks, $future_salary_array)
 
 function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 {
-	global $user, $cookie, $sitename, $prefix, $user_prefix, $db, $admin, $broadcast_msg, $my_headlines, $module_name, $subscription_url, $partner;
+	global $user, $prefix, $user_prefix, $db, $partner;
 	$sharedFunctions = new Shared($db);
 
 	$sql = "SELECT * FROM ".$prefix."_bbconfig";
@@ -223,7 +225,7 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 					<td valign=top><b>Salary</b></td>
 				</tr>";
 				
-	$partnerTid = Shared::getTidFromTeamname($partner);
+	$partnerTid = $sharedFunctions->getTidFromTeamname($partner);
 	$queryOtherTeamPlayers = "SELECT pos, name, pid, cy, cy1, cy2, cy3, cy4, cy5, cy6
 		FROM nuke_iblplyr
 		WHERE teamname = '$partner'

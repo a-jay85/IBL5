@@ -12,30 +12,30 @@ mysql_connect($dbhost,$dbuname,$dbpass);
     $utime=time();
     $exptime=$utime-300; // (in seconds)
 
-    @mysql_query("delete from online where timevisit<$exptime");
-    $uexists=@mysql_num_rows(@mysql_query("select id from online where visitor='$uvisitor'"));
+    @$db->sql_query("delete from online where timevisit<$exptime");
+    $uexists=@$db->sql_numrows(@$db->sql_query("select id from online where visitor='$uvisitor'"));
 
     if ($uexists>0){
-        @mysql_query("update online set timevisit='$utime' where visitor='$uvisitor'");
+        @$db->sql_query("update online set timevisit='$utime' where visitor='$uvisitor'");
         } else {
-        @mysql_query("insert into online (visitor,timevisit) values ('$uvisitor','$utime')");
+        @$db->sql_query("insert into online (visitor,timevisit) values ('$uvisitor','$utime')");
     }
 
 
 // DISPLAYING ONLINE USER DATABASE -->
 
-    $rs=@mysql_query("select * from online");
+    $rs=@$db->sql_query("select * from online");
     echo "<style><!--n";
     echo "body {font-family:verdana;font-size:10pt}n";
     echo "td {font-family:verdana;font-size:10pt}n";
     echo "--></style>n";
     echo "<div align=center><table><tr bgcolor=#CCCCCC>
             <td><b>Visitor IP/Host<td><b>Last visit</tr>";
-    while ($ro=@mysql_fetch_array($rs)){
+    while ($ro=@$db->sql_fetchrow($rs)){
         echo "<tr><td>".$ro[visitor]."<td>".date('j M Y - H:i',$ro[timevisit])."</tr>";
     }
     echo "</table></div>";
-    $jmlonline=@mysql_num_rows(@mysql_query("select id from online"));
+    $jmlonline=@$db->sql_numrows(@$db->sql_query("select id from online"));
     echo "<div align=center><b>There are $jmlonline user online</b></div>";
 
 ?>

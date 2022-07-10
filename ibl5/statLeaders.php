@@ -1,6 +1,7 @@
 <?php
 
 require 'mainfile.php';
+$sharedFunctions = new Shared($db);
 
 $arrayStatNames = array(
     'POINTS',
@@ -27,20 +28,22 @@ $arrayStatQueries = array(
 );
 
 if ($_GET['seasonPhase'] == NULL) {
-    $seasonPhase = Shared::getCurrentSeasonPhase();
+    $seasonPhase = $sharedFunctions->getCurrentSeasonPhase();
 } else {
     $seasonPhase = $_GET['seasonPhase'];
 }
 
 function seasonHighTable($queryForStat, $statName, $playerOrTeam, $seasonPhase)
 {
+    global $db, $sharedFunctions;
+
     if ($playerOrTeam == 'player') {
         $isPlayer = 'pid != 0';
     } elseif ($playerOrTeam == 'team') {
         $isPlayer = 'pid = 0';
     }
 
-    $playoffYear = Shared::getCurrentSeasonEndingYear();
+    $playoffYear = $sharedFunctions->getCurrentSeasonEndingYear();
     $seasonStartingYear = $playoffYear - 1;
 
     if ($seasonPhase == "Playoffs") {
@@ -68,8 +71,8 @@ function seasonHighTable($queryForStat, $statName, $playerOrTeam, $seasonPhase)
             AND date BETWEEN '" . $seasonStartingYear . "-11-01' AND '" . $playoffYear . "-04-30'
             ORDER BY `" . $statName . "` DESC, date ASC LIMIT 15;";
     }
-    $result = mysql_query($query);
-    $numRows = mysql_num_rows($result);
+    $result = $db->sql_query($query);
+    $numRows = $db->sql_numrows($result);
 
     echo "\t\t\t<table border=1>\n";
     echo "\t\t\t\t<th colspan=4 align=center>$statName</th>\n";
@@ -82,7 +85,7 @@ function seasonHighTable($queryForStat, $statName, $playerOrTeam, $seasonPhase)
         $j = 0;
         while ($j < 3) {
             echo "\t\t\t\t\t<td>\n";
-            echo "\t\t\t\t\t\t" . mysql_result($result, $i, $j) . "\n";
+            echo "\t\t\t\t\t\t" . $db->sql_result($result, $i, $j) . "\n";
             echo "\t\t\t\t\t</td>\n";
             $j++;
         }

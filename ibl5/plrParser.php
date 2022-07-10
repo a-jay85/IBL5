@@ -1,12 +1,13 @@
 <?php
 
 require 'mainfile.php';
+$sharedFunctions = new Shared($db);
 
-$currentSeasonEndingYear = Shared::getCurrentSeasonEndingYear();
+$currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
 
 $stringTeamIDsNames = "SELECT teamid,team_name FROM nuke_ibl_team_info ORDER BY teamid ASC;";
-$queryTeamIDsNames = mysql_query($stringTeamIDsNames);
-$numRowsTeamIDsNames = mysql_num_rows($queryTeamIDsNames);
+$queryTeamIDsNames = $db->sql_query($stringTeamIDsNames);
+$numRowsTeamIDsNames = $db->sql_numrows($queryTeamIDsNames);
 
 $plrFile = fopen("IBL5.plr", "rb");
 while (!feof($plrFile)) {
@@ -557,10 +558,10 @@ while (!feof($plrFile)) {
             `retired` = 0,
             `r_foul` = $minutesPerPF;";
         if ($pid != 0) {
-            if (mysql_query($playerUpdateQuery)) {
+            if ($db->sql_query($playerUpdateQuery)) {
                 echo $pid . '<p>';
             } else {
-                die('Invalid query: ' . mysql_error());
+                die('Invalid query: ' . $db->sql_error());
             }
         }
     } elseif ($ordinal >= 1441 && $ordinal <= 1504) {
@@ -589,17 +590,17 @@ while (!feof($plrFile)) {
             `pf` = '.$seasonPF.'
             WHERE
             `ordinal` = \''.$ordinal.'\';';
-        if (mysql_query($teamUpdateQuery)) echo $teamUpdateQuery.'<br>';
+        if ($db->sql_query($teamUpdateQuery)) echo $teamUpdateQuery.'<br>';
     }
 }
 fclose($plrFile);
 
 $i = 0;
 while ($i < $numRowsTeamIDsNames) {
-    $teamname = mysql_result($queryTeamIDsNames, $i, 'team_name');
-    $teamID = mysql_result($queryTeamIDsNames, $i, 'teamid');
+    $teamname = $db->sql_result($queryTeamIDsNames, $i, 'team_name');
+    $teamID = $db->sql_result($queryTeamIDsNames, $i, 'teamid');
     $teamnameUpdateQuery = "UPDATE `nuke_iblplyr__test` SET `teamname` = '$teamname' WHERE `tid` = $teamID;";
-    if (mysql_query($teamnameUpdateQuery)) echo $teamnameUpdateQuery.'<br>';
+    if ($db->sql_query($teamnameUpdateQuery)) echo $teamnameUpdateQuery.'<br>';
     $i++;
 }
 

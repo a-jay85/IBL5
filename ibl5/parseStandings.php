@@ -3,9 +3,7 @@
 //This section stores Standings values in a database table called 'ibl_standings' so that they can be retrieved quickly.
 //The file 'block-AJstandings.php' relies on 'ibl_standings' to automate the sidebar standings display.
 
-require 'config.php';
-mysql_connect($dbhost,$dbuname,$dbpass);
-@mysql_select_db($dbname) or die("Unable to select database");
+require 'mainfile.php';
 
 $standingsFilePath = 'ibl/IBL/Standings.htm';
 
@@ -37,7 +35,10 @@ function extractLosses($var) {
 	return $var;
 }
 
-function extractStandingsValues($confVar,$divVar) {
+function extractStandingsValues($confVar,$divVar)
+{
+	global $db;
+
 	echo '<br>';
 	echo 'Updating the conference standings for all teams...';
 	foreach ($confVar as $row) {
@@ -83,9 +84,9 @@ function extractStandingsValues($confVar,$divVar) {
 				awayLosses = '".$awayLosses."'
 			";
 
-			$rowUpdate = mysql_query($sqlQueryString);
+			$rowUpdate = $db->sql_query($sqlQueryString);
 			if (!$sqlQueryString) {
-				die('Invalid query: ' . mysql_error());
+				die('Invalid query: ' . $db->sql_error());
 			}
 		}
 	}
@@ -104,9 +105,9 @@ function extractStandingsValues($confVar,$divVar) {
 				divGB = '".$divGB."'
 			";
 
-			$rowUpdate = mysql_query($sqlQueryString);
+			$rowUpdate = $db->sql_query($sqlQueryString);
 			if (!$sqlQueryString) {
-				die('Invalid query: ' . mysql_error());
+				die('Invalid query: ' . $db->sql_error());
 			}
 		}
 	}

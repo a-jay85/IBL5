@@ -25,31 +25,31 @@ if ($Bird > 2) {
 
 //-----GRAB TEAM INFO AND STATS------
 $query = "SELECT * FROM nuke_ibl_team_info WHERE team_name = '$Team_Name'";
-$result = mysql_query($query);
+$result = $db->sql_query($query);
 
-$tf_wins = mysql_result($result, 0, "Contract_Wins");
-$tf_loss = mysql_result($result, 0, "Contract_Losses");
-$tf_trdw = mysql_result($result, 0, "Contract_AvgW");
-$tf_trdl = mysql_result($result, 0, "Contract_AvgL");
-$tf_coach = mysql_result($result, 0, "Contract_Coach");
+$tf_wins = $db->sql_result($result, 0, "Contract_Wins");
+$tf_loss = $db->sql_result($result, 0, "Contract_Losses");
+$tf_trdw = $db->sql_result($result, 0, "Contract_AvgW");
+$tf_trdl = $db->sql_result($result, 0, "Contract_AvgL");
+$tf_coach = $db->sql_result($result, 0, "Contract_Coach");
 
 //echo "Wins: $tf_wins<br> Losses: $tf_loss<br> Trad Win: $tf_trdw<br> Trad Loss: $tf_trdl<br> Coach: $tf_coach<br>";
 
-$UsedExtensionChunk = mysql_result($result, 0, "Used_Extension_This_Chunk");
-$UsedExtensionSeason = mysql_result($result, 0, "Used_Extension_This_Season");
+$UsedExtensionChunk = $db->sql_result($result, 0, "Used_Extension_This_Chunk");
+$UsedExtensionSeason = $db->sql_result($result, 0, "Used_Extension_This_Season");
 //-----END OF TEAM INFO AND STATS-----
 
 //-----GRAB PLAYER PREFERENCES-----
 $queryteam = "SELECT * FROM nuke_iblplyr WHERE name = '$Player_Name'";
-$resultteam = mysql_query($queryteam);
+$resultteam = $db->sql_query($queryteam);
 
-$player_team = mysql_result($resultteam, 0, "teamname");
-$player_winner = mysql_result($resultteam, 0, "winner");
-$player_tradition = mysql_result($resultteam, 0, "tradition");
-$player_coach = mysql_result($resultteam, 0, "coach");
-$player_security = mysql_result($resultteam, 0, "security");
-$player_loyalty = mysql_result($resultteam, 0, "loyalty");
-$player_playingtime = mysql_result($resultteam, 0, "playingTime");
+$player_team = $db->sql_result($resultteam, 0, "teamname");
+$player_winner = $db->sql_result($resultteam, 0, "winner");
+$player_tradition = $db->sql_result($resultteam, 0, "tradition");
+$player_coach = $db->sql_result($resultteam, 0, "coach");
+$player_security = $db->sql_result($resultteam, 0, "security");
+$player_loyalty = $db->sql_result($resultteam, 0, "loyalty");
+$player_playingtime = $db->sql_result($resultteam, 0, "playingTime");
 //-----END OF PLAYER PREFERENCES-----
 
 $nooffer = 0;
@@ -151,7 +151,7 @@ if ($nooffer == 0) {
     // ==== MARK THE EXTENSION AS USED FOR THIS CHUNK ====
 
     $querychunk="UPDATE nuke_ibl_team_info SET Used_Extension_This_Chunk = 1 WHERE team_name = '$Team_Name'";
-    $resultchunk=mysql_query($querychunk);
+    $resultchunk=$db->sql_query($querychunk);
 
     echo "Message from the commissioner's office: <font color=#0000cc>Your offer is legal, and is therefore an extension attempt.  Please note that you may make no further extension attempts until after the next sim.</font></br>";
 
@@ -211,22 +211,22 @@ if ($nooffer == 0) {
         $timestamp = date('Y-m-d H:i:s', time());
 
         $querytopic = "SELECT * FROM nuke_topics WHERE topicname = '$Team_Name'";
-        $resulttopic = mysql_query($querytopic);
-        $topicid = mysql_result($resulttopic, 0, "topicid");
+        $resulttopic = $db->sql_query($querytopic);
+        $topicid = $db->sql_result($resulttopic, 0, "topicid");
 
         $querycat = "SELECT * FROM nuke_stories_cat WHERE title = 'Contract Extensions'";
-        $resultcat = mysql_query($querycat);
-        $ContractExtensions = mysql_result($resultcat, 0, "counter");
-        $catid = mysql_result($resultcat, 0, "catid");
+        $resultcat = $db->sql_query($querycat);
+        $ContractExtensions = $db->sql_result($resultcat, 0, "counter");
+        $catid = $db->sql_result($resultcat, 0, "catid");
 
         $ContractExtensions = $ContractExtensions + 1;
 
         $querycat2 = "UPDATE nuke_stories_cat SET counter = $ContractExtensions WHERE title = 'Contract Extensions'";
-        $resultcat2 = mysql_query($querycat2);
+        $resultcat2 = $db->sql_query($querycat2);
 
         $querystor = "INSERT INTO nuke_stories (catid, aid, title, time, hometext, topic, informant, counter, alanguage)
             VALUES ('$catid', 'Associated Press', '$storytitle', '$timestamp', '$hometext', '$topicid', 'Associated Press', '0', 'english')";
-        $resultstor = mysql_query($querystor);
+        $resultstor = $db->sql_query($querystor);
 
     } else {
         $Offer_in_Millions = $Offer_Total / 100;
@@ -252,8 +252,8 @@ if ($nooffer == 0) {
         }
 
         // ==== UPDATE PLAYER DATABASE WITH NEW CONTRACT INFORMATION ====
-        $yearOfCurrentContract = mysql_result($resultteam, 0, "cy");
-        $salaryInCurrentYear = mysql_result($resultteam, 0, "cy" . $yearOfCurrentContract);
+        $yearOfCurrentContract = $db->sql_result($resultteam, 0, "cy");
+        $salaryInCurrentYear = $db->sql_result($resultteam, 0, "cy" . $yearOfCurrentContract);
 
         $queryContractUpdate = "UPDATE nuke_iblplyr
             SET cy = 1,
@@ -265,34 +265,34 @@ if ($nooffer == 0) {
                 cy5 = $Offer_4,
                 cy6 = $Offer_5
             WHERE name = '$Player_Name';";
-        $resultContractUpdate = mysql_query($queryContractUpdate);
+        $resultContractUpdate = $db->sql_query($queryContractUpdate);
 
         // ==== MARK THE EXTENSION AS USED FOR THIS SEASON ====
 
         $queryseason = "UPDATE nuke_ibl_team_info SET Used_Extension_This_Season = 1 WHERE team_name = '$Team_Name'";
-        $resultseason = mysql_query($queryseason);
+        $resultseason = $db->sql_query($queryseason);
 
         // ==== PUT ANNOUNCEMENT INTO DATABASE ON NEWS PAGE
 
         $timestamp = date('Y-m-d H:i:s', time());
 
         $querytopic = "SELECT * FROM nuke_topics WHERE topicname = '$Team_Name'";
-        $resulttopic = mysql_query($querytopic);
-        $topicid = mysql_result($resulttopic, 0, "topicid");
+        $resulttopic = $db->sql_query($querytopic);
+        $topicid = $db->sql_result($resulttopic, 0, "topicid");
 
         $querycat = "SELECT * FROM nuke_stories_cat WHERE title = 'Contract Extensions'";
-        $resultcat = mysql_query($querycat);
-        $ContractExtensions = mysql_result($resultcat, 0, "counter");
-        $catid = mysql_result($resultcat, 0, "catid");
+        $resultcat = $db->sql_query($querycat);
+        $ContractExtensions = $db->sql_result($resultcat, 0, "counter");
+        $catid = $db->sql_result($resultcat, 0, "catid");
 
         $ContractExtensions = $ContractExtensions + 1;
 
         $querycat2 = "UPDATE nuke_stories_cat SET counter = $ContractExtensions WHERE title = 'Contract Extensions'";
-        $resultcat2 = mysql_query($querycat2);
+        $resultcat2 = $db->sql_query($querycat2);
 
         $querystor = "INSERT INTO nuke_stories (catid, aid, title, time, hometext, topic, informant, counter, alanguage)
             VALUES ('$catid', 'Associated Press', '$storytitle', '$timestamp', '$hometext', '$topicid', 'Associated Press', '0', 'english')";
-        $resultstor = mysql_query($querystor);
+        $resultstor = $db->sql_query($querystor);
 
     }
 

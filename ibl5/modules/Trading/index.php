@@ -306,7 +306,7 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 
 function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
 {
-	global $user, $cookie, $sitename, $prefix, $user_prefix, $db, $admin, $broadcast_msg, $my_headlines, $module_name, $subscription_url, $attrib, $step, $player;
+	global $user, $prefix, $user_prefix, $db;
 	$sharedFunctions = new Shared($db);
 
 	$sql = "SELECT * FROM " . $prefix . "_bbconfig";
@@ -459,7 +459,7 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
 
 function reviewtrade($user)
 {
-	global $db, $stop, $module_name, $redirect, $mode, $t, $f, $gfx_chk;
+	global $db, $stop;
 	$sharedFunctions = new Shared($db);
 
 	if (!is_user($user)) {
@@ -507,7 +507,7 @@ function reviewtrade($user)
 
 function offertrade($user)
 {
-	global $db, $stop, $module_name, $redirect, $mode, $t, $f, $gfx_chk;
+	global $db, $stop;
 	$sharedFunctions = new Shared($db);
 
 	if (!is_user($user)) {

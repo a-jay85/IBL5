@@ -49,7 +49,7 @@ function main($user) {
 
 function userinfo($username, $bypass=0, $hid=0, $url=0)
 	{
-	global $user, $cookie, $sitename, $prefix, $user_prefix, $db, $admin, $broadcast_msg, $my_headlines, $module_name, $useset, $subscription_url;
+	global $user, $prefix, $user_prefix, $db;
 	$sql = "SELECT * FROM ".$prefix."_bbconfig";
 	$result = $db->sql_query($sql);
 	while ( $row = $db->sql_fetchrow($result) )	{
@@ -64,7 +64,7 @@ function userinfo($username, $bypass=0, $hid=0, $url=0)
 }
 
 function display() {
-	global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
+	global $prefix, $db, $cookie;
 	$sharedFunctions = new Shared($db);
 
 	include("header.php");
@@ -1116,7 +1116,7 @@ function display() {
 
 // === START NEGOTIATE FUNCTION ===
 function negotiate($pid) {
-	global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
+	global $prefix, $db, $user, $cookie;
 	$pid = intval($pid);
 
 	cookiedecode($user);
@@ -2032,7 +2032,7 @@ function negotiate($pid) {
 // === END OF NEGOTIATE FUNCTION ===
 
 function positionmigration($pid) {
-	global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
+	global $prefix, $db, $user, $cookie;
 	$pid = intval($pid);
 
 	cookiedecode($user);
@@ -2119,7 +2119,7 @@ function positionmigration($pid) {
 }
 
 function teamdisplay($pid) {
-	global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
+	global $prefix, $db, $user, $cookie;
 	$sharedFunctions = new Shared($db);
 	
 	$pid = intval($pid);

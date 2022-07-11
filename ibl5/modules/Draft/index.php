@@ -28,7 +28,7 @@ $userpage = 1;
 include("modules/$module_name/navbar.php");
 
 function userinfo($username, $bypass=0, $hid=0, $url=0) {
-    global $user, $cookie, $sitename, $prefix, $user_prefix, $db, $admin, $broadcast_msg, $my_headlines, $module_name, $useset, $subscription_url;
+    global $user, $prefix, $user_prefix, $db;
     $sql = "SELECT * FROM ".$prefix."_bbconfig";
     $result = $db->sql_query($sql);
     while ( $row = $db->sql_fetchrow($result) )

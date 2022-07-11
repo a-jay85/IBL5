@@ -53,7 +53,7 @@ if ($op == "Reply") {
 $result = $db->sql_query("select catid, aid, time, title, hometext, bodytext, topic, informant, notes, acomm, haspoll, pollID, score, ratings FROM ".$prefix."_stories where sid='$sid'");
 if ($numrows = $db->sql_numrows($result) != 1) {
 	Header("Location: index.php");
-	fdie();
+	die();
 }
 $row = $db->sql_fetchrow($result);
 $catid = intval($row['catid']);

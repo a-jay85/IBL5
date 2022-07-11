@@ -14,7 +14,7 @@
 
 if (stristr(htmlentities($_SERVER['PHP_SELF']), "header.php")) {
 	Header("Location: index.php");
-	fdie();
+	die();
 }
 
 define('NUKE_HEADER', true);
@@ -26,7 +26,7 @@ require_once("mainfile.php");
 
 
 function head() {
-	global $slogan, $sitename, $banners, $nukeurl, $Version_Num, $artpage, $topic, $hlpfile, $user, $hr, $theme, $cookie, $bgcolor1, $bgcolor2, $bgcolor3, $bgcolor4, $textcolor1, $textcolor2, $forumpage, $adminpage, $userpage, $pagetitle;
+	global $sitename, $pagetitle;
 	$ThemeSel = get_theme();
 	include_secure("themes/$ThemeSel/theme.php");
 	echo '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">';

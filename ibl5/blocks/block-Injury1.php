@@ -16,7 +16,7 @@ if ( !defined('BLOCK_FILE') ) {
     die();
 }
 
-global $prefix, $multilingual, $currentlang, $db;
+global $db;
 
 $queryo="SELECT * FROM nuke_users WHERE user_ibl_team != '' ORDER BY user_ibl_team ASC";
 $resulto=$db->sql_query($queryo);

@@ -43,7 +43,7 @@ function menu()
 
 function oneonone()
 {
-	global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
+	global $prefix, $db, $user, $cookie;
 	include("header.php");
 
 	cookiedecode($user);

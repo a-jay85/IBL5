@@ -67,7 +67,7 @@ function display_score($score) {
 }
 
 function write_review() {
-	global $admin, $sitename, $user, $cookie, $prefix, $user_prefix, $currentlang, $multilingual, $db, $module_name;
+	global $admin, $sitename, $user, $cookie, $user_prefix, $currentlang, $multilingual, $db, $module_name;
 	include ('header.php');
 	OpenTable();
 	echo "
@@ -267,7 +267,7 @@ function preview_review($date, $title, $text, $reviewer, $email, $score, $cover,
 }
 
 function send_review($date, $title, $text, $reviewer, $email, $score, $cover, $url, $url_title, $hits, $id, $rlanguage) {
-	global $admin, $EditedMessage, $prefix, $db, $module_name;
+	global $admin, $prefix, $db, $module_name;
 	include ('header.php');
 	$id = intval($id);
 	$title = filter($title, "nohtml", 1);

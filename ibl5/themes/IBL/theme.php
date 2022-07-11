@@ -54,7 +54,7 @@ function FormatStory($thetext, $notes, $aid, $informant) {
 }
 
 function themeheader() {
-    global $prefix, $db, $user, $cookie, $bgcolor1, $bgcolor2, $bgcolor3, $banners, $sitename, $anonymous, $user;
+    global $prefix, $db, $user, $cookie, $bgcolor1, $bgcolor2, $user;
     echo "<body bgcolor=\"$bgcolor1\">";
 	ads(0);
     if (is_user($user)) {
@@ -107,7 +107,7 @@ function themeheader() {
 }
 
 function themefooter() {
-    global $bgcolor1, $bgcolor2, $bgcolor3;
+    global $bgcolor1;
     // if (defined('INDEX_FILE')) {
     	echo "</td><td>&nbsp;&nbsp;</td><td valign=\"top\" bgcolor=$bgcolor1>";
     	blocks("right");
@@ -120,7 +120,7 @@ function themefooter() {
 }
 
 function themeindex ($aid, $informant, $time, $title, $counter, $topic, $thetext, $notes, $morelink, $topicname, $topicimage, $topictext) {
-    global $tipath, $anonymous, $bgcolor1, $bgcolor2, $bgcolor3;
+    global $tipath, $bgcolor1, $bgcolor2, $bgcolor3;
     $ThemeSel = get_theme();
     if (file_exists("themes/$ThemeSel/images/topics/$topicimage")) {
     	$t_image = "themes/$ThemeSel/images/topics/$topicimage";
@@ -145,7 +145,7 @@ function themeindex ($aid, $informant, $time, $title, $counter, $topic, $thetext
 }
 
 function themearticle ($aid, $informant, $datetime, $title, $thetext, $topic, $topicname, $topicimage, $topictext) {
-    global $admin, $sid, $tipath, $bgcolor1, $bgcolor2, $bgcolor3;
+    global $tipath, $bgcolor1, $bgcolor2, $bgcolor3;
     $ThemeSel = get_theme();
     if (file_exists("themes/$ThemeSel/images/topics/$topicimage")) {
     	$t_image = "themes/$ThemeSel/images/topics/$topicimage";

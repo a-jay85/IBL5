@@ -16,7 +16,7 @@ if ( !defined('BLOCK_FILE') ) {
     die();
 }
 
-global $prefix, $multilingual, $currentlang, $db;
+global $db;
 
 $max_chunk_query="SELECT MAX(chunk) as maxchunk FROM nuke_iblplyr_chunk WHERE active = 1";
 $max_chunk_result=$db->sql_query($max_chunk_query);

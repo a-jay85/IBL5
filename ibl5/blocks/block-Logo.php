@@ -17,7 +17,7 @@ if ( !defined('BLOCK_FILE') ) {
     die();
 }
 
-global $cat, $language, $prefix, $multilingual, $currentlang, $db;
+global $db;
 
 $actual_url = "$_SERVER[REQUEST_URI]";
 

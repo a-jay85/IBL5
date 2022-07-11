@@ -16,7 +16,7 @@ if (!defined('BLOCK_FILE')) {
     die();
 }
 
-global $prefix, $multilingual, $currentlang, $db;
+global $db;
 
 $query = "SELECT TeamID, Team, ranking, win, loss, color1, color2
     FROM nuke_ibl_power rankings

@@ -16,7 +16,7 @@ if ( !defined('BLOCK_FILE') ) {
     die();
 }
 
-global $prefix, $multilingual, $currentlang, $db;
+global $db;
 
 $content=$content."<table>";
 $division="Atlantic";

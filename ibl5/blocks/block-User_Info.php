@@ -22,7 +22,7 @@ if ( !defined('BLOCK_FILE') ) {
 
 $content = "";
 
-global $user, $cookie, $prefix, $user_prefix, $db, $anonymous, $sitekey, $gfx_chk, $locale;
+global $user, $cookie, $prefix, $user_prefix, $db, $anonymous, $sitekey, $gfx_chk;
 mt_srand ((double)microtime()*1000000);
 $maxran = 1000000;
 $random_num = mt_rand(0, $maxran);

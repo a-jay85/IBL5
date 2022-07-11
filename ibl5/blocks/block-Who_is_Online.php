@@ -14,7 +14,7 @@
 
 if ( !defined('BLOCK_FILE') ) {
     Header("Location: ../index.php");
-    fdie();
+    die();
 }
 
 global $user, $cookie, $prefix, $db, $user_prefix;

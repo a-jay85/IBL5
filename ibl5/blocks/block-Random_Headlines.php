@@ -17,7 +17,7 @@ if ( !defined('BLOCK_FILE') ) {
     die();
 }
 
-global $prefix, $multilingual, $currentlang, $db, $tipath, $user, $cookie, $userinfo;
+global $prefix, $multilingual, $currentlang, $db, $tipath, $user, $userinfo;
 
 getusrinfo($user);
 

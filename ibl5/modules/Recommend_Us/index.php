@@ -21,7 +21,7 @@ get_lang($module_name);
 $pagetitle = "- "._RECOMMEND."";
 
 function RecommendSite($mess="0") {
-	global $user, $cookie, $prefix, $db, $user_prefix, $module_name, $gfx_chk;
+	global $user, $cookie, $db, $user_prefix, $module_name, $gfx_chk;
 	include ("header.php");
 	title(""._RECOMMEND."");
 	OpenTable();

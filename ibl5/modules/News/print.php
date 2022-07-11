@@ -24,7 +24,7 @@ $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
 if(!isset($sid)) {
-	fdie();
+	die();
 }
 
 function PrintPage($sid) {
@@ -69,7 +69,7 @@ function PrintPage($sid) {
 	    </td></tr></table>
 	    </body>
 	    </html>";
-	fdie();
+	die();
 }
 
 PrintPage($sid);

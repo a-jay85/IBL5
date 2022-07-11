@@ -14,10 +14,10 @@
 
 if ( !defined('BLOCK_FILE') ) {
     Header("Location: ../index.php");
-    fdie();
+    die();
 }
 
-global $cat, $language, $prefix, $multilingual, $currentlang, $db;
+global $cat, $prefix, $multilingual, $currentlang, $db;
 
     if ($multilingual == 1) {
 	$querylang = "AND (alanguage='$currentlang' OR alanguage='')"; /* the OR is needed to display stories who are posted to ALL languages */

@@ -17,7 +17,7 @@ if ( !defined('BLOCK_FILE') ) {
     die();
 }
 
-global $cookie, $prefix, $multilingual, $currentlang, $db, $user, $userinfo;
+global $prefix, $multilingual, $currentlang, $db, $user, $userinfo;
 
 if ($multilingual == 1) {
     $querylang = "AND (alanguage='$currentlang' OR alanguage='')"; /* the OR is needed to display stories who are posted to ALL languages */

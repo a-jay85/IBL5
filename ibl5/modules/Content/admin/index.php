@@ -232,7 +232,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
 	}
 
 	function content_edit($pid) {
-		global $prefix, $db, $language, $multilingual, $bgcolor2, $admin_file;
+		global $prefix, $db, $language, $multilingual, $admin_file;
 		include("header.php");
 		GraphicAdmin();
 		title(""._CONTENTMANAGER."");

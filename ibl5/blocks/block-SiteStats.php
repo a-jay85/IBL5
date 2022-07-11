@@ -14,10 +14,10 @@
 
 if ( !defined('BLOCK_FILE') ) {
     Header("Location: ../index.php");
-    fdie();
+    die();
 }
 
-global $prefix, $startdate, $db;
+global $prefix, $db;
 
 $row = $db->sql_fetchrow($db->sql_query("SELECT count FROM ".$prefix."_counter WHERE type='total' AND var='hits'"));
 $row1 = $db->sql_numrows($db->sql_query("SELECT user_id FROM ".$prefix."_users"));

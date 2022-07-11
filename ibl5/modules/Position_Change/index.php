@@ -35,7 +35,7 @@ function menu()
 
 function poschange($pid)
 {
-    global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
+    global $prefix, $db, $user, $cookie;
 
 	$sharedFunctions = new Shared($db);
 

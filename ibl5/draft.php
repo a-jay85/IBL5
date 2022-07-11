@@ -1,6 +1,6 @@
 <?php
 
-require $_SERVER['DOCUMENT_ROOT'] . '/mainfile.php';
+require 'mainfile.php';
 
 $queryfirstyear = "SELECT draftyear FROM nuke_iblplyr ORDER BY draftyear ASC";
 $resultfirstyear = $db->sql_query($queryfirstyear);

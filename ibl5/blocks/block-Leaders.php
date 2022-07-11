@@ -16,7 +16,7 @@ if ( !defined('BLOCK_FILE') ) {
     die();
 }
 
-global $prefix, $multilingual, $currentlang, $db;
+global $db;
 
 $query="SELECT * FROM nuke_iblplyr WHERE retired = 0 AND name NOT LIKE \"%Buyouts%\" ORDER BY ordinal ASC";
 $result=$db->sql_query($query);

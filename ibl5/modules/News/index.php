@@ -152,7 +152,7 @@ function rate_article($sid, $score, $random_num="0", $gfx_check) {
 			echo "<input type=\"submit\" value=\""._CASTMYVOTE."\"></font></center></form>";
 			CloseTable();
 			include("footer.php");
-			fdie();
+			die();
 		} else {
 			$score = intval($score);
 			$sid = intval($sid);
@@ -161,13 +161,13 @@ function rate_article($sid, $score, $random_num="0", $gfx_check) {
 				if ($score < 1) { $score = 1; }
 				if ($score != 1 AND $score != 2 AND $score != 3 AND $score != 4 AND $score != 5) {
 					Header("Location: index.php");
-					fdie();
+					die();
 				}
 				$ip = $_SERVER['REMOTE_ADDR'];
 				$num = $db->sql_numrows($db->sql_query("SELECT * FROM ".$prefix."_stories WHERE sid='$sid' AND rating_ip='$ip'"));
 				if ($num != 0) {
 					Header("Location: modules.php?name=News&op=rate_complete&sid=$sid&rated=1");
-					fdie();
+					die();
 				}
 				if (isset($ratecookie)) {
 					$rcookie = base64_decode($ratecookie);
@@ -181,7 +181,7 @@ function rate_article($sid, $score, $random_num="0", $gfx_check) {
 				}
 				if ($a == 1) {
 					Header("Location: modules.php?name=News&op=rate_complete&sid=$sid&rated=1");
-					fdie();
+					die();
 				} else {
 					$ip = $_SERVER['REMOTE_ADDR'];
 					$result = $db->sql_query("update ".$prefix."_stories set score=score+$score, ratings=ratings+1, rating_ip='$ip' where sid='$sid'");

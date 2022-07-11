@@ -20,7 +20,7 @@ function menuimg($gfile) {
 }
 
 function nav($main_up=0) {
-    global $module_name, $articlecomm;
+    global $articlecomm;
     $handle=opendir('themes');
     while ($file = readdir($handle)) {
 	if ( (!mb_ereg("[.]",$file)) ) {

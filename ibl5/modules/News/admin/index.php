@@ -380,7 +380,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
 			$db->sql_query("INSERT INTO ".$prefix."_stories VALUES (NULL, '$catid2', '$aid2', '$title', now(), '$hometext', '$bodytext', '0', '0', '$topic2', '$informant2', '$notes', '$ihome2', '$alanguage2', '$acomm2', '0', '0', '0', '0', '0', '$associated2')");
 		}
 		Header("Location: ".$admin_file.".php?op=adminMain");
-		fdie();
+		die();
 	}
 
 	function autoEdit($anid) {
@@ -633,7 +633,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
 			$notes = filter($notes, "", 1);
 			$result = $db->sql_query("update ".$prefix."_autonews set catid='$catid', title='$title', time='$date', hometext='$hometext', bodytext='$bodytext', topic='$topic', notes='$notes', ihome='$ihome', alanguage='$alanguage', acomm='$acomm' where anid='$anid'");
 			if (!$result) {
-				fdie();
+				die();
 			}
 			if ($ultramode) {
 				ultramode();
@@ -1979,7 +1979,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
 			$bodytext = filter($bodytext, "", 1);
 			$result = $db->sql_query("insert into ".$prefix."_autonews values (NULL, '$catid', '$aid', '$subject', '$date', '$hometext', '$bodytext', '$topic', '$author', '$notes', '$ihome', '$alanguage', '$acomm', '$associated')");
 			if (!$result) {
-				fdie();
+				die();
 			}
 			$result = $db->sql_query("update ".$prefix."_authors set counter=counter+1 where aid='$aid'");
 			if ($ultramode) {
@@ -2018,7 +2018,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
 			$artid = intval($artid);
 			$db->sql_query("UPDATE ".$prefix."_poll_desc SET artid='$artid' WHERE pollID='$id'");
 			if (!$result) {
-				fdie();
+				die();
 			}
 			$result = $db->sql_query("update ".$prefix."_authors set counter=counter+1 where aid='$aid'");
 			if ($ultramode) {

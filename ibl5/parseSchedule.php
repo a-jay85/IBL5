@@ -26,8 +26,6 @@ function stripTrailingSpaces($var) {
 
 function dateExtract($rawDate) {
 	if ($rawDate != FALSE) {
-		global $rows;
-
 		$month = stripLeadingZeros(date('m', strtotime($rawDate)));
 		$day = stripLeadingZeros(date('d', strtotime($rawDate)));
 		$year = date('Y', strtotime($rawDate));

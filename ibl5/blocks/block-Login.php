@@ -14,10 +14,10 @@
 
 if ( !defined('BLOCK_FILE') ) {
     Header("Location: ../index.php");
-    fdie();
+    die();
 }
 
-global $admin, $user, $sitekey, $gfx_chk, $admin_file;
+global $admin, $user, $gfx_chk, $admin_file;
 
 mt_srand ((double)microtime()*1000000);
 $maxran = 1000000;

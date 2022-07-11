@@ -40,7 +40,7 @@ function menu()
 
 function leaderboards()
 {
-    global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
+    global $db;
     include("header.php");
     OpenTable();
 

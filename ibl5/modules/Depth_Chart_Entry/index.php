@@ -18,7 +18,7 @@
 
 if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) die ("You can't access this file directly...");
 
-
+$sharedFunctions = new Shared($db);
 
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
@@ -30,9 +30,7 @@ $pagetitle = " - Depth Chart Entry";
 
 function userinfo($username, $bypass=0, $hid=0, $url=0)
 	{
-	global $user, $prefix, $user_prefix, $db, $useset;
-
-	$sharedFunctions = new Shared($db);
+	global $user, $prefix, $user_prefix, $db, $sharedFunctions, $useset;
 
 	$sql = "SELECT * FROM ".$prefix."_bbconfig";
 	$result = $db->sql_query($sql);
@@ -294,7 +292,7 @@ function main($user) {
 }
 
 function submit() {
-	global $db;
+	global $db, $sharedFunctions;
 
     include("header.php");
     OpenTable();

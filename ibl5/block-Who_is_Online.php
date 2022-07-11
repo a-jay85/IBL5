@@ -25,10 +25,10 @@ mysql_connect($dbhost,$dbuname,$dbpass);
 // DISPLAYING ONLINE USER DATABASE -->
 
     $rs=@$db->sql_query("select * from online");
-    echo "<style><!--n";
-    echo "body {font-family:verdana;font-size:10pt}n";
-    echo "td {font-family:verdana;font-size:10pt}n";
-    echo "--></style>n";
+    echo "<style><!--
+        body {font-family:verdana;font-size:10pt}
+        td {font-family:verdana;font-size:10pt}
+        --> </style>";
     echo "<div align=center><table><tr bgcolor=#CCCCCC>
             <td><b>Visitor IP/Host<td><b>Last visit</tr>";
     while ($ro=@$db->sql_fetchrow($rs)){

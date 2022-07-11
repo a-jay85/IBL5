@@ -71,7 +71,7 @@ function waivers($user)
 
 function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
 {
-    global $user, $cookie, $sitename, $prefix, $user_prefix, $db, $admin, $broadcast_msg, $my_headlines, $module_name, $subscription_url, $partner, $action;
+    global $user, $prefix, $user_prefix, $db, $action;
     $sharedFunctions = new Shared($db);
 
     $sql = "SELECT * FROM " . $prefix . "_bbconfig";

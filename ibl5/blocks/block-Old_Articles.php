@@ -17,7 +17,7 @@ if ( !defined('BLOCK_FILE') ) {
     die();
 }
 
-global $locale, $oldnum, $storynum, $storyhome, $cookie, $categories, $cat, $prefix, $multilingual, $currentlang, $db, $new_topic, $user_news, $userinfo, $user;
+global $locale, $oldnum, $storynum, $storyhome, $categories, $cat, $prefix, $multilingual, $currentlang, $db, $new_topic, $user_news, $userinfo, $user;
 
 getusrinfo($user);
 if ($multilingual == 1) {

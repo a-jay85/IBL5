@@ -49,7 +49,7 @@ function footmsg() {
 }
 
 function foot() {
-	global $prefix, $user_prefix, $db, $index, $user, $cookie, $storynum, $user, $cookie, $Default_Theme, $foot1, $foot2, $foot3, $foot4, $home, $name, $admin, $commercial_license;
+	global $name, $admin, $commercial_license;
 	if(defined('HOME_FILE')) {
 		blocks("Down");
 	}

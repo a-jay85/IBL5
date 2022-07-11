@@ -30,7 +30,7 @@ $pagetitle = " - Depth Chart Entry";
 
 function userinfo($username, $bypass=0, $hid=0, $url=0)
 	{
-	global $user, $cookie, $sitename, $prefix, $user_prefix, $db, $admin, $broadcast_msg, $my_headlines, $module_name, $useset, $subscription_url;
+	global $user, $prefix, $user_prefix, $db, $useset;
 
 	$sharedFunctions = new Shared($db);
 

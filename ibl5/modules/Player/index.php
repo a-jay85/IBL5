@@ -50,7 +50,7 @@ function menu()
 
 function leaderboards()
 {
-    global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
+    global $db;
 
     include("header.php");
     OpenTable();
@@ -413,7 +413,7 @@ function leaderboards()
 
 function search()
 {
-    global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
+    global $db;
 
     include("header.php");
     OpenTable();
@@ -860,7 +860,7 @@ function search()
 
 function awards()
 {
-    global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
+    global $db;
 
     include("header.php");
     OpenTable();
@@ -1002,7 +1002,7 @@ function awards()
 }
 
 function showpage($pid,$spec) {
-    global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
+    global $prefix, $db, $user, $cookie;
 	$sharedFunctions = new Shared($db);
 
     $pid = intval($pid);
@@ -3112,7 +3112,7 @@ function showpage($pid,$spec) {
 
 function negotiate($pid)
 {
-    global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
+    global $prefix, $db, $user, $cookie;
 
     $pid = intval($pid);
     $playerinfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM " . $prefix . "_iblplyr WHERE pid = '$pid'"));
@@ -3567,7 +3567,7 @@ function negotiate($pid)
 }
 
 function rookieoption($pid) {
-	global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
+	global $prefix, $db, $user, $cookie;
 	$sharedFunctions = new Shared($db);
 
 	$pid = intval($pid);

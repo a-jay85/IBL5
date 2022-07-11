@@ -730,7 +730,7 @@ function reply($pid, $sid, $mode, $order, $thold) {
 				echo "";
 			}
 		}
-		if (!isset($pid) || !isset($sid)) { echo "Something is not right. This message is just to keep things from messing up down the road"; fdie(); }
+		if (!isset($pid) || !isset($sid)) { echo "Something is not right. This message is just to keep things from messing up down the road"; die(); }
 		if ($pid == 0) {
 			$row3 = $db->sql_fetchrow($db->sql_query("SELECT title FROM ".$prefix."_stories WHERE sid='$sid'"));
 			$subject = filter($row3['title'], "nohtml");
@@ -901,7 +901,7 @@ function CreateTopic ($xanonpost, $subject, $comment, $pid, $sid, $host_name, $m
 		echo "<center>"._COMMENTPOSTERROR."<br><br>"._GOBACK."</center>";
 		CloseTable();
 		include("footer.php");
-		fdie();
+		die();
 	}
 	//$comment = filter($comment);
 	if (is_user($user) AND !$xanonpost) {
@@ -938,10 +938,10 @@ function CreateTopic ($xanonpost, $subject, $comment, $pid, $sid, $host_name, $m
 					echo "<br><br><a href=\"modules.php?name=$module_name&file=article&sid=$sid$koptions\">"._MODERATEDRETURN."</a>";
 					CloseTable();
 					include("footer.php");
-					fdie();
+					die();
 				} elseif ($krow['karma'] == 3) {
 					Header("Location: modules.php?name=$module_name&file=article&sid=$sid$koptions");
-					fdie();
+					die();
 				}
 			}
 			$db->sql_query("INSERT INTO ".$prefix."_comments VALUES (NULL, '$pid', '$sid', now(), '$name', '$email', '$url', '$ip', '$subject', '$comment', '$score', '0', '0')");
@@ -957,7 +957,7 @@ function CreateTopic ($xanonpost, $subject, $comment, $pid, $sid, $host_name, $m
 		."to reply to does not exist. If you're just trying to be "
 		."annoying, well then too bad.";
 		include("footer.php");
-		fdie();
+		die();
 	}
 	$options = "";
 	$options .= "&mode=".$mode;

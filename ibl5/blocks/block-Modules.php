@@ -14,10 +14,10 @@
 
 if ( !defined('BLOCK_FILE') ) {
 	Header("Location: ../index.php");
-	fdie();
+	die();
 }
 
-global $prefix, $db, $admin, $language, $currentlang;
+global $prefix, $db, $admin;
 
 $ThemeSel = get_theme();
 if (file_exists("themes/$ThemeSel/module.php")) {

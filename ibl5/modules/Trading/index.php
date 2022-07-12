@@ -162,7 +162,7 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 
 	OpenTable();
 
-	$teamlogo = $userinfo[user_ibl_team];
+	$teamlogo = $userinfo['user_ibl_team'];
 	$tid = $sharedFunctions->getTidFromTeamname($teamlogo);
 	$sharedFunctions->displaytopmenu($tid);
 
@@ -259,8 +259,8 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 	$queryListOfAllTeams = "SELECT team_name, team_city FROM nuke_ibl_team_info ORDER BY team_city ASC";
 	$resultListOfAllTeams = $db->sql_query($queryListOfAllTeams);
 	while ($rowInListOfAllTeams = $db->sql_fetchrow($resultListOfAllTeams)) {
-		$team_name = $rowInListOfAllTeams[team_name];
-		$team_city = $rowInListOfAllTeams[team_city];
+		$team_name = $rowInListOfAllTeams['team_name'];
+		$team_city = $rowInListOfAllTeams['team_city'];
 
 		if ($team_name != 'Free Agents') {
 			echo "<a href=\"modules.php?name=Trading&op=offertrade&partner=$team_name\">$team_city $team_name</a><br>";
@@ -329,7 +329,7 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
 
 	OpenTable();
 
-	$teamlogo = $userinfo[user_ibl_team];
+	$teamlogo = $userinfo['user_ibl_team'];
 	$tid = $sharedFunctions->getTidFromTeamname($teamlogo);
 	$sharedFunctions->displaytopmenu($tid);
 
@@ -349,14 +349,14 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
 	while ($row3 = $db->sql_fetchrow($result3)) {
 		$isinvolvedintrade = 0;
 		$hashammer = 0;
-		$offerid = $row3[tradeofferid];
-		$itemid = $row3[itemid];
+		$offerid = $row3['tradeofferid'];
+		$itemid = $row3['itemid'];
 
 		// For itemtype (1 = player, 0 = pick)
-		$itemtype = $row3[itemtype];
-		$from = $row3[from];
-		$to = $row3[to];
-		$approval = $row3[approval];
+		$itemtype = $row3['itemtype'];
+		$from = $row3['from'];
+		$to = $row3['to'];
+		$approval = $row3['approval'];
 
 		if ($from == $teamlogo) {
 			$isinvolvedintrade = 1;
@@ -407,9 +407,9 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
 				$numsgetpick = $db->sql_numrows($resultsgetpick);
 				$rowsgetpick = $db->sql_fetchrow($resultgetpick);
 
-				$pickteam = $rowsgetpick[teampick];
-				$pickyear = $rowsgetpick[year];
-				$pickround = $rowsgetpick[round];
+				$pickteam = $rowsgetpick['teampick'];
+				$pickyear = $rowsgetpick['year'];
+				$pickround = $rowsgetpick['round'];
 
 				echo "The $from send the $pickteam $pickyear Round $pickround draft pick to the $to.<br>";
 			} else {
@@ -418,8 +418,8 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
 				$numsgetplyr = $db->sql_numrows($resultsgetplyr);
 				$rowsgetplyr = $db->sql_fetchrow($resultgetplyr);
 
-				$plyrname = $rowsgetplyr[name];
-				$plyrpos = $rowsgetplyr[pos];
+				$plyrname = $rowsgetplyr['name'];
+				$plyrpos = $rowsgetplyr['pos'];
 
 				echo "The $from send $plyrpos $plyrname to the $to.<br>";
 			}
@@ -434,8 +434,8 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
 	$resultListOfAllTeams = $db->sql_query($queryListOfAllTeams);
 
 	while($rowInListOfAllTeams = $db->sql_fetchrow($resultListOfAllTeams)) {
-		$team_name = $rowInListOfAllTeams[team_name];
-		$team_city = $rowInListOfAllTeams[team_city];
+		$team_name = $rowInListOfAllTeams['team_name'];
+		$team_city = $rowInListOfAllTeams['team_city'];
 
 		if ($team_name != 'Free Agents') {
 			//------Trade Deadline Code---------

@@ -22,9 +22,6 @@ get_lang($module_name);
 
 $pagetitle = "Season Stats";
 
-
-
-
 {
 	include("header.php");
 	OpenTable();

@@ -35,7 +35,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 		cookiedecode($user);
 	}
 
-	$teamlogo = $userinfo[user_ibl_team];
+	$teamlogo = $userinfo['user_ibl_team'];
 	$tid = $sharedFunctions->getTidFromTeamname($teamlogo);
 
 	include("header.php");

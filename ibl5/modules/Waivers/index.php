@@ -286,7 +286,7 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
 
     OpenTable();
 
-    $teamlogo = $userinfo[user_ibl_team];
+    $teamlogo = $userinfo['user_ibl_team'];
 	$queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$teamlogo'";
 	$tid = $db->sql_result($db->sql_query($queryTeamID), 0);
 
@@ -296,7 +296,7 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
     $sql7 = "SELECT * FROM nuke_ibl_team_info ORDER BY teamid ASC ";
     $result7 = $db->sql_query($sql7);
 
-    $sql9 = "SELECT * FROM nuke_iblplyr WHERE teamname = '$userinfo[user_ibl_team]' AND retired = '0' AND ordinal < '961' AND injured = '0' ORDER BY ordinal ASC ";
+    $sql9 = "SELECT * FROM nuke_iblplyr WHERE teamname = '$userinfo[user_ibl_team]' AND retired = '0' AND ordinal < '961' AND injured = '0' ORDER BY ordinal ASC";
     $result9 = $db->sql_query($sql9);
 
     $healthyrosterslots = 15;
@@ -334,12 +334,12 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
 
     while ($row8 = $db->sql_fetchrow($result8)) {
         $wait_time = '';
-        $player_pos = $row8[pos];
-        $player_name = $row8[name];
-        $player_pid = $row8[pid];
-        $cy = $row8[cy];
+        $player_pos = $row8['pos'];
+        $player_name = $row8['name'];
+        $player_pid = $row8['pid'];
+        $cy = $row8['cy'];
         $xcyy = "cy$cy";
-        $player_exp = $row8[exp];
+        $player_exp = $row8['exp'];
         $zcy2 = $row8[$xcyy];
 
         if ($zcy2 == '' AND $zcy2 == 0) {
@@ -366,7 +366,7 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
         $nocheckbox = 0;
 
         if ($action == 'add') {
-            $player_droptime = $row8[droptime];
+            $player_droptime = $row8['droptime'];
             $time_diff = $timenow - $player_droptime;
 
             if ($time_diff < 86400) {

@@ -28,12 +28,12 @@ OpenTable();
 $min_date_query="SELECT MIN(Date) as mindate FROM ibl_schedule";
 $min_date_result=$db->sql_query($min_date_query);
 $row = $db->sql_fetch_assoc($min_date_result);
-$min_date=$row[mindate];
+$min_date=$row['mindate'];
 
 $max_date_query="SELECT MAX(Date) as maxdate FROM ibl_schedule";
 $max_date_result=$db->sql_query($max_date_query);
 $row2 = $db->sql_fetch_assoc($max_date_result);
-$max_date=$row2[maxdate];
+$max_date=$row2['maxdate'];
 $max_date=fnc_date_calc($max_date,0);
 
 $chunk_start_date=$min_date;
@@ -166,13 +166,6 @@ function chunk ($chunk_start_date, $chunk_end_date, $j)
 	}
 	echo "</table>";
 	//return array($homewin, $homeloss, $visitorwin, $visitorloss);
-}
-
-function teamname ($teamid) {
-	$query="SELECT * FROM nuke_ibl_team_info WHERE teamid = $teamid";
-	$result=$db->sql_query($query);
-	$name=$db->sql_result($result, 0, "team_name");
-	return $name;
 }
 
 function fnc_date_calc($this_date,$num_days){

@@ -257,7 +257,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0) {
 		$formName = "EOYVote";
 	}
 
-    $voterTeamName = $userinfo[user_ibl_team];
+    $voterTeamName = $userinfo['user_ibl_team'];
 	$tid = $sharedFunctions->getTidFromTeamname($voterTeamName);
 
 	echo "<form name=\"$formName\" method=\"post\" action=\"$formName.php\">

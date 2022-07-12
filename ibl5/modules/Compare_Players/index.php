@@ -37,7 +37,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 		cookiedecode($user);
 	}
 
-	$teamlogo = $userinfo[user_ibl_team];
+	$teamlogo = $userinfo['user_ibl_team'];
 	$tid = $sharedFunctions->getTidFromTeamname($teamlogo);
 
 	include("header.php");
@@ -240,7 +240,7 @@ function comparePlayers()
 					<th>$player1Array[stats_to]</th>
 					<th>$player1Array[stats_blk]</th>
 					<th>$player1Array[stats_pf]</th>
-					<th>" . (2 * $player1Array[stats_fgm] + $player1Array[stats_ftm] + $player1Array[stats_tgm]) . "</th>
+					<th>" . (2 * $player1Array['stats_fgm'] + $player1Array['stats_ftm'] + $player1Array['stats_tgm']) . "</th>
 				</tr>
 				<tr>
 					<th>$player2Array[pos]</th>
@@ -261,7 +261,7 @@ function comparePlayers()
 					<th>$player2Array[stats_to]</th>
 					<th>$player2Array[stats_blk]</th>
 					<th>$player2Array[stats_pf]</th>
-					<th>" . (2 * $player2Array[stats_fgm] + $player2Array[stats_ftm] + $player2Array[stats_tgm]) . "</th>
+					<th>" . (2 * $player2Array['stats_fgm'] + $player2Array['stats_ftm'] + $player2Array['stats_tgm']) . "</th>
 				</tr>
 			</tbody>
 		</table>

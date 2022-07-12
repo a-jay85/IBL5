@@ -56,7 +56,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 				$num4 = $db->sql_numrows($result4);
 				$row4 = $db->sql_fetchrow($result4);
 				if ($num4 == 0 ){
-					if ($userinfo[scoutingpoints] < 2) {
+					if ($userinfo['scoutingpoints'] < 2) {
 					echo "Sorry, not enough scouting points remain to scout that attribute.";
 					} else {
 
@@ -128,22 +128,22 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 						}
 
 						$db->sql_query("insert into " . $prefix . "_scout_points_spent values ('$player', '$userinfo[user_ibl_team]', '$attrib_sta', '$attrib_fga', '$attrib_fgp', '$attrib_fta', '$attrib_ftp', '$attrib_tga', '$attrib_tgp', '$attrib_orb', '$attrib_drb', '$attrib_ast', '$attrib_stl', '$attrib_tvr', '$attrib_blk', '$attrib_offo', '$attrib_offd', '$attrib_offp', '$attrib_offt', '$attrib_defo', '$attrib_defd', '$attrib_defp', '$attrib_deft', '$attrib_Tal', '$attrib_Skl', '$attrib_Int')");
-						$newscoutingpoints = $userinfo[scoutingpoints] - 2;
+						$newscoutingpoints = $userinfo['scoutingpoints'] - 2;
 						$db->sql_query("update " . $prefix . "_users set scoutingpoints='$newscoutingpoints' where user_id = '$userinfo[user_id]'");
 					}
 				} else {
 					if ($step == 1) {
 
-						if ($userinfo[scoutingpoints] < 2) {
+						if ($userinfo['scoutingpoints'] < 2) {
 						echo "Sorry, not enough scouting points remain to scout that attribute.";
 						} else {
 
 							if ($row4[$attrib] == 0) {
-								$userinfo[scoutingpoints] = $userinfo[scoutingpoints] - 2;
+								$userinfo['scoutingpoints'] = $userinfo['scoutingpoints'] - 2;
 								$db->sql_query("update " . $prefix . "_users set scoutingpoints='$userinfo[scoutingpoints]' where user_id = '$userinfo[user_id]'");
 								$sql_info = "UPDATE nuke_scout_points_spent SET $attrib = 2 WHERE name = '$player' AND teamname ='$userinfo[user_ibl_team]'";
 								$process = $db->sql_query($sql_info, BEGIN_TRANSACTION);
-								if ($attrib == offo) {
+								if ($attrib == 'offo') {
 									$sql_info = "UPDATE nuke_scout_points_spent SET offd = 2 WHERE name = '$player' AND teamname ='$userinfo[user_ibl_team]'";
 									$process = $db->sql_query($sql_info, BEGIN_TRANSACTION);
 									$sql_info = "UPDATE nuke_scout_points_spent SET offp = 2 WHERE name = '$player' AND teamname ='$userinfo[user_ibl_team]'";
@@ -151,7 +151,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 									$sql_info = "UPDATE nuke_scout_points_spent SET offt = 2 WHERE name = '$player' AND teamname ='$userinfo[user_ibl_team]'";
 									$process = $db->sql_query($sql_info, BEGIN_TRANSACTION);
 								}
-								if ($attrib == defo) {
+								if ($attrib == 'defo') {
 									$sql_info = "UPDATE nuke_scout_points_spent SET defd = 2 WHERE name = '$player' AND teamname ='$userinfo[user_ibl_team]'";
 									$process = $db->sql_query($sql_info, BEGIN_TRANSACTION);
 									$sql_info = "UPDATE nuke_scout_points_spent SET defp = 2 WHERE name = '$player' AND teamname ='$userinfo[user_ibl_team]'";
@@ -159,7 +159,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 									$sql_info = "UPDATE nuke_scout_points_spent SET deft = 2 WHERE name = '$player' AND teamname ='$userinfo[user_ibl_team]'";
 									$process = $db->sql_query($sql_info, BEGIN_TRANSACTION);
 								}
-								if ($attrib == tal) {
+								if ($attrib == 'tal') {
 									$sql_info = "UPDATE nuke_scout_points_spent SET skl = 2 WHERE name = '$player' AND teamname ='$userinfo[user_ibl_team]'";
 									$process = $db->sql_query($sql_info, BEGIN_TRANSACTION);
 									$sql_info = "UPDATE nuke_scout_points_spent SET int = 2 WHERE name = '$player' AND teamname ='$userinfo[user_ibl_team]'";
@@ -170,12 +170,12 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 						}
 					} else if ($step == 2) {
 
-						if ($userinfo[scoutingpoints] < 1) {
+						if ($userinfo['scoutingpoints'] < 1) {
 						echo "Sorry, not enough scouting points remain to scout that attribute.";
 						} else {
 
 							if ($row4[$attrib] == 2) {
-								$userinfo[scoutingpoints] = $userinfo[scoutingpoints] - 1;
+								$userinfo['scoutingpoints'] = $userinfo['scoutingpoints'] - 1;
 								$db->sql_query("update " . $prefix . "_users set scoutingpoints='$userinfo[scoutingpoints]' where user_id = '$userinfo[user_id]'");
 								$sql_info = "UPDATE nuke_scout_points_spent SET $attrib = 3 WHERE name = '$player' AND teamname ='$userinfo[user_ibl_team]'";
 								$process = $db->sql_query($sql_info, BEGIN_TRANSACTION);
@@ -192,14 +192,14 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 
     OpenTable();
 
-    $teamlogo = $userinfo[user_ibl_team];
+    $teamlogo = $userinfo['user_ibl_team'];
 	$tid = $sharedFunctions->getTidFromTeamname($teamlogo);
 
 	$sharedFunctions->displaytopmenu($tid);
 
 // ========== DISPLAY ROOKIES
 
-    $scoutingpoints = $userinfo[scoutingpoints];
+    $scoutingpoints = $userinfo['scoutingpoints'];
 
 	$draft_sql = "SELECT * from nuke_ibl_draft WHERE player = '' ORDER BY round ASC, pick ASC";
 	$draft_result = $db->sql_query($draft_sql);
@@ -271,34 +271,34 @@ echo "<input type='hidden' name='draft_pick' value='$draft_pick'>";
 	(($i % 2)==0) ? $bgcolor="EEEEEE" : $bgcolor="DDDDDD";
     $i++;
 
-	$player_pos = $row3[pos];
-	$player_name = $row3[name];
-	$player_team = $row3[team];
-	$player_age = $row3[age];
-	$player_sta = $row3[sta];
-	$player_fga = $row3[fga];
-	$player_fgp = $row3[fgp];
-	$player_fta = $row3[fta];
-	$player_ftp = $row3[ftp];
-	$player_tga = $row3[tga];
-	$player_tgp = $row3[tgp];
-	$player_orb = $row3[orb];
-	$player_drb = $row3[drb];
-	$player_ast = $row3[ast];
-	$player_stl = $row3[stl];
-	$player_tvr = $row3[tvr];
-	$player_blk = $row3[blk];
-	$player_offo = $row3[offo];
-	$player_offd = $row3[offd];
-	$player_offp = $row3[offp];
-	$player_offt = $row3[offt];
-	$player_defo = $row3[defo];
-	$player_defd = $row3[defd];
-	$player_defp = $row3[defp];
-	$player_deft = $row3[deft];
-	$player_tal = $row3[tal];
-	$player_skl = $row3[skl];
-	$player_int = $row3[int];
+	$player_pos = $row3['pos'];
+	$player_name = $row3['name'];
+	$player_team = $row3['team'];
+	$player_age = $row3['age'];
+	$player_sta = $row3['sta'];
+	$player_fga = $row3['fga'];
+	$player_fgp = $row3['fgp'];
+	$player_fta = $row3['fta'];
+	$player_ftp = $row3['ftp'];
+	$player_tga = $row3['tga'];
+	$player_tgp = $row3['tgp'];
+	$player_orb = $row3['orb'];
+	$player_drb = $row3['drb'];
+	$player_ast = $row3['ast'];
+	$player_stl = $row3['stl'];
+	$player_tvr = $row3['tvr'];
+	$player_blk = $row3['blk'];
+	$player_offo = $row3['offo'];
+	$player_offd = $row3['offd'];
+	$player_offp = $row3['offp'];
+	$player_offt = $row3['offt'];
+	$player_defo = $row3['defo'];
+	$player_defd = $row3['defd'];
+	$player_defp = $row3['defp'];
+	$player_deft = $row3['deft'];
+	$player_tal = $row3['tal'];
+	$player_skl = $row3['skl'];
+	$player_int = $row3['int'];
 
 	$draftedPlayersQuery = "SELECT iblhoops_draft.player.`player_name`
 FROM   iblhoops_draft.pick
@@ -616,8 +616,8 @@ if ($splayer_sta == 2) {
 // === END CODE FOR MASKING SHOOTING PERCENTAGES
 // === BEGIN CODE FOR MASKING OFFENSE AND DEFENSE RATINGS
 
-	$Total_Off = $row3[offo]+$row3[offd]+$row3[offp]+$row3[offt];
-	$Total_Def = $row3[defo]+$row3[defd]+$row3[defp]+$row3[deft];
+	$Total_Off = $row3['offo'] + $row3['offd'] + $row3['offp'] + $row3['offt'];
+	$Total_Def = $row3['defo'] + $row3['defd'] + $row3['defp'] + $row3['deft'];
 	$display_Off = NULL;
 	$display_Def = NULL;
 
@@ -763,7 +763,7 @@ if ($splayer_deft == 2) {
 } else {
 }
 
-	$Total_Pot = $row3[tal]+$row3[skl]+$row3[int];
+	$Total_Pot = $row3['tal'] + $row3['skl'] + $row3['int'];
 	$display_Pot = NULL;
 
 
@@ -852,35 +852,35 @@ echo"<tr><th colspan=28><center>Players Your Team has invited</th></tr>
 
     while($row3 = $db->sql_fetchrow($result3)) {
 
-	$player_pos = $row3[pos];
-	$player_name = $row3[name];
-	$player_team = $row3[team];
-	$player_sta = $row3[sta];
-	$player_age = $row3[age];
-	$player_fga = $row3[fga];
-	$player_fgp = $row3[fgp];
-	$player_fta = $row3[fta];
-	$player_ftp = $row3[ftp];
-	$player_tga = $row3[tga];
-	$player_tgp = $row3[tgp];
-	$player_orb = $row3[orb];
-	$player_drb = $row3[drb];
-	$player_ast = $row3[ast];
-	$player_stl = $row3[stl];
-	$player_tvr = $row3[tvr];
-	$player_blk = $row3[blk];
-	$player_offo = $row3[offo];
-	$player_offd = $row3[offd];
-	$player_offp = $row3[offp];
-	$player_offt = $row3[offt];
-	$player_defo = $row3[defo];
-	$player_defd = $row3[defd];
-	$player_defp = $row3[defp];
-	$player_deft = $row3[deft];
-	$player_tal = $row3[tal];
-	$player_skl = $row3[skl];
-	$player_int = $row3[int];
-	$player_drafted = $row3[drafted];
+	$player_pos = $row3['pos'];
+	$player_name = $row3['name'];
+	$player_team = $row3['team'];
+	$player_sta = $row3['sta'];
+	$player_age = $row3['age'];
+	$player_fga = $row3['fga'];
+	$player_fgp = $row3['fgp'];
+	$player_fta = $row3['fta'];
+	$player_ftp = $row3['ftp'];
+	$player_tga = $row3['tga'];
+	$player_tgp = $row3['tgp'];
+	$player_orb = $row3['orb'];
+	$player_drb = $row3['drb'];
+	$player_ast = $row3['ast'];
+	$player_stl = $row3['stl'];
+	$player_tvr = $row3['tvr'];
+	$player_blk = $row3['blk'];
+	$player_offo = $row3['offo'];
+	$player_offd = $row3['offd'];
+	$player_offp = $row3['offp'];
+	$player_offt = $row3['offt'];
+	$player_defo = $row3['defo'];
+	$player_defd = $row3['defd'];
+	$player_defp = $row3['defp'];
+	$player_deft = $row3['deft'];
+	$player_tal = $row3['tal'];
+	$player_skl = $row3['skl'];
+	$player_int = $row3['int'];
+	$player_drafted = $row3['drafted'];
 
 // === GRAB SCOUTING POINT EXPENDITURES ===
 
@@ -889,30 +889,30 @@ echo"<tr><th colspan=28><center>Players Your Team has invited</th></tr>
     $numscouted = $db->sql_numrows($resultscouted);
     $rowscouted = $db->sql_fetchrow($resultscouted);
 
-        $splayer_sta = $rowscouted[sta];
-	$splayer_fga = $rowscouted[fga];
-	$splayer_fgp = $rowscouted[fgp];
-	$splayer_fta = $rowscouted[fta];
-	$splayer_ftp = $rowscouted[ftp];
-	$splayer_tga = $rowscouted[tga];
-	$splayer_tgp = $rowscouted[tgp];
-	$splayer_orb = $rowscouted[orb];
-	$splayer_drb = $rowscouted[drb];
-	$splayer_ast = $rowscouted[ast];
-	$splayer_stl = $rowscouted[stl];
-	$splayer_tvr = $rowscouted[tvr];
-	$splayer_blk = $rowscouted[blk];
-	$splayer_offo = $rowscouted[offo];
-	$splayer_offd = $rowscouted[offd];
-	$splayer_offp = $rowscouted[offp];
-	$splayer_offt = $rowscouted[offt];
-	$splayer_defo = $rowscouted[defo];
-	$splayer_defd = $rowscouted[defd];
-	$splayer_defp = $rowscouted[defp];
-	$splayer_deft = $rowscouted[deft];
-	$splayer_tal = $rowscouted[tal];
-	$splayer_skl = $rowscouted[skl];
-	$splayer_int = $rowscouted[int];
+    $splayer_sta = $rowscouted['sta'];
+	$splayer_fga = $rowscouted['fga'];
+	$splayer_fgp = $rowscouted['fgp'];
+	$splayer_fta = $rowscouted['fta'];
+	$splayer_ftp = $rowscouted['ftp'];
+	$splayer_tga = $rowscouted['tga'];
+	$splayer_tgp = $rowscouted['tgp'];
+	$splayer_orb = $rowscouted['orb'];
+	$splayer_drb = $rowscouted['drb'];
+	$splayer_ast = $rowscouted['ast'];
+	$splayer_stl = $rowscouted['stl'];
+	$splayer_tvr = $rowscouted['tvr'];
+	$splayer_blk = $rowscouted['blk'];
+	$splayer_offo = $rowscouted['offo'];
+	$splayer_offd = $rowscouted['offd'];
+	$splayer_offp = $rowscouted['offp'];
+	$splayer_offt = $rowscouted['offt'];
+	$splayer_defo = $rowscouted['defo'];
+	$splayer_defd = $rowscouted['defd'];
+	$splayer_defp = $rowscouted['defp'];
+	$splayer_deft = $rowscouted['deft'];
+	$splayer_tal = $rowscouted['tal'];
+	$splayer_skl = $rowscouted['skl'];
+	$splayer_int = $rowscouted['int'];
 
 	$display_pos = $player_pos;
 	$display_name = $player_name;
@@ -1150,8 +1150,8 @@ if ($splayer_sta == 2) {
 // === END CODE FOR MASKING SHOOTING PERCENTAGES
 // === BEGIN CODE FOR MASKING OFFENSE AND DEFENSE RATINGS
 
-	$Total_Off = $row3[offo]+$row3[offd]+$row3[offp]+$row3[offt];
-	$Total_Def = $row3[defo]+$row3[defd]+$row3[defp]+$row3[deft];
+	$Total_Off = $row3['offo'] + $row3['offd'] + $row3['offp'] + $row3['offt'];
+	$Total_Def = $row3['defo'] + $row3['defd'] + $row3['defp'] + $row3['deft'];
 	$display_Off = NULL;
 	$display_Def = NULL;
 
@@ -1297,7 +1297,7 @@ if ($splayer_deft == 2) {
 } else {
 }
 
-	$Total_Pot = $row3[tal]+$row3[skl]+$row3[int];
+	$Total_Pot = $row3['tal'] + $row3['skl'] + $row3['int'];
 	$display_Pot = NULL;
 
 
@@ -1379,38 +1379,38 @@ echo"<tr><th colspan=28><center>Players Invited by Other Teams (cannot be scoute
 
     while($row3 = $db->sql_fetchrow($result3)) {
 
-	$player_pos = $row3[pos];
-	$player_name = $row3[name];
-	$player_team = $row3[team];
-	$player_sta = $row3[sta];
-	$player_age = $row3[age];
-	$player_fga = $row3[fga];
-	$player_fgp = $row3[fgp];
-	$player_fta = $row3[fta];
-	$player_ftp = $row3[ftp];
-	$player_tga = $row3[tga];
-	$player_tgp = $row3[tgp];
-	$player_orb = $row3[orb];
-	$player_drb = $row3[drb];
-	$player_ast = $row3[ast];
-	$player_stl = $row3[stl];
-	$player_tvr = $row3[tvr];
-	$player_blk = $row3[blk];
-	$player_offo = $row3[offo];
-	$player_offd = $row3[offd];
-	$player_offp = $row3[offp];
-	$player_offt = $row3[offt];
-	$player_defo = $row3[defo];
-	$player_defd = $row3[defd];
-	$player_defp = $row3[defp];
-	$player_deft = $row3[deft];
-	$player_tal = $row3[tal];
-	$player_skl = $row3[skl];
-	$player_int = $row3[int];
+	$player_pos = $row3['pos'];
+	$player_name = $row3['name'];
+	$player_team = $row3['team'];
+	$player_sta = $row3['sta'];
+	$player_age = $row3['age'];
+	$player_fga = $row3['fga'];
+	$player_fgp = $row3['fgp'];
+	$player_fta = $row3['fta'];
+	$player_ftp = $row3['ftp'];
+	$player_tga = $row3['tga'];
+	$player_tgp = $row3['tgp'];
+	$player_orb = $row3['orb'];
+	$player_drb = $row3['drb'];
+	$player_ast = $row3['ast'];
+	$player_stl = $row3['stl'];
+	$player_tvr = $row3['tvr'];
+	$player_blk = $row3['blk'];
+	$player_offo = $row3['offo'];
+	$player_offd = $row3['offd'];
+	$player_offp = $row3['offp'];
+	$player_offt = $row3['offt'];
+	$player_defo = $row3['defo'];
+	$player_defd = $row3['defd'];
+	$player_defp = $row3['defp'];
+	$player_deft = $row3['deft'];
+	$player_tal = $row3['tal'];
+	$player_skl = $row3['skl'];
+	$player_int = $row3['int'];
 
 	$display_pos = $player_pos;
 	$display_name = $player_name;
-	$player_drafted = $row3[drafted];
+	$player_drafted = $row3['drafted'];
 
 // ===== BEGIN CODE FOR MASKING THE 1-100 RATINGS
 
@@ -1577,8 +1577,8 @@ echo"<tr><th colspan=28><center>Players Invited by Other Teams (cannot be scoute
 // === END CODE FOR MASKING SHOOTING PERCENTAGES
 // === BEGIN CODE FOR MASKING OFFENSE AND DEFENSE RATINGS
 
-	$Total_Off = $row3[offo]+$row3[offd]+$row3[offp]+$row3[offt];
-	$Total_Def = $row3[defo]+$row3[defd]+$row3[defp]+$row3[deft];
+	$Total_Off = $row3['offo'] + $row3['offd'] + $row3['offp'] + $row3['offt'];
+	$Total_Def = $row3['defo'] + $row3['defd'] + $row3['defp'] + $row3['deft'];
 	$display_Off = NULL;
 	$display_Def = NULL;
 
@@ -1607,7 +1607,7 @@ echo"<tr><th colspan=28><center>Players Invited by Other Teams (cannot be scoute
 	$display_Def = "A";
 	}
 
-	$Total_Pot = $row3[tal]+$row3[skl]+$row3[int];
+	$Total_Pot = $row3['tal'] + $row3['skl'] + $row3['int'];
 	$display_Pot = NULL;
 
 

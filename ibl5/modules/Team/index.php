@@ -221,7 +221,7 @@ function drafthistory($tid)
 	$sqlc = "SELECT * FROM nuke_ibl_team_info WHERE teamid = $tid";
 	$resultc = $db->sql_query($sqlc);
 	$rowc = $db->sql_fetchrow($resultc);
-	$teamname = $rowc[team_name];
+	$teamname = $rowc['team_name'];
 
 	$sqld = "SELECT * FROM nuke_iblplyr WHERE draftedby LIKE '$teamname' ORDER BY draftyear DESC, draftround, draftpickno ASC ";
 	$resultd = $db->sql_query($sqld);
@@ -230,13 +230,13 @@ function drafthistory($tid)
 	echo "$teamname Draft History<table class=\"sortable\"><tr><th>Player</th><th>Pos</th><th>Year</th><th>Round</th><th>Pick</th></tr>";
 
 	while($rowd = $db->sql_fetchrow($resultd)) {
-		$player_pid = $rowd[pid];
-		$player_name = $rowd[name];
-		$player_pos = $rowd[pos];
-		$player_draftyear = $rowd[draftyear];
-		$player_draftround = $rowd[draftround];
-		$player_draftpickno = $rowd[draftpickno];
-		$player_retired = $rowd[retired];
+		$player_pid = $rowd['pid'];
+		$player_name = $rowd['name'];
+		$player_pos = $rowd['pos'];
+		$player_draftyear = $rowd['draftyear'];
+		$player_draftround = $rowd['draftround'];
+		$player_draftpickno = $rowd['draftpickno'];
+		$player_retired = $rowd['retired'];
 
 		if ($player_retired == 1) {
 			echo "<tr><td><a href=\"./modules.php?name=Player&pa=showpage&pid=$player_pid\">$player_name</a> (retired)</td><td>$player_pos</td><td>$player_draftyear</td><td>$player_draftround</td><td>$player_draftpickno</td></tr>";
@@ -1657,7 +1657,7 @@ function team($tid)
 		$t++;
 		}
 
-		$thischunk = $row[maxchunk];
+		$thischunk = $row['maxchunk'];
 
 		$table_averages .= "</tfoot>
 			</table>";
@@ -2609,7 +2609,7 @@ function editset($username, $bypass=0, $hid=0, $url=0)
 
 	// === GRAB TEAM INFORMATION FOR LOGGED-IN USER===
 
-	$teamlogo = $userinfo[user_ibl_team];
+	$teamlogo = $userinfo['user_ibl_team'];
 	$queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$teamlogo'";
 	$tid = $db->sql_result($db->sql_query($queryTeamID), 0);
 
@@ -2988,7 +2988,7 @@ function changesetgo($username, $action, $set, $type, $position)
 	$result2 = $db->sql_query($sql2);
 	$num = $db->sql_numrows($result2);
 	$userinfo = $db->sql_fetchrow($result2);
-	$teamlogo = $userinfo[user_ibl_team];
+	$teamlogo = $userinfo['user_ibl_team'];
 	if(!$bypass) cookiedecode($user);
 	include("header.php");
 

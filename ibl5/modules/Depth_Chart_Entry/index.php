@@ -43,7 +43,7 @@ function userinfo($username, $bypass=0, $hid=0, $url=0)
 	$userinfo = $db->sql_fetchrow($result2);
 	if(!$bypass) cookiedecode($user);
 
-	$teamlogo = $userinfo[user_ibl_team];
+	$teamlogo = $userinfo['user_ibl_team'];
 	$tid = $sharedFunctions->getTidFromTeamname($teamlogo);
 
 	include("header.php");
@@ -92,12 +92,12 @@ function userinfo($username, $bypass=0, $hid=0, $url=0)
 	$resultSelectedOffenseSet = $db->sql_query($querySelectedOffenseSet);
 	$offenseSet = $db->sql_fetchrow($resultSelectedOffenseSet);
 
-	$offense_name = $offenseSet[offense_name];
-	$Slot1 = $offenseSet[PG_Depth_Name];
-	$Slot2 = $offenseSet[SG_Depth_Name];
-	$Slot3 = $offenseSet[SF_Depth_Name];
-	$Slot4 = $offenseSet[PF_Depth_Name];
-	$Slot5 = $offenseSet[C_Depth_Name];
+	$offense_name = $offenseSet['offense_name'];
+	$Slot1 = $offenseSet['PG_Depth_Name'];
+	$Slot2 = $offenseSet['SG_Depth_Name'];
+	$Slot3 = $offenseSet['SF_Depth_Name'];
+	$Slot4 = $offenseSet['PF_Depth_Name'];
+	$Slot5 = $offenseSet['C_Depth_Name'];
 
 	$Low1 = 1;
 	$Low2 = 1;
@@ -130,24 +130,24 @@ function userinfo($username, $bypass=0, $hid=0, $url=0)
 	$depthcount = 1;
 
 	while ($player = $db->sql_fetchrow($playersOnTeam)) {
-		$player_pid = $player[pid];
-		$player_pos = $player[pos];
-		$player_name = $player[name];
-		$player_staminacap = $player[sta]+40;
+		$player_pid = $player['pid'];
+		$player_pos = $player['pos'];
+		$player_name = $player['name'];
+		$player_staminacap = $player['sta']+40;
 		if ($player_staminacap > 40) $player_staminacap = 40;
-		$player_PG = $player[dc_PGDepth];
-		$player_SG = $player[dc_SGDepth];
-		$player_SF = $player[dc_SFDepth];
-		$player_PF = $player[dc_PFDepth];
-		$player_C = $player[dc_CDepth];
-		$player_active = $player[dc_active];
-		$player_min = $player[dc_minutes];
-		$player_of = $player[dc_of];
-		$player_df = $player[dc_df];
-		$player_oi = $player[dc_oi];
-		$player_di = $player[dc_di];
-		$player_bh = $player[dc_bh];
-		$player_inj = $player[injured];
+		$player_PG = $player['dc_PGDepth'];
+		$player_SG = $player['dc_SGDepth'];
+		$player_SF = $player['dc_SFDepth'];
+		$player_PF = $player['dc_PFDepth'];
+		$player_C = $player['dc_CDepth'];
+		$player_active = $player['dc_active'];
+		$player_min = $player['dc_minutes'];
+		$player_of = $player['dc_of'];
+		$player_df = $player['dc_df'];
+		$player_oi = $player['dc_oi'];
+		$player_di = $player['dc_di'];
+		$player_bh = $player['dc_bh'];
+		$player_inj = $player['injured'];
 
 		if ($player_pos == 'PG') $pos_value = 1;
 		if ($player_pos == 'G') $pos_value = 2;
@@ -519,5 +519,3 @@ switch($op) {
 		main($user);
 	break;
 }
-
-?>

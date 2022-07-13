@@ -203,7 +203,7 @@ function display() {
 		</thead>
 		<tbody>";
 
-	$showteam = $db->sql_query("SELECT * FROM ".$prefix."_iblplyr WHERE teamname='$userteam' AND retired='0' ORDER BY ordinal ASC");
+	$showteam = $db->sql_query("SELECT * FROM ".$prefix."_iblplyr WHERE (teamname='$userteam' AND retired='0') OR name LIKE '%$userteam Buyouts%' ORDER BY ordinal ASC");
 	while ($teamlist = $db->sql_fetchrow($showteam)) {
 		$ordinal = stripslashes(check_html($teamlist['ordinal'], "nohtml"));
 		$draftyear = stripslashes(check_html($teamlist['draftyear'], "nohtml"));

@@ -1361,12 +1361,12 @@ function negotiate($pid) {
 	$offer6 = stripslashes(check_html($offergrabber['offer6'], "nohtml"));
 
 	if ($offer1 == 0) {
-		$prefill1=$dem1;
-		$prefill2=$dem2;
-		$prefill3=$dem3;
-		$prefill4=$dem4;
-		$prefill5=$dem5;
-		$prefill6=$dem6;
+		$prefill1 = "";
+		$prefill2 = "";
+		$prefill3 = "";
+		$prefill4 = "";
+		$prefill5 = "";
+		$prefill6 = "";
 	} else {
 		$prefill1=$offer1;
 		$prefill2=$offer2;

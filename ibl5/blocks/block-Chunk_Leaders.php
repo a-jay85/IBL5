@@ -35,6 +35,7 @@ function getLastSimStatLeaders($statName, $query)
         LIMIT 5;");
         // the previous query throws an error in MySQL 5.7.34 that can be fixed by running the following SQL query:
         // SET GLOBAL sql_mode=(SELECT REPLACE(@@sql_mode,'ONLY_FULL_GROUP_BY',''));
+        // source: https://stackoverflow.com/questions/41887460/select-list-is-not-in-group-by-clause-and-contains-nonaggregated-column-inc
 
     $i = 1;
     $numrows = $db->sql_numrows($querySimStatLeaders);

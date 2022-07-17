@@ -1258,14 +1258,6 @@ function showpage($pid, $spec)
             </table>";
     }
 
-    // POSITION CHANGE BUTTON START
-
-    // if ($can_renegotiate >= 0 AND $player_team_name == $userteam) {
-    //     echo "<table align=right bgcolor=#ffff00><tr><td align=center><a href=\"modules.php?name=Position_Change&pid=$pid\">CHANGE<BR>POSITION</a></td></tr></table>";
-    // }
-
-    // POSITION CHANGE BUTTON END
-
     echo "<font class=\"content\">Age: $player_age | Height: $player_ht_ft-$player_ht_in | Weight: $player_wt | College: <a href=\"http://college.iblhoops.net/rosters/roster$player_collegeid.htm\">$player_college</a><br>
         <i>Drafted by the $player_drafted_by with the # $player_draft_pick pick of round $player_draft_round in the <a href=\"online/draft.php?year=$player_draft_year\">$player_draft_year Draft</a></i><br>
         <center><table>
@@ -3501,10 +3493,6 @@ switch ($pa) {
 
     case "negotiate":
         negotiate($pid);
-        break;
-
-    case "poschange":
-        poschange($pid);
         break;
 
     case "rookieoption":

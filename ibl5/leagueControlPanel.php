@@ -39,10 +39,6 @@ if (isset($_POST['query'])) {
             $queryString = "UPDATE ibl_team_info SET HasMLE = 1, HasLLE = 1;";
             $successText = "All teams' MLEs and LLEs have been reset.";
             break;
-        case 'Set all undefined player positions':
-            $queryString = "UPDATE ibl_plr SET altpos = pos WHERE altpos = \"\"";
-            $successText = "All undefined player positions have been set.";
-            break;
         case 'Set all players on waivers to Free Agents and reset their Bird years':
             $queryString = "UPDATE ibl_plr SET teamname = 'Free Agents', bird = 0 WHERE retired != 1 AND ordinal >= 960;";
             $successText = "All players currently on waivers have their teamname set to Free Agents and 0 Bird years.";
@@ -151,7 +147,6 @@ switch ($currentSeasonPhase) {
     case 'Free Agency':
         echo "<INPUT type='submit' name='query' value='Reset All Contract Extensions'><p>
             <INPUT type='submit' name='query' value='Reset All MLEs/LLEs'><p>
-            <INPUT type='submit' name='query' value='Set all undefined player positions'><p>
             <INPUT type='submit' name='query' value='Set Free Agency factors for PFW'><p>
             <A HREF=\"tradition.php\">Set Free Agency factors for Tradition</A><p>
             <INPUT type='submit' name='query' value='Set all players on waivers to Free Agents and reset their Bird years'><p>";

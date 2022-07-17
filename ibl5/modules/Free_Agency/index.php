@@ -391,11 +391,6 @@ function display()
                 echo "<a href=\"modules.php?name=Player&pa=rookieoption&pid=$pid\">Rookie Option</a>";
             }
 
-            // ==== CHECK FOR ROOKIE POSITION MIGRATION POSSIBILITY
-            // if ($exp == 0) {
-            //     echo "<a href=\"modules.php?name=Free_Agency&pa=positionmigration&pid=$pid\">Migrate Position</a>";
-            // }
-
             if ($ordinal > 960) {
                 $name .= "*";
             }
@@ -2081,129 +2076,6 @@ function negotiate($pid)
 }
 // === END OF NEGOTIATE FUNCTION ===
 
-function positionmigration($pid)
-{
-    global $prefix, $db, $user, $cookie;
-    $pid = intval($pid);
-
-    cookiedecode($user);
-
-    $sql2 = "SELECT * FROM " . $prefix . "_users WHERE username='$cookie[1]'";
-    $result2 = $db->sql_query($sql2);
-    $num2 = $db->sql_numrows($result2);
-    $userinfo = $db->sql_fetchrow($result2);
-
-    $userteam = stripslashes(check_html($userinfo['user_ibl_team'], "nohtml"));
-
-    $playerinfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_plr WHERE pid='$pid'"));
-
-    $player_name = stripslashes(check_html($playerinfo['name'], "nohtml"));
-    $player_base_pos = stripslashes(check_html($playerinfo['pos'], "nohtml"));
-    //$player_pos = stripslashes(check_html($playerinfo['altpos'], "nohtml"));
-    $player_team_name = stripslashes(check_html($playerinfo['teamname'], "nohtml"));
-    $player_draftround = stripslashes(check_html($playerinfo['draftround'], "nohtml"));
-    $player_exp = stripslashes(check_html($playerinfo['exp'], "nohtml"));
-
-    if ($player_exp == 0) {
-        if ($player_draftround != 0) {
-            if ($player_base_pos != $player_pos) {
-                $eligible_PG = 0;
-                $eligible_G = 0;
-                $eligible_SG = 0;
-                $eligible_GF = 0;
-                $eligible_SF = 0;
-                $eligible_F = 0;
-                $eligible_PF = 0;
-                $eligible_FC = 0;
-                $eligible_C = 0;
-
-                echo "<img align=left src=\"images/player/$pid.jpg\">";
-
-                echo "You may migrate $player_name from their current position.  Once you choose a new position, it cannot be undone.
-					<form name=\"Migrate\" method=\"post\" action=\"migrate.php\">
-					<input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
-					<input type=\"hidden\" name=\"playername\" value=\"$player_name\">
-					<select name=\"NewPos\">
-				";
-
-                if ($player_base_pos == 'PG') {
-                    $eligible_PG = 1;
-                    $eligible_G = 1;
-                    $eligible_SG = 1;
-                } elseif ($player_base_pos == 'SG') {
-                    $eligible_PG = 1;
-                    $eligible_G = 1;
-                    $eligible_SG = 1;
-                    $eligible_GF = 1;
-                } elseif ($player_base_pos == 'SF') {
-                    $eligible_SG = 1;
-                    $eligible_FG = 1;
-                    $eligible_SF = 1;
-                    $eligible_F = 1;
-                } elseif ($player_base_pos == 'PF') {
-                    $eligible_SF = 1;
-                    $eligible_F = 1;
-                    $eligible_PF = 1;
-                    $eligible_FC = 1;
-                } else {
-                    $eligible_PF = 1;
-                    $eligible_FC = 1;
-                    $eligible_C = 1;
-                }
-
-                if ($eligible_PG == 1) {
-                    echo "  <option value=\"PG\" " . ($player_base_pos == 'PG' ? "SELECTED " : "") . ">PG</option>";
-                }
-
-                if ($eligible_G == 1) {
-                    echo "  <option value=\"G\">G</option>";
-                }
-
-                if ($eligible_SG == 1) {
-                    echo "  <option value=\"SG\" " . ($player_base_pos == 'SG' ? "SELECTED " : "") . ">SG</option>";
-                }
-
-                if ($eligible_GF == 1) {
-                    echo "  <option value=\"GF\">GF</option>";
-                }
-
-                if ($eligible_SF == 1) {
-                    echo "  <option value=\"SF\" " . ($player_base_pos == 'SF' ? "SELECTED " : "") . ">SF</option>";
-                }
-
-                if ($eligible_F == 1) {
-                    echo "  <option value=\"F\">F</option>";
-                }
-
-                if ($eligible_PF == 1) {
-                    echo "  <option value=\"PF\" " . ($player_base_pos == 'PF' ? "SELECTED " : "") . ">PF</option>";
-                }
-
-                if ($eligible_FC == 1) {
-                    echo "  <option value=\"FC\">FC</option>";
-                }
-
-                if ($eligible_C == 1) {
-                    echo "  <option value=\"C\" " . ($player_base_pos == 'C' ? "SELECTED " : "") . ">C</option>";
-                }
-
-                echo "</select>
-					<input type=\"submit\" value=\"Migrate Player!\"></form>";
-
-            } else {
-                echo "Sorry, $player_name has already been migrated to $player_pos.  He cannot be migrated again.";
-            }
-
-        } else {
-            echo "Sorry, $player_name was not drafted; only draft picks may be migrated.";
-        }
-
-    } else {
-        echo "Sorry, $player_name is no longer a rookie; only rookies may be migrated.";
-    }
-
-}
-
 function teamdisplay($pid)
 {
     global $prefix, $db, $user, $cookie;
@@ -2341,10 +2213,6 @@ switch ($pa) {
 
     case "negotiate":
         negotiate($pid);
-        break;
-
-    case "positionmigration":
-        positionmigration($pid);
         break;
 
     default:

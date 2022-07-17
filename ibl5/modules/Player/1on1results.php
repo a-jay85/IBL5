@@ -2,7 +2,7 @@
 
 $player2 = str_replace("%20", " ", $player);
 
-$query = "SELECT * FROM nuke_one_on_one WHERE winner = '$player2' ORDER BY gameid ASC";
+$query = "SELECT * FROM ibl_one_on_one WHERE winner = '$player2' ORDER BY gameid ASC";
 $result = $db->sql_query($query);
 $num = $db->sql_numrows($result);
 
@@ -29,7 +29,7 @@ while ($i < $num) {
     $i++;
 }
 
-$query = "SELECT * FROM nuke_one_on_one WHERE loser = '$player2' ORDER BY gameid ASC";
+$query = "SELECT * FROM ibl_one_on_one WHERE loser = '$player2' ORDER BY gameid ASC";
 $result = $db->sql_query($query);
 $num = $db->sql_numrows($result);
 $i = 0;

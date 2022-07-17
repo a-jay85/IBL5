@@ -2,11 +2,11 @@
 
 require 'mainfile.php';
 
-$sqlpriority = "SELECT * FROM nuke_ibl_waiver_priority ORDER BY pct ASC";
+$sqlpriority = "SELECT * FROM ibl_waiver_priority ORDER BY pct ASC";
 $resultpriority = $db->sql_query($sqlpriority);
 $numpriority = $db->sql_numrows($resultpriority);
 $j = 0;while ($j < $numpriority) {$teamgrab = $db->sql_result($resulttake, $j, "team");
-    $sqltake = "SELECT * FROM nuke_ibl_waiver_move WHERE `team` = '$teamgrab'";
+    $sqltake = "SELECT * FROM ibl_waiver_move WHERE `team` = '$teamgrab'";
     $resulttake = $db->sql_query($sqltake);
     $numtake = $db->sql_numrows($resulttake);
     $Timestamp = intval(time());

@@ -2,7 +2,7 @@
 
 require 'mainfile.php';
 
-$query1 = "SELECT * FROM nuke_ibl_team_info";
+$query1 = "SELECT * FROM ibl_team_info";
 $result1 = $db->sql_query($query1);
 $num1 = $db->sql_numrows($result1);
 
@@ -12,7 +12,7 @@ echo "<HTML><HEAD><TITLE>UPDATE</TITLE></HEAD><BODY>";
 
 while ($i < $num1) {
     $teamname = $db->sql_result($result1, $i, "team_name");
-    $query2 = "SELECT * FROM nuke_iblteam_win_loss WHERE currentname = '$teamname' ORDER BY year DESC LIMIT 5";
+    $query2 = "SELECT * FROM ibl_team_win_loss WHERE currentname = '$teamname' ORDER BY year DESC LIMIT 5";
     $result2 = $db->sql_query($query2);
     $num2 = $db->sql_numrows($result2);
     $j = 0;
@@ -34,9 +34,9 @@ while ($i < $num1) {
 
     echo " Tradition: $tradw - $tradl<br>";
 
-    $query3 = "UPDATE nuke_ibl_team_info SET `Contract_AvgW` = '$tradw' WHERE `team_name` = '$teamname'";
+    $query3 = "UPDATE ibl_team_info SET `Contract_AvgW` = '$tradw' WHERE `team_name` = '$teamname'";
     $result3 = $db->sql_query($query3);
-    $query4 = "UPDATE nuke_ibl_team_info SET `Contract_AvgL` = '$tradl' WHERE `team_name` = '$teamname'";
+    $query4 = "UPDATE ibl_team_info SET `Contract_AvgL` = '$tradl' WHERE `team_name` = '$teamname'";
     $result4 = $db->sql_query($query4);
     $i++;
 }

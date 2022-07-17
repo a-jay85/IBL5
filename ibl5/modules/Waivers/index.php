@@ -100,7 +100,7 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
     $Healthy_Roster_Slots = $_POST['healthyrosterslots'];
 
     if ($Type_Of_Action == 'add' or $Type_Of_Action == 'drop') {
-        $queryt = "SELECT * FROM nuke_ibl_team_info WHERE team_name = '$Team_Offering'";
+        $queryt = "SELECT * FROM ibl_team_info WHERE team_name = '$Team_Offering'";
         $resultt = $db->sql_query($queryt);
 
         $teamid = $db->sql_result($resultt, 0, "teamid");
@@ -109,7 +109,7 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
 
         // ADD TEAM TOTAL SALARY FOR THIS YEAR
 
-        $querysalary = "SELECT * FROM nuke_iblplyr WHERE teamname = '$Team_Offering' AND retired = 0";
+        $querysalary = "SELECT * FROM ibl_plr WHERE teamname = '$Team_Offering' AND retired = 0";
         $results = $db->sql_query($querysalary);
         $num = $db->sql_numrows($results);
         $z = 0;
@@ -125,7 +125,7 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
 
         $k = 0;
 
-        $waiverquery = "SELECT * FROM nuke_iblplyr WHERE pid = '$Player_to_Process'";
+        $waiverquery = "SELECT * FROM ibl_plr WHERE pid = '$Player_to_Process'";
         $waiverresult = $db->sql_query($waiverquery);
         $playername = $db->sql_result($waiverresult, 0, "name");
         $players_team = $db->sql_result($waiverresult, 0, "tid");
@@ -141,7 +141,7 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
             if ($Roster_Slots > 2 and $TotalSalary > 7000) { // TODO: Change 7000 to hard cap variable
                 $errortext = "You have 12 players and are over $70 mill hard cap.  Therefore you can't drop a player!";
             } else {
-                $queryi = "UPDATE nuke_iblplyr SET `ordinal` = '1000', `droptime` = '$Timestamp' WHERE `pid` = '$Player_to_Process' LIMIT 1;";
+                $queryi = "UPDATE ibl_plr SET `ordinal` = '1000', `droptime` = '$Timestamp' WHERE `pid` = '$Player_to_Process' LIMIT 1;";
                 $resulti = $db->sql_query($queryi);
 
                 $topicid = 32;
@@ -218,7 +218,7 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
             } elseif ($Healthy_Roster_Slots < 1) {
                 $errortext = "You have full roster of 15 players. You can't sign another player at this time!";
             } else {
-                $queryi = "UPDATE nuke_iblplyr
+                $queryi = "UPDATE ibl_plr
                     SET `ordinal` = '800',
                         `bird` = 0, ";
                 if ($newWaiverContract == true) {
@@ -292,16 +292,16 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
     OpenTable();
 
     $teamlogo = $userinfo['user_ibl_team'];
-    $queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$teamlogo'";
+    $queryTeamID = "SELECT teamid FROM ibl_team_info WHERE team_name = '$teamlogo'";
     $tid = $db->sql_result($db->sql_query($queryTeamID), 0);
 
     $sharedFunctions->displaytopmenu($tid);
 
     echo "<center><font color=red><b>$errortext</b></font></center>";
-    $sql7 = "SELECT * FROM nuke_ibl_team_info ORDER BY teamid ASC ";
+    $sql7 = "SELECT * FROM ibl_team_info ORDER BY teamid ASC ";
     $result7 = $db->sql_query($sql7);
 
-    $sql9 = "SELECT * FROM nuke_iblplyr WHERE teamname = '$userinfo[user_ibl_team]' AND retired = '0' AND ordinal < '961' AND injured = '0' ORDER BY ordinal ASC";
+    $sql9 = "SELECT * FROM ibl_plr WHERE teamname = '$userinfo[user_ibl_team]' AND retired = '0' AND ordinal < '961' AND injured = '0' ORDER BY ordinal ASC";
     $result9 = $db->sql_query($sql9);
 
     $healthyrosterslots = 15;
@@ -310,7 +310,7 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
         $healthyrosterslots--;
     }
 
-    $sql10 = "SELECT * FROM nuke_iblplyr WHERE teamname = '$userinfo[user_ibl_team]' AND retired = '0' AND ordinal < '961' ORDER BY ordinal ASC ";
+    $sql10 = "SELECT * FROM ibl_plr WHERE teamname = '$userinfo[user_ibl_team]' AND retired = '0' AND ordinal < '961' ORDER BY ordinal ASC ";
     $result10 = $db->sql_query($sql10);
 
     $rosterslots = 15;
@@ -320,10 +320,10 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
     }
 
     if ($action == 'drop') {
-        $sql8 = "SELECT * FROM nuke_iblplyr WHERE teamname = '$userinfo[user_ibl_team]' AND retired = '0' AND ordinal < '961' ORDER BY ordinal ASC ";
+        $sql8 = "SELECT * FROM ibl_plr WHERE teamname = '$userinfo[user_ibl_team]' AND retired = '0' AND ordinal < '961' ORDER BY ordinal ASC ";
         $result8 = $db->sql_query($sql8);
     } else {
-        $sql8 = "SELECT * FROM nuke_iblplyr WHERE ordinal > '959' AND retired = '0' ORDER BY ordinal ASC ";
+        $sql8 = "SELECT * FROM ibl_plr WHERE ordinal > '959' AND retired = '0' ORDER BY ordinal ASC ";
         $result8 = $db->sql_query($sql8);
     }
 

@@ -18,11 +18,11 @@ if (!defined('BLOCK_FILE')) {
 
 global $db;
 
-$max_chunk_query = "SELECT MAX(chunk) as maxchunk FROM nuke_iblplyr_chunk WHERE active = 1";
+$max_chunk_query = "SELECT MAX(chunk) as maxchunk FROM ibl_plr_chunk WHERE active = 1";
 $max_chunk_result = $db->sql_query($max_chunk_query);
 $row = $db->sql_fetch_assoc($max_chunk_result);
 
-//$query2="SELECT * FROM nuke_iblplyr_chunk WHERE chunk = $row[maxchunk] ORDER BY pid ASC";
+//$query2="SELECT * FROM ibl_plr_chunk WHERE chunk = $row[maxchunk] ORDER BY pid ASC";
 //$result2 = $db->sql_query($query2);
 //$new_name=$db->sql_result($result2,0,"name");
 
@@ -74,11 +74,11 @@ function all_chunk($pos, $row)
 {
     global $db;
 
-    $querypoc = "SELECT * FROM nuke_iblplyr_chunk WHERE chunk = $row[maxchunk] ORDER BY qa DESC";
+    $querypoc = "SELECT * FROM ibl_plr_chunk WHERE chunk = $row[maxchunk] ORDER BY qa DESC";
     $resultpoc = $db->sql_query($querypoc);
     $pospoc = $db->sql_result($resultpoc, 0, "pos");
 
-    $query = "SELECT * FROM nuke_iblplyr_chunk WHERE chunk = $row[maxchunk] AND pos = '$pos' ORDER BY qa DESC";
+    $query = "SELECT * FROM ibl_plr_chunk WHERE chunk = $row[maxchunk] AND pos = '$pos' ORDER BY qa DESC";
     $result = $db->sql_query($query);
     $name = $db->sql_result($result, 0, "name");
     $pid = $db->sql_result($result, 0, "pid");

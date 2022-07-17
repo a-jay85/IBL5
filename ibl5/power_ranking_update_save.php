@@ -2,7 +2,7 @@
 
 require 'mainfile.php';
 
-$query = "SELECT * FROM nuke_ibl_power WHERE TeamID BETWEEN 1 AND 32 ORDER BY TeamID ASC";
+$query = "SELECT * FROM ibl_power WHERE TeamID BETWEEN 1 AND 32 ORDER BY TeamID ASC";
 $result = $db->sql_query($query);
 $num = $db->sql_numrows($result);
 
@@ -13,11 +13,11 @@ while ($i < $num) {
     $Team = $db->sql_result($result, $i, "Team");
     $i++;
     list($wins, $losses, $gb) = record($tid);
-    $query3 = "UPDATE nuke_ibl_power SET win = $wins, loss = $losses, gb = $gb WHERE TeamID = $tid;";
+    $query3 = "UPDATE ibl_power SET win = $wins, loss = $losses, gb = $gb WHERE TeamID = $tid;";
 
     $result3 = $db->sql_query($query3);
     $ranking = ranking($tid, $wins, $losses);
-    $query4 = "UPDATE nuke_ibl_power SET ranking = $ranking WHERE TeamID = $tid;";
+    $query4 = "UPDATE ibl_power SET ranking = $ranking WHERE TeamID = $tid;";
     $result4 = $db->sql_query($query4);
     echo "Updating $Team wins $wins and losses $losses and ranking $ranking<br>";
 }
@@ -73,7 +73,7 @@ function ranking($tid, $wins, $losses)
         $home = $db->sql_result($result, $i, "Home");
         $HScore = $db->sql_result($result, $i, "HScore");
 
-        $query2 = "SELECT * FROM nuke_ibl_power WHERE TeamID = $home";
+        $query2 = "SELECT * FROM ibl_power WHERE TeamID = $home";
         $result2 = $db->sql_query($query2);
         $oppwins = $db->sql_result($result2, 0, "win");
         $opploss = $db->sql_result($result2, 0, "loss");
@@ -96,7 +96,7 @@ function ranking($tid, $wins, $losses)
         $home = $db->sql_result($result, $i, "Home");
         $HScore = $db->sql_result($result, $i, "HScore");
 
-        $query2 = "SELECT * FROM nuke_ibl_power WHERE TeamID = $visitor";
+        $query2 = "SELECT * FROM ibl_power WHERE TeamID = $visitor";
         $result2 = $db->sql_query($query2);
         $oppwins = $db->sql_result($result2, 0, "win");
         $opploss = $db->sql_result($result2, 0, "loss");

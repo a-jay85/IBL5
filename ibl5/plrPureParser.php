@@ -168,7 +168,7 @@ while (!feof($plrFile)) {
     $ratingTD = substr($line, 605, 2);
 
     if ($ordinal <= 1440) {
-        $playerUpdateQuery = "INSERT INTO nuke_iblplyr__pure_plr
+        $playerUpdateQuery = "INSERT INTO ibl_plr__pure_plr
             (   `ordinal`,
                 `name`,
                 `age`,
@@ -653,7 +653,7 @@ $i = 0;
 while ($i < $numRowsTeamIDsNames) {
     $teamname = $db->sql_result($queryTeamIDsNames, $i, 'team_name');
     $teamID = $db->sql_result($queryTeamIDsNames, $i, 'teamid');
-    $teamnameUpdateQuery = "UPDATE `nuke_iblplyr__test` SET `teamname` = '$teamname' WHERE `tid` = $teamID;";
+    $teamnameUpdateQuery = "UPDATE `ibl_plr__test` SET `teamname` = '$teamname' WHERE `tid` = $teamID;";
     if ($db->sql_query($teamnameUpdateQuery)) {
         echo $teamnameUpdateQuery . '<br>';
     }

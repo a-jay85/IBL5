@@ -69,7 +69,7 @@ function oneonone()
     echo "<form name=\"OneOnOne\" method=\"post\" action=\"modules.php?name=One-on-One\">
     Player One: <select name=\"pid1\">";
 
-    $query = "SELECT * FROM nuke_iblplyr WHERE retired = '0' ORDER BY name ASC";
+    $query = "SELECT * FROM ibl_plr WHERE retired = '0' ORDER BY name ASC";
     $result = $db->sql_query($query);
     $num = $db->sql_numrows($result);
 
@@ -548,7 +548,7 @@ function rungame($p1, $p2, $owner)
 {
     global $db;
 
-    $query1 = "SELECT * FROM nuke_iblplyr WHERE pid = $p1";
+    $query1 = "SELECT * FROM ibl_plr WHERE pid = $p1";
     $result1 = $db->sql_query($query1);
 
     $p1_name = $db->sql_result($result1, 0, "name");
@@ -571,7 +571,7 @@ function rungame($p1, $p2, $owner)
     $p1_blk = $db->sql_result($result1, 0, "r_blk");
     $p1_foul = $db->sql_result($result1, 0, "r_foul");
 
-    $query2 = "SELECT * FROM nuke_iblplyr WHERE pid = $p2";
+    $query2 = "SELECT * FROM ibl_plr WHERE pid = $p2";
     $result2 = $db->sql_query($query2);
 
     $p2_name = $db->sql_result($result2, 0, "name");

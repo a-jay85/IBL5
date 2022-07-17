@@ -14,7 +14,7 @@ while ($i < $num1) {
     $playername = $db->sql_result($result1, $i, "name");
     $playerid = $db->sql_result($result1, $i, "pid");
 
-    $query2 = "SELECT * FROM nuke_iblplyr WHERE name = '$playername'";
+    $query2 = "SELECT * FROM ibl_plr WHERE name = '$playername'";
     $result2 = $db->sql_query($query2);
     $num2 = $db->sql_numrows($result2);
     $retired = $db->sql_result($result2, 0, "retired");

@@ -8,7 +8,7 @@ $Roster_Slots = $_POST['rosterslots'];
 $Healthy_Roster_Slots = $_POST['healthyrosterslots'];
 $Type_Of_Action = $_POST['Action'];
 
-$queryt = "SELECT * FROM nuke_ibl_team_info WHERE team_name = '$Team_Offering' ";
+$queryt = "SELECT * FROM ibl_team_info WHERE team_name = '$Team_Offering' ";
 $resultt = $db->sql_query($queryt);
 
 $teamid = $db->sql_result($resultt, 0, "teamid");
@@ -17,7 +17,7 @@ $Timestamp = intval(time());
 
 // ADD TEAM TOTAL SALARY FOR THIS YEAR
 
-$querysalary = "SELECT * FROM nuke_iblplyr WHERE teamname = '$Team_Offering' AND retired = 0 ";
+$querysalary = "SELECT * FROM ibl_plr WHERE teamname = '$Team_Offering' AND retired = 0 ";
 $results = $db->sql_query($querysalary);
 $num = $db->sql_numrows($results);
 $z = 0;
@@ -39,7 +39,7 @@ while ($k < $Fields_Counter) {
     $Salary = $_POST['cy' . $k];
     $Index = $_POST['index' . $k];
     $Check = $_POST['check' . $k];
-    $queryn = "SELECT * FROM nuke_iblplyr WHERE pid = '$Index' ";
+    $queryn = "SELECT * FROM ibl_plr WHERE pid = '$Index' ";
     $resultn = $db->sql_query($queryn);
     $playername = $db->sql_result($resultn, 0, "name");
     $players_team = $db->sql_result($resultn, 0, "tid");
@@ -52,7 +52,7 @@ while ($k < $Fields_Counter) {
 
             } else {
 
-                $queryi = "UPDATE nuke_iblplyr SET `ordinal` = '1000', `droptime` = '$Timestamp' WHERE `pid` = '$Index' LIMIT 1;";
+                $queryi = "UPDATE ibl_plr SET `ordinal` = '1000', `droptime` = '$Timestamp' WHERE `pid` = '$Index' LIMIT 1;";
                 $resulti = $db->sql_query($queryi);
 
                 $topicid = 32;
@@ -83,7 +83,7 @@ while ($k < $Fields_Counter) {
 
         } else {
             if ($players_team == $teamid) {
-                $queryi = "UPDATE nuke_iblplyr SET `ordinal` = '800', `teamname` = '$Team_Offering', `tid` = '$teamid' WHERE `pid` = '$Index' LIMIT 1;";
+                $queryi = "UPDATE ibl_plr SET `ordinal` = '800', `teamname` = '$Team_Offering', `tid` = '$teamid' WHERE `pid` = '$Index' LIMIT 1;";
                 $resulti = $db->sql_query($queryi);
                 $Roster_Slots++;
 
@@ -128,7 +128,7 @@ while ($k < $Fields_Counter) {
 
                 } else {
 
-                    $queryi = "UPDATE nuke_iblplyr SET `ordinal` = '800', `cy` = '1', `cy1` = '$Salary', `teamname` = '$Team_Offering', `tid` = '$teamid' WHERE `pid` = '$Index' LIMIT 1;";
+                    $queryi = "UPDATE ibl_plr SET `ordinal` = '800', `cy` = '1', `cy1` = '$Salary', `teamname` = '$Team_Offering', `tid` = '$teamid' WHERE `pid` = '$Index' LIMIT 1;";
                     $resulti = $db->sql_query($queryi);
                     $Roster_Slots++;
 

@@ -24,7 +24,7 @@ while ($i < $numOfTeams + 1) {
     $currentCapResult = $db->sql_query($currentCapQuery);
     $teamCapTotal = $db->sql_result($currentCapResult, 0);
 
-    $teamnameQuery = "SELECT teamname FROM nuke_iblplyr WHERE tid=$i AND retired=0 LIMIT 1";
+    $teamnameQuery = "SELECT teamname FROM ibl_plr WHERE tid=$i AND retired=0 LIMIT 1";
     $teamnameResult = $db->sql_query($teamnameQuery);
     $teamname = $db->sql_result($teamnameResult, 0);
 

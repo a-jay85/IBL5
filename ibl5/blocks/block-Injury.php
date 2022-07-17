@@ -48,7 +48,7 @@ while ($j < $numo) {
     $user_team = $db->sql_result($resulto, $j, "user_ibl_team");
 
     $sql = "SELECT *
-        FROM nuke_iblplyr
+        FROM ibl_plr
         WHERE teamname = '$user_team'
         AND retired = '0'
         AND injured = '0'
@@ -59,7 +59,7 @@ while ($j < $numo) {
     $num1 = $db->sql_numrows($result1);
 
     $sql2 = "SELECT *
-        FROM nuke_iblplyr
+        FROM ibl_plr
         WHERE teamname = '$user_team'
         AND retired = '0'
         AND injured > '0'
@@ -85,7 +85,7 @@ while ($j < $numo) {
     if ($waivers_needed < 0) {
         $waivers_needed = 0;
     }
-    $sql3 = "SELECT chart FROM nuke_ibl_team_info WHERE team_name = '$user_team'";
+    $sql3 = "SELECT chart FROM ibl_team_info WHERE team_name = '$user_team'";
     $result3 = $db->sql_query($sql3);
     $chart = $db->sql_result($result3, 0, "chart");
 

@@ -15,19 +15,19 @@ if (isset($_POST['query'])) {
     switch ($_POST['query']) {
         case 'Set Season Phase':
             if (isset($_POST['SeasonPhase'])) {
-                $queryString = "UPDATE nuke_ibl_settings SET value = '{$_POST['SeasonPhase']}' WHERE name = 'Current Season Phase';";
+                $queryString = "UPDATE ibl_settings SET value = '{$_POST['SeasonPhase']}' WHERE name = 'Current Season Phase';";
             }
             $successText = "Season Phase has been set to {$_POST['SeasonPhase']}.";
             break;
         case 'Set Waiver Wire Status':
             if (isset($_POST['Waivers'])) {
-                $queryString = "UPDATE nuke_ibl_settings SET value = '{$_POST['Waivers']}' WHERE name = 'Allow Waiver Moves';";
+                $queryString = "UPDATE ibl_settings SET value = '{$_POST['Waivers']}' WHERE name = 'Allow Waiver Moves';";
             }
             $successText = "Waiver Wire Status has been set to {$_POST['Waivers']}.";
             break;
         case 'Set Allow Trades Status':
             if (isset($_POST['Trades'])) {
-                $queryString = "UPDATE nuke_ibl_settings SET value = '{$_POST['Trades']}' WHERE name = 'Allow Trades';";
+                $queryString = "UPDATE ibl_settings SET value = '{$_POST['Trades']}' WHERE name = 'Allow Trades';";
             }
             $successText = "Allow Trades Status has been set to {$_POST['Trades']}.";
             break;

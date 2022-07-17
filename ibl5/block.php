@@ -51,13 +51,17 @@ while ($i < $num) {
     $offeryears = 6;
     if ($offer6 == 0) {
         $offeryears = 5;
-    }if ($offer5 == 0) {
+    }
+    if ($offer5 == 0) {
         $offeryears = 4;
-    }if ($offer4 == 0) {
+    }
+    if ($offer4 == 0) {
         $offeryears = 3;
-    }if ($offer3 == 0) {
+    }
+    if ($offer3 == 0) {
         $offeryears = 2;
-    }if ($offer2 == 0) {
+    }
+    if ($offer2 == 0) {
         $offeryears = 1;
     }
     $offertotal = ($offer1 + $offer2 + $offer3 + $offer4 + $offer5 + $offer6) / 100;
@@ -65,15 +69,20 @@ while ($i < $num) {
     $demyrs = 6;
     if ($dem6 == 0) {
         $demyrs = 5;
-    }if ($dem5 == 0) {
+    }
+    if ($dem5 == 0) {
         $demyrs = 4;
-    }if ($dem4 == 0) {
+    }
+    if ($dem4 == 0) {
         $demyrs = 3;
-    }if ($dem3 == 0) {
+    }
+    if ($dem3 == 0) {
         $demyrs = 2;
-    }if ($dem2 == 0) {
+    }
+    if ($dem2 == 0) {
         $demyrs = 1;
-    }if ($offer2 == 0) {
+    }
+    if ($offer2 == 0) {
     } else {
         if ($offer2 < 0.5 * $dem1) {
             $perceivedvalue = 0;
@@ -135,13 +144,17 @@ while ($i < $num) {
     $offeryears = 6;
     if ($offer6 == 0) {
         $offeryears = 5;
-    }if ($offer5 == 0) {
+    }
+    if ($offer5 == 0) {
         $offeryears = 4;
-    }if ($offer4 == 0) {
+    }
+    if ($offer4 == 0) {
         $offeryears = 3;
-    }if ($offer3 == 0) {
+    }
+    if ($offer3 == 0) {
         $offeryears = 2;
-    }if ($offer2 == 0) {
+    }
+    if ($offer2 == 0) {
         $offeryears = 1;
     }
     $offertotal = ($offer1 + $offer2 + $offer3 + $offer4 + $offer5 + $offer6) / 100;

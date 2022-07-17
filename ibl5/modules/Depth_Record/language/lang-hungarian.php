@@ -17,18 +17,16 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PREVIOUS","Elõzõ oldal");
-define("_NEXT","Következõ oldal");
-define("_PAGE","oldal");
-define("_DEACTIVATE","Kikapcsolás");
-define("_ACTIVATE","Bekapcsolás");
-define("_PUBLISHEDON","Published on");
-define("_PAGESLIST","Pages List");
-define("_LISTOFCONTENT","List of available content in");
-define("_YOURADMINLIST","You're Administrator: following is the list of Inactive pages:");
-define("_COPYRIGHT","Copyright &copy; by");
-define("_COPYRIGHT2","All Right Reserved.");
-define("_CONTENTCATEGORIES","Available Content Categories");
-define("_NONCLASSCONT","Non Categorized Content");
-
-?>
+define("_PREVIOUS", "Elï¿½zï¿½ oldal");
+define("_NEXT", "Kï¿½vetkezï¿½ oldal");
+define("_PAGE", "oldal");
+define("_DEACTIVATE", "Kikapcsolï¿½s");
+define("_ACTIVATE", "Bekapcsolï¿½s");
+define("_PUBLISHEDON", "Published on");
+define("_PAGESLIST", "Pages List");
+define("_LISTOFCONTENT", "List of available content in");
+define("_YOURADMINLIST", "You're Administrator: following is the list of Inactive pages:");
+define("_COPYRIGHT", "Copyright &copy; by");
+define("_COPYRIGHT2", "All Right Reserved.");
+define("_CONTENTCATEGORIES", "Available Content Categories");
+define("_NONCLASSCONT", "Non Categorized Content");

@@ -17,30 +17,26 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_EMAIL","E-post");
-define("_SAVECHANGES","Lagre endringer");
-define("_SCORE","Poeng:");
-define("_PRODUCTTITLE","Produktnavn");
-define("_RELATEDLINK","Relatert link");
-define("_LINKTITLE","Tittel på linken");
-define("_REVIEWER","Anmelder:");
-define("_REVIEWID","Anmelder ID");
-define("_REVIEWS","Anmeldelser");
-define("_DATE","Dato");
-define("_REVADMIN","Anmelderadministrasjon");
-define("_REVTITLE","Anmeldersidens tittel");
-define("_REVDESC","Anmeldersidens beskrivelse");
-define("_REVWAITING","Anmeldelser som venter på godkjenning");
-define("_REVIMGINFO","Legg til ditt bilde (150x150) i images/reviews");
-define("_TEXT","Tekst");
-define("_IMAGE","Bilde");
-define("_NOREVIEW2ADD","Ingen anmeldelser å legge til");
-define("_ADDREVIEW","Legg til anmeldelse");
-define("_CLICK2ADDREVIEW","Trykk her for å skrive en anmeldelse");
-define("_DELMODREVIEW","Slett/Rediger en anmeldelse");
-define("_MODREVINFO","Du kan enkelt slette/redigere anmeldelser gjennom å bla i <a href=\"modules.php?name=Reviews\">Anmeldelser</a> som Admin.");
-define("_LANGUAGE","Språk");
-
-
-?>
+define("_EMAIL", "E-post");
+define("_SAVECHANGES", "Lagre endringer");
+define("_SCORE", "Poeng:");
+define("_PRODUCTTITLE", "Produktnavn");
+define("_RELATEDLINK", "Relatert link");
+define("_LINKTITLE", "Tittel pï¿½ linken");
+define("_REVIEWER", "Anmelder:");
+define("_REVIEWID", "Anmelder ID");
+define("_REVIEWS", "Anmeldelser");
+define("_DATE", "Dato");
+define("_REVADMIN", "Anmelderadministrasjon");
+define("_REVTITLE", "Anmeldersidens tittel");
+define("_REVDESC", "Anmeldersidens beskrivelse");
+define("_REVWAITING", "Anmeldelser som venter pï¿½ godkjenning");
+define("_REVIMGINFO", "Legg til ditt bilde (150x150) i images/reviews");
+define("_TEXT", "Tekst");
+define("_IMAGE", "Bilde");
+define("_NOREVIEW2ADD", "Ingen anmeldelser ï¿½ legge til");
+define("_ADDREVIEW", "Legg til anmeldelse");
+define("_CLICK2ADDREVIEW", "Trykk her for ï¿½ skrive en anmeldelse");
+define("_DELMODREVIEW", "Slett/Rediger en anmeldelse");
+define("_MODREVINFO", "Du kan enkelt slette/redigere anmeldelser gjennom ï¿½ bla i <a href=\"modules.php?name=Reviews\">Anmeldelser</a> som Admin.");
+define("_LANGUAGE", "Sprï¿½k");

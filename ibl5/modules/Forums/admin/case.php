@@ -22,18 +22,15 @@
 /* Forum admin files for PHP-Nuke 7.5 by chatserv                       */
 /************************************************************************/
 
-if ( !defined('ADMIN_FILE') )
-{
-	die("Illegal File Access");
+if (!defined('ADMIN_FILE')) {
+    die("Illegal File Access");
 }
 $module_name = "Forums";
 
-switch($op) {
+switch ($op) {
 
     case "forums":
-    include("modules/$module_name/admin/forums.php");
-    break;
- 
-}
+        include "modules/$module_name/admin/forums.php";
+        break;
 
-?>
+}

@@ -17,30 +17,26 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_REVIEWS","Ανασκοπήσεις");
-define("_SCORE","Βαθμολογία (αποτέλεσμα αξιολόγησης)");
-define("_EMAIL","Email");
-define("_SAVECHANGES","Αποθήκευση Αλλαγών");
-define("_DATE","Ημερομηνία");
-define("_LINKTITLE","Επικεφαλίδα Συνδέσμου");
-define("_PRODUCTTITLE","Τίτλος");
-define("_RELATEDLINK","Σχετικοί Συνδέσμοι ");
-define("_REVIEWER","Σχολιαστές ?");
-define("_REVIEWID","Περιφραφή ID");
-define("_REVADMIN","Διαχείριση Reviews");
-define("_REVTITLE","Σελίδα Τίτλων Reviews");
-define("_REVDESC","Σελιδα Περιγραφής Reviews");
-define("_REVWAITING","Reviews εν αναμονή Έγκρισης");
-define("_TEXT","Κείμενο");
-define("_IMAGE","Εικόνα");
-define("_REVIMGINFO","Αποθήκευση την 150*150 εικόνα σας στο φάκελο εικόνες/reviews");
-define("_ADDREVIEW","Προσθήκη Review");
-define("_NOREVIEW2ADD","Δεν υπάρχουν reviews για προσθήκη");
-define("_CLICK2ADDREVIEW","Κάντε κλικ εδώ για να γράψτε κάποιο review");
-define("_DELMODREVIEW","Διαγραφή / Τροποποίση review");
-define("_MODREVINFO","Μπορείτε εύκολα να διαγράψτε/τροποποιήσετε reviews αν προσπελάσετε το <a href=\"modules.php?name=Reviews\">Reviews</a> ως Διαχειριστής.");
-define("_LANGUAGE","Language");
-
-
-?>
+define("_REVIEWS", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_SCORE", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ (οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½)");
+define("_EMAIL", "Email");
+define("_SAVECHANGES", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_DATE", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_LINKTITLE", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_PRODUCTTITLE", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_RELATEDLINK", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ ");
+define("_REVIEWER", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ ?");
+define("_REVIEWID", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ ID");
+define("_REVADMIN", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ Reviews");
+define("_REVTITLE", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ Reviews");
+define("_REVDESC", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ Reviews");
+define("_REVWAITING", "Reviews οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_TEXT", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_IMAGE", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_REVIMGINFO", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½ 150*150 οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½/reviews");
+define("_ADDREVIEW", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ Review");
+define("_NOREVIEW2ADD", "οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ reviews οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_CLICK2ADDREVIEW", "οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½ οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ review");
+define("_DELMODREVIEW", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ / οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ review");
+define("_MODREVINFO", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½/οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ reviews οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½ <a href=\"modules.php?name=Reviews\">Reviews</a> οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½.");
+define("_LANGUAGE", "Language");

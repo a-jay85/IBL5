@@ -7,25 +7,22 @@
 /*                                                                        */
 /**************************************************************************/
 
-
-define("_CATEGORY","Categoria");
-define("_LVOTES","Vots");
-define("_HITS","Hits");
-define("_TOPWELCOME","Benvingut al TOP de");
-define("_READSTORIES","primeres noticies més llegides");
-define("_COMMENTEDSTORIES","primeres noticies més comentades");
-define("_ACTIVECAT","categories més actives");
-define("_READSECTION","primers articles més llegits a les seccions especials");
-define("_NEWSSUBMITTERS","primers usuaris que més noticies envien i es publiquen");
-define("_NEWSSENT","noticies enviade");
-define("_VOTEDPOLLS","primeres enquestes més votades");
-define("_MOSTACTIVEAUTHORS","autors més actius");
-define("_NEWSPUBLISHED","noticies publicades");
-define("_READREVIEWS","reviews més llegits");
-define("_DOWNLOADEDFILES","archius més descargats");
-define("_MOSTREADPAGES","pàgines més llegides");
-define("_MOSTVOTEDSTORIES","histories més votades");
-define("_POINTS","punts");
-define("_BESTRATEDSTORIES","histories millor votades (basat en un màxim de 5 punts)");
-
-?>
+define("_CATEGORY", "Categoria");
+define("_LVOTES", "Vots");
+define("_HITS", "Hits");
+define("_TOPWELCOME", "Benvingut al TOP de");
+define("_READSTORIES", "primeres noticies mï¿½s llegides");
+define("_COMMENTEDSTORIES", "primeres noticies mï¿½s comentades");
+define("_ACTIVECAT", "categories mï¿½s actives");
+define("_READSECTION", "primers articles mï¿½s llegits a les seccions especials");
+define("_NEWSSUBMITTERS", "primers usuaris que mï¿½s noticies envien i es publiquen");
+define("_NEWSSENT", "noticies enviade");
+define("_VOTEDPOLLS", "primeres enquestes mï¿½s votades");
+define("_MOSTACTIVEAUTHORS", "autors mï¿½s actius");
+define("_NEWSPUBLISHED", "noticies publicades");
+define("_READREVIEWS", "reviews mï¿½s llegits");
+define("_DOWNLOADEDFILES", "archius mï¿½s descargats");
+define("_MOSTREADPAGES", "pï¿½gines mï¿½s llegides");
+define("_MOSTVOTEDSTORIES", "histories mï¿½s votades");
+define("_POINTS", "punts");
+define("_BESTRATEDSTORIES", "histories millor votades (basat en un mï¿½xim de 5 punts)");

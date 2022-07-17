@@ -2,10 +2,10 @@
 
 /*************************************************************************/
 /* The Slovak language file for module Top                      */
-/* Author: AlRashid 			 Date: 09.09.2002   					 */
+/* Author: AlRashid              Date: 09.09.2002                        */
 /* alrashid@klokan.sk, http://alrashid.klokan.sk                         */
-/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk			     */
-/*  		Dakujem                                                      */
+/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk                 */
+/*          Dakujem                                                      */
 /*************************************************************************/
 /**************************************************************************/
 /* PHP-NUKE: Advanced Content Management System                           */
@@ -24,32 +24,30 @@
 /* And, if you use HTML code, please double check it.                     */
 /*************************************************************************/
 /* The Slovak language file for module Top                      */
-/* Author: AlRashid 			 Date: 09.09.2002   					 */
+/* Author: AlRashid              Date: 09.09.2002                        */
 /* alrashid@klokan.sk, http://alrashid.klokan.sk                         */
-/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk			     */
-/*  		Dakujem                                                      */
+/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk                 */
+/*          Dakujem                                                      */
 /*************************************************************************/
 /**************************************************************************/
 
-define("_CATEGORY","Kategória");
-define("_LVOTES","hlasovalo");
-define("_HITS"," krát èítané");
-define("_TOPWELCOME","Vitajte na stránke TOP na");
-define("_READSTORIES","najèítanejších èlánkov:");
-define("_COMMENTEDSTORIES","najkomentovanejších èlánkov:");
-define("_ACTIVECAT","najaktívnejších kategórií:");
-define("_READSECTION","najèítanejších èlánkov v iných oblastiach:");
-define("_NEWSSUBMITTERS","najaktívnejších prispievate¾ov:");
-define("_NEWSSENT","poslaných noviniek:");
-define("_VOTEDPOLLS","Najnavštevovanejších ankiet");
-define("_MOSTACTIVEAUTHORS","najaktívnejších autorov");
-define("_NEWSPUBLISHED","publikovaných èlánkov:");
-define("_READREVIEWS","najèítanejších recenzií:");
-define("_DOWNLOADEDFILES","najsahovanejších súborov:");
-define("_LDOWNLOADS","downloads");
-define("_MOSTREADPAGES","Najèítanejšie strany");
-define("_MOSTVOTEDSTORIES","Najviac hodnotené èlánky");
-define("_POINTS","body");
-define("_BESTRATEDSTORIES","Najlepšie hodnotené èlánky ( minimálne 5 hlasov )");
-
-?>
+define("_CATEGORY", "Kategï¿½ria");
+define("_LVOTES", "hlasovalo");
+define("_HITS", " krï¿½t ï¿½ï¿½tanï¿½");
+define("_TOPWELCOME", "Vitajte na strï¿½nke TOP na");
+define("_READSTORIES", "najï¿½ï¿½tanejï¿½ï¿½ch ï¿½lï¿½nkov:");
+define("_COMMENTEDSTORIES", "najkomentovanejï¿½ï¿½ch ï¿½lï¿½nkov:");
+define("_ACTIVECAT", "najaktï¿½vnejï¿½ï¿½ch kategï¿½riï¿½:");
+define("_READSECTION", "najï¿½ï¿½tanejï¿½ï¿½ch ï¿½lï¿½nkov v inï¿½ch oblastiach:");
+define("_NEWSSUBMITTERS", "najaktï¿½vnejï¿½ï¿½ch prispievateï¿½ov:");
+define("_NEWSSENT", "poslanï¿½ch noviniek:");
+define("_VOTEDPOLLS", "Najnavï¿½tevovanejï¿½ï¿½ch ankiet");
+define("_MOSTACTIVEAUTHORS", "najaktï¿½vnejï¿½ï¿½ch autorov");
+define("_NEWSPUBLISHED", "publikovanï¿½ch ï¿½lï¿½nkov:");
+define("_READREVIEWS", "najï¿½ï¿½tanejï¿½ï¿½ch recenziï¿½:");
+define("_DOWNLOADEDFILES", "najsï¿½ahovanejï¿½ï¿½ch sï¿½borov:");
+define("_LDOWNLOADS", "downloads");
+define("_MOSTREADPAGES", "Najï¿½ï¿½tanejï¿½ie strany");
+define("_MOSTVOTEDSTORIES", "Najviac hodnotenï¿½ ï¿½lï¿½nky");
+define("_POINTS", "body");
+define("_BESTRATEDSTORIES", "Najlepï¿½ie hodnotenï¿½ ï¿½lï¿½nky ( minimï¿½lne 5 hlasov )");

@@ -16,17 +16,15 @@
 /* so your entry will look like: This is \"double quoted\" text.          */
 /* And, if you use HTML code, please double check it.                     */
 /*                                                                        */
-/* Polish translation by Nordavind®(Bolo) (http://forum.phpnuke.org.pl)   */
+/* Polish translation by Nordavindï¿½(Bolo) (http://forum.phpnuke.org.pl)   */
 /*                                                                        */
 /**************************************************************************/
 
-define("_CATEGORY","Kategoria");
-define("_CATEGORIES","Kategorie");
-define("_FAQ2","FAQ (Czêsto zadawane pytania)");
-define("_BACKTOTOP","Powrót na górê");
-define("_BACKTOFAQINDEX","Powrót do indeksu pytañ");
-define("_MAIN","G³ówna");
-define("_QUESTION","Pytanie");
-define("_ANSWER","Odpowied¼");
-
-?>
+define("_CATEGORY", "Kategoria");
+define("_CATEGORIES", "Kategorie");
+define("_FAQ2", "FAQ (Czï¿½sto zadawane pytania)");
+define("_BACKTOTOP", "Powrï¿½t na gï¿½rï¿½");
+define("_BACKTOFAQINDEX", "Powrï¿½t do indeksu pytaï¿½");
+define("_MAIN", "Gï¿½ï¿½wna");
+define("_QUESTION", "Pytanie");
+define("_ANSWER", "Odpowiedï¿½");

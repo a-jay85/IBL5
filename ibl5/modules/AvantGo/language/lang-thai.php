@@ -17,11 +17,9 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PDATE","ÇÑ¹");
-define("_PTOPIC","ËÑÇ¢éÍ:");
-define("_COMESFROM","º·¤ÇÒÁ¹ÕéÁÒ¨Ò¡");
-define("_THEURL","URL ÊÓËÃÑºàÃ×èÍ§¹Õé¤×Í:");
-define("_DATE","ÇÑ¹·Õè");
-define("_TITLE","ª×èÍàÃ×èÍ§");
-
-?>
+define("_PDATE", "ï¿½Ñ¹");
+define("_PTOPIC", "ï¿½ï¿½Ç¢ï¿½ï¿½:");
+define("_COMESFROM", "ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò¨Ò¡");
+define("_THEURL", "URL ï¿½ï¿½ï¿½ï¿½Ñºï¿½ï¿½ï¿½ï¿½Í§ï¿½ï¿½ï¿½ï¿½ï¿½:");
+define("_DATE", "ï¿½Ñ¹ï¿½ï¿½ï¿½");
+define("_TITLE", "ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í§");

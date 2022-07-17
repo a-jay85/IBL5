@@ -17,7 +17,7 @@
 /************************************************************************/
 
 if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
-    die ("You can't access this file directly...");
+    die("You can't access this file directly...");
 }
 
 $module_name = basename(dirname(__FILE__));
@@ -27,13 +27,13 @@ $pagetitle = "- Player Archives";
 
 function showmenu()
 {
-    include("header.php");
+    include "header.php";
     OpenTable();
 
     menu();
 
     CloseTable();
-    include("footer.php");
+    include "footer.php";
 }
 
 function menu()
@@ -52,7 +52,7 @@ function leaderboards()
 {
     global $db;
 
-    include("header.php");
+    include "header.php";
     OpenTable();
 
     menu();
@@ -76,7 +76,7 @@ function leaderboards()
         'Ply' => 'Playoff Totals',
         'PLA' => 'Playoff Averages',
         'HET' => 'H.E.A.T. Totals',
-        'HEA' => 'H.E.A.T. Averages'
+        'HEA' => 'H.E.A.T. Averages',
     );
 
     foreach ($typeArray as $key => $value) {
@@ -109,7 +109,7 @@ function leaderboards()
         'stl' => 'Steals',
         'tvr' => 'Turnovers',
         'blk' => 'Blocked Shots',
-        'pf' => 'Personal Fouls'
+        'pf' => 'Personal Fouls',
     );
 
     foreach ($sort_cat_array as $key => $value) {
@@ -143,7 +143,7 @@ function leaderboards()
 
     // ===== RUN QUERY IF FORM HAS BEEN SUBMITTED
 
-    if ($submitted != NULL) {
+    if ($submitted != null) {
         $tableforquery = "nuke_iblplyr";
 
         if ($boards_type == 'Reg') {
@@ -188,9 +188,9 @@ function leaderboards()
         }
 
         if ($tableforquery == "nuke_iblplyr") {
-            $sortby = "car_".$sortby;
+            $sortby = "car_" . $sortby;
             if ($sort_cat == 'Games') {
-                 $sortby = "car_gm";
+                $sortby = "car_gm";
             }
             if ($sort_cat == 'Minutes') {
                 $sortby = "car_min";
@@ -238,7 +238,7 @@ function leaderboards()
             $numstop = $display;
         }
 
-        if ($display == NULL) {
+        if ($display == null) {
             $numstop = $num;
         } else {
             $numstop = $display;
@@ -317,8 +317,8 @@ function leaderboards()
             }
 
             if (
-                $tableforquery == "ibl_season_career_avgs" OR
-                $tableforquery == "ibl_heat_career_avgs" OR
+                $tableforquery == "ibl_season_career_avgs" or
+                $tableforquery == "ibl_heat_career_avgs" or
                 $tableforquery == "ibl_playoff_career_avgs"
             ) {
                 $plyr_name = $db->sql_result($result, $i, "name");
@@ -345,7 +345,7 @@ function leaderboards()
             }
 
             if (
-                $tableforquery == "ibl_heat_career_totals" OR
+                $tableforquery == "ibl_heat_career_totals" or
                 $tableforquery == "ibl_playoff_career_totals"
             ) {
                 $plyr_name = $db->sql_result($result, $i, "name");
@@ -408,14 +408,14 @@ function leaderboards()
     }
 
     CloseTable();
-    include("footer.php");
+    include "footer.php";
 }
 
 function search()
 {
     global $db;
 
-    include("header.php");
+    include "header.php";
     OpenTable();
 
     menu();
@@ -561,143 +561,143 @@ function search()
     if ($active == 0) {
         $query .= " AND retired = '0'";
     }
-    if ($search_name != NULL) {
+    if ($search_name != null) {
         $query .= " AND name LIKE '%$search_name%'";
     }
-    if ($college != NULL) {
+    if ($college != null) {
         $query .= " AND college LIKE '%$college%'";
     }
-    if ($pos != NULL) {
+    if ($pos != null) {
         $query .= " AND pos = '$pos'";
     }
-    if ($age != NULL) {
+    if ($age != null) {
         $query .= " AND age <= '$age'";
     }
 
-    if ($Clutch != NULL) {
+    if ($Clutch != null) {
         $query .= " AND Clutch >= '$Clutch'";
     }
-    if ($Stamina != NULL) {
+    if ($Stamina != null) {
         $query .= " AND sta >= '$Stamina'";
     }
-    if ($Consistency != NULL) {
+    if ($Consistency != null) {
         $query .= " AND Consistency >= '$Consistency'";
     }
 
-    if ($oo != NULL) {
+    if ($oo != null) {
         $query .= " AND oo >= '$oo'";
     }
-    if ($do != NULL) {
+    if ($do != null) {
         $query .= " AND do >= '$do'";
     }
-    if ($po != NULL) {
+    if ($po != null) {
         $query .= " AND po >= '$po'";
     }
-    if ($to != NULL) {
+    if ($to != null) {
         $query .= " AND `to` >= '$to'";
     }
 
-    if ($od != NULL) {
+    if ($od != null) {
         $query .= " AND od >= '$od'";
     }
-    if ($dd != NULL) {
+    if ($dd != null) {
         $query .= " AND dd >= '$dd'";
     }
-    if ($pd != NULL) {
+    if ($pd != null) {
         $query .= " AND pd >= '$pd'";
     }
-    if ($td != NULL) {
+    if ($td != null) {
         $query .= " AND td >= '$td'";
     }
 
-    if ($exp != NULL) {
+    if ($exp != null) {
         $query .= " AND exp >= '$exp'";
     }
-    if ($bird != NULL) {
+    if ($bird != null) {
         $query .= " AND bird >= '$bird'";
     }
 
-    if ($exp_max != NULL) {
+    if ($exp_max != null) {
         $query .= " AND exp <= '$exp_max'";
     }
-    if ($bird != NULL) {
+    if ($bird != null) {
         $query .= " AND bird <= '$bird_max'";
     }
 
-    if ($talent != NULL) {
+    if ($talent != null) {
         $query .= " AND talent >= '$talent'";
     }
-    if ($skill != NULL) {
+    if ($skill != null) {
         $query .= " AND skill >= '$skill'";
     }
-    if ($intangibles != NULL) {
+    if ($intangibles != null) {
         $query .= " AND intangibles >= '$intangibles'";
     }
 
-    if ($coach != NULL) {
+    if ($coach != null) {
         $query .= " AND coach >= '$coach'";
     }
-    if ($loyalty != NULL) {
+    if ($loyalty != null) {
         $query .= " AND loyalty >= '$loyalty'";
     }
-    if ($playingTime != NULL) {
+    if ($playingTime != null) {
         $query .= " AND playingTime >= '$playingTime'";
     }
-    if ($winner != NULL) {
+    if ($winner != null) {
         $query .= " AND winner >= '$winner'";
     }
-    if ($tradition != NULL) {
+    if ($tradition != null) {
         $query .= " AND tradition >= '$tradition'";
     }
-    if ($security != NULL) {
+    if ($security != null) {
         $query .= " AND security >= '$security'";
     }
 
-    if ($exp != NULL) {
+    if ($exp != null) {
         $query .= " AND exp >= '$exp'";
     }
-    if ($bird != NULL) {
+    if ($bird != null) {
         $query .= " AND bird >= '$bird'";
     }
 
-    if ($r_fga != NULL) {
+    if ($r_fga != null) {
         $query .= " AND r_fga >= '$r_fga'";
     }
-    if ($r_fgp != NULL) {
+    if ($r_fgp != null) {
         $query .= " AND r_fgp >= '$r_fgp'";
     }
-    if ($r_fta != NULL) {
+    if ($r_fta != null) {
         $query .= " AND r_fta >= '$r_fta'";
     }
-    if ($r_ftp != NULL) {
+    if ($r_ftp != null) {
         $query .= " AND r_ftp >= '$r_ftp'";
     }
-    if ($r_tga != NULL) {
+    if ($r_tga != null) {
         $query .= " AND r_tga >= '$r_tga'";
     }
-    if ($r_tgp != NULL) {
+    if ($r_tgp != null) {
         $query .= " AND r_tgp >= '$r_tgp'";
 
     }
-    if ($r_orb != NULL) {
+    if ($r_orb != null) {
         $query .= " AND r_orb >= '$r_orb'";
     }
-    if ($r_drb != NULL) {
+    if ($r_drb != null) {
         $query .= " AND r_drb >= '$r_drb'";
     }
-    if ($r_ast != NULL) {
+    if ($r_ast != null) {
         $query .= " AND r_ast >= '$r_ast'";
     }
-    if ($r_stl != NULL) {
+    if ($r_stl != null) {
         $query .= " AND r_stl >= '$r_stl'";
     }
-    if ($r_to != NULL) {
+    if ($r_to != null) {
         $query .= " AND r_to >= '$r_to'";
     }
-    if ($r_blk != NULL) {
+    if ($r_blk != null) {
         $query .= " AND r_blk >= '$r_blk'";
     }
-    if ($r_foul != NULL) {
+    if ($r_foul != null) {
         $query .= " AND r_foul >= '$r_foul'";
     }
 
@@ -855,14 +855,14 @@ function search()
     echo "</table></center>";
 
     CloseTable();
-    include("footer.php");
+    include "footer.php";
 }
 
 function awards()
 {
     global $db;
 
-    include("header.php");
+    include "header.php";
     OpenTable();
     menu();
 
@@ -887,7 +887,7 @@ function awards()
             <tr>
                 <td colspan=3>SORT BY:";
 
-    if ($as_sortby == NULL) {
+    if ($as_sortby == null) {
         $sortby = 3;
     }
 
@@ -917,29 +917,29 @@ function awards()
     $continuequery = 0;
     $query = "SELECT * FROM nuke_ibl_awards";
 
-    if ($as_year != NULL) {
+    if ($as_year != null) {
         $query .= " WHERE year = '$as_year'";
         $continuequery = 1;
     }
 
     if ($continuequery == 0) {
-        if ($as_Award != NULL) {
+        if ($as_Award != null) {
             $query .= " WHERE Award LIKE '%$as_Award%'";
             $continuequery = 1;
         }
     } else {
-        if ($as_Award != NULL) {
+        if ($as_Award != null) {
             $query .= " AND Award LIKE '%$as_Award%'";
         }
     }
 
     if ($continuequery == 0) {
-        if ($as_name != NULL) {
+        if ($as_name != null) {
             $query .= " WHERE name LIKE '%$as_name%'";
             $continuequery = 1;
         }
     } else {
-        if ($as_name != NULL) {
+        if ($as_name != null) {
             $query .= " AND name LIKE '%$as_name%'";
         }
     }
@@ -998,12 +998,13 @@ function awards()
     echo "</table></center>";
 
     CloseTable();
-    include("footer.php");
+    include "footer.php";
 }
 
-function showpage($pid,$spec) {
+function showpage($pid, $spec)
+{
     global $prefix, $db, $user, $cookie;
-	$sharedFunctions = new Shared($db);
+    $sharedFunctions = new Shared($db);
 
     $pid = intval($pid);
     $spec = intval($spec);
@@ -1181,18 +1182,18 @@ function showpage($pid,$spec) {
 
     // DISPLAY PAGE
 
-    include("header.php");
+    include "header.php";
     OpenTable();
 
     menu();
 
     $seasonPhase = $sharedFunctions->getCurrentSeasonPhase();
 
-	echo "<table>
+    echo "<table>
         <tr>
             <td valign=top><font class=\"title\">$player_pos $player_name ";
 
-    if ($player_nickname != NULL) {
+    if ($player_nickname != null) {
         echo "- Nickname: \"$player_nickname\" ";
     }
 
@@ -1213,14 +1214,14 @@ function showpage($pid,$spec) {
     $userinfo = $db->sql_fetchrow($result2);
 
     $userteam = stripslashes(check_html($userinfo['user_ibl_team'], "nohtml"));
-    if (($player_exp == 4 AND $player_draft_round == 1 AND 2 * $salaryIn3rdYearOfCurrentContract == $salaryIn4thYearOfCurrentContract AND $salaryIn4thYearOfCurrentContract <> 0) OR
-        ($player_exp == 3 AND $player_draft_round == 2 AND 2 * $salaryIn2ndYearOfCurrentContract == $salaryIn3rdYearOfCurrentContract AND $salaryIn3rdYearOfCurrentContract <> 0)) {
-    		echo "<table align=right bgcolor=#ff0000>
+    if (($player_exp == 4 and $player_draft_round == 1 and 2 * $salaryIn3rdYearOfCurrentContract == $salaryIn4thYearOfCurrentContract and $salaryIn4thYearOfCurrentContract != 0) or
+        ($player_exp == 3 and $player_draft_round == 2 and 2 * $salaryIn2ndYearOfCurrentContract == $salaryIn3rdYearOfCurrentContract and $salaryIn3rdYearOfCurrentContract != 0)) {
+        echo "<table align=right bgcolor=#ff0000>
                 <tr>
                     <td align=center>ROOKIE OPTION<br>USED; RENEGOTIATION<br>IMPOSSIBLE</td>
                 </tr>
             </table>";
-    		$can_renegotiate = 0;
+        $can_renegotiate = 0;
     }
 
     $queryHasUsedExtensionThisSeason = "SELECT Used_Extension_This_Season
@@ -1229,12 +1230,12 @@ function showpage($pid,$spec) {
     $hasUsedExtensionThisSeason = $db->sql_result($db->sql_query($queryHasUsedExtensionThisSeason), 0);
 
     $currentSeasonPhase = $sharedFunctions->getCurrentSeasonPhase();
-    if ($hasUsedExtensionThisSeason == 0 AND
-        $can_renegotiate == 1 AND
-        $currentSeasonPhase != 'Draft' AND
-        $currentSeasonPhase != 'Free Agency' AND
+    if ($hasUsedExtensionThisSeason == 0 and
+        $can_renegotiate == 1 and
+        $currentSeasonPhase != 'Draft' and
+        $currentSeasonPhase != 'Free Agency' and
         $player_team_name == $userteam) {
-            echo "<table align=right bgcolor=#ff0000>
+        echo "<table align=right bgcolor=#ff0000>
                 <tr>
                     <td align=center><a href=\"modules.php?name=Player&pa=negotiate&pid=$pid\">RENEGOTIATE<BR>CONTRACT</a></td>
                 </tr>
@@ -1243,14 +1244,14 @@ function showpage($pid,$spec) {
 
     // RENEGOTIATION BUTTON END
 
-    if ((((($player_draft_round == 1 && $player_exp == 2 && $salaryIn4thYearOfCurrentContract == 0) OR
-            ($player_draft_round == 2 && $player_exp == 1 && $salaryIn3rdYearOfCurrentContract == 0)) AND
-            $seasonPhase == "Free Agency") OR
-        (($player_draft_round == 1 && $player_exp == 3 && $salaryIn4thYearOfCurrentContract == 0) OR
-            ($player_draft_round == 2 && $player_exp == 2 && $salaryIn3rdYearOfCurrentContract == 0)) AND
-            ($seasonPhase == "Preseason" OR $seasonPhase == "HEAT")) AND
+    if ((((($player_draft_round == 1 && $player_exp == 2 && $salaryIn4thYearOfCurrentContract == 0) or
+        ($player_draft_round == 2 && $player_exp == 1 && $salaryIn3rdYearOfCurrentContract == 0)) and
+        $seasonPhase == "Free Agency") or
+        (($player_draft_round == 1 && $player_exp == 3 && $salaryIn4thYearOfCurrentContract == 0) or
+            ($player_draft_round == 2 && $player_exp == 2 && $salaryIn3rdYearOfCurrentContract == 0)) and
+        ($seasonPhase == "Preseason" or $seasonPhase == "HEAT")) and
         $userteam == $player_team_name) {
-            echo "<table align=right bgcolor=#ffbb00>
+        echo "<table align=right bgcolor=#ffbb00>
                 <tr>
                     <td align=center><a href=\"modules.php?name=Player&pa=rookieoption&pid=$pid\">ROOKIE<BR>OPTION</a></td>
                 </tr>
@@ -1317,7 +1318,7 @@ function showpage($pid,$spec) {
         </table></center>
     <b>BIRD YEARS:</b> $player_bird | <b>Remaining Contract:</b> $contract_display </td>";
 
-    if ($spec == NULL) {
+    if ($spec == null) {
         // ==== PLAYER SEASON AND CAREER HIGHS ====
 
         $retired = stripslashes(check_html($playerinfo['retired'], "nohtml"));
@@ -1460,7 +1461,7 @@ function showpage($pid,$spec) {
 
     // PLAYER OVERVIEW
 
-    if ($spec == NULL) {
+    if ($spec == null) {
         // NOTE ALL-STAR WEEKEND APPEARANCES
 
         echo "<tr>
@@ -1478,7 +1479,7 @@ function showpage($pid,$spec) {
             <td>$asg</td>
         </tr>";
 
-        $allstarquery2 = $db->sql_query("SELECT * FROM " . $prefix."_ibl_awards WHERE name='$player_name' AND Award LIKE 'Three-Point Contest%'");
+        $allstarquery2 = $db->sql_query("SELECT * FROM " . $prefix . "_ibl_awards WHERE name='$player_name' AND Award LIKE 'Three-Point Contest%'");
         $allstarresult2 = $db->sql_query($allstarquery2);
         $threepointcontests = $db->sql_numrows($allstarquery2);
 
@@ -2035,18 +2036,18 @@ function showpage($pid,$spec) {
             $car_pts = $car_pts + $stats_pts;
         }
 
-        @$car_fgp = $car_fgm/$car_fga;
-        @$car_ftp = $car_ftm/$car_fta;
-        @$car_tgp = $car_3gm/$car_3ga;
-        @$car_avgm = $car_min/$car_gm;
-        @$car_avgo = $car_orb/$car_gm;
-        @$car_avgr = $car_reb/$car_gm;
-        @$car_avga = $car_ast/$car_gm;
-        @$car_avgs = $car_stl/$car_gm;
-        @$car_avgb = $car_blk/$car_gm;
-        @$car_avgt = $car_tvr/$car_gm;
-        @$car_avgf = $car_pf/$car_gm;
-        @$car_avgp = $car_pts/$car_gm;
+        @$car_fgp = $car_fgm / $car_fga;
+        @$car_ftp = $car_ftm / $car_fta;
+        @$car_tgp = $car_3gm / $car_3ga;
+        @$car_avgm = $car_min / $car_gm;
+        @$car_avgo = $car_orb / $car_gm;
+        @$car_avgr = $car_reb / $car_gm;
+        @$car_avga = $car_ast / $car_gm;
+        @$car_avgs = $car_stl / $car_gm;
+        @$car_avgb = $car_blk / $car_gm;
+        @$car_avgt = $car_tvr / $car_gm;
+        @$car_avgf = $car_pf / $car_gm;
+        @$car_avgp = $car_pts / $car_gm;
 
         echo "<tr>
             <td colspan=2>Career Averages</td>
@@ -2590,7 +2591,7 @@ function showpage($pid,$spec) {
             $hist_tvr = stripslashes(check_html($rowplayoff4['tvr'], "nohtml"));
             $hist_blk = stripslashes(check_html($rowplayoff4['blk'], "nohtml"));
             $hist_pf = stripslashes(check_html($rowplayoff4['pf'], "nohtml"));
-            $hist_pts = $hist_fgm+$hist_fgm+$hist_ftm+$hist_tgm;
+            $hist_pts = $hist_fgm + $hist_fgm + $hist_ftm + $hist_tgm;
 
             @$hist_mpg = ($hist_min / $hist_gm);
             @$hist_opg = ($hist_orb / $hist_gm);
@@ -2718,11 +2719,11 @@ function showpage($pid,$spec) {
         $worlds_header_done_yet = 0;
         $world_color = 0;
 
-            $result45 = $db->sql_query("SELECT * FROM " . $prefix . "_iblworlds WHERE name='$player_name' ORDER BY year ASC");
-            while ($row45 = $db->sql_fetchrow($result45)) {
+        $result45 = $db->sql_query("SELECT * FROM " . $prefix . "_iblworlds WHERE name='$player_name' ORDER BY year ASC");
+        while ($row45 = $db->sql_fetchrow($result45)) {
 
-        if ($worlds_header_done_yet == 0) {
-            echo "<table border=1 cellspacing=0>
+            if ($worlds_header_done_yet == 0) {
+                echo "<table border=1 cellspacing=0>
                 <tr>
                     <td colspan=14><center><b><font class=\"content\">World Championships Totals</font></b></center></td>
                 </tr>
@@ -2742,31 +2743,31 @@ function showpage($pid,$spec) {
                     <td>pf</td>
                     <td>pts</td>
                 </tr>";
-            $worlds_header_done_yet = 1;
-        }
+                $worlds_header_done_yet = 1;
+            }
 
-        $world_year = stripslashes(check_html($row45['year'], "nohtml"));
-        $world_gm = stripslashes(check_html($row45['games'], "nohtml"));
-        $world_min = stripslashes(check_html($row45['minutes'], "nohtml"));
-        $world_fgm = stripslashes(check_html($row45['fgm'], "nohtml"));
-        $world_fga = stripslashes(check_html($row45['fga'], "nohtml"));
-        @$world_fgp = ($world_fgm / $world_fga);
-        $world_ftm = stripslashes(check_html($row45['ftm'], "nohtml"));
-        $world_fta = stripslashes(check_html($row45['fta'], "nohtml"));
-        @$world_ftp = ($world_ftm / $world_fta);
-        $world_tgm = stripslashes(check_html($row45['tgm'], "nohtml"));
-        $world_tga = stripslashes(check_html($row45['tga'], "nohtml"));
-        @$world_tgp = ($world_tgm / $world_tga);
-        $world_orb = stripslashes(check_html($row45['orb'], "nohtml"));
-        $world_reb = stripslashes(check_html($row45['reb'], "nohtml"));
-        $world_ast = stripslashes(check_html($row45['ast'], "nohtml"));
-        $world_stl = stripslashes(check_html($row45['stl'], "nohtml"));
-        $world_tvr = stripslashes(check_html($row45['tvr'], "nohtml"));
-        $world_blk = stripslashes(check_html($row45['blk'], "nohtml"));
-        $world_pf = stripslashes(check_html($row45['pf'], "nohtml"));
-        $world_pts = $world_fgm + $world_fgm + $world_ftm + $world_tgm;
+            $world_year = stripslashes(check_html($row45['year'], "nohtml"));
+            $world_gm = stripslashes(check_html($row45['games'], "nohtml"));
+            $world_min = stripslashes(check_html($row45['minutes'], "nohtml"));
+            $world_fgm = stripslashes(check_html($row45['fgm'], "nohtml"));
+            $world_fga = stripslashes(check_html($row45['fga'], "nohtml"));
+            @$world_fgp = ($world_fgm / $world_fga);
+            $world_ftm = stripslashes(check_html($row45['ftm'], "nohtml"));
+            $world_fta = stripslashes(check_html($row45['fta'], "nohtml"));
+            @$world_ftp = ($world_ftm / $world_fta);
+            $world_tgm = stripslashes(check_html($row45['tgm'], "nohtml"));
+            $world_tga = stripslashes(check_html($row45['tga'], "nohtml"));
+            @$world_tgp = ($world_tgm / $world_tga);
+            $world_orb = stripslashes(check_html($row45['orb'], "nohtml"));
+            $world_reb = stripslashes(check_html($row45['reb'], "nohtml"));
+            $world_ast = stripslashes(check_html($row45['ast'], "nohtml"));
+            $world_stl = stripslashes(check_html($row45['stl'], "nohtml"));
+            $world_tvr = stripslashes(check_html($row45['tvr'], "nohtml"));
+            $world_blk = stripslashes(check_html($row45['blk'], "nohtml"));
+            $world_pf = stripslashes(check_html($row45['pf'], "nohtml"));
+            $world_pts = $world_fgm + $world_fgm + $world_ftm + $world_tgm;
 
-        echo "<td><center>$world_year</center></td>
+            echo "<td><center>$world_year</center></td>
             <td><center>$world_gm</center></td>
             <td><center>$world_min</center></td>
             <td><center>$world_fgm - $world_fga</center></td>
@@ -2782,22 +2783,22 @@ function showpage($pid,$spec) {
             <td><center>$world_pts</td>
         </tr>";
 
-        $cw_gm = $cw_gm + $world_gm;
-        $cw_min = $cw_min + $world_min;
-        $cw_fgm = $cw_fgm + $world_fgm;
-        $cw_fga = $cw_fga + $world_fga;
-        $cw_ftm = $cw_ftm + $world_ftm;
-        $cw_fta = $cw_fta + $world_fta;
-        $cw_tgm = $cw_tgm + $world_tgm;
-        $cw_tga = $cw_tga + $world_tga;
-        $cw_orb = $cw_orb + $world_orb;
-        $cw_reb = $cw_reb + $world_reb;
-        $cw_ast = $cw_ast + $world_ast;
-        $cw_stl = $cw_stl + $world_stl;
-        $cw_tvr = $cw_tvr + $world_tvr;
-        $cw_blk = $cw_blk + $world_blk;
-        $cw_pf = $cw_pf + $world_pf;
-        $cw_pts = $cw_pts + $world_pts;
+            $cw_gm = $cw_gm + $world_gm;
+            $cw_min = $cw_min + $world_min;
+            $cw_fgm = $cw_fgm + $world_fgm;
+            $cw_fga = $cw_fga + $world_fga;
+            $cw_ftm = $cw_ftm + $world_ftm;
+            $cw_fta = $cw_fta + $world_fta;
+            $cw_tgm = $cw_tgm + $world_tgm;
+            $cw_tga = $cw_tga + $world_tga;
+            $cw_orb = $cw_orb + $world_orb;
+            $cw_reb = $cw_reb + $world_reb;
+            $cw_ast = $cw_ast + $world_ast;
+            $cw_stl = $cw_stl + $world_stl;
+            $cw_tvr = $cw_tvr + $world_tvr;
+            $cw_blk = $cw_blk + $world_blk;
+            $cw_pf = $cw_pf + $world_pf;
+            $cw_pts = $cw_pts + $world_pts;
 
         }
 
@@ -3039,8 +3040,8 @@ function showpage($pid,$spec) {
         } else {
             $query = "SELECT * FROM ibl_box_scores WHERE Date BETWEEN '$currentSeasonStaringYear-10-01' AND '$currentSeasonEndingYear-07-01' AND pid = $pid ORDER BY Date ASC";
         }
-        $result=$db->sql_query($query);
-        $num=$db->sql_numrows($result);
+        $result = $db->sql_query($query);
+        $num = $db->sql_numrows($result);
 
         echo '<p><H1><center>GAME LOG</center></H1><p><table class=\"sortable\" width="100%">
               <tr>
@@ -3079,7 +3080,7 @@ function showpage($pid,$spec) {
                     <td class=\"gamelog\">" . $sharedFunctions->getTeamnameFromTid($row['visitorTID']) . "</td>
                     <td class=\"gamelog\">" . $sharedFunctions->getTeamnameFromTid($row['homeTID']) . "</td>
                     <td class=\"gamelog\">" . $row['gameMIN'] . "</td>
-                    <td class=\"gamelog\">" . ((2*$row['game2GM']) + (3*$row['game3GM']) + $row['gameFTM']) . "</td>
+                    <td class=\"gamelog\">" . ((2 * $row['game2GM']) + (3 * $row['game3GM']) + $row['gameFTM']) . "</td>
                     <td class=\"gamelog\">" . ($row['game2GM'] + $row['game3GM']) . "</td>
                     <td class=\"gamelog\">" . ($row['game2GA'] + $row['game3GA']) . "</td>
                     <td class=\"gamelog\">" . number_format(($row['game2GM'] + $row['game3GM']) / ($row['game2GA'] + $row['game3GA']), 3, '.', '') . "</td>
@@ -3105,7 +3106,7 @@ function showpage($pid,$spec) {
     echo "</td></tr></table></table>";
 
     CloseTable();
-    include("footer.php");
+    include "footer.php";
 
     // END OF DISPLAY PAGE
 }
@@ -3127,7 +3128,7 @@ function negotiate($pid)
     $player_coach = stripslashes(check_html($playerinfo['coach'], "nohtml"));
     $player_tradition = stripslashes(check_html($playerinfo['tradition'], "nohtml"));
 
-    include("header.php");
+    include "header.php";
     OpenTable();
 
     menu();
@@ -3297,23 +3298,23 @@ function negotiate($pid)
             $maxRaise = round($baseDemands * 0.1);
 
             $dem1 = $baseDemands;
-            $dem2 = $baseDemands+$maxRaise;
-            $dem3 = $baseDemands+$maxRaise * 2;
-            $dem4 = $baseDemands+$maxRaise * 3;
-            $dem5 = $baseDemands+$maxRaise * 4;
+            $dem2 = $baseDemands + $maxRaise;
+            $dem3 = $baseDemands + $maxRaise * 2;
+            $dem4 = $baseDemands + $maxRaise * 3;
+            $dem5 = $baseDemands + $maxRaise * 4;
             $dem6 = 0;
             /*
             // Old way to determine demands here
-                $demands = $db->sql_fetchrow($db->sql_query("SELECT * FROM " . $prefix . "_ibl_demands WHERE name='$player_name'"));
-                $dem1 = stripslashes(check_html($demands['dem1'], "nohtml"));
-                $dem2 = stripslashes(check_html($demands['dem2'], "nohtml"));
-                $dem3 = stripslashes(check_html($demands['dem3'], "nohtml"));
-                $dem4 = stripslashes(check_html($demands['dem4'], "nohtml"));
-                $dem5 = stripslashes(check_html($demands['dem5'], "nohtml"));
+            $demands = $db->sql_fetchrow($db->sql_query("SELECT * FROM " . $prefix . "_ibl_demands WHERE name='$player_name'"));
+            $dem1 = stripslashes(check_html($demands['dem1'], "nohtml"));
+            $dem2 = stripslashes(check_html($demands['dem2'], "nohtml"));
+            $dem3 = stripslashes(check_html($demands['dem3'], "nohtml"));
+            $dem4 = stripslashes(check_html($demands['dem4'], "nohtml"));
+            $dem5 = stripslashes(check_html($demands['dem5'], "nohtml"));
             // The sixth year is zero for extensions only; remove the line below and uncomment the regular line in the FA module.
-                $dem6 = 0;
+            $dem6 = 0;
             //    $dem6 = stripslashes(check_html($demands['dem6'], "nohtml"));
-            */
+             */
             $teamfactors = $db->sql_fetchrow($db->sql_query("SELECT * FROM " . $prefix . "_ibl_team_info WHERE team_name = '$userteam'"));
             $tf_wins = stripslashes(check_html($teamfactors['Contract_Wins'], "nohtml"));
             $tf_loss = stripslashes(check_html($teamfactors['Contract_Losses'], "nohtml"));
@@ -3379,9 +3380,9 @@ function negotiate($pid)
             //$coachFactor = (0.0025*($tf_coach)*($player_coach-1));
             //$modfactor4 = (.025*($player_loyalty-1));
             $loyaltyFactor = (0.025 * ($player_loyalty - 1));
-            $modfactor5 = (.01*($demyrs-1)-0.025)*($player_security-1);
+            $modfactor5 = (.01 * ($demyrs - 1) - 0.025) * ($player_security - 1);
             //$securityFactor = (0.01*$demyrs-0.025)*($player_security-1);
-            $modfactor6 = -(.0035*$tf_millions/100-0.028)*($player_playingtime-1);
+            $modfactor6 = -(.0035 * $tf_millions / 100 - 0.028) * ($player_playingtime - 1);
             $PTFactor = (($tf_millions * -0.00005) + 0.025) * ($player_playingtime - 1);
 
             $modifier = 1 + $PFWFactor + $traditionFactor + $coachFactor + $loyaltyFactor + $securityFactor + $PTFactor;
@@ -3422,7 +3423,7 @@ function negotiate($pid)
 
             $capquery = "SELECT * FROM " . $prefix . "_iblplyr WHERE teamname='$userteam' AND retired = '0'";
             $capresult = $db->sql_query($capquery);
-            while($capdecrementer = $db->sql_fetchrow($capresult)) {
+            while ($capdecrementer = $db->sql_fetchrow($capresult)) {
 
                 $capcy = stripslashes(check_html($capdecrementer['cy'], "nohtml"));
                 $capcy1 = stripslashes(check_html($capdecrementer['cy1'], "nohtml"));
@@ -3468,7 +3469,6 @@ function negotiate($pid)
                 if ($player_exp > 9) {
                     $maxyr1 = 1451;
                 }
-
 
                 echo "Note that if you offer the max and I refuse, it means I am opting for Free Agency at the end of the season):
                     <table cellspacing=0 border=1>
@@ -3563,61 +3563,62 @@ function negotiate($pid)
     // RENEGOTIATION STUFF END
 
     CloseTable();
-    include("footer.php");
+    include "footer.php";
 }
 
-function rookieoption($pid) {
-	global $prefix, $db, $user, $cookie;
-	$sharedFunctions = new Shared($db);
+function rookieoption($pid)
+{
+    global $prefix, $db, $user, $cookie;
+    $sharedFunctions = new Shared($db);
 
-	$pid = intval($pid);
+    $pid = intval($pid);
 
-	cookiedecode($user);
+    cookiedecode($user);
 
-	$sql2 = "SELECT * FROM " . $prefix . "_users WHERE username='$cookie[1]'";
-	$result2 = $db->sql_query($sql2);
-	$num2 = $db->sql_numrows($result2);
-	$userinfo = $db->sql_fetchrow($result2);
+    $sql2 = "SELECT * FROM " . $prefix . "_users WHERE username='$cookie[1]'";
+    $result2 = $db->sql_query($sql2);
+    $num2 = $db->sql_numrows($result2);
+    $userinfo = $db->sql_fetchrow($result2);
 
-	$userteam = stripslashes(check_html($userinfo['user_ibl_team'], "nohtml"));
+    $userteam = stripslashes(check_html($userinfo['user_ibl_team'], "nohtml"));
 
-	$playerinfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM " . $prefix . "_iblplyr WHERE pid='$pid'"));
+    $playerinfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM " . $prefix . "_iblplyr WHERE pid='$pid'"));
 
-	$player_name = stripslashes(check_html($playerinfo['name'], "nohtml"));
-	$player_pos = stripslashes(check_html($playerinfo['pos'], "nohtml"));
-	$player_team_name = stripslashes(check_html($playerinfo['teamname'], "nohtml"));
-	$player_draftround = stripslashes(check_html($playerinfo['draftround'], "nohtml"));
-	$player_exp = stripslashes(check_html($playerinfo['exp'], "nohtml"));
+    $player_name = stripslashes(check_html($playerinfo['name'], "nohtml"));
+    $player_pos = stripslashes(check_html($playerinfo['pos'], "nohtml"));
+    $player_team_name = stripslashes(check_html($playerinfo['teamname'], "nohtml"));
+    $player_draftround = stripslashes(check_html($playerinfo['draftround'], "nohtml"));
+    $player_exp = stripslashes(check_html($playerinfo['exp'], "nohtml"));
 
-	if ($userteam != $player_team_name) {
-		echo "$player_pos $player_name is not on your team.<br>
+    if ($userteam != $player_team_name) {
+        echo "$player_pos $player_name is not on your team.<br>
             <a href=\"javascript:history.back()\">Go Back</a>";
-		return;
-	}
+        return;
+    }
 
     $seasonPhase = $sharedFunctions->getCurrentSeasonPhase();
 
-	if (($seasonPhase == "Free Agency" AND $player_exp == 2 AND $player_draftround == 1) OR
-        (($seasonPhase == "Preseason" OR $seasonPhase == "HEAT") AND
-        $player_exp == 3 AND
-        $player_draftround == 1)) {
-		$finalYearOfRookieContract = stripslashes(check_html($playerinfo['cy3'], "nohtml"));
-	} elseif (($seasonPhase == "Free Agency" AND $player_exp == 1 AND $player_draftround == 2) OR
-        (($seasonPhase == "Preseason" OR $seasonPhase == "HEAT") AND
-        $player_exp == 2 AND
-        $player_draftround == 2)) {
-		$finalYearOfRookieContract = stripslashes(check_html($playerinfo['cy2'], "nohtml"));
-	} else {
-		echo "Sorry, $player_pos $player_name is not eligible for a rookie option.<p>
+    if (($seasonPhase == "Free Agency" and $player_exp == 2 and $player_draftround == 1) or
+        (($seasonPhase == "Preseason" or $seasonPhase == "HEAT") and
+            $player_exp == 3 and
+            $player_draftround == 1)) {
+        $finalYearOfRookieContract = stripslashes(check_html($playerinfo['cy3'], "nohtml"));
+    } elseif (($seasonPhase == "Free Agency" and $player_exp == 1 and $player_draftround == 2) or
+        (($seasonPhase == "Preseason" or $seasonPhase == "HEAT") and
+            $player_exp == 2 and
+            $player_draftround == 2)) {
+        $finalYearOfRookieContract = stripslashes(check_html($playerinfo['cy2'], "nohtml"));
+    } else {
+        echo "Sorry, $player_pos $player_name is not eligible for a rookie option.<p>
             Only draft picks are eligible for rookie options, and the option must be exercised
             before the final season of their rookie contract is underway.<p>
     		<a href=\"javascript:history.back()\">Go Back</a>";
         return;
-	}
+    }
 
-	$rookieOptionValue = 2 * $finalYearOfRookieContract;
+    $rookieOptionValue = 2 * $finalYearOfRookieContract;
 
-	echo "<img align=left src=\"images/player/$pid.jpg\">
+    echo "<img align=left src=\"images/player/$pid.jpg\">
     	You may exercise the rookie extension option on <b>$player_pos $player_name</b>.<br>
     	Their contract value the season after this one will be <b>$rookieOptionValue</b>.<br>
     	However, by exercising this option, <b>you can't use an in-season contract extension on them next season</b>.<br>
@@ -3631,35 +3632,33 @@ function rookieoption($pid) {
     	<input type=\"submit\" value=\"Activate Rookie Extension\"></form>";
 }
 
-switch($pa) {
+switch ($pa) {
 
     case "negotiate":
-    negotiate($pid);
-    break;
+        negotiate($pid);
+        break;
 
     case "poschange":
-    poschange($pid);
-    break;
+        poschange($pid);
+        break;
 
-	case "rookieoption":
-	rookieoption($pid);
-	break;
+    case "rookieoption":
+        rookieoption($pid);
+        break;
 
     case "awards":
-    awards();
-    break;
+        awards();
+        break;
 
     case "showpage":
-    showpage($pid, $spec);
-    break;
+        showpage($pid, $spec);
+        break;
 
     case "search":
-    search();
-    break;
+        search();
+        break;
 
     case "Leaderboards":
-    leaderboards();
-    break;
+        leaderboards();
+        break;
 }
-
-?>

@@ -17,11 +17,9 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_ACTIVETOPICS","Argumente Aktualisht Aktivë");
-define("_CLICK2LIST","Kliko për listën komplete të të gjithë artikujve që gjenden në këtë diskutim");
-define("_TOTNEWS","Total News");
-define("_TOTREADS","Total Reads");
-define("_MORE","More");
-define("_NONEWSYET","...There aren't any news yet for this topic...");
-
-?>
+define("_ACTIVETOPICS", "Argumente Aktualisht Aktivï¿½");
+define("_CLICK2LIST", "Kliko pï¿½r listï¿½n komplete tï¿½ tï¿½ gjithï¿½ artikujve qï¿½ gjenden nï¿½ kï¿½tï¿½ diskutim");
+define("_TOTNEWS", "Total News");
+define("_TOTREADS", "Total Reads");
+define("_MORE", "More");
+define("_NONEWSYET", "...There aren't any news yet for this topic...");

@@ -13,12 +13,10 @@
 /************************************************************************/
 
 if (!defined('ADMIN_FILE')) {
-	die ("Access Denied");
+    die("Access Denied");
 }
 
 global $admin_file;
-if ($radminsuper==1) {
-    adminmenu("".$admin_file.".php?op=mod_authors", ""._EDITADMINS."", "authors.gif");
+if ($radminsuper == 1) {
+    adminmenu("" . $admin_file . ".php?op=mod_authors", "" . _EDITADMINS . "", "authors.gif");
 }
-
-?>

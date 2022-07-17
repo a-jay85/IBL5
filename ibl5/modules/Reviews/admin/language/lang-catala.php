@@ -17,30 +17,26 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_EMAIL","E-Mail");
-define("_SAVECHANGES","Desar Canvis");
-define("_SCORE","Puntuació");
-define("_PRODUCTTITLE","Nom del Producte");
-define("_RELATEDLINK","Vincle Relacionat");
-define("_LINKTITLE","Títul del Vincle");
-define("_REVIEWER","Moderador:");
-define("_REVIEWID","ID del Review");
-define("_REVIEWS","Reviews");
-define("_DATE","Data");
-define("_REVADMIN","Administració de Reviews");
-define("_REVTITLE","Títol de la Pàgina de Reviews");
-define("_REVDESC","Pàgina de Descripció de Reviews");
-define("_REVWAITING","Reviews esperant ser aprovats");
-define("_REVIMGINFO","Guarda la teva Imatge de 150x150 a images/reviews");
-define("_TEXT","Text");
-define("_IMAGE","Imatge");
-define("_NOREVIEW2ADD","No hi han Reviews per a Afegir");
-define("_ADDREVIEW","Afegir Review");
-define("_CLICK2ADDREVIEW","Fes click aquí per a escriure un Review");
-define("_DELMODREVIEW","Esborrar / Modificar un Review");
-define("_MODREVINFO","Pots Esborrar/modificar Reviews navegant per <a href=\"modules.php?name=Reviews\">Reviews</a> com Administrador.");
-define("_LANGUAGE","Lenguatge");
-
-
-?>
+define("_EMAIL", "E-Mail");
+define("_SAVECHANGES", "Desar Canvis");
+define("_SCORE", "Puntuaciï¿½");
+define("_PRODUCTTITLE", "Nom del Producte");
+define("_RELATEDLINK", "Vincle Relacionat");
+define("_LINKTITLE", "Tï¿½tul del Vincle");
+define("_REVIEWER", "Moderador:");
+define("_REVIEWID", "ID del Review");
+define("_REVIEWS", "Reviews");
+define("_DATE", "Data");
+define("_REVADMIN", "Administraciï¿½ de Reviews");
+define("_REVTITLE", "Tï¿½tol de la Pï¿½gina de Reviews");
+define("_REVDESC", "Pï¿½gina de Descripciï¿½ de Reviews");
+define("_REVWAITING", "Reviews esperant ser aprovats");
+define("_REVIMGINFO", "Guarda la teva Imatge de 150x150 a images/reviews");
+define("_TEXT", "Text");
+define("_IMAGE", "Imatge");
+define("_NOREVIEW2ADD", "No hi han Reviews per a Afegir");
+define("_ADDREVIEW", "Afegir Review");
+define("_CLICK2ADDREVIEW", "Fes click aquï¿½ per a escriure un Review");
+define("_DELMODREVIEW", "Esborrar / Modificar un Review");
+define("_MODREVINFO", "Pots Esborrar/modificar Reviews navegant per <a href=\"modules.php?name=Reviews\">Reviews</a> com Administrador.");
+define("_LANGUAGE", "Lenguatge");

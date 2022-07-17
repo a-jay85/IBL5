@@ -17,26 +17,24 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PREVIOUS","Faqja e Kaluar");
-define("_NEXT","Faqja në Vazhdim");
-define("_SEARCHRESULTS","Rezultatet e Kërkimit");
-define("_PAGE","Faqja");
-define("_RETURNTO","Kthehu tek");
-define("_DEACTIVATE","Disaktivo");
-define("_ACTIVATE","Aktivo");
-define("_ENCYCLOPEDIA","Enciklopedia");
-define("_NOCONTENTFORLETTER","Nuk ka korrispondues për gërmën");
-define("_ENCYSELECTLETTER","Seleksiono një gërmë nga kjo listë për të konsultuar termet:");
-define("_COPYRIGHT","Copyright &copy; by $sitename. Të gjitha të drejtat të rezervuara.");
-define("_YOURADMINENCY","Je administratori, kjo Enciklopedi nuk është aktive!");
-define("_ENCYNOTACTIVE","Na vjen keq, kjo enciklopedi nuk është aktive për momentin.");
-define("_AVAILABLEENCYLIST","Lista e Enciklopedive në dispozicion tek");
-define("_YOURADMININACTIVELIST","Je administratori: në vazhdim lista e Enciklopedive jo aktive:");
-define("_NORESULTSTEXT","Asnjë rezultat në tekstin e termeve...");
-define("_NORESULTSTITLE","Asnjë rezultat në titullin e termevei...");
-define("_SEARCHRESULTSFOR","Rezultatet e Kërkimit për:");
-define("_SEARCHNOTCOMPLETE","Opcionet e kërkimit nuk janë komlete. Ju lutem, riprovo edhe një herë.");
-define("_RESULTSINTERMTITLE","Rezultate në titujt e termeve:");
-define("_RESULTSINTERMTEXT","Rezultate në tekstin e termeve:");
-
-?>
+define("_PREVIOUS", "Faqja e Kaluar");
+define("_NEXT", "Faqja nï¿½ Vazhdim");
+define("_SEARCHRESULTS", "Rezultatet e Kï¿½rkimit");
+define("_PAGE", "Faqja");
+define("_RETURNTO", "Kthehu tek");
+define("_DEACTIVATE", "Disaktivo");
+define("_ACTIVATE", "Aktivo");
+define("_ENCYCLOPEDIA", "Enciklopedia");
+define("_NOCONTENTFORLETTER", "Nuk ka korrispondues pï¿½r gï¿½rmï¿½n");
+define("_ENCYSELECTLETTER", "Seleksiono njï¿½ gï¿½rmï¿½ nga kjo listï¿½ pï¿½r tï¿½ konsultuar termet:");
+define("_COPYRIGHT", "Copyright &copy; by $sitename. Tï¿½ gjitha tï¿½ drejtat tï¿½ rezervuara.");
+define("_YOURADMINENCY", "Je administratori, kjo Enciklopedi nuk ï¿½shtï¿½ aktive!");
+define("_ENCYNOTACTIVE", "Na vjen keq, kjo enciklopedi nuk ï¿½shtï¿½ aktive pï¿½r momentin.");
+define("_AVAILABLEENCYLIST", "Lista e Enciklopedive nï¿½ dispozicion tek");
+define("_YOURADMININACTIVELIST", "Je administratori: nï¿½ vazhdim lista e Enciklopedive jo aktive:");
+define("_NORESULTSTEXT", "Asnjï¿½ rezultat nï¿½ tekstin e termeve...");
+define("_NORESULTSTITLE", "Asnjï¿½ rezultat nï¿½ titullin e termevei...");
+define("_SEARCHRESULTSFOR", "Rezultatet e Kï¿½rkimit pï¿½r:");
+define("_SEARCHNOTCOMPLETE", "Opcionet e kï¿½rkimit nuk janï¿½ komlete. Ju lutem, riprovo edhe njï¿½ herï¿½.");
+define("_RESULTSINTERMTITLE", "Rezultate nï¿½ titujt e termeve:");
+define("_RESULTSINTERMTEXT", "Rezultate nï¿½ tekstin e termeve:");

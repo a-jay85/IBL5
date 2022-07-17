@@ -17,28 +17,24 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_FUNCTIONS","Tehtävät");
-define("_YES","Kyllä");
-define("_NO","Ei");
-define("_SAVE","Tallenna");
-define("_ID","ID");
-define("_CATEGORIES","Aihepiirit");
-define("_ALL","Kaikki");
-define("_FAQ","UKK");
-define("_CONTENT","Sisältö");
-define("_FAQADMIN","UKK ylläpito");
-define("_ACTIVEFAQS","Aktiiviset Kysymykset");
-define("_ADDCATEGORY","Lisää kategoria");
-define("_QUESTIONS","Kysymykset ja vastaukset");
-define("_ADDQUESTION","Lisää kysymys");
-define("_QUESTION","Kysymys");
-define("_ANSWER","Vastaus");
-define("_EDITCATEGORY","Muokkaa kategoriaa");
-define("_EDITQUESTIONS","Muokkaa kysymyksiä ja vastauksia");
-define("_FAQDELWARNING","VAROITUS: Oletteko varma, että tahdotte poistaa UKKn ja kaiken sen sisällön?");
-define("_QUESTIONDEL","VAROITUS: Oletteko varma, että tahdotte poistaa tämän kysymyksen sen vastauksen?");
-define("_LANGUAGE","Language");
-
-
-?>
+define("_FUNCTIONS", "Tehtï¿½vï¿½t");
+define("_YES", "Kyllï¿½");
+define("_NO", "Ei");
+define("_SAVE", "Tallenna");
+define("_ID", "ID");
+define("_CATEGORIES", "Aihepiirit");
+define("_ALL", "Kaikki");
+define("_FAQ", "UKK");
+define("_CONTENT", "Sisï¿½ltï¿½");
+define("_FAQADMIN", "UKK yllï¿½pito");
+define("_ACTIVEFAQS", "Aktiiviset Kysymykset");
+define("_ADDCATEGORY", "Lisï¿½ï¿½ kategoria");
+define("_QUESTIONS", "Kysymykset ja vastaukset");
+define("_ADDQUESTION", "Lisï¿½ï¿½ kysymys");
+define("_QUESTION", "Kysymys");
+define("_ANSWER", "Vastaus");
+define("_EDITCATEGORY", "Muokkaa kategoriaa");
+define("_EDITQUESTIONS", "Muokkaa kysymyksiï¿½ ja vastauksia");
+define("_FAQDELWARNING", "VAROITUS: Oletteko varma, ettï¿½ tahdotte poistaa UKKn ja kaiken sen sisï¿½llï¿½n?");
+define("_QUESTIONDEL", "VAROITUS: Oletteko varma, ettï¿½ tahdotte poistaa tï¿½mï¿½n kysymyksen sen vastauksen?");
+define("_LANGUAGE", "Language");

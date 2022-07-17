@@ -17,28 +17,24 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_FUNCTIONS","Funtzioak");
-define("_YES","Bai");
-define("_NO","Ez");
-define("_SAVE","Gorde");
-define("_ID","ID");
-define("_CATEGORIES","Kategoria");
-define("_ALL","Guztiak");
-define("_FAQ","FAQ-ak");
-define("_CONTENT","Edukia");
-define("_FAQADMIN","FAQen administrazioa");
-define("_ACTIVEFAQS","Aktibo dauden FAQak");
-define("_ADDCATEGORY","Kategoria bat gehitu");
-define("_QUESTIONS","Galderak eta erantzunak");
-define("_ADDQUESTION","Galdera gehitu");
-define("_QUESTION","Galdera");
-define("_ANSWER","Erantzuna");
-define("_EDITCATEGORY","Kategoria editatu");
-define("_EDITQUESTIONS","Galderak eta erantzunak editatu");
-define("_FAQDELWARNING","KONTUZ: ziur zaude FAQak eta bere eduki guztiak ezabatu nahi dituzula?");
-define("_QUESTIONDEL","KONTUZ: ziur zaude galdera hau ezabatu nahi duzula?");
-define("_LANGUAGE","Hizkuntza");
-
-
-?>
+define("_FUNCTIONS", "Funtzioak");
+define("_YES", "Bai");
+define("_NO", "Ez");
+define("_SAVE", "Gorde");
+define("_ID", "ID");
+define("_CATEGORIES", "Kategoria");
+define("_ALL", "Guztiak");
+define("_FAQ", "FAQ-ak");
+define("_CONTENT", "Edukia");
+define("_FAQADMIN", "FAQen administrazioa");
+define("_ACTIVEFAQS", "Aktibo dauden FAQak");
+define("_ADDCATEGORY", "Kategoria bat gehitu");
+define("_QUESTIONS", "Galderak eta erantzunak");
+define("_ADDQUESTION", "Galdera gehitu");
+define("_QUESTION", "Galdera");
+define("_ANSWER", "Erantzuna");
+define("_EDITCATEGORY", "Kategoria editatu");
+define("_EDITQUESTIONS", "Galderak eta erantzunak editatu");
+define("_FAQDELWARNING", "KONTUZ: ziur zaude FAQak eta bere eduki guztiak ezabatu nahi dituzula?");
+define("_QUESTIONDEL", "KONTUZ: ziur zaude galdera hau ezabatu nahi duzula?");
+define("_LANGUAGE", "Hizkuntza");

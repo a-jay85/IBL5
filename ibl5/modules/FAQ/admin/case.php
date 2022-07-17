@@ -13,13 +13,13 @@
 /************************************************************************/
 
 if (!defined('ADMIN_FILE')) {
-	die ("Access Denied");
+    die("Access Denied");
 }
 
 $module_name = "FAQ";
-include_secure("modules/$module_name/admin/language/lang-".$currentlang.".php");
+include_secure("modules/$module_name/admin/language/lang-" . $currentlang . ".php");
 
-switch($op) {
+switch ($op) {
 
     case "FaqCatSave":
     case "FaqCatGoSave":
@@ -31,9 +31,7 @@ switch($op) {
     case "FaqCatGoDel":
     case "FaqAdmin":
     case "FaqCatGo":
-    include ("modules/$module_name/admin/index.php");
-    break;
+        include "modules/$module_name/admin/index.php";
+        break;
 
 }
-
-?>

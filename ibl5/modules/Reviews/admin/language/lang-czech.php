@@ -17,30 +17,26 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_EMAIL","E-mail");
-define("_SAVECHANGES","Uložit zmìny");
-define("_SCORE","Skóre:");
-define("_PRODUCTTITLE","Název produktu");
-define("_RELATEDLINK","Související odkaz");
-define("_LINKTITLE","Název odkazu");
-define("_REVIEWER","Recenzent:");
-define("_REVIEWID","ID recenze");
-define("_REVIEWS","Recenze");
-define("_DATE","Datum");
-define("_REVADMIN","Administrace recenzí");
-define("_REVTITLE","Nadpis stránky recenzí");
-define("_REVDESC","Popis stránky recenzí");
-define("_REVWAITING","Recenze èekající na ovìøení");
-define("_REVIMGINFO","Uložte váš obrázek o velikosti 150*150 do adresáøe images/reviews");
-define("_TEXT","Text");
-define("_IMAGE","Obrázek");
-define("_NOREVIEW2ADD","Nejsou recenze k pøidání");
-define("_ADDREVIEW","Pøidat recenzi");
-define("_CLICK2ADDREVIEW","Kliknìte a napište recenzi");
-define("_DELMODREVIEW","Smazat / Upravit recenzi");
-define("_MODREVINFO","Mùžete jednoduše mazat/upravovat recenze pøi prohlížení stránky <a href=\"modules.php?name=Reviews\">Reviews</a> jako administrátor.");
-define("_LANGUAGE","Language");
-
-
-?>
+define("_EMAIL", "E-mail");
+define("_SAVECHANGES", "Uloï¿½it zmï¿½ny");
+define("_SCORE", "Skï¿½re:");
+define("_PRODUCTTITLE", "Nï¿½zev produktu");
+define("_RELATEDLINK", "Souvisejï¿½cï¿½ odkaz");
+define("_LINKTITLE", "Nï¿½zev odkazu");
+define("_REVIEWER", "Recenzent:");
+define("_REVIEWID", "ID recenze");
+define("_REVIEWS", "Recenze");
+define("_DATE", "Datum");
+define("_REVADMIN", "Administrace recenzï¿½");
+define("_REVTITLE", "Nadpis strï¿½nky recenzï¿½");
+define("_REVDESC", "Popis strï¿½nky recenzï¿½");
+define("_REVWAITING", "Recenze ï¿½ekajï¿½cï¿½ na ovï¿½ï¿½enï¿½");
+define("_REVIMGINFO", "Uloï¿½te vï¿½ obrï¿½zek o velikosti 150*150 do adresï¿½ï¿½e images/reviews");
+define("_TEXT", "Text");
+define("_IMAGE", "Obrï¿½zek");
+define("_NOREVIEW2ADD", "Nejsou recenze k pï¿½idï¿½nï¿½");
+define("_ADDREVIEW", "Pï¿½idat recenzi");
+define("_CLICK2ADDREVIEW", "Kliknï¿½te a napiï¿½te recenzi");
+define("_DELMODREVIEW", "Smazat / Upravit recenzi");
+define("_MODREVINFO", "Mï¿½ï¿½ete jednoduï¿½e mazat/upravovat recenze pï¿½i prohlï¿½enï¿½ strï¿½nky <a href=\"modules.php?name=Reviews\">Reviews</a> jako administrï¿½tor.");
+define("_LANGUAGE", "Language");

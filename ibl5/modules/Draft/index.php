@@ -17,35 +17,34 @@
 /************************************************************************/
 
 if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
-	die ("You can't access this file directly...");
+    die("You can't access this file directly...");
 }
 
-require_once("mainfile.php");
+require_once "mainfile.php";
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 $userpage = 1;
 
-include("modules/$module_name/navbar.php");
+include "modules/$module_name/navbar.php";
 
-function userinfo($username, $bypass=0, $hid=0, $url=0) {
+function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
+{
     global $user, $prefix, $user_prefix, $db;
-    $sql = "SELECT * FROM ".$prefix."_bbconfig";
+    $sql = "SELECT * FROM " . $prefix . "_bbconfig";
     $result = $db->sql_query($sql);
-    while ( $row = $db->sql_fetchrow($result) )
-    {
-    $board_config[$row['config_name']] = $row['config_value'];
+    while ($row = $db->sql_fetchrow($result)) {
+        $board_config[$row['config_name']] = $row['config_value'];
     }
-    $sql2 = "SELECT * FROM ".$user_prefix."_users WHERE username='$username'";
+    $sql2 = "SELECT * FROM " . $user_prefix . "_users WHERE username='$username'";
     $result2 = $db->sql_query($sql2);
     $num = $db->sql_numrows($result2);
     $userinfo = $db->sql_fetchrow($result2);
-    if(!$bypass) cookiedecode($user);
-    include("header.php");
+    if (!$bypass) {
+        cookiedecode($user);
+    }
 
-echo "TEST";
-    include("footer.php");
+    include "header.php";
+
+    echo "TEST";
+    include "footer.php";
 }
-
-
-
-?>

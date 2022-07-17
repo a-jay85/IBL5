@@ -6,13 +6,13 @@
 //
 define('_ISO639_2', 'eng');
 
-define('_AT_GUEST','Guest');
-define('_AT_LOGIN','Login');
-define('_AT_LOGOUT','Logout');
-define('_AT_MYACCOUNT','My Account');
-define('_AT_NEWACCOUNT','Register');
-define('_AT_REMEMBERME','Remember me');
-define('_AT_WELCOME','Welcome');
+define('_AT_GUEST', 'Guest');
+define('_AT_LOGIN', 'Login');
+define('_AT_LOGOUT', 'Logout');
+define('_AT_MYACCOUNT', 'My Account');
+define('_AT_NEWACCOUNT', 'Register');
+define('_AT_REMEMBERME', 'Remember me');
+define('_AT_WELCOME', 'Welcome');
 define('_AT_TEMPLATENOTDEFINED', 'Template not defined in theme configuration!');
 define('_AT_TEMPLATENOTFOUND', 'Template not found!');
 define('_AT_SECONDS', 'Seconds');
@@ -30,5 +30,3 @@ define('_AT_SEPTEMBER', 'September');
 define('_AT_OCTOBER', 'October');
 define('_AT_NOVEMBER', 'November');
 define('_AT_DECEMBER', 'December');
-
-?>

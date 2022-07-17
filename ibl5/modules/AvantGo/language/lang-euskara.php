@@ -17,12 +17,9 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PDATE","Data");
-define("_PTOPIC","Gaia");
-define("_COMESFROM","Notizi hau aterata dagoen sistemaren izena:");
-define("_THEURL","Notiziaren URLa:");
-define("_DATE","Data");
-define("_TITLE","Tituloa");
-
-
-?>
+define("_PDATE", "Data");
+define("_PTOPIC", "Gaia");
+define("_COMESFROM", "Notizi hau aterata dagoen sistemaren izena:");
+define("_THEURL", "Notiziaren URLa:");
+define("_DATE", "Data");
+define("_TITLE", "Tituloa");

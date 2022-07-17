@@ -17,26 +17,23 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
+define("_CATEGORY", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
 
-define("_CATEGORY","Категорія");
-
-define("_LVOTES","голосів");
-define("_HITS","Хітів");
-define("_TOPWELCOME","Найкраще на");
-define("_READSTORIES","самих популярних статей");
-define("_COMMENTEDSTORIES","самих обговорюваних статей");
-define("_ACTIVECAT","самих активних категорій");
-define("_READSECTION","самих популярних статей в спеціальних розділах");
-define("_NEWSSUBMITTERS","самих активних авторів новин");
-define("_NEWSSENT","присланих новин");
-define("_VOTEDPOLLS","самих активних голосувань");
-define("_MOSTACTIVEAUTHORS","самих активних авторів");
-define("_NEWSPUBLISHED","опублікованих новин");
-define("_READREVIEWS","самих популярних оглядів");
-define("_DOWNLOADEDFILES","самих популярних файлів для скачування");
-define("_MOSTREADPAGES","most read pages");
-define("_MOSTVOTEDSTORIES","most voted stories");
-define("_POINTS","points");
-define("_BESTRATEDSTORIES","best rated stories (based on 5 maximun points)");
-
-?>
+define("_LVOTES", "пїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_HITS", "ХіпїЅпїЅ");
+define("_TOPWELCOME", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ");
+define("_READSTORIES", "пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_COMMENTEDSTORIES", "пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_ACTIVECAT", "пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_READSECTION", "пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_NEWSSUBMITTERS", "пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ");
+define("_NEWSSENT", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ");
+define("_VOTEDPOLLS", "пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_MOSTACTIVEAUTHORS", "пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_NEWSPUBLISHED", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ");
+define("_READREVIEWS", "пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_DOWNLOADEDFILES", "пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_MOSTREADPAGES", "most read pages");
+define("_MOSTVOTEDSTORIES", "most voted stories");
+define("_POINTS", "points");
+define("_BESTRATEDSTORIES", "best rated stories (based on 5 maximun points)");

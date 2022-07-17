@@ -19,5 +19,3 @@ $version_number = "8.1";
 $filedate = filemtime("version.php");
 $filedate = date("F d, Y", $filedate);
 $version = "PHP-Nuke $version_number (Release Date: $filedate)";
-
-?>

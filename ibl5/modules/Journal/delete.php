@@ -29,50 +29,47 @@
 /* it under the terms of the GNU General Public License as published by */
 /* the Free Software Foundation; either version 2 of the License.       */
 /************************************************************************/
-    /* Journal 2.0 Enhanced and Debugged 2004                               */
-    /* by sixonetonoffun -- http://www.netflake.com --                      */
-    /* Images Created by GanjaUK -- http://www.GanjaUK.com                  */
-    /************************************************************************/
-if ( !defined('MODULE_FILE') )
-{
-	die("You can't access this file directly...");
+/* Journal 2.0 Enhanced and Debugged 2004                               */
+/* by sixonetonoffun -- http://www.netflake.com --                      */
+/* Images Created by GanjaUK -- http://www.GanjaUK.com                  */
+/************************************************************************/
+if (!defined('MODULE_FILE')) {
+    die("You can't access this file directly...");
 }
 
-require_once("mainfile.php");
+require_once "mainfile.php";
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
-if (!isset($jid) OR !is_numeric($jid)) { die("No journal specified."); }
-$pagetitle = "- "._USERSJOURNAL."";
-include("header.php");
-include("modules/$module_name/functions.php");
-    if (is_user($user) || is_admin($admin)) {
-cookiedecode($user);
-$username = $cookie[1];
-        $username = filter($username, "nohtml");
-        $sitename = filter($sitename, "nohtml");
-        $debug = filter($debug, "nohtml");
-if ($debug == "true") :
-    echo ("UserName:$username<br>SiteName: $sitename");
-endif;
-$jid = intval($jid);
-startjournal($sitename,$user);
-echo ("<br>");
-OpenTable();
-echo ("<div align=center class=title><strong>"._ABOUTTODELETE."</strong><br><br><img src=\"modules/$module_name/images/trash.gif\">&nbsp;&nbsp;&nbsp;<img src=\"modules/$module_name/images/trash.gif\">&nbsp;&nbsp;&nbsp;<img src=\"modules/$module_name/images/trash.gif\"></div>");
-echo ("<br><div align=center>"._SUREDELJOURNAL."<br><br>[ <a href=\"modules.php?name=$module_name&file=deleteyes&jid=$jid\">"._YES."</a> | <a href=\"modules.php?name=$module_name&file=edit\">"._NO."</a> ]</div><br><br>");
-echo ("<div align=center>"._YOUCANTSAVE."</div>");
-CloseTable();
-        journalfoot();
-    }
-    if (!is_user($user) && !is_admin($admin)) {
-        $pagetitle = "- "._YOUMUSTBEMEMBER."";
-        $pagetitle = filter($pagetitle, "nohtml");
-        OpenTable();
-        echo "<center><b>"._YOUMUSTBEMEMBER."</b></center>";
-        CloseTable();
-        include("footer.php");
-        die();
-    }
-
-?>
+if (!isset($jid) or !is_numeric($jid)) {die("No journal specified.");}
+$pagetitle = "- " . _USERSJOURNAL . "";
+include "header.php";
+include "modules/$module_name/functions.php";
+if (is_user($user) || is_admin($admin)) {
+    cookiedecode($user);
+    $username = $cookie[1];
+    $username = filter($username, "nohtml");
+    $sitename = filter($sitename, "nohtml");
+    $debug = filter($debug, "nohtml");
+    if ($debug == "true"):
+        echo ("UserName:$username<br>SiteName: $sitename");
+    endif;
+    $jid = intval($jid);
+    startjournal($sitename, $user);
+    echo ("<br>");
+    OpenTable();
+    echo ("<div align=center class=title><strong>" . _ABOUTTODELETE . "</strong><br><br><img src=\"modules/$module_name/images/trash.gif\">&nbsp;&nbsp;&nbsp;<img src=\"modules/$module_name/images/trash.gif\">&nbsp;&nbsp;&nbsp;<img src=\"modules/$module_name/images/trash.gif\"></div>");
+    echo ("<br><div align=center>" . _SUREDELJOURNAL . "<br><br>[ <a href=\"modules.php?name=$module_name&file=deleteyes&jid=$jid\">" . _YES . "</a> | <a href=\"modules.php?name=$module_name&file=edit\">" . _NO . "</a> ]</div><br><br>");
+    echo ("<div align=center>" . _YOUCANTSAVE . "</div>");
+    CloseTable();
+    journalfoot();
+}
+if (!is_user($user) && !is_admin($admin)) {
+    $pagetitle = "- " . _YOUMUSTBEMEMBER . "";
+    $pagetitle = filter($pagetitle, "nohtml");
+    OpenTable();
+    echo "<center><b>" . _YOUMUSTBEMEMBER . "</b></center>";
+    CloseTable();
+    include "footer.php";
+    die();
+}

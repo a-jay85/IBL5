@@ -17,11 +17,9 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PDATE","Datum:");
-define("_PTOPIC","Téma:");
-define("_COMESFROM","Tento èlánek najdete na");
-define("_THEURL","Adresa tohoto èlánku je:");
-define("_DATE","Datum");
-define("_TITLE","Název");
-
-?>
+define("_PDATE", "Datum:");
+define("_PTOPIC", "Tï¿½ma:");
+define("_COMESFROM", "Tento ï¿½lï¿½nek najdete na");
+define("_THEURL", "Adresa tohoto ï¿½lï¿½nku je:");
+define("_DATE", "Datum");
+define("_TITLE", "Nï¿½zev");

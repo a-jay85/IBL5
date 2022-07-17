@@ -4,60 +4,58 @@
 /* PHP-NUKE: Advanced Content Management System                           */
 /* ============================================                           */
 /*                                                                        */
-/* Php-Nuke'nin sürekli geliþmesine baðlý olarak eski Türkçe dil dosyalarý*/
-/* güncelliðini yitirdiði için "HighLAndeR" tarafýndan "MaXCoDeR"in       */
-/* yapmýþ olduðu çeviriler güncelleþtirilip yeni çeviriler eklenmiþtir... */
+/* Php-Nuke'nin sï¿½rekli geliï¿½mesine baï¿½lï¿½ olarak eski Tï¿½rkï¿½e dil dosyalarï¿½*/
+/* gï¿½ncelliï¿½ini yitirdiï¿½i iï¿½in "HighLAndeR" tarafï¿½ndan "MaXCoDeR"in       */
+/* yapmï¿½ï¿½ olduï¿½u ï¿½eviriler gï¿½ncelleï¿½tirilip yeni ï¿½eviriler eklenmiï¿½tir... */
 /*                                                                        */
-/* NOT: Yardýmlarý için Gurol400(gurol400@propc.org)'e teþekkürler.       */
+/* NOT: Yardï¿½mlarï¿½ iï¿½in Gurol400(gurol400@propc.org)'e teï¿½ekkï¿½rler.       */
 /*                                                                        */
-/* Türkçe Çevirmeni: HighLAndeR                                           */
-/* Email: highlander@propc.org ICQ#: 110930777 	URL: http://www.propc.org */
+/* Tï¿½rkï¿½e ï¿½evirmeni: HighLAndeR                                           */
+/* Email: highlander@propc.org ICQ#: 110930777     URL: http://www.propc.org */
 /*                                                                        */
-/* Türkçe Çevirmeni: Selim "MaXCoDeR" Þumlu                               */
+/* Tï¿½rkï¿½e ï¿½evirmeni: Selim "MaXCoDeR" ï¿½umlu                               */
 /* Mail:webmaster@pcnet.com.tr ICQ:19648424 URL: http://www.turknuke.com  */
 /**************************************************************************/
 
-define("_PRINTER","Yazdýrýlabilir Sayfa");
-define("_FRIEND","Bu Haberi Arkadaþýna Gönder");
-define("_YOURNAME","Ýsminiz");
-define("_OK","Tamam!");
-define("_ALLOWEDHTML","Ýzin Verilen HTML:");
-define("_EXTRANS","HTML tag'leri metne");
-define("_HTMLFORMATED","HTML Biçimli");
-define("_PLAINTEXT","Metin Biçimli");
-define("_ARTICLES","Haber");
-define("_SUBMITNEWS","Haber Öner");
-define("_SUBMITADVICE","Lütfen haberinizi aþaðýdaki forma girin ve tekrar kontrol edin.<br>Tüm haberlerin yayýnlanmayacaðýný bilmelisiniz.<br>Öneriniz kontrol edilip yeniden düzenlenebilir.");
-define("_SUBTITLE","Baþlýk");
-define("_BEDESCRIPTIVE","Açýklayýcý ve basit olun");
-define("_BADTITLES","kötü baþlýklar= 'Buna bakýn!' veya 'Bir Haber'");
-define("_HTMLISFINE","HTML kullanabilirsiniz fakat doðru yazdýðýnýzdan emin olun!");
-define("_AREYOUSURE","Bir URL eklediniz mi? Yazým hatalarýný kontrol ettiniz mi?");
-define("_SUBPREVIEW","Göndermeden önce önizleme yapmalýsýnýz");
-define("_SELECTTOPIC","Konu Seçin");
-define("_NEWSUBPREVIEW","Haber Önerisi Önizleme");
-define("_STORYLOOK","Haberiniz bu þekilde görüntülenecek:");
-define("_CHECKSTORY","Lütfen göndermeden önce metni ve baðlantýlarý kontrol edin!");
-define("_THANKSSUB","Öneriniz için teþekkürler!");
-define("_SUBSENT","Haberiniz alýndý...");
-define("_SUBTEXT","Önerinizi kýsa süre içinde içinde inceleyecek ve uygun görülürse yayýnlayacaðýz.");
-define("_WEHAVESUB","Þu an");
-define("_WAITING","bekleyen öneri bulunuyor.");
-define("_PREVIEW","Önizleme");
-define("_NEWUSER","Yeni Kullanýcý");
-define("_USCORE","Puan");
-define("_DATE","Tarih");
-define("_STORYTEXT","Haber Metni");
-define("_EXTENDEDTEXT","Geniþ Metin");
-define("_LANGUAGE","Dil");
+define("_PRINTER", "Yazdï¿½rï¿½labilir Sayfa");
+define("_FRIEND", "Bu Haberi Arkadaï¿½ï¿½na Gï¿½nder");
+define("_YOURNAME", "ï¿½sminiz");
+define("_OK", "Tamam!");
+define("_ALLOWEDHTML", "ï¿½zin Verilen HTML:");
+define("_EXTRANS", "HTML tag'leri metne");
+define("_HTMLFORMATED", "HTML Biï¿½imli");
+define("_PLAINTEXT", "Metin Biï¿½imli");
+define("_ARTICLES", "Haber");
+define("_SUBMITNEWS", "Haber ï¿½ner");
+define("_SUBMITADVICE", "Lï¿½tfen haberinizi aï¿½aï¿½ï¿½daki forma girin ve tekrar kontrol edin.<br>Tï¿½m haberlerin yayï¿½nlanmayacaï¿½ï¿½nï¿½ bilmelisiniz.<br>ï¿½neriniz kontrol edilip yeniden dï¿½zenlenebilir.");
+define("_SUBTITLE", "Baï¿½lï¿½k");
+define("_BEDESCRIPTIVE", "Aï¿½ï¿½klayï¿½cï¿½ ve basit olun");
+define("_BADTITLES", "kï¿½tï¿½ baï¿½lï¿½klar= 'Buna bakï¿½n!' veya 'Bir Haber'");
+define("_HTMLISFINE", "HTML kullanabilirsiniz fakat doï¿½ru yazdï¿½ï¿½ï¿½nï¿½zdan emin olun!");
+define("_AREYOUSURE", "Bir URL eklediniz mi? Yazï¿½m hatalarï¿½nï¿½ kontrol ettiniz mi?");
+define("_SUBPREVIEW", "Gï¿½ndermeden ï¿½nce ï¿½nizleme yapmalï¿½sï¿½nï¿½z");
+define("_SELECTTOPIC", "Konu Seï¿½in");
+define("_NEWSUBPREVIEW", "Haber ï¿½nerisi ï¿½nizleme");
+define("_STORYLOOK", "Haberiniz bu ï¿½ekilde gï¿½rï¿½ntï¿½lenecek:");
+define("_CHECKSTORY", "Lï¿½tfen gï¿½ndermeden ï¿½nce metni ve baï¿½lantï¿½larï¿½ kontrol edin!");
+define("_THANKSSUB", "ï¿½neriniz iï¿½in teï¿½ekkï¿½rler!");
+define("_SUBSENT", "Haberiniz alï¿½ndï¿½...");
+define("_SUBTEXT", "ï¿½nerinizi kï¿½sa sï¿½re iï¿½inde iï¿½inde inceleyecek ve uygun gï¿½rï¿½lï¿½rse yayï¿½nlayacaï¿½ï¿½z.");
+define("_WEHAVESUB", "ï¿½u an");
+define("_WAITING", "bekleyen ï¿½neri bulunuyor.");
+define("_PREVIEW", "ï¿½nizleme");
+define("_NEWUSER", "Yeni Kullanï¿½cï¿½");
+define("_USCORE", "Puan");
+define("_DATE", "Tarih");
+define("_STORYTEXT", "Haber Metni");
+define("_EXTENDEDTEXT", "Geniï¿½ Metin");
+define("_LANGUAGE", "Dil");
 
-define("_SELECTMONTH2VIEW","Lütfen görüntülemek istediðiniz ayý seçin:");
-define("_SHOWALLSTORIES","TÜM Haberleri Göster");
-define("_STORIESARCHIVE","Haber Arþivi");
-define("_ACTIONS","Hareketler");
-define("_ARCHIVESINDEX","Haber Arþivi Ýndeksi");
-define("_ALLSTORIESARCH","Tüm Haberler");
-define("_NEXTPAGE","Sonraki Sayfa");
-define("_PREVIOUSPAGE","Önceki Sayfa");
-
-?>
+define("_SELECTMONTH2VIEW", "Lï¿½tfen gï¿½rï¿½ntï¿½lemek istediï¿½iniz ayï¿½ seï¿½in:");
+define("_SHOWALLSTORIES", "Tï¿½M Haberleri Gï¿½ster");
+define("_STORIESARCHIVE", "Haber Arï¿½ivi");
+define("_ACTIONS", "Hareketler");
+define("_ARCHIVESINDEX", "Haber Arï¿½ivi ï¿½ndeksi");
+define("_ALLSTORIESARCH", "Tï¿½m Haberler");
+define("_NEXTPAGE", "Sonraki Sayfa");
+define("_PREVIOUSPAGE", "ï¿½nceki Sayfa");

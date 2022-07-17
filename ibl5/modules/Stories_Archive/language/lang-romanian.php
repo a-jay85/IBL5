@@ -17,18 +17,16 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PRINTER","Pagina Formatata pentru Imprimanta");
-define("_FRIEND","Trimite acest Articol unui Prieten");
-define("_ARTICLES","Articole");
-define("_USCORE","Scor");
-define("_DATE","Data");
-define("_SELECTMONTH2VIEW","Va rugam sa selectati luna pe care doriti sa o vizionati:");
-define("_SHOWALLSTORIES","Arata Toate Articolele");
-define("_STORIESARCHIVE","Arhiva Articole");
-define("_ACTIONS","Actiuni");
-define("_ARCHIVESINDEX","Index Arhiva Articole");
-define("_ALLSTORIESARCH","Toate Articolele");
-define("_NEXTPAGE","Urmatoarea Pagina");
-define("_PREVIOUSPAGE","Pagina Anterioara");
-
-?>
+define("_PRINTER", "Pagina Formatata pentru Imprimanta");
+define("_FRIEND", "Trimite acest Articol unui Prieten");
+define("_ARTICLES", "Articole");
+define("_USCORE", "Scor");
+define("_DATE", "Data");
+define("_SELECTMONTH2VIEW", "Va rugam sa selectati luna pe care doriti sa o vizionati:");
+define("_SHOWALLSTORIES", "Arata Toate Articolele");
+define("_STORIESARCHIVE", "Arhiva Articole");
+define("_ACTIONS", "Actiuni");
+define("_ARCHIVESINDEX", "Index Arhiva Articole");
+define("_ALLSTORIESARCH", "Toate Articolele");
+define("_NEXTPAGE", "Urmatoarea Pagina");
+define("_PREVIOUSPAGE", "Pagina Anterioara");

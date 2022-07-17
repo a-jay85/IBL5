@@ -17,39 +17,35 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_SEND","Senda");
-define("_FUNCTIONS","Aðgerðir");
-define("_YES","Já");
-define("_NO","Nei");
-define("_CATEGORY","Flokkur");
-define("_SAVECHANGES","Vista breytingar");
-define("_PAGEBREAK","Ef þú vilt hafa margar síður getur skrifað <b>[--pagebreak--]</b> þar sem þú vilt fá síðuskil.");
-define("_SIGNATURE","Undirskrift");
-define("_DESCRIPTION","Lýsing");
-define("_TITLE","Titill");
-define("_ACTIVE","Virkur");
-define("_DEACTIVATE","Gera óvirkan");
-define("_INACTIVE","Óvirkur");
-define("_ACTIVATE","Gera virkan");
-define("_CONTENT","Efni");
-define("_ADDCATEGORY","Bæta við flokki");
-define("_EDITCATEGORY","Breyta flokki");
-define("_ADD","Bæta við");
-define("_LANGUAGE","Tungumál");
-define("_CONTENTMANAGER","Stjórn á innihaldi");
-define("_DELCONTWARNING","Ertu viss um að þú viljir eyða þessari síðu");
-define("_DELCONTENT","Eyða síðu");
-define("_CURRENTSTATUS","Núverandi staða");
-define("_ADDANEWPAGE","Bæta við nýrri síðu");
-define("_CSUBTITLE","Undirtitill");
-define("_HEADERTEXT","Texti í haus");
-define("_PAGETEXT","Texti síðu");
-define("_FOOTERTEXT","Texti í fót");
-define("_ACTIVATEPAGE","Gera þessa síðu virka?");
-define("_EDITPAGECONTENT","Breyta efni síðu");
-define("_DELCONTENTCAT","AÐVÖRUN: Ertu viss um að þú viljir eyða þessum efnisflokki? Síður sem tilheyra þessum efnisflokki, ef þær eru þá til, munu ekki verða fjarlægðar heldur munu þær ekki verða tengdar efnisflokki lengur.");
-define("_DELCATEGORY","Eyða efnisflokki");
-
-
-?>
+define("_SEND", "Senda");
+define("_FUNCTIONS", "Aï¿½gerï¿½ir");
+define("_YES", "Jï¿½");
+define("_NO", "Nei");
+define("_CATEGORY", "Flokkur");
+define("_SAVECHANGES", "Vista breytingar");
+define("_PAGEBREAK", "Ef ï¿½ï¿½ vilt hafa margar sï¿½ï¿½ur getur skrifaï¿½ <b>[--pagebreak--]</b> ï¿½ar sem ï¿½ï¿½ vilt fï¿½ sï¿½ï¿½uskil.");
+define("_SIGNATURE", "Undirskrift");
+define("_DESCRIPTION", "Lï¿½sing");
+define("_TITLE", "Titill");
+define("_ACTIVE", "Virkur");
+define("_DEACTIVATE", "Gera ï¿½virkan");
+define("_INACTIVE", "ï¿½virkur");
+define("_ACTIVATE", "Gera virkan");
+define("_CONTENT", "Efni");
+define("_ADDCATEGORY", "Bï¿½ta viï¿½ flokki");
+define("_EDITCATEGORY", "Breyta flokki");
+define("_ADD", "Bï¿½ta viï¿½");
+define("_LANGUAGE", "Tungumï¿½l");
+define("_CONTENTMANAGER", "Stjï¿½rn ï¿½ innihaldi");
+define("_DELCONTWARNING", "Ertu viss um aï¿½ ï¿½ï¿½ viljir eyï¿½a ï¿½essari sï¿½ï¿½u");
+define("_DELCONTENT", "Eyï¿½a sï¿½ï¿½u");
+define("_CURRENTSTATUS", "Nï¿½verandi staï¿½a");
+define("_ADDANEWPAGE", "Bï¿½ta viï¿½ nï¿½rri sï¿½ï¿½u");
+define("_CSUBTITLE", "Undirtitill");
+define("_HEADERTEXT", "Texti ï¿½ haus");
+define("_PAGETEXT", "Texti sï¿½ï¿½u");
+define("_FOOTERTEXT", "Texti ï¿½ fï¿½t");
+define("_ACTIVATEPAGE", "Gera ï¿½essa sï¿½ï¿½u virka?");
+define("_EDITPAGECONTENT", "Breyta efni sï¿½ï¿½u");
+define("_DELCONTENTCAT", "Aï¿½Vï¿½RUN: Ertu viss um aï¿½ ï¿½ï¿½ viljir eyï¿½a ï¿½essum efnisflokki? Sï¿½ï¿½ur sem tilheyra ï¿½essum efnisflokki, ef ï¿½ï¿½r eru ï¿½ï¿½ til, munu ekki verï¿½a fjarlï¿½gï¿½ar heldur munu ï¿½ï¿½r ekki verï¿½a tengdar efnisflokki lengur.");
+define("_DELCATEGORY", "Eyï¿½a efnisflokki");

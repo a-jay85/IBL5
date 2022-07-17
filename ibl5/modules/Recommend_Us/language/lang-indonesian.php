@@ -17,23 +17,21 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_SEND","Kirim");
-define("_FYOURNAME","Nama Anda:");
-define("_FYOUREMAIL","Alamat Email Anda:");
-define("_FFRIENDNAME","Nama Penerima:");
-define("_FFRIENDEMAIL","Alamat Email Penerima:");
-define("_HELLO","Hello");
-define("_YOURFRIEND","Teman anda");
-define("_RECOMMEND","Rekomendasikan Situs Ini Pada Teman Anda");
-define("_INTSITE","Situs Menarik:");
-define("_OURSITE","menganggap situs kami");
-define("_INTSENT","menarik, dan menginginkan anda mengunjunginya.");
-define("_FSITENAME","Nama Situs:");
-define("_FSITEURL","Alamat Situs:");
-define("_FREFERENCE","Referensi dari anda sudah dikirim ke");
-define("_THANKSREC","Terima kasih atas rekomendasi anda!");
-define("_SECURITYCODEERROR","<b>ERROR:</b> The security code you wrote is incorrect...<br>Please write it exactly as given bellow:");
+define("_SEND", "Kirim");
+define("_FYOURNAME", "Nama Anda:");
+define("_FYOUREMAIL", "Alamat Email Anda:");
+define("_FFRIENDNAME", "Nama Penerima:");
+define("_FFRIENDEMAIL", "Alamat Email Penerima:");
+define("_HELLO", "Hello");
+define("_YOURFRIEND", "Teman anda");
+define("_RECOMMEND", "Rekomendasikan Situs Ini Pada Teman Anda");
+define("_INTSITE", "Situs Menarik:");
+define("_OURSITE", "menganggap situs kami");
+define("_INTSENT", "menarik, dan menginginkan anda mengunjunginya.");
+define("_FSITENAME", "Nama Situs:");
+define("_FSITEURL", "Alamat Situs:");
+define("_FREFERENCE", "Referensi dari anda sudah dikirim ke");
+define("_THANKSREC", "Terima kasih atas rekomendasi anda!");
+define("_SECURITYCODEERROR", "<b>ERROR:</b> The security code you wrote is incorrect...<br>Please write it exactly as given bellow:");
 
-define("_SENDSITEERROR","<b>Error sending the recommendation...</b><br><br><b>ERROR:</b> One or more required fields are empty.<br>Please go back and correct the problem, then try again.");
-
-?>
+define("_SENDSITEERROR", "<b>Error sending the recommendation...</b><br><br><b>ERROR:</b> One or more required fields are empty.<br>Please go back and correct the problem, then try again.");

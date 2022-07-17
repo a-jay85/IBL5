@@ -13,7 +13,7 @@
 /************************************************************************/
 
 if (!defined('MODULE_FILE')) {
-    die ("You can't access this file directly...");
+    die("You can't access this file directly...");
 }
 
 $module_name = basename(dirname(__FILE__));
@@ -27,7 +27,7 @@ function waivers($user)
     $sharedFunctions = new Shared($db);
 
     if (!is_user($user)) {
-        include("header.php");
+        include "header.php";
         if ($stop) {
             OpenTable();
             $sharedFunctions->displaytopmenu($tid);
@@ -46,43 +46,49 @@ function waivers($user)
             loginbox();
             CloseTable();
         }
-        include("footer.php");
+        include "footer.php";
     } elseif (is_user($user)) {
         $currentSeasonPhase = $sharedFunctions->getCurrentSeasonPhase();
         $allowWaiverMoves = $sharedFunctions->getWaiverWireStatus();
 
-        if (($currentSeasonPhase == "Preseason" AND $allowWaiverMoves == "Yes")
-            OR $currentSeasonPhase == "HEAT"
-            OR $currentSeasonPhase == "Regular Season"
-            OR $currentSeasonPhase == "Playoffs") {
+        if (($currentSeasonPhase == "Preseason" and $allowWaiverMoves == "Yes")
+            or $currentSeasonPhase == "HEAT"
+            or $currentSeasonPhase == "Regular Season"
+            or $currentSeasonPhase == "Playoffs") {
             global $cookie;
             cookiedecode($user);
             waiverexecute($cookie[1], $action);
         } else {
-            include ("header.php");
+            include "header.php";
             OpenTable();
             $sharedFunctions->displaytopmenu($tid);
             echo "Sorry, but players may not be added from or dropped to waivers at the present time.";
             CloseTable();
-            include ("footer.php");
+            include "footer.php";
         }
     }
 }
 
-function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
+function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
 {
     global $user, $prefix, $user_prefix, $db, $action;
     $sharedFunctions = new Shared($db);
 
     $sql = "SELECT * FROM " . $prefix . "_bbconfig";
     $result = $db->sql_query($sql);
-    while ($row = $db->sql_fetchrow($result)) $board_config[$row['config_name']] = $row['config_value'];
+    while ($row = $db->sql_fetchrow($result)) {
+        $board_config[$row['config_name']] = $row['config_value'];
+    }
+
     $sql2 = "SELECT * FROM " . $user_prefix . "_users WHERE username = '$username'";
     $result2 = $db->sql_query($sql2);
     $num = $db->sql_numrows($result2);
     $userinfo = $db->sql_fetchrow($result2);
-    if (!$bypass) cookiedecode($user);
-    include("header.php");
+    if (!$bypass) {
+        cookiedecode($user);
+    }
+
+    include "header.php";
 
     ////////// WAIVER ADDITIONS/CUTS
 
@@ -93,7 +99,7 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
     $Roster_Slots = $_POST['rosterslots'];
     $Healthy_Roster_Slots = $_POST['healthyrosterslots'];
 
-    if ($Type_Of_Action == 'add' OR $Type_Of_Action == 'drop') {
+    if ($Type_Of_Action == 'add' or $Type_Of_Action == 'drop') {
         $queryt = "SELECT * FROM nuke_ibl_team_info WHERE team_name = '$Team_Offering'";
         $resultt = $db->sql_query($queryt);
 
@@ -143,7 +149,7 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
                 $hometext = "The " . $Team_Offering . " cut " . $playername . " to waivers.";
 
                 // ==== PUT ANNOUNCEMENT INTO DATABASE ON NEWS PAGE
-                $timestamp = date('Y-m-d H:i:s',time());
+                $timestamp = date('Y-m-d H:i:s', time());
 
                 $querycat = "SELECT * FROM nuke_stories_cat WHERE title = 'Waiver Pool Moves'";
                 $resultcat = $db->sql_query($querycat);
@@ -182,7 +188,7 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
                 $errortext = "Your waiver move should now be processed. $playername has been cut to waivers.";
             }
         } else if ($Type_Of_Action == 'add') {
-            if ($cy1 == '' OR $cy1 == 0) {
+            if ($cy1 == '' or $cy1 == 0) {
                 if ($player_exp > 9) {
                     $cy1 = 103;
                 } elseif ($player_exp > 8) {
@@ -202,12 +208,12 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
                 } else {
                     $cy1 = 51;
                 }
-                $newWaiverContract = TRUE;
+                $newWaiverContract = true;
             }
 
-            if ($Healthy_Roster_Slots < 4 AND $TotalSalary + $cy1 > 7000) { // TODO: Change 7000 to hard cap variable
+            if ($Healthy_Roster_Slots < 4 and $TotalSalary + $cy1 > 7000) { // TODO: Change 7000 to hard cap variable
                 $errortext = "You have 12 or more healthy players and this signing will put you over $70 million. Therefore you cannot make this signing.";
-            } elseif ($Healthy_Roster_Slots > 3 AND $TotalSalary + $cy1 > 7000 AND $cy1 > 103) { // TODO: Change 7000 to hard cap variable
+            } elseif ($Healthy_Roster_Slots > 3 and $TotalSalary + $cy1 > 7000 and $cy1 > 103) { // TODO: Change 7000 to hard cap variable
                 $errortext = "You are over the hard cap and therefore can only sign players who are making veteran minimum!";
             } elseif ($Healthy_Roster_Slots < 1) {
                 $errortext = "You have full roster of 15 players. You can't sign another player at this time!";
@@ -215,7 +221,7 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
                 $queryi = "UPDATE nuke_iblplyr
                     SET `ordinal` = '800',
                         `bird` = 0, ";
-                if ($newWaiverContract == TRUE) {
+                if ($newWaiverContract == true) {
                     $queryi .= "`cy1` = $cy1,
                                 `cy` = 1, ";
                 }
@@ -277,7 +283,6 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
                     $errortext = "Oops, something went wrong. Post what you were trying to do in <A HREF=\"https://discord.com/channels/666986450889474053/671435182502576169\">#site-bugs-and-to-do</A> and we'll fix it asap. Sorry!";
                 }
 
-
             }
         } // END OF IF/ELSE BRACE FOR TYPE OF ACTION IS DROP OR ADD
     } // IF ELSE BRACE FOR IF TYPE OF ACTION FIELD IS NOT NULL; I.E., DROP OR ADD
@@ -287,8 +292,8 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
     OpenTable();
 
     $teamlogo = $userinfo['user_ibl_team'];
-	$queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$teamlogo'";
-	$tid = $db->sql_result($db->sql_query($queryTeamID), 0);
+    $queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$teamlogo'";
+    $tid = $db->sql_result($db->sql_query($queryTeamID), 0);
 
     $sharedFunctions->displaytopmenu($tid);
 
@@ -301,14 +306,18 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
 
     $healthyrosterslots = 15;
 
-    while ($row9 = $db->sql_fetchrow($result9)) $healthyrosterslots--;
+    while ($row9 = $db->sql_fetchrow($result9)) {
+        $healthyrosterslots--;
+    }
 
     $sql10 = "SELECT * FROM nuke_iblplyr WHERE teamname = '$userinfo[user_ibl_team]' AND retired = '0' AND ordinal < '961' ORDER BY ordinal ASC ";
     $result10 = $db->sql_query($sql10);
 
     $rosterslots = 15;
 
-    while ($row10 = $db->sql_fetchrow($result10)) $rosterslots--;
+    while ($row10 = $db->sql_fetchrow($result10)) {
+        $rosterslots--;
+    }
 
     if ($action == 'drop') {
         $sql8 = "SELECT * FROM nuke_iblplyr WHERE teamname = '$userinfo[user_ibl_team]' AND retired = '0' AND ordinal < '961' ORDER BY ordinal ASC ";
@@ -342,7 +351,7 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
         $player_exp = $row8['exp'];
         $zcy2 = $row8[$xcyy];
 
-        if ($zcy2 == '' AND $zcy2 == 0) {
+        if ($zcy2 == '' and $zcy2 == 0) {
             if ($player_exp > 9) {
                 $zcy2 = 103;
             } elseif ($player_exp > 8) {
@@ -382,15 +391,15 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
         <option value=\"$player_pid\">$player_pos $player_name $wait_time $zcy2</option>";
         //        echo "<input type=\"hidden\" name=\"index$k\" value=\"$player_pid\"><input type=\"hidden\" name=\"cy$k\" value=\"$cy2\"><input type=\"hidden\" name=\"type$k\" value=\"1\">";
         /*
-                if ($nocheckbox == 1)
-                {
-                echo "** $player_pos $player_name $wait_time
+        if ($nocheckbox == 1)
+        {
+        echo "** $player_pos $player_name $wait_time
         <br>";
-                } else {
-                echo "<input type=\"checkbox\" name=\"check$k\"> $player_pos $player_name $wait_time $$cy2
+        } else {
+        echo "<input type=\"checkbox\" name=\"check$k\"> $player_pos $player_name $wait_time $$cy2
         <br>";
-                }
-        */
+        }
+         */
         $k++;
     }
 
@@ -403,9 +412,7 @@ function waiverexecute($username, $action, $bypass=0, $hid=0, $url=0)
 
     // === END INSERT OF TRADE STUFF ===
 
-    include("footer.php");
+    include "footer.php";
 }
 
 waivers($user, $action);
-
-?>

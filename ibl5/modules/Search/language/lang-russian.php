@@ -18,55 +18,54 @@
 /**************************************************************************/
 
 /**************************************************************************/
-/* Доп. перевод, проверка синтаксиса/Add. Russian transl.& spell checking:*/
-/*         Александр Бурчак / Alexander Burchak, alexburchak@ua.fm        */
-/* Дата/Date:                                                             */
+/* пїЅпїЅпїЅ. пїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ/Add. Russian transl.& spell checking:*/
+/*         пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ / Alexander Burchak, alexburchak@ua.fm        */
+/* пїЅпїЅпїЅпїЅ/Date:                                                             */
 /*         15.03.2004                                                     */
 /**************************************************************************/
 
-define("_ALLTOPICS","Все темы");
-define("_NOCOMMENTS","Без комментариев");
-define("_UCOMMENT","Комментарий");
-define("_REVIEWS","Рецензии");
-define("_SEARCHUSERS","Искать в базе данных пользователя");
-define("_SEARCHSECTIONS","Искать в специальных секциях");
-define("_SEARCHREVIEWS","Искать в рецензиях");
-define("_SEARCHIN","Искать в");
-define("_ARTICLES","Статьи");
-define("_ALLAUTHORS","Все авторы");
-define("_ALL","Все");
-define("_WEEK","неделя");
-define("_WEEKS","недели");
-define("_MONTH","месяц");
-define("_MONTHS","месяца");
-define("_SEARCHON","Искать в:");
-define("_SSTORIES","Статьи");
-define("_SSECTIONS","Секции");
-define("_SUSERS","Пользователи");
-define("_NOMATCHES","Ничего не найдено по Вашему запросу");
-define("_PREVMATCHES","Предыдущие соответствия");
-define("_NEXTMATCHES","Следующие соответствия");
-define("_INSECTION","Статьи в секции");
-define("_NONAME","Имя не введено");
-define("_SCOMMENTS","Комментарии");
-define("_SEARCHRESULTS","Результат поиска");
-define("_CONTRIBUTEDBY","Опубликовано");
-define("_UCOMMENTS","Комментарии");
-define("_MATCHTITLE","Соответствие по заголовку");
-define("_MATCHTEXT","Соответствие по тексту статьи");
-define("_MATCHBOTH","Соответствие по заголовку и тексту статьи");
-define("_SREPLY","Ответить");
-define("_SREPLIES","Ответы");
-define("_ATTACHART","Прикрепление к статье");
-define("_PAGES","Страницы");
-define("_REVIEWSCORE","Баллов для этой рецензии");
-define("_PAGE","Страница");
-define("_DOWNLOADS","Закачки");
-define("_WEBLINKS","Каталог ссылок");
-define("_FINDMORE","...больше");
-define("_DIDNOTFIND","Не нашли, что искали?");
-define("_ENCYCLOPEDIA","Энциклопедия");
-define("_SEARCHINSTORY","Поиск по всем комментариям к статье:");
-define("_SEARCHCHARACTERS","<center><b>Search System Error</b><br><br>Your query should be at least 3 characters long to be processed.<br>Please, fix the problem and try again...</center>");
+define("_ALLTOPICS", "пїЅпїЅпїЅ пїЅпїЅпїЅпїЅ");
+define("_NOCOMMENTS", "пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_UCOMMENT", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_REVIEWS", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_SEARCHUSERS", "пїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_SEARCHSECTIONS", "пїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_SEARCHREVIEWS", "пїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_SEARCHIN", "пїЅпїЅпїЅпїЅпїЅпїЅ пїЅ");
+define("_ARTICLES", "пїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_ALLAUTHORS", "пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_ALL", "пїЅпїЅпїЅ");
+define("_WEEK", "пїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_WEEKS", "пїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_MONTH", "пїЅпїЅпїЅпїЅпїЅ");
+define("_MONTHS", "пїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_SEARCHON", "пїЅпїЅпїЅпїЅпїЅпїЅ пїЅ:");
+define("_SSTORIES", "пїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_SSECTIONS", "пїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_SUSERS", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_NOMATCHES", "пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_PREVMATCHES", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_NEXTMATCHES", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_INSECTION", "пїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_NONAME", "пїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_SCOMMENTS", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_SEARCHRESULTS", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_CONTRIBUTEDBY", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_UCOMMENTS", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_MATCHTITLE", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_MATCHTEXT", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_MATCHBOTH", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_SREPLY", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_SREPLIES", "пїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_ATTACHART", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_PAGES", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_REVIEWSCORE", "пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_PAGE", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_DOWNLOADS", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_WEBLINKS", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_FINDMORE", "...пїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_DIDNOTFIND", "пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ?");
+define("_ENCYCLOPEDIA", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_SEARCHINSTORY", "пїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ:");
 
-?>
+define("_SEARCHCHARACTERS", "<center><b>Search System Error</b><br><br>Your query should be at least 3 characters long to be processed.<br>Please, fix the problem and try again...</center>");

@@ -17,18 +17,16 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PRINTER","Printervriendelijke pagina");
-define("_FRIEND","Stuur dit verhaal naar een kennis");
-define("_ARTICLES","Artikelen");
-define("_USCORE","Score");
-define("_DATE","Datum");
-define("_SELECTMONTH2VIEW","Kies de maand die je wil raadplegen:");
-define("_SHOWALLSTORIES","Toon ALLE verhalen");
-define("_STORIESARCHIVE","Archief Verhalen");
-define("_ACTIONS","Acties");
-define("_ARCHIVESINDEX","Index Archief Verhalen");
-define("_ALLSTORIESARCH","Alle Verhalen");
-define("_NEXTPAGE","Volgende Pagina");
-define("_PREVIOUSPAGE","Vorige Pagina");
-
-?>
+define("_PRINTER", "Printervriendelijke pagina");
+define("_FRIEND", "Stuur dit verhaal naar een kennis");
+define("_ARTICLES", "Artikelen");
+define("_USCORE", "Score");
+define("_DATE", "Datum");
+define("_SELECTMONTH2VIEW", "Kies de maand die je wil raadplegen:");
+define("_SHOWALLSTORIES", "Toon ALLE verhalen");
+define("_STORIESARCHIVE", "Archief Verhalen");
+define("_ACTIONS", "Acties");
+define("_ARCHIVESINDEX", "Index Archief Verhalen");
+define("_ALLSTORIESARCH", "Alle Verhalen");
+define("_NEXTPAGE", "Volgende Pagina");
+define("_PREVIOUSPAGE", "Vorige Pagina");

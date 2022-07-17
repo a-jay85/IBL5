@@ -17,39 +17,35 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_SEND","Êè§");
-define("_FUNCTIONS","¡ÒÃ¨Ñ´¡ÒÃ");
-define("_YES","µ¡Å§");
-define("_NO","äÁèµ¡Å§");
-define("_CATEGORY","¡ÅØèÁ");
-define("_SAVECHANGES","ºÑ¹·Ö¡¡ÒÃà»ÅÕèÂ¹á»Å§");
-define("_PAGEBREAK","¶éÒ¤Ø³µéÍ§¡ÒÃ·Õè¨Ðáºè§Ë¹éÒ¡ÃØ³ÒãÊè<b>[--pagebreak--]</b>´éÇÂ");
-define("_SIGNATURE","ÅÒÂà«ç¹");
-define("_DESCRIPTION","ÃÒÂÅÐàÍÕÂ´");
-define("_TITLE","ª×èÍ");
-define("_ACTIVE","·Ó§Ò¹");
-define("_DEACTIVATE","äÁè·Ó§Ò¹");
-define("_INACTIVE","äÁè·Ó§Ò¹");
-define("_ACTIVATE","·Ó§Ò¹");
-define("_CONTENT","à¹×éÍËÒ");
-define("_ADDCATEGORY","à¾ÔèÁËÁÇ´ËÁÙè");
-define("_EDITCATEGORY","á¡éä¢ËÁÇ´");
-define("_ADD","à¾ÔèÁ");
-define("_LANGUAGE","ÀÒÉÒ");
-define("_CONTENTMANAGER","¨Ñ´¡ÒÃà¹×éÍËÒ");
-define("_DELCONTWARNING","¤Ø³á¹èã¨·Õè¨ÐÅºË¹éÒ¹Õé");
-define("_DELCONTENT","ÅºË¹éÒ¹Õé");
-define("_CURRENTSTATUS","Ê¶Ò¹Ð»Ñ¨¨ØºÑ¹");
-define("_ADDANEWPAGE","à¾ÔèÁË¹éÒãËÁè");
-define("_CSUBTITLE","ª×èÍÂèÍÂ");
-define("_HEADERTEXT","¢éÍ¤ÇÒÁÊèÇ¹ËÑÇ");
-define("_PAGETEXT","ÃÒÂÅÐàÍÕÂ´¢Í§à¹×éÍËÒ");
-define("_FOOTERTEXT","¢éÍ¤ÇÒÁÊèÇ¹·éÒÂ");
-define("_ACTIVATEPAGE","Ë¹éÒ¹Õé·Ó§Ò¹?");
-define("_EDITPAGECONTENT","á¡éä¢à¹×éÍËÒ¢Í§Ë¹éÒ");
-define("_DELCONTENTCAT","¤Óàµ×Í¹: ¤Ø³µéÍ§¡ÒÃÅº»ÃÐàÀ·¹Õé? àÍ¡ÊÒÃµèÒ§æ·ÕèÍÂÙèã¹»ÃÐàÀ·¹Õé¨ÐÂÑ§äÁè¶Ù¡Åº áµè¨ÐäÁè¶Ù¡¨Ñ´à¢éÒ»ÃÐàÀ·ã´æ");
-define("_DELCATEGORY","Åº»ÃÐàÀ·");
-
-
-?>
+define("_SEND", "ï¿½ï¿½");
+define("_FUNCTIONS", "ï¿½ï¿½Ã¨Ñ´ï¿½ï¿½ï¿½");
+define("_YES", "ï¿½ï¿½Å§");
+define("_NO", "ï¿½ï¿½èµ¡Å§");
+define("_CATEGORY", "ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_SAVECHANGES", "ï¿½Ñ¹ï¿½Ö¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â¹ï¿½Å§");
+define("_PAGEBREAK", "ï¿½ï¿½Ò¤Ø³ï¿½ï¿½Í§ï¿½ï¿½Ã·ï¿½ï¿½ï¿½ï¿½ï¿½Ë¹ï¿½Ò¡ï¿½Ø³ï¿½ï¿½ï¿½ï¿½<b>[--pagebreak--]</b>ï¿½ï¿½ï¿½ï¿½");
+define("_SIGNATURE", "ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_DESCRIPTION", "ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â´");
+define("_TITLE", "ï¿½ï¿½ï¿½ï¿½");
+define("_ACTIVE", "ï¿½Ó§Ò¹");
+define("_DEACTIVATE", "ï¿½ï¿½ï¿½Ó§Ò¹");
+define("_INACTIVE", "ï¿½ï¿½ï¿½Ó§Ò¹");
+define("_ACTIVATE", "ï¿½Ó§Ò¹");
+define("_CONTENT", "ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_ADDCATEGORY", "ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç´ï¿½ï¿½ï¿½ï¿½");
+define("_EDITCATEGORY", "ï¿½ï¿½ï¿½ï¿½ï¿½Ç´");
+define("_ADD", "ï¿½ï¿½ï¿½ï¿½");
+define("_LANGUAGE", "ï¿½ï¿½ï¿½ï¿½");
+define("_CONTENTMANAGER", "ï¿½Ñ´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_DELCONTWARNING", "ï¿½Ø³ï¿½ï¿½ã¨·ï¿½ï¿½ï¿½ÅºË¹ï¿½Ò¹ï¿½ï¿½");
+define("_DELCONTENT", "ÅºË¹ï¿½Ò¹ï¿½ï¿½");
+define("_CURRENTSTATUS", "Ê¶Ò¹Ð»Ñ¨ï¿½ØºÑ¹");
+define("_ADDANEWPAGE", "ï¿½ï¿½ï¿½ï¿½Ë¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_CSUBTITLE", "ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_HEADERTEXT", "ï¿½ï¿½Í¤ï¿½ï¿½ï¿½ï¿½ï¿½Ç¹ï¿½ï¿½ï¿½");
+define("_PAGETEXT", "ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â´ï¿½Í§ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_FOOTERTEXT", "ï¿½ï¿½Í¤ï¿½ï¿½ï¿½ï¿½ï¿½Ç¹ï¿½ï¿½ï¿½ï¿½");
+define("_ACTIVATEPAGE", "Ë¹ï¿½Ò¹ï¿½ï¿½Ó§Ò¹?");
+define("_EDITPAGECONTENT", "ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò¢Í§Ë¹ï¿½ï¿½");
+define("_DELCONTENTCAT", "ï¿½ï¿½ï¿½ï¿½Í¹: ï¿½Ø³ï¿½ï¿½Í§ï¿½ï¿½ï¿½Åºï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½? ï¿½Í¡ï¿½ï¿½Ãµï¿½Ò§ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ã¹»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ§ï¿½ï¿½ï¿½Ù¡Åº ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ù¡ï¿½Ñ´ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_DELCATEGORY", "Åºï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");

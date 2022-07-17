@@ -17,11 +17,9 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PDATE","Datum:");
-define("_PTOPIC","Naslov:");
-define("_COMESFROM","Èlanek prihaja od");
-define("_THEURL","URL èlanka je:");
-define("_DATE","Datum");
-define("_TITLE","Naslov");
-
-?>
+define("_PDATE", "Datum:");
+define("_PTOPIC", "Naslov:");
+define("_COMESFROM", "ï¿½lanek prihaja od");
+define("_THEURL", "URL ï¿½lanka je:");
+define("_DATE", "Datum");
+define("_TITLE", "Naslov");

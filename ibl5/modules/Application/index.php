@@ -13,14 +13,14 @@
 /************************************************************************/
 
 if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
-	die ("You can't access this file directly...");
+    die("You can't access this file directly...");
 }
 
-require_once("mainfile.php");
+require_once "mainfile.php";
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 $userpage = 1;
-include("header.php");
+include "header.php";
 
 ?>
 

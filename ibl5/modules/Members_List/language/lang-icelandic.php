@@ -17,27 +17,25 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_URL","Slóð");
-define("_EMAIL","Netfang");
-define("_REALNAME","Fullt nafn");
-define("_FUNCTIONS","Aðgerðir");
-define("_PREVIOUS","Fyrri síða");
-define("_MEMBERSLIST","Meðlimalisti");
-define("_GREETINGS","Bestu kveðjur til nýjasta meðlimsins:");
-define("_SORTBY","Raða eftir:");
-define("_MNICKNAME","notandanafni");
-define("_MREALNAME","fullu nafni");
-define("_MEMAIL","netfangi");
-define("_MURL","vefslóð");
-define("_ONLINEREG","Þessir meðlimir eru tengdir núna:");
-define("_WEHAVE","Við erum með");
-define("_MREGISTERED","skráða notendur í dag.  Það eru");
-define("_MREGONLINE","skráðir notendur tengdir í augnablikinu.");
-define("_REGSOFAR","skráða notendur í dag.");
-define("_USERSFOUND","notendur fundust undir");
-define("_USERSSHOWN","notendur sýndir");
-define("_NOMEMBERS","Engir notendur undir");
-define("_PAGES","Síður");
-define("_HOMEPAGE","Heimasíða");
-
-?>
+define("_URL", "Slï¿½ï¿½");
+define("_EMAIL", "Netfang");
+define("_REALNAME", "Fullt nafn");
+define("_FUNCTIONS", "Aï¿½gerï¿½ir");
+define("_PREVIOUS", "Fyrri sï¿½ï¿½a");
+define("_MEMBERSLIST", "Meï¿½limalisti");
+define("_GREETINGS", "Bestu kveï¿½jur til nï¿½jasta meï¿½limsins:");
+define("_SORTBY", "Raï¿½a eftir:");
+define("_MNICKNAME", "notandanafni");
+define("_MREALNAME", "fullu nafni");
+define("_MEMAIL", "netfangi");
+define("_MURL", "vefslï¿½ï¿½");
+define("_ONLINEREG", "ï¿½essir meï¿½limir eru tengdir nï¿½na:");
+define("_WEHAVE", "Viï¿½ erum meï¿½");
+define("_MREGISTERED", "skrï¿½ï¿½a notendur ï¿½ dag.  ï¿½aï¿½ eru");
+define("_MREGONLINE", "skrï¿½ï¿½ir notendur tengdir ï¿½ augnablikinu.");
+define("_REGSOFAR", "skrï¿½ï¿½a notendur ï¿½ dag.");
+define("_USERSFOUND", "notendur fundust undir");
+define("_USERSSHOWN", "notendur sï¿½ndir");
+define("_NOMEMBERS", "Engir notendur undir");
+define("_PAGES", "Sï¿½ï¿½ur");
+define("_HOMEPAGE", "Heimasï¿½ï¿½a");

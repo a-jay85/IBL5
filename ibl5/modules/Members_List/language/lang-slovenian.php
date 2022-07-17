@@ -17,27 +17,25 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_URL","URL");
-define("_EMAIL","E-mail");
-define("_REALNAME","Pravo ime");
-define("_FUNCTIONS","Funkcije");
-define("_PREVIOUS","Prejšnja stran");
-define("_MEMBERSLIST","Popis èlanov");
-define("_GREETINGS","Želimo dobrodošlico našemu najnovejšemu èlanu:");
-define("_SORTBY","Sortiraj po:");
-define("_MNICKNAME","nadimku");
-define("_MREALNAME","pravem imenu");
-define("_MEMAIL","e-mailu");
-define("_MURL","URL-ju");
-define("_ONLINEREG","Èlani ki so trenutno online:");
-define("_WEHAVE","Imamo");
-define("_MREGISTERED","registriranih èlanov dosedaj.");
-define("_MREGONLINE","registriranih èlanov je trenutno online.");
-define("_REGSOFAR","registriranih èlanov dosedaj.");
-define("_USERSFOUND","uporabnikov najdenih na");
-define("_USERSSHOWN","uporabnikov prikazanih");
-define("_NOMEMBERS","Noben èlan, ki ustreza kriteriju ni bil najden");
-define("_PAGES","Strani");
-define("_HOMEPAGE","Stran(HomePage)");
-
-?>
+define("_URL", "URL");
+define("_EMAIL", "E-mail");
+define("_REALNAME", "Pravo ime");
+define("_FUNCTIONS", "Funkcije");
+define("_PREVIOUS", "Prejï¿½nja stran");
+define("_MEMBERSLIST", "Popis ï¿½lanov");
+define("_GREETINGS", "ï¿½elimo dobrodoï¿½lico naï¿½emu najnovejï¿½emu ï¿½lanu:");
+define("_SORTBY", "Sortiraj po:");
+define("_MNICKNAME", "nadimku");
+define("_MREALNAME", "pravem imenu");
+define("_MEMAIL", "e-mailu");
+define("_MURL", "URL-ju");
+define("_ONLINEREG", "ï¿½lani ki so trenutno online:");
+define("_WEHAVE", "Imamo");
+define("_MREGISTERED", "registriranih ï¿½lanov dosedaj.");
+define("_MREGONLINE", "registriranih ï¿½lanov je trenutno online.");
+define("_REGSOFAR", "registriranih ï¿½lanov dosedaj.");
+define("_USERSFOUND", "uporabnikov najdenih na");
+define("_USERSSHOWN", "uporabnikov prikazanih");
+define("_NOMEMBERS", "Noben ï¿½lan, ki ustreza kriteriju ni bil najden");
+define("_PAGES", "Strani");
+define("_HOMEPAGE", "Stran(HomePage)");

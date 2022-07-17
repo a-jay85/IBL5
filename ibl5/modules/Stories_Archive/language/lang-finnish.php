@@ -17,22 +17,18 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PRINTER","Kevyempi versio tulostusta varten");
-define("_FRIEND","Lähetä ystävälle");
+define("_PRINTER", "Kevyempi versio tulostusta varten");
+define("_FRIEND", "Lï¿½hetï¿½ ystï¿½vï¿½lle");
 
+define("_ARTICLES", "Artikkelit");
+define("_USCORE", "Pisteet");
+define("_DATE", "Pï¿½ivï¿½");
 
- 
-define("_ARTICLES","Artikkelit");
-define("_USCORE","Pisteet");
-define("_DATE","Päivä");
-
-define("_SELECTMONTH2VIEW","Please select the month you want to view:");
-define("_SHOWALLSTORIES","Show ALL Stories");
-define("_STORIESARCHIVE","Stories Archive");
-define("_ACTIONS","Actions");
-define("_ARCHIVESINDEX","Stories Archive Index");
-define("_ALLSTORIESARCH","All Stories");
-define("_NEXTPAGE","Seuraava sivu");
-define("_PREVIOUSPAGE","Edellinen sivu");
-
-?>
+define("_SELECTMONTH2VIEW", "Please select the month you want to view:");
+define("_SHOWALLSTORIES", "Show ALL Stories");
+define("_STORIESARCHIVE", "Stories Archive");
+define("_ACTIONS", "Actions");
+define("_ARCHIVESINDEX", "Stories Archive Index");
+define("_ALLSTORIESARCH", "All Stories");
+define("_NEXTPAGE", "Seuraava sivu");
+define("_PREVIOUSPAGE", "Edellinen sivu");

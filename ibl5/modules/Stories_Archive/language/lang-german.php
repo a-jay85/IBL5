@@ -17,19 +17,16 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PRINTER","Druckbare Version");
-define("_FRIEND","Diesen Artikel an einen Freund senden");
-define("_ARTICLES","Artikel");
-define("_USCORE","Wertung");
-define("_DATE","Datum");
-define("_SELECTMONTH2VIEW","W&auml;hlen Sie einen Monat der angezeigt werden soll:");
-define("_SHOWALLSTORIES","Zeige ALLE Stories");
-define("_STORIESARCHIVE","Stories Archiv");
-define("_ACTIONS","Aktionen");
-define("_ARCHIVESINDEX","Stories Archiv Index");
-define("_ALLSTORIESARCH","Alle Stories");
-define("_NEXTPAGE","N&auml;chste Seite");
-define("_PREVIOUSPAGE","Vorhergehende Seite");
-
-
-?>
+define("_PRINTER", "Druckbare Version");
+define("_FRIEND", "Diesen Artikel an einen Freund senden");
+define("_ARTICLES", "Artikel");
+define("_USCORE", "Wertung");
+define("_DATE", "Datum");
+define("_SELECTMONTH2VIEW", "W&auml;hlen Sie einen Monat der angezeigt werden soll:");
+define("_SHOWALLSTORIES", "Zeige ALLE Stories");
+define("_STORIESARCHIVE", "Stories Archiv");
+define("_ACTIONS", "Aktionen");
+define("_ARCHIVESINDEX", "Stories Archiv Index");
+define("_ALLSTORIESARCH", "Alle Stories");
+define("_NEXTPAGE", "N&auml;chste Seite");
+define("_PREVIOUSPAGE", "Vorhergehende Seite");

@@ -1,23 +1,23 @@
 <?php
 /***************************************************************************
-*                            lang_admin.php [Estonian]
-*                              -------------------
-*     begin                : Sat Dec 16 2000
-*     copyright            : (C) 2001 The phpBB Group
-*     email                : support@phpbb.com
-*
-*     $Id: lang_admin.php,v 1.35.2.3 2002/06/27 20:06:44 thefinn Exp $
-*
-****************************************************************************/
+ *                            lang_admin.php [Estonian]
+ *                              -------------------
+ *     begin                : Sat Dec 16 2000
+ *     copyright            : (C) 2001 The phpBB Group
+ *     email                : support@phpbb.com
+ *
+ *     $Id: lang_admin.php,v 1.35.2.3 2002/06/27 20:06:44 thefinn Exp $
+ *
+ ****************************************************************************/
 
 /***************************************************************************
-*
-*   This program is free software; you can redistribute it and/or modify
-*   it under the terms of the GNU General Public License as published by
-*   the Free Software Foundation; either version 2 of the License, or
-*   (at your option) any later version.
-*
-***************************************************************************/
+ *
+ *   This program is free software; you can redistribute it and/or modify
+ *   it under the terms of the GNU General Public License as published by
+ *   the Free Software Foundation; either version 2 of the License, or
+ *   (at your option) any later version.
+ *
+ ***************************************************************************/
 
 //
 // Format is same as lang_main
@@ -27,14 +27,14 @@
 // Modules, this replaces the keys used
 // in the modules[][] arrays in each module file
 //
-$lang['General'] = 'Üldine Adminn';
+$lang['General'] = 'ï¿½ldine Adminn';
 $lang['Users'] = 'Kasutaja Adminn';
 $lang['Groups'] = 'Grupide Adminn';
 $lang['Forums'] = 'Foorumi Adminn';
 $lang['Styles'] = 'Stiilide Adminn';
 
 $lang['Configuration'] = 'Konfiguratsioon';
-$lang['Permissions'] = 'Õigused';
+$lang['Permissions'] = 'ï¿½igused';
 $lang['Manage'] = 'Juhtimine';
 $lang['Disallow'] = 'Keelanimesi';
 $lang['Prune'] = 'Puhastamine';
@@ -49,14 +49,13 @@ $lang['Add_new'] = 'Lisa';
 $lang['Backup_DB'] = 'Andmebaasi Varukoopia';
 $lang['Restore_DB'] = 'Taasta Andmebaas';
 
-
 //
 // Index
 //
 $lang['Admin'] = 'Administratsioon';
-$lang['Not_admin'] = 'Sul ei ole õigust seda foorumit administreerida';
+$lang['Not_admin'] = 'Sul ei ole ï¿½igust seda foorumit administreerida';
 $lang['Welcome_phpBB'] = 'Teretulemast!';
-$lang['Admin_intro'] = 'See leht annab sulle kiire ülevaate oma lehe statistikast. Kõiki võimalused leiad sa vasakust menüüst.';
+$lang['Admin_intro'] = 'See leht annab sulle kiire ï¿½levaate oma lehe statistikast. Kï¿½iki vï¿½imalused leiad sa vasakust menï¿½ï¿½st.';
 $lang['Main_index'] = 'Foorumi pealeht';
 $lang['Forum_stats'] = 'Foorumi Statistika';
 $lang['Admin_Index'] = 'Adminni pealeht';
@@ -65,36 +64,35 @@ $lang['Preview_forum'] = 'Foorumi eelvaade';
 $lang['Click_return_admin_index'] = 'Vajuta %ssiia%s, et naasta adminni pealehele';
 
 $lang['Statistic'] = 'Statistika';
-$lang['Value'] = 'Väärtus';
+$lang['Value'] = 'Vï¿½ï¿½rtus';
 $lang['Number_posts'] = 'Postitusi kokku';
-$lang['Posts_per_day'] = 'Postitusi päevas';
+$lang['Posts_per_day'] = 'Postitusi pï¿½evas';
 $lang['Number_topics'] = 'Teemasi kokku';
-$lang['Topics_per_day'] = 'Teemasi päevas';
+$lang['Topics_per_day'] = 'Teemasi pï¿½evas';
 $lang['Number_users'] = 'Kasutajaid kokku';
-$lang['Users_per_day'] = 'Kasutajaid päevas';
+$lang['Users_per_day'] = 'Kasutajaid pï¿½evas';
 $lang['Board_started'] = 'Foorum avati';
-$lang['Avatar_dir_size'] = 'Avataride mälumaht';
+$lang['Avatar_dir_size'] = 'Avataride mï¿½lumaht';
 $lang['Database_size'] = 'Andmebaasi suurus';
-$lang['Gzip_compression'] ='Gzip kompresioon';
+$lang['Gzip_compression'] = 'Gzip kompresioon';
 $lang['Not_available'] = 'Pole saadaval';
 
 $lang['ON'] = 'SEES'; // This is for GZip compression
-$lang['OFF'] = 'VÄLJAS';
-
+$lang['OFF'] = 'Vï¿½LJAS';
 
 //
 // DB Utils
 //
-$lang['Database_Utilities'] = 'Andmebaasi võimalused';
+$lang['Database_Utilities'] = 'Andmebaasi vï¿½imalused';
 
 $lang['Restore'] = 'Taasta';
 $lang['Backup'] = 'Varukoopia';
-$lang['Restore_explain'] = 'See taastab täielikult foorumi seisu varukoopia ajal. See on suur operatsioon ja palun ärke lahkuge siit lehelt enne kui see on tegevuse lõpetanud!';
-$lang['Backup_explain'] = 'Siin sa saad teha varukoopia kõigele phpBB datale. Kui su server seda toetab võid nad ka pakkida Gzip formaati enne downloadi.';
+$lang['Restore_explain'] = 'See taastab tï¿½ielikult foorumi seisu varukoopia ajal. See on suur operatsioon ja palun ï¿½rke lahkuge siit lehelt enne kui see on tegevuse lï¿½petanud!';
+$lang['Backup_explain'] = 'Siin sa saad teha varukoopia kï¿½igele phpBB datale. Kui su server seda toetab vï¿½id nad ka pakkida Gzip formaati enne downloadi.';
 
-$lang['Backup_options'] = 'Varukoopia võimalused';
+$lang['Backup_options'] = 'Varukoopia vï¿½imalused';
 $lang['Start_backup'] = 'Alusta varukoopia tegemist';
-$lang['Full_backup'] = 'Täielik varukoopia';
+$lang['Full_backup'] = 'Tï¿½ielik varukoopia';
 $lang['Structure_backup'] = 'Ainult struktuuri varukoopia';
 $lang['Data_backup'] = 'Ainult andmete(postitused, teemad, kasutajad) varukoopia';
 $lang['Additional_tables'] = 'Lisa tabelid';
@@ -106,11 +104,10 @@ $lang['Restore_success'] = 'Andmebaas on edukalt taastatud. Sinu andmebaas peaks
 $lang['Backup_download'] = 'Su allalaadimine algab peatselt, palun oota.';
 $lang['Backups_not_supported'] = 'Sinu andmebaas ei toeta Varukoopiate tegemist. Vabandame!';
 
-$lang['Restore_Error_uploading'] = 'Tekkis viga faili üleslaadimisel.';
-$lang['Restore_Error_filename'] = 'Faili nimega on probleem, palun proovi muud faili või nime.';
-$lang['Restore_Error_decompress'] = 'Ei saa lahti pakkida Gzip formaati, palun lae ülesse puhas tekst fail-';
-$lang['Restore_Error_no_file'] = 'Ühtegi faili ei laetud üles!';
-
+$lang['Restore_Error_uploading'] = 'Tekkis viga faili ï¿½leslaadimisel.';
+$lang['Restore_Error_filename'] = 'Faili nimega on probleem, palun proovi muud faili vï¿½i nime.';
+$lang['Restore_Error_decompress'] = 'Ei saa lahti pakkida Gzip formaati, palun lae ï¿½lesse puhas tekst fail-';
+$lang['Restore_Error_no_file'] = 'ï¿½htegi faili ei laetud ï¿½les!';
 
 //
 // Auth pages
@@ -118,32 +115,32 @@ $lang['Restore_Error_no_file'] = 'Ühtegi faili ei laetud üles!';
 $lang['Select_a_User'] = 'Vali kasutaja';
 $lang['Select_a_Group'] = 'Valia grupp';
 $lang['Select_a_Forum'] = 'Vali foorum';
-$lang['Auth_Control_User'] = 'Kasutajate õigused';
-$lang['Auth_Control_Group'] = 'Grupide õigused';
-$lang['Auth_Control_Forum'] = 'Foorumite õigused';
+$lang['Auth_Control_User'] = 'Kasutajate ï¿½igused';
+$lang['Auth_Control_Group'] = 'Grupide ï¿½igused';
+$lang['Auth_Control_Forum'] = 'Foorumite ï¿½igused';
 $lang['Look_up_User'] = 'Otsi kasutaja';
 $lang['Look_up_Group'] = 'Otsi grupp';
 $lang['Look_up_Forum'] = 'Otsi foorum';
 
-$lang['Group_auth_explain'] = 'Siin sa saad muuta õigusi ja moderaatori staatust tervele kasutajate gruppile. NB! Kui kasutajal on eraldi antud õigus midagi modereerida vms. , siis need õigused jäävad talle endiselt alles. Sind hoiatatakse kui selline juhus tekib.';
-$lang['User_auth_explain'] = 'Siin sa saad muuta õigusi ja moderaatori staatust kindlale kasutajale. NB! Kui kasutaja kuulub gruppi, siis selle grupi õigusega võib ta endiselt kirjutada foorumitesse, kustutada teemasi jne. Kui selline juhus tekib siis seda öeldakse.';
+$lang['Group_auth_explain'] = 'Siin sa saad muuta ï¿½igusi ja moderaatori staatust tervele kasutajate gruppile. NB! Kui kasutajal on eraldi antud ï¿½igus midagi modereerida vms. , siis need ï¿½igused jï¿½ï¿½vad talle endiselt alles. Sind hoiatatakse kui selline juhus tekib.';
+$lang['User_auth_explain'] = 'Siin sa saad muuta ï¿½igusi ja moderaatori staatust kindlale kasutajale. NB! Kui kasutaja kuulub gruppi, siis selle grupi ï¿½igusega vï¿½ib ta endiselt kirjutada foorumitesse, kustutada teemasi jne. Kui selline juhus tekib siis seda ï¿½eldakse.';
 $lang['Forum_auth_explain'] = 'Siin sa saad muuta foorumi seadeid. ET mis tasemega kasutajad saavad seda vaadata, modereerida jne.';
 
 $lang['Simple_mode'] = 'Tavaline Mode';
-$lang['Advanced_mode'] = 'Täpsem Mode';
+$lang['Advanced_mode'] = 'Tï¿½psem Mode';
 $lang['Moderator_status'] = 'Moderaatori staatus';
 
-$lang['Allowed_Access'] = 'Lubatud juurdepääs';
-$lang['Disallowed_Access'] = 'Keelatud juurdepääs';
+$lang['Allowed_Access'] = 'Lubatud juurdepï¿½ï¿½s';
+$lang['Disallowed_Access'] = 'Keelatud juurdepï¿½ï¿½s';
 $lang['Is_Moderator'] = 'On Moderaator';
 $lang['Not_Moderator'] = 'Ei ole Moteraator';
 
 $lang['Conflict_warning'] = 'Administreerimis konflikt! HOIATUS!';
-$lang['Conflict_access_userauth'] = 'Sellel kasutajal on endiselt juurdepääs sellele foorumile oma kasutajte gruppi kaudu. Sa võib-olla tahad muuta grupi õigusi või eemaldada see kasutaja sealt grupist. Grupid, mis annavad õigusi(ja foorumid mida nad mõjutavad) on allpool ära toodud.';
-$lang['Conflict_mod_userauth'] = 'Sellel kasutajal on endiselt moderaatori õigused sellele foorumile oma kasutajate grupi kaudu. Sa võibolla tahad muuta grupi õigusi või eemaldada see kasutaja sealt grupist. Grupid, mis annavad õigusi (ja foorumid mida nad mõjutavad) on allpool ära toodud.';
+$lang['Conflict_access_userauth'] = 'Sellel kasutajal on endiselt juurdepï¿½ï¿½s sellele foorumile oma kasutajte gruppi kaudu. Sa vï¿½ib-olla tahad muuta grupi ï¿½igusi vï¿½i eemaldada see kasutaja sealt grupist. Grupid, mis annavad ï¿½igusi(ja foorumid mida nad mï¿½jutavad) on allpool ï¿½ra toodud.';
+$lang['Conflict_mod_userauth'] = 'Sellel kasutajal on endiselt moderaatori ï¿½igused sellele foorumile oma kasutajate grupi kaudu. Sa vï¿½ibolla tahad muuta grupi ï¿½igusi vï¿½i eemaldada see kasutaja sealt grupist. Grupid, mis annavad ï¿½igusi (ja foorumid mida nad mï¿½jutavad) on allpool ï¿½ra toodud.';
 
-$lang['Conflict_access_groupauth'] = 'Järgmistel kasutajatel on endiselt õigused nende kasutajte grupi kaudu. Sa võibolla tahad neid muuta. Kõik on ära toodud all nimekirjas.';
-$lang['Conflict_mod_groupauth'] = 'Antud kasutajatel on endiselt modereerimis õigused osades foorumites. Kõik vajalik on ära toodud all nimekirjas';
+$lang['Conflict_access_groupauth'] = 'Jï¿½rgmistel kasutajatel on endiselt ï¿½igused nende kasutajte grupi kaudu. Sa vï¿½ibolla tahad neid muuta. Kï¿½ik on ï¿½ra toodud all nimekirjas.';
+$lang['Conflict_mod_groupauth'] = 'Antud kasutajatel on endiselt modereerimis ï¿½igused osades foorumites. Kï¿½ik vajalik on ï¿½ra toodud all nimekirjas';
 
 $lang['Public'] = 'Avalik';
 $lang['Private'] = 'Isiklik';
@@ -151,10 +148,9 @@ $lang['Registered'] = 'Registreerunutele';
 $lang['Administrators'] = 'Administraatoritele';
 $lang['Hidden'] = 'Peidetud';
 
-
 // These are displayed in the drop down boxes for advanced
 // mode forum auth, try and keep them short!
-$lang['Forum_ALL'] = 'KÕIK';
+$lang['Forum_ALL'] = 'Kï¿½IK';
 $lang['Forum_REG'] = 'REG';
 $lang['Forum_PRIVATE'] = 'PRIV';
 $lang['Forum_MOD'] = 'MOD';
@@ -168,160 +164,156 @@ $lang['Edit'] = 'Muuda';
 $lang['Delete'] = 'Kustuta';
 $lang['Sticky'] = 'Kleeps';
 $lang['Announce'] = 'Teavita';
-$lang['Vote'] = 'Hääleta';
-$lang['Pollcreate'] = 'Loo hääletus';
+$lang['Vote'] = 'Hï¿½ï¿½leta';
+$lang['Pollcreate'] = 'Loo hï¿½ï¿½letus';
 
-$lang['Permissions'] = 'Õigused';
-$lang['Simple_Permission'] = 'Lihtõigused';
+$lang['Permissions'] = 'ï¿½igused';
+$lang['Simple_Permission'] = 'Lihtï¿½igused';
 
 $lang['User_Level'] = 'Kasutaja level';
 $lang['Auth_User'] = 'Kasutaja';
 $lang['Auth_Admin'] = 'Administraator';
 $lang['Group_memberships'] = 'Katuajate grupi liikmed';
-$lang['Usergroup_members'] = 'Sellel grupil on järgmised liikmed';
+$lang['Usergroup_members'] = 'Sellel grupil on jï¿½rgmised liikmed';
 
-$lang['Forum_auth_updated'] = 'Foorumi õigused muudetud';
-$lang['User_auth_updated'] = 'Kasutaja õigused muudetud';
-$lang['Group_auth_updated'] = 'Grupi õigused muudetud';
+$lang['Forum_auth_updated'] = 'Foorumi ï¿½igused muudetud';
+$lang['User_auth_updated'] = 'Kasutaja ï¿½igused muudetud';
+$lang['Group_auth_updated'] = 'Grupi ï¿½igused muudetud';
 
-$lang['Auth_updated'] = 'Õigused on muudetud';
-$lang['Click_return_userauth'] = 'Vajuta %ssiia%s et minna tagasi kasutajate õiguste lehele.';
-$lang['Click_return_groupauth'] = 'Vajuta %ssiia%s et minna tagasi grupi õiguste lehele.';
-$lang['Click_return_forumauth'] = 'Vajuta %ssiia%s et minna tagasi foorumi õiguste lehele.';
-
+$lang['Auth_updated'] = 'ï¿½igused on muudetud';
+$lang['Click_return_userauth'] = 'Vajuta %ssiia%s et minna tagasi kasutajate ï¿½iguste lehele.';
+$lang['Click_return_groupauth'] = 'Vajuta %ssiia%s et minna tagasi grupi ï¿½iguste lehele.';
+$lang['Click_return_forumauth'] = 'Vajuta %ssiia%s et minna tagasi foorumi ï¿½iguste lehele.';
 
 //
 // Banning
 //
 $lang['Ban_control'] = 'Bannide juhtimine';
-$lang['Ban_explain'] = 'Siin sa saad juhtida kasutajate bannimist. Sa saad bannida kas kasutajanime, ip aadressi jne. Niimoodi keelad tal isegi jõudmise su foorumi avalehele. Et ära hoida ühe kasutaja topelt registreerimist võid sa ka bannida tema emaili!';
-$lang['Ban_explain_warn'] = 'NB! Kui sa bannid mingi ip vahemiku siis baasi lisatakse kõik IP aadressid eraldi. Palun ürita seda listi hoida väiksena, veel parem lisa ainult üks ip aadress.';
+$lang['Ban_explain'] = 'Siin sa saad juhtida kasutajate bannimist. Sa saad bannida kas kasutajanime, ip aadressi jne. Niimoodi keelad tal isegi jï¿½udmise su foorumi avalehele. Et ï¿½ra hoida ï¿½he kasutaja topelt registreerimist vï¿½id sa ka bannida tema emaili!';
+$lang['Ban_explain_warn'] = 'NB! Kui sa bannid mingi ip vahemiku siis baasi lisatakse kï¿½ik IP aadressid eraldi. Palun ï¿½rita seda listi hoida vï¿½iksena, veel parem lisa ainult ï¿½ks ip aadress.';
 
 $lang['Select_username'] = 'Vali kasutajanimi';
 $lang['Select_ip'] = 'Vali ip IP';
 $lang['Select_email'] = 'Vali Emaili aadress';
 
-$lang['Ban_username'] = 'Banni üks või rohkem kasutajanimesi';
-$lang['Ban_username_explain'] = 'Sa võid ka korraga bannide mitut kasutajat';
+$lang['Ban_username'] = 'Banni ï¿½ks vï¿½i rohkem kasutajanimesi';
+$lang['Ban_username_explain'] = 'Sa vï¿½id ka korraga bannide mitut kasutajat';
 
-$lang['Ban_IP'] = 'Banni üks või rohkem ip aadressi või teenusepakkuja';
-$lang['IP_hostname'] = 'IP addressid või teenusepakkuja nimed';
-$lang['Ban_IP_explain'] = 'Et ära märkida mitmeid ip aadressid või teenusepakkujad, eralda need komaga.';
+$lang['Ban_IP'] = 'Banni ï¿½ks vï¿½i rohkem ip aadressi vï¿½i teenusepakkuja';
+$lang['IP_hostname'] = 'IP addressid vï¿½i teenusepakkuja nimed';
+$lang['Ban_IP_explain'] = 'Et ï¿½ra mï¿½rkida mitmeid ip aadressid vï¿½i teenusepakkujad, eralda need komaga.';
 
-$lang['Ban_email'] = 'Banni üks või mitu e-maili aadressi';
+$lang['Ban_email'] = 'Banni ï¿½ks vï¿½i mitu e-maili aadressi';
 $lang['Ban_email_explain'] = 'Et bannida mitmeid emaile, eralda need komadega.';
 
-$lang['Unban_username'] = 'Eemalda bann ühelt või mitmelt kasutajalt';
-$lang['Unban_username_explain'] = 'Sa võid eemaldada ka banni mitmelt korraga hoides all ctrl.';
+$lang['Unban_username'] = 'Eemalda bann ï¿½helt vï¿½i mitmelt kasutajalt';
+$lang['Unban_username_explain'] = 'Sa vï¿½id eemaldada ka banni mitmelt korraga hoides all ctrl.';
 
-$lang['Unban_IP'] = 'Eemalda bann ühelt või mitmelt ip aadressilt';
-$lang['Unban_IP_explain'] = 'Sa võid eemaldada ka banni mitmelt korraga hoides all ctrl.';
+$lang['Unban_IP'] = 'Eemalda bann ï¿½helt vï¿½i mitmelt ip aadressilt';
+$lang['Unban_IP_explain'] = 'Sa vï¿½id eemaldada ka banni mitmelt korraga hoides all ctrl.';
 
-$lang['Unban_email'] = 'Eemalda bann ühelt või mitmelt emaili aadresssilt';
-$lang['Unban_email_explain'] = 'Sa võid eemaldada ka banni mitmelt korraga hoides all ctrl.';
+$lang['Unban_email'] = 'Eemalda bann ï¿½helt vï¿½i mitmelt emaili aadresssilt';
+$lang['Unban_email_explain'] = 'Sa vï¿½id eemaldada ka banni mitmelt korraga hoides all ctrl.';
 
-$lang['No_banned_users'] = 'Ei ole ühtegi bannitud kasutajat';
-$lang['No_banned_ip'] = 'Ei ole ühtegi bannitud ip-d';
-$lang['No_banned_email'] = 'Ei ole ühtegi bannitud e-maili';
+$lang['No_banned_users'] = 'Ei ole ï¿½htegi bannitud kasutajat';
+$lang['No_banned_ip'] = 'Ei ole ï¿½htegi bannitud ip-d';
+$lang['No_banned_email'] = 'Ei ole ï¿½htegi bannitud e-maili';
 
 $lang['Ban_update_sucessful'] = 'Bannitute listi uuendati edukalt!';
 $lang['Click_return_banadmin'] = 'Vajuta %ssiia%s et minna tagasi bannide juhtimisele';
 
-
-
 //
 // Configuration
 //
-$lang['General_Config'] = 'Üldine konfiguratsioon';
-$lang['Config_explain'] = 'Alumine form laseb sul muuta üldist seadistust. Muude asjade muutmiseks kasuta vasakul olevat menüüd.';
+$lang['General_Config'] = 'ï¿½ldine konfiguratsioon';
+$lang['Config_explain'] = 'Alumine form laseb sul muuta ï¿½ldist seadistust. Muude asjade muutmiseks kasuta vasakul olevat menï¿½ï¿½d.';
 
-$lang['Click_return_config'] = 'Vajuta %ssiia%s et minna tagasi Üldiste Seadistuste lehele';
+$lang['Click_return_config'] = 'Vajuta %ssiia%s et minna tagasi ï¿½ldiste Seadistuste lehele';
 
-$lang['General_settings'] = 'Üldised forumi seadistused';
+$lang['General_settings'] = 'ï¿½ldised forumi seadistused';
 $lang['Server_name'] = 'Domeeni nimi';
 $lang['Server_name_explain'] = 'Domeen, kus see foorum asetseb';
 $lang['Script_path'] = 'Foorumi kaust';
 $lang['Script_path_explain'] = 'Kaust kus foorum asub domeeni suhtes.';
 $lang['Server_port'] = 'Serveri Port';
 $lang['Server_port_explain'] = 'Port, kus su server jookseb. Enamasti 80, muuda ainult siis, kui sa tead, et see ei ole nii.';
-$lang['Site_name'] = 'Lehekülje nimi';
-$lang['Site_desc'] = 'Lehekülje kirjeldus';
+$lang['Site_name'] = 'Lehekï¿½lje nimi';
+$lang['Site_desc'] = 'Lehekï¿½lje kirjeldus';
 $lang['Board_disable'] = 'Sulge foorum';
-$lang['Board_disable_explain'] = 'See teeb foorumi kasutajatele kinniseks. NB! Ära välja logi, sa ei saa enam sisse logida!';
+$lang['Board_disable_explain'] = 'See teeb foorumi kasutajatele kinniseks. NB! ï¿½ra vï¿½lja logi, sa ei saa enam sisse logida!';
 $lang['Acct_activation'] = 'Ava kontode aktivatsioon';
 $lang['Acc_None'] = 'puudub'; // These three entries are the type of activation
 $lang['Acc_User'] = 'kasutaja';
 $lang['Acc_Admin'] = 'admin';
 
-$lang['Abilities_settings'] = 'Kasutajate ja foorumi põhilised seaded';
-$lang['Max_poll_options'] = 'Maksimum arv küsitluse vastuseid';
+$lang['Abilities_settings'] = 'Kasutajate ja foorumi pï¿½hilised seaded';
+$lang['Max_poll_options'] = 'Maksimum arv kï¿½sitluse vastuseid';
 $lang['Flood_Interval'] = 'Postituste interval';
 $lang['Flood_Interval_explain'] = 'Sekundites, kui kaua peab kasutaja ootama, et saaks teha uue postituse';
 $lang['Board_email_form'] = 'Kasutajate emailimine foorumi kaudu';
-$lang['Board_email_form_explain'] = 'kasutajad võivad saata emaile selle foorumi kaudu';
+$lang['Board_email_form_explain'] = 'kasutajad vï¿½ivad saata emaile selle foorumi kaudu';
 $lang['Topics_per_page'] = 'Teemasi lehe peale';
 $lang['Posts_per_page'] = 'Postitusi lehe peale';
 $lang['Hot_threshold'] = 'Postitusi, et teema muutuks populaarseks';
 $lang['Default_style'] = 'Vaikimisi Stiil';
-$lang['Override_style'] = 'Kasutaja stiilist üle kirjutamine';
+$lang['Override_style'] = 'Kasutaja stiilist ï¿½le kirjutamine';
 $lang['Override_style_explain'] = 'Asenda kasutaja valitud stiil igal juhul vaikimisi stiiliga.';
 $lang['Default_language'] = 'Vaikimisi keel';
-$lang['Date_format'] = 'Kuupäeva formaat';
-$lang['System_timezone'] = 'Süsteemi ajatsoon';
+$lang['Date_format'] = 'Kuupï¿½eva formaat';
+$lang['System_timezone'] = 'Sï¿½steemi ajatsoon';
 $lang['Enable_gzip'] = 'Luba GZip pakkimine';
-$lang['Enable_prune'] = 'Võimalda foorumi auto-puhastamine';
-$lang['Allow_HTML'] = 'Võimalda HTML';
-$lang['Allow_BBCode'] = 'Võimalda BBKood';
-$lang['Allowed_tags'] = 'Võimalda HTML tagid';
+$lang['Enable_prune'] = 'Vï¿½imalda foorumi auto-puhastamine';
+$lang['Allow_HTML'] = 'Vï¿½imalda HTML';
+$lang['Allow_BBCode'] = 'Vï¿½imalda BBKood';
+$lang['Allowed_tags'] = 'Vï¿½imalda HTML tagid';
 $lang['Allowed_tags_explain'] = 'Eralda tagid komadega';
-$lang['Allow_smilies'] = 'Võimalda emotsioonid';
+$lang['Allow_smilies'] = 'Vï¿½imalda emotsioonid';
 $lang['Smilies_path'] = 'Emotsioonide kaust';
-$lang['Smilies_path_explain'] = 'Asukoht foorumi kausta suhtes. Näide: images/smiles';
-$lang['Allow_sig'] = 'Võimalda allkirjastamine';
+$lang['Smilies_path_explain'] = 'Asukoht foorumi kausta suhtes. Nï¿½ide: images/smiles';
+$lang['Allow_sig'] = 'Vï¿½imalda allkirjastamine';
 $lang['Max_sig_length'] = 'Max. allkirja pikkus';
-$lang['Max_sig_length_explain'] = 'Max. arv tähti kasutaja allkirjas';
-$lang['Allow_name_change'] = 'Võimalda kasutajanime muutmist';
+$lang['Max_sig_length_explain'] = 'Max. arv tï¿½hti kasutaja allkirjas';
+$lang['Allow_name_change'] = 'Vï¿½imalda kasutajanime muutmist';
 $lang['Avatar_settings'] = 'Avatari seadistused';
-$lang['Allow_local'] = 'Võimalda galerii avatarid';
-$lang['Allow_remote'] = 'Võimalda kaug-avatarid';
-$lang['Allow_remote_explain'] = 'Avatarist link teisel lehel. näide www.hot.ee/gretler/avatar.jpg';
-$lang['Allow_upload'] = 'Võimalda avataride üleslaadimine';
+$lang['Allow_local'] = 'Vï¿½imalda galerii avatarid';
+$lang['Allow_remote'] = 'Vï¿½imalda kaug-avatarid';
+$lang['Allow_remote_explain'] = 'Avatarist link teisel lehel. nï¿½ide www.hot.ee/gretler/avatar.jpg';
+$lang['Allow_upload'] = 'Vï¿½imalda avataride ï¿½leslaadimine';
 $lang['Max_filesize'] = 'Max. avatari suurus';
-$lang['Max_filesize_explain'] = 'Avataride üleslaadimiseks.';
+$lang['Max_filesize_explain'] = 'Avataride ï¿½leslaadimiseks.';
 $lang['Max_avatar_size'] = 'Max. avatari dimensioon';
-$lang['Max_avatar_size_explain'] = '(Kõrgus ja laius pixlites)';
+$lang['Max_avatar_size_explain'] = '(Kï¿½rgus ja laius pixlites)';
 $lang['Avatar_storage_path'] = 'Avataride kaust';
-$lang['Avatar_storage_path_explain'] = 'Avataride kaust, näide: images/avatars';
+$lang['Avatar_storage_path_explain'] = 'Avataride kaust, nï¿½ide: images/avatars';
 $lang['Avatar_gallery_path'] = 'Avataride galerii kaust';
-$lang['Avatar_gallery_path_explain'] = 'galerii kaust, näide images/avatars/gallery';
+$lang['Avatar_gallery_path_explain'] = 'galerii kaust, nï¿½ide images/avatars/gallery';
 $lang['COPPA_settings'] = 'COPPA seaded';
 $lang['COPPA_fax'] = 'COPPA Faksi number';
 $lang['COPPA_mail'] = 'COPPA E-maili Address';
-$lang['COPPA_mail_explain'] = 'See on aadress, kuhu vanemad peaksid saatma täidetud formi, aga siin foorumis on see maha võetud';
+$lang['COPPA_mail_explain'] = 'See on aadress, kuhu vanemad peaksid saatma tï¿½idetud formi, aga siin foorumis on see maha vï¿½etud';
 $lang['Email_settings'] = 'E-maili seaded';
 $lang['Admin_email'] = 'Adminni email';
 $lang['Email_sig'] = 'E-maili allkiri';
-$lang['Email_sig_explain'] = 'See tekst lisatakse kõigile väljaminevatele emaili aadressidele';
+$lang['Email_sig_explain'] = 'See tekst lisatakse kï¿½igile vï¿½ljaminevatele emaili aadressidele';
 $lang['Use_SMTP'] = 'Kasuta SMTP e-maili';
-$lang['Use_SMTP_explain'] = 'Vali see, kui sa tahad või pead kasutama serverit mailide välja saatmiseks mail() funktsiooni asemel.';
+$lang['Use_SMTP_explain'] = 'Vali see, kui sa tahad vï¿½i pead kasutama serverit mailide vï¿½lja saatmiseks mail() funktsiooni asemel.';
 $lang['SMTP_server'] = 'SMTP Serveri aadress';
 $lang['SMTP_username'] = 'SMTP kasutaja';
-$lang['SMTP_username_explain'] = 'Ainult siis sisesta kasutaja nimi, kui su server seda nõuab';
+$lang['SMTP_username_explain'] = 'Ainult siis sisesta kasutaja nimi, kui su server seda nï¿½uab';
 $lang['SMTP_password'] = 'SMTP parool';
-$lang['SMTP_password_explain'] = 'Ainult siis sisesta parool kui su server seda nõuab';
-$lang['Disable_privmsg'] = 'Privaat sõnumid';
+$lang['SMTP_password_explain'] = 'Ainult siis sisesta parool kui su server seda nï¿½uab';
+$lang['Disable_privmsg'] = 'Privaat sï¿½numid';
 $lang['Inbox_limits'] = 'Max postitusi INBOXis';
 $lang['Sentbox_limits'] = 'Max postitusi SENTBOXis';
 $lang['Savebox_limits'] = 'Max postiusi SAVABOXis';
-$lang['Cookie_settings'] = 'Küpsiste seaded';
-$lang['Cookie_settings_explain'] = 'Need detailid kirjeldavad, kuidas küpsised saavad olema saadetud su kasutajate brauseritesse. Need peaksid olema hetkel õiged näitajad. kui on vajalik, siis muuda neid, aga ettevaatlikult. Ebakorrektne muutmine võib põhjustada selle, et kasutajad ei saa enam sisse logida.';
-$lang['Cookie_domain'] = 'Küpsiste domeen';
-$lang['Cookie_name'] = 'Küpsise nimi';
-$lang['Cookie_path'] = 'Küpsise tee';
-$lang['Cookie_secure'] = 'Küpsiste turvalisus';
-$lang['Cookie_secure_explain'] = 'Kui su server jookseb SSL kaudu, siis vali see valik, muul juhul jäta valimata.';
+$lang['Cookie_settings'] = 'Kï¿½psiste seaded';
+$lang['Cookie_settings_explain'] = 'Need detailid kirjeldavad, kuidas kï¿½psised saavad olema saadetud su kasutajate brauseritesse. Need peaksid olema hetkel ï¿½iged nï¿½itajad. kui on vajalik, siis muuda neid, aga ettevaatlikult. Ebakorrektne muutmine vï¿½ib pï¿½hjustada selle, et kasutajad ei saa enam sisse logida.';
+$lang['Cookie_domain'] = 'Kï¿½psiste domeen';
+$lang['Cookie_name'] = 'Kï¿½psise nimi';
+$lang['Cookie_path'] = 'Kï¿½psise tee';
+$lang['Cookie_secure'] = 'Kï¿½psiste turvalisus';
+$lang['Cookie_secure_explain'] = 'Kui su server jookseb SSL kaudu, siis vali see valik, muul juhul jï¿½ta valimata.';
 $lang['Session_length'] = 'Sessiooni pikkus [ sekundites ]';
-
 
 //
 // Forum Management
@@ -338,33 +330,32 @@ $lang['Update_order'] = 'Uuenda';
 $lang['Config_updated'] = 'Foorumi seadistused on edukalt uuendatud';
 $lang['Edit'] = 'Muuda';
 $lang['Delete'] = 'Kustuta';
-$lang['Move_up'] = 'liiguta ülespoole';
+$lang['Move_up'] = 'liiguta ï¿½lespoole';
 $lang['Move_down'] = 'liiguta allapoole';
 $lang['Resync'] = 'Resync';
-$lang['No_mode'] = 'Ühtegi MODE´t ei muudetud';
-$lang['Forum_edit_delete_explain'] = 'All olev vorm lubab sul muuta põhilisi näitajaid. Muude asjade muutmiseks kasuta vasakul olevat menüüd.';
+$lang['No_mode'] = 'ï¿½htegi MODEï¿½t ei muudetud';
+$lang['Forum_edit_delete_explain'] = 'All olev vorm lubab sul muuta pï¿½hilisi nï¿½itajaid. Muude asjade muutmiseks kasuta vasakul olevat menï¿½ï¿½d.';
 $lang['Move_contents'] = 'liiguta kogu sisu';
 $lang['Forum_delete'] = 'Kustuta foorum';
 $lang['Forum_delete_explain'] = 'All olev vorm lubab sul foorumi kustutada ja otsustada kuhu sa tahad kogu selle sisu panna';
 $lang['Status_locked'] = 'Lukus';
 $lang['Status_unlocked'] = 'Avatud';
-$lang['Forum_settings'] = 'Üldised foorumi seadistused';
+$lang['Forum_settings'] = 'ï¿½ldised foorumi seadistused';
 $lang['Forum_name'] = 'Foorumi nimi';
 $lang['Forum_desc'] = 'Kirjeldus';
 $lang['Forum_status'] = 'Foorumi staatus';
 $lang['Forum_pruning'] = 'Auto-puhastus';
 $lang['prune_freq'] = 'Kontrolli teema vanust iga';
 $lang['prune_days'] = 'Eemalda teemad, kuhu pole tehtud uusi postitusi';
-$lang['Set_prune_data'] = 'Sa oled auto puhastuse küll sisse lülitanud, aga sa ei märkinud, kui tihti ja milliste parameetrite järgi seda teha tuleb. Palun mine tagasi ja paranda viga';
+$lang['Set_prune_data'] = 'Sa oled auto puhastuse kï¿½ll sisse lï¿½litanud, aga sa ei mï¿½rkinud, kui tihti ja milliste parameetrite jï¿½rgi seda teha tuleb. Palun mine tagasi ja paranda viga';
 $lang['Move_and_Delete'] = 'Liiguta ja kustuta';
-$lang['Delete_all_posts'] = 'Kustuta kõik postitused';
+$lang['Delete_all_posts'] = 'Kustuta kï¿½ik postitused';
 $lang['Nowhere_to_move'] = 'pole kuhugi liigutada';
 $lang['Edit_Category'] = 'Muuda kategoorja';
 $lang['Edit_Category_explain'] = 'Kasuta seda vormi et muuta kategrooja nime';
 $lang['Forums_updated'] = 'Foorumi ja kategooria uuendati edukalt.';
-$lang['Must_delete_forums'] = 'Sa pead enne kustutama kõik foorumid, kui saad kustutada seda kategooriat';
+$lang['Must_delete_forums'] = 'Sa pead enne kustutama kï¿½ik foorumid, kui saad kustutada seda kategooriat';
 $lang['Click_return_forumadmin'] = 'Vajuta %ssiia%s et minna tagasi foorumi seadistuste lehele';
-
 
 //
 // Smiley Management
@@ -380,8 +371,8 @@ $lang['Smile'] = 'Emotsioon';
 $lang['Emotion'] = 'Smaili';
 $lang['Select_pak'] = 'Vali PACK(.pak) fail';
 $lang['replace_existing'] = 'Asenda hetkel olev emotsioon';
-$lang['keep_existing'] = 'Jäta hetkel olemas oleva emot. alles';
-$lang['smiley_import_inst'] = 'Sa peaksid unzippima oma smiley paki ja üles laadima kõik failid õigesse Smiley kataloogi installimiseks. Siis valmia korrektse informatsiooni siin vormis et importida smily pack.';
+$lang['keep_existing'] = 'Jï¿½ta hetkel olemas oleva emot. alles';
+$lang['smiley_import_inst'] = 'Sa peaksid unzippima oma smiley paki ja ï¿½les laadima kï¿½ik failid ï¿½igesse Smiley kataloogi installimiseks. Siis valmia korrektse informatsiooni siin vormis et importida smily pack.';
 $lang['smiley_import'] = 'Emotsiooni paki Import';
 $lang['choose_smile_pak'] = 'Vali Emot. paki .pak fail';
 $lang['import'] = 'Impordi emotsioonid';
@@ -389,38 +380,37 @@ $lang['smile_conflicts'] = 'Mida tuleks teha, kui tekivad vastuolud.';
 $lang['del_existing_smileys'] = 'kustuta olemas olevad emot. enne importi';
 $lang['import_smile_pack'] = 'Impordi emot. pakk.';
 $lang['export_smile_pack'] = 'Tee uus emot pakk';
-$lang['export_smiles'] = 'Et teha emot. pakk hetkel instaleeritud emotsioonidest klikki %ssiin%s et allalaadida smiles.pak fail. Nimeta see fail kohaselt olles kindel et failile jääb .pak laiend. Siis tee uus zip fail, mis sisaldab kõiki neid emotsioone plus siis see .pak fail.';
+$lang['export_smiles'] = 'Et teha emot. pakk hetkel instaleeritud emotsioonidest klikki %ssiin%s et allalaadida smiles.pak fail. Nimeta see fail kohaselt olles kindel et failile jï¿½ï¿½b .pak laiend. Siis tee uus zip fail, mis sisaldab kï¿½iki neid emotsioone plus siis see .pak fail.';
 $lang['smiley_add_success'] = 'Emotsioonid lisati edukalt.';
 $lang['smiley_edit_success'] = 'Emotsioonid uuendati edukalt.';
 $lang['smiley_import_success'] = 'Emot. pakk importiti edukalt.';
 $lang['smiley_del_success'] = 'Emotsioon kustutati edukalt.';
 $lang['Click_return_smileadmin'] = 'Vajuta %ssiia%s, et minna tagasi emotsioonide juhtimis lehele.';
 
-
 //
 // User Management
 //
 $lang['User_admin'] = 'Kasutaja juhtimine';
-$lang['User_admin_explain'] = 'Siin sa saad muuta kasutaja informatsiooni ja osasi spetsiifilisi võimalusi. Et muuta kasutaja õigusi kasuta Grupide juhtimist ja Kasutajate õiguste paneele.';
-$lang['Look_up_user'] = 'Otsi kasutaja üles';
-$lang['Admin_user_fail'] = 'Kasutaja profiili muutmine ebaõnnestus!';
+$lang['User_admin_explain'] = 'Siin sa saad muuta kasutaja informatsiooni ja osasi spetsiifilisi vï¿½imalusi. Et muuta kasutaja ï¿½igusi kasuta Grupide juhtimist ja Kasutajate ï¿½iguste paneele.';
+$lang['Look_up_user'] = 'Otsi kasutaja ï¿½les';
+$lang['Admin_user_fail'] = 'Kasutaja profiili muutmine ebaï¿½nnestus!';
 $lang['Admin_user_updated'] = 'Kasutaja profiil uuendati edukalt!';
 $lang['Click_return_useradmin'] = 'Vajuta %ssiia%s, et minna tagasi kasutajate juhtimis lehele.';
 $lang['User_delete'] = 'Kustuta see kasutaja';
 $lang['User_delete_explain'] = 'Vajuta siia, et kustuta see kasutaja, seda ei saa tagasi muuta.';
 $lang['User_deleted'] = 'Kasutaja kustutati edukalt.';
 $lang['User_status'] = 'Kasutaja on aktiivne';
-$lang['User_allowpm'] = 'Saab saata privaat sõnumeid';
-$lang['User_allowavatar'] = 'Võib näidata avatare';
-$lang['Admin_avatar_explain'] = 'Siin sa saad näha ja kustutada kasutaja avatari.';
-$lang['User_special'] = '"ainult adminnile" väljad';
-$lang['User_special_explain'] = 'Neid välju ei saa kasutajad ise muuta';
+$lang['User_allowpm'] = 'Saab saata privaat sï¿½numeid';
+$lang['User_allowavatar'] = 'Vï¿½ib nï¿½idata avatare';
+$lang['Admin_avatar_explain'] = 'Siin sa saad nï¿½ha ja kustutada kasutaja avatari.';
+$lang['User_special'] = '"ainult adminnile" vï¿½ljad';
+$lang['User_special_explain'] = 'Neid vï¿½lju ei saa kasutajad ise muuta';
 
 //
 // Group Management
 //
 $lang['Group_administration'] = 'Grupide juhtimine';
-$lang['Group_admin_explain'] = 'Siin paneelil sa saad juhtida kasutajategruppe, sa saad neid kustutada, luua ja muuta. Sa võid neid avada ja sulgeda ja palju muud.';
+$lang['Group_admin_explain'] = 'Siin paneelil sa saad juhtida kasutajategruppe, sa saad neid kustutada, luua ja muuta. Sa vï¿½id neid avada ja sulgeda ja palju muud.';
 $lang['Error_updating_groups'] = 'Grupide muutmisel tekkis viga.';
 $lang['Updated_group'] = 'Grupp uuendati edukalt';
 $lang['Added_new_group'] = 'Uus grupp loodi edukalt.';
@@ -438,79 +428,74 @@ $lang['group_delete'] = 'Kustuta grupp';
 $lang['group_delete_check'] = 'Kustuta see grupp';
 $lang['submit_group_changes'] = 'Uuenda';
 $lang['reset_group_changes'] = 'Taasta';
-$lang['No_group_name'] = 'Sa pead ära märkima sellele grupile ka nime.';
+$lang['No_group_name'] = 'Sa pead ï¿½ra mï¿½rkima sellele grupile ka nime.';
 $lang['No_group_moderator'] = 'Sa pead lisama sellele grupile moderaatori';
-$lang['No_group_mode'] = 'Sa pead märkima sellele grupile oleku, avatud/suletud';
-$lang['No_group_action'] = 'Käsklust ei ole antud';
+$lang['No_group_mode'] = 'Sa pead mï¿½rkima sellele grupile oleku, avatud/suletud';
+$lang['No_group_action'] = 'Kï¿½sklust ei ole antud';
 $lang['delete_group_moderator'] = 'Kustuta grupi vana moderaator?';
-$lang['delete_moderator_explain'] = 'Kui sa muudad selle grupi moderaatorit siis tee siia kasti linnuke. Muul juhul ära tee midagi ja sellest liikmest saab selle grupi tavaliige.';
+$lang['delete_moderator_explain'] = 'Kui sa muudad selle grupi moderaatorit siis tee siia kasti linnuke. Muul juhul ï¿½ra tee midagi ja sellest liikmest saab selle grupi tavaliige.';
 $lang['Click_return_groupsadmin'] = 'Vajuta %ssiia%s, et minna tagasi grupi juhtimis lehele';
 $lang['Select_group'] = 'Vali grupp';
-$lang['Look_up_group'] = 'Otsi grupp üles';
-
-
+$lang['Look_up_group'] = 'Otsi grupp ï¿½les';
 
 //
 // Prune Administration
 //
 $lang['Forum_Prune'] = 'Foorumi puhastus';
-$lang['Forum_Prune_explain'] = 'See kustutab teemad, milledesse pole sinu poolt määratud päevade jooksul uusi postitusi tehtud. Kui sa ei sisesta päevade arvu, kustutatakse kõik teemad. See ei eemalda teemasid, kus on aktiivne küsitlus, samuti ei kustuta see teadaandeid. Need teemad tuleb käsitsi kustutada.';
+$lang['Forum_Prune_explain'] = 'See kustutab teemad, milledesse pole sinu poolt mï¿½ï¿½ratud pï¿½evade jooksul uusi postitusi tehtud. Kui sa ei sisesta pï¿½evade arvu, kustutatakse kï¿½ik teemad. See ei eemalda teemasid, kus on aktiivne kï¿½sitlus, samuti ei kustuta see teadaandeid. Need teemad tuleb kï¿½sitsi kustutada.';
 $lang['Do_Prune'] = 'Puhasta';
-$lang['All_Forums'] = 'Kõik foorumid';
-$lang['Prune_topics_not_posted'] = 'Puhasta teemad, kuhu pole vastatud viimasel ... päeval';
+$lang['All_Forums'] = 'Kï¿½ik foorumid';
+$lang['Prune_topics_not_posted'] = 'Puhasta teemad, kuhu pole vastatud viimasel ... pï¿½eval';
 $lang['Topics_pruned'] = 'Teemad puhastatud';
 $lang['Posts_pruned'] = 'Postitused puhastatud';
-$lang['Prune_success'] = 'Kõik foorumid puhastati edukalt.';
-
+$lang['Prune_success'] = 'Kï¿½ik foorumid puhastati edukalt.';
 
 //
 // Word censor
 //
 $lang['Words_title'] = 'Tsensuur';
-$lang['Words_explain'] = 'Siit paneelist saad sa lisada, muuta, ja eemaldada sõnu, mis tsenseeritakse foorumis automaatselt. Lisaks ei saa kasutajad registreerida kasutajanime, mis sisaldab neid sõnu. Tärnid (*) on lubatud sõnaväljal, nt *pass* tsenseerib ka sõna "hundipassikontroll", pass* tsenseeriks ka sõna "passikontroll", *pass tsenseeriks sõna "hundipass".';
-$lang['Word'] = 'Sõna';
+$lang['Words_explain'] = 'Siit paneelist saad sa lisada, muuta, ja eemaldada sï¿½nu, mis tsenseeritakse foorumis automaatselt. Lisaks ei saa kasutajad registreerida kasutajanime, mis sisaldab neid sï¿½nu. Tï¿½rnid (*) on lubatud sï¿½navï¿½ljal, nt *pass* tsenseerib ka sï¿½na "hundipassikontroll", pass* tsenseeriks ka sï¿½na "passikontroll", *pass tsenseeriks sï¿½na "hundipass".';
+$lang['Word'] = 'Sï¿½na';
 $lang['Edit_word_censor'] = 'Muuda tsensuuri';
 $lang['Replacement'] = 'Asendus';
-$lang['Add_new_word'] = 'Lisa uus sõna';
+$lang['Add_new_word'] = 'Lisa uus sï¿½na';
 $lang['Update_word'] = 'Uuenda tsensuuri';
 
-$lang['Must_enter_word'] = 'Sa pead sisestama sõna ja selle asenduse';
-$lang['No_word_selected'] = 'Muutmiseks pole sõna valitud';
+$lang['Must_enter_word'] = 'Sa pead sisestama sï¿½na ja selle asenduse';
+$lang['No_word_selected'] = 'Muutmiseks pole sï¿½na valitud';
 
 $lang['Word_updated'] = 'Valitud tsensuur uuendatud';
-$lang['Word_added'] = 'Tsenseeritav sõna lisatud';
-$lang['Word_removed'] = 'Tsenseeritav sõna eemaldatud';
+$lang['Word_added'] = 'Tsenseeritav sï¿½na lisatud';
+$lang['Word_removed'] = 'Tsenseeritav sï¿½na eemaldatud';
 
 $lang['Click_return_wordadmin'] = 'Vajuta %ssiia%s et minna tagasi Tsensuuri algusesse';
-
 
 //
 // Mass E-mail
 //
-$lang['Mass_email_explain'] = 'Siit saad sa saata e-maili kas kõigile kasutajatele või mingi kindla grupi kasutajatele. Seda tehes saadetakse e-mail administraatori aadressile ja kirja pimekoopia kõigile kasutajatele. Kui sa saadad kirja suurele kasutajagrupile, siis ole kannatlik ja ära katkesta laadimist poolepealt. Mass e-maili saadetaksegi kaua aega, sulle antakse märku, kui see valmis on';
+$lang['Mass_email_explain'] = 'Siit saad sa saata e-maili kas kï¿½igile kasutajatele vï¿½i mingi kindla grupi kasutajatele. Seda tehes saadetakse e-mail administraatori aadressile ja kirja pimekoopia kï¿½igile kasutajatele. Kui sa saadad kirja suurele kasutajagrupile, siis ole kannatlik ja ï¿½ra katkesta laadimist poolepealt. Mass e-maili saadetaksegi kaua aega, sulle antakse mï¿½rku, kui see valmis on';
 $lang['Compose'] = 'Kirjuta';
 
 $lang['Recipients'] = 'Saajad';
-$lang['All_users'] = 'Kõik kasutajad';
+$lang['All_users'] = 'Kï¿½ik kasutajad';
 
 $lang['Email_successfull'] = 'Sinu teade on saadetud';
 $lang['Click_return_massemail'] = 'Vajuta %ssiia%s et minna Mass e-maili algusesse';
-
 
 //
 // Ranks admin
 //
 $lang['Ranks_title'] = 'Tasemete  Administratsioon';
-$lang['Ranks_explain'] = 'Siin saad sa lisada, muuta, vaadata ja kustutada tasemeid. Võid luua ka eritasemed, mida saad kasutajale omistada kasutajate õiguste paneelis.';
+$lang['Ranks_explain'] = 'Siin saad sa lisada, muuta, vaadata ja kustutada tasemeid. Vï¿½id luua ka eritasemed, mida saad kasutajale omistada kasutajate ï¿½iguste paneelis.';
 
 $lang['Add_new_rank'] = 'Lisa uus tase';
 
 $lang['Rank_title'] = 'Taseme pealkiri';
-$lang['Rank_special'] = 'Määra eritase';
+$lang['Rank_special'] = 'Mï¿½ï¿½ra eritase';
 $lang['Rank_minimum'] = 'Minimum Postitusi';
 $lang['Rank_maximum'] = 'Maximum Postitusi';
 $lang['Rank_image'] = 'Taseme pilt (Sama mis phpBB2 juurkaust)';
-$lang['Rank_image_explain'] = 'Kasuta seda, et valida väike pilt, mis kaasneb selle tasemega.';
+$lang['Rank_image_explain'] = 'Kasuta seda, et valida vï¿½ike pilt, mis kaasneb selle tasemega.';
 
 $lang['Must_select_rank'] = 'Sa pead valima taseme';
 $lang['No_assigned_rank'] = 'Eritasemeid pole';
@@ -518,16 +503,15 @@ $lang['No_assigned_rank'] = 'Eritasemeid pole';
 $lang['Rank_updated'] = 'Tase on edukalt uuendatud';
 $lang['Rank_added'] = 'Tase on edukalt lisatud';
 $lang['Rank_removed'] = 'Tase on edukalt kustutatud';
-$lang['No_update_ranks'] = 'Tase kustutati edukalt, kuid ei uuendatud kasutajakontosid, kes on sellel tasemel. Nendel kasutajakontodel pead sa taseme käsitsi muutma.';
+$lang['No_update_ranks'] = 'Tase kustutati edukalt, kuid ei uuendatud kasutajakontosid, kes on sellel tasemel. Nendel kasutajakontodel pead sa taseme kï¿½sitsi muutma.';
 
 $lang['Click_return_rankadmin'] = 'Vajuta %ssiia%s, et minna tagasi Tasemete Administratsiooni';
-
 
 //
 // Disallow Username Admin
 //
 $lang['Disallow_control'] = 'Kasutajanimede keelamine';
-$lang['Disallow_explain'] = 'Siia saad sa lisada kasutajanimesid, mida ei lubata kasutada. Keelatud kasutajanimed võivad sisaldada tärne (*). Sa ei saa keelata kasutajanime, mis on juba registreeritud, enne tuleb see nimi kustutada ja siis alles keelata.';
+$lang['Disallow_explain'] = 'Siia saad sa lisada kasutajanimesid, mida ei lubata kasutada. Keelatud kasutajanimed vï¿½ivad sisaldada tï¿½rne (*). Sa ei saa keelata kasutajanime, mis on juba registreeritud, enne tuleb see nimi kustutada ja siis alles keelata.';
 
 $lang['Delete_disallow'] = 'Kustuta';
 $lang['Delete_disallow_title'] = 'Eemalda keelatud kasutajanimi';
@@ -535,28 +519,27 @@ $lang['Delete_disallow_explain'] = 'Sa saad keelatud kasutajanime eemaldada, val
 
 $lang['Add_disallow'] = 'Lisa';
 $lang['Add_disallow_title'] = 'Lisa keelatud kasutajanimi';
-$lang['Add_disallow_explain'] = 'Sa saad kasutajanime keelatamisel kasutada ka tärni (*), mis vastab ükskõik mis tähele.';
+$lang['Add_disallow_explain'] = 'Sa saad kasutajanime keelatamisel kasutada ka tï¿½rni (*), mis vastab ï¿½kskï¿½ik mis tï¿½hele.';
 
 $lang['No_disallowed'] = 'Keelatud kasutajanimesid pole';
 
 $lang['Disallowed_deleted'] = 'Keelatud kasutajanimi eemaldati.';
 $lang['Disallow_successful'] = 'Keelatud kasutajanimi lisatud';
-$lang['Disallowed_already'] = 'Sisestatud nime ei ole võimalik keelata. See on kas juba keelatud, esineb tsenseeritud sõnades, või on olemas sellenimeline kasutaja';
+$lang['Disallowed_already'] = 'Sisestatud nime ei ole vï¿½imalik keelata. See on kas juba keelatud, esineb tsenseeritud sï¿½nades, vï¿½i on olemas sellenimeline kasutaja';
 
 $lang['Click_return_disallowadmin'] = 'Vajuta %ssiia%s et minna Kasutajanimede keelamise algusesse';
-
 
 //
 // Styles Admin
 //
 $lang['Styles_admin'] = 'Stiilide Administratsioon';
-$lang['Styles_explain'] = 'Siin saad sa lisada, eemaldada ja muuta stiile (põhjad ja teemad) mida saavad kasutajad valida';
-$lang['Styles_addnew_explain'] = 'Järgnev nimekiri sisaldab kõiki teemasid, mis on saadaval olemasolevatele põhjadele. Siin nimekirjas olevaid asju pole veel phpBB andmebaasi installitud. Teema installimiseks kliki installeerimise lingil';
+$lang['Styles_explain'] = 'Siin saad sa lisada, eemaldada ja muuta stiile (pï¿½hjad ja teemad) mida saavad kasutajad valida';
+$lang['Styles_addnew_explain'] = 'Jï¿½rgnev nimekiri sisaldab kï¿½iki teemasid, mis on saadaval olemasolevatele pï¿½hjadele. Siin nimekirjas olevaid asju pole veel phpBB andmebaasi installitud. Teema installimiseks kliki installeerimise lingil';
 
 $lang['Select_template'] = 'Vali teema';
 
 $lang['Style'] = 'Stiil';
-$lang['Template'] = 'Põhi';
+$lang['Template'] = 'Pï¿½hi';
 $lang['Install'] = 'Installeeri';
 $lang['Download'] = 'Lae alla';
 
@@ -564,95 +547,95 @@ $lang['Edit_theme'] = 'Muuda teemat';
 $lang['Edit_theme_explain'] = 'Allolevas vormis saab valitud teemade seadeid muuta.';
 
 $lang['Create_theme'] = 'Loo teema';
-$lang['Create_theme_explain'] = 'Kasuta allolevad vormi, et luua uus teema valitud teema. Värve sisestades (milleks sa peaksid kasutama 16 süsteemi arve) ei tohi sa kasutada märki #, nt.. CCCCCC on lubatud, #CCCCCC aga mitte';
+$lang['Create_theme_explain'] = 'Kasuta allolevad vormi, et luua uus teema valitud teema. Vï¿½rve sisestades (milleks sa peaksid kasutama 16 sï¿½steemi arve) ei tohi sa kasutada mï¿½rki #, nt.. CCCCCC on lubatud, #CCCCCC aga mitte';
 
 $lang['Export_themes'] = 'Ekspordi teema';
-$lang['Export_explain'] = 'Siin saad sa eksportida teema andmed valitud põhjale. Vali allolevast nimekirjast põhi ja skript loob teema konfiguratsiooni faii ning püüab seda salvestada valitud põhjade kausta. Kui see ise ei saa faili salvestada, annab see sulle võimaluse see alla laadida. Et skript saaks antud faili salvestada, pead sa andma kirjutamisloa veebiserveri põhjade kaustale. Lisainfo jaoks vaata phpBB 2 kasutaja juhendit.';
+$lang['Export_explain'] = 'Siin saad sa eksportida teema andmed valitud pï¿½hjale. Vali allolevast nimekirjast pï¿½hi ja skript loob teema konfiguratsiooni faii ning pï¿½ï¿½ab seda salvestada valitud pï¿½hjade kausta. Kui see ise ei saa faili salvestada, annab see sulle vï¿½imaluse see alla laadida. Et skript saaks antud faili salvestada, pead sa andma kirjutamisloa veebiserveri pï¿½hjade kaustale. Lisainfo jaoks vaata phpBB 2 kasutaja juhendit.';
 
 $lang['Theme_installed'] = 'Valitud teema instlalitud.';
-$lang['Style_removed'] = 'Valitud teema andmebaasist eemaldatud. Et seda stiili arvutist täielikult kustutada, pead sa kustutama põhjade kaustas oleva stiilifaili.';
-$lang['Theme_info_saved'] = 'Teema info valitud põhjale on salvestatud. Nüüd sa peaksid muutma faili theme_info.cfg (võimalusel ka põhjade kausta) ainult loetavaks(read-only)';
-$lang['Theme_updated'] = 'Valitud teema uuendatud. Nüüd tuleks eksportida uue teema seaded.';
-$lang['Theme_created'] = 'Teema loodud. Nüüd peaksid sa selle teema eksportima teema konfiguratsioonifaili, et see turvaliselt säilitada või seda mujal kasutada.';
+$lang['Style_removed'] = 'Valitud teema andmebaasist eemaldatud. Et seda stiili arvutist tï¿½ielikult kustutada, pead sa kustutama pï¿½hjade kaustas oleva stiilifaili.';
+$lang['Theme_info_saved'] = 'Teema info valitud pï¿½hjale on salvestatud. Nï¿½ï¿½d sa peaksid muutma faili theme_info.cfg (vï¿½imalusel ka pï¿½hjade kausta) ainult loetavaks(read-only)';
+$lang['Theme_updated'] = 'Valitud teema uuendatud. Nï¿½ï¿½d tuleks eksportida uue teema seaded.';
+$lang['Theme_created'] = 'Teema loodud. Nï¿½ï¿½d peaksid sa selle teema eksportima teema konfiguratsioonifaili, et see turvaliselt sï¿½ilitada vï¿½i seda mujal kasutada.';
 
 $lang['Confirm_delete_style'] = 'Oled sa kindel, et soovid antud stiili kustutada?';
 
-$lang['Download_theme_cfg'] = 'Eksportija ei saanud kirutada teema infofaili. Vajuta allolevale nupule, et see fail oma brauseriga alla laadida. Kui fail on alla laetud, siis tõsta see kausta, kus asuvad põhjad (templates). Siis võid sa need failid kasutamiseks pakkida või mujal kasutada, kui sa soovid.';
-$lang['No_themes'] = 'Valitud teemale pole ühtegi teemat lisatud. Et luua uut teemat, kliki vasakul olevas paneelis linki Loo uus';
-$lang['No_template_dir'] = 'Ei õnnestunud avad põhjade kausta. See võib olla veebiserverile lugematu või pole seda olemas';
+$lang['Download_theme_cfg'] = 'Eksportija ei saanud kirutada teema infofaili. Vajuta allolevale nupule, et see fail oma brauseriga alla laadida. Kui fail on alla laetud, siis tï¿½sta see kausta, kus asuvad pï¿½hjad (templates). Siis vï¿½id sa need failid kasutamiseks pakkida vï¿½i mujal kasutada, kui sa soovid.';
+$lang['No_themes'] = 'Valitud teemale pole ï¿½htegi teemat lisatud. Et luua uut teemat, kliki vasakul olevas paneelis linki Loo uus';
+$lang['No_template_dir'] = 'Ei ï¿½nnestunud avad pï¿½hjade kausta. See vï¿½ib olla veebiserverile lugematu vï¿½i pole seda olemas';
 $lang['Cannot_remove_style'] = 'Sa ei saa valitud stiili eemalda, kuna see on praegu foorumi vaikimisi stiil. Palun  muuda vaikimisi stiili ja proovi uuuesti.';
-$lang['Style_exists'] = 'Sellise nimega stiil on juba olemas. Mine tagasi ja vali mõni muu nimi.';
+$lang['Style_exists'] = 'Sellise nimega stiil on juba olemas. Mine tagasi ja vali mï¿½ni muu nimi.';
 
 $lang['Click_return_styleadmin'] = 'Vajuta %ssiia%s et minna tagasi Stiilide Administreerimise lehele';
 
 $lang['Theme_settings'] = 'Teema seaded';
 $lang['Theme_element'] = 'Teema Element';
 $lang['Simple_name'] = 'Lihtne nimi';
-$lang['Value'] = 'Väärtus';
+$lang['Value'] = 'Vï¿½ï¿½rtus';
 $lang['Save_Settings'] = 'Salvesta seaded';
 
 $lang['Stylesheet'] = 'CSS Stiilileht';
 $lang['Background_image'] = 'Taustapilt';
-$lang['Background_color'] = 'Taustavärv';
+$lang['Background_color'] = 'Taustavï¿½rv';
 $lang['Theme_name'] = 'Teema nimi';
-$lang['Link_color'] = 'Lingi värv';
-$lang['Text_color'] = 'Teksti värv';
-$lang['VLink_color'] = 'Külastatud lingi värv';
-$lang['ALink_color'] = 'Aktiivse lingi värv';
-$lang['HLink_color'] = 'Hover lingi värv';
-$lang['Tr_color1'] = 'Tabeli rea värv 1';
-$lang['Tr_color2'] = 'Tabeli rea värv 2';
-$lang['Tr_color3'] = 'Tabeli rea värv 3';
+$lang['Link_color'] = 'Lingi vï¿½rv';
+$lang['Text_color'] = 'Teksti vï¿½rv';
+$lang['VLink_color'] = 'Kï¿½lastatud lingi vï¿½rv';
+$lang['ALink_color'] = 'Aktiivse lingi vï¿½rv';
+$lang['HLink_color'] = 'Hover lingi vï¿½rv';
+$lang['Tr_color1'] = 'Tabeli rea vï¿½rv 1';
+$lang['Tr_color2'] = 'Tabeli rea vï¿½rv 2';
+$lang['Tr_color3'] = 'Tabeli rea vï¿½rv 3';
 $lang['Tr_class1'] = 'Tabeli rea klass 1';
 $lang['Tr_class2'] = 'Tabeli rea klass 2';
 $lang['Tr_class3'] = 'Tabeli rea klass 3';
-$lang['Th_color1'] = 'Tabeli päise värv 1';
-$lang['Th_color2'] = 'Tabeli päise värv 2';
-$lang['Th_color3'] = 'Tabeli päise värv 3';
-$lang['Th_class1'] = 'Tabeli päise klass 1';
-$lang['Th_class2'] = 'Tabeli päise klass 2';
-$lang['Th_class3'] = 'Tabeli päise klass 3';
-$lang['Td_color1'] = 'Tablei lahtir(celli) värv 1';
-$lang['Td_color2'] = 'Tablei lahtir(celli) värv 2';
-$lang['Td_color3'] = 'Tablei lahtir(celli) värv 3';
+$lang['Th_color1'] = 'Tabeli pï¿½ise vï¿½rv 1';
+$lang['Th_color2'] = 'Tabeli pï¿½ise vï¿½rv 2';
+$lang['Th_color3'] = 'Tabeli pï¿½ise vï¿½rv 3';
+$lang['Th_class1'] = 'Tabeli pï¿½ise klass 1';
+$lang['Th_class2'] = 'Tabeli pï¿½ise klass 2';
+$lang['Th_class3'] = 'Tabeli pï¿½ise klass 3';
+$lang['Td_color1'] = 'Tablei lahtir(celli) vï¿½rv 1';
+$lang['Td_color2'] = 'Tablei lahtir(celli) vï¿½rv 2';
+$lang['Td_color3'] = 'Tablei lahtir(celli) vï¿½rv 3';
 $lang['Td_class1'] = 'Tablei lahtir(celli) klass 1';
 $lang['Td_class2'] = 'Tablei lahtir(celli) klass 2';
 $lang['Td_class3'] = 'Tablei lahtir(celli) klass 3';
-$lang['fontface1'] = 'Kirja tüüp 1';
-$lang['fontface2'] = 'Kirja tüüp 2';
-$lang['fontface3'] = 'Kirja tüüp 3';
+$lang['fontface1'] = 'Kirja tï¿½ï¿½p 1';
+$lang['fontface2'] = 'Kirja tï¿½ï¿½p 2';
+$lang['fontface3'] = 'Kirja tï¿½ï¿½p 3';
 $lang['fontsize1'] = 'Kirja suurus 1';
 $lang['fontsize2'] = 'Kirja suurus 2';
 $lang['fontsize3'] = 'Kirja suurus 3';
-$lang['fontcolor1'] = 'Kirja värv 1';
-$lang['fontcolor2'] = 'Kirja värv 2';
-$lang['fontcolor3'] = 'Kirja värv 3';
+$lang['fontcolor1'] = 'Kirja vï¿½rv 1';
+$lang['fontcolor2'] = 'Kirja vï¿½rv 2';
+$lang['fontcolor3'] = 'Kirja vï¿½rv 3';
 $lang['span_class1'] = 'Ajavahemiku(span) klass 1';
 $lang['span_class2'] = 'Ajavahemiku(span) klass 2';
 $lang['span_class3'] = 'Ajavahemiku(span) klass 3';
-$lang['img_poll_size'] = 'Hääletuse pildi suurus [px]';
-$lang['img_pm_size'] = 'Privaatsõnumi Staatuse suurus [px]';
+$lang['img_poll_size'] = 'Hï¿½ï¿½letuse pildi suurus [px]';
+$lang['img_pm_size'] = 'Privaatsï¿½numi Staatuse suurus [px]';
 
 //
 // Install Process
 //
 $lang['Welcome_install'] = 'Teretulemast phpBB 2 Installeerimisele';
-$lang['Initial_config'] = 'Põhikonfiguratsioon';
+$lang['Initial_config'] = 'Pï¿½hikonfiguratsioon';
 $lang['DB_config'] = 'Andmebaasi konfiguratsioon';
 $lang['Admin_config'] = 'Administraatori konfiguratsioon';
-$lang['continue_upgrade'] = 'Kui sa oled konfiguratsioonifaili oma arvutisse laadinud, siis võid sa vajutada\'Jätka Uendamist\' nuppu allpool et jätkata uuenddamise protsessi.  Palun oota konfiguratsioonifaili üleslaadimisega seni, kuni uuendamine on lõpetatud.';
-$lang['upgrade_submit'] = 'Jätka uuendamist';
+$lang['continue_upgrade'] = 'Kui sa oled konfiguratsioonifaili oma arvutisse laadinud, siis vï¿½id sa vajutada\'Jï¿½tka Uendamist\' nuppu allpool et jï¿½tkata uuenddamise protsessi.  Palun oota konfiguratsioonifaili ï¿½leslaadimisega seni, kuni uuendamine on lï¿½petatud.';
+$lang['upgrade_submit'] = 'Jï¿½tka uuendamist';
 
-$lang['Installer_Error'] = 'Installeerimise käigus on tekkinud viga';
+$lang['Installer_Error'] = 'Installeerimise kï¿½igus on tekkinud viga';
 $lang['Previous_Install'] = 'Tuvastatud on eelnev installeerimine';
 $lang['Install_db_error'] = 'Andmebaasi uuendamisel tekkis viga';
 
-$lang['Re_install'] = 'Su eelnev installatsioon on veel aktiivne. <br /><br />Kui sa tahad phpBB 2-e reinstalleerida, siis vajuta allolevale Jah nupule. Selle tegemine kustutab kõik eenevad andmed, varukoopiaid ei teha! Administraatori kasutajanimi ja parool, millega sa end foorumisse sisse oled loginud, taastatakse pärast reinstalleerimist, ühtegi teist seadet alles ei jää. <br /><br />Mõtle hoolikalt järele, enne kui Jah vajutad!';
+$lang['Re_install'] = 'Su eelnev installatsioon on veel aktiivne. <br /><br />Kui sa tahad phpBB 2-e reinstalleerida, siis vajuta allolevale Jah nupule. Selle tegemine kustutab kï¿½ik eenevad andmed, varukoopiaid ei teha! Administraatori kasutajanimi ja parool, millega sa end foorumisse sisse oled loginud, taastatakse pï¿½rast reinstalleerimist, ï¿½htegi teist seadet alles ei jï¿½ï¿½. <br /><br />Mï¿½tle hoolikalt jï¿½rele, enne kui Jah vajutad!';
 
-$lang['Inst_Step_0'] = 'Aitäh, et oled valinud phpBB 2-e. Et seda installeerimist lõpetada, märgi palun ära allpool nõutud üksikasjad. Andmebaas, millesse sa installeerima hakkad, peaks enne olemas olema. Kui sa installeerid admebaasi, mis kasutab ODBC-d, nt MS Access, siis peaksid sa enne jätkamist looma sellele DSN-i.';
+$lang['Inst_Step_0'] = 'Aitï¿½h, et oled valinud phpBB 2-e. Et seda installeerimist lï¿½petada, mï¿½rgi palun ï¿½ra allpool nï¿½utud ï¿½ksikasjad. Andmebaas, millesse sa installeerima hakkad, peaks enne olemas olema. Kui sa installeerid admebaasi, mis kasutab ODBC-d, nt MS Access, siis peaksid sa enne jï¿½tkamist looma sellele DSN-i.';
 
 $lang['Start_Install'] = 'Alusta Installeerimist';
-$lang['Finish_Install'] = 'Lõpeta Installeerimine';
+$lang['Finish_Install'] = 'Lï¿½peta Installeerimine';
 
 $lang['Default_lang'] = 'Foorumi vaikimisi keel';
 $lang['DB_Host'] = 'Andmebaasi serveri hostinimi/DSN';
@@ -661,37 +644,36 @@ $lang['DB_Username'] = 'Andmebaasi kasutajanimi';
 $lang['DB_Password'] = 'Andmebaasi parool';
 $lang['Database'] = 'Sinu andmebaas';
 $lang['Install_lang'] = 'Vali installerimiseks keel';
-$lang['dbms'] = 'Andmebaasi tüüp';
+$lang['dbms'] = 'Andmebaasi tï¿½ï¿½p';
 $lang['Table_Prefix'] = 'Prefiks andmebaasi tabelitele';
 $lang['Admin_Username'] = 'Administraatori kasutajanimi';
 $lang['Admin_Password'] = 'Administraatori parool';
 $lang['Admin_Password_confirm'] = 'Administraatori parool [ Kinnita ]';
 
-$lang['Inst_Step_2'] = 'Administraatori kasutajanimi on loodud.  Peamine installeerimine on valmis. Nüüd viiakse sind uut installeerimist administreerima. Vaata kindlasti üle Üldine Konfiguratsioon, et teha vajalikud muudatused. Aitäh, et valisid phpBB 2-e.';
+$lang['Inst_Step_2'] = 'Administraatori kasutajanimi on loodud.  Peamine installeerimine on valmis. Nï¿½ï¿½d viiakse sind uut installeerimist administreerima. Vaata kindlasti ï¿½le ï¿½ldine Konfiguratsioon, et teha vajalikud muudatused. Aitï¿½h, et valisid phpBB 2-e.';
 
-$lang['Unwriteable_config'] = 'Su konfiguratsioonifail on hetkel kirjutuskaitstud. Selle koopia laetakse alla, kui sa vajutad allolevale nupule. See fail tuleks panna sammasse kausta, kus on phpBB 2. Kui see on tehtud, peaks sa sisse logima adminstraatori kasutajanime ja parooliga, mille sa said eelmises vormis ning üle vaatama Administratsioonipaneeli (vastav link ilmub iga lehekülje alla äärde, kui sa oled end sisse loginud), et kontrollida peamisi seadeid. Aitäh, et valisid phpBB 2-e.';
+$lang['Unwriteable_config'] = 'Su konfiguratsioonifail on hetkel kirjutuskaitstud. Selle koopia laetakse alla, kui sa vajutad allolevale nupule. See fail tuleks panna sammasse kausta, kus on phpBB 2. Kui see on tehtud, peaks sa sisse logima adminstraatori kasutajanime ja parooliga, mille sa said eelmises vormis ning ï¿½le vaatama Administratsioonipaneeli (vastav link ilmub iga lehekï¿½lje alla ï¿½ï¿½rde, kui sa oled end sisse loginud), et kontrollida peamisi seadeid. Aitï¿½h, et valisid phpBB 2-e.';
 $lang['Download_config'] = 'Lae alla konfiguratsioon';
 
 $lang['ftp_choose'] = 'Vali allalaadimise meetod.';
-$lang['ftp_option'] = '<br />Kuna FTP laiendid on selles PHP versioonis lubatud, võidakse sulle pakkuda võimalust proovida konfiguratsiooni faili FTP kaudu paika seada.';
+$lang['ftp_option'] = '<br />Kuna FTP laiendid on selles PHP versioonis lubatud, vï¿½idakse sulle pakkuda vï¿½imalust proovida konfiguratsiooni faili FTP kaudu paika seada.';
 $lang['ftp_instructs'] = 'Sa tegid valiku, et soovid automaatselt vajalikud failid FTP kaudu phpBB 2-e kontole kanda.  Palun sisesta vajalik info, et seda protsessi lihtsustada. Note that the FTP path should be the exact path via ftp to your phpBB2 installation as if you were ftping to it using any normal client.';
 $lang['ftp_info'] = 'Sisesta oma FTP info';
-$lang['Attempt_ftp'] = 'Püüa konfiguratsioonifaili FTP-ga paika panna';
-$lang['Send_file'] = 'Saada see fail mulle ja seadistan selle FTP kaudu käsitsi.';
+$lang['Attempt_ftp'] = 'Pï¿½ï¿½a konfiguratsioonifaili FTP-ga paika panna';
+$lang['Send_file'] = 'Saada see fail mulle ja seadistan selle FTP kaudu kï¿½sitsi.';
 $lang['ftp_path'] = 'FTP teerada phpBB 2-e juurde';
 $lang['ftp_username'] = 'Su FTP kasutajanimi';
 $lang['ftp_password'] = 'Su FTP parool';
 $lang['Transfer_config'] = 'Alusta laadimist';
-$lang['NoFTP_config'] = 'FTP kaudu konfiguratsioonifaili paika panemine ebaõnnestus. Palun lae see fail alla ja pane käsitsi vastavasse kataloogi.';
+$lang['NoFTP_config'] = 'FTP kaudu konfiguratsioonifaili paika panemine ebaï¿½nnestus. Palun lae see fail alla ja pane kï¿½sitsi vastavasse kataloogi.';
 
 $lang['Install'] = 'Installeeri';
 $lang['Upgrade'] = 'Uuenda';
 
 $lang['Install_Method'] = 'Vali installeerimise meetod';
-$lang['Install_No_Ext'] = 'Sinu serveri PHP konfiguratsioon ei toeta valitud andmebaasi tüüpi.';
-$lang['Install_No_PCRE'] = 'phpBB2 nõuab Perliga sobivat Tavaliste Laiendite Moodulit, mida sinu PHP konfiguratsioon ei paista toetavat.';
+$lang['Install_No_Ext'] = 'Sinu serveri PHP konfiguratsioon ei toeta valitud andmebaasi tï¿½ï¿½pi.';
+$lang['Install_No_PCRE'] = 'phpBB2 nï¿½uab Perliga sobivat Tavaliste Laiendite Moodulit, mida sinu PHP konfiguratsioon ei paista toetavat.';
 
 //
 // That's all Folks!
 // -------------------------------------------------
-?>

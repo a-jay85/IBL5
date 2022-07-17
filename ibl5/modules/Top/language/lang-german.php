@@ -17,26 +17,23 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
+define("_CATEGORY", "Bereich");
 
-define("_CATEGORY","Bereich");
-
-define("_LVOTES","Stimmen");
-define("_HITS","Hits");
-define("_TOPWELCOME","Willkommen bei den TOP 10 von");
-define("_READSTORIES","am meisten gelesene Artikel");
-define("_COMMENTEDSTORIES","am meisten kommentierte Artikel");
-define("_ACTIVECAT","aktivste Bereiche");
-define("_READSECTION","meistgelesene Artikel in den Bereichen");
-define("_NEWSSUBMITTERS","aktivste Nachrichtenschreiber");
-define("_NEWSSENT","Gesendete Nachrichten");
-define("_VOTEDPOLLS","aktivste Umfragen");
-define("_MOSTACTIVEAUTHORS","aktivste Autoren");
-define("_NEWSPUBLISHED","Nachrichten geschrieben");
-define("_READREVIEWS","am meisten gelesene Testberichte");
-define("_DOWNLOADEDFILES","am meisten gezogene Downloads");
-define("_MOSTREADPAGES","meist gelesene Seiten");
-define("_MOSTVOTEDSTORIES","am h&auml;ufigsten bewertete Artikel");
-define("_POINTS","Punkte");
-define("_BESTRATEDSTORIES","best bewerteste Artikel (basierend auf maximal 5 Punkten)");
-
-?>
+define("_LVOTES", "Stimmen");
+define("_HITS", "Hits");
+define("_TOPWELCOME", "Willkommen bei den TOP 10 von");
+define("_READSTORIES", "am meisten gelesene Artikel");
+define("_COMMENTEDSTORIES", "am meisten kommentierte Artikel");
+define("_ACTIVECAT", "aktivste Bereiche");
+define("_READSECTION", "meistgelesene Artikel in den Bereichen");
+define("_NEWSSUBMITTERS", "aktivste Nachrichtenschreiber");
+define("_NEWSSENT", "Gesendete Nachrichten");
+define("_VOTEDPOLLS", "aktivste Umfragen");
+define("_MOSTACTIVEAUTHORS", "aktivste Autoren");
+define("_NEWSPUBLISHED", "Nachrichten geschrieben");
+define("_READREVIEWS", "am meisten gelesene Testberichte");
+define("_DOWNLOADEDFILES", "am meisten gezogene Downloads");
+define("_MOSTREADPAGES", "meist gelesene Seiten");
+define("_MOSTVOTEDSTORIES", "am h&auml;ufigsten bewertete Artikel");
+define("_POINTS", "Punkte");
+define("_BESTRATEDSTORIES", "best bewerteste Artikel (basierend auf maximal 5 Punkten)");

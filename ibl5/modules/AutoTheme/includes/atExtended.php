@@ -24,79 +24,77 @@
 
 function atExtendedInit()
 {
-	return array();
+    return array();
 }
 
 function atThemeExit()
 {
-	$runningconfig = atGetRunningConfig();
+    $runningconfig = atGetRunningConfig();
     extract($runningconfig);
 
     $display = ob_get_contents();
     list($junk, $display) = atTemplateSplit($display, "#AUTOTHEME_START#");
-    
-    $display = atThemeAddHeader().$display;
+
+    $display = atThemeAddHeader() . $display;
     $display = str_replace('$', '\$', $display);
-        
-	//atRunningSetVar('display', $display);
-	//atCommandAdd('display', 'echo $display;');
-	
-	$template = $template['dtd'];
-	
-	if (!$template) {
+
+    //atRunningSetVar('display', $display);
+    //atCommandAdd('display', 'echo $display;');
+
+    $template = $template['dtd'];
+
+    if (!$template) {
         $template = "HTML401_Transitional.html";
     }
-    if (@file_exists($themepath.$template)) {
-		$file = $themepath.$template;
-	}
-	elseif (@file_exists($atdir."templates/$platform/$template")) {
-		$file = $atdir."templates/$platform/$template";
-	}
-	else {
-		$file = $atdir."templates/HTML.html";
-	}
-	$HTML = atTemplateRead($file);
-	$HTML = mb_eregi_replace('\<\/head\>', '', $HTML);
-	$HTML = preg_replace('/(\<\!--[ ]*\[|{)display(}|\][ ]*--\>)/', $display, $HTML);
-	$output = atCommandReplace($HTML);
+    if (@file_exists($themepath . $template)) {
+        $file = $themepath . $template;
+    } elseif (@file_exists($atdir . "templates/$platform/$template")) {
+        $file = $atdir . "templates/$platform/$template";
+    } else {
+        $file = $atdir . "templates/HTML.html";
+    }
+    $HTML = atTemplateRead($file);
+    $HTML = mb_eregi_replace('\<\/head\>', '', $HTML);
+    $HTML = preg_replace('/(\<\!--[ ]*\[|{)display(}|\][ ]*--\>)/', $display, $HTML);
+    $output = atCommandReplace($HTML);
 
-	ob_end_clean();
+    ob_end_clean();
     atTemplateDisplay($output);
-    
+
     return die();
 }
-	
+
 function atThemeAddHeader()
 {
     $runningconfig = atGetRunningConfig();
     extract($runningconfig);
- 
+
     $stylesheet = $style['stylesheet'];
-    
+
     $head = "\n<!--\n************************ AutoTheme 0.87 *************************\n-->\n";
-    
+
     if (atGetModName() == "AutoTheme") {
-    	$head .= "<script type=\"text/javascript\" src=\"modules/AutoTheme/javascript/picker.js\"></script>\n"
-				."<script type=\"text/javascript\">\n"
-				."  var JS_PATH = \"modules/AutoTheme/javascript/\";\n"
-				."  var PU_PATH = JS_PATH + \"popups/\";\n"
-				."</script>\n";
+        $head .= "<script type=\"text/javascript\" src=\"modules/AutoTheme/javascript/picker.js\"></script>\n"
+            . "<script type=\"text/javascript\">\n"
+            . "  var JS_PATH = \"modules/AutoTheme/javascript/\";\n"
+            . "  var PU_PATH = JS_PATH + \"popups/\";\n"
+            . "</script>\n";
     }
     if (isset($stylesheet)) {
-        if (@file_exists($themepath.$stylesheet) && !@is_dir($themepath.$stylesheet)) {
+        if (@file_exists($themepath . $stylesheet) && !@is_dir($themepath . $stylesheet)) {
             $head .= "\n<!-- Custom Page stylesheet -->\n";
-        	$head .= "<link rel=\"stylesheet\" href=\"".$themepath.$stylesheet."\" type=\"text/css\""
-        	.($xhtml ? " />" : ">")."\n";
+            $head .= "<link rel=\"stylesheet\" href=\"" . $themepath . $stylesheet . "\" type=\"text/css\""
+                . ($xhtml ? " />" : ">") . "\n";
         }
     }
     if ($system = atPlatformHeader($xhtml)) {
-	    $head .= "\n<!-- Head from system -->\n";
-	    $head .= "$system\n";
+        $head .= "\n<!-- Head from system -->\n";
+        $head .= "$system\n";
     }
     if ($style['head']) {
-	    $head .= "\n<!-- Head from config -->\n";
-	    $head .= trim($style['head'])."\n";
-    }    
+        $head .= "\n<!-- Head from config -->\n";
+        $head .= trim($style['head']) . "\n";
+    }
     return $head;
 }
 
@@ -104,7 +102,5 @@ function atThemeAddFooter()
 {
     $footer = "\n<!--\n************************ AutoTheme 0.87 ************************\n-->\n";
 
-	echo $footer;
+    echo $footer;
 }
-
-?>

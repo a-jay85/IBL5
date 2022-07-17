@@ -13,10 +13,8 @@
 /************************************************************************/
 
 if (!defined('ADMIN_FILE')) {
-	die ("Access Denied");
+    die("Access Denied");
 }
 
 global $admin_file;
-adminmenu("".$admin_file.".php?op=adminStory", ""._NEWS."", "stories.gif");
-	
-?>
+adminmenu("" . $admin_file . ".php?op=adminStory", "" . _NEWS . "", "stories.gif");

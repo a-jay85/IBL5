@@ -18,33 +18,30 @@
 /**************************************************************************/
 
 /**************************************************************************/
-/* Translation by:							  */
-/*									  */
-/* Rui Cristovão (ord'hor) ordhor@hotmail.com				  */
+/* Translation by:                              */
+/*                                      */
+/* Rui Cristovï¿½o (ord'hor) ordhor@hotmail.com                  */
 /**************************************************************************/
 
-
-define("_URL","Link");
-define("_EMAIL","Email");
-define("_REALNAME","Nome verdadeiro");
-define("_FUNCTIONS","Funções");
-define("_PREVIOUS","Página Anterior");
-define("_MEMBERSLIST","Lista de utilizadores");
-define("_GREETINGS","Saudações ao nosso recente membro:");
-define("_SORTBY","Seleccionar por:");
-define("_MNICKNAME","Apelido");
-define("_MREALNAME","Nome verdadeiro");
-define("_MEMAIL","Email");
-define("_MURL","Homepage");
-define("_ONLINEREG","Utilizadores registados e ligados neste momento:");
-define("_WEHAVE","Nós temos");
-define("_MREGISTERED","alguns utilizadores registados. E destes");
-define("_MREGONLINE","os seguinte(s) estão ligados agora.");
-define("_REGSOFAR","utilizadores registados até agora.");
-define("_USERSFOUND","utilizadores encontrados por");
-define("_USERSSHOWN","mostrar utilizadores");
-define("_NOMEMBERS","Nenhum utilizador encontrado por");
-define("_PAGES","Páginas");
-define("_HOMEPAGE","Homepage");
-
-?>
+define("_URL", "Link");
+define("_EMAIL", "Email");
+define("_REALNAME", "Nome verdadeiro");
+define("_FUNCTIONS", "Funï¿½ï¿½es");
+define("_PREVIOUS", "Pï¿½gina Anterior");
+define("_MEMBERSLIST", "Lista de utilizadores");
+define("_GREETINGS", "Saudaï¿½ï¿½es ao nosso recente membro:");
+define("_SORTBY", "Seleccionar por:");
+define("_MNICKNAME", "Apelido");
+define("_MREALNAME", "Nome verdadeiro");
+define("_MEMAIL", "Email");
+define("_MURL", "Homepage");
+define("_ONLINEREG", "Utilizadores registados e ligados neste momento:");
+define("_WEHAVE", "Nï¿½s temos");
+define("_MREGISTERED", "alguns utilizadores registados. E destes");
+define("_MREGONLINE", "os seguinte(s) estï¿½o ligados agora.");
+define("_REGSOFAR", "utilizadores registados atï¿½ agora.");
+define("_USERSFOUND", "utilizadores encontrados por");
+define("_USERSSHOWN", "mostrar utilizadores");
+define("_NOMEMBERS", "Nenhum utilizador encontrado por");
+define("_PAGES", "Pï¿½ginas");
+define("_HOMEPAGE", "Homepage");

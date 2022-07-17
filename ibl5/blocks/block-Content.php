@@ -12,7 +12,7 @@
 /* the Free Software Foundation; either version 2 of the License.       */
 /************************************************************************/
 
-if ( !defined('BLOCK_FILE') ) {
+if (!defined('BLOCK_FILE')) {
     Header("Location: ../index.php");
     die();
 }
@@ -21,9 +21,7 @@ global $prefix, $db;
 
 $result = $db->sql_query("SELECT pid, title FROM " . $prefix . "_pages WHERE active='1'");
 while ($row = $db->sql_fetchrow($result)) {
-$pid = intval($row['pid']);
-$title = filter($row['title'], "nohtml");
+    $pid = intval($row['pid']);
+    $title = filter($row['title'], "nohtml");
     $content .= "<strong><big>&middot;</big></strong>&nbsp;<a href=\"modules.php?name=Content&amp;pa=showpage&amp;pid=$pid\">$title</a><br>";
 }
-
-?>

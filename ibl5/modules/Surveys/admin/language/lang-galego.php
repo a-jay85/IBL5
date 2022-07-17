@@ -17,37 +17,33 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_YES","Sí");
-define("_NO","Non");
-define("_CATEGORY","Categoría");
-define("_SAVECHANGES","Gardar cambios");
-define("_ARTICLES","Artigos");
-define("_SELECTTOPIC","Seleccionar Tema");
-define("_OPTION","Opción");
-define("_ADMPOLLS","Enquisas/Votacións");
-define("_TITLE","Título");
-define("_STORYTEXT","Texto da Noticia");
-define("_EXTENDEDTEXT","Texto Extendido");
-define("_PUBLISHINHOME","¿Publicar na Páxina de Inicio?");
-define("_ONLYIFCATSELECTED","Só funciona se a categoría  <i>Artigos</i> non está seleccionada");
-define("_ADD","Engadir");
-define("_POLLSADMIN","Administración de Votacións/Enquisas");
-define("_CREATEPOLL","Crear Enquisa");
-define("_DELETEPOLLS","Borrar Enquisas");
-define("_POLLTITLE","Título da Enquisa");
-define("_POLLEACHFIELD","Por favor escriba cada opción da enquisa");
-define("_CREATEPOLLBUT","Crear Enquisa");
-define("_REMOVEEXISTING","Eliminar unha enquisa existente");
-define("_POLLDELWARNING","AVISO: A enquisa seleccionada será borrada INMEDIATAMENTE da base de datos!");
-define("_CHOOSEPOLL","Seleccione votación da siguiente lista:");
-define("_EDITPOLL","Editar Enquisas");
-define("_CHOOSEPOLLEDIT","Escolla a Enquisa que queira editar:");
-define("_ACTIVATECOMMENTS","¿Activar comentarios para esta Noticia?");
-define("_LANGUAGE","Idioma");
-define("_ANNOUNCEPOLL","Anuncie esta nova Enquisa no seu site");
-define("_LEAVEBLANK","(Deixe en blanco para crear unha nova enquisa sin anunciala)");
-define("_POLLEDIT","Editar Enquisa:");
-
-
-?>
+define("_YES", "Sï¿½");
+define("_NO", "Non");
+define("_CATEGORY", "Categorï¿½a");
+define("_SAVECHANGES", "Gardar cambios");
+define("_ARTICLES", "Artigos");
+define("_SELECTTOPIC", "Seleccionar Tema");
+define("_OPTION", "Opciï¿½n");
+define("_ADMPOLLS", "Enquisas/Votaciï¿½ns");
+define("_TITLE", "Tï¿½tulo");
+define("_STORYTEXT", "Texto da Noticia");
+define("_EXTENDEDTEXT", "Texto Extendido");
+define("_PUBLISHINHOME", "ï¿½Publicar na Pï¿½xina de Inicio?");
+define("_ONLYIFCATSELECTED", "Sï¿½ funciona se a categorï¿½a  <i>Artigos</i> non estï¿½ seleccionada");
+define("_ADD", "Engadir");
+define("_POLLSADMIN", "Administraciï¿½n de Votaciï¿½ns/Enquisas");
+define("_CREATEPOLL", "Crear Enquisa");
+define("_DELETEPOLLS", "Borrar Enquisas");
+define("_POLLTITLE", "Tï¿½tulo da Enquisa");
+define("_POLLEACHFIELD", "Por favor escriba cada opciï¿½n da enquisa");
+define("_CREATEPOLLBUT", "Crear Enquisa");
+define("_REMOVEEXISTING", "Eliminar unha enquisa existente");
+define("_POLLDELWARNING", "AVISO: A enquisa seleccionada serï¿½ borrada INMEDIATAMENTE da base de datos!");
+define("_CHOOSEPOLL", "Seleccione votaciï¿½n da siguiente lista:");
+define("_EDITPOLL", "Editar Enquisas");
+define("_CHOOSEPOLLEDIT", "Escolla a Enquisa que queira editar:");
+define("_ACTIVATECOMMENTS", "ï¿½Activar comentarios para esta Noticia?");
+define("_LANGUAGE", "Idioma");
+define("_ANNOUNCEPOLL", "Anuncie esta nova Enquisa no seu site");
+define("_LEAVEBLANK", "(Deixe en blanco para crear unha nova enquisa sin anunciala)");
+define("_POLLEDIT", "Editar Enquisa:");

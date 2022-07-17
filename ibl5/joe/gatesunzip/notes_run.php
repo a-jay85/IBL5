@@ -18,10 +18,9 @@
  ***************************************************************************/
 
 include "includes/classes.inc.php";
-$statement = "update team set team_comments = '".addslashes($_POST['team_comments'])."' where
-team_id = '".$login->team_id()."'";
+$statement = "update team set team_comments = '" . addslashes($_POST['team_comments']) . "' where
+team_id = '" . $login->team_id() . "'";
 mysql_query($statement);
 $_SESSION['message'] = "Saved";
 header("Location: notes.php");
 exit;
-?>

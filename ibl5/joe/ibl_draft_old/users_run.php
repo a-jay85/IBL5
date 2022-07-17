@@ -21,22 +21,21 @@ include "includes/classes.inc.php";
 
 // Admin only!
 if ($login->is_admin()) {
-  if (is_array($_POST['team_id'])) {
-    foreach($_POST['team_id'] as $team_id) {
-      $team = new team($team_id);
-      if ($_POST['has_password'][$team_id]) {
-	$team->set_has_password();
-      } else {
-	$team->clear_password();
-      }
-      $team->set_autopick($_POST['team_autopick'][$team_id]);
-      $team->set_clock_adj($_POST['team_clock_adj'][$team_id]);
+    if (is_array($_POST['team_id'])) {
+        foreach ($_POST['team_id'] as $team_id) {
+            $team = new team($team_id);
+            if ($_POST['has_password'][$team_id]) {
+                $team->set_has_password();
+            } else {
+                $team->clear_password();
+            }
+            $team->set_autopick($_POST['team_autopick'][$team_id]);
+            $team->set_clock_adj($_POST['team_clock_adj'][$team_id]);
+        }
     }
-  }
- }
+}
 
 // May have updated the pick list by turning autopick on
 process_pick_queue();
 
 header("Location: users.php");
-?>

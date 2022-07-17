@@ -26,12 +26,11 @@ $result = mysql_query($statement);
 echo mysql_error();
 $line = array();
 while ($row = mysql_fetch_array($result)) {
-  list($first, $last) = explode(" ",$row['player_name']);
-  $line[] = $row['pick_id'].'. - '.$last.', '.$first.', '.$row['position_name'].', '.$row['player_school'];
+    list($first, $last) = explode(" ", $row['player_name']);
+    $line[] = $row['pick_id'] . '. - ' . $last . ', ' . $first . ', ' . $row['position_name'] . ', ' . $row['player_school'];
 }
 if (count($line)) {
-  echo implode("<br>",$line);
+    echo implode("<br>", $line);
 } else {
-  echo "No drafted players";
+    echo "No drafted players";
 }
-?>

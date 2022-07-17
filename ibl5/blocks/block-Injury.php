@@ -45,9 +45,9 @@ $content = "<table border=0>
 
 $j = 0;
 while ($j < $numo) {
-	$user_team = $db->sql_result($resulto, $j, "user_ibl_team");
+    $user_team = $db->sql_result($resulto, $j, "user_ibl_team");
 
-	$sql = "SELECT *
+    $sql = "SELECT *
         FROM nuke_iblplyr
         WHERE teamname = '$user_team'
         AND retired = '0'
@@ -55,47 +55,45 @@ while ($j < $numo) {
         AND droptime = '0'
         AND ordinal < 960
         AND name NOT LIKE '%Buyout%'"; // "ordinal < 960" excludes waived players from this query
-	$result1 = $db->sql_query($sql);
-	$num1 = $db->sql_numrows($result1);
+    $result1 = $db->sql_query($sql);
+    $num1 = $db->sql_numrows($result1);
 
-	$sql2 = "SELECT *
+    $sql2 = "SELECT *
         FROM nuke_iblplyr
         WHERE teamname = '$user_team'
         AND retired = '0'
         AND injured > '0'
         AND active = '1'";
-	$result2 = $db->sql_query($sql2);
-	$num2 = $db->sql_numrows($result2);
+    $result2 = $db->sql_query($sql2);
+    $num2 = $db->sql_numrows($result2);
 
-	if ($num2 > 0) {
-		$new_lineups = 'Yes';
-	} else {
-		$new_lineups = 'No';
-	}
+    if ($num2 > 0) {
+        $new_lineups = 'Yes';
+    } else {
+        $new_lineups = 'No';
+    }
 
-	$waivers_needed = 12;
-	$healthy = 0;
-	$i = 0;
-	while ($i < $num1) {
-		$healthy++;
-		$i++;
-	}
+    $waivers_needed = 12;
+    $healthy = 0;
+    $i = 0;
+    while ($i < $num1) {
+        $healthy++;
+        $i++;
+    }
 
-	$waivers_needed = $waivers_needed - $healthy;
-	if ($waivers_needed < 0) {
-		$waivers_needed = 0;
-	}
-	$sql3 = "SELECT chart FROM nuke_ibl_team_info WHERE team_name = '$user_team'";
-	$result3 = $db->sql_query($sql3);
-	$chart = $db->sql_result($result3, 0, "chart");
+    $waivers_needed = $waivers_needed - $healthy;
+    if ($waivers_needed < 0) {
+        $waivers_needed = 0;
+    }
+    $sql3 = "SELECT chart FROM nuke_ibl_team_info WHERE team_name = '$user_team'";
+    $result3 = $db->sql_query($sql3);
+    $chart = $db->sql_result($result3, 0, "chart");
 
-	if ($waivers_needed > 0 || $new_lineups == 'Yes' && $chart == 0) {
-		$content .= "<tr><td>$user_team</td><td>$healthy</td><td>$waivers_needed</td><td>$new_lineups</td></tr>";
-	}
+    if ($waivers_needed > 0 || $new_lineups == 'Yes' && $chart == 0) {
+        $content .= "<tr><td>$user_team</td><td>$healthy</td><td>$waivers_needed</td><td>$new_lineups</td></tr>";
+    }
 
     $j++;
 }
 
 $content .= "</table>";
-
-?>

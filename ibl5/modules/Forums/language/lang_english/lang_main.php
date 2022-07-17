@@ -21,7 +21,7 @@
 
 //
 // CONTRIBUTORS:
-//	 Add your details here if wanted, e.g. Name, username, email address, website
+//     Add your details here if wanted, e.g. Name, username, email address, website
 // 2002-08-27  Philip M. White        - fixed many grammar problems
 //
 
@@ -37,7 +37,7 @@ $lang['ENCODING'] = 'iso-8859-1';
 $lang['DIRECTION'] = 'ltr';
 $lang['LEFT'] = 'left';
 $lang['RIGHT'] = 'right';
-$lang['DATE_FORMAT'] =  'd M Y'; // This should be changed to the default date format for your language, php date() format
+$lang['DATE_FORMAT'] = 'd M Y'; // This should be changed to the default date format for your language, php date() format
 
 // This is optional, if you would like a _SHORT_ message output
 // along with our copyright message indicating you are the translator
@@ -104,7 +104,7 @@ $lang['AIM'] = 'AIM Address';
 $lang['MSNM'] = 'MSN Messenger';
 $lang['YIM'] = 'Yahoo Messenger';
 
-$lang['Forum_Index'] = '%s Forum Index';  // eg. sitename Forum Index, %s can be removed if you prefer
+$lang['Forum_Index'] = '%s Forum Index'; // eg. sitename Forum Index, %s can be removed if you prefer
 
 $lang['Post_new_topic'] = 'Post new topic';
 $lang['Reply_to_topic'] = 'Reply to topic';
@@ -120,7 +120,6 @@ $lang['Click_return_group'] = 'Click %sHere%s to return to group information';
 $lang['Admin_panel'] = 'Go to Administration Panel';
 
 $lang['Board_disable'] = 'Sorry, but this board is currently unavailable.  Please try again later.';
-
 
 //
 // Global Header strings
@@ -163,7 +162,6 @@ $lang['Last_Post'] = 'Last Post';
 $lang['Moderator'] = 'Moderator';
 $lang['Moderators'] = 'Moderators';
 
-
 //
 // Stats block text
 //
@@ -173,7 +171,7 @@ $lang['Posted_article_total'] = 'Our users have posted a total of <b>%d</b> arti
 $lang['Registered_users_zero_total'] = 'We have <b>0</b> registered users'; // # registered users
 $lang['Registered_users_total'] = 'We have <b>%d</b> registered users'; // # registered users
 $lang['Registered_user_total'] = 'We have <b>%d</b> registered user'; // # registered users
-$lang['Newest_user'] = 'The newest registered user is <b>%s%s%s</b>'; // a href, username, /a 
+$lang['Newest_user'] = 'The newest registered user is <b>%s%s%s</b>'; // a href, username, /a
 
 $lang['No_new_posts_last_visit'] = 'No new posts since your last visit';
 $lang['No_new_posts'] = 'No new posts';
@@ -184,7 +182,6 @@ $lang['New_posts_hot'] = 'New posts [ Popular ]';
 $lang['No_new_posts_locked'] = 'No new posts [ Locked ]';
 $lang['New_posts_locked'] = 'New posts [ Locked ]';
 $lang['Forum_is_locked'] = 'Forum is locked';
-
 
 //
 // Login
@@ -199,7 +196,6 @@ $lang['Log_me_in'] = 'Log me on automatically each visit';
 
 $lang['Error_login'] = 'You have specified an incorrect or inactive username, or an invalid password.';
 
-
 //
 // Index page
 //
@@ -213,7 +209,6 @@ $lang['Who_is_Online'] = 'Who is Online';
 
 $lang['Mark_all_forums'] = 'Mark all forums read';
 $lang['Forums_marked_read'] = 'All forums have been marked read';
-
 
 //
 // Viewforum
@@ -244,10 +239,9 @@ $lang['Rules_delete_can'] = 'You <b>can</b> delete your posts in this forum';
 $lang['Rules_delete_cannot'] = 'You <b>cannot</b> delete your posts in this forum';
 $lang['Rules_vote_can'] = 'You <b>can</b> vote in polls in this forum';
 $lang['Rules_vote_cannot'] = 'You <b>cannot</b> vote in polls in this forum';
-$lang['Rules_moderate'] = 'You <b>can</b> %smoderate this forum%s'; // %s replaced by a href links, do not remove! 
+$lang['Rules_moderate'] = 'You <b>can</b> %smoderate this forum%s'; // %s replaced by a href links, do not remove!
 
 $lang['No_topics_post_one'] = 'There are no posts in this forum.<br />Click on the <b>Post New Topic</b> link on this page to post one.';
-
 
 //
 // Viewtopic
@@ -273,7 +267,7 @@ $lang['Oldest_First'] = 'Oldest First';
 
 $lang['Back_to_top'] = 'Back to top';
 
-$lang['Read_profile'] = 'View user\'s profile'; 
+$lang['Read_profile'] = 'View user\'s profile';
 $lang['Visit_website'] = 'Visit poster\'s website';
 $lang['ICQ_status'] = 'ICQ Status';
 $lang['Edit_delete_post'] = 'Edit/Delete this post';
@@ -417,7 +411,6 @@ $lang['font_huge'] = 'Huge';
 $lang['Close_Tags'] = 'Close Tags';
 $lang['Styles_tip'] = 'Tip: Styles can be applied quickly to selected text.';
 
-
 //
 // Private Messaging
 //
@@ -457,7 +450,7 @@ $lang['Sent'] = 'Sent';
 $lang['Saved'] = 'Saved';
 $lang['Delete_marked'] = 'Delete Marked';
 $lang['Delete_all'] = 'Delete All';
-$lang['Save_marked'] = 'Save Marked'; 
+$lang['Save_marked'] = 'Save Marked';
 $lang['Save_message'] = 'Save Message';
 $lang['Delete_message'] = 'Delete Message';
 
@@ -501,16 +494,15 @@ $lang['Confirm_delete_pm'] = 'Are you sure you want to delete this message?';
 $lang['Confirm_delete_pms'] = 'Are you sure you want to delete these messages?';
 
 $lang['Inbox_size'] = 'Your Inbox is %d%% full'; // eg. Your Inbox is 50% full
-$lang['Sentbox_size'] = 'Your Sentbox is %d%% full'; 
-$lang['Savebox_size'] = 'Your Savebox is %d%% full'; 
+$lang['Sentbox_size'] = 'Your Sentbox is %d%% full';
+$lang['Savebox_size'] = 'Your Savebox is %d%% full';
 
 $lang['Click_view_privmsg'] = 'Click %sHere%s to visit your Inbox';
-
 
 //
 // Profiles/Registration
 //
-$lang['Viewing_user_profile'] = 'Viewing profile :: %s'; // %s is username 
+$lang['Viewing_user_profile'] = 'Viewing profile :: %s'; // %s is username
 $lang['About_user'] = 'All about %s'; // %s is username
 
 $lang['Preferences'] = 'Preferences';
@@ -528,7 +520,7 @@ $lang['Email_address'] = 'E-mail address';
 $lang['Send_private_message'] = 'Send private message';
 $lang['Hidden_email'] = '[ Hidden ]';
 $lang['Interests'] = 'Interests';
-$lang['Occupation'] = 'Occupation'; 
+$lang['Occupation'] = 'Occupation';
 $lang['Poster_rank'] = 'Poster rank';
 
 $lang['Total_posts'] = 'Total posts';
@@ -590,7 +582,7 @@ $lang['Delete_Image'] = 'Delete Image';
 $lang['Current_Image'] = 'Current Image';
 
 $lang['Notify_on_privmsg'] = 'Notify on new Private Message';
-$lang['Popup_on_privmsg'] = 'Pop up window on new Private Message'; 
+$lang['Popup_on_privmsg'] = 'Pop up window on new Private Message';
 $lang['Popup_on_privmsg_explain'] = 'Some templates may open a new window to inform you when new private messages arrive.';
 $lang['Hide_user'] = 'Hide your online status';
 
@@ -610,7 +602,7 @@ $lang['Signature_too_long'] = 'Your signature is too long.';
 $lang['Fields_empty'] = 'You must fill in the required fields.';
 $lang['Avatar_filetype'] = 'The avatar filetype must be .jpg, .gif or .png';
 $lang['Avatar_filesize'] = 'The avatar image file size must be less than %d KB'; // The avatar image file size must be less than 6 KB
-$lang['Avatar_imagesize'] = 'The avatar must be less than %d pixels wide and %d pixels high'; 
+$lang['Avatar_imagesize'] = 'The avatar must be less than %d pixels wide and %d pixels high';
 
 $lang['Welcome_subject'] = 'Welcome to %s Forums'; // Welcome to my.com forums
 $lang['New_account_subject'] = 'New user account';
@@ -633,7 +625,7 @@ $lang['Agree_over_13'] = 'I Agree to these terms and am <b>over</b> or <b>exactl
 $lang['Agree_not'] = 'I do not agree to these terms';
 
 $lang['Wrong_activation'] = 'The activation key you supplied does not match any in the database.';
-$lang['Send_password'] = 'Send me a new password'; 
+$lang['Send_password'] = 'Send me a new password';
 $lang['Password_updated'] = 'A new password has been created; please check your e-mail for details on how to activate it.';
 $lang['No_email_match'] = 'The e-mail address you supplied does not match the one listed for that username.';
 $lang['New_password_activation'] = 'New password activation';
@@ -652,7 +644,6 @@ $lang['Send_email'] = 'Send e-mail';
 $lang['Empty_subject_email'] = 'You must specify a subject for the e-mail.';
 $lang['Empty_message_email'] = 'You must enter a message to be e-mailed.';
 
-
 //
 // Visual confirmation system strings
 //
@@ -661,8 +652,6 @@ $lang['Too_many_registers'] = 'You have exceeded the number of registration atte
 $lang['Confirm_code_impaired'] = 'If you are visually impaired or cannot otherwise read this code please contact the %sAdministrator%s for help.';
 $lang['Confirm_code'] = 'Confirmation code';
 $lang['Confirm_code_explain'] = 'Enter the code exactly as you see it. The code is case sensitive and zero has a diagonal line through it.';
-
-
 
 //
 // Memberslist
@@ -679,7 +668,6 @@ $lang['Sort_Website'] = 'Website';
 $lang['Sort_Ascending'] = 'Ascending';
 $lang['Sort_Descending'] = 'Descending';
 $lang['Order'] = 'Order';
-
 
 //
 // Group control panel
@@ -715,7 +703,7 @@ $lang['No_pending_group_members'] = 'This group has no pending members';
 $lang['Group_joined'] = 'You have successfully subscribed to this group.<br />You will be notified when your subscription is approved by the group moderator.';
 $lang['Group_request'] = 'A request to join your group has been made.';
 $lang['Group_approved'] = 'Your request has been approved.';
-$lang['Group_added'] = 'You have been added to this usergroup.'; 
+$lang['Group_added'] = 'You have been added to this usergroup.';
 $lang['Already_member_group'] = 'You are already a member of this group';
 $lang['User_is_member_group'] = 'User is already a member of this group';
 $lang['Group_type_updated'] = 'Successfully updated group type.';
@@ -747,7 +735,6 @@ $lang['None'] = 'None';
 $lang['Subscribe'] = 'Subscribe';
 $lang['Unsubscribe'] = 'Unsubscribe';
 $lang['View_Information'] = 'View Information';
-
 
 //
 // Search
@@ -788,17 +775,16 @@ $lang['Search_Flood_Error'] = 'You cannot make another search so soon after your
 
 $lang['Close_window'] = 'Close Window';
 
-
 //
 // Auth related entries
 //
 // Note the %s will be replaced with one of the following 'user' arrays
 $lang['Sorry_auth_announce'] = 'Sorry, but only %s can post announcements in this forum.';
-$lang['Sorry_auth_sticky'] = 'Sorry, but only %s can post sticky messages in this forum.'; 
-$lang['Sorry_auth_read'] = 'Sorry, but only %s can read topics in this forum.'; 
-$lang['Sorry_auth_post'] = 'Sorry, but only %s can post topics in this forum.'; 
+$lang['Sorry_auth_sticky'] = 'Sorry, but only %s can post sticky messages in this forum.';
+$lang['Sorry_auth_read'] = 'Sorry, but only %s can read topics in this forum.';
+$lang['Sorry_auth_post'] = 'Sorry, but only %s can post topics in this forum.';
 $lang['Sorry_auth_reply'] = 'Sorry, but only %s can reply to posts in this forum.';
-$lang['Sorry_auth_edit'] = 'Sorry, but only %s can edit posts in this forum.'; 
+$lang['Sorry_auth_edit'] = 'Sorry, but only %s can edit posts in this forum.';
 $lang['Sorry_auth_delete'] = 'Sorry, but only %s can delete posts in this forum.';
 $lang['Sorry_auth_vote'] = 'Sorry, but only %s can vote in polls in this forum.';
 
@@ -813,7 +799,6 @@ $lang['Not_Moderator'] = 'You are not a moderator of this forum.';
 $lang['Not_Authorised'] = 'Not Authorised';
 
 $lang['You_been_banned'] = 'You have been banned from this forum.<br />Please contact the webmaster or board administrator for more information.';
-
 
 //
 // Viewonline
@@ -843,7 +828,6 @@ $lang['Viewing_online'] = 'Viewing who is online';
 $lang['Viewing_member_list'] = 'Viewing member list';
 $lang['Viewing_priv_msgs'] = 'Viewing Private Messages';
 $lang['Viewing_FAQ'] = 'Viewing FAQ';
-
 
 //
 // Moderator Control Panel
@@ -889,7 +873,6 @@ $lang['Other_IP_this_user'] = 'Other IP addresses this user has posted from';
 $lang['Users_this_IP'] = 'Users posting from this IP address';
 $lang['IP_info'] = 'IP Information';
 $lang['Lookup_IP'] = 'Look up IP address';
-
 
 //
 // Timezones ... for display on each page
@@ -1021,5 +1004,3 @@ $lang['Please_remove_install_contrib'] = 'Please ensure both the install/ and co
 //
 // That's all, Folks!
 // -------------------------------------------------
-
-?>

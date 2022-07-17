@@ -17,11 +17,9 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PDATE","Tanggal:");
-define("_PTOPIC","Topik:");
-define("_COMESFROM","Berita ini dari");
-define("_THEURL","URL berita ini adalah:");
-define("_DATE","Tanggal");
-define("_TITLE","Judul");
-
-?>
+define("_PDATE", "Tanggal:");
+define("_PTOPIC", "Topik:");
+define("_COMESFROM", "Berita ini dari");
+define("_THEURL", "URL berita ini adalah:");
+define("_DATE", "Tanggal");
+define("_TITLE", "Judul");

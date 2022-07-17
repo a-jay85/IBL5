@@ -17,18 +17,16 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PRINTER","Utskriftsvennlig side");
-define("_FRIEND","Send denne artikkelen til en venn");
-define("_ARTICLES","Artiklene");
-define("_USCORE","Poeng");
-define("_DATE","Dato");
-define("_SELECTMONTH2VIEW","Velg måneden du vil se:");
-define("_SHOWALLSTORIES","Vis ALLE artikler");
-define("_STORIESARCHIVE","Artikkelarkiv");
-define("_ACTIONS","Valg");
-define("_ARCHIVESINDEX","Artikkelarkiv hovedside");
-define("_ALLSTORIESARCH","Alle artikler");
-define("_NEXTPAGE","Neste side");
-define("_PREVIOUSPAGE","Forrige side");
-
-?>
+define("_PRINTER", "Utskriftsvennlig side");
+define("_FRIEND", "Send denne artikkelen til en venn");
+define("_ARTICLES", "Artiklene");
+define("_USCORE", "Poeng");
+define("_DATE", "Dato");
+define("_SELECTMONTH2VIEW", "Velg mï¿½neden du vil se:");
+define("_SHOWALLSTORIES", "Vis ALLE artikler");
+define("_STORIESARCHIVE", "Artikkelarkiv");
+define("_ACTIONS", "Valg");
+define("_ARCHIVESINDEX", "Artikkelarkiv hovedside");
+define("_ALLSTORIESARCH", "Alle artikler");
+define("_NEXTPAGE", "Neste side");
+define("_PREVIOUSPAGE", "Forrige side");

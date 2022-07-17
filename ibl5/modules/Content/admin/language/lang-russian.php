@@ -17,39 +17,35 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_SEND","Отправить");
-define("_FUNCTIONS","Функции");
-define("_YES","Да");
-define("_NO","Нет");
-define("_CATEGORY","Категория");
-define("_SAVECHANGES","Сохранить изменения");
-define("_PAGEBREAK","");
-define("_SIGNATURE","Немного о себе");
-define("_DESCRIPTION","Примечание");
-define("_TITLE","Зоголовог");
-define("_ACTIVE","Вкл.");
-define("_DEACTIVATE","Выкл.");
-define("_INACTIVE","Выключить");
-define("_ACTIVATE","Включить");
-define("_CONTENT","Content");
-define("_ADDCATEGORY","Добавить категорию");
-define("_EDITCATEGORY","Редактировать категорию");
-define("_ADD","Добавить");
-define("_LANGUAGE","Language");
-define("_CONTENTMANAGER","Content Manager");
-define("_DELCONTWARNING","Are you sure you want to delete the page");
-define("_DELCONTENT","Delete Page");
-define("_CURRENTSTATUS","Current Status");
-define("_ADDANEWPAGE","Add a New Page");
-define("_CSUBTITLE","Sub-Title");
-define("_HEADERTEXT","Header Text");
-define("_PAGETEXT","Page Text");
-define("_FOOTERTEXT","Footer Text");
-define("_ACTIVATEPAGE","Activate This Page?");
-define("_EDITPAGECONTENT","Edit Page Content");
-define("_DELCONTENTCAT","WARNING: Are you sure you want to delete this category? Pages under this category, if they exist, will not be removed, but will not be attached to any category.");
-define("_DELCATEGORY","Delete Category");
-
-
-?>
+define("_SEND", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_FUNCTIONS", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_YES", "пїЅпїЅ");
+define("_NO", "пїЅпїЅпїЅ");
+define("_CATEGORY", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_SAVECHANGES", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_PAGEBREAK", "");
+define("_SIGNATURE", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅ");
+define("_DESCRIPTION", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_TITLE", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_ACTIVE", "пїЅпїЅпїЅ.");
+define("_DEACTIVATE", "пїЅпїЅпїЅпїЅ.");
+define("_INACTIVE", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_ACTIVATE", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_CONTENT", "Content");
+define("_ADDCATEGORY", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_EDITCATEGORY", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_ADD", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_LANGUAGE", "Language");
+define("_CONTENTMANAGER", "Content Manager");
+define("_DELCONTWARNING", "Are you sure you want to delete the page");
+define("_DELCONTENT", "Delete Page");
+define("_CURRENTSTATUS", "Current Status");
+define("_ADDANEWPAGE", "Add a New Page");
+define("_CSUBTITLE", "Sub-Title");
+define("_HEADERTEXT", "Header Text");
+define("_PAGETEXT", "Page Text");
+define("_FOOTERTEXT", "Footer Text");
+define("_ACTIVATEPAGE", "Activate This Page?");
+define("_EDITPAGECONTENT", "Edit Page Content");
+define("_DELCONTENTCAT", "WARNING: Are you sure you want to delete this category? Pages under this category, if they exist, will not be removed, but will not be attached to any category.");
+define("_DELCATEGORY", "Delete Category");

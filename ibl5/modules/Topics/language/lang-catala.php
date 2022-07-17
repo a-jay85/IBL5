@@ -7,7 +7,5 @@
 /*                                                                        */
 /**************************************************************************/
 
-define("_ACTIVETOPICS","Tòpics Actius");
-define("_CLICK2LIST","Fes Click al gràfic per a llistar tots els articles sobre aquest tòpic");
-
-?>
+define("_ACTIVETOPICS", "Tï¿½pics Actius");
+define("_CLICK2LIST", "Fes Click al grï¿½fic per a llistar tots els articles sobre aquest tï¿½pic");

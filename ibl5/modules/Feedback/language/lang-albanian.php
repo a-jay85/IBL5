@@ -17,19 +17,17 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_SEND","Dërgoje");
-define("_YOURNAME","Emri Juaj");
-define("_MESSAGE","Mesazhi");
-define("_YOUREMAIL","Email Juaj");
-define("_FEEDBACKNOTE","Të gjitha komentet dhe propozimet mbi këtë web site janë me të vërtetë të mirëpritura dhe një burim i vyer informacioni për ne. Faleminderit!");
-define("_FEEDBACKTITLE","Formulari Feedback");
-define("_FEEDBACK","Feedback");
-define("_FBENTERNAME","GABIM: Ju lutem shkruani emrin tuaj!");
-define("_FBENTEREMAIL","GABIM: Ju lutem shkruani adresën tuaj e-mail!");
-define("_FBENTERMESSAGE","GABIM: Ju lutem shkruani një mesazh!");
-define("_SENDEREMAIL","Email i Dërguesit");
-define("_SENDERNAME","Emri i Dërguesit");
-define("_FBMAILSENT","Mail u dërgua!");
-define("_FBTHANKSFORCONTACT","Ju faleminderit për ndihmën");
-
-?>
+define("_SEND", "Dï¿½rgoje");
+define("_YOURNAME", "Emri Juaj");
+define("_MESSAGE", "Mesazhi");
+define("_YOUREMAIL", "Email Juaj");
+define("_FEEDBACKNOTE", "Tï¿½ gjitha komentet dhe propozimet mbi kï¿½tï¿½ web site janï¿½ me tï¿½ vï¿½rtetï¿½ tï¿½ mirï¿½pritura dhe njï¿½ burim i vyer informacioni pï¿½r ne. Faleminderit!");
+define("_FEEDBACKTITLE", "Formulari Feedback");
+define("_FEEDBACK", "Feedback");
+define("_FBENTERNAME", "GABIM: Ju lutem shkruani emrin tuaj!");
+define("_FBENTEREMAIL", "GABIM: Ju lutem shkruani adresï¿½n tuaj e-mail!");
+define("_FBENTERMESSAGE", "GABIM: Ju lutem shkruani njï¿½ mesazh!");
+define("_SENDEREMAIL", "Email i Dï¿½rguesit");
+define("_SENDERNAME", "Emri i Dï¿½rguesit");
+define("_FBMAILSENT", "Mail u dï¿½rgua!");
+define("_FBTHANKSFORCONTACT", "Ju faleminderit pï¿½r ndihmï¿½n");

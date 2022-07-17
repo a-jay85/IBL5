@@ -17,19 +17,17 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PRINTER","Versión para imprimir");
-define("_FRIEND","Enviar a un amigo");
-define("_ARTICLES","Artigos");
-define("_USCORE","Puntuación");
-define("_DATE","Fecha");
+define("_PRINTER", "Versiï¿½n para imprimir");
+define("_FRIEND", "Enviar a un amigo");
+define("_ARTICLES", "Artigos");
+define("_USCORE", "Puntuaciï¿½n");
+define("_DATE", "Fecha");
 
-define("_SELECTMONTH2VIEW","Seleccione o mes que quere ver:");
-define("_SHOWALLSTORIES","Mostar TÓDA-LAS Noticas");
-define("_STORIESARCHIVE","Arquivo de Noticias");
-define("_ACTIONS","Accións");
-define("_ARCHIVESINDEX","Índice do Arquivo de Noticias");
-define("_ALLSTORIESARCH","Tóda-las Noticias");
-define("_NEXTPAGE","Próxima Páxina");
-define("_PREVIOUSPAGE","Páxina Previa");
-
-?>
+define("_SELECTMONTH2VIEW", "Seleccione o mes que quere ver:");
+define("_SHOWALLSTORIES", "Mostar Tï¿½DA-LAS Noticas");
+define("_STORIESARCHIVE", "Arquivo de Noticias");
+define("_ACTIONS", "Acciï¿½ns");
+define("_ARCHIVESINDEX", "ï¿½ndice do Arquivo de Noticias");
+define("_ALLSTORIESARCH", "Tï¿½da-las Noticias");
+define("_NEXTPAGE", "Prï¿½xima Pï¿½xina");
+define("_PREVIOUSPAGE", "Pï¿½xina Previa");

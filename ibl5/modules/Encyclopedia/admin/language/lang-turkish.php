@@ -17,41 +17,37 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_SEND","Gönder");
-define("_FUNCTIONS","Fonksiyonlar");
-define("_YES","Evet");
-define("_NO","Hayýr");
-define("_SAVECHANGES","Deðiþiklikleri Kaydet");
-define("_PAGEBREAK","Birden fazla sayfa kullanmak için kesmek istediðiniz yere <b>[--pagebreak--]</b> yazabilirsiniz.");
-define("_DESCRIPTION","Taným");
-define("_TO","Kime");
-define("_TITLE","Baþlýk");
-define("_ACTIVE","Aktif");
-define("_DEACTIVATE","Pasifleþtir");
-define("_INACTIVE","Pasif");
-define("_ACTIVATE","Etkinleþtir");
-define("_ADD","Ekle");
-define("_LANGUAGE","Dil");
-define("_ENCYCLOPEDIA","Ansiklopedi");
-define("_ENCYCLOPEDIAMANAGER","Ansiklopedi Yöneticisi");
-define("_DELENCYCLOPEDIA","Ansiklopedi Sil");
-define("_DELENCYCONTWARNING","Bu ansiklopediyi ve TÜM içeriðini silmek istediðinizden emin misiniz?");
-define("_DELENCYCLOPEDIATEXT","Ansiklopedi Terimi Sil");
-define("_DELENCYTEXTWARNING","Bu terimi silmek istediðinizden emin misiniz?");
-define("_CURRENTSTATUS","Geçerli Durum");
-define("_ACTIVATEPAGE","Bu sayfayý etkinleþtir?");
-define("_TERMS","Terim");
-define("_ADDNEWENCYCLOPEDIA","Yeni Ansiklopedi Ekle");
-define("_ADDNEWENCYTERM","Yeni Ansiklopedi Terimi Ekle");
-define("_TERMTEXT","Terim Metni");
-define("_MOVETERMS","Terimleri Taþý");
-define("_MOVEALLTERMSFROM","Buradaki TÜM terimleri");
-define("_EDITENCYCLOPEDIA","Ansiklopedi Düzenle");
-define("_ENCYTERMSEDIT","Ansiklopedi Terimi Düzenle");
-define("_SELECTONETERM","Lütfen aþaðýdaki listeden bir terim seçin:");
-define("_NOCONTENTFORLETTER","Üzgünüm, bu harf için içerik mevcut deðil");
-define("_CHANGETOENCY","Ansiklopedi Deðiþtir");
-
-
-?>
+define("_SEND", "Gï¿½nder");
+define("_FUNCTIONS", "Fonksiyonlar");
+define("_YES", "Evet");
+define("_NO", "Hayï¿½r");
+define("_SAVECHANGES", "Deï¿½iï¿½iklikleri Kaydet");
+define("_PAGEBREAK", "Birden fazla sayfa kullanmak iï¿½in kesmek istediï¿½iniz yere <b>[--pagebreak--]</b> yazabilirsiniz.");
+define("_DESCRIPTION", "Tanï¿½m");
+define("_TO", "Kime");
+define("_TITLE", "Baï¿½lï¿½k");
+define("_ACTIVE", "Aktif");
+define("_DEACTIVATE", "Pasifleï¿½tir");
+define("_INACTIVE", "Pasif");
+define("_ACTIVATE", "Etkinleï¿½tir");
+define("_ADD", "Ekle");
+define("_LANGUAGE", "Dil");
+define("_ENCYCLOPEDIA", "Ansiklopedi");
+define("_ENCYCLOPEDIAMANAGER", "Ansiklopedi Yï¿½neticisi");
+define("_DELENCYCLOPEDIA", "Ansiklopedi Sil");
+define("_DELENCYCONTWARNING", "Bu ansiklopediyi ve Tï¿½M iï¿½eriï¿½ini silmek istediï¿½inizden emin misiniz?");
+define("_DELENCYCLOPEDIATEXT", "Ansiklopedi Terimi Sil");
+define("_DELENCYTEXTWARNING", "Bu terimi silmek istediï¿½inizden emin misiniz?");
+define("_CURRENTSTATUS", "Geï¿½erli Durum");
+define("_ACTIVATEPAGE", "Bu sayfayï¿½ etkinleï¿½tir?");
+define("_TERMS", "Terim");
+define("_ADDNEWENCYCLOPEDIA", "Yeni Ansiklopedi Ekle");
+define("_ADDNEWENCYTERM", "Yeni Ansiklopedi Terimi Ekle");
+define("_TERMTEXT", "Terim Metni");
+define("_MOVETERMS", "Terimleri Taï¿½ï¿½");
+define("_MOVEALLTERMSFROM", "Buradaki Tï¿½M terimleri");
+define("_EDITENCYCLOPEDIA", "Ansiklopedi Dï¿½zenle");
+define("_ENCYTERMSEDIT", "Ansiklopedi Terimi Dï¿½zenle");
+define("_SELECTONETERM", "Lï¿½tfen aï¿½aï¿½ï¿½daki listeden bir terim seï¿½in:");
+define("_NOCONTENTFORLETTER", "ï¿½zgï¿½nï¿½m, bu harf iï¿½in iï¿½erik mevcut deï¿½il");
+define("_CHANGETOENCY", "Ansiklopedi Deï¿½iï¿½tir");

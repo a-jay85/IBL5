@@ -16,53 +16,51 @@
 /* so your entry will look like: This is \"double quoted\" text.          */
 /* And, if you use HTML code, please double check it.                     */
 /*                                                                        */
-/* Polish translation by Nordavind®(Bolo) (http://forum.phpnuke.org.pl)   */
+/* Polish translation by Nordavindï¿½(Bolo) (http://forum.phpnuke.org.pl)   */
 /*                                                                        */
 /**************************************************************************/
 
-define("_ALLTOPICS","Wszystkie tematy");
-define("_NOCOMMENTS","Bez komentarza");
-define("_UCOMMENT","Komentarz");
-define("_REVIEWS","Recenzje");
-define("_SEARCHUSERS","Szukaj w bazie u¿ytkowników");
-define("_SEARCHSECTIONS","Szukaj w sekcjach specjalnych");
-define("_SEARCHREVIEWS","Szukaj w recenzjach");
-define("_SEARCHIN","Szukaj w");
-define("_ARTICLES","Artyku³y");
-define("_ALLAUTHORS","Wszyscy autorzy");
-define("_ALL","Wszystko");
-define("_WEEK","tydzieñ");
-define("_WEEKS","tygodnie");
-define("_MONTH","miesi±c");
-define("_MONTHS","miesi±ce");
-define("_SEARCHON","Szukaj na:");
-define("_SSTORIES","Artyku³y");
-define("_SSECTIONS","Sekcje");
-define("_SUSERS","U¿ytkownicy");
-define("_NOMATCHES","Brak rezultatów wyszukiwania");
-define("_PREVMATCHES","poprzednie wyniki");
-define("_NEXTMATCHES","nastêpne wyniki");
-define("_INSECTION","Artyku³ w sekcji");
-define("_NONAME","Nie wpisano nazwy");
-define("_SCOMMENTS","Komentarze");
-define("_SEARCHRESULTS","Wyniki wyszukiwania");
-define("_CONTRIBUTEDBY","Wspó³praca");
-define("_UCOMMENTS","Komentarze");
-define("_MATCHTITLE","Szukaj wed³ug tytu³u artyku³u");
-define("_MATCHTEXT","Szukaj wed³ug tekstu");
-define("_MATCHBOTH","Szukaj wed³ug tytu³u i tekstu");
-define("_SREPLY","Odpowiedz");
-define("_SREPLIES","Odpowiedzi");
-define("_ATTACHART","Do³±czony do artyku³u");
-define("_PAGES","Strony");
-define("_REVIEWSCORE","Wynik dla tej recenzji");
-define("_PAGE","Strona");
-define("_DOWNLOADS","Pliki");
-define("_WEBLINKS","Linki");
-define("_FINDMORE","... wiêcej");
-define("_DIDNOTFIND","Nie znalaz³e¶(a¶) tego czego szuka³e¶(a¶)?");
-define("_ENCYCLOPEDIA","Encyklopedia");
-define("_SEARCHINSTORY","Przeszukaj wszystkie komentarze:");
-define("_SEARCHCHARACTERS","<center><b>Search System Error</b><br><br>Your query should be at least 3 characters long to be processed.<br>Please, fix the problem and try again...</center>");
-
-?>
+define("_ALLTOPICS", "Wszystkie tematy");
+define("_NOCOMMENTS", "Bez komentarza");
+define("_UCOMMENT", "Komentarz");
+define("_REVIEWS", "Recenzje");
+define("_SEARCHUSERS", "Szukaj w bazie uï¿½ytkownikï¿½w");
+define("_SEARCHSECTIONS", "Szukaj w sekcjach specjalnych");
+define("_SEARCHREVIEWS", "Szukaj w recenzjach");
+define("_SEARCHIN", "Szukaj w");
+define("_ARTICLES", "Artykuï¿½y");
+define("_ALLAUTHORS", "Wszyscy autorzy");
+define("_ALL", "Wszystko");
+define("_WEEK", "tydzieï¿½");
+define("_WEEKS", "tygodnie");
+define("_MONTH", "miesiï¿½c");
+define("_MONTHS", "miesiï¿½ce");
+define("_SEARCHON", "Szukaj na:");
+define("_SSTORIES", "Artykuï¿½y");
+define("_SSECTIONS", "Sekcje");
+define("_SUSERS", "Uï¿½ytkownicy");
+define("_NOMATCHES", "Brak rezultatï¿½w wyszukiwania");
+define("_PREVMATCHES", "poprzednie wyniki");
+define("_NEXTMATCHES", "nastï¿½pne wyniki");
+define("_INSECTION", "Artykuï¿½ w sekcji");
+define("_NONAME", "Nie wpisano nazwy");
+define("_SCOMMENTS", "Komentarze");
+define("_SEARCHRESULTS", "Wyniki wyszukiwania");
+define("_CONTRIBUTEDBY", "Wspï¿½praca");
+define("_UCOMMENTS", "Komentarze");
+define("_MATCHTITLE", "Szukaj wedï¿½ug tytuï¿½u artykuï¿½u");
+define("_MATCHTEXT", "Szukaj wedï¿½ug tekstu");
+define("_MATCHBOTH", "Szukaj wedï¿½ug tytuï¿½u i tekstu");
+define("_SREPLY", "Odpowiedz");
+define("_SREPLIES", "Odpowiedzi");
+define("_ATTACHART", "Doï¿½ï¿½czony do artykuï¿½u");
+define("_PAGES", "Strony");
+define("_REVIEWSCORE", "Wynik dla tej recenzji");
+define("_PAGE", "Strona");
+define("_DOWNLOADS", "Pliki");
+define("_WEBLINKS", "Linki");
+define("_FINDMORE", "... wiï¿½cej");
+define("_DIDNOTFIND", "Nie znalazï¿½eï¿½(aï¿½) tego czego szukaï¿½eï¿½(aï¿½)?");
+define("_ENCYCLOPEDIA", "Encyklopedia");
+define("_SEARCHINSTORY", "Przeszukaj wszystkie komentarze:");
+define("_SEARCHCHARACTERS", "<center><b>Search System Error</b><br><br>Your query should be at least 3 characters long to be processed.<br>Please, fix the problem and try again...</center>");

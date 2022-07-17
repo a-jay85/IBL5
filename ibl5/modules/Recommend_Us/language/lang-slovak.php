@@ -2,10 +2,10 @@
 
 /*************************************************************************/
 /* The Slovak language file for module Recommend_Us                      */
-/* Author: AlRashid 			 Date: 09.09.2002   					 */
+/* Author: AlRashid              Date: 09.09.2002                        */
 /* alrashid@klokan.sk, http://alrashid.klokan.sk                         */
-/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk			     */
-/*  		Dakujem                                                      */
+/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk                 */
+/*          Dakujem                                                      */
 /*************************************************************************/
 /**************************************************************************/
 /* PHP-NUKE: Advanced Content Management System                           */
@@ -24,30 +24,28 @@
 /* And, if you use HTML code, please double check it.                     */
 /*************************************************************************/
 /* The Slovak language file for module Recommend_Us                      */
-/* Author: AlRashid 			 Date: 09.09.2002   					 */
+/* Author: AlRashid              Date: 09.09.2002                        */
 /* alrashid@klokan.sk, http://alrashid.klokan.sk                         */
-/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk			     */
-/*  		Dakujem                                                      */
+/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk                 */
+/*          Dakujem                                                      */
 /*************************************************************************/
 /**************************************************************************/
 
-define("_SEND","Posla?");
-define("_FYOURNAME","Vaše meno:");
-define("_FYOUREMAIL","Váš e-mail:");
-define("_FFRIENDNAME","Meno vášho priate¾a:");
-define("_FFRIENDEMAIL","E-mail vášho priate¾a:");
-define("_HELLO","Ahoj,");
-define("_YOURFRIEND","Váš priate¾");
-define("_RECOMMEND","Posla? odporuèenie na tieto webstránky priate¾ovi, známemu");
-define("_INTSITE","Zaujimavá stránka:");
-define("_OURSITE","považuje našu stránku");
-define("_INTSENT","za zaujímavú a rozhodol sa Vám ju posla?.");
-define("_FSITENAME","Názov webstránky:");
-define("_FSITEURL","URL webstránky:");
-define("_FREFERENCE","Odporuèenie na našu stránku bola odoslaná");
-define("_THANKSREC","Srdeèná vïaka za odporuèenie našich stránok!");
-define("_SECURITYCODEERROR","<b>ERROR:</b> The security code you wrote is incorrect...<br>Please write it exactly as given bellow:");
+define("_SEND", "Posla?");
+define("_FYOURNAME", "Vaï¿½e meno:");
+define("_FYOUREMAIL", "Vï¿½ e-mail:");
+define("_FFRIENDNAME", "Meno vï¿½ho priateï¿½a:");
+define("_FFRIENDEMAIL", "E-mail vï¿½ho priateï¿½a:");
+define("_HELLO", "Ahoj,");
+define("_YOURFRIEND", "Vï¿½ priateï¿½");
+define("_RECOMMEND", "Posla? odporuï¿½enie na tieto webstrï¿½nky priateï¿½ovi, znï¿½memu");
+define("_INTSITE", "Zaujimavï¿½ strï¿½nka:");
+define("_OURSITE", "povaï¿½uje naï¿½u strï¿½nku");
+define("_INTSENT", "za zaujï¿½mavï¿½ a rozhodol sa Vï¿½m ju posla?.");
+define("_FSITENAME", "Nï¿½zov webstrï¿½nky:");
+define("_FSITEURL", "URL webstrï¿½nky:");
+define("_FREFERENCE", "Odporuï¿½enie na naï¿½u strï¿½nku bola odoslanï¿½");
+define("_THANKSREC", "Srdeï¿½nï¿½ vï¿½aka za odporuï¿½enie naï¿½ich strï¿½nok!");
+define("_SECURITYCODEERROR", "<b>ERROR:</b> The security code you wrote is incorrect...<br>Please write it exactly as given bellow:");
 
-define("_SENDSITEERROR","<b>Error sending the recommendation...</b><br><br><b>ERROR:</b> One or more required fields are empty.<br>Please go back and correct the problem, then try again.");
-
-?>
+define("_SENDSITEERROR", "<b>Error sending the recommendation...</b><br><br><b>ERROR:</b> One or more required fields are empty.<br>Please go back and correct the problem, then try again.");

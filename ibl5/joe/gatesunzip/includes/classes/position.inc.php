@@ -17,23 +17,24 @@
  *
  ***************************************************************************/
 
-define (kPositionK, 10);
-define (kPositionP, 9);
+define(kPositionK, 10);
+define(kPositionP, 9);
 
-class position {
-  function option_list() {
-    $statement = "select * from position order by position_id";
-    $result = mysql_query($statement);
-    while ($row = mysql_fetch_array($result)) {
-      if ($row['position_id'] == $_GET['position_id']) {
-	$selected = " selected";
-      } else {
-	$selected = '';
-      }
-      $html .= '
-          <option value="'.$row['position_id'].'"'.$selected.'>'.$row['position_name'].'</option>';
+class position
+{
+    public function option_list()
+    {
+        $statement = "select * from position order by position_id";
+        $result = mysql_query($statement);
+        while ($row = mysql_fetch_array($result)) {
+            if ($row['position_id'] == $_GET['position_id']) {
+                $selected = " selected";
+            } else {
+                $selected = '';
+            }
+            $html .= '
+          <option value="' . $row['position_id'] . '"' . $selected . '>' . $row['position_name'] . '</option>';
+        }
+        return $html;
     }
-    return $html;
-  }
 }
-?>

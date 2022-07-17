@@ -850,7 +850,7 @@ function rungame($p1, $p2, $owner)
 
     echo "$playbyplay";
 
-    $querygetgameid = "SELECT * FROM nuke_one_on_one";
+    $querygetgameid = "SELECT * FROM ibl_one_on_one";
     $resultgetgameid = $db->sql_query($querygetgameid);
     $gameid = $db->sql_numrows($resultgetgameid) + 1;
 
@@ -868,7 +868,7 @@ function rungame($p1, $p2, $owner)
 
     $playbyplay2 = addslashes($playbyplay);
 
-    $queryinsertgame = "INSERT INTO nuke_one_on_one (gameid, playbyplay, winner, loser, winscore, lossscore, owner) VALUES ('$gameid', '$playbyplay2', '$winner', '$loser', '$winscore', '$lossscore', '$owner')";
+    $queryinsertgame = "INSERT INTO ibl_one_on_one (gameid, playbyplay, winner, loser, winscore, lossscore, owner) VALUES ('$gameid', '$playbyplay2', '$winner', '$loser', '$winscore', '$lossscore', '$owner')";
     $resultinsert = $db->sql_query($queryinsertgame);
 
     echo "GAME ID: $gameid";
@@ -899,7 +899,7 @@ function printgame($gameid)
 {
     global $db;
 
-    $querygetgameid = "SELECT * FROM nuke_one_on_one WHERE gameid = '$gameid'";
+    $querygetgameid = "SELECT * FROM ibl_one_on_one WHERE gameid = '$gameid'";
     $resultgetgameid = $db->sql_query($querygetgameid);
 
     $gametext = stripslashes($db->sql_result($resultgetgameid, 0, "playbyplay"));

@@ -3544,7 +3544,6 @@ function asg_results()
     }
     $sql2 = "SELECT * FROM " . $user_prefix . "_users WHERE username='$username'";
     $result2 = $db->sql_query($sql2);
-    $num = $db->sql_numrows($result2);
     $userinfo = $db->sql_fetchrow($result2);
     if (!$bypass) {
         cookiedecode($user);
@@ -3555,7 +3554,6 @@ function asg_results()
     $result2 = $db->sql_query($sql2);
     $num2 = $db->sql_numrows($result2);
     $userinfo = $db->sql_fetchrow($result2);
-    $teamlogo = stripslashes(check_html($userinfo['user_ibl_team'], "nohtml"));
     $user = stripslashes(check_html($userinfo['username'], "nohtml"));
     OpenTable();
 
@@ -3660,7 +3658,6 @@ function eoy_results()
     }
     $sql2 = "SELECT * FROM " . $user_prefix . "_users WHERE username='$username'";
     $result2 = $db->sql_query($sql2);
-    $num = $db->sql_numrows($result2);
     $userinfo = $db->sql_fetchrow($result2);
     if (!$bypass) {
         cookiedecode($user);
@@ -3671,7 +3668,6 @@ function eoy_results()
     $result2 = $db->sql_query($sql2);
     $num2 = $db->sql_numrows($result2);
     $userinfo = $db->sql_fetchrow($result2);
-    $teamlogo = stripslashes(check_html($userinfo['user_ibl_team'], "nohtml"));
     $user = stripslashes(check_html($userinfo['username'], "nohtml"));
     OpenTable();
 
@@ -3681,9 +3677,6 @@ function eoy_results()
         $query1 = "select sum(score) as votes,name from (select MVP_1 as name, 3 as score from ibl_EOY_Votes union all select MVP_2 as name, 2 as score from ibl_EOY_Votes union all select MVP_3 as name, 1 as score from ibl_EOY_Votes) as tbl group by name;";
         $result1 = $db->sql_query($query1);
         $num1 = $db->sql_numrows($result1);
-        $query15 = "select sum(score) as votes,name from (select MVP_1 as name, 1 as score from ibl_EOY_Votes) as tbl group by name;";
-        $result15 = $db->sql_query($query15);
-        $num15 = $db->sql_numrows($result15);
 
         $query2 = "select sum(score) as votes,name from (select Six_1 as name, 3 as score from ibl_EOY_Votes union all select Six_2 as name, 2 as score from ibl_EOY_Votes union all select Six_3 as name, 1 as score from ibl_EOY_Votes) as tbl group by name;";
         $result2 = $db->sql_query($query2);

@@ -2072,7 +2072,7 @@ function showpage($pid, $spec)
         printf('%01.1f', $car_avgf);
         echo "</center></td><td><center>";
         printf('%01.1f', $car_avgp);
-        echo "</center></td></tr></table>";
+        echo "</center></td></tr>";
 
         // END PAST STATS GRAB
     }
@@ -2210,7 +2210,7 @@ function showpage($pid, $spec)
             <td><center>$car_blk</center></td>
             <td><center>$car_pf</center></td>
             <td><center>$car_pts</td>
-        </tr></table>";
+        </tr>";
     }
 
     // CAREER PLAYOFF AVERAGES
@@ -2380,7 +2380,7 @@ function showpage($pid, $spec)
         printf('%01.1f', $car_avgf);
         echo "</center></td><td><center>";
         printf('%01.1f', $car_avgp);
-        echo "</center></td></tr></table>";
+        echo "</center></td></tr>";
 
         // END PAST PLAYOFF STATS GRAB
     }
@@ -2517,7 +2517,7 @@ function showpage($pid, $spec)
             <td><center>$car_blk</center></td>
             <td><center>$car_pf</center></td>
             <td><center>$car_pts</td>
-        </tr></table>";
+        </tr>";
     }
 
     // CAREER H.E.A.T. AVERAGES
@@ -2685,7 +2685,7 @@ function showpage($pid, $spec)
         printf('%01.1f', $car_avgf);
         echo "</center></td><td><center>";
         printf('%01.1f', $car_avgp);
-        echo "</center></td></tr></table>";
+        echo "</center></td></tr>";
 
         // END PAST H.E.A.T. STATS GRAB
     }
@@ -3096,7 +3096,6 @@ function showpage($pid, $spec)
                     <td class=\"gamelog\">" . $row['gamePF'] . "</td>
                 </tr>";
         }
-        echo '</table>';
     }
 
     echo "</td></tr></table></table>";

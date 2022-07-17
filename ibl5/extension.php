@@ -17,10 +17,10 @@ $Offer_3 = $_POST['offeryear3'];
 $Offer_4 = $_POST['offeryear4'];
 $Offer_5 = $_POST['offeryear5'];
 
-$Offer_max_increase = round($Offer_1 * 0.1,0);
+$Offer_max_increase = round($Offer_1 * 0.1, 0);
 
 if ($Bird > 2) {
-    $Offer_max_increase = round($Offer_1 * 0.125,0);
+    $Offer_max_increase = round($Offer_1 * 0.125, 0);
 }
 
 //-----GRAB TEAM INFO AND STATS------
@@ -150,8 +150,8 @@ if ($nooffer == 0) {
 
     // ==== MARK THE EXTENSION AS USED FOR THIS CHUNK ====
 
-    $querychunk="UPDATE nuke_ibl_team_info SET Used_Extension_This_Chunk = 1 WHERE team_name = '$Team_Name'";
-    $resultchunk=$db->sql_query($querychunk);
+    $querychunk = "UPDATE nuke_ibl_team_info SET Used_Extension_This_Chunk = 1 WHERE team_name = '$Team_Name'";
+    $resultchunk = $db->sql_query($querychunk);
 
     echo "Message from the commissioner's office: <font color=#0000cc>Your offer is legal, and is therefore an extension attempt.  Please note that you may make no further extension attempts until after the next sim.</font></br>";
 
@@ -191,8 +191,8 @@ if ($nooffer == 0) {
     if ($Offer_Value < $Demands_Value) {
         $Offer_in_Millions = $Offer_Total / 100;
 
-        $storytitle = $Player_Name." turns down an extension offer from the ".$Team_Name;
-        $hometext = $Player_Name." today rejected a contract extension offer from the ".$Team_Name." worth $Offer_in_Millions million dollars over ".$Offer_Years." years.";
+        $storytitle = $Player_Name . " turns down an extension offer from the " . $Team_Name;
+        $hometext = $Player_Name . " today rejected a contract extension offer from the " . $Team_Name . " worth $Offer_in_Millions million dollars over " . $Offer_Years . " years.";
 
         Discord::postToChannel('#extensions', $hometext);
 
@@ -201,11 +201,10 @@ if ($nooffer == 0) {
 
         $recipient = 'ibldepthcharts@gmail.com';
         $emailsubject = "Unsuccessful Extension - " . $Player_Name;
-        $filetext = $Player_Name . " refuses an extension offer from the " . $Team_Name . " of " . $Offer_Total . " for " . $Offer_Years." years.
+        $filetext = $Player_Name . " refuses an extension offer from the " . $Team_Name . " of " . $Offer_Total . " for " . $Offer_Years . " years.
         For reference purposes: the offer was " . $Offer_1 . " " . $Offer_2 . " " . $Offer_3 . " " . $Offer_4 . " " . $Offer_5 . " and the offer value was thus considered to be " . $Offer_Value . ".";
 
-        if (mail($recipient, $emailsubject, $filetext, "From: rejected-extensions@iblhoops.net"))
-        {
+        if (mail($recipient, $emailsubject, $filetext, "From: rejected-extensions@iblhoops.net")) {
         }
 
         $timestamp = date('Y-m-d H:i:s', time());
@@ -241,7 +240,7 @@ if ($nooffer == 0) {
 
         $recipient = 'ibldepthcharts@gmail.com';
         $emailsubject = "Successful Extension - " . $Player_Name;
-        $filetext = $Player_Name." accepts an extension offer from the " . $Team_Name . " of " . $Offer_Total . " for " . $Offer_Years . " years.
+        $filetext = $Player_Name . " accepts an extension offer from the " . $Team_Name . " of " . $Offer_Total . " for " . $Offer_Years . " years.
             For reference purposes: the offer was " . $Offer_1 . " " . $Offer_2 . " " . $Offer_3 . " " . $Offer_4 . " " . $Offer_5 . " and the offer value was thus considered to be " . $Offer_Value . "; the player wanted an offer with a value of " . $Demands_Value;
 
         if (mail($recipient, $emailsubject, $filetext, "From: accepted-extensions@iblhoops.net")) {
@@ -299,5 +298,3 @@ if ($nooffer == 0) {
 } else {
     echo "<font color=#ff0000>Your extension attempt was not legal and will not be recorded as an attempt. If you have not yet successfully extended a player this season, and have not yet made a successful offer this Chunk, you may press the \"Back\" Button on your browser to try again.</font>";
 }
-
-?>

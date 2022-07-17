@@ -17,30 +17,26 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_EMAIL","อีเมล์");
-define("_SAVECHANGES","บันทึกการเปลี่ยนแปลง");
-define("_SCORE","คะแนน:");
-define("_PRODUCTTITLE","เรื่อง");
-define("_RELATEDLINK","ลิงก์ที่เกี่ยวข้อง");
-define("_LINKTITLE","ชื่อลิงก์");
-define("_REVIEWER","ผู้วิจารณ์");
-define("_REVIEWID","รหัสบทวิจารณ์");
-define("_REVIEWS","บทวิจารณ์");
-define("_DATE","วันที่");
-define("_REVADMIN","จัดการบทวิจารณ์");
-define("_REVTITLE","บทวิจารณ์");
-define("_REVDESC","เป็นหน้าที่ให้วิจารณ์ในส่วนต่างๆได้อย่างเสรี");
-define("_REVWAITING","บทวิจารณ์ที่อยู่ระหว่างการตรวจสอบ");
-define("_REVIMGINFO","เก็บรูปขนาด 150*150 ใน images/reviews");
-define("_TEXT","ข้อความ");
-define("_IMAGE","รูป");
-define("_NOREVIEW2ADD","ไม่มีบทวิจารณ์ที่จะเพิ่ม");
-define("_ADDREVIEW","เพิ่มบทวิจารณ์");
-define("_CLICK2ADDREVIEW","คลิ๊กที่นี่เพื่อเขียนบทวิจารณ์");
-define("_DELMODREVIEW","ลบ/แก้ไขบทวิจารณ์");
-define("_MODREVINFO","คุณสามารถลบ/แก้ไข บทวิจารณ์โดยเปิด <a href=\"modules.php?op=modload&amp;name=Reviews\">ที่นี่</a> ด้วยผู้ดูแลระบบ");
-define("_LANGUAGE","ภาษา");
-
-
-?>
+define("_EMAIL", "๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ");
+define("_SAVECHANGES", "๏ฟฝัน๏ฟฝึก๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝยน๏ฟฝลง");
+define("_SCORE", "๏ฟฝ๏ฟฝแนน:");
+define("_PRODUCTTITLE", "๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝอง");
+define("_RELATEDLINK", "๏ฟฝิง๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝวข๏ฟฝอง");
+define("_LINKTITLE", "๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝิง๏ฟฝ๏ฟฝ");
+define("_REVIEWER", "๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝิจ๏ฟฝรณ๏ฟฝ");
+define("_REVIEWID", "๏ฟฝ๏ฟฝ๏ฟฝสบ๏ฟฝ๏ฟฝิจ๏ฟฝรณ๏ฟฝ");
+define("_REVIEWS", "๏ฟฝ๏ฟฝ๏ฟฝิจ๏ฟฝรณ๏ฟฝ");
+define("_DATE", "๏ฟฝัน๏ฟฝ๏ฟฝ๏ฟฝ");
+define("_REVADMIN", "๏ฟฝัด๏ฟฝ๏ฟฝรบ๏ฟฝ๏ฟฝิจ๏ฟฝรณ๏ฟฝ");
+define("_REVTITLE", "๏ฟฝ๏ฟฝ๏ฟฝิจ๏ฟฝรณ๏ฟฝ");
+define("_REVDESC", "๏ฟฝ๏ฟฝหน๏ฟฝาท๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝิจ๏ฟฝรณ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝวน๏ฟฝ๏ฟฝาง๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝาง๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ");
+define("_REVWAITING", "๏ฟฝ๏ฟฝ๏ฟฝิจ๏ฟฝรณ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝาง๏ฟฝ๏ฟฝรต๏ฟฝวจ๏ฟฝอบ");
+define("_REVIMGINFO", "๏ฟฝ๏ฟฝ๏ฟฝูป๏ฟฝ๏ฟฝาด 150*150 ๏ฟฝ images/reviews");
+define("_TEXT", "๏ฟฝ๏ฟฝอค๏ฟฝ๏ฟฝ๏ฟฝ");
+define("_IMAGE", "๏ฟฝูป");
+define("_NOREVIEW2ADD", "๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝีบ๏ฟฝ๏ฟฝิจ๏ฟฝรณ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ");
+define("_ADDREVIEW", "๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝิจ๏ฟฝรณ๏ฟฝ");
+define("_CLICK2ADDREVIEW", "๏ฟฝ๏ฟฝ๏ฟฝ๊กท๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝยน๏ฟฝ๏ฟฝ๏ฟฝิจ๏ฟฝรณ๏ฟฝ");
+define("_DELMODREVIEW", "ลบ/๏ฟฝ๏ฟฝไขบ๏ฟฝ๏ฟฝิจ๏ฟฝรณ๏ฟฝ");
+define("_MODREVINFO", "๏ฟฝุณ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝรถลบ/๏ฟฝ๏ฟฝ๏ฟฝ ๏ฟฝ๏ฟฝ๏ฟฝิจ๏ฟฝรณ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝิด <a href=\"modules.php?op=modload&amp;name=Reviews\">๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ</a> ๏ฟฝ๏ฟฝ๏ฟฝยผ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝะบ๏ฟฝ");
+define("_LANGUAGE", "๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ");

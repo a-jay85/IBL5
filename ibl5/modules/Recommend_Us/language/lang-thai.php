@@ -17,22 +17,20 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_SEND","ส่ง");
-define("_FYOURNAME","ชื่อคุณ:");
-define("_FYOUREMAIL","อีเมล์คุณ:");
-define("_FFRIENDNAME","ชื่อเพื่อนคุณ:");
-define("_FFRIENDEMAIL","อีเมล์เพื่อนคุณ:");
-define("_HELLO","สวัสดี");
-define("_YOURFRIEND","คุณ");
-define("_RECOMMEND","แนะนำบอกต่อ");
-define("_INTSITE","เว็บที่น่าสนใจ:");
-define("_OURSITE","พิจารณาเห็นว่าเว็บของเรา");
-define("_INTSENT","น่าสนใจและต้องการส่งถึงคุณ");
-define("_FSITENAME","ชื่อเว็บ :");
-define("_FSITEURL"," URL:");
-define("_FREFERENCE","ข้อมูลของเว็บไซต์นี้ได้ถูกส่งไปยัง");
-define("_THANKSREC","ขอขอบคุณที่แนะนำเรา!");
-define("_SECURITYCODEERROR","<b>ERROR:</b> The security code you wrote is incorrect...<br>Please write it exactly as given bellow:");
-define("_SENDSITEERROR","<b>Error sending the recommendation...</b><br><br><b>ERROR:</b> One or more required fields are empty.<br>Please go back and correct the problem, then try again.");
-
-?>
+define("_SEND", "๏ฟฝ๏ฟฝ");
+define("_FYOURNAME", "๏ฟฝ๏ฟฝ๏ฟฝอคุณ:");
+define("_FYOUREMAIL", "๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝุณ:");
+define("_FFRIENDNAME", "๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝอน๏ฟฝุณ:");
+define("_FFRIENDEMAIL", "๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝอน๏ฟฝุณ:");
+define("_HELLO", "๏ฟฝ๏ฟฝ๏ฟฝสด๏ฟฝ");
+define("_YOURFRIEND", "๏ฟฝุณ");
+define("_RECOMMEND", "๏ฟฝะนำบอก๏ฟฝ๏ฟฝ๏ฟฝ");
+define("_INTSITE", "๏ฟฝ๏ฟฝ็บท๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝสน๏ฟฝ:");
+define("_OURSITE", "๏ฟฝิจ๏ฟฝรณ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ็บของ๏ฟฝ๏ฟฝ๏ฟฝ");
+define("_INTSENT", "๏ฟฝ๏ฟฝ๏ฟฝสน๏ฟฝ๏ฟฝ๏ฟฝะต๏ฟฝอง๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ่งถึง๏ฟฝุณ");
+define("_FSITENAME", "๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ :");
+define("_FSITEURL", " URL:");
+define("_FREFERENCE", "๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝลของ๏ฟฝ๏ฟฝ๏ฟฝไซต๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝูก๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝัง");
+define("_THANKSREC", "๏ฟฝอขอบ๏ฟฝุณ๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝะน๏ฟฝ๏ฟฝ๏ฟฝ๏ฟฝ!");
+define("_SECURITYCODEERROR", "<b>ERROR:</b> The security code you wrote is incorrect...<br>Please write it exactly as given bellow:");
+define("_SENDSITEERROR", "<b>Error sending the recommendation...</b><br><br><b>ERROR:</b> One or more required fields are empty.<br>Please go back and correct the problem, then try again.");

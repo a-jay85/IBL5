@@ -17,18 +17,16 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PREVIOUS","Previous Page");
-define("_NEXT","Next Page");
-define("_PAGE","Page");
-define("_DEACTIVATE","Deactivate");
-define("_ACTIVATE","Activate");
-define("_PUBLISHEDON","Published on");
-define("_PAGESLIST","Pages List");
-define("_LISTOFCONTENT","List of available content in");
-define("_YOURADMINLIST","You're Administrator: following is the list of Inactive pages:");
-define("_COPYRIGHT","Copyright &copy; by");
-define("_COPYRIGHT2","All Right Reserved.");
-define("_CONTENTCATEGORIES","Available Content Categories");
-define("_NONCLASSCONT","Non Categorized Content");
-
-?>
+define("_PREVIOUS", "Previous Page");
+define("_NEXT", "Next Page");
+define("_PAGE", "Page");
+define("_DEACTIVATE", "Deactivate");
+define("_ACTIVATE", "Activate");
+define("_PUBLISHEDON", "Published on");
+define("_PAGESLIST", "Pages List");
+define("_LISTOFCONTENT", "List of available content in");
+define("_YOURADMINLIST", "You're Administrator: following is the list of Inactive pages:");
+define("_COPYRIGHT", "Copyright &copy; by");
+define("_COPYRIGHT2", "All Right Reserved.");
+define("_CONTENTCATEGORIES", "Available Content Categories");
+define("_NONCLASSCONT", "Non Categorized Content");

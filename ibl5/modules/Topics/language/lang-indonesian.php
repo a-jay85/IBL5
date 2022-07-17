@@ -17,7 +17,5 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_ACTIVETOPICS","Topik Yang Aktif Saat Ini");
-define("_CLICK2LIST","Klik untuk melihat berita yang ada di topik ini");
-
-?>
+define("_ACTIVETOPICS", "Topik Yang Aktif Saat Ini");
+define("_CLICK2LIST", "Klik untuk melihat berita yang ada di topik ini");

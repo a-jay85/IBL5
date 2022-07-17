@@ -17,41 +17,37 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_SEND","¶Ç°e");
-define("_FUNCTIONS","¥\¯à¿ï¶µ");
-define("_YES","¬O");
-define("_NO","§_");
-define("_SAVECHANGES","Àx¦s§ó§ï");
-define("_PAGEBREAK","±z¥i¥H¥Î²Å¸¹ <b>[--pagebreak--]</b> ¤Á³Î¤å³¹¡A§@¦h­¶Åã¥Ü");
-define("_DESCRIPTION","´y­z");
-define("_TO","µ¹");
-define("_TITLE","¼ÐÃD");
-define("_ACTIVE","Åã¥Ü");
-define("_DEACTIVATE","ÁôÂÃ");
-define("_INACTIVE","ÁôÂÃ");
-define("_ACTIVATE","Åã¥Ü");
-define("_ADD","·s¼W");
-define("_LANGUAGE","»y¨¥");
-define("_ENCYCLOPEDIA","¦Ê¬ì¥þ®Ñ/ºëµØ°Ï");
-define("_ENCYCLOPEDIAMANAGER","¦Ê¬ì¥þ®Ñ ºÞ²z");
-define("_DELENCYCLOPEDIA","§R°£¦Ê¬ì¥þ®Ñ");
-define("_DELENCYCONTWARNING","±z½T©w­n§R°£³o­Ó¦Ê¬ì¥þ®Ñ¤Î©Ò¦³¸Ì­±ªº¤º®e?");
-define("_DELENCYCLOPEDIATEXT","§R°£¦Ê¬ì¥þ®Ñ¶µ¥Ø");
-define("_DELENCYTEXTWARNING","±z½T©w­n§R°£³o­Ó¶µ¥Ø¶Ü?");
-define("_CURRENTSTATUS","¥Ø«eª¬ºA");
-define("_ACTIVATEPAGE","±Ò°Ê³o­Ó¶µ¥Ø?");
-define("_TERMS","¶µ¥Ø");
-define("_ADDNEWENCYCLOPEDIA","¼W¥[·sªº¦Ê¬ì¥þ®Ñ");
-define("_ADDNEWENCYTERM"," ¼W¥[·sªº¦Ê¬ì¥þ®Ñ¶µ¥Ø");
-define("_TERMTEXT","¶µ¥Ø¤º®e");
-define("_MOVETERMS","²¾°Ê¶µ¥Ø");
-define("_MOVEALLTERMSFROM","²¾°Ê©Ò¦³¶µ¥Ø¦Û");
-define("_EDITENCYCLOPEDIA","½s¿è¦Ê¬ì¥þ®Ñ");
-define("_ENCYTERMSEDIT","¦Ê¬ì¥þ®Ñ¶µ¥Ø½s¿è");
-define("_SELECTONETERM","½Ð¥Ñ¥H¤Uªº¦Cªí¤¤¿ï¾Ü¤@­Ó¶µ¥Ø:");
-define("_NOCONTENTFORLETTER","¹ï¤£°_¡A³o­Ó¦r¥À¤¤¨S¦³¥ô¦ó¤º®e¡C");
-define("_CHANGETOENCY","Change to Encyclopedia");
-
-
-?>
+define("_SEND", "ï¿½Ç°e");
+define("_FUNCTIONS", "ï¿½\ï¿½ï¿½ï¶µ");
+define("_YES", "ï¿½O");
+define("_NO", "ï¿½_");
+define("_SAVECHANGES", "ï¿½xï¿½sï¿½ï¿½ï¿½");
+define("_PAGEBREAK", "ï¿½zï¿½iï¿½Hï¿½Î²Å¸ï¿½ <b>[--pagebreak--]</b> ï¿½ï¿½ï¿½Î¤å³¹ï¿½Aï¿½@ï¿½hï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_DESCRIPTION", "ï¿½yï¿½z");
+define("_TO", "ï¿½ï¿½");
+define("_TITLE", "ï¿½ï¿½ï¿½D");
+define("_ACTIVE", "ï¿½ï¿½ï¿½");
+define("_DEACTIVATE", "ï¿½ï¿½ï¿½ï¿½");
+define("_INACTIVE", "ï¿½ï¿½ï¿½ï¿½");
+define("_ACTIVATE", "ï¿½ï¿½ï¿½");
+define("_ADD", "ï¿½sï¿½W");
+define("_LANGUAGE", "ï¿½yï¿½ï¿½");
+define("_ENCYCLOPEDIA", "ï¿½Ê¬ï¿½ï¿½ï¿½ï¿½/ï¿½ï¿½Ø°ï¿½");
+define("_ENCYCLOPEDIAMANAGER", "ï¿½Ê¬ï¿½ï¿½ï¿½ï¿½ ï¿½Þ²z");
+define("_DELENCYCLOPEDIA", "ï¿½Rï¿½ï¿½ï¿½Ê¬ï¿½ï¿½ï¿½ï¿½");
+define("_DELENCYCONTWARNING", "ï¿½zï¿½Tï¿½wï¿½nï¿½Rï¿½ï¿½ï¿½oï¿½Ó¦Ê¬ï¿½ï¿½ï¿½Ñ¤Î©Ò¦ï¿½ï¿½Ì­ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½e?");
+define("_DELENCYCLOPEDIATEXT", "ï¿½Rï¿½ï¿½ï¿½Ê¬ï¿½ï¿½ï¿½Ñ¶ï¿½ï¿½ï¿½");
+define("_DELENCYTEXTWARNING", "ï¿½zï¿½Tï¿½wï¿½nï¿½Rï¿½ï¿½ï¿½oï¿½Ó¶ï¿½ï¿½Ø¶ï¿½?");
+define("_CURRENTSTATUS", "ï¿½Ø«eï¿½ï¿½ï¿½A");
+define("_ACTIVATEPAGE", "ï¿½Ò°Ê³oï¿½Ó¶ï¿½ï¿½ï¿½?");
+define("_TERMS", "ï¿½ï¿½ï¿½ï¿½");
+define("_ADDNEWENCYCLOPEDIA", "ï¿½Wï¿½[ï¿½sï¿½ï¿½ï¿½Ê¬ï¿½ï¿½ï¿½ï¿½");
+define("_ADDNEWENCYTERM", " ï¿½Wï¿½[ï¿½sï¿½ï¿½ï¿½Ê¬ï¿½ï¿½ï¿½Ñ¶ï¿½ï¿½ï¿½");
+define("_TERMTEXT", "ï¿½ï¿½ï¿½Ø¤ï¿½ï¿½e");
+define("_MOVETERMS", "ï¿½ï¿½ï¿½Ê¶ï¿½ï¿½ï¿½");
+define("_MOVEALLTERMSFROM", "ï¿½ï¿½ï¿½Ê©Ò¦ï¿½ï¿½ï¿½ï¿½Ø¦ï¿½");
+define("_EDITENCYCLOPEDIA", "ï¿½sï¿½ï¿½Ê¬ï¿½ï¿½ï¿½ï¿½");
+define("_ENCYTERMSEDIT", "ï¿½Ê¬ï¿½ï¿½ï¿½Ñ¶ï¿½ï¿½Ø½sï¿½ï¿½");
+define("_SELECTONETERM", "ï¿½Ð¥Ñ¥Hï¿½Uï¿½ï¿½ï¿½Cï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ü¤@ï¿½Ó¶ï¿½ï¿½ï¿½:");
+define("_NOCONTENTFORLETTER", "ï¿½ï¤£ï¿½_ï¿½Aï¿½oï¿½Ó¦rï¿½ï¿½ï¿½ï¿½ï¿½Sï¿½ï¿½ï¿½ï¿½ï¿½ó¤º®eï¿½C");
+define("_CHANGETOENCY", "Change to Encyclopedia");

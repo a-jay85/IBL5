@@ -17,18 +17,16 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PREVIOUS","Eelmine leht");
-define("_NEXT","Järgmine leht");
-define("_PAGE","Leht");
-define("_DEACTIVATE","Deaktiveeri");
-define("_ACTIVATE","Aktiveeri");
-define("_PUBLISHEDON","Avalikustatud");
-define("_PAGESLIST","Lehtede nimekiri");
-define("_LISTOFCONTENT","Olemasoleva sisu nimekiri");
-define("_YOURADMINLIST","Administraator: järgnev on nimekiri aktiviseerimatta lehtedest:");
-define("_COPYRIGHT","Autoriõigused &copy; by");
-define("_COPYRIGHT2","Kõik õigused reserveeritud.");
-define("_CONTENTCATEGORIES","Kategooriad");
-define("_NONCLASSCONT","Ilma kategooriata tekstid");
-
-?>
+define("_PREVIOUS", "Eelmine leht");
+define("_NEXT", "Jï¿½rgmine leht");
+define("_PAGE", "Leht");
+define("_DEACTIVATE", "Deaktiveeri");
+define("_ACTIVATE", "Aktiveeri");
+define("_PUBLISHEDON", "Avalikustatud");
+define("_PAGESLIST", "Lehtede nimekiri");
+define("_LISTOFCONTENT", "Olemasoleva sisu nimekiri");
+define("_YOURADMINLIST", "Administraator: jï¿½rgnev on nimekiri aktiviseerimatta lehtedest:");
+define("_COPYRIGHT", "Autoriï¿½igused &copy; by");
+define("_COPYRIGHT2", "Kï¿½ik ï¿½igused reserveeritud.");
+define("_CONTENTCATEGORIES", "Kategooriad");
+define("_NONCLASSCONT", "Ilma kategooriata tekstid");

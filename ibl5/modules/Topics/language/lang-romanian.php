@@ -17,11 +17,9 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_ACTIVETOPICS","Topic-uri active momentan");
-define("_CLICK2LIST","Click pentru a lista toate articolele din acest topic");
-define("_TOTNEWS","Total News");
-define("_TOTREADS","Total Reads");
-define("_MORE","More");
-define("_NONEWSYET","...There aren't any news yet for this topic...");
-
-?>
+define("_ACTIVETOPICS", "Topic-uri active momentan");
+define("_CLICK2LIST", "Click pentru a lista toate articolele din acest topic");
+define("_TOTNEWS", "Total News");
+define("_TOTREADS", "Total Reads");
+define("_MORE", "More");
+define("_NONEWSYET", "...There aren't any news yet for this topic...");

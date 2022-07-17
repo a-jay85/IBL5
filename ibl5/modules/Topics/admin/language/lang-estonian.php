@@ -17,30 +17,26 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_CURRENTTOPICS","Praegune aktiivsed teemad");
-define("_CLICK2EDIT","Vajuta teemale et redigeerida");
-define("_ADDATOPIC","Lisa uus teema");
-define("_TOPICNAME","Teema nimi");
-define("_TOPICNAME1","(lihtsalt nimi ilma tühikuteta - max: 20 tähemärki)");
-define("_TOPICNAME2","(näiteks: hobid&tegevused)");
-define("_TOPICTEXT","Teema tekst");
-define("_TOPICTEXT1","(täielik teema tekst või kirjeldus  - max: 40 tähemärki)");
-define("_TOPICTEXT2","(näiteks: Tegevus ja huvialad)");
-define("_TOPICIMAGE","Teema pilt");
-define("_ADDTOPIC","Lisa teema");
-define("_EDITTOPIC","Muuda teemat");
-define("_ADDRELATED","Lisa seotud linke");
-define("_ACTIVERELATEDLINKS","Aktiivsed seotud lingid");
-define("_SITENAME","Lehe nimi");
-define("_NORELATED","Selles teemas pole seotud linke");
-define("_EDITRELATED","Redigeeri seotud linki");
-define("_YES","Jah");
-define("_NO","Ei");
-define("_TOPICSMANAGER","Teemade adminn");
-define("_DELETETOPIC","Kustuta teema");
-define("_TOPICDELSURE","Oled sa kindel, et soovid kustutada teema?");
-define("_TOPICDELSURE1","See kustutab ühtlasi KÕIK jutud ja kommentarid!");
-
-
-?>
+define("_CURRENTTOPICS", "Praegune aktiivsed teemad");
+define("_CLICK2EDIT", "Vajuta teemale et redigeerida");
+define("_ADDATOPIC", "Lisa uus teema");
+define("_TOPICNAME", "Teema nimi");
+define("_TOPICNAME1", "(lihtsalt nimi ilma tï¿½hikuteta - max: 20 tï¿½hemï¿½rki)");
+define("_TOPICNAME2", "(nï¿½iteks: hobid&tegevused)");
+define("_TOPICTEXT", "Teema tekst");
+define("_TOPICTEXT1", "(tï¿½ielik teema tekst vï¿½i kirjeldus  - max: 40 tï¿½hemï¿½rki)");
+define("_TOPICTEXT2", "(nï¿½iteks: Tegevus ja huvialad)");
+define("_TOPICIMAGE", "Teema pilt");
+define("_ADDTOPIC", "Lisa teema");
+define("_EDITTOPIC", "Muuda teemat");
+define("_ADDRELATED", "Lisa seotud linke");
+define("_ACTIVERELATEDLINKS", "Aktiivsed seotud lingid");
+define("_SITENAME", "Lehe nimi");
+define("_NORELATED", "Selles teemas pole seotud linke");
+define("_EDITRELATED", "Redigeeri seotud linki");
+define("_YES", "Jah");
+define("_NO", "Ei");
+define("_TOPICSMANAGER", "Teemade adminn");
+define("_DELETETOPIC", "Kustuta teema");
+define("_TOPICDELSURE", "Oled sa kindel, et soovid kustutada teema?");
+define("_TOPICDELSURE1", "See kustutab ï¿½htlasi Kï¿½IK jutud ja kommentarid!");

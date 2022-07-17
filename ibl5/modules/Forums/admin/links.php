@@ -24,16 +24,13 @@
 /* Forum admin files for PHP-Nuke 7.5 by chatserv                       */
 /************************************************************************/
 
-if ( !defined('ADMIN_FILE') )
-{
-	die("Illegal File Access");
+if (!defined('ADMIN_FILE')) {
+    die("Illegal File Access");
 }
 global $admin_file;
-    adminmenu("".$admin_file.".php?op=forums", "Forums", "forums.gif");
+adminmenu("" . $admin_file . ".php?op=forums", "Forums", "forums.gif");
 
 # $Log: links.php,v $
 # Revision 1.1  2004/10/05 18:04:51  chatserv
 # Initial CVS Addition
 #
-
-?>

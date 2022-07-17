@@ -12,7 +12,7 @@
 /* ICQ:	155265588                                                     */
 /* Webside:	www.Sjove-Film.dk - HitsMaskinen.dk - FilmCentralen.dk        */
 /*                                                                        */
-/* Hvis de finder fejl må og skal de sende en e-mail eller icq til mig!   */
+/* Hvis de finder fejl mï¿½ og skal de sende en e-mail eller icq til mig!   */
 /**************************************************************************/
 
 define("_EMAIL","E-mailadresse");
@@ -23,13 +23,13 @@ define("_CHECKALL","Marker alle");
 define("_FROM","Fra");
 define("_DATE","Dato");
 define("_DONTHAVEMESSAGES","Du har ingen beskeder");
-define("_NOTREAD","Ikke læst");
+define("_NOTREAD","Ikke lï¿½st");
 define("_MSGSTATUS","Beskedstatus");
 define("_PRIVATEMESSAGE","Private beskeder");
 define("_INDEX","Indeks");
 define("_SENT","Sendt");
 define("_PREVIOUSMESSAGE","Forrige besked");
-define("_NEXTMESSAGE","Næste besked");
+define("_NEXTMESSAGE","Nï¿½ste besked");
 define("_PROFILE","Profil");
 define("_ABOUTPOSTING","Om at poste");
 define("_ALLREGCANPOST","Alle registrede brugere kan sende private bekseder");
@@ -37,7 +37,7 @@ define("_TO","Til");
 define("_MESSAGEICON","Beskedikon");
 define("_MESSAGE","Besked");
 define("_HTML","HTML");
-define("_PMON","Tænd");
+define("_PMON","Tï¿½nd");
 define("_PMOFF","Sluk");
 define("_BBCODE","BBCode");
 define("_WROTE","skrevet");
@@ -50,9 +50,9 @@ define("_CANCELSEND","Fortryd send");
 define("_CLEAR","Ryd");
 define("_SUBMIT","Send");
 define("_USERNOTINDB","Den valgte bruger eksisterer ikke i vores database.");
-define("_CHECKNAMEANDTRY","Kontroller navnet og prøv igen.");
+define("_CHECKNAMEANDTRY","Kontroller navnet og prï¿½v igen.");
 define("_MSGPOSTED","Din besked er sendt.");
-define("_RETURNTOPMSG","Klik her for at genindlæse dine private beskeder.");
+define("_RETURNTOPMSG","Klik her for at genindlï¿½se dine private beskeder.");
 define("_MSGDELETED","Dine beskeder er blevet slettet.");
 define("_BBGO","Go!");
 define("_BBNEWPMSG","Ny(e) meddelse(r)");
@@ -62,17 +62,17 @@ define("_BBEMPTYPMSG","De har ikke nogen meddelser");
 define("_BBLOGIN","Log ind for at tjekke deres private meddelser");
 define("_BBPMSG","Privat meddelse");
 define("_BBINBOX","Indbakke");
-define("_BBSELECTFORUM","Vælg et forum");
+define("_BBSELECTFORUM","Vï¿½lg et forum");
 define("_BBNOFORUM","Ikke flere fora");
-define("_BBBANNED","De har ikke lov til at komme ind, desværre...");
-define("_CLICKSMILEBUTTONS","Klik på et smilie for at sætte det ind i Deres meddelse:");
-define("_CLICKCODEBUTTONS","Klik på en af de følgende klapper for at sætte BBCode ind i deres meddelse:");
+define("_BBBANNED","De har ikke lov til at komme ind, desvï¿½rre...");
+define("_CLICKSMILEBUTTONS","Klik pï¿½ et smilie for at sï¿½tte det ind i Deres meddelse:");
+define("_CLICKCODEBUTTONS","Klik pï¿½ en af de fï¿½lgende klapper for at sï¿½tte BBCode ind i deres meddelse:");
 define("_PRIVMSGERROR","Privat meddelse fejl!");
-define("_USERDOESNTEXIST","Desværre, den valgte bruger eksisterer ikke i vores database")
+define("_USERDOESNTEXIST","Desvï¿½rre, den valgte bruger eksisterer ikke i vores database")
 define("_DELETESELECTED","Slet valgte");
 define("_SENDNEWMSG","Send ny meddelse");
 define("_REPLY","Svar");
 define("_NOSUBJECT","Der er intet emne til Deres meddelse.");
-define("_NOMESSAGE","Der er ingen meddelse. Vær venlig at skrive én!");
+define("_NOMESSAGE","Der er ingen meddelse. Vï¿½r venlig at skrive ï¿½n!");
 
 ?>

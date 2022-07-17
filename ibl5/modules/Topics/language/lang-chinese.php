@@ -17,12 +17,9 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_ACTIVETOPICS","¥Ø«eªº·s»D¥DÃD");
-define("_CLICK2LIST","½ÐÂI¿ï·s»D¥DÃD¡Aª½±µ¤@Äý¤å³¹");
-define("_TOTNEWS","Á`¤å³¹¼Æ");
-define("_TOTREADS","Á`¾\Åª¼Æ");
-define("_MORE","¹î¬Ý§ó¦h");
-define("_NONEWSYET","...¥Ø«e¥»¥DÃD¤¤©|µL¥ô¦ó¤å³¹...");
-
-?>
+define("_ACTIVETOPICS", "ï¿½Ø«eï¿½ï¿½ï¿½sï¿½Dï¿½Dï¿½D");
+define("_CLICK2LIST", "ï¿½ï¿½ï¿½Iï¿½ï¿½sï¿½Dï¿½Dï¿½Dï¿½Aï¿½ï¿½ï¿½ï¿½ï¿½@ï¿½ï¿½ï¿½å³¹");
+define("_TOTNEWS", "ï¿½`ï¿½å³¹ï¿½ï¿½");
+define("_TOTREADS", "ï¿½`ï¿½\Åªï¿½ï¿½");
+define("_MORE", "ï¿½ï¿½Ý§ï¿½h");
+define("_NONEWSYET", "...ï¿½Ø«eï¿½ï¿½ï¿½Dï¿½Dï¿½ï¿½ï¿½|ï¿½Lï¿½ï¿½ï¿½ï¿½å³¹...");

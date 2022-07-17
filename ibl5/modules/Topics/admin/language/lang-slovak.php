@@ -17,30 +17,26 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_CURRENTTOPICS","Current Active Topics");
-define("_CLICK2EDIT","Click on Topic to Edit");
-define("_ADDATOPIC","Add a New Topic");
-define("_TOPICNAME","Topic Name");
-define("_TOPICNAME1","(just a name without spaces - max: 20 characters)");
-define("_TOPICNAME2","(for example: gamesandhobbies)");
-define("_TOPICTEXT","Topic Text");
-define("_TOPICTEXT1","(the full topic text or description - max: 40 characters)");
-define("_TOPICTEXT2","(for example: Games and Hobbies)");
-define("_TOPICIMAGE","Topic Image");
-define("_ADDTOPIC","Add Topic");
-define("_EDITTOPIC","Edit Topic");
-define("_ADDRELATED","Add Related Links");
-define("_ACTIVERELATEDLINKS","Active Related Links");
-define("_SITENAME","Site Name");
-define("_NORELATED","There are no related links for this topic");
-define("_EDITRELATED","Edit Related Link");
-define("_YES","Áno");
-define("_NO","Nie");
-define("_TOPICSMANAGER","Manažér tém");
-define("_DELETETOPIC","Vymaza? tému");
-define("_TOPICDELSURE","Ste si istý, že chcete vymaza? tému so všetkým, èo k nej patrí?");
-define("_TOPICDELSURE1","Týmto budú všetky èlánky a komentáre vymazané!");
-
-
-?>
+define("_CURRENTTOPICS", "Current Active Topics");
+define("_CLICK2EDIT", "Click on Topic to Edit");
+define("_ADDATOPIC", "Add a New Topic");
+define("_TOPICNAME", "Topic Name");
+define("_TOPICNAME1", "(just a name without spaces - max: 20 characters)");
+define("_TOPICNAME2", "(for example: gamesandhobbies)");
+define("_TOPICTEXT", "Topic Text");
+define("_TOPICTEXT1", "(the full topic text or description - max: 40 characters)");
+define("_TOPICTEXT2", "(for example: Games and Hobbies)");
+define("_TOPICIMAGE", "Topic Image");
+define("_ADDTOPIC", "Add Topic");
+define("_EDITTOPIC", "Edit Topic");
+define("_ADDRELATED", "Add Related Links");
+define("_ACTIVERELATEDLINKS", "Active Related Links");
+define("_SITENAME", "Site Name");
+define("_NORELATED", "There are no related links for this topic");
+define("_EDITRELATED", "Edit Related Link");
+define("_YES", "ï¿½no");
+define("_NO", "Nie");
+define("_TOPICSMANAGER", "Manaï¿½ï¿½r tï¿½m");
+define("_DELETETOPIC", "Vymaza? tï¿½mu");
+define("_TOPICDELSURE", "Ste si istï¿½, ï¿½e chcete vymaza? tï¿½mu so vï¿½etkï¿½m, ï¿½o k nej patrï¿½?");
+define("_TOPICDELSURE1", "Tï¿½mto budï¿½ vï¿½etky ï¿½lï¿½nky a komentï¿½re vymazanï¿½!");

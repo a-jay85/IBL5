@@ -23,9 +23,9 @@
 // ----------------------------------------------------------------------
 
 if (!mb_eregi("index.php|modules.php", $_SERVER['PHP_SELF'])) {
-    die ("Access Denied");
+    die("Access Denied");
 }
-include("header.php");
+include "header.php";
 
 OpenTable();
 
@@ -35,6 +35,4 @@ echo "This site is running the AutoTheme HTML Theme System.  AutoTheme is curren
 
 CloseTable();
 
-include("footer.php");
-
-?>
+include "footer.php";

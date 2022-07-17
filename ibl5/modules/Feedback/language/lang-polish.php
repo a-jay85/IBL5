@@ -16,23 +16,21 @@
 /* so your entry will look like: This is \"double quoted\" text.          */
 /* And, if you use HTML code, please double check it.                     */
 /*                                                                        */
-/* Polish translation by Nordavind®(Bolo) (http://forum.phpnuke.org.pl)   */
+/* Polish translation by Nordavindï¿½(Bolo) (http://forum.phpnuke.org.pl)   */
 /*                                                                        */
 /**************************************************************************/
 
-define("_SEND","Wy¶lij");
-define("_YOURNAME","Twoje imiê i nazwisko");
-define("_MESSAGE","Wiadomo¶æ");
-define("_YOUREMAIL","Twój adres e-mail");
-define("_FEEDBACKNOTE","Wszystkie sugestie i komentarze dotycz±ce tej strony s± mile widziane i s± cennym ¼ród³em informacji dla nas!");
-define("_FEEDBACKTITLE","Formularz kontaktowy");
-define("_FEEDBACK","Kontakt");
-define("_FBENTERNAME","B£¡D: Wpisz swój nick!");
-define("_FBENTEREMAIL","B£¡D: Podaj swój adres e-mail!");
-define("_FBENTERMESSAGE","B£¡D: Wpisz wiadomo¶æ!");
-define("_SENDEREMAIL","Imiê nadawcy");
-define("_SENDERNAME","Nick nadawcy");
-define("_FBMAILSENT","E-mail zosta³ wys³any!");
-define("_FBTHANKSFORCONTACT","Dziêkujemy za po¶wiêcenie czasu i wys³anie formularza");
-
-?>
+define("_SEND", "Wyï¿½lij");
+define("_YOURNAME", "Twoje imiï¿½ i nazwisko");
+define("_MESSAGE", "Wiadomoï¿½ï¿½");
+define("_YOUREMAIL", "Twï¿½j adres e-mail");
+define("_FEEDBACKNOTE", "Wszystkie sugestie i komentarze dotyczï¿½ce tej strony sï¿½ mile widziane i sï¿½ cennym ï¿½rï¿½dï¿½em informacji dla nas!");
+define("_FEEDBACKTITLE", "Formularz kontaktowy");
+define("_FEEDBACK", "Kontakt");
+define("_FBENTERNAME", "Bï¿½ï¿½D: Wpisz swï¿½j nick!");
+define("_FBENTEREMAIL", "Bï¿½ï¿½D: Podaj swï¿½j adres e-mail!");
+define("_FBENTERMESSAGE", "Bï¿½ï¿½D: Wpisz wiadomoï¿½ï¿½!");
+define("_SENDEREMAIL", "Imiï¿½ nadawcy");
+define("_SENDERNAME", "Nick nadawcy");
+define("_FBMAILSENT", "E-mail zostaï¿½ wysï¿½any!");
+define("_FBTHANKSFORCONTACT", "Dziï¿½kujemy za poï¿½wiï¿½cenie czasu i wysï¿½anie formularza");

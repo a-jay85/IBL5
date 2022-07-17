@@ -17,30 +17,26 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_EMAIL","Email");
-define("_SAVECHANGES","Változások mentése");
-define("_SCORE","Pontok:");
-define("_PRODUCTTITLE","Termék neve");
-define("_RELATEDLINK","Kapcsolódó link");
-define("_LINKTITLE","A céloldal neve");
-define("_REVIEWER","Szerzõ:");
-define("_REVIEWID","Leírás száma");
-define("_REVIEWS","Ismertetõk");
-define("_DATE","Dátum");
-define("_REVADMIN","Ismertetõk adminisztrálása");
-define("_REVTITLE","Ismertetõk oldal címe");
-define("_REVDESC","Ismertetõk oldal leírása");
-define("_REVWAITING","Jóáhagyásra váró leírások");
-define("_REVIMGINFO","Töltsd fel a 150*150 méretû képed az images/reviews könyvtárba");
-define("_TEXT","Szöveg");
-define("_IMAGE","Kép");
-define("_NOREVIEW2ADD","Nincs hozzáadható ismertetõ");
-define("_ADDREVIEW","Ismertetõ hozzáadása");
-define("_CLICK2ADDREVIEW","Kattints ide új ismertetõ írásához");
-define("_DELMODREVIEW","Ismertetõ szerkesztése / törlése");
-define("_MODREVINFO","Ismertetõk szerkesztéséhez és törléséhez egyszerûen lépj adminisztrátorként a <a href=\"modules.php?name=Reviews\">Reviews</a> oldalra.");
-define("_LANGUAGE","Language");
-
-
-?>
+define("_EMAIL", "Email");
+define("_SAVECHANGES", "Vï¿½ltozï¿½sok mentï¿½se");
+define("_SCORE", "Pontok:");
+define("_PRODUCTTITLE", "Termï¿½k neve");
+define("_RELATEDLINK", "Kapcsolï¿½dï¿½ link");
+define("_LINKTITLE", "A cï¿½loldal neve");
+define("_REVIEWER", "Szerzï¿½:");
+define("_REVIEWID", "Leï¿½rï¿½s szï¿½ma");
+define("_REVIEWS", "Ismertetï¿½k");
+define("_DATE", "Dï¿½tum");
+define("_REVADMIN", "Ismertetï¿½k adminisztrï¿½lï¿½sa");
+define("_REVTITLE", "Ismertetï¿½k oldal cï¿½me");
+define("_REVDESC", "Ismertetï¿½k oldal leï¿½rï¿½sa");
+define("_REVWAITING", "Jï¿½ï¿½hagyï¿½sra vï¿½rï¿½ leï¿½rï¿½sok");
+define("_REVIMGINFO", "Tï¿½ltsd fel a 150*150 mï¿½retï¿½ kï¿½ped az images/reviews kï¿½nyvtï¿½rba");
+define("_TEXT", "Szï¿½veg");
+define("_IMAGE", "Kï¿½p");
+define("_NOREVIEW2ADD", "Nincs hozzï¿½adhatï¿½ ismertetï¿½");
+define("_ADDREVIEW", "Ismertetï¿½ hozzï¿½adï¿½sa");
+define("_CLICK2ADDREVIEW", "Kattints ide ï¿½j ismertetï¿½ ï¿½rï¿½sï¿½hoz");
+define("_DELMODREVIEW", "Ismertetï¿½ szerkesztï¿½se / tï¿½rlï¿½se");
+define("_MODREVINFO", "Ismertetï¿½k szerkesztï¿½sï¿½hez ï¿½s tï¿½rlï¿½sï¿½hez egyszerï¿½en lï¿½pj adminisztrï¿½torkï¿½nt a <a href=\"modules.php?name=Reviews\">Reviews</a> oldalra.");
+define("_LANGUAGE", "Language");

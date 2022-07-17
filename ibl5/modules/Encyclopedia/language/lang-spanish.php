@@ -17,26 +17,24 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PREVIOUS","Página Anterior");
-define("_NEXT","Página Siguiente");
-define("_SEARCHRESULTS","Resultados de la Búsqueda");
-define("_PAGE","página(s) ");
-define("_RETURNTO","Volver a");
-define("_DEACTIVATE","Desactivar");
-define("_ACTIVATE","Activar");
-define("_ENCYCLOPEDIA","Enciclopedia");
-define("_NOCONTENTFORLETTER","Disculpa, no existe ningún contenido por la letra");
-define("_ENCYSELECTLETTER","Por Favor selecciona una letra de la siguiente lista para consultar los términos:");
-define("_COPYRIGHT","Copyright");
-define("_YOURADMINENCY","Eres Administrador, esta enciclopedia no está activada!");
-define("_ENCYNOTACTIVE","Disculpa, esta enciclopedia no está activada en este momento.");
-define("_AVAILABLEENCYLIST","Lista de las Enciclopedias disponibles en");
-define("_YOURADMININACTIVELIST","Eres Administrador: Lista de las Enciclopedias Inactivas:");
-define("_NORESULTSTEXT","No hay Resultados en el Texto de los Términos...");
-define("_NORESULTSTITLE","No hay Resultados en Título de los Términos...");
-define("_SEARCHRESULTSFOR","Resultados de la Búsqueda de:");
-define("_SEARCHNOTCOMPLETE","Opciones de la búsqueda no está completas. Por Favor intenta de nuevo.");
-define("_RESULTSINTERMTITLE","Resultados en el título de los términos:");
-define("_RESULTSINTERMTEXT","Resultados en el texto de los términos:");
-
-?>
+define("_PREVIOUS", "Pï¿½gina Anterior");
+define("_NEXT", "Pï¿½gina Siguiente");
+define("_SEARCHRESULTS", "Resultados de la Bï¿½squeda");
+define("_PAGE", "pï¿½gina(s) ");
+define("_RETURNTO", "Volver a");
+define("_DEACTIVATE", "Desactivar");
+define("_ACTIVATE", "Activar");
+define("_ENCYCLOPEDIA", "Enciclopedia");
+define("_NOCONTENTFORLETTER", "Disculpa, no existe ningï¿½n contenido por la letra");
+define("_ENCYSELECTLETTER", "Por Favor selecciona una letra de la siguiente lista para consultar los tï¿½rminos:");
+define("_COPYRIGHT", "Copyright");
+define("_YOURADMINENCY", "Eres Administrador, esta enciclopedia no estï¿½ activada!");
+define("_ENCYNOTACTIVE", "Disculpa, esta enciclopedia no estï¿½ activada en este momento.");
+define("_AVAILABLEENCYLIST", "Lista de las Enciclopedias disponibles en");
+define("_YOURADMININACTIVELIST", "Eres Administrador: Lista de las Enciclopedias Inactivas:");
+define("_NORESULTSTEXT", "No hay Resultados en el Texto de los Tï¿½rminos...");
+define("_NORESULTSTITLE", "No hay Resultados en Tï¿½tulo de los Tï¿½rminos...");
+define("_SEARCHRESULTSFOR", "Resultados de la Bï¿½squeda de:");
+define("_SEARCHNOTCOMPLETE", "Opciones de la bï¿½squeda no estï¿½ completas. Por Favor intenta de nuevo.");
+define("_RESULTSINTERMTITLE", "Resultados en el tï¿½tulo de los tï¿½rminos:");
+define("_RESULTSINTERMTEXT", "Resultados en el texto de los tï¿½rminos:");

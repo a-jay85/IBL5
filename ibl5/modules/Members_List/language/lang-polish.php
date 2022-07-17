@@ -16,31 +16,29 @@
 /* so your entry will look like: This is \"double quoted\" text.          */
 /* And, if you use HTML code, please double check it.                     */
 /*                                                                        */
-/* Polish translation by Nordavind®(Bolo) (http://forum.phpnuke.org.pl)   */
+/* Polish translation by Nordavindï¿½(Bolo) (http://forum.phpnuke.org.pl)   */
 /*                                                                        */
 /**************************************************************************/
 
-define("_URL","URL");
-define("_EMAIL","E-mail");
-define("_REALNAME","Prawdziwa nazwa");
-define("_FUNCTIONS","Funkcje");
-define("_PREVIOUS","Poprzednia strona");
-define("_MEMBERSLIST","Lista zarejestrowanych u¿ytkowników");
-define("_GREETINGS","Pozdrowienia dla ostatnio zarejestrowanego u¿ytkownika:");
-define("_SORTBY","Sortowane wed³ug:");
-define("_MNICKNAME","Pseudonim");
-define("_MREALNAME","Prawdziwe imiê");
-define("_MEMAIL","E-mail");
-define("_MURL","Adres");
-define("_ONLINEREG","Aktualnie zarejestrowanych u¿ytkowników online:");
-define("_WEHAVE","Mamy");
-define("_MREGISTERED","dotychczas zarejestrowanych u¿ytkowników. Teraz jest");
-define("_MREGONLINE","zarejestrowanych u¿ytkowników online.");
-define("_REGSOFAR","dotychczas zarejestrowanych u¿ytkowników.");
-define("_USERSFOUND","znalezionych u¿ytkowników dla");
-define("_USERSSHOWN","pokazanych u¿ytkowników");
-define("_NOMEMBERS","Brak zarejestrowanych u¿ytkowników dla");
-define("_PAGES","Strony");
-define("_HOMEPAGE","Strona WWW");
-
-?>
+define("_URL", "URL");
+define("_EMAIL", "E-mail");
+define("_REALNAME", "Prawdziwa nazwa");
+define("_FUNCTIONS", "Funkcje");
+define("_PREVIOUS", "Poprzednia strona");
+define("_MEMBERSLIST", "Lista zarejestrowanych uï¿½ytkownikï¿½w");
+define("_GREETINGS", "Pozdrowienia dla ostatnio zarejestrowanego uï¿½ytkownika:");
+define("_SORTBY", "Sortowane wedï¿½ug:");
+define("_MNICKNAME", "Pseudonim");
+define("_MREALNAME", "Prawdziwe imiï¿½");
+define("_MEMAIL", "E-mail");
+define("_MURL", "Adres");
+define("_ONLINEREG", "Aktualnie zarejestrowanych uï¿½ytkownikï¿½w online:");
+define("_WEHAVE", "Mamy");
+define("_MREGISTERED", "dotychczas zarejestrowanych uï¿½ytkownikï¿½w. Teraz jest");
+define("_MREGONLINE", "zarejestrowanych uï¿½ytkownikï¿½w online.");
+define("_REGSOFAR", "dotychczas zarejestrowanych uï¿½ytkownikï¿½w.");
+define("_USERSFOUND", "znalezionych uï¿½ytkownikï¿½w dla");
+define("_USERSSHOWN", "pokazanych uï¿½ytkownikï¿½w");
+define("_NOMEMBERS", "Brak zarejestrowanych uï¿½ytkownikï¿½w dla");
+define("_PAGES", "Strony");
+define("_HOMEPAGE", "Strona WWW");

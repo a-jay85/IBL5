@@ -17,28 +17,24 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_FUNCTIONS","Funktioner");
-define("_YES","Ja");
-define("_NO","Nej");
-define("_SAVE","Gem");
-define("_ID","ID");
-define("_CATEGORIES","Kategorier");
-define("_ALL","Alle");
-define("_FAQ","Administration af FAQ's");
-define("_CONTENT","Indhold");
-define("_FAQADMIN","Administration af FAQ's");
-define("_ACTIVEFAQS","Eksisterende FAQ's");
-define("_ADDCATEGORY","Opret en ny kategori");
-define("_QUESTIONS","Spørgsmål og svar");
-define("_ADDQUESTION","Opret et nyt spørgsmål");
-define("_QUESTION","Spørgsmål");
-define("_ANSWER","Svar");
-define("_EDITCATEGORY","Redigér kategori");
-define("_EDITQUESTIONS","Redigér spørgsmål og svar");
-define("_FAQDELWARNING","ADVARSEL: Er du sikker på, at du vil slette denne FAQ og al dens indhold?");
-define("_QUESTIONDEL","ADVARSEL: Er du sikker på, at du vil slette dette spørgsmål?");
-define("_LANGUAGE","Sprog");
-
-
-?>
+define("_FUNCTIONS", "Funktioner");
+define("_YES", "Ja");
+define("_NO", "Nej");
+define("_SAVE", "Gem");
+define("_ID", "ID");
+define("_CATEGORIES", "Kategorier");
+define("_ALL", "Alle");
+define("_FAQ", "Administration af FAQ's");
+define("_CONTENT", "Indhold");
+define("_FAQADMIN", "Administration af FAQ's");
+define("_ACTIVEFAQS", "Eksisterende FAQ's");
+define("_ADDCATEGORY", "Opret en ny kategori");
+define("_QUESTIONS", "Spï¿½rgsmï¿½l og svar");
+define("_ADDQUESTION", "Opret et nyt spï¿½rgsmï¿½l");
+define("_QUESTION", "Spï¿½rgsmï¿½l");
+define("_ANSWER", "Svar");
+define("_EDITCATEGORY", "Redigï¿½r kategori");
+define("_EDITQUESTIONS", "Redigï¿½r spï¿½rgsmï¿½l og svar");
+define("_FAQDELWARNING", "ADVARSEL: Er du sikker pï¿½, at du vil slette denne FAQ og al dens indhold?");
+define("_QUESTIONDEL", "ADVARSEL: Er du sikker pï¿½, at du vil slette dette spï¿½rgsmï¿½l?");
+define("_LANGUAGE", "Sprog");

@@ -16,28 +16,26 @@
 /* so your entry will look like: This is \"double quoted\" text.          */
 /* And, if you use HTML code, please double check it.                     */
 /*                                                                        */
-/* Polish translation by Nordavind®(Bolo) (http://forum.phpnuke.org.pl)   */
+/* Polish translation by Nordavindï¿½(Bolo) (http://forum.phpnuke.org.pl)   */
 /*                                                                        */
 /**************************************************************************/
 
-define("_CATEGORY","Kategoria");
-define("_LVOTES","G³osów");
-define("_HITS","Ods³on");
-define("_TOPWELCOME","Witaj na stronie NAJ w");
-define("_READSTORIES","najczê¶ciej czytanych artyku³ów");
-define("_COMMENTEDSTORIES","najczê¶ciej komentowanych artyku³ów");
-define("_ACTIVECAT","najbardziej aktywnych kategorii");
-define("_READSECTION","najczê¶ciej czytanych artyku³ów w sekcji specjalnej");
-define("_NEWSSUBMITTERS","najbardziej aktywnych dostarczycieli newsów");
-define("_NEWSSENT","wys³anych newsów");
-define("_VOTEDPOLLS","ankiet w których g³osowano najczê¶ciej");
-define("_MOSTACTIVEAUTHORS","najaktywniejszych autorów");
-define("_NEWSPUBLISHED","opublikowanych newsów");
-define("_READREVIEWS","najczê¶ciej czytanych recenzji");
-define("_DOWNLOADEDFILES","najczê¶ciej ¶ci±ganych plików");
-define("_MOSTREADPAGES","najczê¶ciej czytanych stron");
-define("_MOSTVOTEDSTORIES","najczê¶ciej ocenianych newsów");
-define("_POINTS","punktów");
-define("_BESTRATEDSTORIES","najlepiej ocenianych newsów (minimum 5 punktów)");
-
-?>
+define("_CATEGORY", "Kategoria");
+define("_LVOTES", "Gï¿½osï¿½w");
+define("_HITS", "Odsï¿½on");
+define("_TOPWELCOME", "Witaj na stronie NAJ w");
+define("_READSTORIES", "najczï¿½ciej czytanych artykuï¿½ï¿½w");
+define("_COMMENTEDSTORIES", "najczï¿½ciej komentowanych artykuï¿½ï¿½w");
+define("_ACTIVECAT", "najbardziej aktywnych kategorii");
+define("_READSECTION", "najczï¿½ciej czytanych artykuï¿½ï¿½w w sekcji specjalnej");
+define("_NEWSSUBMITTERS", "najbardziej aktywnych dostarczycieli newsï¿½w");
+define("_NEWSSENT", "wysï¿½anych newsï¿½w");
+define("_VOTEDPOLLS", "ankiet w ktï¿½rych gï¿½osowano najczï¿½ciej");
+define("_MOSTACTIVEAUTHORS", "najaktywniejszych autorï¿½w");
+define("_NEWSPUBLISHED", "opublikowanych newsï¿½w");
+define("_READREVIEWS", "najczï¿½ciej czytanych recenzji");
+define("_DOWNLOADEDFILES", "najczï¿½ciej ï¿½ciï¿½ganych plikï¿½w");
+define("_MOSTREADPAGES", "najczï¿½ciej czytanych stron");
+define("_MOSTVOTEDSTORIES", "najczï¿½ciej ocenianych newsï¿½w");
+define("_POINTS", "punktï¿½w");
+define("_BESTRATEDSTORIES", "najlepiej ocenianych newsï¿½w (minimum 5 punktï¿½w)");

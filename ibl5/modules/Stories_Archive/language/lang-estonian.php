@@ -17,18 +17,16 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PRINTER","Printerisõbralik lehekülg");
-define("_FRIEND","Saada see jutt sõbrale");
-define("_ARTICLES","Artiklid");
-define("_USCORE","Punktid");
-define("_DATE","Kuupäev");
-define("_SELECTMONTH2VIEW","Palun vali kuu mida sa soovid näha:");
-define("_SHOWALLSTORIES","Näita KÕIKI jutte");
-define("_STORIESARCHIVE","Juttude arhiiv");
-define("_ACTIONS","Tegevus");
-define("_ARCHIVESINDEX","Juttude arhiivi esilehele");
-define("_ALLSTORIESARCH","Kõik jutud");
-define("_NEXTPAGE","Järgmine leht");
-define("_PREVIOUSPAGE","Eelmine leht");
-
-?>
+define("_PRINTER", "Printerisï¿½bralik lehekï¿½lg");
+define("_FRIEND", "Saada see jutt sï¿½brale");
+define("_ARTICLES", "Artiklid");
+define("_USCORE", "Punktid");
+define("_DATE", "Kuupï¿½ev");
+define("_SELECTMONTH2VIEW", "Palun vali kuu mida sa soovid nï¿½ha:");
+define("_SHOWALLSTORIES", "Nï¿½ita Kï¿½IKI jutte");
+define("_STORIESARCHIVE", "Juttude arhiiv");
+define("_ACTIONS", "Tegevus");
+define("_ARCHIVESINDEX", "Juttude arhiivi esilehele");
+define("_ALLSTORIESARCH", "Kï¿½ik jutud");
+define("_NEXTPAGE", "Jï¿½rgmine leht");
+define("_PREVIOUSPAGE", "Eelmine leht");

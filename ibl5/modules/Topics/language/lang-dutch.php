@@ -17,11 +17,9 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_ACTIVETOPICS","Actuele actieve onderwerpen");
-define("_CLICK2LIST","Klik om alle artikelen in dit onderwerp te zien");
-define("_TOTNEWS","Total News");
-define("_TOTREADS","Total Reads");
-define("_MORE","More");
-define("_NONEWSYET","...There aren't any news yet for this topic...");
-
-?>
+define("_ACTIVETOPICS", "Actuele actieve onderwerpen");
+define("_CLICK2LIST", "Klik om alle artikelen in dit onderwerp te zien");
+define("_TOTNEWS", "Total News");
+define("_TOTREADS", "Total Reads");
+define("_MORE", "More");
+define("_NONEWSYET", "...There aren't any news yet for this topic...");

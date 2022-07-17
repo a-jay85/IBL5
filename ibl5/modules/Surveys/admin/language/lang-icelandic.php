@@ -17,37 +17,33 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_YES","Já");
-define("_NO","Nei");
-define("_CATEGORY","Flokkur");
-define("_SAVECHANGES","Vista breytingar");
-define("_ARTICLES","greinar");
-define("_SELECTTOPIC","Veldu efnisflokk");
-define("_OPTION","Valkostur");
-define("_ADMPOLLS","Skoðanakannanir");
-define("_TITLE","Titill");
-define("_STORYTEXT","Texti fréttar");
-define("_EXTENDEDTEXT","Aukatexti");
-define("_PUBLISHINHOME","Birta á aðalsíðu?");
-define("_ONLYIFCATSELECTED","Virkar aðeins ef <i>greinar</i> flokkurinn er ekki valinn");
-define("_ADD","Bæta við");
-define("_POLLSADMIN","Kerfisstjórn skoðanakannana");
-define("_CREATEPOLL","Búa til nýja skoðanakönnun");
-define("_DELETEPOLLS","Eyða skoðanakönnunum");
-define("_POLLTITLE","Titill skoðanakönnunar");
-define("_POLLEACHFIELD","Vinsamlegast setjið hvern svarmöguleika í sér reit");
-define("_CREATEPOLLBUT","Búa til skoðanakönnun");
-define("_REMOVEEXISTING","Eyða skoðanakönnun");
-define("_POLLDELWARNING","VARÚÐ: Viðkomandi könnun verður STRAX eytt úr gagnagrunninum!");
-define("_CHOOSEPOLL","Veldu skoðanakönnun úr listanum hér fyrir neðan:");
-define("_EDITPOLL","Breyta könnunum");
-define("_CHOOSEPOLLEDIT","Veldu könnum sem þú vilt breyta:");
-define("_ACTIVATECOMMENTS","Gera mögulegt að gera athugasemdir við þessa grein?");
-define("_LANGUAGE","Tungumál");
-define("_ANNOUNCEPOLL","Tilkynna þessa nýju könnum á vefnum þínum");
-define("_LEAVEBLANK","(Látið vera autt til þess að búa til könnun án þess tilkynna um hana sérstaklega)");
-define("_POLLEDIT","Breyta könnun:");
-
-
-?>
+define("_YES", "Jï¿½");
+define("_NO", "Nei");
+define("_CATEGORY", "Flokkur");
+define("_SAVECHANGES", "Vista breytingar");
+define("_ARTICLES", "greinar");
+define("_SELECTTOPIC", "Veldu efnisflokk");
+define("_OPTION", "Valkostur");
+define("_ADMPOLLS", "Skoï¿½anakannanir");
+define("_TITLE", "Titill");
+define("_STORYTEXT", "Texti frï¿½ttar");
+define("_EXTENDEDTEXT", "Aukatexti");
+define("_PUBLISHINHOME", "Birta ï¿½ aï¿½alsï¿½ï¿½u?");
+define("_ONLYIFCATSELECTED", "Virkar aï¿½eins ef <i>greinar</i> flokkurinn er ekki valinn");
+define("_ADD", "Bï¿½ta viï¿½");
+define("_POLLSADMIN", "Kerfisstjï¿½rn skoï¿½anakannana");
+define("_CREATEPOLL", "Bï¿½a til nï¿½ja skoï¿½anakï¿½nnun");
+define("_DELETEPOLLS", "Eyï¿½a skoï¿½anakï¿½nnunum");
+define("_POLLTITLE", "Titill skoï¿½anakï¿½nnunar");
+define("_POLLEACHFIELD", "Vinsamlegast setjiï¿½ hvern svarmï¿½guleika ï¿½ sï¿½r reit");
+define("_CREATEPOLLBUT", "Bï¿½a til skoï¿½anakï¿½nnun");
+define("_REMOVEEXISTING", "Eyï¿½a skoï¿½anakï¿½nnun");
+define("_POLLDELWARNING", "VARï¿½ï¿½: Viï¿½komandi kï¿½nnun verï¿½ur STRAX eytt ï¿½r gagnagrunninum!");
+define("_CHOOSEPOLL", "Veldu skoï¿½anakï¿½nnun ï¿½r listanum hï¿½r fyrir neï¿½an:");
+define("_EDITPOLL", "Breyta kï¿½nnunum");
+define("_CHOOSEPOLLEDIT", "Veldu kï¿½nnum sem ï¿½ï¿½ vilt breyta:");
+define("_ACTIVATECOMMENTS", "Gera mï¿½gulegt aï¿½ gera athugasemdir viï¿½ ï¿½essa grein?");
+define("_LANGUAGE", "Tungumï¿½l");
+define("_ANNOUNCEPOLL", "Tilkynna ï¿½essa nï¿½ju kï¿½nnum ï¿½ vefnum ï¿½ï¿½num");
+define("_LEAVEBLANK", "(Lï¿½tiï¿½ vera autt til ï¿½ess aï¿½ bï¿½a til kï¿½nnun ï¿½n ï¿½ess tilkynna um hana sï¿½rstaklega)");
+define("_POLLEDIT", "Breyta kï¿½nnun:");

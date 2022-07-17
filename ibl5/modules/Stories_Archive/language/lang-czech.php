@@ -17,18 +17,16 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PRINTER","Vytisknout stránku");
-define("_FRIEND","Poslat tento èlánek známým");
-define("_ARTICLES","Èlánky");
-define("_USCORE","Hodnocení");
-define("_DATE","Datum");
-define("_SELECTMONTH2VIEW","Please select the month you want to view:");
-define("_SHOWALLSTORIES","Show ALL Stories");
-define("_STORIESARCHIVE","Stories Archive");
-define("_ACTIONS","Actions");
-define("_ARCHIVESINDEX","Stories Archive Index");
-define("_ALLSTORIESARCH","All Stories");
-define("_NEXTPAGE","Next Page");
-define("_PREVIOUSPAGE","Previous Page");
-
-?>
+define("_PRINTER", "Vytisknout strï¿½nku");
+define("_FRIEND", "Poslat tento ï¿½lï¿½nek znï¿½mï¿½m");
+define("_ARTICLES", "ï¿½lï¿½nky");
+define("_USCORE", "Hodnocenï¿½");
+define("_DATE", "Datum");
+define("_SELECTMONTH2VIEW", "Please select the month you want to view:");
+define("_SHOWALLSTORIES", "Show ALL Stories");
+define("_STORIESARCHIVE", "Stories Archive");
+define("_ACTIONS", "Actions");
+define("_ARCHIVESINDEX", "Stories Archive Index");
+define("_ALLSTORIESARCH", "All Stories");
+define("_NEXTPAGE", "Next Page");
+define("_PREVIOUSPAGE", "Previous Page");

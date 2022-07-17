@@ -17,24 +17,22 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_CATEGORY","Kategória");
-define("_LVOTES","szavazat");
-define("_HITS","találat");
-define("_TOPWELCOME","Ez a");
-define("_READSTORIES","legolvasottabb cikkek toplistája");
-define("_COMMENTEDSTORIES","legtöbb hozzászólással rendelkezõ cikkek toplistája");
-define("_ACTIVECAT","legaktívabb kategóriák toplistája");
-define("_READSECTION","a különleges témák legolvasottabb cikkeinek toplistája");
-define("_NEWSSUBMITTERS","a legaktívabb szerzõk toplistája");
-define("_NEWSSENT","beküldött hír");
-define("_VOTEDPOLLS","a legtöbb szavazatot kapott szavazások toplistája");
-define("_MOSTACTIVEAUTHORS","Aktív szerzõk:");
-define("_NEWSPUBLISHED","közzétett cikk");
-define("_READREVIEWS","legolvasottabb ismeretetõk topllistája");
-define("_DOWNLOADEDFILES","legtöbbször letöltött fájlok toplistája");
-define("_MOSTREADPAGES","most read pages");
-define("_MOSTVOTEDSTORIES","most voted stories");
-define("_POINTS","points");
-define("_BESTRATEDSTORIES","best rated stories (based on 5 maximun points)");
-
-?>
+define("_CATEGORY", "Kategï¿½ria");
+define("_LVOTES", "szavazat");
+define("_HITS", "talï¿½lat");
+define("_TOPWELCOME", "Ez a");
+define("_READSTORIES", "legolvasottabb cikkek toplistï¿½ja");
+define("_COMMENTEDSTORIES", "legtï¿½bb hozzï¿½szï¿½lï¿½ssal rendelkezï¿½ cikkek toplistï¿½ja");
+define("_ACTIVECAT", "legaktï¿½vabb kategï¿½riï¿½k toplistï¿½ja");
+define("_READSECTION", "a kï¿½lï¿½nleges tï¿½mï¿½k legolvasottabb cikkeinek toplistï¿½ja");
+define("_NEWSSUBMITTERS", "a legaktï¿½vabb szerzï¿½k toplistï¿½ja");
+define("_NEWSSENT", "bekï¿½ldï¿½tt hï¿½r");
+define("_VOTEDPOLLS", "a legtï¿½bb szavazatot kapott szavazï¿½sok toplistï¿½ja");
+define("_MOSTACTIVEAUTHORS", "Aktï¿½v szerzï¿½k:");
+define("_NEWSPUBLISHED", "kï¿½zzï¿½tett cikk");
+define("_READREVIEWS", "legolvasottabb ismeretetï¿½k topllistï¿½ja");
+define("_DOWNLOADEDFILES", "legtï¿½bbszï¿½r letï¿½ltï¿½tt fï¿½jlok toplistï¿½ja");
+define("_MOSTREADPAGES", "most read pages");
+define("_MOSTVOTEDSTORIES", "most voted stories");
+define("_POINTS", "points");
+define("_BESTRATEDSTORIES", "best rated stories (based on 5 maximun points)");

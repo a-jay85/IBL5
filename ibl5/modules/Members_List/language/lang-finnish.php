@@ -17,27 +17,25 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_URL","URL");
-define("_EMAIL","Sähköposti");
-define("_REALNAME","Oikea nimesi");
-define("_FUNCTIONS","Tehtävät");
-define("_PREVIOUS","Edellinen sivu");
-define("_MEMBERSLIST","Rekisteröityneet käyttäjät");
-define("_GREETINGS","Tervehtikäämme yhdessä meidän uusinta käyttäjää:");
-define("_SORTBY","Lajittele:");
-define("_MNICKNAME","Nick");
-define("_MREALNAME","Nimi");
-define("_MEMAIL","Sähköposti");
-define("_MURL","URL");
-define("_ONLINEREG","Online rekisteröityneet käyttäjät:");
-define("_WEHAVE","Meillä on");
-define("_MREGISTERED","rekisteröitynyttä käyttäjää ja");
-define("_MREGONLINE","käyttäjää on Online.");
-define("_REGSOFAR","rekisteröitynyttä käyttäjää.");
-define("_USERSFOUND","Löytyi käyttäjää");
-define("_USERSSHOWN","näytetään käyttäjää");
-define("_NOMEMBERS","ei löytynyt");
-define("_PAGES","Sivut");
-define("_HOMEPAGE","Kotisivut");
-
-?>
+define("_URL", "URL");
+define("_EMAIL", "Sï¿½hkï¿½posti");
+define("_REALNAME", "Oikea nimesi");
+define("_FUNCTIONS", "Tehtï¿½vï¿½t");
+define("_PREVIOUS", "Edellinen sivu");
+define("_MEMBERSLIST", "Rekisterï¿½ityneet kï¿½yttï¿½jï¿½t");
+define("_GREETINGS", "Tervehtikï¿½ï¿½mme yhdessï¿½ meidï¿½n uusinta kï¿½yttï¿½jï¿½ï¿½:");
+define("_SORTBY", "Lajittele:");
+define("_MNICKNAME", "Nick");
+define("_MREALNAME", "Nimi");
+define("_MEMAIL", "Sï¿½hkï¿½posti");
+define("_MURL", "URL");
+define("_ONLINEREG", "Online rekisterï¿½ityneet kï¿½yttï¿½jï¿½t:");
+define("_WEHAVE", "Meillï¿½ on");
+define("_MREGISTERED", "rekisterï¿½itynyttï¿½ kï¿½yttï¿½jï¿½ï¿½ ja");
+define("_MREGONLINE", "kï¿½yttï¿½jï¿½ï¿½ on Online.");
+define("_REGSOFAR", "rekisterï¿½itynyttï¿½ kï¿½yttï¿½jï¿½ï¿½.");
+define("_USERSFOUND", "Lï¿½ytyi kï¿½yttï¿½jï¿½ï¿½");
+define("_USERSSHOWN", "nï¿½ytetï¿½ï¿½n kï¿½yttï¿½jï¿½ï¿½");
+define("_NOMEMBERS", "ei lï¿½ytynyt");
+define("_PAGES", "Sivut");
+define("_HOMEPAGE", "Kotisivut");

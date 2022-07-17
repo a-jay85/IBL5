@@ -17,18 +17,16 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PREVIOUS","Prejšnja stran");
-define("_NEXT","Naslednja stran");
-define("_PAGE","Strani");
-define("_DEACTIVATE","Deaktiviraj");
-define("_ACTIVATE","Aktiviraj");
-define("_PUBLISHEDON","Published on");
-define("_PAGESLIST","Pages List");
-define("_LISTOFCONTENT","List of available content in");
-define("_YOURADMINLIST","You're Administrator: following is the list of Inactive pages:");
-define("_COPYRIGHT","Copyright &copy; by");
-define("_COPYRIGHT2","All Right Reserved.");
-define("_CONTENTCATEGORIES","Available Content Categories");
-define("_NONCLASSCONT","Non Categorized Content");
-
-?>
+define("_PREVIOUS", "Prejï¿½nja stran");
+define("_NEXT", "Naslednja stran");
+define("_PAGE", "Strani");
+define("_DEACTIVATE", "Deaktiviraj");
+define("_ACTIVATE", "Aktiviraj");
+define("_PUBLISHEDON", "Published on");
+define("_PAGESLIST", "Pages List");
+define("_LISTOFCONTENT", "List of available content in");
+define("_YOURADMINLIST", "You're Administrator: following is the list of Inactive pages:");
+define("_COPYRIGHT", "Copyright &copy; by");
+define("_COPYRIGHT2", "All Right Reserved.");
+define("_CONTENTCATEGORIES", "Available Content Categories");
+define("_NONCLASSCONT", "Non Categorized Content");

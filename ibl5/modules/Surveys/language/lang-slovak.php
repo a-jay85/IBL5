@@ -2,10 +2,10 @@
 
 /*************************************************************************/
 /* The Slovak language file for module Surveys                      */
-/* Author: AlRashid 			 Date: 09.09.2002   					 */
+/* Author: AlRashid              Date: 09.09.2002                        */
 /* alrashid@klokan.sk, http://alrashid.klokan.sk                         */
-/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk			     */
-/*  		Dakujem                                                      */
+/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk                 */
+/*          Dakujem                                                      */
 /*************************************************************************/
 /**************************************************************************/
 /* PHP-NUKE: Advanced Content Management System                           */
@@ -24,65 +24,63 @@
 /* And, if you use HTML code, please double check it.                     */
 /*************************************************************************/
 /* The Slovak language file for module Surveys                      */
-/* Author: AlRashid 			 Date: 09.09.2002   					 */
+/* Author: AlRashid              Date: 09.09.2002                        */
 /* alrashid@klokan.sk, http://alrashid.klokan.sk                         */
-/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk			     */
-/*  		Dakujem                                                      */
+/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk                 */
+/*          Dakujem                                                      */
 /*************************************************************************/
 /**************************************************************************/
 
-define("_YOURNAME","Vaše meno");
-define("_OK","Ok!");
-define("_COMMENT","Komentár");
-define("_CONFIGURE","Konfigurácia");
-define("_LOGINCREATE","Prihlásenie/Vytvori konto");
-define("_THRESHOLD","Prah");
-define("_NOCOMMENTS","Bez komentára");
-define("_NESTED","Triedené");
-define("_FLAT","Ako prišlo");
-define("_THREAD","V súvislostiach");
-define("_OLDEST","Najprv staršie");
-define("_NEWEST","Najprv novšie");
-define("_HIGHEST","Najprv s vyšším skóre");
-define("_COMMENTSWARNING","Za obsah komentárov je zodpovednı uívate¾, nie prevádzkovate¾ tıchto stránok.");
-define("_SCORE","Skóre:");
-define("_USERINFO","O uívate¾ovi");
-define("_READREST","Èíta zvyšok komentára...");
-define("_REPLY","odpoveda");
-define("_REPLYMAIN","posla komentár");
-define("_NOSUBJECT","Chıba predmet");
-define("_NOANONCOMMENTS","Ako anonymnı uívate¾ nemôete posiela komentáre, prosím <a href=\"modules.php?name=Your_Account\">zaregistrujte sa</a>");
-define("_PARENT","Parent");
-define("_ROOT","Hlavnı");
-define("_UCOMMENT","Komentár");
-define("_ALLOWEDHTML","Povoli HTML:");
-define("_POSTANON","Posla anonymne");
-define("_EXTRANS","Extrans (html kód do textu)");
-define("_HTMLFORMATED","HTML formátovanie");
-define("_PLAINTEXT","obyèajnı text");
-define("_ONN","na...");
-define("_SUBJECT","Predmet");
-define("_SURVEYCOM","Posla komentár k hlasovaniu");
-define("_SURVEYCOMPRE","Pozrie posielanı komentár k hlasovaniu");
-define("_NOTRIGHT","Nieèo nie je v poridku s pasovaním premennej do tejto funkcie.");
-define("_DIRECTCOM","Priamy komentár k ankete...");
-define("_SENDAMSG","Posla správu");
-define("_PASTSURVEYS"," Preh¾ad doterajších ankiet");
-define("_LVOTES","hlasovalo");
-define("_TOTALVOTES","Celkom hlasovalo:");
-define("_VOTING","Stránka ankiet");
-define("_OTHERPOLLS","Iné ankety");
-define("_CURRENTSURVEY","Aktuálna anketa");
-define("_CURRENTPOLLRESULTS","Vısledky aktuálnej ankety");
-define("_PREVIEW","Prezrie");
-define("_REFRESH","Obnovi");
-define("_SURVEYS","Ankety");
-define("_ATTACHEDTOARTICLE","- pripojená k èlánku");
-define("_SURVEYSATTACHED","Ankety pripojené k èlánkom");
+define("_YOURNAME", "Vaï¿½e meno");
+define("_OK", "Ok!");
+define("_COMMENT", "Komentï¿½r");
+define("_CONFIGURE", "Konfigurï¿½cia");
+define("_LOGINCREATE", "Prihlï¿½senie/Vytvoriï¿½ konto");
+define("_THRESHOLD", "Prah");
+define("_NOCOMMENTS", "Bez komentï¿½ra");
+define("_NESTED", "Triedenï¿½");
+define("_FLAT", "Ako priï¿½lo");
+define("_THREAD", "V sï¿½vislostiach");
+define("_OLDEST", "Najprv starï¿½ie");
+define("_NEWEST", "Najprv novï¿½ie");
+define("_HIGHEST", "Najprv s vyï¿½ï¿½ï¿½m skï¿½re");
+define("_COMMENTSWARNING", "Za obsah komentï¿½rov je zodpovednï¿½ uï¿½ï¿½vateï¿½, nie prevï¿½dzkovateï¿½ tï¿½chto strï¿½nok.");
+define("_SCORE", "Skï¿½re:");
+define("_USERINFO", "O uï¿½ï¿½vateï¿½ovi");
+define("_READREST", "ï¿½ï¿½taï¿½ zvyï¿½ok komentï¿½ra...");
+define("_REPLY", "odpovedaï¿½");
+define("_REPLYMAIN", "poslaï¿½ komentï¿½r");
+define("_NOSUBJECT", "Chï¿½ba predmet");
+define("_NOANONCOMMENTS", "Ako anonymnï¿½ uï¿½ï¿½vateï¿½ nemï¿½ï¿½ete posielaï¿½ komentï¿½re, prosï¿½m <a href=\"modules.php?name=Your_Account\">zaregistrujte sa</a>");
+define("_PARENT", "Parent");
+define("_ROOT", "Hlavnï¿½");
+define("_UCOMMENT", "Komentï¿½r");
+define("_ALLOWEDHTML", "Povoliï¿½ HTML:");
+define("_POSTANON", "Poslaï¿½ anonymne");
+define("_EXTRANS", "Extrans (html kï¿½d do textu)");
+define("_HTMLFORMATED", "HTML formï¿½tovanie");
+define("_PLAINTEXT", "obyï¿½ajnï¿½ text");
+define("_ONN", "na...");
+define("_SUBJECT", "Predmet");
+define("_SURVEYCOM", "Poslaï¿½ komentï¿½r k hlasovaniu");
+define("_SURVEYCOMPRE", "Pozrieï¿½ posielanï¿½ komentï¿½r k hlasovaniu");
+define("_NOTRIGHT", "Nieï¿½o nie je v poridku s pasovanï¿½m premennej do tejto funkcie.");
+define("_DIRECTCOM", "Priamy komentï¿½r k ankete...");
+define("_SENDAMSG", "Poslaï¿½ sprï¿½vu");
+define("_PASTSURVEYS", " Prehï¿½ad doterajï¿½ï¿½ch ankiet");
+define("_LVOTES", "hlasovalo");
+define("_TOTALVOTES", "Celkom hlasovalo:");
+define("_VOTING", "Strï¿½nka ankiet");
+define("_OTHERPOLLS", "Inï¿½ ankety");
+define("_CURRENTSURVEY", "Aktuï¿½lna anketa");
+define("_CURRENTPOLLRESULTS", "Vï¿½sledky aktuï¿½lnej ankety");
+define("_PREVIEW", "Prezrieï¿½");
+define("_REFRESH", "Obnoviï¿½");
+define("_SURVEYS", "Ankety");
+define("_ATTACHEDTOARTICLE", "- pripojenï¿½ k ï¿½lï¿½nku");
+define("_SURVEYSATTACHED", "Ankety pripojenï¿½ k ï¿½lï¿½nkom");
 define("_LAST5POLLS", "Last 5 Surveys at");
 define("_MOREPOLLS", "...more polls");
-define("_COMMENTSMODERATION","Comments Moderation System");
-define("_MODERATE","Moderate");
-define("_CLICKTOMODERATE","Please select your moderation values for each comment on this survey, then click on <i>Moderate</i> button bellow to save your comments moderation preferences. Be fair on each value, this will contribute and benefict all users/readers. Thank you.");
-
-?>
+define("_COMMENTSMODERATION", "Comments Moderation System");
+define("_MODERATE", "Moderate");
+define("_CLICKTOMODERATE", "Please select your moderation values for each comment on this survey, then click on <i>Moderate</i> button bellow to save your comments moderation preferences. Be fair on each value, this will contribute and benefict all users/readers. Thank you.");

@@ -22,7 +22,7 @@ global $commercial_license, $sitename, $slogan;
 # Include for Meta Tags generation               #
 ##################################################
 
-$metastring = "<META HTTP-EQUIV=\"Content-Type\" CONTENT=\"text/html; charset="._CHARSET."\">\n";
+$metastring = "<META HTTP-EQUIV=\"Content-Type\" CONTENT=\"text/html; charset=" . _CHARSET . "\">\n";
 $metastring .= "<META HTTP-EQUIV=\"EXPIRES\" CONTENT=\"0\">\n";
 $metastring .= "<META NAME=\"RESOURCE-TYPE\" CONTENT=\"DOCUMENT\">\n";
 $metastring .= "<META NAME=\"DISTRIBUTION\" CONTENT=\"GLOBAL\">\n";
@@ -42,10 +42,7 @@ $metastring .= "<META NAME=\"RATING\" CONTENT=\"GENERAL\">\n";
 // IF YOU REALLY NEED TO REMOVE IT AND HAVE MY WRITTEN AUTHORIZATION CHECK: http://phpnuke.org/modules.php?name=Commercial_License
 // PLAY FAIR AND SUPPORT THE DEVELOPMENT, PLEASE!
 if ($commercial_license != 1) {
-	$metastring .= "<META NAME=\"GENERATOR\" CONTENT=\"PHP-Nuke Copyright (c) 2007 by Francisco Burzi. This is free software, and you may redistribute it under the GPL (http://phpnuke.org/files/gpl.txt). PHP-Nuke comes with absolutely no warranty, for details, see the license (http://phpnuke.org/files/gpl.txt).\">\n";
+    $metastring .= "<META NAME=\"GENERATOR\" CONTENT=\"PHP-Nuke Copyright (c) 2007 by Francisco Burzi. This is free software, and you may redistribute it under the GPL (http://phpnuke.org/files/gpl.txt). PHP-Nuke comes with absolutely no warranty, for details, see the license (http://phpnuke.org/files/gpl.txt).\">\n";
 }
 
-
 echo $metastring;
-
-?>

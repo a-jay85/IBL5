@@ -7,39 +7,36 @@
 /*                                                                        */
 /**************************************************************************/
 
-
-define("_HITS","Hits");
-define("_BROWSERS","Navegadors");
-define("_OPERATINGSYS","Sistemes Operatius");
-define("_UNKNOWN","Desconegut");
-define("_OTHER","Altres / Desconegut");
-define("_MISCSTATS","Estadístiques Variades");
-define("_REGUSERS","Usuaris Registrats:");
-define("_ACTIVEAUTHORS","Autors Actius:");
-define("_STORIESPUBLISHED","Noticies Publicades:");
-define("_SACTIVETOPICS","Temes Actius:");
-define("_COMMENTSPOSTED","Comentaris Enviats:");
-define("_SSPECIALSECT","Seccions Especials:");
-define("_ARTICLESSEC","Articles a Seccions:");
-define("_LINKSINLINKS","Enllaços:");
-define("_LINKSCAT","Categories a Enllaços:");
-define("_NEWSWAITING","Noticies Esperant:");
-define("_NUKEVERSION","Versió de PHP-Nuke:");
-define("_SEARCHENGINES","Motors de Cerca");
-define("_BOTS","Robots/Spiders");
-define("_STATS","Estadístiques d'Acces");
-define("_RETURNBASICSTATS","Tornar a Estadístiques Bàsiques");
-define("_BACKTODETSTATS","Tornar a Estadístiques amb Detall");
-define("_BACKTOMAIN","Tornar al Principal");
-define("_TODAYIS","Aviu és");
-define("_MOSTMONTH","Mes més actiu");
-define("_MOSTDAY","Dia més actiu");
-define("_MOSTHOUR","Hora més activa");
-define("_YEARLYSTATS","Estadístiques per Any");
-define("_MONTLYSTATS","Estadístiques Mensuales per a");
-define("_SPAGESVIEWS","Impresions de Pàgina");
-define("_DAILYSTATS","Estadístiques Diaries per a");
-define("_HOURLYSTATS","Estadístiques per Hores per a");
-define("_VIEWDETAILED","Veure Estadístiques Detallades");
-
-?>
+define("_HITS", "Hits");
+define("_BROWSERS", "Navegadors");
+define("_OPERATINGSYS", "Sistemes Operatius");
+define("_UNKNOWN", "Desconegut");
+define("_OTHER", "Altres / Desconegut");
+define("_MISCSTATS", "Estadï¿½stiques Variades");
+define("_REGUSERS", "Usuaris Registrats:");
+define("_ACTIVEAUTHORS", "Autors Actius:");
+define("_STORIESPUBLISHED", "Noticies Publicades:");
+define("_SACTIVETOPICS", "Temes Actius:");
+define("_COMMENTSPOSTED", "Comentaris Enviats:");
+define("_SSPECIALSECT", "Seccions Especials:");
+define("_ARTICLESSEC", "Articles a Seccions:");
+define("_LINKSINLINKS", "Enllaï¿½os:");
+define("_LINKSCAT", "Categories a Enllaï¿½os:");
+define("_NEWSWAITING", "Noticies Esperant:");
+define("_NUKEVERSION", "Versiï¿½ de PHP-Nuke:");
+define("_SEARCHENGINES", "Motors de Cerca");
+define("_BOTS", "Robots/Spiders");
+define("_STATS", "Estadï¿½stiques d'Acces");
+define("_RETURNBASICSTATS", "Tornar a Estadï¿½stiques Bï¿½siques");
+define("_BACKTODETSTATS", "Tornar a Estadï¿½stiques amb Detall");
+define("_BACKTOMAIN", "Tornar al Principal");
+define("_TODAYIS", "Aviu ï¿½s");
+define("_MOSTMONTH", "Mes mï¿½s actiu");
+define("_MOSTDAY", "Dia mï¿½s actiu");
+define("_MOSTHOUR", "Hora mï¿½s activa");
+define("_YEARLYSTATS", "Estadï¿½stiques per Any");
+define("_MONTLYSTATS", "Estadï¿½stiques Mensuales per a");
+define("_SPAGESVIEWS", "Impresions de Pï¿½gina");
+define("_DAILYSTATS", "Estadï¿½stiques Diaries per a");
+define("_HOURLYSTATS", "Estadï¿½stiques per Hores per a");
+define("_VIEWDETAILED", "Veure Estadï¿½stiques Detallades");

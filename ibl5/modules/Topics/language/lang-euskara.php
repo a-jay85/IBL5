@@ -17,9 +17,5 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_ACTIVETOPICS","Aktibo dauden Gaiak");
-define("_CLICK2LIST","Egin klik Gai honi buruz dauden berri guztiak zerrendatzeko.");
-
-
-?>
+define("_ACTIVETOPICS", "Aktibo dauden Gaiak");
+define("_CLICK2LIST", "Egin klik Gai honi buruz dauden berri guztiak zerrendatzeko.");

@@ -4,35 +4,33 @@
 /* PHP-NUKE: Advanced Content Management System                           */
 /* ============================================                           */
 /*                                                                        */
-/* Php-Nuke'nin sürekli geliþmesine baðlý olarak eski Türkçe dil dosyalarý*/
-/* güncelliðini yitirdiði için "HighLAndeR" tarafýndan "MaXCoDeR"in       */
-/* yapmýþ olduðu çeviriler güncelleþtirilip yeni çeviriler eklenmiþtir... */
+/* Php-Nuke'nin sï¿½rekli geliï¿½mesine baï¿½lï¿½ olarak eski Tï¿½rkï¿½e dil dosyalarï¿½*/
+/* gï¿½ncelliï¿½ini yitirdiï¿½i iï¿½in "HighLAndeR" tarafï¿½ndan "MaXCoDeR"in       */
+/* yapmï¿½ï¿½ olduï¿½u ï¿½eviriler gï¿½ncelleï¿½tirilip yeni ï¿½eviriler eklenmiï¿½tir... */
 /*                                                                        */
-/* NOT: Yardýmlarý için Gurol400(gurol400@propc.org)'e teþekkürler.       */
+/* NOT: Yardï¿½mlarï¿½ iï¿½in Gurol400(gurol400@propc.org)'e teï¿½ekkï¿½rler.       */
 /*                                                                        */
-/* Türkçe Çevirmeni: HighLAndeR                                           */
-/* Email: highlander@propc.org ICQ#: 110930777 	URL: http://www.propc.org */
+/* Tï¿½rkï¿½e ï¿½evirmeni: HighLAndeR                                           */
+/* Email: highlander@propc.org ICQ#: 110930777     URL: http://www.propc.org */
 /*                                                                        */
-/* Türkçe Çevirmeni: Selim "MaXCoDeR" Þumlu                               */
+/* Tï¿½rkï¿½e ï¿½evirmeni: Selim "MaXCoDeR" ï¿½umlu                               */
 /* Mail:webmaster@pcnet.com.tr ICQ:19648424 URL: http://www.turknuke.com  */
 /**************************************************************************/
 
-define("_SEND","Gönder");
-define("_FYOURNAME","Ýsminiz:");
-define("_FYOUREMAIL","E-mail Adresiniz:");
-define("_FFRIENDNAME","Arkadaþýnýzýn Ýsmi:");
-define("_FFRIENDEMAIL","Arkadaþýnýzýn E-mail'i:");
-define("_HELLO","Merhaba");
-define("_YOURFRIEND","Arkadasiniz");
-define("_RECOMMEND","Bu Siteyi Arkadaþýna Öner");
-define("_INTSITE","ilginc bir site:");
-define("_OURSITE","sitemiz olan");
-define("_INTSENT","adli siteyi ilginc buldu ve size gondermek istedi.");
-define("_FSITENAME","Site Ýsmi:");
-define("_FSITEURL","Site Adresi:");
-define("_FREFERENCE","Referansýmýzýn gönerildiði kiþi:");
-define("_THANKSREC","Bizi önerdiðiniz için teþekkürler!");
-define("_SECURITYCODEERROR","<b>ERROR:</b> The security code you wrote is incorrect...<br>Please write it exactly as given bellow:");
-define("_SENDSITEERROR","<b>Error sending the recommendation...</b><br><br><b>ERROR:</b> One or more required fields are empty.<br>Please go back and correct the problem, then try again.");
-
-?>
+define("_SEND", "Gï¿½nder");
+define("_FYOURNAME", "ï¿½sminiz:");
+define("_FYOUREMAIL", "E-mail Adresiniz:");
+define("_FFRIENDNAME", "Arkadaï¿½ï¿½nï¿½zï¿½n ï¿½smi:");
+define("_FFRIENDEMAIL", "Arkadaï¿½ï¿½nï¿½zï¿½n E-mail'i:");
+define("_HELLO", "Merhaba");
+define("_YOURFRIEND", "Arkadasiniz");
+define("_RECOMMEND", "Bu Siteyi Arkadaï¿½ï¿½na ï¿½ner");
+define("_INTSITE", "ilginc bir site:");
+define("_OURSITE", "sitemiz olan");
+define("_INTSENT", "adli siteyi ilginc buldu ve size gondermek istedi.");
+define("_FSITENAME", "Site ï¿½smi:");
+define("_FSITEURL", "Site Adresi:");
+define("_FREFERENCE", "Referansï¿½mï¿½zï¿½n gï¿½nerildiï¿½i kiï¿½i:");
+define("_THANKSREC", "Bizi ï¿½nerdiï¿½iniz iï¿½in teï¿½ekkï¿½rler!");
+define("_SECURITYCODEERROR", "<b>ERROR:</b> The security code you wrote is incorrect...<br>Please write it exactly as given bellow:");
+define("_SENDSITEERROR", "<b>Error sending the recommendation...</b><br><br><b>ERROR:</b> One or more required fields are empty.<br>Please go back and correct the problem, then try again.");

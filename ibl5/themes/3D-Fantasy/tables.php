@@ -1,6 +1,7 @@
 <?php
 
-function OpenTable() {
+function OpenTable()
+{
     echo "<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\" width=\"100%\"><tr>
     <td width=\"15\" height=\"15\"><img src=\"themes/3D-Fantasy/images/up-left2.gif\" alt=\"\" border=\"0\"></td>
     <td background=\"themes/3D-Fantasy/images/up2.gif\" align=\"center\" width=\"100%\" height=\"15\">&nbsp;</td>
@@ -10,7 +11,8 @@ function OpenTable() {
     <td bgcolor=\"ffffff\" width=\"100%\">";
 }
 
-function OpenTable2() {
+function OpenTable2()
+{
 
     echo "<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\" align=\"center\"><tr>
     <td width=\"15\" height=\"15\"><img src=\"themes/3D-Fantasy/images/up-left2.gif\" alt=\"\" border=\"0\"></td>
@@ -20,8 +22,9 @@ function OpenTable2() {
     <td background=\"themes/3D-Fantasy/images/left2.gif\" width=\"15\">&nbsp;</td>
     <td bgcolor=\"ffffff\">";
 }
-    
-function CloseTable() {
+
+function CloseTable()
+{
     echo "</td>
     <td background=\"themes/3D-Fantasy/images/right2.gif\">&nbsp;</td></tr>
     <tr>
@@ -32,7 +35,8 @@ function CloseTable() {
     <br>";
 }
 
-function CloseTable2() {
+function CloseTable2()
+{
     echo "</td>
     <td background=\"themes/3D-Fantasy/images/right2.gif\">&nbsp;</td></tr>
     <tr>
@@ -42,5 +46,3 @@ function CloseTable2() {
     </td></tr></table>
     <br>";
 }
-
-?>

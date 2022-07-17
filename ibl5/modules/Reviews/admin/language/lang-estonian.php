@@ -17,30 +17,26 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_EMAIL","Email");
-define("_SAVECHANGES","Salvesta muudatused");
-define("_SCORE","Punktid:");
-define("_PRODUCTTITLE","Toote pealkiri");
-define("_RELATEDLINK","Seotud link");
-define("_LINKTITLE","Lingi pealkiri");
-define("_REVIEWER","Ülevaate kirjutas:");
-define("_REVIEWID","Ülevaate ID");
-define("_REVIEWS","Ülevaadet");
-define("_DATE","Kuupäev");
-define("_REVADMIN","Ülevaadete administratsioon");
-define("_REVTITLE","Ülevaadete lehe pealkiri");
-define("_REVDESC","Ülevaadete lehe kirjeldus");
-define("_REVWAITING","Ülevaadet ootab heakskiitu");
-define("_REVIMGINFO","Salvesta oma 150*150 pilt images/reviews kaustas");
-define("_TEXT","Tekst");
-define("_IMAGE","Pilt");
-define("_NOREVIEW2ADD","Ülevaadet ei ole lisatud");
-define("_ADDREVIEW","Lisa ülevaade");
-define("_CLICK2ADDREVIEW","Kliki siia et kirjutada ülevaade");
-define("_DELMODREVIEW","Kustuta/Muuda ülevaadet");
-define("_MODREVINFO","Sa võid lihsalt kustutada/muuta <a href=\"modules.php?name=Reviews\">Ülevaated</a>avades neid Adminnina.");
-define("_LANGUAGE","Keel");
-
-
-?>
+define("_EMAIL", "Email");
+define("_SAVECHANGES", "Salvesta muudatused");
+define("_SCORE", "Punktid:");
+define("_PRODUCTTITLE", "Toote pealkiri");
+define("_RELATEDLINK", "Seotud link");
+define("_LINKTITLE", "Lingi pealkiri");
+define("_REVIEWER", "ï¿½levaate kirjutas:");
+define("_REVIEWID", "ï¿½levaate ID");
+define("_REVIEWS", "ï¿½levaadet");
+define("_DATE", "Kuupï¿½ev");
+define("_REVADMIN", "ï¿½levaadete administratsioon");
+define("_REVTITLE", "ï¿½levaadete lehe pealkiri");
+define("_REVDESC", "ï¿½levaadete lehe kirjeldus");
+define("_REVWAITING", "ï¿½levaadet ootab heakskiitu");
+define("_REVIMGINFO", "Salvesta oma 150*150 pilt images/reviews kaustas");
+define("_TEXT", "Tekst");
+define("_IMAGE", "Pilt");
+define("_NOREVIEW2ADD", "ï¿½levaadet ei ole lisatud");
+define("_ADDREVIEW", "Lisa ï¿½levaade");
+define("_CLICK2ADDREVIEW", "Kliki siia et kirjutada ï¿½levaade");
+define("_DELMODREVIEW", "Kustuta/Muuda ï¿½levaadet");
+define("_MODREVINFO", "Sa vï¿½id lihsalt kustutada/muuta <a href=\"modules.php?name=Reviews\">ï¿½levaated</a>avades neid Adminnina.");
+define("_LANGUAGE", "Keel");

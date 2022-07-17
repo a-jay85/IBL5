@@ -5,9 +5,9 @@ $sharedFunctions = new Shared($db);
 $currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
 $previousSeasonEndingYear = $currentSeasonEndingYear - 1;
 
-$query="SELECT a.name, a.teamid, a.team, b.tid, b.teamname FROM nuke_iblhist a, nuke_iblplyr b WHERE a.pid = b.pid AND a.year = $previousSeasonEndingYear AND a.teamid != b.tid ORDER BY b.teamname";
-$result=$db->sql_query($query);
-$num=$db->sql_numrows($result);
+$query = "SELECT a.name, a.teamid, a.team, b.tid, b.teamname FROM nuke_iblhist a, nuke_iblplyr b WHERE a.pid = b.pid AND a.year = $previousSeasonEndingYear AND a.teamid != b.tid ORDER BY b.teamname";
+$result = $db->sql_query($query);
+$num = $db->sql_numrows($result);
 
 echo "<script src=\"http://www.iblhoops.net/jslib/sorttable.js\"></script>
 <center>
@@ -22,16 +22,15 @@ echo "<script src=\"http://www.iblhoops.net/jslib/sorttable.js\"></script>
 
 $i = 0;
 while ($i < $num) {
-	$playername = $db->sql_result($result, $i, "name");
-	$oldteam = $db->sql_result($result, $i, "team");
-	$newteam = $db->sql_result($result, $i, "teamname");
-	echo "<tr>
+    $playername = $db->sql_result($result, $i, "name");
+    $oldteam = $db->sql_result($result, $i, "team");
+    $newteam = $db->sql_result($result, $i, "teamname");
+    echo "<tr>
 		<td>$playername</td>
 		<td>$newteam</td>
 		<td>$oldteam</td>
 	</tr>";
-	$i++;
+    $i++;
 }
 
 echo "</table></center>";
-?>

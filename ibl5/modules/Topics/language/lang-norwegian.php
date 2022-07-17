@@ -17,7 +17,5 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_ACTIVETOPICS","Aktive emner");
-define("_CLICK2LIST","Trykk på emne for å se oversikt over alle artikler");
-
-?>
+define("_ACTIVETOPICS", "Aktive emner");
+define("_CLICK2LIST", "Trykk pï¿½ emne for ï¿½ se oversikt over alle artikler");

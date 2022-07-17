@@ -17,18 +17,16 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PREVIOUS","Vorherige Seite");
-define("_NEXT","N&auml;chste Seite");
-define("_PAGE","Seite");
-define("_DEACTIVATE","Deaktivieren");
-define("_ACTIVATE","Aktivieren");
-define("_PUBLISHEDON","Publiziert am");
-define("_PAGESLIST","Seiten gelisted");
-define("_LISTOFCONTENT","Zeige den vorhanden Inhalt in");
-define("_YOURADMINLIST","Sie sind Administrator: nachfolgend die inaktiven Seiten:");
-define("_COPYRIGHT","Copyright &copy; by");
-define("_COPYRIGHT2","Alle Rechte vorbehalten.");
-define("_CONTENTCATEGORIES","verf&uuml;gbare Kategorien");
-define("_NONCLASSCONT","Nicht kategorisierter Inhalt");
-
-?>
+define("_PREVIOUS", "Vorherige Seite");
+define("_NEXT", "N&auml;chste Seite");
+define("_PAGE", "Seite");
+define("_DEACTIVATE", "Deaktivieren");
+define("_ACTIVATE", "Aktivieren");
+define("_PUBLISHEDON", "Publiziert am");
+define("_PAGESLIST", "Seiten gelisted");
+define("_LISTOFCONTENT", "Zeige den vorhanden Inhalt in");
+define("_YOURADMINLIST", "Sie sind Administrator: nachfolgend die inaktiven Seiten:");
+define("_COPYRIGHT", "Copyright &copy; by");
+define("_COPYRIGHT2", "Alle Rechte vorbehalten.");
+define("_CONTENTCATEGORIES", "verf&uuml;gbare Kategorien");
+define("_NONCLASSCONT", "Nicht kategorisierter Inhalt");

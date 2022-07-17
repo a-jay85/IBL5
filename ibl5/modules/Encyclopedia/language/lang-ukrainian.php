@@ -17,30 +17,25 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
+define("_PREVIOUS", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_NEXT", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
 
-
-
-define("_PREVIOUS","Попережня сторінка");
-define("_NEXT","Наступна сторінка");
-
-define("_SEARCHRESULTS","Результати пошуку");
-define("_PAGE","Сторінка");
-define("_RETURNTO","Повернутись на ");
-define("_DEACTIVATE","Зробити неактивним");
-define("_ACTIVATE","Зробити активним");
-define("_ENCYCLOPEDIA","Encyclopedia");
-define("_NOCONTENTFORLETTER","Sorry, there isn't any content for the letter");
-define("_ENCYSELECTLETTER","Please select a letter from the following list to consult terms:");
-define("_COPYRIGHT","Copyright");
-define("_YOURADMINENCY","You're Administrator, this encyclopedia isn't active!");
-define("_ENCYNOTACTIVE","Sorry, this encyclopedia isn't active right now.");
-define("_AVAILABLEENCYLIST","List of available Encyclopedias in");
-define("_YOURADMININACTIVELIST","You're Administrator: following is the list of Inactive Encyclopedias:");
-define("_NORESULTSTEXT","No Results in Term's Text...");
-define("_NORESULTSTITLE","No Results in Term's Title...");
-define("_SEARCHRESULTSFOR","Search Results for:");
-define("_SEARCHNOTCOMPLETE","Search options aren't complete. Please try again.");
-define("_RESULTSINTERMTITLE","Results in the term's title:");
-define("_RESULTSINTERMTEXT","Results in the term's text:");
-
-?>
+define("_SEARCHRESULTS", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_PAGE", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_RETURNTO", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ ");
+define("_DEACTIVATE", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_ACTIVATE", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_ENCYCLOPEDIA", "Encyclopedia");
+define("_NOCONTENTFORLETTER", "Sorry, there isn't any content for the letter");
+define("_ENCYSELECTLETTER", "Please select a letter from the following list to consult terms:");
+define("_COPYRIGHT", "Copyright");
+define("_YOURADMINENCY", "You're Administrator, this encyclopedia isn't active!");
+define("_ENCYNOTACTIVE", "Sorry, this encyclopedia isn't active right now.");
+define("_AVAILABLEENCYLIST", "List of available Encyclopedias in");
+define("_YOURADMININACTIVELIST", "You're Administrator: following is the list of Inactive Encyclopedias:");
+define("_NORESULTSTEXT", "No Results in Term's Text...");
+define("_NORESULTSTITLE", "No Results in Term's Title...");
+define("_SEARCHRESULTSFOR", "Search Results for:");
+define("_SEARCHNOTCOMPLETE", "Search options aren't complete. Please try again.");
+define("_RESULTSINTERMTITLE", "Results in the term's title:");
+define("_RESULTSINTERMTEXT", "Results in the term's text:");

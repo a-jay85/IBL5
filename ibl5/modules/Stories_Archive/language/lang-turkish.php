@@ -4,31 +4,29 @@
 /* PHP-NUKE: Advanced Content Management System                           */
 /* ============================================                           */
 /*                                                                        */
-/* Php-Nuke'nin sürekli geliþmesine baðlý olarak eski Türkçe dil dosyalarý*/
-/* güncelliðini yitirdiði için "HighLAndeR" tarafýndan "MaXCoDeR"in       */
-/* yapmýþ olduðu çeviriler güncelleþtirilip yeni çeviriler eklenmiþtir... */
+/* Php-Nuke'nin sï¿½rekli geliï¿½mesine baï¿½lï¿½ olarak eski Tï¿½rkï¿½e dil dosyalarï¿½*/
+/* gï¿½ncelliï¿½ini yitirdiï¿½i iï¿½in "HighLAndeR" tarafï¿½ndan "MaXCoDeR"in       */
+/* yapmï¿½ï¿½ olduï¿½u ï¿½eviriler gï¿½ncelleï¿½tirilip yeni ï¿½eviriler eklenmiï¿½tir... */
 /*                                                                        */
-/* NOT: Yardýmlarý için Gurol400(gurol400@propc.org)'e teþekkürler.       */
+/* NOT: Yardï¿½mlarï¿½ iï¿½in Gurol400(gurol400@propc.org)'e teï¿½ekkï¿½rler.       */
 /*                                                                        */
-/* Türkçe Çevirmeni: HighLAndeR                                           */
-/* Email: highlander@propc.org ICQ#: 110930777 	URL: http://www.propc.org */
+/* Tï¿½rkï¿½e ï¿½evirmeni: HighLAndeR                                           */
+/* Email: highlander@propc.org ICQ#: 110930777     URL: http://www.propc.org */
 /*                                                                        */
-/* Türkçe Çevirmeni: Selim "MaXCoDeR" Þumlu                               */
+/* Tï¿½rkï¿½e ï¿½evirmeni: Selim "MaXCoDeR" ï¿½umlu                               */
 /* Mail:webmaster@pcnet.com.tr ICQ:19648424 URL: http://www.turknuke.com  */
 /**************************************************************************/
 
-define("_PRINTER","Yazdýrýlabilir Sayfa");
-define("_FRIEND","Bu Haberi Arkadaþýna Gönder");
-define("_ARTICLES","Haber");
-define("_USCORE","Puan");
-define("_DATE","Tarih");
-define("_SELECTMONTH2VIEW","Lütfen görüntülemek istediðiniz ayý seçin:");
-define("_SHOWALLSTORIES","TÜM Haberleri Göster");
-define("_STORIESARCHIVE","Haber Arþivi");
-define("_ACTIONS","Hareketler");
-define("_ARCHIVESINDEX","Haber Arþivi Ýndeksi");
-define("_ALLSTORIESARCH","Tüm Haberler");
-define("_NEXTPAGE","Sonraki Sayfa");
-define("_PREVIOUSPAGE","Önceki Sayfa");
-
-?>
+define("_PRINTER", "Yazdï¿½rï¿½labilir Sayfa");
+define("_FRIEND", "Bu Haberi Arkadaï¿½ï¿½na Gï¿½nder");
+define("_ARTICLES", "Haber");
+define("_USCORE", "Puan");
+define("_DATE", "Tarih");
+define("_SELECTMONTH2VIEW", "Lï¿½tfen gï¿½rï¿½ntï¿½lemek istediï¿½iniz ayï¿½ seï¿½in:");
+define("_SHOWALLSTORIES", "Tï¿½M Haberleri Gï¿½ster");
+define("_STORIESARCHIVE", "Haber Arï¿½ivi");
+define("_ACTIONS", "Hareketler");
+define("_ARCHIVESINDEX", "Haber Arï¿½ivi ï¿½ndeksi");
+define("_ALLSTORIESARCH", "Tï¿½m Haberler");
+define("_NEXTPAGE", "Sonraki Sayfa");
+define("_PREVIOUSPAGE", "ï¿½nceki Sayfa");

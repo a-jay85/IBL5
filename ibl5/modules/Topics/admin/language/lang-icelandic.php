@@ -17,30 +17,26 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_CURRENTTOPICS","Current Active Topics");
-define("_CLICK2EDIT","Click on Topic to Edit");
-define("_ADDATOPIC","Add a New Topic");
-define("_TOPICNAME","Topic Name");
-define("_TOPICNAME1","(just a name without spaces - max: 20 characters)");
-define("_TOPICNAME2","(for example: gamesandhobbies)");
-define("_TOPICTEXT","Topic Text");
-define("_TOPICTEXT1","(the full topic text or description - max: 40 characters)");
-define("_TOPICTEXT2","(for example: Games and Hobbies)");
-define("_TOPICIMAGE","Topic Image");
-define("_ADDTOPIC","Add Topic");
-define("_EDITTOPIC","Edit Topic");
-define("_ADDRELATED","Add Related Links");
-define("_ACTIVERELATEDLINKS","Active Related Links");
-define("_SITENAME","Site Name");
-define("_NORELATED","There are no related links for this topic");
-define("_EDITRELATED","Edit Related Link");
-define("_YES","Já");
-define("_NO","Nei");
-define("_TOPICSMANAGER","Kerfisstjórn efnisflokka");
-define("_DELETETOPIC","Eyða efnisflokki");
-define("_TOPICDELSURE","Ertu viss um að þú viljir eyða þessum efnisflokki");
-define("_TOPICDELSURE1","Þetta mun eyða ÖLLUM fréttum og athugasemdum í þessum efnisflokki!");
-
-
-?>
+define("_CURRENTTOPICS", "Current Active Topics");
+define("_CLICK2EDIT", "Click on Topic to Edit");
+define("_ADDATOPIC", "Add a New Topic");
+define("_TOPICNAME", "Topic Name");
+define("_TOPICNAME1", "(just a name without spaces - max: 20 characters)");
+define("_TOPICNAME2", "(for example: gamesandhobbies)");
+define("_TOPICTEXT", "Topic Text");
+define("_TOPICTEXT1", "(the full topic text or description - max: 40 characters)");
+define("_TOPICTEXT2", "(for example: Games and Hobbies)");
+define("_TOPICIMAGE", "Topic Image");
+define("_ADDTOPIC", "Add Topic");
+define("_EDITTOPIC", "Edit Topic");
+define("_ADDRELATED", "Add Related Links");
+define("_ACTIVERELATEDLINKS", "Active Related Links");
+define("_SITENAME", "Site Name");
+define("_NORELATED", "There are no related links for this topic");
+define("_EDITRELATED", "Edit Related Link");
+define("_YES", "Jï¿½");
+define("_NO", "Nei");
+define("_TOPICSMANAGER", "Kerfisstjï¿½rn efnisflokka");
+define("_DELETETOPIC", "Eyï¿½a efnisflokki");
+define("_TOPICDELSURE", "Ertu viss um aï¿½ ï¿½ï¿½ viljir eyï¿½a ï¿½essum efnisflokki");
+define("_TOPICDELSURE1", "ï¿½etta mun eyï¿½a ï¿½LLUM frï¿½ttum og athugasemdum ï¿½ ï¿½essum efnisflokki!");

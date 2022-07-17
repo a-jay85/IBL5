@@ -29,28 +29,26 @@ $content .= "<table width=150>";
 
 $i = 0;
 while ($i < $num) {
-	$tid = $db->sql_result($result, $i, "TeamID");
-	$Team = $db->sql_result($result, $i, "Team");
-	$ranking = $db->sql_result($result, $i, "ranking");
-	$wins = $db->sql_result($result, $i, "win");
-	$losses = $db->sql_result($result, $i, "loss");
-	$teamcolor1 = $db->sql_result($result, $i, "color1");
-	$teamcolor2 = $db->sql_result($result, $i, "color2");
+    $tid = $db->sql_result($result, $i, "TeamID");
+    $Team = $db->sql_result($result, $i, "Team");
+    $ranking = $db->sql_result($result, $i, "ranking");
+    $wins = $db->sql_result($result, $i, "win");
+    $losses = $db->sql_result($result, $i, "loss");
+    $teamcolor1 = $db->sql_result($result, $i, "color1");
+    $teamcolor2 = $db->sql_result($result, $i, "color2");
 
-	$bgcolor = "$teamcolor1";
+    $bgcolor = "$teamcolor1";
 
-	$content .= "<tr>
+    $content .= "<tr>
         <td align=right valign=top>" . ($i + 1) . ".</td>
         <td bgcolor=$bgcolor align=center><a href=\"modules.php?name=Team&op=team&tid=$tid\"><font color=#$teamcolor2>$Team</font></a></td>
         <td align=right valign=top>$ranking</td>
     </tr>";
 
-	$i++;
+    $i++;
 }
 
 $content .= "<tr>
     <td colspan=3><center><a href=\"modules.php?name=Power_Rankings\"><font color=#aaaaaa><i>-- Full Power Rankings --</i></font></a></center></td>
 </tr>
 </table>";
-
-?>

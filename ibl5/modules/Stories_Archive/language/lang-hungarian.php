@@ -17,18 +17,16 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PRINTER","Nyomtatható változat");
-define("_FRIEND","Küldd el levélben!");
-define("_ARTICLES","cikk");
-define("_USCORE","Osztályzatok");
-define("_DATE","Dátum");
-define("_SELECTMONTH2VIEW","Please select the month you want to view:");
-define("_SHOWALLSTORIES","Show ALL Stories");
-define("_STORIESARCHIVE","Stories Archive");
-define("_ACTIONS","Actions");
-define("_ARCHIVESINDEX","Stories Archive Index");
-define("_ALLSTORIESARCH","All Stories");
-define("_NEXTPAGE","Next Page");
-define("_PREVIOUSPAGE","Previous Page");
-
-?>
+define("_PRINTER", "Nyomtathatï¿½ vï¿½ltozat");
+define("_FRIEND", "Kï¿½ldd el levï¿½lben!");
+define("_ARTICLES", "cikk");
+define("_USCORE", "Osztï¿½lyzatok");
+define("_DATE", "Dï¿½tum");
+define("_SELECTMONTH2VIEW", "Please select the month you want to view:");
+define("_SHOWALLSTORIES", "Show ALL Stories");
+define("_STORIESARCHIVE", "Stories Archive");
+define("_ACTIONS", "Actions");
+define("_ARCHIVESINDEX", "Stories Archive Index");
+define("_ALLSTORIESARCH", "All Stories");
+define("_NEXTPAGE", "Next Page");
+define("_PREVIOUSPAGE", "Previous Page");

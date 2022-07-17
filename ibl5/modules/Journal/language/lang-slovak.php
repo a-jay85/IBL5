@@ -2,10 +2,10 @@
 
 /*************************************************************************/
 /* The Slovak language file for module Journal                      */
-/* Author: AlRashid 			 Date: 09.09.2002   					 */
+/* Author: AlRashid              Date: 09.09.2002                        */
 /* alrashid@klokan.sk, http://alrashid.klokan.sk                         */
-/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk			     */
-/*  		Dakujem                                                      */
+/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk                 */
+/*          Dakujem                                                      */
 /*************************************************************************/
 /**************************************************************************/
 /* PHP-NUKE: Advanced Content Management System                           */
@@ -24,105 +24,103 @@
 /* And, if you use HTML code, please double check it.                     */
 /*************************************************************************/
 /* The Slovak language file for module Journal                      */
-/* Author: AlRashid 			 Date: 09.09.2002   					 */
+/* Author: AlRashid              Date: 09.09.2002                        */
 /* alrashid@klokan.sk, http://alrashid.klokan.sk                         */
-/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk			     */
-/*  		Dakujem                                                      */
+/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk                 */
+/*          Dakujem                                                      */
 /*************************************************************************/
 /**************************************************************************/
 
-define("_USERSJOURNAL","Denník uívate¾a");
-define("_YOUMUSTBEMEMBER","Ak chcete zapisova do denníka, musíte by <a href=\"module.php?name=Your_Account\">registrovanım uívate¾om</a>.");
-define("_ADDJOURNAL","Prida záznam do denníka");
-define("_ADDENTRY","Prida záznam");
-define("_YOURLAST20","Poslednıch 20 záznamov");
-define("_LISTALLENTRIES","Vypísa všetky záznamy");
-define("_TITLE","Titulok");
-define("_BODY","Text");
-define("_WRAP","Odstavce oddelte pomocou &lt;p&gt; a &lt;/p&gt; tagov. HTML je povolené.");
-define("_LITTLEGRAPH","Obrázok");
-define("_OPTIONAL","(volite¾né)");
-define("_PUBLIC","Verejné");
-define("_TYPOS","(Skontrolovali ste preklepy?)");
-define("_LEAVECOMMENT","Okomentova záznam");
-define("_COMMENTBOX","Komentár");
-define("_POSTCOMMENT","Posla komentár");
-define("_COMMENTSNOTE","Pozn.: Vaše meno sa zobrazí ved¾a komentára. Nie je to teda anonymné. Majite¾ denníka môe kedyko¾vek vymaza Váš komentár.");
-define("_COMMENTDELETED","Komentár bol vymazanı z databázy");
-define("_RETURNJOURNAL","Návrat na Váš záznam v denníku");
-define("_COMMENTPOSTED","Váš komentár bol pridanı na koniec záznamu");
-define("_RETURNJOURNAL2","Návrat na záznam");
-define("_THANKS","Ïakujeme");
-define("_ABOUTTODELETE","Chcete vymaza záznam v denníku?");
-define("_SUREDELJOURNAL","Chcete urèite vymaza tento záznam?");
-define("_YOUCANTSAVE","U viac nebudete môc zobrazi tento záznam. VŠetky pridané komentáre budú taktie vymazané!");
-define("_YOUWRONG","Vaše <a href=\"modules.php?name=Your_Account\">uivate¾ské meno</a> nezodpovedá celkom zaznamenanému menu autora tohto príspevku.<br>Vzh¾adom na bezpeènostné opatrenia nebude tento denníkovı záznam vymazanı z databázy. <br> Presvedète sa, èi ste <a href=\"modules.php?name=Your_Account\">prihlásenı</a> na tejto stránke pod rovnakım menom ako autor");
-define("_ENTRYREMOVED","Denníkovı záznam bol vymazanı z databázy");
-define("_ANERROR","Vyskytol sa problém. Vráte sa, prosím, na domácu stránku <a href=\"modules.php?name=Journal\">Denníka</a>.");
-define("_ISPRIVATE","Toto je súkromnı záznam v denníku, nemáte právo zobrazi ho.");
-define("_LASTUPDATED","Naposledy zmenené");
-define("_WRITECOMMENT","Napísa komentár");
-define("_VIEWMORE","viac");
-define("_USERPROFILE","Profil uívate¾a");
-define("_SENDMESSAGE","Posla správu");
-define("_CREATEACCOUNT","Vytvori konto");
-define("_REGUSERSCOMM","<a href=\"modules.php?name=Your_Account\">Registrovaní</a> uívatelia tu môu zanecha komentár");
-define("_COMMENTBY","Okomentoval");
-define("_DELCOMMENT","Vymaza tento komentár");
-define("_NOTYOURS","Denníkovı záznam nepatrí uívate¾ovi <b>$username</b>.<br><b>Nemôete</b> upravi tento záznam.");
-define("_UPDATEOK","Úprava prebehla úspešne");
-define("_UPDATED","--- Záznam v denníku bol upravenı! ---");
-define("_JOURNALFOR","Denník uívate¾a");
-define("_LAST20FOR","Poslednıch 20 záznamov v denníku uívate¾a");
-define("_CLICKTOVIEW","(Priezrie)");
-define("_TIME","Èas");
-define("_COMPLETELIST","Kompletnı zoznam uívate¾a");
-define("_COMMENT","komentár");
-define("_PUBLICENTRIES","Verejné záznamy");
-define("_PRIVATEENTRIES","Súkromné záznamy");
-define("_TOTALENTRIES","Záznamov spolu");
-define("_JOURNALDIR","Adresár denníka");
-define("_YOURJOURNAL","Váš denník");
-define("_MEMBERSCAN","Registrovaní èlenovia si môu automaticky vytvori vlastnı denník a posiela komentáre.");
-define("_20ACTIVE","Poslednıch 20 aktívnych denníkov");
-define("_VIEWJOURNAL","Prezrie<br>Denník");
-define("_MEMBER","Èlen");
-define("_MEMBERPROFILE","Profil èlena");
-define("_CREATEACCOUNT2","Vytvori<br>konto");
-define("_PRIVMSGJ","Súkromná<br>správa");
-define("_PRIVMSGJ2","Súkromná správa");
-define("_ALPHABETICAL","Abecednı zoznam autorov denníkov");
-define("_VIEWJOURNAL2","Prezrie Denník");
-define("_USERPROFILE2","Profil uívate¾a");
-define("_20AUTHORS","Poslednıch 20 aktívnych autorov");
-define("_LISTALLJOURNALS","Vypísa všetky denníky");
-define("_SEARCHMEMBER","Vyh¾ada èlena");
-define("_EDITJOURNAL","Upravi záznam");
-define("_NOTYOURS2","Tento denníkovı záznam nepatrí uívate¾ovi <b>$username</b>.<br><b>Nemôete</b> ho upravova.");
-define("_MODIFYENTRY","Upravi záznam");
-define("_ENTRYADDED","Záznam bol pridanı do denníka");
-define("_JOURNALSEARCH","Preh¾adáva denníku");
-define("_IN","v");
-define("_SEARCHRESULTS","Preh¾adáva vısledky");
-define("_BODYTEXT","Text");
-define("_UCOMMENTS","Komentáre");
-define("_READ","Èíta");
-define("_PUBLICFOR","verejnıch záznamov bolo najdenıch vo Vašom vyh¾adávaní vırazu");
-define("_VIEW","Prezrie");
-define("_PROFILE","Profil");
-define("_SENDJFRIEND","Poslaø denník priate¾ovi");
-define("_YOUSENDJOURNAL","Posielate tento denníkovı záznam priate¾ovi. Vyplòte, prosím, nasledovnı formulár (vyaduje sa):");
-define("_FYOURNAME","VaŠe meno");
-define("_FYOUREMAIL","Váš email");
-define("_FFRIENDNAME","Meno Vášho priate¾a");
-define("_FFRIENDEMAIL","Email Vášho priate¾a");
-define("_SEND","Posla");
-define("_INTERESTING","Zaujímavı text na");
-define("_HELLO","Servus");
-define("_YOURFRIEND","Váš priate¾");
-define("_CONSIDERED","povauje nasledujúci záznam v denníku na našej stránke za zaujímavı aj pre Vás.");
-define("_AREMORE","Na našej stránke sú k dispozícii ïalšie denníky. Príïte si ich prezrie.");
-define("_FSENT","Správa bola odoslaná. Ïakujeme.");
-define("_URL","URL");
-
-?>
+define("_USERSJOURNAL", "Dennï¿½k uï¿½ï¿½vateï¿½a");
+define("_YOUMUSTBEMEMBER", "Ak chcete zapisovaï¿½ do dennï¿½ka, musï¿½te byï¿½ <a href=\"module.php?name=Your_Account\">registrovanï¿½m uï¿½ï¿½vateï¿½om</a>.");
+define("_ADDJOURNAL", "Pridaï¿½ zï¿½znam do dennï¿½ka");
+define("_ADDENTRY", "Pridaï¿½ zï¿½znam");
+define("_YOURLAST20", "Poslednï¿½ch 20 zï¿½znamov");
+define("_LISTALLENTRIES", "Vypï¿½saï¿½ vï¿½etky zï¿½znamy");
+define("_TITLE", "Titulok");
+define("_BODY", "Text");
+define("_WRAP", "Odstavce oddelte pomocou &lt;p&gt; a &lt;/p&gt; tagov. HTML je povolenï¿½.");
+define("_LITTLEGRAPH", "Obrï¿½zok");
+define("_OPTIONAL", "(voliteï¿½nï¿½)");
+define("_PUBLIC", "Verejnï¿½");
+define("_TYPOS", "(Skontrolovali ste preklepy?)");
+define("_LEAVECOMMENT", "Okomentovaï¿½ zï¿½znam");
+define("_COMMENTBOX", "Komentï¿½r");
+define("_POSTCOMMENT", "Poslaï¿½ komentï¿½r");
+define("_COMMENTSNOTE", "Pozn.: Vaï¿½e meno sa zobrazï¿½ vedï¿½a komentï¿½ra. Nie je to teda anonymnï¿½. Majiteï¿½ dennï¿½ka mï¿½ï¿½e kedykoï¿½vek vymazaï¿½ Vï¿½ komentï¿½r.");
+define("_COMMENTDELETED", "Komentï¿½r bol vymazanï¿½ z databï¿½zy");
+define("_RETURNJOURNAL", "Nï¿½vrat na Vï¿½ zï¿½znam v dennï¿½ku");
+define("_COMMENTPOSTED", "Vï¿½ komentï¿½r bol pridanï¿½ na koniec zï¿½znamu");
+define("_RETURNJOURNAL2", "Nï¿½vrat na zï¿½znam");
+define("_THANKS", "ï¿½akujeme");
+define("_ABOUTTODELETE", "Chcete vymazaï¿½ zï¿½znam v dennï¿½ku?");
+define("_SUREDELJOURNAL", "Chcete urï¿½ite vymazaï¿½ tento zï¿½znam?");
+define("_YOUCANTSAVE", "Uï¿½ viac nebudete mï¿½cï¿½ zobraziï¿½ tento zï¿½znam. Vï¿½etky pridanï¿½ komentï¿½re budï¿½ taktieï¿½ vymazanï¿½!");
+define("_YOUWRONG", "Vaï¿½e <a href=\"modules.php?name=Your_Account\">uï¿½ivateï¿½skï¿½ meno</a> nezodpovedï¿½ celkom zaznamenanï¿½mu menu autora tohto prï¿½spevku.<br>Vzhï¿½adom na bezpeï¿½nostnï¿½ opatrenia nebude tento dennï¿½kovï¿½ zï¿½znam vymazanï¿½ z databï¿½zy. <br> Presvedï¿½te sa, ï¿½i ste <a href=\"modules.php?name=Your_Account\">prihlï¿½senï¿½</a> na tejto strï¿½nke pod rovnakï¿½m menom ako autor");
+define("_ENTRYREMOVED", "Dennï¿½kovï¿½ zï¿½znam bol vymazanï¿½ z databï¿½zy");
+define("_ANERROR", "Vyskytol sa problï¿½m. Vrï¿½te sa, prosï¿½m, na domï¿½cu strï¿½nku <a href=\"modules.php?name=Journal\">Dennï¿½ka</a>.");
+define("_ISPRIVATE", "Toto je sï¿½kromnï¿½ zï¿½znam v dennï¿½ku, nemï¿½te prï¿½vo zobraziï¿½ ho.");
+define("_LASTUPDATED", "Naposledy zmenenï¿½");
+define("_WRITECOMMENT", "Napï¿½saï¿½ komentï¿½r");
+define("_VIEWMORE", "viac");
+define("_USERPROFILE", "Profil uï¿½ï¿½vateï¿½a");
+define("_SENDMESSAGE", "Poslaï¿½ sprï¿½vu");
+define("_CREATEACCOUNT", "Vytvoriï¿½ konto");
+define("_REGUSERSCOMM", "<a href=\"modules.php?name=Your_Account\">Registrovanï¿½</a> uï¿½ï¿½vatelia tu mï¿½ï¿½u zanechaï¿½ komentï¿½r");
+define("_COMMENTBY", "Okomentoval");
+define("_DELCOMMENT", "Vymazaï¿½ tento komentï¿½r");
+define("_NOTYOURS", "Dennï¿½kovï¿½ zï¿½znam nepatrï¿½ uï¿½ï¿½vateï¿½ovi <b>$username</b>.<br><b>Nemï¿½ï¿½ete</b> upraviï¿½ tento zï¿½znam.");
+define("_UPDATEOK", "ï¿½prava prebehla ï¿½speï¿½ne");
+define("_UPDATED", "--- Zï¿½znam v dennï¿½ku bol upravenï¿½! ---");
+define("_JOURNALFOR", "Dennï¿½k uï¿½ï¿½vateï¿½a");
+define("_LAST20FOR", "Poslednï¿½ch 20 zï¿½znamov v dennï¿½ku uï¿½ï¿½vateï¿½a");
+define("_CLICKTOVIEW", "(Priezrieï¿½)");
+define("_TIME", "ï¿½as");
+define("_COMPLETELIST", "Kompletnï¿½ zoznam uï¿½ï¿½vateï¿½a");
+define("_COMMENT", "komentï¿½r");
+define("_PUBLICENTRIES", "Verejnï¿½ zï¿½znamy");
+define("_PRIVATEENTRIES", "Sï¿½kromnï¿½ zï¿½znamy");
+define("_TOTALENTRIES", "Zï¿½znamov spolu");
+define("_JOURNALDIR", "Adresï¿½r dennï¿½ka");
+define("_YOURJOURNAL", "Vï¿½ dennï¿½k");
+define("_MEMBERSCAN", "Registrovanï¿½ ï¿½lenovia si mï¿½ï¿½u automaticky vytvoriï¿½ vlastnï¿½ dennï¿½k a posielaï¿½ komentï¿½re.");
+define("_20ACTIVE", "Poslednï¿½ch 20 aktï¿½vnych dennï¿½kov");
+define("_VIEWJOURNAL", "Prezrieï¿½<br>Dennï¿½k");
+define("_MEMBER", "ï¿½len");
+define("_MEMBERPROFILE", "Profil ï¿½lena");
+define("_CREATEACCOUNT2", "Vytvoriï¿½<br>konto");
+define("_PRIVMSGJ", "Sï¿½kromnï¿½<br>sprï¿½va");
+define("_PRIVMSGJ2", "Sï¿½kromnï¿½ sprï¿½va");
+define("_ALPHABETICAL", "Abecednï¿½ zoznam autorov dennï¿½kov");
+define("_VIEWJOURNAL2", "Prezrieï¿½ Dennï¿½k");
+define("_USERPROFILE2", "Profil uï¿½ï¿½vateï¿½a");
+define("_20AUTHORS", "Poslednï¿½ch 20 aktï¿½vnych autorov");
+define("_LISTALLJOURNALS", "Vypï¿½saï¿½ vï¿½etky dennï¿½ky");
+define("_SEARCHMEMBER", "Vyhï¿½adaï¿½ ï¿½lena");
+define("_EDITJOURNAL", "Upraviï¿½ zï¿½znam");
+define("_NOTYOURS2", "Tento dennï¿½kovï¿½ zï¿½znam nepatrï¿½ uï¿½ï¿½vateï¿½ovi <b>$username</b>.<br><b>Nemï¿½ï¿½ete</b> ho upravovaï¿½.");
+define("_MODIFYENTRY", "Upraviï¿½ zï¿½znam");
+define("_ENTRYADDED", "Zï¿½znam bol pridanï¿½ do dennï¿½ka");
+define("_JOURNALSEARCH", "Prehï¿½adï¿½vaï¿½ dennï¿½ku");
+define("_IN", "v");
+define("_SEARCHRESULTS", "Prehï¿½adï¿½vaï¿½ vï¿½sledky");
+define("_BODYTEXT", "Text");
+define("_UCOMMENTS", "Komentï¿½re");
+define("_READ", "ï¿½ï¿½taï¿½");
+define("_PUBLICFOR", "verejnï¿½ch zï¿½znamov bolo najdenï¿½ch vo Vaï¿½om vyhï¿½adï¿½vanï¿½ vï¿½razu");
+define("_VIEW", "Prezrieï¿½");
+define("_PROFILE", "Profil");
+define("_SENDJFRIEND", "Poslaï¿½ dennï¿½k priateï¿½ovi");
+define("_YOUSENDJOURNAL", "Posielate tento dennï¿½kovï¿½ zï¿½znam priateï¿½ovi. Vyplï¿½te, prosï¿½m, nasledovnï¿½ formulï¿½r (vyï¿½aduje sa):");
+define("_FYOURNAME", "Vaï¿½e meno");
+define("_FYOUREMAIL", "Vï¿½ email");
+define("_FFRIENDNAME", "Meno Vï¿½ho priateï¿½a");
+define("_FFRIENDEMAIL", "Email Vï¿½ho priateï¿½a");
+define("_SEND", "Poslaï¿½");
+define("_INTERESTING", "Zaujï¿½mavï¿½ text na");
+define("_HELLO", "Servus");
+define("_YOURFRIEND", "Vï¿½ priateï¿½");
+define("_CONSIDERED", "povaï¿½uje nasledujï¿½ci zï¿½znam v dennï¿½ku na naï¿½ej strï¿½nke za zaujï¿½mavï¿½ aj pre Vï¿½s.");
+define("_AREMORE", "Na naï¿½ej strï¿½nke sï¿½ k dispozï¿½cii ï¿½alï¿½ie dennï¿½ky. Prï¿½ï¿½te si ich prezrieï¿½.");
+define("_FSENT", "Sprï¿½va bola odoslanï¿½. ï¿½akujeme.");
+define("_URL", "URL");

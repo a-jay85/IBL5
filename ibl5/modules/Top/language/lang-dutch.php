@@ -17,25 +17,23 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_CATEGORY","Categorie");
-define("_LVOTES","Stemmen");
-define("_HITS","Hits:");
-define("_TOPWELCOME","Welkom op de TOP pagina van ");
-define("_READSTORIES","vaakst gelezen verhalen");
-define("_COMMENTEDSTORIES","vaakst gecommentarieerde verhalen");
-define("_ACTIVECAT","meest actieve categorieën");
-define("_READSECTION","vaakst gelezen artikelen in speciale secties");
-define("_NEWSSUBMITTERS","meest actieve nieuws-inzenders");
-define("_NEWSSENT","nieuws ingezonden");
-define("_VOTEDPOLLS","vaakst gestemde peilingen");
-define("_MOSTACTIVEAUTHORS","vaakst actieve auteurs");
-define("_NEWSPUBLISHED","nieuws gepubliceerd");
-define("_READREVIEWS","vaakst gelezen recensies");
-define("_DOWNLOADEDFILES","vaakst gedownloade bestanden");
-define("_MOSTREADPAGES","meest geraadpleegde pagina's");
-define("_MOSTVOTEDSTORIES","meest gestemde verhalen");
-define("_POINTS","punten");
-define("_BESTRATEDSTORIES","best beoordeelde verhalen (5 punten = maximum)");
-define("_LDOWNLOADS","x bekeken.");
-
-?>
+define("_CATEGORY", "Categorie");
+define("_LVOTES", "Stemmen");
+define("_HITS", "Hits:");
+define("_TOPWELCOME", "Welkom op de TOP pagina van ");
+define("_READSTORIES", "vaakst gelezen verhalen");
+define("_COMMENTEDSTORIES", "vaakst gecommentarieerde verhalen");
+define("_ACTIVECAT", "meest actieve categorieï¿½n");
+define("_READSECTION", "vaakst gelezen artikelen in speciale secties");
+define("_NEWSSUBMITTERS", "meest actieve nieuws-inzenders");
+define("_NEWSSENT", "nieuws ingezonden");
+define("_VOTEDPOLLS", "vaakst gestemde peilingen");
+define("_MOSTACTIVEAUTHORS", "vaakst actieve auteurs");
+define("_NEWSPUBLISHED", "nieuws gepubliceerd");
+define("_READREVIEWS", "vaakst gelezen recensies");
+define("_DOWNLOADEDFILES", "vaakst gedownloade bestanden");
+define("_MOSTREADPAGES", "meest geraadpleegde pagina's");
+define("_MOSTVOTEDSTORIES", "meest gestemde verhalen");
+define("_POINTS", "punten");
+define("_BESTRATEDSTORIES", "best beoordeelde verhalen (5 punten = maximum)");
+define("_LDOWNLOADS", "x bekeken.");

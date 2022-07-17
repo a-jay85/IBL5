@@ -17,19 +17,17 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PRINTER","Pagina Stampabile");
-define("_FRIEND","Invia questo Articolo ad un Amico");
-define("_ARTICLES","Articoli");
-define("_USCORE","Voto");
-define("_DATE","Data");
+define("_PRINTER", "Pagina Stampabile");
+define("_FRIEND", "Invia questo Articolo ad un Amico");
+define("_ARTICLES", "Articoli");
+define("_USCORE", "Voto");
+define("_DATE", "Data");
 
-define("_SELECTMONTH2VIEW","Seleziona il mese da vedere:");
-define("_SHOWALLSTORIES","Mostra tutti gli articoli");
-define("_STORIESARCHIVE","Archivio articoli");
-define("_ACTIONS","Azioni");
-define("_ARCHIVESINDEX","Indice archivio articoli");
-define("_ALLSTORIESARCH","Tutti gli articoli");
-define("_NEXTPAGE","Pagina seguente");
-define("_PREVIOUSPAGE","Pagina precedente");
-
-?>
+define("_SELECTMONTH2VIEW", "Seleziona il mese da vedere:");
+define("_SHOWALLSTORIES", "Mostra tutti gli articoli");
+define("_STORIESARCHIVE", "Archivio articoli");
+define("_ACTIONS", "Azioni");
+define("_ARCHIVESINDEX", "Indice archivio articoli");
+define("_ALLSTORIESARCH", "Tutti gli articoli");
+define("_NEXTPAGE", "Pagina seguente");
+define("_PREVIOUSPAGE", "Pagina precedente");

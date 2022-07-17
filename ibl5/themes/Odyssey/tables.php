@@ -11,24 +11,26 @@
 /* according with the table content                         */
 /************************************************************/
 
-function OpenTable() {
+function OpenTable()
+{
     global $bgcolor1, $bgcolor2;
     echo "<table width=\"100%\" border=\"0\" cellspacing=\"1\" cellpadding=\"0\" bgcolor=\"$bgcolor2\"><tr><td>\n";
     echo "<table width=\"100%\" border=\"0\" cellspacing=\"1\" cellpadding=\"8\" bgcolor=\"#FFFFFF\"><tr><td>\n";
 }
 
-function CloseTable() {
+function CloseTable()
+{
     echo "</td></tr></table></td></tr></table>\n";
 }
 
-function OpenTable2() {
+function OpenTable2()
+{
     global $bgcolor1, $bgcolor2;
     echo "<table border=\"0\" cellspacing=\"1\" cellpadding=\"0\" bgcolor=\"$bgcolor2\" align=\"center\"><tr><td>\n";
     echo "<table border=\"0\" cellspacing=\"1\" cellpadding=\"8\" bgcolor=\"#FFFFFF\"><tr><td>\n";
 }
 
-function CloseTable2() {
+function CloseTable2()
+{
     echo "</td></tr></table></td></tr></table>\n";
 }
-
-?>

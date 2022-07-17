@@ -12,7 +12,7 @@
 /* the Free Software Foundation; either version 2 of the License.       */
 /************************************************************************/
 
-if ( !defined('BLOCK_FILE') ) {
+if (!defined('BLOCK_FILE')) {
     Header("Location: ../index.php");
     die();
 }
@@ -21,5 +21,3 @@ if ( !defined('BLOCK_FILE') ) {
 $content = "<br>";
 $content .= ads(1);
 $content .= "<br>";
-
-?>

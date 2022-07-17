@@ -2,10 +2,10 @@
 
 /*************************************************************************/
 /* The Slovak language file for module News                      */
-/* Author: AlRashid 			 Date: 09.09.2002   					 */
+/* Author: AlRashid              Date: 09.09.2002                        */
 /* alrashid@klokan.sk, http://alrashid.klokan.sk                         */
-/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk			     */
-/*  		Dakujem                                                      */
+/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk                 */
+/*          Dakujem                                                      */
 /*************************************************************************/
 /**************************************************************************/
 /* PHP-NUKE: Advanced Content Management System                           */
@@ -24,116 +24,114 @@
 /* And, if you use HTML code, please double check it.                     */
 /*************************************************************************/
 /* The Slovak language file for module News                      */
-/* Author: AlRashid 			 Date: 09.09.2002   					 */
+/* Author: AlRashid              Date: 09.09.2002                        */
 /* alrashid@klokan.sk, http://alrashid.klokan.sk                         */
-/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk			     */
-/*  		Dakujem                                                      */
+/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk                 */
+/*          Dakujem                                                      */
 /*************************************************************************/
 /**************************************************************************/
 
-define("_SEND","Posla?");
-define("_URL","URL");
-define("_PRINTER","Stránka vhodná na tlaè");
-define("_FRIEND","Posla? tento èlánok priate¾ovi, známemu");
-define("_YOURNAME","Vaše meno");
-define("_OK","Ok!");
-define("_RELATED","Príbuzné odkazy");
-define("_MOREABOUT","Viac o");
-define("_NEWSBY","Iné èlánky od:");
-define("_MOSTREAD","Najèítanejšie èlánky");
-define("_READMORE","Èíta? ïalej...");
-define("_BYTESMORE","bajtov");
-define("_COMMENTSQ","Komentova?");
-define("_COMMENT","Komentár");
-define("_CONFIGURE","Konfigurácia");
-define("_LOGINCREATE","Prihlásenie/Vytvori? konto");
-define("_THRESHOLD","Prah");
-define("_NOCOMMENTS","Bez komentára");
-define("_NESTED","Triedené");
-define("_FLAT","Ako prišlo");
-define("_THREAD","V súvislostiach");
-define("_OLDEST","Najprv staršie");
-define("_NEWEST","Najprv novšie");
-define("_HIGHEST","Najprv s vyšším skóre");
-define("_COMMENTSWARNING","Za obsah komentárov je zodpovedný užívate¾, nie prevádzkovate¾ týchto stránok.");
-define("_SCORE","Skóre:");
-define("_USERINFO","O užívate¾ovi");
-define("_READREST","Èíta? zvyšok komentára...");
-define("_REPLY","odpoveda?");
-define("_REPLYMAIN","posla? komentár");
-define("_NOSUBJECT","Chýba predmet");
-define("_NOANONCOMMENTS","Ako anonymný užívate¾ nemôžete posiela? komentáre, prosím <a href=\"modules.php?name=Your_Account\">zaregistrujte sa</a>");
-define("_PARENT","Parent");
-define("_ROOT","Hlavný");
-define("_UCOMMENT","Komentár");
-define("_ALLOWEDHTML","Povoli? HTML:");
-define("_POSTANON","Posla? anonymne");
-define("_EXTRANS","Extrans (html kód do textu)");
-define("_HTMLFORMATED","HTML formátovanie");
-define("_PLAINTEXT","obyèajný text");
-define("_ONN","na...");
-define("_SUBJECT","Predmet");
-define("_COMMENTREPLY","Posla? komentár");
-define("_COMREPLYPRE","Prezrie? posielaný komentár");
-define("_NOTRIGHT","Nieèo nie je v poridku s pasovaním premennej do tejto funkcie.");
-define("_SENDAMSG","Posla? správu");
-define("_YOUSENDSTORY","Posla? tento èlánok:");
-define("_TOAFRIEND","Vášmu priate¾ovi, známemu:");
-define("_FYOURNAME","Vaše meno:");
-define("_FYOUREMAIL","Váš e-mail:");
-define("_FFRIENDNAME","Meno vášho priate¾a:");
-define("_FFRIENDEMAIL","E-mail vášho priate¾a:");
-define("_INTERESTING","Zaujimavy èlánok na");
-define("_HELLO","Ahoj,");
-define("_YOURFRIEND","Váš priate¾");
-define("_CONSIDERED","sa domnieva, že by Vás tento èlánok mohol zaujíma? a tak vám ho posiela.");
-define("_FDATE","Dátum:");
-define("_FTOPIC","Téma:");
-define("_YOUCANREAD","Aj ïalšie zaujímavé èlánky sú na");
-define("_FSTORY","èlánok");
-define("_HASSENT","bol odoslaný komu:");
-define("_THANKS","Vïaka!");
-define("_RECOMMEND","Posla? odporuèenie na tieto webstránky priate¾ovi, známemu");
-define("_PDATE","Dátum:");
-define("_PTOPIC","Vec:");
-define("_COMESFROM","Tento èlánok je z");
-define("_THEURL","URL tohoto èlánku je:");
-define("_PREVIEW","Prezrie?");
-define("_NEWUSER","Nový užívate¾");
-define("_OPTIONS","Možnosti");
-define("_REFRESH","Obnovi?");
-define("_ADD","Prida?");
-define("_NOCOMMENTSACT","Komentáre k tomuto èlánku nie sú dostupné.");
-define("_ARTICLEPOLL","Anketa k èlánku");
-define("_RATEARTICLE","Hodnotenie èlánku");
-define("_RATETHISARTICLE","Obetujte prosím chví¾ku hodnoteniu tohto èlánku:");
-define("_CASTMYVOTE","Moje hodnotenie");
-define("_AVERAGESCORE","Priemerné skóre");
-define("_BAD","Zlý");
-define("_REGULAR","Priemerný");
-define("_GOOD","Dobrý");
-define("_VERYGOOD","Ve¾mi dobrý");
-define("_EXCELLENT","Vynikajúci");
-define("_ARTICLERATING","Hodnotenie èlánku");
-define("_THANKSVOTEARTICLE","Ïakujeme za Vaše ohodnotenie.");
-define("_ALREADYVOTEDARTICLE","Prepáète, ale v nedávnej minulosti ste už ohodnotili tento èlánok!");
-define("_BACKTOARTICLEPAGE","Spä? na stránku s èlánkom");
-define("_DIDNTRATE","Nevybrali ste žiadne skóre pre tento èlánok");
-define("_NOINFO4TOPIC","Prepáète, k zadanej téme neexistuje žiadna ïalšia informácia");
-define("_GOTONEWSINDEX","Index èlánkov");
-define("_SELECTNEWTOPIC","Vybra? novú tému");
-define("_GOTOHOME","Návrat domov");
-define("_SEARCHONTOPIC","H¾ada? èlánky na túto tému");
-define("_SEARCHDIS","H¾ada? v diskusii");
-define("_READPDF","Read as PDF");
+define("_SEND", "Posla?");
+define("_URL", "URL");
+define("_PRINTER", "Strï¿½nka vhodnï¿½ na tlaï¿½");
+define("_FRIEND", "Posla? tento ï¿½lï¿½nok priateï¿½ovi, znï¿½memu");
+define("_YOURNAME", "Vaï¿½e meno");
+define("_OK", "Ok!");
+define("_RELATED", "Prï¿½buznï¿½ odkazy");
+define("_MOREABOUT", "Viac o");
+define("_NEWSBY", "Inï¿½ ï¿½lï¿½nky od:");
+define("_MOSTREAD", "Najï¿½ï¿½tanejï¿½ie ï¿½lï¿½nky");
+define("_READMORE", "ï¿½ï¿½ta? ï¿½alej...");
+define("_BYTESMORE", "bajtov");
+define("_COMMENTSQ", "Komentova?");
+define("_COMMENT", "Komentï¿½r");
+define("_CONFIGURE", "Konfigurï¿½cia");
+define("_LOGINCREATE", "Prihlï¿½senie/Vytvori? konto");
+define("_THRESHOLD", "Prah");
+define("_NOCOMMENTS", "Bez komentï¿½ra");
+define("_NESTED", "Triedenï¿½");
+define("_FLAT", "Ako priï¿½lo");
+define("_THREAD", "V sï¿½vislostiach");
+define("_OLDEST", "Najprv starï¿½ie");
+define("_NEWEST", "Najprv novï¿½ie");
+define("_HIGHEST", "Najprv s vyï¿½ï¿½ï¿½m skï¿½re");
+define("_COMMENTSWARNING", "Za obsah komentï¿½rov je zodpovednï¿½ uï¿½ï¿½vateï¿½, nie prevï¿½dzkovateï¿½ tï¿½chto strï¿½nok.");
+define("_SCORE", "Skï¿½re:");
+define("_USERINFO", "O uï¿½ï¿½vateï¿½ovi");
+define("_READREST", "ï¿½ï¿½ta? zvyï¿½ok komentï¿½ra...");
+define("_REPLY", "odpoveda?");
+define("_REPLYMAIN", "posla? komentï¿½r");
+define("_NOSUBJECT", "Chï¿½ba predmet");
+define("_NOANONCOMMENTS", "Ako anonymnï¿½ uï¿½ï¿½vateï¿½ nemï¿½ï¿½ete posiela? komentï¿½re, prosï¿½m <a href=\"modules.php?name=Your_Account\">zaregistrujte sa</a>");
+define("_PARENT", "Parent");
+define("_ROOT", "Hlavnï¿½");
+define("_UCOMMENT", "Komentï¿½r");
+define("_ALLOWEDHTML", "Povoli? HTML:");
+define("_POSTANON", "Posla? anonymne");
+define("_EXTRANS", "Extrans (html kï¿½d do textu)");
+define("_HTMLFORMATED", "HTML formï¿½tovanie");
+define("_PLAINTEXT", "obyï¿½ajnï¿½ text");
+define("_ONN", "na...");
+define("_SUBJECT", "Predmet");
+define("_COMMENTREPLY", "Posla? komentï¿½r");
+define("_COMREPLYPRE", "Prezrie? posielanï¿½ komentï¿½r");
+define("_NOTRIGHT", "Nieï¿½o nie je v poridku s pasovanï¿½m premennej do tejto funkcie.");
+define("_SENDAMSG", "Posla? sprï¿½vu");
+define("_YOUSENDSTORY", "Posla? tento ï¿½lï¿½nok:");
+define("_TOAFRIEND", "Vï¿½mu priateï¿½ovi, znï¿½memu:");
+define("_FYOURNAME", "Vaï¿½e meno:");
+define("_FYOUREMAIL", "Vï¿½ e-mail:");
+define("_FFRIENDNAME", "Meno vï¿½ho priateï¿½a:");
+define("_FFRIENDEMAIL", "E-mail vï¿½ho priateï¿½a:");
+define("_INTERESTING", "Zaujimavy ï¿½lï¿½nok na");
+define("_HELLO", "Ahoj,");
+define("_YOURFRIEND", "Vï¿½ priateï¿½");
+define("_CONSIDERED", "sa domnieva, ï¿½e by Vï¿½s tento ï¿½lï¿½nok mohol zaujï¿½ma? a tak vï¿½m ho posiela.");
+define("_FDATE", "Dï¿½tum:");
+define("_FTOPIC", "Tï¿½ma:");
+define("_YOUCANREAD", "Aj ï¿½alï¿½ie zaujï¿½mavï¿½ ï¿½lï¿½nky sï¿½ na");
+define("_FSTORY", "ï¿½lï¿½nok");
+define("_HASSENT", "bol odoslanï¿½ komu:");
+define("_THANKS", "Vï¿½aka!");
+define("_RECOMMEND", "Posla? odporuï¿½enie na tieto webstrï¿½nky priateï¿½ovi, znï¿½memu");
+define("_PDATE", "Dï¿½tum:");
+define("_PTOPIC", "Vec:");
+define("_COMESFROM", "Tento ï¿½lï¿½nok je z");
+define("_THEURL", "URL tohoto ï¿½lï¿½nku je:");
+define("_PREVIEW", "Prezrie?");
+define("_NEWUSER", "Novï¿½ uï¿½ï¿½vateï¿½");
+define("_OPTIONS", "Moï¿½nosti");
+define("_REFRESH", "Obnovi?");
+define("_ADD", "Prida?");
+define("_NOCOMMENTSACT", "Komentï¿½re k tomuto ï¿½lï¿½nku nie sï¿½ dostupnï¿½.");
+define("_ARTICLEPOLL", "Anketa k ï¿½lï¿½nku");
+define("_RATEARTICLE", "Hodnotenie ï¿½lï¿½nku");
+define("_RATETHISARTICLE", "Obetujte prosï¿½m chvï¿½ï¿½ku hodnoteniu tohto ï¿½lï¿½nku:");
+define("_CASTMYVOTE", "Moje hodnotenie");
+define("_AVERAGESCORE", "Priemernï¿½ skï¿½re");
+define("_BAD", "Zlï¿½");
+define("_REGULAR", "Priemernï¿½");
+define("_GOOD", "Dobrï¿½");
+define("_VERYGOOD", "Veï¿½mi dobrï¿½");
+define("_EXCELLENT", "Vynikajï¿½ci");
+define("_ARTICLERATING", "Hodnotenie ï¿½lï¿½nku");
+define("_THANKSVOTEARTICLE", "ï¿½akujeme za Vaï¿½e ohodnotenie.");
+define("_ALREADYVOTEDARTICLE", "Prepï¿½ï¿½te, ale v nedï¿½vnej minulosti ste uï¿½ ohodnotili tento ï¿½lï¿½nok!");
+define("_BACKTOARTICLEPAGE", "Spï¿½? na strï¿½nku s ï¿½lï¿½nkom");
+define("_DIDNTRATE", "Nevybrali ste ï¿½iadne skï¿½re pre tento ï¿½lï¿½nok");
+define("_NOINFO4TOPIC", "Prepï¿½ï¿½te, k zadanej tï¿½me neexistuje ï¿½iadna ï¿½alï¿½ia informï¿½cia");
+define("_GOTONEWSINDEX", "Index ï¿½lï¿½nkov");
+define("_SELECTNEWTOPIC", "Vybra? novï¿½ tï¿½mu");
+define("_GOTOHOME", "Nï¿½vrat domov");
+define("_SEARCHONTOPIC", "Hï¿½ada? ï¿½lï¿½nky na tï¿½to tï¿½mu");
+define("_SEARCHDIS", "Hï¿½ada? v diskusii");
+define("_READPDF", "Read as PDF");
 define("_READWITHCOMMENTS", "You can read the complete story with its comments from");
-define("_TOFINISHRATING","To finish the rating process and to let the system count your vote, please complete the requested information:");
-define("_TOFINISHRATINGERROR","<b>ERROR:</b> The security code you wrote is incorrect...<br>Please write it exactly as given bellow:");
-define("_YOURATEDARTICLE","Your vote was");
-define("_COMMENTSMODERATION","Comments Moderation System");
-define("_MODERATE","Moderate");
-define("_CLICKTOMODERATE","Please select your moderation values for each comment on this article, then click on <i>Moderate</i> button bellow to save your comments moderation preferences. Be fair on each value, this will contribute and benefict all users/readers. Thank you.");
-define("_COMMENTSSYSTEM","Comments System");
-define("_COMMENTPOSTERROR","<b>Error saving your comment...</b><br><br><b>ERROR:</b> The title or the main text of your comment are empty.<br>Please go back and correct the problem, then try again.");
-
-?>
+define("_TOFINISHRATING", "To finish the rating process and to let the system count your vote, please complete the requested information:");
+define("_TOFINISHRATINGERROR", "<b>ERROR:</b> The security code you wrote is incorrect...<br>Please write it exactly as given bellow:");
+define("_YOURATEDARTICLE", "Your vote was");
+define("_COMMENTSMODERATION", "Comments Moderation System");
+define("_MODERATE", "Moderate");
+define("_CLICKTOMODERATE", "Please select your moderation values for each comment on this article, then click on <i>Moderate</i> button bellow to save your comments moderation preferences. Be fair on each value, this will contribute and benefict all users/readers. Thank you.");
+define("_COMMENTSSYSTEM", "Comments System");
+define("_COMMENTPOSTERROR", "<b>Error saving your comment...</b><br><br><b>ERROR:</b> The title or the main text of your comment are empty.<br>Please go back and correct the problem, then try again.");

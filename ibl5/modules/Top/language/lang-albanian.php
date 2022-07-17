@@ -17,25 +17,23 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_CATEGORY","Kategoria");
-define("_LVOTES","Vota");
-define("_HITS","Hits");
-define("_TOPWELCOME","Faqja e TOP të");
-define("_READSTORIES","Artikujt më të lexuar");
-define("_COMMENTEDSTORIES","Artikujt më të komentuar");
-define("_ACTIVECAT","Kategoritë më aktive");
-define("_READSECTION","Artikujt më të lexuar në seksionet specialë");
-define("_NEWSSUBMITTERS","Dërguesit më aktivë");
-define("_NEWSSENT","artikujt e dërguar");
-define("_VOTEDPOLLS","Sondazhi më i votuar");
-define("_MOSTACTIVEAUTHORS","Autorët më aktivë");
-define("_NEWSPUBLISHED","artikujt e publikuar");
-define("_READREVIEWS","Recensimet më të lexuara");
-define("_DOWNLOADEDFILES","files më të shkarkuar");
-define("_LDOWNLOADS","downloads");
-define("_MOSTREADPAGES","faqet më të vizituara");
-define("_MOSTVOTEDSTORIES","artikujt më të votuar");
-define("_POINTS","pikë");
-define("_BESTRATEDSTORIES","artikujt me pozicion më të lartë (bazuar në maksimum 5 pikë)");
-
-?>
+define("_CATEGORY", "Kategoria");
+define("_LVOTES", "Vota");
+define("_HITS", "Hits");
+define("_TOPWELCOME", "Faqja e TOP tï¿½");
+define("_READSTORIES", "Artikujt mï¿½ tï¿½ lexuar");
+define("_COMMENTEDSTORIES", "Artikujt mï¿½ tï¿½ komentuar");
+define("_ACTIVECAT", "Kategoritï¿½ mï¿½ aktive");
+define("_READSECTION", "Artikujt mï¿½ tï¿½ lexuar nï¿½ seksionet specialï¿½");
+define("_NEWSSUBMITTERS", "Dï¿½rguesit mï¿½ aktivï¿½");
+define("_NEWSSENT", "artikujt e dï¿½rguar");
+define("_VOTEDPOLLS", "Sondazhi mï¿½ i votuar");
+define("_MOSTACTIVEAUTHORS", "Autorï¿½t mï¿½ aktivï¿½");
+define("_NEWSPUBLISHED", "artikujt e publikuar");
+define("_READREVIEWS", "Recensimet mï¿½ tï¿½ lexuara");
+define("_DOWNLOADEDFILES", "files mï¿½ tï¿½ shkarkuar");
+define("_LDOWNLOADS", "downloads");
+define("_MOSTREADPAGES", "faqet mï¿½ tï¿½ vizituara");
+define("_MOSTVOTEDSTORIES", "artikujt mï¿½ tï¿½ votuar");
+define("_POINTS", "pikï¿½");
+define("_BESTRATEDSTORIES", "artikujt me pozicion mï¿½ tï¿½ lartï¿½ (bazuar nï¿½ maksimum 5 pikï¿½)");

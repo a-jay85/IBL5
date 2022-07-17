@@ -27,12 +27,11 @@ position.position_id = player.position_id";
 $result = mysql_query($statement);
 $line = array();
 while ($row = mysql_fetch_array($result)) {
-  list($first, $last) = explode(" ",$row['player_name']);
-  $line[] = $row['pick_id'].'. - '.$last.', '.$first.', '.$row['position_name'].', '.$row['player_school'];
+    list($first, $last) = explode(" ", $row['player_name']);
+    $line[] = $row['pick_id'] . '. - ' . $last . ', ' . $first . ', ' . $row['position_name'] . ', ' . $row['player_school'];
 }
 if (count($line)) {
-  echo implode("\n",$line);
+    echo implode("\n", $line);
 } else {
-  echo "No drafted players";
+    echo "No drafted players";
 }
-?>

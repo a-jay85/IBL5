@@ -2,10 +2,10 @@
 
 /*************************************************************************/
 /* The Slovak language file for module FAQ                      */
-/* Author: AlRashid 			 Date: 09.09.2002   					 */
+/* Author: AlRashid              Date: 09.09.2002                        */
 /* alrashid@klokan.sk, http://alrashid.klokan.sk                         */
-/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk			     */
-/*  		Dakujem                                                      */
+/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk                 */
+/*          Dakujem                                                      */
 /*************************************************************************/
 /**************************************************************************/
 /* PHP-NUKE: Advanced Content Management System                           */
@@ -24,20 +24,18 @@
 /* And, if you use HTML code, please double check it.                     */
 /*************************************************************************/
 /* The Slovak language file for module FAQ                      */
-/* Author: AlRashid 			 Date: 09.09.2002   					 */
+/* Author: AlRashid              Date: 09.09.2002                        */
 /* alrashid@klokan.sk, http://alrashid.klokan.sk                         */
-/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk			     */
-/*  		Dakujem                                                      */
+/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk                 */
+/*          Dakujem                                                      */
 /*************************************************************************/
 /**************************************************************************/
 
-define("_CATEGORY","Kategória");
-define("_CATEGORIES","Kategórie");
-define("_FAQ2","FAQ (èasto kladené otázky)");
-define("_BACKTOTOP","Nahor");
-define("_BACKTOFAQINDEX","FAQ Index");
-define("_MAIN","Hlavné");
-define("_QUESTION","Otázka");
-define("_ANSWER","Odpoveï");
-
-?>
+define("_CATEGORY", "Kategï¿½ria");
+define("_CATEGORIES", "Kategï¿½rie");
+define("_FAQ2", "FAQ (ï¿½asto kladenï¿½ otï¿½zky)");
+define("_BACKTOTOP", "Nahor");
+define("_BACKTOFAQINDEX", "FAQ Index");
+define("_MAIN", "Hlavnï¿½");
+define("_QUESTION", "Otï¿½zka");
+define("_ANSWER", "Odpoveï¿½");

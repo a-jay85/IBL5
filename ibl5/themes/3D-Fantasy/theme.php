@@ -37,8 +37,8 @@ $bgcolor3 = "#ffffff";
 $bgcolor4 = "#d5d5d5";
 $textcolor1 = "#000000";
 $textcolor2 = "#000000";
-if(file_exists("themes/3D-Fantasy/tables.php")){
-include("themes/3D-Fantasy/tables.php");
+if (file_exists("themes/3D-Fantasy/tables.php")) {
+    include "themes/3D-Fantasy/tables.php";
 }
 /************************************************************/
 /* Function themeheader()                                   */
@@ -48,7 +48,8 @@ include("themes/3D-Fantasy/tables.php");
 /* function for left side with: blocks(left);               */
 /************************************************************/
 
-function themeheader() {
+function themeheader()
+{
     global $user, $banners, $sitename, $slogan, $cookie, $prefix, $anonymous, $db;
     cookiedecode($user);
     $username = $cookie[1];
@@ -56,33 +57,33 @@ function themeheader() {
         $username = $anonymous;
     }
     echo "<body bgcolor=\"#ffffff\" text=\"#000000\" link=\"#363636\" vlink=\"#363636\" alink=\"#d5ae83\"><br>\n\n\n";
-	ads(0);
+    ads(0);
     $topics_list = "<select name=\"topic\" onChange='submit()'>\n";
     $topics_list .= "<option value=\"\">All Topics</option>\n";
-    $toplist = $db->sql_query("select topicid, topictext from ".$prefix."_topics order by topictext");
-    while(list($topicid, $topics) = $db->sql_fetchrow($toplist)) {
-	$topicid = intval($topicid);
-    if ($topicid==$topic) { $sel = "selected "; }
-	$topics_list .= "<option $sel value=\"$topicid\">$topics</option>\n";
-	$sel = "";
+    $toplist = $db->sql_query("select topicid, topictext from " . $prefix . "_topics order by topictext");
+    while (list($topicid, $topics) = $db->sql_fetchrow($toplist)) {
+        $topicid = intval($topicid);
+        if ($topicid == $topic) {$sel = "selected ";}
+        $topics_list .= "<option $sel value=\"$topicid\">$topics</option>\n";
+        $sel = "";
     }
     if ($username == $anonymous) {
-	$theuser = "&nbsp;&nbsp;<a href=\"modules.php?name=Your_Account\">Create an account";
+        $theuser = "&nbsp;&nbsp;<a href=\"modules.php?name=Your_Account\">Create an account";
     } else {
-	$theuser = "&nbsp;&nbsp;Welcome $username!";
+        $theuser = "&nbsp;&nbsp;Welcome $username!";
     }
     $public_msg = public_message();
     $tmpl_file = "themes/3D-Fantasy/header.html";
     $thefile = implode("", file($tmpl_file));
     $thefile = addslashes($thefile);
-    $thefile = "\$r_file=\"".$thefile."\";";
+    $thefile = "\$r_file=\"" . $thefile . "\";";
     eval($thefile);
     print $r_file;
     blocks("left");
     $tmpl_file = "themes/3D-Fantasy/left_center.html";
     $thefile = implode("", file($tmpl_file));
     $thefile = addslashes($thefile);
-    $thefile = "\$r_file=\"".$thefile."\";";
+    $thefile = "\$r_file=\"" . $thefile . "\";";
     eval($thefile);
     print $r_file;
 }
@@ -98,22 +99,23 @@ function themeheader() {
 /* and internal one.                                        */
 /************************************************************/
 
-function themefooter() {
+function themefooter()
+{
     global $index, $foot1, $foot2, $foot3, $foot4;
     if (defined('INDEX_FILE')) {
-	$tmpl_file = "themes/3D-Fantasy/center_right.html";
-	$thefile = implode("", file($tmpl_file));
-	$thefile = addslashes($thefile);
-	$thefile = "\$r_file=\"".$thefile."\";";
-	eval($thefile);
-	print $r_file;
-	blocks("right");
+        $tmpl_file = "themes/3D-Fantasy/center_right.html";
+        $thefile = implode("", file($tmpl_file));
+        $thefile = addslashes($thefile);
+        $thefile = "\$r_file=\"" . $thefile . "\";";
+        eval($thefile);
+        print $r_file;
+        blocks("right");
     }
     $footer_message = "$foot1<br>$foot2<br>$foot3<br>$foot4";
     $tmpl_file = "themes/3D-Fantasy/footer.html";
     $thefile = implode("", file($tmpl_file));
     $thefile = addslashes($thefile);
-    $thefile = "\$r_file=\"".$thefile."\";";
+    $thefile = "\$r_file=\"" . $thefile . "\";";
     eval($thefile);
     print $r_file;
 }
@@ -124,36 +126,37 @@ function themefooter() {
 /* This function format the stories on the Homepage         */
 /************************************************************/
 
-function themeindex ($aid, $informant, $time, $title, $counter, $topic, $thetext, $notes, $morelink, $topicname, $topicimage, $topictext) {
+function themeindex($aid, $informant, $time, $title, $counter, $topic, $thetext, $notes, $morelink, $topicname, $topicimage, $topictext)
+{
     global $anonymous, $tipath;
     $ThemeSel = get_theme();
     if (file_exists("themes/$ThemeSel/images/topics/$topicimage")) {
-	$t_image = "themes/$ThemeSel/images/topics/$topicimage";
+        $t_image = "themes/$ThemeSel/images/topics/$topicimage";
     } else {
-	$t_image = "$tipath$topicimage";
+        $t_image = "$tipath$topicimage";
     }
     if (!empty($notes)) {
-	$notes = "<br><br><b>"._NOTE."</b> <i>$notes</i>\n";
+        $notes = "<br><br><b>" . _NOTE . "</b> <i>$notes</i>\n";
     } else {
-	$notes = "";
+        $notes = "";
     }
     if ("$aid" == "$informant") {
-	$content = "$thetext$notes\n";
+        $content = "$thetext$notes\n";
     } else {
-	if(!empty($informant)) {
-	    $content = "<a href=\"modules.php?name=Your_Account&amp;op=userinfo&amp;username=$informant\">$informant</a> ";
-	} else {
-	    $content = "$anonymous ";
-	}
-	$content .= ""._WRITES." <i>\"$thetext\"</i>$notes\n";
+        if (!empty($informant)) {
+            $content = "<a href=\"modules.php?name=Your_Account&amp;op=userinfo&amp;username=$informant\">$informant</a> ";
+        } else {
+            $content = "$anonymous ";
+        }
+        $content .= "" . _WRITES . " <i>\"$thetext\"</i>$notes\n";
     }
-    $posted = ""._POSTEDBY." ";
+    $posted = "" . _POSTEDBY . " ";
     $posted .= get_author($aid);
-    $posted .= " "._ON." $time $timezone ($counter "._READS.")";
+    $posted .= " " . _ON . " $time $timezone ($counter " . _READS . ")";
     $tmpl_file = "themes/3D-Fantasy/story_home.html";
     $thefile = implode("", file($tmpl_file));
     $thefile = addslashes($thefile);
-    $thefile = "\$r_file=\"".$thefile."\";";
+    $thefile = "\$r_file=\"" . $thefile . "\";";
     eval($thefile);
     print $r_file;
 }
@@ -165,35 +168,36 @@ function themeindex ($aid, $informant, $time, $title, $counter, $topic, $thetext
 /* you click on that "Read More..." link in the home        */
 /************************************************************/
 
-function themearticle ($aid, $informant, $datetime, $title, $thetext, $topic, $topicname, $topicimage, $topictext) {
+function themearticle($aid, $informant, $datetime, $title, $thetext, $topic, $topicname, $topicimage, $topictext)
+{
     global $admin, $sid, $tipath;
     $ThemeSel = get_theme();
     if (file_exists("themes/$ThemeSel/images/topics/$topicimage")) {
-	$t_image = "themes/$ThemeSel/images/topics/$topicimage";
+        $t_image = "themes/$ThemeSel/images/topics/$topicimage";
     } else {
-	$t_image = "$tipath$topicimage";
+        $t_image = "$tipath$topicimage";
     }
-    $posted = ""._POSTEDON." $datetime "._BY." ";
+    $posted = "" . _POSTEDON . " $datetime " . _BY . " ";
     $posted .= get_author($aid);
     if (!empty($notes)) {
-	$notes = "<br><br><b>"._NOTE."</b> <i>$notes</i>\n";
+        $notes = "<br><br><b>" . _NOTE . "</b> <i>$notes</i>\n";
     } else {
-	$notes = "";
+        $notes = "";
     }
     if ("$aid" == "$informant") {
-	$content = "$thetext$notes\n";
+        $content = "$thetext$notes\n";
     } else {
-	if(!empty($informant)) {
-	    $content = "<a href=\"modules.php?name=Your_Account&amp;op=userinfo&amp;username=$informant\">$informant</a> ";
-	} else {
-	    $content = "$anonymous ";
-	}
-	$content .= ""._WRITES." <i>\"$thetext\"</i>$notes\n";
+        if (!empty($informant)) {
+            $content = "<a href=\"modules.php?name=Your_Account&amp;op=userinfo&amp;username=$informant\">$informant</a> ";
+        } else {
+            $content = "$anonymous ";
+        }
+        $content .= "" . _WRITES . " <i>\"$thetext\"</i>$notes\n";
     }
     $tmpl_file = "themes/3D-Fantasy/story_page.html";
     $thefile = implode("", file($tmpl_file));
     $thefile = addslashes($thefile);
-    $thefile = "\$r_file=\"".$thefile."\";";
+    $thefile = "\$r_file=\"" . $thefile . "\";";
     eval($thefile);
     print $r_file;
 }
@@ -204,13 +208,12 @@ function themearticle ($aid, $informant, $datetime, $title, $thetext, $topic, $t
 /* Control look of your blocks. Just simple.                */
 /************************************************************/
 
-function themesidebox($title, $content) {
+function themesidebox($title, $content)
+{
     $tmpl_file = "themes/3D-Fantasy/blocks.html";
     $thefile = implode("", file($tmpl_file));
     $thefile = addslashes($thefile);
-    $thefile = "\$r_file=\"".$thefile."\";";
+    $thefile = "\$r_file=\"" . $thefile . "\";";
     eval($thefile);
     print $r_file;
 }
-
-?>

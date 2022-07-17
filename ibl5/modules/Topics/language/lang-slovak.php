@@ -2,10 +2,10 @@
 
 /*************************************************************************/
 /* The Slovak language file for module Topics                      */
-/* Author: AlRashid 			 Date: 09.09.2002   					 */
+/* Author: AlRashid              Date: 09.09.2002                        */
 /* alrashid@klokan.sk, http://alrashid.klokan.sk                         */
-/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk			     */
-/*  		Dakujem                                                      */
+/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk                 */
+/*          Dakujem                                                      */
 /*************************************************************************/
 /**************************************************************************/
 /* PHP-NUKE: Advanced Content Management System                           */
@@ -24,14 +24,12 @@
 /* And, if you use HTML code, please double check it.                     */
 /*************************************************************************/
 /* The Slovak language file for module Topics                      */
-/* Author: AlRashid 			 Date: 09.09.2002   					 */
+/* Author: AlRashid              Date: 09.09.2002                        */
 /* alrashid@klokan.sk, http://alrashid.klokan.sk                         */
-/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk			     */
-/*  		Dakujem                                                      */
+/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk                 */
+/*          Dakujem                                                      */
 /*************************************************************************/
 /**************************************************************************/
 
-define("_ACTIVETOPICS","Aktuálne aktívne témy");
-define("_CLICK2LIST","Kliknite na obrázok a zobrazia sa èlánky k danej téme.");
-
-?>
+define("_ACTIVETOPICS", "Aktuï¿½lne aktï¿½vne tï¿½my");
+define("_CLICK2LIST", "Kliknite na obrï¿½zok a zobrazia sa ï¿½lï¿½nky k danej tï¿½me.");

@@ -17,11 +17,9 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_ACTIVETOPICS","Virkir efnisflokkar");
-define("_CLICK2LIST","Smelltu á efnisflokk til að sjá allar greinar í þeim flokki");
-define("_TOTNEWS","Total News");
-define("_TOTREADS","Total Reads");
-define("_MORE","More");
-define("_NONEWSYET","...There aren't any news yet for this topic...");
-
-?>
+define("_ACTIVETOPICS", "Virkir efnisflokkar");
+define("_CLICK2LIST", "Smelltu ï¿½ efnisflokk til aï¿½ sjï¿½ allar greinar ï¿½ ï¿½eim flokki");
+define("_TOTNEWS", "Total News");
+define("_TOTREADS", "Total Reads");
+define("_MORE", "More");
+define("_NONEWSYET", "...There aren't any news yet for this topic...");

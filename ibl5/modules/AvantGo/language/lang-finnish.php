@@ -17,11 +17,9 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PDATE","Päivä:");
-define("_PTOPIC","Aihe:");
-define("_COMESFROM","Artikkelin läde");
-define("_THEURL","Artikkelin URL:");
-define("_DATE","Päivä");
-define("_TITLE","Otsikko");
-
-?>
+define("_PDATE", "Pï¿½ivï¿½:");
+define("_PTOPIC", "Aihe:");
+define("_COMESFROM", "Artikkelin lï¿½de");
+define("_THEURL", "Artikkelin URL:");
+define("_DATE", "Pï¿½ivï¿½");
+define("_TITLE", "Otsikko");

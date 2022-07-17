@@ -17,27 +17,25 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_URL","URL");
-define("_EMAIL","Email");
-define("_REALNAME","Pärisnimi");
-define("_FUNCTIONS","Funktsioonid");
-define("_PREVIOUS","Eelmine leht");
-define("_MEMBERSLIST","Liikmete nimekiri");
-define("_GREETINGS","Õnnitlused meie viimasele registreeritud kasutajale:");
-define("_SORTBY","Sorteeri:");
-define("_MNICKNAME","kasutajanimi");
-define("_MREALNAME","pärisnimi");
-define("_MEMAIL","email");
-define("_MURL","url");
-define("_ONLINEREG","Praegu portaalis registreerituid kasutajaid:");
-define("_WEHAVE","Meil on");
-define("_MREGISTERED","registreerituid kasutajaid siiani");
-define("_MREGONLINE","hetkel portaalis registreerituid kasutajaid.");
-define("_REGSOFAR","registreeritud kasutajat.");
-define("_USERSFOUND","kasutaja(t) leitud päringule");
-define("_USERSSHOWN","kuvan kasutajaid");
-define("_NOMEMBERS","Ei ole ühtegi sellist kasutajat");
-define("_PAGES","Lehed");
-define("_HOMEPAGE","Kodulehekülg");
-
-?>
+define("_URL", "URL");
+define("_EMAIL", "Email");
+define("_REALNAME", "Pï¿½risnimi");
+define("_FUNCTIONS", "Funktsioonid");
+define("_PREVIOUS", "Eelmine leht");
+define("_MEMBERSLIST", "Liikmete nimekiri");
+define("_GREETINGS", "ï¿½nnitlused meie viimasele registreeritud kasutajale:");
+define("_SORTBY", "Sorteeri:");
+define("_MNICKNAME", "kasutajanimi");
+define("_MREALNAME", "pï¿½risnimi");
+define("_MEMAIL", "email");
+define("_MURL", "url");
+define("_ONLINEREG", "Praegu portaalis registreerituid kasutajaid:");
+define("_WEHAVE", "Meil on");
+define("_MREGISTERED", "registreerituid kasutajaid siiani");
+define("_MREGONLINE", "hetkel portaalis registreerituid kasutajaid.");
+define("_REGSOFAR", "registreeritud kasutajat.");
+define("_USERSFOUND", "kasutaja(t) leitud pï¿½ringule");
+define("_USERSSHOWN", "kuvan kasutajaid");
+define("_NOMEMBERS", "Ei ole ï¿½htegi sellist kasutajat");
+define("_PAGES", "Lehed");
+define("_HOMEPAGE", "Kodulehekï¿½lg");

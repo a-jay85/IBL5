@@ -17,28 +17,24 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_FUNCTIONS","¥\¯à¿ï¶µ");
-define("_YES","¬O");
-define("_NO","§_");
-define("_SAVE","Àx¦s");
-define("_ID","ÃÑ§O½X");
-define("_CATEGORIES","Ãþ§O");
-define("_ALL","¥þ³¡");
-define("_FAQ","±`¨£°Ýµª¶°");
-define("_CONTENT","¤º®e");
-define("_FAQADMIN","FAQ ºÞ²z");
-define("_ACTIVEFAQS","¬¡°Ê¤¤ªºFAQs");
-define("_ADDCATEGORY","·s¼WÃþ§O");
-define("_QUESTIONS","°ÝÃD»P¸Ñµª");
-define("_ADDQUESTION","·s¼W°ÝÃD");
-define("_QUESTION","°ÝÃD");
-define("_ANSWER","¸Ñµª");
-define("_EDITCATEGORY","½s¿èÃþ§O");
-define("_EDITQUESTIONS","½s¿è°ÝÃD»P¸Ñµª");
-define("_FAQDELWARNING","Äµ§i¡G½T©w§R°£³o­ÓFAQ©M¬ÛÃöªº¤º®e¶Ü¡H");
-define("_QUESTIONDEL","Äµ§i¡G½T©w§R°£³o­Ó°ÝÃD¡H");
-define("_LANGUAGE","»y¨¥");
-
-
-?>
+define("_FUNCTIONS", "ï¿½\ï¿½ï¿½ï¶µ");
+define("_YES", "ï¿½O");
+define("_NO", "ï¿½_");
+define("_SAVE", "ï¿½xï¿½s");
+define("_ID", "ï¿½Ñ§Oï¿½X");
+define("_CATEGORIES", "ï¿½ï¿½ï¿½O");
+define("_ALL", "ï¿½ï¿½ï¿½ï¿½");
+define("_FAQ", "ï¿½`ï¿½ï¿½ï¿½Ýµï¿½ï¿½ï¿½");
+define("_CONTENT", "ï¿½ï¿½ï¿½e");
+define("_FAQADMIN", "FAQ ï¿½Þ²z");
+define("_ACTIVEFAQS", "ï¿½ï¿½ï¿½Ê¤ï¿½ï¿½ï¿½FAQs");
+define("_ADDCATEGORY", "ï¿½sï¿½Wï¿½ï¿½ï¿½O");
+define("_QUESTIONS", "ï¿½ï¿½ï¿½Dï¿½Pï¿½Ñµï¿½");
+define("_ADDQUESTION", "ï¿½sï¿½Wï¿½ï¿½ï¿½D");
+define("_QUESTION", "ï¿½ï¿½ï¿½D");
+define("_ANSWER", "ï¿½Ñµï¿½");
+define("_EDITCATEGORY", "ï¿½sï¿½ï¿½ï¿½ï¿½ï¿½O");
+define("_EDITQUESTIONS", "ï¿½sï¿½ï¿½ï¿½ï¿½Dï¿½Pï¿½Ñµï¿½");
+define("_FAQDELWARNING", "Äµï¿½iï¿½Gï¿½Tï¿½wï¿½Rï¿½ï¿½ï¿½oï¿½ï¿½FAQï¿½Mï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½eï¿½Ü¡H");
+define("_QUESTIONDEL", "Äµï¿½iï¿½Gï¿½Tï¿½wï¿½Rï¿½ï¿½ï¿½oï¿½Ó°ï¿½ï¿½Dï¿½H");
+define("_LANGUAGE", "ï¿½yï¿½ï¿½");

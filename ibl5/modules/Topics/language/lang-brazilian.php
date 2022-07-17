@@ -21,12 +21,9 @@
 /* Comments/suggestions: aleagi@terra.com.br - aleagi@phpnuke.org.br      */
 /**************************************************************************/
 
-
-define("_ACTIVETOPICS","Tópicos ativos atualmente");
-define("_CLICK2LIST","Clique para listar todas as notícias deste Tópico");
-define("_TOTNEWS","Total de notícias");
-define("_TOTREADS","Total de visualizações");
-define("_MORE","Mais...");
-define("_NONEWSYET","...Ainda não há nenhuma notícia neste Tópico...");
-
-?>
+define("_ACTIVETOPICS", "Tï¿½picos ativos atualmente");
+define("_CLICK2LIST", "Clique para listar todas as notï¿½cias deste Tï¿½pico");
+define("_TOTNEWS", "Total de notï¿½cias");
+define("_TOTREADS", "Total de visualizaï¿½ï¿½es");
+define("_MORE", "Mais...");
+define("_NONEWSYET", "...Ainda nï¿½o hï¿½ nenhuma notï¿½cia neste Tï¿½pico...");

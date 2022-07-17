@@ -22,7 +22,7 @@
 //
 // ----------------------------------------------------------------------
 
-require_once("modules/AutoTheme/includes/atAPI.php");
+require_once "modules/AutoTheme/includes/atAPI.php";
 $runningconfig = atThemeInit($thename);
 
 $bgcolor1 = atRunningGetVar("bgcolor1");
@@ -40,12 +40,11 @@ if (!function_exists("OpenTable")) {
 
         if ($template['table1']) {
             $file = $template['table1'];
-			
-            $template = atTemplateCompile($themepath.$file);
+
+            $template = atTemplateCompile($themepath . $file);
             list($output, $close) = atTemplateSplit($template, "table-content");
             atTemplateDisplay($output);
-        }
-        else {
+        } else {
             echo "<table width=\"100%\" border=\"0\" cellspacing=\"1\" cellpadding=\"0\" bgcolor=\"$tblcolor1\"><tr><td>\n";
             echo "<table width=\"100%\" border=\"0\" cellspacing=\"1\" cellpadding=\"4\" bgcolor=\"$tblcolor2\"><tr><td>\n";
         }
@@ -61,11 +60,10 @@ if (!function_exists("CloseTable")) {
         if ($template['table1']) {
             $file = $template['table1'];
 
-            $template = atTemplateCompile($themepath.$file);
+            $template = atTemplateCompile($themepath . $file);
             list($open, $output) = atTemplateSplit($template, "table-content");
             atTemplateDisplay($output);
-        }
-        else {
+        } else {
             echo "</td></tr></table></td></tr></table>\n";
         }
     }
@@ -80,11 +78,10 @@ if (!function_exists("OpenTable2")) {
         if ($template['table2']) {
             $file = $template['table2'];
 
-            $template = atTemplateCompile($themepath.$file);
+            $template = atTemplateCompile($themepath . $file);
             list($output, $close) = atTemplateSplit($template, "table-content");
             atTemplateDisplay($output);
-        }
-        else {
+        } else {
             echo "<table border=\"0\" cellspacing=\"1\" cellpadding=\"0\" bgcolor=\"$tblcolor3\" align=\"center\"><tr><td>\n";
             echo "<table border=\"0\" cellspacing=\"1\" cellpadding=\"4\" bgcolor=\"$tblcolor4\"><tr><td>\n";
         }
@@ -100,14 +97,11 @@ if (!function_exists("CloseTable2")) {
         if ($template['table2']) {
             $file = $template['table2'];
 
-            $template = atTemplateCompile($themepath.$file);
+            $template = atTemplateCompile($themepath . $file);
             list($open, $output) = atTemplateSplit($template, "table-content");
             atTemplateDisplay($output);
-        }
-        else {
+        } else {
             echo "</td></tr></table></td></tr></table>\n";
         }
     }
 }
-
-?>

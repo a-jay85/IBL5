@@ -17,28 +17,24 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_FUNCTIONS","Funksjoner");
-define("_YES","Ja");
-define("_NO","Nei");
-define("_SAVE","Lagre");
-define("_ID","ID");
-define("_CATEGORIES","Kategorier");
-define("_ALL","Alle");
-define("_FAQ","FAQ");
-define("_CONTENT","Innhold");
-define("_FAQADMIN","FAQ Administrasjon");
-define("_ACTIVEFAQS","Aktive FAQer");
-define("_ADDCATEGORY","Legg til ny kategori");
-define("_QUESTIONS","Spørsmål og Svar");
-define("_ADDQUESTION","Legg til et nytt spørsmål");
-define("_QUESTION","Spørsmål");
-define("_ANSWER","Svar");
-define("_EDITCATEGORY","Rediger kategori");
-define("_EDITQUESTIONS","Rediger Spørsmål og Svar");
-define("_FAQDELWARNING","ADVARSEL: er du sikker på at du vil slette denne FAQ med alt innhold?");
-define("_QUESTIONDEL","ADVARSEL: er du sikker på at du vil slette dette spørsmålet?");
-define("_LANGUAGE","Språk");
-
-
-?>
+define("_FUNCTIONS", "Funksjoner");
+define("_YES", "Ja");
+define("_NO", "Nei");
+define("_SAVE", "Lagre");
+define("_ID", "ID");
+define("_CATEGORIES", "Kategorier");
+define("_ALL", "Alle");
+define("_FAQ", "FAQ");
+define("_CONTENT", "Innhold");
+define("_FAQADMIN", "FAQ Administrasjon");
+define("_ACTIVEFAQS", "Aktive FAQer");
+define("_ADDCATEGORY", "Legg til ny kategori");
+define("_QUESTIONS", "Spï¿½rsmï¿½l og Svar");
+define("_ADDQUESTION", "Legg til et nytt spï¿½rsmï¿½l");
+define("_QUESTION", "Spï¿½rsmï¿½l");
+define("_ANSWER", "Svar");
+define("_EDITCATEGORY", "Rediger kategori");
+define("_EDITQUESTIONS", "Rediger Spï¿½rsmï¿½l og Svar");
+define("_FAQDELWARNING", "ADVARSEL: er du sikker pï¿½ at du vil slette denne FAQ med alt innhold?");
+define("_QUESTIONDEL", "ADVARSEL: er du sikker pï¿½ at du vil slette dette spï¿½rsmï¿½let?");
+define("_LANGUAGE", "Sprï¿½k");

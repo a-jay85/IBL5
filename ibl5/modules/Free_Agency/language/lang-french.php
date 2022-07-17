@@ -17,18 +17,16 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PREVIOUS","Page Pr&eacute;c&eacute;dente");
-define("_NEXT","Page Suivante");
-define("_PAGE","Page");
-define("_DEACTIVATE","D&eacute;sactiver");
-define("_ACTIVATE","Activer");
-define("_PUBLISHEDON","Publié le");
-define("_PAGESLIST","Liste des pages");
-define("_LISTOFCONTENT","Liste du contenu accéssibles dans");
-define("_YOURADMINLIST","Vous êtes un administrateur: voici la liste des pages inactives:");
-define("_COPYRIGHT","Copyright &copy; by");
-define("_COPYRIGHT2","All Right Reserved.");
-define("_CONTENTCATEGORIES","Available Content Categories");
-define("_NONCLASSCONT","Non Categorized Content");
-
-?>
+define("_PREVIOUS", "Page Pr&eacute;c&eacute;dente");
+define("_NEXT", "Page Suivante");
+define("_PAGE", "Page");
+define("_DEACTIVATE", "D&eacute;sactiver");
+define("_ACTIVATE", "Activer");
+define("_PUBLISHEDON", "Publiï¿½ le");
+define("_PAGESLIST", "Liste des pages");
+define("_LISTOFCONTENT", "Liste du contenu accï¿½ssibles dans");
+define("_YOURADMINLIST", "Vous ï¿½tes un administrateur: voici la liste des pages inactives:");
+define("_COPYRIGHT", "Copyright &copy; by");
+define("_COPYRIGHT2", "All Right Reserved.");
+define("_CONTENTCATEGORIES", "Available Content Categories");
+define("_NONCLASSCONT", "Non Categorized Content");

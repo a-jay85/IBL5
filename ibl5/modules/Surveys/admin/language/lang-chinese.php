@@ -17,37 +17,33 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_YES","¬O");
-define("_NO","§_");
-define("_CATEGORY","Ãþ§O");
-define("_SAVECHANGES","Àx¦s§ó§ï");
-define("_ARTICLES","¤å³¹");
-define("_SELECTTOPIC","¿ï¾Ü·s»D¥DÃD");
-define("_OPTION","¿ï¶µ");
-define("_ADMPOLLS","½Õ¬d/§ë²¼");
-define("_TITLE","¼ÐÃD");
-define("_STORYTEXT","³ø¾É¥»¤å");
-define("_EXTENDEDTEXT","©µ¦ù¥»¤å");
-define("_PUBLISHINHOME","¦b­º­¶µoªí¡H");
-define("_ONLYIFCATSELECTED","·í<i>¤å³¹</i>Ãþ§O¨S¦³³Q¿ï¾Ü®É¤~¥Í®Ä");
-define("_ADD","·s¼W");
-define("_POLLSADMIN","§ë²¼/½Õ¬dºÞ²z");
-define("_CREATEPOLL","·s¼W§ë²¼");
-define("_DELETEPOLLS","§R°£§ë²¼");
-define("_POLLTITLE","§ë²¼¼ÐÃD");
-define("_POLLEACHFIELD","½Ð¿é¤J§ë²¼¿ï¶µ");
-define("_CREATEPOLLBUT","²£¥Í§ë²¼");
-define("_REMOVEEXISTING","²¾°£§ë²¼");
-define("_POLLDELWARNING","Äµ§i¡G¿ï¾Üªº§ë²¼±N·|¥ß¨è³Q²¾°£¦Ü¸ê®Æ®w¥~¡I");
-define("_CHOOSEPOLL","½Ð¥Ñ¤U¦C¤@Äýªí¿ï¾Ü¤@­Ó§ë²¼¿ï¶µ¡G");
-define("_EDITPOLL","½s¿è§ë²¼");
-define("_CHOOSEPOLLEDIT","¿ï¾Ü§A­n½s¿èªº§ë²¼:");
-define("_ACTIVATECOMMENTS","Åý³o½g¤å³¹¥i¥H±µ¨ü·N¨£µoªí?");
-define("_LANGUAGE","»y¨¥");
-define("_ANNOUNCEPOLL","¦b±zªººô¯¸¤¤¤½§G³o­Ó·sªº§ë²¼/½Õ¬d?");
-define("_LEAVEBLANK","(«O¯dªÅ¥Õ±N·|²£¥Í¤@­Ó¤£¤½§Gªº·s§ë²¼)");
-define("_POLLEDIT","½s¿è§ë²¼:");
-
-
-?>
+define("_YES", "ï¿½O");
+define("_NO", "ï¿½_");
+define("_CATEGORY", "ï¿½ï¿½ï¿½O");
+define("_SAVECHANGES", "ï¿½xï¿½sï¿½ï¿½ï¿½");
+define("_ARTICLES", "ï¿½å³¹");
+define("_SELECTTOPIC", "ï¿½ï¿½Ü·sï¿½Dï¿½Dï¿½D");
+define("_OPTION", "ï¿½ï¶µ");
+define("_ADMPOLLS", "ï¿½Õ¬d/ï¿½ë²¼");
+define("_TITLE", "ï¿½ï¿½ï¿½D");
+define("_STORYTEXT", "ï¿½ï¿½ï¿½É¥ï¿½ï¿½ï¿½");
+define("_EXTENDEDTEXT", "ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_PUBLISHINHOME", "ï¿½bï¿½ï¿½ï¿½ï¿½ï¿½oï¿½ï¿½ï¿½H");
+define("_ONLYIFCATSELECTED", "ï¿½ï¿½<i>ï¿½å³¹</i>ï¿½ï¿½ï¿½Oï¿½Sï¿½ï¿½ï¿½Qï¿½ï¿½Ü®É¤~ï¿½Í®ï¿½");
+define("_ADD", "ï¿½sï¿½W");
+define("_POLLSADMIN", "ï¿½ë²¼/ï¿½Õ¬dï¿½Þ²z");
+define("_CREATEPOLL", "ï¿½sï¿½Wï¿½ë²¼");
+define("_DELETEPOLLS", "ï¿½Rï¿½ï¿½ï¿½ë²¼");
+define("_POLLTITLE", "ï¿½ë²¼ï¿½ï¿½ï¿½D");
+define("_POLLEACHFIELD", "ï¿½Ð¿ï¿½Jï¿½ë²¼ï¿½ï¶µ");
+define("_CREATEPOLLBUT", "ï¿½ï¿½ï¿½Í§ë²¼");
+define("_REMOVEEXISTING", "ï¿½ï¿½ï¿½ï¿½ï¿½ë²¼");
+define("_POLLDELWARNING", "Äµï¿½iï¿½Gï¿½ï¿½Üªï¿½ï¿½ë²¼ï¿½Nï¿½|ï¿½ß¨ï¿½Qï¿½ï¿½ï¿½ï¿½ï¿½Ü¸ï¿½Æ®wï¿½~ï¿½I");
+define("_CHOOSEPOLL", "ï¿½Ð¥Ñ¤Uï¿½Cï¿½@ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ü¤@ï¿½Ó§ë²¼ï¿½ï¶µï¿½G");
+define("_EDITPOLL", "ï¿½sï¿½ï¿½ë²¼");
+define("_CHOOSEPOLLEDIT", "ï¿½ï¿½Ü§Aï¿½nï¿½sï¿½èªºï¿½ë²¼:");
+define("_ACTIVATECOMMENTS", "ï¿½ï¿½ï¿½oï¿½gï¿½å³¹ï¿½iï¿½Hï¿½ï¿½ï¿½ï¿½ï¿½Nï¿½ï¿½ï¿½oï¿½ï¿½?");
+define("_LANGUAGE", "ï¿½yï¿½ï¿½");
+define("_ANNOUNCEPOLL", "ï¿½bï¿½zï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Gï¿½oï¿½Ó·sï¿½ï¿½ï¿½ë²¼/ï¿½Õ¬d?");
+define("_LEAVEBLANK", "(ï¿½Oï¿½dï¿½Å¥Õ±Nï¿½|ï¿½ï¿½ï¿½Í¤@ï¿½Ó¤ï¿½ï¿½ï¿½ï¿½Gï¿½ï¿½ï¿½sï¿½ë²¼)");
+define("_POLLEDIT", "ï¿½sï¿½ï¿½ë²¼:");

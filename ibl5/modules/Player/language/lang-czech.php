@@ -17,18 +17,16 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PREVIOUS","Pøedchozí stránka");
-define("_NEXT","Další stránka");
-define("_PAGE","Stránka");
-define("_DEACTIVATE","Deaktivovat");
-define("_ACTIVATE","Aktivovat");
-define("_PUBLISHEDON","Published on");
-define("_PAGESLIST","Pages List");
-define("_LISTOFCONTENT","List of available content in");
-define("_YOURADMINLIST","You're Administrator: following is the list of Inactive pages:");
-define("_COPYRIGHT","Copyright &copy; by");
-define("_COPYRIGHT2","All Right Reserved.");
-define("_CONTENTCATEGORIES","Available Content Categories");
-define("_NONCLASSCONT","Non Categorized Content");
-
-?>
+define("_PREVIOUS", "Pï¿½edchozï¿½ strï¿½nka");
+define("_NEXT", "Dalï¿½ï¿½ strï¿½nka");
+define("_PAGE", "Strï¿½nka");
+define("_DEACTIVATE", "Deaktivovat");
+define("_ACTIVATE", "Aktivovat");
+define("_PUBLISHEDON", "Published on");
+define("_PAGESLIST", "Pages List");
+define("_LISTOFCONTENT", "List of available content in");
+define("_YOURADMINLIST", "You're Administrator: following is the list of Inactive pages:");
+define("_COPYRIGHT", "Copyright &copy; by");
+define("_COPYRIGHT2", "All Right Reserved.");
+define("_CONTENTCATEGORIES", "Available Content Categories");
+define("_NONCLASSCONT", "Non Categorized Content");

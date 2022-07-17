@@ -17,30 +17,26 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_EMAIL","Email");
-define("_SAVECHANGES","Gravar alterações");
-define("_SCORE","Pontuação:");
-define("_PRODUCTTITLE","Título da revisão");
-define("_RELATEDLINK","Link relacionado");
-define("_LINKTITLE","Título do Link ");
-define("_REVIEWER","Revisor:");
-define("_REVIEWID","ID da Revisão");
-define("_REVIEWS","Revisão");
-define("_DATE","Data");
-define("_REVADMIN","Administração de Revisões");
-define("_REVTITLE","Título da Página de Revisão");
-define("_REVDESC","Descrição da Página de Revisão");
-define("_REVWAITING","Revisões à espera de validação");
-define("_REVIMGINFO","Armazene suas imagens 150*150 em imagens/reviews");
-define("_TEXT","Texto");
-define("_IMAGE","Imagem");
-define("_NOREVIEW2ADD","Nenhuma revisão para adicionar");
-define("_ADDREVIEW","Adicionar Revisão");
-define("_CLICK2ADDREVIEW","Clique aqui para escrever uma Revisão");
-define("_DELMODREVIEW","Apagar / Modificar uma Revisão");
-define("_MODREVINFO","Você pode facilmente apagar/editar revisões explorando em <a href=\"modules.php?name=Reviews\"><b>Revisões</b></a> como Administrador.");
-define("_LANGUAGE","Língua");
-
-
-?>
+define("_EMAIL", "Email");
+define("_SAVECHANGES", "Gravar alteraï¿½ï¿½es");
+define("_SCORE", "Pontuaï¿½ï¿½o:");
+define("_PRODUCTTITLE", "Tï¿½tulo da revisï¿½o");
+define("_RELATEDLINK", "Link relacionado");
+define("_LINKTITLE", "Tï¿½tulo do Link ");
+define("_REVIEWER", "Revisor:");
+define("_REVIEWID", "ID da Revisï¿½o");
+define("_REVIEWS", "Revisï¿½o");
+define("_DATE", "Data");
+define("_REVADMIN", "Administraï¿½ï¿½o de Revisï¿½es");
+define("_REVTITLE", "Tï¿½tulo da Pï¿½gina de Revisï¿½o");
+define("_REVDESC", "Descriï¿½ï¿½o da Pï¿½gina de Revisï¿½o");
+define("_REVWAITING", "Revisï¿½es ï¿½ espera de validaï¿½ï¿½o");
+define("_REVIMGINFO", "Armazene suas imagens 150*150 em imagens/reviews");
+define("_TEXT", "Texto");
+define("_IMAGE", "Imagem");
+define("_NOREVIEW2ADD", "Nenhuma revisï¿½o para adicionar");
+define("_ADDREVIEW", "Adicionar Revisï¿½o");
+define("_CLICK2ADDREVIEW", "Clique aqui para escrever uma Revisï¿½o");
+define("_DELMODREVIEW", "Apagar / Modificar uma Revisï¿½o");
+define("_MODREVINFO", "Vocï¿½ pode facilmente apagar/editar revisï¿½es explorando em <a href=\"modules.php?name=Reviews\"><b>Revisï¿½es</b></a> como Administrador.");
+define("_LANGUAGE", "Lï¿½ngua");

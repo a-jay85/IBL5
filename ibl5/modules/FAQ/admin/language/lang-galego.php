@@ -17,28 +17,24 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_FUNCTIONS","Funcións");
-define("_YES","Sí");
-define("_NO","Non");
-define("_SAVE","Gardar");
-define("_ID","ID");
-define("_CATEGORIES","Categorías");
-define("_ALL","Todo");
-define("_FAQ","PUF");
-define("_CONTENT","Contido");
-define("_FAQADMIN","Administración das PUF");
-define("_ACTIVEFAQS","PUF Activas");
-define("_ADDCATEGORY","Engadir Categoría");
-define("_QUESTIONS","Preguntas e Respostas");
-define("_ADDQUESTION","Engadir Pregunta");
-define("_QUESTION","Pregunta");
-define("_ANSWER","Resposta");
-define("_EDITCATEGORY","Editar Categoría");
-define("_EDITQUESTIONS","Editar Preguntas e Respostas");
-define("_FAQDELWARNING","AVISO: ¿Está seguro de borrar esta PUF e todo o seu contido?");
-define("_QUESTIONDEL","AVISO: ¿Está seguro de querer borrar esta pregunta?");
-define("_LANGUAGE","Idioma");
-
-
-?>
+define("_FUNCTIONS", "Funciï¿½ns");
+define("_YES", "Sï¿½");
+define("_NO", "Non");
+define("_SAVE", "Gardar");
+define("_ID", "ID");
+define("_CATEGORIES", "Categorï¿½as");
+define("_ALL", "Todo");
+define("_FAQ", "PUF");
+define("_CONTENT", "Contido");
+define("_FAQADMIN", "Administraciï¿½n das PUF");
+define("_ACTIVEFAQS", "PUF Activas");
+define("_ADDCATEGORY", "Engadir Categorï¿½a");
+define("_QUESTIONS", "Preguntas e Respostas");
+define("_ADDQUESTION", "Engadir Pregunta");
+define("_QUESTION", "Pregunta");
+define("_ANSWER", "Resposta");
+define("_EDITCATEGORY", "Editar Categorï¿½a");
+define("_EDITQUESTIONS", "Editar Preguntas e Respostas");
+define("_FAQDELWARNING", "AVISO: ï¿½Estï¿½ seguro de borrar esta PUF e todo o seu contido?");
+define("_QUESTIONDEL", "AVISO: ï¿½Estï¿½ seguro de querer borrar esta pregunta?");
+define("_LANGUAGE", "Idioma");

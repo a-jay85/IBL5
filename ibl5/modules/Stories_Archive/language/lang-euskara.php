@@ -17,19 +17,16 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PRINTER","Inprimatzeko bertsioa");
-define("_FRIEND","Lagun bati bidali");
-define("_ARTICLES","Artikuloak");
-define("_USCORE","Hasierako puntuazioa");
-define("_DATE","Data");
-define("_SELECTMONTH2VIEW","Aukeratu ikusi nahi duzun hilabetea:");
-define("_SHOWALLSTORIES","Historia GUZTIAK erakutsi");
-define("_STORIESARCHIVE","Historien artxiboa");
-define("_ACTIONS","Akzioak");
-define("_ARCHIVESINDEX","Historien artxiboaren indizea");
-define("_ALLSTORIESARCH","Historia guztiak");
-define("_NEXTPAGE","Hurrengo orria");
-define("_PREVIOUSPAGE","Aurreko orria");
-
-
-?>
+define("_PRINTER", "Inprimatzeko bertsioa");
+define("_FRIEND", "Lagun bati bidali");
+define("_ARTICLES", "Artikuloak");
+define("_USCORE", "Hasierako puntuazioa");
+define("_DATE", "Data");
+define("_SELECTMONTH2VIEW", "Aukeratu ikusi nahi duzun hilabetea:");
+define("_SHOWALLSTORIES", "Historia GUZTIAK erakutsi");
+define("_STORIESARCHIVE", "Historien artxiboa");
+define("_ACTIONS", "Akzioak");
+define("_ARCHIVESINDEX", "Historien artxiboaren indizea");
+define("_ALLSTORIESARCH", "Historia guztiak");
+define("_NEXTPAGE", "Hurrengo orria");
+define("_PREVIOUSPAGE", "Aurreko orria");

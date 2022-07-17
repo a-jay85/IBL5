@@ -17,64 +17,60 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PRINTER","¤Íµ½¦C¦L®æ¦¡");
-define("_FRIEND","±Hµ¹ªB¤Í");
+define("_PRINTER", "ï¿½Íµï¿½ï¿½Cï¿½Lï¿½æ¦¡");
+define("_FRIEND", "ï¿½Hï¿½ï¿½ï¿½Bï¿½ï¿½");
 
-define("_YOURNAME","±zªº¦W¦r");
+define("_YOURNAME", "ï¿½zï¿½ï¿½ï¿½Wï¿½r");
 
-define("_OK","½T©w");
+define("_OK", "ï¿½Tï¿½w");
 
+define("_ALLOWEDHTML", "ï¿½ï¿½ï¿½\HTMLï¿½yï¿½kï¿½G");
+define("_EXTRANS", "Extrans (html tags to ï¿½ï¿½ï¿½ï¿½)");
+define("_HTMLFORMATED", "HTMLï¿½æ¦¡");
+define("_PLAINTEXT", "ï¿½@ï¿½ï¿½ï¿½rï¿½æ¦¡");
+define("_ARTICLES", "ï¿½å³¹");
+define("_SUBMITNEWS", "ï¿½ë»¼ï¿½sï¿½D");
+define("_SUBMITADVICE", "ï¿½Ð¨Ì·Ó®æ¦¡ï¿½ï¿½gï¿½zï¿½ï¿½ï¿½ï¿½ï¿½É¨ï¿½ï¿½Ë¬dï¿½ï¿½ë»¼<br>ï¿½Ã«Dï¿½Ò¦ï¿½ï¿½ï¿½ï¿½ë»¼ï¿½ï¿½ï¿½|ï¿½Qï¿½oï¿½ï¿½<br>ï¿½Ú­Ìªï¿½ï¿½sï¿½ï¿½iï¿½ï¿½|ï¿½ï¿½zï¿½ï¿½ï¿½ë»¼ï¿½ï¿½ï¿½eï¿½ï¿½ï¿½Aï¿½×ªï¿½ï¿½×§ï¿½");
+define("_SUBTITLE", "ï¿½ï¿½ï¿½D");
+define("_BEDESCRIPTIVE", "ï¿½ï¿½Â²ï¿½ï¿½ï¿½nï¿½Aï¿½Mï¿½ï¿½ï¿½aï¿½yï¿½z");
+define("_BADTITLES", "ï¿½ï¿½ï¿½}ï¿½ï¿½ï¿½ï¿½ï¿½Dï¿½ï¿½='ï¿½Ó¹Lï¿½Ó¡I' ï¿½ï¿½ 'ï¿½@ï¿½gï¿½å³¹'");
 
-define("_ALLOWEDHTML","¤¹³\HTML»yªk¡G");
-define("_EXTRANS","Extrans (html tags to ¥»¤å)");
-define("_HTMLFORMATED","HTML®æ¦¡");
-define("_PLAINTEXT","¤@¯ë¤å¦r®æ¦¡");
-define("_ARTICLES","¤å³¹");
-define("_SUBMITNEWS","§ë»¼·s»D");
-define("_SUBMITADVICE","½Ð¨Ì·Ó®æ¦¡¶ñ¼g±zªº³ø¾É¨ÃÀË¬d«á§ë»¼<br>¨Ã«D©Ò¦³ªº§ë»¼³£·|³Qµoªí<br>§Ú­Ìªº½s¿è¥i¯à·|¹ï±zªº§ë»¼¤º®e°µ¾A«×ªº­×§ï");
-define("_SUBTITLE","¼ÐÃD");
-define("_BEDESCRIPTIVE","½ÐÂ²³æ§ã­n¡A²M·¡¦a´y­z");
-define("_BADTITLES","¤£¨}ªº¼ÐÃD¬°='·Ó¹L¨Ó¡I' ©Î '¤@½g¤å³¹'");
-
-define("_HTMLISFINE","¥i¥H¨Ï¥ÎHTML¡A¦ý½Ð¥J²ÓÀË¬d»yªk");
-define("_AREYOUSURE","½Ð½T©wºô¯¸Ãìµ²ªº¦³®Ä©Ê");
-define("_SUBPREVIEW","¦b§ë»¼¤§«e½Ð¥ý¹wÄý¨ÃÀË¬d");
-define("_SELECTTOPIC","¿ï¾Ü·s»D¥DÃD");
-define("_NEWSUBPREVIEW","¹wÄý§ë»¼·s»D");
-define("_STORYLOOK","±zªº³ø¾É±N·|¥Î¦¹ºØ¤è¦¡§e²{¡G");
-define("_CHECKSTORY","¦b±H¥X±zªº³ø¾É¤§«e¡A½ÐÀË¬d±zªº¥»¤å»Pºô¯¸Ãìµ²");
-define("_THANKSSUB","·PÁÂ±zªº§ë»¼¡I");
-define("_SUBSENT","±zªº¤å³¹¤w¸g³Q§Ú­Ì¦¬¨ì...");
-define("_SUBTEXT","§Ú­Ì·|¦b´X¤p®É¤ºÀË¬d±zªº§ë»¼¡A¤º®e½T©wµL»~«á§Ú­Ì´N·|µoªí");
-define("_WEHAVESUB","¥Ø«e§Ú­Ì¦³");
-define("_WAITING","¥÷§ë»¼µ¥«Ý³Qµoªí");
-define("_PREVIEW","¹wÄý");
-define("_NEWUSER","·s¨Ï¥ÎªÌ");
-define("_USCORE","¤À¼Æ");
-define("_DATE","¤é´Á");
-define("_STORYTEXT","³ø¾É¥»¤å");
-define("_EXTENDEDTEXT","©µ¦ù¥»¤å");
-define("_LANGUAGE","»y¨¥");
-define("_JANUARY","¤@¤ë");
-define("_FEBRUARY","¤G¤ë");
-define("_MARCH","¤T¤ë");
-define("_APRIL","¥|¤ë");
-define("_MAY","¤­¤ë");
-define("_JUNE","¤»¤ë");
-define("_JULY","¤C¤ë");
-define("_AUGUST","¤K¤ë");
-define("_SEPTEMBER","¤E¤ë");
-define("_OCTOBER","¤Q¤ë");
-define("_NOVEMBER","¤Q¤@¤ë");
-define("_DECEMBER","¤Q¤G¤ë");
-define("_SELECTMONTH2VIEW","½Ð¿ï¾Ü±z­n¬Ýªº¤ë¥÷:");
-define("_SHOWALLSTORIES","Åã¥Ü©Ò¦³ªº¤å³¹");
-define("_STORIESARCHIVE","¤å³¹¸ê®Æ®w");
-define("_ACTIONS","¦æ°Ê");
-define("_ARCHIVESINDEX","¤å³¹¸ê®Æ®w¯Á¤Þ");
-define("_ALLSTORIESARCH","©Ò¦³¤å³¹");
-define("_NEXTPAGE","¤U¤@­¶");
-define("_PREVIOUSPAGE","¤W¤@­¶");
-
-
-?>
+define("_HTMLISFINE", "ï¿½iï¿½Hï¿½Ï¥ï¿½HTMLï¿½Aï¿½ï¿½ï¿½Ð¥Jï¿½ï¿½ï¿½Ë¬dï¿½yï¿½k");
+define("_AREYOUSURE", "ï¿½Ð½Tï¿½wï¿½ï¿½ï¿½ï¿½ï¿½ìµ²ï¿½ï¿½ï¿½ï¿½ï¿½Ä©ï¿½");
+define("_SUBPREVIEW", "ï¿½bï¿½ë»¼ï¿½ï¿½ï¿½eï¿½Ð¥ï¿½ï¿½wï¿½ï¿½ï¿½ï¿½ï¿½Ë¬d");
+define("_SELECTTOPIC", "ï¿½ï¿½Ü·sï¿½Dï¿½Dï¿½D");
+define("_NEWSUBPREVIEW", "ï¿½wï¿½ï¿½ï¿½ë»¼ï¿½sï¿½D");
+define("_STORYLOOK", "ï¿½zï¿½ï¿½ï¿½ï¿½ï¿½É±Nï¿½|ï¿½Î¦ï¿½ï¿½Ø¤è¦¡ï¿½eï¿½{ï¿½G");
+define("_CHECKSTORY", "ï¿½bï¿½Hï¿½Xï¿½zï¿½ï¿½ï¿½ï¿½ï¿½É¤ï¿½ï¿½eï¿½Aï¿½ï¿½ï¿½Ë¬dï¿½zï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Pï¿½ï¿½ï¿½ï¿½ï¿½ìµ²");
+define("_THANKSSUB", "ï¿½Pï¿½Â±zï¿½ï¿½ï¿½ë»¼ï¿½I");
+define("_SUBSENT", "ï¿½zï¿½ï¿½ï¿½å³¹ï¿½wï¿½gï¿½Qï¿½Ú­Ì¦ï¿½ï¿½ï¿½...");
+define("_SUBTEXT", "ï¿½Ú­Ì·|ï¿½bï¿½Xï¿½pï¿½É¤ï¿½ï¿½Ë¬dï¿½zï¿½ï¿½ï¿½ë»¼ï¿½Aï¿½ï¿½ï¿½eï¿½Tï¿½wï¿½Lï¿½~ï¿½ï¿½Ú­Ì´Nï¿½|ï¿½oï¿½ï¿½");
+define("_WEHAVESUB", "ï¿½Ø«eï¿½Ú­Ì¦ï¿½");
+define("_WAITING", "ï¿½ï¿½ï¿½ë»¼ï¿½ï¿½ï¿½Ý³Qï¿½oï¿½ï¿½");
+define("_PREVIEW", "ï¿½wï¿½ï¿½");
+define("_NEWUSER", "ï¿½sï¿½Ï¥Îªï¿½");
+define("_USCORE", "ï¿½ï¿½ï¿½ï¿½");
+define("_DATE", "ï¿½ï¿½ï¿½");
+define("_STORYTEXT", "ï¿½ï¿½ï¿½É¥ï¿½ï¿½ï¿½");
+define("_EXTENDEDTEXT", "ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_LANGUAGE", "ï¿½yï¿½ï¿½");
+define("_JANUARY", "ï¿½@ï¿½ï¿½");
+define("_FEBRUARY", "ï¿½Gï¿½ï¿½");
+define("_MARCH", "ï¿½Tï¿½ï¿½");
+define("_APRIL", "ï¿½|ï¿½ï¿½");
+define("_MAY", "ï¿½ï¿½ï¿½ï¿½");
+define("_JUNE", "ï¿½ï¿½ï¿½ï¿½");
+define("_JULY", "ï¿½Cï¿½ï¿½");
+define("_AUGUST", "ï¿½Kï¿½ï¿½");
+define("_SEPTEMBER", "ï¿½Eï¿½ï¿½");
+define("_OCTOBER", "ï¿½Qï¿½ï¿½");
+define("_NOVEMBER", "ï¿½Qï¿½@ï¿½ï¿½");
+define("_DECEMBER", "ï¿½Qï¿½Gï¿½ï¿½");
+define("_SELECTMONTH2VIEW", "ï¿½Ð¿ï¿½Ü±zï¿½nï¿½Ýªï¿½ï¿½ï¿½ï¿½:");
+define("_SHOWALLSTORIES", "ï¿½ï¿½Ü©Ò¦ï¿½ï¿½ï¿½ï¿½å³¹");
+define("_STORIESARCHIVE", "ï¿½å³¹ï¿½ï¿½Æ®w");
+define("_ACTIONS", "ï¿½ï¿½ï¿½");
+define("_ARCHIVESINDEX", "ï¿½å³¹ï¿½ï¿½Æ®wï¿½ï¿½ï¿½ï¿½");
+define("_ALLSTORIESARCH", "ï¿½Ò¦ï¿½ï¿½å³¹");
+define("_NEXTPAGE", "ï¿½Uï¿½@ï¿½ï¿½");
+define("_PREVIOUSPAGE", "ï¿½Wï¿½@ï¿½ï¿½");

@@ -17,39 +17,35 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_SEND","Küldés");
-define("_FUNCTIONS","Funkciók");
-define("_YES","Igen");
-define("_NO","Nem");
-define("_CATEGORY","Kategória");
-define("_SAVECHANGES","Változások mentése");
-define("_PAGEBREAK","Ha több oldalra szeretnéd bontani az írást, írj <b>[--pagebreak--]</b>-et oda, ahol vágni szeretnél!");
-define("_SIGNATURE","Aláírás");
-define("_DESCRIPTION","Leírás");
-define("_TITLE","Cím");
-define("_ACTIVE","Aktív");
-define("_DEACTIVATE","Kikapcsolás");
-define("_INACTIVE","Inaktív");
-define("_ACTIVATE","Bekapcsolás");
-define("_CONTENT","Tartalom");
-define("_ADDCATEGORY","Új kategória");
-define("_EDITCATEGORY","Kategória szerkesztése");
-define("_ADD","Hozzáadás");
-define("_LANGUAGE","Language");
-define("_CONTENTMANAGER","Content Manager");
-define("_DELCONTWARNING","Are you sure you want to delete the page");
-define("_DELCONTENT","Delete Page");
-define("_CURRENTSTATUS","Current Status");
-define("_ADDANEWPAGE","Add a New Page");
-define("_CSUBTITLE","Sub-Title");
-define("_HEADERTEXT","Header Text");
-define("_PAGETEXT","Page Text");
-define("_FOOTERTEXT","Footer Text");
-define("_ACTIVATEPAGE","Activate This Page?");
-define("_EDITPAGECONTENT","Edit Page Content");
-define("_DELCONTENTCAT","WARNING: Are you sure you want to delete this category? Pages under this category, if they exist, will not be removed, but will not be attached to any category.");
-define("_DELCATEGORY","Delete Category");
-
-
-?>
+define("_SEND", "Kï¿½ldï¿½s");
+define("_FUNCTIONS", "Funkciï¿½k");
+define("_YES", "Igen");
+define("_NO", "Nem");
+define("_CATEGORY", "Kategï¿½ria");
+define("_SAVECHANGES", "Vï¿½ltozï¿½sok mentï¿½se");
+define("_PAGEBREAK", "Ha tï¿½bb oldalra szeretnï¿½d bontani az ï¿½rï¿½st, ï¿½rj <b>[--pagebreak--]</b>-et oda, ahol vï¿½gni szeretnï¿½l!");
+define("_SIGNATURE", "Alï¿½ï¿½rï¿½s");
+define("_DESCRIPTION", "Leï¿½rï¿½s");
+define("_TITLE", "Cï¿½m");
+define("_ACTIVE", "Aktï¿½v");
+define("_DEACTIVATE", "Kikapcsolï¿½s");
+define("_INACTIVE", "Inaktï¿½v");
+define("_ACTIVATE", "Bekapcsolï¿½s");
+define("_CONTENT", "Tartalom");
+define("_ADDCATEGORY", "ï¿½j kategï¿½ria");
+define("_EDITCATEGORY", "Kategï¿½ria szerkesztï¿½se");
+define("_ADD", "Hozzï¿½adï¿½s");
+define("_LANGUAGE", "Language");
+define("_CONTENTMANAGER", "Content Manager");
+define("_DELCONTWARNING", "Are you sure you want to delete the page");
+define("_DELCONTENT", "Delete Page");
+define("_CURRENTSTATUS", "Current Status");
+define("_ADDANEWPAGE", "Add a New Page");
+define("_CSUBTITLE", "Sub-Title");
+define("_HEADERTEXT", "Header Text");
+define("_PAGETEXT", "Page Text");
+define("_FOOTERTEXT", "Footer Text");
+define("_ACTIVATEPAGE", "Activate This Page?");
+define("_EDITPAGECONTENT", "Edit Page Content");
+define("_DELCONTENTCAT", "WARNING: Are you sure you want to delete this category? Pages under this category, if they exist, will not be removed, but will not be attached to any category.");
+define("_DELCATEGORY", "Delete Category");

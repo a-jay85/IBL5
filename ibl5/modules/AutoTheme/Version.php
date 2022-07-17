@@ -34,5 +34,3 @@ $modversion['author'] = 'Shawn McKenzie';
 $modversion['contact'] = 'http://spidean.mckenzies.net';
 $modversion['admin'] = 1;
 $modversion['securityschema'] = array('AutoTheme::' => '::');
-
-?>

@@ -17,13 +17,11 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_CATEGORY","Kategoria");
-define("_CATEGORIES","Kategoritë");
-define("_FAQ2","FAQ (Pyetjet e bëra më shpesh)");
-define("_BACKTOTOP","Kthehu në Fillim të faqes");
-define("_BACKTOFAQINDEX","Kthehu tek Treguesi i FAQ");
-define("_MAIN","Kryesore");
-define("_QUESTION","Pyetje");
-define("_ANSWER","Përgjigje");
-
-?>
+define("_CATEGORY", "Kategoria");
+define("_CATEGORIES", "Kategoritï¿½");
+define("_FAQ2", "FAQ (Pyetjet e bï¿½ra mï¿½ shpesh)");
+define("_BACKTOTOP", "Kthehu nï¿½ Fillim tï¿½ faqes");
+define("_BACKTOFAQINDEX", "Kthehu tek Treguesi i FAQ");
+define("_MAIN", "Kryesore");
+define("_QUESTION", "Pyetje");
+define("_ANSWER", "Pï¿½rgjigje");

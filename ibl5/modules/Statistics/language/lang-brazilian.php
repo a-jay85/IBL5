@@ -21,39 +21,36 @@
 /* Comments/suggestions: aleagi@terra.com.br - aleagi@phpnuke.org.br      */
 /**************************************************************************/
 
-
-define("_HITS","Cliques");
-define("_BROWSERS","Navegador");
-define("_OPERATINGSYS","Sistema Operacional");
-define("_UNKNOWN","Desconhecido");
-define("_OTHER","Outro/Desconhecido");
-define("_MISCSTATS","Estatísticas diversas");
-define("_REGUSERS","Usuários cadstrados:");
-define("_ACTIVEAUTHORS","Autores ativos:");
-define("_STORIESPUBLISHED","Notícias publicadas:");
-define("_SACTIVETOPICS","Tópicos ativos:");
-define("_COMMENTSPOSTED","Comentários enviados:");
-define("_SSPECIALSECT","Seções:");
-define("_ARTICLESSEC","Artigos em seções:");
-define("_LINKSINLINKS","Links:");
-define("_LINKSCAT","Categorias em Links:");
-define("_NEWSWAITING","Noticías aguardando revisão para publicação:");
-define("_NUKEVERSION","Versão do PHP-Nuke:");
-define("_SEARCHENGINES","Sistemas de Busca");
-define("_BOTS","Rôbos/Aranhas");
-define("_STATS","Estatísticas de acesso");
-define("_RETURNBASICSTATS","Volte para as Estatísticas básicas");
-define("_BACKTODETSTATS","Voltar para as Estatísticas detalhadas");
-define("_BACKTOMAIN","Voltar para a principal");
-define("_TODAYIS","Hoje é");
-define("_MOSTMONTH","Mês mais acessado");
-define("_MOSTDAY","Dia mais acessado");
-define("_MOSTHOUR","Hora mais acessada");
-define("_YEARLYSTATS","Estatísticas anuais");
-define("_MONTLYSTATS","Estatísticas mensais");
-define("_SPAGESVIEWS","Visualizações");
-define("_DAILYSTATS","Estatística diária");
-define("_HOURLYSTATS","Estatística por hora");
-define("_VIEWDETAILED","Visualizar estatísticas detalhadas");
-
-?>
+define("_HITS", "Cliques");
+define("_BROWSERS", "Navegador");
+define("_OPERATINGSYS", "Sistema Operacional");
+define("_UNKNOWN", "Desconhecido");
+define("_OTHER", "Outro/Desconhecido");
+define("_MISCSTATS", "Estatï¿½sticas diversas");
+define("_REGUSERS", "Usuï¿½rios cadstrados:");
+define("_ACTIVEAUTHORS", "Autores ativos:");
+define("_STORIESPUBLISHED", "Notï¿½cias publicadas:");
+define("_SACTIVETOPICS", "Tï¿½picos ativos:");
+define("_COMMENTSPOSTED", "Comentï¿½rios enviados:");
+define("_SSPECIALSECT", "Seï¿½ï¿½es:");
+define("_ARTICLESSEC", "Artigos em seï¿½ï¿½es:");
+define("_LINKSINLINKS", "Links:");
+define("_LINKSCAT", "Categorias em Links:");
+define("_NEWSWAITING", "Noticï¿½as aguardando revisï¿½o para publicaï¿½ï¿½o:");
+define("_NUKEVERSION", "Versï¿½o do PHP-Nuke:");
+define("_SEARCHENGINES", "Sistemas de Busca");
+define("_BOTS", "Rï¿½bos/Aranhas");
+define("_STATS", "Estatï¿½sticas de acesso");
+define("_RETURNBASICSTATS", "Volte para as Estatï¿½sticas bï¿½sicas");
+define("_BACKTODETSTATS", "Voltar para as Estatï¿½sticas detalhadas");
+define("_BACKTOMAIN", "Voltar para a principal");
+define("_TODAYIS", "Hoje ï¿½");
+define("_MOSTMONTH", "Mï¿½s mais acessado");
+define("_MOSTDAY", "Dia mais acessado");
+define("_MOSTHOUR", "Hora mais acessada");
+define("_YEARLYSTATS", "Estatï¿½sticas anuais");
+define("_MONTLYSTATS", "Estatï¿½sticas mensais");
+define("_SPAGESVIEWS", "Visualizaï¿½ï¿½es");
+define("_DAILYSTATS", "Estatï¿½stica diï¿½ria");
+define("_HOURLYSTATS", "Estatï¿½stica por hora");
+define("_VIEWDETAILED", "Visualizar estatï¿½sticas detalhadas");

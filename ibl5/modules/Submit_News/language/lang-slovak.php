@@ -2,10 +2,10 @@
 
 /*************************************************************************/
 /* The Slovak language file for module Submit_News                      */
-/* Author: AlRashid 			 Date: 09.09.2002   					 */
+/* Author: AlRashid              Date: 09.09.2002                        */
 /* alrashid@klokan.sk, http://alrashid.klokan.sk                         */
-/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk			     */
-/*  		Dakujem                                                      */
+/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk                 */
+/*          Dakujem                                                      */
 /*************************************************************************/
 /**************************************************************************/
 /* PHP-NUKE: Advanced Content Management System                           */
@@ -24,54 +24,52 @@
 /* And, if you use HTML code, please double check it.                     */
 /*************************************************************************/
 /* The Slovak language file for module Submit_News                      */
-/* Author: AlRashid 			 Date: 09.09.2002   					 */
+/* Author: AlRashid              Date: 09.09.2002                        */
 /* alrashid@klokan.sk, http://alrashid.klokan.sk                         */
-/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk			     */
-/*  		Dakujem                                                      */
+/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk                 */
+/*          Dakujem                                                      */
 /*************************************************************************/
 /**************************************************************************/
 
-define("_PRINTER","Stránka vhodná na tlaè");
-define("_FRIEND","Posla tento èlánok priate¾ovi, známemu");
-define("_YOURNAME","Vaše meno");
-define("_OK","Ok!");
-define("_ALLOWEDHTML","Povoli HTML:");
-define("_EXTRANS","Extrans (html kód do textu)");
-define("_HTMLFORMATED","HTML formátovanie");
-define("_PLAINTEXT","obyèajnı text");
-define("_ARTICLES","Èlánky");
-define("_SUBMITNEWS","Zasla príspevok");
-define("_SUBMITADVICE","Prosím napíšte èlánok do nasledovného formulára a pred odoslaním ho skontrolujte.<br>Nie všetky èlánky musia by publikované.<br>Váš príspevok bude skontrolovanı a môe by opravenı našim tímom");
-define("_SUBTITLE","Názov");
-define("_BEDESCRIPTIVE","Jednoducho, struène a jasne.");
-define("_BADTITLES","zlé názvy='Pozri toto!' alebo 'Èlánok'");
-define("_HTMLISFINE","HTML je fajn, ale otestujte prípadné URL a kód HTML!");
-define("_AREYOUSURE","Naozaj chcete vloi URL? Otestovali ste funkènos adresy?");
-define("_SUBPREVIEW","Pred odoslaním si príspevok prezrite");
-define("_SELECTTOPIC","Vıber témy");
-define("_NEWSUBPREVIEW","Náh¾ad pred odoslaním príspevku");
-define("_STORYLOOK","Váš príspevok bude vyzera takto:");
-define("_CHECKSTORY","Prosím pred odoslaním skontrolujte texty, odkazy atp.");
-define("_THANKSSUB","Srdeèná vïaka za príspevok!");
-define("_SUBSENT","Váš príspevok bol odoslanı...");
-define("_SUBTEXT","Pozrieme si váš príspevok v najbliších hodinách. Ak je zaujímavı a relevantnı, èoskoro ho publikujeme.");
-define("_WEHAVESUB","V tejto chvíli máme");
-define("_WAITING","príspevkov èakajúcich na publikovanie.");
-define("_PREVIEW","Prezrie");
-define("_NEWUSER","Novı uívate¾");
-define("_USCORE","Skóre");
-define("_DATE","Dátum");
-define("_STORYTEXT","Text èlánku");
-define("_EXTENDEDTEXT","Rozšírenı text");
-define("_LANGUAGE","Jazyk");
+define("_PRINTER", "Strï¿½nka vhodnï¿½ na tlaï¿½");
+define("_FRIEND", "Poslaï¿½ tento ï¿½lï¿½nok priateï¿½ovi, znï¿½memu");
+define("_YOURNAME", "Vaï¿½e meno");
+define("_OK", "Ok!");
+define("_ALLOWEDHTML", "Povoliï¿½ HTML:");
+define("_EXTRANS", "Extrans (html kï¿½d do textu)");
+define("_HTMLFORMATED", "HTML formï¿½tovanie");
+define("_PLAINTEXT", "obyï¿½ajnï¿½ text");
+define("_ARTICLES", "ï¿½lï¿½nky");
+define("_SUBMITNEWS", "Zaslaï¿½ prï¿½spevok");
+define("_SUBMITADVICE", "Prosï¿½m napï¿½te ï¿½lï¿½nok do nasledovnï¿½ho formulï¿½ra a pred odoslanï¿½m ho skontrolujte.<br>Nie vï¿½etky ï¿½lï¿½nky musia byï¿½ publikovanï¿½.<br>Vï¿½ prï¿½spevok bude skontrolovanï¿½ a mï¿½ï¿½e byï¿½ opravenï¿½ naï¿½im tï¿½mom");
+define("_SUBTITLE", "Nï¿½zov");
+define("_BEDESCRIPTIVE", "Jednoducho, struï¿½ne a jasne.");
+define("_BADTITLES", "zlï¿½ nï¿½zvy='Pozri toto!' alebo 'ï¿½lï¿½nok'");
+define("_HTMLISFINE", "HTML je fajn, ale otestujte prï¿½padnï¿½ URL a kï¿½d HTML!");
+define("_AREYOUSURE", "Naozaj chcete vloï¿½iï¿½ URL? Otestovali ste funkï¿½nosï¿½ adresy?");
+define("_SUBPREVIEW", "Pred odoslanï¿½m si prï¿½spevok prezrite");
+define("_SELECTTOPIC", "Vï¿½ber tï¿½my");
+define("_NEWSUBPREVIEW", "Nï¿½hï¿½ad pred odoslanï¿½m prï¿½spevku");
+define("_STORYLOOK", "Vï¿½ prï¿½spevok bude vyzeraï¿½ takto:");
+define("_CHECKSTORY", "Prosï¿½m pred odoslanï¿½m skontrolujte texty, odkazy atp.");
+define("_THANKSSUB", "Srdeï¿½nï¿½ vï¿½aka za prï¿½spevok!");
+define("_SUBSENT", "Vï¿½ prï¿½spevok bol odoslanï¿½...");
+define("_SUBTEXT", "Pozrieme si vï¿½ prï¿½spevok v najbliï¿½ï¿½ï¿½ch hodinï¿½ch. Ak je zaujï¿½mavï¿½ a relevantnï¿½, ï¿½oskoro ho publikujeme.");
+define("_WEHAVESUB", "V tejto chvï¿½li mï¿½me");
+define("_WAITING", "prï¿½spevkov ï¿½akajï¿½cich na publikovanie.");
+define("_PREVIEW", "Prezrieï¿½");
+define("_NEWUSER", "Novï¿½ uï¿½ï¿½vateï¿½");
+define("_USCORE", "Skï¿½re");
+define("_DATE", "Dï¿½tum");
+define("_STORYTEXT", "Text ï¿½lï¿½nku");
+define("_EXTENDEDTEXT", "Rozï¿½ï¿½renï¿½ text");
+define("_LANGUAGE", "Jazyk");
 
-define("_SELECTMONTH2VIEW","Vyberte mesiac, ktory chcete prezrie:");
-define("_SHOWALLSTORIES","Zobrazi všetky èlánky");
-define("_STORIESARCHIVE","Archív èlánkov");
-define("_ACTIONS","Monosti");
-define("_ARCHIVESINDEX","Index archívu èlánkov");
-define("_ALLSTORIESARCH","Všetky èlánky");
-define("_NEXTPAGE","Ïalšia strana");
-define("_PREVIOUSPAGE","Predchádzajúca strana");
-
-?>
+define("_SELECTMONTH2VIEW", "Vyberte mesiac, ktory chcete prezrieï¿½:");
+define("_SHOWALLSTORIES", "Zobraziï¿½ vï¿½etky ï¿½lï¿½nky");
+define("_STORIESARCHIVE", "Archï¿½v ï¿½lï¿½nkov");
+define("_ACTIONS", "Moï¿½nosti");
+define("_ARCHIVESINDEX", "Index archï¿½vu ï¿½lï¿½nkov");
+define("_ALLSTORIESARCH", "Vï¿½etky ï¿½lï¿½nky");
+define("_NEXTPAGE", "ï¿½alï¿½ia strana");
+define("_PREVIOUSPAGE", "Predchï¿½dzajï¿½ca strana");

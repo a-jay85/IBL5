@@ -18,64 +18,61 @@
 /**************************************************************************/
 
 /**************************************************************************/
-/* Translation by:							  */
-/*									  */
-/* Rui Cristovão (ord'hor) ordhor@hotmail.com				  */
+/* Translation by:                              */
+/*                                      */
+/* Rui Cristovï¿½o (ord'hor) ordhor@hotmail.com                  */
 /**************************************************************************/
 
-
-define("_YOURNAME","O seu nome");
-define("_OK","Ok!");
-define("_COMMENT","comentário");
-define("_CONFIGURE","Configurar");
-define("_LOGINCREATE","Login/Criar uma Conta");
-define("_THRESHOLD","Início");
-define("_NOCOMMENTS","Sem Comentários");
-define("_NESTED","Alojados");
-define("_FLAT","Plano");
-define("_THREAD","Discussão");
-define("_OLDEST","Antigos");
-define("_NEWEST","Novos");
-define("_HIGHEST","Pontuação Mais Alta");
-define("_COMMENTSWARNING","Os comentários são propriedade de quem os escreveu. Nós não somos responsáveis pelo seu conteúdo.");
-define("_SCORE","Pontuação:");
-define("_USERINFO","Informações do Utilizador");
-define("_READREST","Ler o resto deste comentário...");
-define("_REPLY","Responder a este");
-define("_REPLYMAIN","Enviar comentário");
-define("_NOSUBJECT","Sem título");
-define("_NOANONCOMMENTS","Os comentários não podem ser enviados por utilizadores anónimos. Por favor <a href=\"modules.php?name=Your_Account&amp;op=new_user\"><b>registe-se</b></a>");
-define("_PARENT","Principal");
-define("_ROOT","Raíz");
-define("_UCOMMENT","Comentário");
-define("_ALLOWEDHTML","Código HTML que pode inserir:");
-define("_POSTANON","Enviar como anónimo");
-define("_EXTRANS","Usar (comandos de HTML no texto)");
-define("_HTMLFORMATED","Formatado em HTML");
-define("_PLAINTEXT","Texto simples");
-define("_ONN"," em...");
-define("_SUBJECT","Título");
-define("_SURVEYCOM","Rever comentário antes de enviá-lo");
-define("_SURVEYCOMPRE","Visualizar a revisão do comentário");
-define("_NOTRIGHT","Algo não correu como previsto.... Esta mensagem é só para esclarecer isso...");
-define("_DIRECTCOM","Comentário directo á votação...");
-define("_SENDAMSG","Enviar a Mensagem");
-define("_PASTSURVEYS","Votações anteriores");
-define("_LVOTES","votos");
-define("_TOTALVOTES","Total de votos:");
-define("_VOTING","Zona de Votação");
-define("_OTHERPOLLS","Outras votações");
-define("_CURRENTSURVEY","Votação actual");
-define("_CURRENTPOLLRESULTS","Resultado actual da votação");
-define("_PREVIEW","Pré-Visualização");
-define("_REFRESH","actualizar");
-define("_SURVEYS","Votações");
-define("_ATTACHEDTOARTICLE","- anexo ao artigo:");
-define("_SURVEYSATTACHED","Votações anexas a artigos");
-define("_LAST5POLLS", "Últimas 5 votações");
-define("_MOREPOLLS", "...mais votações");
-define("_COMMENTSMODERATION","Comments Moderation System");
-define("_MODERATE","Moderate");
-define("_CLICKTOMODERATE","Please select your moderation values for each comment on this survey, then click on <i>Moderate</i> button bellow to save your comments moderation preferences. Be fair on each value, this will contribute and benefict all users/readers. Thank you.");
-
-?>
+define("_YOURNAME", "O seu nome");
+define("_OK", "Ok!");
+define("_COMMENT", "comentï¿½rio");
+define("_CONFIGURE", "Configurar");
+define("_LOGINCREATE", "Login/Criar uma Conta");
+define("_THRESHOLD", "Inï¿½cio");
+define("_NOCOMMENTS", "Sem Comentï¿½rios");
+define("_NESTED", "Alojados");
+define("_FLAT", "Plano");
+define("_THREAD", "Discussï¿½o");
+define("_OLDEST", "Antigos");
+define("_NEWEST", "Novos");
+define("_HIGHEST", "Pontuaï¿½ï¿½o Mais Alta");
+define("_COMMENTSWARNING", "Os comentï¿½rios sï¿½o propriedade de quem os escreveu. Nï¿½s nï¿½o somos responsï¿½veis pelo seu conteï¿½do.");
+define("_SCORE", "Pontuaï¿½ï¿½o:");
+define("_USERINFO", "Informaï¿½ï¿½es do Utilizador");
+define("_READREST", "Ler o resto deste comentï¿½rio...");
+define("_REPLY", "Responder a este");
+define("_REPLYMAIN", "Enviar comentï¿½rio");
+define("_NOSUBJECT", "Sem tï¿½tulo");
+define("_NOANONCOMMENTS", "Os comentï¿½rios nï¿½o podem ser enviados por utilizadores anï¿½nimos. Por favor <a href=\"modules.php?name=Your_Account&amp;op=new_user\"><b>registe-se</b></a>");
+define("_PARENT", "Principal");
+define("_ROOT", "Raï¿½z");
+define("_UCOMMENT", "Comentï¿½rio");
+define("_ALLOWEDHTML", "Cï¿½digo HTML que pode inserir:");
+define("_POSTANON", "Enviar como anï¿½nimo");
+define("_EXTRANS", "Usar (comandos de HTML no texto)");
+define("_HTMLFORMATED", "Formatado em HTML");
+define("_PLAINTEXT", "Texto simples");
+define("_ONN", " em...");
+define("_SUBJECT", "Tï¿½tulo");
+define("_SURVEYCOM", "Rever comentï¿½rio antes de enviï¿½-lo");
+define("_SURVEYCOMPRE", "Visualizar a revisï¿½o do comentï¿½rio");
+define("_NOTRIGHT", "Algo nï¿½o correu como previsto.... Esta mensagem ï¿½ sï¿½ para esclarecer isso...");
+define("_DIRECTCOM", "Comentï¿½rio directo ï¿½ votaï¿½ï¿½o...");
+define("_SENDAMSG", "Enviar a Mensagem");
+define("_PASTSURVEYS", "Votaï¿½ï¿½es anteriores");
+define("_LVOTES", "votos");
+define("_TOTALVOTES", "Total de votos:");
+define("_VOTING", "Zona de Votaï¿½ï¿½o");
+define("_OTHERPOLLS", "Outras votaï¿½ï¿½es");
+define("_CURRENTSURVEY", "Votaï¿½ï¿½o actual");
+define("_CURRENTPOLLRESULTS", "Resultado actual da votaï¿½ï¿½o");
+define("_PREVIEW", "Prï¿½-Visualizaï¿½ï¿½o");
+define("_REFRESH", "actualizar");
+define("_SURVEYS", "Votaï¿½ï¿½es");
+define("_ATTACHEDTOARTICLE", "- anexo ao artigo:");
+define("_SURVEYSATTACHED", "Votaï¿½ï¿½es anexas a artigos");
+define("_LAST5POLLS", "ï¿½ltimas 5 votaï¿½ï¿½es");
+define("_MOREPOLLS", "...mais votaï¿½ï¿½es");
+define("_COMMENTSMODERATION", "Comments Moderation System");
+define("_MODERATE", "Moderate");
+define("_CLICKTOMODERATE", "Please select your moderation values for each comment on this survey, then click on <i>Moderate</i> button bellow to save your comments moderation preferences. Be fair on each value, this will contribute and benefict all users/readers. Thank you.");

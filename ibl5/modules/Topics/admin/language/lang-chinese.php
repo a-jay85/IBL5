@@ -17,30 +17,26 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_CURRENTTOPICS","Current Active Topics");
-define("_CLICK2EDIT","Click on Topic to Edit");
-define("_ADDATOPIC","Add a New Topic");
-define("_TOPICNAME","Topic Name");
-define("_TOPICNAME1","(just a name without spaces - max: 20 characters)");
-define("_TOPICNAME2","(for example: gamesandhobbies)");
-define("_TOPICTEXT","Topic Text");
-define("_TOPICTEXT1","(the full topic text or description - max: 40 characters)");
-define("_TOPICTEXT2","(for example: Games and Hobbies)");
-define("_TOPICIMAGE","Topic Image");
-define("_ADDTOPIC","Add Topic");
-define("_EDITTOPIC","Edit Topic");
-define("_ADDRELATED","Add Related Links");
-define("_ACTIVERELATEDLINKS","Active Related Links");
-define("_SITENAME","Site Name");
-define("_NORELATED","There are no related links for this topic");
-define("_EDITRELATED","Edit Related Link");
-define("_YES","¬O");
-define("_NO","§_");
-define("_TOPICSMANAGER","·s»D¥DÃD ºÞ²z­û");
-define("_DELETETOPIC","§R°£·s»D¥DÃD");
-define("_TOPICDELSURE","½T©w­n§R°£·s»D¥DÃD¡H");
-define("_TOPICDELSURE1","³o±N·|§R°£©Ò¦³ªº³ø¾É©M¬ÛÃöªºµûµù¡I");
-
-
-?>
+define("_CURRENTTOPICS", "Current Active Topics");
+define("_CLICK2EDIT", "Click on Topic to Edit");
+define("_ADDATOPIC", "Add a New Topic");
+define("_TOPICNAME", "Topic Name");
+define("_TOPICNAME1", "(just a name without spaces - max: 20 characters)");
+define("_TOPICNAME2", "(for example: gamesandhobbies)");
+define("_TOPICTEXT", "Topic Text");
+define("_TOPICTEXT1", "(the full topic text or description - max: 40 characters)");
+define("_TOPICTEXT2", "(for example: Games and Hobbies)");
+define("_TOPICIMAGE", "Topic Image");
+define("_ADDTOPIC", "Add Topic");
+define("_EDITTOPIC", "Edit Topic");
+define("_ADDRELATED", "Add Related Links");
+define("_ACTIVERELATEDLINKS", "Active Related Links");
+define("_SITENAME", "Site Name");
+define("_NORELATED", "There are no related links for this topic");
+define("_EDITRELATED", "Edit Related Link");
+define("_YES", "ï¿½O");
+define("_NO", "ï¿½_");
+define("_TOPICSMANAGER", "ï¿½sï¿½Dï¿½Dï¿½D ï¿½Þ²zï¿½ï¿½");
+define("_DELETETOPIC", "ï¿½Rï¿½ï¿½ï¿½sï¿½Dï¿½Dï¿½D");
+define("_TOPICDELSURE", "ï¿½Tï¿½wï¿½nï¿½Rï¿½ï¿½ï¿½sï¿½Dï¿½Dï¿½Dï¿½H");
+define("_TOPICDELSURE1", "ï¿½oï¿½Nï¿½|ï¿½Rï¿½ï¿½ï¿½Ò¦ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½É©Mï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½I");

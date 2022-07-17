@@ -17,22 +17,20 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_SEND","ÃÑÓá");
-define("_FYOURNAME","ÇÓãß:");
-define("_FYOUREMAIL","ÈÑíÏß ÇáÅáßÊÑæäí:");
-define("_FFRIENDNAME","ÇÓã ÕÏíŞß:");
-define("_FFRIENDEMAIL","ÈÑíÏ ÕÏíŞß:");
-define("_HELLO","ãÑÍÈÇ");
-define("_YOURFRIEND","ÕÏíŞß");
-define("_RECOMMEND","ÇÑÓá åĞÇ ÇáãæŞÚ Çáì ÕÏíŞ");
-define("_INTSITE","ãæŞÚ ããÊÚ:");
-define("_OURSITE","íÚÊŞÏ Ãä ãæŞÚäÇ");
-define("_INTSENT","ããÊÚ æÃÑÇÏ Ãä íÑÓáå áß.");
-define("_FSITENAME","ÇÓã ÇáãæŞÚ:");
-define("_FSITEURL","ÚäæÇä ÇáãæŞÚ:");
-define("_FREFERENCE","ÇáãÑÌÚ áãæŞÚäÇ ÃÑÓá Çáì");
-define("_THANKSREC","ÔßÑÇ áÃÎÈÇÑ ÕÏíŞß ÚäÇ!");
-define("_SECURITYCODEERROR","<b>ERROR:</b> The security code you wrote is incorrect...<br>Please write it exactly as given bellow:");
-define("_SENDSITEERROR","<b>Error sending the recommendation...</b><br><br><b>ERROR:</b> One or more required fields are empty.<br>Please go back and correct the problem, then try again.");
-
-?>
+define("_SEND", "ï¿½ï¿½ï¿½ï¿½");
+define("_FYOURNAME", "ï¿½ï¿½ï¿½ï¿½:");
+define("_FYOUREMAIL", "ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½:");
+define("_FFRIENDNAME", "ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½:");
+define("_FFRIENDEMAIL", "ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½:");
+define("_HELLO", "ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_YOURFRIEND", "ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_RECOMMEND", "ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½");
+define("_INTSITE", "ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½:");
+define("_OURSITE", "ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_INTSENT", "ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½.");
+define("_FSITENAME", "ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½:");
+define("_FSITEURL", "ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½:");
+define("_FREFERENCE", "ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½");
+define("_THANKSREC", "ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½!");
+define("_SECURITYCODEERROR", "<b>ERROR:</b> The security code you wrote is incorrect...<br>Please write it exactly as given bellow:");
+define("_SENDSITEERROR", "<b>Error sending the recommendation...</b><br><br><b>ERROR:</b> One or more required fields are empty.<br>Please go back and correct the problem, then try again.");

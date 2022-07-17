@@ -17,25 +17,23 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_CATEGORY","Kategoria");
- 
-define("_LVOTES","ääntä");
-define("_HITS","Lukukertoja");
-define("_TOPWELCOME","Tervetuloa sivulle"); 
-define("_READSTORIES","Luetuimmat artikkelit");
-define("_COMMENTEDSTORIES","Kommentoiduimmat artikkelit"); 
-define("_ACTIVECAT","Aktiivisimmat kategoriat");
-define("_READSECTION","Luetuimmat opetukset"); 
-define("_NEWSSUBMITTERS","Aktiivisimmat artikkeleiden kirjoittajat");
-define("_NEWSSENT","Uutista lähetetty");
-define("_VOTEDPOLLS","Äänestetyimmät äänestykset");
-define("_MOSTACTIVEAUTHORS","Aktiivisimmat kirjoittajat");
-define("_NEWSPUBLISHED","Uutista julkaistu");
-define("_READREVIEWS","Luetuimmat arvostelut");
-define("_DOWNLOADEDFILES","Useimmin imuroidut tiedostot");
-define("_MOSTREADPAGES","most read pages");
-define("_MOSTVOTEDSTORIES","most voted stories");
-define("_POINTS","points");
-define("_BESTRATEDSTORIES","best rated stories (based on 5 maximun points)");
+define("_CATEGORY", "Kategoria");
 
-?>
+define("_LVOTES", "ï¿½ï¿½ntï¿½");
+define("_HITS", "Lukukertoja");
+define("_TOPWELCOME", "Tervetuloa sivulle");
+define("_READSTORIES", "Luetuimmat artikkelit");
+define("_COMMENTEDSTORIES", "Kommentoiduimmat artikkelit");
+define("_ACTIVECAT", "Aktiivisimmat kategoriat");
+define("_READSECTION", "Luetuimmat opetukset");
+define("_NEWSSUBMITTERS", "Aktiivisimmat artikkeleiden kirjoittajat");
+define("_NEWSSENT", "Uutista lï¿½hetetty");
+define("_VOTEDPOLLS", "ï¿½ï¿½nestetyimmï¿½t ï¿½ï¿½nestykset");
+define("_MOSTACTIVEAUTHORS", "Aktiivisimmat kirjoittajat");
+define("_NEWSPUBLISHED", "Uutista julkaistu");
+define("_READREVIEWS", "Luetuimmat arvostelut");
+define("_DOWNLOADEDFILES", "Useimmin imuroidut tiedostot");
+define("_MOSTREADPAGES", "most read pages");
+define("_MOSTVOTEDSTORIES", "most voted stories");
+define("_POINTS", "points");
+define("_BESTRATEDSTORIES", "best rated stories (based on 5 maximun points)");

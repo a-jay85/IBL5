@@ -17,13 +17,11 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_CATEGORY","Danh m&#7909;c");
-define("_CATEGORIES","Nhi&#7873;u danh m&#7909;c");
-define("_FAQ2","FAQ (Cƒu Th&#432;&#7901;ng H&#7887;i)");
-define("_BACKTOTOP","Tr&#7903; l&#7841;i &#273;&#7847;u");
-define("_BACKTOFAQINDEX","Tr&#7903; l&#7841;i m&#7909;c l&#7909;c c&#7911;a Cƒu Th&#432;&#7901;ng H&#7887;i");
-define("_MAIN","Ph&#7847;n Ch¡nh");
-define("_QUESTION","Cƒu h&#7887;i");
-define("_ANSWER","Tr&#7843; l&#7901;i");
-
-?>
+define("_CATEGORY", "Danh m&#7909;c");
+define("_CATEGORIES", "Nhi&#7873;u danh m&#7909;c");
+define("_FAQ2", "FAQ (Cï¿½u Th&#432;&#7901;ng H&#7887;i)");
+define("_BACKTOTOP", "Tr&#7903; l&#7841;i &#273;&#7847;u");
+define("_BACKTOFAQINDEX", "Tr&#7903; l&#7841;i m&#7909;c l&#7909;c c&#7911;a Cï¿½u Th&#432;&#7901;ng H&#7887;i");
+define("_MAIN", "Ph&#7847;n Chï¿½nh");
+define("_QUESTION", "Cï¿½u h&#7887;i");
+define("_ANSWER", "Tr&#7843; l&#7901;i");

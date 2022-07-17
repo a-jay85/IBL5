@@ -21,9 +21,9 @@
  ***************************************************************************/
 
 /* CONTRIBUTORS
-	2002-12-15	Philip M. White (pwhite@mailhaven.com)
-		Fixed many minor grammatical mistakes
-*/
+2002-12-15    Philip M. White (pwhite@mailhaven.com)
+Fixed many minor grammatical mistakes
+ */
 
 //
 // Format is same as lang_main
@@ -55,7 +55,6 @@ $lang['Add_new'] = 'Add';
 $lang['Backup_DB'] = 'Backup Database';
 $lang['Restore_DB'] = 'Restore Database';
 
-
 //
 // Index
 //
@@ -81,12 +80,11 @@ $lang['Users_per_day'] = 'Users per day';
 $lang['Board_started'] = 'Board started';
 $lang['Avatar_dir_size'] = 'Avatar directory size';
 $lang['Database_size'] = 'Database size';
-$lang['Gzip_compression'] ='Gzip compression';
+$lang['Gzip_compression'] = 'Gzip compression';
 $lang['Not_available'] = 'Not available';
 
 $lang['ON'] = 'ON'; // This is for GZip compression
-$lang['OFF'] = 'OFF'; 
-
+$lang['OFF'] = 'OFF';
 
 //
 // DB Utils
@@ -117,19 +115,18 @@ $lang['Restore_Error_filename'] = 'Filename problem; please try an alternative f
 $lang['Restore_Error_decompress'] = 'Cannot decompress a gzip file; please upload a plain text version';
 $lang['Restore_Error_no_file'] = 'No file was uploaded';
 
-
 //
 // Auth pages
 //
 $lang['Select_a_User'] = 'Select a User';
 $lang['Select_a_Group'] = 'Select a Group';
 $lang['Select_a_Forum'] = 'Select a Forum';
-$lang['Auth_Control_User'] = 'User Permissions Control'; 
-$lang['Auth_Control_Group'] = 'Group Permissions Control'; 
-$lang['Auth_Control_Forum'] = 'Forum Permissions Control'; 
-$lang['Look_up_User'] = 'Look up User'; 
-$lang['Look_up_Group'] = 'Look up Group'; 
-$lang['Look_up_Forum'] = 'Look up Forum'; 
+$lang['Auth_Control_User'] = 'User Permissions Control';
+$lang['Auth_Control_Group'] = 'Group Permissions Control';
+$lang['Auth_Control_Forum'] = 'Forum Permissions Control';
+$lang['Look_up_User'] = 'Look up User';
+$lang['Look_up_Group'] = 'Look up Group';
+$lang['Look_up_Forum'] = 'Look up Forum';
 
 $lang['Group_auth_explain'] = 'Here you can alter the permissions and moderator status assigned to each user group. Do not forget when changing group permissions that individual user permissions may still allow the user entry to forums, etc. You will be warned if this is the case.';
 $lang['User_auth_explain'] = 'Here you can alter the permissions and moderator status assigned to each individual user. Do not forget when changing user permissions that group permissions may still allow the user entry to forums, etc. You will be warned if this is the case.';
@@ -172,14 +169,14 @@ $lang['Reply'] = 'Reply';
 $lang['Edit'] = 'Edit';
 $lang['Delete'] = 'Delete';
 $lang['Sticky'] = 'Sticky';
-$lang['Announce'] = 'Announce'; 
+$lang['Announce'] = 'Announce';
 $lang['Vote'] = 'Vote';
 $lang['Pollcreate'] = 'Poll create';
 
 $lang['Permissions'] = 'Permissions';
 $lang['Simple_Permission'] = 'Simple Permissions';
 
-$lang['User_Level'] = 'User Level'; 
+$lang['User_Level'] = 'User Level';
 $lang['Auth_User'] = 'User';
 $lang['Auth_Admin'] = 'Administrator';
 $lang['Group_memberships'] = 'Usergroup memberships';
@@ -193,7 +190,6 @@ $lang['Auth_updated'] = 'Permissions have been updated';
 $lang['Click_return_userauth'] = 'Click %sHere%s to return to User Permissions';
 $lang['Click_return_groupauth'] = 'Click %sHere%s to return to Group Permissions';
 $lang['Click_return_forumauth'] = 'Click %sHere%s to return to Forum Permissions';
-
 
 //
 // Banning
@@ -232,7 +228,6 @@ $lang['No_banned_email'] = 'No banned email addresses';
 $lang['Ban_update_sucessful'] = 'The banlist has been updated successfully';
 $lang['Click_return_banadmin'] = 'Click %sHere%s to return to Ban Control';
 
-
 //
 // Configuration
 //
@@ -260,7 +255,7 @@ $lang['Acc_Admin'] = 'Admin';
 $lang['Abilities_settings'] = 'User and Forum Basic Settings';
 $lang['Max_poll_options'] = 'Max number of poll options';
 $lang['Flood_Interval'] = 'Flood Interval';
-$lang['Flood_Interval_explain'] = 'Number of seconds a user must wait between posts'; 
+$lang['Flood_Interval_explain'] = 'Number of seconds a user must wait between posts';
 $lang['Board_email_form'] = 'User email via board';
 $lang['Board_email_form_explain'] = 'Users send email to each other via this board';
 $lang['Topics_per_page'] = 'Topics Per Page';
@@ -322,7 +317,7 @@ $lang['Inbox_limits'] = 'Max posts in Inbox';
 $lang['Sentbox_limits'] = 'Max posts in Sentbox';
 $lang['Savebox_limits'] = 'Max posts in Savebox';
 
-$lang['Cookie_settings'] = 'Cookie settings'; 
+$lang['Cookie_settings'] = 'Cookie settings';
 $lang['Cookie_settings_explain'] = 'These details define how cookies are sent to your users\' browsers. In most cases the default values for the cookie settings should be sufficient, but if you need to change them do so with care -- incorrect settings can prevent users from logging in';
 $lang['Cookie_domain'] = 'Cookie domain';
 $lang['Cookie_name'] = 'Cookie name';
@@ -343,7 +338,7 @@ $lang['Autologin_time_explain'] = 'How long a autologin key is valid for in days
 
 // Search Flood Control - added 2.0.20
 $lang['Search_Flood_Interval'] = 'Search Flood Interval';
-$lang['Search_Flood_Interval_explain'] = 'Number of seconds a user must wait between search requests'; 
+$lang['Search_Flood_Interval_explain'] = 'Number of seconds a user must wait between search requests';
 
 //
 // Forum Management
@@ -394,7 +389,6 @@ $lang['Forums_updated'] = 'Forum and Category information updated successfully';
 $lang['Must_delete_forums'] = 'You need to delete all forums before you can delete this category';
 
 $lang['Click_return_forumadmin'] = 'Click %sHere%s to return to Forum Administration';
-
 
 //
 // Smiley Management
@@ -456,7 +450,6 @@ $lang['Admin_avatar_explain'] = 'Here you can see and delete the user\'s current
 $lang['User_special'] = 'Special admin-only fields';
 $lang['User_special_explain'] = 'These fields are not able to be modified by the users.  Here you can set their status and other options that are not given to users.';
 
-
 //
 // Group Management
 //
@@ -489,7 +482,6 @@ $lang['Click_return_groupsadmin'] = 'Click %sHere%s to return to Group Administr
 $lang['Select_group'] = 'Select a group';
 $lang['Look_up_group'] = 'Look up group';
 
-
 //
 // Prune Administration
 //
@@ -501,7 +493,6 @@ $lang['Prune_topics_not_posted'] = 'Prune topics with no replies in this many da
 $lang['Topics_pruned'] = 'Topics pruned';
 $lang['Posts_pruned'] = 'Posts pruned';
 $lang['Prune_success'] = 'Pruning of forums was successful';
-
 
 //
 // Word censor
@@ -525,19 +516,17 @@ $lang['Click_return_wordadmin'] = 'Click %sHere%s to return to Word Censor Admin
 
 $lang['Confirm_delete_word'] = 'Are you sure you want to delete this word censor?';
 
-
 //
 // Mass Email
 //
 $lang['Mass_email_explain'] = 'Here you can email a message to either all of your users or all users of a specific group.  To do this, an email will be sent out to the administrative email address supplied, with a blind carbon copy sent to all recipients. If you are emailing a large group of people please be patient after submitting and do not stop the page halfway through. It is normal for a mass emailing to take a long time and you will be notified when the script has completed';
-$lang['Compose'] = 'Compose'; 
+$lang['Compose'] = 'Compose';
 
-$lang['Recipients'] = 'Recipients'; 
+$lang['Recipients'] = 'Recipients';
 $lang['All_users'] = 'All Users';
 
 $lang['Email_successfull'] = 'Your message has been sent';
 $lang['Click_return_massemail'] = 'Click %sHere%s to return to the Mass Email form';
-
 
 //
 // Ranks admin
@@ -587,7 +576,6 @@ $lang['Disallow_successful'] = 'The disallowed username has been successfully ad
 $lang['Disallowed_already'] = 'The name you entered could not be disallowed. It either already exists in the list, exists in the word censor list, or a matching username is present.';
 
 $lang['Click_return_disallowadmin'] = 'Click %sHere%s to return to Disallow Username Administration';
-
 
 //
 // Styles Admin
@@ -677,7 +665,6 @@ $lang['span_class3'] = 'Span Class 3';
 $lang['img_poll_size'] = 'Polling Image Size [px]';
 $lang['img_pm_size'] = 'Private Message Status size [px]';
 
-
 //
 // Install Process
 //
@@ -732,7 +719,6 @@ $lang['NoFTP_config'] = 'The attempt to FTP the config file into place failed.  
 $lang['Install'] = 'Install';
 $lang['Upgrade'] = 'Upgrade';
 
-
 $lang['Install_Method'] = 'Choose your installation method';
 
 $lang['Install_No_Ext'] = 'The PHP configuration on your server doesn\'t support the database type that you chose';
@@ -762,5 +748,3 @@ $lang['Login_reset_time_explain'] = 'Time in minutes the user have to wait until
 //
 // That's all Folks!
 // -------------------------------------------------
-
-?>

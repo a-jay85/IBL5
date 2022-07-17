@@ -13,9 +13,9 @@
 /************************************************************************/
 
 /* Block to fit perfectly in the center of the site, remember that not all
-   blocks looks good on Center, just try and see yourself what fits your needs */
+blocks looks good on Center, just try and see yourself what fits your needs */
 
-if ( !defined('BLOCK_FILE') ) {
+if (!defined('BLOCK_FILE')) {
     Header("Location: ../index.php");
     die();
 }
@@ -34,9 +34,7 @@ while ($row = $db->sql_fetchrow($result)) {
     $title = filter($row['title'], "nohtml");
     $comtotal = intval($row['comments']);
     $counter = intval($row['counter']);
-    $content .= "<tr><td align=\"left\"><strong><big>&middot;</big></strong>&nbsp;<a href=\"modules.php?name=News&amp;file=article&amp;sid=$sid\">$title</a></td><td align=\"right\">[ $comtotal "._COMMENTS." - $counter "._READS." ]</td></tr>";
+    $content .= "<tr><td align=\"left\"><strong><big>&middot;</big></strong>&nbsp;<a href=\"modules.php?name=News&amp;file=article&amp;sid=$sid\">$title</a></td><td align=\"right\">[ $comtotal " . _COMMENTS . " - $counter " . _READS . " ]</td></tr>";
 }
 $content .= "</table>";
-$content .= "<br><center>[ <a href=\"modules.php?name=News\">"._MORENEWS."</a> ]</center>";
-
-?>
+$content .= "<br><center>[ <a href=\"modules.php?name=News\">" . _MORENEWS . "</a> ]</center>";

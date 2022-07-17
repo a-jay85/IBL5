@@ -18,30 +18,27 @@
 /**************************************************************************/
 
 /**************************************************************************/
-/* Translation by:							  */
-/*									  */
-/* Rui Cristovão (ord'hor) ordhor@hotmail.com				  */
+/* Translation by:                              */
+/*                                      */
+/* Rui Cristovï¿½o (ord'hor) ordhor@hotmail.com                  */
 /**************************************************************************/
 
-
-define("_CATEGORY","Categoria");
-define("_LVOTES","votos");
-define("_HITS","Hits");
-define("_TOPWELCOME","Bem vindo ao TOP de");
-define("_READSTORIES","notícias mais lidas");
-define("_COMMENTEDSTORIES","notícias mais comentadas");
-define("_ACTIVECAT","categorias mais activas");
-define("_READSECTION","artigos mais lidos nas secções especiais");
-define("_NEWSSUBMITTERS","utilizadores mais activos no envio de notícias e que são pulicadas");
-define("_NEWSSENT","enviar notícia");
-define("_VOTEDPOLLS","votações com mais adesão");
-define("_MOSTACTIVEAUTHORS","autores mais activos");
-define("_NEWSPUBLISHED","notícias publicadas");
-define("_READREVIEWS","revisões mais lidas");
-define("_DOWNLOADEDFILES","downloads mais requisitados");
-define("_MOSTREADPAGES","páginas mais lidas");
-define("_MOSTVOTEDSTORIES","artigos com mais votações");
-define("_POINTS","pontos");
-define("_BESTRATEDSTORIES","artigos mais bem classificados (de pontuação 5 para cima)");
-
-?>
+define("_CATEGORY", "Categoria");
+define("_LVOTES", "votos");
+define("_HITS", "Hits");
+define("_TOPWELCOME", "Bem vindo ao TOP de");
+define("_READSTORIES", "notï¿½cias mais lidas");
+define("_COMMENTEDSTORIES", "notï¿½cias mais comentadas");
+define("_ACTIVECAT", "categorias mais activas");
+define("_READSECTION", "artigos mais lidos nas secï¿½ï¿½es especiais");
+define("_NEWSSUBMITTERS", "utilizadores mais activos no envio de notï¿½cias e que sï¿½o pulicadas");
+define("_NEWSSENT", "enviar notï¿½cia");
+define("_VOTEDPOLLS", "votaï¿½ï¿½es com mais adesï¿½o");
+define("_MOSTACTIVEAUTHORS", "autores mais activos");
+define("_NEWSPUBLISHED", "notï¿½cias publicadas");
+define("_READREVIEWS", "revisï¿½es mais lidas");
+define("_DOWNLOADEDFILES", "downloads mais requisitados");
+define("_MOSTREADPAGES", "pï¿½ginas mais lidas");
+define("_MOSTVOTEDSTORIES", "artigos com mais votaï¿½ï¿½es");
+define("_POINTS", "pontos");
+define("_BESTRATEDSTORIES", "artigos mais bem classificados (de pontuaï¿½ï¿½o 5 para cima)");

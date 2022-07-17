@@ -17,28 +17,24 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_FUNCTIONS","Aðgerðir");
-define("_YES","Já");
-define("_NO","Nei");
-define("_SAVE","Vista");
-define("_ID","Númer");
-define("_CATEGORIES","flokkar");
-define("_ALL","Allt");
-define("_FAQ","SOS");
-define("_CONTENT","Efni");
-define("_FAQADMIN","SOS stjórnun");
-define("_ACTIVEFAQS","Virkar SOS");
-define("_ADDCATEGORY","Bæta við flokki");
-define("_QUESTIONS","Spurningar og svör");
-define("_ADDQUESTION","Bæta við nýrri spurningu");
-define("_QUESTION","Spurning");
-define("_ANSWER","Svar");
-define("_EDITCATEGORY","Breyta flokki");
-define("_EDITQUESTIONS","Breyta spurningum og svörum");
-define("_FAQDELWARNING","VARÚÐ: Ertu viss um að þú viljir eyða þessu SOS og öllu efni þess?");
-define("_QUESTIONDEL","VARÚÐ: Ertu viss um að þú viljir eyða þessari spurningu?");
-define("_LANGUAGE","Tungumál");
-
-
-?>
+define("_FUNCTIONS", "Aï¿½gerï¿½ir");
+define("_YES", "Jï¿½");
+define("_NO", "Nei");
+define("_SAVE", "Vista");
+define("_ID", "Nï¿½mer");
+define("_CATEGORIES", "flokkar");
+define("_ALL", "Allt");
+define("_FAQ", "SOS");
+define("_CONTENT", "Efni");
+define("_FAQADMIN", "SOS stjï¿½rnun");
+define("_ACTIVEFAQS", "Virkar SOS");
+define("_ADDCATEGORY", "Bï¿½ta viï¿½ flokki");
+define("_QUESTIONS", "Spurningar og svï¿½r");
+define("_ADDQUESTION", "Bï¿½ta viï¿½ nï¿½rri spurningu");
+define("_QUESTION", "Spurning");
+define("_ANSWER", "Svar");
+define("_EDITCATEGORY", "Breyta flokki");
+define("_EDITQUESTIONS", "Breyta spurningum og svï¿½rum");
+define("_FAQDELWARNING", "VARï¿½ï¿½: Ertu viss um aï¿½ ï¿½ï¿½ viljir eyï¿½a ï¿½essu SOS og ï¿½llu efni ï¿½ess?");
+define("_QUESTIONDEL", "VARï¿½ï¿½: Ertu viss um aï¿½ ï¿½ï¿½ viljir eyï¿½a ï¿½essari spurningu?");
+define("_LANGUAGE", "Tungumï¿½l");

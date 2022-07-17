@@ -17,30 +17,26 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_EMAIL","Email");
-define("_SAVECHANGES","Deðiþiklikleri Kaydet");
-define("_SCORE","Skor:");
-define("_PRODUCTTITLE","Ürün Adý");
-define("_RELATEDLINK","Ýlgili Baðlantý");
-define("_LINKTITLE","Baðlantý Baþlýðý");
-define("_REVIEWER","Yazan:");
-define("_REVIEWID","Ýzlenim ID");
-define("_REVIEWS","Ýzlenimler");
-define("_DATE","Tarih");
-define("_REVADMIN","Ýncelemeler Yönetimi");
-define("_REVTITLE","Ýncelemeler Sayfasý Baþlýðý");
-define("_REVDESC","Ýncelemeler Sayfasý Tanýmý");
-define("_REVWAITING","Onay Bekleyen Ýncelemeler");
-define("_REVIMGINFO","150*150 grafiklerinizi images/reviews içinde saklayýn");
-define("_TEXT","Metin");
-define("_IMAGE","Grafik");
-define("_NOREVIEW2ADD","Eklenecek inceleme yok");
-define("_ADDREVIEW","Ýnceleme Ekle");
-define("_CLICK2ADDREVIEW","Ýnceleme yazmak için týklayýn");
-define("_DELMODREVIEW","Ýnceleme Sil / Deðiþtir");
-define("_MODREVINFO","Ýnceleme silmek/deðiþtirmek için yönetici olarak <a href=\"modules.php?name=Reviews\">Ýncelemeler</a> sayfasýna girin.");
-define("_LANGUAGE","Dil");
-
-
-?>
+define("_EMAIL", "Email");
+define("_SAVECHANGES", "Deï¿½iï¿½iklikleri Kaydet");
+define("_SCORE", "Skor:");
+define("_PRODUCTTITLE", "ï¿½rï¿½n Adï¿½");
+define("_RELATEDLINK", "ï¿½lgili Baï¿½lantï¿½");
+define("_LINKTITLE", "Baï¿½lantï¿½ Baï¿½lï¿½ï¿½ï¿½");
+define("_REVIEWER", "Yazan:");
+define("_REVIEWID", "ï¿½zlenim ID");
+define("_REVIEWS", "ï¿½zlenimler");
+define("_DATE", "Tarih");
+define("_REVADMIN", "ï¿½ncelemeler Yï¿½netimi");
+define("_REVTITLE", "ï¿½ncelemeler Sayfasï¿½ Baï¿½lï¿½ï¿½ï¿½");
+define("_REVDESC", "ï¿½ncelemeler Sayfasï¿½ Tanï¿½mï¿½");
+define("_REVWAITING", "Onay Bekleyen ï¿½ncelemeler");
+define("_REVIMGINFO", "150*150 grafiklerinizi images/reviews iï¿½inde saklayï¿½n");
+define("_TEXT", "Metin");
+define("_IMAGE", "Grafik");
+define("_NOREVIEW2ADD", "Eklenecek inceleme yok");
+define("_ADDREVIEW", "ï¿½nceleme Ekle");
+define("_CLICK2ADDREVIEW", "ï¿½nceleme yazmak iï¿½in tï¿½klayï¿½n");
+define("_DELMODREVIEW", "ï¿½nceleme Sil / Deï¿½iï¿½tir");
+define("_MODREVINFO", "ï¿½nceleme silmek/deï¿½iï¿½tirmek iï¿½in yï¿½netici olarak <a href=\"modules.php?name=Reviews\">ï¿½ncelemeler</a> sayfasï¿½na girin.");
+define("_LANGUAGE", "Dil");

@@ -17,18 +17,16 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PREVIOUS","Forrige side");
-define("_NEXT","Neste side");
-define("_PAGE","Side");
-define("_DEACTIVATE","Deaktiver");
-define("_ACTIVATE","Aktiver");
-define("_PUBLISHEDON","Publisert den");
-define("_PAGESLIST","Liste over sider");
-define("_LISTOFCONTENT","Liste over tilgjengelig innhold i");
-define("_YOURADMINLIST","Du er administrator: følgende er listen over inaktive sider:");
-define("_COPYRIGHT","Copyright &copy; by");
-define("_COPYRIGHT2","All Right Reserved.");
-define("_CONTENTCATEGORIES","tilgjengelig innhold kategorier");
-define("_NONCLASSCONT","Ikke-kategorisert innhold");
-
-?>
+define("_PREVIOUS", "Forrige side");
+define("_NEXT", "Neste side");
+define("_PAGE", "Side");
+define("_DEACTIVATE", "Deaktiver");
+define("_ACTIVATE", "Aktiver");
+define("_PUBLISHEDON", "Publisert den");
+define("_PAGESLIST", "Liste over sider");
+define("_LISTOFCONTENT", "Liste over tilgjengelig innhold i");
+define("_YOURADMINLIST", "Du er administrator: fï¿½lgende er listen over inaktive sider:");
+define("_COPYRIGHT", "Copyright &copy; by");
+define("_COPYRIGHT2", "All Right Reserved.");
+define("_CONTENTCATEGORIES", "tilgjengelig innhold kategorier");
+define("_NONCLASSCONT", "Ikke-kategorisert innhold");

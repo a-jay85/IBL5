@@ -13,29 +13,27 @@
 /************************************************************************/
 
 if (!defined('ADMIN_FILE')) {
-	die ("Access Denied");
+    die("Access Denied");
 }
 
 $module_name = "Encyclopedia";
-include_secure("modules/$module_name/admin/language/lang-".$currentlang.".php");
+include_secure("modules/$module_name/admin/language/lang-" . $currentlang . ".php");
 
-switch($op) {
+switch ($op) {
 
-	case "encyclopedia":
-	case "move_terms":
-	case "encyclopedia_terms":
-	case "encyclopedia_edit":
-	case "encyclopedia_delete":
-	case "encyclopedia_save":
-	case "encyclopedia_save_edit":
-	case "encyclopedia_text_edit":
-	case "encyclopedia_text_delete":
-	case "encyclopedia_text_save":
-	case "encyclopedia_text_save_edit":
-	case "encyclopedia_change_status":
-	include("modules/$module_name/admin/index.php");
-	break;
+    case "encyclopedia":
+    case "move_terms":
+    case "encyclopedia_terms":
+    case "encyclopedia_edit":
+    case "encyclopedia_delete":
+    case "encyclopedia_save":
+    case "encyclopedia_save_edit":
+    case "encyclopedia_text_edit":
+    case "encyclopedia_text_delete":
+    case "encyclopedia_text_save":
+    case "encyclopedia_text_save_edit":
+    case "encyclopedia_change_status":
+        include "modules/$module_name/admin/index.php";
+        break;
 
 }
-
-?>

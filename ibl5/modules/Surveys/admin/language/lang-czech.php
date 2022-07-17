@@ -17,37 +17,33 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_YES","Ano");
-define("_NO","Ne");
-define("_CATEGORY","Kategorie");
-define("_SAVECHANGES","Uložit zmìny");
-define("_ARTICLES","Èlánky");
-define("_SELECTTOPIC","Vyberte téma");
-define("_OPTION","Volby");
-define("_ADMPOLLS","Ankety");
-define("_TITLE","Název");
-define("_STORYTEXT","Text èlánku");
-define("_EXTENDEDTEXT","Rozšíøený text");
-define("_PUBLISHINHOME","Publikovat na úvodní stránce?");
-define("_ONLYIFCATSELECTED","Pracuje pouze tehdy, když není vybrána kategorie <i>Èlánky</i>");
-define("_ADD","Pøidat");
-define("_POLLSADMIN","Administrace anket");
-define("_CREATEPOLL","Vytvoøit novou anketu");
-define("_DELETEPOLLS","Smazat anketu");
-define("_POLLTITLE","Anketní otázka");
-define("_POLLEACHFIELD","Zadejte, prosím, každou možnou odpoveï do samostatného pole");
-define("_CREATEPOLLBUT","Vytvoøit anketu");
-define("_REMOVEEXISTING","Odstranit existující anketu");
-define("_POLLDELWARNING","POZOR: Vybraná anketa bude okamžitì odstranìna z databáze!");
-define("_CHOOSEPOLL","Vyberte anketu z tohoto seznamu:");
-define("_EDITPOLL","Edit Polls");
-define("_CHOOSEPOLLEDIT","Choose the Poll you want to edit:");
-define("_ACTIVATECOMMENTS","Activate Comments for this Story?");
-define("_LANGUAGE","Language");
-define("_ANNOUNCEPOLL","Announce this new Survey in your site");
-define("_LEAVEBLANK","(Leave blank to create a new survey without announce it)");
-define("_POLLEDIT","Edit Poll:");
-
-
-?>
+define("_YES", "Ano");
+define("_NO", "Ne");
+define("_CATEGORY", "Kategorie");
+define("_SAVECHANGES", "Uloï¿½it zmï¿½ny");
+define("_ARTICLES", "ï¿½lï¿½nky");
+define("_SELECTTOPIC", "Vyberte tï¿½ma");
+define("_OPTION", "Volby");
+define("_ADMPOLLS", "Ankety");
+define("_TITLE", "Nï¿½zev");
+define("_STORYTEXT", "Text ï¿½lï¿½nku");
+define("_EXTENDEDTEXT", "Rozï¿½ï¿½ï¿½enï¿½ text");
+define("_PUBLISHINHOME", "Publikovat na ï¿½vodnï¿½ strï¿½nce?");
+define("_ONLYIFCATSELECTED", "Pracuje pouze tehdy, kdyï¿½ nenï¿½ vybrï¿½na kategorie <i>ï¿½lï¿½nky</i>");
+define("_ADD", "Pï¿½idat");
+define("_POLLSADMIN", "Administrace anket");
+define("_CREATEPOLL", "Vytvoï¿½it novou anketu");
+define("_DELETEPOLLS", "Smazat anketu");
+define("_POLLTITLE", "Anketnï¿½ otï¿½zka");
+define("_POLLEACHFIELD", "Zadejte, prosï¿½m, kaï¿½dou moï¿½nou odpoveï¿½ do samostatnï¿½ho pole");
+define("_CREATEPOLLBUT", "Vytvoï¿½it anketu");
+define("_REMOVEEXISTING", "Odstranit existujï¿½cï¿½ anketu");
+define("_POLLDELWARNING", "POZOR: Vybranï¿½ anketa bude okamï¿½itï¿½ odstranï¿½na z databï¿½ze!");
+define("_CHOOSEPOLL", "Vyberte anketu z tohoto seznamu:");
+define("_EDITPOLL", "Edit Polls");
+define("_CHOOSEPOLLEDIT", "Choose the Poll you want to edit:");
+define("_ACTIVATECOMMENTS", "Activate Comments for this Story?");
+define("_LANGUAGE", "Language");
+define("_ANNOUNCEPOLL", "Announce this new Survey in your site");
+define("_LEAVEBLANK", "(Leave blank to create a new survey without announce it)");
+define("_POLLEDIT", "Edit Poll:");

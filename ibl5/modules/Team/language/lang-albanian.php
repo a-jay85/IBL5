@@ -17,18 +17,16 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PREVIOUS","Faqja e Mëparshme");
-define("_NEXT","Faqja që Vjen");
-define("_PAGE","Faqja");
-define("_DEACTIVATE","Disaktivo");
-define("_ACTIVATE","Aktivo");
-define("_PUBLISHEDON","Publikuar më");
-define("_PAGESLIST","Lista e Faqeve");
-define("_LISTOFCONTENT","Lista e Përmbajtjeve që gjenden tek");
-define("_YOURADMINLIST","Je administratori: në vijim lista e faqeve joaktive:");
-define("_COPYRIGHT","Copyright &copy; by Rruzull&Linux. Të gjitha të drejtat janë të rezervuara.");
-define("_COPYRIGHT2","Të gjitha të Drejtat janë të Rezervuara.");
-define("_CONTENTCATEGORIES","Kategoritë në dispozicion");
-define("_NONCLASSCONT","Përmbajtje e Pa Kategorizueshme");
-
-?>
+define("_PREVIOUS", "Faqja e Mï¿½parshme");
+define("_NEXT", "Faqja qï¿½ Vjen");
+define("_PAGE", "Faqja");
+define("_DEACTIVATE", "Disaktivo");
+define("_ACTIVATE", "Aktivo");
+define("_PUBLISHEDON", "Publikuar mï¿½");
+define("_PAGESLIST", "Lista e Faqeve");
+define("_LISTOFCONTENT", "Lista e Pï¿½rmbajtjeve qï¿½ gjenden tek");
+define("_YOURADMINLIST", "Je administratori: nï¿½ vijim lista e faqeve joaktive:");
+define("_COPYRIGHT", "Copyright &copy; by Rruzull&Linux. Tï¿½ gjitha tï¿½ drejtat janï¿½ tï¿½ rezervuara.");
+define("_COPYRIGHT2", "Tï¿½ gjitha tï¿½ Drejtat janï¿½ tï¿½ Rezervuara.");
+define("_CONTENTCATEGORIES", "Kategoritï¿½ nï¿½ dispozicion");
+define("_NONCLASSCONT", "Pï¿½rmbajtje e Pa Kategorizueshme");

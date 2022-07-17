@@ -17,11 +17,9 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_ACTIVETOPICS","Trenutno aktivne teme");
-define("_CLICK2LIST","Kliknite na sliko za izpis vseh èlankov te teme");
-define("_TOTNEWS","Total News");
-define("_TOTREADS","Total Reads");
-define("_MORE","More");
-define("_NONEWSYET","...There aren't any news yet for this topic...");
-
-?>
+define("_ACTIVETOPICS", "Trenutno aktivne teme");
+define("_CLICK2LIST", "Kliknite na sliko za izpis vseh ï¿½lankov te teme");
+define("_TOTNEWS", "Total News");
+define("_TOTREADS", "Total Reads");
+define("_MORE", "More");
+define("_NONEWSYET", "...There aren't any news yet for this topic...");

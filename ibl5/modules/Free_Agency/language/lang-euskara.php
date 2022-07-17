@@ -17,18 +17,16 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PREVIOUS","Aurreko orria");
-define("_NEXT","Hurrengo orria");
-define("_PAGE","orrialde ");
-define("_DEACTIVATE","Desaktibatu");
-define("_ACTIVATE","Aktibatu");
-define("_PUBLISHEDON","Noiz publikatua:");
-define("_PAGESLIST","Orrien zerrenda");
-define("_LISTOFCONTENT","Sistema honen eduki zerrenda:");
-define("_YOURADMINLIST","Administratzailea zara, ondoren aktibatu gabe dauden orrien zerrenda");
-define("_COPYRIGHT","Copyright &copy; by");
-define("_COPYRIGHT2","All Right Reserved.");
-define("_CONTENTCATEGORIES","Available Content Categories");
-define("_NONCLASSCONT","Non Categorized Content");
-
-?>
+define("_PREVIOUS", "Aurreko orria");
+define("_NEXT", "Hurrengo orria");
+define("_PAGE", "orrialde ");
+define("_DEACTIVATE", "Desaktibatu");
+define("_ACTIVATE", "Aktibatu");
+define("_PUBLISHEDON", "Noiz publikatua:");
+define("_PAGESLIST", "Orrien zerrenda");
+define("_LISTOFCONTENT", "Sistema honen eduki zerrenda:");
+define("_YOURADMINLIST", "Administratzailea zara, ondoren aktibatu gabe dauden orrien zerrenda");
+define("_COPYRIGHT", "Copyright &copy; by");
+define("_COPYRIGHT2", "All Right Reserved.");
+define("_CONTENTCATEGORIES", "Available Content Categories");
+define("_NONCLASSCONT", "Non Categorized Content");

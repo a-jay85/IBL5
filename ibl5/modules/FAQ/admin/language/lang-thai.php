@@ -17,28 +17,24 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_FUNCTIONS","¡ÒÃ¨Ñ´¡ÒÃ");
-define("_YES","µ¡Å§");
-define("_NO","äÁèµ¡Å§");
-define("_SAVE","ºÑ¹·Ö¡¢éÍÁÙÅ");
-define("_ID","àÃ×èÍ§·Õè");
-define("_CATEGORIES","»ÃÐàÀ·");
-define("_ALL","·Ñé§ËÁ´");
-define("_FAQ","¶ÒÁ/µÍº");
-define("_CONTENT","à¹×éÍËÒ");
-define("_FAQADMIN","¨Ñ´¡ÒÃ¤Ó¶ÒÁ¶ÒÁºèÍÂ");
-define("_ACTIVEFAQS","¤Ó¶ÒÁ¶ÒÁºèÍÂ- ·Ó§Ò¹");
-define("_ADDCATEGORY","à¾ÔèÁËÁÇ´ËÁÙè");
-define("_QUESTIONS","¤Ó¶ÒÁáÅÐ¤ÓµÍº");
-define("_ADDQUESTION","à¾ÔèÁ¤Ó¶ÒÁãËÁè");
-define("_QUESTION","¤Ó¶ÒÁ");
-define("_ANSWER","¤ÓµÍº");
-define("_EDITCATEGORY","á¡éä¢ËÁÇ´");
-define("_EDITQUESTIONS","á¡éä¢¤Ó¶ÒÁáÅÐ¤ÓµÍº");
-define("_FAQDELWARNING","¤Óàµ×Í¹: ¤Ø³á¹èã¨·Õè¨ÐÅº¤Ó¶ÒÁ-¤ÓµÍº áÅÐà¹×éÍËÒ·Ñé§ËÁ´?");
-define("_QUESTIONDEL","¤Óàµ×Í¹: ¤Ø³µéÍ§¡ÒÃÅº¤Ó¶ÒÁ¹Õé?");
-define("_LANGUAGE","ÀÒÉÒ");
-
-
-?>
+define("_FUNCTIONS", "ï¿½ï¿½Ã¨Ñ´ï¿½ï¿½ï¿½");
+define("_YES", "ï¿½ï¿½Å§");
+define("_NO", "ï¿½ï¿½èµ¡Å§");
+define("_SAVE", "ï¿½Ñ¹ï¿½Ö¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_ID", "ï¿½ï¿½ï¿½ï¿½Í§ï¿½ï¿½ï¿½");
+define("_CATEGORIES", "ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_ALL", "ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_FAQ", "ï¿½ï¿½ï¿½/ï¿½Íº");
+define("_CONTENT", "ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_FAQADMIN", "ï¿½Ñ´ï¿½ï¿½Ã¤Ó¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_ACTIVEFAQS", "ï¿½Ó¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½- ï¿½Ó§Ò¹");
+define("_ADDCATEGORY", "ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç´ï¿½ï¿½ï¿½ï¿½");
+define("_QUESTIONS", "ï¿½Ó¶ï¿½ï¿½ï¿½ï¿½Ð¤ÓµÍº");
+define("_ADDQUESTION", "ï¿½ï¿½ï¿½ï¿½ï¿½Ó¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_QUESTION", "ï¿½Ó¶ï¿½ï¿½");
+define("_ANSWER", "ï¿½ÓµÍº");
+define("_EDITCATEGORY", "ï¿½ï¿½ï¿½ï¿½ï¿½Ç´");
+define("_EDITQUESTIONS", "ï¿½ï¿½ä¢¤Ó¶ï¿½ï¿½ï¿½ï¿½Ð¤ÓµÍº");
+define("_FAQDELWARNING", "ï¿½ï¿½ï¿½ï¿½Í¹: ï¿½Ø³ï¿½ï¿½ã¨·ï¿½ï¿½ï¿½Åºï¿½Ó¶ï¿½ï¿½-ï¿½ÓµÍº ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò·ï¿½ï¿½ï¿½ï¿½ï¿½?");
+define("_QUESTIONDEL", "ï¿½ï¿½ï¿½ï¿½Í¹: ï¿½Ø³ï¿½ï¿½Í§ï¿½ï¿½ï¿½Åºï¿½Ó¶ï¿½ï¿½ï¿½ï¿½ï¿½?");
+define("_LANGUAGE", "ï¿½ï¿½ï¿½ï¿½");

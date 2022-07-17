@@ -13,10 +13,10 @@
 /************************************************************************/
 
 if (!defined('ADMIN_FILE')) {
-	die ("Access Denied");
+    die("Access Denied");
 }
 
-switch($op) {
+switch ($op) {
     case "moderation":
     case "moderation_news":
     case "moderation_news_view":
@@ -25,11 +25,9 @@ switch($op) {
     case "moderation_reviews":
     case "moderation_reviews_view":
     case "moderation_users_list":
-	case "moderation_approval":
-	case "moderation_reject":
-    include("admin/modules/moderation.php");
-    break;
+    case "moderation_approval":
+    case "moderation_reject":
+        include "admin/modules/moderation.php";
+        break;
 
 }
-
-?>

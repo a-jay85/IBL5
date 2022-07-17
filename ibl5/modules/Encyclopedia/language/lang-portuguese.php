@@ -18,32 +18,29 @@
 /**************************************************************************/
 
 /**************************************************************************/
-/* Translation by:							  */
-/*									  */
-/* Rui Cristovão (ord'hor) ordhor@hotmail.com				  */
+/* Translation by:                              */
+/*                                      */
+/* Rui Cristovï¿½o (ord'hor) ordhor@hotmail.com                  */
 /**************************************************************************/
 
-
-define("_PREVIOUS","Página Anterior");
-define("_NEXT","Página Seguinte");
-define("_SEARCHRESULTS","Resultados da Pesquisa");
-define("_PAGE","Páginas");
-define("_RETURNTO","Voltar para");
-define("_DEACTIVATE","Desactivar");
-define("_ACTIVATE","Activo");
-define("_ENCYCLOPEDIA","Enciclopédia");
-define("_NOCONTENTFORLETTER","Desculpe, não existe conteúdo para a carta");
-define("_ENCYSELECTLETTER","Por favor seleccione uma carta da lista seguinte para consulta de termos:");
-define("_COPYRIGHT","Copyright");
-define("_YOURADMINENCY","Você é Administrador, esta enciclopédia não está activa!");
-define("_ENCYNOTACTIVE","Desculpe, mas esta enciclopédia não está activa de momento.");
-define("_AVAILABLEENCYLIST","Lista de enciclopédias disponiveis em");
-define("_YOURADMININACTIVELIST","Você é Administrador: segue-se a lista das enciclopédias inactivas:");
-define("_NORESULTSTEXT","Sem resultados no texto do termo...");
-define("_NORESULTSTITLE","Sem resultados pelo título do termo...");
-define("_SEARCHRESULTSFOR","Procurar resultados para:");
-define("_SEARCHNOTCOMPLETE","As opcções de procura não estão completas. Por favor tente de novo.");
-define("_RESULTSINTERMTITLE","Resultados pelo título do termo:");
-define("_RESULTSINTERMTEXT","Results no texto do termo:");
-
-?>
+define("_PREVIOUS", "Pï¿½gina Anterior");
+define("_NEXT", "Pï¿½gina Seguinte");
+define("_SEARCHRESULTS", "Resultados da Pesquisa");
+define("_PAGE", "Pï¿½ginas");
+define("_RETURNTO", "Voltar para");
+define("_DEACTIVATE", "Desactivar");
+define("_ACTIVATE", "Activo");
+define("_ENCYCLOPEDIA", "Enciclopï¿½dia");
+define("_NOCONTENTFORLETTER", "Desculpe, nï¿½o existe conteï¿½do para a carta");
+define("_ENCYSELECTLETTER", "Por favor seleccione uma carta da lista seguinte para consulta de termos:");
+define("_COPYRIGHT", "Copyright");
+define("_YOURADMINENCY", "Vocï¿½ ï¿½ Administrador, esta enciclopï¿½dia nï¿½o estï¿½ activa!");
+define("_ENCYNOTACTIVE", "Desculpe, mas esta enciclopï¿½dia nï¿½o estï¿½ activa de momento.");
+define("_AVAILABLEENCYLIST", "Lista de enciclopï¿½dias disponiveis em");
+define("_YOURADMININACTIVELIST", "Vocï¿½ ï¿½ Administrador: segue-se a lista das enciclopï¿½dias inactivas:");
+define("_NORESULTSTEXT", "Sem resultados no texto do termo...");
+define("_NORESULTSTITLE", "Sem resultados pelo tï¿½tulo do termo...");
+define("_SEARCHRESULTSFOR", "Procurar resultados para:");
+define("_SEARCHNOTCOMPLETE", "As opcï¿½ï¿½es de procura nï¿½o estï¿½o completas. Por favor tente de novo.");
+define("_RESULTSINTERMTITLE", "Resultados pelo tï¿½tulo do termo:");
+define("_RESULTSINTERMTEXT", "Results no texto do termo:");

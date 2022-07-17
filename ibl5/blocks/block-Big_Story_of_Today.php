@@ -12,7 +12,7 @@
 /* the Free Software Foundation; either version 2 of the License.       */
 /************************************************************************/
 
-if ( !defined('BLOCK_FILE') ) {
+if (!defined('BLOCK_FILE')) {
     Header("Location: ../index.php");
     die();
 }
@@ -36,42 +36,40 @@ if ($month < 10) {
 }
 $year = $today['year'];
 $tdate = "$year-$month-$day";
-$row = $db->sql_fetchrow($db->sql_query("SELECT sid, title FROM ".$prefix."_stories WHERE (time LIKE '%$tdate%') $querylang ORDER BY counter DESC LIMIT 0,1"));
+$row = $db->sql_fetchrow($db->sql_query("SELECT sid, title FROM " . $prefix . "_stories WHERE (time LIKE '%$tdate%') $querylang ORDER BY counter DESC LIMIT 0,1"));
 $fsid = intval($row['sid']);
 $ftitle = filter($row['title'], "nohtml");
 $content = "<span class=\"content\">";
-if ((!$fsid) AND (!$ftitle)) {
-    $content .= ""._NOBIGSTORY."</font>";
+if ((!$fsid) and (!$ftitle)) {
+    $content .= "" . _NOBIGSTORY . "</font>";
 } else {
-    $content .= ""._BIGSTORY."<br><br>";
+    $content .= "" . _BIGSTORY . "<br><br>";
     getusrinfo($user);
-          if (!isset($mode) OR empty($mode)) {
-            if(isset($userinfo['umode'])) {
-              $mode = $userinfo['umode'];
-            } else {
-              $mode = "thread";
-            }
-          }
-          if (!isset($order) OR empty($order)) {
-            if(isset($userinfo['uorder'])) {
-              $order = $userinfo['uorder'];
-            } else {
-              $order = 0;
-            }
-          }
-          if (!isset($thold) OR empty($thold)) {
-            if(isset($userinfo['thold'])) {
-              $thold = $userinfo['thold'];
-            } else {
-              $thold = 0;
-            }
-          }
+    if (!isset($mode) or empty($mode)) {
+        if (isset($userinfo['umode'])) {
+            $mode = $userinfo['umode'];
+        } else {
+            $mode = "thread";
+        }
+    }
+    if (!isset($order) or empty($order)) {
+        if (isset($userinfo['uorder'])) {
+            $order = $userinfo['uorder'];
+        } else {
+            $order = 0;
+        }
+    }
+    if (!isset($thold) or empty($thold)) {
+        if (isset($userinfo['thold'])) {
+            $thold = $userinfo['thold'];
+        } else {
+            $thold = 0;
+        }
+    }
     $r_options = "";
-    $r_options .= "&amp;mode=".$mode;
-    $r_options .= "&amp;order=".$order;
-    $r_options .= "&amp;thold=".$thold;
+    $r_options .= "&amp;mode=" . $mode;
+    $r_options .= "&amp;order=" . $order;
+    $r_options .= "&amp;thold=" . $thold;
 
     $content .= "<a href=\"modules.php?name=News&amp;file=article&amp;sid=$fsid$r_options\">$ftitle</a></span>";
 }
-
-?>

@@ -48,7 +48,7 @@ if (isset($_POST['query'])) {
             $successText = "All players currently on waivers have their teamname set to Free Agents and 0 Bird years.";
             break;
         case 'Set Free Agency factors for PFW':
-            if ($currentSeasonPhase == 'Draft' OR $currentSeasonPhase == 'Free Agency') {
+            if ($currentSeasonPhase == 'Draft' or $currentSeasonPhase == 'Free Agency') {
                 $queryString = "UPDATE nuke_ibl_team_info info, nuke_ibl_power power
                     SET Contract_Wins = power.win,
                     	Contract_Losses = power.loss
@@ -70,7 +70,7 @@ if (isset($_POST['query'])) {
     }
 
     if ($db->sql_query($queryString)) {
-        $querySuccessful = TRUE;
+        $querySuccessful = true;
         if (isset($_POST['SeasonPhase'])) {
             $currentSeasonPhase = $_POST['SeasonPhase'];
         }
@@ -81,8 +81,9 @@ if (isset($_POST['query'])) {
             $allowTradesStatus = $_POST['Trades'];
         }
     } else {
-        $querySuccessful = FALSE;
-    };
+        $querySuccessful = false;
+    }
+    ;
 }
 
 echo "
@@ -161,7 +162,7 @@ echo "<INPUT type='submit' name='query' value='Deactivate Player and Season Lead
     <INPUT type='submit' name='query' value='Activate Player and Season Leaders modules after Trivia'><p>
     </FORM><p><hr><p>";
 
-if ($querySuccessful == TRUE) {
+if ($querySuccessful == true) {
     echo "<code>" . $queryString . "</code>";
     echo "<p>";
     echo "<b>" . $successText . "</b>";
@@ -171,10 +172,9 @@ if ($querySuccessful == TRUE) {
     echo "Oops, something went wrong:<p>
     <FONT color=red>$failureText</FONT><p>
     Let A-Jay know what you were trying to do and he'll look into it.";
-};
+}
+;
 
 echo "
 </BODY>
 </HTML>";
-
-?>

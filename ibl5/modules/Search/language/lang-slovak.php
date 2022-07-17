@@ -2,10 +2,10 @@
 
 /*************************************************************************/
 /* The Slovak language file for module Search                      */
-/* Author: AlRashid 			 Date: 09.09.2002   					 */
+/* Author: AlRashid              Date: 09.09.2002                        */
 /* alrashid@klokan.sk, http://alrashid.klokan.sk                         */
-/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk			     */
-/*  		Dakujem                                                      */
+/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk                 */
+/*          Dakujem                                                      */
 /*************************************************************************/
 /**************************************************************************/
 /* PHP-NUKE: Advanced Content Management System                           */
@@ -24,57 +24,55 @@
 /* And, if you use HTML code, please double check it.                     */
 /*************************************************************************/
 /* The Slovak language file for module Search                      */
-/* Author: AlRashid 			 Date: 09.09.2002   					 */
+/* Author: AlRashid              Date: 09.09.2002                        */
 /* alrashid@klokan.sk, http://alrashid.klokan.sk                         */
-/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk			     */
-/*  		Dakujem                                                      */
+/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk                 */
+/*          Dakujem                                                      */
 /*************************************************************************/
 /**************************************************************************/
 
-define("_ALLTOPICS","Všetky témy");
-define("_NOCOMMENTS","Bez komentára");
-define("_UCOMMENT","Komentár");
-define("_REVIEWS","Recenzie");
-define("_SEARCHUSERS","H¾ada v databáze uívate¾ov");
-define("_SEARCHSECTIONS","H¾ada v záujmovıch oblastiach");
-define("_SEARCHREVIEWS","H¾ada v recenziách");
-define("_SEARCHIN","H¾ada v téme:");
-define("_ARTICLES","Èlánky");
-define("_ALLAUTHORS","Všetkıch autorov");
-define("_ALL","Všetko");
-define("_WEEK","tıdeò");
-define("_WEEKS","tıdne");
-define("_MONTH","mesiac");
-define("_MONTHS","mesiace");
-define("_SEARCHON","H¾adaj v:");
-define("_SSTORIES","Èlánky");
-define("_SSECTIONS","Záujmové oblasti");
-define("_SUSERS","uívatelia");
-define("_NOMATCHES","Nenašiel sa iadny vısledok");
-define("_PREVMATCHES","predchádzajúcich záznamov");
-define("_NEXTMATCHES","ïalšie nájdené záznamy");
-define("_INSECTION","Èlánok v oblasti");
-define("_NONAME","Nebolo zadané iadne meno");
-define("_SCOMMENTS","Komentáre");
-define("_SEARCHRESULTS","Vısledky vyh¾adávania");
-define("_CONTRIBUTEDBY","Príspevok poslal");
-define("_UCOMMENTS","Komentáre");
-define("_MATCHTITLE","Porovna nadpisy");
-define("_MATCHTEXT","Porovna texty èlánkov");
-define("_MATCHBOTH","Porovna nadpisy a texty èlánkov");
-define("_SREPLY","Odpoveï");
-define("_SREPLIES","Odpovede");
-define("_ATTACHART","Prídavky k èlánku");
-define("_PAGES","Stránky");
-define("_REVIEWSCORE","Skóre pre túto recenziu");
-define("_PAGE","Strana");
-define("_DOWNLOADS","Downloady");
-define("_WEBLINKS","Web linky");
-define("_FINDMORE",".. viac");
-define("_DIDNOTFIND","Nenašli ste, èo ste chceli?");
-define("_ENCYCLOPEDIA","Encyklopédia");
-define("_SEARCHINSTORY","Preh¾adáva všetky komentáre v èlánku:");
+define("_ALLTOPICS", "Vï¿½etky tï¿½my");
+define("_NOCOMMENTS", "Bez komentï¿½ra");
+define("_UCOMMENT", "Komentï¿½r");
+define("_REVIEWS", "Recenzie");
+define("_SEARCHUSERS", "Hï¿½adaï¿½ v databï¿½ze uï¿½ï¿½vateï¿½ov");
+define("_SEARCHSECTIONS", "Hï¿½adaï¿½ v zï¿½ujmovï¿½ch oblastiach");
+define("_SEARCHREVIEWS", "Hï¿½adaï¿½ v recenziï¿½ch");
+define("_SEARCHIN", "Hï¿½adaï¿½ v tï¿½me:");
+define("_ARTICLES", "ï¿½lï¿½nky");
+define("_ALLAUTHORS", "Vï¿½etkï¿½ch autorov");
+define("_ALL", "Vï¿½etko");
+define("_WEEK", "tï¿½ï¿½deï¿½");
+define("_WEEKS", "tï¿½ï¿½dne");
+define("_MONTH", "mesiac");
+define("_MONTHS", "mesiace");
+define("_SEARCHON", "Hï¿½adaj v:");
+define("_SSTORIES", "ï¿½lï¿½nky");
+define("_SSECTIONS", "Zï¿½ujmovï¿½ oblasti");
+define("_SUSERS", "uï¿½ï¿½vatelia");
+define("_NOMATCHES", "Nenaï¿½iel sa ï¿½iadny vï¿½sledok");
+define("_PREVMATCHES", "predchï¿½dzajï¿½cich zï¿½znamov");
+define("_NEXTMATCHES", "ï¿½alï¿½ie nï¿½jdenï¿½ zï¿½znamy");
+define("_INSECTION", "ï¿½lï¿½nok v oblasti");
+define("_NONAME", "Nebolo zadanï¿½ ï¿½iadne meno");
+define("_SCOMMENTS", "Komentï¿½re");
+define("_SEARCHRESULTS", "Vï¿½sledky vyhï¿½adï¿½vania");
+define("_CONTRIBUTEDBY", "Prï¿½spevok poslal");
+define("_UCOMMENTS", "Komentï¿½re");
+define("_MATCHTITLE", "Porovnaï¿½ nadpisy");
+define("_MATCHTEXT", "Porovnaï¿½ texty ï¿½lï¿½nkov");
+define("_MATCHBOTH", "Porovnaï¿½ nadpisy a texty ï¿½lï¿½nkov");
+define("_SREPLY", "Odpoveï¿½");
+define("_SREPLIES", "Odpovede");
+define("_ATTACHART", "Prï¿½davky k ï¿½lï¿½nku");
+define("_PAGES", "Strï¿½nky");
+define("_REVIEWSCORE", "Skï¿½re pre tï¿½to recenziu");
+define("_PAGE", "Strana");
+define("_DOWNLOADS", "Downloady");
+define("_WEBLINKS", "Web linky");
+define("_FINDMORE", ".. viac");
+define("_DIDNOTFIND", "Nenaï¿½li ste, ï¿½o ste chceli?");
+define("_ENCYCLOPEDIA", "Encyklopï¿½dia");
+define("_SEARCHINSTORY", "Prehï¿½adï¿½vaï¿½ vï¿½etky komentï¿½re v ï¿½lï¿½nku:");
 
-define("_SEARCHCHARACTERS","<center><b>Search System Error</b><br><br>Your query should be at least 3 characters long to be processed.<br>Please, fix the problem and try again...</center>");
-
-?>
+define("_SEARCHCHARACTERS", "<center><b>Search System Error</b><br><br>Your query should be at least 3 characters long to be processed.<br>Please, fix the problem and try again...</center>");

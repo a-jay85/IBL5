@@ -14,44 +14,44 @@ $i = 0;
 $storytext = "";
 
 while ($i < $num0) {
-	$itemid = $db->sql_result($result0, $i, "itemid");
-	$itemtype = $db->sql_result($result0, $i, "itemtype");
-	$from = $db->sql_result($result0, $i, "from");
-	$to = $db->sql_result($result0, $i, "to");
+    $itemid = $db->sql_result($result0, $i, "itemid");
+    $itemtype = $db->sql_result($result0, $i, "itemtype");
+    $from = $db->sql_result($result0, $i, "from");
+    $to = $db->sql_result($result0, $i, "to");
 
-	if ($itemtype == 0) {
-		$queryj = "SELECT * FROM ibl_draft_picks WHERE `pickid` = '$itemid'";
-		$resultj = $db->sql_query($queryj);
-		$tradeLine = "The $from send the " . $db->sql_result($resultj, 0, "year") . " " . $db->sql_result($resultj, 0, "teampick") . " Round " . $db->sql_result($resultj, 0, "round") . " draft pick to the $to.<br>";
-		$storytext .= $tradeLine;
+    if ($itemtype == 0) {
+        $queryj = "SELECT * FROM ibl_draft_picks WHERE `pickid` = '$itemid'";
+        $resultj = $db->sql_query($queryj);
+        $tradeLine = "The $from send the " . $db->sql_result($resultj, 0, "year") . " " . $db->sql_result($resultj, 0, "teampick") . " Round " . $db->sql_result($resultj, 0, "round") . " draft pick to the $to.<br>";
+        $storytext .= $tradeLine;
 
-		$queryi = 'UPDATE ibl_draft_picks SET `ownerofpick` = "' . $to . '" WHERE `pickid` = ' . $itemid . ' LIMIT 1;';
-		$resulti = $db->sql_query($queryi);
-	} else {
-		$queryj = "SELECT * FROM nuke_ibl_team_info WHERE team_name = '$to'";
-		$resultj = $db->sql_query($queryj);
-		$tid = $db->sql_result($resultj, 0, "teamid");
+        $queryi = 'UPDATE ibl_draft_picks SET `ownerofpick` = "' . $to . '" WHERE `pickid` = ' . $itemid . ' LIMIT 1;';
+        $resulti = $db->sql_query($queryi);
+    } else {
+        $queryj = "SELECT * FROM nuke_ibl_team_info WHERE team_name = '$to'";
+        $resultj = $db->sql_query($queryj);
+        $tid = $db->sql_result($resultj, 0, "teamid");
 
-		$queryk = "SELECT * FROM nuke_iblplyr WHERE pid = '$itemid'";
-		$resultk = $db->sql_query($queryk);
+        $queryk = "SELECT * FROM nuke_iblplyr WHERE pid = '$itemid'";
+        $resultk = $db->sql_query($queryk);
 
-		$tradeLine = "The $from send " . $db->sql_result($resultk, 0, "pos") . " " . $db->sql_result($resultk, 0, "name") . " to the $to.<br>";
-		$storytext .= $tradeLine;
+        $tradeLine = "The $from send " . $db->sql_result($resultk, 0, "pos") . " " . $db->sql_result($resultk, 0, "name") . " to the $to.<br>";
+        $storytext .= $tradeLine;
 
-		$queryi = 'UPDATE nuke_iblplyr SET `teamname` = "' . $to . '", `tid` = ' . $tid . ' WHERE `pid` = ' . $itemid . ' LIMIT 1;';
-		$resulti = $db->sql_query($queryi);
-	}
+        $queryi = 'UPDATE nuke_iblplyr SET `teamname` = "' . $to . '", `tid` = ' . $tid . ' WHERE `pid` = ' . $itemid . ' LIMIT 1;';
+        $resulti = $db->sql_query($queryi);
+    }
 
-	$currentSeasonPhase = $sharedFunctions->getCurrentSeasonPhase();
-	if ($currentSeasonPhase == "Playoffs" OR $currentSeasonPhase == "Draft" OR $currentSeasonPhase == "Free Agency") {
-		$queryInsert = "INSERT INTO ibl_trade_queue (query, tradeline) VALUES ('$queryi', '$tradeLine');";
-		$db->sql_query("$queryInsert");
-	}
+    $currentSeasonPhase = $sharedFunctions->getCurrentSeasonPhase();
+    if ($currentSeasonPhase == "Playoffs" or $currentSeasonPhase == "Draft" or $currentSeasonPhase == "Free Agency") {
+        $queryInsert = "INSERT INTO ibl_trade_queue (query, tradeline) VALUES ('$queryi', '$tradeLine');";
+        $db->sql_query("$queryInsert");
+    }
 
-	$i++;
+    $i++;
 }
 
-$timestamp = date('Y-m-d H:i:s',time());
+$timestamp = date('Y-m-d H:i:s', time());
 $storytitle = "$from and $to make a trade.";
 
 $querystor = "INSERT INTO nuke_stories
@@ -75,9 +75,9 @@ VALUES      ('2',
              'english') ";
 $resultstor = $db->sql_query($querystor);
 
-if (isset($resultstor) AND $_SERVER['SERVER_NAME'] != "localhost") {
-	$recipient = 'ibldepthcharts@gmail.com';
-	mail($recipient, $storytitle, $storytext, "From: trades@iblhoops.net");
+if (isset($resultstor) and $_SERVER['SERVER_NAME'] != "localhost") {
+    $recipient = 'ibldepthcharts@gmail.com';
+    mail($recipient, $storytitle, $storytext, "From: trades@iblhoops.net");
 }
 
 Discord::postToChannel('#trades', $storytext);

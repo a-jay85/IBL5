@@ -2,10 +2,10 @@
 
 /*************************************************************************/
 /* The Slovak language file for module Private_Messages                      */
-/* Author: AlRashid 			 Date: 09.09.2002   					 */
+/* Author: AlRashid              Date: 09.09.2002                        */
 /* alrashid@klokan.sk, http://alrashid.klokan.sk                         */
-/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk			     */
-/*  		Dakujem                                                      */
+/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk                 */
+/*          Dakujem                                                      */
 /*************************************************************************/
 /**************************************************************************/
 /* PHP-NUKE: Advanced Content Management System                           */
@@ -24,71 +24,69 @@
 /* And, if you use HTML code, please double check it.                     */
 /*************************************************************************/
 /* The Slovak language file for module Private_Messages                      */
-/* Author: AlRashid 			 Date: 09.09.2002   					 */
+/* Author: AlRashid              Date: 09.09.2002                        */
 /* alrashid@klokan.sk, http://alrashid.klokan.sk                         */
-/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk			     */
-/*  		Dakujem                                                      */
+/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk                 */
+/*          Dakujem                                                      */
 /*************************************************************************/
 /**************************************************************************/
 
-define("_EMAIL","E-mail");
-define("_RE","Re");
-define("_SUBJECT","Predmet");
-define("_PRIVATEMESSAGES","Vaše súkromné odkazy");
-define("_CHECKALL","Vybra všetko");
-define("_FROM","Od");
-define("_DATE","Dátum");
-define("_DONTHAVEMESSAGES","Nemáte iadne odkazy");
-define("_NOTREAD","Neèítané");
-define("_MSGSTATUS","Stav odkazov");
-define("_PRIVATEMESSAGE","Súkromná správa");
-define("_INDEX","Index");
-define("_SENT","Poslal");
-define("_PREVIOUSMESSAGE","Predchádzajúci odkaz");
-define("_NEXTMESSAGE","Nasledujúci odkaz");
-define("_PROFILE","Profil");
-define("_ABOUTPOSTING","O príspevku");
-define("_ALLREGCANPOST","Všetci registrovaní uívatelia môu posiela súkromné odkazy");
-define("_TO","pre");
-define("_MESSAGEICON","Ikonka odkazu");
-define("_MESSAGE","Odkaz");
-define("_HTML","HTML");
-define("_PMON","Zapnuté");
-define("_PMOFF","Vypnuté");
-define("_BBCODE","BBCode");
-define("_WROTE","napísal");
-define("_OPTIONS","Monosti");
-define("_HTMLDISSABLE"," Vypnú HTML v tejto správe");
-define("_BBCODEDISSABLE","Vypnnú <i>BBCode</i> v tejto pošte");
-define("_SMILEDISSABLE","Vypnú <i>smajlíky</i> v tejto pošte");
-define("_CANCELREPLY","Zruši odpoveï");
-define("_CANCELSEND","Zruši odoslanie");
-define("_CLEAR","Vymaza");
-define("_SUBMIT","Posla");
-define("_USERNOTINDB","Vybranı uívate¾ neexistuje v databáze.");
-define("_CHECKNAMEANDTRY","Prosím, zadajte nové uivate¾ské meno a skúste znova.");
-define("_MSGPOSTED","Váš odkaz bol odoslanı.");
-define("_RETURNTOPMSG","Kliknutím sem moete obnovi súkromné odkazy.");
-define("_MSGDELETED","Vaše odkazy boli zmazané.");
-define("_BBGO","ïalej");
-define("_BBNEWPMSG","Nové správy");
-define("_BBNONEWPMSG","iadne nové správy");
-define("_BBTOTALPMSG","Správ spolu");
-define("_BBEMPTYPMSG","Nemáte iadnu správu");
-define("_BBLOGIN","Prihláste sa, aby sa Vám zobrazili privátne správy");
-define("_BBPMSG","Privátna správa");
-define("_BBINBOX","Doruèené správy");
-define("_BBSELECTFORUM","Vyberte fórum");
-define("_BBNOFORUM","iadne ïalšie fórum");
-define("_BBBANNED","Zakázanı");
-define("_CLICKSMILEBUTTONS","Kliknutím na smajlík ho vloíte do správy");
-define("_CLICKCODEBUTTONS","Kliknutím na nasledovné tlaèítka vloíte BBCode do správy:");
-define("_PRIVMSGERROR","Chyba súkromnıch správ");
-define("_USERDOESNTEXIST","Vybranı uívate¾ neexistuje v našej databáze");
-define("_DELETESELECTED","Vymaza oznaèené");
-define("_SENDNEWMSG","Posla správu");
-define("_REPLY","Odpoveda");
-define("_NOSUBJECT","Nenapísali ste Predmet správy.");
-define("_NOMESSAGE","Nenapísali ste samotnú správu. Napíšte, prosím, správu!");
-
-?>
+define("_EMAIL", "E-mail");
+define("_RE", "Re");
+define("_SUBJECT", "Predmet");
+define("_PRIVATEMESSAGES", "Vaï¿½e sï¿½kromnï¿½ odkazy");
+define("_CHECKALL", "Vybraï¿½ vï¿½etko");
+define("_FROM", "Od");
+define("_DATE", "Dï¿½tum");
+define("_DONTHAVEMESSAGES", "Nemï¿½te ï¿½iadne odkazy");
+define("_NOTREAD", "Neï¿½ï¿½tanï¿½");
+define("_MSGSTATUS", "Stav odkazov");
+define("_PRIVATEMESSAGE", "Sï¿½kromnï¿½ sprï¿½va");
+define("_INDEX", "Index");
+define("_SENT", "Poslal");
+define("_PREVIOUSMESSAGE", "Predchï¿½dzajï¿½ci odkaz");
+define("_NEXTMESSAGE", "Nasledujï¿½ci odkaz");
+define("_PROFILE", "Profil");
+define("_ABOUTPOSTING", "O prï¿½spevku");
+define("_ALLREGCANPOST", "Vï¿½etci registrovanï¿½ uï¿½ï¿½vatelia mï¿½ï¿½u posielaï¿½ sï¿½kromnï¿½ odkazy");
+define("_TO", "pre");
+define("_MESSAGEICON", "Ikonka odkazu");
+define("_MESSAGE", "Odkaz");
+define("_HTML", "HTML");
+define("_PMON", "Zapnutï¿½");
+define("_PMOFF", "Vypnutï¿½");
+define("_BBCODE", "BBCode");
+define("_WROTE", "napï¿½sal");
+define("_OPTIONS", "Moï¿½nosti");
+define("_HTMLDISSABLE", " Vypnï¿½ï¿½ HTML v tejto sprï¿½ve");
+define("_BBCODEDISSABLE", "Vypnnï¿½ï¿½ <i>BBCode</i> v tejto poï¿½te");
+define("_SMILEDISSABLE", "Vypnï¿½ï¿½ <i>smajlï¿½ky</i> v tejto poï¿½te");
+define("_CANCELREPLY", "Zruï¿½iï¿½ odpoveï¿½");
+define("_CANCELSEND", "Zruï¿½iï¿½ odoslanie");
+define("_CLEAR", "Vymazaï¿½");
+define("_SUBMIT", "Poslaï¿½");
+define("_USERNOTINDB", "Vybranï¿½ uï¿½ï¿½vateï¿½ neexistuje v databï¿½ze.");
+define("_CHECKNAMEANDTRY", "Prosï¿½m, zadajte novï¿½ uï¿½ivateï¿½skï¿½ meno a skï¿½ste znova.");
+define("_MSGPOSTED", "Vï¿½ odkaz bol odoslanï¿½.");
+define("_RETURNTOPMSG", "Kliknutï¿½m sem moï¿½ete obnoviï¿½ sï¿½kromnï¿½ odkazy.");
+define("_MSGDELETED", "Vaï¿½e odkazy boli zmazanï¿½.");
+define("_BBGO", "ï¿½alej");
+define("_BBNEWPMSG", "Novï¿½ sprï¿½vy");
+define("_BBNONEWPMSG", "ï¿½iadne novï¿½ sprï¿½vy");
+define("_BBTOTALPMSG", "Sprï¿½v spolu");
+define("_BBEMPTYPMSG", "Nemï¿½te ï¿½iadnu sprï¿½vu");
+define("_BBLOGIN", "Prihlï¿½ste sa, aby sa Vï¿½m zobrazili privï¿½tne sprï¿½vy");
+define("_BBPMSG", "Privï¿½tna sprï¿½va");
+define("_BBINBOX", "Doruï¿½enï¿½ sprï¿½vy");
+define("_BBSELECTFORUM", "Vyberte fï¿½rum");
+define("_BBNOFORUM", "ï¿½iadne ï¿½alï¿½ie fï¿½rum");
+define("_BBBANNED", "Zakï¿½zanï¿½");
+define("_CLICKSMILEBUTTONS", "Kliknutï¿½m na smajlï¿½k ho vloï¿½ï¿½te do sprï¿½vy");
+define("_CLICKCODEBUTTONS", "Kliknutï¿½m na nasledovnï¿½ tlaï¿½ï¿½tka vloï¿½ï¿½te BBCode do sprï¿½vy:");
+define("_PRIVMSGERROR", "Chyba sï¿½kromnï¿½ch sprï¿½v");
+define("_USERDOESNTEXIST", "Vybranï¿½ uï¿½ï¿½vateï¿½ neexistuje v naï¿½ej databï¿½ze");
+define("_DELETESELECTED", "Vymazaï¿½ oznaï¿½enï¿½");
+define("_SENDNEWMSG", "Poslaï¿½ sprï¿½vu");
+define("_REPLY", "Odpovedaï¿½");
+define("_NOSUBJECT", "Nenapï¿½sali ste Predmet sprï¿½vy.");
+define("_NOMESSAGE", "Nenapï¿½sali ste samotnï¿½ sprï¿½vu. Napï¿½te, prosï¿½m, sprï¿½vu!");

@@ -17,27 +17,25 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_URL","URL");
-define("_EMAIL","E-Mail");
-define("_REALNAME","Nome real");
-define("_FUNCTIONS","Funcións");
-define("_PREVIOUS","Páxina anterior");
-define("_MEMBERSLIST","Lista de Membros");
-define("_GREETINGS","Felicidades ó noso último usuario rexistrado:");
-define("_SORTBY","Ordeado por:");
-define("_MNICKNAME","Alias");
-define("_MREALNAME","Nome real");
-define("_MEMAIL","E-Mail");
-define("_MURL","URL");
-define("_ONLINEREG","Usuarios rexistrados en líña agora:");
-define("_WEHAVE","Temos");
-define("_MREGISTERED","usuarios rexistrados ata agora. Hai");
-define("_MREGONLINE","usuario(s) rexistrado(s) en líña agora mesmo.");
-define("_REGSOFAR","usuarios rexistrados ata agora.");
-define("_USERSFOUND","usuarios encontrados para");
-define("_USERSSHOWN","usuarios mostrados");
-define("_NOMEMBERS","Non se encontraron membros por");
-define("_PAGES","Páxinas");
-define("_HOMEPAGE","Páxina de Inicio");
-
-?>
+define("_URL", "URL");
+define("_EMAIL", "E-Mail");
+define("_REALNAME", "Nome real");
+define("_FUNCTIONS", "Funciï¿½ns");
+define("_PREVIOUS", "Pï¿½xina anterior");
+define("_MEMBERSLIST", "Lista de Membros");
+define("_GREETINGS", "Felicidades ï¿½ noso ï¿½ltimo usuario rexistrado:");
+define("_SORTBY", "Ordeado por:");
+define("_MNICKNAME", "Alias");
+define("_MREALNAME", "Nome real");
+define("_MEMAIL", "E-Mail");
+define("_MURL", "URL");
+define("_ONLINEREG", "Usuarios rexistrados en lï¿½ï¿½a agora:");
+define("_WEHAVE", "Temos");
+define("_MREGISTERED", "usuarios rexistrados ata agora. Hai");
+define("_MREGONLINE", "usuario(s) rexistrado(s) en lï¿½ï¿½a agora mesmo.");
+define("_REGSOFAR", "usuarios rexistrados ata agora.");
+define("_USERSFOUND", "usuarios encontrados para");
+define("_USERSSHOWN", "usuarios mostrados");
+define("_NOMEMBERS", "Non se encontraron membros por");
+define("_PAGES", "Pï¿½xinas");
+define("_HOMEPAGE", "Pï¿½xina de Inicio");

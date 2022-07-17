@@ -17,27 +17,25 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_URL","URL");
-define("_EMAIL","Email");
-define("_REALNAME","Emri i Vërtetë");
-define("_FUNCTIONS","Funksione");
-define("_PREVIOUS","Faqja e Mëparshme");
-define("_MEMBERSLIST","Lista e Anëtarëve");
-define("_GREETINGS","I urojmë mirëseardhjen Anëtarit tonë të fundit të Regjistruar:");
-define("_SORTBY","Rrjeshtuar për:");
-define("_MNICKNAME","nickname");
-define("_MREALNAME","emri reale");
-define("_MEMAIL","email");
-define("_MURL","url");
-define("_ONLINEREG","Përdorues të Regjistruar Online:");
-define("_WEHAVE","Ne kemi");
-define("_MREGISTERED","përdorues të regjistruar deri tani. Kemi");
-define("_MREGONLINE","përdorues të regjistruar tani online.");
-define("_REGSOFAR","përdorues të regjistruar deri tani.");
-define("_USERSFOUND","anëtarë të gjetur sipas");
-define("_USERSSHOWN","anëtarë të shfaqur");
-define("_NOMEMBERS","Asnjë Anëtar nuk u gjet për");
-define("_PAGES","Faqe");
-define("_HOMEPAGE","Home");
-
-?>
+define("_URL", "URL");
+define("_EMAIL", "Email");
+define("_REALNAME", "Emri i Vï¿½rtetï¿½");
+define("_FUNCTIONS", "Funksione");
+define("_PREVIOUS", "Faqja e Mï¿½parshme");
+define("_MEMBERSLIST", "Lista e Anï¿½tarï¿½ve");
+define("_GREETINGS", "I urojmï¿½ mirï¿½seardhjen Anï¿½tarit tonï¿½ tï¿½ fundit tï¿½ Regjistruar:");
+define("_SORTBY", "Rrjeshtuar pï¿½r:");
+define("_MNICKNAME", "nickname");
+define("_MREALNAME", "emri reale");
+define("_MEMAIL", "email");
+define("_MURL", "url");
+define("_ONLINEREG", "Pï¿½rdorues tï¿½ Regjistruar Online:");
+define("_WEHAVE", "Ne kemi");
+define("_MREGISTERED", "pï¿½rdorues tï¿½ regjistruar deri tani. Kemi");
+define("_MREGONLINE", "pï¿½rdorues tï¿½ regjistruar tani online.");
+define("_REGSOFAR", "pï¿½rdorues tï¿½ regjistruar deri tani.");
+define("_USERSFOUND", "anï¿½tarï¿½ tï¿½ gjetur sipas");
+define("_USERSSHOWN", "anï¿½tarï¿½ tï¿½ shfaqur");
+define("_NOMEMBERS", "Asnjï¿½ Anï¿½tar nuk u gjet pï¿½r");
+define("_PAGES", "Faqe");
+define("_HOMEPAGE", "Home");

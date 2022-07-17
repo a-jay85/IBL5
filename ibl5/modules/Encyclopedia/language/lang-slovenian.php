@@ -17,26 +17,24 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PREVIOUS","Prejšnja stran");
-define("_NEXT","Naslednja stran");
-define("_SEARCHRESULTS","Rezultati iskanja");
-define("_PAGE","Strani");
-define("_RETURNTO","Nazaj na");
-define("_DEACTIVATE","Deaktiviraj");
-define("_ACTIVATE","Aktiviraj");
-define("_ENCYCLOPEDIA","Encyclopedia");
-define("_NOCONTENTFORLETTER","Sorry, there isn't any content for the letter");
-define("_ENCYSELECTLETTER","Please select a letter from the following list to consult terms:");
-define("_COPYRIGHT","Copyright");
-define("_YOURADMINENCY","You're Administrator, this encyclopedia isn't active!");
-define("_ENCYNOTACTIVE","Sorry, this encyclopedia isn't active right now.");
-define("_AVAILABLEENCYLIST","List of available Encyclopedias in");
-define("_YOURADMININACTIVELIST","You're Administrator: following is the list of Inactive Encyclopedias:");
-define("_NORESULTSTEXT","No Results in Term's Text...");
-define("_NORESULTSTITLE","No Results in Term's Title...");
-define("_SEARCHRESULTSFOR","Search Results for:");
-define("_SEARCHNOTCOMPLETE","Search options aren't complete. Please try again.");
-define("_RESULTSINTERMTITLE","Results in the term's title:");
-define("_RESULTSINTERMTEXT","Results in the term's text:");
-
-?>
+define("_PREVIOUS", "Prejï¿½nja stran");
+define("_NEXT", "Naslednja stran");
+define("_SEARCHRESULTS", "Rezultati iskanja");
+define("_PAGE", "Strani");
+define("_RETURNTO", "Nazaj na");
+define("_DEACTIVATE", "Deaktiviraj");
+define("_ACTIVATE", "Aktiviraj");
+define("_ENCYCLOPEDIA", "Encyclopedia");
+define("_NOCONTENTFORLETTER", "Sorry, there isn't any content for the letter");
+define("_ENCYSELECTLETTER", "Please select a letter from the following list to consult terms:");
+define("_COPYRIGHT", "Copyright");
+define("_YOURADMINENCY", "You're Administrator, this encyclopedia isn't active!");
+define("_ENCYNOTACTIVE", "Sorry, this encyclopedia isn't active right now.");
+define("_AVAILABLEENCYLIST", "List of available Encyclopedias in");
+define("_YOURADMININACTIVELIST", "You're Administrator: following is the list of Inactive Encyclopedias:");
+define("_NORESULTSTEXT", "No Results in Term's Text...");
+define("_NORESULTSTITLE", "No Results in Term's Title...");
+define("_SEARCHRESULTSFOR", "Search Results for:");
+define("_SEARCHNOTCOMPLETE", "Search options aren't complete. Please try again.");
+define("_RESULTSINTERMTITLE", "Results in the term's title:");
+define("_RESULTSINTERMTEXT", "Results in the term's text:");

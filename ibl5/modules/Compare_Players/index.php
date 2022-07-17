@@ -12,9 +12,11 @@
 /* the Free Software Foundation; either version 2 of the License.       */
 /************************************************************************/
 
-if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) die ("You can't access this file directly...");
+if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
+    die("You can't access this file directly...");
+}
 
-require_once("mainfile.php");
+require_once "mainfile.php";
 
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
@@ -22,40 +24,40 @@ $userpage = 1;
 
 function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 {
-	global $user, $prefix, $user_prefix, $db;
-	$sharedFunctions = new Shared($db);
+    global $user, $prefix, $user_prefix, $db;
+    $sharedFunctions = new Shared($db);
 
-	$sql = "SELECT * FROM " . $prefix . "_bbconfig";
-	$result = $db->sql_query($sql);
-	while ($row = $db->sql_fetchrow($result)) {
-		$board_config[$row['config_name']] = $row['config_value'];
-	}
-	$sql2 = "SELECT * FROM " . $user_prefix . "_users WHERE username = '$username'";
-	$result2 = $db->sql_query($sql2);
-	$userinfo = $db->sql_fetchrow($result2);
-	if (!$bypass) {
-		cookiedecode($user);
-	}
+    $sql = "SELECT * FROM " . $prefix . "_bbconfig";
+    $result = $db->sql_query($sql);
+    while ($row = $db->sql_fetchrow($result)) {
+        $board_config[$row['config_name']] = $row['config_value'];
+    }
+    $sql2 = "SELECT * FROM " . $user_prefix . "_users WHERE username = '$username'";
+    $result2 = $db->sql_query($sql2);
+    $userinfo = $db->sql_fetchrow($result2);
+    if (!$bypass) {
+        cookiedecode($user);
+    }
 
-	$teamlogo = $userinfo['user_ibl_team'];
-	$tid = $sharedFunctions->getTidFromTeamname($teamlogo);
+    $teamlogo = $userinfo['user_ibl_team'];
+    $tid = $sharedFunctions->getTidFromTeamname($teamlogo);
 
-	include("header.php");
-	OpenTable();
-	$sharedFunctions->displaytopmenu($tid);
+    include "header.php";
+    OpenTable();
+    $sharedFunctions->displaytopmenu($tid);
 
-	comparePlayers();
+    comparePlayers();
 
-	CloseTable();
-	include("footer.php");
+    CloseTable();
+    include "footer.php";
 }
 
 function comparePlayers()
 {
-	if (!isset($_POST['Player1'])) {
-		$playerNamesArray = getPlayerNamesArray();
+    if (!isset($_POST['Player1'])) {
+        $playerNamesArray = getPlayerNamesArray();
 
-		echo '<link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+        echo '<link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
 	  <link rel="stylesheet" href="/resources/demos/style.css">
 	  <script src="https://code.jquery.com/jquery-1.12.4.js"></script>
 	  <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
@@ -63,12 +65,12 @@ function comparePlayers()
 	  $( function() {
 		var availableTags = [';
 
-		foreach ($playerNamesArray as $name) {
-			  echo "\"$name\",
+        foreach ($playerNamesArray as $name) {
+            echo "\"$name\",
 			  ";
-		}
+        }
 
-		echo '""];
+        echo '""];
 		$( "#Player1" ).autocomplete({
 		  source: availableTags
 		});
@@ -78,7 +80,7 @@ function comparePlayers()
 	  } );
 	  </script>';
 
-		echo '<FORM action="modules.php?name=Compare_Players" method="POST">
+        echo '<FORM action="modules.php?name=Compare_Players" method="POST">
 			<div class="ui-widget">
 				<label for="Player1">Player 1: </label>
 				<input id="Player1" type="text" name="Player1"><br>
@@ -87,11 +89,11 @@ function comparePlayers()
 	  		</div>
 			<INPUT type="submit" value="Compare">
 		</FORM>';
-	} else {
-		$player1Array = getPlayerInfoArrayFromName($_POST['Player1']);
-		$player2Array = getPlayerInfoArrayFromName($_POST['Player2']);
+    } else {
+        $player1Array = getPlayerInfoArrayFromName($_POST['Player1']);
+        $player2Array = getPlayerInfoArrayFromName($_POST['Player2']);
 
-		echo "<table border=1 cellspacing=0 align=center class=\"sortable\">
+        echo "<table border=1 cellspacing=0 align=center class=\"sortable\">
 			<caption>
 				<center><b>Current Ratings</b></center>
 			</caption>
@@ -345,66 +347,65 @@ function comparePlayers()
 				</tr>
 			</tbody>
 		</table>";
-	}
+    }
 
 }
 
 function getPlayerNamesArray()
 {
-	global $db;
+    global $db;
 
-	$query = "SELECT name
+    $query = "SELECT name
 		FROM nuke_iblplyr
 		WHERE ordinal != 0
 		ORDER BY name ASC;";
-	$result = $db->sql_query($query);
-	$numRows = $db->sql_numrows($result);
-	$i = 0;
-	while ($i < $numRows) {
-		$array[$i] = $db->sql_result($result, $i);
-		$i++;
-	}
-	return $array;
+    $result = $db->sql_query($query);
+    $numRows = $db->sql_numrows($result);
+    $i = 0;
+    while ($i < $numRows) {
+        $array[$i] = $db->sql_result($result, $i);
+        $i++;
+    }
+    return $array;
 }
 
 function getPlayerInfoArrayFromName($playerName)
 {
-	global $db;
-	
-	$query = "SELECT *
+    global $db;
+
+    $query = "SELECT *
 		FROM nuke_iblplyr
 		WHERE name = '$playerName'
 		LIMIT 1;";
-	$result = $db->sql_query($query);
-	$array = $db->sql_fetch_assoc($result);
-	return $array;
+    $result = $db->sql_query($query);
+    $array = $db->sql_fetch_assoc($result);
+    return $array;
 }
 
-function main($user) {
-	global $stop;
-	if (!is_user($user)) {
-		include("header.php");
-		OpenTable();
-		echo "<center><font class=\"title\"><b>" . ($stop ? _LOGININCOR : _USERREGLOGIN) . "</b></font></center>";
-		CloseTable();
-		echo "<br>";
-		if (!is_user($user)) {
-			OpenTable();
-			loginbox();
-			CloseTable();
-		}
-		include("footer.php");
-	} elseif (is_user($user)) {
-		global $cookie;
-		cookiedecode($user);
-		userinfo($cookie[1]);
-	}
+function main($user)
+{
+    global $stop;
+    if (!is_user($user)) {
+        include "header.php";
+        OpenTable();
+        echo "<center><font class=\"title\"><b>" . ($stop ? _LOGININCOR : _USERREGLOGIN) . "</b></font></center>";
+        CloseTable();
+        echo "<br>";
+        if (!is_user($user)) {
+            OpenTable();
+            loginbox();
+            CloseTable();
+        }
+        include "footer.php";
+    } elseif (is_user($user)) {
+        global $cookie;
+        cookiedecode($user);
+        userinfo($cookie[1]);
+    }
 }
 
-switch($op) {
-	default:
-		main($user);
-	break;
+switch ($op) {
+    default:
+        main($user);
+        break;
 }
-
-?>

@@ -17,26 +17,23 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
+define("_CATEGORY", "Maila");
 
-define("_CATEGORY","Maila");
-
-define("_LVOTES","Botoak");
-define("_HITS","Hits-ak (irakurrienak)");
-define("_TOPWELCOME","Ongi etorri sistemaren TOP atalera:");
-define("_READSTORIES","Berri irakurrienak");
-define("_COMMENTEDSTORIES","Berri komentatuenak");
-define("_ACTIVECAT","Aktiboenak diren atalak");
-define("_READSECTION","Atal Berezietan notizi irakurrienak");
-define("_NEWSSUBMITTERS","Berri gehien bidali eta publikatzen dituzten sistema-kideak");
-define("_NEWSSENT","notizi bidalita");
-define("_VOTEDPOLLS","Gehien bozkatu diren Inkestak");
-define("_MOSTACTIVEAUTHORS","Autore aktiboenak");
-define("_NEWSPUBLISHED","notizi publikatuta");
-define("_READREVIEWS","Berrikuspen irakurrienak");
-define("_DOWNLOADEDFILES","Gehien jaso diren artxiboak");
-define("_MOSTREADPAGES","orri irakurrienak");
-define("_MOSTVOTEDSTORIES","most voted stories");
-define("_POINTS","points");
-define("_BESTRATEDSTORIES","best rated stories (based on 5 maximun points)");
-
-?>
+define("_LVOTES", "Botoak");
+define("_HITS", "Hits-ak (irakurrienak)");
+define("_TOPWELCOME", "Ongi etorri sistemaren TOP atalera:");
+define("_READSTORIES", "Berri irakurrienak");
+define("_COMMENTEDSTORIES", "Berri komentatuenak");
+define("_ACTIVECAT", "Aktiboenak diren atalak");
+define("_READSECTION", "Atal Berezietan notizi irakurrienak");
+define("_NEWSSUBMITTERS", "Berri gehien bidali eta publikatzen dituzten sistema-kideak");
+define("_NEWSSENT", "notizi bidalita");
+define("_VOTEDPOLLS", "Gehien bozkatu diren Inkestak");
+define("_MOSTACTIVEAUTHORS", "Autore aktiboenak");
+define("_NEWSPUBLISHED", "notizi publikatuta");
+define("_READREVIEWS", "Berrikuspen irakurrienak");
+define("_DOWNLOADEDFILES", "Gehien jaso diren artxiboak");
+define("_MOSTREADPAGES", "orri irakurrienak");
+define("_MOSTVOTEDSTORIES", "most voted stories");
+define("_POINTS", "points");
+define("_BESTRATEDSTORIES", "best rated stories (based on 5 maximun points)");

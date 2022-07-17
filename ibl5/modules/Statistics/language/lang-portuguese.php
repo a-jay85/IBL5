@@ -18,44 +18,41 @@
 /**************************************************************************/
 
 /**************************************************************************/
-/* Translation by:							  */
-/*									  */
-/* Rui Cristovão (ord'hor) ordhor@hotmail.com				  */
+/* Translation by:                              */
+/*                                      */
+/* Rui Cristovï¿½o (ord'hor) ordhor@hotmail.com                  */
 /**************************************************************************/
 
-
-define("_HITS","Hits");
-define("_BROWSERS","Navegadores");
-define("_OPERATINGSYS","Sistema Operativo");
-define("_UNKNOWN","Desconhecido");
-define("_OTHER","Outro / Desconhecido");
-define("_MISCSTATS","Estatísticas Diversas");
-define("_REGUSERS","utilizadores registados:");
-define("_ACTIVEAUTHORS","Autores activos:");
-define("_STORIESPUBLISHED","Artigos publicados:");
-define("_SACTIVETOPICS","Temas activos:");
-define("_COMMENTSPOSTED","Comentários enviados:");
-define("_SSPECIALSECT","Secções especiais:");
-define("_ARTICLESSEC","Artigos em secções:");
-define("_LINKSINLINKS","Links em web links:");
-define("_LINKSCAT","Categorias em links:");
-define("_NEWSWAITING","Noticías à espera de publicação:");
-define("_NUKEVERSION","Versão do PHP-Nuke:");
-define("_SEARCHENGINES","Sistemas de Pesquisa");
-define("_BOTS","Robôs/Spiders");
-define("_STATS","Estatísticas de Acesso");
-define("_RETURNBASICSTATS","Regressar às estatísticas básicas");
-define("_BACKTODETSTATS","Voltar às estatísticas detalhadas");
-define("_BACKTOMAIN","Voltar à página principal");
-define("_TODAYIS","Hoje é");
-define("_MOSTMONTH","Mês mais activo");
-define("_MOSTDAY","Dia mais activo");
-define("_MOSTHOUR","Hora mais activa");
-define("_YEARLYSTATS","Estatísticas Anuais");
-define("_MONTLYSTATS","Estatísticas Mensais para");
-define("_SPAGESVIEWS","Visualizações");
-define("_DAILYSTATS","Estatísticas diárias para");
-define("_HOURLYSTATS","Estatísticas das horas para");
-define("_VIEWDETAILED","Ver Estatísticas Detalhadas");
-
-?>
+define("_HITS", "Hits");
+define("_BROWSERS", "Navegadores");
+define("_OPERATINGSYS", "Sistema Operativo");
+define("_UNKNOWN", "Desconhecido");
+define("_OTHER", "Outro / Desconhecido");
+define("_MISCSTATS", "Estatï¿½sticas Diversas");
+define("_REGUSERS", "utilizadores registados:");
+define("_ACTIVEAUTHORS", "Autores activos:");
+define("_STORIESPUBLISHED", "Artigos publicados:");
+define("_SACTIVETOPICS", "Temas activos:");
+define("_COMMENTSPOSTED", "Comentï¿½rios enviados:");
+define("_SSPECIALSECT", "Secï¿½ï¿½es especiais:");
+define("_ARTICLESSEC", "Artigos em secï¿½ï¿½es:");
+define("_LINKSINLINKS", "Links em web links:");
+define("_LINKSCAT", "Categorias em links:");
+define("_NEWSWAITING", "Noticï¿½as ï¿½ espera de publicaï¿½ï¿½o:");
+define("_NUKEVERSION", "Versï¿½o do PHP-Nuke:");
+define("_SEARCHENGINES", "Sistemas de Pesquisa");
+define("_BOTS", "Robï¿½s/Spiders");
+define("_STATS", "Estatï¿½sticas de Acesso");
+define("_RETURNBASICSTATS", "Regressar ï¿½s estatï¿½sticas bï¿½sicas");
+define("_BACKTODETSTATS", "Voltar ï¿½s estatï¿½sticas detalhadas");
+define("_BACKTOMAIN", "Voltar ï¿½ pï¿½gina principal");
+define("_TODAYIS", "Hoje ï¿½");
+define("_MOSTMONTH", "Mï¿½s mais activo");
+define("_MOSTDAY", "Dia mais activo");
+define("_MOSTHOUR", "Hora mais activa");
+define("_YEARLYSTATS", "Estatï¿½sticas Anuais");
+define("_MONTLYSTATS", "Estatï¿½sticas Mensais para");
+define("_SPAGESVIEWS", "Visualizaï¿½ï¿½es");
+define("_DAILYSTATS", "Estatï¿½sticas diï¿½rias para");
+define("_HOURLYSTATS", "Estatï¿½sticas das horas para");
+define("_VIEWDETAILED", "Ver Estatï¿½sticas Detalhadas");

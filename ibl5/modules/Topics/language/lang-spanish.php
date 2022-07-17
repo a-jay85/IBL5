@@ -17,11 +17,9 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_ACTIVETOPICS","Tópicos Activos");
-define("_CLICK2LIST","Haz Click en el gráfico para listar todos los artículos sobre este tópico");
-define("_TOTNEWS","Total de Noticias");
-define("_TOTREADS","Total de Lecturas");
-define("_MORE","Más");
-define("_NONEWSYET","...Aún no hay noticias sobre este tópico...");
-
-?>
+define("_ACTIVETOPICS", "Tï¿½picos Activos");
+define("_CLICK2LIST", "Haz Click en el grï¿½fico para listar todos los artï¿½culos sobre este tï¿½pico");
+define("_TOTNEWS", "Total de Noticias");
+define("_TOTREADS", "Total de Lecturas");
+define("_MORE", "Mï¿½s");
+define("_NONEWSYET", "...Aï¿½n no hay noticias sobre este tï¿½pico...");

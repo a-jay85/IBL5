@@ -13,45 +13,42 @@
 /************************************************************************/
 
 if (!defined('ADMIN_FILE')) {
-	die ("Access Denied");
+    die("Access Denied");
 }
 
 $module_name = "Downloads";
-include_secure("modules/$module_name/admin/language/lang-".$currentlang.".php");
+include_secure("modules/$module_name/admin/language/lang-" . $currentlang . ".php");
 
+switch ($op) {
 
-switch($op) {
-
-	case "downloads":
-	case "DownloadsDelNew":
-	case "DownloadsAddCat":
-	case "DownloadsAddSubCat":
-	case "DownloadsAddDownload":
-	case "DownloadsAddEditorial":
-	case "DownloadsModEditorial":
-	case "DownloadsDownloadCheck":
-	case "DownloadsValidate":
-	case "DownloadsDelEditorial":
-	case "DownloadsCleanVotes":
-	case "DownloadsListBrokenDownloads":
-	case "DownloadsDelBrokenDownloads":
-	case "DownloadsIgnoreBrokenDownloads":
-	case "DownloadsListModRequests":
-	case "DownloadsChangeModRequests":
-	case "DownloadsChangeIgnoreRequests":
-	case "DownloadsDelCat":
-	case "DownloadsModCat":
-	case "DownloadsModCatS":
-	case "DownloadsModDownload":
-	case "DownloadsModDownloadS":
-	case "DownloadsDelDownload":
-	case "DownloadsDelVote":
-	case "DownloadsDelComment":
-	case "DownloadsTransfer":
-	case "check_download":
-	include("modules/$module_name/admin/index.php");
-	break;
+    case "downloads":
+    case "DownloadsDelNew":
+    case "DownloadsAddCat":
+    case "DownloadsAddSubCat":
+    case "DownloadsAddDownload":
+    case "DownloadsAddEditorial":
+    case "DownloadsModEditorial":
+    case "DownloadsDownloadCheck":
+    case "DownloadsValidate":
+    case "DownloadsDelEditorial":
+    case "DownloadsCleanVotes":
+    case "DownloadsListBrokenDownloads":
+    case "DownloadsDelBrokenDownloads":
+    case "DownloadsIgnoreBrokenDownloads":
+    case "DownloadsListModRequests":
+    case "DownloadsChangeModRequests":
+    case "DownloadsChangeIgnoreRequests":
+    case "DownloadsDelCat":
+    case "DownloadsModCat":
+    case "DownloadsModCatS":
+    case "DownloadsModDownload":
+    case "DownloadsModDownloadS":
+    case "DownloadsDelDownload":
+    case "DownloadsDelVote":
+    case "DownloadsDelComment":
+    case "DownloadsTransfer":
+    case "check_download":
+        include "modules/$module_name/admin/index.php";
+        break;
 
 }
-
-?>

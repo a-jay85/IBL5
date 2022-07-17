@@ -17,26 +17,24 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PREVIOUS","Páxina anterior");
-define("_NEXT","Páxina seguinte");
-define("_SEARCHRESULTS","Resultados da Búsqueda");
-define("_PAGE","páxina(s) ");
-define("_RETURNTO","Voltar a");
-define("_DEACTIVATE","Desactivar");
-define("_ACTIVATE","Activar");
-define("_ENCYCLOPEDIA","Enciclopedia");
-define("_NOCONTENTFORLETTER","Desculpe, non existe contido pola letra");
-define("_ENCYSELECTLETTER","Seleccione unha letra da seguinte lista para consultar termos:");
-define("_COPYRIGHT","Copyright");
-define("_YOURADMINENCY","É Administrador, esta enciclopedia non está activa!");
-define("_ENCYNOTACTIVE","Desculpe, esta enciclopedia non está activa neste momento.");
-define("_AVAILABLEENCYLIST","Lista de Enciclopedias dispoñibles en");
-define("_YOURADMININACTIVELIST","É Administrador: Lista de Enciclopedias Inactivas:");
-define("_NORESULTSTEXT","Non hai Resultados no Texto dos Termos...");
-define("_NORESULTSTITLE","Non hai Resultados no Títulos dos Termos...");
-define("_SEARCHRESULTSFOR","Resultados da Búsqueda de:");
-define("_SEARCHNOTCOMPLETE","As Opcións de Búsqueda non están completas. Inténteo de novo.");
-define("_RESULTSINTERMTITLE","Resultados nos títulos dos termos:");
-define("_RESULTSINTERMTEXT","Resultados no texto dos termos:");
-
-?>
+define("_PREVIOUS", "Pï¿½xina anterior");
+define("_NEXT", "Pï¿½xina seguinte");
+define("_SEARCHRESULTS", "Resultados da Bï¿½squeda");
+define("_PAGE", "pï¿½xina(s) ");
+define("_RETURNTO", "Voltar a");
+define("_DEACTIVATE", "Desactivar");
+define("_ACTIVATE", "Activar");
+define("_ENCYCLOPEDIA", "Enciclopedia");
+define("_NOCONTENTFORLETTER", "Desculpe, non existe contido pola letra");
+define("_ENCYSELECTLETTER", "Seleccione unha letra da seguinte lista para consultar termos:");
+define("_COPYRIGHT", "Copyright");
+define("_YOURADMINENCY", "ï¿½ Administrador, esta enciclopedia non estï¿½ activa!");
+define("_ENCYNOTACTIVE", "Desculpe, esta enciclopedia non estï¿½ activa neste momento.");
+define("_AVAILABLEENCYLIST", "Lista de Enciclopedias dispoï¿½ibles en");
+define("_YOURADMININACTIVELIST", "ï¿½ Administrador: Lista de Enciclopedias Inactivas:");
+define("_NORESULTSTEXT", "Non hai Resultados no Texto dos Termos...");
+define("_NORESULTSTITLE", "Non hai Resultados no Tï¿½tulos dos Termos...");
+define("_SEARCHRESULTSFOR", "Resultados da Bï¿½squeda de:");
+define("_SEARCHNOTCOMPLETE", "As Opciï¿½ns de Bï¿½squeda non estï¿½n completas. Intï¿½nteo de novo.");
+define("_RESULTSINTERMTITLE", "Resultados nos tï¿½tulos dos termos:");
+define("_RESULTSINTERMTEXT", "Resultados no texto dos termos:");

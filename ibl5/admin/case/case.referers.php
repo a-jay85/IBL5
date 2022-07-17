@@ -13,16 +13,14 @@
 /************************************************************************/
 
 if (!defined('ADMIN_FILE')) {
-	die ("Access Denied");
+    die("Access Denied");
 }
 
-switch($op) {
+switch ($op) {
 
     case "hreferer":
     case "delreferer":
-    include("admin/modules/referers.php");
-    break;
+        include "admin/modules/referers.php";
+        break;
 
 }
-
-?>

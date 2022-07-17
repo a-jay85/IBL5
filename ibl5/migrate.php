@@ -7,11 +7,11 @@ $Player_Name = $_POST['playername'];
 $Position = $_POST['NewPos'];
 
 $recipient = 'ibldepthcharts@gmail.com';
-$emailsubject = "Position Migration - ".$Player_Name;
-$filetext = $Team_Name." migrates ".$Player_Name." to ".$Position.".";
+$emailsubject = "Position Migration - " . $Player_Name;
+$filetext = $Team_Name . " migrates " . $Player_Name . " to " . $Position . ".";
 
-$querymigrate="UPDATE nuke_iblplyr SET altpos = '$Position' WHERE name = '$Player_Name'";
-$resultmigrate=$db->sql_query($querymigrate);
+$querymigrate = "UPDATE nuke_iblplyr SET altpos = '$Position' WHERE name = '$Player_Name'";
+$resultmigrate = $db->sql_query($querymigrate);
 
 echo "<html><head><title>Position Migration Processing</title></head><body>
 
@@ -23,5 +23,3 @@ if (mail($recipient, $emailsubject, $filetext, "From: migration@iblhoops.net")) 
 } else {
     echo " Message failed to e-mail properly; please notify the commissioner of the error.</center>";
 }
-
-?>

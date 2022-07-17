@@ -17,39 +17,35 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_SEND","Posla?");
-define("_FUNCTIONS","Funkcie");
-define("_YES","Áno");
-define("_NO","Nie");
-define("_CATEGORY","Kategória");
-define("_SAVECHANGES","Uloži? zmeny");
-define("_PAGEBREAK","Ak chcete písa? viac strán, môžete napísa? <b>[--pagebreak--]</b> tam, kde chcete text zalomi?.");
-define("_SIGNATURE","Podpis");
-define("_DESCRIPTION","Popis");
-define("_TITLE","Názov");
-define("_ACTIVE","Aktívny");
-define("_DEACTIVATE","Deaktivova?");
-define("_INACTIVE","Neaktívny");
-define("_ACTIVATE","Aktivova?");
-define("_CONTENT","Obsah");
-define("_ADDCATEGORY","Prida? novú kategóriu");
-define("_EDITCATEGORY","Upravi? kategóriu");
-define("_ADD","Prida?");
-define("_LANGUAGE","Jazyk");
-define("_CONTENTMANAGER","Manažér obsahu");
-define("_DELCONTWARNING","Urèite chcete vymaza? túto stránku?");
-define("_DELCONTENT","Vymaza? stránku");
-define("_CURRENTSTATUS","Aktuálny stav");
-define("_ADDANEWPAGE","Prida? stránku");
-define("_CSUBTITLE","Podnadpis");
-define("_HEADERTEXT","Text hlavièky");
-define("_PAGETEXT","Text stránky");
-define("_FOOTERTEXT","Text pätièky");
-define("_ACTIVATEPAGE","Aktivova? túto stránku?");
-define("_EDITPAGECONTENT","Upravi? obsah stránky");
-define("_DELCONTENTCAT","UPOZORNENIE: Urèite chcete vymaza? túto kategóriu? Stránky zatriedené v tejto kategótii síce nebudú vymazané, ale doèasne nebudú priradené k žiadnej kategórii!");
-define("_DELCATEGORY","Vymaza? kategóriu");
-
-
-?>
+define("_SEND", "Posla?");
+define("_FUNCTIONS", "Funkcie");
+define("_YES", "ï¿½no");
+define("_NO", "Nie");
+define("_CATEGORY", "Kategï¿½ria");
+define("_SAVECHANGES", "Uloï¿½i? zmeny");
+define("_PAGEBREAK", "Ak chcete pï¿½sa? viac strï¿½n, mï¿½ï¿½ete napï¿½sa? <b>[--pagebreak--]</b> tam, kde chcete text zalomi?.");
+define("_SIGNATURE", "Podpis");
+define("_DESCRIPTION", "Popis");
+define("_TITLE", "Nï¿½zov");
+define("_ACTIVE", "Aktï¿½vny");
+define("_DEACTIVATE", "Deaktivova?");
+define("_INACTIVE", "Neaktï¿½vny");
+define("_ACTIVATE", "Aktivova?");
+define("_CONTENT", "Obsah");
+define("_ADDCATEGORY", "Prida? novï¿½ kategï¿½riu");
+define("_EDITCATEGORY", "Upravi? kategï¿½riu");
+define("_ADD", "Prida?");
+define("_LANGUAGE", "Jazyk");
+define("_CONTENTMANAGER", "Manaï¿½ï¿½r obsahu");
+define("_DELCONTWARNING", "Urï¿½ite chcete vymaza? tï¿½to strï¿½nku?");
+define("_DELCONTENT", "Vymaza? strï¿½nku");
+define("_CURRENTSTATUS", "Aktuï¿½lny stav");
+define("_ADDANEWPAGE", "Prida? strï¿½nku");
+define("_CSUBTITLE", "Podnadpis");
+define("_HEADERTEXT", "Text hlaviï¿½ky");
+define("_PAGETEXT", "Text strï¿½nky");
+define("_FOOTERTEXT", "Text pï¿½tiï¿½ky");
+define("_ACTIVATEPAGE", "Aktivova? tï¿½to strï¿½nku?");
+define("_EDITPAGECONTENT", "Upravi? obsah strï¿½nky");
+define("_DELCONTENTCAT", "UPOZORNENIE: Urï¿½ite chcete vymaza? tï¿½to kategï¿½riu? Strï¿½nky zatriedenï¿½ v tejto kategï¿½tii sï¿½ce nebudï¿½ vymazanï¿½, ale doï¿½asne nebudï¿½ priradenï¿½ k ï¿½iadnej kategï¿½rii!");
+define("_DELCATEGORY", "Vymaza? kategï¿½riu");

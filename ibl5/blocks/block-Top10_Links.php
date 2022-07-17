@@ -12,7 +12,7 @@
 /* the Free Software Foundation; either version 2 of the License.       */
 /************************************************************************/
 
-if ( !defined('BLOCK_FILE') ) {
+if (!defined('BLOCK_FILE')) {
     Header("Location: ../index.php");
     die();
 }
@@ -20,7 +20,7 @@ if ( !defined('BLOCK_FILE') ) {
 global $prefix, $db;
 
 $a = 1;
-$result = $db->sql_query("SELECT lid, title FROM ".$prefix."_links_links ORDER BY hits DESC LIMIT 0,10");
+$result = $db->sql_query("SELECT lid, title FROM " . $prefix . "_links_links ORDER BY hits DESC LIMIT 0,10");
 while ($row = $db->sql_fetchrow($result)) {
     $lid = intval($row['lid']);
     $title = filter($row['title'], "nohtml");
@@ -28,5 +28,3 @@ while ($row = $db->sql_fetchrow($result)) {
     $content .= "<strong><big>&middot;</big></strong>&nbsp;$a: <a href=\"modules.php?name=Web_Links&amp;l_op=viewlinkdetails&amp;lid=$lid&amp;ttitle=$title\">$title2</a><br>";
     $a++;
 }
-
-?>

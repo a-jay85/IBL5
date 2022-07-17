@@ -17,24 +17,22 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_CATEGORY","Kategori");
-define("_LVOTES","stemmer");
-define("_HITS","Treff");
-define("_TOPWELCOME","Velkommen til TOPPsiden for");
-define("_READSTORIES","mest leste artikler");
-define("_COMMENTEDSTORIES","mest kommenterte artikler");
-define("_ACTIVECAT","mest aktive kategorier");
-define("_READSECTION","mest leste artikler i spesialavdelingene");
-define("_NEWSSUBMITTERS","mest aktive bidragsytere");
-define("_NEWSSENT","nyheter sendt");
-define("_VOTEDPOLLS","mest stemmer i avstemmingene");
-define("_MOSTACTIVEAUTHORS","mest aktive skribent");
-define("_NEWSPUBLISHED","nyheter publisert");
-define("_READREVIEWS","mest leste anmeldelser");
-define("_DOWNLOADEDFILES","mest nedlastede filer");
-define("_MOSTREADPAGES","mest leste sider");
-define("_MOSTVOTEDSTORIES","mest stemte artikler");
-define("_POINTS","poeng");
-define("_BESTRATEDSTORIES","beste artikler (basert på maksimalt 5 poeng)");
-
-?>
+define("_CATEGORY", "Kategori");
+define("_LVOTES", "stemmer");
+define("_HITS", "Treff");
+define("_TOPWELCOME", "Velkommen til TOPPsiden for");
+define("_READSTORIES", "mest leste artikler");
+define("_COMMENTEDSTORIES", "mest kommenterte artikler");
+define("_ACTIVECAT", "mest aktive kategorier");
+define("_READSECTION", "mest leste artikler i spesialavdelingene");
+define("_NEWSSUBMITTERS", "mest aktive bidragsytere");
+define("_NEWSSENT", "nyheter sendt");
+define("_VOTEDPOLLS", "mest stemmer i avstemmingene");
+define("_MOSTACTIVEAUTHORS", "mest aktive skribent");
+define("_NEWSPUBLISHED", "nyheter publisert");
+define("_READREVIEWS", "mest leste anmeldelser");
+define("_DOWNLOADEDFILES", "mest nedlastede filer");
+define("_MOSTREADPAGES", "mest leste sider");
+define("_MOSTVOTEDSTORIES", "mest stemte artikler");
+define("_POINTS", "poeng");
+define("_BESTRATEDSTORIES", "beste artikler (basert pï¿½ maksimalt 5 poeng)");

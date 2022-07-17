@@ -4,111 +4,109 @@
 /* PHP-NUKE: Advanced Content Management System                           */
 /* ============================================                           */
 /*                                                                        */
-/* Php-Nuke'nin sürekli geliþmesine baðlý olarak eski Türkçe dil dosyalarý*/
-/* güncelliðini yitirdiði için "HighLAndeR" tarafýndan "MaXCoDeR"in       */
-/* yapmýþ olduðu çeviriler güncelleþtirilip yeni çeviriler eklenmiþtir... */
+/* Php-Nuke'nin sï¿½rekli geliï¿½mesine baï¿½lï¿½ olarak eski Tï¿½rkï¿½e dil dosyalarï¿½*/
+/* gï¿½ncelliï¿½ini yitirdiï¿½i iï¿½in "HighLAndeR" tarafï¿½ndan "MaXCoDeR"in       */
+/* yapmï¿½ï¿½ olduï¿½u ï¿½eviriler gï¿½ncelleï¿½tirilip yeni ï¿½eviriler eklenmiï¿½tir... */
 /*                                                                        */
-/* NOT: Yardýmlarý için Gurol400(gurol400@propc.org)'e teþekkürler.       */
+/* NOT: Yardï¿½mlarï¿½ iï¿½in Gurol400(gurol400@propc.org)'e teï¿½ekkï¿½rler.       */
 /*                                                                        */
-/* Türkçe Çevirmeni: HighLAndeR                                           */
-/* Email: highlander@propc.org ICQ#: 110930777 	URL: http://www.propc.org */
+/* Tï¿½rkï¿½e ï¿½evirmeni: HighLAndeR                                           */
+/* Email: highlander@propc.org ICQ#: 110930777     URL: http://www.propc.org */
 /*                                                                        */
-/* Türkçe Çevirmeni: Selim "MaXCoDeR" Þumlu                               */
+/* Tï¿½rkï¿½e ï¿½evirmeni: Selim "MaXCoDeR" ï¿½umlu                               */
 /* Mail:webmaster@pcnet.com.tr ICQ:19648424 URL: http://www.turknuke.com  */
 /**************************************************************************/
 
-define("_USERSJOURNAL","Kullanýcý Günlüðü");
-define("_YOUMUSTBEMEMBER","Bir günlük yazýsý ekleyebilmek için önce <a href=\"module.php?name=Your_Account\">kayýt</a> olmalýsýnýz.");
-define("_ADDJOURNAL","Günlük Yazýsý Ekle");
-define("_ADDENTRY","Yeni Yazý Ekle");
-define("_YOURLAST20","Son 20 Yazýnýz");
-define("_LISTALLENTRIES","Tüm Yazýlarýný Listele");
-define("_TITLE","Baþlýk");
-define("_BODY","Metin");
-define("_WRAP","Paragraflarý &lt;p&gt; ve &lt;/p&gt; etiketleri ile belirtin. HTML kullanabilirsiniz.");
-define("_LITTLEGRAPH","Grafik");
-define("_OPTIONAL","(opsiyonel)");
-define("_PUBLIC","Genel");
-define("_TYPOS","(Yazým hatalarýný kontrol ettiniz mi?)");
-define("_LEAVECOMMENT","Günlük yazýsýna yorum ekle");
-define("_COMMENTBOX","Yorum Kutusu");
-define("_POSTCOMMENT","Yorum Gönder");
-define("_COMMENTSNOTE","Not: Adýnýzý yorumlarýnýzýn yanýnda görüntülenecektir. Anonim olarak yorum <i>yazamazsýnýz</i>! Ayrýca günlük sahibi yorumunuzu silebilir.");
-define("_COMMENTDELETED","Yorum veritabanýndan silindi");
-define("_RETURNJOURNAL","Günlük Yazýsýna Geri Dön");
-define("_COMMENTPOSTED","Yorumunuz günlük yazýsýnýn altýna eklendi");
-define("_RETURNJOURNAL2","Günlük yazýsýna geri dön");
-define("_THANKS","TEÞEKKÜRLER!");
-define("_ABOUTTODELETE","Bir günlük yazýsý silmek üzeresiniz!");
-define("_SUREDELJOURNAL","Bu günlük yazýsýný silmek istediðinizden emin misiniz?");
-define("_YOUCANTSAVE","Silindikten sonra bir yazýyý tekrar <b>okuyamazsýnýz</b>! Tüm yorumlar da yazýyla birlikte silinir!");
-define("_YOUWRONG","<a href=\"modules.php?name=Your_Account\">Kullanýcý adýnýz</a> ve bu yazýnýn yazarý arasýnda bir sorun oluþtu.<br>Güvenlik sebepleri yüzünden yazý veritabanýndan silinmeyecek.<br>Lütfen bu siteye yazar ile ayný kullanýcý adý ile <a href=\"modules.php?name=Your_Account\">giriþ yaptýðýnýzdan</a> emin olun.");
-define("_ENTRYREMOVED","Günlük yazýsý veritabanýndan silindi");
-define("_ANERROR","Bir hata oluþtu. Lütfen <a href=\"modules.php?name=Journal\">Günlük Anasayfasý'na</a> geri dönün.");
-define("_ISPRIVATE","Bu özel bir günlük yazýsýdýr, bunu görme yetkiniz yok.");
-define("_LASTUPDATED","Son güncelleme:");
-define("_WRITECOMMENT","Yorum Yaz");
-define("_VIEWMORE","Devamýný Göster");
-define("_USERPROFILE","Kullanýcý bilgileri");
-define("_SENDMESSAGE","Mesaj Gönder");
-define("_CREATEACCOUNT","Hesap Aç");
-define("_REGUSERSCOMM","<a href=\"modules.php?name=Your_Account\">Kayýtlý</a> kullanýcýlar yorum yazabilir");
-define("_COMMENTBY","Yorumu Yazan:");
-define("_DELCOMMENT","Bu yorumu sil");
-define("_NOTYOURS","Günlük yazýsý <b>$username</b> kullanýcýsýna ait deðil.<br>Bu günlük yazýsýný <b>güncelleyemezsiniz</b>.");
-define("_UPDATEOK","Güncelleme Baþarýlý!");
-define("_UPDATED","--- Günlük Yazýsý Güncellendi! ---");
-define("_JOURNALFOR","Günlük:");
-define("_LAST20FOR","Son 20 Günlük Yazýsý:");
-define("_CLICKTOVIEW","(görmek için týklayýn)");
-define("_TIME","Saat");
-define("_COMPLETELIST","Tam Liste:");
-define("_COMMENT","yorum");
-define("_PUBLICENTRIES","Genel Yazýlar");
-define("_PRIVATEENTRIES","Özel Yazýlar");
-define("_TOTALENTRIES","Toplam Yazý");
-define("_JOURNALDIR","Günlük Dizini");
-define("_YOURJOURNAL","Günlüðünüz");
-define("_MEMBERSCAN","Site üyeleri otomatik olarak kendi günlüklerini yaratma ve yorum gönderme yetkisine sahip olur.");
-define("_20ACTIVE","Son 20 Aktif Günlük");
-define("_VIEWJOURNAL","Günlüðü<br>Göster");
-define("_MEMBER","Kullanýcý");
-define("_MEMBERPROFILE","Kullanýcý<br>Bilgileri");
-define("_CREATEACCOUNT2","Hesap<br>Yarat");
-define("_PRIVMSGJ","Özel<br>Mesaj");
-define("_PRIVMSGJ2","Özel Mesaj");
-define("_ALPHABETICAL","Günlük Yazarlarýnýn Alfabetik Listesi");
-define("_VIEWJOURNAL2","Günlüðü Göster");
-define("_USERPROFILE2","Kullanýcý Bilgileri");
-define("_20AUTHORS","Son 20 Aktif Yazar");
-define("_LISTALLJOURNALS","Tüm Günlükleri Listele");
-define("_SEARCHMEMBER","Kullanýcý Ara");
-define("_EDITJOURNAL","Günlük Yazýsý Düzenle");
-define("_NOTYOURS2","Günlük yazýsý <b>$username</b> kullanýcýsýna ait deðil.<br>Bu günlük yazýsýný <b>güncelleyemezsiniz</b>.");
-define("_MODIFYENTRY","Yazýyý Düzenle");
-define("_ENTRYADDED","Günlük Yazýsý Eklendi!");
-define("_JOURNALSEARCH","Günlük Arama");
-define("_IN","burada:");
-define("_SEARCHRESULTS","Arama Sonuçlarý");
-define("_BODYTEXT","Metin");
-define("_UCOMMENTS","Yorumlar");
-define("_READ","Oku");
-define("_PUBLICFOR","genel yazý bulundu:");
-define("_VIEW","Göster");
-define("_PROFILE","Profil");
-define("_SENDJFRIEND","Bu günlüðü arkadaþýna gönder");
-define("_YOUSENDJOURNAL","Bu günlük yazýsýný bir arkadaþýnýza göndermek üzeresiniz. Lütfen aþaðýdaki gerekli bilgileri girin:");
-define("_FYOURNAME","Ýsminiz");
-define("_FYOUREMAIL","Emailiniz");
-define("_FFRIENDNAME","Arkadaþýnýzýn Ýsmi");
-define("_FFRIENDEMAIL","Arkadaþýnýzýn Emaili");
-define("_SEND","Gönder");
-define("_INTERESTING","Ilginc bir yazi:");
-define("_HELLO","Merhaba");
-define("_YOURFRIEND","Arkadasiniz");
-define("_CONSIDERED","asagidaki gunluk yazisinin ilginizi cekecegini dusundu.");
-define("_AREMORE","Sitemizde cok daha fazla gunluk bulunuyor. Hepsini okumak icin davetlisiniz!");
-define("_FSENT","Mesaj gönderildi. Teþekkür ederiz!");
-define("_URL","Adres");
-
-?>
+define("_USERSJOURNAL", "Kullanï¿½cï¿½ Gï¿½nlï¿½ï¿½ï¿½");
+define("_YOUMUSTBEMEMBER", "Bir gï¿½nlï¿½k yazï¿½sï¿½ ekleyebilmek iï¿½in ï¿½nce <a href=\"module.php?name=Your_Account\">kayï¿½t</a> olmalï¿½sï¿½nï¿½z.");
+define("_ADDJOURNAL", "Gï¿½nlï¿½k Yazï¿½sï¿½ Ekle");
+define("_ADDENTRY", "Yeni Yazï¿½ Ekle");
+define("_YOURLAST20", "Son 20 Yazï¿½nï¿½z");
+define("_LISTALLENTRIES", "Tï¿½m Yazï¿½larï¿½nï¿½ Listele");
+define("_TITLE", "Baï¿½lï¿½k");
+define("_BODY", "Metin");
+define("_WRAP", "Paragraflarï¿½ &lt;p&gt; ve &lt;/p&gt; etiketleri ile belirtin. HTML kullanabilirsiniz.");
+define("_LITTLEGRAPH", "Grafik");
+define("_OPTIONAL", "(opsiyonel)");
+define("_PUBLIC", "Genel");
+define("_TYPOS", "(Yazï¿½m hatalarï¿½nï¿½ kontrol ettiniz mi?)");
+define("_LEAVECOMMENT", "Gï¿½nlï¿½k yazï¿½sï¿½na yorum ekle");
+define("_COMMENTBOX", "Yorum Kutusu");
+define("_POSTCOMMENT", "Yorum Gï¿½nder");
+define("_COMMENTSNOTE", "Not: Adï¿½nï¿½zï¿½ yorumlarï¿½nï¿½zï¿½n yanï¿½nda gï¿½rï¿½ntï¿½lenecektir. Anonim olarak yorum <i>yazamazsï¿½nï¿½z</i>! Ayrï¿½ca gï¿½nlï¿½k sahibi yorumunuzu silebilir.");
+define("_COMMENTDELETED", "Yorum veritabanï¿½ndan silindi");
+define("_RETURNJOURNAL", "Gï¿½nlï¿½k Yazï¿½sï¿½na Geri Dï¿½n");
+define("_COMMENTPOSTED", "Yorumunuz gï¿½nlï¿½k yazï¿½sï¿½nï¿½n altï¿½na eklendi");
+define("_RETURNJOURNAL2", "Gï¿½nlï¿½k yazï¿½sï¿½na geri dï¿½n");
+define("_THANKS", "TEï¿½EKKï¿½RLER!");
+define("_ABOUTTODELETE", "Bir gï¿½nlï¿½k yazï¿½sï¿½ silmek ï¿½zeresiniz!");
+define("_SUREDELJOURNAL", "Bu gï¿½nlï¿½k yazï¿½sï¿½nï¿½ silmek istediï¿½inizden emin misiniz?");
+define("_YOUCANTSAVE", "Silindikten sonra bir yazï¿½yï¿½ tekrar <b>okuyamazsï¿½nï¿½z</b>! Tï¿½m yorumlar da yazï¿½yla birlikte silinir!");
+define("_YOUWRONG", "<a href=\"modules.php?name=Your_Account\">Kullanï¿½cï¿½ adï¿½nï¿½z</a> ve bu yazï¿½nï¿½n yazarï¿½ arasï¿½nda bir sorun oluï¿½tu.<br>Gï¿½venlik sebepleri yï¿½zï¿½nden yazï¿½ veritabanï¿½ndan silinmeyecek.<br>Lï¿½tfen bu siteye yazar ile aynï¿½ kullanï¿½cï¿½ adï¿½ ile <a href=\"modules.php?name=Your_Account\">giriï¿½ yaptï¿½ï¿½ï¿½nï¿½zdan</a> emin olun.");
+define("_ENTRYREMOVED", "Gï¿½nlï¿½k yazï¿½sï¿½ veritabanï¿½ndan silindi");
+define("_ANERROR", "Bir hata oluï¿½tu. Lï¿½tfen <a href=\"modules.php?name=Journal\">Gï¿½nlï¿½k Anasayfasï¿½'na</a> geri dï¿½nï¿½n.");
+define("_ISPRIVATE", "Bu ï¿½zel bir gï¿½nlï¿½k yazï¿½sï¿½dï¿½r, bunu gï¿½rme yetkiniz yok.");
+define("_LASTUPDATED", "Son gï¿½ncelleme:");
+define("_WRITECOMMENT", "Yorum Yaz");
+define("_VIEWMORE", "Devamï¿½nï¿½ Gï¿½ster");
+define("_USERPROFILE", "Kullanï¿½cï¿½ bilgileri");
+define("_SENDMESSAGE", "Mesaj Gï¿½nder");
+define("_CREATEACCOUNT", "Hesap Aï¿½");
+define("_REGUSERSCOMM", "<a href=\"modules.php?name=Your_Account\">Kayï¿½tlï¿½</a> kullanï¿½cï¿½lar yorum yazabilir");
+define("_COMMENTBY", "Yorumu Yazan:");
+define("_DELCOMMENT", "Bu yorumu sil");
+define("_NOTYOURS", "Gï¿½nlï¿½k yazï¿½sï¿½ <b>$username</b> kullanï¿½cï¿½sï¿½na ait deï¿½il.<br>Bu gï¿½nlï¿½k yazï¿½sï¿½nï¿½ <b>gï¿½ncelleyemezsiniz</b>.");
+define("_UPDATEOK", "Gï¿½ncelleme Baï¿½arï¿½lï¿½!");
+define("_UPDATED", "--- Gï¿½nlï¿½k Yazï¿½sï¿½ Gï¿½ncellendi! ---");
+define("_JOURNALFOR", "Gï¿½nlï¿½k:");
+define("_LAST20FOR", "Son 20 Gï¿½nlï¿½k Yazï¿½sï¿½:");
+define("_CLICKTOVIEW", "(gï¿½rmek iï¿½in tï¿½klayï¿½n)");
+define("_TIME", "Saat");
+define("_COMPLETELIST", "Tam Liste:");
+define("_COMMENT", "yorum");
+define("_PUBLICENTRIES", "Genel Yazï¿½lar");
+define("_PRIVATEENTRIES", "ï¿½zel Yazï¿½lar");
+define("_TOTALENTRIES", "Toplam Yazï¿½");
+define("_JOURNALDIR", "Gï¿½nlï¿½k Dizini");
+define("_YOURJOURNAL", "Gï¿½nlï¿½ï¿½ï¿½nï¿½z");
+define("_MEMBERSCAN", "Site ï¿½yeleri otomatik olarak kendi gï¿½nlï¿½klerini yaratma ve yorum gï¿½nderme yetkisine sahip olur.");
+define("_20ACTIVE", "Son 20 Aktif Gï¿½nlï¿½k");
+define("_VIEWJOURNAL", "Gï¿½nlï¿½ï¿½ï¿½<br>Gï¿½ster");
+define("_MEMBER", "Kullanï¿½cï¿½");
+define("_MEMBERPROFILE", "Kullanï¿½cï¿½<br>Bilgileri");
+define("_CREATEACCOUNT2", "Hesap<br>Yarat");
+define("_PRIVMSGJ", "ï¿½zel<br>Mesaj");
+define("_PRIVMSGJ2", "ï¿½zel Mesaj");
+define("_ALPHABETICAL", "Gï¿½nlï¿½k Yazarlarï¿½nï¿½n Alfabetik Listesi");
+define("_VIEWJOURNAL2", "Gï¿½nlï¿½ï¿½ï¿½ Gï¿½ster");
+define("_USERPROFILE2", "Kullanï¿½cï¿½ Bilgileri");
+define("_20AUTHORS", "Son 20 Aktif Yazar");
+define("_LISTALLJOURNALS", "Tï¿½m Gï¿½nlï¿½kleri Listele");
+define("_SEARCHMEMBER", "Kullanï¿½cï¿½ Ara");
+define("_EDITJOURNAL", "Gï¿½nlï¿½k Yazï¿½sï¿½ Dï¿½zenle");
+define("_NOTYOURS2", "Gï¿½nlï¿½k yazï¿½sï¿½ <b>$username</b> kullanï¿½cï¿½sï¿½na ait deï¿½il.<br>Bu gï¿½nlï¿½k yazï¿½sï¿½nï¿½ <b>gï¿½ncelleyemezsiniz</b>.");
+define("_MODIFYENTRY", "Yazï¿½yï¿½ Dï¿½zenle");
+define("_ENTRYADDED", "Gï¿½nlï¿½k Yazï¿½sï¿½ Eklendi!");
+define("_JOURNALSEARCH", "Gï¿½nlï¿½k Arama");
+define("_IN", "burada:");
+define("_SEARCHRESULTS", "Arama Sonuï¿½larï¿½");
+define("_BODYTEXT", "Metin");
+define("_UCOMMENTS", "Yorumlar");
+define("_READ", "Oku");
+define("_PUBLICFOR", "genel yazï¿½ bulundu:");
+define("_VIEW", "Gï¿½ster");
+define("_PROFILE", "Profil");
+define("_SENDJFRIEND", "Bu gï¿½nlï¿½ï¿½ï¿½ arkadaï¿½ï¿½na gï¿½nder");
+define("_YOUSENDJOURNAL", "Bu gï¿½nlï¿½k yazï¿½sï¿½nï¿½ bir arkadaï¿½ï¿½nï¿½za gï¿½ndermek ï¿½zeresiniz. Lï¿½tfen aï¿½aï¿½ï¿½daki gerekli bilgileri girin:");
+define("_FYOURNAME", "ï¿½sminiz");
+define("_FYOUREMAIL", "Emailiniz");
+define("_FFRIENDNAME", "Arkadaï¿½ï¿½nï¿½zï¿½n ï¿½smi");
+define("_FFRIENDEMAIL", "Arkadaï¿½ï¿½nï¿½zï¿½n Emaili");
+define("_SEND", "Gï¿½nder");
+define("_INTERESTING", "Ilginc bir yazi:");
+define("_HELLO", "Merhaba");
+define("_YOURFRIEND", "Arkadasiniz");
+define("_CONSIDERED", "asagidaki gunluk yazisinin ilginizi cekecegini dusundu.");
+define("_AREMORE", "Sitemizde cok daha fazla gunluk bulunuyor. Hepsini okumak icin davetlisiniz!");
+define("_FSENT", "Mesaj gï¿½nderildi. Teï¿½ekkï¿½r ederiz!");
+define("_URL", "Adres");

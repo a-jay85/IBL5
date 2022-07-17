@@ -21,13 +21,11 @@
 /* Comments/suggestions: aleagi@terra.com.br - aleagi@phpnuke.org.br      */
 /**************************************************************************/
 
-define("_CATEGORY","Categoria");
-define("_CATEGORIES","Categorias");
-define("_FAQ2","FAQ (Perguntas Frequentes)");
-define("_BACKTOTOP","Voltar ao TOP");
-define("_BACKTOFAQINDEX","Voltar ao índice do FAQ");
-define("_MAIN","Índice");
-define("_QUESTION","Pergunta");
-define("_ANSWER","Resposta");
-
-?>
+define("_CATEGORY", "Categoria");
+define("_CATEGORIES", "Categorias");
+define("_FAQ2", "FAQ (Perguntas Frequentes)");
+define("_BACKTOTOP", "Voltar ao TOP");
+define("_BACKTOFAQINDEX", "Voltar ao ï¿½ndice do FAQ");
+define("_MAIN", "ï¿½ndice");
+define("_QUESTION", "Pergunta");
+define("_ANSWER", "Resposta");

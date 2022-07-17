@@ -17,13 +17,11 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_CATEGORY","Kategori");
-define("_CATEGORIES","Kategorier");
-define("_FAQ2","FAQ (Frekvent Ställda Frågor)");
-define("_BACKTOTOP","Tillbaka till toppen");
-define("_BACKTOFAQINDEX","Tillbaka till FAQ Index");
-define("_MAIN","Huvudsida");
-define("_QUESTION","Fråga");
-define("_ANSWER","Svar");
-
-?>
+define("_CATEGORY", "Kategori");
+define("_CATEGORIES", "Kategorier");
+define("_FAQ2", "FAQ (Frekvent Stï¿½llda Frï¿½gor)");
+define("_BACKTOTOP", "Tillbaka till toppen");
+define("_BACKTOFAQINDEX", "Tillbaka till FAQ Index");
+define("_MAIN", "Huvudsida");
+define("_QUESTION", "Frï¿½ga");
+define("_ANSWER", "Svar");

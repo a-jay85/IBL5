@@ -17,51 +17,54 @@
  *
  ***************************************************************************/
 
-define (kSettingLeagueName, 1);
-define (kSettingPickTimeLimit, 2);
-define (kSettingSendMails, 3);
-define (kSettingStartTime, 4);
-define (kSettingEndTime, 5);
-define (kSettingExpiredPick, 6);
-define (kSettingRolloverMethod, 7);
-define (kSettingAutopickReduction, 8);
-define (kSettingTimeZone, 9);
-define (kSettingMaxDelay, 10);
+define(kSettingLeagueName, 1);
+define(kSettingPickTimeLimit, 2);
+define(kSettingSendMails, 3);
+define(kSettingStartTime, 4);
+define(kSettingEndTime, 5);
+define(kSettingExpiredPick, 6);
+define(kSettingRolloverMethod, 7);
+define(kSettingAutopickReduction, 8);
+define(kSettingTimeZone, 9);
+define(kSettingMaxDelay, 10);
 
 // Config constants
-define (kExpireSkipPick, 0); // Default, skip pick when expired
-define (kExpireMakePick, 1); // Make a BPA selection when expired
+define(kExpireSkipPick, 0); // Default, skip pick when expired
+define(kExpireMakePick, 1); // Make a BPA selection when expired
 
 // Settings for kSettingSendMails
-define (kEmailOff, 0);
-define (kEmailAll, 1);
-define (kEmailNextPick, 2);
+define(kEmailOff, 0);
+define(kEmailAll, 1);
+define(kEmailNextPick, 2);
 
 // Settings for kSettingRolloverMethod
-define (kRollIntoTomorrow, 0);
-define (kFinishToday, 1);
+define(kRollIntoTomorrow, 0);
+define(kFinishToday, 1);
 
-class settings {
-  function settings() {
-    $statement = "select * from settings";
-    $result = mysql_query($statement);
-    while ($row = mysql_fetch_array($result)) {
-      $this->setting[$row['setting_id']] = $row['setting_value'];
+class settings
+{
+    public function settings()
+    {
+        $statement = "select * from settings";
+        $result = mysql_query($statement);
+        while ($row = mysql_fetch_array($result)) {
+            $this->setting[$row['setting_id']] = $row['setting_value'];
+        }
     }
-  }
 
-  function get_value($id) {
-    return $this->setting[$id];
-  }
+    public function get_value($id)
+    {
+        return $this->setting[$id];
+    }
 
-  function set_value($id, $value) {
-    $id = mysql_real_escape_string($id);
-    $value = mysql_real_escape_string($value);
-    $statement = "insert into settings (setting_id) values ('$id')";
-    mysql_query($statement);
-    $statement = "update settings set setting_value = '$value' where setting_id = '$id'";
-    mysql_query($statement);
-    $this->setting[$id] = $value;
-  }
+    public function set_value($id, $value)
+    {
+        $id = mysql_real_escape_string($id);
+        $value = mysql_real_escape_string($value);
+        $statement = "insert into settings (setting_id) values ('$id')";
+        mysql_query($statement);
+        $statement = "update settings set setting_value = '$value' where setting_id = '$id'";
+        mysql_query($statement);
+        $this->setting[$id] = $value;
+    }
 }
-?>

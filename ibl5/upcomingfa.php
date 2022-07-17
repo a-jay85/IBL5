@@ -8,8 +8,8 @@ $currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
 $tid = $_REQUEST['tid'];
 $yr = $_REQUEST['yr'];
 
-if ($tid == NULL) {
-    if ($currentSeasonEndingYear != NULL) {
+if ($tid == null) {
+    if ($currentSeasonEndingYear != null) {
         // === CODE FOR FREE AGENTS
 
         echo "<html><head><title>Upcoming Free Agents List ($currentSeasonEndingYear)</title></head><body>
@@ -51,68 +51,68 @@ if ($tid == NULL) {
                 <th>Trad</th>
             </tr>";
 
-        $query="SELECT * FROM nuke_iblplyr WHERE retired = 0 ORDER BY ordinal ASC";
-        $result=$db->sql_query($query);
-        $num=$db->sql_numrows($result);
+        $query = "SELECT * FROM nuke_iblplyr WHERE retired = 0 ORDER BY ordinal ASC";
+        $result = $db->sql_query($query);
+        $num = $db->sql_numrows($result);
 
         $i = 0;
         $j = 0;
 
         while ($i < $num) {
-            $draftyear=$db->sql_result($result,$i,"draftyear");
-            $exp=$db->sql_result($result,$i,"exp");
-            $cy=$db->sql_result($result,$i,"cy");
-            $cyt=$db->sql_result($result,$i,"cyt");
+            $draftyear = $db->sql_result($result, $i, "draftyear");
+            $exp = $db->sql_result($result, $i, "exp");
+            $cy = $db->sql_result($result, $i, "cy");
+            $cyt = $db->sql_result($result, $i, "cyt");
 
-            $yearoffreeagency=$draftyear+$exp+$cyt-$cy;
+            $yearoffreeagency = $draftyear + $exp + $cyt - $cy;
 
             if ($yearoffreeagency == $currentSeasonEndingYear) {
-                $name=$db->sql_result($result,$i,"name");
-                $team=$db->sql_result($result,$i,"teamname");
-                $tid=$db->sql_result($result,$i,"tid");
-                $pid=$db->sql_result($result,$i,"pid");
-                $pos=$db->sql_result($result,$i,"pos");
-                $age=$db->sql_result($result,$i,"age");
-                $inj=$db->sql_result($result,$i,"injured");
+                $name = $db->sql_result($result, $i, "name");
+                $team = $db->sql_result($result, $i, "teamname");
+                $tid = $db->sql_result($result, $i, "tid");
+                $pid = $db->sql_result($result, $i, "pid");
+                $pos = $db->sql_result($result, $i, "pos");
+                $age = $db->sql_result($result, $i, "age");
+                $inj = $db->sql_result($result, $i, "injured");
 
-                $r_2ga=$db->sql_result($result,$i,"r_fga");
-                $r_2gp=$db->sql_result($result,$i,"r_fgp");
-                $r_fta=$db->sql_result($result,$i,"r_fta");
-                $r_ftp=$db->sql_result($result,$i,"r_ftp");
-                $r_3ga=$db->sql_result($result,$i,"r_tga");
-                $r_3gp=$db->sql_result($result,$i,"r_tgp");
-                $r_orb=$db->sql_result($result,$i,"r_orb");
-                $r_drb=$db->sql_result($result,$i,"r_drb");
-                $r_ast=$db->sql_result($result,$i,"r_ast");
-                $r_stl=$db->sql_result($result,$i,"r_stl");
-                $r_blk=$db->sql_result($result,$i,"r_blk");
-                $r_tvr=$db->sql_result($result,$i,"r_to");
-                $r_sta=$db->sql_result($result,$i,"sta");
-                $r_foul=$db->sql_result($result,$i,"r_foul");
-                $r_totoff=$db->sql_result($result,$i,"oo")+$db->sql_result($result,$i,"do")+$db->sql_result($result,$i,"po")+$db->sql_result($result,$i,"to");
-                $r_totdef=$db->sql_result($result,$i,"od")+$db->sql_result($result,$i,"dd")+$db->sql_result($result,$i,"pd")+$db->sql_result($result,$i,"td");
-                $r_oo=$db->sql_result($result,$i,"oo");
-                $r_do=$db->sql_result($result,$i,"do");
-                $r_po=$db->sql_result($result,$i,"po");
-                $r_to=$db->sql_result($result,$i,"to");
-                $r_od=$db->sql_result($result,$i,"od");
-                $r_dd=$db->sql_result($result,$i,"dd");
-                $r_pd=$db->sql_result($result,$i,"pd");
-                $r_td=$db->sql_result($result,$i,"td");
-                $r_foul=$db->sql_result($result,$i,"r_foul");
-                $loyalty=$db->sql_result($result,$i,"loyalty");
-                $playForWinner=$db->sql_result($result,$i,"winner");
-                $playingTime=$db->sql_result($result,$i,"playingTime");
-                $security=$db->sql_result($result,$i,"security");
-                $coach=$db->sql_result($result,$i,"coach");
-                $tradition=$db->sql_result($result,$i,"tradition");
+                $r_2ga = $db->sql_result($result, $i, "r_fga");
+                $r_2gp = $db->sql_result($result, $i, "r_fgp");
+                $r_fta = $db->sql_result($result, $i, "r_fta");
+                $r_ftp = $db->sql_result($result, $i, "r_ftp");
+                $r_3ga = $db->sql_result($result, $i, "r_tga");
+                $r_3gp = $db->sql_result($result, $i, "r_tgp");
+                $r_orb = $db->sql_result($result, $i, "r_orb");
+                $r_drb = $db->sql_result($result, $i, "r_drb");
+                $r_ast = $db->sql_result($result, $i, "r_ast");
+                $r_stl = $db->sql_result($result, $i, "r_stl");
+                $r_blk = $db->sql_result($result, $i, "r_blk");
+                $r_tvr = $db->sql_result($result, $i, "r_to");
+                $r_sta = $db->sql_result($result, $i, "sta");
+                $r_foul = $db->sql_result($result, $i, "r_foul");
+                $r_totoff = $db->sql_result($result, $i, "oo") + $db->sql_result($result, $i, "do") + $db->sql_result($result, $i, "po") + $db->sql_result($result, $i, "to");
+                $r_totdef = $db->sql_result($result, $i, "od") + $db->sql_result($result, $i, "dd") + $db->sql_result($result, $i, "pd") + $db->sql_result($result, $i, "td");
+                $r_oo = $db->sql_result($result, $i, "oo");
+                $r_do = $db->sql_result($result, $i, "do");
+                $r_po = $db->sql_result($result, $i, "po");
+                $r_to = $db->sql_result($result, $i, "to");
+                $r_od = $db->sql_result($result, $i, "od");
+                $r_dd = $db->sql_result($result, $i, "dd");
+                $r_pd = $db->sql_result($result, $i, "pd");
+                $r_td = $db->sql_result($result, $i, "td");
+                $r_foul = $db->sql_result($result, $i, "r_foul");
+                $loyalty = $db->sql_result($result, $i, "loyalty");
+                $playForWinner = $db->sql_result($result, $i, "winner");
+                $playingTime = $db->sql_result($result, $i, "playingTime");
+                $security = $db->sql_result($result, $i, "security");
+                $coach = $db->sql_result($result, $i, "coach");
+                $tradition = $db->sql_result($result, $i, "tradition");
 
                 if ($j == 0) {
                     echo "      <tr bgcolor=#ffffff align=center>";
-                    $j=1;
+                    $j = 1;
                 } else {
                     echo "      <tr bgcolor=#e6e7e2 align=center>";
-                    $j=0;
+                    $j = 0;
                 }
                 echo "<td>$pos</td>
                     <td><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>
@@ -159,5 +159,3 @@ if ($tid == NULL) {
             </table>";
     }
 }
-
-?>

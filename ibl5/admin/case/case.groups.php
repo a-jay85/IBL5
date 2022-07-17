@@ -13,10 +13,10 @@
 /************************************************************************/
 
 if (!defined('ADMIN_FILE')) {
-	die ("Access Denied");
+    die("Access Denied");
 }
 
-switch($op) {
+switch ($op) {
 
     case "Groups":
     case "grp_add":
@@ -24,9 +24,7 @@ switch($op) {
     case "grp_edit_save":
     case "grp_del":
     case "points_update":
-    include("admin/modules/groups.php");
-    break;
+        include "admin/modules/groups.php";
+        break;
 
 }
-
-?>

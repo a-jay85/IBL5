@@ -2,10 +2,10 @@
 
 /*************************************************************************/
 /* The Slovak language file for module Stories_Archive                      */
-/* Author: AlRashid 			 Date: 09.09.2002   					 */
+/* Author: AlRashid              Date: 09.09.2002                        */
 /* alrashid@klokan.sk, http://alrashid.klokan.sk                         */
-/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk			     */
-/*  		Dakujem                                                      */
+/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk                 */
+/*          Dakujem                                                      */
 /*************************************************************************/
 /**************************************************************************/
 /* PHP-NUKE: Advanced Content Management System                           */
@@ -24,25 +24,23 @@
 /* And, if you use HTML code, please double check it.                     */
 /*************************************************************************/
 /* The Slovak language file for module Stories_Archive                      */
-/* Author: AlRashid 			 Date: 09.09.2002   					 */
+/* Author: AlRashid              Date: 09.09.2002                        */
 /* alrashid@klokan.sk, http://alrashid.klokan.sk                         */
-/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk			     */
-/*  		Dakujem                                                      */
+/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk                 */
+/*          Dakujem                                                      */
 /*************************************************************************/
 /**************************************************************************/
 
-define("_PRINTER","Stránka vhodná na tlaè");
-define("_FRIEND","Posla tento èlánok priate¾ovi, známemu");
-define("_ARTICLES","Èlánky");
-define("_USCORE","Skóre");
-define("_DATE","Dátum");
-define("_SELECTMONTH2VIEW","Vyberte mesiac, ktory chcete prezrie:");
-define("_SHOWALLSTORIES","Zobrazi všetky èlánky");
-define("_STORIESARCHIVE","Archív èlánkov");
-define("_ACTIONS","Možnosti");
-define("_ARCHIVESINDEX","Index archívu èlánkov");
-define("_ALLSTORIESARCH","Všetky èlánky");
-define("_NEXTPAGE","Ïalšia strana");
-define("_PREVIOUSPAGE","Predchádzajúca strana");
-
-?>
+define("_PRINTER", "Strï¿½nka vhodnï¿½ na tlaï¿½");
+define("_FRIEND", "Poslaï¿½ tento ï¿½lï¿½nok priateï¿½ovi, znï¿½memu");
+define("_ARTICLES", "ï¿½lï¿½nky");
+define("_USCORE", "Skï¿½re");
+define("_DATE", "Dï¿½tum");
+define("_SELECTMONTH2VIEW", "Vyberte mesiac, ktory chcete prezrieï¿½:");
+define("_SHOWALLSTORIES", "Zobraziï¿½ vï¿½etky ï¿½lï¿½nky");
+define("_STORIESARCHIVE", "Archï¿½v ï¿½lï¿½nkov");
+define("_ACTIONS", "Moï¿½nosti");
+define("_ARCHIVESINDEX", "Index archï¿½vu ï¿½lï¿½nkov");
+define("_ALLSTORIESARCH", "Vï¿½etky ï¿½lï¿½nky");
+define("_NEXTPAGE", "ï¿½alï¿½ia strana");
+define("_PREVIOUSPAGE", "Predchï¿½dzajï¿½ca strana");

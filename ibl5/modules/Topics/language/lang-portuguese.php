@@ -18,13 +18,10 @@
 /**************************************************************************/
 
 /**************************************************************************/
-/* Translation by:							  */
-/*									  */
-/* Rui Cristovão (ord'hor) ordhor@hotmail.com				  */
+/* Translation by:                              */
+/*                                      */
+/* Rui Cristovï¿½o (ord'hor) ordhor@hotmail.com                  */
 /**************************************************************************/
 
-
-define("_ACTIVETOPICS","Temas Activos neste momento");
-define("_CLICK2LIST","Clique para listar todos os artigos deste tema");
-
-?>
+define("_ACTIVETOPICS", "Temas Activos neste momento");
+define("_CLICK2LIST", "Clique para listar todos os artigos deste tema");

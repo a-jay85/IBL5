@@ -17,19 +17,17 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_SEND","Kirim");
-define("_YOURNAME","Nama Anda");
-define("_MESSAGE","Pesan");
-define("_YOUREMAIL","Alamat Email");
-define("_FEEDBACKNOTE","Terima kasih anda mau mencoba menghubungi kami.<br>\nSegala masukan dari anda tentang $sitename merupakan sumber informasi berharga bagi kami dan sangat kami hargai.!");
-define("_FEEDBACKTITLE","Komentar dan Saran");
-define("_FEEDBACK","Feedback");
-define("_FBENTERNAME","ERROR: Anda belum mengisi nama anda!");
-define("_FBENTEREMAIL","ERROR: Anda belum mengisi e-mail anda!");
-define("_FBENTERMESSAGE","ERROR: Anda belum mengisi pesan anda!");
-define("_SENDEREMAIL","Alamat Email Pengirim");
-define("_SENDERNAME","Nama Pengirim");
-define("_FBMAILSENT","Pesan anda sudah dikirim!");
-define("_FBTHANKSFORCONTACT","Terima kasih atas perhatian anda");
-
-?>
+define("_SEND", "Kirim");
+define("_YOURNAME", "Nama Anda");
+define("_MESSAGE", "Pesan");
+define("_YOUREMAIL", "Alamat Email");
+define("_FEEDBACKNOTE", "Terima kasih anda mau mencoba menghubungi kami.<br>\nSegala masukan dari anda tentang $sitename merupakan sumber informasi berharga bagi kami dan sangat kami hargai.!");
+define("_FEEDBACKTITLE", "Komentar dan Saran");
+define("_FEEDBACK", "Feedback");
+define("_FBENTERNAME", "ERROR: Anda belum mengisi nama anda!");
+define("_FBENTEREMAIL", "ERROR: Anda belum mengisi e-mail anda!");
+define("_FBENTERMESSAGE", "ERROR: Anda belum mengisi pesan anda!");
+define("_SENDEREMAIL", "Alamat Email Pengirim");
+define("_SENDERNAME", "Nama Pengirim");
+define("_FBMAILSENT", "Pesan anda sudah dikirim!");
+define("_FBTHANKSFORCONTACT", "Terima kasih atas perhatian anda");

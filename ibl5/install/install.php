@@ -16,16 +16,17 @@
 /************************************************************************/
 
 /** Include common.php */
-include_once( 'common.php' );
-function writableCell( $folder ) {
-	echo "<tr>";
-	echo "<td class=\"item\">" . $folder . "</td>";
-	echo "<td align=\"left\">";
-	echo is_writable( "../$folder" ) ? '<b><font color="green">Writeable</font></b>' : '<b><font color="red">Unwriteable</font></b>' . "</td>";
-	echo "</tr>";
+include_once 'common.php';
+function writableCell($folder)
+{
+    echo "<tr>";
+    echo "<td class=\"item\">" . $folder . "</td>";
+    echo "<td align=\"left\">";
+    echo is_writable("../$folder") ? '<b><font color="green">Writeable</font></b>' : '<b><font color="red">Unwriteable</font></b>' . "</td>";
+    echo "</tr>";
 }
 ?>
-<?php echo "<?xml version=\"1.0\" encoding=\"iso-8859-1\"?".">"; ?>
+<?php echo "<?xml version=\"1.0\" encoding=\"iso-8859-1\"?" . ">"; ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>

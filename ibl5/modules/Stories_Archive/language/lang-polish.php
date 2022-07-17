@@ -16,21 +16,20 @@
 /* so your entry will look like: This is \"double quoted\" text.          */
 /* And, if you use HTML code, please double check it.                     */
 /*                                                                        */
-/* Polish translation by Nordavind®(Bolo) (http://forum.phpnuke.org.pl)   */
+/* Polish translation by Nordavindï¿½(Bolo) (http://forum.phpnuke.org.pl)   */
 /*                                                                        */
 /**************************************************************************/
 
-define("_PRINTER","Strona gotowa do druku");
-define("_FRIEND","Wy¶lij ten artyku³ do znajomych");
-define("_ARTICLES","Artyku³y");
-define("_USCORE","Wynik");
-define("_DATE","Data");
-define("_SELECTMONTH2VIEW","Proszê wybraæ miesi±c który chcesz przejrzeæ:");
-define("_SHOWALLSTORIES","Poka¿ WSZYSTKIE artyku³y");
-define("_STORIESARCHIVE","Archiwum artyku³ów");
-define("_ACTIONS","Akcje");
-define("_ARCHIVESINDEX","Wykaz archiwum artyku³ów");
-define("_ALLSTORIESARCH","Wszystkie artyku³y");
-define("_NEXTPAGE","Nastêpna strona");
-define("_PREVIOUSPAGE","Poprzednia strona");
-
+define("_PRINTER", "Strona gotowa do druku");
+define("_FRIEND", "Wyï¿½lij ten artykuï¿½ do znajomych");
+define("_ARTICLES", "Artykuï¿½y");
+define("_USCORE", "Wynik");
+define("_DATE", "Data");
+define("_SELECTMONTH2VIEW", "Proszï¿½ wybraï¿½ miesiï¿½c ktï¿½ry chcesz przejrzeï¿½:");
+define("_SHOWALLSTORIES", "Pokaï¿½ WSZYSTKIE artykuï¿½y");
+define("_STORIESARCHIVE", "Archiwum artykuï¿½ï¿½w");
+define("_ACTIONS", "Akcje");
+define("_ARCHIVESINDEX", "Wykaz archiwum artykuï¿½ï¿½w");
+define("_ALLSTORIESARCH", "Wszystkie artykuï¿½y");
+define("_NEXTPAGE", "Nastï¿½pna strona");
+define("_PREVIOUSPAGE", "Poprzednia strona");

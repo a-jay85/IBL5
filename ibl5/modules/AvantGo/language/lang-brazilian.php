@@ -21,11 +21,9 @@
 /* Comments/suggestions: aleagi@terra.com.br - aleagi@phpnuke.org.br      */
 /**************************************************************************/
 
-define("_PDATE","Data:");
-define("_PTOPIC","Tópico:");
-define("_COMESFROM","Esta notícia veio de");
-define("_THEURL","O link desta notícia é:");
-define("_DATE","Data");
-define("_TITLE","Título");
-
-?>
+define("_PDATE", "Data:");
+define("_PTOPIC", "Tï¿½pico:");
+define("_COMESFROM", "Esta notï¿½cia veio de");
+define("_THEURL", "O link desta notï¿½cia ï¿½:");
+define("_DATE", "Data");
+define("_TITLE", "Tï¿½tulo");

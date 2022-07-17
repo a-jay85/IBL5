@@ -17,28 +17,24 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_FUNCTIONS","Fonksiyonlar");
-define("_YES","Evet");
-define("_NO","Hayýr");
-define("_SAVE","Kaydet");
-define("_ID","ID");
-define("_CATEGORIES","Kategori");
-define("_ALL","Tümü");
-define("_FAQ","SSS");
-define("_CONTENT","Ýçerik");
-define("_FAQADMIN","SSS Yönetimi");
-define("_ACTIVEFAQS","Aktif SSS'ler");
-define("_ADDCATEGORY","Yeni Kategori Ekle");
-define("_QUESTIONS","Sorular ve Cevaplar");
-define("_ADDQUESTION","Yeni Soru Ekle");
-define("_QUESTION","Soru");
-define("_ANSWER","Cevap");
-define("_EDITCATEGORY","Kategori Düzenle");
-define("_EDITQUESTIONS","Soru ve Cevaplarý Düzenle");
-define("_FAQDELWARNING","UYARI: Bu SSS ve tüm içeriðini silmek istediðinizden emin misiniz?");
-define("_QUESTIONDEL","UYARI: Bu soruyu silmek istediðinizden emin misiniz?");
-define("_LANGUAGE","Dil");
-
-
-?>
+define("_FUNCTIONS", "Fonksiyonlar");
+define("_YES", "Evet");
+define("_NO", "Hayï¿½r");
+define("_SAVE", "Kaydet");
+define("_ID", "ID");
+define("_CATEGORIES", "Kategori");
+define("_ALL", "Tï¿½mï¿½");
+define("_FAQ", "SSS");
+define("_CONTENT", "ï¿½ï¿½erik");
+define("_FAQADMIN", "SSS Yï¿½netimi");
+define("_ACTIVEFAQS", "Aktif SSS'ler");
+define("_ADDCATEGORY", "Yeni Kategori Ekle");
+define("_QUESTIONS", "Sorular ve Cevaplar");
+define("_ADDQUESTION", "Yeni Soru Ekle");
+define("_QUESTION", "Soru");
+define("_ANSWER", "Cevap");
+define("_EDITCATEGORY", "Kategori Dï¿½zenle");
+define("_EDITQUESTIONS", "Soru ve Cevaplarï¿½ Dï¿½zenle");
+define("_FAQDELWARNING", "UYARI: Bu SSS ve tï¿½m iï¿½eriï¿½ini silmek istediï¿½inizden emin misiniz?");
+define("_QUESTIONDEL", "UYARI: Bu soruyu silmek istediï¿½inizden emin misiniz?");
+define("_LANGUAGE", "Dil");

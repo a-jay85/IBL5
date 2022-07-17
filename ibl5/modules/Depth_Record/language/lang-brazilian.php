@@ -21,18 +21,16 @@
 /* Comments/suggestions: aleagi@terra.com.br - aleagi@phpnuke.org.br      */
 /**************************************************************************/
 
-define("_PREVIOUS","Página anterior");
-define("_NEXT","Próxima página");
-define("_PAGE","Página(s)");
-define("_DEACTIVATE","Desativar");
-define("_ACTIVATE","Ativar");
-define("_PUBLISHEDON","Publicado em");
-define("_PAGESLIST","Lista de páginas");
-define("_LISTOFCONTENT","Lista de conteúdo disponível em");
-define("_YOURADMINLIST","Olá Administrador. A seguir, uma lista de páginas intivas:");
-define("_COPYRIGHT","Copyright &copy; por");
-define("_COPYRIGHT2","Todos os direitos reservados.");
-define("_CONTENTCATEGORIES","Categorias de conteúdo disponíveis");
-define("_NONCLASSCONT","Conteúdo não-categorizado");
-
-?>
+define("_PREVIOUS", "Pï¿½gina anterior");
+define("_NEXT", "Prï¿½xima pï¿½gina");
+define("_PAGE", "Pï¿½gina(s)");
+define("_DEACTIVATE", "Desativar");
+define("_ACTIVATE", "Ativar");
+define("_PUBLISHEDON", "Publicado em");
+define("_PAGESLIST", "Lista de pï¿½ginas");
+define("_LISTOFCONTENT", "Lista de conteï¿½do disponï¿½vel em");
+define("_YOURADMINLIST", "Olï¿½ Administrador. A seguir, uma lista de pï¿½ginas intivas:");
+define("_COPYRIGHT", "Copyright &copy; por");
+define("_COPYRIGHT2", "Todos os direitos reservados.");
+define("_CONTENTCATEGORIES", "Categorias de conteï¿½do disponï¿½veis");
+define("_NONCLASSCONT", "Conteï¿½do nï¿½o-categorizado");

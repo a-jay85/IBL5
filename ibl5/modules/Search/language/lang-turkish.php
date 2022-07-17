@@ -4,62 +4,60 @@
 /* PHP-NUKE: Advanced Content Management System                           */
 /* ============================================                           */
 /*                                                                        */
-/* Php-Nuke'nin sürekli geliþmesine baðlý olarak eski Türkçe dil dosyalarý*/
-/* güncelliðini yitirdiði için "HighLAndeR" tarafýndan "MaXCoDeR"in       */
-/* yapmýþ olduðu çeviriler güncelleþtirilip yeni çeviriler eklenmiþtir... */
+/* Php-Nuke'nin sï¿½rekli geliï¿½mesine baï¿½lï¿½ olarak eski Tï¿½rkï¿½e dil dosyalarï¿½*/
+/* gï¿½ncelliï¿½ini yitirdiï¿½i iï¿½in "HighLAndeR" tarafï¿½ndan "MaXCoDeR"in       */
+/* yapmï¿½ï¿½ olduï¿½u ï¿½eviriler gï¿½ncelleï¿½tirilip yeni ï¿½eviriler eklenmiï¿½tir... */
 /*                                                                        */
-/* NOT: Yardýmlarý için Gurol400(gurol400@propc.org)'e teþekkürler.       */
+/* NOT: Yardï¿½mlarï¿½ iï¿½in Gurol400(gurol400@propc.org)'e teï¿½ekkï¿½rler.       */
 /*                                                                        */
-/* Türkçe Çevirmeni: HighLAndeR                                           */
-/* Email: highlander@propc.org ICQ#: 110930777 	URL: http://www.propc.org */
+/* Tï¿½rkï¿½e ï¿½evirmeni: HighLAndeR                                           */
+/* Email: highlander@propc.org ICQ#: 110930777     URL: http://www.propc.org */
 /*                                                                        */
-/* Türkçe Çevirmeni: Selim "MaXCoDeR" Þumlu                               */
+/* Tï¿½rkï¿½e ï¿½evirmeni: Selim "MaXCoDeR" ï¿½umlu                               */
 /* Mail:webmaster@pcnet.com.tr ICQ:19648424 URL: http://www.turknuke.com  */
 /**************************************************************************/
 
-define("_ALLTOPICS","Tüm Konular");
-define("_NOCOMMENTS","Yorum Yok");
-define("_UCOMMENT","Yorum");
-define("_REVIEWS","Ýzlenimler");
-define("_SEARCHUSERS","Kullanýcý Veritabanýnda Ara");
-define("_SEARCHSECTIONS","Özel Bölümlerde Ara");
-define("_SEARCHREVIEWS","Ýzlenimlerde Ara");
-define("_SEARCHIN","Ara:");
-define("_ARTICLES","Haber");
-define("_ALLAUTHORS","Tüm Yazarlar");
-define("_ALL","Tümü");
-define("_WEEK","hafta");
-define("_WEEKS","hafta");
-define("_MONTH","ay");
-define("_MONTHS","ay");
-define("_SEARCHON","Ara:");
-define("_SSTORIES","Haber");
-define("_SSECTIONS","Bölümler");
-define("_SUSERS","Kullanýcýlar");
-define("_NOMATCHES","Uygun sonuç bulunamadý");
-define("_PREVMATCHES","önceki sonuçlar");
-define("_NEXTMATCHES","sonraki sonuçlar");
-define("_INSECTION","Makale Bulunuyor");
-define("_NONAME","Ýsim girilmemiþ");
-define("_SCOMMENTS","Yorum");
-define("_SEARCHRESULTS","Arama Sonuçlarý");
-define("_CONTRIBUTEDBY","Katkýda bulunan");
-define("_UCOMMENTS","Yorum");
-define("_MATCHTITLE","Baþlýk");
-define("_MATCHTEXT","Haber Metni");
-define("_MATCHBOTH","Baþlýk ve Haber Metni");
-define("_SREPLY","Cevap");
-define("_SREPLIES","Cevap");
-define("_ATTACHART","Habere Eklenmiþ");
-define("_PAGES","Sayfa");
-define("_REVIEWSCORE","Ýzlenim Puaný");
-define("_PAGE","Sayfa");
-define("_DOWNLOADS","Dosyalar");
-define("_WEBLINKS","Web Baðlantýlarý");
-define("_FINDMORE","... devamý");
-define("_DIDNOTFIND","Aradýðýnýzý bulamadýnýz mý?");
-define("_ENCYCLOPEDIA","Ansikloðedi");
-define("_SEARCHINSTORY","Bu haberdeki tüm yorumlarý ara:");
-define("_SEARCHCHARACTERS","<center><b>Search System Error</b><br><br>Your query should be at least 3 characters long to be processed.<br>Please, fix the problem and try again...</center>");
-
-?>
+define("_ALLTOPICS", "Tï¿½m Konular");
+define("_NOCOMMENTS", "Yorum Yok");
+define("_UCOMMENT", "Yorum");
+define("_REVIEWS", "ï¿½zlenimler");
+define("_SEARCHUSERS", "Kullanï¿½cï¿½ Veritabanï¿½nda Ara");
+define("_SEARCHSECTIONS", "ï¿½zel Bï¿½lï¿½mlerde Ara");
+define("_SEARCHREVIEWS", "ï¿½zlenimlerde Ara");
+define("_SEARCHIN", "Ara:");
+define("_ARTICLES", "Haber");
+define("_ALLAUTHORS", "Tï¿½m Yazarlar");
+define("_ALL", "Tï¿½mï¿½");
+define("_WEEK", "hafta");
+define("_WEEKS", "hafta");
+define("_MONTH", "ay");
+define("_MONTHS", "ay");
+define("_SEARCHON", "Ara:");
+define("_SSTORIES", "Haber");
+define("_SSECTIONS", "Bï¿½lï¿½mler");
+define("_SUSERS", "Kullanï¿½cï¿½lar");
+define("_NOMATCHES", "Uygun sonuï¿½ bulunamadï¿½");
+define("_PREVMATCHES", "ï¿½nceki sonuï¿½lar");
+define("_NEXTMATCHES", "sonraki sonuï¿½lar");
+define("_INSECTION", "Makale Bulunuyor");
+define("_NONAME", "ï¿½sim girilmemiï¿½");
+define("_SCOMMENTS", "Yorum");
+define("_SEARCHRESULTS", "Arama Sonuï¿½larï¿½");
+define("_CONTRIBUTEDBY", "Katkï¿½da bulunan");
+define("_UCOMMENTS", "Yorum");
+define("_MATCHTITLE", "Baï¿½lï¿½k");
+define("_MATCHTEXT", "Haber Metni");
+define("_MATCHBOTH", "Baï¿½lï¿½k ve Haber Metni");
+define("_SREPLY", "Cevap");
+define("_SREPLIES", "Cevap");
+define("_ATTACHART", "Habere Eklenmiï¿½");
+define("_PAGES", "Sayfa");
+define("_REVIEWSCORE", "ï¿½zlenim Puanï¿½");
+define("_PAGE", "Sayfa");
+define("_DOWNLOADS", "Dosyalar");
+define("_WEBLINKS", "Web Baï¿½lantï¿½larï¿½");
+define("_FINDMORE", "... devamï¿½");
+define("_DIDNOTFIND", "Aradï¿½ï¿½ï¿½nï¿½zï¿½ bulamadï¿½nï¿½z mï¿½?");
+define("_ENCYCLOPEDIA", "Ansikloï¿½edi");
+define("_SEARCHINSTORY", "Bu haberdeki tï¿½m yorumlarï¿½ ara:");
+define("_SEARCHCHARACTERS", "<center><b>Search System Error</b><br><br>Your query should be at least 3 characters long to be processed.<br>Please, fix the problem and try again...</center>");

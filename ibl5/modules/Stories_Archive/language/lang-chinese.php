@@ -17,34 +17,29 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PRINTER","¤Íµ½¦C¦L®æ¦¡");
-define("_FRIEND","±Hµ¹ªB¤Í");
+define("_PRINTER", "ï¿½Íµï¿½ï¿½Cï¿½Lï¿½æ¦¡");
+define("_FRIEND", "ï¿½Hï¿½ï¿½ï¿½Bï¿½ï¿½");
 
-
-
-define("_ARTICLES","¤å³¹");
-define("_USCORE","¤À¼Æ");
-define("_DATE","¤é´Á");
-define("_JANUARY","¤@¤ë");
-define("_FEBRUARY","¤G¤ë");
-define("_MARCH","¤T¤ë");
-define("_APRIL","¥|¤ë");
-define("_MAY","¤­¤ë");
-define("_JUNE","¤»¤ë");
-define("_JULY","¤C¤ë");
-define("_AUGUST","¤K¤ë");
-define("_SEPTEMBER","¤E¤ë");
-define("_OCTOBER","¤Q¤ë");
-define("_NOVEMBER","¤Q¤@¤ë");
-define("_DECEMBER","¤Q¤G¤ë");
-define("_SELECTMONTH2VIEW","½Ð¿ï¾Ü±z­n¬Ýªº¤ë¥÷:");
-define("_SHOWALLSTORIES","Åã¥Ü©Ò¦³ªº¤å³¹");
-define("_STORIESARCHIVE","¤å³¹¸ê®Æ®w");
-define("_ACTIONS","¦æ°Ê");
-define("_ARCHIVESINDEX","¤å³¹¸ê®Æ®w¯Á¤Þ");
-define("_ALLSTORIESARCH","©Ò¦³¤å³¹");
-define("_NEXTPAGE","¤U¤@­¶");
-define("_PREVIOUSPAGE","¤W¤@­¶");
-
-
-?>
+define("_ARTICLES", "ï¿½å³¹");
+define("_USCORE", "ï¿½ï¿½ï¿½ï¿½");
+define("_DATE", "ï¿½ï¿½ï¿½");
+define("_JANUARY", "ï¿½@ï¿½ï¿½");
+define("_FEBRUARY", "ï¿½Gï¿½ï¿½");
+define("_MARCH", "ï¿½Tï¿½ï¿½");
+define("_APRIL", "ï¿½|ï¿½ï¿½");
+define("_MAY", "ï¿½ï¿½ï¿½ï¿½");
+define("_JUNE", "ï¿½ï¿½ï¿½ï¿½");
+define("_JULY", "ï¿½Cï¿½ï¿½");
+define("_AUGUST", "ï¿½Kï¿½ï¿½");
+define("_SEPTEMBER", "ï¿½Eï¿½ï¿½");
+define("_OCTOBER", "ï¿½Qï¿½ï¿½");
+define("_NOVEMBER", "ï¿½Qï¿½@ï¿½ï¿½");
+define("_DECEMBER", "ï¿½Qï¿½Gï¿½ï¿½");
+define("_SELECTMONTH2VIEW", "ï¿½Ð¿ï¿½Ü±zï¿½nï¿½Ýªï¿½ï¿½ï¿½ï¿½:");
+define("_SHOWALLSTORIES", "ï¿½ï¿½Ü©Ò¦ï¿½ï¿½ï¿½ï¿½å³¹");
+define("_STORIESARCHIVE", "ï¿½å³¹ï¿½ï¿½Æ®w");
+define("_ACTIONS", "ï¿½ï¿½ï¿½");
+define("_ARCHIVESINDEX", "ï¿½å³¹ï¿½ï¿½Æ®wï¿½ï¿½ï¿½ï¿½");
+define("_ALLSTORIESARCH", "ï¿½Ò¦ï¿½ï¿½å³¹");
+define("_NEXTPAGE", "ï¿½Uï¿½@ï¿½ï¿½");
+define("_PREVIOUSPAGE", "ï¿½Wï¿½@ï¿½ï¿½");

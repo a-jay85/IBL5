@@ -17,18 +17,16 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PRINTER","Printer Friendly Page");
-define("_FRIEND","Send this Story to a Friend");
-define("_ARTICLES","Articles");
-define("_USCORE","Score");
-define("_DATE","Date");
-define("_SELECTMONTH2VIEW","Please select the month you want to see:");
-define("_SHOWALLSTORIES","Show ALL Stories");
-define("_STORIESARCHIVE","Stories Archive");
-define("_ACTIONS","Actions");
-define("_ARCHIVESINDEX","Stories Archive Index");
-define("_ALLSTORIESARCH","All Stories");
-define("_NEXTPAGE","Next Page");
-define("_PREVIOUSPAGE","Previous Page");
-
-?>
+define("_PRINTER", "Printer Friendly Page");
+define("_FRIEND", "Send this Story to a Friend");
+define("_ARTICLES", "Articles");
+define("_USCORE", "Score");
+define("_DATE", "Date");
+define("_SELECTMONTH2VIEW", "Please select the month you want to see:");
+define("_SHOWALLSTORIES", "Show ALL Stories");
+define("_STORIESARCHIVE", "Stories Archive");
+define("_ACTIONS", "Actions");
+define("_ARCHIVESINDEX", "Stories Archive Index");
+define("_ALLSTORIESARCH", "All Stories");
+define("_NEXTPAGE", "Next Page");
+define("_PREVIOUSPAGE", "Previous Page");

@@ -17,41 +17,37 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_SEND","ÃÑÓá");
-define("_FUNCTIONS","ÇáÏæÇá");
-define("_YES","äÚã");
-define("_NO","áÇ");
-define("_SAVECHANGES","ÍÝÙ ÇáÊÛííÑÇÊ");
-define("_PAGEBREAK","ÇÐÇ ÃÑÏÊ ÕÝÍÇÊ ãÊÚÏÏÉ ÝÅäß ÊÓÊØíÚ Ãä ÊßÊÈ  <b>[--pagebreak--]</b> Ýí ãßÇä ÇáÝÕá.");
-define("_DESCRIPTION","ÇáæÕÝ");
-define("_TO","Çáì");
-define("_TITLE","ÇáÚäæÇä");
-define("_ACTIVE","äÔíØ");
-define("_DEACTIVATE","ÊÚØíá");
-define("_INACTIVE","ãÚØá");
-define("_ACTIVATE","ÊäÔíØ");
-define("_ADD","ÃÖÝ");
-define("_LANGUAGE","ÇááÛÉ");
-define("_ENCYCLOPEDIA","ÇáãæÓæÚÇÊ");
-define("_ENCYCLOPEDIAMANAGER","ÇáÊÍßã Ýí ÇáãæÓæÚÉ");
-define("_DELENCYCLOPEDIA","ÇÍÐÝ ÇáãæÓæÚÉ");
-define("_DELENCYCONTWARNING","åá ÃäÊ ãÊÃßøÏ Ãäøß ÊÑíÏ Ãä ÊÍÐÝ åÐå ÇáãæÓæÚÉ æ ßáø ãÍÊæÇåÇ ?");
-define("_DELENCYCLOPEDIATEXT","ÍÐÝ ãÕØáÍÇÊ ÇáãæÓæÚÉ");
-define("_DELENCYTEXTWARNING","åá ÃäÊ ãÊÃßøÏ Ãäøß ÊÑíÏ Ãä ÊÍÐÝ åÐÇ ÇáãÕØáÍ ?");
-define("_CURRENTSTATUS","ÇáæÖÚ ÇáÍÇáí");
-define("_ACTIVATEPAGE","ÊäÔíØ åÐå ÇáÕÝÍÉ¿");
-define("_TERMS","ÇáãÕØáÍÇÊ");
-define("_ADDNEWENCYCLOPEDIA","ÃÖÝ ãæÓæÚÉ ÌÏíÏÉ");
-define("_ADDNEWENCYTERM","ÃÖÝ ãÕØáÍ ááãæÓæÚÉ");
-define("_TERMTEXT","äÕ ÇáãÕØáÍ");
-define("_MOVETERMS","äÞá ÇáãÕØáÍÇÊ");
-define("_MOVEALLTERMSFROM","äÞá ßáø ÇáãÕØáÍÇÊ ãä");
-define("_EDITENCYCLOPEDIA","ÊÚÏíá ÇáãæÓæÚÉ");
-define("_ENCYTERMSEDIT","ÊäÞíÍ ãÕØáÍÇÊ ÇáãæÓæÚÉ");
-define("_SELECTONETERM","ãä ÝÖáß ÇÎÊÑ ãÕØáÍ æÇÍÏ ãä ÇáÞÇÆãÉ ÇáÊøÇáíÉ:");
-define("_NOCONTENTFORLETTER","ÚÝæÇ¡ áÇ íæÌÏ ãÍÊæíÇÊ ááÑÓÇáÉ");
-define("_CHANGETOENCY","ÊÛíøÑ Åáì ÇáãæÓæÚÉ");
-
-
-?>
+define("_SEND", "ï¿½ï¿½ï¿½ï¿½");
+define("_FUNCTIONS", "ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_YES", "ï¿½ï¿½ï¿½");
+define("_NO", "ï¿½ï¿½");
+define("_SAVECHANGES", "ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_PAGEBREAK", "ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½  <b>[--pagebreak--]</b> ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½.");
+define("_DESCRIPTION", "ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_TO", "ï¿½ï¿½ï¿½");
+define("_TITLE", "ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_ACTIVE", "ï¿½ï¿½ï¿½ï¿½");
+define("_DEACTIVATE", "ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_INACTIVE", "ï¿½ï¿½ï¿½ï¿½");
+define("_ACTIVATE", "ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_ADD", "ï¿½ï¿½ï¿½");
+define("_LANGUAGE", "ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_ENCYCLOPEDIA", "ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_ENCYCLOPEDIAMANAGER", "ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_DELENCYCLOPEDIA", "ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_DELENCYCONTWARNING", "ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ?");
+define("_DELENCYCLOPEDIATEXT", "ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_DELENCYTEXTWARNING", "ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ?");
+define("_CURRENTSTATUS", "ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_ACTIVATEPAGE", "ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½É¿");
+define("_TERMS", "ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_ADDNEWENCYCLOPEDIA", "ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_ADDNEWENCYTERM", "ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_TERMTEXT", "ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_MOVETERMS", "ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_MOVEALLTERMSFROM", "ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½");
+define("_EDITENCYCLOPEDIA", "ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_ENCYTERMSEDIT", "ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_SELECTONETERM", "ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½:");
+define("_NOCONTENTFORLETTER", "ï¿½ï¿½ï¿½Ç¡ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_CHANGETOENCY", "ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");

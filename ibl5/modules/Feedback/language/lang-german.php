@@ -17,19 +17,17 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_SEND","Senden");
-define("_YOURNAME","Ihr Name");
-define("_MESSAGE","Nachricht");
-define("_YOUREMAIL","Ihre eMailadresse");
-define("_FEEDBACKNOTE","Alle Kommentare und Vorschl&auml;ge &uuml;ber diese  Webseite sind willkommen und helfen uns, unser Angebot noch zu verbessern. Danke!");
-define("_FEEDBACKTITLE","Feedback Formular");
-define("_FEEDBACK","Feedback");
-define("_FBENTERNAME","Fehler: Bitte geben Sie ihren Namen ein!");
-define("_FBENTEREMAIL","Fehler: Bitte geben Sie ihre eMailadresse ein!");
-define("_FBENTERMESSAGE","Fehler: Bitte geben Sie eine Nachricht ein!");
-define("_SENDEREMAIL","eMail des Absenders");
-define("_SENDERNAME","Name des Absenders");
-define("_FBMAILSENT","eMail wurde versendet!");
-define("_FBTHANKSFORCONTACT","Danke, dass Sie uns kontaktierten.");
-
-?>
+define("_SEND", "Senden");
+define("_YOURNAME", "Ihr Name");
+define("_MESSAGE", "Nachricht");
+define("_YOUREMAIL", "Ihre eMailadresse");
+define("_FEEDBACKNOTE", "Alle Kommentare und Vorschl&auml;ge &uuml;ber diese  Webseite sind willkommen und helfen uns, unser Angebot noch zu verbessern. Danke!");
+define("_FEEDBACKTITLE", "Feedback Formular");
+define("_FEEDBACK", "Feedback");
+define("_FBENTERNAME", "Fehler: Bitte geben Sie ihren Namen ein!");
+define("_FBENTEREMAIL", "Fehler: Bitte geben Sie ihre eMailadresse ein!");
+define("_FBENTERMESSAGE", "Fehler: Bitte geben Sie eine Nachricht ein!");
+define("_SENDEREMAIL", "eMail des Absenders");
+define("_SENDERNAME", "Name des Absenders");
+define("_FBMAILSENT", "eMail wurde versendet!");
+define("_FBTHANKSFORCONTACT", "Danke, dass Sie uns kontaktierten.");

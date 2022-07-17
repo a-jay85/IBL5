@@ -2,10 +2,10 @@
 
 /*************************************************************************/
 /* The Slovak language file for module Content                      */
-/* Author: AlRashid 			 Date: 09.09.2002   					 */
+/* Author: AlRashid              Date: 09.09.2002                        */
 /* alrashid@klokan.sk, http://alrashid.klokan.sk                         */
-/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk			     */
-/*  		Dakujem                                                      */
+/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk                 */
+/*          Dakujem                                                      */
 /*************************************************************************/
 /**************************************************************************/
 /* PHP-NUKE: Advanced Content Management System                           */
@@ -24,25 +24,23 @@
 /* And, if you use HTML code, please double check it.                     */
 /*************************************************************************/
 /* The Slovak language file for module Content                      */
-/* Author: AlRashid 			 Date: 09.09.2002   					 */
+/* Author: AlRashid              Date: 09.09.2002                        */
 /* alrashid@klokan.sk, http://alrashid.klokan.sk                         */
-/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk			     */
-/*  		Dakujem                                                      */
+/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk                 */
+/*          Dakujem                                                      */
 /*************************************************************************/
 /**************************************************************************/
 
-define("_PREVIOUS","Predchádzajúca strana");
-define("_NEXT","Nasledujúca strana");
-define("_PAGE","Strana");
-define("_DEACTIVATE","Deaktivova");
-define("_ACTIVATE","Aktivova");
-define("_PUBLISHEDON","Publikované ");
-define("_PAGESLIST","Zoznam stránok");
-define("_LISTOFCONTENT","Dostupný obsah v ");
-define("_YOURADMINLIST","Ste Administrátor. Nasleduje zoznam neaktivovaných stránok");
-define("_COPYRIGHT","Copyleft:$sitename.");
-define("_COPYRIGHT2","Všetky práva vyhradené");
-define("_CONTENTCATEGORIES","Dostupné kategórie");
-define("_NONCLASSCONT","Nekategorizovaný obsah");
-
-?>
+define("_PREVIOUS", "Predchï¿½dzajï¿½ca strana");
+define("_NEXT", "Nasledujï¿½ca strana");
+define("_PAGE", "Strana");
+define("_DEACTIVATE", "Deaktivovaï¿½");
+define("_ACTIVATE", "Aktivovaï¿½");
+define("_PUBLISHEDON", "Publikovanï¿½ ");
+define("_PAGESLIST", "Zoznam strï¿½nok");
+define("_LISTOFCONTENT", "Dostupnï¿½ obsah v ");
+define("_YOURADMINLIST", "Ste Administrï¿½tor. Nasleduje zoznam neaktivovanï¿½ch strï¿½nok");
+define("_COPYRIGHT", "Copyleft:$sitename.");
+define("_COPYRIGHT2", "Vï¿½etky prï¿½va vyhradenï¿½");
+define("_CONTENTCATEGORIES", "Dostupnï¿½ kategï¿½rie");
+define("_NONCLASSCONT", "Nekategorizovanï¿½ obsah");

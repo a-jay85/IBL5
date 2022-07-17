@@ -16,62 +16,60 @@
 /* so your entry will look like: This is \"double quoted\" text.          */
 /* And, if you use HTML code, please double check it.                     */
 /*                                                                        */
-/* Polish translation by Nordavind®(Bolo) (http://forum.phpnuke.org.pl)   */
+/* Polish translation by Nordavindï¿½(Bolo) (http://forum.phpnuke.org.pl)   */
 /*                                                                        */
 /**************************************************************************/
 
-define("_YOURNAME","Twoje imiê i nazwisko");
-define("_OK","OK!");
-define("_COMMENT","komentarz");
-define("_CONFIGURE","Konfiguracja");
-define("_LOGINCREATE","Logowanie/Za³o¿enie konta");
-define("_THRESHOLD","Próg");
-define("_NOCOMMENTS","Bez komentarza");
-define("_NESTED","Zagnie¿d¿ony");
-define("_FLAT","P³aski");
-define("_THREAD","W±tek");
-define("_OLDEST","Starsze jako pierwsze");
-define("_NEWEST","Nowsze jako pierwsze");
-define("_HIGHEST","Najpierw najwy¿ej oceniane");
-define("_COMMENTSWARNING","Komentarze s± w³asno¶ci± ich twórców. Nie ponosimy odpowiedzialno¶ci za ich tre¶æ.");
-define("_SCORE","Wynik:");
-define("_USERINFO","Informacje o u¿ytkowniku");
-define("_READREST","Przeczytaj dalszy ci±g komentarza...");
-define("_REPLY","Odpowiedz na to");
-define("_REPLYMAIN","Napisz komentarz");
-define("_NOSUBJECT","Bez tematu");
-define("_NOANONCOMMENTS","Komentowanie niedozwolone dla anonimowego u¿ytkownika, proszê siê <a href=\"modules.php?name=Your_Account&amp;op=new_user&amp;op=new_user\">zarejestrowaæ</a>");
-define("_PARENT","Nadrzêdny");
-define("_ROOT","G³ówny");
-define("_UCOMMENT","Komentarz");
-define("_ALLOWEDHTML","Dozwolony HTML:");
-define("_POSTANON","Wy¶lij anonimowo");
-define("_EXTRANS","Zamiana (tagi HTML na tekst)");
-define("_HTMLFORMATED","Formatowanie HTML");
-define("_PLAINTEXT","Zwyk³y tekst bez formatowania");
-define("_ONN","na...");
-define("_SUBJECT","Temat");
-define("_SURVEYCOM","Wy¶lij komentarz");
-define("_SURVEYCOMPRE","Przejrzyj komentarz");
-define("_NOTRIGHT","Co¶ jest nie tak ze zmienn± w tej funkcji. Ta wiadomo¶æ ma w³a¶nie ustrzec Ciê od b³êdów");
-define("_DIRECTCOM","Bezpo¶redni przegl±d komentarza...");
-define("_SENDAMSG","Wy¶lij wiadomo¶æ");
-define("_PASTSURVEYS","Poprzednie ankiety");
-define("_LVOTES","G³osów");
-define("_TOTALVOTES","Razem g³osów:");
-define("_VOTING","Skrytka do g³osowania");
-define("_OTHERPOLLS","Inne ankiety");
-define("_CURRENTSURVEY","Bie¿±ce g³osowanie");
-define("_CURRENTPOLLRESULTS","Aktualny rezultat g³osowania");
-define("_PREVIEW","Podgl±d");
-define("_REFRESH","Od¶wie¿");
-define("_SURVEYS","Ankiety");
-define("_ATTACHEDTOARTICLE","- dodana do artyku³u:");
-define("_SURVEYSATTACHED","Ankiety dodane do artyku³ów");
+define("_YOURNAME", "Twoje imiï¿½ i nazwisko");
+define("_OK", "OK!");
+define("_COMMENT", "komentarz");
+define("_CONFIGURE", "Konfiguracja");
+define("_LOGINCREATE", "Logowanie/Zaï¿½oï¿½enie konta");
+define("_THRESHOLD", "Prï¿½g");
+define("_NOCOMMENTS", "Bez komentarza");
+define("_NESTED", "Zagnieï¿½dï¿½ony");
+define("_FLAT", "Pï¿½aski");
+define("_THREAD", "Wï¿½tek");
+define("_OLDEST", "Starsze jako pierwsze");
+define("_NEWEST", "Nowsze jako pierwsze");
+define("_HIGHEST", "Najpierw najwyï¿½ej oceniane");
+define("_COMMENTSWARNING", "Komentarze sï¿½ wï¿½asnoï¿½ciï¿½ ich twï¿½rcï¿½w. Nie ponosimy odpowiedzialnoï¿½ci za ich treï¿½ï¿½.");
+define("_SCORE", "Wynik:");
+define("_USERINFO", "Informacje o uï¿½ytkowniku");
+define("_READREST", "Przeczytaj dalszy ciï¿½g komentarza...");
+define("_REPLY", "Odpowiedz na to");
+define("_REPLYMAIN", "Napisz komentarz");
+define("_NOSUBJECT", "Bez tematu");
+define("_NOANONCOMMENTS", "Komentowanie niedozwolone dla anonimowego uï¿½ytkownika, proszï¿½ siï¿½ <a href=\"modules.php?name=Your_Account&amp;op=new_user&amp;op=new_user\">zarejestrowaï¿½</a>");
+define("_PARENT", "Nadrzï¿½dny");
+define("_ROOT", "Gï¿½ï¿½wny");
+define("_UCOMMENT", "Komentarz");
+define("_ALLOWEDHTML", "Dozwolony HTML:");
+define("_POSTANON", "Wyï¿½lij anonimowo");
+define("_EXTRANS", "Zamiana (tagi HTML na tekst)");
+define("_HTMLFORMATED", "Formatowanie HTML");
+define("_PLAINTEXT", "Zwykï¿½y tekst bez formatowania");
+define("_ONN", "na...");
+define("_SUBJECT", "Temat");
+define("_SURVEYCOM", "Wyï¿½lij komentarz");
+define("_SURVEYCOMPRE", "Przejrzyj komentarz");
+define("_NOTRIGHT", "Coï¿½ jest nie tak ze zmiennï¿½ w tej funkcji. Ta wiadomoï¿½ï¿½ ma wï¿½aï¿½nie ustrzec Ciï¿½ od bï¿½ï¿½dï¿½w");
+define("_DIRECTCOM", "Bezpoï¿½redni przeglï¿½d komentarza...");
+define("_SENDAMSG", "Wyï¿½lij wiadomoï¿½ï¿½");
+define("_PASTSURVEYS", "Poprzednie ankiety");
+define("_LVOTES", "Gï¿½osï¿½w");
+define("_TOTALVOTES", "Razem gï¿½osï¿½w:");
+define("_VOTING", "Skrytka do gï¿½osowania");
+define("_OTHERPOLLS", "Inne ankiety");
+define("_CURRENTSURVEY", "Bieï¿½ï¿½ce gï¿½osowanie");
+define("_CURRENTPOLLRESULTS", "Aktualny rezultat gï¿½osowania");
+define("_PREVIEW", "Podglï¿½d");
+define("_REFRESH", "Odï¿½wieï¿½");
+define("_SURVEYS", "Ankiety");
+define("_ATTACHEDTOARTICLE", "- dodana do artykuï¿½u:");
+define("_SURVEYSATTACHED", "Ankiety dodane do artykuï¿½ï¿½w");
 define("_LAST5POLLS", "Najnowsze 5 ankiet na");
-define("_MOREPOLLS", "...wiêcej ankiet");
-define("_COMMENTSMODERATION","Comments Moderation System");
-define("_MODERATE","Moderate");
-define("_CLICKTOMODERATE","Please select your moderation values for each comment on this survey, then click on <i>Moderate</i> button bellow to save your comments moderation preferences. Be fair on each value, this will contribute and benefict all users/readers. Thank you.");
-
-?>
+define("_MOREPOLLS", "...wiï¿½cej ankiet");
+define("_COMMENTSMODERATION", "Comments Moderation System");
+define("_MODERATE", "Moderate");
+define("_CLICKTOMODERATE", "Please select your moderation values for each comment on this survey, then click on <i>Moderate</i> button bellow to save your comments moderation preferences. Be fair on each value, this will contribute and benefict all users/readers. Thank you.");

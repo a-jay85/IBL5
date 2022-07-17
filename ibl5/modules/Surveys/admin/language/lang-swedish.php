@@ -17,37 +17,33 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_YES","Ja");
-define("_NO","Nej");
-define("_CATEGORY","Kategori");
-define("_SAVECHANGES","Spara Ändringar");
-define("_ARTICLES","Artiklarna");
-define("_SELECTTOPIC","Välj Ämne");
-define("_OPTION","Valfritt");
-define("_ADMPOLLS","Undersökningar/Omröstningar");
-define("_TITLE","Titel");
-define("_STORYTEXT","Ingress");
-define("_EXTENDEDTEXT","Brödtext");
-define("_PUBLISHINHOME","Publicera på Förstasidan?");
-define("_ONLYIFCATSELECTED","Fungerar bara om <i>Articles</i> kategorin inte är vald");
-define("_ADD","Addera");
-define("_POLLSADMIN","Undersökningar/Omröstningar Administration");
-define("_CREATEPOLL","Skapa en ny undersökning");
-define("_DELETEPOLLS","Radera undersökningar");
-define("_POLLTITLE","Undersökningstitel");
-define("_POLLEACHFIELD","Ange varje valmöjlighet på en egen rad");
-define("_CREATEPOLLBUT","Skapa Undersökning");
-define("_REMOVEEXISTING","Ta bort en existerande undersökning");
-define("_POLLDELWARNING","VARNING: Den valda undersökningen ta GENAST bort från databasen!");
-define("_CHOOSEPOLL","Välj en undersökning från listan nedan:");
-define("_EDITPOLL","Edit Polls");
-define("_CHOOSEPOLLEDIT","Choose the Poll you want to edit:");
-define("_ACTIVATECOMMENTS","Activate Comments for this Story?");
-define("_LANGUAGE","Language");
-define("_ANNOUNCEPOLL","Announce this new Survey in your site");
-define("_LEAVEBLANK","(Leave blank to create a new survey without announce it)");
-define("_POLLEDIT","Edit Poll:");
-
-
-?>
+define("_YES", "Ja");
+define("_NO", "Nej");
+define("_CATEGORY", "Kategori");
+define("_SAVECHANGES", "Spara ï¿½ndringar");
+define("_ARTICLES", "Artiklarna");
+define("_SELECTTOPIC", "Vï¿½lj ï¿½mne");
+define("_OPTION", "Valfritt");
+define("_ADMPOLLS", "Undersï¿½kningar/Omrï¿½stningar");
+define("_TITLE", "Titel");
+define("_STORYTEXT", "Ingress");
+define("_EXTENDEDTEXT", "Brï¿½dtext");
+define("_PUBLISHINHOME", "Publicera pï¿½ Fï¿½rstasidan?");
+define("_ONLYIFCATSELECTED", "Fungerar bara om <i>Articles</i> kategorin inte ï¿½r vald");
+define("_ADD", "Addera");
+define("_POLLSADMIN", "Undersï¿½kningar/Omrï¿½stningar Administration");
+define("_CREATEPOLL", "Skapa en ny undersï¿½kning");
+define("_DELETEPOLLS", "Radera undersï¿½kningar");
+define("_POLLTITLE", "Undersï¿½kningstitel");
+define("_POLLEACHFIELD", "Ange varje valmï¿½jlighet pï¿½ en egen rad");
+define("_CREATEPOLLBUT", "Skapa Undersï¿½kning");
+define("_REMOVEEXISTING", "Ta bort en existerande undersï¿½kning");
+define("_POLLDELWARNING", "VARNING: Den valda undersï¿½kningen ta GENAST bort frï¿½n databasen!");
+define("_CHOOSEPOLL", "Vï¿½lj en undersï¿½kning frï¿½n listan nedan:");
+define("_EDITPOLL", "Edit Polls");
+define("_CHOOSEPOLLEDIT", "Choose the Poll you want to edit:");
+define("_ACTIVATECOMMENTS", "Activate Comments for this Story?");
+define("_LANGUAGE", "Language");
+define("_ANNOUNCEPOLL", "Announce this new Survey in your site");
+define("_LEAVEBLANK", "(Leave blank to create a new survey without announce it)");
+define("_POLLEDIT", "Edit Poll:");

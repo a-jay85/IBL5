@@ -17,41 +17,37 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_SEND","Posla?");
-define("_FUNCTIONS","Funkcie");
-define("_YES","Áno");
-define("_NO","Nie");
-define("_SAVECHANGES","Uloži? zmeny");
-define("_PAGEBREAK","Ak chcete písa? viac strán, môžete napísa? <b>[--pagebreak--]</b> tam, kde chcete text zalomi?.");
-define("_DESCRIPTION","Popis");
-define("_TO","pre");
-define("_TITLE","Názov");
-define("_ACTIVE","Aktívny");
-define("_DEACTIVATE","Deaktivova?");
-define("_INACTIVE","Neaktívny");
-define("_ACTIVATE","Aktivova?");
-define("_ADD","Prida?");
-define("_LANGUAGE","Jazyk");
-define("_ENCYCLOPEDIA","Encyklopédia");
-define("_ENCYCLOPEDIAMANAGER","Manažér Encyklopédie");
-define("_DELENCYCLOPEDIA","Vymaza? Encyklopédiu");
-define("_DELENCYCONTWARNING","Ste si istý, že chete vymaza? túto encyklopédiu so všetkým èo obsahuje");
-define("_DELENCYCLOPEDIATEXT","Vymaza? heslá encyklopédie");
-define("_DELENCYTEXTWARNING","Urèite chcete vymaza? toto heslo?");
-define("_CURRENTSTATUS","Aktuálny stav");
-define("_ACTIVATEPAGE","Aktivova? túto stránku?");
-define("_TERMS","Termíny");
-define("_ADDNEWENCYCLOPEDIA","Prida? novú encyklopédiu");
-define("_ADDNEWENCYTERM","Prida? nový encyklopedický termín");
-define("_TERMTEXT","Vysvetlenie termínu");
-define("_MOVETERMS","Presunút termíny");
-define("_MOVEALLTERMSFROM","Presunú? všetky termíny z");
-define("_EDITENCYCLOPEDIA","Upravi? Encyklopédiu");
-define("_ENCYTERMSEDIT","Upravi? encyklopedické termíny");
-define("_SELECTONETERM","Vyberte jeden termín z nasledujúceho zoznamu:");
-define("_NOCONTENTFORLETTER","Encyklopédia neobsahuje žiadny termín pre zadané písmeno..");
-define("_CHANGETOENCY","Zmeni? do encyklopédie");
-
-
-?>
+define("_SEND", "Posla?");
+define("_FUNCTIONS", "Funkcie");
+define("_YES", "ï¿½no");
+define("_NO", "Nie");
+define("_SAVECHANGES", "Uloï¿½i? zmeny");
+define("_PAGEBREAK", "Ak chcete pï¿½sa? viac strï¿½n, mï¿½ï¿½ete napï¿½sa? <b>[--pagebreak--]</b> tam, kde chcete text zalomi?.");
+define("_DESCRIPTION", "Popis");
+define("_TO", "pre");
+define("_TITLE", "Nï¿½zov");
+define("_ACTIVE", "Aktï¿½vny");
+define("_DEACTIVATE", "Deaktivova?");
+define("_INACTIVE", "Neaktï¿½vny");
+define("_ACTIVATE", "Aktivova?");
+define("_ADD", "Prida?");
+define("_LANGUAGE", "Jazyk");
+define("_ENCYCLOPEDIA", "Encyklopï¿½dia");
+define("_ENCYCLOPEDIAMANAGER", "Manaï¿½ï¿½r Encyklopï¿½die");
+define("_DELENCYCLOPEDIA", "Vymaza? Encyklopï¿½diu");
+define("_DELENCYCONTWARNING", "Ste si istï¿½, ï¿½e chete vymaza? tï¿½to encyklopï¿½diu so vï¿½etkï¿½m ï¿½o obsahuje");
+define("_DELENCYCLOPEDIATEXT", "Vymaza? heslï¿½ encyklopï¿½die");
+define("_DELENCYTEXTWARNING", "Urï¿½ite chcete vymaza? toto heslo?");
+define("_CURRENTSTATUS", "Aktuï¿½lny stav");
+define("_ACTIVATEPAGE", "Aktivova? tï¿½to strï¿½nku?");
+define("_TERMS", "Termï¿½ny");
+define("_ADDNEWENCYCLOPEDIA", "Prida? novï¿½ encyklopï¿½diu");
+define("_ADDNEWENCYTERM", "Prida? novï¿½ encyklopedickï¿½ termï¿½n");
+define("_TERMTEXT", "Vysvetlenie termï¿½nu");
+define("_MOVETERMS", "Presunï¿½t termï¿½ny");
+define("_MOVEALLTERMSFROM", "Presunï¿½? vï¿½etky termï¿½ny z");
+define("_EDITENCYCLOPEDIA", "Upravi? Encyklopï¿½diu");
+define("_ENCYTERMSEDIT", "Upravi? encyklopedickï¿½ termï¿½ny");
+define("_SELECTONETERM", "Vyberte jeden termï¿½n z nasledujï¿½ceho zoznamu:");
+define("_NOCONTENTFORLETTER", "Encyklopï¿½dia neobsahuje ï¿½iadny termï¿½n pre zadanï¿½ pï¿½smeno..");
+define("_CHANGETOENCY", "Zmeni? do encyklopï¿½die");

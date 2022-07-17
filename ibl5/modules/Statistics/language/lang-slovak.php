@@ -2,10 +2,10 @@
 
 /*************************************************************************/
 /* The Slovak language file for module Statistics                      */
-/* Author: AlRashid 			 Date: 09.09.2002   					 */
+/* Author: AlRashid              Date: 09.09.2002                        */
 /* alrashid@klokan.sk, http://alrashid.klokan.sk                         */
-/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk			     */
-/*  		Dakujem                                                      */
+/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk                 */
+/*          Dakujem                                                      */
 /*************************************************************************/
 /**************************************************************************/
 /* PHP-NUKE: Advanced Content Management System                           */
@@ -24,45 +24,43 @@
 /* And, if you use HTML code, please double check it.                     */
 /*************************************************************************/
 /* The Slovak language file for module Statistics                      */
-/* Author: AlRashid 			 Date: 09.09.2002   					 */
+/* Author: AlRashid              Date: 09.09.2002                        */
 /* alrashid@klokan.sk, http://alrashid.klokan.sk                         */
-/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk			     */
-/*  		Dakujem                                                      */
+/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk                 */
+/*          Dakujem                                                      */
 /*************************************************************************/
 /**************************************************************************/
 
-define("_HITS"," krát èítané");
-define("_BROWSERS","Prehliadaèe");
-define("_OPERATINGSYS","Operaèný systém");
-define("_UNKNOWN","Neidentifikované");
-define("_OTHER","Iné / Neznáme");
-define("_MISCSTATS","Všeobecné štatistiky");
-define("_REGUSERS","Registrovaní užívatelia:");
-define("_ACTIVEAUTHORS","Aktívni autori:");
-define("_STORIESPUBLISHED","Publikované èlánky:");
-define("_SACTIVETOPICS","Aktívne hlavné témy:");
-define("_COMMENTSPOSTED","Publikované komentáre:");
-define("_SSPECIALSECT","Iné oblasti:");
-define("_ARTICLESSEC","Èlánky v iných oblastiach:");
-define("_LINKSINLINKS","Odkazy na webstránky:");
-define("_LINKSCAT","Kategóríe odkazov:");
-define("_NEWSWAITING","Èlánky, èakajúce na publikovanie:");
-define("_NUKEVERSION","Verzia PHP-Nuke:");
-define("_SEARCHENGINES","Vyh¾adávacie nástroje");
-define("_BOTS","Robots/Spiders");
-define("_STATS","Statistiky prístupov");
-define("_RETURNBASICSTATS","Spä na základné štatistiky");
-define("_BACKTODETSTATS","Spä na detailné štatistiky");
-define("_BACKTOMAIN","Návrat domov");
-define("_TODAYIS","Dnes je");
-define("_MOSTMONTH","Najnavštevovanejší mesiac");
-define("_MOSTDAY","Najnavštevovanejší deò");
-define("_MOSTHOUR","Najnavštevovanejšia hodina");
-define("_YEARLYSTATS","Roèné štatistiky");
-define("_MONTLYSTATS","Mesaèné štatistiky pre:");
-define("_SPAGESVIEWS","zobrazených stránok");
-define("_DAILYSTATS","Denné štatistiky pre:");
-define("_HOURLYSTATS","Hodinové štatistiky pre:");
-define("_VIEWDETAILED","Zobrazi podrobné štatistiky");
-
-?>
+define("_HITS", " krï¿½t ï¿½ï¿½tanï¿½");
+define("_BROWSERS", "Prehliadaï¿½e");
+define("_OPERATINGSYS", "Operaï¿½nï¿½ systï¿½m");
+define("_UNKNOWN", "Neidentifikovanï¿½");
+define("_OTHER", "Inï¿½ / Neznï¿½me");
+define("_MISCSTATS", "Vï¿½eobecnï¿½ ï¿½tatistiky");
+define("_REGUSERS", "Registrovanï¿½ uï¿½ï¿½vatelia:");
+define("_ACTIVEAUTHORS", "Aktï¿½vni autori:");
+define("_STORIESPUBLISHED", "Publikovanï¿½ ï¿½lï¿½nky:");
+define("_SACTIVETOPICS", "Aktï¿½vne hlavnï¿½ tï¿½my:");
+define("_COMMENTSPOSTED", "Publikovanï¿½ komentï¿½re:");
+define("_SSPECIALSECT", "Inï¿½ oblasti:");
+define("_ARTICLESSEC", "ï¿½lï¿½nky v inï¿½ch oblastiach:");
+define("_LINKSINLINKS", "Odkazy na webstrï¿½nky:");
+define("_LINKSCAT", "Kategï¿½rï¿½e odkazov:");
+define("_NEWSWAITING", "ï¿½lï¿½nky, ï¿½akajï¿½ce na publikovanie:");
+define("_NUKEVERSION", "Verzia PHP-Nuke:");
+define("_SEARCHENGINES", "Vyhï¿½adï¿½vacie nï¿½stroje");
+define("_BOTS", "Robots/Spiders");
+define("_STATS", "Statistiky prï¿½stupov");
+define("_RETURNBASICSTATS", "Spï¿½ na zï¿½kladnï¿½ ï¿½tatistiky");
+define("_BACKTODETSTATS", "Spï¿½ na detailnï¿½ ï¿½tatistiky");
+define("_BACKTOMAIN", "Nï¿½vrat domov");
+define("_TODAYIS", "Dnes je");
+define("_MOSTMONTH", "Najnavï¿½tevovanejï¿½ï¿½ mesiac");
+define("_MOSTDAY", "Najnavï¿½tevovanejï¿½ï¿½ deï¿½");
+define("_MOSTHOUR", "Najnavï¿½tevovanejï¿½ia hodina");
+define("_YEARLYSTATS", "Roï¿½nï¿½ ï¿½tatistiky");
+define("_MONTLYSTATS", "Mesaï¿½nï¿½ ï¿½tatistiky pre:");
+define("_SPAGESVIEWS", "zobrazenï¿½ch strï¿½nok");
+define("_DAILYSTATS", "Dennï¿½ ï¿½tatistiky pre:");
+define("_HOURLYSTATS", "Hodinovï¿½ ï¿½tatistiky pre:");
+define("_VIEWDETAILED", "Zobraziï¿½ podrobnï¿½ ï¿½tatistiky");

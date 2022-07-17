@@ -17,39 +17,35 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_SEND","Enviar");
-define("_FUNCTIONS","Funções");
-define("_YES","sim");
-define("_NO","Não");
-define("_CATEGORY","Categoria");
-define("_SAVECHANGES","Salvar alterações");
-define("_PAGEBREAK","Se o texto que você for excrever for muito grande, divida-o em páginas usando <b>[--pagebreak--]</b> para cada quebra de página.");
-define("_SIGNATURE","Assinatura");
-define("_DESCRIPTION","Descrição");
-define("_TITLE","Título");
-define("_ACTIVE","Ativo");
-define("_DEACTIVATE","Desativar");
-define("_INACTIVE","Inativo");
-define("_ACTIVATE","Ativar");
-define("_CONTENT","Conteúdo");
-define("_ADDCATEGORY","Adicionar uma nova categoria");
-define("_EDITCATEGORY","Editar categoria");
-define("_ADD","Adicionar");
-define("_LANGUAGE","Idioma");
-define("_CONTENTMANAGER","Gerenciados de Conteúdo");
-define("_DELCONTWARNING","Você tem certeza de que quer apagar esta página?");
-define("_DELCONTENT","Apagar página");
-define("_CURRENTSTATUS","Status atual");
-define("_ADDANEWPAGE","Adicionar nova página");
-define("_CSUBTITLE","Subtítulo");
-define("_HEADERTEXT","Texto de Cabeçalho");
-define("_PAGETEXT","Texto da página");
-define("_FOOTERTEXT","Texto do rodapé");
-define("_ACTIVATEPAGE","Ativar esta página?");
-define("_EDITPAGECONTENT","Editar conteúdo da página");
-define("_DELCONTENTCAT","<b>AVISO</b>: Você tem certeza de que quer apagar esta Categoria? As páginas sob esta Categoria, sel existirem, serão removidas, mas não serão anexadas a outra Categoria.");
-define("_DELCATEGORY","Apagar Categoria");
-
-
-?>
+define("_SEND", "Enviar");
+define("_FUNCTIONS", "Funï¿½ï¿½es");
+define("_YES", "sim");
+define("_NO", "Nï¿½o");
+define("_CATEGORY", "Categoria");
+define("_SAVECHANGES", "Salvar alteraï¿½ï¿½es");
+define("_PAGEBREAK", "Se o texto que vocï¿½ for excrever for muito grande, divida-o em pï¿½ginas usando <b>[--pagebreak--]</b> para cada quebra de pï¿½gina.");
+define("_SIGNATURE", "Assinatura");
+define("_DESCRIPTION", "Descriï¿½ï¿½o");
+define("_TITLE", "Tï¿½tulo");
+define("_ACTIVE", "Ativo");
+define("_DEACTIVATE", "Desativar");
+define("_INACTIVE", "Inativo");
+define("_ACTIVATE", "Ativar");
+define("_CONTENT", "Conteï¿½do");
+define("_ADDCATEGORY", "Adicionar uma nova categoria");
+define("_EDITCATEGORY", "Editar categoria");
+define("_ADD", "Adicionar");
+define("_LANGUAGE", "Idioma");
+define("_CONTENTMANAGER", "Gerenciados de Conteï¿½do");
+define("_DELCONTWARNING", "Vocï¿½ tem certeza de que quer apagar esta pï¿½gina?");
+define("_DELCONTENT", "Apagar pï¿½gina");
+define("_CURRENTSTATUS", "Status atual");
+define("_ADDANEWPAGE", "Adicionar nova pï¿½gina");
+define("_CSUBTITLE", "Subtï¿½tulo");
+define("_HEADERTEXT", "Texto de Cabeï¿½alho");
+define("_PAGETEXT", "Texto da pï¿½gina");
+define("_FOOTERTEXT", "Texto do rodapï¿½");
+define("_ACTIVATEPAGE", "Ativar esta pï¿½gina?");
+define("_EDITPAGECONTENT", "Editar conteï¿½do da pï¿½gina");
+define("_DELCONTENTCAT", "<b>AVISO</b>: Vocï¿½ tem certeza de que quer apagar esta Categoria? As pï¿½ginas sob esta Categoria, sel existirem, serï¿½o removidas, mas nï¿½o serï¿½o anexadas a outra Categoria.");
+define("_DELCATEGORY", "Apagar Categoria");

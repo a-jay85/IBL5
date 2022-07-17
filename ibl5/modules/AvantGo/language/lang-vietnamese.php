@@ -17,11 +17,9 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PDATE","Ng…y:");
-define("_PTOPIC","Ch&#7911; &#273;&#7873;:");
-define("_COMESFROM","B…i n…y &#273;&#7871;n t&#7915;");
-define("_THEURL","C i link cho b…i n…y l…:");
-define("_DATE","Ng…y");
-define("_TITLE","T&#7921;a");
-
-?>
+define("_PDATE", "Ngï¿½y:");
+define("_PTOPIC", "Ch&#7911; &#273;&#7873;:");
+define("_COMESFROM", "Bï¿½i nï¿½y &#273;&#7871;n t&#7915;");
+define("_THEURL", "Cï¿½i link cho bï¿½i nï¿½y lï¿½:");
+define("_DATE", "Ngï¿½y");
+define("_TITLE", "T&#7921;a");

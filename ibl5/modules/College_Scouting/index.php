@@ -218,7 +218,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 	<table>
 		<tr>
 			<th colspan=26>
-				<center>Welcome to the 1989 IBL Draft<br><br><br>SCOUTING CENTRAL - $teamlogo Scouting - $scoutingpoints Scout Points Remaining<br><a href=\"http://college.ibl.net\">Main College Page</a> | <a href=\"http://college.ibl.net/draftdeclarants.php\">College Draft Declarants Page</a></center>
+				<center>Welcome to the 1989 IBL Draft<br><br><br>SCOUTING CENTRAL - $teamlogo Scouting - $scoutingpoints Scout Points Remaining</center><br>
 			</th>
 		</tr>
 	</table>

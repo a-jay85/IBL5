@@ -60,7 +60,7 @@ if ($num == 0) {
             <td><a href=\"../modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>
             <td>$draftedby</td>
             <td><img height=50 src=\"../images/player/$pid.jpg\"></td>
-            <td><a href=\"http://college.ijbl.net/rosters/roster$collegid.htm\">$college</a></td>
+            <td>$college</td>
         </tr>
 ";
 

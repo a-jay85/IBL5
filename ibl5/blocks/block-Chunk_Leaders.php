@@ -23,7 +23,6 @@ function getLastSimStatLeaders($statName, $query)
     global $db;
 
     $queryLastSimDates = $db->sql_query("SELECT * FROM ibl_sim_dates ORDER BY Sim DESC LIMIT 1");
-    $lastSimNumber = $db->sql_result($queryLastSimDates, 0, "Sim");
     $lastSimStartDate = $db->sql_result($queryLastSimDates, 0, "Start Date");
     $lastSimEndDate = $db->sql_result($queryLastSimDates, 0, "End Date");
 
@@ -34,6 +33,8 @@ function getLastSimStatLeaders($statName, $query)
         GROUP BY name
         ORDER BY $statName DESC
         LIMIT 5;");
+        // the previous query throws an error in MySQL 5.7.34 that can be fixed by running the following SQL query:
+        // SET GLOBAL sql_mode=(SELECT REPLACE(@@sql_mode,'ONLY_FULL_GROUP_BY',''));
 
     $i = 1;
     $numrows = $db->sql_numrows($querySimStatLeaders);

@@ -16,7 +16,7 @@ while ($i < $num) {
     $query3 = "UPDATE ibl_power SET win = $wins, loss = $losses, gb = $gb, home_win = $homewin, home_loss = $homeloss, road_win = $visitorwin, road_loss = $visitorloss WHERE TeamID = $tid;";
     $result3 = $db->sql_query($query3);
 
-    $query3a = "UPDATE nuke_heat_win_loss a, ibl_power b  SET a.wins = b.win, a.losses = b.loss WHERE a.currentname = b.Team and a.year = '2001';";
+    $query3a = "UPDATE ibl_heat_win_loss a, ibl_power b  SET a.wins = b.win, a.losses = b.loss WHERE a.currentname = b.Team and a.year = '2001';";
     $result3a = $db->sql_query($query3a);
 
     list($lastwins, $lastlosses) = last($tid);

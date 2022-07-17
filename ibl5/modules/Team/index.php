@@ -2306,7 +2306,7 @@ function team_info_right($team_name, $color1, $color2, $owner_name, $tid)
 
     // HEAT SEASON RESULTS
 
-    $querywl = "SELECT * FROM nuke_heat_win_loss WHERE currentname = '$team_name' ORDER BY year DESC";
+    $querywl = "SELECT * FROM ibl_heat_win_loss WHERE currentname = '$team_name' ORDER BY year DESC";
     $resultwl = $db->sql_query($querywl);
     $numwl = $db->sql_numrows($resultwl);
     $h = 0;

@@ -26,7 +26,7 @@ $currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
 
 include "header.php";
 
-$queryTeamInfo = "SELECT * FROM nuke_ibl_team_info WHERE teamid != 35 ORDER BY teamid ASC";
+$queryTeamInfo = "SELECT * FROM ibl_team_info WHERE teamid != 35 ORDER BY teamid ASC";
 $resultTeamInfo = $db->sql_query($queryTeamInfo);
 $numberOfTeams = $db->sql_numrows($resultTeamInfo);
 
@@ -130,7 +130,7 @@ function get_salary($tid, $team_name, $currentSeasonEndingYear)
     //     $hh++;
     // }
 
-    $queryPlayersUnderContractAfterThisSeason = "SELECT * FROM nuke_iblplyr WHERE retired = 0 AND tid = $tid AND cy <> cyt";
+    $queryPlayersUnderContractAfterThisSeason = "SELECT * FROM ibl_plr WHERE retired = 0 AND tid = $tid AND cy <> cyt";
     $resultPlayersUnderContractAfterThisSeason = $db->sql_query($queryPlayersUnderContractAfterThisSeason);
     $numberOfPlayersUnderContractAfterThisSeason = $db->sql_numrows($resultPlayersUnderContractAfterThisSeason);
 
@@ -184,7 +184,7 @@ function get_salary1($tid, $team_name, $currentSeasonEndingYear)
     //     $hh++;
     // }
 
-    $queryPlayersUnderContractAfterThisSeason = "SELECT * FROM nuke_iblplyr WHERE retired = 0 AND tid = $tid AND cy <> cyt AND droptime = 0 AND name NOT LIKE '%Buyout%'";
+    $queryPlayersUnderContractAfterThisSeason = "SELECT * FROM ibl_plr WHERE retired = 0 AND tid = $tid AND cy <> cyt AND droptime = 0 AND name NOT LIKE '%Buyout%'";
     $resultPlayersUnderContractAfterThisSeason = $db->sql_query($queryPlayersUnderContractAfterThisSeason);
     $numberOfPlayersUnderContractAfterThisSeason = $db->sql_numrows($resultPlayersUnderContractAfterThisSeason);
 

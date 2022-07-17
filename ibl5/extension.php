@@ -24,7 +24,7 @@ if ($Bird > 2) {
 }
 
 //-----GRAB TEAM INFO AND STATS------
-$query = "SELECT * FROM nuke_ibl_team_info WHERE team_name = '$Team_Name'";
+$query = "SELECT * FROM ibl_team_info WHERE team_name = '$Team_Name'";
 $result = $db->sql_query($query);
 
 $tf_wins = $db->sql_result($result, 0, "Contract_Wins");
@@ -40,7 +40,7 @@ $UsedExtensionSeason = $db->sql_result($result, 0, "Used_Extension_This_Season")
 //-----END OF TEAM INFO AND STATS-----
 
 //-----GRAB PLAYER PREFERENCES-----
-$queryteam = "SELECT * FROM nuke_iblplyr WHERE name = '$Player_Name'";
+$queryteam = "SELECT * FROM ibl_plr WHERE name = '$Player_Name'";
 $resultteam = $db->sql_query($queryteam);
 
 $player_team = $db->sql_result($resultteam, 0, "teamname");
@@ -150,7 +150,7 @@ if ($nooffer == 0) {
 
     // ==== MARK THE EXTENSION AS USED FOR THIS CHUNK ====
 
-    $querychunk = "UPDATE nuke_ibl_team_info SET Used_Extension_This_Chunk = 1 WHERE team_name = '$Team_Name'";
+    $querychunk = "UPDATE ibl_team_info SET Used_Extension_This_Chunk = 1 WHERE team_name = '$Team_Name'";
     $resultchunk = $db->sql_query($querychunk);
 
     echo "Message from the commissioner's office: <font color=#0000cc>Your offer is legal, and is therefore an extension attempt.  Please note that you may make no further extension attempts until after the next sim.</font></br>";
@@ -254,7 +254,7 @@ if ($nooffer == 0) {
         $yearOfCurrentContract = $db->sql_result($resultteam, 0, "cy");
         $salaryInCurrentYear = $db->sql_result($resultteam, 0, "cy" . $yearOfCurrentContract);
 
-        $queryContractUpdate = "UPDATE nuke_iblplyr
+        $queryContractUpdate = "UPDATE ibl_plr
             SET cy = 1,
                 cyt = 1 + $Offer_Years,
                 cy1 = $salaryInCurrentYear,
@@ -268,7 +268,7 @@ if ($nooffer == 0) {
 
         // ==== MARK THE EXTENSION AS USED FOR THIS SEASON ====
 
-        $queryseason = "UPDATE nuke_ibl_team_info SET Used_Extension_This_Season = 1 WHERE team_name = '$Team_Name'";
+        $queryseason = "UPDATE ibl_team_info SET Used_Extension_This_Season = 1 WHERE team_name = '$Team_Name'";
         $resultseason = $db->sql_query($queryseason);
 
         // ==== PUT ANNOUNCEMENT INTO DATABASE ON NEWS PAGE

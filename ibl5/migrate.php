@@ -10,7 +10,7 @@ $recipient = 'ibldepthcharts@gmail.com';
 $emailsubject = "Position Migration - " . $Player_Name;
 $filetext = $Team_Name . " migrates " . $Player_Name . " to " . $Position . ".";
 
-$querymigrate = "UPDATE nuke_iblplyr SET altpos = '$Position' WHERE name = '$Player_Name'";
+$querymigrate = "UPDATE ibl_plr SET altpos = '$Position' WHERE name = '$Player_Name'";
 $resultmigrate = $db->sql_query($querymigrate);
 
 echo "<html><head><title>Position Migration Processing</title></head><body>

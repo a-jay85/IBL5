@@ -144,10 +144,10 @@ function leaderboards()
     // ===== RUN QUERY IF FORM HAS BEEN SUBMITTED
 
     if ($submitted != null) {
-        $tableforquery = "nuke_iblplyr";
+        $tableforquery = "ibl_plr";
 
         if ($boards_type == 'Reg') {
-            $tableforquery = "nuke_iblplyr";
+            $tableforquery = "ibl_plr";
             $restriction2 = "car_gm > 0 ";
         }
 
@@ -187,7 +187,7 @@ function leaderboards()
             }
         }
 
-        if ($tableforquery == "nuke_iblplyr") {
+        if ($tableforquery == "ibl_plr") {
             $sortby = "car_" . $sortby;
             if ($sort_cat == 'Games') {
                 $sortby = "car_gm";
@@ -248,7 +248,7 @@ function leaderboards()
 
         while ($i < $numstop) {
             $retired = 0;
-            if ($tableforquery == "nuke_iblplyr") {
+            if ($tableforquery == "ibl_plr") {
                 $retired = $db->sql_result($result, $i, "retired");
                 if ($retired == 0) {
                     $plyr_name = $db->sql_result($result, $i, "name");
@@ -292,7 +292,7 @@ function leaderboards()
                         sum(tvr) as tvr,
                         sum(pf) as pf,
                         sum(ftm) + sum(3gm) + (2 * sum(fgm)) as pts
-                        FROM nuke_iblhist
+                        FROM ibl_hist
                         WHERE pid = $pid;");
                     $gm = number_format($db->sql_result($result_iblhist, 0, "gm"));
                     $min = number_format($db->sql_result($result_iblhist, 0, "min"));
@@ -556,7 +556,7 @@ function search()
 
     // ========= SET QUERY BASED ON SEARCH PARAMETERS
 
-    $query = "SELECT * FROM nuke_iblplyr WHERE pid > '0'";
+    $query = "SELECT * FROM ibl_plr WHERE pid > '0'";
 
     if ($active == 0) {
         $query .= " AND retired = '0'";
@@ -1008,7 +1008,7 @@ function showpage($pid, $spec)
 
     $pid = intval($pid);
     $spec = intval($spec);
-    $playerinfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM " . $prefix . "_iblplyr WHERE pid='$pid'"));
+    $playerinfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_plr WHERE pid='$pid'"));
     $player_name = stripslashes(check_html($playerinfo['name'], "nohtml"));
     $player_nickname = stripslashes(check_html($playerinfo['nickname'], "nohtml"));
     $player_pos = stripslashes(check_html($playerinfo['pos'], "nohtml"));
@@ -1225,7 +1225,7 @@ function showpage($pid, $spec)
     }
 
     $queryHasUsedExtensionThisSeason = "SELECT Used_Extension_This_Season
-        FROM nuke_ibl_team_info
+        FROM ibl_team_info
         WHERE team_name = '" . $userinfo['user_ibl_team'] . "';";
     $hasUsedExtensionThisSeason = $db->sql_result($db->sql_query($queryHasUsedExtensionThisSeason), 0);
 
@@ -1725,7 +1725,7 @@ function showpage($pid, $spec)
                         <td>pts</td>
                     </tr>";
 
-        $result44 = $db->sql_query("SELECT * FROM " . $prefix . "_iblhist WHERE pid=$pid ORDER BY year ASC");
+        $result44 = $db->sql_query("SELECT * FROM ibl_hist WHERE pid=$pid ORDER BY year ASC");
 
         while ($row44 = $db->sql_fetchrow($result44)) {
             $hist_year = stripslashes(check_html($row44['year'], "nohtml"));
@@ -1900,7 +1900,7 @@ function showpage($pid, $spec)
         $car_pf = 0;
         $car_pts = 0;
 
-        $result44 = $db->sql_query("SELECT * FROM " . $prefix . "_iblhist WHERE pid=$pid ORDER BY year ASC");
+        $result44 = $db->sql_query("SELECT * FROM ibl_hist WHERE pid=$pid ORDER BY year ASC");
         while ($row44 = $db->sql_fetchrow($result44)) {
 
             $hist_year = stripslashes(check_html($row44['year'], "nohtml"));
@@ -1984,7 +1984,7 @@ function showpage($pid, $spec)
 
         // CURRENT YEAR AVERAGES
         $retired = $db->sql_result($db->sql_query("SELECT retired
-            FROM nuke_iblplyr
+            FROM ibl_plr
             WHERE pid=$pid;"), 0);
 
         if ($retired != 1) {
@@ -2126,7 +2126,7 @@ function showpage($pid, $spec)
                 <td>pts</td>
             </tr>";
 
-        $resultplayoff4 = $db->sql_query("SELECT * FROM " . $prefix . "_ibl_playoff_stats WHERE name='$player_name' ORDER BY year ASC");
+        $resultplayoff4 = $db->sql_query("SELECT * FROM ibl_playoff_stats WHERE name='$player_name' ORDER BY year ASC");
         while ($rowplayoff4 = $db->sql_fetchrow($resultplayoff4)) {
             $hist_year = stripslashes(check_html($rowplayoff4['year'], "nohtml"));
             $hist_team = stripslashes(check_html($rowplayoff4['team'], "nohtml"));
@@ -2262,7 +2262,7 @@ function showpage($pid, $spec)
         $car_pf = 0;
         $car_pts = 0;
 
-        $resultplayoff4 = $db->sql_query("SELECT * FROM " . $prefix . "_ibl_playoff_stats WHERE name='$player_name' ORDER BY year ASC");
+        $resultplayoff4 = $db->sql_query("SELECT * FROM ibl_playoff_stats WHERE name='$player_name' ORDER BY year ASC");
         while ($rowplayoff4 = $db->sql_fetchrow($resultplayoff4)) {
             $hist_year = stripslashes(check_html($rowplayoff4['year'], "nohtml"));
             $hist_team = stripslashes(check_html($rowplayoff4['team'], "nohtml"));
@@ -2434,7 +2434,7 @@ function showpage($pid, $spec)
                 <td>pts</td>
             </tr>";
 
-        $resultplayoff4 = $db->sql_query("SELECT * FROM " . $prefix . "_ibl_heat_stats WHERE name='$player_name' ORDER BY year ASC");
+        $resultplayoff4 = $db->sql_query("SELECT * FROM ibl_heat_stats WHERE name='$player_name' ORDER BY year ASC");
         while ($rowplayoff4 = $db->sql_fetchrow($resultplayoff4)) {
             $hist_year = stripslashes(check_html($rowplayoff4['year'], "nohtml"));
             $hist_team = stripslashes(check_html($rowplayoff4['team'], "nohtml"));
@@ -2569,7 +2569,7 @@ function showpage($pid, $spec)
         $car_pf = 0;
         $car_pts = 0;
 
-        $resultplayoff4 = $db->sql_query("SELECT * FROM " . $prefix . "_ibl_heat_stats WHERE name='$player_name' ORDER BY year ASC");
+        $resultplayoff4 = $db->sql_query("SELECT * FROM ibl_heat_stats WHERE name='$player_name' ORDER BY year ASC");
         while ($rowplayoff4 = $db->sql_fetchrow($resultplayoff4)) {
             $hist_year = stripslashes(check_html($rowplayoff4['year'], "nohtml"));
             $hist_team = stripslashes(check_html($rowplayoff4['team'], "nohtml"));
@@ -2719,7 +2719,7 @@ function showpage($pid, $spec)
         $worlds_header_done_yet = 0;
         $world_color = 0;
 
-        $result45 = $db->sql_query("SELECT * FROM " . $prefix . "_iblworlds WHERE name='$player_name' ORDER BY year ASC");
+        $result45 = $db->sql_query("SELECT * FROM iblworlds WHERE name='$player_name' ORDER BY year ASC");
         while ($row45 = $db->sql_fetchrow($result45)) {
 
             if ($worlds_header_done_yet == 0) {
@@ -2864,7 +2864,7 @@ function showpage($pid, $spec)
 
         $totalsalary = 0;
 
-        $result44 = $db->sql_query("SELECT * FROM " . $prefix . "_iblhist WHERE pid=$pid ORDER BY year ASC");
+        $result44 = $db->sql_query("SELECT * FROM ibl_hist WHERE pid=$pid ORDER BY year ASC");
         while ($row44 = $db->sql_fetchrow($result44)) {
             $r_year = stripslashes(check_html($row44['year'], "nohtml"));
             $r_2ga = stripslashes(check_html($row44['r_2ga'], "nohtml"));
@@ -3116,7 +3116,7 @@ function negotiate($pid)
     global $prefix, $db, $user, $cookie;
 
     $pid = intval($pid);
-    $playerinfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM " . $prefix . "_iblplyr WHERE pid = '$pid'"));
+    $playerinfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_plr WHERE pid = '$pid'"));
     $player_name = stripslashes(check_html($playerinfo['name'], "nohtml"));
     $player_pos = stripslashes(check_html($playerinfo['pos'], "nohtml"));
     $player_team_name = stripslashes(check_html($playerinfo['teamname'], "nohtml"));
@@ -3243,27 +3243,27 @@ function negotiate($pid)
             $negotiatingPlayerTD = intval($playerinfo['td']);
 
             // Pull max values of each stat category
-            $marketMaxFGA = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_fga) FROM " . $prefix . "_iblplyr"));
-            $marketMaxFGP = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_fgp) FROM " . $prefix . "_iblplyr"));
-            $marketMaxFTA = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_fta) FROM " . $prefix . "_iblplyr"));
-            $marketMaxFTP = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_ftp) FROM " . $prefix . "_iblplyr"));
-            $marketMaxTGA = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_tga) FROM " . $prefix . "_iblplyr"));
-            $marketMaxTGP = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_tgp) FROM " . $prefix . "_iblplyr"));
-            $marketMaxORB = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_orb) FROM " . $prefix . "_iblplyr"));
-            $marketMaxDRB = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_drb) FROM " . $prefix . "_iblplyr"));
-            $marketMaxAST = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_ast) FROM " . $prefix . "_iblplyr"));
-            $marketMaxSTL = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_stl) FROM " . $prefix . "_iblplyr"));
-            $marketMaxTOV = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_to) FROM " . $prefix . "_iblplyr"));
-            $marketMaxBLK = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_blk) FROM " . $prefix . "_iblplyr"));
-            $marketMaxFOUL = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_foul) FROM " . $prefix . "_iblplyr"));
-            $marketMaxOO = $db->sql_fetchrow($db->sql_query("SELECT MAX(oo) FROM " . $prefix . "_iblplyr"));
-            $marketMaxOD = $db->sql_fetchrow($db->sql_query("SELECT MAX(od) FROM " . $prefix . "_iblplyr"));
-            $marketMaxDO = $db->sql_fetchrow($db->sql_query("SELECT MAX(do) FROM " . $prefix . "_iblplyr"));
-            $marketMaxDD = $db->sql_fetchrow($db->sql_query("SELECT MAX(dd) FROM " . $prefix . "_iblplyr"));
-            $marketMaxPO = $db->sql_fetchrow($db->sql_query("SELECT MAX(po) FROM " . $prefix . "_iblplyr"));
-            $marketMaxPD = $db->sql_fetchrow($db->sql_query("SELECT MAX(pd) FROM " . $prefix . "_iblplyr"));
-            $marketMaxTO = $db->sql_fetchrow($db->sql_query("SELECT MAX(to) FROM " . $prefix . "_iblplyr"));
-            $marketMaxTD = $db->sql_fetchrow($db->sql_query("SELECT MAX(td) FROM " . $prefix . "_iblplyr"));
+            $marketMaxFGA = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_fga) FROM ibl_plr"));
+            $marketMaxFGP = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_fgp) FROM ibl_plr"));
+            $marketMaxFTA = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_fta) FROM ibl_plr"));
+            $marketMaxFTP = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_ftp) FROM ibl_plr"));
+            $marketMaxTGA = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_tga) FROM ibl_plr"));
+            $marketMaxTGP = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_tgp) FROM ibl_plr"));
+            $marketMaxORB = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_orb) FROM ibl_plr"));
+            $marketMaxDRB = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_drb) FROM ibl_plr"));
+            $marketMaxAST = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_ast) FROM ibl_plr"));
+            $marketMaxSTL = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_stl) FROM ibl_plr"));
+            $marketMaxTOV = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_to) FROM ibl_plr"));
+            $marketMaxBLK = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_blk) FROM ibl_plr"));
+            $marketMaxFOUL = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_foul) FROM ibl_plr"));
+            $marketMaxOO = $db->sql_fetchrow($db->sql_query("SELECT MAX(oo) FROM ibl_plr"));
+            $marketMaxOD = $db->sql_fetchrow($db->sql_query("SELECT MAX(od) FROM ibl_plr"));
+            $marketMaxDO = $db->sql_fetchrow($db->sql_query("SELECT MAX(do) FROM ibl_plr"));
+            $marketMaxDD = $db->sql_fetchrow($db->sql_query("SELECT MAX(dd) FROM ibl_plr"));
+            $marketMaxPO = $db->sql_fetchrow($db->sql_query("SELECT MAX(po) FROM ibl_plr"));
+            $marketMaxPD = $db->sql_fetchrow($db->sql_query("SELECT MAX(pd) FROM ibl_plr"));
+            $marketMaxTO = $db->sql_fetchrow($db->sql_query("SELECT MAX(to) FROM ibl_plr"));
+            $marketMaxTD = $db->sql_fetchrow($db->sql_query("SELECT MAX(td) FROM ibl_plr"));
 
             // Determine raw score for each stat
             $rawFGA = $negotiatingPlayerFGA / intval($marketMaxFGA[0]) * 100;
@@ -3315,14 +3315,14 @@ function negotiate($pid)
             $dem6 = 0;
             //    $dem6 = stripslashes(check_html($demands['dem6'], "nohtml"));
              */
-            $teamfactors = $db->sql_fetchrow($db->sql_query("SELECT * FROM " . $prefix . "_ibl_team_info WHERE team_name = '$userteam'"));
+            $teamfactors = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_team_info WHERE team_name = '$userteam'"));
             $tf_wins = stripslashes(check_html($teamfactors['Contract_Wins'], "nohtml"));
             $tf_loss = stripslashes(check_html($teamfactors['Contract_Losses'], "nohtml"));
             $tf_trdw = stripslashes(check_html($teamfactors['Contract_AvgW'], "nohtml"));
             $tf_trdl = stripslashes(check_html($teamfactors['Contract_AvgL'], "nohtml"));
             $tf_coach = stripslashes(check_html($teamfactors['Contract_Coach'], "nohtml"));
 
-            $millionsatposition = $db->sql_query("SELECT * FROM " . $prefix . "_iblplyr WHERE teamname = '$userteam' AND pos IN ($adjpos) AND name != '$player_name'");
+            $millionsatposition = $db->sql_query("SELECT * FROM ibl_plr WHERE teamname = '$userteam' AND pos IN ($adjpos) AND name != '$player_name'");
             // LOOP TO GET MILLIONS COMMITTED AT POSITION
 
             $tf_millions = 0;
@@ -3421,7 +3421,7 @@ function negotiate($pid)
 
             $capnumber = 7000;
 
-            $capquery = "SELECT * FROM " . $prefix . "_iblplyr WHERE teamname='$userteam' AND retired = '0'";
+            $capquery = "SELECT * FROM ibl_plr WHERE teamname='$userteam' AND retired = '0'";
             $capresult = $db->sql_query($capquery);
             while ($capdecrementer = $db->sql_fetchrow($capresult)) {
 
@@ -3582,7 +3582,7 @@ function rookieoption($pid)
 
     $userteam = stripslashes(check_html($userinfo['user_ibl_team'], "nohtml"));
 
-    $playerinfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM " . $prefix . "_iblplyr WHERE pid='$pid'"));
+    $playerinfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_plr WHERE pid='$pid'"));
 
     $player_name = stripslashes(check_html($playerinfo['name'], "nohtml"));
     $player_pos = stripslashes(check_html($playerinfo['pos'], "nohtml"));

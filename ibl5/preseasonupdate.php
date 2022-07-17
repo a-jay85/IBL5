@@ -2,7 +2,7 @@
 
 require 'mainfile.php';
 
-$query1 = "SELECT * FROM nuke_iblplyr WHERE `retired` = '0'";
+$query1 = "SELECT * FROM ibl_plr WHERE `retired` = '0'";
 $result1 = $db->sql_query($query1);
 $num1 = $db->sql_numrows($result1);
 
@@ -15,7 +15,7 @@ while ($i < $num1) {
     $playername = $db->sql_result($result1, $i, "name");
     $playerid = $db->sql_result($result1, $i, "pid");
 
-    $query2 = "SELECT * FROM nuke_ibl_preseason_hist WHERE pid LIKE '$playerid'";
+    $query2 = "SELECT * FROM ibl_preseason_hist WHERE pid LIKE '$playerid'";
     $result2 = $db->sql_query($query2);
     @$num2 = $db->sql_numrows($result2);
 
@@ -32,7 +32,7 @@ while ($i < $num1) {
 
     echo "Updating $playername's records... $tot_minutes total minutes.<br>";
 
-    $query3 = "UPDATE nuke_iblplyr SET `car_preseason_min` = '$tot_minutes' WHERE pid = '$playerid'";
+    $query3 = "UPDATE ibl_plr SET `car_preseason_min` = '$tot_minutes' WHERE pid = '$playerid'";
     $result3 = $db->sql_query($query3);
 
     $i++;

@@ -3,7 +3,7 @@
 require 'mainfile.php';
 
 $query = "SELECT name, COUNT(*) as appearances
-FROM nuke_ibl_awards
+FROM ibl_awards
 WHERE Award LIKE '%Conference All-Star'
 GROUP BY name;";
 $result = $db->sql_query($query);

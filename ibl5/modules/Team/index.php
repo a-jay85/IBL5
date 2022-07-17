@@ -2009,12 +2009,6 @@ function team_info_right($team_name, $color1, $color2, $owner_name, $tid)
 
     // ==== GET OWNER INFO
 
-    $queryo = "SELECT * FROM nuke_users WHERE user_ibl_team = '$team_name' ORDER BY user_id DESC";
-    $resulto = $db->sql_query($queryo);
-
-    $query1 = "SELECT * FROM ibl_team_info WHERE teamid = $tid";
-    $result1 = $db->sql_query($query1);
-
     $output = "<table bgcolor=#eeeeee width=220>";
     $output = $output . "<tr bgcolor=\"#$color1\"><td align=\"center\">
 		<font color=\"#$color2\"><b>Current Season</b></font>

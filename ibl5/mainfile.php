@@ -1041,7 +1041,7 @@ function formatTimestamp($time) {
         $time = gmmktime($datetime[4],$datetime[5],$datetime[6],$datetime[2],$datetime[3],$datetime[1]);
     }
     $time -= date("Z");
-    $datetime = strftime(_DATESTRING, $time);
+    $datetime = date(_DATESTRING, $time);
     $datetime = ucfirst($datetime);
     return $datetime;
 }
@@ -1289,7 +1289,7 @@ function automated_news() {
 	while ($row = $db->sql_fetchrow($result)) {
 		$anid = intval($row['anid']);
 		$time = $row['time'];
-		ereg ("([0-9]{4})-([0-9]{1,2})-([0-9]{1,2}) ([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})", $time, $date);
+		mb_ereg ("([0-9]{4})-([0-9]{1,2})-([0-9]{1,2}) ([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})", $time, $date);
 		if (($date[1] <= $year) AND ($date[2] <= $month) AND ($date[3] <= $day)) {
 			if (($date[4] < $hour) AND ($date[5] >= $min) OR ($date[4] <= $hour) AND ($date[5] <= $min)) {
 				$result2 = $db->sql_query("SELECT * FROM ".$prefix."_autonews WHERE anid='$anid'");

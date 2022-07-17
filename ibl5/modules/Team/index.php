@@ -3559,8 +3559,8 @@ function asg_results()
     $user = stripslashes(check_html($userinfo['username'], "nohtml"));
     OpenTable();
 
-    if (($user !== 'chibul') && ($user != 'Joe') && ($user != 'eggman')) {
-        echo "Sorry, only the IBL Executive Staff may view this page.<br>";
+    if (($user !== 'chibul') && ($user != 'Joe') && ($user != 'A-Jay') && ($user != 'Melvis')) {
+        echo "Sorry, only IBL Admins may view this page.<br>";
     } else {
         $query1 = "select count(name) as votes,name from (select East_C as name from ibl_ASG_Votes) as tbl group by name having count(name) > 0 order by 1 desc;";
         $result1 = $db->sql_query($query1);
@@ -3675,8 +3675,8 @@ function eoy_results()
     $user = stripslashes(check_html($userinfo['username'], "nohtml"));
     OpenTable();
 
-    if (($user !== 'chibul') && ($user != 'Joe') && ($user != 'eggman')) {
-        echo "Sorry, only the IBL Executive Staff may view this page.<br>";
+    if (($user != 'chibul') && ($user != 'Joe') && ($user != 'A-Jay') && ($user != 'Melvis')) {
+        echo "Sorry, only the IBL Admins may view this page.<br>";
     } else {
         $query1 = "select sum(score) as votes,name from (select MVP_1 as name, 3 as score from ibl_EOY_Votes union all select MVP_2 as name, 2 as score from ibl_EOY_Votes union all select MVP_3 as name, 1 as score from ibl_EOY_Votes) as tbl group by name;";
         $result1 = $db->sql_query($query1);

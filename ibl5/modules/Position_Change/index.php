@@ -42,7 +42,7 @@ function poschange($pid)
     cookiedecode($user);
 
     $pid = intval($pid);
-    $playerinfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM " . $prefix . "_iblplyr WHERE pid='$pid'"));
+    $playerinfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_plr WHERE pid='$pid'"));
     $player_name = stripslashes(check_html($playerinfo['name'], "nohtml"));
     $player_pos = stripslashes(check_html($playerinfo['altpos'], "nohtml"));
     $player_team_name = stripslashes(check_html($playerinfo['teamname'], "nohtml"));

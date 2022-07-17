@@ -2,7 +2,7 @@
 
 require 'mainfile.php';
 
-$query1 = "SELECT * FROM nuke_iblplyr";
+$query1 = "SELECT * FROM ibl_plr";
 $result1 = $db->sql_query($query1);
 $num1 = $db->sql_numrows($result1);
 

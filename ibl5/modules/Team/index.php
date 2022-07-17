@@ -37,7 +37,7 @@ $Type_Of_Action = $_POST['Action'];
 if ($Type_Of_Action != NULL)
 {
 
-$queryt="SELECT * FROM nuke_ibl_team_info WHERE team_name = '$Team_Offering' ";
+$queryt="SELECT * FROM ibl_team_info WHERE team_name = '$Team_Offering' ";
 $resultt=$db->sql_query($queryt);
 
 $teamid=$db->sql_result($resultt,0,"teamid");
@@ -46,7 +46,7 @@ $Timestamp = intval(time());
 
 // ADD TEAM TOTAL SALARY FOR THIS YEAR
 
-$querysalary="SELECT * FROM nuke_iblplyr WHERE teamname = '$Team_Offering' AND retired = 0 ";
+$querysalary="SELECT * FROM ibl_plr WHERE teamname = '$Team_Offering' AND retired = 0 ";
 $results=$db->sql_query($querysalary);
 $num=$db->sql_numrows($results);
 $z=0;
@@ -71,7 +71,7 @@ $Type=$_POST['type'.$k];
 $Salary=$_POST['cy'.$k];
 $Index=$_POST['index'.$k];
 $Check=$_POST['check'.$k];
-$queryn="SELECT * FROM nuke_iblplyr WHERE pid = '$Index' ";
+$queryn="SELECT * FROM ibl_plr WHERE pid = '$Index' ";
 $resultn=$db->sql_query($queryn);
 $playername=$db->sql_result($resultn,0,"name");
 $players_team=$db->sql_result($resultn,0,"tid");
@@ -87,7 +87,7 @@ echo "You have 12 players and are over $70 mill hard cap.  Therefore you can't d
 
 } else {
 
-$queryi = "UPDATE nuke_iblplyr SET `ordinal` = '1000', `droptime` = '$Timestamp' WHERE `pid` = '$Index' LIMIT 1;";
+$queryi = "UPDATE ibl_plr SET `ordinal` = '1000', `droptime` = '$Timestamp' WHERE `pid` = '$Index' LIMIT 1;";
 $resulti=$db->sql_query($queryi);
 
 $topicid=32;
@@ -120,7 +120,7 @@ Your waiver moves should now be processed.  <br>You will be automatically redire
 } else {
 if ($players_team == $teamid)
 {
-$queryi = "UPDATE nuke_iblplyr SET `ordinal` = '800', `teamname` = '$Team_Offering', `tid` = '$teamid' WHERE `pid` = '$Index' LIMIT 1;";
+$queryi = "UPDATE ibl_plr SET `ordinal` = '800', `teamname` = '$Team_Offering', `tid` = '$teamid' WHERE `pid` = '$Index' LIMIT 1;";
 $resulti=$db->sql_query($queryi);
 $Roster_Slots++;
 
@@ -166,7 +166,7 @@ echo "You have full roster of 15 players.  You can't sign another player at this
 
 } else {
 
-$queryi = "UPDATE nuke_iblplyr SET `ordinal` = '800', `cy` = '1', `cy1` = '$Salary', `teamname` = '$Team_Offering', `tid` = '$teamid' WHERE `pid` = '$Index' LIMIT 1;";
+$queryi = "UPDATE ibl_plr SET `ordinal` = '800', `cy` = '1', `cy1` = '$Salary', `teamname` = '$Team_Offering', `tid` = '$teamid' WHERE `pid` = '$Index' LIMIT 1;";
 $resulti=$db->sql_query($queryi);
 $Roster_Slots++;
 
@@ -217,12 +217,12 @@ function drafthistory($tid)
     OpenTable();
     $sharedFunctions->displaytopmenu($tid);
 
-    $sqlc = "SELECT * FROM nuke_ibl_team_info WHERE teamid = $tid";
+    $sqlc = "SELECT * FROM ibl_team_info WHERE teamid = $tid";
     $resultc = $db->sql_query($sqlc);
     $rowc = $db->sql_fetchrow($resultc);
     $teamname = $rowc['team_name'];
 
-    $sqld = "SELECT * FROM nuke_iblplyr WHERE draftedby LIKE '$teamname' ORDER BY draftyear DESC, draftround, draftpickno ASC ";
+    $sqld = "SELECT * FROM ibl_plr WHERE draftedby LIKE '$teamname' ORDER BY draftyear DESC, draftround, draftpickno ASC ";
     $resultd = $db->sql_query($sqld);
     $numd = $db->sql_numrows($resultd);
 
@@ -257,7 +257,7 @@ function leaguestats()
     include "header.php";
     OpenTable();
 
-    $queryteam = "SELECT * FROM nuke_ibl_team_info";
+    $queryteam = "SELECT * FROM ibl_team_info";
     $resultteam = $db->sql_query($queryteam);
     $numteams = $db->sql_numrows($resultteam);
 
@@ -588,7 +588,7 @@ function schedule($tid)
     //============================
     // GRAB TEAM COLORS, ET AL
     //============================
-    $queryteam = "SELECT * FROM nuke_ibl_team_info WHERE teamid = '$tid';";
+    $queryteam = "SELECT * FROM ibl_team_info WHERE teamid = '$tid';";
     $resultteam = $db->sql_query($queryteam);
     $teamid = $db->sql_result($resultteam, 0, "teamid");
     $team_city = $db->sql_result($resultteam, 0, "team_city");
@@ -775,7 +775,7 @@ function finances($tid)
     $tid = intval($tid);
     $yr = $_REQUEST['yr'];
 
-    $queryteam = "SELECT * FROM nuke_ibl_team_info WHERE teamid = '$tid' ";
+    $queryteam = "SELECT * FROM ibl_team_info WHERE teamid = '$tid' ";
     $resultteam = $db->sql_query($queryteam);
 
     $teamid = $db->sql_result($resultteam, 0, "teamid");
@@ -837,7 +837,7 @@ function team($tid)
     // GRAB TEAM COLORS, ET AL
     //============================
 
-    $queryteam = "SELECT * FROM nuke_ibl_team_info WHERE teamid = '$tid' ";
+    $queryteam = "SELECT * FROM ibl_team_info WHERE teamid = '$tid' ";
     $resultteam = $db->sql_query($queryteam);
 
     $teamid = $db->sql_result($resultteam, 0, "teamid");
@@ -876,25 +876,25 @@ function team($tid)
 
     if ($tid == 0) { // Team 0 is the Free Agents; we want a query that will pick up all of their players.
         if ($faon == 0) {
-            $query = "SELECT * FROM nuke_iblplyr WHERE ordinal > '959' AND retired = 0 ORDER BY ordinal ASC";
-            //            $query="SELECT * FROM nuke_iblplyr WHERE tid = 0 AND retired = 0 ORDER BY ordinal ASC";
+            $query = "SELECT * FROM ibl_plr WHERE ordinal > '959' AND retired = 0 ORDER BY ordinal ASC";
+            //            $query="SELECT * FROM ibl_plr WHERE tid = 0 AND retired = 0 ORDER BY ordinal ASC";
         } else {
-            $query = "SELECT * FROM nuke_iblplyr WHERE ordinal > '959' AND retired = 0 AND cyt != cy ORDER BY ordinal ASC";
-            //            $query="SELECT * FROM nuke_iblplyr WHERE tid = 0 AND retired = 0 AND cyt != cy ORDER BY ordinal ASC";
+            $query = "SELECT * FROM ibl_plr WHERE ordinal > '959' AND retired = 0 AND cyt != cy ORDER BY ordinal ASC";
+            //            $query="SELECT * FROM ibl_plr WHERE tid = 0 AND retired = 0 AND cyt != cy ORDER BY ordinal ASC";
         }
         $result = $db->sql_query($query);
         $num = $db->sql_numrows($result);
     } else if ($tid == "-1") { // SHOW ENTIRE LEAGUE
-        $query = "SELECT * FROM nuke_iblplyr WHERE retired = 0 AND name NOT LIKE '%Buyouts' ORDER BY ordinal ASC";
+        $query = "SELECT * FROM ibl_plr WHERE retired = 0 AND name NOT LIKE '%Buyouts' ORDER BY ordinal ASC";
         $result = $db->sql_query($query);
         $num = $db->sql_numrows($result);
     } else { // If not Free Agents, use the code below instead.
         if ($yr != "") {
-            $query = "SELECT * FROM nuke_iblhist WHERE teamid = '$tid' AND year = '$yr' ORDER BY name ASC";
+            $query = "SELECT * FROM ibl_hist WHERE teamid = '$tid' AND year = '$yr' ORDER BY name ASC";
         } else if ($faon == 0) {
-            $query = "SELECT * FROM nuke_iblplyr WHERE tid = '$tid' AND retired = 0 ORDER BY name ASC";
+            $query = "SELECT * FROM ibl_plr WHERE tid = '$tid' AND retired = 0 ORDER BY name ASC";
         } else {
-            $query = "SELECT * FROM nuke_iblplyr WHERE tid = '$tid' AND retired = 0 AND cyt != cy ORDER BY name ASC";
+            $query = "SELECT * FROM ibl_plr WHERE tid = '$tid' AND retired = 0 AND cyt != cy ORDER BY name ASC";
         }
         $result = $db->sql_query($query);
         $num = $db->sql_numrows($result);
@@ -1676,7 +1676,7 @@ function team($tid)
             $simEndDate = $arrayLastSimDates['End Date'];
 
             $playersOnTeam = $db->sql_query("SELECT pid
-		        FROM nuke_iblplyr
+		        FROM ibl_plr
 		        WHERE tid = $tid
 		        ORDER BY name ASC");
             $numberOfPlayersOnTeam = $db->sql_numrows($playersOnTeam);
@@ -1945,7 +1945,7 @@ function team($tid)
 
     $hh = 0;
 
-    $query_all_team_colors = "SELECT * FROM nuke_ibl_team_info ORDER BY teamid ASC";
+    $query_all_team_colors = "SELECT * FROM ibl_team_info ORDER BY teamid ASC";
     $colors = $db->sql_query($query_all_team_colors);
     $num_all_team_colors = $db->sql_numrows($colors);
 
@@ -2061,7 +2061,7 @@ function team_info_right($team_name, $color1, $color2, $owner_name, $tid)
     $resulto = $db->sql_query($queryo);
     $numo = $db->sql_numrows($resulto);
 
-    $query1 = "SELECT * FROM nuke_ibl_team_info WHERE teamid = $tid";
+    $query1 = "SELECT * FROM ibl_team_info WHERE teamid = $tid";
     $result1 = $db->sql_query($query1);
 
     $coaching = $db->sql_result($result1, 0, "Contract_Coach");
@@ -2085,7 +2085,7 @@ function team_info_right($team_name, $color1, $color2, $owner_name, $tid)
     //==================
 
     $owner_award_code = $owner_name . " (" . $team_name . ")";
-    $querydec = "SELECT * FROM nuke_ibl_gmhistory WHERE name LIKE '$owner_award_code' ORDER BY year ASC";
+    $querydec = "SELECT * FROM ibl_gm_history WHERE name LIKE '$owner_award_code' ORDER BY year ASC";
     $resultdec = $db->sql_query($querydec);
     $numdec = $db->sql_numrows($resultdec);
     if ($numdec > 0) {
@@ -2106,7 +2106,7 @@ function team_info_right($team_name, $color1, $color2, $owner_name, $tid)
 
     // CHAMPIONSHIP BANNERS
 
-    $querybanner = "SELECT * FROM nuke_iblbanners WHERE currentname = '$team_name' ORDER BY year ASC";
+    $querybanner = "SELECT * FROM ibl_banners WHERE currentname = '$team_name' ORDER BY year ASC";
     $resultbanner = $db->sql_query($querybanner);
     $numbanner = $db->sql_numrows($resultbanner);
 
@@ -2255,7 +2255,7 @@ function team_info_right($team_name, $color1, $color2, $owner_name, $tid)
     //==================
 
     $owner_award_code = $team_name . "";
-    $querydec = "SELECT * FROM nuke_ibl_teamawards WHERE name LIKE '$owner_award_code' ORDER BY year DESC";
+    $querydec = "SELECT * FROM ibl_team_awards WHERE name LIKE '$owner_award_code' ORDER BY year DESC";
     $resultdec = $db->sql_query($querydec);
     $numdec = $db->sql_numrows($resultdec);
     if ($numdec > 0) {
@@ -2276,7 +2276,7 @@ function team_info_right($team_name, $color1, $color2, $owner_name, $tid)
 
     // REGULAR SEASON RESULTS
 
-    $querywl = "SELECT * FROM nuke_iblteam_win_loss WHERE currentname = '$team_name' ORDER BY year DESC";
+    $querywl = "SELECT * FROM ibl_team_win_loss WHERE currentname = '$team_name' ORDER BY year DESC";
     $resultwl = $db->sql_query($querywl);
     $numwl = $db->sql_numrows($resultwl);
 
@@ -2498,7 +2498,7 @@ function viewinjuries($tid)
 
     $sharedFunctions->displaytopmenu($tid);
 
-    $query = "SELECT * FROM nuke_iblplyr WHERE injured > 0 AND retired = 0 ORDER BY ordinal ASC";
+    $query = "SELECT * FROM ibl_plr WHERE injured > 0 AND retired = 0 ORDER BY ordinal ASC";
 
     $result = $db->sql_query($query);
     $num = $db->sql_numrows($result);
@@ -2508,7 +2508,7 @@ function viewinjuries($tid)
 		<table class=\"sortable\">
 		<tr><th>Pos</th><th>Player</th><th>Team</th><th>Days Injured</th>";
 
-    $query_all_team_colors = "SELECT * FROM nuke_ibl_team_info ORDER BY teamid ASC";
+    $query_all_team_colors = "SELECT * FROM ibl_team_info ORDER BY teamid ASC";
     $colors = $db->sql_query($query_all_team_colors);
     $num_all_team_colors = $db->sql_numrows($colors);
 
@@ -2633,14 +2633,14 @@ function editset($username, $bypass = 0, $hid = 0, $url = 0)
     // === GRAB TEAM INFORMATION FOR LOGGED-IN USER===
 
     $teamlogo = $userinfo['user_ibl_team'];
-    $queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$teamlogo'";
+    $queryTeamID = "SELECT teamid FROM ibl_team_info WHERE team_name = '$teamlogo'";
     $tid = $db->sql_result($db->sql_query($queryTeamID), 0);
 
     $sharedFunctions->displaytopmenu($tid);
 
     echo "<hr><center><img src=\"images/logo/$tid.jpg\"><br>";
 
-    $sql3 = "SELECT * FROM nuke_ibl_offense_sets WHERE TeamName = '$teamlogo' ORDER BY SetNumber ASC ";
+    $sql3 = "SELECT * FROM ibl_offense_sets WHERE TeamName = '$teamlogo' ORDER BY SetNumber ASC ";
     $result3 = $db->sql_query($sql3);
     $num3 = $db->sql_numrows($result3);
 
@@ -2667,7 +2667,7 @@ function editset($username, $bypass = 0, $hid = 0, $url = 0)
     echo "</select><input type=\"submit\" value=\"Select This Set\"></form></td></tr>";
 
     if ($SetToWorkOn == null) {} else {
-        $sql4 = "SELECT * FROM nuke_ibl_offense_sets WHERE TeamName = '$teamlogo' AND SetNumber = '$SetToWorkOn'";
+        $sql4 = "SELECT * FROM ibl_offense_sets WHERE TeamName = '$teamlogo' AND SetNumber = '$SetToWorkOn'";
         $result4 = $db->sql_query($sql4);
         $num4 = $db->sql_numrows($result4);
 
@@ -2905,39 +2905,39 @@ function editset($username, $bypass = 0, $hid = 0, $url = 0)
             echo "<td>";
 
             if ($j == 1) {
-                $sql5 = "SELECT * FROM nuke_iblplyr WHERE teamname = '$teamlogo' AND altpos = 'PG' AND retired = '0' ORDER BY ordinal ASC ";
+                $sql5 = "SELECT * FROM ibl_plr WHERE teamname = '$teamlogo' AND altpos = 'PG' AND retired = '0' ORDER BY ordinal ASC ";
                 $result5 = $db->sql_query($sql5);
                 $num5 = $db->sql_numrows($result5);
             } else if ($j == 2) {
-                $sql5 = "SELECT * FROM nuke_iblplyr WHERE teamname = '$teamlogo' AND altpos = 'G' AND retired = '0' ORDER BY ordinal ASC ";
+                $sql5 = "SELECT * FROM ibl_plr WHERE teamname = '$teamlogo' AND altpos = 'G' AND retired = '0' ORDER BY ordinal ASC ";
                 $result5 = $db->sql_query($sql5);
                 $num5 = $db->sql_numrows($result5);
             } else if ($j == 3) {
-                $sql5 = "SELECT * FROM nuke_iblplyr WHERE teamname = '$teamlogo' AND altpos = 'SG' AND retired = '0' ORDER BY ordinal ASC ";
+                $sql5 = "SELECT * FROM ibl_plr WHERE teamname = '$teamlogo' AND altpos = 'SG' AND retired = '0' ORDER BY ordinal ASC ";
                 $result5 = $db->sql_query($sql5);
                 $num5 = $db->sql_numrows($result5);
             } else if ($j == 4) {
-                $sql5 = "SELECT * FROM nuke_iblplyr WHERE teamname = '$teamlogo' AND altpos = 'GF' AND retired = '0' ORDER BY ordinal ASC ";
+                $sql5 = "SELECT * FROM ibl_plr WHERE teamname = '$teamlogo' AND altpos = 'GF' AND retired = '0' ORDER BY ordinal ASC ";
                 $result5 = $db->sql_query($sql5);
                 $num5 = $db->sql_numrows($result5);
             } else if ($j == 5) {
-                $sql5 = "SELECT * FROM nuke_iblplyr WHERE teamname = '$teamlogo' AND altpos = 'SF' AND retired = '0' ORDER BY ordinal ASC ";
+                $sql5 = "SELECT * FROM ibl_plr WHERE teamname = '$teamlogo' AND altpos = 'SF' AND retired = '0' ORDER BY ordinal ASC ";
                 $result5 = $db->sql_query($sql5);
                 $num5 = $db->sql_numrows($result5);
             } else if ($j == 6) {
-                $sql5 = "SELECT * FROM nuke_iblplyr WHERE teamname = '$teamlogo' AND altpos = 'F' AND retired = '0' ORDER BY ordinal ASC ";
+                $sql5 = "SELECT * FROM ibl_plr WHERE teamname = '$teamlogo' AND altpos = 'F' AND retired = '0' ORDER BY ordinal ASC ";
                 $result5 = $db->sql_query($sql5);
                 $num5 = $db->sql_numrows($result5);
             } else if ($j == 7) {
-                $sql5 = "SELECT * FROM nuke_iblplyr WHERE teamname = '$teamlogo' AND altpos = 'PF' AND retired = '0' ORDER BY ordinal ASC ";
+                $sql5 = "SELECT * FROM ibl_plr WHERE teamname = '$teamlogo' AND altpos = 'PF' AND retired = '0' ORDER BY ordinal ASC ";
                 $result5 = $db->sql_query($sql5);
                 $num5 = $db->sql_numrows($result5);
             } else if ($j == 8) {
-                $sql5 = "SELECT * FROM nuke_iblplyr WHERE teamname = '$teamlogo' AND altpos = 'FC' AND retired = '0' ORDER BY ordinal ASC ";
+                $sql5 = "SELECT * FROM ibl_plr WHERE teamname = '$teamlogo' AND altpos = 'FC' AND retired = '0' ORDER BY ordinal ASC ";
                 $result5 = $db->sql_query($sql5);
                 $num5 = $db->sql_numrows($result5);
             } else {
-                $sql5 = "SELECT * FROM nuke_iblplyr WHERE teamname = '$teamlogo' AND altpos = 'C' AND retired = '0' ORDER BY ordinal ASC ";
+                $sql5 = "SELECT * FROM ibl_plr WHERE teamname = '$teamlogo' AND altpos = 'C' AND retired = '0' ORDER BY ordinal ASC ";
                 $result5 = $db->sql_query($sql5);
                 $num5 = $db->sql_numrows($result5);
             }
@@ -3041,7 +3041,7 @@ function changesetgo($username, $action, $set, $type, $position)
         $query_loc = $query_loc . '_High_Range';
     }
 
-    $sqla = "SELECT * FROM nuke_ibl_offense_sets WHERE `TeamName` = '$teamlogo' AND `SetNumber` = '$set'";
+    $sqla = "SELECT * FROM ibl_offense_sets WHERE `TeamName` = '$teamlogo' AND `SetNumber` = '$set'";
     $resulta = $db->sql_query($sqla);
 
     $newtarget = $db->sql_result($resulta, 0, "$query_loc");
@@ -3064,7 +3064,7 @@ function changesetgo($username, $action, $set, $type, $position)
     /* ONCE SEASON STARTS DISABLE CHANGE OPTION                            */
     /***********************************************************************/
 
-    $sqlb = "UPDATE nuke_ibl_offense_sets SET `$query_loc` = '$newtarget' WHERE `TeamName` = '$teamlogo' AND `SetNumber` = '$set'";
+    $sqlb = "UPDATE ibl_offense_sets SET `$query_loc` = '$newtarget' WHERE `TeamName` = '$teamlogo' AND `SetNumber` = '$set'";
     $resultb = $db->sql_query($sqlb);
 
     echo "Your change has been made; please click the button to view changes.";
@@ -3194,7 +3194,7 @@ $sharedFunctions->displaytopmenu($tid);
 // === GRAB TEAM INFORMATION FOR LOGGED-IN USER===
 
 $teamlogo = $userinfo[user_ibl_team];
-$queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$teamlogo'";
+$queryTeamID = "SELECT teamid FROM ibl_team_info WHERE team_name = '$teamlogo'";
 $tid = $db->sql_result($db->sql_query($queryTeamID), 0);
 
 echo "<hr>
@@ -3349,7 +3349,7 @@ echo "<b>Cheater!  Each category can't have more than 7 points allocated!</b>";
 
 if ($n_total < 89)
 {
-$sqla = "UPDATE nuke_ibl_training SET `2ga` = '$n_fga', `2gp` = '$n_fgp', `fta` = '$n_fta', `ftp` = '$n_ftp', `3ga` = '$n_tga', `3gp` = '$n_tgp', `orb` = '$n_orb', `drb` = '$n_drb', `ast` = '$n_ast', `stl` = '$n_stl', `tvr` = '$n_tvr', `blk` = '$n_blk', `oo` = '$n_oo', `do` = '$n_do', `po` = '$n_po', `to` = '$n_to', `od` = '$n_od', `dd` = '$n_dd', `pd` = '$n_pd', `td` = '$n_td', `Foul` = '$n_Foul', `Sta` = '$n_Sta' WHERE `teamname` = '$teamlogo' AND `training_set` = '$k'";
+$sqla = "UPDATE ibl_training SET `2ga` = '$n_fga', `2gp` = '$n_fgp', `fta` = '$n_fta', `ftp` = '$n_ftp', `3ga` = '$n_tga', `3gp` = '$n_tgp', `orb` = '$n_orb', `drb` = '$n_drb', `ast` = '$n_ast', `stl` = '$n_stl', `tvr` = '$n_tvr', `blk` = '$n_blk', `oo` = '$n_oo', `do` = '$n_do', `po` = '$n_po', `to` = '$n_to', `od` = '$n_od', `dd` = '$n_dd', `pd` = '$n_pd', `td` = '$n_td', `Foul` = '$n_Foul', `Sta` = '$n_Sta' WHERE `teamname` = '$teamlogo' AND `training_set` = '$k'";
 $resultadj= $db->sql_query($sqla);
 }
 if ($n_total > 88)
@@ -3360,7 +3360,7 @@ echo "Error!  Too many training points allocated (you allocated $n_total, you ca
 }
 }
 
-$sqltr = "SELECT * FROM nuke_ibl_training WHERE teamname = '$teamlogo' ";
+$sqltr = "SELECT * FROM ibl_training WHERE teamname = '$teamlogo' ";
 $resulttr = $db->sql_query($sqltr);
 $numtr = $db->sql_numrows($resulttr);
 $i = 0;
@@ -3541,7 +3541,7 @@ function standings($team)
 {
     global $db;
 
-    $query = "SELECT * FROM nuke_ibl_power WHERE Team = '$team'";
+    $query = "SELECT * FROM ibl_power WHERE Team = '$team'";
     $result = $db->sql_query($query);
     $num = $db->sql_numrows($result);
     $Team = $db->sql_result($result, 0, "Team");
@@ -3557,7 +3557,7 @@ function standings($team)
     $last_win = $db->sql_result($result, 0, "last_win");
     $last_loss = $db->sql_result($result, 0, "last_loss");
 
-    $query2 = "SELECT * FROM nuke_ibl_power WHERE Division = '$division' ORDER BY gb DESC";
+    $query2 = "SELECT * FROM ibl_power WHERE Division = '$division' ORDER BY gb DESC";
     $result2 = $db->sql_query($query2);
     $num = $db->sql_numrows($result2);
     $i = 0;
@@ -3571,7 +3571,7 @@ function standings($team)
         $i++;
     }
 
-    $query3 = "SELECT * FROM nuke_ibl_power WHERE Conference = '$conference' ORDER BY gb DESC";
+    $query3 = "SELECT * FROM ibl_power WHERE Conference = '$conference' ORDER BY gb DESC";
     $result3 = $db->sql_query($query3);
     $num = $db->sql_numrows($result3);
     $i = 0;
@@ -3633,10 +3633,10 @@ function asg_voting()
         if ($teamlogo == "") {
             echo "Sorry, you must be logged in to vote.<br>";
         } else {
-            $queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$teamlogo'";
+            $queryTeamID = "SELECT teamid FROM ibl_team_info WHERE team_name = '$teamlogo'";
             $tid = $db->sql_result($db->sql_query($queryTeamID), 0);
             echo "<form name=\"ASGVote\" method=\"post\" action=\"./ASGVote.php\"><center><img src=\"images/logo/$tid.jpg\"><br><br>";
-            $query = "SELECT * FROM nuke_iblplyr where pos = 'C' and (tid = '1' or tid = '26' or tid = '4' or tid = '3' or tid = '21' or tid = '2' or tid = '24' or tid = '29' or tid = '6' or tid = '27' or tid = '9' or tid = '7' or tid = '10' or tid = '5' or tid = '8' or tid = '31') and teamname != 'Retired' and stats_gm > '10' order by (((stats_3gm*3)+stats_ftm+(stats_fgm-stats_3gm)*2)+stats_orb+stats_drb+(2*stats_ast)+(2*stats_stl)+(2*stats_blk)-((stats_fga-stats_fgm)+(stats_fta-stats_ftm)+stats_to+stats_pf))/stats_gm desc";
+            $query = "SELECT * FROM ibl_plr where pos = 'C' and (tid = '1' or tid = '26' or tid = '4' or tid = '3' or tid = '21' or tid = '2' or tid = '24' or tid = '29' or tid = '6' or tid = '27' or tid = '9' or tid = '7' or tid = '10' or tid = '5' or tid = '8' or tid = '31') and teamname != 'Retired' and stats_gm > '10' order by (((stats_3gm*3)+stats_ftm+(stats_fgm-stats_3gm)*2)+stats_orb+stats_drb+(2*stats_ast)+(2*stats_stl)+(2*stats_blk)-((stats_fga-stats_fgm)+(stats_fta-stats_ftm)+stats_to+stats_pf))/stats_gm desc";
             $result = $db->sql_query($query);
             while ($row = $db->sql_fetch_assoc($result)) {
                 $ppg = floatval($row['stats_3gm'] * 3 + ($row['stats_fgm'] - $row['stats_3gm']) * 2 + $row['stats_ftm']) / intval($row['stats_gm']);
@@ -3661,7 +3661,7 @@ function asg_voting()
                 $gs = floatval($row['stats_gs']);
                 $dd .= "<option value='" . $row['name'] . ", " . $row['teamname'] . "'>" . $row['name'] . ", " . $row['teamname'] . ", " . $ppg . " pts, " . $rpg . " reb, " . $apg . " ast, " . $spg . " stl,  " . $tpg . " to, " . $bpg . " blk, " . $fgp . " fgp, " . $ftp . " ftp, " . $tpp . " 3gp, " . $gm . " gm, " . $gs . " gs</option>";
             }
-            $query1 = "SELECT * FROM nuke_iblplyr where (pos = 'PF' or pos = 'SF') and (tid = '1' or tid = '26' or tid = '4' or tid = '3' or tid = '21' or tid = '2' or tid = '24' or tid = '29' or tid = '6' or tid = '27' or tid = '9' or tid = '7' or tid = '10' or tid = '5' or tid = '8' or tid = '31') and teamname != 'Retired' order by (((stats_3gm*3)+stats_ftm+(stats_fgm-stats_3gm)*2)+stats_orb+stats_drb+(2*stats_ast)+(2*stats_stl)+(2*stats_blk)-((stats_fga-stats_fgm)+(stats_fta-stats_ftm)+stats_to+stats_pf))/stats_gm desc";
+            $query1 = "SELECT * FROM ibl_plr where (pos = 'PF' or pos = 'SF') and (tid = '1' or tid = '26' or tid = '4' or tid = '3' or tid = '21' or tid = '2' or tid = '24' or tid = '29' or tid = '6' or tid = '27' or tid = '9' or tid = '7' or tid = '10' or tid = '5' or tid = '8' or tid = '31') and teamname != 'Retired' order by (((stats_3gm*3)+stats_ftm+(stats_fgm-stats_3gm)*2)+stats_orb+stats_drb+(2*stats_ast)+(2*stats_stl)+(2*stats_blk)-((stats_fga-stats_fgm)+(stats_fta-stats_ftm)+stats_to+stats_pf))/stats_gm desc";
             $result1 = $db->sql_query($query1);
             while ($row = $db->sql_fetch_assoc($result1)) {
                 $ppg = floatval($row['stats_3gm'] * 3 + ($row['stats_fgm'] - $row['stats_3gm']) * 2 + $row['stats_ftm']) / intval($row['stats_gm']);
@@ -3686,7 +3686,7 @@ function asg_voting()
                 $gs = floatval($row['stats_gs']);
                 $ff .= "<option value='" . $row['name'] . ", " . $row['teamname'] . "'>" . $row['name'] . ", " . $row['teamname'] . ", " . $ppg . " pts, " . $rpg . " reb, " . $apg . " ast, " . $spg . " stl,  " . $tpg . " to, " . $bpg . " blk, " . $fgp . " fgp, " . $ftp . " ftp, " . $tpp . " 3gp, " . $gm . " gm, " . $gs . " gs</option>";
             }
-            $query2 = "SELECT * FROM nuke_iblplyr where (pos = 'PG' or pos = 'SG') and (tid = '1' or tid = '26' or tid = '4' or tid = '3' or tid = '21' or tid = '2' or tid = '24' or tid = '29' or tid = '6' or tid = '27' or tid = '9' or tid = '7' or tid = '10' or tid = '5' or tid = '8' or tid = '31') and teamname != 'Retired' order by (((stats_3gm*3)+stats_ftm+(stats_fgm-stats_3gm)*2)+stats_orb+stats_drb+(2*stats_ast)+(2*stats_stl)+(2*stats_blk)-((stats_fga-stats_fgm)+(stats_fta-stats_ftm)+stats_to+stats_pf))/stats_gm desc";
+            $query2 = "SELECT * FROM ibl_plr where (pos = 'PG' or pos = 'SG') and (tid = '1' or tid = '26' or tid = '4' or tid = '3' or tid = '21' or tid = '2' or tid = '24' or tid = '29' or tid = '6' or tid = '27' or tid = '9' or tid = '7' or tid = '10' or tid = '5' or tid = '8' or tid = '31') and teamname != 'Retired' order by (((stats_3gm*3)+stats_ftm+(stats_fgm-stats_3gm)*2)+stats_orb+stats_drb+(2*stats_ast)+(2*stats_stl)+(2*stats_blk)-((stats_fga-stats_fgm)+(stats_fta-stats_ftm)+stats_to+stats_pf))/stats_gm desc";
             $result2 = $db->sql_query($query2);
             while ($row = $db->sql_fetch_assoc($result2)) {
                 $ppg = floatval($row['stats_3gm'] * 3 + ($row['stats_fgm'] - $row['stats_3gm']) * 2 + $row['stats_ftm']) / intval($row['stats_gm']);
@@ -3711,7 +3711,7 @@ function asg_voting()
                 $gs = floatval($row['stats_gs']);
                 $hh .= "<option value='" . $row['name'] . ", " . $row['teamname'] . "'>" . $row['name'] . ", " . $row['teamname'] . ", " . $ppg . " pts, " . $rpg . " reb, " . $apg . " ast, " . $spg . " stl,  " . $tpg . " to, " . $bpg . " blk, " . $fgp . " fgp, " . $ftp . " ftp, " . $tpp . " 3gp, " . $gm . " gm, " . $gs . " gs</option>";
             }
-            $query3 = "SELECT * FROM nuke_iblplyr where pos = 'C' and (tid = '11' or tid = '25' or tid = '30' or tid = '13' or tid = '14' or tid = '15' or tid = '12' or tid = '32' or tid = '16' or tid = '17' or tid = '22' or tid = '20' or tid = '19' or tid = '23' or tid = '18' or tid = '28') and teamname != 'Retired' order by (((stats_3gm*3)+stats_ftm+(stats_fgm-stats_3gm)*2)+stats_orb+stats_drb+(2*stats_ast)+(2*stats_stl)+(2*stats_blk)-((stats_fga-stats_fgm)+(stats_fta-stats_ftm)+stats_to+stats_pf))/stats_gm desc";
+            $query3 = "SELECT * FROM ibl_plr where pos = 'C' and (tid = '11' or tid = '25' or tid = '30' or tid = '13' or tid = '14' or tid = '15' or tid = '12' or tid = '32' or tid = '16' or tid = '17' or tid = '22' or tid = '20' or tid = '19' or tid = '23' or tid = '18' or tid = '28') and teamname != 'Retired' order by (((stats_3gm*3)+stats_ftm+(stats_fgm-stats_3gm)*2)+stats_orb+stats_drb+(2*stats_ast)+(2*stats_stl)+(2*stats_blk)-((stats_fga-stats_fgm)+(stats_fta-stats_ftm)+stats_to+stats_pf))/stats_gm desc";
             $result3 = $db->sql_query($query3);
             while ($row = $db->sql_fetch_assoc($result3)) {
                 $ppg = floatval($row['stats_3gm'] * 3 + ($row['stats_fgm'] - $row['stats_3gm']) * 2 + $row['stats_ftm']) / intval($row['stats_gm']);
@@ -3736,7 +3736,7 @@ function asg_voting()
                 $gs = floatval($row['stats_gs']);
                 $ii .= "<option value='" . $row['name'] . ", " . $row['teamname'] . "'>" . $row['name'] . ", " . $row['teamname'] . ", " . $ppg . " pts, " . $rpg . " reb, " . $apg . " ast, " . $spg . " stl,  " . $tpg . " to, " . $bpg . " blk, " . $fgp . " fgp, " . $ftp . " ftp, " . $tpp . " 3gp, " . $gm . " gm, " . $gs . " gs</option>";
             }
-            $query4 = "SELECT * FROM nuke_iblplyr where (pos = 'PF' or pos = 'SF') and (tid = '11' or tid = '25' or tid = '30' or tid = '13' or tid = '14' or tid = '15' or tid = '12' or tid = '32' or tid = '16' or tid = '17' or tid = '22' or tid = '20' or tid = '19' or tid = '23' or tid = '18' or tid = '28') and teamname != 'Retired' order by (((stats_3gm*3)+stats_ftm+(stats_fgm-stats_3gm)*2)+stats_orb+stats_drb+(2*stats_ast)+(2*stats_stl)+(2*stats_blk)-((stats_fga-stats_fgm)+(stats_fta-stats_ftm)+stats_to+stats_pf))/stats_gm desc";
+            $query4 = "SELECT * FROM ibl_plr where (pos = 'PF' or pos = 'SF') and (tid = '11' or tid = '25' or tid = '30' or tid = '13' or tid = '14' or tid = '15' or tid = '12' or tid = '32' or tid = '16' or tid = '17' or tid = '22' or tid = '20' or tid = '19' or tid = '23' or tid = '18' or tid = '28') and teamname != 'Retired' order by (((stats_3gm*3)+stats_ftm+(stats_fgm-stats_3gm)*2)+stats_orb+stats_drb+(2*stats_ast)+(2*stats_stl)+(2*stats_blk)-((stats_fga-stats_fgm)+(stats_fta-stats_ftm)+stats_to+stats_pf))/stats_gm desc";
             $result4 = $db->sql_query($query4);
             while ($row = $db->sql_fetch_assoc($result4)) {
                 $ppg = floatval($row['stats_3gm'] * 3 + ($row['stats_fgm'] - $row['stats_3gm']) * 2 + $row['stats_ftm']) / intval($row['stats_gm']);
@@ -3761,7 +3761,7 @@ function asg_voting()
                 $gs = floatval($row['stats_gs']);
                 $jj .= "<option value='" . $row['name'] . ", " . $row['teamname'] . "'>" . $row['name'] . ", " . $row['teamname'] . ", " . $ppg . " pts, " . $rpg . " reb, " . $apg . " ast, " . $spg . " stl,  " . $tpg . " to, " . $bpg . " blk, " . $fgp . " fgp, " . $ftp . " ftp, " . $tpp . " 3gp, " . $gm . " gm, " . $gs . " gs</option>";
             }
-            $query5 = "SELECT * FROM nuke_iblplyr where (pos = 'PG' or pos = 'SG') and (tid = '11' or tid = '25' or tid = '30' or tid = '13' or tid = '14' or tid = '15' or tid = '12' or tid = '32' or tid = '16' or tid = '17' or tid = '22' or tid = '20' or tid = '19' or tid = '23' or tid = '18' or tid = '28') and teamname != 'Retired' order by (((stats_3gm*3)+stats_ftm+(stats_fgm-stats_3gm)*2)+stats_orb+stats_drb+(2*stats_ast)+(2*stats_stl)+(2*stats_blk)-((stats_fga-stats_fgm)+(stats_fta-stats_ftm)+stats_to+stats_pf))/stats_gm desc";
+            $query5 = "SELECT * FROM ibl_plr where (pos = 'PG' or pos = 'SG') and (tid = '11' or tid = '25' or tid = '30' or tid = '13' or tid = '14' or tid = '15' or tid = '12' or tid = '32' or tid = '16' or tid = '17' or tid = '22' or tid = '20' or tid = '19' or tid = '23' or tid = '18' or tid = '28') and teamname != 'Retired' order by (((stats_3gm*3)+stats_ftm+(stats_fgm-stats_3gm)*2)+stats_orb+stats_drb+(2*stats_ast)+(2*stats_stl)+(2*stats_blk)-((stats_fga-stats_fgm)+(stats_fta-stats_ftm)+stats_to+stats_pf))/stats_gm desc";
             $result5 = $db->sql_query($query5);
             while ($row = $db->sql_fetch_assoc($result5)) {
                 $ppg = floatval($row['stats_3gm'] * 3 + ($row['stats_fgm'] - $row['stats_3gm']) * 2 + $row['stats_ftm']) / intval($row['stats_gm']);
@@ -3878,10 +3878,10 @@ function eoy_voting()
         if ($teamlogo == "") {
             echo "Sorry, you must be logged in to vote.<br>";
         } else {
-            $queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$teamlogo'";
+            $queryTeamID = "SELECT teamid FROM ibl_team_info WHERE team_name = '$teamlogo'";
             $tid = $db->sql_result($db->sql_query($queryTeamID), 0);
             echo "<form name=\"EOYVote\" method=\"post\" action=\"./EOYVote.php\"><center><img src=\"images/logo/$tid.jpg\"><br><br>";
-            $query = "SELECT * FROM nuke_iblplyr where teamname != 'Retired' and stats_gm >= '55' and (stats_min/stats_gm) >= 24 order by (((stats_3gm*3)+stats_ftm+(stats_fgm-stats_3gm)*2)+stats_orb+stats_drb+(2*stats_ast)+(2*stats_stl)+(2*stats_blk)-((stats_fga-stats_fgm)+(stats_fta-stats_ftm)+stats_to+stats_pf))/stats_gm desc";
+            $query = "SELECT * FROM ibl_plr where teamname != 'Retired' and stats_gm >= '55' and (stats_min/stats_gm) >= 24 order by (((stats_3gm*3)+stats_ftm+(stats_fgm-stats_3gm)*2)+stats_orb+stats_drb+(2*stats_ast)+(2*stats_stl)+(2*stats_blk)-((stats_fga-stats_fgm)+(stats_fta-stats_ftm)+stats_to+stats_pf))/stats_gm desc";
 
             $result = $db->sql_query($query);
             while ($row = $db->sql_fetch_assoc($result)) {
@@ -3907,7 +3907,7 @@ function eoy_voting()
                 $gs = floatval($row['stats_gs']);
                 $dd .= "<option value='" . $row['name'] . ", " . $row['teamname'] . "'>" . $row['name'] . ", " . $row['teamname'] . ", " . $ppg . " pts, " . $rpg . " reb, " . $apg . " ast, " . $spg . " stl,  " . $tpg . " to, " . $bpg . " blk, " . $fgp . " fgp, " . $ftp . " ftp, " . $tpp . " 3gp, " . $gm . " gm, " . $gs . " gs</option>";
             }
-            $query1 = "SELECT * FROM nuke_iblplyr where teamname != 'Retired' and (stats_gs/stats_gm) <= '0.5' and stats_gm > '55' order by (((stats_3gm*3)+stats_ftm+(stats_fgm-stats_3gm)*2)+stats_orb+stats_drb+(2*stats_ast)+(2*stats_stl)+(2*stats_blk)-((stats_fga-stats_fgm)+(stats_fta-stats_ftm)+stats_to+stats_pf))/stats_gm desc";
+            $query1 = "SELECT * FROM ibl_plr where teamname != 'Retired' and (stats_gs/stats_gm) <= '0.5' and stats_gm > '55' order by (((stats_3gm*3)+stats_ftm+(stats_fgm-stats_3gm)*2)+stats_orb+stats_drb+(2*stats_ast)+(2*stats_stl)+(2*stats_blk)-((stats_fga-stats_fgm)+(stats_fta-stats_ftm)+stats_to+stats_pf))/stats_gm desc";
             $result1 = $db->sql_query($query1);
             while ($row = $db->sql_fetch_assoc($result1)) {
                 $ppg = floatval($row['stats_3gm'] * 3 + ($row['stats_fgm'] - $row['stats_3gm']) * 2 + $row['stats_ftm']) / intval($row['stats_gm']);
@@ -3932,7 +3932,7 @@ function eoy_voting()
                 $gs = floatval($row['stats_gs']);
                 $ff .= "<option value='" . $row['name'] . ", " . $row['teamname'] . "'>" . $row['name'] . ", " . $row['teamname'] . ", " . $ppg . " pts, " . $rpg . " reb, " . $apg . " ast, " . $spg . " stl,  " . $tpg . " to, " . $bpg . " blk, " . $fgp . " fgp, " . $ftp . " ftp, " . $tpp . " 3gp, " . $gm . " gm, " . $gs . " gs</option>";
             }
-            $query2 = "SELECT * FROM nuke_iblplyr where teamname != 'Retired' and exp = '1' and stats_gm >= '55' and (stats_min/stats_gm) >= 24 order by (((stats_3gm*3)+stats_ftm+(stats_fgm-stats_3gm)*2)+stats_orb+stats_drb+(2*stats_ast)+(2*stats_stl)+(2*stats_blk)-((stats_fga-stats_fgm)+(stats_fta-stats_ftm)+stats_to+stats_pf))/stats_gm desc";
+            $query2 = "SELECT * FROM ibl_plr where teamname != 'Retired' and exp = '1' and stats_gm >= '55' and (stats_min/stats_gm) >= 24 order by (((stats_3gm*3)+stats_ftm+(stats_fgm-stats_3gm)*2)+stats_orb+stats_drb+(2*stats_ast)+(2*stats_stl)+(2*stats_blk)-((stats_fga-stats_fgm)+(stats_fta-stats_ftm)+stats_to+stats_pf))/stats_gm desc";
             $result2 = $db->sql_query($query2);
             while ($row = $db->sql_fetch_assoc($result2)) {
                 $ppg = floatval($row['stats_3gm'] * 3 + ($row['stats_fgm'] - $row['stats_3gm']) * 2 + $row['stats_ftm']) / intval($row['stats_gm']);
@@ -3957,7 +3957,7 @@ function eoy_voting()
                 $gs = floatval($row['stats_gs']);
                 $hh .= "<option value='" . $row['name'] . ", " . $row['teamname'] . "'>" . $row['name'] . ", " . $row['teamname'] . ", " . $ppg . " pts, " . $rpg . " reb, " . $apg . " ast, " . $spg . " stl,  " . $tpg . " to, " . $bpg . " blk, " . $fgp . " fgp, " . $ftp . " ftp, " . $tpp . " 3gp, " . $gm . " gm, " . $gs . " gs</option>";
             }
-            $query3 = "SELECT * from nuke_ibl_team_info where teamid != '35' order by owner_name";
+            $query3 = "SELECT * from ibl_team_info where teamid != '35' order by owner_name";
             $result3 = $db->sql_query($query3);
             while ($row = $db->sql_fetch_assoc($result3)) {
                 $ii .= "<option value='" . $row['owner_name'] . ", " . $row['team_city'] . " " . $row['team_name'] . "'>" . $row['owner_name'] . ", " . $row['team_city'] . " " . $row['team_name'] . "</option>";

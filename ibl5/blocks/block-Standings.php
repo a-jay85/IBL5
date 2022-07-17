@@ -41,7 +41,7 @@ function standings($division)
 {
     global $db;
 
-    $query = "SELECT * FROM nuke_ibl_power WHERE Division = '$division' ORDER BY gb DESC";
+    $query = "SELECT * FROM ibl_power WHERE Division = '$division' ORDER BY gb DESC";
     $result = $db->sql_query($query);
     $num = $db->sql_numrows($result);
     $i = 0;

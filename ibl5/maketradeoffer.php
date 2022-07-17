@@ -2,11 +2,11 @@
 
 require 'mainfile.php';
 
-$query0 = "SELECT * FROM nuke_ibl_trade_autocounter ORDER BY `counter` DESC";
+$query0 = "SELECT * FROM ibl_trade_autocounter ORDER BY `counter` DESC";
 $result0 = $db->sql_query($query0);
 $tradeofferid = $db->sql_result($result0, 0, "counter") + 1;
 
-$query0a = "INSERT INTO nuke_ibl_trade_autocounter ( `counter` ) VALUES ( '$tradeofferid') ";
+$query0a = "INSERT INTO ibl_trade_autocounter ( `counter` ) VALUES ( '$tradeofferid') ";
 $result0a = $db->sql_query($query0a);
 
 $Team_Offering = $_POST['Team_Name'];
@@ -85,7 +85,7 @@ if ($error == 0) {
         $Index = $_POST['index' . $k];
         $Check = $_POST['check' . $k];
         if ($Check == "on") {
-            $queryi = "INSERT INTO nuke_ibl_trade_info ( `tradeofferid` , `itemid` , `itemtype` , `from` , `to` , `approval` ) VALUES ( '$tradeofferid', '$Index', '$Type', '$Team_Offering', '$Team_Receiving' , '$Team_Receiving' )";
+            $queryi = "INSERT INTO ibl_trade_info ( `tradeofferid` , `itemid` , `itemtype` , `from` , `to` , `approval` ) VALUES ( '$tradeofferid', '$Index', '$Type', '$Team_Offering', '$Team_Receiving' , '$Team_Receiving' )";
             $resulti = $db->sql_query($queryi);
         }
         $k++;
@@ -96,7 +96,7 @@ if ($error == 0) {
         $Index = $_POST['index' . $k];
         $Check = $_POST['check' . $k];
         if ($Check == "on") {
-            $queryi = "INSERT INTO nuke_ibl_trade_info ( `tradeofferid` , `itemid` , `itemtype` , `from` , `to` , `approval` ) VALUES ( '$tradeofferid', '$Index', '$Type', '$Team_Receiving', '$Team_Offering' , '$Team_Receiving' )";
+            $queryi = "INSERT INTO ibl_trade_info ( `tradeofferid` , `itemid` , `itemtype` , `from` , `to` , `approval` ) VALUES ( '$tradeofferid', '$Index', '$Type', '$Team_Receiving', '$Team_Offering' , '$Team_Receiving' )";
             $resulti = $db->sql_query($queryi);
         }
         $k++;

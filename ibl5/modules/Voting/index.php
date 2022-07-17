@@ -82,7 +82,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
             }
 
             $query = "SELECT *
-				FROM nuke_iblplyr
+				FROM ibl_plr
 				WHERE pos IN ($positions)
 					AND tid IN ('" . formatTidsForSqlQuery($conferenceTids) . "')
 					AND retired != 1
@@ -90,25 +90,25 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 				ORDER BY name";
         } else {
             $mvpQuery = "SELECT *
-				FROM nuke_iblplyr
+				FROM ibl_plr
 				WHERE retired != 1
 					AND stats_gm >= '50'
 					AND stats_min/stats_gm >= '30'
 				ORDER BY name";
             $sixthQuery = "SELECT *
-				FROM nuke_iblplyr
+				FROM ibl_plr
 				WHERE retired != 1
 					AND stats_min/stats_gm >= 15
 					AND stats_gs/stats_gm <= '.5'
 				ORDER BY name";
             $royQuery = "SELECT *
-				FROM nuke_iblplyr
+				FROM ibl_plr
 				WHERE retired != 1
 					AND exp = '1'
 					AND stats_gm >= '10'
 				ORDER BY name";
             $gmQuery = "SELECT owner_name, team_city, team_name
-			 	FROM nuke_ibl_team_info
+			 	FROM ibl_team_info
 				WHERE teamid != '35'
 				ORDER BY owner_name";
 

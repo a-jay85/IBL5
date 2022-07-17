@@ -5,7 +5,7 @@ $sharedFunctions = new Shared($db);
 
 $currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
 
-$stringTeamIDsNames = "SELECT teamid,team_name FROM nuke_ibl_team_info ORDER BY teamid ASC;";
+$stringTeamIDsNames = "SELECT teamid,team_name FROM ibl_team_info ORDER BY teamid ASC;";
 $queryTeamIDsNames = $db->sql_query($stringTeamIDsNames);
 $numRowsTeamIDsNames = $db->sql_numrows($queryTeamIDsNames);
 
@@ -192,7 +192,7 @@ while (!feof($plrFile)) {
     }
 
     if ($ordinal <= 1440) {
-        $playerUpdateQuery = "INSERT INTO nuke_iblplyr__test
+        $playerUpdateQuery = "INSERT INTO ibl_plr__test
             (   `ordinal`,
                 `name`,
                 `age`,
@@ -605,7 +605,7 @@ $i = 0;
 while ($i < $numRowsTeamIDsNames) {
     $teamname = $db->sql_result($queryTeamIDsNames, $i, 'team_name');
     $teamID = $db->sql_result($queryTeamIDsNames, $i, 'teamid');
-    $teamnameUpdateQuery = "UPDATE `nuke_iblplyr__test` SET `teamname` = '$teamname' WHERE `tid` = $teamID;";
+    $teamnameUpdateQuery = "UPDATE `ibl_plr__test` SET `teamname` = '$teamname' WHERE `tid` = $teamID;";
     if ($db->sql_query($teamnameUpdateQuery)) {
         echo $teamnameUpdateQuery . '<br>';
     }

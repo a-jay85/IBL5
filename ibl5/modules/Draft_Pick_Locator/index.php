@@ -2,7 +2,7 @@
 
 $sharedFunctions = new Shared($db);
 
-$query = "SELECT * FROM nuke_ibl_team_info WHERE teamid != 35 ORDER BY teamid ASC";
+$query = "SELECT * FROM ibl_team_info WHERE teamid != 35 ORDER BY teamid ASC";
 $result = $db->sql_query($query);
 $num = $db->sql_numrows($result);
 

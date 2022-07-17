@@ -32,24 +32,24 @@ if (isset($_POST['query'])) {
             $successText = "Allow Trades Status has been set to {$_POST['Trades']}.";
             break;
         case 'Reset All Contract Extensions':
-            $queryString = "UPDATE nuke_ibl_team_info SET Used_Extension_This_Season = 0;";
+            $queryString = "UPDATE ibl_team_info SET Used_Extension_This_Season = 0;";
             $successText = "All teams' contract extensions have been reset.";
             break;
         case 'Reset All MLEs/LLEs':
-            $queryString = "UPDATE nuke_ibl_team_info SET HasMLE = 1, HasLLE = 1;";
+            $queryString = "UPDATE ibl_team_info SET HasMLE = 1, HasLLE = 1;";
             $successText = "All teams' MLEs and LLEs have been reset.";
             break;
         case 'Set all undefined player positions':
-            $queryString = "UPDATE nuke_iblplyr SET altpos = pos WHERE altpos = \"\"";
+            $queryString = "UPDATE ibl_plr SET altpos = pos WHERE altpos = \"\"";
             $successText = "All undefined player positions have been set.";
             break;
         case 'Set all players on waivers to Free Agents and reset their Bird years':
-            $queryString = "UPDATE nuke_iblplyr SET teamname = 'Free Agents', bird = 0 WHERE retired != 1 AND ordinal >= 960;";
+            $queryString = "UPDATE ibl_plr SET teamname = 'Free Agents', bird = 0 WHERE retired != 1 AND ordinal >= 960;";
             $successText = "All players currently on waivers have their teamname set to Free Agents and 0 Bird years.";
             break;
         case 'Set Free Agency factors for PFW':
             if ($currentSeasonPhase == 'Draft' or $currentSeasonPhase == 'Free Agency') {
-                $queryString = "UPDATE nuke_ibl_team_info info, nuke_ibl_power power
+                $queryString = "UPDATE ibl_team_info info, ibl_power power
                     SET Contract_Wins = power.win,
                     	Contract_Losses = power.loss
                     WHERE power.TeamID = info.teamid;";

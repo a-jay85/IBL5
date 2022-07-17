@@ -498,12 +498,12 @@ echo '<p>The ibl_schedule and ibl_standings table have been updated.<p>';
 //*****************************************************************************
 //*** POWER RANKINGS UPDATE
 //*****************************************************************************
-//This section updates nuke_ibl_power. This replaces power_ranking_update.php.
+//This section updates ibl_power. This replaces power_ranking_update.php.
 
-echo '<p>Updating the nuke_ibl_power database table...<p>';
+echo '<p>Updating the ibl_power database table...<p>';
 
 $queryTeams = "SELECT TeamID, Team, streak_type, streak
-	FROM nuke_ibl_power
+	FROM ibl_power
 	WHERE TeamID
 	BETWEEN 1 AND 32
 	ORDER BY TeamID ASC";
@@ -547,7 +547,7 @@ while ($i < $numTeams) {
         if ($awayTeamScore !== $homeTeamScore) { // Ignore tied games since they're usually 0-0 games that haven't yet occurred
             if ($tid == $awayTeam) {
                 $queryOpponentWinLoss = "SELECT win, loss
-					FROM nuke_ibl_power
+					FROM ibl_power
 					WHERE TeamID = $homeTeam";
                 $resultOpponentWinLoss = $db->sql_query($queryOpponentWinLoss);
                 $opponentWins = $db->sql_result($resultOpponentWinLoss, 0, "win");
@@ -582,7 +582,7 @@ while ($i < $numTeams) {
                 }
             } elseif ($tid == $homeTeam) {
                 $queryOpponentWinLoss = "SELECT win, loss
-					FROM nuke_ibl_power
+					FROM ibl_power
 					WHERE TeamID = $awayTeam";
                 $resultOpponentWinLoss = $db->sql_query($queryOpponentWinLoss);
                 $opponentWins = $db->sql_result($resultOpponentWinLoss, 0, "win");
@@ -626,8 +626,8 @@ while ($i < $numTeams) {
     $lossPoints = $lossPoints + $losses;
     $ranking = round(($winPoints / ($winPoints + $lossPoints)) * 100, 1);
 
-    // Update nuke_ibl_power with each team's win/loss info and current power ranking score
-    $query3 = "UPDATE nuke_ibl_power
+    // Update ibl_power with each team's win/loss info and current power ranking score
+    $query3 = "UPDATE ibl_power
 		SET win = $wins,
 			loss = $losses,
 			gb = $gb,
@@ -645,24 +645,24 @@ while ($i < $numTeams) {
 
     echo "Updating $teamName: $wins wins, $losses losses, $gb games back, $homeWins home wins, $homeLosses home losses, $awayWins away wins, $awayLosses away losses, streak = $streakType$streak, last 10 = $winsInLast10Games-$lossesInLast10Games, ranking score = $ranking<br>";
 
-    // Update nuke_iblteam_win_loss with each team's season win/loss info
-    $query4 = "UPDATE nuke_iblteam_win_loss a, nuke_ibl_power b
+    // Update ibl_team_win_loss with each team's season win/loss info
+    $query4 = "UPDATE ibl_team_win_loss a, ibl_power b
 		SET a.wins = b.win,
 			a.losses = b.loss
 		WHERE a.currentname = b.Team AND a.year = '" . $currentSeasonEndingYear . "';";
     $result4 = $db->sql_query($query4);
 
-    // Update teams' total wins in ibl_team_history by summing up a team's wins in nuke_iblteam_win_loss
+    // Update teams' total wins in ibl_team_history by summing up a team's wins in ibl_team_win_loss
     $query8 = "UPDATE ibl_team_history a
 		SET totwins = (SELECT SUM(b.wins)
-		FROM nuke_iblteam_win_loss AS b
+		FROM ibl_team_win_loss AS b
 		WHERE a.team_name = b.currentname)";
     $result8 = $db->sql_query($query8);
 
-    // Update teams' total losses in ibl_team_history by summing up a team's losses in nuke_iblteam_win_loss
+    // Update teams' total losses in ibl_team_history by summing up a team's losses in ibl_team_win_loss
     $query9 = "UPDATE ibl_team_history a
 		SET totloss = (SELECT SUM(b.losses)
-		FROM nuke_iblteam_win_loss AS b
+		FROM ibl_team_win_loss AS b
 		WHERE a.team_name = b.currentname)";
     $result9 = $db->sql_query($query9);
 
@@ -750,7 +750,7 @@ function displayStandings($region)
             $team_name = "<b>X</b>-" . $team_name;
         }
 
-        $queryLast10Games = "SELECT last_win, last_loss, streak_type, streak FROM nuke_ibl_power WHERE TeamID = $tid";
+        $queryLast10Games = "SELECT last_win, last_loss, streak_type, streak FROM ibl_power WHERE TeamID = $tid";
         $resultLast10Games = $db->sql_query($queryLast10Games);
         $winsInLast10Games = $db->sql_result($resultLast10Games, 0, 0);
         $lossesInLast10Games = $db->sql_result($resultLast10Games, 0, 1);
@@ -794,7 +794,7 @@ if ($db->sql_query($sqlQueryString)) {
     die('Invalid query: ' . $db->sql_error());
 }
 
-$resetExtensionQueryString = 'UPDATE nuke_ibl_team_info SET Used_Extension_This_Chunk = 0';
+$resetExtensionQueryString = 'UPDATE ibl_team_info SET Used_Extension_This_Chunk = 0';
 if ($db->sql_query($resetExtensionQueryString)) {
     echo $resetExtensionQueryString . '<p>';
     echo '<p>Contract Extension usages have been reset.<p>';

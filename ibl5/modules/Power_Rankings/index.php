@@ -31,7 +31,7 @@ OpenTable();
 echo "<center><font class=\"storytitle\">" . ($currentSeasonEndingYear - 1) . "-$currentSeasonEndingYear IBL Power Rankings</font></center>\n\n";
 echo "<p>\n\n";
 
-$query = "SELECT * FROM nuke_ibl_power WHERE TeamID BETWEEN 1 AND 32 ORDER BY ranking DESC";
+$query = "SELECT * FROM ibl_power WHERE TeamID BETWEEN 1 AND 32 ORDER BY ranking DESC";
 $result = $db->sql_query($query);
 $num = $db->sql_numrows($result);
 

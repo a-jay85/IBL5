@@ -2,17 +2,17 @@
 
 require 'mainfile.php';
 
-$queryfirstyear = "SELECT draftyear FROM nuke_iblplyr ORDER BY draftyear ASC";
+$queryfirstyear = "SELECT draftyear FROM ibl_plr ORDER BY draftyear ASC";
 $resultfirstyear = $db->sql_query($queryfirstyear);
 $startyear = $db->sql_result($resultfirstyear, 0, "draftyear");
 
-$querylastyear = "SELECT draftyear FROM nuke_iblplyr ORDER BY draftyear DESC";
+$querylastyear = "SELECT draftyear FROM ibl_plr ORDER BY draftyear DESC";
 $resultlastyear = $db->sql_query($querylastyear);
 $endyear = $db->sql_result($resultlastyear, 0, "draftyear");
 
 $year = $_REQUEST['year'];
 
-$query = "SELECT * FROM nuke_iblplyr WHERE draftyear = '$year' AND draftround > 0 ORDER BY draftround, draftpickno ASC";
+$query = "SELECT * FROM ibl_plr WHERE draftyear = '$year' AND draftround > 0 ORDER BY draftround, draftpickno ASC";
 $result = $db->sql_query($query);
 $num = $db->sql_numrows($result);
 

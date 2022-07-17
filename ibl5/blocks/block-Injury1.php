@@ -28,11 +28,11 @@ $j = 0;
 while ($j < $numo) {
     $user_team = $db->sql_result($resulto, $j, "user_ibl_team");
 
-    $sql = "SELECT * FROM nuke_iblplyr WHERE teamname='$user_team' AND retired = '0' AND ordinal < '961' AND injured = '0' ORDER BY ordinal ASC ";
+    $sql = "SELECT * FROM ibl_plr WHERE teamname='$user_team' AND retired = '0' AND ordinal < '961' AND injured = '0' ORDER BY ordinal ASC ";
     $result1 = $db->sql_query($sql);
     $num1 = $db->sql_numrows($result1);
 
-    $sql2 = "SELECT * FROM nuke_iblplyr WHERE teamname='$user_team' AND retired = '0' AND ordinal < '961' AND injured = '0' AND active = '1' ORDER BY ordinal ASC ";
+    $sql2 = "SELECT * FROM ibl_plr WHERE teamname='$user_team' AND retired = '0' AND ordinal < '961' AND injured = '0' AND active = '1' ORDER BY ordinal ASC ";
     $result2 = $db->sql_query($sql2);
     $num2 = $db->sql_numrows($result2);
 
@@ -54,7 +54,7 @@ while ($j < $numo) {
     if ($waivers_needed < 0) {
         $waivers_needed = 0;
     }
-    $sql3 = "SELECT chart FROM nuke_ibl_team_info WHERE team_name='$user_team'";
+    $sql3 = "SELECT chart FROM ibl_team_info WHERE team_name='$user_team'";
     $result3 = $db->sql_query($sql3);
     $chart = $db->sql_result($result3, 0, "chart");
 

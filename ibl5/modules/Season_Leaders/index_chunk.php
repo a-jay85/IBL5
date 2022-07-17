@@ -28,7 +28,7 @@ function chunkstats()
     OpenTable();
     echo "<center><font class=\"storytitle\">Sim Stats</font></center><br><br>";
 
-    $max_chunk_query = "SELECT MAX(chunk) as maxchunk FROM nuke_iblplyr_chunk";
+    $max_chunk_query = "SELECT MAX(chunk) as maxchunk FROM ibl_plr_chunk";
     $max_chunk_result = $db->sql_query($max_chunk_query);
     $row = $db->sql_fetch_assoc($max_chunk_result);
 
@@ -72,7 +72,7 @@ function chunkstats()
         $sort = "qa";
     }
 
-    $query = "SELECT * FROM nuke_iblplyr_chunk WHERE $argument AND qa !=0 ORDER BY $sort DESC";
+    $query = "SELECT * FROM ibl_plr_chunk WHERE $argument AND qa !=0 ORDER BY $sort DESC";
     $result = $db->sql_query($query);
     $num = $db->sql_numrows($result);
 
@@ -193,7 +193,7 @@ function seasonstats()
         $sort = "((2*`stats_fgm`+`stats_ftm`+`stats_3gm`)/`stats_gm`)";
     }
 
-    $query = "SELECT * FROM nuke_iblplyr_test where retired = 0 $argument ORDER BY $sort DESC";
+    $query = "SELECT * FROM ibl_plr_test where retired = 0 $argument ORDER BY $sort DESC";
     $result = $db->sql_query($query);
     $num = $db->sql_numrows($result);
 
@@ -297,7 +297,7 @@ function team_option($team_selected)
 {
     global $db;
 
-    $query = "SELECT * FROM nuke_ibl_power WHERE TeamID BETWEEN 1 AND 32 ORDER BY TeamID ASC";
+    $query = "SELECT * FROM ibl_power WHERE TeamID BETWEEN 1 AND 32 ORDER BY TeamID ASC";
     $result = $db->sql_query($query);
     $num = $db->sql_numrows($result);
     echo "<option value=0>All</option>";

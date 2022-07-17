@@ -2,7 +2,7 @@
 
 require 'mainfile.php';
 
-$query1 = "SELECT * FROM nuke_iblplyr";
+$query1 = "SELECT * FROM ibl_plr";
 $result1 = $db->sql_query($query1);
 $num1 = $db->sql_numrows($result1);
 
@@ -15,7 +15,7 @@ while ($i < $num1) {
     $playername = $db->sql_result($result1, $i, "name");
     $playerid = $db->sql_result($result1, $i, "pid");
 
-    $query2 = "SELECT * FROM nuke_ibl_heat_stats WHERE name LIKE '$playername'";
+    $query2 = "SELECT * FROM ibl_heat_stats WHERE name LIKE '$playername'";
     $result2 = $db->sql_query($query2);
     @$num2 = $db->sql_numrows($result2);
 

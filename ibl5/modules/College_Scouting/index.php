@@ -203,7 +203,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 
     $scoutingpoints = $userinfo['scoutingpoints'];
 
-    $draft_sql = "SELECT * from nuke_ibl_draft WHERE player = '' ORDER BY round ASC, pick ASC";
+    $draft_sql = "SELECT * from ibl_draft WHERE player = '' ORDER BY round ASC, pick ASC";
     $draft_result = $db->sql_query($draft_sql);
 
     $draft_team = $db->sql_result($draft_result, 0, "team");
@@ -211,7 +211,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
     $draft_round = $db->sql_result($draft_result, 0, "round");
     $draft_pick = $db->sql_result($draft_result, 0, "pick");
 
-    $queryTeamID = "SELECT teamid FROM nuke_ibl_team_info WHERE team_name = '$teamlogo'";
+    $queryTeamID = "SELECT teamid FROM ibl_team_info WHERE team_name = '$teamlogo'";
     $tid = $db->sql_result($db->sql_query($queryTeamID), 0);
 
     echo "<center><img src=\"images/logo/$tid.jpg\"><br>

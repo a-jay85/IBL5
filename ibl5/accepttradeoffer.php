@@ -5,7 +5,7 @@ $sharedFunctions = new Shared($db);
 
 $offer_id = $_POST['offer'];
 
-$query0 = "SELECT * FROM nuke_ibl_trade_info WHERE tradeofferid = '$offer_id'";
+$query0 = "SELECT * FROM ibl_trade_info WHERE tradeofferid = '$offer_id'";
 $result0 = $db->sql_query($query0);
 $num0 = $db->sql_numrows($result0);
 
@@ -28,17 +28,17 @@ while ($i < $num0) {
         $queryi = 'UPDATE ibl_draft_picks SET `ownerofpick` = "' . $to . '" WHERE `pickid` = ' . $itemid . ' LIMIT 1;';
         $resulti = $db->sql_query($queryi);
     } else {
-        $queryj = "SELECT * FROM nuke_ibl_team_info WHERE team_name = '$to'";
+        $queryj = "SELECT * FROM ibl_team_info WHERE team_name = '$to'";
         $resultj = $db->sql_query($queryj);
         $tid = $db->sql_result($resultj, 0, "teamid");
 
-        $queryk = "SELECT * FROM nuke_iblplyr WHERE pid = '$itemid'";
+        $queryk = "SELECT * FROM ibl_plr WHERE pid = '$itemid'";
         $resultk = $db->sql_query($queryk);
 
         $tradeLine = "The $from send " . $db->sql_result($resultk, 0, "pos") . " " . $db->sql_result($resultk, 0, "name") . " to the $to.<br>";
         $storytext .= $tradeLine;
 
-        $queryi = 'UPDATE nuke_iblplyr SET `teamname` = "' . $to . '", `tid` = ' . $tid . ' WHERE `pid` = ' . $itemid . ' LIMIT 1;';
+        $queryi = 'UPDATE ibl_plr SET `teamname` = "' . $to . '", `tid` = ' . $tid . ' WHERE `pid` = ' . $itemid . ' LIMIT 1;';
         $resulti = $db->sql_query($queryi);
     }
 
@@ -82,7 +82,7 @@ if (isset($resultstor) and $_SERVER['SERVER_NAME'] != "localhost") {
 
 Discord::postToChannel('#trades', $storytext);
 
-$queryclear = "DELETE FROM nuke_ibl_trade_info WHERE `tradeofferid` = '$offer_id'";
+$queryclear = "DELETE FROM ibl_trade_info WHERE `tradeofferid` = '$offer_id'";
 $resultclear = $db->sql_query($queryclear);
 
 ?>

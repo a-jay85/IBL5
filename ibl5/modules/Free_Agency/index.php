@@ -92,7 +92,7 @@ function display()
     /*
     // ==== COMPUTE PLAYER SALARIES FOR NEXT YEAR TO GET SOFT AND HARD CAP NUMBERS
 
-    $salary = $db->sql_query("SELECT * FROM ".$prefix."_iblplyr WHERE teamname='$userteam'");
+    $salary = $db->sql_query("SELECT * FROM ibl_plr WHERE teamname='$userteam'");
 
     $tf_millions=0;
 
@@ -210,7 +210,7 @@ function display()
 		</thead>
 		<tbody>";
 
-    $showteam = $db->sql_query("SELECT * FROM " . $prefix . "_iblplyr WHERE (teamname='$userteam' AND retired='0') OR name LIKE '%$userteam Buyouts%' ORDER BY ordinal ASC");
+    $showteam = $db->sql_query("SELECT * FROM ibl_plr WHERE (teamname='$userteam' AND retired='0') OR name LIKE '%$userteam Buyouts%' ORDER BY ordinal ASC");
     while ($teamlist = $db->sql_fetchrow($showteam)) {
         $ordinal = stripslashes(check_html($teamlist['ordinal'], "nohtml"));
         $draftyear = stripslashes(check_html($teamlist['draftyear'], "nohtml"));
@@ -530,11 +530,11 @@ function display()
 		</thead>
 		<tbody>";
 
-    $showteam = $db->sql_query("SELECT * FROM " . $prefix . "_iblplyr WHERE retired='0' ORDER BY ordinal ASC");
+    $showteam = $db->sql_query("SELECT * FROM ibl_plr WHERE retired='0' ORDER BY ordinal ASC");
     while ($teamlist = $db->sql_fetchrow($showteam)) {
         $name = stripslashes(check_html($teamlist['name'], "nohtml"));
 
-        $numoffers = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_ibl_fa_offers WHERE name='$name' AND team='$userteam'"));
+        $numoffers = $db->sql_numrows($db->sql_query("SELECT * FROM ibl_fa_offers WHERE name='$name' AND team='$userteam'"));
         if ($numoffers == 1) {
             $team = stripslashes(check_html($teamlist['teamname'], "nohtml"));
             $tid = stripslashes(check_html($teamlist['tid'], "nohtml"));
@@ -543,7 +543,7 @@ function display()
             $age = stripslashes(check_html($teamlist['age'], "nohtml"));
             $inj = stripslashes(check_html($teamlist['injured'], "nohtml"));
 
-            $getoffers = $db->sql_fetchrow($db->sql_query("SELECT * FROM " . $prefix . "_ibl_fa_offers WHERE name='$name' AND team='$userteam'"));
+            $getoffers = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_fa_offers WHERE name='$name' AND team='$userteam'"));
 
             $offer1 = stripslashes(check_html($getoffers['offer1'], "nohtml"));
             $offer2 = stripslashes(check_html($getoffers['offer2'], "nohtml"));
@@ -684,7 +684,7 @@ function display()
 
     // ===== CAP AND ROSTER SLOT INFO =====
 
-    $exceptioninfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM " . $prefix . "_ibl_team_info WHERE team_name='$userteam'"));
+    $exceptioninfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_team_info WHERE team_name='$userteam'"));
 
     $HasMLE = stripslashes(check_html($exceptioninfo['HasMLE'], "nohtml"));
     $HasLLE = stripslashes(check_html($exceptioninfo['HasLLE'], "nohtml"));
@@ -805,7 +805,7 @@ function display()
 		</thead>
 		<tbody>";
 
-    $showteam = $db->sql_query("SELECT * FROM " . $prefix . "_iblplyr WHERE teamname='$userteam' AND retired='0' ORDER BY ordinal ASC");
+    $showteam = $db->sql_query("SELECT * FROM ibl_plr WHERE teamname='$userteam' AND retired='0' ORDER BY ordinal ASC");
     while ($teamlist = $db->sql_fetchrow($showteam)) {
         $draftyear = stripslashes(check_html($teamlist['draftyear'], "nohtml"));
         $exp = stripslashes(check_html($teamlist['exp'], "nohtml"));
@@ -995,7 +995,7 @@ function display()
 		</thead>
 		<tbody>";
 
-    $showteam = $db->sql_query("SELECT * FROM " . $prefix . "_iblplyr WHERE teamname!='$userteam' AND retired='0' ORDER BY ordinal ASC");
+    $showteam = $db->sql_query("SELECT * FROM ibl_plr WHERE teamname!='$userteam' AND retired='0' ORDER BY ordinal ASC");
     while ($teamlist = $db->sql_fetchrow($showteam)) {
         $draftyear = stripslashes(check_html($teamlist['draftyear'], "nohtml"));
         $exp = stripslashes(check_html($teamlist['exp'], "nohtml"));
@@ -1141,12 +1141,12 @@ function negotiate($pid)
 
     $userteam = stripslashes(check_html($userinfo['user_ibl_team'], "nohtml"));
 
-    $exceptioninfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM " . $prefix . "_ibl_team_info WHERE team_name='$userteam'"));
+    $exceptioninfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_team_info WHERE team_name='$userteam'"));
 
     $HasMLE = stripslashes(check_html($exceptioninfo['HasMLE'], "nohtml"));
     $HasLLE = stripslashes(check_html($exceptioninfo['HasLLE'], "nohtml"));
 
-    $playerinfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM " . $prefix . "_iblplyr WHERE pid='$pid'"));
+    $playerinfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_plr WHERE pid='$pid'"));
 
     $player_name = stripslashes(check_html($playerinfo['name'], "nohtml"));
     $player_pos = stripslashes(check_html($playerinfo['pos'], "nohtml"));
@@ -1189,14 +1189,14 @@ function negotiate($pid)
     $dem5 = stripslashes(check_html($demands['dem5'], "nohtml"));
     $dem6 = stripslashes(check_html($demands['dem6'], "nohtml"));
 
-    $teamfactors = $db->sql_fetchrow($db->sql_query("SELECT * FROM " . $prefix . "_ibl_team_info WHERE team_name='$userteam'"));
+    $teamfactors = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_team_info WHERE team_name='$userteam'"));
     $tf_wins = stripslashes(check_html($teamfactors['Contract_Wins'], "nohtml"));
     $tf_loss = stripslashes(check_html($teamfactors['Contract_Losses'], "nohtml"));
     $tf_trdw = stripslashes(check_html($teamfactors['Contract_AvgW'], "nohtml"));
     $tf_trdl = stripslashes(check_html($teamfactors['Contract_AvgL'], "nohtml"));
     $tf_coach = stripslashes(check_html($teamfactors['Contract_Coach'], "nohtml"));
 
-    $millionsatposition = $db->sql_query("SELECT * FROM " . $prefix . "_iblplyr WHERE teamname='$userteam' AND pos='$player_pos' AND name!='$player_name'");
+    $millionsatposition = $db->sql_query("SELECT * FROM ibl_plr WHERE teamname='$userteam' AND pos='$player_pos' AND name!='$player_name'");
 
     // LOOP TO GET MILLIONS COMMITTED AT POSITION
 
@@ -1315,7 +1315,7 @@ function negotiate($pid)
 
     $rosterspots = 15;
 
-    $capquery = "SELECT * FROM " . $prefix . "_iblplyr WHERE teamname='$userteam' AND retired = '0'";
+    $capquery = "SELECT * FROM ibl_plr WHERE teamname='$userteam' AND retired = '0'";
     $capresult = $db->sql_query($capquery);
 
     while ($capdecrementer = $db->sql_fetchrow($capresult)) {
@@ -1371,7 +1371,7 @@ function negotiate($pid)
 
     }
 
-    $capquery2 = "SELECT * FROM " . $prefix . "_ibl_fa_offers WHERE team='$userteam'";
+    $capquery2 = "SELECT * FROM ibl_fa_offers WHERE team='$userteam'";
     $capresult2 = $db->sql_query($capquery2);
 
     while ($capdecrementer2 = $db->sql_fetchrow($capresult2)) {
@@ -1401,7 +1401,7 @@ function negotiate($pid)
 
     // END LOOP
 
-    $offergrabber = $db->sql_fetchrow($db->sql_query("SELECT * FROM " . $prefix . "_ibl_fa_offers WHERE team='$userteam' AND name='$player_name'"));
+    $offergrabber = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_fa_offers WHERE team='$userteam' AND name='$player_name'"));
 
     $offer1 = stripslashes(check_html($offergrabber['offer1'], "nohtml"));
     $offer2 = stripslashes(check_html($offergrabber['offer2'], "nohtml"));
@@ -1852,7 +1852,7 @@ function negotiate($pid)
         // ===== CHECK TO SEE IF MLE IS AVAILABLE =====
 
         if ($HasMLE == 1) {
-            $MLEoffers = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_ibl_fa_offers WHERE MLE='1' AND team='$userteam'"));
+            $MLEoffers = $db->sql_numrows($db->sql_query("SELECT * FROM ibl_fa_offers WHERE MLE='1' AND team='$userteam'"));
             if ($MLEoffers == 0) {
                 echo "<tr><td>Mid-Level Exception (click the button that corresponds to the final year you wish to offer):</td>
 
@@ -1994,7 +1994,7 @@ function negotiate($pid)
         // ===== CHECK TO SEE IF LLE IS AVAILABLE =====
 
         if ($HasLLE == 1) {
-            $LLEoffers = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_ibl_fa_offers WHERE LLE='1' AND team='$userteam'"));
+            $LLEoffers = $db->sql_numrows($db->sql_query("SELECT * FROM ibl_fa_offers WHERE LLE='1' AND team='$userteam'"));
             if ($LLEoffers == 0) {
                 echo "<tr><td>Lower-Level Exception:</td>
 				<td>
@@ -2095,7 +2095,7 @@ function positionmigration($pid)
 
     $userteam = stripslashes(check_html($userinfo['user_ibl_team'], "nohtml"));
 
-    $playerinfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM " . $prefix . "_iblplyr WHERE pid='$pid'"));
+    $playerinfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_plr WHERE pid='$pid'"));
 
     $player_name = stripslashes(check_html($playerinfo['name'], "nohtml"));
     $player_base_pos = stripslashes(check_html($playerinfo['pos'], "nohtml"));
@@ -2218,7 +2218,7 @@ function teamdisplay($pid)
     echo "<center><h1>Cap Space and Roster Spots for all teams</h1></center>
 		<table border=1 cellspacing=0><tr bgcolor=#0000cc><td><font color=#ffffff>Team</font></td><td><font color=#ffffff>Soft Cap Space</font></td><td><font color=#ffffff>Hard Cap Space</font></td><td><font color=#ffffff>Roster Slots</font></td><td><font color=#ffffff>MLE</font></td><td><font color=#ffffff>LLE</font></td></tr>";
 
-    $showcapteam = $db->sql_query("SELECT * FROM " . $prefix . "_ibl_team_info WHERE teamid>'0' ORDER BY teamid ASC");
+    $showcapteam = $db->sql_query("SELECT * FROM ibl_team_info WHERE teamid>'0' ORDER BY teamid ASC");
 
     while ($teamcaplist = $db->sql_fetchrow($showcapteam)) {
         $currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
@@ -2236,7 +2236,7 @@ function teamdisplay($pid)
 
         // ==== NOTE PLAYERS CURRENTLY UNDER CONTRACT FOR TEAM
 
-        $showteam = $db->sql_query("SELECT * FROM " . $prefix . "_iblplyr WHERE teamname='$capteam' AND retired='0' ORDER BY ordinal ASC");
+        $showteam = $db->sql_query("SELECT * FROM ibl_plr WHERE teamname='$capteam' AND retired='0' ORDER BY ordinal ASC");
 
         while ($teamlist = $db->sql_fetchrow($showteam)) {
             $ordinal = stripslashes(check_html($teamlist['ordinal'], "nohtml"));

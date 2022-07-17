@@ -86,7 +86,7 @@ $pagetitle = "Season Stats";
         $sort = "((2*`fgm`+`ftm`+`3gm`)/`gm`)";
     }
 
-    $query = "SELECT * FROM nuke_iblplyr where tid != 0";
+    $query = "SELECT * FROM ibl_plr where tid != 0";
     $result = $db->sql_query($query);
     $num = $db->sql_numrows($result);
 
@@ -177,7 +177,7 @@ function team_option($team_selected)
 {
     global $db;
 
-    $query = "SELECT * FROM nuke_ibl_power WHERE TeamID BETWEEN 1 AND 32 ORDER BY TeamID ASC";
+    $query = "SELECT * FROM ibl_power WHERE TeamID BETWEEN 1 AND 32 ORDER BY TeamID ASC";
     $result = $db->sql_query($query);
     $num = $db->sql_numrows($result);
     echo "<option value=0>All</option>";
@@ -197,7 +197,7 @@ function team_option($team_selected)
 
 //function year_option ($year_selected)
 //{
-//    $query="SELECT distinct year FROM nuke_iblhist WHERE teamid BETWEEN 1 AND 32 ORDER BY teamid ASC";
+//    $query="SELECT distinct year FROM ibl_hist WHERE teamid BETWEEN 1 AND 32 ORDER BY teamid ASC";
 //    $result=$db->sql_query($query);
 //    $num=$db->sql_numrows($result);
 //    echo "<option value=0>All</option>";

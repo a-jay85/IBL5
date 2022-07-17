@@ -19,8 +19,8 @@ if (!defined('BLOCK_FILE')) {
 global $db;
 
 $query = "SELECT TeamID, Team, ranking, win, loss, color1, color2
-    FROM nuke_ibl_power rankings
-    INNER JOIN nuke_ibl_team_info info USING (teamid)
+    FROM ibl_power rankings
+    INNER JOIN ibl_team_info info USING (teamid)
     ORDER BY ranking DESC;";
 $result = $db->sql_query($query);
 $num = $db->sql_numrows($result);

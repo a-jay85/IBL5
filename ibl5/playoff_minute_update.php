@@ -2,7 +2,7 @@
 
 require 'mainfile.php';
 
-$query = "SELECT * FROM nuke_iblplyr WHERE `retired` = '0' ORDER BY ordinal ASC";
+$query = "SELECT * FROM ibl_plr WHERE `retired` = '0' ORDER BY ordinal ASC";
 $result = $db->sql_query($query);
 $num = $db->sql_numrows($result);
 
@@ -10,7 +10,7 @@ $i = 0;
 echo "<table><tr><td>Name</td><td>Year</td><td>Playoff Minures</td></tr>";
 while ($i < $num) {
     $name = $db->sql_result($result, $i, "name");
-    $query2 = "SELECT * FROM nuke_ibl_playoff_stats WHERE name='$name' ORDER BY year ASC";
+    $query2 = "SELECT * FROM ibl_playoff_stats WHERE name='$name' ORDER BY year ASC";
     $result2 = $db->sql_query($query2);
     $num2 = $db->sql_numrows($result2);
 
@@ -25,7 +25,7 @@ while ($i < $num) {
     }
     echo "<tr><td></td><td></td><td>$total_minutes</td></tr>";
     echo "Updating $name's records... $total_minutes total minutes.<br>";
-    $query3 = "UPDATE nuke_iblplyr SET car_playoff_min = '$total_minutes' WHERE name = '$name'";
+    $query3 = "UPDATE ibl_plr SET car_playoff_min = '$total_minutes' WHERE name = '$name'";
     $result3 = $db->sql_query($query3);
 
     $i++;

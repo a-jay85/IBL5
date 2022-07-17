@@ -22,10 +22,10 @@ get_lang($module_name);
 $userpage = 1;
 include "header.php";
 
-$queryEasternFrontcourt = "select count(name) as votes,name from (select East_F1 as name from IBL_ASG_Votes union all select East_F2 from IBL_ASG_Votes union all select East_C from IBL_ASG_Votes) as tbl group by name having count(name) > 0 order by 1 desc;";
-$queryEasternBackcourt = "select count(name) as votes,name from (select East_G1 as name from IBL_ASG_Votes union all select East_G2 from IBL_ASG_Votes) as tbl group by name having count(name) > 0 order by 1 desc;";
-$queryWesternFrontcourt = "select count(name) as votes,name from (select West_F1 as name from IBL_ASG_Votes union all select West_F2 from IBL_ASG_Votes union all select West_C from IBL_ASG_Votes) as tbl group by name having count(name) > 0 order by 1 desc;";
-$queryWesternBackcourt = "select count(name) as votes,name from (select West_G1 as name from IBL_ASG_Votes union all select West_G2 from IBL_ASG_Votes) as tbl group by name having count(name) > 0 order by 1 desc;";
+$queryEasternFrontcourt = "select count(name) as votes,name from (select East_F1 as name from ibl_ASG_Votes union all select East_F2 from ibl_ASG_Votes union all select East_C from ibl_ASG_Votes) as tbl group by name having count(name) > 0 order by 1 desc;";
+$queryEasternBackcourt = "select count(name) as votes,name from (select East_G1 as name from ibl_ASG_Votes union all select East_G2 from ibl_ASG_Votes) as tbl group by name having count(name) > 0 order by 1 desc;";
+$queryWesternFrontcourt = "select count(name) as votes,name from (select West_F1 as name from ibl_ASG_Votes union all select West_F2 from ibl_ASG_Votes union all select West_C from ibl_ASG_Votes) as tbl group by name having count(name) > 0 order by 1 desc;";
+$queryWesternBackcourt = "select count(name) as votes,name from (select West_G1 as name from ibl_ASG_Votes union all select West_G2 from ibl_ASG_Votes) as tbl group by name having count(name) > 0 order by 1 desc;";
 
 function displayVotingResultsTable($query)
 {

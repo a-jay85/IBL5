@@ -89,34 +89,34 @@ else if (count($_POST['ECF']) > 3) {
 
     // ==== UPDATE SELECTED VOTES IN DATABASE ====
 
-    $query1 = "UPDATE IBL_ASG_Votes SET East_C = '$ECF3' WHERE team_name = '$Team_Name'"; //TODO: rename these database columns to match
+    $query1 = "UPDATE ibl_ASG_Votes SET East_C = '$ECF3' WHERE team_name = '$Team_Name'"; //TODO: rename these database columns to match
     $result1 = $db->sql_query($query1);
 
-    $query2 = "UPDATE IBL_ASG_Votes SET East_F1 = '$ECF1' WHERE team_name = '$Team_Name'";
+    $query2 = "UPDATE ibl_ASG_Votes SET East_F1 = '$ECF1' WHERE team_name = '$Team_Name'";
     $result2 = $db->sql_query($query2);
 
-    $query3 = "UPDATE IBL_ASG_Votes SET East_F2 = '$ECF2' WHERE team_name = '$Team_Name'";
+    $query3 = "UPDATE ibl_ASG_Votes SET East_F2 = '$ECF2' WHERE team_name = '$Team_Name'";
     $result3 = $db->sql_query($query3);
 
-    $query4 = "UPDATE IBL_ASG_Votes SET East_G1 = '$ECB1' WHERE team_name = '$Team_Name'";
+    $query4 = "UPDATE ibl_ASG_Votes SET East_G1 = '$ECB1' WHERE team_name = '$Team_Name'";
     $result4 = $db->sql_query($query4);
 
-    $query5 = "UPDATE IBL_ASG_Votes SET East_G2 = '$ECB2' WHERE team_name = '$Team_Name'";
+    $query5 = "UPDATE ibl_ASG_Votes SET East_G2 = '$ECB2' WHERE team_name = '$Team_Name'";
     $result5 = $db->sql_query($query5);
 
-    $query6 = "UPDATE IBL_ASG_Votes SET West_C = '$WCF3' WHERE team_name = '$Team_Name'";
+    $query6 = "UPDATE ibl_ASG_Votes SET West_C = '$WCF3' WHERE team_name = '$Team_Name'";
     $result6 = $db->sql_query($query6);
 
-    $query7 = "UPDATE IBL_ASG_Votes SET West_F1 = '$WCF1' WHERE team_name = '$Team_Name'";
+    $query7 = "UPDATE ibl_ASG_Votes SET West_F1 = '$WCF1' WHERE team_name = '$Team_Name'";
     $result7 = $db->sql_query($query7);
 
-    $query8 = "UPDATE IBL_ASG_Votes SET West_F2 = '$WCF2' WHERE team_name = '$Team_Name'";
+    $query8 = "UPDATE ibl_ASG_Votes SET West_F2 = '$WCF2' WHERE team_name = '$Team_Name'";
     $result8 = $db->sql_query($query8);
 
-    $query9 = "UPDATE IBL_ASG_Votes SET West_G1 = '$WCB1' WHERE team_name = '$Team_Name'";
+    $query9 = "UPDATE ibl_ASG_Votes SET West_G1 = '$WCB1' WHERE team_name = '$Team_Name'";
     $result9 = $db->sql_query($query9);
 
-    $query10 = "UPDATE IBL_ASG_Votes SET West_G2 = '$WCB2' WHERE team_name = '$Team_Name'";
+    $query10 = "UPDATE ibl_ASG_Votes SET West_G2 = '$WCB2' WHERE team_name = '$Team_Name'";
     $result10 = $db->sql_query($query10);
 
     $query11 = "UPDATE ibl_team_history SET asg_vote = NOW() + INTERVAL 2 HOUR WHERE team_name = '$Team_Name'";

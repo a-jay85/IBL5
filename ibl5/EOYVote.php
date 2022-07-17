@@ -112,40 +112,40 @@ GM Choice 3: $GM3<br><br>
 
 // ==== UPDATE SELECTED VOTES IN DATABASE ====
 
-    $query1 = "UPDATE IBL_EOY_Votes SET MVP_1 = '$MVP1' WHERE team_name = '$Team_Name'";
+    $query1 = "UPDATE ibl_EOY_Votes SET MVP_1 = '$MVP1' WHERE team_name = '$Team_Name'";
     $result1 = $db->sql_query($query1);
 
-    $query2 = "UPDATE IBL_EOY_Votes SET MVP_2 = '$MVP2' WHERE team_name = '$Team_Name'";
+    $query2 = "UPDATE ibl_EOY_Votes SET MVP_2 = '$MVP2' WHERE team_name = '$Team_Name'";
     $result2 = $db->sql_query($query2);
 
-    $query3 = "UPDATE IBL_EOY_Votes SET MVP_3 = '$MVP3' WHERE team_name = '$Team_Name'";
+    $query3 = "UPDATE ibl_EOY_Votes SET MVP_3 = '$MVP3' WHERE team_name = '$Team_Name'";
     $result3 = $db->sql_query($query3);
 
-    $query4 = "UPDATE IBL_EOY_Votes SET Six_1 = '$Six1' WHERE team_name = '$Team_Name'";
+    $query4 = "UPDATE ibl_EOY_Votes SET Six_1 = '$Six1' WHERE team_name = '$Team_Name'";
     $result4 = $db->sql_query($query4);
 
-    $query5 = "UPDATE IBL_EOY_Votes SET Six_2 = '$Six2' WHERE team_name = '$Team_Name'";
+    $query5 = "UPDATE ibl_EOY_Votes SET Six_2 = '$Six2' WHERE team_name = '$Team_Name'";
     $result5 = $db->sql_query($query5);
 
-    $query6 = "UPDATE IBL_EOY_Votes SET Six_3 = '$Six3' WHERE team_name = '$Team_Name'";
+    $query6 = "UPDATE ibl_EOY_Votes SET Six_3 = '$Six3' WHERE team_name = '$Team_Name'";
     $result6 = $db->sql_query($query6);
 
-    $query7 = "UPDATE IBL_EOY_Votes SET ROY_1 = '$ROY1' WHERE team_name = '$Team_Name'";
+    $query7 = "UPDATE ibl_EOY_Votes SET ROY_1 = '$ROY1' WHERE team_name = '$Team_Name'";
     $result7 = $db->sql_query($query7);
 
-    $query8 = "UPDATE IBL_EOY_Votes SET ROY_2 = '$ROY2' WHERE team_name = '$Team_Name'";
+    $query8 = "UPDATE ibl_EOY_Votes SET ROY_2 = '$ROY2' WHERE team_name = '$Team_Name'";
     $result8 = $db->sql_query($query8);
 
-    $query9 = "UPDATE IBL_EOY_Votes SET ROY_3 = '$ROY3' WHERE team_name = '$Team_Name'";
+    $query9 = "UPDATE ibl_EOY_Votes SET ROY_3 = '$ROY3' WHERE team_name = '$Team_Name'";
     $result9 = $db->sql_query($query9);
 
-    $query10 = "UPDATE IBL_EOY_Votes SET GM_1 = '$GM1' WHERE team_name = '$Team_Name'";
+    $query10 = "UPDATE ibl_EOY_Votes SET GM_1 = '$GM1' WHERE team_name = '$Team_Name'";
     $result10 = $db->sql_query($query10);
 
-    $query11 = "UPDATE IBL_EOY_Votes SET GM_2 = '$GM2' WHERE team_name = '$Team_Name'";
+    $query11 = "UPDATE ibl_EOY_Votes SET GM_2 = '$GM2' WHERE team_name = '$Team_Name'";
     $result11 = $db->sql_query($query11);
 
-    $query12 = "UPDATE IBL_EOY_Votes SET GM_3 = '$GM3' WHERE team_name = '$Team_Name'";
+    $query12 = "UPDATE ibl_EOY_Votes SET GM_3 = '$GM3' WHERE team_name = '$Team_Name'";
     $result12 = $db->sql_query($query12);
 
     $query13 = "UPDATE ibl_team_history SET eoy_vote = NOW() + INTERVAL 2 HOUR WHERE team_name = '$Team_Name'";

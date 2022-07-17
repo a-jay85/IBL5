@@ -22,23 +22,23 @@ get_lang($module_name);
 $userpage = 1;
 include "header.php";
 
-$query1 = "select sum(score) as votes,name from (select MVP_1 as name, 3 as score from IBL_EOY_Votes union all select MVP_2 as name, 2 as score from IBL_EOY_Votes union all select MVP_3 as name, 1 as score from IBL_EOY_Votes) as tbl group by name;";
+$query1 = "select sum(score) as votes,name from (select MVP_1 as name, 3 as score from ibl_EOY_Votes union all select MVP_2 as name, 2 as score from ibl_EOY_Votes union all select MVP_3 as name, 1 as score from ibl_EOY_Votes) as tbl group by name;";
 $result1 = $db->sql_query($query1);
 $num1 = $db->sql_numrows($result1);
 
-$query15 = "select sum(score) as votes,name from (select MVP_1 as name, 1 as score from IBL_EOY_Votes) as tbl group by name;";
+$query15 = "select sum(score) as votes,name from (select MVP_1 as name, 1 as score from ibl_EOY_Votes) as tbl group by name;";
 $result15 = $db->sql_query($query15);
 $num15 = $db->sql_numrows($result15);
 
-$query2 = "select sum(score) as votes,name from (select Six_1 as name, 3 as score from IBL_EOY_Votes union all select Six_2 as name, 2 as score from IBL_EOY_Votes union all select Six_3 as name, 1 as score from IBL_EOY_Votes) as tbl group by name;";
+$query2 = "select sum(score) as votes,name from (select Six_1 as name, 3 as score from ibl_EOY_Votes union all select Six_2 as name, 2 as score from ibl_EOY_Votes union all select Six_3 as name, 1 as score from ibl_EOY_Votes) as tbl group by name;";
 $result2 = $db->sql_query($query2);
 $num2 = $db->sql_numrows($result2);
 
-$query3 = "select sum(score) as votes,name from (select ROY_1 as name, 3 as score from IBL_EOY_Votes union all select ROY_2 as name, 2 as score from IBL_EOY_Votes union all select ROY_3 as name, 1 as score from IBL_EOY_Votes) as tbl group by name;";
+$query3 = "select sum(score) as votes,name from (select ROY_1 as name, 3 as score from ibl_EOY_Votes union all select ROY_2 as name, 2 as score from ibl_EOY_Votes union all select ROY_3 as name, 1 as score from ibl_EOY_Votes) as tbl group by name;";
 $result3 = $db->sql_query($query3);
 $num3 = $db->sql_numrows($result3);
 
-$query4 = "select sum(score) as votes,name from (select GM_1 as name, 3 as score from IBL_EOY_Votes union all select GM_2 as name, 2 as score from IBL_EOY_Votes union all select GM_3 as name, 1 as score from IBL_EOY_Votes) as tbl group by name;";
+$query4 = "select sum(score) as votes,name from (select GM_1 as name, 3 as score from ibl_EOY_Votes union all select GM_2 as name, 2 as score from ibl_EOY_Votes union all select GM_3 as name, 1 as score from ibl_EOY_Votes) as tbl group by name;";
 $result4 = $db->sql_query($query4);
 $num4 = $db->sql_numrows($result4);
 

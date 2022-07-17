@@ -1321,7 +1321,7 @@ if ($id == null) {
     echo "
 </table></td><td bgcolor=#cccccc width=200 valign=top><center><u><b>AWARDS</b></u></center>";
 
-    $query4 = "SELECT * FROM nuke_ibl_awards WHERE name = '$name' ORDER BY year ASC";
+    $query4 = "SELECT * FROM ibl_awards WHERE name = '$name' ORDER BY year ASC";
     $result4 = $db->sql_query($query4);
     @$num4 = $db->sql_numrows($result4);
 

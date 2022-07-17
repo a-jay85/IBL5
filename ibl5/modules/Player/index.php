@@ -915,7 +915,7 @@ function awards()
     // ========= SET QUERY BASED ON SEARCH PARAMETERS
 
     $continuequery = 0;
-    $query = "SELECT * FROM nuke_ibl_awards";
+    $query = "SELECT * FROM ibl_awards";
 
     if ($as_year != null) {
         $query .= " WHERE year = '$as_year'";
@@ -1471,7 +1471,7 @@ function showpage($pid, $spec)
             <th colspan=2><center>All-Star Activity</center></th>
         </tr>";
 
-        $allstarquery = $db->sql_query("SELECT * FROM " . $prefix . "_ibl_awards WHERE name='$player_name' AND Award LIKE '%Conference All-Star'");
+        $allstarquery = $db->sql_query("SELECT * FROM ibl_awards WHERE name='$player_name' AND Award LIKE '%Conference All-Star'");
         $allstarresult = $db->sql_query($allstarquery);
         $asg = $db->sql_numrows($allstarquery);
         echo "<tr>
@@ -1479,7 +1479,7 @@ function showpage($pid, $spec)
             <td>$asg</td>
         </tr>";
 
-        $allstarquery2 = $db->sql_query("SELECT * FROM " . $prefix . "_ibl_awards WHERE name='$player_name' AND Award LIKE 'Three-Point Contest%'");
+        $allstarquery2 = $db->sql_query("SELECT * FROM ibl_awards WHERE name='$player_name' AND Award LIKE 'Three-Point Contest%'");
         $allstarresult2 = $db->sql_query($allstarquery2);
         $threepointcontests = $db->sql_numrows($allstarquery2);
 
@@ -1488,7 +1488,7 @@ function showpage($pid, $spec)
             <td>$threepointcontests</td>
         </tr>";
 
-        $allstarquery3 = $db->sql_query("SELECT * FROM " . $prefix . "_ibl_awards WHERE name='$player_name' AND Award LIKE 'Slam Dunk Competition%'");
+        $allstarquery3 = $db->sql_query("SELECT * FROM ibl_awards WHERE name='$player_name' AND Award LIKE 'Slam Dunk Competition%'");
         $allstarresult3 = $db->sql_query($allstarquery3);
         $dunkcontests = $db->sql_numrows($allstarquery3);
 
@@ -1497,7 +1497,7 @@ function showpage($pid, $spec)
             <td>$dunkcontests</td>
         </tr>";
 
-        $allstarquery4 = $db->sql_query("SELECT * FROM " . $prefix . "_ibl_awards WHERE name='$player_name' AND Award LIKE 'Rookie-Sophomore Challenge'");
+        $allstarquery4 = $db->sql_query("SELECT * FROM ibl_awards WHERE name='$player_name' AND Award LIKE 'Rookie-Sophomore Challenge'");
         $allstarresult4 = $db->sql_query($allstarquery4);
         $rooksoph = $db->sql_numrows($allstarquery4);
 
@@ -2934,7 +2934,7 @@ function showpage($pid, $spec)
     if ($spec == 1) {
         // START AWARDS SCRIPT
 
-        $awardsquery = $db->sql_query("SELECT * FROM " . $prefix . "_ibl_awards WHERE name='$player_name' ORDER BY year ASC");
+        $awardsquery = $db->sql_query("SELECT * FROM ibl_awards WHERE name='$player_name' ORDER BY year ASC");
         $awardsresult = $db->sql_query($awardsquery);
         $awardswon = $db->sql_numrows($awardsquery);
 

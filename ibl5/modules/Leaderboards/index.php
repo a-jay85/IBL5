@@ -131,10 +131,10 @@ function leaderboards()
     // ===== RUN QUERY IF FORM HAS BEEN SUBMITTED
 
     if ($submitted != null) {
-        $tableforquery = "nuke_iblplyr";
+        $tableforquery = "ibl_plr";
 
         if ($boards_type == 'Reg') {
-            $tableforquery = "nuke_iblplyr";
+            $tableforquery = "ibl_plr";
             $restriction2 = "car_gm > 0 ";
         }
 
@@ -174,7 +174,7 @@ function leaderboards()
             }
         }
 
-        if ($tableforquery == "nuke_iblplyr") {
+        if ($tableforquery == "ibl_plr") {
             $sortby = "car_" . $sortby;
             if ($sort_cat == 'Games') {
                 $sortby = "car_gm";
@@ -209,7 +209,7 @@ function leaderboards()
 
         while ($i < $num) {
             $retired = 0;
-            if ($tableforquery == "nuke_iblplyr") {
+            if ($tableforquery == "ibl_plr") {
                 $retired = $db->sql_result($result, $i, "retired");
                 $plyr_name = $db->sql_result($result, $i, "name");
                 $pid = $db->sql_result($result, $i, "pid");

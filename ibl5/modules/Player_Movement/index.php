@@ -5,7 +5,7 @@ $sharedFunctions = new Shared($db);
 $currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
 $previousSeasonEndingYear = $currentSeasonEndingYear - 1;
 
-$query = "SELECT a.name, a.teamid, a.team, b.tid, b.teamname FROM nuke_iblhist a, nuke_iblplyr b WHERE a.pid = b.pid AND a.year = $previousSeasonEndingYear AND a.teamid != b.tid ORDER BY b.teamname";
+$query = "SELECT a.name, a.teamid, a.team, b.tid, b.teamname FROM ibl_hist a, ibl_plr b WHERE a.pid = b.pid AND a.year = $previousSeasonEndingYear AND a.teamid != b.tid ORDER BY b.teamname";
 $result = $db->sql_query($query);
 $num = $db->sql_numrows($result);
 

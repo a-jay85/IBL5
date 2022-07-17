@@ -58,7 +58,7 @@ $pagetitle = "All-Star Game Stats";
         $sort = "((2*`stats_fgm`+`stats_ftm`+`stats_3gm`)/`stats_gm`)";
     }
 
-    $query = "SELECT * FROM nuke_iblplyr WHERE stats_gs/stats_gm >= 0.5 and stats_gm >= 15 and retired = 0 $argument ORDER BY $sort DESC";
+    $query = "SELECT * FROM ibl_plr WHERE stats_gs/stats_gm >= 0.5 and stats_gm >= 15 and retired = 0 $argument ORDER BY $sort DESC";
     $result = $db->sql_query($query);
     $num = $db->sql_numrows($result);
 
@@ -163,7 +163,7 @@ function team_option($team_selected)
 {
     global $db;
 
-    $query = "SELECT * FROM nuke_ibl_power WHERE TeamID BETWEEN 1 AND 32 ORDER BY TeamID ASC";
+    $query = "SELECT * FROM ibl_power WHERE TeamID BETWEEN 1 AND 32 ORDER BY TeamID ASC";
     $result = $db->sql_query($query);
     $num = $db->sql_numrows($result);
     echo "<option value=0>All</option>";

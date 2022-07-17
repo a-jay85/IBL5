@@ -128,12 +128,12 @@ $Offer_Avg = ($Offer_1 + $Offer_2 + $Offer_3 + $Offer_4 + $Offer_5 + $Offer_6) /
 
 // LOOP TO GET MILLIONS COMMITTED AT POSITION
 
-$queryposition = "SELECT * FROM nuke_iblplyr WHERE `name` ='$Player_Name'";
+$queryposition = "SELECT * FROM ibl_plr WHERE `name` ='$Player_Name'";
 $resultposition = $db->sql_query($queryposition);
 
 $player_pos = $db->sql_result($resultposition, 0, "pos");
 
-$querymillions = "SELECT * FROM nuke_iblplyr WHERE `teamname`='$Team_Name' AND `pos`='$player_pos' AND `name`!='$Player_Name'";
+$querymillions = "SELECT * FROM ibl_plr WHERE `teamname`='$Team_Name' AND `pos`='$player_pos' AND `name`!='$Player_Name'";
 $resultmillions = $db->sql_query($querymillions);
 $nummillions = $db->sql_numrows($resultmillions);
 
@@ -213,7 +213,7 @@ if ($player_pos == 'C') {
     $adjpos2 = '';
 }
 
-$querymillions = "SELECT * FROM nuke_iblplyr WHERE `teamname`='$Team_Name' AND `pos`='$adjpos1' AND `name`!='$player_name'";
+$querymillions = "SELECT * FROM ibl_plr WHERE `teamname`='$Team_Name' AND `pos`='$adjpos1' AND `name`!='$player_name'";
 $resultmillions = $db->sql_query($querymillions);
 $nummillions = $db->sql_numrows($resultmillions);
 $i = 0;
@@ -250,7 +250,7 @@ while ($i < $nummillions) {
     $i++;
 }
 
-$querymillions = "SELECT * FROM nuke_iblplyr WHERE `teamname`='$Team_Name' AND `pos`='$adjpos2' AND `name`!='$player_name'";
+$querymillions = "SELECT * FROM ibl_plr WHERE `teamname`='$Team_Name' AND `pos`='$adjpos2' AND `name`!='$player_name'";
 $resultmillions = $db->sql_query($querymillions);
 $nummillions = $db->sql_numrows($resultmillions);
 $i = 0;
@@ -296,7 +296,7 @@ if ($tf_millions > 2000) {
     $tf_millions = 2000;
 }
 
-$query1 = "SELECT * FROM nuke_ibl_team_info WHERE team_name = '$Team_Name'";
+$query1 = "SELECT * FROM ibl_team_info WHERE team_name = '$Team_Name'";
 $result1 = $db->sql_query($query1);
 
 $tf_wins = $db->sql_result($result1, 0, "Contract_Wins");
@@ -305,7 +305,7 @@ $tf_trdw = $db->sql_result($result1, 0, "Contract_AvgW");
 $tf_trdl = $db->sql_result($result1, 0, "Contract_AvgL");
 $tf_coach = $db->sql_result($result1, 0, "Contract_Coach");
 
-$queryteam = "SELECT * FROM nuke_iblplyr WHERE name = '$Player_Name'";
+$queryteam = "SELECT * FROM ibl_plr WHERE name = '$Player_Name'";
 $resultteam = $db->sql_query($queryteam);
 
 $player_team = $db->sql_result($resultteam, 0, "teamname");
@@ -572,10 +572,10 @@ if ($nooffer == 0) {
 
 // ==== ENTER OFFER INTO DATABASE (OR UPDATE IF OFFER ALREADY EXISTS) ====
 
-    $querydrop = "DELETE FROM `nuke_ibl_fa_offers` WHERE `name` = '$Player_Name' AND `team` = '$Team_Name' LIMIT 1";
+    $querydrop = "DELETE FROM `ibl_fa_offers` WHERE `name` = '$Player_Name' AND `team` = '$Team_Name' LIMIT 1";
     $resultdrop = $db->sql_query($querydrop);
 
-    $querychunk = "INSERT INTO `nuke_ibl_fa_offers` ( `name` , `team` , `offer1` , `offer2` , `offer3` , `offer4` , `offer5` , `offer6` , `modifier` , `random` , `perceivedvalue` , `MLE` , `LLE` )
+    $querychunk = "INSERT INTO `ibl_fa_offers` ( `name` , `team` , `offer1` , `offer2` , `offer3` , `offer4` , `offer5` , `offer6` , `modifier` , `random` , `perceivedvalue` , `MLE` , `LLE` )
 VALUES ( '$Player_Name', '$Team_Name', '$Offer_1', '$Offer_2', '$Offer_3', '$Offer_4', '$Offer_5', '$Offer_6', '$modifier', '$random', '$perceivedvalue', '$MLE', '$LLE' )";
 
     $resultchunk = $db->sql_query($querychunk);

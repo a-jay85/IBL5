@@ -2,11 +2,11 @@
 
 require 'mainfile.php';
 
-$query = "SELECT * FROM nuke_iblplyr WHERE retired = 0 ORDER BY pid ASC";
+$query = "SELECT * FROM ibl_plr WHERE retired = 0 ORDER BY pid ASC";
 $result = $db->sql_query($query);
 $num = $db->sql_numrows($result);
 
-$max_chunk_query = "SELECT MAX(chunk) as maxchunk FROM nuke_iblplyr_chunk WHERE active = 1";
+$max_chunk_query = "SELECT MAX(chunk) as maxchunk FROM ibl_plr_chunk WHERE active = 1";
 $max_chunk_result = $db->sql_query($max_chunk_query);
 $row = $db->sql_fetch_assoc($max_chunk_result);
 $new_chunk = $row[maxchunk] + 1;
@@ -67,7 +67,7 @@ while ($i < $num) {
     //echo "<tr><td>$i. $name</td><td>Chunk $games_chunk</td><td>$minutes_chunk</td></tr>";
     //echo "<tr><td></td><td>Total $games_total</td><td>$minutes_total</td></tr>";
 
-    $query3 = "UPDATE nuke_iblplyr_chunk SET active = 1, tid = $tid, teamname = '$teamname', stats_gs = $games_start_chunk, stats_gm = $games_chunk, stats_min = $minutes_chunk, stats_fgm = $stats_fgm_chunk, stats_fga = $stats_fga_chunk, stats_ftm = $stats_ftm_chunk, stats_fta = $stats_fta_chunk, stats_3gm = $stats_3gm_chunk, stats_3ga = $stats_3ga_chunk, stats_orb = $stats_orb_chunk, stats_drb = $stats_drb_chunk, stats_ast = $stats_ast_chunk, stats_stl = $stats_stl_chunk, stats_to = $stats_to_chunk, stats_blk = $stats_blk_chunk, stats_pf = $stats_pf_chunk, qa = $qa WHERE pid = $pid AND chunk = $new_chunk";
+    $query3 = "UPDATE ibl_plr_chunk SET active = 1, tid = $tid, teamname = '$teamname', stats_gs = $games_start_chunk, stats_gm = $games_chunk, stats_min = $minutes_chunk, stats_fgm = $stats_fgm_chunk, stats_fga = $stats_fga_chunk, stats_ftm = $stats_ftm_chunk, stats_fta = $stats_fta_chunk, stats_3gm = $stats_3gm_chunk, stats_3ga = $stats_3ga_chunk, stats_orb = $stats_orb_chunk, stats_drb = $stats_drb_chunk, stats_ast = $stats_ast_chunk, stats_stl = $stats_stl_chunk, stats_to = $stats_to_chunk, stats_blk = $stats_blk_chunk, stats_pf = $stats_pf_chunk, qa = $qa WHERE pid = $pid AND chunk = $new_chunk";
     echo "Updating $name's records... $qa<br>";
     $result3 = $db->sql_query($query3);
 
@@ -78,7 +78,7 @@ function sum_chunk_stats($stat, $player_id, $stats_total)
 {
     global $db;
 
-    $query2 = "SELECT SUM($stat) AS total_games FROM nuke_iblplyr_chunk WHERE pid='$player_id' AND active = 1";
+    $query2 = "SELECT SUM($stat) AS total_games FROM ibl_plr_chunk WHERE pid='$player_id' AND active = 1";
     $result2 = $db->sql_query($query2);
     $row_sum = $db->sql_fetch_assoc($result2);
     $new_chunk_stat = $stats_total - $row_sum[total_games];

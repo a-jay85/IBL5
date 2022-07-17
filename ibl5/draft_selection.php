@@ -7,7 +7,7 @@ $player = $_POST['player'];
 $draft_round = $_POST['draft_round'];
 $draft_pick = $_POST['draft_pick'];
 
-$query = "UPDATE nuke_ibl_draft SET `player` = '$player' WHERE `round` = '$draft_round' AND `pick` = '$draft_pick'";
+$query = "UPDATE ibl_draft SET `player` = '$player' WHERE `round` = '$draft_round' AND `pick` = '$draft_pick'";
 $result = $db->sql_query($query);
 
 $query2 = "UPDATE `nuke_scout_rookieratings` SET `drafted` = '1' WHERE `name` = '$player'";

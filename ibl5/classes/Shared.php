@@ -42,7 +42,7 @@ class Shared
     public function getNumberOfTitles($teamname, $titleName)
     {
         $queryNumberOfTitles = $this->db->sql_query("SELECT COUNT(name)
-        	FROM nuke_ibl_teamawards
+        	FROM ibl_team_awards
         	WHERE name = '$teamname'
         	AND Award LIKE '%$titleName%';");
 
@@ -52,7 +52,7 @@ class Shared
     public function getTeamnameFromTid($tid)
     {
         $queryTeamnameFromTid = $this->db->sql_query("SELECT team_name
-            FROM nuke_ibl_team_info
+            FROM ibl_team_info
             WHERE teamid = $tid
             LIMIT 1;");
 
@@ -62,7 +62,7 @@ class Shared
     public function getTidFromTeamname($teamname)
     {
         $queryTidFromTeamname = $this->db->sql_query("SELECT teamid
-            FROM nuke_ibl_team_info
+            FROM ibl_team_info
             WHERE team_name = '$teamname'
             LIMIT 1;");
 
@@ -91,18 +91,18 @@ class Shared
 
     public function displaytopmenu($tid)
     {
-        $queryteam = "SELECT * FROM nuke_ibl_team_info WHERE teamid = '$tid' ";
+        $queryteam = "SELECT * FROM ibl_team_info WHERE teamid = '$tid' ";
         $resultteam = $this->db->sql_query($queryteam);
         $color1 = $this->db->sql_result($resultteam, 0, "color1");
         $color2 = $this->db->sql_result($resultteam, 0, "color2");
 
         echo "<table width=600 border=0><tr>";
 
-        $teamCityQuery = "SELECT `team_city`,`team_name`,`teamid` FROM `nuke_ibl_team_info` ORDER BY `team_city` ASC";
+        $teamCityQuery = "SELECT `team_city`,`team_name`,`teamid` FROM `ibl_team_info` ORDER BY `team_city` ASC";
         $teamCityResult = $this->db->sql_query($teamCityQuery);
-        $teamNameQuery = "SELECT `team_city`,`team_name`,`teamid` FROM `nuke_ibl_team_info` ORDER BY `team_name` ASC";
+        $teamNameQuery = "SELECT `team_city`,`team_name`,`teamid` FROM `ibl_team_info` ORDER BY `team_name` ASC";
         $teamNameResult = $this->db->sql_query($teamNameQuery);
-        $teamIDQuery = "SELECT `team_city`,`team_name`,`teamid` FROM `nuke_ibl_team_info` ORDER BY `teamid` ASC";
+        $teamIDQuery = "SELECT `team_city`,`team_name`,`teamid` FROM `ibl_team_info` ORDER BY `teamid` ASC";
         $teamIDResult = $this->db->sql_query($teamIDQuery);
 
         echo '<p>';

@@ -18,7 +18,7 @@ if ($id == null) {
         echo "</center></td></tr>
 <tr><td valign=top><center><h3>Active Players</h3></center><ul>";
 
-        $query = "SELECT * FROM nuke_iblplyr WHERE retired = '0' ORDER BY name ASC";
+        $query = "SELECT * FROM ibl_plr WHERE retired = '0' ORDER BY name ASC";
         $result = $db->sql_query($query);
         $num = $db->sql_numrows($result);
 
@@ -39,7 +39,7 @@ if ($id == null) {
         echo "</ul></td>
 <td valign=top><center><h3>Retired Players</h3></center><ul>";
 
-        $query = "SELECT * FROM nuke_iblplyr WHERE retired = '1' ORDER BY name ASC";
+        $query = "SELECT * FROM ibl_plr WHERE retired = '1' ORDER BY name ASC";
         $result = $db->sql_query($query);
         $num = $db->sql_numrows($result);
 
@@ -78,7 +78,7 @@ if ($id == null) {
         echo "</td></tr>
 <tr><td valign=top><ul>";
 
-        $query = "SELECT * FROM nuke_iblhist WHERE year = $year ORDER BY name ASC";
+        $query = "SELECT * FROM ibl_hist WHERE year = $year ORDER BY name ASC";
         $result = $db->sql_query($query);
         $num = $db->sql_numrows($result);
 
@@ -100,11 +100,11 @@ if ($id == null) {
     }
 } else {
 
-    $query = "SELECT * FROM nuke_iblplyr WHERE pid = '$id'";
+    $query = "SELECT * FROM ibl_plr WHERE pid = '$id'";
     $result = $db->sql_query($query);
     $num = $db->sql_numrows($result);
 
-    $query2 = "SELECT * FROM nuke_iblhist WHERE pid = '$id' ORDER BY year ASC";
+    $query2 = "SELECT * FROM ibl_hist WHERE pid = '$id' ORDER BY year ASC";
     $result2 = $db->sql_query($query2);
     $num2 = $db->sql_numrows($result2);
 
@@ -1264,7 +1264,7 @@ if ($id == null) {
 
 /* =======================Loop player historical ratings */
 
-        $queryratings = "SELECT * FROM nuke_iblhist WHERE name = '$name' ORDER BY year ASC";
+        $queryratings = "SELECT * FROM ibl_hist WHERE name = '$name' ORDER BY year ASC";
         $resultratings = $db->sql_query($queryratings);
         @$numratings = $db->sql_numrows($resultratings);
 

@@ -27,12 +27,12 @@ $currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
 $fiveSeasonsAgoEndingYear = $currentSeasonEndingYear - 4;
 
 $query2 = "SELECT *,
-	SUM(nuke_iblteam_win_loss.wins) as five_season_wins,
-	SUM(nuke_iblteam_win_loss.losses) as five_season_losses,
-	(SUM(nuke_iblteam_win_loss.wins) + SUM(nuke_iblteam_win_loss.losses)) as totalgames,
-	ROUND((SUM(nuke_iblteam_win_loss.wins) / (SUM(nuke_iblteam_win_loss.wins) + SUM(nuke_iblteam_win_loss.losses))), 3) as five_season_winpct
+	SUM(ibl_team_win_loss.wins) as five_season_wins,
+	SUM(ibl_team_win_loss.losses) as five_season_losses,
+	(SUM(ibl_team_win_loss.wins) + SUM(ibl_team_win_loss.losses)) as totalgames,
+	ROUND((SUM(ibl_team_win_loss.wins) / (SUM(ibl_team_win_loss.wins) + SUM(ibl_team_win_loss.losses))), 3) as five_season_winpct
 FROM ibl_team_history
-INNER JOIN nuke_iblteam_win_loss ON nuke_iblteam_win_loss.currentname = ibl_team_history.team_name
+INNER JOIN ibl_team_win_loss ON ibl_team_win_loss.currentname = ibl_team_history.team_name
 WHERE teamid != 35
 AND year BETWEEN $fiveSeasonsAgoEndingYear AND $currentSeasonEndingYear
 GROUP BY currentname

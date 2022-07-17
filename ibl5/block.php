@@ -5,7 +5,7 @@ $sharedFunctions = new Shared($db);
 
 $val = $_GET['day'];
 
-$query = "SELECT * FROM `nuke_ibl_fa_offers` ORDER BY name ASC, perceivedvalue DESC";
+$query = "SELECT * FROM `ibl_fa_offers` ORDER BY name ASC, perceivedvalue DESC";
 $result = $db->sql_query($query);
 $num = $db->sql_numrows($result);
 
@@ -86,7 +86,7 @@ while ($i < $num) {
         if ($perceivedvalue > $demands) {
             echo " <TR><TD>$name</TD><TD>$team</TD><TD>$offer1</TD><TD>$offer2</TD><TD>$offer3</TD><TD>$offer4</TD><TD>$offer5</TD><TD>$offer6</TD><TD>$MLE</TD><TD>$LLE</TD></TR>";
             $text = $text . $name . " accepts the " . $team . " offer of a " . $offeryears . "-year deal worth a total of " . $offertotal . " million dollars.<br> ";
-            $code = $code . "UPDATE `nuke_iblplyr`
+            $code = $code . "UPDATE `ibl_plr`
 				SET `cy` = '0',
 					`cy1` = '" . $offer1 . "',
 					`cy2` = '" . $offer2 . "',
@@ -100,10 +100,10 @@ while ($i < $num) {
 				WHERE `name` = '" . $name . "'
 				LIMIT 1;";
             if ($MLE == 1) {
-                $code = $code . "UPDATE `nuke_ibl_team_info` SET `HasMLE` = '0' WHERE `team_name` = '" . $team . "' LIMIT 1;";
+                $code = $code . "UPDATE `ibl_team_info` SET `HasMLE` = '0' WHERE `team_name` = '" . $team . "' LIMIT 1;";
             }
             if ($LLE == 1) {
-                $code = $code . "UPDATE `nuke_ibl_team_info` SET `HasLLE` = '0' WHERE `team_name` = '" . $team . "' LIMIT 1;";
+                $code = $code . "UPDATE `ibl_team_info` SET `HasLLE` = '0' WHERE `team_name` = '" . $team . "' LIMIT 1;";
             }
         }
     }

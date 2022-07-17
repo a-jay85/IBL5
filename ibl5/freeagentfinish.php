@@ -2,7 +2,7 @@
 
 require 'mainfile.php';
 
-$query = "SELECT * FROM nuke_iblplyr WHERE retired = 0 AND exp > 0 AND cy = 0 AND teamname <> 'Free Agents' ORDER BY ordinal ASC";
+$query = "SELECT * FROM ibl_plr WHERE retired = 0 AND exp > 0 AND cy = 0 AND teamname <> 'Free Agents' ORDER BY ordinal ASC";
 $result = $db->sql_query($query);
 $num = $db->sql_numrows($result);
 

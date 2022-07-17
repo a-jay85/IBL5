@@ -83,18 +83,18 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
         echo "<option value=\"-2\"" . ($settingVar == -2 ? " SELECTED" : "") . ">-2</option>";
     }
 
-    $sql7 = "SELECT * FROM " . $prefix . "_ibl_offense_sets WHERE TeamName = '$teamlogo' ORDER BY SetNumber ASC";
+    $sql7 = "SELECT * FROM ibl_offense_sets WHERE TeamName = '$teamlogo' ORDER BY SetNumber ASC";
     $result7 = $db->sql_query($sql7);
     $num7 = $db->sql_numrows($result7);
 
-    $queryPlayersOnTeam = "SELECT * FROM " . $prefix . "_iblplyr WHERE teamname = '$teamlogo' AND tid = $tid AND retired = '0' AND ordinal <= 960 ORDER BY ordinal ASC"; // 960 is the cut-off ordinal for players on waivers
+    $queryPlayersOnTeam = "SELECT * FROM ibl_plr WHERE teamname = '$teamlogo' AND tid = $tid AND retired = '0' AND ordinal <= 960 ORDER BY ordinal ASC"; // 960 is the cut-off ordinal for players on waivers
     $playersOnTeam = $db->sql_query($queryPlayersOnTeam);
 
     if ($useset == null) {
         $useset = 1;
     }
 
-    $querySelectedOffenseSet = "SELECT * FROM " . $prefix . "_ibl_offense_sets WHERE TeamName = '$teamlogo' AND SetNumber = '$useset'";
+    $querySelectedOffenseSet = "SELECT * FROM ibl_offense_sets WHERE TeamName = '$teamlogo' AND SetNumber = '$useset'";
     $resultSelectedOffenseSet = $db->sql_query($querySelectedOffenseSet);
     $offenseSet = $db->sql_fetchrow($resultSelectedOffenseSet);
 
@@ -416,18 +416,18 @@ function submit()
         $dc_insertC = $_POST['BH' . $i];
         $dc_insertkey = addslashes($_POST['Name' . $i]);
 
-        $updatequery1 = "UPDATE " . $prefix . "_iblplyr SET dc_PGDepth = '$dc_insert1' WHERE name = '$dc_insertkey'";
-        $updatequery2 = "UPDATE " . $prefix . "_iblplyr SET dc_SGDepth = '$dc_insert2' WHERE name = '$dc_insertkey'";
-        $updatequery3 = "UPDATE " . $prefix . "_iblplyr SET dc_SFDepth = '$dc_insert3' WHERE name = '$dc_insertkey'";
-        $updatequery4 = "UPDATE " . $prefix . "_iblplyr SET dc_PFDepth = '$dc_insert4' WHERE name = '$dc_insertkey'";
-        $updatequery5 = "UPDATE " . $prefix . "_iblplyr SET dc_CDepth = '$dc_insert5' WHERE name = '$dc_insertkey'";
-        $updatequery6 = "UPDATE " . $prefix . "_iblplyr SET dc_active = '$dc_insert6' WHERE name = '$dc_insertkey'";
-        $updatequery7 = "UPDATE " . $prefix . "_iblplyr SET dc_minutes = '$dc_insert7' WHERE name = '$dc_insertkey'";
-        $updatequery8 = "UPDATE " . $prefix . "_iblplyr SET dc_of = '$dc_insert8' WHERE name = '$dc_insertkey'";
-        $updatequery9 = "UPDATE " . $prefix . "_iblplyr SET dc_df = '$dc_insert9' WHERE name = '$dc_insertkey'";
-        $updatequeryA = "UPDATE " . $prefix . "_iblplyr SET dc_oi = '$dc_insertA' WHERE name = '$dc_insertkey'";
-        $updatequeryB = "UPDATE " . $prefix . "_iblplyr SET dc_di = '$dc_insertB' WHERE name = '$dc_insertkey'";
-        $updatequeryC = "UPDATE " . $prefix . "_iblplyr SET dc_bh = '$dc_insertC' WHERE name = '$dc_insertkey'";
+        $updatequery1 = "UPDATE ibl_plr SET dc_PGDepth = '$dc_insert1' WHERE name = '$dc_insertkey'";
+        $updatequery2 = "UPDATE ibl_plr SET dc_SGDepth = '$dc_insert2' WHERE name = '$dc_insertkey'";
+        $updatequery3 = "UPDATE ibl_plr SET dc_SFDepth = '$dc_insert3' WHERE name = '$dc_insertkey'";
+        $updatequery4 = "UPDATE ibl_plr SET dc_PFDepth = '$dc_insert4' WHERE name = '$dc_insertkey'";
+        $updatequery5 = "UPDATE ibl_plr SET dc_CDepth = '$dc_insert5' WHERE name = '$dc_insertkey'";
+        $updatequery6 = "UPDATE ibl_plr SET dc_active = '$dc_insert6' WHERE name = '$dc_insertkey'";
+        $updatequery7 = "UPDATE ibl_plr SET dc_minutes = '$dc_insert7' WHERE name = '$dc_insertkey'";
+        $updatequery8 = "UPDATE ibl_plr SET dc_of = '$dc_insert8' WHERE name = '$dc_insertkey'";
+        $updatequery9 = "UPDATE ibl_plr SET dc_df = '$dc_insert9' WHERE name = '$dc_insertkey'";
+        $updatequeryA = "UPDATE ibl_plr SET dc_oi = '$dc_insertA' WHERE name = '$dc_insertkey'";
+        $updatequeryB = "UPDATE ibl_plr SET dc_di = '$dc_insertB' WHERE name = '$dc_insertkey'";
+        $updatequeryC = "UPDATE ibl_plr SET dc_bh = '$dc_insertC' WHERE name = '$dc_insertkey'";
         $updatequeryD = "UPDATE ibl_team_history SET depth = NOW() WHERE team_name = '$Team_Name'";
         $updatequeryF = "UPDATE ibl_team_history SET sim_depth = NOW() WHERE team_name = '$Team_Name'";
         $executeupdate1 = $db->sql_query($updatequery1);

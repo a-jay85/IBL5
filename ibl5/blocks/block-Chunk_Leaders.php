@@ -29,7 +29,7 @@ function getLastSimStatLeaders($statName, $query)
 
     $querySimStatLeaders = $db->sql_query("SELECT players.name, boxes.pid, teamname, players.tid, CAST(FORMAT(($query / COUNT(players.NAME)), 1) AS DECIMAL(3,1)) as `$statName`
         FROM ibl_box_scores boxes
-        INNER JOIN nuke_iblplyr players USING(pid)
+        INNER JOIN ibl_plr players USING(pid)
         WHERE Date BETWEEN '$lastSimStartDate' AND '$lastSimEndDate'
         GROUP BY name
         ORDER BY $statName DESC

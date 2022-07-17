@@ -18,10 +18,10 @@ $filetext = $Team_Name . " exercise the rookie extension option on " . $Player_N
 
 if (($seasonPhase == "Free Agency" and $player_exp == 2 and $player_draftround == 1) or
     (($seasonPhase == "Preseason" or $seasonPhase == "HEAT") and $player_exp == 3 and $player_draftround == 1)) {
-    $queryrookieoption = "UPDATE nuke_iblplyr SET cy4 = '$ExtensionAmount' WHERE name = '$Player_Name'";
+    $queryrookieoption = "UPDATE ibl_plr SET cy4 = '$ExtensionAmount' WHERE name = '$Player_Name'";
 } elseif (($seasonPhase == "Free Agency" and $player_exp == 1 and $player_draftround == 2) or
     (($seasonPhase == "Preseason" or $seasonPhase == "HEAT") and $player_exp == 2 and $player_draftround == 2)) {
-    $queryrookieoption = "UPDATE nuke_iblplyr SET cy3 = '$ExtensionAmount' WHERE name = '$Player_Name'";
+    $queryrookieoption = "UPDATE ibl_plr SET cy3 = '$ExtensionAmount' WHERE name = '$Player_Name'";
 } else {
     die("This player's experience doesn't match their rookie status; please let the commish know about this error.");
 }

@@ -77,7 +77,7 @@ function queryTeamInfo()
     global $db;
 
     $query = "SELECT teamid, team_city, team_name, color1, color2
-		FROM nuke_ibl_team_info
+		FROM ibl_team_info
 		WHERE teamid != 99 AND teamid != 35
 		ORDER BY teamid ASC;";
     $result = $db->sql_query($query);

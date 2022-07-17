@@ -356,7 +356,7 @@ function getPlayerNamesArray()
     global $db;
 
     $query = "SELECT name
-		FROM nuke_iblplyr
+		FROM ibl_plr
 		WHERE ordinal != 0
 		ORDER BY name ASC;";
     $result = $db->sql_query($query);
@@ -374,7 +374,7 @@ function getPlayerInfoArrayFromName($playerName)
     global $db;
 
     $query = "SELECT *
-		FROM nuke_iblplyr
+		FROM ibl_plr
 		WHERE name = '$playerName'
 		LIMIT 1;";
     $result = $db->sql_query($query);

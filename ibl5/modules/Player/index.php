@@ -1472,7 +1472,6 @@ function showpage($pid, $spec)
         </tr>";
 
         $allstarquery = $db->sql_query("SELECT * FROM ibl_awards WHERE name='$player_name' AND Award LIKE '%Conference All-Star'");
-        $allstarresult = $db->sql_query($allstarquery);
         $asg = $db->sql_numrows($allstarquery);
         echo "<tr>
             <td><b>All Star Games:</b></td>
@@ -1480,7 +1479,6 @@ function showpage($pid, $spec)
         </tr>";
 
         $allstarquery2 = $db->sql_query("SELECT * FROM ibl_awards WHERE name='$player_name' AND Award LIKE 'Three-Point Contest%'");
-        $allstarresult2 = $db->sql_query($allstarquery2);
         $threepointcontests = $db->sql_numrows($allstarquery2);
 
         echo "<tr>
@@ -1489,7 +1487,6 @@ function showpage($pid, $spec)
         </tr>";
 
         $allstarquery3 = $db->sql_query("SELECT * FROM ibl_awards WHERE name='$player_name' AND Award LIKE 'Slam Dunk Competition%'");
-        $allstarresult3 = $db->sql_query($allstarquery3);
         $dunkcontests = $db->sql_numrows($allstarquery3);
 
         echo "<tr>
@@ -1498,7 +1495,6 @@ function showpage($pid, $spec)
         </tr>";
 
         $allstarquery4 = $db->sql_query("SELECT * FROM ibl_awards WHERE name='$player_name' AND Award LIKE 'Rookie-Sophomore Challenge'");
-        $allstarresult4 = $db->sql_query($allstarquery4);
         $rooksoph = $db->sql_numrows($allstarquery4);
 
         echo "<tr>

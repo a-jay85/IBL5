@@ -53,7 +53,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
         if ($attrib != null) {
             if ($player != null) {
 
-                $sql4 = "SELECT * FROM nuke_scout_points_spent WHERE name LIKE '%$player%' AND teamname = '$userinfo[user_ibl_team]' ORDER BY name DESC";
+                $sql4 = "SELECT * FROM ibl_scout_points_spent WHERE name LIKE '%$player%' AND teamname = '$userinfo[user_ibl_team]' ORDER BY name DESC";
                 $result4 = $db->sql_query($sql4);
                 $num4 = $db->sql_numrows($result4);
                 $row4 = $db->sql_fetchrow($result4);
@@ -143,28 +143,28 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
                             if ($row4[$attrib] == 0) {
                                 $userinfo['scoutingpoints'] = $userinfo['scoutingpoints'] - 2;
                                 $db->sql_query("update " . $prefix . "_users set scoutingpoints='$userinfo[scoutingpoints]' where user_id = '$userinfo[user_id]'");
-                                $sql_info = "UPDATE nuke_scout_points_spent SET $attrib = 2 WHERE name = '$player' AND teamname ='$userinfo[user_ibl_team]'";
+                                $sql_info = "UPDATE ibl_scout_points_spent SET $attrib = 2 WHERE name = '$player' AND teamname ='$userinfo[user_ibl_team]'";
                                 $process = $db->sql_query($sql_info, BEGIN_TRANSACTION);
                                 if ($attrib == 'offo') {
-                                    $sql_info = "UPDATE nuke_scout_points_spent SET offd = 2 WHERE name = '$player' AND teamname ='$userinfo[user_ibl_team]'";
+                                    $sql_info = "UPDATE ibl_scout_points_spent SET offd = 2 WHERE name = '$player' AND teamname ='$userinfo[user_ibl_team]'";
                                     $process = $db->sql_query($sql_info, BEGIN_TRANSACTION);
-                                    $sql_info = "UPDATE nuke_scout_points_spent SET offp = 2 WHERE name = '$player' AND teamname ='$userinfo[user_ibl_team]'";
+                                    $sql_info = "UPDATE ibl_scout_points_spent SET offp = 2 WHERE name = '$player' AND teamname ='$userinfo[user_ibl_team]'";
                                     $process = $db->sql_query($sql_info, BEGIN_TRANSACTION);
-                                    $sql_info = "UPDATE nuke_scout_points_spent SET offt = 2 WHERE name = '$player' AND teamname ='$userinfo[user_ibl_team]'";
+                                    $sql_info = "UPDATE ibl_scout_points_spent SET offt = 2 WHERE name = '$player' AND teamname ='$userinfo[user_ibl_team]'";
                                     $process = $db->sql_query($sql_info, BEGIN_TRANSACTION);
                                 }
                                 if ($attrib == 'defo') {
-                                    $sql_info = "UPDATE nuke_scout_points_spent SET defd = 2 WHERE name = '$player' AND teamname ='$userinfo[user_ibl_team]'";
+                                    $sql_info = "UPDATE ibl_scout_points_spent SET defd = 2 WHERE name = '$player' AND teamname ='$userinfo[user_ibl_team]'";
                                     $process = $db->sql_query($sql_info, BEGIN_TRANSACTION);
-                                    $sql_info = "UPDATE nuke_scout_points_spent SET defp = 2 WHERE name = '$player' AND teamname ='$userinfo[user_ibl_team]'";
+                                    $sql_info = "UPDATE ibl_scout_points_spent SET defp = 2 WHERE name = '$player' AND teamname ='$userinfo[user_ibl_team]'";
                                     $process = $db->sql_query($sql_info, BEGIN_TRANSACTION);
-                                    $sql_info = "UPDATE nuke_scout_points_spent SET deft = 2 WHERE name = '$player' AND teamname ='$userinfo[user_ibl_team]'";
+                                    $sql_info = "UPDATE ibl_scout_points_spent SET deft = 2 WHERE name = '$player' AND teamname ='$userinfo[user_ibl_team]'";
                                     $process = $db->sql_query($sql_info, BEGIN_TRANSACTION);
                                 }
                                 if ($attrib == 'tal') {
-                                    $sql_info = "UPDATE nuke_scout_points_spent SET skl = 2 WHERE name = '$player' AND teamname ='$userinfo[user_ibl_team]'";
+                                    $sql_info = "UPDATE ibl_scout_points_spent SET skl = 2 WHERE name = '$player' AND teamname ='$userinfo[user_ibl_team]'";
                                     $process = $db->sql_query($sql_info, BEGIN_TRANSACTION);
-                                    $sql_info = "UPDATE nuke_scout_points_spent SET int = 2 WHERE name = '$player' AND teamname ='$userinfo[user_ibl_team]'";
+                                    $sql_info = "UPDATE ibl_scout_points_spent SET int = 2 WHERE name = '$player' AND teamname ='$userinfo[user_ibl_team]'";
                                     $process = $db->sql_query($sql_info, BEGIN_TRANSACTION);
                                 }
                             } else {
@@ -179,7 +179,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
                             if ($row4[$attrib] == 2) {
                                 $userinfo['scoutingpoints'] = $userinfo['scoutingpoints'] - 1;
                                 $db->sql_query("update " . $prefix . "_users set scoutingpoints='$userinfo[scoutingpoints]' where user_id = '$userinfo[user_id]'");
-                                $sql_info = "UPDATE nuke_scout_points_spent SET $attrib = 3 WHERE name = '$player' AND teamname ='$userinfo[user_ibl_team]'";
+                                $sql_info = "UPDATE ibl_scout_points_spent SET $attrib = 3 WHERE name = '$player' AND teamname ='$userinfo[user_ibl_team]'";
                                 $process = $db->sql_query($sql_info, BEGIN_TRANSACTION);
                             } else {
                             }
@@ -265,7 +265,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
     // START GENERAL DECLARANTS
     // ==========
 
-    $sql3 = "SELECT * FROM nuke_scout_rookieratings WHERE invite = '' ORDER BY drafted, name";
+    $sql3 = "SELECT * FROM ibl_scout_rookieratings WHERE invite = '' ORDER BY drafted, name";
     $result3 = $db->sql_query($sql3);
 
     $i = 0;
@@ -316,7 +316,7 @@ FROM   iblhoops_draft.pick
 
         if (in_array($player_name, $draftedPlayersArray)) {
             $player_drafted = 1;
-            $db->sql_query("UPDATE nuke_scout_rookieratings
+            $db->sql_query("UPDATE ibl_scout_rookieratings
 SET drafted = 1
 WHERE name = '$player_name';"); // This query should really be executed in the Draft-O-Matic when the player is drafted, but this works for now.
         } else {
@@ -325,7 +325,7 @@ WHERE name = '$player_name';"); // This query should really be executed in the D
 
 // === GRAB SCOUTING POINT EXPENDITURES ===
 
-        $sqlscouted = "SELECT * FROM nuke_scout_points_spent WHERE name LIKE '%$row3[name]%' AND teamname = '$teamlogo' ORDER BY name ASC ";
+        $sqlscouted = "SELECT * FROM ibl_scout_points_spent WHERE name LIKE '%$row3[name]%' AND teamname = '$teamlogo' ORDER BY name ASC ";
         $resultscouted = $db->sql_query($sqlscouted);
         $numscouted = $db->sql_numrows($resultscouted);
         $rowscouted = $db->sql_fetchrow($resultscouted);
@@ -846,7 +846,7 @@ WHERE name = '$player_name';"); // This query should really be executed in the D
     echo "<tr><th colspan=28><center>Players Your Team has invited</th></tr>
 ";
 
-    $sql3 = "SELECT * FROM nuke_scout_rookieratings WHERE invite LIKE '%$teamlogo%' ORDER BY ranking DESC";
+    $sql3 = "SELECT * FROM ibl_scout_rookieratings WHERE invite LIKE '%$teamlogo%' ORDER BY ranking DESC";
     $result3 = $db->sql_query($sql3);
 
     while ($row3 = $db->sql_fetchrow($result3)) {
@@ -883,7 +883,7 @@ WHERE name = '$player_name';"); // This query should really be executed in the D
 
 // === GRAB SCOUTING POINT EXPENDITURES ===
 
-        $sqlscouted = "SELECT * FROM nuke_scout_points_spent WHERE name = '$row3[name]' AND teamname = '$teamlogo' ORDER BY name ASC ";
+        $sqlscouted = "SELECT * FROM ibl_scout_points_spent WHERE name = '$row3[name]' AND teamname = '$teamlogo' ORDER BY name ASC ";
         $resultscouted = $db->sql_query($sqlscouted);
         $numscouted = $db->sql_numrows($resultscouted);
         $rowscouted = $db->sql_fetchrow($resultscouted);
@@ -1369,7 +1369,7 @@ WHERE name = '$player_name';"); // This query should really be executed in the D
     echo "<tr><th colspan=28><center>Players Invited by Other Teams (cannot be scouted)</th></tr>
 ";
 
-    $sql3 = "SELECT * FROM nuke_scout_rookieratings WHERE invite NOT LIKE '%$teamlogo%' AND invite != '' ORDER BY ranking DESC";
+    $sql3 = "SELECT * FROM ibl_scout_rookieratings WHERE invite NOT LIKE '%$teamlogo%' AND invite != '' ORDER BY ranking DESC";
     $result3 = $db->sql_query($sql3);
 
     while ($row3 = $db->sql_fetchrow($result3)) {

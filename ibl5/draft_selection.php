@@ -10,7 +10,7 @@ $draft_pick = $_POST['draft_pick'];
 $query = "UPDATE ibl_draft SET `player` = '$player' WHERE `round` = '$draft_round' AND `pick` = '$draft_pick'";
 $result = $db->sql_query($query);
 
-$query2 = "UPDATE `nuke_scout_rookieratings` SET `drafted` = '1' WHERE `name` = '$player'";
+$query2 = "UPDATE `ibl_scout_rookieratings` SET `drafted` = '1' WHERE `name` = '$player'";
 $result2 = $db->sql_query($query2);
 //$system_date = time() + (7 * 24 * 60 * 60);
 //echo 'Now:       '. date('Y-m-d h:m:s') ."<br>";

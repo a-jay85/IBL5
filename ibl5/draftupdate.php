@@ -41,7 +41,7 @@ Enter the Team Drafting: <input type=\"text\" name=\"team\" />
         $query = "UPDATE `college_players2` SET `draftedby` = '$team' WHERE `name` = '$name'";
         $result = $db->sql_query($query);
 
-        $query2 = "UPDATE `nuke_scout_rookieratings` SET `drafted` = '1' WHERE `name` = '$name'";
+        $query2 = "UPDATE `ibl_scout_rookieratings` SET `drafted` = '1' WHERE `name` = '$name'";
         $result2 = $db->sql_query($query2);
 
         echo "<html><head><title>Draft Update Page</title></head><body>";

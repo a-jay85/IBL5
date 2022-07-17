@@ -823,7 +823,7 @@ function display()
             $inj = stripslashes(check_html($teamlist['injured'], "nohtml"));
             $bird = stripslashes(check_html($teamlist['bird'], "nohtml"));
 
-            $getdemands = $db->sql_fetchrow($db->sql_query("SELECT * FROM " . $prefix . "_ibl_demands WHERE name='$name'"));
+            $getdemands = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_demands WHERE name='$name'"));
 
             $dem1 = stripslashes(check_html($getdemands['dem1'], "nohtml"));
             $dem2 = stripslashes(check_html($getdemands['dem2'], "nohtml"));
@@ -1012,7 +1012,7 @@ function display()
             $age = stripslashes(check_html($teamlist['age'], "nohtml"));
             $inj = stripslashes(check_html($teamlist['injured'], "nohtml"));
 
-            $getdemands = $db->sql_fetchrow($db->sql_query("SELECT * FROM " . $prefix . "_ibl_demands WHERE name='$name'"));
+            $getdemands = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_demands WHERE name='$name'"));
 
             $dem1 = stripslashes(check_html($getdemands['dem1'], "nohtml"));
             $dem2 = stripslashes(check_html($getdemands['dem2'], "nohtml"));
@@ -1181,7 +1181,7 @@ function negotiate($pid)
     echo "<b>$player_pos $player_name</b> - Contract Demands:
 	<br>";
 
-    $demands = $db->sql_fetchrow($db->sql_query("SELECT * FROM " . $prefix . "_ibl_demands WHERE name='$player_name'"));
+    $demands = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_demands WHERE name='$player_name'"));
     $dem1 = stripslashes(check_html($demands['dem1'], "nohtml"));
     $dem2 = stripslashes(check_html($demands['dem2'], "nohtml"));
     $dem3 = stripslashes(check_html($demands['dem3'], "nohtml"));

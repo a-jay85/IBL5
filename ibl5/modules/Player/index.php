@@ -3305,7 +3305,7 @@ function negotiate($pid)
             $dem6 = 0;
             /*
             // Old way to determine demands here
-            $demands = $db->sql_fetchrow($db->sql_query("SELECT * FROM " . $prefix . "_ibl_demands WHERE name='$player_name'"));
+            $demands = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_demands WHERE name='$player_name'"));
             $dem1 = stripslashes(check_html($demands['dem1'], "nohtml"));
             $dem2 = stripslashes(check_html($demands['dem2'], "nohtml"));
             $dem3 = stripslashes(check_html($demands['dem3'], "nohtml"));

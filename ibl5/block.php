@@ -37,7 +37,7 @@ while ($i < $num) {
     $LLE = $db->sql_result($result, $i, "LLE");
     $random = $db->sql_result($result, $i, "random");
 
-    $query2 = "SELECT * FROM `nuke_ibl_demands` WHERE name = '$name'";
+    $query2 = "SELECT * FROM `ibl_demands` WHERE name = '$name'";
     $result2 = $db->sql_query($query2);
     $num2 = $db->sql_numrows($result2);
 

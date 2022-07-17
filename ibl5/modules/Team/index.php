@@ -2009,21 +2009,6 @@ function team_info_right($team_name, $color1, $color2, $owner_name, $tid)
 
     // ==== GET OWNER INFO
 
-    $queryo = "SELECT * FROM nuke_users WHERE user_ibl_team = '$team_name' ORDER BY user_id DESC";
-    $resulto = $db->sql_query($queryo);
-    $numo = $db->sql_numrows($resulto);
-
-    $query1 = "SELECT * FROM ibl_team_info WHERE teamid = $tid";
-    $result1 = $db->sql_query($query1);
-
-    $coaching = $db->sql_result($result1, 0, "Contract_Coach");
-
-    $user_id = $db->sql_result($resulto, 0, "user_id");
-    $username = $db->sql_result($resulto, 0, "username");
-    $user_lastvisit = $db->sql_result($resulto, 0, "user_lastvisit");
-    $date_started = $db->sql_result($resulto, 0, "date_started");
-    $visitdate = date(r, $user_lastvisit);
-
     $output = "<table bgcolor=#eeeeee width=220>";
     $output = $output . "<tr bgcolor=\"#$color1\"><td align=\"center\">
 		<font color=\"#$color2\"><b>Current Season</b></font>

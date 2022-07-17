@@ -767,54 +767,6 @@ function boxscore($year, $month, $tid, $wins, $losses, $winStreak, $lossStreak)
     return array($wins, $losses, $winStreak, $lossStreak);
 }
 
-function finances($tid)
-{
-    global $db;
-    $sharedFunctions = new Shared($db);
-
-    $tid = intval($tid);
-    $yr = $_REQUEST['yr'];
-
-    $queryteam = "SELECT * FROM ibl_team_info WHERE teamid = '$tid' ";
-    $resultteam = $db->sql_query($queryteam);
-
-    $teamid = $db->sql_result($resultteam, 0, "teamid");
-    $team_city = $db->sql_result($resultteam, 0, "team_city");
-    $team_name = $db->sql_result($resultteam, 0, "team_name");
-    $coach_pts = $db->sql_result($resultteam, 0, "Contract_Coach");
-    $color1 = $db->sql_result($resultteam, 0, "color1");
-    $color2 = $db->sql_result($resultteam, 0, "color2");
-    $owner_name = $db->sql_result($resultteam, 0, "owner_name");
-    $owner_email = $db->sql_result($resultteam, 0, "owner_email");
-    $icq = $db->sql_result($resultteam, 0, "icq");
-    $aim = $db->sql_result($resultteam, 0, "aim");
-    $msn = $db->sql_result($resultteam, 0, "msn");
-
-    include "teamcap.php";
-    include "header.php";
-
-    $matrix = teamcap($tid);
-
-    $returned_stuff = financialdisplay($matrix, $yr, $tid);
-    $output = $returned_stuff[0];
-    $bottom_output = $returned_stuff[1];
-
-    // END NEW CBA FINANCIAL PLANNER
-
-    OpenTable();
-
-    $sharedFunctions->displaytopmenu($tid);
-
-    echo "<table valign=top align=center><tr><td align=center valign=top><img src=\"./images/logo/$tid.jpg\"></td></tr>
-		<tr bgcolor=$color1><td><font color=$color2><b><center>$team_city $team_name Finances (Cap Space)</center></b></font></td></tr>
-		<tr><td align=center><table border=1 cellpadding=0><tr>$bottom_output</tr></table></td></tr>";
-    echo $output[$yr];
-    echo "</td></tr></table></td></tr></table>";
-
-    CloseTable();
-    include "footer.php";
-}
-
 function team($tid)
 {
     global $db;
@@ -4369,10 +4321,6 @@ switch ($op) {
 
     case "team":
         team($tid);
-        break;
-
-    case "finances":
-        finances($tid);
         break;
 
     case "schedule":

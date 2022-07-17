@@ -43,7 +43,7 @@ position.position_id = player.position_id";
 	$pick = (($pick_id-1)%26)+1;
 	$subject = $settings->get_value(kSettingLeagueName)." Draft Selection Notification: Round $round Pick $pick";
     $queryCurrentSeasonEndingYear = mysql_query('SELECT value
-        FROM iblhoops_ibl5.`nuke_ibl_settings`
+        FROM iblhoops_ibl5.`ibl_settings`
         WHERE name = "Current Season Ending Year"
         LIMIT 1');
     $currentSeasonEndingYear = mysql_result($queryCurrentSeasonEndingYear, 0);

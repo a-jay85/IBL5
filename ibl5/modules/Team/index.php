@@ -3472,12 +3472,12 @@ function financialdisplay($matrix, $yr, $tid)
 
     // NEW CBA FINANCIAL PLANNER
     $iteration = 1;
-    $cap_amount[1] = $db->sql_result($db->sql_query("SELECT value FROM nuke_ibl_settings WHERE name = 'Hard_Cap_Year_1' "), 0, "value");
-    $cap_amount[2] = $db->sql_result($db->sql_query("SELECT value FROM nuke_ibl_settings WHERE name = 'Hard_Cap_Year_2' "), 0, "value");
-    $cap_amount[3] = $db->sql_result($db->sql_query("SELECT value FROM nuke_ibl_settings WHERE name = 'Hard_Cap_Year_3' "), 0, "value");
-    $cap_amount[4] = $db->sql_result($db->sql_query("SELECT value FROM nuke_ibl_settings WHERE name = 'Hard_Cap_Year_4' "), 0, "value");
-    $cap_amount[5] = $db->sql_result($db->sql_query("SELECT value FROM nuke_ibl_settings WHERE name = 'Hard_Cap_Year_5' "), 0, "value");
-    $cap_amount[6] = $db->sql_result($db->sql_query("SELECT value FROM nuke_ibl_settings WHERE name = 'Hard_Cap_Year_6' "), 0, "value");
+    $cap_amount[1] = $db->sql_result($db->sql_query("SELECT value FROM ibl_settings WHERE name = 'Hard_Cap_Year_1' "), 0, "value");
+    $cap_amount[2] = $db->sql_result($db->sql_query("SELECT value FROM ibl_settings WHERE name = 'Hard_Cap_Year_2' "), 0, "value");
+    $cap_amount[3] = $db->sql_result($db->sql_query("SELECT value FROM ibl_settings WHERE name = 'Hard_Cap_Year_3' "), 0, "value");
+    $cap_amount[4] = $db->sql_result($db->sql_query("SELECT value FROM ibl_settings WHERE name = 'Hard_Cap_Year_4' "), 0, "value");
+    $cap_amount[5] = $db->sql_result($db->sql_query("SELECT value FROM ibl_settings WHERE name = 'Hard_Cap_Year_5' "), 0, "value");
+    $cap_amount[6] = $db->sql_result($db->sql_query("SELECT value FROM ibl_settings WHERE name = 'Hard_Cap_Year_6' "), 0, "value");
 
     while ($season_min < $season_max) {
         $cap_space = $cap_amount[$iteration];
@@ -3619,7 +3619,7 @@ function asg_voting()
     $num2 = $db->sql_numrows($result2);
     $userinfo = $db->sql_fetchrow($result2);
     $teamlogo = stripslashes(check_html($userinfo['user_ibl_team'], "nohtml"));
-    $sql3 = "SELECT * FROM " . $prefix . "_ibl_settings WHERE name = 'ASG Voting'";
+    $sql3 = "SELECT * FROM ibl_settings WHERE name = 'ASG Voting'";
     $result3 = $db->sql_query($sql3);
     $num3 = $db->sql_numrows($result3);
     $info = $db->sql_fetchrow($result3);
@@ -3864,7 +3864,7 @@ function eoy_voting()
     $userinfo = $db->sql_fetchrow($result2);
     $teamlogo = stripslashes(check_html($userinfo['user_ibl_team'], "nohtml"));
 
-    $sql3 = "SELECT * FROM " . $prefix . "_ibl_settings WHERE name = 'EOY Voting'";
+    $sql3 = "SELECT * FROM ibl_settings WHERE name = 'EOY Voting'";
     $result3 = $db->sql_query($sql3);
     $num3 = $db->sql_numrows($result3);
     $info = $db->sql_fetchrow($result3);

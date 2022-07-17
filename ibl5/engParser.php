@@ -4,7 +4,7 @@ require 'config.php';
 mysql_connect($dbhost, $dbuname, $dbpass);
 @mysql_select_db($dbname) or die("Unable to select database");
 
-$leagueFileName = $db->sql_result($db->sql_query("SELECT value FROM nuke_ibl_settings WHERE name = 'League File Name'"), 0);
+$leagueFileName = $db->sql_result($db->sql_query("SELECT value FROM ibl_settings WHERE name = 'League File Name'"), 0);
 $engFile = fopen("$leagueFileName.eng", "rb");
 $engArray = array();
 

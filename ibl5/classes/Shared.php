@@ -22,7 +22,7 @@ class Shared
     public function getCurrentSeasonEndingYear()
     {
         $queryCurrentSeasonEndingYear = $this->db->sql_query("SELECT value
-            FROM nuke_ibl_settings
+            FROM ibl_settings
             WHERE name = 'Current Season Ending Year'
             LIMIT 1");
 
@@ -32,7 +32,7 @@ class Shared
     public function getCurrentSeasonPhase()
     {
         $queryCurrentSeasonPhase = $this->db->sql_query("SELECT value
-            FROM nuke_ibl_settings
+            FROM ibl_settings
             WHERE name = 'Current Season Phase'
             LIMIT 1");
 
@@ -72,7 +72,7 @@ class Shared
     public function getWaiverWireStatus()
     {
         $queryWaiverWireStatus = $this->db->sql_query("SELECT value
-            FROM nuke_ibl_settings
+            FROM ibl_settings
             WHERE name = 'Allow Waiver Moves'
             LIMIT 1");
 
@@ -82,7 +82,7 @@ class Shared
     public function getAllowTradesStatus()
     {
         $queryAllowTradesStatus = $this->db->sql_query("SELECT value
-            FROM nuke_ibl_settings
+            FROM ibl_settings
             WHERE name = 'Allow Trades'
             LIMIT 1");
 

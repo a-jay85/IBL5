@@ -2,7 +2,7 @@
 
 require 'mainfile.php';
 
-$query1 = "UPDATE IBL_ASG_Votes SET East_C = NULL, East_F1 = NULL, East_F2 = NULL, East_G1 = NULL, East_G2 = NULL, West_C = NULL, West_F1 = NULL, West_F2 = NULL, West_G1 = NULL, West_G2 = NULL";
+$query1 = "UPDATE ibl_ASG_Votes SET East_C = NULL, East_F1 = NULL, East_F2 = NULL, East_G1 = NULL, East_G2 = NULL, West_C = NULL, West_F1 = NULL, West_F2 = NULL, West_G1 = NULL, West_G2 = NULL";
 $result1 = $db->sql_query($query1);
 
 $query2 = "UPDATE ibl_settings SET value = 'Yes' where name = 'ASG Voting'";

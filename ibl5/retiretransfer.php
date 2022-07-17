@@ -23,8 +23,6 @@ while ($i < $num1) {
     $query3 = "UPDATE ibl_playoff_career_totals SET `retired` = '$retired' WHERE `name` = '$playername'";
     $result3 = $db->sql_query($query3);
 
-    $query4 = "UPDATE ibl_worlds_totals SET `retired` = '$retired' WHERE `name` = '$playername'";
-    $result4 = $db->sql_query($query4);
     $i++;
 }
 

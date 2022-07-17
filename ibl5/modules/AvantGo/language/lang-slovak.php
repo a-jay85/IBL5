@@ -2,10 +2,10 @@
 
 /*************************************************************************/
 /* The Slovak language file for module AvantGo                      */
-/* Author: AlRashid 			 Date: 09.09.2002   					 */
+/* Author: AlRashid              Date: 09.09.2002                        */
 /* alrashid@klokan.sk, http://alrashid.klokan.sk                         */
-/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk			     */
-/*  		Dakujem                                                      */
+/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk                 */
+/*          Dakujem                                                      */
 /*************************************************************************/
 /**************************************************************************/
 /* PHP-NUKE: Advanced Content Management System                           */
@@ -24,18 +24,16 @@
 /* And, if you use HTML code, please double check it.                     */
 /*************************************************************************/
 /* The Slovak language file for module AvantGo                      */
-/* Author: AlRashid 			 Date: 09.09.2002   					 */
+/* Author: AlRashid              Date: 09.09.2002                        */
 /* alrashid@klokan.sk, http://alrashid.klokan.sk                         */
-/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk			     */
-/*  		Dakujem                                                      */
+/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk                 */
+/*          Dakujem                                                      */
 /*************************************************************************/
 /**************************************************************************/
 
-define("_PDATE","Dátum:");
-define("_PTOPIC","Vec:");
-define("_COMESFROM","Tento èlánok je z");
-define("_THEURL","URL tohoto èlánku je:");
-define("_DATE","Dátum");
-define("_TITLE","Názov");
-
-?>
+define("_PDATE", "Dï¿½tum:");
+define("_PTOPIC", "Vec:");
+define("_COMESFROM", "Tento ï¿½lï¿½nok je z");
+define("_THEURL", "URL tohoto ï¿½lï¿½nku je:");
+define("_DATE", "Dï¿½tum");
+define("_TITLE", "Nï¿½zov");

@@ -12,7 +12,7 @@
 /* the Free Software Foundation; either version 2 of the License.       */
 /************************************************************************/
 
-if ( !defined('BLOCK_FILE') ) {
+if (!defined('BLOCK_FILE')) {
     Header("Location: ../index.php");
     die();
 }
@@ -29,11 +29,9 @@ if (
     $actual_url == "/ibl5/" ||
     $actual_url == "/ibl5/index.php"
 ) {} else {
-	$boxstuff .= '<a href="index.php"><img src="logocorner.jpg" border="0"></a>';
+    $boxstuff .= '<a href="index.php"><img src="logocorner.jpg" border="0"></a>';
 }
 
 $boxstuff .= "</span>";
 
 $content = $boxstuff;
-
-?>

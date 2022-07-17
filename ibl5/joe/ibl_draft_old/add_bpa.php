@@ -20,17 +20,16 @@
 include "includes/classes.inc.php";
 
 if ($_POST['position_id']) {
-  $statement = "select max(bpa_priority) from bpa where team_id = '".$login->team_id()."'";
-  $row = mysql_fetch_array(mysql_query($statement));
-  $priority = $row['max(bpa_priority)'] + 1;
-  $statement = "insert into bpa (team_id, position_id, bpa_priority, attribute_id, bpa_max_experience)
+    $statement = "select max(bpa_priority) from bpa where team_id = '" . $login->team_id() . "'";
+    $row = mysql_fetch_array(mysql_query($statement));
+    $priority = $row['max(bpa_priority)'] + 1;
+    $statement = "insert into bpa (team_id, position_id, bpa_priority, attribute_id, bpa_max_experience)
 values
-('".$login->team_id()."', '".$_POST['position_id']."', '$priority', '".$_POST['attribute_id']."', '".$_POST['bpa_max_experience']."')";
-  mysql_query($statement);
-  echo mysql_error();
- }
+('" . $login->team_id() . "', '" . $_POST['position_id'] . "', '$priority', '" . $_POST['attribute_id'] . "', '" . $_POST['bpa_max_experience'] . "')";
+    mysql_query($statement);
+    echo mysql_error();
+}
 
 process_pick_queue();
 
 header("Location: priority.php");
-?>

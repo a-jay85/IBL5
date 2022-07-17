@@ -17,27 +17,24 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
+define("_CATEGORY", "ï¿½ï¿½ï¿½O");
 
-define("_CATEGORY","Ãþ§O");
-
-define("_LVOTES","§ë²¼¤@Äý");
-define("_HITS","Hits");
-define("_TOPWELCOME","Åwªï¨Ó¨ì±Æ¦æº]");
-define("_READSTORIES","¶µ³Ì¨üÅwªïªº³ø¾É");
-define("_COMMENTEDSTORIES","¶µ³Ì¨ãª§Ä³©Êªº³ø¾É");
-define("_ACTIVECAT","¶µ³Ì¬¡ÅDªºÃþ§O");
-define("_READSECTION","¶µ³Ì¨üÅwªïªº±MÄæ");
-define("_NEWSSUBMITTERS","¶µ³Ì¬¡ÅDªº·s»D§ë»¼ªÌ");
-define("_NEWSSENT","·s»D±H°e");
-define("_VOTEDPOLLS","¶µ±o²¼¼Æ³Ì¦hªº§ë²¼½Õ¬d");
-define("_MOSTACTIVEAUTHORS","¦ì³Ì¬¡ÅDªº§@ªÌ");
-define("_NEWSPUBLISHED","·s»Dµoªí");
-define("_READREVIEWS","³Ì¨üÅwªïªº§@«~µû½×");
-define("_DOWNLOADEDFILES","³Ì±`³Q¤U¸üªºÀÉ®×");
-define("_LDOWNLOADS","¤U¸ü¦¸¼Æ");
-define("_MOSTREADPAGES","³Ì±`³Q¾\Åªªººô­¶");
-define("_MOSTVOTEDSTORIES","§ë²¼³Ì¿ãÅDªº¤å³¹");
-define("_POINTS","ÂI");
-define("_BESTRATEDSTORIES","³Qµû¬°³Ì¨Îªº¤å³¹ (³Ì°ª¤À 5 ÂI)");
-
-?>
+define("_LVOTES", "ï¿½ë²¼ï¿½@ï¿½ï¿½");
+define("_HITS", "Hits");
+define("_TOPWELCOME", "ï¿½wï¿½ï¿½Ó¨ï¿½Æ¦ï¿½]");
+define("_READSTORIES", "ï¿½ï¿½ï¿½Ì¨ï¿½ï¿½wï¿½ïªºï¿½ï¿½ï¿½ï¿½");
+define("_COMMENTEDSTORIES", "ï¿½ï¿½ï¿½Ì¨ãª§Ä³ï¿½Êªï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_ACTIVECAT", "ï¿½ï¿½ï¿½Ì¬ï¿½ï¿½Dï¿½ï¿½ï¿½ï¿½ï¿½O");
+define("_READSECTION", "ï¿½ï¿½ï¿½Ì¨ï¿½ï¿½wï¿½ïªºï¿½Mï¿½ï¿½");
+define("_NEWSSUBMITTERS", "ï¿½ï¿½ï¿½Ì¬ï¿½ï¿½Dï¿½ï¿½ï¿½sï¿½Dï¿½ë»¼ï¿½ï¿½");
+define("_NEWSSENT", "ï¿½sï¿½Dï¿½Hï¿½e");
+define("_VOTEDPOLLS", "ï¿½ï¿½ï¿½oï¿½ï¿½ï¿½Æ³Ì¦hï¿½ï¿½ï¿½ë²¼ï¿½Õ¬d");
+define("_MOSTACTIVEAUTHORS", "ï¿½ï¿½Ì¬ï¿½ï¿½Dï¿½ï¿½ï¿½@ï¿½ï¿½");
+define("_NEWSPUBLISHED", "ï¿½sï¿½Dï¿½oï¿½ï¿½");
+define("_READREVIEWS", "ï¿½Ì¨ï¿½ï¿½wï¿½ïªºï¿½@ï¿½~ï¿½ï¿½ï¿½ï¿½");
+define("_DOWNLOADEDFILES", "ï¿½Ì±`ï¿½Qï¿½Uï¿½ï¿½ï¿½ï¿½ï¿½É®ï¿½");
+define("_LDOWNLOADS", "ï¿½Uï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_MOSTREADPAGES", "ï¿½Ì±`ï¿½Qï¿½\Åªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_MOSTVOTEDSTORIES", "ï¿½ë²¼ï¿½Ì¿ï¿½ï¿½Dï¿½ï¿½ï¿½å³¹");
+define("_POINTS", "ï¿½I");
+define("_BESTRATEDSTORIES", "ï¿½Qï¿½ï¿½ï¿½ï¿½ï¿½Ì¨Îªï¿½ï¿½å³¹ (ï¿½Ì°ï¿½ï¿½ï¿½ 5 ï¿½I)");

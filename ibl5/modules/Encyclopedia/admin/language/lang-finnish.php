@@ -17,41 +17,37 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_SEND","Lähetä");
-define("_FUNCTIONS","Tehtävät");
-define("_YES","Kyllä");
-define("_NO","Ei");
-define("_SAVECHANGES","Tallenna muutokset");
-define("_PAGEBREAK","Jos tahdotte käyttää opetuksessa useita sivuja, voitte erotella sivut käyttäen <b>[--pagebreak--]</b> tagia.");
-define("_DESCRIPTION","Kuvaus");
-define("_TO","Kenelle:");
-define("_TITLE","Otsikko");
-define("_ACTIVE","Aktiivinen");
-define("_DEACTIVATE","Deaktivoi");
-define("_INACTIVE","Ei aktiivinen");
-define("_ACTIVATE","Aktivoi");
-define("_ADD","Lisää");
-define("_LANGUAGE","Language");
-define("_ENCYCLOPEDIA","Encyclopedia");
-define("_ENCYCLOPEDIAMANAGER","Encyclopedia Manager");
-define("_DELENCYCLOPEDIA","Delete Encyclopedia");
-define("_DELENCYCONTWARNING","Are you sure you want to delete this Encyclopedia and ALL its content?");
-define("_DELENCYCLOPEDIATEXT","Delete Encyclopedia Terms");
-define("_DELENCYTEXTWARNING","Are you sure you want to delete this Term?");
-define("_CURRENTSTATUS","Current Status");
-define("_ACTIVATEPAGE","Activate This Page?");
-define("_TERMS","Terms");
-define("_ADDNEWENCYCLOPEDIA","Add a New Encyclopedia");
-define("_ADDNEWENCYTERM","Add a New Encyclopedia Term");
-define("_TERMTEXT","Term Text");
-define("_MOVETERMS","Move Terms");
-define("_MOVEALLTERMSFROM","Move ALL Terms From");
-define("_EDITENCYCLOPEDIA","Edit Encyclopedia");
-define("_ENCYTERMSEDIT","Encyclopedia Terms Edit");
-define("_SELECTONETERM","Please select one term from the following list:");
-define("_NOCONTENTFORLETTER","Sorry, there isn't any content for the letter");
-define("_CHANGETOENCY","Change to Encyclopedia");
-
-
-?>
+define("_SEND", "Lï¿½hetï¿½");
+define("_FUNCTIONS", "Tehtï¿½vï¿½t");
+define("_YES", "Kyllï¿½");
+define("_NO", "Ei");
+define("_SAVECHANGES", "Tallenna muutokset");
+define("_PAGEBREAK", "Jos tahdotte kï¿½yttï¿½ï¿½ opetuksessa useita sivuja, voitte erotella sivut kï¿½yttï¿½en <b>[--pagebreak--]</b> tagia.");
+define("_DESCRIPTION", "Kuvaus");
+define("_TO", "Kenelle:");
+define("_TITLE", "Otsikko");
+define("_ACTIVE", "Aktiivinen");
+define("_DEACTIVATE", "Deaktivoi");
+define("_INACTIVE", "Ei aktiivinen");
+define("_ACTIVATE", "Aktivoi");
+define("_ADD", "Lisï¿½ï¿½");
+define("_LANGUAGE", "Language");
+define("_ENCYCLOPEDIA", "Encyclopedia");
+define("_ENCYCLOPEDIAMANAGER", "Encyclopedia Manager");
+define("_DELENCYCLOPEDIA", "Delete Encyclopedia");
+define("_DELENCYCONTWARNING", "Are you sure you want to delete this Encyclopedia and ALL its content?");
+define("_DELENCYCLOPEDIATEXT", "Delete Encyclopedia Terms");
+define("_DELENCYTEXTWARNING", "Are you sure you want to delete this Term?");
+define("_CURRENTSTATUS", "Current Status");
+define("_ACTIVATEPAGE", "Activate This Page?");
+define("_TERMS", "Terms");
+define("_ADDNEWENCYCLOPEDIA", "Add a New Encyclopedia");
+define("_ADDNEWENCYTERM", "Add a New Encyclopedia Term");
+define("_TERMTEXT", "Term Text");
+define("_MOVETERMS", "Move Terms");
+define("_MOVEALLTERMSFROM", "Move ALL Terms From");
+define("_EDITENCYCLOPEDIA", "Edit Encyclopedia");
+define("_ENCYTERMSEDIT", "Encyclopedia Terms Edit");
+define("_SELECTONETERM", "Please select one term from the following list:");
+define("_NOCONTENTFORLETTER", "Sorry, there isn't any content for the letter");
+define("_CHANGETOENCY", "Change to Encyclopedia");

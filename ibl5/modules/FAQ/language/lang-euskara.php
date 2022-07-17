@@ -17,14 +17,11 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_CATEGORY","Maila");
-define("_CATEGORIES","Kategoria");
-define("_FAQ2","FAQ (Gehien egiten diren galderak)");
-define("_BACKTOTOP","Hasierara bueltatu");
-define("_BACKTOFAQINDEX","FAQ-eko hasierara bueltatu");
-define("_MAIN","Nagusia");
-define("_QUESTION","Galdera");
-define("_ANSWER","Erantzuna");
-
-
-?>
+define("_CATEGORY", "Maila");
+define("_CATEGORIES", "Kategoria");
+define("_FAQ2", "FAQ (Gehien egiten diren galderak)");
+define("_BACKTOTOP", "Hasierara bueltatu");
+define("_BACKTOFAQINDEX", "FAQ-eko hasierara bueltatu");
+define("_MAIN", "Nagusia");
+define("_QUESTION", "Galdera");
+define("_ANSWER", "Erantzuna");

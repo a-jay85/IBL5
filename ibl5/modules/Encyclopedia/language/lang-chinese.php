@@ -17,31 +17,25 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
+define("_PREVIOUS", "ï¿½Wï¿½@ï¿½ï¿½");
+define("_NEXT", "ï¿½Uï¿½@ï¿½ï¿½");
 
-
-
-define("_PREVIOUS","¤W¤@­¶");
-define("_NEXT","¤U¤@­¶");
-
-define("_SEARCHRESULTS","·j´Mµ²ªG");
-define("_PAGE","­¶");
-define("_RETURNTO","¦^¨ì");
-define("_DEACTIVATE","ÁôÂÃ");
-define("_ACTIVATE","Åã¥Ü");
-define("_ENCYCLOPEDIA","¦Ê¬ì¥þ®Ñ/ºëµØ°Ï");
-define("_NOCONTENTFORLETTER","©êºp¡A³o­Ó¦r¥À¤¤¨S¦³¥ô¦ó¤º®e¡C");
-define("_ENCYSELECTLETTER","½Ð¥Ñ©³¤Uªº¦Cªí¤¤¿ï¾Ü­n¬d¸ßªº¶µ¥Ø:");
-define("_COPYRIGHT","Copyright &copy; by $sitename. All Right Reserved.");
-define("_YOURADMINENCY","±z¬OºÞ²zªÌ¡A³o­Ó¦Ê¬ì¥þ®Ñ©|¥¼¶}©ñ!");
-define("_ENCYNOTACTIVE","¹ï¤£°_¡A¥Ø«e³o­Ó¦Ê¬ì¥þ®Ñ©|¥¼¶}©ñ.");
-define("_AVAILABLEENCYLIST","¥Ø«eªº¦Ê¬ì¥þ®Ñ¦Cªí");
-define("_YOURADMININACTIVELIST","±z¬OºÞ²zªÌ¡G©³¤U¬O¥¼±Ò°Êªº¦Ê¬ì¥þ®Ñ¦Cªí:");
-define("_NORESULTSTEXT","´M§ä¤º¤å¨S¦³¥ô¦ó²Å¦Xªºµ²ªG...");
-define("_NORESULTSTITLE","´M§ä¼ÐÃD¨S¦³¥ô¦ó²Å¦Xªºµ²ªG...");
-define("_SEARCHRESULTSFOR","·j´Mµ²ªG:");
-define("_SEARCHNOTCOMPLETE","·j´M¿ï¶µ¨S¦³§¹¦¨¡A½Ð¦A¸Õ¤@¦¸.");
-define("_RESULTSINTERMTITLE","²Å¦Xªº¼ÐÃD:");
-define("_RESULTSINTERMTEXT","²Å¦Xªº¤º¤å:");
-
-
-?>
+define("_SEARCHRESULTS", "ï¿½jï¿½Mï¿½ï¿½ï¿½G");
+define("_PAGE", "ï¿½ï¿½");
+define("_RETURNTO", "ï¿½^ï¿½ï¿½");
+define("_DEACTIVATE", "ï¿½ï¿½ï¿½ï¿½");
+define("_ACTIVATE", "ï¿½ï¿½ï¿½");
+define("_ENCYCLOPEDIA", "ï¿½Ê¬ï¿½ï¿½ï¿½ï¿½/ï¿½ï¿½Ø°ï¿½");
+define("_NOCONTENTFORLETTER", "ï¿½ï¿½pï¿½Aï¿½oï¿½Ó¦rï¿½ï¿½ï¿½ï¿½ï¿½Sï¿½ï¿½ï¿½ï¿½ï¿½ó¤º®eï¿½C");
+define("_ENCYSELECTLETTER", "ï¿½Ð¥Ñ©ï¿½ï¿½Uï¿½ï¿½ï¿½Cï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ü­nï¿½dï¿½ßªï¿½ï¿½ï¿½ï¿½ï¿½:");
+define("_COPYRIGHT", "Copyright &copy; by $sitename. All Right Reserved.");
+define("_YOURADMINENCY", "ï¿½zï¿½Oï¿½Þ²zï¿½Ì¡Aï¿½oï¿½Ó¦Ê¬ï¿½ï¿½ï¿½Ñ©|ï¿½ï¿½ï¿½}ï¿½ï¿½!");
+define("_ENCYNOTACTIVE", "ï¿½ï¤£ï¿½_ï¿½Aï¿½Ø«eï¿½oï¿½Ó¦Ê¬ï¿½ï¿½ï¿½Ñ©|ï¿½ï¿½ï¿½}ï¿½ï¿½.");
+define("_AVAILABLEENCYLIST", "ï¿½Ø«eï¿½ï¿½ï¿½Ê¬ï¿½ï¿½ï¿½Ñ¦Cï¿½ï¿½");
+define("_YOURADMININACTIVELIST", "ï¿½zï¿½Oï¿½Þ²zï¿½Ì¡Gï¿½ï¿½ï¿½Uï¿½Oï¿½ï¿½ï¿½Ò°Êªï¿½ï¿½Ê¬ï¿½ï¿½ï¿½Ñ¦Cï¿½ï¿½:");
+define("_NORESULTSTEXT", "ï¿½Mï¿½ä¤ºï¿½ï¿½Sï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Å¦Xï¿½ï¿½ï¿½ï¿½ï¿½G...");
+define("_NORESULTSTITLE", "ï¿½Mï¿½ï¿½ï¿½ï¿½Dï¿½Sï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Å¦Xï¿½ï¿½ï¿½ï¿½ï¿½G...");
+define("_SEARCHRESULTSFOR", "ï¿½jï¿½Mï¿½ï¿½ï¿½G:");
+define("_SEARCHNOTCOMPLETE", "ï¿½jï¿½Mï¿½ï¶µï¿½Sï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Aï¿½Ð¦Aï¿½Õ¤@ï¿½ï¿½.");
+define("_RESULTSINTERMTITLE", "ï¿½Å¦Xï¿½ï¿½ï¿½ï¿½ï¿½D:");
+define("_RESULTSINTERMTEXT", "ï¿½Å¦Xï¿½ï¿½ï¿½ï¿½ï¿½ï¿½:");

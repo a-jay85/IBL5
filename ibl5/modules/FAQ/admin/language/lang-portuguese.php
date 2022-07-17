@@ -17,28 +17,24 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_FUNCTIONS","Funções");
-define("_YES","Sim");
-define("_NO","Não");
-define("_SAVE","Gravar");
-define("_ID","ID");
-define("_CATEGORIES","Categorias");
-define("_ALL","Todos");
-define("_FAQ","FAQ");
-define("_CONTENT","Conteúdo");
-define("_FAQADMIN","Administrar FAQ");
-define("_ACTIVEFAQS","Activar FAQs");
-define("_ADDCATEGORY","Adicionar uma Nova Categoria");
-define("_QUESTIONS","Perguntas & Respostas");
-define("_ADDQUESTION","Adicionar uma Nova Pergunta");
-define("_QUESTION","Pergunta");
-define("_ANSWER","Resposta");
-define("_EDITCATEGORY","Editar Categoria");
-define("_EDITQUESTIONS","Editar Perguntas & Respostas");
-define("_FAQDELWARNING","CUIDADO: Você realmente quer apagar esta FAQ e todo o seu conteúdo?");
-define("_QUESTIONDEL","CUIDADO: Você realmente quer apagar esta pergunta?");
-define("_LANGUAGE","Língua");
-
-
-?>
+define("_FUNCTIONS", "Funï¿½ï¿½es");
+define("_YES", "Sim");
+define("_NO", "Nï¿½o");
+define("_SAVE", "Gravar");
+define("_ID", "ID");
+define("_CATEGORIES", "Categorias");
+define("_ALL", "Todos");
+define("_FAQ", "FAQ");
+define("_CONTENT", "Conteï¿½do");
+define("_FAQADMIN", "Administrar FAQ");
+define("_ACTIVEFAQS", "Activar FAQs");
+define("_ADDCATEGORY", "Adicionar uma Nova Categoria");
+define("_QUESTIONS", "Perguntas & Respostas");
+define("_ADDQUESTION", "Adicionar uma Nova Pergunta");
+define("_QUESTION", "Pergunta");
+define("_ANSWER", "Resposta");
+define("_EDITCATEGORY", "Editar Categoria");
+define("_EDITQUESTIONS", "Editar Perguntas & Respostas");
+define("_FAQDELWARNING", "CUIDADO: Vocï¿½ realmente quer apagar esta FAQ e todo o seu conteï¿½do?");
+define("_QUESTIONDEL", "CUIDADO: Vocï¿½ realmente quer apagar esta pergunta?");
+define("_LANGUAGE", "Lï¿½ngua");

@@ -15,7 +15,7 @@
 $sharedFunctions = new Shared($db);
 
 if (!defined('MODULE_FILE')) {
-	die ("You can't access this file directly...");
+    die("You can't access this file directly...");
 }
 
 $module_name = basename(dirname(__FILE__));
@@ -25,7 +25,7 @@ $pagetitle = "- $module_name";
 
 $currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
 
-include("header.php");
+include "header.php";
 
 OpenTable();
 echo "<center><font class=\"storytitle\">" . ($currentSeasonEndingYear - 1) . "-$currentSeasonEndingYear IBL Power Rankings</font></center>\n\n";
@@ -59,47 +59,45 @@ echo "</tr>\n";
 
 $i = 0;
 while ($i < $num) {
-	$tid = $db->sql_result($result, $i, "TeamID");
-	$Team = $db->sql_result($result, $i, "Team");
-	$ranking = $db->sql_result($result, $i, "ranking");
-	$wins = $db->sql_result($result, $i, "win");
-	$losses = $db->sql_result($result, $i, "loss");
-	$homeWins = $db->sql_result($result, $i, "home_win");
-	$homeLosses = $db->sql_result($result, $i, "home_loss");
-	$awayWins = $db->sql_result($result, $i, "road_win");
-	$awayLosses = $db->sql_result($result, $i, "road_loss");
+    $tid = $db->sql_result($result, $i, "TeamID");
+    $Team = $db->sql_result($result, $i, "Team");
+    $ranking = $db->sql_result($result, $i, "ranking");
+    $wins = $db->sql_result($result, $i, "win");
+    $losses = $db->sql_result($result, $i, "loss");
+    $homeWins = $db->sql_result($result, $i, "home_win");
+    $homeLosses = $db->sql_result($result, $i, "home_loss");
+    $awayWins = $db->sql_result($result, $i, "road_win");
+    $awayLosses = $db->sql_result($result, $i, "road_loss");
 
-	$i++;
+    $i++;
 
-	if(($i % 2)==0) {
-		$bgcolor="FFFFFF";
-	} else {
-		$bgcolor="DDDDDD";
-	}
+    if (($i % 2) == 0) {
+        $bgcolor = "FFFFFF";
+    } else {
+        $bgcolor = "DDDDDD";
+    }
 
-	echo "<tr bgcolor=$bgcolor>";
-	echo "\t<td align=right>";
-	echo "\t\t<font class=\"option\">$i.</td>";
-	echo "\t<td align=center>";
-	echo "\t\t<a href=\"modules.php?name=Team&op=team&tid=$tid\"><img src=\"images/logo/$tid.jpg\"></a>";
-	echo "\t</td>";
-	echo "\t<td align=center>";
-	echo "\t\t<font class=\"option\">$wins-$losses";
-	echo "\t</td>";
-	echo "\t<td align=center>";
-	echo "\t\t$homeWins-$homeLosses";
-	echo "\t</td>";
-	echo "\t<td align=center>";
-	echo "\t\t$awayWins-$awayLosses";
-	echo "\t</td>";
-	echo "\t<td align=center>";
-	echo "\t\t<font class=\"option\">$ranking";
-	echo "\t</td>";
-	echo "</tr>";
+    echo "<tr bgcolor=$bgcolor>";
+    echo "\t<td align=right>";
+    echo "\t\t<font class=\"option\">$i.</td>";
+    echo "\t<td align=center>";
+    echo "\t\t<a href=\"modules.php?name=Team&op=team&tid=$tid\"><img src=\"images/logo/$tid.jpg\"></a>";
+    echo "\t</td>";
+    echo "\t<td align=center>";
+    echo "\t\t<font class=\"option\">$wins-$losses";
+    echo "\t</td>";
+    echo "\t<td align=center>";
+    echo "\t\t$homeWins-$homeLosses";
+    echo "\t</td>";
+    echo "\t<td align=center>";
+    echo "\t\t$awayWins-$awayLosses";
+    echo "\t</td>";
+    echo "\t<td align=center>";
+    echo "\t\t<font class=\"option\">$ranking";
+    echo "\t</td>";
+    echo "</tr>";
 }
 
 CloseTable();
 
-include("footer.php");
-
-?>
+include "footer.php";

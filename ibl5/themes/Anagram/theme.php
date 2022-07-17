@@ -35,23 +35,27 @@ $textcolor2 = "#000000";
 /* according with the table content                         */
 /************************************************************/
 
-function OpenTable() {
+function OpenTable()
+{
     global $bgcolor1, $bgcolor2;
     echo "<table width=\"100%\" border=\"0\" cellspacing=\"1\" cellpadding=\"0\" bgcolor=\"$bgcolor2\"><tr><td>\n";
     echo "<table width=\"100%\" border=\"0\" cellspacing=\"1\" cellpadding=\"8\" bgcolor=\"$bgcolor1\"><tr><td>\n";
 }
 
-function CloseTable() {
+function CloseTable()
+{
     echo "</td></tr></table></td></tr></table>\n";
 }
 
-function OpenTable2() {
+function OpenTable2()
+{
     global $bgcolor1, $bgcolor2;
     echo "<table border=\"0\" cellspacing=\"1\" cellpadding=\"0\" bgcolor=\"$bgcolor2\" align=\"center\"><tr><td>\n";
     echo "<table border=\"0\" cellspacing=\"1\" cellpadding=\"8\" bgcolor=\"$bgcolor1\"><tr><td>\n";
 }
 
-function CloseTable2() {
+function CloseTable2()
+{
     echo "</td></tr></table></td></tr></table>\n";
 }
 
@@ -64,23 +68,24 @@ function CloseTable2() {
 /* when displaying the story.                               */
 /************************************************************/
 
-function FormatStory($thetext, $notes, $aid, $informant) {
+function FormatStory($thetext, $notes, $aid, $informant)
+{
     global $anonymous;
     if (!empty($notes)) {
-	$notes = "<br><br><b>"._NOTE."</b> <i>$notes</i>\n";
+        $notes = "<br><br><b>" . _NOTE . "</b> <i>$notes</i>\n";
     } else {
-	$notes = "";
+        $notes = "";
     }
     if ("$aid" == "$informant") {
-	echo "<font class=\"content\">$thetext$notes</font>\n";
+        echo "<font class=\"content\">$thetext$notes</font>\n";
     } else {
-	if(!empty($informant)) {
-	    $boxstuff = "<a href=\"modules.php?name=Your_Account&amp;op=userinfo&amp;username=$informant\">$informant</a> ";
-	} else {
-	    $boxstuff = "$anonymous ";
-	}
-	$boxstuff .= ""._WRITES." <i>\"$thetext\"</i>$notes\n";
-	echo "<font class=\"content\">$boxstuff</font>\n";
+        if (!empty($informant)) {
+            $boxstuff = "<a href=\"modules.php?name=Your_Account&amp;op=userinfo&amp;username=$informant\">$informant</a> ";
+        } else {
+            $boxstuff = "$anonymous ";
+        }
+        $boxstuff .= "" . _WRITES . " <i>\"$thetext\"</i>$notes\n";
+        echo "<font class=\"content\">$boxstuff</font>\n";
     }
 }
 
@@ -92,7 +97,8 @@ function FormatStory($thetext, $notes, $aid, $informant) {
 /* function for left side with: blocks(left);               */
 /************************************************************/
 
-function themeheader() {
+function themeheader()
+{
     global $user, $banners, $sitename, $slogan, $cookie, $prefix, $anonymous, $db;
     cookiedecode($user);
     $username = $cookie[1];
@@ -100,84 +106,84 @@ function themeheader() {
         $username = $anonymous;
     }
     echo "<body bgcolor=\"#ffffff\" text=\"#000000\">\n";
-	ads(0);
+    ads(0);
     echo "<br>\n"
-	."<table cellpadding=\"0\" cellspacing=\"10\" width=\"780\" border=\"0\" align=\"center\" bgcolor=\"#EEEEEE\">\n"
-	."<tr>\n"
-	."<td bgcolor=\"#EEEEEE\">\n"
-	."<a href=\"index.php\"><img src=\"themes/Anagram/images/logo.gif\" align=\"left\" alt=\""._WELCOMETO." $sitename\" border=\"0\"></a></td>\n"
-	."<td bgcolor=\"#EEEEEE\" align=\"right\">\n"
-	."<form action=\"modules.php?name=Search\" method=\"post\"><font class=\"content\" color=\"#000000\"><b>"._SEARCH." </b>\n"
-	."<input type=\"text\" name=\"query\" size=\"14\"></font></form></td>\n"
-	."<td bgcolor=\"#EEEEEE\" align=\"right\">\n"
-	."<form action=\"modules.php?name=Search\" method=\"get\"><font class=\"content\"><b>"._TOPICS." </b>\n";
-    $toplist = $db->sql_query("select topicid, topictext from $prefix"._topics." order by topictext");
+        . "<table cellpadding=\"0\" cellspacing=\"10\" width=\"780\" border=\"0\" align=\"center\" bgcolor=\"#EEEEEE\">\n"
+        . "<tr>\n"
+        . "<td bgcolor=\"#EEEEEE\">\n"
+        . "<a href=\"index.php\"><img src=\"themes/Anagram/images/logo.gif\" align=\"left\" alt=\"" . _WELCOMETO . " $sitename\" border=\"0\"></a></td>\n"
+        . "<td bgcolor=\"#EEEEEE\" align=\"right\">\n"
+        . "<form action=\"modules.php?name=Search\" method=\"post\"><font class=\"content\" color=\"#000000\"><b>" . _SEARCH . " </b>\n"
+        . "<input type=\"text\" name=\"query\" size=\"14\"></font></form></td>\n"
+        . "<td bgcolor=\"#EEEEEE\" align=\"right\">\n"
+        . "<form action=\"modules.php?name=Search\" method=\"get\"><font class=\"content\"><b>" . _TOPICS . " </b>\n";
+    $toplist = $db->sql_query("select topicid, topictext from $prefix" . _topics . " order by topictext");
     echo "<select name=\"topic\"onChange='submit()'>\n"
-	."<option value=\"\">"._ALLTOPICS."</option>\n";
-    while(list($topicid, $topics) = $db->sql_fetchrow($toplist)) {
-	$topicid = intval($topicid);
-    if ($topicid==$topic) { $sel = "selected "; }
-	echo "<option $sel value=\"$topicid\">$topics</option>\n";
-	$sel = "";
+        . "<option value=\"\">" . _ALLTOPICS . "</option>\n";
+    while (list($topicid, $topics) = $db->sql_fetchrow($toplist)) {
+        $topicid = intval($topicid);
+        if ($topicid == $topic) {$sel = "selected ";}
+        echo "<option $sel value=\"$topicid\">$topics</option>\n";
+        $sel = "";
     }
     echo "</select></font></form></td>\n"
-	."</tr></table>\n"
+        . "</tr></table>\n"
 
-    ."<table cellpadding=\"1\" cellspacing=\"2\" width=\"780\" border=\"0\" align=\"center\" bgcolor=\"#DAD8D8\">\n"
-    ."<tr>\n"
-    ."<td width=\"14%\" bgcolor=\"#EEEEEE\" align=\"center\" style=\"cursor:hand\" onMouseOver=\"this.style.background='#DAD8D8'\" onMouseOut=\"this.style.background='#EEEEEE'\" onClick=\"window.location.href='/'\"><a href=\"/\">Home</a></td>\n"
-    ."<td width=\"14%\" bgcolor=\"#EEEEEE\" align=\"center\" style=\"cursor:hand\" onMouseOver=\"this.style.background='#DAD8D8'\" onMouseOut=\"this.style.background='#EEEEEE'\" onClick=\"window.location.href='modules.php?name=Your_Account'\"><a href=\"modules.php?name=Your_Account\">Your Account</a></td>\n"
-    ."<td width=\"14%\" bgcolor=\"#EEEEEE\" align=\"center\" style=\"cursor:hand\" onMouseOver=\"this.style.background='#DAD8D8'\" onMouseOut=\"this.style.background='#EEEEEE'\" onClick=\"window.location.href='modules.php?name=FAQ'\"><a href=\"modules.php?name=FAQ\">FAQ</a></td>\n"
-    ."<td width=\"14%\" bgcolor=\"#EEEEEE\" align=\"center\" style=\"cursor:hand\" onMouseOver=\"this.style.background='#DAD8D8'\" onMouseOut=\"this.style.background='#EEEEEE'\" onClick=\"window.location.href='modules.php?name=Topics'\"><a href=\"modules.php?name=Topics\">Topics</a></td>\n"
-    ."<td width=\"14%\" bgcolor=\"#EEEEEE\" align=\"center\" style=\"cursor:hand\" onMouseOver=\"this.style.background='#DAD8D8'\" onMouseOut=\"this.style.background='#EEEEEE'\" onClick=\"window.location.href='modules.php?name=Content'\"><a href=\"modules.php?name=Contenido\">Content</a></td>\n"
-    ."<td width=\"14%\" bgcolor=\"#EEEEEE\" align=\"center\" style=\"cursor:hand\" onMouseOver=\"this.style.background='#DAD8D8'\" onMouseOut=\"this.style.background='#EEEEEE'\" onClick=\"window.location.href='modules.php?name=Submit_News'\"><a href=\"modules.php?name=Submit_News\">Submit News</a></td>\n"
-    ."<td width=\"14%\" bgcolor=\"#EEEEEE\" align=\"center\" style=\"cursor:hand\" onMouseOver=\"this.style.background='#DAD8D8'\" onMouseOut=\"this.style.background='#EEEEEE'\" onClick=\"window.location.href='modules.php?name=Top'\"><a href=\"modules.php?name=Top\">Top 10</a></td>\n"
-    ."</tr>\n"
-    ."</table>\n"
+        . "<table cellpadding=\"1\" cellspacing=\"2\" width=\"780\" border=\"0\" align=\"center\" bgcolor=\"#DAD8D8\">\n"
+        . "<tr>\n"
+        . "<td width=\"14%\" bgcolor=\"#EEEEEE\" align=\"center\" style=\"cursor:hand\" onMouseOver=\"this.style.background='#DAD8D8'\" onMouseOut=\"this.style.background='#EEEEEE'\" onClick=\"window.location.href='/'\"><a href=\"/\">Home</a></td>\n"
+        . "<td width=\"14%\" bgcolor=\"#EEEEEE\" align=\"center\" style=\"cursor:hand\" onMouseOver=\"this.style.background='#DAD8D8'\" onMouseOut=\"this.style.background='#EEEEEE'\" onClick=\"window.location.href='modules.php?name=Your_Account'\"><a href=\"modules.php?name=Your_Account\">Your Account</a></td>\n"
+        . "<td width=\"14%\" bgcolor=\"#EEEEEE\" align=\"center\" style=\"cursor:hand\" onMouseOver=\"this.style.background='#DAD8D8'\" onMouseOut=\"this.style.background='#EEEEEE'\" onClick=\"window.location.href='modules.php?name=FAQ'\"><a href=\"modules.php?name=FAQ\">FAQ</a></td>\n"
+        . "<td width=\"14%\" bgcolor=\"#EEEEEE\" align=\"center\" style=\"cursor:hand\" onMouseOver=\"this.style.background='#DAD8D8'\" onMouseOut=\"this.style.background='#EEEEEE'\" onClick=\"window.location.href='modules.php?name=Topics'\"><a href=\"modules.php?name=Topics\">Topics</a></td>\n"
+        . "<td width=\"14%\" bgcolor=\"#EEEEEE\" align=\"center\" style=\"cursor:hand\" onMouseOver=\"this.style.background='#DAD8D8'\" onMouseOut=\"this.style.background='#EEEEEE'\" onClick=\"window.location.href='modules.php?name=Content'\"><a href=\"modules.php?name=Contenido\">Content</a></td>\n"
+        . "<td width=\"14%\" bgcolor=\"#EEEEEE\" align=\"center\" style=\"cursor:hand\" onMouseOver=\"this.style.background='#DAD8D8'\" onMouseOut=\"this.style.background='#EEEEEE'\" onClick=\"window.location.href='modules.php?name=Submit_News'\"><a href=\"modules.php?name=Submit_News\">Submit News</a></td>\n"
+        . "<td width=\"14%\" bgcolor=\"#EEEEEE\" align=\"center\" style=\"cursor:hand\" onMouseOver=\"this.style.background='#DAD8D8'\" onMouseOut=\"this.style.background='#EEEEEE'\" onClick=\"window.location.href='modules.php?name=Top'\"><a href=\"modules.php?name=Top\">Top 10</a></td>\n"
+        . "</tr>\n"
+        . "</table>\n"
 
-		."<table cellpadding=\"0\" cellspacing=\"0\" width=\"780\" border=\"0\" align=\"center\" bgcolor=\"#fefefe\">\n"
-		."<tr>\n"
-		."<td bgcolor=\"#DAD8D8\" colspan=\"4\"><IMG src=\"themes/Anagram/images/pixel.gif\" width=\"1\" height=1 alt=\"\" border=\"0\" hspace=\"0\"></td>\n"
-		."</tr>\n"
-		."<tr valign=\"middle\" bgcolor=\"#DAD8D8\">\n"
-		."<td width=\"20%\" nowrap><font class=\"content\">\n";
-	    if ($username == "Anonymous") {
-		echo "&nbsp;&nbsp;<a href=\"modules.php?name=Your_Account\">"._LOGINCREATE."</a>\n";
-	    } else {
-		echo "&nbsp;&nbsp;"._HELLO." $username!";
-	    }
-	    echo "</font></td>\n"
-		    ."<td align=\"center\" height=\"20\" width=\"60%\">\n"
-	        ."&nbsp;\n"
-	        ."</td>\n"
-	        ."<td align=\"right\" width=\"20%\"><font class=\"content\">\n"
-	        ."<script type=\"text/javascript\">\n\n"
-	        ."<!--   // Array ofmonth Names\n"
-	        ."var monthNames = new Array( \""._JANUARY."\",\""._FEBRUARY."\",\""._MARCH."\",\""._APRIL."\",\""._MAY."\",\""._JUNE."\",\""._JULY."\",\""._AUGUST."\",\""._SEPTEMBER."\",\""._OCTOBER."\",\""._NOVEMBER."\",\""._DECEMBER."\");\n"
-	        ."var now = new Date();\n"
-	        ."thisYear = now.getYear();\n"
-	        ."if(thisYear < 1900) {thisYear += 1900}; // corrections if Y2K display problem\n"
-	        ."document.write(monthNames[now.getMonth()] + \" \" + now.getDate() + \", \" + thisYear);\n"
-	        ."// -->\n\n"
-	        ."</script></b></font></td>\n"
-	        ."<td>&nbsp;</td>\n"
-	        ."</tr>\n"
-	        ."<tr>\n"
-	        ."<td bgcolor=\"#DAD8D8\" colspan=\"4\"><IMG src=\"themes/ Anagram/images/pixel.gif\" width=\"1\" height=\"1\" alt=\"\" border=\"0\" hspace=\"0\"></td>\n"
-	        ."</tr>\n"
-        ."</table>\n"
-;
+        . "<table cellpadding=\"0\" cellspacing=\"0\" width=\"780\" border=\"0\" align=\"center\" bgcolor=\"#fefefe\">\n"
+        . "<tr>\n"
+        . "<td bgcolor=\"#DAD8D8\" colspan=\"4\"><IMG src=\"themes/Anagram/images/pixel.gif\" width=\"1\" height=1 alt=\"\" border=\"0\" hspace=\"0\"></td>\n"
+        . "</tr>\n"
+        . "<tr valign=\"middle\" bgcolor=\"#DAD8D8\">\n"
+        . "<td width=\"20%\" nowrap><font class=\"content\">\n";
+    if ($username == "Anonymous") {
+        echo "&nbsp;&nbsp;<a href=\"modules.php?name=Your_Account\">" . _LOGINCREATE . "</a>\n";
+    } else {
+        echo "&nbsp;&nbsp;" . _HELLO . " $username!";
+    }
+    echo "</font></td>\n"
+        . "<td align=\"center\" height=\"20\" width=\"60%\">\n"
+        . "&nbsp;\n"
+        . "</td>\n"
+        . "<td align=\"right\" width=\"20%\"><font class=\"content\">\n"
+        . "<script type=\"text/javascript\">\n\n"
+        . "<!--   // Array ofmonth Names\n"
+        . "var monthNames = new Array( \"" . _JANUARY . "\",\"" . _FEBRUARY . "\",\"" . _MARCH . "\",\"" . _APRIL . "\",\"" . _MAY . "\",\"" . _JUNE . "\",\"" . _JULY . "\",\"" . _AUGUST . "\",\"" . _SEPTEMBER . "\",\"" . _OCTOBER . "\",\"" . _NOVEMBER . "\",\"" . _DECEMBER . "\");\n"
+        . "var now = new Date();\n"
+        . "thisYear = now.getYear();\n"
+        . "if(thisYear < 1900) {thisYear += 1900}; // corrections if Y2K display problem\n"
+        . "document.write(monthNames[now.getMonth()] + \" \" + now.getDate() + \", \" + thisYear);\n"
+        . "// -->\n\n"
+        . "</script></b></font></td>\n"
+        . "<td>&nbsp;</td>\n"
+        . "</tr>\n"
+        . "<tr>\n"
+        . "<td bgcolor=\"#DAD8D8\" colspan=\"4\"><IMG src=\"themes/ Anagram/images/pixel.gif\" width=\"1\" height=\"1\" alt=\"\" border=\"0\" hspace=\"0\"></td>\n"
+        . "</tr>\n"
+        . "</table>\n"
+    ;
 
-	$public_msg = public_message();
-        echo "$public_msg<br>";
-	echo "<!-- Begin Main Content -->\n"
-	."<table width=\"780\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" align=\"center\"><tr valign=\"top\">\n"
-	."<td background=\"themes/Anagram/images/column-bg.gif\" width=\"150\" valign=\"top\">\n";
+    $public_msg = public_message();
+    echo "$public_msg<br>";
+    echo "<!-- Begin Main Content -->\n"
+        . "<table width=\"780\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" align=\"center\"><tr valign=\"top\">\n"
+        . "<td background=\"themes/Anagram/images/column-bg.gif\" width=\"150\" valign=\"top\">\n";
     blocks("left");
     echo "</td>\n"
-        ."<td><img src=\"themes/Anagram/images/pixel.gif\" width=\"1\" height=\"1\" border=\"0\" alt=\"\"></td>\n"
-        ."<td><img src=\"themes/Anagram/images/pixel.gif\" width=\"5\" height=\"1\" border=\"0\" alt=\"\"></td>\n"
-        ."<td width=\"100%\">\n";
+        . "<td><img src=\"themes/Anagram/images/pixel.gif\" width=\"1\" height=\"1\" border=\"0\" alt=\"\"></td>\n"
+        . "<td><img src=\"themes/Anagram/images/pixel.gif\" width=\"5\" height=\"1\" border=\"0\" alt=\"\"></td>\n"
+        . "<td width=\"100%\">\n";
 }
 
 /************************************************************/
@@ -191,28 +197,29 @@ function themeheader() {
 /* and internal one.                                        */
 /************************************************************/
 
-function themefooter() {
+function themefooter()
+{
     if (defined('INDEX_FILE')) {
-	echo "</td><td><img src=\"themes/Anagram/images/pixel.gif\" width=\"5\" height=\"1\" border=\"0\" alt=\"\"></td>\n"
-	    ."<td background=\"themes/Anagram/images/column-bg.gif\" valign=\"top\" width=\"150\">\n";
-	blocks(right);
+        echo "</td><td><img src=\"themes/Anagram/images/pixel.gif\" width=\"5\" height=\"1\" border=\"0\" alt=\"\"></td>\n"
+            . "<td background=\"themes/Anagram/images/column-bg.gif\" valign=\"top\" width=\"150\">\n";
+        blocks(right);
     }
     echo "</td>\n"
-	."</tr></table>\n"
+        . "</tr></table>\n"
 
-        ."<table width=\"780\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\" align=\"center\">\n"
-        ."<tr align=\"center\">\n"
-        ."<td width=\"100%\" bgcolor=\"#DAD8D8\"><img src=\"themes/Anagram/images/pixel.gif\" width=\"1\" height=\"1\" alt=\"\"></td>\n"
-        ."</tr>\n"
-        ."</table>\n"
+        . "<table width=\"780\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\" align=\"center\">\n"
+        . "<tr align=\"center\">\n"
+        . "<td width=\"100%\" bgcolor=\"#DAD8D8\"><img src=\"themes/Anagram/images/pixel.gif\" width=\"1\" height=\"1\" alt=\"\"></td>\n"
+        . "</tr>\n"
+        . "</table>\n"
 
-        ."<table width=\"780\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#EEEEEE\" align=\"center\">\n"
-        ."<tr align=\"center\">\n"
-        ."<td width=\"100%\" colspan=\"3\">\n";
+        . "<table width=\"780\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#EEEEEE\" align=\"center\">\n"
+        . "<tr align=\"center\">\n"
+        . "<td width=\"100%\" colspan=\"3\">\n";
     footmsg();
     echo "</td>\n"
-        ."</tr>\n"
-        ."</table>\n";
+        . "</tr>\n"
+        . "</table>\n";
 }
 
 /************************************************************/
@@ -221,30 +228,31 @@ function themefooter() {
 /* This function format the stories on the Homepage         */
 /************************************************************/
 
-function themeindex ($aid, $informant, $time, $title, $counter, $topic, $thetext, $notes, $morelink, $topicname, $topicimage, $topictext) {
+function themeindex($aid, $informant, $time, $title, $counter, $topic, $thetext, $notes, $morelink, $topicname, $topicimage, $topictext)
+{
     global $anonymous, $tipath;
     $ThemeSel = get_theme();
     if (file_exists("themes/$ThemeSel/images/topics/$topicimage")) {
-	$t_image = "themes/$ThemeSel/images/topics/$topicimage";
+        $t_image = "themes/$ThemeSel/images/topics/$topicimage";
     } else {
-	$t_image = "$tipath$topicimage";
+        $t_image = "$tipath$topicimage";
     }
     echo "<table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" bgcolor=\"#ffffff\" width=\"100%\"><tr><td>\n"
-	."<table border=\"0\" cellpadding=\"1\" cellspacing=\"0\" bgcolor=\"#DAD8D8\" width=\"100%\"><tr><td>\n"
-	."<table border=\"0\" cellpadding=\"3\" cellspacing=\"0\" bgcolor=\"#EEEEEE\" width=\"100%\"><tr><td align=\"left\">\n"
-	."<font class=\"option\" color=\"#363636\"><b>$title</b></font>\n"
-	."</td></tr></table></td></tr></table>\n"
-	."<b><a href=\"modules.php?name=News&amp;new_topic=$topic\"><img src=\"$t_image\" border=\"0\" Alt=\"$topictext\" align=\"right\" hspace=\"10\" vspace=\"10\"></a></B>\n";
+        . "<table border=\"0\" cellpadding=\"1\" cellspacing=\"0\" bgcolor=\"#DAD8D8\" width=\"100%\"><tr><td>\n"
+        . "<table border=\"0\" cellpadding=\"3\" cellspacing=\"0\" bgcolor=\"#EEEEEE\" width=\"100%\"><tr><td align=\"left\">\n"
+        . "<font class=\"option\" color=\"#363636\"><b>$title</b></font>\n"
+        . "</td></tr></table></td></tr></table>\n"
+        . "<b><a href=\"modules.php?name=News&amp;new_topic=$topic\"><img src=\"$t_image\" border=\"0\" Alt=\"$topictext\" align=\"right\" hspace=\"10\" vspace=\"10\"></a></B>\n";
     FormatStory($thetext, $notes, $aid, $informant);
     echo "</td></tr></table>\n"
-	."<table background=\"themes/Anagram/images/column-bg.gif\" border=\"0\" cellpadding=\"1\" cellspacing=\"0\" width=\"100%\"><tr><td>\n"
-	."<table border=\"0\" cellpadding=\"3\" cellspacing=\"0\" width=\"100%\"><tr><td align=\"center\">\n"
-	."<font class=\"tiny\">"._POSTEDBY." ";
+        . "<table background=\"themes/Anagram/images/column-bg.gif\" border=\"0\" cellpadding=\"1\" cellspacing=\"0\" width=\"100%\"><tr><td>\n"
+        . "<table border=\"0\" cellpadding=\"3\" cellspacing=\"0\" width=\"100%\"><tr><td align=\"center\">\n"
+        . "<font class=\"tiny\">" . _POSTEDBY . " ";
     formatAidHeader($aid);
-    echo " "._ON." $time $timezone ($counter "._READS.")<br></font>\n"
-	."<font class=\"content\">$morelink</font>\n"
-	."</td></tr></table></td></tr></table>\n"
-	."<br>\n\n\n";
+    echo " " . _ON . " $time $timezone ($counter " . _READS . ")<br></font>\n"
+        . "<font class=\"content\">$morelink</font>\n"
+        . "</td></tr></table></td></tr></table>\n"
+        . "<br>\n\n\n";
 }
 
 /************************************************************/
@@ -254,26 +262,27 @@ function themeindex ($aid, $informant, $time, $title, $counter, $topic, $thetext
 /* you click on that "Read More..." link in the home        */
 /************************************************************/
 
-function themearticle ($aid, $informant, $datetime, $title, $thetext, $topic, $topicname, $topicimage, $topictext) {
+function themearticle($aid, $informant, $datetime, $title, $thetext, $topic, $topicname, $topicimage, $topictext)
+{
     global $admin, $sid, $tipath, $admin_file;
     $ThemeSel = get_theme();
     if (file_exists("themes/$ThemeSel/images/topics/$topicimage")) {
-	$t_image = "themes/$ThemeSel/images/topics/$topicimage";
+        $t_image = "themes/$ThemeSel/images/topics/$topicimage";
     } else {
-	$t_image = "$tipath$topicimage";
+        $t_image = "$tipath$topicimage";
     }
     echo "<table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" bgcolor=\"#ffffff\" width=\"100%\"><tr><td>\n"
-        ."<table border=\"0\" cellpadding=\"1\" cellspacing=\"0\" bgcolor=\"#DAD8D8\" width=\"100%\"><tr><td>\n"
-        ."<table border=\"0\" cellpadding=\"3\" cellspacing=\"0\" bgcolor=\"#EEEEEE\" width=\"100%\"><tr><td align=\"left\">\n"
-        ."<font class=\"option\" color=\"#363636\"><b>$title</b></font><br>\n"
-        ."<font class=\"content\">"._POSTEDON." $datetime "._BY." ";
+        . "<table border=\"0\" cellpadding=\"1\" cellspacing=\"0\" bgcolor=\"#DAD8D8\" width=\"100%\"><tr><td>\n"
+        . "<table border=\"0\" cellpadding=\"3\" cellspacing=\"0\" bgcolor=\"#EEEEEE\" width=\"100%\"><tr><td align=\"left\">\n"
+        . "<font class=\"option\" color=\"#363636\"><b>$title</b></font><br>\n"
+        . "<font class=\"content\">" . _POSTEDON . " $datetime " . _BY . " ";
     formatAidHeader($aid);
     if (is_admin($admin)) {
-	echo "<br>[ <a href=\"".$admin_file.".php?op=EditStory&amp;sid=$sid\">"._EDIT."</a> | <a href=\"".$admin_file.".php?op=RemoveStory&amp;sid=$sid\">"._DELETE."</a> ]\n";
+        echo "<br>[ <a href=\"" . $admin_file . ".php?op=EditStory&amp;sid=$sid\">" . _EDIT . "</a> | <a href=\"" . $admin_file . ".php?op=RemoveStory&amp;sid=$sid\">" . _DELETE . "</a> ]\n";
     }
     echo "</td></tr></table></td></tr></table><br>";
     echo "<a href=\"modules.php?name=News&amp;new_topic=$topic\"><img src=\"$t_image\" border=\"0\" Alt=\"$topictext\" align=\"right\" hspace=\"10\" vspace=\"10\"></a>\n";
-    FormatStory($thetext, $notes="", $aid, $informant);
+    FormatStory($thetext, $notes = "", $aid, $informant);
     echo "</td></tr></table><br>\n\n\n";
 }
 
@@ -283,26 +292,25 @@ function themearticle ($aid, $informant, $datetime, $title, $thetext, $topic, $t
 /* Control look of your blocks. Just simple.                */
 /************************************************************/
 
-function themesidebox($title, $content) {
+function themesidebox($title, $content)
+{
     echo "<table border=\"0\" cellpadding=\"1\" cellspacing=\"0\" width=\"150\">\n"
-    ."<tr>\n"
-    ."<td>\n"
+        . "<tr>\n"
+        . "<td>\n"
 
-	."<table border=\"0\" cellpadding=\"3\" cellspacing=\"0\" bgcolor=\"#EEEEEE\" width=\"100%\">\n"
-	."<tr>\n"
-	."<td align=left><font class=\"content\" color=\"#363636\"><b>$title</b></font></td>\n"
-	."</tr>\n"
-	."</table>\n"
+        . "<table border=\"0\" cellpadding=\"3\" cellspacing=\"0\" bgcolor=\"#EEEEEE\" width=\"100%\">\n"
+        . "<tr>\n"
+        . "<td align=left><font class=\"content\" color=\"#363636\"><b>$title</b></font></td>\n"
+        . "</tr>\n"
+        . "</table>\n"
 
-	."</td>\n"
-	."</tr>\n"
-	."</table>\n"
+        . "</td>\n"
+        . "</tr>\n"
+        . "</table>\n"
 
-	."<table border=\"0\" cellpadding=\"3\" cellspacing=\"0\" width=\"150\">\n"
-	."<tr valign=\"top\"><td>\n"
-	."$content\n"
-	."</td></tr></table>\n"
-	."<br>\n\n\n";
+        . "<table border=\"0\" cellpadding=\"3\" cellspacing=\"0\" width=\"150\">\n"
+        . "<tr valign=\"top\"><td>\n"
+        . "$content\n"
+        . "</td></tr></table>\n"
+        . "<br>\n\n\n";
 }
-
-?>

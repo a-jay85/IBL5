@@ -20,9 +20,8 @@
  *
  ***************************************************************************/
 
-if ( !defined('IN_PHPBB') )
-{
-        die('Hacking attempt');
+if (!defined('IN_PHPBB')) {
+    die('Hacking attempt');
 }
 
 //
@@ -30,15 +29,15 @@ if ( !defined('IN_PHPBB') )
 //
 global $nukeuser, $popup;
 
-$admin_link = ( $userdata['user_level'] == ADMIN ) ? '<a href="' . append_sid("modules/Forums/admin/index.$phpEx?admin=1") . '">' . $lang['Admin_panel'] . '</a><br /><br />' : '';
+$admin_link = ($userdata['user_level'] == ADMIN) ? '<a href="' . append_sid("modules/Forums/admin/index.$phpEx?admin=1") . '">' . $lang['Admin_panel'] . '</a><br /><br />' : '';
 
 $template->set_filenames(array(
-        'overall_footer' => ( empty($gen_simple_header) ) ? 'overall_footer.tpl' : 'simple_footer.tpl')
+    'overall_footer' => (empty($gen_simple_header)) ? 'overall_footer.tpl' : 'simple_footer.tpl')
 );
 
 $template->assign_vars(array(
-        'TRANSLATION_INFO' => ( isset($lang['TRANSLATION_INFO']) ) ? $lang['TRANSLATION_INFO'] : '',
-        'ADMIN_LINK' => $admin_link)
+    'TRANSLATION_INFO' => (isset($lang['TRANSLATION_INFO'])) ? $lang['TRANSLATION_INFO'] : '',
+    'ADMIN_LINK' => $admin_link)
 );
 
 $template->pparse('overall_footer');
@@ -52,6 +51,5 @@ $db->sql_close();
 // Compress buffered output if required and send to browser
 //
 if ($popup != "1") {
-    include("footer.php");
-    }
-?>
+    include "footer.php";
+}

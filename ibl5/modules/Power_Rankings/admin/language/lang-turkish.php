@@ -17,39 +17,35 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_SEND","Gönder");
-define("_FUNCTIONS","Fonksiyonlar");
-define("_YES","Evet");
-define("_NO","Hayýr");
-define("_CATEGORY","Kategori");
-define("_SAVECHANGES","Deðiþiklikleri Kaydet");
-define("_PAGEBREAK","Birden fazla sayfa kullanmak için kesmek istediðiniz yere <b>[--pagebreak--]</b> yazabilirsiniz.");
-define("_SIGNATURE","Ýmza");
-define("_DESCRIPTION","Taným");
-define("_TITLE","Baþlýk");
-define("_ACTIVE","Aktif");
-define("_DEACTIVATE","Pasifleþtir");
-define("_INACTIVE","Pasif");
-define("_ACTIVATE","Etkinleþtir");
-define("_CONTENT","Ýçerik");
-define("_ADDCATEGORY","Yeni Kategori Ekle");
-define("_EDITCATEGORY","Kategori Düzenle");
-define("_ADD","Ekle");
-define("_LANGUAGE","Dil");
-define("_CONTENTMANAGER","Ýçerik Yöneticisi");
-define("_DELCONTWARNING","Sayfayý silmek istediðinizden emin misiniz:");
-define("_DELCONTENT","Sayfa Sil");
-define("_CURRENTSTATUS","Geçerli Durum");
-define("_ADDANEWPAGE","Yeni Sayfa Ekle");
-define("_CSUBTITLE","Alt-Baþlýk");
-define("_HEADERTEXT","Baþlýk Metni");
-define("_PAGETEXT","Sayfa Metni");
-define("_FOOTERTEXT","Alt Metin");
-define("_ACTIVATEPAGE","Bu sayfayý etkinleþtir?");
-define("_EDITPAGECONTENT","Sayfa Ýçeriðini Düzenle");
-define("_DELCONTENTCAT","UYARI: Bu kategoriyi silmek istediðinizden emin misiniz? Eðer varsa, bu kategori altýndaki sayfalar silinmeyecek, fakat herhangi bir kategoriye de baðlanmayacaklar.");
-define("_DELCATEGORY","Kategoriyi Sil");
-
-
-?>
+define("_SEND", "Gï¿½nder");
+define("_FUNCTIONS", "Fonksiyonlar");
+define("_YES", "Evet");
+define("_NO", "Hayï¿½r");
+define("_CATEGORY", "Kategori");
+define("_SAVECHANGES", "Deï¿½iï¿½iklikleri Kaydet");
+define("_PAGEBREAK", "Birden fazla sayfa kullanmak iï¿½in kesmek istediï¿½iniz yere <b>[--pagebreak--]</b> yazabilirsiniz.");
+define("_SIGNATURE", "ï¿½mza");
+define("_DESCRIPTION", "Tanï¿½m");
+define("_TITLE", "Baï¿½lï¿½k");
+define("_ACTIVE", "Aktif");
+define("_DEACTIVATE", "Pasifleï¿½tir");
+define("_INACTIVE", "Pasif");
+define("_ACTIVATE", "Etkinleï¿½tir");
+define("_CONTENT", "ï¿½ï¿½erik");
+define("_ADDCATEGORY", "Yeni Kategori Ekle");
+define("_EDITCATEGORY", "Kategori Dï¿½zenle");
+define("_ADD", "Ekle");
+define("_LANGUAGE", "Dil");
+define("_CONTENTMANAGER", "ï¿½ï¿½erik Yï¿½neticisi");
+define("_DELCONTWARNING", "Sayfayï¿½ silmek istediï¿½inizden emin misiniz:");
+define("_DELCONTENT", "Sayfa Sil");
+define("_CURRENTSTATUS", "Geï¿½erli Durum");
+define("_ADDANEWPAGE", "Yeni Sayfa Ekle");
+define("_CSUBTITLE", "Alt-Baï¿½lï¿½k");
+define("_HEADERTEXT", "Baï¿½lï¿½k Metni");
+define("_PAGETEXT", "Sayfa Metni");
+define("_FOOTERTEXT", "Alt Metin");
+define("_ACTIVATEPAGE", "Bu sayfayï¿½ etkinleï¿½tir?");
+define("_EDITPAGECONTENT", "Sayfa ï¿½ï¿½eriï¿½ini Dï¿½zenle");
+define("_DELCONTENTCAT", "UYARI: Bu kategoriyi silmek istediï¿½inizden emin misiniz? Eï¿½er varsa, bu kategori altï¿½ndaki sayfalar silinmeyecek, fakat herhangi bir kategoriye de baï¿½lanmayacaklar.");
+define("_DELCATEGORY", "Kategoriyi Sil");

@@ -13,19 +13,17 @@
 /************************************************************************/
 
 if (!defined('ADMIN_FILE')) {
-	die ("Access Denied");
+    die("Access Denied");
 }
 
-switch($op) {
+switch ($op) {
 
     case "modules":
     case "module_status":
     case "module_edit":
     case "module_edit_save":
     case "home_module":
-    include("admin/modules/modules.php");
-    break;
+        include "admin/modules/modules.php";
+        break;
 
 }
-
-?>

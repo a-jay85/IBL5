@@ -17,18 +17,16 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PRINTER","Utskriftsvänlig sida");
-define("_FRIEND","Skicka denna artikel till en kompis");
-define("_ARTICLES","Artiklarna");
-define("_USCORE","Poäng");
-define("_DATE","Datum");
-define("_SELECTMONTH2VIEW","Please select the month you want to view:");
-define("_SHOWALLSTORIES","Show ALL Stories");
-define("_STORIESARCHIVE","Stories Archive");
-define("_ACTIONS","Actions");
-define("_ARCHIVESINDEX","Stories Archive Index");
-define("_ALLSTORIESARCH","All Stories");
-define("_NEXTPAGE","Next Page");
-define("_PREVIOUSPAGE","Previous Page");
-
-?>
+define("_PRINTER", "Utskriftsvï¿½nlig sida");
+define("_FRIEND", "Skicka denna artikel till en kompis");
+define("_ARTICLES", "Artiklarna");
+define("_USCORE", "Poï¿½ng");
+define("_DATE", "Datum");
+define("_SELECTMONTH2VIEW", "Please select the month you want to view:");
+define("_SHOWALLSTORIES", "Show ALL Stories");
+define("_STORIESARCHIVE", "Stories Archive");
+define("_ACTIONS", "Actions");
+define("_ARCHIVESINDEX", "Stories Archive Index");
+define("_ALLSTORIESARCH", "All Stories");
+define("_NEXTPAGE", "Next Page");
+define("_PREVIOUSPAGE", "Previous Page");

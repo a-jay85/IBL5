@@ -17,37 +17,33 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_YES","Po");
-define("_NO","Jo");
-define("_CATEGORY","Kategoria");
-define("_SAVECHANGES","Shpëto Ndryshimet");
-define("_ARTICLES","Artikuj");
-define("_SELECTTOPIC","Seleksiono Argumentin");
-define("_OPTION","Opcione");
-define("_ADMPOLLS","Sondazh");
-define("_TITLE","Titulli");
-define("_STORYTEXT","Teksti parathënës (është teksti që shfaqet në faqen e parë)");
-define("_EXTENDEDTEXT","Teksti në vazhdim");
-define("_PUBLISHINHOME","Publikon në Home Page?");
-define("_ONLYIFCATSELECTED","Funksionon vetëm n.q.s. kategoria <i>Artikuj</i> nuk është e seleksionuar");
-define("_ADD","Shto");
-define("_POLLSADMIN","Administrimi i Sondazheve");
-define("_CREATEPOLL","Krijo një Sondazh të Ri");
-define("_DELETEPOLLS","Fshi Sondazhin");
-define("_POLLTITLE","Titulli i Sondazhit");
-define("_POLLEACHFIELD","Shkruaj një mundësi për çdo fushë të vetme");
-define("_CREATEPOLLBUT","Krijo Sondazhin");
-define("_REMOVEEXISTING","Hiq një Sondazh Ekzistues");
-define("_POLLDELWARNING","KUJDES: Sondazhi i zgjedhur do të hiqet MENJËHERË nga database!");
-define("_CHOOSEPOLL","Zgjidh një Sondazh nga Lista:");
-define("_EDITPOLL","Shkruaj Sondazhet");
-define("_CHOOSEPOLLEDIT","Zgjidh Sondazhin që deshiron të ndryshosh:");
-define("_ACTIVATECOMMENTS","Aktivon komentet për këtë artikull?");
-define("_LANGUAGE","Gjuha");
-define("_ANNOUNCEPOLL","Lajmëro këtë rezervë në sitin tënd");
-define("_LEAVEBLANK","(Lëre bosh për të krijuar një rezervë pa e lajmëruar)");
-define("_POLLEDIT","Shkruaj Sondazhin:");
-
-
-?>
+define("_YES", "Po");
+define("_NO", "Jo");
+define("_CATEGORY", "Kategoria");
+define("_SAVECHANGES", "Shpï¿½to Ndryshimet");
+define("_ARTICLES", "Artikuj");
+define("_SELECTTOPIC", "Seleksiono Argumentin");
+define("_OPTION", "Opcione");
+define("_ADMPOLLS", "Sondazh");
+define("_TITLE", "Titulli");
+define("_STORYTEXT", "Teksti parathï¿½nï¿½s (ï¿½shtï¿½ teksti qï¿½ shfaqet nï¿½ faqen e parï¿½)");
+define("_EXTENDEDTEXT", "Teksti nï¿½ vazhdim");
+define("_PUBLISHINHOME", "Publikon nï¿½ Home Page?");
+define("_ONLYIFCATSELECTED", "Funksionon vetï¿½m n.q.s. kategoria <i>Artikuj</i> nuk ï¿½shtï¿½ e seleksionuar");
+define("_ADD", "Shto");
+define("_POLLSADMIN", "Administrimi i Sondazheve");
+define("_CREATEPOLL", "Krijo njï¿½ Sondazh tï¿½ Ri");
+define("_DELETEPOLLS", "Fshi Sondazhin");
+define("_POLLTITLE", "Titulli i Sondazhit");
+define("_POLLEACHFIELD", "Shkruaj njï¿½ mundï¿½si pï¿½r ï¿½do fushï¿½ tï¿½ vetme");
+define("_CREATEPOLLBUT", "Krijo Sondazhin");
+define("_REMOVEEXISTING", "Hiq njï¿½ Sondazh Ekzistues");
+define("_POLLDELWARNING", "KUJDES: Sondazhi i zgjedhur do tï¿½ hiqet MENJï¿½HERï¿½ nga database!");
+define("_CHOOSEPOLL", "Zgjidh njï¿½ Sondazh nga Lista:");
+define("_EDITPOLL", "Shkruaj Sondazhet");
+define("_CHOOSEPOLLEDIT", "Zgjidh Sondazhin qï¿½ deshiron tï¿½ ndryshosh:");
+define("_ACTIVATECOMMENTS", "Aktivon komentet pï¿½r kï¿½tï¿½ artikull?");
+define("_LANGUAGE", "Gjuha");
+define("_ANNOUNCEPOLL", "Lajmï¿½ro kï¿½tï¿½ rezervï¿½ nï¿½ sitin tï¿½nd");
+define("_LEAVEBLANK", "(Lï¿½re bosh pï¿½r tï¿½ krijuar njï¿½ rezervï¿½ pa e lajmï¿½ruar)");
+define("_POLLEDIT", "Shkruaj Sondazhin:");

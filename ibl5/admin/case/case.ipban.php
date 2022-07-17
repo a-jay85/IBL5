@@ -13,18 +13,16 @@
 /************************************************************************/
 
 if (!defined('ADMIN_FILE')) {
-	die ("Access Denied");
+    die("Access Denied");
 }
 
-switch($op) {
+switch ($op) {
     case "ipban":
     case "save_banned":
     case "ipban_delete":
-	case "ipban_edit":
-	case "ipban_save":
-    include("admin/modules/ipban.php");
-    break;
+    case "ipban_edit":
+    case "ipban_save":
+        include "admin/modules/ipban.php";
+        break;
 
 }
-
-?>

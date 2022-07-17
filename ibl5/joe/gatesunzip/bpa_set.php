@@ -19,20 +19,20 @@
 
 include "includes/classes.inc.php";
 
-if(is_array($_POST['bpa_priority'])) {
-  foreach($_POST['bpa_priority'] as $bpa_id=>$bpa_priority) {
-    $statement = "update bpa set bpa_priority = '$bpa_priority'
-where team_id = '".$login->team_id()."' and bpa_id = '$bpa_id'";
-    mysql_query($statement);
-  }
- }
+if (is_array($_POST['bpa_priority'])) {
+    foreach ($_POST['bpa_priority'] as $bpa_id => $bpa_priority) {
+        $statement = "update bpa set bpa_priority = '$bpa_priority'
+where team_id = '" . $login->team_id() . "' and bpa_id = '$bpa_id'";
+        mysql_query($statement);
+    }
+}
 
 // Delete any?
 if (is_array($_POST['delete'])) {
-  foreach($_POST['delete'] as $bpa_id) {
-    $statement = "delete from bpa where team_id = '".$login->team_id()."' and bpa_id = '$bpa_id'";
-    mysql_query($statement);
-  }
+    foreach ($_POST['delete'] as $bpa_id) {
+        $statement = "delete from bpa where team_id = '" . $login->team_id() . "' and bpa_id = '$bpa_id'";
+        mysql_query($statement);
+    }
 }
 
 // Process the queue
@@ -41,4 +41,3 @@ process_pick_queue();
 $_SESSION['message'] = "Priority set successfully.";
 
 header("Location: priority.php?queue=bpa");
-?>

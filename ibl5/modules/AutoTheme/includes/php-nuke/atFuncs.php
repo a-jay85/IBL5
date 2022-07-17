@@ -39,7 +39,7 @@ function themeindex($aid, $informant, $datetime, $title, $counter, $topic, $home
     list($preformat, $info, $links) = themeformatnews($vars);
 
     atRunningMultiSetVars($vars);
-    
+
     atNewsSummary($info, $links, $preformat);
 }
 
@@ -61,7 +61,7 @@ function themesidebox($title, $content)
     $block['content'] = $content;
 
     if ($block['position'] == "d") {
-    	$block['position'] = "c";
+        $block['position'] = "c";
     }
     atThemeBlock($block);
 }
@@ -69,74 +69,72 @@ function themesidebox($title, $content)
 function themeformatnews($vars)
 {
     extract($vars);
-    
-    $preformat = array (
-	   'bodytext' => $bodytext,
-	   'bytesmore' => $morelink,
-	   'category' => $title,
-	   'comment' => '?',
-	   'hometext' => $hometext,
-	   'notes' => $notes,
-	   'searchtopic' => $topicimage,
-	   'print' => $morelink,
-	   'readmore' => $morelink,
-	   'send' => $morelink,
-	   'title' => $title,
-	   'version' => '?',
-	   'more' => $morelink,
-	   'catandtitle' => $title,
-	   'maintext' => $hometext,
-	   'fulltext' => $bodytext,
+
+    $preformat = array(
+        'bodytext' => $bodytext,
+        'bytesmore' => $morelink,
+        'category' => $title,
+        'comment' => '?',
+        'hometext' => $hometext,
+        'notes' => $notes,
+        'searchtopic' => $topicimage,
+        'print' => $morelink,
+        'readmore' => $morelink,
+        'send' => $morelink,
+        'title' => $title,
+        'version' => '?',
+        'more' => $morelink,
+        'catandtitle' => $title,
+        'maintext' => $hometext,
+        'fulltext' => $bodytext,
     );
 
-    $info = array (
-	   'aid' => $aid,
-	   'bodytext' => $bodytext,
-	   'catthemeoverride' => '?',
-	   'cid' => '?',
-	   'cattitle' => $title,
-	   'comments' => '?',
-	   'counter' => $counter,
-	   'hometext' => $hometext,
-	   'informant' => $informant,
-	   'notes' => $notes,
-	   'sid' => $sid,
-	   'themeoverride' => '?',
-	   'tid' => $topic,
-	   'time' => $datetime,
-	   'title' => $title,
-	   'topicname' => $topicname,
-	   'topicimage' => $topicimage,
-	   'topictext' => $topictext,
-	   'tcounter' => '?',
-	   'unixtime' => '?',
-	   'withcomm' => '?',
-	   'skins' => '?',
-	   'topicid' => $topic,
-	   'topic' => $topic,
-	   'catid' => '?',
-	   'version' => '?',
-	   'longdatetime' => $datetime,
-	   'briefdatetime' => $datetime,
-	   'longdate' => $datetime,
-	   'briefdate' => $datetime,
-	   'catandtitle' => $title,
-	   'maintext' => $hometext,
-	   'fulltext' => $bodytext,
+    $info = array(
+        'aid' => $aid,
+        'bodytext' => $bodytext,
+        'catthemeoverride' => '?',
+        'cid' => '?',
+        'cattitle' => $title,
+        'comments' => '?',
+        'counter' => $counter,
+        'hometext' => $hometext,
+        'informant' => $informant,
+        'notes' => $notes,
+        'sid' => $sid,
+        'themeoverride' => '?',
+        'tid' => $topic,
+        'time' => $datetime,
+        'title' => $title,
+        'topicname' => $topicname,
+        'topicimage' => $topicimage,
+        'topictext' => $topictext,
+        'tcounter' => '?',
+        'unixtime' => '?',
+        'withcomm' => '?',
+        'skins' => '?',
+        'topicid' => $topic,
+        'topic' => $topic,
+        'catid' => '?',
+        'version' => '?',
+        'longdatetime' => $datetime,
+        'briefdatetime' => $datetime,
+        'longdate' => $datetime,
+        'briefdate' => $datetime,
+        'catandtitle' => $title,
+        'maintext' => $hometext,
+        'fulltext' => $bodytext,
     );
-    
-    $links = array (
-	   'category' => '?',
-	   'comment' => '?',
-	   'fullarticle' => '?',
-	   'searchtopic' => '?',
-	   'print' => '?',
-	   'send' => '?',
-	   'version' => '?',
+
+    $links = array(
+        'category' => '?',
+        'comment' => '?',
+        'fullarticle' => '?',
+        'searchtopic' => '?',
+        'print' => '?',
+        'send' => '?',
+        'version' => '?',
     );
 
     return array($preformat, $info, $links);
 
 }
-
-?>

@@ -4,8 +4,8 @@ require 'mainfile.php';
 
 $offer_id = $_POST['offer'];
 
-$queryclear="DELETE FROM nuke_ibl_trade_info WHERE `tradeofferid` = '$offer_id'";
-$resultclear=$db->sql_query($queryclear);
+$queryclear = "DELETE FROM nuke_ibl_trade_info WHERE `tradeofferid` = '$offer_id'";
+$resultclear = $db->sql_query($queryclear);
 
 ?>
 

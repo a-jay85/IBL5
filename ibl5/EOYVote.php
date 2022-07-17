@@ -2,7 +2,7 @@
 
 require 'mainfile.php';
 
-include("header.php");
+include "header.php";
 
 echo "<HTML><HEAD><TITLE>End of Year Voting Result</TITLE></HEAD><BODY>";
 
@@ -20,117 +20,80 @@ $GM1 = $_POST['GM'][1];
 $GM2 = $_POST['GM'][2];
 $GM3 = $_POST['GM'][3];
 
-if (strpos($MVP1,$Team_Name) !== false) {
-echo "Sorry, you cannot vote for your own player. Try again.<br>";
-}
-else if (strpos($MVP2,$Team_Name) !== false) {
-echo "Sorry, you cannot vote for your own player. Try again.<br>";
-}
-else if (strpos($MVP3,$Team_Name) !== false) {
-echo "Sorry, you cannot vote for your own player. Try again.<br>";
-}
-else if (strpos($Six1,$Team_Name) !== false) {
-echo "Sorry, you cannot vote for your own player. Try again.<br>";
-}
-else if (strpos($Six2,$Team_Name) !== false) {
-echo "Sorry, you cannot vote for your own player. Try again.<br>";
-}
-else if (strpos($Six3,$Team_Name) !== false) {
-echo "Sorry, you cannot vote for your own player. Try again.<br>";
-}
-else if (strpos($ROY1,$Team_Name) !== false) {
-echo "Sorry, you cannot vote for your own player. Try again.<br>";
-}
-else if (strpos($ROY2,$Team_Name) !== false) {
-echo "Sorry, you cannot vote for your own player. Try again.<br>";
-}
-else if (strpos($ROY3,$Team_Name) !== false) {
-echo "Sorry, you cannot vote for your own player. Try again.<br>";
-}
-else if (strpos($GM1,$Team_Name) !== false) {
-echo "Sorry, you cannot vote for yourself. Try again.<br>";
-}
-else if (strpos($GM2,$Team_Name) !== false) {
-echo "Sorry, you cannot vote for yourself. Try again.<br>";
-}
-else if (strpos($GM3,$Team_Name) !== false) {
-echo "Sorry, you cannot vote for yourself. Try again.<br>";
-}
-else if ($MVP1 == "") {
-echo "Sorry, you must select an MVP. Try again.<br>";
-}
-else if ($MVP2 == "") {
-echo "Sorry, you must select an MVP. Try again.<br>";
-}
-else if ($MVP3 == "") {
-echo "Sorry, you must select an MVP. Try again.<br>";
-}
-else if ($Six1 == "") {
-echo "Sorry, you must select a 6th Man of the Year. Try again.<br>";
-}
-else if ($Six2 == "") {
-echo "Sorry, you must select a 6th Man of the Year. Try again.<br>";
-}
-else if ($Six3 == "") {
-echo "Sorry, you must select a 6th Man of the Year . Try again.<br>";
-}
-else if ($ROY1 == "") {
-echo "Sorry, you must select a Rookie of the Year. Try again.<br>";
-}
-else if ($ROY2 == "") {
-echo "Sorry, you must select a Rookie of the Year. Try again.<br>";
-}
-else if ($ROY3 == "") {
-echo "Sorry, you must select a Rookie of the Year. Try again.<br>";
-}
-else if ($GM1 == "") {
-echo "Sorry, you must select a GM of the Year. Try again.<br>";
-}
-else if ($GM2 == "") {
-echo "Sorry, you must select a GM of the Year. Try again.<br>";
-}
-else if ($GM3 == "") {
-echo "Sorry, you must select a GM of the Year. Try again.<br>";
-}
-else if ($MVP1 == $MVP2) {
-echo "Sorry, you have selected the same player for multiple MVP slots. Try again.<br>";
-}
-else if ($MVP1 == $MVP3) {
-echo "Sorry, you have selected the same player for multiple MVP slots. Try again.<br>";
-}
-else if ($MVP2 == $MVP3) {
-echo "Sorry, you have selected the same player for multiple MVP slots. Try again.<br>";
-}
-else if ($Six1 == $Six2) {
-echo "Sorry, you have selected the same player for multiple Sixth Man of the Year slots. Try again.<br>";
-}
-else if ($Six1 == $Six3) {
-echo "Sorry, you have selected the same player for multiple Sixth Man of the Year slots. Try again.<br>";
-}
-else if ($Six2 == $Six3) {
-echo "Sorry, you have selected the same player for multiple Sixth Man of the Year slots. Try again.<br>";
-}
-else if ($ROY1 == $ROY2) {
-echo "Sorry, you have selected the same player for multiple Rookie of the Year slots. Try again.<br>";
-}
-else if ($ROY1 == $ROY3) {
-echo "Sorry, you have selected the same player for multiple Rookie of the Year slots. Try again.<br>";
-}
-else if ($ROY2 == $ROY3) {
-echo "Sorry, you have selected the same player for multiple Rookie of the Year slots. Try again.<br>";
-}
-else if ($GM1 == $GM2) {
-echo "Sorry, you have selected the same player for multiple GM of the Year slots. Try again.<br>";
-}
-else if ($GM1 == $GM3) {
-echo "Sorry, you have selected the same player for multiple GM of the Year slots. Try again.<br>";
-}
-else if ($GM2 == $GM3) {
-echo "Sorry, you have selected the same player for multiple GM of the Year slots. Try again.<br>";
-}
-
-else {
-echo "Thank you for voting. The $Team_Name vote has been recorded.</br><br>
+if (strpos($MVP1, $Team_Name) !== false) {
+    echo "Sorry, you cannot vote for your own player. Try again.<br>";
+} else if (strpos($MVP2, $Team_Name) !== false) {
+    echo "Sorry, you cannot vote for your own player. Try again.<br>";
+} else if (strpos($MVP3, $Team_Name) !== false) {
+    echo "Sorry, you cannot vote for your own player. Try again.<br>";
+} else if (strpos($Six1, $Team_Name) !== false) {
+    echo "Sorry, you cannot vote for your own player. Try again.<br>";
+} else if (strpos($Six2, $Team_Name) !== false) {
+    echo "Sorry, you cannot vote for your own player. Try again.<br>";
+} else if (strpos($Six3, $Team_Name) !== false) {
+    echo "Sorry, you cannot vote for your own player. Try again.<br>";
+} else if (strpos($ROY1, $Team_Name) !== false) {
+    echo "Sorry, you cannot vote for your own player. Try again.<br>";
+} else if (strpos($ROY2, $Team_Name) !== false) {
+    echo "Sorry, you cannot vote for your own player. Try again.<br>";
+} else if (strpos($ROY3, $Team_Name) !== false) {
+    echo "Sorry, you cannot vote for your own player. Try again.<br>";
+} else if (strpos($GM1, $Team_Name) !== false) {
+    echo "Sorry, you cannot vote for yourself. Try again.<br>";
+} else if (strpos($GM2, $Team_Name) !== false) {
+    echo "Sorry, you cannot vote for yourself. Try again.<br>";
+} else if (strpos($GM3, $Team_Name) !== false) {
+    echo "Sorry, you cannot vote for yourself. Try again.<br>";
+} else if ($MVP1 == "") {
+    echo "Sorry, you must select an MVP. Try again.<br>";
+} else if ($MVP2 == "") {
+    echo "Sorry, you must select an MVP. Try again.<br>";
+} else if ($MVP3 == "") {
+    echo "Sorry, you must select an MVP. Try again.<br>";
+} else if ($Six1 == "") {
+    echo "Sorry, you must select a 6th Man of the Year. Try again.<br>";
+} else if ($Six2 == "") {
+    echo "Sorry, you must select a 6th Man of the Year. Try again.<br>";
+} else if ($Six3 == "") {
+    echo "Sorry, you must select a 6th Man of the Year . Try again.<br>";
+} else if ($ROY1 == "") {
+    echo "Sorry, you must select a Rookie of the Year. Try again.<br>";
+} else if ($ROY2 == "") {
+    echo "Sorry, you must select a Rookie of the Year. Try again.<br>";
+} else if ($ROY3 == "") {
+    echo "Sorry, you must select a Rookie of the Year. Try again.<br>";
+} else if ($GM1 == "") {
+    echo "Sorry, you must select a GM of the Year. Try again.<br>";
+} else if ($GM2 == "") {
+    echo "Sorry, you must select a GM of the Year. Try again.<br>";
+} else if ($GM3 == "") {
+    echo "Sorry, you must select a GM of the Year. Try again.<br>";
+} else if ($MVP1 == $MVP2) {
+    echo "Sorry, you have selected the same player for multiple MVP slots. Try again.<br>";
+} else if ($MVP1 == $MVP3) {
+    echo "Sorry, you have selected the same player for multiple MVP slots. Try again.<br>";
+} else if ($MVP2 == $MVP3) {
+    echo "Sorry, you have selected the same player for multiple MVP slots. Try again.<br>";
+} else if ($Six1 == $Six2) {
+    echo "Sorry, you have selected the same player for multiple Sixth Man of the Year slots. Try again.<br>";
+} else if ($Six1 == $Six3) {
+    echo "Sorry, you have selected the same player for multiple Sixth Man of the Year slots. Try again.<br>";
+} else if ($Six2 == $Six3) {
+    echo "Sorry, you have selected the same player for multiple Sixth Man of the Year slots. Try again.<br>";
+} else if ($ROY1 == $ROY2) {
+    echo "Sorry, you have selected the same player for multiple Rookie of the Year slots. Try again.<br>";
+} else if ($ROY1 == $ROY3) {
+    echo "Sorry, you have selected the same player for multiple Rookie of the Year slots. Try again.<br>";
+} else if ($ROY2 == $ROY3) {
+    echo "Sorry, you have selected the same player for multiple Rookie of the Year slots. Try again.<br>";
+} else if ($GM1 == $GM2) {
+    echo "Sorry, you have selected the same player for multiple GM of the Year slots. Try again.<br>";
+} else if ($GM1 == $GM3) {
+    echo "Sorry, you have selected the same player for multiple GM of the Year slots. Try again.<br>";
+} else if ($GM2 == $GM3) {
+    echo "Sorry, you have selected the same player for multiple GM of the Year slots. Try again.<br>";
+} else {
+    echo "Thank you for voting. The $Team_Name vote has been recorded.</br><br>
 
 MVP Choice 1: $MVP1<br>
 MVP Choice 2: $MVP2<br>
@@ -147,49 +110,46 @@ GM Choice 3: $GM3<br><br>
 
 ";
 
-
 // ==== UPDATE SELECTED VOTES IN DATABASE ====
 
-$query1="UPDATE IBL_EOY_Votes SET MVP_1 = '$MVP1' WHERE team_name = '$Team_Name'";
-$result1=$db->sql_query($query1);
+    $query1 = "UPDATE IBL_EOY_Votes SET MVP_1 = '$MVP1' WHERE team_name = '$Team_Name'";
+    $result1 = $db->sql_query($query1);
 
-$query2="UPDATE IBL_EOY_Votes SET MVP_2 = '$MVP2' WHERE team_name = '$Team_Name'";
-$result2=$db->sql_query($query2);
+    $query2 = "UPDATE IBL_EOY_Votes SET MVP_2 = '$MVP2' WHERE team_name = '$Team_Name'";
+    $result2 = $db->sql_query($query2);
 
-$query3="UPDATE IBL_EOY_Votes SET MVP_3 = '$MVP3' WHERE team_name = '$Team_Name'";
-$result3=$db->sql_query($query3);
+    $query3 = "UPDATE IBL_EOY_Votes SET MVP_3 = '$MVP3' WHERE team_name = '$Team_Name'";
+    $result3 = $db->sql_query($query3);
 
-$query4="UPDATE IBL_EOY_Votes SET Six_1 = '$Six1' WHERE team_name = '$Team_Name'";
-$result4=$db->sql_query($query4);
+    $query4 = "UPDATE IBL_EOY_Votes SET Six_1 = '$Six1' WHERE team_name = '$Team_Name'";
+    $result4 = $db->sql_query($query4);
 
-$query5="UPDATE IBL_EOY_Votes SET Six_2 = '$Six2' WHERE team_name = '$Team_Name'";
-$result5=$db->sql_query($query5);
+    $query5 = "UPDATE IBL_EOY_Votes SET Six_2 = '$Six2' WHERE team_name = '$Team_Name'";
+    $result5 = $db->sql_query($query5);
 
-$query6="UPDATE IBL_EOY_Votes SET Six_3 = '$Six3' WHERE team_name = '$Team_Name'";
-$result6=$db->sql_query($query6);
+    $query6 = "UPDATE IBL_EOY_Votes SET Six_3 = '$Six3' WHERE team_name = '$Team_Name'";
+    $result6 = $db->sql_query($query6);
 
-$query7="UPDATE IBL_EOY_Votes SET ROY_1 = '$ROY1' WHERE team_name = '$Team_Name'";
-$result7=$db->sql_query($query7);
+    $query7 = "UPDATE IBL_EOY_Votes SET ROY_1 = '$ROY1' WHERE team_name = '$Team_Name'";
+    $result7 = $db->sql_query($query7);
 
-$query8="UPDATE IBL_EOY_Votes SET ROY_2 = '$ROY2' WHERE team_name = '$Team_Name'";
-$result8=$db->sql_query($query8);
+    $query8 = "UPDATE IBL_EOY_Votes SET ROY_2 = '$ROY2' WHERE team_name = '$Team_Name'";
+    $result8 = $db->sql_query($query8);
 
-$query9="UPDATE IBL_EOY_Votes SET ROY_3 = '$ROY3' WHERE team_name = '$Team_Name'";
-$result9=$db->sql_query($query9);
+    $query9 = "UPDATE IBL_EOY_Votes SET ROY_3 = '$ROY3' WHERE team_name = '$Team_Name'";
+    $result9 = $db->sql_query($query9);
 
-$query10="UPDATE IBL_EOY_Votes SET GM_1 = '$GM1' WHERE team_name = '$Team_Name'";
-$result10=$db->sql_query($query10);
+    $query10 = "UPDATE IBL_EOY_Votes SET GM_1 = '$GM1' WHERE team_name = '$Team_Name'";
+    $result10 = $db->sql_query($query10);
 
-$query11="UPDATE IBL_EOY_Votes SET GM_2 = '$GM2' WHERE team_name = '$Team_Name'";
-$result11=$db->sql_query($query11);
+    $query11 = "UPDATE IBL_EOY_Votes SET GM_2 = '$GM2' WHERE team_name = '$Team_Name'";
+    $result11 = $db->sql_query($query11);
 
-$query12="UPDATE IBL_EOY_Votes SET GM_3 = '$GM3' WHERE team_name = '$Team_Name'";
-$result12=$db->sql_query($query12);
+    $query12 = "UPDATE IBL_EOY_Votes SET GM_3 = '$GM3' WHERE team_name = '$Team_Name'";
+    $result12 = $db->sql_query($query12);
 
-$query13="UPDATE ibl_team_history SET eoy_vote = NOW() + INTERVAL 2 HOUR WHERE team_name = '$Team_Name'";
-$result13=$db->sql_query($query13);
+    $query13 = "UPDATE ibl_team_history SET eoy_vote = NOW() + INTERVAL 2 HOUR WHERE team_name = '$Team_Name'";
+    $result13 = $db->sql_query($query13);
 
 }
-include("footer.php");
-
-?>
+include "footer.php";

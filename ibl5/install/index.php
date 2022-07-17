@@ -15,25 +15,27 @@
 /* the Free Software Foundation; either version 2 of the License.       */
 /************************************************************************/
 
-require_once( 'version.php' );
+require_once 'version.php';
 
 /** Include common.php */
-include_once( 'common.php' );
+include_once 'common.php';
 
-function get_php_setting($val) {
-	$r =  (ini_get($val) == '1' ? 1 : 0);
-	return $r ? 'ON' : 'OFF';
+function get_php_setting($val)
+{
+    $r = (ini_get($val) == '1' ? 1 : 0);
+    return $r ? 'ON' : 'OFF';
 }
 
-function writableCell( $folder ) {
-	echo '<tr>';
-	echo '<td class="item">' . $folder . '</td>';
-	echo '<td align="left">';
-	echo is_writable( "../$folder" ) ? '<b><font color="green">Writeable</font></b>' : '<b><font color="red">Unwriteable</font></b>' . '</td>';
-	echo '</tr>';
+function writableCell($folder)
+{
+    echo '<tr>';
+    echo '<td class="item">' . $folder . '</td>';
+    echo '<td align="left">';
+    echo is_writable("../$folder") ? '<b><font color="green">Writeable</font></b>' : '<b><font color="red">Unwriteable</font></b>' . '</td>';
+    echo '</tr>';
 }
 
-echo "<?xml version=\"1.0\" encoding=\"iso-8859-1\"?".">";
+echo "<?xml version=\"1.0\" encoding=\"iso-8859-1\"?" . ">";
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
@@ -92,7 +94,7 @@ correctly.
 	PHP version >= 4.3.0
 	</td>
 	<td align="left">
-	<?php echo phpversion() < '4.3' ? '<b><font color="red">No</font></b>' : '<b><font color="green">Yes</font></b>';?>
+	<?php echo phpversion() < '4.3' ? '<b><font color="red">No</font></b>' : '<b><font color="green">Yes</font></b>'; ?>
 	</td>
 </tr>
 <tr>
@@ -100,7 +102,7 @@ correctly.
 	&nbsp; - zlib compression support
 	</td>
 	<td align="left">
-	<?php echo extension_loaded('zlib') ? '<b><font color="green">Available</font></b>' : '<b><font color="red">Unavailable</font></b>';?>
+	<?php echo extension_loaded('zlib') ? '<b><font color="green">Available</font></b>' : '<b><font color="red">Unavailable</font></b>'; ?>
 	</td>
 </tr>
 <tr>
@@ -108,7 +110,7 @@ correctly.
 	&nbsp; - GD graphics support
 	</td>
 	<td align="left">
-	<?php echo extension_loaded('gd') ? '<b><font color="green">Available</font></b>' : '<b><font color="red">Unavailable</font></b>';?>
+	<?php echo extension_loaded('gd') ? '<b><font color="green">Available</font></b>' : '<b><font color="red">Unavailable</font></b>'; ?>
 	</td>
 </tr>
 <tr>
@@ -116,7 +118,7 @@ correctly.
 	&nbsp; - MySQL support
 	</td>
 	<td align="left">
-	<?php echo function_exists( 'mysql_connect' ) ? '<b><font color="green">Available</font></b>' : '<b><font color="red">Unavailable</font></b>';?>
+	<?php echo function_exists('mysql_connect') ? '<b><font color="green">Available</font></b>' : '<b><font color="red">Unavailable</font></b>'; ?>
 	</td>
 </tr>
 <tr>
@@ -125,13 +127,13 @@ correctly.
 	</td>
 	<td align="left">
 	<?php
-	if (@file_exists('../config.php') &&  @is_writable( '../config.php' )){
-		echo '<b><font color="green">Writeable</font></b>';
-	} else if (is_writable( '..' )) {
-		echo '<b><font color="green">Writeable</font></b>';
-	} else {
-		echo '<b><font color="red">Unwriteable</font></b><br /><span class="small">You can still continue the install as the configuration will be displayed at the end, just copy & paste this and upload.</span>';
-	} ?>
+if (@file_exists('../config.php') && @is_writable('../config.php')) {
+    echo '<b><font color="green">Writeable</font></b>';
+} else if (is_writable('..')) {
+    echo '<b><font color="green">Writeable</font></b>';
+} else {
+    echo '<b><font color="red">Unwriteable</font></b><br /><span class="small">You can still continue the install as the configuration will be displayed at the end, just copy & paste this and upload.</span>';
+}?>
 	</td>
 </tr>
 </table>
@@ -164,34 +166,34 @@ However, PHP-Nuke will still operate if your settings do not quite match the rec
 	</td>
 </tr>
 <?php
-$php_recommended_settings = array(array ('Safe Mode','safe_mode','OFF'),
-array ('Display Errors','display_errors','ON'),
-array ('File Uploads','file_uploads','ON'),
-array ('Magic Quotes GPC','magic_quotes_gpc','ON'),
-array ('Magic Quotes Runtime','magic_quotes_runtime','OFF'),
-array ('Register Globals','register_globals','OFF'),
-array ('Output Buffering','output_buffering','OFF'),
-array ('Session auto start','session.auto_start','OFF'),
+$php_recommended_settings = array(array('Safe Mode', 'safe_mode', 'OFF'),
+    array('Display Errors', 'display_errors', 'ON'),
+    array('File Uploads', 'file_uploads', 'ON'),
+    array('Magic Quotes GPC', 'magic_quotes_gpc', 'ON'),
+    array('Magic Quotes Runtime', 'magic_quotes_runtime', 'OFF'),
+    array('Register Globals', 'register_globals', 'OFF'),
+    array('Output Buffering', 'output_buffering', 'OFF'),
+    array('Session auto start', 'session.auto_start', 'OFF'),
 );
 
 foreach ($php_recommended_settings as $phprec) {
-?>
+    ?>
 <tr>
 	<td class="item"><?php echo $phprec[0]; ?>:</td>
 	<td class="toggle"><?php echo $phprec[2]; ?>:</td>
 	<td>
 	<?php
-	if ( get_php_setting($phprec[1]) == $phprec[2] ) {
-	?>
+if (get_php_setting($phprec[1]) == $phprec[2]) {
+        ?>
 		<font color="green"><b>
 	<?php
-	} else {
-	?>
+} else {
+        ?>
 		<font color="red"><b>
 	<?php
-	}
-	echo get_php_setting($phprec[1]);
-	?>
+}
+    echo get_php_setting($phprec[1]);
+    ?>
 	</b></font>
 	<td>
 </tr>
@@ -219,8 +221,8 @@ to write to it.
 
 <table class="content">
 <?php
-writableCell( 'config.php' );
-writableCell( 'ultramode.txt' );
+writableCell('config.php');
+writableCell('ultramode.txt');
 ?>
 </table>
 </div>

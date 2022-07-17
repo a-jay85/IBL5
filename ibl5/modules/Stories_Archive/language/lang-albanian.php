@@ -17,30 +17,28 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PRINTER","Faqe e Stampueshme");
-define("_FRIEND","Dërgoja këtë Artikull ndonjë Miku");
-define("_ARTICLES","Artikuj");
-define("_USCORE","Vota");
-define("_DATE","Data");
-define("_JANUARY","Janar");
-define("_FEBRUARY","Shkurt");
-define("_MARCH","Mars");
-define("_APRIL","Prill");
-define("_MAY","Maj");
-define("_JUNE","Qershor");
-define("_JULY","Korrik");
-define("_AUGUST","Gusht");
-define("_SEPTEMBER","Shtator");
-define("_OCTOBER","Tetor");
-define("_NOVEMBER","Nëntor");
-define("_DECEMBER","Dhjetor");
-define("_SELECTMONTH2VIEW","Seleksiono muajin që dëshiron të shohësh:");
-define("_SHOWALLSTORIES","Shfaq të gjithë artikujt");
-define("_STORIESARCHIVE","Arkivi i artikujve");
-define("_ACTIONS","Aksione");
-define("_ARCHIVESINDEX","Treguesi i arkivit të artikujve");
-define("_ALLSTORIESARCH","Të gjithë artikujt");
-define("_NEXTPAGE","Faqja në vazhdim");
-define("_PREVIOUSPAGE","Faqja e kaluar");
-
-?>
+define("_PRINTER", "Faqe e Stampueshme");
+define("_FRIEND", "Dï¿½rgoja kï¿½tï¿½ Artikull ndonjï¿½ Miku");
+define("_ARTICLES", "Artikuj");
+define("_USCORE", "Vota");
+define("_DATE", "Data");
+define("_JANUARY", "Janar");
+define("_FEBRUARY", "Shkurt");
+define("_MARCH", "Mars");
+define("_APRIL", "Prill");
+define("_MAY", "Maj");
+define("_JUNE", "Qershor");
+define("_JULY", "Korrik");
+define("_AUGUST", "Gusht");
+define("_SEPTEMBER", "Shtator");
+define("_OCTOBER", "Tetor");
+define("_NOVEMBER", "Nï¿½ntor");
+define("_DECEMBER", "Dhjetor");
+define("_SELECTMONTH2VIEW", "Seleksiono muajin qï¿½ dï¿½shiron tï¿½ shohï¿½sh:");
+define("_SHOWALLSTORIES", "Shfaq tï¿½ gjithï¿½ artikujt");
+define("_STORIESARCHIVE", "Arkivi i artikujve");
+define("_ACTIONS", "Aksione");
+define("_ARCHIVESINDEX", "Treguesi i arkivit tï¿½ artikujve");
+define("_ALLSTORIESARCH", "Tï¿½ gjithï¿½ artikujt");
+define("_NEXTPAGE", "Faqja nï¿½ vazhdim");
+define("_PREVIOUSPAGE", "Faqja e kaluar");

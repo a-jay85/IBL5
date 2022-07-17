@@ -2,10 +2,10 @@
 
 /*************************************************************************/
 /* The Slovak language file for module Reviews                      */
-/* Author: AlRashid 			 Date: 09.09.2002   					 */
+/* Author: AlRashid              Date: 09.09.2002                        */
 /* alrashid@klokan.sk, http://alrashid.klokan.sk                         */
-/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk			     */
-/*  		Dakujem                                                      */
+/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk                 */
+/*          Dakujem                                                      */
 /*************************************************************************/
 /**************************************************************************/
 /* PHP-NUKE: Advanced Content Management System                           */
@@ -24,90 +24,88 @@
 /* And, if you use HTML code, please double check it.                     */
 /*************************************************************************/
 /* The Slovak language file for module Reviews                      */
-/* Author: AlRashid 			 Date: 09.09.2002   					 */
+/* Author: AlRashid              Date: 09.09.2002                        */
 /* alrashid@klokan.sk, http://alrashid.klokan.sk                         */
-/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk			     */
-/*  		Dakujem                                                      */
+/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk                 */
+/*          Dakujem                                                      */
 /*************************************************************************/
 /**************************************************************************/
 
-define("_PREVIOUS","Predchádzajúca strana");
-define("_NEXT","Nasledujúca strana");
-define("_YOURNAME","Vaše meno");
-define("_SORTASC","Triedené nahor");
-define("_SORTDESC","Triedené nadol");
-define("_CANCEL","Zruši");
-define("_YES","Áno");
-define("_NO","Nie");
-define("_SCORE","Skóre:");
-define("_REPLYMAIN","posla komentár");
-define("_ALLOWEDHTML","Povoli HTML:");
-define("_POSTANON","Posla anonymne");
-define("_WRITEREVIEW","Napísa recenziu");
-define("_WRITEREVIEWFOR","Napísa recenziu pre");
-define("_ENTERINFO","Prosím zadajte informácie v súlade so skutoènosou.");
-define("_PRODUCTTITLE","Názov recenzie");
-define("_NAMEPRODUCT","Názov èoho sa recenzia tıka.");
-define("_REVIEW","Recenzia");
-define("_CHECKREVIEW","Tu napíšte recenziu. Prosím dbajte na gramatiku! Skúste napísa aspoò 100 slov. Ak ovládate HTML príkazy, môete ich poui.");
-define("_FULLNAMEREQ","Meno a priezvisko. Vyaduje sa.");
-define("_REMAIL","Vaš e-mail");
-define("_REMAILREQ","Vaša e-mailová adresa. Vyaduje sa.");
-define("_SELECTSCORE","Skóre pre tento produkt - 10 je najlepšie, 1 najhoršie");
-define("_RELATEDLINK","Súvisiaci odkaz");
-define("_PRODUCTSITE","Oficiálna webstránka produktu. Uistite sa, e URL zaèína s \"http://\"");
-define("_LINKTITLE","Názov odkazu");
-define("_LINKTITLEREQ","Poadované iba ak je zadanı súvisiaci odkaz, inak netreba.");
-define("_RIMAGEFILE","Názov obrázkového súboru");
-define("_RIMAGEFILEREQ","Názov zodpovedajúceho obrázku, z adresára images/reviews/. Nevyaduje sa.");
-define("_CHECKINFO","Prosím preverte si, èi sú zadané informácie 100% platné a sú gramaticky správne. Pri tejto príleitosti, prosím nepíšte text len ve¾kımi písmenami VŠETKO VE¼KÉ, takı text nebude prijatı.");
-define("_INVALIDTITLE","Nevyplnenı názov... Nesmie zosta prázdny");
-define("_INVALIDSCORE","Neplatné skóre... Musí by od 1 po 10");
-define("_INVALIDTEXT","Nevyplnenı text recenzie... Nesmie zosta prázdny");
-define("_INVALIDHITS","Klik musí by kladné èíslo");
-define("_CHECKNAME","Treba zada oba údaje, aj meno aj e-mail");
-define("_INVALIDEMAIL","Neplatná e-mailová adresa (napr.: janko@mrkvicka.sk)");
-define("_INVALIDLINK","Musíte zada oba údaje, názov odkazu a príslušnı odkaz alebo obe necha prázdne");
-define("_ADDED","Pridané:");
-define("_REVIEWER","Recenzent:");
-define("_REVIEWID","ID recenzie");
-define("_HITS"," krát èítané");
-define("_LOOKSRIGHT","Je to v poriadku?");
-define("_RMODIFIED","upravené");
-define("_RADDED","pridaná");
-define("_ADMINLOGGED","Ste prihlásenı ako admin... recenzia bude okamite");
-define("_RTHANKS","Vïaka za zaslanie recenzie");
-define("_MODIFICATION","úpravy");
-define("_ISAVAILABLE","Je odteraz k dispozícii v databáze recenzií.");
-define("_EDITORWILLLOOK","Správca overí váš príspevok.");
-define("_RBACK","Návrat na zoznam recenzií");
-define("_RWELCOME","Vitajte v oblasti recenzií");
-define("_10MOSTPOP","10 najob¾úbenejších recenzií");
-define("_10MOSTREC","10 najnovších rezenzií");
-define("_THEREARE","V našej databáze sa nachádza");
-define("_REVIEWSINDB","recenzií.");
-define("_REVIEWS","Recenzie");
-define("_REVIEWSLETTER","Recenzie produktov zaèínajúcich na písmeno");
-define("_NOREVIEWS","Neexistuje iadna recenzia produktu zaèínajúceho na písmeno");
-define("_TOTALREVIEWS","Všetky nájdené recenzie.");
-define("_RETURN2MAIN","Návrat na zoznam recenzií");
-define("_REVIEWCOMMENT","Komentár k recenzii:");
-define("_YOURNICK","Váše uivate¾ské meno:");
-define("_RCREATEACCOUNT","<a href=\"modules.php?name=Your_Account\">Vytvor</a> konto");
-define("_YOURCOMMENT","Váš komentár:");
-define("_MYSCORE","Moje skóre:");
-define("_REVIEWMOD","Úprava recenzie");
-define("_RDATE","Dátum:");
-define("_RTITLE","Názov produktu:");
-define("_RTEXT","Text:");
-define("_REVEMAIL","e-mail:");
-define("_RLINK","Odkaz:");
-define("_RLINKTITLE","Názov odkazu:");
-define("_COVERIMAGE","Obrázok:");
-define("_PREMODS","Pozrie úpravy");
-define("_PAGE","Strana");
-define("_PAGEBREAK","Ak chcete písa viac strán, môete napísa <b>[--pagebreak--]</b> tam, kde chcete text zalomi.");
-define("_PREVIEW","Prezrie");
-define("_LANGUAGE","Jazyk");
-
-?>
+define("_PREVIOUS", "Predchï¿½dzajï¿½ca strana");
+define("_NEXT", "Nasledujï¿½ca strana");
+define("_YOURNAME", "Vaï¿½e meno");
+define("_SORTASC", "Triedenï¿½ nahor");
+define("_SORTDESC", "Triedenï¿½ nadol");
+define("_CANCEL", "Zruï¿½iï¿½");
+define("_YES", "ï¿½no");
+define("_NO", "Nie");
+define("_SCORE", "Skï¿½re:");
+define("_REPLYMAIN", "poslaï¿½ komentï¿½r");
+define("_ALLOWEDHTML", "Povoliï¿½ HTML:");
+define("_POSTANON", "Poslaï¿½ anonymne");
+define("_WRITEREVIEW", "Napï¿½saï¿½ recenziu");
+define("_WRITEREVIEWFOR", "Napï¿½saï¿½ recenziu pre");
+define("_ENTERINFO", "Prosï¿½m zadajte informï¿½cie v sï¿½lade so skutoï¿½nosï¿½ou.");
+define("_PRODUCTTITLE", "Nï¿½zov recenzie");
+define("_NAMEPRODUCT", "Nï¿½zov ï¿½oho sa recenzia tï¿½ka.");
+define("_REVIEW", "Recenzia");
+define("_CHECKREVIEW", "Tu napï¿½te recenziu. Prosï¿½m dbajte na gramatiku! Skï¿½ste napï¿½saï¿½ aspoï¿½ 100 slov. Ak ovlï¿½date HTML prï¿½kazy, mï¿½ï¿½ete ich pouï¿½iï¿½.");
+define("_FULLNAMEREQ", "Meno a priezvisko. Vyï¿½aduje sa.");
+define("_REMAIL", "Vaï¿½ e-mail");
+define("_REMAILREQ", "Vaï¿½a e-mailovï¿½ adresa. Vyï¿½aduje sa.");
+define("_SELECTSCORE", "Skï¿½re pre tento produkt - 10 je najlepï¿½ie, 1 najhorï¿½ie");
+define("_RELATEDLINK", "Sï¿½visiaci odkaz");
+define("_PRODUCTSITE", "Oficiï¿½lna webstrï¿½nka produktu. Uistite sa, ï¿½e URL zaï¿½ï¿½na s \"http://\"");
+define("_LINKTITLE", "Nï¿½zov odkazu");
+define("_LINKTITLEREQ", "Poï¿½adovanï¿½ iba ak je zadanï¿½ sï¿½visiaci odkaz, inak netreba.");
+define("_RIMAGEFILE", "Nï¿½zov obrï¿½zkovï¿½ho sï¿½boru");
+define("_RIMAGEFILEREQ", "Nï¿½zov zodpovedajï¿½ceho obrï¿½zku, z adresï¿½ra images/reviews/. Nevyï¿½aduje sa.");
+define("_CHECKINFO", "Prosï¿½m preverte si, ï¿½i sï¿½ zadanï¿½ informï¿½cie 100% platnï¿½ a sï¿½ gramaticky sprï¿½vne. Pri tejto prï¿½leï¿½itosti, prosï¿½m nepï¿½te text len veï¿½kï¿½mi pï¿½smenami Vï¿½ETKO VEï¿½Kï¿½, takï¿½ text nebude prijatï¿½.");
+define("_INVALIDTITLE", "Nevyplnenï¿½ nï¿½zov... Nesmie zostaï¿½ prï¿½zdny");
+define("_INVALIDSCORE", "Neplatnï¿½ skï¿½re... Musï¿½ byï¿½ od 1 po 10");
+define("_INVALIDTEXT", "Nevyplnenï¿½ text recenzie... Nesmie zostaï¿½ prï¿½zdny");
+define("_INVALIDHITS", "Klik musï¿½ byï¿½ kladnï¿½ ï¿½ï¿½slo");
+define("_CHECKNAME", "Treba zadaï¿½ oba ï¿½daje, aj meno aj e-mail");
+define("_INVALIDEMAIL", "Neplatnï¿½ e-mailovï¿½ adresa (napr.: janko@mrkvicka.sk)");
+define("_INVALIDLINK", "Musï¿½te zadaï¿½ oba ï¿½daje, nï¿½zov odkazu a prï¿½sluï¿½nï¿½ odkaz alebo obe nechaï¿½ prï¿½zdne");
+define("_ADDED", "Pridanï¿½:");
+define("_REVIEWER", "Recenzent:");
+define("_REVIEWID", "ID recenzie");
+define("_HITS", " krï¿½t ï¿½ï¿½tanï¿½");
+define("_LOOKSRIGHT", "Je to v poriadku?");
+define("_RMODIFIED", "upravenï¿½");
+define("_RADDED", "pridanï¿½");
+define("_ADMINLOGGED", "Ste prihlï¿½senï¿½ ako admin... recenzia bude okamï¿½ite");
+define("_RTHANKS", "Vï¿½aka za zaslanie recenzie");
+define("_MODIFICATION", "ï¿½pravy");
+define("_ISAVAILABLE", "Je odteraz k dispozï¿½cii v databï¿½ze recenziï¿½.");
+define("_EDITORWILLLOOK", "Sprï¿½vca overï¿½ vï¿½ prï¿½spevok.");
+define("_RBACK", "Nï¿½vrat na zoznam recenziï¿½");
+define("_RWELCOME", "Vitajte v oblasti recenziï¿½");
+define("_10MOSTPOP", "10 najobï¿½ï¿½benejï¿½ï¿½ch recenziï¿½");
+define("_10MOSTREC", "10 najnovï¿½ï¿½ch rezenziï¿½");
+define("_THEREARE", "V naï¿½ej databï¿½ze sa nachï¿½dza");
+define("_REVIEWSINDB", "recenziï¿½.");
+define("_REVIEWS", "Recenzie");
+define("_REVIEWSLETTER", "Recenzie produktov zaï¿½ï¿½najï¿½cich na pï¿½smeno");
+define("_NOREVIEWS", "Neexistuje ï¿½iadna recenzia produktu zaï¿½ï¿½najï¿½ceho na pï¿½smeno");
+define("_TOTALREVIEWS", "Vï¿½etky nï¿½jdenï¿½ recenzie.");
+define("_RETURN2MAIN", "Nï¿½vrat na zoznam recenziï¿½");
+define("_REVIEWCOMMENT", "Komentï¿½r k recenzii:");
+define("_YOURNICK", "Vï¿½e uï¿½ivateï¿½skï¿½ meno:");
+define("_RCREATEACCOUNT", "<a href=\"modules.php?name=Your_Account\">Vytvor</a> konto");
+define("_YOURCOMMENT", "Vï¿½ komentï¿½r:");
+define("_MYSCORE", "Moje skï¿½re:");
+define("_REVIEWMOD", "ï¿½prava recenzie");
+define("_RDATE", "Dï¿½tum:");
+define("_RTITLE", "Nï¿½zov produktu:");
+define("_RTEXT", "Text:");
+define("_REVEMAIL", "e-mail:");
+define("_RLINK", "Odkaz:");
+define("_RLINKTITLE", "Nï¿½zov odkazu:");
+define("_COVERIMAGE", "Obrï¿½zok:");
+define("_PREMODS", "Pozrieï¿½ ï¿½pravy");
+define("_PAGE", "Strana");
+define("_PAGEBREAK", "Ak chcete pï¿½saï¿½ viac strï¿½n, mï¿½ï¿½ete napï¿½saï¿½ <b>[--pagebreak--]</b> tam, kde chcete text zalomiï¿½.");
+define("_PREVIEW", "Prezrieï¿½");
+define("_LANGUAGE", "Jazyk");

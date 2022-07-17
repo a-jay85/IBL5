@@ -17,13 +17,11 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_CATEGORY","Flokkur");
-define("_CATEGORIES","Flokkar");
-define("_FAQ2","SOS (Spurningar og svör)");
-define("_BACKTOTOP","Fara efst");
-define("_BACKTOFAQINDEX","Aftur í SOS listann");
-define("_MAIN","Efst");
-define("_QUESTION","Spurning");
-define("_ANSWER","Svar");
-
-?>
+define("_CATEGORY", "Flokkur");
+define("_CATEGORIES", "Flokkar");
+define("_FAQ2", "SOS (Spurningar og svï¿½r)");
+define("_BACKTOTOP", "Fara efst");
+define("_BACKTOFAQINDEX", "Aftur ï¿½ SOS listann");
+define("_MAIN", "Efst");
+define("_QUESTION", "Spurning");
+define("_ANSWER", "Svar");

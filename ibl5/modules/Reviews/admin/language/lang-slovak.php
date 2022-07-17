@@ -17,30 +17,26 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_EMAIL","E-mail");
-define("_SAVECHANGES","Uloži? zmeny");
-define("_SCORE","Skóre:");
-define("_PRODUCTTITLE","Názov recenzie");
-define("_RELATEDLINK","Súvisiaci odkaz");
-define("_LINKTITLE","Názov odkazu");
-define("_REVIEWER","Recenzent:");
-define("_REVIEWID","ID recenzie");
-define("_REVIEWS","Recenzie");
-define("_DATE","Dátum");
-define("_REVADMIN","Administrácia recenzií");
-define("_REVTITLE","Názov stránky recenzie");
-define("_REVDESC","Popis stránky Recenzie");
-define("_REVWAITING","Recenzie èakajúce na overenie");
-define("_REVIMGINFO","Uložte obrázok formátu 150*150 v images/reviews");
-define("_TEXT","Text");
-define("_IMAGE","Obrázok");
-define("_NOREVIEW2ADD","Žiadna recenzia nebola pridaná");
-define("_ADDREVIEW","Prida? recenziu");
-define("_CLICK2ADDREVIEW","Kliknite sem a napíšte recenziu");
-define("_DELMODREVIEW","Vymaza? alebo upravi? recenziu");
-define("_MODREVINFO","Ako administrátor môžete jednoducho maza?/upravova? recenzie priamo cez stránku <a href=\"modules.php?name=Reviews\">reviews</a>.");
-define("_LANGUAGE","Jazyk");
-
-
-?>
+define("_EMAIL", "E-mail");
+define("_SAVECHANGES", "Uloï¿½i? zmeny");
+define("_SCORE", "Skï¿½re:");
+define("_PRODUCTTITLE", "Nï¿½zov recenzie");
+define("_RELATEDLINK", "Sï¿½visiaci odkaz");
+define("_LINKTITLE", "Nï¿½zov odkazu");
+define("_REVIEWER", "Recenzent:");
+define("_REVIEWID", "ID recenzie");
+define("_REVIEWS", "Recenzie");
+define("_DATE", "Dï¿½tum");
+define("_REVADMIN", "Administrï¿½cia recenziï¿½");
+define("_REVTITLE", "Nï¿½zov strï¿½nky recenzie");
+define("_REVDESC", "Popis strï¿½nky Recenzie");
+define("_REVWAITING", "Recenzie ï¿½akajï¿½ce na overenie");
+define("_REVIMGINFO", "Uloï¿½te obrï¿½zok formï¿½tu 150*150 v images/reviews");
+define("_TEXT", "Text");
+define("_IMAGE", "Obrï¿½zok");
+define("_NOREVIEW2ADD", "ï¿½iadna recenzia nebola pridanï¿½");
+define("_ADDREVIEW", "Prida? recenziu");
+define("_CLICK2ADDREVIEW", "Kliknite sem a napï¿½te recenziu");
+define("_DELMODREVIEW", "Vymaza? alebo upravi? recenziu");
+define("_MODREVINFO", "Ako administrï¿½tor mï¿½ï¿½ete jednoducho maza?/upravova? recenzie priamo cez strï¿½nku <a href=\"modules.php?name=Reviews\">reviews</a>.");
+define("_LANGUAGE", "Jazyk");

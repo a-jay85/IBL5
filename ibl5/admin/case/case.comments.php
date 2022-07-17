@@ -13,18 +13,16 @@
 /************************************************************************/
 
 if (!defined('ADMIN_FILE')) {
-	die ("Access Denied");
+    die("Access Denied");
 }
 
-switch($op) {
+switch ($op) {
 
     case "RemoveComment":
     case "removeSubComments":
     case "removePollSubComments":
     case "RemovePollComment":
-    include("admin/modules/comments.php");
-    break;
+        include "admin/modules/comments.php";
+        break;
 
 }
-
-?>

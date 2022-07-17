@@ -11,7 +11,7 @@
 /* it under the terms of the GNU General Public License as published by */
 /* the Free Software Foundation; either version 2 of the License.       */
 /************************************************************************/
-		
+
 if (stristr(htmlentities($_SERVER['PHP_SELF']), "javascript.php")) {
     Header("Location: ../index.php");
     die();
@@ -23,15 +23,15 @@ if (stristr(htmlentities($_SERVER['PHP_SELF']), "javascript.php")) {
 
 global $module, $name, $admin, $advanced_editor, $lang, $nuke_editor;
 
-if (file_exists("themes/".$ThemeSel."/style/editor.css")) {
-    $edtcss = "editor_css : \"themes/".$ThemeSel."/style/editor.css\",";
+if (file_exists("themes/" . $ThemeSel . "/style/editor.css")) {
+    $edtcss = "editor_css : \"themes/" . $ThemeSel . "/style/editor.css\",";
 } else {
     $edtcss = "editor_css : \"includes/tiny_mce/themes/default/editor_ui.css\",";
 }
 
 if ($nuke_editor == 1) {
-	if (is_admin($admin) AND $name != "Private_Messages" AND $name != "Forums" AND !defined('NO_EDITOR')) {
-		echo "<!-- tinyMCE -->
+    if (is_admin($admin) and $name != "Private_Messages" and $name != "Forums" and !defined('NO_EDITOR')) {
+        echo "<!-- tinyMCE -->
 			<script language=\"javascript\" type=\"text/javascript\" src=\"includes/tiny_mce/tiny_mce.js\"></script>
 			<script language=\"javascript\" type=\"text/javascript\">
 		   	tinyMCE.init({
@@ -44,8 +44,8 @@ if ($nuke_editor == 1) {
 		   	});
 			</script>
 			<!-- /tinyMCE -->";
-	} elseif ($name != "Private_Messages" AND $name != "Forums" AND !defined('NO_EDITOR')) {
-		echo "<!-- tinyMCE -->
+    } elseif ($name != "Private_Messages" and $name != "Forums" and !defined('NO_EDITOR')) {
+        echo "<!-- tinyMCE -->
 			<script language=\"javascript\" type=\"text/javascript\" src=\"includes/tiny_mce/tiny_mce.js\"></script>
 			<script language=\"javascript\" type=\"text/javascript\">
 		   	tinyMCE.init({
@@ -58,7 +58,7 @@ if ($nuke_editor == 1) {
 		   	});
 			</script>
 			<!-- /tinyMCE -->";
-	}
+    }
 }
 
 if ($userpage == 1) {
@@ -74,14 +74,12 @@ if ($userpage == 1) {
     echo "</SCRIPT>\n\n";
 }
 
-if (defined('MODULE_FILE') AND file_exists("modules/".$name."/copyright.php")) {
+if (defined('MODULE_FILE') and file_exists("modules/" . $name . "/copyright.php")) {
     echo "<script type=\"text/javascript\">\n";
     echo "<!--\n";
     echo "function openwindow(){\n";
-    echo "	window.open (\"modules/".$name."/copyright.php\",\"Copyright\",\"toolbar=no,location=no,directories=no,status=no,scrollbars=yes,resizable=no,copyhistory=no,width=400,height=200\");\n";
+    echo "	window.open (\"modules/" . $name . "/copyright.php\",\"Copyright\",\"toolbar=no,location=no,directories=no,status=no,scrollbars=yes,resizable=no,copyhistory=no,width=400,height=200\");\n";
     echo "}\n";
     echo "//-->\n";
     echo "</SCRIPT>\n\n";
 }
-
-?>

@@ -13,13 +13,13 @@
 /************************************************************************/
 
 if (!defined('ADMIN_FILE')) {
-	die ("Access Denied");
+    die("Access Denied");
 }
 
 $module_name = "News";
-include_secure("modules/$module_name/admin/language/lang-".$currentlang.".php");
+include_secure("modules/$module_name/admin/language/lang-" . $currentlang . ".php");
 
-switch($op) {
+switch ($op) {
 
     case "YesDelCategory":
     case "subdelete":
@@ -44,9 +44,7 @@ switch($op) {
     case "autoSaveEdit":
     case "submissions":
     case "publish_now":
-    include("modules/$module_name/admin/index.php");
-    break;
+        include "modules/$module_name/admin/index.php";
+        break;
 
 }
-
-?>

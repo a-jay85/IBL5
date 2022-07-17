@@ -4,39 +4,37 @@
 /* PHP-NUKE: Advanced Content Management System                           */
 /* ============================================                           */
 /*                                                                        */
-/* Php-Nuke'nin sürekli geliþmesine baðlý olarak eski Türkçe dil dosyalarý*/
-/* güncelliðini yitirdiði için "HighLAndeR" tarafýndan "MaXCoDeR"in       */
-/* yapmýþ olduðu çeviriler güncelleþtirilip yeni çeviriler eklenmiþtir... */
+/* Php-Nuke'nin sï¿½rekli geliï¿½mesine baï¿½lï¿½ olarak eski Tï¿½rkï¿½e dil dosyalarï¿½*/
+/* gï¿½ncelliï¿½ini yitirdiï¿½i iï¿½in "HighLAndeR" tarafï¿½ndan "MaXCoDeR"in       */
+/* yapmï¿½ï¿½ olduï¿½u ï¿½eviriler gï¿½ncelleï¿½tirilip yeni ï¿½eviriler eklenmiï¿½tir... */
 /*                                                                        */
-/* NOT: Yardýmlarý için Gurol400(gurol400@propc.org)'e teþekkürler.       */
+/* NOT: Yardï¿½mlarï¿½ iï¿½in Gurol400(gurol400@propc.org)'e teï¿½ekkï¿½rler.       */
 /*                                                                        */
-/* Türkçe Çevirmeni: HighLAndeR                                           */
-/* Email: highlander@propc.org ICQ#: 110930777 	URL: http://www.propc.org */
+/* Tï¿½rkï¿½e ï¿½evirmeni: HighLAndeR                                           */
+/* Email: highlander@propc.org ICQ#: 110930777     URL: http://www.propc.org */
 /*                                                                        */
-/* Türkçe Çevirmeni: Selim "MaXCoDeR" Þumlu                               */
+/* Tï¿½rkï¿½e ï¿½evirmeni: Selim "MaXCoDeR" ï¿½umlu                               */
 /* Mail:webmaster@pcnet.com.tr ICQ:19648424 URL: http://www.turknuke.com  */
 /**************************************************************************/
 
-define("_PREVIOUS","Önceki Sayfa");
-define("_NEXT","Sonraki Sayfa");
-define("_SEARCHRESULTS","Arama Sonuçlarý");
-define("_PAGE","Sayfa");
-define("_RETURNTO","Geri Dön:");
-define("_DEACTIVATE","Pasifleþtir");
-define("_ACTIVATE","Etkinleþtir");
-define("_ENCYCLOPEDIA","Ansiklopedi");
-define("_NOCONTENTFORLETTER","Üzgünüm, bu harf için içerik mevcut deðil");
-define("_ENCYSELECTLETTER","Terimleri görmek için lütfen listeden bir harf seçin:");
-define("_COPYRIGHT","Telif Hakký");
-define("_YOURADMINENCY","Yöneticisiniz, bu ansiklopedi aktif deðil!");
-define("_ENCYNOTACTIVE","Üzgünüm, bu ansiklopedi þu an aktif deðil.");
-define("_AVAILABLEENCYLIST","Ansiklopedi Listesi:");
-define("_YOURADMININACTIVELIST","Yöneticisiniz: pasif ansiklopedilerin listesi aþaðýdadýr:");
-define("_NORESULTSTEXT","Terim metninde sonuç bulunamadý...");
-define("_NORESULTSTITLE","Terim baþlýðýnda sonuç bulunamadý...");
-define("_SEARCHRESULTSFOR","Arama Sonuçlarý:");
-define("_SEARCHNOTCOMPLETE","Arama seçenekleri eksik. Lütfen tekrar deneyin.");
-define("_RESULTSINTERMTITLE","Terim baþlýðýnda sonuçlar:");
-define("_RESULTSINTERMTEXT","Terim metninde sonuçlar:");
-
-?>
+define("_PREVIOUS", "ï¿½nceki Sayfa");
+define("_NEXT", "Sonraki Sayfa");
+define("_SEARCHRESULTS", "Arama Sonuï¿½larï¿½");
+define("_PAGE", "Sayfa");
+define("_RETURNTO", "Geri Dï¿½n:");
+define("_DEACTIVATE", "Pasifleï¿½tir");
+define("_ACTIVATE", "Etkinleï¿½tir");
+define("_ENCYCLOPEDIA", "Ansiklopedi");
+define("_NOCONTENTFORLETTER", "ï¿½zgï¿½nï¿½m, bu harf iï¿½in iï¿½erik mevcut deï¿½il");
+define("_ENCYSELECTLETTER", "Terimleri gï¿½rmek iï¿½in lï¿½tfen listeden bir harf seï¿½in:");
+define("_COPYRIGHT", "Telif Hakkï¿½");
+define("_YOURADMINENCY", "Yï¿½neticisiniz, bu ansiklopedi aktif deï¿½il!");
+define("_ENCYNOTACTIVE", "ï¿½zgï¿½nï¿½m, bu ansiklopedi ï¿½u an aktif deï¿½il.");
+define("_AVAILABLEENCYLIST", "Ansiklopedi Listesi:");
+define("_YOURADMININACTIVELIST", "Yï¿½neticisiniz: pasif ansiklopedilerin listesi aï¿½aï¿½ï¿½dadï¿½r:");
+define("_NORESULTSTEXT", "Terim metninde sonuï¿½ bulunamadï¿½...");
+define("_NORESULTSTITLE", "Terim baï¿½lï¿½ï¿½ï¿½nda sonuï¿½ bulunamadï¿½...");
+define("_SEARCHRESULTSFOR", "Arama Sonuï¿½larï¿½:");
+define("_SEARCHNOTCOMPLETE", "Arama seï¿½enekleri eksik. Lï¿½tfen tekrar deneyin.");
+define("_RESULTSINTERMTITLE", "Terim baï¿½lï¿½ï¿½ï¿½nda sonuï¿½lar:");
+define("_RESULTSINTERMTEXT", "Terim metninde sonuï¿½lar:");

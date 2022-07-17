@@ -16,14 +16,14 @@
 /************************************************************************/
 
 /** Include common.php */
-require_once( 'common.php' );
+require_once 'common.php';
 
-$DBhostname = mosGetParam( $_POST, 'DBhostname', '' );
-$DBuserName = mosGetParam( $_POST, 'DBuserName', '' );
-$DBpassword = mosGetParam( $_POST, 'DBpassword', '' );
-$DBname  	= mosGetParam( $_POST, 'DBname', '' );
+$DBhostname = mosGetParam($_POST, 'DBhostname', '');
+$DBuserName = mosGetParam($_POST, 'DBuserName', '');
+$DBpassword = mosGetParam($_POST, 'DBpassword', '');
+$DBname = mosGetParam($_POST, 'DBname', '');
 
-echo "<?xml version=\"1.0\" encoding=\"iso-8859-1\"?".">";
+echo "<?xml version=\"1.0\" encoding=\"iso-8859-1\"?" . ">";
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
@@ -101,8 +101,8 @@ function check() {
   				<p>Setting up PHP-Nuke to run on your server involves 4 simple steps...</p>
   				<p>Please enter the hostname of the server PHP-Nuke is to be installed on.</p>
 				<p>Enter the MySQL username, password and database name you wish to use with PHP-Nuke.</p>
-				<p><font color='FF0000'><b>WARNING:</b></font> If the database name exists the installer will remove/delete it and will create a new one. All data in the 
-					existing database will be erased and there is no way to recover it. So, before proceed be sure that the database doesn't exists 
+				<p><font color='FF0000'><b>WARNING:</b></font> If the database name exists the installer will remove/delete it and will create a new one. All data in the
+					existing database will be erased and there is no way to recover it. So, before proceed be sure that the database doesn't exists
 					or you already made a backup of the existing data.</p>
   			</div>
 			<div class="install-form">

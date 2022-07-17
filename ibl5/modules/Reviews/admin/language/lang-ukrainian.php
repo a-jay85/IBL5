@@ -17,30 +17,26 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_EMAIL","Email");          //
-define("_SAVECHANGES","Зберегти зміни");
-define("_SCORE","Оцінка:");
-define("_PRODUCTTITLE","Назв");
-define("_RELATEDLINK","Схожі ресурси");
-define("_LINKTITLE","Назва ресурсу");
-define("_REVIEWER","Оглядач:");
-define("_REVIEWID","ID огляду");
-define("_REVIEWS","Огляди");
-define("_DATE","Дата");
-define("_REVADMIN","Адміністрування оглядів");
-define("_REVTITLE","Назва оглядів");
-define("_REVDESC","Опис оглядів");
-define("_REVWAITING","Огляди, що очікують підтвердження");
-define("_REVIMGINFO","Збережіть малюнок 150*150 в images/reviews");
-define("_TEXT","Текст");
-define("_IMAGE","Малюнок");
-define("_NOREVIEW2ADD","Немає нових оглядів");
-define("_ADDREVIEW","Додати огляд");
-define("_CLICK2ADDREVIEW","Напишіть огляд");
-define("_DELMODREVIEW","Витерти/Змінити огляд");
-define("_MODREVINFO","Ви можете витирати/редагувати <a href=\"reviews.php\">огляди</a> переглядаючи їх як адмін..");
-define("_LANGUAGE","Language");
-
-
-?>
+define("_EMAIL", "Email"); //
+define("_SAVECHANGES", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ");
+define("_SCORE", "пїЅпїЅпїЅпїЅпїЅпїЅ:");
+define("_PRODUCTTITLE", "пїЅпїЅпїЅпїЅ");
+define("_RELATEDLINK", "пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_LINKTITLE", "пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_REVIEWER", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅ:");
+define("_REVIEWID", "ID пїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_REVIEWS", "пїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_DATE", "пїЅпїЅпїЅпїЅ");
+define("_REVADMIN", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_REVTITLE", "пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_REVDESC", "пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_REVWAITING", "пїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_REVIMGINFO", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ 150*150 пїЅ images/reviews");
+define("_TEXT", "пїЅпїЅпїЅпїЅпїЅ");
+define("_IMAGE", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_NOREVIEW2ADD", "пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_ADDREVIEW", "пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ");
+define("_CLICK2ADDREVIEW", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ");
+define("_DELMODREVIEW", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅ/пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ");
+define("_MODREVINFO", "пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ/пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ <a href=\"reviews.php\">пїЅпїЅпїЅпїЅпїЅпїЅ</a> пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅ..");
+define("_LANGUAGE", "Language");

@@ -21,28 +21,25 @@
 /* Comments/suggestions: aleagi@terra.com.br - aleagi@phpnuke.org.br      */
 /**************************************************************************/
 
-
-define("_URL","Link");
-define("_EMAIL","e-mail");
-define("_REALNAME","Nome verdadeiro");
-define("_FUNCTIONS","Funções");
-define("_PREVIOUS","Página anterior");
-define("_MEMBERSLIST","Lista de usuários");
-define("_GREETINGS","Saudações ao nosso mais novo usuário:");
-define("_SORTBY","Classificar por:");
-define("_MNICKNAME","Apelido");
-define("_MREALNAME","Nome verdadeiro");
-define("_MEMAIL","e-mail");
-define("_MURL","Homepage");
-define("_ONLINEREG","Usuários cadastrados on-line neste momento:");
-define("_WEHAVE","possuímos");
-define("_MREGISTERED","alguns usuários cadastrados. E destes");
-define("_MREGONLINE","o(s) seguinte(s) está(ã)o conectado(s) agora.");
-define("_REGSOFAR","Usuários cadastrados até agora.");
-define("_USERSFOUND","Usuários encontrados por");
-define("_USERSSHOWN","Mostrar usuários");
-define("_NOMEMBERS","Nenhum usuário encontrado por");
-define("_PAGES","Páginas");
-define("_HOMEPAGE","Homepage");
-
-?>
+define("_URL", "Link");
+define("_EMAIL", "e-mail");
+define("_REALNAME", "Nome verdadeiro");
+define("_FUNCTIONS", "Funï¿½ï¿½es");
+define("_PREVIOUS", "Pï¿½gina anterior");
+define("_MEMBERSLIST", "Lista de usuï¿½rios");
+define("_GREETINGS", "Saudaï¿½ï¿½es ao nosso mais novo usuï¿½rio:");
+define("_SORTBY", "Classificar por:");
+define("_MNICKNAME", "Apelido");
+define("_MREALNAME", "Nome verdadeiro");
+define("_MEMAIL", "e-mail");
+define("_MURL", "Homepage");
+define("_ONLINEREG", "Usuï¿½rios cadastrados on-line neste momento:");
+define("_WEHAVE", "possuï¿½mos");
+define("_MREGISTERED", "alguns usuï¿½rios cadastrados. E destes");
+define("_MREGONLINE", "o(s) seguinte(s) estï¿½(ï¿½)o conectado(s) agora.");
+define("_REGSOFAR", "Usuï¿½rios cadastrados atï¿½ agora.");
+define("_USERSFOUND", "Usuï¿½rios encontrados por");
+define("_USERSSHOWN", "Mostrar usuï¿½rios");
+define("_NOMEMBERS", "Nenhum usuï¿½rio encontrado por");
+define("_PAGES", "Pï¿½ginas");
+define("_HOMEPAGE", "Homepage");

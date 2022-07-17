@@ -13,7 +13,7 @@
 /************************************************************************/
 
 if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
-	die ("You can't access this file directly...");
+    die("You can't access this file directly...");
 }
 
 $sharedFunctions = new Shared($db);
@@ -21,7 +21,7 @@ $sharedFunctions = new Shared($db);
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 $userpage = 1;
-include("header.php");
+include "header.php";
 
 $query2 = "SELECT * FROM ibl_team_history WHERE teamid != 35 ORDER BY teamid ASC"; // Grab all teams except for the Free Agents
 $result2 = $db->sql_query($query2);
@@ -32,17 +32,17 @@ $sharedFunctions->displaytopmenu($tid);
 
 $k = 0;
 while ($k < $num2) {
-	$teamname[$k] = $db->sql_result($result2, $k, "team_name");
-	$teamcity[$k] = $db->sql_result($result2, $k, "team_city");
-	$teamcolor1[$k] = $db->sql_result($result2, $k, "color1");
-	$teamcolor2[$k] = $db->sql_result($result2, $k, "color2");
+    $teamname[$k] = $db->sql_result($result2, $k, "team_name");
+    $teamcity[$k] = $db->sql_result($result2, $k, "team_city");
+    $teamcolor1[$k] = $db->sql_result($result2, $k, "color1");
+    $teamcolor2[$k] = $db->sql_result($result2, $k, "color2");
     $depth[$k] = $db->sql_result($result2, $k, "depth");
     $simdepth[$k] = $db->sql_result($result2, $k, "sim_depth");
-	$asg_vote[$k] = $db->sql_result($result2, $k, "asg_vote");
-	$eoy_vote[$k] = $db->sql_result($result2, $k, "eoy_vote");
-	$teamid[$k] = $db->sql_result($result2, $k, "teamid");
+    $asg_vote[$k] = $db->sql_result($result2, $k, "asg_vote");
+    $eoy_vote[$k] = $db->sql_result($result2, $k, "eoy_vote");
+    $teamid[$k] = $db->sql_result($result2, $k, "teamid");
 
-	$table_echo .= "<tr>
+    $table_echo .= "<tr>
 		<td bgcolor=#" . $teamcolor1[$k] . "><a href=\"modules.php?name=Team&op=team&tid=" . $teamid[$k] . "\"><font color=#" . $teamcolor2[$k] . ">" . $teamcity[$k] . " " . $teamname[$k] . "</a></td>
 		<td>" . $simdepth[$k] . "</td>
 		<td>" . $depth[$k] . "</td>
@@ -50,7 +50,7 @@ while ($k < $num2) {
 		<td>" . $eoy_vote[$k] . "</td>
 	</tr>";
 
-	$k++;
+    $k++;
 }
 
 $text .= "<table class=\"sortable\" border=1>
@@ -66,6 +66,4 @@ $text .= "<table class=\"sortable\" border=1>
 echo $text;
 
 CloseTable();
-include("footer.php");
-
-?>
+include "footer.php";

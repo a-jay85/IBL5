@@ -17,11 +17,9 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PDATE","Data:");
-define("_PTOPIC","Argomenti:");
-define("_COMESFROM","Ky Artikull vjen nga");
-define("_THEURL","URL e këtij Artikulli është:");
-define("_DATE","Data");
-define("_TITLE","Titulli");
-
-?>
+define("_PDATE", "Data:");
+define("_PTOPIC", "Argomenti:");
+define("_COMESFROM", "Ky Artikull vjen nga");
+define("_THEURL", "URL e kï¿½tij Artikulli ï¿½shtï¿½:");
+define("_DATE", "Data");
+define("_TITLE", "Titulli");

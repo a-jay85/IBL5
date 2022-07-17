@@ -17,30 +17,26 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_CURRENTTOPICS","Current Active Topics");
-define("_CLICK2EDIT","Click on Topic to Edit");
-define("_ADDATOPIC","Add a New Topic");
-define("_TOPICNAME","Topic Name");
-define("_TOPICNAME1","(just a name without spaces - max: 20 characters)");
-define("_TOPICNAME2","(for example: gamesandhobbies)");
-define("_TOPICTEXT","Topic Text");
-define("_TOPICTEXT1","(the full topic text or description - max: 40 characters)");
-define("_TOPICTEXT2","(for example: Games and Hobbies)");
-define("_TOPICIMAGE","Topic Image");
-define("_ADDTOPIC","Add Topic");
-define("_EDITTOPIC","Edit Topic");
-define("_ADDRELATED","Add Related Links");
-define("_ACTIVERELATEDLINKS","Active Related Links");
-define("_SITENAME","Site Name");
-define("_NORELATED","There are no related links for this topic");
-define("_EDITRELATED","Edit Related Link");
-define("_YES","Sí");
-define("_NO","Non");
-define("_TOPICSMANAGER","Administración de Temas");
-define("_DELETETOPIC","Borrar Tema");
-define("_TOPICDELSURE","¿Está seguro de querer borra-lo Tema");
-define("_TOPICDELSURE1","¡Isto borrará TODA_LAS súas historias e os seus comentarios!");
-
-
-?>
+define("_CURRENTTOPICS", "Current Active Topics");
+define("_CLICK2EDIT", "Click on Topic to Edit");
+define("_ADDATOPIC", "Add a New Topic");
+define("_TOPICNAME", "Topic Name");
+define("_TOPICNAME1", "(just a name without spaces - max: 20 characters)");
+define("_TOPICNAME2", "(for example: gamesandhobbies)");
+define("_TOPICTEXT", "Topic Text");
+define("_TOPICTEXT1", "(the full topic text or description - max: 40 characters)");
+define("_TOPICTEXT2", "(for example: Games and Hobbies)");
+define("_TOPICIMAGE", "Topic Image");
+define("_ADDTOPIC", "Add Topic");
+define("_EDITTOPIC", "Edit Topic");
+define("_ADDRELATED", "Add Related Links");
+define("_ACTIVERELATEDLINKS", "Active Related Links");
+define("_SITENAME", "Site Name");
+define("_NORELATED", "There are no related links for this topic");
+define("_EDITRELATED", "Edit Related Link");
+define("_YES", "Sï¿½");
+define("_NO", "Non");
+define("_TOPICSMANAGER", "Administraciï¿½n de Temas");
+define("_DELETETOPIC", "Borrar Tema");
+define("_TOPICDELSURE", "ï¿½Estï¿½ seguro de querer borra-lo Tema");
+define("_TOPICDELSURE1", "ï¿½Isto borrarï¿½ TODA_LAS sï¿½as historias e os seus comentarios!");

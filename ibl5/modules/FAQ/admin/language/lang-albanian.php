@@ -17,28 +17,24 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_FUNCTIONS","Funksione");
-define("_YES","Po");
-define("_NO","Jo");
-define("_SAVE","Shpëtoje");
-define("_ID","ID");
-define("_CATEGORIES","Kategori");
-define("_ALL","Të Gjithë");
-define("_FAQ","FAQ");
-define("_CONTENT","Përmbajtja");
-define("_FAQADMIN","Administrimi i FAQ");
-define("_ACTIVEFAQS","FAQ Aktive");
-define("_ADDCATEGORY","Shto një Kategori të Re");
-define("_QUESTIONS","Pyetje dhe Përgjigje");
-define("_ADDQUESTION","Shto Pyetje");
-define("_QUESTION","Pyetje");
-define("_ANSWER","Përgjigje");
-define("_EDITCATEGORY","Shkruaj Kategorinë");
-define("_EDITQUESTIONS","Shkruaj Pyetje dhe Përgjigje");
-define("_FAQDELWARNING","KUJDES: Je i sigurt që dëshiron të fshish këtë Faq dhe të gjithë përmbajtjen e tij?");
-define("_QUESTIONDEL","KUJDES: Je i sigurt që do t'a fshish këtë Pyetje?");
-define("_LANGUAGE","Gjuha");
-
-
-?>
+define("_FUNCTIONS", "Funksione");
+define("_YES", "Po");
+define("_NO", "Jo");
+define("_SAVE", "Shpï¿½toje");
+define("_ID", "ID");
+define("_CATEGORIES", "Kategori");
+define("_ALL", "Tï¿½ Gjithï¿½");
+define("_FAQ", "FAQ");
+define("_CONTENT", "Pï¿½rmbajtja");
+define("_FAQADMIN", "Administrimi i FAQ");
+define("_ACTIVEFAQS", "FAQ Aktive");
+define("_ADDCATEGORY", "Shto njï¿½ Kategori tï¿½ Re");
+define("_QUESTIONS", "Pyetje dhe Pï¿½rgjigje");
+define("_ADDQUESTION", "Shto Pyetje");
+define("_QUESTION", "Pyetje");
+define("_ANSWER", "Pï¿½rgjigje");
+define("_EDITCATEGORY", "Shkruaj Kategorinï¿½");
+define("_EDITQUESTIONS", "Shkruaj Pyetje dhe Pï¿½rgjigje");
+define("_FAQDELWARNING", "KUJDES: Je i sigurt qï¿½ dï¿½shiron tï¿½ fshish kï¿½tï¿½ Faq dhe tï¿½ gjithï¿½ pï¿½rmbajtjen e tij?");
+define("_QUESTIONDEL", "KUJDES: Je i sigurt qï¿½ do t'a fshish kï¿½tï¿½ Pyetje?");
+define("_LANGUAGE", "Gjuha");

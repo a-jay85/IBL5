@@ -17,30 +17,26 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_CURRENTTOPICS","Current Active Topics");
-define("_CLICK2EDIT","Click on Topic to Edit");
-define("_ADDATOPIC","Add a New Topic");
-define("_TOPICNAME","Topic Name");
-define("_TOPICNAME1","(just a name without spaces - max: 20 characters)");
-define("_TOPICNAME2","(for example: gamesandhobbies)");
-define("_TOPICTEXT","Topic Text");
-define("_TOPICTEXT1","(the full topic text or description - max: 40 characters)");
-define("_TOPICTEXT2","(for example: Games and Hobbies)");
-define("_TOPICIMAGE","Topic Image");
-define("_ADDTOPIC","Add Topic");
-define("_EDITTOPIC","Edit Topic");
-define("_ADDRELATED","Add Related Links");
-define("_ACTIVERELATEDLINKS","Active Related Links");
-define("_SITENAME","Site Name");
-define("_NORELATED","There are no related links for this topic");
-define("_EDITRELATED","Edit Related Link");
-define("_YES","Evet");
-define("_NO","Hayýr");
-define("_TOPICSMANAGER","Konu Yönetici");
-define("_DELETETOPIC","Konu Sil");
-define("_TOPICDELSURE","Konuyu silmek istediðinizden emin misiniz:");
-define("_TOPICDELSURE1","Bu iþlem TÜM haber ve yorumlarý silecek!");
-
-
-?>
+define("_CURRENTTOPICS", "Current Active Topics");
+define("_CLICK2EDIT", "Click on Topic to Edit");
+define("_ADDATOPIC", "Add a New Topic");
+define("_TOPICNAME", "Topic Name");
+define("_TOPICNAME1", "(just a name without spaces - max: 20 characters)");
+define("_TOPICNAME2", "(for example: gamesandhobbies)");
+define("_TOPICTEXT", "Topic Text");
+define("_TOPICTEXT1", "(the full topic text or description - max: 40 characters)");
+define("_TOPICTEXT2", "(for example: Games and Hobbies)");
+define("_TOPICIMAGE", "Topic Image");
+define("_ADDTOPIC", "Add Topic");
+define("_EDITTOPIC", "Edit Topic");
+define("_ADDRELATED", "Add Related Links");
+define("_ACTIVERELATEDLINKS", "Active Related Links");
+define("_SITENAME", "Site Name");
+define("_NORELATED", "There are no related links for this topic");
+define("_EDITRELATED", "Edit Related Link");
+define("_YES", "Evet");
+define("_NO", "Hayï¿½r");
+define("_TOPICSMANAGER", "Konu Yï¿½netici");
+define("_DELETETOPIC", "Konu Sil");
+define("_TOPICDELSURE", "Konuyu silmek istediï¿½inizden emin misiniz:");
+define("_TOPICDELSURE1", "Bu iï¿½lem Tï¿½M haber ve yorumlarï¿½ silecek!");

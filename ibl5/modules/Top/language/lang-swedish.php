@@ -17,24 +17,22 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_CATEGORY","Kategori");
-define("_LVOTES","röster");
-define("_HITS","Träffar");
-define("_TOPWELCOME","Välkommen till TOPP sidan för");
-define("_READSTORIES","mest lästa artiklar");
-define("_COMMENTEDSTORIES","mest kommenterade artiklar");
-define("_ACTIVECAT","mest aktiva kategorier");
-define("_READSECTION","mest lästa artiklar i specialavdelningarna");
-define("_NEWSSUBMITTERS","mest aktiva bidragspostare");
-define("_NEWSSENT","nyheter skickade");
-define("_VOTEDPOLLS","mest röster i undersökningar");
-define("_MOSTACTIVEAUTHORS","mest aktiva skribent");
-define("_NEWSPUBLISHED","nyheter publicerade");
-define("_READREVIEWS","mest lästa recensioner");
-define("_DOWNLOADEDFILES","mest nedladdade filer");
-define("_MOSTREADPAGES","most read pages");
-define("_MOSTVOTEDSTORIES","most voted stories");
-define("_POINTS","points");
-define("_BESTRATEDSTORIES","best rated stories (based on 5 maximun points)");
-
-?>
+define("_CATEGORY", "Kategori");
+define("_LVOTES", "rï¿½ster");
+define("_HITS", "Trï¿½ffar");
+define("_TOPWELCOME", "Vï¿½lkommen till TOPP sidan fï¿½r");
+define("_READSTORIES", "mest lï¿½sta artiklar");
+define("_COMMENTEDSTORIES", "mest kommenterade artiklar");
+define("_ACTIVECAT", "mest aktiva kategorier");
+define("_READSECTION", "mest lï¿½sta artiklar i specialavdelningarna");
+define("_NEWSSUBMITTERS", "mest aktiva bidragspostare");
+define("_NEWSSENT", "nyheter skickade");
+define("_VOTEDPOLLS", "mest rï¿½ster i undersï¿½kningar");
+define("_MOSTACTIVEAUTHORS", "mest aktiva skribent");
+define("_NEWSPUBLISHED", "nyheter publicerade");
+define("_READREVIEWS", "mest lï¿½sta recensioner");
+define("_DOWNLOADEDFILES", "mest nedladdade filer");
+define("_MOSTREADPAGES", "most read pages");
+define("_MOSTVOTEDSTORIES", "most voted stories");
+define("_POINTS", "points");
+define("_BESTRATEDSTORIES", "best rated stories (based on 5 maximun points)");

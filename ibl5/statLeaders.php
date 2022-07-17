@@ -12,7 +12,7 @@ $arrayStatNames = array(
     'TURNOVERS',
     'Field Goals Made',
     'Free Throws Made',
-    'Three Pointers Made'
+    'Three Pointers Made',
 );
 
 $arrayStatQueries = array(
@@ -24,10 +24,10 @@ $arrayStatQueries = array(
     '`gameTOV`',
     '(`game2GM` + `game3GM`)',
     '`gameFTM`',
-    '`game3GM`'
+    '`game3GM`',
 );
 
-if ($_GET['seasonPhase'] == NULL) {
+if ($_GET['seasonPhase'] == null) {
     $seasonPhase = $sharedFunctions->getCurrentSeasonPhase();
 } else {
     $seasonPhase = $_GET['seasonPhase'];
@@ -95,19 +95,19 @@ function seasonHighTable($queryForStat, $statName, $playerOrTeam, $seasonPhase)
     echo "\t\t\t</table>\n";
 }
 
-function nextTableColumn ()
+function nextTableColumn()
 {
     echo "\t\t</td>\n";
     echo "\t\t<td align=center>\n";
 }
 
-function startTableRow ()
+function startTableRow()
 {
     echo "\t<tr>\n";
     echo "\t\t<td align=center>\n";
 }
 
-function endTableRow ()
+function endTableRow()
 {
     echo "\t\t</td>\n";
     echo "\t</tr>\n";

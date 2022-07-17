@@ -17,24 +17,22 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_CATEGORY","Flokkur");
-define("_LVOTES","atkvæði");
-define("_HITS","Heimsóknir");
-define("_TOPWELCOME","Velkomin(n) á síðuna yfir vinsælasta efnið hjá");
-define("_READSTORIES","vinsælustu fréttirnar");
-define("_COMMENTEDSTORIES","umtöluðustu fréttirnar");
-define("_ACTIVECAT","virkustu efnisflokkanir");
-define("_READSECTION","mest lesnu greinar í greinasafninu");
-define("_NEWSSUBMITTERS","virkustu fréttaritararnir");
-define("_NEWSSENT","innsendar fréttir");
-define("_VOTEDPOLLS","vinsælustu kannanirnar");
-define("_MOSTACTIVEAUTHORS","virkustu ritararnir");
-define("_NEWSPUBLISHED","innsendar fréttir");
-define("_READREVIEWS","vinsælustu umsagnirnar");
-define("_DOWNLOADEDFILES","mest sóttu skrárnar");
-define("_MOSTREADPAGES","mest lesnu síðurnar");
-define("_MOSTVOTEDSTORIES","greinar sem flestir hafa greitt atkvæði um");
-define("_POINTS","punktar");
-define("_BESTRATEDSTORIES","greinarnar sem fengið hafa hæstu einkunina (byggt á 5 punkta hámarki)");
-
-?>
+define("_CATEGORY", "Flokkur");
+define("_LVOTES", "atkvï¿½ï¿½i");
+define("_HITS", "Heimsï¿½knir");
+define("_TOPWELCOME", "Velkomin(n) ï¿½ sï¿½ï¿½una yfir vinsï¿½lasta efniï¿½ hjï¿½");
+define("_READSTORIES", "vinsï¿½lustu frï¿½ttirnar");
+define("_COMMENTEDSTORIES", "umtï¿½luï¿½ustu frï¿½ttirnar");
+define("_ACTIVECAT", "virkustu efnisflokkanir");
+define("_READSECTION", "mest lesnu greinar ï¿½ greinasafninu");
+define("_NEWSSUBMITTERS", "virkustu frï¿½ttaritararnir");
+define("_NEWSSENT", "innsendar frï¿½ttir");
+define("_VOTEDPOLLS", "vinsï¿½lustu kannanirnar");
+define("_MOSTACTIVEAUTHORS", "virkustu ritararnir");
+define("_NEWSPUBLISHED", "innsendar frï¿½ttir");
+define("_READREVIEWS", "vinsï¿½lustu umsagnirnar");
+define("_DOWNLOADEDFILES", "mest sï¿½ttu skrï¿½rnar");
+define("_MOSTREADPAGES", "mest lesnu sï¿½ï¿½urnar");
+define("_MOSTVOTEDSTORIES", "greinar sem flestir hafa greitt atkvï¿½ï¿½i um");
+define("_POINTS", "punktar");
+define("_BESTRATEDSTORIES", "greinarnar sem fengiï¿½ hafa hï¿½stu einkunina (byggt ï¿½ 5 punkta hï¿½marki)");

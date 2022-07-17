@@ -2,10 +2,10 @@
 
 /*************************************************************************/
 /* The Slovak language file for module Encyclopedia                      */
-/* Author: AlRashid 			 Date: 09.09.2002   					 */
+/* Author: AlRashid              Date: 09.09.2002                        */
 /* alrashid@klokan.sk, http://alrashid.klokan.sk                         */
-/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk			     */
-/*  		Dakujem                                                      */
+/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk                 */
+/*          Dakujem                                                      */
 /*************************************************************************/
 /**************************************************************************/
 /* PHP-NUKE: Advanced Content Management System                           */
@@ -24,33 +24,31 @@
 /* And, if you use HTML code, please double check it.                     */
 /*************************************************************************/
 /* The Slovak language file for module Encyclopedia                      */
-/* Author: AlRashid 			 Date: 09.09.2002   					 */
+/* Author: AlRashid              Date: 09.09.2002                        */
 /* alrashid@klokan.sk, http://alrashid.klokan.sk                         */
-/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk			     */
-/*  		Dakujem                                                      */
+/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk                 */
+/*          Dakujem                                                      */
 /*************************************************************************/
 /**************************************************************************/
 
-define("_PREVIOUS","Predchádzajúca strana");
-define("_NEXT","Nasledujúca strana");
-define("_SEARCHRESULTS","Výsledky vyh¾adávania");
-define("_PAGE","Strana");
-define("_RETURNTO","Návrat na");
-define("_DEACTIVATE","Deaktivova");
-define("_ACTIVATE","Aktivova");
-define("_ENCYCLOPEDIA","Encyklopédia");
-define("_NOCONTENTFORLETTER","Encyklopédia neobsahuje žiadny termín pre zadané písmeno..");
-define("_ENCYSELECTLETTER","Aby sa zobrazili heslá, vyberte zodpovedajúce písmeno zo zoznamu");
-define("_COPYRIGHT","Copyleft:$sitename.");
-define("_YOURADMINENCY","Ste Administrátor. Táto encyklopédia nie je aktivovaná!");
-define("_ENCYNOTACTIVE","Táto encyklopédia nie je práve aktivovaná");
-define("_AVAILABLEENCYLIST","Zoznam dostupných encyklopédií v");
-define("_YOURADMININACTIVELIST","Ste Administrátor. Toto je zoznam neaktivovaných encyklopédií :");
-define("_NORESULTSTEXT","Žiadny výsledok vo vysvetleniach...");
-define("_NORESULTSTITLE","Žiadny výsledok medzi termínmy...");
-define("_SEARCHRESULTSFOR","Výsledky vyh¾adávania pre:");
-define("_SEARCHNOTCOMPLETE","Vo¾by vyh¾adávania nie sú úplné. Skúste znova.");
-define("_RESULTSINTERMTITLE","Výsledky medzi termínmy:");
-define("_RESULTSINTERMTEXT","Výsledky vo vysvetleniach:");
-
-?>
+define("_PREVIOUS", "Predchï¿½dzajï¿½ca strana");
+define("_NEXT", "Nasledujï¿½ca strana");
+define("_SEARCHRESULTS", "Vï¿½sledky vyhï¿½adï¿½vania");
+define("_PAGE", "Strana");
+define("_RETURNTO", "Nï¿½vrat na");
+define("_DEACTIVATE", "Deaktivovaï¿½");
+define("_ACTIVATE", "Aktivovaï¿½");
+define("_ENCYCLOPEDIA", "Encyklopï¿½dia");
+define("_NOCONTENTFORLETTER", "Encyklopï¿½dia neobsahuje ï¿½iadny termï¿½n pre zadanï¿½ pï¿½smeno..");
+define("_ENCYSELECTLETTER", "Aby sa zobrazili heslï¿½, vyberte zodpovedajï¿½ce pï¿½smeno zo zoznamu");
+define("_COPYRIGHT", "Copyleft:$sitename.");
+define("_YOURADMINENCY", "Ste Administrï¿½tor. Tï¿½to encyklopï¿½dia nie je aktivovanï¿½!");
+define("_ENCYNOTACTIVE", "Tï¿½to encyklopï¿½dia nie je prï¿½ve aktivovanï¿½");
+define("_AVAILABLEENCYLIST", "Zoznam dostupnï¿½ch encyklopï¿½diï¿½ v");
+define("_YOURADMININACTIVELIST", "Ste Administrï¿½tor. Toto je zoznam neaktivovanï¿½ch encyklopï¿½diï¿½ :");
+define("_NORESULTSTEXT", "ï¿½iadny vï¿½sledok vo vysvetleniach...");
+define("_NORESULTSTITLE", "ï¿½iadny vï¿½sledok medzi termï¿½nmy...");
+define("_SEARCHRESULTSFOR", "Vï¿½sledky vyhï¿½adï¿½vania pre:");
+define("_SEARCHNOTCOMPLETE", "Voï¿½by vyhï¿½adï¿½vania nie sï¿½ ï¿½plnï¿½. Skï¿½ste znova.");
+define("_RESULTSINTERMTITLE", "Vï¿½sledky medzi termï¿½nmy:");
+define("_RESULTSINTERMTEXT", "Vï¿½sledky vo vysvetleniach:");

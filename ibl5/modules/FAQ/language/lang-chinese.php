@@ -17,14 +17,11 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_CATEGORY","Ãþ§O");
-define("_CATEGORIES","Ãþ§O");
-define("_FAQ2","FAQ (±`¨£°Ýµª¶°)");
-define("_BACKTOTOP","¦^¨ì³»ºÝ");
-define("_BACKTOFAQINDEX","¦^¨ì FAQ ¯Á¤Þ");
-define("_MAIN","¥D­nªº");
-define("_QUESTION","°ÝÃD");
-define("_ANSWER","¸Ñµª");
-
-
-?>
+define("_CATEGORY", "ï¿½ï¿½ï¿½O");
+define("_CATEGORIES", "ï¿½ï¿½ï¿½O");
+define("_FAQ2", "FAQ (ï¿½`ï¿½ï¿½ï¿½Ýµï¿½ï¿½ï¿½)");
+define("_BACKTOTOP", "ï¿½^ï¿½ì³»ï¿½ï¿½");
+define("_BACKTOFAQINDEX", "ï¿½^ï¿½ï¿½ FAQ ï¿½ï¿½ï¿½ï¿½");
+define("_MAIN", "ï¿½Dï¿½nï¿½ï¿½");
+define("_QUESTION", "ï¿½ï¿½ï¿½D");
+define("_ANSWER", "ï¿½Ñµï¿½");

@@ -11,26 +11,26 @@
  *
  ***************************************************************************/
 /***************************************************************************
-* phpbb2 forums port version 2.0.5 (c) 2003 - Nuke Cops (http://nukecops.com)
-*
-* Ported by Nuke Cops to phpbb2 standalone 2.0.5 Test
-* and debugging completed by the Elite Nukers and site members.
-*
-* You run this package at your sole risk. Nuke Cops and affiliates cannot
-* be held liable if anything goes wrong. You are advised to test this
-* package on a development system. Backup everything before implementing
-* in a production environment. If something goes wrong, you can always
-* backout and restore your backups.
-*
-* Installing and running this also means you agree to the terms of the AUP
-* found at Nuke Cops.
-*
-* This is version 2.0.5 of the phpbb2 forum port for PHP-Nuke. Work is based
-* on Tom Nitzschner's forum port version 2.0.6. Tom's 2.0.6 port was based
-* on the phpbb2 standalone version 2.0.3. Our version 2.0.5 from Nuke Cops is
-* now reflecting phpbb2 standalone 2.0.5 that fixes some bugs and the
-* invalid_session error message.
-***************************************************************************/
+ * phpbb2 forums port version 2.0.5 (c) 2003 - Nuke Cops (http://nukecops.com)
+ *
+ * Ported by Nuke Cops to phpbb2 standalone 2.0.5 Test
+ * and debugging completed by the Elite Nukers and site members.
+ *
+ * You run this package at your sole risk. Nuke Cops and affiliates cannot
+ * be held liable if anything goes wrong. You are advised to test this
+ * package on a development system. Backup everything before implementing
+ * in a production environment. If something goes wrong, you can always
+ * backout and restore your backups.
+ *
+ * Installing and running this also means you agree to the terms of the AUP
+ * found at Nuke Cops.
+ *
+ * This is version 2.0.5 of the phpbb2 forum port for PHP-Nuke. Work is based
+ * on Tom Nitzschner's forum port version 2.0.6. Tom's 2.0.6 port was based
+ * on the phpbb2 standalone version 2.0.3. Our version 2.0.5 from Nuke Cops is
+ * now reflecting phpbb2 standalone 2.0.5 that fixes some bugs and the
+ * invalid_session error message.
+ ***************************************************************************/
 /***************************************************************************
  *   This file is part of the phpBB2 port to Nuke 6.0 (c) copyright 2002
  *   by Tom Nitzschner (tom@toms-home.com)
@@ -59,193 +59,165 @@
  *
  ***************************************************************************/
 
-if ( !defined('IN_PHPBB') )
-{
-        die("Hacking attempt");
-        exit;
+if (!defined('IN_PHPBB')) {
+    die("Hacking attempt");
+    exit;
 }
 
 // Is send through board enabled? No, return to index
-if (!$board_config['board_email_form'])
-{
-        $header_location = ( @preg_match("/Microsoft|WebSTAR|Xitami/", $_SERVER["SERVER_SOFTWARE"]) ) ? "Refresh: 0; URL=" : "Location: ";
-        header($header_location . append_sid("index.$phpEx", true));
-        exit;
+if (!$board_config['board_email_form']) {
+    $header_location = (@preg_match("/Microsoft|WebSTAR|Xitami/", $_SERVER["SERVER_SOFTWARE"])) ? "Refresh: 0; URL=" : "Location: ";
+    header($header_location . append_sid("index.$phpEx", true));
+    exit;
 }
 
-if ( !empty($HTTP_GET_VARS[POST_USERS_URL]) || !empty($HTTP_POST_VARS[POST_USERS_URL]) )
-{
-        $user_id = ( !empty($HTTP_GET_VARS[POST_USERS_URL]) ) ? intval($HTTP_GET_VARS[POST_USERS_URL]) : intval($HTTP_POST_VARS[POST_USERS_URL]);
-}
-else
-{
-        message_die(GENERAL_MESSAGE, $lang['No_user_specified']);
+if (!empty($HTTP_GET_VARS[POST_USERS_URL]) || !empty($HTTP_POST_VARS[POST_USERS_URL])) {
+    $user_id = (!empty($HTTP_GET_VARS[POST_USERS_URL])) ? intval($HTTP_GET_VARS[POST_USERS_URL]) : intval($HTTP_POST_VARS[POST_USERS_URL]);
+} else {
+    message_die(GENERAL_MESSAGE, $lang['No_user_specified']);
 }
 
-if ( !$userdata['session_logged_in'] )
-{
-        header('Location: ' . append_sid("login.$phpEx?redirect=profile.$phpEx&mode=email&" . POST_USERS_URL . "=$user_id", true));
-        exit;
+if (!$userdata['session_logged_in']) {
+    header('Location: ' . append_sid("login.$phpEx?redirect=profile.$phpEx&mode=email&" . POST_USERS_URL . "=$user_id", true));
+    exit;
 }
 
 $sql = "SELECT username, user_email, user_viewemail, user_lang
         FROM " . USERS_TABLE . "
         WHERE user_id = '$user_id'";
-if ( $result = $db->sql_query($sql) )
-{
-        $row = $db->sql_fetchrow($result);
+if ($result = $db->sql_query($sql)) {
+    $row = $db->sql_fetchrow($result);
 
-        $username = $row['username'];
-        $user_email = $row['user_email'];
-        $user_lang = $row['user_lang'];
+    $username = $row['username'];
+    $user_email = $row['user_email'];
+    $user_lang = $row['user_lang'];
 
-        if ( $row['user_viewemail'] || $userdata['user_level'] == ADMIN )
-        {
-                if ( time() - $userdata['user_emailtime'] < $board_config['flood_interval'] )
-                {
-                        message_die(GENERAL_MESSAGE, $lang['Flood_email_limit']);
-                }
+    if ($row['user_viewemail'] || $userdata['user_level'] == ADMIN) {
+        if (time() - $userdata['user_emailtime'] < $board_config['flood_interval']) {
+            message_die(GENERAL_MESSAGE, $lang['Flood_email_limit']);
+        }
 
-                if ( isset($HTTP_POST_VARS['submit']) )
-                {
-                        $error = FALSE;
+        if (isset($HTTP_POST_VARS['submit'])) {
+            $error = false;
 
-                        if ( !empty($HTTP_POST_VARS['subject']) )
-                        {
-                                $subject = trim(stripslashes($HTTP_POST_VARS['subject']));
-                        }
-                        else
-                        {
-                                $error = TRUE;
-                                $error_msg = ( !empty($error_msg) ) ? $error_msg . '<br />' . $lang['Empty_subject_email'] : $lang['Empty_subject_email'];
-                        }
+            if (!empty($HTTP_POST_VARS['subject'])) {
+                $subject = trim(stripslashes($HTTP_POST_VARS['subject']));
+            } else {
+                $error = true;
+                $error_msg = (!empty($error_msg)) ? $error_msg . '<br />' . $lang['Empty_subject_email'] : $lang['Empty_subject_email'];
+            }
 
-                        if ( !empty($HTTP_POST_VARS['message']) )
-                        {
-                                $message = trim(stripslashes($HTTP_POST_VARS['message']));
-                        }
-                        else
-                        {
-                                $error = TRUE;
-                                $error_msg = ( !empty($error_msg) ) ? $error_msg . '<br />' . $lang['Empty_message_email'] : $lang['Empty_message_email'];
-                        }
+            if (!empty($HTTP_POST_VARS['message'])) {
+                $message = trim(stripslashes($HTTP_POST_VARS['message']));
+            } else {
+                $error = true;
+                $error_msg = (!empty($error_msg)) ? $error_msg . '<br />' . $lang['Empty_message_email'] : $lang['Empty_message_email'];
+            }
 
-                        if ( !$error )
-                        {
-                                $sql = "UPDATE " . USERS_TABLE . "
+            if (!$error) {
+                $sql = "UPDATE " . USERS_TABLE . "
                                         SET user_emailtime = " . time() . "
                                         WHERE user_id = " . $userdata['user_id'];
-                                if ( $result = $db->sql_query($sql) )
-                                {
-                                        include("modules/Forums/includes/emailer.php");
-                                        $emailer = new emailer($board_config['smtp_delivery']);
+                if ($result = $db->sql_query($sql)) {
+                    include "modules/Forums/includes/emailer.php";
+                    $emailer = new emailer($board_config['smtp_delivery']);
 
-                                        $emailer->from($userdata['user_email']);
-                                        $emailer->replyto($userdata['user_email']);
+                    $emailer->from($userdata['user_email']);
+                    $emailer->replyto($userdata['user_email']);
 
-                                        $email_headers = 'X-AntiAbuse: Board servername - ' . $server_name . "\n";
-                                        $email_headers .= 'X-AntiAbuse: User_id - ' . $userdata['user_id'] . "\n";
-                                        $email_headers .= 'X-AntiAbuse: Username - ' . $userdata['username'] . "\n";
-                                        $email_headers .= 'X-AntiAbuse: User IP - ' . decode_ip($user_ip) . "\n";
+                    $email_headers = 'X-AntiAbuse: Board servername - ' . $server_name . "\n";
+                    $email_headers .= 'X-AntiAbuse: User_id - ' . $userdata['user_id'] . "\n";
+                    $email_headers .= 'X-AntiAbuse: Username - ' . $userdata['username'] . "\n";
+                    $email_headers .= 'X-AntiAbuse: User IP - ' . decode_ip($user_ip) . "\n";
 
-                                        $emailer->use_template('profile_send_email', $user_lang);
-                                        $emailer->email_address($user_email);
-                                        $emailer->set_subject($subject);
-                                        $emailer->extra_headers($email_headers);
+                    $emailer->use_template('profile_send_email', $user_lang);
+                    $emailer->email_address($user_email);
+                    $emailer->set_subject($subject);
+                    $emailer->extra_headers($email_headers);
 
-                                        $emailer->assign_vars(array(
-                                                'SITENAME' => $board_config['sitename'],
-                                                'BOARD_EMAIL' => $board_config['board_email'],
-                                                'FROM_USERNAME' => $userdata['username'],
-                                                'TO_USERNAME' => $username,
-                                                'MESSAGE' => $message)
-                                        );
-                                        $emailer->send();
-                                        $emailer->reset();
+                    $emailer->assign_vars(array(
+                        'SITENAME' => $board_config['sitename'],
+                        'BOARD_EMAIL' => $board_config['board_email'],
+                        'FROM_USERNAME' => $userdata['username'],
+                        'TO_USERNAME' => $username,
+                        'MESSAGE' => $message)
+                    );
+                    $emailer->send();
+                    $emailer->reset();
 
-                                        if ( !empty($HTTP_POST_VARS['cc_email']) )
-                                        {
-                                                $emailer->from($userdata['user_email']);
-                                                $emailer->replyto($userdata['user_email']);
-                                                $emailer->use_template('profile_send_email');
-                                                $emailer->email_address($userdata['user_email']);
-                                                $emailer->set_subject($subject);
+                    if (!empty($HTTP_POST_VARS['cc_email'])) {
+                        $emailer->from($userdata['user_email']);
+                        $emailer->replyto($userdata['user_email']);
+                        $emailer->use_template('profile_send_email');
+                        $emailer->email_address($userdata['user_email']);
+                        $emailer->set_subject($subject);
 
-                                                $emailer->assign_vars(array(
-                                                        'SITENAME' => $board_config['sitename'],
-                                                        'BOARD_EMAIL' => $board_config['board_email'],
-                                                        'FROM_USERNAME' => $userdata['username'],
-                                                        'TO_USERNAME' => $username,
-                                                        'MESSAGE' => $message)
-                                                );
-                                                $emailer->send();
-                                                $emailer->reset();
-                                        }
-
-                                        $template->assign_vars(array(
-                                                'META' => '<meta http-equiv="refresh" content="5;url=' . append_sid("index.$phpEx") . '">')
-                                        );
-
-                                        $message = $lang['Email_sent'] . '<br /><br />' . sprintf($lang['Click_return_index'],  '<a href="' . append_sid("index.$phpEx") . '">', '</a>');
-
-                                        message_die(GENERAL_MESSAGE, $message);
-                                }
-                                else
-                                {
-                                        message_die(GENERAL_ERROR, 'Could not update last email time', '', __LINE__, __FILE__, $sql);
-                                }
-                        }
-                }
-
-                include("modules/Forums/includes/page_header.php");
-
-                $template->set_filenames(array(
-                        'body' => 'profile_send_email.tpl')
-                );
-                make_jumpbox('viewforum.'.$phpEx);
-
-                if ( $error )
-                {
-                        $template->set_filenames(array(
-                                'reg_header' => 'error_body.tpl')
+                        $emailer->assign_vars(array(
+                            'SITENAME' => $board_config['sitename'],
+                            'BOARD_EMAIL' => $board_config['board_email'],
+                            'FROM_USERNAME' => $userdata['username'],
+                            'TO_USERNAME' => $username,
+                            'MESSAGE' => $message)
                         );
-                        $template->assign_vars(array(
-                                'ERROR_MESSAGE' => $error_msg)
-                        );
-                        $template->assign_var_from_handle('ERROR_BOX', 'reg_header');
+                        $emailer->send();
+                        $emailer->reset();
+                    }
+
+                    $template->assign_vars(array(
+                        'META' => '<meta http-equiv="refresh" content="5;url=' . append_sid("index.$phpEx") . '">')
+                    );
+
+                    $message = $lang['Email_sent'] . '<br /><br />' . sprintf($lang['Click_return_index'], '<a href="' . append_sid("index.$phpEx") . '">', '</a>');
+
+                    message_die(GENERAL_MESSAGE, $message);
+                } else {
+                    message_die(GENERAL_ERROR, 'Could not update last email time', '', __LINE__, __FILE__, $sql);
                 }
-
-                $template->assign_vars(array(
-                        'USERNAME' => $username,
-
-                        'S_HIDDEN_FIELDS' => '',
-                        'S_POST_ACTION' => append_sid("profile.$phpEx?mode=email&amp;" . POST_USERS_URL . "=$user_id"),
-
-                        'L_SEND_EMAIL_MSG' => $lang['Send_email_msg'],
-                        'L_RECIPIENT' => $lang['Recipient'],
-                        'L_SUBJECT' => $lang['Subject'],
-                        'L_MESSAGE_BODY' => $lang['Message_body'],
-                        'L_MESSAGE_BODY_DESC' => $lang['Email_message_desc'],
-                        'L_EMPTY_SUBJECT_EMAIL' => $lang['Empty_subject_email'],
-                        'L_EMPTY_MESSAGE_EMAIL' => $lang['Empty_message_email'],
-                        'L_OPTIONS' => $lang['Options'],
-                        'L_CC_EMAIL' => $lang['CC_email'],
-                        'L_SPELLCHECK' => $lang['Spellcheck'],
-                        'L_SEND_EMAIL' => $lang['Send_email'])
-                );
-
-                $template->pparse('body');
-
-                include("modules/Forums/includes/page_tail.php");
+            }
         }
-        else
-        {
-                message_die(GENERAL_MESSAGE, $lang['User_prevent_email']);
-        }
-}
-else
-{
-        message_die(GENERAL_MESSAGE, $lang['User_not_exist']);
-}
 
-?>
+        include "modules/Forums/includes/page_header.php";
+
+        $template->set_filenames(array(
+            'body' => 'profile_send_email.tpl')
+        );
+        make_jumpbox('viewforum.' . $phpEx);
+
+        if ($error) {
+            $template->set_filenames(array(
+                'reg_header' => 'error_body.tpl')
+            );
+            $template->assign_vars(array(
+                'ERROR_MESSAGE' => $error_msg)
+            );
+            $template->assign_var_from_handle('ERROR_BOX', 'reg_header');
+        }
+
+        $template->assign_vars(array(
+            'USERNAME' => $username,
+
+            'S_HIDDEN_FIELDS' => '',
+            'S_POST_ACTION' => append_sid("profile.$phpEx?mode=email&amp;" . POST_USERS_URL . "=$user_id"),
+
+            'L_SEND_EMAIL_MSG' => $lang['Send_email_msg'],
+            'L_RECIPIENT' => $lang['Recipient'],
+            'L_SUBJECT' => $lang['Subject'],
+            'L_MESSAGE_BODY' => $lang['Message_body'],
+            'L_MESSAGE_BODY_DESC' => $lang['Email_message_desc'],
+            'L_EMPTY_SUBJECT_EMAIL' => $lang['Empty_subject_email'],
+            'L_EMPTY_MESSAGE_EMAIL' => $lang['Empty_message_email'],
+            'L_OPTIONS' => $lang['Options'],
+            'L_CC_EMAIL' => $lang['CC_email'],
+            'L_SPELLCHECK' => $lang['Spellcheck'],
+            'L_SEND_EMAIL' => $lang['Send_email'])
+        );
+
+        $template->pparse('body');
+
+        include "modules/Forums/includes/page_tail.php";
+    } else {
+        message_die(GENERAL_MESSAGE, $lang['User_prevent_email']);
+    }
+} else {
+    message_die(GENERAL_MESSAGE, $lang['User_not_exist']);
+}

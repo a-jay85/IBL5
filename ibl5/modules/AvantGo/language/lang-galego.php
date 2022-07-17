@@ -17,11 +17,9 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PDATE","Fecha");
-define("_PTOPIC","Tema");
-define("_COMESFROM","Este artigo proven de");
-define("_THEURL","A dirección desta noticia é:");
-define("_DATE","Fecha");
-define("_TITLE","Título");
-
-?>
+define("_PDATE", "Fecha");
+define("_PTOPIC", "Tema");
+define("_COMESFROM", "Este artigo proven de");
+define("_THEURL", "A direcciï¿½n desta noticia ï¿½:");
+define("_DATE", "Fecha");
+define("_TITLE", "Tï¿½tulo");

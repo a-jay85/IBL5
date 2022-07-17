@@ -25,86 +25,91 @@ $rows = $schedule->getElementsByTagName('tr');
 
 function extractDate($rawDate)
 {
-	if ($rawDate != FALSE) {
-		if (substr($rawDate,0,4) === "Post") {
-			$rawDate = substr_replace($rawDate, 'June', 0, 4); // TODO: recognize "Post" instead of hacking it into June
-			var_dump($rawDate);
-		}
+    if ($rawDate != false) {
+        if (substr($rawDate, 0, 4) === "Post") {
+            $rawDate = substr_replace($rawDate, 'June', 0, 4); // TODO: recognize "Post" instead of hacking it into June
+            var_dump($rawDate);
+        }
 
-		$month = ltrim(date('m', strtotime($rawDate)), '0');
-		$day = ltrim(date('d', strtotime($rawDate)), '0');
-		$year = date('Y', strtotime($rawDate));
-		$date = $year . "-" . $month . "-" . $day;
+        $month = ltrim(date('m', strtotime($rawDate)), '0');
+        $day = ltrim(date('d', strtotime($rawDate)), '0');
+        $year = date('Y', strtotime($rawDate));
+        $date = $year . "-" . $month . "-" . $day;
 
-		$dateArray = array(
-			"date" => $date,
-			"year" => $year,
-			"month" => $month,
-			"day" => $day);
-		return $dateArray;
-	}
+        $dateArray = array(
+            "date" => $date,
+            "year" => $year,
+            "month" => $month,
+            "day" => $day);
+        return $dateArray;
+    }
 }
 
 function extractBoxID($boxHREF)
 {
-	$boxID = ltrim(rtrim($boxHREF,'.htm'),'box');
-	return $boxID;
+    $boxID = ltrim(rtrim($boxHREF, '.htm'), 'box');
+    return $boxID;
 }
 
 function assignGroupingsFor($region)
 {
-	if (in_array($region, array("Eastern", "Western"))) {
-		$grouping = 'conference';
-		$groupingGB = 'confGB';
-		$groupingMagicNumber = 'confMagicNumber';
-	}
-	if (in_array($region, array("Atlantic", "Central", "Midwest", "Pacific"))) {
-		$grouping = 'division';
-		$groupingGB = 'divGB';
-		$groupingMagicNumber = 'divMagicNumber';
-	}
-	return array ($grouping, $groupingGB, $groupingMagicNumber);
+    if (in_array($region, array("Eastern", "Western"))) {
+        $grouping = 'conference';
+        $groupingGB = 'confGB';
+        $groupingMagicNumber = 'confMagicNumber';
+    }
+    if (in_array($region, array("Atlantic", "Central", "Midwest", "Pacific"))) {
+        $grouping = 'division';
+        $groupingGB = 'divGB';
+        $groupingMagicNumber = 'divMagicNumber';
+    }
+    return array($grouping, $groupingGB, $groupingMagicNumber);
 }
 
 echo 'Updating the ibl_schedule database table...<p>';
-if ($db->sql_query('TRUNCATE TABLE ibl_schedule')) echo 'TRUNCATE TABLE ibl_schedule<p>';
+if ($db->sql_query('TRUNCATE TABLE ibl_schedule')) {
+    echo 'TRUNCATE TABLE ibl_schedule<p>';
+}
 
 foreach ($rows as $row) {
-	$checkThirdCell = $row->childNodes->item(2)->nodeValue;
-	$checkSecondCell = $row->childNodes->item(1)->nodeValue;
-	$checkFirstCell = $row->childNodes->item(0)->nodeValue;
+    $checkThirdCell = $row->childNodes->item(2)->nodeValue;
+    $checkSecondCell = $row->childNodes->item(1)->nodeValue;
+    $checkFirstCell = $row->childNodes->item(0)->nodeValue;
 
-	if ($checkSecondCell === NULL /*AND substr($checkFirstCell,0,4) !== "Post"*/) {
-		$fullDate = extractDate($row->textContent);
-		$date = $fullDate['date'];
-		$year = $fullDate['year'];
-	}
+    if ($checkSecondCell === null/*AND substr($checkFirstCell,0,4) !== "Post"*/) {
+        $fullDate = extractDate($row->textContent);
+        $date = $fullDate['date'];
+        $year = $fullDate['year'];
+    }
 
-	if ($checkThirdCell !== NULL AND $checkThirdCell !== "" AND $checkFirstCell !== "visitor") {
+    if ($checkThirdCell !== null and $checkThirdCell !== "" and $checkFirstCell !== "visitor") {
 
-		if ($row->childNodes->item(1)->getElementsByTagName('a')->length !== 0) {
-			$boxLink = $row->childNodes->item(1)->getElementsByTagName('a')->item(0)->getAttribute('href');
-			$boxID = extractBoxID($boxLink);
-		}
+        if ($row->childNodes->item(1)->getElementsByTagName('a')->length !== 0) {
+            $boxLink = $row->childNodes->item(1)->getElementsByTagName('a')->item(0)->getAttribute('href');
+            $boxID = extractBoxID($boxLink);
+        }
 
-		$visitorName = rtrim($row->childNodes->item(0)->textContent);
-		$vScore = $row->childNodes->item(1)->textContent;
-		$homeName = rtrim($row->childNodes->item(2)->textContent);
-		$hScore = $row->childNodes->item(3)->textContent;
+        $visitorName = rtrim($row->childNodes->item(0)->textContent);
+        $vScore = $row->childNodes->item(1)->textContent;
+        $homeName = rtrim($row->childNodes->item(2)->textContent);
+        $hScore = $row->childNodes->item(3)->textContent;
 
-		if ($row->childNodes->item(1)->nodeValue === NULL OR $row->childNodes->item(1)->nodeValue === "") {
-			$vScore = 0;
-			$hScore = 0;
-			if ($boxID > 99999 OR $boxID === NULL) {
-				$boxID = $boxID + 1;
-			} else $boxID = 100000;
-		}
+        if ($row->childNodes->item(1)->nodeValue === null or $row->childNodes->item(1)->nodeValue === "") {
+            $vScore = 0;
+            $hScore = 0;
+            if ($boxID > 99999 or $boxID === null) {
+                $boxID = $boxID + 1;
+            } else {
+                $boxID = 100000;
+            }
 
-		$visitorTID = $sharedFunctions->getTidFromTeamname($visitorName);
-		$homeTID = $sharedFunctions->getTidFromTeamname($homeName);
-	}
+        }
 
-	$sqlQueryString = "INSERT INTO ibl_schedule (
+        $visitorTID = $sharedFunctions->getTidFromTeamname($visitorName);
+        $homeTID = $sharedFunctions->getTidFromTeamname($homeName);
+    }
+
+    $sqlQueryString = "INSERT INTO ibl_schedule (
 		Year,
 		BoxID,
 		Date,
@@ -122,28 +127,28 @@ foreach ($rows as $row) {
 		$homeTID,
 		$hScore
 	)";
-		/* ON DUPLICATE KEY UPDATE
-			Year = $year,
-			Date = '$date',
-			Visitor = $visitorTID,
-			Vscore = $vScore,
-			Home = $homeTID,
-			Hscore = $hScore
-		"; */
+    /* ON DUPLICATE KEY UPDATE
+    Year = $year,
+    Date = '$date',
+    Visitor = $visitorTID,
+    Vscore = $vScore,
+    Home = $homeTID,
+    Hscore = $hScore
+    "; */
 
-	if ($db->sql_query($sqlQueryString)) {
-		echo $sqlQueryString . '<br>';
-	} // DO NOT use 'else die('Invalid query: '.$db->sql_error()' here -- script depends on being able to pass broken SQL strings for now.
+    if ($db->sql_query($sqlQueryString)) {
+        echo $sqlQueryString . '<br>';
+    } // DO NOT use 'else die('Invalid query: '.$db->sql_error()' here -- script depends on being able to pass broken SQL strings for now.
 
-	unset($visitorName,
-		$homeName,
-		$boxLink,
-		$hScore,
-		$vScore,
-		$homeName,
-		$visitorName,
-		$homeTID,
-		$visitorTID);
+    unset($visitorName,
+        $homeName,
+        $boxLink,
+        $hScore,
+        $vScore,
+        $homeName,
+        $visitorName,
+        $homeTID,
+        $visitorTID);
 }
 
 echo 'ibl_schedule database table has been updated.<p>';
@@ -160,63 +165,65 @@ echo 'ibl_schedule database table has been updated.<p>';
 
 function extractWins($var)
 {
-	$var = rtrim(substr($var, 0, 2),'-');
-	return $var;
+    $var = rtrim(substr($var, 0, 2), '-');
+    return $var;
 }
 
 function extractLosses($var)
 {
-	$var = ltrim(substr($var, -2, 2), '-');
-	return $var;
+    $var = ltrim(substr($var, -2, 2), '-');
+    return $var;
 }
 
 echo '<p>Updating the ibl_standings database table...<p>';
-if ($db->sql_query('TRUNCATE TABLE ibl_standings')) echo 'TRUNCATE TABLE ibl_standings<p>';
+if ($db->sql_query('TRUNCATE TABLE ibl_standings')) {
+    echo 'TRUNCATE TABLE ibl_standings<p>';
+}
 
 function extractStandingsValues()
 {
-	global $db, $sharedFunctions;
+    global $db, $sharedFunctions;
 
-	echo '<p>Updating the conference standings for all teams...<p>';
+    echo '<p>Updating the conference standings for all teams...<p>';
 
-	$standingsFilePath = 'ibl/IBL/Standings.htm';
+    $standingsFilePath = 'ibl/IBL/Standings.htm';
 
-	$standings = new DOMDocument();
-	$standings->loadHTMLFile($standingsFilePath);
-	$standings->preserveWhiteSpace = false;
+    $standings = new DOMDocument();
+    $standings->loadHTMLFile($standingsFilePath);
+    $standings->preserveWhiteSpace = false;
 
-	$getRows = $standings->getElementsByTagName('tr');
-	$rowsByConference = $getRows->item(0)->childNodes->item(0)->childNodes->item(0)->childNodes;
-	$rowsByDivision = $getRows->item(0)->childNodes->item(1)->childNodes->item(0)->childNodes;
+    $getRows = $standings->getElementsByTagName('tr');
+    $rowsByConference = $getRows->item(0)->childNodes->item(0)->childNodes->item(0)->childNodes;
+    $rowsByDivision = $getRows->item(0)->childNodes->item(1)->childNodes->item(0)->childNodes;
 
-	foreach ($rowsByConference as $row) {
-		if (!is_null($row->childNodes)) {
-			$teamName = $row->childNodes->item(0)->nodeValue;
-			if (in_array($teamName, array("Eastern", "Western"))) {
-				$conference = $teamName;
-			}
-			if (!in_array($teamName, array("Eastern", "Western", "team", ""))) {
-				$tid = $sharedFunctions->getTidFromTeamname($teamName);
-				$leagueRecord = $row->childNodes->item(1)->nodeValue;
-				$pct = $row->childNodes->item(2)->nodeValue;
-				$confGB = $row->childNodes->item(3)->nodeValue;
-				$confRecord = $row->childNodes->item(4)->nodeValue;
-				$divRecord = $row->childNodes->item(5)->nodeValue;
-				$homeRecord = $row->childNodes->item(6)->nodeValue;
-				$awayRecord = $row->childNodes->item(7)->nodeValue;
+    foreach ($rowsByConference as $row) {
+        if (!is_null($row->childNodes)) {
+            $teamName = $row->childNodes->item(0)->nodeValue;
+            if (in_array($teamName, array("Eastern", "Western"))) {
+                $conference = $teamName;
+            }
+            if (!in_array($teamName, array("Eastern", "Western", "team", ""))) {
+                $tid = $sharedFunctions->getTidFromTeamname($teamName);
+                $leagueRecord = $row->childNodes->item(1)->nodeValue;
+                $pct = $row->childNodes->item(2)->nodeValue;
+                $confGB = $row->childNodes->item(3)->nodeValue;
+                $confRecord = $row->childNodes->item(4)->nodeValue;
+                $divRecord = $row->childNodes->item(5)->nodeValue;
+                $homeRecord = $row->childNodes->item(6)->nodeValue;
+                $awayRecord = $row->childNodes->item(7)->nodeValue;
 
-				$confWins = extractWins($confRecord);
-				$confLosses = extractLosses($confRecord);
-				$divWins = extractWins($divRecord);
-				$divLosses = extractLosses($divRecord);
-				$homeWins = extractWins($homeRecord);
-				$homeLosses = extractLosses($homeRecord);
-				$awayWins = extractWins($awayRecord);
-				$awayLosses = extractLosses($awayRecord);
+                $confWins = extractWins($confRecord);
+                $confLosses = extractLosses($confRecord);
+                $divWins = extractWins($divRecord);
+                $divLosses = extractLosses($divRecord);
+                $homeWins = extractWins($homeRecord);
+                $homeLosses = extractLosses($homeRecord);
+                $awayWins = extractWins($awayRecord);
+                $awayLosses = extractLosses($awayRecord);
 
-				$gamesUnplayed = 82 - $homeWins - $homeLosses - $awayWins - $awayLosses; // TODO: make number of games in season dynamic
+                $gamesUnplayed = 82 - $homeWins - $homeLosses - $awayWins - $awayLosses; // TODO: make number of games in season dynamic
 
-				$sqlQueryString = "INSERT INTO ibl_standings (
+                $sqlQueryString = "INSERT INTO ibl_standings (
 					tid,
 					team_name,
 					leagueRecord,
@@ -238,67 +245,70 @@ function extractStandingsValues()
 					awayLosses
 				)
 				VALUES (
-					'".$tid."',
-					'".rtrim($teamName)."',
-					'".$leagueRecord."',
-					'".$pct."',
-					'".$gamesUnplayed."',
-					'".$conference."',
-					'".$confGB."',
-					'".$confRecord."',
-					'".$divRecord."',
-					'".$homeRecord."',
-					'".$awayRecord."',
-					'".$confWins."',
-					'".$confLosses."',
-					'".$divWins."',
-					'".$divLosses."',
-					'".$homeWins."',
-					'".$homeLosses."',
-					'".$awayWins."',
-					'".$awayLosses."'
+					'" . $tid . "',
+					'" . rtrim($teamName) . "',
+					'" . $leagueRecord . "',
+					'" . $pct . "',
+					'" . $gamesUnplayed . "',
+					'" . $conference . "',
+					'" . $confGB . "',
+					'" . $confRecord . "',
+					'" . $divRecord . "',
+					'" . $homeRecord . "',
+					'" . $awayRecord . "',
+					'" . $confWins . "',
+					'" . $confLosses . "',
+					'" . $divWins . "',
+					'" . $divLosses . "',
+					'" . $homeWins . "',
+					'" . $homeLosses . "',
+					'" . $awayWins . "',
+					'" . $awayLosses . "'
 				)
 				ON DUPLICATE KEY UPDATE
-					tid = '".$tid."',
-					leagueRecord = '".$leagueRecord."',
-					pct = '".$pct."',
-					gamesUnplayed = '".$gamesUnplayed."',
-					conference = '".$conference."',
-					confGB = '".$confGB."',
-					confRecord = '".$confRecord."',
-					divRecord = '".$divRecord."',
-					homeRecord = '".$homeRecord."',
-					awayRecord = '".$awayRecord."',
-					confWins = '".$confWins."',
-					confLosses = '".$confLosses."',
-					divWins = '".$divWins."',
-					divlosses = '".$divLosses."',
-					homeWins = '".$homeWins."',
-					homeLosses = '".$homeLosses."',
-					awayWins = '".$awayWins."',
-					awayLosses = '".$awayLosses."'
+					tid = '" . $tid . "',
+					leagueRecord = '" . $leagueRecord . "',
+					pct = '" . $pct . "',
+					gamesUnplayed = '" . $gamesUnplayed . "',
+					conference = '" . $conference . "',
+					confGB = '" . $confGB . "',
+					confRecord = '" . $confRecord . "',
+					divRecord = '" . $divRecord . "',
+					homeRecord = '" . $homeRecord . "',
+					awayRecord = '" . $awayRecord . "',
+					confWins = '" . $confWins . "',
+					confLosses = '" . $confLosses . "',
+					divWins = '" . $divWins . "',
+					divlosses = '" . $divLosses . "',
+					homeWins = '" . $homeWins . "',
+					homeLosses = '" . $homeLosses . "',
+					awayWins = '" . $awayWins . "',
+					awayLosses = '" . $awayLosses . "'
 				";
 
-				if ($db->sql_query($sqlQueryString)) {
-					echo $sqlQueryString . '<br>';
-				} else die('Invalid query: ' . $db->sql_error());
-			}
-		}
+                if ($db->sql_query($sqlQueryString)) {
+                    echo $sqlQueryString . '<br>';
+                } else {
+                    die('Invalid query: ' . $db->sql_error());
+                }
 
-	}
-	echo '<p>Conference standings have been updated.<p>';
+            }
+        }
 
-	echo '<p>Updating the division games back for all teams...<br>';
-	foreach ($rowsByDivision as $row) {
-		if (!is_null($row->childNodes)) {
-			$teamName = $row->childNodes->item(0)->nodeValue;
-			if (in_array($teamName, array("Atlantic", "Central", "Midwest", "Pacific"))) {
-				$division = $teamName;
-			}
-			if (!in_array($teamName, array("Atlantic", "Central", "Midwest", "Pacific", "team", ""))) {
-				$divGB = $row->childNodes->item(3)->nodeValue;
+    }
+    echo '<p>Conference standings have been updated.<p>';
 
-				$sqlQueryString = "INSERT INTO ibl_standings (
+    echo '<p>Updating the division games back for all teams...<br>';
+    foreach ($rowsByDivision as $row) {
+        if (!is_null($row->childNodes)) {
+            $teamName = $row->childNodes->item(0)->nodeValue;
+            if (in_array($teamName, array("Atlantic", "Central", "Midwest", "Pacific"))) {
+                $division = $teamName;
+            }
+            if (!in_array($teamName, array("Atlantic", "Central", "Midwest", "Pacific", "team", ""))) {
+                $divGB = $row->childNodes->item(3)->nodeValue;
+
+                $sqlQueryString = "INSERT INTO ibl_standings (
 					team_name,
 					division,
 					divGB
@@ -312,135 +322,140 @@ function extractStandingsValues()
 					division = '$division',
 					divGB = '$divGB'";
 
-				if ($db->sql_query($sqlQueryString)) {
-					echo $sqlQueryString . '<br>';
-				} else die('Invalid query: ' . $db->sql_error());
-			}
-		}
+                if ($db->sql_query($sqlQueryString)) {
+                    echo $sqlQueryString . '<br>';
+                } else {
+                    die('Invalid query: ' . $db->sql_error());
+                }
 
-	}
-	echo 'Division standings have been updated.<p>';
+            }
+        }
+
+    }
+    echo 'Division standings have been updated.<p>';
 }
 
 function checkIfRegionIsClinched($region)
 {
-	global $db, $sharedFunctions;
+    global $db, $sharedFunctions;
 
-	list ($grouping, $groupingGB, $groupingMagicNumber) = assignGroupingsFor($region);
-	echo "<p>Checking if the $region $grouping has been clinched...<br>";
+    list($grouping, $groupingGB, $groupingMagicNumber) = assignGroupingsFor($region);
+    echo "<p>Checking if the $region $grouping has been clinched...<br>";
 
-	$queryWinningestTeam = "SELECT team_name, homeWins + awayWins AS wins
+    $queryWinningestTeam = "SELECT team_name, homeWins + awayWins AS wins
 		FROM ibl_standings
 		WHERE $grouping = '$region'
 		ORDER BY wins DESC
 		LIMIT 1;";
-	$resultWinningestTeam = $db->sql_query($queryWinningestTeam);
-	$winningestTeamName = $db->sql_result($resultWinningestTeam, 0, "team_name");
-	$winningestTeamWins = $db->sql_result($resultWinningestTeam, 0, "wins");
+    $resultWinningestTeam = $db->sql_query($queryWinningestTeam);
+    $winningestTeamName = $db->sql_result($resultWinningestTeam, 0, "team_name");
+    $winningestTeamWins = $db->sql_result($resultWinningestTeam, 0, "wins");
 
-	$queryLeastLosingestTeam = "SELECT homeLosses + awayLosses AS losses
+    $queryLeastLosingestTeam = "SELECT homeLosses + awayLosses AS losses
 		FROM ibl_standings
 		WHERE $grouping = '$region'
 			AND team_name != '$winningestTeamName'
 		ORDER BY losses ASC
 		LIMIT 1;";
-	$resultLeastLosingestTeam = $db->sql_query($queryLeastLosingestTeam);
-	$leastLosingestTeamLosses = $db->sql_result($resultLeastLosingestTeam, 0, "losses");
+    $resultLeastLosingestTeam = $db->sql_query($queryLeastLosingestTeam);
+    $leastLosingestTeamLosses = $db->sql_result($resultLeastLosingestTeam, 0, "losses");
 
-	$magicNumber = 82 + 1 - $winningestTeamWins - $leastLosingestTeamLosses;
+    $magicNumber = 82 + 1 - $winningestTeamWins - $leastLosingestTeamLosses;
 
-	if ($magicNumber <= 0) {
-		$querySetTeamToClinched = "UPDATE ibl_standings
+    if ($magicNumber <= 0) {
+        $querySetTeamToClinched = "UPDATE ibl_standings
 			SET clinched" . ucfirst($grouping) . " = 1
 			WHERE team_name = '$winningestTeamName';";
 
-		if ($db->sql_query($querySetTeamToClinched)) {
-			echo "The $winningestTeamName have clinched the $region $grouping!";
-		};
-	} else {
-		echo "Nope: the $region $grouping is still up for grabs!<p>";
-	}
+        if ($db->sql_query($querySetTeamToClinched)) {
+            echo "The $winningestTeamName have clinched the $region $grouping!";
+        }
+        ;
+    } else {
+        echo "Nope: the $region $grouping is still up for grabs!<p>";
+    }
 }
 
 function checkIfPlayoffsClinched($conference)
 {
-	global $db, $sharedFunctions;
+    global $db, $sharedFunctions;
 
-	echo "<p>Checking if any teams have clinched playoff spots in the $conference Conference...<br>";
+    echo "<p>Checking if any teams have clinched playoff spots in the $conference Conference...<br>";
 
-	$queryEightWinningestTeams = "SELECT team_name, homeWins + awayWins AS wins
+    $queryEightWinningestTeams = "SELECT team_name, homeWins + awayWins AS wins
 		FROM ibl_standings
 		WHERE conference = '$conference'
 		ORDER BY wins DESC
 		LIMIT 8;";
-	$resultEightWinningestTeams = $db->sql_query($queryEightWinningestTeams);
+    $resultEightWinningestTeams = $db->sql_query($queryEightWinningestTeams);
 
-	$querySixLosingestTeams = "SELECT homeLosses + awayLosses AS losses
+    $querySixLosingestTeams = "SELECT homeLosses + awayLosses AS losses
 		FROM ibl_standings
 		WHERE conference = '$conference'
 		ORDER BY losses DESC
 		LIMIT 6;";
-	$resultSixLosingestTeams = $db->sql_query($querySixLosingestTeams);
+    $resultSixLosingestTeams = $db->sql_query($querySixLosingestTeams);
 
-	$i = 0;
-	while ($i < 8) {
-		$contendingTeamName = $db->sql_result($resultEightWinningestTeams, $i, "team_name");
-		$contendingTeamWins = $db->sql_result($resultEightWinningestTeams, $i, "wins");
-		$teamsEliminated = 0;
+    $i = 0;
+    while ($i < 8) {
+        $contendingTeamName = $db->sql_result($resultEightWinningestTeams, $i, "team_name");
+        $contendingTeamWins = $db->sql_result($resultEightWinningestTeams, $i, "wins");
+        $teamsEliminated = 0;
 
-		$j = 0;
-		while ($j < 6) {
-			$bottomTeamLosses = $db->sql_result($resultSixLosingestTeams, $j, "losses");
+        $j = 0;
+        while ($j < 6) {
+            $bottomTeamLosses = $db->sql_result($resultSixLosingestTeams, $j, "losses");
 
-			$magicNumber = 82 + 1 - $contendingTeamWins - $bottomTeamLosses;
+            $magicNumber = 82 + 1 - $contendingTeamWins - $bottomTeamLosses;
 
-			if ($magicNumber <= 0) {
-				$teamsEliminated++;
-			}
+            if ($magicNumber <= 0) {
+                $teamsEliminated++;
+            }
 
-			$j++;
-		}
+            $j++;
+        }
 
-		if ($teamsEliminated == 6) {
-			$querySetTeamToClinched = "UPDATE ibl_standings
+        if ($teamsEliminated == 6) {
+            $querySetTeamToClinched = "UPDATE ibl_standings
 				SET clinchedPlayoffs = 1
 				WHERE team_name = '$contendingTeamName';";
 
-			if ($db->sql_query($querySetTeamToClinched)) {
-				echo "The $contendingTeamName have clinched a playoff spot!<br>";
-			};
-		}
+            if ($db->sql_query($querySetTeamToClinched)) {
+                echo "The $contendingTeamName have clinched a playoff spot!<br>";
+            }
+            ;
+        }
 
-		$i++;
-	}
+        $i++;
+    }
 }
 
 function updateMagicNumbers($region)
 {
-	global $db, $sharedFunctions;
+    global $db, $sharedFunctions;
 
-	echo "<p>Updating the magic numbers for the $region...<br>";
-	list ($grouping, $groupingGB, $groupingMagicNumber) = assignGroupingsFor($region);
+    echo "<p>Updating the magic numbers for the $region...<br>";
+    list($grouping, $groupingGB, $groupingMagicNumber) = assignGroupingsFor($region);
 
-	$query = "SELECT team_name, homeWins, homeLosses, awayWins, awayLosses
+    $query = "SELECT team_name, homeWins, homeLosses, awayWins, awayLosses
 		FROM ibl_standings
 		WHERE $grouping = '$region'
 		ORDER BY pct DESC";
-	$result = $db->sql_query($query);
-	$limit = $db->sql_numrows($result);
+    $result = $db->sql_query($query);
+    $limit = $db->sql_numrows($result);
 
-	$i = 0;
-	while ($i < $limit) {
-		$teamName = $db->sql_result($result, $i, 0);
-		$teamTotalWins = $db->sql_result($result, $i, 1) + $db->sql_result($result, $i, 3);
-		if ($i + 1 != $limit) {
-			$belowTeamTotalLosses = $db->sql_result($result, $i + 1, 2) + $db->sql_result($result, $i + 1, 4);
-		} else {
-			$belowTeamTotalLosses = 0; // This results in an inaccurate Magic Number for the bottom team in the $region, but prevents query errors
-		}
-		$magicNumber = 82 + 1 - $teamTotalWins - $belowTeamTotalLosses; // TODO: Make number of games in a season dynamic
+    $i = 0;
+    while ($i < $limit) {
+        $teamName = $db->sql_result($result, $i, 0);
+        $teamTotalWins = $db->sql_result($result, $i, 1) + $db->sql_result($result, $i, 3);
+        if ($i + 1 != $limit) {
+            $belowTeamTotalLosses = $db->sql_result($result, $i + 1, 2) + $db->sql_result($result, $i + 1, 4);
+        } else {
+            $belowTeamTotalLosses = 0; // This results in an inaccurate Magic Number for the bottom team in the $region, but prevents query errors
+        }
+        $magicNumber = 82 + 1 - $teamTotalWins - $belowTeamTotalLosses; // TODO: Make number of games in a season dynamic
 
-		$sqlQueryString = "INSERT INTO ibl_standings (
+        $sqlQueryString = "INSERT INTO ibl_standings (
 			team_name,
 			$groupingMagicNumber
 		)
@@ -451,18 +466,21 @@ function updateMagicNumbers($region)
 		ON DUPLICATE KEY UPDATE
 			$groupingMagicNumber = '$magicNumber'";
 
-		if ($db->sql_query($sqlQueryString)) {
-			echo $sqlQueryString . '<br>';
-		} else die('Invalid query: ' . $db->sql_error());
-		$i++;
-	}
+        if ($db->sql_query($sqlQueryString)) {
+            echo $sqlQueryString . '<br>';
+        } else {
+            die('Invalid query: ' . $db->sql_error());
+        }
 
-	checkIfRegionIsClinched($region);
-	if ($grouping == 'conference') {
-		checkIfPlayoffsClinched($region);
-	}
+        $i++;
+    }
 
-	echo "<p>Magic numbers for the $region $grouping have been updated.<p>";
+    checkIfRegionIsClinched($region);
+    if ($grouping == 'conference') {
+        checkIfPlayoffsClinched($region);
+    }
+
+    echo "<p>Magic numbers for the $region $grouping have been updated.<p>";
 }
 
 extractStandingsValues();
@@ -496,120 +514,120 @@ $currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
 
 $i = 0;
 while ($i < $numTeams) {
-	$tid = $db->sql_result($resultTeams, $i, "TeamID");
-	$teamName = $db->sql_result($resultTeams, $i, "Team");
+    $tid = $db->sql_result($resultTeams, $i, "TeamID");
+    $teamName = $db->sql_result($resultTeams, $i, "Team");
 
-	$queryGames = "SELECT Visitor, Vscore, Home, HScore
+    $queryGames = "SELECT Visitor, Vscore, Home, HScore
 		FROM ibl_schedule
 		WHERE (Visitor = $tid OR Home = $tid)
 		AND (BoxID > 0 AND BoxID < 100000)
 		AND Date BETWEEN '" . ($currentSeasonEndingYear - 1) . "-10-31' AND '$currentSeasonEndingYear-05-30'
 		ORDER BY Date ASC";
-	$resultGames = $db->sql_query($queryGames);
-	$numGames = $db->sql_numrows($resultGames);
+    $resultGames = $db->sql_query($queryGames);
+    $numGames = $db->sql_numrows($resultGames);
 
-	$wins = 0;
-	$losses = 0;
-	$homeWins = 0;
-	$homeLosses = 0;
-	$awayWins = 0;
-	$awayLosses = 0;
-	$winPoints = 0;
-	$lossPoints = 0;
-	$winsInLast10Games = 0;
-	$lossesInLast10Games = 0;
-	$streak = 0;
+    $wins = 0;
+    $losses = 0;
+    $homeWins = 0;
+    $homeLosses = 0;
+    $awayWins = 0;
+    $awayLosses = 0;
+    $winPoints = 0;
+    $lossPoints = 0;
+    $winsInLast10Games = 0;
+    $lossesInLast10Games = 0;
+    $streak = 0;
 
-	$j = 0;
-	while ($j < $numGames) {
-		$awayTeam = $db->sql_result($resultGames, $j, "Visitor");
-		$awayTeamScore = $db->sql_result($resultGames, $j, "VScore");
-		$homeTeam = $db->sql_result($resultGames, $j, "Home");
-		$homeTeamScore = $db->sql_result($resultGames, $j, "HScore");
-		if ($awayTeamScore !== $homeTeamScore) { // Ignore tied games since they're usually 0-0 games that haven't yet occurred
-			if ($tid == $awayTeam) {
-				$queryOpponentWinLoss = "SELECT win, loss
+    $j = 0;
+    while ($j < $numGames) {
+        $awayTeam = $db->sql_result($resultGames, $j, "Visitor");
+        $awayTeamScore = $db->sql_result($resultGames, $j, "VScore");
+        $homeTeam = $db->sql_result($resultGames, $j, "Home");
+        $homeTeamScore = $db->sql_result($resultGames, $j, "HScore");
+        if ($awayTeamScore !== $homeTeamScore) { // Ignore tied games since they're usually 0-0 games that haven't yet occurred
+            if ($tid == $awayTeam) {
+                $queryOpponentWinLoss = "SELECT win, loss
 					FROM nuke_ibl_power
 					WHERE TeamID = $homeTeam";
-				$resultOpponentWinLoss = $db->sql_query($queryOpponentWinLoss);
-				$opponentWins = $db->sql_result($resultOpponentWinLoss, 0, "win");
-				$opponentLosses = $db->sql_result($resultOpponentWinLoss, 0, "loss");
+                $resultOpponentWinLoss = $db->sql_query($queryOpponentWinLoss);
+                $opponentWins = $db->sql_result($resultOpponentWinLoss, 0, "win");
+                $opponentLosses = $db->sql_result($resultOpponentWinLoss, 0, "loss");
 
-				if ($awayTeamScore > $homeTeamScore) {
-					$wins++;
-					$awayWins++;
-					$winPoints = $winPoints + $opponentWins;
-					if ($j >= $numGames - 10) {
-						$winsInLast10Games++;
-					}
-					if ($streakType == "W") {
-						$streak++;
-					} else {
-						$streak = 1;
-					}
-					$streakType = "W";
-				} else {
-					$losses++;
-					$awayLosses++;
-					$lossPoints = $lossPoints + $opponentLosses;
-					if ($j >= $numGames - 10) {
-						$lossesInLast10Games++;
-					}
-					if ($streakType == "L") {
-						$streak++;
-					} else {
-						$streak = 1;
-					}
-					$streakType = "L";
-				}
-			} elseif ($tid == $homeTeam) {
-				$queryOpponentWinLoss = "SELECT win, loss
+                if ($awayTeamScore > $homeTeamScore) {
+                    $wins++;
+                    $awayWins++;
+                    $winPoints = $winPoints + $opponentWins;
+                    if ($j >= $numGames - 10) {
+                        $winsInLast10Games++;
+                    }
+                    if ($streakType == "W") {
+                        $streak++;
+                    } else {
+                        $streak = 1;
+                    }
+                    $streakType = "W";
+                } else {
+                    $losses++;
+                    $awayLosses++;
+                    $lossPoints = $lossPoints + $opponentLosses;
+                    if ($j >= $numGames - 10) {
+                        $lossesInLast10Games++;
+                    }
+                    if ($streakType == "L") {
+                        $streak++;
+                    } else {
+                        $streak = 1;
+                    }
+                    $streakType = "L";
+                }
+            } elseif ($tid == $homeTeam) {
+                $queryOpponentWinLoss = "SELECT win, loss
 					FROM nuke_ibl_power
 					WHERE TeamID = $awayTeam";
-				$resultOpponentWinLoss = $db->sql_query($queryOpponentWinLoss);
-				$opponentWins = $db->sql_result($resultOpponentWinLoss, 0, "win");
-				$opponentLosses = $db->sql_result($resultOpponentWinLoss, 0, "loss");
+                $resultOpponentWinLoss = $db->sql_query($queryOpponentWinLoss);
+                $opponentWins = $db->sql_result($resultOpponentWinLoss, 0, "win");
+                $opponentLosses = $db->sql_result($resultOpponentWinLoss, 0, "loss");
 
-				if ($awayTeamScore > $homeTeamScore) {
-					$losses++;
-					$homeLosses++;
-					$lossPoints = $lossPoints + $opponentLosses;
-					if ($j >= $numGames - 10) {
-						$lossesInLast10Games++;
-					}
-					if ($streakType == "L") {
-						$streak++;
-					} else {
-						$streak = 1;
-					}
-					$streakType = "L";
-				} else {
-					$wins++;
-					$homeWins++;
-					$winPoints = $winPoints + $opponentWins;
-					if ($j >= $numGames - 10) {
-						$winsInLast10Games++;
-					}
-					if ($streakType == "W") {
-						$streak++;
-					} else {
-						$streak = 1;
-					}
-					$streakType = "W";
-				}
-			}
-		}
-		$j++;
-	}
+                if ($awayTeamScore > $homeTeamScore) {
+                    $losses++;
+                    $homeLosses++;
+                    $lossPoints = $lossPoints + $opponentLosses;
+                    if ($j >= $numGames - 10) {
+                        $lossesInLast10Games++;
+                    }
+                    if ($streakType == "L") {
+                        $streak++;
+                    } else {
+                        $streak = 1;
+                    }
+                    $streakType = "L";
+                } else {
+                    $wins++;
+                    $homeWins++;
+                    $winPoints = $winPoints + $opponentWins;
+                    if ($j >= $numGames - 10) {
+                        $winsInLast10Games++;
+                    }
+                    if ($streakType == "W") {
+                        $streak++;
+                    } else {
+                        $streak = 1;
+                    }
+                    $streakType = "W";
+                }
+            }
+        }
+        $j++;
+    }
 
-	$gb = ($wins / 2) - ($losses / 2);
+    $gb = ($wins / 2) - ($losses / 2);
 
-	$winPoints = $winPoints + $wins;
-	$lossPoints = $lossPoints + $losses;
-	$ranking = round(($winPoints / ($winPoints + $lossPoints)) * 100, 1);
+    $winPoints = $winPoints + $wins;
+    $lossPoints = $lossPoints + $losses;
+    $ranking = round(($winPoints / ($winPoints + $lossPoints)) * 100, 1);
 
-	// Update nuke_ibl_power with each team's win/loss info and current power ranking score
-	$query3 = "UPDATE nuke_ibl_power
+    // Update nuke_ibl_power with each team's win/loss info and current power ranking score
+    $query3 = "UPDATE nuke_ibl_power
 		SET win = $wins,
 			loss = $losses,
 			gb = $gb,
@@ -623,36 +641,36 @@ while ($i < $numTeams) {
 			streak = $streak,
 			ranking = $ranking
 		WHERE TeamID = $tid;";
-	$result3 = $db->sql_query($query3);
+    $result3 = $db->sql_query($query3);
 
-	echo "Updating $teamName: $wins wins, $losses losses, $gb games back, $homeWins home wins, $homeLosses home losses, $awayWins away wins, $awayLosses away losses, streak = $streakType$streak, last 10 = $winsInLast10Games-$lossesInLast10Games, ranking score = $ranking<br>";
+    echo "Updating $teamName: $wins wins, $losses losses, $gb games back, $homeWins home wins, $homeLosses home losses, $awayWins away wins, $awayLosses away losses, streak = $streakType$streak, last 10 = $winsInLast10Games-$lossesInLast10Games, ranking score = $ranking<br>";
 
-	// Update nuke_iblteam_win_loss with each team's season win/loss info
-	$query4 = "UPDATE nuke_iblteam_win_loss a, nuke_ibl_power b
+    // Update nuke_iblteam_win_loss with each team's season win/loss info
+    $query4 = "UPDATE nuke_iblteam_win_loss a, nuke_ibl_power b
 		SET a.wins = b.win,
 			a.losses = b.loss
-		WHERE a.currentname = b.Team AND a.year = '".$currentSeasonEndingYear."';";
-	$result4 = $db->sql_query($query4);
+		WHERE a.currentname = b.Team AND a.year = '" . $currentSeasonEndingYear . "';";
+    $result4 = $db->sql_query($query4);
 
-	// Update teams' total wins in ibl_team_history by summing up a team's wins in nuke_iblteam_win_loss
-	$query8 = "UPDATE ibl_team_history a
+    // Update teams' total wins in ibl_team_history by summing up a team's wins in nuke_iblteam_win_loss
+    $query8 = "UPDATE ibl_team_history a
 		SET totwins = (SELECT SUM(b.wins)
 		FROM nuke_iblteam_win_loss AS b
 		WHERE a.team_name = b.currentname)";
-	$result8 = $db->sql_query($query8);
+    $result8 = $db->sql_query($query8);
 
-	// Update teams' total losses in ibl_team_history by summing up a team's losses in nuke_iblteam_win_loss
-	$query9 = "UPDATE ibl_team_history a
+    // Update teams' total losses in ibl_team_history by summing up a team's losses in nuke_iblteam_win_loss
+    $query9 = "UPDATE ibl_team_history a
 		SET totloss = (SELECT SUM(b.losses)
 		FROM nuke_iblteam_win_loss AS b
 		WHERE a.team_name = b.currentname)";
-	$result9 = $db->sql_query($query9);
+    $result9 = $db->sql_query($query9);
 
-	// Update teams' win percentage in ibl_team_history
-	$query12 = "UPDATE ibl_team_history a SET winpct = a.totwins / (a.totwins + a.totloss)";
-	$result12 = $db->sql_query($query12);
+    // Update teams' win percentage in ibl_team_history
+    $query12 = "UPDATE ibl_team_history a SET winpct = a.totwins / (a.totwins + a.totloss)";
+    $result12 = $db->sql_query($query12);
 
-	$i++;
+    $i++;
 }
 
 echo '<p>Power Rankings have been updated.<p>';
@@ -677,19 +695,19 @@ $standingsHTML = "<script src=\"sorttable.js\"></script>";
 
 function displayStandings($region)
 {
-	global $db, $sharedFunctions, $standingsHTML;
+    global $db, $sharedFunctions, $standingsHTML;
 
-	list ($grouping, $groupingGB, $groupingMagicNumber) = assignGroupingsFor($region);
+    list($grouping, $groupingGB, $groupingMagicNumber) = assignGroupingsFor($region);
 
-	$query = "SELECT tid, team_name, leagueRecord, pct, $groupingGB, confRecord, divRecord, homeRecord, awayRecord, gamesUnplayed, $groupingMagicNumber, clinchedConference, clinchedDivision, clinchedPlayoffs, (homeWins + homeLosses) AS homeGames, (awayWins + awayLosses) AS awayGames
+    $query = "SELECT tid, team_name, leagueRecord, pct, $groupingGB, confRecord, divRecord, homeRecord, awayRecord, gamesUnplayed, $groupingMagicNumber, clinchedConference, clinchedDivision, clinchedPlayoffs, (homeWins + homeLosses) AS homeGames, (awayWins + awayLosses) AS awayGames
 		FROM ibl_standings
 		WHERE $grouping = '$region' ORDER BY $groupingGB ASC";
-	$result = $db->sql_query($query);
-	$limit = $db->sql_numrows($result);
+    $result = $db->sql_query($query);
+    $limit = $db->sql_numrows($result);
 
-	$standingsHTML .= '<font color=#fd004d><b>' . $region . ' ' . ucfirst($grouping) . '</b></font>';
-	$standingsHTML .= '<table class="sortable">';
-	$standingsHTML .= '<tr>
+    $standingsHTML .= '<font color=#fd004d><b>' . $region . ' ' . ucfirst($grouping) . '</b></font>';
+    $standingsHTML .= '<table class="sortable">';
+    $standingsHTML .= '<tr>
 		<td><font color=#ffffff><b>Team</b></font></td>
 		<td><font color=#ffffff><b>W-L</b></font></td>
 		<td><font color=#ffffff><b>Pct</b></font></td>
@@ -706,40 +724,40 @@ function displayStandings($region)
 		<td><font color=#ffffff><b>Streak</b></font></td>
 	</tr>';
 
-	$i = 0;
-	while ($i < $limit) {
-		$tid = $db->sql_result($result, $i, 0);
-		$team_name = $db->sql_result($result, $i, 1);
-		$leagueRecord = $db->sql_result($result, $i, 2);
-		$pct = $db->sql_result($result, $i, 3);
-		$GB = $db->sql_result($result, $i, 4);
-		$confRecord = $db->sql_result($result, $i, 5);
-		$divRecord = $db->sql_result($result, $i, 6);
-		$homeRecord = $db->sql_result($result, $i, 7);
-		$awayRecord = $db->sql_result($result, $i, 8);
-		$gamesUnplayed = $db->sql_result($result, $i, 9);
-		$magicNumber = $db->sql_result($result, $i, 10);
-		$clinchedConference = $db->sql_result($result, $i, 11);
-		$clinchedDivision = $db->sql_result($result, $i, 12);
-		$clinchedPlayoffs = $db->sql_result($result, $i, 13);
-		$homeGames = $db->sql_result($result, $i, "homeGames");
-		$awayGames = $db->sql_result($result, $i, "awayGames");
-	    if ($clinchedConference == 1) {
-	        $team_name = "<b>Z</b>-" . $team_name;
-	    } elseif ($clinchedDivision == 1) {
-	        $team_name = "<b>Y</b>-" . $team_name;
-	    } elseif ($clinchedPlayoffs == 1) {
-	        $team_name = "<b>X</b>-" . $team_name;
-	    }
+    $i = 0;
+    while ($i < $limit) {
+        $tid = $db->sql_result($result, $i, 0);
+        $team_name = $db->sql_result($result, $i, 1);
+        $leagueRecord = $db->sql_result($result, $i, 2);
+        $pct = $db->sql_result($result, $i, 3);
+        $GB = $db->sql_result($result, $i, 4);
+        $confRecord = $db->sql_result($result, $i, 5);
+        $divRecord = $db->sql_result($result, $i, 6);
+        $homeRecord = $db->sql_result($result, $i, 7);
+        $awayRecord = $db->sql_result($result, $i, 8);
+        $gamesUnplayed = $db->sql_result($result, $i, 9);
+        $magicNumber = $db->sql_result($result, $i, 10);
+        $clinchedConference = $db->sql_result($result, $i, 11);
+        $clinchedDivision = $db->sql_result($result, $i, 12);
+        $clinchedPlayoffs = $db->sql_result($result, $i, 13);
+        $homeGames = $db->sql_result($result, $i, "homeGames");
+        $awayGames = $db->sql_result($result, $i, "awayGames");
+        if ($clinchedConference == 1) {
+            $team_name = "<b>Z</b>-" . $team_name;
+        } elseif ($clinchedDivision == 1) {
+            $team_name = "<b>Y</b>-" . $team_name;
+        } elseif ($clinchedPlayoffs == 1) {
+            $team_name = "<b>X</b>-" . $team_name;
+        }
 
-		$queryLast10Games = "SELECT last_win, last_loss, streak_type, streak FROM nuke_ibl_power WHERE TeamID = $tid";
-		$resultLast10Games = $db->sql_query($queryLast10Games);
-		$winsInLast10Games = $db->sql_result($resultLast10Games, 0, 0);
-		$lossesInLast10Games = $db->sql_result($resultLast10Games, 0, 1);
-		$streakType = $db->sql_result($resultLast10Games, 0, 2);
-		$streak = $db->sql_result($resultLast10Games, 0, 3);
+        $queryLast10Games = "SELECT last_win, last_loss, streak_type, streak FROM nuke_ibl_power WHERE TeamID = $tid";
+        $resultLast10Games = $db->sql_query($queryLast10Games);
+        $winsInLast10Games = $db->sql_result($resultLast10Games, 0, 0);
+        $lossesInLast10Games = $db->sql_result($resultLast10Games, 0, 1);
+        $streakType = $db->sql_result($resultLast10Games, 0, 2);
+        $streak = $db->sql_result($resultLast10Games, 0, 3);
 
-		$standingsHTML .= '<tr><td><a href="modules.php?name=Team&op=team&tid=' . $tid . '">' . $team_name . '</td>
+        $standingsHTML .= '<tr><td><a href="modules.php?name=Team&op=team&tid=' . $tid . '">' . $team_name . '</td>
 			<td>' . $leagueRecord . '</td>
 			<td>' . $pct . '</td>
 			<td><center>' . $GB . '</center></td>
@@ -753,9 +771,9 @@ function displayStandings($region)
 			<td><center>' . $awayGames . '</center></td>
 			<td>' . $winsInLast10Games . '-' . $lossesInLast10Games . '</td>
 			<td>' . $streakType . ' ' . $streak . '</td></tr>';
-		$i++;
-	}
-	$standingsHTML .= '<tr><td colspan=10><hr></td></tr></table><p>';
+        $i++;
+    }
+    $standingsHTML .= '<tr><td colspan=10><hr></td></tr></table><p>';
 }
 
 echo '<p>Updating the Standings page...<p>';
@@ -770,40 +788,42 @@ displayStandings('Pacific');
 
 $sqlQueryString = "UPDATE nuke_pages SET text = '$standingsHTML' WHERE pid = 4";
 if ($db->sql_query($sqlQueryString)) {
-	echo $sqlQueryString . '<p>';
-	echo '<p>Full standings page has been updated.<p>';
-} else die('Invalid query: ' . $db->sql_error());
+    echo $sqlQueryString . '<p>';
+    echo '<p>Full standings page has been updated.<p>';
+} else {
+    die('Invalid query: ' . $db->sql_error());
+}
 
 $resetExtensionQueryString = 'UPDATE nuke_ibl_team_info SET Used_Extension_This_Chunk = 0';
 if ($db->sql_query($resetExtensionQueryString)) {
-	echo $resetExtensionQueryString . '<p>';
-	echo '<p>Contract Extension usages have been reset.<p>';
-} else die('Invalid query: ' . $db->sql_error());
+    echo $resetExtensionQueryString . '<p>';
+    echo '<p>Contract Extension usages have been reset.<p>';
+} else {
+    die('Invalid query: ' . $db->sql_error());
+}
 
 $currentSeasonPhase = $sharedFunctions->getCurrentSeasonPhase();
-if ($currentSeasonPhase == "Playoffs" OR $currentSeasonPhase == "Draft" OR $currentSeasonPhase == "Free Agency") {
-	echo '<p>Re-applying postseason trades made during the playoffs...</p>';
+if ($currentSeasonPhase == "Playoffs" or $currentSeasonPhase == "Draft" or $currentSeasonPhase == "Free Agency") {
+    echo '<p>Re-applying postseason trades made during the playoffs...</p>';
 
-	$postseasonTradeQueueQuery = "SELECT * FROM ibl_trade_queue;";
-	$postseasonTradeQueueResult = $db->sql_query($postseasonTradeQueueQuery);
-	$i = 0;
-	while ($i < $db->sql_numrows($postseasonTradeQueueResult)) {
-		$queuedTradeQuery = $db->sql_result($postseasonTradeQueueResult, $i);
-		$tradeLine = $db->sql_result($postseasonTradeQueueResult, $i, 1);
-		if ($db->sql_query($queuedTradeQuery)) {
-			echo $tradeLine . "\n";
-		}
-		$i++;
-	}
-	echo '<p>Postseason trades have been re-applied!';
+    $postseasonTradeQueueQuery = "SELECT * FROM ibl_trade_queue;";
+    $postseasonTradeQueueResult = $db->sql_query($postseasonTradeQueueQuery);
+    $i = 0;
+    while ($i < $db->sql_numrows($postseasonTradeQueueResult)) {
+        $queuedTradeQuery = $db->sql_result($postseasonTradeQueueResult, $i);
+        $tradeLine = $db->sql_result($postseasonTradeQueueResult, $i, 1);
+        if ($db->sql_query($queuedTradeQuery)) {
+            echo $tradeLine . "\n";
+        }
+        $i++;
+    }
+    echo '<p>Postseason trades have been re-applied!';
 } elseif ($currentSeasonPhase == "Preseason") {
-	if ($db->sql_query("TRUNCATE TABLE ibl_trade_queue;")) {
-		echo "<p>TRUNCATE TABLE ibl_trade_queue;";
-	}
+    if ($db->sql_query("TRUNCATE TABLE ibl_trade_queue;")) {
+        echo "<p>TRUNCATE TABLE ibl_trade_queue;";
+    }
 }
 
 echo '<p>All the things have been updated!<p>';
 
 echo '<a href="index.php">Return to the IBL homepage</a>';
-
-?>

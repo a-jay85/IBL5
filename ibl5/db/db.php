@@ -51,44 +51,44 @@ if (defined('FORUM_ADMIN')) {
     $the_include = "db";
 }
 
-switch($dbtype) {
+switch ($dbtype) {
 
-	case 'MySQL':
+    case 'MySQL':
         // commented out since mysql.php has been moved to /classes and is now autoloaded
-		// include("".$the_include."/mysql.php");
-		break;
+        // include("".$the_include."/mysql.php");
+        break;
 
-	case 'mysql4':
-		include("".$the_include."/mysql4.php");
-		break;
+    case 'mysql4':
+        include "" . $the_include . "/mysql4.php";
+        break;
 
-	case 'sqlite':
-		include("".$the_include."/sqlite.php");
-		break;
+    case 'sqlite':
+        include "" . $the_include . "/sqlite.php";
+        break;
 
-	case 'postgres':
-		include("".$the_include."/postgres7.php");
-		break;
+    case 'postgres':
+        include "" . $the_include . "/postgres7.php";
+        break;
 
-	case 'mssql':
-		include("".$the_include."/mssql.php");
-		break;
+    case 'mssql':
+        include "" . $the_include . "/mssql.php";
+        break;
 
-	case 'oracle':
-		include("".$the_include."/oracle.php");
-		break;
+    case 'oracle':
+        include "" . $the_include . "/oracle.php";
+        break;
 
-	case 'msaccess':
-		include("".$the_include."/msaccess.php");
-		break;
+    case 'msaccess':
+        include "" . $the_include . "/msaccess.php";
+        break;
 
-	case 'mssql-odbc':
-		include("".$the_include."/mssql-odbc.php");
-		break;
+    case 'mssql-odbc':
+        include "" . $the_include . "/mssql-odbc.php";
+        break;
 
-	case 'db2':
-		include("".$the_include."/db2.php");
-		break;
+    case 'db2':
+        include "" . $the_include . "/db2.php";
+        break;
 
 }
 
@@ -97,8 +97,6 @@ if ($dbtype = 'MySQL') {
 } else {
     $db = new sql_db($dbhost, $dbuname, $dbpass, $dbname, false);
 }
-if(!$db->db_connect_id) {
+if (!$db->db_connect_id) {
     die("<br><br><center><img src=images/logo.gif><br><br><b>There seems to be a problem with the $dbtype server, sorry for the inconvenience.<br><br>We should be back shortly.</center></b>");
 }
-
-?>

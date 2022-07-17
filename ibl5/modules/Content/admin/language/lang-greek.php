@@ -17,39 +17,35 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_SIGNATURE","Υπογραφή");
-define("_SAVECHANGES","Αποθήκευση Αλλαγών");
-define("_CATEGORY","Κατηγορίες");
-define("_DESCRIPTION","Περιγραφή");
-define("_TITLE","Τίτλος");
-define("_FUNCTIONS","Λειτουργίες");
-define("_PAGEBREAK","Αν έχετε πολλαπλές σελίδες μπορείτε να σημειώσετε <b>[--pagebreak--]</b> στο σημείο που θέλετε να εισαχθεί μια διακοπή σελίδας.");
-define("_YES","Ναι");
-define("_NO","Οχι");
-define("_SEND","Αποστολή");
-define("_ACTIVE","Ενεργό");
-define("_DEACTIVATE","Απενεργοποίηση");
-define("_INACTIVE","Απενεργοποιημένο");
-define("_ACTIVATE","Ενεργοποίηση");
-define("_CONTENT","Περιεχόμενα");
-define("_ADD","Προσθήκη ");
-define("_EDITCATEGORY","Επεξεργασία Κατηγορίας");
-define("_ADDCATEGORY","Προσθήκη Νέας Κατηγορίας");
-define("_LANGUAGE","Language");
-define("_CONTENTMANAGER","Content Manager");
-define("_DELCONTWARNING","Are you sure you want to delete the page");
-define("_DELCONTENT","Delete Page");
-define("_CURRENTSTATUS","Current Status");
-define("_ADDANEWPAGE","Add a New Page");
-define("_CSUBTITLE","Sub-Title");
-define("_HEADERTEXT","Header Text");
-define("_PAGETEXT","Page Text");
-define("_FOOTERTEXT","Footer Text");
-define("_ACTIVATEPAGE","Activate This Page?");
-define("_EDITPAGECONTENT","Edit Page Content");
-define("_DELCONTENTCAT","WARNING: Are you sure you want to delete this category? Pages under this category, if they exist, will not be removed, but will not be attached to any category.");
-define("_DELCATEGORY","Delete Category");
-
-
-?>
+define("_SIGNATURE", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_SAVECHANGES", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_CATEGORY", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_DESCRIPTION", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_TITLE", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_FUNCTIONS", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_PAGEBREAK", "οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ <b>[--pagebreak--]</b> οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½.");
+define("_YES", "οΏ½οΏ½οΏ½");
+define("_NO", "οΏ½οΏ½οΏ½");
+define("_SEND", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_ACTIVE", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_DEACTIVATE", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_INACTIVE", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_ACTIVATE", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_CONTENT", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_ADD", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ ");
+define("_EDITCATEGORY", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_ADDCATEGORY", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_LANGUAGE", "Language");
+define("_CONTENTMANAGER", "Content Manager");
+define("_DELCONTWARNING", "Are you sure you want to delete the page");
+define("_DELCONTENT", "Delete Page");
+define("_CURRENTSTATUS", "Current Status");
+define("_ADDANEWPAGE", "Add a New Page");
+define("_CSUBTITLE", "Sub-Title");
+define("_HEADERTEXT", "Header Text");
+define("_PAGETEXT", "Page Text");
+define("_FOOTERTEXT", "Footer Text");
+define("_ACTIVATEPAGE", "Activate This Page?");
+define("_EDITPAGECONTENT", "Edit Page Content");
+define("_DELCONTENTCAT", "WARNING: Are you sure you want to delete this category? Pages under this category, if they exist, will not be removed, but will not be attached to any category.");
+define("_DELCATEGORY", "Delete Category");

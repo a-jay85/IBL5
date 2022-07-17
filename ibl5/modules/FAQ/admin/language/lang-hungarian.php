@@ -17,28 +17,24 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_FUNCTIONS","Funkciók");
-define("_YES","Igen");
-define("_NO","Nem");
-define("_SAVE","Ment");
-define("_ID","ID");
-define("_CATEGORIES","kategória");
-define("_ALL","Minden");
-define("_FAQ","GYIK/FAQ");
-define("_CONTENT","Tartalom");
-define("_FAQADMIN","FAQ Adminisztráció");
-define("_ACTIVEFAQS","Aktív FAQ-ok");
-define("_ADDCATEGORY","Új kategória");
-define("_QUESTIONS","Kérdések és Válaszok");
-define("_ADDQUESTION","Új kérdés");
-define("_QUESTION","Kérdés");
-define("_ANSWER","Válasz");
-define("_EDITCATEGORY","Kategória szerkesztése");
-define("_EDITQUESTIONS","Kérdések és Válaszok szerkesztése");
-define("_FAQDELWARNING","FIGYELMEZTETÉS: Biztosan törölni akarod ezt a FAQ-ot és teljes tartalmát?");
-define("_QUESTIONDEL","FIGYELMEZTETÉS: Biztosan törölni akarod ezt a kérdést?");
-define("_LANGUAGE","Language");
-
-
-?>
+define("_FUNCTIONS", "Funkciï¿½k");
+define("_YES", "Igen");
+define("_NO", "Nem");
+define("_SAVE", "Ment");
+define("_ID", "ID");
+define("_CATEGORIES", "kategï¿½ria");
+define("_ALL", "Minden");
+define("_FAQ", "GYIK/FAQ");
+define("_CONTENT", "Tartalom");
+define("_FAQADMIN", "FAQ Adminisztrï¿½ciï¿½");
+define("_ACTIVEFAQS", "Aktï¿½v FAQ-ok");
+define("_ADDCATEGORY", "ï¿½j kategï¿½ria");
+define("_QUESTIONS", "Kï¿½rdï¿½sek ï¿½s Vï¿½laszok");
+define("_ADDQUESTION", "ï¿½j kï¿½rdï¿½s");
+define("_QUESTION", "Kï¿½rdï¿½s");
+define("_ANSWER", "Vï¿½lasz");
+define("_EDITCATEGORY", "Kategï¿½ria szerkesztï¿½se");
+define("_EDITQUESTIONS", "Kï¿½rdï¿½sek ï¿½s Vï¿½laszok szerkesztï¿½se");
+define("_FAQDELWARNING", "FIGYELMEZTETï¿½S: Biztosan tï¿½rï¿½lni akarod ezt a FAQ-ot ï¿½s teljes tartalmï¿½t?");
+define("_QUESTIONDEL", "FIGYELMEZTETï¿½S: Biztosan tï¿½rï¿½lni akarod ezt a kï¿½rdï¿½st?");
+define("_LANGUAGE", "Language");

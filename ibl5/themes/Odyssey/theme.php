@@ -22,7 +22,7 @@
 /************************************************************/
 
 global $loonr, $prefix, $db, $kokku;
-$kokku = $db->sql_numrows($db->sql_query("select * from ".$prefix."_stories LIMIT 0, 30 "));
+$kokku = $db->sql_numrows($db->sql_query("select * from " . $prefix . "_stories LIMIT 0, 30 "));
 
 $bgcolor1 = "#FFFFFF";
 $bgcolor2 = "#00BBCC";
@@ -35,7 +35,7 @@ if (empty($loonr)) {
     $loonr = "0";
 }
 
-include("themes/Odyssey/tables.php");
+include "themes/Odyssey/tables.php";
 
 /************************************************************/
 /* Function themeheader()                                   */
@@ -45,7 +45,8 @@ include("themes/Odyssey/tables.php");
 /* function for left side with: blocks(left);               */
 /************************************************************/
 
-function themeheader() {
+function themeheader()
+{
     global $user, $banners, $sitename, $slogan, $cookie, $prefix, $db, $anonymous;
     cookiedecode($user);
     $username = $cookie[1];
@@ -53,33 +54,33 @@ function themeheader() {
         $username = $anonymous;
     }
     echo "<body bgcolor=\"#004080\" text=\"#000000\" link=\"#004080\" vlink=\"#004080\" alink=\"#004080\">";
-	ads(0);
+    ads(0);
     $topics_list = "<select name=\"topic\" onChange='submit()'>\n";
     $topics_list .= "<option value=\"\">All Topics</option>\n";
-    $toplist = $db->sql_query("select topicid, topictext from ".$prefix."_topics order by topictext");
-    while(list($topicid, $topics) = $db->sql_fetchrow($toplist)) {
-	$topicid = intval($topicid);
-    if ($topicid==$topic) { $sel = "selected "; }
-	$topics_list .= "<option $sel value=\"$topicid\">$topics</option>\n";
-	$sel = "";
+    $toplist = $db->sql_query("select topicid, topictext from " . $prefix . "_topics order by topictext");
+    while (list($topicid, $topics) = $db->sql_fetchrow($toplist)) {
+        $topicid = intval($topicid);
+        if ($topicid == $topic) {$sel = "selected ";}
+        $topics_list .= "<option $sel value=\"$topicid\">$topics</option>\n";
+        $sel = "";
     }
     if ($username == $anonymous) {
-	$theuser = "&nbsp;&nbsp;<a href=\"modules.php?name=Your_Account\">Create an account";
+        $theuser = "&nbsp;&nbsp;<a href=\"modules.php?name=Your_Account\">Create an account";
     } else {
-	$theuser = "&nbsp;&nbsp;Welcome $username!";
+        $theuser = "&nbsp;&nbsp;Welcome $username!";
     }
     $public_msg = public_message();
     $tmpl_file = "themes/Odyssey/header.html";
     $thefile = implode("", file($tmpl_file));
     $thefile = addslashes($thefile);
-    $thefile = "\$r_file=\"".$thefile."\";";
+    $thefile = "\$r_file=\"" . $thefile . "\";";
     eval($thefile);
     print $r_file;
     blocks("left");
     $tmpl_file = "themes/Odyssey/left_center.html";
     $thefile = implode("", file($tmpl_file));
     $thefile = addslashes($thefile);
-    $thefile = "\$r_file=\"".$thefile."\";";
+    $thefile = "\$r_file=\"" . $thefile . "\";";
     eval($thefile);
     print $r_file;
 }
@@ -95,22 +96,23 @@ function themeheader() {
 /* and internal one.                                        */
 /************************************************************/
 
-function themefooter() {
+function themefooter()
+{
     global $foot1, $foot2, $foot3, $foot4;
     if (defined('INDEX_FILE')) {
-	$tmpl_file = "themes/Odyssey/center_right.html";
-	$thefile = implode("", file($tmpl_file));
-	$thefile = addslashes($thefile);
-	$thefile = "\$r_file=\"".$thefile."\";";
-	eval($thefile);
-	print $r_file;
-	blocks("right");
+        $tmpl_file = "themes/Odyssey/center_right.html";
+        $thefile = implode("", file($tmpl_file));
+        $thefile = addslashes($thefile);
+        $thefile = "\$r_file=\"" . $thefile . "\";";
+        eval($thefile);
+        print $r_file;
+        blocks("right");
     }
     $footer_message = "$foot1<br>$foot2<br>$foot3<br>$foot4";
     $tmpl_file = "themes/Odyssey/footer.html";
     $thefile = implode("", file($tmpl_file));
     $thefile = addslashes($thefile);
-    $thefile = "\$r_file=\"".$thefile."\";";
+    $thefile = "\$r_file=\"" . $thefile . "\";";
     eval($thefile);
     print $r_file;
 }
@@ -121,66 +123,67 @@ function themefooter() {
 /* This function format the stories on the Homepage         */
 /************************************************************/
 
-function themeindex ($aid, $informant, $time, $title, $counter, $topic, $thetext, $notes, $morelink, $topicname, $topicimage, $topictext) {
-    global $anonymous, $tipath, $cookie, $loonr, $vasak, $parem, $kokku, $storyhome, $storynum; 
+function themeindex($aid, $informant, $time, $title, $counter, $topic, $thetext, $notes, $morelink, $topicname, $topicimage, $topictext)
+{
+    global $anonymous, $tipath, $cookie, $loonr, $vasak, $parem, $kokku, $storyhome, $storynum;
     $ThemeSel = get_theme();
     if (file_exists("themes/$ThemeSel/images/topics/$topicimage")) {
-	$t_image = "themes/$ThemeSel/images/topics/$topicimage";
+        $t_image = "themes/$ThemeSel/images/topics/$topicimage";
     } else {
-	$t_image = "$tipath$topicimage";
+        $t_image = "$tipath$topicimage";
     }
-    $loonr = ($loonr+1);
+    $loonr = ($loonr + 1);
     if (isset($cookie[3])) {
-	$storynum = $cookie[3];
+        $storynum = $cookie[3];
     } else {
-	$storynum = $storyhome;
+        $storynum = $storyhome;
     }
-    $ridaaa1 = round($loonr/2);
+    $ridaaa1 = round($loonr / 2);
     if (!empty($notes)) {
-	$notes = "<br><br><b>"._NOTE."</b> <i>$notes</i>\n";
+        $notes = "<br><br><b>" . _NOTE . "</b> <i>$notes</i>\n";
     } else {
-	$notes = "";
+        $notes = "";
     }
     if ("$aid" == "$informant") {
-	$content = "$thetext$notes\n";
+        $content = "$thetext$notes\n";
     } else {
-	if(!empty($informant)) {
-	    $content = "<a href=\"modules.php?name=Your_Account&amp;op=userinfo&amp;username=$informant\">$informant</a> ";
-	} else {
-	    $content = "$anonymous ";
-	}
-	$content .= ""._WRITES." <i>\"$thetext\"</i>$notes\n";
+        if (!empty($informant)) {
+            $content = "<a href=\"modules.php?name=Your_Account&amp;op=userinfo&amp;username=$informant\">$informant</a> ";
+        } else {
+            $content = "$anonymous ";
+        }
+        $content .= "" . _WRITES . " <i>\"$thetext\"</i>$notes\n";
     }
-    $posted = ""._POSTEDBY." ";
+    $posted = "" . _POSTEDBY . " ";
     $posted .= get_author($aid);
-    $posted .= " "._ON." $time $timezone ($counter "._READS.")";
-    if (($ridaaa1*2) != $loonr) {
-	$tmpl_file = "themes/Odyssey/story_home.html";
-	$thefile = implode("", file($tmpl_file));
-	$thefile = addslashes($thefile);
-	$thefile = "\$r_file=\"".$thefile."\";";
-	eval($thefile);
-	$vasak .= "$r_file";
+    $posted .= " " . _ON . " $time $timezone ($counter " . _READS . ")";
+    if (($ridaaa1 * 2) != $loonr) {
+        $tmpl_file = "themes/Odyssey/story_home.html";
+        $thefile = implode("", file($tmpl_file));
+        $thefile = addslashes($thefile);
+        $thefile = "\$r_file=\"" . $thefile . "\";";
+        eval($thefile);
+        $vasak .= "$r_file";
     } else {
-	$tmpl_file = "themes/Odyssey/story_home.html";
-	$thefile = implode("", file($tmpl_file));
-	$thefile = addslashes($thefile);
-	$thefile = "\$r_file=\"".$thefile."\";";
-	eval($thefile);
-	$parem .= "$r_file";
+        $tmpl_file = "themes/Odyssey/story_home.html";
+        $thefile = implode("", file($tmpl_file));
+        $thefile = addslashes($thefile);
+        $thefile = "\$r_file=\"" . $thefile . "\";";
+        eval($thefile);
+        $parem .= "$r_file";
     }
-    if ($loonr == $storynum OR $loonr == $kokku) {
-	echo "<table width=\"100%\" border=\"0\"  cellpadding=\"0\" cellspacing=\"0\">";
-	echo "<tr>";
-	echo "<td width=\"49%\" valign=\"top\">";
-	print $vasak;
-	echo "</td>";
-	echo "<td width=\"5\" cellpadding=\"0\" cellspacing=\"0\" valign=\"top\"></td>";
-	echo "<td width=\"49%\" valign=\"top\">";
-	print $parem;
-	echo "</td>";
-	echo "</tr>";
-	echo "</table>";
+    if ($loonr == $storynum or $loonr == $kokku) {
+        echo "<table width=\"100%\" border=\"0\"  cellpadding=\"0\" cellspacing=\"0\">";
+        echo "<tr>";
+        echo "<td width=\"49%\" valign=\"top\">";
+        print $vasak;
+        echo "</td>";
+        echo "<td width=\"5\" cellpadding=\"0\" cellspacing=\"0\" valign=\"top\"></td>";
+        echo "<td width=\"49%\" valign=\"top\">";
+        print $parem;
+        echo "</td>";
+        echo "</tr>";
+        echo "</table>";
     }
 }
 
@@ -191,35 +194,36 @@ function themeindex ($aid, $informant, $time, $title, $counter, $topic, $thetext
 /* you click on that "Read More..." link in the home        */
 /************************************************************/
 
-function themearticle ($aid, $informant, $datetime, $title, $thetext, $topic, $topicname, $topicimage, $topictext) {
+function themearticle($aid, $informant, $datetime, $title, $thetext, $topic, $topicname, $topicimage, $topictext)
+{
     global $admin, $sid, $tipath;
     $ThemeSel = get_theme();
     if (file_exists("themes/$ThemeSel/images/topics/$topicimage")) {
-	$t_image = "themes/$ThemeSel/images/topics/$topicimage";
+        $t_image = "themes/$ThemeSel/images/topics/$topicimage";
     } else {
-	$t_image = "$tipath$topicimage";
+        $t_image = "$tipath$topicimage";
     }
-    $posted = ""._POSTEDON." $datetime "._BY." ";
+    $posted = "" . _POSTEDON . " $datetime " . _BY . " ";
     $posted .= get_author($aid);
     if (!empty($notes)) {
-	$notes = "<br><br><b>"._NOTE."</b> <i>$notes</i>\n";
+        $notes = "<br><br><b>" . _NOTE . "</b> <i>$notes</i>\n";
     } else {
-	$notes = "";
+        $notes = "";
     }
     if ("$aid" == "$informant") {
-	$content = "$thetext$notes\n";
+        $content = "$thetext$notes\n";
     } else {
-	if(!empty($informant)) {
-	    $content = "<a href=\"modules.php?name=Your_Account&amp;op=userinfo&amp;username=$informant\">$informant</a> ";
-	} else {
-	    $content = "$anonymous ";
-	}
-	$content .= ""._WRITES." <i>\"$thetext\"</i>$notes\n";
+        if (!empty($informant)) {
+            $content = "<a href=\"modules.php?name=Your_Account&amp;op=userinfo&amp;username=$informant\">$informant</a> ";
+        } else {
+            $content = "$anonymous ";
+        }
+        $content .= "" . _WRITES . " <i>\"$thetext\"</i>$notes\n";
     }
     $tmpl_file = "themes/Odyssey/story_page.html";
     $thefile = implode("", file($tmpl_file));
     $thefile = addslashes($thefile);
-    $thefile = "\$r_file=\"".$thefile."\";";
+    $thefile = "\$r_file=\"" . $thefile . "\";";
     eval($thefile);
     print $r_file;
 }
@@ -230,13 +234,12 @@ function themearticle ($aid, $informant, $datetime, $title, $thetext, $topic, $t
 /* Control look of your blocks. Just simple.                */
 /************************************************************/
 
-function themesidebox($title, $content) {
+function themesidebox($title, $content)
+{
     $tmpl_file = "themes/Odyssey/blocks.html";
     $thefile = implode("", file($tmpl_file));
     $thefile = addslashes($thefile);
-    $thefile = "\$r_file=\"".$thefile."\";";
+    $thefile = "\$r_file=\"" . $thefile . "\";";
     eval($thefile);
     print $r_file;
 }
-
-?>

@@ -17,32 +17,27 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_URL","URL");
+define("_URL", "URL");
 
+define("_EMAIL", "<b>eMail</b>");
+define("_REALNAME", "Richtiger Name");
+define("_FUNCTIONS", "Funktionen");
 
-define("_EMAIL","<b>eMail</b>");
-define("_REALNAME","Richtiger Name");
-define("_FUNCTIONS","Funktionen");
-
-
-define("_PREVIOUS","Vorherige Seite");
-define("_MEMBERSLIST","Mitgliederliste");
-define("_GREETINGS","Liebe Gr&uuml;sse an den neuen Benutzer:");
-define("_SORTBY","Sortieren nach:");
-define("_MNICKNAME","Benutzername");
-define("_MREALNAME","Richtiger Name");
-define("_MEMAIL","eMail");
-define("_MURL","url");
-define("_ONLINEREG","registrierte Benutzer momentan online:");
-define("_WEHAVE","Es sind");
-define("_MREGISTERED","bisher angemeldete Benutzer. Zur Zeit sind es");
-define("_MREGONLINE","angemeldete Benutzer online.");
-define("_REGSOFAR","angemeldete Benutzer.");
-define("_USERSFOUND","Benutzer gefunden zu");
-define("_USERSSHOWN","angezeigte Benutzer");
-define("_NOMEMBERS","Keine Mitglieder gefunden zu");
-define("_PAGES","Seiten");
-define("_HOMEPAGE","Homepage");
-
-
-?>
+define("_PREVIOUS", "Vorherige Seite");
+define("_MEMBERSLIST", "Mitgliederliste");
+define("_GREETINGS", "Liebe Gr&uuml;sse an den neuen Benutzer:");
+define("_SORTBY", "Sortieren nach:");
+define("_MNICKNAME", "Benutzername");
+define("_MREALNAME", "Richtiger Name");
+define("_MEMAIL", "eMail");
+define("_MURL", "url");
+define("_ONLINEREG", "registrierte Benutzer momentan online:");
+define("_WEHAVE", "Es sind");
+define("_MREGISTERED", "bisher angemeldete Benutzer. Zur Zeit sind es");
+define("_MREGONLINE", "angemeldete Benutzer online.");
+define("_REGSOFAR", "angemeldete Benutzer.");
+define("_USERSFOUND", "Benutzer gefunden zu");
+define("_USERSSHOWN", "angezeigte Benutzer");
+define("_NOMEMBERS", "Keine Mitglieder gefunden zu");
+define("_PAGES", "Seiten");
+define("_HOMEPAGE", "Homepage");

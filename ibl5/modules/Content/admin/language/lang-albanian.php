@@ -17,39 +17,35 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_SEND","Dërgo");
-define("_FUNCTIONS","Funksione");
-define("_YES","Po");
-define("_NO","Jo");
-define("_CATEGORY","Kategoria");
-define("_SAVECHANGES","Shpëto Ndryshimet");
-define("_PAGEBREAK","Nëse dëshiron më shumë se një faqe shto <b>[--pagebreak--]</b> në pikat e ndërprerjes.");
-define("_SIGNATURE","Firma");
-define("_DESCRIPTION","Përshkrimi");
-define("_TITLE","Titulli");
-define("_ACTIVE","Aktiv");
-define("_DEACTIVATE","Disaktivo");
-define("_INACTIVE","Jo aktiv");
-define("_ACTIVATE","Aktivo");
-define("_CONTENT","Përmbajtja");
-define("_ADDCATEGORY","Shto një Kategori të Re");
-define("_EDITCATEGORY","Shkruaj Kategorinë");
-define("_ADD","Shto");
-define("_LANGUAGE","Gjuha");
-define("_CONTENTMANAGER","Manazheri i Përmbajtjes");
-define("_DELCONTWARNING","I sigurt që dëshiron të fshish faqen");
-define("_DELCONTENT","Fshi faqen");
-define("_CURRENTSTATUS","Gjëndja aktuale");
-define("_ADDANEWPAGE","Shto një faqe të re");
-define("_CSUBTITLE","Nën-titull");
-define("_HEADERTEXT","Teksti i Fillimit të Faqes");
-define("_PAGETEXT","Teksti Faqes");
-define("_FOOTERTEXT","Teksti i Fund'Faqes");
-define("_ACTIVATEPAGE","Aktivon faqen?");
-define("_EDITPAGECONTENT","Shkruaj Përmbajtjen e Faqes");
-define("_DELCONTENTCAT","KUJDES : Jeni i sigurt që deshironi të eleminoni këtë kategori? Faqet nën këtë kategori, nëse ekzistojnë, nuk do të eleminohen, por nuk do ti përkasin më asnjë kategorie.");
-define("_DELCATEGORY","Elemino Kategorinë");
-
-
-?>
+define("_SEND", "Dï¿½rgo");
+define("_FUNCTIONS", "Funksione");
+define("_YES", "Po");
+define("_NO", "Jo");
+define("_CATEGORY", "Kategoria");
+define("_SAVECHANGES", "Shpï¿½to Ndryshimet");
+define("_PAGEBREAK", "Nï¿½se dï¿½shiron mï¿½ shumï¿½ se njï¿½ faqe shto <b>[--pagebreak--]</b> nï¿½ pikat e ndï¿½rprerjes.");
+define("_SIGNATURE", "Firma");
+define("_DESCRIPTION", "Pï¿½rshkrimi");
+define("_TITLE", "Titulli");
+define("_ACTIVE", "Aktiv");
+define("_DEACTIVATE", "Disaktivo");
+define("_INACTIVE", "Jo aktiv");
+define("_ACTIVATE", "Aktivo");
+define("_CONTENT", "Pï¿½rmbajtja");
+define("_ADDCATEGORY", "Shto njï¿½ Kategori tï¿½ Re");
+define("_EDITCATEGORY", "Shkruaj Kategorinï¿½");
+define("_ADD", "Shto");
+define("_LANGUAGE", "Gjuha");
+define("_CONTENTMANAGER", "Manazheri i Pï¿½rmbajtjes");
+define("_DELCONTWARNING", "I sigurt qï¿½ dï¿½shiron tï¿½ fshish faqen");
+define("_DELCONTENT", "Fshi faqen");
+define("_CURRENTSTATUS", "Gjï¿½ndja aktuale");
+define("_ADDANEWPAGE", "Shto njï¿½ faqe tï¿½ re");
+define("_CSUBTITLE", "Nï¿½n-titull");
+define("_HEADERTEXT", "Teksti i Fillimit tï¿½ Faqes");
+define("_PAGETEXT", "Teksti Faqes");
+define("_FOOTERTEXT", "Teksti i Fund'Faqes");
+define("_ACTIVATEPAGE", "Aktivon faqen?");
+define("_EDITPAGECONTENT", "Shkruaj Pï¿½rmbajtjen e Faqes");
+define("_DELCONTENTCAT", "KUJDES : Jeni i sigurt qï¿½ deshironi tï¿½ eleminoni kï¿½tï¿½ kategori? Faqet nï¿½n kï¿½tï¿½ kategori, nï¿½se ekzistojnï¿½, nuk do tï¿½ eleminohen, por nuk do ti pï¿½rkasin mï¿½ asnjï¿½ kategorie.");
+define("_DELCATEGORY", "Elemino Kategorinï¿½");

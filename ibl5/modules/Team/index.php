@@ -2014,7 +2014,7 @@ function team_info_right($team_name, $color1, $color2, $owner_name, $tid)
 		<font color=\"#$color2\"><b>Current Season</b></font>
 		</td></tr>
 		<tr><td>";
-    $output .= standings($team_name);
+    $output .= teamCurrentSeasonStandings($team_name);
     $output .= "</td></tr>";
 
     //==================
@@ -3474,7 +3474,7 @@ function financialdisplay($matrix, $yr, $tid)
     return $returning;
 }
 
-function standings($team)
+function teamCurrentSeasonStandings($team)
 {
     global $db;
 

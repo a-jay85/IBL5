@@ -17,9 +17,5 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_ACTIVETOPICS","Zur Zeit aktive Themen");
-define("_CLICK2LIST","Alle Artikel zu diesem Thema anzeigen");
-
-
-?>
+define("_ACTIVETOPICS", "Zur Zeit aktive Themen");
+define("_CLICK2LIST", "Alle Artikel zu diesem Thema anzeigen");

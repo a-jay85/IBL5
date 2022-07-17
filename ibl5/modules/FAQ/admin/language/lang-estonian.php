@@ -17,28 +17,24 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_FUNCTIONS","Funktsioonid");
-define("_YES","Jah");
-define("_NO","Ei");
-define("_SAVE","Salvesta");
-define("_ID","ID");
-define("_CATEGORIES","Kategooria");
-define("_ALL","Kõik");
-define("_FAQ","KKK");
-define("_CONTENT","Sisu");
-define("_FAQADMIN","KKK administratsioon");
-define("_ACTIVEFAQS","Aktiivsed KKK'ed");
-define("_ADDCATEGORY","Lisa uus kategooria");
-define("_QUESTIONS","Küsimused ja vastused");
-define("_ADDQUESTION","Lisa uus küsimus");
-define("_QUESTION","Küsimus");
-define("_ANSWER","Vastus");
-define("_EDITCATEGORY","Redigeeri kategooriat");
-define("_EDITQUESTIONS","Redigeeri küsimusi ja vastuseid");
-define("_FAQDELWARNING","HOIATUS: Oled sa kindel, et soovid kustutada KKK ja kogu selle sisu?");
-define("_QUESTIONDEL","HOIATUS: Oled sa kindel, et soovid kustutada selle küsimuse?");
-define("_LANGUAGE","Keel");
-
-
-?>
+define("_FUNCTIONS", "Funktsioonid");
+define("_YES", "Jah");
+define("_NO", "Ei");
+define("_SAVE", "Salvesta");
+define("_ID", "ID");
+define("_CATEGORIES", "Kategooria");
+define("_ALL", "Kï¿½ik");
+define("_FAQ", "KKK");
+define("_CONTENT", "Sisu");
+define("_FAQADMIN", "KKK administratsioon");
+define("_ACTIVEFAQS", "Aktiivsed KKK'ed");
+define("_ADDCATEGORY", "Lisa uus kategooria");
+define("_QUESTIONS", "Kï¿½simused ja vastused");
+define("_ADDQUESTION", "Lisa uus kï¿½simus");
+define("_QUESTION", "Kï¿½simus");
+define("_ANSWER", "Vastus");
+define("_EDITCATEGORY", "Redigeeri kategooriat");
+define("_EDITQUESTIONS", "Redigeeri kï¿½simusi ja vastuseid");
+define("_FAQDELWARNING", "HOIATUS: Oled sa kindel, et soovid kustutada KKK ja kogu selle sisu?");
+define("_QUESTIONDEL", "HOIATUS: Oled sa kindel, et soovid kustutada selle kï¿½simuse?");
+define("_LANGUAGE", "Keel");

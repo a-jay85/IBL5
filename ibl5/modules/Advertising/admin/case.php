@@ -13,13 +13,13 @@
 /************************************************************************/
 
 if (!defined('ADMIN_FILE')) {
-	die ("Access Denied");
+    die("Access Denied");
 }
 
 $module_name = "Advertising";
-include_secure("modules/$module_name/admin/language/lang-".$currentlang.".php");
+include_secure("modules/$module_name/admin/language/lang-" . $currentlang . ".php");
 
-switch($op) {
+switch ($op) {
 
     case "BannersAdmin":
     case "BannersAdd":
@@ -39,15 +39,13 @@ switch($op) {
     case "position_edit":
     case "position_delete":
     case "ad_terms":
-	case "ad_plans":
-	case "ad_plans_add":
-	case "ad_plans_edit":
-	case "ad_plans_save":
-	case "ad_plans_delete":
-	case "ad_plans_status":
-    include("modules/$module_name/admin/index.php");
-    break;
+    case "ad_plans":
+    case "ad_plans_add":
+    case "ad_plans_edit":
+    case "ad_plans_save":
+    case "ad_plans_delete":
+    case "ad_plans_status":
+        include "modules/$module_name/admin/index.php";
+        break;
 
 }
-
-?>

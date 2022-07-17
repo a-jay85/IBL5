@@ -7,9 +7,7 @@
 // This must be defined to use many of the multi-language features
 //
 
-define('english','eng');
+define('english', 'eng');
 define('hebrew', 'heb');
 define('farsi', 'far');
 define('arabic', 'ara');
-
-?>

@@ -2,9 +2,9 @@
 
 $sharedFunctions = new Shared($db);
 
-$query="SELECT * FROM nuke_ibl_team_info WHERE teamid != 35 ORDER BY teamid ASC";
-$result=$db->sql_query($query);
-$num=$db->sql_numrows($result);
+$query = "SELECT * FROM nuke_ibl_team_info WHERE teamid != 35 ORDER BY teamid ASC";
+$result = $db->sql_query($query);
+$num = $db->sql_numrows($result);
 
 $currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
 
@@ -36,29 +36,29 @@ echo "<HTML><HEAD><TITLE>Draft Pick Matrix</TITLE></HEAD>
                 </TR>
 ";
 
-$i=0;
+$i = 0;
 
 while ($i < $num) {
-    $teamid=$db->sql_result($result,$i,"teamid");
-    $team_city=$db->sql_result($result,$i,"team_city");
-    $team_name=$db->sql_result($result,$i,"team_name");
-    $color1=$db->sql_result($result,$i,"color1");
-    $color2=$db->sql_result($result,$i,"color2");
+    $teamid = $db->sql_result($result, $i, "teamid");
+    $team_city = $db->sql_result($result, $i, "team_city");
+    $team_name = $db->sql_result($result, $i, "team_name");
+    $color1 = $db->sql_result($result, $i, "color1");
+    $color2 = $db->sql_result($result, $i, "color2");
 
-    $j=0;
-    $k=0;
+    $j = 0;
+    $k = 0;
 
-    $query2="SELECT * FROM ibl_draft_picks WHERE teampick = '$team_name' ORDER BY year, round ASC";
-    $result2=$db->sql_query($query2);
-    $num2=$db->sql_numrows($result2);
+    $query2 = "SELECT * FROM ibl_draft_picks WHERE teampick = '$team_name' ORDER BY year, round ASC";
+    $result2 = $db->sql_query($query2);
+    $num2 = $db->sql_numrows($result2);
 
     echo "<TR><TD bgcolor=#$color1><CENTER><a href=\"../modules.php?name=Team&op=team&tid=$teamid\"><font color=#$color2>$team_city $team_name</font></a></CENTER></TD>";
 
     while ($j < $num2) {
 
-        $ownerofpick=$db->sql_result($result2,$j,"ownerofpick");
-        $year=$db->sql_result($result2,$j,"year");
-        $round=$db->sql_result($result2,$j,"round");
+        $ownerofpick = $db->sql_result($result2, $j, "ownerofpick");
+        $year = $db->sql_result($result2, $j, "year");
+        $round = $db->sql_result($result2, $j, "round");
 
         if ($ownerofpick != $team_name) {
             echo "<TD bgcolor=#FF0000><center>$ownerofpick</center></TD>";
@@ -77,5 +77,3 @@ while ($i < $num) {
 echo "</TABLE></CENTER></HTML>";
 
 $db->sql_close();
-
-?>

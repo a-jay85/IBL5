@@ -17,24 +17,22 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_CATEGORY","Kategorie");
-define("_LVOTES","hlasovalo");
-define("_HITS","Klinkutí");
-define("_TOPWELCOME","Stránka TOP na");
-define("_READSTORIES","nejètenìjších èlánkù");
-define("_COMMENTEDSTORIES","èlánkù s nejvíce komentáøi");
-define("_ACTIVECAT","nejvyhledávanìjších kategorií");
-define("_READSECTION","nejètenìjších èlánkù ve speciální sekci");
-define("_NEWSSUBMITTERS","nejaktivnìjších dopisovatelù");
-define("_NEWSSENT","poslaných zpráv");
-define("_VOTEDPOLLS","anket s nejvíce hlasy");
-define("_MOSTACTIVEAUTHORS","nejaktivnìjších autorù");
-define("_NEWSPUBLISHED","èlánky(ù)");
-define("_READREVIEWS","nejètenìjších recenzí");
-define("_DOWNLOADEDFILES","nejstahovanìjších souborù");
-define("_MOSTREADPAGES","most read pages");
-define("_MOSTVOTEDSTORIES","most voted stories");
-define("_POINTS","points");
-define("_BESTRATEDSTORIES","best rated stories (based on 5 maximun points)");
-
-?>
+define("_CATEGORY", "Kategorie");
+define("_LVOTES", "hlasovalo");
+define("_HITS", "Klinkutï¿½");
+define("_TOPWELCOME", "Strï¿½nka TOP na");
+define("_READSTORIES", "nejï¿½tenï¿½jï¿½ï¿½ch ï¿½lï¿½nkï¿½");
+define("_COMMENTEDSTORIES", "ï¿½lï¿½nkï¿½ s nejvï¿½ce komentï¿½ï¿½i");
+define("_ACTIVECAT", "nejvyhledï¿½vanï¿½jï¿½ï¿½ch kategoriï¿½");
+define("_READSECTION", "nejï¿½tenï¿½jï¿½ï¿½ch ï¿½lï¿½nkï¿½ ve speciï¿½lnï¿½ sekci");
+define("_NEWSSUBMITTERS", "nejaktivnï¿½jï¿½ï¿½ch dopisovatelï¿½");
+define("_NEWSSENT", "poslanï¿½ch zprï¿½v");
+define("_VOTEDPOLLS", "anket s nejvï¿½ce hlasy");
+define("_MOSTACTIVEAUTHORS", "nejaktivnï¿½jï¿½ï¿½ch autorï¿½");
+define("_NEWSPUBLISHED", "ï¿½lï¿½nky(ï¿½)");
+define("_READREVIEWS", "nejï¿½tenï¿½jï¿½ï¿½ch recenzï¿½");
+define("_DOWNLOADEDFILES", "nejstahovanï¿½jï¿½ï¿½ch souborï¿½");
+define("_MOSTREADPAGES", "most read pages");
+define("_MOSTVOTEDSTORIES", "most voted stories");
+define("_POINTS", "points");
+define("_BESTRATEDSTORIES", "best rated stories (based on 5 maximun points)");

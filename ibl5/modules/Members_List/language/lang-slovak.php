@@ -2,10 +2,10 @@
 
 /*************************************************************************/
 /* The Slovak language file for module Members_List                      */
-/* Author: AlRashid 			 Date: 09.09.2002   					 */
+/* Author: AlRashid              Date: 09.09.2002                        */
 /* alrashid@klokan.sk, http://alrashid.klokan.sk                         */
-/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk			     */
-/*  		Dakujem                                                      */
+/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk                 */
+/*          Dakujem                                                      */
 /*************************************************************************/
 /**************************************************************************/
 /* PHP-NUKE: Advanced Content Management System                           */
@@ -24,34 +24,32 @@
 /* And, if you use HTML code, please double check it.                     */
 /*************************************************************************/
 /* The Slovak language file for module Members_List                      */
-/* Author: AlRashid 			 Date: 09.09.2002   					 */
+/* Author: AlRashid              Date: 09.09.2002                        */
 /* alrashid@klokan.sk, http://alrashid.klokan.sk                         */
-/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk			     */
-/*  		Dakujem                                                      */
+/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk                 */
+/*          Dakujem                                                      */
 /*************************************************************************/
 /**************************************************************************/
 
-define("_URL","URL");
-define("_EMAIL","E-mail");
-define("_REALNAME","Skutoèné meno");
-define("_FUNCTIONS","Funkcie");
-define("_PREVIOUS","Predchádzajúca strana");
-define("_MEMBERSLIST","zozname èlenov");
-define("_GREETINGS","Pozdravujeme nášho naposledy zaregistrovaného užívate¾a:");
-define("_SORTBY","Trieïi pod¾a:");
-define("_MNICKNAME","uživate¾ského mena");
-define("_MREALNAME","skutoèného mena");
-define("_MEMAIL","e-mailu");
-define("_MURL","URL");
-define("_ONLINEREG","Momentálne sú online títo registrovaní užívatelia:");
-define("_WEHAVE","Máme celkom");
-define("_MREGISTERED","doteraz zaregistrovaných užívate¾ov. Práve je tu");
-define("_MREGONLINE","z nich.");
-define("_REGSOFAR","registrovaných užívate¾ov.");
-define("_USERSFOUND","nájdených užívate¾ov pre");
-define("_USERSSHOWN","zobrazi užívate¾ov");
-define("_NOMEMBERS","Žiadny užívate¾ s uživate¾ským menom zaèínajúcim na písmeno");
-define("_PAGES","Stránky");
-define("_HOMEPAGE","Domovská stránka");
-
-?>
+define("_URL", "URL");
+define("_EMAIL", "E-mail");
+define("_REALNAME", "Skutoï¿½nï¿½ meno");
+define("_FUNCTIONS", "Funkcie");
+define("_PREVIOUS", "Predchï¿½dzajï¿½ca strana");
+define("_MEMBERSLIST", "zozname ï¿½lenov");
+define("_GREETINGS", "Pozdravujeme nï¿½ho naposledy zaregistrovanï¿½ho uï¿½ï¿½vateï¿½a:");
+define("_SORTBY", "Trieï¿½iï¿½ podï¿½a:");
+define("_MNICKNAME", "uï¿½ivateï¿½skï¿½ho mena");
+define("_MREALNAME", "skutoï¿½nï¿½ho mena");
+define("_MEMAIL", "e-mailu");
+define("_MURL", "URL");
+define("_ONLINEREG", "Momentï¿½lne sï¿½ online tï¿½to registrovanï¿½ uï¿½ï¿½vatelia:");
+define("_WEHAVE", "Mï¿½me celkom");
+define("_MREGISTERED", "doteraz zaregistrovanï¿½ch uï¿½ï¿½vateï¿½ov. Prï¿½ve je tu");
+define("_MREGONLINE", "z nich.");
+define("_REGSOFAR", "registrovanï¿½ch uï¿½ï¿½vateï¿½ov.");
+define("_USERSFOUND", "nï¿½jdenï¿½ch uï¿½ï¿½vateï¿½ov pre");
+define("_USERSSHOWN", "zobraziï¿½ uï¿½ï¿½vateï¿½ov");
+define("_NOMEMBERS", "ï¿½iadny uï¿½ï¿½vateï¿½ s uï¿½ivateï¿½skï¿½m menom zaï¿½ï¿½najï¿½cim na pï¿½smeno");
+define("_PAGES", "Strï¿½nky");
+define("_HOMEPAGE", "Domovskï¿½ strï¿½nka");

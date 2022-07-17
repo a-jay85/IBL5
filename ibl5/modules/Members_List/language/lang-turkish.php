@@ -4,40 +4,38 @@
 /* PHP-NUKE: Advanced Content Management System                           */
 /* ============================================                           */
 /*                                                                        */
-/* Php-Nuke'nin sürekli geliþmesine baðlý olarak eski Türkçe dil dosyalarý*/
-/* güncelliðini yitirdiði için "HighLAndeR" tarafýndan "MaXCoDeR"in       */
-/* yapmýþ olduðu çeviriler güncelleþtirilip yeni çeviriler eklenmiþtir... */
+/* Php-Nuke'nin sï¿½rekli geliï¿½mesine baï¿½lï¿½ olarak eski Tï¿½rkï¿½e dil dosyalarï¿½*/
+/* gï¿½ncelliï¿½ini yitirdiï¿½i iï¿½in "HighLAndeR" tarafï¿½ndan "MaXCoDeR"in       */
+/* yapmï¿½ï¿½ olduï¿½u ï¿½eviriler gï¿½ncelleï¿½tirilip yeni ï¿½eviriler eklenmiï¿½tir... */
 /*                                                                        */
-/* NOT: Yardýmlarý için Gurol400(gurol400@propc.org)'e teþekkürler.       */
+/* NOT: Yardï¿½mlarï¿½ iï¿½in Gurol400(gurol400@propc.org)'e teï¿½ekkï¿½rler.       */
 /*                                                                        */
-/* Türkçe Çevirmeni: HighLAndeR                                           */
-/* Email: highlander@propc.org ICQ#: 110930777 	URL: http://www.propc.org */
+/* Tï¿½rkï¿½e ï¿½evirmeni: HighLAndeR                                           */
+/* Email: highlander@propc.org ICQ#: 110930777     URL: http://www.propc.org */
 /*                                                                        */
-/* Türkçe Çevirmeni: Selim "MaXCoDeR" Þumlu                               */
+/* Tï¿½rkï¿½e ï¿½evirmeni: Selim "MaXCoDeR" ï¿½umlu                               */
 /* Mail:webmaster@pcnet.com.tr ICQ:19648424 URL: http://www.turknuke.com  */
 /**************************************************************************/
 
-define("_URL","URL");
-define("_EMAIL","Email");
-define("_REALNAME","Gerçek Ýsim");
-define("_FUNCTIONS","Fonksiyonlar");
-define("_PREVIOUS","Önceki Sayfa");
-define("_MEMBERSLIST","Üye Listesi");
-define("_GREETINGS","Son Kayýt Olan Üyemiz:");
-define("_SORTBY","Sýralama:");
-define("_MNICKNAME","nickname");
-define("_MREALNAME","gerçek isim");
-define("_MEMAIL","email");
-define("_MURL","adres");
-define("_ONLINEREG","Online Kayýtlý Kullanýcýlar:");
-define("_WEHAVE","Þu an");
-define("_MREGISTERED","kayýtlý kullanýcýmýz var. Bunlardan");
-define("_MREGONLINE","kayýtlý kullanýcý þu an sitede bulunuyor.");
-define("_REGSOFAR","kayýtlý kullanýcý bulunuyor.");
-define("_USERSFOUND","kullanýcý bulundu:");
-define("_USERSSHOWN","kullanýcý görüntülendi");
-define("_NOMEMBERS","Kullanýcý bulunamadý:");
-define("_PAGES","Sayfa");
-define("_HOMEPAGE","AnaSayfa");
-
-?>
+define("_URL", "URL");
+define("_EMAIL", "Email");
+define("_REALNAME", "Gerï¿½ek ï¿½sim");
+define("_FUNCTIONS", "Fonksiyonlar");
+define("_PREVIOUS", "ï¿½nceki Sayfa");
+define("_MEMBERSLIST", "ï¿½ye Listesi");
+define("_GREETINGS", "Son Kayï¿½t Olan ï¿½yemiz:");
+define("_SORTBY", "Sï¿½ralama:");
+define("_MNICKNAME", "nickname");
+define("_MREALNAME", "gerï¿½ek isim");
+define("_MEMAIL", "email");
+define("_MURL", "adres");
+define("_ONLINEREG", "Online Kayï¿½tlï¿½ Kullanï¿½cï¿½lar:");
+define("_WEHAVE", "ï¿½u an");
+define("_MREGISTERED", "kayï¿½tlï¿½ kullanï¿½cï¿½mï¿½z var. Bunlardan");
+define("_MREGONLINE", "kayï¿½tlï¿½ kullanï¿½cï¿½ ï¿½u an sitede bulunuyor.");
+define("_REGSOFAR", "kayï¿½tlï¿½ kullanï¿½cï¿½ bulunuyor.");
+define("_USERSFOUND", "kullanï¿½cï¿½ bulundu:");
+define("_USERSSHOWN", "kullanï¿½cï¿½ gï¿½rï¿½ntï¿½lendi");
+define("_NOMEMBERS", "Kullanï¿½cï¿½ bulunamadï¿½:");
+define("_PAGES", "Sayfa");
+define("_HOMEPAGE", "AnaSayfa");

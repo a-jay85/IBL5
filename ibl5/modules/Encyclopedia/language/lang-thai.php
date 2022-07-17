@@ -17,26 +17,24 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PREVIOUS","Ë¹éÒ¡èÍ¹");
-define("_NEXT","Ë¹éÒ¶Ñ´ä»");
-define("_SEARCHRESULTS","¼Å¡ÒÃ¤é¹ËÒ");
-define("_PAGE","Ë¹éÒ");
-define("_RETURNTO","¡ÅÑºä»·Õè");
-define("_DEACTIVATE","äÁè·Ó§Ò¹");
-define("_ACTIVATE","·Ó§Ò¹");
-define("_ENCYCLOPEDIA","¾¨¹Ò¹Ø¡ÃÁ");
-define("_NOCONTENTFORLETTER","àÊÕÂã¨ äÁèÁÕ¤ÓÈÑ¾·ì·Õè¢Öé¹µé¹´éÇÂÍÑ¡ÉÃµÑÇ¹Õé");
-define("_ENCYSELECTLETTER","¡ÃØ³ÒàÅ×Í¡ÍÑ¡ÉÃµÑÇáÃ¡¢Í§¤ÓÈÑ¾·ì¨Ò¡ÃÒÂ¡ÒÃ¢éÒ§ÅèÒ§¹Õé:");
-define("_COPYRIGHT","Ê§Ç¹ÅÔ¢ÊÔ·¸Ôì");
-define("_YOURADMINENCY","¤Ø³¤×Í¼Ùé¤Çº¤ØÁÃÐºº ¾¨¹Ò¹Ø¡ÃÁ¹ÕéÂÑ§äÁè·Ó§Ò¹!");
-define("_ENCYNOTACTIVE","àÊÕÂã¨ µÍ¹¹Õé¾¨¹Ò¹Ø¡ÃÁÂÑ§äÁè·Ó§Ò¹");
-define("_AVAILABLEENCYLIST","ÃÒÂª×èÍ¢Í§¾¨¹Ò¹Ø¡ÃÁã¹");
-define("_YOURADMININACTIVELIST","¤Ø³¤×Í¼Ùé¤Çº¤ØÁÃÐºº : ÃÒÂª×èÍ¢éÒ§ÅèÒ§¹Õé¤×Í ¾¨¹Ò¹Ø¡ÃÁ·ÕèÂÑ§äÁè·Ó§Ò¹:");
-define("_NORESULTSTEXT","äÁè¾º¢éÍÁÙÅ¨Ò¡¤ÓÍ¸ÔºÒÂÈÑ¾·ì...");
-define("_NORESULTSTITLE","äÁè¾º¢éÍÁÙÅ¨Ò¡ª×èÍ¤ÓÈÑ¾·ì...");
-define("_SEARCHRESULTSFOR","¼Å¡ÒÃ¤é¹ËÒÊÓËÃÑº:");
-define("_SEARCHNOTCOMPLETE","¤é¹ËÒäÁè¾º ¡ÃØ³ÒÅÍ§ãËÁè");
-define("_RESULTSINTERMTITLE","¼Å¡ÒÃ¤é¹ËÒ¨Ò¡ª×èÍ¤ÓÈÑ¾·ì:");
-define("_RESULTSINTERMTEXT","¼Å¡ÒÃ¤é¹ËÒ¨Ò¡¤ÓÍ¸ÔºÒÂÈÑ¾·ì:");
-
-?>
+define("_PREVIOUS", "Ë¹ï¿½Ò¡ï¿½Í¹");
+define("_NEXT", "Ë¹ï¿½Ò¶Ñ´ï¿½");
+define("_SEARCHRESULTS", "ï¿½Å¡ï¿½Ã¤ï¿½ï¿½ï¿½");
+define("_PAGE", "Ë¹ï¿½ï¿½");
+define("_RETURNTO", "ï¿½ï¿½Ñºä»·ï¿½ï¿½");
+define("_DEACTIVATE", "ï¿½ï¿½ï¿½Ó§Ò¹");
+define("_ACTIVATE", "ï¿½Ó§Ò¹");
+define("_ENCYCLOPEDIA", "ï¿½ï¿½ï¿½Ò¹Ø¡ï¿½ï¿½");
+define("_NOCONTENTFORLETTER", "ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Õ¤ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½ï¿½é¹µé¹´ï¿½ï¿½ï¿½ï¿½Ñ¡ï¿½Ãµï¿½Ç¹ï¿½ï¿½");
+define("_ENCYSELECTLETTER", "ï¿½ï¿½Ø³ï¿½ï¿½ï¿½ï¿½Í¡ï¿½Ñ¡ï¿½Ãµï¿½ï¿½ï¿½Ã¡ï¿½Í§ï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½Ò¡ï¿½ï¿½Â¡ï¿½Ã¢ï¿½Ò§ï¿½ï¿½Ò§ï¿½ï¿½ï¿½:");
+define("_COPYRIGHT", "Ê§Ç¹ï¿½Ô¢ï¿½Ô·ï¿½ï¿½ï¿½");
+define("_YOURADMINENCY", "ï¿½Ø³ï¿½ï¿½Í¼ï¿½ï¿½Çºï¿½ï¿½ï¿½ï¿½Ðºï¿½ ï¿½ï¿½ï¿½Ò¹Ø¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ§ï¿½ï¿½ï¿½Ó§Ò¹!");
+define("_ENCYNOTACTIVE", "ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Í¹ï¿½ï¿½é¾¨ï¿½Ò¹Ø¡ï¿½ï¿½ï¿½Ñ§ï¿½ï¿½ï¿½Ó§Ò¹");
+define("_AVAILABLEENCYLIST", "ï¿½ï¿½Âªï¿½ï¿½Í¢Í§ï¿½ï¿½ï¿½Ò¹Ø¡ï¿½ï¿½ï¿½");
+define("_YOURADMININACTIVELIST", "ï¿½Ø³ï¿½ï¿½Í¼ï¿½ï¿½Çºï¿½ï¿½ï¿½ï¿½Ðºï¿½ : ï¿½ï¿½Âªï¿½ï¿½Í¢ï¿½Ò§ï¿½ï¿½Ò§ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ò¹Ø¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ§ï¿½ï¿½ï¿½Ó§Ò¹:");
+define("_NORESULTSTEXT", "ï¿½ï¿½è¾ºï¿½ï¿½ï¿½ï¿½ï¿½Å¨Ò¡ï¿½ï¿½Í¸Ôºï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½...");
+define("_NORESULTSTITLE", "ï¿½ï¿½è¾ºï¿½ï¿½ï¿½ï¿½ï¿½Å¨Ò¡ï¿½ï¿½ï¿½Í¤ï¿½ï¿½Ñ¾ï¿½ï¿½...");
+define("_SEARCHRESULTSFOR", "ï¿½Å¡ï¿½Ã¤ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñº:");
+define("_SEARCHNOTCOMPLETE", "ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½è¾º ï¿½ï¿½Ø³ï¿½ï¿½Í§ï¿½ï¿½ï¿½ï¿½");
+define("_RESULTSINTERMTITLE", "ï¿½Å¡ï¿½Ã¤ï¿½ï¿½Ò¨Ò¡ï¿½ï¿½ï¿½Í¤ï¿½ï¿½Ñ¾ï¿½ï¿½:");
+define("_RESULTSINTERMTEXT", "ï¿½Å¡ï¿½Ã¤ï¿½ï¿½Ò¨Ò¡ï¿½ï¿½Í¸Ôºï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½:");

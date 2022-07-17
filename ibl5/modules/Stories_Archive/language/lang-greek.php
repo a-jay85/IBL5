@@ -17,18 +17,16 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PRINTER","Åêôýðùóç áñ÷éêÞò óåëßäáò");
-define("_FRIEND","ÐñïùèÞóôå ôçí éóôïñßá áõôÞ ó'Ýíá ößëï ");
-define("_ARTICLES","Áñèñá");
-define("_USCORE","Âáèìïëüãçóç (âáèìïëïãßá)");
-define("_DATE","Çìåñïìçíßá");
-define("_SELECTMONTH2VIEW","Please select the month you want to view:");
-define("_SHOWALLSTORIES","Show ALL Stories");
-define("_STORIESARCHIVE","Stories Archive");
-define("_ACTIONS","Actions");
-define("_ARCHIVESINDEX","Stories Archive Index");
-define("_ALLSTORIESARCH","All Stories");
-define("_NEXTPAGE","Next Page");
-define("_PREVIOUSPAGE","Previous Page");
-
-?>
+define("_PRINTER", "ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_FRIEND", "ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½'ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ");
+define("_ARTICLES", "ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_USCORE", "ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½)");
+define("_DATE", "ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
+define("_SELECTMONTH2VIEW", "Please select the month you want to view:");
+define("_SHOWALLSTORIES", "Show ALL Stories");
+define("_STORIESARCHIVE", "Stories Archive");
+define("_ACTIONS", "Actions");
+define("_ARCHIVESINDEX", "Stories Archive Index");
+define("_ALLSTORIESARCH", "All Stories");
+define("_NEXTPAGE", "Next Page");
+define("_PREVIOUSPAGE", "Previous Page");

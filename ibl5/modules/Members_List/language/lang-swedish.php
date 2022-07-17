@@ -17,27 +17,25 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_URL","URL");
-define("_EMAIL","E-post");
-define("_REALNAME","Namn");
-define("_FUNCTIONS","Funktioner");
-define("_PREVIOUS","Föregående Sida");
-define("_MEMBERSLIST","Medlemslista");
-define("_GREETINGS","En speciell hälsning till vår senast registrerade medlem:");
-define("_SORTBY","Sortera efter:");
-define("_MNICKNAME","alias");
-define("_MREALNAME","namn");
-define("_MEMAIL","e-postadress");
-define("_MURL","url");
-define("_ONLINEREG","Medlemmar som är online just nu:");
-define("_WEHAVE","Vi har för närvarande");
-define("_MREGISTERED","registrerade medlemmar. Av dem är");
-define("_MREGONLINE","online just nu.");
-define("_REGSOFAR","registrerade medlemmar.");
-define("_USERSFOUND","medlemmar hittade under");
-define("_USERSSHOWN","medlemmar visas");
-define("_NOMEMBERS","Inga medlemmar funna under");
-define("_PAGES","Sidor");
-define("_HOMEPAGE","Hemsida");
-
-?>
+define("_URL", "URL");
+define("_EMAIL", "E-post");
+define("_REALNAME", "Namn");
+define("_FUNCTIONS", "Funktioner");
+define("_PREVIOUS", "Fï¿½regï¿½ende Sida");
+define("_MEMBERSLIST", "Medlemslista");
+define("_GREETINGS", "En speciell hï¿½lsning till vï¿½r senast registrerade medlem:");
+define("_SORTBY", "Sortera efter:");
+define("_MNICKNAME", "alias");
+define("_MREALNAME", "namn");
+define("_MEMAIL", "e-postadress");
+define("_MURL", "url");
+define("_ONLINEREG", "Medlemmar som ï¿½r online just nu:");
+define("_WEHAVE", "Vi har fï¿½r nï¿½rvarande");
+define("_MREGISTERED", "registrerade medlemmar. Av dem ï¿½r");
+define("_MREGONLINE", "online just nu.");
+define("_REGSOFAR", "registrerade medlemmar.");
+define("_USERSFOUND", "medlemmar hittade under");
+define("_USERSSHOWN", "medlemmar visas");
+define("_NOMEMBERS", "Inga medlemmar funna under");
+define("_PAGES", "Sidor");
+define("_HOMEPAGE", "Hemsida");

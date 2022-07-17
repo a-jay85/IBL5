@@ -17,37 +17,33 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_YES","Sim");
-define("_NO","Não");
-define("_CATEGORY","Categoria");
-define("_SAVECHANGES","Gravar alterações");
-define("_ARTICLES","Artigos");
-define("_SELECTTOPIC","Seleccionar Tema");
-define("_OPTION","Opção");
-define("_ADMPOLLS","Votações");
-define("_TITLE","Título");
-define("_STORYTEXT","Texto do Artigo");
-define("_EXTENDEDTEXT","Texto Adicional");
-define("_PUBLISHINHOME","Publicar no Site?");
-define("_ONLYIFCATSELECTED","Só funciona se a categoria <i>Artigos</i> não estiver seleccionada");
-define("_ADD","Adicionar");
-define("_POLLSADMIN","Administração de Votações");
-define("_CREATEPOLL","Criar uma nova votação");
-define("_DELETEPOLLS","Apagar Votações");
-define("_POLLTITLE","Título da Votação");
-define("_POLLEACHFIELD","Por favor preencha cada opção num só campo");
-define("_CREATEPOLLBUT","Criar Votação");
-define("_REMOVEEXISTING","Remover a votação existente");
-define("_POLLDELWARNING","ATENÇÃO: A votação escolhida será automaticamente removida da nossa database!");
-define("_CHOOSEPOLL","Por favor escolha uma votação das opções em baixo:");
-define("_EDITPOLL","Editar Sondagens");
-define("_CHOOSEPOLLEDIT","Escolha a votação que deseja editar:");
-define("_ACTIVATECOMMENTS","Activar comentários para este artigo?");
-define("_LANGUAGE","Língua");
-define("_ANNOUNCEPOLL","Anunciar esta votação no seu web site");
-define("_LEAVEBLANK","(Deixe vazio para criar uma nova votação sem a anunciar)");
-define("_POLLEDIT","Editar Votação:");
-
-
-?>
+define("_YES", "Sim");
+define("_NO", "Nï¿½o");
+define("_CATEGORY", "Categoria");
+define("_SAVECHANGES", "Gravar alteraï¿½ï¿½es");
+define("_ARTICLES", "Artigos");
+define("_SELECTTOPIC", "Seleccionar Tema");
+define("_OPTION", "Opï¿½ï¿½o");
+define("_ADMPOLLS", "Votaï¿½ï¿½es");
+define("_TITLE", "Tï¿½tulo");
+define("_STORYTEXT", "Texto do Artigo");
+define("_EXTENDEDTEXT", "Texto Adicional");
+define("_PUBLISHINHOME", "Publicar no Site?");
+define("_ONLYIFCATSELECTED", "Sï¿½ funciona se a categoria <i>Artigos</i> nï¿½o estiver seleccionada");
+define("_ADD", "Adicionar");
+define("_POLLSADMIN", "Administraï¿½ï¿½o de Votaï¿½ï¿½es");
+define("_CREATEPOLL", "Criar uma nova votaï¿½ï¿½o");
+define("_DELETEPOLLS", "Apagar Votaï¿½ï¿½es");
+define("_POLLTITLE", "Tï¿½tulo da Votaï¿½ï¿½o");
+define("_POLLEACHFIELD", "Por favor preencha cada opï¿½ï¿½o num sï¿½ campo");
+define("_CREATEPOLLBUT", "Criar Votaï¿½ï¿½o");
+define("_REMOVEEXISTING", "Remover a votaï¿½ï¿½o existente");
+define("_POLLDELWARNING", "ATENï¿½ï¿½O: A votaï¿½ï¿½o escolhida serï¿½ automaticamente removida da nossa database!");
+define("_CHOOSEPOLL", "Por favor escolha uma votaï¿½ï¿½o das opï¿½ï¿½es em baixo:");
+define("_EDITPOLL", "Editar Sondagens");
+define("_CHOOSEPOLLEDIT", "Escolha a votaï¿½ï¿½o que deseja editar:");
+define("_ACTIVATECOMMENTS", "Activar comentï¿½rios para este artigo?");
+define("_LANGUAGE", "Lï¿½ngua");
+define("_ANNOUNCEPOLL", "Anunciar esta votaï¿½ï¿½o no seu web site");
+define("_LEAVEBLANK", "(Deixe vazio para criar uma nova votaï¿½ï¿½o sem a anunciar)");
+define("_POLLEDIT", "Editar Votaï¿½ï¿½o:");

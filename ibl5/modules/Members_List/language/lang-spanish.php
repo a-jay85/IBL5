@@ -17,27 +17,25 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_URL","URL");
-define("_EMAIL","E-Mail");
-define("_REALNAME","Nombre Real");
-define("_FUNCTIONS","Funciones");
-define("_PREVIOUS","Página Anterior");
-define("_MEMBERSLIST","Listado de Miembros");
-define("_GREETINGS","Felicidades a nuestro último usuario registrado:");
-define("_SORTBY","Ordenado por:");
-define("_MNICKNAME","Nickname");
-define("_MREALNAME","Nombre Real");
-define("_MEMAIL","E-Mail");
-define("_MURL","URL");
-define("_ONLINEREG","Usuarios registrados en línea ahora:");
-define("_WEHAVE","Tenemos");
-define("_MREGISTERED","usuarios registrados hasta ahora. Hay");
-define("_MREGONLINE","usuario(s) registrado(s) en línea ahora mismo.");
-define("_REGSOFAR","usuarios registrados hasta ahora.");
-define("_USERSFOUND","usuarios encontrados por");
-define("_USERSSHOWN","usuarios mostrados");
-define("_NOMEMBERS","No se han encontrado miembros por");
-define("_PAGES","Páginas");
-define("_HOMEPAGE","Página de Inicio");
-
-?>
+define("_URL", "URL");
+define("_EMAIL", "E-Mail");
+define("_REALNAME", "Nombre Real");
+define("_FUNCTIONS", "Funciones");
+define("_PREVIOUS", "Pï¿½gina Anterior");
+define("_MEMBERSLIST", "Listado de Miembros");
+define("_GREETINGS", "Felicidades a nuestro ï¿½ltimo usuario registrado:");
+define("_SORTBY", "Ordenado por:");
+define("_MNICKNAME", "Nickname");
+define("_MREALNAME", "Nombre Real");
+define("_MEMAIL", "E-Mail");
+define("_MURL", "URL");
+define("_ONLINEREG", "Usuarios registrados en lï¿½nea ahora:");
+define("_WEHAVE", "Tenemos");
+define("_MREGISTERED", "usuarios registrados hasta ahora. Hay");
+define("_MREGONLINE", "usuario(s) registrado(s) en lï¿½nea ahora mismo.");
+define("_REGSOFAR", "usuarios registrados hasta ahora.");
+define("_USERSFOUND", "usuarios encontrados por");
+define("_USERSSHOWN", "usuarios mostrados");
+define("_NOMEMBERS", "No se han encontrado miembros por");
+define("_PAGES", "Pï¿½ginas");
+define("_HOMEPAGE", "Pï¿½gina de Inicio");

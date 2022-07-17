@@ -13,13 +13,13 @@
 /************************************************************************/
 
 if (!defined('ADMIN_FILE')) {
-	die ("Access Denied");
+    die("Access Denied");
 }
 
 $module_name = "Topics";
-include_secure("modules/$module_name/admin/language/lang-".$currentlang.".php");
+include_secure("modules/$module_name/admin/language/lang-" . $currentlang . ".php");
 
-switch($op) {
+switch ($op) {
 
     case "relatedsave":
     case "relatededit":
@@ -29,9 +29,7 @@ switch($op) {
     case "topicmake":
     case "topicdelete":
     case "topicchange":
-    include("modules/$module_name/admin/index.php");
-    break;
+        include "modules/$module_name/admin/index.php";
+        break;
 
 }
-
-?>

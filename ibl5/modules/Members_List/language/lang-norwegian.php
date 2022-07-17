@@ -17,27 +17,25 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_URL","URL");
-define("_EMAIL","E-post");
-define("_REALNAME","Navn");
-define("_FUNCTIONS","Funksjoner");
-define("_PREVIOUS","Forrige side");
-define("_MEMBERSLIST","Medlemsliste");
-define("_GREETINGS","En spesiell hilsen til vårt nyest registrerte medlem:");
-define("_SORTBY","Sorter etter:");
-define("_MNICKNAME","alias");
-define("_MREALNAME","navn");
-define("_MEMAIL","e-postadresse");
-define("_MURL","url");
-define("_ONLINEREG","Medlemmer som er online akkurat nå:");
-define("_WEHAVE","Vi har for tiden");
-define("_MREGISTERED","registrerte medlemmer. Av disse er");
-define("_MREGONLINE","online akkurat nå.");
-define("_REGSOFAR","registrerte medlemmer.");
-define("_USERSFOUND","medlemmer funnet under");
-define("_USERSSHOWN","medlememr vises");
-define("_NOMEMBERS","ingen medlemmer funnet under");
-define("_PAGES","Sider");
-define("_HOMEPAGE","Hjemmeside");
-
-?>
+define("_URL", "URL");
+define("_EMAIL", "E-post");
+define("_REALNAME", "Navn");
+define("_FUNCTIONS", "Funksjoner");
+define("_PREVIOUS", "Forrige side");
+define("_MEMBERSLIST", "Medlemsliste");
+define("_GREETINGS", "En spesiell hilsen til vï¿½rt nyest registrerte medlem:");
+define("_SORTBY", "Sorter etter:");
+define("_MNICKNAME", "alias");
+define("_MREALNAME", "navn");
+define("_MEMAIL", "e-postadresse");
+define("_MURL", "url");
+define("_ONLINEREG", "Medlemmer som er online akkurat nï¿½:");
+define("_WEHAVE", "Vi har for tiden");
+define("_MREGISTERED", "registrerte medlemmer. Av disse er");
+define("_MREGONLINE", "online akkurat nï¿½.");
+define("_REGSOFAR", "registrerte medlemmer.");
+define("_USERSFOUND", "medlemmer funnet under");
+define("_USERSSHOWN", "medlememr vises");
+define("_NOMEMBERS", "ingen medlemmer funnet under");
+define("_PAGES", "Sider");
+define("_HOMEPAGE", "Hjemmeside");

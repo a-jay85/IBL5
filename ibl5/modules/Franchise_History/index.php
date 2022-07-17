@@ -13,7 +13,7 @@
 /************************************************************************/
 
 if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
-	die ("You can't access this file directly...");
+    die("You can't access this file directly...");
 }
 
 $sharedFunctions = new Shared($db);
@@ -21,7 +21,7 @@ $sharedFunctions = new Shared($db);
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 $userpage = 1;
-include("header.php");
+include "header.php";
 
 $currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
 $fiveSeasonsAgoEndingYear = $currentSeasonEndingYear - 4;
@@ -44,19 +44,19 @@ OpenTable();
 
 $k = 0;
 while ($k < $num2) {
-	$teamid[$k] = $db->sql_result($result2, $k, "teamid");
-	$teamname[$k] = $db->sql_result($result2, $k, "team_name");
-	$teamcity[$k] = $db->sql_result($result2, $k, "team_city");
-	$teamcolor1[$k] = $db->sql_result($result2, $k, "color1");
-	$teamcolor2[$k] = $db->sql_result($result2, $k, "color2");
+    $teamid[$k] = $db->sql_result($result2, $k, "teamid");
+    $teamname[$k] = $db->sql_result($result2, $k, "team_name");
+    $teamcity[$k] = $db->sql_result($result2, $k, "team_city");
+    $teamcolor1[$k] = $db->sql_result($result2, $k, "color1");
+    $teamcolor2[$k] = $db->sql_result($result2, $k, "color2");
 
     $totwins[$k] = $db->sql_result($result2, $k, "totwins");
     $totloss[$k] = $db->sql_result($result2, $k, "totloss");
     $pct[$k] = $db->sql_result($result2, $k, "winpct");
 
-	$lastFiveSeasonsWins[$k] = $db->sql_result($result2, $k, "five_season_wins");
-	$lastFiveSeasonsLosses[$k] = $db->sql_result($result2, $k, "five_season_losses");
-	$lastFiveSeasonsWinPct[$k] = $db->sql_result($result2, $k, "five_season_winpct");
+    $lastFiveSeasonsWins[$k] = $db->sql_result($result2, $k, "five_season_wins");
+    $lastFiveSeasonsLosses[$k] = $db->sql_result($result2, $k, "five_season_losses");
+    $lastFiveSeasonsWinPct[$k] = $db->sql_result($result2, $k, "five_season_winpct");
 
     $playoffs[$k] = $db->sql_result($result2, $k, "playoffs");
     $heat[$k] = $db->sql_result($result2, $k, "heat_titles");
@@ -64,7 +64,7 @@ while ($k < $num2) {
     $conf[$k] = $db->sql_result($result2, $k, "conf_titles");
     $ibl[$k] = $db->sql_result($result2, $k, "ibl_titles");
 
-	$table_echo .= "<tr>
+    $table_echo .= "<tr>
 		<td bgcolor=#" . $teamcolor1[$k] . "><a href=\"modules.php?name=Team&op=team&tid=" . $teamid[$k] . "\"><font color=#" . $teamcolor2[$k] . ">" . $teamcity[$k] . " " . $teamname[$k] . "</a></td>
 		<td>" . $totwins[$k] . "</td>
 		<td>" . $totloss[$k] . "</td>
@@ -79,7 +79,7 @@ while ($k < $num2) {
 		<td>" . $sharedFunctions->getNumberOfTitles($teamname[$k], 'IBL Champions') . "</td>
 	</tr>";
 
-	$k++;
+    $k++;
 }
 
 $text .= "
@@ -103,6 +103,4 @@ $text .= "
 echo $text;
 
 CloseTable();
-include("footer.php");
-
-?>
+include "footer.php";

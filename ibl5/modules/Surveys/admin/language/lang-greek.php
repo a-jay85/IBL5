@@ -17,37 +17,33 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_ARTICLES","Αρθρα");
-define("_OPTION","Επιλογές");
-define("_SAVECHANGES","Αποθήκευση Αλλαγών");
-define("_CATEGORY","Κατηγορίες");
-define("_TITLE","Τίτλος");
-define("_YES","Ναι");
-define("_NO","Οχι");
-define("_SELECTTOPIC","Επιλέξτε Θέμα");
-define("_ADMPOLLS","Δημοσκοπήσεις");
-define("_ADD","Προσθήκη ");
-define("_PUBLISHINHOME","Δημοσίευση στη Κύρια Σελίδα;");
-define("_ONLYIFCATSELECTED","Λειτουργεί μόνο εάν δεν έχει επιλεχθεί η <i>Articles</i> κατηγορία");
-define("_STORYTEXT","Ιστορία σε μορφή Κειμένου");
-define("_EXTENDEDTEXT","Εκτεταμένο Κείμενο");
-define("_POLLSADMIN","Διαχείριση Ψηφοφοριών/Αξιολογήσεων ");
-define("_CREATEPOLL","Δημιουργία Νέας Ψηφοφορίας");
-define("_DELETEPOLLS","Διαγραφή Ψηφοφορίας");
-define("_POLLTITLE","Τίτλος Ψηφοφορίας");
-define("_POLLEACHFIELD","Παρακαλούμε εισάγεται όποια διαθέσιμη επιλογή σ'ένα μοναδικό πεδίο");
-define("_CREATEPOLLBUT","Δημιουργία Ψηφοφορίας");
-define("_REMOVEEXISTING","Διαγραφή υπάρχουσας Ψηφοφορίας");
-define("_POLLDELWARNING","ΠΡΟΣΟΧΗ: Η επιλεγμένη  ψηφοφορία θα διαγραφεί ΑΜΕΣΑ από τη Βάση!");
-define("_CHOOSEPOLL","Παρακαλώ διαλέξτε κάποια ψηφοφορία από τη παρακάτω λίστα");
-define("_EDITPOLL","Edit Polls");
-define("_CHOOSEPOLLEDIT","Choose the Poll you want to edit:");
-define("_ACTIVATECOMMENTS","Activate Comments for this Story?");
-define("_LANGUAGE","Language");
-define("_ANNOUNCEPOLL","Announce this new Survey in your site");
-define("_LEAVEBLANK","(Leave blank to create a new survey without announce it)");
-define("_POLLEDIT","Edit Poll:");
-
-
-?>
+define("_ARTICLES", "οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_OPTION", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_SAVECHANGES", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_CATEGORY", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_TITLE", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_YES", "οΏ½οΏ½οΏ½");
+define("_NO", "οΏ½οΏ½οΏ½");
+define("_SELECTTOPIC", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½");
+define("_ADMPOLLS", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_ADD", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ ");
+define("_PUBLISHINHOME", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½;");
+define("_ONLYIFCATSELECTED", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½ <i>Articles</i> οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_STORYTEXT", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_EXTENDEDTEXT", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_POLLSADMIN", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½/οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ ");
+define("_CREATEPOLL", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_DELETEPOLLS", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_POLLTITLE", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_POLLEACHFIELD", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½'οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_CREATEPOLLBUT", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_REMOVEEXISTING", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_POLLDELWARNING", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½: οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½  οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½ οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½!");
+define("_CHOOSEPOLL", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½ οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_EDITPOLL", "Edit Polls");
+define("_CHOOSEPOLLEDIT", "Choose the Poll you want to edit:");
+define("_ACTIVATECOMMENTS", "Activate Comments for this Story?");
+define("_LANGUAGE", "Language");
+define("_ANNOUNCEPOLL", "Announce this new Survey in your site");
+define("_LEAVEBLANK", "(Leave blank to create a new survey without announce it)");
+define("_POLLEDIT", "Edit Poll:");

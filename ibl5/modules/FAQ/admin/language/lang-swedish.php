@@ -17,28 +17,24 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_FUNCTIONS","Funktioner");
-define("_YES","Ja");
-define("_NO","Nej");
-define("_SAVE","Spara");
-define("_ID","ID");
-define("_CATEGORIES","Kategorier");
-define("_ALL","Alla");
-define("_FAQ","FAQ");
-define("_CONTENT","Innehåll");
-define("_FAQADMIN","FAQ Administration");
-define("_ACTIVEFAQS","Aktiva FAQar");
-define("_ADDCATEGORY","Addera en Ny Kategori");
-define("_QUESTIONS","Frågor och Svar");
-define("_ADDQUESTION","Addera en Ny Fråga");
-define("_QUESTION","Fråga");
-define("_ANSWER","Svar");
-define("_EDITCATEGORY","Redigera Kategori");
-define("_EDITQUESTIONS","Redigera Frågor och Svar");
-define("_FAQDELWARNING","VARNING: Är du säker på att du vill radera denna FAQ och allt dess innehåll?");
-define("_QUESTIONDEL","VARNING: Är du säker på att du vill radera denna fråga?");
-define("_LANGUAGE","Language");
-
-
-?>
+define("_FUNCTIONS", "Funktioner");
+define("_YES", "Ja");
+define("_NO", "Nej");
+define("_SAVE", "Spara");
+define("_ID", "ID");
+define("_CATEGORIES", "Kategorier");
+define("_ALL", "Alla");
+define("_FAQ", "FAQ");
+define("_CONTENT", "Innehï¿½ll");
+define("_FAQADMIN", "FAQ Administration");
+define("_ACTIVEFAQS", "Aktiva FAQar");
+define("_ADDCATEGORY", "Addera en Ny Kategori");
+define("_QUESTIONS", "Frï¿½gor och Svar");
+define("_ADDQUESTION", "Addera en Ny Frï¿½ga");
+define("_QUESTION", "Frï¿½ga");
+define("_ANSWER", "Svar");
+define("_EDITCATEGORY", "Redigera Kategori");
+define("_EDITQUESTIONS", "Redigera Frï¿½gor och Svar");
+define("_FAQDELWARNING", "VARNING: ï¿½r du sï¿½ker pï¿½ att du vill radera denna FAQ och allt dess innehï¿½ll?");
+define("_QUESTIONDEL", "VARNING: ï¿½r du sï¿½ker pï¿½ att du vill radera denna frï¿½ga?");
+define("_LANGUAGE", "Language");

@@ -17,13 +17,11 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_CATEGORY","Kategori");
-define("_CATEGORIES","Kategori");
-define("_FAQ2","PSD (Pertanyan yang Sering Ditanyakan/FAQ)");
-define("_BACKTOTOP","Kembali ke atas");
-define("_BACKTOFAQINDEX","Kembali ke Indeks PSD");
-define("_MAIN","Indeks");
-define("_QUESTION","Pertanyaan");
-define("_ANSWER","Jawaban");
-
-?>
+define("_CATEGORY", "Kategori");
+define("_CATEGORIES", "Kategori");
+define("_FAQ2", "PSD (Pertanyan yang Sering Ditanyakan/FAQ)");
+define("_BACKTOTOP", "Kembali ke atas");
+define("_BACKTOFAQINDEX", "Kembali ke Indeks PSD");
+define("_MAIN", "Indeks");
+define("_QUESTION", "Pertanyaan");
+define("_ANSWER", "Jawaban");

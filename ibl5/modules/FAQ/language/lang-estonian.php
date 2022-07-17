@@ -17,13 +17,11 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_CATEGORY","Kategooria");
-define("_CATEGORIES","Kategooriad");
-define("_FAQ2","KKK (Korduma Kippuvad Küsimused)");
-define("_BACKTOTOP","Tagasi üles");
-define("_BACKTOFAQINDEX","Tagasi KKK Avalehele");
-define("_MAIN","Avalehele");
-define("_QUESTION","Küsimus");
-define("_ANSWER","Vastus");
-
-?>
+define("_CATEGORY", "Kategooria");
+define("_CATEGORIES", "Kategooriad");
+define("_FAQ2", "KKK (Korduma Kippuvad Kï¿½simused)");
+define("_BACKTOTOP", "Tagasi ï¿½les");
+define("_BACKTOFAQINDEX", "Tagasi KKK Avalehele");
+define("_MAIN", "Avalehele");
+define("_QUESTION", "Kï¿½simus");
+define("_ANSWER", "Vastus");

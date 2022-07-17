@@ -11,7 +11,7 @@ $arrayStatNames = array(
     'TURNOVERS',
     'Field Goals Made',
     'Free Throws Made',
-    'Three Pointers Made'
+    'Three Pointers Made',
 );
 
 $arrayStatQueries = array(
@@ -23,12 +23,12 @@ $arrayStatQueries = array(
     '`gameTOV`',
     '(`game2GM` + `game3GM`)',
     '`gameFTM`',
-    '`game3GM`'
+    '`game3GM`',
 );
 
 function seasonHighTable($queryForStat, $statName, $playerOrTeam)
 {
-	global $db;
+    global $db;
 
     if ($playerOrTeam == 'player') {
         $isPlayer = 'pid != 0';
@@ -64,24 +64,23 @@ function seasonHighTable($queryForStat, $statName, $playerOrTeam)
     echo "\t\t\t</table>\n";
 }
 
-function nextTableColumn ()
+function nextTableColumn()
 {
     echo "\t\t</td>\n";
     echo "\t\t<td align=center>\n";
 }
 
-function startTableRow ()
+function startTableRow()
 {
     echo "\t<tr>\n";
     echo "\t\t<td align=center>\n";
 }
 
-function endTableRow ()
+function endTableRow()
 {
     echo "\t\t</td>\n";
     echo "\t</tr>\n";
 }
-
 
 echo "<html><head><title>Season Stat Leaders</title></head>\n\n";
 echo "<body>\n\n";

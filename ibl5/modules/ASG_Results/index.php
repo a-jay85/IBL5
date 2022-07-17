@@ -13,14 +13,14 @@
 /************************************************************************/
 
 if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
-	die ("You can't access this file directly...");
+    die("You can't access this file directly...");
 }
 
-require_once("mainfile.php");
+require_once "mainfile.php";
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 $userpage = 1;
-include("header.php");
+include "header.php";
 
 $queryEasternFrontcourt = "select count(name) as votes,name from (select East_F1 as name from IBL_ASG_Votes union all select East_F2 from IBL_ASG_Votes union all select East_C from IBL_ASG_Votes) as tbl group by name having count(name) > 0 order by 1 desc;";
 $queryEasternBackcourt = "select count(name) as votes,name from (select East_G1 as name from IBL_ASG_Votes union all select East_G2 from IBL_ASG_Votes) as tbl group by name having count(name) > 0 order by 1 desc;";
@@ -29,22 +29,22 @@ $queryWesternBackcourt = "select count(name) as votes,name from (select West_G1 
 
 function displayVotingResultsTable($query)
 {
-	global $db;
+    global $db;
 
-	$i = 0;
-	$result = $db->sql_query($query);
-	$num_rows = $db->sql_numrows($result);
+    $i = 0;
+    $result = $db->sql_query($query);
+    $num_rows = $db->sql_numrows($result);
 
-	while ($i < $num_rows) {
-		$player[$i] = $db->sql_result($result, $i, "name");
-		$votes[$i] = $db->sql_result($result, $i);
+    while ($i < $num_rows) {
+        $player[$i] = $db->sql_result($result, $i, "name");
+        $votes[$i] = $db->sql_result($result, $i);
 
-		$row .= "<tr><td>" . $player[$i] . "</td><td>" . $votes[$i] . "</td></tr>";
+        $row .= "<tr><td>" . $player[$i] . "</td><td>" . $votes[$i] . "</td></tr>";
 
-		$i++;
-	}
+        $i++;
+    }
 
-	echo "
+    echo "
 	<table class=\"sortable\" border=1>
 		<tr>
 			<th>Player</th>
@@ -68,6 +68,4 @@ displayVotingResultsTable($queryWesternBackcourt);
 
 CloseTable();
 
-include("footer.php");
-
-?>
+include "footer.php";

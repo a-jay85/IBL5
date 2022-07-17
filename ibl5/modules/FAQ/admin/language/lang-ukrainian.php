@@ -17,28 +17,24 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_FUNCTIONS","Функції");
-define("_YES","Так");
-define("_NO","Ні");
-define("_SAVE","Зберегти");
-define("_ID","ID");
-define("_CATEGORIES","Категорії");
-define("_ALL","Всі");
-define("_FAQ","FAQ");
-define("_CONTENT","Зміст");
-define("_FAQADMIN","Адміністрування FAQ");
-define("_ACTIVEFAQS","Активні FAQ");
-define("_ADDCATEGORY","Створити нову категорію");
-define("_QUESTIONS","Питання і відповіді");
-define("_ADDQUESTION","Додати нове питання");
-define("_QUESTION","Питання");
-define("_ANSWER","Відповідь");
-define("_EDITCATEGORY","Редагувати категорію");
-define("_EDITQUESTIONS","Редагувати відповіді і питання");
-define("_FAQDELWARNING","Ви дійсно хочете витерти цю категорію і всі питання, що в неї входять?");
-define("_QUESTIONDEL","Ви дійсно хочете витерти це питання?");
-define("_LANGUAGE","Language");
-
-
-?>
+define("_FUNCTIONS", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_YES", "пїЅпїЅпїЅ");
+define("_NO", "Ні");
+define("_SAVE", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_ID", "ID");
+define("_CATEGORIES", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_ALL", "пїЅпїЅ");
+define("_FAQ", "FAQ");
+define("_CONTENT", "пїЅпїЅпїЅпїЅ");
+define("_FAQADMIN", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ FAQ");
+define("_ACTIVEFAQS", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅ FAQ");
+define("_ADDCATEGORY", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_QUESTIONS", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_ADDQUESTION", "пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_QUESTION", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_ANSWER", "ВіпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_EDITCATEGORY", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_EDITQUESTIONS", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_FAQDELWARNING", "пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅ пїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ?");
+define("_QUESTIONDEL", "пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ?");
+define("_LANGUAGE", "Language");

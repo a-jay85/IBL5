@@ -17,25 +17,23 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_CATEGORY","Kategooria");
-define("_LVOTES","hääl(t)");
-define("_HITS","Tabamust");
-define("_TOPWELCOME","Teretulemast TOP lehele");
-define("_READSTORIES","enim loetud jutud");
-define("_COMMENTEDSTORIES","enim kommenteeritud jutud");
-define("_ACTIVECAT","kõige aktiivsemad kategooriad");
-define("_READSECTION","enim loetud artiklid täpsetes rubriikides");
-define("_NEWSSUBMITTERS","kõige aktiivsemad uudiste saatjad");
-define("_NEWSSENT","uudist saatnud");
-define("_VOTEDPOLLS","enim hääletatud küsitlused");
-define("_MOSTACTIVEAUTHORS","kõige aktiivsemad autorid");
-define("_NEWSPUBLISHED","uudist avalikustanud");
-define("_READREVIEWS","enim loetud ülevaadet");
-define("_DOWNLOADEDFILES","enim allalaetud faili");
-define("_LDOWNLOADS","korda allalaetud");
-define("_MOSTREADPAGES","enim loetud lehed");
-define("_MOSTVOTEDSTORIES","enim hääletatud juttu");
-define("_POINTS","punkt(i)");
-define("_BESTRATEDSTORIES","Parimaks hinnatud juttu (põhinevad 5 maximum punkti hinangul)");
-
-?>
+define("_CATEGORY", "Kategooria");
+define("_LVOTES", "hï¿½ï¿½l(t)");
+define("_HITS", "Tabamust");
+define("_TOPWELCOME", "Teretulemast TOP lehele");
+define("_READSTORIES", "enim loetud jutud");
+define("_COMMENTEDSTORIES", "enim kommenteeritud jutud");
+define("_ACTIVECAT", "kï¿½ige aktiivsemad kategooriad");
+define("_READSECTION", "enim loetud artiklid tï¿½psetes rubriikides");
+define("_NEWSSUBMITTERS", "kï¿½ige aktiivsemad uudiste saatjad");
+define("_NEWSSENT", "uudist saatnud");
+define("_VOTEDPOLLS", "enim hï¿½ï¿½letatud kï¿½sitlused");
+define("_MOSTACTIVEAUTHORS", "kï¿½ige aktiivsemad autorid");
+define("_NEWSPUBLISHED", "uudist avalikustanud");
+define("_READREVIEWS", "enim loetud ï¿½levaadet");
+define("_DOWNLOADEDFILES", "enim allalaetud faili");
+define("_LDOWNLOADS", "korda allalaetud");
+define("_MOSTREADPAGES", "enim loetud lehed");
+define("_MOSTVOTEDSTORIES", "enim hï¿½ï¿½letatud juttu");
+define("_POINTS", "punkt(i)");
+define("_BESTRATEDSTORIES", "Parimaks hinnatud juttu (pï¿½hinevad 5 maximum punkti hinangul)");

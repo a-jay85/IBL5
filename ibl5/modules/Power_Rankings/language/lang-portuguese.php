@@ -18,24 +18,21 @@
 /**************************************************************************/
 
 /**************************************************************************/
-/* Translation by:							  */
-/*									  */
-/* Rui Cristovão (ord'hor) ordhor@hotmail.com				  */
+/* Translation by:                              */
+/*                                      */
+/* Rui Cristovï¿½o (ord'hor) ordhor@hotmail.com                  */
 /**************************************************************************/
 
-
-define("_PREVIOUS","Página Anterior");
-define("_NEXT","Página Seguinte");
-define("_PAGE","Página");
-define("_DEACTIVATE","Desactivar");
-define("_ACTIVATE","Activo");
-define("_PUBLISHEDON","Publicado em");
-define("_PAGESLIST","Lista de Páginas");
-define("_LISTOFCONTENT","Lista do conteúdo disponivel em");
-define("_YOURADMINLIST","Você é Administrados: Segue-se a lista de páginas inactivas:");
-define("_COPYRIGHT","Copyright &copia; por");
-define("_COPYRIGHT2","Todos os direitos reservados.");
-define("_CONTENTCATEGORIES","Conteúdo das Categorias Disponíveis");
-define("_NONCLASSCONT","Conteúdo não categorisado");
-
-?>
+define("_PREVIOUS", "Pï¿½gina Anterior");
+define("_NEXT", "Pï¿½gina Seguinte");
+define("_PAGE", "Pï¿½gina");
+define("_DEACTIVATE", "Desactivar");
+define("_ACTIVATE", "Activo");
+define("_PUBLISHEDON", "Publicado em");
+define("_PAGESLIST", "Lista de Pï¿½ginas");
+define("_LISTOFCONTENT", "Lista do conteï¿½do disponivel em");
+define("_YOURADMINLIST", "Vocï¿½ ï¿½ Administrados: Segue-se a lista de pï¿½ginas inactivas:");
+define("_COPYRIGHT", "Copyright &copia; por");
+define("_COPYRIGHT2", "Todos os direitos reservados.");
+define("_CONTENTCATEGORIES", "Conteï¿½do das Categorias Disponï¿½veis");
+define("_NONCLASSCONT", "Conteï¿½do nï¿½o categorisado");

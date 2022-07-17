@@ -17,11 +17,9 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_ACTIVETOPICS","Hetkel aktiivsed teemad");
-define("_CLICK2LIST","Vajuta nimekirjale, et näha kõiki artikleid siin teemas");
-define("_TOTNEWS","Uudiseid kokku");
-define("_TOTREADS","Loetud kokku");
-define("_MORE","Veel");
-define("_NONEWSYET","...Hetkel ei ole selles teemas ühtegi uudist...");
-
-?>
+define("_ACTIVETOPICS", "Hetkel aktiivsed teemad");
+define("_CLICK2LIST", "Vajuta nimekirjale, et nï¿½ha kï¿½iki artikleid siin teemas");
+define("_TOTNEWS", "Uudiseid kokku");
+define("_TOTREADS", "Loetud kokku");
+define("_MORE", "Veel");
+define("_NONEWSYET", "...Hetkel ei ole selles teemas ï¿½htegi uudist...");

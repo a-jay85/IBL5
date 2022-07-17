@@ -2,10 +2,10 @@
 
 /*************************************************************************/
 /* The Slovak language file for module Feedback                      */
-/* Author: AlRashid 			 Date: 09.09.2002   					 */
+/* Author: AlRashid              Date: 09.09.2002                        */
 /* alrashid@klokan.sk, http://alrashid.klokan.sk                         */
-/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk			     */
-/*  		Dakujem                                                      */
+/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk                 */
+/*          Dakujem                                                      */
 /*************************************************************************/
 /**************************************************************************/
 /* PHP-NUKE: Advanced Content Management System                           */
@@ -24,26 +24,24 @@
 /* And, if you use HTML code, please double check it.                     */
 /*************************************************************************/
 /* The Slovak language file for module Feedback                      */
-/* Author: AlRashid 			 Date: 09.09.2002   					 */
+/* Author: AlRashid              Date: 09.09.2002                        */
 /* alrashid@klokan.sk, http://alrashid.klokan.sk                         */
-/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk			     */
-/*  		Dakujem                                                      */
+/* Pripadne chyby mi prosim oznamte na alrashid@klokan.sk                 */
+/*          Dakujem                                                      */
 /*************************************************************************/
 /**************************************************************************/
 
-define("_SEND","Posla");
-define("_YOURNAME","Vaše meno");
-define("_MESSAGE","Odkaz");
-define("_YOUREMAIL","Váš e-mail");
-define("_FEEDBACKNOTE","Vaše komentáre, návrhy a pripomienky k tejto stránke sú vítané a ve¾mi prospešné. Ïakujeme.");
-define("_FEEDBACKTITLE","Formulár");
-define("_FEEDBACK","Napíšte nám");
-define("_FBENTERNAME","Napíšte Vaše meno!");
-define("_FBENTEREMAIL","Napíšte korektne Vašu e-mailovú adresu!");
-define("_FBENTERMESSAGE","Napíšte odkaz!");
-define("_SENDEREMAIL","Email odosielatela");
-define("_SENDERNAME","Meno odosielatela");
-define("_FBMAILSENT","Odkaz bol poslaný!");
-define("_FBTHANKSFORCONTACT","Ïakujeme, že ste nás kontaktovali.");
-
-?>
+define("_SEND", "Poslaï¿½");
+define("_YOURNAME", "Vaï¿½e meno");
+define("_MESSAGE", "Odkaz");
+define("_YOUREMAIL", "Vï¿½ e-mail");
+define("_FEEDBACKNOTE", "Vaï¿½e komentï¿½re, nï¿½vrhy a pripomienky k tejto strï¿½nke sï¿½ vï¿½tanï¿½ a veï¿½mi prospeï¿½nï¿½. ï¿½akujeme.");
+define("_FEEDBACKTITLE", "Formulï¿½r");
+define("_FEEDBACK", "Napï¿½te nï¿½m");
+define("_FBENTERNAME", "Napï¿½te Vaï¿½e meno!");
+define("_FBENTEREMAIL", "Napï¿½te korektne Vaï¿½u e-mailovï¿½ adresu!");
+define("_FBENTERMESSAGE", "Napï¿½te odkaz!");
+define("_SENDEREMAIL", "Email odosielatela");
+define("_SENDERNAME", "Meno odosielatela");
+define("_FBMAILSENT", "Odkaz bol poslanï¿½!");
+define("_FBTHANKSFORCONTACT", "ï¿½akujeme, ï¿½e ste nï¿½s kontaktovali.");

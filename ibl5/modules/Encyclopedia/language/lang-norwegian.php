@@ -17,26 +17,24 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PREVIOUS","Forrige side");
-define("_NEXT","Neste side");
-define("_SEARCHRESULTS","Søkeresultat");
-define("_PAGE","Side");
-define("_RETURNTO","Gå tilbake til");
-define("_DEACTIVATE","Deaktiver");
-define("_ACTIVATE","Aktiver");
-define("_ENCYCLOPEDIA","Oppslagsverk");
-define("_NOCONTENTFORLETTER","Beklager, det er ikke innhold for bokstaven");
-define("_ENCYSELECTLETTER","Velg en bokstav fra listen for å se termene:");
-define("_COPYRIGHT","Copyright");
-define("_YOURADMINENCY","Du er administrator, dette oppslagsverket er ikke aktivt!");
-define("_ENCYNOTACTIVE","Beklager, dette oppslagsverket er ikke aktivt!");
-define("_AVAILABLEENCYLIST","Liste over tilgjengelige oppslagsverk i");
-define("_YOURADMININACTIVELIST","Du er administrator, her er listen over inaktive oppslagsverk:");
-define("_NORESULTSTEXT","Ingen resultat i termens tekst...");
-define("_NORESULTSTITLE","Ingen resultat i termens tittel...");
-define("_SEARCHRESULTSFOR","Søkeresultat for:");
-define("_SEARCHNOTCOMPLETE","Søkevalgene er ikke komplette. Prøv igjen.");
-define("_RESULTSINTERMTITLE","Resultat i termenes tittel:");
-define("_RESULTSINTERMTEXT","Resultat i termenes tekst:");
-
-?>
+define("_PREVIOUS", "Forrige side");
+define("_NEXT", "Neste side");
+define("_SEARCHRESULTS", "Sï¿½keresultat");
+define("_PAGE", "Side");
+define("_RETURNTO", "Gï¿½ tilbake til");
+define("_DEACTIVATE", "Deaktiver");
+define("_ACTIVATE", "Aktiver");
+define("_ENCYCLOPEDIA", "Oppslagsverk");
+define("_NOCONTENTFORLETTER", "Beklager, det er ikke innhold for bokstaven");
+define("_ENCYSELECTLETTER", "Velg en bokstav fra listen for ï¿½ se termene:");
+define("_COPYRIGHT", "Copyright");
+define("_YOURADMINENCY", "Du er administrator, dette oppslagsverket er ikke aktivt!");
+define("_ENCYNOTACTIVE", "Beklager, dette oppslagsverket er ikke aktivt!");
+define("_AVAILABLEENCYLIST", "Liste over tilgjengelige oppslagsverk i");
+define("_YOURADMININACTIVELIST", "Du er administrator, her er listen over inaktive oppslagsverk:");
+define("_NORESULTSTEXT", "Ingen resultat i termens tekst...");
+define("_NORESULTSTITLE", "Ingen resultat i termens tittel...");
+define("_SEARCHRESULTSFOR", "Sï¿½keresultat for:");
+define("_SEARCHNOTCOMPLETE", "Sï¿½kevalgene er ikke komplette. Prï¿½v igjen.");
+define("_RESULTSINTERMTITLE", "Resultat i termenes tittel:");
+define("_RESULTSINTERMTEXT", "Resultat i termenes tekst:");

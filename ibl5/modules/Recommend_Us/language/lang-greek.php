@@ -17,22 +17,20 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_FYOURNAME","Όνομα");
-define("_FYOUREMAIL","E-mail");
-define("_FFRIENDNAME","Ονόματα Φίλων ");
-define("_FFRIENDEMAIL","E-mail Φίλων");
-define("_SEND","Αποστολή");
-define("_HELLO","Γειά σας");
-define("_YOURFRIEND","Οι Φίλοι σας");
-define("_RECOMMEND","Προτείνετε τον Ιστοχώρο αυτό σε Φίλους");
-define("_INTSITE","Ενδιαφέροντες Ιστοχώροι");
-define("_OURSITE","θεώρησε ότι ο Ιστοχώρος μας");
-define("_INTSENT","ενδιαφέρον και επιθυμούσε να σας τα στείλει.");
-define("_FSITENAME","Όνομα Ιστοχώρου");
-define("_FSITEURL","URL Ιστοχώρου");
-define("_FREFERENCE","Οι αναφορές προς τον ιστοχώρο μας διαβιβάστηκαν στον");
-define("_THANKSREC","Ευχαριστούμε που μας διαφημίσατε!");
-define("_SECURITYCODEERROR","<b>ERROR:</b> The security code you wrote is incorrect...<br>Please write it exactly as given bellow:");
-define("_SENDSITEERROR","<b>Error sending the recommendation...</b><br><br><b>ERROR:</b> One or more required fields are empty.<br>Please go back and correct the problem, then try again.");
-
-?>
+define("_FYOURNAME", "οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_FYOUREMAIL", "E-mail");
+define("_FFRIENDNAME", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½ ");
+define("_FFRIENDEMAIL", "E-mail οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_SEND", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_HELLO", "οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½");
+define("_YOURFRIEND", "οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½");
+define("_RECOMMEND", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_INTSITE", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_OURSITE", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½ οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½");
+define("_INTSENT", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½ οΏ½οΏ½οΏ½ οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½.");
+define("_FSITENAME", "οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_FSITEURL", "URL οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½");
+define("_FREFERENCE", "οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½");
+define("_THANKSREC", "οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½ οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½οΏ½!");
+define("_SECURITYCODEERROR", "<b>ERROR:</b> The security code you wrote is incorrect...<br>Please write it exactly as given bellow:");
+define("_SENDSITEERROR", "<b>Error sending the recommendation...</b><br><br><b>ERROR:</b> One or more required fields are empty.<br>Please go back and correct the problem, then try again.");

@@ -17,41 +17,37 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_SEND","Dërgo");
-define("_FUNCTIONS","Funksione");
-define("_YES","Po");
-define("_NO","Jo");
-define("_SAVECHANGES","Shpëto Ndryshimet");
-define("_PAGEBREAK","Nëse dëshiron më shumë se një faqe shto <b>[--pagebreak--]</b> në pikat e ndërprerjes.");
-define("_DESCRIPTION","Përshkrimi");
-define("_TO","Tek");
-define("_TITLE","Titulli");
-define("_ACTIVE","Aktiv");
-define("_DEACTIVATE","Disaktivo");
-define("_INACTIVE","Jo aktiv");
-define("_ACTIVATE","Aktivo");
-define("_ADD","Shto");
-define("_LANGUAGE","Gjuha");
-define("_ENCYCLOPEDIA","Enciklopedia");
-define("_ENCYCLOPEDIAMANAGER","Manazheri i Enciklopedisë");
-define("_DELENCYCLOPEDIA","Elemino Enciklopedinë");
-define("_DELENCYCONTWARNING","Je i sigurt që dëshiron të fshish këtë Enciklopedi dhe të GJITHË përmbajtjen e saj?");
-define("_DELENCYCLOPEDIATEXT","Fshi terme nga Enciklopedia");
-define("_DELENCYTEXTWARNING","Je i sigurt që dëshiron të fshish termet?");
-define("_CURRENTSTATUS","Gjëndja aktuale");
-define("_ACTIVATEPAGE","Aktivon faqen?");
-define("_TERMS","Terme");
-define("_ADDNEWENCYCLOPEDIA","Shto një Enciklopedi të Re");
-define("_ADDNEWENCYTERM","Shto një term të ri në Enciklopedi");
-define("_TERMTEXT","Teksti i termit");
-define("_MOVETERMS","Lëviz Termet");
-define("_MOVEALLTERMSFROM","Lëviz TË GJITHË termet nga");
-define("_EDITENCYCLOPEDIA","Shkruaj Enciklopedinë");
-define("_ENCYTERMSEDIT","Shkruaj termet e Enciklopedisë");
-define("_SELECTONETERM","Seleksiono një term nga lista në vazhdim:");
-define("_NOCONTENTFORLETTER","Nuk ka korrispondues për gërmën");
-define("_CHANGETOENCY","Ndrysho Enciklopedi");
-
-
-?>
+define("_SEND", "Dï¿½rgo");
+define("_FUNCTIONS", "Funksione");
+define("_YES", "Po");
+define("_NO", "Jo");
+define("_SAVECHANGES", "Shpï¿½to Ndryshimet");
+define("_PAGEBREAK", "Nï¿½se dï¿½shiron mï¿½ shumï¿½ se njï¿½ faqe shto <b>[--pagebreak--]</b> nï¿½ pikat e ndï¿½rprerjes.");
+define("_DESCRIPTION", "Pï¿½rshkrimi");
+define("_TO", "Tek");
+define("_TITLE", "Titulli");
+define("_ACTIVE", "Aktiv");
+define("_DEACTIVATE", "Disaktivo");
+define("_INACTIVE", "Jo aktiv");
+define("_ACTIVATE", "Aktivo");
+define("_ADD", "Shto");
+define("_LANGUAGE", "Gjuha");
+define("_ENCYCLOPEDIA", "Enciklopedia");
+define("_ENCYCLOPEDIAMANAGER", "Manazheri i Enciklopedisï¿½");
+define("_DELENCYCLOPEDIA", "Elemino Enciklopedinï¿½");
+define("_DELENCYCONTWARNING", "Je i sigurt qï¿½ dï¿½shiron tï¿½ fshish kï¿½tï¿½ Enciklopedi dhe tï¿½ GJITHï¿½ pï¿½rmbajtjen e saj?");
+define("_DELENCYCLOPEDIATEXT", "Fshi terme nga Enciklopedia");
+define("_DELENCYTEXTWARNING", "Je i sigurt qï¿½ dï¿½shiron tï¿½ fshish termet?");
+define("_CURRENTSTATUS", "Gjï¿½ndja aktuale");
+define("_ACTIVATEPAGE", "Aktivon faqen?");
+define("_TERMS", "Terme");
+define("_ADDNEWENCYCLOPEDIA", "Shto njï¿½ Enciklopedi tï¿½ Re");
+define("_ADDNEWENCYTERM", "Shto njï¿½ term tï¿½ ri nï¿½ Enciklopedi");
+define("_TERMTEXT", "Teksti i termit");
+define("_MOVETERMS", "Lï¿½viz Termet");
+define("_MOVEALLTERMSFROM", "Lï¿½viz Tï¿½ GJITHï¿½ termet nga");
+define("_EDITENCYCLOPEDIA", "Shkruaj Enciklopedinï¿½");
+define("_ENCYTERMSEDIT", "Shkruaj termet e Enciklopedisï¿½");
+define("_SELECTONETERM", "Seleksiono njï¿½ term nga lista nï¿½ vazhdim:");
+define("_NOCONTENTFORLETTER", "Nuk ka korrispondues pï¿½r gï¿½rmï¿½n");
+define("_CHANGETOENCY", "Ndrysho Enciklopedi");

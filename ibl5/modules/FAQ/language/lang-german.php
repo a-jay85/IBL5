@@ -17,14 +17,11 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_CATEGORY","Bereich");
-define("_CATEGORIES","Themen- Bereiche");
-define("_FAQ2","FAQ (H&auml;ufige Fragen und Antworten)");
-define("_BACKTOTOP","Zur&uuml;ck zum Anfang");
-define("_BACKTOFAQINDEX","Zur&uuml;ck zum FAQ Index");
-define("_MAIN","Start");
-define("_QUESTION","Frage");
-define("_ANSWER","Antwort");
-
-
-?>
+define("_CATEGORY", "Bereich");
+define("_CATEGORIES", "Themen- Bereiche");
+define("_FAQ2", "FAQ (H&auml;ufige Fragen und Antworten)");
+define("_BACKTOTOP", "Zur&uuml;ck zum Anfang");
+define("_BACKTOFAQINDEX", "Zur&uuml;ck zum FAQ Index");
+define("_MAIN", "Start");
+define("_QUESTION", "Frage");
+define("_ANSWER", "Antwort");

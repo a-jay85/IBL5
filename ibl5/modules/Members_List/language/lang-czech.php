@@ -17,27 +17,25 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_URL","URL");
-define("_EMAIL","E-mail");
-define("_REALNAME","Jméno");
-define("_FUNCTIONS","Funkce");
-define("_PREVIOUS","Pøedchozí stránka");
-define("_MEMBERSLIST","Seznam uživatelù");
-define("_GREETINGS","Vítáme naposledy zaregistrovaného uživatele:");
-define("_SORTBY","Tøídìno podle:");
-define("_MNICKNAME","pøezdívky");
-define("_MREALNAME","pravého jména");
-define("_MEMAIL","e-mailu");
-define("_MURL","url");
-define("_ONLINEREG","Registrovaní uživatelé, kteøí jsou online:");
-define("_WEHAVE","Máme dosud");
-define("_MREGISTERED","registrovaných uživatelù. Momentálnì prohlíží stránku");
-define("_MREGONLINE","uživatel(é/ù).");
-define("_REGSOFAR","registrované uživatele.");
-define("_USERSFOUND","uživatel pod");
-define("_USERSSHOWN","ukázat uživatele");
-define("_NOMEMBERS","Nikdo není registrován pod pøezdívkou zaèínající na");
-define("_PAGES","Stránky");
-define("_HOMEPAGE","Domovská stránka");
-
-?>
+define("_URL", "URL");
+define("_EMAIL", "E-mail");
+define("_REALNAME", "Jmï¿½no");
+define("_FUNCTIONS", "Funkce");
+define("_PREVIOUS", "Pï¿½edchozï¿½ strï¿½nka");
+define("_MEMBERSLIST", "Seznam uï¿½ivatelï¿½");
+define("_GREETINGS", "Vï¿½tï¿½me naposledy zaregistrovanï¿½ho uï¿½ivatele:");
+define("_SORTBY", "Tï¿½ï¿½dï¿½no podle:");
+define("_MNICKNAME", "pï¿½ezdï¿½vky");
+define("_MREALNAME", "pravï¿½ho jmï¿½na");
+define("_MEMAIL", "e-mailu");
+define("_MURL", "url");
+define("_ONLINEREG", "Registrovanï¿½ uï¿½ivatelï¿½, kteï¿½ï¿½ jsou online:");
+define("_WEHAVE", "Mï¿½me dosud");
+define("_MREGISTERED", "registrovanï¿½ch uï¿½ivatelï¿½. Momentï¿½lnï¿½ prohlï¿½ï¿½ strï¿½nku");
+define("_MREGONLINE", "uï¿½ivatel(ï¿½/ï¿½).");
+define("_REGSOFAR", "registrovanï¿½ uï¿½ivatele.");
+define("_USERSFOUND", "uï¿½ivatel pod");
+define("_USERSSHOWN", "ukï¿½zat uï¿½ivatele");
+define("_NOMEMBERS", "Nikdo nenï¿½ registrovï¿½n pod pï¿½ezdï¿½vkou zaï¿½ï¿½najï¿½cï¿½ na");
+define("_PAGES", "Strï¿½nky");
+define("_HOMEPAGE", "Domovskï¿½ strï¿½nka");

@@ -13,27 +13,25 @@
 /************************************************************************/
 
 if (!defined('ADMIN_FILE')) {
-	die ("Access Denied");
+    die("Access Denied");
 }
 
 $module_name = "Content";
-include_secure("modules/$module_name/admin/language/lang-".$currentlang.".php");
+include_secure("modules/$module_name/admin/language/lang-" . $currentlang . ".php");
 
-switch($op) {
+switch ($op) {
 
-	case "content":
-	case "content_edit":
-	case "content_delete":
-	case "content_save":
-	case "content_save_edit":
-	case "content_change_status":
-	case "add_category":
-	case "edit_category":
-	case "save_category":
-	case "del_content_cat":
-	include("modules/$module_name/admin/index.php");
-	break;
+    case "content":
+    case "content_edit":
+    case "content_delete":
+    case "content_save":
+    case "content_save_edit":
+    case "content_change_status":
+    case "add_category":
+    case "edit_category":
+    case "save_category":
+    case "del_content_cat":
+        include "modules/$module_name/admin/index.php";
+        break;
 
 }
-
-?>

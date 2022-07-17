@@ -17,27 +17,25 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_URL","URL");
-define("_EMAIL","Email");
-define("_REALNAME","Valódi név");
-define("_FUNCTIONS","Funkciók");
-define("_PREVIOUS","Elõzõ oldal");
-define("_MEMBERSLIST","Felhasználók listája");
-define("_GREETINGS","Legutolsó regisztrált tagunk:");
-define("_SORTBY","Rendezés:");
-define("_MNICKNAME","felhasználónév");
-define("_MREALNAME","igazi név");
-define("_MEMAIL","email");
-define("_MURL","link");
-define("_ONLINEREG","Jelenleg a következõ regisztrált tagok olvasnak bennünket:");
-define("_WEHAVE","Eddig");
-define("_MREGISTERED","regisztrált tagunk van. Jelenleg");
-define("_MREGONLINE","regisztrált tag olvas bennünket.");
-define("_REGSOFAR","regisztrált tagunk van.");
-define("_USERSFOUND","tag található itt:");
-define("_USERSSHOWN","tagokat megmutatja");
-define("_NOMEMBERS","Nem találni tagokat ide:");
-define("_PAGES","oldal");
-define("_HOMEPAGE","Honlap");
-
-?>
+define("_URL", "URL");
+define("_EMAIL", "Email");
+define("_REALNAME", "Valï¿½di nï¿½v");
+define("_FUNCTIONS", "Funkciï¿½k");
+define("_PREVIOUS", "Elï¿½zï¿½ oldal");
+define("_MEMBERSLIST", "Felhasznï¿½lï¿½k listï¿½ja");
+define("_GREETINGS", "Legutolsï¿½ regisztrï¿½lt tagunk:");
+define("_SORTBY", "Rendezï¿½s:");
+define("_MNICKNAME", "felhasznï¿½lï¿½nï¿½v");
+define("_MREALNAME", "igazi nï¿½v");
+define("_MEMAIL", "email");
+define("_MURL", "link");
+define("_ONLINEREG", "Jelenleg a kï¿½vetkezï¿½ regisztrï¿½lt tagok olvasnak bennï¿½nket:");
+define("_WEHAVE", "Eddig");
+define("_MREGISTERED", "regisztrï¿½lt tagunk van. Jelenleg");
+define("_MREGONLINE", "regisztrï¿½lt tag olvas bennï¿½nket.");
+define("_REGSOFAR", "regisztrï¿½lt tagunk van.");
+define("_USERSFOUND", "tag talï¿½lhatï¿½ itt:");
+define("_USERSSHOWN", "tagokat megmutatja");
+define("_NOMEMBERS", "Nem talï¿½lni tagokat ide:");
+define("_PAGES", "oldal");
+define("_HOMEPAGE", "Honlap");

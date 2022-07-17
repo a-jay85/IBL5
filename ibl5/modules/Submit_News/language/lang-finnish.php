@@ -17,49 +17,46 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PRINTER","Kevyempi versio tulostusta varten");
-define("_FRIEND","Lähetä ystävälle");
-define("_YOURNAME","Nimesi");
-define("_OK","Ok!");
- 
+define("_PRINTER", "Kevyempi versio tulostusta varten");
+define("_FRIEND", "Lï¿½hetï¿½ ystï¿½vï¿½lle");
+define("_YOURNAME", "Nimesi");
+define("_OK", "Ok!");
 
-define("_ALLOWEDHTML","HTML sallittu:");
-define("_EXTRANS","Lisää html tagit tekstiin");
-define("_HTMLFORMATED","HTML formatoituna");
-define("_PLAINTEXT","Pelkkänä tekstinä");
-define("_ARTICLES","Artikkelit");
-define("_SUBMITNEWS","Kirjoita materiaalia");
-define("_SUBMITADVICE","Kuka tahansa voi ilmoittaa uutisen, artikkelin tai tapahtuman, jonka katsoo olevan asiallinen ja sopiva julkaistavaksi!<br><br>Täytä alla olevat kentät huolella!<br><br>Sivuston ylläpitäjä tarkistaa ennen julkaisemista aineiston...<br>Kirjoitta esimerkiksi toiveita uutisen julkaisemispäivästä, kategoriasta ensimmäiseen kenttään - kaikki oikoluetaan toistamiseen enne julkaisemista<br>Voit muotoilla kentät HTML -kielellä, mutta silloin esikatselukin myös html-tilassa!!!");
-define("_SUBTITLE","Otsikko");
-define("_BEDESCRIPTIVE","Valitse tarkka ja kuvaava, lyhyt ja ytimekäs");
-define("_BADTITLES","Huonoja otsikoita='Tarkastakaas tämä!' tai 'uutinen'");
-define("_HTMLISFINE","HTML -muotoilua voidaan käyttää. Tarkasta URLit ja HTMl-tagit!");
-define("_AREYOUSURE","Oletko varma, että laitoit oikean URLin? Tarkistitkos urlin toimivuuden?");
-define("_SUBPREVIEW","Sinun pitää esikatsella uutinen ennen sen lähettämistä");
-define("_SELECTTOPIC","Valitse oikea kanava");
-define("_NEWSUBPREVIEW","Esikatselu");
-define("_STORYLOOK","Lähettämäsi uutinen näyttää suunnilleen tältä:");
-define("_CHECKSTORY","Tarkista vielä teksti, linkit, oikeinkirjoitus!!");
-define("_THANKSSUB","Kiitos kun olet rakentamassa yhteistä verkkoyhteisöä!");
-define("_SUBSENT","Olemme vastaanottaneet lähettämäsi uutisen");
-define("_SUBTEXT","Me tarkistamme uutisesi muutaman tunnin sisällä ja lisäämme sen sivuillemme, jos se on mielenkiintoinen ja täyttää mielestämme sille vaaditut piirteet.");
-define("_WEHAVESUB","Tällä hetkellä");
-define("_WAITING","uutista odottaa tarkastamista.");
-define("_PREVIEW","Esikatsele");
-define("_NEWUSER","Uusi käyttäjä");
-define("_USCORE","Pisteet");
-define("_DATE","Päivä");
-define("_STORYTEXT","Ingressi etusivulle");
-define("_EXTENDEDTEXT","Loput tekstistä");
-define("_LANGUAGE","Language");
+define("_ALLOWEDHTML", "HTML sallittu:");
+define("_EXTRANS", "Lisï¿½ï¿½ html tagit tekstiin");
+define("_HTMLFORMATED", "HTML formatoituna");
+define("_PLAINTEXT", "Pelkkï¿½nï¿½ tekstinï¿½");
+define("_ARTICLES", "Artikkelit");
+define("_SUBMITNEWS", "Kirjoita materiaalia");
+define("_SUBMITADVICE", "Kuka tahansa voi ilmoittaa uutisen, artikkelin tai tapahtuman, jonka katsoo olevan asiallinen ja sopiva julkaistavaksi!<br><br>Tï¿½ytï¿½ alla olevat kentï¿½t huolella!<br><br>Sivuston yllï¿½pitï¿½jï¿½ tarkistaa ennen julkaisemista aineiston...<br>Kirjoitta esimerkiksi toiveita uutisen julkaisemispï¿½ivï¿½stï¿½, kategoriasta ensimmï¿½iseen kenttï¿½ï¿½n - kaikki oikoluetaan toistamiseen enne julkaisemista<br>Voit muotoilla kentï¿½t HTML -kielellï¿½, mutta silloin esikatselukin myï¿½s html-tilassa!!!");
+define("_SUBTITLE", "Otsikko");
+define("_BEDESCRIPTIVE", "Valitse tarkka ja kuvaava, lyhyt ja ytimekï¿½s");
+define("_BADTITLES", "Huonoja otsikoita='Tarkastakaas tï¿½mï¿½!' tai 'uutinen'");
+define("_HTMLISFINE", "HTML -muotoilua voidaan kï¿½yttï¿½ï¿½. Tarkasta URLit ja HTMl-tagit!");
+define("_AREYOUSURE", "Oletko varma, ettï¿½ laitoit oikean URLin? Tarkistitkos urlin toimivuuden?");
+define("_SUBPREVIEW", "Sinun pitï¿½ï¿½ esikatsella uutinen ennen sen lï¿½hettï¿½mistï¿½");
+define("_SELECTTOPIC", "Valitse oikea kanava");
+define("_NEWSUBPREVIEW", "Esikatselu");
+define("_STORYLOOK", "Lï¿½hettï¿½mï¿½si uutinen nï¿½yttï¿½ï¿½ suunnilleen tï¿½ltï¿½:");
+define("_CHECKSTORY", "Tarkista vielï¿½ teksti, linkit, oikeinkirjoitus!!");
+define("_THANKSSUB", "Kiitos kun olet rakentamassa yhteistï¿½ verkkoyhteisï¿½ï¿½!");
+define("_SUBSENT", "Olemme vastaanottaneet lï¿½hettï¿½mï¿½si uutisen");
+define("_SUBTEXT", "Me tarkistamme uutisesi muutaman tunnin sisï¿½llï¿½ ja lisï¿½ï¿½mme sen sivuillemme, jos se on mielenkiintoinen ja tï¿½yttï¿½ï¿½ mielestï¿½mme sille vaaditut piirteet.");
+define("_WEHAVESUB", "Tï¿½llï¿½ hetkellï¿½");
+define("_WAITING", "uutista odottaa tarkastamista.");
+define("_PREVIEW", "Esikatsele");
+define("_NEWUSER", "Uusi kï¿½yttï¿½jï¿½");
+define("_USCORE", "Pisteet");
+define("_DATE", "Pï¿½ivï¿½");
+define("_STORYTEXT", "Ingressi etusivulle");
+define("_EXTENDEDTEXT", "Loput tekstistï¿½");
+define("_LANGUAGE", "Language");
 
-define("_SELECTMONTH2VIEW","Please select the month you want to view:");
-define("_SHOWALLSTORIES","Show ALL Stories");
-define("_STORIESARCHIVE","Stories Archive");
-define("_ACTIONS","Actions");
-define("_ARCHIVESINDEX","Stories Archive Index");
-define("_ALLSTORIESARCH","All Stories");
-define("_NEXTPAGE","Seuraava sivu");
-define("_PREVIOUSPAGE","Edellinen sivu");
-
-?>
+define("_SELECTMONTH2VIEW", "Please select the month you want to view:");
+define("_SHOWALLSTORIES", "Show ALL Stories");
+define("_STORIESARCHIVE", "Stories Archive");
+define("_ACTIONS", "Actions");
+define("_ARCHIVESINDEX", "Stories Archive Index");
+define("_ALLSTORIESARCH", "All Stories");
+define("_NEXTPAGE", "Seuraava sivu");
+define("_PREVIOUSPAGE", "Edellinen sivu");

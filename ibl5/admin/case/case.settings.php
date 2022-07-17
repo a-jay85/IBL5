@@ -13,36 +13,34 @@
 /************************************************************************/
 
 if (!defined('ADMIN_FILE')) {
-	die ("Access Denied");
+    die("Access Denied");
 }
 
-switch($op) {
+switch ($op) {
 
-	case "options_menu":
-	case "general":
-	case "savegeneral":
-	case "themes":
-	case "savethemes":
-	case "users":
-	case "saveusers":
-	case "comments":
-	case "savecomments":
-	case "languages":
-	case "savelanguages":
-	case "footer":
-	case "savefooter":
-	case "backend":
-	case "savebackend":
-	case "referers":
-	case "savereferers":
-	case "mailing":
-	case "savemailing":
-	case "other":
-	case "saveother":
-	case "Configure":
-	include("admin/modules/settings.php");
-	break;
+    case "options_menu":
+    case "general":
+    case "savegeneral":
+    case "themes":
+    case "savethemes":
+    case "users":
+    case "saveusers":
+    case "comments":
+    case "savecomments":
+    case "languages":
+    case "savelanguages":
+    case "footer":
+    case "savefooter":
+    case "backend":
+    case "savebackend":
+    case "referers":
+    case "savereferers":
+    case "mailing":
+    case "savemailing":
+    case "other":
+    case "saveother":
+    case "Configure":
+        include "admin/modules/settings.php";
+        break;
 
 }
-
-?>

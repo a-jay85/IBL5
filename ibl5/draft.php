@@ -71,5 +71,3 @@ if ($num == 0) {
 $db->sql_close();
 
 echo "</table></center></body></html>";
-
-?>

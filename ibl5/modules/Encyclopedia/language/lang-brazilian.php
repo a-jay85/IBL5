@@ -21,26 +21,24 @@
 /* Comments/suggestions: aleagi@terra.com.br - aleagi@phpnuke.org.br      */
 /**************************************************************************/
 
-define("_PREVIOUS","Página anterior");
-define("_NEXT","Próxima página");
-define("_SEARCHRESULTS","Resultados da Busca");
-define("_PAGE","Páginas");
-define("_RETURNTO","Voltar para");
-define("_DEACTIVATE","Desativar");
-define("_ACTIVATE","Ativar");
-define("_ENCYCLOPEDIA","Enciclopédia");
-define("_NOCONTENTFORLETTER","Desculpe, não há conteúdo para esta letra");
-define("_ENCYSELECTLETTER","Por favor selecione uma letra da seguinte lista para visualizar seu(s) termo(s):");
-define("_COPYRIGHT","Copyright");
-define("_YOURADMINENCY","Reconheci você como Administrador. Esta Enciclopédia não está ativa!");
-define("_ENCYNOTACTIVE","Desculpe, esta Enciclopédia não está ativa.");
-define("_AVAILABLEENCYLIST","Lista de enciclopédias disponíveis em");
-define("_YOURADMININACTIVELIST","Reconheci você como Administrador. Segue uma lista das Enciclopédias INATIVAS:");
-define("_NORESULTSTEXT","Nenhum resultado para a busca por texto de termos...");
-define("_NORESULTSTITLE","Nenhum resultao para a busca por título de termos...");
-define("_SEARCHRESULTSFOR","Resultados da busca por:");
-define("_SEARCHNOTCOMPLETE","As opções de busca não estão completas. por favor, tente novamente.");
-define("_RESULTSINTERMTITLE","Resultados para a busca do título dos termos:");
-define("_RESULTSINTERMTEXT","Resultados para a busca do texto dos termos:");
-
-?>
+define("_PREVIOUS", "Pï¿½gina anterior");
+define("_NEXT", "Prï¿½xima pï¿½gina");
+define("_SEARCHRESULTS", "Resultados da Busca");
+define("_PAGE", "Pï¿½ginas");
+define("_RETURNTO", "Voltar para");
+define("_DEACTIVATE", "Desativar");
+define("_ACTIVATE", "Ativar");
+define("_ENCYCLOPEDIA", "Enciclopï¿½dia");
+define("_NOCONTENTFORLETTER", "Desculpe, nï¿½o hï¿½ conteï¿½do para esta letra");
+define("_ENCYSELECTLETTER", "Por favor selecione uma letra da seguinte lista para visualizar seu(s) termo(s):");
+define("_COPYRIGHT", "Copyright");
+define("_YOURADMINENCY", "Reconheci vocï¿½ como Administrador. Esta Enciclopï¿½dia nï¿½o estï¿½ ativa!");
+define("_ENCYNOTACTIVE", "Desculpe, esta Enciclopï¿½dia nï¿½o estï¿½ ativa.");
+define("_AVAILABLEENCYLIST", "Lista de enciclopï¿½dias disponï¿½veis em");
+define("_YOURADMININACTIVELIST", "Reconheci vocï¿½ como Administrador. Segue uma lista das Enciclopï¿½dias INATIVAS:");
+define("_NORESULTSTEXT", "Nenhum resultado para a busca por texto de termos...");
+define("_NORESULTSTITLE", "Nenhum resultao para a busca por tï¿½tulo de termos...");
+define("_SEARCHRESULTSFOR", "Resultados da busca por:");
+define("_SEARCHNOTCOMPLETE", "As opï¿½ï¿½es de busca nï¿½o estï¿½o completas. por favor, tente novamente.");
+define("_RESULTSINTERMTITLE", "Resultados para a busca do tï¿½tulo dos termos:");
+define("_RESULTSINTERMTEXT", "Resultados para a busca do texto dos termos:");

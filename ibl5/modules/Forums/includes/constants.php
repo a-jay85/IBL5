@@ -20,9 +20,8 @@
  *
  ***************************************************************************/
 
-if ( !defined('IN_PHPBB') )
-{
-        die("Hacking attempt");
+if (!defined('IN_PHPBB')) {
+    die("Hacking attempt");
 }
 
 // Debug Level
@@ -62,8 +61,8 @@ define('POST_ANNOUNCE', 2);
 define('POST_GLOBAL_ANNOUNCE', 3);
 // SQL codes
 define('BEGIN_TRANSACTION', 1);
-if(!defined('END_TRANSACTION')) {
-define('END_TRANSACTION', 2);
+if (!defined('END_TRANSACTION')) {
+    define('END_TRANSACTION', 2);
 }
 // Error codes
 define('GENERAL_MESSAGE', 200);
@@ -119,35 +118,33 @@ define('AUTH_POLLCREATE', 9);
 define('AUTH_VOTE', 10);
 define('AUTH_ATTACH', 11);
 // Table names
-define('CONFIRM_TABLE', $prefix.'_bbconfirm');
-define('AUTH_ACCESS_TABLE', $prefix.'_bbauth_access');
-define('BANLIST_TABLE', $prefix.'_bbbanlist');
-define('CATEGORIES_TABLE', $prefix.'_bbcategories');
-define('CONFIG_TABLE', $prefix.'_bbconfig');
-define('DISALLOW_TABLE', $prefix.'_bbdisallow');
-define('FORUMS_TABLE', $prefix.'_bbforums');
-define('GROUPS_TABLE', $prefix.'_bbgroups');
-define('POSTS_TABLE', $prefix.'_bbposts');
-define('POSTS_TEXT_TABLE', $prefix.'_bbposts_text');
-define('PRIVMSGS_TABLE', $prefix.'_bbprivmsgs');
-define('PRIVMSGS_TEXT_TABLE', $prefix.'_bbprivmsgs_text');
-define('PRIVMSGS_IGNORE_TABLE', $prefix.'_bbprivmsgs_ignore');
-define('PRUNE_TABLE', $prefix.'_bbforum_prune');
-define('RANKS_TABLE', $prefix.'_bbranks');
-define('SEARCH_TABLE', $prefix.'_bbsearch_results');
-define('SEARCH_WORD_TABLE', $prefix.'_bbsearch_wordlist');
-define('SEARCH_MATCH_TABLE', $prefix.'_bbsearch_wordmatch');
-define('SESSIONS_TABLE', $prefix.'_bbsessions');
-define('SMILIES_TABLE', $prefix.'_bbsmilies');
-define('THEMES_TABLE', $prefix.'_bbthemes');
-define('THEMES_NAME_TABLE', $prefix.'_bbthemes_name');
-define('TOPICS_TABLE', $prefix.'_bbtopics');
-define('TOPICS_WATCH_TABLE', $prefix.'_bbtopics_watch');
-define('USER_GROUP_TABLE', $prefix.'_bbuser_group');
-define('USERS_TABLE', $user_prefix.'_users');
-define('WORDS_TABLE', $prefix.'_bbwords');
-define('VOTE_DESC_TABLE', $prefix.'_bbvote_desc');
-define('VOTE_RESULTS_TABLE', $prefix.'_bbvote_results');
-define('VOTE_USERS_TABLE', $prefix.'_bbvote_voters');
-
-?>
+define('CONFIRM_TABLE', $prefix . '_bbconfirm');
+define('AUTH_ACCESS_TABLE', $prefix . '_bbauth_access');
+define('BANLIST_TABLE', $prefix . '_bbbanlist');
+define('CATEGORIES_TABLE', $prefix . '_bbcategories');
+define('CONFIG_TABLE', $prefix . '_bbconfig');
+define('DISALLOW_TABLE', $prefix . '_bbdisallow');
+define('FORUMS_TABLE', $prefix . '_bbforums');
+define('GROUPS_TABLE', $prefix . '_bbgroups');
+define('POSTS_TABLE', $prefix . '_bbposts');
+define('POSTS_TEXT_TABLE', $prefix . '_bbposts_text');
+define('PRIVMSGS_TABLE', $prefix . '_bbprivmsgs');
+define('PRIVMSGS_TEXT_TABLE', $prefix . '_bbprivmsgs_text');
+define('PRIVMSGS_IGNORE_TABLE', $prefix . '_bbprivmsgs_ignore');
+define('PRUNE_TABLE', $prefix . '_bbforum_prune');
+define('RANKS_TABLE', $prefix . '_bbranks');
+define('SEARCH_TABLE', $prefix . '_bbsearch_results');
+define('SEARCH_WORD_TABLE', $prefix . '_bbsearch_wordlist');
+define('SEARCH_MATCH_TABLE', $prefix . '_bbsearch_wordmatch');
+define('SESSIONS_TABLE', $prefix . '_bbsessions');
+define('SMILIES_TABLE', $prefix . '_bbsmilies');
+define('THEMES_TABLE', $prefix . '_bbthemes');
+define('THEMES_NAME_TABLE', $prefix . '_bbthemes_name');
+define('TOPICS_TABLE', $prefix . '_bbtopics');
+define('TOPICS_WATCH_TABLE', $prefix . '_bbtopics_watch');
+define('USER_GROUP_TABLE', $prefix . '_bbuser_group');
+define('USERS_TABLE', $user_prefix . '_users');
+define('WORDS_TABLE', $prefix . '_bbwords');
+define('VOTE_DESC_TABLE', $prefix . '_bbvote_desc');
+define('VOTE_RESULTS_TABLE', $prefix . '_bbvote_results');
+define('VOTE_USERS_TABLE', $prefix . '_bbvote_voters');

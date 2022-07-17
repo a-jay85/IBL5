@@ -17,53 +17,50 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 /*Translated to Brazilian by: Luiz Gustavo Aleagi Nunes - tatau           */
-/*For any comments/suggestions: aleagi@terra.com.br			        */
+/*For any comments/suggestions: aleagi@terra.com.br                    */
 /**************************************************************************/
 
-
-define("_ALLTOPICS","Todos os Tópicos");
-define("_NOCOMMENTS","Sem comentários");
-define("_UCOMMENT","Comentário");
-define("_REVIEWS","Revisão");
-define("_SEARCHUSERS","Buscar Usuários no banco de dados");
-define("_SEARCHSECTIONS","Buscar em Seções");
-define("_SEARCHREVIEWS","Buscar em Revisões");
-define("_SEARCHIN","Buscar em");
-define("_ARTICLES","Artigos");
-define("_ALLAUTHORS","Todos os autores");
-define("_ALL","Todos");
-define("_WEEK","semana");
-define("_WEEKS","semanas");
-define("_MONTH","mês");
-define("_MONTHS","meses");
-define("_SEARCHON","Buscar em:");
-define("_SSTORIES","Histórias");
-define("_SSECTIONS","Seções");
-define("_SUSERS","Usuários");
-define("_NOMATCHES","Nada encontrado para");
-define("_PREVMATCHES","Registros anteriores");
-define("_NEXTMATCHES","Próximos registros");
-define("_INSECTION","Artigo na Seção");
-define("_NONAME","Nenhum nome inscrito");
-define("_SCOMMENTS","Comentários");
-define("_SEARCHRESULTS","Resultados da Busca");
-define("_CONTRIBUTEDBY","Contribuição de");
-define("_UCOMMENTS","Comentários");
-define("_MATCHTITLE","Coincidir ao TÍTULO");
-define("_MATCHTEXT","coincidir ao TEXTO do Artigo");
-define("_MATCHBOTH","coincidir ao TÍTULO e TEXTO do Artigo");
-define("_SREPLY","Responder");
-define("_SREPLIES","Responder");
-define("_ATTACHART","Anexar ao artigo");
-define("_PAGES","Páginas");
-define("_REVIEWSCORE","Pontuação para esta Revisão");
-define("_PAGE","Páginas");
-define("_DOWNLOADS","Downloads");
-define("_WEBLINKS","Links");
-define("_FINDMORE","... mais...");
-define("_DIDNOTFIND","Não encontrou o que estava procurando?");
-define("_ENCYCLOPEDIA","Enciclopédia");
-define("_SEARCHINSTORY","Procure em todos os comentários em Histórias:");
-define("_SEARCHCHARACTERS","<center><b>Search System Error</b><br><br>Your query should be at least 3 characters long to be processed.<br>Please, fix the problem and try again...</center>");
-
-?>
+define("_ALLTOPICS", "Todos os Tï¿½picos");
+define("_NOCOMMENTS", "Sem comentï¿½rios");
+define("_UCOMMENT", "Comentï¿½rio");
+define("_REVIEWS", "Revisï¿½o");
+define("_SEARCHUSERS", "Buscar Usuï¿½rios no banco de dados");
+define("_SEARCHSECTIONS", "Buscar em Seï¿½ï¿½es");
+define("_SEARCHREVIEWS", "Buscar em Revisï¿½es");
+define("_SEARCHIN", "Buscar em");
+define("_ARTICLES", "Artigos");
+define("_ALLAUTHORS", "Todos os autores");
+define("_ALL", "Todos");
+define("_WEEK", "semana");
+define("_WEEKS", "semanas");
+define("_MONTH", "mï¿½s");
+define("_MONTHS", "meses");
+define("_SEARCHON", "Buscar em:");
+define("_SSTORIES", "Histï¿½rias");
+define("_SSECTIONS", "Seï¿½ï¿½es");
+define("_SUSERS", "Usuï¿½rios");
+define("_NOMATCHES", "Nada encontrado para");
+define("_PREVMATCHES", "Registros anteriores");
+define("_NEXTMATCHES", "Prï¿½ximos registros");
+define("_INSECTION", "Artigo na Seï¿½ï¿½o");
+define("_NONAME", "Nenhum nome inscrito");
+define("_SCOMMENTS", "Comentï¿½rios");
+define("_SEARCHRESULTS", "Resultados da Busca");
+define("_CONTRIBUTEDBY", "Contribuiï¿½ï¿½o de");
+define("_UCOMMENTS", "Comentï¿½rios");
+define("_MATCHTITLE", "Coincidir ao Tï¿½TULO");
+define("_MATCHTEXT", "coincidir ao TEXTO do Artigo");
+define("_MATCHBOTH", "coincidir ao Tï¿½TULO e TEXTO do Artigo");
+define("_SREPLY", "Responder");
+define("_SREPLIES", "Responder");
+define("_ATTACHART", "Anexar ao artigo");
+define("_PAGES", "Pï¿½ginas");
+define("_REVIEWSCORE", "Pontuaï¿½ï¿½o para esta Revisï¿½o");
+define("_PAGE", "Pï¿½ginas");
+define("_DOWNLOADS", "Downloads");
+define("_WEBLINKS", "Links");
+define("_FINDMORE", "... mais...");
+define("_DIDNOTFIND", "Nï¿½o encontrou o que estava procurando?");
+define("_ENCYCLOPEDIA", "Enciclopï¿½dia");
+define("_SEARCHINSTORY", "Procure em todos os comentï¿½rios em Histï¿½rias:");
+define("_SEARCHCHARACTERS", "<center><b>Search System Error</b><br><br>Your query should be at least 3 characters long to be processed.<br>Please, fix the problem and try again...</center>");

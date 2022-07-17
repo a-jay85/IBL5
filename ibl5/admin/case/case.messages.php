@@ -13,19 +13,17 @@
 /************************************************************************/
 
 if (!defined('ADMIN_FILE')) {
-	die ("Access Denied");
+    die("Access Denied");
 }
 
-switch($op) {
+switch ($op) {
 
     case "messages":
     case "addmsg":
     case "editmsg":
     case "deletemsg":
     case "savemsg":
-    include("admin/modules/messages.php");
-    break;
+        include "admin/modules/messages.php";
+        break;
 
 }
-
-?>

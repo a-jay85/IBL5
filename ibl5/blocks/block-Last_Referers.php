@@ -16,7 +16,7 @@
 /* the Free Software Foundation; either version 2 of the License.       */
 /************************************************************************/
 
-if ( !defined('BLOCK_FILE') ) {
+if (!defined('BLOCK_FILE')) {
     Header("Location: ../index.php");
     die();
 }
@@ -30,17 +30,15 @@ while ($row = $db->sql_fetchrow($result)) {
     $rid = intval($row['rid']);
     $url = filter($row['url'], "nohtml");
     $url2 = str_replace("_", " ", $url);
-    if(strlen($url2) > 18) {
-		$url2 = substr($url,0,20);
+    if (strlen($url2) > 18) {
+        $url2 = substr($url, 0, 20);
         $url2 .= "..";
     }
     $content .= "$a:&nbsp;<a href=\"$url\" target=\"new\">$url2</a><br>";
     $a++;
 }
 if (is_admin($admin)) {
-    $total = $db->sql_numrows($db->sql_query("SELECT * FROM ".$prefix."_referer"));
-    $content .= "<br><center>$total "._HTTPREFERERS."<br>[ <a href=\"".$admin_file.".php?op=delreferer\">"._DELETE."</a> ]</center>";
-    
-}
+    $total = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_referer"));
+    $content .= "<br><center>$total " . _HTTPREFERERS . "<br>[ <a href=\"" . $admin_file . ".php?op=delreferer\">" . _DELETE . "</a> ]</center>";
 
-?>
+}

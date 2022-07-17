@@ -21,17 +21,16 @@ include "includes/classes.inc.php";
 
 // If it's our turn to pick, make the pick
 if ($login->can_pick()) {
-  $statement = "select pick_id, team.team_id, team_name from pick, team where pick.team_id = '".$login->team_id()."'
-and (pick.player_id is NULL or pick.player_id = '".kSkipPick."')
+    $statement = "select pick_id, team.team_id, team_name from pick, team where pick.team_id = '" . $login->team_id() . "'
+and (pick.player_id is NULL or pick.player_id = '" . kSkipPick . "')
 order by pick_id
 limit 1";
-  $row = mysql_fetch_array(mysql_query($statement));
-  
-  if ($row['pick_id'] && $_GET['player_id']) {
-    make_pick($row['pick_id'], $_GET['player_id']);
-  }
- }
+    $row = mysql_fetch_array(mysql_query($statement));
+
+    if ($row['pick_id'] && $_GET['player_id']) {
+        make_pick($row['pick_id'], $_GET['player_id']);
+    }
+}
 process_pick_queue();
-header("Location: ".$_SERVER['HTTP_REFERER']);
+header("Location: " . $_SERVER['HTTP_REFERER']);
 exit;
-?>

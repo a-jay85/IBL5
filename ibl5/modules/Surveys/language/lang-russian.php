@@ -21,64 +21,62 @@
 /**************************************************************************/
 
 /**************************************************************************/
-/* Доп. перевод, проверка синтаксиса/Add. Russian transl.& spell checking:*/
-/*         Александр Бурчак / Alexander Burchak, alexburchak@ua.fm        */
-/* Дата/Date:                                                             */
+/* пїЅпїЅпїЅ. пїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ/Add. Russian transl.& spell checking:*/
+/*         пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ / Alexander Burchak, alexburchak@ua.fm        */
+/* пїЅпїЅпїЅпїЅ/Date:                                                             */
 /*         15.03.2004                                                     */
 /**************************************************************************/
 
-define("_YOURNAME","Ваше имя");
-define("_OK","Ok!");
-define("_COMMENT","комментарий");
-define("_CONFIGURE","Конфигурировать");
-define("_LOGINCREATE","Войти/Создать аккаунт");
-define("_THRESHOLD","Порог");
-define("_NOCOMMENTS","Без комментариев");
-define("_NESTED","Тупо");
-define("_FLAT","Плоско");
-define("_THREAD","Тонко");
-define("_OLDEST","По возрастанию");
-define("_NEWEST","По убыванию");
-define("_HIGHEST","Сначала лучшие");
-define("_COMMENTSWARNING","Владельцем комментария является их отправитель. Мы не несем ответственности за их содержание.");
-define("_SCORE","Всего:");
-define("_USERINFO","Информация о пользователе");
-define("_READREST","Прочитать остаток этого комментария...");
-define("_REPLY","Ответить на это");
-define("_REPLYMAIN","Поместить комментарий");
-define("_NOSUBJECT","Без темы");
-define("_NOANONCOMMENTS","Вы не можете отправить комментарий анонимно, пожалуйста <a href=\"modules.php?name=Your_Account\">зарегистрируйтесь</a>");
-define("_PARENT","Родитель");
-define("_ROOT","Администратор");
-define("_UCOMMENT","Комментарий");
-define("_ALLOWEDHTML","Разрешенные HTML теги:");
-define("_POSTANON","Поместить анонимно");
-define("_EXTRANS","Экстра (HTML теги к тексту)");
-define("_HTMLFORMATED","Отформатирован в HTML");
-define("_PLAINTEXT","Исходный текст");
-define("_ONN","на...");
-define("_SUBJECT","Тема");
-define("_SURVEYCOM","Поместить комментарий к голосованию");
-define("_SURVEYCOMPRE","Предпросмотр комментария к голосованию");
-define("_NOTRIGHT","Что-то не так с передачей переменной этой функции.");
-define("_DIRECTCOM","Прямой комментарий к голосованию...");
-define("_SENDAMSG","Отправить сообщение");
-define("_PASTSURVEYS","Предыдущие голосования");
-define("_LVOTES","голоса");
-define("_TOTALVOTES","Всего голосов:");
-define("_VOTING","Кабинка для голосования");
-define("_OTHERPOLLS","Другие опросы");
-define("_CURRENTSURVEY","Текущее голосование");
-define("_CURRENTPOLLRESULTS","Ответы на текущий опрос");
-define("_PREVIEW","Предпросмотр");
-define("_REFRESH","Обновить");
-define("_SURVEYS","Голосования");
-define("_ATTACHEDTOARTICLE","- Прикреплен к статье:");
-define("_SURVEYSATTACHED","Голосования, прикрепленные к статьям");
-define("_LAST5POLLS", "Последние 5 опросов на");
-define("_MOREPOLLS", "...другие опросы");
-define("_COMMENTSMODERATION","Comments Moderation System");
-define("_MODERATE","Moderate");
-define("_CLICKTOMODERATE","Please select your moderation values for each comment on this survey, then click on <i>Moderate</i> button bellow to save your comments moderation preferences. Be fair on each value, this will contribute and benefict all users/readers. Thank you.");
-
-?>
+define("_YOURNAME", "пїЅпїЅпїЅпїЅ пїЅпїЅпїЅ");
+define("_OK", "Ok!");
+define("_COMMENT", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_CONFIGURE", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_LOGINCREATE", "пїЅпїЅпїЅпїЅпїЅ/пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_THRESHOLD", "пїЅпїЅпїЅпїЅпїЅ");
+define("_NOCOMMENTS", "пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_NESTED", "пїЅпїЅпїЅпїЅ");
+define("_FLAT", "пїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_THREAD", "пїЅпїЅпїЅпїЅпїЅ");
+define("_OLDEST", "пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_NEWEST", "пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_HIGHEST", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_COMMENTSWARNING", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ. пїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ.");
+define("_SCORE", "пїЅпїЅпїЅпїЅпїЅ:");
+define("_USERINFO", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_READREST", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ...");
+define("_REPLY", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅ");
+define("_REPLYMAIN", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_NOSUBJECT", "пїЅпїЅпїЅ пїЅпїЅпїЅпїЅ");
+define("_NOANONCOMMENTS", "пїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ <a href=\"modules.php?name=Your_Account\">пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ</a>");
+define("_PARENT", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_ROOT", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_UCOMMENT", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_ALLOWEDHTML", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ HTML пїЅпїЅпїЅпїЅ:");
+define("_POSTANON", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_EXTRANS", "пїЅпїЅпїЅпїЅпїЅпїЅ (HTML пїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ)");
+define("_HTMLFORMATED", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ HTML");
+define("_PLAINTEXT", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ");
+define("_ONN", "пїЅпїЅ...");
+define("_SUBJECT", "пїЅпїЅпїЅпїЅ");
+define("_SURVEYCOM", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_SURVEYCOMPRE", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_NOTRIGHT", "пїЅпїЅпїЅ-пїЅпїЅ пїЅпїЅ пїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ.");
+define("_DIRECTCOM", "пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ...");
+define("_SENDAMSG", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_PASTSURVEYS", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_LVOTES", "пїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_TOTALVOTES", "пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ:");
+define("_VOTING", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_OTHERPOLLS", "пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_CURRENTSURVEY", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_CURRENTPOLLRESULTS", "пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ");
+define("_PREVIEW", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_REFRESH", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_SURVEYS", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_ATTACHEDTOARTICLE", "- пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ:");
+define("_SURVEYSATTACHED", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_LAST5POLLS", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ 5 пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ");
+define("_MOREPOLLS", "...пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ");
+define("_COMMENTSMODERATION", "Comments Moderation System");
+define("_MODERATE", "Moderate");
+define("_CLICKTOMODERATE", "Please select your moderation values for each comment on this survey, then click on <i>Moderate</i> button bellow to save your comments moderation preferences. Be fair on each value, this will contribute and benefict all users/readers. Thank you.");

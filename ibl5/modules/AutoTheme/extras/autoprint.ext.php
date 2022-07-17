@@ -6,13 +6,13 @@
 //
 // $extra = array ( 'at operation' => 'extra function' );
 //
-$extra['autoprint'] = array (
-	'name' => 'AutoPrint',
-	'description' => 'Printer friendly theme',
-	'version' => '1.7',
-	'author' => 'Shawn McKenzie',
-	'contact' => 'http://spidean.mckenzies.net',
-	'atadmin' => 'at_admin_autoprint',
+$extra['autoprint'] = array(
+    'name' => 'AutoPrint',
+    'description' => 'Printer friendly theme',
+    'version' => '1.7',
+    'author' => 'Shawn McKenzie',
+    'contact' => 'http://spidean.mckenzies.net',
+    'atadmin' => 'at_admin_autoprint',
 );
 
 // Extra functions
@@ -23,10 +23,8 @@ function at_admin_autoprint($vars)
 
     if (!$theme) {
         $theme = "AutoPrint";
-    }	
-    $output = _AT_THEME." <input type=\"text\" name=\"theme\" value=\"$theme\">\n";
-	
-	return $output;
-}
+    }
+    $output = _AT_THEME . " <input type=\"text\" name=\"theme\" value=\"$theme\">\n";
 
-?>
+    return $output;
+}

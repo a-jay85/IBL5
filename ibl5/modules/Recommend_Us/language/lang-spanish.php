@@ -17,22 +17,21 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_SEND","Enviar");
-define("_FYOURNAME","Tu Nombre:");
-define("_FYOUREMAIL","Tu E-Mail:");
-define("_FFRIENDNAME","Nombre de tu amigo:");
-define("_FFRIENDEMAIL","E-Mail de tu amigo:");
-define("_HELLO","Hola");
-define("_YOURFRIEND","Tu amigo");
-define("_RECOMMEND","Recomendar este sitio a un amigo");
-define("_INTSITE","Lugar interesante:");
-define("_OURSITE","consideró nuestro sitio");
-define("_INTSENT","interesante y quiso enviártelo.");
-define("_FSITENAME","Nombre del sitio");
-define("_FSITEURL","Dirección del sitio:");
-define("_FREFERENCE","La referencia a nuestro sitio ha sido enviada a");
-define("_THANKSREC","Gracias por recomendarnos");
-define("_SECURITYCODEERROR","<b>ERROR:</b> The security code you wrote is incorrect...<br>Please write it exactly as given bellow:");
-define("_SENDSITEERROR","<b>Error sending the recommendation...</b><br><br><b>ERROR:</b> One or more required fields are empty.<br>Please go back and correct the problem, then try again.");
+define("_SEND", "Enviar");
+define("_FYOURNAME", "Tu Nombre:");
+define("_FYOUREMAIL", "Tu E-Mail:");
+define("_FFRIENDNAME", "Nombre de tu amigo:");
+define("_FFRIENDEMAIL", "E-Mail de tu amigo:");
+define("_HELLO", "Hola");
+define("_YOURFRIEND", "Tu amigo");
+define("_RECOMMEND", "Recomendar este sitio a un amigo");
+define("_INTSITE", "Lugar interesante:");
+define("_OURSITE", "considerï¿½ nuestro sitio");
+define("_INTSENT", "interesante y quiso enviï¿½rtelo.");
+define("_FSITENAME", "Nombre del sitio");
+define("_FSITEURL", "Direcciï¿½n del sitio:");
+define("_FREFERENCE", "La referencia a nuestro sitio ha sido enviada a");
+define("_THANKSREC", "Gracias por recomendarnos");
+define("_SECURITYCODEERROR", "<b>ERROR:</b> The security code you wrote is incorrect...<br>Please write it exactly as given bellow:");
 
-?>
+define("_SENDSITEERROR", "<b>Error sending the recommendation...</b><br><br><b>ERROR:</b> One or more required fields are empty.<br>Please go back and correct the problem, then try again.");

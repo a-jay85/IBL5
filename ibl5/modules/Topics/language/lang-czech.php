@@ -17,11 +17,9 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_ACTIVETOPICS","Souèasná aktivní témata");
-define("_CLICK2LIST","Pro zobrazení èlánkù, kliknìte na obrázek pro dané téma.");
-define("_TOTNEWS","Total News");
-define("_TOTREADS","Total Reads");
-define("_MORE","More");
-define("_NONEWSYET","...There aren't any news yet for this topic...");
-
-?>
+define("_ACTIVETOPICS", "Souï¿½asnï¿½ aktivnï¿½ tï¿½mata");
+define("_CLICK2LIST", "Pro zobrazenï¿½ ï¿½lï¿½nkï¿½, kliknï¿½te na obrï¿½zek pro danï¿½ tï¿½ma.");
+define("_TOTNEWS", "Total News");
+define("_TOTREADS", "Total Reads");
+define("_MORE", "More");
+define("_NONEWSYET", "...There aren't any news yet for this topic...");

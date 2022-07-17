@@ -17,30 +17,26 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_EMAIL","¹q¤l¶l¥ó");
-define("_SAVECHANGES","Àx¦s§ó§ï");
-define("_SCORE","¤À¼Æ¡G");
-define("_PRODUCTTITLE","§@«~¦WºÙ");
-define("_RELATEDLINK","¬ÛÃöªºÃìµ²");
-define("_LINKTITLE","Ãìµ²ªº¼ÐÃD");
-define("_REVIEWER","§@«~µû½×ªÌ¡G");
-define("_REVIEWID","§@«~µû½× ÃÑ§O½X");
-define("_REVIEWS","§@«~µû½×");
-define("_DATE","¤é´Á");
-define("_REVADMIN","§@«~µû½×ºÞ²z");
-define("_REVTITLE","§@«~µû½×­¶¼ÐÃD");
-define("_REVDESC","§@«~µû½×­¶´y­z");
-define("_REVWAITING","«Ý®Ö¥iªº§@«~µû½×");
-define("_REVIMGINFO","Àx¦s±zªº 150*150 ¼v¹³©óimages/reviews");
-define("_TEXT","¥»¤å");
-define("_IMAGE","¼v¹³");
-define("_NOREVIEW2ADD","¨S¦³¥i¼W¥[§@«~µû½×");
-define("_ADDREVIEW","·s¼W §@«~µû½×");
-define("_CLICK2ADDREVIEW","¼g¤@­Ó§@«~µû½×¡H");
-define("_DELMODREVIEW","§R°£/­×§ï§@«~µû½×");
-define("_MODREVINFO","±z¥i¥H»´ÃP¦a¥HºÞ²z­ûªº¨­¤À¡A©ó<a href=\"modules.php?name=Reviews\">Reviews</a>§R°£/­×§ï§@«~µû½×");
-define("_LANGUAGE","»y¨¥");
-
-
-?>
+define("_EMAIL", "ï¿½qï¿½lï¿½lï¿½ï¿½");
+define("_SAVECHANGES", "ï¿½xï¿½sï¿½ï¿½ï¿½");
+define("_SCORE", "ï¿½ï¿½ï¿½Æ¡G");
+define("_PRODUCTTITLE", "ï¿½@ï¿½~ï¿½Wï¿½ï¿½");
+define("_RELATEDLINK", "ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ìµ²");
+define("_LINKTITLE", "ï¿½ìµ²ï¿½ï¿½ï¿½ï¿½ï¿½D");
+define("_REVIEWER", "ï¿½@ï¿½~ï¿½ï¿½ï¿½×ªÌ¡G");
+define("_REVIEWID", "ï¿½@ï¿½~ï¿½ï¿½ï¿½ï¿½ ï¿½Ñ§Oï¿½X");
+define("_REVIEWS", "ï¿½@ï¿½~ï¿½ï¿½ï¿½ï¿½");
+define("_DATE", "ï¿½ï¿½ï¿½");
+define("_REVADMIN", "ï¿½@ï¿½~ï¿½ï¿½ï¿½×ºÞ²z");
+define("_REVTITLE", "ï¿½@ï¿½~ï¿½ï¿½ï¿½×­ï¿½ï¿½ï¿½ï¿½D");
+define("_REVDESC", "ï¿½@ï¿½~ï¿½ï¿½ï¿½×­ï¿½ï¿½yï¿½z");
+define("_REVWAITING", "ï¿½Ý®Ö¥iï¿½ï¿½ï¿½@ï¿½~ï¿½ï¿½ï¿½ï¿½");
+define("_REVIMGINFO", "ï¿½xï¿½sï¿½zï¿½ï¿½ 150*150 ï¿½vï¿½ï¿½ï¿½ï¿½images/reviews");
+define("_TEXT", "ï¿½ï¿½ï¿½ï¿½");
+define("_IMAGE", "ï¿½vï¿½ï¿½");
+define("_NOREVIEW2ADD", "ï¿½Sï¿½ï¿½ï¿½iï¿½Wï¿½[ï¿½@ï¿½~ï¿½ï¿½ï¿½ï¿½");
+define("_ADDREVIEW", "ï¿½sï¿½W ï¿½@ï¿½~ï¿½ï¿½ï¿½ï¿½");
+define("_CLICK2ADDREVIEW", "ï¿½gï¿½@ï¿½Ó§@ï¿½~ï¿½ï¿½ï¿½×¡H");
+define("_DELMODREVIEW", "ï¿½Rï¿½ï¿½/ï¿½×§ï¿½@ï¿½~ï¿½ï¿½ï¿½ï¿½");
+define("_MODREVINFO", "ï¿½zï¿½iï¿½Hï¿½ï¿½ï¿½Pï¿½aï¿½Hï¿½Þ²zï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Aï¿½ï¿½<a href=\"modules.php?name=Reviews\">Reviews</a>ï¿½Rï¿½ï¿½/ï¿½×§ï¿½@ï¿½~ï¿½ï¿½ï¿½ï¿½");
+define("_LANGUAGE", "ï¿½yï¿½ï¿½");

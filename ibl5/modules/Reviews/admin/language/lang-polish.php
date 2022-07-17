@@ -17,30 +17,26 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-
-define("_EMAIL","E-mail");
-define("_SAVECHANGES","Zapisz zmiany");
-define("_SCORE","Wynik:");
-define("_PRODUCTTITLE","Nazwa produktu");
-define("_RELATEDLINK","Link");
-define("_LINKTITLE","Tytu³ linku");
-define("_REVIEWER","Recenzent:");
-define("_REVIEWID","ID recenzji");
-define("_REVIEWS","Recenzje");
-define("_DATE","Data");
-define("_REVADMIN","Zarz±dzanie recenzjami");
-define("_REVTITLE","Tytu³ strony z recenzjami");
-define("_REVDESC","Opis strony");
-define("_REVWAITING","Recenzje oczekuj±ce na sprawdzenie");
-define("_REVIMGINFO","Zapisz swój obrazek wielko¶ci 150*150 w images/reviews");
-define("_TEXT","Tekst");
-define("_IMAGE","Grafika");
-define("_NOREVIEW2ADD","Brak recenzji do dodania");
-define("_ADDREVIEW","Dodaj recenzjê");
-define("_CLICK2ADDREVIEW","Kliknij tutaj, aby napisaæ recenzjê");
-define("_DELMODREVIEW","Usuñ / Modyfikuj recenzjê");
-define("_MODREVINFO","Mo¿esz ³atwo usun±æ / zmieniæ recenzjê przegl±daj±c <a href=\"modules.php?name=Reviews\">Recenzje</a> jako administrator.");
-define("_LANGUAGE","Jêzyk");
-
-
-?>
+define("_EMAIL", "E-mail");
+define("_SAVECHANGES", "Zapisz zmiany");
+define("_SCORE", "Wynik:");
+define("_PRODUCTTITLE", "Nazwa produktu");
+define("_RELATEDLINK", "Link");
+define("_LINKTITLE", "Tytuï¿½ linku");
+define("_REVIEWER", "Recenzent:");
+define("_REVIEWID", "ID recenzji");
+define("_REVIEWS", "Recenzje");
+define("_DATE", "Data");
+define("_REVADMIN", "Zarzï¿½dzanie recenzjami");
+define("_REVTITLE", "Tytuï¿½ strony z recenzjami");
+define("_REVDESC", "Opis strony");
+define("_REVWAITING", "Recenzje oczekujï¿½ce na sprawdzenie");
+define("_REVIMGINFO", "Zapisz swï¿½j obrazek wielkoï¿½ci 150*150 w images/reviews");
+define("_TEXT", "Tekst");
+define("_IMAGE", "Grafika");
+define("_NOREVIEW2ADD", "Brak recenzji do dodania");
+define("_ADDREVIEW", "Dodaj recenzjï¿½");
+define("_CLICK2ADDREVIEW", "Kliknij tutaj, aby napisaï¿½ recenzjï¿½");
+define("_DELMODREVIEW", "Usuï¿½ / Modyfikuj recenzjï¿½");
+define("_MODREVINFO", "Moï¿½esz ï¿½atwo usunï¿½ï¿½ / zmieniï¿½ recenzjï¿½ przeglï¿½dajï¿½c <a href=\"modules.php?name=Reviews\">Recenzje</a> jako administrator.");
+define("_LANGUAGE", "Jï¿½zyk");

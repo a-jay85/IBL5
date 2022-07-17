@@ -13,10 +13,10 @@
 /************************************************************************/
 
 if (!defined('ADMIN_FILE')) {
-	die ("Access Denied");
+    die("Access Denied");
 }
 
-switch($op) {
+switch ($op) {
 
     case "BlocksAdmin":
     case "BlocksAdd":
@@ -24,7 +24,7 @@ switch($op) {
     case "BlocksEditSave":
     case "ChangeStatus":
     case "BlocksDelete":
-    case "BlockOrder":    
+    case "BlockOrder":
     case "HeadlinesDel":
     case "HeadlinesAdd":
     case "HeadlinesSave":
@@ -32,9 +32,7 @@ switch($op) {
     case "HeadlinesEdit":
     case "fixweight":
     case "block_show":
-    include("admin/modules/blocks.php");
-    break;
+        include "admin/modules/blocks.php";
+        break;
 
 }
-
-?>

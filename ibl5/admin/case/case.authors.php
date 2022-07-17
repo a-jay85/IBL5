@@ -13,10 +13,10 @@
 /************************************************************************/
 
 if (!defined('ADMIN_FILE')) {
-	die ("Access Denied");
+    die("Access Denied");
 }
 
-switch($op) {
+switch ($op) {
 
     case "mod_authors":
     case "modifyadmin":
@@ -26,9 +26,7 @@ switch($op) {
     case "deladmin":
     case "assignstories":
     case "deladminconf":
-    include("admin/modules/authors.php");
-    break;
+        include "admin/modules/authors.php";
+        break;
 
 }
-
-?>

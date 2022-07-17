@@ -17,17 +17,16 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PREVIOUS","Vorige pagina");
-define("_NEXT","Volgende pagina");
-define("_PAGE","Pagina");
-define("_DEACTIVATE","Deactiveren");
-define("_ACTIVATE","Activeren");
-define("_PUBLISHEDON","Gepubliceerd op");
-define("_PAGESLIST","Lijst Pagina's");
-define("_LISTOFCONTENT","Lijst beschikbare informatie in");
-define("_YOURADMINLIST","Je bent Beheerder (Administrator): hierna de lijst van de inactieve pagina's:");
-define("_COPYRIGHT","Copyright &copy; door");
-define("_COPYRIGHT2","Alle Rechten Voorbehouden.");
-define("_CONTENTCATEGORIES","Beschikbare Inhoud Categorieën");
-define("_NONCLASSCONT","Inhoud niet in een Categorie opgenomen");
-?>
+define("_PREVIOUS", "Vorige pagina");
+define("_NEXT", "Volgende pagina");
+define("_PAGE", "Pagina");
+define("_DEACTIVATE", "Deactiveren");
+define("_ACTIVATE", "Activeren");
+define("_PUBLISHEDON", "Gepubliceerd op");
+define("_PAGESLIST", "Lijst Pagina's");
+define("_LISTOFCONTENT", "Lijst beschikbare informatie in");
+define("_YOURADMINLIST", "Je bent Beheerder (Administrator): hierna de lijst van de inactieve pagina's:");
+define("_COPYRIGHT", "Copyright &copy; door");
+define("_COPYRIGHT2", "Alle Rechten Voorbehouden.");
+define("_CONTENTCATEGORIES", "Beschikbare Inhoud Categorieï¿½n");
+define("_NONCLASSCONT", "Inhoud niet in een Categorie opgenomen");

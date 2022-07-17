@@ -17,21 +17,16 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
+define("_PREVIOUS", "ï¿½Wï¿½@ï¿½ï¿½");
+define("_NEXT", "ï¿½Uï¿½@ï¿½ï¿½");
 
-
-define("_PREVIOUS","¤W¤@­¶");
-define("_NEXT","¤U¤@­¶");
-
-
-define("_PAGE","­¶");
-define("_DEACTIVATE","ÁôÂÃ");
-define("_ACTIVATE","Åã¥Ü");
-define("_PUBLISHEDON","µoªí©ó");
-define("_PAGESLIST","ºô­¶¤º®e¦Cªí");
-define("_LISTOFCONTENT","¥iÀò±oªººô­¶¤º®e¦b ");
-define("_YOURADMINLIST","±z¬OºÞ²zªÌ: ©³¤U¬O©|¥¼¶}©ñªººô­¶¤º®e:");
-define("_COPYRIGHT","Copyright &copy; by $sitename. All Right Reserved.");
-define("_CONTENTCATEGORIES","©Ò¦³¤º®eÃþ§O");
-define("_NONCLASSCONT","Non Categorized Content");
-
-?>
+define("_PAGE", "ï¿½ï¿½");
+define("_DEACTIVATE", "ï¿½ï¿½ï¿½ï¿½");
+define("_ACTIVATE", "ï¿½ï¿½ï¿½");
+define("_PUBLISHEDON", "ï¿½oï¿½ï¿½ï¿½ï¿½");
+define("_PAGESLIST", "ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½eï¿½Cï¿½ï¿½");
+define("_LISTOFCONTENT", "ï¿½iï¿½ï¿½oï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½eï¿½b ");
+define("_YOURADMINLIST", "ï¿½zï¿½Oï¿½Þ²zï¿½ï¿½: ï¿½ï¿½ï¿½Uï¿½Oï¿½|ï¿½ï¿½ï¿½}ï¿½ñªººï¿½ï¿½ï¿½ï¿½ï¿½ï¿½e:");
+define("_COPYRIGHT", "Copyright &copy; by $sitename. All Right Reserved.");
+define("_CONTENTCATEGORIES", "ï¿½Ò¦ï¿½ï¿½ï¿½ï¿½eï¿½ï¿½ï¿½O");
+define("_NONCLASSCONT", "Non Categorized Content");

@@ -17,18 +17,16 @@
 /* And, if you use HTML code, please double check it.                     */
 /**************************************************************************/
 
-define("_PREVIOUS","Fyrri síða");
-define("_NEXT","Næsta síða");
-define("_PAGE","Síða");
-define("_DEACTIVATE","Gera óvirkan");
-define("_ACTIVATE","Gera virkan");
-define("_PUBLISHEDON","Birt þann");
-define("_PAGESLIST","Listi yfir síður");
-define("_LISTOFCONTENT","Listi yfir tiltækt efni í");
-define("_YOURADMINLIST","Kerfisstjórinn þinn: eftirfarandi er listi yfir síður sem eru ekki virkar:");
-define("_COPYRIGHT","Höfundarétt &copy; á");
-define("_COPYRIGHT2","Öll réttindi áskilin.");
-define("_CONTENTCATEGORIES","Tiltækir efnisflokkar");
-define("_NONCLASSCONT","Óflokkað efni");
-
-?>
+define("_PREVIOUS", "Fyrri sï¿½ï¿½a");
+define("_NEXT", "Nï¿½sta sï¿½ï¿½a");
+define("_PAGE", "Sï¿½ï¿½a");
+define("_DEACTIVATE", "Gera ï¿½virkan");
+define("_ACTIVATE", "Gera virkan");
+define("_PUBLISHEDON", "Birt ï¿½ann");
+define("_PAGESLIST", "Listi yfir sï¿½ï¿½ur");
+define("_LISTOFCONTENT", "Listi yfir tiltï¿½kt efni ï¿½");
+define("_YOURADMINLIST", "Kerfisstjï¿½rinn ï¿½inn: eftirfarandi er listi yfir sï¿½ï¿½ur sem eru ekki virkar:");
+define("_COPYRIGHT", "Hï¿½fundarï¿½tt &copy; ï¿½");
+define("_COPYRIGHT2", "ï¿½ll rï¿½ttindi ï¿½skilin.");
+define("_CONTENTCATEGORIES", "Tiltï¿½kir efnisflokkar");
+define("_NONCLASSCONT", "ï¿½flokkaï¿½ efni");

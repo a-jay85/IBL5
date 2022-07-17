@@ -16,30 +16,28 @@
 /* so your entry will look like: This is \"double quoted\" text.          */
 /* And, if you use HTML code, please double check it.                     */
 /*                                                                        */
-/* Polish translation by Nordavind®(Bolo) (http://forum.phpnuke.org.pl)   */
+/* Polish translation by Nordavindï¿½(Bolo) (http://forum.phpnuke.org.pl)   */
 /*                                                                        */
 /**************************************************************************/
 
-define("_PREVIOUS","Poprzednia strona");
-define("_NEXT","Nastêpna strona");
-define("_SEARCHRESULTS","Wyniki wyszukiwania");
-define("_PAGE","Strona");
-define("_RETURNTO","Powrót do");
-define("_DEACTIVATE","Deaktywuj");
-define("_ACTIVATE","Aktywuj");
-define("_ENCYCLOPEDIA","Encyklopedia");
-define("_NOCONTENTFORLETTER","Przepraszamy, nie ma ¿adnej zawarto¶ci dla tej litery");
-define("_ENCYSELECTLETTER","Proszê wybraæ literê z poni¿szych:");
-define("_COPYRIGHT","Prawa autorskie");
-define("_YOURADMINENCY","Jeste¶ Administratorem, ta Encyklopedia nie jest aktywna!");
-define("_ENCYNOTACTIVE","Przepraszamy, ta Encyklopedia nie jest teraz aktywna.");
-define("_AVAILABLEENCYLIST","Lista dostêpnych Encyklopedii w");
-define("_YOURADMININACTIVELIST","Jeste¶ Administratorem: oto lista nieaktywnych Encyklopedii:");
-define("_NORESULTSTEXT","Brak wyników w tek¶cie hase³...");
-define("_NORESULTSTITLE","Brak wyników w nazwach hase³...");
-define("_SEARCHRESULTSFOR","Szukaj wyników dla:");
-define("_SEARCHNOTCOMPLETE","Opcje wyszukiwania nie s± kompletne. Spróbuj ponownie.");
-define("_RESULTSINTERMTITLE","Wyniki w tek¶cie opisu:");
-define("_RESULTSINTERMTEXT","Wyniki w temacie opisu:");
-
-?>
+define("_PREVIOUS", "Poprzednia strona");
+define("_NEXT", "Nastï¿½pna strona");
+define("_SEARCHRESULTS", "Wyniki wyszukiwania");
+define("_PAGE", "Strona");
+define("_RETURNTO", "Powrï¿½t do");
+define("_DEACTIVATE", "Deaktywuj");
+define("_ACTIVATE", "Aktywuj");
+define("_ENCYCLOPEDIA", "Encyklopedia");
+define("_NOCONTENTFORLETTER", "Przepraszamy, nie ma ï¿½adnej zawartoï¿½ci dla tej litery");
+define("_ENCYSELECTLETTER", "Proszï¿½ wybraï¿½ literï¿½ z poniï¿½szych:");
+define("_COPYRIGHT", "Prawa autorskie");
+define("_YOURADMINENCY", "Jesteï¿½ Administratorem, ta Encyklopedia nie jest aktywna!");
+define("_ENCYNOTACTIVE", "Przepraszamy, ta Encyklopedia nie jest teraz aktywna.");
+define("_AVAILABLEENCYLIST", "Lista dostï¿½pnych Encyklopedii w");
+define("_YOURADMININACTIVELIST", "Jesteï¿½ Administratorem: oto lista nieaktywnych Encyklopedii:");
+define("_NORESULTSTEXT", "Brak wynikï¿½w w tekï¿½cie haseï¿½...");
+define("_NORESULTSTITLE", "Brak wynikï¿½w w nazwach haseï¿½...");
+define("_SEARCHRESULTSFOR", "Szukaj wynikï¿½w dla:");
+define("_SEARCHNOTCOMPLETE", "Opcje wyszukiwania nie sï¿½ kompletne. Sprï¿½buj ponownie.");
+define("_RESULTSINTERMTITLE", "Wyniki w tekï¿½cie opisu:");
+define("_RESULTSINTERMTEXT", "Wyniki w temacie opisu:");

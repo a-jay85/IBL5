@@ -2010,12 +2010,12 @@ function team_info_right($team_name, $color1, $color2, $owner_name, $tid)
     // ==== GET OWNER INFO
 
     $output = "<table bgcolor=#eeeeee width=220>";
-    $output = $output . "<tr bgcolor=\"#$color1\"><td align=\"center\">
+    $output .= "<tr bgcolor=\"#$color1\"><td align=\"center\">
 		<font color=\"#$color2\"><b>Current Season</b></font>
 		</td></tr>
 		<tr><td>";
-    $output = $output . standings($team_name);
-    $output = $output . "</td></tr>";
+    $output .= standings($team_name);
+    $output .= "</td></tr>";
 
     //==================
     // GM HISTORY
@@ -2029,17 +2029,17 @@ function team_info_right($team_name, $color1, $color2, $owner_name, $tid)
         $dec = 0;
     }
 
-    $output = $output . "<tr bgcolor=\"#$color1\"><td align=\"center\">
+    $output .= "<tr bgcolor=\"#$color1\"><td align=\"center\">
 		<font color=\"#$color2\"><b>GM History</b></font>
 		</td></tr>
 		<tr><td>";
     while ($dec < $numdec) {
         $dec_year = $db->sql_result($resultdec, $dec, "year");
         $dec_Award = $db->sql_result($resultdec, $dec, "Award");
-        $output = $output . "<table border=0 cellpadding=0 cellspacing=0><tr><td>$dec_year $dec_Award</td></tr></table>";
+        $output .= "<table border=0 cellpadding=0 cellspacing=0><tr><td>$dec_year $dec_Award</td></tr></table>";
         $dec++;
     }
-    $output = $output . "</td></tr>";
+    $output .= "</td></tr>";
 
     // CHAMPIONSHIP BANNERS
 
@@ -2199,17 +2199,17 @@ function team_info_right($team_name, $color1, $color2, $owner_name, $tid)
         $dec = 0;
     }
 
-    $output = $output . "<tr bgcolor=\"#$color1\"><td align=\"center\">
+    $output .= "<tr bgcolor=\"#$color1\"><td align=\"center\">
 		<font color=\"#$color2\"><b>Team Accomplishments</b></font>
 		</td></tr>
 		<tr><td>";
     while ($dec < $numdec) {
         $dec_year = $db->sql_result($resultdec, $dec, "year");
         $dec_Award = $db->sql_result($resultdec, $dec, "Award");
-        $output = $output . "<table border=0 cellpadding=0 cellspacing=0><tr><td>$dec_year $dec_Award</td></tr></table>";
+        $output .= "<table border=0 cellpadding=0 cellspacing=0><tr><td>$dec_year $dec_Award</td></tr></table>";
         $dec++;
     }
-    $output = $output . "</td></tr>";
+    $output .= "</td></tr>";
 
     // REGULAR SEASON RESULTS
 
@@ -2221,7 +2221,7 @@ function team_info_right($team_name, $color1, $color2, $owner_name, $tid)
     $wintot = 0;
     $lostot = 0;
 
-    $output = $output . "<tr bgcolor=\"#$color1\"><td align=center><font color=\"#$color2\"><b>Regular Season History</b></font></td></tr>
+    $output .= "<tr bgcolor=\"#$color1\"><td align=center><font color=\"#$color2\"><b>Regular Season History</b></font></td></tr>
 		<tr><td><div id=\"History-R\" style=\"overflow:auto\">";
 
     while ($h < $numwl) {
@@ -2232,13 +2232,13 @@ function team_info_right($team_name, $color1, $color2, $owner_name, $tid)
         $wintot = $wintot + $wins;
         $lostot = $lostot + $losses;
         @$winpct = number_format($wins / ($wins + $losses), 3);
-        $output = $output . "<a href=\"./modules.php?name=Team&op=team&tid=$tid&yr=$yearwl\">" . ($yearwl - 1) . "-$yearwl $namewl</a>: $wins-$losses ($winpct)<br>";
+        $output .= "<a href=\"./modules.php?name=Team&op=team&tid=$tid&yr=$yearwl\">" . ($yearwl - 1) . "-$yearwl $namewl</a>: $wins-$losses ($winpct)<br>";
 
         $h++;
     }
     @$wlpct = number_format($wintot / ($wintot + $lostot), 3);
 
-    $output = $output . "</div></td></tr>
+    $output .= "</div></td></tr>
 		<tr><td><b>Totals:</b> $wintot - $lostot ($wlpct)</td></tr>";
 
     // HEAT SEASON RESULTS
@@ -2250,7 +2250,7 @@ function team_info_right($team_name, $color1, $color2, $owner_name, $tid)
     $wintot = 0;
     $lostot = 0;
 
-    $output = $output . "<tr bgcolor=\"#$color1\"><td align=center><font color=\"#$color2\"><b>H.E.A.T. History</b></font></td></tr>
+    $output .= "<tr bgcolor=\"#$color1\"><td align=center><font color=\"#$color2\"><b>H.E.A.T. History</b></font></td></tr>
 		<tr><td><div id=\"History-R\" style=\"overflow:auto\">";
 
     while ($h < $numwl) {
@@ -2261,13 +2261,13 @@ function team_info_right($team_name, $color1, $color2, $owner_name, $tid)
         $wintot = $wintot + $wins;
         $lostot = $lostot + $losses;
         @$winpct = number_format($wins / ($wins + $losses), 3);
-        $output = $output . "<a href=\"./modules.php?name=Team&op=team&tid=$tid&yr=$yearwl\">$yearwl $namewl</a>: $wins-$losses ($winpct)<br>";
+        $output .= "<a href=\"./modules.php?name=Team&op=team&tid=$tid&yr=$yearwl\">$yearwl $namewl</a>: $wins-$losses ($winpct)<br>";
 
         $h++;
     }
     @$wlpct = number_format($wintot / ($wintot + $lostot), 3);
 
-    $output = $output . "</div></td></tr>
+    $output .= "</div></td></tr>
 		<tr><td><b>Totals:</b> $wintot - $lostot ($wlpct)</td></tr>";
 
     // POST-SEASON RESULTS
@@ -2387,35 +2387,35 @@ function team_info_right($team_name, $color1, $color2, $owner_name, $tid)
     @$fourthpct = number_format($fourth_wins / ($fourth_wins + $fourth_losses), 3);
 
     if ($round_one_output != "") {
-        $output = $output . "<tr bgcolor=\"#$color1\"><td align=center><font color=\"#$color2\"><b>First-Round Playoff Results</b></font></td></tr>
+        $output .= "<tr bgcolor=\"#$color1\"><td align=center><font color=\"#$color2\"><b>First-Round Playoff Results</b></font></td></tr>
 			<tr><td>
 			<div id=\"History-P1\" style=\"overflow:auto\">" . $round_one_output . "</div></td></tr>
 			<tr><td><b>Totals:</b> $first_wins - $first_losses ($firstpct)<br>
 			<b>Series:</b> $first_round_victories - $first_round_losses ($r1wlpct)</td></tr>";
     }
     if ($round_two_output != "") {
-        $output = $output . "<tr bgcolor=\"#$color1\"><td align=center><font color=\"#$color2\"><b>Conference Semis Playoff Results</b></font></td></tr>
+        $output .= "<tr bgcolor=\"#$color1\"><td align=center><font color=\"#$color2\"><b>Conference Semis Playoff Results</b></font></td></tr>
 			<tr><td>
 			<div id=\"History-P2\" style=\"overflow:auto\">" . $round_two_output . "</div></td></tr>
 			<tr><td><b>Totals:</b> $second_wins - $second_losses ($secondpct)<br>
 			<b>Series:</b> $second_round_victories - $second_round_losses ($r2wlpct)</td></tr>";
     }
     if ($round_three_output != "") {
-        $output = $output . "<tr bgcolor=\"#$color1\"><td align=center><font color=\"#$color2\"><b>Conference Finals Playoff Results</b></font></td></tr>
+        $output .= "<tr bgcolor=\"#$color1\"><td align=center><font color=\"#$color2\"><b>Conference Finals Playoff Results</b></font></td></tr>
 			<tr><td>
 			<div id=\"History-P3\" style=\"overflow:auto\">" . $round_three_output . "</div></td></tr>
 			<tr><td><b>Totals:</b> $third_wins - $third_losses ($thirdpct)<br>
 			<b>Series:</b> $third_round_victories - $third_round_losses ($r3wlpct)</td></tr>";
     }
     if ($round_four_output != "") {
-        $output = $output . "<tr bgcolor=\"#$color1\"><td align=center><font color=\"#$color2\"><b>IBL Finals Playoff Results</b></font></td></tr>
+        $output .= "<tr bgcolor=\"#$color1\"><td align=center><font color=\"#$color2\"><b>IBL Finals Playoff Results</b></font></td></tr>
 			<tr><td>
 			<div id=\"History-P4\" style=\"overflow:auto\">" . $round_four_output . "</div></td></tr>
 			<tr><td><b>Totals:</b> $fourth_wins - $fourth_losses ($fourthpct)<br>
 			<b>Series:</b> $fourth_round_victories - $fourth_round_losses ($r4wlpct)</td></tr>";
     }
 
-    $output = $output . "<tr bgcolor=\"#$color1\"><td align=center><font color=\"#$color2\"><b>Post-Season Totals</b></font></td></tr>
+    $output .= "<tr bgcolor=\"#$color1\"><td align=center><font color=\"#$color2\"><b>Post-Season Totals</b></font></td></tr>
 		<tr><td><b>Games:</b> $totalplayoffwins - $totalplayofflosses ($pwlpct)</td></tr>
 		<tr><td><b>Series:</b> $round_victories - $round_losses ($swlpct)</td></tr>
 		</table>";

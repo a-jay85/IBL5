@@ -810,7 +810,7 @@ function search()
                 echo "<td><center>$pos</center></td>
                     <td><center><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></center></td>
                     <td colspan=30><center> --- Retired --- </center></td>
-                    <td><a href=\"http://college.iblhoops.net/rosters/roster$collegeid.htm\">$college</td>
+                    <td>$college</td>
                 </tr>";
             } else {
                 echo "<td><center>$pos</center></td>
@@ -846,7 +846,7 @@ function search()
                     <td><center>$intangibles</center></td>
                     <td><center>$Clutch</center></td>
                     <td><center>$Consistency</center></td>
-                    <td><a href=\"http://college.iblhoops.net/rosters/roster$collegeid.htm\">$college</td>
+                    <td>$college</td>
                 </tr>";
             }
         } // Matches up with form submitted check variable
@@ -1258,7 +1258,7 @@ function showpage($pid, $spec)
             </table>";
     }
 
-    echo "<font class=\"content\">Age: $player_age | Height: $player_ht_ft-$player_ht_in | Weight: $player_wt | College: <a href=\"http://college.iblhoops.net/rosters/roster$player_collegeid.htm\">$player_college</a><br>
+    echo "<font class=\"content\">Age: $player_age | Height: $player_ht_ft-$player_ht_in | Weight: $player_wt | College: $player_college<br>
         <i>Drafted by the $player_drafted_by with the # $player_draft_pick pick of round $player_draft_round in the <a href=\"online/draft.php?year=$player_draft_year\">$player_draft_year Draft</a></i><br>
         <center><table>
             <tr>

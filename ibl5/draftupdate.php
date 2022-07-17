@@ -16,11 +16,7 @@ Please enter the name of the player drafted (spelling must match exactly) and th
 Enter the Player's Name: <input type=\"text\" name=\"name\" />
 Enter the Team Drafting: <input type=\"text\" name=\"team\" />
 <input type=\"submit\" name=\"UPDATE!\" />
-</form>
-<center><a href=\"http://college.ibl.net/draftdeclarants.php\">Link to Draft Declarants Page</a> (to easily check results)</center>
-
-
-";
+</form>";
 
 } else {
     if ($team == null) {
@@ -31,10 +27,7 @@ A player name was entered, but no team was entered. Please enter the name of the
 Enter the Player's Name: <input type=\"text\" name=\"name\" />
 Enter the Team Drafting: <input type=\"text\" name=\"team\" />
 <input type=\"submit\" name=\"UPDATE!\" />
-</form>
-<center><a href=\"http://college.ibl.net/draftdeclarants.php\">Link to Draft Declarants Page</a> (to easily check results)</center>
-
-";
+</form>";
 
     } else {
 
@@ -57,10 +50,7 @@ Enter the Team Drafting: <input type=\"text\" name=\"team\" />
 Enter the Player's Name: <input type=\"text\" name=\"name\" />
 Enter the Team Drafting: <input type=\"text\" name=\"team\" />
 <input type=\"submit\" name=\"UPDATE!\" />
-</form>
-<center><a href=\"http://college.ibl.net/draftdeclarants.php\">Link to Draft Declarants Page</a> (to easily check results)</center>
-
-";
+</form>";
 
     }
 }

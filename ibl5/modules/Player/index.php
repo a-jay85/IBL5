@@ -3123,27 +3123,27 @@ function negotiate($pid)
             $marketMaxTD = $db->sql_fetchrow($db->sql_query("SELECT MAX(td) FROM ibl_plr"));
 
             // Determine raw score for each stat
-            $rawFGA = $negotiatingPlayerFGA / intval($marketMaxFGA[0]) * 100;
-            $rawFGP = $negotiatingPlayerFGP / intval($marketMaxFGP[0]) * 100;
-            $rawFTA = $negotiatingPlayerFTA / intval($marketMaxFTA[0]) * 100;
-            $rawFTP = $negotiatingPlayerFTP / intval($marketMaxFTP[0]) * 100;
-            $rawTGA = $negotiatingPlayerTGA / intval($marketMaxTGA[0]) * 100;
-            $rawTGP = $negotiatingPlayerTGP / intval($marketMaxTGP[0]) * 100;
-            $rawORB = $negotiatingPlayerORB / intval($marketMaxORB[0]) * 100;
-            $rawDRB = $negotiatingPlayerDRB / intval($marketMaxDRB[0]) * 100;
-            $rawAST = $negotiatingPlayerAST / intval($marketMaxAST[0]) * 100;
-            $rawSTL = $negotiatingPlayerSTL / intval($marketMaxSTL[0]) * 100;
-            $rawTOV = $negotiatingPlayerTOV / intval($marketMaxTOV[0]) * 100;
-            $rawBLK = $negotiatingPlayerBLK / intval($marketMaxBLK[0]) * 100;
-            $rawFOUL = $negotiatingPlayerFOUL / intval($marketMaxFOUL[0]) * 100;
-            $rawOO = $negotiatingPlayerOO / intval($marketMaxOO[0]) * 100;
-            $rawOD = $negotiatingPlayerOD / intval($marketMaxOD[0]) * 100;
-            $rawDO = $negotiatingPlayerDO / intval($marketMaxDO[0]) * 100;
-            $rawDD = $negotiatingPlayerDD / intval($marketMaxDD[0]) * 100;
-            $rawPO = $negotiatingPlayerPO / intval($marketMaxPO[0]) * 100;
-            $rawPD = $negotiatingPlayerPD / intval($marketMaxPD[0]) * 100;
-            $rawTO = $negotiatingPlayerTO / intval($marketMaxTO[0]) * 100;
-            $rawTD = $negotiatingPlayerTD / intval($marketMaxTD[0]) * 100;
+            $rawFGA = intval(round($negotiatingPlayerFGA / intval($marketMaxFGA[0]) * 100));
+            $rawFGP = intval(round($negotiatingPlayerFGP / intval($marketMaxFGP[0]) * 100));
+            $rawFTA = intval(round($negotiatingPlayerFTA / intval($marketMaxFTA[0]) * 100));
+            $rawFTP = intval(round($negotiatingPlayerFTP / intval($marketMaxFTP[0]) * 100));
+            $rawTGA = intval(round($negotiatingPlayerTGA / intval($marketMaxTGA[0]) * 100));
+            $rawTGP = intval(round($negotiatingPlayerTGP / intval($marketMaxTGP[0]) * 100));
+            $rawORB = intval(round($negotiatingPlayerORB / intval($marketMaxORB[0]) * 100));
+            $rawDRB = intval(round($negotiatingPlayerDRB / intval($marketMaxDRB[0]) * 100));
+            $rawAST = intval(round($negotiatingPlayerAST / intval($marketMaxAST[0]) * 100));
+            $rawSTL = intval(round($negotiatingPlayerSTL / intval($marketMaxSTL[0]) * 100));
+            $rawTOV = intval(round($negotiatingPlayerTOV / intval($marketMaxTOV[0]) * 100));
+            $rawBLK = intval(round($negotiatingPlayerBLK / intval($marketMaxBLK[0]) * 100));
+            $rawFOUL = intval(round($negotiatingPlayerFOUL / intval($marketMaxFOUL[0]) * 100));
+            $rawOO = intval(round($negotiatingPlayerOO / intval($marketMaxOO[0]) * 100));
+            $rawOD = intval(round($negotiatingPlayerOD / intval($marketMaxOD[0]) * 100));
+            $rawDO = intval(round($negotiatingPlayerDO / intval($marketMaxDO[0]) * 100));
+            $rawDD = intval(round($negotiatingPlayerDD / intval($marketMaxDD[0]) * 100));
+            $rawPO = intval(round($negotiatingPlayerPO / intval($marketMaxPO[0]) * 100));
+            $rawPD = intval(round($negotiatingPlayerPD / intval($marketMaxPD[0]) * 100));
+            $rawTO = intval(round($negotiatingPlayerTO / intval($marketMaxTO[0]) * 100));
+            $rawTD = intval(round($negotiatingPlayerTD / intval($marketMaxTD[0]) * 100));
             $totalRawScore = $rawFGA + $rawFGP + $rawFTA + $rawFTP + $rawTGA + $rawTGP + $rawORB + $rawDRB + $rawAST + $rawSTL + $rawTOV + $rawBLK + $rawFOUL +
                 $rawOO + $rawOD + $rawDO + $rawDD + $rawPO + $rawPD + $rawTO + $rawTD;
             //    var_dump($totalRawScore);
@@ -3244,7 +3244,7 @@ function negotiate($pid)
 
             $modifier = 1 + $PFWFactor + $traditionFactor + $coachFactor + $loyaltyFactor + $securityFactor + $PTFactor;
             //echo "Wins: $tf_wins<br>Loses: $tf_loss<br>Tradition Wins: $tf_trdw<br> Tradition Loses: $tf_trdl<br>Coach: $tf_coach<br>Loyalty: $player_loyalty<br>Play Time: $tf_millions<br>ModW: $modfactor1<br>ModT: $modfactor2<br>ModC: $modfactor3<br>ModL: $modfactor4<br>ModS: $modfactor5<br>ModP: $modfactor6<br>Mod: $modifier<br>Demand 1: $dem1<br>Demand 2: $dem2<br>Demand 3: $dem3<br>Demand 4: $dem4<br>Demand 5: $dem5<br>";
-
+            
             $dem1 = round($dem1 / $modifier);
             $dem2 = round($dem2 / $modifier);
             $dem3 = round($dem3 / $modifier);

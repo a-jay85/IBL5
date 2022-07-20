@@ -109,7 +109,8 @@ switch ($currentSeasonPhase) {
                 <option value = \"Yes\"" . ($waiverWireStatus == "Yes" ? " SELECTED" : "") . ">Yes</option>
                 <option value = \"No\"" . ($waiverWireStatus == "No" ? " SELECTED" : "") . ">No</option>
             </select>
-            <INPUT type='submit' name='query' value='Set Waiver Wire Status'><p>";
+            <INPUT type='submit' name='query' value='Set Waiver Wire Status'><p>
+            <INPUT type='submit' name='query' value='Set all players on waivers to Free Agents and reset their Bird years'><p>";
         break;
     case 'HEAT':
         echo "<A HREF=\"updateAllTheThings.php\">Update All The Things</A><p>

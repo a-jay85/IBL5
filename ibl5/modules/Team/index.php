@@ -590,10 +590,6 @@ function schedule($tid)
     //============================
     $queryteam = "SELECT * FROM ibl_team_info WHERE teamid = '$tid';";
     $resultteam = $db->sql_query($queryteam);
-    $teamid = $db->sql_result($resultteam, 0, "teamid");
-    $team_city = $db->sql_result($resultteam, 0, "team_city");
-    $team_name = $db->sql_result($resultteam, 0, "team_name");
-    $coach_pts = $db->sql_result($resultteam, 0, "Contract_Coach");
     $color1 = $db->sql_result($resultteam, 0, "color1");
     $color2 = $db->sql_result($resultteam, 0, "color2");
     //=============================
@@ -602,7 +598,6 @@ function schedule($tid)
     $sharedFunctions->displaytopmenu($tid);
     $query = "SELECT * FROM `ibl_schedule` WHERE Visitor = $tid OR Home = $tid ORDER BY Date ASC;";
     $result = $db->sql_query($query);
-    $num = $db->sql_numrows($result);
     $year = $db->sql_result($result, 0, "Year");
     $year1 = $year + 1;
     $wins = 0;
@@ -662,14 +657,16 @@ function boxscore($year, $month, $tid, $wins, $losses, $winStreak, $lossStreak)
     $teamSeasonRecordsResult = $db->sql_query($teamSeasonRecordsQuery);
 
     $arrayLastSimDates = $sharedFunctions->getLastSimDatesArray();
-    $lastSimStartDate = date_create($arrayLastSimDates["Start Date"]);
     $lastSimEndDate = date_create($arrayLastSimDates["End Date"]);
     $projectedNextSimEndDate = date_add($lastSimEndDate, date_interval_create_from_date_string('7 days'));
 
     // override $projectedNextSimEndDate to account for the blank week at end of HEAT
     $currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
     $currentSeasonBeginningYear = $currentSeasonEndingYear - 1;
-    if ($projectedNextSimEndDate >= date_create("$currentSeasonBeginningYear-10-23") and $projectedNextSimEndDate < date_create("$currentSeasonBeginningYear-11-01")) {
+    if (
+        $projectedNextSimEndDate >= date_create("$currentSeasonBeginningYear-10-23")
+        AND $projectedNextSimEndDate < date_create("$currentSeasonBeginningYear-11-01")
+    ) {
         $projectedNextSimEndDate = date_create("$currentSeasonBeginningYear-11-08");
     }
 

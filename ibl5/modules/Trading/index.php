@@ -40,6 +40,9 @@ function buildTeamFutureSalary($resultTeamPlayers, $k)
         if ($seasonPhase == "Playoffs" or $seasonPhase == "Draft" or $seasonPhase == "Free Agency") {
             $contract_year++;
         }
+        if ($contract_year == 0) {
+            $contract_year = 1;
+        }
         $player_contract = $rowTeamPlayers["cy$contract_year"];
         if ($contract_year == 7) {
             $player_contract = 0;

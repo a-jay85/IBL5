@@ -36,6 +36,7 @@ function buildTeamFutureSalary($resultTeamPlayers, $k)
         $player_pos = $rowTeamPlayers["pos"];
         $player_name = $rowTeamPlayers["name"];
         $player_pid = $rowTeamPlayers["pid"];
+        $player_ordinal = $rowTeamPlayers["ordinal"];
         $contract_year = $rowTeamPlayers["cy"];
         if ($seasonPhase == "Playoffs" or $seasonPhase == "Draft" or $seasonPhase == "Free Agency") {
             $contract_year++;
@@ -63,7 +64,7 @@ function buildTeamFutureSalary($resultTeamPlayers, $k)
 			<input type=\"hidden\" name=\"type$k\" value=\"1\">
 		<tr>";
 
-        if ($player_contract != 0) {
+        if ($player_contract != 0 AND $player_ordinal < 960) { // "ordinal < 960" prevents trading of waived players and Buyouts
             echo "<td align=\"center\"><input type=\"checkbox\" name=\"check$k\"></td>";
         } else {
             echo "<td align=\"center\"><input type=\"hidden\" name=\"check$k\"></td>";
@@ -172,12 +173,10 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
     $tid = $sharedFunctions->getTidFromTeamname($teamlogo);
     $sharedFunctions->displaytopmenu($tid);
 
-    $queryOfferingTeamPlayers = "SELECT pos, name, pid, cy, cy1, cy2, cy3, cy4, cy5, cy6
+    $queryOfferingTeamPlayers = "SELECT pos, name, pid, ordinal, cy, cy1, cy2, cy3, cy4, cy5, cy6
 		FROM ibl_plr
-		WHERE teamname = '$teamlogo'
-		AND tid = $tid
+		WHERE tid = $tid
 		AND retired = '0'
-		AND name NOT LIKE '%Buyouts%'
 		ORDER BY ordinal ASC ";
     $resultOfferingTeamPlayers = $db->sql_query($queryOfferingTeamPlayers);
 
@@ -232,12 +231,10 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 				</tr>";
 
     $partnerTid = $sharedFunctions->getTidFromTeamname($partner);
-    $queryOtherTeamPlayers = "SELECT pos, name, pid, cy, cy1, cy2, cy3, cy4, cy5, cy6
+    $queryOtherTeamPlayers = "SELECT pos, name, pid, ordinal, cy, cy1, cy2, cy3, cy4, cy5, cy6
 		FROM ibl_plr
-		WHERE teamname = '$partner'
-		AND tid = $partnerTid
+		WHERE tid = $partnerTid
 		AND retired = '0'
-		AND name NOT LIKE '%Buyouts%'
 		ORDER BY ordinal ASC ";
     $resultOtherTeamPlayers = $db->sql_query($queryOtherTeamPlayers);
 

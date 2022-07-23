@@ -1106,7 +1106,7 @@ function showpage($pid, $spec)
 
     $can_renegotiate = 0;
 
-    if ($yearOfCurrentContract == 1) {
+    if ($yearOfCurrentContract == 1 OR $yearOfCurrentContract == 0) {
         $contract_display = $salaryIn1stYearOfCurrentContract;
         if ($salaryIn2ndYearOfCurrentContract != 0) {
             $contract_display = $contract_display . "/" . $salaryIn2ndYearOfCurrentContract;
@@ -3015,30 +3015,16 @@ function negotiate($pid)
 
     $can_renegotiate = 0;
 
-    if ($yearOfCurrentContract == 1) {
-        if ($salaryIn2ndYearOfCurrentContract == 0) {
-            $can_renegotiate = 1;
-        }
-    } elseif ($yearOfCurrentContract == 2) {
-        if ($salaryIn3rdYearOfCurrentContract == 0) {
-            $can_renegotiate = 1;
-        }
-    } elseif ($yearOfCurrentContract == 3) {
-        if ($salaryIn4thYearOfCurrentContract == 0) {
-            $can_renegotiate = 1;
-        }
-    } elseif ($yearOfCurrentContract == 4) {
-        if ($salaryIn5thYearOfCurrentContract == 0) {
-            $can_renegotiate = 1;
-        }
-    } elseif ($yearOfCurrentContract == 5) {
-        if ($salaryIn6thYearOfCurrentContract == 0) {
-            $can_renegotiate = 1;
-        }
-    } elseif ($yearOfCurrentContract == 6) {
+    if (
+        ($yearOfCurrentContract == 0 AND $salaryIn2ndYearOfCurrentContract == 0)
+        OR ($yearOfCurrentContract == 1 AND $salaryIn2ndYearOfCurrentContract == 0)
+        OR ($yearOfCurrentContract == 2 AND $salaryIn3rdYearOfCurrentContract == 0)
+        OR ($yearOfCurrentContract == 3 AND $salaryIn4thYearOfCurrentContract == 0)
+        OR ($yearOfCurrentContract == 4 AND $salaryIn5thYearOfCurrentContract == 0)
+        OR ($yearOfCurrentContract == 5 AND $salaryIn6thYearOfCurrentContract == 0)
+        OR ($yearOfCurrentContract == 6)
+    ) {
         $can_renegotiate = 1;
-    } else {
-        $contract_display = "not under contract";
     }
 
     // END CONTRACT CHECKER

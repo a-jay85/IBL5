@@ -664,7 +664,10 @@ function boxscore($year, $month, $tid, $wins, $losses, $winStreak, $lossStreak)
     // override $projectedNextSimEndDate to account for the blank week at end of HEAT
     $currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
     $currentSeasonBeginningYear = $currentSeasonEndingYear - 1;
-    if ($projectedNextSimEndDate >= date_create("$currentSeasonBeginningYear-10-23") and $projectedNextSimEndDate < date_create("$currentSeasonBeginningYear-11-01")) {
+    if (
+        $projectedNextSimEndDate >= date_create("$currentSeasonBeginningYear-10-23")
+        AND $projectedNextSimEndDate < date_create("$currentSeasonBeginningYear-11-01")
+    ) {
         $projectedNextSimEndDate = date_create("$currentSeasonBeginningYear-11-08");
     }
 

@@ -19,9 +19,9 @@ function scoParser($uploadedFilePath, $seasonEndingYear, $seasonPhase)
     fseek($scoFile, 1000000);
 
     if ($seasonPhase == "Preseason") {
-        $stringDeleteCurrentSeasonBoxScores = "DELETE FROM `ibl_box_scores` WHERE `Date` BETWEEN '$currentSeasonStartingYear-09-01' AND '$currentSeasonEndingYear-07-01';";
+        $stringDeleteCurrentSeasonBoxScores = "DELETE FROM `ibl_box_scores` WHERE `Date` BETWEEN '$currentSeasonStartingYear-07-01' AND '$currentSeasonStartingYear-09-01';";
     } elseif ($seasonPhase == "HEAT") {
-        $stringDeleteCurrentSeasonBoxScores = "DELETE FROM `ibl_box_scores` WHERE `Date` BETWEEN '$currentSeasonStartingYear-10-01' AND '$currentSeasonEndingYear-07-01';";
+        $stringDeleteCurrentSeasonBoxScores = "DELETE FROM `ibl_box_scores` WHERE `Date` BETWEEN '$currentSeasonStartingYear-09-01' AND '$currentSeasonStartingYear-11-01';";
     } else {
         $stringDeleteCurrentSeasonBoxScores = "DELETE FROM `ibl_box_scores` WHERE `Date` BETWEEN '$currentSeasonStartingYear-11-01' AND '$currentSeasonEndingYear-07-01';";
     }

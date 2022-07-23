@@ -657,7 +657,6 @@ function boxscore($year, $month, $tid, $wins, $losses, $winStreak, $lossStreak)
     $teamSeasonRecordsResult = $db->sql_query($teamSeasonRecordsQuery);
 
     $arrayLastSimDates = $sharedFunctions->getLastSimDatesArray();
-    $lastSimStartDate = date_create($arrayLastSimDates["Start Date"]);
     $lastSimEndDate = date_create($arrayLastSimDates["End Date"]);
     $projectedNextSimEndDate = date_add($lastSimEndDate, date_interval_create_from_date_string('7 days'));
 

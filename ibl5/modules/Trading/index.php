@@ -30,8 +30,9 @@ function buildTeamFutureSalary($resultTeamPlayers, $k)
     global $db;
     $sharedFunctions = new Shared($db);
 
+    $seasonPhase = $sharedFunctions->getCurrentSeasonPhase();
+
     while ($rowTeamPlayers = $db->sql_fetch_assoc($resultTeamPlayers)) {
-        $seasonPhase = $sharedFunctions->getCurrentSeasonPhase();
         $player_pos = $rowTeamPlayers["pos"];
         $player_name = $rowTeamPlayers["name"];
         $player_pid = $rowTeamPlayers["pid"];

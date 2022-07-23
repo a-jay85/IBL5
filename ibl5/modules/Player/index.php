@@ -2822,7 +2822,7 @@ function showpage($pid, $spec)
 
         $urlwanted = str_replace(" ", "%20", $player_name);
 
-        readfile("http://iblhoops.net/ibl5/online/articles.php?player=$urlwanted"); // Relative URL paths don't seem to work for this
+        readfile("http://iblhoops.net/ibl5/articles.php?player=$urlwanted"); // Relative URL paths don't seem to work for this
 
         // END NEWS ARTICLE PICKUP
     }

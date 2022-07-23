@@ -3,7 +3,12 @@
 require 'mainfile.php';
 
 $player = $_REQUEST['player'];
-$query = "SELECT * FROM nuke_stories WHERE hometext LIKE '%$player%' OR bodytext LIKE '%$player%' ORDER BY time DESC";
+$query = "SELECT *
+    FROM nuke_stories
+    WHERE (hometext LIKE '%$player%' OR bodytext LIKE '%$player%')
+        AND hometext NOT LIKE '%$player II%'
+        AND bodytext NOT LIKE '%$player II%'
+        ORDER BY time DESC;";
 $result = $db->sql_query($query);
 $num = $db->sql_numrows($result);
 

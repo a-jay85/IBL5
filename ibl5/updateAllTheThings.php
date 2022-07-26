@@ -291,10 +291,8 @@ function extractStandingsValues()
                 } else {
                     die('Invalid query: ' . $db->sql_error());
                 }
-
             }
         }
-
     }
     echo '<p>Conference standings have been updated.<p>';
 
@@ -517,7 +515,7 @@ while ($i < $numTeams) {
     $tid = $db->sql_result($resultTeams, $i, "TeamID");
     $teamName = $db->sql_result($resultTeams, $i, "Team");
 
-    $queryGames = "SELECT Visitor, Vscore, Home, HScore
+    $queryGames = "SELECT Visitor, VScore, Home, HScore
 		FROM ibl_schedule
 		WHERE (Visitor = $tid OR Home = $tid)
 		AND (BoxID > 0 AND BoxID < 100000)

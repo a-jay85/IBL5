@@ -83,7 +83,6 @@ foreach ($rows as $row) {
     }
 
     if ($checkThirdCell !== null and $checkThirdCell !== "" and $checkFirstCell !== "visitor") {
-
         if ($row->childNodes->item(1)->getElementsByTagName('a')->length !== 0) {
             $boxLink = $row->childNodes->item(1)->getElementsByTagName('a')->item(0)->getAttribute('href');
             $boxID = extractBoxID($boxLink);
@@ -102,7 +101,6 @@ foreach ($rows as $row) {
             } else {
                 $boxID = 100000;
             }
-
         }
 
         $visitorTID = $sharedFunctions->getTidFromTeamname($visitorName);
@@ -325,10 +323,8 @@ function extractStandingsValues()
                 } else {
                     die('Invalid query: ' . $db->sql_error());
                 }
-
             }
         }
-
     }
     echo 'Division standings have been updated.<p>';
 }

@@ -926,12 +926,14 @@ function team($tid)
 				<th><font color=$color2>Pos</font></th>
 				<th><font color=$color2>Player</font></th>
 				<th><font color=$color2>Age</font></th>
+                <td bgcolor=#000000 width=0></td>
 				<th><font color=$color2>2ga</font></th>
 				<th><font color=$color2>2g%</font></th>
 				<th><font color=$color2>fta</font></th>
 				<th><font color=$color2>ft%</font></th>
 				<th><font color=$color2>3ga</font></th>
 				<th><font color=$color2>3g%</font></th>
+                <td bgcolor=#000000 width=0></td>
 				<th><font color=$color2>orb</font></th>
 				<th><font color=$color2>drb</font></th>
 				<th><font color=$color2>ast</font></th>
@@ -939,14 +941,20 @@ function team($tid)
 				<th><font color=$color2>tvr</font></th>
 				<th><font color=$color2>blk</font></th>
 				<th><font color=$color2>foul</font></th>
+                <td bgcolor=#000000 width=0></td>
 				<th><font color=$color2>oo</font></th>
 				<th><font color=$color2>do</font></th>
 				<th><font color=$color2>po</font></th>
 				<th><font color=$color2>to</font></th>
+                <td bgcolor=#000000 width=0></td>
 				<th><font color=$color2>od</font></th>
 				<th><font color=$color2>dd</font></th>
 				<th><font color=$color2>pd</font></th>
 				<th><font color=$color2>td</font></th>
+                <td bgcolor=#000000 width=0></td>
+                <th><font color=$color2>Clu</font></th>
+                <th><font color=$color2>Con</font></th>
+                <td bgcolor=#000000 width=0></td>
 				<th><font color=$color2>Inj</font></th>
 			</tr>
 		</thead>
@@ -984,6 +992,8 @@ function team($tid)
             $r_dd = $db->sql_result($result, $i, "dd");
             $r_pd = $db->sql_result($result, $i, "pd");
             $r_td = $db->sql_result($result, $i, "td");
+            $clutch = $db->sql_result($result, $i, "Clutch");
+            $consistency = $db->sql_result($result, $i, "Consistency");
 
             $draftyear = $db->sql_result($result, $i, "draftyear");
             $exp = $db->sql_result($result, $i, "exp");
@@ -1013,12 +1023,14 @@ function team($tid)
             $r_dd = $db->sql_result($result, $i, "r_dd");
             $r_pd = $db->sql_result($result, $i, "r_pd");
             $r_td = $db->sql_result($result, $i, "r_td");
+            $clutch = $db->sql_result($result, $i, "Clu");
+            $consistency = $db->sql_result($result, $i, "Con");
         }
 
         (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
 
         $table_ratings .= "<tr bgcolor=$bgcolor>
-			<td>$pos</td>";
+			<td align=center>$pos</td>";
 
         if ($tid == 0) {
             $table_ratings .= "<td><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>";
@@ -1030,29 +1042,37 @@ function team($tid)
             $table_ratings .= "<td><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>";
         }
 
-        $table_ratings .= "<td>$age</td>
-			<td>$r_2ga</td>
-			<td>$r_2gp</td>
-			<td>$r_fta</td>
-			<td>$r_ftp</td>
-			<td>$r_3ga</td>
-			<td>$r_3gp</td>
-			<td>$r_orb</td>
-			<td>$r_drb</td>
-			<td>$r_ast</td>
-			<td>$r_stl</td>
-			<td>$r_tvr</td>
-			<td>$r_blk</td>
-			<td>$r_foul</td>
-			<td>$r_oo</td>
-			<td>$r_do</td>
-			<td>$r_po</td>
-			<td>$r_to</td>
-			<td>$r_od</td>
-			<td>$r_dd</td>
-			<td>$r_pd</td>
-			<td>$r_td</td>
-			<td>$inj</td>
+        $table_ratings .= "<td align=center>$age</td>
+            <td bgcolor=#000000></td>
+			<td align=center>$r_2ga</td>
+			<td align=center>$r_2gp</td>
+			<td align=center>$r_fta</td>
+			<td align=center>$r_ftp</td>
+			<td align=center>$r_3ga</td>
+			<td align=center>$r_3gp</td>
+            <td bgcolor=#000000></td>
+			<td align=center>$r_orb</td>
+			<td align=center>$r_drb</td>
+			<td align=center>$r_ast</td>
+			<td align=center>$r_stl</td>
+			<td align=center>$r_tvr</td>
+			<td align=center>$r_blk</td>
+			<td align=center>$r_foul</td>
+            <td bgcolor=#000000></td>
+			<td align=center>$r_oo</td>
+			<td align=center>$r_do</td>
+			<td align=center>$r_po</td>
+			<td align=center>$r_to</td>
+            <td bgcolor=#000000></td>
+			<td align=center>$r_od</td>
+			<td align=center>$r_dd</td>
+			<td align=center>$r_pd</td>
+			<td align=center>$r_td</td>
+            <td bgcolor=#000000></td>
+			<td align=center>$clutch</td>
+			<td align=center>$consistency</td>
+            <td bgcolor=#000000></td>
+			<td align=center>$inj</td>
 		</tr>";
 
         $i++;
@@ -1753,12 +1773,11 @@ function team($tid)
 					<th><font color=$color2>Year3</font></th>
 					<th><font color=$color2>Year4</font></th>
 					<th><font color=$color2>Year5</font></th>
-					<th><font color=$color2>Year6</font></th><td bgcolor=#000000 width=3></th>
+					<th><font color=$color2>Year6</font></th>
+                        <td bgcolor=#000000 width=3></td>
 					<th><font color=$color2>Talent</font></th>
 					<th><font color=$color2>Skill</font></th>
 					<th><font color=$color2>Intang</font></th>
-					<th><font color=$color2>Clutch</font></th>
-					<th><font color=$color2>Consistency</font></th>
 				</tr>
 			</thead>
 		<tbody>";
@@ -1807,8 +1826,6 @@ function team($tid)
             $talent = $db->sql_result($result, $i, "talent");
             $skill = $db->sql_result($result, $i, "skill");
             $intangibles = $db->sql_result($result, $i, "intangibles");
-            $Clutch = $db->sql_result($result, $i, "Clutch");
-            $Consistency = $db->sql_result($result, $i, "Consistency");
 
             (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
 
@@ -1830,12 +1847,11 @@ function team($tid)
 				<td>$con3</td>
 				<td>$con4</td>
 				<td>$con5</td>
-				<td>$con6</td><td bgcolor=#000000></td>
+				<td>$con6</td>
+                <td bgcolor=#000000></td>
 				<td>$talent</td>
 				<td>$skill</td>
 				<td>$intangibles</td>
-				<td>$Clutch</td>
-				<td>$Consistency</td>
 			</tr>";
 
             $cap1 = $cap1 + $con1;

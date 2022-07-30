@@ -1,15 +1,17 @@
 .DS_Store
 .ftpquota
 error_log
-!/ibl5
-!sharedFunctions.php
+/phpmyadmin
+
 config.php
 config.inc.php
 discordWebhooks (not CURL).php
 Discord.php
+
+!/ibl5
+/*
 /backups
-depthcharts
+/depthcharts
 /ibl
 /ibl5/vendor
 /ibl5/joe/ibl_draft/includes/classes/Discord.php
-/phpmyadmin

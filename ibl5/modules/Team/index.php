@@ -1766,18 +1766,26 @@ function team($tid)
 			<thead>
 				<tr bgcolor=$color1>
 					<th><font color=$color2>Pos</font></th>
-					<th colspan=3><font color=$color2>Player</font></th>
+					<th colspan=2><font color=$color2>Player</font></th>
+					<th><font color=$color2>Exp</font></th>
 					<th><font color=$color2>Bird</font></th>
+                    <td bgcolor=#000000 width=0></td>
 					<th><font color=$color2>Year1</font></th>
 					<th><font color=$color2>Year2</font></th>
 					<th><font color=$color2>Year3</font></th>
 					<th><font color=$color2>Year4</font></th>
 					<th><font color=$color2>Year5</font></th>
 					<th><font color=$color2>Year6</font></th>
-                        <td bgcolor=#000000 width=3></td>
-					<th><font color=$color2>Talent</font></th>
-					<th><font color=$color2>Skill</font></th>
-					<th><font color=$color2>Intang</font></th>
+                    <td bgcolor=#000000 width=0></td>
+					<th><font color=$color2>Tal</font></th>
+					<th><font color=$color2>Skl</font></th>
+					<th><font color=$color2>Int</font></th>
+                    <td bgcolor=#000000 width=0></td>
+                    <th><font color=$color2>Loy</font></th>
+                    <th><font color=$color2>PFW</font></th>
+                    <th><font color=$color2>PT</font></th>
+                    <th><font color=$color2>Sec</font></th>
+                    <th><font color=$color2>Trad</font></th>
 				</tr>
 			</thead>
 		<tbody>";
@@ -1822,26 +1830,38 @@ function team($tid)
                 $year5 < 7 ? $con5 = $db->sql_result($result, $i, "cy$year5") : $con5 = 0;
                 $year6 < 7 ? $con6 = $db->sql_result($result, $i, "cy$year6") : $con6 = 0;
             }
+            $exp = $db->sql_result($result, $i, "exp");
             $bird = $db->sql_result($result, $i, "bird");
             $talent = $db->sql_result($result, $i, "talent");
             $skill = $db->sql_result($result, $i, "skill");
             $intangibles = $db->sql_result($result, $i, "intangibles");
+            $loyalty = $db->sql_result($result, $i, "loyalty");
+            $winner = $db->sql_result($result, $i, "winner");
+            $playingTime = $db->sql_result($result, $i, "playingTime");
+            $security = $db->sql_result($result, $i, "security");
+            $tradition = $db->sql_result($result, $i, "tradition");
 
             (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
 
-            $table_contracts .= "<tr bgcolor=$bgcolor><td>$pos</td>";
+            $table_contracts .= "
+                <tr bgcolor=$bgcolor>
+                <td align=center>$pos</td>
+                <td colspan=2><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">";
 
             if ($tid == 0) {
-                $table_contracts = $table_contracts . "<td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>";
-            } elseif ($p_ord > 959) {
-                $table_contracts = $table_contracts . "<td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">($name)*</a></td>";
+                $table_contracts = $table_contracts . "$name";
+            } elseif ($p_ord >= 960) {
+                $table_contracts = $table_contracts . "($name)*";
             } elseif ($cy == $cyt) {
-                $table_contracts = $table_contracts . "<td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name^</a></td>";
+                $table_contracts = $table_contracts . "$name^";
             } else {
-                $table_contracts = $table_contracts . "<td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>";
+                $table_contracts = $table_contracts . "$name";
             }
 
-            $table_contracts .= "<td>$bird</td>
+            $table_contracts .= "</a></td>
+                <td align=center>$exp</td>
+                <td align=center>$bird</td>
+                <td bgcolor=#000000></td>
 				<td>$con1</td>
 				<td>$con2</td>
 				<td>$con3</td>
@@ -1849,9 +1869,15 @@ function team($tid)
 				<td>$con5</td>
 				<td>$con6</td>
                 <td bgcolor=#000000></td>
-				<td>$talent</td>
-				<td>$skill</td>
-				<td>$intangibles</td>
+				<td align=center>$talent</td>
+				<td align=center>$skill</td>
+				<td align=center>$intangibles</td>
+                <td bgcolor=#000000></td>
+				<td align=center>$loyalty</td>
+				<td align=center>$winner</td>
+				<td align=center>$playingTime</td>
+				<td align=center>$security</td>
+				<td align=center>$tradition</td>
 			</tr>";
 
             $cap1 = $cap1 + $con1;
@@ -1880,14 +1906,17 @@ function team($tid)
 			<tfoot>
 				<tr>
 					<td></td>
-					<td colspan=3><b>Cap Totals</td>
+					<td colspan=2><b>Cap Totals</td>
 					<td></td>
+                    <td></td>
+                    <td bgcolor=#000000></td>
 					<td><b>$cap1</td>
 					<td><b>$cap2</td>
 					<td><b>$cap3</td>
 					<td><b>$cap4</td>
 					<td><b>$cap5</td>
-					<td><b>$cap6</td><td bgcolor=#000000></td>
+					<td><b>$cap6</td>
+                    <td bgcolor=#000000></td>
 					<td></td>
 					<td></td>
 					<td></td>
@@ -1895,7 +1924,7 @@ function team($tid)
 					<td></td>
 				</tr>
 				<tr>
-					<td colspan=17><i>Note:</i> Players whose names appear in parenthesis and with a trailing asterisk are waived players that still count against the salary cap.</td>
+					<td colspan=19><i>Note:</i> Players whose names appear in parenthesis and with a trailing asterisk are waived players that still count against the salary cap.</td>
 				</tr>
 			</tfoot>
 		</table>";

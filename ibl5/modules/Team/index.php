@@ -957,7 +957,6 @@ function team($tid)
     while ($i < $num) {
         if ($yr == "") {
             $name = $db->sql_result($result, $i, "name");
-            $team = $db->sql_result($result, $i, "teamname");
             $pid = $db->sql_result($result, $i, "pid");
             $pos = $db->sql_result($result, $i, "pos");
             $p_ord = $db->sql_result($result, $i, "ordinal");
@@ -985,17 +984,13 @@ function team($tid)
             $r_dd = $db->sql_result($result, $i, "dd");
             $r_pd = $db->sql_result($result, $i, "pd");
             $r_td = $db->sql_result($result, $i, "td");
-            $r_bird = $db->sql_result($result, $i, "bird");
 
             $draftyear = $db->sql_result($result, $i, "draftyear");
             $exp = $db->sql_result($result, $i, "exp");
             $cy = $db->sql_result($result, $i, "cy");
             $cyt = $db->sql_result($result, $i, "cyt");
-
-            $yearoffreeagency = $draftyear + $exp + $cyt - $cy;
         } else {
             $name = $db->sql_result($result, $i, "name");
-            $team = $db->sql_result($result, $i, "team");
             $pid = $db->sql_result($result, $i, "pid");
 
             $r_2ga = $db->sql_result($result, $i, "r_2ga");

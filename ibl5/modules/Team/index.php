@@ -796,24 +796,10 @@ function team($tid)
     $queryteam = "SELECT * FROM ibl_team_info WHERE teamid = '$tid' ";
     $resultteam = $db->sql_query($queryteam);
 
-    $teamid = $db->sql_result($resultteam, 0, "teamid");
-    $team_city = $db->sql_result($resultteam, 0, "team_city");
     $team_name = $db->sql_result($resultteam, 0, "team_name");
-    $coach_pts = $db->sql_result($resultteam, 0, "Contract_Coach");
     $color1 = $db->sql_result($resultteam, 0, "color1");
     $color2 = $db->sql_result($resultteam, 0, "color2");
     $owner_name = $db->sql_result($resultteam, 0, "owner_name");
-    $owner_email = $db->sql_result($resultteam, 0, "owner_email");
-    $icq = $db->sql_result($resultteam, 0, "icq");
-    $aim = $db->sql_result($resultteam, 0, "aim");
-    $msn = $db->sql_result($resultteam, 0, "msn");
-    $Extension = $db->sql_result($resultteam, 0, "Used_Extension_This_Season");
-
-    if ($Extension == 0) {
-        $Extension_Text = "contract extension still available";
-    } else {
-        $Extension_Text = "contract extension used for this season";
-    }
 
     //=============================
     //DISPLAY TOP MENU
@@ -827,7 +813,6 @@ function team($tid)
 
     $queryfaon = "SELECT * FROM nuke_modules WHERE mid = '83' ORDER BY title ASC"; // THIS CHECKS IF FA IS ACTIVE AND HIDES FA PLAYERS IF IT IS
     $resultfaon = $db->sql_query($queryfaon);
-    $numfaon = $db->sql_numrows($resultfaon);
     $faon = $db->sql_result($resultfaon, 0, "active");
 
     if ($tid == 0) { // Team 0 is the Free Agents; we want a query that will pick up all of their players.
@@ -1337,26 +1322,6 @@ function team($tid)
 
         /* =======================AVERAGES */
 
-        if ($yr == "") {
-            if ($tid != "-1") {
-                $per_query = "SELECT * FROM ibl_per_calculator WHERE team_id = '$tid' ";
-            } else {
-                $per_query = "SELECT * FROM ibl_per_calculator ";
-            }
-            $per_result = $db->sql_query($per_query);
-            $per_rows = $db->sql_numrows($per_result);
-
-            $per = 0;
-            while ($per < $per_rows) {
-                $PER_array[$per]['name'] = $db->sql_result($per_result, $per, "player_name");
-                $PER_array[$per]['pid'] = $db->sql_result($per_result, $per, "player_id");
-                $PER_array[$per]['PER'] = $db->sql_result($per_result, $per, "PER");
-                $PER_array[$per]['MM'] = $db->sql_result($per_result, $per, "Magic_Metric");
-                $PER_array[$per]['GS'] = $db->sql_result($per_result, $per, "Game_Score");
-
-                $per++;
-            }
-        }
         $i = 0;
 
         while ($i < $num) {
@@ -1370,22 +1335,7 @@ function team($tid)
             $cy = $db->sql_result($result, $i, "cy");
             $cyt = $db->sql_result($result, $i, "cyt");
 
-            $yearoffreeagency = $draftyear + $exp + $cyt - $cy;
-
-            $stats_PER = "";
-            $stats_MM = "";
-            $stats_GS = "";
-
             if ($yr == "") {
-                $pc = 0;
-                while ($pc < $per) {
-                    if ($PER_array[$pc]['pid'] == $pid) {
-                        $stats_PER = number_format($PER_array[$pc]['PER'], 3);
-                        $stats_Magic_Metric = number_format($PER_array[$pc]['MM'], 3);
-                        $stats_Game_Score = number_format($PER_array[$pc]['GS'], 3);
-                    }
-                    $pc++;
-                }
                 $stats_gm = $db->sql_result($result, $i, "stats_gm");
                 $stats_gs = $db->sql_result($result, $i, "stats_gs");
                 $stats_min = $db->sql_result($result, $i, "stats_min");
@@ -1628,8 +1578,6 @@ function team($tid)
             }
             $t++;
         }
-
-        $thischunk = $row['maxchunk'];
 
         $table_averages .= "</tfoot>
 			</table>";
@@ -1894,13 +1842,6 @@ function team($tid)
         $cap4 = number_format($cap4 / 100, 2);
         $cap5 = number_format($cap5 / 100, 2);
         $cap6 = number_format($cap6 / 100, 2);
-
-        // Begin hack to populate a MySQL table that has each team's current cap total.
-        // Calculating cap totals for the current season is dificult at the moment. - A-Jay
-        $currentCap = $cap1;
-        $capTotalQuery = "INSERT INTO ibl_current_cap (tid,currentCap) VALUES ('" . $tid . "','" . $currentCap . "') ON DUPLICATE KEY UPDATE currentCap='" . $currentCap . "'";
-        $capTotalQueryExec = $db->sql_query($capTotalQuery);
-        // End salary cap hack.
 
         $table_contracts .= "</tbody>
 			<tfoot>
@@ -2596,7 +2537,6 @@ function editset($username, $bypass = 0, $hid = 0, $url = 0)
 
     $sql2 = "SELECT * FROM " . $user_prefix . "_users WHERE username='$username'";
     $result2 = $db->sql_query($sql2);
-    $num = $db->sql_numrows($result2);
     $userinfo = $db->sql_fetchrow($result2);
     if (!$bypass) {
         cookiedecode($user);
@@ -2620,7 +2560,6 @@ function editset($username, $bypass = 0, $hid = 0, $url = 0)
 
     $sql3 = "SELECT * FROM ibl_offense_sets WHERE TeamName = '$teamlogo' ORDER BY SetNumber ASC ";
     $result3 = $db->sql_query($sql3);
-    $num3 = $db->sql_numrows($result3);
 
     $SetToWorkOn = $_POST['SelectedSet'];
 
@@ -2647,7 +2586,6 @@ function editset($username, $bypass = 0, $hid = 0, $url = 0)
     if ($SetToWorkOn == null) {} else {
         $sql4 = "SELECT * FROM ibl_offense_sets WHERE TeamName = '$teamlogo' AND SetNumber = '$SetToWorkOn'";
         $result4 = $db->sql_query($sql4);
-        $num4 = $db->sql_numrows($result4);
 
         $name1 = $db->sql_result($result4, 0, "PG_Depth_Name");
         $name2 = $db->sql_result($result4, 0, "SG_Depth_Name");
@@ -2985,7 +2923,6 @@ function changesetgo($username, $action, $set, $type, $position)
     }
     $sql2 = "SELECT * FROM " . $user_prefix . "_users WHERE username='$username'";
     $result2 = $db->sql_query($sql2);
-    $num = $db->sql_numrows($result2);
     $userinfo = $db->sql_fetchrow($result2);
     $teamlogo = $userinfo['user_ibl_team'];
     if (!$bypass) {

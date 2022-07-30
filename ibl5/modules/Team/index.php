@@ -1956,7 +1956,6 @@ function team($tid)
     }
 
     while ($hh < $numpicks) {
-        $ownerofpick = $db->sql_result($resultpicks, $hh, "ownerofpick");
         $teampick = $db->sql_result($resultpicks, $hh, "teampick");
         $year = $db->sql_result($resultpicks, $hh, "year");
         $round = $db->sql_result($resultpicks, $hh, "round");
@@ -1967,8 +1966,6 @@ function team($tid)
             if ($pick_team_name == $teampick) {
                 $pick_team_id = $color_array[$j]['team_id'];
                 $pick_team_city = $color_array[$j]['team_city'];
-                $pick_team_color1 = $color_array[$j]['color1'];
-                $pick_team_color2 = $color_array[$j]['color2'];
             }
             $j++;
         }

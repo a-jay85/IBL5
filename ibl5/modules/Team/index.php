@@ -822,8 +822,8 @@ function team($tid)
             $r_dd = $db->sql_result($result, $i, "r_dd");
             $r_pd = $db->sql_result($result, $i, "r_pd");
             $r_td = $db->sql_result($result, $i, "r_td");
-            $clutch = $db->sql_result($result, $i, "Clu");
-            $consistency = $db->sql_result($result, $i, "Con");
+            $clutch = $db->sql_result($result, $i, "Clutch");
+            $consistency = $db->sql_result($result, $i, "Consistency");
         }
 
         (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";

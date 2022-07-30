@@ -726,14 +726,14 @@ function team($tid)
 				<th><font color=$color2>Pos</font></th>
 				<th><font color=$color2>Player</font></th>
 				<th><font color=$color2>Age</font></th>
-                <td bgcolor=#000000 width=0></td>
+                <td bgcolor=$color1 width=0></td>
 				<th><font color=$color2>2ga</font></th>
 				<th><font color=$color2>2g%</font></th>
 				<th><font color=$color2>fta</font></th>
 				<th><font color=$color2>ft%</font></th>
 				<th><font color=$color2>3ga</font></th>
 				<th><font color=$color2>3g%</font></th>
-                <td bgcolor=#000000 width=0></td>
+                <td bgcolor=$color1 width=0></td>
 				<th><font color=$color2>orb</font></th>
 				<th><font color=$color2>drb</font></th>
 				<th><font color=$color2>ast</font></th>
@@ -741,20 +741,20 @@ function team($tid)
 				<th><font color=$color2>tvr</font></th>
 				<th><font color=$color2>blk</font></th>
 				<th><font color=$color2>foul</font></th>
-                <td bgcolor=#000000 width=0></td>
+                <td bgcolor=$color1 width=0></td>
 				<th><font color=$color2>oo</font></th>
 				<th><font color=$color2>do</font></th>
 				<th><font color=$color2>po</font></th>
 				<th><font color=$color2>to</font></th>
-                <td bgcolor=#000000 width=0></td>
+                <td bgcolor=$color1 width=0></td>
 				<th><font color=$color2>od</font></th>
 				<th><font color=$color2>dd</font></th>
 				<th><font color=$color2>pd</font></th>
 				<th><font color=$color2>td</font></th>
-                <td bgcolor=#000000 width=0></td>
+                <td bgcolor=$color1 width=0></td>
                 <th><font color=$color2>Clu</font></th>
                 <th><font color=$color2>Con</font></th>
-                <td bgcolor=#000000 width=0></td>
+                <td bgcolor=$color1 width=0></td>
 				<th><font color=$color2>Inj</font></th>
 			</tr>
 		</thead>
@@ -844,14 +844,14 @@ function team($tid)
 
         $table_ratings .= "</a></td>
             <td align=center>$age</td>
-            <td bgcolor=#000000></td>
+            <td bgcolor=$color1></td>
 			<td align=center>$r_2ga</td>
 			<td align=center>$r_2gp</td>
 			<td align=center>$r_fta</td>
 			<td align=center>$r_ftp</td>
 			<td align=center>$r_3ga</td>
 			<td align=center>$r_3gp</td>
-            <td bgcolor=#000000></td>
+            <td bgcolor=$color1></td>
 			<td align=center>$r_orb</td>
 			<td align=center>$r_drb</td>
 			<td align=center>$r_ast</td>
@@ -859,20 +859,20 @@ function team($tid)
 			<td align=center>$r_tvr</td>
 			<td align=center>$r_blk</td>
 			<td align=center>$r_foul</td>
-            <td bgcolor=#000000></td>
+            <td bgcolor=$color1></td>
 			<td align=center>$r_oo</td>
 			<td align=center>$r_do</td>
 			<td align=center>$r_po</td>
 			<td align=center>$r_to</td>
-            <td bgcolor=#000000></td>
+            <td bgcolor=$color1></td>
 			<td align=center>$r_od</td>
 			<td align=center>$r_dd</td>
 			<td align=center>$r_pd</td>
 			<td align=center>$r_td</td>
-            <td bgcolor=#000000></td>
+            <td bgcolor=$color1></td>
 			<td align=center>$clutch</td>
 			<td align=center>$consistency</td>
-            <td bgcolor=#000000></td>
+            <td bgcolor=$color1></td>
 			<td align=center>$inj</td>
 		</tr>";
 
@@ -1527,18 +1527,18 @@ function team($tid)
 					<th colspan=2><font color=$color2>Player</font></th>
 					<th><font color=$color2>Exp</font></th>
 					<th><font color=$color2>Bird</font></th>
-                    <td bgcolor=#000000 width=0></td>
+                    <td bgcolor=$color1 width=0></td>
 					<th><font color=$color2>Year1</font></th>
 					<th><font color=$color2>Year2</font></th>
 					<th><font color=$color2>Year3</font></th>
 					<th><font color=$color2>Year4</font></th>
 					<th><font color=$color2>Year5</font></th>
 					<th><font color=$color2>Year6</font></th>
-                    <td bgcolor=#000000 width=0></td>
+                    <td bgcolor=$color1 width=0></td>
 					<th><font color=$color2>Tal</font></th>
 					<th><font color=$color2>Skl</font></th>
 					<th><font color=$color2>Int</font></th>
-                    <td bgcolor=#000000 width=0></td>
+                    <td bgcolor=$color1 width=0></td>
                     <th><font color=$color2>Loy</font></th>
                     <th><font color=$color2>PFW</font></th>
                     <th><font color=$color2>PT</font></th>
@@ -1619,18 +1619,18 @@ function team($tid)
             $table_contracts .= "</a></td>
                 <td align=center>$exp</td>
                 <td align=center>$bird</td>
-                <td bgcolor=#000000></td>
+                <td bgcolor=$color1></td>
 				<td>$con1</td>
 				<td>$con2</td>
 				<td>$con3</td>
 				<td>$con4</td>
 				<td>$con5</td>
 				<td>$con6</td>
-                <td bgcolor=#000000></td>
+                <td bgcolor=$color1></td>
 				<td align=center>$talent</td>
 				<td align=center>$skill</td>
 				<td align=center>$intangibles</td>
-                <td bgcolor=#000000></td>
+                <td bgcolor=$color1></td>
 				<td align=center>$loyalty</td>
 				<td align=center>$winner</td>
 				<td align=center>$playingTime</td>
@@ -1660,14 +1660,18 @@ function team($tid)
 					<td colspan=2><b>Cap Totals</td>
 					<td></td>
                     <td></td>
-                    <td bgcolor=#000000></td>
+                    <td bgcolor=$color1></td>
 					<td><b>$cap1</td>
 					<td><b>$cap2</td>
 					<td><b>$cap3</td>
 					<td><b>$cap4</td>
 					<td><b>$cap5</td>
 					<td><b>$cap6</td>
-                    <td bgcolor=#000000></td>
+                    <td bgcolor=$color1></td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td></td>
 					<td></td>
 					<td></td>
 					<td></td>

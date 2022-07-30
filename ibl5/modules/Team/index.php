@@ -829,19 +829,21 @@ function team($tid)
         (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
 
         $table_ratings .= "<tr bgcolor=$bgcolor>
-			<td align=center>$pos</td>";
+			<td align=center>$pos</td>
+            <td><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">";
 
         if ($tid == 0) {
-            $table_ratings .= "<td><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>";
+            $table_ratings .= "$name";
         } elseif ($p_ord > 959) { // On waivers
-            $table_ratings .= "<td>(<a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name)*</a></td>";
+            $table_ratings .= "($name)*";
         } elseif ($cy == $cyt) { // Eligible for FA this offseason
-            $table_ratings .= "<td><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a>^</td>";
+            $table_ratings .= "$name^";
         } else {
-            $table_ratings .= "<td><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>";
+            $table_ratings .= "$name";
         }
 
-        $table_ratings .= "<td align=center>$age</td>
+        $table_ratings .= "</a></td>
+            <td align=center>$age</td>
             <td bgcolor=#000000></td>
 			<td align=center>$r_2ga</td>
 			<td align=center>$r_2gp</td>
@@ -961,19 +963,21 @@ function team($tid)
             (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
 
             $table_totals .= "<tr bgcolor=$bgcolor>
-				<td>$pos</td>";
+				<td>$pos</td>
+                <td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">";
 
             if ($tid == 0) {
-                $table_totals .= "<td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>";
+                $table_totals .= "$name";
             } elseif ($p_ord > 959) {
-                $table_totals .= "<td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">($name)*</a></td>";
+                $table_totals .= "($name)*";
             } elseif ($cy == $cyt) {
-                $table_totals .= "<td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name^</a></td>";
+                $table_totals .= "$name^";
             } else {
-                $table_totals .= "<td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>";
+                $table_totals .= "$name";
             }
 
-            $table_totals .= "<td><center>$stats_gm</center></td>
+            $table_totals .= "</a></td>
+                <td><center>$stats_gm</center></td>
 				<td><center>$stats_gs</center></td>
 				<td><center>$stats_min</center></td>
 				<td><center>$stats_fgm</center></td>
@@ -1204,21 +1208,21 @@ function team($tid)
             (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
 
             $table_averages .= "<tr bgcolor=$bgcolor>
-				<td>$pos</td>";
+				<td>$pos</td>
+                <td colspan=3><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">";
 
             if ($tid == 0) {
-                $table_averages .= "<td colspan=3><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>";
+                $table_averages .= "$name";
+            } elseif ($p_ord > 959) {
+                $table_averages .= "($name)*";
+            } elseif ($cy == $cyt) {
+                $table_averages .= "$name^";
             } else {
-                if ($p_ord > 959) {
-                    $table_averages .= "<td colspan=3><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">($name)*</a></td>";
-                } elseif ($cy == $cyt) {
-                    $table_averages .= "<td colspan=3><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name^</a></td>";
-                } else {
-                    $table_averages .= "<td colspan=3><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>";
-                }
+                $table_averages .= "$name";
             }
 
-            $table_averages .= "<td><center>$stats_gm</center></td>
+            $table_averages .= "</a></td>
+                <td><center>$stats_gm</center></td>
 				<td><center>$stats_gs</center></td>
 				<td><center>$stats_mpg</center></td>
 				<td><center>$stats_fgm</center></td>

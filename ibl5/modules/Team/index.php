@@ -143,24 +143,24 @@ function leaguestats()
         @$team_off_avgpf = number_format($team_off_pf / $team_off_games, 2);
         @$team_off_avgpts = number_format($team_off_pts / $team_off_games, 2);
 
-        $lg_off_games = $lg_off_games + $team_off_games;
-        $lg_off_minutes = $lg_off_minutes + $team_off_minutes;
-        $lg_off_fgm = $lg_off_fgm + $team_off_fgm;
-        $lg_off_fga = $lg_off_fga + $team_off_fga;
-        $lg_off_ftm = $lg_off_ftm + $team_off_ftm;
-        $lg_off_fta = $lg_off_fta + $team_off_fta;
-        $lg_off_tgm = $lg_off_tgm + $team_off_tgm;
-        $lg_off_tga = $lg_off_tga + $team_off_tga;
-        $lg_off_orb = $lg_off_orb + $team_off_orb;
-        $lg_off_reb = $lg_off_reb + $team_off_reb;
-        $lg_off_ast = $lg_off_ast + $team_off_ast;
-        $lg_off_stl = $lg_off_stl + $team_off_stl;
-        $lg_off_tvr = $lg_off_tvr + $team_off_tvr;
-        $lg_off_blk = $lg_off_blk + $team_off_blk;
-        $lg_off_pf = $lg_off_pf + $team_off_pf;
-        $lg_off_pts = $lg_off_pts + $team_off_pts;
+        $lg_off_games += $team_off_games;
+        $lg_off_minutes += $team_off_minutes;
+        $lg_off_fgm += $team_off_fgm;
+        $lg_off_fga += $team_off_fga;
+        $lg_off_ftm += $team_off_ftm;
+        $lg_off_fta += $team_off_fta;
+        $lg_off_tgm += $team_off_tgm;
+        $lg_off_tga += $team_off_tga;
+        $lg_off_orb += $team_off_orb;
+        $lg_off_reb += $team_off_reb;
+        $lg_off_ast += $team_off_ast;
+        $lg_off_stl += $team_off_stl;
+        $lg_off_tvr += $team_off_tvr;
+        $lg_off_blk += $team_off_blk;
+        $lg_off_pf += $team_off_pf;
+        $lg_off_pts += $team_off_pts;
 
-        $offense_totals = $offense_totals . "<tr>
+        $offense_totals .= "<tr>
 			<td bgcolor=\"$teamcolor1\"><a href=\"modules.php?name=Team&op=team&tid=$tid\"><font color=\"$teamcolor2\">$teamcity $team_off_name Offense</font></a></td>
 			<td>$team_off_games</td>
 			<td>$team_off_fgm</td>
@@ -179,7 +179,7 @@ function leaguestats()
 			<td>$team_off_pts</td>
 		</tr>";
 
-        $offense_averages = $offense_averages . "<tr>
+        $offense_averages .= "<tr>
 			<td bgcolor=\"$teamcolor1\"><a href=\"modules.php?name=Team&op=team&tid=$tid\"><font color=\"$teamcolor2\">$teamcity $team_off_name Offense</font></a></td>
 			<td>$team_off_avgfgm</td>
 			<td>$team_off_avgfga</td>
@@ -257,7 +257,7 @@ function leaguestats()
         @$team_def_avgpf = number_format($team_def_pf / $team_def_games, 2);
         @$team_def_avgpts = number_format($team_def_pts / $team_def_games, 2);
 
-        $defense_totals = $defense_totals . "<tr>
+        $defense_totals .= "<tr>
 			<td bgcolor=\"$teamcolor1\"><a href=\"modules.php?name=Team&op=team&tid=$tid\"><font color=\"$teamcolor2\">$teamcity $team_def_name Defense</font></a></td>
 			<td>$team_def_games</td>
 			<td>$team_def_fgm</td>
@@ -276,7 +276,7 @@ function leaguestats()
 			<td>$team_def_pts</td>
 		</tr>";
 
-        $defense_averages = $defense_averages . "<tr>
+        $defense_averages .= "<tr>
 			<td bgcolor=\"$teamcolor1\"><a href=\"modules.php?name=Team&op=team&tid=$tid\"><font color=\"$teamcolor2\">$teamcity $team_def_name Defense</font></a></td>
 			<td>$team_def_avgfgm</td>
 			<td>$team_def_avgfga</td>
@@ -719,7 +719,7 @@ function team($tid)
 
     // BEGIN RATINGS TABLE
 
-    $table_ratings = "<table  align=\"center\" class=\"sortable\">
+    $table_ratings = "<table align=\"center\" class=\"sortable\">
 		<colgroup span=2><colgroup span=2><colgroup span=6><colgroup span=6><colgroup span=4><colgroup span=4><colgroup span=1>
 		<thead bgcolor=$color1>
 			<tr bgcolor=$color1>
@@ -795,7 +795,6 @@ function team($tid)
             $clutch = $db->sql_result($result, $i, "Clutch");
             $consistency = $db->sql_result($result, $i, "Consistency");
 
-            $draftyear = $db->sql_result($result, $i, "draftyear");
             $exp = $db->sql_result($result, $i, "exp");
             $cy = $db->sql_result($result, $i, "cy");
             $cyt = $db->sql_result($result, $i, "cyt");
@@ -917,7 +916,6 @@ function team($tid)
             $p_ord = $db->sql_result($result, $i, "ordinal");
             $pid = $db->sql_result($result, $i, "pid");
 
-            $draftyear = $db->sql_result($result, $i, "draftyear");
             $exp = $db->sql_result($result, $i, "exp");
             $cy = $db->sql_result($result, $i, "cy");
             $cyt = $db->sql_result($result, $i, "cyt");
@@ -1212,11 +1210,11 @@ function team($tid)
                 $table_averages .= "<td colspan=3><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>";
             } else {
                 if ($p_ord > 959) {
-                    $table_averages = $table_averages . "<td colspan=3><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">($name)*</a></td>";
+                    $table_averages .= "<td colspan=3><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">($name)*</a></td>";
                 } elseif ($cy == $cyt) {
-                    $table_averages = $table_averages . "<td colspan=3><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name^</a></td>";
+                    $table_averages .= "<td colspan=3><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name^</a></td>";
                 } else {
-                    $table_averages = $table_averages . "<td colspan=3><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>";
+                    $table_averages .= "<td colspan=3><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>";
                 }
             }
 
@@ -1395,11 +1393,11 @@ function team($tid)
 			</table>";
 
         if ($yr == "") {
-            $table_simAverages = $table_simAverages . "<table align=\"center\" class=\"sortable\"><thead>";
+            $table_simAverages .= "<table align=\"center\" class=\"sortable\"><thead>";
 
             /* ======================CHUNK STATS */
 
-            $table_simAverages = $table_simAverages . "<tr bgcolor=$color1><th><font color=$color2>Pos</font></th><th colspan=3><font color=$color2>Player</font></th><th><font color=$color2>g</font></th><th><font color=$color2>min</font></th><th><font color=$color2>fgm</font></th><th><font color=$color2>fga</font></th><th><font color=$color2>fgp</font></th><th><font color=$color2>ftm</font></th><th><font color=$color2>fta</font></th><th><font color=$color2>ftp</font></th><th><font color=$color2>3gm</font></th><th><font color=$color2>3ga</font></th><th><font color=$color2>3gp</font></th><th><font color=$color2>orb</font></th><th><font color=$color2>reb</font></th><th><font color=$color2>ast</font></th><th><font color=$color2>stl</font></th><th><font color=$color2>to</font></th><th><font color=$color2>blk</font></th><th><font color=$color2>pf</font></th><th><font color=$color2>pts</font></th></tr></thead><tbody>";
+            $table_simAverages .= "<tr bgcolor=$color1><th><font color=$color2>Pos</font></th><th colspan=3><font color=$color2>Player</font></th><th><font color=$color2>g</font></th><th><font color=$color2>min</font></th><th><font color=$color2>fgm</font></th><th><font color=$color2>fga</font></th><th><font color=$color2>fgp</font></th><th><font color=$color2>ftm</font></th><th><font color=$color2>fta</font></th><th><font color=$color2>ftp</font></th><th><font color=$color2>3gm</font></th><th><font color=$color2>3ga</font></th><th><font color=$color2>3gp</font></th><th><font color=$color2>orb</font></th><th><font color=$color2>reb</font></th><th><font color=$color2>ast</font></th><th><font color=$color2>stl</font></th><th><font color=$color2>to</font></th><th><font color=$color2>blk</font></th><th><font color=$color2>pf</font></th><th><font color=$color2>pts</font></th></tr></thead><tbody>";
 
             $arrayLastSimDates = $sharedFunctions->getLastSimDatesArray();
 
@@ -1518,7 +1516,7 @@ function team($tid)
     } // END OF TID != 0 brace - inserted so that Free Agents won't clog up the page with season averages and totals when those are almost always zeros.
 
     if ($yr == "") {
-        $table_contracts = $table_contracts . "<table align=\"center\" class=\"sortable\">
+        $table_contracts .= "<table align=\"center\" class=\"sortable\">
 			<thead>
 				<tr bgcolor=$color1>
 					<th><font color=$color2>Pos</font></th>
@@ -1605,13 +1603,13 @@ function team($tid)
                 <td colspan=2><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">";
 
             if ($tid == 0) {
-                $table_contracts = $table_contracts . "$name";
+                $table_contracts .= "$name";
             } elseif ($p_ord >= 960) {
-                $table_contracts = $table_contracts . "($name)*";
+                $table_contracts .= "($name)*";
             } elseif ($cy == $cyt) {
-                $table_contracts = $table_contracts . "$name^";
+                $table_contracts .= "$name^";
             } else {
-                $table_contracts = $table_contracts . "$name";
+                $table_contracts .= "$name";
             }
 
             $table_contracts .= "</a></td>
@@ -1636,12 +1634,12 @@ function team($tid)
 				<td align=center>$tradition</td>
 			</tr>";
 
-            $cap1 = $cap1 + $con1;
-            $cap2 = $cap2 + $con2;
-            $cap3 = $cap3 + $con3;
-            $cap4 = $cap4 + $con4;
-            $cap5 = $cap5 + $con5;
-            $cap6 = $cap6 + $con6;
+            $cap1 += $con1;
+            $cap2 += $con2;
+            $cap3 += $con3;
+            $cap4 += $con4;
+            $cap5 += $con5;
+            $cap6 += $con6;
             $i++;
         }
         $cap1 = number_format($cap1 / 100, 2);
@@ -1699,8 +1697,6 @@ function team($tid)
         $color_array[$i]['team_id'] = $db->sql_result($colors, $i, "teamid");
         $color_array[$i]['team_city'] = $db->sql_result($colors, $i, "team_city");
         $color_array[$i]['team_name'] = $db->sql_result($colors, $i, "team_name");
-        $color_array[$i]['color1'] = $db->sql_result($colors, $i, "color1");
-        $color_array[$i]['color2'] = $db->sql_result($colors, $i, "color2");
         $i++;
     }
 
@@ -1718,11 +1714,11 @@ function team($tid)
             }
             $j++;
         }
-        $table_draftpicks = $table_draftpicks . "<tr><td valign=\"center\"><a href=\"modules.php?name=Team&op=team&tid=$pick_team_id\"><img src=\"images/logo/$teampick.png\"></a></td><td valign=\"center\"><a href=\"modules.php?name=Team&op=team&tid=$pick_team_id\">$year $pick_team_city $teampick (Round $round)</a></td></tr>";
+        $table_draftpicks .= "<tr><td valign=\"center\"><a href=\"modules.php?name=Team&op=team&tid=$pick_team_id\"><img src=\"images/logo/$teampick.png\"></a></td><td valign=\"center\"><a href=\"modules.php?name=Team&op=team&tid=$pick_team_id\">$year $pick_team_city $teampick (Round $round)</a></td></tr>";
 
         $hh++;
     }
-    $table_draftpicks = $table_draftpicks . "</table>";
+    $table_draftpicks .= "</table>";
 
     $inforight = team_info_right($team_name, $color1, $color2, $owner_name, $tid);
 
@@ -1737,42 +1733,42 @@ function team($tid)
 
     if ($display == "ratings") {
         $showing = "Player Ratings";
-        $tabs = $tabs . "<td bgcolor=#BBBBBB><a href=\"modules.php?name=Team&op=team&tid=$tid&display=ratings$insertyear\">Ratings</a></td>";
+        $tabs .= "<td bgcolor=#BBBBBB><a href=\"modules.php?name=Team&op=team&tid=$tid&display=ratings$insertyear\">Ratings</a></td>";
         $table_output = $table_ratings;
     } else {
-        $tabs = $tabs . "<td><a href=\"modules.php?name=Team&op=team&tid=$tid&display=ratings$insertyear\">Ratings</a></td>";
+        $tabs .= "<td><a href=\"modules.php?name=Team&op=team&tid=$tid&display=ratings$insertyear\">Ratings</a></td>";
     }
 
     if ($display == "total_s") {
         $showing = "Season Totals";
-        $tabs = $tabs . "<td bgcolor=#BBBBBB><a href=\"modules.php?name=Team&op=team&tid=$tid&display=total_s$insertyear\">Season Totals</a></td>";
+        $tabs .= "<td bgcolor=#BBBBBB><a href=\"modules.php?name=Team&op=team&tid=$tid&display=total_s$insertyear\">Season Totals</a></td>";
         $table_output = $table_totals;
     } else {
-        $tabs = $tabs . "<td><a href=\"modules.php?name=Team&op=team&tid=$tid&display=total_s$insertyear\">Season Totals</a></td>";
+        $tabs .= "<td><a href=\"modules.php?name=Team&op=team&tid=$tid&display=total_s$insertyear\">Season Totals</a></td>";
     }
 
     if ($display == "avg_s") {
         $showing = "Season Averages";
-        $tabs = $tabs . "<td bgcolor=#BBBBBB><a href=\"modules.php?name=Team&op=team&tid=$tid&display=avg_s$insertyear\">Season Averages</a></td>";
+        $tabs .= "<td bgcolor=#BBBBBB><a href=\"modules.php?name=Team&op=team&tid=$tid&display=avg_s$insertyear\">Season Averages</a></td>";
         $table_output = $table_averages;
     } else {
-        $tabs = $tabs . "<td ><a href=\"modules.php?name=Team&op=team&tid=$tid&display=avg_s$insertyear\">Season Averages</a></td>";
+        $tabs .= "<td ><a href=\"modules.php?name=Team&op=team&tid=$tid&display=avg_s$insertyear\">Season Averages</a></td>";
     }
 
     if ($display == "chunk") {
         $showing = "Chunk Averages";
-        $tabs = $tabs . "<td bgcolor=#BBBBBB><a href=\"modules.php?name=Team&op=team&tid=$tid&display=chunk$insertyear\">Sim Averages</a></td>";
+        $tabs .= "<td bgcolor=#BBBBBB><a href=\"modules.php?name=Team&op=team&tid=$tid&display=chunk$insertyear\">Sim Averages</a></td>";
         $table_output = $table_simAverages;
     } else {
-        $tabs = $tabs . "<td><a href=\"modules.php?name=Team&op=team&tid=$tid&display=chunk$insertyear\">Sim Averages</a></td>";
+        $tabs .= "<td><a href=\"modules.php?name=Team&op=team&tid=$tid&display=chunk$insertyear\">Sim Averages</a></td>";
     }
 
     if ($display == "contracts") {
         $showing = "Contracts";
-        $tabs = $tabs . "<td bgcolor=#BBBBBB><a href=\"modules.php?name=Team&op=team&tid=$tid&display=contracts$insertyear\">Contracts</a></td>";
+        $tabs .= "<td bgcolor=#BBBBBB><a href=\"modules.php?name=Team&op=team&tid=$tid&display=contracts$insertyear\">Contracts</a></td>";
         $table_output = $table_contracts;
     } else {
-        $tabs = $tabs . "<td><a href=\"modules.php?name=Team&op=team&tid=$tid&display=contracts$insertyear\">Contracts</a></td>";
+        $tabs .= "<td><a href=\"modules.php?name=Team&op=team&tid=$tid&display=contracts$insertyear\">Contracts</a></td>";
     }
 
     echo "<table align=center><tr bgcolor=$color1><td><font color=$color2><b><center>$showing (Sortable by clicking on Column Heading)</center></b></font></td></tr>
@@ -1858,108 +1854,108 @@ function team_info_right($team_name, $color1, $color2, $owner_name, $tid)
 
         if ($bannertype == 1) {
             if ($championships % 5 == 0) {
-                $ibl_banner = $ibl_banner . "<tr><td align=\"center\"><table><tr>";
+                $ibl_banner .= "<tr><td align=\"center\"><table><tr>";
             }
-            $ibl_banner = $ibl_banner . "<td><table><tr bgcolor=$color1><td valign=top height=80 width=120 background=\"./images/banners/banner1.gif\"><font color=#$color2>
+            $ibl_banner .= "<td><table><tr bgcolor=$color1><td valign=top height=80 width=120 background=\"./images/banners/banner1.gif\"><font color=#$color2>
 				<center><b>$banneryear<br>
 				$bannername<br>IBL Champions</b></center></td></tr></table></td>";
 
             $championships++;
 
             if ($championships % 5 == 0) {
-                $ibl_banner = $ibl_banner . "</tr></td></table></tr>";
+                $ibl_banner .= "</tr></td></table></tr>";
             }
 
             if ($champ_text == "") {
                 $champ_text = "$banneryear";
             } else {
-                $champ_text = $champ_text . ", $banneryear";
+                $champ_text .= ", $banneryear";
             }
             if ($bannername != $team_name) {
-                $champ_text = $champ_text . " (as $bannername)";
+                $champ_text .= " (as $bannername)";
             }
         } else if ($bannertype == 2 or $bannertype == 3) {
             if ($conference_titles % 5 == 0) {
-                $conf_banner = $conf_banner . "<tr><td align=\"center\"><table><tr>";
+                $conf_banner .= "<tr><td align=\"center\"><table><tr>";
             }
 
-            $conf_banner = $conf_banner . "<td><table><tr bgcolor=$color1><td valign=top height=80 width=120 background=\"./images/banners/banner2.gif\"><font color=#$color2>
+            $conf_banner .= "<td><table><tr bgcolor=$color1><td valign=top height=80 width=120 background=\"./images/banners/banner2.gif\"><font color=#$color2>
 				<center><b>$banneryear<br>
 				$bannername<br>";
             if ($bannertype == 2) {
-                $conf_banner = $conf_banner . "Eastern Conf. Champions</b></center></td></tr></table></td>";
+                $conf_banner .= "Eastern Conf. Champions</b></center></td></tr></table></td>";
             } else {
-                $conf_banner = $conf_banner . "Western Conf. Champions</b></center></td></tr></table></td>";
+                $conf_banner .= "Western Conf. Champions</b></center></td></tr></table></td>";
             }
 
             $conference_titles++;
 
             if ($conference_titles % 5 == 0) {
-                $conf_banner = $conf_banner . "</tr></table></td></tr>";
+                $conf_banner .= "</tr></table></td></tr>";
             }
 
             if ($conf_text == "") {
                 $conf_text = "$banneryear";
             } else {
-                $conf_text = $conf_text . ", $banneryear";
+                $conf_text .= ", $banneryear";
             }
             if ($bannername != $team_name) {
-                $conf_text = $conf_text . " (as $bannername)";
+                $conf_text .= " (as $bannername)";
             }
         } else if ($bannertype == 4 or $bannertype == 5 or $bannertype == 6 or $bannertype == 7) {
             if ($division_titles % 5 == 0) {
-                $div_banner = $div_banner . "<tr><td align=\"center\"><table><tr>";
+                $div_banner .= "<tr><td align=\"center\"><table><tr>";
             }
-            $div_banner = $div_banner . "<td><table><tr bgcolor=$color1><td valign=top height=80 width=120><font color=#$color2>
+            $div_banner .= "<td><table><tr bgcolor=$color1><td valign=top height=80 width=120><font color=#$color2>
 				<center><b>$banneryear<br>
 				$bannername<br>";
             if ($bannertype == 4) {
-                $div_banner = $div_banner . "Atlantic Div. Champions</b></center></td></tr></table></td>";
+                $div_banner .= "Atlantic Div. Champions</b></center></td></tr></table></td>";
             } else if ($bannertype == 5) {
-                $div_banner = $div_banner . "Central Div. Champions</b></center></td></tr></table></td>";
+                $div_banner .= "Central Div. Champions</b></center></td></tr></table></td>";
             } else if ($bannertype == 6) {
-                $div_banner = $div_banner . "Midwest Div. Champions</b></center></td></tr></table></td>";
+                $div_banner .= "Midwest Div. Champions</b></center></td></tr></table></td>";
             } else if ($bannertype == 7) {
-                $div_banner = $div_banner . "Pacific Div. Champions</b></center></td></tr></table></td>";
+                $div_banner .= "Pacific Div. Champions</b></center></td></tr></table></td>";
             }
 
             $division_titles++;
 
             if ($division_titles % 5 == 0) {
-                $div_banner = $div_banner . "</tr></table></td></tr>";
+                $div_banner .= "</tr></table></td></tr>";
             }
 
             if ($div_text == "") {
                 $div_text = "$banneryear";
             } else {
-                $div_text = $div_text . ", $banneryear";
+                $div_text .= ", $banneryear";
             }
             if ($bannername != $team_name) {
-                $div_text = $div_text . " (as $bannername)";
+                $div_text .= " (as $bannername)";
             }
         }
         $j++;
     }
 
     if (substr($ibl_banner, -23) != "</tr></table></td></tr>" and $ibl_banner != "") {
-        $ibl_banner = $ibl_banner . "</tr></table></td></tr>";
+        $ibl_banner .= "</tr></table></td></tr>";
     }
     if (substr($conf_banner, -23) != "</tr></table></td></tr>" and $conf_banner != "") {
-        $conf_banner = $conf_banner . "</tr></table></td></tr>";
+        $conf_banner .= "</tr></table></td></tr>";
     }
     if (substr($div_banner, -23) != "</tr></table></td></tr>" and $div_banner != "") {
-        $div_banner = $div_banner . "</tr></table></td></tr>";
+        $div_banner .= "</tr></table></td></tr>";
     }
 
     $banner_output = "";
     if ($ibl_banner != "") {
-        $banner_output = $banner_output . $ibl_banner;
+        $banner_output .= $ibl_banner;
     }
     if ($conf_banner != "") {
-        $banner_output = $banner_output . $conf_banner;
+        $banner_output .= $conf_banner;
     }
     if ($div_banner != "") {
-        $banner_output = $banner_output . $div_banner;
+        $banner_output .= $div_banner;
     }
     if ($banner_output != "") {
         $banner_output = "<center><table><tr><td bgcolor=\"#$color1\" align=\"center\"><font color=\"#$color2\"><h2>$team_name Banners</h2></font></td></tr>" . $banner_output . "</table></center>";
@@ -2019,8 +2015,8 @@ function team_info_right($team_name, $color1, $color2, $owner_name, $tid)
         $namewl = $db->sql_result($resultwl, $h, "namethatyear");
         $wins = $db->sql_result($resultwl, $h, "wins");
         $losses = $db->sql_result($resultwl, $h, "losses");
-        $wintot = $wintot + $wins;
-        $lostot = $lostot + $losses;
+        $wintot += $wins;
+        $lostot += $losses;
         @$winpct = number_format($wins / ($wins + $losses), 3);
         $output .= "<a href=\"./modules.php?name=Team&op=team&tid=$tid&yr=$yearwl\">" . ($yearwl - 1) . "-$yearwl $namewl</a>: $wins-$losses ($winpct)<br>";
 
@@ -2048,8 +2044,8 @@ function team_info_right($team_name, $color1, $color2, $owner_name, $tid)
         $namewl = $db->sql_result($resultwl, $h, "namethatyear");
         $wins = $db->sql_result($resultwl, $h, "wins");
         $losses = $db->sql_result($resultwl, $h, "losses");
-        $wintot = $wintot + $wins;
-        $lostot = $lostot + $losses;
+        $wintot += $wins;
+        $lostot += $losses;
         @$winpct = number_format($wins / ($wins + $losses), 3);
         $output .= "<a href=\"./modules.php?name=Team&op=team&tid=$tid&yr=$yearwl\">$yearwl $namewl</a>: $wins-$losses ($winpct)<br>";
 
@@ -2101,67 +2097,67 @@ function team_info_right($team_name, $color1, $color2, $owner_name, $tid)
 
         if ($playoffround == 1) {
             if ($playoffwinner == $team_name) {
-                $totalplayoffwins = $totalplayoffwins + 4;
-                $totalplayofflosses = $totalplayofflosses + $playoffloser_games;
-                $first_wins = $first_wins + 4;
-                $first_losses = $first_losses + $playoffloser_games;
+                $totalplayoffwins += 4;
+                $totalplayofflosses += $playoffloser_games;
+                $first_wins += 4;
+                $first_losses += $playoffloser_games;
                 $first_round_victories++;
-                $round_one_output = $round_one_output . "$playoffyear - $team_name 4, $playoffloser $playoffloser_games<br>";
+                $round_one_output .= "$playoffyear - $team_name 4, $playoffloser $playoffloser_games<br>";
             } else if ($playoffloser == $team_name) {
-                $totalplayofflosses = $totalplayofflosses + 4;
-                $totalplayoffwins = $totalplayoffwins + $playoffloser_games;
-                $first_losses = $first_losses + 4;
-                $first_wins = $first_wins + $playoffloser_games;
+                $totalplayofflosses += 4;
+                $totalplayoffwins += $playoffloser_games;
+                $first_losses += 4;
+                $first_wins += $playoffloser_games;
                 $first_round_losses++;
-                $round_one_output = $round_one_output . "$playoffyear - $playoffwinner 4, $team_name $playoffloser_games<br>";
+                $round_one_output .= "$playoffyear - $playoffwinner 4, $team_name $playoffloser_games<br>";
             }
         } else if ($playoffround == 2) {
             if ($playoffwinner == $team_name) {
-                $totalplayoffwins = $totalplayoffwins + 4;
-                $totalplayofflosses = $totalplayofflosses + $playoffloser_games;
-                $second_wins = $second_wins + 4;
-                $second_losses = $second_losses + $playoffloser_games;
+                $totalplayoffwins += 4;
+                $totalplayofflosses += $playoffloser_games;
+                $second_wins += 4;
+                $second_losses += $playoffloser_games;
                 $second_round_victories++;
-                $round_two_output = $round_two_output . "$playoffyear - $team_name 4, $playoffloser $playoffloser_games<br>";
+                $round_two_output .= "$playoffyear - $team_name 4, $playoffloser $playoffloser_games<br>";
             } else if ($playoffloser == $team_name) {
-                $totalplayofflosses = $totalplayofflosses + 4;
-                $totalplayoffwins = $totalplayoffwins + $playoffloser_games;
-                $second_losses = $second_losses + 4;
-                $second_wins = $second_wins + $playoffloser_games;
+                $totalplayofflosses += 4;
+                $totalplayoffwins += $playoffloser_games;
+                $second_losses += 4;
+                $second_wins += $playoffloser_games;
                 $second_round_losses++;
-                $round_two_output = $round_two_output . "$playoffyear - $playoffwinner 4, $team_name $playoffloser_games<br>";
+                $round_two_output .= "$playoffyear - $playoffwinner 4, $team_name $playoffloser_games<br>";
             }
         } else if ($playoffround == 3) {
             if ($playoffwinner == $team_name) {
-                $totalplayoffwins = $totalplayoffwins + 4;
-                $totalplayofflosses = $totalplayofflosses + $playoffloser_games;
-                $third_wins = $third_wins + 4;
-                $third_losses = $third_losses + $playoffloser_games;
+                $totalplayoffwins += 4;
+                $totalplayofflosses += $playoffloser_games;
+                $third_wins += 4;
+                $third_losses += $playoffloser_games;
                 $third_round_victories++;
-                $round_three_output = $round_three_output . "$playoffyear - $team_name 4, $playoffloser $playoffloser_games<br>";
+                $round_three_output .= "$playoffyear - $team_name 4, $playoffloser $playoffloser_games<br>";
             } else if ($playoffloser == $team_name) {
-                $totalplayofflosses = $totalplayofflosses + 4;
-                $totalplayoffwins = $totalplayoffwins + $playoffloser_games;
-                $third_losses = $third_losses + 4;
-                $third_wins = $third_wins + $playoffloser_games;
+                $totalplayofflosses += 4;
+                $totalplayoffwins += $playoffloser_games;
+                $third_losses += 4;
+                $third_wins += $playoffloser_games;
                 $third_round_losses++;
-                $round_three_output = $round_three_output . "$playoffyear - $playoffwinner 4, $team_name $playoffloser_games<br>";
+                $round_three_output .= "$playoffyear - $playoffwinner 4, $team_name $playoffloser_games<br>";
             }
         } else if ($playoffround == 4) {
             if ($playoffwinner == $team_name) {
-                $totalplayoffwins = $totalplayoffwins + 4;
-                $totalplayofflosses = $totalplayofflosses + $playoffloser_games;
-                $fourth_wins = $fourth_wins + 4;
-                $fourth_losses = $fourth_losses + $playoffloser_games;
+                $totalplayoffwins += 4;
+                $totalplayofflosses += $playoffloser_games;
+                $fourth_wins += 4;
+                $fourth_losses += $playoffloser_games;
                 $fourth_round_victories++;
-                $round_four_output = $round_four_output . "$playoffyear - $team_name 4, $playoffloser $playoffloser_games<br>";
+                $round_four_output .= "$playoffyear - $team_name 4, $playoffloser $playoffloser_games<br>";
             } else if ($playoffloser == $team_name) {
-                $totalplayofflosses = $totalplayofflosses + 4;
-                $totalplayoffwins = $totalplayoffwins + $playoffloser_games;
-                $fourth_losses = $fourth_losses + 4;
-                $fourth_wins = $fourth_wins + $playoffloser_games;
+                $totalplayofflosses += 4;
+                $totalplayoffwins += $playoffloser_games;
+                $fourth_losses += 4;
+                $fourth_wins += $playoffloser_games;
                 $fourth_round_losses++;
-                $round_four_output = $round_four_output . "$playoffyear - $playoffwinner 4, $team_name $playoffloser_games<br>";
+                $round_four_output .= "$playoffyear - $playoffwinner 4, $team_name $playoffloser_games<br>";
             }
         }
         $pp++;
@@ -2380,10 +2376,10 @@ function eoy_voters()
         $eoy_vote[$k] = $db->sql_result($result2, $k, "eoy_vote");
         $teamid[$k] = $db->sql_result($result2, $k, "teamid");
 
-        $table_echo = $table_echo . "<tr><td bgcolor=#" . $teamcolor1[$k] . "><a href=\"./modules.php?name=Team&op=team&tid=" . $teamid[$k] . "\"><font color=#" . $teamcolor2[$k] . ">" . $teamcity[$k] . " " . $teamname[$k] . "</a></td><td>" . $eoy_vote[$k] . "</td></tr>";
+        $table_echo .= "<tr><td bgcolor=#" . $teamcolor1[$k] . "><a href=\"./modules.php?name=Team&op=team&tid=" . $teamid[$k] . "\"><font color=#" . $teamcolor2[$k] . ">" . $teamcity[$k] . " " . $teamname[$k] . "</a></td><td>" . $eoy_vote[$k] . "</td></tr>";
         $k++;
     }
-    $text = $text . "<table class=\"sortable\" border=1><tr><th>Team</th><th>Vote Received</th></tr>$table_echo</table>";
+    $text .= "<table class=\"sortable\" border=1><tr><th>Team</th><th>Vote Received</th></tr>$table_echo</table>";
     echo $text;
     CloseTable();
     include "footer.php";
@@ -2408,10 +2404,10 @@ function asg_voters()
         $asg_vote[$k] = $db->sql_result($result2, $k, "asg_vote");
         $teamid[$k] = $db->sql_result($result2, $k, "teamid");
 
-        $table_echo = $table_echo . "<tr><td bgcolor=#" . $teamcolor1[$k] . "><a href=\"./modules.php?name=Team&op=team&tid=" . $teamid[$k] . "\"><font color=#" . $teamcolor2[$k] . ">" . $teamcity[$k] . " " . $teamname[$k] . "</a></td><td>" . $asg_vote[$k] . "</td></tr>";
+        $table_echo .= "<tr><td bgcolor=#" . $teamcolor1[$k] . "><a href=\"./modules.php?name=Team&op=team&tid=" . $teamid[$k] . "\"><font color=#" . $teamcolor2[$k] . ">" . $teamcity[$k] . " " . $teamname[$k] . "</a></td><td>" . $asg_vote[$k] . "</td></tr>";
         $k++;
     }
-    $text = $text . "<table class=\"sortable\" border=1><tr><th>Team</th><th>Vote Received</th></tr>$table_echo</table>";
+    $text .= "<table class=\"sortable\" border=1><tr><th>Team</th><th>Vote Received</th></tr>$table_echo</table>";
     echo $text;
     CloseTable();
     include "footer.php";

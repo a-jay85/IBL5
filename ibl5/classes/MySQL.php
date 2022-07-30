@@ -88,8 +88,8 @@ if (!defined("SQL_LAYER")) {
                 $this->query_result = @mysqli_query($this->db_connect_id, $query);
             }
             if ($this->query_result) {
-                unset($this->row[$this->query_result]);
-                unset($this->rowset[$this->query_result]);
+                unset($this->row);
+                unset($this->rowset);
                 return $this->query_result;
             } else {
                 return ($transaction == END_TRANSACTION) ? true : false;

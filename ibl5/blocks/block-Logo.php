@@ -29,7 +29,7 @@ if (
     $actual_url == "/ibl5/" ||
     $actual_url == "/ibl5/index.php"
 ) {} else {
-    $boxstuff .= '<a href="index.php"><img src="logocorner.jpg" border="0"></a>';
+    $boxstuff .= '<a href="index.php"><img src="images/ibl/logocorner.jpg" border="0"></a>';
 }
 
 $boxstuff .= "</span>";

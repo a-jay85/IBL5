@@ -42,7 +42,6 @@ function drafthistory($tid)
 
     $sqld = "SELECT * FROM ibl_plr WHERE draftedby LIKE '$teamname' ORDER BY draftyear DESC, draftround, draftpickno ASC ";
     $resultd = $db->sql_query($sqld);
-    $numd = $db->sql_numrows($resultd);
 
     echo "$teamname Draft History<table class=\"sortable\"><tr><th>Player</th><th>Pos</th><th>Year</th><th>Round</th><th>Pick</th></tr>";
 
@@ -225,7 +224,6 @@ function leaguestats()
         }
 
         $team_def_games = $db->sql_result($resultTeamDefenseTotals, $t, "games");
-        $team_def_minutes = $db->sql_result($resultTeamDefenseTotals, $t, "minutes");
         $team_def_fgm = $db->sql_result($resultTeamDefenseTotals, $t, "fgm");
         $team_def_fga = $db->sql_result($resultTeamDefenseTotals, $t, "fga");
         $team_def_ftm = $db->sql_result($resultTeamDefenseTotals, $t, "ftm");
@@ -597,7 +595,6 @@ function team($tid)
     $tid = intval($tid);
 
     $yr = $_REQUEST['yr'];
-    $fayr = $_REQUEST['fayr'];
 
     $display = $_REQUEST['display'];
     if ($display == null) {
@@ -925,8 +922,6 @@ function team($tid)
             $cy = $db->sql_result($result, $i, "cy");
             $cyt = $db->sql_result($result, $i, "cyt");
 
-            $yearoffreeagency = $draftyear + $exp + $cyt - $cy;
-
             if ($yr == "") {
                 $stats_gm = $db->sql_result($result, $i, "stats_gm");
                 $stats_gs = $db->sql_result($result, $i, "stats_gs");
@@ -1148,7 +1143,6 @@ function team($tid)
             $p_ord = $db->sql_result($result, $i, "ordinal");
             $pid = $db->sql_result($result, $i, "pid");
 
-            $draftyear = $db->sql_result($result, $i, "draftyear");
             $exp = $db->sql_result($result, $i, "exp");
             $cy = $db->sql_result($result, $i, "cy");
             $cyt = $db->sql_result($result, $i, "cyt");
@@ -1470,9 +1464,6 @@ function team($tid)
                     }
 
                     @$simAverageMIN = number_format(($simTotalMIN / $numberOfGamesPlayedInSim), 1);
-                    @$simAverage2GM = $simTotal2GM / $numberOfGamesPlayedInSim;
-                    @$simAverage2GA = $simTotal2GA / $numberOfGamesPlayedInSim;
-                    @$simAverage2GP = number_format(($simTotal2GM / $simTotal2GA), 3);
                     @$simAverageFTM = number_format(($simTotalFTM / $numberOfGamesPlayedInSim), 1);
                     @$simAverageFTA = number_format(($simTotalFTA / $numberOfGamesPlayedInSim), 1);
                     @$simAverageFTP = number_format(($simTotalFTM / $simTotalFTA), 3);
@@ -1483,7 +1474,6 @@ function team($tid)
                     @$simAverageFGA = number_format((($simTotal2GA + $simTotal3GA) / $numberOfGamesPlayedInSim), 1);
                     @$simAverageFGP = number_format((($simTotal2GM + $simTotal3GM) / ($simTotal2GA + $simTotal3GA)), 3);
                     @$simAverageORB = number_format(($simTotalORB / $numberOfGamesPlayedInSim), 1);
-                    @$simAverageDRB = number_format(($simTotalDRB / $numberOfGamesPlayedInSim), 1);
                     @$simAverageREB = number_format((($simTotalORB + $simTotalDRB) / $numberOfGamesPlayedInSim), 1);
                     @$simAverageAST = number_format(($simTotalAST / $numberOfGamesPlayedInSim), 1);
                     @$simAverageSTL = number_format(($simTotalSTL / $numberOfGamesPlayedInSim), 1);
@@ -2279,7 +2269,6 @@ function viewinjuries($tid)
         while ($j < $k) {
             $pick_team_name = $color_array[$j]['team_name'];
             if ($pick_team_name == $team) {
-                $pick_team_id = $color_array[$j]['team_id'];
                 $pick_team_city = $color_array[$j]['team_city'];
                 $pick_team_color1 = $color_array[$j]['color1'];
                 $pick_team_color2 = $color_array[$j]['color2'];

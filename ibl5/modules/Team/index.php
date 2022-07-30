@@ -2279,6 +2279,10 @@ function team_info_right($team_name, $color1, $color2, $owner_name, $tid)
     $second_wins = 0;
     $third_wins = 0;
     $fourth_wins = 0;
+    $first_losses = 0;
+    $second_losses = 0;
+    $third_losses = 0;
+    $fourth_losses = 0;
 
     while ($pp < $numplayoffs) {
         $playoffround = $db->sql_result($resultplayoffs, $pp, "round");
@@ -2481,12 +2485,10 @@ function menu()
     global $db;
     $sharedFunctions = new Shared($db);
 
-    $tid = intval($tid);
-
     include "header.php";
     OpenTable();
 
-    $sharedFunctions->displaytopmenu($tid);
+    $sharedFunctions->displaytopmenu(0);
 
     CloseTable();
     include "footer.php";
@@ -2500,8 +2502,8 @@ function teamCurrentSeasonStandings($team)
     $result = $db->sql_query($query);
     $num = $db->sql_numrows($result);
     $Team = $db->sql_result($result, 0, "Team");
-    $win = $db->sql_result($result, $i, "win");
-    $loss = $db->sql_result($result, $i, "loss");
+    $win = $db->sql_result($result, 0, "win");
+    $loss = $db->sql_result($result, 0, "loss");
     $gb = $db->sql_result($result, 0, "gb");
     $division = $db->sql_result($result, 0, "Division");
     $conference = $db->sql_result($result, 0, "Conference");
@@ -2538,7 +2540,7 @@ function teamCurrentSeasonStandings($team)
         $i++;
     }
 
-    $standings = $standings . "<table><tr><td align='right'><b>Team:</td><td>$team</td></tr>
+    $standings = "<table><tr><td align='right'><b>Team:</td><td>$team</td></tr>
 		<tr><td align='right'><b>Record:</td><td>$win-$loss</td></tr>
 		<tr><td align='right'><b>Conference:</td><td>$conference</td></tr>
 		<tr><td align='right'><b>Conf Position:</td><td>$Conf_Pos</td></tr>

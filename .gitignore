@@ -9,9 +9,9 @@ discordWebhooks (not CURL).php
 Discord.php
 
 !/ibl5
-/*
-/backups
-/depthcharts
+/*.php
+backups
+depthcharts
 /ibl
 /ibl5/vendor
 /ibl5/joe/ibl_draft/includes/classes/Discord.php

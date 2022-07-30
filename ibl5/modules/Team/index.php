@@ -587,6 +587,20 @@ function boxscore($year, $month, $tid, $wins, $losses, $winStreak, $lossStreak)
     return array($wins, $losses, $winStreak, $lossStreak);
 }
 
+function decoratePlayerName($name, $tid, $ordinal, $currentContractYear, $totalYearsOnContract)
+{
+    if ($tid == 0) {
+        $playerNameDecorated = "$name";
+    } elseif ($$ordinal >= 960) { // on waivers
+        $playerNameDecorated = "($name)*";
+    } elseif ($currentContractYear == $totalYearsOnContract) { // eligible for Free Agency at the end of this season
+        $playerNameDecorated = "$name^";
+    } else {
+        $playerNameDecorated = "$name";
+    }
+    return $playerNameDecorated;
+}
+
 function team($tid)
 {
     global $db;
@@ -826,23 +840,13 @@ function team($tid)
             $consistency = $db->sql_result($result, $i, "Consistency");
         }
 
+        $playerNameDecorated = decoratePlayerName($name, $tid, $p_ord, $cy, $cyt);
+
         (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
 
         $table_ratings .= "<tr bgcolor=$bgcolor>
 			<td align=center>$pos</td>
-            <td><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">";
-
-        if ($tid == 0) {
-            $table_ratings .= "$name";
-        } elseif ($p_ord > 959) { // On waivers
-            $table_ratings .= "($name)*";
-        } elseif ($cy == $cyt) { // Eligible for FA this offseason
-            $table_ratings .= "$name^";
-        } else {
-            $table_ratings .= "$name";
-        }
-
-        $table_ratings .= "</a></td>
+            <td><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$playerNameDecorated</a></td>
             <td align=center>$age</td>
             <td bgcolor=$color1></td>
 			<td align=center>$r_2ga</td>
@@ -917,10 +921,11 @@ function team($tid)
             $pos = $db->sql_result($result, $i, "pos");
             $p_ord = $db->sql_result($result, $i, "ordinal");
             $pid = $db->sql_result($result, $i, "pid");
-
             $exp = $db->sql_result($result, $i, "exp");
             $cy = $db->sql_result($result, $i, "cy");
             $cyt = $db->sql_result($result, $i, "cyt");
+
+            $playerNameDecorated = decoratePlayerName($name, $tid, $p_ord, $cy, $cyt);
 
             if ($yr == "") {
                 $stats_gm = $db->sql_result($result, $i, "stats_gm");
@@ -964,19 +969,7 @@ function team($tid)
 
             $table_totals .= "<tr bgcolor=$bgcolor>
 				<td>$pos</td>
-                <td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">";
-
-            if ($tid == 0) {
-                $table_totals .= "$name";
-            } elseif ($p_ord > 959) {
-                $table_totals .= "($name)*";
-            } elseif ($cy == $cyt) {
-                $table_totals .= "$name^";
-            } else {
-                $table_totals .= "$name";
-            }
-
-            $table_totals .= "</a></td>
+                <td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$playerNameDecorated</a></td>
                 <td><center>$stats_gm</center></td>
 				<td><center>$stats_gs</center></td>
 				<td><center>$stats_min</center></td>
@@ -1144,10 +1137,11 @@ function team($tid)
             $pos = $db->sql_result($result, $i, "pos");
             $p_ord = $db->sql_result($result, $i, "ordinal");
             $pid = $db->sql_result($result, $i, "pid");
-
             $exp = $db->sql_result($result, $i, "exp");
             $cy = $db->sql_result($result, $i, "cy");
             $cyt = $db->sql_result($result, $i, "cyt");
+
+            $playerNameDecorated = decoratePlayerName($name, $tid, $p_ord, $cy, $cyt);
 
             if ($yr == "") {
                 $stats_gm = $db->sql_result($result, $i, "stats_gm");
@@ -1209,19 +1203,7 @@ function team($tid)
 
             $table_averages .= "<tr bgcolor=$bgcolor>
 				<td>$pos</td>
-                <td colspan=3><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">";
-
-            if ($tid == 0) {
-                $table_averages .= "$name";
-            } elseif ($p_ord > 959) {
-                $table_averages .= "($name)*";
-            } elseif ($cy == $cyt) {
-                $table_averages .= "$name^";
-            } else {
-                $table_averages .= "$name";
-            }
-
-            $table_averages .= "</a></td>
+                <td colspan=3><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$playerNameDecorated</a></td>
                 <td><center>$stats_gm</center></td>
 				<td><center>$stats_gs</center></td>
 				<td><center>$stats_mpg</center></td>
@@ -1558,6 +1540,19 @@ function team($tid)
             $pid = $db->sql_result($result, $i, "pid");
             $cy = $db->sql_result($result, $i, "cy");
             $cyt = $db->sql_result($result, $i, "cyt");
+            $exp = $db->sql_result($result, $i, "exp");
+            $bird = $db->sql_result($result, $i, "bird");
+            $talent = $db->sql_result($result, $i, "talent");
+            $skill = $db->sql_result($result, $i, "skill");
+            $intangibles = $db->sql_result($result, $i, "intangibles");
+            $loyalty = $db->sql_result($result, $i, "loyalty");
+            $winner = $db->sql_result($result, $i, "winner");
+            $playingTime = $db->sql_result($result, $i, "playingTime");
+            $security = $db->sql_result($result, $i, "security");
+            $tradition = $db->sql_result($result, $i, "tradition");
+
+            $playerNameDecorated = decoratePlayerName($name, $tid, $p_ord, $cy, $cyt);
+
             if ($faon == 0) {
                 $year1 = $cy;
                 $year2 = $cy + 1;
@@ -1588,35 +1583,13 @@ function team($tid)
                 $year5 < 7 ? $con5 = $db->sql_result($result, $i, "cy$year5") : $con5 = 0;
                 $year6 < 7 ? $con6 = $db->sql_result($result, $i, "cy$year6") : $con6 = 0;
             }
-            $exp = $db->sql_result($result, $i, "exp");
-            $bird = $db->sql_result($result, $i, "bird");
-            $talent = $db->sql_result($result, $i, "talent");
-            $skill = $db->sql_result($result, $i, "skill");
-            $intangibles = $db->sql_result($result, $i, "intangibles");
-            $loyalty = $db->sql_result($result, $i, "loyalty");
-            $winner = $db->sql_result($result, $i, "winner");
-            $playingTime = $db->sql_result($result, $i, "playingTime");
-            $security = $db->sql_result($result, $i, "security");
-            $tradition = $db->sql_result($result, $i, "tradition");
 
             (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
 
             $table_contracts .= "
                 <tr bgcolor=$bgcolor>
                 <td align=center>$pos</td>
-                <td colspan=2><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">";
-
-            if ($tid == 0) {
-                $table_contracts .= "$name";
-            } elseif ($p_ord >= 960) {
-                $table_contracts .= "($name)*";
-            } elseif ($cy == $cyt) {
-                $table_contracts .= "$name^";
-            } else {
-                $table_contracts .= "$name";
-            }
-
-            $table_contracts .= "</a></td>
+                <td colspan=2><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$playerNameDecorated</a></td>
                 <td align=center>$exp</td>
                 <td align=center>$bird</td>
                 <td bgcolor=$color1></td>

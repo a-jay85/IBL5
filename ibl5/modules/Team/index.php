@@ -1678,7 +1678,7 @@ function team($tid)
 
     } // END OF IF YEAR EQUAL NULL STATEMENT FROM BEFORE CHUNK AVERAGES
 
-    $table_draftpicks = $table_draftpicks . "<table align=\"center\">";
+    $table_draftpicks .= "<table align=\"center\">";
 
     // PUT DRAFT PICKS BELOW SALARY PRINTOUT
 

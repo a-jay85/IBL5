@@ -133,7 +133,7 @@ function team($tid)
 
     if ($display == "per36mins") {
         $showing = "Per 36 Minutes";
-        $table_per36Minutes = per36Minutes($db, $result, $color1, $color2, $tid, $yr, $team_name);
+        $table_per36Minutes = per36Minutes($db, $result, $color1, $color2, $tid, $yr);
         $table_output = $table_per36Minutes;
         $tabs .= "<td bgcolor=#BBBBBB style=\"font-weight:bold\">";
     } else {
@@ -718,7 +718,7 @@ function seasonAverages($db, $result, $color1, $color2, $tid, $yr, $team_name)
     return $table_averages;
 }
 
-function per36Minutes($db, $result, $color1, $color2, $tid, $yr, $team_name)
+function per36Minutes($db, $result, $color1, $color2, $tid, $yr)
 {
     $table_per36Minutes = "<table align=\"center\" class=\"sortable\">
         <thead>

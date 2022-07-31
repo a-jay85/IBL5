@@ -743,8 +743,10 @@ function team($tid)
                 <td bgcolor=$color1 width=0></td>
 				<th><font color=$color2>2ga</font></th>
 				<th><font color=$color2>2g%</font></th>
+                <td bgcolor=#CCCCCC width=0></td>
 				<th><font color=$color2>fta</font></th>
 				<th><font color=$color2>ft%</font></th>
+                <td bgcolor=#CCCCCC width=0></td>
 				<th><font color=$color2>3ga</font></th>
 				<th><font color=$color2>3g%</font></th>
                 <td bgcolor=$color1 width=0></td>
@@ -760,7 +762,7 @@ function team($tid)
 				<th><font color=$color2>do</font></th>
 				<th><font color=$color2>po</font></th>
 				<th><font color=$color2>to</font></th>
-                <td bgcolor=$color1 width=0></td>
+                <td bgcolor=#CCCCCC width=0></td>
 				<th><font color=$color2>od</font></th>
 				<th><font color=$color2>dd</font></th>
 				<th><font color=$color2>pd</font></th>
@@ -851,8 +853,10 @@ function team($tid)
             <td bgcolor=$color1></td>
 			<td align=center>$r_2ga</td>
 			<td align=center>$r_2gp</td>
+            <td bgcolor=#CCCCCC width=0></td>
 			<td align=center>$r_fta</td>
 			<td align=center>$r_ftp</td>
+            <td bgcolor=#CCCCCC width=0></td>
 			<td align=center>$r_3ga</td>
 			<td align=center>$r_3gp</td>
             <td bgcolor=$color1></td>
@@ -868,7 +872,7 @@ function team($tid)
 			<td align=center>$r_do</td>
 			<td align=center>$r_po</td>
 			<td align=center>$r_to</td>
-            <td bgcolor=$color1></td>
+            <td bgcolor=#CCCCCC width=0></td>
 			<td align=center>$r_od</td>
 			<td align=center>$r_dd</td>
 			<td align=center>$r_pd</td>
@@ -894,12 +898,16 @@ function team($tid)
 					<th><font color=$color2>g</font></th>
 					<th><font color=$color2>gs</font></th>
 					<th><font color=$color2>min</font></th>
+                    <td bgcolor=$color1 width=0></td>
 					<th><font color=$color2>fgm</font></th>
 					<th><font color=$color2>fga</font></th>
+                    <td bgcolor=#CCCCCC width=0></td>
 					<th><font color=$color2>ftm</font></th>
 					<th><font color=$color2>fta</font></th>
+                    <td bgcolor=#CCCCCC width=0></td>
 					<th><font color=$color2>3gm</font></th>
 					<th><font color=$color2>3ga</font></th>
+                    <td bgcolor=$color1 width=0></td>
 					<th><font color=$color2>orb</font></th>
 					<th><font color=$color2>reb</font></th>
 					<th><font color=$color2>ast</font></th>
@@ -973,12 +981,16 @@ function team($tid)
                 <td><center>$stats_gm</center></td>
 				<td><center>$stats_gs</center></td>
 				<td><center>$stats_min</center></td>
+                <td bgcolor=$color1 width=0></td>
 				<td><center>$stats_fgm</center></td>
 				<td><center>$stats_fga</center></td>
+                <td bgcolor=#CCCCCC width=0></td>
 				<td><center>$stats_ftm</center></td>
 				<td><center>$stats_fta</center></td>
+                <td bgcolor=#CCCCCC width=0></td>
 				<td><center>$stats_tgm</center></td>
 				<td><center>$stats_tga</center></td>
+                <td bgcolor=$color1 width=0></td>
 				<td><center>$stats_orb</center></td>
 				<td><center>$stats_reb</center></td>
 				<td><center>$stats_ast</center></td>
@@ -1027,12 +1039,16 @@ function team($tid)
 					<td><center><b>$team_off_games</center></td>
 					<td><center><b>$team_off_games</center></td>
 					<td><center><b>$team_off_minutes</center></td>
+                    <td bgcolor=$color1 width=0></td>
 					<td><center><b>$team_off_fgm</center></td>
 					<td><center><b>$team_off_fga</b></center></td>
+                    <td bgcolor=#CCCCCC width=0></td>
 					<td><center><b>$team_off_ftm</center></td>
 					<td><center><b>$team_off_fta</b></center></td>
+                    <td bgcolor=#CCCCCC width=0></td>
 					<td><center><b>$team_off_tgm</center></td>
 					<td><center><b>$team_off_tga</b></center></td>
+                    <td bgcolor=$color1 width=0></td>
 					<td><center><b>$team_off_orb</center></td>
 					<td><center><b>$team_off_reb</center></td>
 					<td><center><b>$team_off_ast</center></td>
@@ -1076,12 +1092,16 @@ function team($tid)
 					<td><center><b>$team_def_games</center></td>
 					<td><center><b>$team_def_games</center></td>
 					<td><center><b>$team_def_minutes</center></td>
+                    <td bgcolor=$color1 width=0></td>
 					<td><center><b>$team_def_fgm</center></td>
 					<td><center><b>$team_def_fga</b></center></td>
+                    <td bgcolor=#CCCCCC width=0></td>
 					<td><center><b>$team_def_ftm</center></td>
 					<td><center><b>$team_def_fta</b></center></td>
+                    <td bgcolor=#CCCCCC width=0></td>
 					<td><center><b>$team_def_tgm</b></center></td>
 					<td><center><b>$team_def_tga</b></center></td>
+                    <td bgcolor=$color1 width=0></td>
 					<td><center><b>$team_def_orb</center></td>
 					<td><center><b>$team_def_reb</center></td>
 					<td><center><b>$team_def_ast</center></td>
@@ -1107,15 +1127,19 @@ function team($tid)
 					<th><font color=$color2>g</font></th>
 					<th><font color=$color2>gs</font></th>
 					<th><font color=$color2>min</font></th>
+                    <td bgcolor=$color1 width=0></td>
 					<th><font color=$color2>fgm</font></th>
 					<th><font color=$color2>fga</font></th>
 					<th><font color=$color2>fgp</font></th>
+                    <td bgcolor=#CCCCCC width=0></td>
 					<th><font color=$color2>ftm</font></th>
 					<th><font color=$color2>fta</font></th>
 					<th><font color=$color2>ftp</font></th>
+                    <td bgcolor=#CCCCCC width=0></td>
 					<th><font color=$color2>3gm</font></th>
 					<th><font color=$color2>3ga</font></th>
 					<th><font color=$color2>3gp</font></th>
+                    <td bgcolor=$color1 width=0></td>
 					<th><font color=$color2>orb</font></th>
 					<th><font color=$color2>reb</font></th>
 					<th><font color=$color2>ast</font></th>
@@ -1207,15 +1231,19 @@ function team($tid)
                 <td><center>$stats_gm</center></td>
 				<td><center>$stats_gs</center></td>
 				<td><center>$stats_mpg</center></td>
+                <td bgcolor=$color1 width=0></td>
 				<td><center>$stats_fgm</center></td>
 				<td><center>$stats_fga</center></td>
 				<td><center>$stats_fgp</center></td>
+                <td bgcolor=#CCCCCC width=0></td>
 				<td><center>$stats_ftm</center></td>
 				<td><center>$stats_fta</center></td>
 				<td><center>$stats_ftp</center></td>
+                <td bgcolor=#CCCCCC width=0></td>
 				<td><center>$stats_tgm</center></td>
 				<td><center>$stats_tga</center></td>
 				<td><center>$stats_tgp</center></td>
+                <td bgcolor=$color1 width=0></td>
 				<td><center>$stats_opg</center></td>
 				<td><center>$stats_rpg</center></td>
 				<td><center>$stats_apg</center></td>
@@ -1282,15 +1310,19 @@ function team($tid)
 					<td><b><center>$team_off_games</center></td>
 					<td><b><center>$team_off_games</center></td>
 					<td><center><b>$team_off_avgmin</center></td>
+                    <td bgcolor=$color1 width=0></td>
 					<td><center><b>$team_off_avgfgm</center></td>
 					<td><center><b>$team_off_avgfga</center></td>
 					<td><center><b>$team_off_fgp</center></td>
+                    <td bgcolor=#CCCCCC width=0></td>
 					<td><center><b>$team_off_avgftm</center></td>
 					<td><center><b>$team_off_avgfta</center></td>
 					<td><center><b>$team_off_ftp</center></td>
+                    <td bgcolor=#CCCCCC width=0></td>
 					<td><center><b>$team_off_avgtgm</center></td>
 					<td><center><b>$team_off_avgtga</center></td>
 					<td><center><b>$team_off_tgp</center></td>
+                    <td bgcolor=$color1 width=0></td>
 					<td><center><b>$team_off_avgorb</center></td>
 					<td><center><b>$team_off_avgreb</center></td>
 					<td><center><b>$team_off_avgast</center></td>
@@ -1353,15 +1385,19 @@ function team($tid)
 					<td><center><b>$team_def_games</center></td>
 					<td><b>$team_def_games</td>
 					<td><center><b>$team_def_avgmin</center></td>
+                    <td bgcolor=$color1 width=0></td>
 					<td><center><b>$team_def_avgfgm</center></td>
 					<td><center><b>$team_def_avgfga</center></td>
 					<td><center><b>$team_def_fgp</center></td>
+                    <td bgcolor=#CCCCCC width=0></td>
 					<td><center><b>$team_def_avgftm</center></td>
 					<td><center><b>$team_def_avgfta</center></td>
 					<td><center><b>$team_def_ftp</center></td>
+                    <td bgcolor=#CCCCCC width=0></td>
 					<td><center><b>$team_def_avgtgm</center></td>
 					<td><center><b>$team_def_avgtga</center></td>
 					<td><center><b>$team_def_tgp</center></td>
+                    <td bgcolor=$color1 width=0></td>
 					<td><center><b>$team_def_avgorb</center></td>
 					<td><center><b>$team_def_avgreb</center></td>
 					<td><center><b>$team_def_avgast</center></td>
@@ -1383,7 +1419,33 @@ function team($tid)
 
             /* ======================CHUNK STATS */
 
-            $table_simAverages .= "<tr bgcolor=$color1><th><font color=$color2>Pos</font></th><th colspan=3><font color=$color2>Player</font></th><th><font color=$color2>g</font></th><th><font color=$color2>min</font></th><th><font color=$color2>fgm</font></th><th><font color=$color2>fga</font></th><th><font color=$color2>fgp</font></th><th><font color=$color2>ftm</font></th><th><font color=$color2>fta</font></th><th><font color=$color2>ftp</font></th><th><font color=$color2>3gm</font></th><th><font color=$color2>3ga</font></th><th><font color=$color2>3gp</font></th><th><font color=$color2>orb</font></th><th><font color=$color2>reb</font></th><th><font color=$color2>ast</font></th><th><font color=$color2>stl</font></th><th><font color=$color2>to</font></th><th><font color=$color2>blk</font></th><th><font color=$color2>pf</font></th><th><font color=$color2>pts</font></th></tr></thead><tbody>";
+            $table_simAverages .= "<tr bgcolor=$color1>
+                <th><font color=$color2>Pos</font></th>
+                <th colspan=3><font color=$color2>Player</font></th>
+                <th><font color=$color2>g</font></th>
+                <th><font color=$color2>min</font></th>
+                <td bgcolor=$color1 width=0></td>
+                <th><font color=$color2>fgm</font></th>
+                <th><font color=$color2>fga</font></th>
+                <th><font color=$color2>fgp</font></th>
+                <td bgcolor=#CCCCCC width=0></td>
+                <th><font color=$color2>ftm</font></th>
+                <th><font color=$color2>fta</font></th>
+                <th><font color=$color2>ftp</font></th>
+                <td bgcolor=#CCCCCC width=0></td>
+                <th><font color=$color2>3gm</font></th>
+                <th><font color=$color2>3ga</font></th>
+                <th><font color=$color2>3gp</font></th>
+                <td bgcolor=$color1 width=0></td>
+                <th><font color=$color2>orb</font></th>
+                <th><font color=$color2>reb</font></th>
+                <th><font color=$color2>ast</font></th>
+                <th><font color=$color2>stl</font></th>
+                <th><font color=$color2>to</font></th>
+                <th><font color=$color2>blk</font></th>
+                <th><font color=$color2>pf</font></th>
+                <th><font color=$color2>pts</font></th>
+            </tr></thead><tbody>";
 
             $arrayLastSimDates = $sharedFunctions->getLastSimDatesArray();
 
@@ -1473,15 +1535,19 @@ function team($tid)
 						<td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>
 						<td><center>$numberOfGamesPlayedInSim</center></td>
 						<td><center>$simAverageMIN</center></td>
+                        <td bgcolor=$color1 width=0></td>
 						<td><center>$simAverageFGM</center></td>
 						<td><center>$simAverageFGA</center></td>
 						<td><center>$simAverageFGP</center></td>
+                        <td bgcolor=#CCCCCC width=0></td>
 						<td><center>$simAverageFTM</center></td>
 						<td><center>$simAverageFTA</center></td>
 						<td><center>$simAverageFTP</center></td>
+                        <td bgcolor=#CCCCCC width=0></td>
 						<td><center>$simAverage3GM</center></td>
 						<td><center>$simAverage3GA</center></td>
 						<td><center>$simAverage3GP</center></td>
+                        <td bgcolor=$color1 width=0></td>
 						<td><center>$simAverageORB</center></td>
 						<td><center>$simAverageREB</center></td>
 						<td><center>$simAverageAST</center></td>

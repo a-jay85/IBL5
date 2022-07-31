@@ -1487,6 +1487,172 @@ function simAverages($db, $sharedFunctions, $color1, $color2, $tid)
     return $table_simAverages;
 }
 
+function contracts($db, $result, $color1, $color2, $tid, $faon)
+{
+    $table_contracts = "<table align=\"center\" class=\"sortable\">
+        <thead>
+            <tr bgcolor=$color1>
+                <th><font color=$color2>Pos</font></th>
+                <th colspan=2><font color=$color2>Player</font></th>
+                <th><font color=$color2>Exp</font></th>
+                <th><font color=$color2>Bird</font></th>
+                <td bgcolor=$color1 width=0></td>
+                <th><font color=$color2>Year1</font></th>
+                <th><font color=$color2>Year2</font></th>
+                <th><font color=$color2>Year3</font></th>
+                <th><font color=$color2>Year4</font></th>
+                <th><font color=$color2>Year5</font></th>
+                <th><font color=$color2>Year6</font></th>
+                <td bgcolor=$color1 width=0></td>
+                <th><font color=$color2>Tal</font></th>
+                <th><font color=$color2>Skl</font></th>
+                <th><font color=$color2>Int</font></th>
+                <td bgcolor=$color1 width=0></td>
+                <th><font color=$color2>Loy</font></th>
+                <th><font color=$color2>PFW</font></th>
+                <th><font color=$color2>PT</font></th>
+                <th><font color=$color2>Sec</font></th>
+                <th><font color=$color2>Trad</font></th>
+            </tr>
+        </thead>
+    <tbody>";
+
+    $cap1 = 0;
+    $cap2 = 0;
+    $cap3 = 0;
+    $cap4 = 0;
+    $cap5 = 0;
+    $cap6 = 0;
+
+    $i = 0;
+    $num = $db->sql_numrows($result);
+    while ($i < $num) {
+        $name = $db->sql_result($result, $i, "name");
+        $pos = $db->sql_result($result, $i, "pos");
+        $p_ord = $db->sql_result($result, $i, "ordinal");
+        $pid = $db->sql_result($result, $i, "pid");
+        $cy = $db->sql_result($result, $i, "cy");
+        $cyt = $db->sql_result($result, $i, "cyt");
+        $exp = $db->sql_result($result, $i, "exp");
+        $bird = $db->sql_result($result, $i, "bird");
+        $talent = $db->sql_result($result, $i, "talent");
+        $skill = $db->sql_result($result, $i, "skill");
+        $intangibles = $db->sql_result($result, $i, "intangibles");
+        $loyalty = $db->sql_result($result, $i, "loyalty");
+        $winner = $db->sql_result($result, $i, "winner");
+        $playingTime = $db->sql_result($result, $i, "playingTime");
+        $security = $db->sql_result($result, $i, "security");
+        $tradition = $db->sql_result($result, $i, "tradition");
+
+        $playerNameDecorated = decoratePlayerName($name, $tid, $p_ord, $cy, $cyt);
+
+        if ($faon == 0) {
+            $year1 = $cy;
+            $year2 = $cy + 1;
+            $year3 = $cy + 2;
+            $year4 = $cy + 3;
+            $year5 = $cy + 4;
+            $year6 = $cy + 5;
+        } else {
+            $year1 = $cy + 1;
+            $year2 = $cy + 2;
+            $year3 = $cy + 3;
+            $year4 = $cy + 4;
+            $year5 = $cy + 5;
+            $year6 = $cy + 6;
+        }
+        if ($cy == 0) {
+            $year1 < 7 ? $con1 = $db->sql_result($result, $i, "cy1") : $con1 = 0;
+            $year2 < 7 ? $con2 = $db->sql_result($result, $i, "cy2") : $con2 = 0;
+            $year3 < 7 ? $con3 = $db->sql_result($result, $i, "cy3") : $con3 = 0;
+            $year4 < 7 ? $con4 = $db->sql_result($result, $i, "cy4") : $con4 = 0;
+            $year5 < 7 ? $con5 = $db->sql_result($result, $i, "cy5") : $con5 = 0;
+            $year6 < 7 ? $con6 = $db->sql_result($result, $i, "cy6") : $con6 = 0;
+        } else {
+            $year1 < 7 ? $con1 = $db->sql_result($result, $i, "cy$year1") : $con1 = 0;
+            $year2 < 7 ? $con2 = $db->sql_result($result, $i, "cy$year2") : $con2 = 0;
+            $year3 < 7 ? $con3 = $db->sql_result($result, $i, "cy$year3") : $con3 = 0;
+            $year4 < 7 ? $con4 = $db->sql_result($result, $i, "cy$year4") : $con4 = 0;
+            $year5 < 7 ? $con5 = $db->sql_result($result, $i, "cy$year5") : $con5 = 0;
+            $year6 < 7 ? $con6 = $db->sql_result($result, $i, "cy$year6") : $con6 = 0;
+        }
+
+        (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
+
+        $table_contracts .= "
+            <tr bgcolor=$bgcolor>
+            <td align=center>$pos</td>
+            <td colspan=2><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$playerNameDecorated</a></td>
+            <td align=center>$exp</td>
+            <td align=center>$bird</td>
+            <td bgcolor=$color1></td>
+            <td>$con1</td>
+            <td>$con2</td>
+            <td>$con3</td>
+            <td>$con4</td>
+            <td>$con5</td>
+            <td>$con6</td>
+            <td bgcolor=$color1></td>
+            <td align=center>$talent</td>
+            <td align=center>$skill</td>
+            <td align=center>$intangibles</td>
+            <td bgcolor=$color1></td>
+            <td align=center>$loyalty</td>
+            <td align=center>$winner</td>
+            <td align=center>$playingTime</td>
+            <td align=center>$security</td>
+            <td align=center>$tradition</td>
+        </tr>";
+
+        $cap1 += $con1;
+        $cap2 += $con2;
+        $cap3 += $con3;
+        $cap4 += $con4;
+        $cap5 += $con5;
+        $cap6 += $con6;
+        $i++;
+    }
+    $cap1 = number_format($cap1 / 100, 2);
+    $cap2 = number_format($cap2 / 100, 2);
+    $cap3 = number_format($cap3 / 100, 2);
+    $cap4 = number_format($cap4 / 100, 2);
+    $cap5 = number_format($cap5 / 100, 2);
+    $cap6 = number_format($cap6 / 100, 2);
+
+    $table_contracts .= "</tbody>
+        <tfoot>
+            <tr>
+                <td></td>
+                <td colspan=2><b>Cap Totals</td>
+                <td></td>
+                <td></td>
+                <td bgcolor=$color1></td>
+                <td><b>$cap1</td>
+                <td><b>$cap2</td>
+                <td><b>$cap3</td>
+                <td><b>$cap4</td>
+                <td><b>$cap5</td>
+                <td><b>$cap6</td>
+                <td bgcolor=$color1></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td colspan=19><i>Note:</i> Players whose names appear in parenthesis and with a trailing asterisk are waived players that still count against the salary cap.</td>
+            </tr>
+        </tfoot>
+    </table>";
+
+    return $table_contracts;
+}
+
 function team($tid)
 {
     global $db;
@@ -1566,164 +1732,6 @@ function team($tid)
     if ($tid != 0 and $yr == "") {
         $starters_table = lastSimsStarters($db, $result, $color1, $color2);
     }
-
-    if ($yr == "") {
-        $table_contracts .= "<table align=\"center\" class=\"sortable\">
-			<thead>
-				<tr bgcolor=$color1>
-					<th><font color=$color2>Pos</font></th>
-					<th colspan=2><font color=$color2>Player</font></th>
-					<th><font color=$color2>Exp</font></th>
-					<th><font color=$color2>Bird</font></th>
-                    <td bgcolor=$color1 width=0></td>
-					<th><font color=$color2>Year1</font></th>
-					<th><font color=$color2>Year2</font></th>
-					<th><font color=$color2>Year3</font></th>
-					<th><font color=$color2>Year4</font></th>
-					<th><font color=$color2>Year5</font></th>
-					<th><font color=$color2>Year6</font></th>
-                    <td bgcolor=$color1 width=0></td>
-					<th><font color=$color2>Tal</font></th>
-					<th><font color=$color2>Skl</font></th>
-					<th><font color=$color2>Int</font></th>
-                    <td bgcolor=$color1 width=0></td>
-                    <th><font color=$color2>Loy</font></th>
-                    <th><font color=$color2>PFW</font></th>
-                    <th><font color=$color2>PT</font></th>
-                    <th><font color=$color2>Sec</font></th>
-                    <th><font color=$color2>Trad</font></th>
-				</tr>
-			</thead>
-		<tbody>";
-
-        /* =======================CONTRACTS ET AL */
-
-        $i = 0;
-        while ($i < $num) {
-            $name = $db->sql_result($result, $i, "name");
-            $pos = $db->sql_result($result, $i, "pos");
-            $p_ord = $db->sql_result($result, $i, "ordinal");
-            $pid = $db->sql_result($result, $i, "pid");
-            $cy = $db->sql_result($result, $i, "cy");
-            $cyt = $db->sql_result($result, $i, "cyt");
-            $exp = $db->sql_result($result, $i, "exp");
-            $bird = $db->sql_result($result, $i, "bird");
-            $talent = $db->sql_result($result, $i, "talent");
-            $skill = $db->sql_result($result, $i, "skill");
-            $intangibles = $db->sql_result($result, $i, "intangibles");
-            $loyalty = $db->sql_result($result, $i, "loyalty");
-            $winner = $db->sql_result($result, $i, "winner");
-            $playingTime = $db->sql_result($result, $i, "playingTime");
-            $security = $db->sql_result($result, $i, "security");
-            $tradition = $db->sql_result($result, $i, "tradition");
-
-            $playerNameDecorated = decoratePlayerName($name, $tid, $p_ord, $cy, $cyt);
-
-            if ($faon == 0) {
-                $year1 = $cy;
-                $year2 = $cy + 1;
-                $year3 = $cy + 2;
-                $year4 = $cy + 3;
-                $year5 = $cy + 4;
-                $year6 = $cy + 5;
-            } else {
-                $year1 = $cy + 1;
-                $year2 = $cy + 2;
-                $year3 = $cy + 3;
-                $year4 = $cy + 4;
-                $year5 = $cy + 5;
-                $year6 = $cy + 6;
-            }
-            if ($cy == 0) {
-                $year1 < 7 ? $con1 = $db->sql_result($result, $i, "cy1") : $con1 = 0;
-                $year2 < 7 ? $con2 = $db->sql_result($result, $i, "cy2") : $con2 = 0;
-                $year3 < 7 ? $con3 = $db->sql_result($result, $i, "cy3") : $con3 = 0;
-                $year4 < 7 ? $con4 = $db->sql_result($result, $i, "cy4") : $con4 = 0;
-                $year5 < 7 ? $con5 = $db->sql_result($result, $i, "cy5") : $con5 = 0;
-                $year6 < 7 ? $con6 = $db->sql_result($result, $i, "cy6") : $con6 = 0;
-            } else {
-                $year1 < 7 ? $con1 = $db->sql_result($result, $i, "cy$year1") : $con1 = 0;
-                $year2 < 7 ? $con2 = $db->sql_result($result, $i, "cy$year2") : $con2 = 0;
-                $year3 < 7 ? $con3 = $db->sql_result($result, $i, "cy$year3") : $con3 = 0;
-                $year4 < 7 ? $con4 = $db->sql_result($result, $i, "cy$year4") : $con4 = 0;
-                $year5 < 7 ? $con5 = $db->sql_result($result, $i, "cy$year5") : $con5 = 0;
-                $year6 < 7 ? $con6 = $db->sql_result($result, $i, "cy$year6") : $con6 = 0;
-            }
-
-            (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
-
-            $table_contracts .= "
-                <tr bgcolor=$bgcolor>
-                <td align=center>$pos</td>
-                <td colspan=2><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$playerNameDecorated</a></td>
-                <td align=center>$exp</td>
-                <td align=center>$bird</td>
-                <td bgcolor=$color1></td>
-				<td>$con1</td>
-				<td>$con2</td>
-				<td>$con3</td>
-				<td>$con4</td>
-				<td>$con5</td>
-				<td>$con6</td>
-                <td bgcolor=$color1></td>
-				<td align=center>$talent</td>
-				<td align=center>$skill</td>
-				<td align=center>$intangibles</td>
-                <td bgcolor=$color1></td>
-				<td align=center>$loyalty</td>
-				<td align=center>$winner</td>
-				<td align=center>$playingTime</td>
-				<td align=center>$security</td>
-				<td align=center>$tradition</td>
-			</tr>";
-
-            $cap1 += $con1;
-            $cap2 += $con2;
-            $cap3 += $con3;
-            $cap4 += $con4;
-            $cap5 += $con5;
-            $cap6 += $con6;
-            $i++;
-        }
-        $cap1 = number_format($cap1 / 100, 2);
-        $cap2 = number_format($cap2 / 100, 2);
-        $cap3 = number_format($cap3 / 100, 2);
-        $cap4 = number_format($cap4 / 100, 2);
-        $cap5 = number_format($cap5 / 100, 2);
-        $cap6 = number_format($cap6 / 100, 2);
-
-        $table_contracts .= "</tbody>
-			<tfoot>
-				<tr>
-					<td></td>
-					<td colspan=2><b>Cap Totals</td>
-					<td></td>
-                    <td></td>
-                    <td bgcolor=$color1></td>
-					<td><b>$cap1</td>
-					<td><b>$cap2</td>
-					<td><b>$cap3</td>
-					<td><b>$cap4</td>
-					<td><b>$cap5</td>
-					<td><b>$cap6</td>
-                    <td bgcolor=$color1></td>
-					<td></td>
-					<td></td>
-					<td></td>
-					<td></td>
-					<td></td>
-					<td></td>
-					<td></td>
-					<td></td>
-					<td></td>
-				</tr>
-				<tr>
-					<td colspan=19><i>Note:</i> Players whose names appear in parenthesis and with a trailing asterisk are waived players that still count against the salary cap.</td>
-				</tr>
-			</tfoot>
-		</table>";
-
-    } // END OF IF YEAR EQUAL NULL STATEMENT FROM BEFORE CHUNK AVERAGES
 
     $table_draftpicks .= "<table align=\"center\">";
 
@@ -1820,6 +1828,7 @@ function team($tid)
     if ($display == "contracts") {
         $showing = "Contracts";
         $tabs .= "<td bgcolor=#BBBBBB><a href=\"modules.php?name=Team&op=team&tid=$tid&display=contracts$insertyear\">Contracts</a></td>";
+        $table_contracts = contracts($db, $result, $color1, $color2, $tid, $faon);
         $table_output = $table_contracts;
     } else {
         $tabs .= "<td><a href=\"modules.php?name=Team&op=team&tid=$tid&display=contracts$insertyear\">Contracts</a></td>";

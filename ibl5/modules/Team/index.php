@@ -1653,6 +1653,54 @@ function contracts($db, $result, $color1, $color2, $tid, $faon)
     return $table_contracts;
 }
 
+function draftPicks($db, $team_name)
+{
+    $table_draftpicks = "<table align=\"center\">";
+
+    $querypicks = "SELECT * FROM ibl_draft_picks WHERE ownerofpick = '$team_name' ORDER BY year, round ASC";
+    $resultpicks = $db->sql_query($querypicks);
+    $numpicks = $db->sql_numrows($resultpicks);
+
+    $query_all_team_colors = "SELECT * FROM ibl_team_info ORDER BY teamid ASC";
+    $colors = $db->sql_query($query_all_team_colors);
+    $num_all_team_colors = $db->sql_numrows($colors);
+
+    $i = 0;
+    while ($i < $num_all_team_colors) {
+        $color_array[$i]['team_id'] = $db->sql_result($colors, $i, "teamid");
+        $color_array[$i]['team_city'] = $db->sql_result($colors, $i, "team_city");
+        $color_array[$i]['team_name'] = $db->sql_result($colors, $i, "team_name");
+        $i++;
+    }
+
+    $hh = 0;
+    while ($hh < $numpicks) {
+        $teampick = $db->sql_result($resultpicks, $hh, "teampick");
+        $year = $db->sql_result($resultpicks, $hh, "year");
+        $round = $db->sql_result($resultpicks, $hh, "round");
+
+        $j = 0;
+        while ($j < $i) {
+            $pick_team_name = $color_array[$j]['team_name'];
+            if ($pick_team_name == $teampick) {
+                $pick_team_id = $color_array[$j]['team_id'];
+                $pick_team_city = $color_array[$j]['team_city'];
+            }
+            $j++;
+        }
+        $table_draftpicks .= "<tr>
+            <td valign=\"center\"><a href=\"modules.php?name=Team&op=team&tid=$pick_team_id\"><img src=\"images/logo/$teampick.png\"></a></td>
+            <td valign=\"center\"><a href=\"modules.php?name=Team&op=team&tid=$pick_team_id\">$year $pick_team_city $teampick (Round $round)</a></td>
+        </tr>";
+
+        $hh++;
+    }
+
+    $table_draftpicks .= "</table>";
+
+    return $table_draftpicks;
+}
+
 function team($tid)
 {
     global $db;
@@ -1733,51 +1781,6 @@ function team($tid)
         $starters_table = lastSimsStarters($db, $result, $color1, $color2);
     }
 
-    $table_draftpicks .= "<table align=\"center\">";
-
-    // PUT DRAFT PICKS BELOW SALARY PRINTOUT
-
-    $querypicks = "SELECT * FROM ibl_draft_picks WHERE ownerofpick = '$team_name' ORDER BY year, round ASC";
-    $resultpicks = $db->sql_query($querypicks);
-    $numpicks = $db->sql_numrows($resultpicks);
-
-    $hh = 0;
-
-    $query_all_team_colors = "SELECT * FROM ibl_team_info ORDER BY teamid ASC";
-    $colors = $db->sql_query($query_all_team_colors);
-    $num_all_team_colors = $db->sql_numrows($colors);
-
-    $i = 0;
-    while ($i < $num_all_team_colors) {
-        $color_array[$i]['team_id'] = $db->sql_result($colors, $i, "teamid");
-        $color_array[$i]['team_city'] = $db->sql_result($colors, $i, "team_city");
-        $color_array[$i]['team_name'] = $db->sql_result($colors, $i, "team_name");
-        $i++;
-    }
-
-    while ($hh < $numpicks) {
-        $teampick = $db->sql_result($resultpicks, $hh, "teampick");
-        $year = $db->sql_result($resultpicks, $hh, "year");
-        $round = $db->sql_result($resultpicks, $hh, "round");
-
-        $j = 0;
-        while ($j < $i) {
-            $pick_team_name = $color_array[$j]['team_name'];
-            if ($pick_team_name == $teampick) {
-                $pick_team_id = $color_array[$j]['team_id'];
-                $pick_team_city = $color_array[$j]['team_city'];
-            }
-            $j++;
-        }
-        $table_draftpicks .= "<tr>
-            <td valign=\"center\"><a href=\"modules.php?name=Team&op=team&tid=$pick_team_id\"><img src=\"images/logo/$teampick.png\"></a></td>
-            <td valign=\"center\"><a href=\"modules.php?name=Team&op=team&tid=$pick_team_id\">$year $pick_team_city $teampick (Round $round)</a></td>
-        </tr>";
-
-        $hh++;
-    }
-    $table_draftpicks .= "</table>";
-
     $inforight = team_info_right($team_name, $color1, $color2, $owner_name, $tid);
 
     $team_info_right = $inforight[0];
@@ -1833,6 +1836,8 @@ function team($tid)
     } else {
         $tabs .= "<td><a href=\"modules.php?name=Team&op=team&tid=$tid&display=contracts$insertyear\">Contracts</a></td>";
     }
+
+    $table_draftpicks = draftPicks($db, $team_name);
 
     echo "<table align=center>
         <tr bgcolor=$color1><td><font color=$color2><b><center>$showing (Sortable by clicking on Column Heading)</center></b></font></td></tr>

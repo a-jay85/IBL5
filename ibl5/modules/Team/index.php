@@ -1414,12 +1414,10 @@ function team($tid)
         $table_averages .= "</tfoot>
 			</table>";
 
+        /* ======================CHUNK STATS */
+
         if ($yr == "") {
-            $table_simAverages .= "<table align=\"center\" class=\"sortable\"><thead>";
-
-            /* ======================CHUNK STATS */
-
-            $table_simAverages .= "<tr bgcolor=$color1>
+            $table_simAverages .= "<table align=\"center\" class=\"sortable\"><thead><tr bgcolor=$color1>
                 <th><font color=$color2>Pos</font></th>
                 <th colspan=3><font color=$color2>Player</font></th>
                 <th><font color=$color2>g</font></th>

@@ -613,7 +613,6 @@ function seasonAverages($db, $result, $color1, $color2, $tid, $yr, $team_name)
         $pos = $db->sql_result($result, $i, "pos");
         $p_ord = $db->sql_result($result, $i, "ordinal");
         $pid = $db->sql_result($result, $i, "pid");
-        $exp = $db->sql_result($result, $i, "exp");
         $cy = $db->sql_result($result, $i, "cy");
         $cyt = $db->sql_result($result, $i, "cyt");
 

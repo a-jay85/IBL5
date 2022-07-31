@@ -672,6 +672,10 @@ function team($tid)
 
     echo "<table><tr><td align=center valign=top><img src=\"./images/logo/$tid.jpg\">";
 
+    if ($yr != "") {
+        echo "<center><h1>$yr $team_name</h1></center>";
+    }
+
     /* =================== INSERT STARTERS =========== */
 
     $startingPG = null;
@@ -711,9 +715,7 @@ function team($tid)
         }
         $s++;
     }
-    if ($yr != "") {
-        echo "<center><h1>$yr $team_name</h1></center>";
-    }
+    
     if ($tid != 0 and $yr == "") {
         $starters_table = "<table align=\"center\" border=1 cellpadding=1 cellspacing=1>
 			<tr bgcolor=$color1>

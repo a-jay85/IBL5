@@ -1414,12 +1414,10 @@ function team($tid)
         $table_averages .= "</tfoot>
 			</table>";
 
+        /* ======================CHUNK STATS */
+
         if ($yr == "") {
-            $table_simAverages .= "<table align=\"center\" class=\"sortable\"><thead>";
-
-            /* ======================CHUNK STATS */
-
-            $table_simAverages .= "<tr bgcolor=$color1>
+            $table_simAverages .= "<table align=\"center\" class=\"sortable\"><thead><tr bgcolor=$color1>
                 <th><font color=$color2>Pos</font></th>
                 <th colspan=3><font color=$color2>Player</font></th>
                 <th><font color=$color2>g</font></th>
@@ -1761,7 +1759,10 @@ function team($tid)
             }
             $j++;
         }
-        $table_draftpicks .= "<tr><td valign=\"center\"><a href=\"modules.php?name=Team&op=team&tid=$pick_team_id\"><img src=\"images/logo/$teampick.png\"></a></td><td valign=\"center\"><a href=\"modules.php?name=Team&op=team&tid=$pick_team_id\">$year $pick_team_city $teampick (Round $round)</a></td></tr>";
+        $table_draftpicks .= "<tr>
+            <td valign=\"center\"><a href=\"modules.php?name=Team&op=team&tid=$pick_team_id\"><img src=\"images/logo/$teampick.png\"></a></td>
+            <td valign=\"center\"><a href=\"modules.php?name=Team&op=team&tid=$pick_team_id\">$year $pick_team_city $teampick (Round $round)</a></td>
+        </tr>";
 
         $hh++;
     }
@@ -1818,13 +1819,15 @@ function team($tid)
         $tabs .= "<td><a href=\"modules.php?name=Team&op=team&tid=$tid&display=contracts$insertyear\">Contracts</a></td>";
     }
 
-    echo "<table align=center><tr bgcolor=$color1><td><font color=$color2><b><center>$showing (Sortable by clicking on Column Heading)</center></b></font></td></tr>
+    echo "<table align=center>
+        <tr bgcolor=$color1><td><font color=$color2><b><center>$showing (Sortable by clicking on Column Heading)</center></b></font></td></tr>
 		<tr><td align=center><table><tr>$tabs</tr></table></td></tr>
 		<tr><td align=center>$table_output</td></tr>
 		<tr><td align=center>$starters_table</td></tr>
 		<tr bgcolor=$color1><td><font color=$color2><b><center>Draft Picks</center></b></font></td></tr>
 		<tr><td>$table_draftpicks</td></tr>
-		<tr><td>$rafters</td></tr></table>";
+		<tr><td>$rafters</td></tr>
+    </table>";
 
     // TRANSITIONS TO NEXT SIDE OF PAGE
 
@@ -2400,7 +2403,7 @@ function teamCurrentSeasonStandings($team)
 		<tr><td align='right'><b>Home Record:</td><td>$home_win-$home_loss</td></tr>
 		<tr><td align='right'><b>Road Record:</td><td>$road_win-$road_loss</td></tr>
 		<tr><td align='right'><b>Last 10:</td><td>$last_win-$last_loss</td></tr>
-		</table>";
+	</table>";
     return $standings;
 }
 

@@ -26,623 +26,154 @@ get_lang($module_name);
 
 $pagetitle = "- Team Pages";
 
-function drafthistory($tid)
-{
-    global $db;
-    $sharedFunctions = new Shared($db);
-
-    include "header.php";
-    OpenTable();
-    $sharedFunctions->displaytopmenu($tid);
-
-    $sqlc = "SELECT * FROM ibl_team_info WHERE teamid = $tid";
-    $resultc = $db->sql_query($sqlc);
-    $rowc = $db->sql_fetchrow($resultc);
-    $teamname = $rowc['team_name'];
-
-    $sqld = "SELECT * FROM ibl_plr WHERE draftedby LIKE '$teamname' ORDER BY draftyear DESC, draftround, draftpickno ASC ";
-    $resultd = $db->sql_query($sqld);
-
-    echo "$teamname Draft History<table class=\"sortable\"><tr><th>Player</th><th>Pos</th><th>Year</th><th>Round</th><th>Pick</th></tr>";
-
-    while ($rowd = $db->sql_fetchrow($resultd)) {
-        $player_pid = $rowd['pid'];
-        $player_name = $rowd['name'];
-        $player_pos = $rowd['pos'];
-        $player_draftyear = $rowd['draftyear'];
-        $player_draftround = $rowd['draftround'];
-        $player_draftpickno = $rowd['draftpickno'];
-        $player_retired = $rowd['retired'];
-
-        if ($player_retired == 1) {
-            echo "<tr><td><a href=\"./modules.php?name=Player&pa=showpage&pid=$player_pid\">$player_name</a> (retired)</td><td>$player_pos</td><td>$player_draftyear</td><td>$player_draftround</td><td>$player_draftpickno</td></tr>";
-        } else {
-            echo "<tr><td><a href=\"./modules.php?name=Player&pa=showpage&pid=$player_pid\">$player_name</a></td><td>$player_pos</td><td>$player_draftyear</td><td>$player_draftround</td><td>$player_draftpickno</td></tr>";
-        }
-    }
-
-    echo "</table>";
-
-    CloseTable();
-    include "footer.php";
-}
-
-function leaguestats()
-{
-    global $db;
-
-    include "header.php";
-    OpenTable();
-
-    $queryteam = "SELECT * FROM ibl_team_info";
-    $resultteam = $db->sql_query($queryteam);
-    $numteams = $db->sql_numrows($resultteam);
-
-    $n = 0;
-    while ($n < $numteams) {
-        $teamid[$n] = $db->sql_result($resultteam, $n, "teamid");
-        $team_city[$n] = $db->sql_result($resultteam, $n, "team_city");
-        $team_name[$n] = $db->sql_result($resultteam, $n, "team_name");
-        $coach_pts[$n] = $db->sql_result($resultteam, $n, "Contract_Coach");
-        $color1[$n] = $db->sql_result($resultteam, $n, "color1");
-        $color2[$n] = $db->sql_result($resultteam, $n, "color2");
-        $n++;
-    }
-
-    $queryTeamOffenseTotals = "SELECT * FROM ibl_team_offense_stats ORDER BY team ASC";
-    $resultTeamOffenseTotals = $db->sql_query($queryTeamOffenseTotals);
-    $numTeamOffenseTotals = $db->sql_numrows($resultTeamOffenseTotals);
-
-    $t = 0;
-
-    while ($t < $numTeamOffenseTotals) {
-        $team_off_name = $db->sql_result($resultTeamOffenseTotals, $t, "team");
-        $m = 0;
-        while ($m < $n) {
-            if ($team_off_name == $team_name[$m]) {
-                $teamcolor1 = $color1[$m];
-                $teamcolor2 = $color2[$m];
-                $teamcity = $team_city[$m];
-                $tid = $teamid[$m];
-            }
-            $m++;
-        }
-
-        $team_off_games = $db->sql_result($resultTeamOffenseTotals, $t, "games");
-        $team_off_minutes = $db->sql_result($resultTeamOffenseTotals, $t, "minutes");
-        $team_off_fgm = $db->sql_result($resultTeamOffenseTotals, $t, "fgm");
-        $team_off_fga = $db->sql_result($resultTeamOffenseTotals, $t, "fga");
-        $team_off_ftm = $db->sql_result($resultTeamOffenseTotals, $t, "ftm");
-        $team_off_fta = $db->sql_result($resultTeamOffenseTotals, $t, "fta");
-        $team_off_tgm = $db->sql_result($resultTeamOffenseTotals, $t, "tgm");
-        $team_off_tga = $db->sql_result($resultTeamOffenseTotals, $t, "tga");
-        $team_off_orb = $db->sql_result($resultTeamOffenseTotals, $t, "orb");
-        $team_off_reb = $db->sql_result($resultTeamOffenseTotals, $t, "reb");
-        $team_off_ast = $db->sql_result($resultTeamOffenseTotals, $t, "ast");
-        $team_off_stl = $db->sql_result($resultTeamOffenseTotals, $t, "stl");
-        $team_off_tvr = $db->sql_result($resultTeamOffenseTotals, $t, "tvr");
-        $team_off_blk = $db->sql_result($resultTeamOffenseTotals, $t, "blk");
-        $team_off_pf = $db->sql_result($resultTeamOffenseTotals, $t, "pf");
-        $team_off_pts = $team_off_fgm + $team_off_fgm + $team_off_ftm + $team_off_tgm;
-
-        @$team_off_avgfgm = number_format($team_off_fgm / $team_off_games, 2);
-        @$team_off_avgfga = number_format($team_off_fga / $team_off_games, 2);
-        @$team_off_fgp = number_format($team_off_fgm / $team_off_fga, 3);
-        @$team_off_avgftm = number_format($team_off_ftm / $team_off_games, 2);
-        @$team_off_avgfta = number_format($team_off_fta / $team_off_games, 2);
-        @$team_off_ftp = number_format($team_off_ftm / $team_off_fta, 3);
-        @$team_off_avgtgm = number_format($team_off_tgm / $team_off_games, 2);
-        @$team_off_avgtga = number_format($team_off_tga / $team_off_games, 2);
-        @$team_off_tgp = number_format($team_off_tgm / $team_off_tga, 3);
-        @$team_off_avgorb = number_format($team_off_orb / $team_off_games, 2);
-        @$team_off_avgreb = number_format($team_off_reb / $team_off_games, 2);
-        @$team_off_avgast = number_format($team_off_ast / $team_off_games, 2);
-        @$team_off_avgstl = number_format($team_off_stl / $team_off_games, 2);
-        @$team_off_avgtvr = number_format($team_off_tvr / $team_off_games, 2);
-        @$team_off_avgblk = number_format($team_off_blk / $team_off_games, 2);
-        @$team_off_avgpf = number_format($team_off_pf / $team_off_games, 2);
-        @$team_off_avgpts = number_format($team_off_pts / $team_off_games, 2);
-
-        $lg_off_games += $team_off_games;
-        $lg_off_minutes += $team_off_minutes;
-        $lg_off_fgm += $team_off_fgm;
-        $lg_off_fga += $team_off_fga;
-        $lg_off_ftm += $team_off_ftm;
-        $lg_off_fta += $team_off_fta;
-        $lg_off_tgm += $team_off_tgm;
-        $lg_off_tga += $team_off_tga;
-        $lg_off_orb += $team_off_orb;
-        $lg_off_reb += $team_off_reb;
-        $lg_off_ast += $team_off_ast;
-        $lg_off_stl += $team_off_stl;
-        $lg_off_tvr += $team_off_tvr;
-        $lg_off_blk += $team_off_blk;
-        $lg_off_pf += $team_off_pf;
-        $lg_off_pts += $team_off_pts;
-
-        $offense_totals .= "<tr>
-			<td bgcolor=\"$teamcolor1\"><a href=\"modules.php?name=Team&op=team&tid=$tid\"><font color=\"$teamcolor2\">$teamcity $team_off_name Offense</font></a></td>
-			<td>$team_off_games</td>
-			<td>$team_off_fgm</td>
-			<td>$team_off_fga</td>
-			<td>$team_off_ftm</td>
-			<td>$team_off_fta</td>
-			<td>$team_off_tgm</td>
-			<td>$team_off_tga</td>
-			<td>$team_off_orb</td>
-			<td>$team_off_reb</td>
-			<td>$team_off_ast</td>
-			<td>$team_off_stl</td>
-			<td>$team_off_tvr</td>
-			<td>$team_off_blk</td>
-			<td>$team_off_pf</td>
-			<td>$team_off_pts</td>
-		</tr>";
-
-        $offense_averages .= "<tr>
-			<td bgcolor=\"$teamcolor1\"><a href=\"modules.php?name=Team&op=team&tid=$tid\"><font color=\"$teamcolor2\">$teamcity $team_off_name Offense</font></a></td>
-			<td>$team_off_avgfgm</td>
-			<td>$team_off_avgfga</td>
-			<td>$team_off_fgp</td>
-			<td>$team_off_avgftm</td>
-			<td>$team_off_avgfta</td>
-			<td>$team_off_ftp</td>
-			<td>$team_off_avgtgm</td>
-			<td>$team_off_avgtga</td>
-			<td>$team_off_tgp</td>
-			<td>$team_off_avgorb</td>
-			<td>$team_off_avgreb</td>
-			<td>$team_off_avgast</td>
-			<td>$team_off_avgstl</td>
-			<td>$team_off_avgtvr</td>
-			<td>$team_off_avgblk</td>
-			<td>$team_off_avgpf</td>
-			<td>$team_off_avgpts</td>
-		</tr>";
-
-        $t++;
-    }
-
-    $queryTeamDefenseTotals = "SELECT * FROM ibl_team_defense_stats ORDER BY team ASC";
-    $resultTeamDefenseTotals = $db->sql_query($queryTeamDefenseTotals);
-    $numTeamDefenseTotals = $db->sql_numrows($resultTeamDefenseTotals);
-
-    $t = 0;
-
-    while ($t < $numTeamDefenseTotals) {
-
-        $team_def_name = $db->sql_result($resultTeamDefenseTotals, $t, "team");
-        $m = 0;
-        while ($m < $n) {
-            if ($team_def_name == $team_name[$m]) {
-                $teamcolor1 = $color1[$m];
-                $teamcolor2 = $color2[$m];
-                $teamcity = $team_city[$m];
-                $tid = $teamid[$m];
-            }
-            $m++;
-        }
-
-        $team_def_games = $db->sql_result($resultTeamDefenseTotals, $t, "games");
-        $team_def_fgm = $db->sql_result($resultTeamDefenseTotals, $t, "fgm");
-        $team_def_fga = $db->sql_result($resultTeamDefenseTotals, $t, "fga");
-        $team_def_ftm = $db->sql_result($resultTeamDefenseTotals, $t, "ftm");
-        $team_def_fta = $db->sql_result($resultTeamDefenseTotals, $t, "fta");
-        $team_def_tgm = $db->sql_result($resultTeamDefenseTotals, $t, "tgm");
-        $team_def_tga = $db->sql_result($resultTeamDefenseTotals, $t, "tga");
-        $team_def_orb = $db->sql_result($resultTeamDefenseTotals, $t, "orb");
-        $team_def_reb = $db->sql_result($resultTeamDefenseTotals, $t, "reb");
-        $team_def_ast = $db->sql_result($resultTeamDefenseTotals, $t, "ast");
-        $team_def_stl = $db->sql_result($resultTeamDefenseTotals, $t, "stl");
-        $team_def_tvr = $db->sql_result($resultTeamDefenseTotals, $t, "tvr");
-        $team_def_blk = $db->sql_result($resultTeamDefenseTotals, $t, "blk");
-        $team_def_pf = $db->sql_result($resultTeamDefenseTotals, $t, "pf");
-        $team_def_pts = $team_def_fgm + $team_def_fgm + $team_def_ftm + $team_def_tgm;
-
-        @$team_def_avgfgm = number_format($team_def_fgm / $team_def_games, 2);
-        @$team_def_avgfga = number_format($team_def_fga / $team_def_games, 2);
-        @$team_def_fgp = number_format($team_def_fgm / $team_def_fga, 3);
-        @$team_def_avgftm = number_format($team_def_ftm / $team_def_games, 2);
-        @$team_def_avgfta = number_format($team_def_fta / $team_def_games, 2);
-        @$team_def_ftp = number_format($team_def_ftm / $team_def_fta, 3);
-        @$team_def_avgtgm = number_format($team_def_tgm / $team_def_games, 2);
-        @$team_def_avgtga = number_format($team_def_tga / $team_def_games, 2);
-        @$team_def_tgp = number_format($team_def_tgm / $team_def_tga, 3);
-        @$team_def_avgorb = number_format($team_def_orb / $team_def_games, 2);
-        @$team_def_avgreb = number_format($team_def_reb / $team_def_games, 2);
-        @$team_def_avgast = number_format($team_def_ast / $team_def_games, 2);
-        @$team_def_avgstl = number_format($team_def_stl / $team_def_games, 2);
-        @$team_def_avgtvr = number_format($team_def_tvr / $team_def_games, 2);
-        @$team_def_avgblk = number_format($team_def_blk / $team_def_games, 2);
-        @$team_def_avgpf = number_format($team_def_pf / $team_def_games, 2);
-        @$team_def_avgpts = number_format($team_def_pts / $team_def_games, 2);
-
-        $defense_totals .= "<tr>
-			<td bgcolor=\"$teamcolor1\"><a href=\"modules.php?name=Team&op=team&tid=$tid\"><font color=\"$teamcolor2\">$teamcity $team_def_name Defense</font></a></td>
-			<td>$team_def_games</td>
-			<td>$team_def_fgm</td>
-			<td>$team_def_fga</td>
-			<td>$team_def_ftm</td>
-			<td>$team_def_fta</td>
-			<td>$team_def_tgm</td>
-			<td>$team_def_tga</td>
-			<td>$team_def_orb</td>
-			<td>$team_def_reb</td>
-			<td>$team_def_ast</td>
-			<td>$team_def_stl</td>
-			<td>$team_def_tvr</td>
-			<td>$team_def_blk</td>
-			<td>$team_def_pf</td>
-			<td>$team_def_pts</td>
-		</tr>";
-
-        $defense_averages .= "<tr>
-			<td bgcolor=\"$teamcolor1\"><a href=\"modules.php?name=Team&op=team&tid=$tid\"><font color=\"$teamcolor2\">$teamcity $team_def_name Defense</font></a></td>
-			<td>$team_def_avgfgm</td>
-			<td>$team_def_avgfga</td>
-			<td>$team_def_fgp</td>
-			<td>$team_def_avgftm</td>
-			<td>$team_def_avgfta</td>
-			<td>$team_def_ftp</td>
-			<td>$team_def_avgtgm</td>
-			<td>$team_def_avgtga</td>
-			<td>$team_def_tgp</td>
-			<td>$team_def_avgorb</td>
-			<td>$team_def_avgreb</td>
-			<td>$team_def_avgast</td>
-			<td>$team_def_avgstl</td>
-			<td>$team_def_avgtvr</td>
-			<td>$team_def_avgblk</td>
-			<td>$team_def_avgpf</td>
-			<td>$team_def_avgpts</td>
-		</tr>";
-
-        $t++;
-    }
-
-    @$lg_off_avgfgm = number_format($lg_off_fgm / $lg_off_games, 2);
-    @$lg_off_avgfga = number_format($lg_off_fga / $lg_off_games, 2);
-    @$lg_off_fgp = number_format($lg_off_fgm / $lg_off_fga, 3);
-    @$lg_off_avgftm = number_format($lg_off_ftm / $lg_off_games, 2);
-    @$lg_off_avgfta = number_format($lg_off_fta / $lg_off_games, 2);
-    @$lg_off_ftp = number_format($lg_off_ftm / $lg_off_fta, 3);
-    @$lg_off_avgtgm = number_format($lg_off_tgm / $lg_off_games, 2);
-    @$lg_off_avgtga = number_format($lg_off_tga / $lg_off_games, 2);
-    @$lg_off_tgp = number_format($lg_off_tgm / $lg_off_tga, 3);
-    @$lg_off_avgorb = number_format($lg_off_orb / $lg_off_games, 2);
-    @$lg_off_avgreb = number_format($lg_off_reb / $lg_off_games, 2);
-    @$lg_off_avgast = number_format($lg_off_ast / $lg_off_games, 2);
-    @$lg_off_avgstl = number_format($lg_off_stl / $lg_off_games, 2);
-    @$lg_off_avgtvr = number_format($lg_off_tvr / $lg_off_games, 2);
-    @$lg_off_avgblk = number_format($lg_off_blk / $lg_off_games, 2);
-    @$lg_off_avgpf = number_format($lg_off_pf / $lg_off_games, 2);
-    @$lg_off_avgpts = number_format($lg_off_pts / $lg_off_games, 2);
-
-    $league_totals = "<tr style=\"font-weight:bold\">
-		<td>LEAGUE TOTALS</td>
-		<td>$lg_off_games</td>
-		<td>$lg_off_fgm</td>
-		<td>$lg_off_fga</td>
-		<td>$lg_off_ftm</td>
-		<td>$lg_off_fta</td>
-		<td>$lg_off_tgm</td>
-		<td>$lg_off_tga</td>
-		<td>$lg_off_orb</td>
-		<td>$lg_off_reb</td>
-		<td>$lg_off_ast</td>
-		<td>$lg_off_stl</td>
-		<td>$lg_off_tvr</td>
-		<td>$lg_off_blk</td>
-		<td>$lg_off_pf</td>
-		<td>$lg_off_pts</td>
-	</tr>";
-
-    $league_averages = "<tr style=\"font-weight:bold\">
-		<td>LEAGUE AVERAGES</td>
-		<td>$lg_off_avgfgm</td>
-		<td>$lg_off_avgfga</td>
-		<td>$lg_off_fgp</td>
-		<td>$lg_off_avgftm</td>
-		<td>$lg_off_avgfta</td>
-		<td>$lg_off_ftp</td>
-		<td>$lg_off_avgtgm</td>
-		<td>$lg_off_avgtga</td>
-		<td>$lg_off_tgp</td>
-		<td>$lg_off_avgorb</td>
-		<td>$lg_off_avgreb</td>
-		<td>$lg_off_avgast</td>
-		<td>$lg_off_avgstl</td>
-		<td>$lg_off_avgtvr</td>
-		<td>$lg_off_avgblk</td>
-		<td>$lg_off_avgpf</td>
-		<td>$lg_off_avgpts</td>
-	</tr>";
-
-    echo "<center>
-		<h1>League-wide Statistics</h1>
-
-		<h2>Team Offense Totals</h2>
-		<table class=\"sortable\">
-		<thead><tr><th>Team</th><th>Gm</th><th>FGM</th><th>FGA</th><th>FTM</th><th>FTA</th><th>3GM</th><th>3GA</th><th>ORB</th><th>REB</th><th>AST</th><th>STL</th><th>TVR</th><th>BLK</th><th>PF</th><th>PTS</th></tr></thead>
-		<tbody>$offense_totals</tbody>
-		<tfoot>$league_totals</tfoot>
-		</table>
-
-		<h2>Team Defense Totals</h2>
-		<table class=\"sortable\">
-		<thead><tr><th>Team</th><th>Gm</th><th>FGM</th><th>FGA</th><th>FTM</th><th>FTA</th><th>3GM</th><th>3GA</th><th>ORB</th><th>REB</th><th>AST</th><th>STL</th><th>TVR</th><th>BLK</th><th>PF</th><th>PTS</th></tr></thead>
-		<tbody>$defense_totals</tbody>
-		<tfoot>$league_totals</tfoot>
-		</table>
-
-		<h2>Team Offense Averages</h2>
-		<table class=\"sortable\">
-		<thead><tr><th>Team</th><th>FGM</th><th>FGA</th><th>FGP</th><th>FTM</th><th>FTA</th><th>FTP</th><th>3GM</th><th>3GA</th><th>3GP</th><th>ORB</th><th>REB</th><th>AST</th><th>STL</th><th>TVR</th><th>BLK</th><th>PF</th><th>PTS</th></tr></thead>
-		<tbody>$offense_averages</tbody>
-		<tfoot>$league_averages</tfoot>
-		</table>
-
-		<h2>Team Defense Averages</h2>
-		<table class=\"sortable\">
-		<thead><tr><th>Team</th><th>FGM</th><th>FGA</th><th>FGP</th><th>FTM</th><th>FTA</th><th>FTP</th><th>3GM</th><th>3GA</th><th>3GP</th><th>ORB</th><th>REB</th><th>AST</th><th>STL</th><th>TVR</th><th>BLK</th><th>PF</th><th>PTS</th></tr></thead>
-		<tbody>$defense_averages</tbody>
-		<tfoot>$league_averages</tfoot>
-		</table>";
-
-    CloseTable();
-    include "footer.php";
-}
-
-function schedule($tid)
+function team($tid)
 {
     global $db;
     $sharedFunctions = new Shared($db);
 
     $tid = intval($tid);
+
+    $yr = $_REQUEST['yr'];
+
+    $display = $_REQUEST['display'];
+    if ($display == null) {
+        $display = "ratings";
+    }
+
     include "header.php";
     OpenTable();
+
     //============================
     // GRAB TEAM COLORS, ET AL
     //============================
-    $queryteam = "SELECT * FROM ibl_team_info WHERE teamid = '$tid';";
+
+    $queryteam = "SELECT * FROM ibl_team_info WHERE teamid = '$tid' ";
     $resultteam = $db->sql_query($queryteam);
+
+    $team_name = $db->sql_result($resultteam, 0, "team_name");
     $color1 = $db->sql_result($resultteam, 0, "color1");
     $color2 = $db->sql_result($resultteam, 0, "color2");
+    $owner_name = $db->sql_result($resultteam, 0, "owner_name");
+
     //=============================
     //DISPLAY TOP MENU
     //=============================
+
     $sharedFunctions->displaytopmenu($tid);
-    $query = "SELECT * FROM `ibl_schedule` WHERE Visitor = $tid OR Home = $tid ORDER BY Date ASC;";
-    $result = $db->sql_query($query);
-    $year = $db->sql_result($result, 0, "Year");
-    $year1 = $year + 1;
-    $wins = 0;
-    $losses = 0;
-    echo "<center>
-		<img src=\"./images/logo/$tid.jpg\">
-		<table width=600 border=1>
-			<tr bgcolor=$color1><td colspan=26><center><font color=$color2><h1>Team Schedule</h1><p><i>games highlighted in yellow are projected to be run next sim (7 days)</i></font></center></td></tr>
-			<tr bgcolor=$color2><td colspan=26><font color=$color1><b><center>November</center></b></font></td></tr>
-			<tr bgcolor=$color2><td><font color=$color1><b>Date</font></td><td><font color=$color1><b>Visitor</font></td><td><font color=$color1><b>Score</font></td><td><font color=$color1><b>Home</font></td><td><font color=$color1><b>Score</font></td><td><font color=$color1><b>Box Score</font></td><td><font color=$color1><b>Record</font></td><td><font color=$color1><b>Streak</font></td></tr>";
-    list($wins, $losses, $winStreak, $lossStreak) = boxscore($year, '11', $tid, $wins, $losses, $winStreak, $lossStreak);
-    echo "<tr bgcolor=$color1><td colspan=26><font color=$color2><b><center>December</center></b></font></td></tr>
-		<tr bgcolor=$color1><td><font color=$color2><b>Date</font></td><td><font color=$color2><b>Visitor</font></td><td><font color=$color2><b>Score</font></td><td><font color=$color2><b>Home</font></td><td><font color=$color2><b>Score</font></td><td><font color=$color2><b>Box Score</b></font></td><td><font color=$color2><b>Record</font></td><td><font color=$color2><b>Streak</font></td></tr>";
-    list($wins, $losses, $winStreak, $lossStreak) = boxscore($year, '12', $tid, $wins, $losses, $winStreak, $lossStreak);
-    echo "<tr bgcolor=$color2><td colspan=26><font color=$color1><b><center>January</center></b></font></td></tr>
-		<tr bgcolor=$color2><td><font color=$color1><b>Date</font></td><td><font color=$color1><b>Visitor</font></td><td><font color=$color1><b>Score</font></td><td><font color=$color1><b>Home</font></td><td><font color=$color1><b>Score</font></td><td><font color=$color1><b>Box Score</b></font></td><td><font color=$color1><b>Record</font></td><td><font color=$color1><b>Streak</font></td></tr>";
-    list($wins, $losses, $winStreak, $lossStreak) = boxscore($year1, '01', $tid, $wins, $losses, $winStreak, $lossStreak);
-    echo "<tr bgcolor=$color1><td colspan=26><font color=$color2><b><center>February</center></b></font></td></tr>
-		<tr bgcolor=$color1><td><font color=$color2><b>Date</font></td><td><font color=$color2><b>Visitor</font></td><td><font color=$color2><b>Score</font></td><td><font color=$color2><b>Home</font></td><td><font color=$color2><b>Score</font></td><td><font color=$color2><b>Box Score</b></font></td><td><font color=$color2><b>Record</font></td><td><font color=$color2><b>Streak</font></td></tr>";
-    list($wins, $losses, $winStreak, $lossStreak) = boxscore($year1, '02', $tid, $wins, $losses, $winStreak, $lossStreak);
-    echo "<tr bgcolor=$color2><td colspan=26><font color=$color1><b><center>March</center></b></font></td></tr>
-		<tr bgcolor=$color2><td><font color=$color1><b>Date</font></td><td><font color=$color1><b>Visitor</font></td><td><font color=$color1><b>Score</font></td><td><font color=$color1><b>Home</font></td><td><font color=$color1><b>Score</font></td><td><font color=$color1><b>Box Score</b></font></td><td><font color=$color1><b>Record</font></td><td><font color=$color1><b>Streak</font></td></tr>";
-    list($wins, $losses, $winStreak, $lossStreak) = boxscore($year1, '03', $tid, $wins, $losses, $winStreak, $lossStreak);
-    echo "<tr bgcolor=$color1><td colspan=26><font color=$color2><b><center>April</center></b></font></td></tr>
-		<tr bgcolor=$color1><td><font color=$color2><b>Date</font></td><td><font color=$color2><b>Visitor</font></td><td><font color=$color2><b>Score</font></td><td><font color=$color2><b>Home</font></td><td><font color=$color2><b>Score</font></td><td><font color=$color2><b>Box Score</b></font></td><td><font color=$color2><b>Record</font></td><td><font color=$color2><b>Streak</font></td></tr>";
-    list($wins, $losses, $winStreak, $lossStreak) = boxscore($year1, '04', $tid, $wins, $losses, $winStreak, $lossStreak);
-    echo "<tr bgcolor=$color2><td colspan=26><font color=$color1><b><center>May</center></b></font></td></tr>
-		<tr bgcolor=$color2><td><font color=$color1><b>Date</font></td><td><font color=$color1><b>Visitor</font></td><td><font color=$color1><b>Score</font></td><td><font color=$color1><b>Home</font></td><td><font color=$color1><b>Score</font></td><td><font color=$color1><b>Box Score</b></font></td><td><font color=$color1><b>Record</font></td><td><font color=$color1><b>Streak</font></td></tr>";
-    list($wins, $losses, $winStreak, $lossStreak) = boxscore($year1, '05', $tid, $wins, $losses, $winStreak, $lossStreak);
-    echo "<tr bgcolor=$color1><td colspan=26><font color=$color2><b><center>Playoffs</center></b></font></td></tr>
-		<tr bgcolor=$color1><td><font color=$color2><b>Date</font></td><td><font color=$color2><b>Visitor</font></td><td><font color=$color2><b>Score</font></td><td><font color=$color2><b>Home</font></td><td><font color=$color2><b>Score</font></td><td><font color=$color2><b>Box Score</b></font></td><td><font color=$color2><b>Record</font></td><td><font color=$color2><b>Streak</font></td></tr>";
-    list($wins, $losses, $winStreak, $lossStreak) = boxscore($year1, '06', $tid, $wins, $losses, $winStreak, $lossStreak);
-    echo "</center>";
-    CloseTable();
+
+    //=============================
+    //GET CONTRACT AMOUNTS CORRECT
+    //=============================
+
+    $queryfaon = "SELECT * FROM nuke_modules WHERE mid = '83' ORDER BY title ASC"; // THIS CHECKS IF FA IS ACTIVE AND HIDES FA PLAYERS IF IT IS
+    $resultfaon = $db->sql_query($queryfaon);
+    $faon = $db->sql_result($resultfaon, 0, "active");
+
+    if ($tid == 0) { // Team 0 is the Free Agents; we want a query that will pick up all of their players.
+        if ($faon == 0) {
+            $query = "SELECT * FROM ibl_plr WHERE ordinal > '959' AND retired = 0 ORDER BY ordinal ASC";
+            //            $query="SELECT * FROM ibl_plr WHERE tid = 0 AND retired = 0 ORDER BY ordinal ASC";
+        } else {
+            $query = "SELECT * FROM ibl_plr WHERE ordinal > '959' AND retired = 0 AND cyt != cy ORDER BY ordinal ASC";
+            //            $query="SELECT * FROM ibl_plr WHERE tid = 0 AND retired = 0 AND cyt != cy ORDER BY ordinal ASC";
+        }
+        $result = $db->sql_query($query);
+        $num = $db->sql_numrows($result);
+    } else if ($tid == "-1") { // SHOW ENTIRE LEAGUE
+        $query = "SELECT * FROM ibl_plr WHERE retired = 0 AND name NOT LIKE '%Buyouts' ORDER BY ordinal ASC";
+        $result = $db->sql_query($query);
+        $num = $db->sql_numrows($result);
+    } else { // If not Free Agents, use the code below instead.
+        if ($yr != "") {
+            $query = "SELECT * FROM ibl_hist WHERE teamid = '$tid' AND year = '$yr' ORDER BY name ASC";
+        } else if ($faon == 0) {
+            $query = "SELECT * FROM ibl_plr WHERE tid = '$tid' AND retired = 0 ORDER BY name ASC";
+        } else {
+            $query = "SELECT * FROM ibl_plr WHERE tid = '$tid' AND retired = 0 AND cyt != cy ORDER BY name ASC";
+        }
+        $result = $db->sql_query($query);
+        $num = $db->sql_numrows($result);
+    }
+
+    echo "<table><tr><td align=center valign=top><img src=\"./images/logo/$tid.jpg\">";
+
+    if ($yr != "") {
+        echo "<center><h1>$yr $team_name</h1></center>";
+        $insertyear = "&yr=$yr";
+    } else {
+        $insertyear = "";
+    }
+
+    if ($display == "ratings") {
+        $showing = "Player Ratings";
+        $tabs .= "<td bgcolor=#BBBBBB><a href=\"modules.php?name=Team&op=team&tid=$tid&display=ratings$insertyear\">Ratings</a></td>";
+        $table_ratings = ratings($db, $result, $color1, $color2, $tid, $yr);
+        $table_output = $table_ratings;
+    } else {
+        $tabs .= "<td><a href=\"modules.php?name=Team&op=team&tid=$tid&display=ratings$insertyear\">Ratings</a></td>";
+    }
+
+    if ($display == "total_s") {
+        $showing = "Season Totals";
+        $tabs .= "<td bgcolor=#BBBBBB><a href=\"modules.php?name=Team&op=team&tid=$tid&display=total_s$insertyear\">Season Totals</a></td>";
+        $table_totals = seasonTotals($db, $result, $color1, $color2, $tid, $yr, $team_name);
+        $table_output = $table_totals;
+    } else {
+        $tabs .= "<td><a href=\"modules.php?name=Team&op=team&tid=$tid&display=total_s$insertyear\">Season Totals</a></td>";
+    }
+
+    if ($display == "avg_s") {
+        $showing = "Season Averages";
+        $tabs .= "<td bgcolor=#BBBBBB><a href=\"modules.php?name=Team&op=team&tid=$tid&display=avg_s$insertyear\">Season Averages</a></td>";
+        $table_averages = seasonAverages($db, $result, $color1, $color2, $tid, $yr, $team_name);
+        $table_output = $table_averages;
+    } else {
+        $tabs .= "<td ><a href=\"modules.php?name=Team&op=team&tid=$tid&display=avg_s$insertyear\">Season Averages</a></td>";
+    }
+
+    if ($display == "chunk") {
+        $showing = "Chunk Averages";
+        $tabs .= "<td bgcolor=#BBBBBB><a href=\"modules.php?name=Team&op=team&tid=$tid&display=chunk$insertyear\">Sim Averages</a></td>";
+        $table_simAverages = simAverages($db, $sharedFunctions, $color1, $color2, $tid);
+        $table_output = $table_simAverages;
+    } else {
+        $tabs .= "<td><a href=\"modules.php?name=Team&op=team&tid=$tid&display=chunk$insertyear\">Sim Averages</a></td>";
+    }
+
+    if ($display == "contracts") {
+        $showing = "Contracts";
+        $tabs .= "<td bgcolor=#BBBBBB><a href=\"modules.php?name=Team&op=team&tid=$tid&display=contracts$insertyear\">Contracts</a></td>";
+        $table_contracts = contracts($db, $result, $color1, $color2, $tid, $faon);
+        $table_output = $table_contracts;
+    } else {
+        $tabs .= "<td><a href=\"modules.php?name=Team&op=team&tid=$tid&display=contracts$insertyear\">Contracts</a></td>";
+    }
+
+    if ($tid != 0 AND $yr == "") {
+        $starters_table = lastSimsStarters($db, $result, $color1, $color2);
+    }
+
+    $table_draftpicks = draftPicks($db, $team_name);
+
+    $inforight = team_info_right($team_name, $color1, $color2, $owner_name, $tid);
+    $team_info_right = $inforight[0];
+    $rafters = $inforight[1];
+
+    echo "<table align=center>
+        <tr bgcolor=$color1><td><font color=$color2><b><center>$showing (Sortable by clicking on Column Heading)</center></b></font></td></tr>
+		<tr><td align=center><table><tr>$tabs</tr></table></td></tr>
+		<tr><td align=center>$table_output</td></tr>
+		<tr><td align=center>$starters_table</td></tr>
+		<tr bgcolor=$color1><td><font color=$color2><b><center>Draft Picks</center></b></font></td></tr>
+		<tr><td>$table_draftpicks</td></tr>
+		<tr><td>$rafters</td></tr>
+    </table>";
+
+    // TRANSITIONS TO NEXT SIDE OF PAGE
+    echo "</td><td valign=top>$team_info_right</td></tr></table>";
 
     CloseTable();
     include "footer.php";
-}
-
-function boxscore($year, $month, $tid, $wins, $losses, $winStreak, $lossStreak)
-{
-    global $db;
-    $sharedFunctions = new Shared($db);
-
-    //TODO: unify this code with the Schedule module's chunk function
-
-    $query = "SELECT *
-		FROM `ibl_schedule`
-		WHERE (Visitor = $tid AND Date BETWEEN '$year-$month-01' AND '$year-$month-31')
-			OR (Home = $tid AND Date BETWEEN '$year-$month-01' AND '$year-$month-31')
-		ORDER BY Date ASC";
-    $result = $db->sql_query($query);
-    $num = $db->sql_numrows($result);
-    $i = 0;
-
-    $teamSeasonRecordsQuery = "SELECT tid, leagueRecord FROM ibl_standings ORDER BY tid ASC;";
-    $teamSeasonRecordsResult = $db->sql_query($teamSeasonRecordsQuery);
-
-    $arrayLastSimDates = $sharedFunctions->getLastSimDatesArray();
-    $lastSimEndDate = date_create($arrayLastSimDates["End Date"]);
-    $projectedNextSimEndDate = date_add($lastSimEndDate, date_interval_create_from_date_string('7 days'));
-    $currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
-    $currentSeasonBeginningYear = $currentSeasonEndingYear - 1;
-
-    // override $projectedNextSimEndDate to account for the blank week at end of HEAT
-    if (
-        $projectedNextSimEndDate >= date_create("$currentSeasonBeginningYear-10-23")
-        AND $projectedNextSimEndDate < date_create("$currentSeasonBeginningYear-11-01")
-    ) {
-        $projectedNextSimEndDate = date_create("$currentSeasonBeginningYear-11-08");
-    }
-    // override $projectedNextSimEndDate to account for the All-Star Break
-    if (
-        $projectedNextSimEndDate >= date_create("$currentSeasonEndingYear-02-01")
-        AND $projectedNextSimEndDate < date_create("$currentSeasonEndingYear-02-11")
-    ) {
-        $projectedNextSimEndDate = date_create("$currentSeasonEndingYear-02-11");
-    }
-
-    while ($i < $num) {
-        $date = $db->sql_result($result, $i, "Date");
-        $visitor = $db->sql_result($result, $i, "Visitor");
-        $visitorScore = $db->sql_result($result, $i, "VScore");
-        $home = $db->sql_result($result, $i, "Home");
-        $homeScore = $db->sql_result($result, $i, "HScore");
-        $boxID = $db->sql_result($result, $i, "BoxID");
-
-        $visitorTeamname = $sharedFunctions->getTeamnameFromTid($visitor);
-        $homeTeamname = $sharedFunctions->getTeamnameFromTid($home);
-        $visitorRecord = $db->sql_result($teamSeasonRecordsResult, $visitor - 1, "leagueRecord");
-        $homeRecord = $db->sql_result($teamSeasonRecordsResult, $home - 1, "leagueRecord");
-
-        if ($visitorScore == $homeScore) {
-            if (date_create($date) <= $projectedNextSimEndDate) {
-                echo "<tr bgcolor=#DDDD00>";
-            } else {
-                echo "<tr>";
-            }
-            echo "<td>$date</td>
-				<td><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$visitorTeamname ($visitorRecord)</a></td>
-				<td></td>
-				<td><a href=\"modules.php?name=Team&op=team&tid=$home\">$homeTeamname ($homeRecord)</a></td>
-				<td></td>
-				<td></td>
-				<td></td>
-				<td></td>
-			</tr>";
-        } else {
-            if ($tid == $visitor) {
-                if ($visitorScore > $homeScore) {
-                    $wins++;
-                    $winStreak++;
-                    $lossStreak = 0;
-                    $winlosscolor = "green";
-                } else {
-                    $losses++;
-                    $lossStreak++;
-                    $winStreak = 0;
-                    $winlosscolor = "red";
-                }
-            } else {
-                if ($visitorScore > $homeScore) {
-                    $losses++;
-                    $lossStreak++;
-                    $winStreak = 0;
-                    $winlosscolor = "red";
-                } else {
-                    $wins++;
-                    $winStreak++;
-                    $lossStreak = 0;
-                    $winlosscolor = "green";
-                }
-            }
-
-            if ($winStreak > $lossStreak) {
-                $streak = "W $winStreak";
-            } else {
-                $streak = "L $lossStreak";
-            }
-
-            (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
-
-            if ($visitorScore > $homeScore) {
-                echo "<tr bgcolor=$bgcolor>
-					<td>$date</td>
-					<td><b><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$visitorTeamname ($visitorRecord)</a></b></td>
-					<td><b><font color=$winlosscolor>$visitorScore</font></b></td>
-					<td><a href=\"modules.php?name=Team&op=team&tid=$home\">$homeTeamname ($homeRecord)</a></td>
-					<td><b><font color=$winlosscolor>$homeScore</font></b></td>
-					<td><a href=\"./ibl/IBL/box$boxID.htm\">View</a></td>
-					<td>$wins - $losses</td>
-					<td>$streak</td>
-				</tr>";
-            } else if ($visitorScore < $homeScore) {
-                echo "<tr bgcolor=$bgcolor>
-					<td>$date</td>
-					<td><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$visitorTeamname ($visitorRecord)</a></td>
-					<td><b><font color=$winlosscolor>$visitorScore</font></b></td>
-					<td><b><a href=\"modules.php?name=Team&op=team&tid=$home\">$homeTeamname ($homeRecord)</a></b></td>
-					<td><b><font color=$winlosscolor>$homeScore</font></b></td>
-					<td><a href=\"./ibl/IBL/box$boxID.htm\">View</a></td>
-					<td>$wins - $losses</td>
-					<td>$streak</td>
-				</tr>";
-            }
-        }
-
-        $i++;
-    }
-
-    return array($wins, $losses, $winStreak, $lossStreak);
-}
-
-function decoratePlayerName($name, $tid, $ordinal, $currentContractYear, $totalYearsOnContract)
-{
-    if ($tid == 0) {
-        $playerNameDecorated = "$name";
-    } elseif ($$ordinal >= 960) { // on waivers
-        $playerNameDecorated = "($name)*";
-    } elseif ($currentContractYear == $totalYearsOnContract) { // eligible for Free Agency at the end of this season
-        $playerNameDecorated = "$name^";
-    } else {
-        $playerNameDecorated = "$name";
-    }
-    return $playerNameDecorated;
-}
-
-function lastSimsStarters($db, $result, $color1, $color2)
-{
-    $num = $db->sql_numrows($result);
-    $i = 0;
-    while ($i < $num) {
-        if ($db->sql_result($result, $i, "PGDepth") == 1) {
-            $startingPG = $db->sql_result($result, $i, "name");
-            $startingPGpid = $db->sql_result($result, $i, "pid");
-        }
-        if ($db->sql_result($result, $i, "SGDepth") == 1) {
-            $startingSG = $db->sql_result($result, $i, "name");
-            $startingSGpid = $db->sql_result($result, $i, "pid");
-        }
-        if ($db->sql_result($result, $i, "SFDepth") == 1) {
-            $startingSF = $db->sql_result($result, $i, "name");
-            $startingSFpid = $db->sql_result($result, $i, "pid");
-        }
-        if ($db->sql_result($result, $i, "PFDepth") == 1) {
-            $startingPF = $db->sql_result($result, $i, "name");
-            $startingPFpid = $db->sql_result($result, $i, "pid");
-        }
-        if ($db->sql_result($result, $i, "CDepth") == 1) {
-            $startingC = $db->sql_result($result, $i, "name");
-            $startingCpid = $db->sql_result($result, $i, "pid");
-        }
-        $i++;
-    }
-
-    $starters_table = "<table align=\"center\" border=1 cellpadding=1 cellspacing=1>
-        <tr bgcolor=$color1>
-            <td colspan=5><font color=$color2><center><b>Last Sim's Starters</b></center></font></td>
-        </tr>
-        <tr>
-            <td><center><b>PG</b><br><img src=\"./images/player/$startingPGpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingPGpid\">$startingPG</a></td>
-            <td><center><b>SG</b><br><img src=\"./images/player/$startingSGpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingSGpid\">$startingSG</a></td>
-            <td><center><b>SF</b><br><img src=\"./images/player/$startingSFpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingSFpid\">$startingSF</a></td>
-            <td><center><b>PF</b><br><img src=\"./images/player/$startingPFpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingPFpid\">$startingPF</a></td>
-            <td><center><b>C</b><br><img src=\"./images/player/$startingCpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingCpid\">$startingC</a></td>
-        </tr>
-    </table>";
-
-    return $starters_table;
 }
 
 function ratings($db, $result, $color1, $color2, $tid, $yr)
@@ -1653,6 +1184,64 @@ function contracts($db, $result, $color1, $color2, $tid, $faon)
     return $table_contracts;
 }
 
+function decoratePlayerName($name, $tid, $ordinal, $currentContractYear, $totalYearsOnContract)
+{
+    if ($tid == 0) {
+        $playerNameDecorated = "$name";
+    } elseif ($$ordinal >= 960) { // on waivers
+        $playerNameDecorated = "($name)*";
+    } elseif ($currentContractYear == $totalYearsOnContract) { // eligible for Free Agency at the end of this season
+        $playerNameDecorated = "$name^";
+    } else {
+        $playerNameDecorated = "$name";
+    }
+    return $playerNameDecorated;
+}
+
+function lastSimsStarters($db, $result, $color1, $color2)
+{
+    $num = $db->sql_numrows($result);
+    $i = 0;
+    while ($i < $num) {
+        if ($db->sql_result($result, $i, "PGDepth") == 1) {
+            $startingPG = $db->sql_result($result, $i, "name");
+            $startingPGpid = $db->sql_result($result, $i, "pid");
+        }
+        if ($db->sql_result($result, $i, "SGDepth") == 1) {
+            $startingSG = $db->sql_result($result, $i, "name");
+            $startingSGpid = $db->sql_result($result, $i, "pid");
+        }
+        if ($db->sql_result($result, $i, "SFDepth") == 1) {
+            $startingSF = $db->sql_result($result, $i, "name");
+            $startingSFpid = $db->sql_result($result, $i, "pid");
+        }
+        if ($db->sql_result($result, $i, "PFDepth") == 1) {
+            $startingPF = $db->sql_result($result, $i, "name");
+            $startingPFpid = $db->sql_result($result, $i, "pid");
+        }
+        if ($db->sql_result($result, $i, "CDepth") == 1) {
+            $startingC = $db->sql_result($result, $i, "name");
+            $startingCpid = $db->sql_result($result, $i, "pid");
+        }
+        $i++;
+    }
+
+    $starters_table = "<table align=\"center\" border=1 cellpadding=1 cellspacing=1>
+        <tr bgcolor=$color1>
+            <td colspan=5><font color=$color2><center><b>Last Sim's Starters</b></center></font></td>
+        </tr>
+        <tr>
+            <td><center><b>PG</b><br><img src=\"./images/player/$startingPGpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingPGpid\">$startingPG</a></td>
+            <td><center><b>SG</b><br><img src=\"./images/player/$startingSGpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingSGpid\">$startingSG</a></td>
+            <td><center><b>SF</b><br><img src=\"./images/player/$startingSFpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingSFpid\">$startingSF</a></td>
+            <td><center><b>PF</b><br><img src=\"./images/player/$startingPFpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingPFpid\">$startingPF</a></td>
+            <td><center><b>C</b><br><img src=\"./images/player/$startingCpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingCpid\">$startingC</a></td>
+        </tr>
+    </table>";
+
+    return $starters_table;
+}
+
 function draftPicks($db, $team_name)
 {
     $table_draftpicks = "<table align=\"center\">";
@@ -1699,164 +1288,6 @@ function draftPicks($db, $team_name)
     $table_draftpicks .= "</table>";
 
     return $table_draftpicks;
-}
-
-function team($tid)
-{
-    global $db;
-    $sharedFunctions = new Shared($db);
-
-    $tid = intval($tid);
-
-    $yr = $_REQUEST['yr'];
-
-    $display = $_REQUEST['display'];
-    if ($display == null) {
-        $display = "ratings";
-    }
-
-    include "header.php";
-    OpenTable();
-
-    //============================
-    // GRAB TEAM COLORS, ET AL
-    //============================
-
-    $queryteam = "SELECT * FROM ibl_team_info WHERE teamid = '$tid' ";
-    $resultteam = $db->sql_query($queryteam);
-
-    $team_name = $db->sql_result($resultteam, 0, "team_name");
-    $color1 = $db->sql_result($resultteam, 0, "color1");
-    $color2 = $db->sql_result($resultteam, 0, "color2");
-    $owner_name = $db->sql_result($resultteam, 0, "owner_name");
-
-    //=============================
-    //DISPLAY TOP MENU
-    //=============================
-
-    $sharedFunctions->displaytopmenu($tid);
-
-    //=============================
-    //GET CONTRACT AMOUNTS CORRECT
-    //=============================
-
-    $queryfaon = "SELECT * FROM nuke_modules WHERE mid = '83' ORDER BY title ASC"; // THIS CHECKS IF FA IS ACTIVE AND HIDES FA PLAYERS IF IT IS
-    $resultfaon = $db->sql_query($queryfaon);
-    $faon = $db->sql_result($resultfaon, 0, "active");
-
-    if ($tid == 0) { // Team 0 is the Free Agents; we want a query that will pick up all of their players.
-        if ($faon == 0) {
-            $query = "SELECT * FROM ibl_plr WHERE ordinal > '959' AND retired = 0 ORDER BY ordinal ASC";
-            //            $query="SELECT * FROM ibl_plr WHERE tid = 0 AND retired = 0 ORDER BY ordinal ASC";
-        } else {
-            $query = "SELECT * FROM ibl_plr WHERE ordinal > '959' AND retired = 0 AND cyt != cy ORDER BY ordinal ASC";
-            //            $query="SELECT * FROM ibl_plr WHERE tid = 0 AND retired = 0 AND cyt != cy ORDER BY ordinal ASC";
-        }
-        $result = $db->sql_query($query);
-        $num = $db->sql_numrows($result);
-    } else if ($tid == "-1") { // SHOW ENTIRE LEAGUE
-        $query = "SELECT * FROM ibl_plr WHERE retired = 0 AND name NOT LIKE '%Buyouts' ORDER BY ordinal ASC";
-        $result = $db->sql_query($query);
-        $num = $db->sql_numrows($result);
-    } else { // If not Free Agents, use the code below instead.
-        if ($yr != "") {
-            $query = "SELECT * FROM ibl_hist WHERE teamid = '$tid' AND year = '$yr' ORDER BY name ASC";
-        } else if ($faon == 0) {
-            $query = "SELECT * FROM ibl_plr WHERE tid = '$tid' AND retired = 0 ORDER BY name ASC";
-        } else {
-            $query = "SELECT * FROM ibl_plr WHERE tid = '$tid' AND retired = 0 AND cyt != cy ORDER BY name ASC";
-        }
-        $result = $db->sql_query($query);
-        $num = $db->sql_numrows($result);
-    }
-
-    echo "<table><tr><td align=center valign=top><img src=\"./images/logo/$tid.jpg\">";
-
-    if ($yr != "") {
-        echo "<center><h1>$yr $team_name</h1></center>";
-    }
-
-    // Last Sim's Starters
-    if ($tid != 0 and $yr == "") {
-        $starters_table = lastSimsStarters($db, $result, $color1, $color2);
-    }
-
-    $inforight = team_info_right($team_name, $color1, $color2, $owner_name, $tid);
-
-    $team_info_right = $inforight[0];
-    $rafters = $inforight[1];
-
-    if ($yr != "") {
-        $insertyear = "&yr=$yr";
-    } else {
-        $insertyear = "";
-    }
-
-    if ($display == "ratings") {
-        $showing = "Player Ratings";
-        $tabs .= "<td bgcolor=#BBBBBB><a href=\"modules.php?name=Team&op=team&tid=$tid&display=ratings$insertyear\">Ratings</a></td>";
-        $table_ratings = ratings($db, $result, $color1, $color2, $tid, $yr);
-        $table_output = $table_ratings;
-    } else {
-        $tabs .= "<td><a href=\"modules.php?name=Team&op=team&tid=$tid&display=ratings$insertyear\">Ratings</a></td>";
-    }
-
-    if ($display == "total_s") {
-        $showing = "Season Totals";
-        $tabs .= "<td bgcolor=#BBBBBB><a href=\"modules.php?name=Team&op=team&tid=$tid&display=total_s$insertyear\">Season Totals</a></td>";
-        $table_totals = seasonTotals($db, $result, $color1, $color2, $tid, $yr, $team_name);
-        $table_output = $table_totals;
-    } else {
-        $tabs .= "<td><a href=\"modules.php?name=Team&op=team&tid=$tid&display=total_s$insertyear\">Season Totals</a></td>";
-    }
-
-    if ($display == "avg_s") {
-        $showing = "Season Averages";
-        $tabs .= "<td bgcolor=#BBBBBB><a href=\"modules.php?name=Team&op=team&tid=$tid&display=avg_s$insertyear\">Season Averages</a></td>";
-        $table_averages = seasonAverages($db, $result, $color1, $color2, $tid, $yr, $team_name);
-        $table_output = $table_averages;
-    } else {
-        $tabs .= "<td ><a href=\"modules.php?name=Team&op=team&tid=$tid&display=avg_s$insertyear\">Season Averages</a></td>";
-    }
-
-    if ($display == "chunk") {
-        $showing = "Chunk Averages";
-        $tabs .= "<td bgcolor=#BBBBBB><a href=\"modules.php?name=Team&op=team&tid=$tid&display=chunk$insertyear\">Sim Averages</a></td>";
-        $table_simAverages = simAverages($db, $sharedFunctions, $color1, $color2, $tid);
-        $table_output = $table_simAverages;
-    } else {
-        $tabs .= "<td><a href=\"modules.php?name=Team&op=team&tid=$tid&display=chunk$insertyear\">Sim Averages</a></td>";
-    }
-
-    if ($display == "contracts") {
-        $showing = "Contracts";
-        $tabs .= "<td bgcolor=#BBBBBB><a href=\"modules.php?name=Team&op=team&tid=$tid&display=contracts$insertyear\">Contracts</a></td>";
-        $table_contracts = contracts($db, $result, $color1, $color2, $tid, $faon);
-        $table_output = $table_contracts;
-    } else {
-        $tabs .= "<td><a href=\"modules.php?name=Team&op=team&tid=$tid&display=contracts$insertyear\">Contracts</a></td>";
-    }
-
-    $table_draftpicks = draftPicks($db, $team_name);
-
-    echo "<table align=center>
-        <tr bgcolor=$color1><td><font color=$color2><b><center>$showing (Sortable by clicking on Column Heading)</center></b></font></td></tr>
-		<tr><td align=center><table><tr>$tabs</tr></table></td></tr>
-		<tr><td align=center>$table_output</td></tr>
-		<tr><td align=center>$starters_table</td></tr>
-		<tr bgcolor=$color1><td><font color=$color2><b><center>Draft Picks</center></b></font></td></tr>
-		<tr><td>$table_draftpicks</td></tr>
-		<tr><td>$rafters</td></tr>
-    </table>";
-
-    // TRANSITIONS TO NEXT SIDE OF PAGE
-
-    echo "</td><td valign=top>$team_info_right</td></tr></table>";
-
-    // CLOSES UP THE TABLE
-
-    CloseTable();
-    include "footer.php";
 }
 
 function team_info_right($team_name, $color1, $color2, $owner_name, $tid)
@@ -2285,6 +1716,586 @@ function team_info_right($team_name, $color1, $color2, $owner_name, $tid)
     return $ultimate_output;
 }
 
+function teamCurrentSeasonStandings($team)
+{
+    global $db;
+
+    $query = "SELECT * FROM ibl_power WHERE Team = '$team'";
+    $result = $db->sql_query($query);
+    $num = $db->sql_numrows($result);
+    $Team = $db->sql_result($result, 0, "Team");
+    $win = $db->sql_result($result, 0, "win");
+    $loss = $db->sql_result($result, 0, "loss");
+    $gb = $db->sql_result($result, 0, "gb");
+    $division = $db->sql_result($result, 0, "Division");
+    $conference = $db->sql_result($result, 0, "Conference");
+    $home_win = $db->sql_result($result, 0, "home_win");
+    $home_loss = $db->sql_result($result, 0, "home_loss");
+    $road_win = $db->sql_result($result, 0, "road_win");
+    $road_loss = $db->sql_result($result, 0, "road_loss");
+    $last_win = $db->sql_result($result, 0, "last_win");
+    $last_loss = $db->sql_result($result, 0, "last_loss");
+
+    $query2 = "SELECT * FROM ibl_power WHERE Division = '$division' ORDER BY gb DESC";
+    $result2 = $db->sql_query($query2);
+    $num = $db->sql_numrows($result2);
+    $i = 0;
+    $gbbase = $db->sql_result($result2, $i, "gb");
+    $gb = $gbbase - $gb;
+    while ($i < $num) {
+        $Team2 = $db->sql_result($result2, $i, "Team");
+        if ($Team2 == $Team) {
+            $Div_Pos = $i + 1;
+        }
+        $i++;
+    }
+
+    $query3 = "SELECT * FROM ibl_power WHERE Conference = '$conference' ORDER BY gb DESC";
+    $result3 = $db->sql_query($query3);
+    $num = $db->sql_numrows($result3);
+    $i = 0;
+    while ($i < $num) {
+        $Team3 = $db->sql_result($result3, $i, "Team");
+        if ($Team3 == $Team) {
+            $Conf_Pos = $i + 1;
+        }
+        $i++;
+    }
+
+    $standings = "<table><tr><td align='right'><b>Team:</td><td>$team</td></tr>
+		<tr><td align='right'><b>Record:</td><td>$win-$loss</td></tr>
+		<tr><td align='right'><b>Conference:</td><td>$conference</td></tr>
+		<tr><td align='right'><b>Conf Position:</td><td>$Conf_Pos</td></tr>
+		<tr><td align='right'><b>Division:</td><td>$division</td></tr>
+		<tr><td align='right'><b>Div Position:</td><td>$Div_Pos</td></tr>
+		<tr><td align='right'><b>GB:</td><td>$gb</td></tr>
+		<tr><td align='right'><b>Home Record:</td><td>$home_win-$home_loss</td></tr>
+		<tr><td align='right'><b>Road Record:</td><td>$road_win-$road_loss</td></tr>
+		<tr><td align='right'><b>Last 10:</td><td>$last_win-$last_loss</td></tr>
+	</table>";
+    return $standings;
+}
+
+function leaguestats()
+{
+    global $db;
+
+    include "header.php";
+    OpenTable();
+
+    $queryteam = "SELECT * FROM ibl_team_info";
+    $resultteam = $db->sql_query($queryteam);
+    $numteams = $db->sql_numrows($resultteam);
+
+    $n = 0;
+    while ($n < $numteams) {
+        $teamid[$n] = $db->sql_result($resultteam, $n, "teamid");
+        $team_city[$n] = $db->sql_result($resultteam, $n, "team_city");
+        $team_name[$n] = $db->sql_result($resultteam, $n, "team_name");
+        $coach_pts[$n] = $db->sql_result($resultteam, $n, "Contract_Coach");
+        $color1[$n] = $db->sql_result($resultteam, $n, "color1");
+        $color2[$n] = $db->sql_result($resultteam, $n, "color2");
+        $n++;
+    }
+
+    $queryTeamOffenseTotals = "SELECT * FROM ibl_team_offense_stats ORDER BY team ASC";
+    $resultTeamOffenseTotals = $db->sql_query($queryTeamOffenseTotals);
+    $numTeamOffenseTotals = $db->sql_numrows($resultTeamOffenseTotals);
+
+    $t = 0;
+
+    while ($t < $numTeamOffenseTotals) {
+        $team_off_name = $db->sql_result($resultTeamOffenseTotals, $t, "team");
+        $m = 0;
+        while ($m < $n) {
+            if ($team_off_name == $team_name[$m]) {
+                $teamcolor1 = $color1[$m];
+                $teamcolor2 = $color2[$m];
+                $teamcity = $team_city[$m];
+                $tid = $teamid[$m];
+            }
+            $m++;
+        }
+
+        $team_off_games = $db->sql_result($resultTeamOffenseTotals, $t, "games");
+        $team_off_minutes = $db->sql_result($resultTeamOffenseTotals, $t, "minutes");
+        $team_off_fgm = $db->sql_result($resultTeamOffenseTotals, $t, "fgm");
+        $team_off_fga = $db->sql_result($resultTeamOffenseTotals, $t, "fga");
+        $team_off_ftm = $db->sql_result($resultTeamOffenseTotals, $t, "ftm");
+        $team_off_fta = $db->sql_result($resultTeamOffenseTotals, $t, "fta");
+        $team_off_tgm = $db->sql_result($resultTeamOffenseTotals, $t, "tgm");
+        $team_off_tga = $db->sql_result($resultTeamOffenseTotals, $t, "tga");
+        $team_off_orb = $db->sql_result($resultTeamOffenseTotals, $t, "orb");
+        $team_off_reb = $db->sql_result($resultTeamOffenseTotals, $t, "reb");
+        $team_off_ast = $db->sql_result($resultTeamOffenseTotals, $t, "ast");
+        $team_off_stl = $db->sql_result($resultTeamOffenseTotals, $t, "stl");
+        $team_off_tvr = $db->sql_result($resultTeamOffenseTotals, $t, "tvr");
+        $team_off_blk = $db->sql_result($resultTeamOffenseTotals, $t, "blk");
+        $team_off_pf = $db->sql_result($resultTeamOffenseTotals, $t, "pf");
+        $team_off_pts = $team_off_fgm + $team_off_fgm + $team_off_ftm + $team_off_tgm;
+
+        @$team_off_avgfgm = number_format($team_off_fgm / $team_off_games, 2);
+        @$team_off_avgfga = number_format($team_off_fga / $team_off_games, 2);
+        @$team_off_fgp = number_format($team_off_fgm / $team_off_fga, 3);
+        @$team_off_avgftm = number_format($team_off_ftm / $team_off_games, 2);
+        @$team_off_avgfta = number_format($team_off_fta / $team_off_games, 2);
+        @$team_off_ftp = number_format($team_off_ftm / $team_off_fta, 3);
+        @$team_off_avgtgm = number_format($team_off_tgm / $team_off_games, 2);
+        @$team_off_avgtga = number_format($team_off_tga / $team_off_games, 2);
+        @$team_off_tgp = number_format($team_off_tgm / $team_off_tga, 3);
+        @$team_off_avgorb = number_format($team_off_orb / $team_off_games, 2);
+        @$team_off_avgreb = number_format($team_off_reb / $team_off_games, 2);
+        @$team_off_avgast = number_format($team_off_ast / $team_off_games, 2);
+        @$team_off_avgstl = number_format($team_off_stl / $team_off_games, 2);
+        @$team_off_avgtvr = number_format($team_off_tvr / $team_off_games, 2);
+        @$team_off_avgblk = number_format($team_off_blk / $team_off_games, 2);
+        @$team_off_avgpf = number_format($team_off_pf / $team_off_games, 2);
+        @$team_off_avgpts = number_format($team_off_pts / $team_off_games, 2);
+
+        $lg_off_games += $team_off_games;
+        $lg_off_minutes += $team_off_minutes;
+        $lg_off_fgm += $team_off_fgm;
+        $lg_off_fga += $team_off_fga;
+        $lg_off_ftm += $team_off_ftm;
+        $lg_off_fta += $team_off_fta;
+        $lg_off_tgm += $team_off_tgm;
+        $lg_off_tga += $team_off_tga;
+        $lg_off_orb += $team_off_orb;
+        $lg_off_reb += $team_off_reb;
+        $lg_off_ast += $team_off_ast;
+        $lg_off_stl += $team_off_stl;
+        $lg_off_tvr += $team_off_tvr;
+        $lg_off_blk += $team_off_blk;
+        $lg_off_pf += $team_off_pf;
+        $lg_off_pts += $team_off_pts;
+
+        $offense_totals .= "<tr>
+			<td bgcolor=\"$teamcolor1\"><a href=\"modules.php?name=Team&op=team&tid=$tid\"><font color=\"$teamcolor2\">$teamcity $team_off_name Offense</font></a></td>
+			<td>$team_off_games</td>
+			<td>$team_off_fgm</td>
+			<td>$team_off_fga</td>
+			<td>$team_off_ftm</td>
+			<td>$team_off_fta</td>
+			<td>$team_off_tgm</td>
+			<td>$team_off_tga</td>
+			<td>$team_off_orb</td>
+			<td>$team_off_reb</td>
+			<td>$team_off_ast</td>
+			<td>$team_off_stl</td>
+			<td>$team_off_tvr</td>
+			<td>$team_off_blk</td>
+			<td>$team_off_pf</td>
+			<td>$team_off_pts</td>
+		</tr>";
+
+        $offense_averages .= "<tr>
+			<td bgcolor=\"$teamcolor1\"><a href=\"modules.php?name=Team&op=team&tid=$tid\"><font color=\"$teamcolor2\">$teamcity $team_off_name Offense</font></a></td>
+			<td>$team_off_avgfgm</td>
+			<td>$team_off_avgfga</td>
+			<td>$team_off_fgp</td>
+			<td>$team_off_avgftm</td>
+			<td>$team_off_avgfta</td>
+			<td>$team_off_ftp</td>
+			<td>$team_off_avgtgm</td>
+			<td>$team_off_avgtga</td>
+			<td>$team_off_tgp</td>
+			<td>$team_off_avgorb</td>
+			<td>$team_off_avgreb</td>
+			<td>$team_off_avgast</td>
+			<td>$team_off_avgstl</td>
+			<td>$team_off_avgtvr</td>
+			<td>$team_off_avgblk</td>
+			<td>$team_off_avgpf</td>
+			<td>$team_off_avgpts</td>
+		</tr>";
+
+        $t++;
+    }
+
+    $queryTeamDefenseTotals = "SELECT * FROM ibl_team_defense_stats ORDER BY team ASC";
+    $resultTeamDefenseTotals = $db->sql_query($queryTeamDefenseTotals);
+    $numTeamDefenseTotals = $db->sql_numrows($resultTeamDefenseTotals);
+
+    $t = 0;
+
+    while ($t < $numTeamDefenseTotals) {
+
+        $team_def_name = $db->sql_result($resultTeamDefenseTotals, $t, "team");
+        $m = 0;
+        while ($m < $n) {
+            if ($team_def_name == $team_name[$m]) {
+                $teamcolor1 = $color1[$m];
+                $teamcolor2 = $color2[$m];
+                $teamcity = $team_city[$m];
+                $tid = $teamid[$m];
+            }
+            $m++;
+        }
+
+        $team_def_games = $db->sql_result($resultTeamDefenseTotals, $t, "games");
+        $team_def_fgm = $db->sql_result($resultTeamDefenseTotals, $t, "fgm");
+        $team_def_fga = $db->sql_result($resultTeamDefenseTotals, $t, "fga");
+        $team_def_ftm = $db->sql_result($resultTeamDefenseTotals, $t, "ftm");
+        $team_def_fta = $db->sql_result($resultTeamDefenseTotals, $t, "fta");
+        $team_def_tgm = $db->sql_result($resultTeamDefenseTotals, $t, "tgm");
+        $team_def_tga = $db->sql_result($resultTeamDefenseTotals, $t, "tga");
+        $team_def_orb = $db->sql_result($resultTeamDefenseTotals, $t, "orb");
+        $team_def_reb = $db->sql_result($resultTeamDefenseTotals, $t, "reb");
+        $team_def_ast = $db->sql_result($resultTeamDefenseTotals, $t, "ast");
+        $team_def_stl = $db->sql_result($resultTeamDefenseTotals, $t, "stl");
+        $team_def_tvr = $db->sql_result($resultTeamDefenseTotals, $t, "tvr");
+        $team_def_blk = $db->sql_result($resultTeamDefenseTotals, $t, "blk");
+        $team_def_pf = $db->sql_result($resultTeamDefenseTotals, $t, "pf");
+        $team_def_pts = $team_def_fgm + $team_def_fgm + $team_def_ftm + $team_def_tgm;
+
+        @$team_def_avgfgm = number_format($team_def_fgm / $team_def_games, 2);
+        @$team_def_avgfga = number_format($team_def_fga / $team_def_games, 2);
+        @$team_def_fgp = number_format($team_def_fgm / $team_def_fga, 3);
+        @$team_def_avgftm = number_format($team_def_ftm / $team_def_games, 2);
+        @$team_def_avgfta = number_format($team_def_fta / $team_def_games, 2);
+        @$team_def_ftp = number_format($team_def_ftm / $team_def_fta, 3);
+        @$team_def_avgtgm = number_format($team_def_tgm / $team_def_games, 2);
+        @$team_def_avgtga = number_format($team_def_tga / $team_def_games, 2);
+        @$team_def_tgp = number_format($team_def_tgm / $team_def_tga, 3);
+        @$team_def_avgorb = number_format($team_def_orb / $team_def_games, 2);
+        @$team_def_avgreb = number_format($team_def_reb / $team_def_games, 2);
+        @$team_def_avgast = number_format($team_def_ast / $team_def_games, 2);
+        @$team_def_avgstl = number_format($team_def_stl / $team_def_games, 2);
+        @$team_def_avgtvr = number_format($team_def_tvr / $team_def_games, 2);
+        @$team_def_avgblk = number_format($team_def_blk / $team_def_games, 2);
+        @$team_def_avgpf = number_format($team_def_pf / $team_def_games, 2);
+        @$team_def_avgpts = number_format($team_def_pts / $team_def_games, 2);
+
+        $defense_totals .= "<tr>
+			<td bgcolor=\"$teamcolor1\"><a href=\"modules.php?name=Team&op=team&tid=$tid\"><font color=\"$teamcolor2\">$teamcity $team_def_name Defense</font></a></td>
+			<td>$team_def_games</td>
+			<td>$team_def_fgm</td>
+			<td>$team_def_fga</td>
+			<td>$team_def_ftm</td>
+			<td>$team_def_fta</td>
+			<td>$team_def_tgm</td>
+			<td>$team_def_tga</td>
+			<td>$team_def_orb</td>
+			<td>$team_def_reb</td>
+			<td>$team_def_ast</td>
+			<td>$team_def_stl</td>
+			<td>$team_def_tvr</td>
+			<td>$team_def_blk</td>
+			<td>$team_def_pf</td>
+			<td>$team_def_pts</td>
+		</tr>";
+
+        $defense_averages .= "<tr>
+			<td bgcolor=\"$teamcolor1\"><a href=\"modules.php?name=Team&op=team&tid=$tid\"><font color=\"$teamcolor2\">$teamcity $team_def_name Defense</font></a></td>
+			<td>$team_def_avgfgm</td>
+			<td>$team_def_avgfga</td>
+			<td>$team_def_fgp</td>
+			<td>$team_def_avgftm</td>
+			<td>$team_def_avgfta</td>
+			<td>$team_def_ftp</td>
+			<td>$team_def_avgtgm</td>
+			<td>$team_def_avgtga</td>
+			<td>$team_def_tgp</td>
+			<td>$team_def_avgorb</td>
+			<td>$team_def_avgreb</td>
+			<td>$team_def_avgast</td>
+			<td>$team_def_avgstl</td>
+			<td>$team_def_avgtvr</td>
+			<td>$team_def_avgblk</td>
+			<td>$team_def_avgpf</td>
+			<td>$team_def_avgpts</td>
+		</tr>";
+
+        $t++;
+    }
+
+    @$lg_off_avgfgm = number_format($lg_off_fgm / $lg_off_games, 2);
+    @$lg_off_avgfga = number_format($lg_off_fga / $lg_off_games, 2);
+    @$lg_off_fgp = number_format($lg_off_fgm / $lg_off_fga, 3);
+    @$lg_off_avgftm = number_format($lg_off_ftm / $lg_off_games, 2);
+    @$lg_off_avgfta = number_format($lg_off_fta / $lg_off_games, 2);
+    @$lg_off_ftp = number_format($lg_off_ftm / $lg_off_fta, 3);
+    @$lg_off_avgtgm = number_format($lg_off_tgm / $lg_off_games, 2);
+    @$lg_off_avgtga = number_format($lg_off_tga / $lg_off_games, 2);
+    @$lg_off_tgp = number_format($lg_off_tgm / $lg_off_tga, 3);
+    @$lg_off_avgorb = number_format($lg_off_orb / $lg_off_games, 2);
+    @$lg_off_avgreb = number_format($lg_off_reb / $lg_off_games, 2);
+    @$lg_off_avgast = number_format($lg_off_ast / $lg_off_games, 2);
+    @$lg_off_avgstl = number_format($lg_off_stl / $lg_off_games, 2);
+    @$lg_off_avgtvr = number_format($lg_off_tvr / $lg_off_games, 2);
+    @$lg_off_avgblk = number_format($lg_off_blk / $lg_off_games, 2);
+    @$lg_off_avgpf = number_format($lg_off_pf / $lg_off_games, 2);
+    @$lg_off_avgpts = number_format($lg_off_pts / $lg_off_games, 2);
+
+    $league_totals = "<tr style=\"font-weight:bold\">
+		<td>LEAGUE TOTALS</td>
+		<td>$lg_off_games</td>
+		<td>$lg_off_fgm</td>
+		<td>$lg_off_fga</td>
+		<td>$lg_off_ftm</td>
+		<td>$lg_off_fta</td>
+		<td>$lg_off_tgm</td>
+		<td>$lg_off_tga</td>
+		<td>$lg_off_orb</td>
+		<td>$lg_off_reb</td>
+		<td>$lg_off_ast</td>
+		<td>$lg_off_stl</td>
+		<td>$lg_off_tvr</td>
+		<td>$lg_off_blk</td>
+		<td>$lg_off_pf</td>
+		<td>$lg_off_pts</td>
+	</tr>";
+
+    $league_averages = "<tr style=\"font-weight:bold\">
+		<td>LEAGUE AVERAGES</td>
+		<td>$lg_off_avgfgm</td>
+		<td>$lg_off_avgfga</td>
+		<td>$lg_off_fgp</td>
+		<td>$lg_off_avgftm</td>
+		<td>$lg_off_avgfta</td>
+		<td>$lg_off_ftp</td>
+		<td>$lg_off_avgtgm</td>
+		<td>$lg_off_avgtga</td>
+		<td>$lg_off_tgp</td>
+		<td>$lg_off_avgorb</td>
+		<td>$lg_off_avgreb</td>
+		<td>$lg_off_avgast</td>
+		<td>$lg_off_avgstl</td>
+		<td>$lg_off_avgtvr</td>
+		<td>$lg_off_avgblk</td>
+		<td>$lg_off_avgpf</td>
+		<td>$lg_off_avgpts</td>
+	</tr>";
+
+    echo "<center>
+		<h1>League-wide Statistics</h1>
+
+		<h2>Team Offense Totals</h2>
+		<table class=\"sortable\">
+		<thead><tr><th>Team</th><th>Gm</th><th>FGM</th><th>FGA</th><th>FTM</th><th>FTA</th><th>3GM</th><th>3GA</th><th>ORB</th><th>REB</th><th>AST</th><th>STL</th><th>TVR</th><th>BLK</th><th>PF</th><th>PTS</th></tr></thead>
+		<tbody>$offense_totals</tbody>
+		<tfoot>$league_totals</tfoot>
+		</table>
+
+		<h2>Team Defense Totals</h2>
+		<table class=\"sortable\">
+		<thead><tr><th>Team</th><th>Gm</th><th>FGM</th><th>FGA</th><th>FTM</th><th>FTA</th><th>3GM</th><th>3GA</th><th>ORB</th><th>REB</th><th>AST</th><th>STL</th><th>TVR</th><th>BLK</th><th>PF</th><th>PTS</th></tr></thead>
+		<tbody>$defense_totals</tbody>
+		<tfoot>$league_totals</tfoot>
+		</table>
+
+		<h2>Team Offense Averages</h2>
+		<table class=\"sortable\">
+		<thead><tr><th>Team</th><th>FGM</th><th>FGA</th><th>FGP</th><th>FTM</th><th>FTA</th><th>FTP</th><th>3GM</th><th>3GA</th><th>3GP</th><th>ORB</th><th>REB</th><th>AST</th><th>STL</th><th>TVR</th><th>BLK</th><th>PF</th><th>PTS</th></tr></thead>
+		<tbody>$offense_averages</tbody>
+		<tfoot>$league_averages</tfoot>
+		</table>
+
+		<h2>Team Defense Averages</h2>
+		<table class=\"sortable\">
+		<thead><tr><th>Team</th><th>FGM</th><th>FGA</th><th>FGP</th><th>FTM</th><th>FTA</th><th>FTP</th><th>3GM</th><th>3GA</th><th>3GP</th><th>ORB</th><th>REB</th><th>AST</th><th>STL</th><th>TVR</th><th>BLK</th><th>PF</th><th>PTS</th></tr></thead>
+		<tbody>$defense_averages</tbody>
+		<tfoot>$league_averages</tfoot>
+		</table>";
+
+    CloseTable();
+    include "footer.php";
+}
+
+function schedule($tid)
+{
+    global $db;
+    $sharedFunctions = new Shared($db);
+
+    $tid = intval($tid);
+    include "header.php";
+    OpenTable();
+    //============================
+    // GRAB TEAM COLORS, ET AL
+    //============================
+    $queryteam = "SELECT * FROM ibl_team_info WHERE teamid = '$tid';";
+    $resultteam = $db->sql_query($queryteam);
+    $color1 = $db->sql_result($resultteam, 0, "color1");
+    $color2 = $db->sql_result($resultteam, 0, "color2");
+    //=============================
+    //DISPLAY TOP MENU
+    //=============================
+    $sharedFunctions->displaytopmenu($tid);
+    $query = "SELECT * FROM `ibl_schedule` WHERE Visitor = $tid OR Home = $tid ORDER BY Date ASC;";
+    $result = $db->sql_query($query);
+    $year = $db->sql_result($result, 0, "Year");
+    $year1 = $year + 1;
+    $wins = 0;
+    $losses = 0;
+    echo "<center>
+		<img src=\"./images/logo/$tid.jpg\">
+		<table width=600 border=1>
+			<tr bgcolor=$color1><td colspan=26><center><font color=$color2><h1>Team Schedule</h1><p><i>games highlighted in yellow are projected to be run next sim (7 days)</i></font></center></td></tr>
+			<tr bgcolor=$color2><td colspan=26><font color=$color1><b><center>November</center></b></font></td></tr>
+			<tr bgcolor=$color2><td><font color=$color1><b>Date</font></td><td><font color=$color1><b>Visitor</font></td><td><font color=$color1><b>Score</font></td><td><font color=$color1><b>Home</font></td><td><font color=$color1><b>Score</font></td><td><font color=$color1><b>Box Score</font></td><td><font color=$color1><b>Record</font></td><td><font color=$color1><b>Streak</font></td></tr>";
+    list($wins, $losses, $winStreak, $lossStreak) = boxscore($year, '11', $tid, $wins, $losses, $winStreak, $lossStreak);
+    echo "<tr bgcolor=$color1><td colspan=26><font color=$color2><b><center>December</center></b></font></td></tr>
+		<tr bgcolor=$color1><td><font color=$color2><b>Date</font></td><td><font color=$color2><b>Visitor</font></td><td><font color=$color2><b>Score</font></td><td><font color=$color2><b>Home</font></td><td><font color=$color2><b>Score</font></td><td><font color=$color2><b>Box Score</b></font></td><td><font color=$color2><b>Record</font></td><td><font color=$color2><b>Streak</font></td></tr>";
+    list($wins, $losses, $winStreak, $lossStreak) = boxscore($year, '12', $tid, $wins, $losses, $winStreak, $lossStreak);
+    echo "<tr bgcolor=$color2><td colspan=26><font color=$color1><b><center>January</center></b></font></td></tr>
+		<tr bgcolor=$color2><td><font color=$color1><b>Date</font></td><td><font color=$color1><b>Visitor</font></td><td><font color=$color1><b>Score</font></td><td><font color=$color1><b>Home</font></td><td><font color=$color1><b>Score</font></td><td><font color=$color1><b>Box Score</b></font></td><td><font color=$color1><b>Record</font></td><td><font color=$color1><b>Streak</font></td></tr>";
+    list($wins, $losses, $winStreak, $lossStreak) = boxscore($year1, '01', $tid, $wins, $losses, $winStreak, $lossStreak);
+    echo "<tr bgcolor=$color1><td colspan=26><font color=$color2><b><center>February</center></b></font></td></tr>
+		<tr bgcolor=$color1><td><font color=$color2><b>Date</font></td><td><font color=$color2><b>Visitor</font></td><td><font color=$color2><b>Score</font></td><td><font color=$color2><b>Home</font></td><td><font color=$color2><b>Score</font></td><td><font color=$color2><b>Box Score</b></font></td><td><font color=$color2><b>Record</font></td><td><font color=$color2><b>Streak</font></td></tr>";
+    list($wins, $losses, $winStreak, $lossStreak) = boxscore($year1, '02', $tid, $wins, $losses, $winStreak, $lossStreak);
+    echo "<tr bgcolor=$color2><td colspan=26><font color=$color1><b><center>March</center></b></font></td></tr>
+		<tr bgcolor=$color2><td><font color=$color1><b>Date</font></td><td><font color=$color1><b>Visitor</font></td><td><font color=$color1><b>Score</font></td><td><font color=$color1><b>Home</font></td><td><font color=$color1><b>Score</font></td><td><font color=$color1><b>Box Score</b></font></td><td><font color=$color1><b>Record</font></td><td><font color=$color1><b>Streak</font></td></tr>";
+    list($wins, $losses, $winStreak, $lossStreak) = boxscore($year1, '03', $tid, $wins, $losses, $winStreak, $lossStreak);
+    echo "<tr bgcolor=$color1><td colspan=26><font color=$color2><b><center>April</center></b></font></td></tr>
+		<tr bgcolor=$color1><td><font color=$color2><b>Date</font></td><td><font color=$color2><b>Visitor</font></td><td><font color=$color2><b>Score</font></td><td><font color=$color2><b>Home</font></td><td><font color=$color2><b>Score</font></td><td><font color=$color2><b>Box Score</b></font></td><td><font color=$color2><b>Record</font></td><td><font color=$color2><b>Streak</font></td></tr>";
+    list($wins, $losses, $winStreak, $lossStreak) = boxscore($year1, '04', $tid, $wins, $losses, $winStreak, $lossStreak);
+    echo "<tr bgcolor=$color2><td colspan=26><font color=$color1><b><center>May</center></b></font></td></tr>
+		<tr bgcolor=$color2><td><font color=$color1><b>Date</font></td><td><font color=$color1><b>Visitor</font></td><td><font color=$color1><b>Score</font></td><td><font color=$color1><b>Home</font></td><td><font color=$color1><b>Score</font></td><td><font color=$color1><b>Box Score</b></font></td><td><font color=$color1><b>Record</font></td><td><font color=$color1><b>Streak</font></td></tr>";
+    list($wins, $losses, $winStreak, $lossStreak) = boxscore($year1, '05', $tid, $wins, $losses, $winStreak, $lossStreak);
+    echo "<tr bgcolor=$color1><td colspan=26><font color=$color2><b><center>Playoffs</center></b></font></td></tr>
+		<tr bgcolor=$color1><td><font color=$color2><b>Date</font></td><td><font color=$color2><b>Visitor</font></td><td><font color=$color2><b>Score</font></td><td><font color=$color2><b>Home</font></td><td><font color=$color2><b>Score</font></td><td><font color=$color2><b>Box Score</b></font></td><td><font color=$color2><b>Record</font></td><td><font color=$color2><b>Streak</font></td></tr>";
+    list($wins, $losses, $winStreak, $lossStreak) = boxscore($year1, '06', $tid, $wins, $losses, $winStreak, $lossStreak);
+    echo "</center>";
+    CloseTable();
+
+    CloseTable();
+    include "footer.php";
+}
+
+function boxscore($year, $month, $tid, $wins, $losses, $winStreak, $lossStreak)
+{
+    global $db;
+    $sharedFunctions = new Shared($db);
+
+    //TODO: unify this code with the Schedule module's chunk function
+
+    $query = "SELECT *
+		FROM `ibl_schedule`
+		WHERE (Visitor = $tid AND Date BETWEEN '$year-$month-01' AND '$year-$month-31')
+			OR (Home = $tid AND Date BETWEEN '$year-$month-01' AND '$year-$month-31')
+		ORDER BY Date ASC";
+    $result = $db->sql_query($query);
+    $num = $db->sql_numrows($result);
+    $i = 0;
+
+    $teamSeasonRecordsQuery = "SELECT tid, leagueRecord FROM ibl_standings ORDER BY tid ASC;";
+    $teamSeasonRecordsResult = $db->sql_query($teamSeasonRecordsQuery);
+
+    $arrayLastSimDates = $sharedFunctions->getLastSimDatesArray();
+    $lastSimEndDate = date_create($arrayLastSimDates["End Date"]);
+    $projectedNextSimEndDate = date_add($lastSimEndDate, date_interval_create_from_date_string('7 days'));
+    $currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
+    $currentSeasonBeginningYear = $currentSeasonEndingYear - 1;
+
+    // override $projectedNextSimEndDate to account for the blank week at end of HEAT
+    if (
+        $projectedNextSimEndDate >= date_create("$currentSeasonBeginningYear-10-23")
+        AND $projectedNextSimEndDate < date_create("$currentSeasonBeginningYear-11-01")
+    ) {
+        $projectedNextSimEndDate = date_create("$currentSeasonBeginningYear-11-08");
+    }
+    // override $projectedNextSimEndDate to account for the All-Star Break
+    if (
+        $projectedNextSimEndDate >= date_create("$currentSeasonEndingYear-02-01")
+        AND $projectedNextSimEndDate < date_create("$currentSeasonEndingYear-02-11")
+    ) {
+        $projectedNextSimEndDate = date_create("$currentSeasonEndingYear-02-11");
+    }
+
+    while ($i < $num) {
+        $date = $db->sql_result($result, $i, "Date");
+        $visitor = $db->sql_result($result, $i, "Visitor");
+        $visitorScore = $db->sql_result($result, $i, "VScore");
+        $home = $db->sql_result($result, $i, "Home");
+        $homeScore = $db->sql_result($result, $i, "HScore");
+        $boxID = $db->sql_result($result, $i, "BoxID");
+
+        $visitorTeamname = $sharedFunctions->getTeamnameFromTid($visitor);
+        $homeTeamname = $sharedFunctions->getTeamnameFromTid($home);
+        $visitorRecord = $db->sql_result($teamSeasonRecordsResult, $visitor - 1, "leagueRecord");
+        $homeRecord = $db->sql_result($teamSeasonRecordsResult, $home - 1, "leagueRecord");
+
+        if ($visitorScore == $homeScore) {
+            if (date_create($date) <= $projectedNextSimEndDate) {
+                echo "<tr bgcolor=#DDDD00>";
+            } else {
+                echo "<tr>";
+            }
+            echo "<td>$date</td>
+				<td><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$visitorTeamname ($visitorRecord)</a></td>
+				<td></td>
+				<td><a href=\"modules.php?name=Team&op=team&tid=$home\">$homeTeamname ($homeRecord)</a></td>
+				<td></td>
+				<td></td>
+				<td></td>
+				<td></td>
+			</tr>";
+        } else {
+            if ($tid == $visitor) {
+                if ($visitorScore > $homeScore) {
+                    $wins++;
+                    $winStreak++;
+                    $lossStreak = 0;
+                    $winlosscolor = "green";
+                } else {
+                    $losses++;
+                    $lossStreak++;
+                    $winStreak = 0;
+                    $winlosscolor = "red";
+                }
+            } else {
+                if ($visitorScore > $homeScore) {
+                    $losses++;
+                    $lossStreak++;
+                    $winStreak = 0;
+                    $winlosscolor = "red";
+                } else {
+                    $wins++;
+                    $winStreak++;
+                    $lossStreak = 0;
+                    $winlosscolor = "green";
+                }
+            }
+
+            if ($winStreak > $lossStreak) {
+                $streak = "W $winStreak";
+            } else {
+                $streak = "L $lossStreak";
+            }
+
+            (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
+
+            if ($visitorScore > $homeScore) {
+                echo "<tr bgcolor=$bgcolor>
+					<td>$date</td>
+					<td><b><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$visitorTeamname ($visitorRecord)</a></b></td>
+					<td><b><font color=$winlosscolor>$visitorScore</font></b></td>
+					<td><a href=\"modules.php?name=Team&op=team&tid=$home\">$homeTeamname ($homeRecord)</a></td>
+					<td><b><font color=$winlosscolor>$homeScore</font></b></td>
+					<td><a href=\"./ibl/IBL/box$boxID.htm\">View</a></td>
+					<td>$wins - $losses</td>
+					<td>$streak</td>
+				</tr>";
+            } else if ($visitorScore < $homeScore) {
+                echo "<tr bgcolor=$bgcolor>
+					<td>$date</td>
+					<td><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$visitorTeamname ($visitorRecord)</a></td>
+					<td><b><font color=$winlosscolor>$visitorScore</font></b></td>
+					<td><b><a href=\"modules.php?name=Team&op=team&tid=$home\">$homeTeamname ($homeRecord)</a></b></td>
+					<td><b><font color=$winlosscolor>$homeScore</font></b></td>
+					<td><a href=\"./ibl/IBL/box$boxID.htm\">View</a></td>
+					<td>$wins - $losses</td>
+					<td>$streak</td>
+				</tr>";
+            }
+        }
+
+        $i++;
+    }
+
+    return array($wins, $losses, $winStreak, $lossStreak);
+}
+
 function viewinjuries($tid)
 {
     global $db;
@@ -2353,78 +2364,45 @@ function viewinjuries($tid)
     include "footer.php";
 }
 
-function menu()
+function drafthistory($tid)
 {
     global $db;
     $sharedFunctions = new Shared($db);
 
     include "header.php";
     OpenTable();
+    $sharedFunctions->displaytopmenu($tid);
 
-    $sharedFunctions->displaytopmenu(0);
+    $sqlc = "SELECT * FROM ibl_team_info WHERE teamid = $tid";
+    $resultc = $db->sql_query($sqlc);
+    $rowc = $db->sql_fetchrow($resultc);
+    $teamname = $rowc['team_name'];
+
+    $sqld = "SELECT * FROM ibl_plr WHERE draftedby LIKE '$teamname' ORDER BY draftyear DESC, draftround, draftpickno ASC ";
+    $resultd = $db->sql_query($sqld);
+
+    echo "$teamname Draft History<table class=\"sortable\"><tr><th>Player</th><th>Pos</th><th>Year</th><th>Round</th><th>Pick</th></tr>";
+
+    while ($rowd = $db->sql_fetchrow($resultd)) {
+        $player_pid = $rowd['pid'];
+        $player_name = $rowd['name'];
+        $player_pos = $rowd['pos'];
+        $player_draftyear = $rowd['draftyear'];
+        $player_draftround = $rowd['draftround'];
+        $player_draftpickno = $rowd['draftpickno'];
+        $player_retired = $rowd['retired'];
+
+        if ($player_retired == 1) {
+            echo "<tr><td><a href=\"./modules.php?name=Player&pa=showpage&pid=$player_pid\">$player_name</a> (retired)</td><td>$player_pos</td><td>$player_draftyear</td><td>$player_draftround</td><td>$player_draftpickno</td></tr>";
+        } else {
+            echo "<tr><td><a href=\"./modules.php?name=Player&pa=showpage&pid=$player_pid\">$player_name</a></td><td>$player_pos</td><td>$player_draftyear</td><td>$player_draftround</td><td>$player_draftpickno</td></tr>";
+        }
+    }
+
+    echo "</table>";
 
     CloseTable();
     include "footer.php";
-}
-
-function teamCurrentSeasonStandings($team)
-{
-    global $db;
-
-    $query = "SELECT * FROM ibl_power WHERE Team = '$team'";
-    $result = $db->sql_query($query);
-    $num = $db->sql_numrows($result);
-    $Team = $db->sql_result($result, 0, "Team");
-    $win = $db->sql_result($result, 0, "win");
-    $loss = $db->sql_result($result, 0, "loss");
-    $gb = $db->sql_result($result, 0, "gb");
-    $division = $db->sql_result($result, 0, "Division");
-    $conference = $db->sql_result($result, 0, "Conference");
-    $home_win = $db->sql_result($result, 0, "home_win");
-    $home_loss = $db->sql_result($result, 0, "home_loss");
-    $road_win = $db->sql_result($result, 0, "road_win");
-    $road_loss = $db->sql_result($result, 0, "road_loss");
-    $last_win = $db->sql_result($result, 0, "last_win");
-    $last_loss = $db->sql_result($result, 0, "last_loss");
-
-    $query2 = "SELECT * FROM ibl_power WHERE Division = '$division' ORDER BY gb DESC";
-    $result2 = $db->sql_query($query2);
-    $num = $db->sql_numrows($result2);
-    $i = 0;
-    $gbbase = $db->sql_result($result2, $i, "gb");
-    $gb = $gbbase - $gb;
-    while ($i < $num) {
-        $Team2 = $db->sql_result($result2, $i, "Team");
-        if ($Team2 == $Team) {
-            $Div_Pos = $i + 1;
-        }
-        $i++;
-    }
-
-    $query3 = "SELECT * FROM ibl_power WHERE Conference = '$conference' ORDER BY gb DESC";
-    $result3 = $db->sql_query($query3);
-    $num = $db->sql_numrows($result3);
-    $i = 0;
-    while ($i < $num) {
-        $Team3 = $db->sql_result($result3, $i, "Team");
-        if ($Team3 == $Team) {
-            $Conf_Pos = $i + 1;
-        }
-        $i++;
-    }
-
-    $standings = "<table><tr><td align='right'><b>Team:</td><td>$team</td></tr>
-		<tr><td align='right'><b>Record:</td><td>$win-$loss</td></tr>
-		<tr><td align='right'><b>Conference:</td><td>$conference</td></tr>
-		<tr><td align='right'><b>Conf Position:</td><td>$Conf_Pos</td></tr>
-		<tr><td align='right'><b>Division:</td><td>$division</td></tr>
-		<tr><td align='right'><b>Div Position:</td><td>$Div_Pos</td></tr>
-		<tr><td align='right'><b>GB:</td><td>$gb</td></tr>
-		<tr><td align='right'><b>Home Record:</td><td>$home_win-$home_loss</td></tr>
-		<tr><td align='right'><b>Road Record:</td><td>$road_win-$road_loss</td></tr>
-		<tr><td align='right'><b>Last 10:</td><td>$last_win-$last_loss</td></tr>
-	</table>";
-    return $standings;
 }
 
 function eoy_voters()
@@ -2483,13 +2461,27 @@ function asg_voters()
     include "footer.php";
 }
 
-switch ($op) {
-    case "leaguestats":
-        leaguestats();
-        break;
+function menu()
+{
+    global $db;
+    $sharedFunctions = new Shared($db);
 
+    include "header.php";
+    OpenTable();
+
+    $sharedFunctions->displaytopmenu(0);
+
+    CloseTable();
+    include "footer.php";
+}
+
+switch ($op) {
     case "team":
         team($tid);
+        break;
+
+    case "leaguestats":
+        leaguestats();
         break;
 
     case "schedule":

@@ -78,11 +78,9 @@ function team($tid)
             //            $query="SELECT * FROM ibl_plr WHERE tid = 0 AND retired = 0 AND cyt != cy ORDER BY ordinal ASC";
         }
         $result = $db->sql_query($query);
-        $num = $db->sql_numrows($result);
     } else if ($tid == "-1") { // SHOW ENTIRE LEAGUE
         $query = "SELECT * FROM ibl_plr WHERE retired = 0 AND name NOT LIKE '%Buyouts' ORDER BY ordinal ASC";
         $result = $db->sql_query($query);
-        $num = $db->sql_numrows($result);
     } else { // If not Free Agents, use the code below instead.
         if ($yr != "") {
             $query = "SELECT * FROM ibl_hist WHERE teamid = '$tid' AND year = '$yr' ORDER BY name ASC";
@@ -92,7 +90,6 @@ function team($tid)
             $query = "SELECT * FROM ibl_plr WHERE tid = '$tid' AND retired = 0 AND cyt != cy ORDER BY name ASC";
         }
         $result = $db->sql_query($query);
-        $num = $db->sql_numrows($result);
     }
 
     echo "<table><tr><td align=center valign=top><img src=\"./images/logo/$tid.jpg\">";

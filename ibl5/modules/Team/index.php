@@ -103,48 +103,53 @@ function team($tid)
 
     if ($display == "ratings") {
         $showing = "Player Ratings";
-        $tabs .= "<td bgcolor=#BBBBBB><a href=\"modules.php?name=Team&op=team&tid=$tid&display=ratings$insertyear\">Ratings</a></td>";
         $table_ratings = ratings($db, $result, $color1, $color2, $tid, $yr);
         $table_output = $table_ratings;
+        $tabs .= "<td bgcolor=#BBBBBB style=\"font-weight:bold\">";
     } else {
-        $tabs .= "<td><a href=\"modules.php?name=Team&op=team&tid=$tid&display=ratings$insertyear\">Ratings</a></td>";
+        $tabs .= "<td>";
     }
+    $tabs .= "<a href=\"modules.php?name=Team&op=team&tid=$tid&display=ratings$insertyear\">Ratings</a></td>";
 
     if ($display == "total_s") {
         $showing = "Season Totals";
-        $tabs .= "<td bgcolor=#BBBBBB><a href=\"modules.php?name=Team&op=team&tid=$tid&display=total_s$insertyear\">Season Totals</a></td>";
         $table_totals = seasonTotals($db, $result, $color1, $color2, $tid, $yr, $team_name);
         $table_output = $table_totals;
+        $tabs .= "<td bgcolor=#BBBBBB style=\"font-weight:bold\">";
     } else {
-        $tabs .= "<td><a href=\"modules.php?name=Team&op=team&tid=$tid&display=total_s$insertyear\">Season Totals</a></td>";
+        $tabs .= "<td>";
     }
+    $tabs .= "<a href=\"modules.php?name=Team&op=team&tid=$tid&display=total_s$insertyear\">Season Totals</a></td>";
 
     if ($display == "avg_s") {
         $showing = "Season Averages";
-        $tabs .= "<td bgcolor=#BBBBBB><a href=\"modules.php?name=Team&op=team&tid=$tid&display=avg_s$insertyear\">Season Averages</a></td>";
         $table_averages = seasonAverages($db, $result, $color1, $color2, $tid, $yr, $team_name);
         $table_output = $table_averages;
+        $tabs .= "<td bgcolor=#BBBBBB style=\"font-weight:bold\">";
     } else {
-        $tabs .= "<td ><a href=\"modules.php?name=Team&op=team&tid=$tid&display=avg_s$insertyear\">Season Averages</a></td>";
+        $tabs .= "<td>";
     }
+    $tabs .= "<a href=\"modules.php?name=Team&op=team&tid=$tid&display=avg_s$insertyear\">Season Averages</a></td>";
 
     if ($display == "chunk") {
         $showing = "Chunk Averages";
-        $tabs .= "<td bgcolor=#BBBBBB><a href=\"modules.php?name=Team&op=team&tid=$tid&display=chunk$insertyear\">Sim Averages</a></td>";
+        $tabs .= "<td bgcolor=#BBBBBB style=\"font-weight:bold\">";
         $table_simAverages = simAverages($db, $sharedFunctions, $color1, $color2, $tid);
         $table_output = $table_simAverages;
     } else {
-        $tabs .= "<td><a href=\"modules.php?name=Team&op=team&tid=$tid&display=chunk$insertyear\">Sim Averages</a></td>";
+        $tabs .= "<td>";
     }
+    $tabs .= "<a href=\"modules.php?name=Team&op=team&tid=$tid&display=chunk$insertyear\">Sim Averages</a></td>";
 
     if ($display == "contracts") {
         $showing = "Contracts";
-        $tabs .= "<td bgcolor=#BBBBBB><a href=\"modules.php?name=Team&op=team&tid=$tid&display=contracts$insertyear\">Contracts</a></td>";
+        $tabs .= "<td bgcolor=#BBBBBB style=\"font-weight:bold\">";
         $table_contracts = contracts($db, $result, $color1, $color2, $tid, $faon);
         $table_output = $table_contracts;
     } else {
-        $tabs .= "<td><a href=\"modules.php?name=Team&op=team&tid=$tid&display=contracts$insertyear\">Contracts</a></td>";
+        $tabs .= "<td>";
     }
+    $tabs .= "<a href=\"modules.php?name=Team&op=team&tid=$tid&display=contracts$insertyear\">Contracts</a></td>";
 
     if ($tid != 0 AND $yr == "") {
         $starters_table = lastSimsStarters($db, $result, $color1, $color2);

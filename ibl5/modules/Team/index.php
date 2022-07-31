@@ -601,30 +601,30 @@ function decoratePlayerName($name, $tid, $ordinal, $currentContractYear, $totalY
     return $playerNameDecorated;
 }
 
-function lastSimsStarters($db, $queryResult, $color1, $color2)
+function lastSimsStarters($db, $result, $color1, $color2)
 {
-    $num = $db->sql_numrows($queryResult);
+    $num = $db->sql_numrows($result);
     $i = 0;
     while ($i < $num) {
-        if ($db->sql_result($queryResult, $i, "PGDepth") == 1) {
-            $startingPG = $db->sql_result($queryResult, $i, "name");
-            $startingPGpid = $db->sql_result($queryResult, $i, "pid");
+        if ($db->sql_result($result, $i, "PGDepth") == 1) {
+            $startingPG = $db->sql_result($result, $i, "name");
+            $startingPGpid = $db->sql_result($result, $i, "pid");
         }
-        if ($db->sql_result($queryResult, $i, "SGDepth") == 1) {
-            $startingSG = $db->sql_result($queryResult, $i, "name");
-            $startingSGpid = $db->sql_result($queryResult, $i, "pid");
+        if ($db->sql_result($result, $i, "SGDepth") == 1) {
+            $startingSG = $db->sql_result($result, $i, "name");
+            $startingSGpid = $db->sql_result($result, $i, "pid");
         }
-        if ($db->sql_result($queryResult, $i, "SFDepth") == 1) {
-            $startingSF = $db->sql_result($queryResult, $i, "name");
-            $startingSFpid = $db->sql_result($queryResult, $i, "pid");
+        if ($db->sql_result($result, $i, "SFDepth") == 1) {
+            $startingSF = $db->sql_result($result, $i, "name");
+            $startingSFpid = $db->sql_result($result, $i, "pid");
         }
-        if ($db->sql_result($queryResult, $i, "PFDepth") == 1) {
-            $startingPF = $db->sql_result($queryResult, $i, "name");
-            $startingPFpid = $db->sql_result($queryResult, $i, "pid");
+        if ($db->sql_result($result, $i, "PFDepth") == 1) {
+            $startingPF = $db->sql_result($result, $i, "name");
+            $startingPFpid = $db->sql_result($result, $i, "pid");
         }
-        if ($db->sql_result($queryResult, $i, "CDepth") == 1) {
-            $startingC = $db->sql_result($queryResult, $i, "name");
-            $startingCpid = $db->sql_result($queryResult, $i, "pid");
+        if ($db->sql_result($result, $i, "CDepth") == 1) {
+            $startingC = $db->sql_result($result, $i, "name");
+            $startingCpid = $db->sql_result($result, $i, "pid");
         }
         $i++;
     }

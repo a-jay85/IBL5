@@ -49,6 +49,10 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 
     $teamlogo = $userinfo['user_ibl_team'];
     $tid = $sharedFunctions->getTidFromTeamname($teamlogo);
+    $queryteam = "SELECT * FROM ibl_team_info WHERE teamid = '$tid' ";
+    $resultteam = $db->sql_query($queryteam);
+    $color1 = $db->sql_result($resultteam, 0, "color1");
+    $color2 = $db->sql_result($resultteam, 0, "color2");
 
     include "header.php";
     OpenTable();
@@ -130,11 +134,36 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 
     echo "<hr>
 		<form name=\"Depth_Chart\" method=\"post\" action=\"modules.php?name=Depth_Chart_Entry&op=submit\">
-		<input type=\"hidden\" name=\"Team_Name\" value=\"$teamlogo\"><input type=\"hidden\" name=\"Set_Name\" value=\"$offense_name\">
-		<center><img src=\"images/logo/$tid.jpg\"><br><table><tr><th colspan=14><center>DEPTH CHART ENTRY - Offensive Set: $offense_name</center></th></tr>
-		<tr><th>Pos</th><th>Player</th><th>$Slot1</th><th>$Slot2</th><th>$Slot3</th><th>$Slot4</th><th>$Slot5</th><th>active</th><th>min</th><th>OF</th><th>DF</th><th>OI</th><th>DI</th><th>BH</th></tr>";
+		    <input type=\"hidden\" name=\"Team_Name\" value=\"$teamlogo\">
+            <input type=\"hidden\" name=\"Set_Name\" value=\"$offense_name\">
+		<center><img src=\"images/logo/$tid.jpg\"><br>";
+
+    $table_ratings = $sharedFunctions->ratings($db, $playersOnTeam, $color1, $color2, $tid, "");
+    echo $table_ratings;
+
+    echo "<p><table>
+        <tr>
+            <th colspan=14><center>DEPTH CHART ENTRY - Offensive Set: $offense_name</center></th>
+        </tr>
+        <tr>
+            <th>Pos</th>
+            <th>Player</th>
+            <th>$Slot1</th>
+            <th>$Slot2</th>
+            <th>$Slot3</th>
+            <th>$Slot4</th>
+            <th>$Slot5</th>
+            <th>active</th>
+            <th>min</th>
+            <th>OF</th>
+            <th>DF</th>
+            <th>OI</th>
+            <th>DI</th>
+            <th>BH</th>
+        </tr>";
     $depthcount = 1;
 
+    mysqli_data_seek($playersOnTeam, 0);
     while ($player = $db->sql_fetchrow($playersOnTeam)) {
         $player_pid = $player['pid'];
         $player_pos = $player['pos'];
@@ -194,16 +223,13 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
             $pos_value = 9;
         }
 
-        echo "\n
-				<tr>
-						<td>
-								$player_pos
-						</td>
-						<td nowrap>
-								<input type=\"hidden\" name=\"Injury$depthcount\" value=\"$player_inj\">
-								<input type=\"hidden\" name=\"Name$depthcount\" value=\"$player_name\">
-								<a href=\"./modules.php?name=Player&pa=showpage&pid=$player_pid\">$player_name</a>
-						</td>\n";
+        echo " <tr>
+            <td>$player_pos</td>
+			<td nowrap>
+                <input type=\"hidden\" name=\"Injury$depthcount\" value=\"$player_inj\">
+                <input type=\"hidden\" name=\"Name$depthcount\" value=\"$player_name\">
+                <a href=\"./modules.php?name=Player&pa=showpage&pid=$player_pid\">$player_name</a>
+            </td>";
 
         if ($pos_value >= $Low1 && $player_inj < 15) {
             if ($pos_value <= $High1) {
@@ -297,7 +323,10 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
         $depthcount++;
     }
 
-    echo "<tr><th colspan=14><input type=\"radio\" checked> Submit Depth Chart? <input type=\"submit\" value=\"Submit\"></th></tr></form></table></center>";
+    echo "<tr>
+        <th colspan=14><input type=\"radio\" checked> Submit Depth Chart? <input type=\"submit\" value=\"Submit\"></th>
+    </tr></form></table></center>";
+
     CloseTable();
 
     // === END INSERT OF IBL DEPTH CHART ===

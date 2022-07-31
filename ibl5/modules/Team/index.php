@@ -133,9 +133,9 @@ function team($tid)
 
     if ($display == "chunk") {
         $showing = "Chunk Averages";
-        $tabs .= "<td bgcolor=#BBBBBB style=\"font-weight:bold\">";
         $table_simAverages = simAverages($db, $sharedFunctions, $color1, $color2, $tid);
         $table_output = $table_simAverages;
+        $tabs .= "<td bgcolor=#BBBBBB style=\"font-weight:bold\">";
     } else {
         $tabs .= "<td>";
     }
@@ -143,9 +143,9 @@ function team($tid)
 
     if ($display == "contracts") {
         $showing = "Contracts";
-        $tabs .= "<td bgcolor=#BBBBBB style=\"font-weight:bold\">";
         $table_contracts = contracts($db, $result, $color1, $color2, $tid, $faon);
         $table_output = $table_contracts;
+        $tabs .= "<td bgcolor=#BBBBBB style=\"font-weight:bold\">";
     } else {
         $tabs .= "<td>";
     }

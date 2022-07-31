@@ -93,13 +93,13 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 				FROM ibl_plr
 				WHERE retired != 1
 					AND stats_gm >= '50'
-					AND stats_min/stats_gm >= '30'
+					AND stats_min / stats_gm >= '30'
 				ORDER BY name";
             $sixthQuery = "SELECT *
 				FROM ibl_plr
 				WHERE retired != 1
-					AND stats_min/stats_gm >= 15
-					AND stats_gs/stats_gm <= '.5'
+					AND stats_min / stats_gm >= 15
+					AND stats_gs / stats_gm <= '.5'
 				ORDER BY name";
             $royQuery = "SELECT *
 				FROM ibl_plr

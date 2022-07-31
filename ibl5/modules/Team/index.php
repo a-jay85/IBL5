@@ -601,6 +601,50 @@ function decoratePlayerName($name, $tid, $ordinal, $currentContractYear, $totalY
     return $playerNameDecorated;
 }
 
+function lastSimsStarters($db, $queryResult, $color1, $color2)
+{
+    $num = $db->sql_numrows($queryResult);
+    $i = 0;
+    while ($i < $num) {
+        if ($db->sql_result($queryResult, $i, "PGDepth") == 1) {
+            $startingPG = $db->sql_result($queryResult, $i, "name");
+            $startingPGpid = $db->sql_result($queryResult, $i, "pid");
+        }
+        if ($db->sql_result($queryResult, $i, "SGDepth") == 1) {
+            $startingSG = $db->sql_result($queryResult, $i, "name");
+            $startingSGpid = $db->sql_result($queryResult, $i, "pid");
+        }
+        if ($db->sql_result($queryResult, $i, "SFDepth") == 1) {
+            $startingSF = $db->sql_result($queryResult, $i, "name");
+            $startingSFpid = $db->sql_result($queryResult, $i, "pid");
+        }
+        if ($db->sql_result($queryResult, $i, "PFDepth") == 1) {
+            $startingPF = $db->sql_result($queryResult, $i, "name");
+            $startingPFpid = $db->sql_result($queryResult, $i, "pid");
+        }
+        if ($db->sql_result($queryResult, $i, "CDepth") == 1) {
+            $startingC = $db->sql_result($queryResult, $i, "name");
+            $startingCpid = $db->sql_result($queryResult, $i, "pid");
+        }
+        $i++;
+    }
+
+    $starters_table = "<table align=\"center\" border=1 cellpadding=1 cellspacing=1>
+        <tr bgcolor=$color1>
+            <td colspan=5><font color=$color2><center><b>Last Sim's Starters</b></center></font></td>
+        </tr>
+        <tr>
+            <td><center><b>PG</b><br><img src=\"./images/player/$startingPGpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingPGpid\">$startingPG</a></td>
+            <td><center><b>SG</b><br><img src=\"./images/player/$startingSGpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingSGpid\">$startingSG</a></td>
+            <td><center><b>SF</b><br><img src=\"./images/player/$startingSFpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingSFpid\">$startingSF</a></td>
+            <td><center><b>PF</b><br><img src=\"./images/player/$startingPFpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingPFpid\">$startingPF</a></td>
+            <td><center><b>C</b><br><img src=\"./images/player/$startingCpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingCpid\">$startingC</a></td>
+        </tr>
+    </table>";
+
+    return $starters_table;
+}
+
 function team($tid)
 {
     global $db;
@@ -676,62 +720,10 @@ function team($tid)
         echo "<center><h1>$yr $team_name</h1></center>";
     }
 
-    /* =================== INSERT STARTERS =========== */
-
-    $startingPG = null;
-    $startingSG = null;
-    $startingSF = null;
-    $startingPF = null;
-    $startingC = null;
-
-    $startingPGpid = null;
-    $startingSGpid = null;
-    $startingSFpid = null;
-    $startingPFpid = null;
-    $startingCpid = null;
-
-    $s = 0;
-
-    while ($s < $num) {
-        if ($db->sql_result($result, $s, "PGDepth") == 1) {
-            $startingPG = $db->sql_result($result, $s, "name");
-            $startingPGpid = $db->sql_result($result, $s, "pid");
-        }
-        if ($db->sql_result($result, $s, "SGDepth") == 1) {
-            $startingSG = $db->sql_result($result, $s, "name");
-            $startingSGpid = $db->sql_result($result, $s, "pid");
-        }
-        if ($db->sql_result($result, $s, "SFDepth") == 1) {
-            $startingSF = $db->sql_result($result, $s, "name");
-            $startingSFpid = $db->sql_result($result, $s, "pid");
-        }
-        if ($db->sql_result($result, $s, "PFDepth") == 1) {
-            $startingPF = $db->sql_result($result, $s, "name");
-            $startingPFpid = $db->sql_result($result, $s, "pid");
-        }
-        if ($db->sql_result($result, $s, "CDepth") == 1) {
-            $startingC = $db->sql_result($result, $s, "name");
-            $startingCpid = $db->sql_result($result, $s, "pid");
-        }
-        $s++;
-    }
-    
+    // Last Sim's Starters
     if ($tid != 0 and $yr == "") {
-        $starters_table = "<table align=\"center\" border=1 cellpadding=1 cellspacing=1>
-			<tr bgcolor=$color1>
-				<td colspan=5><font color=$color2><center><b>Last Sim's Starters</b></center></font></td>
-			</tr>
-			<tr>
-				<td><center><b>PG</b><br><img src=\"./images/player/$startingPGpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingPGpid\">$startingPG</a></td>
-				<td><center><b>SG</b><br><img src=\"./images/player/$startingSGpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingSGpid\">$startingSG</a></td>
-				<td><center><b>SF</b><br><img src=\"./images/player/$startingSFpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingSFpid\">$startingSF</a></td>
-				<td><center><b>PF</b><br><img src=\"./images/player/$startingPFpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingPFpid\">$startingPF</a></td>
-				<td><center><b>C</b><br><img src=\"./images/player/$startingCpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingCpid\">$startingC</a></td>
-			</tr>
-		</table>";
+        $starters_table = lastSimsStarters($db, $result, $color1, $color2);
     }
-
-    // END OF INSERTION OF STARTERS
 
     // BEGIN RATINGS TABLE
 

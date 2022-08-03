@@ -727,7 +727,8 @@ function per36Minutes($db, $result, $color1, $color2, $tid, $yr)
                 <th colspan=3><font color=$color2>Player</font></th>
                 <th><font color=$color2>g</font></th>
                 <th><font color=$color2>gs</font></th>
-                <th><font color=$color2>min</font></th>
+                <th><font color=$color2>mpg</font></th>
+                <th><font color=$color2>36min</font></th>
                 <td bgcolor=$color1 width=0></td>
                 <th><font color=$color2>fgm</font></th>
                 <th><font color=$color2>fga</font></th>
@@ -813,7 +814,8 @@ function per36Minutes($db, $result, $color1, $color2, $tid, $yr)
         @$stats_tgm = number_format((36 / $stats_min * $stats_tgm), 1);
         @$stats_tga = number_format((36 / $stats_min * $stats_tga), 1);
         @$stats_tgp = number_format(($stats_tgm / $stats_tga), 3);
-        @$stats_mpg = number_format((36 / $stats_min * $stats_min), 1);
+        @$stats_mpg = number_format(($stats_min / $stats_gm), 1);
+        @$stats_per36Min = number_format((36 / $stats_min * $stats_min), 1);
         @$stats_opg = number_format((36 / $stats_min * $stats_orb), 1);
         @$stats_rpg = number_format((36 / $stats_min * $stats_reb), 1);
         @$stats_apg = number_format((36 / $stats_min * $stats_ast), 1);
@@ -831,6 +833,7 @@ function per36Minutes($db, $result, $color1, $color2, $tid, $yr)
             <td><center>$stats_gm</center></td>
             <td><center>$stats_gs</center></td>
             <td><center>$stats_mpg</center></td>
+            <td><center>$stats_per36Min</center></td>
             <td bgcolor=$color1 width=0></td>
             <td><center>$stats_fgm</center></td>
             <td><center>$stats_fga</center></td>

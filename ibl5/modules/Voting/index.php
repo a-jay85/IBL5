@@ -279,25 +279,25 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
         $westernConferenceBackcourt .= getCandidates('WCB', $voterTeamName);
 
         echo "<div onclick=\"ShowAndHideECF()\">
-				<h2>Select THREE Eastern Conference Frontcourt Players:</h2>
+				<h2>Select FOUR Eastern Conference Frontcourt Players:</h2>
 				<i>Tap/click here to reveal/hide nominees</i>
 			</div>
 			$easternConferenceFrontcourt
 
 			<div onclick=\"ShowAndHideECB()\">
-				<h2>Select TWO Eastern Conference Backcourt Players:</h2>
+				<h2>Select FOUR Eastern Conference Backcourt Players:</h2>
 				<i>Tap/click here to reveal/hide nominees</i>
 			</div>
 			$easternConferenceBackcourt
 
 			<div onclick=\"ShowAndHideWCF()\">
-				<h2>Select THREE Western Conference Frontcourt Players:</h2>
+				<h2>Select FOUR Western Conference Frontcourt Players:</h2>
 				<i>Tap/click here to reveal/hide nominees</i>
 			</div>
 			$westernConferenceFrontcourt
 
 			<div onclick=\"ShowAndHideWCB()\">
-				<h2>Select TWO Western Conference Backcourt Players:</h2>
+				<h2>Select FOUR Western Conference Backcourt Players:</h2>
 				<i>Tap/click here to reveal/hide nominees</i>
 			</div>
 			$westernConferenceBackcourt";

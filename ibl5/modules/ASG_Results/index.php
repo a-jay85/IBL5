@@ -34,6 +34,7 @@ function displayVotingResultsTable($query)
     $i = 0;
     $result = $db->sql_query($query);
     $num_rows = $db->sql_numrows($result);
+    $row = "";
 
     while ($i < $num_rows) {
         $player[$i] = $db->sql_result($result, $i, "name");

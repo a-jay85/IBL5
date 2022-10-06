@@ -66,8 +66,8 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 
         $seasonPhase = $sharedFunctions->getCurrentSeasonPhase();
         if ($seasonPhase == "Regular Season") {
-            $easternConferenceTids = array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 25);
-            $westernConferenceTids = array(13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 26);
+            $easternConferenceTids = array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 25, 27);
+            $westernConferenceTids = array(13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 26, 28);
 
             if (strpos($votingCategory, 'EC') !== false) {
                 $conferenceTids = $easternConferenceTids;

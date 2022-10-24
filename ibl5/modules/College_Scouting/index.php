@@ -301,6 +301,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
         $player_tal = $row3['tal'];
         $player_skl = $row3['skl'];
         $player_int = $row3['int'];
+        $player_drafted_db = $row3['drafted'];
 
         $draftedPlayersQuery = "SELECT iblhoops_draft.player.`player_name`
 FROM   iblhoops_draft.pick
@@ -788,8 +789,8 @@ WHERE name = '$player_name';"); // This query should really be executed in the D
 
         if ($teamlogo == $draft_team && $player_drafted == 0) {
             echo "<tr bgcolor = $bgcolor><td><input type='radio' name='player' value='$player_name'><td>$player_pos</td><td nowrap>";
-        } elseif ($player_drafted == 1) {
-            echo "<tr style=\"color: #BBBBBB\"><td><td>$player_pos</td><td nowrap>";
+        } elseif ($player_drafted == 1 OR $player_drafted_db == 1) {
+            echo "<tr><td><td>$player_pos</td><td nowrap>";
         } else {
             echo "<tr bgcolor = $bgcolor><td><td>$player_pos</td><td nowrap>";
         }
@@ -798,13 +799,13 @@ WHERE name = '$player_name';"); // This query should really be executed in the D
         // SHOW PLAYER NAME, STRIKE OUT IF DRAFTED ALREADY
         // ====
 
-        if ($player_drafted == 1) {
+        if ($player_drafted == 1 OR $player_drafted_db == 1) {
             echo "<strike>";
         }
 
         echo "$player_name";
 
-        if ($player_drafted == 1) {
+        if ($player_drafted == 1 OR $player_drafted_db == 1) {
             echo "</strike>";
         }
 
@@ -1323,13 +1324,13 @@ WHERE name = '$player_name';"); // This query should really be executed in the D
         // SHOW PLAYER NAME, STRIKE OUT IF DRAFTED ALREADY
         // ====
 
-        if ($player_drafted == 1) {
+        if ($player_drafted == 1 OR $player_drafted_db == 1) {
             echo "<strike>";
         }
 
         echo "$player_name";
 
-        if ($player_drafted == 1) {
+        if ($player_drafted == 1 OR $player_drafted_db == 1) {
             echo "</strike>";
         }
 

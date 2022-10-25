@@ -14,7 +14,6 @@ if ($name == null) {
 
     <form action=\"draftupdate.php\" method=\"POST\">
     Enter the Player's Name: <input type=\"text\" name=\"name\" />
-    Enter the Team Drafting: <input type=\"text\" name=\"team\" />
     <input type=\"submit\" name=\"UPDATE!\" />
     </form>";
 } else {
@@ -32,7 +31,6 @@ if ($name == null) {
 
     <form action=\"draftupdate.php\" method=\"POST\">
     Enter the Player's Name: <input type=\"text\" name=\"name\" />
-    Enter the Team Drafting: <input type=\"text\" name=\"team\" />
     <input type=\"submit\" name=\"UPDATE!\" />
     </form>";
 }

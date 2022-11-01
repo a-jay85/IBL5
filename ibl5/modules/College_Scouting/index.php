@@ -800,13 +800,13 @@ WHERE name = '$player_name';"); // This query should really be executed in the D
         // ====
 
         if ($player_drafted == 1 OR $player_drafted_db == 1) {
-            echo "<strike>";
+            echo "<strike><i>";
         }
 
         echo "$player_name";
 
         if ($player_drafted == 1 OR $player_drafted_db == 1) {
-            echo "</strike>";
+            echo "</i></strike>";
         }
 
         echo "</td><td>$player_team</td><td>$player_age</td><td>$display_fga</td><td>$display_fgp</td><td>$display_fta</td><td>$display_ftp</td><td>$display_tga</td><td>$display_tgp</td><td>$display_orb</td><td>$display_drb</td><td>$display_ast</td><td>$display_stl</td><td>$display_tvr</td><td>$display_blk</td>";

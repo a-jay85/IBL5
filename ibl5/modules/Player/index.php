@@ -1259,7 +1259,7 @@ function showpage($pid, $spec)
     }
 
     echo "<font class=\"content\">Age: $player_age | Height: $player_ht_ft-$player_ht_in | Weight: $player_wt | College: $player_college<br>
-        <i>Drafted by the $player_drafted_by with the # $player_draft_pick pick of round $player_draft_round in the <a href=\"online/draft.php?year=$player_draft_year\">$player_draft_year Draft</a></i><br>
+        <i>Drafted by the $player_drafted_by with the # $player_draft_pick pick of round $player_draft_round in the <a href=\"draft.php?year=$player_draft_year\">$player_draft_year Draft</a></i><br>
         <center><table>
             <tr>
                 <td align=center><b>2ga</b></td>

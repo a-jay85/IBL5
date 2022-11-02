@@ -203,6 +203,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 
     $scoutingpoints = $userinfo['scoutingpoints'];
 
+    $draft_year = $sharedFunctions->getCurrentSeasonEndingYear();
     $draft_sql = "SELECT * from ibl_draft WHERE player = '' ORDER BY round ASC, pick ASC";
     $draft_result = $db->sql_query($draft_sql);
 
@@ -218,7 +219,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 	<table>
 		<tr>
 			<th colspan=26>
-				<center>Welcome to the 1989 IBL Draft<br><br><br>SCOUTING CENTRAL - $teamlogo Scouting - $scoutingpoints Scout Points Remaining</center><br>
+				<center>Welcome to the $draft_year IBL Draft<br><br><br>SCOUTING CENTRAL - $teamlogo Scouting - $scoutingpoints Scout Points Remaining</center><br>
 			</th>
 		</tr>
 	</table>

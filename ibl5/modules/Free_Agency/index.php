@@ -1310,7 +1310,7 @@ function negotiate($pid)
 
     $rosterspots = 15;
 
-    $capquery = "SELECT * FROM ibl_plr WHERE teamname='$userteam' AND retired = '0'";
+    $capquery = "SELECT * FROM ibl_plr WHERE teamname='$userteam' OR (tid=$tid AND teamname='Free Agents') AND retired = '0'";
     $capresult = $db->sql_query($capquery);
 
     while ($capdecrementer = $db->sql_fetchrow($capresult)) {

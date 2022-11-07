@@ -279,6 +279,8 @@ function display()
             $contract5 = 0;
             $contract6 = 0;
 
+            $firstCharacterOfPlayerName = substr($name, 0, 1); // if player name doesn't start with '|' (pipe symbol), then don't occupy a roster slot
+
             if ($millionscy == 0) {
                 $contract1 = $millionscy1;
                 $contract2 = $millionscy2;
@@ -287,22 +289,22 @@ function display()
                 $contract5 = $millionscy5;
                 $contract6 = $millionscy6;
 
-                if ($millionscy1 != 0 AND $team == $userteam) {
+                if ($millionscy1 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots1 -= 1;
                 }
-                if ($millionscy2 != 0 AND $team == $userteam) {
+                if ($millionscy2 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots2 -= 1;
                 }
-                if ($millionscy3 != 0 AND $team == $userteam) {
+                if ($millionscy3 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots3 -= 1;
                 }
-                if ($millionscy4 != 0 AND $team == $userteam) {
+                if ($millionscy4 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots4 -= 1;
                 }
-                if ($millionscy5 != 0 AND $team == $userteam) {
+                if ($millionscy5 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots5 -= 1;
                 }
-                if ($millionscy6 != 0 AND $team == $userteam) {
+                if ($millionscy6 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots6 -= 1;
                 }
             }
@@ -313,19 +315,19 @@ function display()
                 $contract4 = $millionscy5;
                 $contract5 = $millionscy6;
 
-                if ($millionscy2 != 0 AND $team == $userteam) {
+                if ($millionscy2 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots1 -= 1;
                 }
-                if ($millionscy3 != 0 AND $team == $userteam) {
+                if ($millionscy3 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots2 -= 1;
                 }
-                if ($millionscy4 != 0 AND $team == $userteam) {
+                if ($millionscy4 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots3 -= 1;
                 }
-                if ($millionscy5 != 0 AND $team == $userteam) {
+                if ($millionscy5 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots4 -= 1;
                 }
-                if ($millionscy6 != 0 AND $team == $userteam) {
+                if ($millionscy6 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots5 -= 1;
                 }
             }
@@ -335,16 +337,16 @@ function display()
                 $contract3 = $millionscy5;
                 $contract4 = $millionscy6;
 
-                if ($millionscy3 != 0 AND $team == $userteam) {
+                if ($millionscy3 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots1 -= 1;
                 }
-                if ($millionscy4 != 0 AND $team == $userteam) {
+                if ($millionscy4 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots2 -= 1;
                 }
-                if ($millionscy5 != 0 AND $team == $userteam) {
+                if ($millionscy5 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots3 -= 1;
                 }
-                if ($millionscy6 != 0 AND $team == $userteam) {
+                if ($millionscy6 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots4 -= 1;
                 }
             }
@@ -353,13 +355,13 @@ function display()
                 $contract2 = $millionscy5;
                 $contract3 = $millionscy6;
 
-                if ($millionscy4 != 0 AND $team == $userteam) {
+                if ($millionscy4 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots1 -= 1;
                 }
-                if ($millionscy5 != 0 AND $team == $userteam) {
+                if ($millionscy5 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots2 -= 1;
                 }
-                if ($millionscy6 != 0 AND $team == $userteam) {
+                if ($millionscy6 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots3 -= 1;
                 }
             }
@@ -367,20 +369,21 @@ function display()
                 $contract1 = $millionscy5;
                 $contract2 = $millionscy6;
 
-                if ($millionscy5 != 0 AND $team == $userteam) {
+                if ($millionscy5 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots1 -= 1;
                 }
-                if ($millionscy6 != 0 AND $team == $userteam) {
+                if ($millionscy6 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots2 -= 1;
                 }
             }
             if ($millionscy == 5) {
                 $contract1 = $millionscy6;
 
-                if ($millionscy6 != 0 AND $team == $userteam) {
+                if ($millionscy6 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots1 -= 1;
                 }
             }
+            
 
             echo "<tr>
 				<td>";

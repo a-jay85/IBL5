@@ -40,6 +40,11 @@ while ($i < $numberOfTeams) {
     $teamcolor1[$i] = $db->sql_result($resultTeamInfo, $i, "color1");
     $teamcolor2[$i] = $db->sql_result($resultTeamInfo, $i, "color2");
 
+    $hasMLE[$i] = $db->sql_result($resultTeamInfo, $i, "HasMLE");
+    $hasLLE[$i] = $db->sql_result($resultTeamInfo, $i, "HasLLE");
+    $hasMLE[$i] = ($hasMLE[$i] == "1") ? "\u{2705}" : "\u{274C}";
+    $hasLLE[$i] = ($hasLLE[$i] == "1") ? "\u{2705}" : "\u{274C}";
+
     $teamTotalSalaryYear1[$i] = 0;
     $teamTotalSalaryYear2[$i] = 0;
     $teamTotalSalaryYear3[$i] = 0;
@@ -73,6 +78,8 @@ while ($i < $numberOfTeams) {
 		<td align=center>$teamTotalSalaryYear5[$i]</td>
 		<td align=center>$teamTotalSalaryYear6[$i]</td>
 		<td align=center>$teamFreeAgencySlots[$i]</td>
+        <td align=center>$hasMLE[$i]</td>
+        <td align=center>$hasLLE[$i]</td>
 	</tr>";
 
     $i++;

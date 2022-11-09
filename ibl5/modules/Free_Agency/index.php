@@ -227,7 +227,6 @@ function display()
             $pid = stripslashes(check_html($teamlist['pid'], "nohtml"));
             $pos = stripslashes(check_html($teamlist['pos'], "nohtml"));
             $age = stripslashes(check_html($teamlist['age'], "nohtml"));
-            $inj = stripslashes(check_html($teamlist['injured'], "nohtml"));
             $draftround = stripslashes(check_html($teamlist['draftround'], "nohtml"));
 
             $r_2ga = stripslashes(check_html($teamlist['r_fga'], "nohtml"));
@@ -541,7 +540,6 @@ function display()
             $pid = stripslashes(check_html($teamlist['pid'], "nohtml"));
             $pos = stripslashes(check_html($teamlist['pos'], "nohtml"));
             $age = stripslashes(check_html($teamlist['age'], "nohtml"));
-            $inj = stripslashes(check_html($teamlist['injured'], "nohtml"));
 
             $getoffers = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_fa_offers WHERE name='$name' AND team='$userteam'"));
 
@@ -820,7 +818,6 @@ function display()
             $pid = stripslashes(check_html($teamlist['pid'], "nohtml"));
             $pos = stripslashes(check_html($teamlist['pos'], "nohtml"));
             $age = stripslashes(check_html($teamlist['age'], "nohtml"));
-            $inj = stripslashes(check_html($teamlist['injured'], "nohtml"));
             $bird = stripslashes(check_html($teamlist['bird'], "nohtml"));
 
             $getdemands = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_demands WHERE name='$name'"));
@@ -1010,7 +1007,6 @@ function display()
             $pid = stripslashes(check_html($teamlist['pid'], "nohtml"));
             $pos = stripslashes(check_html($teamlist['pos'], "nohtml"));
             $age = stripslashes(check_html($teamlist['age'], "nohtml"));
-            $inj = stripslashes(check_html($teamlist['injured'], "nohtml"));
 
             $getdemands = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_demands WHERE name='$name'"));
 

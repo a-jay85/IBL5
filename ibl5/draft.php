@@ -23,7 +23,7 @@ echo "<html><head><title>Overview of $year IBL Draft</title></head><body>
 echo "<center><h2>$year Draft</h2>
 ";
 
-$startyear = 1989; // magic number reasoning: we kept players' real life draft years intact, but IBLv5's first non-dispersal draft was held in 1989.
+$startyear = 1988; // magic number reasoning: we kept players' real life draft years intact, but IBLv5's first non-dispersal draft was held in 1988.
 
 while ($startyear < $endyear + 1) {
     echo "<a href=\"draft.php?year=$startyear\">$startyear</a> |

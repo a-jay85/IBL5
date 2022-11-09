@@ -88,6 +88,8 @@ $text .= "<table class=\"sortable\" border=1>
 		<th>" . ($currentSeasonEndingYear + 4) . "-<br>" . ($currentSeasonEndingYear + 5) . "</th>
 		<th>" . ($currentSeasonEndingYear + 5) . "-<br>" . ($currentSeasonEndingYear + 6) . "</th>
 		<th>FA Slots</th>
+        <th>Has MLE</th>
+        <th>Has LLE</th>
 	</tr>
 	$table_echo
 </table>";
@@ -134,6 +136,7 @@ function get_salary($tid, $team_name, $currentSeasonEndingYear)
     $resultPlayersUnderContractAfterThisSeason = $db->sql_query($queryPlayersUnderContractAfterThisSeason);
     $numberOfPlayersUnderContractAfterThisSeason = $db->sql_numrows($resultPlayersUnderContractAfterThisSeason);
 
+    $contract_amt[][] = 0;
     $i = 0;
     while ($i < $numberOfPlayersUnderContractAfterThisSeason) {
         $yearUnderContract = $db->sql_result($resultPlayersUnderContractAfterThisSeason, $i, "cy");
@@ -188,6 +191,7 @@ function get_salary1($tid, $team_name, $currentSeasonEndingYear)
     $resultPlayersUnderContractAfterThisSeason = $db->sql_query($queryPlayersUnderContractAfterThisSeason);
     $numberOfPlayersUnderContractAfterThisSeason = $db->sql_numrows($resultPlayersUnderContractAfterThisSeason);
 
+    $contract_amt[][] = 0;
     $i = 0;
     while ($i < $numberOfPlayersUnderContractAfterThisSeason) {
         $yearUnderContract = $db->sql_result($resultPlayersUnderContractAfterThisSeason, $i, "cy");

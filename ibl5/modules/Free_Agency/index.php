@@ -389,8 +389,10 @@ function display()
 				<td>";
 
             // ==== ROOKIE OPTIONS
-            if (($draftround == 1 && $exp == 2 && $millionscy4 == 0) or
-                ($draftround == 2 && $exp == 1 && $millionscy3 == 0)) {
+            if (
+                ($draftround == 1 && $exp == 2 && $millionscy4 == 0)
+                OR ($draftround == 2 && $exp == 1 && $millionscy3 == 0)
+            ) {
                 echo "<a href=\"modules.php?name=Player&pa=rookieoption&pid=$pid\">Rookie Option</a>";
             }
 

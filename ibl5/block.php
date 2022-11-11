@@ -82,12 +82,6 @@ while ($i < $num) {
     if ($dem2 == 0) {
         $demyrs = 1;
     }
-    if ($offer2 == 0) {
-    } else {
-        if ($offer2 < 0.5 * $dem1) {
-            $perceivedvalue = 0;
-        }
-    }
 
     $demands = ($dem1 + $dem2 + $dem3 + $dem4 + $dem5 + $dem6) / $demyrs * ((11 - $val) / 10);
     if ($nameholder == $name) {

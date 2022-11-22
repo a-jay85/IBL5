@@ -93,7 +93,7 @@ class Shared
     {
         if ($tid == 0) {
             $playerNameDecorated = "$name";
-        } elseif ($$ordinal >= 960) { // on waivers
+        } elseif ($ordinal >= 960) { // on waivers
             $playerNameDecorated = "($name)*";
         } elseif ($currentContractYear == $totalYearsOnContract) { // eligible for Free Agency at the end of this season
             $playerNameDecorated = "$name^";

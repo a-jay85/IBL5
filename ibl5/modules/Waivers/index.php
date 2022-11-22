@@ -224,6 +224,16 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
                 if ($newWaiverContract == true) {
                     $queryi .= "`cy1` = $cy1,
                                 `cy` = 1, ";
+                    $finalContract = $cy1;
+                } else {
+                    $currentContractYear = $db->sql_result($waiverresult, 0, "cy");
+                    $contractLengthInYears = $db->sql_result($waiverresult, 0, "cyt");
+                    while ($currentContractYear <= $contractLengthInYears) {
+                        $contractYearIncrementor = "cy$currentContractYear";
+                        $salaryForCurrentYear = $db->sql_result($waiverresult, 0, "$contractYearIncrementor");
+                        $finalContract .= $salaryForCurrentYear . " ";
+                        $currentContractYear++;
+                    }
                 }
                 $queryi .= "`teamname` = '$Team_Offering',
                             `tid` = '$teamid'
@@ -235,7 +245,7 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
 
                     $topicid = 33;
                     $storytitle = $Team_Offering . " make waiver additions";
-                    $hometext = "The " . $Team_Offering . " sign " . $playername . " from waivers for $cy1.";
+                    $hometext = "The " . $Team_Offering . " sign " . $playername . " from waivers for $finalContract";
 
                     // ==== PUT ANNOUNCEMENT INTO DATABASE ON NEWS PAGE
 

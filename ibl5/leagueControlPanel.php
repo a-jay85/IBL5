@@ -13,6 +13,24 @@ $allowTradesStatus = $sharedFunctions->getAllowTradesStatus();
 
 if (isset($_POST['query'])) {
     switch ($_POST['query']) {
+        case 'Insert new `ibl_heat_win_loss` database entries':
+            $queryTeamNames = "SELECT team_name FROM ibl_team_info WHERE teamid != 35 ORDER BY teamid ASC;";
+            $resultTeamNames = $db->sql_query($queryTeamNames);
+            $numTeamNames = $db->sql_numrows($resultTeamNames);
+            $currentSeasonHEATYear = $currentSeasonEndingYear - 1;
+
+            $i = 0;
+            while ($i < $numTeamNames) {
+                $values .= "($currentSeasonHEATYear, '" . $db->sql_result($resultTeamNames, $i) . "', '" . $db->sql_result($resultTeamNames, $i) . "', 0, 0)";
+                if ($i < $numTeamNames - 1) {
+                    $values .= ", ";
+                }
+                $i++;
+            }
+
+            $queryString = "INSERT INTO ibl_heat_win_loss (`year`, `currentname`, `namethatyear`, `wins`, `losses`) VALUES $values;";
+            $successText = "New `ibl_heat_win_loss` database entries were inserted for each team for the $currentSeasonHEATYear season.";
+            break;
         case 'Set Season Phase':
             if (isset($_POST['SeasonPhase'])) {
                 $queryString = "UPDATE ibl_settings SET value = '{$_POST['SeasonPhase']}' WHERE name = 'Current Season Phase';";
@@ -116,7 +134,8 @@ switch ($currentSeasonPhase) {
         echo "<A HREF=\"updateAllTheThings.php\">Update All The Things</A><p>
             <A HREF=\"scoParser.php\">Run scoParser.php</A><p>
             <A HREF=\"heatupdateboth.php\">Update HEAT Leaderboards</A><p>
-            <A HREF=\"history_update.php\">IBL History Update</A><p>";
+            <A HREF=\"history_update.php\">IBL History Update</A><p>
+            <INPUT type='submit' name='query' value='Insert new `ibl_heat_win_loss` database entries'><p>";
         break;
     case 'Regular Season':
         echo "<A HREF=\"updateAllTheThings.php\">Update All The Things</A><p>

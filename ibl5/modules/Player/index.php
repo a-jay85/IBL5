@@ -710,10 +710,7 @@ function search()
         @$num = $db->sql_numrows($result);
     }
 
-    echo "<table border=1 cellpadding=0 cellspacing=0>
-        <tr>
-            <td colspan=34><center><i>Players Matching all Criteria</i></center></td>
-        </tr>
+    echo "<table class=\"sortable\" border=1 cellpadding=0 cellspacing=0>
         <tr>
             <th>Pos</th>
             <th>Player</th>

@@ -28,6 +28,17 @@ $Minimum = $_POST['vetmin'];
 $MLE = 0;
 $LLE = 0;
 
+// Check if player being offered was previously signed to a team during this Free Agency period
+$queryOfferedPlayer = "SELECT * FROM ibl_plr WHERE name = '$Player_Name';";
+$resultOfferedPlayer = $db->sql_query($queryOfferedPlayer);
+$currentContractYearOfOfferedPlayer = $db->sql_result($resultOfferedPlayer, 0, "cy");
+$year1ContractOfOfferedPlayer = $db->sql_result($resultOfferedPlayer, 0, "cy1");
+if ($currentContractYearOfOfferedPlayer == 0 AND ($year1ContractOfOfferedPlayer != "0")) {
+    echo "Sorry, this player was previously signed to a team this Free Agency period.<p>
+        Please <a href=\"modules.php?name=Free_Agency\">click here to return to the Free Agency main page</a>.";
+    exit();
+}
+
 if ($MLE_Years == 8) {
     $Offer_1 = $Minimum;
     $Offer_2 = 0;

@@ -505,6 +505,7 @@ $resultTeams = $db->sql_query($queryTeams);
 $numTeams = $db->sql_numrows($resultTeams);
 
 $currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
+$currentSeasonPhase = $sharedFunctions->getCurrentSeasonPhase();
 
 $i = 0;
 while ($i < $numTeams) {
@@ -517,6 +518,7 @@ while ($i < $numTeams) {
 		AND (BoxID > 0 AND BoxID < 100000)
 		AND Date BETWEEN '" . ($currentSeasonEndingYear - 1) . "-10-31' AND '$currentSeasonEndingYear-05-30'
 		ORDER BY Date ASC";
+
     $resultGames = $db->sql_query($queryGames);
     $numGames = $db->sql_numrows($resultGames);
 
@@ -645,6 +647,17 @@ while ($i < $numTeams) {
 			a.losses = b.loss
 		WHERE a.currentname = b.Team AND a.year = '" . $currentSeasonEndingYear . "';";
     $result4 = $db->sql_query($query4);
+
+    // IF HEAT, update ibl_heat_win_loss with each team's HEAT win/loss info
+    $queryUpdateHeatWinLoss = "UPDATE ibl_heat_win_loss a, ibl_power b
+    SET a.wins = b.win,
+        a.losses = b.loss
+    WHERE a.currentname = b.Team AND a.year = '" . ($currentSeasonEndingYear - 1) . "';";
+    if ($db->sql_query($queryUpdateHeatWinLoss)) {
+        echo $queryUpdateHeatWinLoss . "<p>";
+    } else {
+        echo "<b>`ibl_heat_win_loss` update FAILED for $teamName! Have you <A HREF=\"leagueControlPanel.php\">inserted new database rows</A> for the new HEAT season?</b>";
+    }
 
     // Update teams' total wins in ibl_team_history by summing up a team's wins in ibl_team_win_loss
     $query8 = "UPDATE ibl_team_history a
@@ -796,7 +809,6 @@ if ($db->sql_query($resetExtensionQueryString)) {
     die('Invalid query: ' . $db->sql_error());
 }
 
-$currentSeasonPhase = $sharedFunctions->getCurrentSeasonPhase();
 if ($currentSeasonPhase == "Playoffs" or $currentSeasonPhase == "Draft" or $currentSeasonPhase == "Free Agency") {
     echo '<p>Re-applying postseason trades made during the playoffs...</p>';
 

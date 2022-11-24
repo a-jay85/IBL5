@@ -1252,6 +1252,7 @@ function draftPicks($db, $team_name)
         $teampick = $db->sql_result($resultpicks, $hh, "teampick");
         $year = $db->sql_result($resultpicks, $hh, "year");
         $round = $db->sql_result($resultpicks, $hh, "round");
+        $notes = $db->sql_result($resultpicks, $hh, "notes");
 
         $j = 0;
         while ($j < $i) {
@@ -1263,9 +1264,14 @@ function draftPicks($db, $team_name)
             $j++;
         }
         $table_draftpicks .= "<tr>
-            <td valign=\"center\"><a href=\"modules.php?name=Team&op=team&tid=$pick_team_id\"><img src=\"images/logo/$teampick.png\"></a></td>
+            <td valign=\"center\"><a href=\"modules.php?name=Team&op=team&tid=$pick_team_id\"><img src=\"images/logo/$teampick.png\" height=33 width=33></a></td>
             <td valign=\"center\"><a href=\"modules.php?name=Team&op=team&tid=$pick_team_id\">$year $pick_team_city $teampick (Round $round)</a></td>
         </tr>";
+        if ($notes != NULL) {
+            $table_draftpicks .= "<tr>
+                <td width=200 colspan=2 valign=\"top\"><i>$notes</i><br>&nbsp;</td>
+            </tr>";
+        }
 
         $hh++;
     }

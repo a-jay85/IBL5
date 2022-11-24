@@ -1788,7 +1788,6 @@ function leaguestats()
     $numTeamOffenseTotals = $db->sql_numrows($resultTeamOffenseTotals);
 
     $t = 0;
-
     while ($t < $numTeamOffenseTotals) {
         $team_off_name = $db->sql_result($resultTeamOffenseTotals, $t, "team");
         $m = 0;
@@ -1894,6 +1893,27 @@ function leaguestats()
 			<td>$team_off_avgpts</td>
 		</tr>";
 
+        $teamHeaderCells[$t] = "<td bgcolor=\"$teamcolor1\"><a href=\"modules.php?name=Team&op=team&tid=$tid\"><font color=\"$teamcolor2\">$teamcity $team_off_name Offense</font></a></td>";
+        $teamOffenseAveragesArray[$t] = array(
+            $team_off_avgfgm,
+			$team_off_avgfga,
+			$team_off_fgp,
+			$team_off_avgftm,
+			$team_off_avgfta,
+			$team_off_ftp,
+			$team_off_avgtgm,
+			$team_off_avgtga,
+			$team_off_tgp,
+			$team_off_avgorb,
+			$team_off_avgreb,
+			$team_off_avgast,
+			$team_off_avgstl,
+			$team_off_avgtvr,
+			$team_off_avgblk,
+			$team_off_avgpf,
+			$team_off_avgpts
+        );
+
         $t++;
     }
 
@@ -1902,9 +1922,7 @@ function leaguestats()
     $numTeamDefenseTotals = $db->sql_numrows($resultTeamDefenseTotals);
 
     $t = 0;
-
     while ($t < $numTeamDefenseTotals) {
-
         $team_def_name = $db->sql_result($resultTeamDefenseTotals, $t, "team");
         $m = 0;
         while ($m < $n) {
@@ -1991,6 +2009,26 @@ function leaguestats()
 			<td>$team_def_avgpts</td>
 		</tr>";
 
+        $teamDefenseAveragesArray[$t] = array(
+            $team_def_avgfgm,
+			$team_def_avgfga,
+			$team_def_fgp,
+			$team_def_avgftm,
+			$team_def_avgfta,
+			$team_def_ftp,
+			$team_def_avgtgm,
+			$team_def_avgtga,
+			$team_def_tgp,
+			$team_def_avgorb,
+			$team_def_avgreb,
+			$team_def_avgast,
+			$team_def_avgstl,
+			$team_def_avgtvr,
+			$team_def_avgblk,
+			$team_def_avgpf,
+			$team_def_avgpts
+        );
+
         $t++;
     }
 
@@ -2052,6 +2090,23 @@ function leaguestats()
 		<td>$lg_off_avgpts</td>
 	</tr>";
 
+    $i = 0;
+    while ($i < $numteams - 1) {
+        $league_differentials .= "<tr>";
+        $league_differentials .= $teamHeaderCells[$i];
+
+        $j = 0;
+        while ($j < sizeof($teamOffenseAveragesArray[$i])) {
+            $differential = $teamOffenseAveragesArray[$i][$j] - $teamDefenseAveragesArray[$i][$j];
+            $league_differentials .= "<td align='right'>" . number_format($differential, 2) . "</td>";
+
+            $j++;
+        }
+        $league_differentials .= "</tr>";
+
+        $i++;
+    }
+
     echo "<center>
 		<h1>League-wide Statistics</h1>
 
@@ -2081,6 +2136,12 @@ function leaguestats()
 		<thead><tr><th>Team</th><th>FGM</th><th>FGA</th><th>FGP</th><th>FTM</th><th>FTA</th><th>FTP</th><th>3GM</th><th>3GA</th><th>3GP</th><th>ORB</th><th>REB</th><th>AST</th><th>STL</th><th>TVR</th><th>BLK</th><th>PF</th><th>PTS</th></tr></thead>
 		<tbody>$defense_averages</tbody>
 		<tfoot>$league_averages</tfoot>
+		</table>
+
+		<h2>Team Off/Def Average Differentials</h2>
+		<table class=\"sortable\">
+		<thead><tr><th>Team</th><th>FGM</th><th>FGA</th><th>FGP</th><th>FTM</th><th>FTA</th><th>FTP</th><th>3GM</th><th>3GA</th><th>3GP</th><th>ORB</th><th>REB</th><th>AST</th><th>STL</th><th>TVR</th><th>BLK</th><th>PF</th><th>PTS</th></tr></thead>
+		<tbody>$league_differentials</tbody>
 		</table>";
 
     CloseTable();

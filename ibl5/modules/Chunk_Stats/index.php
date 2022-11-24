@@ -79,7 +79,7 @@ function chunkstats()
     echo "<table border=1>";
     echo "<tr><td><b>Sim</td>
 		<td><select name=\"chunk\">";
-    chunk_option($row[maxchunk], $chunk);
+    chunk_option($row['maxchunk'], $chunk);
     echo "</select></td>";
     echo "<td><b>Team</td>
 		<td><select name=\"team\">";
@@ -96,33 +96,33 @@ function chunkstats()
 		<td><input type=\"submit\" value=\"Search Sim Data\"></td>";
     echo "</tr></table>";
 
-    echo "<table cellpadding=3 CELLSPACING=0 border=0>
+    echo "<table class=\"sortable\" cellpadding=3 CELLSPACING=0 border=0>
 		<tr bgcolor=D99795>
-			<td><b>Rank</td>
-			<td><b>Name</td>
-			<td><b>Pos</td>
-			<td><b>Team</td>
-			<td><b>Sim</td>
-			<td><b>G</td>
-			<td><b>Min</td>
-			<td align=right><b>fgm</td>
-			<td><b>fga</td>
-			<td align=right><b>fg%</td>
-			<td><b>ftm</td>
-			<td align=right><b>fta</td>
-			<td><b>ft%</td>
-			<td align=right><b>tgm</td>
-			<td><b>tga</td>
-			<td align=right><b>tg%</td>
-			<td><b>orb</td>
-			<td align=right><b>reb</td>
-			<td><b>ast</td>
-			<td align=right><b>stl</td>
-			<td><b>to</td>
-			<td align=right><b>blk</td>
-			<td><b>pf</td>
-			<td align=right><b>ppg</td>
-			<td><b>QA</td>
+			<th><b>Rank</td>
+			<th><b>Name</td>
+			<th><b>Pos</td>
+			<th><b>Team</td>
+			<th><b>Sim</td>
+			<th><b>G</td>
+			<th><b>Min</td>
+			<th align=right><b>fgm</td>
+			<th><b>fga</td>
+			<th align=right><b>fg%</td>
+			<th><b>ftm</td>
+			<th align=right><b>fta</td>
+			<th><b>ft%</td>
+			<th align=right><b>tgm</td>
+			<th><b>tga</td>
+			<th align=right><b>tg%</td>
+			<th><b>orb</td>
+			<th align=right><b>reb</td>
+			<th><b>ast</td>
+			<th align=right><b>stl</td>
+			<th><b>to</td>
+			<th align=right><b>blk</td>
+			<th><b>pf</td>
+			<th align=right><b>ppg</td>
+			<th><b>QA</td>
 		</tr>";
 
     $query = "SELECT * FROM ibl_plr_chunk WHERE $argument AND qa !=0 ORDER BY $sort DESC";
@@ -271,7 +271,33 @@ function seasonstats()
     echo "</select></td><td><input type=\"submit\" value=\"Search Season Data\"></td>";
     echo "</tr></table>";
 
-    echo "<table cellpadding=3 CELLSPACING=0 border=0><tr bgcolor=C2D69A><td><b>Rank</td><td><b>Name</td><td><b>Pos</td><td><b>Team</td><td><b>G</td><td><b>Min</td><td allign=right><b>fgm</td><td><b>fga</td><td allign=right><b>fg%</td><td><b>ftm</td><td allign=right><b>fta</td><td><b>ft%</td><td allign=right><b>tgm</td><td><b>tga</td><td allign=right><b>tg%</td><td><b>orb</td><td allign=right><b>reb</td><td><b>ast</td><td allign=right><b>stl</td><td><b>to</td><td allign=right><b>blk</td><td><b>pf</td><td allign=right><b>ppg</td><td allign=right><b>qa</td></tr>";
+    echo "<table class=\"sortable\" cellpadding=3 CELLSPACING=0 border=0>
+        <tr bgcolor=C2D69A>
+            <th><b>Rank</td>
+            <th><b>Name</td>
+            <th><b>Pos</td>
+            <th><b>Team</td>
+            <th><b>G</td>
+            <th><b>Min</td>
+            <th align=right><b>fgm</td>
+            <th><b>fga</td>
+            <th align=right><b>fg%</td>
+            <th><b>ftm</td>
+            <th align=right><b>fta</td>
+            <th><b>ft%</td>
+            <th align=right><b>tgm</td>
+            <th><b>tga</td>
+            <th align=right><b>tg%</td>
+            <th><b>orb</td>
+            <th align=right><b>reb</td>
+            <th><b>ast</td>
+            <th align=right><b>stl</td>
+            <th><b>to</td>
+            <th align=right><b>blk</td>
+            <th><b>pf</td>
+            <th align=right><b>ppg</td>
+            <th align=right><b>qa</td>
+        </tr>";
 
     while ($i < $num) {
         $pid = $db->sql_result($result, $i, "pid");

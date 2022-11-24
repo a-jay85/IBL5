@@ -330,10 +330,10 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
     }
 
     if ($action == 'drop') {
-        $sql8 = "SELECT * FROM ibl_plr WHERE teamname = '$userinfo[user_ibl_team]' AND retired = '0' AND ordinal < '961' ORDER BY ordinal ASC ";
+        $sql8 = "SELECT * FROM ibl_plr WHERE teamname = '$userinfo[user_ibl_team]' AND retired = '0' AND ordinal < '961' ORDER BY name ASC ";
         $result8 = $db->sql_query($sql8);
     } else {
-        $sql8 = "SELECT * FROM ibl_plr WHERE ordinal >= '960' AND retired = '0' AND name NOT LIKE '%|%' ORDER BY ordinal ASC";
+        $sql8 = "SELECT * FROM ibl_plr WHERE ordinal >= '960' AND retired = '0' AND name NOT LIKE '%|%' ORDER BY name ASC";
         $result8 = $db->sql_query($sql8);
     }
 
@@ -398,7 +398,7 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
             }
         }
         $dropdown = $dropdown . "
-        <option value=\"$player_pid\">$player_pos $player_name $wait_time $zcy2</option>";
+        <option value=\"$player_pid\">$player_name $wait_time $zcy2</option>";
         //        echo "<input type=\"hidden\" name=\"index$k\" value=\"$player_pid\"><input type=\"hidden\" name=\"cy$k\" value=\"$cy2\"><input type=\"hidden\" name=\"type$k\" value=\"1\">";
         /*
         if ($nocheckbox == 1)

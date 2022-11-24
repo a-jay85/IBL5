@@ -620,7 +620,11 @@ while ($i < $numTeams) {
 
     $winPoints = $winPoints + $wins;
     $lossPoints = $lossPoints + $losses;
-    $ranking = round(($winPoints / ($winPoints + $lossPoints)) * 100, 1);
+    if ($winPoints + $lossPoints != 0) {
+        $ranking = round(($winPoints / ($winPoints + $lossPoints)) * 100, 1);
+    } else {
+        $ranking = 0; // avoids division by zero warnings
+    }
 
     // Update ibl_power with each team's win/loss info and current power ranking score
     $query3 = "UPDATE ibl_power

@@ -95,6 +95,7 @@ function buildTeamFuturePicks($resultTeamPicks, $future_salary_array)
         $pick_year = $rowTeamDraftPicks["year"];
         $pick_team = $rowTeamDraftPicks["teampick"];
         $pick_round = $rowTeamDraftPicks["round"];
+        $pick_notes = $rowTeamDraftPicks["notes"];
         $pick_id = $rowTeamDraftPicks["pickid"];
 
         $y = $pick_year - $currentSeasonEndingYear + 1;
@@ -135,6 +136,11 @@ function buildTeamFuturePicks($resultTeamPicks, $future_salary_array)
 				$pick_year $pick_team Round $pick_round
 			</td>
 		</tr>";
+        if ($pick_notes != NULL) {
+            echo "<tr>
+                <td colspan=3 width=150>$pick_notes</td>
+            </tr>";
+        }
 
         $k++;
     }
@@ -415,8 +421,12 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
                 $pickteam = $rowsgetpick['teampick'];
                 $pickyear = $rowsgetpick['year'];
                 $pickround = $rowsgetpick['round'];
+                $picknotes = $rowsgetpick['notes'];
 
                 echo "The $from send the $pickteam $pickyear Round $pickround draft pick to the $to.<br>";
+                if ($picknotes != NULL) {
+                    echo "<i>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;" . $picknotes . "</i><br>";
+                }
             } else {
                 $sqlgetplyr = "SELECT * FROM ibl_plr WHERE pid = '$itemid'";
                 $resultgetplyr = $db->sql_query($sqlgetplyr);

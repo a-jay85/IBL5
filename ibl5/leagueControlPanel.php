@@ -14,22 +14,29 @@ $allowTradesStatus = $sharedFunctions->getAllowTradesStatus();
 if (isset($_POST['query'])) {
     switch ($_POST['query']) {
         case 'Insert new `ibl_heat_win_loss` database entries':
-            $queryTeamNames = "SELECT team_name FROM ibl_team_info WHERE teamid != 35 ORDER BY teamid ASC;";
-            $resultTeamNames = $db->sql_query($queryTeamNames);
-            $numTeamNames = $db->sql_numrows($resultTeamNames);
             $currentSeasonHEATYear = $currentSeasonEndingYear - 1;
+            $queryHEATEntriesAlreadyExist = "SELECT currentname FROM ibl_heat_win_loss WHERE year = $currentSeasonHEATYear;";
+            $resultHEATEntriesAlreadyExist = $db->sql_query($queryHEATEntriesAlreadyExist);
 
-            $i = 0;
-            while ($i < $numTeamNames) {
-                $values .= "($currentSeasonHEATYear, '" . $db->sql_result($resultTeamNames, $i) . "', '" . $db->sql_result($resultTeamNames, $i) . "', 0, 0)";
-                if ($i < $numTeamNames - 1) {
-                    $values .= ", ";
+            if ($db->sql_numrows($resultHEATEntriesAlreadyExist) == 0) {
+                $queryTeamNames = "SELECT team_name FROM ibl_team_info WHERE teamid != 35 ORDER BY teamid ASC;";
+                $resultTeamNames = $db->sql_query($queryTeamNames);
+                $numTeamNames = $db->sql_numrows($resultTeamNames);
+    
+                $i = 0;
+                while ($i < $numTeamNames) {
+                    $values .= "($currentSeasonHEATYear, '" . $db->sql_result($resultTeamNames, $i) . "', '" . $db->sql_result($resultTeamNames, $i) . "', 0, 0)";
+                    if ($i < $numTeamNames - 1) {
+                        $values .= ", ";
+                    }
+                    $i++;
                 }
-                $i++;
+    
+                $queryString = "INSERT INTO ibl_heat_win_loss (`year`, `currentname`, `namethatyear`, `wins`, `losses`) VALUES $values;";
+                $successText = "New `ibl_heat_win_loss` database entries were inserted for each team for the $currentSeasonHEATYear season.";
+            } else {
+                $failureText = "`ibl_heat_win_loss` database entries already exist for the $currentSeasonHEATYear season! New entries were NOT inserted.";
             }
-
-            $queryString = "INSERT INTO ibl_heat_win_loss (`year`, `currentname`, `namethatyear`, `wins`, `losses`) VALUES $values;";
-            $successText = "New `ibl_heat_win_loss` database entries were inserted for each team for the $currentSeasonHEATYear season.";
             break;
         case 'Set Season Phase':
             if (isset($_POST['SeasonPhase'])) {

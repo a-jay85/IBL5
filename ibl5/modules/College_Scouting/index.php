@@ -105,7 +105,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 			<th>Int</th>
 		</tr>";
 
-    echo "<form name='draft_form' action='online/draft_selection.php' method='POST'>";
+    echo "<form name='draft_form' action='draft_selection.php' method='POST'>";
     echo "<input type='hidden' name='teamname' value='$teamlogo'>";
     echo "<input type='hidden' name='draft_round' value='$draft_round'>";
     echo "<input type='hidden' name='draft_pick' value='$draft_pick'>";
@@ -172,21 +172,18 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
             $player_drafted = 0;
         }
 
-        if ($teamlogo == $draft_team && $player_drafted == 0) {
+        if ($teamlogo == $draft_team && $player_drafted_db == 0) {
             echo "
                 <tr bgcolor=$bgcolor>
-                    <td><input type='radio' name='player' value='$player_name'></td>
-                    <td>$player_pos</td>";
+                    <td align=center><input type='radio' name='player' value='$player_name'></td>";
         } elseif ($player_drafted == 1 OR $player_drafted_db == 1) {
             echo "
                 <tr>
-                    <td></td>
-                    <td>$player_pos</td>";
+                    <td></td>";
         } else {
             echo "
                 <tr bgcolor=$bgcolor>
-                    <td></td>
-                    <td>$player_pos</td>";
+                    <td></td>";
         }
 
         // ====
@@ -199,6 +196,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
         }
 
         echo "
+            <td>$player_pos</td>
             <td>$player_team</td>
             <td>$player_age</td>
             <td>$display_fga</td>
@@ -234,7 +232,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
     // ========
 
     if ($teamlogo == $draft_team && $player_drafted == 0) {
-        echo "</table><input type='submit' value='Draft'></form>";
+        echo "</table><center><input type='submit' style=\"height:100px; width:150px\" value='Draft'></center></form>";
     } else {
         echo "</table></form>";
     }

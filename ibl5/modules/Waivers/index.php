@@ -342,7 +342,6 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
 
     while ($playerForWaiverOperation = $db->sql_fetchrow($resultListOfPlayersForWaiverOperation)) {
         $wait_time = '';
-        $player_pos = $playerForWaiverOperation['pos'];
         $player_name = $playerForWaiverOperation['name'];
         $player_pid = $playerForWaiverOperation['pid'];
         $cy = $playerForWaiverOperation['cy'];
@@ -395,7 +394,7 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
         echo "** $player_pos $player_name $wait_time
         <br>";
         } else {
-        echo "<input type=\"checkbox\" name=\"check$k\"> $player_pos $player_name $wait_time $$cy2
+        echo "<input type=\"checkbox\" name=\"check$k\">$player_name $wait_time $$cy2
         <br>";
         }
          */

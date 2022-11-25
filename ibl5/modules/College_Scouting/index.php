@@ -52,7 +52,6 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 
     $sharedFunctions->displaytopmenu($tid);
 
-    // ========== DISPLAY ROOKIES
     $draft_year = $sharedFunctions->getCurrentSeasonEndingYear();
     $draft_sql = "SELECT * from ibl_draft WHERE player = '' ORDER BY round ASC, pick ASC";
     $draft_result = $db->sql_query($draft_sql);
@@ -106,10 +105,6 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
     echo "<input type='hidden' name='teamname' value='$teamlogo'>";
     echo "<input type='hidden' name='draft_round' value='$draft_round'>";
     echo "<input type='hidden' name='draft_pick' value='$draft_pick'>";
-
-    // ==========
-    // START GENERAL DECLARANTS
-    // ==========
 
     $sql3 = "SELECT * FROM ibl_scout_rookieratings ORDER BY drafted, name";
     $result3 = $db->sql_query($sql3);
@@ -196,10 +191,6 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
     }
 
     echo "</table>";
-
-    // ========
-    // END GENERAL DECLARANTS
-    // ========
 
     if ($teamlogo == $draft_team && $player_drafted == 0) {
         echo "</table><center><input type='submit' style=\"height:100px; width:150px\" value='Draft'></center></form>";

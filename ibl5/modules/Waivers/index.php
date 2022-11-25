@@ -317,8 +317,7 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
         WHERE teamname = '$userinfo[user_ibl_team]'
             AND retired = '0'
             AND ordinal <= '960'
-            AND injured = '0'
-        ORDER BY ordinal ASC";
+            AND injured = '0'";
     $resultSelectHealthyPlayersOnUsersTeam = $db->sql_query($querySelectHealthyPlayersOnUsersTeam);
     $numhealthyPlayersOnUsersTeam = $db->sql_numrows($resultSelectHealthyPlayersOnUsersTeam);
     $healthyRosterSpots = 15;
@@ -330,18 +329,17 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
         WHERE teamname = '$userinfo[user_ibl_team]'
             AND retired = '0'
             AND ordinal <= '960'
-        ORDER BY ordinal ASC ";
+        ORDER BY name ASC";
     $resultSelectAllPlayersOnUsersTeam = $db->sql_query($querySelectAllPlayersOnUsersTeam);
     $numPlayersOnUsersTeam = $db->sql_numrows($resultSelectAllPlayersOnUsersTeam);
     $rosterSpots = 15;
     $rosterSpots -= $numPlayersOnUsersTeam;
 
     if ($action == 'drop') {
-        $sql8 = "SELECT * FROM ibl_plr WHERE teamname = '$userinfo[user_ibl_team]' AND retired = '0' AND ordinal <= '960' ORDER BY name ASC ";
-        $result8 = $db->sql_query($sql8);
+        $resultListOfPlayersForWaiverOperation = $db->sql_query($querySelectAllPlayersOnUsersTeam);
     } else {
-        $sql8 = "SELECT * FROM ibl_plr WHERE ordinal > '960' AND retired = '0' AND name NOT LIKE '%|%' ORDER BY name ASC";
-        $result8 = $db->sql_query($sql8);
+        $queryAllPlayersOnWaivers = "SELECT * FROM ibl_plr WHERE ordinal > '960' AND retired = '0' AND name NOT LIKE '%|%' ORDER BY name ASC";
+        $resultListOfPlayersForWaiverOperation = $db->sql_query($queryAllPlayersOnWaivers);
     }
 
     echo "<form name=\"Waiver_Move\" method=\"post\" action=\"\"><input type=\"hidden\" name=\"Team_Name\" value=\"$teamlogo\">";
@@ -358,15 +356,15 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
     $k = 0;
     $timenow = intval(time());
 
-    while ($row8 = $db->sql_fetchrow($result8)) {
+    while ($playerForWaiverOperation = $db->sql_fetchrow($resultListOfPlayersForWaiverOperation)) {
         $wait_time = '';
-        $player_pos = $row8['pos'];
-        $player_name = $row8['name'];
-        $player_pid = $row8['pid'];
-        $cy = $row8['cy'];
+        $player_pos = $playerForWaiverOperation['pos'];
+        $player_name = $playerForWaiverOperation['name'];
+        $player_pid = $playerForWaiverOperation['pid'];
+        $cy = $playerForWaiverOperation['cy'];
         $xcyy = "cy$cy";
-        $player_exp = $row8['exp'];
-        $zcy2 = $row8[$xcyy];
+        $player_exp = $playerForWaiverOperation['exp'];
+        $zcy2 = $playerForWaiverOperation[$xcyy];
 
         if ($zcy2 == '' and $zcy2 == 0) {
             if ($player_exp > 9) {
@@ -392,7 +390,7 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
         $nocheckbox = 0;
 
         if ($action == 'add') {
-            $player_droptime = $row8['droptime'];
+            $player_droptime = $playerForWaiverOperation['droptime'];
             $time_diff = $timenow - $player_droptime;
 
             if ($time_diff < 86400) {
@@ -424,7 +422,7 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
     echo "<input type=\"hidden\" name=\"healthyrosterslots\" value=\"$healthyRosterSpots\"></td>";
     echo "</td></tr><tr><td colspan=3><center><input type=\"submit\" value=\"Click to $action player(s) to/from Waiver Pool\"></td></tr></form></center></table></center>";
     
-    $table_ratings = $sharedFunctions->ratings($db, $result8, "DDDDDD", "333333", "0", "");
+    $table_ratings = $sharedFunctions->ratings($db, $resultListOfPlayersForWaiverOperation, "DDDDDD", "333333", "0", "");
     echo $table_ratings;
 
     CloseTable();

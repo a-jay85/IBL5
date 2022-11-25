@@ -311,13 +311,19 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
 
     echo "<center><font color=red><b>$errortext</b></font></center>";
 
-    $sql9 = "SELECT * FROM ibl_plr WHERE teamname = '$userinfo[user_ibl_team]' AND retired = '0' AND ordinal <= '960' AND injured = '0' ORDER BY ordinal ASC";
-    $result9 = $db->sql_query($sql9);
+    $querySelectHealthyPlayersOnUsersTeam = "
+        SELECT *
+        FROM ibl_plr
+        WHERE teamname = '$userinfo[user_ibl_team]'
+            AND retired = '0'
+            AND ordinal <= '960'
+            AND injured = '0'
+        ORDER BY ordinal ASC";
+    $resultSelectHealthyPlayersOnUsersTeam = $db->sql_query($querySelectHealthyPlayersOnUsersTeam);
+    $healthyPlayersOnUsersTeam = $db->sql_numrows($resultSelectHealthyPlayersOnUsersTeam);
 
-    $healthyrosterslots = 15;
-    while ($row9 = $db->sql_fetchrow($result9)) {
-        $healthyrosterslots--;
-    }
+    $healthyRosterSlots = 15;
+    $healthyRosterSlots -= $healthyPlayersOnUsersTeam;
 
     $sql10 = "SELECT * FROM ibl_plr WHERE teamname = '$userinfo[user_ibl_team]' AND retired = '0' AND ordinal <= '960' ORDER BY ordinal ASC ";
     $result10 = $db->sql_query($sql10);
@@ -340,7 +346,7 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
 
     echo "<center><img src=\"images/logo/$tid.jpg\"><br><table border=1 cellspacing=0 cellpadding=0>
         <tr>
-            <th colspan=3><center>WAIVER WIRE - YOUR TEAM CURRENTLY HAS $rosterslots EMPTY ROSTER SPOTS and $healthyrosterslots HEALTHY ROSTER SPOTS</center></th>
+            <th colspan=3><center>WAIVER WIRE - YOUR TEAM CURRENTLY HAS $rosterslots EMPTY ROSTER SPOTS and $healthyRosterSlots HEALTHY ROSTER SPOTS</center></th>
         </tr>
         <tr>
             <td valign=top><center><b><u>$userinfo[user_ibl_team]</u></b></center>
@@ -412,7 +418,7 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
     }
 
     echo "$dropdown</select><input type=\"hidden\" name=\"rosterslots\" value=\"$rosterslots\"></td>";
-    echo "<input type=\"hidden\" name=\"healthyrosterslots\" value=\"$healthyrosterslots\"></td>";
+    echo "<input type=\"hidden\" name=\"healthyrosterslots\" value=\"$healthyRosterSlots\"></td>";
     echo "</td></tr><tr><td colspan=3><center><input type=\"submit\" value=\"Click to $action player(s) to/from Waiver Pool\"></td></tr></form></center></table></center>";
     
     $table_ratings = $sharedFunctions->ratings($db, $result8, "DDDDDD", "333333", "0", "");

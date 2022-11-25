@@ -320,18 +320,21 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
             AND injured = '0'
         ORDER BY ordinal ASC";
     $resultSelectHealthyPlayersOnUsersTeam = $db->sql_query($querySelectHealthyPlayersOnUsersTeam);
-    $healthyPlayersOnUsersTeam = $db->sql_numrows($resultSelectHealthyPlayersOnUsersTeam);
+    $numhealthyPlayersOnUsersTeam = $db->sql_numrows($resultSelectHealthyPlayersOnUsersTeam);
+    $healthyRosterSpots = 15;
+    $healthyRosterSpots -= $numhealthyPlayersOnUsersTeam;
 
-    $healthyRosterSlots = 15;
-    $healthyRosterSlots -= $healthyPlayersOnUsersTeam;
-
-    $sql10 = "SELECT * FROM ibl_plr WHERE teamname = '$userinfo[user_ibl_team]' AND retired = '0' AND ordinal <= '960' ORDER BY ordinal ASC ";
-    $result10 = $db->sql_query($sql10);
-
-    $rosterslots = 15;
-    while ($row10 = $db->sql_fetchrow($result10)) {
-        $rosterslots--;
-    }
+    $querySelectAllPlayersOnUsersTeam = "
+        SELECT *
+        FROM ibl_plr
+        WHERE teamname = '$userinfo[user_ibl_team]'
+            AND retired = '0'
+            AND ordinal <= '960'
+        ORDER BY ordinal ASC ";
+    $resultSelectAllPlayersOnUsersTeam = $db->sql_query($querySelectAllPlayersOnUsersTeam);
+    $numPlayersOnUsersTeam = $db->sql_numrows($resultSelectAllPlayersOnUsersTeam);
+    $rosterSpots = 15;
+    $rosterSpots -= $numPlayersOnUsersTeam;
 
     if ($action == 'drop') {
         $sql8 = "SELECT * FROM ibl_plr WHERE teamname = '$userinfo[user_ibl_team]' AND retired = '0' AND ordinal <= '960' ORDER BY name ASC ";
@@ -346,7 +349,7 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
 
     echo "<center><img src=\"images/logo/$tid.jpg\"><br><table border=1 cellspacing=0 cellpadding=0>
         <tr>
-            <th colspan=3><center>WAIVER WIRE - YOUR TEAM CURRENTLY HAS $rosterslots EMPTY ROSTER SPOTS and $healthyRosterSlots HEALTHY ROSTER SPOTS</center></th>
+            <th colspan=3><center>WAIVER WIRE - YOUR TEAM CURRENTLY HAS $rosterSpots EMPTY ROSTER SPOTS and $healthyRosterSpots HEALTHY ROSTER SPOTS</center></th>
         </tr>
         <tr>
             <td valign=top><center><b><u>$userinfo[user_ibl_team]</u></b></center>
@@ -417,8 +420,8 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
         $k++;
     }
 
-    echo "$dropdown</select><input type=\"hidden\" name=\"rosterslots\" value=\"$rosterslots\"></td>";
-    echo "<input type=\"hidden\" name=\"healthyrosterslots\" value=\"$healthyRosterSlots\"></td>";
+    echo "$dropdown</select><input type=\"hidden\" name=\"rosterslots\" value=\"$rosterSpots\"></td>";
+    echo "<input type=\"hidden\" name=\"healthyrosterslots\" value=\"$healthyRosterSpots\"></td>";
     echo "</td></tr><tr><td colspan=3><center><input type=\"submit\" value=\"Click to $action player(s) to/from Waiver Pool\"></td></tr></form></center></table></center>";
     
     $table_ratings = $sharedFunctions->ratings($db, $result8, "DDDDDD", "333333", "0", "");

@@ -310,8 +310,6 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
     $sharedFunctions->displaytopmenu($tid);
 
     echo "<center><font color=red><b>$errortext</b></font></center>";
-    $sql7 = "SELECT * FROM ibl_team_info ORDER BY teamid ASC ";
-    $result7 = $db->sql_query($sql7);
 
     $sql9 = "SELECT * FROM ibl_plr WHERE teamname = '$userinfo[user_ibl_team]' AND retired = '0' AND ordinal <= '960' AND injured = '0' ORDER BY ordinal ASC";
     $result9 = $db->sql_query($sql9);

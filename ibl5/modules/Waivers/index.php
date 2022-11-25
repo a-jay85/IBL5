@@ -415,10 +415,8 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
         $k++;
     }
 
-    echo "$dropdown</select><input type=\"hidden\" name=\"rosterslots\" value=\"$rosterslots\"></td>
-    ";
-    echo "<input type=\"hidden\" name=\"healthyrosterslots\" value=\"$healthyrosterslots\"></td>
-    ";
+    echo "$dropdown</select><input type=\"hidden\" name=\"rosterslots\" value=\"$rosterslots\"></td>";
+    echo "<input type=\"hidden\" name=\"healthyrosterslots\" value=\"$healthyrosterslots\"></td>";
     echo "</td></tr><tr><td colspan=3><center><input type=\"submit\" value=\"Click to $action player(s) to/from Waiver Pool\"></td></tr></form></center></table></center>";
     
     $table_ratings = $sharedFunctions->ratings($db, $result8, "DDDDDD", "333333", "0", "");

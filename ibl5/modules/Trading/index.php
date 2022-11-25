@@ -14,12 +14,10 @@ function menu()
     global $db;
     $sharedFunctions = new Shared($db);
 
-    $tid = intval($tid);
-
     include "header.php";
     OpenTable();
 
-    $sharedFunctions->displaytopmenu($tid);
+    $sharedFunctions->displaytopmenu(0);
 
     CloseTable();
     include "footer.php";
@@ -32,6 +30,8 @@ function buildTeamFutureSalary($resultTeamPlayers, $k)
 
     $seasonPhase = $sharedFunctions->getCurrentSeasonPhase();
 
+    $future_salary_array[][] = "";
+    
     while ($rowTeamPlayers = $db->sql_fetch_assoc($resultTeamPlayers)) {
         $player_pos = $rowTeamPlayers["pos"];
         $player_name = $rowTeamPlayers["name"];

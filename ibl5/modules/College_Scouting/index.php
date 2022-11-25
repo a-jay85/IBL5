@@ -78,7 +78,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 			<th>Draft</th>
 			<th>Pos</th>
 			<th>Name</th>
-			<th>College</th>
+			<th>Team</th>
 			<th>Age</th>
 			<th>fga</th>
 			<th>fgp</th>
@@ -103,7 +103,6 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 			<th>Tal</th>
 			<th>Skl</th>
 			<th>Int</th>
-			<th>Stamina</th>
 		</tr>";
 
     echo "<form name='draft_form' action='online/draft_selection.php' method='POST'>";
@@ -114,7 +113,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
     // ==========
     // START GENERAL DECLARANTS
     // ==========
-    
+
     $sql3 = "SELECT * FROM ibl_scout_rookieratings ORDER BY drafted, name";
     $result3 = $db->sql_query($sql3);
 
@@ -127,7 +126,6 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
         $player_name = $row3['name'];
         $player_team = $row3['team'];
         $player_age = $row3['age'];
-        $display_sta = $row3['sta'];
         $display_fga = $row3['fga'];
         $display_fgp = $row3['fgp'];
         $display_fta = $row3['fta'];
@@ -153,13 +151,13 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
         $display_int = $row3['int'];
         $player_drafted_db = $row3['drafted'];
 
-        $draftedPlayersQuery = "
+        $queryPlayersDrafted = "
             SELECT iblhoops_draft.player.`player_name`
               FROM iblhoops_draft.pick
         INNER JOIN iblhoops_draft.player
                 ON iblhoops_draft.pick.player_id =
                    iblhoops_draft.player.player_id;";
-        $draftedResult = $db->sql_query($draftedPlayersQuery);
+        $draftedResult = $db->sql_query($queryPlayersDrafted);
 
         $j = 0;
         while ($draftedPlayersArray[$j] = $db->sql_result($draftedResult, $j)) {
@@ -175,46 +173,57 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
         }
 
         if ($teamlogo == $draft_team && $player_drafted == 0) {
-            echo "<tr bgcolor = $bgcolor><td><input type='radio' name='player' value='$player_name'><td>$player_pos</td><td nowrap>";
+            echo "
+                <tr bgcolor=$bgcolor>
+                    <td><input type='radio' name='player' value='$player_name'></td>
+                    <td>$player_pos</td>";
         } elseif ($player_drafted == 1 OR $player_drafted_db == 1) {
-            echo "<tr><td><td>$player_pos</td><td nowrap>";
+            echo "
+                <tr>
+                    <td></td>
+                    <td>$player_pos</td>";
         } else {
-            echo "<tr bgcolor = $bgcolor><td><td>$player_pos</td><td nowrap>";
+            echo "
+                <tr bgcolor=$bgcolor>
+                    <td></td>
+                    <td>$player_pos</td>";
         }
 
         // ====
         // SHOW PLAYER NAME, STRIKE OUT IF DRAFTED ALREADY
         // ====
         if ($player_drafted == 1 OR $player_drafted_db == 1) {
-            echo "<strike><i>";
-        }
-
-        echo "$player_name";
-
-        if ($player_drafted == 1 OR $player_drafted_db == 1) {
-            echo "</i></strike>";
-        }
-
-        echo "</td><td>$player_team</td><td>$player_age</td><td>$display_fga</td><td>$display_fgp</td><td>$display_fta</td><td>$display_ftp</td><td>$display_tga</td><td>$display_tgp</td><td>$display_orb</td><td>$display_drb</td><td>$display_ast</td><td>$display_stl</td><td>$display_tvr</td><td>$display_blk</td>";
-
-        if ($display_Off != null) {
-            echo "<td colspan=4 border=1><center>$display_Off</center></td>";
+            echo "<td nowrap><strike><i>$player_name</i></strike></td>";
         } else {
-            echo "<td>$display_offo</td><td>$display_offd</td><td>$display_offp</td><td>$display_offt</td>";
+            echo "<td nowrap>$player_name</td>";
         }
 
-        if ($display_Def != null) {
-            echo "<td colspan=4 border=1><center>$display_Def</center></td>";
-        } else {
-            echo "<td>$display_defo</td><td>$display_defd</td><td>$display_defp</td><td>$display_deft</td>";
-        }
-
-        if ($display_Pot != null) {
-            echo "<td colspan=3 border=1><center>$display_Pot</center></td><td>$display_sta</td>";
-        } else {
-            echo "<td>$display_tal</td><td>$display_skl</td><td>$display_int</td><td>$display_sta</td>";
-        }
-
+        echo "
+            <td>$player_team</td>
+            <td>$player_age</td>
+            <td>$display_fga</td>
+            <td>$display_fgp</td>
+            <td>$display_fta</td>
+            <td>$display_ftp</td>
+            <td>$display_tga</td>
+            <td>$display_tgp</td>
+            <td>$display_orb</td>
+            <td>$display_drb</td>
+            <td>$display_ast</td>
+            <td>$display_stl</td>
+            <td>$display_tvr</td>
+            <td>$display_blk</td>
+            <td>$display_offo</td>
+            <td>$display_offd</td>
+            <td>$display_offp</td>
+            <td>$display_offt</td>
+            <td>$display_defo</td>
+            <td>$display_defd</td>
+            <td>$display_defp</td>
+            <td>$display_deft</td>
+            <td>$display_tal</td>
+            <td>$display_skl</td>
+            <td>$display_int</td>";
         echo "</tr>";
     }
 

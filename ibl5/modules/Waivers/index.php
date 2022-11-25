@@ -97,7 +97,6 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
     $Team_Offering = $_POST['Team_Name'];
     $Type_Of_Action = $_POST['Action'];
     $Player_to_Process = $_POST['Player_ID'];
-    $Fields_Counter = $_POST['counterfields'];
     $Roster_Slots = $_POST['rosterslots'];
     $Healthy_Roster_Slots = $_POST['healthyrosterslots'];
 
@@ -416,7 +415,7 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
         $k++;
     }
 
-    echo "$dropdown</select><input type=\"hidden\" name=\"counterfields\" value=\"$k\"><input type=\"hidden\" name=\"rosterslots\" value=\"$rosterslots\"></td>
+    echo "$dropdown</select><input type=\"hidden\" name=\"rosterslots\" value=\"$rosterslots\"></td>
     ";
     echo "<input type=\"hidden\" name=\"healthyrosterslots\" value=\"$healthyrosterslots\"></td>
     ";

@@ -313,7 +313,7 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
     $sql7 = "SELECT * FROM ibl_team_info ORDER BY teamid ASC ";
     $result7 = $db->sql_query($sql7);
 
-    $sql9 = "SELECT * FROM ibl_plr WHERE teamname = '$userinfo[user_ibl_team]' AND retired = '0' AND ordinal < '961' AND injured = '0' ORDER BY ordinal ASC";
+    $sql9 = "SELECT * FROM ibl_plr WHERE teamname = '$userinfo[user_ibl_team]' AND retired = '0' AND ordinal <= '960' AND injured = '0' ORDER BY ordinal ASC";
     $result9 = $db->sql_query($sql9);
 
     $healthyrosterslots = 15;
@@ -322,7 +322,7 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
         $healthyrosterslots--;
     }
 
-    $sql10 = "SELECT * FROM ibl_plr WHERE teamname = '$userinfo[user_ibl_team]' AND retired = '0' AND ordinal < '961' ORDER BY ordinal ASC ";
+    $sql10 = "SELECT * FROM ibl_plr WHERE teamname = '$userinfo[user_ibl_team]' AND retired = '0' AND ordinal <= '960' ORDER BY ordinal ASC ";
     $result10 = $db->sql_query($sql10);
 
     $rosterslots = 15;
@@ -332,10 +332,10 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
     }
 
     if ($action == 'drop') {
-        $sql8 = "SELECT * FROM ibl_plr WHERE teamname = '$userinfo[user_ibl_team]' AND retired = '0' AND ordinal < '961' ORDER BY name ASC ";
+        $sql8 = "SELECT * FROM ibl_plr WHERE teamname = '$userinfo[user_ibl_team]' AND retired = '0' AND ordinal <= '960' ORDER BY name ASC ";
         $result8 = $db->sql_query($sql8);
     } else {
-        $sql8 = "SELECT * FROM ibl_plr WHERE ordinal >= '960' AND retired = '0' AND name NOT LIKE '%|%' ORDER BY name ASC";
+        $sql8 = "SELECT * FROM ibl_plr WHERE ordinal > '960' AND retired = '0' AND name NOT LIKE '%|%' ORDER BY name ASC";
         $result8 = $db->sql_query($sql8);
     }
 

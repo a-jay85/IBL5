@@ -51,10 +51,12 @@ function waivers($user)
         $currentSeasonPhase = $sharedFunctions->getCurrentSeasonPhase();
         $allowWaiverMoves = $sharedFunctions->getWaiverWireStatus();
 
-        if (($currentSeasonPhase == "Preseason" and $allowWaiverMoves == "Yes")
-            or $currentSeasonPhase == "HEAT"
-            or $currentSeasonPhase == "Regular Season"
-            or $currentSeasonPhase == "Playoffs") {
+        if (
+            ($currentSeasonPhase == "Preseason" AND $allowWaiverMoves == "Yes")
+            OR $currentSeasonPhase == "HEAT"
+            OR $currentSeasonPhase == "Regular Season"
+            OR $currentSeasonPhase == "Playoffs"
+        ) {
             global $cookie;
             cookiedecode($user);
             waiverexecute($cookie[1], $action);

@@ -344,30 +344,40 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
         $wait_time = '';
         $player_name = $playerForWaiverOperation['name'];
         $player_pid = $playerForWaiverOperation['pid'];
-        $cy = $playerForWaiverOperation['cy'];
-        $xcyy = "cy$cy";
+        $currentContractYear = $playerForWaiverOperation['cy'];
+        $contractLengthInYears = $playerForWaiverOperation['cyt'];
+        $contractYearIncrementor = "cy$currentContractYear";
         $player_exp = $playerForWaiverOperation['exp'];
-        $zcy2 = $playerForWaiverOperation[$xcyy];
+        $salaryForCurrentYear = $playerForWaiverOperation[$contractYearIncrementor];
 
-        if ($zcy2 == '' and $zcy2 == 0) {
+        $fullContract = "";
+        if ($salaryForCurrentYear == '' and $salaryForCurrentYear == 0) {
             if ($player_exp > 9) {
-                $zcy2 = 103;
+                $fullContract = 103;
             } elseif ($player_exp > 8) {
-                $zcy2 = 100;
+                $fullContract = 100;
             } elseif ($player_exp > 7) {
-                $zcy2 = 89;
+                $fullContract = 89;
             } elseif ($player_exp > 6) {
-                $zcy2 = 82;
+                $fullContract = 82;
             } elseif ($player_exp > 5) {
-                $zcy2 = 76;
+                $fullContract = 76;
             } elseif ($player_exp > 4) {
-                $zcy2 = 70;
+                $fullContract = 70;
             } elseif ($player_exp > 3) {
-                $zcy2 = 64;
+                $fullContract = 64;
             } elseif ($player_exp > 2) {
-                $zcy2 = 61;
+                $fullContract = 61;
             } else {
-                $zcy2 = 51;
+                $fullContract = 51;
+            }
+        } else {
+            while ($currentContractYear <= $contractLengthInYears) {
+                $contractYearIncrementor = "cy$currentContractYear";
+                $salaryForCurrentYear = $playerForWaiverOperation[$contractYearIncrementor];
+                $fullContract .= $salaryForCurrentYear . " ";
+                
+                $currentContractYear++;
             }
         }
         $nocheckbox = 0;
@@ -386,15 +396,15 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
             }
         }
         $dropdown = $dropdown . "
-        <option value=\"$player_pid\">$player_name $wait_time $zcy2</option>";
+        <option value=\"$player_pid\">$player_name $fullContract $wait_time</option>";
         //        echo "<input type=\"hidden\" name=\"index$k\" value=\"$player_pid\"><input type=\"hidden\" name=\"cy$k\" value=\"$cy2\"><input type=\"hidden\" name=\"type$k\" value=\"1\">";
         /*
         if ($nocheckbox == 1)
         {
-        echo "** $player_pos $player_name $wait_time
+        echo "** $player_name $fullContract $wait_time
         <br>";
         } else {
-        echo "<input type=\"checkbox\" name=\"check$k\">$player_name $wait_time $$cy2
+        echo "<input type=\"checkbox\" name=\"check$k\">$player_name $fullContract $wait_time
         <br>";
         }
          */

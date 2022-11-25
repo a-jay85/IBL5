@@ -67,7 +67,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
     echo "<center><img src=\"images/logo/$tid.jpg\"><br>
 	<table>
 		<tr>
-			<th colspan=26>
+			<th colspan=27>
 				<center>Welcome to the $draft_year IBL Draft!
 			</th>
 		</tr>
@@ -149,50 +149,23 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
         $display_tal = $row3['tal'];
         $display_skl = $row3['skl'];
         $display_int = $row3['int'];
-        $player_drafted_db = $row3['drafted'];
+        $isPlayerDrafted = $row3['drafted'];
 
-        $queryPlayersDrafted = "
-            SELECT iblhoops_draft.player.`player_name`
-              FROM iblhoops_draft.pick
-        INNER JOIN iblhoops_draft.player
-                ON iblhoops_draft.pick.player_id =
-                   iblhoops_draft.player.player_id;";
-        $draftedResult = $db->sql_query($queryPlayersDrafted);
-
-        $j = 0;
-        while ($draftedPlayersArray[$j] = $db->sql_result($draftedResult, $j)) {
-            $j++;
-        }
-
-        if (in_array($player_name, $draftedPlayersArray)) {
-            $player_drafted = 1;
-            $db->sql_query("UPDATE ibl_scout_rookieratings SET drafted = 1 WHERE name = '$player_name';");
-            // This query should really be executed in the Draft-O-Matic when the player is drafted, but this works for now.
-        } else {
-            $player_drafted = 0;
-        }
-
-        if ($teamlogo == $draft_team && $player_drafted_db == 0) {
+        if ($teamlogo == $draft_team && $isPlayerDrafted == 0) {
             echo "
                 <tr bgcolor=$bgcolor>
-                    <td align=center><input type='radio' name='player' value='$player_name'></td>";
-        } elseif ($player_drafted == 1 OR $player_drafted_db == 1) {
+                    <td align=center><input type='radio' name='player' value='$player_name'></td>
+                    <td nowrap>$player_name</td>";
+        } elseif ($isPlayerDrafted == 1) {
             echo "
                 <tr>
-                    <td></td>";
+                    <td></td>
+                    <td nowrap><strike><i>$player_name</i></strike></td>";
         } else {
             echo "
                 <tr bgcolor=$bgcolor>
-                    <td></td>";
-        }
-
-        // ====
-        // SHOW PLAYER NAME, STRIKE OUT IF DRAFTED ALREADY
-        // ====
-        if ($player_drafted == 1 OR $player_drafted_db == 1) {
-            echo "<td nowrap><strike><i>$player_name</i></strike></td>";
-        } else {
-            echo "<td nowrap>$player_name</td>";
+                    <td></td>
+                    <td nowrap>$player_name</td>";
         }
 
         echo "

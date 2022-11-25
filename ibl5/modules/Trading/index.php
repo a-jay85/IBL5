@@ -163,7 +163,6 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 
     $sql2 = "SELECT * FROM " . $user_prefix . "_users WHERE username = '$username'";
     $result2 = $db->sql_query($sql2);
-    $num = $db->sql_numrows($result2);
     $userinfo = $db->sql_fetchrow($result2);
     if (!$bypass) {
         cookiedecode($user);
@@ -250,8 +249,6 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 		ORDER BY year, round ASC ";
     $resultOtherTeamDraftPicks = $db->sql_query($queryOtherTeamDraftPicks);
 
-    $roster_hold_teamb = (15 - $db->sql_numrows($resultOtherTeamPlayers)) * 75;
-
     $future_salary_arrayb = buildTeamFutureSalary($resultOtherTeamPlayers, $k);
     $future_salary_arrayb = buildTeamFuturePicks($resultOtherTeamDraftPicks, $future_salary_arrayb);
     $k = $future_salary_arrayb['k']; // pull $k value out to populate $Fields_Counter in maketradeoffer.php
@@ -328,7 +325,6 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
 
     $sql2 = "SELECT * FROM " . $user_prefix . "_users WHERE username = '$username'";
     $result2 = $db->sql_query($sql2);
-    $num = $db->sql_numrows($result2);
     $userinfo = $db->sql_fetchrow($result2);
     if (!$bypass) {
         cookiedecode($user);
@@ -348,7 +344,6 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
 
     $sql3 = "SELECT * FROM ibl_trade_info ORDER BY tradeofferid ASC";
     $result3 = $db->sql_query($sql3);
-    $num3 = $db->sql_numrows($result3);
 
     $tradeworkingonnow = 0;
 
@@ -415,7 +410,6 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
             if ($itemtype == 0) {
                 $sqlgetpick = "SELECT * FROM ibl_draft_picks WHERE pickid = '$itemid'";
                 $resultgetpick = $db->sql_query($sqlgetpick);
-                $numsgetpick = $db->sql_numrows($resultsgetpick);
                 $rowsgetpick = $db->sql_fetchrow($resultgetpick);
 
                 $pickteam = $rowsgetpick['teampick'];
@@ -430,7 +424,6 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
             } else {
                 $sqlgetplyr = "SELECT * FROM ibl_plr WHERE pid = '$itemid'";
                 $resultgetplyr = $db->sql_query($sqlgetplyr);
-                $numsgetplyr = $db->sql_numrows($resultsgetplyr);
                 $rowsgetplyr = $db->sql_fetchrow($resultgetplyr);
 
                 $plyrname = $rowsgetplyr['name'];

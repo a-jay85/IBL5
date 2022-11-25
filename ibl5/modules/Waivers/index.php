@@ -315,7 +315,6 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
     $result9 = $db->sql_query($sql9);
 
     $healthyrosterslots = 15;
-
     while ($row9 = $db->sql_fetchrow($result9)) {
         $healthyrosterslots--;
     }
@@ -324,7 +323,6 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
     $result10 = $db->sql_query($sql10);
 
     $rosterslots = 15;
-
     while ($row10 = $db->sql_fetchrow($result10)) {
         $rosterslots--;
     }

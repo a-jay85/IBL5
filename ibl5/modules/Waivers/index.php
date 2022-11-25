@@ -92,8 +92,6 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
 
     include "header.php";
 
-    ////////// WAIVER ADDITIONS/CUTS
-
     $Team_Offering = $_POST['Team_Name'];
     $Type_Of_Action = $_POST['Action'];
     $Player_to_Process = $_POST['Player_ID'];
@@ -245,11 +243,10 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
                 if ($db->sql_query($queryi)) {
                     $Roster_Slots++;
 
+                    // ==== PUT ANNOUNCEMENT INTO DATABASE ON NEWS PAGE
                     $topicid = 33;
                     $storytitle = $Team_Offering . " make waiver additions";
                     $hometext = "The " . $Team_Offering . " sign " . $playername . " from waivers for $finalContract";
-
-                    // ==== PUT ANNOUNCEMENT INTO DATABASE ON NEWS PAGE
 
                     $timestamp = date('Y-m-d H:i:s', time());
 
@@ -309,8 +306,6 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
 
     $sharedFunctions->displaytopmenu($tid);
 
-    echo "<center><font color=red><b>$errortext</b></font></center>";
-
     $querySelectHealthyPlayersOnUsersTeam = "
         SELECT *
         FROM ibl_plr
@@ -341,17 +336,6 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
         $queryAllPlayersOnWaivers = "SELECT * FROM ibl_plr WHERE ordinal > '960' AND retired = '0' AND name NOT LIKE '%|%' ORDER BY name ASC";
         $resultListOfPlayersForWaiverOperation = $db->sql_query($queryAllPlayersOnWaivers);
     }
-
-    echo "<form name=\"Waiver_Move\" method=\"post\" action=\"\"><input type=\"hidden\" name=\"Team_Name\" value=\"$teamlogo\">";
-    echo "<input type=\"hidden\" name=\"Action\" value=\"$action\">";
-
-    echo "<center><img src=\"images/logo/$tid.jpg\"><br><table border=1 cellspacing=0 cellpadding=0>
-        <tr>
-            <th colspan=3><center>WAIVER WIRE - YOUR TEAM CURRENTLY HAS $rosterSpots EMPTY ROSTER SPOTS and $healthyRosterSpots HEALTHY ROSTER SPOTS</center></th>
-        </tr>
-        <tr>
-            <td valign=top><center><b><u>$userinfo[user_ibl_team]</u></b></center>
-            <select name=\"Player_ID\"><option value=\"\">Select player...</option>";
 
     $k = 0;
     $timenow = intval(time());
@@ -418,16 +402,31 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
         $k++;
     }
 
-    echo "$dropdown</select><input type=\"hidden\" name=\"rosterslots\" value=\"$rosterSpots\"></td>";
-    echo "<input type=\"hidden\" name=\"healthyrosterslots\" value=\"$healthyRosterSpots\"></td>";
-    echo "</td></tr><tr><td colspan=3><center><input type=\"submit\" value=\"Click to $action player(s) to/from Waiver Pool\"></td></tr></form></center></table></center>";
+    echo "<center><font color=red><b>$errortext</b></font></center>";
+    echo "<form name=\"Waiver_Move\" method=\"post\" action=\"\"><input type=\"hidden\" name=\"Team_Name\" value=\"$teamlogo\">";
+    echo "<center><img src=\"images/logo/$tid.jpg\"><br><table border=1 cellspacing=0 cellpadding=0>
+        <tr>
+            <th colspan=3><center>WAIVER WIRE - YOUR TEAM CURRENTLY HAS $rosterSpots EMPTY ROSTER SPOTS and $healthyRosterSpots HEALTHY ROSTER SPOTS</center></th>
+        </tr>
+        <tr>
+            <td valign=top><center><b><u>$userinfo[user_ibl_team]</u></b>
+                <select name=\"Player_ID\"><option value=\"\">Select player...</option>
+                    $dropdown
+                </select></center>
+            </td>
+        </tr>";
+    echo "<input type=\"hidden\" name=\"Action\" value=\"$action\">";
+    echo "<input type=\"hidden\" name=\"rosterslots\" value=\"$rosterSpots\">";
+    echo "<input type=\"hidden\" name=\"healthyrosterslots\" value=\"$healthyRosterSpots\">";
+    echo "
+        <tr>
+            <td colspan=3><center><input type=\"submit\" value=\"Click to $action player(s) to/from Waiver Pool\"></center></td>
+        </tr></form></table></center>";
     
     $table_ratings = $sharedFunctions->ratings($db, $resultListOfPlayersForWaiverOperation, "DDDDDD", "333333", "0", "");
     echo $table_ratings;
 
     CloseTable();
-
-    // === END INSERT OF TRADE STUFF ===
 
     include "footer.php";
 }

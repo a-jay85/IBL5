@@ -234,6 +234,7 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
                         $contractYearIncrementor = "cy$currentContractYear";
                         $salaryForCurrentYear = $db->sql_result($waiverresult, 0, "$contractYearIncrementor");
                         $finalContract .= $salaryForCurrentYear . " ";
+                        
                         $currentContractYear++;
                     }
                 }

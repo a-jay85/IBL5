@@ -17,7 +17,7 @@ if (!defined('BLOCK_FILE')) {
     die();
 }
 
-global $db;
+global $db, $cookie;
 
 $actual_url = "$_SERVER[REQUEST_URI]";
 
@@ -35,3 +35,12 @@ if (
 $boxstuff .= "</span>";
 
 $content = $boxstuff;
+
+// A-Jay's localhost/production switch for development
+if ($cookie[1] == "A-Jay") {
+    if ($_SERVER['SERVER_NAME'] != "localhost") {
+        echo "<a href=\"localhost:8888$actual_url\">switch to localhost</a>";
+    } elseif ($_SERVER['SERVER_NAME'] == "localhost") {
+        echo "<a href=\"http://www.iblhoops.net$actual_url\">switch to production</a>";
+    }
+}

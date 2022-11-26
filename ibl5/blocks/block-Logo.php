@@ -24,11 +24,11 @@ $actual_url = "$_SERVER[REQUEST_URI]";
 $boxstuff = "<span class=\"content\">";
 
 if (
-    $actual_url == "/" ||
-    $actual_url == "/index.php" ||
-    $actual_url == "/ibl5/" ||
-    $actual_url == "/ibl5/index.php"
-) {} else {
+    $actual_url != "/"
+    AND $actual_url != "/index.php"
+    AND $actual_url != "/ibl5/"
+    AND $actual_url != "/ibl5/index.php"
+) {
     $boxstuff .= '<a href="index.php"><img src="images/ibl/logocorner.jpg" border="0"></a>';
 }
 

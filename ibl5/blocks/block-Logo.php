@@ -39,7 +39,7 @@ $content = $boxstuff;
 // A-Jay's localhost/production switch for development
 if ($cookie[1] == "A-Jay") {
     if ($_SERVER['SERVER_NAME'] != "localhost") {
-        $localURL = str_replace("ibl5/", "/", $actual_url);
+        $localURL = str_replace("ibl5/", "", $actual_url);
         echo "<a href=\"localhost:8888$localURL\">switch to localhost</a>";
     } elseif ($_SERVER['SERVER_NAME'] == "localhost") {
         echo "<a href=\"http://www.iblhoops.net$actual_url\">switch to production</a>";

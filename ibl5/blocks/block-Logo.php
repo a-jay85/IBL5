@@ -40,9 +40,10 @@ $content = $boxstuff;
 if ($cookie[1] == "A-Jay") {
     if ($_SERVER['SERVER_NAME'] != "localhost") {
         $localURL = str_replace("ibl5/", "", $actual_url);
-        echo "<a href=\"localhost:8888$localURL\">switch to localhost</a>";
+        echo "<a href=\"http://localhost:8888$localURL\">switch to localhost</a>";
     } elseif ($_SERVER['SERVER_NAME'] == "localhost") {
-        echo "<a href=\"http://www.iblhoops.net$actual_url\">switch to production</a>";
+        $prodURL = "/ibl5" . $actual_url;
+        echo "<a href=\"http://www.iblhoops.net$prodURL\">switch to production</a>";
     }
 }
 echo $newURL;

@@ -46,4 +46,3 @@ if ($cookie[1] == "A-Jay") {
         echo "<a href=\"http://www.iblhoops.net$prodURL\">switch to production</a>";
     }
 }
-echo $newURL;

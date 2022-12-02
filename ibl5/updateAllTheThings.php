@@ -653,14 +653,16 @@ while ($i < $numTeams) {
     $result4 = $db->sql_query($query4);
 
     // IF HEAT, update ibl_heat_win_loss with each team's HEAT win/loss info
-    $queryUpdateHeatWinLoss = "UPDATE ibl_heat_win_loss a, ibl_power b
-    SET a.wins = b.win,
-        a.losses = b.loss
-    WHERE a.currentname = b.Team AND a.year = '" . ($currentSeasonEndingYear - 1) . "';";
-    if ($db->sql_query($queryUpdateHeatWinLoss)) {
-        echo $queryUpdateHeatWinLoss . "<p>";
-    } else {
-        echo "<b>`ibl_heat_win_loss` update FAILED for $teamName! Have you <A HREF=\"leagueControlPanel.php\">inserted new database rows</A> for the new HEAT season?</b>";
+    if ($currentSeasonPhase == "HEAT") {
+        $queryUpdateHeatWinLoss = "UPDATE ibl_heat_win_loss a, ibl_power b
+        SET a.wins = b.win,
+            a.losses = b.loss
+        WHERE a.currentname = b.Team AND a.year = '" . ($currentSeasonEndingYear - 1) . "';";
+        if ($db->sql_query($queryUpdateHeatWinLoss)) {
+            echo $queryUpdateHeatWinLoss . "<p>";
+        } else {
+            echo "<b>`ibl_heat_win_loss` update FAILED for $teamName! Have you <A HREF=\"leagueControlPanel.php\">inserted new database rows</A> for the new HEAT season?</b><p>";
+        }
     }
 
     // Update teams' total wins in ibl_team_history by summing up a team's wins in ibl_team_win_loss

@@ -212,48 +212,51 @@ class Shared
                 $clutch = $db->sql_result($result, $i, "Clutch");
                 $consistency = $db->sql_result($result, $i, "Consistency");
             }
+
+            $firstCharacterOfPlayerName = substr($name, 0, 1); // if player name starts with '|' (pipe symbol), then skip them
+            if ($firstCharacterOfPlayerName !== '|') {
+                $playerNameDecorated = Shared::decoratePlayerName($name, $tid, $p_ord, $cy, $cyt);
     
-            $playerNameDecorated = Shared::decoratePlayerName($name, $tid, $p_ord, $cy, $cyt);
-    
-            (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
-    
-            $table_ratings .= "<tr bgcolor=$bgcolor>
-                <td align=center>$pos</td>
-                <td><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$playerNameDecorated</a></td>
-                <td align=center>$age</td>
-                <td bgcolor=$color1></td>
-                <td align=center>$r_2ga</td>
-                <td align=center>$r_2gp</td>
-                <td bgcolor=#CCCCCC width=0></td>
-                <td align=center>$r_fta</td>
-                <td align=center>$r_ftp</td>
-                <td bgcolor=#CCCCCC width=0></td>
-                <td align=center>$r_3ga</td>
-                <td align=center>$r_3gp</td>
-                <td bgcolor=$color1></td>
-                <td align=center>$r_orb</td>
-                <td align=center>$r_drb</td>
-                <td align=center>$r_ast</td>
-                <td align=center>$r_stl</td>
-                <td align=center>$r_tvr</td>
-                <td align=center>$r_blk</td>
-                <td align=center>$r_foul</td>
-                <td bgcolor=$color1></td>
-                <td align=center>$r_oo</td>
-                <td align=center>$r_do</td>
-                <td align=center>$r_po</td>
-                <td align=center>$r_to</td>
-                <td bgcolor=#CCCCCC width=0></td>
-                <td align=center>$r_od</td>
-                <td align=center>$r_dd</td>
-                <td align=center>$r_pd</td>
-                <td align=center>$r_td</td>
-                <td bgcolor=$color1></td>
-                <td align=center>$clutch</td>
-                <td align=center>$consistency</td>
-                <td bgcolor=$color1></td>
-                <td align=center>$inj</td>
-            </tr>";
+                (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
+        
+                $table_ratings .= "<tr bgcolor=$bgcolor>
+                    <td align=center>$pos</td>
+                    <td><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$playerNameDecorated</a></td>
+                    <td align=center>$age</td>
+                    <td bgcolor=$color1></td>
+                    <td align=center>$r_2ga</td>
+                    <td align=center>$r_2gp</td>
+                    <td bgcolor=#CCCCCC width=0></td>
+                    <td align=center>$r_fta</td>
+                    <td align=center>$r_ftp</td>
+                    <td bgcolor=#CCCCCC width=0></td>
+                    <td align=center>$r_3ga</td>
+                    <td align=center>$r_3gp</td>
+                    <td bgcolor=$color1></td>
+                    <td align=center>$r_orb</td>
+                    <td align=center>$r_drb</td>
+                    <td align=center>$r_ast</td>
+                    <td align=center>$r_stl</td>
+                    <td align=center>$r_tvr</td>
+                    <td align=center>$r_blk</td>
+                    <td align=center>$r_foul</td>
+                    <td bgcolor=$color1></td>
+                    <td align=center>$r_oo</td>
+                    <td align=center>$r_do</td>
+                    <td align=center>$r_po</td>
+                    <td align=center>$r_to</td>
+                    <td bgcolor=#CCCCCC width=0></td>
+                    <td align=center>$r_od</td>
+                    <td align=center>$r_dd</td>
+                    <td align=center>$r_pd</td>
+                    <td align=center>$r_td</td>
+                    <td bgcolor=$color1></td>
+                    <td align=center>$clutch</td>
+                    <td align=center>$consistency</td>
+                    <td bgcolor=$color1></td>
+                    <td align=center>$inj</td>
+                </tr>";
+            }
     
             $i++;
         }

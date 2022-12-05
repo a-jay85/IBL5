@@ -653,7 +653,9 @@ while ($i < $numTeams) {
     $result4 = $db->sql_query($query4);
 
     // IF HEAT, update ibl_heat_win_loss with each team's HEAT win/loss info
-    if ($currentSeasonPhase == "HEAT") {
+    if ($currentSeasonPhase == "HEAT"
+        AND $wins != 0
+        AND $losses != 0) {
         $queryUpdateHeatWinLoss = "UPDATE ibl_heat_win_loss a, ibl_power b
         SET a.wins = b.win,
             a.losses = b.loss

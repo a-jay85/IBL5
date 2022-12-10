@@ -1778,10 +1778,19 @@ function teamCurrentSeasonStandings($team)
 
 function leaguestats()
 {
-    global $db;
+    global $db, $cookie;
+    $sharedFunctions = new Shared($db);
+
+    $trHighlight = "<tr bgcolor=#DDDD00 align=right>";
 
     include "header.php";
     OpenTable();
+
+    $username = $cookie[1];
+    $queryTid = "SELECT user_ibl_team FROM nuke_users WHERE username = '$username' LIMIT 1;";
+    $resultTid = $db->sql_query($queryTid);
+    $userteam = $db->sql_result($resultTid, 0);
+    $userTid = $sharedFunctions->getTidFromTeamname($userteam);
 
     $queryteam = "SELECT * FROM ibl_team_info";
     $resultteam = $db->sql_query($queryteam);
@@ -1868,7 +1877,13 @@ function leaguestats()
         $lg_off_pf += $team_off_pf;
         $lg_off_pts += $team_off_pts;
 
-        $offense_totals .= "<tr>
+        if ($userTid == $tid) {
+            $trSubstitute = $trHighlight;
+        } else {
+            $trSubstitute = "<tr align=right>";
+        }
+
+        $offense_totals .= "$trSubstitute
 			<td bgcolor=\"$teamcolor1\"><a href=\"modules.php?name=Team&op=team&tid=$tid\"><font color=\"$teamcolor2\">$teamcity $team_off_name Offense</font></a></td>
 			<td>$team_off_games</td>
 			<td>$team_off_fgm</td>
@@ -1887,7 +1902,7 @@ function leaguestats()
 			<td>$team_off_pts</td>
 		</tr>";
 
-        $offense_averages .= "<tr>
+        $offense_averages .= "$trSubstitute
 			<td bgcolor=\"$teamcolor1\"><a href=\"modules.php?name=Team&op=team&tid=$tid\"><font color=\"$teamcolor2\">$teamcity $team_off_name Offense</font></a></td>
 			<td>$team_off_avgfgm</td>
 			<td>$team_off_avgfga</td>
@@ -1908,8 +1923,9 @@ function leaguestats()
 			<td>$team_off_avgpts</td>
 		</tr>";
 
-        $teamHeaderCells[$t] = "<td bgcolor=\"$teamcolor1\"><a href=\"modules.php?name=Team&op=team&tid=$tid\"><font color=\"$teamcolor2\">$teamcity $team_off_name Offense</font></a></td>";
+        $teamHeaderCells[$t] = "<td bgcolor=\"$teamcolor1\"><a href=\"modules.php?name=Team&op=team&tid=$tid\"><font color=\"$teamcolor2\">$teamcity $team_off_name Diff</font></a></td>";
         $teamOffenseAveragesArray[$t] = array(
+            $team_off_name,
             $team_off_avgfgm,
 			$team_off_avgfga,
 			$team_off_fgp,
@@ -1984,7 +2000,13 @@ function leaguestats()
         @$team_def_avgpf = number_format($team_def_pf / $team_def_games, 2);
         @$team_def_avgpts = number_format($team_def_pts / $team_def_games, 2);
 
-        $defense_totals .= "<tr>
+        if ($userTid == $tid) {
+            $trSubstitute = $trHighlight;
+        } else {
+            $trSubstitute = "<tr align=right>";
+        }
+
+        $defense_totals .= "$trSubstitute
 			<td bgcolor=\"$teamcolor1\"><a href=\"modules.php?name=Team&op=team&tid=$tid\"><font color=\"$teamcolor2\">$teamcity $team_def_name Defense</font></a></td>
 			<td>$team_def_games</td>
 			<td>$team_def_fgm</td>
@@ -2003,7 +2025,7 @@ function leaguestats()
 			<td>$team_def_pts</td>
 		</tr>";
 
-        $defense_averages .= "<tr>
+        $defense_averages .= "$trSubstitute
 			<td bgcolor=\"$teamcolor1\"><a href=\"modules.php?name=Team&op=team&tid=$tid\"><font color=\"$teamcolor2\">$teamcity $team_def_name Defense</font></a></td>
 			<td>$team_def_avgfgm</td>
 			<td>$team_def_avgfga</td>
@@ -2025,6 +2047,7 @@ function leaguestats()
 		</tr>";
 
         $teamDefenseAveragesArray[$t] = array(
+            $team_def_name,
             $team_def_avgfgm,
 			$team_def_avgfga,
 			$team_def_fgp,
@@ -2107,10 +2130,16 @@ function leaguestats()
 
     $i = 0;
     while ($i < $numteams - 1) {
-        $league_differentials .= "<tr>";
+        if ($userteam == $teamOffenseAveragesArray[$i][0]) {
+            $trSubstitute = $trHighlight;
+        } else {
+            $trSubstitute = "<tr align=right>";
+        }
+
+        $league_differentials .= $trSubstitute;
         $league_differentials .= $teamHeaderCells[$i];
 
-        $j = 0;
+        $j = 1;
         while ($j < sizeof($teamOffenseAveragesArray[$i])) {
             $differential = $teamOffenseAveragesArray[$i][$j] - $teamDefenseAveragesArray[$i][$j];
             $league_differentials .= "<td align='right'>" . number_format($differential, 2) . "</td>";

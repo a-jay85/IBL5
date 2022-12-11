@@ -1081,6 +1081,12 @@ function showpage($pid, $spec)
     $stats_pts = 2 * $stats_fgm + $stats_ftm + $stats_tgm;
 
     @$stats_mpg = ($stats_min / $stats_gm);
+    @$stats_fgmpg = ($stats_fgm / $stats_gm);
+    @$stats_fgapg = ($stats_fga / $stats_gm);
+    @$stats_ftmpg = ($stats_ftm / $stats_gm);
+    @$stats_ftapg = ($stats_fta / $stats_gm);
+    @$stats_3gmpg = ($stats_tgm / $stats_gm);
+    @$stats_3gapg = ($stats_tga / $stats_gm);
     @$stats_opg = ($stats_orb / $stats_gm);
     @$stats_rpg = ($stats_reb / $stats_gm);
     @$stats_apg = ($stats_ast / $stats_gm);
@@ -1850,21 +1856,27 @@ function showpage($pid, $spec)
                 <td colspan=15><center><b><font class=\"content\">Career Averages</font></b></center></td>
             </tr>
             <tr>
-                <td>year</td>
-                <td>team</td>
-                <td>g</td>
-                <td>min</td>
-                <td>FGP</td>
-                <td>FTP</td>
-                <td>3GP</td>
-                <td>orb</td>
-                <td>reb</td>
-                <td>ast</td>
-                <td>stl</td>
-                <td>to</td>
-                <td>blk</td>
-                <td>pf</td>
-                <td>pts</td>
+                <th>year</th>
+                <th>team</th>
+                <th>g</th>
+                <th>min</th>
+                <th>fgm</th>
+                <th>fga</th>
+                <th>fgp</th>
+                <th>ftm</th>
+                <th>fta</th>
+                <th>ftp</th>
+                <th>3gm</th>
+                <th>3ga</th>
+                <th>3gp</th>
+                <th>orb</th>
+                <th>reb</th>
+                <th>ast</th>
+                <th>stl</th>
+                <th>to</th>
+                <th>blk</th>
+                <th>pf</th>
+                <th>pts</th>
             </tr>";
 
         $car_gm = 0;
@@ -1876,7 +1888,6 @@ function showpage($pid, $spec)
         $car_3gm = 0;
         $car_3ga = 0;
         $car_orb = 0;
-        $car_drb = 0;
         $car_reb = 0;
         $car_ast = 0;
         $car_stl = 0;
@@ -1887,7 +1898,6 @@ function showpage($pid, $spec)
 
         $result44 = $db->sql_query("SELECT * FROM ibl_hist WHERE pid=$pid ORDER BY year ASC");
         while ($row44 = $db->sql_fetchrow($result44)) {
-
             $hist_year = stripslashes(check_html($row44['year'], "nohtml"));
             $hist_team = stripslashes(check_html($row44['team'], "nohtml"));
             $hist_gm = stripslashes(check_html($row44['gm'], "nohtml"));
@@ -1911,6 +1921,12 @@ function showpage($pid, $spec)
             $hist_pts = $hist_fgm + $hist_fgm + $hist_ftm + $hist_tgm;
 
             @$hist_mpg = ($hist_min / $hist_gm);
+            @$hist_fgmpg = ($hist_fgm / $hist_gm);
+            @$hist_fgapg = ($hist_fga / $hist_gm);
+            @$hist_ftmpg = ($hist_ftm / $hist_gm);
+            @$hist_ftapg = ($hist_fta / $hist_gm);
+            @$hist_3gmpg = ($hist_tgm / $hist_gm);
+            @$hist_3gapg = ($hist_tga / $hist_gm);
             @$hist_opg = ($hist_orb / $hist_gm);
             @$hist_rpg = ($hist_reb / $hist_gm);
             @$hist_apg = ($hist_ast / $hist_gm);
@@ -1943,9 +1959,21 @@ function showpage($pid, $spec)
                 <td><center>";
             printf('%01.1f', $hist_mpg);
             echo "</center></td><td><center>";
+            printf('%01.1f', $hist_fgmpg);
+            echo "</center></td><td><center>";
+            printf('%01.1f', $hist_fgapg);
+            echo "</center></td><td><center>";
             printf('%01.3f', $hist_fgp);
             echo "</center></td><td><center>";
+            printf('%01.1f', $hist_ftmpg);
+            echo "</center></td><td><center>";
+            printf('%01.1f', $hist_ftapg);
+            echo "</center></td><td><center>";
             printf('%01.3f', $hist_ftp);
+            echo "</center></td><td><center>";
+            printf('%01.1f', $hist_3gmpg);
+            echo "</center></td><td><center>";
+            printf('%01.1f', $hist_3gapg);
             echo "</center></td><td><center>";
             printf('%01.3f', $hist_tgp);
             echo "</center></td><td><center>";
@@ -1980,9 +2008,21 @@ function showpage($pid, $spec)
                 <td><center>";
             printf('%01.1f', $stats_mpg);
             echo "</center></td><td><center>";
+            printf('%01.1f', $stats_fgmpg);
+            echo "</center></td><td><center>";
+            printf('%01.1f', $stats_fgapg);
+            echo "</center></td><td><center>";
             printf('%01.3f', $stats_fgp);
             echo "</center></td><td><center>";
+            printf('%01.1f', $stats_ftmpg);
+            echo "</center></td><td><center>";
+            printf('%01.1f', $stats_ftapg);
+            echo "</center></td><td><center>";
             printf('%01.3f', $stats_ftp);
+            echo "</center></td><td><center>";
+            printf('%01.1f', $stats_3gmpg);
+            echo "</center></td><td><center>";
+            printf('%01.1f', $stats_3gapg);
             echo "</center></td><td><center>";
             printf('%01.3f', $stats_tgp);
             echo "</center></td><td><center>";
@@ -2021,10 +2061,16 @@ function showpage($pid, $spec)
             $car_pts = $car_pts + $stats_pts;
         }
 
-        @$car_fgp = $car_fgm / $car_fga;
-        @$car_ftp = $car_ftm / $car_fta;
-        @$car_tgp = $car_3gm / $car_3ga;
         @$car_avgm = $car_min / $car_gm;
+        @$car_fgmpg = $car_fgm / $car_gm;
+        @$car_fgapg = $car_fga / $car_gm;
+        @$car_fgp = $car_fgm / $car_fga;
+        @$car_ftmpg = $car_ftm / $car_gm;
+        @$car_ftapg = $car_fta / $car_gm;
+        @$car_ftp = $car_ftm / $car_fta;
+        @$car_3gmpg = $car_3gm / $car_gm;
+        @$car_3gapg = $car_3ga / $car_gm;
+        @$car_tgp = $car_3gm / $car_3ga;
         @$car_avgo = $car_orb / $car_gm;
         @$car_avgr = $car_reb / $car_gm;
         @$car_avga = $car_ast / $car_gm;
@@ -2040,9 +2086,21 @@ function showpage($pid, $spec)
             <td><center>";
         printf('%01.1f', $car_avgm);
         echo "</center></td><td><center>";
+        printf('%01.1f', $car_fgmpg);
+        echo "</center></td><td><center>";
+        printf('%01.1f', $car_fgapg);
+        echo "</center></td><td><center>";
         printf('%01.3f', $car_fgp);
         echo "</center></td><td><center>";
+        printf('%01.1f', $car_ftmpg);
+        echo "</center></td><td><center>";
+        printf('%01.1f', $car_ftapg);
+        echo "</center></td><td><center>";
         printf('%01.3f', $car_ftp);
+        echo "</center></td><td><center>";
+        printf('%01.1f', $car_3gmpg);
+        echo "</center></td><td><center>";
+        printf('%01.1f', $car_3gapg);
         echo "</center></td><td><center>";
         printf('%01.3f', $car_tgp);
         echo "</center></td><td><center>";

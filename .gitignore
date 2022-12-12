@@ -1,8 +1,11 @@
 .DS_Store
+.env
 .ftpquota
 error_log
+node_modules
 /phpmyadmin
 
+config.json
 config.php
 config.inc.php
 discordWebhooks (not CURL).php

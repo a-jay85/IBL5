@@ -18,7 +18,7 @@ const express = require('express')
 const app = express()
 const port = 50000
 
-app.get('/', (req,res) => {
+app.post('/discordDM', (req,res) => {
     res.send('Hello World!')
     client.users.send('283183467804491776', 'test');
 })

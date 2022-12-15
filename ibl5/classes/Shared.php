@@ -39,6 +39,27 @@ class Shared
         return $this->db->sql_result($queryCurrentSeasonPhase, 0);
     }
 
+    public function getDiscordIDFromTeamname($teamname)
+    {
+        $queryDiscordIDFromTeamname = $this->db->sql_query("SELECT discordID
+            FROM ibl_team_info
+            WHERE team_name = '$teamname'
+            LIMIT 1;");
+
+        return $this->db->sql_result($queryDiscordIDFromTeamname, 0);
+    }
+
+    public function getDiscordIDFromUsername($username)
+    {
+        $queryDiscordIDFromUsername = $this->db->sql_query("SELECT discordID
+            FROM ibl_team_info
+            INNER JOIN nuke_users ON ibl_team_info.team_name = nuke_users.user_ibl_team
+            WHERE username = '$username'
+            LIMIT 1;");
+
+        return $this->db->sql_result($queryDiscordIDFromUsername, 0);
+    }
+
     public function getNumberOfTitles($teamname, $titleName)
     {
         $queryNumberOfTitles = $this->db->sql_query("SELECT COUNT(name)

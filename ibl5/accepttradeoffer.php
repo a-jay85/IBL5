@@ -85,7 +85,6 @@ $toDiscordID = $sharedFunctions->getDiscordIDFromTeamname($to);
 $discordText = "<@!$fromDiscordID> and <@!$toDiscordID> agreed to a trade:<br>" . $storytext;
 
 Discord::postToChannel('#trades', $discordText);
-// Discord::postToChannel('#trades', $storytext);
 
 $queryclear = "DELETE FROM ibl_trade_info WHERE `tradeofferid` = '$offer_id'";
 $resultclear = $db->sql_query($queryclear);

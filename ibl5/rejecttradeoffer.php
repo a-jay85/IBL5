@@ -12,7 +12,7 @@ $resultclear = $db->sql_query($queryclear);
 
 $rejectingUserDiscordID = $sharedFunctions->getDiscordIDFromTeamname($teamRejecting);
 $receivingUserDiscordID = $sharedFunctions->getDiscordIDFromTeamname($teamReceiving);
-$discordDMmessage = 'Sorry, trade proposal declined by <@!' . $rejectingUserDiscordID . '>!
+$discordDMmessage = 'Sorry, trade proposal declined by <@!' . $rejectingUserDiscordID . '>.
 
 Go here to make another offer: http://www.iblhoops.net/ibl5/modules.php?name=Trading&op=reviewtrade';
 $arrayContent = array(

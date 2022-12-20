@@ -80,7 +80,12 @@ if (isset($resultstor) and $_SERVER['SERVER_NAME'] != "localhost") {
     mail($recipient, $storytitle, $storytext, "From: trades@iblhoops.net");
 }
 
-Discord::postToChannel('#trades', $storytext);
+$fromDiscordID = $sharedFunctions->getDiscordIDFromTeamname($from);
+$toDiscordID = $sharedFunctions->getDiscordIDFromTeamname($to);
+$discordText = "<@!$fromDiscordID> and <@!$toDiscordID> agreed to a trade:<br>" . $storytext;
+
+Discord::postToChannel('#trades', $discordText);
+// Discord::postToChannel('#trades', $storytext);
 
 $queryclear = "DELETE FROM ibl_trade_info WHERE `tradeofferid` = '$offer_id'";
 $resultclear = $db->sql_query($queryclear);

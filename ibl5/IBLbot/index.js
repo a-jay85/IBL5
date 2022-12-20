@@ -18,9 +18,12 @@ const express = require('express')
 const app = express()
 const port = 50000
 
-app.post('/discordDM', (req,res) => {
-    res.send('Hello World!')
-    client.users.send('283183467804491776', 'test');
+app.use(express.json())
+
+app.post('/discordDM', function(req, res) {
+    client.users.send(req.body.content.receivingUserDiscordID, req.body.content.message);
+    console.log(req.body.content);
+    res.send('Discord DM sent!');
 })
 
 app.listen (port, () => {

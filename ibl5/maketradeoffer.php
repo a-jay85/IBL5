@@ -1,6 +1,7 @@
 <?php
 
 require 'mainfile.php';
+$sharedFunctions = new Shared($db);
 
 $query0 = "SELECT * FROM ibl_trade_autocounter ORDER BY `counter` DESC";
 $result0 = $db->sql_query($query0);
@@ -101,5 +102,19 @@ if ($error == 0) {
         }
         $k++;
     }
+
+    $offeringUserDiscordID = $sharedFunctions->getDiscordIDFromTeamname($Team_Offering);
+    $receivingUserDiscordID = $sharedFunctions->getDiscordIDFromTeamname($Team_Receiving);
+    $discordDMmessage = 'Trade Offer Received from <@!' . $offeringUserDiscordID . '>!
+    
+Click here to review: http://www.iblhoops.net/ibl5/modules.php?name=Trading&op=reviewtrade';
+    $arrayContent = array(
+            'message' => $discordDMmessage,
+            'receivingUserDiscordID' => $receivingUserDiscordID,);
+
+    echo "<p>";
+    $response = Discord::sendCurlPOST('http://localhost:50000/discordDM', $arrayContent);
+
+    echo "<p>";
     echo "Trade Offer Entered Into Database. Go back <a href='modules.php?name=Trading&op=reviewtrade'>Trade Review Page</a>";
 }

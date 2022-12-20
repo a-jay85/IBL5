@@ -47,7 +47,7 @@ while ($j < $Fields_Counter) {
 echo "His Payroll: $$PayrollB<br><br>";
 $New_PayrollA = $PayrollA - $Total_SalaryA + $Total_SalaryB;
 $New_PayrollB = $PayrollB - $Total_SalaryB + $Total_SalaryA;
-echo "Your New Payroll: $$New_PayrollA<br>His New Payroll: $$New_PayrollB<br>";
+echo "Your New Payroll: $$New_PayrollA<br>His New Payroll: $$New_PayrollB<p>";
 //if ($PayrollA < 7000)
 //{
 if ($New_PayrollA > 7000) {
@@ -78,36 +78,93 @@ if ($New_PayrollB > 7000) {
 
 //-----END SALARY MATCH CHECK-----
 if ($error == 0) {
+    $tradeText = "";
 
     $k = 0;
-
     while ($k < $Swapat) {
-        $Type = $_POST['type' . $k];
-        $Index = $_POST['index' . $k];
+        $itemtype = $_POST['type' . $k];
+        $itemid = $_POST['index' . $k];
         $Check = $_POST['check' . $k];
         if ($Check == "on") {
-            $queryi = "INSERT INTO ibl_trade_info ( `tradeofferid` , `itemid` , `itemtype` , `from` , `to` , `approval` ) VALUES ( '$tradeofferid', '$Index', '$Type', '$Team_Offering', '$Team_Receiving' , '$Team_Receiving' )";
+            $queryi = "INSERT INTO ibl_trade_info ( `tradeofferid` , `itemid` , `itemtype` , `from` , `to` , `approval` ) VALUES ( '$tradeofferid', '$itemid', '$itemtype', '$Team_Offering', '$Team_Receiving' , '$Team_Receiving' )";
             $resulti = $db->sql_query($queryi);
+
+            if ($itemtype == 0) {
+                $sqlgetpick = "SELECT * FROM ibl_draft_picks WHERE pickid = '$itemid'";
+                $resultgetpick = $db->sql_query($sqlgetpick);
+                $rowsgetpick = $db->sql_fetchrow($resultgetpick);
+    
+                $pickteam = $rowsgetpick['teampick'];
+                $pickyear = $rowsgetpick['year'];
+                $pickround = $rowsgetpick['round'];
+                $picknotes = $rowsgetpick['notes'];
+    
+                $tradeText .= "The $Team_Offering send the $pickteam $pickyear Round $pickround draft pick to the $Team_Receiving.<br>";
+                if ($picknotes != NULL) {
+                    $tradeText .= "<i>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;" . $picknotes . "</i><br>";
+                }
+            } else {
+                $sqlgetplyr = "SELECT * FROM ibl_plr WHERE pid = '$itemid'";
+                $resultgetplyr = $db->sql_query($sqlgetplyr);
+                $rowsgetplyr = $db->sql_fetchrow($resultgetplyr);
+    
+                $plyrname = $rowsgetplyr['name'];
+                $plyrpos = $rowsgetplyr['pos'];
+    
+                $tradeText .= "The $Team_Offering send $plyrpos $plyrname to the $Team_Receiving.<br>";
+            }
         }
+
         $k++;
     }
 
     while ($k < $Fields_Counter) {
-        $Type = $_POST['type' . $k];
-        $Index = $_POST['index' . $k];
+        $itemtype = $_POST['type' . $k];
+        $itemid = $_POST['index' . $k];
         $Check = $_POST['check' . $k];
         if ($Check == "on") {
             $queryi = "INSERT INTO ibl_trade_info ( `tradeofferid` , `itemid` , `itemtype` , `from` , `to` , `approval` ) VALUES ( '$tradeofferid', '$Index', '$Type', '$Team_Receiving', '$Team_Offering' , '$Team_Receiving' )";
             $resulti = $db->sql_query($queryi);
+
+            if ($itemtype == 0) {
+                $sqlgetpick = "SELECT * FROM ibl_draft_picks WHERE pickid = '$itemid'";
+                $resultgetpick = $db->sql_query($sqlgetpick);
+                $rowsgetpick = $db->sql_fetchrow($resultgetpick);
+    
+                $pickteam = $rowsgetpick['teampick'];
+                $pickyear = $rowsgetpick['year'];
+                $pickround = $rowsgetpick['round'];
+                $picknotes = $rowsgetpick['notes'];
+    
+                $tradeText .= "The $Team_Offering send the $pickteam $pickyear Round $pickround draft pick to the $Team_Receiving.<br>";
+                if ($picknotes != NULL) {
+                    $tradeText .= "<i>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;" . $picknotes . "</i><br>";
+                }
+            } else {
+                $sqlgetplyr = "SELECT * FROM ibl_plr WHERE pid = '$itemid'";
+                $resultgetplyr = $db->sql_query($sqlgetplyr);
+                $rowsgetplyr = $db->sql_fetchrow($resultgetplyr);
+    
+                $plyrname = $rowsgetplyr['name'];
+                $plyrpos = $rowsgetplyr['pos'];
+    
+                $tradeText .= "The $Team_Offering send $plyrpos $plyrname to the $Team_Receiving.<br>";
+            }
         }
         $k++;
     }
 
+    echo $tradeText;
+    $tradeText = str_replace('<br>', "\n", $tradeText);
+    $tradeText = str_replace('&nbsp;', " ", $tradeText);
+    $tradeText = str_replace('<i>', "_", $tradeText);
+    $tradeText = str_replace('</i>', "_", $tradeText);
+
     $offeringUserDiscordID = $sharedFunctions->getDiscordIDFromTeamname($Team_Offering);
     $receivingUserDiscordID = $sharedFunctions->getDiscordIDFromTeamname($Team_Receiving);
     $discordDMmessage = 'New trade proposal from <@!' . $offeringUserDiscordID . '>!
-    
-Go here to review: http://www.iblhoops.net/ibl5/modules.php?name=Trading&op=reviewtrade';
+'. $tradeText .'
+Go here to accept or decline: http://www.iblhoops.net/ibl5/modules.php?name=Trading&op=reviewtrade';
     $arrayContent = array(
             'message' => $discordDMmessage,
             'receivingUserDiscordID' => $receivingUserDiscordID,);

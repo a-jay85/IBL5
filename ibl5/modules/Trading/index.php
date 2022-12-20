@@ -366,9 +366,11 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
 
         if ($from == $teamlogo) {
             $isinvolvedintrade = 1;
+            $oppositeTeam = $to;
         }
         if ($to == $teamlogo) {
             $isinvolvedintrade = 1;
+            $oppositeTeam = $from;
         }
         if ($approval == $teamlogo) {
             $hashammer = 1;
@@ -400,6 +402,8 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
 						<td valign=center>
 							<form name=\"tradereject\" method=\"post\" action=\"rejecttradeoffer.php\">
 								<input type=\"hidden\" name=\"offer\" value=\"$offerid\">
+                                <input type=\"hidden\" name=\"teamRejecting\" value=\"$teamlogo\">
+                                <input type=\"hidden\" name=\"teamReceiving\" value=\"$oppositeTeam\">
 								<input type=\"submit\" value=\"Reject\">
 							</form>
 						</td>

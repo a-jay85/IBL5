@@ -105,9 +105,9 @@ if ($error == 0) {
 
     $offeringUserDiscordID = $sharedFunctions->getDiscordIDFromTeamname($Team_Offering);
     $receivingUserDiscordID = $sharedFunctions->getDiscordIDFromTeamname($Team_Receiving);
-    $discordDMmessage = 'Trade Offer Received from <@!' . $offeringUserDiscordID . '>!
+    $discordDMmessage = 'New trade proposal from <@!' . $offeringUserDiscordID . '>!
     
-Click here to review: http://www.iblhoops.net/ibl5/modules.php?name=Trading&op=reviewtrade';
+Go here to review: http://www.iblhoops.net/ibl5/modules.php?name=Trading&op=reviewtrade';
     $arrayContent = array(
             'message' => $discordDMmessage,
             'receivingUserDiscordID' => $receivingUserDiscordID,);

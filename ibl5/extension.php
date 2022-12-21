@@ -238,16 +238,18 @@ if ($nooffer == 0) {
         echo "<table bgcolor=#cccccc><tr><td><b>Response from $Player_Name:</b> I accept your extension offer of $Offer_in_Millions million dollars over $Offer_Years years.  Thank you! (Can't believe you gave me that much...sucker!)</td></tr></table>
         Note from the commissioner's office: <font color=#cc0000>Please note that you have used up your successful extension for this season and may not make any more extension attempts.</font><br>";
 
-        $recipient = 'ibldepthcharts@gmail.com';
-        $emailsubject = "Successful Extension - " . $Player_Name;
-        $filetext = $Player_Name . " accepts an extension offer from the " . $Team_Name . " of " . $Offer_Total . " for " . $Offer_Years . " years.
-            For reference purposes: the offer was " . $Offer_1 . " " . $Offer_2 . " " . $Offer_3 . " " . $Offer_4 . " " . $Offer_5 . " and the offer value was thus considered to be " . $Offer_Value . "; the player wanted an offer with a value of " . $Demands_Value;
+        if ($_SERVER['SERVER_NAME'] != "localhost") {
+            $recipient = 'ibldepthcharts@gmail.com';
+            $emailsubject = "Successful Extension - " . $Player_Name;
+            $filetext = $Player_Name . " accepts an extension offer from the " . $Team_Name . " of " . $Offer_Total . " for " . $Offer_Years . " years.
+                For reference purposes: the offer was " . $Offer_1 . " " . $Offer_2 . " " . $Offer_3 . " " . $Offer_4 . " " . $Offer_5 . " and the offer value was thus considered to be " . $Offer_Value . "; the player wanted an offer with a value of " . $Demands_Value;
 
-        if (mail($recipient, $emailsubject, $filetext, "From: accepted-extensions@iblhoops.net")) {
-            echo "<center> An e-mail regarding this extension has been successfully sent to the commissioner's office.  Thank you. </center>";
-        } else {
-            echo " Message failed to e-mail properly; please notify the commissioner of the error with the following amounts you offered:</center><br>
-            " . $Offer_1 . " " . $Offer_2 . " " . $Offer_3 . " " . $Offer_4 . " " . $Offer_5;
+            if (mail($recipient, $emailsubject, $filetext, "From: accepted-extensions@iblhoops.net")) {
+                echo "<center> An e-mail regarding this extension has been successfully sent to the commissioner's office.  Thank you. </center>";
+            } else {
+                echo " Message failed to e-mail properly; please notify the commissioner of the error with the following amounts you offered:</center><br>
+                " . $Offer_1 . " " . $Offer_2 . " " . $Offer_3 . " " . $Offer_4 . " " . $Offer_5;
+            }
         }
 
         // ==== UPDATE PLAYER DATABASE WITH NEW CONTRACT INFORMATION ====

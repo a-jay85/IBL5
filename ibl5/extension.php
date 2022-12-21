@@ -256,6 +256,13 @@ if ($nooffer == 0) {
         $yearOfCurrentContract = $db->sql_result($resultteam, 0, "cy");
         $salaryInCurrentYear = $db->sql_result($resultteam, 0, "cy" . $yearOfCurrentContract);
 
+        if ($Offer_4 == "" OR $Offer_4 == NULL) {
+            $Offer_4 = 0;
+        }
+        if ($Offer_5 == "" OR $Offer_5 == NULL) {
+            $Offer_5 = 0;
+        }
+
         $queryContractUpdate = "UPDATE ibl_plr
             SET cy = 1,
                 cyt = 1 + $Offer_Years,
@@ -267,7 +274,7 @@ if ($nooffer == 0) {
                 cy6 = $Offer_5
             WHERE name = '$Player_Name';";
         $resultContractUpdate = $db->sql_query($queryContractUpdate);
-
+        var_dump($resultContractUpdate);
         // ==== MARK THE EXTENSION AS USED FOR THIS SEASON ====
 
         $queryseason = "UPDATE ibl_team_info SET Used_Extension_This_Season = 1 WHERE team_name = '$Team_Name'";

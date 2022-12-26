@@ -231,7 +231,7 @@ if ($nooffer == 0) {
         $Offer_in_Millions = $Offer_Total / 100;
 
         $storytitle = $Player_Name . " extends their contract with the " . $Team_Name;
-        $hometext = $Player_Name . " today accepted a contract extension offer from the " . $Team_Name . " worth $Offer_in_Millions million dollars over " . $Offer_Years . " years.";
+        $hometext = $Player_Name . " today accepted a contract extension offer from the " . $Team_Name . " worth $Offer_in_Millions million dollars over " . $Offer_Years . " years:<br>" . $Offer_1 . " " . $Offer_2 . " " . $Offer_3 . " " . $Offer_4 . " " . $Offer_5;
 
         Discord::postToChannel('#extensions', $hometext);
 

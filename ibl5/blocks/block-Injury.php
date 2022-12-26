@@ -18,9 +18,9 @@ if (!defined('BLOCK_FILE')) {
 
 global $db;
 
-$queryo = "SELECT * FROM nuke_users WHERE user_ibl_team != '' ORDER BY user_ibl_team ASC";
-$resulto = $db->sql_query($queryo);
-$numo = $db->sql_numrows($resulto);
+$queryActiveTeamAccounts = "SELECT * FROM nuke_users WHERE user_ibl_team != '' ORDER BY user_ibl_team ASC";
+$resultActiveTeamAccounts = $db->sql_query($queryActiveTeamAccounts);
+$numberOfActiveTeamAccounts = $db->sql_numrows($resultActiveTeamAccounts);
 
 $content = "<table border=0>
     <tr>
@@ -39,61 +39,51 @@ $content = "<table border=0>
             <font color=#ffffff><b>WAIVERS NEEDED</b></font>
         </td>
         <td bgcolor=#000066>
-            <font color=#ffffff><b>NEW LINEUP NEEDED</b></font>
+            <font color=#ffffff><b>NEW DEPTH CHART NEEDED</b></font>
         </td>
     </tr>";
 
-$j = 0;
-while ($j < $numo) {
-    $user_team = $db->sql_result($resulto, $j, "user_ibl_team");
+$i = 0;
+while ($i < $numberOfActiveTeamAccounts) {
+    $teamname = $db->sql_result($resultActiveTeamAccounts, $i, "user_ibl_team");
 
-    $sql = "SELECT *
+    $queryHealthyPlayersOnTeam = "SELECT *
         FROM ibl_plr
-        WHERE teamname = '$user_team'
+        WHERE teamname = '$teamname'
         AND retired = '0'
-        AND injured = '0'
-        AND droptime = '0'
+        AND injured < 7
         AND ordinal < 960
-        AND name NOT LIKE '%Buyout%'"; // "ordinal < 960" excludes waived players from this query
-    $result1 = $db->sql_query($sql);
-    $num1 = $db->sql_numrows($result1);
+        AND name NOT LIKE '%|%'"; // "ordinal < 960" excludes waived players from this query
+    $resultHealthyPlayersOnTeam = $db->sql_query($queryHealthyPlayersOnTeam);
+    $numberOfHealthyPlayersOnTeam = $db->sql_numrows($resultHealthyPlayersOnTeam);
 
-    $sql2 = "SELECT *
+    $queryInjuredActivePlayersOnTeam = "SELECT *
         FROM ibl_plr
-        WHERE teamname = '$user_team'
+        WHERE teamname = '$teamname'
         AND retired = '0'
-        AND injured > '0'
+        AND injured > 7
         AND active = '1'";
-    $result2 = $db->sql_query($sql2);
-    $num2 = $db->sql_numrows($result2);
+    $resultInjuredActivePlayersOnTeam = $db->sql_query($queryInjuredActivePlayersOnTeam);
+    $numberOfInjuredActivePlayersOnTeam = $db->sql_numrows($resultInjuredActivePlayersOnTeam);
 
-    if ($num2 > 0) {
-        $new_lineups = 'Yes';
+    $waiversNeeded = 12;
+    $waiversNeeded -= $numberOfHealthyPlayersOnTeam;
+
+    if ($numberOfInjuredActivePlayersOnTeam > 0) {
+        $newDepthChartNeeded = 'Yes';
     } else {
-        $new_lineups = 'No';
+        $newDepthChartNeeded = 'No';
+    }
+  
+    $querySimDepthChartTimestamp = "SELECT sim_depth FROM ibl_team_history WHERE team_name = '$teamname'";
+    $resultSimDepthChartTimestamp = $db->sql_query($querySimDepthChartTimestamp);
+    $simDepthChartTimestamp = $db->sql_result($resultSimDepthChartTimestamp, 0, "chart");
+
+    if ($waiversNeeded > 0 || $newDepthChartNeeded == 'Yes' && $simDepthChartTimestamp == "No Depth Chart") {
+        $content .= "<tr><td>$teamname</td><td>$numberOfHealthyPlayersOnTeam</td><td>$waiversNeeded</td><td>$newDepthChartNeeded</td></tr>";
     }
 
-    $waivers_needed = 12;
-    $healthy = 0;
-    $i = 0;
-    while ($i < $num1) {
-        $healthy++;
-        $i++;
-    }
-
-    $waivers_needed = $waivers_needed - $healthy;
-    if ($waivers_needed < 0) {
-        $waivers_needed = 0;
-    }
-    $sql3 = "SELECT chart FROM ibl_team_info WHERE team_name = '$user_team'";
-    $result3 = $db->sql_query($sql3);
-    $chart = $db->sql_result($result3, 0, "chart");
-
-    if ($waivers_needed > 0 || $new_lineups == 'Yes' && $chart == 0) {
-        $content .= "<tr><td>$user_team</td><td>$healthy</td><td>$waivers_needed</td><td>$new_lineups</td></tr>";
-    }
-
-    $j++;
+    $i++;
 }
 
 $content .= "</table>";

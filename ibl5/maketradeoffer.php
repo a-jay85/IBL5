@@ -136,7 +136,7 @@ if ($error == 0) {
                 $pickround = $rowsgetpick['round'];
                 $picknotes = $rowsgetpick['notes'];
     
-                $tradeText .= "The $Team_Offering send the $pickteam $pickyear Round $pickround draft pick to the $Team_Receiving.<br>";
+                $tradeText .= "The $Team_Receiving send the $pickteam $pickyear Round $pickround draft pick to the $Team_Offering.<br>";
                 if ($picknotes != NULL) {
                     $tradeText .= "<i>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;" . $picknotes . "</i><br>";
                 }
@@ -148,7 +148,7 @@ if ($error == 0) {
                 $plyrname = $rowsgetplyr['name'];
                 $plyrpos = $rowsgetplyr['pos'];
     
-                $tradeText .= "The $Team_Offering send $plyrpos $plyrname to the $Team_Receiving.<br>";
+                $tradeText .= "The $Team_Receiving send $plyrpos $plyrname to the $Team_Offering.<br>";
             }
         }
 

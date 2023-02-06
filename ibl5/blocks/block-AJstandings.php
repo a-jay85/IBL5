@@ -19,24 +19,6 @@ if (!defined('BLOCK_FILE')) {
 global $db;
 $sharedFunctions = new Shared($db);
 
-/* DIVISIONAL STANDINGS
-$queryNLWest = "SELECT tid,team_name,leagueRecord,divGB FROM ibl_standings WHERE division = 'NL West' ORDER BY divGB ASC";
-$resultNLWest = $db->sql_query($queryNLWest);
-$limitNLWest = $db->sql_numrows($resultNLWest);
-
-$queryNLEast = "SELECT tid,team_name,leagueRecord,divGB FROM ibl_standings WHERE division = 'NL East' ORDER BY divGB ASC";
-$resultNLEast = $db->sql_query($queryNLEast);
-$limitNLEast = $db->sql_numrows($resultNLEast);
-
-$queryALWest = "SELECT tid,team_name,leagueRecord,divGB FROM ibl_standings WHERE division = 'AL West' ORDER BY divGB ASC";
-$resultALWest = $db->sql_query($queryALWest);
-$limitALWest = $db->sql_numrows($resultALWest);
-
-$queryALEast = "SELECT tid,team_name,leagueRecord,divGB FROM ibl_standings WHERE division = 'AL East' ORDER BY divGB ASC";
-$resultALEast = $db->sql_query($queryALEast);
-$limitALEast = $db->sql_numrows($resultALEast);
- */
-
 $arrayLastSimDates = $sharedFunctions->getLastSimDatesArray();
 $lastSimStartDate = $arrayLastSimDates["Start Date"];
 $lastSimEndDate = $arrayLastSimDates["End Date"];
@@ -112,71 +94,6 @@ while ($i < $limitWesternConference) {
     $content = $content . '<tr><td nowrap><a href="modules.php?name=Team&op=team&tid=' . $tid . '">' . $team_name . '</a> (' . $leagueRecord . ')</td><td>' . $confGB . '</td></tr>';
     $i++;
 }
-
-/* DIVISIONAL STANDINGS
-$content=$content.'
-<tr><td colspan=2><center><font color=#fd004d><b>NL West Division</b></font></center></td></tr>
-<tr bgcolor=#006cb3><td><center><font color=#ffffff><b>Team (W-L)</b></font></center></td><td><center><font color=#ffffff><b>GB</b></font></center></td></tr>';
-
-$i = 0;
-while ($i < $limitNLWest) {
-$tid = $db->sql_result($resultNLWest,$i,0);
-$team_name = $db->sql_result($resultNLWest,$i,1);
-$leagueRecord = $db->sql_result($resultNLWest,$i,2);
-$divGB = $db->sql_result($resultNLWest,$i,3);
-
-$content=$content.'<tr><td nowrap><a href="modules.php?name=Team&op=team&tid='.$tid.'">'.$team_name.'</a> ('.$leagueRecord.')</td><td>'.$divGB.'</td></tr>';
-$i++;
-}
-
-$content=$content.'
-<tr><td colspan=2><hr></td></tr>
-<tr><td colspan=2><center><font color=#fd004d><b>NL East Division</b></font></center></td></tr>
-<tr bgcolor=#006cb3><td><center><font color=#ffffff><b>Team (W-L)</b></font></center></td><td><center><font color=#ffffff><b>GB</b></font></center></td></tr>';
-
-$i = 0;
-while ($i < $limitNLEast) {
-$tid = $db->sql_result($resultNLEast,$i,0);
-$team_name = $db->sql_result($resultNLEast,$i,1);
-$leagueRecord = $db->sql_result($resultNLEast,$i,2);
-$divGB = $db->sql_result($resultNLEast,$i,3);
-
-$content=$content.'<tr><td nowrap><a href="modules.php?name=Team&op=team&tid='.$tid.'">'.$team_name.'</a> ('.$leagueRecord.')</td><td>'.$divGB.'</td></tr>';
-$i++;
-}
-
-$content=$content.'
-<tr><td colspan=2><hr></td></tr>
-<tr><td colspan=2><center><font color=#fd004d><b>AL West Division</b></font></center></td></tr>
-<tr bgcolor=#006cb3><td><center><font color=#ffffff><b>Team (W-L)</b></font></center></td><td><center><font color=#ffffff><b>GB</b></font></center></td></tr>';
-
-$i = 0;
-while ($i < $limitALWest) {
-$tid = $db->sql_result($resultALWest,$i,0);
-$team_name = $db->sql_result($resultALWest,$i,1);
-$leagueRecord = $db->sql_result($resultALWest,$i,2);
-$divGB = $db->sql_result($resultALWest,$i,3);
-
-$content=$content.'<tr><td nowrap><a href="modules.php?name=Team&op=team&tid='.$tid.'">'.$team_name.'</a> ('.$leagueRecord.')</td><td>'.$divGB.'</td></tr>';
-$i++;
-}
-
-$content=$content.'
-<tr><td colspan=2><hr></td></tr>
-<tr><td colspan=2><center><font color=#fd004d><b>AL East Division</b></font></center></td></tr>
-<tr bgcolor=#006cb3><td><center><font color=#ffffff><b>Team (W-L)</b></font></center></td><td><center><font color=#ffffff><b>GB</b></font></center></td></tr>';
-
-$i = 0;
-while ($i < $limitALEast) {
-$tid = $db->sql_result($resultALEast,$i,0);
-$team_name = $db->sql_result($resultALEast,$i,1);
-$leagueRecord = $db->sql_result($resultALEast,$i,2);
-$divGB = $db->sql_result($resultALEast,$i,3);
-
-$content=$content.'<tr><td nowrap><a href="modules.php?name=Team&op=team&tid='.$tid.'">'.$team_name.'</a> ('.$leagueRecord.')</td><td>'.$divGB.'</td></tr>';
-$i++;
-}
- */
 
 $content = $content . '
 <tr><td colspan=2><center><a href="modules.php?name=Content&pa=showpage&pid=4"><font color=#aaaaaa><i>-- Full Standings --</i></font></a></center></td></tr>

@@ -48,7 +48,10 @@ $content = $content . "<center>-to-</center>";
 $content = $content . "<center><strong>$lastSimEndDate</strong></center>";
 $content = $content . '<tr><td colspan=2><hr></td></tr>';
 
-$queryEasternConference = "SELECT tid,team_name,leagueRecord,confGB,clinchedConference,clinchedDivision,clinchedPlayoffs FROM ibl_standings WHERE conference = 'Eastern' ORDER BY confGB ASC";
+$queryEasternConference = "SELECT tid, team_name, leagueRecord, confGB, clinchedConference, clinchedDivision, clinchedPlayoffs
+    FROM ibl_standings
+    WHERE conference = 'Eastern'
+    ORDER BY confGB ASC";
 $resultEasternConference = $db->sql_query($queryEasternConference);
 $limitEasternConference = $db->sql_numrows($resultEasternConference);
 
@@ -77,7 +80,10 @@ while ($i < $limitEasternConference) {
     $i++;
 }
 
-$queryWesternConference = "SELECT tid,team_name,leagueRecord,confGB,clinchedConference,clinchedDivision,clinchedPlayoffs FROM ibl_standings WHERE conference = 'Western' ORDER BY confGB ASC";
+$queryWesternConference = "SELECT tid, team_name, leagueRecord, confGB, clinchedConference, clinchedDivision, clinchedPlayoffs
+    FROM ibl_standings
+    WHERE conference = 'Western'
+    ORDER BY confGB ASC";
 $resultWesternConference = $db->sql_query($queryWesternConference);
 $limitWesternConference = $db->sql_numrows($resultWesternConference);
 

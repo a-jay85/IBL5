@@ -1,4 +1,5 @@
 <?php
+
 /************************************************************************/
 /* PHP-NUKE: Web Portal System                                          */
 /* ===========================                                          */
@@ -17,6 +18,7 @@ if (!defined('BLOCK_FILE')) {
 }
 
 global $db;
+
 $sharedFunctions = new Shared($db);
 
 $arrayLastSimDates = $sharedFunctions->getLastSimDatesArray();
@@ -38,8 +40,19 @@ $resultEasternConference = $db->sql_query($queryEasternConference);
 $limitEasternConference = $db->sql_numrows($resultEasternConference);
 
 $content = $content . '
-<tr><td colspan=2><center><font color=#fd004d><b>Eastern Conference</b></font></center></td></tr>
-<tr bgcolor=#006cb3><td><center><font color=#ffffff><b>Team (W-L)</b></font></center></td><td><center><font color=#ffffff><b>GB</b></font></center></td></tr>';
+    <tr>
+        <td colspan=2>
+            <center><font color=#fd004d><b>Eastern Conference</b></font></center>
+        </td>
+    </tr>
+    <tr bgcolor=#006cb3>
+        <td>
+            <center><font color=#ffffff><b>Team (W-L)</b></font></center>
+        </td>
+        <td>
+            <center><font color=#ffffff><b>GB</b></font></center>
+        </td>
+    </tr>';
 
 $i = 0;
 while ($i < $limitEasternConference) {
@@ -58,7 +71,15 @@ while ($i < $limitEasternConference) {
         $team_name = "<b>X</b>-" . $team_name;
     }
 
-    $content = $content . '<tr><td nowrap><a href="modules.php?name=Team&op=team&tid=' . $tid . '">' . $team_name . '</a> (' . $leagueRecord . ')</td><td>' . $confGB . '</td></tr>';
+    $content = $content . '
+        <tr>
+            <td nowrap>
+                <a href="modules.php?name=Team&op=team&tid=' . $tid . '">' . $team_name . '</a> (' . $leagueRecord . ')
+            </td>
+            <td>
+                ' . $confGB . '
+            </td>
+        </tr>';
     $i++;
 }
 
@@ -70,9 +91,24 @@ $resultWesternConference = $db->sql_query($queryWesternConference);
 $limitWesternConference = $db->sql_numrows($resultWesternConference);
 
 $content = $content . '
-<tr><td colspan=2><hr></td></tr>
-<tr><td colspan=2><center><font color=#fd004d><b>Western Conference</b></font></center></td></tr>
-<tr bgcolor=#006cb3><td><center><font color=#ffffff><b>Team (W-L)</b></font></center></td><td><center><font color=#ffffff><b>GB</b></font></center></td></tr>';
+    <tr>
+        <td colspan=2>
+            <hr>
+        </td>
+    </tr>
+    <tr>
+        <td colspan=2>
+            <center><font color=#fd004d><b>Western Conference</b></font></center>
+        </td>
+    </tr>
+    <tr bgcolor=#006cb3>
+        <td>
+            <center><font color=#ffffff><b>Team (W-L)</b></font></center>
+        </td>
+        <td>
+            <center><font color=#ffffff><b>GB</b></font></center>
+        </td>
+    </tr>';
 
 $i = 0;
 while ($i < $limitWesternConference) {
@@ -91,10 +127,22 @@ while ($i < $limitWesternConference) {
         $team_name = "<b>X</b>-" . $team_name;
     }
 
-    $content = $content . '<tr><td nowrap><a href="modules.php?name=Team&op=team&tid=' . $tid . '">' . $team_name . '</a> (' . $leagueRecord . ')</td><td>' . $confGB . '</td></tr>';
+    $content = $content . '
+        <tr>
+            <td nowrap>
+                <a href="modules.php?name=Team&op=team&tid=' . $tid . '">' . $team_name . '</a> (' . $leagueRecord . ')
+            </td>
+            <td>
+                ' . $confGB . '
+            </td>
+        </tr>';
     $i++;
 }
 
 $content = $content . '
-<tr><td colspan=2><center><a href="modules.php?name=Content&pa=showpage&pid=4"><font color=#aaaaaa><i>-- Full Standings --</i></font></a></center></td></tr>
+    <tr>
+        <td colspan=2>
+            <center><a href="modules.php?name=Content&pa=showpage&pid=4"><font color=#aaaaaa><i>-- Full Standings --</i></font></a></center>
+        </td>
+    </tr>
 </table>';

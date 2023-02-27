@@ -16,7 +16,7 @@ while ($j < $num) {
     $ordinal = $db->sql_result($result, $j, "ordinal");
     $name = $db->sql_result($result, $j, "name");
     $age = $db->sql_result($result, $j, "age");
-    $Stamina = $db->sql_result($result, $j, "Sta");
+    $stamina = $db->sql_result($result, $j, "sta");
     $teamname = $db->sql_result($result, $j, "teamname");
     $pos = $db->sql_result($result, $j, "pos");
     $coach = $db->sql_result($result, $j, "coach");
@@ -27,7 +27,7 @@ while ($j < $num) {
     $security = $db->sql_result($result, $j, "security");
     $exp = $db->sql_result($result, $j, "exp");
 
-    echo "<tr><td>$ordinal</td><td>$name</td><td>$age</td><td>$teamname</td><td>$pos</td><td>$coach</td><td>$loyalty</td><td>$playingTime</td><td>$winner</td><td>$tradition</td><td>$security</td><td>$exp</td><td>$Stamina</td></tr>
+    echo "<tr><td>$ordinal</td><td>$name</td><td>$age</td><td>$teamname</td><td>$pos</td><td>$coach</td><td>$loyalty</td><td>$playingTime</td><td>$winner</td><td>$tradition</td><td>$security</td><td>$exp</td><td>$stamina</td></tr>
 ";
 
     $j++;

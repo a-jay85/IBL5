@@ -278,7 +278,8 @@ function display()
             $contract5 = 0;
             $contract6 = 0;
 
-            $firstCharacterOfPlayerName = substr($name, 0, 1); // if player name doesn't start with '|' (pipe symbol), then don't occupy a roster slot
+            // if player name doesn't start with '|' (pipe symbol), then don't occupy a roster slot
+            $firstCharacterOfPlayerName = substr($name, 0, 1); 
 
             if ($millionscy == 0) {
                 $contract1 = $millionscy1;

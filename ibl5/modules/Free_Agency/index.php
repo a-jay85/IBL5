@@ -1127,6 +1127,8 @@ function display()
 function negotiate($pid)
 {
     global $prefix, $db, $user, $cookie;
+    $sharedFunctions = new Shared($db);
+
     $pid = intval($pid);
 
     cookiedecode($user);
@@ -1137,6 +1139,7 @@ function negotiate($pid)
     $userinfo = $db->sql_fetchrow($result2);
 
     $userteam = stripslashes(check_html($userinfo['user_ibl_team'], "nohtml"));
+    $tid = $sharedFunctions->getTidFromTeamname($userteam);
 
     $exceptioninfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_team_info WHERE team_name='$userteam'"));
 
@@ -1312,7 +1315,9 @@ function negotiate($pid)
 
     $rosterspots = 15;
 
-    $capquery = "SELECT * FROM ibl_plr WHERE teamname='$userteam' AND retired = '0'";
+    $capquery = "SELECT * FROM ibl_plr WHERE (teamname='$userteam' AND retired = '0') OR
+                    (`name` LIKE '%Buyout%' AND `name` LIKE '%$userteam%') OR
+                    (`name` LIKE '%Cash%' AND tid=$tid);";
     $capresult = $db->sql_query($capquery);
 
     while ($capdecrementer = $db->sql_fetchrow($capresult)) {

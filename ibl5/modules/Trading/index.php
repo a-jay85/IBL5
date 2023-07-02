@@ -275,12 +275,6 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
     echo "</td></tr></table>";
     $z = 0;
     while ($z < 6) {
-        $pass_future_salary_player[$z] = $pass_future_salary_array[$z] + $future_salary_array['player'][$z];
-        $pass_future_salary_hold[$z] = $pass_future_salary_array[$z] + $future_salary_array['hold'][$z];
-        $pass_future_salary_picks[$z] = $pass_future_salary_array[$z] + $future_salary_array['picks'][$z];
-        $pass_future_salary_playerb[$z] = $pass_future_salary_arrayb[$z];
-        $pass_future_salary_holdb[$z] = $pass_future_salary_arrayb[$z] + $future_salary_arrayb['hold'][$z];
-        $pass_future_salary_picksb[$z] = $pass_future_salary_arrayb[$z] + $future_salary_arrayb['picks'][$z];
         echo "<tr>
             <td>
                 <b>$teamlogo Cap Total in " . ($currentSeasonEndingYear + $z) . ":</b> " . $future_salary_array['player'][$z] . "
@@ -290,13 +284,6 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
             </td>";
         $z++;
     }
-
-    $pass_future_salary_player = implode(",", $pass_future_salary_player);
-    $pass_future_salary_hold = implode(",", $pass_future_salary_hold);
-    $pass_future_salary_picks = implode(",", $pass_future_salary_picks);
-    $pass_future_salary_playerb = implode(",", $pass_future_salary_playerb);
-    $pass_future_salary_holdb = implode(",", $pass_future_salary_holdb);
-    $pass_future_salary_picksb = implode(",", $pass_future_salary_picksb);
 
     $i = 1;
     while ($i < 7) {
@@ -317,12 +304,6 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 
     echo "<tr>
             <td colspan=3 align=center>
-                <input type=\"hidden\" name=\"pass_future_salary_player\" value=\"" . htmlspecialchars($pass_future_salary_player) . "\">
-                <input type=\"hidden\" name=\"pass_future_salary_hold\" value=\"" . htmlspecialchars($pass_future_salary_hold) . "\">
-                <input type=\"hidden\" name=\"pass_future_salary_picks\" value=\"" . htmlspecialchars($pass_future_salary_picks) . "\">
-                <input type=\"hidden\" name=\"pass_future_salary_playerb\" value=\"" . htmlspecialchars($pass_future_salary_playerb) . "\">
-                <input type=\"hidden\" name=\"pass_future_salary_holdb\" value=\"" . htmlspecialchars($pass_future_salary_holdb) . "\">
-                <input type=\"hidden\" name=\"pass_future_salary_picksb\" value=\"" . htmlspecialchars($pass_future_salary_picksb) . "\">
                 <input type=\"hidden\" name=\"counterfields\" value=\"$k\">
                 <input type=\"submit\" value=\"Make Trade Offer\">
             </td>

@@ -59,10 +59,10 @@ function buildTeamFutureSalary($resultTeamPlayers, $k)
             $i++;
         }
 
-        echo "<input type=\"hidden\" name=\"index$k\" value=\"$player_pid\">
+        echo "<tr>
+            <input type=\"hidden\" name=\"index$k\" value=\"$player_pid\">
 			<input type=\"hidden\" name=\"contract$k\" value=\"$player_contract\">
-			<input type=\"hidden\" name=\"type$k\" value=\"1\">
-		<tr>";
+			<input type=\"hidden\" name=\"type$k\" value=\"1\">";
 
         if ($player_contract != 0 AND $player_ordinal < 960) { // "ordinal < 960" prevents trading of waived players and Buyouts
             echo "<td align=\"center\"><input type=\"checkbox\" name=\"check$k\"></td>";

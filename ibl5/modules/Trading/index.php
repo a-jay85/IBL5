@@ -100,27 +100,27 @@ function buildTeamFuturePicks($resultTeamPicks, $future_salary_array)
 
         $y = $pick_year - $currentSeasonEndingYear + 1;
         if ($pick_round == 1) {
-            $future_salary_array['picks'][$y] = $future_salary_array['picks'][$y] + 75;
+            $future_salary_array['picks'][$y] += 75;
             $future_salary_array['hold'][$y]++;
             //$future_salary_array[$y]=$future_salary_array[$y]+321;
             //$future_roster_sports[$y]=$future_roster_sports[$y]+1;
             $y++;
-            $future_salary_array['picks'][$y] = $future_salary_array['picks'][$y] + 75;
+            $future_salary_array['picks'][$y] += 75;
             $future_salary_array['hold'][$y]++;
             //$future_salary_array[$y]=$future_salary_array[$y]+345;
             //$future_roster_sports[$y]=$future_roster_sports[$y]+1;
             $y++;
-            $future_salary_array['picks'][$y] = $future_salary_array['picks'][$y] + 75;
+            $future_salary_array['picks'][$y] += 75;
             $future_salary_array['hold'][$y]++;
             //$future_salary_array[$y]=$future_salary_array[$y]+369;
             //$future_roster_sports[$y]=$future_roster_sports[$y]+1;
         } else {
-            $future_salary_array['picks'][$y] = $future_salary_array['picks'][$y] + 75;
+            $future_salary_array['picks'][$y] += 75;
             $future_salary_array['hold'][$y]++;
             //$future_salary_array[$y]=$future_salary_array[$y]+35;
             //$future_roster_sports[$y]=$future_roster_sports[$y]+1;
             $y++;
-            $future_salary_array['picks'][$y] = $future_salary_array['picks'][$y] + 75;
+            $future_salary_array['picks'][$y] += 75;
             $future_salary_array['hold'][$y]++;
             //$future_salary_array[$y]=$future_salary_array[$y]+51;
             //$future_roster_sports[$y]=$future_roster_sports[$y]+1;

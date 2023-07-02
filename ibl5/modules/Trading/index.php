@@ -363,7 +363,7 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
         $offerid = $row3['tradeofferid'];
         $itemid = $row3['itemid'];
 
-        // For itemtype (1 = player, 0 = pick)
+        // For itemtype (1 = player, 0 = pick, cash = cash)
         $itemtype = $row3['itemtype'];
         $from = $row3['from'];
         $to = $row3['to'];
@@ -416,7 +416,21 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
 				</table>";
             }
 
-            if ($itemtype == 0) {
+            if ($itemtype == 'cash') {
+                $queryCashDetails = "SELECT * FROM ibl_trade_cash WHERE tradeOfferID = $offerid AND sendingTeam = '$from';";
+                $cashDetails = $db->sql_fetchrow($db->sql_query($queryCashDetails));
+
+                $cashYear[1] = $cashDetails['cy1'];
+                $cashYear[2] = $cashDetails['cy2'];
+                $cashYear[3] = $cashDetails['cy3'];
+                $cashYear[4] = $cashDetails['cy4'];
+                $cashYear[5] = $cashDetails['cy5'];
+                $cashYear[6] = $cashDetails['cy6'];
+
+                echo "The $from send 
+                $cashYear[1] $cashYear[2] $cashYear[3] $cashYear[4] $cashYear[5] $cashYear[6]
+                in cash to the $to.<br>";
+            } elseif ($itemtype == 0) {
                 $sqlgetpick = "SELECT * FROM ibl_draft_picks WHERE pickid = '$itemid'";
                 $resultgetpick = $db->sql_query($sqlgetpick);
                 $rowsgetpick = $db->sql_fetchrow($resultgetpick);
@@ -430,7 +444,7 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
                 if ($picknotes != NULL) {
                     echo "<i>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;" . $picknotes . "</i><br>";
                 }
-            } else {
+            } elseif ($itemtype == 1) {
                 $sqlgetplyr = "SELECT * FROM ibl_plr WHERE pid = '$itemid'";
                 $resultgetplyr = $db->sql_query($sqlgetplyr);
                 $rowsgetplyr = $db->sql_fetchrow($resultgetplyr);
@@ -440,6 +454,7 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
 
                 echo "The $from send $plyrpos $plyrname to the $to.<br>";
             }
+
             $tradeworkingonnow = $offerid;
         }
     }

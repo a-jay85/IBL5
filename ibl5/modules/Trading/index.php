@@ -51,7 +51,7 @@ function buildTeamFutureSalary($resultTeamPlayers, $k)
 
         $i = 0;
         while ($contract_year < 7) {
-            $future_salary_array['player'][$i] = $future_salary_array['player'][$i] + $rowTeamPlayers["cy$contract_year"];
+            $future_salary_array['player'][$i] += $rowTeamPlayers["cy$contract_year"];
             if ($rowTeamPlayers["cy$contract_year"] > 0) {
                 $future_salary_array['hold'][$i]++;
             }

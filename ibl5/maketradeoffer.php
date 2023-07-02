@@ -110,18 +110,18 @@ if ($error == 0) {
         $check = $_POST['check' . $k];
         if ($check == "on") {
             $queryi = "INSERT INTO ibl_trade_info 
-            ( `tradeofferid`, 
-              `itemid`, 
-              `itemtype`, 
-              `from`, 
-              `to`, 
-              `approval` ) 
-VALUES      ( '$tradeofferid', 
-              '$itemid', 
-              '$itemtype', 
-              '$offeringTeam', 
-              '$receivingTeam', 
-              '$receivingTeam' );";
+              ( `tradeofferid`, 
+                `itemid`, 
+                `itemtype`, 
+                `from`, 
+                `to`, 
+                `approval` ) 
+VALUES        ( '$tradeofferid', 
+                '$itemid', 
+                '$itemtype', 
+                '$offeringTeam', 
+                '$receivingTeam', 
+                '$receivingTeam' );";
             $resulti = $db->sql_query($queryi);
 
             if ($itemtype == 0) {
@@ -153,24 +153,59 @@ VALUES      ( '$tradeofferid',
         $k++;
     }
 
+    if (
+        $userSendsCash[1] != 0
+        OR $userSendsCash[2] != 0
+        OR $userSendsCash[3] != 0
+        OR $userSendsCash[4] != 0
+        OR $userSendsCash[5] != 0
+        OR $userSendsCash[6] != 0
+    ) {
+        $queryUserSendsCash = "INSERT INTO ibl_trade_cash
+          ( `tradeOfferID`,
+            `sendingTeam`,
+            `receivingTeam`,
+            `cy1`,
+            `cy2`,
+            `cy3`,
+            `cy4`,
+            `cy5`,
+            `cy6` )
+VALUES    ( '$tradeofferid',
+            '$offeringTeam',
+            '$receivingTeam',
+            '$userSendsCash[1]',
+            '$userSendsCash[2]',
+            '$userSendsCash[3]',
+            '$userSendsCash[4]',
+            '$userSendsCash[5]',
+            '$userSendsCash[6]' );";
+        $resultUserSendsCash = $db->sql_query($queryUserSendsCash);
+        if ($resultUserSendsCash) {
+            $tradeText .= "The $offeringTeam send 
+            $userSendsCash[1] $userSendsCash[2] $userSendsCash[3] $userSendsCash[4] $userSendsCash[5] $userSendsCash[6]
+            in cash to the $receivingTeam.<br>";
+        }
+    }
+
     while ($k < $fieldsCounter) {
         $itemtype = $_POST['type' . $k];
         $itemid = $_POST['index' . $k];
         $check = $_POST['check' . $k];
         if ($check == "on") {
             $queryi = "INSERT INTO ibl_trade_info 
-            ( `tradeofferid`, 
-              `itemid`, 
-              `itemtype`, 
-              `from`, 
-              `to`, 
-              `approval` ) 
-VALUES      ( '$tradeofferid', 
-              '$itemid', 
-              '$itemtype', 
-              '$receivingTeam', 
-              '$offeringTeam', 
-              '$receivingTeam' );";
+              ( `tradeofferid`, 
+                `itemid`, 
+                `itemtype`, 
+                `from`, 
+                `to`, 
+                `approval` ) 
+VALUES        ( '$tradeofferid', 
+                '$itemid', 
+                '$itemtype', 
+                '$receivingTeam', 
+                '$offeringTeam', 
+                '$receivingTeam' );";
             $resulti = $db->sql_query($queryi);
 
             if ($itemtype == 0) {
@@ -200,6 +235,41 @@ VALUES      ( '$tradeofferid',
         }
 
         $k++;
+    }
+
+    if (
+        $partnerSendsCash[1] != 0
+        OR $partnerSendsCash[2] != 0
+        OR $partnerSendsCash[3] != 0
+        OR $partnerSendsCash[4] != 0
+        OR $partnerSendsCash[5] != 0
+        OR $partnerSendsCash[6] != 0
+    ) {
+        $queryPartnerSendsCash = "INSERT INTO ibl_trade_cash
+          ( `tradeOfferID`,
+            `sendingTeam`,
+            `receivingTeam`,
+            `cy1`,
+            `cy2`,
+            `cy3`,
+            `cy4`,
+            `cy5`,
+            `cy6` )
+VALUES    ( '$tradeofferid',
+            '$receivingTeam',
+            '$offeringTeam',
+            '$partnerSendsCash[1]',
+            '$partnerSendsCash[2]',
+            '$partnerSendsCash[3]',
+            '$partnerSendsCash[4]',
+            '$partnerSendsCash[5]',
+            '$partnerSendsCash[6]' );";
+        $resultPartnerSendsCash = $db->sql_query($queryPartnerSendsCash);
+        if ($resultPartnerSendsCash) {
+            $tradeText .= "The $receivingTeam send
+            $partnerSendsCash[1] $partnerSendsCash[2] $partnerSendsCash[3] $partnerSendsCash[4] $partnerSendsCash[5] $partnerSendsCash[6]
+            in cash to the $offeringTeam.<br>";
+        }
     }
 
     echo $tradeText;

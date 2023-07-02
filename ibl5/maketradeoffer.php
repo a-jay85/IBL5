@@ -86,7 +86,19 @@ if ($error == 0) {
         $itemid = $_POST['index' . $k];
         $Check = $_POST['check' . $k];
         if ($Check == "on") {
-            $queryi = "INSERT INTO ibl_trade_info ( `tradeofferid` , `itemid` , `itemtype` , `from` , `to` , `approval` ) VALUES ( '$tradeofferid', '$itemid', '$itemtype', '$Team_Offering', '$Team_Receiving' , '$Team_Receiving' )";
+            $queryi = "INSERT INTO ibl_trade_info 
+            ( ` tradeofferid ` , 
+              ` itemid ` , 
+              ` itemtype ` , 
+              ` from ` , 
+              ` to ` , 
+              ` approval ` ) 
+VALUES      ( '$tradeofferid', 
+              '$itemid', 
+              '$itemtype', 
+              '$Team_Offering', 
+              '$Team_Receiving', 
+              '$Team_Receiving' ) ";
             $resulti = $db->sql_query($queryi);
 
             if ($itemtype == 0) {
@@ -123,7 +135,19 @@ if ($error == 0) {
         $itemid = $_POST['index' . $k];
         $Check = $_POST['check' . $k];
         if ($Check == "on") {
-            $queryi = "INSERT INTO ibl_trade_info ( `tradeofferid` , `itemid` , `itemtype` , `from` , `to` , `approval` ) VALUES ( '$tradeofferid', '$itemid', '$itemtype', '$Team_Receiving', '$Team_Offering' , '$Team_Receiving' )";
+            $queryi = "INSERT INTO ibl_trade_info 
+            ( ` tradeofferid ` , 
+              ` itemid ` , 
+              ` itemtype ` , 
+              ` from ` , 
+              ` to ` , 
+              ` approval ` ) 
+VALUES      ( '$tradeofferid', 
+              '$itemid', 
+              '$itemtype', 
+              '$Team_Receiving', 
+              '$Team_Offering', 
+              '$Team_Receiving' ) ";
             $resulti = $db->sql_query($queryi);
 
             if ($itemtype == 0) {

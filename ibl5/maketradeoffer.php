@@ -15,6 +15,14 @@ $receivingTeam = $_POST['Team_Name2'];
 $switchCounter = $_POST['half'];
 $fieldsCounter = $_POST['counterfields'];
 $fieldsCounter += 1;
+
+$i = 1;
+while ($i < 7) {
+    $userSendsCash[$i] = $_POST['userSendsCash' . $i];
+    $partnerSendsCash[$i] = $_POST['partnerSendsCash' . $i];
+    $i++;
+}
+
 //-----CHECK IF SALARIES MATCH-----
 
 $j = 0;
@@ -23,11 +31,18 @@ while ($j < $switchCounter) {
     $salary = $_POST['contract' . $j];
     $userCurrentSeasonCapTotal += $salary;
     if ($check == "on") {
-        $userTradeCapTotal += $salary;
-        echo "Total Trade Salary My Team: $userTradeCapTotal<br>";
+        $userCapSentToPartner += $salary;
+        echo "Total Trade Salary My Team: $userCapSentToPartner<br>";
     }
     $j++;
 }
+
+if ($userSendsCash[1] != 0) {
+    $userCurrentSeasonCapTotal += $userSendsCash[1];
+    $partnerCurrentSeasonCapTotal -= $userSendsCash[1];
+    echo "Cash Consideration sent to them this season: $userSendsCash[1]<br>";
+}
+
 echo "My Payroll: $userCurrentSeasonCapTotal<br><br>";
 
 while ($j < $fieldsCounter) {
@@ -35,18 +50,25 @@ while ($j < $fieldsCounter) {
     $salary = $_POST['contract' . $j];
     $partnerCurrentSeasonCapTotal += $salary;
     if ($check == "on") {
-        $partnerTradeCapTotal += $salary;
-        echo "Total Trade Salary Their Team: $partnerTradeCapTotal<br>";
+        $partnerCapSentToUser += $salary;
+        echo "Total Trade Salary Their Team: $partnerCapSentToUser<br>";
     }
     $j++;
 }
-echo "His Payroll: $partnerCurrentSeasonCapTotal<br><br>";
 
-$userPostTradeCapTotal = $userCurrentSeasonCapTotal - $userTradeCapTotal + $partnerTradeCapTotal;
-echo "Your New Payroll: $userPostTradeCapTotal<br>";
+if ($partnerSendsCash[1] != 0) {
+    $partnerCurrentSeasonCapTotal += $partnerSendsCash[1];
+    $userCurrentSeasonCapTotal -= $partnerSendsCash[1];
+    echo "Cash Consideration sent to me this season: $partnerSendsCash[1]<br>";
+}
 
-$partnerPostTradeCapTotal = $partnerCurrentSeasonCapTotal - $partnerTradeCapTotal + $userTradeCapTotal;
-echo "His New Payroll: $partnerPostTradeCapTotal<p>";
+echo "Their Payroll this season: $partnerCurrentSeasonCapTotal<br><br>";
+
+$userPostTradeCapTotal = $userCurrentSeasonCapTotal - $userCapSentToPartner + $partnerCapSentToUser;
+echo "Your Payroll this season, if this trade is accepted: $userPostTradeCapTotal<br>";
+
+$partnerPostTradeCapTotal = $partnerCurrentSeasonCapTotal - $partnerCapSentToUser + $userCapSentToPartner;
+echo "Their Payroll this season, if this trade is accepted: $partnerPostTradeCapTotal<p>";
 
 $error = 0;
 //if ($userCurrentSeasonCapTotal < 7000)

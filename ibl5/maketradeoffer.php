@@ -11,7 +11,9 @@ $query0a = "INSERT INTO ibl_trade_autocounter ( `counter` ) VALUES ( '$tradeoffe
 $result0a = $db->sql_query($query0a);
 
 $offeringTeam = $_POST['Team_Name'];
+$tidOfferingTeam = $sharedFunctions->getTidFromTeamname($offeringTeam);
 $receivingTeam = $_POST['Team_Name2'];
+$tidReceivingTeam = $sharedFunctions->getTidFromTeamname($receivingTeam);
 $switchCounter = $_POST['half'];
 $fieldsCounter = $_POST['counterfields'];
 $fieldsCounter += 1;
@@ -181,7 +183,23 @@ VALUES    ( '$tradeofferid',
             '$userSendsCash[5]',
             '$userSendsCash[6]' );";
         $resultUserSendsCash = $db->sql_query($queryUserSendsCash);
-        if ($resultUserSendsCash) {
+
+        $queryUserInsertCashTradeInfo = "INSERT INTO ibl_trade_info
+          ( `tradeofferid`,
+            `itemid`,
+            `itemtype`,
+            `from`,
+            `to`,
+            `approval` )
+VALUES    ( '$tradeofferid',
+            '$tidOfferingTeam" . '0' . "$tidReceivingTeam" . '0' . "',
+            'cash',
+            '$offeringTeam',
+            '$receivingTeam',
+            '$receivingTeam' );";
+        $resultUserInsertCashTradeInfo = $db->sql_query($queryUserInsertCashTradeInfo);
+
+        if ($resultUserSendsCash AND $resultUserInsertCashTradeInfo) {
             $tradeText .= "The $offeringTeam send 
             $userSendsCash[1] $userSendsCash[2] $userSendsCash[3] $userSendsCash[4] $userSendsCash[5] $userSendsCash[6]
             in cash to the $receivingTeam.<br>";
@@ -265,7 +283,23 @@ VALUES    ( '$tradeofferid',
             '$partnerSendsCash[5]',
             '$partnerSendsCash[6]' );";
         $resultPartnerSendsCash = $db->sql_query($queryPartnerSendsCash);
-        if ($resultPartnerSendsCash) {
+
+        $queryPartnerInsertCashTradeInfo = "INSERT INTO ibl_trade_info
+          ( `tradeofferid`,
+            `itemid`,
+            `itemtype`,
+            `from`,
+            `to`,
+            `approval` )
+VALUES    ( '$tradeofferid',
+            '$tidReceivingTeam" . '0' . "$tidOfferingTeam" . '0' . "',
+            'cash',
+            '$receivingTeam',
+            '$offeringTeam',
+            '$receivingTeam' );";
+        $resultPartnerInsertCashTradeInfo = $db->sql_query($queryPartnerInsertCashTradeInfo);
+
+        if ($resultPartnerSendsCash AND $resultPartnerInsertCashTradeInfo) {
             $tradeText .= "The $receivingTeam send
             $partnerSendsCash[1] $partnerSendsCash[2] $partnerSendsCash[3] $partnerSendsCash[4] $partnerSendsCash[5] $partnerSendsCash[6]
             in cash to the $offeringTeam.<br>";

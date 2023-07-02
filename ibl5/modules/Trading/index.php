@@ -304,12 +304,12 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
         echo "<tr>
             <td>
                 <b>$teamlogo send
-                <input type=\"number\" name=\"userSendsCash$i\" value =\"0\" min=\"-2000\" max =\"2000\">
+                <input type=\"number\" name=\"userSendsCash$i\" value =\"0\" min=\"0\" max =\"2000\">
                 for " . ($currentSeasonEndingYear + $i - 1) . "</b>
             </td>
             <td align=right>
                 <b>$partner send
-                <input type=\"number\" name=\"partnerSendsCash$i\" value =\"0\" min=\"-2000\" max =\"2000\">
+                <input type=\"number\" name=\"partnerSendsCash$i\" value =\"0\" min=\"0\" max =\"2000\">
                 for " . ($currentSeasonEndingYear + $i - 1) . "</b>
             </td>
         </tr>";

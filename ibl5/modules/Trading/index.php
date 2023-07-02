@@ -259,7 +259,6 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 		<td valign=top>
 			<table>
 				<tr>
-					<input type=\"hidden\" name=\"counterfields\" value=\"$k\">
 					<td valign=top><center><b><u>Make Trade Offer To...</u></b></center>";
 
     $queryListOfAllTeams = "SELECT team_name, team_city FROM ibl_team_info ORDER BY team_city ASC";
@@ -324,6 +323,7 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
                 <input type=\"hidden\" name=\"pass_future_salary_playerb\" value=\"" . htmlspecialchars($pass_future_salary_playerb) . "\">
                 <input type=\"hidden\" name=\"pass_future_salary_holdb\" value=\"" . htmlspecialchars($pass_future_salary_holdb) . "\">
                 <input type=\"hidden\" name=\"pass_future_salary_picksb\" value=\"" . htmlspecialchars($pass_future_salary_picksb) . "\">
+                <input type=\"hidden\" name=\"counterfields\" value=\"$k\">
                 <input type=\"submit\" value=\"Make Trade Offer\">
             </td>
         </tr>

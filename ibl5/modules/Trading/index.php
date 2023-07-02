@@ -283,10 +283,9 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
         $pass_future_salary_holdb[$z] = $pass_future_salary_arrayb[$z] + $future_salary_arrayb['hold'][$z];
         $pass_future_salary_picksb[$z] = $pass_future_salary_arrayb[$z] + $future_salary_arrayb['picks'][$z];
         echo "<tr><td><b>
-			Total Year: " . ($currentSeasonEndingYear + $z) . ":
-			Salary: $" . $future_salary_array['player'][$z] . "</b></td>";
+            $teamlogo Cap Total in " . ($currentSeasonEndingYear + $z) . ": " . $future_salary_array['player'][$z] . "</b></td>";
         echo "<td align=right><b>
-			Salary: $" . $future_salary_arrayb['player'][$z] . "</b></td>";
+            $partner Cap Total in " . ($currentSeasonEndingYear + $z) . ": " . $future_salary_arrayb['player'][$z] . "</b></td>";
         $z++;
     }
 

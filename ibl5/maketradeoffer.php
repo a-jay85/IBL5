@@ -10,66 +10,67 @@ $tradeofferid = $db->sql_result($result0, 0, "counter") + 1;
 $query0a = "INSERT INTO ibl_trade_autocounter ( `counter` ) VALUES ( '$tradeofferid') ";
 $result0a = $db->sql_query($query0a);
 
-$Team_Offering = $_POST['Team_Name'];
-$Team_Receiving = $_POST['Team_Name2'];
-$Swapat = $_POST['half'];
-$Fields_Counter = $_POST['counterfields'];
-$Fields_Counter = $Fields_Counter + 1;
-$error = 0;
+$offeringTeam = $_POST['Team_Name'];
+$receivingTeam = $_POST['Team_Name2'];
+$switchCounter = $_POST['half'];
+$fieldsCounter = $_POST['counterfields'];
+$fieldsCounter += 1;
 //-----CHECK IF SALARIES MATCH-----
 
 $j = 0;
-while ($j < $Swapat) {
-    $Type = $_POST['type' . $j];
-    $Index = $_POST['index' . $j];
-    $Check = $_POST['check' . $j];
-    $Salary = $_POST['contract' . $j];
-    $PayrollA = $PayrollA + $Salary;
-    if ($Check == "on") {
-        $Total_SalaryA = $Total_SalaryA + $Salary;
-        echo "Total Trade Salary My Team: $$Total_SalaryA<br>";
+while ($j < $switchCounter) {
+    $check = $_POST['check' . $j];
+    $salary = $_POST['contract' . $j];
+    $userCurrentSeasonCapTotal += $salary;
+    if ($check == "on") {
+        $userTradeCapTotal += $salary;
+        echo "Total Trade Salary My Team: $userTradeCapTotal<br>";
     }
     $j++;
 }
-echo "My Payroll: $$PayrollA<br><br>";
-while ($j < $Fields_Counter) {
-    $Type = $_POST['type' . $j];
-    $Index = $_POST['index' . $j];
-    $Check = $_POST['check' . $j];
-    $Salary = $_POST['contract' . $j];
-    $PayrollB = $PayrollB + $Salary;
-    if ($Check == "on") {
-        $Total_SalaryB = $Total_SalaryB + $Salary;
-        echo "Total Trade Salary Their Team: $$Total_SalaryB<br>";
+echo "My Payroll: $userCurrentSeasonCapTotal<br><br>";
+
+while ($j < $fieldsCounter) {
+    $check = $_POST['check' . $j];
+    $salary = $_POST['contract' . $j];
+    $partnerCurrentSeasonCapTotal += $salary;
+    if ($check == "on") {
+        $partnerTradeCapTotal += $salary;
+        echo "Total Trade Salary Their Team: $partnerTradeCapTotal<br>";
     }
     $j++;
 }
-echo "His Payroll: $$PayrollB<br><br>";
-$New_PayrollA = $PayrollA - $Total_SalaryA + $Total_SalaryB;
-$New_PayrollB = $PayrollB - $Total_SalaryB + $Total_SalaryA;
-echo "Your New Payroll: $$New_PayrollA<br>His New Payroll: $$New_PayrollB<p>";
-//if ($PayrollA < 7000)
+echo "His Payroll: $partnerCurrentSeasonCapTotal<br><br>";
+
+$userPostTradeCapTotal = $userCurrentSeasonCapTotal - $userTradeCapTotal + $partnerTradeCapTotal;
+echo "Your New Payroll: $userPostTradeCapTotal<br>";
+
+$partnerPostTradeCapTotal = $partnerCurrentSeasonCapTotal - $partnerTradeCapTotal + $userTradeCapTotal;
+echo "His New Payroll: $partnerPostTradeCapTotal<p>";
+
+$error = 0;
+//if ($userCurrentSeasonCapTotal < 7000)
 //{
-if ($New_PayrollA > 7000) {
+if ($userPostTradeCapTotal > 7000) {
     echo "This trade is illegal since it puts you over the hard cap.";
     $error = 1;
 }
 //}else{
-//if ($New_PayrollA > $PayrollA)
+//if ($userPostTradeCapTotal > $userCurrentSeasonCapTotal)
 //{
 //echo "This trade is illegal since you are over the cap and can only make trades that lower your total salary";
 //$error=1;
 //}
 //}
 
-//if ($PayrollB < 7000)
+//if ($partnerCurrentSeasonCapTotal < 7000)
 //{
-if ($New_PayrollB > 7000) {
+if ($partnerPostTradeCapTotal > 7000) {
     echo "This trade is illegal since it puts other team over the hard cap.";
     $error = 1;
 }
 //}else{
-//if ($New_PayrollB > $PayrollB)
+//if ($partnerPostTradeCapTotal > $partnerCurrentSeasonCapTotal)
 //{
 //echo "This trade is illegal since other team is over the cap and can only make trades that lower their total salary";
 //$error=1;
@@ -81,24 +82,24 @@ if ($error == 0) {
     $tradeText = "";
 
     $k = 0;
-    while ($k < $Swapat) {
+    while ($k < $switchCounter) {
         $itemtype = $_POST['type' . $k];
         $itemid = $_POST['index' . $k];
-        $Check = $_POST['check' . $k];
-        if ($Check == "on") {
+        $check = $_POST['check' . $k];
+        if ($check == "on") {
             $queryi = "INSERT INTO ibl_trade_info 
-            ( ` tradeofferid ` , 
-              ` itemid ` , 
-              ` itemtype ` , 
-              ` from ` , 
-              ` to ` , 
-              ` approval ` ) 
+            ( `tradeofferid`, 
+              `itemid`, 
+              `itemtype`, 
+              `from`, 
+              `to`, 
+              `approval` ) 
 VALUES      ( '$tradeofferid', 
               '$itemid', 
               '$itemtype', 
-              '$Team_Offering', 
-              '$Team_Receiving', 
-              '$Team_Receiving' ) ";
+              '$offeringTeam', 
+              '$receivingTeam', 
+              '$receivingTeam' );";
             $resulti = $db->sql_query($queryi);
 
             if ($itemtype == 0) {
@@ -111,7 +112,7 @@ VALUES      ( '$tradeofferid',
                 $pickround = $rowsgetpick['round'];
                 $picknotes = $rowsgetpick['notes'];
     
-                $tradeText .= "The $Team_Offering send the $pickteam $pickyear Round $pickround draft pick to the $Team_Receiving.<br>";
+                $tradeText .= "The $offeringTeam send the $pickteam $pickyear Round $pickround draft pick to the $receivingTeam.<br>";
                 if ($picknotes != NULL) {
                     $tradeText .= "<i>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;" . $picknotes . "</i><br>";
                 }
@@ -123,31 +124,31 @@ VALUES      ( '$tradeofferid',
                 $plyrname = $rowsgetplyr['name'];
                 $plyrpos = $rowsgetplyr['pos'];
     
-                $tradeText .= "The $Team_Offering send $plyrpos $plyrname to the $Team_Receiving.<br>";
+                $tradeText .= "The $offeringTeam send $plyrpos $plyrname to the $receivingTeam.<br>";
             }
         }
 
         $k++;
     }
 
-    while ($k < $Fields_Counter) {
+    while ($k < $fieldsCounter) {
         $itemtype = $_POST['type' . $k];
         $itemid = $_POST['index' . $k];
-        $Check = $_POST['check' . $k];
-        if ($Check == "on") {
+        $check = $_POST['check' . $k];
+        if ($check == "on") {
             $queryi = "INSERT INTO ibl_trade_info 
-            ( ` tradeofferid ` , 
-              ` itemid ` , 
-              ` itemtype ` , 
-              ` from ` , 
-              ` to ` , 
-              ` approval ` ) 
+            ( `tradeofferid`, 
+              `itemid`, 
+              `itemtype`, 
+              `from`, 
+              `to`, 
+              `approval` ) 
 VALUES      ( '$tradeofferid', 
               '$itemid', 
               '$itemtype', 
-              '$Team_Receiving', 
-              '$Team_Offering', 
-              '$Team_Receiving' ) ";
+              '$receivingTeam', 
+              '$offeringTeam', 
+              '$receivingTeam' );";
             $resulti = $db->sql_query($queryi);
 
             if ($itemtype == 0) {
@@ -160,7 +161,7 @@ VALUES      ( '$tradeofferid',
                 $pickround = $rowsgetpick['round'];
                 $picknotes = $rowsgetpick['notes'];
     
-                $tradeText .= "The $Team_Receiving send the $pickteam $pickyear Round $pickround draft pick to the $Team_Offering.<br>";
+                $tradeText .= "The $receivingTeam send the $pickteam $pickyear Round $pickround draft pick to the $offeringTeam.<br>";
                 if ($picknotes != NULL) {
                     $tradeText .= "<i>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;" . $picknotes . "</i><br>";
                 }
@@ -172,7 +173,7 @@ VALUES      ( '$tradeofferid',
                 $plyrname = $rowsgetplyr['name'];
                 $plyrpos = $rowsgetplyr['pos'];
     
-                $tradeText .= "The $Team_Receiving send $plyrpos $plyrname to the $Team_Offering.<br>";
+                $tradeText .= "The $receivingTeam send $plyrpos $plyrname to the $offeringTeam.<br>";
             }
         }
 
@@ -185,8 +186,8 @@ VALUES      ( '$tradeofferid',
     $tradeText = str_replace('<i>', "_", $tradeText);
     $tradeText = str_replace('</i>', "_", $tradeText);
 
-    $offeringUserDiscordID = $sharedFunctions->getDiscordIDFromTeamname($Team_Offering);
-    $receivingUserDiscordID = $sharedFunctions->getDiscordIDFromTeamname($Team_Receiving);
+    $offeringUserDiscordID = $sharedFunctions->getDiscordIDFromTeamname($offeringTeam);
+    $receivingUserDiscordID = $sharedFunctions->getDiscordIDFromTeamname($receivingTeam);
     $discordDMmessage = 'New trade proposal from <@!' . $offeringUserDiscordID . '>!
 '. $tradeText .'
 Go here to accept or decline: http://www.iblhoops.net/ibl5/modules.php?name=Trading&op=reviewtrade';

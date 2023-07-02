@@ -178,18 +178,18 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
     $tid = $sharedFunctions->getTidFromTeamname($teamlogo);
     $sharedFunctions->displaytopmenu($tid);
 
-    $queryOfferingTeamPlayers = "SELECT pos, name, pid, ordinal, cy, cy1, cy2, cy3, cy4, cy5, cy6
+    $queryUserTeamPlayers = "SELECT pos, name, pid, ordinal, cy, cy1, cy2, cy3, cy4, cy5, cy6
 		FROM ibl_plr
 		WHERE tid = $tid
 		AND retired = '0'
 		ORDER BY ordinal ASC ";
-    $resultOfferingTeamPlayers = $db->sql_query($queryOfferingTeamPlayers);
+    $resultUserTeamPlayers = $db->sql_query($queryUserTeamPlayers);
 
-    $queryOfferingTeamDraftPicks = "SELECT *
+    $queryUserTeamDraftPicks = "SELECT *
 		FROM ibl_draft_picks
 		WHERE ownerofpick = '$teamlogo'
 		ORDER BY year, round ASC ";
-    $resultOfferingTeamDraftPicks = $db->sql_query($queryOfferingTeamDraftPicks);
+    $resultUserTeamDraftPicks = $db->sql_query($queryUserTeamDraftPicks);
 
     echo "<form name=\"Trade_Offer\" method=\"post\" action=\"maketradeoffer.php\">
 		<input type=\"hidden\" name=\"Team_Name\" value=\"$teamlogo\">
@@ -213,8 +213,8 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 								<td valign=top><b>Name</b></td>
 								<td valign=top><b>Salary</b></td>";
 
-    $future_salary_array = buildTeamFutureSalary($resultOfferingTeamPlayers, 0);
-    $future_salary_array = buildTeamFuturePicks($resultOfferingTeamDraftPicks, $future_salary_array);
+    $future_salary_array = buildTeamFutureSalary($resultUserTeamPlayers, 0);
+    $future_salary_array = buildTeamFuturePicks($resultUserTeamDraftPicks, $future_salary_array);
     $k = $future_salary_array['k']; // pull $k value out to populate $Fields_Counter in maketradeoffer.php
 
     echo "</table>
@@ -236,21 +236,21 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 				</tr>";
 
     $partnerTid = $sharedFunctions->getTidFromTeamname($partner);
-    $queryOtherTeamPlayers = "SELECT pos, name, pid, ordinal, cy, cy1, cy2, cy3, cy4, cy5, cy6
+    $queryPartnerTeamPlayers = "SELECT pos, name, pid, ordinal, cy, cy1, cy2, cy3, cy4, cy5, cy6
 		FROM ibl_plr
 		WHERE tid = $partnerTid
 		AND retired = '0'
 		ORDER BY ordinal ASC ";
-    $resultOtherTeamPlayers = $db->sql_query($queryOtherTeamPlayers);
+    $resultPartnerTeamPlayers = $db->sql_query($queryPartnerTeamPlayers);
 
-    $queryOtherTeamDraftPicks = "SELECT *
+    $queryPartnerTeamDraftPicks = "SELECT *
 		FROM ibl_draft_picks
 		WHERE ownerofpick = '$partner'
 		ORDER BY year, round ASC ";
-    $resultOtherTeamDraftPicks = $db->sql_query($queryOtherTeamDraftPicks);
+    $resultPartnerTeamDraftPicks = $db->sql_query($queryPartnerTeamDraftPicks);
 
-    $future_salary_arrayb = buildTeamFutureSalary($resultOtherTeamPlayers, $k);
-    $future_salary_arrayb = buildTeamFuturePicks($resultOtherTeamDraftPicks, $future_salary_arrayb);
+    $future_salary_arrayb = buildTeamFutureSalary($resultPartnerTeamPlayers, $k);
+    $future_salary_arrayb = buildTeamFuturePicks($resultPartnerTeamDraftPicks, $future_salary_arrayb);
     $k = $future_salary_arrayb['k']; // pull $k value out to populate $Fields_Counter in maketradeoffer.php
 
     $k--;

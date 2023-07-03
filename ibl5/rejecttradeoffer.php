@@ -20,7 +20,7 @@ $arrayContent = array(
         'receivingUserDiscordID' => $receivingUserDiscordID,);
 
 echo "<p>";
-$response = Discord::sendCurlPOST('http://localhost:50000/discordDM', $arrayContent);
+// $response = Discord::sendCurlPOST('http://localhost:50000/discordDM', $arrayContent);
 
 ?>
 

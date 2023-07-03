@@ -63,9 +63,7 @@ if ($offer_id != NULL) {
             $resultInsertNegativeCashRow = $db->sql_query($queryInsertNegativeCashRow);
 
             if ($resultInsertPositiveCashRow AND $resultInsertNegativeCashRow) {
-                $tradeLine = "The $from send 
-                $cashYear[1] $cashYear[2] $cashYear[3] $cashYear[4] $cashYear[5] $cashYear[6]
-                in cash to the $to.<br>";
+                $tradeLine = "The $from send $cashYear[1] $cashYear[2] $cashYear[3] $cashYear[4] $cashYear[5] $cashYear[6] in cash to the $to.<br>";
                 $storytext .= $tradeLine;
             }
         } elseif ($itemtype == 0) {

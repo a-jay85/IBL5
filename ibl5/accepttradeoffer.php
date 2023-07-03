@@ -32,10 +32,10 @@ if ($offer_id != NULL) {
         $itemtype = $db->sql_result($result0, $i, "itemtype");
         $from = $db->sql_result($result0, $i, "from");
         $to = $db->sql_result($result0, $i, "to");
-
-        $itemid = checkIfPidExists($itemid, $db);
     
         if ($itemtype == 'cash') {
+            $itemid = checkIfPidExists($itemid, $db);
+            
             $tidSendingTeam = $sharedFunctions->getTidFromTeamname($from);
             $tidReceivingTeam = $sharedFunctions->getTidFromTeamname($to);
             $queryCashDetails = "SELECT * FROM ibl_trade_cash WHERE tradeOfferID = $offer_id AND sendingTeam = '$from';";
@@ -75,9 +75,7 @@ if ($offer_id != NULL) {
             $queryi = 'UPDATE ibl_draft_picks SET `ownerofpick` = "' . $to . '" WHERE `pickid` = ' . $itemid . ' LIMIT 1;';
             $resulti = $db->sql_query($queryi);
         } elseif ($itemtype == 1) {
-            $queryj = "SELECT * FROM ibl_team_info WHERE team_name = '$to'";
-            $resultj = $db->sql_query($queryj);
-            $tid = $db->sql_result($resultj, 0, "teamid");
+            $tid = $sharedFunctions->getTidFromTeamname($to);
     
             $queryk = "SELECT * FROM ibl_plr WHERE pid = '$itemid'";
             $resultk = $db->sql_query($queryk);

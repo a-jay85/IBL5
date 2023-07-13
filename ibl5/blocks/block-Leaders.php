@@ -22,17 +22,9 @@ $query = "SELECT * FROM ibl_plr WHERE retired = 0 AND name NOT LIKE \"%Buyouts%\
 $result = $db->sql_query($query);
 $num = $db->sql_numrows($result);
 $i = 0;
-$name1 = "";
-$name2 = "";
-$name3 = "";
-$name4 = "";
-$name5 = "";
+$name1 = $name2 = $name3 = $name4 = $name5 = "";
 
-$ppg1 = 0;
-$ppg2 = 0;
-$ppg3 = 0;
-$ppg4 = 0;
-$ppg5 = 0;
+$ppg1 = $ppg2 = $ppg3 = $ppg4 = $ppg5 = 0;
 
 while ($i < $num) {
 

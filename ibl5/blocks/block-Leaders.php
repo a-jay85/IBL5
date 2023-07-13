@@ -25,6 +25,10 @@ $i = 0;
 $name1 = $name2 = $name3 = $name4 = $name5 = "";
 
 $ppg1 = $ppg2 = $ppg3 = $ppg4 = $ppg5 = 0;
+$reb1 = $reb2 = $reb3 = $reb4 = $reb5 = 0;
+$ast1 = $ast2 = $ast3 = $ast4 = $ast5 = 0;
+$stl1 = $stl2 = $stl3 = $stl4 = $stl5 = 0;
+$blk1 = $blk2 = $blk3 = $blk4 = $blk5 = 0;
 
 while ($i < $num) {
 

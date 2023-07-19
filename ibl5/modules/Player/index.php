@@ -1107,15 +1107,15 @@ function showpage($pid, $spec)
     if ($yearOfCurrentContract == 1 OR $yearOfCurrentContract == 0) {
         $contract_display = $salaryIn1stYearOfCurrentContract;
         if ($salaryIn2ndYearOfCurrentContract != 0) {
-            $contract_display = $contract_display . "/" . $salaryIn2ndYearOfCurrentContract;
+            $contract_display .=  "/" . $salaryIn2ndYearOfCurrentContract;
             if ($salaryIn3rdYearOfCurrentContract != 0) {
-                $contract_display = $contract_display . "/" . $salaryIn3rdYearOfCurrentContract;
+                $contract_display .=  "/" . $salaryIn3rdYearOfCurrentContract;
                 if ($salaryIn4thYearOfCurrentContract != 0) {
-                    $contract_display = $contract_display . "/" . $salaryIn4thYearOfCurrentContract;
+                    $contract_display .=  "/" . $salaryIn4thYearOfCurrentContract;
                     if ($salaryIn5thYearOfCurrentContract != 0) {
-                        $contract_display = $contract_display . "/" . $salaryIn5thYearOfCurrentContract;
+                        $contract_display .=  "/" . $salaryIn5thYearOfCurrentContract;
                         if ($salaryIn6thYearOfCurrentContract != 0) {
-                            $contract_display = $contract_display . "/" . $salaryIn6thYearOfCurrentContract;
+                            $contract_display .=  "/" . $salaryIn6thYearOfCurrentContract;
                         }
                     }
                 }
@@ -1126,13 +1126,13 @@ function showpage($pid, $spec)
     } elseif ($yearOfCurrentContract == 2) {
         $contract_display = $salaryIn2ndYearOfCurrentContract;
         if ($salaryIn3rdYearOfCurrentContract != 0) {
-            $contract_display = $contract_display . "/" . $salaryIn3rdYearOfCurrentContract;
+            $contract_display .=  "/" . $salaryIn3rdYearOfCurrentContract;
             if ($salaryIn4thYearOfCurrentContract != 0) {
-                $contract_display = $contract_display . "/" . $salaryIn4thYearOfCurrentContract;
+                $contract_display .=  "/" . $salaryIn4thYearOfCurrentContract;
                 if ($salaryIn5thYearOfCurrentContract != 0) {
-                    $contract_display = $contract_display . "/" . $salaryIn5thYearOfCurrentContract;
+                    $contract_display .=  "/" . $salaryIn5thYearOfCurrentContract;
                     if ($salaryIn6thYearOfCurrentContract != 0) {
-                        $contract_display = $contract_display . "/" . $salaryIn6thYearOfCurrentContract;
+                        $contract_display .=  "/" . $salaryIn6thYearOfCurrentContract;
                     }
                 }
             }
@@ -1142,11 +1142,11 @@ function showpage($pid, $spec)
     } elseif ($yearOfCurrentContract == 3) {
         $contract_display = $salaryIn3rdYearOfCurrentContract;
         if ($salaryIn4thYearOfCurrentContract != 0) {
-            $contract_display = $contract_display . "/" . $salaryIn4thYearOfCurrentContract;
+            $contract_display .=  "/" . $salaryIn4thYearOfCurrentContract;
             if ($salaryIn5thYearOfCurrentContract != 0) {
-                $contract_display = $contract_display . "/" . $salaryIn5thYearOfCurrentContract;
+                $contract_display .=  "/" . $salaryIn5thYearOfCurrentContract;
                 if ($salaryIn6thYearOfCurrentContract != 0) {
-                    $contract_display = $contract_display . "/" . $salaryIn6thYearOfCurrentContract;
+                    $contract_display .=  "/" . $salaryIn6thYearOfCurrentContract;
                 }
             }
         } else {
@@ -1155,9 +1155,9 @@ function showpage($pid, $spec)
     } elseif ($yearOfCurrentContract == 4) {
         $contract_display = $salaryIn4thYearOfCurrentContract;
         if ($salaryIn5thYearOfCurrentContract != 0) {
-            $contract_display = $contract_display . "/" . $salaryIn5thYearOfCurrentContract;
+            $contract_display .=  "/" . $salaryIn5thYearOfCurrentContract;
             if ($salaryIn6thYearOfCurrentContract != 0) {
-                $contract_display = $contract_display . "/" . $salaryIn6thYearOfCurrentContract;
+                $contract_display .=  "/" . $salaryIn6thYearOfCurrentContract;
             }
         } else {
             $can_renegotiate = 1;
@@ -1165,7 +1165,7 @@ function showpage($pid, $spec)
     } elseif ($yearOfCurrentContract == 5) {
         $contract_display = $salaryIn5thYearOfCurrentContract;
         if ($salaryIn6thYearOfCurrentContract != 0) {
-            $contract_display = $contract_display . "/" . $salaryIn6thYearOfCurrentContract;
+            $contract_display .=  "/" . $salaryIn6thYearOfCurrentContract;
         } else {
             $can_renegotiate = 1;
         }

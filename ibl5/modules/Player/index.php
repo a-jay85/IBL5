@@ -1597,18 +1597,10 @@ function showpage($pid, $spec)
             }
 
             @$simAverageMIN = $simTotalMIN / $numberOfGamesPlayedInSim;
-            @$simAverage2GM = $simTotal2GM / $numberOfGamesPlayedInSim;
-            @$simAverage2GA = $simTotal2GA / $numberOfGamesPlayedInSim;
-            @$simAverage2GP = $simTotal2GM / $simTotal2GA;
-            @$simAverageFTM = $simTotalFTM / $numberOfGamesPlayedInSim;
-            @$simAverageFTA = $simTotalFTA / $numberOfGamesPlayedInSim;
             @$simAverageFTP = $simTotalFTM / $simTotalFTA;
-            @$simAverage3GM = $simTotal3GM / $numberOfGamesPlayedInSim;
-            @$simAverage3GA = $simTotal3GA / $numberOfGamesPlayedInSim;
             @$simAverage3GP = $simTotal3GM / $simTotal3GA;
             @$simAverageFGP = ($simTotal2GM + $simTotal3GM) / ($simTotal2GA + $simTotal3GA);
             @$simAverageORB = $simTotalORB / $numberOfGamesPlayedInSim;
-            @$simAverageDRB = $simTotalDRB / $numberOfGamesPlayedInSim;
             @$simAverageREB = ($simTotalORB + $simTotalDRB) / $numberOfGamesPlayedInSim;
             @$simAverageAST = $simTotalAST / $numberOfGamesPlayedInSim;
             @$simAverageSTL = $simTotalSTL / $numberOfGamesPlayedInSim;

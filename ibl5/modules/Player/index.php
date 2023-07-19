@@ -884,10 +884,6 @@ function awards()
             <tr>
                 <td colspan=3>SORT BY:";
 
-    if ($as_sortby == null) {
-        $sortby = 3;
-    }
-
     if ($as_sortby == 1) {
         echo "<input type=\"radio\" name=\"aw_sortby\" value=\"1\" checked> Name |";
     } else {
@@ -1020,7 +1016,6 @@ function showpage($pid, $spec)
     $player_draft_round = stripslashes(check_html($playerinfo['draftround'], "nohtml"));
     $player_draft_year = stripslashes(check_html($playerinfo['draftyear'], "nohtml"));
     $player_college = stripslashes(check_html($playerinfo['college'], "nohtml"));
-    $player_collegeid = stripslashes(check_html($playerinfo['collegeid'], "nohtml"));
 
     $player_exp = stripslashes(check_html($playerinfo['exp'], "nohtml"));
     $year = stripslashes(check_html($playerinfo['draftyear'], "nohtml")) + stripslashes(check_html($playerinfo['exp'], "nohtml"));
@@ -1213,7 +1208,6 @@ function showpage($pid, $spec)
 
     $sql2 = "SELECT * FROM " . $prefix . "_users WHERE username='$cookie[1]'";
     $result2 = $db->sql_query($sql2);
-    $num2 = $db->sql_numrows($result2);
     $userinfo = $db->sql_fetchrow($result2);
 
     $userteam = stripslashes(check_html($userinfo['user_ibl_team'], "nohtml"));
@@ -2746,8 +2740,6 @@ function showpage($pid, $spec)
         // START AWARDS SCRIPT
 
         $awardsquery = $db->sql_query("SELECT * FROM ibl_awards WHERE name='$player_name' ORDER BY year ASC");
-        $awardsresult = $db->sql_query($awardsquery);
-        $awardswon = $db->sql_numrows($awardsquery);
 
         echo "<table border=1 cellspacing=0 cellpadding=0 valign=top>
             <tr>
@@ -2934,8 +2926,6 @@ function negotiate($pid)
     $player_loyalty = stripslashes(check_html($playerinfo['loyalty'], "nohtml"));
     $player_winner = stripslashes(check_html($playerinfo['winner'], "nohtml"));
     $player_playingtime = stripslashes(check_html($playerinfo['playingTime'], "nohtml"));
-    $player_security = stripslashes(check_html($playerinfo['security'], "nohtml"));
-    $player_coach = stripslashes(check_html($playerinfo['coach'], "nohtml"));
     $player_tradition = stripslashes(check_html($playerinfo['tradition'], "nohtml"));
 
     include "header.php";
@@ -2949,7 +2939,6 @@ function negotiate($pid)
 
     $sql2 = "SELECT * FROM " . $prefix . "_users WHERE username = '$cookie[1]'";
     $result2 = $db->sql_query($sql2);
-    $num2 = $db->sql_numrows($result2);
     $userinfo = $db->sql_fetchrow($result2);
 
     $userteam = stripslashes(check_html($userinfo['user_ibl_team'], "nohtml"));
@@ -2957,7 +2946,6 @@ function negotiate($pid)
     $player_exp = stripslashes(check_html($playerinfo['exp'], "nohtml"));
     $player_bird = stripslashes(check_html($playerinfo['bird'], "nohtml"));
     $yearOfCurrentContract = stripslashes(check_html($playerinfo['cy'], "nohtml"));
-    $salaryIn1stYearOfCurrentContract = stripslashes(check_html($playerinfo['cy1'], "nohtml"));
     $salaryIn2ndYearOfCurrentContract = stripslashes(check_html($playerinfo['cy2'], "nohtml"));
     $salaryIn3rdYearOfCurrentContract = stripslashes(check_html($playerinfo['cy3'], "nohtml"));
     $salaryIn4thYearOfCurrentContract = stripslashes(check_html($playerinfo['cy4'], "nohtml"));
@@ -3088,7 +3076,6 @@ function negotiate($pid)
             $tf_loss = stripslashes(check_html($teamfactors['Contract_Losses'], "nohtml"));
             $tf_trdw = stripslashes(check_html($teamfactors['Contract_AvgW'], "nohtml"));
             $tf_trdl = stripslashes(check_html($teamfactors['Contract_AvgL'], "nohtml"));
-            $tf_coach = stripslashes(check_html($teamfactors['Contract_Coach'], "nohtml"));
 
             $millionsatposition = $db->sql_query("SELECT * FROM ibl_plr WHERE teamname = '$userteam' AND pos IN ($player_pos) AND name != '$player_name'");
             // LOOP TO GET MILLIONS COMMITTED AT POSITION
@@ -3097,7 +3084,6 @@ function negotiate($pid)
 
             while ($millionscounter = $db->sql_fetchrow($millionsatposition)) {
                 $millionscy = stripslashes(check_html($millionscounter['cy'], "nohtml"));
-                $millionscy1 = stripslashes(check_html($millionscounter['cy1'], "nohtml"));
                 $millionscy2 = stripslashes(check_html($millionscounter['cy2'], "nohtml"));
                 $millionscy3 = stripslashes(check_html($millionscounter['cy3'], "nohtml"));
                 $millionscy4 = stripslashes(check_html($millionscounter['cy4'], "nohtml"));
@@ -3148,9 +3134,7 @@ function negotiate($pid)
             //$coachFactor = (0.0025*($tf_coach)*($player_coach-1));
             //$modfactor4 = (.025*($player_loyalty-1));
             $loyaltyFactor = (0.025 * ($player_loyalty - 1));
-            $modfactor5 = (.01 * ($demyrs - 1) - 0.025) * ($player_security - 1);
             //$securityFactor = (0.01*$demyrs-0.025)*($player_security-1);
-            $modfactor6 = -(.0035 * $tf_millions / 100 - 0.028) * ($player_playingtime - 1);
             $PTFactor = (($tf_millions * -0.00005) + 0.025) * ($player_playingtime - 1);
 
             $modifier = 1 + $PFWFactor + $traditionFactor + $coachFactor + $loyaltyFactor + $securityFactor + $PTFactor;
@@ -3166,7 +3150,6 @@ function negotiate($pid)
             // $dem6 = round($dem6/$modifier);
 
             $demtot = round(($dem1 + $dem2 + $dem3 + $dem4 + $dem5 + $dem6) / 100, 2);
-            $demavg = ($dem1 + $dem2 + $dem3 + $dem4 + $dem5 + $dem6) / $demyrs;
 
             $demand_display = $dem1;
             if ($dem2 != 0) {
@@ -3194,7 +3177,6 @@ function negotiate($pid)
             while ($capdecrementer = $db->sql_fetchrow($capresult)) {
 
                 $capcy = stripslashes(check_html($capdecrementer['cy'], "nohtml"));
-                $capcy1 = stripslashes(check_html($capdecrementer['cy1'], "nohtml"));
                 $capcy2 = stripslashes(check_html($capdecrementer['cy2'], "nohtml"));
                 $capcy3 = stripslashes(check_html($capdecrementer['cy3'], "nohtml"));
                 $capcy4 = stripslashes(check_html($capdecrementer['cy4'], "nohtml"));
@@ -3345,7 +3327,6 @@ function rookieoption($pid)
 
     $sql2 = "SELECT * FROM " . $prefix . "_users WHERE username='$cookie[1]'";
     $result2 = $db->sql_query($sql2);
-    $num2 = $db->sql_numrows($result2);
     $userinfo = $db->sql_fetchrow($result2);
 
     $userteam = stripslashes(check_html($userinfo['user_ibl_team'], "nohtml"));

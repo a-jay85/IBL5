@@ -136,10 +136,11 @@ function leaderboards()
     }
 
     echo "</select></td>
-          <td>Limit: <input type=\"text\" name=\"display\" size=\"4\" value=\"$display\"> Records</td><td>
-          <input type=\"hidden\" name=\"submitted\" value=\"1\">
-          <input type=\"submit\" value=\"Display Leaderboards\"></form>
-          </td></tr></table>";
+        <td>Limit: <input type=\"text\" name=\"display\" size=\"4\" value=\"$display\"> Records</td>
+        <td>
+            <input type=\"hidden\" name=\"submitted\" value=\"1\">
+            <input type=\"submit\" value=\"Display Leaderboards\"></form>
+        </td></tr></table>";
 
     // ===== RUN QUERY IF FORM HAS BEEN SUBMITTED
 
@@ -510,8 +511,7 @@ function search()
         echo "<option value=\"0\">No</option>";
     }
 
-    echo "</td>
-            </tr>
+    echo "</td></tr>
             <tr>
                 <td colspan=2>Minimum Years In League: <input type=\"text\" name=\"exp\" size=\"2\" value=\"$exp\"></td>
                 <td colspan=2>Maximum Years In League: <input type=\"text\" name=\"exp_max\" size=\"2\" value=\"$exp\"></td>
@@ -903,7 +903,8 @@ function awards()
     }
 
     echo "</td></tr></table>
-        <input type=\"submit\" value=\"Search for Matches!\"></form>";
+        <input type=\"submit\" value=\"Search for Matches!\">
+    </form>";
 
     // ========= SET QUERY BASED ON SEARCH PARAMETERS
 
@@ -1430,9 +1431,8 @@ function showpage($pid, $spec)
 
     echo "<tr>
         <td colspan=2><hr></td>
-    </tr>";
-
-    echo "<tr>
+    </tr>
+    <tr>
         <td colspan=2><b><center>PLAYER MENU</center></b><br>
             <center>
             <a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">Player Overview</a> | <a href=\"modules.php?name=Player&pa=showpage&pid=$pid&spec=1\">Bio (Awards, News)</a><br>
@@ -1454,10 +1454,9 @@ function showpage($pid, $spec)
         // NOTE ALL-STAR WEEKEND APPEARANCES
 
         echo "<tr>
-            <td colspan=3>";
-
-        echo "<table align=left cellspacing=1 cellpadding=0 border=1>
-            <th colspan=2><center>All-Star Activity</center></th>
+            <td colspan=3>
+                <table align=left cellspacing=1 cellpadding=0 border=1>
+                    <th colspan=2><center>All-Star Activity</center></th>
         </tr>";
 
         $allstarquery = $db->sql_query("SELECT * FROM ibl_awards WHERE name='$player_name' AND Award LIKE '%Conference All-Star'");
@@ -1489,9 +1488,8 @@ function showpage($pid, $spec)
         echo "<tr>
             <td><b>Rookie-Sophomore<br>Challenges:</b></td>
             <td>$rooksoph</td>
-        </tr>";
-
-        echo "</table>";
+        </tr>
+        </table>";
 
         // END ALL-STAR WEEKEND ACTIVITY SCRIPT
 
@@ -1504,7 +1502,8 @@ function showpage($pid, $spec)
                 <td><b>Clutch</b></td>
                 <td><b>Consistency</b></td>
             </tr>
-            <tr align=center><td>$player_talent</td>
+            <tr align=center>
+                <td>$player_talent</td>
                 <td>$player_skill</td>
                 <td>$player_intangibles</td>
                 <td>$player_clutch</td>

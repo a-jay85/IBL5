@@ -3364,12 +3364,13 @@ function rookieoption($pid)
     	However, by exercising this option, <b>you can't use an in-season contract extension on them next season</b>.<br>
     	<b>They will become a free agent</b>.<br>
     	<form name=\"RookieExtend\" method=\"post\" action=\"rookieoption.php\">
-    	<input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
-    	<input type=\"hidden\" name=\"playername\" value=\"$player_name\">
-    	<input type=\"hidden\" name=\"rookieOptionValue\" value=\"$rookieOptionValue\">
-    	<input type=\"hidden\" name=\"player_exp\" value=\"$player_exp\">
-    	<input type=\"hidden\" name=\"player_draftround\" value=\"$player_draftround\">
-    	<input type=\"submit\" value=\"Activate Rookie Extension\"></form>";
+            <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+            <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
+            <input type=\"hidden\" name=\"rookieOptionValue\" value=\"$rookieOptionValue\">
+            <input type=\"hidden\" name=\"player_exp\" value=\"$player_exp\">
+            <input type=\"hidden\" name=\"player_draftround\" value=\"$player_draftround\">
+            <input type=\"submit\" value=\"Activate Rookie Extension\">
+        </form>";
 }
 
 switch ($pa) {

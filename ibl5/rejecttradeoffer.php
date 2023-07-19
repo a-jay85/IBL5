@@ -7,8 +7,10 @@ $offer_id = $_POST['offer'];
 $teamRejecting = $_POST['teamRejecting'];
 $teamReceiving = $_POST['teamReceiving'];
 
-$queryclear = "DELETE FROM ibl_trade_info WHERE `tradeofferid` = '$offer_id'";
-$resultclear = $db->sql_query($queryclear);
+$queryClearInfo = "DELETE FROM ibl_trade_info WHERE `tradeOfferID` = '$offer_id'";
+$resultClearInfo = $db->sql_query($queryClearInfo);
+$queryClearCash = "DELETE FROM ibl_trade_cash WHERE `tradeOfferID` = '$offer_id'";
+$resultClearCash = $db->sql_query($queryClearCash);
 
 $rejectingUserDiscordID = $sharedFunctions->getDiscordIDFromTeamname($teamRejecting);
 $receivingUserDiscordID = $sharedFunctions->getDiscordIDFromTeamname($teamReceiving);

@@ -1581,21 +1581,8 @@ function showpage($pid, $spec)
                 ORDER BY Date ASC");
 
             $numberOfGamesPlayedInSim = $db->sql_numrows($resultPlayerSimBoxScores);
-            $simTotalMIN = 0;
-            $simTotal2GM = 0;
-            $simTotal2GA = 0;
-            $simTotalFTM = 0;
-            $simTotalFTA = 0;
-            $simTotal3GM = 0;
-            $simTotal3GA = 0;
-            $simTotalORB = 0;
-            $simTotalDRB = 0;
-            $simTotalAST = 0;
-            $simTotalSTL = 0;
-            $simTotalTOV = 0;
-            $simTotalBLK = 0;
-            $simTotalPF = 0;
-            $simTotalPTS = 0;
+            $simTotalMIN = $simTotal2GM = $simTotal2GA = $simTotalFTM = $simTotalFTA = $simTotal3GM = $simTotal3GA = 0;
+            $simTotalORB = $simTotalDRB = $simTotalAST = $simTotalSTL = $simTotalTOV = $simTotalBLK = $simTotalPF = $simTotalPTS = 0;
 
             while ($row = $db->sql_fetch_assoc($resultPlayerSimBoxScores)) {
                 $simTotalMIN += $row['gameMIN'];
@@ -1674,23 +1661,8 @@ function showpage($pid, $spec)
     if ($spec == 3) {
         // GET PAST STATS
 
-        $car_gm = 0;
-        $car_min = 0;
-        $car_fgm = 0;
-        $car_fga = 0;
-        $car_ftm = 0;
-        $car_fta = 0;
-        $car_3gm = 0;
-        $car_3ga = 0;
-        $car_orb = 0;
-        $car_drb = 0;
-        $car_reb = 0;
-        $car_ast = 0;
-        $car_stl = 0;
-        $car_blk = 0;
-        $car_tvr = 0;
-        $car_pf = 0;
-        $car_pts = 0;
+        $car_gm = $car_min = $car_fgm = $car_fga = $car_ftm = $car_fta = $car_3gm = $car_3ga = 0;
+        $car_orb = $car_reb = $car_ast = $car_stl = $car_blk = $car_tvr = $car_pf = $car_pts = 0;
 
         echo "<tr>
             <td valign=top>
@@ -1879,22 +1851,8 @@ function showpage($pid, $spec)
                 <th>pts</th>
             </tr>";
 
-        $car_gm = 0;
-        $car_min = 0;
-        $car_fgm = 0;
-        $car_fga = 0;
-        $car_ftm = 0;
-        $car_fta = 0;
-        $car_3gm = 0;
-        $car_3ga = 0;
-        $car_orb = 0;
-        $car_reb = 0;
-        $car_ast = 0;
-        $car_stl = 0;
-        $car_blk = 0;
-        $car_tvr = 0;
-        $car_pf = 0;
-        $car_pts = 0;
+        $car_gm = $car_min = $car_fgm = $car_fga = $car_ftm = $car_fta = $car_3gm = $car_3ga = 0;
+        $car_orb = $car_reb = $car_ast = $car_stl = $car_blk = $car_tvr = $car_pf = $car_pts = 0;
 
         $result44 = $db->sql_query("SELECT * FROM ibl_hist WHERE pid=$pid ORDER BY year ASC");
         while ($row44 = $db->sql_fetchrow($result44)) {
@@ -2129,23 +2087,8 @@ function showpage($pid, $spec)
     if ($spec == 5) {
         // GET PAST PLAYOFF STATS
 
-        $car_gm = 0;
-        $car_min = 0;
-        $car_fgm = 0;
-        $car_fga = 0;
-        $car_ftm = 0;
-        $car_fta = 0;
-        $car_3gm = 0;
-        $car_3ga = 0;
-        $car_orb = 0;
-        $car_drb = 0;
-        $car_reb = 0;
-        $car_ast = 0;
-        $car_stl = 0;
-        $car_blk = 0;
-        $car_tvr = 0;
-        $car_pf = 0;
-        $car_pts = 0;
+        $car_gm = $car_min = $car_fgm = $car_fga = $car_ftm = $car_fta = $car_3gm = $car_3ga = 0;
+        $car_orb = $car_reb = $car_ast = $car_stl = $car_blk = $car_tvr = $car_pf = $car_pts = 0;
 
         echo "<table border=1 cellspacing=0 class=\"sortable\>
             <tr>
@@ -2287,23 +2230,8 @@ function showpage($pid, $spec)
                 <td>pts</td>
             </tr>";
 
-        $car_gm = 0;
-        $car_min = 0;
-        $car_fgm = 0;
-        $car_fga = 0;
-        $car_ftm = 0;
-        $car_fta = 0;
-        $car_3gm = 0;
-        $car_3ga = 0;
-        $car_orb = 0;
-        $car_drb = 0;
-        $car_reb = 0;
-        $car_ast = 0;
-        $car_stl = 0;
-        $car_blk = 0;
-        $car_tvr = 0;
-        $car_pf = 0;
-        $car_pts = 0;
+        $car_gm = $car_min = $car_fgm = $car_fga = $car_ftm = $car_fta = $car_3gm = $car_3ga = 0;
+        $car_orb = $car_reb = $car_ast = $car_stl = $car_blk = $car_tvr = $car_pf = $car_pts = 0;
 
         $resultplayoff4 = $db->sql_query("SELECT * FROM ibl_playoff_stats WHERE name='$player_name' ORDER BY year ASC");
         while ($rowplayoff4 = $db->sql_fetchrow($resultplayoff4)) {
@@ -2437,23 +2365,8 @@ function showpage($pid, $spec)
     if ($spec == 7) {
         // GET PAST H.E.A.T. STATS
 
-        $car_gm = 0;
-        $car_min = 0;
-        $car_fgm = 0;
-        $car_fga = 0;
-        $car_ftm = 0;
-        $car_fta = 0;
-        $car_3gm = 0;
-        $car_3ga = 0;
-        $car_orb = 0;
-        $car_drb = 0;
-        $car_reb = 0;
-        $car_ast = 0;
-        $car_stl = 0;
-        $car_blk = 0;
-        $car_tvr = 0;
-        $car_pf = 0;
-        $car_pts = 0;
+        $car_gm = $car_min = $car_fgm = $car_fga = $car_ftm = $car_fta = $car_3gm = $car_3ga = 0;
+        $car_orb = $car_reb = $car_ast = $car_stl = $car_blk = $car_tvr = $car_pf = $car_pts = 0;
 
         echo "<table border=1 cellspacing=0 class=\"sortable\>
             <tr>
@@ -2594,23 +2507,8 @@ function showpage($pid, $spec)
                 <td>pts</td>
             </tr>";
 
-        $car_gm = 0;
-        $car_min = 0;
-        $car_fgm = 0;
-        $car_fga = 0;
-        $car_ftm = 0;
-        $car_fta = 0;
-        $car_3gm = 0;
-        $car_3ga = 0;
-        $car_orb = 0;
-        $car_drb = 0;
-        $car_reb = 0;
-        $car_ast = 0;
-        $car_stl = 0;
-        $car_blk = 0;
-        $car_tvr = 0;
-        $car_pf = 0;
-        $car_pts = 0;
+        $car_gm = $car_min = $car_fgm = $car_fga = $car_ftm = $car_fta = $car_3gm = $car_3ga = 0;
+        $car_orb = $car_reb = $car_ast = $car_stl = $car_blk = $car_tvr = $car_pf = $car_pts = 0;
 
         $resultplayoff4 = $db->sql_query("SELECT * FROM ibl_heat_stats WHERE name='$player_name' ORDER BY year ASC");
         while ($rowplayoff4 = $db->sql_fetchrow($resultplayoff4)) {

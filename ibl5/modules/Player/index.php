@@ -3087,34 +3087,6 @@ function negotiate($pid)
     echo "<b>$player_pos $player_name</b> - Contract Demands:
     <br>";
 
-    if ($player_pos == 'PG') {
-        $adjpos = "'G', 'PG'";
-    }
-    if ($player_pos == 'G') {
-        $adjpos = "'PG', 'SG', 'G'";
-    }
-    if ($player_pos == 'SG') {
-        $adjpos = "'G', 'GF', 'SG'";
-    }
-    if ($player_pos == 'GF') {
-        $adjpos = "'SG', 'SF', 'GF'";
-    }
-    if ($player_pos == 'SF') {
-        $adjpos = "'GF', 'F', 'SF'";
-    }
-    if ($player_pos == 'F') {
-        $adjpos = "'SF', 'PF', 'F'";
-    }
-    if ($player_pos == 'PF') {
-        $adjpos = "'F', 'FC', 'PF'";
-    }
-    if ($player_pos == 'FC') {
-        $adjpos = "'PF', 'FC', 'C'";
-    }
-    if ($player_pos == 'C') {
-        $adjpos = "'FC', 'C'";
-    }
-
     if ($can_renegotiate == 1) {
         if ($player_team_name == $userteam) {
             // Assign player stats to variables
@@ -3220,7 +3192,7 @@ function negotiate($pid)
             $tf_trdl = stripslashes(check_html($teamfactors['Contract_AvgL'], "nohtml"));
             $tf_coach = stripslashes(check_html($teamfactors['Contract_Coach'], "nohtml"));
 
-            $millionsatposition = $db->sql_query("SELECT * FROM ibl_plr WHERE teamname = '$userteam' AND pos IN ($adjpos) AND name != '$player_name'");
+            $millionsatposition = $db->sql_query("SELECT * FROM ibl_plr WHERE teamname = '$userteam' AND pos IN ($player_pos) AND name != '$player_name'");
             // LOOP TO GET MILLIONS COMMITTED AT POSITION
 
             $tf_millions = 0;

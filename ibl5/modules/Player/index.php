@@ -1200,7 +1200,7 @@ function showpage($pid, $spec)
         <hr>
         <table>
             <tr>
-                <td valign=center><img src=\"images/player/$pid.jpg\"></td>
+                <td valign=center><img src=\"images/player/$pid.jpg\" height=\"90\" width=\"65\"></td>
                 <td>";
 
     // RENEGOTIATION BUTTON START

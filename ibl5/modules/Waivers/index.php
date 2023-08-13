@@ -210,7 +210,9 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
                 $newWaiverContract = true;
             }
 
-            if ($Healthy_Roster_Slots < 4 and $TotalSalary + $cy1 > 7000) { // TODO: Change 7000 to hard cap variable
+            if ($Player_to_Process == NULL OR $Player_to_Process == "") {
+                $errortext = "You didn't select a valid player. Please select a player and try again.";
+            } elseif ($Healthy_Roster_Slots < 4 and $TotalSalary + $cy1 > 7000) { // TODO: Change 7000 to hard cap variable
                 $errortext = "You have 12 or more healthy players and this signing will put you over $70 million. Therefore you cannot make this signing.";
             } elseif ($Healthy_Roster_Slots > 3 and $TotalSalary + $cy1 > 7000 and $cy1 > 103) { // TODO: Change 7000 to hard cap variable
                 $errortext = "You are over the hard cap and therefore can only sign players who are making veteran minimum!";

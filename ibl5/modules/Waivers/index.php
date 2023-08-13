@@ -248,7 +248,7 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
                     // ==== PUT ANNOUNCEMENT INTO DATABASE ON NEWS PAGE
                     $topicid = 33;
                     $storytitle = $Team_Offering . " make waiver additions";
-                    $hometext = "The " . $Team_Offering . " sign " . $playername . " from waivers for $finalContract";
+                    $hometext = "The " . $Team_Offering . " sign " . $playername . " from waivers for $finalContract.";
 
                     $timestamp = date('Y-m-d H:i:s', time());
 

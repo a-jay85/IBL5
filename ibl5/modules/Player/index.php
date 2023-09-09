@@ -994,65 +994,16 @@ function awards()
     include "footer.php";
 }
 
-function showpage($pid, $spec)
+function showpage($playerID, $spec)
 {
     global $prefix, $db, $user, $cookie;
     $sharedFunctions = new Shared($db);
-
-    $pid = intval($pid);
+    $player = new Player($db, $playerID);
     $spec = intval($spec);
-    $playerinfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_plr WHERE pid='$pid'"));
-    $player_name = stripslashes(check_html($playerinfo['name'], "nohtml"));
-    $player_nickname = stripslashes(check_html($playerinfo['nickname'], "nohtml"));
-    $player_pos = stripslashes(check_html($playerinfo['pos'], "nohtml"));
-    $player_team_name = stripslashes(check_html($playerinfo['teamname'], "nohtml"));
-    $player_team_id = stripslashes(check_html($playerinfo['tid'], "nohtml"));
-    $player_ht_ft = stripslashes(check_html($playerinfo['htft'], "nohtml"));
-    $player_ht_in = stripslashes(check_html($playerinfo['htin'], "nohtml"));
-    $player_wt = stripslashes(check_html($playerinfo['wt'], "nohtml"));
-    $player_age = stripslashes(check_html($playerinfo['age'], "nohtml"));
-    $player_drafted_by = stripslashes(check_html($playerinfo['draftedby'], "nohtml"));
-    $player_draft_pick = stripslashes(check_html($playerinfo['draftpickno'], "nohtml"));
-    $player_draft_round = stripslashes(check_html($playerinfo['draftround'], "nohtml"));
-    $player_draft_year = stripslashes(check_html($playerinfo['draftyear'], "nohtml"));
-    $player_college = stripslashes(check_html($playerinfo['college'], "nohtml"));
 
-    $player_exp = stripslashes(check_html($playerinfo['exp'], "nohtml"));
-    $year = stripslashes(check_html($playerinfo['draftyear'], "nohtml")) + stripslashes(check_html($playerinfo['exp'], "nohtml"));
-    $player_talent = stripslashes(check_html($playerinfo['talent'], "nohtml"));
-    $player_skill = stripslashes(check_html($playerinfo['skill'], "nohtml"));
-    $player_intangibles = stripslashes(check_html($playerinfo['intangibles'], "nohtml"));
-    $player_clutch = stripslashes(check_html($playerinfo['Clutch'], "nohtml"));
-    $player_consistency = stripslashes(check_html($playerinfo['Consistency'], "nohtml"));
-    $player_loyalty = stripslashes(check_html($playerinfo['loyalty'], "nohtml"));
-    $player_winner = stripslashes(check_html($playerinfo['winner'], "nohtml"));
-    $player_playingtime = stripslashes(check_html($playerinfo['playingTime'], "nohtml"));
-    $player_security = stripslashes(check_html($playerinfo['security'], "nohtml"));
-    $player_coach = stripslashes(check_html($playerinfo['coach'], "nohtml"));
-    $player_tradition = stripslashes(check_html($playerinfo['tradition'], "nohtml"));
-    $player_retired = stripslashes(check_html($playerinfo['retired'], "nohtml"));
+    $playerinfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_plr WHERE pid='$playerID'"));
 
-    $player_rating_2ga = stripslashes(check_html($playerinfo['r_fga'], "nohtml"));
-    $player_rating_2gp = stripslashes(check_html($playerinfo['r_fgp'], "nohtml"));
-    $player_rating_fta = stripslashes(check_html($playerinfo['r_fta'], "nohtml"));
-    $player_rating_ftp = stripslashes(check_html($playerinfo['r_ftp'], "nohtml"));
-    $player_rating_3ga = stripslashes(check_html($playerinfo['r_tga'], "nohtml"));
-    $player_rating_3gp = stripslashes(check_html($playerinfo['r_tgp'], "nohtml"));
-    $player_rating_orb = stripslashes(check_html($playerinfo['r_orb'], "nohtml"));
-    $player_rating_drb = stripslashes(check_html($playerinfo['r_drb'], "nohtml"));
-    $player_rating_ast = stripslashes(check_html($playerinfo['r_ast'], "nohtml"));
-    $player_rating_stl = stripslashes(check_html($playerinfo['r_stl'], "nohtml"));
-    $player_rating_tvr = stripslashes(check_html($playerinfo['r_to'], "nohtml"));
-    $player_rating_blk = stripslashes(check_html($playerinfo['r_blk'], "nohtml"));
-    $player_rating_oo = stripslashes(check_html($playerinfo['oo'], "nohtml"));
-    $player_rating_do = stripslashes(check_html($playerinfo['do'], "nohtml"));
-    $player_rating_po = stripslashes(check_html($playerinfo['po'], "nohtml"));
-    $player_rating_to = stripslashes(check_html($playerinfo['to'], "nohtml"));
-    $player_rating_od = stripslashes(check_html($playerinfo['od'], "nohtml"));
-    $player_rating_dd = stripslashes(check_html($playerinfo['dd'], "nohtml"));
-    $player_rating_pd = stripslashes(check_html($playerinfo['pd'], "nohtml"));
-    $player_rating_td = stripslashes(check_html($playerinfo['td'], "nohtml"));
-    $player_rating_foul = stripslashes(check_html($playerinfo['r_foul'], "nohtml"));
+    $year = $player->draftYear + $player->yearsOfExperience;
 
     $stats_gm = stripslashes(check_html($playerinfo['stats_gm'], "nohtml"));
     $stats_min = stripslashes(check_html($playerinfo['stats_min'], "nohtml"));
@@ -1091,31 +1042,22 @@ function showpage($pid, $spec)
     @$stats_fpg = ($stats_pf / $stats_gm);
     @$stats_ppg = ($stats_pts / $stats_gm);
 
-    $player_bird = stripslashes(check_html($playerinfo['bird'], "nohtml"));
-    $yearOfCurrentContract = stripslashes(check_html($playerinfo['cy'], "nohtml"));
-    $salaryIn1stYearOfCurrentContract = stripslashes(check_html($playerinfo['cy1'], "nohtml"));
-    $salaryIn2ndYearOfCurrentContract = stripslashes(check_html($playerinfo['cy2'], "nohtml"));
-    $salaryIn3rdYearOfCurrentContract = stripslashes(check_html($playerinfo['cy3'], "nohtml"));
-    $salaryIn4thYearOfCurrentContract = stripslashes(check_html($playerinfo['cy4'], "nohtml"));
-    $salaryIn5thYearOfCurrentContract = stripslashes(check_html($playerinfo['cy5'], "nohtml"));
-    $salaryIn6thYearOfCurrentContract = stripslashes(check_html($playerinfo['cy6'], "nohtml"));
-
     // CONTRACT FORMATTER
 
     $can_renegotiate = 0;
 
-    if ($yearOfCurrentContract == 1 OR $yearOfCurrentContract == 0) {
-        $contract_display = $salaryIn1stYearOfCurrentContract;
-        if ($salaryIn2ndYearOfCurrentContract != 0) {
-            $contract_display .=  "/" . $salaryIn2ndYearOfCurrentContract;
-            if ($salaryIn3rdYearOfCurrentContract != 0) {
-                $contract_display .=  "/" . $salaryIn3rdYearOfCurrentContract;
-                if ($salaryIn4thYearOfCurrentContract != 0) {
-                    $contract_display .=  "/" . $salaryIn4thYearOfCurrentContract;
-                    if ($salaryIn5thYearOfCurrentContract != 0) {
-                        $contract_display .=  "/" . $salaryIn5thYearOfCurrentContract;
-                        if ($salaryIn6thYearOfCurrentContract != 0) {
-                            $contract_display .=  "/" . $salaryIn6thYearOfCurrentContract;
+    if ($player->contractCurrentYear == 1 OR $player->contractCurrentYear == 0) {
+        $contract_display = $player->contractYear1Salary;
+        if ($player->contractYear2Salary != 0) {
+            $contract_display .=  "/" . $player->contractYear2Salary;
+            if ($player->contractYear3Salary != 0) {
+                $contract_display .=  "/" . $player->contractYear3Salary;
+                if ($player->contractYear4Salary != 0) {
+                    $contract_display .=  "/" . $player->contractYear4Salary;
+                    if ($player->contractYear5Salary != 0) {
+                        $contract_display .=  "/" . $player->contractYear5Salary;
+                        if ($player->contractYear6Salary != 0) {
+                            $contract_display .=  "/" . $player->contractYear6Salary;
                         }
                     }
                 }
@@ -1123,54 +1065,54 @@ function showpage($pid, $spec)
         } else {
             $can_renegotiate = 1;
         }
-    } elseif ($yearOfCurrentContract == 2) {
-        $contract_display = $salaryIn2ndYearOfCurrentContract;
-        if ($salaryIn3rdYearOfCurrentContract != 0) {
-            $contract_display .=  "/" . $salaryIn3rdYearOfCurrentContract;
-            if ($salaryIn4thYearOfCurrentContract != 0) {
-                $contract_display .=  "/" . $salaryIn4thYearOfCurrentContract;
-                if ($salaryIn5thYearOfCurrentContract != 0) {
-                    $contract_display .=  "/" . $salaryIn5thYearOfCurrentContract;
-                    if ($salaryIn6thYearOfCurrentContract != 0) {
-                        $contract_display .=  "/" . $salaryIn6thYearOfCurrentContract;
+    } elseif ($player->contractCurrentYear == 2) {
+        $contract_display = $player->contractYear2Salary;
+        if ($player->contractYear3Salary != 0) {
+            $contract_display .=  "/" . $player->contractYear3Salary;
+            if ($player->contractYear4Salary != 0) {
+                $contract_display .=  "/" . $player->contractYear4Salary;
+                if ($player->contractYear5Salary != 0) {
+                    $contract_display .=  "/" . $player->contractYear5Salary;
+                    if ($player->contractYear6Salary != 0) {
+                        $contract_display .=  "/" . $player->contractYear6Salary;
                     }
                 }
             }
         } else {
             $can_renegotiate = 1;
         }
-    } elseif ($yearOfCurrentContract == 3) {
-        $contract_display = $salaryIn3rdYearOfCurrentContract;
-        if ($salaryIn4thYearOfCurrentContract != 0) {
-            $contract_display .=  "/" . $salaryIn4thYearOfCurrentContract;
-            if ($salaryIn5thYearOfCurrentContract != 0) {
-                $contract_display .=  "/" . $salaryIn5thYearOfCurrentContract;
-                if ($salaryIn6thYearOfCurrentContract != 0) {
-                    $contract_display .=  "/" . $salaryIn6thYearOfCurrentContract;
+    } elseif ($player->contractCurrentYear == 3) {
+        $contract_display = $player->contractYear3Salary;
+        if ($player->contractYear4Salary != 0) {
+            $contract_display .=  "/" . $player->contractYear4Salary;
+            if ($player->contractYear5Salary != 0) {
+                $contract_display .=  "/" . $player->contractYear5Salary;
+                if ($player->contractYear6Salary != 0) {
+                    $contract_display .=  "/" . $player->contractYear6Salary;
                 }
             }
         } else {
             $can_renegotiate = 1;
         }
-    } elseif ($yearOfCurrentContract == 4) {
-        $contract_display = $salaryIn4thYearOfCurrentContract;
-        if ($salaryIn5thYearOfCurrentContract != 0) {
-            $contract_display .=  "/" . $salaryIn5thYearOfCurrentContract;
-            if ($salaryIn6thYearOfCurrentContract != 0) {
-                $contract_display .=  "/" . $salaryIn6thYearOfCurrentContract;
+    } elseif ($player->contractCurrentYear == 4) {
+        $contract_display = $player->contractYear4Salary;
+        if ($player->contractYear5Salary != 0) {
+            $contract_display .=  "/" . $player->contractYear5Salary;
+            if ($player->contractYear6Salary != 0) {
+                $contract_display .=  "/" . $player->contractYear6Salary;
             }
         } else {
             $can_renegotiate = 1;
         }
-    } elseif ($yearOfCurrentContract == 5) {
-        $contract_display = $salaryIn5thYearOfCurrentContract;
-        if ($salaryIn6thYearOfCurrentContract != 0) {
-            $contract_display .=  "/" . $salaryIn6thYearOfCurrentContract;
+    } elseif ($player->contractCurrentYear == 5) {
+        $contract_display = $player->contractYear5Salary;
+        if ($player->contractYear6Salary != 0) {
+            $contract_display .=  "/" . $player->contractYear6Salary;
         } else {
             $can_renegotiate = 1;
         }
-    } elseif ($yearOfCurrentContract == 6) {
-        $contract_display = $salaryIn6thYearOfCurrentContract;
+    } elseif ($player->contractCurrentYear == 6) {
+        $contract_display = $player->contractYear6Salary;
         $can_renegotiate = 1;
     } else {
         $contract_display = "not under contract";
@@ -1189,17 +1131,17 @@ function showpage($pid, $spec)
 
     echo "<table>
         <tr>
-            <td valign=top><font class=\"title\">$player_pos $player_name ";
+            <td valign=top><font class=\"title\">$player->position $player->name ";
 
-    if ($player_nickname != null) {
-        echo "- Nickname: \"$player_nickname\" ";
+    if ($player->nickname != NULL) {
+        echo "- Nickname: \"$player->nickname\" ";
     }
 
-    echo "(<a href=\"modules.php?name=Team&op=team&tid=$player_team_id\">$player_team_name</a>)</font>
+    echo "(<a href=\"modules.php?name=Team&op=team&tid=$player->teamID\">$player->teamName</a>)</font>
         <hr>
         <table>
             <tr>
-                <td valign=center><img src=\"images/player/$pid.jpg\" height=\"90\" width=\"65\"></td>
+                <td valign=center><img src=\"images/player/$playerID.jpg\" height=\"90\" width=\"65\"></td>
                 <td>";
 
     // RENEGOTIATION BUTTON START
@@ -1211,8 +1153,8 @@ function showpage($pid, $spec)
     $userinfo = $db->sql_fetchrow($result2);
 
     $userteam = stripslashes(check_html($userinfo['user_ibl_team'], "nohtml"));
-    if (($player_exp == 4 and $player_draft_round == 1 and 2 * $salaryIn3rdYearOfCurrentContract == $salaryIn4thYearOfCurrentContract and $salaryIn4thYearOfCurrentContract != 0) or
-        ($player_exp == 3 and $player_draft_round == 2 and 2 * $salaryIn2ndYearOfCurrentContract == $salaryIn3rdYearOfCurrentContract and $salaryIn3rdYearOfCurrentContract != 0)) {
+    if (($player->yearsOfExperience == 4 and $player->draftRound == 1 and 2 * $player->contractYear3Salary == $player->contractYear4Salary and $player->contractYear4Salary != 0) or
+        ($player->yearsOfExperience == 3 and $player->draftRound == 2 and 2 * $player->contractYear2Salary == $player->contractYear3Salary and $player->contractYear3Salary != 0)) {
         echo "<table align=right bgcolor=#ff0000>
                 <tr>
                     <td align=center>ROOKIE OPTION<br>USED; RENEGOTIATION<br>IMPOSSIBLE</td>
@@ -1231,32 +1173,32 @@ function showpage($pid, $spec)
         $can_renegotiate == 1 and
         $currentSeasonPhase != 'Draft' and
         $currentSeasonPhase != 'Free Agency' and
-        $player_team_name == $userteam) {
+        $player->teamName == $userteam) {
         echo "<table align=right bgcolor=#ff0000>
                 <tr>
-                    <td align=center><a href=\"modules.php?name=Player&pa=negotiate&pid=$pid\">RENEGOTIATE<BR>CONTRACT</a></td>
+                    <td align=center><a href=\"modules.php?name=Player&pa=negotiate&pid=$playerID\">RENEGOTIATE<BR>CONTRACT</a></td>
                 </tr>
             </table>";
     }
 
     // RENEGOTIATION BUTTON END
 
-    if ((((($player_draft_round == 1 && $player_exp == 2 && $salaryIn4thYearOfCurrentContract == 0) or
-        ($player_draft_round == 2 && $player_exp == 1 && $salaryIn3rdYearOfCurrentContract == 0)) and
+    if ((((($player->draftRound == 1 && $player->yearsOfExperience == 2 && $player->contractYear4Salary == 0) or
+        ($player->draftRound == 2 && $player->yearsOfExperience == 1 && $player->contractYear3Salary == 0)) and
         $seasonPhase == "Free Agency") or
-        (($player_draft_round == 1 && $player_exp == 3 && $salaryIn4thYearOfCurrentContract == 0) or
-            ($player_draft_round == 2 && $player_exp == 2 && $salaryIn3rdYearOfCurrentContract == 0)) and
+        (($player->draftRound == 1 && $player->yearsOfExperience == 3 && $player->contractYear4Salary == 0) or
+            ($player->draftRound == 2 && $player->yearsOfExperience == 2 && $player->contractYear3Salary == 0)) and
         ($seasonPhase == "Preseason" or $seasonPhase == "HEAT")) and
-        $userteam == $player_team_name) {
+        $player->teamName == $userteam) {
         echo "<table align=right bgcolor=#ffbb00>
                 <tr>
-                    <td align=center><a href=\"modules.php?name=Player&pa=rookieoption&pid=$pid\">ROOKIE<BR>OPTION</a></td>
+                    <td align=center><a href=\"modules.php?name=Player&pa=rookieoption&pid=$playerID\">ROOKIE<BR>OPTION</a></td>
                 </tr>
             </table>";
     }
 
-    echo "<font class=\"content\">Age: $player_age | Height: $player_ht_ft-$player_ht_in | Weight: $player_wt | College: $player_college<br>
-        <i>Drafted by the $player_drafted_by with the # $player_draft_pick pick of round $player_draft_round in the <a href=\"draft.php?year=$player_draft_year\">$player_draft_year Draft</a></i><br>
+    echo "<font class=\"content\">Age: $player->age | Height: $player->heightFeet-$player->heightInches | Weight: $player->weightPounds | College: $player->collegeName<br>
+        <i>Drafted by the $player->draftTeamOriginalName with the # $player->draftPickNumber pick of round $player->draftRound in the <a href=\"draft.php?year=$player->draftYear\">$player->draftYear Draft</a></i><br>
         <center><table>
             <tr>
                 <td align=center><b>2ga</b></td>
@@ -1282,30 +1224,30 @@ function showpage($pid, $spec)
                 <td align=center><b>td</b></td>
             </tr>
             <tr>
-                <td align=center>$player_rating_2ga</td>
-                <td align=center>$player_rating_2gp</td>
-                <td align=center>$player_rating_fta</td>
-                <td align=center>$player_rating_ftp</td>
-                <td align=center>$player_rating_3ga</td>
-                <td align=center>$player_rating_3gp</td>
-                <td align=center>$player_rating_orb</td>
-                <td align=center>$player_rating_drb</td>
-                <td align=center>$player_rating_ast</td>
-                <td align=center>$player_rating_stl</td>
-                <td align=center>$player_rating_tvr</td>
-                <td align=center>$player_rating_blk</td>
-                <td align=center>$player_rating_foul</td>
-                <td align=center>$player_rating_oo</td>
-                <td align=center>$player_rating_do</td>
-                <td align=center>$player_rating_po</td>
-                <td align=center>$player_rating_to</td>
-                <td align=center>$player_rating_od</td>
-                <td align=center>$player_rating_dd</td>
-                <td align=center>$player_rating_pd</td>
-                <td align=center>$player_rating_td</td>
+                <td align=center>$player->ratingFieldGoalAttempts</td>
+                <td align=center>$player->ratingFieldGoalPercentage</td>
+                <td align=center>$player->ratingFreeThrowAttempts</td>
+                <td align=center>$player->ratingFreeThrowPercentage</td>
+                <td align=center>$player->ratingThreePointAttempts</td>
+                <td align=center>$player->ratingThreePointPercentage</td>
+                <td align=center>$player->ratingOffensiveRebounds</td>
+                <td align=center>$player->ratingDefensiveRebounds</td>
+                <td align=center>$player->ratingAssists</td>
+                <td align=center>$player->ratingSteals</td>
+                <td align=center>$player->ratingTurnovers</td>
+                <td align=center>$player->ratingBlocks</td>
+                <td align=center>$player->ratingFouls</td>
+                <td align=center>$player->ratingOutsideOffense</td>
+                <td align=center>$player->ratingDriveOffense</td>
+                <td align=center>$player->ratingPostOffense</td>
+                <td align=center>$player->ratingTransitionOffense</td>
+                <td align=center>$player->ratingOutsideDefense</td>
+                <td align=center>$player->ratingDriveDefense</td>
+                <td align=center>$player->ratingPostDefense</td>
+                <td align=center>$player->ratingTransitionDefense</td>
             </tr>
         </table></center>
-    <b>BIRD YEARS:</b> $player_bird | <b>Remaining Contract:</b> $contract_display </td>";
+    <b>BIRD YEARS:</b> $player->birdYears | <b>Remaining Contract:</b> $contract_display </td>";
 
     if ($spec == null) {
         // ==== PLAYER SEASON AND CAREER HIGHS ====
@@ -1434,12 +1376,12 @@ function showpage($pid, $spec)
     <tr>
         <td colspan=2><b><center>PLAYER MENU</center></b><br>
             <center>
-            <a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">Player Overview</a> | <a href=\"modules.php?name=Player&pa=showpage&pid=$pid&spec=1\">Bio (Awards, News)</a><br>
-            <a href=\"modules.php?name=Player&pa=showpage&pid=$pid&spec=2\">One-on-one Results</a> | <a href=\"modules.php?name=Player&pa=showpage&pid=$pid&spec=10\">Season Sim Stats</a> | <a href=\"modules.php?name=Player&pa=showpage&pid=$pid&spec=0\">Game Log</font></a><br>
-            <a href=\"modules.php?name=Player&pa=showpage&pid=$pid&spec=3\">Regular-Season Totals</a> | <a href=\"modules.php?name=Player&pa=showpage&pid=$pid&spec=4\">Regular-Season Averages</a><br>
-            <a href=\"modules.php?name=Player&pa=showpage&pid=$pid&spec=5\">Playoff Totals</a> | <a href=\"modules.php?name=Player&pa=showpage&pid=$pid&spec=6\">Playoff Averages</a><br>
-            <a href=\"modules.php?name=Player&pa=showpage&pid=$pid&spec=7\">H.E.A.T. Totals</a> | <a href=\"modules.php?name=Player&pa=showpage&pid=$pid&spec=8\">H.E.A.T. Averages</a><br>
-            <a href=\"modules.php?name=Player&pa=showpage&pid=$pid&spec=9\">Ratings and Salary History</a>
+            <a href=\"modules.php?name=Player&pa=showpage&pid=$playerID\">Player Overview</a> | <a href=\"modules.php?name=Player&pa=showpage&pid=$playerID&spec=1\">Bio (Awards, News)</a><br>
+            <a href=\"modules.php?name=Player&pa=showpage&pid=$playerID&spec=2\">One-on-one Results</a> | <a href=\"modules.php?name=Player&pa=showpage&pid=$playerID&spec=10\">Season Sim Stats</a> | <a href=\"modules.php?name=Player&pa=showpage&pid=$playerID&spec=0\">Game Log</font></a><br>
+            <a href=\"modules.php?name=Player&pa=showpage&pid=$playerID&spec=3\">Regular-Season Totals</a> | <a href=\"modules.php?name=Player&pa=showpage&pid=$playerID&spec=4\">Regular-Season Averages</a><br>
+            <a href=\"modules.php?name=Player&pa=showpage&pid=$playerID&spec=5\">Playoff Totals</a> | <a href=\"modules.php?name=Player&pa=showpage&pid=$playerID&spec=6\">Playoff Averages</a><br>
+            <a href=\"modules.php?name=Player&pa=showpage&pid=$playerID&spec=7\">H.E.A.T. Totals</a> | <a href=\"modules.php?name=Player&pa=showpage&pid=$playerID&spec=8\">H.E.A.T. Averages</a><br>
+            <a href=\"modules.php?name=Player&pa=showpage&pid=$playerID&spec=9\">Ratings and Salary History</a>
             </center>
         </td>
     </tr>
@@ -1458,14 +1400,14 @@ function showpage($pid, $spec)
                     <th colspan=2><center>All-Star Activity</center></th>
         </tr>";
 
-        $allstarquery = $db->sql_query("SELECT * FROM ibl_awards WHERE name='$player_name' AND Award LIKE '%Conference All-Star'");
+        $allstarquery = $db->sql_query("SELECT * FROM ibl_awards WHERE name='$player->name' AND Award LIKE '%Conference All-Star'");
         $asg = $db->sql_numrows($allstarquery);
         echo "<tr>
             <td><b>All Star Games:</b></td>
             <td>$asg</td>
         </tr>";
 
-        $allstarquery2 = $db->sql_query("SELECT * FROM ibl_awards WHERE name='$player_name' AND Award LIKE 'Three-Point Contest%'");
+        $allstarquery2 = $db->sql_query("SELECT * FROM ibl_awards WHERE name='$player->name' AND Award LIKE 'Three-Point Contest%'");
         $threepointcontests = $db->sql_numrows($allstarquery2);
 
         echo "<tr>
@@ -1473,7 +1415,7 @@ function showpage($pid, $spec)
             <td>$threepointcontests</td>
         </tr>";
 
-        $allstarquery3 = $db->sql_query("SELECT * FROM ibl_awards WHERE name='$player_name' AND Award LIKE 'Slam Dunk Competition%'");
+        $allstarquery3 = $db->sql_query("SELECT * FROM ibl_awards WHERE name='$player->name' AND Award LIKE 'Slam Dunk Competition%'");
         $dunkcontests = $db->sql_numrows($allstarquery3);
 
         echo "<tr>
@@ -1481,7 +1423,7 @@ function showpage($pid, $spec)
             <td>$dunkcontests</td>
         </tr>";
 
-        $allstarquery4 = $db->sql_query("SELECT * FROM ibl_awards WHERE name='$player_name' AND Award LIKE 'Rookie-Sophomore Challenge'");
+        $allstarquery4 = $db->sql_query("SELECT * FROM ibl_awards WHERE name='$player->name' AND Award LIKE 'Rookie-Sophomore Challenge'");
         $rooksoph = $db->sql_numrows($allstarquery4);
 
         echo "<tr>
@@ -1502,11 +1444,11 @@ function showpage($pid, $spec)
                 <td><b>Consistency</b></td>
             </tr>
             <tr align=center>
-                <td>$player_talent</td>
-                <td>$player_skill</td>
-                <td>$player_intangibles</td>
-                <td>$player_clutch</td>
-                <td>$player_consistency</td>
+                <td>$player->ratingTalent</td>
+                <td>$player->ratingSkill</td>
+                <td>$player->ratingIntangibles</td>
+                <td>$player->ratingClutch</td>
+                <td>$player->ratingConsistency</td>
             </tr>
         </table>
         <table>
@@ -1515,16 +1457,14 @@ function showpage($pid, $spec)
                 <td><b>Play for Winner</b></td>
                 <td><b>Playing Time</b></td>
                 <td><b>Security</b></td>
-                <td><b>Coach</b></td>
                 <td><b>Tradition</b></td>
             </tr>
             <tr align=center>
-                <td>$player_loyalty</td>
-                <td>$player_winner</td>
-                <td>$player_playingtime</td>
-                <td>$player_security</td>
-                <td>$player_coach</td>
-                <td>$player_tradition</td>
+                <td>$player->freeAgencyLoyalty</td>
+                <td>$player->freeAgencyPlayForWinner</td>
+                <td>$player->freeAgencyPlayingTime</td>
+                <td>$player->freeAgencySecurity</td>
+                <td>$player->freeAgencyTradition</td>
             </tr>
         </table>
         </center>
@@ -1568,7 +1508,7 @@ function showpage($pid, $spec)
 
             $resultPlayerSimBoxScores = $db->sql_query("SELECT *
                 FROM ibl_box_scores
-                WHERE pid = $pid
+                WHERE pid = $playerID
                 AND Date BETWEEN '$simStartDate' AND '$simEndDate'
                 ORDER BY Date ASC");
 
@@ -1672,7 +1612,7 @@ function showpage($pid, $spec)
                         <td>pts</td>
                     </tr>";
 
-        $result44 = $db->sql_query("SELECT * FROM ibl_hist WHERE pid=$pid ORDER BY year ASC");
+        $result44 = $db->sql_query("SELECT * FROM ibl_hist WHERE pid=$playerID ORDER BY year ASC");
 
         while ($row44 = $db->sql_fetchrow($result44)) {
             $hist_year = stripslashes(check_html($row44['year'], "nohtml"));
@@ -1735,9 +1675,9 @@ function showpage($pid, $spec)
 
         // CURRENT YEAR TOTALS
 
-        if ($player_retired <= 0) {
+        if ($player->isRetired <= 0) {
             echo "<td><center>$year</center></td>
-                <td><center>$player_team_name</center></td>
+                <td><center>$player->teamName</center></td>
                 <td><center>$stats_gm</center></td>
                 <td><center>$stats_min</center></td>
                 <td><center>$stats_fgm-$stats_fga</center></td>
@@ -1838,7 +1778,7 @@ function showpage($pid, $spec)
         $car_gm = $car_min = $car_fgm = $car_fga = $car_ftm = $car_fta = $car_3gm = $car_3ga = 0;
         $car_orb = $car_reb = $car_ast = $car_stl = $car_blk = $car_tvr = $car_pf = $car_pts = 0;
 
-        $result44 = $db->sql_query("SELECT * FROM ibl_hist WHERE pid=$pid ORDER BY year ASC");
+        $result44 = $db->sql_query("SELECT * FROM ibl_hist WHERE pid=$playerID ORDER BY year ASC");
         while ($row44 = $db->sql_fetchrow($result44)) {
             $hist_year = stripslashes(check_html($row44['year'], "nohtml"));
             $hist_team = stripslashes(check_html($row44['team'], "nohtml"));
@@ -1940,12 +1880,12 @@ function showpage($pid, $spec)
         // CURRENT YEAR AVERAGES
         $retired = $db->sql_result($db->sql_query("SELECT retired
             FROM ibl_plr
-            WHERE pid=$pid;"), 0);
+            WHERE pid=$playerID;"), 0);
 
         if ($retired != 1) {
             echo "<tr align=center>
                 <td><center>$year</center></td>
-                <td><center>$player_team_name</center></td>
+                <td><center>$player->teamName</center></td>
                 <td><center>$stats_gm</center></td>
                 <td><center>";
             printf('%01.1f', $stats_mpg);
@@ -2096,7 +2036,7 @@ function showpage($pid, $spec)
                 <td>pts</td>
             </tr>";
 
-        $resultplayoff4 = $db->sql_query("SELECT * FROM ibl_playoff_stats WHERE name='$player_name' ORDER BY year ASC");
+        $resultplayoff4 = $db->sql_query("SELECT * FROM ibl_playoff_stats WHERE name='$player->name' ORDER BY year ASC");
         while ($rowplayoff4 = $db->sql_fetchrow($resultplayoff4)) {
             $hist_year = stripslashes(check_html($rowplayoff4['year'], "nohtml"));
             $hist_team = stripslashes(check_html($rowplayoff4['team'], "nohtml"));
@@ -2217,7 +2157,7 @@ function showpage($pid, $spec)
         $car_gm = $car_min = $car_fgm = $car_fga = $car_ftm = $car_fta = $car_3gm = $car_3ga = 0;
         $car_orb = $car_reb = $car_ast = $car_stl = $car_blk = $car_tvr = $car_pf = $car_pts = 0;
 
-        $resultplayoff4 = $db->sql_query("SELECT * FROM ibl_playoff_stats WHERE name='$player_name' ORDER BY year ASC");
+        $resultplayoff4 = $db->sql_query("SELECT * FROM ibl_playoff_stats WHERE name='$player->name' ORDER BY year ASC");
         while ($rowplayoff4 = $db->sql_fetchrow($resultplayoff4)) {
             $hist_year = stripslashes(check_html($rowplayoff4['year'], "nohtml"));
             $hist_team = stripslashes(check_html($rowplayoff4['team'], "nohtml"));
@@ -2374,7 +2314,7 @@ function showpage($pid, $spec)
                 <td>pts</td>
             </tr>";
 
-        $resultplayoff4 = $db->sql_query("SELECT * FROM ibl_heat_stats WHERE name='$player_name' ORDER BY year ASC");
+        $resultplayoff4 = $db->sql_query("SELECT * FROM ibl_heat_stats WHERE name='$player->name' ORDER BY year ASC");
         while ($rowplayoff4 = $db->sql_fetchrow($resultplayoff4)) {
             $hist_year = stripslashes(check_html($rowplayoff4['year'], "nohtml"));
             $hist_team = stripslashes(check_html($rowplayoff4['team'], "nohtml"));
@@ -2494,7 +2434,7 @@ function showpage($pid, $spec)
         $car_gm = $car_min = $car_fgm = $car_fga = $car_ftm = $car_fta = $car_3gm = $car_3ga = 0;
         $car_orb = $car_reb = $car_ast = $car_stl = $car_blk = $car_tvr = $car_pf = $car_pts = 0;
 
-        $resultplayoff4 = $db->sql_query("SELECT * FROM ibl_heat_stats WHERE name='$player_name' ORDER BY year ASC");
+        $resultplayoff4 = $db->sql_query("SELECT * FROM ibl_heat_stats WHERE name='$player->name' ORDER BY year ASC");
         while ($rowplayoff4 = $db->sql_fetchrow($resultplayoff4)) {
             $hist_year = stripslashes(check_html($rowplayoff4['year'], "nohtml"));
             $hist_team = stripslashes(check_html($rowplayoff4['team'], "nohtml"));
@@ -2659,7 +2599,7 @@ function showpage($pid, $spec)
 
         $totalsalary = 0;
 
-        $result44 = $db->sql_query("SELECT * FROM ibl_hist WHERE pid=$pid ORDER BY year ASC");
+        $result44 = $db->sql_query("SELECT * FROM ibl_hist WHERE pid=$playerID ORDER BY year ASC");
         while ($row44 = $db->sql_fetchrow($result44)) {
             $r_year = stripslashes(check_html($row44['year'], "nohtml"));
             $r_2ga = stripslashes(check_html($row44['r_2ga'], "nohtml"));
@@ -2729,7 +2669,7 @@ function showpage($pid, $spec)
     if ($spec == 1) {
         // START AWARDS SCRIPT
 
-        $awardsquery = $db->sql_query("SELECT * FROM ibl_awards WHERE name='$player_name' ORDER BY year ASC");
+        $awardsquery = $db->sql_query("SELECT * FROM ibl_awards WHERE name='$player->name' ORDER BY year ASC");
 
         echo "<table border=1 cellspacing=0 cellpadding=0 valign=top>
             <tr>
@@ -2755,7 +2695,7 @@ function showpage($pid, $spec)
         <tr>
             <td>";
 
-        $urlwanted = str_replace(" ", "%20", $player_name);
+        $urlwanted = str_replace(" ", "%20", $player->name);
 
         readfile("http://iblhoops.net/ibl5/articles.php?player=$urlwanted"); // Relative URL paths don't seem to work for this
 
@@ -2771,11 +2711,11 @@ function showpage($pid, $spec)
         <tr>
             <td>";
 
-        //$oneononeurlwanted=str_replace(" ", "%20", $player_name);
+        //$oneononeurlwanted=str_replace(" ", "%20", $player->name);
 
         //echo (readfile("online/1on1results.php?player=$oneononeurlwanted"));
 
-        $player2 = str_replace("%20", " ", $player_name);
+        $player2 = str_replace("%20", " ", $player->name);
 
         $query = "SELECT * FROM ibl_one_on_one WHERE winner = '$player2' ORDER BY gameid ASC";
         $result = $db->sql_query($query);
@@ -2829,9 +2769,9 @@ function showpage($pid, $spec)
         $currentSeasonStaringYear = $currentSeasonEndingYear - 1;
 
         if ($seasonPhase == "Preseason") {
-            $query = "SELECT * FROM ibl_box_scores WHERE Date BETWEEN '$currentSeasonStaringYear-09-01' AND '$currentSeasonEndingYear-07-01' AND pid = $pid ORDER BY Date ASC";
+            $query = "SELECT * FROM ibl_box_scores WHERE Date BETWEEN '$currentSeasonStaringYear-09-01' AND '$currentSeasonEndingYear-07-01' AND pid = $playerID ORDER BY Date ASC";
         } else {
-            $query = "SELECT * FROM ibl_box_scores WHERE Date BETWEEN '$currentSeasonStaringYear-10-01' AND '$currentSeasonEndingYear-07-01' AND pid = $pid ORDER BY Date ASC";
+            $query = "SELECT * FROM ibl_box_scores WHERE Date BETWEEN '$currentSeasonStaringYear-10-01' AND '$currentSeasonEndingYear-07-01' AND pid = $playerID ORDER BY Date ASC";
         }
         $result = $db->sql_query($query);
         $num = $db->sql_numrows($result);

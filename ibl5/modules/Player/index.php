@@ -762,7 +762,6 @@ function search()
             $age = $db->sql_result($result, $i, "age");
             $teamname = $db->sql_result($result, $i, "teamname");
             $college = $db->sql_result($result, $i, "college");
-            $collegeid = $db->sql_result($result, $i, "collegeid");
             $exp = $db->sql_result($result, $i, "exp");
             $bird = $db->sql_result($result, $i, "bird");
 

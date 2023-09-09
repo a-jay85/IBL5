@@ -47,7 +47,6 @@ if ($num == 0) {
         $round = $db->sql_result($result, $i, "draftround");
         $draftpickno = $db->sql_result($result, $i, "draftpickno");
         $college = $db->sql_result($result, $i, "college");
-        $collegeid = $db->sql_result($result, $i, "collegeid");
 
         if ($i % 2) {
             echo "<tr bgcolor=#ffffff>";

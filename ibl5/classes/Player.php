@@ -21,8 +21,8 @@ class Player
     public $ratingFreeThrowPercentage;
     public $ratingThreePointAttempts;
     public $ratingThreePointPercentage;
-    public $ratingOffensiveRebounding;
-    public $ratingDefensiveRebounding;
+    public $ratingOffensiveRebounds;
+    public $ratingDefensiveRebounds;
     public $ratingAssists;
     public $ratingSteals;
     public $ratingTurnovers;
@@ -101,8 +101,8 @@ class Player
         $this->ratingFreeThrowPercentage = $plr['r_ftp'];
         $this->ratingThreePointAttempts = $plr['r_tga'];
         $this->ratingThreePointPercentage = $plr['r_tgp'];
-        $this->ratingOffensiveRebounding = $plr['r_orb'];
-        $this->ratingDefensiveRebounding = $plr['r_drb'];
+        $this->ratingOffensiveRebounds = $plr['r_orb'];
+        $this->ratingDefensiveRebounds = $plr['r_drb'];
         $this->ratingAssists = $plr['r_ast'];
         $this->ratingSteals = $plr['r_stl'];
         $this->ratingTurnovers = $plr['r_to'];

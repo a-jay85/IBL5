@@ -42,6 +42,12 @@ function scoParser($uploadedFilePath, $seasonEndingYear, $seasonPhase)
         $gameOfThatDay = substr($line, 4, 2) + 1;
         $visitorTID = substr($line, 6, 2) + 1;
         $homeTID = substr($line, 8, 2) + 1;
+        $attendance = substr($line, 10, 5);
+        $capacity = substr($line, 15, 5);
+        $visitorWins = substr($line, 20, 2);
+        $visitorLosses = substr($line, 22, 2);
+        $homeWins = substr($line, 24, 2);
+        $homeLosses = substr($line, 26, 2);
         $visitorQ1pts = substr($line, 28, 3);
         $visitorQ2pts = substr($line, 31, 3);
         $visitorQ3pts = substr($line, 34, 3);

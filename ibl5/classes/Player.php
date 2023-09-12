@@ -174,4 +174,40 @@ class Player
     
         $this->timeDroppedOnWaivers = $plrRow['droptime'];
     }
+
+    public function canRenegotiateContract()
+    {
+        if (
+            (($this->contractCurrentYear == 0 OR $this->contractCurrentYear == 1) AND $this->contractYear2Salary == 0)
+            OR $this->contractCurrentYear == 1 AND $this->contractYear2Salary == 0
+            OR $this->contractCurrentYear == 2 AND $this->contractYear3Salary == 0
+            OR $this->contractCurrentYear == 3 AND $this->contractYear4Salary == 0
+            OR $this->contractCurrentYear == 4 AND $this->contractYear5Salary == 0
+            OR $this->contractCurrentYear == 5 AND $this->contractYear6Salary == 0
+            OR $this->contractCurrentYear == 6
+        ) {
+            return TRUE;
+        }
+        
+        return FALSE;
+    }
+
+    public function wasRookieOptioned()
+    {
+        if ((
+            $this->yearsOfExperience == 4 
+            AND $this->draftRound == 1
+            AND $this->contractYear4Salary != 0
+            AND 2 * $this->contractYear3Salary == $this->contractYear4Salary
+        ) OR (
+            $this->yearsOfExperience == 3
+            AND $this->draftRound == 2
+            AND $this->contractYear3Salary != 0
+            AND 2 * $this->contractYear2Salary == $this->contractYear3Salary
+        )) {
+            return TRUE;
+        }
+
+        return FALSE;
+    }
 }

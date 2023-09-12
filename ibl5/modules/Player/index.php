@@ -1044,8 +1044,6 @@ function showpage($playerID, $spec)
 
     // CONTRACT FORMATTER
 
-    $can_renegotiate = 0;
-
     if ($player->contractCurrentYear == 1 OR $player->contractCurrentYear == 0) {
         $contract_display = $player->contractYear1Salary;
         if ($player->contractYear2Salary != 0) {
@@ -1062,8 +1060,6 @@ function showpage($playerID, $spec)
                     }
                 }
             }
-        } else {
-            $can_renegotiate = 1;
         }
     } elseif ($player->contractCurrentYear == 2) {
         $contract_display = $player->contractYear2Salary;
@@ -1078,8 +1074,6 @@ function showpage($playerID, $spec)
                     }
                 }
             }
-        } else {
-            $can_renegotiate = 1;
         }
     } elseif ($player->contractCurrentYear == 3) {
         $contract_display = $player->contractYear3Salary;
@@ -1091,8 +1085,6 @@ function showpage($playerID, $spec)
                     $contract_display .=  "/" . $player->contractYear6Salary;
                 }
             }
-        } else {
-            $can_renegotiate = 1;
         }
     } elseif ($player->contractCurrentYear == 4) {
         $contract_display = $player->contractYear4Salary;
@@ -1101,19 +1093,14 @@ function showpage($playerID, $spec)
             if ($player->contractYear6Salary != 0) {
                 $contract_display .=  "/" . $player->contractYear6Salary;
             }
-        } else {
-            $can_renegotiate = 1;
         }
     } elseif ($player->contractCurrentYear == 5) {
         $contract_display = $player->contractYear5Salary;
         if ($player->contractYear6Salary != 0) {
             $contract_display .=  "/" . $player->contractYear6Salary;
-        } else {
-            $can_renegotiate = 1;
         }
     } elseif ($player->contractCurrentYear == 6) {
         $contract_display = $player->contractYear6Salary;
-        $can_renegotiate = 1;
     } else {
         $contract_display = "not under contract";
     }
@@ -1153,14 +1140,12 @@ function showpage($playerID, $spec)
     $userinfo = $db->sql_fetchrow($result2);
 
     $userteam = stripslashes(check_html($userinfo['user_ibl_team'], "nohtml"));
-    if (($player->yearsOfExperience == 4 and $player->draftRound == 1 and 2 * $player->contractYear3Salary == $player->contractYear4Salary and $player->contractYear4Salary != 0) or
-        ($player->yearsOfExperience == 3 and $player->draftRound == 2 and 2 * $player->contractYear2Salary == $player->contractYear3Salary and $player->contractYear3Salary != 0)) {
+    if ($player->wasRookieOptioned()) {
         echo "<table align=right bgcolor=#ff0000>
                 <tr>
                     <td align=center>ROOKIE OPTION<br>USED; RENEGOTIATION<br>IMPOSSIBLE</td>
                 </tr>
             </table>";
-        $can_renegotiate = 0;
     }
 
     $queryHasUsedExtensionThisSeason = "SELECT Used_Extension_This_Season
@@ -1169,11 +1154,13 @@ function showpage($playerID, $spec)
     $hasUsedExtensionThisSeason = $db->sql_result($db->sql_query($queryHasUsedExtensionThisSeason), 0);
 
     $currentSeasonPhase = $sharedFunctions->getCurrentSeasonPhase();
-    if ($hasUsedExtensionThisSeason == 0 and
-        $can_renegotiate == 1 and
+    if (
+        $hasUsedExtensionThisSeason == 0 and
+        $player->canRenegotiateContract() and
         $currentSeasonPhase != 'Draft' and
         $currentSeasonPhase != 'Free Agency' and
-        $player->teamName == $userteam) {
+        $player->teamName == $userteam
+    ) {
         echo "<table align=right bgcolor=#ff0000>
                 <tr>
                     <td align=center><a href=\"modules.php?name=Player&pa=negotiate&pid=$playerID\">RENEGOTIATE<BR>CONTRACT</a></td>

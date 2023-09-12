@@ -76,84 +76,102 @@ class Player
 
     public $timeDroppedOnWaivers;
 
-    public function __construct($db, int $playerID)
+    public function __construct()
     {
-        $this->db = $db;
-        $this->playerID = $playerID;
+    }
 
+    public static function withID($db, int $playerID)
+    {
+        $instance = new self();
+        $instance->loadByID($db, $playerID);
+        return $instance;
+    }
+
+    public static function withPlrRow(array $plrRow)
+    {
+        $instance = new self();
+        $instance->fill($plrRow);
+        return $instance;
+    }
+
+    protected function loadByID($db, int $playerID)
+    {
         $query = "SELECT * FROM ibl_plr WHERE pid = $playerID LIMIT 1;";
         $result = $db->sql_query($query);
-        $plr = $db->sql_fetch_assoc($result);
-        $this->plr = $plr;
+        $plrRow = $db->sql_fetch_assoc($result);
+        $this->fill($plrRow);
+    }
 
-        $this->ordinal = $plr['ordinal'];
-        $this->name = $plr['name'];
-        $this->nickname = $plr['nickname'];
-        $this->age = $plr['age'];
+    protected function fill(array $plrRow)
+    {
+        $this->ordinal = $plrRow['ordinal'];
+        $this->name = $plrRow['name'];
+        $this->nickname = $plrRow['nickname'];
+        $this->age = $plrRow['age'];
 
-        $this->teamID = $plr['tid'];
-        $this->teamName = $plr['teamname'];
-        $this->position = $plr['pos'];
+        $this->teamID = $plrRow['tid'];
+        $this->teamName = $plrRow['teamname'];
+        $this->position = $plrRow['pos'];
         
-        $this->ratingFieldGoalAttempts = $plr['r_fga'];
-        $this->ratingFieldGoalPercentage = $plr['r_fgp'];
-        $this->ratingFreeThrowAttempts = $plr['r_fta'];
-        $this->ratingFreeThrowPercentage = $plr['r_ftp'];
-        $this->ratingThreePointAttempts = $plr['r_tga'];
-        $this->ratingThreePointPercentage = $plr['r_tgp'];
-        $this->ratingOffensiveRebounds = $plr['r_orb'];
-        $this->ratingDefensiveRebounds = $plr['r_drb'];
-        $this->ratingAssists = $plr['r_ast'];
-        $this->ratingSteals = $plr['r_stl'];
-        $this->ratingTurnovers = $plr['r_to'];
-        $this->ratingBlocks = $plr['r_blk'];
-        $this->ratingFouls = $plr['r_foul'];
-        $this->ratingOutsideOffense = $plr['oo'];
-        $this->ratingOutsideDefense = $plr['od'];
-        $this->ratingDriveOffense = $plr['do'];
-        $this->ratingDriveDefense = $plr['dd'];
-        $this->ratingPostOffense = $plr['po'];
-        $this->ratingPostDefense = $plr['pd'];
-        $this->ratingTransitionOffense = $plr['to'];
-        $this->ratingTransitionDefense = $plr['td'];
-        $this->ratingClutch = $plr['Clutch'];
-        $this->ratingConsistency = $plr['Consistency'];
-        $this->ratingTalent = $plr['talent'];
-        $this->ratingSkill = $plr['skill'];
-        $this->ratingIntangibles = $plr['intangibles'];
+        $this->ratingFieldGoalAttempts = $plrRow['r_fga'];
+        $this->ratingFieldGoalPercentage = $plrRow['r_fgp'];
+        $this->ratingFreeThrowAttempts = $plrRow['r_fta'];
+        $this->ratingFreeThrowPercentage = $plrRow['r_ftp'];
+        $this->ratingThreePointAttempts = $plrRow['r_tga'];
+        $this->ratingThreePointPercentage = $plrRow['r_tgp'];
+        $this->ratingOffensiveRebounds = $plrRow['r_orb'];
+        $this->ratingDefensiveRebounds = $plrRow['r_drb'];
+        $this->ratingAssists = $plrRow['r_ast'];
+        $this->ratingSteals = $plrRow['r_stl'];
+        $this->ratingTurnovers = $plrRow['r_to'];
+        $this->ratingBlocks = $plrRow['r_blk'];
+        $this->ratingFouls = $plrRow['r_foul'];
+        $this->ratingOutsideOffense = $plrRow['oo'];
+        $this->ratingOutsideDefense = $plrRow['od'];
+        $this->ratingDriveOffense = $plrRow['do'];
+        $this->ratingDriveDefense = $plrRow['dd'];
+        $this->ratingPostOffense = $plrRow['po'];
+        $this->ratingPostDefense = $plrRow['pd'];
+        $this->ratingTransitionOffense = $plrRow['to'];
+        $this->ratingTransitionDefense = $plrRow['td'];
+        $this->ratingClutch = $plrRow['Clutch'];
+        $this->ratingConsistency = $plrRow['Consistency'];
+        $this->ratingTalent = $plrRow['talent'];
+        $this->ratingSkill = $plrRow['skill'];
+        $this->ratingIntangibles = $plrRow['intangibles'];
 
-        $this->freeAgencyLoyalty = $plr['loyalty'];
-        $this->freeAgencyPlayingTime = $plr['playingTime'];
-        $this->freeAgencyPlayForWinner = $plr['winner'];
-        $this->freeAgencyTradition = $plr['tradition'];
-        $this->freeAgencySecurity = $plr['security'];
+        $this->freeAgencyLoyalty = $plrRow['loyalty'];
+        $this->freeAgencyPlayingTime = $plrRow['playingTime'];
+        $this->freeAgencyPlayForWinner = $plrRow['winner'];
+        $this->freeAgencyTradition = $plrRow['tradition'];
+        $this->freeAgencySecurity = $plrRow['security'];
 
-        $this->yearsOfExperience = $plr['exp'];
-        $this->birdYears = $plr['bird'];
-        $this->contractCurrentYear = $plr['cy'];
-        $this->contractTotalYears = $plr['cyt'];
-        $this->contractYear1Salary = $plr['cy1'];
-        $this->contractYear2Salary = $plr['cy2'];
-        $this->contractYear3Salary = $plr['cy3'];
-        $this->contractYear4Salary = $plr['cy4'];
-        $this->contractYear5Salary = $plr['cy5'];
-        $this->contractYear6Salary = $plr['cy6'];
+        $this->yearsOfExperience = $plrRow['exp'];
+        $this->birdYears = $plrRow['bird'];
+        $this->contractCurrentYear = $plrRow['cy'];
+        $this->contractTotalYears = $plrRow['cyt'];
+        $this->contractYear1Salary = $plrRow['cy1'];
+        $this->contractYear2Salary = $plrRow['cy2'];
+        $this->contractYear3Salary = $plrRow['cy3'];
+        $this->contractYear4Salary = $plrRow['cy4'];
+        $this->contractYear5Salary = $plrRow['cy5'];
+        $this->contractYear6Salary = $plrRow['cy6'];
     
-        $this->draftYear = $plr['draftyear'];
-        $this->draftRound = $plr['draftround'];
-        $this->draftPickNumber = $plr['draftpickno'];
-        $this->draftTeamOriginalName = $plr['draftedby'];
-        $this->draftTeamCurrentName = $plr['draftedbycurrentname'];
-        $this->collegeName = $plr['college'];
+        $this->draftYear = $plrRow['draftyear'];
+        $this->draftRound = $plrRow['draftround'];
+        $this->draftPickNumber = $plrRow['draftpickno'];
+        $this->draftTeamOriginalName = $plrRow['draftedby'];
+        $this->draftTeamCurrentName = $plrRow['draftedbycurrentname'];
+        $this->collegeName = $plrRow['college'];
     
-        $this->daysRemainingForInjury = $plr['injured'];
+        $this->daysRemainingForInjury = $plrRow['injured'];
     
-        $this->heightFeet = $plr['htft'];
-        $this->heightInches = $plr['htin'];
-        $this->weightPounds = $plr['wt'];
+        $this->heightFeet = $plrRow['htft'];
+        $this->heightInches = $plrRow['htin'];
+        $this->weightPounds = $plrRow['wt'];
     
-        $this->isRetired = $plr['retired'];
+        $this->isRetired = $plrRow['retired'];
     
-        $this->timeDroppedOnWaivers = $plr['droptime'];
+        $this->timeDroppedOnWaivers = $plrRow['droptime'];
     }
 }

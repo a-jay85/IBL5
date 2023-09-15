@@ -998,7 +998,7 @@ function showpage($playerID, $spec)
 {
     global $prefix, $db, $user, $cookie;
     $sharedFunctions = new Shared($db);
-    $player = Player::withID($db, $playerID);
+    $player = Player::withPlayerID($db, $playerID);
     $spec = intval($spec);
 
     $playerinfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_plr WHERE pid='$playerID'"));

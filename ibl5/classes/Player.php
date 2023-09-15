@@ -80,7 +80,7 @@ class Player
     {
     }
 
-    public static function withID($db, int $playerID)
+    public static function withPlayerID($db, int $playerID)
     {
         $instance = new self();
         $instance->loadByID($db, $playerID);

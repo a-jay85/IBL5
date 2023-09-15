@@ -999,48 +999,10 @@ function showpage($playerID, $spec)
     global $prefix, $db, $user, $cookie;
     $sharedFunctions = new Shared($db);
     $player = Player::withPlayerID($db, $playerID);
+    $playerStats = PlayerStats::withPlayerID($db, $playerID);
     $spec = intval($spec);
 
-    $playerinfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_plr WHERE pid='$playerID'"));
-
     $year = $player->draftYear + $player->yearsOfExperience;
-
-    $stats_gm = stripslashes(check_html($playerinfo['stats_gm'], "nohtml"));
-    $stats_min = stripslashes(check_html($playerinfo['stats_min'], "nohtml"));
-    $stats_fgm = stripslashes(check_html($playerinfo['stats_fgm'], "nohtml"));
-    $stats_fga = stripslashes(check_html($playerinfo['stats_fga'], "nohtml"));
-    @$stats_fgp = ($stats_fgm / $stats_fga);
-    $stats_ftm = stripslashes(check_html($playerinfo['stats_ftm'], "nohtml"));
-    $stats_fta = stripslashes(check_html($playerinfo['stats_fta'], "nohtml"));
-    @$stats_ftp = ($stats_ftm / $stats_fta);
-    $stats_tgm = stripslashes(check_html($playerinfo['stats_3gm'], "nohtml"));
-    $stats_tga = stripslashes(check_html($playerinfo['stats_3ga'], "nohtml"));
-    @$stats_tgp = ($stats_tgm / $stats_tga);
-    $stats_orb = stripslashes(check_html($playerinfo['stats_orb'], "nohtml"));
-    $stats_drb = stripslashes(check_html($playerinfo['stats_drb'], "nohtml"));
-    $stats_reb = $stats_orb + $stats_drb;
-    $stats_ast = stripslashes(check_html($playerinfo['stats_ast'], "nohtml"));
-    $stats_stl = stripslashes(check_html($playerinfo['stats_stl'], "nohtml"));
-    $stats_to = stripslashes(check_html($playerinfo['stats_to'], "nohtml"));
-    $stats_blk = stripslashes(check_html($playerinfo['stats_blk'], "nohtml"));
-    $stats_pf = stripslashes(check_html($playerinfo['stats_pf'], "nohtml"));
-    $stats_pts = 2 * $stats_fgm + $stats_ftm + $stats_tgm;
-
-    @$stats_mpg = ($stats_min / $stats_gm);
-    @$stats_fgmpg = ($stats_fgm / $stats_gm);
-    @$stats_fgapg = ($stats_fga / $stats_gm);
-    @$stats_ftmpg = ($stats_ftm / $stats_gm);
-    @$stats_ftapg = ($stats_fta / $stats_gm);
-    @$stats_3gmpg = ($stats_tgm / $stats_gm);
-    @$stats_3gapg = ($stats_tga / $stats_gm);
-    @$stats_opg = ($stats_orb / $stats_gm);
-    @$stats_rpg = ($stats_reb / $stats_gm);
-    @$stats_apg = ($stats_ast / $stats_gm);
-    @$stats_spg = ($stats_stl / $stats_gm);
-    @$stats_tpg = ($stats_to / $stats_gm);
-    @$stats_bpg = ($stats_blk / $stats_gm);
-    @$stats_fpg = ($stats_pf / $stats_gm);
-    @$stats_ppg = ($stats_pts / $stats_gm);
 
     // CONTRACT FORMATTER
 
@@ -1239,36 +1201,6 @@ function showpage($playerID, $spec)
     if ($spec == null) {
         // ==== PLAYER SEASON AND CAREER HIGHS ====
 
-        $retired = stripslashes(check_html($playerinfo['retired'], "nohtml"));
-
-        $sh_pts = stripslashes(check_html($playerinfo['sh_pts'], "nohtml"));
-        $sh_reb = stripslashes(check_html($playerinfo['sh_reb'], "nohtml"));
-        $sh_ast = stripslashes(check_html($playerinfo['sh_ast'], "nohtml"));
-        $sh_stl = stripslashes(check_html($playerinfo['sh_stl'], "nohtml"));
-        $sh_blk = stripslashes(check_html($playerinfo['sh_blk'], "nohtml"));
-        $s_dd = stripslashes(check_html($playerinfo['s_dd'], "nohtml"));
-        $s_td = stripslashes(check_html($playerinfo['s_td'], "nohtml"));
-
-        $sp_pts = stripslashes(check_html($playerinfo['sp_pts'], "nohtml"));
-        $sp_reb = stripslashes(check_html($playerinfo['sp_reb'], "nohtml"));
-        $sp_ast = stripslashes(check_html($playerinfo['sp_ast'], "nohtml"));
-        $sp_stl = stripslashes(check_html($playerinfo['sp_stl'], "nohtml"));
-        $sp_blk = stripslashes(check_html($playerinfo['sp_blk'], "nohtml"));
-
-        $ch_pts = stripslashes(check_html($playerinfo['ch_pts'], "nohtml"));
-        $ch_reb = stripslashes(check_html($playerinfo['ch_reb'], "nohtml"));
-        $ch_ast = stripslashes(check_html($playerinfo['ch_ast'], "nohtml"));
-        $ch_stl = stripslashes(check_html($playerinfo['ch_stl'], "nohtml"));
-        $ch_blk = stripslashes(check_html($playerinfo['ch_blk'], "nohtml"));
-        $c_dd = stripslashes(check_html($playerinfo['c_dd'], "nohtml"));
-        $c_td = stripslashes(check_html($playerinfo['c_td'], "nohtml"));
-
-        $cp_pts = stripslashes(check_html($playerinfo['cp_pts'], "nohtml"));
-        $cp_reb = stripslashes(check_html($playerinfo['cp_reb'], "nohtml"));
-        $cp_ast = stripslashes(check_html($playerinfo['cp_ast'], "nohtml"));
-        $cp_stl = stripslashes(check_html($playerinfo['cp_stl'], "nohtml"));
-        $cp_blk = stripslashes(check_html($playerinfo['cp_blk'], "nohtml"));
-
         echo "<td rowspan=3 valign=top>
 
         <table border=1 cellspacing=0 cellpadding=0>
@@ -1285,38 +1217,38 @@ function showpage($playerID, $spec)
             </tr>
             <tr>
                 <td><b>Points</b></td>
-                <td>$sh_pts</td>
-                <td>$ch_pts</td>
+                <td>$playerStats->seasonHighPoints</td>
+                <td>$playerStats->careerSeasonHighPoints</td>
             </tr>
             <tr>
                 <td><b>Rebounds</b></td>
-                <td>$sh_reb</td>
-                <td>$ch_reb</td>
+                <td>$playerStats->seasonHighRebounds</td>
+                <td>$playerStats->careerSeasonHighRebounds</td>
             </tr>
             <tr>
                 <td><b>Assists</b></td>
-                <td>$sh_ast</td>
-                <td>$ch_ast</td>
+                <td>$playerStats->seasonHighAssists</td>
+                <td>$playerStats->careerSeasonHighAssists</td>
             </tr>
             <tr>
                 <td><b>Steals</b></td>
-                <td>$sh_stl</td>
-                <td>$ch_stl</td>
+                <td>$playerStats->seasonHighSteals</td>
+                <td>$playerStats->careerSeasonHighSteals</td>
             </tr>
             <tr>
                 <td><b>Blocks</b></td>
-                <td>$sh_blk</td>
-                <td>$ch_blk</td>
+                <td>$playerStats->seasonHighBlocks</td>
+                <td>$playerStats->careerSeasonHighBlocks</td>
             </tr>
             <tr>
                 <td>Double-Doubles</td>
-                <td>$s_dd</td>
-                <td>$c_dd</td>
+                <td>$playerStats->seasonDoubleDoubles</td>
+                <td>$playerStats->careerDoubleDoubles</td>
             </tr>
             <tr>
                 <td>Triple-Doubles</td>
-                <td>$s_td</td>
-                <td>$c_td</td>
+                <td>$playerStats->seasonTripleDoubles</td>
+                <td>$playerStats->careerTripleDoubles</td>
             </tr>
             <tr bgcolor=#0000cc>
                 <td align=center colspan=3><font color=#ffffff><b>Playoffs</b></font></td>
@@ -1328,28 +1260,28 @@ function showpage($playerID, $spec)
             </tr>
             <tr>
                 <td><b>Points</b></td>
-                <td>$sp_pts</td>
-                <td>$cp_pts</td>
+                <td>$playerStats->seasonPlayoffHighPoints</td>
+                <td>$playerStats->careerPlayoffHighPoints</td>
             </tr>
             <tr>
                 <td><b>Rebounds</b></td>
-                <td>$sp_reb</td>
-                <td>$cp_reb</td>
+                <td>$playerStats->seasonPlayoffHighRebounds</td>
+                <td>$playerStats->careerPlayoffHighRebounds</td>
             </tr>
             <tr>
                 <td><b>Assists</b></td>
-                <td>$sp_ast</td>
-                <td>$cp_ast</td>
+                <td>$playerStats->seasonPlayoffHighAssists</td>
+                <td>$playerStats->careerPlayoffHighAssists</td>
             </tr>
             <tr>
                 <td><b>Steals</b></td>
-                <td>$sp_stl</td>
-                <td>$cp_stl</td>
+                <td>$playerStats->seasonPlayoffHighSteals</td>
+                <td>$playerStats->careerPlayoffHighSteals</td>
             </tr>
             <tr>
                 <td><b>Blocks</b></td>
-                <td>$sp_blk</td>
-                <td>$cp_blk</td>
+                <td>$playerStats->seasonPlayoffHighBlocks</td>
+                <td>$playerStats->careerPlayoffHighBlocks</td>
             </tr>
         </table></td>";
 
@@ -1865,51 +1797,48 @@ function showpage($playerID, $spec)
         }
 
         // CURRENT YEAR AVERAGES
-        $retired = $db->sql_result($db->sql_query("SELECT retired
-            FROM ibl_plr
-            WHERE pid=$playerID;"), 0);
 
-        if ($retired != 1) {
+        if (!$player->isRetired) {
             echo "<tr align=center>
                 <td><center>$year</center></td>
                 <td><center>$player->teamName</center></td>
-                <td><center>$stats_gm</center></td>
+                <td><center>$playerStats->seasonGamesPlayed</center></td>
                 <td><center>";
-            printf('%01.1f', $stats_mpg);
+            printf('%01.1f', $playerStats->seasonMinutesPerGame);
             echo "</center></td><td><center>";
-            printf('%01.1f', $stats_fgmpg);
+            printf('%01.1f', $playerStats->seasonFieldGoalsMadePerGame);
             echo "</center></td><td><center>";
-            printf('%01.1f', $stats_fgapg);
+            printf('%01.1f', $playerStats->seasonFieldGoalsAttemptedPerGame);
             echo "</center></td><td><center>";
-            printf('%01.3f', $stats_fgp);
+            printf('%01.3f', $playerStats->seasonFieldGoalPercentage);
             echo "</center></td><td><center>";
-            printf('%01.1f', $stats_ftmpg);
+            printf('%01.1f', $playerStats->seasonFreeThrowsMadePerGame);
             echo "</center></td><td><center>";
-            printf('%01.1f', $stats_ftapg);
+            printf('%01.1f', $playerStats->seasonFreeThrowsAttemptedPerGame);
             echo "</center></td><td><center>";
-            printf('%01.3f', $stats_ftp);
+            printf('%01.3f', $playerStats->seasonFreeThrowPercentage);
             echo "</center></td><td><center>";
-            printf('%01.1f', $stats_3gmpg);
+            printf('%01.1f', $playerStats->seasonThreePointersMadePerGame);
             echo "</center></td><td><center>";
-            printf('%01.1f', $stats_3gapg);
+            printf('%01.1f', $playerStats->seasonThreePointersAttemptedPerGame);
             echo "</center></td><td><center>";
-            printf('%01.3f', $stats_tgp);
+            printf('%01.3f', $playerStats->seasonThreePointPercentage);
             echo "</center></td><td><center>";
-            printf('%01.1f', $stats_opg);
+            printf('%01.1f', $playerStats->seasonOffensiveReboundsPerGame);
             echo "</center></td><td><center>";
-            printf('%01.1f', $stats_rpg);
+            printf('%01.1f', $playerStats->seasonTotalReboundsPerGame);
             echo "</center></td><td><center>";
-            printf('%01.1f', $stats_apg);
+            printf('%01.1f', $playerStats->seasonAssistsPerGame);
             echo "</center></td><td><center>";
-            printf('%01.1f', $stats_spg);
+            printf('%01.1f', $playerStats->seasonStealsPerGame);
             echo "</center></td><td><center>";
-            printf('%01.1f', $stats_tpg);
+            printf('%01.1f', $playerStats->seasonTurnoversPerGame);
             echo "</center></td><td><center>";
-            printf('%01.1f', $stats_bpg);
+            printf('%01.1f', $playerStats->seasonBlocksPerGame);
             echo "</center></td><td><center>";
-            printf('%01.1f', $stats_fpg);
+            printf('%01.1f', $playerStats->seasonPersonalFoulsPerGame);
             echo "</center></td><td><center>";
-            printf('%01.1f', $stats_ppg);
+            printf('%01.1f', $playerStats->seasonPointsPerGame);
             echo "</center></td></tr>";
 
             $car_gm = $car_gm + $stats_gm;

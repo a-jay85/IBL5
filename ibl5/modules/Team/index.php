@@ -29,9 +29,9 @@ $pagetitle = "- Team Pages";
 function team($tid)
 {
     global $db;
-    $sharedFunctions = new Shared($db);
-
     $tid = intval($tid);
+    $team = Team::withTeamID($db, $tid);
+    $sharedFunctions = new Shared($db);
 
     $yr = $_REQUEST['yr'];
 
@@ -42,18 +42,6 @@ function team($tid)
 
     include "header.php";
     OpenTable();
-
-    //============================
-    // GRAB TEAM COLORS, ET AL
-    //============================
-
-    $queryteam = "SELECT * FROM ibl_team_info WHERE teamid = '$tid' ";
-    $resultteam = $db->sql_query($queryteam);
-
-    $team_name = $db->sql_result($resultteam, 0, "team_name");
-    $color1 = $db->sql_result($resultteam, 0, "color1");
-    $color2 = $db->sql_result($resultteam, 0, "color2");
-    $owner_name = $db->sql_result($resultteam, 0, "owner_name");
 
     //=============================
     //DISPLAY TOP MENU
@@ -95,7 +83,7 @@ function team($tid)
     echo "<table><tr><td align=center valign=top><img src=\"./images/logo/$tid.jpg\">";
 
     if ($yr != "") {
-        echo "<center><h1>$yr $team_name</h1></center>";
+        echo "<center><h1>$yr $team->name</h1></center>";
         $insertyear = "&yr=$yr";
     } else {
         $insertyear = "";
@@ -103,7 +91,7 @@ function team($tid)
 
     if ($display == "ratings") {
         $showing = "Player Ratings";
-        $table_ratings = $sharedFunctions->ratings($db, $result, $color1, $color2, $tid, $yr);
+        $table_ratings = $sharedFunctions->ratings($db, $result, $team->color1, $team->color2, $tid, $yr);
         $table_output = $table_ratings;
         $tabs .= "<td bgcolor=#BBBBBB style=\"font-weight:bold\">";
     } else {
@@ -113,7 +101,7 @@ function team($tid)
 
     if ($display == "total_s") {
         $showing = "Season Totals";
-        $table_totals = seasonTotals($db, $result, $color1, $color2, $tid, $yr, $team_name);
+        $table_totals = seasonTotals($db, $result, $team->color1, $team->color2, $tid, $yr, $team->name);
         $table_output = $table_totals;
         $tabs .= "<td bgcolor=#BBBBBB style=\"font-weight:bold\">";
     } else {
@@ -123,7 +111,7 @@ function team($tid)
 
     if ($display == "avg_s") {
         $showing = "Season Averages";
-        $table_averages = seasonAverages($db, $result, $color1, $color2, $tid, $yr, $team_name);
+        $table_averages = seasonAverages($db, $result, $team->color1, $team->color2, $tid, $yr, $team->name);
         $table_output = $table_averages;
         $tabs .= "<td bgcolor=#BBBBBB style=\"font-weight:bold\">";
     } else {
@@ -133,7 +121,7 @@ function team($tid)
 
     if ($display == "per36mins") {
         $showing = "Per 36 Minutes";
-        $table_per36Minutes = per36Minutes($db, $result, $color1, $color2, $tid, $yr);
+        $table_per36Minutes = per36Minutes($db, $result, $team->color1, $team->color2, $tid, $yr);
         $table_output = $table_per36Minutes;
         $tabs .= "<td bgcolor=#BBBBBB style=\"font-weight:bold\">";
     } else {
@@ -143,7 +131,7 @@ function team($tid)
 
     if ($display == "chunk") {
         $showing = "Chunk Averages";
-        $table_simAverages = simAverages($db, $sharedFunctions, $color1, $color2, $tid);
+        $table_simAverages = simAverages($db, $sharedFunctions, $team->color1, $team->color2, $tid);
         $table_output = $table_simAverages;
         $tabs .= "<td bgcolor=#BBBBBB style=\"font-weight:bold\">";
     } else {
@@ -153,7 +141,7 @@ function team($tid)
 
     if ($display == "contracts") {
         $showing = "Contracts";
-        $table_contracts = contracts($db, $result, $color1, $color2, $tid, $faon);
+        $table_contracts = contracts($db, $result, $team->color1, $team->color2, $tid, $faon);
         $table_output = $table_contracts;
         $tabs .= "<td bgcolor=#BBBBBB style=\"font-weight:bold\">";
     } else {
@@ -162,21 +150,21 @@ function team($tid)
     $tabs .= "<a href=\"modules.php?name=Team&op=team&tid=$tid&display=contracts$insertyear\">Contracts</a></td>";
 
     if ($tid != 0 AND $yr == "") {
-        $starters_table = lastSimsStarters($db, $result, $color1, $color2);
+        $starters_table = lastSimsStarters($db, $result, $team->color1, $team->color2);
     }
 
-    $table_draftpicks = draftPicks($db, $team_name);
+    $table_draftpicks = draftPicks($db, $team->name);
 
-    $inforight = team_info_right($team_name, $color1, $color2, $owner_name, $tid);
+    $inforight = team_info_right($team->name, $team->color1, $team->color2, $team->ownerName, $tid);
     $team_info_right = $inforight[0];
     $rafters = $inforight[1];
 
     echo "<table align=center>
-        <tr bgcolor=$color1><td><font color=$color2><b><center>$showing (Sortable by clicking on Column Heading)</center></b></font></td></tr>
+        <tr bgcolor=$team->color1><td><font color=$team->color2><b><center>$showing (Sortable by clicking on Column Heading)</center></b></font></td></tr>
 		<tr><td align=center><table><tr>$tabs</tr></table></td></tr>
 		<tr><td align=center>$table_output</td></tr>
 		<tr><td align=center>$starters_table</td></tr>
-		<tr bgcolor=$color1><td><font color=$color2><b><center>Draft Picks</center></b></font></td></tr>
+		<tr bgcolor=$team->color1><td><font color=$team->color2><b><center>Draft Picks</center></b></font></td></tr>
 		<tr><td>$table_draftpicks</td></tr>
 		<tr><td>$rafters</td></tr>
     </table>";

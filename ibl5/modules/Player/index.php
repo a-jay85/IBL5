@@ -1594,22 +1594,22 @@ function showpage($playerID, $spec)
 
         // CURRENT YEAR TOTALS
 
-        if ($player->isRetired <= 0) {
+        if ($player->isRetired == 0) {
             echo "<td><center>$year</center></td>
                 <td><center>$player->teamName</center></td>
-                <td><center>$stats_gm</center></td>
-                <td><center>$stats_min</center></td>
-                <td><center>$stats_fgm-$stats_fga</center></td>
-                <td><center>$stats_ftm-$stats_fta</center></td>
-                <td><center>$stats_tgm-$stats_tga</center></td>
-                <td><center>$stats_orb</center></td>
-                <td><center>$stats_reb</center></td>
-                <td><center>$stats_ast</center></td>
-                <td><center>$stats_stl</center></td>
-                <td><center>$stats_to</center></td>
-                <td><center>$stats_blk</center></td>
-                <td><center>$stats_pf</center></td>
-                <td><center>$stats_pts</td>
+                <td><center>$playerStats->seasonGamesPlayed</center></td>
+                <td><center>$playerStats->seasonMinutes</center></td>
+                <td><center>$playerStats->seasonFieldGoalsMade-$playerStats->seasonFieldGoalsAttempted</center></td>
+                <td><center>$playerStats->seasonFreeThrowsMade-$playerStats->seasonFreeThrowsAttempted</center></td>
+                <td><center>$playerStats->seasonThreePointersMade-$playerStats->seasonThreePointersAttempted</center></td>
+                <td><center>$playerStats->seasonOffensiveRebounds</center></td>
+                <td><center>$playerStats->seasonTotalRebounds</center></td>
+                <td><center>$playerStats->seasonAssists</center></td>
+                <td><center>$playerStats->seasonSteals</center></td>
+                <td><center>$playerStats->seasonTurnovers</center></td>
+                <td><center>$playerStats->seasonBlocks</center></td>
+                <td><center>$playerStats->seasonPersonalFouls</center></td>
+                <td><center>$playerStats->seasonPoints</td>
             </tr>";
 
             $car_gm = $car_gm + $stats_gm;

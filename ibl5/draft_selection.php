@@ -28,7 +28,7 @@ if ($player != NULL) {
     $resultUpdateRookieTable = $db->sql_query($queryUpdateRookieTable);
 
     if ($resultUpdateDraftTable AND $resultUpdateRookieTable) {
-        $message = "With pick number $draft_pick in round $draft_round of the $currentSeasonEndingYear IBL Draft, **" . $teamname . "** selects **" . $player . "!**";
+        $message = "With pick number $draft_pick in round $draft_round of the $currentSeasonEndingYear IBL Draft, the **" . $teamname . "** select **" . $player . "!**";
         echo "$message<br>
         <a href=\"modules.php?name=College_Scouting\">Go back to the Draft module</a>";
     
@@ -41,7 +41,6 @@ if ($player != NULL) {
         $discordIDOfTeamOnTheClock = $db->sql_result($resultDiscordIDOfTeamOnTheClock, 0);
 
         $message .= '
-    
 **<@!' . $discordIDOfTeamOnTheClock . '>** is on the clock!';
 
         Discord::postToChannel('#draft-picks', $message);

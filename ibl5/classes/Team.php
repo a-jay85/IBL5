@@ -34,7 +34,7 @@ class Team
     public static function withTeamRow($db, array $teamRow)
     {
         $instance = new self();
-        $instance->fill($db, teamRow);
+        $instance->fill($db, $teamRow);
         return $instance;
     }
 

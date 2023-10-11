@@ -3,6 +3,7 @@
 class Player
 {
     protected $db;
+
     public $playerID;
     public $plr;
 
@@ -87,10 +88,10 @@ class Player
         return $instance;
     }
 
-    public static function withPlrRow(array $plrRow)
+    public static function withPlrRow($db, array $plrRow)
     {
         $instance = new self();
-        $instance->fill($plrRow);
+        $instance->fill($db, $plrRow);
         return $instance;
     }
 
@@ -99,11 +100,13 @@ class Player
         $query = "SELECT * FROM ibl_plr WHERE pid = $playerID LIMIT 1;";
         $result = $db->sql_query($query);
         $plrRow = $db->sql_fetch_assoc($result);
-        $this->fill($plrRow);
+        $this->fill($db, $plrRow);
     }
 
-    protected function fill(array $plrRow)
+    protected function fill($db, array $plrRow)
     {
+        $this->db = $db;
+
         $this->ordinal = $plrRow['ordinal'];
         $this->name = $plrRow['name'];
         $this->nickname = $plrRow['nickname'];

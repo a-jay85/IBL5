@@ -31,10 +31,10 @@ class Team
         return $instance;
     }
 
-    public static function withTeamRow(array $teamRow)
+    public static function withTeamRow($db, array $teamRow)
     {
         $instance = new self();
-        $instance->fill($teamRow);
+        $instance->fill($db, teamRow);
         return $instance;
     }
 
@@ -43,11 +43,13 @@ class Team
         $query = "SELECT * FROM ibl_team_info WHERE teamid = $teamID LIMIT 1;";
         $result = $db->sql_query($query);
         $teamRow = $db->sql_fetch_assoc($result);
-        $this->fill($teamRow);
+        $this->fill($db, $teamRow);
     }
 
-    protected function fill(array $teamRow)
+    protected function fill($db, array $teamRow)
     {
+        $this->db = $db;
+
         $this->teamID = $teamRow['teamid'];
 
         $this->city = $teamRow['team_city'];
@@ -65,14 +67,14 @@ class Team
         $this->hasLLE = $teamRow['HasLLE'];
     }
 
-    public function getActiveRosterArrayAlphabetically($db)
+    public function getActiveRosterArrayAlphabetically()
     {
         $query = "SELECT * FROM ibl_plr WHERE tid = '$this->teamID' AND retired = 0 ORDER BY name ASC";
-        $result = $db->sql_query($query);
+        $result = $this->db->sql_query($query);
         $array = array();
         foreach ($result as $plrRow) {
             $playerID = $plrRow['pid'];
-            $array[$playerID] = Player::withPlayerID($db, $playerID);
+            $array[$playerID] = Player::withPlayerID($this->db, $playerID);
         }
 
         return $array;

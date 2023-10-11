@@ -3,8 +3,8 @@
 class Team
 {
     protected $db;
+
     public $teamID;
-    public $team;
 
     public $city;
     public $name;
@@ -48,6 +48,8 @@ class Team
 
     protected function fill(array $teamRow)
     {
+        $this->teamID = $teamRow['teamid'];
+
         $this->city = $teamRow['team_city'];
         $this->name = $teamRow['team_name'];
         $this->color1 = $teamRow['color1'];
@@ -61,5 +63,18 @@ class Team
         $this->hasUsedExtensionThisSeason = $teamRow['Used_Extension_This_Season'];
         $this->hasMLE = $teamRow['HasMLE'];
         $this->hasLLE = $teamRow['HasLLE'];
+    }
+
+    public function getActiveRosterArrayAlphabetically($db)
+    {
+        $query = "SELECT * FROM ibl_plr WHERE tid = '$this->teamID' AND retired = 0 ORDER BY name ASC";
+        $result = $db->sql_query($query);
+        $array = array();
+        foreach ($result as $plrRow) {
+            $playerID = $plrRow['pid'];
+            $array[$playerID] = Player::withPlayerID($db, $playerID);
+        }
+
+        return $array;
     }
 }

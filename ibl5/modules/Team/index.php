@@ -159,14 +159,29 @@ function team($tid)
     $team_info_right = $inforight[0];
     $rafters = $inforight[1];
 
-    echo "<table align=center>
-        <tr bgcolor=$team->color1><td><font color=$team->color2><b><center>$showing (Sortable by clicking on Column Heading)</center></b></font></td></tr>
-		<tr><td align=center><table><tr>$tabs</tr></table></td></tr>
-		<tr><td align=center>$table_output</td></tr>
-		<tr><td align=center>$starters_table</td></tr>
-		<tr bgcolor=$team->color1><td><font color=$team->color2><b><center>Draft Picks</center></b></font></td></tr>
-		<tr><td>$table_draftpicks</td></tr>
-		<tr><td>$rafters</td></tr>
+    echo "
+    <table align=center>
+        <tr bgcolor=$team->color1>
+            <td><font color=$team->color2><b><center>$showing (Sortable by clicking on Column Heading)</center></b></font></td>
+        </tr>
+		<tr>
+            <td align=center><table><tr>$tabs</tr></table></td>
+        </tr>
+		<tr>
+            <td align=center>$table_output</td>
+        </tr>
+		<tr>
+            <td align=center>$starters_table</td>
+        </tr>
+		<tr bgcolor=$team->color1>
+            <td><font color=$team->color2><b><center>Draft Picks</center></b></font></td>
+        </tr>
+		<tr>
+            <td>$table_draftpicks</td>
+        </tr>
+		<tr>
+            <td>$rafters</td>
+        </tr>
     </table>";
 
     // TRANSITIONS TO NEXT SIDE OF PAGE

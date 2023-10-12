@@ -1154,12 +1154,6 @@ function contracts($db, $result, $color1, $color2, $tid, $faon)
         $cap6 += $con6;
         $i++;
     }
-    $cap1 = number_format($cap1 / 100, 2);
-    $cap2 = number_format($cap2 / 100, 2);
-    $cap3 = number_format($cap3 / 100, 2);
-    $cap4 = number_format($cap4 / 100, 2);
-    $cap5 = number_format($cap5 / 100, 2);
-    $cap6 = number_format($cap6 / 100, 2);
 
     $table_contracts .= "</tbody>
         <tfoot>

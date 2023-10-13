@@ -48,6 +48,20 @@ if ($offer_id != NULL) {
             $cashYear[5] = $cashDetails['cy5'];
             $cashYear[6] = $cashDetails['cy6'];
 
+            if ($cashYear[6] != 0) {
+                $contractTotalYears = 6;
+            } elseif ($cashYear[5] != 0) {
+                $contractTotalYears = 5;
+            } elseif ($cashYear[4] != 0) {
+                $contractTotalYears = 4;
+            } elseif ($cashYear[3] != 0) {
+                $contractTotalYears = 3;
+            } elseif ($cashYear[2] != 0) {
+                $contractTotalYears = 2;
+            } else {
+                $contractTotalYears = 1;
+            }
+
             $queryInsertPositiveCashRow = "INSERT INTO `ibl_plr` 
                 (`ordinal`, 
                 `pid`, 
@@ -71,7 +85,7 @@ if ($offer_id != NULL) {
                 '$from',
                 '1',
                 '1',
-                '1',
+                '$contractTotalYears',
                 '$cashYear[1]',
                 '$cashYear[2]',
                 '$cashYear[3]',

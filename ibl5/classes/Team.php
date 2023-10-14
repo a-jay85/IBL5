@@ -20,6 +20,9 @@ class Team
     public $hasMLE;
     public $hasLLE;
 
+    const SOFT_CAP_MAX = 5000;
+    const HARD_CAP_MAX = 7000;
+
     public function __construct()
     {
     }

@@ -190,6 +190,12 @@ class Player
         return $contractArray;
     }
 
+    public function getTotalRemainingSalary()
+    {
+        $contractArray = $this->getRemainingContractArray();
+        return array_sum($contractArray);
+    }
+
     public function canRenegotiateContract()
     {
         if (

@@ -74,7 +74,6 @@ class Team
     {
         $query = "SELECT * FROM ibl_plr WHERE tid = '$this->teamID' AND retired = 0 ORDER BY name ASC";
         $result = $this->db->sql_query($query);
-
         return $result;
     }
 
@@ -82,19 +81,17 @@ class Team
     {
         $query = "SELECT * FROM ibl_plr WHERE tid = '$this->teamID' AND name LIKE '%Buyout%' ORDER BY name ASC";
         $result = $this->db->sql_query($query);
-
         return $result;
     }
 
     public function getTotalCurrentSeasonSalariesFromPlrResult($result)
     {
         $totalCurrentSeasonSalaries = 0;
-        
+
         $playerArray = $this->convertPlrResultIntoPlayerArray($result);
         foreach ($playerArray as $player) {
             $totalCurrentSeasonSalaries += $player->getCurrentSeasonSalary();
         }
-
         return $totalCurrentSeasonSalaries;
     }
 
@@ -105,7 +102,6 @@ class Team
             $playerID = $plrRow['pid'];
             $array[$playerID] = Player::withPlayerID($this->db, $playerID);
         }
-
         return $array;
     }
 }

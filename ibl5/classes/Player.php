@@ -182,7 +182,6 @@ class Player
     public function getCurrentSeasonSalary()
     {
         $currentSeasonSalary = $this->{"contractYear" . $this->contractCurrentYear . "Salary"};
-
         return $currentSeasonSalary;
     }
 
@@ -193,7 +192,6 @@ class Player
             $contractArray[$remainingContractYear] = $this->{"contractYear" . $i . "Salary"};
             $remainingContractYear++;
         }
-
         return $contractArray;
     }
 
@@ -216,7 +214,6 @@ class Player
         ) {
             return TRUE;
         }
-        
         return FALSE;
     }
 
@@ -235,7 +232,6 @@ class Player
         )) {
             return TRUE;
         }
-
         return FALSE;
     }
 }

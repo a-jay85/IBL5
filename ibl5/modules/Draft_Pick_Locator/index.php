@@ -8,6 +8,13 @@ $num = $db->sql_numrows($result);
 
 $currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
 
+$jazz = Team::withTeamID($db, 13);
+$jazzResult = $jazz->getAlphabeticalActiveRosterResult();
+$jazzPlayerArray = $jazz->convertPlrResultIntoPlayerArray($jazzResult);
+$jasonKidd = $jazzPlayerArray['618'];
+$jasonKiddTotalRemainingSalary = $jasonKidd->getTotalRemainingSalary();
+print_r($jasonKiddTotalRemainingSalary);
+
 echo "<HTML><HEAD><TITLE>Draft Pick Matrix</TITLE></HEAD>
     <BODY>
         <CENTER>

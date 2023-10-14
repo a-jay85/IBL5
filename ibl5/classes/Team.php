@@ -67,10 +67,16 @@ class Team
         $this->hasLLE = $teamRow['HasLLE'];
     }
 
-    public function getActiveRosterArrayAlphabetically()
+    public function getAlphabeticalActiveRosterResult()
     {
         $query = "SELECT * FROM ibl_plr WHERE tid = '$this->teamID' AND retired = 0 ORDER BY name ASC";
         $result = $this->db->sql_query($query);
+
+        return $result;
+    }
+
+    public function convertPlrResultIntoPlayerArray($result)
+    {
         $array = array();
         foreach ($result as $plrRow) {
             $playerID = $plrRow['pid'];

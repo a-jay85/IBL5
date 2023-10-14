@@ -53,7 +53,7 @@ function team($tid)
     //GET CONTRACT AMOUNTS CORRECT
     //=============================
 
-    $queryfaon = "SELECT * FROM nuke_modules WHERE mid = '83' ORDER BY title ASC"; // THIS CHECKS IF FA IS ACTIVE AND HIDES FA PLAYERS IF IT IS
+    $queryfaon = "SELECT title, active FROM nuke_modules WHERE title = 'Free_Agency' LIMIT 1";
     $resultfaon = $db->sql_query($queryfaon);
     $faon = $db->sql_result($resultfaon, 0, "active");
 

@@ -86,6 +86,18 @@ class Team
         return $result;
     }
 
+    public function getTotalCurrentSeasonSalariesFromPlrResult($result)
+    {
+        $totalCurrentSeasonSalaries = 0;
+        
+        $playerArray = $this->convertPlrResultIntoPlayerArray($result);
+        foreach ($playerArray as $player) {
+            $totalCurrentSeasonSalaries += $player->getCurrentSeasonSalary();
+        }
+
+        return $totalCurrentSeasonSalaries;
+    }
+
     public function convertPlrResultIntoPlayerArray($result)
     {
         $array = array();

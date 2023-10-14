@@ -75,6 +75,14 @@ class Team
         return $result;
     }
 
+    public function getBuyoutsResult()
+    {
+        $query = "SELECT * FROM ibl_plr WHERE tid = '$this->teamID' AND name LIKE '%Buyout%' ORDER BY name ASC";
+        $result = $this->db->sql_query($query);
+
+        return $result;
+    }
+
     public function convertPlrResultIntoPlayerArray($result)
     {
         $array = array();

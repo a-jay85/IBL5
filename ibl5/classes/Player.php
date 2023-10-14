@@ -179,6 +179,13 @@ class Player
         $this->timeDroppedOnWaivers = $plrRow['droptime'];
     }
 
+    public function getCurrentSeasonSalary()
+    {
+        $currentSeasonSalary = $this->{"contractYear" . $this->contractCurrentYear . "Salary"};
+
+        return $currentSeasonSalary;
+    }
+
     public function getRemainingContractArray()
     {
         $remainingContractYear = 1;

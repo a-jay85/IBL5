@@ -179,6 +179,17 @@ class Player
         $this->timeDroppedOnWaivers = $plrRow['droptime'];
     }
 
+    public function getRemainingContractArray()
+    {
+        $remainingContractYear = 1;
+        for ($i = $this->contractCurrentYear; $i <= $this->contractTotalYears; $i++) {
+            $contractArray[$remainingContractYear] = $this->{"contractYear" . $i . "Salary"};
+            $remainingContractYear++;
+        }
+
+        return $contractArray;
+    }
+
     public function canRenegotiateContract()
     {
         if (

@@ -107,6 +107,7 @@ class Player
     {
         $this->db = $db;
 
+        $this->playerID = $plrRow['pid'];
         $this->ordinal = $plrRow['ordinal'];
         $this->name = $plrRow['name'];
         $this->nickname = $plrRow['nickname'];

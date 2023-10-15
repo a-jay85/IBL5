@@ -22,6 +22,7 @@ class Team
 
     const SOFT_CAP_MAX = 5000;
     const HARD_CAP_MAX = 7000;
+    const BUYOUT_PERCENTAGE_MAX = 0.40;
 
     public function __construct()
     {
@@ -102,6 +103,19 @@ class Team
         $projectedTotalCurrentSeasonSalaries = $totalCurrentSeasonSalaries + $currentSeasonContractValueToBeAdded;
 
         if ($projectedTotalCurrentSeasonSalaries <= self::HARD_CAP_MAX) {
+            return TRUE;
+        }
+        return FALSE;
+    }
+
+    public function canAddBuyoutWithoutExceedingBuyoutLimit($currentSeasonBuyoutValueToBeAdded)
+    {
+        $buyoutsResult = $this->getBuyoutsResult();
+        $totalCurrentSeasonBuyouts = $this->getTotalCurrentSeasonSalariesFromPlrResult($buyoutsResult);
+        $projectedTotalCurrentSeasonBuyouts = $totalCurrentSeasonBuyouts + $currentSeasonBuyoutValueToBeAdded;
+        $buyoutLimit = self::HARD_CAP_MAX * self::BUYOUT_PERCENTAGE_MAX;
+
+        if ($projectedTotalCurrentSeasonBuyouts <= $buyoutLimit) {
             return TRUE;
         }
         return FALSE;

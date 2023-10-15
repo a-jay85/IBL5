@@ -185,6 +185,22 @@ class Player
         return $currentSeasonSalary;
     }
 
+    public function getLongBuyoutArray()
+    {
+        $totalRemainingSalary = $this->getTotalRemainingSalary();
+        $oneSixthOfTotalRemainingSalary = round($totalRemainingSalary / 6);
+        $longBuyoutArray[1] = $longBuyoutArray[2] = $longBuyoutArray[3] = $longBuyoutArray[4] = $longBuyoutArray[5] = $longBuyoutArray[6] = $oneSixthOfTotalRemainingSalary;
+        return $longBuyoutArray;
+    }
+
+    public function getShortBuyoutArray()
+    {
+        $totalRemainingSalary = $this->getTotalRemainingSalary();
+        $oneHalfOfTotalRemainingSalary = round($totalRemainingSalary / 2);
+        $shortBuyoutArray[1] = $shortBuyoutArray[2] = $oneHalfOfTotalRemainingSalary;
+        return $shortBuyoutArray;
+    }
+
     public function getRemainingContractArray()
     {
         $remainingContractYear = 1;

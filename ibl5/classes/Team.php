@@ -95,6 +95,18 @@ class Team
         return $totalCurrentSeasonSalaries;
     }
 
+    public function canAddContractWithoutGoingOverHardCap($currentSeasonContractValueToBeAdded)
+    {
+        $teamResult = $this->getAlphabeticalActiveRosterResult();
+        $totalCurrentSeasonSalaries = $this->getTotalCurrentSeasonSalariesFromPlrResult($teamResult);
+        $projectedTotalCurrentSeasonSalaries = $totalCurrentSeasonSalaries + $currentSeasonContractValueToBeAdded;
+
+        if ($projectedTotalCurrentSeasonSalaries <= self::HARD_CAP_MAX) {
+            return TRUE;
+        }
+        return FALSE;
+    }
+
     public function convertPlrResultIntoPlayerArray($result)
     {
         $array = array();

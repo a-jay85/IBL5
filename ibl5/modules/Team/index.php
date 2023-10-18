@@ -141,7 +141,7 @@ function team($tid)
 
     if ($display == "contracts") {
         $showing = "Contracts";
-        $table_contracts = contracts($db, $result, $team->color1, $team->color2, $tid, $faon);
+        $table_contracts = contracts($db, $result, $team, $faon);
         $table_output = $table_contracts;
         $tabs .= "<td bgcolor=#BBBBBB style=\"font-weight:bold\">";
     } else {
@@ -1029,32 +1029,32 @@ function simAverages($db, $sharedFunctions, $color1, $color2, $tid)
     return $table_simAverages;
 }
 
-function contracts($db, $result, $color1, $color2, $tid, $faon)
+function contracts($db, $result, $team, $faon)
 {
     $table_contracts = "<table align=\"center\" class=\"sortable\">
         <thead>
-            <tr bgcolor=$color1>
-                <th><font color=$color2>Pos</font></th>
-                <th colspan=2><font color=$color2>Player</font></th>
-                <th><font color=$color2>Exp</font></th>
-                <th><font color=$color2>Bird</font></th>
-                <td bgcolor=$color1 width=0></td>
-                <th><font color=$color2>Year1</font></th>
-                <th><font color=$color2>Year2</font></th>
-                <th><font color=$color2>Year3</font></th>
-                <th><font color=$color2>Year4</font></th>
-                <th><font color=$color2>Year5</font></th>
-                <th><font color=$color2>Year6</font></th>
-                <td bgcolor=$color1 width=0></td>
-                <th><font color=$color2>Tal</font></th>
-                <th><font color=$color2>Skl</font></th>
-                <th><font color=$color2>Int</font></th>
-                <td bgcolor=$color1 width=0></td>
-                <th><font color=$color2>Loy</font></th>
-                <th><font color=$color2>PFW</font></th>
-                <th><font color=$color2>PT</font></th>
-                <th><font color=$color2>Sec</font></th>
-                <th><font color=$color2>Trad</font></th>
+            <tr bgcolor=$team->color1>
+                <th><font color=$team->color2>Pos</font></th>
+                <th colspan=2><font color=$team->color2>Player</font></th>
+                <th><font color=$team->color2>Exp</font></th>
+                <th><font color=$team->color2>Bird</font></th>
+                <td bgcolor=$team->color1 width=0></td>
+                <th><font color=$team->color2>Year1</font></th>
+                <th><font color=$team->color2>Year2</font></th>
+                <th><font color=$team->color2>Year3</font></th>
+                <th><font color=$team->color2>Year4</font></th>
+                <th><font color=$team->color2>Year5</font></th>
+                <th><font color=$team->color2>Year6</font></th>
+                <td bgcolor=$team->color1 width=0></td>
+                <th><font color=$team->color2>Tal</font></th>
+                <th><font color=$team->color2>Skl</font></th>
+                <th><font color=$team->color2>Int</font></th>
+                <td bgcolor=$team->color1 width=0></td>
+                <th><font color=$team->color2>Loy</font></th>
+                <th><font color=$team->color2>PFW</font></th>
+                <th><font color=$team->color2>PT</font></th>
+                <th><font color=$team->color2>Sec</font></th>
+                <th><font color=$team->color2>Trad</font></th>
             </tr>
         </thead>
     <tbody>";
@@ -1086,7 +1086,7 @@ function contracts($db, $result, $color1, $color2, $tid, $faon)
         $security = $db->sql_result($result, $i, "security");
         $tradition = $db->sql_result($result, $i, "tradition");
 
-        $playerNameDecorated = Shared::decoratePlayerName($name, $tid, $p_ord, $cy, $cyt);
+        $playerNameDecorated = Shared::decoratePlayerName($name, $team->teamID, $p_ord, $cy, $cyt);
 
         if ($faon == 0) {
             $year1 = $cy;
@@ -1127,18 +1127,18 @@ function contracts($db, $result, $color1, $color2, $tid, $faon)
             <td colspan=2><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$playerNameDecorated</a></td>
             <td align=center>$exp</td>
             <td align=center>$bird</td>
-            <td bgcolor=$color1></td>
+            <td bgcolor=$team->color1></td>
             <td>$con1</td>
             <td>$con2</td>
             <td>$con3</td>
             <td>$con4</td>
             <td>$con5</td>
             <td>$con6</td>
-            <td bgcolor=$color1></td>
+            <td bgcolor=$team->color1></td>
             <td align=center>$talent</td>
             <td align=center>$skill</td>
             <td align=center>$intangibles</td>
-            <td bgcolor=$color1></td>
+            <td bgcolor=$team->color1></td>
             <td align=center>$loyalty</td>
             <td align=center>$winner</td>
             <td align=center>$playingTime</td>
@@ -1162,14 +1162,14 @@ function contracts($db, $result, $color1, $color2, $tid, $faon)
                 <td colspan=2><b>Cap Totals</td>
                 <td></td>
                 <td></td>
-                <td bgcolor=$color1></td>
+                <td bgcolor=$team->color1></td>
                 <td><b>$cap1</td>
                 <td><b>$cap2</td>
                 <td><b>$cap3</td>
                 <td><b>$cap4</td>
                 <td><b>$cap5</td>
                 <td><b>$cap6</td>
-                <td bgcolor=$color1></td>
+                <td bgcolor=$team->color1></td>
                 <td></td>
                 <td></td>
                 <td></td>

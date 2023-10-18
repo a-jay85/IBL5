@@ -1067,66 +1067,50 @@ function contracts($db, $result, $team, $faon)
     $cap6 = 0;
 
     $i = 0;
-    $num = $db->sql_numrows($result);
-    while ($i < $num) {
-        $name = $db->sql_result($result, $i, "name");
-        $pos = $db->sql_result($result, $i, "pos");
-        $p_ord = $db->sql_result($result, $i, "ordinal");
-        $pid = $db->sql_result($result, $i, "pid");
-        $cy = $db->sql_result($result, $i, "cy");
-        $cyt = $db->sql_result($result, $i, "cyt");
-        $exp = $db->sql_result($result, $i, "exp");
-        $bird = $db->sql_result($result, $i, "bird");
-        $talent = $db->sql_result($result, $i, "talent");
-        $skill = $db->sql_result($result, $i, "skill");
-        $intangibles = $db->sql_result($result, $i, "intangibles");
-        $loyalty = $db->sql_result($result, $i, "loyalty");
-        $winner = $db->sql_result($result, $i, "winner");
-        $playingTime = $db->sql_result($result, $i, "playingTime");
-        $security = $db->sql_result($result, $i, "security");
-        $tradition = $db->sql_result($result, $i, "tradition");
+    foreach ($result as $plrRow) {
+        $player = Player::withPlrRow($db, $plrRow);
 
-        $playerNameDecorated = Shared::decoratePlayerName($name, $team->teamID, $p_ord, $cy, $cyt);
+        $playerNameDecorated = Shared::decoratePlayerName($player->name, $team->teamID, $player->ordinal, $player->contractCurrentYear, $player->contractTotalYears);
 
         if ($faon == 0) {
-            $year1 = $cy;
-            $year2 = $cy + 1;
-            $year3 = $cy + 2;
-            $year4 = $cy + 3;
-            $year5 = $cy + 4;
-            $year6 = $cy + 5;
+            $year1 = $player->contractCurrentYear;
+            $year2 = $player->contractCurrentYear + 1;
+            $year3 = $player->contractCurrentYear + 2;
+            $year4 = $player->contractCurrentYear + 3;
+            $year5 = $player->contractCurrentYear + 4;
+            $year6 = $player->contractCurrentYear + 5;
         } else {
-            $year1 = $cy + 1;
-            $year2 = $cy + 2;
-            $year3 = $cy + 3;
-            $year4 = $cy + 4;
-            $year5 = $cy + 5;
-            $year6 = $cy + 6;
+            $year1 = $player->contractCurrentYear + 1;
+            $year2 = $player->contractCurrentYear + 2;
+            $year3 = $player->contractCurrentYear + 3;
+            $year4 = $player->contractCurrentYear + 4;
+            $year5 = $player->contractCurrentYear + 5;
+            $year6 = $player->contractCurrentYear + 6;
         }
-        if ($cy == 0) {
-            $year1 < 7 ? $con1 = $db->sql_result($result, $i, "cy1") : $con1 = 0;
-            $year2 < 7 ? $con2 = $db->sql_result($result, $i, "cy2") : $con2 = 0;
-            $year3 < 7 ? $con3 = $db->sql_result($result, $i, "cy3") : $con3 = 0;
-            $year4 < 7 ? $con4 = $db->sql_result($result, $i, "cy4") : $con4 = 0;
-            $year5 < 7 ? $con5 = $db->sql_result($result, $i, "cy5") : $con5 = 0;
-            $year6 < 7 ? $con6 = $db->sql_result($result, $i, "cy6") : $con6 = 0;
+        if ($player->contractCurrentYear == 0) {
+            $year1 < 7 ? $con1 = $player->contractYear1Salary : $con1 = 0;
+            $year2 < 7 ? $con2 = $player->contractYear2Salary : $con2 = 0;
+            $year3 < 7 ? $con3 = $player->contractYear3Salary : $con3 = 0;
+            $year4 < 7 ? $con4 = $player->contractYear4Salary : $con4 = 0;
+            $year5 < 7 ? $con5 = $player->contractYear5Salary : $con5 = 0;
+            $year6 < 7 ? $con6 = $player->contractYear6Salary : $con6 = 0;
         } else {
-            $year1 < 7 ? $con1 = $db->sql_result($result, $i, "cy$year1") : $con1 = 0;
-            $year2 < 7 ? $con2 = $db->sql_result($result, $i, "cy$year2") : $con2 = 0;
-            $year3 < 7 ? $con3 = $db->sql_result($result, $i, "cy$year3") : $con3 = 0;
-            $year4 < 7 ? $con4 = $db->sql_result($result, $i, "cy$year4") : $con4 = 0;
-            $year5 < 7 ? $con5 = $db->sql_result($result, $i, "cy$year5") : $con5 = 0;
-            $year6 < 7 ? $con6 = $db->sql_result($result, $i, "cy$year6") : $con6 = 0;
+            $year1 < 7 ? $con1 = $player->{'contractYear' . $year1 . 'Salary'} : $con1 = 0;
+            $year2 < 7 ? $con2 = $player->{'contractYear' . $year2 . 'Salary'} : $con2 = 0;
+            $year3 < 7 ? $con3 = $player->{'contractYear' . $year3 . 'Salary'} : $con3 = 0;
+            $year4 < 7 ? $con4 = $player->{'contractYear' . $year4 . 'Salary'} : $con4 = 0;
+            $year5 < 7 ? $con5 = $player->{'contractYear' . $year5 . 'Salary'} : $con5 = 0;
+            $year6 < 7 ? $con6 = $player->{'contractYear' . $year6 . 'Salary'} : $con6 = 0;
         }
 
         (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
 
         $table_contracts .= "
             <tr bgcolor=$bgcolor>
-            <td align=center>$pos</td>
-            <td colspan=2><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$playerNameDecorated</a></td>
-            <td align=center>$exp</td>
-            <td align=center>$bird</td>
+            <td align=center>$player->position</td>
+            <td colspan=2><a href=\"./modules.php?name=Player&pa=showpage&pid=$player->playerID\">$playerNameDecorated</a></td>
+            <td align=center>$player->yearsOfExperience</td>
+            <td align=center>$player->birdYears</td>
             <td bgcolor=$team->color1></td>
             <td>$con1</td>
             <td>$con2</td>
@@ -1135,15 +1119,15 @@ function contracts($db, $result, $team, $faon)
             <td>$con5</td>
             <td>$con6</td>
             <td bgcolor=$team->color1></td>
-            <td align=center>$talent</td>
-            <td align=center>$skill</td>
-            <td align=center>$intangibles</td>
+            <td align=center>$player->ratingTalent</td>
+            <td align=center>$player->ratingSkill</td>
+            <td align=center>$player->ratingIntangibles</td>
             <td bgcolor=$team->color1></td>
-            <td align=center>$loyalty</td>
-            <td align=center>$winner</td>
-            <td align=center>$playingTime</td>
-            <td align=center>$security</td>
-            <td align=center>$tradition</td>
+            <td align=center>$player->freeAgencyLoyalty</td>
+            <td align=center>$player->freeAgencyPlayForWinner</td>
+            <td align=center>$player->freeAgencyPlayingTime</td>
+            <td align=center>$player->freeAgencySecurity</td>
+            <td align=center>$player->freeAgencyTradition</td>
         </tr>";
 
         $cap1 += $con1;

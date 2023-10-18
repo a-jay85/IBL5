@@ -72,10 +72,10 @@ function team($tid)
     } else { // If not Free Agents, use the code below instead.
         if ($yr != "") {
             $query = "SELECT * FROM ibl_hist WHERE teamid = '$tid' AND year = '$yr' ORDER BY name ASC";
-        } else if ($faon == 0) {
-            $query = "SELECT * FROM ibl_plr WHERE tid = '$tid' AND retired = 0 ORDER BY name ASC";
-        } else {
+        } else if ($faon == 1) {
             $query = "SELECT * FROM ibl_plr WHERE tid = '$tid' AND retired = 0 AND cyt != cy ORDER BY name ASC";
+        } else {
+            $query = "SELECT * FROM ibl_plr WHERE tid = '$tid' AND retired = 0 ORDER BY name ASC";
         }
         $result = $db->sql_query($query);
     }

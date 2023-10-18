@@ -2093,62 +2093,6 @@ function drafthistory($tid)
     include "footer.php";
 }
 
-function eoy_voters()
-{
-    global $db;
-
-    include "header.php";
-    $query2 = "SELECT * FROM ibl_team_history WHERE teamid != 35 ORDER BY teamid ASC";
-    $result2 = $db->sql_query($query2);
-    $num2 = $db->sql_numrows($result2);
-
-    OpenTable();
-    $k = 0;
-    while ($k < $num2) {
-        $teamname[$k] = $db->sql_result($result2, $k, "team_name");
-        $teamcity[$k] = $db->sql_result($result2, $k, "team_city");
-        $teamcolor1[$k] = $db->sql_result($result2, $k, "color1");
-        $teamcolor2[$k] = $db->sql_result($result2, $k, "color2");
-        $eoy_vote[$k] = $db->sql_result($result2, $k, "eoy_vote");
-        $teamid[$k] = $db->sql_result($result2, $k, "teamid");
-
-        $table_echo .= "<tr><td bgcolor=#" . $teamcolor1[$k] . "><a href=\"./modules.php?name=Team&op=team&tid=" . $teamid[$k] . "\"><font color=#" . $teamcolor2[$k] . ">" . $teamcity[$k] . " " . $teamname[$k] . "</a></td><td>" . $eoy_vote[$k] . "</td></tr>";
-        $k++;
-    }
-    $text .= "<table class=\"sortable\" border=1><tr><th>Team</th><th>Vote Received</th></tr>$table_echo</table>";
-    echo $text;
-    CloseTable();
-    include "footer.php";
-}
-
-function asg_voters()
-{
-    global $db;
-
-    include "header.php";
-    $query2 = "SELECT * FROM ibl_team_history WHERE teamid != 35 ORDER BY teamid ASC";
-    $result2 = $db->sql_query($query2);
-    $num2 = $db->sql_numrows($result2);
-
-    OpenTable();
-    $k = 0;
-    while ($k < $num2) {
-        $teamname[$k] = $db->sql_result($result2, $k, "team_name");
-        $teamcity[$k] = $db->sql_result($result2, $k, "team_city");
-        $teamcolor1[$k] = $db->sql_result($result2, $k, "color1");
-        $teamcolor2[$k] = $db->sql_result($result2, $k, "color2");
-        $asg_vote[$k] = $db->sql_result($result2, $k, "asg_vote");
-        $teamid[$k] = $db->sql_result($result2, $k, "teamid");
-
-        $table_echo .= "<tr><td bgcolor=#" . $teamcolor1[$k] . "><a href=\"./modules.php?name=Team&op=team&tid=" . $teamid[$k] . "\"><font color=#" . $teamcolor2[$k] . ">" . $teamcity[$k] . " " . $teamname[$k] . "</a></td><td>" . $asg_vote[$k] . "</td></tr>";
-        $k++;
-    }
-    $text .= "<table class=\"sortable\" border=1><tr><th>Team</th><th>Vote Received</th></tr>$table_echo</table>";
-    echo $text;
-    CloseTable();
-    include "footer.php";
-}
-
 function menu()
 {
     global $db;
@@ -2182,14 +2126,6 @@ switch ($op) {
 
     case "drafthistory":
         drafthistory($tid);
-        break;
-
-    case "eoy_voters":
-        eoy_voters();
-        break;
-
-    case "asg_voters":
-        asg_voters();
         break;
 
     default:

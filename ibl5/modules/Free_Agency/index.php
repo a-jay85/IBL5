@@ -1315,9 +1315,7 @@ function negotiate($pid)
 
     $rosterspots = 15;
 
-    $capquery = "SELECT * FROM ibl_plr WHERE (teamname='$userteam' AND retired = '0') OR
-                    (`name` LIKE '%Buyout%' AND `name` LIKE '%$userteam%') OR
-                    (`name` LIKE '%Cash%' AND tid=$tid);";
+    $capquery = "SELECT * FROM ibl_plr WHERE (tid=$tid AND retired='0') ORDER BY ordinal ASC;";
     $capresult = $db->sql_query($capquery);
 
     while ($capdecrementer = $db->sql_fetchrow($capresult)) {

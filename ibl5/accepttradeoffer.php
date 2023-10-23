@@ -48,6 +48,12 @@ if ($offer_id != NULL) {
             $cashYear[5] = $cashDetails['cy5'];
             $cashYear[6] = $cashDetails['cy6'];
 
+            $contractCurrentYear = 1;
+            $currentSeasonPhase = $sharedFunctions->getCurrentSeasonPhase();
+            if ($currentSeasonPhase == "Free Agency") {
+                $contractCurrentYear = 0;
+            }
+            
             if ($cashYear[6] != 0) {
                 $contractTotalYears = 6;
             } elseif ($cashYear[5] != 0) {
@@ -83,8 +89,8 @@ if ($offer_id != NULL) {
                 '| <B>Cash to $to</B>',
                 '$tidSendingTeam',
                 '$from',
-                '1',
-                '1',
+                '$contractCurrentYear',
+                '$contractCurrentYear',
                 '$contractTotalYears',
                 '$cashYear[1]',
                 '$cashYear[2]',
@@ -117,9 +123,9 @@ if ($offer_id != NULL) {
                 '| <B>Cash from $from</B>',
                 '$tidReceivingTeam',
                 '$to',
-                '1',
-                '1',
-                '1',
+                '$contractCurrentYear',
+                '$contractCurrentYear',
+                '$contractTotalYears',
                 '-$cashYear[1]',
                 '-$cashYear[2]',
                 '-$cashYear[3]',
@@ -153,7 +159,6 @@ if ($offer_id != NULL) {
             $resulti = $db->sql_query($queryi);
         }
     
-        $currentSeasonPhase = $sharedFunctions->getCurrentSeasonPhase();
         if ($currentSeasonPhase == "Playoffs" or $currentSeasonPhase == "Draft" or $currentSeasonPhase == "Free Agency") {
             $queryInsert = "INSERT INTO ibl_trade_queue (query, tradeline) VALUES ('$queryi', '$tradeLine');";
             $db->sql_query("$queryInsert");

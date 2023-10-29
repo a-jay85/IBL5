@@ -42,7 +42,7 @@ function menu()
     <a href=\"modules.php?name=Player&pa=search\">Player Search</a>  |
     <a href=\"modules.php?name=Player&pa=awards\">Awards Search</a> |
     <a href=\"modules.php?name=One-on-One\">One-on-One Game</a> |
-    <a href=\"modules.php?name=Player&pa=Leaderboards\">Career Leaderboards</a> (All Types)
+    <a href=\"modules.php?name=Leaderboards\">Career Leaderboards</a> (All Types)
     </b><hr>";
 }
 

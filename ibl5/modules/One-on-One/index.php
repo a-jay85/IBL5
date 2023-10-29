@@ -25,22 +25,6 @@ $pagetitle = "- $module_name";
 
 oneonone();
 
-function menu()
-{
-    echo "<center><b>
-	<a href=\"modules.php?name=Player_Search\">Player Search</a>  |
-	<a href=\"modules.php?name=Player&pa=awards\">Awards Search</a> |
-	<a href=\"modules.php?name=One-on-One\">One-On-One Game</a> |
-	<a href=\"modules.php?name=Leaderboards\">Career Leaderboards</a> (All Types)
-	</b><hr>";
-}
-
-// ================================================================================
-//
-// One-On-One Code
-//
-// ================================================================================
-
 function oneonone()
 {
     global $prefix, $db, $user, $cookie;
@@ -56,7 +40,7 @@ function oneonone()
     $ownerplaying = stripslashes(check_html($userinfo['username'], "nohtml"));
 
     OpenTable();
-    menu();
+    UI::playerMenu();
 
     $player1 = $_POST['pid1'];
     $player2 = $_POST['pid2'];

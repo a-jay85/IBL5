@@ -40,6 +40,8 @@ function showpage($playerID, $spec)
 {
     global $prefix, $db, $user, $cookie;
     $sharedFunctions = new Shared($db);
+    $seasonPhase = $sharedFunctions->getCurrentSeasonPhase();
+    
     $player = Player::withPlayerID($db, $playerID);
     $playerStats = PlayerStats::withPlayerID($db, $playerID);
     $spec = intval($spec);
@@ -51,8 +53,6 @@ function showpage($playerID, $spec)
     include "header.php";
     OpenTable();
     UI::playerMenu();
-
-    $seasonPhase = $sharedFunctions->getCurrentSeasonPhase();
 
     echo "<table>
         <tr>

@@ -30,7 +30,9 @@ function team($tid)
 {
     global $db;
     $tid = intval($tid);
-    $team = Team::withTeamID($db, $tid);
+    if ($tid > 0) {
+        $team = Team::withTeamID($db, $tid);
+    }
     $sharedFunctions = new Shared($db);
 
     $yr = $_REQUEST['yr'];

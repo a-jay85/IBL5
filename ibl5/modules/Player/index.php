@@ -44,72 +44,7 @@ function showpage($playerID, $spec)
     $playerStats = PlayerStats::withPlayerID($db, $playerID);
     $spec = intval($spec);
 
-    $year = $player->draftYear + $player->yearsOfExperience;
-
-    // CONTRACT FORMATTER
-
-    if ($player->contractCurrentYear == 1 OR $player->contractCurrentYear == 0) {
-        $contract_display = $player->contractYear1Salary;
-        if ($player->contractYear2Salary != 0) {
-            $contract_display .=  "/" . $player->contractYear2Salary;
-            if ($player->contractYear3Salary != 0) {
-                $contract_display .=  "/" . $player->contractYear3Salary;
-                if ($player->contractYear4Salary != 0) {
-                    $contract_display .=  "/" . $player->contractYear4Salary;
-                    if ($player->contractYear5Salary != 0) {
-                        $contract_display .=  "/" . $player->contractYear5Salary;
-                        if ($player->contractYear6Salary != 0) {
-                            $contract_display .=  "/" . $player->contractYear6Salary;
-                        }
-                    }
-                }
-            }
-        }
-    } elseif ($player->contractCurrentYear == 2) {
-        $contract_display = $player->contractYear2Salary;
-        if ($player->contractYear3Salary != 0) {
-            $contract_display .=  "/" . $player->contractYear3Salary;
-            if ($player->contractYear4Salary != 0) {
-                $contract_display .=  "/" . $player->contractYear4Salary;
-                if ($player->contractYear5Salary != 0) {
-                    $contract_display .=  "/" . $player->contractYear5Salary;
-                    if ($player->contractYear6Salary != 0) {
-                        $contract_display .=  "/" . $player->contractYear6Salary;
-                    }
-                }
-            }
-        }
-    } elseif ($player->contractCurrentYear == 3) {
-        $contract_display = $player->contractYear3Salary;
-        if ($player->contractYear4Salary != 0) {
-            $contract_display .=  "/" . $player->contractYear4Salary;
-            if ($player->contractYear5Salary != 0) {
-                $contract_display .=  "/" . $player->contractYear5Salary;
-                if ($player->contractYear6Salary != 0) {
-                    $contract_display .=  "/" . $player->contractYear6Salary;
-                }
-            }
-        }
-    } elseif ($player->contractCurrentYear == 4) {
-        $contract_display = $player->contractYear4Salary;
-        if ($player->contractYear5Salary != 0) {
-            $contract_display .=  "/" . $player->contractYear5Salary;
-            if ($player->contractYear6Salary != 0) {
-                $contract_display .=  "/" . $player->contractYear6Salary;
-            }
-        }
-    } elseif ($player->contractCurrentYear == 5) {
-        $contract_display = $player->contractYear5Salary;
-        if ($player->contractYear6Salary != 0) {
-            $contract_display .=  "/" . $player->contractYear6Salary;
-        }
-    } elseif ($player->contractCurrentYear == 6) {
-        $contract_display = $player->contractYear6Salary;
-    } else {
-        $contract_display = "not under contract";
-    }
-
-    // END CONTRACT FORMATTER
+    $year = $player->draftYear + $player->yearsOfExperience; 
 
     // DISPLAY PAGE
 
@@ -186,6 +121,8 @@ function showpage($playerID, $spec)
                 </tr>
             </table>";
     }
+
+    $contract_display = implode("/", $player->getRemainingContractArray());
 
     echo "<font class=\"content\">Age: $player->age | Height: $player->heightFeet-$player->heightInches | Weight: $player->weightPounds | College: $player->collegeName<br>
         <i>Drafted by the $player->draftTeamOriginalName with the # $player->draftPickNumber pick of round $player->draftRound in the <a href=\"draft.php?year=$player->draftYear\">$player->draftYear Draft</a></i><br>

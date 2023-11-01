@@ -84,26 +84,26 @@ function showpage($playerID, $spec)
                     <td align=center>ROOKIE OPTION<br>USED; RENEGOTIATION<br>IMPOSSIBLE</td>
                 </tr>
             </table>";
-    }
+    } else {
+        $queryHasUsedExtensionThisSeason = "SELECT Used_Extension_This_Season
+            FROM ibl_team_info
+            WHERE team_name = '" . $userinfo['user_ibl_team'] . "';";
+        $hasUsedExtensionThisSeason = $db->sql_result($db->sql_query($queryHasUsedExtensionThisSeason), 0);
 
-    $queryHasUsedExtensionThisSeason = "SELECT Used_Extension_This_Season
-        FROM ibl_team_info
-        WHERE team_name = '" . $userinfo['user_ibl_team'] . "';";
-    $hasUsedExtensionThisSeason = $db->sql_result($db->sql_query($queryHasUsedExtensionThisSeason), 0);
-
-    $currentSeasonPhase = $sharedFunctions->getCurrentSeasonPhase();
-    if (
-        $hasUsedExtensionThisSeason == 0 and
-        $player->canRenegotiateContract() and
-        $currentSeasonPhase != 'Draft' and
-        $currentSeasonPhase != 'Free Agency' and
-        $player->teamName == $userteam
-    ) {
-        echo "<table align=right bgcolor=#ff0000>
-                <tr>
-                    <td align=center><a href=\"modules.php?name=Player&pa=negotiate&pid=$playerID\">RENEGOTIATE<BR>CONTRACT</a></td>
-                </tr>
-            </table>";
+        $currentSeasonPhase = $sharedFunctions->getCurrentSeasonPhase();
+        if (
+            $hasUsedExtensionThisSeason == 0 and
+            $player->canRenegotiateContract() and
+            $currentSeasonPhase != 'Draft' and
+            $currentSeasonPhase != 'Free Agency' and
+            $player->teamName == $userteam
+        ) {
+            echo "<table align=right bgcolor=#ff0000>
+                    <tr>
+                        <td align=center><a href=\"modules.php?name=Player&pa=negotiate&pid=$playerID\">RENEGOTIATE<BR>CONTRACT</a></td>
+                    </tr>
+                </table>";
+        }
     }
 
     // RENEGOTIATION BUTTON END

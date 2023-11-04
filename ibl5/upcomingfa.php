@@ -20,7 +20,6 @@ if ($tid == null) {
                 <th>Player</th>
                 <th>Team</th>
                 <th>Age</th>
-                <th>Sta</th>
                 <th>2ga</th>
                 <th>2g%</th>
                 <th>fta</th>
@@ -42,12 +41,10 @@ if ($tid == null) {
                 <th>d-d</th>
                 <th>p-d</th>
                 <th>t-d</th>
-                <th>Inj</th>
                 <th>Loy</th>
                 <th>PFW</th>
                 <th>PT</th>
                 <th>Sec</th>
-                <th>Cch</th>
                 <th>Trad</th>
             </tr>";
 
@@ -73,7 +70,6 @@ if ($tid == null) {
                 $pid = $db->sql_result($result, $i, "pid");
                 $pos = $db->sql_result($result, $i, "pos");
                 $age = $db->sql_result($result, $i, "age");
-                $inj = $db->sql_result($result, $i, "injured");
 
                 $r_2ga = $db->sql_result($result, $i, "r_fga");
                 $r_2gp = $db->sql_result($result, $i, "r_fgp");
@@ -87,7 +83,6 @@ if ($tid == null) {
                 $r_stl = $db->sql_result($result, $i, "r_stl");
                 $r_blk = $db->sql_result($result, $i, "r_blk");
                 $r_tvr = $db->sql_result($result, $i, "r_to");
-                $r_sta = $db->sql_result($result, $i, "sta");
                 $r_foul = $db->sql_result($result, $i, "r_foul");
                 $r_totoff = $db->sql_result($result, $i, "oo") + $db->sql_result($result, $i, "do") + $db->sql_result($result, $i, "po") + $db->sql_result($result, $i, "to");
                 $r_totdef = $db->sql_result($result, $i, "od") + $db->sql_result($result, $i, "dd") + $db->sql_result($result, $i, "pd") + $db->sql_result($result, $i, "td");
@@ -104,7 +99,6 @@ if ($tid == null) {
                 $playForWinner = $db->sql_result($result, $i, "winner");
                 $playingTime = $db->sql_result($result, $i, "playingTime");
                 $security = $db->sql_result($result, $i, "security");
-                $coach = $db->sql_result($result, $i, "coach");
                 $tradition = $db->sql_result($result, $i, "tradition");
 
                 if ($j == 0) {
@@ -118,7 +112,6 @@ if ($tid == null) {
                     <td><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>
                     <td><a href=\"team.php?tid=$tid\">$team</a></td>
                     <td>$age</td>
-                    <td>$r_sta</td>
                     <td>$r_2ga</td>
                     <td>$r_2gp</td>
                     <td>$r_fta</td>
@@ -140,12 +133,10 @@ if ($tid == null) {
                     <td>$r_dd</td>
                     <td>$r_pd</td>
                     <td>$r_td</td>
-                    <td>$inj</td>
                     <td>$loyalty</td>
                     <td>$playForWinner</td>
                     <td>$playingTime</td>
                     <td>$security</td>
-                    <td>$coach</td>
                     <td>$tradition</td>
                 </tr>
                 ";

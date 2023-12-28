@@ -237,7 +237,7 @@ function seasonTotals($db, $result, $color1, $color2, $tid, $yr, $team_name)
 
         $firstCharacterOfPlayerName = substr($name, 0, 1); // if player name starts with '|' (pipe symbol), then skip them
         if ($firstCharacterOfPlayerName !== '|') {
-            $playerNameDecorated = Shared::decoratePlayerName($name, $tid, $p_ord, $cy, $cyt);
+            $playerNameDecorated = UI::decoratePlayerName($name, $tid, $p_ord, $cy, $cyt);
 
             if ($yr == "") {
                 $stats_gm = $db->sql_result($result, $i, "stats_gm");
@@ -476,7 +476,7 @@ function seasonAverages($db, $result, $color1, $color2, $tid, $yr, $team_name)
 
         $firstCharacterOfPlayerName = substr($name, 0, 1); // if player name starts with '|' (pipe symbol), then skip them
         if ($firstCharacterOfPlayerName !== '|') {
-            $playerNameDecorated = Shared::decoratePlayerName($name, $tid, $p_ord, $cy, $cyt);
+            $playerNameDecorated = UI::decoratePlayerName($name, $tid, $p_ord, $cy, $cyt);
 
             if ($yr == "") {
                 $stats_gm = $db->sql_result($result, $i, "stats_gm");
@@ -779,7 +779,7 @@ function per36Minutes($db, $result, $color1, $color2, $tid, $yr)
 
         $firstCharacterOfPlayerName = substr($name, 0, 1); // if player name starts with '|' (pipe symbol), then skip them
         if ($firstCharacterOfPlayerName !== '|') {
-            $playerNameDecorated = Shared::decoratePlayerName($name, $tid, $p_ord, $cy, $cyt);
+            $playerNameDecorated = UI::decoratePlayerName($name, $tid, $p_ord, $cy, $cyt);
 
             if ($yr == "") {
                 $stats_gm = $db->sql_result($result, $i, "stats_gm");
@@ -1072,7 +1072,7 @@ function contracts($db, $result, $team, $faon)
     foreach ($result as $plrRow) {
         $player = Player::withPlrRow($db, $plrRow);
 
-        $playerNameDecorated = Shared::decoratePlayerName($player->name, $team->teamID, $player->ordinal, $player->contractCurrentYear, $player->contractTotalYears);
+        $playerNameDecorated = UI::decoratePlayerName($player->name, $team->teamID, $player->ordinal, $player->contractCurrentYear, $player->contractTotalYears);
 
         if ($faon == 0) {
             $year1 = $player->contractCurrentYear;

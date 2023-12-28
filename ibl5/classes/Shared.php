@@ -110,20 +110,6 @@ class Shared
         return $this->db->sql_result($queryAllowTradesStatus, 0);
     }
 
-    public static function decoratePlayerName($name, $tid, $ordinal, $currentContractYear, $totalYearsOnContract)
-    {
-        if ($tid == 0) {
-            $playerNameDecorated = "$name";
-        } elseif ($ordinal >= 960) { // on waivers
-            $playerNameDecorated = "($name)*";
-        } elseif ($currentContractYear == $totalYearsOnContract) { // eligible for Free Agency at the end of this season
-            $playerNameDecorated = "$name^";
-        } else {
-            $playerNameDecorated = "$name";
-        }
-        return $playerNameDecorated;
-    }
-
     public function ratings($db, $result, $color1, $color2, $tid, $yr)
     {
         $table_ratings = "<table align=\"center\" class=\"sortable\">
@@ -236,7 +222,7 @@ class Shared
 
             $firstCharacterOfPlayerName = substr($name, 0, 1); // if player name starts with '|' (pipe symbol), then skip them
             if ($firstCharacterOfPlayerName !== '|') {
-                $playerNameDecorated = Shared::decoratePlayerName($name, $tid, $p_ord, $cy, $cyt);
+                $playerNameDecorated = UI::decoratePlayerName($name, $tid, $p_ord, $cy, $cyt);
     
                 (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
         

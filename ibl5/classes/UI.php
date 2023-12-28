@@ -2,6 +2,20 @@
 
 class UI
 {
+    public static function decoratePlayerName($name, $tid, $ordinal, $currentContractYear, $totalYearsOnContract)
+    {
+        if ($tid == 0) {
+            $playerNameDecorated = "$name";
+        } elseif ($ordinal >= 960) { // on waivers
+            $playerNameDecorated = "($name)*";
+        } elseif ($currentContractYear == $totalYearsOnContract) { // eligible for Free Agency at the end of this season
+            $playerNameDecorated = "$name^";
+        } else {
+            $playerNameDecorated = "$name";
+        }
+        return $playerNameDecorated;
+    }
+
     public static function playerMenu()
     {
         echo "<center><b>

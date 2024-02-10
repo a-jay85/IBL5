@@ -72,8 +72,8 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
     <table class=\"sortable\">
     	<tr>
 			<th>Draft</th>
-			<th>Pos</th>
 			<th>Name</th>
+			<th>Pos</th>
 			<th>Team</th>
 			<th>Age</th>
 			<th>fga</th>

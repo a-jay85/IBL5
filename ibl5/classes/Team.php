@@ -10,6 +10,7 @@ class Team
     public $name;
     public $color1;
     public $color2;
+    public $arena;
 
     public $ownerName;
     public $ownerEmail;
@@ -60,6 +61,7 @@ class Team
         $this->name = $teamRow['team_name'];
         $this->color1 = $teamRow['color1'];
         $this->color2 = $teamRow['color2'];
+        $this->arena = $teamRow['arena'];
     
         $this->ownerName = $teamRow['owner_name'];
         $this->ownerEmail = $teamRow['owner_email'];

@@ -19,19 +19,19 @@ function checkIfPidExists($pid, $db) {
 }
 
 if ($offer_id != NULL) {
-    $query0 = "SELECT * FROM ibl_trade_info WHERE tradeofferid = '$offer_id'";
-    $result0 = $db->sql_query($query0);
-    $num0 = $db->sql_numrows($result0);
-    
+    $queryTradeRows = "SELECT * FROM ibl_trade_info WHERE tradeofferid = '$offer_id'";
+    $resultTradeRows = $db->sql_query($queryTradeRows);
+    $numTradeRows = $db->sql_numrows($resultTradeRows);
+
     $i = 0;
     
     $storytext = "";
 
-    while ($i < $num0) {
-        $itemid = $db->sql_result($result0, $i, "itemid");
-        $itemtype = $db->sql_result($result0, $i, "itemtype");
-        $from = $db->sql_result($result0, $i, "from");
-        $to = $db->sql_result($result0, $i, "to");
+    while ($i < $numTradeRows) {
+        $itemid = $db->sql_result($resultTradeRows, $i, "itemid");
+        $itemtype = $db->sql_result($resultTradeRows, $i, "itemtype");
+        $from = $db->sql_result($resultTradeRows, $i, "from");
+        $to = $db->sql_result($resultTradeRows, $i, "to");
     
         if ($itemtype == 'cash') {
             $itemid = checkIfPidExists($itemid, $db);

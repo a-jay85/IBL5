@@ -1284,7 +1284,7 @@ function team_info_right($team)
 		<font color=\"#$team->color2\"><b>Current Season</b></font>
 		</td></tr>
 		<tr><td>";
-    $output .= teamCurrentSeasonStandings($team->name);
+    $output .= teamCurrentSeasonStandings($team);
     $output .= "</td></tr>";
 
     //==================
@@ -1703,10 +1703,9 @@ function teamCurrentSeasonStandings($team)
 {
     global $db;
 
-    $query = "SELECT * FROM ibl_power WHERE Team = '$team'";
+    $query = "SELECT * FROM ibl_power WHERE Team = '$team->name'";
     $result = $db->sql_query($query);
     $num = $db->sql_numrows($result);
-    $Team = $db->sql_result($result, 0, "Team");
     $win = $db->sql_result($result, 0, "win");
     $loss = $db->sql_result($result, 0, "loss");
     $gb = $db->sql_result($result, 0, "gb");
@@ -1727,7 +1726,7 @@ function teamCurrentSeasonStandings($team)
     $gb = $gbbase - $gb;
     while ($i < $num) {
         $Team2 = $db->sql_result($result2, $i, "Team");
-        if ($Team2 == $Team) {
+        if ($Team2 == $team->name) {
             $Div_Pos = $i + 1;
         }
         $i++;
@@ -1739,13 +1738,13 @@ function teamCurrentSeasonStandings($team)
     $i = 0;
     while ($i < $num) {
         $Team3 = $db->sql_result($result3, $i, "Team");
-        if ($Team3 == $Team) {
+        if ($Team3 == $team->name) {
             $Conf_Pos = $i + 1;
         }
         $i++;
     }
 
-    $standings = "<table><tr><td align='right'><b>Team:</td><td>$team</td></tr>
+    $standings = "<table><tr><td align='right'><b>Team:</td><td>$team->name</td></tr>
 		<tr><td align='right'><b>Record:</td><td>$win-$loss</td></tr>
 		<tr><td align='right'><b>Conference:</td><td>$conference</td></tr>
 		<tr><td align='right'><b>Conf Position:</td><td>$Conf_Pos</td></tr>

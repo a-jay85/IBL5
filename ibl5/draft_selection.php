@@ -5,7 +5,7 @@ require 'mainfile.php';
 global $db;
 
 $teamname = $_POST['teamname'];
-$player = $_POST['player'];
+$playerToBeDrafted = $_POST['player'];
 $draft_round = $_POST['draft_round'];
 $draft_pick = $_POST['draft_pick'];
 $date = date('Y-m-d h:m:s');
@@ -13,9 +13,16 @@ $date = date('Y-m-d h:m:s');
 $sharedFunctions = new Shared($db);
 $currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
 
-if ($player != NULL) {
+$queryCurrentDraftSelection = "SELECT `player`
+    FROM ibl_draft
+    WHERE `round` = '$draft_round' 
+       AND `pick` = '$draft_pick';";
+$resultCurrentDraftSelection = $db->sql_query($queryCurrentDraftSelection);
+$currentDraftSelection = $db->sql_result($resultCurrentDraftSelection, 0);
+
+if (($currentDraftSelection == NULL OR $currentDraftSelection == "") AND $playerToBeDrafted != NULL) {
     $queryUpdateDraftTable = "UPDATE ibl_draft 
-         SET `player` = '$player', 
+         SET `player` = '$playerToBeDrafted', 
                `date` = '$date' 
         WHERE `round` = '$draft_round' 
            AND `pick` = '$draft_pick'";
@@ -24,11 +31,11 @@ if ($player != NULL) {
     $queryUpdateRookieTable = "UPDATE `ibl_scout_rookieratings`
           SET `team` = '$teamname', 
            `drafted` = '1'
-        WHERE `name` = '$player'";
+        WHERE `name` = '$playerToBeDrafted'";
     $resultUpdateRookieTable = $db->sql_query($queryUpdateRookieTable);
 
     if ($resultUpdateDraftTable AND $resultUpdateRookieTable) {
-        $message = "With pick number $draft_pick in round $draft_round of the $currentSeasonEndingYear IBL Draft, the **" . $teamname . "** select **" . $player . "!**";
+        $message = "With pick number $draft_pick in round $draft_round of the $currentSeasonEndingYear IBL Draft, the **" . $teamname . "** select **" . $playerToBeDrafted . "!**";
         echo "$message<br>
         <a href=\"modules.php?name=College_Scouting\">Go back to the Draft module</a>";
     
@@ -50,7 +57,10 @@ if ($player != NULL) {
             
             <a href=\"modules.php?name=College_Scouting\">Go back to the Draft module</a>";
     }
-} else {
+} elseif ($playerToBeDrafted == NULL) {
     echo "Oops, you didn't select a player.<p>
-        Please <a href=\"modules.php?name=College_Scouting\">go back to the Draft module</a> and select a player before hitting the Draft button.";
+        <a href=\"modules.php?name=College_Scouting\">Click here to return to the Draft module</a> and please select a player before hitting the Draft button.";
+} elseif ($currentDraftSelection != NULL) {
+    echo "Oops, it looks like you've already drafted a player with this draft pick.<p>
+        <a href=\"modules.php?name=College_Scouting\">Click here to return to the Draft module</a> and if it's your turn, try drafting again.";
 }

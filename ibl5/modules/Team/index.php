@@ -1746,6 +1746,7 @@ function teamCurrentSeasonStandings($team)
 
     $standings = "<table><tr><td align='right'><b>Team:</td><td>$team->name</td></tr>
 		<tr><td align='right'><b>Record:</td><td>$win-$loss</td></tr>
+		<tr><td align='right'><b>Arena:</td><td>$team->arena</td></tr>
 		<tr><td align='right'><b>Conference:</td><td>$conference</td></tr>
 		<tr><td align='right'><b>Conf Position:</td><td>$Conf_Pos</td></tr>
 		<tr><td align='right'><b>Division:</td><td>$division</td></tr>

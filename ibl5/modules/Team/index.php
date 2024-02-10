@@ -143,7 +143,7 @@ function team($tid)
 
     if ($display == "contracts") {
         $showing = "Contracts";
-        $table_contracts = contracts($db, $result, $team, $isFreeAgencyModuleActive);
+        $table_contracts = contracts($db, $result, $team, $isFreeAgencyModuleActive, $sharedFunctions->getCurrentSeasonEndingYear());
         $table_output = $table_contracts;
         $tabs .= "<td bgcolor=#BBBBBB style=\"font-weight:bold\">";
     } else {
@@ -1031,8 +1031,12 @@ function simAverages($db, $sharedFunctions, $color1, $color2, $tid)
     return $table_simAverages;
 }
 
-function contracts($db, $result, $team, $isFreeAgencyModuleActive)
+function contracts($db, $result, $team, $isFreeAgencyModuleActive, $currentSeasonEndingYear)
 {
+    if ($isFreeAgencyModuleActive == 1) {
+        $currentSeasonEndingYear++;
+    }
+    
     $table_contracts = "<table align=\"center\" class=\"sortable\">
         <thead>
             <tr bgcolor=$team->color1>
@@ -1041,12 +1045,12 @@ function contracts($db, $result, $team, $isFreeAgencyModuleActive)
                 <th><font color=$team->color2>Exp</font></th>
                 <th><font color=$team->color2>Bird</font></th>
                 <td bgcolor=$team->color1 width=0></td>
-                <th><font color=$team->color2>Year1</font></th>
-                <th><font color=$team->color2>Year2</font></th>
-                <th><font color=$team->color2>Year3</font></th>
-                <th><font color=$team->color2>Year4</font></th>
-                <th><font color=$team->color2>Year5</font></th>
-                <th><font color=$team->color2>Year6</font></th>
+                <th><font color=$team->color2>" . ($currentSeasonEndingYear + -1) . "-<br>" . ($currentSeasonEndingYear + 0) . "</font></th>
+                <th><font color=$team->color2>" . ($currentSeasonEndingYear + 0) . "-<br>" . ($currentSeasonEndingYear + 1) . "</font></th>
+                <th><font color=$team->color2>" . ($currentSeasonEndingYear + 1) . "-<br>" . ($currentSeasonEndingYear + 2) . "</font></th>
+                <th><font color=$team->color2>" . ($currentSeasonEndingYear + 2) . "-<br>" . ($currentSeasonEndingYear + 3) . "</font></th>
+                <th><font color=$team->color2>" . ($currentSeasonEndingYear + 3) . "-<br>" . ($currentSeasonEndingYear + 4) . "</font></th>
+                <th><font color=$team->color2>" . ($currentSeasonEndingYear + 4) . "-<br>" . ($currentSeasonEndingYear + 5) . "</font></th>
                 <td bgcolor=$team->color1 width=0></td>
                 <th><font color=$team->color2>Tal</font></th>
                 <th><font color=$team->color2>Skl</font></th>

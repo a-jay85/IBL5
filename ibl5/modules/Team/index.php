@@ -57,10 +57,10 @@ function team($tid)
 
     $queryfaon = "SELECT title, active FROM nuke_modules WHERE title = 'Free_Agency' LIMIT 1";
     $resultfaon = $db->sql_query($queryfaon);
-    $faon = $db->sql_result($resultfaon, 0, "active");
+    $isFreeAgencyModuleActive = $db->sql_result($resultfaon, 0, "active");
 
     if ($tid == 0) { // Team 0 is the Free Agents; we want a query that will pick up all of their players.
-        if ($faon == 0) {
+        if ($isFreeAgencyModuleActive == 0) {
             $query = "SELECT * FROM ibl_plr WHERE ordinal > '959' AND retired = 0 ORDER BY ordinal ASC";
             //            $query="SELECT * FROM ibl_plr WHERE tid = 0 AND retired = 0 ORDER BY ordinal ASC";
         } else {
@@ -75,7 +75,7 @@ function team($tid)
         if ($yr != "") {
             $query = "SELECT * FROM ibl_hist WHERE teamid = '$tid' AND year = '$yr' ORDER BY name ASC";
             $result = $db->sql_query($query);
-        } else if ($faon == 1) {
+        } else if ($isFreeAgencyModuleActive == 1) {
             $result = $team->getAlphabeticalFreeAgencyRosterResult();
         } else {
             $result = $team->getAlphabeticalActiveRosterResult();
@@ -143,7 +143,7 @@ function team($tid)
 
     if ($display == "contracts") {
         $showing = "Contracts";
-        $table_contracts = contracts($db, $result, $team, $faon);
+        $table_contracts = contracts($db, $result, $team, $isFreeAgencyModuleActive);
         $table_output = $table_contracts;
         $tabs .= "<td bgcolor=#BBBBBB style=\"font-weight:bold\">";
     } else {
@@ -1031,7 +1031,7 @@ function simAverages($db, $sharedFunctions, $color1, $color2, $tid)
     return $table_simAverages;
 }
 
-function contracts($db, $result, $team, $faon)
+function contracts($db, $result, $team, $isFreeAgencyModuleActive)
 {
     $table_contracts = "<table align=\"center\" class=\"sortable\">
         <thead>
@@ -1074,7 +1074,7 @@ function contracts($db, $result, $team, $faon)
 
         $playerNameDecorated = UI::decoratePlayerName($player->name, $team->teamID, $player->ordinal, $player->contractCurrentYear, $player->contractTotalYears);
 
-        if ($faon == 0) {
+        if ($isFreeAgencyModuleActive == 0) {
             $year1 = $player->contractCurrentYear;
             $year2 = $player->contractCurrentYear + 1;
             $year3 = $player->contractCurrentYear + 2;

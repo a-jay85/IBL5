@@ -198,7 +198,6 @@ $tf_wins = $db->sql_result($result1, 0, "Contract_Wins");
 $tf_loss = $db->sql_result($result1, 0, "Contract_Losses");
 $tf_trdw = $db->sql_result($result1, 0, "Contract_AvgW");
 $tf_trdl = $db->sql_result($result1, 0, "Contract_AvgL");
-$tf_coach = $db->sql_result($result1, 0, "Contract_Coach");
 
 $queryteam = "SELECT * FROM ibl_plr WHERE name = '$Player_Name'";
 $resultteam = $db->sql_query($queryteam);
@@ -206,7 +205,6 @@ $resultteam = $db->sql_query($queryteam);
 $player_team = $db->sql_result($resultteam, 0, "teamname");
 $player_winner = $db->sql_result($resultteam, 0, "winner");
 $player_tradition = $db->sql_result($resultteam, 0, "tradition");
-$player_coach = $db->sql_result($resultteam, 0, "coach");
 $player_security = $db->sql_result($resultteam, 0, "security");
 $player_loyalty = $db->sql_result($resultteam, 0, "loyalty");
 $player_playingtime = $db->sql_result($resultteam, 0, "playingTime");
@@ -216,7 +214,6 @@ $traditionWinLossDifferential = $tf_trdw - $tf_trdl;
 
 $modfactor1 = (0.000153 * ($seasonWinLossDifferential) * ($player_winner - 1));
 $modfactor2 = (0.000153 * ($traditionWinLossDifferential) * ($player_tradition - 1));
-$modfactor3 = (0.0025 * ($tf_coach) * ($player_coach - 1));
 
 if ($Team_Name == $player_team) {
     $modfactor4 = (.025 * ($player_loyalty - 1));
@@ -227,10 +224,9 @@ if ($Team_Name == $player_team) {
 $modfactor5 = (.01 * ($yrsinoffer - 1) - 0.025) * ($player_security - 1);
 $modfactor6 = -(.0025 * $tf_millions / 100 - 0.025) * ($player_playingtime - 1);
 
-$modifier = 1 + $modfactor1 + $modfactor2 + $modfactor3 + $modfactor4 + $modfactor5 + $modfactor6;
+$modifier = 1 + $modfactor1 + $modfactor2 + $modfactor4 + $modfactor5 + $modfactor6;
 $modfactor1 *= 100;
 $modfactor2 *= 100;
-$modfactor3 *= 100;
 $modfactor4 *= 100;
 $modfactor5 *= 100;
 $modfactor6 *= 100;
@@ -251,9 +247,6 @@ $perceivedvalue = $Offer_Avg * $modifier * $modrandom;
 //     Tradition Wins: $tf_trdw<br>
 //     Tradition Losses: $tf_trdl<br>
 //     Tradition Win/Loss Differential: $traditionWinLossDifferential<br>
-//     <br>
-//     Coach Bonus: $modfactor3 %<br>
-//     Coaching Points: $tf_coach<br>
 //     <br>
 //     Loyalty Bonus: $modfactor4 %<br>
 //     <br>

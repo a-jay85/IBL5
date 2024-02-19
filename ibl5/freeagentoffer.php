@@ -212,24 +212,25 @@ $player_playingtime = $db->sql_result($resultteam, 0, "playingTime");
 $seasonWinLossDifferential = $tf_wins - $tf_loss;
 $traditionWinLossDifferential = $tf_trdw - $tf_trdl;
 
-$modfactor1 = (0.000153 * ($seasonWinLossDifferential) * ($player_winner - 1));
-$modfactor2 = (0.000153 * ($traditionWinLossDifferential) * ($player_tradition - 1));
+$factorPlayForWinner = (0.000153 * ($seasonWinLossDifferential) * ($player_winner - 1));
+$factorTradition = (0.000153 * ($traditionWinLossDifferential) * ($player_tradition - 1));
 
 if ($Team_Name == $player_team) {
-    $modfactor4 = (.025 * ($player_loyalty - 1));
+    $factorLoyalty = (.025 * ($player_loyalty - 1));
 } else {
-    $modfactor4 = -(.025 * ($player_loyalty - 1));
+    $factorLoyalty = -(.025 * ($player_loyalty - 1));
 }
 
-$modfactor5 = (.01 * ($yrsinoffer - 1) - 0.025) * ($player_security - 1);
-$modfactor6 = -(.0025 * $tf_millions / 100 - 0.025) * ($player_playingtime - 1);
+$factorSecurity = (.01 * ($yrsinoffer - 1) - 0.025) * ($player_security - 1);
+$factorPlayingTime = -(.0025 * $tf_millions / 100 - 0.025) * ($player_playingtime - 1);
 
-$modifier = 1 + $modfactor1 + $modfactor2 + $modfactor4 + $modfactor5 + $modfactor6;
-$modfactor1 *= 100;
-$modfactor2 *= 100;
-$modfactor4 *= 100;
-$modfactor5 *= 100;
-$modfactor6 *= 100;
+$modifier = 1 + $factorPlayForWinner + $factorTradition + $factorLoyalty + $factorSecurity + $factorPlayingTime;
+$factorPlayForWinner *= 100;
+$factorTradition *= 100;
+$factorLoyalty *= 100;
+$factorSecurity *= 100;
+$factorPlayingTime *= 100;
+
 $random = (rand(5, -5));
 $modrandom = (100 + $random) / 100;
 
@@ -238,22 +239,22 @@ $Demands_Average = $Demands_Total / $Demands_Years;
 $perceivedvalue = $Offer_Avg * $modifier * $modrandom;
 
 // echo "
-//     Season Winner Bonus: $modfactor1 %<br>
+//     Season Winner Bonus: $factorPlayForWinner %<br>
 //     Season Wins: $tf_wins<br>
 //     Season Losses: $tf_loss<br>
 //     Season Win/Loss Differential: $seasonWinLossDifferential<br>
 //     <br>
-//     Tradition Bonus: $modfactor2 %<br>
+//     Tradition Bonus: $factorTradition %<br>
 //     Tradition Wins: $tf_trdw<br>
 //     Tradition Losses: $tf_trdl<br>
 //     Tradition Win/Loss Differential: $traditionWinLossDifferential<br>
 //     <br>
-//     Loyalty Bonus: $modfactor4 %<br>
+//     Loyalty Bonus: $factorLoyalty %<br>
 //     <br>
-//     Security Bonus: $modfactor5 %<br>
+//     Security Bonus: $factorSecurity %<br>
 //     Years Offered: $yrsinoffer<br>
 //     <br>
-//     Play Time Bonus: $modfactor6 %<br>
+//     Play Time Bonus: $factorPlayingTime %<br>
 //     Money Commited: $tf_millions<br>
 //     <br>
 //     Random: $modrandom%<br>

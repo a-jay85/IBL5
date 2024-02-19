@@ -211,8 +211,11 @@ $player_security = $db->sql_result($resultteam, 0, "security");
 $player_loyalty = $db->sql_result($resultteam, 0, "loyalty");
 $player_playingtime = $db->sql_result($resultteam, 0, "playingTime");
 
-$modfactor1 = (0.000153 * ($tf_wins - $tf_loss) * ($player_winner - 1));
-$modfactor2 = (0.000153 * ($tf_trdw - $tf_trdl) * ($player_tradition - 1));
+$seasonWinLossDifferential = $tf_wins - $tf_loss;
+$traditionWinLossDifferential = $tf_trdw - $tf_trdl;
+
+$modfactor1 = (0.000153 * ($seasonWinLossDifferential) * ($player_winner - 1));
+$modfactor2 = (0.000153 * ($traditionWinLossDifferential) * ($player_tradition - 1));
 $modfactor3 = (0.0025 * ($tf_coach) * ($player_coach - 1));
 
 if ($Team_Name == $player_team) {
@@ -239,11 +242,15 @@ $Demands_Average = $Demands_Total / $Demands_Years;
 $perceivedvalue = $Offer_Avg * $modifier * $modrandom;
 
 // echo "
-//     Winner Bonus: $modfactor1 %<br>
-//     Wins: $tf_wins<br>
+//     Season Winner Bonus: $modfactor1 %<br>
+//     Season Wins: $tf_wins<br>
+//     Season Losses: $tf_loss<br>
+//     Season Win/Loss Differential: $seasonWinLossDifferential<br>
 //     <br>
 //     Tradition Bonus: $modfactor2 %<br>
 //     Tradition Wins: $tf_trdw<br>
+//     Tradition Losses: $tf_trdl<br>
+//     Tradition Win/Loss Differential: $traditionWinLossDifferential<br>
 //     <br>
 //     Coach Bonus: $modfactor3 %<br>
 //     Coaching Points: $tf_coach<br>

@@ -149,10 +149,9 @@ $resultmillions = $db->sql_query($querymillions);
 $nummillions = $db->sql_numrows($resultmillions);
 
 $tf_millions = 0;
+
 $i = 0;
-
 while ($i < $nummillions) {
-
     $millionscy = $db->sql_result($resultmillions, $i, "cy");
     $millionscy1 = $db->sql_result($resultmillions, $i, "cy1");
     $millionscy2 = $db->sql_result($resultmillions, $i, "cy2");
@@ -164,22 +163,22 @@ while ($i < $nummillions) {
 // LOOK AT SALARY COMMITTED NEXT YEAR, NOT THIS YEAR
 
     if ($millionscy == 0) {
-        $tf_millions = $tf_millions + $millionscy1;
+        $tf_millions += $millionscy1;
     }
     if ($millionscy == 1) {
-        $tf_millions = $tf_millions + $millionscy2;
+        $tf_millions += $millionscy2;
     }
     if ($millionscy == 2) {
-        $tf_millions = $tf_millions + $millionscy3;
+        $tf_millions += $millionscy3;
     }
     if ($millionscy == 3) {
-        $tf_millions = $tf_millions + $millionscy4;
+        $tf_millions += $millionscy4;
     }
     if ($millionscy == 4) {
-        $tf_millions = $tf_millions + $millionscy5;
+        $tf_millions += $millionscy5;
     }
     if ($millionscy == 5) {
-        $tf_millions = $tf_millions + $millionscy6;
+        $tf_millions += $millionscy6;
     }
 
     $i++;

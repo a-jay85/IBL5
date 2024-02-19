@@ -227,12 +227,12 @@ $modfactor5 = (.01 * ($yrsinoffer - 1) - 0.025) * ($player_security - 1);
 $modfactor6 = -(.0025 * $tf_millions / 100 - 0.025) * ($player_playingtime - 1);
 
 $modifier = 1 + $modfactor1 + $modfactor2 + $modfactor3 + $modfactor4 + $modfactor5 + $modfactor6;
-$modfactor1 = $modfactor1 * 100;
-$modfactor2 = $modfactor2 * 100;
-$modfactor3 = $modfactor3 * 100;
-$modfactor4 = $modfactor4 * 100;
-$modfactor5 = $modfactor5 * 100;
-$modfactor6 = $modfactor6 * 100;
+$modfactor1 *= 100;
+$modfactor2 *= 100;
+$modfactor3 *= 100;
+$modfactor4 *= 100;
+$modfactor5 *= 100;
+$modfactor6 *= 100;
 $random = (rand(5, -5));
 $modrandom = (100 + $random) / 100;
 

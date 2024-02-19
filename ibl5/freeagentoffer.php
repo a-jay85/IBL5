@@ -428,21 +428,43 @@ if ($nooffer == 0) {
 // ==== IF OFFER IS LEGIT, PROCESS OFFER ====
 
 if ($nooffer == 0) {
-
-// ==== ENTER OFFER INTO DATABASE (OR UPDATE IF OFFER ALREADY EXISTS) ====
-
     $querydrop = "DELETE FROM `ibl_fa_offers` WHERE `name` = '$Player_Name' AND `team` = '$Team_Name' LIMIT 1";
     $resultdrop = $db->sql_query($querydrop);
 
-    $querychunk = "INSERT INTO `ibl_fa_offers` ( `name` , `team` , `offer1` , `offer2` , `offer3` , `offer4` , `offer5` , `offer6` , `modifier` , `random` , `perceivedvalue` , `MLE` , `LLE` )
-VALUES ( '$Player_Name', '$Team_Name', '$Offer_1', '$Offer_2', '$Offer_3', '$Offer_4', '$Offer_5', '$Offer_6', '$modifier', '$random', '$perceivedvalue', '$MLE', '$LLE' )";
+    $querychunk = "INSERT INTO `ibl_fa_offers` 
+    (`name`, 
+     `team`, 
+     `offer1`, 
+     `offer2`, 
+     `offer3`, 
+     `offer4`, 
+     `offer5`, 
+     `offer6`, 
+     `modifier`, 
+     `random`, 
+     `perceivedvalue`, 
+     `mle`, 
+     `lle`) 
+        VALUES
+    ( '$Player_Name', 
+      '$Team_Name', 
+      '$Offer_1', 
+      '$Offer_2', 
+      '$Offer_3', 
+      '$Offer_4', 
+      '$Offer_5', 
+      '$Offer_6', 
+      '$modifier', 
+      '$random', 
+      '$perceivedvalue', 
+      '$MLE', 
+      '$LLE' )";
 
     $resultchunk = $db->sql_query($querychunk);
 
-    echo "Your offer is legal, and has been entered into the system.  It should show up immediately.  Please <a href=\"modules.php?name=Free_Agency\">click here to return to the Free Agency main page</a> (your offer should now be visible).</br>";
-
+    echo "Your offer is legal. It should be immediately reflected in your Free Agency module.<br>
+        Please <a href=\"modules.php?name=Free_Agency\">click here to return to the Free Agency module</a>.";
 } else {
-
-    echo "<font color=#ff0000>Your offer was not legal, and will not be recorded. You may press the \"Back\" Button on your browser to try again.</font>";
-
+    echo "<font color=#ff0000>Your offer was not legal and will not be recorded.<br>
+        Please go \"Back\" in your browser to try again.</font>";
 }

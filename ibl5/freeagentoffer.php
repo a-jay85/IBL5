@@ -428,6 +428,22 @@ if ($nooffer == 0) {
 // ==== IF OFFER IS LEGIT, PROCESS OFFER ====
 
 if ($nooffer == 0) {
+    if ($Offer_2 == "" OR $Offer_2 == NULL) {
+        $Offer_2 = 0;
+    }
+    if ($Offer_3 == "" OR $Offer_3 == NULL) {
+        $Offer_3 = 0;
+    }
+    if ($Offer_4 == "" OR $Offer_4 == NULL) {
+        $Offer_4 = 0;
+    }
+    if ($Offer_5 == "" OR $Offer_5 == NULL) {
+        $Offer_5 = 0;
+    }
+    if ($Offer_6 == "" OR $Offer_6 == NULL) {
+        $Offer_6 = 0;
+    }
+
     $querydrop = "DELETE FROM `ibl_fa_offers` WHERE `name` = '$Player_Name' AND `team` = '$Team_Name' LIMIT 1";
     $resultdrop = $db->sql_query($querydrop);
 

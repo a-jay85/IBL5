@@ -141,7 +141,6 @@ $Offer_Avg = ($Offer_1 + $Offer_2 + $Offer_3 + $Offer_4 + $Offer_5 + $Offer_6) /
 
 $queryposition = "SELECT * FROM ibl_plr WHERE `name` ='$Player_Name'";
 $resultposition = $db->sql_query($queryposition);
-
 $player_pos = $db->sql_result($resultposition, 0, "pos");
 
 $querymillions = "SELECT * FROM ibl_plr WHERE `teamname`='$Team_Name' AND `pos`='$player_pos' AND `name`!='$Player_Name'";
@@ -284,8 +283,7 @@ if ($Offer_1 < $Minimum) {
 
 // ===== BIRD RIGHTS TREATMENT
 
-if ($player_team == $Team_Name) {
-} else {
+if ($player_team != $Team_Name) {
     $Bird_Years = 0;
 }
 

@@ -237,9 +237,36 @@ $modfactor5 = $modfactor5 * 100;
 $modfactor6 = $modfactor6 * 100;
 $random = (rand(5, -5));
 $modrandom = (100 + $random) / 100;
-//echo "Winner Bonus: $modfactor1 %<br> Wins: $tf_wins<br> Tradition Bonus: $modfactor2 %<br> Tradition Wins: $tf_trdw<br> Coach Bonus: $modfactor3 %<br> Coaching Points: $tf_coach<br> Loyalty Bonus: $modfactor4 %<br> Security Bonus: $modfactor5 %<br> Years Offered: $yrsinoffer<br> Play Time Bonus: $modfactor6 %<br>Money Commited: $tf_millions<br>Random: $modrandom%<br>";
+
+$Demands_Average = $Demands_Total / $Demands_Years;
 
 $perceivedvalue = $Offer_Avg * $modifier * $modrandom;
+
+echo "
+    Winner Bonus: $modfactor1 %<br>
+    Wins: $tf_wins<br>
+    <br>
+    Tradition Bonus: $modfactor2 %<br>
+    Tradition Wins: $tf_trdw<br>
+    <br>
+    Coach Bonus: $modfactor3 %<br>
+    Coaching Points: $tf_coach<br>
+    <br>
+    Loyalty Bonus: $modfactor4 %<br>
+    <br>
+    Security Bonus: $modfactor5 %<br>
+    Years Offered: $yrsinoffer<br>
+    <br>
+    Play Time Bonus: $modfactor6 %<br>
+    Money Commited: $tf_millions<br>
+    <br>
+    Random: $modrandom%<br>
+    <br>
+    Demands Years: $Demands_Years<br>
+    Demands Total: $Demands_Total<br>
+    Demands Average: $Demands_Average<br>
+    <br>
+    Perceived Value: $perceivedvalue<br>";
 
 $nooffer = 0;
 

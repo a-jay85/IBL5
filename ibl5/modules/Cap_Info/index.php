@@ -25,6 +25,12 @@ while ($i < $numberOfTeams) {
     $teamRow = $db->sql_fetch_assoc($resultTeamInfo);
     $team = Team::withTeamRow($db, $teamRow);
 
+    $positions = ['PG', 'SG', 'SF', 'PF', 'C'];
+    foreach ($positions as $position) {
+        ${"team" . $position . "sResult"} = $team->getPlayersUnderContractByPositionResult($position);
+        ${"teamTotal" . $position . "NextSeasonSalary"} = $team->getTotalNextSeasonSalariesFromPlrResult(${"team" . $position . "sResult"});
+    }
+
     $teamTotalSalaryYear1[$i] = 0;
     $teamTotalSalaryYear2[$i] = 0;
     $teamTotalSalaryYear3[$i] = 0;
@@ -54,11 +60,11 @@ while ($i < $numberOfTeams) {
 				<font color=#$team->color2>$team->city $team->name
 			</a>
 		</td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
+        <td align=center>$teamTotalPGNextSeasonSalary</td>
+        <td align=center>$teamTotalSGNextSeasonSalary</td>
+        <td align=center>$teamTotalSFNextSeasonSalary</td>
+        <td align=center>$teamTotalPFNextSeasonSalary</td>
+        <td align=center>$teamTotalCNextSeasonSalary</td>
 		<td align=center>$teamTotalSalaryYear1[$i]</td>
 		<td align=center>$teamTotalSalaryYear2[$i]</td>
 		<td align=center>$teamTotalSalaryYear3[$i]</td>
@@ -76,17 +82,17 @@ while ($i < $numberOfTeams) {
 $text .= "<table class=\"sortable\" border=1>
 	<tr>
 		<th>Team</th>
-		<th>" . ($currentSeasonEndingYear + 1) . "<br>PG Salary</th>
-		<th>" . ($currentSeasonEndingYear + 1) . "<br>SG Salary</th>
-		<th>" . ($currentSeasonEndingYear + 1) . "<br>SF Salary</th>
-		<th>" . ($currentSeasonEndingYear + 1) . "<br>PF Salary</th>
-		<th>" . ($currentSeasonEndingYear + 1) . "<br>C Salary</th>
-		<th>" . ($currentSeasonEndingYear + 0) . "-<br>" . ($currentSeasonEndingYear + 1) . "</th>
-		<th>" . ($currentSeasonEndingYear + 1) . "-<br>" . ($currentSeasonEndingYear + 2) . "</th>
-		<th>" . ($currentSeasonEndingYear + 2) . "-<br>" . ($currentSeasonEndingYear + 3) . "</th>
-		<th>" . ($currentSeasonEndingYear + 3) . "-<br>" . ($currentSeasonEndingYear + 4) . "</th>
-		<th>" . ($currentSeasonEndingYear + 4) . "-<br>" . ($currentSeasonEndingYear + 5) . "</th>
-		<th>" . ($currentSeasonEndingYear + 5) . "-<br>" . ($currentSeasonEndingYear + 6) . "</th>
+		<th>" . ($currentSeasonEndingYear + 0) . "-<br>" . ($currentSeasonEndingYear + 1) . "<br>PG</th>
+		<th>" . ($currentSeasonEndingYear + 0) . "-<br>" . ($currentSeasonEndingYear + 1) . "<br>SG</th>
+		<th>" . ($currentSeasonEndingYear + 0) . "-<br>" . ($currentSeasonEndingYear + 1) . "<br>SF</th>
+		<th>" . ($currentSeasonEndingYear + 0) . "-<br>" . ($currentSeasonEndingYear + 1) . "<br>PF</th>
+		<th>" . ($currentSeasonEndingYear + 0) . "-<br>" . ($currentSeasonEndingYear + 1) . "<br>C</th>
+		<th>" . ($currentSeasonEndingYear + 0) . "-<br>" . ($currentSeasonEndingYear + 1) . "<br>Total</th>
+		<th>" . ($currentSeasonEndingYear + 1) . "-<br>" . ($currentSeasonEndingYear + 2) . "<br>Total</th>
+		<th>" . ($currentSeasonEndingYear + 2) . "-<br>" . ($currentSeasonEndingYear + 3) . "<br>Total</th>
+		<th>" . ($currentSeasonEndingYear + 3) . "-<br>" . ($currentSeasonEndingYear + 4) . "<br>Total</th>
+		<th>" . ($currentSeasonEndingYear + 4) . "-<br>" . ($currentSeasonEndingYear + 5) . "<br>Total</th>
+		<th>" . ($currentSeasonEndingYear + 5) . "-<br>" . ($currentSeasonEndingYear + 6) . "<br>Total</th>
 		<th>FA Slots</th>
         <th>Has MLE</th>
         <th>Has LLE</th>

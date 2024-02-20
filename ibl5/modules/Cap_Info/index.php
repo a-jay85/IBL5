@@ -25,9 +25,6 @@ while ($i < $numberOfTeams) {
     $teamRow = $db->sql_fetch_assoc($resultTeamInfo);
     $team = Team::withTeamRow($db, $teamRow);
 
-    $MLEicon = ($team->hasMLE == "1") ? "\u{2705}" : "\u{274C}";
-    $LLEicon = ($team->hasLLE == "1") ? "\u{2705}" : "\u{274C}";
-
     $teamTotalSalaryYear1[$i] = 0;
     $teamTotalSalaryYear2[$i] = 0;
     $teamTotalSalaryYear3[$i] = 0;
@@ -47,6 +44,9 @@ while ($i < $numberOfTeams) {
     $teamTotalSalaryYear6[$i] = 7000 - $team_array[6]["salary"];
 
     $teamFreeAgencySlots[$i] = $teamFreeAgencySlots[$i] - $team_array1[1]["roster"];
+
+    $MLEicon = ($team->hasMLE == "1") ? "\u{2705}" : "\u{274C}";
+    $LLEicon = ($team->hasLLE == "1") ? "\u{2705}" : "\u{274C}";
 
     $table_echo .= "<tr>
 		<td bgcolor=#$team->color1>

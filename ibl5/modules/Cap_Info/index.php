@@ -22,16 +22,11 @@ OpenTable();
 
 $i = 0;
 while ($i < $numberOfTeams) {
-    $teamid[$i] = $db->sql_result($resultTeamInfo, $i, "teamid");
-    $teamname[$i] = $db->sql_result($resultTeamInfo, $i, "team_name");
-    $teamcity[$i] = $db->sql_result($resultTeamInfo, $i, "team_city");
-    $teamcolor1[$i] = $db->sql_result($resultTeamInfo, $i, "color1");
-    $teamcolor2[$i] = $db->sql_result($resultTeamInfo, $i, "color2");
+    $teamRow = $db->sql_fetch_assoc($resultTeamInfo);
+    $team = Team::withTeamRow($db, $teamRow);
 
-    $hasMLE[$i] = $db->sql_result($resultTeamInfo, $i, "HasMLE");
-    $hasLLE[$i] = $db->sql_result($resultTeamInfo, $i, "HasLLE");
-    $hasMLE[$i] = ($hasMLE[$i] == "1") ? "\u{2705}" : "\u{274C}";
-    $hasLLE[$i] = ($hasLLE[$i] == "1") ? "\u{2705}" : "\u{274C}";
+    $MLEicon = ($team->hasMLE == "1") ? "\u{2705}" : "\u{274C}";
+    $LLEicon = ($team->hasLLE == "1") ? "\u{2705}" : "\u{274C}";
 
     $teamTotalSalaryYear1[$i] = 0;
     $teamTotalSalaryYear2[$i] = 0;
@@ -41,8 +36,8 @@ while ($i < $numberOfTeams) {
     $teamTotalSalaryYear6[$i] = 0;
     $teamFreeAgencySlots[$i] = 15;
 
-    $team_array = get_salary($teamid[$i]);
-    $team_array1 = get_salary1($teamid[$i]);
+    $team_array = get_salary($team->teamID);
+    $team_array1 = get_salary1($team->teamID);
 
     $teamTotalSalaryYear1[$i] = 7000 - $team_array[1]["salary"];
     $teamTotalSalaryYear2[$i] = 7000 - $team_array[2]["salary"];
@@ -54,9 +49,9 @@ while ($i < $numberOfTeams) {
     $teamFreeAgencySlots[$i] = $teamFreeAgencySlots[$i] - $team_array1[1]["roster"];
 
     $table_echo .= "<tr>
-		<td bgcolor=#$teamcolor1[$i]>
-			<a href=\"modules.php?name=Team&op=team&tid=$teamid[$i]&display=contracts\">
-				<font color=#$teamcolor2[$i]>$teamcity[$i] $teamname[$i]
+		<td bgcolor=#$team->color1>
+			<a href=\"modules.php?name=Team&op=team&tid=$team->teamID&display=contracts\">
+				<font color=#$team->color2>$team->city $team->name
 			</a>
 		</td>
 		<td align=center>$teamTotalSalaryYear1[$i]</td>
@@ -71,8 +66,8 @@ while ($i < $numberOfTeams) {
 		<td align=center>$teamTotalSalaryYear5[$i]</td>
 		<td align=center>$teamTotalSalaryYear6[$i]</td>
 		<td align=center>$teamFreeAgencySlots[$i]</td>
-        <td align=center>$hasMLE[$i]</td>
-        <td align=center>$hasLLE[$i]</td>
+        <td align=center>$MLEicon</td>
+        <td align=center>$LLEicon</td>
 	</tr>";
 
     $i++;

@@ -187,7 +187,8 @@ class Player
 
     public function getNextSeasonSalary()
     {
-        $nextSeasonSalary = $this->{"contractYear" . $this->contractCurrentYear + 1 . "Salary"};
+        $contractNextYear = $this->contractCurrentYear + 1;
+        $nextSeasonSalary = $this->{"contractYear" . $contractNextYear . "Salary"};
         return $nextSeasonSalary;
     }
 

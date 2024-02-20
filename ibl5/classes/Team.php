@@ -94,6 +94,13 @@ class Team
         return $result;
     }
 
+    public function getPlayersUnderContractByPositionResult($position)
+    {
+        $query = "SELECT * FROM ibl_plr WHERE teamname = '$this->name' AND pos = '$position' and cy1 != 0";
+        $result = $this->db->sql_query($query);
+        return $result;
+    }
+
     public function getTotalCurrentSeasonSalariesFromPlrResult($result)
     {
         $totalCurrentSeasonSalaries = 0;

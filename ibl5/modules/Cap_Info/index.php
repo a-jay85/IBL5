@@ -54,12 +54,12 @@ while ($i < $numberOfTeams) {
 				<font color=#$team->color2>$team->city $team->name
 			</a>
 		</td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td></td>
 		<td align=center>$teamTotalSalaryYear1[$i]</td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
 		<td align=center>$teamTotalSalaryYear2[$i]</td>
 		<td align=center>$teamTotalSalaryYear3[$i]</td>
 		<td align=center>$teamTotalSalaryYear4[$i]</td>
@@ -76,12 +76,12 @@ while ($i < $numberOfTeams) {
 $text .= "<table class=\"sortable\" border=1>
 	<tr>
 		<th>Team</th>
-		<th>" . ($currentSeasonEndingYear + 0) . "-<br>" . ($currentSeasonEndingYear + 1) . "</th>
 		<th>" . ($currentSeasonEndingYear + 1) . "<br>PG Salary</th>
 		<th>" . ($currentSeasonEndingYear + 1) . "<br>SG Salary</th>
 		<th>" . ($currentSeasonEndingYear + 1) . "<br>SF Salary</th>
 		<th>" . ($currentSeasonEndingYear + 1) . "<br>PF Salary</th>
 		<th>" . ($currentSeasonEndingYear + 1) . "<br>C Salary</th>
+		<th>" . ($currentSeasonEndingYear + 0) . "-<br>" . ($currentSeasonEndingYear + 1) . "</th>
 		<th>" . ($currentSeasonEndingYear + 1) . "-<br>" . ($currentSeasonEndingYear + 2) . "</th>
 		<th>" . ($currentSeasonEndingYear + 2) . "-<br>" . ($currentSeasonEndingYear + 3) . "</th>
 		<th>" . ($currentSeasonEndingYear + 3) . "-<br>" . ($currentSeasonEndingYear + 4) . "</th>

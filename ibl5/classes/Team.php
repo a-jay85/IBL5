@@ -105,6 +105,17 @@ class Team
         return $totalCurrentSeasonSalaries;
     }
 
+    public function getTotalNextSeasonSalariesFromPlrResult($result)
+    {
+        $totalNextSeasonSalaries = 0;
+
+        $playerArray = $this->convertPlrResultIntoPlayerArray($result);
+        foreach ($playerArray as $player) {
+            $totalNextSeasonSalaries += $player->getNextSeasonSalary();
+        }
+        return $totalNextSeasonSalaries;
+    }
+
     public function canAddContractWithoutGoingOverHardCap($currentSeasonContractValueToBeAdded)
     {
         $teamResult = $this->getAlphabeticalActiveRosterResult();

@@ -185,6 +185,12 @@ class Player
         return $currentSeasonSalary;
     }
 
+    public function getNextSeasonSalary()
+    {
+        $nextSeasonSalary = $this->{"contractYear" . $this->contractCurrentYear + 1 . "Salary"};
+        return $nextSeasonSalary;
+    }
+
     public function getLongBuyoutArray()
     {
         $totalRemainingSalary = $this->getTotalRemainingSalary();

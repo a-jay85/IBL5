@@ -304,7 +304,7 @@ if ($Bird_Years < 3) {
         }
     }
 } else {
-    $Hard_Cap_Space = $Cap_Space + 2000;
+    $Hard_Cap_Space = $amendedCapSpaceYear1 + 2000;
     $Hard_Cap_Space2 = $Cap_Space2 + 2000;
     $Hard_Cap_Space3 = $Cap_Space3 + 2000;
     $Hard_Cap_Space4 = $Cap_Space4 + 2000;
@@ -409,20 +409,6 @@ if ($nooffer == 0) {
             echo "Sorry, you cannot decrease salary in later years of a contract.  You offered $Offer_6 in the sixth year, which is less than you offered in the fifth year, $Offer_5.<br>";
             $nooffer = 1;
         }
-    }
-}
-// ==== CHECK FOR OFFERS THAT EXCEED THE HARD CAP ====
-
-$Hard_Cap_Space = $Cap_Space + 2000;
-$Hard_Cap_Space2 = $Cap_Space2 + 2000;
-$Hard_Cap_Space3 = $Cap_Space3 + 2000;
-$Hard_Cap_Space4 = $Cap_Space4 + 2000;
-$Hard_Cap_Space5 = $Cap_Space5 + 2000;
-$Hard_Cap_Space6 = $Cap_Space6 + 2000;
-if ($nooffer == 0) {
-    if ($Offer_1 > $Hard_Cap_Space) {
-        echo "Sorry, you do not have sufficient cap space under the Hard Cap to make the offer.  You offered $Offer_1 in the first year of the contract, which is more than $Hard_Cap_Space, the amount of hard cap space you have available.<br>";
-        $nooffer = 1;
     }
 }
 

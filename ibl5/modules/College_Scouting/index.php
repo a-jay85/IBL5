@@ -144,9 +144,10 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
         $isPlayerDrafted = $row3['drafted'];
 
         if ($teamlogo == $draft_team && $isPlayerDrafted == 0) {
+            // NOTE: `value` in the following echo block is formatted with single quotes to allow for apostrophes in player names.
             echo "
                 <tr bgcolor=$bgcolor>
-                    <td align=center><input type='radio' name='player' value='$player_name'></td>
+                    <td align=center><input type='radio' name='player' value=\"$player_name\"></td>
                     <td nowrap>$player_name</td>";
         } elseif ($isPlayerDrafted == 1) {
             echo "

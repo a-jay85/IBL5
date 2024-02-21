@@ -21,17 +21,18 @@ $resultCurrentDraftSelection = $db->sql_query($queryCurrentDraftSelection);
 $currentDraftSelection = $db->sql_result($resultCurrentDraftSelection, 0);
 
 if (($currentDraftSelection == NULL OR $currentDraftSelection == "") AND $playerToBeDrafted != NULL) {
-    $queryUpdateDraftTable = "UPDATE ibl_draft 
-         SET `player` = '$playerToBeDrafted', 
-               `date` = '$date' 
-        WHERE `round` = '$draft_round' 
-           AND `pick` = '$draft_pick'";
+    // NOTE: $queryUpdateDraftTable and $queryUpdateRookieTable are formatted with single quotes to allow for apostrophes in player names.
+    $queryUpdateDraftTable = 'UPDATE ibl_draft 
+         SET `player` = "' . $playerToBeDrafted . '", 
+               `date` = "' . $date . '" 
+        WHERE `round` = "' . $draft_round . '" 
+           AND `pick` = "' . $draft_pick . '"';
     $resultUpdateDraftTable = $db->sql_query($queryUpdateDraftTable);
     
-    $queryUpdateRookieTable = "UPDATE `ibl_scout_rookieratings`
-          SET `team` = '$teamname', 
-           `drafted` = '1'
-        WHERE `name` = '$playerToBeDrafted'";
+    $queryUpdateRookieTable = 'UPDATE `ibl_scout_rookieratings`
+          SET `team` = "' . $teamname . '", 
+           `drafted` = "1"
+        WHERE `name` = "' . $playerToBeDrafted . '"';
     $resultUpdateRookieTable = $db->sql_query($queryUpdateRookieTable);
 
     if ($resultUpdateDraftTable AND $resultUpdateRookieTable) {

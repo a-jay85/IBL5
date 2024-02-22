@@ -60,6 +60,8 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
     $draft_round = $db->sql_result($draft_result, 0, "round");
     $draft_pick = $db->sql_result($draft_result, 0, "pick");
 
+    $pickOwner = $sharedFunctions->getCurrentOwnerOfDraftPick($draft_year, $draft_round, $draft_team);
+
     echo "<center><img src=\"images/logo/$tid.jpg\"><br>
 	<table>
 		<tr>
@@ -143,7 +145,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
         $display_int = $row3['int'];
         $isPlayerDrafted = $row3['drafted'];
 
-        if ($teamlogo == $draft_team && $isPlayerDrafted == 0) {
+        if ($teamlogo == $pickOwner && $isPlayerDrafted == 0) {
             // NOTE: `value` in the following echo block is formatted with single quotes to allow for apostrophes in player names.
             echo "
                 <tr bgcolor=$bgcolor>
@@ -193,7 +195,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 
     echo "</table>";
 
-    if ($teamlogo == $draft_team && $player_drafted == 0) {
+    if ($teamlogo == $pickOwner && $player_drafted == 0) {
         echo "</table><center><input type='submit' style=\"height:100px; width:150px\" value='Draft'></center></form>";
     } else {
         echo "</table></form>";

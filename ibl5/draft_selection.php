@@ -40,9 +40,11 @@ if (($currentDraftSelection == NULL OR $currentDraftSelection == "") AND $player
         echo "$message<p>
         <a href=\"modules.php?name=College_Scouting\">Go back to the Draft module</a>";
     
-        $queryTeamOnTheClock = "SELECT team from ibl_draft WHERE player = '' ORDER BY round ASC, pick ASC LIMIT 1";
-        $resultTeamOnTheClock = $db->sql_query($queryTeamOnTheClock);
-        $teamOnTheClock = $db->sql_result($resultTeamOnTheClock, 0);
+        $queryNextTeamDraftPick = "SELECT team from ibl_draft WHERE player = '' ORDER BY round ASC, pick ASC LIMIT 1";
+        $resultNextTeamDraftPick = $db->sql_query($queryNextTeamDraftPick);
+        $nextTeamDraftPick = $db->sql_result($resultNextTeamDraftPick, 0);
+
+        $teamOnTheClock = $sharedFunctions->getCurrentOwnerOfDraftPick($currentSeasonEndingYear, $draft_round, $nextTeamDraftPick);
 
         if ($teamOnTheClock != NULL) {
             $queryDiscordIDOfTeamOnTheClock = "SELECT discordID from ibl_team_info WHERE team_name = '$teamOnTheClock' LIMIT 1;";

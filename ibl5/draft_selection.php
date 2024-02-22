@@ -8,7 +8,7 @@ $teamname = $_POST['teamname'];
 $playerToBeDrafted = $_POST['player'];
 $draft_round = $_POST['draft_round'];
 $draft_pick = $_POST['draft_pick'];
-$date = date('Y-m-d h:m:s');
+$date = date('Y-m-d h:i:s');
 
 $sharedFunctions = new Shared($db);
 $currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();

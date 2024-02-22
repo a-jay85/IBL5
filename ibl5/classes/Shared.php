@@ -70,6 +70,18 @@ class Shared
         return $this->db->sql_result($queryNumberOfTitles, 0);
     }
 
+    public function getCurrentOwnerOfDraftPick($draftYear, $draftRound, $teamNameOfDraftPickOrigin)
+    {
+        $queryCurrentOwnerOfDraftPick = $this->db->sql_query("SELECT ownerofpick
+            FROM ibl_draft_picks
+            WHERE year = '$draftYear'
+            AND round = '$draftRound'
+            AND teampick = '$teamNameOfDraftPickOrigin'
+            LIMIT 1;");
+
+        return $this->db->sql_result($queryCurrentOwnerOfDraftPick, 0);
+    }
+
     public function getTeamnameFromTid($tid)
     {
         $queryTeamnameFromTid = $this->db->sql_query("SELECT team_name

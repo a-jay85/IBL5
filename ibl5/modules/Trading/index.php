@@ -291,18 +291,23 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
         $z++;
     }
 
-    $i = 1;
-    while ($i < 7) {
+    $currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear(); // This resets the incrementation from the last block.
+    $i = 1; // We need to start at 1 because of the "xSendsCash" value names.
+    if ($seasonPhase == "Playoffs" or $seasonPhase == "Draft" or $seasonPhase == "Free Agency") {
+        $i++;
+    }
+    while ($i <= 6) {
+        // Because we start $i = 1, the math to derive the years to display increases by 1 too.
         echo "<tr>
             <td>
                 <b>$teamlogo send
                 <input type=\"number\" name=\"userSendsCash$i\" value =\"0\" min=\"0\" max =\"2000\">
-                for " . ($currentSeasonEndingYear + $i - 1) . "</b>
+                for " . ($currentSeasonEndingYear - 2 + $i) . "-" . ($currentSeasonEndingYear - 1 + $i) . "</b>
             </td>
             <td align=right>
                 <b>$partner send
                 <input type=\"number\" name=\"partnerSendsCash$i\" value =\"0\" min=\"0\" max =\"2000\">
-                for " . ($currentSeasonEndingYear + $i - 1) . "</b>
+                for " . ($currentSeasonEndingYear - 2 + $i) . "-" . ($currentSeasonEndingYear - 1 + $i) . "</b>
             </td>
         </tr>";
         $i++;

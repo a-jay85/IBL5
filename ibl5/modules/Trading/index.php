@@ -171,6 +171,7 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
     include "header.php";
 
     $currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
+    $seasonPhase = $sharedFunctions->getCurrentSeasonPhase();
 
     OpenTable();
 
@@ -274,13 +275,18 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 
     echo "</td></tr></table>";
     $z = 0;
-    while ($z < 6) {
+    $seasonsToDisplay = 6;
+    if ($seasonPhase == "Playoffs" or $seasonPhase == "Draft" or $seasonPhase == "Free Agency") {
+        $currentSeasonEndingYear++;
+        $seasonsToDisplay--;
+    }
+    while ($z < $seasonsToDisplay) {
         echo "<tr>
             <td>
-                <b>$teamlogo Cap Total in " . ($currentSeasonEndingYear + $z) . ":</b> " . $future_salary_array['player'][$z] . "
+                <b>$teamlogo Cap Total in " . ($currentSeasonEndingYear + $z - 1) . "-" . ($currentSeasonEndingYear + $z) . ":</b> " . $future_salary_array['player'][$z] . "
             </td>
             <td align=right>
-                <b>$partner Cap Total in " . ($currentSeasonEndingYear + $z) . ":</b> " . $future_salary_arrayb['player'][$z] . "
+                <b>$partner Cap Total in " . ($currentSeasonEndingYear + $z - 1) . "-" . ($currentSeasonEndingYear + $z) . ":</b> " . $future_salary_arrayb['player'][$z] . "
             </td>";
         $z++;
     }

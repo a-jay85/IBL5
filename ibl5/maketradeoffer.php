@@ -73,33 +73,15 @@ $partnerPostTradeCapTotal = $partnerCurrentSeasonCapTotal - $partnerCapSentToUse
 echo "Their Payroll this season, if this trade is accepted: $partnerPostTradeCapTotal<p>";
 
 $error = 0;
-//if ($userCurrentSeasonCapTotal < 7000)
-//{
+
 if ($userPostTradeCapTotal > 7000) {
     echo "This trade is illegal since it puts you over the hard cap.";
     $error = 1;
 }
-//}else{
-//if ($userPostTradeCapTotal > $userCurrentSeasonCapTotal)
-//{
-//echo "This trade is illegal since you are over the cap and can only make trades that lower your total salary";
-//$error=1;
-//}
-//}
-
-//if ($partnerCurrentSeasonCapTotal < 7000)
-//{
 if ($partnerPostTradeCapTotal > 7000) {
     echo "This trade is illegal since it puts other team over the hard cap.";
     $error = 1;
 }
-//}else{
-//if ($partnerPostTradeCapTotal > $partnerCurrentSeasonCapTotal)
-//{
-//echo "This trade is illegal since other team is over the cap and can only make trades that lower their total salary";
-//$error=1;
-//}
-//}
 
 //-----END SALARY MATCH CHECK-----
 if ($error == 0) {

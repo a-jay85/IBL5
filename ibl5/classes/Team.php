@@ -11,6 +11,7 @@ class Team
     public $color1;
     public $color2;
     public $arena;
+    public $formerlyKnownAs;
 
     public $ownerName;
     public $ownerEmail;
@@ -62,6 +63,7 @@ class Team
         $this->color1 = $teamRow['color1'];
         $this->color2 = $teamRow['color2'];
         $this->arena = $teamRow['arena'];
+        $this->formerlyKnownAs = $teamRow['formerly_known_as'];
     
         $this->ownerName = $teamRow['owner_name'];
         $this->ownerEmail = $teamRow['owner_email'];

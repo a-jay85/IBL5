@@ -175,22 +175,8 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
         $i = 0;
         while ($row = $db->sql_fetch_assoc($result)) {
             if ($votingCategory != "GM") {
-                $name = $row['name'];
-                $teamname = $row['teamname'];
-                $gm = $row['stats_gm'];
-                $gs = $row['stats_gs'];
-                $mpg = number_format(($row['stats_min'] / $row['stats_gm']), 1);
-                $fgp = number_format(($row['stats_fgm'] / $row['stats_fga']), 3);
-                $ftp = number_format(($row['stats_ftm'] / $row['stats_fta']), 3);
-                $threePointersPerGame = number_format(($row['stats_3gm'] / $row['stats_gm']), 1);
-                $tpp = number_format(($row['stats_3gm'] / $row['stats_3ga']), 3);
-                $rpg = number_format((($row['stats_orb'] + $row['stats_drb']) / $row['stats_gm']), 1);
-                $apg = number_format(($row['stats_ast'] / $row['stats_gm']), 1);
-                $spg = number_format(($row['stats_stl'] / $row['stats_gm']), 1);
-                $tpg = number_format(($row['stats_to'] / $row['stats_gm']), 1);
-                $bpg = number_format(($row['stats_blk'] / $row['stats_gm']), 1);
-                $pfg = number_format(($row['stats_pf'] / $row['stats_gm']), 1);
-                $ppg = number_format(((($row['stats_3gm'] * 3) + (($row['stats_fgm'] - $row['stats_3gm']) * 2) + $row['stats_ftm']) / $row['stats_gm']), 1);
+                $player = Player::withPlrRow($db, $row);
+                $playerStats = PlayerStats::withPlrRow($db, $row);
             } else {
                 $name = $row['owner_name'];
                 $teamname = $row['team_city'] . " " . $row['team_name'];
@@ -209,11 +195,11 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 
             if (!str_contains($teamname, $voterTeamName)) {
                 if ($seasonPhase == "Regular Season") {
-                    $output .= "<td><center><input type=\"checkbox\" name=\"" . $votingCategory . "[]\" value=\"$name, $teamname\"></center></td>";
+                    $output .= "<td><center><input type=\"checkbox\" name=\"" . $votingCategory . "[]\" value=\"$player->name, $player->teamName\"></center></td>";
                 } else {
-                    $output .= "<td><center><input type=\"radio\" name=\"" . $votingCategory . "[1]\" value=\"$name, $teamname\"></center></td>
-								<td><center><input type=\"radio\" name=\"" . $votingCategory . "[2]\" value=\"$name, $teamname\"></center></td>
-								<td><center><input type=\"radio\" name=\"" . $votingCategory . "[3]\" value=\"$name, $teamname\"></center></td>";
+                    $output .= "<td><center><input type=\"radio\" name=\"" . $votingCategory . "[1]\" value=\"$player->name, $player->teamName\"></center></td>
+								<td><center><input type=\"radio\" name=\"" . $votingCategory . "[2]\" value=\"$player->name, $player->teamName\"></center></td>
+								<td><center><input type=\"radio\" name=\"" . $votingCategory . "[3]\" value=\"$player->name, $player->teamName\"></center></td>";
                 }
             } else {
                 if ($seasonPhase == "Regular Season") {
@@ -226,21 +212,21 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
             }
 
             if ($votingCategory != "GM") {
-                $output .= "<td>$name, $teamname</td>
-							<td>$gm</td>
-							<td>$gs</td>
-							<td>$mpg</td>
-							<td>$fgp</td>
-							<td>$ftp</td>
-							<td>$threePointersPerGame</td>
-							<td>$tpp</td>
-							<td>$rpg</td>
-							<td>$apg</td>
-							<td>$spg</td>
-							<td>$tpg</td>
-							<td>$bpg</td>
-							<td>$pfg</td>
-							<td>$ppg</td>
+                $output .= "<td>$player->name, $player->teamName</td>
+							<td>$playerStats->seasonGamesPlayed</td>
+							<td>$playerStats->seasonGamesStarted</td>
+							<td>$playerStats->seasonMinutesPerGame</td>
+							<td>$playerStats->seasonFieldGoalPercentage</td>
+							<td>$playerStats->seasonFreeThrowPercentage</td>
+							<td>$playerStats->seasonThreePointersMadePerGame</td>
+							<td>$playerStats->seasonThreePointPercentage</td>
+							<td>$playerStats->seasonTotalReboundsPerGame</td>
+							<td>$playerStats->seasonAssistsPerGame</td>
+							<td>$playerStats->seasonStealsPerGame</td>
+							<td>$playerStats->seasonTurnoversPerGame</td>
+							<td>$playerStats->seasonBlocksPerGame</td>
+							<td>$playerStats->seasonPersonalFoulsPerGame</td>
+							<td>$playerStats->seasonPointsPerGame</td>
 						</tr>";
             } else {
                 $output .= "<td>$name</td>

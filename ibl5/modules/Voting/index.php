@@ -154,10 +154,17 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 						<th>gm</th>
 						<th>gs</th>
 						<th>min</th>
+						<th>fgm</th>
+						<th>fga</th>
 						<th>fgp</th>
+						<th>ftm</th>
+						<th>fta</th>
 						<th>ftp</th>
 						<th>3gm</th>
+						<th>3ga</th>
 						<th>3gp</th>
+						<th>orb</th>
+						<th>drb</th>
 						<th>reb</th>
 						<th>ast</th>
 						<th>stl</th>
@@ -165,6 +172,8 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 						<th>blk</th>
 						<th>pf</th>
 						<th>pts</th>
+						<th>2x2</th>
+						<th>3x3</th>
 					</tr>";
         } else {
             $output .= "<th>Name</th>
@@ -216,10 +225,17 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 							<td>$playerStats->seasonGamesPlayed</td>
 							<td>$playerStats->seasonGamesStarted</td>
 							<td>$playerStats->seasonMinutesPerGame</td>
+							<td>$playerStats->seasonFieldGoalsMadePerGame</td>
+							<td>$playerStats->seasonFieldGoalsAttemptedPerGame</td>
 							<td>$playerStats->seasonFieldGoalPercentage</td>
+							<td>$playerStats->seasonFreeThrowsMadePerGame</td>
+							<td>$playerStats->seasonFreeThrowsAttemptedPerGame</td>
 							<td>$playerStats->seasonFreeThrowPercentage</td>
 							<td>$playerStats->seasonThreePointersMadePerGame</td>
+							<td>$playerStats->seasonThreePointersAttemptedPerGame</td>
 							<td>$playerStats->seasonThreePointPercentage</td>
+							<td>$playerStats->seasonOffensiveReboundsPerGame</td>
+							<td>$playerStats->seasonDefensiveReboundsPerGame</td>
 							<td>$playerStats->seasonTotalReboundsPerGame</td>
 							<td>$playerStats->seasonAssistsPerGame</td>
 							<td>$playerStats->seasonStealsPerGame</td>
@@ -227,6 +243,8 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 							<td>$playerStats->seasonBlocksPerGame</td>
 							<td>$playerStats->seasonPersonalFoulsPerGame</td>
 							<td>$playerStats->seasonPointsPerGame</td>
+							<td>$playerStats->seasonDoubleDoubles</td>
+							<td>$playerStats->seasonTripleDoubles</td>
 						</tr>";
             } else {
                 $output .= "<td>$name</td>

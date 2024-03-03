@@ -175,38 +175,38 @@ class UI
         return $table_contracts;
     }
 
-    public static function per36Minutes($db, $result, $color1, $color2, $tid, $yr)
+    public static function per36Minutes($db, $result, $team, $yr)
     {
         $table_per36Minutes = "<table align=\"center\" class=\"sortable\">
             <thead>
-                <tr bgcolor=$color1>
-                    <th><font color=$color2>Pos</font></th>
-                    <th colspan=3><font color=$color2>Player</font></th>
-                    <th><font color=$color2>g</font></th>
-                    <th><font color=$color2>gs</font></th>
-                    <th><font color=$color2>mpg</font></th>
-                    <th><font color=$color2>36min</font></th>
-                    <td bgcolor=$color1 width=0></td>
-                    <th><font color=$color2>fgm</font></th>
-                    <th><font color=$color2>fga</font></th>
-                    <th><font color=$color2>fgp</font></th>
+                <tr bgcolor=$team->color1>
+                    <th><font color=$team->color2>Pos</font></th>
+                    <th colspan=3><font color=$team->color2>Player</font></th>
+                    <th><font color=$team->color2>g</font></th>
+                    <th><font color=$team->color2>gs</font></th>
+                    <th><font color=$team->color2>mpg</font></th>
+                    <th><font color=$team->color2>36min</font></th>
+                    <td bgcolor=$team->color1 width=0></td>
+                    <th><font color=$team->color2>fgm</font></th>
+                    <th><font color=$team->color2>fga</font></th>
+                    <th><font color=$team->color2>fgp</font></th>
                     <td bgcolor=#CCCCCC width=0></td>
-                    <th><font color=$color2>ftm</font></th>
-                    <th><font color=$color2>fta</font></th>
-                    <th><font color=$color2>ftp</font></th>
+                    <th><font color=$team->color2>ftm</font></th>
+                    <th><font color=$team->color2>fta</font></th>
+                    <th><font color=$team->color2>ftp</font></th>
                     <td bgcolor=#CCCCCC width=0></td>
-                    <th><font color=$color2>3gm</font></th>
-                    <th><font color=$color2>3ga</font></th>
-                    <th><font color=$color2>3gp</font></th>
-                    <td bgcolor=$color1 width=0></td>
-                    <th><font color=$color2>orb</font></th>
-                    <th><font color=$color2>reb</font></th>
-                    <th><font color=$color2>ast</font></th>
-                    <th><font color=$color2>stl</font></th>
-                    <th><font color=$color2>to</font></th>
-                    <th><font color=$color2>blk</font></th>
-                    <th><font color=$color2>pf</font></th>
-                    <th><font color=$color2>pts</font></th>
+                    <th><font color=$team->color2>3gm</font></th>
+                    <th><font color=$team->color2>3ga</font></th>
+                    <th><font color=$team->color2>3gp</font></th>
+                    <td bgcolor=$team->color1 width=0></td>
+                    <th><font color=$team->color2>orb</font></th>
+                    <th><font color=$team->color2>reb</font></th>
+                    <th><font color=$team->color2>ast</font></th>
+                    <th><font color=$team->color2>stl</font></th>
+                    <th><font color=$team->color2>to</font></th>
+                    <th><font color=$team->color2>blk</font></th>
+                    <th><font color=$team->color2>pf</font></th>
+                    <th><font color=$team->color2>pts</font></th>
                 </tr>
             </thead>
         <tbody>";
@@ -225,7 +225,7 @@ class UI
     
             $firstCharacterOfPlayerName = substr($name, 0, 1); // if player name starts with '|' (pipe symbol), then skip them
             if ($firstCharacterOfPlayerName !== '|') {
-                $playerNameDecorated = UI::decoratePlayerName($name, $tid, $p_ord, $cy, $cyt);
+                $playerNameDecorated = UI::decoratePlayerName($name, $team->teamID, $p_ord, $cy, $cyt);
     
                 if ($yr == "") {
                     $stats_gm = $db->sql_result($result, $i, "stats_gm");
@@ -293,7 +293,7 @@ class UI
                     <td><center>$stats_gs</center></td>
                     <td><center>$stats_mpg</center></td>
                     <td><center>$stats_per36Min</center></td>
-                    <td bgcolor=$color1 width=0></td>
+                    <td bgcolor=$team->color1 width=0></td>
                     <td><center>$stats_fgm</center></td>
                     <td><center>$stats_fga</center></td>
                     <td><center>$stats_fgp</center></td>
@@ -305,7 +305,7 @@ class UI
                     <td><center>$stats_tgm</center></td>
                     <td><center>$stats_tga</center></td>
                     <td><center>$stats_tgp</center></td>
-                    <td bgcolor=$color1 width=0></td>
+                    <td bgcolor=$team->color1 width=0></td>
                     <td><center>$stats_opg</center></td>
                     <td><center>$stats_rpg</center></td>
                     <td><center>$stats_apg</center></td>

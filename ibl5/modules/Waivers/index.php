@@ -434,7 +434,7 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
             <td colspan=3><center><input type=\"submit\" value=\"Click to $action player(s) to/from Waiver Pool\"></center></td>
         </tr></form></table></center>";
     
-    $table_ratings = $sharedFunctions->ratings($db, $resultListOfPlayersForWaiverOperation, "DDDDDD", "333333", "0", "");
+    $table_ratings = UI::ratings($db, $resultListOfPlayersForWaiverOperation, "DDDDDD", "333333", "0", "");
     echo $table_ratings;
 
     CloseTable();

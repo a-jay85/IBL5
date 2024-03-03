@@ -62,10 +62,8 @@ function team($tid)
     if ($tid == 0) { // Team 0 is the Free Agents; we want a query that will pick up all of their players.
         if ($isFreeAgencyModuleActive == 0) {
             $query = "SELECT * FROM ibl_plr WHERE ordinal > '959' AND retired = 0 ORDER BY ordinal ASC";
-            //            $query="SELECT * FROM ibl_plr WHERE tid = 0 AND retired = 0 ORDER BY ordinal ASC";
         } else {
             $query = "SELECT * FROM ibl_plr WHERE ordinal > '959' AND retired = 0 AND cyt != cy ORDER BY ordinal ASC";
-            //            $query="SELECT * FROM ibl_plr WHERE tid = 0 AND retired = 0 AND cyt != cy ORDER BY ordinal ASC";
         }
         $result = $db->sql_query($query);
     } else if ($tid == "-1") { // SHOW ENTIRE LEAGUE

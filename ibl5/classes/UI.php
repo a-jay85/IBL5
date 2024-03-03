@@ -27,6 +27,154 @@ class UI
         <hr>";
     }
 
+    public static function contracts($db, $result, $team, $isFreeAgencyModuleActive, $currentSeasonEndingYear)
+    {
+        if ($isFreeAgencyModuleActive == 1) {
+            $currentSeasonEndingYear++;
+        }
+        
+        $table_contracts = "<table align=\"center\" class=\"sortable\">
+            <thead>
+                <tr bgcolor=$team->color1>
+                    <th><font color=$team->color2>Pos</font></th>
+                    <th colspan=2><font color=$team->color2>Player</font></th>
+                    <th><font color=$team->color2>Exp</font></th>
+                    <th><font color=$team->color2>Bird</font></th>
+                    <td bgcolor=$team->color1 width=0></td>
+                    <th><font color=$team->color2>" . ($currentSeasonEndingYear + -1) . "-<br>" . ($currentSeasonEndingYear + 0) . "</font></th>
+                    <th><font color=$team->color2>" . ($currentSeasonEndingYear + 0) . "-<br>" . ($currentSeasonEndingYear + 1) . "</font></th>
+                    <th><font color=$team->color2>" . ($currentSeasonEndingYear + 1) . "-<br>" . ($currentSeasonEndingYear + 2) . "</font></th>
+                    <th><font color=$team->color2>" . ($currentSeasonEndingYear + 2) . "-<br>" . ($currentSeasonEndingYear + 3) . "</font></th>
+                    <th><font color=$team->color2>" . ($currentSeasonEndingYear + 3) . "-<br>" . ($currentSeasonEndingYear + 4) . "</font></th>
+                    <th><font color=$team->color2>" . ($currentSeasonEndingYear + 4) . "-<br>" . ($currentSeasonEndingYear + 5) . "</font></th>
+                    <td bgcolor=$team->color1 width=0></td>
+                    <th><font color=$team->color2>Tal</font></th>
+                    <th><font color=$team->color2>Skl</font></th>
+                    <th><font color=$team->color2>Int</font></th>
+                    <td bgcolor=$team->color1 width=0></td>
+                    <th><font color=$team->color2>Loy</font></th>
+                    <th><font color=$team->color2>PFW</font></th>
+                    <th><font color=$team->color2>PT</font></th>
+                    <th><font color=$team->color2>Sec</font></th>
+                    <th><font color=$team->color2>Trad</font></th>
+                </tr>
+            </thead>
+        <tbody>";
+    
+        $cap1 = 0;
+        $cap2 = 0;
+        $cap3 = 0;
+        $cap4 = 0;
+        $cap5 = 0;
+        $cap6 = 0;
+    
+        $i = 0;
+        foreach ($result as $plrRow) {
+            $player = Player::withPlrRow($db, $plrRow);
+    
+            $playerNameDecorated = UI::decoratePlayerName($player->name, $team->teamID, $player->ordinal, $player->contractCurrentYear, $player->contractTotalYears);
+    
+            if ($isFreeAgencyModuleActive == 0) {
+                $year1 = $player->contractCurrentYear;
+                $year2 = $player->contractCurrentYear + 1;
+                $year3 = $player->contractCurrentYear + 2;
+                $year4 = $player->contractCurrentYear + 3;
+                $year5 = $player->contractCurrentYear + 4;
+                $year6 = $player->contractCurrentYear + 5;
+            } else {
+                $year1 = $player->contractCurrentYear + 1;
+                $year2 = $player->contractCurrentYear + 2;
+                $year3 = $player->contractCurrentYear + 3;
+                $year4 = $player->contractCurrentYear + 4;
+                $year5 = $player->contractCurrentYear + 5;
+                $year6 = $player->contractCurrentYear + 6;
+            }
+            if ($player->contractCurrentYear == 0) {
+                $year1 < 7 ? $con1 = $player->contractYear1Salary : $con1 = 0;
+                $year2 < 7 ? $con2 = $player->contractYear2Salary : $con2 = 0;
+                $year3 < 7 ? $con3 = $player->contractYear3Salary : $con3 = 0;
+                $year4 < 7 ? $con4 = $player->contractYear4Salary : $con4 = 0;
+                $year5 < 7 ? $con5 = $player->contractYear5Salary : $con5 = 0;
+                $year6 < 7 ? $con6 = $player->contractYear6Salary : $con6 = 0;
+            } else {
+                $year1 < 7 ? $con1 = $player->{'contractYear' . $year1 . 'Salary'} : $con1 = 0;
+                $year2 < 7 ? $con2 = $player->{'contractYear' . $year2 . 'Salary'} : $con2 = 0;
+                $year3 < 7 ? $con3 = $player->{'contractYear' . $year3 . 'Salary'} : $con3 = 0;
+                $year4 < 7 ? $con4 = $player->{'contractYear' . $year4 . 'Salary'} : $con4 = 0;
+                $year5 < 7 ? $con5 = $player->{'contractYear' . $year5 . 'Salary'} : $con5 = 0;
+                $year6 < 7 ? $con6 = $player->{'contractYear' . $year6 . 'Salary'} : $con6 = 0;
+            }
+    
+            (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
+    
+            $table_contracts .= "
+                <tr bgcolor=$bgcolor>
+                <td align=center>$player->position</td>
+                <td colspan=2><a href=\"./modules.php?name=Player&pa=showpage&pid=$player->playerID\">$playerNameDecorated</a></td>
+                <td align=center>$player->yearsOfExperience</td>
+                <td align=center>$player->birdYears</td>
+                <td bgcolor=$team->color1></td>
+                <td>$con1</td>
+                <td>$con2</td>
+                <td>$con3</td>
+                <td>$con4</td>
+                <td>$con5</td>
+                <td>$con6</td>
+                <td bgcolor=$team->color1></td>
+                <td align=center>$player->ratingTalent</td>
+                <td align=center>$player->ratingSkill</td>
+                <td align=center>$player->ratingIntangibles</td>
+                <td bgcolor=$team->color1></td>
+                <td align=center>$player->freeAgencyLoyalty</td>
+                <td align=center>$player->freeAgencyPlayForWinner</td>
+                <td align=center>$player->freeAgencyPlayingTime</td>
+                <td align=center>$player->freeAgencySecurity</td>
+                <td align=center>$player->freeAgencyTradition</td>
+            </tr>";
+    
+            $cap1 += $con1;
+            $cap2 += $con2;
+            $cap3 += $con3;
+            $cap4 += $con4;
+            $cap5 += $con5;
+            $cap6 += $con6;
+            $i++;
+        }
+    
+        $table_contracts .= "</tbody>
+            <tfoot>
+                <tr>
+                    <td></td>
+                    <td colspan=2><b>Cap Totals</td>
+                    <td></td>
+                    <td></td>
+                    <td bgcolor=$team->color1></td>
+                    <td><b>$cap1</td>
+                    <td><b>$cap2</td>
+                    <td><b>$cap3</td>
+                    <td><b>$cap4</td>
+                    <td><b>$cap5</td>
+                    <td><b>$cap6</td>
+                    <td bgcolor=$team->color1></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td colspan=19><i>Note:</i> Players whose names appear in parenthesis and with a trailing asterisk are waived players that still count against the salary cap.</td>
+                </tr>
+            </tfoot>
+        </table>";
+    
+        return $table_contracts;
+    }
+
     public static function per36Minutes($db, $result, $color1, $color2, $tid, $yr)
     {
         $table_per36Minutes = "<table align=\"center\" class=\"sortable\">

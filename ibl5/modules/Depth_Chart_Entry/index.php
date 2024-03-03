@@ -138,7 +138,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
             <input type=\"hidden\" name=\"Set_Name\" value=\"$offense_name\">
 		<center><img src=\"images/logo/$tid.jpg\"><br>";
 
-    $table_ratings = $sharedFunctions->ratings($db, $playersOnTeam, $color1, $color2, $tid, "");
+    $table_ratings = UI::ratings($db, $playersOnTeam, $color1, $color2, $tid, "");
     echo $table_ratings;
 
     echo "<p><table>

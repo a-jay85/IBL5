@@ -121,7 +121,7 @@ function team($tid)
 
     if ($display == "per36mins") {
         $showing = "Per 36 Minutes";
-        $table_per36Minutes = UI::per36Minutes($db, $result, $team->color1, $team->color2, $tid, $yr);
+        $table_per36Minutes = UI::per36Minutes($db, $result, $team, $yr);
         $table_output = $table_per36Minutes;
         $tabs .= "<td bgcolor=#BBBBBB style=\"font-weight:bold\">";
     } else {

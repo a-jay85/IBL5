@@ -11,6 +11,7 @@ class Player
     public $name;
     public $nickname;
     public $age;
+    public $historicalYear;
 
     public $teamID;
     public $teamName;
@@ -59,6 +60,7 @@ class Player
     public $contractYear4Salary;
     public $contractYear5Salary;
     public $contractYear6Salary;
+    public $salaryJSB;
 
     public $draftYear;
     public $draftRound;
@@ -177,6 +179,42 @@ class Player
         $this->isRetired = $plrRow['retired'];
     
         $this->timeDroppedOnWaivers = $plrRow['droptime'];
+    }
+
+    protected function fillHistorical($db, array $plrRow)
+    {
+        $this->db = $db;
+
+        $this->playerID = $plrRow['pid'];
+        $this->historicalYear = $plrRow['year'];
+        $this->name = $plrRow['name'];
+
+        $this->teamName = $plrRow['team'];
+        $this->teamID = $plrRow['teamid'];
+        
+        $this->ratingFieldGoalAttempts = $plrRow['r_2ga'];
+        $this->ratingFieldGoalPercentage = $plrRow['r_2gp'];
+        $this->ratingFreeThrowAttempts = $plrRow['r_fta'];
+        $this->ratingFreeThrowPercentage = $plrRow['r_ftp'];
+        $this->ratingThreePointAttempts = $plrRow['r_3ga'];
+        $this->ratingThreePointPercentage = $plrRow['r_3gp'];
+        $this->ratingOffensiveRebounds = $plrRow['r_orb'];
+        $this->ratingDefensiveRebounds = $plrRow['r_drb'];
+        $this->ratingAssists = $plrRow['r_ast'];
+        $this->ratingSteals = $plrRow['r_stl'];
+        $this->ratingBlocks = $plrRow['r_blk'];
+        $this->ratingTurnovers = $plrRow['r_tvr'];
+
+        $this->ratingOutsideOffense = $plrRow['r_oo'];
+        $this->ratingOutsideDefense = $plrRow['r_od'];
+        $this->ratingDriveOffense = $plrRow['r_do'];
+        $this->ratingDriveDefense = $plrRow['r_dd'];
+        $this->ratingPostOffense = $plrRow['r_po'];
+        $this->ratingPostDefense = $plrRow['r_pd'];
+        $this->ratingTransitionOffense = $plrRow['r_to'];
+        $this->ratingTransitionDefense = $plrRow['r_td'];
+
+        $this->salaryJSB = $plrRow['salary'];
     }
 
     public function getCurrentSeasonSalary()

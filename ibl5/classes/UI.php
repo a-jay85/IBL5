@@ -781,7 +781,6 @@ class UI
                 <td><center>$playerStats->seasonPersonalFouls</center></td>
                 <td><center>$playerStats->seasonPoints</center></td>
                 </tr>";    
-            }
 
             $i++;
         }

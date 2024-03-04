@@ -790,7 +790,7 @@ class UI
 
         // ==== INSERT TEAM OFFENSE AND DEFENSE TOTALS ====
 
-        $queryTeamOffenseTotals = "SELECT * FROM ibl_team_offense_stats WHERE team = '$team_name' AND year = '1989'";
+        $queryTeamOffenseTotals = "SELECT * FROM ibl_team_offense_stats WHERE team = '$team->name'";
         $resultTeamOffenseTotals = $db->sql_query($queryTeamOffenseTotals);
         $numTeamOffenseTotals = $db->sql_numrows($resultTeamOffenseTotals);
 
@@ -843,7 +843,7 @@ class UI
             $t++;
         }
 
-        $queryTeamDefenseTotals = "SELECT * FROM ibl_team_defense_stats WHERE team = '$team_name' AND year = '1989'";
+        $queryTeamDefenseTotals = "SELECT * FROM ibl_team_defense_stats WHERE team = '$team->name'";
         $resultTeamDefenseTotals = $db->sql_query($queryTeamDefenseTotals);
         $numTeamDefenseTotals = $db->sql_numrows($resultTeamDefenseTotals);
 

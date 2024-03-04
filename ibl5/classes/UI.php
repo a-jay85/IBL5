@@ -291,47 +291,47 @@ class UI
         return $table_per36Minutes;
     }
     
-    public static function ratings($db, $result, $color1, $color2, $tid, $yr)
+    public static function ratings($db, $result, $team, $yr)
     {
         $table_ratings = "<table align=\"center\" class=\"sortable\">
             <colgroup span=2><colgroup span=2><colgroup span=6><colgroup span=6><colgroup span=4><colgroup span=4><colgroup span=1>
-            <thead bgcolor=$color1>
-                <tr bgcolor=$color1>
-                    <th><font color=$color2>Pos</font></th>
-                    <th><font color=$color2>Player</font></th>
-                    <th><font color=$color2>Age</font></th>
-                    <td bgcolor=$color1 width=0></td>
-                    <th><font color=$color2>2ga</font></th>
-                    <th><font color=$color2>2g%</font></th>
+            <thead bgcolor=$team->color1>
+                <tr bgcolor=$team->color1>
+                    <th><font color=$team->color2>Pos</font></th>
+                    <th><font color=$team->color2>Player</font></th>
+                    <th><font color=$team->color2>Age</font></th>
+                    <td bgcolor=$team->color1 width=0></td>
+                    <th><font color=$team->color2>2ga</font></th>
+                    <th><font color=$team->color2>2g%</font></th>
                     <td bgcolor=#CCCCCC width=0></td>
-                    <th><font color=$color2>fta</font></th>
-                    <th><font color=$color2>ft%</font></th>
+                    <th><font color=$team->color2>fta</font></th>
+                    <th><font color=$team->color2>ft%</font></th>
                     <td bgcolor=#CCCCCC width=0></td>
-                    <th><font color=$color2>3ga</font></th>
-                    <th><font color=$color2>3g%</font></th>
-                    <td bgcolor=$color1 width=0></td>
-                    <th><font color=$color2>orb</font></th>
-                    <th><font color=$color2>drb</font></th>
-                    <th><font color=$color2>ast</font></th>
-                    <th><font color=$color2>stl</font></th>
-                    <th><font color=$color2>tvr</font></th>
-                    <th><font color=$color2>blk</font></th>
-                    <th><font color=$color2>foul</font></th>
-                    <td bgcolor=$color1 width=0></td>
-                    <th><font color=$color2>oo</font></th>
-                    <th><font color=$color2>do</font></th>
-                    <th><font color=$color2>po</font></th>
-                    <th><font color=$color2>to</font></th>
+                    <th><font color=$team->color2>3ga</font></th>
+                    <th><font color=$team->color2>3g%</font></th>
+                    <td bgcolor=$team->color1 width=0></td>
+                    <th><font color=$team->color2>orb</font></th>
+                    <th><font color=$team->color2>drb</font></th>
+                    <th><font color=$team->color2>ast</font></th>
+                    <th><font color=$team->color2>stl</font></th>
+                    <th><font color=$team->color2>tvr</font></th>
+                    <th><font color=$team->color2>blk</font></th>
+                    <th><font color=$team->color2>foul</font></th>
+                    <td bgcolor=$team->color1 width=0></td>
+                    <th><font color=$team->color2>oo</font></th>
+                    <th><font color=$team->color2>do</font></th>
+                    <th><font color=$team->color2>po</font></th>
+                    <th><font color=$team->color2>to</font></th>
                     <td bgcolor=#CCCCCC width=0></td>
-                    <th><font color=$color2>od</font></th>
-                    <th><font color=$color2>dd</font></th>
-                    <th><font color=$color2>pd</font></th>
-                    <th><font color=$color2>td</font></th>
-                    <td bgcolor=$color1 width=0></td>
-                    <th><font color=$color2>Clu</font></th>
-                    <th><font color=$color2>Con</font></th>
-                    <td bgcolor=$color1 width=0></td>
-                    <th><font color=$color2>Inj</font></th>
+                    <th><font color=$team->color2>od</font></th>
+                    <th><font color=$team->color2>dd</font></th>
+                    <th><font color=$team->color2>pd</font></th>
+                    <th><font color=$team->color2>td</font></th>
+                    <td bgcolor=$team->color1 width=0></td>
+                    <th><font color=$team->color2>Clu</font></th>
+                    <th><font color=$team->color2>Con</font></th>
+                    <td bgcolor=$team->color1 width=0></td>
+                    <th><font color=$team->color2>Inj</font></th>
                 </tr>
             </thead>
         <tbody>";
@@ -403,7 +403,7 @@ class UI
 
             $firstCharacterOfPlayerName = substr($name, 0, 1); // if player name starts with '|' (pipe symbol), then skip them
             if ($firstCharacterOfPlayerName !== '|') {
-                $playerNameDecorated = UI::decoratePlayerName($name, $tid, $p_ord, $cy, $cyt);
+                $playerNameDecorated = UI::decoratePlayerName($name, $team->teamID, $p_ord, $cy, $cyt);
     
                 (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
         
@@ -411,7 +411,7 @@ class UI
                     <td align=center>$pos</td>
                     <td><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$playerNameDecorated</a></td>
                     <td align=center>$age</td>
-                    <td bgcolor=$color1></td>
+                    <td bgcolor=$team->color1></td>
                     <td align=center>$r_2ga</td>
                     <td align=center>$r_2gp</td>
                     <td bgcolor=#CCCCCC width=0></td>
@@ -420,7 +420,7 @@ class UI
                     <td bgcolor=#CCCCCC width=0></td>
                     <td align=center>$r_3ga</td>
                     <td align=center>$r_3gp</td>
-                    <td bgcolor=$color1></td>
+                    <td bgcolor=$team->color1></td>
                     <td align=center>$r_orb</td>
                     <td align=center>$r_drb</td>
                     <td align=center>$r_ast</td>
@@ -428,7 +428,7 @@ class UI
                     <td align=center>$r_tvr</td>
                     <td align=center>$r_blk</td>
                     <td align=center>$r_foul</td>
-                    <td bgcolor=$color1></td>
+                    <td bgcolor=$team->color1></td>
                     <td align=center>$r_oo</td>
                     <td align=center>$r_do</td>
                     <td align=center>$r_po</td>
@@ -438,10 +438,10 @@ class UI
                     <td align=center>$r_dd</td>
                     <td align=center>$r_pd</td>
                     <td align=center>$r_td</td>
-                    <td bgcolor=$color1></td>
+                    <td bgcolor=$team->color1></td>
                     <td align=center>$clutch</td>
                     <td align=center>$consistency</td>
-                    <td bgcolor=$color1></td>
+                    <td bgcolor=$team->color1></td>
                     <td align=center>$inj</td>
                 </tr>";
             }

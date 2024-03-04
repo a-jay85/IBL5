@@ -97,6 +97,13 @@ class Player
         return $instance;
     }
 
+    public static function withHistoricalPlrRow($db, array $plrRow)
+    {
+        $instance = new self();
+        $instance->fillHistorical($db, $plrRow);
+        return $instance;
+    }
+
     protected function loadByID($db, int $playerID)
     {
         $query = "SELECT * FROM ibl_plr WHERE pid = $playerID LIMIT 1;";

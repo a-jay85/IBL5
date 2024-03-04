@@ -337,114 +337,61 @@ class UI
         <tbody>";
     
         $i = 0;
-        $num = $db->sql_numrows($result);
-        while ($i < $num) {
+        foreach ($result as $plrRow) {
             if ($yr == "") {
-                $name = $db->sql_result($result, $i, "name");
-                $pid = $db->sql_result($result, $i, "pid");
-                $pos = $db->sql_result($result, $i, "pos");
-                $p_ord = $db->sql_result($result, $i, "ordinal");
-                $age = $db->sql_result($result, $i, "age");
-                $inj = $db->sql_result($result, $i, "injured");
-    
-                $r_2ga = $db->sql_result($result, $i, "r_fga");
-                $r_2gp = $db->sql_result($result, $i, "r_fgp");
-                $r_fta = $db->sql_result($result, $i, "r_fta");
-                $r_ftp = $db->sql_result($result, $i, "r_ftp");
-                $r_3ga = $db->sql_result($result, $i, "r_tga");
-                $r_3gp = $db->sql_result($result, $i, "r_tgp");
-                $r_orb = $db->sql_result($result, $i, "r_orb");
-                $r_drb = $db->sql_result($result, $i, "r_drb");
-                $r_ast = $db->sql_result($result, $i, "r_ast");
-                $r_stl = $db->sql_result($result, $i, "r_stl");
-                $r_blk = $db->sql_result($result, $i, "r_blk");
-                $r_tvr = $db->sql_result($result, $i, "r_to");
-                $r_foul = $db->sql_result($result, $i, "r_foul");
-                $r_oo = $db->sql_result($result, $i, "oo");
-                $r_do = $db->sql_result($result, $i, "do");
-                $r_po = $db->sql_result($result, $i, "po");
-                $r_to = $db->sql_result($result, $i, "to");
-                $r_od = $db->sql_result($result, $i, "od");
-                $r_dd = $db->sql_result($result, $i, "dd");
-                $r_pd = $db->sql_result($result, $i, "pd");
-                $r_td = $db->sql_result($result, $i, "td");
-                $clutch = $db->sql_result($result, $i, "Clutch");
-                $consistency = $db->sql_result($result, $i, "Consistency");
-    
-                $cy = $db->sql_result($result, $i, "cy");
-                $cyt = $db->sql_result($result, $i, "cyt");
+                $player = Player::withPlrRow($db, $plrRow);
+
+                $firstCharacterOfPlayerName = substr($player->name, 0, 1); // if player name starts with '|' (pipe symbol), then skip them
+                if ($firstCharacterOfPlayerName !== '|') {
+                    $playerNameDecorated = UI::decoratePlayerName($player->name, $team->teamID, $player->ordinal, $player->contractCurrentYear, $player->contractTotalYears);
+                } else {
+                    continue;
+                }
             } else {
-                $name = $db->sql_result($result, $i, "name");
-                $pid = $db->sql_result($result, $i, "pid");
-    
-                $r_2ga = $db->sql_result($result, $i, "r_2ga");
-                $r_2gp = $db->sql_result($result, $i, "r_2gp");
-                $r_fta = $db->sql_result($result, $i, "r_fta");
-                $r_ftp = $db->sql_result($result, $i, "r_ftp");
-                $r_3ga = $db->sql_result($result, $i, "r_3ga");
-                $r_3gp = $db->sql_result($result, $i, "r_3gp");
-                $r_orb = $db->sql_result($result, $i, "r_orb");
-                $r_drb = $db->sql_result($result, $i, "r_drb");
-                $r_ast = $db->sql_result($result, $i, "r_ast");
-                $r_stl = $db->sql_result($result, $i, "r_stl");
-                $r_blk = $db->sql_result($result, $i, "r_blk");
-                $r_tvr = $db->sql_result($result, $i, "r_tvr");
-                $r_oo = $db->sql_result($result, $i, "r_oo");
-                $r_do = $db->sql_result($result, $i, "r_do");
-                $r_po = $db->sql_result($result, $i, "r_po");
-                $r_to = $db->sql_result($result, $i, "r_to");
-                $r_od = $db->sql_result($result, $i, "r_od");
-                $r_dd = $db->sql_result($result, $i, "r_dd");
-                $r_pd = $db->sql_result($result, $i, "r_pd");
-                $r_td = $db->sql_result($result, $i, "r_td");
-                $clutch = $db->sql_result($result, $i, "Clutch");
-                $consistency = $db->sql_result($result, $i, "Consistency");
+                $player = Player::withHistoricalPlrRow($db, $plrRow);
+                
+                $playerNameDecorated = $player->name;
             }
 
-            $firstCharacterOfPlayerName = substr($name, 0, 1); // if player name starts with '|' (pipe symbol), then skip them
-            if ($firstCharacterOfPlayerName !== '|') {
-                $playerNameDecorated = UI::decoratePlayerName($name, $team->teamID, $p_ord, $cy, $cyt);
+            (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
     
-                (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
-        
-                $table_ratings .= "<tr bgcolor=$bgcolor>
-                    <td align=center>$pos</td>
-                    <td><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$playerNameDecorated</a></td>
-                    <td align=center>$age</td>
-                    <td bgcolor=$team->color1></td>
-                    <td align=center>$r_2ga</td>
-                    <td align=center>$r_2gp</td>
-                    <td bgcolor=#CCCCCC width=0></td>
-                    <td align=center>$r_fta</td>
-                    <td align=center>$r_ftp</td>
-                    <td bgcolor=#CCCCCC width=0></td>
-                    <td align=center>$r_3ga</td>
-                    <td align=center>$r_3gp</td>
-                    <td bgcolor=$team->color1></td>
-                    <td align=center>$r_orb</td>
-                    <td align=center>$r_drb</td>
-                    <td align=center>$r_ast</td>
-                    <td align=center>$r_stl</td>
-                    <td align=center>$r_tvr</td>
-                    <td align=center>$r_blk</td>
-                    <td align=center>$r_foul</td>
-                    <td bgcolor=$team->color1></td>
-                    <td align=center>$r_oo</td>
-                    <td align=center>$r_do</td>
-                    <td align=center>$r_po</td>
-                    <td align=center>$r_to</td>
-                    <td bgcolor=#CCCCCC width=0></td>
-                    <td align=center>$r_od</td>
-                    <td align=center>$r_dd</td>
-                    <td align=center>$r_pd</td>
-                    <td align=center>$r_td</td>
-                    <td bgcolor=$team->color1></td>
-                    <td align=center>$clutch</td>
-                    <td align=center>$consistency</td>
-                    <td bgcolor=$team->color1></td>
-                    <td align=center>$inj</td>
-                </tr>";
-            }
+            $table_ratings .= "<tr bgcolor=$bgcolor>
+                <td align=center>$player->position</td>
+                <td><a href=\"./modules.php?name=Player&pa=showpage&pid=$player->playerID\">$playerNameDecorated</a></td>
+                <td align=center>$player->age</td>
+                <td bgcolor=$team->color1></td>
+                <td align=center>$player->ratingFieldGoalAttempts</td>
+                <td align=center>$player->ratingFieldGoalPercentage</td>
+                <td bgcolor=#CCCCCC width=0></td>
+                <td align=center>$player->ratingFreeThrowAttempts</td>
+                <td align=center>$player->ratingFreeThrowPercentage</td>
+                <td bgcolor=#CCCCCC width=0></td>
+                <td align=center>$player->ratingThreePointAttempts</td>
+                <td align=center>$player->ratingThreePointPercentage</td>
+                <td bgcolor=$team->color1></td>
+                <td align=center>$player->ratingOffensiveRebounds</td>
+                <td align=center>$player->ratingDefensiveRebounds</td>
+                <td align=center>$player->ratingAssists</td>
+                <td align=center>$player->ratingSteals</td>
+                <td align=center>$player->ratingTurnovers</td>
+                <td align=center>$player->ratingBlocks</td>
+                <td align=center>$player->ratingFouls</td>
+                <td bgcolor=$team->color1></td>
+                <td align=center>$player->ratingOutsideOffense</td>
+                <td align=center>$player->ratingDriveOffense</td>
+                <td align=center>$player->ratingPostOffense</td>
+                <td align=center>$player->ratingTransitionOffense</td>
+                <td bgcolor=#CCCCCC width=0></td>
+                <td align=center>$player->ratingOutsideDefense</td>
+                <td align=center>$player->ratingDriveDefense</td>
+                <td align=center>$player->ratingPostDefense</td>
+                <td align=center>$player->ratingTransitionDefense</td>
+                <td bgcolor=$team->color1></td>
+                <td align=center>$player->ratingClutch</td>
+                <td align=center>$player->ratingConsistency</td>
+                <td bgcolor=$team->color1></td>
+                <td align=center>$player->daysRemainingForInjury</td>
+            </tr>";
     
             $i++;
         }

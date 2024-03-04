@@ -703,116 +703,83 @@ class UI
         return $table_averages;
     }
 
-    public static function seasonTotals($db, $result, $color1, $color2, $tid, $yr, $team_name)
+    public static function seasonTotals($db, $result, $team, $yr)
     {
         $table_totals = "<table align=\"center\" class=\"sortable\">
             <thead>
-                <tr bgcolor=$color1>
-                    <th><font color=$color2>Pos</font></th>
-                    <th colspan=3><font color=$color2>Player</font></th>
-                    <th><font color=$color2>g</font></th>
-                    <th><font color=$color2>gs</font></th>
-                    <th><font color=$color2>min</font></th>
-                    <td bgcolor=$color1 width=0></td>
-                    <th><font color=$color2>fgm</font></th>
-                    <th><font color=$color2>fga</font></th>
+                <tr bgcolor=$team->color1>
+                    <th><font color=$team->color2>Pos</font></th>
+                    <th colspan=3><font color=$team->color2>Player</font></th>
+                    <th><font color=$team->color2>g</font></th>
+                    <th><font color=$team->color2>gs</font></th>
+                    <th><font color=$team->color2>min</font></th>
+                    <td bgcolor=$team->color1 width=0></td>
+                    <th><font color=$team->color2>fgm</font></th>
+                    <th><font color=$team->color2>fga</font></th>
                     <td bgcolor=#CCCCCC width=0></td>
-                    <th><font color=$color2>ftm</font></th>
-                    <th><font color=$color2>fta</font></th>
+                    <th><font color=$team->color2>ftm</font></th>
+                    <th><font color=$team->color2>fta</font></th>
                     <td bgcolor=#CCCCCC width=0></td>
-                    <th><font color=$color2>3gm</font></th>
-                    <th><font color=$color2>3ga</font></th>
-                    <td bgcolor=$color1 width=0></td>
-                    <th><font color=$color2>orb</font></th>
-                    <th><font color=$color2>reb</font></th>
-                    <th><font color=$color2>ast</font></th>
-                    <th><font color=$color2>stl</font></th>
-                    <th><font color=$color2>to</font></th>
-                    <th><font color=$color2>blk</font></th>
-                    <th><font color=$color2>pf</font></th>
-                    <th><font color=$color2>pts</font></th>
+                    <th><font color=$team->color2>3gm</font></th>
+                    <th><font color=$team->color2>3ga</font></th>
+                    <td bgcolor=$team->color1 width=0></td>
+                    <th><font color=$team->color2>orb</font></th>
+                    <th><font color=$team->color2>reb</font></th>
+                    <th><font color=$team->color2>ast</font></th>
+                    <th><font color=$team->color2>stl</font></th>
+                    <th><font color=$team->color2>to</font></th>
+                    <th><font color=$team->color2>blk</font></th>
+                    <th><font color=$team->color2>pf</font></th>
+                    <th><font color=$team->color2>pts</font></th>
                 </tr>
             </thead>
         <tbody>";
 
         $i = 0;
-        $num = $db->sql_numrows($result);
-        while ($i < $num) {
-            $name = $db->sql_result($result, $i, "name");
-            $pos = $db->sql_result($result, $i, "pos");
-            $p_ord = $db->sql_result($result, $i, "ordinal");
-            $pid = $db->sql_result($result, $i, "pid");
-            $cy = $db->sql_result($result, $i, "cy");
-            $cyt = $db->sql_result($result, $i, "cyt");
+        foreach ($result as $plrRow) {
+            if ($yr == "") {
+                $player = Player::withPlrRow($db, $plrRow);
+                $playerStats = PlayerStats::withPlrRow($db, $plrRow);
 
-            $firstCharacterOfPlayerName = substr($name, 0, 1); // if player name starts with '|' (pipe symbol), then skip them
+                $firstCharacterOfPlayerName = substr($player->name, 0, 1); // if player name starts with '|' (pipe symbol), then skip them
             if ($firstCharacterOfPlayerName !== '|') {
-                $playerNameDecorated = UI::decoratePlayerName($name, $tid, $p_ord, $cy, $cyt);
-
-                if ($yr == "") {
-                    $stats_gm = $db->sql_result($result, $i, "stats_gm");
-                    $stats_gs = $db->sql_result($result, $i, "stats_gs");
-                    $stats_min = $db->sql_result($result, $i, "stats_min");
-                    $stats_fgm = $db->sql_result($result, $i, "stats_fgm");
-                    $stats_fga = $db->sql_result($result, $i, "stats_fga");
-                    $stats_ftm = $db->sql_result($result, $i, "stats_ftm");
-                    $stats_fta = $db->sql_result($result, $i, "stats_fta");
-                    $stats_tgm = $db->sql_result($result, $i, "stats_3gm");
-                    $stats_tga = $db->sql_result($result, $i, "stats_3ga");
-                    $stats_orb = $db->sql_result($result, $i, "stats_orb");
-                    $stats_drb = $db->sql_result($result, $i, "stats_drb");
-                    $stats_ast = $db->sql_result($result, $i, "stats_ast");
-                    $stats_stl = $db->sql_result($result, $i, "stats_stl");
-                    $stats_to = $db->sql_result($result, $i, "stats_to");
-                    $stats_blk = $db->sql_result($result, $i, "stats_blk");
-                    $stats_pf = $db->sql_result($result, $i, "stats_pf");
-                    $stats_reb = $stats_orb + $stats_drb;
-                    $stats_pts = 2 * $stats_fgm + $stats_ftm + $stats_tgm;
+                    $playerNameDecorated = UI::decoratePlayerName($player->name, $team->teamID, $player->ordinal, $player->contractCurrentYear, $player->contractTotalYears);
                 } else {
-                    $stats_gm = $db->sql_result($result, $i, "gm");
-                    $stats_min = $db->sql_result($result, $i, "min");
-                    $stats_fgm = $db->sql_result($result, $i, "fgm");
-                    $stats_fga = $db->sql_result($result, $i, "fga");
-                    $stats_ftm = $db->sql_result($result, $i, "ftm");
-                    $stats_fta = $db->sql_result($result, $i, "fta");
-                    $stats_tgm = $db->sql_result($result, $i, "3gm");
-                    $stats_tga = $db->sql_result($result, $i, "3ga");
-                    $stats_orb = $db->sql_result($result, $i, "orb");
-                    $stats_ast = $db->sql_result($result, $i, "ast");
-                    $stats_stl = $db->sql_result($result, $i, "stl");
-                    $stats_to = $db->sql_result($result, $i, "tvr");
-                    $stats_blk = $db->sql_result($result, $i, "blk");
-                    $stats_pf = $db->sql_result($result, $i, "pf");
-                    $stats_reb = $db->sql_result($result, $i, "reb");
-                    $stats_pts = 2 * $stats_fgm + $stats_ftm + $stats_tgm;
+                    continue;
+                }
+            } else {
+                $player = Player::withHistoricalPlrRow($db, $plrRow);
+                $playerStats = PlayerStats::withHistoricalPlrRow($db, $plrRow);
+
+                $playerNameDecorated = $player->name;
                 }
         
                 (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
         
                 $table_totals .= "<tr bgcolor=$bgcolor>
-                    <td>$pos</td>
-                    <td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$playerNameDecorated</a></td>
-                    <td><center>$stats_gm</center></td>
-                    <td><center>$stats_gs</center></td>
-                    <td><center>$stats_min</center></td>
-                    <td bgcolor=$color1 width=0></td>
-                    <td><center>$stats_fgm</center></td>
-                    <td><center>$stats_fga</center></td>
+                <td>$player->position</td>
+                <td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$player->playerID\">$playerNameDecorated</a></td>
+                <td><center>$playerStats->seasonGamesPlayed</center></td>
+                <td><center>$playerStats->seasonGamesStarted</center></td>
+                <td><center>$playerStats->seasonMinutes</center></td>
+                <td bgcolor=$team->color1 width=0></td>
+                <td><center>$playerStats->seasonFieldGoalsMade</center></td>
+                <td><center>$playerStats->seasonFieldGoalsAttempted</center></td>
                     <td bgcolor=#CCCCCC width=0></td>
-                    <td><center>$stats_ftm</center></td>
-                    <td><center>$stats_fta</center></td>
+                <td><center>$playerStats->seasonFreeThrowsMade</center></td>
+                <td><center>$playerStats->seasonFreeThrowsAttempted</center></td>
                     <td bgcolor=#CCCCCC width=0></td>
-                    <td><center>$stats_tgm</center></td>
-                    <td><center>$stats_tga</center></td>
-                    <td bgcolor=$color1 width=0></td>
-                    <td><center>$stats_orb</center></td>
-                    <td><center>$stats_reb</center></td>
-                    <td><center>$stats_ast</center></td>
-                    <td><center>$stats_stl</center></td>
-                    <td><center>$stats_to</center></td>
-                    <td><center>$stats_blk</center></td>
-                    <td><center>$stats_pf</center></td>
-                    <td><center>$stats_pts</center></td>
+                <td><center>$playerStats->seasonThreePointersMade</center></td>
+                <td><center>$playerStats->seasonThreePointersAttempted</center></td>
+                <td bgcolor=$team->color1 width=0></td>
+                <td><center>$playerStats->seasonOffensiveRebounds</center></td>
+                <td><center>$playerStats->seasonTotalRebounds</center></td>
+                <td><center>$playerStats->seasonAssists</center></td>
+                <td><center>$playerStats->seasonSteals</center></td>
+                <td><center>$playerStats->seasonTurnovers</center></td>
+                <td><center>$playerStats->seasonBlocks</center></td>
+                <td><center>$playerStats->seasonPersonalFouls</center></td>
+                <td><center>$playerStats->seasonPoints</center></td>
                 </tr>";    
             }
 
@@ -850,11 +817,11 @@ class UI
 
             if ($yr == "") {
                 $table_totals .= "<tr>
-                    <td colspan=4><b>$team_name Offense</td>
+                    <td colspan=4><b>$team->name Offense</td>
                     <td><center><b>$team_off_games</center></td>
                     <td><center><b>$team_off_games</center></td>
                     <td><center><b>$team_off_minutes</center></td>
-                    <td bgcolor=$color1 width=0></td>
+                    <td bgcolor=$team->color1 width=0></td>
                     <td><center><b>$team_off_fgm</center></td>
                     <td><center><b>$team_off_fga</b></center></td>
                     <td bgcolor=#CCCCCC width=0></td>
@@ -863,7 +830,7 @@ class UI
                     <td bgcolor=#CCCCCC width=0></td>
                     <td><center><b>$team_off_tgm</center></td>
                     <td><center><b>$team_off_tga</b></center></td>
-                    <td bgcolor=$color1 width=0></td>
+                    <td bgcolor=$team->color1 width=0></td>
                     <td><center><b>$team_off_orb</center></td>
                     <td><center><b>$team_off_reb</center></td>
                     <td><center><b>$team_off_ast</center></td>
@@ -903,11 +870,11 @@ class UI
 
             if ($yr == "") {
                 $table_totals .= "<tr>
-                    <td colspan=4><b>$team_name Defense</td>
+                    <td colspan=4><b>$team->name Defense</td>
                     <td><center><b>$team_def_games</center></td>
                     <td><center><b>$team_def_games</center></td>
                     <td><center><b>$team_def_minutes</center></td>
-                    <td bgcolor=$color1 width=0></td>
+                    <td bgcolor=$team->color1 width=0></td>
                     <td><center><b>$team_def_fgm</center></td>
                     <td><center><b>$team_def_fga</b></center></td>
                     <td bgcolor=#CCCCCC width=0></td>
@@ -916,7 +883,7 @@ class UI
                     <td bgcolor=#CCCCCC width=0></td>
                     <td><center><b>$team_def_tgm</b></center></td>
                     <td><center><b>$team_def_tga</b></center></td>
-                    <td bgcolor=$color1 width=0></td>
+                    <td bgcolor=$team->color1 width=0></td>
                     <td><center><b>$team_def_orb</center></td>
                     <td><center><b>$team_def_reb</center></td>
                     <td><center><b>$team_def_ast</center></td>

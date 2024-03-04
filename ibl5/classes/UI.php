@@ -790,111 +790,58 @@ class UI
 
         // ==== INSERT TEAM OFFENSE AND DEFENSE TOTALS ====
 
-        $queryTeamOffenseTotals = "SELECT * FROM ibl_team_offense_stats WHERE team = '$team->name'";
-        $resultTeamOffenseTotals = $db->sql_query($queryTeamOffenseTotals);
-        $numTeamOffenseTotals = $db->sql_numrows($resultTeamOffenseTotals);
+        $teamStats = TeamStats::withTeamName($db, $team->name);
 
-        $t = 0;
-
-        while ($t < $numTeamOffenseTotals) {
-            $team_off_games = $db->sql_result($resultTeamOffenseTotals, $t, "games");
-            $team_off_minutes = $db->sql_result($resultTeamOffenseTotals, $t, "minutes");
-            $team_off_fgm = $db->sql_result($resultTeamOffenseTotals, $t, "fgm");
-            $team_off_fga = $db->sql_result($resultTeamOffenseTotals, $t, "fga");
-            $team_off_ftm = $db->sql_result($resultTeamOffenseTotals, $t, "ftm");
-            $team_off_fta = $db->sql_result($resultTeamOffenseTotals, $t, "fta");
-            $team_off_tgm = $db->sql_result($resultTeamOffenseTotals, $t, "tgm");
-            $team_off_tga = $db->sql_result($resultTeamOffenseTotals, $t, "tga");
-            $team_off_orb = $db->sql_result($resultTeamOffenseTotals, $t, "orb");
-            $team_off_reb = $db->sql_result($resultTeamOffenseTotals, $t, "reb");
-            $team_off_ast = $db->sql_result($resultTeamOffenseTotals, $t, "ast");
-            $team_off_stl = $db->sql_result($resultTeamOffenseTotals, $t, "stl");
-            $team_off_tvr = $db->sql_result($resultTeamOffenseTotals, $t, "tvr");
-            $team_off_blk = $db->sql_result($resultTeamOffenseTotals, $t, "blk");
-            $team_off_pf = $db->sql_result($resultTeamOffenseTotals, $t, "pf");
-            $team_off_pts = $team_off_fgm + $team_off_fgm + $team_off_ftm + $team_off_tgm;
-
-            if ($yr == "") {
-                $table_totals .= "<tr>
-                    <td colspan=4><b>$team->name Offense</td>
-                    <td><center><b>$team_off_games</center></td>
-                    <td><center><b>$team_off_games</center></td>
-                    <td><center><b>$team_off_minutes</center></td>
-                    <td bgcolor=$team->color1 width=0></td>
-                    <td><center><b>$team_off_fgm</center></td>
-                    <td><center><b>$team_off_fga</b></center></td>
-                    <td bgcolor=#CCCCCC width=0></td>
-                    <td><center><b>$team_off_ftm</center></td>
-                    <td><center><b>$team_off_fta</b></center></td>
-                    <td bgcolor=#CCCCCC width=0></td>
-                    <td><center><b>$team_off_tgm</center></td>
-                    <td><center><b>$team_off_tga</b></center></td>
-                    <td bgcolor=$team->color1 width=0></td>
-                    <td><center><b>$team_off_orb</center></td>
-                    <td><center><b>$team_off_reb</center></td>
-                    <td><center><b>$team_off_ast</center></td>
-                    <td><center><b>$team_off_stl</center></td>
-                    <td><center><b>$team_off_tvr</center></td>
-                    <td><center><b>$team_off_blk</center></td>
-                    <td><center><b>$team_off_pf</center></td>
-                    <td><center><b>$team_off_pts</center></td>
-                </tr>";
-            }
-            $t++;
-        }
-
-        $queryTeamDefenseTotals = "SELECT * FROM ibl_team_defense_stats WHERE team = '$team->name'";
-        $resultTeamDefenseTotals = $db->sql_query($queryTeamDefenseTotals);
-        $numTeamDefenseTotals = $db->sql_numrows($resultTeamDefenseTotals);
-
-        $t = 0;
-
-        while ($t < $numTeamDefenseTotals) {
-            $team_def_games = $db->sql_result($resultTeamDefenseTotals, $t, "games");
-            $team_def_minutes = $db->sql_result($resultTeamDefenseTotals, $t, "minutes");
-            $team_def_fgm = $db->sql_result($resultTeamDefenseTotals, $t, "fgm");
-            $team_def_fga = $db->sql_result($resultTeamDefenseTotals, $t, "fga");
-            $team_def_ftm = $db->sql_result($resultTeamDefenseTotals, $t, "ftm");
-            $team_def_fta = $db->sql_result($resultTeamDefenseTotals, $t, "fta");
-            $team_def_tgm = $db->sql_result($resultTeamDefenseTotals, $t, "tgm");
-            $team_def_tga = $db->sql_result($resultTeamDefenseTotals, $t, "tga");
-            $team_def_orb = $db->sql_result($resultTeamDefenseTotals, $t, "orb");
-            $team_def_reb = $db->sql_result($resultTeamDefenseTotals, $t, "reb");
-            $team_def_ast = $db->sql_result($resultTeamDefenseTotals, $t, "ast");
-            $team_def_stl = $db->sql_result($resultTeamDefenseTotals, $t, "stl");
-            $team_def_tvr = $db->sql_result($resultTeamDefenseTotals, $t, "tvr");
-            $team_def_blk = $db->sql_result($resultTeamDefenseTotals, $t, "blk");
-            $team_def_pf = $db->sql_result($resultTeamDefenseTotals, $t, "pf");
-            $team_def_pts = $team_def_fgm + $team_def_fgm + $team_def_ftm + $team_def_tgm;
-
-            if ($yr == "") {
-                $table_totals .= "<tr>
-                    <td colspan=4><b>$team->name Defense</td>
-                    <td><center><b>$team_def_games</center></td>
-                    <td><center><b>$team_def_games</center></td>
-                    <td><center><b>$team_def_minutes</center></td>
-                    <td bgcolor=$team->color1 width=0></td>
-                    <td><center><b>$team_def_fgm</center></td>
-                    <td><center><b>$team_def_fga</b></center></td>
-                    <td bgcolor=#CCCCCC width=0></td>
-                    <td><center><b>$team_def_ftm</center></td>
-                    <td><center><b>$team_def_fta</b></center></td>
-                    <td bgcolor=#CCCCCC width=0></td>
-                    <td><center><b>$team_def_tgm</b></center></td>
-                    <td><center><b>$team_def_tga</b></center></td>
-                    <td bgcolor=$team->color1 width=0></td>
-                    <td><center><b>$team_def_orb</center></td>
-                    <td><center><b>$team_def_reb</center></td>
-                    <td><center><b>$team_def_ast</center></td>
-                    <td><center><b>$team_def_stl</center></td>
-                    <td><center><b>$team_def_tvr</center></td>
-                    <td><center><b>$team_def_blk</center></td>
-                    <td><center><b>$team_def_pf</center></td>
-                    <td><center><b>$team_def_pts</center></td>
-                </tr>";
-            }
-
-            $t++;
+        if ($yr == "") {
+            $table_totals .= "<tr>
+                <td colspan=4><b>$team->name Offense</td>
+                <td><center><b>$teamStats->seasonGamesPlayed</center></td>
+                <td><center><b>$teamStats->seasonGamesPlayed</center></td>
+                <td><center><b>$teamStats->seasonOffenseTotalMinutes</center></td>
+                <td bgcolor=$team->color1 width=0></td>
+                <td><center><b>$teamStats->seasonOffenseTotalFieldGoalsMade</center></td>
+                <td><center><b>$teamStats->seasonOffenseTotalFieldGoalsAttempted</b></center></td>
+                <td bgcolor=#CCCCCC width=0></td>
+                <td><center><b>$teamStats->seasonOffenseTotalFreeThrowsMade</center></td>
+                <td><center><b>$teamStats->seasonOffenseTotalFreeThrowsAttempted</b></center></td>
+                <td bgcolor=#CCCCCC width=0></td>
+                <td><center><b>$teamStats->seasonOffenseTotalThreePointersMade</center></td>
+                <td><center><b>$teamStats->seasonOffenseTotalThreePointersAttempted</b></center></td>
+                <td bgcolor=$team->color1 width=0></td>
+                <td><center><b>$teamStats->seasonOffenseTotalOffensiveRebounds</center></td>
+                <td><center><b>$teamStats->seasonOffenseTotalRebounds</center></td>
+                <td><center><b>$teamStats->seasonOffenseTotalAssists</center></td>
+                <td><center><b>$teamStats->seasonOffenseTotalSteals</center></td>
+                <td><center><b>$teamStats->seasonOffenseTotalTurnovers</center></td>
+                <td><center><b>$teamStats->seasonOffenseTotalBlocks</center></td>
+                <td><center><b>$teamStats->seasonOffenseTotalPersonalFouls</center></td>
+                <td><center><b>$teamStats->seasonOffenseTotalPoints</center></td>
+            </tr>";
+            
+            $table_totals .= "<tr>
+                <td colspan=4><b>$team->name Defense</td>
+                <td><center><b>$teamStats->seasonGamesPlayed</center></td>
+                <td><center><b>$teamStats->seasonGamesPlayed</center></td>
+                <td><center><b>$teamStats->seasonDefenseTotalMinutes</center></td>
+                <td bgcolor=$team->color1 width=0></td>
+                <td><center><b>$teamStats->seasonDefenseTotalFieldGoalsMade</center></td>
+                <td><center><b>$teamStats->seasonDefenseTotalFieldGoalsAttempted</b></center></td>
+                <td bgcolor=#CCCCCC width=0></td>
+                <td><center><b>$teamStats->seasonDefenseTotalFreeThrowsMade</center></td>
+                <td><center><b>$teamStats->seasonDefenseTotalFreeThrowsAttempted</b></center></td>
+                <td bgcolor=#CCCCCC width=0></td>
+                <td><center><b>$teamStats->seasonDefenseTotalThreePointersMade</b></center></td>
+                <td><center><b>$teamStats->seasonDefenseTotalThreePointersAttempted</b></center></td>
+                <td bgcolor=$team->color1 width=0></td>
+                <td><center><b>$teamStats->seasonDefenseTotalOffensiveRebounds</center></td>
+                <td><center><b>$teamStats->seasonDefenseTotalRebounds</center></td>
+                <td><center><b>$teamStats->seasonDefenseTotalAssists</center></td>
+                <td><center><b>$teamStats->seasonDefenseTotalSteals</center></td>
+                <td><center><b>$teamStats->seasonDefenseTotalTurnovers</center></td>
+                <td><center><b>$teamStats->seasonDefenseTotalBlocks</center></td>
+                <td><center><b>$teamStats->seasonDefenseTotalPersonalFouls</center></td>
+                <td><center><b>$teamStats->seasonDefenseTotalPoints</center></td>
+            </tr>";
         }
 
         $table_totals .= "</tfoot>

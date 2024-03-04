@@ -49,10 +49,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 
     $teamlogo = $userinfo['user_ibl_team'];
     $tid = $sharedFunctions->getTidFromTeamname($teamlogo);
-    $queryteam = "SELECT * FROM ibl_team_info WHERE teamid = '$tid' ";
-    $resultteam = $db->sql_query($queryteam);
-    $color1 = $db->sql_result($resultteam, 0, "color1");
-    $color2 = $db->sql_result($resultteam, 0, "color2");
+    $team = Team::withTeamID($db, $tid);
 
     include "header.php";
     OpenTable();
@@ -138,7 +135,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
             <input type=\"hidden\" name=\"Set_Name\" value=\"$offense_name\">
 		<center><img src=\"images/logo/$tid.jpg\"><br>";
 
-    $table_ratings = UI::ratings($db, $playersOnTeam, $color1, $color2, $tid, "");
+    $table_ratings = UI::ratings($db, $playersOnTeam, $team, "");
     echo $table_ratings;
 
     echo "<p><table>

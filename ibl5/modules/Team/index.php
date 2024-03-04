@@ -101,7 +101,7 @@ function team($tid)
 
     if ($display == "total_s") {
         $showing = "Season Totals";
-        $table_totals = UI::seasonTotals($db, $result, $team->color1, $team->color2, $tid, $yr, $team->name);
+        $table_totals = UI::seasonTotals($db, $result, $team, $yr);
         $table_output = $table_totals;
         $tabs .= "<td bgcolor=#BBBBBB style=\"font-weight:bold\">";
     } else {

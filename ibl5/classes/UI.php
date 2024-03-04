@@ -211,112 +211,77 @@ class UI
             </thead>
         <tbody>";
     
-        /* =======================AVERAGES */
-    
         $i = 0;
-        $num = $db->sql_numrows($result);
-        while ($i < $num) {
-            $name = $db->sql_result($result, $i, "name");
-            $pos = $db->sql_result($result, $i, "pos");
-            $p_ord = $db->sql_result($result, $i, "ordinal");
-            $pid = $db->sql_result($result, $i, "pid");
-            $cy = $db->sql_result($result, $i, "cy");
-            $cyt = $db->sql_result($result, $i, "cyt");
-    
-            $firstCharacterOfPlayerName = substr($name, 0, 1); // if player name starts with '|' (pipe symbol), then skip them
-            if ($firstCharacterOfPlayerName !== '|') {
-                $playerNameDecorated = UI::decoratePlayerName($name, $team->teamID, $p_ord, $cy, $cyt);
-    
-                if ($yr == "") {
-                    $stats_gm = $db->sql_result($result, $i, "stats_gm");
-                    $stats_gs = $db->sql_result($result, $i, "stats_gs");
-                    $stats_min = $db->sql_result($result, $i, "stats_min");
-                    $stats_fgm = $db->sql_result($result, $i, "stats_fgm");
-                    $stats_fga = $db->sql_result($result, $i, "stats_fga");
-                    $stats_ftm = $db->sql_result($result, $i, "stats_ftm");
-                    $stats_fta = $db->sql_result($result, $i, "stats_fta");
-                    $stats_tgm = $db->sql_result($result, $i, "stats_3gm");
-                    $stats_tga = $db->sql_result($result, $i, "stats_3ga");
-                    $stats_orb = $db->sql_result($result, $i, "stats_orb");
-                    $stats_drb = $db->sql_result($result, $i, "stats_drb");
-                    $stats_ast = $db->sql_result($result, $i, "stats_ast");
-                    $stats_stl = $db->sql_result($result, $i, "stats_stl");
-                    $stats_to = $db->sql_result($result, $i, "stats_to");
-                    $stats_blk = $db->sql_result($result, $i, "stats_blk");
-                    $stats_pf = $db->sql_result($result, $i, "stats_pf");
-                    $stats_reb = $stats_orb + $stats_drb;
-                    $stats_pts = 2 * $stats_fgm + $stats_ftm + $stats_tgm;
+        foreach ($result as $plrRow) {
+            if ($yr == "") {
+                $player = Player::withPlrRow($db, $plrRow);
+                $playerStats = PlayerStats::withPlrRow($db, $plrRow);
+
+                $firstCharacterOfPlayerName = substr($player->name, 0, 1); // if player name starts with '|' (pipe symbol), then skip them
+                if ($firstCharacterOfPlayerName !== '|') {
+                    $playerNameDecorated = UI::decoratePlayerName($player->name, $team->teamID, $player->ordinal, $player->contractCurrentYear, $player->contractTotalYears);
                 } else {
-                    $stats_gm = $db->sql_result($result, $i, "gm");
-                    $stats_min = $db->sql_result($result, $i, "min");
-                    $stats_fgm = $db->sql_result($result, $i, "fgm");
-                    $stats_fga = $db->sql_result($result, $i, "fga");
-                    $stats_ftm = $db->sql_result($result, $i, "ftm");
-                    $stats_fta = $db->sql_result($result, $i, "fta");
-                    $stats_tgm = $db->sql_result($result, $i, "3gm");
-                    $stats_tga = $db->sql_result($result, $i, "3ga");
-                    $stats_orb = $db->sql_result($result, $i, "orb");
-                    $stats_ast = $db->sql_result($result, $i, "ast");
-                    $stats_stl = $db->sql_result($result, $i, "stl");
-                    $stats_to = $db->sql_result($result, $i, "tvr");
-                    $stats_blk = $db->sql_result($result, $i, "blk");
-                    $stats_pf = $db->sql_result($result, $i, "pf");
-                    $stats_reb = $db->sql_result($result, $i, "reb");
-                    $stats_pts = 2 * $stats_fgm + $stats_ftm + $stats_tgm;
+                    continue;
                 }
-                @$stats_fgm = number_format((36 / $stats_min * $stats_fgm), 1);
-                @$stats_fga = number_format((36 / $stats_min * $stats_fga), 1);
-                @$stats_fgp = number_format(($stats_fgm / $stats_fga), 3);
-                @$stats_ftm = number_format((36 / $stats_min * $stats_ftm), 1);
-                @$stats_fta = number_format((36 / $stats_min * $stats_fta), 1);
-                @$stats_ftp = number_format(($stats_ftm / $stats_fta), 3);
-                @$stats_tgm = number_format((36 / $stats_min * $stats_tgm), 1);
-                @$stats_tga = number_format((36 / $stats_min * $stats_tga), 1);
-                @$stats_tgp = number_format(($stats_tgm / $stats_tga), 3);
-                @$stats_mpg = number_format(($stats_min / $stats_gm), 1);
-                @$stats_per36Min = number_format((36 / $stats_min * $stats_min), 1);
-                @$stats_opg = number_format((36 / $stats_min * $stats_orb), 1);
-                @$stats_rpg = number_format((36 / $stats_min * $stats_reb), 1);
-                @$stats_apg = number_format((36 / $stats_min * $stats_ast), 1);
-                @$stats_spg = number_format((36 / $stats_min * $stats_stl), 1);
-                @$stats_tpg = number_format((36 / $stats_min * $stats_to), 1);
-                @$stats_bpg = number_format((36 / $stats_min * $stats_blk), 1);
-                @$stats_fpg = number_format((36 / $stats_min * $stats_pf), 1);
-                @$stats_ppg = number_format((36 / $stats_min * $stats_pts), 1);
-        
-                (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
-        
-                $table_per36Minutes .= "<tr bgcolor=$bgcolor>
-                    <td>$pos</td>
-                    <td colspan=3><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$playerNameDecorated</a></td>
-                    <td><center>$stats_gm</center></td>
-                    <td><center>$stats_gs</center></td>
-                    <td><center>$stats_mpg</center></td>
-                    <td><center>$stats_per36Min</center></td>
-                    <td bgcolor=$team->color1 width=0></td>
-                    <td><center>$stats_fgm</center></td>
-                    <td><center>$stats_fga</center></td>
-                    <td><center>$stats_fgp</center></td>
-                    <td bgcolor=#CCCCCC width=0></td>
-                    <td><center>$stats_ftm</center></td>
-                    <td><center>$stats_fta</center></td>
-                    <td><center>$stats_ftp</center></td>
-                    <td bgcolor=#CCCCCC width=0></td>
-                    <td><center>$stats_tgm</center></td>
-                    <td><center>$stats_tga</center></td>
-                    <td><center>$stats_tgp</center></td>
-                    <td bgcolor=$team->color1 width=0></td>
-                    <td><center>$stats_opg</center></td>
-                    <td><center>$stats_rpg</center></td>
-                    <td><center>$stats_apg</center></td>
-                    <td><center>$stats_spg</center></td>
-                    <td><center>$stats_tpg</center></td>
-                    <td><center>$stats_bpg</center></td>
-                    <td><center>$stats_fpg</center></td>
-                    <td><center>$stats_ppg</center></td>
-                </tr>";
+            } else {
+                $player = Player::withHistoricalPlrRow($db, $plrRow);
+                $playerStats = PlayerStats::withHistoricalPlrRow($db, $plrRow);
+
+                $playerNameDecorated = $player->name;
             }
     
+            @$stats_fgm = number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonFieldGoalsMade), 1);
+            @$stats_fga = number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonFieldGoalsAttempted), 1);
+            @$stats_fgp = number_format(($stats_fgm / $stats_fga), 3);
+            @$stats_ftm = number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonFreeThrowsMade), 1);
+            @$stats_fta = number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonFreeThrowsAttempted), 1);
+            @$stats_ftp = number_format(($stats_ftm / $stats_fta), 3);
+            @$stats_tgm = number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonThreePointersMade), 1);
+            @$stats_tga = number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonThreePointersAttempted), 1);
+            @$stats_tgp = number_format(($stats_tgm / $stats_tga), 3);
+            @$stats_mpg = number_format(($playerStats->seasonMinutes / $playerStats->seasonGamesPlayed), 1);
+            @$stats_per36Min = number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonMinutes), 1);
+            @$stats_opg = number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonOffensiveRebounds), 1);
+            @$stats_rpg = number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonTotalRebounds), 1);
+            @$stats_apg = number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonAssists), 1);
+            @$stats_spg = number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonSteals), 1);
+            @$stats_tpg = number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonTurnovers), 1);
+            @$stats_bpg = number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonBlocks), 1);
+            @$stats_fpg = number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonPersonalFouls), 1);
+            @$stats_ppg = number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonPoints), 1);
+        
+            (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
+        
+            $table_per36Minutes .= "<tr bgcolor=$bgcolor>
+                <td>$player->position</td>
+                <td colspan=3><a href=\"modules.php?name=Player&pa=showpage&pid=$player->playerID\">$playerNameDecorated</a></td>
+                <td><center>$playerStats->seasonGamesPlayed</center></td>
+                <td><center>$playerStats->seasonGamesStarted</center></td>
+                <td><center>$stats_mpg</center></td>
+                <td><center>$stats_per36Min</center></td>
+                <td bgcolor=$team->color1 width=0></td>
+                <td><center>$stats_fgm</center></td>
+                <td><center>$stats_fga</center></td>
+                <td><center>$stats_fgp</center></td>
+                <td bgcolor=#CCCCCC width=0></td>
+                <td><center>$stats_ftm</center></td>
+                <td><center>$stats_fta</center></td>
+                <td><center>$stats_ftp</center></td>
+                <td bgcolor=#CCCCCC width=0></td>
+                <td><center>$stats_tgm</center></td>
+                <td><center>$stats_tga</center></td>
+                <td><center>$stats_tgp</center></td>
+                <td bgcolor=$team->color1 width=0></td>
+                <td><center>$stats_opg</center></td>
+                <td><center>$stats_rpg</center></td>
+                <td><center>$stats_apg</center></td>
+                <td><center>$stats_spg</center></td>
+                <td><center>$stats_tpg</center></td>
+                <td><center>$stats_bpg</center></td>
+                <td><center>$stats_fpg</center></td>
+                <td><center>$stats_ppg</center></td>
+            </tr>";
+
             $i++;
         }
     

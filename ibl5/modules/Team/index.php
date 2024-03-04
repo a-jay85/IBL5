@@ -91,7 +91,7 @@ function team($tid)
 
     if ($display == "ratings") {
         $showing = "Player Ratings";
-        $table_ratings = UI::ratings($db, $result, $team->color1, $team->color2, $tid, $yr);
+        $table_ratings = UI::ratings($db, $result, $team, $yr);
         $table_output = $table_ratings;
         $tabs .= "<td bgcolor=#BBBBBB style=\"font-weight:bold\">";
     } else {

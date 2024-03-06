@@ -25,6 +25,18 @@ while ($i < 7) {
     $i++;
 }
 
+$filteredUserSendsCash = array_filter($userSendsCash);
+$filteredPartnerSendsCash = array_filter($partnerSendsCash);
+
+if (!empty($filteredUserSendsCash) AND min($filteredUserSendsCash) < 100) {
+        echo "This trade is illegal: the minimum amount of cash that your team can send in any one season is 100.";
+        exit;
+}
+if (!empty($filteredPartnerSendsCash) AND min($filteredPartnerSendsCash) < 100) {
+        echo "This trade is illegal: the minimum amount of cash that the other team can send in any one season is 100.";
+        exit;
+}
+
 //-----CHECK IF SALARIES MATCH-----
 
 $j = 0;

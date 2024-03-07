@@ -29,6 +29,8 @@ $Minimum = $_POST['vetmin'];
 $MLE = 0;
 $LLE = 0;
 
+$sharedFunctions = new Shared($db);
+
 // Check if player being offered was previously signed to a team during this Free Agency period
 $queryOfferedPlayer = "SELECT * FROM ibl_plr WHERE name = '$Player_Name';";
 $resultOfferedPlayer = $db->sql_query($queryOfferedPlayer);
@@ -467,13 +469,13 @@ if ($nooffer == 0) {
     $resultchunk = $db->sql_query($querychunk);
 
     if ($resultchunk) {
-        $playerTeamDiscordID = Shared::getDiscordIDFromTeamname($player_teamName);
+        $playerTeamDiscordID = $sharedFunctions->getDiscordIDFromTeamname($player_teamName);
         if ($Team_Name == $player_teamName) {
-            $discordMessage = "Free agent $Player_Name has been offered a contract to stay with the $player_teamName, according to a source.";
+            $discordMessage = "Free agent **$Player_Name** has been offered a contract to _stay_ with the **$player_teamName**, according to a source.
+_**$player_teamName** GM <@!$playerTeamDiscordID> could not be reached for comment._";
         } else {
-            $discordMessage = "Free agent $Player_Name has been offered a contract to leave the $player_teamName, according to a source.
-
-$player_teamName GM <@!$playerTeamDiscordID could not be reached for comment.";
+            $discordMessage = "Free agent **$Player_Name** has been offered a contract to _leave_ the **$player_teamName**, according to a source.
+_**$player_teamName** GM <@!$playerTeamDiscordID> could not be reached for comment._";
         }
 
         Discord::postToChannel('#free-agency', $discordMessage);

@@ -39,7 +39,7 @@ class Shared
         return $this->db->sql_result($queryCurrentSeasonPhase, 0);
     }
 
-    public static function getDiscordIDFromTeamname($teamname)
+    public function getDiscordIDFromTeamname($teamname)
     {
         $queryDiscordIDFromTeamname = $this->db->sql_query("SELECT discordID
             FROM ibl_team_info

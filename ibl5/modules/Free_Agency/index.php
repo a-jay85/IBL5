@@ -1487,199 +1487,211 @@ function negotiate($pid)
 		<tr><td>Please enter your offer in this row:</td><td>";
         if ($player_exp > 0) {
             echo "<INPUT TYPE=\"text\" NAME=\"offeryear1\" SIZE=\"4\" VALUE=\"$prefill1\"></td><td>
-			<INPUT TYPE=\"text\" NAME=\"offeryear2\" SIZE=\"4\" VALUE=\"$prefill2\"></td><td>
-			<INPUT TYPE=\"text\" NAME=\"offeryear3\" SIZE=\"4\" VALUE=\"$prefill3\"></td><td>
-			<INPUT TYPE=\"text\" NAME=\"offeryear4\" SIZE=\"4\" VALUE=\"$prefill4\"></td><td>
-			<INPUT TYPE=\"text\" NAME=\"offeryear5\" SIZE=\"4\" VALUE=\"$prefill5\"></td><td>
-			<INPUT TYPE=\"text\" NAME=\"offeryear6\" SIZE=\"4\" VALUE=\"$prefill6\"></td>";
+                  <INPUT TYPE=\"text\" NAME=\"offeryear2\" SIZE=\"4\" VALUE=\"$prefill2\"></td><td>
+                  <INPUT TYPE=\"text\" NAME=\"offeryear3\" SIZE=\"4\" VALUE=\"$prefill3\"></td><td>
+                  <INPUT TYPE=\"text\" NAME=\"offeryear4\" SIZE=\"4\" VALUE=\"$prefill4\"></td><td>
+                  <INPUT TYPE=\"text\" NAME=\"offeryear5\" SIZE=\"4\" VALUE=\"$prefill5\"></td><td>
+                  <INPUT TYPE=\"text\" NAME=\"offeryear6\" SIZE=\"4\" VALUE=\"$prefill6\"></td>";
         } else { // Limit undrafted rookie FA contracts to two years
             echo "<INPUT TYPE=\"text\" NAME=\"offeryear1\" SIZE=\"4\" VALUE=\"$prefill3\"></td><td>
-			<INPUT TYPE=\"text\" NAME=\"offeryear2\" SIZE=\"4\" VALUE=\"$prefill4\"></td>";
+			      <INPUT TYPE=\"text\" NAME=\"offeryear2\" SIZE=\"4\" VALUE=\"$prefill4\"></td>";
         }
         $amendedCapSpaceYear1 = $capnumber + $offer1;
         echo "<input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-		<input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-		<input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-		<input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-		<input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-		<input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
-		<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
-		<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
-		<input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
-		<input type=\"hidden\" name=\"capnumber3\" value=\"$capnumber3\">
-		<input type=\"hidden\" name=\"capnumber4\" value=\"$capnumber4\">
-		<input type=\"hidden\" name=\"capnumber5\" value=\"$capnumber5\">
-		<input type=\"hidden\" name=\"capnumber6\" value=\"$capnumber6\">
-		<input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
-		<input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
-		<input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
-		<input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
-		<input type=\"hidden\" name=\"playername\" value=\"$player_name\">
-		<input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
-		<input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
-		<input type=\"hidden\" name=\"MLEyrs\" value=\"0\">
-		<td><input type=\"submit\" value=\"Offer/Amend Free Agent Contract!\"></form></td></tr>
+              <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
+              <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
+              <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
+              <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
+              <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
+              <input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
+              <input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
+              <input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
+              <input type=\"hidden\" name=\"capnumber3\" value=\"$capnumber3\">
+              <input type=\"hidden\" name=\"capnumber4\" value=\"$capnumber4\">
+              <input type=\"hidden\" name=\"capnumber5\" value=\"$capnumber5\">
+              <input type=\"hidden\" name=\"capnumber6\" value=\"$capnumber6\">
+              <input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
+              <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
+              <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
+              <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+              <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
+              <input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
+              <input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
+              <input type=\"hidden\" name=\"MLEyrs\" value=\"0\">
+	    <td>  <input type=\"submit\" value=\"Offer/Amend Free Agent Contract!\"></form></td></tr>
 
 		<tr><td colspan=8><center><b>MAX SALARY OFFERS:</b></center></td></tr>
 
 		<td>Max Level Contract 10%(click the button that corresponds to the final year you wish to offer):</td>
 
 		<td>
-		<form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
-		<input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-		<input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-		<input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-		<input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-		<input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-		<input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
-		<input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
-		<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
-		<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
-		<input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
-		<input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
-		<input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
-		<input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
-		<input type=\"hidden\" name=\"playername\" value=\"$player_name\">
-		<input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
-		<input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
-		<input type=\"hidden\" name=\"MLEyrs\" value=\"0\">
-		<input type=\"submit\" value=\"$maxstartsat\"></form></td>
+            <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
+                <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
+                <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
+                <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
+                <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
+                <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
+                <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
+                <input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
+                <input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
+                <input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
+                <input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
+                <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
+                <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
+                <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
+                <input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
+                <input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
+                <input type=\"hidden\" name=\"MLEyrs\" value=\"0\">
+                <input type=\"submit\" value=\"$maxstartsat\">
+            </form>
+        </td>
 
 		<td>
-		<form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
-		<input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-		<input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-		<input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-		<input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-		<input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-		<input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
-		<input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
-		<input type=\"hidden\" name=\"offeryear2\" value=\"$maxstartsat2\">
-		<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
-		<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
-		<input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
-		<input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
-		<input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
-		<input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
-		<input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
-		<input type=\"hidden\" name=\"playername\" value=\"$player_name\">
-		<input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
-		<input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
-		<input type=\"hidden\" name=\"MLEyrs\" value=\"0\">
-		<input type=\"submit\" value=\"$maxstartsat2\"></form></td>";
+            <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
+                <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
+                <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
+                <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
+                <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
+                <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
+                <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
+                <input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
+                <input type=\"hidden\" name=\"offeryear2\" value=\"$maxstartsat2\">
+                <input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
+                <input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
+                <input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
+                <input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
+                <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
+                <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
+                <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
+                <input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
+                <input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
+                <input type=\"hidden\" name=\"MLEyrs\" value=\"0\">
+                <input type=\"submit\" value=\"$maxstartsat2\">
+            </form>
+        </td>";
 
         if ($player_exp > 0) {
             echo "<td>
-			<form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
-			<input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-			<input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-			<input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-			<input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-			<input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-			<input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
-			<input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
-			<input type=\"hidden\" name=\"offeryear2\" value=\"$maxstartsat2\">
-			<input type=\"hidden\" name=\"offeryear3\" value=\"$maxstartsat3\">
-			<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
-			<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
-			<input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
-			<input type=\"hidden\" name=\"capnumber3\" value=\"$capnumber3\">
-			<input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
-			<input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
-			<input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
-			<input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
-			<input type=\"hidden\" name=\"playername\" value=\"$player_name\">
-			<input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
-			<input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
-			<input type=\"hidden\" name=\"MLEyrs\" value=\"0\">
-			<input type=\"submit\" value=\"$maxstartsat3\"></form></td>
+                <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
+                    <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
+                    <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
+                    <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
+                    <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
+                    <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
+                    <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
+                    <input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
+                    <input type=\"hidden\" name=\"offeryear2\" value=\"$maxstartsat2\">
+                    <input type=\"hidden\" name=\"offeryear3\" value=\"$maxstartsat3\">
+                    <input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
+                    <input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
+                    <input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
+                    <input type=\"hidden\" name=\"capnumber3\" value=\"$capnumber3\">
+                    <input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
+                    <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
+                    <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
+                    <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                    <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
+                    <input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
+                    <input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
+                    <input type=\"hidden\" name=\"MLEyrs\" value=\"0\">
+                    <input type=\"submit\" value=\"$maxstartsat3\">
+                </form>
+            </td>
 
 			<td>
-			<form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
-			<input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-			<input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-			<input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-			<input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-			<input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-			<input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
-			<input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
-			<input type=\"hidden\" name=\"offeryear2\" value=\"$maxstartsat2\">
-			<input type=\"hidden\" name=\"offeryear3\" value=\"$maxstartsat3\">
-			<input type=\"hidden\" name=\"offeryear4\" value=\"$maxstartsat4\">
-			<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
-			<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
-			<input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
-			<input type=\"hidden\" name=\"capnumber3\" value=\"$capnumber3\">
-			<input type=\"hidden\" name=\"capnumber4\" value=\"$capnumber4\">
-			<input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
-			<input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
-			<input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
-			<input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
-			<input type=\"hidden\" name=\"playername\" value=\"$player_name\">
-			<input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
-			<input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
-			<input type=\"hidden\" name=\"MLEyrs\" value=\"0\">
-			<input type=\"submit\" value=\"$maxstartsat4\"></form></td>
+                <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
+                    <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
+                    <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
+                    <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
+                    <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
+                    <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
+                    <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
+                    <input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
+                    <input type=\"hidden\" name=\"offeryear2\" value=\"$maxstartsat2\">
+                    <input type=\"hidden\" name=\"offeryear3\" value=\"$maxstartsat3\">
+                    <input type=\"hidden\" name=\"offeryear4\" value=\"$maxstartsat4\">
+                    <input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
+                    <input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
+                    <input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
+                    <input type=\"hidden\" name=\"capnumber3\" value=\"$capnumber3\">
+                    <input type=\"hidden\" name=\"capnumber4\" value=\"$capnumber4\">
+                    <input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
+                    <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
+                    <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
+                    <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                    <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
+                    <input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
+                    <input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
+                    <input type=\"hidden\" name=\"MLEyrs\" value=\"0\">
+                    <input type=\"submit\" value=\"$maxstartsat4\">
+                </form>
+            </td>
 
 			<td>
-			<form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
-			<input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-			<input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-			<input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-			<input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-			<input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-			<input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
-			<input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
-			<input type=\"hidden\" name=\"offeryear2\" value=\"$maxstartsat2\">
-			<input type=\"hidden\" name=\"offeryear3\" value=\"$maxstartsat3\">
-			<input type=\"hidden\" name=\"offeryear4\" value=\"$maxstartsat4\">
-			<input type=\"hidden\" name=\"offeryear5\" value=\"$maxstartsat5\">
-			<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
-			<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
-			<input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
-			<input type=\"hidden\" name=\"capnumber3\" value=\"$capnumber3\">
-			<input type=\"hidden\" name=\"capnumber4\" value=\"$capnumber4\">
-			<input type=\"hidden\" name=\"capnumber5\" value=\"$capnumber5\">
-			<input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
-			<input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
-			<input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
-			<input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
-			<input type=\"hidden\" name=\"playername\" value=\"$player_name\">
-			<input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
-			<input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
-			<input type=\"hidden\" name=\"MLEyrs\" value=\"0\">
-			<input type=\"submit\" value=\"$maxstartsat5\"></form></td>
+                <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
+                    <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
+                    <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
+                    <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
+                    <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
+                    <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
+                    <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
+                    <input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
+                    <input type=\"hidden\" name=\"offeryear2\" value=\"$maxstartsat2\">
+                    <input type=\"hidden\" name=\"offeryear3\" value=\"$maxstartsat3\">
+                    <input type=\"hidden\" name=\"offeryear4\" value=\"$maxstartsat4\">
+                    <input type=\"hidden\" name=\"offeryear5\" value=\"$maxstartsat5\">
+                    <input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
+                    <input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
+                    <input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
+                    <input type=\"hidden\" name=\"capnumber3\" value=\"$capnumber3\">
+                    <input type=\"hidden\" name=\"capnumber4\" value=\"$capnumber4\">
+                    <input type=\"hidden\" name=\"capnumber5\" value=\"$capnumber5\">
+                    <input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
+                    <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
+                    <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
+                    <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                    <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
+                    <input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
+                    <input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
+                    <input type=\"hidden\" name=\"MLEyrs\" value=\"0\">
+                    <input type=\"submit\" value=\"$maxstartsat5\">
+                </form>
+            </td>
 
 			<td>
-			<form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
-			<input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-			<input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-			<input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-			<input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-			<input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-			<input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
-			<input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
-			<input type=\"hidden\" name=\"offeryear2\" value=\"$maxstartsat2\">
-			<input type=\"hidden\" name=\"offeryear3\" value=\"$maxstartsat3\">
-			<input type=\"hidden\" name=\"offeryear4\" value=\"$maxstartsat4\">
-			<input type=\"hidden\" name=\"offeryear5\" value=\"$maxstartsat5\">
-			<input type=\"hidden\" name=\"offeryear6\" value=\"$maxstartsat6\">
-			<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
-			<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
-			<input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
-			<input type=\"hidden\" name=\"capnumber3\" value=\"$capnumber3\">
-			<input type=\"hidden\" name=\"capnumber4\" value=\"$capnumber4\">
-			<input type=\"hidden\" name=\"capnumber5\" value=\"$capnumber5\">
-			<input type=\"hidden\" name=\"capnumber6\" value=\"$capnumber6\">
-			<input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
-			<input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
-			<input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
-			<input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
-			<input type=\"hidden\" name=\"playername\" value=\"$player_name\">
-			<input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
-			<input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
-			<input type=\"hidden\" name=\"MLEyrs\" value=\"0\">
-			<input type=\"submit\" value=\"$maxstartsat6\"></form></td>";
+                <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
+                    <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
+                    <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
+                    <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
+                    <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
+                    <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
+                    <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
+                    <input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
+                    <input type=\"hidden\" name=\"offeryear2\" value=\"$maxstartsat2\">
+                    <input type=\"hidden\" name=\"offeryear3\" value=\"$maxstartsat3\">
+                    <input type=\"hidden\" name=\"offeryear4\" value=\"$maxstartsat4\">
+                    <input type=\"hidden\" name=\"offeryear5\" value=\"$maxstartsat5\">
+                    <input type=\"hidden\" name=\"offeryear6\" value=\"$maxstartsat6\">
+                    <input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
+                    <input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
+                    <input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
+                    <input type=\"hidden\" name=\"capnumber3\" value=\"$capnumber3\">
+                    <input type=\"hidden\" name=\"capnumber4\" value=\"$capnumber4\">
+                    <input type=\"hidden\" name=\"capnumber5\" value=\"$capnumber5\">
+                    <input type=\"hidden\" name=\"capnumber6\" value=\"$capnumber6\">
+                    <input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
+                    <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
+                    <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
+                    <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                    <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
+                    <input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
+                    <input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
+                    <input type=\"hidden\" name=\"MLEyrs\" value=\"0\">
+                    <input type=\"submit\" value=\"$maxstartsat6\">
+                </form>
+            </td>";
         } else { // Limit undrafted rookie FA contracts to two years
             echo "";
         }
@@ -1691,160 +1703,172 @@ function negotiate($pid)
         if ($player_bird > 2 && $player_team_name == $userteam) {
             echo "<tr><td><b>Max Bird Level Contract 12.5%(click the button that corresponds to the final year you wish to offer):</b></td>
 			<td>
-			<form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
-			<input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-			<input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-			<input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-			<input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-			<input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-			<input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
-			<input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
-			<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
-			<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
-			<input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
-			<input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
-			<input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
-			<input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
-			<input type=\"hidden\" name=\"playername\" value=\"$player_name\">
-			<input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
-			<input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
-			<input type=\"hidden\" name=\"MLEyrs\" value=\"0\">
-			<input type=\"submit\" value=\"$maxstartsat\"></form></td>
+                <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
+                    <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
+                    <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
+                    <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
+                    <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
+                    <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
+                    <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
+                    <input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
+                    <input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
+                    <input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
+                    <input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
+                    <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
+                    <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
+                    <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                    <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
+                    <input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
+                    <input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
+                    <input type=\"hidden\" name=\"MLEyrs\" value=\"0\">
+                    <input type=\"submit\" value=\"$maxstartsat\">
+                </form>
+            </td>
 
 			<td>
-			<form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
-			<input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-			<input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-			<input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-			<input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-			<input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-			<input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
-			<input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
-			<input type=\"hidden\" name=\"offeryear2\" value=\"$maxstartsatbird2\">
-			<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
-			<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
-			<input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
-			<input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
-			<input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
-			<input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
-			<input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
-			<input type=\"hidden\" name=\"playername\" value=\"$player_name\">
-			<input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
-			<input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
-			<input type=\"hidden\" name=\"MLEyrs\" value=\"0\">
-			<input type=\"submit\" value=\"$maxstartsatbird2\"></form></td>
+                <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
+                    <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
+                    <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
+                    <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
+                    <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
+                    <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
+                    <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
+                    <input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
+                    <input type=\"hidden\" name=\"offeryear2\" value=\"$maxstartsatbird2\">
+                    <input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
+                    <input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
+                    <input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
+                    <input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
+                    <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
+                    <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
+                    <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                    <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
+                    <input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
+                    <input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
+                    <input type=\"hidden\" name=\"MLEyrs\" value=\"0\">
+                    <input type=\"submit\" value=\"$maxstartsatbird2\">
+                </form>
+            </td>
 
 			<td>
-			<form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
-			<input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-			<input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-			<input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-			<input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-			<input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-			<input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
-			<input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
-			<input type=\"hidden\" name=\"offeryear2\" value=\"$maxstartsatbird2\">
-			<input type=\"hidden\" name=\"offeryear3\" value=\"$maxstartsatbird3\">
-			<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
-			<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
-			<input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
-			<input type=\"hidden\" name=\"capnumber3\" value=\"$capnumber3\">
-			<input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
-			<input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
-			<input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
-			<input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
-			<input type=\"hidden\" name=\"playername\" value=\"$player_name\">
-			<input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
-			<input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
-			<input type=\"hidden\" name=\"MLEyrs\" value=\"0\">
-			<input type=\"submit\" value=\"$maxstartsatbird3\"></form></td>
+                <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
+                    <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
+                    <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
+                    <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
+                    <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
+                    <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
+                    <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
+                    <input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
+                    <input type=\"hidden\" name=\"offeryear2\" value=\"$maxstartsatbird2\">
+                    <input type=\"hidden\" name=\"offeryear3\" value=\"$maxstartsatbird3\">
+                    <input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
+                    <input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
+                    <input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
+                    <input type=\"hidden\" name=\"capnumber3\" value=\"$capnumber3\">
+                    <input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
+                    <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
+                    <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
+                    <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                    <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
+                    <input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
+                    <input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
+                    <input type=\"hidden\" name=\"MLEyrs\" value=\"0\">
+                    <input type=\"submit\" value=\"$maxstartsatbird3\">
+                </form>
+            </td>
 
 			<td>
-			<form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
-			<input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-			<input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-			<input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-			<input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-			<input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-			<input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
-			<input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
-			<input type=\"hidden\" name=\"offeryear2\" value=\"$maxstartsatbird2\">
-			<input type=\"hidden\" name=\"offeryear3\" value=\"$maxstartsatbird3\">
-			<input type=\"hidden\" name=\"offeryear4\" value=\"$maxstartsatbird4\">
-			<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
-			<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
-			<input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
-			<input type=\"hidden\" name=\"capnumber3\" value=\"$capnumber3\">
-			<input type=\"hidden\" name=\"capnumber4\" value=\"$capnumber4\">
-			<input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
-			<input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
-			<input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
-			<input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
-			<input type=\"hidden\" name=\"playername\" value=\"$player_name\">
-			<input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
-			<input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
-			<input type=\"hidden\" name=\"MLEyrs\" value=\"0\">
-			<input type=\"submit\" value=\"$maxstartsatbird4\"></form></td>
+                <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
+                    <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
+                    <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
+                    <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
+                    <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
+                    <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
+                    <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
+                    <input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
+                    <input type=\"hidden\" name=\"offeryear2\" value=\"$maxstartsatbird2\">
+                    <input type=\"hidden\" name=\"offeryear3\" value=\"$maxstartsatbird3\">
+                    <input type=\"hidden\" name=\"offeryear4\" value=\"$maxstartsatbird4\">
+                    <input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
+                    <input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
+                    <input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
+                    <input type=\"hidden\" name=\"capnumber3\" value=\"$capnumber3\">
+                    <input type=\"hidden\" name=\"capnumber4\" value=\"$capnumber4\">
+                    <input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
+                    <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
+                    <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
+                    <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                    <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
+                    <input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
+                    <input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
+                    <input type=\"hidden\" name=\"MLEyrs\" value=\"0\">
+                    <input type=\"submit\" value=\"$maxstartsatbird4\">
+                </form>
+            </td>
 
 			<td>
-			<form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
-			<input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-			<input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-			<input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-			<input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-			<input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-			<input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
-			<input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
-			<input type=\"hidden\" name=\"offeryear2\" value=\"$maxstartsatbird2\">
-			<input type=\"hidden\" name=\"offeryear3\" value=\"$maxstartsatbird3\">
-			<input type=\"hidden\" name=\"offeryear4\" value=\"$maxstartsatbird4\">
-			<input type=\"hidden\" name=\"offeryear5\" value=\"$maxstartsatbird5\">
-			<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
-			<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
-			<input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
-			<input type=\"hidden\" name=\"capnumber3\" value=\"$capnumber3\">
-			<input type=\"hidden\" name=\"capnumber4\" value=\"$capnumber4\">
-			<input type=\"hidden\" name=\"capnumber5\" value=\"$capnumber5\">
-			<input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
-			<input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
-			<input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
-			<input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
-			<input type=\"hidden\" name=\"playername\" value=\"$player_name\">
-			<input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
-			<input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
-			<input type=\"hidden\" name=\"MLEyrs\" value=\"0\">
-			<input type=\"submit\" value=\"$maxstartsatbird5\"></form></td>
+                <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
+                    <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
+                    <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
+                    <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
+                    <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
+                    <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
+                    <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
+                    <input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
+                    <input type=\"hidden\" name=\"offeryear2\" value=\"$maxstartsatbird2\">
+                    <input type=\"hidden\" name=\"offeryear3\" value=\"$maxstartsatbird3\">
+                    <input type=\"hidden\" name=\"offeryear4\" value=\"$maxstartsatbird4\">
+                    <input type=\"hidden\" name=\"offeryear5\" value=\"$maxstartsatbird5\">
+                    <input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
+                    <input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
+                    <input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
+                    <input type=\"hidden\" name=\"capnumber3\" value=\"$capnumber3\">
+                    <input type=\"hidden\" name=\"capnumber4\" value=\"$capnumber4\">
+                    <input type=\"hidden\" name=\"capnumber5\" value=\"$capnumber5\">
+                    <input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
+                    <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
+                    <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
+                    <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                    <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
+                    <input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
+                    <input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
+                    <input type=\"hidden\" name=\"MLEyrs\" value=\"0\">
+                    <input type=\"submit\" value=\"$maxstartsatbird5\">
+                </form>
+            </td>
 
 			<td>
-			<form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
-			<input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-			<input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-			<input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-			<input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-			<input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-			<input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
-			<input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
-			<input type=\"hidden\" name=\"offeryear2\" value=\"$maxstartsatbird2\">
-			<input type=\"hidden\" name=\"offeryear3\" value=\"$maxstartsatbird3\">
-			<input type=\"hidden\" name=\"offeryear4\" value=\"$maxstartsatbird4\">
-			<input type=\"hidden\" name=\"offeryear5\" value=\"$maxstartsatbird5\">
-			<input type=\"hidden\" name=\"offeryear6\" value=\"$maxstartsatbird6\">
-			<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
-			<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
-			<input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
-			<input type=\"hidden\" name=\"capnumber3\" value=\"$capnumber3\">
-			<input type=\"hidden\" name=\"capnumber4\" value=\"$capnumber4\">
-			<input type=\"hidden\" name=\"capnumber5\" value=\"$capnumber5\">
-			<input type=\"hidden\" name=\"capnumber6\" value=\"$capnumber6\">
-			<input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
-			<input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
-			<input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
-			<input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
-			<input type=\"hidden\" name=\"playername\" value=\"$player_name\">
-			<input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
-			<input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
-			<input type=\"hidden\" name=\"MLEyrs\" value=\"0\">
-			<input type=\"submit\" value=\"$maxstartsatbird6\"></form></td>";
+                <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
+                    <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
+                    <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
+                    <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
+                    <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
+                    <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
+                    <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
+                    <input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
+                    <input type=\"hidden\" name=\"offeryear2\" value=\"$maxstartsatbird2\">
+                    <input type=\"hidden\" name=\"offeryear3\" value=\"$maxstartsatbird3\">
+                    <input type=\"hidden\" name=\"offeryear4\" value=\"$maxstartsatbird4\">
+                    <input type=\"hidden\" name=\"offeryear5\" value=\"$maxstartsatbird5\">
+                    <input type=\"hidden\" name=\"offeryear6\" value=\"$maxstartsatbird6\">
+                    <input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
+                    <input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
+                    <input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
+                    <input type=\"hidden\" name=\"capnumber3\" value=\"$capnumber3\">
+                    <input type=\"hidden\" name=\"capnumber4\" value=\"$capnumber4\">
+                    <input type=\"hidden\" name=\"capnumber5\" value=\"$capnumber5\">
+                    <input type=\"hidden\" name=\"capnumber6\" value=\"$capnumber6\">
+                    <input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
+                    <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
+                    <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
+                    <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                    <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
+                    <input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
+                    <input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
+                    <input type=\"hidden\" name=\"MLEyrs\" value=\"0\">
+                    <input type=\"submit\" value=\"$maxstartsatbird6\">
+                </form>
+            </td>";
         }
 
         echo "<tr><td colspan=8><center><b>SALARY CAP EXCEPTIONS:</b></center></td></tr>";
@@ -1857,133 +1881,145 @@ function negotiate($pid)
                 echo "<tr><td>Mid-Level Exception (click the button that corresponds to the final year you wish to offer):</td>
 
 				<td>
-				<form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
-				<input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-				<input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-				<input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-				<input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-				<input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-				<input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
-				<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
-				<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
-				<input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
-				<input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
-				<input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
-				<input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
-				<input type=\"hidden\" name=\"playername\" value=\"$player_name\">
-				<input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
-				<input type=\"hidden\" name=\"MLEyrs\" value=\"1\">
-				<input type=\"submit\" value=\"450\"></form></td>
+                    <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
+                        <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
+                        <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
+                        <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
+                        <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
+                        <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
+                        <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
+                        <input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
+                        <input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
+                        <input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
+                        <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
+                        <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
+                        <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                        <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
+                        <input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
+                        <input type=\"hidden\" name=\"MLEyrs\" value=\"1\">
+                        <input type=\"submit\" value=\"450\">
+                    </form>
+                </td>
 
 				<td>
-				<form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
-				<input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-				<input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-				<input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-				<input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-				<input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-				<input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
-				<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
-				<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
-				<input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
-				<input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
-				<input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
-				<input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
-				<input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
-				<input type=\"hidden\" name=\"playername\" value=\"$player_name\">
-				<input type=\"hidden\" name=\"MLEyrs\" value=\"2\">
-				<input type=\"submit\" value=\"495\"></form></td>";
+                    <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
+                        <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
+                        <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
+                        <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
+                        <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
+                        <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
+                        <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
+                        <input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
+                        <input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
+                        <input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
+                        <input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
+                        <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
+                        <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
+                        <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                        <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
+                        <input type=\"hidden\" name=\"MLEyrs\" value=\"2\">
+                        <input type=\"submit\" value=\"495\">
+                    </form>
+                </td>";
 
                 if ($player_exp > 0) {
                     echo "<td>
-					<form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
-					<input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-					<input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-					<input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-					<input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-					<input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-					<input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
-					<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
-					<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
-					<input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
-					<input type=\"hidden\" name=\"capnumber3\" value=\"$capnumber3\">
-					<input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
-					<input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
-					<input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
-					<input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
-					<input type=\"hidden\" name=\"playername\" value=\"$player_name\">
-					<input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
-					<input type=\"hidden\" name=\"MLEyrs\" value=\"3\">
-					<input type=\"submit\" value=\"540\"></form></td>
+                        <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
+                            <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
+                            <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
+                            <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
+                            <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
+                            <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
+                            <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
+                            <input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
+                            <input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
+                            <input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
+                            <input type=\"hidden\" name=\"capnumber3\" value=\"$capnumber3\">
+                            <input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
+                            <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
+                            <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
+                            <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                            <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
+                            <input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
+                            <input type=\"hidden\" name=\"MLEyrs\" value=\"3\">
+                            <input type=\"submit\" value=\"540\">
+                        </form>
+                    </td>
 
 					<td>
-					<form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
-					<input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-					<input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-					<input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-					<input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-					<input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-					<input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
-					<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
-					<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
-					<input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
-					<input type=\"hidden\" name=\"capnumber3\" value=\"$capnumber3\">
-					<input type=\"hidden\" name=\"capnumber4\" value=\"$capnumber4\">
-					<input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
-					<input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
-					<input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
-					<input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
-					<input type=\"hidden\" name=\"playername\" value=\"$player_name\">
-					<input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
-					<input type=\"hidden\" name=\"MLEyrs\" value=\"4\">
-					<input type=\"submit\" value=\"585\"></form></td>
+                        <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
+                            <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
+                            <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
+                            <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
+                            <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
+                            <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
+                            <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
+                            <input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
+                            <input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
+                            <input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
+                            <input type=\"hidden\" name=\"capnumber3\" value=\"$capnumber3\">
+                            <input type=\"hidden\" name=\"capnumber4\" value=\"$capnumber4\">
+                            <input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
+                            <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
+                            <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
+                            <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                            <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
+                            <input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
+                            <input type=\"hidden\" name=\"MLEyrs\" value=\"4\">
+                            <input type=\"submit\" value=\"585\">
+                        </form>
+                    /td>
 
 					<td>
-					<form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
-					<input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-					<input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-					<input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-					<input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-					<input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-					<input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
-					<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
-					<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
-					<input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
-					<input type=\"hidden\" name=\"capnumber3\" value=\"$capnumber3\">
-					<input type=\"hidden\" name=\"capnumber4\" value=\"$capnumber4\">
-					<input type=\"hidden\" name=\"capnumber5\" value=\"$capnumber5\">
-					<input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
-					<input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
-					<input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
-					<input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
-					<input type=\"hidden\" name=\"playername\" value=\"$player_name\">
-					<input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
-					<input type=\"hidden\" name=\"MLEyrs\" value=\"5\">
-					<input type=\"submit\" value=\"630\"></form></td>
+                        <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
+                            <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
+                            <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
+                            <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
+                            <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
+                            <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
+                            <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
+                            <input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
+                            <input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
+                            <input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
+                            <input type=\"hidden\" name=\"capnumber3\" value=\"$capnumber3\">
+                            <input type=\"hidden\" name=\"capnumber4\" value=\"$capnumber4\">
+                            <input type=\"hidden\" name=\"capnumber5\" value=\"$capnumber5\">
+                            <input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
+                            <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
+                            <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
+                            <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                            <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
+                            <input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
+                            <input type=\"hidden\" name=\"MLEyrs\" value=\"5\">
+                            <input type=\"submit\" value=\"630\">
+                        </form>
+                    </td>
 
 					<td>
-					<form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
-					<input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-					<input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-					<input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-					<input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-					<input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-					<input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
-					<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
-					<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
-					<input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
-					<input type=\"hidden\" name=\"capnumber3\" value=\"$capnumber3\">
-					<input type=\"hidden\" name=\"capnumber4\" value=\"$capnumber4\">
-					<input type=\"hidden\" name=\"capnumber5\" value=\"$capnumber5\">
-					<input type=\"hidden\" name=\"capnumber6\" value=\"$capnumber6\">
-					<input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
-					<input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
-					<input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
-					<input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
-					<input type=\"hidden\" name=\"playername\" value=\"$player_name\">
-					<input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
-					<input type=\"hidden\" name=\"MLEyrs\" value=\"6\">
-					<input type=\"submit\" value=\"675\"></form></td>";
+                        <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
+                            <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
+                            <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
+                            <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
+                            <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
+                            <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
+                            <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
+                            <input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
+                            <input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
+                            <input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
+                            <input type=\"hidden\" name=\"capnumber3\" value=\"$capnumber3\">
+                            <input type=\"hidden\" name=\"capnumber4\" value=\"$capnumber4\">
+                            <input type=\"hidden\" name=\"capnumber5\" value=\"$capnumber5\">
+                            <input type=\"hidden\" name=\"capnumber6\" value=\"$capnumber6\">
+                            <input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
+                            <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
+                            <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
+                            <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                            <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
+                            <input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
+                            <input type=\"hidden\" name=\"MLEyrs\" value=\"6\">
+                            <input type=\"submit\" value=\"675\">
+                        </form>
+                    </td>";
                 } else { // Limit undrafted rookie FA contracts to two years
                     echo "";
                 }
@@ -1998,23 +2034,25 @@ function negotiate($pid)
             if ($LLEoffers == 0) {
                 echo "<tr><td>Lower-Level Exception:</td>
 				<td>
-				<form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
-				<input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-				<input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-				<input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-				<input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-				<input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-				<input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
-				<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
-				<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
-				<input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
-				<input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
-				<input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
-				<input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
-				<input type=\"hidden\" name=\"playername\" value=\"$player_name\">
-				<input type=\"hidden\" name=\"MLEyrs\" value=\"7\">
-				<input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
-				<input type=\"submit\" value=\"145\"></form></td>
+                    <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
+                        <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
+                        <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
+                        <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
+                        <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
+                        <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
+                        <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
+                        <input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
+                        <input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
+                        <input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
+                        <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
+                        <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
+                        <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                        <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
+                        <input type=\"hidden\" name=\"MLEyrs\" value=\"7\">
+                        <input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
+                        <input type=\"submit\" value=\"145\">
+                    </form>
+                </td>
 				<td colspan=6></td></tr>";
             }
         }
@@ -2023,23 +2061,25 @@ function negotiate($pid)
 
         echo "<tr><td>Veterans Exception:</td>
 		<td>
-		<form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
-		<input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-		<input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-		<input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-		<input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-		<input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-		<input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
-		<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
-		<input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
-		<input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
-		<input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
-		<input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
-		<input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
-		<input type=\"hidden\" name=\"playername\" value=\"$player_name\">
-		<input type=\"hidden\" name=\"MLEyrs\" value=\"8\">
-		<input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
-		<input type=\"submit\" value=\"$vetmin\"></form></td>
+            <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
+                <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
+                <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
+                <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
+                <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
+                <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
+                <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
+                <input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
+                <input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
+                <input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
+                <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
+                <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
+                <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
+                <input type=\"hidden\" name=\"MLEyrs\" value=\"8\">
+                <input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
+                <input type=\"submit\" value=\"$vetmin\">
+            </form>
+        </td>
 		<td colspan=6></td></tr>";
     }
 

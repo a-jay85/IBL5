@@ -122,6 +122,16 @@ class Shared
         return $this->db->sql_result($queryAllowTradesStatus, 0);
     }
 
+    public function isFreeAgencyModuleActive()
+    {
+        $queryIsFreeAgencyModuleActive = $this->db->sql_query("SELECT title, active
+            FROM nuke_modules
+            WHERE title = 'Free_Agency'
+            LIMIT 1");
+
+        return $this->db->sql_result($queryIsFreeAgencyModuleActive, 0, "active");
+    }
+
     public function displaytopmenu($tid)
     {
         $queryteam = "SELECT * FROM ibl_team_info WHERE teamid = '$tid' ";

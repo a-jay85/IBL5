@@ -55,9 +55,7 @@ function team($tid)
     //GET CONTRACT AMOUNTS CORRECT
     //=============================
 
-    $queryfaon = "SELECT title, active FROM nuke_modules WHERE title = 'Free_Agency' LIMIT 1";
-    $resultfaon = $db->sql_query($queryfaon);
-    $isFreeAgencyModuleActive = $db->sql_result($resultfaon, 0, "active");
+    $isFreeAgencyModuleActive = $sharedFunctions->isFreeAgencyModuleActive();
 
     if ($tid == 0) { // Team 0 is the Free Agents; we want a query that will pick up all of their players.
         if ($isFreeAgencyModuleActive == 0) {

@@ -6,6 +6,7 @@ echo "<HTML><HEAD><TITLE>Free Agency Offer Entry</TITLE></HEAD><BODY>";
 
 $Team_Name = $_POST['teamname'];
 $Player_Name = $_POST['playername'];
+$player_teamName = $_POST['player_teamname'];
 $Demands_Years = $_POST['demyrs'];
 $Demands_Total = $_POST['demtot'] * 100;
 $amendedCapSpaceYear1 = $_POST['amendedCapSpaceYear1'];

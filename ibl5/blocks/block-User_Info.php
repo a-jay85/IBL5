@@ -129,7 +129,10 @@ $content .= "<img src=\"images/blocks/group-3.gif\" height=\"14\" width=\"17\"> 
 $content .= "<img src=\"images/blocks/ur-anony.gif\" height=\"14\" width=\"17\"> " . _BVIS . ": <b>$guest_online_num</b><br>\n";
 $content .= "<img src=\"images/blocks/ur-member.gif\" height=\"14\" width=\"17\"> " . _BMEM . ": <b>$member_online_num</b><br>\n";
 $content .= "<img src=\"images/blocks/ur-registered.gif\" height=\"14\" width=\"17\"> " . _BTT . ": <b>$who_online_num</b><br>\n";
-if ($member_online_num > 0) {
+
+$sharedFunctions = new Shared($db);
+
+if ($member_online_num > 0 AND !$sharedFunctions->isFreeAgencyModuleActive()) {
     $content .= "<hr>\n<img src=\"images/blocks/group-1.gif\" height=\"14\" width=\"17\"> <b><u>" . _BON . ":</u></b><br>$who_online_now";
 }
 $content .= "</form>";

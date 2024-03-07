@@ -1135,7 +1135,6 @@ function negotiate($pid)
 
     $sql2 = "SELECT * FROM " . $prefix . "_users WHERE username='$cookie[1]'";
     $result2 = $db->sql_query($sql2);
-    $num2 = $db->sql_numrows($result2);
     $userinfo = $db->sql_fetchrow($result2);
 
     $userteam = stripslashes(check_html($userinfo['user_ibl_team'], "nohtml"));
@@ -1151,25 +1150,12 @@ function negotiate($pid)
     $player_name = stripslashes(check_html($playerinfo['name'], "nohtml"));
     $player_pos = stripslashes(check_html($playerinfo['pos'], "nohtml"));
     $player_team_name = stripslashes(check_html($playerinfo['teamname'], "nohtml"));
-    $player_loyalty = stripslashes(check_html($playerinfo['loyalty'], "nohtml"));
-    $player_winner = stripslashes(check_html($playerinfo['winner'], "nohtml"));
-    $player_playingtime = stripslashes(check_html($playerinfo['playingTime'], "nohtml"));
-    $player_security = stripslashes(check_html($playerinfo['security'], "nohtml"));
-    $player_coach = stripslashes(check_html($playerinfo['coach'], "nohtml"));
-    $player_tradition = stripslashes(check_html($playerinfo['tradition'], "nohtml"));
 
     include "header.php";
     OpenTable();
 
     $player_exp = stripslashes(check_html($playerinfo['exp'], "nohtml"));
     $player_bird = stripslashes(check_html($playerinfo['bird'], "nohtml"));
-    $player_cy = stripslashes(check_html($playerinfo['cy'], "nohtml"));
-    $player_cy1 = stripslashes(check_html($playerinfo['cy1'], "nohtml"));
-    $player_cy2 = stripslashes(check_html($playerinfo['cy2'], "nohtml"));
-    $player_cy3 = stripslashes(check_html($playerinfo['cy3'], "nohtml"));
-    $player_cy4 = stripslashes(check_html($playerinfo['cy4'], "nohtml"));
-    $player_cy5 = stripslashes(check_html($playerinfo['cy5'], "nohtml"));
-    $player_cy6 = stripslashes(check_html($playerinfo['cy6'], "nohtml"));
 
     $offer1 = 0;
     $offer2 = 0;
@@ -1188,13 +1174,6 @@ function negotiate($pid)
     $dem4 = stripslashes(check_html($demands['dem4'], "nohtml"));
     $dem5 = stripslashes(check_html($demands['dem5'], "nohtml"));
     $dem6 = stripslashes(check_html($demands['dem6'], "nohtml"));
-
-    $teamfactors = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_team_info WHERE team_name='$userteam'"));
-    $tf_wins = stripslashes(check_html($teamfactors['Contract_Wins'], "nohtml"));
-    $tf_loss = stripslashes(check_html($teamfactors['Contract_Losses'], "nohtml"));
-    $tf_trdw = stripslashes(check_html($teamfactors['Contract_AvgW'], "nohtml"));
-    $tf_trdl = stripslashes(check_html($teamfactors['Contract_AvgL'], "nohtml"));
-    $tf_coach = stripslashes(check_html($teamfactors['Contract_Coach'], "nohtml"));
 
     $millionsatposition = $db->sql_query("SELECT * FROM ibl_plr WHERE teamname='$userteam' AND pos='$player_pos' AND name!='$player_name'");
 
@@ -1258,17 +1237,7 @@ function negotiate($pid)
         }
     }
 
-    $modfactor1 = (0.0005 * ($tf_wins - $tf_losses) * ($player_winner - 1));
-    $modfactor2 = (0.00125 * ($tf_trdw - $tf_trdl) * ($player_tradition - 1));
-    $modfactor3 = (.01 * ($tf_coach) * ($player_coach = 1));
-    $modfactor4 = (.025 * ($player_loyalty - 1));
-    $modfactor5 = (.01 * ($demyrs - 1) - 0.025) * ($player_security - 1);
-    $modfactor6 = -(.0035 * $tf_millions / 100 - 0.028) * ($player_playingtime - 1);
-
-    $modifier = 1 + $modfactor1 + $modfactor2 + $modfactor3 + $modfactor4 + $modfactor5 + $modfactor6 - 0.20;
-
     $demtot = round(($dem1 + $dem2 + $dem3 + $dem4 + $dem5 + $dem6) / 100, 2);
-    $demavg = ($dem1 + $dem2 + $dem3 + $dem4 + $dem5 + $dem6) / $demyrs;
 
     if ($player_exp > 0) {
         $demand_display = $dem1;

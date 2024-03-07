@@ -471,10 +471,10 @@ if ($nooffer == 0) {
     if ($resultchunk) {
         $playerTeamDiscordID = $sharedFunctions->getDiscordIDFromTeamname($player_teamName);
         if ($Team_Name == $player_teamName) {
-            $discordMessage = "Free agent **$Player_Name** has been offered a contract to _stay_ with the **$player_teamName**, according to a source.
+            $discordMessage = "Free agent **$Player_Name** has been offered a contract to _stay_ with the **$player_teamName**.
 _**$player_teamName** GM <@!$playerTeamDiscordID> could not be reached for comment._";
         } else {
-            $discordMessage = "Free agent **$Player_Name** has been offered a contract to _leave_ the **$player_teamName**, according to a source.
+            $discordMessage = "Free agent **$Player_Name** has been offered a contract to _leave_ the **$player_teamName**.
 _**$player_teamName** GM <@!$playerTeamDiscordID> could not be reached for comment._";
         }
 

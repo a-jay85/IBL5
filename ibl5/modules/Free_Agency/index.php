@@ -1514,6 +1514,7 @@ function negotiate($pid)
               <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
               <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
               <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+              <input type=\"hidden\" name=\"player_teamname\" value=\"$player_team_name\">
               <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
               <input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
               <input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
@@ -1539,6 +1540,7 @@ function negotiate($pid)
                 <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
                 <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
                 <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                <input type=\"hidden\" name=\"player_teamname\" value=\"$player_team_name\">
                 <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
                 <input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
                 <input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
@@ -1564,6 +1566,7 @@ function negotiate($pid)
                 <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
                 <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
                 <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                <input type=\"hidden\" name=\"player_teamname\" value=\"$player_team_name\">
                 <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
                 <input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
                 <input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
@@ -1592,6 +1595,7 @@ function negotiate($pid)
                     <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
                     <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
                     <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                    <input type=\"hidden\" name=\"player_teamname\" value=\"$player_team_name\">
                     <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
                     <input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
                     <input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
@@ -1621,6 +1625,7 @@ function negotiate($pid)
                     <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
                     <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
                     <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                    <input type=\"hidden\" name=\"player_teamname\" value=\"$player_team_name\">
                     <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
                     <input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
                     <input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
@@ -1652,6 +1657,7 @@ function negotiate($pid)
                     <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
                     <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
                     <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                    <input type=\"hidden\" name=\"player_teamname\" value=\"$player_team_name\">
                     <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
                     <input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
                     <input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
@@ -1685,6 +1691,7 @@ function negotiate($pid)
                     <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
                     <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
                     <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                    <input type=\"hidden\" name=\"player_teamname\" value=\"$player_team_name\">
                     <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
                     <input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
                     <input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
@@ -1717,6 +1724,7 @@ function negotiate($pid)
                     <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
                     <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
                     <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                    <input type=\"hidden\" name=\"player_teamname\" value=\"$player_team_name\">
                     <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
                     <input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
                     <input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
@@ -1742,6 +1750,7 @@ function negotiate($pid)
                     <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
                     <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
                     <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                    <input type=\"hidden\" name=\"player_teamname\" value=\"$player_team_name\">
                     <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
                     <input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
                     <input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
@@ -1769,6 +1778,7 @@ function negotiate($pid)
                     <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
                     <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
                     <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                    <input type=\"hidden\" name=\"player_teamname\" value=\"$player_team_name\">
                     <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
                     <input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
                     <input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
@@ -1798,6 +1808,7 @@ function negotiate($pid)
                     <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
                     <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
                     <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                    <input type=\"hidden\" name=\"player_teamname\" value=\"$player_team_name\">
                     <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
                     <input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
                     <input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
@@ -1829,6 +1840,7 @@ function negotiate($pid)
                     <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
                     <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
                     <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                    <input type=\"hidden\" name=\"player_teamname\" value=\"$player_team_name\">
                     <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
                     <input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
                     <input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
@@ -1862,6 +1874,7 @@ function negotiate($pid)
                     <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
                     <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
                     <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                    <input type=\"hidden\" name=\"player_teamname\" value=\"$player_team_name\">
                     <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
                     <input type=\"hidden\" name=\"bird\" value=\"$player_bird\">
                     <input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
@@ -1894,6 +1907,7 @@ function negotiate($pid)
                         <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
                         <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
                         <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                        <input type=\"hidden\" name=\"player_teamname\" value=\"$player_team_name\">
                         <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
                         <input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
                         <input type=\"hidden\" name=\"MLEyrs\" value=\"1\">
@@ -1916,6 +1930,7 @@ function negotiate($pid)
                         <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
                         <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
                         <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                        <input type=\"hidden\" name=\"player_teamname\" value=\"$player_team_name\">
                         <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
                         <input type=\"hidden\" name=\"MLEyrs\" value=\"2\">
                         <input type=\"submit\" value=\"495\">
@@ -1939,6 +1954,7 @@ function negotiate($pid)
                             <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
                             <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
                             <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                            <input type=\"hidden\" name=\"player_teamname\" value=\"$player_team_name\">
                             <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
                             <input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
                             <input type=\"hidden\" name=\"MLEyrs\" value=\"3\">
@@ -1963,6 +1979,7 @@ function negotiate($pid)
                             <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
                             <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
                             <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                            <input type=\"hidden\" name=\"player_teamname\" value=\"$player_team_name\">
                             <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
                             <input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
                             <input type=\"hidden\" name=\"MLEyrs\" value=\"4\">
@@ -1988,6 +2005,7 @@ function negotiate($pid)
                             <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
                             <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
                             <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                            <input type=\"hidden\" name=\"player_teamname\" value=\"$player_team_name\">
                             <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
                             <input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
                             <input type=\"hidden\" name=\"MLEyrs\" value=\"5\">
@@ -2014,6 +2032,7 @@ function negotiate($pid)
                             <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
                             <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
                             <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                            <input type=\"hidden\" name=\"player_teamname\" value=\"$player_team_name\">
                             <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
                             <input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
                             <input type=\"hidden\" name=\"MLEyrs\" value=\"6\">
@@ -2047,6 +2066,7 @@ function negotiate($pid)
                         <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
                         <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
                         <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                        <input type=\"hidden\" name=\"player_teamname\" value=\"$player_team_name\">
                         <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
                         <input type=\"hidden\" name=\"MLEyrs\" value=\"7\">
                         <input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
@@ -2074,6 +2094,7 @@ function negotiate($pid)
                 <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
                 <input type=\"hidden\" name=\"max\" value=\"$maxstartsat\">
                 <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+                <input type=\"hidden\" name=\"player_teamname\" value=\"$player_team_name\">
                 <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
                 <input type=\"hidden\" name=\"MLEyrs\" value=\"8\">
                 <input type=\"hidden\" name=\"vetmin\" value=\"$vetmin\">
@@ -2113,6 +2134,7 @@ function negotiate($pid)
     echo "<form name=\"FAOfferDelete\" method=\"post\" action=\"freeagentofferdelete.php\">
 		<input type=\"submit\" value=\"Retract All Offers to this Player!\">
 		<input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
+        <input type=\"hidden\" name=\"player_teamname\" value=\"$player_team_name\">
 		<input type=\"hidden\" name=\"playername\" value=\"$player_name\">
 		</form>";
 

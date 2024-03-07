@@ -1954,7 +1954,7 @@ function negotiate($pid)
                             <input type=\"hidden\" name=\"MLEyrs\" value=\"4\">
                             <input type=\"submit\" value=\"585\">
                         </form>
-                    /td>
+                    </td>
 
 					<td>
                         <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">

@@ -466,8 +466,22 @@ if ($nooffer == 0) {
 
     $resultchunk = $db->sql_query($querychunk);
 
-    echo "Your offer is legal. It should be immediately reflected in your Free Agency module.<br>
-        Please <a href=\"modules.php?name=Free_Agency\">click here to return to the Free Agency module</a>.";
+    if ($resultchunk) {
+        $playerTeamDiscordID = Shared::getDiscordIDFromTeamname($player_teamName);
+        if ($Team_Name == $player_teamName) {
+            $discordMessage = "Free agent $Player_Name has been offered a contract to stay with the $player_teamName, according to a source.";
+        } else {
+            $discordMessage = "Free agent $Player_Name has been offered a contract to leave the $player_teamName, according to a source.
+
+$player_teamName GM <@!$playerTeamDiscordID could not be reached for comment.";
+        }
+
+        Discord::postToChannel('#free-agency', $discordMessage);
+
+        echo "Your offer is legal. It should be immediately reflected in your Free Agency module.<br>
+            Please <a href=\"modules.php?name=Free_Agency\">click here to return to the Free Agency module</a>.";
+    }
+
 } else {
     echo "<font color=#ff0000>Your offer was not legal and will not be recorded.<br>
         Please go \"Back\" in your browser to try again.</font>";

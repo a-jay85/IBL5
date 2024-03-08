@@ -81,7 +81,7 @@ function display()
     $result2 = $db->sql_query($sql2);
     $userinfo = $db->sql_fetchrow($result2);
 
-    $userTeamName = stripslashes(check_html($userinfo['user_ibl_team'], "nohtml"));
+    $userTeamName = $userinfo['user_ibl_team'];
     $tid = $sharedFunctions->getTidFromTeamname($userTeamName);
 
     $sharedFunctions->displaytopmenu($tid);
@@ -156,44 +156,44 @@ function display()
 
     $showteam = $db->sql_query("SELECT * FROM ibl_plr WHERE (tid=$tid AND retired='0') ORDER BY ordinal ASC");
     while ($teamlist = $db->sql_fetchrow($showteam)) {
-        $ordinal = stripslashes(check_html($teamlist['ordinal'], "nohtml"));
-        $draftyear = stripslashes(check_html($teamlist['draftyear'], "nohtml"));
-        $exp = stripslashes(check_html($teamlist['exp'], "nohtml"));
-        $cy = stripslashes(check_html($teamlist['cy'], "nohtml"));
-        $cyt = stripslashes(check_html($teamlist['cyt'], "nohtml"));
+        $ordinal = $teamlist['ordinal'];
+        $draftyear = $teamlist['draftyear'];
+        $exp = $teamlist['exp'];
+        $cy = $teamlist['cy'];
+        $cyt = $teamlist['cyt'];
 
         $yearoffreeagency = $draftyear + $exp + $cyt - $cy;
 
         if ($yearoffreeagency != $currentSeasonEndingYear) {
-            $name = stripslashes(check_html($teamlist['name'], "nohtml"));
-            $team = stripslashes(check_html($teamlist['teamname'], "nohtml"));
-            $tid = stripslashes(check_html($teamlist['tid'], "nohtml"));
-            $pid = stripslashes(check_html($teamlist['pid'], "nohtml"));
-            $pos = stripslashes(check_html($teamlist['pos'], "nohtml"));
-            $age = stripslashes(check_html($teamlist['age'], "nohtml"));
-            $draftround = stripslashes(check_html($teamlist['draftround'], "nohtml"));
+            $name = $teamlist['name'];
+            $team = $teamlist['teamname'];
+            $tid = $teamlist['tid'];
+            $pid = $teamlist['pid'];
+            $pos = $teamlist['pos'];
+            $age = $teamlist['age'];
+            $draftround = $teamlist['draftround'];
 
-            $r_2ga = stripslashes(check_html($teamlist['r_fga'], "nohtml"));
-            $r_2gp = stripslashes(check_html($teamlist['r_fgp'], "nohtml"));
-            $r_fta = stripslashes(check_html($teamlist['r_fta'], "nohtml"));
-            $r_ftp = stripslashes(check_html($teamlist['r_ftp'], "nohtml"));
-            $r_3ga = stripslashes(check_html($teamlist['r_tga'], "nohtml"));
-            $r_3gp = stripslashes(check_html($teamlist['r_tgp'], "nohtml"));
-            $r_orb = stripslashes(check_html($teamlist['r_orb'], "nohtml"));
-            $r_drb = stripslashes(check_html($teamlist['r_drb'], "nohtml"));
-            $r_ast = stripslashes(check_html($teamlist['r_ast'], "nohtml"));
-            $r_stl = stripslashes(check_html($teamlist['r_stl'], "nohtml"));
-            $r_blk = stripslashes(check_html($teamlist['r_blk'], "nohtml"));
-            $r_tvr = stripslashes(check_html($teamlist['r_to'], "nohtml"));
-            $r_foul = stripslashes(check_html($teamlist['r_foul'], "nohtml"));
-            $r_oo = stripslashes(check_html($teamlist['oo'], "nohtml"));
-            $r_do = stripslashes(check_html($teamlist['do'], "nohtml"));
-            $r_po = stripslashes(check_html($teamlist['po'], "nohtml"));
-            $r_to = stripslashes(check_html($teamlist['to'], "nohtml"));
-            $r_od = stripslashes(check_html($teamlist['od'], "nohtml"));
-            $r_dd = stripslashes(check_html($teamlist['dd'], "nohtml"));
-            $r_pd = stripslashes(check_html($teamlist['pd'], "nohtml"));
-            $r_td = stripslashes(check_html($teamlist['td'], "nohtml"));
+            $r_2ga = $teamlist['r_fga'];
+            $r_2gp = $teamlist['r_fgp'];
+            $r_fta = $teamlist['r_fta'];
+            $r_ftp = $teamlist['r_ftp'];
+            $r_3ga = $teamlist['r_tga'];
+            $r_3gp = $teamlist['r_tgp'];
+            $r_orb = $teamlist['r_orb'];
+            $r_drb = $teamlist['r_drb'];
+            $r_ast = $teamlist['r_ast'];
+            $r_stl = $teamlist['r_stl'];
+            $r_blk = $teamlist['r_blk'];
+            $r_tvr = $teamlist['r_to'];
+            $r_foul = $teamlist['r_foul'];
+            $r_oo = $teamlist['oo'];
+            $r_do = $teamlist['do'];
+            $r_po = $teamlist['po'];
+            $r_to = $teamlist['to'];
+            $r_od = $teamlist['od'];
+            $r_dd = $teamlist['dd'];
+            $r_pd = $teamlist['pd'];
+            $r_td = $teamlist['td'];
 
             $talent = $teamlist['talent'];
             $skill = $teamlist['skill'];
@@ -207,13 +207,13 @@ function display()
 
             // === MATCH UP CONTRACT AMOUNTS WITH FUTURE YEARS BASED ON CURRENT YEAR OF CONTRACT
 
-            $millionscy = stripslashes(check_html($teamlist['cy'], "nohtml"));
-            $millionscy1 = stripslashes(check_html($teamlist['cy1'], "nohtml"));
-            $millionscy2 = stripslashes(check_html($teamlist['cy2'], "nohtml"));
-            $millionscy3 = stripslashes(check_html($teamlist['cy3'], "nohtml"));
-            $millionscy4 = stripslashes(check_html($teamlist['cy4'], "nohtml"));
-            $millionscy5 = stripslashes(check_html($teamlist['cy5'], "nohtml"));
-            $millionscy6 = stripslashes(check_html($teamlist['cy6'], "nohtml"));
+            $millionscy = $teamlist['cy'];
+            $millionscy1 = $teamlist['cy1'];
+            $millionscy2 = $teamlist['cy2'];
+            $millionscy3 = $teamlist['cy3'];
+            $millionscy4 = $teamlist['cy4'];
+            $millionscy5 = $teamlist['cy5'];
+            $millionscy6 = $teamlist['cy6'];
 
             $contract1 = 0;
             $contract2 = 0;
@@ -476,46 +476,46 @@ function display()
 
     $showteam = $db->sql_query("SELECT * FROM ibl_plr WHERE retired='0' ORDER BY ordinal ASC");
     while ($teamlist = $db->sql_fetchrow($showteam)) {
-        $name = stripslashes(check_html($teamlist['name'], "nohtml"));
+        $name = $teamlist['name'];
 
         $numoffers = $db->sql_numrows($db->sql_query("SELECT * FROM ibl_fa_offers WHERE name='$name' AND team='$userTeamName'"));
         if ($numoffers == 1) {
-            $team = stripslashes(check_html($teamlist['teamname'], "nohtml"));
-            $tid = stripslashes(check_html($teamlist['tid'], "nohtml"));
-            $pid = stripslashes(check_html($teamlist['pid'], "nohtml"));
-            $pos = stripslashes(check_html($teamlist['pos'], "nohtml"));
-            $age = stripslashes(check_html($teamlist['age'], "nohtml"));
+            $team = $teamlist['teamname'];
+            $tid = $teamlist['tid'];
+            $pid = $teamlist['pid'];
+            $pos = $teamlist['pos'];
+            $age = $teamlist['age'];
 
             $getoffers = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_fa_offers WHERE name='$name' AND team='$userTeamName'"));
 
-            $offer1 = stripslashes(check_html($getoffers['offer1'], "nohtml"));
-            $offer2 = stripslashes(check_html($getoffers['offer2'], "nohtml"));
-            $offer3 = stripslashes(check_html($getoffers['offer3'], "nohtml"));
-            $offer4 = stripslashes(check_html($getoffers['offer4'], "nohtml"));
-            $offer5 = stripslashes(check_html($getoffers['offer5'], "nohtml"));
-            $offer6 = stripslashes(check_html($getoffers['offer6'], "nohtml"));
+            $offer1 = $getoffers['offer1'];
+            $offer2 = $getoffers['offer2'];
+            $offer3 = $getoffers['offer3'];
+            $offer4 = $getoffers['offer4'];
+            $offer5 = $getoffers['offer5'];
+            $offer6 = $getoffers['offer6'];
 
-            $r_2ga = stripslashes(check_html($teamlist['r_fga'], "nohtml"));
-            $r_2gp = stripslashes(check_html($teamlist['r_fgp'], "nohtml"));
-            $r_fta = stripslashes(check_html($teamlist['r_fta'], "nohtml"));
-            $r_ftp = stripslashes(check_html($teamlist['r_ftp'], "nohtml"));
-            $r_3ga = stripslashes(check_html($teamlist['r_tga'], "nohtml"));
-            $r_3gp = stripslashes(check_html($teamlist['r_tgp'], "nohtml"));
-            $r_orb = stripslashes(check_html($teamlist['r_orb'], "nohtml"));
-            $r_drb = stripslashes(check_html($teamlist['r_drb'], "nohtml"));
-            $r_ast = stripslashes(check_html($teamlist['r_ast'], "nohtml"));
-            $r_stl = stripslashes(check_html($teamlist['r_stl'], "nohtml"));
-            $r_blk = stripslashes(check_html($teamlist['r_blk'], "nohtml"));
-            $r_tvr = stripslashes(check_html($teamlist['r_to'], "nohtml"));
-            $r_foul = stripslashes(check_html($teamlist['r_foul'], "nohtml"));
-            $r_oo = stripslashes(check_html($teamlist['oo'], "nohtml"));
-            $r_do = stripslashes(check_html($teamlist['do'], "nohtml"));
-            $r_po = stripslashes(check_html($teamlist['po'], "nohtml"));
-            $r_to = stripslashes(check_html($teamlist['to'], "nohtml"));
-            $r_od = stripslashes(check_html($teamlist['od'], "nohtml"));
-            $r_dd = stripslashes(check_html($teamlist['dd'], "nohtml"));
-            $r_pd = stripslashes(check_html($teamlist['pd'], "nohtml"));
-            $r_td = stripslashes(check_html($teamlist['td'], "nohtml"));
+            $r_2ga = $teamlist['r_fga'];
+            $r_2gp = $teamlist['r_fgp'];
+            $r_fta = $teamlist['r_fta'];
+            $r_ftp = $teamlist['r_ftp'];
+            $r_3ga = $teamlist['r_tga'];
+            $r_3gp = $teamlist['r_tgp'];
+            $r_orb = $teamlist['r_orb'];
+            $r_drb = $teamlist['r_drb'];
+            $r_ast = $teamlist['r_ast'];
+            $r_stl = $teamlist['r_stl'];
+            $r_blk = $teamlist['r_blk'];
+            $r_tvr = $teamlist['r_to'];
+            $r_foul = $teamlist['r_foul'];
+            $r_oo = $teamlist['oo'];
+            $r_do = $teamlist['do'];
+            $r_po = $teamlist['po'];
+            $r_to = $teamlist['to'];
+            $r_od = $teamlist['od'];
+            $r_dd = $teamlist['dd'];
+            $r_pd = $teamlist['pd'];
+            $r_td = $teamlist['td'];
 
             $talent = $teamlist['talent'];
             $skill = $teamlist['skill'];
@@ -629,8 +629,8 @@ function display()
 
     $exceptioninfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_team_info WHERE team_name='$userTeamName'"));
 
-    $HasMLE = stripslashes(check_html($exceptioninfo['HasMLE'], "nohtml"));
-    $HasLLE = stripslashes(check_html($exceptioninfo['HasLLE'], "nohtml"));
+    $HasMLE = $exceptioninfo['HasMLE'];
+    $HasLLE = $exceptioninfo['HasLLE'];
 
     echo "<tr bgcolor=#cc0000>
 		<td colspan=21 bgcolor=#eeeeee></td>
@@ -750,51 +750,51 @@ function display()
 
     $showteam = $db->sql_query("SELECT * FROM ibl_plr WHERE teamname='$userTeamName' AND retired='0' ORDER BY ordinal ASC");
     while ($teamlist = $db->sql_fetchrow($showteam)) {
-        $draftyear = stripslashes(check_html($teamlist['draftyear'], "nohtml"));
-        $exp = stripslashes(check_html($teamlist['exp'], "nohtml"));
-        $cy = stripslashes(check_html($teamlist['cy'], "nohtml"));
-        $cyt = stripslashes(check_html($teamlist['cyt'], "nohtml"));
+        $draftyear = $teamlist['draftyear'];
+        $exp = $teamlist['exp'];
+        $cy = $teamlist['cy'];
+        $cyt = $teamlist['cyt'];
         $yearoffreeagency = $draftyear + $exp + $cyt - $cy;
 
         if ($yearoffreeagency == $currentSeasonEndingYear) {
-            $name = stripslashes(check_html($teamlist['name'], "nohtml"));
-            $team = stripslashes(check_html($teamlist['teamname'], "nohtml"));
-            $tid = stripslashes(check_html($teamlist['tid'], "nohtml"));
-            $pid = stripslashes(check_html($teamlist['pid'], "nohtml"));
-            $pos = stripslashes(check_html($teamlist['pos'], "nohtml"));
-            $age = stripslashes(check_html($teamlist['age'], "nohtml"));
-            $bird = stripslashes(check_html($teamlist['bird'], "nohtml"));
+            $name = $teamlist['name'];
+            $team = $teamlist['teamname'];
+            $tid = $teamlist['tid'];
+            $pid = $teamlist['pid'];
+            $pos = $teamlist['pos'];
+            $age = $teamlist['age'];
+            $bird = $teamlist['bird'];
 
             $getdemands = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_demands WHERE name='$name'"));
 
-            $dem1 = stripslashes(check_html($getdemands['dem1'], "nohtml"));
-            $dem2 = stripslashes(check_html($getdemands['dem2'], "nohtml"));
-            $dem3 = stripslashes(check_html($getdemands['dem3'], "nohtml"));
-            $dem4 = stripslashes(check_html($getdemands['dem4'], "nohtml"));
-            $dem5 = stripslashes(check_html($getdemands['dem5'], "nohtml"));
-            $dem6 = stripslashes(check_html($getdemands['dem6'], "nohtml"));
+            $dem1 = $getdemands['dem1'];
+            $dem2 = $getdemands['dem2'];
+            $dem3 = $getdemands['dem3'];
+            $dem4 = $getdemands['dem4'];
+            $dem5 = $getdemands['dem5'];
+            $dem6 = $getdemands['dem6'];
 
-            $r_2ga = stripslashes(check_html($teamlist['r_fga'], "nohtml"));
-            $r_2gp = stripslashes(check_html($teamlist['r_fgp'], "nohtml"));
-            $r_fta = stripslashes(check_html($teamlist['r_fta'], "nohtml"));
-            $r_ftp = stripslashes(check_html($teamlist['r_ftp'], "nohtml"));
-            $r_3ga = stripslashes(check_html($teamlist['r_tga'], "nohtml"));
-            $r_3gp = stripslashes(check_html($teamlist['r_tgp'], "nohtml"));
-            $r_orb = stripslashes(check_html($teamlist['r_orb'], "nohtml"));
-            $r_drb = stripslashes(check_html($teamlist['r_drb'], "nohtml"));
-            $r_ast = stripslashes(check_html($teamlist['r_ast'], "nohtml"));
-            $r_stl = stripslashes(check_html($teamlist['r_stl'], "nohtml"));
-            $r_blk = stripslashes(check_html($teamlist['r_blk'], "nohtml"));
-            $r_tvr = stripslashes(check_html($teamlist['r_to'], "nohtml"));
-            $r_foul = stripslashes(check_html($teamlist['r_foul'], "nohtml"));
-            $r_oo = stripslashes(check_html($teamlist['oo'], "nohtml"));
-            $r_do = stripslashes(check_html($teamlist['do'], "nohtml"));
-            $r_po = stripslashes(check_html($teamlist['po'], "nohtml"));
-            $r_to = stripslashes(check_html($teamlist['to'], "nohtml"));
-            $r_od = stripslashes(check_html($teamlist['od'], "nohtml"));
-            $r_dd = stripslashes(check_html($teamlist['dd'], "nohtml"));
-            $r_pd = stripslashes(check_html($teamlist['pd'], "nohtml"));
-            $r_td = stripslashes(check_html($teamlist['td'], "nohtml"));
+            $r_2ga = $teamlist['r_fga'];
+            $r_2gp = $teamlist['r_fgp'];
+            $r_fta = $teamlist['r_fta'];
+            $r_ftp = $teamlist['r_ftp'];
+            $r_3ga = $teamlist['r_tga'];
+            $r_3gp = $teamlist['r_tgp'];
+            $r_orb = $teamlist['r_orb'];
+            $r_drb = $teamlist['r_drb'];
+            $r_ast = $teamlist['r_ast'];
+            $r_stl = $teamlist['r_stl'];
+            $r_blk = $teamlist['r_blk'];
+            $r_tvr = $teamlist['r_to'];
+            $r_foul = $teamlist['r_foul'];
+            $r_oo = $teamlist['oo'];
+            $r_do = $teamlist['do'];
+            $r_po = $teamlist['po'];
+            $r_to = $teamlist['to'];
+            $r_od = $teamlist['od'];
+            $r_dd = $teamlist['dd'];
+            $r_pd = $teamlist['pd'];
+            $r_td = $teamlist['td'];
 
             $talent = $teamlist['talent'];
             $skill = $teamlist['skill'];
@@ -939,50 +939,50 @@ function display()
 
     $showteam = $db->sql_query("SELECT * FROM ibl_plr WHERE teamname!='$userTeamName' AND retired='0' ORDER BY ordinal ASC");
     while ($teamlist = $db->sql_fetchrow($showteam)) {
-        $draftyear = stripslashes(check_html($teamlist['draftyear'], "nohtml"));
-        $exp = stripslashes(check_html($teamlist['exp'], "nohtml"));
-        $cy = stripslashes(check_html($teamlist['cy'], "nohtml"));
-        $cyt = stripslashes(check_html($teamlist['cyt'], "nohtml"));
+        $draftyear = $teamlist['draftyear'];
+        $exp = $teamlist['exp'];
+        $cy = $teamlist['cy'];
+        $cyt = $teamlist['cyt'];
         $yearoffreeagency = $draftyear + $exp + $cyt - $cy;
 
         if ($yearoffreeagency == $currentSeasonEndingYear) {
-            $name = stripslashes(check_html($teamlist['name'], "nohtml"));
-            $team = stripslashes(check_html($teamlist['teamname'], "nohtml"));
-            $tid = stripslashes(check_html($teamlist['tid'], "nohtml"));
-            $pid = stripslashes(check_html($teamlist['pid'], "nohtml"));
-            $pos = stripslashes(check_html($teamlist['pos'], "nohtml"));
-            $age = stripslashes(check_html($teamlist['age'], "nohtml"));
+            $name = $teamlist['name'];
+            $team = $teamlist['teamname'];
+            $tid = $teamlist['tid'];
+            $pid = $teamlist['pid'];
+            $pos = $teamlist['pos'];
+            $age = $teamlist['age'];
 
             $getdemands = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_demands WHERE name='$name'"));
 
-            $dem1 = stripslashes(check_html($getdemands['dem1'], "nohtml"));
-            $dem2 = stripslashes(check_html($getdemands['dem2'], "nohtml"));
-            $dem3 = stripslashes(check_html($getdemands['dem3'], "nohtml"));
-            $dem4 = stripslashes(check_html($getdemands['dem4'], "nohtml"));
-            $dem5 = stripslashes(check_html($getdemands['dem5'], "nohtml"));
-            $dem6 = stripslashes(check_html($getdemands['dem6'], "nohtml"));
+            $dem1 = $getdemands['dem1'];
+            $dem2 = $getdemands['dem2'];
+            $dem3 = $getdemands['dem3'];
+            $dem4 = $getdemands['dem4'];
+            $dem5 = $getdemands['dem5'];
+            $dem6 = $getdemands['dem6'];
 
-            $r_2ga = stripslashes(check_html($teamlist['r_fga'], "nohtml"));
-            $r_2gp = stripslashes(check_html($teamlist['r_fgp'], "nohtml"));
-            $r_fta = stripslashes(check_html($teamlist['r_fta'], "nohtml"));
-            $r_ftp = stripslashes(check_html($teamlist['r_ftp'], "nohtml"));
-            $r_3ga = stripslashes(check_html($teamlist['r_tga'], "nohtml"));
-            $r_3gp = stripslashes(check_html($teamlist['r_tgp'], "nohtml"));
-            $r_orb = stripslashes(check_html($teamlist['r_orb'], "nohtml"));
-            $r_drb = stripslashes(check_html($teamlist['r_drb'], "nohtml"));
-            $r_ast = stripslashes(check_html($teamlist['r_ast'], "nohtml"));
-            $r_stl = stripslashes(check_html($teamlist['r_stl'], "nohtml"));
-            $r_blk = stripslashes(check_html($teamlist['r_blk'], "nohtml"));
-            $r_tvr = stripslashes(check_html($teamlist['r_to'], "nohtml"));
-            $r_foul = stripslashes(check_html($teamlist['r_foul'], "nohtml"));
-            $r_oo = stripslashes(check_html($teamlist['oo'], "nohtml"));
-            $r_do = stripslashes(check_html($teamlist['do'], "nohtml"));
-            $r_po = stripslashes(check_html($teamlist['po'], "nohtml"));
-            $r_to = stripslashes(check_html($teamlist['to'], "nohtml"));
-            $r_od = stripslashes(check_html($teamlist['od'], "nohtml"));
-            $r_dd = stripslashes(check_html($teamlist['dd'], "nohtml"));
-            $r_pd = stripslashes(check_html($teamlist['pd'], "nohtml"));
-            $r_td = stripslashes(check_html($teamlist['td'], "nohtml"));
+            $r_2ga = $teamlist['r_fga'];
+            $r_2gp = $teamlist['r_fgp'];
+            $r_fta = $teamlist['r_fta'];
+            $r_ftp = $teamlist['r_ftp'];
+            $r_3ga = $teamlist['r_tga'];
+            $r_3gp = $teamlist['r_tgp'];
+            $r_orb = $teamlist['r_orb'];
+            $r_drb = $teamlist['r_drb'];
+            $r_ast = $teamlist['r_ast'];
+            $r_stl = $teamlist['r_stl'];
+            $r_blk = $teamlist['r_blk'];
+            $r_tvr = $teamlist['r_to'];
+            $r_foul = $teamlist['r_foul'];
+            $r_oo = $teamlist['oo'];
+            $r_do = $teamlist['do'];
+            $r_po = $teamlist['po'];
+            $r_to = $teamlist['to'];
+            $r_od = $teamlist['od'];
+            $r_dd = $teamlist['dd'];
+            $r_pd = $teamlist['pd'];
+            $r_td = $teamlist['td'];
 
             $talent = $teamlist['talent'];
             $skill = $teamlist['skill'];
@@ -1081,25 +1081,25 @@ function negotiate($pid)
     $result2 = $db->sql_query($sql2);
     $userinfo = $db->sql_fetchrow($result2);
 
-    $userteam = stripslashes(check_html($userinfo['user_ibl_team'], "nohtml"));
+    $userteam = $userinfo['user_ibl_team'];
     $tid = $sharedFunctions->getTidFromTeamname($userteam);
 
     $exceptioninfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_team_info WHERE team_name='$userteam'"));
 
-    $HasMLE = stripslashes(check_html($exceptioninfo['HasMLE'], "nohtml"));
-    $HasLLE = stripslashes(check_html($exceptioninfo['HasLLE'], "nohtml"));
+    $HasMLE = $exceptioninfo['HasMLE'];
+    $HasLLE = $exceptioninfo['HasLLE'];
 
     $playerinfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_plr WHERE pid='$pid'"));
 
-    $player_name = stripslashes(check_html($playerinfo['name'], "nohtml"));
-    $player_pos = stripslashes(check_html($playerinfo['pos'], "nohtml"));
-    $player_team_name = stripslashes(check_html($playerinfo['teamname'], "nohtml"));
+    $player_name = $playerinfo['name'];
+    $player_pos = $playerinfo['pos'];
+    $player_team_name = $playerinfo['teamname'];
 
     include "header.php";
     OpenTable();
 
-    $player_exp = stripslashes(check_html($playerinfo['exp'], "nohtml"));
-    $player_bird = stripslashes(check_html($playerinfo['bird'], "nohtml"));
+    $player_exp = $playerinfo['exp'];
+    $player_bird = $playerinfo['bird'];
 
     $offer1 = 0;
     $offer2 = 0;
@@ -1112,12 +1112,12 @@ function negotiate($pid)
 	<br>";
 
     $demands = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_demands WHERE name='$player_name'"));
-    $dem1 = stripslashes(check_html($demands['dem1'], "nohtml"));
-    $dem2 = stripslashes(check_html($demands['dem2'], "nohtml"));
-    $dem3 = stripslashes(check_html($demands['dem3'], "nohtml"));
-    $dem4 = stripslashes(check_html($demands['dem4'], "nohtml"));
-    $dem5 = stripslashes(check_html($demands['dem5'], "nohtml"));
-    $dem6 = stripslashes(check_html($demands['dem6'], "nohtml"));
+    $dem1 = $demands['dem1'];
+    $dem2 = $demands['dem2'];
+    $dem3 = $demands['dem3'];
+    $dem4 = $demands['dem4'];
+    $dem5 = $demands['dem5'];
+    $dem6 = $demands['dem6'];
 
     $millionsatposition = $db->sql_query("SELECT * FROM ibl_plr WHERE teamname='$userteam' AND pos='$player_pos' AND name!='$player_name'");
 
@@ -1126,13 +1126,13 @@ function negotiate($pid)
     $tf_millions = 0;
 
     while ($millionscounter = $db->sql_fetchrow($millionsatposition)) {
-        $millionscy = stripslashes(check_html($millionscounter['cy'], "nohtml"));
-        $millionscy1 = stripslashes(check_html($millionscounter['cy1'], "nohtml"));
-        $millionscy2 = stripslashes(check_html($millionscounter['cy2'], "nohtml"));
-        $millionscy3 = stripslashes(check_html($millionscounter['cy3'], "nohtml"));
-        $millionscy4 = stripslashes(check_html($millionscounter['cy4'], "nohtml"));
-        $millionscy5 = stripslashes(check_html($millionscounter['cy5'], "nohtml"));
-        $millionscy6 = stripslashes(check_html($millionscounter['cy6'], "nohtml"));
+        $millionscy = $millionscounter['cy'];
+        $millionscy1 = $millionscounter['cy1'];
+        $millionscy2 = $millionscounter['cy2'];
+        $millionscy3 = $millionscounter['cy3'];
+        $millionscy4 = $millionscounter['cy4'];
+        $millionscy5 = $millionscounter['cy5'];
+        $millionscy6 = $millionscounter['cy6'];
 
         // LOOK AT SALARY COMMITTED IN PROPER YEAR
 
@@ -1232,15 +1232,15 @@ function negotiate($pid)
     $capresult = $db->sql_query($capquery);
 
     while ($capdecrementer = $db->sql_fetchrow($capresult)) {
-        $ordinal = stripslashes(check_html($capdecrementer['ordinal'], "nohtml"));
-        $capcy = stripslashes(check_html($capdecrementer['cy'], "nohtml"));
-        $capcyt = stripslashes(check_html($capdecrementer['cyt'], "nohtml"));
-        $capcy1 = stripslashes(check_html($capdecrementer['cy1'], "nohtml"));
-        $capcy2 = stripslashes(check_html($capdecrementer['cy2'], "nohtml"));
-        $capcy3 = stripslashes(check_html($capdecrementer['cy3'], "nohtml"));
-        $capcy4 = stripslashes(check_html($capdecrementer['cy4'], "nohtml"));
-        $capcy5 = stripslashes(check_html($capdecrementer['cy5'], "nohtml"));
-        $capcy6 = stripslashes(check_html($capdecrementer['cy6'], "nohtml"));
+        $ordinal = $capdecrementer['ordinal'];
+        $capcy = $capdecrementer['cy'];
+        $capcyt = $capdecrementer['cyt'];
+        $capcy1 = $capdecrementer['cy1'];
+        $capcy2 = $capdecrementer['cy2'];
+        $capcy3 = $capdecrementer['cy3'];
+        $capcy4 = $capdecrementer['cy4'];
+        $capcy5 = $capdecrementer['cy5'];
+        $capcy6 = $capdecrementer['cy6'];
 
         // LOOK AT SALARY COMMITTED IN PROPER YEAR
 
@@ -1288,12 +1288,12 @@ function negotiate($pid)
     $capresult2 = $db->sql_query($capquery2);
 
     while ($capdecrementer2 = $db->sql_fetchrow($capresult2)) {
-        $offer1 = stripslashes(check_html($capdecrementer2['offer1'], "nohtml"));
-        $offer2 = stripslashes(check_html($capdecrementer2['offer2'], "nohtml"));
-        $offer3 = stripslashes(check_html($capdecrementer2['offer3'], "nohtml"));
-        $offer4 = stripslashes(check_html($capdecrementer2['offer4'], "nohtml"));
-        $offer5 = stripslashes(check_html($capdecrementer2['offer5'], "nohtml"));
-        $offer6 = stripslashes(check_html($capdecrementer2['offer6'], "nohtml"));
+        $offer1 = $capdecrementer2['offer1'];
+        $offer2 = $capdecrementer2['offer2'];
+        $offer3 = $capdecrementer2['offer3'];
+        $offer4 = $capdecrementer2['offer4'];
+        $offer5 = $capdecrementer2['offer5'];
+        $offer6 = $capdecrementer2['offer6'];
         $capnumber = $capnumber - $offer1;
         $capnumber2 = $capnumber2 - $offer2;
         $capnumber3 = $capnumber3 - $offer3;
@@ -1316,12 +1316,12 @@ function negotiate($pid)
 
     $offergrabber = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_fa_offers WHERE team='$userteam' AND name='$player_name'"));
 
-    $offer1 = stripslashes(check_html($offergrabber['offer1'], "nohtml"));
-    $offer2 = stripslashes(check_html($offergrabber['offer2'], "nohtml"));
-    $offer3 = stripslashes(check_html($offergrabber['offer3'], "nohtml"));
-    $offer4 = stripslashes(check_html($offergrabber['offer4'], "nohtml"));
-    $offer5 = stripslashes(check_html($offergrabber['offer5'], "nohtml"));
-    $offer6 = stripslashes(check_html($offergrabber['offer6'], "nohtml"));
+    $offer1 = $offergrabber['offer1'];
+    $offer2 = $offergrabber['offer2'];
+    $offer3 = $offergrabber['offer3'];
+    $offer4 = $offergrabber['offer4'];
+    $offer5 = $offergrabber['offer5'];
+    $offer6 = $offergrabber['offer6'];
 
     if ($offer1 == 0) {
         $prefill1 = "";
@@ -2075,9 +2075,9 @@ function teamdisplay($pid)
     while ($teamcaplist = $db->sql_fetchrow($showcapteam)) {
         $currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
 
-        $capteam = stripslashes(check_html($teamcaplist['team_name'], "nohtml"));
-        $HasMLE = stripslashes(check_html($teamcaplist['HasMLE'], "nohtml"));
-        $HasLLE = stripslashes(check_html($teamcaplist['HasLLE'], "nohtml"));
+        $capteam = $teamcaplist['team_name'];
+        $HasMLE = $teamcaplist['HasMLE'];
+        $HasLLE = $teamcaplist['HasLLE'];
         $conttot1 = 0;
         $conttot2 = 0;
         $conttot3 = 0;
@@ -2091,24 +2091,24 @@ function teamdisplay($pid)
         $showteam = $db->sql_query("SELECT * FROM ibl_plr WHERE teamname='$capteam' AND retired='0' ORDER BY ordinal ASC");
 
         while ($teamlist = $db->sql_fetchrow($showteam)) {
-            $ordinal = stripslashes(check_html($teamlist['ordinal'], "nohtml"));
-            $draftyear = stripslashes(check_html($teamlist['draftyear'], "nohtml"));
-            $exp = stripslashes(check_html($teamlist['exp'], "nohtml"));
-            $cy = stripslashes(check_html($teamlist['cy'], "nohtml"));
-            $cyt = stripslashes(check_html($teamlist['cyt'], "nohtml"));
+            $ordinal = $teamlist['ordinal'];
+            $draftyear = $teamlist['draftyear'];
+            $exp = $teamlist['exp'];
+            $cy = $teamlist['cy'];
+            $cyt = $teamlist['cyt'];
 
             $yearoffreeagency = $draftyear + $exp + $cyt - $cy;
 
             if ($yearoffreeagency != $currentSeasonEndingYear) {
                 // === MATCH UP CONTRACT AMOUNTS WITH FUTURE YEARS BASED ON CURRENT YEAR OF CONTRACT
 
-                $millionscy = stripslashes(check_html($teamlist['cy'], "nohtml"));
-                $millionscy1 = stripslashes(check_html($teamlist['cy1'], "nohtml"));
-                $millionscy2 = stripslashes(check_html($teamlist['cy2'], "nohtml"));
-                $millionscy3 = stripslashes(check_html($teamlist['cy3'], "nohtml"));
-                $millionscy4 = stripslashes(check_html($teamlist['cy4'], "nohtml"));
-                $millionscy5 = stripslashes(check_html($teamlist['cy5'], "nohtml"));
-                $millionscy6 = stripslashes(check_html($teamlist['cy6'], "nohtml"));
+                $millionscy = $teamlist['cy'];
+                $millionscy1 = $teamlist['cy1'];
+                $millionscy2 = $teamlist['cy2'];
+                $millionscy3 = $teamlist['cy3'];
+                $millionscy4 = $teamlist['cy4'];
+                $millionscy5 = $teamlist['cy5'];
+                $millionscy6 = $teamlist['cy6'];
 
                 $contract1 = 0;
                 $contract2 = 0;

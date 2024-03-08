@@ -88,19 +88,8 @@ function display()
 
     $currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
 
-    $conttot1 = 0;
-    $conttot2 = 0;
-    $conttot3 = 0;
-    $conttot4 = 0;
-    $conttot5 = 0;
-    $conttot6 = 0;
-
-    $rosterspots1 = 15;
-    $rosterspots2 = 15;
-    $rosterspots3 = 15;
-    $rosterspots4 = 15;
-    $rosterspots5 = 15;
-    $rosterspots6 = 15;
+    $conttot1 = $conttot2 = $conttot3 = $conttot4 = $conttot5 = $conttot6 = 0;
+    $rosterspots1 = $rosterspots2 = $rosterspots3 = $rosterspots4 = $rosterspots5 = $rosterspots6 = 15;
 
     echo "<center><img src=\"images/logo/$tid.jpg\"></center><p>";
 

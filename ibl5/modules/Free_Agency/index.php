@@ -194,12 +194,7 @@ function display()
             $millionscy5 = $teamlist['cy5'];
             $millionscy6 = $teamlist['cy6'];
 
-            $contract1 = 0;
-            $contract2 = 0;
-            $contract3 = 0;
-            $contract4 = 0;
-            $contract5 = 0;
-            $contract6 = 0;
+            $contract1 = $contract2 = $contract3 = $contract4 = $contract5 = $contract6 = 0;
 
             // if player name doesn't start with '|' (pipe symbol), then don't occupy a roster slot
             $firstCharacterOfPlayerName = substr($name, 0, 1); 

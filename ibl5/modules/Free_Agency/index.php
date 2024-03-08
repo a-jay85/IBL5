@@ -44,29 +44,8 @@ function main($user)
         }
         include "footer.php";
     } elseif (is_user($user)) {
-        global $cookie;
-        cookiedecode($user);
-        userinfo($cookie[1]);
+        display();
     }
-}
-
-function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
-{
-    global $user, $prefix, $user_prefix, $db;
-    $sql = "SELECT * FROM " . $prefix . "_bbconfig";
-    $result = $db->sql_query($sql);
-    while ($row = $db->sql_fetchrow($result)) {
-        $board_config[$row['config_name']] = $row['config_value'];
-    }
-    $sql2 = "SELECT * FROM " . $user_prefix . "_users WHERE username='$username'";
-    $result2 = $db->sql_query($sql2);
-    $num = $db->sql_numrows($result2);
-    $userinfo = $db->sql_fetchrow($result2);
-    if (!$bypass) {
-        cookiedecode($user);
-    }
-
-    display();
 }
 
 function display()

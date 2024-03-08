@@ -79,7 +79,6 @@ function display()
 
     $sql2 = "SELECT * FROM " . $prefix . "_users WHERE username='$cookie[1]'";
     $result2 = $db->sql_query($sql2);
-    $num2 = $db->sql_numrows($result2);
     $userinfo = $db->sql_fetchrow($result2);
 
     $userteam = stripslashes(check_html($userinfo['user_ibl_team'], "nohtml"));
@@ -88,50 +87,6 @@ function display()
     $sharedFunctions->displaytopmenu($tid);
 
     $currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
-
-    /*
-    // ==== COMPUTE PLAYER SALARIES FOR NEXT YEAR TO GET SOFT AND HARD CAP NUMBERS
-
-    $salary = $db->sql_query("SELECT * FROM ibl_plr WHERE teamname='$userteam'");
-
-    $tf_millions=0;
-
-    while ($capcounter = $db->sql_fetchrow($salary)) {
-    $millionscy = stripslashes(check_html($capcounter['cy'], "nohtml"));
-    $millionscy1 = stripslashes(check_html($capcounter['cy1'], "nohtml"));
-    $millionscy2 = stripslashes(check_html($capcounter['cy2'], "nohtml"));
-    $millionscy3 = stripslashes(check_html($capcounter['cy3'], "nohtml"));
-    $millionscy4 = stripslashes(check_html($capcounter['cy4'], "nohtml"));
-    $millionscy5 = stripslashes(check_html($capcounter['cy5'], "nohtml"));
-    $millionscy6 = stripslashes(check_html($capcounter['cy6'], "nohtml"));
-
-    // === LOOK AT SALARY COMMITTED NEXT YEAR, NOT THIS YEAR
-
-    if ($millionscy == 0) {
-    $tf_millions = $tf_millions+$millionscy1;
-    }
-    if ($millionscy == 1) {
-    $tf_millions = $tf_millions+$millionscy2;
-    }
-    if ($millionscy == 2) {
-    $tf_millions = $tf_millions+$millionscy3;
-    }
-    if ($millionscy == 3) {
-    $tf_millions = $tf_millions+$millionscy4;
-    }
-    if ($millionscy == 4) {
-    $tf_millions = $tf_millions+$millionscy5;
-    }
-    if ($millionscy == 5) {
-    $tf_millions = $tf_millions+$millionscy6;
-    }
-    }
-
-    // ==== END SUMMING OF SALARIES NEXT YEAR; DETERMINE HARD AND SOFT CAP AMOUNTS
-
-    $softcap = 5000 - $tf_millions;
-    $hardcap = 7000 - $tf_millions;
-     */
 
     $conttot1 = 0;
     $conttot2 = 0;

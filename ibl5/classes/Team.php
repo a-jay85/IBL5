@@ -82,6 +82,13 @@ class Team
         return $result;
     }
 
+    public function getOrdinalActiveRosterResult()
+    {
+        $query = "SELECT * FROM ibl_plr WHERE tid = '$this->teamID' AND retired = 0 ORDER BY ordinal ASC";
+        $result = $this->db->sql_query($query);
+        return $result;
+    }
+
     public function getAlphabeticalFreeAgencyRosterResult()
     {
         $query = "SELECT * FROM ibl_plr WHERE tid = '$this->teamID' AND retired = 0 AND cyt != cy ORDER BY name ASC";

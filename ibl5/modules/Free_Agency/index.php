@@ -549,12 +549,12 @@ function display()
 				<td>$trad</td>
 			</tr>";
 
-            $conttot1 = $conttot1 + $offer1;
-            $conttot2 = $conttot2 + $offer2;
-            $conttot3 = $conttot3 + $offer3;
-            $conttot4 = $conttot4 + $offer4;
-            $conttot5 = $conttot5 + $offer5;
-            $conttot6 = $conttot6 + $offer6;
+            $conttot1 += $offer1;
+            $conttot2 += $offer2;
+            $conttot3 += $offer3;
+            $conttot4 += $offer4;
+            $conttot5 += $offer5;
+            $conttot6 += $offer6;
 
             if ($offer1 != 0) {
                 $rosterspots1 -= 1;
@@ -1224,41 +1224,41 @@ function negotiate($pid)
         // LOOK AT SALARY COMMITTED IN PROPER YEAR
 
         if ($capcy == 0) {
-            $capnumber = $capnumber - $capcy1;
-            $capnumber2 = $capnumber2 - $capcy2;
-            $capnumber3 = $capnumber3 - $capcy3;
-            $capnumber4 = $capnumber4 - $capcy4;
-            $capnumber5 = $capnumber5 - $capcy5;
-            $capnumber6 = $capnumber6 - $capcy6;
+            $capnumber -= $capcy1;
+            $capnumber2 -= $capcy2;
+            $capnumber3 -= $capcy3;
+            $capnumber4 -= $capcy4;
+            $capnumber5 -= $capcy5;
+            $capnumber6 -= $capcy6;
         }
         if ($capcy == 1) {
-            $capnumber = $capnumber - $capcy2;
-            $capnumber2 = $capnumber2 - $capcy3;
-            $capnumber3 = $capnumber3 - $capcy4;
-            $capnumber4 = $capnumber4 - $capcy5;
-            $capnumber5 = $capnumber5 - $capcy6;
+            $capnumber -= $capcy2;
+            $capnumber2 -= $capcy3;
+            $capnumber3 -= $capcy4;
+            $capnumber4 -= $capcy5;
+            $capnumber5 -= $capcy6;
         }
         if ($capcy == 2) {
-            $capnumber = $capnumber - $capcy3;
-            $capnumber2 = $capnumber2 - $capcy4;
-            $capnumber3 = $capnumber3 - $capcy5;
-            $capnumber4 = $capnumber4 - $capcy6;
+            $capnumber -= $capcy3;
+            $capnumber2 -= $capcy4;
+            $capnumber3 -= $capcy5;
+            $capnumber4 -= $capcy6;
         }
         if ($capcy == 3) {
-            $capnumber = $capnumber - $capcy4;
-            $capnumber2 = $capnumber2 - $capcy5;
-            $capnumber3 = $capnumber3 - $capcy6;
+            $capnumber -= $capcy4;
+            $capnumber2 -= $capcy5;
+            $capnumber3 -= $capcy6;
         }
         if ($capcy == 4) {
-            $capnumber = $capnumber - $capcy5;
-            $capnumber2 = $capnumber2 - $capcy6;
+            $capnumber -= $capcy5;
+            $capnumber2 -= $capcy6;
         }
         if ($capcy == 5) {
-            $capnumber = $capnumber - $capcy6;
+            $capnumber -= $capcy6;
         }
 
         if ($capcy != $capcyt && $ordinal <= 960) {
-            $rosterspots = $rosterspots - 1;
+            $rosterspots -= 1;
         }
 
     }
@@ -1273,12 +1273,12 @@ function negotiate($pid)
         $offer4 = $capdecrementer2['offer4'];
         $offer5 = $capdecrementer2['offer5'];
         $offer6 = $capdecrementer2['offer6'];
-        $capnumber = $capnumber - $offer1;
-        $capnumber2 = $capnumber2 - $offer2;
-        $capnumber3 = $capnumber3 - $offer3;
-        $capnumber4 = $capnumber4 - $offer4;
-        $capnumber5 = $capnumber5 - $offer5;
-        $capnumber6 = $capnumber6 - $offer6;
+        $capnumber -= $offer1;
+        $capnumber2 -= $offer2;
+        $capnumber3 -= $offer3;
+        $capnumber4 -= $offer4;
+        $capnumber5 -= $offer5;
+        $capnumber6 -= $offer6;
         $offer1 = 0;
 
         $rosterspots = $rosterspots - 1;
@@ -2130,12 +2130,12 @@ function teamdisplay($pid)
                     $contract1 = $millionscy6;
                 }
 
-                $conttot1 = $conttot1 + $contract1;
-                $conttot2 = $conttot2 + $contract2;
-                $conttot3 = $conttot3 + $contract3;
-                $conttot4 = $conttot4 + $contract4;
-                $conttot5 = $conttot5 + $contract5;
-                $conttot6 = $conttot6 + $contract6;
+                $conttot1 += $contract1;
+                $conttot2 += $contract2;
+                $conttot3 += $contract3;
+                $conttot4 += $contract4;
+                $conttot5 += $contract5;
+                $conttot6 += $contract6;
 
                 if ($ordinal <= 960) {
                     $rosterspots -= 1;

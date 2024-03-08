@@ -81,8 +81,8 @@ function display()
     $result2 = $db->sql_query($sql2);
     $userinfo = $db->sql_fetchrow($result2);
 
-    $userteam = stripslashes(check_html($userinfo['user_ibl_team'], "nohtml"));
-    $tid = $sharedFunctions->getTidFromTeamname($userteam);
+    $userTeamName = stripslashes(check_html($userinfo['user_ibl_team'], "nohtml"));
+    $tid = $sharedFunctions->getTidFromTeamname($userTeamName);
 
     $sharedFunctions->displaytopmenu($tid);
 
@@ -97,7 +97,7 @@ function display()
 
     echo "<table border=1 cellspacing=0 class=\"sortable\">
 		<caption style=\"background-color: #0000cc\">
-			<center><b><font color=white>$userteam Players Under Contract</font></b></center>
+			<center><b><font color=white>$userTeamName Players Under Contract</font></b></center>
 		</caption>
 		<colgroup>
 			<col span=5>
@@ -233,22 +233,22 @@ function display()
                 $contract5 = $millionscy5;
                 $contract6 = $millionscy6;
 
-                if ($millionscy1 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
+                if ($millionscy1 != 0 AND $team == $userTeamName AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots1 -= 1;
                 }
-                if ($millionscy2 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
+                if ($millionscy2 != 0 AND $team == $userTeamName AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots2 -= 1;
                 }
-                if ($millionscy3 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
+                if ($millionscy3 != 0 AND $team == $userTeamName AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots3 -= 1;
                 }
-                if ($millionscy4 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
+                if ($millionscy4 != 0 AND $team == $userTeamName AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots4 -= 1;
                 }
-                if ($millionscy5 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
+                if ($millionscy5 != 0 AND $team == $userTeamName AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots5 -= 1;
                 }
-                if ($millionscy6 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
+                if ($millionscy6 != 0 AND $team == $userTeamName AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots6 -= 1;
                 }
             }
@@ -259,19 +259,19 @@ function display()
                 $contract4 = $millionscy5;
                 $contract5 = $millionscy6;
 
-                if ($millionscy2 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
+                if ($millionscy2 != 0 AND $team == $userTeamName AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots1 -= 1;
                 }
-                if ($millionscy3 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
+                if ($millionscy3 != 0 AND $team == $userTeamName AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots2 -= 1;
                 }
-                if ($millionscy4 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
+                if ($millionscy4 != 0 AND $team == $userTeamName AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots3 -= 1;
                 }
-                if ($millionscy5 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
+                if ($millionscy5 != 0 AND $team == $userTeamName AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots4 -= 1;
                 }
-                if ($millionscy6 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
+                if ($millionscy6 != 0 AND $team == $userTeamName AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots5 -= 1;
                 }
             }
@@ -281,16 +281,16 @@ function display()
                 $contract3 = $millionscy5;
                 $contract4 = $millionscy6;
 
-                if ($millionscy3 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
+                if ($millionscy3 != 0 AND $team == $userTeamName AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots1 -= 1;
                 }
-                if ($millionscy4 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
+                if ($millionscy4 != 0 AND $team == $userTeamName AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots2 -= 1;
                 }
-                if ($millionscy5 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
+                if ($millionscy5 != 0 AND $team == $userTeamName AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots3 -= 1;
                 }
-                if ($millionscy6 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
+                if ($millionscy6 != 0 AND $team == $userTeamName AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots4 -= 1;
                 }
             }
@@ -299,13 +299,13 @@ function display()
                 $contract2 = $millionscy5;
                 $contract3 = $millionscy6;
 
-                if ($millionscy4 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
+                if ($millionscy4 != 0 AND $team == $userTeamName AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots1 -= 1;
                 }
-                if ($millionscy5 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
+                if ($millionscy5 != 0 AND $team == $userTeamName AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots2 -= 1;
                 }
-                if ($millionscy6 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
+                if ($millionscy6 != 0 AND $team == $userTeamName AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots3 -= 1;
                 }
             }
@@ -313,17 +313,17 @@ function display()
                 $contract1 = $millionscy5;
                 $contract2 = $millionscy6;
 
-                if ($millionscy5 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
+                if ($millionscy5 != 0 AND $team == $userTeamName AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots1 -= 1;
                 }
-                if ($millionscy6 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
+                if ($millionscy6 != 0 AND $team == $userTeamName AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots2 -= 1;
                 }
             }
             if ($millionscy == 5) {
                 $contract1 = $millionscy6;
 
-                if ($millionscy6 != 0 AND $team == $userteam AND $firstCharacterOfPlayerName !== '|') {
+                if ($millionscy6 != 0 AND $team == $userTeamName AND $firstCharacterOfPlayerName !== '|') {
                     $rosterspots1 -= 1;
                 }
             }
@@ -398,7 +398,7 @@ function display()
     echo "</tbody>
 		<tfoot>
 			<tr>
-				<td colspan=29 align=right><b><i>$userteam Total Committed Contracts</i></b></td>
+				<td colspan=29 align=right><b><i>$userTeamName Total Committed Contracts</i></b></td>
 				<td><b><i>$conttot1</i></b></td>
 				<td><b><i>$conttot2</i></b></td>
 				<td><b><i>$conttot3</i></b></td>
@@ -417,7 +417,7 @@ function display()
 
     echo "<table border=1 cellspacing=0 class=\"sortable\">
 		<caption style=\"background-color: #0000cc\">
-			<center><b><font color=white>$userteam Outstanding Contract Offers</font></b></center>
+			<center><b><font color=white>$userTeamName Outstanding Contract Offers</font></b></center>
 		</caption>
 		<colgroup>
 			<col span=5>
@@ -478,7 +478,7 @@ function display()
     while ($teamlist = $db->sql_fetchrow($showteam)) {
         $name = stripslashes(check_html($teamlist['name'], "nohtml"));
 
-        $numoffers = $db->sql_numrows($db->sql_query("SELECT * FROM ibl_fa_offers WHERE name='$name' AND team='$userteam'"));
+        $numoffers = $db->sql_numrows($db->sql_query("SELECT * FROM ibl_fa_offers WHERE name='$name' AND team='$userTeamName'"));
         if ($numoffers == 1) {
             $team = stripslashes(check_html($teamlist['teamname'], "nohtml"));
             $tid = stripslashes(check_html($teamlist['tid'], "nohtml"));
@@ -486,7 +486,7 @@ function display()
             $pos = stripslashes(check_html($teamlist['pos'], "nohtml"));
             $age = stripslashes(check_html($teamlist['age'], "nohtml"));
 
-            $getoffers = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_fa_offers WHERE name='$name' AND team='$userteam'"));
+            $getoffers = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_fa_offers WHERE name='$name' AND team='$userTeamName'"));
 
             $offer1 = stripslashes(check_html($getoffers['offer1'], "nohtml"));
             $offer2 = stripslashes(check_html($getoffers['offer2'], "nohtml"));
@@ -601,7 +601,7 @@ function display()
     echo "</tbody>
 		<tfoot>
 			<tr>
-				<td colspan=29 align=right><b><i>$userteam Total Committed Plus Offered Contracts</i></b></td>
+				<td colspan=29 align=right><b><i>$userTeamName Total Committed Plus Offered Contracts</i></b></td>
 				<td><b><i>$conttot1</i></b></td>
 				<td><b><i>$conttot2</i></b></td>
 				<td><b><i>$conttot3</i></b></td>
@@ -627,7 +627,7 @@ function display()
 
     // ===== CAP AND ROSTER SLOT INFO =====
 
-    $exceptioninfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_team_info WHERE team_name='$userteam'"));
+    $exceptioninfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_team_info WHERE team_name='$userTeamName'"));
 
     $HasMLE = stripslashes(check_html($exceptioninfo['HasMLE'], "nohtml"));
     $HasLLE = stripslashes(check_html($exceptioninfo['HasLLE'], "nohtml"));
@@ -690,7 +690,7 @@ function display()
 
     echo "<table border=1 cellspacing=0 class=\"sortable\">
 		<caption style=\"background-color: #0000cc\">
-			<center><b><font color=white>$userteam Unsigned Free Agents</b><br>
+			<center><b><font color=white>$userTeamName Unsigned Free Agents</b><br>
 			(Note: * and <i>italicized</i> indicates player has Bird Rights)</font></b></center>
 		</caption>
 		<colgroup>
@@ -748,7 +748,7 @@ function display()
 		</thead>
 		<tbody>";
 
-    $showteam = $db->sql_query("SELECT * FROM ibl_plr WHERE teamname='$userteam' AND retired='0' ORDER BY ordinal ASC");
+    $showteam = $db->sql_query("SELECT * FROM ibl_plr WHERE teamname='$userTeamName' AND retired='0' ORDER BY ordinal ASC");
     while ($teamlist = $db->sql_fetchrow($showteam)) {
         $draftyear = stripslashes(check_html($teamlist['draftyear'], "nohtml"));
         $exp = stripslashes(check_html($teamlist['exp'], "nohtml"));
@@ -937,7 +937,7 @@ function display()
 		</thead>
 		<tbody>";
 
-    $showteam = $db->sql_query("SELECT * FROM ibl_plr WHERE teamname!='$userteam' AND retired='0' ORDER BY ordinal ASC");
+    $showteam = $db->sql_query("SELECT * FROM ibl_plr WHERE teamname!='$userTeamName' AND retired='0' ORDER BY ordinal ASC");
     while ($teamlist = $db->sql_fetchrow($showteam)) {
         $draftyear = stripslashes(check_html($teamlist['draftyear'], "nohtml"));
         $exp = stripslashes(check_html($teamlist['exp'], "nohtml"));

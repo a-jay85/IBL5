@@ -726,7 +726,7 @@ function display()
             }
 
             echo "</td>
-				<td>$pos</td>
+				<td>$player->position</td>
 				<td><a href=\"modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->name</a></td>
 				<td><a href=\"modules.php?name=Team&op=team&tid=$player->teamID\">$player->teamName</a></td>
                 <td>$player->age</td>
@@ -755,7 +755,7 @@ function display()
                 <td>$player->ratingSkill</td>
                 <td>$player->ratingIntangibles</td>";
 
-            if ($exp > 0) {
+            if ($player->yearsOfExperience > 0) {
                 echo "
                 <td>$year1PlayerDemands</td>
 				<td>$year2PlayerDemands</td>

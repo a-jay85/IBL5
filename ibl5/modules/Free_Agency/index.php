@@ -306,7 +306,7 @@ function display()
 
     echo "<table border=1 cellspacing=0 class=\"sortable\">
 		<caption style=\"background-color: #0000cc\">
-			<center><b><font color=white>$team->name Outstanding Contract Offers</font></b></center>
+			<center><b><font color=white>$team->name Contract Offers</font></b></center>
 		</caption>
 		<colgroup>
 			<col span=5>

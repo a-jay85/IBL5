@@ -363,122 +363,79 @@ function display()
 		</thead>
 		<tbody>";
 
-    $showteam = $db->sql_query("SELECT * FROM ibl_plr WHERE retired='0' ORDER BY ordinal ASC");
-    while ($teamlist = $db->sql_fetchrow($showteam)) {
-        $name = $teamlist['name'];
+    foreach ($team->getFreeAgencyOffersResult() as $offerRow) {
+        $playerID = $sharedFunctions->getPlayerIDFromPlayerName($offerRow['name']);
+        $player = Player::withPlayerID($db, $playerID);
 
-        $numoffers = $db->sql_numrows($db->sql_query("SELECT * FROM ibl_fa_offers WHERE name='$name' AND team='$team->name'"));
-        if ($numoffers == 1) {
-            $team = $teamlist['teamname'];
-            $tid = $teamlist['tid'];
-            $pid = $teamlist['pid'];
-            $pos = $teamlist['pos'];
-            $age = $teamlist['age'];
+        $offer1 = $offerRow['offer1'];
+        $offer2 = $offerRow['offer2'];
+        $offer3 = $offerRow['offer3'];
+        $offer4 = $offerRow['offer4'];
+        $offer5 = $offerRow['offer5'];
+        $offer6 = $offerRow['offer6'];
 
-            $getoffers = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_fa_offers WHERE name='$name' AND team='$team->name'"));
+        echo "<tr>
+            <td><a href=\"modules.php?name=Free_Agency&pa=negotiate&pid=$pid\">Negotiate</a></td>
+            <td>$player->position</td>
+            <td><a href=\"modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->name</a></td>
+            <td><a href=\"modules.php?name=Team&op=team&tid=$player->teamID\">$player->teamName</a></td>
+            <td>$player->age</td>
+            <td>$player->ratingFieldGoalAttempts</td>
+            <td>$player->ratingFieldGoalPercentage</td>
+            <td>$player->ratingFreeThrowAttempts</td>
+            <td>$player->ratingFreeThrowPercentage</td>
+            <td>$player->ratingThreePointAttempts</td>
+            <td>$player->ratingThreePointPercentage</td>
+            <td>$player->ratingOffensiveRebounds</td>
+            <td>$player->ratingDefensiveRebounds</td>
+            <td>$player->ratingAssists</td>
+            <td>$player->ratingSteals</td>
+            <td>$player->ratingTurnovers</td>
+            <td>$player->ratingBlocks</td>
+            <td>$player->ratingFouls</td>
+            <td>$player->ratingOutsideOffense</td>
+            <td>$player->ratingDriveOffense</td>
+            <td>$player->ratingPostOffense</td>
+            <td>$player->ratingTransitionOffense</td>
+            <td>$player->ratingOutsideDefense</td>
+            <td>$player->ratingDriveDefense</td>
+            <td>$player->ratingPostDefense</td>
+            <td>$player->ratingTransitionDefense</td>
+            <td>$player->ratingTalent</td>
+            <td>$player->ratingSkill</td>
+            <td>$player->ratingIntangibles</td>
+            <td>$year1Salary</td>
+            <td>$year2Salary</td>
+            <td>$year3Salary</td>
+            <td>$year4Salary</td>
+            <td>$year5Salary</td>
+            <td>$year6Salary</td>
+            <td>$player->freeAgencyLoyalty</td>
+            <td>$player->freeAgencyPlayForWinner</td>
+            <td>$player->freeAgencyPlayingTime</td>
+            <td>$player->freeAgencySecurity</td>
+            <td>$player->freeAgencyTradition</td>
+        </tr>";
 
-            $offer1 = $getoffers['offer1'];
-            $offer2 = $getoffers['offer2'];
-            $offer3 = $getoffers['offer3'];
-            $offer4 = $getoffers['offer4'];
-            $offer5 = $getoffers['offer5'];
-            $offer6 = $getoffers['offer6'];
+        $year1TotalSalary += $offer1;
+        $year2TotalSalary += $offer2;
+        $year3TotalSalary += $offer3;
+        $year4TotalSalary += $offer4;
+        $year5TotalSalary += $offer5;
+        $year6TotalSalary += $offer6;
 
-            $r_2ga = $teamlist['r_fga'];
-            $r_2gp = $teamlist['r_fgp'];
-            $r_fta = $teamlist['r_fta'];
-            $r_ftp = $teamlist['r_ftp'];
-            $r_3ga = $teamlist['r_tga'];
-            $r_3gp = $teamlist['r_tgp'];
-            $r_orb = $teamlist['r_orb'];
-            $r_drb = $teamlist['r_drb'];
-            $r_ast = $teamlist['r_ast'];
-            $r_stl = $teamlist['r_stl'];
-            $r_blk = $teamlist['r_blk'];
-            $r_tvr = $teamlist['r_to'];
-            $r_foul = $teamlist['r_foul'];
-            $r_oo = $teamlist['oo'];
-            $r_do = $teamlist['do'];
-            $r_po = $teamlist['po'];
-            $r_to = $teamlist['to'];
-            $r_od = $teamlist['od'];
-            $r_dd = $teamlist['dd'];
-            $r_pd = $teamlist['pd'];
-            $r_td = $teamlist['td'];
-
-            $talent = $teamlist['talent'];
-            $skill = $teamlist['skill'];
-            $intangibles = $teamlist['intangibles'];
-
-            $loy = $teamlist['loyalty'];
-            $pfw = $teamlist['winner'];
-            $pt = $teamlist['playingTime'];
-            $sec = $teamlist['security'];
-            $trad = $teamlist['tradition'];
-
-            echo "<tr>
-				<td><a href=\"modules.php?name=Free_Agency&pa=negotiate&pid=$pid\">Negotiate</a></td>
-				<td>$pos</td>
-				<td><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>
-				<td><a href=\"modules.php?name=Team&op=team&tid=$tid\">$team</a></td>
-				<td>$age</td>
-				<td>$r_2ga</td>
-				<td>$r_2gp</td>
-				<td>$r_fta</td>
-				<td>$r_ftp</td>
-				<td>$r_3ga</td>
-				<td>$r_3gp</td>
-				<td>$r_orb</td>
-				<td>$r_drb</td>
-				<td>$r_ast</td>
-				<td>$r_stl</td>
-				<td>$r_tvr</td>
-				<td>$r_blk</td>
-				<td>$r_foul</td>
-				<td>$r_oo</td>
-				<td>$r_do</td>
-				<td>$r_po</td>
-				<td>$r_to</td>
-				<td>$r_od</td>
-				<td>$r_dd</td>
-				<td>$r_pd</td>
-				<td>$r_td</td>
-				<td>$talent</td>
-				<td>$skill</td>
-				<td>$intangibles</td>
-				<td>$offer1</td>
-				<td>$offer2</td>
-				<td>$offer3</td>
-				<td>$offer4</td>
-				<td>$offer5</td>
-				<td>$offer6</td>
-				<td>$loy</td>
-				<td>$pfw</td>
-				<td>$pt</td>
-				<td>$sec</td>
-				<td>$trad</td>
-			</tr>";
-
-            $year1TotalSalary += $offer1;
-            $year2TotalSalary += $offer2;
-            $year3TotalSalary += $offer3;
-            $year4TotalSalary += $offer4;
-            $year5TotalSalary += $offer5;
-            $year6TotalSalary += $offer6;
-
-            if ($offer1 != 0) $rosterspots1--;
-            if ($offer2 != 0) $rosterspots2--;
-            if ($offer3 != 0) $rosterspots3--;
-            if ($offer4 != 0) $rosterspots4--;
-            if ($offer5 != 0) $rosterspots5--;
-            if ($offer6 != 0) $rosterspots6--;
-        }
+        if ($offer1 != 0) $rosterspots1--;
+        if ($offer2 != 0) $rosterspots2--;
+        if ($offer3 != 0) $rosterspots3--;
+        if ($offer4 != 0) $rosterspots4--;
+        if ($offer5 != 0) $rosterspots5--;
+        if ($offer6 != 0) $rosterspots6--;
     }
 
     echo "</tbody>
 		<tfoot>
 			<tr>
-				<td colspan=29 align=right><b><i>$team->name Total Committed Plus Offered Contracts</i></b></td>
+				<td colspan=29 align=right><b><i>$team->name Total Salary Plus Contract Offers</i></b></td>
 				<td><b><i>$year1TotalSalary</i></b></td>
 				<td><b><i>$year2TotalSalary</i></b></td>
 				<td><b><i>$year3TotalSalary</i></b></td>

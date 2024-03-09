@@ -573,12 +573,12 @@ function display()
         $yearPlayerIsFreeAgent = $player->draftYear + $player->yearsOfExperience + $player->contractTotalYears - $player->contractCurrentYear;
         if ($yearPlayerIsFreeAgent == $currentSeasonEndingYear) {
             $playerDemands = $db->sql_fetchrow($player->getFreeAgencyDemands());
-            $dem1 = $playerDemands['dem1'];
-            $dem2 = $playerDemands['dem2'];
-            $dem3 = $playerDemands['dem3'];
-            $dem4 = $playerDemands['dem4'];
-            $dem5 = $playerDemands['dem5'];
-            $dem6 = $playerDemands['dem6'];
+            $year1PlayerDemands = $playerDemands['dem1'];
+            $year2PlayerDemands = $playerDemands['dem2'];
+            $year3PlayerDemands = $playerDemands['dem3'];
+            $year4PlayerDemands = $playerDemands['dem4'];
+            $year5PlayerDemands = $playerDemands['dem5'];
+            $year6PlayerDemands = $playerDemands['dem6'];
 
             echo "<tr>
 				<td>";
@@ -626,12 +626,12 @@ function display()
                 <td>$player->ratingTalent</td>
                 <td>$player->ratingSkill</td>
                 <td>$player->ratingIntangibles</td>
-				<td>$dem1</td>
-				<td>$dem2</td>
-				<td>$dem3</td>
-				<td>$dem4</td>
-				<td>$dem5</td>
-				<td>$dem6</td>
+				<td>$year1PlayerDemands</td>
+				<td>$year2PlayerDemands</td>
+				<td>$year3PlayerDemands</td>
+				<td>$year4PlayerDemands</td>
+				<td>$year5PlayerDemands</td>
+				<td>$year6PlayerDemands</td>
                 <td>$player->freeAgencyLoyalty</td>
                 <td>$player->freeAgencyPlayForWinner</td>
                 <td>$player->freeAgencyPlayingTime</td>

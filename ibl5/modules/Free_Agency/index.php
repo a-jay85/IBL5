@@ -446,18 +446,18 @@ function display()
 
     // ==== END INSERT OF PLAYERS WITH OFFERS
 
-    $softcap = Team::SOFT_CAP_MAX - $year1TotalSalary;
-    $hardcap = Team::HARD_CAP_MAX - $year1TotalSalary;
-    $softcap2 = Team::SOFT_CAP_MAX - $year2TotalSalary;
-    $hardcap2 = Team::HARD_CAP_MAX - $year2TotalSalary;
-    $softcap3 = Team::SOFT_CAP_MAX - $year3TotalSalary;
-    $hardcap3 = Team::HARD_CAP_MAX - $year3TotalSalary;
-    $softcap4 = Team::SOFT_CAP_MAX - $year4TotalSalary;
-    $hardcap4 = Team::HARD_CAP_MAX - $year4TotalSalary;
-    $softcap5 = Team::SOFT_CAP_MAX - $year5TotalSalary;
-    $hardcap5 = Team::HARD_CAP_MAX - $year5TotalSalary;
-    $softcap6 = Team::SOFT_CAP_MAX - $year6TotalSalary;
-    $hardcap6 = Team::HARD_CAP_MAX - $year6TotalSalary;
+    $year1AvailableSoftCap = Team::SOFT_CAP_MAX - $year1TotalSalary;
+    $year1AvailableHardCap = Team::HARD_CAP_MAX - $year1TotalSalary;
+    $year2AvailableSoftCap = Team::SOFT_CAP_MAX - $year2TotalSalary;
+    $year2AvailableHardCap = Team::HARD_CAP_MAX - $year2TotalSalary;
+    $year3AvailableSoftCap = Team::SOFT_CAP_MAX - $year3TotalSalary;
+    $year3AvailableHardCap = Team::HARD_CAP_MAX - $year3TotalSalary;
+    $year4AvailableSoftCap = Team::SOFT_CAP_MAX - $year4TotalSalary;
+    $year4AvailableHardCap = Team::HARD_CAP_MAX - $year4TotalSalary;
+    $year5AvailableSoftCap = Team::SOFT_CAP_MAX - $year5TotalSalary;
+    $year5AvailableHardCap = Team::HARD_CAP_MAX - $year5TotalSalary;
+    $year6AvailableSoftCap = Team::SOFT_CAP_MAX - $year6TotalSalary;
+    $year6AvailableHardCap = Team::HARD_CAP_MAX - $year6TotalSalary;
 
     // ===== CAP AND ROSTER SLOT INFO =====
 
@@ -469,24 +469,24 @@ function display()
         <td align=center>$MLEicon</td>
 		<td colspan=19 bgcolor=#eeeeee></td>
 		<td colspan=8 align=right><font color=white><b>Soft Cap Space</b></font></td>
-		<td>$softcap</td>
-		<td>$softcap2</td>
-		<td>$softcap3</td>
-		<td>$softcap4</td>
-		<td>$softcap5</td>
-		<td>$softcap6</td>
+		<td>$year1AvailableSoftCap</td>
+		<td>$year2AvailableSoftCap</td>
+		<td>$year3AvailableSoftCap</td>
+		<td>$year4AvailableSoftCap</td>
+		<td>$year5AvailableSoftCap</td>
+		<td>$year6AvailableSoftCap</td>
 	</tr>";
     echo "<tr bgcolor=#cc0000>
     <td align=right><font color=white><b>LLE:</b></font></td>
     <td align=center>$LLEicon</td>
     <td colspan=19 bgcolor=#eeeeee></td>
 		<td colspan=8 align=right><font color=white><b>Hard Cap Space</b></font></td>
-		<td>$hardcap</td>
-		<td>$hardcap2</td>
-		<td>$hardcap3</td>
-		<td>$hardcap4</td>
-		<td>$hardcap5</td>
-		<td>$hardcap6</td>
+		<td>$year1AvailableHardCap</td>
+		<td>$year2AvailableHardCap</td>
+		<td>$year3AvailableHardCap</td>
+		<td>$year4AvailableHardCap</td>
+		<td>$year5AvailableHardCap</td>
+		<td>$year6AvailableHardCap</td>
 	</tr>";
     echo "<tr bgcolor=#cc0000>
 		<td colspan=21 bgcolor=#eeeeee></td>
@@ -1985,10 +1985,10 @@ function teamdisplay($pid)
         }
         // ==== END LIST OF PLAYERS CURRENTLY UNDER CONTRACT
 
-        $softcap = Team::SOFT_CAP_MAX - $conttot1;
-        $hardcap = Team::HARD_CAP_MAX - $conttot1;
+        $availableSoftCap = Team::SOFT_CAP_MAX - $conttot1;
+        $availableHardCap = Team::HARD_CAP_MAX - $conttot1;
 
-        echo "<tr><td>$capteam</td><td>$softcap</td><td>$hardcap</td><td>$rosterspots</td>";
+        echo "<tr><td>$capteam</td><td>$availableSoftCap</td><td>$availableHardCap</td><td>$rosterspots</td>";
 
         echo "<td>" . ($HasMLE == 1 ? "MLE" : "") . "</td>";
         echo "<td>" . ($HasLLE == 1 ? "LLE" : "") . "</td>";

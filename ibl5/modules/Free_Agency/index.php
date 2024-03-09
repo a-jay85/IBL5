@@ -404,12 +404,12 @@ function display()
             <td>$player->ratingTalent</td>
             <td>$player->ratingSkill</td>
             <td>$player->ratingIntangibles</td>
-            <td>$year1Salary</td>
-            <td>$year2Salary</td>
-            <td>$year3Salary</td>
-            <td>$year4Salary</td>
-            <td>$year5Salary</td>
-            <td>$year6Salary</td>
+            <td>$offer1</td>
+            <td>$offer2</td>
+            <td>$offer3</td>
+            <td>$offer4</td>
+            <td>$offer5</td>
+            <td>$offer6</td>
             <td>$player->freeAgencyLoyalty</td>
             <td>$player->freeAgencyPlayForWinner</td>
             <td>$player->freeAgencyPlayingTime</td>

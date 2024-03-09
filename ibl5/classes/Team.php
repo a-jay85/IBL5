@@ -103,6 +103,13 @@ class Team
         return $result;
     }
 
+    public function getFreeAgencyOffersResult()
+    {
+        $query = "SELECT * FROM ibl_fa_offers WHERE team='$this->name' ORDER BY name ASC";
+        $result = $this->db->sql_query($query);
+        return $result;
+    }
+
     public function getPlayersUnderContractByPositionResult($position)
     {
         $query = "SELECT * FROM ibl_plr WHERE teamname = '$this->name' AND pos = '$position' and cy1 != 0";

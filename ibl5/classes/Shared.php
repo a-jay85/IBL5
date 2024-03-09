@@ -81,6 +81,16 @@ class Shared
 
         return $this->db->sql_result($queryCurrentOwnerOfDraftPick, 0);
     }
+    
+    public function getPlayerIDFromPlayerName($playerName)
+    {
+        $queryPlayerIDFromPlayerName = $this->db->sql_query("SELECT pid
+            FROM ibl_plr
+            WHERE name = '$playerName'
+            LIMIT 1;");
+    
+        return $this->db->sql_result($queryPlayerIDFromPlayerName, 0);
+    }
 
     public function getTeamnameFromTid($tid)
     {

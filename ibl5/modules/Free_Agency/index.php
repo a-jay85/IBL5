@@ -67,7 +67,7 @@ function display()
 
     $currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
 
-    $conttot1 = $conttot2 = $conttot3 = $conttot4 = $conttot5 = $conttot6 = 0;
+    $year1TotalSalary = $year2TotalSalary = $year3TotalSalary = $year4TotalSalary = $year5TotalSalary = $year6TotalSalary = 0;
     $rosterspots1 = $rosterspots2 = $rosterspots3 = $rosterspots4 = $rosterspots5 = $rosterspots6 = 15;
 
     echo "<center><img src=\"images/logo/$team->teamID.jpg\"></center><p>";
@@ -140,130 +140,91 @@ function display()
         if ($yearPlayerIsFreeAgent != $currentSeasonEndingYear) {
             // === MATCH UP CONTRACT AMOUNTS WITH FUTURE YEARS BASED ON CURRENT YEAR OF CONTRACT
 
-            $millionscy = $player->contractCurrentYear;
-            $millionscy1 = $player->contractYear1Salary;
-            $millionscy2 = $player->contractYear2Salary;
-            $millionscy3 = $player->contractYear3Salary;
-            $millionscy4 = $player->contractYear4Salary;
-            $millionscy5 = $player->contractYear5Salary;
-            $millionscy6 = $player->contractYear6Salary;
-
-            $contract1 = $contract2 = $contract3 = $contract4 = $contract5 = $contract6 = 0;
+            $year1Salary = $year2Salary = $year3Salary = $year4Salary = $year5Salary = $year6Salary = 0;
 
             // if player name doesn't start with '|' (pipe symbol), then don't occupy a roster slot
             $firstCharacterOfPlayerName = substr($player->name, 0, 1); 
 
-            if ($millionscy == 0) {
-                $contract1 = $millionscy1;
-                $contract2 = $millionscy2;
-                $contract3 = $millionscy3;
-                $contract4 = $millionscy4;
-                $contract5 = $millionscy5;
-                $contract6 = $millionscy6;
+            if ($player->contractCurrentYear == 0) {
+                $year1Salary = $player->contractYear1Salary;
+                $year2Salary = $player->contractYear2Salary;
+                $year3Salary = $player->contractYear3Salary;
+                $year4Salary = $player->contractYear4Salary;
+                $year5Salary = $player->contractYear5Salary;
+                $year6Salary = $player->contractYear6Salary;
 
-                if ($millionscy1 != 0 AND $player->teamName == $team->name AND $firstCharacterOfPlayerName !== '|') {
-                    $rosterspots1--;
-                }
-                if ($millionscy2 != 0 AND $player->teamName == $team->name AND $firstCharacterOfPlayerName !== '|') {
-                    $rosterspots2--;
-                }
-                if ($millionscy3 != 0 AND $player->teamName == $team->name AND $firstCharacterOfPlayerName !== '|') {
-                    $rosterspots3--;
-                }
-                if ($millionscy4 != 0 AND $player->teamName == $team->name AND $firstCharacterOfPlayerName !== '|') {
-                    $rosterspots4--;
-                }
-                if ($millionscy5 != 0 AND $player->teamName == $team->name AND $firstCharacterOfPlayerName !== '|') {
-                    $rosterspots5--;
-                }
-                if ($millionscy6 != 0 AND $player->teamName == $team->name AND $firstCharacterOfPlayerName !== '|') {
-                    $rosterspots6--;
+                if ($player->teamName == $team->name AND $firstCharacterOfPlayerName !== '|') {
+                    if ($player->contractYear1Salary != 0) $rosterspots1--;
+                    if ($player->contractYear2Salary != 0) $rosterspots2--;
+                    if ($player->contractYear3Salary != 0) $rosterspots3--;
+                    if ($player->contractYear4Salary != 0) $rosterspots4--;
+                    if ($player->contractYear5Salary != 0) $rosterspots5--;
+                    if ($player->contractYear6Salary != 0) $rosterspots6--;
                 }
             }
-            if ($millionscy == 1) {
-                $contract1 = $millionscy2;
-                $contract2 = $millionscy3;
-                $contract3 = $millionscy4;
-                $contract4 = $millionscy5;
-                $contract5 = $millionscy6;
+            if ($player->contractCurrentYear == 1) {
+                $year1Salary = $player->contractYear2Salary;
+                $year2Salary = $player->contractYear3Salary;
+                $year3Salary = $player->contractYear4Salary;
+                $year4Salary = $player->contractYear5Salary;
+                $year5Salary = $player->contractYear6Salary;
 
-                if ($millionscy2 != 0 AND $player->teamName == $team->name AND $firstCharacterOfPlayerName !== '|') {
-                    $rosterspots1--;
-                }
-                if ($millionscy3 != 0 AND $player->teamName == $team->name AND $firstCharacterOfPlayerName !== '|') {
-                    $rosterspots2--;
-                }
-                if ($millionscy4 != 0 AND $player->teamName == $team->name AND $firstCharacterOfPlayerName !== '|') {
-                    $rosterspots3--;
-                }
-                if ($millionscy5 != 0 AND $player->teamName == $team->name AND $firstCharacterOfPlayerName !== '|') {
-                    $rosterspots4--;
-                }
-                if ($millionscy6 != 0 AND $player->teamName == $team->name AND $firstCharacterOfPlayerName !== '|') {
-                    $rosterspots5--;
+                if ($player->teamName == $team->name AND $firstCharacterOfPlayerName !== '|') {
+                    if ($player->contractYear2Salary != 0) $rosterspots1--;
+                    if ($player->contractYear3Salary != 0) $rosterspots2--;
+                    if ($player->contractYear4Salary != 0) $rosterspots3--;
+                    if ($player->contractYear5Salary != 0) $rosterspots4--;
+                    if ($player->contractYear6Salary != 0) $rosterspots5--;
                 }
             }
-            if ($millionscy == 2) {
-                $contract1 = $millionscy3;
-                $contract2 = $millionscy4;
-                $contract3 = $millionscy5;
-                $contract4 = $millionscy6;
+            if ($player->contractCurrentYear == 2) {
+                $year1Salary = $player->contractYear3Salary;
+                $year2Salary = $player->contractYear4Salary;
+                $year3Salary = $player->contractYear5Salary;
+                $year4Salary = $player->contractYear6Salary;
 
-                if ($millionscy3 != 0 AND $player->teamName == $team->name AND $firstCharacterOfPlayerName !== '|') {
-                    $rosterspots1--;
-                }
-                if ($millionscy4 != 0 AND $player->teamName == $team->name AND $firstCharacterOfPlayerName !== '|') {
-                    $rosterspots2--;
-                }
-                if ($millionscy5 != 0 AND $player->teamName == $team->name AND $firstCharacterOfPlayerName !== '|') {
-                    $rosterspots3--;
-                }
-                if ($millionscy6 != 0 AND $player->teamName == $team->name AND $firstCharacterOfPlayerName !== '|') {
-                    $rosterspots4--;
+                if ($player->teamName == $team->name AND $firstCharacterOfPlayerName !== '|') {
+                    if ($player->contractYear3Salary != 0) $rosterspots1--;
+                    if ($player->contractYear4Salary != 0) $rosterspots2--;
+                    if ($player->contractYear5Salary != 0) $rosterspots3--;
+                    if ($player->contractYear6Salary != 0) $rosterspots4--;
                 }
             }
-            if ($millionscy == 3) {
-                $contract1 = $millionscy4;
-                $contract2 = $millionscy5;
-                $contract3 = $millionscy6;
+            if ($player->contractCurrentYear == 3) {
+                $year1Salary = $player->contractYear4Salary;
+                $year2Salary = $player->contractYear5Salary;
+                $year3Salary = $player->contractYear6Salary;
 
-                if ($millionscy4 != 0 AND $player->teamName == $team->name AND $firstCharacterOfPlayerName !== '|') {
-                    $rosterspots1--;
-                }
-                if ($millionscy5 != 0 AND $player->teamName == $team->name AND $firstCharacterOfPlayerName !== '|') {
-                    $rosterspots2--;
-                }
-                if ($millionscy6 != 0 AND $player->teamName == $team->name AND $firstCharacterOfPlayerName !== '|') {
-                    $rosterspots3--;
+                if ($player->teamName == $team->name AND $firstCharacterOfPlayerName !== '|') {
+                    if ($player->contractYear4Salary != 0) $rosterspots1--;
+                    if ($player->contractYear5Salary != 0) $rosterspots2--;
+                    if ($player->contractYear6Salary != 0) $rosterspots3--;
                 }
             }
-            if ($millionscy == 4) {
-                $contract1 = $millionscy5;
-                $contract2 = $millionscy6;
+            if ($player->contractCurrentYear == 4) {
+                $year1Salary = $player->contractYear5Salary;
+                $year2Salary = $player->contractYear6Salary;
 
-                if ($millionscy5 != 0 AND $player->teamName == $team->name AND $firstCharacterOfPlayerName !== '|') {
-                    $rosterspots1--;
-                }
-                if ($millionscy6 != 0 AND $player->teamName == $team->name AND $firstCharacterOfPlayerName !== '|') {
-                    $rosterspots2--;
+                if ($player->teamName == $team->name AND $firstCharacterOfPlayerName !== '|') {
+                    if ($player->contractYear5Salary != 0) $rosterspots1--;
+                    if ($player->contractYear6Salary != 0) $rosterspots2--;
                 }
             }
-            if ($millionscy == 5) {
-                $contract1 = $millionscy6;
+            if ($player->contractCurrentYear == 5) {
+                $year1Salary = $player->contractYear6Salary;
 
-                if ($millionscy6 != 0 AND $player->teamName == $team->name AND $firstCharacterOfPlayerName !== '|') {
-                    $rosterspots1--;
+                if ($player->teamName == $team->name AND $firstCharacterOfPlayerName !== '|') {
+                    if ($player->contractYear6Salary != 0) $rosterspots1--;
                 }
             }
-
 
             echo "<tr>
                 <td>";
 
             // ==== ROOKIE OPTIONS
             if (
-                ($player->draftRound == 1 && $player->yearsOfExperience == 2 && $millionscy4 == 0)
-             OR ($player->draftRound == 2 && $player->yearsOfExperience == 1 && $millionscy3 == 0)
+                ($player->draftRound == 1 && $player->yearsOfExperience == 2 && $player->contractYear4Salary == 0)
+             OR ($player->draftRound == 2 && $player->yearsOfExperience == 1 && $player->contractYear3Salary == 0)
             ) {
                 echo "<a href=\"modules.php?name=Player&pa=rookieoption&pid=$player->playerID\">Rookie Option</a>";
             }
@@ -301,12 +262,12 @@ function display()
                 <td>$player->ratingTalent</td>
                 <td>$player->ratingSkill</td>
                 <td>$player->ratingIntangibles</td>
-                <td>$contract1</td>
-                <td>$contract2</td>
-                <td>$contract3</td>
-                <td>$contract4</td>
-                <td>$contract5</td>
-                <td>$contract6</td>
+                <td>$year1Salary</td>
+                <td>$year2Salary</td>
+                <td>$year3Salary</td>
+                <td>$year4Salary</td>
+                <td>$year5Salary</td>
+                <td>$year6Salary</td>
                 <td>$player->freeAgencyLoyalty</td>
                 <td>$player->freeAgencyPlayForWinner</td>
                 <td>$player->freeAgencyPlayingTime</td>
@@ -314,25 +275,25 @@ function display()
                 <td>$player->freeAgencyTradition</td>
             </tr>";
 
-            $conttot1 += $contract1;
-            $conttot2 += $contract2;
-            $conttot3 += $contract3;
-            $conttot4 += $contract4;
-            $conttot5 += $contract5;
-            $conttot6 += $contract6;
+            $year1TotalSalary += $year1Salary;
+            $year2TotalSalary += $year2Salary;
+            $year3TotalSalary += $year3Salary;
+            $year4TotalSalary += $year4Salary;
+            $year5TotalSalary += $year5Salary;
+            $year6TotalSalary += $year6Salary;
         }
     }
 
     echo "</tbody>
 		<tfoot>
 			<tr>
-				<td colspan=29 align=right><b><i>$team->name Total Committed Contracts</i></b></td>
-				<td><b><i>$conttot1</i></b></td>
-				<td><b><i>$conttot2</i></b></td>
-				<td><b><i>$conttot3</i></b></td>
-				<td><b><i>$conttot4</i></b></td>
-				<td><b><i>$conttot5</i></b></td>
-				<td><b><i>$conttot6</i></b></td>
+				<td colspan=29 align=right><b><i>$team->name Total Salary</i></b></td>
+				<td><b><i>$year1TotalSalary</i></b></td>
+				<td><b><i>$year2TotalSalary</i></b></td>
+				<td><b><i>$year3TotalSalary</i></b></td>
+				<td><b><i>$year4TotalSalary</i></b></td>
+				<td><b><i>$year5TotalSalary</i></b></td>
+				<td><b><i>$year6TotalSalary</i></b></td>
 			</tr>
 		</tfoot>
 	</table>
@@ -498,12 +459,12 @@ function display()
 				<td>$trad</td>
 			</tr>";
 
-            $conttot1 += $offer1;
-            $conttot2 += $offer2;
-            $conttot3 += $offer3;
-            $conttot4 += $offer4;
-            $conttot5 += $offer5;
-            $conttot6 += $offer6;
+            $year1TotalSalary += $offer1;
+            $year2TotalSalary += $offer2;
+            $year3TotalSalary += $offer3;
+            $year4TotalSalary += $offer4;
+            $year5TotalSalary += $offer5;
+            $year6TotalSalary += $offer6;
 
             if ($offer1 != 0) {
                 $rosterspots1--;
@@ -530,28 +491,28 @@ function display()
 		<tfoot>
 			<tr>
 				<td colspan=29 align=right><b><i>$team->name Total Committed Plus Offered Contracts</i></b></td>
-				<td><b><i>$conttot1</i></b></td>
-				<td><b><i>$conttot2</i></b></td>
-				<td><b><i>$conttot3</i></b></td>
-				<td><b><i>$conttot4</i></b></td>
-				<td><b><i>$conttot5</i></b></td>
-				<td><b><i>$conttot6</i></b></td>
+				<td><b><i>$year1TotalSalary</i></b></td>
+				<td><b><i>$year2TotalSalary</i></b></td>
+				<td><b><i>$year3TotalSalary</i></b></td>
+				<td><b><i>$year4TotalSalary</i></b></td>
+				<td><b><i>$year5TotalSalary</i></b></td>
+				<td><b><i>$year6TotalSalary</i></b></td>
 			</tr>";
 
     // ==== END INSERT OF PLAYERS WITH OFFERS
 
-    $softcap = 5000 - $conttot1;
-    $hardcap = 7000 - $conttot1;
-    $softcap2 = 5000 - $conttot2;
-    $hardcap2 = 7000 - $conttot2;
-    $softcap3 = 5000 - $conttot3;
-    $hardcap3 = 7000 - $conttot3;
-    $softcap4 = 5000 - $conttot4;
-    $hardcap4 = 7000 - $conttot4;
-    $softcap5 = 5000 - $conttot5;
-    $hardcap5 = 7000 - $conttot5;
-    $softcap6 = 5000 - $conttot6;
-    $hardcap6 = 7000 - $conttot6;
+    $softcap = 5000 - $year1TotalSalary;
+    $hardcap = 7000 - $year1TotalSalary;
+    $softcap2 = 5000 - $year2TotalSalary;
+    $hardcap2 = 7000 - $year2TotalSalary;
+    $softcap3 = 5000 - $year3TotalSalary;
+    $hardcap3 = 7000 - $year3TotalSalary;
+    $softcap4 = 5000 - $year4TotalSalary;
+    $hardcap4 = 7000 - $year4TotalSalary;
+    $softcap5 = 5000 - $year5TotalSalary;
+    $hardcap5 = 7000 - $year5TotalSalary;
+    $softcap6 = 5000 - $year6TotalSalary;
+    $hardcap6 = 7000 - $year6TotalSalary;
 
     // ===== CAP AND ROSTER SLOT INFO =====
 

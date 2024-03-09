@@ -466,24 +466,12 @@ function display()
             $year5TotalSalary += $offer5;
             $year6TotalSalary += $offer6;
 
-            if ($offer1 != 0) {
-                $rosterspots1--;
-            }
-            if ($offer2 != 0) {
-                $rosterspots2--;
-            }
-            if ($offer3 != 0) {
-                $rosterspots3--;
-            }
-            if ($offer4 != 0) {
-                $rosterspots4--;
-            }
-            if ($offer5 != 0) {
-                $rosterspots5--;
-            }
-            if ($offer6 != 0) {
-                $rosterspots6--;
-            }
+            if ($offer1 != 0) $rosterspots1--;
+            if ($offer2 != 0) $rosterspots2--;
+            if ($offer3 != 0) $rosterspots3--;
+            if ($offer4 != 0) $rosterspots4--;
+            if ($offer5 != 0) $rosterspots5--;
+            if ($offer6 != 0) $rosterspots6--;
         }
     }
 

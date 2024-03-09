@@ -298,26 +298,25 @@ if ($Bird_Years > 2) {
 }
 
 // ==== CHECK FOR ILLEGAL OFFERS THAT ARE OVER THE SALARY CAP
-if ($Bird_Years < 3) {
-    if ($Offer_1 > $amendedCapSpaceYear1) {
-        echo "Sorry, you do not have sufficient cap space under the soft cap to make the offer.  You offered $Offer_1 in the first year of the contract, which is more than $Cap_Space, the amount of cap space you have available.<br>";
+
+$Hard_Cap_Space = $amendedCapSpaceYear1 + 2000;
+$Hard_Cap_Space2 = $Cap_Space2 + 2000;
+$Hard_Cap_Space3 = $Cap_Space3 + 2000;
+$Hard_Cap_Space4 = $Cap_Space4 + 2000;
+$Hard_Cap_Space5 = $Cap_Space5 + 2000;
+$Hard_Cap_Space6 = $Cap_Space6 + 2000;
+
+if ($Offer_1 > $Hard_Cap_Space) {
+    echo "Sorry, you do not have sufficient cap space under the hard cap to make the offer.  You offered $Offer_1 in the first year of the contract, which is more than $Hard_Cap_Space, the amount of hard cap space you have available.<br>";
+    $nooffer = 1;
+}
+if ($nooffer == 0) {
+    if ($Bird_Years < 3 AND $Offer_1 > $amendedCapSpaceYear1 AND $MLE_Years == 0) {
+        echo "Sorry, you do not have sufficient cap space under the soft cap to make the offer.  You offered $Offer_1 in the first year of the contract, which is more than $amendedCapSpaceYear1, the amount of soft cap space you have available.<br>";
         $nooffer = 1;
     }
-} else {
-    $Hard_Cap_Space = $amendedCapSpaceYear1 + 2000;
-    $Hard_Cap_Space2 = $Cap_Space2 + 2000;
-    $Hard_Cap_Space3 = $Cap_Space3 + 2000;
-    $Hard_Cap_Space4 = $Cap_Space4 + 2000;
-    $Hard_Cap_Space5 = $Cap_Space5 + 2000;
-    $Hard_Cap_Space6 = $Cap_Space6 + 2000;
-
-    if ($nooffer == 0) {
-        if ($Offer_1 > $Hard_Cap_Space) {
-            echo "Sorry, you do not have sufficient cap space under the Hard Cap to make the offer.  You offered $Offer_1 in the first year of the contract, which is more than $Hard_Cap_Space, the amount of cap space you have available.<br>";
-            $nooffer = 1;
-        }
-    }
 }
+
 
 // ==== CHECK FOR OFFERS OVER MAX
 

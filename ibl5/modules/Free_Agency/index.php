@@ -446,18 +446,18 @@ function display()
 
     // ==== END INSERT OF PLAYERS WITH OFFERS
 
-    $softcap = 5000 - $year1TotalSalary;
-    $hardcap = 7000 - $year1TotalSalary;
-    $softcap2 = 5000 - $year2TotalSalary;
-    $hardcap2 = 7000 - $year2TotalSalary;
-    $softcap3 = 5000 - $year3TotalSalary;
-    $hardcap3 = 7000 - $year3TotalSalary;
-    $softcap4 = 5000 - $year4TotalSalary;
-    $hardcap4 = 7000 - $year4TotalSalary;
-    $softcap5 = 5000 - $year5TotalSalary;
-    $hardcap5 = 7000 - $year5TotalSalary;
-    $softcap6 = 5000 - $year6TotalSalary;
-    $hardcap6 = 7000 - $year6TotalSalary;
+    $softcap = Team::SOFT_CAP_MAX - $year1TotalSalary;
+    $hardcap = Team::HARD_CAP_MAX - $year1TotalSalary;
+    $softcap2 = Team::SOFT_CAP_MAX - $year2TotalSalary;
+    $hardcap2 = Team::HARD_CAP_MAX - $year2TotalSalary;
+    $softcap3 = Team::SOFT_CAP_MAX - $year3TotalSalary;
+    $hardcap3 = Team::HARD_CAP_MAX - $year3TotalSalary;
+    $softcap4 = Team::SOFT_CAP_MAX - $year4TotalSalary;
+    $hardcap4 = Team::HARD_CAP_MAX - $year4TotalSalary;
+    $softcap5 = Team::SOFT_CAP_MAX - $year5TotalSalary;
+    $hardcap5 = Team::HARD_CAP_MAX - $year5TotalSalary;
+    $softcap6 = Team::SOFT_CAP_MAX - $year6TotalSalary;
+    $hardcap6 = Team::HARD_CAP_MAX - $year6TotalSalary;
 
     // ===== CAP AND ROSTER SLOT INFO =====
 
@@ -1039,12 +1039,12 @@ function negotiate($pid)
 
     // LOOP TO GET SOFT CAP SPACE
 
-    $capnumber = 5000;
-    $capnumber2 = 5000;
-    $capnumber3 = 5000;
-    $capnumber4 = 5000;
-    $capnumber5 = 5000;
-    $capnumber6 = 5000;
+    $capnumber = Team::SOFT_CAP_MAX;
+    $capnumber2 = Team::SOFT_CAP_MAX;
+    $capnumber3 = Team::SOFT_CAP_MAX;
+    $capnumber4 = Team::SOFT_CAP_MAX;
+    $capnumber5 = Team::SOFT_CAP_MAX;
+    $capnumber6 = Team::SOFT_CAP_MAX;
 
     $rosterspots = 15;
 
@@ -1857,7 +1857,7 @@ function negotiate($pid)
 		<li>The first year of the contract must be at least the veteran's minimum ($vetmin for this player).</li>
 		<li><b>For Players who do not have Bird Rights with your team:</b> You may add no more than 10% of your the amount you offer in the first year as a raise between years (for instance, if you offer 500 in Year 1, you cannot offer a raise of more than 50 between any two subsequent years.)</li>
 		<li><b>Bird Rights Player on Your Team:</b> You may add no more than 12.5% of your the amount you offer in the first year as a raise between years (for instance, if you offer 500 in Year 1, you cannot offer a raise of more than 62 between any two subsequent years.)</li>
-		<li>For reference, \"100\" entered in the fields above corresponds to 1 million dollars; the 50 million dollar soft cap thus means you have 5000 to play with.</li>
+		<li>For reference, \"100\" entered in the fields above corresponds to 1 million dollars; e.g. a 50 million dollar soft cap thus means you have 5000 to play with.</li>
 		</ul></td></tr>
 		</table>
 
@@ -1985,8 +1985,8 @@ function teamdisplay($pid)
         }
         // ==== END LIST OF PLAYERS CURRENTLY UNDER CONTRACT
 
-        $softcap = 5000 - $conttot1;
-        $hardcap = 7000 - $conttot1;
+        $softcap = Team::SOFT_CAP_MAX - $conttot1;
+        $hardcap = Team::HARD_CAP_MAX - $conttot1;
 
         echo "<tr><td>$capteam</td><td>$softcap</td><td>$hardcap</td><td>$rosterspots</td>";
 

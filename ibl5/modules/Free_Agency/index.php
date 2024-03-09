@@ -704,112 +704,71 @@ function display()
 		</thead>
 		<tbody>";
 
-    $showteam = $db->sql_query("SELECT * FROM ibl_plr WHERE teamname!='$team->name' AND retired='0' ORDER BY ordinal ASC");
-    while ($teamlist = $db->sql_fetchrow($showteam)) {
-        $draftyear = $teamlist['draftyear'];
-        $exp = $teamlist['exp'];
-        $cy = $teamlist['cy'];
-        $cyt = $teamlist['cyt'];
-        $yearPlayerIsFreeAgent = $draftyear + $exp + $cyt - $cy;
+    $resultFreeAgentsNotOnUserTeam = $db->sql_query("SELECT * FROM ibl_plr WHERE teamname!='$team->name' AND retired='0' ORDER BY ordinal ASC");
+    foreach ($resultFreeAgentsNotOnUserTeam as $playerRow) {
+        $player = Player::withPlrRow($db, $playerRow);
 
+        $yearPlayerIsFreeAgent = $player->draftYear + $player->yearsOfExperience + $player->contractTotalYears - $player->contractCurrentYear;
         if ($yearPlayerIsFreeAgent == $currentSeasonEndingYear) {
-            $name = $teamlist['name'];
-            $team = $teamlist['teamname'];
-            $tid = $teamlist['tid'];
-            $pid = $teamlist['pid'];
-            $pos = $teamlist['pos'];
-            $age = $teamlist['age'];
-
-            $getdemands = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_demands WHERE name='$name'"));
-
-            $dem1 = $getdemands['dem1'];
-            $dem2 = $getdemands['dem2'];
-            $dem3 = $getdemands['dem3'];
-            $dem4 = $getdemands['dem4'];
-            $dem5 = $getdemands['dem5'];
-            $dem6 = $getdemands['dem6'];
-
-            $r_2ga = $teamlist['r_fga'];
-            $r_2gp = $teamlist['r_fgp'];
-            $r_fta = $teamlist['r_fta'];
-            $r_ftp = $teamlist['r_ftp'];
-            $r_3ga = $teamlist['r_tga'];
-            $r_3gp = $teamlist['r_tgp'];
-            $r_orb = $teamlist['r_orb'];
-            $r_drb = $teamlist['r_drb'];
-            $r_ast = $teamlist['r_ast'];
-            $r_stl = $teamlist['r_stl'];
-            $r_blk = $teamlist['r_blk'];
-            $r_tvr = $teamlist['r_to'];
-            $r_foul = $teamlist['r_foul'];
-            $r_oo = $teamlist['oo'];
-            $r_do = $teamlist['do'];
-            $r_po = $teamlist['po'];
-            $r_to = $teamlist['to'];
-            $r_od = $teamlist['od'];
-            $r_dd = $teamlist['dd'];
-            $r_pd = $teamlist['pd'];
-            $r_td = $teamlist['td'];
-
-            $talent = $teamlist['talent'];
-            $skill = $teamlist['skill'];
-            $intangibles = $teamlist['intangibles'];
-
-            $loy = $teamlist['loyalty'];
-            $pfw = $teamlist['winner'];
-            $pt = $teamlist['playingTime'];
-            $sec = $teamlist['security'];
-            $trad = $teamlist['tradition'];
+            $playerDemands = $db->sql_fetchrow($player->getFreeAgencyDemands());
+            $year1PlayerDemands = $playerDemands['dem1'];
+            $year2PlayerDemands = $playerDemands['dem2'];
+            $year3PlayerDemands = $playerDemands['dem3'];
+            $year4PlayerDemands = $playerDemands['dem4'];
+            $year5PlayerDemands = $playerDemands['dem5'];
+            $year6PlayerDemands = $playerDemands['dem6'];
 
             echo "<tr>
-				<td>";
+                <td>";
 
             if ($rosterspots1 > 0) {
-                echo "<a href=\"modules.php?name=Free_Agency&pa=negotiate&pid=$pid\">Negotiate</a>";
+                echo "<a href=\"modules.php?name=Free_Agency&pa=negotiate&pid=$player->playerID\">Negotiate</a>";
             }
 
             echo "</td>
 				<td>$pos</td>
-				<td><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>
-				<td><a href=\"modules.php?name=Team&op=team&tid=$tid\">$team</a></td>
-				<td>$age</td>
-				<td>$r_2ga</td>
-				<td>$r_2gp</td>
-				<td>$r_fta</td>
-				<td>$r_ftp</td>
-				<td>$r_3ga</td>
-				<td>$r_3gp</td>
-				<td>$r_orb</td>
-				<td>$r_drb</td>
-				<td>$r_ast</td>
-				<td>$r_stl</td>
-				<td>$r_tvr</td>
-				<td>$r_blk</td>
-				<td>$r_foul</td>
-				<td>$r_oo</td>
-				<td>$r_do</td>
-				<td>$r_po</td>
-				<td>$r_to</td>
-				<td>$r_od</td>
-				<td>$r_dd</td>
-				<td>$r_pd</td>
-				<td>$r_td</td>
-				<td>$talent</td>
-				<td>$skill</td>
-				<td>$intangibles</td>";
+				<td><a href=\"modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->name</a></td>
+				<td><a href=\"modules.php?name=Team&op=team&tid=$player->teamID\">$player->teamName</a></td>
+                <td>$player->age</td>
+                <td>$player->ratingFieldGoalAttempts</td>
+                <td>$player->ratingFieldGoalPercentage</td>
+                <td>$player->ratingFreeThrowAttempts</td>
+                <td>$player->ratingFreeThrowPercentage</td>
+                <td>$player->ratingThreePointAttempts</td>
+                <td>$player->ratingThreePointPercentage</td>
+                <td>$player->ratingOffensiveRebounds</td>
+                <td>$player->ratingDefensiveRebounds</td>
+                <td>$player->ratingAssists</td>
+                <td>$player->ratingSteals</td>
+                <td>$player->ratingTurnovers</td>
+                <td>$player->ratingBlocks</td>
+                <td>$player->ratingFouls</td>
+                <td>$player->ratingOutsideOffense</td>
+                <td>$player->ratingDriveOffense</td>
+                <td>$player->ratingPostOffense</td>
+                <td>$player->ratingTransitionOffense</td>
+                <td>$player->ratingOutsideDefense</td>
+                <td>$player->ratingDriveDefense</td>
+                <td>$player->ratingPostDefense</td>
+                <td>$player->ratingTransitionDefense</td>
+                <td>$player->ratingTalent</td>
+                <td>$player->ratingSkill</td>
+                <td>$player->ratingIntangibles</td>";
 
             if ($exp > 0) {
-                echo "<td>$dem1</td>
-				<td>$dem2</td>
-				<td>$dem3</td>
-				<td>$dem4</td>
-				<td>$dem5</td>
-				<td>$dem6</td>";
+                echo "
+                <td>$year1PlayerDemands</td>
+				<td>$year2PlayerDemands</td>
+				<td>$year3PlayerDemands</td>
+				<td>$year4PlayerDemands</td>
+				<td>$year5PlayerDemands</td>
+				<td>$year6PlayerDemands</td>";
             } else {
                 // Limit undrafted rookie FA contracts to two years by only displaying their demands for years 3 and 4
                 // this is hacky and assumes that the demands table always contains demands for years 3 and 4 instead of recalculating demands appropriately
-                echo "<td>$dem3</td>
-				<td>$dem4</td>
+                echo "
+                <td>$year3PlayerDemands</td>
+				<td>$year4PlayerDemands</td>
 				<td></td>
 				<td></td>
 				<td></td>
@@ -817,11 +776,11 @@ function display()
             }
 
             echo "
-				<td>$loy</td>
-				<td>$pfw</td>
-				<td>$pt</td>
-				<td>$sec</td>
-				<td>$trad</td>
+                <td>$player->freeAgencyLoyalty</td>
+                <td>$player->freeAgencyPlayForWinner</td>
+                <td>$player->freeAgencyPlayingTime</td>
+                <td>$player->freeAgencySecurity</td>
+                <td>$player->freeAgencyTradition</td>
 			</tr>";
         }
     }

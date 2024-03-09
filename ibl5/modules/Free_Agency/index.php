@@ -587,17 +587,15 @@ function display()
                 echo "<a href=\"modules.php?name=Free_Agency&pa=negotiate&pid=$player->playerID\">Negotiate</a>";
             }
 
-            echo "</td><td>$player->position</td><td><a href=\"modules.php?name=Player&pa=showpage&pid=$player->playerID\">";
-
-            // ==== NOTE PLAYERS ON TEAM WITH BIRD RIGHTS
+            echo "</td>
+                <td>$player->position</td>
+                <td><a href=\"modules.php?name=Player&pa=showpage&pid=$player->playerID\">";
 
             if ($player->birdYears >= 3) {
                 echo "*<i>$player->name</i>*";
             } else {
                 echo "$player->name";
             }
-
-            // ==== END NOTE BIRD RIGHTS
 
             echo "</a></td>
 				<td><a href=\"modules.php?name=Team&op=team&tid=$player->teamID\">$player->teamName</a></td>

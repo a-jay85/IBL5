@@ -323,14 +323,6 @@ function display()
         }
     }
 
-    $showteam = $db->sql_query("SELECT * FROM ibl_plr WHERE (tid=$tid AND retired='0') ORDER BY ordinal ASC");
-    while ($teamlist = $db->sql_fetchrow($showteam)) {
-        if ($yearoffreeagency != $currentSeasonEndingYear) {
-
-            
-        }
-    }
-
     echo "</tbody>
 		<tfoot>
 			<tr>

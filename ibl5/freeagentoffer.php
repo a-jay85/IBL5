@@ -300,11 +300,8 @@ if ($Bird_Years > 2) {
 // ==== CHECK FOR ILLEGAL OFFERS THAT ARE OVER THE SALARY CAP
 if ($Bird_Years < 3) {
     if ($Offer_1 > $amendedCapSpaceYear1) {
-        if ($MLE_Years > 0) {
-        } else {
-            echo "Sorry, you do not have sufficient cap space under the soft cap to make the offer.  You offered $Offer_1 in the first year of the contract, which is more than $Cap_Space, the amount of cap space you have available.<br>";
-            $nooffer = 1;
-        }
+        echo "Sorry, you do not have sufficient cap space under the soft cap to make the offer.  You offered $Offer_1 in the first year of the contract, which is more than $Cap_Space, the amount of cap space you have available.<br>";
+        $nooffer = 1;
     }
 } else {
     $Hard_Cap_Space = $amendedCapSpaceYear1 + 2000;

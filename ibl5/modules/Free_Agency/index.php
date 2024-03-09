@@ -136,8 +136,8 @@ function display()
     foreach ($team->getOrdinalActiveRosterResult() as $playerRow) {
         $player = Player::withPlrRow($db, $playerRow);
 
-        $yearOfFreeAgency = $player->draftYear + $player->yearsOfExperience + $player->contractTotalYears - $player->contractCurrentYear;
-        if ($yearOfFreeAgency != $currentSeasonEndingYear) {
+        $yearPlayerIsFreeAgent = $player->draftYear + $player->yearsOfExperience + $player->contractTotalYears - $player->contractCurrentYear;
+        if ($yearPlayerIsFreeAgent != $currentSeasonEndingYear) {
             // === MATCH UP CONTRACT AMOUNTS WITH FUTURE YEARS BASED ON CURRENT YEAR OF CONTRACT
 
             $millionscy = $player->contractCurrentYear;
@@ -690,9 +690,9 @@ function display()
         $exp = $teamlist['exp'];
         $cy = $teamlist['cy'];
         $cyt = $teamlist['cyt'];
-        $yearoffreeagency = $draftyear + $exp + $cyt - $cy;
+        $yearPlayerIsFreeAgent = $draftyear + $exp + $cyt - $cy;
 
-        if ($yearoffreeagency == $currentSeasonEndingYear) {
+        if ($yearPlayerIsFreeAgent == $currentSeasonEndingYear) {
             $name = $teamlist['name'];
             $team = $teamlist['teamname'];
             $tid = $teamlist['tid'];
@@ -879,9 +879,9 @@ function display()
         $exp = $teamlist['exp'];
         $cy = $teamlist['cy'];
         $cyt = $teamlist['cyt'];
-        $yearoffreeagency = $draftyear + $exp + $cyt - $cy;
+        $yearPlayerIsFreeAgent = $draftyear + $exp + $cyt - $cy;
 
-        if ($yearoffreeagency == $currentSeasonEndingYear) {
+        if ($yearPlayerIsFreeAgent == $currentSeasonEndingYear) {
             $name = $teamlist['name'];
             $team = $teamlist['teamname'];
             $tid = $teamlist['tid'];

@@ -495,154 +495,66 @@ class UI
     
         $table_averages = $table_averages . "</tbody><tfoot>";
     
-        $queryTeamOffenseTotals = "SELECT * FROM ibl_team_offense_stats WHERE team = '$team->name' AND year = '1989'";
-        $resultTeamOffenseTotals = $db->sql_query($queryTeamOffenseTotals);
-        $numTeamOffenseTotals = $db->sql_numrows($resultTeamOffenseTotals);
+        $teamStats = TeamStats::withTeamName($db, $team->name);
     
-        $t = 0;
-    
-        while ($t < $numTeamOffenseTotals) {
-            $team_off_games = $db->sql_result($resultTeamOffenseTotals, $t, "games");
-            $team_off_minutes = $db->sql_result($resultTeamOffenseTotals, $t, "minutes");
-            $team_off_fgm = $db->sql_result($resultTeamOffenseTotals, $t, "fgm");
-            $team_off_fga = $db->sql_result($resultTeamOffenseTotals, $t, "fga");
-            @$team_off_fgp = number_format(($team_off_fgm / $team_off_fga), 3);
-            $team_off_ftm = $db->sql_result($resultTeamOffenseTotals, $t, "ftm");
-            $team_off_fta = $db->sql_result($resultTeamOffenseTotals, $t, "fta");
-            @$team_off_ftp = number_format(($team_off_ftm / $team_off_fta), 3);
-            $team_off_tgm = $db->sql_result($resultTeamOffenseTotals, $t, "tgm");
-            $team_off_tga = $db->sql_result($resultTeamOffenseTotals, $t, "tga");
-            @$team_off_tgp = number_format(($team_off_tgm / $team_off_tga), 3);
-            $team_off_orb = $db->sql_result($resultTeamOffenseTotals, $t, "orb");
-            $team_off_reb = $db->sql_result($resultTeamOffenseTotals, $t, "reb");
-            $team_off_ast = $db->sql_result($resultTeamOffenseTotals, $t, "ast");
-            $team_off_stl = $db->sql_result($resultTeamOffenseTotals, $t, "stl");
-            $team_off_tvr = $db->sql_result($resultTeamOffenseTotals, $t, "tvr");
-            $team_off_blk = $db->sql_result($resultTeamOffenseTotals, $t, "blk");
-            $team_off_pf = $db->sql_result($resultTeamOffenseTotals, $t, "pf");
-            $team_off_pts = $team_off_fgm + $team_off_fgm + $team_off_ftm + $team_off_tgm;
-    
-            @$team_off_avgfgm = number_format(($team_off_fgm / $team_off_games), 1);
-            @$team_off_avgfga = number_format(($team_off_fga / $team_off_games), 1);
-            @$team_off_avgftm = number_format(($team_off_ftm / $team_off_games), 1);
-            @$team_off_avgfta = number_format(($team_off_fta / $team_off_games), 1);
-            @$team_off_avgtgm = number_format(($team_off_tgm / $team_off_games), 1);
-            @$team_off_avgtga = number_format(($team_off_tga / $team_off_games), 1);
-            @$team_off_avgmin = number_format(($team_off_minutes / $team_off_games), 1);
-            @$team_off_avgorb = number_format(($team_off_orb / $team_off_games), 1);
-            @$team_off_avgreb = number_format(($team_off_reb / $team_off_games), 1);
-            @$team_off_avgast = number_format(($team_off_ast / $team_off_games), 1);
-            @$team_off_avgstl = number_format(($team_off_stl / $team_off_games), 1);
-            @$team_off_avgtvr = number_format(($team_off_tvr / $team_off_games), 1);
-            @$team_off_avgblk = number_format(($team_off_blk / $team_off_games), 1);
-            @$team_off_avgpf = number_format(($team_off_pf / $team_off_games), 1);
-            @$team_off_avgpts = number_format(($team_off_pts / $team_off_games), 1);
-    
-            if ($yr == "") {
-                $table_averages .= "<tr>
-                    <td colspan=4><b>$team->name Offense</td>
-                    <td><b><center>$team_off_games</center></td>
-                    <td><b><center>$team_off_games</center></td>
-                    <td><center><b>$team_off_avgmin</center></td>
-                    <td bgcolor=$team->color1 width=0></td>
-                    <td><center><b>$team_off_avgfgm</center></td>
-                    <td><center><b>$team_off_avgfga</center></td>
-                    <td><center><b>$team_off_fgp</center></td>
-                    <td bgcolor=#CCCCCC width=0></td>
-                    <td><center><b>$team_off_avgftm</center></td>
-                    <td><center><b>$team_off_avgfta</center></td>
-                    <td><center><b>$team_off_ftp</center></td>
-                    <td bgcolor=#CCCCCC width=0></td>
-                    <td><center><b>$team_off_avgtgm</center></td>
-                    <td><center><b>$team_off_avgtga</center></td>
-                    <td><center><b>$team_off_tgp</center></td>
-                    <td bgcolor=$team->color1 width=0></td>
-                    <td><center><b>$team_off_avgorb</center></td>
-                    <td><center><b>$team_off_avgreb</center></td>
-                    <td><center><b>$team_off_avgast</center></td>
-                    <td><center><b>$team_off_avgstl</center></td>
-                    <td><center><b>$team_off_avgtvr</center></td>
-                    <td><center><b>$team_off_avgblk</center></td>
-                    <td><center><b>$team_off_avgpf</center></td>
-                    <td><center><b>$team_off_avgpts</center></td>
-                </tr>";
-            }
-            $t++;
+        if ($yr == "") {
+            $table_averages .= "<tr>
+                <td colspan=4><b>$team->name Offense</td>
+                <td><b><center>$teamStats->seasonOffenseGamesPlayed</center></td>
+                <td><b><center>$teamStats->seasonOffenseGamesPlayed</center></td>
+                <td><center><b>$teamStats->seasonOffenseMinutesPerGame</center></td>
+                <td bgcolor=$team->color1 width=0></td>
+                <td><center><b>$teamStats->seasonOffenseFieldGoalsMadePerGame</center></td>
+                <td><center><b>$teamStats->seasonOffenseFieldGoalsAttemptedPerGame</center></td>
+                <td><center><b>$teamStats->seasonOffenseFieldGoalPercentage</center></td>
+                <td bgcolor=#CCCCCC width=0></td>
+                <td><center><b>$teamStats->seasonOffenseFreeThrowsMadePerGame</center></td>
+                <td><center><b>$teamStats->seasonOffenseFreeThrowsAttemptedPerGame</center></td>
+                <td><center><b>$teamStats->seasonOffenseFreeThrowPercentage</center></td>
+                <td bgcolor=#CCCCCC width=0></td>
+                <td><center><b>$teamStats->seasonOffenseThreePointersMadePerGame</center></td>
+                <td><center><b>$teamStats->seasonOffenseThreePointersAttemptedPerGame</center></td>
+                <td><center><b>$teamStats->seasonOffenseThreePointPercentage</center></td>
+                <td bgcolor=$team->color1 width=0></td>
+                <td><center><b>$teamStats->seasonOffenseOffensiveReboundsPerGame</center></td>
+                <td><center><b>$teamStats->seasonOffenseTotalReboundsPerGame</center></td>
+                <td><center><b>$teamStats->seasonOffenseAssistsPerGame</center></td>
+                <td><center><b>$teamStats->seasonOffenseStealsPerGame</center></td>
+                <td><center><b>$teamStats->seasonOffenseTurnoversPerGame</center></td>
+                <td><center><b>$teamStats->seasonOffenseBlocksPerGame</center></td>
+                <td><center><b>$teamStats->seasonOffensePersonalFoulsPerGame</center></td>
+                <td><center><b>$teamStats->seasonOffensePointsPerGame</center></td>
+            </tr>";
         }
     
-        $queryTeamDefenseTotals = "SELECT * FROM ibl_team_defense_stats WHERE team = '$team->name' AND year = '1989'";
-        $resultTeamDefenseTotals = $db->sql_query($queryTeamDefenseTotals);
-        $numTeamDefenseTotals = $db->sql_numrows($resultTeamDefenseTotals);
-    
-        $t = 0;
-    
-        while ($t < $numTeamDefenseTotals) {
-            $team_def_games = $db->sql_result($resultTeamDefenseTotals, $t, "games");
-            $team_def_minutes = $db->sql_result($resultTeamDefenseTotals, $t, "minutes");
-            $team_def_fgm = $db->sql_result($resultTeamDefenseTotals, $t, "fgm");
-            $team_def_fga = $db->sql_result($resultTeamDefenseTotals, $t, "fga");
-            @$team_def_fgp = number_format(($team_def_fgm / $team_def_fga), 3);
-            $team_def_ftm = $db->sql_result($resultTeamDefenseTotals, $t, "ftm");
-            $team_def_fta = $db->sql_result($resultTeamDefenseTotals, $t, "fta");
-            @$team_def_ftp = number_format(($team_def_ftm / $team_def_fta), 3);
-            $team_def_tgm = $db->sql_result($resultTeamDefenseTotals, $t, "tgm");
-            $team_def_tga = $db->sql_result($resultTeamDefenseTotals, $t, "tga");
-            @$team_def_tgp = number_format(($team_def_tgm / $team_def_tga), 3);
-            $team_def_orb = $db->sql_result($resultTeamDefenseTotals, $t, "orb");
-            $team_def_reb = $db->sql_result($resultTeamDefenseTotals, $t, "reb");
-            $team_def_ast = $db->sql_result($resultTeamDefenseTotals, $t, "ast");
-            $team_def_stl = $db->sql_result($resultTeamDefenseTotals, $t, "stl");
-            $team_def_tvr = $db->sql_result($resultTeamDefenseTotals, $t, "tvr");
-            $team_def_blk = $db->sql_result($resultTeamDefenseTotals, $t, "blk");
-            $team_def_pf = $db->sql_result($resultTeamDefenseTotals, $t, "pf");
-            $team_def_pts = $team_def_fgm + $team_def_fgm + $team_def_ftm + $team_def_tgm;
-    
-            @$team_def_avgfgm = number_format(($team_def_fgm / $team_def_games), 1);
-            @$team_def_avgfga = number_format(($team_def_fga / $team_def_games), 1);
-            @$team_def_avgftm = number_format(($team_def_ftm / $team_def_games), 1);
-            @$team_def_avgfta = number_format(($team_def_fta / $team_def_games), 1);
-            @$team_def_avgtgm = number_format(($team_def_tgm / $team_def_games), 1);
-            @$team_def_avgtga = number_format(($team_def_tga / $team_def_games), 1);
-            @$team_def_avgmin = number_format(($team_def_minutes / $team_def_games), 1);
-            @$team_def_avgorb = number_format(($team_def_orb / $team_def_games), 1);
-            @$team_def_avgreb = number_format(($team_def_reb / $team_def_games), 1);
-            @$team_def_avgast = number_format(($team_def_ast / $team_def_games), 1);
-            @$team_def_avgstl = number_format(($team_def_stl / $team_def_games), 1);
-            @$team_def_avgtvr = number_format(($team_def_tvr / $team_def_games), 1);
-            @$team_def_avgblk = number_format(($team_def_blk / $team_def_games), 1);
-            @$team_def_avgpf = number_format(($team_def_pf / $team_def_games), 1);
-            @$team_def_avgpts = number_format(($team_def_pts / $team_def_games), 1);
-    
-            if ($yr == "") {
-                $table_averages .= "<tr>
-                    <td colspan=4><b>$team->name Defense</td>
-                    <td><center><b>$team_def_games</center></td>
-                    <td><b>$team_def_games</td>
-                    <td><center><b>$team_def_avgmin</center></td>
-                    <td bgcolor=$team->color1 width=0></td>
-                    <td><center><b>$team_def_avgfgm</center></td>
-                    <td><center><b>$team_def_avgfga</center></td>
-                    <td><center><b>$team_def_fgp</center></td>
-                    <td bgcolor=#CCCCCC width=0></td>
-                    <td><center><b>$team_def_avgftm</center></td>
-                    <td><center><b>$team_def_avgfta</center></td>
-                    <td><center><b>$team_def_ftp</center></td>
-                    <td bgcolor=#CCCCCC width=0></td>
-                    <td><center><b>$team_def_avgtgm</center></td>
-                    <td><center><b>$team_def_avgtga</center></td>
-                    <td><center><b>$team_def_tgp</center></td>
-                    <td bgcolor=$team->color1 width=0></td>
-                    <td><center><b>$team_def_avgorb</center></td>
-                    <td><center><b>$team_def_avgreb</center></td>
-                    <td><center><b>$team_def_avgast</center></td>
-                    <td><center><b>$team_def_avgstl</center></td>
-                    <td><center><b>$team_def_avgtvr</center></td>
-                    <td><center><b>$team_def_avgblk</center></td>
-                    <td><center><b>$team_def_avgpf</center></td>
-                    <td><center><b>$team_def_avgpts</center></td>
-                </tr>";
-            }
-            $t++;
+        if ($yr == "") {
+            $table_averages .= "<tr>
+                <td colspan=4><b>$team->name Defense</td>
+                <td><center><b>$teamStats->seasonDefenseGamesPlayed</center></td>
+                <td><b>$teamStats->seasonDefenseGamesPlayed</td>
+                <td><center><b>$teamStats->seasonDefenseMinutesPerGame</center></td>
+                <td bgcolor=$team->color1 width=0></td>
+                <td><center><b>$teamStats->seasonDefenseFieldGoalsMadePerGame</center></td>
+                <td><center><b>$teamStats->seasonDefenseFieldGoalsAttemptedPerGame</center></td>
+                <td><center><b>$teamStats->seasonDefenseFieldGoalPercentage</center></td>
+                <td bgcolor=#CCCCCC width=0></td>
+                <td><center><b>$teamStats->seasonDefenseFreeThrowsMadePerGame</center></td>
+                <td><center><b>$teamStats->seasonDefenseFreeThrowsAttemptedPerGame</center></td>
+                <td><center><b>$teamStats->seasonDefenseFreeThrowPercentage</center></td>
+                <td bgcolor=#CCCCCC width=0></td>
+                <td><center><b>$teamStats->seasonDefenseThreePointersMadePerGame</center></td>
+                <td><center><b>$teamStats->seasonDefenseThreePointersAttemptedPerGame</center></td>
+                <td><center><b>$teamStats->seasonDefenseThreePointPercentage</center></td>
+                <td bgcolor=$team->color1 width=0></td>
+                <td><center><b>$teamStats->seasonDefenseOffensiveReboundsPerGame</center></td>
+                <td><center><b>$teamStats->seasonDefenseTotalReboundsPerGame</center></td>
+                <td><center><b>$teamStats->seasonDefenseAssistsPerGame</center></td>
+                <td><center><b>$teamStats->seasonDefenseStealsPerGame</center></td>
+                <td><center><b>$teamStats->seasonDefenseTurnoversPerGame</center></td>
+                <td><center><b>$teamStats->seasonDefenseBlocksPerGame</center></td>
+                <td><center><b>$teamStats->seasonDefensePersonalFoulsPerGame</center></td>
+                <td><center><b>$teamStats->seasonDefensePointsPerGame</center></td>
+            </tr>";
         }
     
         $table_averages .= "</tfoot>
@@ -743,8 +655,8 @@ class UI
         if ($yr == "") {
             $table_totals .= "<tr>
                 <td colspan=4><b>$team->name Offense</td>
-                <td><center><b>$teamStats->seasonGamesPlayed</center></td>
-                <td><center><b>$teamStats->seasonGamesPlayed</center></td>
+                <td><center><b>$teamStats->seasonOffenseGamesPlayed</center></td>
+                <td><center><b>$teamStats->seasonOffenseGamesPlayed</center></td>
                 <td><center><b>$teamStats->seasonOffenseTotalMinutes</center></td>
                 <td bgcolor=$team->color1 width=0></td>
                 <td><center><b>$teamStats->seasonOffenseTotalFieldGoalsMade</center></td>
@@ -768,8 +680,8 @@ class UI
             
             $table_totals .= "<tr>
                 <td colspan=4><b>$team->name Defense</td>
-                <td><center><b>$teamStats->seasonGamesPlayed</center></td>
-                <td><center><b>$teamStats->seasonGamesPlayed</center></td>
+                <td><center><b>$teamStats->seasonDefenseGamesPlayed</center></td>
+                <td><center><b>$teamStats->seasonDefenseGamesPlayed</center></td>
                 <td><center><b>$teamStats->seasonDefenseTotalMinutes</center></td>
                 <td bgcolor=$team->color1 width=0></td>
                 <td><center><b>$teamStats->seasonDefenseTotalFieldGoalsMade</center></td>

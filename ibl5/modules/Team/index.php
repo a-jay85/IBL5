@@ -109,7 +109,7 @@ function team($tid)
 
     if ($display == "avg_s") {
         $showing = "Season Averages";
-        $table_averages = UI::seasonAverages($db, $result, $team->color1, $team->color2, $tid, $yr, $team->name);
+        $table_averages = UI::seasonAverages($db, $result, $team, $yr);
         $table_output = $table_averages;
         $tabs .= "<td bgcolor=#BBBBBB style=\"font-weight:bold\">";
     } else {

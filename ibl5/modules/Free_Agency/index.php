@@ -375,7 +375,7 @@ function display()
         $offer6 = $offerRow['offer6'];
 
         echo "<tr>
-            <td><a href=\"modules.php?name=Free_Agency&pa=negotiate&pid=$pid\">Negotiate</a></td>
+            <td><a href=\"modules.php?name=Free_Agency&pa=negotiate&pid=$player->playerID\">Negotiate</a></td>
             <td>$player->position</td>
             <td><a href=\"modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->name</a></td>
             <td><a href=\"modules.php?name=Team&op=team&tid=$player->teamID\">$player->teamName</a></td>

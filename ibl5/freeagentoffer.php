@@ -478,7 +478,9 @@ _**$player_teamName** GM <@!$playerTeamDiscordID> could not be reached for comme
 _**$player_teamName** GM <@!$playerTeamDiscordID> could not be reached for comment._";
         }
 
-        Discord::postToChannel('#free-agency', $discordMessage);
+        if ($Offer_1 > 145) {
+            Discord::postToChannel('#free-agency', $discordMessage);
+        }
 
         echo "Your offer is legal. It should be immediately reflected in your Free Agency module.<br>
             Please <a href=\"modules.php?name=Free_Agency\">click here to return to the Free Agency module</a>.";

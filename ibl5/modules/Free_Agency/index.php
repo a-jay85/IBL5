@@ -478,9 +478,9 @@ function display()
 		<td>$year6AvailableSoftCap</td>
 	</tr>";
     echo "<tr bgcolor=#cc0000>
-    <td align=right><font color=white><b>LLE:</b></font></td>
-    <td align=center>$LLEicon</td>
-    <td colspan=19 bgcolor=#eeeeee></td>
+        <td align=right><font color=white><b>LLE:</b></font></td>
+        <td align=center>$LLEicon</td>
+        <td colspan=19 bgcolor=#eeeeee></td>
 		<td colspan=8 align=right><font color=white><b>Hard Cap Space</b></font></td>
 		<td>$year1AvailableHardCap</td>
 		<td>$year2AvailableHardCap</td>

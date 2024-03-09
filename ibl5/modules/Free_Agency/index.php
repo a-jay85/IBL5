@@ -461,13 +461,13 @@ function display()
 
     // ===== CAP AND ROSTER SLOT INFO =====
 
-    $exceptioninfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_team_info WHERE team_name='$team->name'"));
-
-    $HasMLE = $exceptioninfo['HasMLE'];
-    $HasLLE = $exceptioninfo['HasLLE'];
+    $MLEicon = ($team->hasMLE == "1") ? "\u{2705}" : "\u{274C}";
+    $LLEicon = ($team->hasLLE == "1") ? "\u{2705}" : "\u{274C}";
 
     echo "<tr bgcolor=#cc0000>
-		<td colspan=21 bgcolor=#eeeeee></td>
+        <td align=right><font color=white><b>MLE:</b></font></td>
+        <td align=center>$MLEicon</td>
+		<td colspan=19 bgcolor=#eeeeee></td>
 		<td colspan=8 align=right><font color=white><b>Soft Cap Space</b></font></td>
 		<td>$softcap</td>
 		<td>$softcap2</td>
@@ -477,7 +477,9 @@ function display()
 		<td>$softcap6</td>
 	</tr>";
     echo "<tr bgcolor=#cc0000>
-		<td colspan=21 bgcolor=#eeeeee></td>
+    <td align=right><font color=white><b>LLE:</b></font></td>
+    <td align=center>$LLEicon</td>
+    <td colspan=19 bgcolor=#eeeeee></td>
 		<td colspan=8 align=right><font color=white><b>Hard Cap Space</b></font></td>
 		<td>$hardcap</td>
 		<td>$hardcap2</td>
@@ -496,22 +498,6 @@ function display()
 		<td>$rosterspots5</td>
 		<td>$rosterspots6</td>
 	</tr>";
-
-    echo "<tr bgcolor=#cc0000><td colspan=35><font color=white><b>";
-
-    if ($team->hasMLE == 1) {
-        echo "Your team has access to the Mid-Level Exception (MLE) and hasn't signed a player with it (but you may have offered it to someone above).</b></font></td></tr>";
-    } else {
-        echo "Your team does NOT have access to the Mid-Level Exception - you either used it or didn't have sufficient cap space at the start of free agency.</b></font></td></tr>";
-    }
-
-    echo "                <tr bgcolor=#cc0000><td colspan=35><font color=white><b>";
-
-    if ($team->hasLLE == 1) {
-        echo "Your team has access to the Lower-Level Exception (LLE) and hasn't signed a player with it (but you may have offered it to someone above).</b></font></td></tr>";
-    } else {
-        echo "Your team does not have access to the Lower-Level Exception; you have already used it to sign a free agent.</b></font></td></tr>";
-    }
 
     echo "</tfoot>
 	</table>

@@ -230,6 +230,13 @@ class Player
         return $currentSeasonSalary;
     }
 
+    public function getFreeAgencyDemands()
+    {
+        $query = "SELECT * FROM ibl_demands WHERE name='$this->name'";
+        $result = $this->db->sql_query($query);
+        return $result;
+    }
+
     public function getNextSeasonSalary()
     {
         $contractNextYear = $this->contractCurrentYear + 1;

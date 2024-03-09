@@ -796,12 +796,10 @@ function display()
 // === START NEGOTIATE FUNCTION ===
 function negotiate($pid)
 {
-    global $prefix, $db, $user, $cookie;
+    global $prefix, $db, $cookie;
     $sharedFunctions = new Shared($db);
 
     $pid = intval($pid);
-
-    cookiedecode($user);
 
     $sql2 = "SELECT * FROM " . $prefix . "_users WHERE username='$cookie[1]'";
     $result2 = $db->sql_query($sql2);
@@ -1784,12 +1782,11 @@ function negotiate($pid)
 
 function teamdisplay($pid)
 {
-    global $prefix, $db, $user, $cookie;
+    global $db;
     $sharedFunctions = new Shared($db);
 
     $pid = intval($pid);
 
-    cookiedecode($user);
     include "header.php";
     OpenTable();
 

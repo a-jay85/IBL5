@@ -2,16 +2,16 @@
 
 class UI
 {
-    public static function decoratePlayerName($name, $tid, $ordinal, $currentContractYear, $totalYearsOnContract)
+    public static function decoratePlayerName($player)
     {
-        if ($tid == 0) {
-            $playerNameDecorated = "$name";
-        } elseif ($ordinal >= 960) { // on waivers
-            $playerNameDecorated = "($name)*";
-        } elseif ($currentContractYear == $totalYearsOnContract) { // eligible for Free Agency at the end of this season
-            $playerNameDecorated = "$name^";
+        if ($player->teamID == 0) {
+            $playerNameDecorated = "$player->name";
+        } elseif ($player->ordinal >= 960) { // on waivers
+            $playerNameDecorated = "($player->name)*";
+        } elseif ($player->contractCurrentYear == $player->contractTotalYears) { // eligible for Free Agency at the end of this season
+            $playerNameDecorated = "$player->name^";
         } else {
-            $playerNameDecorated = "$name";
+            $playerNameDecorated = "$player->name";
         }
         return $playerNameDecorated;
     }
@@ -72,7 +72,7 @@ class UI
         foreach ($result as $plrRow) {
             $player = Player::withPlrRow($db, $plrRow);
     
-            $playerNameDecorated = UI::decoratePlayerName($player->name, $team->teamID, $player->ordinal, $player->contractCurrentYear, $player->contractTotalYears);
+            $playerNameDecorated = UI::decoratePlayerName($player);
     
             if ($isFreeAgencyModuleActive == 0) {
                 $year1 = $player->contractCurrentYear;
@@ -219,7 +219,7 @@ class UI
 
                 $firstCharacterOfPlayerName = substr($player->name, 0, 1); // if player name starts with '|' (pipe symbol), then skip them
                 if ($firstCharacterOfPlayerName !== '|') {
-                    $playerNameDecorated = UI::decoratePlayerName($player->name, $team->teamID, $player->ordinal, $player->contractCurrentYear, $player->contractTotalYears);
+                    $playerNameDecorated = UI::decoratePlayerName($player);
                 } else {
                     continue;
                 }
@@ -343,7 +343,7 @@ class UI
 
                 $firstCharacterOfPlayerName = substr($player->name, 0, 1); // if player name starts with '|' (pipe symbol), then skip them
                 if ($firstCharacterOfPlayerName !== '|') {
-                    $playerNameDecorated = UI::decoratePlayerName($player->name, $team->teamID, $player->ordinal, $player->contractCurrentYear, $player->contractTotalYears);
+                    $playerNameDecorated = UI::decoratePlayerName($player);
                 } else {
                     continue;
                 }
@@ -446,7 +446,7 @@ class UI
 
                 $firstCharacterOfPlayerName = substr($player->name, 0, 1); // if player name starts with '|' (pipe symbol), then skip them
                 if ($firstCharacterOfPlayerName !== '|') {
-                    $playerNameDecorated = UI::decoratePlayerName($player->name, $team->teamID, $player->ordinal, $player->contractCurrentYear, $player->contractTotalYears);
+                    $playerNameDecorated = UI::decoratePlayerName($player);
                 } else {
                     continue;
                 }
@@ -603,7 +603,7 @@ class UI
 
                 $firstCharacterOfPlayerName = substr($player->name, 0, 1); // if player name starts with '|' (pipe symbol), then skip them
                 if ($firstCharacterOfPlayerName !== '|') {
-                    $playerNameDecorated = UI::decoratePlayerName($player->name, $team->teamID, $player->ordinal, $player->contractCurrentYear, $player->contractTotalYears);
+                    $playerNameDecorated = UI::decoratePlayerName($player);
                 } else {
                     continue;
                 }

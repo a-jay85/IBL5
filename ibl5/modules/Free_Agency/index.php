@@ -500,9 +500,7 @@ function display()
 		<td>$rosterspots6</td>
 	</tr>";
 
-    echo "</tfoot>
-	</table>
-
+    echo "</tfoot></table>
 	<p>
 	<hr>
 	<p>";

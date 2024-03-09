@@ -499,7 +499,7 @@ function display()
 
     echo "<tr bgcolor=#cc0000><td colspan=35><font color=white><b>";
 
-    if ($HasMLE == 1) {
+    if ($team->hasMLE == 1) {
         echo "Your team has access to the Mid-Level Exception (MLE) and hasn't signed a player with it (but you may have offered it to someone above).</b></font></td></tr>";
     } else {
         echo "Your team does NOT have access to the Mid-Level Exception - you either used it or didn't have sufficient cap space at the start of free agency.</b></font></td></tr>";
@@ -507,7 +507,7 @@ function display()
 
     echo "                <tr bgcolor=#cc0000><td colspan=35><font color=white><b>";
 
-    if ($HasLLE == 1) {
+    if ($team->hasLLE == 1) {
         echo "Your team has access to the Lower-Level Exception (LLE) and hasn't signed a player with it (but you may have offered it to someone above).</b></font></td></tr>";
     } else {
         echo "Your team does not have access to the Lower-Level Exception; you have already used it to sign a free agent.</b></font></td></tr>";

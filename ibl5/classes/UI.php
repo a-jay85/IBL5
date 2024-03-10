@@ -27,9 +27,11 @@ class UI
         <hr>";
     }
 
-    public static function contracts($db, $result, $team, $isFreeAgencyModuleActive, $currentSeasonEndingYear)
+    public static function contracts($db, $result, $team, $sharedFunctions)
     {
-        if ($isFreeAgencyModuleActive == 1) {
+        $currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
+
+        if ($sharedFunctions->isFreeAgencyModuleActive() == 1) {
             $currentSeasonEndingYear++;
         }
         
@@ -74,7 +76,7 @@ class UI
     
             $playerNameDecorated = UI::decoratePlayerName($player);
     
-            if ($isFreeAgencyModuleActive == 0) {
+            if ($sharedFunctions->isFreeAgencyModuleActive() == 0) {
                 $year1 = $player->contractCurrentYear;
                 $year2 = $player->contractCurrentYear + 1;
                 $year3 = $player->contractCurrentYear + 2;

@@ -712,34 +712,34 @@ class UI
         return $table_totals;
     }
 
-    public static function simAverages($db, $sharedFunctions, $color1, $color2, $tid)
+    public static function simAverages($db, $team, $sharedFunctions)
     {
-        $table_simAverages = "<table align=\"center\" class=\"sortable\"><thead><tr bgcolor=$color1>
-            <th><font color=$color2>Pos</font></th>
-            <th colspan=3><font color=$color2>Player</font></th>
-            <th><font color=$color2>g</font></th>
-            <th><font color=$color2>min</font></th>
-            <td bgcolor=$color1 width=0></td>
-            <th><font color=$color2>fgm</font></th>
-            <th><font color=$color2>fga</font></th>
-            <th><font color=$color2>fgp</font></th>
+        $table_simAverages = "<table align=\"center\" class=\"sortable\"><thead><tr bgcolor=$team->color1>
+            <th><font color=$team->color2>Pos</font></th>
+            <th colspan=3><font color=$team->color2>Player</font></th>
+            <th><font color=$team->color2>g</font></th>
+            <th><font color=$team->color2>min</font></th>
+            <td bgcolor=$team->color1 width=0></td>
+            <th><font color=$team->color2>fgm</font></th>
+            <th><font color=$team->color2>fga</font></th>
+            <th><font color=$team->color2>fgp</font></th>
             <td bgcolor=#CCCCCC width=0></td>
-            <th><font color=$color2>ftm</font></th>
-            <th><font color=$color2>fta</font></th>
-            <th><font color=$color2>ftp</font></th>
+            <th><font color=$team->color2>ftm</font></th>
+            <th><font color=$team->color2>fta</font></th>
+            <th><font color=$team->color2>ftp</font></th>
             <td bgcolor=#CCCCCC width=0></td>
-            <th><font color=$color2>3gm</font></th>
-            <th><font color=$color2>3ga</font></th>
-            <th><font color=$color2>3gp</font></th>
-            <td bgcolor=$color1 width=0></td>
-            <th><font color=$color2>orb</font></th>
-            <th><font color=$color2>reb</font></th>
-            <th><font color=$color2>ast</font></th>
-            <th><font color=$color2>stl</font></th>
-            <th><font color=$color2>to</font></th>
-            <th><font color=$color2>blk</font></th>
-            <th><font color=$color2>pf</font></th>
-            <th><font color=$color2>pts</font></th>
+            <th><font color=$team->color2>3gm</font></th>
+            <th><font color=$team->color2>3ga</font></th>
+            <th><font color=$team->color2>3gp</font></th>
+            <td bgcolor=$team->color1 width=0></td>
+            <th><font color=$team->color2>orb</font></th>
+            <th><font color=$team->color2>reb</font></th>
+            <th><font color=$team->color2>ast</font></th>
+            <th><font color=$team->color2>stl</font></th>
+            <th><font color=$team->color2>to</font></th>
+            <th><font color=$team->color2>blk</font></th>
+            <th><font color=$team->color2>pf</font></th>
+            <th><font color=$team->color2>pts</font></th>
         </tr></thead><tbody>";
     
         $arrayLastSimDates = $sharedFunctions->getLastSimDatesArray();
@@ -749,7 +749,7 @@ class UI
     
         $playersOnTeam = $db->sql_query("SELECT pid
             FROM ibl_plr
-            WHERE tid = $tid
+            WHERE tid = $team->teamID
             ORDER BY name ASC");
         $numberOfPlayersOnTeam = $db->sql_numrows($playersOnTeam);
     
@@ -830,7 +830,7 @@ class UI
                     <td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>
                     <td><center>$numberOfGamesPlayedInSim</center></td>
                     <td><center>$simAverageMIN</center></td>
-                    <td bgcolor=$color1 width=0></td>
+                    <td bgcolor=$team->color1 width=0></td>
                     <td><center>$simAverageFGM</center></td>
                     <td><center>$simAverageFGA</center></td>
                     <td><center>$simAverageFGP</center></td>
@@ -842,7 +842,7 @@ class UI
                     <td><center>$simAverage3GM</center></td>
                     <td><center>$simAverage3GA</center></td>
                     <td><center>$simAverage3GP</center></td>
-                    <td bgcolor=$color1 width=0></td>
+                    <td bgcolor=$team->color1 width=0></td>
                     <td><center>$simAverageORB</center></td>
                     <td><center>$simAverageREB</center></td>
                     <td><center>$simAverageAST</center></td>

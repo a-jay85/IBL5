@@ -139,7 +139,7 @@ function team($tid)
 
     if ($display == "contracts") {
         $showing = "Contracts";
-        $table_contracts = UI::contracts($db, $result, $team, $isFreeAgencyModuleActive, $sharedFunctions->getCurrentSeasonEndingYear());
+        $table_contracts = UI::contracts($db, $result, $team, $sharedFunctions);
         $table_output = $table_contracts;
         $tabs .= "<td bgcolor=#BBBBBB style=\"font-weight:bold\">";
     } else {

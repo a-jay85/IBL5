@@ -129,7 +129,7 @@ function team($tid)
 
     if ($display == "chunk") {
         $showing = "Chunk Averages";
-        $table_simAverages = UI::simAverages($db, $sharedFunctions, $team->color1, $team->color2, $tid);
+        $table_simAverages = UI::simAverages($db, $team, $sharedFunctions);
         $table_output = $table_simAverages;
         $tabs .= "<td bgcolor=#BBBBBB style=\"font-weight:bold\">";
     } else {
@@ -139,7 +139,7 @@ function team($tid)
 
     if ($display == "contracts") {
         $showing = "Contracts";
-        $table_contracts = UI::contracts($db, $result, $team, $isFreeAgencyModuleActive, $sharedFunctions->getCurrentSeasonEndingYear());
+        $table_contracts = UI::contracts($db, $result, $team, $sharedFunctions);
         $table_output = $table_contracts;
         $tabs .= "<td bgcolor=#BBBBBB style=\"font-weight:bold\">";
     } else {

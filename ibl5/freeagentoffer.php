@@ -464,19 +464,19 @@ if ($nooffer == 0) {
 
     $resultchunk = $db->sql_query($querychunk);
 
-    if ($resultchunk) {
-        $playerTeamDiscordID = $sharedFunctions->getDiscordIDFromTeamname($player_teamName);
-        if ($Team_Name == $player_teamName) {
-            $discordMessage = "Free agent **$Player_Name** has been offered a contract to _stay_ with the **$player_teamName**.
-_**$player_teamName** GM <@!$playerTeamDiscordID> could not be reached for comment._";
-        } else {
-            $discordMessage = "Free agent **$Player_Name** has been offered a contract to _leave_ the **$player_teamName**.
-_**$player_teamName** GM <@!$playerTeamDiscordID> could not be reached for comment._";
-        }
+//     if ($resultchunk) {
+//         $playerTeamDiscordID = $sharedFunctions->getDiscordIDFromTeamname($player_teamName);
+//         if ($Team_Name == $player_teamName) {
+//             $discordMessage = "Free agent **$Player_Name** has been offered a contract to _stay_ with the **$player_teamName**.
+// _**$player_teamName** GM <@!$playerTeamDiscordID> could not be reached for comment._";
+//         } else {
+//             $discordMessage = "Free agent **$Player_Name** has been offered a contract to _leave_ the **$player_teamName**.
+// _**$player_teamName** GM <@!$playerTeamDiscordID> could not be reached for comment._";
+//         }
 
-        if ($Offer_1 > 145) {
-            Discord::postToChannel('#free-agency', $discordMessage);
-        }
+//         if ($Offer_1 > 145) {
+//             Discord::postToChannel('#free-agency', $discordMessage);
+//         }
 
         echo "Your offer is legal. It should be immediately reflected in your Free Agency module.<br>
             Please <a href=\"modules.php?name=Free_Agency\">click here to return to the Free Agency module</a>.";

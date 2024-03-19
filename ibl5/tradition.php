@@ -27,8 +27,8 @@ while ($i < $num1) {
     while ($j < $num2) {
         $wins = $db->sql_result($result2, $j, "wins");
         $losses = $db->sql_result($result2, $j, "losses");
-        $totw = $totw + $wins;
-        $totl = $totl + $losses;
+        $totw += $wins;
+        $totl += $losses;
         $j++;
     }
 

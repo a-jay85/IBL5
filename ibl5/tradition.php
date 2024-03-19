@@ -8,7 +8,7 @@ $num1 = $db->sql_numrows($result1);
 
 $i = 0;
 
-echo "<HTML><HEAD><TITLE>UPDATE</TITLE></HEAD><BODY>";
+echo "<HTML><HEAD><TITLE>Update Tradition for Free Agency Factors</TITLE></HEAD><BODY>";
 
 while ($i < $num1) {
     $teamname = $db->sql_result($result1, $i, "team_name");

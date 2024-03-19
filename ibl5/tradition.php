@@ -12,7 +12,12 @@ echo "<HTML><HEAD><TITLE>UPDATE</TITLE></HEAD><BODY>";
 
 while ($i < $num1) {
     $teamname = $db->sql_result($result1, $i, "team_name");
-    $query2 = "SELECT * FROM ibl_team_win_loss WHERE currentname = '$teamname' ORDER BY year DESC LIMIT 5";
+    $query2 = "SELECT *
+        FROM ibl_team_win_loss
+        WHERE currentname = '$teamname'
+            AND (wins + losses = 82)
+        ORDER BY year DESC
+        LIMIT 5;";
     $result2 = $db->sql_query($query2);
     $num2 = $db->sql_numrows($result2);
     $j = 0;

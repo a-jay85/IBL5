@@ -12,10 +12,8 @@ get_lang($module_name);
 $pagetitle = "- $module_name";
 
 $username = $cookie[1];
-$queryTid = "SELECT user_ibl_team FROM nuke_users WHERE username = '$username' LIMIT 1;";
-$resultTid = $db->sql_query($queryTid);
-$userteam = $db->sql_result($resultTid, 0);
-$userTid = $sharedFunctions->getTidFromTeamname($userteam);
+$userTeam = Team::withTeamName($db, $sharedFunctions->getTeamnameFromUsername($username));
+$userTid = $sharedFunctions->getTidFromTeamname($userTeam->name);
 
 $queryteam = "SELECT * FROM ibl_team_info";
 $resultteam = $db->sql_query($queryteam);

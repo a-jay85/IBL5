@@ -56,12 +56,9 @@ function display()
     include "header.php";
     OpenTable();
 
-    $sql2 = "SELECT * FROM " . $prefix . "_users WHERE username='$cookie[1]'";
-    $result2 = $db->sql_query($sql2);
-    $userinfo = $db->sql_fetchrow($result2);
-
-    $tid = $sharedFunctions->getTidFromTeamname($userinfo['user_ibl_team']);
-    $team = Team::withTeamID($db, $tid);
+    $username = $cookie[1];
+    $teamName = $sharedFunctions->getTeamnameFromUsername($username);
+    $team = Team::withTeamName($db, $teamName);
 
     $sharedFunctions->displaytopmenu($team->teamID);
 

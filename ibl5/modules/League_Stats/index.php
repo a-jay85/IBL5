@@ -13,7 +13,7 @@ $pagetitle = "- $module_name";
 
 $username = $cookie[1];
 $userTeam = Team::withTeamName($db, $sharedFunctions->getTeamnameFromUsername($username));
-$userTid = $sharedFunctions->getTidFromTeamname($userTeam->name);
+$userTeamID = $sharedFunctions->getTidFromTeamname($userTeam->name);
 
 $queryteam = "SELECT * FROM ibl_team_info";
 $resultteam = $db->sql_query($queryteam);
@@ -100,7 +100,7 @@ while ($t < $numTeamOffenseTotals) {
     $lg_off_pf += $team_off_pf;
     $lg_off_pts += $team_off_pts;
 
-    if ($userTid == $tid) {
+    if ($userTeamID == $tid) {
         $trSubstitute = "<tr bgcolor=#DDDD00 align=right>";
     } else {
         $trSubstitute = "<tr align=right>";
@@ -223,7 +223,7 @@ while ($t < $numTeamDefenseTotals) {
     @$team_def_avgpf = number_format($team_def_pf / $team_def_games, 2);
     @$team_def_avgpts = number_format($team_def_pts / $team_def_games, 2);
 
-    if ($userTid == $tid) {
+    if ($userTeamID == $tid) {
         $trSubstitute = "<tr bgcolor=#DDDD00 align=right>";
     } else {
         $trSubstitute = "<tr align=right>";

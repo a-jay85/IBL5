@@ -37,6 +37,13 @@ class Team
         return $instance;
     }
 
+    public static function withTeamName($db, string $teamName)
+    {
+        $instance = new self();
+        $instance->loadByName($db, $teamName);
+        return $instance;
+    }
+
     public static function withTeamRow($db, array $teamRow)
     {
         $instance = new self();
@@ -47,6 +54,14 @@ class Team
     protected function loadByID($db, int $teamID)
     {
         $query = "SELECT * FROM ibl_team_info WHERE teamid = $teamID LIMIT 1;";
+        $result = $db->sql_query($query);
+        $teamRow = $db->sql_fetch_assoc($result);
+        $this->fill($db, $teamRow);
+    }
+
+    protected function loadByName($db, string $name)
+    {
+        $query = "SELECT * FROM ibl_team_info WHERE team_name = '$name' LIMIT 1;";
         $result = $db->sql_query($query);
         $teamRow = $db->sql_fetch_assoc($result);
         $this->fill($db, $teamRow);

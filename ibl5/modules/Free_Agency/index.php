@@ -1134,13 +1134,7 @@ function negotiate($pid)
 			      <INPUT TYPE=\"text\" NAME=\"offeryear2\" SIZE=\"4\" VALUE=\"$prefill4\"></td>";
         }
         $amendedCapSpaceYear1 = $capnumber + $offer1;
-        echo "<input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-              <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-              <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-              <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-              <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-              <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
-              <input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
+        echo "<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
               <input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
               <input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
               <input type=\"hidden\" name=\"capnumber3\" value=\"$capnumber3\">
@@ -1164,12 +1158,6 @@ function negotiate($pid)
 
 		<td>
             <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
-                <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-                <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-                <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-                <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-                <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-                <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
                 <input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
                 <input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
                 <input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
@@ -1188,12 +1176,6 @@ function negotiate($pid)
 
 		<td>
             <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
-                <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-                <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-                <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-                <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-                <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-                <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
                 <input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
                 <input type=\"hidden\" name=\"offeryear2\" value=\"$maxstartsat2\">
                 <input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
@@ -1215,12 +1197,6 @@ function negotiate($pid)
         if ($player_exp > 0) {
             echo "<td>
                 <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
-                    <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-                    <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-                    <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-                    <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-                    <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-                    <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
                     <input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
                     <input type=\"hidden\" name=\"offeryear2\" value=\"$maxstartsat2\">
                     <input type=\"hidden\" name=\"offeryear3\" value=\"$maxstartsat3\">
@@ -1243,12 +1219,6 @@ function negotiate($pid)
 
 			<td>
                 <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
-                    <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-                    <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-                    <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-                    <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-                    <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-                    <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
                     <input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
                     <input type=\"hidden\" name=\"offeryear2\" value=\"$maxstartsat2\">
                     <input type=\"hidden\" name=\"offeryear3\" value=\"$maxstartsat3\">
@@ -1273,12 +1243,6 @@ function negotiate($pid)
 
 			<td>
                 <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
-                    <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-                    <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-                    <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-                    <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-                    <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-                    <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
                     <input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
                     <input type=\"hidden\" name=\"offeryear2\" value=\"$maxstartsat2\">
                     <input type=\"hidden\" name=\"offeryear3\" value=\"$maxstartsat3\">
@@ -1305,12 +1269,6 @@ function negotiate($pid)
 
 			<td>
                 <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
-                    <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-                    <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-                    <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-                    <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-                    <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-                    <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
                     <input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
                     <input type=\"hidden\" name=\"offeryear2\" value=\"$maxstartsat2\">
                     <input type=\"hidden\" name=\"offeryear3\" value=\"$maxstartsat3\">
@@ -1348,12 +1306,6 @@ function negotiate($pid)
             echo "<tr><td><b>Max Bird Level Contract 12.5%(click the button that corresponds to the final year you wish to offer):</b></td>
 			<td>
                 <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
-                    <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-                    <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-                    <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-                    <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-                    <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-                    <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
                     <input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
                     <input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
                     <input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
@@ -1372,12 +1324,6 @@ function negotiate($pid)
 
 			<td>
                 <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
-                    <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-                    <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-                    <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-                    <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-                    <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-                    <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
                     <input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
                     <input type=\"hidden\" name=\"offeryear2\" value=\"$maxstartsatbird2\">
                     <input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
@@ -1398,12 +1344,6 @@ function negotiate($pid)
 
 			<td>
                 <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
-                    <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-                    <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-                    <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-                    <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-                    <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-                    <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
                     <input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
                     <input type=\"hidden\" name=\"offeryear2\" value=\"$maxstartsatbird2\">
                     <input type=\"hidden\" name=\"offeryear3\" value=\"$maxstartsatbird3\">
@@ -1426,12 +1366,6 @@ function negotiate($pid)
 
 			<td>
                 <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
-                    <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-                    <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-                    <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-                    <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-                    <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-                    <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
                     <input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
                     <input type=\"hidden\" name=\"offeryear2\" value=\"$maxstartsatbird2\">
                     <input type=\"hidden\" name=\"offeryear3\" value=\"$maxstartsatbird3\">
@@ -1456,12 +1390,6 @@ function negotiate($pid)
 
 			<td>
                 <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
-                    <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-                    <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-                    <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-                    <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-                    <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-                    <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
                     <input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
                     <input type=\"hidden\" name=\"offeryear2\" value=\"$maxstartsatbird2\">
                     <input type=\"hidden\" name=\"offeryear3\" value=\"$maxstartsatbird3\">
@@ -1488,12 +1416,6 @@ function negotiate($pid)
 
 			<td>
                 <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
-                    <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-                    <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-                    <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-                    <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-                    <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-                    <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
                     <input type=\"hidden\" name=\"offeryear1\" value=\"$maxstartsat\">
                     <input type=\"hidden\" name=\"offeryear2\" value=\"$maxstartsatbird2\">
                     <input type=\"hidden\" name=\"offeryear3\" value=\"$maxstartsatbird3\">
@@ -1532,12 +1454,6 @@ function negotiate($pid)
 
 				<td>
                     <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
-                        <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-                        <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-                        <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-                        <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-                        <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-                        <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
                         <input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
                         <input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
                         <input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
@@ -1554,12 +1470,6 @@ function negotiate($pid)
 
 				<td>
                     <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
-                        <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-                        <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-                        <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-                        <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-                        <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-                        <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
                         <input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
                         <input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
                         <input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
@@ -1577,12 +1487,6 @@ function negotiate($pid)
                 if ($player_exp > 0) {
                     echo "<td>
                         <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
-                            <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-                            <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-                            <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-                            <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-                            <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-                            <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
                             <input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
                             <input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
                             <input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
@@ -1601,12 +1505,6 @@ function negotiate($pid)
 
 					<td>
                         <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
-                            <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-                            <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-                            <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-                            <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-                            <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-                            <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
                             <input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
                             <input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
                             <input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
@@ -1626,12 +1524,6 @@ function negotiate($pid)
 
 					<td>
                         <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
-                            <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-                            <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-                            <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-                            <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-                            <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-                            <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
                             <input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
                             <input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
                             <input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
@@ -1652,12 +1544,6 @@ function negotiate($pid)
 
 					<td>
                         <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
-                            <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-                            <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-                            <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-                            <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-                            <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-                            <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
                             <input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
                             <input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
                             <input type=\"hidden\" name=\"capnumber2\" value=\"$capnumber2\">
@@ -1691,12 +1577,6 @@ function negotiate($pid)
                 echo "<tr><td>Lower-Level Exception:</td>
 				<td>
                     <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
-                        <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-                        <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-                        <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-                        <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-                        <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-                        <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
                         <input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
                         <input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
                         <input type=\"hidden\" name=\"demtot\" value=\"$demtot\">
@@ -1719,12 +1599,6 @@ function negotiate($pid)
         echo "<tr><td>Veterans Exception:</td>
 		<td>
             <form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
-                <input type=\"hidden\" name=\"dem1\" value=\"$dem1\">
-                <input type=\"hidden\" name=\"dem2\" value=\"$dem2\">
-                <input type=\"hidden\" name=\"dem3\" value=\"$dem3\">
-                <input type=\"hidden\" name=\"dem4\" value=\"$dem4\">
-                <input type=\"hidden\" name=\"dem5\" value=\"$dem5\">
-                <input type=\"hidden\" name=\"dem6\" value=\"$dem6\">
                 <input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">
                 <input type=\"hidden\" name=\"capnumber\" value=\"$capnumber\">
                 <input type=\"hidden\" name=\"demtot\" value=\"$demtot\">

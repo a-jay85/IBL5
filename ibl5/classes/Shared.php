@@ -102,6 +102,16 @@ class Shared
         return $this->db->sql_result($queryTeamnameFromTid, 0);
     }
 
+    public function getTeamnameFromUsername($username)
+    {
+        $queryTeamnameFromUsername = $this->db->sql_query("SELECT user_ibl_team
+            FROM nuke_users
+            WHERE username = '$username'
+            LIMIT 1;");
+
+        return $this->db->sql_result($queryTeamnameFromUsername, 0);
+    }
+
     public function getTidFromTeamname($teamname)
     {
         $queryTidFromTeamname = $this->db->sql_query("SELECT teamid

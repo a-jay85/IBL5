@@ -220,10 +220,7 @@ function display()
                 <td>";
 
             // ==== ROOKIE OPTIONS
-            if (
-                ($player->draftRound == 1 && $player->yearsOfExperience == 2 && $player->contractYear4Salary == 0)
-             OR ($player->draftRound == 2 && $player->yearsOfExperience == 1 && $player->contractYear3Salary == 0)
-            ) {
+            if ($player->canRookieOption($sharedFunctions->getCurrentSeasonPhase())) {
                 echo "<a href=\"modules.php?name=Player&pa=rookieoption&pid=$player->playerID\">Rookie Option</a>";
             }
 

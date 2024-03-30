@@ -108,14 +108,11 @@ function showpage($playerID, $spec)
 
     // RENEGOTIATION BUTTON END
 
-    if ((((($player->draftRound == 1 && $player->yearsOfExperience == 2 && $player->contractYear4Salary == 0) or
-        ($player->draftRound == 2 && $player->yearsOfExperience == 1 && $player->contractYear3Salary == 0)) and
-        $seasonPhase == "Free Agency") or
-        (($player->draftRound == 1 && $player->yearsOfExperience == 3 && $player->contractYear4Salary == 0) or
-            ($player->draftRound == 2 && $player->yearsOfExperience == 2 && $player->contractYear3Salary == 0)) and
-        ($seasonPhase == "Preseason" or $seasonPhase == "HEAT")) and
-        $player->teamName == $userteam) {
-        echo "<table align=right bgcolor=#ffbb00>
+    if (
+        $player->canRookieOption($seasonPhase)
+        AND $player->teamName == $userteam
+        ) {
+            echo "<table align=right bgcolor=#ffbb00>
                 <tr>
                     <td align=center><a href=\"modules.php?name=Player&pa=rookieoption&pid=$playerID\">ROOKIE<BR>OPTION</a></td>
                 </tr>

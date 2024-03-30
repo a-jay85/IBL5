@@ -14,6 +14,7 @@ libxml_use_internal_errors(true);
 require 'config.php';
 require 'mainfile.php';
 $sharedFunctions = new Shared($db);
+$season = new Season($db);
 
 $scheduleFilePath = 'ibl/IBL/Schedule.htm';
 
@@ -505,7 +506,6 @@ $resultTeams = $db->sql_query($queryTeams);
 $numTeams = $db->sql_numrows($resultTeams);
 
 $currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
-$currentSeasonPhase = $sharedFunctions->getCurrentSeasonPhase();
 
 $i = 0;
 while ($i < $numTeams) {
@@ -653,7 +653,7 @@ while ($i < $numTeams) {
     $result4 = $db->sql_query($query4);
 
     // IF HEAT, update ibl_heat_win_loss with each team's HEAT win/loss info
-    if ($currentSeasonPhase == "HEAT"
+    if ($season->phase == "HEAT"
         AND $wins != 0
         AND $losses != 0) {
         $queryUpdateHeatWinLoss = "UPDATE ibl_heat_win_loss a, ibl_power b
@@ -817,7 +817,11 @@ if ($db->sql_query($resetExtensionQueryString)) {
     die('Invalid query: ' . $db->sql_error());
 }
 
-if ($currentSeasonPhase == "Playoffs" or $currentSeasonPhase == "Draft" or $currentSeasonPhase == "Free Agency") {
+if (
+    $season->phase == "Playoffs"
+    OR $season->phase == "Draft"
+    OR $season->phase == "Free Agency"
+) {
     echo '<p>Re-applying postseason trades made during the playoffs...</p>';
 
     $postseasonTradeQueueQuery = "SELECT * FROM ibl_trade_queue;";
@@ -832,7 +836,7 @@ if ($currentSeasonPhase == "Playoffs" or $currentSeasonPhase == "Draft" or $curr
         $i++;
     }
     echo '<p>Postseason trades have been re-applied!';
-} elseif ($currentSeasonPhase == "Preseason") {
+} elseif ($season->phase == "Preseason") {
     if ($db->sql_query("TRUNCATE TABLE ibl_trade_queue;")) {
         echo "<p>TRUNCATE TABLE ibl_trade_queue;";
     }

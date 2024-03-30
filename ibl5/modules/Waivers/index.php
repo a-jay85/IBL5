@@ -25,6 +25,7 @@ function waivers($user)
 {
     global $db, $stop, $action;
     $sharedFunctions = new Shared($db);
+    $season = new Season($db);
 
     if (!is_user($user)) {
         include "header.php";
@@ -48,14 +49,13 @@ function waivers($user)
         }
         include "footer.php";
     } elseif (is_user($user)) {
-        $currentSeasonPhase = $sharedFunctions->getCurrentSeasonPhase();
         $allowWaiverMoves = $sharedFunctions->getWaiverWireStatus();
 
         if (
-            ($currentSeasonPhase == "Preseason" AND $allowWaiverMoves == "Yes")
-            OR $currentSeasonPhase == "HEAT"
-            OR $currentSeasonPhase == "Regular Season"
-            OR $currentSeasonPhase == "Playoffs"
+            ($season->phase == "Preseason" AND $allowWaiverMoves == "Yes")
+            OR $season->phase == "HEAT"
+            OR $season->phase == "Regular Season"
+            OR $season->phase == "Playoffs"
         ) {
             global $cookie;
             cookiedecode($user);

@@ -31,6 +31,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 {
     global $user, $prefix, $user_prefix, $db;
     $sharedFunctions = new Shared($db);
+    $season = new Season($db);
 
     $sql = "SELECT * FROM " . $prefix . "_bbconfig";
     $result = $db->sql_query($sql);
@@ -50,8 +51,6 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 
     OpenTable();
 
-    $seasonPhase = $sharedFunctions->getCurrentSeasonPhase();
-
     function formatTidsForSqlQuery($conferenceTids)
     {
         $tidsFormattedForQuery = join("','", $conferenceTids);
@@ -62,10 +61,9 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
     {
         global $db;
 
-        $sharedFunctions = new Shared($db);
+        $season = new Season($db);
 
-        $seasonPhase = $sharedFunctions->getCurrentSeasonPhase();
-        if ($seasonPhase == "Regular Season") {
+        if ($season->phase == "Regular Season") {
             $easternConferenceTids = array(1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 22, 25, 27);
             $westernConferenceTids = array(6, 13, 14, 15, 16, 17, 18, 19, 20, 21, 23, 24, 26, 28);
 
@@ -141,7 +139,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 			<tbody>
 				<tr>";
 
-        if ($seasonPhase == "Regular Season") {
+        if ($season->phase == "Regular Season") {
             $output .= "<th>Vote</th>";
         } else {
             $output .= "<th>1st</th>
@@ -203,7 +201,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
             }
 
             if (!str_contains($teamname, $voterTeamName)) {
-                if ($seasonPhase == "Regular Season") {
+                if ($season->phase == "Regular Season") {
                     $output .= "<td><center><input type=\"checkbox\" name=\"" . $votingCategory . "[]\" value=\"$player->name, $player->teamName\"></center></td>";
                 } else {
                     $output .= "<td><center><input type=\"radio\" name=\"" . $votingCategory . "[1]\" value=\"$player->name, $player->teamName\"></center></td>
@@ -211,7 +209,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 								<td><center><input type=\"radio\" name=\"" . $votingCategory . "[3]\" value=\"$player->name, $player->teamName\"></center></td>";
                 }
             } else {
-                if ($seasonPhase == "Regular Season") {
+                if ($season->phase == "Regular Season") {
                     $output .= "<td></td>";
                 } else {
                     $output .= "<td></td>
@@ -260,7 +258,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
         return $output;
     }
 
-    if ($seasonPhase == "Regular Season") {
+    if ($season->phase == "Regular Season") {
         $formName = "ASGVote";
     } else {
         $formName = "EOYVote";
@@ -275,7 +273,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 
     echo "<input type=\"submit\" value=\"Submit Votes!\">";
 
-    if ($seasonPhase == "Regular Season") {
+    if ($season->phase == "Regular Season") {
         $easternConferenceFrontcourt .= getCandidates('ECF', $voterTeamName);
         $easternConferenceBackcourt .= getCandidates('ECB', $voterTeamName);
 

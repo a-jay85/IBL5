@@ -29,16 +29,6 @@ class Shared
         return $this->db->sql_result($queryCurrentSeasonEndingYear, 0);
     }
 
-    public function getCurrentSeasonPhase()
-    {
-        $queryCurrentSeasonPhase = $this->db->sql_query("SELECT value
-            FROM ibl_settings
-            WHERE name = 'Current Season Phase'
-            LIMIT 1");
-
-        return $this->db->sql_result($queryCurrentSeasonPhase, 0);
-    }
-
     public function getDiscordIDFromTeamname($teamname)
     {
         $queryDiscordIDFromTeamname = $this->db->sql_query("SELECT discordID

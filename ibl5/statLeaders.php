@@ -2,6 +2,7 @@
 
 require 'mainfile.php';
 $sharedFunctions = new Shared($db);
+$season = new Season($db);
 
 $arrayStatNames = array(
     'POINTS',
@@ -28,7 +29,7 @@ $arrayStatQueries = array(
 );
 
 if ($_GET['seasonPhase'] == null) {
-    $seasonPhase = $sharedFunctions->getCurrentSeasonPhase();
+    $seasonPhase = $season->phase;
 } else {
     $seasonPhase = $_GET['seasonPhase'];
 }

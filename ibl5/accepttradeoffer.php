@@ -2,6 +2,7 @@
 
 require 'mainfile.php';
 $sharedFunctions = new Shared($db);
+$season = new Season($db);
 
 $offer_id = $_POST['offer'];
     
@@ -154,8 +155,11 @@ if ($offer_id != NULL) {
                 $resulti = $db->sql_query($queryi);
             }
         
-            $currentSeasonPhase = $sharedFunctions->getCurrentSeasonPhase();
-            if ($currentSeasonPhase == "Playoffs" or $currentSeasonPhase == "Draft" or $currentSeasonPhase == "Free Agency") {
+            if (
+                $season->phase == "Playoffs"
+                OR $season->phase == "Draft"
+                OR $season->phase == "Free Agency"
+            ) {
                 $queryInsert = "INSERT INTO ibl_trade_queue (query, tradeline) VALUES ('$queryi', '$tradeLine');";
                 $db->sql_query("$queryInsert");
             }

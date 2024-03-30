@@ -2,6 +2,7 @@
 
 require 'mainfile.php';
 $sharedFunctions = new Shared($db);
+$season = new Season($db);
 
 $Team_Name = $_POST['teamname'];
 $Player_Name = $_POST['playername'];
@@ -9,18 +10,17 @@ $ExtensionAmount = $_POST['rookieOptionValue'];
 $player_exp = $_POST['player_exp'];
 $player_draftround = $_POST['player_draftround'];
 
-$seasonPhase = $sharedFunctions->getCurrentSeasonPhase();
 $tid = $sharedFunctions->getTidFromTeamname($Team_Name);
 
 $recipient = 'ibldepthcharts@gmail.com';
 $emailsubject = "Rookie Extension Option - " . $Player_Name;
 $filetext = $Team_Name . " exercise the rookie extension option on " . $Player_Name . " in the amount of " . $ExtensionAmount . ".";
 
-if (($seasonPhase == "Free Agency" and $player_exp == 2 and $player_draftround == 1) or
-    (($seasonPhase == "Preseason" or $seasonPhase == "HEAT") and $player_exp == 3 and $player_draftround == 1)) {
+if (($season->phase == "Free Agency" and $player_exp == 2 and $player_draftround == 1) or
+    (($season->phase == "Preseason" or $season->phase == "HEAT") and $player_exp == 3 and $player_draftround == 1)) {
     $queryrookieoption = "UPDATE ibl_plr SET cy4 = '$ExtensionAmount' WHERE name = '$Player_Name'";
-} elseif (($seasonPhase == "Free Agency" and $player_exp == 1 and $player_draftround == 2) or
-    (($seasonPhase == "Preseason" or $seasonPhase == "HEAT") and $player_exp == 2 and $player_draftround == 2)) {
+} elseif (($season->phase == "Free Agency" and $player_exp == 1 and $player_draftround == 2) or
+    (($season->phase == "Preseason" or $season->phase == "HEAT") and $player_exp == 2 and $player_draftround == 2)) {
     $queryrookieoption = "UPDATE ibl_plr SET cy3 = '$ExtensionAmount' WHERE name = '$Player_Name'";
 } else {
     die("This player's experience doesn't match their rookie status; please let the commish know about this error.");
@@ -32,7 +32,7 @@ echo "<html><head><title>Rookie Option Page</title></head><body>
 
 Your rookie option has been updated in the database and should reflect on your team pages immediately.<br>";
 
-if ($seasonPhase == "Free Agency") {
+if ($season->phase == "Free Agency") {
     echo "Please <a href=\"modules.php?name=Free_Agency\">click here to return to the Free Agency Screen</a>.";
 } else {
     echo "Please <a href=\"modules.php?name=Team&op=team&tid=$tid\">click here to return to your team page</a>.";

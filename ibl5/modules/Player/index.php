@@ -40,7 +40,7 @@ function showpage($playerID, $spec)
 {
     global $prefix, $db, $user, $cookie;
     $sharedFunctions = new Shared($db);
-    $seasonPhase = $sharedFunctions->getCurrentSeasonPhase();
+    $season = new Season($db);
     
     $player = Player::withPlayerID($db, $playerID);
     $playerStats = PlayerStats::withPlayerID($db, $playerID);
@@ -90,12 +90,11 @@ function showpage($playerID, $spec)
             WHERE team_name = '" . $userinfo['user_ibl_team'] . "';";
         $hasUsedExtensionThisSeason = $db->sql_result($db->sql_query($queryHasUsedExtensionThisSeason), 0);
 
-        $currentSeasonPhase = $sharedFunctions->getCurrentSeasonPhase();
         if (
             $hasUsedExtensionThisSeason == 0 and
             $player->canRenegotiateContract() and
-            $currentSeasonPhase != 'Draft' and
-            $currentSeasonPhase != 'Free Agency' and
+            $season->phase != 'Draft' and
+            $season->phase != 'Free Agency' and
             $player->teamName == $userteam
         ) {
             echo "<table align=right bgcolor=#ff0000>
@@ -109,7 +108,7 @@ function showpage($playerID, $spec)
     // RENEGOTIATION BUTTON END
 
     if (
-        $player->canRookieOption($seasonPhase)
+        $player->canRookieOption($season->phase)
         AND $player->teamName == $userteam
         ) {
             echo "<table align=right bgcolor=#ffbb00>
@@ -1659,7 +1658,7 @@ function showpage($playerID, $spec)
         $currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
         $currentSeasonStaringYear = $currentSeasonEndingYear - 1;
 
-        if ($seasonPhase == "Preseason") {
+        if ($season->phase == "Preseason") {
             $query = "SELECT * FROM ibl_box_scores WHERE Date BETWEEN '$currentSeasonStaringYear-09-01' AND '$currentSeasonEndingYear-07-01' AND pid = $playerID ORDER BY Date ASC";
         } else {
             $query = "SELECT * FROM ibl_box_scores WHERE Date BETWEEN '$currentSeasonStaringYear-10-01' AND '$currentSeasonEndingYear-07-01' AND pid = $playerID ORDER BY Date ASC";
@@ -2139,7 +2138,7 @@ function negotiate($pid)
 function rookieoption($pid)
 {
     global $prefix, $db, $user, $cookie;
-    $sharedFunctions = new Shared($db);
+    $season = new Season($db);
 
     $pid = intval($pid);
 
@@ -2165,15 +2164,13 @@ function rookieoption($pid)
         return;
     }
 
-    $seasonPhase = $sharedFunctions->getCurrentSeasonPhase();
-
-    if (($seasonPhase == "Free Agency" and $player_exp == 2 and $player_draftround == 1) or
-        (($seasonPhase == "Preseason" or $seasonPhase == "HEAT") and
+    if (($season->phase == "Free Agency" and $player_exp == 2 and $player_draftround == 1) or
+        (($season->phase == "Preseason" or $season->phase == "HEAT") and
             $player_exp == 3 and
             $player_draftround == 1)) {
         $finalYearOfRookieContract = stripslashes(check_html($playerinfo['cy3'], "nohtml"));
-    } elseif (($seasonPhase == "Free Agency" and $player_exp == 1 and $player_draftround == 2) or
-        (($seasonPhase == "Preseason" or $seasonPhase == "HEAT") and
+    } elseif (($season->phase == "Free Agency" and $player_exp == 1 and $player_draftround == 2) or
+        (($season->phase == "Preseason" or $season->phase == "HEAT") and
             $player_exp == 2 and
             $player_draftround == 2)) {
         $finalYearOfRookieContract = stripslashes(check_html($playerinfo['cy2'], "nohtml"));

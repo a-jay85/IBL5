@@ -6,11 +6,12 @@ $sharedFunctions = new Shared($db);
 function scoParser($uploadedFilePath, $seasonEndingYear, $seasonPhase)
 {
     global $db, $sharedFunctions;
+    $season = new Season($db);
 
     $scoFilePath = ($uploadedFilePath) ? $uploadedFilePath : "IBL5.sco";
     $currentSeasonEndingYear = ($seasonEndingYear) ? $seasonEndingYear : $sharedFunctions->getCurrentSeasonEndingYear();
     $currentSeasonStartingYear = $currentSeasonEndingYear - 1;
-    $seasonPhase = ($seasonPhase) ? $seasonPhase : $sharedFunctions->getCurrentSeasonPhase();
+    $seasonPhase = ($seasonPhase) ? $seasonPhase : $season->phase;
 
     echo "<h2>Parse Log</h2>
         <b>Parsing .sco file for the $currentSeasonStartingYear-$currentSeasonEndingYear $seasonPhase...</b><p>";

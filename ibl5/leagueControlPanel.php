@@ -2,11 +2,11 @@
 
 require 'mainfile.php';
 $sharedFunctions = new Shared($db);
+$season = new Season($db);
 
 $queryString = "";
 $successText = "";
 
-$currentSeasonPhase = $sharedFunctions->getCurrentSeasonPhase();
 $currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
 $waiverWireStatus = $sharedFunctions->getWaiverWireStatus();
 $allowTradesStatus = $sharedFunctions->getAllowTradesStatus();
@@ -69,7 +69,7 @@ if (isset($_POST['query'])) {
             $successText = "All players currently on waivers have their teamname set to Free Agents and 0 Bird years.";
             break;
         case 'Set Free Agency factors for PFW':
-            if ($currentSeasonPhase == 'Draft' or $currentSeasonPhase == 'Free Agency') {
+            if ($season->phase == 'Draft' or $season->phase == 'Free Agency') {
                 $queryString = "UPDATE ibl_team_info info, ibl_power power
                     SET Contract_Wins = power.win,
                     	Contract_Losses = power.loss
@@ -93,7 +93,7 @@ if (isset($_POST['query'])) {
     if ($db->sql_query($queryString)) {
         $querySuccessful = true;
         if (isset($_POST['SeasonPhase'])) {
-            $currentSeasonPhase = $_POST['SeasonPhase'];
+            $season->phase = $_POST['SeasonPhase'];
         }
         if (isset($_POST['Waivers'])) {
             $waiverWireStatus = $_POST['Waivers'];
@@ -116,17 +116,17 @@ echo "
 
 echo "<FORM action=\"leagueControlPanel.php\" method=\"POST\">
     <select name=\"SeasonPhase\">
-        <option value = \"Preseason\"" . ($currentSeasonPhase == "Preseason" ? " SELECTED" : "") . ">Preseason</option>
-        <option value = \"HEAT\"" . ($currentSeasonPhase == "HEAT" ? " SELECTED" : "") . ">HEAT</option>
-        <option value = \"Regular Season\"" . ($currentSeasonPhase == "Regular Season" ? " SELECTED" : "") . ">Regular Season</option>
-        <option value = \"Playoffs\"" . ($currentSeasonPhase == "Playoffs" ? " SELECTED" : "") . ">Playoffs</option>
-        <option value = \"Draft\"" . ($currentSeasonPhase == "Draft" ? " SELECTED" : "") . ">Draft</option>
-        <option value = \"Free Agency\"" . ($currentSeasonPhase == "Free Agency" ? " SELECTED" : "") . ">Free Agency</option>
+        <option value = \"Preseason\"" . ($season->phase == "Preseason" ? " SELECTED" : "") . ">Preseason</option>
+        <option value = \"HEAT\"" . ($season->phase == "HEAT" ? " SELECTED" : "") . ">HEAT</option>
+        <option value = \"Regular Season\"" . ($season->phase == "Regular Season" ? " SELECTED" : "") . ">Regular Season</option>
+        <option value = \"Playoffs\"" . ($season->phase == "Playoffs" ? " SELECTED" : "") . ">Playoffs</option>
+        <option value = \"Draft\"" . ($season->phase == "Draft" ? " SELECTED" : "") . ">Draft</option>
+        <option value = \"Free Agency\"" . ($season->phase == "Free Agency" ? " SELECTED" : "") . ">Free Agency</option>
     </select>
     <INPUT type='submit' name='query' value='Set Season Phase'><p>
     <A HREF=\"statLeaders.php\">Season Highs</A><p>";
 
-switch ($currentSeasonPhase) {
+switch ($season->phase) {
     case 'Preseason':
         echo "<A HREF=\"updateAllTheThings.php\">Update All The Things</A><p>
             <A HREF=\"scoParser.php\">Run scoParser.php</A><p>

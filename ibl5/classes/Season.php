@@ -12,6 +12,9 @@ class Season
     public $lastSimStartDate;
     public $lastSimEndDate;
 
+    public $allowTrades;
+    public $allowWaivers;
+
     public function __construct($db)
     {
         $this->db = $db;
@@ -24,6 +27,9 @@ class Season
         $arrayLastSimDates = $this->getLastSimDatesArray();
         $this->lastSimStartDate = $arrayLastSimDates["Start Date"];
         $this->lastSimEndDate = $arrayLastSimDates["End Date"];
+
+        $this->allowTrades = $this->getAllowTradesStatus();
+        $this->allowWaivers = $this->getAllowWaiversStatus();
     }
 
     public function getSeasonPhase()
@@ -54,5 +60,25 @@ class Season
             LIMIT 1");
 
         return $this->db->sql_fetch_assoc($queryLastSimDates);
+    }
+
+    public function getAllowTradesStatus()
+    {
+        $queryAllowTradesStatus = $this->db->sql_query("SELECT value
+            FROM ibl_settings
+            WHERE name = 'Allow Trades'
+            LIMIT 1");
+
+        return $this->db->sql_result($queryAllowTradesStatus, 0);
+    }
+
+    public function getAllowWaiversStatus()
+    {
+        $queryAllowWaiversStatus = $this->db->sql_query("SELECT value
+            FROM ibl_settings
+            WHERE name = 'Allow Waiver Moves'
+            LIMIT 1");
+
+        return $this->db->sql_result($queryAllowWaiversStatus, 0);
     }
 }

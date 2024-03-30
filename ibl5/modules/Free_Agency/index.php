@@ -52,6 +52,7 @@ function display()
 {
     global $prefix, $db, $cookie;
     $sharedFunctions = new Shared($db);
+    $season = new Season($db);
 
     include "header.php";
     OpenTable();
@@ -220,7 +221,7 @@ function display()
                 <td>";
 
             // ==== ROOKIE OPTIONS
-            if ($player->canRookieOption($sharedFunctions->getCurrentSeasonPhase())) {
+            if ($player->canRookieOption($season->phase)) {
                 echo "<a href=\"modules.php?name=Player&pa=rookieoption&pid=$player->playerID\">Rookie Option</a>";
             }
 

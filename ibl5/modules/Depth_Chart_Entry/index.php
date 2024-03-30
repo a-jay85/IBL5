@@ -21,6 +21,7 @@ if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
 }
 
 $sharedFunctions = new Shared($db);
+$season = new Season($db);
 
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
@@ -524,8 +525,7 @@ function submit()
 
     $html = $html . "</table>";
 
-    $seasonPhase = $sharedFunctions->getCurrentSeasonPhase();
-    if ($seasonPhase != 'Playoffs') {
+    if ($season->phase != 'Playoffs') {
         $minActivePlayers = 12;
         $maxActivePlayers = 12;
         $minPositionDepth = 3;

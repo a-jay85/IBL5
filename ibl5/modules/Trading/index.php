@@ -27,8 +27,7 @@ function buildTeamFutureSalary($resultTeamPlayers, $k)
 {
     global $db;
     $sharedFunctions = new Shared($db);
-
-    $seasonPhase = $sharedFunctions->getCurrentSeasonPhase();
+    $season = new Season($db);
 
     $future_salary_array[][] = "";
     
@@ -38,7 +37,11 @@ function buildTeamFutureSalary($resultTeamPlayers, $k)
         $player_pid = $rowTeamPlayers["pid"];
         $player_ordinal = $rowTeamPlayers["ordinal"];
         $contract_year = $rowTeamPlayers["cy"];
-        if ($seasonPhase == "Playoffs" or $seasonPhase == "Draft" or $seasonPhase == "Free Agency") {
+        if (
+            $season->phase == "Playoffs"
+            OR $season->phase == "Draft"
+            OR $season->phase == "Free Agency"
+        ) {
             $contract_year++;
         }
         if ($contract_year == 0) {
@@ -154,6 +157,7 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 {
     global $user, $prefix, $user_prefix, $db, $partner;
     $sharedFunctions = new Shared($db);
+    $season = new Season($db);
 
     $sql = "SELECT * FROM " . $prefix . "_bbconfig";
     $result = $db->sql_query($sql);
@@ -171,7 +175,6 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
     include "header.php";
 
     $currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
-    $seasonPhase = $sharedFunctions->getCurrentSeasonPhase();
 
     OpenTable();
 
@@ -276,7 +279,11 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
     echo "</td></tr></table>";
     $z = 0;
     $seasonsToDisplay = 6;
-    if ($seasonPhase == "Playoffs" or $seasonPhase == "Draft" or $seasonPhase == "Free Agency") {
+    if (
+        $season->phase == "Playoffs"
+        OR $season->phase == "Draft"
+        OR $season->phase == "Free Agency"
+    ) {
         $currentSeasonEndingYear++;
         $seasonsToDisplay--;
     }
@@ -293,7 +300,11 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 
     $currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear(); // This resets the incrementation from the last block.
     $i = 1; // We need to start at 1 because of the "xSendsCash" value names.
-    if ($seasonPhase == "Playoffs" or $seasonPhase == "Draft" or $seasonPhase == "Free Agency") {
+    if (
+        $season->phase == "Playoffs"
+        OR $season->phase == "Draft"
+        OR $season->phase == "Free Agency"
+    ) {
         $i++;
     }
     while ($i <= 6) {

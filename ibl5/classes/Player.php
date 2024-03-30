@@ -298,6 +298,27 @@ class Player
         return FALSE;
     }
 
+    public function canRookieOption($seasonPhase)
+    {
+        if ($seasonPhase == "Free Agency") {
+            if (
+                ($this->draftRound == 1 AND $this->yearsOfExperience == 2 AND $this->contractYear4Salary == 0)
+                OR ($this->draftRound == 2 AND $this->yearsOfExperience == 1 AND $this->contractYear3Salary == 0)
+            ) {
+                return TRUE;
+            }
+        } elseif ($seasonPhase == "Preseason" or $seasonPhase == "HEAT") {
+            if (
+                ($this->draftRound == 1 AND $this->yearsOfExperience == 3 AND $this->contractYear4Salary == 0)
+                OR ($this->draftRound == 2 AND $this->yearsOfExperience == 2 AND $this->contractYear3Salary == 0)
+            ) {
+                return TRUE;
+            }
+        } else {
+            return FALSE;
+        }
+    }
+
     public function wasRookieOptioned()
     {
         if ((

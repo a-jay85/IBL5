@@ -49,10 +49,8 @@ function waivers($user)
         }
         include "footer.php";
     } elseif (is_user($user)) {
-        $allowWaiverMoves = $sharedFunctions->getWaiverWireStatus();
-
         if (
-            ($season->phase == "Preseason" AND $allowWaiverMoves == "Yes")
+            ($season->phase == "Preseason" AND $season->allowWaivers == "Yes")
             OR $season->phase == "HEAT"
             OR $season->phase == "Regular Season"
             OR $season->phase == "Playoffs"

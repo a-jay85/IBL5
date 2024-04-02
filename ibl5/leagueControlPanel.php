@@ -7,7 +7,6 @@ $season = new Season($db);
 $queryString = "";
 $successText = "";
 
-$waiverWireStatus = $sharedFunctions->getWaiverWireStatus();
 $allowTradesStatus = $sharedFunctions->getAllowTradesStatus();
 
 if (isset($_POST['query'])) {
@@ -95,7 +94,7 @@ if (isset($_POST['query'])) {
             $season->phase = $_POST['SeasonPhase'];
         }
         if (isset($_POST['Waivers'])) {
-            $waiverWireStatus = $_POST['Waivers'];
+            $season->allowWaivers = $_POST['Waivers'];
         }
         if (isset($_POST['Trades'])) {
             $allowTradesStatus = $_POST['Trades'];
@@ -130,8 +129,8 @@ switch ($season->phase) {
         echo "<A HREF=\"updateAllTheThings.php\">Update All The Things</A><p>
             <A HREF=\"scoParser.php\">Run scoParser.php</A><p>
             <select name=\"Waivers\">
-                <option value = \"Yes\"" . ($waiverWireStatus == "Yes" ? " SELECTED" : "") . ">Yes</option>
-                <option value = \"No\"" . ($waiverWireStatus == "No" ? " SELECTED" : "") . ">No</option>
+                <option value = \"Yes\"" . ($season->allowWaivers == "Yes" ? " SELECTED" : "") . ">Yes</option>
+                <option value = \"No\"" . ($season->allowWaivers == "No" ? " SELECTED" : "") . ">No</option>
             </select>
             <INPUT type='submit' name='query' value='Set Waiver Wire Status'><p>
             <INPUT type='submit' name='query' value='Set all players on waivers to Free Agents and reset their Bird years'><p>";

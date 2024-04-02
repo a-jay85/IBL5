@@ -535,7 +535,6 @@ function reviewtrade($user)
         include "footer.php";
     } elseif (is_user($user)) {
         $allow_trades = $sharedFunctions->getAllowTradesStatus();
-        $allow_waiver_moves = $sharedFunctions->getWaiverWireStatus();
 
         if ($allow_trades == 'Yes') {
             global $cookie;
@@ -546,7 +545,7 @@ function reviewtrade($user)
             OpenTable();
             $sharedFunctions->displaytopmenu($tid);
             echo "Sorry, but trades are not allowed right now.";
-            if ($allow_waiver_moves == 'Yes') {
+            if ($season->allowWaivers == 'Yes') {
                 echo "<br>
 				Players may still be <a href=\"modules.php?name=Waivers&action=add\">Added From Waivers</a> or they may be <a href=\"modules.php?name=Waivers&action=drop\">Dropped to Waivers</a>.";
             } else {

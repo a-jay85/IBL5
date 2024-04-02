@@ -17,11 +17,11 @@ if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
 }
 
 $sharedFunctions = new Shared($db);
+$season = new Season($db);
 
 include "header.php";
 
-$currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
-$fiveSeasonsAgoEndingYear = $currentSeasonEndingYear - 4;
+$fiveSeasonsAgoEndingYear = $season->endingYear - 4;
 
 $query2 = "SELECT *,
 	SUM(ibl_team_win_loss.wins) as five_season_wins,
@@ -31,7 +31,7 @@ $query2 = "SELECT *,
 FROM ibl_team_history
 INNER JOIN ibl_team_win_loss ON ibl_team_win_loss.currentname = ibl_team_history.team_name
 WHERE teamid != 35
-AND year BETWEEN $fiveSeasonsAgoEndingYear AND $currentSeasonEndingYear
+AND year BETWEEN $fiveSeasonsAgoEndingYear AND $season->endingYear
 GROUP BY currentname
 ORDER BY teamid ASC;";
 $result2 = $db->sql_query($query2);

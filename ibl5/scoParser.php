@@ -2,14 +2,15 @@
 
 require 'mainfile.php';
 $sharedFunctions = new Shared($db);
+$season = new Season($db);
 
 function scoParser($uploadedFilePath, $seasonEndingYear, $seasonPhase)
 {
-    global $db, $sharedFunctions;
+    global $db;
     $season = new Season($db);
 
     $scoFilePath = ($uploadedFilePath) ? $uploadedFilePath : "IBL5.sco";
-    $currentSeasonEndingYear = ($seasonEndingYear) ? $seasonEndingYear : $sharedFunctions->getCurrentSeasonEndingYear();
+    $currentSeasonEndingYear = ($seasonEndingYear) ? $seasonEndingYear : $season->endingYear;
     $currentSeasonStartingYear = $currentSeasonEndingYear - 1;
     $seasonPhase = ($seasonPhase) ? $seasonPhase : $season->phase;
 

@@ -19,17 +19,13 @@ if (!defined('BLOCK_FILE')) {
 
 global $db;
 
-$sharedFunctions = new Shared($db);
-
-$arrayLastSimDates = $sharedFunctions->getLastSimDatesArray();
-$lastSimStartDate = $arrayLastSimDates["Start Date"];
-$lastSimEndDate = $arrayLastSimDates["End Date"];
+$season = new Season($db);
 
 $content = $content . '<table width=150>';
 $content = $content . "<center><u>Recent Sim Dates:</u></center>";
-$content = $content . "<center><strong>$lastSimStartDate</strong></center>";
+$content = $content . "<center><strong>$season->lastSimStartDate</strong></center>";
 $content = $content . "<center>-to-</center>";
-$content = $content . "<center><strong>$lastSimEndDate</strong></center>";
+$content = $content . "<center><strong>$season->lastSimEndDate</strong></center>";
 $content = $content . '<tr><td colspan=2><hr></td></tr>';
 
 $queryEasternConference = "SELECT tid, team_name, leagueRecord, confGB, clinchedConference, clinchedDivision, clinchedPlayoffs

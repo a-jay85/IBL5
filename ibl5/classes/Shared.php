@@ -92,16 +92,6 @@ class Shared
         return $this->db->sql_result($queryTidFromTeamname, 0);
     }
 
-    public function getAllowTradesStatus()
-    {
-        $queryAllowTradesStatus = $this->db->sql_query("SELECT value
-            FROM ibl_settings
-            WHERE name = 'Allow Trades'
-            LIMIT 1");
-
-        return $this->db->sql_result($queryAllowTradesStatus, 0);
-    }
-
     public function isFreeAgencyModuleActive()
     {
         $queryIsFreeAgencyModuleActive = $this->db->sql_query("SELECT title, active

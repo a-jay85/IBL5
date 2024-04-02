@@ -92,16 +92,6 @@ class Shared
         return $this->db->sql_result($queryTidFromTeamname, 0);
     }
 
-    public function getWaiverWireStatus()
-    {
-        $queryWaiverWireStatus = $this->db->sql_query("SELECT value
-            FROM ibl_settings
-            WHERE name = 'Allow Waiver Moves'
-            LIMIT 1");
-
-        return $this->db->sql_result($queryWaiverWireStatus, 0);
-    }
-
     public function getAllowTradesStatus()
     {
         $queryAllowTradesStatus = $this->db->sql_query("SELECT value

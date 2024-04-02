@@ -427,7 +427,7 @@ function checkIfPlayoffsClinched($conference)
 
 function updateMagicNumbers($region)
 {
-    global $db, $sharedFunctions;
+    global $db;
 
     echo "<p>Updating the magic numbers for the $region...<br>";
     list($grouping, $groupingGB, $groupingMagicNumber) = assignGroupingsFor($region);
@@ -505,8 +505,6 @@ $queryTeams = "SELECT TeamID, Team, streak_type, streak
 $resultTeams = $db->sql_query($queryTeams);
 $numTeams = $db->sql_numrows($resultTeams);
 
-$currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
-
 $i = 0;
 while ($i < $numTeams) {
     $tid = $db->sql_result($resultTeams, $i, "TeamID");
@@ -516,7 +514,7 @@ while ($i < $numTeams) {
 		FROM ibl_schedule
 		WHERE (Visitor = $tid OR Home = $tid)
 		AND (BoxID > 0 AND BoxID < 100000)
-		AND Date BETWEEN '" . ($currentSeasonEndingYear - 1) . "-10-31' AND '$currentSeasonEndingYear-05-30'
+		AND Date BETWEEN '" . ($season->beginningYear) . "-10-31' AND '$season->endingYear-05-30'
 		ORDER BY Date ASC";
 
     $resultGames = $db->sql_query($queryGames);
@@ -649,7 +647,7 @@ while ($i < $numTeams) {
     $query4 = "UPDATE ibl_team_win_loss a, ibl_power b
 		SET a.wins = b.win,
 			a.losses = b.loss
-		WHERE a.currentname = b.Team AND a.year = '" . $currentSeasonEndingYear . "';";
+		WHERE a.currentname = b.Team AND a.year = '" . $season->endingYear . "';";
     $result4 = $db->sql_query($query4);
 
     // IF HEAT, update ibl_heat_win_loss with each team's HEAT win/loss info
@@ -659,7 +657,7 @@ while ($i < $numTeams) {
         $queryUpdateHeatWinLoss = "UPDATE ibl_heat_win_loss a, ibl_power b
         SET a.wins = b.win,
             a.losses = b.loss
-        WHERE a.currentname = b.Team AND a.year = '" . ($currentSeasonEndingYear - 1) . "';";
+        WHERE a.currentname = b.Team AND a.year = '" . ($season->beginningYear) . "';";
         if ($db->sql_query($queryUpdateHeatWinLoss)) {
             echo $queryUpdateHeatWinLoss . "<p>";
         } else {
@@ -710,7 +708,7 @@ $standingsHTML = "<script src=\"sorttable.js\"></script>";
 
 function displayStandings($region)
 {
-    global $db, $sharedFunctions, $standingsHTML;
+    global $db, $standingsHTML;
 
     list($grouping, $groupingGB, $groupingMagicNumber) = assignGroupingsFor($region);
 

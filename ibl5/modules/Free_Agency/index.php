@@ -63,8 +63,6 @@ function display()
 
     $sharedFunctions->displaytopmenu($team->teamID);
 
-    $currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
-
     $year1TotalSalary = $year2TotalSalary = $year3TotalSalary = $year4TotalSalary = $year5TotalSalary = $year6TotalSalary = 0;
     $rosterspots1 = $rosterspots2 = $rosterspots3 = $rosterspots4 = $rosterspots5 = $rosterspots6 = 15;
 
@@ -136,7 +134,7 @@ function display()
         $player = Player::withPlrRow($db, $playerRow);
 
         $yearPlayerIsFreeAgent = $player->draftYear + $player->yearsOfExperience + $player->contractTotalYears - $player->contractCurrentYear;
-        if ($yearPlayerIsFreeAgent != $currentSeasonEndingYear) {
+        if ($yearPlayerIsFreeAgent != $season->endingYear) {
             // === MATCH UP CONTRACT AMOUNTS WITH FUTURE YEARS BASED ON CURRENT YEAR OF CONTRACT
 
             $year1Salary = $year2Salary = $year3Salary = $year4Salary = $year5Salary = $year6Salary = 0;
@@ -566,7 +564,7 @@ function display()
         $player = Player::withPlrRow($db, $playerRow);
 
         $yearPlayerIsFreeAgent = $player->draftYear + $player->yearsOfExperience + $player->contractTotalYears - $player->contractCurrentYear;
-        if ($yearPlayerIsFreeAgent == $currentSeasonEndingYear) {
+        if ($yearPlayerIsFreeAgent == $season->endingYear) {
             $playerDemands = $db->sql_fetchrow($player->getFreeAgencyDemands());
             $year1PlayerDemands = $playerDemands['dem1'];
             $year2PlayerDemands = $playerDemands['dem2'];
@@ -704,7 +702,7 @@ function display()
         $player = Player::withPlrRow($db, $playerRow);
 
         $yearPlayerIsFreeAgent = $player->draftYear + $player->yearsOfExperience + $player->contractTotalYears - $player->contractCurrentYear;
-        if ($yearPlayerIsFreeAgent == $currentSeasonEndingYear) {
+        if ($yearPlayerIsFreeAgent == $season->endingYear) {
             $playerDemands = $db->sql_fetchrow($player->getFreeAgencyDemands());
             $year1PlayerDemands = $playerDemands['dem1'];
             $year2PlayerDemands = $playerDemands['dem2'];

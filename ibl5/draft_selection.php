@@ -11,7 +11,7 @@ $draft_pick = $_POST['draft_pick'];
 $date = date('Y-m-d h:i:s');
 
 $sharedFunctions = new Shared($db);
-$currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
+$season = new Season($db);
 
 $queryCurrentDraftSelection = "SELECT `player`
     FROM ibl_draft
@@ -36,7 +36,7 @@ if (($currentDraftSelection == NULL OR $currentDraftSelection == "") AND $player
     $resultUpdateRookieTable = $db->sql_query($queryUpdateRookieTable);
 
     if ($resultUpdateDraftTable AND $resultUpdateRookieTable) {
-        $message = "With pick #$draft_pick in round $draft_round of the $currentSeasonEndingYear IBL Draft, the **" . $teamname . "** select **" . $playerToBeDrafted . "!**";
+        $message = "With pick #$draft_pick in round $draft_round of the $season->endingYear IBL Draft, the **" . $teamname . "** select **" . $playerToBeDrafted . "!**";
         echo "$message<p>
         <a href=\"modules.php?name=College_Scouting\">Go back to the Draft module</a>";
     
@@ -44,7 +44,7 @@ if (($currentDraftSelection == NULL OR $currentDraftSelection == "") AND $player
         $resultNextTeamDraftPick = $db->sql_query($queryNextTeamDraftPick);
         $nextTeamDraftPick = $db->sql_result($resultNextTeamDraftPick, 0);
 
-        $teamOnTheClock = $sharedFunctions->getCurrentOwnerOfDraftPick($currentSeasonEndingYear, $draft_round, $nextTeamDraftPick);
+        $teamOnTheClock = $sharedFunctions->getCurrentOwnerOfDraftPick($season->endingYear, $draft_round, $nextTeamDraftPick);
 
         if ($teamOnTheClock != NULL) {
             $queryDiscordIDOfTeamOnTheClock = "SELECT discordID from ibl_team_info WHERE team_name = '$teamOnTheClock' LIMIT 1;";
@@ -55,7 +55,7 @@ if (($currentDraftSelection == NULL OR $currentDraftSelection == "") AND $player
     **<@!' . $discordIDOfTeamOnTheClock . '>** is on the clock!';
         } else {
             $message .= "
-    **🏁 __The $currentSeasonEndingYear IBL Draft has officially concluded!__ 🏁**";
+    **🏁 __The $season->endingYear IBL Draft has officially concluded!__ 🏁**";
         }
 
         Discord::postToChannel('#draft-picks', $message);

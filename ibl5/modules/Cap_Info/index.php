@@ -5,12 +5,11 @@ if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
 }
 
 $sharedFunctions = new Shared($db);
+$season = new Season($db);
 
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 $userpage = 1;
-
-$currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
 
 include "header.php";
 
@@ -84,18 +83,18 @@ while ($i < $numberOfTeams) {
 $text .= "<table class=\"sortable\" border=1>
 	<tr>
 		<th>Team</th>
-		<th>" . ($currentSeasonEndingYear + 0) . "-<br>" . ($currentSeasonEndingYear + 1) . "<br>Total</th>
-		<th>" . ($currentSeasonEndingYear + 1) . "-<br>" . ($currentSeasonEndingYear + 2) . "<br>Total</th>
-		<th>" . ($currentSeasonEndingYear + 2) . "-<br>" . ($currentSeasonEndingYear + 3) . "<br>Total</th>
-		<th>" . ($currentSeasonEndingYear + 3) . "-<br>" . ($currentSeasonEndingYear + 4) . "<br>Total</th>
-		<th>" . ($currentSeasonEndingYear + 4) . "-<br>" . ($currentSeasonEndingYear + 5) . "<br>Total</th>
-		<th>" . ($currentSeasonEndingYear + 5) . "-<br>" . ($currentSeasonEndingYear + 6) . "<br>Total</th>
+		<th>" . ($season->endingYear + 0) . "-<br>" . ($season->endingYear + 1) . "<br>Total</th>
+		<th>" . ($season->endingYear + 1) . "-<br>" . ($season->endingYear + 2) . "<br>Total</th>
+		<th>" . ($season->endingYear + 2) . "-<br>" . ($season->endingYear + 3) . "<br>Total</th>
+		<th>" . ($season->endingYear + 3) . "-<br>" . ($season->endingYear + 4) . "<br>Total</th>
+		<th>" . ($season->endingYear + 4) . "-<br>" . ($season->endingYear + 5) . "<br>Total</th>
+		<th>" . ($season->endingYear + 5) . "-<br>" . ($season->endingYear + 6) . "<br>Total</th>
         <td bgcolor=#AAA></td>
-		<th>" . ($currentSeasonEndingYear + 0) . "-<br>" . ($currentSeasonEndingYear + 1) . "<br>PG</th>
-		<th>" . ($currentSeasonEndingYear + 0) . "-<br>" . ($currentSeasonEndingYear + 1) . "<br>SG</th>
-		<th>" . ($currentSeasonEndingYear + 0) . "-<br>" . ($currentSeasonEndingYear + 1) . "<br>SF</th>
-		<th>" . ($currentSeasonEndingYear + 0) . "-<br>" . ($currentSeasonEndingYear + 1) . "<br>PF</th>
-		<th>" . ($currentSeasonEndingYear + 0) . "-<br>" . ($currentSeasonEndingYear + 1) . "<br>C</th>
+		<th>" . ($season->endingYear + 0) . "-<br>" . ($season->endingYear + 1) . "<br>PG</th>
+		<th>" . ($season->endingYear + 0) . "-<br>" . ($season->endingYear + 1) . "<br>SG</th>
+		<th>" . ($season->endingYear + 0) . "-<br>" . ($season->endingYear + 1) . "<br>SF</th>
+		<th>" . ($season->endingYear + 0) . "-<br>" . ($season->endingYear + 1) . "<br>PF</th>
+		<th>" . ($season->endingYear + 0) . "-<br>" . ($season->endingYear + 1) . "<br>C</th>
         <td bgcolor=#AAA></td>
 		<th>FA Slots</th>
         <th>Has MLE</th>

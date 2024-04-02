@@ -36,7 +36,8 @@ if ($_GET['seasonPhase'] == null) {
 
 function seasonHighTable($queryForStat, $statName, $playerOrTeam, $seasonPhase)
 {
-    global $db, $sharedFunctions;
+    global $db;
+    $season = new Season($db);
 
     if ($playerOrTeam == 'player') {
         $isPlayer = 'pid != 0';
@@ -44,32 +45,29 @@ function seasonHighTable($queryForStat, $statName, $playerOrTeam, $seasonPhase)
         $isPlayer = 'pid = 0';
     }
 
-    $playoffYear = $sharedFunctions->getCurrentSeasonEndingYear();
-    $seasonStartingYear = $playoffYear - 1;
-
     if ($seasonPhase == "Playoffs") {
         $query = "SELECT `name`, `date`, " . $queryForStat . " AS `" . $statName . "`
             FROM ibl_box_scores
             WHERE " . $isPlayer . "
-            AND date >= '" . $playoffYear . "-05-01'
+            AND date >= '" . $season->endingYear . "-05-01'
             ORDER BY `" . $statName . "` DESC, date ASC LIMIT 15;";
     } elseif ($seasonPhase == "Preseason") {
         $query = "SELECT `name`, `date`, " . $queryForStat . " AS `" . $statName . "`
             FROM ibl_box_scores
             WHERE " . $isPlayer . "
-            AND date BETWEEN '" . $seasonStartingYear . "-09-01' AND '" . $seasonStartingYear . "-09-30'
+            AND date BETWEEN '" . $season->beginningYear . "-09-01' AND '" . $season->beginningYear . "-09-30'
             ORDER BY `" . $statName . "` DESC, date ASC LIMIT 15;";
     } elseif ($seasonPhase == "HEAT") {
         $query = "SELECT `name`, `date`, " . $queryForStat . " AS `" . $statName . "`
             FROM ibl_box_scores
             WHERE " . $isPlayer . "
-            AND date BETWEEN '" . $seasonStartingYear . "-10-01' AND '" . $seasonStartingYear . "-10-31'
+            AND date BETWEEN '" . $season->beginningYear . "-10-01' AND '" . $season->beginningYear . "-10-31'
             ORDER BY `" . $statName . "` DESC, date ASC LIMIT 15;";
     } else {
         $query = "SELECT `name`, `date`, " . $queryForStat . " AS `" . $statName . "`
             FROM ibl_box_scores
             WHERE " . $isPlayer . "
-            AND date BETWEEN '" . $seasonStartingYear . "-11-01' AND '" . $playoffYear . "-04-30'
+            AND date BETWEEN '" . $season->beginningYear . "-11-01' AND '" . $season->endingYear . "-04-30'
             ORDER BY `" . $statName . "` DESC, date ASC LIMIT 15;";
     }
     $result = $db->sql_query($query);

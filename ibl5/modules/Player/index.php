@@ -1655,13 +1655,10 @@ function showpage($playerID, $spec)
     // GAME LOG
 
     if ($spec == 0) {
-        $currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
-        $currentSeasonStaringYear = $currentSeasonEndingYear - 1;
-
         if ($season->phase == "Preseason") {
-            $query = "SELECT * FROM ibl_box_scores WHERE Date BETWEEN '$currentSeasonStaringYear-09-01' AND '$currentSeasonEndingYear-07-01' AND pid = $playerID ORDER BY Date ASC";
+            $query = "SELECT * FROM ibl_box_scores WHERE Date BETWEEN '$season->beginningYear-09-01' AND '$season->endingYear-07-01' AND pid = $playerID ORDER BY Date ASC";
         } else {
-            $query = "SELECT * FROM ibl_box_scores WHERE Date BETWEEN '$currentSeasonStaringYear-10-01' AND '$currentSeasonEndingYear-07-01' AND pid = $playerID ORDER BY Date ASC";
+            $query = "SELECT * FROM ibl_box_scores WHERE Date BETWEEN '$season->beginningYear-10-01' AND '$season->endingYear-07-01' AND pid = $playerID ORDER BY Date ASC";
         }
         $result = $db->sql_query($query);
         $num = $db->sql_numrows($result);

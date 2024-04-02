@@ -12,12 +12,11 @@ $pagetitle = "- Team Pages";
 function menu()
 {
     global $db;
-    $sharedFunctions = new Shared($db);
 
     include "header.php";
     OpenTable();
 
-    $sharedFunctions->displaytopmenu(0);
+    UI::displaytopmenu($db, 0);
 
     CloseTable();
     include "footer.php";
@@ -179,7 +178,7 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 
     $teamlogo = $userinfo['user_ibl_team'];
     $tid = $sharedFunctions->getTidFromTeamname($teamlogo);
-    $sharedFunctions->displaytopmenu($tid);
+    UI::displaytopmenu($db, $tid);
 
     $queryUserTeamPlayers = "SELECT pos, name, pid, ordinal, cy, cy1, cy2, cy3, cy4, cy5, cy6
 		FROM ibl_plr
@@ -364,7 +363,7 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
 
     $teamlogo = $userinfo['user_ibl_team'];
     $tid = $sharedFunctions->getTidFromTeamname($teamlogo);
-    $sharedFunctions->displaytopmenu($tid);
+    UI::displaytopmenu($db, $tid);
 
     echo "<center><img src=\"images/logo/$tid.jpg\"><br>";
 
@@ -513,7 +512,6 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
 function reviewtrade($user)
 {
     global $db, $stop;
-    $sharedFunctions = new Shared($db);
     $season = new Season($db);
 
     if (!is_user($user)) {
@@ -529,7 +527,7 @@ function reviewtrade($user)
         }
         if (!is_user($user)) {
             OpenTable();
-            $sharedFunctions->displaytopmenu($tid);
+            UI::displaytopmenu($db, 0);
             loginbox();
             CloseTable();
         }
@@ -542,7 +540,7 @@ function reviewtrade($user)
         } else {
             include "header.php";
             OpenTable();
-            $sharedFunctions->displaytopmenu($tid);
+            UI::displaytopmenu($db, 0);
             echo "Sorry, but trades are not allowed right now.";
             if ($season->allowWaivers == 'Yes') {
                 echo "<br>
@@ -559,7 +557,6 @@ function reviewtrade($user)
 function offertrade($user)
 {
     global $db, $stop;
-    $sharedFunctions = new Shared($db);
 
     if (!is_user($user)) {
         include "header.php";
@@ -574,7 +571,7 @@ function offertrade($user)
         }
         if (!is_user($user)) {
             OpenTable();
-            $sharedFunctions->displaytopmenu($tid);
+            UI::displaytopmenu($db, $tid);
             loginbox();
             CloseTable();
         }

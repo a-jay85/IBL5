@@ -49,7 +49,7 @@ function team($tid)
     //DISPLAY TOP MENU
     //=============================
 
-    $sharedFunctions->displaytopmenu($tid);
+    UI::displaytopmenu($db, $team->teamID);
 
     //=============================
     //GET CONTRACT AMOUNTS CORRECT
@@ -794,7 +794,6 @@ function leaguestats()
 function schedule($tid)
 {
     global $db;
-    $sharedFunctions = new Shared($db);
 
     $tid = intval($tid);
     include "header.php";
@@ -809,7 +808,7 @@ function schedule($tid)
     //=============================
     //DISPLAY TOP MENU
     //=============================
-    $sharedFunctions->displaytopmenu($tid);
+    UI::displaytopmenu($db, $tid);
     $query = "SELECT * FROM `ibl_schedule` WHERE Visitor = $tid OR Home = $tid ORDER BY Date ASC;";
     $result = $db->sql_query($query);
     $year = $db->sql_result($result, 0, "Year");
@@ -985,12 +984,11 @@ function boxscore($year, $month, $tid, $wins, $losses, $winStreak, $lossStreak)
 function viewinjuries($tid)
 {
     global $db;
-    $sharedFunctions = new Shared($db);
 
     include "header.php";
     OpenTable();
 
-    $sharedFunctions->displaytopmenu($tid);
+    UI::displaytopmenu($db, $tid);
 
     $query = "SELECT * FROM ibl_plr WHERE injured > 0 AND retired = 0 ORDER BY ordinal ASC";
 
@@ -1053,11 +1051,10 @@ function viewinjuries($tid)
 function drafthistory($tid)
 {
     global $db;
-    $sharedFunctions = new Shared($db);
 
     include "header.php";
     OpenTable();
-    $sharedFunctions->displaytopmenu($tid);
+    UI::displaytopmenu($db, $tid);
 
     $sqlc = "SELECT * FROM ibl_team_info WHERE teamid = $tid";
     $resultc = $db->sql_query($sqlc);
@@ -1094,12 +1091,11 @@ function drafthistory($tid)
 function menu()
 {
     global $db;
-    $sharedFunctions = new Shared($db);
 
     include "header.php";
     OpenTable();
 
-    $sharedFunctions->displaytopmenu(0);
+    UI::displaytopmenu($db, 0);
 
     CloseTable();
     include "footer.php";

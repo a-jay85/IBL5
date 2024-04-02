@@ -712,8 +712,10 @@ class UI
         return $table_totals;
     }
 
-    public static function simAverages($db, $team, $sharedFunctions)
+    public static function simAverages($db, $team)
     {
+        $season = new Season($db);
+
         $table_simAverages = "<table align=\"center\" class=\"sortable\"><thead><tr bgcolor=$team->color1>
             <th><font color=$team->color2>Pos</font></th>
             <th colspan=3><font color=$team->color2>Player</font></th>
@@ -742,11 +744,6 @@ class UI
             <th><font color=$team->color2>pts</font></th>
         </tr></thead><tbody>";
     
-        $arrayLastSimDates = $sharedFunctions->getLastSimDatesArray();
-    
-        $simStartDate = $arrayLastSimDates['Start Date'];
-        $simEndDate = $arrayLastSimDates['End Date'];
-    
         $playersOnTeam = $db->sql_query("SELECT pid
             FROM ibl_plr
             WHERE tid = $team->teamID
@@ -761,7 +758,7 @@ class UI
             $resultPlayerSimBoxScores = $db->sql_query("SELECT *
                 FROM ibl_box_scores
                 WHERE pid = $pid
-                AND Date BETWEEN '$simStartDate' AND '$simEndDate'
+                AND Date BETWEEN '$season->lastSimStartDate' AND '$season->lastSimEndDate'
                 AND gameMIN > 0
                 ORDER BY Date ASC");
     

@@ -24,20 +24,19 @@ $pagetitle = "- Team Pages";
 function waivers($user)
 {
     global $db, $stop, $action;
-    $sharedFunctions = new Shared($db);
     $season = new Season($db);
 
     if (!is_user($user)) {
         include "header.php";
         if ($stop) {
             OpenTable();
-            $sharedFunctions->displaytopmenu($tid);
+            UI::displaytopmenu($db, $tid);
             echo "<center><font class=\"title\"><b>" . _LOGININCOR . "</b></font></center>\n";
             CloseTable();
             echo "<br>\n";
         } else {
             OpenTable();
-            $sharedFunctions->displaytopmenu($tid);
+            UI::displaytopmenu($db, $tid);
             echo "<center><font class=\"title\"><b>" . _USERREGLOGIN . "</b></font></center>\n";
             CloseTable();
             echo "<br>\n";
@@ -61,7 +60,7 @@ function waivers($user)
         } else {
             include "header.php";
             OpenTable();
-            $sharedFunctions->displaytopmenu($tid);
+            UI::displaytopmenu($db, $tid);
             echo "Sorry, but players may not be added from or dropped to waivers at the present time.";
             CloseTable();
             include "footer.php";
@@ -304,7 +303,7 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
     $queryTeamID = "SELECT teamid FROM ibl_team_info WHERE team_name = '$teamlogo'";
     $tid = $db->sql_result($db->sql_query($queryTeamID), 0);
 
-    $sharedFunctions->displaytopmenu($tid);
+    UI::displaytopmenu($db, $tid);
 
     $querySelectHealthyPlayersOnUsersTeam = "
         SELECT *

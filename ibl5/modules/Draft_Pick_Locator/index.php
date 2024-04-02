@@ -1,12 +1,10 @@
 <?php
 
-$sharedFunctions = new Shared($db);
+$season = new Season($db);
 
 $query = "SELECT * FROM ibl_team_info WHERE teamid != 35 ORDER BY teamid ASC";
 $result = $db->sql_query($query);
 $num = $db->sql_numrows($result);
-
-$currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
 
 echo "<HTML><HEAD><TITLE>Draft Pick Matrix</TITLE></HEAD>
     <BODY>
@@ -16,11 +14,11 @@ echo "<HTML><HEAD><TITLE>Draft Pick Matrix</TITLE></HEAD>
             <TABLE BORDER=1>
                 <TR>
                     <TD ROWSPAN=2><CENTER>Team</CENTER></TD>
-                    <TD COLSPAN=2><CENTER>$currentSeasonEndingYear</CENTER></TD>
-                    <TD COLSPAN=2><CENTER>" . ($currentSeasonEndingYear + 1) . "</CENTER></TD>
-                    <TD COLSPAN=2><CENTER>" . ($currentSeasonEndingYear + 2) . "</CENTER></TD>
-                    <TD COLSPAN=2><CENTER>" . ($currentSeasonEndingYear + 3) . "</CENTER></TD>
-                    <TD COLSPAN=2><CENTER>" . ($currentSeasonEndingYear + 4) . "</CENTER></TD>
+                    <TD COLSPAN=2><CENTER>$season->endingYear</CENTER></TD>
+                    <TD COLSPAN=2><CENTER>" . ($season->endingYear + 1) . "</CENTER></TD>
+                    <TD COLSPAN=2><CENTER>" . ($season->endingYear + 2) . "</CENTER></TD>
+                    <TD COLSPAN=2><CENTER>" . ($season->endingYear + 3) . "</CENTER></TD>
+                    <TD COLSPAN=2><CENTER>" . ($season->endingYear + 4) . "</CENTER></TD>
                 </TR>
                 <TR>
                     <TD><CENTER>Round 1</CENTER></TD>

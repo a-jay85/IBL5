@@ -12,7 +12,7 @@
 /* the Free Software Foundation; either version 2 of the License.       */
 /************************************************************************/
 
-$sharedFunctions = new Shared($db);
+$season = new Season($db);
 
 if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
@@ -23,12 +23,10 @@ get_lang($module_name);
 
 $pagetitle = "- $module_name";
 
-$currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
-
 include "header.php";
 
 OpenTable();
-echo "<center><font class=\"storytitle\">" . ($currentSeasonEndingYear - 1) . "-$currentSeasonEndingYear IBL Power Rankings</font></center>\n\n";
+echo "<center><font class=\"storytitle\">" . ($season->endingYear - 1) . "-$season->endingYear IBL Power Rankings</font></center>\n\n";
 echo "<p>\n\n";
 
 $query = "SELECT * FROM ibl_power WHERE TeamID BETWEEN 1 AND 32 ORDER BY ranking DESC";

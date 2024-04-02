@@ -29,10 +29,10 @@ class UI
 
     public static function contracts($db, $result, $team, $sharedFunctions)
     {
-        $currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
+        $season = new Season($db);
 
         if ($sharedFunctions->isFreeAgencyModuleActive() == 1) {
-            $currentSeasonEndingYear++;
+            $season->endingYear++;
         }
         
         $table_contracts = "<table align=\"center\" class=\"sortable\">
@@ -43,12 +43,12 @@ class UI
                     <th><font color=$team->color2>Exp</font></th>
                     <th><font color=$team->color2>Bird</font></th>
                     <td bgcolor=$team->color1 width=0></td>
-                    <th><font color=$team->color2>" . ($currentSeasonEndingYear + -1) . "-<br>" . ($currentSeasonEndingYear + 0) . "</font></th>
-                    <th><font color=$team->color2>" . ($currentSeasonEndingYear + 0) . "-<br>" . ($currentSeasonEndingYear + 1) . "</font></th>
-                    <th><font color=$team->color2>" . ($currentSeasonEndingYear + 1) . "-<br>" . ($currentSeasonEndingYear + 2) . "</font></th>
-                    <th><font color=$team->color2>" . ($currentSeasonEndingYear + 2) . "-<br>" . ($currentSeasonEndingYear + 3) . "</font></th>
-                    <th><font color=$team->color2>" . ($currentSeasonEndingYear + 3) . "-<br>" . ($currentSeasonEndingYear + 4) . "</font></th>
-                    <th><font color=$team->color2>" . ($currentSeasonEndingYear + 4) . "-<br>" . ($currentSeasonEndingYear + 5) . "</font></th>
+                    <th><font color=$team->color2>" . ($season->endingYear + -1) . "-<br>" . ($season->endingYear + 0) . "</font></th>
+                    <th><font color=$team->color2>" . ($season->endingYear + 0) . "-<br>" . ($season->endingYear + 1) . "</font></th>
+                    <th><font color=$team->color2>" . ($season->endingYear + 1) . "-<br>" . ($season->endingYear + 2) . "</font></th>
+                    <th><font color=$team->color2>" . ($season->endingYear + 2) . "-<br>" . ($season->endingYear + 3) . "</font></th>
+                    <th><font color=$team->color2>" . ($season->endingYear + 3) . "-<br>" . ($season->endingYear + 4) . "</font></th>
+                    <th><font color=$team->color2>" . ($season->endingYear + 4) . "-<br>" . ($season->endingYear + 5) . "</font></th>
                     <td bgcolor=$team->color1 width=0></td>
                     <th><font color=$team->color2>Tal</font></th>
                     <th><font color=$team->color2>Skl</font></th>

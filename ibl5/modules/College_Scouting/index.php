@@ -30,6 +30,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 {
     global $user, $prefix, $user_prefix, $db;
     $sharedFunctions = new Shared($db);
+    $season = new Season($db);
 
     $sql = "SELECT * FROM " . $prefix . "_bbconfig";
     $result = $db->sql_query($sql);
@@ -52,7 +53,6 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 
     $sharedFunctions->displaytopmenu($tid);
 
-    $draft_year = $sharedFunctions->getCurrentSeasonEndingYear();
     $draft_sql = "SELECT * from ibl_draft WHERE player = '' ORDER BY round ASC, pick ASC";
     $draft_result = $db->sql_query($draft_sql);
 
@@ -60,13 +60,13 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
     $draft_round = $db->sql_result($draft_result, 0, "round");
     $draft_pick = $db->sql_result($draft_result, 0, "pick");
 
-    $pickOwner = $sharedFunctions->getCurrentOwnerOfDraftPick($draft_year, $draft_round, $draft_team);
+    $pickOwner = $sharedFunctions->getCurrentOwnerOfDraftPick($season->endingYear, $draft_round, $draft_team);
 
     echo "<center><img src=\"images/logo/$tid.jpg\"><br>
 	<table>
 		<tr>
 			<th colspan=27>
-				<center>Welcome to the $draft_year IBL Draft!
+				<center>Welcome to the $season->endingYear IBL Draft!
 			</th>
 		</tr>
 	</table>

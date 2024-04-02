@@ -61,6 +61,7 @@ function chunk($chunk_start_date, $chunk_end_date, $j)
 
     global $db;
     $sharedFunctions = new Shared($db);
+    $season = new Season($db);
 
     $query = "SELECT *
 		FROM ibl_schedule
@@ -78,10 +79,8 @@ function chunk($chunk_start_date, $chunk_end_date, $j)
     $projectedNextSimEndDate = date_add($lastSimEndDate, date_interval_create_from_date_string('7 days'));
 
     // override $projectedNextSimEndDate to account for the blank week at end of HEAT
-    $currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
-    $currentSeasonBeginningYear = $currentSeasonEndingYear - 1;
-    if ($projectedNextSimEndDate >= date_create("$currentSeasonBeginningYear-10-23") and $projectedNextSimEndDate < date_create("$currentSeasonBeginningYear-11-01")) {
-        $projectedNextSimEndDate = date_create("$currentSeasonBeginningYear-11-08");
+    if ($projectedNextSimEndDate >= date_create("$season->beginningYear-10-23") and $projectedNextSimEndDate < date_create("$season->beginningYear-11-01")) {
+        $projectedNextSimEndDate = date_create("$season->beginningYear-11-08");
     }
 
     echo "<table width=\"500\" cellpadding=\"6\" cellspacing=\"0\" border=\"1\" align=center>";

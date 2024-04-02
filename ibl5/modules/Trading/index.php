@@ -90,18 +90,17 @@ function buildTeamFutureSalary($resultTeamPlayers, $k)
 function buildTeamFuturePicks($resultTeamPicks, $future_salary_array)
 {
     global $db;
-    $sharedFunctions = new Shared($db);
+    $season = new Season($db);
 
     $k = $future_salary_array['k'];
     while ($rowTeamDraftPicks = $db->sql_fetch_assoc($resultTeamPicks)) {
-        $currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
         $pick_year = $rowTeamDraftPicks["year"];
         $pick_team = $rowTeamDraftPicks["teampick"];
         $pick_round = $rowTeamDraftPicks["round"];
         $pick_notes = $rowTeamDraftPicks["notes"];
         $pick_id = $rowTeamDraftPicks["pickid"];
 
-        $y = $pick_year - $currentSeasonEndingYear + 1;
+        $y = $pick_year - $season->endingYear + 1;
         if ($pick_round == 1) {
             $future_salary_array['picks'][$y] += 75;
             $future_salary_array['hold'][$y]++;
@@ -174,7 +173,7 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 
     include "header.php";
 
-    $currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
+    $currentSeasonEndingYear = $season->endingYear; // we use this as an incrementer
 
     OpenTable();
 
@@ -298,7 +297,7 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
         $z++;
     }
 
-    $currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear(); // This resets the incrementation from the last block.
+    $currentSeasonEndingYear = $season->endingYear; // This resets the incrementation from the last block.
     $i = 1; // We need to start at 1 because of the "xSendsCash" value names.
     if (
         $season->phase == "Playoffs"

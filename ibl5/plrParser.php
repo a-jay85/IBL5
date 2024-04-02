@@ -2,8 +2,7 @@
 
 require 'mainfile.php';
 $sharedFunctions = new Shared($db);
-
-$currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
+$season = new Season($db);
 
 $stringTeamIDsNames = "SELECT teamid,team_name FROM ibl_team_info ORDER BY teamid ASC;";
 $queryTeamIDsNames = $db->sql_query($stringTeamIDsNames);
@@ -184,7 +183,7 @@ while (!feof($plrFile)) {
 
     $heightFT = floor($heightInches / 12);
     $heightIN = $heightInches % 12;
-    $draftYear = $currentSeasonEndingYear - $exp;
+    $draftYear = $season->endingYear - $exp;
     if ($realLifePF != 0) {
         $minutesPerPF = round($realLifeMIN / $realLifePF);
     } else {

@@ -9,16 +9,6 @@ class Shared
         $this->db = $db;
     }
 
-    public function getLastSimDatesArray()
-    {
-        $queryLastSimDates = $this->db->sql_query("SELECT *
-            FROM ibl_sim_dates
-            ORDER BY sim DESC
-            LIMIT 1");
-
-        return $this->db->sql_fetch_assoc($queryLastSimDates);
-    }
-
     public function getDiscordIDFromTeamname($teamname)
     {
         $queryDiscordIDFromTeamname = $this->db->sql_query("SELECT discordID

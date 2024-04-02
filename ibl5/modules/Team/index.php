@@ -129,7 +129,7 @@ function team($tid)
 
     if ($display == "chunk") {
         $showing = "Chunk Averages";
-        $table_simAverages = UI::simAverages($db, $team, $sharedFunctions);
+        $table_simAverages = UI::simAverages($db, $team);
         $table_output = $table_simAverages;
         $tabs .= "<td bgcolor=#BBBBBB style=\"font-weight:bold\">";
     } else {
@@ -871,9 +871,7 @@ function boxscore($year, $month, $tid, $wins, $losses, $winStreak, $lossStreak)
     $teamSeasonRecordsQuery = "SELECT tid, leagueRecord FROM ibl_standings ORDER BY tid ASC;";
     $teamSeasonRecordsResult = $db->sql_query($teamSeasonRecordsQuery);
 
-    $arrayLastSimDates = $sharedFunctions->getLastSimDatesArray();
-    $lastSimEndDate = date_create($arrayLastSimDates["End Date"]);
-    $projectedNextSimEndDate = date_add($lastSimEndDate, date_interval_create_from_date_string('7 days'));
+    $projectedNextSimEndDate = date_add($season->lastSimEndDate, date_interval_create_from_date_string('7 days'));
 
     // override $projectedNextSimEndDate to account for the blank week at end of HEAT
     if (

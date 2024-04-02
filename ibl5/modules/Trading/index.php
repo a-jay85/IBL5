@@ -514,6 +514,7 @@ function reviewtrade($user)
 {
     global $db, $stop;
     $sharedFunctions = new Shared($db);
+    $season = new Season($db);
 
     if (!is_user($user)) {
         include "header.php";
@@ -534,9 +535,7 @@ function reviewtrade($user)
         }
         include "footer.php";
     } elseif (is_user($user)) {
-        $allow_trades = $sharedFunctions->getAllowTradesStatus();
-
-        if ($allow_trades == 'Yes') {
+        if ($season->allowTrades == 'Yes') {
             global $cookie;
             cookiedecode($user);
             tradereview($cookie[1]);

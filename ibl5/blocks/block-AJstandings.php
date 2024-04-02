@@ -18,15 +18,14 @@ if (!defined('BLOCK_FILE')) {
 }
 
 global $db;
-
 $season = new Season($db);
 
-$content = $content . '<table width=150>';
-$content = $content . "<center><u>Recent Sim Dates:</u></center>";
-$content = $content . "<center><strong>$season->lastSimStartDate</strong></center>";
-$content = $content . "<center>-to-</center>";
-$content = $content . "<center><strong>$season->lastSimEndDate</strong></center>";
-$content = $content . '<tr><td colspan=2><hr></td></tr>';
+$content .= '<table width=150>';
+$content .= "<center><u>Recent Sim Dates:</u></center>";
+$content .= "<center><strong>$season->lastSimStartDate</strong></center>";
+$content .= "<center>-to-</center>";
+$content .= "<center><strong>$season->lastSimEndDate</strong></center>";
+$content .= '<tr><td colspan=2><hr></td></tr>';
 
 $queryEasternConference = "SELECT tid, team_name, leagueRecord, confGB, clinchedConference, clinchedDivision, clinchedPlayoffs
     FROM ibl_standings
@@ -35,7 +34,7 @@ $queryEasternConference = "SELECT tid, team_name, leagueRecord, confGB, clinched
 $resultEasternConference = $db->sql_query($queryEasternConference);
 $limitEasternConference = $db->sql_numrows($resultEasternConference);
 
-$content = $content . '
+$content .= '
     <tr>
         <td colspan=2>
             <center><font color=#fd004d><b>Eastern Conference</b></font></center>
@@ -67,7 +66,7 @@ while ($i < $limitEasternConference) {
         $team_name = "<b>X</b>-" . $team_name;
     }
 
-    $content = $content . '
+    $content .= '
         <tr>
             <td nowrap>
                 <a href="modules.php?name=Team&op=team&tid=' . $tid . '">' . $team_name . '</a> (' . $leagueRecord . ')
@@ -86,7 +85,7 @@ $queryWesternConference = "SELECT tid, team_name, leagueRecord, confGB, clinched
 $resultWesternConference = $db->sql_query($queryWesternConference);
 $limitWesternConference = $db->sql_numrows($resultWesternConference);
 
-$content = $content . '
+$content .= '
     <tr>
         <td colspan=2>
             <hr>
@@ -123,7 +122,7 @@ while ($i < $limitWesternConference) {
         $team_name = "<b>X</b>-" . $team_name;
     }
 
-    $content = $content . '
+    $content .= '
         <tr>
             <td nowrap>
                 <a href="modules.php?name=Team&op=team&tid=' . $tid . '">' . $team_name . '</a> (' . $leagueRecord . ')
@@ -135,7 +134,7 @@ while ($i < $limitWesternConference) {
     $i++;
 }
 
-$content = $content . '
+$content .= '
     <tr>
         <td colspan=2>
             <center><a href="modules.php?name=Content&pa=showpage&pid=4"><font color=#aaaaaa><i>-- Full Standings --</i></font></a></center>

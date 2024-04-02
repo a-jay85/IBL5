@@ -51,7 +51,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
     $teamlogo = $userinfo['user_ibl_team'];
     $tid = $sharedFunctions->getTidFromTeamname($teamlogo);
 
-    $sharedFunctions->displaytopmenu($tid);
+    UI::displaytopmenu($db, $tid);
 
     $draft_sql = "SELECT * from ibl_draft WHERE player = '' ORDER BY round ASC, pick ASC";
     $draft_result = $db->sql_query($draft_sql);

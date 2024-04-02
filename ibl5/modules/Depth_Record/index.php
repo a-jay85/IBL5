@@ -16,8 +16,6 @@ if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
     die("You can't access this file directly...");
 }
 
-$sharedFunctions = new Shared($db);
-
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 $userpage = 1;
@@ -28,7 +26,7 @@ $result2 = $db->sql_query($query2);
 $num2 = $db->sql_numrows($result2);
 
 OpenTable();
-$sharedFunctions->displaytopmenu($tid);
+UI::displaytopmenu($db, 0);
 
 $k = 0;
 while ($k < $num2) {

@@ -1,13 +1,10 @@
 <?php
 
 require 'mainfile.php';
-$sharedFunctions = new Shared($db);
 $season = new Season($db);
 
 $queryString = "";
 $successText = "";
-
-$allowTradesStatus = $sharedFunctions->getAllowTradesStatus();
 
 if (isset($_POST['query'])) {
     switch ($_POST['query']) {
@@ -97,7 +94,7 @@ if (isset($_POST['query'])) {
             $season->allowWaivers = $_POST['Waivers'];
         }
         if (isset($_POST['Trades'])) {
-            $allowTradesStatus = $_POST['Trades'];
+            $season->allowTrades = $_POST['Trades'];
         }
     } else {
         $querySuccessful = false;
@@ -148,8 +145,8 @@ switch ($season->phase) {
             <A HREF=\"asg_vote_reset.php\">Reset All-Star Voting</A><p>
             <A HREF=\"eoy_vote_reset.php\">Reset End of the Year Voting</A><p>
             <select name=\"Trades\">
-                <option value = \"Yes\"" . ($allowTradesStatus == "Yes" ? " SELECTED" : "") . ">Yes</option>
-                <option value = \"No\"" . ($allowTradesStatus == "No" ? " SELECTED" : "") . ">No</option>
+                <option value = \"Yes\"" . ($season->allowTrades == "Yes" ? " SELECTED" : "") . ">Yes</option>
+                <option value = \"No\"" . ($season->allowTrades == "No" ? " SELECTED" : "") . ">No</option>
             </select>
             <INPUT type='submit' name='query' value='Set Allow Trades Status'><p>";
         break;
@@ -158,8 +155,8 @@ switch ($season->phase) {
             <A HREF=\"scoParser.php\">Run scoParser.php</A><p>
             <A HREF=\"eoy_vote_reset.php\">Reset End of the Year Voting</A><p>
             <select name=\"Trades\">
-                <option value = \"Yes\"" . ($allowTradesStatus == "Yes" ? " SELECTED" : "") . ">Yes</option>
-                <option value = \"No\"" . ($allowTradesStatus == "No" ? " SELECTED" : "") . ">No</option>
+                <option value = \"Yes\"" . ($season->allowTrades == "Yes" ? " SELECTED" : "") . ">Yes</option>
+                <option value = \"No\"" . ($season->allowTrades == "No" ? " SELECTED" : "") . ">No</option>
             </select>
             <INPUT type='submit' name='query' value='Set Allow Trades Status'><p>";
         break;

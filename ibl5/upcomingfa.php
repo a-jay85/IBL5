@@ -1,20 +1,18 @@
 <?php
 
 require 'mainfile.php';
-$sharedFunctions = new Shared($db);
-
-$currentSeasonEndingYear = $sharedFunctions->getCurrentSeasonEndingYear();
+$season = new Season($db);
 
 $tid = $_REQUEST['tid'];
 $yr = $_REQUEST['yr'];
 
 if ($tid == null) {
-    if ($currentSeasonEndingYear != null) {
+    if ($season->endingYear != null) {
         // === CODE FOR FREE AGENTS
 
-        echo "<html><head><title>Upcoming Free Agents List ($currentSeasonEndingYear)</title></head><body>
+        echo "<html><head><title>Upcoming Free Agents List ($season->endingYear)</title></head><body>
             <style>th{ font-size: 9pt; font-family:Arial; color: white; background-color: navy}td      { text-align: Left; font-size: 9pt; font-family:Arial; color:black; }.tdp { font-weight: bold; text-align: Left; font-size: 9pt; color:black; } </style>
-            <center><h2>Players Currently to be Free Agents at the end of the $currentSeasonEndingYear Season</h2>
+            <center><h2>Players Currently to be Free Agents at the end of the $season->endingYear Season</h2>
             <table border=1 cellspacing=1><tr><th colspan=33><center>Player Ratings</center></th></tr>
             <tr><th>Pos</th>
                 <th>Player</th>
@@ -63,7 +61,7 @@ if ($tid == null) {
 
             $yearoffreeagency = $draftyear + $exp + $cyt - $cy;
 
-            if ($yearoffreeagency == $currentSeasonEndingYear) {
+            if ($yearoffreeagency == $season->endingYear) {
                 $name = $db->sql_result($result, $i, "name");
                 $team = $db->sql_result($result, $i, "teamname");
                 $tid = $db->sql_result($result, $i, "tid");

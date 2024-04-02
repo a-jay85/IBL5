@@ -19,16 +19,6 @@ class Shared
         return $this->db->sql_fetch_assoc($queryLastSimDates);
     }
 
-    public function getCurrentSeasonEndingYear()
-    {
-        $queryCurrentSeasonEndingYear = $this->db->sql_query("SELECT value
-            FROM ibl_settings
-            WHERE name = 'Current Season Ending Year'
-            LIMIT 1");
-
-        return $this->db->sql_result($queryCurrentSeasonEndingYear, 0);
-    }
-
     public function getDiscordIDFromTeamname($teamname)
     {
         $queryDiscordIDFromTeamname = $this->db->sql_query("SELECT discordID

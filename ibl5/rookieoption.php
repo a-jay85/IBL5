@@ -5,23 +5,19 @@ $sharedFunctions = new Shared($db);
 $season = new Season($db);
 
 $Team_Name = $_POST['teamname'];
-$Player_Name = $_POST['playername'];
+$player = Player::withPlayerID($db, $_POST['playerID']);
 $ExtensionAmount = $_POST['rookieOptionValue'];
-$player_exp = $_POST['player_exp'];
-$player_draftround = $_POST['player_draftround'];
 
 $tid = $sharedFunctions->getTidFromTeamname($Team_Name);
 
 $recipient = 'ibldepthcharts@gmail.com';
-$emailsubject = "Rookie Extension Option - " . $Player_Name;
-$filetext = $Team_Name . " exercise the rookie extension option on " . $Player_Name . " in the amount of " . $ExtensionAmount . ".";
+$emailsubject = "Rookie Extension Option - " . $player->name;
+$filetext = $Team_Name . " exercise the rookie extension option on " . $player->name . " in the amount of " . $ExtensionAmount . ".";
 
-if (($season->phase == "Free Agency" and $player_exp == 2 and $player_draftround == 1) or
-    (($season->phase == "Preseason" or $season->phase == "HEAT") and $player_exp == 3 and $player_draftround == 1)) {
-    $queryrookieoption = "UPDATE ibl_plr SET cy4 = '$ExtensionAmount' WHERE name = '$Player_Name'";
-} elseif (($season->phase == "Free Agency" and $player_exp == 1 and $player_draftround == 2) or
-    (($season->phase == "Preseason" or $season->phase == "HEAT") and $player_exp == 2 and $player_draftround == 2)) {
-    $queryrookieoption = "UPDATE ibl_plr SET cy3 = '$ExtensionAmount' WHERE name = '$Player_Name'";
+if ($player->draftRound == 1 AND $player->canRookieOption($season->phase)) {
+    $queryrookieoption = "UPDATE ibl_plr SET cy4 = '$ExtensionAmount' WHERE name = '$player->name'";
+} elseif ($player->draftRound == 2 AND $player->canRookieOption($season->phase)) {
+    $queryrookieoption = "UPDATE ibl_plr SET cy3 = '$ExtensionAmount' WHERE name = '$player->name'";
 } else {
     die("This player's experience doesn't match their rookie status; please let the commish know about this error.");
 }
@@ -43,8 +39,8 @@ Discord::postToChannel('#rookie-options', $filetext);
 if (mail($recipient, $emailsubject, $filetext, "From: rookieoption@iblhoops.net")) {
     $rookieOptionInMillions = $ExtensionAmount / 100;
     $timestamp = date('Y-m-d H:i:s', time());
-    $storytitle = $Player_Name . " extends their contract with the " . $Team_Name;
-    $hometext = $Team_Name . " exercise the rookie extension option on " . $Player_Name . " in the amount of " . $rookieOptionInMillions . " million dollars.";
+    $storytitle = $player->name . " extends their contract with the " . $Team_Name;
+    $hometext = $Team_Name . " exercise the rookie extension option on " . $player->name . " in the amount of " . $rookieOptionInMillions . " million dollars.";
 
     $querytopic = "SELECT * FROM nuke_topics WHERE topicname = '$Team_Name'";
     $resulttopic = $db->sql_query($querytopic);

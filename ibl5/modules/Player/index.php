@@ -2134,45 +2134,25 @@ function negotiate($pid)
 
 function rookieoption($pid)
 {
-    global $prefix, $db, $user, $cookie;
+    global $prefix, $db, $cookie;
+    $sharedFunctions = new Shared($db);
     $season = new Season($db);
+    $player = Player::withPlayerID($db, $pid);
 
-    $pid = intval($pid);
+    $userteam = $sharedFunctions->getTeamnameFromUsername($cookie[1]);
 
-    cookiedecode($user);
-
-    $sql2 = "SELECT * FROM " . $prefix . "_users WHERE username='$cookie[1]'";
-    $result2 = $db->sql_query($sql2);
-    $userinfo = $db->sql_fetchrow($result2);
-
-    $userteam = stripslashes(check_html($userinfo['user_ibl_team'], "nohtml"));
-
-    $playerinfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_plr WHERE pid='$pid'"));
-
-    $player_name = stripslashes(check_html($playerinfo['name'], "nohtml"));
-    $player_pos = stripslashes(check_html($playerinfo['pos'], "nohtml"));
-    $player_team_name = stripslashes(check_html($playerinfo['teamname'], "nohtml"));
-    $player_draftround = stripslashes(check_html($playerinfo['draftround'], "nohtml"));
-    $player_exp = stripslashes(check_html($playerinfo['exp'], "nohtml"));
-
-    if ($userteam != $player_team_name) {
-        echo "$player_pos $player_name is not on your team.<br>
+    if ($userteam != $player->teamName) {
+        echo "$player->position $player->name is not on your team.<br>
             <a href=\"javascript:history.back()\">Go Back</a>";
         return;
     }
 
-    if (($season->phase == "Free Agency" and $player_exp == 2 and $player_draftround == 1) or
-        (($season->phase == "Preseason" or $season->phase == "HEAT") and
-            $player_exp == 3 and
-            $player_draftround == 1)) {
-        $finalYearOfRookieContract = stripslashes(check_html($playerinfo['cy3'], "nohtml"));
-    } elseif (($season->phase == "Free Agency" and $player_exp == 1 and $player_draftround == 2) or
-        (($season->phase == "Preseason" or $season->phase == "HEAT") and
-            $player_exp == 2 and
-            $player_draftround == 2)) {
-        $finalYearOfRookieContract = stripslashes(check_html($playerinfo['cy2'], "nohtml"));
+    if ($player->draftRound == 1 AND $player->canRookieOption($season->phase)) {
+        $finalYearOfRookieContract = $player->contractYear3Salary;
+    } elseif ($player->draftRound == 2 AND $player->canRookieOption($season->phase)) {
+        $finalYearOfRookieContract = $player->contractYear2Salary;
     } else {
-        echo "Sorry, $player_pos $player_name is not eligible for a rookie option.<p>
+        echo "Sorry, $player->position $player->name is not eligible for a rookie option.<p>
             Only draft picks are eligible for rookie options, and the option must be exercised
             before the final season of their rookie contract is underway.<p>
     		<a href=\"javascript:history.back()\">Go Back</a>";
@@ -2182,16 +2162,14 @@ function rookieoption($pid)
     $rookieOptionValue = 2 * $finalYearOfRookieContract;
 
     echo "<img align=left src=\"images/player/$pid.jpg\">
-    	You may exercise the rookie extension option on <b>$player_pos $player_name</b>.<br>
+    	You may exercise the rookie extension option on <b>$player->position $player->name</b>.<br>
     	Their contract value the season after this one will be <b>$rookieOptionValue</b>.<br>
     	However, by exercising this option, <b>you can't use an in-season contract extension on them next season</b>.<br>
     	<b>They will become a free agent</b>.<br>
     	<form name=\"RookieExtend\" method=\"post\" action=\"rookieoption.php\">
             <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
-            <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
+            <input type=\"hidden\" name=\"playerID\" value=\"$player->playerID\">
             <input type=\"hidden\" name=\"rookieOptionValue\" value=\"$rookieOptionValue\">
-            <input type=\"hidden\" name=\"player_exp\" value=\"$player_exp\">
-            <input type=\"hidden\" name=\"player_draftround\" value=\"$player_draftround\">
             <input type=\"submit\" value=\"Activate Rookie Extension\">
         </form>";
 }

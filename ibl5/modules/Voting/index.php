@@ -64,13 +64,10 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
         $season = new Season($db);
 
         if ($season->phase == "Regular Season") {
-            $easternConferenceTids = array(1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 22, 25, 27);
-            $westernConferenceTids = array(6, 13, 14, 15, 16, 17, 18, 19, 20, 21, 23, 24, 26, 28);
-
             if (strpos($votingCategory, 'EC') !== false) {
-                $conferenceTids = $easternConferenceTids;
+                $conferenceTids = League::EASTERN_CONFERENCE_TEAMIDS;
             } elseif (strpos($votingCategory, 'WC') !== false) {
-                $conferenceTids = $westernConferenceTids;
+                $conferenceTids = League::WESTERN_CONFERENCE_TEAMIDS;
             }
 
             if (strpos($votingCategory, 'CF') !== false) {

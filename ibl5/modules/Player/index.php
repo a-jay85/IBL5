@@ -38,7 +38,7 @@ function showmenu()
 
 function showpage($playerID, $spec)
 {
-    global $prefix, $db, $user, $cookie;
+    global $db, $cookie;
     $sharedFunctions = new Shared($db);
     $season = new Season($db);
     

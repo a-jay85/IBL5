@@ -71,45 +71,34 @@ function showpage($playerID, $spec)
 
     // RENEGOTIATION BUTTON START
 
-    cookiedecode($user);
+    $userTeamName = $sharedFunctions->getTeamnameFromUsername($cookie[1]);
+    $userTeam = Team::withTeamName($db, $userTeamName);
 
-    $sql2 = "SELECT * FROM " . $prefix . "_users WHERE username='$cookie[1]'";
-    $result2 = $db->sql_query($sql2);
-    $userinfo = $db->sql_fetchrow($result2);
-
-    $userteam = stripslashes(check_html($userinfo['user_ibl_team'], "nohtml"));
     if ($player->wasRookieOptioned()) {
         echo "<table align=right bgcolor=#ff0000>
                 <tr>
                     <td align=center>ROOKIE OPTION<br>USED; RENEGOTIATION<br>IMPOSSIBLE</td>
                 </tr>
             </table>";
-    } else {
-        $queryHasUsedExtensionThisSeason = "SELECT Used_Extension_This_Season
-            FROM ibl_team_info
-            WHERE team_name = '" . $userinfo['user_ibl_team'] . "';";
-        $hasUsedExtensionThisSeason = $db->sql_result($db->sql_query($queryHasUsedExtensionThisSeason), 0);
-
-        if (
-            $hasUsedExtensionThisSeason == 0 and
-            $player->canRenegotiateContract() and
-            $season->phase != 'Draft' and
-            $season->phase != 'Free Agency' and
-            $player->teamName == $userteam
-        ) {
-            echo "<table align=right bgcolor=#ff0000>
-                    <tr>
-                        <td align=center><a href=\"modules.php?name=Player&pa=negotiate&pid=$playerID\">RENEGOTIATE<BR>CONTRACT</a></td>
-                    </tr>
-                </table>";
-        }
+    } elseif (
+        $userTeam->hasUsedExtensionThisSeason == 0
+        AND $player->canRenegotiateContract()
+        AND $player->teamName == $userTeam->name
+        AND $season->phase != 'Draft'
+        AND $season->phase != 'Free Agency'
+    ) {
+        echo "<table align=right bgcolor=#ff0000>
+                <tr>
+                    <td align=center><a href=\"modules.php?name=Player&pa=negotiate&pid=$playerID\">RENEGOTIATE<BR>CONTRACT</a></td>
+                </tr>
+            </table>";
     }
 
     // RENEGOTIATION BUTTON END
 
     if (
         $player->canRookieOption($season->phase)
-        AND $player->teamName == $userteam
+        AND $player->teamName == $userTeam->name
         ) {
             echo "<table align=right bgcolor=#ffbb00>
                 <tr>

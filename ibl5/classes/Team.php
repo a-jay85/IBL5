@@ -118,6 +118,13 @@ class Team
         return $result;
     }
 
+    public function getDraftHistoryResult()
+    {
+        $query = "SELECT * FROM ibl_plr WHERE draftedby LIKE '$this->name' ORDER BY draftyear DESC, draftround, draftpickno ASC";
+        $result = $this->db->sql_query($query);
+        return $result;
+    }
+
     public function getFreeAgencyOffersResult()
     {
         $query = "SELECT * FROM ibl_fa_offers WHERE team='$this->name' ORDER BY name ASC";

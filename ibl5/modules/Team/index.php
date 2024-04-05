@@ -1056,30 +1056,37 @@ function drafthistory($tid)
     OpenTable();
     UI::displaytopmenu($db, $tid);
 
-    $sqlc = "SELECT * FROM ibl_team_info WHERE teamid = $tid";
-    $resultc = $db->sql_query($sqlc);
-    $rowc = $db->sql_fetchrow($resultc);
-    $teamname = $rowc['team_name'];
+    $team = Team::withTeamID($db, $tid);
 
-    $sqld = "SELECT * FROM ibl_plr WHERE draftedby LIKE '$teamname' ORDER BY draftyear DESC, draftround, draftpickno ASC ";
-    $resultd = $db->sql_query($sqld);
+    $draftHistoryResult = $team->getDraftHistoryResult();
 
-    echo "$teamname Draft History<table class=\"sortable\"><tr><th>Player</th><th>Pos</th><th>Year</th><th>Round</th><th>Pick</th></tr>";
+    echo "$team->name Draft History
+        <table class=\"sortable\">
+            <tr>
+                <th>Player</th>
+                <th>Pos</th>
+                <th>Year</th>
+                <th>Round</th>
+                <th>Pick</th>
+            </tr>";
 
-    while ($rowd = $db->sql_fetchrow($resultd)) {
-        $player_pid = $rowd['pid'];
-        $player_name = $rowd['name'];
-        $player_pos = $rowd['pos'];
-        $player_draftyear = $rowd['draftyear'];
-        $player_draftround = $rowd['draftround'];
-        $player_draftpickno = $rowd['draftpickno'];
-        $player_retired = $rowd['retired'];
+    foreach ($draftHistoryResult as $playerRow) {
+        $player = Player::withPlrRow($db, $playerRow);
 
-        if ($player_retired == 1) {
-            echo "<tr><td><a href=\"./modules.php?name=Player&pa=showpage&pid=$player_pid\">$player_name</a> (retired)</td><td>$player_pos</td><td>$player_draftyear</td><td>$player_draftround</td><td>$player_draftpickno</td></tr>";
+        echo "<tr>";
+
+        if ($player->isRetired) {
+            echo "<td><a href=\"./modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->name</a> (retired)</td>";
         } else {
-            echo "<tr><td><a href=\"./modules.php?name=Player&pa=showpage&pid=$player_pid\">$player_name</a></td><td>$player_pos</td><td>$player_draftyear</td><td>$player_draftround</td><td>$player_draftpickno</td></tr>";
+            echo "<td><a href=\"./modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->name</a></td>";
         }
+
+        echo "
+            <td>$player->position</td>
+            <td>$player->draftYear</td>
+            <td>$player->draftRound</td>
+            <td>$player->draftPickNumber</td>
+        </tr>";
     }
 
     echo "</table>";

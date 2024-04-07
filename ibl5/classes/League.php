@@ -38,7 +38,7 @@ class League
         $query = "SELECT *
         FROM ibl_plr
         WHERE pos IN ($positions)
-            AND tid IN ('" . formatTidsForSqlQuery($conferenceTids) . "')
+            AND tid IN ('" . $this->formatTidsForSqlQuery($conferenceTids) . "')
             AND retired != 1
             AND stats_gm > '14'
         ORDER BY name";

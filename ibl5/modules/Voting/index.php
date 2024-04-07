@@ -27,24 +27,16 @@ $userpage = 1;
 
 //include("modules/$module_name/navbar.php");
 
-function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
+function userinfo($username)
 {
-    global $user, $prefix, $user_prefix, $db;
+    global $prefix, $db;
     $sharedFunctions = new Shared($db);
     $season = new Season($db);
 
-    $sql = "SELECT * FROM " . $prefix . "_bbconfig";
-    $result = $db->sql_query($sql);
-    while ($row = $db->sql_fetchrow($result)) {
-        $board_config[$row['config_name']] = $row['config_value'];
-    }
-    $sql2 = "SELECT * FROM " . $user_prefix . "_users WHERE username = '$username'";
+    $sql2 = "SELECT * FROM " . $prefix . "_users WHERE username = '$username'";
     $result2 = $db->sql_query($sql2);
-    $num = $db->sql_numrows($result2);
     $userinfo = $db->sql_fetchrow($result2);
-    if (!$bypass) {
-        cookiedecode($user);
-    }
+
     include "header.php";
 
 // === CODE TO INSERT IBL DEPTH CHART ===
@@ -294,7 +286,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 
 function main($user)
 {
-    global $stop, $module_name, $redirect, $mode, $t, $f, $gfx_chk;
+    global $stop;
     if (!is_user($user)) {
         include "header.php";
         if ($stop) {
@@ -309,33 +301,11 @@ function main($user)
             echo "<br>\n";
         }
         if (!is_user($user)) {
-            OpenTable();
-            mt_srand((double) microtime() * 1000000);
-            $maxran = 1000000;
-            $random_num = mt_rand(0, $maxran);
-            echo "<form action=\"modules.php?name=$module_name\" method=\"post\">\n"
-                . "<b>" . _USERLOGIN . "</b><br><br>\n"
-                . "<table border=\"0\"><tr><td>\n"
-                . "" . _NICKNAME . ":</td><td><input type=\"text\" name=\"username\" size=\"15\" maxlength=\"25\"></td></tr>\n"
-                . "<tr><td>" . _PASSWORD . ":</td><td><input type=\"password\" name=\"user_password\" size=\"15\" maxlength=\"20\"></td></tr>\n";
-            if (extension_loaded("gd") and ($gfx_chk == 2 or $gfx_chk == 4 or $gfx_chk == 5 or $gfx_chk == 7)) {
-                echo "<tr><td colspan='2'>" . _SECURITYCODE . ": <img src='modules.php?name=$module_name&op=gfx&random_num=$random_num' border='1' alt='" . _SECURITYCODE . "' title='" . _SECURITYCODE . "'></td></tr>\n"
-                    . "<tr><td colspan='2'>" . _TYPESECCODE . ": <input type=\"text\" NAME=\"gfx_check\" SIZE=\"7\" MAXLENGTH=\"6\"></td></tr>\n"
-                    . "<input type=\"hidden\" name=\"random_num\" value=\"$random_num\">\n";
-            }
-            echo "</table><input type=\"hidden\" name=\"redirect\" value=$redirect>\n"
-                . "<input type=\"hidden\" name=\"mode\" value=$mode>\n"
-                . "<input type=\"hidden\" name=\"f\" value=$f>\n"
-                . "<input type=\"hidden\" name=\"t\" value=$t>\n"
-                . "<input type=\"hidden\" name=\"op\" value=\"login\">\n"
-                . "<input type=\"submit\" value=\"" . _LOGIN . "\"></form><br>\n\n"
-                . "<center><font class=\"content\">[ <a href=\"modules.php?name=$module_name&amp;op=pass_lost\">" . _PASSWORDLOST . "</a> | <a href=\"modules.php?name=$module_name&amp;op=new_user\">" . _REGNEWUSER . "</a> ]</font></center>\n";
-            CloseTable();
+            loginbox();
         }
         include "footer.php";
     } elseif (is_user($user)) {
         global $cookie;
-        cookiedecode($user);
         userinfo($cookie[1]);
     }
 }

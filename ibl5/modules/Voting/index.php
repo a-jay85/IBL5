@@ -60,66 +60,22 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
     function getCandidates($votingCategory, $voterTeamName)
     {
         global $db;
-
+        $league = new League($db);
         $season = new Season($db);
 
         if ($season->phase == "Regular Season") {
-            if (strpos($votingCategory, 'EC') !== false) {
-                $conferenceTids = League::EASTERN_CONFERENCE_TEAMIDS;
-            } elseif (strpos($votingCategory, 'WC') !== false) {
-                $conferenceTids = League::WESTERN_CONFERENCE_TEAMIDS;
-            }
-
-            if (strpos($votingCategory, 'CF') !== false) {
-                $positions = "'C', 'SF', 'PF'";
-            } elseif (strpos($votingCategory, 'CB') !== false) {
-                $positions = "'PG', 'SG'";
-            }
-
-            $query = "SELECT *
-				FROM ibl_plr
-				WHERE pos IN ($positions)
-					AND tid IN ('" . formatTidsForSqlQuery($conferenceTids) . "')
-					AND retired != 1
-					AND stats_gm > '14'
-				ORDER BY name";
+            $result = $league->getAllStarCandidatesResult($votingCategory);
         } else {
-            $mvpQuery = "SELECT *
-				FROM ibl_plr
-				WHERE retired != 1
-					AND stats_gm >= '41'
-					AND stats_min / stats_gm >= '30'
-				ORDER BY name";
-            $sixthQuery = "SELECT *
-				FROM ibl_plr
-				WHERE retired != 1
-					AND stats_min / stats_gm >= 15
-					AND stats_gs / stats_gm <= '.5'
-					AND stats_gm >= '41'
-				ORDER BY name";
-            $royQuery = "SELECT *
-				FROM ibl_plr
-				WHERE retired != 1
-					AND exp = '1'
-					AND stats_gm >= '41'
-				ORDER BY name";
-            $gmQuery = "SELECT owner_name, team_city, team_name
-			 	FROM ibl_team_info
-				WHERE teamid != '35'
-				ORDER BY owner_name";
-
             if (strpos($votingCategory, 'MVP') !== false) {
-                $query = $mvpQuery;
+                $result = $league->getMVPCandidatesResult();
             } elseif (strpos($votingCategory, 'Six') !== false) {
-                $query = $sixthQuery;
+                $result = $league->getSixthPersonOfTheYearCandidatesResult();
             } elseif (strpos($votingCategory, 'ROY') !== false) {
-                $query = $royQuery;
+                $result = $league->getRookieOfTheYearCandidatesResult();
             } elseif (strpos($votingCategory, 'GM') !== false) {
-                $query = $gmQuery;
+                $result = $league->getGMOfTheYearCandidatesResult();
             }
         }
-
-        $result = $db->sql_query($query);
 
         echo "<SCRIPT>
 			function ShowAndHide$votingCategory() {

@@ -116,12 +116,7 @@ class UI
             </thead>
         <tbody>";
     
-        $cap1 = 0;
-        $cap2 = 0;
-        $cap3 = 0;
-        $cap4 = 0;
-        $cap5 = 0;
-        $cap6 = 0;
+        $cap1 = $cap2 = $cap3 = $cap4 = $cap5 = $cap6 = 0;
     
         $i = 0;
         foreach ($result as $plrRow) {

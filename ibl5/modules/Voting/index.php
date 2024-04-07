@@ -51,12 +51,6 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 
     OpenTable();
 
-    function formatTidsForSqlQuery($conferenceTids)
-    {
-        $tidsFormattedForQuery = join("','", $conferenceTids);
-        return $tidsFormattedForQuery;
-    }
-
     function getCandidates($votingCategory, $voterTeamName)
     {
         global $db;

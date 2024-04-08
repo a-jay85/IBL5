@@ -72,9 +72,9 @@ function team($tid)
             $query = "SELECT * FROM ibl_hist WHERE teamid = '$tid' AND year = '$yr' ORDER BY name ASC";
             $result = $db->sql_query($query);
         } else if ($isFreeAgencyModuleActive == 1) {
-            $result = $team->getAlphabeticalFreeAgencyRosterResult();
+            $result = $team->getFreeAgencyRosterOrderedByNameResult();
         } else {
-            $result = $team->getAlphabeticalActiveRosterResult();
+            $result = $team->getActiveRosterOrderedByNameResult();
         }
     }
 

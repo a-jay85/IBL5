@@ -129,7 +129,7 @@ function display()
 		</thead>
 		<tbody>";
 
-    $resultOrdinalActiveRoster = $team->getOrdinalActiveRosterResult();
+    $resultOrdinalActiveRoster = $team->getActiveRosterOrderedByOrdinalResult();
     foreach ($resultOrdinalActiveRoster as $playerRow) {
         $player = Player::withPlrRow($db, $playerRow);
 

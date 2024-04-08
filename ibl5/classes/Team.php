@@ -90,23 +90,16 @@ class Team
         $this->hasLLE = $teamRow['HasLLE'];
     }
 
-    public function getAlphabeticalActiveRosterResult()
+    public function getActiveRosterOrderedByNameResult()
     {
         $query = "SELECT * FROM ibl_plr WHERE tid = '$this->teamID' AND retired = 0 ORDER BY name ASC";
         $result = $this->db->sql_query($query);
         return $result;
     }
 
-    public function getOrdinalActiveRosterResult()
+    public function getActiveRosterOrderedByOrdinalResult()
     {
         $query = "SELECT * FROM ibl_plr WHERE tid = '$this->teamID' AND retired = 0 ORDER BY ordinal ASC";
-        $result = $this->db->sql_query($query);
-        return $result;
-    }
-
-    public function getAlphabeticalFreeAgencyRosterResult()
-    {
-        $query = "SELECT * FROM ibl_plr WHERE tid = '$this->teamID' AND retired = 0 AND cyt != cy ORDER BY name ASC";
         $result = $this->db->sql_query($query);
         return $result;
     }
@@ -128,6 +121,13 @@ class Team
     public function getFreeAgencyOffersResult()
     {
         $query = "SELECT * FROM ibl_fa_offers WHERE team='$this->name' ORDER BY name ASC";
+        $result = $this->db->sql_query($query);
+        return $result;
+    }
+
+    public function getFreeAgencyRosterOrderedByNameResult()
+    {
+        $query = "SELECT * FROM ibl_plr WHERE tid = '$this->teamID' AND retired = 0 AND cyt != cy ORDER BY name ASC";
         $result = $this->db->sql_query($query);
         return $result;
     }
@@ -163,7 +163,7 @@ class Team
 
     public function canAddContractWithoutGoingOverHardCap($currentSeasonContractValueToBeAdded)
     {
-        $teamResult = $this->getAlphabeticalActiveRosterResult();
+        $teamResult = $this->getActiveRosterOrderedByNameResult();
         $totalCurrentSeasonSalaries = $this->getTotalCurrentSeasonSalariesFromPlrResult($teamResult);
         $projectedTotalCurrentSeasonSalaries = $totalCurrentSeasonSalaries + $currentSeasonContractValueToBeAdded;
 

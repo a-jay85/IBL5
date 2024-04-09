@@ -9,6 +9,7 @@ class Season
     public $beginningYear;
     public $endingYear;
 
+    public $lastSimNumber;
     public $lastSimStartDate;
     public $lastSimEndDate;
 
@@ -25,6 +26,7 @@ class Season
         $this->beginningYear = $this->endingYear - 1;
 
         $arrayLastSimDates = $this->getLastSimDatesArray();
+        $this->lastSimNumber = $arrayLastSimDates["Sim"];
         $this->lastSimStartDate = $arrayLastSimDates["Start Date"];
         $this->lastSimEndDate = $arrayLastSimDates["End Date"];
 

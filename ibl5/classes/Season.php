@@ -64,6 +64,19 @@ class Season
         return $this->db->sql_fetch_assoc($queryLastSimDates);
     }
 
+    public function setLastSimDatesArray($newSimNumber, $newSimStartDate, $newSimEndDate)
+    {
+        $querySimDates = $this->db->sql_query("INSERT INTO ibl_sim_dates
+            (`Sim`,
+            `Start Date`,
+            `End Date`)
+    VALUES  ('$newSimNumber',
+            '$newSimStartDate',
+            '$newSimEndDate'); ");
+
+        return $this->db->sql_result($querySimDates, 0);
+    }
+
     public function getAllowTradesStatus()
     {
         $queryAllowTradesStatus = $this->db->sql_query("SELECT value

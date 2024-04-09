@@ -39,11 +39,11 @@ function scoParser($uploadedFilePath, $seasonEndingYear, $seasonPhase)
         $line = fgets($scoFile, 2001);
 
         $gameYear = $currentSeasonEndingYear;
-        $gameMonth = sprintf("%02u", substr($line, 0, 2) + 10); // sprintf() prepends 0 if the result isn't in double-digits
-        $gameDay = sprintf("%02u", substr($line, 2, 2) + 1);
-        $gameOfThatDay = substr($line, 4, 2) + 1;
-        $visitorTID = substr($line, 6, 2) + 1;
-        $homeTID = substr($line, 8, 2) + 1;
+        @$gameMonth = sprintf("%02u", substr($line, 0, 2) + 10); // sprintf() prepends 0 if the result isn't in double-digits
+        @$gameDay = sprintf("%02u", substr($line, 2, 2) + 1);
+        @$gameOfThatDay = substr($line, 4, 2) + 1;
+        @$visitorTID = substr($line, 6, 2) + 1;
+        @$homeTID = substr($line, 8, 2) + 1;
         $attendance = substr($line, 10, 5);
         $capacity = substr($line, 15, 5);
         $visitorWins = substr($line, 20, 2);

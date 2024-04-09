@@ -1,8 +1,6 @@
 <?php
 
 require 'mainfile.php';
-$sharedFunctions = new Shared($db);
-$season = new Season($db);
 
 function scoParser($uploadedFilePath, $seasonEndingYear, $seasonPhase)
 {

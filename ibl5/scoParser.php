@@ -170,7 +170,7 @@ function scoParser($uploadedFilePath, $seasonEndingYear, $seasonPhase)
         }
     } else {
         $newSimNumber = 1;
-        $newSimStartDate = $db->sql_result($db->sql_query('SELECT Date FROM ibl_box_scores ORDER BY Date ASC LIMIT 1'), 0);
+        $newSimStartDate = $season->getFirstBoxScoreDate();
 
         $insertNewSimDates = $season->setLastSimDatesArray($newSimNumber, $newSimStartDate, $newSimEndDate);
     }

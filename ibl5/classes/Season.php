@@ -54,6 +54,16 @@ class Season
         return $this->db->sql_result($querySeasonEndingYear, 0);
     }
 
+    public function getFirstBoxScoreDate()
+    {
+        $queryFirstBoxScoreDate = $this->db->sql_query("SELECT Date
+            FROM ibl_box_scores
+            ORDER BY Date ASC
+            LIMIT 1");
+
+        return $this->db->sql_result($queryFirstBoxScoreDate, 0);
+    }
+
     public function getLastBoxScoreDate()
     {
         $queryLastBoxScoreDate = $this->db->sql_query("SELECT Date

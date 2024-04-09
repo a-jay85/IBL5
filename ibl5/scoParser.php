@@ -162,7 +162,7 @@ function scoParser($uploadedFilePath, $seasonEndingYear, $seasonPhase)
 
             $newSimNumber = $season->lastSimNumber + 1;
 
-            $insertNewSimDates = $db->sql_query("INSERT INTO ibl_sim_dates (`Sim`, `Start Date`, `End Date`) VALUES ('$newSimNumber', '$newSimStartDate', '$newSimEndDate');");
+            $insertNewSimDates = $season->setLastSimDatesArray($newSimNumber, $newSimStartDate, $newSimEndDate);
         } else {
             echo "<p>Number of .sco lines processed: $numberOfLinesProcessed
             <p>Looks like new box scores haven't been added.<br>Sim Start/End Dates will stay set to $season->lastSimStartDate and $season->lastSimEndDate.";
@@ -172,7 +172,7 @@ function scoParser($uploadedFilePath, $seasonEndingYear, $seasonPhase)
         $newSimNumber = 1;
         $newSimStartDate = $db->sql_result($db->sql_query('SELECT Date FROM ibl_box_scores ORDER BY Date ASC LIMIT 1'), 0);
 
-        $insertNewSimDates = $db->sql_query("INSERT INTO ibl_sim_dates (`Sim`, `Start Date`, `End Date`) VALUES ('$newSimNumber', '$newSimStartDate', '$newSimEndDate');");
+        $insertNewSimDates = $season->setLastSimDatesArray($newSimNumber, $newSimStartDate, $newSimEndDate);
     }
 
     if ($insertNewSimDates) {

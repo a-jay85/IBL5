@@ -2,6 +2,53 @@
 
 class Boxscore
 {
+    public $gameDate;
+    public $gameYear;
+    public $gameMonth;
+    public $gameDay;
+    public $gameOfThatDay;
+
+    public $visitorTeamID;
+    public $homeTeamID;
+
+    public $attendance;
+    public $capacity;
+
+    public $visitorWins;
+    public $visitorLosses;
+    public $homeWins;
+    public $homeLosses;
+
+    public $visitorQ1points;
+    public $visitorQ2points;
+    public $visitorQ3points;
+    public $visitorQ4points;
+    public $visitorOTpoints;
+
+    public $homeQ1points;
+    public $homeQ2points;
+    public $homeQ3points;
+    public $homeQ4points;
+    public $homeOTpoints;
+
+    public $name;
+    public $position;
+    public $playerID;
+    public $gameMinutes;
+    public $gameFieldGoalsMade;
+    public $gameFieldGoalsAttempted;
+    public $gameFreeThrowsMade;
+    public $gameFreeThrowsAttempted;
+    public $gameThreePointersMade;
+    public $gameThreePointersAttempted;
+    public $gameOffensiveRebounds;
+    public $gameDefensiveRebounds;
+    public $gameAssists;
+    public $gameSteals;
+    public $gameTurnovers;
+    public $gameBlocks;
+    public $gamePersonalFouls;
+
     public static function deletePreseasonBoxScores($db, $seasonStartingYear)
     {
         $queryDeletePreseasonBoxScores = "DELETE FROM `ibl_box_scores`

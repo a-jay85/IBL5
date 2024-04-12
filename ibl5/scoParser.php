@@ -67,17 +67,17 @@ function scoParser($uploadedFilePath, $seasonEndingYear, $seasonPhase)
         $homeQ4pts = substr($line, 52, 3);
         $homeOTpts = substr($line, 55, 3);
 
-        if ($gameMonth > 12 and $gameMonth != Boxscore::JSB_PLAYOFF_MONTH) {
+        if ($gameMonth > 12 and $gameMonth != Season::JSB_PLAYOFF_MONTH) {
             $gameMonth = sprintf("%02u", $gameMonth - 12);
-        } elseif ($gameMonth == 22) {
+        } elseif ($gameMonth == Season::JSB_PLAYOFF_MONTH) {
             $gameMonth = sprintf("%02u", $gameMonth - 16); // TODO: not have to hack the Playoffs to be in June
         } elseif ($gameMonth > 10) {
             $gameYear = $currentSeasonStartingYear;
             if ($seasonPhase == "HEAT") {
-                $gameMonth = 10; // Puts HEAT games in October
+                $gameMonth = Season::IBL_HEAT_MONTH;
             }
             if ($seasonPhase == "Preseason") {
-                $gameMonth = 9; // Puts preseason games in September
+                $gameMonth = Season::IBL_PRESEASON_MONTH;
             }
         }
 

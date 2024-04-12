@@ -16,6 +16,10 @@ class Season
     public $allowTrades;
     public $allowWaivers;
 
+    const IBL_PRESEASON_MONTH = 9;
+    const IBL_HEAT_MONTH = 10;
+    const JSB_PLAYOFF_MONTH = 22;
+
     public function __construct($db)
     {
         $this->db = $db;

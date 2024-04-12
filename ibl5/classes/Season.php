@@ -94,7 +94,7 @@ class Season
             '$newSimStartDate',
             '$newSimEndDate'); ");
 
-        return $this->db->sql_result($querySimDates, 0);
+        return $querySimDates;
     }
 
     public function getAllowTradesStatus()

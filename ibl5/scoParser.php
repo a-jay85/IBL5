@@ -19,15 +19,23 @@ function scoParser($uploadedFilePath, $seasonEndingYear, $seasonPhase)
     fseek($scoFile, 1000000);
 
     if ($seasonPhase == "Preseason") {
-        $stringDeleteCurrentSeasonBoxScores = "DELETE FROM `ibl_box_scores` WHERE `Date` BETWEEN '$currentSeasonStartingYear-07-01' AND '$currentSeasonStartingYear-09-01';";
+        if (Boxscore::deletePreseasonBoxScores($db, $currentSeasonStartingYear)) {
+            echo "Deleted any existing Preseason box scores." . "<p>";
+        } else {
+            echo "<b><font color=#F00>Failed to delete existing Preseason box scores!</font></b>";
+        }
     } elseif ($seasonPhase == "HEAT") {
-        $stringDeleteCurrentSeasonBoxScores = "DELETE FROM `ibl_box_scores` WHERE `Date` BETWEEN '$currentSeasonStartingYear-09-01' AND '$currentSeasonStartingYear-11-01';";
+        if (Boxscore::deleteHEATBoxScores($db, $currentSeasonStartingYear)) {
+            echo "Deleted any existing HEAT box scores." . "<p>";
+        } else {
+            echo "<b><font color=#F00>Failed to delete existing HEAT box scores!</font></b>";
+        }
     } else {
-        $stringDeleteCurrentSeasonBoxScores = "DELETE FROM `ibl_box_scores` WHERE `Date` BETWEEN '$currentSeasonStartingYear-11-01' AND '$currentSeasonEndingYear-07-01';";
-    }
-
-    if ($db->sql_query($stringDeleteCurrentSeasonBoxScores)) {
-        echo $stringDeleteCurrentSeasonBoxScores . "<p>";
+        if (Boxscore::deleteRegularSeasonAndPlayoffsBoxScores($db, $currentSeasonStartingYear)) {
+            echo "Deleted any existing regular season and playoffs box scores." . "<p>";
+        } else {
+            echo "<b><font color=#F00>Failed to delete existing regular season and playoffs box scores!</font></b>";
+        }
     }
 
     echo "<i>[scoParser works silently now]</i><br>";

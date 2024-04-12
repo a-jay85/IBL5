@@ -49,6 +49,8 @@ class Boxscore
     public $gameBlocks;
     public $gamePersonalFouls;
 
+    const JSB_PLAYOFF_MONTH = 22;
+
     public static function deletePreseasonBoxScores($db, $seasonStartingYear)
     {
         $queryDeletePreseasonBoxScores = "DELETE FROM `ibl_box_scores`

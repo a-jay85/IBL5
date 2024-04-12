@@ -163,7 +163,8 @@ function scoParser($uploadedFilePath, $seasonEndingYear, $seasonPhase)
             $insertNewSimDates = $season->setLastSimDatesArray($newSimNumber, $newSimStartDate, $newSimEndDate);
         } else {
             echo "<p>Number of .sco lines processed: $numberOfLinesProcessed
-            <p>Looks like new box scores haven't been added.<br>Sim Start/End Dates will stay set to $season->lastSimStartDate and $season->lastSimEndDate.";
+            <p>Looks like new box scores haven't been added.
+            <br>Sim Start/End Dates will stay set to $season->lastSimStartDate and $season->lastSimEndDate.";
             die();
         }
     } else {

@@ -87,12 +87,12 @@ class Season
     public function setLastSimDatesArray($newSimNumber, $newSimStartDate, $newSimEndDate)
     {
         $querySimDates = $this->db->sql_query("INSERT INTO ibl_sim_dates
-            (`Sim`,
-            `Start Date`,
-            `End Date`)
-    VALUES  ('$newSimNumber',
-            '$newSimStartDate',
-            '$newSimEndDate'); ");
+                    (`Sim`,
+                    `Start Date`,
+                    `End Date`)
+            VALUES  ('$newSimNumber',
+                    '$newSimStartDate',
+                    '$newSimEndDate'); ");
 
         return $querySimDates;
     }

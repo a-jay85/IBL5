@@ -81,7 +81,8 @@ function showpage($playerID, $spec)
                 </tr>
             </table>";
     } elseif (
-        $userTeam->hasUsedExtensionThisSeason == 0
+        $userTeam->name != "Free Agents"
+        AND $userTeam->hasUsedExtensionThisSeason == 0
         AND $player->canRenegotiateContract()
         AND $player->teamName == $userTeam->name
         AND $season->phase != 'Draft'
@@ -97,7 +98,8 @@ function showpage($playerID, $spec)
     // RENEGOTIATION BUTTON END
 
     if (
-        $player->canRookieOption($season->phase)
+        $userTeam->name != "Free Agents"
+        AND $player->canRookieOption($season->phase)
         AND $player->teamName == $userTeam->name
         ) {
             echo "<table align=right bgcolor=#ffbb00>

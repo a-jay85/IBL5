@@ -56,7 +56,7 @@ class Boxscore
         $queryDeletePreseasonBoxScores = "DELETE FROM `ibl_box_scores`
             WHERE `Date` BETWEEN '$seasonStartingYear-07-01' AND '$seasonStartingYear-09-01';";
 
-        return $db->sql_result($queryDeletePreseasonBoxScores, 0);
+        return $db->sql_query($queryDeletePreseasonBoxScores, 0);
     }
 
     public static function deleteHEATBoxScores($db, $seasonStartingYear)
@@ -64,7 +64,7 @@ class Boxscore
         $queryDeleteHEATBoxScores = "DELETE FROM `ibl_box_scores`
             WHERE `Date` BETWEEN '$seasonStartingYear-09-01' AND '$seasonStartingYear-11-01';";
 
-        return $db->sql_result($queryDeleteHEATBoxScores, 0);
+        return $db->sql_query($queryDeleteHEATBoxScores, 0);
     }
 
     public static function deleteRegularSeasonAndPlayoffsBoxScores($db, $seasonStartingYear)
@@ -74,6 +74,6 @@ class Boxscore
         $queryDeleteRegularSeasonAndPlayoffsBoxScores = "DELETE FROM `ibl_box_scores`
             WHERE `Date` BETWEEN '$seasonStartingYear-11-01' AND '$seasonEndingYear-07-01';";
 
-        return $db->sql_result($queryDeleteRegularSeasonAndPlayoffsBoxScores, 0);
+        return $db->sql_query($queryDeleteRegularSeasonAndPlayoffsBoxScores, 0);
     }
 }

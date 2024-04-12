@@ -74,12 +74,16 @@ class Shared
 
     public function getTeamnameFromUsername($username)
     {
-        $queryTeamnameFromUsername = $this->db->sql_query("SELECT user_ibl_team
-            FROM nuke_users
-            WHERE username = '$username'
-            LIMIT 1;");
+        if ($username) {
+            $queryTeamnameFromUsername = $this->db->sql_query("SELECT user_ibl_team
+                FROM nuke_users
+                WHERE username = '$username'
+                LIMIT 1;");
 
-        return $this->db->sql_result($queryTeamnameFromUsername, 0);
+            return $this->db->sql_result($queryTeamnameFromUsername, 0);
+        } else {
+            return "Free Agents";
+        }
     }
 
     public function getTidFromTeamname($teamname)

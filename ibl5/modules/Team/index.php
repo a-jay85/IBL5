@@ -984,60 +984,40 @@ function boxscore($year, $month, $tid, $wins, $losses, $winStreak, $lossStreak)
 function viewinjuries($tid)
 {
     global $db;
+    $league = new League($db);
 
     include "header.php";
     OpenTable();
 
     UI::displaytopmenu($db, $tid);
 
-    $query = "SELECT * FROM ibl_plr WHERE injured > 0 AND retired = 0 ORDER BY ordinal ASC";
-
-    $result = $db->sql_query($query);
-    $num = $db->sql_numrows($result);
-
     echo "<center><h2>INJURED PLAYERS</h2></center>
-		<table><tr><td valign=top>
-		<table class=\"sortable\">
-		<tr><th>Pos</th><th>Player</th><th>Team</th><th>Days Injured</th>";
-
-    $query_all_team_colors = "SELECT * FROM ibl_team_info ORDER BY teamid ASC";
-    $colors = $db->sql_query($query_all_team_colors);
-    $num_all_team_colors = $db->sql_numrows($colors);
-
-    $k = 0;
-    while ($k < $num_all_team_colors) {
-        $color_array[$k]['team_id'] = $db->sql_result($colors, $k, "teamid");
-        $color_array[$k]['team_city'] = $db->sql_result($colors, $k, "team_city");
-        $color_array[$k]['team_name'] = $db->sql_result($colors, $k, "team_name");
-        $color_array[$k]['color1'] = $db->sql_result($colors, $k, "color1");
-        $color_array[$k]['color2'] = $db->sql_result($colors, $k, "color2");
-        $k++;
-    }
+		<table>
+            <tr>
+                <td valign=top>
+		            <table class=\"sortable\">
+		                <tr>
+                            <th>Pos</th>
+                            <th>Player</th>
+                            <th>Team</th>
+                            <th>Days Injured</th>
+                        </tr>";
 
     $i = 0;
+    foreach ($league->getInjuredPlayersResult() as $injuredPlayer) {
+        $player = Player::withPlrRow($db, $injuredPlayer);
+        $team = Team::withTeamID($db, $player->teamID);
 
-    while ($i < $num) {
         (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "DDDDDD";
 
-        $name = $db->sql_result($result, $i, "name");
-        $team = $db->sql_result($result, $i, "teamname");
-        $pid = $db->sql_result($result, $i, "pid");
-        $tid = $db->sql_result($result, $i, "tid");
-        $pos = $db->sql_result($result, $i, "pos");
-        $inj = $db->sql_result($result, $i, "injured");
-
-        $j = 0;
-        while ($j < $k) {
-            $pick_team_name = $color_array[$j]['team_name'];
-            if ($pick_team_name == $team) {
-                $pick_team_city = $color_array[$j]['team_city'];
-                $pick_team_color1 = $color_array[$j]['color1'];
-                $pick_team_color2 = $color_array[$j]['color2'];
-            }
-            $j++;
-        }
-
-        echo "<tr bgcolor=$bgcolor><td>$pos</td><td><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td bgcolor=\"#$pick_team_color1\"><a href=\"./modules.php?name=Team&op=team&tid=$tid\"><font color=\"#$pick_team_color2\">$pick_team_city $team</font></a></td><td>$inj</td></tr>";
+        echo "<tr bgcolor=$bgcolor>
+            <td>$player->position</td>
+            <td><a href=\"./modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->name</a></td>
+            <td bgcolor=\"#$team->color1\">
+                <font color=\"#$team->color2\"><a href=\"./modules.php?name=Team&op=team&tid=$player->teamID\">$team->city $player->teamName</a></font>
+            </td>
+            <td>$player->daysRemainingForInjury</td>
+        </tr>";
 
         $i++;
     }

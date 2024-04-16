@@ -129,7 +129,12 @@ class Team
 
     public function getFreeAgencyRosterOrderedByNameResult()
     {
-        $query = "SELECT * FROM ibl_plr WHERE tid = '$this->teamID' AND retired = 0 AND cyt != cy ORDER BY name ASC";
+        $query = "SELECT *
+            FROM ibl_plr
+            WHERE tid = '$this->teamID'
+              AND retired = 0
+              AND cyt != cy
+            ORDER BY name ASC";
         $result = $this->db->sql_query($query);
         return $result;
     }

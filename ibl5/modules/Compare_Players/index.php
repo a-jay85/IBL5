@@ -55,8 +55,6 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 function comparePlayers()
 {
     if (!isset($_POST['Player1'])) {
-        $playerNamesArray = getPlayerNamesArray();
-
         echo '<link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
 	  <link rel="stylesheet" href="/resources/demos/style.css">
 	  <script src="https://code.jquery.com/jquery-1.12.4.js"></script>
@@ -65,7 +63,7 @@ function comparePlayers()
 	  $( function() {
 		var availableTags = [';
 
-        foreach ($playerNamesArray as $name) {
+        foreach (getPlayerNamesArray() as $name) {
             echo "\"$name\",
 			  ";
         }

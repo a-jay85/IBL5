@@ -990,10 +990,9 @@ function viewinjuries($tid)
 
     UI::displaytopmenu($db, $tid);
 
-    $query = "SELECT * FROM ibl_plr WHERE injured > 0 AND retired = 0 ORDER BY ordinal ASC";
-
-    $result = $db->sql_query($query);
-    $num = $db->sql_numrows($result);
+    $league = new League($db);
+    $injuredPlayersResult = $league->getInjuredPlayersResult();
+    $num = $db->sql_numrows($injuredPlayersResult);
 
     echo "<center><h2>INJURED PLAYERS</h2></center>
 		<table><tr><td valign=top>
@@ -1019,12 +1018,12 @@ function viewinjuries($tid)
     while ($i < $num) {
         (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "DDDDDD";
 
-        $name = $db->sql_result($result, $i, "name");
-        $team = $db->sql_result($result, $i, "teamname");
-        $pid = $db->sql_result($result, $i, "pid");
-        $tid = $db->sql_result($result, $i, "tid");
-        $pos = $db->sql_result($result, $i, "pos");
-        $inj = $db->sql_result($result, $i, "injured");
+        $name = $db->sql_result($injuredPlayersResult, $i, "name");
+        $team = $db->sql_result($injuredPlayersResult, $i, "teamname");
+        $pid = $db->sql_result($injuredPlayersResult, $i, "pid");
+        $tid = $db->sql_result($injuredPlayersResult, $i, "tid");
+        $pos = $db->sql_result($injuredPlayersResult, $i, "pos");
+        $inj = $db->sql_result($injuredPlayersResult, $i, "injured");
 
         $j = 0;
         while ($j < $k) {

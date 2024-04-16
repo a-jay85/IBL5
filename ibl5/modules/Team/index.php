@@ -1038,8 +1038,6 @@ function drafthistory($tid)
 
     $team = Team::withTeamID($db, $tid);
 
-    $draftHistoryResult = $team->getDraftHistoryResult();
-
     echo "$team->name Draft History
         <table class=\"sortable\">
             <tr>
@@ -1050,7 +1048,7 @@ function drafthistory($tid)
                 <th>Pick</th>
             </tr>";
 
-    foreach ($draftHistoryResult as $playerRow) {
+    foreach ($team->getDraftHistoryResult() as $playerRow) {
         $player = Player::withPlrRow($db, $playerRow);
 
         echo "<tr>";

@@ -129,8 +129,8 @@ function display()
 		</thead>
 		<tbody>";
 
-    $resultOrdinalActiveRoster = $team->getActiveRosterOrderedByOrdinalResult();
-    foreach ($resultOrdinalActiveRoster as $playerRow) {
+
+    foreach ($team->getActiveRosterOrderedByOrdinalResult() as $playerRow) {
         $player = Player::withPlrRow($db, $playerRow);
 
         $yearPlayerIsFreeAgent = $player->draftYear + $player->yearsOfExperience + $player->contractTotalYears - $player->contractCurrentYear;
@@ -560,7 +560,7 @@ function display()
 		</thead>
 		<tbody>";
 
-    foreach ($resultOrdinalActiveRoster as $playerRow) {
+    foreach ($team->getActiveRosterOrderedByOrdinalResult() as $playerRow) {
         $player = Player::withPlrRow($db, $playerRow);
 
         $yearPlayerIsFreeAgent = $player->draftYear + $player->yearsOfExperience + $player->contractTotalYears - $player->contractCurrentYear;

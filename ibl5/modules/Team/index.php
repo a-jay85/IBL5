@@ -1036,7 +1036,14 @@ function viewinjuries($tid)
             $j++;
         }
 
-        echo "<tr bgcolor=$bgcolor><td>$pos</td><td><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td><td bgcolor=\"#$pick_team_color1\"><a href=\"./modules.php?name=Team&op=team&tid=$tid\"><font color=\"#$pick_team_color2\">$pick_team_city $team</font></a></td><td>$inj</td></tr>";
+        echo "<tr bgcolor=$bgcolor>
+            <td>$pos</td>
+            <td><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>
+            <td bgcolor=\"#$pick_team_color1\">
+            <font color=\"#$pick_team_color2\"><a href=\"./modules.php?name=Team&op=team&tid=$tid\">$pick_team_city $team</a></font>
+            </td>
+            <td>$inj</td>
+        </tr>";
 
         $i++;
     }

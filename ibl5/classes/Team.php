@@ -53,6 +53,8 @@ class Team
 
     protected function loadByID($db, int $teamID)
     {
+        ($teamID) ? $teamID : $teamID = 35;
+
         $query = "SELECT * FROM ibl_team_info WHERE teamid = $teamID LIMIT 1;";
         $result = $db->sql_query($query);
         $teamRow = $db->sql_fetch_assoc($result);

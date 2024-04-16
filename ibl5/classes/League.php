@@ -46,6 +46,17 @@ class League
         return $result;
     }
 
+    public function getInjuredPlayersResult()
+    {
+        $query = "SELECT *
+            FROM ibl_plr
+            WHERE injured > 0
+              AND retired = 0
+            ORDER BY ordinal ASC";
+        $result = $this->db->sql_query($query);
+        return $result;
+    }
+
     public function getMVPCandidatesResult()
     {
         $query = "SELECT *

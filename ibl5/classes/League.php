@@ -38,9 +38,9 @@ class League
         $query = "SELECT *
         FROM ibl_plr
         WHERE pos IN ($positions)
-            AND tid IN ('" . $this->formatTidsForSqlQuery($conferenceTids) . "')
-            AND retired != 1
-            AND stats_gm > '14'
+          AND tid IN ('" . $this->formatTidsForSqlQuery($conferenceTids) . "')
+          AND retired != 1
+          AND stats_gm > '14'
         ORDER BY name";
         $result = $this->db->sql_query($query);
         return $result;
@@ -62,8 +62,8 @@ class League
         $query = "SELECT *
             FROM ibl_plr
             WHERE retired != 1
-                AND stats_gm >= '41'
-                AND stats_min / stats_gm >= '30'
+              AND stats_gm >= '41'
+              AND stats_min / stats_gm >= '30'
             ORDER BY name";
         $result = $this->db->sql_query($query);
         return $result;
@@ -74,9 +74,9 @@ class League
         $query = "SELECT *
             FROM ibl_plr
             WHERE retired != 1
-                AND stats_min / stats_gm >= 15
-                AND stats_gs / stats_gm <= '.5'
-                AND stats_gm >= '41'
+              AND stats_min / stats_gm >= 15
+              AND stats_gs / stats_gm <= '.5'
+              AND stats_gm >= '41'
             ORDER BY name";
         $result = $this->db->sql_query($query);
         return $result;
@@ -87,8 +87,8 @@ class League
         $query = "SELECT *
             FROM ibl_plr
             WHERE retired != 1
-                AND exp = '1'
-                AND stats_gm >= '41'
+              AND exp = '1'
+              AND stats_gm >= '41'
             ORDER BY name";
         $result = $this->db->sql_query($query);
         return $result;

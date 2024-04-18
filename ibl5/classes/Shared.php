@@ -35,7 +35,7 @@ class Shared
         $queryNumberOfTitles = $this->db->sql_query("SELECT COUNT(name)
         	FROM ibl_team_awards
         	WHERE name = '$teamname'
-        	AND Award LIKE '%$titleName%';");
+        	  AND Award LIKE '%$titleName%';");
 
         return $this->db->sql_result($queryNumberOfTitles, 0);
     }
@@ -45,8 +45,8 @@ class Shared
         $queryCurrentOwnerOfDraftPick = $this->db->sql_query("SELECT ownerofpick
             FROM ibl_draft_picks
             WHERE year = '$draftYear'
-            AND round = '$draftRound'
-            AND teampick = '$teamNameOfDraftPickOrigin'
+              AND round = '$draftRound'
+              AND teampick = '$teamNameOfDraftPickOrigin'
             LIMIT 1;");
 
         return $this->db->sql_result($queryCurrentOwnerOfDraftPick, 0);

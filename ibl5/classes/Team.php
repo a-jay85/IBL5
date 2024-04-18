@@ -55,7 +55,10 @@ class Team
     {
         ($teamID) ? $teamID : $teamID = 35;
 
-        $query = "SELECT * FROM ibl_team_info WHERE teamid = $teamID LIMIT 1;";
+        $query = "SELECT *
+            FROM ibl_team_info
+            WHERE teamid = $teamID
+            LIMIT 1;";
         $result = $db->sql_query($query);
         $teamRow = $db->sql_fetch_assoc($result);
         $this->fill($db, $teamRow);
@@ -63,7 +66,10 @@ class Team
 
     protected function loadByName($db, string $name)
     {
-        $query = "SELECT * FROM ibl_team_info WHERE team_name = '$name' LIMIT 1;";
+        $query = "SELECT *
+            FROM ibl_team_info
+            WHERE team_name = '$name'
+            LIMIT 1;";
         $result = $db->sql_query($query);
         $teamRow = $db->sql_fetch_assoc($result);
         $this->fill($db, $teamRow);
@@ -94,35 +100,56 @@ class Team
 
     public function getActiveRosterOrderedByNameResult()
     {
-        $query = "SELECT * FROM ibl_plr WHERE tid = '$this->teamID' AND retired = 0 ORDER BY name ASC";
+        $query = "SELECT *
+            FROM ibl_plr
+            WHERE tid = '$this->teamID'
+              AND retired = 0
+            ORDER BY name ASC";
         $result = $this->db->sql_query($query);
         return $result;
     }
 
     public function getActiveRosterOrderedByOrdinalResult()
     {
-        $query = "SELECT * FROM ibl_plr WHERE tid = '$this->teamID' AND retired = 0 ORDER BY ordinal ASC";
+        $query = "SELECT *
+            FROM ibl_plr
+            WHERE tid = '$this->teamID'
+              AND retired = 0
+            ORDER BY ordinal ASC";
         $result = $this->db->sql_query($query);
         return $result;
     }
 
     public function getBuyoutsResult()
     {
-        $query = "SELECT * FROM ibl_plr WHERE tid = '$this->teamID' AND name LIKE '%Buyout%' ORDER BY name ASC";
+        $query = "SELECT *
+            FROM ibl_plr
+            WHERE tid = '$this->teamID'
+              AND name LIKE '%Buyout%'
+            ORDER BY name ASC";
         $result = $this->db->sql_query($query);
         return $result;
     }
 
     public function getDraftHistoryResult()
     {
-        $query = "SELECT * FROM ibl_plr WHERE draftedby LIKE '$this->name' ORDER BY draftyear DESC, draftround, draftpickno ASC";
+        $query = "SELECT *
+            FROM ibl_plr
+            WHERE draftedby
+             LIKE '$this->name'
+            ORDER BY draftyear DESC,
+                     draftround,
+                     draftpickno ASC";
         $result = $this->db->sql_query($query);
         return $result;
     }
 
     public function getFreeAgencyOffersResult()
     {
-        $query = "SELECT * FROM ibl_fa_offers WHERE team='$this->name' ORDER BY name ASC";
+        $query = "SELECT *
+            FROM ibl_fa_offers
+            WHERE team = '$this->name'
+            ORDER BY name ASC";
         $result = $this->db->sql_query($query);
         return $result;
     }

@@ -95,12 +95,18 @@ class TeamStats
 
     protected function loadByTeamName($db, string $teamName)
     {
-        $queryOffenseTotals = "SELECT * FROM ibl_team_offense_stats WHERE team = '$teamName' LIMIT 1;";
+        $queryOffenseTotals = "SELECT *
+            FROM ibl_team_offense_stats
+            WHERE team = '$teamName'
+            LIMIT 1;";
         $resulOffenseTotals = $db->sql_query($queryOffenseTotals);
         $offenseTotalsRow = $db->sql_fetch_assoc($resulOffenseTotals);
         $this->fillOffenseTotals($offenseTotalsRow);
 
-        $queryDefenseTotals = "SELECT * FROM ibl_team_defense_stats WHERE team = '$teamName' LIMIT 1;";
+        $queryDefenseTotals = "SELECT *
+            FROM ibl_team_defense_stats
+            WHERE team = '$teamName'
+            LIMIT 1;";
         $resulDefenseTotals = $db->sql_query($queryDefenseTotals);
         $defenseTotalsRow = $db->sql_fetch_assoc($resulDefenseTotals);
         $this->fillDefenseTotals($defenseTotalsRow);

@@ -125,7 +125,10 @@ class PlayerStats
 
     protected function loadByID($db, int $playerID)
     {
-        $query = "SELECT * FROM ibl_plr WHERE pid = $playerID LIMIT 1;";
+        $query = "SELECT *
+            FROM ibl_plr
+            WHERE pid = $playerID
+            LIMIT 1;";
         $result = $db->sql_query($query);
         $plrRow = $db->sql_fetch_assoc($result);
         $this->fill($plrRow);

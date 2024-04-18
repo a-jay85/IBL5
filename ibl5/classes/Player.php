@@ -106,7 +106,10 @@ class Player
 
     protected function loadByID($db, int $playerID)
     {
-        $query = "SELECT * FROM ibl_plr WHERE pid = $playerID LIMIT 1;";
+        $query = "SELECT *
+            FROM ibl_plr
+            WHERE pid = $playerID
+            LIMIT 1;";
         $result = $db->sql_query($query);
         $plrRow = $db->sql_fetch_assoc($result);
         $this->fill($db, $plrRow);
@@ -232,7 +235,9 @@ class Player
 
     public function getFreeAgencyDemands()
     {
-        $query = "SELECT * FROM ibl_demands WHERE name='$this->name'";
+        $query = "SELECT *
+            FROM ibl_demands
+            WHERE name='$this->name'";
         $result = $this->db->sql_query($query);
         return $result;
     }

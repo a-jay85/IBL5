@@ -73,6 +73,7 @@ function chunk($chunk_start_date, $chunk_end_date, $j)
     $teamSeasonRecordsQuery = "SELECT tid, leagueRecord FROM ibl_standings ORDER BY tid ASC;";
     $teamSeasonRecordsResult = $db->sql_query($teamSeasonRecordsQuery);
 
+    $season->lastSimEndDate = date_create($season->lastSimEndDate);
     $projectedNextSimEndDate = date_add($season->lastSimEndDate, date_interval_create_from_date_string('7 days'));
 
     // override $projectedNextSimEndDate to account for the blank week at end of HEAT

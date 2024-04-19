@@ -1,0 +1,20 @@
+name: Remote SSH
+on:
+  push:
+    branches:
+      - production
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Execute remote SSH commands
+      uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PRIVATE_KEY }}
+          port: ${{ secrets.PORT }}
+          script: |
+            cd www
+            git pull origin

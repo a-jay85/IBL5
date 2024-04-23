@@ -2,36 +2,36 @@
 
 require 'mainfile.php';
 
-function scoParser($uploadedFilePath, $seasonEndingYear, $seasonPhase)
+function scoParser($uploadedFilePath, $operatingSeasonEndingYear, $operatingSeasonPhase)
 {
     global $db;
     $season = new Season($db);
 
     $scoFilePath = ($uploadedFilePath) ? $uploadedFilePath : "IBL5.sco";
-    $currentSeasonEndingYear = ($seasonEndingYear) ? $seasonEndingYear : $season->endingYear;
-    $currentSeasonStartingYear = $currentSeasonEndingYear - 1;
-    $seasonPhase = ($seasonPhase) ? $seasonPhase : $season->phase;
+    $operatingSeasonEndingYear = ($operatingSeasonEndingYear) ? $operatingSeasonEndingYear : $season->endingYear;
+    $operatingSeasonStartingYear = $operatingSeasonEndingYear - 1;
+    $operatingSeasonPhase = ($operatingSeasonPhase) ? $operatingSeasonPhase : $season->phase;
 
     echo "<h2>Parse Log</h2>
-        <b>Parsing .sco file for the $currentSeasonStartingYear-$currentSeasonEndingYear $seasonPhase...</b><p>";
+        <b>Parsing .sco file for the $operatingSeasonStartingYear-$operatingSeasonEndingYear $operatingSeasonPhase...</b><p>";
 
     $scoFile = fopen("$scoFilePath", "rb");
     fseek($scoFile, 1000000);
 
-    if ($seasonPhase == "Preseason") {
-        if (Boxscore::deletePreseasonBoxScores($db, $currentSeasonStartingYear)) {
+    if ($operatingSeasonPhase == "Preseason") {
+        if (Boxscore::deletePreseasonBoxScores($db, $operatingSeasonStartingYear)) {
             echo "Deleted any existing Preseason box scores." . "<p>";
         } else {
             echo "<b><font color=#F00>Failed to delete existing Preseason box scores!</font></b>";
         }
-    } elseif ($seasonPhase == "HEAT") {
-        if (Boxscore::deleteHEATBoxScores($db, $currentSeasonStartingYear)) {
+    } elseif ($operatingSeasonPhase == "HEAT") {
+        if (Boxscore::deleteHEATBoxScores($db, $operatingSeasonStartingYear)) {
             echo "Deleted any existing HEAT box scores." . "<p>";
         } else {
             echo "<b><font color=#F00>Failed to delete existing HEAT box scores!</font></b>";
         }
     } else {
-        if (Boxscore::deleteRegularSeasonAndPlayoffsBoxScores($db, $currentSeasonStartingYear)) {
+        if (Boxscore::deleteRegularSeasonAndPlayoffsBoxScores($db, $operatingSeasonStartingYear)) {
             echo "Deleted any existing regular season and playoffs box scores." . "<p>";
         } else {
             echo "<b><font color=#F00>Failed to delete existing regular season and playoffs box scores!</font></b>";
@@ -44,7 +44,7 @@ function scoParser($uploadedFilePath, $seasonEndingYear, $seasonPhase)
     while (!feof($scoFile)) {
         $line = fgets($scoFile, 2001);
 
-        $gameYear = $currentSeasonEndingYear;
+        $gameYear = $operatingSeasonEndingYear;
         @$gameMonth = sprintf("%02u", substr($line, 0, 2) + 10); // sprintf() prepends 0 if the result isn't in double-digits
         @$gameDay = sprintf("%02u", substr($line, 2, 2) + 1);
         @$gameOfThatDay = substr($line, 4, 2) + 1;
@@ -72,11 +72,11 @@ function scoParser($uploadedFilePath, $seasonEndingYear, $seasonPhase)
         } elseif ($gameMonth == Season::JSB_PLAYOFF_MONTH) {
             $gameMonth = sprintf("%02u", $gameMonth - 16); // TODO: not have to hack the Playoffs to be in June
         } elseif ($gameMonth > 10) {
-            $gameYear = $currentSeasonStartingYear;
-            if ($seasonPhase == "HEAT") {
+            $gameYear = $operatingSeasonStartingYear;
+            if ($operatingSeasonPhase == "HEAT") {
                 $gameMonth = Season::IBL_HEAT_MONTH;
             }
-            if ($seasonPhase == "Preseason") {
+            if ($operatingSeasonPhase == "Preseason") {
                 $gameMonth = Season::IBL_PRESEASON_MONTH;
             }
         }
@@ -209,8 +209,8 @@ echo "<h1>JSB .sco File Parser</h1>
 
 if ($_FILES['scoFile']['tmp_name']) {
     $uploadedFilePath = $_FILES['scoFile']['tmp_name'];
-    $seasonEndingYear = $_POST['seasonEndingYear'];
-    $seasonPhase = $_POST['seasonPhase'];
+    $operatingSeasonEndingYear = $_POST['seasonEndingYear'];
+    $operatingSeasonPhase = $_POST['seasonPhase'];
 }
 
-scoParser($uploadedFilePath, $seasonEndingYear, $seasonPhase);
+scoParser($uploadedFilePath, $operatingSeasonEndingYear, $operatingSeasonPhase);

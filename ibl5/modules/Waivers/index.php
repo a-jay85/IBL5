@@ -55,7 +55,6 @@ function waivers($user)
             OR $season->phase == "Playoffs"
         ) {
             global $cookie;
-            cookiedecode($user);
             waiverexecute($cookie[1], $action);
         } else {
             include "header.php";
@@ -68,24 +67,14 @@ function waivers($user)
     }
 }
 
-function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
+function waiverexecute($username, $action)
 {
-    global $user, $prefix, $user_prefix, $db, $action;
-    $sharedFunctions = new Shared($db);
-
-    $sql = "SELECT * FROM " . $prefix . "_bbconfig";
-    $result = $db->sql_query($sql);
-    while ($row = $db->sql_fetchrow($result)) {
-        $board_config[$row['config_name']] = $row['config_value'];
-    }
+    global $user_prefix, $db, $action;
 
     $sql2 = "SELECT * FROM " . $user_prefix . "_users WHERE username = '$username'";
     $result2 = $db->sql_query($sql2);
     $num = $db->sql_numrows($result2);
     $userinfo = $db->sql_fetchrow($result2);
-    if (!$bypass) {
-        cookiedecode($user);
-    }
 
     include "header.php";
 
@@ -124,13 +113,8 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
         $waiverquery = "SELECT * FROM ibl_plr WHERE pid = '$Player_to_Process'";
         $waiverresult = $db->sql_query($waiverquery);
         $playername = $db->sql_result($waiverresult, 0, "name");
-        $players_team = $db->sql_result($waiverresult, 0, "tid");
         $cy1 = $db->sql_result($waiverresult, 0, "cy1");
-        $cy2 = $db->sql_result($waiverresult, 0, "cy2");
-        $cy3 = $db->sql_result($waiverresult, 0, "cy3");
-        $cy4 = $db->sql_result($waiverresult, 0, "cy4");
-        $cy5 = $db->sql_result($waiverresult, 0, "cy5");
-        $cy6 = $db->sql_result($waiverresult, 0, "cy6");
+
         $player_exp = $db->sql_result($waiverresult, 0, "exp");
 
         if ($Type_Of_Action == 'drop') {
@@ -138,7 +122,7 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
                 $errortext = "You have 12 players and are over $70 mill hard cap.  Therefore you can't drop a player!";
             } else {
                 $queryi = "UPDATE ibl_plr SET `ordinal` = '1000', `droptime` = '$Timestamp' WHERE `pid` = '$Player_to_Process' LIMIT 1;";
-                $resulti = $db->sql_query($queryi);
+                $db->sql_query($queryi);
 
                 $topicid = 32;
                 $storytitle = $Team_Offering . " make waiver cuts";
@@ -155,7 +139,7 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
                 $WPMoves++;
 
                 $querycat2 = "UPDATE nuke_stories_cat SET counter = $WPMoves WHERE title = 'Waiver Pool Moves'";
-                $resultcat2 = $db->sql_query($querycat2);
+                $db->sql_query($querycat2);
 
                 $querystor = "INSERT INTO nuke_stories
                         (catid,
@@ -177,7 +161,7 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
                          'Associated Press',
                          '0',
                          'english') ";
-                $resultstor = $db->sql_query($querystor);
+                $db->sql_query($querystor);
 
                 Discord::postToChannel('#waiver-wire', $hometext);
 
@@ -257,7 +241,7 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
                     $WPMoves++;
 
                     $querycat2 = "UPDATE nuke_stories_cat SET counter = $WPMoves WHERE title = 'Waiver Pool Moves'";
-                    $resultcat2 = $db->sql_query($querycat2);
+                    $db->sql_query($querycat2);
 
                     $querystor = "INSERT INTO nuke_stories
                             (catid,
@@ -279,7 +263,7 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
                              'Associated Press',
                              '0',
                              'english')";
-                    $resultstor = $db->sql_query($querystor);
+                    $db->sql_query($querystor);
 
                     $recipient = 'ibldepthcharts@gmail.com';
                     mail($recipient, $storytitle, $hometext, "From: waivers@iblhoops.net");
@@ -379,7 +363,6 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
                 $currentContractYear++;
             }
         }
-        $nocheckbox = 0;
 
         if ($action == 'add') {
             $player_droptime = $playerForWaiverOperation['droptime'];
@@ -391,22 +374,11 @@ function waiverexecute($username, $action, $bypass = 0, $hid = 0, $url = 0)
                 $time_minutes = floor(($wait_time - $time_hours * 3600) / 60);
                 $time_seconds = ($wait_time % 60);
                 $wait_time = '(Clears in ' . $time_hours . ' h, ' . $time_minutes . ' m, ' . $time_seconds . ' s)';
-                $nocheckbox = 1;
             }
         }
         $dropdown = $dropdown . "
         <option value=\"$player_pid\">$player_name $fullContract $wait_time</option>";
-        //        echo "<input type=\"hidden\" name=\"index$k\" value=\"$player_pid\"><input type=\"hidden\" name=\"cy$k\" value=\"$cy2\"><input type=\"hidden\" name=\"type$k\" value=\"1\">";
-        /*
-        if ($nocheckbox == 1)
-        {
-        echo "** $player_name $fullContract $wait_time
-        <br>";
-        } else {
-        echo "<input type=\"checkbox\" name=\"check$k\">$player_name $fullContract $wait_time
-        <br>";
-        }
-         */
+
         $k++;
     }
 

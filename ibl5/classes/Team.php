@@ -100,30 +100,8 @@ class Team
         $this->hasMLE = $teamRow['HasMLE'];
         $this->hasLLE = $teamRow['HasLLE'];
 
-        $this->healthyPlayers = $this->db->sql_numrows($this->getHealthyRosterOrderedByNameResult());
+        $this->healthyPlayers = $this->db->sql_numrows($this->getHealthyPlayersOrderedByNameResult());
         $this->healthyRosterSpots = 15 - $this->healthyPlayers;
-    }
-
-    public function getActiveRosterOrderedByNameResult()
-    {
-        $query = "SELECT *
-            FROM ibl_plr
-            WHERE tid = '$this->teamID'
-              AND retired = 0
-            ORDER BY name ASC";
-        $result = $this->db->sql_query($query);
-        return $result;
-    }
-
-    public function getActiveRosterOrderedByOrdinalResult()
-    {
-        $query = "SELECT *
-            FROM ibl_plr
-            WHERE tid = '$this->teamID'
-              AND retired = 0
-            ORDER BY ordinal ASC";
-        $result = $this->db->sql_query($query);
-        return $result;
     }
 
     public function getBuyoutsResult()
@@ -172,7 +150,7 @@ class Team
         return $result;
     }
 
-    public function getHealthyRosterOrderedByNameResult()
+    public function getHealthyPlayersOrderedByNameResult()
     {
         $query = "SELECT *
             FROM ibl_plr
@@ -192,6 +170,28 @@ class Team
             WHERE teamname = '$this->name'
               AND pos = '$position'
               AND cy1 != 0";
+        $result = $this->db->sql_query($query);
+        return $result;
+    }
+
+    public function getRosterUnderContractOrderedByNameResult()
+    {
+        $query = "SELECT *
+            FROM ibl_plr
+            WHERE tid = '$this->teamID'
+              AND retired = 0
+            ORDER BY name ASC";
+        $result = $this->db->sql_query($query);
+        return $result;
+    }
+
+    public function getRosterUnderContractOrderedByOrdinalResult()
+    {
+        $query = "SELECT *
+            FROM ibl_plr
+            WHERE tid = '$this->teamID'
+              AND retired = 0
+            ORDER BY ordinal ASC";
         $result = $this->db->sql_query($query);
         return $result;
     }
@@ -220,7 +220,7 @@ class Team
 
     public function canAddContractWithoutGoingOverHardCap($currentSeasonContractValueToBeAdded)
     {
-        $teamResult = $this->getActiveRosterOrderedByNameResult();
+        $teamResult = $this->getRosterUnderContractOrderedByNameResult();
         $totalCurrentSeasonSalaries = $this->getTotalCurrentSeasonSalariesFromPlrResult($teamResult);
         $projectedTotalCurrentSeasonSalaries = $totalCurrentSeasonSalaries + $currentSeasonContractValueToBeAdded;
 

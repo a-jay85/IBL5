@@ -287,32 +287,8 @@ function waiverexecute($username, $action)
 
     UI::displaytopmenu($db, $team->teamID);
 
-    $querySelectHealthyPlayersOnUsersTeam = "
-        SELECT *
-        FROM ibl_plr
-        WHERE teamname = '$userinfo[user_ibl_team]'
-            AND retired = '0'
-            AND ordinal <= '960'
-            AND injured = '0'";
-    $resultSelectHealthyPlayersOnUsersTeam = $db->sql_query($querySelectHealthyPlayersOnUsersTeam);
-    $numhealthyPlayersOnUsersTeam = $db->sql_numrows($resultSelectHealthyPlayersOnUsersTeam);
-    $healthyRosterSpots = 15;
-    $healthyRosterSpots -= $numhealthyPlayersOnUsersTeam;
-
-    $querySelectAllPlayersOnUsersTeam = "
-        SELECT *
-        FROM ibl_plr
-        WHERE teamname = '$userinfo[user_ibl_team]'
-            AND retired = '0'
-            AND ordinal <= '960'
-        ORDER BY name ASC";
-    $resultSelectAllPlayersOnUsersTeam = $db->sql_query($querySelectAllPlayersOnUsersTeam);
-    $numPlayersOnUsersTeam = $db->sql_numrows($resultSelectAllPlayersOnUsersTeam);
-    $rosterSpots = 15;
-    $rosterSpots -= $numPlayersOnUsersTeam;
-
     if ($action == 'drop') {
-        $resultListOfPlayersForWaiverOperation = $db->sql_query($querySelectAllPlayersOnUsersTeam);
+        $resultListOfPlayersForWaiverOperation = $team->getHealthyAndInjuredPlayersOrderedByNameResult();
     } else {
         $queryAllPlayersOnWaivers = "SELECT * FROM ibl_plr WHERE ordinal > '960' AND retired = '0' AND name NOT LIKE '%|%' ORDER BY name ASC";
         $resultListOfPlayersForWaiverOperation = $db->sql_query($queryAllPlayersOnWaivers);
@@ -381,10 +357,10 @@ function waiverexecute($username, $action)
     }
 
     echo "<center><font color=red><b>$errortext</b></font></center>";
-    echo "<form name=\"Waiver_Move\" method=\"post\" action=\"\"><input type=\"hidden\" name=\"Team_Name\" value=\"$teamlogo\">";
-    echo "<center><img src=\"images/logo/$tid.jpg\"><br><table border=1 cellspacing=0 cellpadding=0>
+    echo "<form name=\"Waiver_Move\" method=\"post\" action=\"\"><input type=\"hidden\" name=\"Team_Name\" value=\"$team->name\">";
+    echo "<center><img src=\"images/logo/$team->teamID.jpg\"><br><table border=1 cellspacing=0 cellpadding=0>
         <tr>
-            <th colspan=3><center>WAIVER WIRE - YOUR TEAM CURRENTLY HAS $rosterSpots EMPTY ROSTER SPOTS and $healthyRosterSpots HEALTHY ROSTER SPOTS</center></th>
+            <th colspan=3><center>WAIVER WIRE - YOUR TEAM CURRENTLY HAS $team->numberOfOpenRosterSpots EMPTY ROSTER SPOTS and $team->numberOfHealthyOpenRosterSpots HEALTHY ROSTER SPOTS</center></th>
         </tr>
         <tr>
             <td valign=top><center><b><u>$userinfo[user_ibl_team]</u></b>
@@ -394,15 +370,15 @@ function waiverexecute($username, $action)
             </td>
         </tr>";
     echo "<input type=\"hidden\" name=\"Action\" value=\"$action\">";
-    echo "<input type=\"hidden\" name=\"rosterslots\" value=\"$rosterSpots\">";
-    echo "<input type=\"hidden\" name=\"healthyrosterslots\" value=\"$healthyRosterSpots\">";
+    echo "<input type=\"hidden\" name=\"rosterslots\" value=\"$team->numberOfOpenRosterSpots\">";
+    echo "<input type=\"hidden\" name=\"healthyrosterslots\" value=\"$team->numberOfHealthyOpenRosterSpots\">";
     echo "
         <tr>
             <td colspan=3><center><input type=\"submit\" value=\"Click to $action player(s) to/from Waiver Pool\"></center></td>
         </tr></form></table></center>";
     
-    $team = Team::withTeamID($db, 35);
-    $table_ratings = UI::ratings($db, $resultListOfPlayersForWaiverOperation, $team, "");
+    $teamFreeAgency = Team::withTeamID($db, 35);
+    $table_ratings = UI::ratings($db, $resultListOfPlayersForWaiverOperation, $teamFreeAgency, "");
     echo $table_ratings;
 
     CloseTable();

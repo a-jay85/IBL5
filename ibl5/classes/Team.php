@@ -166,6 +166,19 @@ class Team
         return $result;
     }
 
+    public function getHealthyRosterOrderedByNameResult()
+    {
+        $query = "SELECT *
+            FROM ibl_plr
+            WHERE teamname = '$this->name'
+              AND retired = '0'
+              AND ordinal <= '960'
+              AND injured = '0'
+            ORDER BY name ASC";
+        $result = $this->db->sql_query($query);
+        return $result;
+    }
+
     public function getPlayersUnderContractByPositionResult($position)
     {
         $query = "SELECT * 

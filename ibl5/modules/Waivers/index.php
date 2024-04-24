@@ -283,11 +283,9 @@ function waiverexecute($username, $action)
 
     OpenTable();
 
-    $teamlogo = $userinfo['user_ibl_team'];
-    $queryTeamID = "SELECT teamid FROM ibl_team_info WHERE team_name = '$teamlogo'";
-    $tid = $db->sql_result($db->sql_query($queryTeamID), 0);
+    $team = Team::withTeamName($db, $userinfo['user_ibl_team']);
 
-    UI::displaytopmenu($db, $tid);
+    UI::displaytopmenu($db, $team->teamID);
 
     $querySelectHealthyPlayersOnUsersTeam = "
         SELECT *

@@ -22,6 +22,9 @@ class Team
     public $hasMLE;
     public $hasLLE;
 
+    public $healthyPlayers;
+    public $healthyRosterSpots;
+
     const SOFT_CAP_MAX = 5000;
     const HARD_CAP_MAX = 7000;
     const BUYOUT_PERCENTAGE_MAX = 0.40;
@@ -96,6 +99,9 @@ class Team
         $this->hasUsedExtensionThisSeason = $teamRow['Used_Extension_This_Season'];
         $this->hasMLE = $teamRow['HasMLE'];
         $this->hasLLE = $teamRow['HasLLE'];
+
+        $this->healthyPlayers = $this->db->sql_numrows($this->getHealthyRosterOrderedByNameResult());
+        $this->healthyRosterSpots = 15 - $this->healthyPlayers;
     }
 
     public function getActiveRosterOrderedByNameResult()

@@ -74,7 +74,7 @@ function team($tid)
         } else if ($isFreeAgencyModuleActive == 1) {
             $result = $team->getFreeAgencyRosterOrderedByNameResult();
         } else {
-            $result = $team->getActiveRosterOrderedByNameResult();
+            $result = $team->getRosterUnderContractOrderedByNameResult();
         }
     }
 

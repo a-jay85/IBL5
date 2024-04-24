@@ -22,8 +22,10 @@ class Team
     public $hasMLE;
     public $hasLLE;
 
-    public $healthyPlayers;
-    public $healthyRosterSpots;
+    public $numberOfPlayers;
+    public $numberOfHealthyPlayers;
+    public $numberOfOpenRosterSpots;
+    public $numberOfHealthyOpenRosterSpots;
 
     const SOFT_CAP_MAX = 5000;
     const HARD_CAP_MAX = 7000;
@@ -100,8 +102,10 @@ class Team
         $this->hasMLE = $teamRow['HasMLE'];
         $this->hasLLE = $teamRow['HasLLE'];
 
-        $this->healthyPlayers = $this->db->sql_numrows($this->getHealthyPlayersOrderedByNameResult());
-        $this->healthyRosterSpots = 15 - $this->healthyPlayers;
+        $this->numberOfPlayers = $this->db->sql_numrows($this->getHealthyAndInjuredPlayersOrderedByNameResult());
+        $this->numberOfHealthyPlayers = $this->db->sql_numrows($this->getHealthyPlayersOrderedByNameResult());
+        $this->numberOfOpenRosterSpots = 15 - $this->numberOfPlayers;
+        $this->numberOfHealthyOpenRosterSpots = 15 - $this->numberOfHealthyPlayers;
     }
 
     public function getBuyoutsResult()

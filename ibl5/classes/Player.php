@@ -60,6 +60,7 @@ class Player
     public $contractYear4Salary;
     public $contractYear5Salary;
     public $contractYear6Salary;
+    public $currentSeasonSalary;
     public $salaryJSB;
 
     public $draftYear;
@@ -172,6 +173,7 @@ class Player
         $this->contractYear4Salary = $plrRow['cy4'];
         $this->contractYear5Salary = $plrRow['cy5'];
         $this->contractYear6Salary = $plrRow['cy6'];
+        $this->currentSeasonSalary = $this->getCurrentSeasonSalary();
     
         $this->draftYear = $plrRow['draftyear'];
         $this->draftRound = $plrRow['draftround'];

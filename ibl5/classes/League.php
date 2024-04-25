@@ -57,6 +57,18 @@ class League
         return $result;
     }
 
+    public function getWaivedPlayersResult()
+    {
+        $query = "SELECT *
+            FROM ibl_plr
+            WHERE ordinal > '960'
+              AND retired = '0'
+              AND name NOT LIKE '%|%'
+            ORDER BY name ASC";
+        $result = $this->db->sql_query($query);
+        return $result;
+    }
+
     public function getMVPCandidatesResult()
     {
         $query = "SELECT *

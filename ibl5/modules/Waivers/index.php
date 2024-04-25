@@ -284,14 +284,14 @@ function waiverexecute($username, $action)
     OpenTable();
 
     $team = Team::withTeamName($db, $userinfo['user_ibl_team']);
+    $league = new League($db);
 
     UI::displaytopmenu($db, $team->teamID);
 
     if ($action == 'drop') {
         $resultListOfPlayersForWaiverOperation = $team->getHealthyAndInjuredPlayersOrderedByNameResult();
     } else {
-        $queryAllPlayersOnWaivers = "SELECT * FROM ibl_plr WHERE ordinal > '960' AND retired = '0' AND name NOT LIKE '%|%' ORDER BY name ASC";
-        $resultListOfPlayersForWaiverOperation = $db->sql_query($queryAllPlayersOnWaivers);
+        $resultListOfPlayersForWaiverOperation = $league->getWaivedPlayersResult();
     }
 
     $k = 0;

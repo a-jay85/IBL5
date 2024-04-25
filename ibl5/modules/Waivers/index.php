@@ -297,50 +297,37 @@ function waiverexecute($username, $action)
     $k = 0;
     $timenow = intval(time());
 
-    while ($playerForWaiverOperation = $db->sql_fetchrow($resultListOfPlayersForWaiverOperation)) {
+    while ($playerRowForWaiverOperation = $db->sql_fetchrow($resultListOfPlayersForWaiverOperation)) {
+        $playerForWaiverOperation = Player::withPlrRow($db, $playerRowForWaiverOperation);
         $wait_time = '';
-        $player_name = $playerForWaiverOperation['name'];
-        $player_pid = $playerForWaiverOperation['pid'];
-        $currentContractYear = $playerForWaiverOperation['cy'];
-        $contractLengthInYears = $playerForWaiverOperation['cyt'];
-        $contractYearIncrementor = "cy$currentContractYear";
-        $player_exp = $playerForWaiverOperation['exp'];
-        $salaryForCurrentYear = $playerForWaiverOperation[$contractYearIncrementor];
 
         $fullContract = "";
-        if ($salaryForCurrentYear == '' and $salaryForCurrentYear == 0) {
-            if ($player_exp > 9) {
+        if ($playerForWaiverOperation->currentSeasonSalary == '' and $playerForWaiverOperation->currentSeasonSalary == 0) {
+            if ($playerForWaiverOperation->yearsOfExperience > 9) {
                 $fullContract = 103;
-            } elseif ($player_exp > 8) {
+            } elseif ($playerForWaiverOperation->yearsOfExperience > 8) {
                 $fullContract = 100;
-            } elseif ($player_exp > 7) {
+            } elseif ($playerForWaiverOperation->yearsOfExperience > 7) {
                 $fullContract = 89;
-            } elseif ($player_exp > 6) {
+            } elseif ($playerForWaiverOperation->yearsOfExperience > 6) {
                 $fullContract = 82;
-            } elseif ($player_exp > 5) {
+            } elseif ($playerForWaiverOperation->yearsOfExperience > 5) {
                 $fullContract = 76;
-            } elseif ($player_exp > 4) {
+            } elseif ($playerForWaiverOperation->yearsOfExperience > 4) {
                 $fullContract = 70;
-            } elseif ($player_exp > 3) {
+            } elseif ($playerForWaiverOperation->yearsOfExperience > 3) {
                 $fullContract = 64;
-            } elseif ($player_exp > 2) {
+            } elseif ($playerForWaiverOperation->yearsOfExperience > 2) {
                 $fullContract = 61;
             } else {
                 $fullContract = 51;
             }
         } else {
-            while ($currentContractYear <= $contractLengthInYears) {
-                $contractYearIncrementor = "cy$currentContractYear";
-                $salaryForCurrentYear = $playerForWaiverOperation[$contractYearIncrementor];
-                $fullContract .= $salaryForCurrentYear . " ";
-                
-                $currentContractYear++;
-            }
+            $fullContract = implode(" ", $playerForWaiverOperation->getRemainingContractArray());
         }
 
         if ($action == 'add') {
-            $player_droptime = $playerForWaiverOperation['droptime'];
-            $time_diff = $timenow - $player_droptime;
+            $time_diff = $timenow - $playerForWaiverOperation->timeDroppedOnWaivers;
 
             if ($time_diff < 86400) {
                 $wait_time = 86400 - $time_diff;
@@ -351,7 +338,7 @@ function waiverexecute($username, $action)
             }
         }
         $dropdown = $dropdown . "
-        <option value=\"$player_pid\">$player_name $fullContract $wait_time</option>";
+        <option value=\"$playerForWaiverOperation->playerID\">$playerForWaiverOperation->name $fullContract $wait_time</option>";
 
         $k++;
     }

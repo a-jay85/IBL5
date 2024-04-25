@@ -271,10 +271,14 @@ class Player
     {
         $remainingContractYear = 1;
         $contractCurrentYear = $this->contractCurrentYear;
+        $contractTotalYears = $this->contractTotalYears;
         if ($contractCurrentYear == 0) {
             $contractCurrentYear = 1;
         }
-        for ($i = $contractCurrentYear; $i <= $this->contractTotalYears; $i++) {
+        if ($contractTotalYears == 0) {
+            $contractTotalYears = 1;
+        }
+        for ($i = $contractCurrentYear; $i <= $contractTotalYears; $i++) {
             if ($this->{"contractYear" . $i . "Salary"} != 0) {
                 $contractArray[$remainingContractYear] = $this->{"contractYear" . $i . "Salary"};
             }

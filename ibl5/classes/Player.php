@@ -269,21 +269,18 @@ class Player
 
     public function getRemainingContractArray()
     {
+        $contractCurrentYear = ($this->contractCurrentYear != 0) ? $this->contractCurrentYear : 1;
+        $contractTotalYears = ($this->contractTotalYears != 0) ? $this->contractTotalYears : 1;
+
         $remainingContractYear = 1;
-        $contractCurrentYear = $this->contractCurrentYear;
-        $contractTotalYears = $this->contractTotalYears;
-        if ($contractCurrentYear == 0) {
-            $contractCurrentYear = 1;
-        }
-        if ($contractTotalYears == 0) {
-            $contractTotalYears = 1;
-        }
         for ($i = $contractCurrentYear; $i <= $contractTotalYears; $i++) {
             if ($this->{"contractYear" . $i . "Salary"} != 0) {
                 $contractArray[$remainingContractYear] = $this->{"contractYear" . $i . "Salary"};
             }
             $remainingContractYear++;
         }
+
+        $contractArray[1] = ($contractArray) ? $contractArray[1] : 0;
         return $contractArray;
     }
 

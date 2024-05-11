@@ -121,6 +121,7 @@ function userinfo($username)
             if ($votingCategory != "GM") {
                 $player = Player::withPlrRow($db, $row);
                 $playerStats = PlayerStats::withPlrRow($db, $row);
+                $teamname = $player->teamName;
             } else {
                 $name = $row['owner_name'];
                 $teamname = $row['team_city'] . " " . $row['team_name'];

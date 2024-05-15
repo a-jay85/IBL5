@@ -45,44 +45,7 @@ function scoParser($uploadedFilePath, $operatingSeasonEndingYear, $operatingSeas
         $line = fgets($scoFile, 2001);
 
         $gameInfoLine = substr($line, 0, 58);
-        $gameYear = $operatingSeasonEndingYear;
-        @$gameMonth = sprintf("%02u", substr($gameInfoLine, 0, 2) + 10); // sprintf() prepends 0 if the result isn't in double-digits
-        @$gameDay = sprintf("%02u", substr($gameInfoLine, 2, 2) + 1);
-        @$gameOfThatDay = substr($gameInfoLine, 4, 2) + 1;
-        @$visitorTID = substr($gameInfoLine, 6, 2) + 1;
-        @$homeTID = substr($gameInfoLine, 8, 2) + 1;
-        $attendance = substr($gameInfoLine, 10, 5);
-        $capacity = substr($gameInfoLine, 15, 5);
-        $visitorWins = substr($gameInfoLine, 20, 2);
-        $visitorLosses = substr($gameInfoLine, 22, 2);
-        $homeWins = substr($gameInfoLine, 24, 2);
-        $homeLosses = substr($gameInfoLine, 26, 2);
-        $visitorQ1pts = substr($gameInfoLine, 28, 3);
-        $visitorQ2pts = substr($gameInfoLine, 31, 3);
-        $visitorQ3pts = substr($gameInfoLine, 34, 3);
-        $visitorQ4pts = substr($gameInfoLine, 37, 3);
-        $visitorOTpts = substr($gameInfoLine, 40, 3);
-        $homeQ1pts = substr($gameInfoLine, 43, 3);
-        $homeQ2pts = substr($gameInfoLine, 46, 3);
-        $homeQ3pts = substr($gameInfoLine, 49, 3);
-        $homeQ4pts = substr($gameInfoLine, 52, 3);
-        $homeOTpts = substr($gameInfoLine, 55, 3);
-
-        if ($gameMonth > 12 and $gameMonth != Season::JSB_PLAYOFF_MONTH) {
-            $gameMonth = sprintf("%02u", $gameMonth - 12);
-        } elseif ($gameMonth == Season::JSB_PLAYOFF_MONTH) {
-            $gameMonth = sprintf("%02u", $gameMonth - 16); // TODO: not have to hack the Playoffs to be in June
-        } elseif ($gameMonth > 10) {
-            $gameYear = $operatingSeasonStartingYear;
-            if ($operatingSeasonPhase == "HEAT") {
-                $gameMonth = Season::IBL_HEAT_MONTH;
-            }
-            if ($operatingSeasonPhase == "Preseason") {
-                $gameMonth = Season::IBL_PRESEASON_MONTH;
-            }
-        }
-
-        $date = $gameYear . '-' . $gameMonth . '-' . $gameDay;
+        $boxscoreGameInfo = Boxscore::withGameInfoLine($gameInfoLine, $operatingSeasonEndingYear, $operatingSeasonPhase);
 
         for ($i = 0; $i < 30; $i++) {
             $x = $i * 53; // 53 = amount of characters to skip to get to the next player's/team's data line
@@ -128,12 +91,12 @@ function scoParser($uploadedFilePath, $operatingSeasonEndingYear, $operatingSeas
                 gamePF
             )
             VALUES (
-                '$date',
+                '$boxscoreGameInfo->gameDate',
                 '$name',
                 '$pos',
                 $pid,
-                $visitorTID,
-                $homeTID,
+                $boxscoreGameInfo->visitorTeamID,
+                $boxscoreGameInfo->homeTeamID,
                 $gameMIN,
                 $game2GM,
                 $game2GA,

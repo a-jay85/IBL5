@@ -86,24 +86,24 @@ function scoParser($uploadedFilePath, $operatingSeasonEndingYear, $operatingSeas
 
         for ($i = 0; $i < 30; $i++) {
             $x = $i * 53; // 53 = amount of characters to skip to get to the next player's/team's data line
-
-            $name = trim(substr($line, 58 + $x, 16));
-            $pos = trim(substr($line, 74 + $x, 2));
-            $pid = trim(substr($line, 76 + $x, 6));
-            $gameMIN = substr($line, 82 + $x, 2);
-            $game2GM = substr($line, 84 + $x, 2);
-            $game2GA = substr($line, 86 + $x, 3);
-            $gameFTM = substr($line, 89 + $x, 2);
-            $gameFTA = substr($line, 91 + $x, 2);
-            $game3GM = substr($line, 93 + $x, 2);
-            $game3GA = substr($line, 95 + $x, 2);
-            $gameORB = substr($line, 97 + $x, 2);
-            $gameDRB = substr($line, 99 + $x, 2);
-            $gameAST = substr($line, 101 + $x, 2);
-            $gameSTL = substr($line, 103 + $x, 2);
-            $gameTOV = substr($line, 105 + $x, 2);
-            $gameBLK = substr($line, 107 + $x, 2);
-            $gamePF = substr($line, 109 + $x, 2);
+            $playerInfoLine = substr($line, 58 + $x, 53);
+            $name = trim(substr($playerInfoLine, 0, 16));
+            $pos = trim(substr($playerInfoLine, 16, 2));
+            $pid = trim(substr($playerInfoLine, 18, 6));
+            $gameMIN = substr($playerInfoLine, 24, 2);
+            $game2GM = substr($playerInfoLine, 26, 2);
+            $game2GA = substr($playerInfoLine, 28, 3);
+            $gameFTM = substr($playerInfoLine, 31, 2);
+            $gameFTA = substr($playerInfoLine, 33, 2);
+            $game3GM = substr($playerInfoLine, 35, 2);
+            $game3GA = substr($playerInfoLine, 37, 2);
+            $gameORB = substr($playerInfoLine, 39, 2);
+            $gameDRB = substr($playerInfoLine, 41, 2);
+            $gameAST = substr($playerInfoLine, 43, 2);
+            $gameSTL = substr($playerInfoLine, 45, 2);
+            $gameTOV = substr($playerInfoLine, 47, 2);
+            $gameBLK = substr($playerInfoLine, 49, 2);
+            $gamePF = substr($playerInfoLine, 51, 2);
 
             $entryInsertQuery = "INSERT INTO ibl_box_scores (
                 Date,

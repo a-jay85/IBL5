@@ -818,7 +818,7 @@ function schedule($tid)
     echo "<center>
 		<img src=\"./images/logo/$tid.jpg\">
 		<table width=600 border=1>
-			<tr bgcolor=$color1><td colspan=26><center><font color=$color2><h1>Team Schedule</h1><p><i>games highlighted in yellow are projected to be run next sim (7 days)</i></font></center></td></tr>
+			<tr bgcolor=$color1><td colspan=26><center><font color=$color2><h1>Team Schedule</h1><p><i>games highlighted in yellow are projected to be run next sim (4 days)</i></font></center></td></tr>
 			<tr bgcolor=$color2><td colspan=26><font color=$color1><b><center>November</center></b></font></td></tr>
 			<tr bgcolor=$color2><td><font color=$color1><b>Date</font></td><td><font color=$color1><b>Visitor</font></td><td><font color=$color1><b>Score</font></td><td><font color=$color1><b>Home</font></td><td><font color=$color1><b>Score</font></td><td><font color=$color1><b>Box Score</font></td><td><font color=$color1><b>Record</font></td><td><font color=$color1><b>Streak</font></td></tr>";
     list($wins, $losses, $winStreak, $lossStreak) = boxscore($year, '11', $tid, $wins, $losses, $winStreak, $lossStreak);
@@ -871,7 +871,7 @@ function boxscore($year, $month, $tid, $wins, $losses, $winStreak, $lossStreak)
     $teamSeasonRecordsResult = $db->sql_query($teamSeasonRecordsQuery);
 
     $season->lastSimEndDate = date_create($season->lastSimEndDate);
-    $projectedNextSimEndDate = date_add($season->lastSimEndDate, date_interval_create_from_date_string('7 days'));
+    $projectedNextSimEndDate = date_add($season->lastSimEndDate, date_interval_create_from_date_string('4 days'));
 
     // override $projectedNextSimEndDate to account for the blank week at end of HEAT
     if (

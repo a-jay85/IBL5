@@ -3,9 +3,13 @@
 class PlayerStats
 {
     protected $db;
+
     public $playerID;
     public $plr;
 
+    public $name;
+    public $position;
+    
     public $seasonGamesStarted;
     public $seasonGamesPlayed;
     public $seasonMinutes;

@@ -381,7 +381,7 @@ class UI
                     <th><font color=$team->color2>Clu</font></th>
                     <th><font color=$team->color2>Con</font></th>
                     <td bgcolor=$team->color1 width=0></td>
-                    <th><font color=$team->color2>Inj</font></th>
+                    <th><font color=$team->color2>Injury Return<br>Date (Days)</font></th>
                 </tr>
             </thead>
         <tbody>";
@@ -405,7 +405,7 @@ class UI
     
             $injuryInfo = $player->getInjuryReturnDate($season->lastSimEndDate);
             if ($injuryInfo != "") {
-                $injuryInfo .= " ($player->daysRemainingForInjury days)";
+                $injuryInfo .= " ($player->daysRemainingForInjury)";
             }
 
             (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";

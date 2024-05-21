@@ -95,6 +95,21 @@ class PlayerStats
     public $careerBlocks;
     public $careerPersonalFouls;
 
+    public $gameMinutesPlayed;
+    public $gameFieldGoalsMade;
+    public $gameFieldGoalsAttempted;
+    public $gameFreeThrowsMade;
+    public $gameFreeThrowsAttempted;
+    public $gameThreePointersMade;
+    public $gameThreePointersAttempted;
+    public $gameOffensiveRebounds;
+    public $gameDefensiveRebounds;
+    public $gameAssists;
+    public $gameSteals;
+    public $gameTurnovers;
+    public $gameBlocks;
+    public $gamePersonalFouls;
+
     public function __construct()
     {
     }

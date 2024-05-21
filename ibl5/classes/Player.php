@@ -248,7 +248,7 @@ class Player
     {
         if ($this->daysRemainingForInjury > 0) {
             $properLastSimEndDate = date_create($rawLastSimEndDate);
-            $injuryDateString = $this->daysRemainingForInjury . ' days';
+            $injuryDateString = $this->daysRemainingForInjury + 1 . ' days';
             $injuryReturnDate = date_add($properLastSimEndDate, date_interval_create_from_date_string($injuryDateString));
             return $injuryReturnDate->format('Y-m-d');
         } else {

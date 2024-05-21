@@ -35,6 +35,8 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 {
     global $user, $prefix, $user_prefix, $db, $sharedFunctions, $useset;
 
+    $season = new Season($db);
+
     $sql = "SELECT * FROM " . $prefix . "_bbconfig";
     $result = $db->sql_query($sql);
     while ($row = $db->sql_fetchrow($result)) {
@@ -136,7 +138,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
             <input type=\"hidden\" name=\"Set_Name\" value=\"$offense_name\">
 		<center><img src=\"images/logo/$tid.jpg\"><br>";
 
-    $table_ratings = UI::ratings($db, $playersOnTeam, $team, "");
+    $table_ratings = UI::ratings($db, $playersOnTeam, $team, "", $season);
     echo $table_ratings;
 
     echo "<p><table>

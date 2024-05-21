@@ -364,8 +364,10 @@ function waiverexecute($username, $action)
             <td colspan=3><center><input type=\"submit\" value=\"Click to $action player(s) to/from Waiver Pool\"></center></td>
         </tr></form></table></center>";
     
+        
     $teamFreeAgency = Team::withTeamID($db, 35);
-    $table_ratings = UI::ratings($db, $resultListOfPlayersForWaiverOperation, $teamFreeAgency, "");
+    $season = new Season($db);
+    $table_ratings = UI::ratings($db, $resultListOfPlayersForWaiverOperation, $teamFreeAgency, "", $season);
     echo $table_ratings;
 
     CloseTable();

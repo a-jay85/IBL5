@@ -244,6 +244,18 @@ class Player
         return $result;
     }
 
+    public function getInjuryReturnDate($rawLastSimEndDate)
+    {
+        if ($this->daysRemainingForInjury > 0) {
+            $properLastSimEndDate = date_create($rawLastSimEndDate);
+            $injuryDateString = $this->daysRemainingForInjury . ' days';
+            $injuryReturnDate = date_add($properLastSimEndDate, date_interval_create_from_date_string($injuryDateString));
+            return $injuryReturnDate->format('Y-m-d');
+        } else {
+            return "";
+        }
+    }
+
     public function getNextSeasonSalary()
     {
         $contractNextYear = $this->contractCurrentYear + 1;

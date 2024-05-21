@@ -34,6 +34,7 @@ function team($tid)
         $team = Team::withTeamID($db, $tid);
     }
     $sharedFunctions = new Shared($db);
+    $season = new Season($db);
 
     $yr = $_REQUEST['yr'];
 
@@ -89,7 +90,7 @@ function team($tid)
 
     if ($display == "ratings") {
         $showing = "Player Ratings";
-        $table_ratings = UI::ratings($db, $result, $team, $yr);
+        $table_ratings = UI::ratings($db, $result, $team, $yr, $season);
         $table_output = $table_ratings;
         $tabs .= "<td bgcolor=#BBBBBB style=\"font-weight:bold\">";
     } else {

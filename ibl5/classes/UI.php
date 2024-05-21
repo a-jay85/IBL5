@@ -341,7 +341,7 @@ class UI
         return $table_per36Minutes;
     }
     
-    public static function ratings($db, $result, $team, $yr)
+    public static function ratings($db, $result, $team, $yr, $season)
     {
         $table_ratings = "<table align=\"center\" class=\"sortable\">
             <colgroup span=2><colgroup span=2><colgroup span=6><colgroup span=6><colgroup span=4><colgroup span=4><colgroup span=1>
@@ -402,9 +402,14 @@ class UI
                 
                 $playerNameDecorated = $player->name;
             }
+    
+            $injuryInfo = $player->getInjuryReturnDate($season->lastSimEndDate);
+            if ($injuryInfo != "") {
+                $injuryInfo .= " ($player->daysRemainingForInjury days)";
+            }
 
             (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
-    
+
             $table_ratings .= "<tr bgcolor=$bgcolor>
                 <td align=center>$player->position</td>
                 <td><a href=\"./modules.php?name=Player&pa=showpage&pid=$player->playerID\">$playerNameDecorated</a></td>
@@ -440,7 +445,7 @@ class UI
                 <td align=center>$player->ratingClutch</td>
                 <td align=center>$player->ratingConsistency</td>
                 <td bgcolor=$team->color1></td>
-                <td align=center>$player->daysRemainingForInjury</td>
+                <td align=center>$injuryInfo</td>
             </tr>";
     
             $i++;

@@ -50,23 +50,7 @@ function scoParser($uploadedFilePath, $operatingSeasonEndingYear, $operatingSeas
         for ($i = 0; $i < 30; $i++) {
             $x = $i * 53; // 53 = amount of characters to skip to get to the next player's/team's data line
             $playerInfoLine = substr($line, 58 + $x, 53);
-            $name = trim(substr($playerInfoLine, 0, 16));
-            $pos = trim(substr($playerInfoLine, 16, 2));
-            $pid = trim(substr($playerInfoLine, 18, 6));
-            $gameMIN = substr($playerInfoLine, 24, 2);
-            $game2GM = substr($playerInfoLine, 26, 2);
-            $game2GA = substr($playerInfoLine, 28, 3);
-            $gameFTM = substr($playerInfoLine, 31, 2);
-            $gameFTA = substr($playerInfoLine, 33, 2);
-            $game3GM = substr($playerInfoLine, 35, 2);
-            $game3GA = substr($playerInfoLine, 37, 2);
-            $gameORB = substr($playerInfoLine, 39, 2);
-            $gameDRB = substr($playerInfoLine, 41, 2);
-            $gameAST = substr($playerInfoLine, 43, 2);
-            $gameSTL = substr($playerInfoLine, 45, 2);
-            $gameTOV = substr($playerInfoLine, 47, 2);
-            $gameBLK = substr($playerInfoLine, 49, 2);
-            $gamePF = substr($playerInfoLine, 51, 2);
+            $playerStats = PlayerStats::withBoxscoreInfoLine($db, $playerInfoLine);
 
             $entryInsertQuery = "INSERT INTO ibl_box_scores (
                 Date,
@@ -92,27 +76,27 @@ function scoParser($uploadedFilePath, $operatingSeasonEndingYear, $operatingSeas
             )
             VALUES (
                 '$boxscoreGameInfo->gameDate',
-                '$name',
-                '$pos',
-                $pid,
+                '$playerStats->name',
+                '$playerStats->position',
+                $playerStats->playerID,
                 $boxscoreGameInfo->visitorTeamID,
                 $boxscoreGameInfo->homeTeamID,
-                $gameMIN,
-                $game2GM,
-                $game2GA,
-                $gameFTM,
-                $gameFTA,
-                $game3GM,
-                $game3GA,
-                $gameORB,
-                $gameDRB,
-                $gameAST,
-                $gameSTL,
-                $gameTOV,
-                $gameBLK,
-                $gamePF
+                $playerStats->gameMinutesPlayed,
+                $playerStats->gameFieldGoalsMade,
+                $playerStats->gameFieldGoalsAttempted,
+                $playerStats->gameFreeThrowsMade,
+                $playerStats->gameFreeThrowsAttempted,
+                $playerStats->gameThreePointersMade,
+                $playerStats->gameThreePointersAttempted,
+                $playerStats->gameOffensiveRebounds,
+                $playerStats->gameDefensiveRebounds,
+                $playerStats->gameAssists,
+                $playerStats->gameSteals,
+                $playerStats->gameTurnovers,
+                $playerStats->gameBlocks,
+                $playerStats->gamePersonalFouls
             )";
-            if ($name != null || $name != '') {
+            if ($playerStats->name != null || $playerStats->name != '') {
                 if ($db->sql_query($entryInsertQuery)) {
                     $numberOfLinesProcessed++;
                     // $entryInsertQuery = str_replace(array("\n", "\t", "\r"), '', $entryInsertQuery); // LOG LINES

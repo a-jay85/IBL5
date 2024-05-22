@@ -31,24 +31,6 @@ class Boxscore
     public $homeQ4points;
     public $homeOTpoints;
 
-    public $name;
-    public $position;
-    public $playerID;
-    public $gameMinutes;
-    public $gameFieldGoalsMade;
-    public $gameFieldGoalsAttempted;
-    public $gameFreeThrowsMade;
-    public $gameFreeThrowsAttempted;
-    public $gameThreePointersMade;
-    public $gameThreePointersAttempted;
-    public $gameOffensiveRebounds;
-    public $gameDefensiveRebounds;
-    public $gameAssists;
-    public $gameSteals;
-    public $gameTurnovers;
-    public $gameBlocks;
-    public $gamePersonalFouls;
-
     protected function fillGameInfo($gameInfoLine, $seasonEndingYear, $seasonPhase)
     {
         $this->gameYear = $seasonEndingYear;

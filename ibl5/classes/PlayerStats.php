@@ -142,6 +142,13 @@ class PlayerStats
         return $instance;
     }
 
+    public static function withBoxscoreInfoLine($db, string $playerInfoLine)
+    {
+        $instance = new self();
+        $instance->fillBoxscoreStats($playerInfoLine);
+        return $instance;
+    }
+
     protected function loadByID($db, int $playerID)
     {
         $query = "SELECT *

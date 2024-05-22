@@ -44,65 +44,13 @@ function scoParser($uploadedFilePath, $operatingSeasonEndingYear, $operatingSeas
     while (!feof($scoFile)) {
         $line = fgets($scoFile, 2001);
 
-        $gameYear = $operatingSeasonEndingYear;
-        @$gameMonth = sprintf("%02u", substr($line, 0, 2) + 10); // sprintf() prepends 0 if the result isn't in double-digits
-        @$gameDay = sprintf("%02u", substr($line, 2, 2) + 1);
-        @$gameOfThatDay = substr($line, 4, 2) + 1;
-        @$visitorTID = substr($line, 6, 2) + 1;
-        @$homeTID = substr($line, 8, 2) + 1;
-        $attendance = substr($line, 10, 5);
-        $capacity = substr($line, 15, 5);
-        $visitorWins = substr($line, 20, 2);
-        $visitorLosses = substr($line, 22, 2);
-        $homeWins = substr($line, 24, 2);
-        $homeLosses = substr($line, 26, 2);
-        $visitorQ1pts = substr($line, 28, 3);
-        $visitorQ2pts = substr($line, 31, 3);
-        $visitorQ3pts = substr($line, 34, 3);
-        $visitorQ4pts = substr($line, 37, 3);
-        $visitorOTpts = substr($line, 40, 3);
-        $homeQ1pts = substr($line, 43, 3);
-        $homeQ2pts = substr($line, 46, 3);
-        $homeQ3pts = substr($line, 49, 3);
-        $homeQ4pts = substr($line, 52, 3);
-        $homeOTpts = substr($line, 55, 3);
-
-        if ($gameMonth > 12 and $gameMonth != Season::JSB_PLAYOFF_MONTH) {
-            $gameMonth = sprintf("%02u", $gameMonth - 12);
-        } elseif ($gameMonth == Season::JSB_PLAYOFF_MONTH) {
-            $gameMonth = sprintf("%02u", $gameMonth - 16); // TODO: not have to hack the Playoffs to be in June
-        } elseif ($gameMonth > 10) {
-            $gameYear = $operatingSeasonStartingYear;
-            if ($operatingSeasonPhase == "HEAT") {
-                $gameMonth = Season::IBL_HEAT_MONTH;
-            }
-            if ($operatingSeasonPhase == "Preseason") {
-                $gameMonth = Season::IBL_PRESEASON_MONTH;
-            }
-        }
-
-        $date = $gameYear . '-' . $gameMonth . '-' . $gameDay;
+        $gameInfoLine = substr($line, 0, 58);
+        $boxscoreGameInfo = Boxscore::withGameInfoLine($gameInfoLine, $operatingSeasonEndingYear, $operatingSeasonPhase);
 
         for ($i = 0; $i < 30; $i++) {
             $x = $i * 53; // 53 = amount of characters to skip to get to the next player's/team's data line
-
-            $name = trim(substr($line, 58 + $x, 16));
-            $pos = trim(substr($line, 74 + $x, 2));
-            $pid = trim(substr($line, 76 + $x, 6));
-            $gameMIN = substr($line, 82 + $x, 2);
-            $game2GM = substr($line, 84 + $x, 2);
-            $game2GA = substr($line, 86 + $x, 3);
-            $gameFTM = substr($line, 89 + $x, 2);
-            $gameFTA = substr($line, 91 + $x, 2);
-            $game3GM = substr($line, 93 + $x, 2);
-            $game3GA = substr($line, 95 + $x, 2);
-            $gameORB = substr($line, 97 + $x, 2);
-            $gameDRB = substr($line, 99 + $x, 2);
-            $gameAST = substr($line, 101 + $x, 2);
-            $gameSTL = substr($line, 103 + $x, 2);
-            $gameTOV = substr($line, 105 + $x, 2);
-            $gameBLK = substr($line, 107 + $x, 2);
-            $gamePF = substr($line, 109 + $x, 2);
+            $playerInfoLine = substr($line, 58 + $x, 53);
+            $playerStats = PlayerStats::withBoxscoreInfoLine($db, $playerInfoLine);
 
             $entryInsertQuery = "INSERT INTO ibl_box_scores (
                 Date,
@@ -127,28 +75,28 @@ function scoParser($uploadedFilePath, $operatingSeasonEndingYear, $operatingSeas
                 gamePF
             )
             VALUES (
-                '$date',
-                '$name',
-                '$pos',
-                $pid,
-                $visitorTID,
-                $homeTID,
-                $gameMIN,
-                $game2GM,
-                $game2GA,
-                $gameFTM,
-                $gameFTA,
-                $game3GM,
-                $game3GA,
-                $gameORB,
-                $gameDRB,
-                $gameAST,
-                $gameSTL,
-                $gameTOV,
-                $gameBLK,
-                $gamePF
+                '$boxscoreGameInfo->gameDate',
+                '$playerStats->name',
+                '$playerStats->position',
+                $playerStats->playerID,
+                $boxscoreGameInfo->visitorTeamID,
+                $boxscoreGameInfo->homeTeamID,
+                $playerStats->gameMinutesPlayed,
+                $playerStats->gameFieldGoalsMade,
+                $playerStats->gameFieldGoalsAttempted,
+                $playerStats->gameFreeThrowsMade,
+                $playerStats->gameFreeThrowsAttempted,
+                $playerStats->gameThreePointersMade,
+                $playerStats->gameThreePointersAttempted,
+                $playerStats->gameOffensiveRebounds,
+                $playerStats->gameDefensiveRebounds,
+                $playerStats->gameAssists,
+                $playerStats->gameSteals,
+                $playerStats->gameTurnovers,
+                $playerStats->gameBlocks,
+                $playerStats->gamePersonalFouls
             )";
-            if ($name != null || $name != '') {
+            if ($playerStats->name != null || $playerStats->name != '') {
                 if ($db->sql_query($entryInsertQuery)) {
                     $numberOfLinesProcessed++;
                     // $entryInsertQuery = str_replace(array("\n", "\t", "\r"), '', $entryInsertQuery); // LOG LINES

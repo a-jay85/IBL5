@@ -3,9 +3,13 @@
 class PlayerStats
 {
     protected $db;
+
     public $playerID;
     public $plr;
 
+    public $name;
+    public $position;
+    
     public $seasonGamesStarted;
     public $seasonGamesPlayed;
     public $seasonMinutes;
@@ -91,6 +95,21 @@ class PlayerStats
     public $careerBlocks;
     public $careerPersonalFouls;
 
+    public $gameMinutesPlayed;
+    public $gameFieldGoalsMade;
+    public $gameFieldGoalsAttempted;
+    public $gameFreeThrowsMade;
+    public $gameFreeThrowsAttempted;
+    public $gameThreePointersMade;
+    public $gameThreePointersAttempted;
+    public $gameOffensiveRebounds;
+    public $gameDefensiveRebounds;
+    public $gameAssists;
+    public $gameSteals;
+    public $gameTurnovers;
+    public $gameBlocks;
+    public $gamePersonalFouls;
+
     public function __construct()
     {
     }
@@ -120,6 +139,13 @@ class PlayerStats
     {
         $instance = new self();
         $instance->fillHistorical($plrRow);
+        return $instance;
+    }
+
+    public static function withBoxscoreInfoLine($db, string $playerInfoLine)
+    {
+        $instance = new self();
+        $instance->fillBoxscoreStats($playerInfoLine);
         return $instance;
     }
 
@@ -262,5 +288,26 @@ class PlayerStats
         @$this->seasonFieldGoalPercentage = number_format(($this->seasonFieldGoalsMade / $this->seasonFieldGoalsAttempted), 3);
         @$this->seasonFreeThrowPercentage = number_format(($this->seasonFreeThrowsMade / $this->seasonFreeThrowsAttempted), 3);
         @$this->seasonThreePointPercentage = number_format(($this->seasonThreePointersMade / $this->seasonThreePointersAttempted), 3);
+    }
+
+    protected function fillBoxscoreStats(string $playerInfoLine)
+    {
+        $this->name = trim(substr($playerInfoLine, 0, 16));
+        $this->position = trim(substr($playerInfoLine, 16, 2));
+        $this->playerID = trim(substr($playerInfoLine, 18, 6));
+        $this->gameMinutesPlayed = substr($playerInfoLine, 24, 2);
+        $this->gameFieldGoalsMade = substr($playerInfoLine, 26, 2);
+        $this->gameFieldGoalsAttempted = substr($playerInfoLine, 28, 3);
+        $this->gameFreeThrowsMade = substr($playerInfoLine, 31, 2);
+        $this->gameFreeThrowsAttempted = substr($playerInfoLine, 33, 2);
+        $this->gameThreePointersMade = substr($playerInfoLine, 35, 2);
+        $this->gameThreePointersAttempted = substr($playerInfoLine, 37, 2);
+        $this->gameOffensiveRebounds = substr($playerInfoLine, 39, 2);
+        $this->gameDefensiveRebounds = substr($playerInfoLine, 41, 2);
+        $this->gameAssists = substr($playerInfoLine, 43, 2);
+        $this->gameSteals = substr($playerInfoLine, 45, 2);
+        $this->gameTurnovers = substr($playerInfoLine, 47, 2);
+        $this->gameBlocks = substr($playerInfoLine, 49, 2);
+        $this->gamePersonalFouls = substr($playerInfoLine, 51, 2);
     }
 }

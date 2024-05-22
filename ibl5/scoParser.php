@@ -4,7 +4,7 @@ require 'mainfile.php';
 
 function scoParser($uploadedFilePath, $operatingSeasonEndingYear, $operatingSeasonPhase)
 {
-    global $db;
+    global $db, $mysqli_db;
     $season = new Season($db);
 
     $scoFilePath = ($uploadedFilePath) ? $uploadedFilePath : "IBL5.sco";
@@ -40,6 +40,53 @@ function scoParser($uploadedFilePath, $operatingSeasonEndingYear, $operatingSeas
 
     echo "<i>[scoParser works silently now]</i><br>";
 
+    $statement = $mysqli_db->prepare("INSERT INTO ibl_box_scores (
+        Date,
+        name,
+        pos,
+        pid,
+        visitorTID,
+        homeTID,
+        gameMIN,
+        game2GM,
+        game2GA,
+        gameFTM,
+        gameFTA,
+        game3GM,
+        game3GA,
+        gameORB,
+        gameDRB,
+        gameAST,
+        gameSTL,
+        gameTOV,
+        gameBLK,
+        gamePF
+    )
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+
+    $statement->bind_param("sssiiiiiiiiiiiiiiiii",
+        $gameDate,
+        $name,
+        $position,
+        $playerID,
+        $visitorTeamID,
+        $homeTeamID,
+        $gameMinutesPlayed,
+        $gameFieldGoalsMade,
+        $gameFieldGoalsAttempted,
+        $gameFreeThrowsMade,
+        $gameFreeThrowsAttempted,
+        $gameThreePointersMade,
+        $gameThreePointersAttempted,
+        $gameOffensiveRebounds,
+        $gameDefensiveRebounds,
+        $gameAssists,
+        $gameSteals,
+        $gameTurnovers,
+        $gameBlocks,
+        $gamePersonalFouls
+    );
+
     $numberOfLinesProcessed = 0;
     while (!feof($scoFile)) {
         $line = fgets($scoFile, 2001);
@@ -52,59 +99,36 @@ function scoParser($uploadedFilePath, $operatingSeasonEndingYear, $operatingSeas
             $playerInfoLine = substr($line, 58 + $x, 53);
             $playerStats = PlayerStats::withBoxscoreInfoLine($db, $playerInfoLine);
 
-            $entryInsertQuery = "INSERT INTO ibl_box_scores (
-                Date,
-                name,
-                pos,
-                pid,
-                visitorTID,
-                homeTID,
-                gameMIN,
-                game2GM,
-                game2GA,
-                gameFTM,
-                gameFTA,
-                game3GM,
-                game3GA,
-                gameORB,
-                gameDRB,
-                gameAST,
-                gameSTL,
-                gameTOV,
-                gameBLK,
-                gamePF
-            )
-            VALUES (
-                '$boxscoreGameInfo->gameDate',
-                '$playerStats->name',
-                '$playerStats->position',
-                $playerStats->playerID,
-                $boxscoreGameInfo->visitorTeamID,
-                $boxscoreGameInfo->homeTeamID,
-                $playerStats->gameMinutesPlayed,
-                $playerStats->gameFieldGoalsMade,
-                $playerStats->gameFieldGoalsAttempted,
-                $playerStats->gameFreeThrowsMade,
-                $playerStats->gameFreeThrowsAttempted,
-                $playerStats->gameThreePointersMade,
-                $playerStats->gameThreePointersAttempted,
-                $playerStats->gameOffensiveRebounds,
-                $playerStats->gameDefensiveRebounds,
-                $playerStats->gameAssists,
-                $playerStats->gameSteals,
-                $playerStats->gameTurnovers,
-                $playerStats->gameBlocks,
-                $playerStats->gamePersonalFouls
-            )";
+            $gameDate = $boxscoreGameInfo->gameDate;
+            $name = $playerStats->name;
+            $position = $playerStats->position;
+            $playerID = $playerStats->playerID;
+            $visitorTeamID = $boxscoreGameInfo->visitorTeamID;
+            $homeTeamID = $boxscoreGameInfo->homeTeamID;
+            $gameMinutesPlayed = $playerStats->gameMinutesPlayed;
+            $gameFieldGoalsMade = $playerStats->gameFieldGoalsMade;
+            $gameFieldGoalsAttempted = $playerStats->gameFieldGoalsAttempted;
+            $gameFreeThrowsMade = $playerStats->gameFreeThrowsMade;
+            $gameFreeThrowsAttempted = $playerStats->gameFreeThrowsAttempted;
+            $gameThreePointersMade = $playerStats->gameThreePointersMade;
+            $gameThreePointersAttempted = $playerStats->gameThreePointersAttempted;
+            $gameOffensiveRebounds = $playerStats->gameOffensiveRebounds;
+            $gameDefensiveRebounds = $playerStats->gameDefensiveRebounds;
+            $gameAssists = $playerStats->gameAssists;
+            $gameSteals = $playerStats->gameSteals;
+            $gameTurnovers = $playerStats->gameTurnovers;
+            $gameBlocks = $playerStats->gameBlocks;
+            $gamePersonalFouls = $playerStats->gamePersonalFouls;
+
             if ($playerStats->name != null || $playerStats->name != '') {
-                if ($db->sql_query($entryInsertQuery)) {
+                if ($statement->execute()) {
                     $numberOfLinesProcessed++;
-                    // $entryInsertQuery = str_replace(array("\n", "\t", "\r"), '', $entryInsertQuery); // LOG LINES
-                    // echo $entryInsertQuery . "<br>";
                 }
             }
         }
     }
+
+    echo "<p>Number of .sco lines processed: $numberOfLinesProcessed";
 
     $newSimEndDate = $season->getLastBoxScoreDate();
 
@@ -118,8 +142,7 @@ function scoParser($uploadedFilePath, $operatingSeasonEndingYear, $operatingSeas
 
             $insertNewSimDates = $season->setLastSimDatesArray($newSimNumber, $newSimStartDate, $newSimEndDate);
         } else {
-            echo "<p>Number of .sco lines processed: $numberOfLinesProcessed
-            <p>Looks like new box scores haven't been added.
+            echo "<p>Looks like new box scores haven't been added.
             <br>Sim Start/End Dates will stay set to $season->lastSimStartDate and $season->lastSimEndDate.";
             die();
         }

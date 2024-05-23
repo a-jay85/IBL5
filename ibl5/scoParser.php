@@ -147,10 +147,8 @@ function scoParser($uploadedFilePath, $operatingSeasonEndingYear, $operatingSeas
             die();
         }
     } else {
-        $newSimNumber = 1;
         $newSimStartDate = $season->getFirstBoxScoreDate();
-
-        $insertNewSimDates = $season->setLastSimDatesArray($newSimNumber, $newSimStartDate, $newSimEndDate);
+        $insertNewSimDates = $season->setLastSimDatesArray(1, $newSimStartDate, $newSimEndDate);
     }
 
     if ($insertNewSimDates) {

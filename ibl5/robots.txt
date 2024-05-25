@@ -1,6 +1,3 @@
-User-agent: Mediapartners-Google*
-Disallow:
-
 User-agent: *
 Disallow: /admin.php
 Disallow: /admin/
@@ -12,3 +9,5 @@ Disallow: /themes/
 Disallow: /blocks/
 Disallow: /modules/
 Disallow: /language/
+Disallow: /ibl/
+Disallow: /IBL/

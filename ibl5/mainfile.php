@@ -12,6 +12,12 @@
 /* the Free Software Foundation; either version 2 of the License.       */
 /************************************************************************/
 
+$ua = $_SERVER['HTTP_USER_AGENT'];
+if (preg_match('/facebookexternalhit/si',$ua)) {
+    header('Location: robots.txt');
+    die();
+}
+
 // End the transaction
 if (!defined('END_TRANSACTION')) {
     define('END_TRANSACTION', 2);

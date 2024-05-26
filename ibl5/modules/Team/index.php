@@ -130,7 +130,7 @@ function team($tid)
 
     if ($display == "chunk") {
         $showing = "Chunk Averages";
-        $table_simAverages = UI::simAverages($db, $team);
+        $table_simAverages = UI::simAverages($db, $team, $season);
         $table_output = $table_simAverages;
         $tabs .= "<td bgcolor=#BBBBBB style=\"font-weight:bold\">";
     } else {

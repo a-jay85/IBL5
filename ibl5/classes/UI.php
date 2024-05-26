@@ -765,10 +765,8 @@ class UI
         return $table_totals;
     }
 
-    public static function simAverages($db, $team)
+    public static function simAverages($db, $team, $season)
     {
-        $season = new Season($db);
-
         $table_simAverages = "<table align=\"center\" class=\"sortable\"><thead><tr bgcolor=$team->color1>
             <th><font color=$team->color2>Pos</font></th>
             <th colspan=3><font color=$team->color2>Player</font></th>
@@ -796,114 +794,100 @@ class UI
             <th><font color=$team->color2>pf</font></th>
             <th><font color=$team->color2>pts</font></th>
         </tr></thead><tbody>";
-    
-        $playersOnTeam = $db->sql_query("SELECT pid
-            FROM ibl_plr
-            WHERE tid = $team->teamID
-            ORDER BY name ASC");
-        $numberOfPlayersOnTeam = $db->sql_numrows($playersOnTeam);
-    
-        $i = 0;
-        while ($i < $numberOfPlayersOnTeam) {
-            $pid = $db->sql_result($playersOnTeam, $i);
-    
-            // TODO: refactor this so that I'm not cutting and pasting the Player module's Sim Stats code
-            $resultPlayerSimBoxScores = $db->sql_query("SELECT *
-                FROM ibl_box_scores
-                WHERE pid = $pid
-                AND Date BETWEEN '$season->lastSimStartDate' AND '$season->lastSimEndDate'
-                AND gameMIN > 0
-                ORDER BY Date ASC");
-    
-            $numberOfGamesPlayedInSim = $db->sql_numrows($resultPlayerSimBoxScores);
-            $simTotalMIN = 0;
-            $simTotal2GM = 0;
-            $simTotal2GA = 0;
-            $simTotalFTM = 0;
-            $simTotalFTA = 0;
-            $simTotal3GM = 0;
-            $simTotal3GA = 0;
-            $simTotalORB = 0;
-            $simTotalDRB = 0;
-            $simTotalAST = 0;
-            $simTotalSTL = 0;
-            $simTotalTOV = 0;
-            $simTotalBLK = 0;
-            $simTotalPF = 0;
-            $simTotalPTS = 0;
-    
-            if ($numberOfGamesPlayedInSim > 0) {
-                while ($row = $db->sql_fetch_assoc($resultPlayerSimBoxScores)) {
-                    $name = $row['name'];
-                    $pos = $row['pos'];
-    
-                    $simTotalMIN += $row['gameMIN'];
-                    $simTotal2GM += $row['game2GM'];
-                    $simTotal2GA += $row['game2GA'];
-                    $simTotalFTM += $row['gameFTM'];
-                    $simTotalFTA += $row['gameFTA'];
-                    $simTotal3GM += $row['game3GM'];
-                    $simTotal3GA += $row['game3GA'];
-                    $simTotalORB += $row['gameORB'];
-                    $simTotalDRB += $row['gameDRB'];
-                    $simTotalAST += $row['gameAST'];
-                    $simTotalSTL += $row['gameSTL'];
-                    $simTotalTOV += $row['gameTOV'];
-                    $simTotalBLK += $row['gameBLK'];
-                    $simTotalPF += $row['gamePF'];
-                    $simTotalPTS += (2 * $row['game2GM']) + $row['gameFTM'] + (3 * $row['game3GM']);
-                }
-    
-                @$simAverageMIN = number_format(($simTotalMIN / $numberOfGamesPlayedInSim), 1);
-                @$simAverageFTM = number_format(($simTotalFTM / $numberOfGamesPlayedInSim), 1);
-                @$simAverageFTA = number_format(($simTotalFTA / $numberOfGamesPlayedInSim), 1);
-                @$simAverageFTP = number_format(($simTotalFTM / $simTotalFTA), 3);
-                @$simAverage3GM = number_format(($simTotal3GM / $numberOfGamesPlayedInSim), 1);
-                @$simAverage3GA = number_format(($simTotal3GA / $numberOfGamesPlayedInSim), 1);
-                @$simAverage3GP = number_format(($simTotal3GM / $simTotal3GA), 3);
-                @$simAverageFGM = number_format((($simTotal2GM + $simTotal3GM) / $numberOfGamesPlayedInSim), 1);
-                @$simAverageFGA = number_format((($simTotal2GA + $simTotal3GA) / $numberOfGamesPlayedInSim), 1);
-                @$simAverageFGP = number_format((($simTotal2GM + $simTotal3GM) / ($simTotal2GA + $simTotal3GA)), 3);
-                @$simAverageORB = number_format(($simTotalORB / $numberOfGamesPlayedInSim), 1);
-                @$simAverageREB = number_format((($simTotalORB + $simTotalDRB) / $numberOfGamesPlayedInSim), 1);
-                @$simAverageAST = number_format(($simTotalAST / $numberOfGamesPlayedInSim), 1);
-                @$simAverageSTL = number_format(($simTotalSTL / $numberOfGamesPlayedInSim), 1);
-                @$simAverageTOV = number_format(($simTotalTOV / $numberOfGamesPlayedInSim), 1);
-                @$simAverageBLK = number_format(($simTotalBLK / $numberOfGamesPlayedInSim), 1);
-                @$simAveragePF = number_format(($simTotalPF / $numberOfGamesPlayedInSim), 1);
-                @$simAveragePTS = number_format(($simTotalPTS / $numberOfGamesPlayedInSim), 1);
-    
-                (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
-    
-                $table_simAverages .= "<tr bgcolor=$bgcolor>
-                    <td>$pos</td>
-                    <td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>
-                    <td><center>$numberOfGamesPlayedInSim</center></td>
-                    <td><center>$simAverageMIN</center></td>
-                    <td bgcolor=$team->color1 width=0></td>
-                    <td><center>$simAverageFGM</center></td>
-                    <td><center>$simAverageFGA</center></td>
-                    <td><center>$simAverageFGP</center></td>
-                    <td bgcolor=#CCCCCC width=0></td>
-                    <td><center>$simAverageFTM</center></td>
-                    <td><center>$simAverageFTA</center></td>
-                    <td><center>$simAverageFTP</center></td>
-                    <td bgcolor=#CCCCCC width=0></td>
-                    <td><center>$simAverage3GM</center></td>
-                    <td><center>$simAverage3GA</center></td>
-                    <td><center>$simAverage3GP</center></td>
-                    <td bgcolor=$team->color1 width=0></td>
-                    <td><center>$simAverageORB</center></td>
-                    <td><center>$simAverageREB</center></td>
-                    <td><center>$simAverageAST</center></td>
-                    <td><center>$simAverageSTL</center></td>
-                    <td><center>$simAverageTOV</center></td>
-                    <td><center>$simAverageBLK</center></td>
-                    <td><center>$simAveragePF</center></td>
-                    <td><center>$simAveragePTS</center></td>
-                </tr>";
-            }
-    
+
+        $resultPlayerSimBoxScores = $db->sql_query("SELECT name,
+            pos,
+            pid,
+            COUNT(DISTINCT `Date`) as games,
+            ROUND(SUM(gameMIN)/COUNT(DISTINCT `Date`), 1) as gameMINavg,
+            ROUND(SUM(game2GM + game3GM)/COUNT(DISTINCT `Date`), 2) as gameFGMavg,
+            ROUND(SUM(game2GA + game3GA)/COUNT(DISTINCT `Date`), 2) as gameFGAavg,
+            ROUND((SUM(game2GM) + SUM(game3GM)) / (SUM(game2GA) + SUM(game3GA)), 3) as gameFGPavg,
+            ROUND(SUM(gameFTM)/COUNT(DISTINCT `Date`), 2) as gameFTMavg,
+            ROUND(SUM(gameFTA)/COUNT(DISTINCT `Date`), 2) as gameFTAavg,
+            ROUND((SUM(gameFTM)) / (SUM(gameFTA)), 3) as gameFTPavg,
+            ROUND(SUM(game3GM)/COUNT(DISTINCT `Date`), 2) as game3GMavg,
+            ROUND(SUM(game3GA)/COUNT(DISTINCT `Date`), 2) as game3GAavg,
+            ROUND((SUM(game3GM)) / (SUM(game3GA)), 3) as game3GPavg,
+            ROUND(SUM(gameORB)/COUNT(DISTINCT `Date`), 1) as gameORBavg,
+            ROUND((SUM(gameORB) + SUM(gameDRB))/COUNT(DISTINCT `Date`), 1) as gameREBavg,
+            ROUND(SUM(gameAST)/COUNT(DISTINCT `Date`), 1) as gameASTavg,
+            ROUND(SUM(gameSTL)/COUNT(DISTINCT `Date`), 1) as gameSTLavg,
+            ROUND(SUM(gameTOV)/COUNT(DISTINCT `Date`), 1) as gameTOVavg,
+            ROUND(SUM(gameBLK)/COUNT(DISTINCT `Date`), 1) as gameBLKavg,
+            ROUND(SUM(gamePF)/COUNT(DISTINCT `Date`) , 1) as gamePFavg,
+            ROUND(((2 * SUM(game2GM)) + SUM(gameFTM) + (3 * SUM(game3GM)))/COUNT(DISTINCT `Date`) , 1) as gamePTSavg
+        FROM   ibl_box_scores
+        WHERE  date BETWEEN '$season->lastSimStartDate' AND '$season->lastSimEndDate'
+            AND ( hometid = $team->teamID
+                OR visitortid = $team->teamID )
+            AND gameMIN > 0
+            AND pid IN (SELECT pid
+                        FROM   ibl_plr
+                        WHERE  tid = $team->teamID
+                            AND retired = 0
+                            AND `name` NOT LIKE '%|%')
+        GROUP  BY name, pos, pid
+        ORDER  BY name ASC;");
+
+        $simAverageMIN = $simAverageFGM = $simAverageFGA = $simAverageFGP = $simAverageFTM = $simAverageFTA = $simAverageFTP = 0;
+        $simAverage3GM = $simAverage3GA = $simAverage3GP = $simAverageORB = $simAverageREB = $simAverageAST = $simAverageSTL = 0;
+        $simAverageTOV = $simAverageBLK = $simAveragePF = $simAveragePTS = $i = 0;
+
+        while ($row = $db->sql_fetch_assoc($resultPlayerSimBoxScores)) {
+            $name = $row['name'];
+            $pos = $row['pos'];
+            $pid = $row['pid'];
+            $numberOfGamesPlayedInSim = $row['games'];
+            $simAverageMIN = $row['gameMINavg'];
+            $simAverageFGM = $row['gameFGMavg'];
+            $simAverageFGA = $row['gameFGAavg'];
+            $simAverageFGP = $row['gameFGPavg'] ?? '0.000';
+            $simAverageFTM = $row['gameFTMavg'];
+            $simAverageFTA = $row['gameFTAavg'];
+            $simAverageFTP = $row['gameFTPavg'] ?? '0.000';
+            $simAverage3GM = $row['game3GMavg'];
+            $simAverage3GA = $row['game3GAavg'];
+            $simAverage3GP = $row['game3GPavg'] ?? '0.000';
+            $simAverageORB = $row['gameORBavg'];
+            $simAverageREB = $row['gameREBavg'];
+            $simAverageAST = $row['gameASTavg'];
+            $simAverageSTL = $row['gameSTLavg'];
+            $simAverageTOV = $row['gameTOVavg'];
+            $simAverageBLK = $row['gameBLKavg'];
+            $simAveragePF = $row['gamePFavg'];
+            $simAveragePTS = $row['gamePTSavg'];
+
+            (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
+
+            $table_simAverages .= "<tr bgcolor=$bgcolor>
+                <td>$pos</td>
+                <td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>
+                <td><center>$numberOfGamesPlayedInSim</center></td>
+                <td><center>$simAverageMIN</center></td>
+                <td bgcolor=$team->color1 width=0></td>
+                <td><center>$simAverageFGM</center></td>
+                <td><center>$simAverageFGA</center></td>
+                <td><center>$simAverageFGP</center></td>
+                <td bgcolor=#CCCCCC width=0></td>
+                <td><center>$simAverageFTM</center></td>
+                <td><center>$simAverageFTA</center></td>
+                <td><center>$simAverageFTP</center></td>
+                <td bgcolor=#CCCCCC width=0></td>
+                <td><center>$simAverage3GM</center></td>
+                <td><center>$simAverage3GA</center></td>
+                <td><center>$simAverage3GP</center></td>
+                <td bgcolor=$team->color1 width=0></td>
+                <td><center>$simAverageORB</center></td>
+                <td><center>$simAverageREB</center></td>
+                <td><center>$simAverageAST</center></td>
+                <td><center>$simAverageSTL</center></td>
+                <td><center>$simAverageTOV</center></td>
+                <td><center>$simAverageBLK</center></td>
+                <td><center>$simAveragePF</center></td>
+                <td><center>$simAveragePTS</center></td>
+            </tr>";
+
             $i++;
         }
     

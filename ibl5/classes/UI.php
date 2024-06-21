@@ -93,6 +93,7 @@ class UI
                 <tr bgcolor=$team->color1>
                     <th><font color=$team->color2>Pos</font></th>
                     <th colspan=2><font color=$team->color2>Player</font></th>
+                    <th><font color=$team->color2>Age</font></th>
                     <th><font color=$team->color2>Exp</font></th>
                     <th><font color=$team->color2>Bird</font></th>
                     <td bgcolor=$team->color1 width=0></td>
@@ -161,6 +162,7 @@ class UI
                 <tr bgcolor=$bgcolor>
                 <td align=center>$player->position</td>
                 <td colspan=2><a href=\"./modules.php?name=Player&pa=showpage&pid=$player->playerID\">$playerNameDecorated</a></td>
+                <td align=center>$player->age</td>
                 <td align=center>$player->yearsOfExperience</td>
                 <td align=center>$player->birdYears</td>
                 <td bgcolor=$team->color1></td>
@@ -196,6 +198,7 @@ class UI
                 <tr>
                     <td></td>
                     <td colspan=2><b>Cap Totals</td>
+                    <td></td>
                     <td></td>
                     <td></td>
                     <td bgcolor=$team->color1></td>

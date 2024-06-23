@@ -176,6 +176,10 @@ echo "<h1>JSB .sco File Parser</h1>
 <hr>
 <br>";
 
+if ($_FILES['scoFile']['error']) {
+    echo $_FILES['scoFile']['error'] . "<p>";
+};
+
 if ($_FILES['scoFile']['tmp_name']) {
     $uploadedFilePath = $_FILES['scoFile']['tmp_name'];
     $operatingSeasonEndingYear = $_POST['seasonEndingYear'];

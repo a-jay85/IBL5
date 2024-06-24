@@ -1652,7 +1652,6 @@ function showpage($playerID, $spec)
             $query = "SELECT * FROM ibl_box_scores WHERE Date BETWEEN '$season->beginningYear-10-01' AND '$season->endingYear-07-01' AND pid = $playerID ORDER BY Date ASC";
         }
         $result = $db->sql_query($query);
-        $num = $db->sql_numrows($result);
 
         echo '<p><H1><center>GAME LOG</center></H1><p><table class=\"sortable\" width="100%">
               <tr>
@@ -1680,7 +1679,7 @@ function showpage($playerID, $spec)
               <th>PF</th>
               </tr>
         ';
-        $i = 0;
+
         while ($row = $db->sql_fetch_assoc($result)) {
             echo "<style>
                     td {}

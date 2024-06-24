@@ -31,6 +31,68 @@ class Boxscore
     public $homeQ4points;
     public $homeOTpoints;
 
+    const PLAYERSTATEMENT_PREPARE = "INSERT INTO ibl_box_scores (
+        Date,
+        name,
+        pos,
+        pid,
+        visitorTID,
+        homeTID,
+        gameMIN,
+        game2GM,
+        game2GA,
+        gameFTM,
+        gameFTA,
+        game3GM,
+        game3GA,
+        gameORB,
+        gameDRB,
+        gameAST,
+        gameSTL,
+        gameTOV,
+        gameBLK,
+        gamePF
+    )
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+
+    const TEAMSTATEMENT_PREPARE = "INSERT INTO ibl_box_scores_teams (
+        Date,
+        name,
+        gameOfThatDay,
+        visitorTeamID,
+        homeTeamID,
+        attendance,
+        capacity,
+        visitorWins,
+        visitorLosses,
+        homeWins,
+        homeLosses,
+        visitorQ1points,
+        visitorQ2points,
+        visitorQ3points,
+        visitorQ4points,
+        visitorOTpoints,
+        homeQ1points,
+        homeQ2points,
+        homeQ3points,
+        homeQ4points,
+        homeOTpoints,
+        gameFGM,
+        gameFGA,
+        gameFTM,
+        gameFTA,
+        game3GM,
+        game3GA,
+        gameORB,
+        gameDRB,
+        gameAST,
+        gameSTL,
+        gameTOV,
+        gameBLK,
+        gamePF
+    )
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+
     protected function fillGameInfo($gameInfoLine, $seasonEndingYear, $seasonPhase)
     {
         $this->gameYear = $seasonEndingYear;

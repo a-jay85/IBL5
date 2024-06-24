@@ -145,27 +145,55 @@ class Boxscore
 
     public static function deletePreseasonBoxScores($db, $seasonStartingYear)
     {
-        $queryDeletePreseasonBoxScores = "DELETE FROM `ibl_box_scores`
+        $queryDeletePreseasonPlayersBoxScores = "DELETE FROM `ibl_box_scores`
+            WHERE `Date` BETWEEN '$seasonStartingYear-07-01' AND '$seasonStartingYear-09-01';";
+        $queryDeletePreseasonTeamsBoxScores = "DELETE FROM `ibl_box_scores_teams`
             WHERE `Date` BETWEEN '$seasonStartingYear-07-01' AND '$seasonStartingYear-09-01';";
 
-        return $db->sql_query($queryDeletePreseasonBoxScores, 0);
+        if (
+            $db->sql_query($queryDeletePreseasonPlayersBoxScores, 0) 
+            AND $db->sql_query($queryDeletePreseasonTeamsBoxScores, 0)
+        ) {
+            return TRUE;
+        } else {
+            return FALSE;
+        }
     }
 
     public static function deleteHEATBoxScores($db, $seasonStartingYear)
     {
-        $queryDeleteHEATBoxScores = "DELETE FROM `ibl_box_scores`
+        $queryDeleteHEATPlayersBoxScores = "DELETE FROM `ibl_box_scores`
+            WHERE `Date` BETWEEN '$seasonStartingYear-09-01' AND '$seasonStartingYear-11-01';";
+        $queryDeleteHEATTeamsBoxScores = "DELETE FROM `ibl_box_scores_teams`
             WHERE `Date` BETWEEN '$seasonStartingYear-09-01' AND '$seasonStartingYear-11-01';";
 
-        return $db->sql_query($queryDeleteHEATBoxScores, 0);
+        if (
+            $db->sql_query($queryDeleteHEATPlayersBoxScores, 0) 
+            AND $db->sql_query($queryDeleteHEATTeamsBoxScores, 0)
+        ) {
+            return TRUE;
+        } else {
+            return FALSE;
+        }
     }
 
     public static function deleteRegularSeasonAndPlayoffsBoxScores($db, $seasonStartingYear)
     {
         $seasonEndingYear = $seasonStartingYear + 1;
 
-        $queryDeleteRegularSeasonAndPlayoffsBoxScores = "DELETE FROM `ibl_box_scores`
+        $queryDeleteRegularSeasonAndPlayoffsPlayersBoxScores = "DELETE FROM `ibl_box_scores`
             WHERE `Date` BETWEEN '$seasonStartingYear-11-01' AND '$seasonEndingYear-07-01';";
 
-        return $db->sql_query($queryDeleteRegularSeasonAndPlayoffsBoxScores, 0);
+        $queryDeleteRegularSeasonAndPlayoffsTeamsBoxScores = "DELETE FROM `ibl_box_scores_teams`
+            WHERE `Date` BETWEEN '$seasonStartingYear-11-01' AND '$seasonEndingYear-07-01';";
+
+        if (
+            $db->sql_query($queryDeleteRegularSeasonAndPlayoffsPlayersBoxScores, 0) 
+            AND $db->sql_query($queryDeleteRegularSeasonAndPlayoffsTeamsBoxScores, 0)
+        ) {
+            return TRUE;
+        } else {
+            return FALSE;
+        }
     }
 }

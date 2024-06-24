@@ -183,7 +183,6 @@ class Boxscore
 
         $queryDeleteRegularSeasonAndPlayoffsPlayersBoxScores = "DELETE FROM `ibl_box_scores`
             WHERE `Date` BETWEEN '$seasonStartingYear-11-01' AND '$seasonEndingYear-07-01';";
-
         $queryDeleteRegularSeasonAndPlayoffsTeamsBoxScores = "DELETE FROM `ibl_box_scores_teams`
             WHERE `Date` BETWEEN '$seasonStartingYear-11-01' AND '$seasonEndingYear-07-01';";
 

@@ -40,31 +40,46 @@ function scoParser($uploadedFilePath, $operatingSeasonEndingYear, $operatingSeas
 
     echo "<i>[scoParser works silently now]</i><br>";
 
-    $statement = $mysqli_db->prepare("INSERT INTO ibl_box_scores (
-        Date,
-        name,
-        pos,
-        pid,
-        visitorTID,
-        homeTID,
-        gameMIN,
-        game2GM,
-        game2GA,
-        gameFTM,
-        gameFTA,
-        game3GM,
-        game3GA,
-        gameORB,
-        gameDRB,
-        gameAST,
-        gameSTL,
-        gameTOV,
-        gameBLK,
-        gamePF
-    )
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+    $teamStatement = $mysqli_db->prepare(Boxscore::TEAMSTATEMENT_PREPARE);
+    $teamStatement->bind_param("ssiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii",
+        $gameDate,
+        $name,
+        $gameOfThatDay,
+        $visitorTeamID,
+        $homeTeamID,
+        $attendance,
+        $capacity,
+        $visitorWins,
+        $visitorLosses,
+        $homeWins,
+        $homeLosses,
+        $visitorQ1points,
+        $visitorQ2points,
+        $visitorQ3points,
+        $visitorQ4points,
+        $visitorOTpoints,
+        $homeQ1points,
+        $homeQ2points,
+        $homeQ3points,
+        $homeQ4points,
+        $homeOTpoints,
+        $gameFieldGoalsMade,
+        $gameFieldGoalsAttempted,
+        $gameFreeThrowsMade,
+        $gameFreeThrowsAttempted,
+        $gameThreePointersMade,
+        $gameThreePointersAttempted,
+        $gameOffensiveRebounds,
+        $gameDefensiveRebounds,
+        $gameAssists,
+        $gameSteals,
+        $gameTurnovers,
+        $gameBlocks,
+        $gamePersonalFouls
+    );
 
-    $statement->bind_param("sssiiiiiiiiiiiiiiiii",
+    $playerStatement = $mysqli_db->prepare(Boxscore::PLAYERSTATEMENT_PREPARE);
+    $playerStatement->bind_param("sssiiiiiiiiiiiiiiiii",
         $gameDate,
         $name,
         $position,
@@ -94,17 +109,35 @@ function scoParser($uploadedFilePath, $operatingSeasonEndingYear, $operatingSeas
         $gameInfoLine = substr($line, 0, 58);
         $boxscoreGameInfo = Boxscore::withGameInfoLine($gameInfoLine, $operatingSeasonEndingYear, $operatingSeasonPhase);
 
+        $gameDate = $boxscoreGameInfo->gameDate;
+        $gameOfThatDay = $boxscoreGameInfo->gameOfThatDay;
+        $visitorTeamID = $boxscoreGameInfo->visitorTeamID;
+        $homeTeamID = $boxscoreGameInfo->homeTeamID;
+        $attendance = $boxscoreGameInfo->attendance;
+        $capacity = $boxscoreGameInfo->capacity;
+        $visitorWins = $boxscoreGameInfo->visitorWins;
+        $visitorLosses = $boxscoreGameInfo->visitorLosses;
+        $homeWins = $boxscoreGameInfo->homeWins;
+        $homeLosses = $boxscoreGameInfo->homeLosses;
+        $visitorQ1points = $boxscoreGameInfo->visitorQ1points;
+        $visitorQ2points = $boxscoreGameInfo->visitorQ2points;
+        $visitorQ3points = $boxscoreGameInfo->visitorQ3points;
+        $visitorQ4points = $boxscoreGameInfo->visitorQ4points;
+        $visitorOTpoints = $boxscoreGameInfo->visitorOTpoints;
+        $homeQ1points = $boxscoreGameInfo->homeQ1points;
+        $homeQ2points = $boxscoreGameInfo->homeQ2points;
+        $homeQ3points = $boxscoreGameInfo->homeQ3points;
+        $homeQ4points = $boxscoreGameInfo->homeQ4points;
+        $homeOTpoints = $boxscoreGameInfo->homeOTpoints;
+
         for ($i = 0; $i < 30; $i++) {
             $x = $i * 53; // 53 = amount of characters to skip to get to the next player's/team's data line
             $playerInfoLine = substr($line, 58 + $x, 53);
             $playerStats = PlayerStats::withBoxscoreInfoLine($db, $playerInfoLine);
 
-            $gameDate = $boxscoreGameInfo->gameDate;
             $name = $playerStats->name;
             $position = $playerStats->position;
             $playerID = $playerStats->playerID;
-            $visitorTeamID = $boxscoreGameInfo->visitorTeamID;
-            $homeTeamID = $boxscoreGameInfo->homeTeamID;
             $gameMinutesPlayed = $playerStats->gameMinutesPlayed;
             $gameFieldGoalsMade = $playerStats->gameFieldGoalsMade;
             $gameFieldGoalsAttempted = $playerStats->gameFieldGoalsAttempted;
@@ -121,8 +154,14 @@ function scoParser($uploadedFilePath, $operatingSeasonEndingYear, $operatingSeas
             $gamePersonalFouls = $playerStats->gamePersonalFouls;
 
             if ($playerStats->name != null || $playerStats->name != '') {
-                if ($statement->execute()) {
-                    $numberOfLinesProcessed++;
+                if ($playerID == 0) {
+                    if ($teamStatement->execute()) {
+                        $numberOfLinesProcessed++;
+                    }
+                } else {
+                    if ($playerStatement->execute()) {
+                        $numberOfLinesProcessed++;
+                    }
                 }
             }
         }

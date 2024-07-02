@@ -15,13 +15,13 @@ $arrayStatNames = array(
 );
 
 $arrayStatQueries = array(
-    '(`game2GM`*2) + `gameFTM` + (`game3GM`*3)',
+    '(`gameFGM`*2) + `gameFTM` + (`game3GM`*3)',
     '(`gameORB` + `gameDRB`)',
     '`gameAST`',
     '`gameSTL`',
     '`gameBLK`',
     '`gameTOV`',
-    '(`game2GM` + `game3GM`)',
+    '(`gameFGM` + `game3GM`)',
     '`gameFTM`',
     '`game3GM`',
 );

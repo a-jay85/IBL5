@@ -80,7 +80,7 @@ function displayColumnLastSimStatLeaders($array, $statName, $content)
     return $content;
 }
 
-$lastSimPointsLeaders = getLastSimStatLeaders('POINTS', '(2 * SUM(game2GM) + SUM(gameFTM) + 3 * SUM(game3GM))');
+$lastSimPointsLeaders = getLastSimStatLeaders('POINTS', '(2 * SUM(gameFGM) + SUM(gameFTM) + 3 * SUM(game3GM))');
 $lastSimReboundsLeaders = getLastSimStatLeaders('REBOUNDS', '(SUM(gameORB) + SUM(gameDRB))');
 $lastSimAssistsLeaders = getLastSimStatLeaders('ASSISTS', 'SUM(gameAST)');
 $lastSimStealsLeaders = getLastSimStatLeaders('STEALS', 'SUM(gameSTL)');

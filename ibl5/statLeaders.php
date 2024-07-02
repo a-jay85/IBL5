@@ -44,28 +44,31 @@ function seasonHighTable($queryForStat, $statName, $playerOrTeam, $seasonPhase)
     }
 
     if ($seasonPhase == "Playoffs") {
-        $query = "SELECT `name`, `date`, " . $queryForStat . " AS `" . $statName . "`
-            FROM ibl_box_scores" . $isTeam . "
-            WHERE date >= '" . $season->endingYear . "-05-01'
-            ORDER BY `" . $statName . "` DESC, date ASC LIMIT 15;";
+        $queryBeginningYear = $season->endingYear;
+        $queryBeginningMonth = Season::IBL_PLAYOFF_MONTH;
+        $queryEndingYear = $season->endingYear;
+        $queryEndingMonth = Season::IBL_PLAYOFF_MONTH;
     } elseif ($seasonPhase == "Preseason") {
-        $query = "SELECT `name`, `date`, " . $queryForStat . " AS `" . $statName . "`
-            FROM ibl_box_scores" . $isTeam . "
-            WHERE date BETWEEN '" . $season->beginningYear . "-09-01' AND '" . $season->beginningYear . "-09-30'
-            ORDER BY `" . $statName . "` DESC, date ASC LIMIT 15;";
+        $queryBeginningYear = $season->beginningYear;
+        $queryBeginningMonth = Season::IBL_PRESEASON_MONTH;
+        $queryEndingYear = $season->beginningYear;
+        $queryEndingMonth = Season::IBL_PRESEASON_MONTH;
     } elseif ($seasonPhase == "HEAT") {
-        $query = "SELECT `name`, `date`, " . $queryForStat . " AS `" . $statName . "`
-            FROM ibl_box_scores" . $isTeam . "
-            WHERE date BETWEEN '" . $season->beginningYear . "-10-01' AND '" . $season->beginningYear . "-10-31'
-            ORDER BY `" . $statName . "` DESC, date ASC LIMIT 15;";
+        $queryBeginningYear = $season->beginningYear;
+        $queryBeginningMonth = Season::IBL_HEAT_MONTH;
+        $queryEndingYear = $season->beginningYear;
+        $queryEndingMonth = Season::IBL_HEAT_MONTH;
     } else {
-        $query = "SELECT `name`, `date`, " . $queryForStat . " AS `" . $statName . "`
-            FROM ibl_box_scores" . $isTeam . "
-            WHERE date BETWEEN '" . $season->beginningYear . "-11-01' AND '" . $season->endingYear . "-04-30'
-            ORDER BY `" . $statName . "` DESC, date ASC LIMIT 15;";
+        $queryBeginningYear = $season->beginningYear;
+        $queryBeginningMonth = Season::IBL_REGULAR_SEASON_STARTING_MONTH;
+        $queryEndingYear = $season->endingYear;
+        $queryEndingMonth = Season::IBL_REGULAR_SEASON_ENDING_MONTH;
     }
 
-    
+    $query = "SELECT `name`, `date`, " . $queryForStat . " AS `" . $statName . "`
+            FROM ibl_box_scores" . $isTeam . "
+            WHERE date BETWEEN '" . $queryBeginningYear . "-" . $queryBeginningMonth . "-01' AND '" . $queryEndingYear . "-" . $queryEndingMonth . "-30'
+            ORDER BY `" . $statName . "` DESC, date ASC LIMIT 15;";
     $result = $db->sql_query($query);
     $numRows = $db->sql_numrows($result);
 

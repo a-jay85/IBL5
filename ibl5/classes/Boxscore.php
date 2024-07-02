@@ -122,7 +122,7 @@ class Boxscore
         if ($this->gameMonth > 12 and $this->gameMonth != Season::JSB_PLAYOFF_MONTH) {
             $this->gameMonth = sprintf("%02u", $this->gameMonth - 12);
         } elseif ($this->gameMonth == Season::JSB_PLAYOFF_MONTH) {
-            $this->gameMonth = sprintf("%02u", $this->gameMonth - 16); // TODO: not have to hack the Playoffs to be in June
+            $this->gameMonth = sprintf("%02u", $this->gameMonth - 16); // This hacks the Playoffs to be in "June"
         } elseif ($this->gameMonth > 10) {
             $this->gameYear = $seasonStartingYear;
             if ($seasonPhase == "HEAT") {

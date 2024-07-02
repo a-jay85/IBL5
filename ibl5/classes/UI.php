@@ -803,9 +803,9 @@ class UI
             pid,
             COUNT(DISTINCT `Date`) as games,
             ROUND(SUM(gameMIN)/COUNT(DISTINCT `Date`), 1) as gameMINavg,
-            ROUND(SUM(game2GM + game3GM)/COUNT(DISTINCT `Date`), 2) as gameFGMavg,
-            ROUND(SUM(game2GA + game3GA)/COUNT(DISTINCT `Date`), 2) as gameFGAavg,
-            ROUND((SUM(game2GM) + SUM(game3GM)) / (SUM(game2GA) + SUM(game3GA)), 3) as gameFGPavg,
+            ROUND(SUM(gameFGM + game3GM)/COUNT(DISTINCT `Date`), 2) as gameFGMavg,
+            ROUND(SUM(gameFGA + game3GA)/COUNT(DISTINCT `Date`), 2) as gameFGAavg,
+            ROUND((SUM(gameFGM) + SUM(game3GM)) / (SUM(gameFGA) + SUM(game3GA)), 3) as gameFGPavg,
             ROUND(SUM(gameFTM)/COUNT(DISTINCT `Date`), 2) as gameFTMavg,
             ROUND(SUM(gameFTA)/COUNT(DISTINCT `Date`), 2) as gameFTAavg,
             ROUND((SUM(gameFTM)) / (SUM(gameFTA)), 3) as gameFTPavg,
@@ -819,7 +819,7 @@ class UI
             ROUND(SUM(gameTOV)/COUNT(DISTINCT `Date`), 1) as gameTOVavg,
             ROUND(SUM(gameBLK)/COUNT(DISTINCT `Date`), 1) as gameBLKavg,
             ROUND(SUM(gamePF)/COUNT(DISTINCT `Date`) , 1) as gamePFavg,
-            ROUND(((2 * SUM(game2GM)) + SUM(gameFTM) + (3 * SUM(game3GM)))/COUNT(DISTINCT `Date`) , 1) as gamePTSavg
+            ROUND(((2 * SUM(gameFGM)) + SUM(gameFTM) + (3 * SUM(game3GM)))/COUNT(DISTINCT `Date`) , 1) as gamePTSavg
         FROM   ibl_box_scores
         WHERE  date BETWEEN '$season->lastSimStartDate' AND '$season->lastSimEndDate'
             AND ( hometid = $team->teamID

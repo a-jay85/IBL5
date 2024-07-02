@@ -402,8 +402,8 @@ function showpage($playerID, $spec)
 
             while ($row = $db->sql_fetch_assoc($resultPlayerSimBoxScores)) {
                 $simTotalMIN += $row['gameMIN'];
-                $simTotal2GM += $row['game2GM'];
-                $simTotal2GA += $row['game2GA'];
+                $simTotal2GM += $row['gameFGM'];
+                $simTotal2GA += $row['gameFGA'];
                 $simTotalFTM += $row['gameFTM'];
                 $simTotalFTA += $row['gameFTA'];
                 $simTotal3GM += $row['game3GM'];
@@ -415,7 +415,7 @@ function showpage($playerID, $spec)
                 $simTotalTOV += $row['gameTOV'];
                 $simTotalBLK += $row['gameBLK'];
                 $simTotalPF += $row['gamePF'];
-                $simTotalPTS += (2 * $row['game2GM']) + $row['gameFTM'] + (3 * $row['game3GM']);
+                $simTotalPTS += (2 * $row['gameFGM']) + $row['gameFTM'] + (3 * $row['game3GM']);
             }
 
             @$simAverageMIN = $simTotalMIN / $numberOfGamesPlayedInSim;
@@ -1690,10 +1690,10 @@ function showpage($playerID, $spec)
                     <td class=\"gamelog\">" . $sharedFunctions->getTeamnameFromTid($row['visitorTID']) . "</td>
                     <td class=\"gamelog\">" . $sharedFunctions->getTeamnameFromTid($row['homeTID']) . "</td>
                     <td class=\"gamelog\">" . $row['gameMIN'] . "</td>
-                    <td class=\"gamelog\">" . ((2 * $row['game2GM']) + (3 * $row['game3GM']) + $row['gameFTM']) . "</td>
-                    <td class=\"gamelog\">" . ($row['game2GM'] + $row['game3GM']) . "</td>
-                    <td class=\"gamelog\">" . ($row['game2GA'] + $row['game3GA']) . "</td>
-                    <td class=\"gamelog\">" . number_format(($row['game2GM'] + $row['game3GM']) / ($row['game2GA'] + $row['game3GA']), 3, '.', '') . "</td>
+                    <td class=\"gamelog\">" . ((2 * $row['gameFGM']) + (3 * $row['game3GM']) + $row['gameFTM']) . "</td>
+                    <td class=\"gamelog\">" . ($row['gameFGM'] + $row['game3GM']) . "</td>
+                    <td class=\"gamelog\">" . ($row['gameFGA'] + $row['game3GA']) . "</td>
+                    <td class=\"gamelog\">" . number_format(($row['gameFGM'] + $row['game3GM']) / ($row['gameFGA'] + $row['game3GA']), 3, '.', '') . "</td>
                     <td class=\"gamelog\">" . $row['gameFTM'] . "</td>
                     <td class=\"gamelog\">" . $row['gameFTA'] . "</td>
                     <td class=\"gamelog\">" . number_format($row['gameFTM'] / $row['gameFTA'], 3, '.', '') . "</td>

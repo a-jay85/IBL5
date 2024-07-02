@@ -18,6 +18,9 @@ class Season
 
     const IBL_PRESEASON_MONTH = 9;
     const IBL_HEAT_MONTH = 10;
+    const IBL_REGULAR_SEASON_STARTING_MONTH = 11;
+    const IBL_REGULAR_SEASON_ENDING_MONTH = 05;
+    const IBL_PLAYOFF_MONTH = 06;
     const JSB_PLAYOFF_MONTH = 22;
 
     public function __construct($db)

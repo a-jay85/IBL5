@@ -64,7 +64,8 @@ function seasonHighTable($queryForStat, $statName, $playerOrTeam, $seasonPhase)
             WHERE date BETWEEN '" . $season->beginningYear . "-11-01' AND '" . $season->endingYear . "-04-30'
             ORDER BY `" . $statName . "` DESC, date ASC LIMIT 15;";
     }
-    echo $query;
+
+    
     $result = $db->sql_query($query);
     $numRows = $db->sql_numrows($result);
 

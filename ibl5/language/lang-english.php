@@ -20,6 +20,7 @@
 define("_CHARSET", "ISO-8859-1");
 define("_SEARCH", "Search");
 define("_LOGIN", "Login");
+define("_USERREGLOGIN", "User Registration/Login");
 define("_WRITES", "writes");
 define("_POSTEDON", "Posted on");
 define("_NICKNAME", "Nickname");

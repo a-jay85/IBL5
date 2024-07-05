@@ -61,19 +61,6 @@ if ($nuke_editor == 1) {
     }
 }
 
-if ($userpage == 1) {
-    echo "<SCRIPT type=\"text/javascript\">\n";
-    echo "<!--\n";
-    echo "function showimage() {\n";
-    echo "if (!document.images)\n";
-    echo "return\n";
-    echo "document.images.avatar.src=\n";
-    echo "'$nukeurl/modules/Forums/images/avatars/gallery/' + document.Register.user_avatar.options[document.Register.user_avatar.selectedIndex].value\n";
-    echo "}\n";
-    echo "//-->\n";
-    echo "</SCRIPT>\n\n";
-}
-
 if (defined('MODULE_FILE') and file_exists("modules/" . $name . "/copyright.php")) {
     echo "<script type=\"text/javascript\">\n";
     echo "<!--\n";

@@ -70,25 +70,6 @@ function themeheader()
     } else {
         $bienvenida = "<a href=\"modules.php?name=Your_Account&amp;op=new_user\">Create an Account</a>";
     }
-    $topics_list = "<select name=\"topic\" onChange='submit()'>\n";
-    $topics_list .= "<option value=\"\">All Topics</option>\n";
-    $toplist = $db->sql_query("select topicid, topictext from $prefix" . "_topics order by topictext");
-    while (list($topicid, $topics) = $db->sql_fetchrow($toplist)) {
-        $topicid = intval($topicid);
-        if ($topicid == $topic) {
-            $sel = "selected ";
-        }
-        $topics_list .= "<option $sel value=\"$topicid\">$topics</option>\n";
-        $sel = "";
-    }
-    // echo "<center><a href=\"index.php\"><img src=\"themes/Sand_Journey/images/LogoLeft.gif\" alt=\"Welcome to $sitename\" title=\"Welcome to $sitename\" border=\"0\"></a><br><br></center>"
-    // ."<table cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" border=\"0\" align=\"center\" bgcolor=\"$bgcolor1\"><tr><td align=\"center\">"
-    // ."<form action=\"modules.php?name=Search\" method=\"post\">"
-    // ."<font class=\"content\"><b>Search</b> <input type=\"text\" size=\"15\" name=\"query\">&nbsp;&nbsp;<b>in</b>&nbsp;&nbsp;$topics_list</font>"
-    // ."</select>"
-    // ."</form>"
-    // ."</td></tr></table>"
-    // ."<br>";
     echo "<table border=\"0 cellpadding=\"4\" cellspacing=\"0\" width=\"100%\" align=\"center\">\n"
         . "<tr><td bgcolor=\"$bgcolor2\" align=\"left\" width=\"20%\">&nbsp;$bienvenida</td>"
         . "<td bgcolor=\"$bgcolor2\" align=\"center\" width=\"60%\"><a href=\"index.php\">Home</a> | <a href=\"modules.php?name=Submit_News\">Submit News</a> | <a href=\"modules.php?name=Your_Account\">Your Account</a> | <a href=\"modules.php?name=Content\">Content</a> | <a href=\"modules.php?name=Topics\">Topics</a> | <a href=\"modules.php?name=Top\">Top 10</a></td>\n"

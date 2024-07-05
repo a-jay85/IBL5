@@ -77,7 +77,7 @@ while ($i < $numberOfActiveTeamAccounts) {
   
     $querySimDepthChartTimestamp = "SELECT sim_depth FROM ibl_team_history WHERE team_name = '$teamname'";
     $resultSimDepthChartTimestamp = $db->sql_query($querySimDepthChartTimestamp);
-    $simDepthChartTimestamp = $db->sql_result($resultSimDepthChartTimestamp, 0, "chart");
+    $simDepthChartTimestamp = $db->sql_result($resultSimDepthChartTimestamp, 0, "sim_depth");
 
     if ($waiversNeeded > 0 || $newDepthChartNeeded == 'Yes' && $simDepthChartTimestamp == "No Depth Chart") {
         $content .= "<tr><td>$teamname</td><td>$numberOfHealthyPlayersOnTeam</td><td>$waiversNeeded</td><td>$newDepthChartNeeded</td></tr>";

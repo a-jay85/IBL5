@@ -31,13 +31,18 @@ $blk1 = $blk2 = $blk3 = $blk4 = $blk5 = 0;
 
 $i = 0;
 while ($i < $num) {
+    $stats_gm = $db->sql_result($result, $i, "stats_gm");
+
+    if ($stats_gm == 0) {
+        $i++;
+        continue;
+    }
+
     $name = $db->sql_result($result, $i, "name");
     $p_ord = $db->sql_result($result, $i, "ordinal");
     $pid = $db->sql_result($result, $i, "pid");
     $tid = $db->sql_result($result, $i, "tid");
     $teamname = $db->sql_result($result, $i, "teamname");
-
-    $stats_gm = $db->sql_result($result, $i, "stats_gm");
 
     $stats_fgm = $db->sql_result($result, $i, "stats_fgm");
     $stats_ftm = $db->sql_result($result, $i, "stats_ftm");

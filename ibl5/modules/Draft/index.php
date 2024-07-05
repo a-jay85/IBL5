@@ -23,7 +23,6 @@ if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
 require_once "mainfile.php";
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
-$userpage = 1;
 
 include "modules/$module_name/navbar.php";
 

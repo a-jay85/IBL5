@@ -78,12 +78,12 @@ function seasonHighTable($queryForStat, $statName, $playerOrTeam, $seasonPhase)
     while ($i < $numRows) {
         echo "<tr>";
         echo "<td align=center>";
-        echo "" . ($i + 1) . "";
+        echo ($i + 1);
         echo "</td>";
         $j = 0;
         while ($j < 3) {
             echo "<td>";
-            echo "" . $db->sql_result($result, $i, $j) . "";
+            echo $db->sql_result($result, $i, $j);
             echo "</td>";
             $j++;
         }

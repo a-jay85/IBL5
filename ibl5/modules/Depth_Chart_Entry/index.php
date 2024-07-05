@@ -25,7 +25,6 @@ $season = new Season($db);
 
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
-$userpage = 1;
 
 $pagetitle = " - Depth Chart Entry";
 

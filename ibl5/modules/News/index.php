@@ -126,7 +126,7 @@ function theindex($new_topic = "0")
     include "footer.php";
 }
 
-function rate_article($sid, $score, $random_num = "0", $gfx_check)
+function rate_article($sid, $score, $gfx_check, $random_num = "0")
 {
     global $prefix, $db, $ratecookie, $sitename, $r_options, $sitekey, $gfx_chk, $module_name;
     if (isset($random_num)) {
@@ -231,7 +231,7 @@ function rate_article($sid, $score, $random_num = "0", $gfx_check)
     }
 }
 
-function rate_complete($sid, $rated = 0, $score)
+function rate_complete($sid, $score, $rated = 0)
 {
     global $sitename, $user, $cookie, $module_name, $userinfo;
     $r_options = "";
@@ -268,11 +268,11 @@ switch ($op) {
         break;
 
     case "rate_article":
-        rate_article($sid, $score, $random_num, $gfx_check);
+        rate_article($sid, $score, $gfx_check, $random_num);
         break;
 
     case "rate_complete":
-        rate_complete($sid, $rated, $score);
+        rate_complete($sid, $score, $rated);
         break;
 
 }

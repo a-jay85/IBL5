@@ -29,14 +29,15 @@ $numrows = $db->sql_numrows($result);
 if ($numrows == 0) {
     return;
 } else {
-    //$boxstuff = "<span class=\"content\">";
+    $boxstuff = "<span class=\"content\">";
+    $a = 0;
     while ($row = $db->sql_fetchrow($result)) {
         $catid = intval($row['catid']);
         $title = filter($row['title'], "nohtml");
         $numrows = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_stories WHERE catid='$catid' $querylang LIMIT 1"));
         if ($numrows > 0) {
             if ($cat == 0 and !$a) {
-                //$boxstuff .= "<li>"._ALLCATEGORIES."</li>";
+                $boxstuff .= "<li>" . _ALLCATEGORIES . "</li>";
                 $a = 1;
             } elseif ($cat != 0 and !$a) {
                 $boxstuff .= "<li><a href=\"modules.php?name=News\">" . _ALLCATEGORIES . "</li>";
@@ -50,6 +51,6 @@ if ($numrows == 0) {
             }
         }
     }
-    //$boxstuff .= "</span>";
+    $boxstuff .= "</span>";
     $content = $boxstuff;
 }

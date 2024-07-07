@@ -609,18 +609,10 @@ function blocks($side)
     $result = $db->sql_query($sql);
     while ($row = $db->sql_fetchrow($result)) {
         $bid = intval($row['bid']);
-        $title = (!isset($row['title'])) ?: filter($row['title'], "nohtml");
-        $content = (!isset($row['content'])) ?: stripslashes($row['content']);
-        if ($row['url'] != NULL) {
-            $url = filter($row['url'], "nohtml");
-        } else {
-            $url = $row['url'];
-        }
-        if ($row['blockfile']  != NULL) {
-            $blockfile = filter($row['blockfile'], "nohtml");
-        } else {
-            $blockfile = $row['blockfile'];
-        }
+        $title = filter($row['title'], "nohtml");
+        $content = stripslashes($row['content']);
+        $url = filter($row['url'], "nohtml");
+        $blockfile = filter($row['blockfile'], "nohtml");
         $view = intval($row['view']);
         $expire = intval($row['expire']);
         $action = filter($row['action'], "nohtml");
@@ -672,11 +664,7 @@ function message_box()
         while ($row = $db->sql_fetchrow($result)) {
             $mid = intval($row['mid']);
             $title = filter($row['title'], "nohtml");
-            if ($row['content'] != NULL) {
-                $content = filter($row['content']);
-            } else {
-                $content = $row['content'];
-            }
+            $content = filter($row['content']);
             $mdate = $row['date'];
             $expire = intval($row['expire']);
             $view = intval($row['view']);
@@ -1453,37 +1441,35 @@ function public_message()
             $c_mid = intval($c_mid);
             $result2 = $db->sql_query("SELECT mid, content, date, who FROM " . $prefix . "_public_messages WHERE mid > '$c_mid' ORDER BY date ASC LIMIT 1");
             $row2 = $db->sql_fetchrow($result2);
-            if ($row2 != NULL) {
-                $mid = intval($row2['mid']);
-                $content = filter($row2['content'], "nohtml");
-                $tdate = $row2['date'];
-                $who = filter($row2['who'], "nohtml");
-                if ((!isset($c_mid)) or ($c_mid = $mid)) {
-                    $public_msg = "<br><table width=\"90%\" border=\"1\" cellspacing=\"2\" cellpadding=\"0\" bgcolor=\"FFFFFF\" align=\"center\"><tr><td>\n";
-                    $public_msg .= "<table width=\"100%\" border=\"0\" cellspacing=\"1\" cellpadding=\"2\" bgcolor=\"FF0000\"><tr><td>\n";
-                    $public_msg .= "<font color=\"FFFFFF\" size=\"3\"><b>" . _BROADCASTFROM . " <a href=\"modules.php?name=Your_Account&amp;op=userinfo&amp;username=$who\"><font color=\"FFFFFF\" size=\"3\">$who</font></a>: \"$content\"</b>";
-                    $public_msg .= "$t_off";
-                    $public_msg .= "</td></tr></table>";
-                    $public_msg .= "</td></tr></table>";
-                    $ref_date = $tdate + 600;
-                    $actual_date = time();
-                    if ($actual_date >= $ref_date) {
-                        $public_msg = "";
-                        $numrows = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_public_messages"));
-                        if ($numrows == 1) {
-                            $db->sql_query("DELETE FROM " . $prefix . "_public_messages");
-                            $mid = 0;
-                        } else {
-                            $db->sql_query("DELETE FROM " . $prefix . "_public_messages WHERE mid='$mid'");
-                        }
-                    }
-                    if ($mid == 0 or empty($mid)) {
-                        setcookie("p_msg");
+            $mid = intval($row2['mid']);
+            $content = filter($row2['content'], "nohtml");
+            $tdate = $row2['date'];
+            $who = filter($row2['who'], "nohtml");
+            if ((!isset($c_mid)) or ($c_mid = $mid)) {
+                $public_msg = "<br><table width=\"90%\" border=\"1\" cellspacing=\"2\" cellpadding=\"0\" bgcolor=\"FFFFFF\" align=\"center\"><tr><td>\n";
+                $public_msg .= "<table width=\"100%\" border=\"0\" cellspacing=\"1\" cellpadding=\"2\" bgcolor=\"FF0000\"><tr><td>\n";
+                $public_msg .= "<font color=\"FFFFFF\" size=\"3\"><b>" . _BROADCASTFROM . " <a href=\"modules.php?name=Your_Account&amp;op=userinfo&amp;username=$who\"><font color=\"FFFFFF\" size=\"3\">$who</font></a>: \"$content\"</b>";
+                $public_msg .= "$t_off";
+                $public_msg .= "</td></tr></table>";
+                $public_msg .= "</td></tr></table>";
+                $ref_date = $tdate + 600;
+                $actual_date = time();
+                if ($actual_date >= $ref_date) {
+                    $public_msg = "";
+                    $numrows = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_public_messages"));
+                    if ($numrows == 1) {
+                        $db->sql_query("DELETE FROM " . $prefix . "_public_messages");
+                        $mid = 0;
                     } else {
-                        $mid = base64_encode($mid);
-                        $mid = addslashes($mid);
-                        setcookie("p_msg", $mid, time() + 600);
+                        $db->sql_query("DELETE FROM " . $prefix . "_public_messages WHERE mid='$mid'");
                     }
+                }
+                if ($mid == 0 or empty($mid)) {
+                    setcookie("p_msg");
+                } else {
+                    $mid = base64_encode($mid);
+                    $mid = addslashes($mid);
+                    setcookie("p_msg", $mid, time() + 600);
                 }
             }
         }
@@ -1589,15 +1575,15 @@ function ads($position)
     } else {
         $bannum = 0;
     }
+    $sql = "SELECT bid, impmade, imageurl, clickurl, alttext FROM " . $prefix . "_banner WHERE position='$position' AND active='1' LIMIT $bannum,1";
+    $result = $db->sql_query($sql);
+    list($bid, $impmade, $imageurl, $clickurl, $alttext) = $db->sql_fetchrow($result);
+    $bid = intval($bid);
+    $imageurl = filter($imageurl, "nohtml");
+    $clickurl = filter($clickurl, "nohtml");
+    $alttext = filter($alttext, "nohtml");
+    $db->sql_query("UPDATE " . $prefix . "_banner SET impmade=impmade+1 WHERE bid='$bid'");
     if ($numrows > 0) {
-        $sql = "SELECT bid, impmade, imageurl, clickurl, alttext FROM " . $prefix . "_banner WHERE position='$position' AND active='1' LIMIT $bannum,1";
-        $result = $db->sql_query($sql);
-        list($bid, $impmade, $imageurl, $clickurl, $alttext) = $db->sql_fetchrow($result);
-        $bid = intval($bid);
-        $imageurl = filter($imageurl, "nohtml");
-        $clickurl = filter($clickurl, "nohtml");
-        $alttext = filter($alttext, "nohtml");
-        $db->sql_query("UPDATE " . $prefix . "_banner SET impmade=impmade+1 WHERE bid='$bid'");
         $sql2 = "SELECT cid, imptotal, impmade, clicks, date, ad_class, ad_code, ad_width, ad_height FROM " . $prefix . "_banner WHERE bid='$bid'";
         $result2 = $db->sql_query($sql2);
         list($cid, $imptotal, $impmade, $clicks, $date, $ad_class, $ad_code, $ad_width, $ad_height) = $db->sql_fetchrow($result2);

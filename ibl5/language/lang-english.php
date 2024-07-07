@@ -172,7 +172,7 @@ define("_ADDITIONALYGRP", "Additionaly this module belongs to the Users Group");
 define("_YOUHAVEPOINTS", "Points you have by participating on the site's content:");
 define("_MVIEWSUBUSERS", "View: Subscribed Users Only");
 define("_MODULESSUBSCRIBER", "We are Sorry but this section of our site is for <i>Subscribed Users Only.</i>");
-define("_SUBHERE", "You can subscribe to our services from <a href=\"$subscription_url\">here</a>");
+@define("_SUBHERE", "You can subscribe to our services from <a href=\"$subscription_url\">here</a>");
 define("_SUBEXPIRED", "Your Subscription Expired");
 define("_HELLO", "Hello");
 define("_SUBSCRIPTIONAT", "This is an automated message to let you know that your subscription at");

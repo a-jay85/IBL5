@@ -28,8 +28,6 @@ get_lang($module_name);
 
 $pagetitle = " - Depth Chart Entry";
 
-//include("modules/$module_name/navbar.php");
-
 function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 {
     global $user, $prefix, $user_prefix, $db, $sharedFunctions, $useset;

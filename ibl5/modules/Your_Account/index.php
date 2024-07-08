@@ -28,10 +28,6 @@ if (isset($username) && (mb_ereg("[^a-zA-Z0-9_-]", $username))) {
     die("Illegal username...");
 }
 
-if (is_user($user)) {
-    include "modules/$module_name/navbar.php";
-}
-
 function userCheck($username, $user_email)
 {
     $username = filter($username, "nohtml", 1);
@@ -282,7 +278,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
         if ((isset($cookie[1])) and (strtolower($username) == strtolower($cookie[1])) and ($userinfo['user_password'] == $cookie[2])) {
             echo "<font class=\"option\">" . htmlentities($username) . ", " . _WELCOMETO . " $sitename!</font><br><br>";
             echo "<font class=\"content\">" . _THISISYOURPAGE . "</font></center><br><br>";
-            nav(1);
+            NukeNavbar::nav(1);
             echo "<br><br>";
         } else {
             echo "<font class=\"title\">" . _PERSONALINFO . ": " . htmlentities($username) . "</font></center><br><br>";

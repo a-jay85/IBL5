@@ -51,9 +51,8 @@ if (!isset($popup) or ($popup != "1")) {
     require "modules/Forums/nukebb.php";
     title("$sitename: $mod_name");
     if (is_user($user)) {
-        include "modules/Your_Account/navbar.php";
         OpenTable();
-        nav();
+        NukeNavbar::nav();
         CloseTable();
         echo "<br>";
     }

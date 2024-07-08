@@ -25,7 +25,7 @@ $aid = substr("$aid", 0, 25);
 $row = $db->sql_fetchrow($db->sql_query("SELECT radminsuper FROM " . $prefix . "_authors WHERE aid='$aid'"));
 if ($row['radminsuper'] == 1) {
 
-    include "header.php";
+    NukeHeader::header();
     GraphicAdmin();
     title("" . _DBOPTIMIZATION . "");
     OpenTable();

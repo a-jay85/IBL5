@@ -34,7 +34,7 @@ function userinfo($username)
     $result2 = $db->sql_query($sql2);
     $userinfo = $db->sql_fetchrow($result2);
 
-    include "header.php";
+    NukeHeader::header();
 
 // === CODE TO INSERT IBL DEPTH CHART ===
 
@@ -286,7 +286,7 @@ function main($user)
 {
     global $stop;
     if (!is_user($user)) {
-        include "header.php";
+        NukeHeader::header();
         if ($stop) {
             OpenTable();
             echo "<center><font class=\"title\"><b>" . _LOGININCOR . "</b></font></center>\n";

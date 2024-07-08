@@ -19,7 +19,7 @@ if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
 $sharedFunctions = new Shared($db);
 $season = new Season($db);
 
-include "header.php";
+NukeHeader::header();
 
 $fiveSeasonsAgoEndingYear = $season->endingYear - 4;
 

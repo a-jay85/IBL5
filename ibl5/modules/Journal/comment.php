@@ -42,7 +42,7 @@ $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
 $pagetitle = "- " . _USERSJOURNAL . "";
-include "header.php";
+NukeHeader::header();
 include "modules/$module_name/functions.php";
 if (is_user($user)) {
     cookiedecode($user);

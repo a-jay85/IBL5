@@ -43,7 +43,7 @@ get_lang($module_name);
 
 if (!isset($jid) or !is_numeric($jid)) {die("No journal specified.");}
 $pagetitle = "- " . _USERSJOURNAL . "";
-include "header.php";
+NukeHeader::header();
 include "modules/$module_name/functions.php";
 if (is_user($user) || is_admin($admin)) {
     cookiedecode($user);

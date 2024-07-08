@@ -37,7 +37,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     function topicsmanager()
     {
         global $prefix, $db, $admin_file, $tipath;
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><span class=\"title\"><b>" . _TOPICSMANAGER . "</b></span></center>";
@@ -103,7 +103,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     function topicedit($topicid)
     {
         global $prefix, $db, $admin_file, $tipath;
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><span class=\"title\"><b>" . _TOPICSMANAGER . "</b></span></center>";
@@ -179,7 +179,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     function relatededit($tid, $rid)
     {
         global $prefix, $db, $admin_file, $tipath;
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><span class=\"title\"><b>" . _TOPICSMANAGER . "</b></span></center>";
@@ -271,7 +271,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
             Header("Location: " . $admin_file . ".php?op=topicsmanager");
         } else {
             global $topicimage;
-            include "header.php";
+            NukeHeader::header();
             GraphicAdmin();
             OpenTable();
             echo "<center><span class=\"title\"><b>" . _TOPICSMANAGER . "</b></span></center>";
@@ -328,7 +328,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     }
 
 } else {
-    include "header.php";
+    NukeHeader::header();
     GraphicAdmin();
     OpenTable();
     echo "<center><b>" . _ERROR . "</b><br><br>You do not have administration permission for module \"$module_name\"</center>";

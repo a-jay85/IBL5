@@ -27,7 +27,7 @@ $pagetitle = "- Player Archives";
 
 function showmenu()
 {
-    include "header.php";
+    NukeHeader::header();
     OpenTable();
 
     UI::playerMenu();
@@ -50,7 +50,7 @@ function showpage($playerID, $spec)
 
     // DISPLAY PAGE
 
-    include "header.php";
+    NukeHeader::header();
     OpenTable();
     UI::playerMenu();
 
@@ -1735,7 +1735,7 @@ function negotiate($pid)
     $player_playingtime = stripslashes(check_html($playerinfo['playingTime'], "nohtml"));
     $player_tradition = stripslashes(check_html($playerinfo['tradition'], "nohtml"));
 
-    include "header.php";
+    NukeHeader::header();
     OpenTable();
     UI::playerMenu();
 

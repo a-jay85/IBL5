@@ -79,7 +79,7 @@ $db->sql_query("UPDATE " . $prefix . "_stories SET counter=counter+1 where sid='
 
 $artpage = 1;
 $pagetitle = "- $title";
-require "header.php";
+NukeHeader::header();
 $artpage = 0;
 
 formatTimestamp($time);

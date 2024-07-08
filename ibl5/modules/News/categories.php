@@ -34,7 +34,7 @@ function theindex($catid)
     } else {
         $querylang = "";
     }
-    include "header.php";
+    NukeHeader::header();
     if (isset($userinfo['storynum'])) {
         $storynum = $userinfo['storynum'];
     } else {

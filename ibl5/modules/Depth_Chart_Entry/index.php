@@ -51,7 +51,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
     $tid = $sharedFunctions->getTidFromTeamname($teamlogo);
     $team = Team::withTeamID($db, $tid);
 
-    include "header.php";
+    NukeHeader::header();
     OpenTable();
     UI::displaytopmenu($db, $tid);
 
@@ -335,7 +335,7 @@ function main($user)
 {
     global $stop;
     if (!is_user($user)) {
-        include "header.php";
+        NukeHeader::header();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . ($stop ? _LOGININCOR : _USERREGLOGIN) . "</b></font></center>";
         CloseTable();
@@ -357,7 +357,7 @@ function submit()
 {
     global $db, $sharedFunctions;
 
-    include "header.php";
+    NukeHeader::header();
     OpenTable();
 
     $Set_Name = $_POST['Set_Name'];

@@ -27,7 +27,7 @@ get_lang($module_name);
 
 $pagetitle = "- Player Archives";
 
-include "header.php";
+NukeHeader::header();
 OpenTable();
 UI::playerMenu();
 

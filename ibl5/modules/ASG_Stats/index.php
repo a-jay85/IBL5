@@ -23,7 +23,7 @@ get_lang($module_name);
 $pagetitle = "All-Star Game Stats";
 
 {
-    include "header.php";
+    NukeHeader::header();
     OpenTable();
     $team = $_POST['team'];
     $position = $_POST['position'];

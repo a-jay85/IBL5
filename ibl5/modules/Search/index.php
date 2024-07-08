@@ -63,7 +63,7 @@ switch ($op) {
         $max = intval($max);
         $query = stripslashes(check_html($query, "nohtml"));
         $pagetitle = "- " . _SEARCH . "";
-        include "header.php";
+        NukeHeader::header();
         $topic = intval($topic);
         if ($topic > 0) {
             $row = $db->sql_fetchrow($db->sql_query("SELECT topicimage, topictext from " . $prefix . "_topics where topicid='$topic'"));

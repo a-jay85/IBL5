@@ -38,7 +38,7 @@ $nowyear = $dot[2];
 function Stats_Main()
 {
     global $prefix, $db, $startdate, $sitename, $ThemeSel, $user_prefix, $Version_Num, $module_name, $textcolor2;
-    include "header.php";
+    NukeHeader::header();
     $result = $db->sql_query("SELECT type, var, count from " . $prefix . "_counter order by type desc");
     while ($row = $db->sql_fetchrow($result)) {
         $type = stripslashes(check_html($row['type'], "nohtml"));
@@ -184,7 +184,7 @@ function Stats($total)
     global $hlpfile, $nowyear, $nowmonth, $nowdate, $nowhour, $sitename, $startdate, $prefix, $db, $now, $module_name;
     $row = $db->sql_query("SELECT count from " . $prefix . "_counter order by type desc");
     list($total) = $db->sql_fetchrow($row);
-    include "header.php";
+    NukeHeader::header();
     title("$sitename " . _STATS . "");
     $total++;
     OpenTable();
@@ -235,7 +235,7 @@ function Stats($total)
 function YearlyStats($year)
 {
     global $hlpfile, $nowyear, $nowmonth, $nowdate, $sitename, $module_name;
-    include "header.php";
+    NukeHeader::header();
     title("$sitename " . _STATS . "");
     opentable();
     $year = intval($year);
@@ -250,7 +250,7 @@ function YearlyStats($year)
 function MonthlyStats($year, $month)
 {
     global $sitename, $module_name, $nowdate;
-    include "header.php";
+    NukeHeader::header();
     title("$sitename " . _STATS . "");
     opentable();
     $year = intval($year);
@@ -266,7 +266,7 @@ function MonthlyStats($year, $month)
 function DailyStats($year, $month, $date)
 {
     global $sitename, $module_name;
-    include "header.php";
+    NukeHeader::header();
     title("$sitename " . _STATS . "");
     opentable();
     $year = intval($year);

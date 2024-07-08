@@ -29,7 +29,7 @@ if ($row['radminsuper'] == 1) {
     {
         global $prefix, $user_prefix, $db, $sitename, $admin_file;
         define('NO_EDITOR', true);
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         $srow = $db->sql_numrows($db->sql_query("select * from " . $user_prefix . "_users where newsletter='1'"));
         $urow = $db->sql_numrows($db->sql_query("select * from " . $user_prefix . "_users"));
@@ -65,7 +65,7 @@ if ($row['radminsuper'] == 1) {
         define('NO_EDITOR', true);
         $subject = filter($subject, nohtml);
         $content = filter($content, nohtml);
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         $srow = $db->sql_numrows($db->sql_query("select * from " . $user_prefix . "_users where newsletter='1'"));
         $urow = $db->sql_numrows($db->sql_query("select * from " . $user_prefix . "_users"));
@@ -145,7 +145,7 @@ if ($row['radminsuper'] == 1) {
 
     function newsletter_sent()
     {
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _NEWSLETTER . "</b></font></center>";
@@ -184,7 +184,7 @@ if ($row['radminsuper'] == 1) {
 
     function massmail_sent()
     {
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _MASSEMAIL . "</b></font></center>";

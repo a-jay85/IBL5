@@ -26,7 +26,7 @@ if (isset($pollID)) {
 }
 
 if (!isset($pollID)) {
-    include 'header.php';
+    NukeHeader::header();
     pollList();
     include 'footer.php';
 } elseif ($pollID <= 0) {
@@ -36,7 +36,7 @@ if (!isset($pollID)) {
     if (isset($tid)) {
         Header("Location: modules.php?name=$module_name"); // SecurityReason Fix 2005 - sp3x -> Now should be OK.
     }
-    include "header.php";
+    NukeHeader::header();
     OpenTable();
     echo "<center><font class=\"title\"><b>" . _CURRENTPOLLRESULTS . "</b></font></center>";
     CloseTable();
@@ -73,7 +73,7 @@ if (!isset($pollID)) {
 } elseif (isset($voteID) and ($voteID > 0)) {
     pollCollector($pollID, $voteID);
 } elseif ($pollID != pollLatest()) {
-    include 'header.php';
+    NukeHeader::header();
     OpenTable();
     echo "<center><font class=\"option\"><b>" . _SURVEY . "</b></font></center>";
     CloseTable();
@@ -83,7 +83,7 @@ if (!isset($pollID)) {
     echo "</td></tr></table>";
     include 'footer.php';
 } else {
-    include 'header.php';
+    NukeHeader::header();
     OpenTable();
     echo "<center><font class=\"option\"><b>" . _CURRENTSURVEY . "</b></font></center>";
     CloseTable();

@@ -37,7 +37,7 @@ function FriendSend($sid)
     global $user, $cookie, $prefix, $db, $user_prefix, $module_name;
     $sid = intval($sid);
     if (!isset($sid)) {die();}
-    include "header.php";
+    NukeHeader::header();
     $row = $db->sql_fetchrow($db->sql_query("SELECT title FROM " . $prefix . "_stories WHERE sid='$sid'"));
     $title = filter($row['title'], "nohtml");
     title("" . _FRIEND . "");
@@ -91,7 +91,7 @@ function SendStory($sid, $yname, $ymail, $fname, $fmail)
 
 function StorySent($title, $fname)
 {
-    include "header.php";
+    NukeHeader::header();
     $title = filter($title, "nohtml");
     $fname = filter($fname, "nohtml");
     OpenTable();

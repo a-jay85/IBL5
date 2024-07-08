@@ -23,7 +23,7 @@ $pagetitle = "- " . _RECOMMEND . "";
 function RecommendSite($mess = "0")
 {
     global $user, $cookie, $db, $user_prefix, $module_name, $gfx_chk;
-    include "header.php";
+    NukeHeader::header();
     title("" . _RECOMMEND . "");
     OpenTable();
     $mess = intval($mess);
@@ -67,7 +67,7 @@ function SendSite($yname, $ymail, $fname, $fmail, $random_num = "0", $gfx_check)
 {
     global $sitename, $slogan, $nukeurl, $module_name, $gfx_chk, $sitekey;
     if (empty($fname) or empty($fmail) or empty($yname) or empty($ymail)) {
-        include "header.php";
+        NukeHeader::header();
         title("$sitename - " . _RECOMMEND . "");
         OpenTable();
         echo "<center>" . _SENDSITEERROR . "<br><br>" . _GOBACK . "";
@@ -96,7 +96,7 @@ function SendSite($yname, $ymail, $fname, $fmail, $random_num = "0", $gfx_check)
 
 function SiteSent($fname)
 {
-    include 'header.php';
+    NukeHeader::header();
     $fname = removecrlf(filter($fname, "nohtml"));
     OpenTable();
     echo "<center><font class=\"content\">" . _FREFERENCE . " $fname...<br><br>" . _THANKSREC . "</font></center>";

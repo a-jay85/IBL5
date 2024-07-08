@@ -19,7 +19,7 @@ if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
 require_once "mainfile.php";
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
-include "header.php";
+NukeHeader::header();
 
 $query2 = "SELECT * FROM nfl order by tot_score DESC";
 $result2 = $db->sql_query($query2);

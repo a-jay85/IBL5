@@ -19,7 +19,7 @@ if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
 require_once "mainfile.php";
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
-include "header.php";
+NukeHeader::header();
 
 $query1 = "select sum(score) as votes,name from (select MVP_1 as name, 3 as score from ibl_votes_EOY union all select MVP_2 as name, 2 as score from ibl_votes_EOY union all select MVP_3 as name, 1 as score from ibl_votes_EOY) as tbl group by name;";
 $result1 = $db->sql_query($query1);

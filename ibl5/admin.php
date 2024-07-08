@@ -62,7 +62,7 @@ global $admin_file;
 $the_first = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_authors"));
 if ($the_first == 0) {
     if (!$name) {
-        include "header.php";
+        NukeHeader::header();
         title("$sitename: " . _ADMINISTRATION . "");
         OpenTable();
         echo "<center><b>" . _NOADMINYET . "</b></center><br><br>"
@@ -158,7 +158,7 @@ $pagetitle = "- " . _ADMINMENU . "";
 function login()
 {
     global $gfx_chk, $admin_file;
-    include "header.php";
+    NukeHeader::header();
     mt_srand((double) microtime() * 1000000);
     $maxran = 1000000;
     $random_num = mt_rand(0, $maxran);
@@ -309,7 +309,7 @@ function GraphicAdmin()
 function adminMain()
 {
     global $language, $admin, $aid, $prefix, $file, $db, $sitename, $user_prefix, $admin_file, $bgcolor1, $locale;
-    include "header.php";
+    NukeHeader::header();
     $dummy = 0;
     $month = date('M');
     $curDate2 = "%" . $month[0] . $month[1] . $month[2] . "%" . date('d') . "%" . date('Y') . "%";
@@ -484,7 +484,7 @@ if ($admintest) {
         case "logout":
             setcookie("admin", false);
             $admin = "";
-            include "header.php";
+            NukeHeader::header();
             OpenTable();
             echo "<center><font class=\"title\"><b>" . _YOUARELOGGEDOUT . "</b></font></center>";
             CloseTable();

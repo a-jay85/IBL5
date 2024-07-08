@@ -25,7 +25,7 @@ $pagetitle = "- $module_name";
 function showpage($pid, $page = 0)
 {
     global $prefix, $db, $sitename, $admin, $module_name;
-    include "header.php";
+    NukeHeader::header();
     OpenTable();
     $pid = intval($pid);
     $mypage = $db->sql_fetchrow($db->sql_query("SELECT * FROM " . $prefix . "_pages WHERE pid='$pid'"));
@@ -97,7 +97,7 @@ function showpage($pid, $page = 0)
 function list_pages()
 {
     global $prefix, $db, $sitename, $admin, $multilingual, $module_name, $admin_file;
-    include "header.php";
+    NukeHeader::header();
     title("$sitename: " . _PAGESLIST . "");
     OpenTable();
     echo "<center><font class=\"content\">" . _LISTOFCONTENT . " $sitename:</center><br><br>";
@@ -174,7 +174,7 @@ function list_pages()
 function list_pages_categories($cid)
 {
     global $prefix, $db, $sitename, $admin, $multilingual, $module_name, $admin_file;
-    include "header.php";
+    NukeHeader::header();
     title("$sitename: " . _PAGESLIST . "");
     OpenTable();
     echo "<center><font class=\"content\">" . _LISTOFCONTENT . " $sitename:</center><br><br>";

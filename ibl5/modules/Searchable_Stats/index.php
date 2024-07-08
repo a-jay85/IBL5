@@ -24,7 +24,7 @@ $pagetitle = "Chunk Stats";
 
 function chunkstats()
 {
-    include "header.php";
+    NukeHeader::header();
     OpenTable();
     echo "<center><font class=\"storytitle\">2049 Chunk Stats</font></center><br><br>";
 
@@ -157,7 +157,7 @@ function chunkstats()
 
 function seasonstats()
 {
-    include "header.php";
+    NukeHeader::header();
     OpenTable();
     $team = $_POST['team'];
     $position = $_POST['position'];

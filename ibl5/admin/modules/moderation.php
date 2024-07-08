@@ -58,7 +58,7 @@ if ($row['radminsuper'] == 1) {
     function moderation()
     {
         global $prefix, $db, $bgcolor2, $admin_file, $user_prefix;
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         mod_menu();
         include "footer.php";
@@ -67,7 +67,7 @@ if ($row['radminsuper'] == 1) {
     function moderation_news()
     {
         global $prefix, $db, $user_prefix, $bgcolor2, $bgcolor1, $admin_file;
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         mod_menu();
         OpenTable();
@@ -97,7 +97,7 @@ if ($row['radminsuper'] == 1) {
     function moderation_news_view($id)
     {
         global $prefix, $db, $admin_file;
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         mod_menu();
         OpenTable();
@@ -144,7 +144,7 @@ if ($row['radminsuper'] == 1) {
     function moderation_surveys()
     {
         global $prefix, $db, $user_prefix, $bgcolor2, $bgcolor1, $admin_file;
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         mod_menu();
         OpenTable();
@@ -174,7 +174,7 @@ if ($row['radminsuper'] == 1) {
     function moderation_surveys_view($id)
     {
         global $prefix, $db, $admin_file;
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         mod_menu();
         OpenTable();
@@ -216,7 +216,7 @@ if ($row['radminsuper'] == 1) {
     function moderation_reviews()
     {
         global $prefix, $db, $user_prefix, $bgcolor2, $bgcolor1, $admin_file;
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         mod_menu();
         OpenTable();
@@ -249,7 +249,7 @@ if ($row['radminsuper'] == 1) {
     {
         global $prefix, $db, $admin_file;
         $id = intval($id);
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         mod_menu();
         OpenTable();
@@ -324,7 +324,7 @@ if ($row['radminsuper'] == 1) {
     function moderation_users_list($section = 0)
     {
         global $prefix, $db, $admin_file, $user_prefix, $bgcolor1, $bgcolor2;
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         mod_menu();
         OpenTable();

@@ -40,7 +40,7 @@ require_once "mainfile.php";
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 $pagetitle = "- " . _USERSJOURNAL . "";
-include "header.php";
+NukeHeader::header();
 include "modules/$module_name/functions.php";
 include "modules/$module_name/kses.php";
 if (empty($title) or empty($jbodytext) or empty($status)) {

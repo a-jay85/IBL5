@@ -92,7 +92,7 @@ if ($row['radminsuper'] == 1) {
     function Configure()
     {
         global $admin_file;
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class='title'><b>" . _SITECONFIG . "</b></font></center>";
@@ -117,7 +117,7 @@ if ($row['radminsuper'] == 1) {
     function general()
     {
         global $prefix, $db, $admin_file;
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         options_menu("general");
         OpenTable();
@@ -191,7 +191,7 @@ if ($row['radminsuper'] == 1) {
     function themes()
     {
         global $prefix, $db, $admin_file;
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         options_menu("themes");
         OpenTable();
@@ -248,7 +248,7 @@ if ($row['radminsuper'] == 1) {
     function users()
     {
         global $prefix, $db, $admin_file;
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         options_menu("users");
         OpenTable();
@@ -319,7 +319,7 @@ if ($row['radminsuper'] == 1) {
     function comments()
     {
         global $prefix, $db, $admin_file;
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         options_menu("comments");
         OpenTable();
@@ -414,7 +414,7 @@ if ($row['radminsuper'] == 1) {
     function languages()
     {
         global $prefix, $db, $admin_file;
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         options_menu("languages");
         OpenTable();
@@ -477,7 +477,7 @@ if ($row['radminsuper'] == 1) {
     function footer()
     {
         global $prefix, $db, $admin_file;
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         options_menu("footer");
         OpenTable();
@@ -502,7 +502,7 @@ if ($row['radminsuper'] == 1) {
     function backend()
     {
         global $prefix, $db, $admin_file;
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         options_menu("backend");
         OpenTable();
@@ -535,7 +535,7 @@ if ($row['radminsuper'] == 1) {
     function referers()
     {
         global $prefix, $db, $admin_file;
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         options_menu("referers");
         OpenTable();
@@ -582,7 +582,7 @@ if ($row['radminsuper'] == 1) {
     function mailing()
     {
         global $prefix, $db, $admin_file;
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         options_menu("mailing");
         OpenTable();
@@ -621,7 +621,7 @@ if ($row['radminsuper'] == 1) {
     function other()
     {
         global $prefix, $db, $admin_file;
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         options_menu("other");
         OpenTable();

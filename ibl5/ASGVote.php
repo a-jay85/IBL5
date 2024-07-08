@@ -2,7 +2,7 @@
 
 require 'mainfile.php';
 
-include "header.php";
+NukeHeader::header();
 
 echo "<HTML><HEAD><TITLE>ASG Voting Result</TITLE></HEAD><BODY>";
 

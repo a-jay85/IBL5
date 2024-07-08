@@ -22,7 +22,7 @@ get_lang($module_name);
 
 $pagetitle = "- $module_name";
 
-include "header.php";
+NukeHeader::header();
 OpenTable();
 
 $min_date_query = "SELECT MIN(Date) as mindate FROM ibl_schedule";

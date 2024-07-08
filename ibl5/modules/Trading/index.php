@@ -13,7 +13,7 @@ function menu()
 {
     global $db;
 
-    include "header.php";
+    NukeHeader::header();
     OpenTable();
 
     UI::displaytopmenu($db, 0);
@@ -170,7 +170,7 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
         cookiedecode($user);
     }
 
-    include "header.php";
+    NukeHeader::header();
 
     $currentSeasonEndingYear = $season->endingYear; // we use this as an incrementer
 
@@ -357,7 +357,7 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
 
     // ===== END OF INFO PICKUP
 
-    include "header.php";
+    NukeHeader::header();
 
     OpenTable();
 
@@ -515,7 +515,7 @@ function reviewtrade($user)
     $season = new Season($db);
 
     if (!is_user($user)) {
-        include "header.php";
+        NukeHeader::header();
         if ($stop) {
             OpenTable();
             echo "<center><font class=\"title\"><b>" . _LOGININCOR . "</b></font></center>\n";
@@ -538,7 +538,7 @@ function reviewtrade($user)
             cookiedecode($user);
             tradereview($cookie[1]);
         } else {
-            include "header.php";
+            NukeHeader::header();
             OpenTable();
             UI::displaytopmenu($db, 0);
             echo "Sorry, but trades are not allowed right now.";
@@ -559,7 +559,7 @@ function offertrade($user)
     global $db, $stop;
 
     if (!is_user($user)) {
-        include "header.php";
+        NukeHeader::header();
         if ($stop) {
             OpenTable();
             echo "<center><font class=\"title\"><b>" . _LOGININCOR . "</b></font></center>\n";

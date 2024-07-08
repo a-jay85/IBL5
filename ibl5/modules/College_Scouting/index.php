@@ -43,7 +43,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
         cookiedecode($user);
     }
 
-    include "header.php";
+    NukeHeader::header();
 
     OpenTable();
 
@@ -208,7 +208,7 @@ function main($user)
 {
     global $stop;
     if (!is_user($user)) {
-        include "header.php";
+        NukeHeader::header();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . ($stop ? _LOGININCOR : _USERREGLOGIN) . "</b></font></center>";
         CloseTable();

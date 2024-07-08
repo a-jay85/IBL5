@@ -79,7 +79,7 @@ function display_score($score)
 function write_review()
 {
     global $admin, $sitename, $user, $cookie, $user_prefix, $currentlang, $multilingual, $db, $module_name;
-    include 'header.php';
+    NukeHeader::header();
     OpenTable();
     echo "
     <b>" . _WRITEREVIEWFOR . " $sitename</b><br><br>
@@ -185,7 +185,7 @@ function preview_review($date, $title, $text, $reviewer, $email, $score, $cover,
     $url_title = filter($url_title, "nohtml", 0, preview);
     $hits = intval($hits);
     $id = intval($id);
-    include 'header.php';
+    NukeHeader::header();
     OpenTable();
     echo "<form method=\"post\" action=\"modules.php?name=$module_name\">";
 
@@ -296,7 +296,7 @@ function preview_review($date, $title, $text, $reviewer, $email, $score, $cover,
 function send_review($date, $title, $text, $reviewer, $email, $score, $cover, $url, $url_title, $hits, $id, $rlanguage)
 {
     global $admin, $prefix, $db, $module_name;
-    include 'header.php';
+    NukeHeader::header();
     $id = intval($id);
     $title = filter($title, "nohtml", 1);
     $text = filter($text, "", 1);
@@ -341,7 +341,7 @@ function send_review($date, $title, $text, $reviewer, $email, $score, $cover, $u
 function reviews_index()
 {
     global $bgcolor3, $bgcolor2, $prefix, $multilingual, $currentlang, $db, $module_name;
-    include 'header.php';
+    NukeHeader::header();
     if ($multilingual == 1) {
         $querylang = "WHERE rlanguage='$currentlang'";
     } else {
@@ -387,7 +387,7 @@ function reviews_index()
 function reviews($letter, $field, $order)
 {
     global $bgcolor4, $sitename, $prefix, $multilingual, $currentlang, $db, $module_name;
-    include 'header.php';
+    NukeHeader::header();
     $letter = substr("$letter", 0, 1);
     if ($multilingual == 1) {
         $querylang = "AND rlanguage='$currentlang'";
@@ -466,7 +466,7 @@ function postcomment($id, $title)
 {
     global $user, $cookie, $AllowableHTML, $anonymous, $module_name, $anonpost;
     if (!is_user($user) && $anonpost == 0) {
-        include "header.php";
+        NukeHeader::header();
         title("$module_name");
         OpenTable();
         echo "<center><b>" . _RESTRICTEDAREA . "</b><br><br>" . _MODULEUSERS . "";
@@ -474,7 +474,7 @@ function postcomment($id, $title)
         include "footer.php";
         die();
     }
-    include "header.php";
+    NukeHeader::header();
     cookiedecode($user);
     $title = filter($title, "nohtml");
     OpenTable();
@@ -524,7 +524,7 @@ function savecomment($xanonpost, $uname, $id, $score, $comments)
 {
     global $anonymous, $user, $cookie, $prefix, $db, $module_name, $user_prefix, $anonpost;
     if (!is_user($user) && $anonpost == 0) {
-        include "header.php";
+        NukeHeader::header();
         title("$module_name");
         OpenTable();
         echo "<center><b>" . _RESTRICTEDAREA . "</b><br><br>" . _MODULEUSERS . "";
@@ -543,7 +543,7 @@ function savecomment($xanonpost, $uname, $id, $score, $comments)
         $krow = $db->sql_fetchrow($db->sql_query("SELECT karma FROM " . $user_prefix . "_users WHERE username='$uname'"));
         if ($krow['karma'] == 2) {
             $db->sql_query("insert into " . $prefix . "_reviews_comments_moderated values (NULL, '$id', '$uname', now(), '$comments', '$score')");
-            include "header.php";
+            NukeHeader::header();
             title("" . _MODERATEDTITLE . "");
             OpenTable();
             echo "<center>" . _COMMENTMODERATED . "";
@@ -598,7 +598,7 @@ function showcontent($id, $page)
     global $admin, $uimages, $prefix, $db, $module_name;
     $id = intval($id);
     $page = intval($page);
-    include 'header.php';
+    NukeHeader::header();
     OpenTable();
     if (($page == 1) or (empty($page))) {
         $db->sql_query("UPDATE " . $prefix . "_reviews SET hits=hits+1 WHERE id='$id'");
@@ -698,7 +698,7 @@ function mod_review($id)
 {
     global $admin, $prefix, $db, $module_name;
     $id = intval($id);
-    include 'header.php';
+    NukeHeader::header();
     OpenTable();
     if (($id == 0) || (!is_admin($admin))) {
         echo "This function must be passed argument id, or you are not admin.";

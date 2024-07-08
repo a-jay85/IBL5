@@ -95,7 +95,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     function poll_createPoll()
     {
         global $language, $admin, $multilingual, $prefix, $db, $admin_file;
-        include 'header.php';
+        NukeHeader::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _POLLSADMIN . "</b></font></center>";
@@ -224,7 +224,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     function poll_removePoll()
     {
         global $prefix, $db, $admin_file;
-        include 'header.php';
+        NukeHeader::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _POLLSADMIN . "</b></font></center>";
@@ -267,7 +267,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     function polledit_select()
     {
         global $prefix, $db, $admin_file;
-        include 'header.php';
+        NukeHeader::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _POLLSADMIN . "</b></font></center>";
@@ -300,7 +300,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     function polledit($pollID)
     {
         global $prefix, $db, $multilingual, $admin_file;
-        include 'header.php';
+        NukeHeader::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _POLLSADMIN . "</b></font></center>";
@@ -418,7 +418,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     }
 
 } else {
-    include "header.php";
+    NukeHeader::header();
     GraphicAdmin();
     OpenTable();
     echo "<center><b>" . _ERROR . "</b><br><br>You do not have administration permission for module \"$module_name\"</center>";

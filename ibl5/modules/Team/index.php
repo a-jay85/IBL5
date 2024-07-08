@@ -43,7 +43,7 @@ function team($tid)
         $display = "ratings";
     }
 
-    include "header.php";
+    NukeHeader::header();
     OpenTable();
 
     //=============================
@@ -777,7 +777,7 @@ function teamCurrentSeasonStandings($team)
 
 function leaguestats()
 {
-    include "header.php";
+    NukeHeader::header();
     OpenTable();
 
     echo "This section has moved: <a href=\"modules.php?name=League_Stats\">https://www.iblhoops.net/modules.php?name=League_Stats</a>
@@ -797,7 +797,7 @@ function schedule($tid)
     global $db;
 
     $tid = intval($tid);
-    include "header.php";
+    NukeHeader::header();
     OpenTable();
     //============================
     // GRAB TEAM COLORS, ET AL
@@ -988,7 +988,7 @@ function viewinjuries($tid)
     global $db;
     $league = new League($db);
 
-    include "header.php";
+    NukeHeader::header();
     OpenTable();
 
     UI::displaytopmenu($db, $tid);
@@ -1034,7 +1034,7 @@ function drafthistory($tid)
 {
     global $db;
 
-    include "header.php";
+    NukeHeader::header();
     OpenTable();
     UI::displaytopmenu($db, $tid);
 
@@ -1079,7 +1079,7 @@ function menu()
 {
     global $db;
 
-    include "header.php";
+    NukeHeader::header();
     OpenTable();
 
     UI::displaytopmenu($db, 0);

@@ -23,7 +23,7 @@ get_lang($module_name);
 function select_month()
 {
     global $prefix, $user_prefix, $db, $module_name;
-    include "header.php";
+    NukeHeader::header();
     title("" . _STORIESARCHIVE . "");
     OpenTable();
     echo "<center><font class=\"content\">" . _SELECTMONTH2VIEW . "</font><br><br></center><br><br>";
@@ -57,7 +57,7 @@ function show_month($year, $month, $month_l)
     $year = intval($year);
     $month = htmlentities($month);
     $month_l = htmlentities($month_l);
-    include "header.php";
+    NukeHeader::header();
     title("" . _STORIESARCHIVE . "");
     title("$sitename: $month_l $year");
     $r_options = "";
@@ -175,7 +175,7 @@ function show_all($min)
     }
 
     $max = 250;
-    include "header.php";
+    NukeHeader::header();
     title("" . _STORIESARCHIVE . "");
     title("$sitename: " . _ALLSTORIESARCH . "");
     $r_options = "";

@@ -74,4 +74,4 @@ if (isset($t)) {
         $pagetitle = check_html($pagetitle, "nohtml");
     }
 }
-include "header.php";
+NukeHeader::header();

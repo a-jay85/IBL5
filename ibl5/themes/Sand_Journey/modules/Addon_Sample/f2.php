@@ -8,7 +8,7 @@ $index = 0;
 
 function f2one()
 {
-    include "header.php";
+    NukeHeader::header();
     OpenTable();
     echo "Addon Sample File (f2.php) function \"f2one\" CALLED FROM Sand_Journey Theme<br><br>";
     echo "<ul>";
@@ -22,7 +22,7 @@ function f2one()
 
 function f2go()
 {
-    include "header.php";
+    NukeHeader::header();
     OpenTable();
     echo "Addon Sample File (f2.php) CALLED FROM Sand_Journey Theme<br>";
     echo "<ul>";

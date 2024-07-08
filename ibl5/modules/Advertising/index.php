@@ -74,7 +74,7 @@ function themenu()
 function theindex()
 {
     global $prefix, $db, $sitename;
-    include "header.php";
+    NukeHeader::header();
     title("$sitename " . _ADVERTISING . "");
     OpenTable();
     echo "" . _WELCOMEADS . "";
@@ -126,7 +126,7 @@ function sitestats()
     $row = $db->sql_fetchrow($db->sql_query("SELECT count FROM " . $prefix . "_counter WHERE type='total'"));
     $views_t = $row['count'];
     $regusers = $db->sql_numrows($db->sql_query("SELECT user_id FROM " . $user_prefix . "_users"));
-    include "header.php";
+    NukeHeader::header();
     title("$sitename: " . _GENERALSTATS . "");
     OpenTable();
     echo "" . _HEREARENUMBERS . "<br><br><br>"
@@ -147,7 +147,7 @@ function sitestats()
 function plans()
 {
     global $module_name, $prefix, $db, $bgcolor2, $sitename;
-    include "header.php";
+    NukeHeader::header();
     title("$sitename: " . _PLANSPRICES . "");
     OpenTable();
     $numrows = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_banner_plans WHERE active='1'"));
@@ -186,7 +186,7 @@ function terms()
     $month = $today['mon'];
     if ($month == 1) {$month = _JANUARY;} elseif ($month == 2) {$month = _FEBRUARY;} elseif ($month == 3) {$month = _MARCH;} elseif ($month == 4) {$month = _APRIL;} elseif ($month == 5) {$month = _MAY;} elseif ($month == 6) {$month = _JUNE;} elseif ($month == 7) {$month = _JULY;} elseif ($month == 8) {$month = _AUGUST;} elseif ($month == 9) {$month = _SEPTEMBER;} elseif ($month == 10) {$month = _OCTOBER;} elseif ($month == 11) {$month = _NOVEMBER;} elseif ($month == 12) {$month = _DECEMBER;}
     $year = $today['year'];
-    include "header.php";
+    NukeHeader::header();
     title("$sitename: " . _TERMSCONDITIONS . "");
     $row = $db->sql_fetchrow($db->sql_query("SELECT * FROM " . $prefix . "_banner_terms"));
     $terms = mb_eregi_replace("\[sitename\]", $sitename, $row['terms_body']);
@@ -206,7 +206,7 @@ function client()
     if (is_client($client)) {
         Header("Location: modules.php?name=$module_name&op=client_home");
     } else {
-        include "header.php";
+        NukeHeader::header();
         title("$sitename: " . _ADSYSTEM . "");
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _CLIENTLOGIN . "</b></font></center><br>";
@@ -340,7 +340,7 @@ function client_valid($login, $pass)
     $pass = filter($pass, "nohtml");
     $numrows = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_banner_clients WHERE login='$login' AND passwd='$pass'"));
     if ($numrows != 1) {
-        include "header.php";
+        NukeHeader::header();
         title("$sitename: " . _ADSYSTEM . "");
         OpenTable();
         echo "<center>" . _LOGININCORRECT . "<br><br>" . _GOBACK . "</center>";
@@ -369,7 +369,7 @@ function client_home()
         $client = explode(":", $client);
         $cid = $client[0];
         $row = $db->sql_fetchrow($db->sql_query("SELECT * FROM " . $prefix . "_banner_clients WHERE cid='$cid'"));
-        include "header.php";
+        NukeHeader::header();
         title("$sitename " . _ADSYSTEM . "");
         OpenTable();
         echo "<center>" . _ACTIVEADSFOR . " " . $row['name'] . "</center><br>"
@@ -497,7 +497,7 @@ function view_banner($cid, $bid)
         $client = explode(":", $client);
         $client_id = $client[0];
         if ($cid != $client_id) {
-            include "header.php";
+            NukeHeader::header();
             title("$sitename " . _ADSYSTEM . "");
             OpenTable();
             echo "<center>" . _ADISNTYOUR . "<br><br>" . _GOBACK . "</center>";
@@ -506,7 +506,7 @@ function view_banner($cid, $bid)
             include "footer.php";
             die();
         } else {
-            include "header.php";
+            NukeHeader::header();
             title("$sitename " . _ADSYSTEM . "");
             OpenTable();
             $row = $db->sql_fetchrow($db->sql_query("SELECT * FROM " . $prefix . "_banner WHERE bid='$bid'"));
@@ -612,7 +612,7 @@ function client_report($cid, $bid)
         $client = explode(":", $client);
         $client_id = $client[0];
         if ($cid != $client_id) {
-            include "header.php";
+            NukeHeader::header();
             title("$sitename: " . _ADSYSTEM . "");
             OpenTable();
             echo "<center>" . _FUNCTIONSNOTALLOWED . "<br><br>" . _GOBACK . "</center>";
@@ -621,7 +621,7 @@ function client_report($cid, $bid)
             include "footer.php";
             die();
         } else {
-            include "header.php";
+            NukeHeader::header();
             title("$sitename: " . _ADSYSTEM . "");
             OpenTable();
             $bid = intval($bid);

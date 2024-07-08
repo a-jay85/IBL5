@@ -2,7 +2,7 @@
 
 global $prefix, $db, $sitename, $admin, $module_name, $user, $cookie;
 
-include "header.php";
+NukeHeader::header();
 OpenTable();
 
 error_reporting(E_ERROR);

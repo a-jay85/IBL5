@@ -24,7 +24,7 @@ $pagetitle = "- $module_name";
 
 global $db;
 
-include "header.php";
+NukeHeader::header();
 OpenTable();
 UI::playerMenu();
 

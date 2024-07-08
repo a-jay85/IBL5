@@ -2,7 +2,7 @@
 
 require 'mainfile.php';
 
-include "header.php";
+NukeHeader::header();
 
 $query5 = "SELECT * FROM ibl_plr";
 //$query5 = "SELECT * FROM ibl_plr where (pos = 'PG' or pos = 'SG') and (tid = '11' or tid = '25' or tid = '30' or tid = '13' or tid = '14' or tid = '15' or tid = '12' or tid = '32' or tid = '16' or tid = '17' or tid = '22' or tid = '20' or tid = '19' or tid = '23' or tid = '18' or tid = '28') and teamname != 'Retired' order by teamname";

@@ -20,7 +20,7 @@ require_once "mainfile.php";
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
-include "header.php";
+NukeHeader::header();
 
 if ($multilingual == 1) {
     $queryalang = "WHERE (alanguage='$currentlang' OR alanguage='')"; /* top stories */

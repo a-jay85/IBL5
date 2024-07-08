@@ -41,7 +41,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
     $teamlogo = $userinfo['user_ibl_team'];
     $tid = $sharedFunctions->getTidFromTeamname($teamlogo);
 
-    include "header.php";
+    NukeHeader::header();
     OpenTable();
     UI::displaytopmenu($db, $tid);
 
@@ -383,7 +383,7 @@ function main($user)
 {
     global $stop;
     if (!is_user($user)) {
-        include "header.php";
+        NukeHeader::header();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . ($stop ? _LOGININCOR : _USERREGLOGIN) . "</b></font></center>";
         CloseTable();

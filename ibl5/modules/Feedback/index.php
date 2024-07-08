@@ -28,7 +28,7 @@ define('INDEX_FILE', true);
 $subject = $sitename . " " . _FEEDBACK;
 define('NO_EDITOR', true);
 
-include "header.php";
+NukeHeader::header();
 
 if (!isset($opi) or ($opi != "ds")) {
     $intcookie = intval($cookie[0]);

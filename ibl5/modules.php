@@ -57,7 +57,7 @@ if (isset($name) && $name == $_REQUEST['name']) {
             if (file_exists($modpath)) {
                 include $modpath;
             } else {
-                include "header.php";
+                NukeHeader::header();
                 OpenTable();
                 echo "<br><center>Sorry, such file doesn't exist...</center><br>";
                 CloseTable();
@@ -68,7 +68,7 @@ if (isset($name) && $name == $_REQUEST['name']) {
             if (file_exists($modpath)) {
                 include $modpath;
             } else {
-                include "header.php";
+                NukeHeader::header();
                 OpenTable();
                 echo "<br><center>Sorry, such file doesn't exist...</center><br>";
                 CloseTable();
@@ -76,7 +76,7 @@ if (isset($name) && $name == $_REQUEST['name']) {
             }
         } elseif ($view == 1 and !is_user($user) and !is_admin($admin)) {
             $pagetitle = "- " . _ACCESSDENIED;
-            include "header.php";
+            NukeHeader::header();
             title($sitename . ": " . _ACCESSDENIED);
             OpenTable();
             echo "<center><strong>" . _RESTRICTEDAREA . "</strong><br><br>" . _MODULEUSERS;
@@ -95,7 +95,7 @@ if (isset($name) && $name == $_REQUEST['name']) {
             if (file_exists($modpath)) {
                 include $modpath;
             } else {
-                include "header.php";
+                NukeHeader::header();
                 OpenTable();
                 echo "<br><center>Sorry, such file doesn't exist...</center><br>";
                 CloseTable();
@@ -103,7 +103,7 @@ if (isset($name) && $name == $_REQUEST['name']) {
             }
         } elseif ($view == 2 and !is_admin($admin)) {
             $pagetitle = "- " . _ACCESSDENIED;
-            include "header.php";
+            NukeHeader::header();
             title($sitename . ": " . _ACCESSDENIED);
             OpenTable();
             echo "<center><b>" . _RESTRICTEDAREA . "</b><br><br>" . _MODULESADMINS . "" . _GOBACK;
@@ -114,7 +114,7 @@ if (isset($name) && $name == $_REQUEST['name']) {
             if (file_exists($modpath)) {
                 include $modpath;
             } else {
-                include "header.php";
+                NukeHeader::header();
                 OpenTable();
                 echo "<br><center>Sorry, such file doesn't exist...</center><br>";
                 CloseTable();
@@ -122,7 +122,7 @@ if (isset($name) && $name == $_REQUEST['name']) {
             }
         } else {
             $pagetitle = "- " . _ACCESSDENIED . "";
-            include "header.php";
+            NukeHeader::header();
             title($sitename . ": " . _ACCESSDENIED . "");
             OpenTable();
             echo "<center><strong>" . _RESTRICTEDAREA . "</strong><br><br>" . _MODULESSUBSCRIBER;
@@ -135,7 +135,7 @@ if (isset($name) && $name == $_REQUEST['name']) {
             include "footer.php";
         }
     } else {
-        include "header.php";
+        NukeHeader::header();
         OpenTable();
         echo "<center>" . _MODULENOTACTIVE . "<br><br>" . _GOBACK . "</center>";
         CloseTable();

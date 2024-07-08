@@ -2,7 +2,7 @@
 
 require 'mainfile.php';
 
-include "header.php";
+NukeHeader::header();
 
 echo "<HTML><HEAD><TITLE>End of Year Voting Result</TITLE></HEAD><BODY>";
 

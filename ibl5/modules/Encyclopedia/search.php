@@ -19,7 +19,7 @@ if (!defined('MODULE_FILE')) {
 require_once "mainfile.php";
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
-include "header.php";
+NukeHeader::header();
 global $db, $prefix;
 $query = filter($query);
 if ((isset($query) and !isset($eid)) and (!empty($query))) {

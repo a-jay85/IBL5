@@ -32,7 +32,7 @@ function main($user)
 {
     global $stop;
     if (!is_user($user)) {
-        include "header.php";
+        NukeHeader::header();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . ($stop ? _LOGININCOR : _USERREGLOGIN) . "</b></font></center>";
         CloseTable();
@@ -54,7 +54,7 @@ function display()
     $sharedFunctions = new Shared($db);
     $season = new Season($db);
 
-    include "header.php";
+    NukeHeader::header();
     OpenTable();
 
     $username = $cookie[1];
@@ -812,7 +812,7 @@ function negotiate($pid)
     $player_pos = $playerinfo['pos'];
     $player_team_name = $playerinfo['teamname'];
 
-    include "header.php";
+    NukeHeader::header();
     OpenTable();
 
     $player_exp = $playerinfo['exp'];

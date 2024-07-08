@@ -31,7 +31,7 @@ function theindex($new_topic = "0")
     } else {
         $querylang = "";
     }
-    include "header.php";
+    NukeHeader::header();
     automated_news();
     if (isset($userinfo['storynum']) and $user_news == 1) {
         $storynum = $userinfo['storynum'];
@@ -137,7 +137,7 @@ function rate_article($sid, $score, $gfx_check, $random_num = "0")
             mt_srand((double) microtime() * 1000000);
             $maxran = 1000000;
             $random_num = mt_rand(0, $maxran);
-            include "header.php";
+            NukeHeader::header();
             title("$sitename: " . _ARTICLERATING . "");
             OpenTable();
             $row = $db->sql_fetchrow($db->sql_query("SELECT title FROM " . $prefix . "_stories WHERE sid='$sid'"));
@@ -193,7 +193,7 @@ function rate_article($sid, $score, $gfx_check, $random_num = "0")
                     Header("Location: modules.php?name=News&op=rate_complete&sid=$sid&score=$score");
                 }
             } else {
-                include "header.php";
+                NukeHeader::header();
                 title("$sitename: " . _ARTICLERATING . "");
                 OpenTable();
                 echo "<center>" . _DIDNTRATE . "<br><br>"
@@ -207,7 +207,7 @@ function rate_article($sid, $score, $gfx_check, $random_num = "0")
         $maxran = 1000000;
         $random_num = mt_rand(0, $maxran);
         if (extension_loaded("gd") and $gfx_chk != 0) {
-            include "header.php";
+            NukeHeader::header();
             title("$sitename: " . _ARTICLERATING . "");
             OpenTable();
             $row = $db->sql_fetchrow($db->sql_query("SELECT title FROM " . $prefix . "_stories WHERE sid='$sid'"));
@@ -241,7 +241,7 @@ function rate_complete($sid, $score, $rated = 0)
         if (isset($userinfo['uorder'])) {$r_options .= "&amp;order=" . $userinfo['uorder'];}
         if (isset($userinfo['thold'])) {$r_options .= "&amp;thold=" . $userinfo['thold'];}
     }
-    include "header.php";
+    NukeHeader::header();
     title("$sitename: " . _ARTICLERATING . "");
     OpenTable();
     if ($rated == 0) {

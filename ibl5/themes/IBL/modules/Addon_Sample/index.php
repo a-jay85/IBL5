@@ -8,7 +8,7 @@ $index = 1;
 
 function one()
 {
-    include "header.php";
+    NukeHeader::header();
     OpenTable();
     echo "Addon Sample File (index.php) function \"one\" CALLED FROM Sand_Journey Theme<br><br>";
     echo "<ul>";
@@ -21,7 +21,7 @@ function one()
 
 function two()
 {
-    include "header.php";
+    NukeHeader::header();
     OpenTable();
     echo "Addon Sample File (index.php) function \"two\" CALLED FROM Sand_Journey Theme";
     echo "<ul>";
@@ -34,7 +34,7 @@ function two()
 
 function AddonSample()
 {
-    include "header.php";
+    NukeHeader::header();
     OpenTable();
     echo "Addon Sample File (index.php) CALLED FROM Sand_Journey Theme<br><br>";
     echo "<ul>";

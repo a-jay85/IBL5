@@ -23,7 +23,7 @@ get_lang($module_name);
 
 $pagetitle = "- $module_name";
 
-include "header.php";
+NukeHeader::header();
 
 OpenTable();
 echo "<center><font class=\"storytitle\">" . ($season->endingYear - 1) . "-$season->endingYear IBL Power Rankings</font></center>\n\n";

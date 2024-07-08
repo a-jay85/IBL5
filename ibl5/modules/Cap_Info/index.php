@@ -10,7 +10,7 @@ $season = new Season($db);
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
-include "header.php";
+NukeHeader::header();
 
 $queryTeamInfo = "SELECT * FROM ibl_team_info WHERE teamid != 35 ORDER BY teamid ASC";
 $resultTeamInfo = $db->sql_query($queryTeamInfo);

@@ -11,7 +11,6 @@ config.inc.php
 discordWebhooks (not CURL).php
 Discord.php
 
-/*
 backups
 depthcharts
 /ibl5/vendor

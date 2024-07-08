@@ -97,9 +97,8 @@ function startjournal($sitename, $user)
     }
     title("$sitename: " . _USERSJOURNAL . "");
     if (is_user($user)) {
-        include "modules/Your_Account/navbar.php";
         OpenTable();
-        nav();
+        NukeNavbar::nav();
         CloseTable();
         echo "<br>";
     }

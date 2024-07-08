@@ -28,7 +28,7 @@ oneonone();
 function oneonone()
 {
     global $prefix, $db, $user, $cookie;
-    include "header.php";
+    NukeHeader::header();
 
     cookiedecode($user);
 

@@ -44,7 +44,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     function FaqAdmin()
     {
         global $admin, $bgcolor2, $prefix, $db, $currentlang, $multilingual, $admin_file, $language;
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _FAQADMIN . "</b></font></center>";
@@ -114,7 +114,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     function FaqCatGo($id_cat)
     {
         global $admin, $bgcolor2, $prefix, $db, $admin_file;
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _FAQADMIN . "</b></font></center>";
@@ -157,7 +157,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     {
         global $admin, $db, $multilingual, $admin_file;
         include "config.php";
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _FAQADMIN . "</b></font></center>";
@@ -211,7 +211,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     function FaqCatGoEdit($id)
     {
         global $admin, $bgcolor2, $prefix, $db, $admin_file;
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _FAQADMIN . "</b></font></center>";
@@ -281,7 +281,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
             $db->sql_query("delete from " . $prefix . "_faqanswer where id_cat='$id_cat'");
             Header("Location: " . $admin_file . ".php?op=FaqAdmin");
         } else {
-            include "header.php";
+            NukeHeader::header();
             GraphicAdmin();
             OpenTable();
             echo "<center><font class=\"title\"><b>" . _FAQADMIN . "</b></font></center>";
@@ -303,7 +303,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
             $db->sql_query("delete from " . $prefix . "_faqanswer where id='$id'");
             Header("Location: " . $admin_file . ".php?op=FaqAdmin");
         } else {
-            include "header.php";
+            NukeHeader::header();
             GraphicAdmin();
             OpenTable();
             echo "<center><font class=\"title\"><b>" . _FAQADMIN . "</b></font></center>";
@@ -361,7 +361,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     }
 
 } else {
-    include "header.php";
+    NukeHeader::header();
     GraphicAdmin();
     OpenTable();
     echo "<center><b>" . _ERROR . "</b><br><br>You do not have administration permission for module \"$module_name\"</center>";

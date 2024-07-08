@@ -29,7 +29,7 @@ if (($row['radminsuper'] == 1) && ($row['name'] == 'God')) {
     {
         global $admin, $prefix, $db, $language, $multilingual, $admin_file, $bgcolor2;
         if (is_admin($admin)) {
-            include "header.php";
+            NukeHeader::header();
             GraphicAdmin();
             OpenTable();
             echo "<center><font class=\"title\"><b>" . _AUTHORSADMIN . "</b></font></center>";
@@ -133,7 +133,7 @@ if (($row['radminsuper'] == 1) && ($row['name'] == 'God')) {
             CloseTable();
             include "footer.php";
         } else {
-            include "header.php";
+            NukeHeader::header();
             GraphicAdmin();
             OpenTable();
             echo "<center><font class=\"title\"><b>Authors Admin</b></font></center>";
@@ -152,7 +152,7 @@ if (($row['radminsuper'] == 1) && ($row['name'] == 'God')) {
     {
         global $admin, $prefix, $db, $multilingual, $admin_file;
         if (is_admin($admin)) {
-            include "header.php";
+            NukeHeader::header();
             GraphicAdmin();
             OpenTable();
             echo "<center><font class=\"title\"><b>" . _AUTHORSADMIN . "</b></font></center>";
@@ -261,7 +261,7 @@ if (($row['radminsuper'] == 1) && ($row['name'] == 'God')) {
             CloseTable();
             include "footer.php";
         } else {
-            include 'header.php';
+            NukeHeader::header();
             GraphicAdmin();
             OpenTable();
             echo "<center><font class=\"title\"><b>Authors Admin</b></font></center>";
@@ -286,7 +286,7 @@ if (($row['radminsuper'] == 1) && ($row['name'] == 'God')) {
             }
             if (!empty($chng_pwd2)) {
                 if ($chng_pwd != $chng_pwd2) {
-                    include "header.php";
+                    NukeHeader::header();
                     GraphicAdmin();
                     OpenTable();
                     echo "" . _PASSWDNOMATCH . "<br><br>"
@@ -406,7 +406,7 @@ if (($row['radminsuper'] == 1) && ($row['name'] == 'God')) {
                 }
             }
         } else {
-            include 'header.php';
+            NukeHeader::header();
             GraphicAdmin();
             OpenTable();
             echo "<center><font class=\"title\"><b>Authors Admin</b></font></center>";
@@ -444,7 +444,7 @@ if (($row['radminsuper'] == 1) && ($row['name'] == 'God')) {
                 $row2 = $db->sql_fetchrow($db->sql_query("SELECT sid from " . $prefix . "_stories where aid='$del_aid'"));
                 $sid = intval($row2['sid']);
                 if ($sid != "") {
-                    include "header.php";
+                    NukeHeader::header();
                     GraphicAdmin();
                     OpenTable();
                     echo "<center><font class=\"title\"><b>" . _AUTHORSADMIN . "</b></font></center>";
@@ -471,7 +471,7 @@ if (($row['radminsuper'] == 1) && ($row['name'] == 'God')) {
             }
             Header("Location: " . $admin_file . ".php?op=deladminconf&del_aid=$del_aid");
         } else {
-            include 'header.php';
+            NukeHeader::header();
             GraphicAdmin();
             OpenTable();
             echo "<center><font class=\"title\"><b>Authors Admin</b></font></center>";
@@ -504,7 +504,7 @@ if (($row['radminsuper'] == 1) && ($row['name'] == 'God')) {
             $add_aid = strtolower(substr("$add_aid", 0, 25));
             $add_name = substr("$add_name", 0, 25);
             if (!($add_aid && $add_name && $add_email && $add_pwd)) {
-                include "header.php";
+                NukeHeader::header();
                 GraphicAdmin();
                 OpenTable();
                 echo "<center><font class=\"title\"><b>" . _AUTHORSADMIN . "</b></font></center>";
@@ -532,7 +532,7 @@ if (($row['radminsuper'] == 1) && ($row['name'] == 'God')) {
             break;
 
         case "deladmin":
-            include "header.php";
+            NukeHeader::header();
             $del_aid = trim($del_aid);
             GraphicAdmin();
             OpenTable();

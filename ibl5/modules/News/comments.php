@@ -536,10 +536,10 @@ function DisplayTopic($sid, $pid = 0, $tid = 0, $mode = "thread", $order = 0, $t
         global $title, $bgcolor1, $bgcolor2, $bgcolor3;
     } else {
         global $title, $bgcolor1, $bgcolor2, $bgcolor3;
-        include_once "header.php";
+        NukeHeader::header();
     }
     if ($pid != 0) {
-        include_once "header.php";
+        NukeHeader::header();
     }
     $count_times = 0;
     cookiedecode($user);
@@ -709,7 +709,7 @@ function DisplayTopic($sid, $pid = 0, $tid = 0, $mode = "thread", $order = 0, $t
 function singlecomment($tid, $sid, $mode, $order, $thold)
 {
     global $module_name, $user, $cookie, $datetime, $bgcolor1, $bgcolor2, $bgcolor3, $bgcolor4, $admin, $anonpost, $prefix, $textcolor2, $db;
-    include "header.php";
+    NukeHeader::header();
     cookiedecode($user);
     getusrinfo($user);
     $sid = intval($sid);
@@ -759,7 +759,7 @@ function singlecomment($tid, $sid, $mode, $order, $thold)
 function reply($pid, $sid, $mode, $order, $thold)
 {
     //include("config.php");  // globalized - Quake
-    include "header.php";
+    NukeHeader::header();
     global $prefix, $module_name, $user, $cookie, $datetime, $bgcolor1, $bgcolor2, $bgcolor3, $db, $anonpost, $anonymous, $admin;
     cookiedecode($user);
     getusrinfo($user);
@@ -903,7 +903,7 @@ function reply($pid, $sid, $mode, $order, $thold)
 function replyPreview($pid, $sid, $subject, $comment, $xanonpost, $mode, $order, $thold)
 {
     global $module_name, $user, $cookie, $AllowableHTML, $anonymous, $anonpost, $userinfo;
-    include "header.php";
+    NukeHeader::header();
     cookiedecode($user);
     getusrinfo($user);
     $sid = intval($sid);
@@ -1002,7 +1002,7 @@ function CreateTopic($xanonpost, $subject, $comment, $pid, $sid, $host_name, $mo
     $comment = format_url($comment);
     $comment = filter($comment, "", 1);
     if (empty($subject) or empty($comment)) {
-        include "header.php";
+        NukeHeader::header();
         title("$sitename - " . _COMMENTSSYSTEM . "");
         OpenTable();
         echo "<center>" . _COMMENTPOSTERROR . "<br><br>" . _GOBACK . "</center>";
@@ -1038,7 +1038,7 @@ function CreateTopic($xanonpost, $subject, $comment, $pid, $sid, $host_name, $mo
                 $koptions .= "&thold=" . $thold;
                 if ($krow['karma'] == 2) {
                     $db->sql_query("INSERT INTO " . $prefix . "_comments_moderated VALUES (NULL, '$pid', '$sid', now(), '$name', '$email', '$url', '$ip', '$subject', '$comment', '$score', '0', '0')");
-                    include "header.php";
+                    NukeHeader::header();
                     title(_MODERATEDTITLE);
                     OpenTable();
                     echo "<center>" . _COMMENTMODERATED . "";
@@ -1059,7 +1059,7 @@ function CreateTopic($xanonpost, $subject, $comment, $pid, $sid, $host_name, $mo
             die("Nice try..");
         }
     } else {
-        include "header.php";
+        NukeHeader::header();
         echo "According to my records, the topic you are trying "
             . "to reply to does not exist. If you're just trying to be "
             . "annoying, well then too bad.";

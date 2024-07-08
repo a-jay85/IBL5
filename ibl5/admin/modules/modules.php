@@ -28,7 +28,7 @@ if ($row['radminsuper'] == 1) {
     function modules()
     {
         global $prefix, $db, $multilingual, $bgcolor2, $admin_file;
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _MODULESADMIN . "</b></font></center>";
@@ -145,7 +145,7 @@ if ($row['radminsuper'] == 1) {
         global $prefix, $db, $admin_file;
         $mid = intval($mid);
         if ($ok == 0) {
-            include "header.php";
+            NukeHeader::header();
             GraphicAdmin();
             title("" . _HOMECONFIG . "");
             OpenTable();
@@ -190,7 +190,7 @@ if ($row['radminsuper'] == 1) {
         $view = intval($row['view']);
         $inmenu = intval($row['inmenu']);
         $mod_group = intval($row['mod_group']);
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         title("" . _MODULEEDIT . "");
         OpenTable();

@@ -23,7 +23,7 @@ get_lang($module_name);
 $pagetitle = "Season Stats";
 
 {
-    include "header.php";
+    NukeHeader::header();
     OpenTable();
     $year = $_POST['year'];
     $team = $_POST['team'];

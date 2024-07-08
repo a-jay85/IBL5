@@ -24,7 +24,7 @@ if ($row['radminsuper'] == 1) {
     function main_ban($ip = 0)
     {
         global $prefix, $db, $bgcolor2, $admin_file;
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _IPBANSYSTEM . "</b></font></center>";
@@ -69,7 +69,7 @@ if ($row['radminsuper'] == 1) {
     function save_banned($ip1, $ip2, $ip3, $ip4, $reason)
     {
         global $prefix, $db;
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _IPBANSYSTEM . "</b></font></center>";
@@ -131,7 +131,7 @@ if ($row['radminsuper'] == 1) {
         $id = intval($id);
         $row = $db->sql_fetchrow($db->sql_query("SELECT * FROM " . $prefix . "_banned_ip WHERE id=" . $id));
         if ($ok == 0) {
-            include "header.php";
+            NukeHeader::header();
             GraphicAdmin();
             OpenTable();
             echo "<center><font class=\"title\"><b>" . _IPBANSYSTEM . "</b></font></center>";
@@ -152,7 +152,7 @@ if ($row['radminsuper'] == 1) {
         global $prefix, $db, $bgcolor2, $admin_file;
         $id = intval($id);
         $row = $db->sql_fetchrow($db->sql_query("SELECT * from " . $prefix . "_banned_ip WHERE id='$id'"));
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _IPBANSYSTEM . "</b></font></center>";
@@ -175,7 +175,7 @@ if ($row['radminsuper'] == 1) {
     function ipban_save($id, $ip1, $ip2, $ip3, $ip4, $reason)
     {
         global $prefix, $db;
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _IPBANSYSTEM . "</b></font></center>";

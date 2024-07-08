@@ -264,7 +264,7 @@ while ($i < $numteams) {
     $i++;
 }
 
-include "header.php";
+NukeHeader::header();
 OpenTable();
 
 echo "<center>

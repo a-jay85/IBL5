@@ -46,7 +46,7 @@ get_lang($module_name);
 
 $pagetitle = "- " . _USERSJOURNAL . "";
 
-include "header.php";
+NukeHeader::header();
 include "modules/$module_name/functions.php";
 if (is_admin($admin)) {
     cookiedecode($user);

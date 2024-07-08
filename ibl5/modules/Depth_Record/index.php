@@ -18,7 +18,7 @@ if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
 
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
-include "header.php";
+NukeHeader::header();
 
 $query2 = "SELECT * FROM ibl_team_history WHERE teamid != 35 ORDER BY teamid ASC"; // Grab all teams except for the Free Agents
 $result2 = $db->sql_query($query2);

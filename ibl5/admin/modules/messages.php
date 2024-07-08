@@ -36,7 +36,7 @@ if ($row['radminsuper'] == 1) {
     function messages()
     {
         global $admin, $admlanguage, $language, $bgcolor1, $bgcolor2, $prefix, $db, $multilingual, $admin_file;
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _MESSAGESADMIN . "</b></font></center>";
@@ -157,7 +157,7 @@ if ($row['radminsuper'] == 1) {
     function editmsg($mid)
     {
         global $admin, $prefix, $db, $multilingual, $admin_file;
-        include "header.php";
+        NukeHeader::header();
         $mid = intval($mid);
         GraphicAdmin();
         OpenTable();
@@ -316,7 +316,7 @@ if ($row['radminsuper'] == 1) {
             }
             Header("Location: " . $admin_file . ".php?op=messages");
         } else {
-            include "header.php";
+            NukeHeader::header();
             GraphicAdmin();
             OpenTable();
             echo "<center><font size=\"4\"><b>" . _MESSAGESADMIN . "</b></font></center>";

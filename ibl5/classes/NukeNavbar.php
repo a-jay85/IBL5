@@ -1,6 +1,7 @@
 <?php
 
-class NukeNavbar {
+class NukeNavbar
+{
     public static function menuimg($gfile)
     {
         $ThemeSel = get_theme();

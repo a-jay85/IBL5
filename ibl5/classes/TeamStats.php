@@ -132,26 +132,26 @@ class TeamStats
         $this->seasonOffenseTotalPersonalFouls = $offenseTotalsRow['pf'];
         $this->seasonOffenseTotalPoints = 2 * $this->seasonOffenseTotalFieldGoalsMade + $this->seasonOffenseTotalFreeThrowsMade + $this->seasonOffenseTotalThreePointersMade;
 
-        @$this->seasonOffenseMinutesPerGame = number_format(($this->seasonOffenseTotalMinutes / $this->seasonOffenseGamesPlayed), 1);
-        @$this->seasonOffenseFieldGoalsMadePerGame = number_format(($this->seasonOffenseTotalFieldGoalsMade / $this->seasonOffenseGamesPlayed), 1);
-        @$this->seasonOffenseFieldGoalsAttemptedPerGame = number_format(($this->seasonOffenseTotalFieldGoalsAttempted / $this->seasonOffenseGamesPlayed), 1);
-        @$this->seasonOffenseFreeThrowsMadePerGame = number_format(($this->seasonOffenseTotalFreeThrowsMade / $this->seasonOffenseGamesPlayed), 1);
-        @$this->seasonOffenseFreeThrowsAttemptedPerGame = number_format(($this->seasonOffenseTotalFreeThrowsAttempted / $this->seasonOffenseGamesPlayed), 1);
-        @$this->seasonOffenseThreePointersMadePerGame = number_format(($this->seasonOffenseTotalThreePointersMade / $this->seasonOffenseGamesPlayed), 1);
-        @$this->seasonOffenseThreePointersAttemptedPerGame = number_format(($this->seasonOffenseTotalThreePointersAttempted / $this->seasonOffenseGamesPlayed), 1);
-        @$this->seasonOffenseOffensiveReboundsPerGame = number_format(($this->seasonOffenseTotalOffensiveRebounds / $this->seasonOffenseGamesPlayed), 1);
-        @$this->seasonOffenseDefensiveReboundsPerGame = number_format(($this->seasonOffenseTotalDefensiveRebounds / $this->seasonOffenseGamesPlayed), 1);
-        @$this->seasonOffenseTotalReboundsPerGame = number_format(($this->seasonOffenseTotalRebounds / $this->seasonOffenseGamesPlayed), 1);
-        @$this->seasonOffenseAssistsPerGame = number_format(($this->seasonOffenseTotalAssists / $this->seasonOffenseGamesPlayed), 1);
-        @$this->seasonOffenseStealsPerGame = number_format(($this->seasonOffenseTotalSteals / $this->seasonOffenseGamesPlayed), 1);
-        @$this->seasonOffenseTurnoversPerGame = number_format(($this->seasonOffenseTotalTurnovers / $this->seasonOffenseGamesPlayed), 1);
-        @$this->seasonOffenseBlocksPerGame = number_format(($this->seasonOffenseTotalBlocks / $this->seasonOffenseGamesPlayed), 1);
-        @$this->seasonOffensePersonalFoulsPerGame = number_format(($this->seasonOffenseTotalPersonalFouls / $this->seasonOffenseGamesPlayed), 1);
-        @$this->seasonOffensePointsPerGame = number_format(($this->seasonOffenseTotalPoints / $this->seasonOffenseGamesPlayed), 1);
+        $this->seasonOffenseMinutesPerGame = ($this->seasonOffenseGamesPlayed) ? number_format(($this->seasonOffenseTotalMinutes / $this->seasonOffenseGamesPlayed), 1) : "0";
+        $this->seasonOffenseFieldGoalsMadePerGame = ($this->seasonOffenseGamesPlayed) ? number_format(($this->seasonOffenseTotalFieldGoalsMade / $this->seasonOffenseGamesPlayed), 1) : "0";
+        $this->seasonOffenseFieldGoalsAttemptedPerGame = ($this->seasonOffenseGamesPlayed) ? number_format(($this->seasonOffenseTotalFieldGoalsAttempted / $this->seasonOffenseGamesPlayed), 1) : "0";
+        $this->seasonOffenseFreeThrowsMadePerGame = ($this->seasonOffenseGamesPlayed) ? number_format(($this->seasonOffenseTotalFreeThrowsMade / $this->seasonOffenseGamesPlayed), 1) : "0";
+        $this->seasonOffenseFreeThrowsAttemptedPerGame = ($this->seasonOffenseGamesPlayed) ? number_format(($this->seasonOffenseTotalFreeThrowsAttempted / $this->seasonOffenseGamesPlayed), 1) : "0";
+        $this->seasonOffenseThreePointersMadePerGame = ($this->seasonOffenseGamesPlayed) ? number_format(($this->seasonOffenseTotalThreePointersMade / $this->seasonOffenseGamesPlayed), 1) : "0";
+        $this->seasonOffenseThreePointersAttemptedPerGame = ($this->seasonOffenseGamesPlayed) ? number_format(($this->seasonOffenseTotalThreePointersAttempted / $this->seasonOffenseGamesPlayed), 1) : "0";
+        $this->seasonOffenseOffensiveReboundsPerGame = ($this->seasonOffenseGamesPlayed) ? number_format(($this->seasonOffenseTotalOffensiveRebounds / $this->seasonOffenseGamesPlayed), 1) : "0";
+        $this->seasonOffenseDefensiveReboundsPerGame = ($this->seasonOffenseGamesPlayed) ? number_format(($this->seasonOffenseTotalDefensiveRebounds / $this->seasonOffenseGamesPlayed), 1) : "0";
+        $this->seasonOffenseTotalReboundsPerGame = ($this->seasonOffenseGamesPlayed) ? number_format(($this->seasonOffenseTotalRebounds / $this->seasonOffenseGamesPlayed), 1) : "0";
+        $this->seasonOffenseAssistsPerGame = ($this->seasonOffenseGamesPlayed) ? number_format(($this->seasonOffenseTotalAssists / $this->seasonOffenseGamesPlayed), 1) : "0";
+        $this->seasonOffenseStealsPerGame = ($this->seasonOffenseGamesPlayed) ? number_format(($this->seasonOffenseTotalSteals / $this->seasonOffenseGamesPlayed), 1) : "0";
+        $this->seasonOffenseTurnoversPerGame = ($this->seasonOffenseGamesPlayed) ? number_format(($this->seasonOffenseTotalTurnovers / $this->seasonOffenseGamesPlayed), 1) : "0";
+        $this->seasonOffenseBlocksPerGame = ($this->seasonOffenseGamesPlayed) ? number_format(($this->seasonOffenseTotalBlocks / $this->seasonOffenseGamesPlayed), 1) : "0";
+        $this->seasonOffensePersonalFoulsPerGame = ($this->seasonOffenseGamesPlayed) ? number_format(($this->seasonOffenseTotalPersonalFouls / $this->seasonOffenseGamesPlayed), 1) : "0";
+        $this->seasonOffensePointsPerGame = ($this->seasonOffenseGamesPlayed) ? number_format(($this->seasonOffenseTotalPoints / $this->seasonOffenseGamesPlayed), 1) : "0";
 
-        @$this->seasonOffenseFieldGoalPercentage = number_format(($this->seasonOffenseTotalFieldGoalsMade / $this->seasonOffenseTotalFieldGoalsAttempted), 3);
-        @$this->seasonOffenseFreeThrowPercentage = number_format(($this->seasonOffenseTotalFreeThrowsMade / $this->seasonOffenseTotalFreeThrowsAttempted), 3);
-        @$this->seasonOffenseThreePointPercentage = number_format(($this->seasonOffenseTotalThreePointersMade / $this->seasonOffenseTotalThreePointersAttempted), 3);
+        $this->seasonOffenseFieldGoalPercentage = ($this->seasonOffenseTotalFieldGoalsAttempted) ? number_format(($this->seasonOffenseTotalFieldGoalsMade / $this->seasonOffenseTotalFieldGoalsAttempted), 3) : "0.000";
+        $this->seasonOffenseFreeThrowPercentage = ($this->seasonOffenseTotalFreeThrowsAttempted) ? number_format(($this->seasonOffenseTotalFreeThrowsMade / $this->seasonOffenseTotalFreeThrowsAttempted), 3) : "0.000";
+        $this->seasonOffenseThreePointPercentage = ($this->seasonOffenseTotalThreePointersAttempted) ? number_format(($this->seasonOffenseTotalThreePointersMade / $this->seasonOffenseTotalThreePointersAttempted), 3) : "0.000";
     }
 
     protected function fillDefenseTotals(array $defenseTotalsRow)
@@ -174,25 +174,25 @@ class TeamStats
         $this->seasonDefenseTotalPersonalFouls = $defenseTotalsRow['pf'];
         $this->seasonDefenseTotalPoints = 2 * $this->seasonDefenseTotalFieldGoalsMade + $this->seasonDefenseTotalFreeThrowsMade + $this->seasonDefenseTotalThreePointersMade;
 
-        @$this->seasonDefenseMinutesPerGame = number_format(($this->seasonDefenseTotalMinutes / $this->seasonDefenseGamesPlayed), 1);
-        @$this->seasonDefenseFieldGoalsMadePerGame = number_format(($this->seasonDefenseTotalFieldGoalsMade / $this->seasonDefenseGamesPlayed), 1);
-        @$this->seasonDefenseFieldGoalsAttemptedPerGame = number_format(($this->seasonDefenseTotalFieldGoalsAttempted / $this->seasonDefenseGamesPlayed), 1);
-        @$this->seasonDefenseFreeThrowsMadePerGame = number_format(($this->seasonDefenseTotalFreeThrowsMade / $this->seasonDefenseGamesPlayed), 1);
-        @$this->seasonDefenseFreeThrowsAttemptedPerGame = number_format(($this->seasonDefenseTotalFreeThrowsAttempted / $this->seasonDefenseGamesPlayed), 1);
-        @$this->seasonDefenseThreePointersMadePerGame = number_format(($this->seasonDefenseTotalThreePointersMade / $this->seasonDefenseGamesPlayed), 1);
-        @$this->seasonDefenseThreePointersAttemptedPerGame = number_format(($this->seasonDefenseTotalThreePointersAttempted / $this->seasonDefenseGamesPlayed), 1);
-        @$this->seasonDefenseOffensiveReboundsPerGame = number_format(($this->seasonDefenseTotalOffensiveRebounds / $this->seasonDefenseGamesPlayed), 1);
-        @$this->seasonDefenseDefensiveReboundsPerGame = number_format(($this->seasonDefenseTotalDefensiveRebounds / $this->seasonDefenseGamesPlayed), 1);
-        @$this->seasonDefenseTotalReboundsPerGame = number_format(($this->seasonDefenseTotalRebounds / $this->seasonDefenseGamesPlayed), 1);
-        @$this->seasonDefenseAssistsPerGame = number_format(($this->seasonDefenseTotalAssists / $this->seasonDefenseGamesPlayed), 1);
-        @$this->seasonDefenseStealsPerGame = number_format(($this->seasonDefenseTotalSteals / $this->seasonDefenseGamesPlayed), 1);
-        @$this->seasonDefenseTurnoversPerGame = number_format(($this->seasonDefenseTotalTurnovers / $this->seasonDefenseGamesPlayed), 1);
-        @$this->seasonDefenseBlocksPerGame = number_format(($this->seasonDefenseTotalBlocks / $this->seasonDefenseGamesPlayed), 1);
-        @$this->seasonDefensePersonalFoulsPerGame = number_format(($this->seasonDefenseTotalPersonalFouls / $this->seasonDefenseGamesPlayed), 1);
-        @$this->seasonDefensePointsPerGame = number_format(($this->seasonDefenseTotalPoints / $this->seasonDefenseGamesPlayed), 1);
+        $this->seasonDefenseMinutesPerGame = ($this->seasonDefenseGamesPlayed) ? number_format(($this->seasonDefenseTotalMinutes / $this->seasonDefenseGamesPlayed), 1) : "0";
+        $this->seasonDefenseFieldGoalsMadePerGame = ($this->seasonDefenseGamesPlayed) ? number_format(($this->seasonDefenseTotalFieldGoalsMade / $this->seasonDefenseGamesPlayed), 1) : "0";
+        $this->seasonDefenseFieldGoalsAttemptedPerGame = ($this->seasonDefenseGamesPlayed) ? number_format(($this->seasonDefenseTotalFieldGoalsAttempted / $this->seasonDefenseGamesPlayed), 1) : "0";
+        $this->seasonDefenseFreeThrowsMadePerGame = ($this->seasonDefenseGamesPlayed) ? number_format(($this->seasonDefenseTotalFreeThrowsMade / $this->seasonDefenseGamesPlayed), 1) : "0";
+        $this->seasonDefenseFreeThrowsAttemptedPerGame = ($this->seasonDefenseGamesPlayed) ? number_format(($this->seasonDefenseTotalFreeThrowsAttempted / $this->seasonDefenseGamesPlayed), 1) : "0";
+        $this->seasonDefenseThreePointersMadePerGame = ($this->seasonDefenseGamesPlayed) ? number_format(($this->seasonDefenseTotalThreePointersMade / $this->seasonDefenseGamesPlayed), 1) : "0";
+        $this->seasonDefenseThreePointersAttemptedPerGame = ($this->seasonDefenseGamesPlayed) ? number_format(($this->seasonDefenseTotalThreePointersAttempted / $this->seasonDefenseGamesPlayed), 1) : "0";
+        $this->seasonDefenseOffensiveReboundsPerGame = ($this->seasonDefenseGamesPlayed) ? number_format(($this->seasonDefenseTotalOffensiveRebounds / $this->seasonDefenseGamesPlayed), 1) : "0";
+        $this->seasonDefenseDefensiveReboundsPerGame = ($this->seasonDefenseGamesPlayed) ? number_format(($this->seasonDefenseTotalDefensiveRebounds / $this->seasonDefenseGamesPlayed), 1) : "0";
+        $this->seasonDefenseTotalReboundsPerGame = ($this->seasonDefenseGamesPlayed) ? number_format(($this->seasonDefenseTotalRebounds / $this->seasonDefenseGamesPlayed), 1) : "0";
+        $this->seasonDefenseAssistsPerGame = ($this->seasonDefenseGamesPlayed) ? number_format(($this->seasonDefenseTotalAssists / $this->seasonDefenseGamesPlayed), 1) : "0";
+        $this->seasonDefenseStealsPerGame = ($this->seasonDefenseGamesPlayed) ? number_format(($this->seasonDefenseTotalSteals / $this->seasonDefenseGamesPlayed), 1) : "0";
+        $this->seasonDefenseTurnoversPerGame = ($this->seasonDefenseGamesPlayed) ? number_format(($this->seasonDefenseTotalTurnovers / $this->seasonDefenseGamesPlayed), 1) : "0";
+        $this->seasonDefenseBlocksPerGame = ($this->seasonDefenseGamesPlayed) ? number_format(($this->seasonDefenseTotalBlocks / $this->seasonDefenseGamesPlayed), 1) : "0";
+        $this->seasonDefensePersonalFoulsPerGame = ($this->seasonDefenseGamesPlayed) ? number_format(($this->seasonDefenseTotalPersonalFouls / $this->seasonDefenseGamesPlayed), 1) : "0";
+        $this->seasonDefensePointsPerGame = ($this->seasonDefenseGamesPlayed) ? number_format(($this->seasonDefenseTotalPoints / $this->seasonDefenseGamesPlayed), 1) : "0";
 
-        @$this->seasonDefenseFieldGoalPercentage = number_format(($this->seasonDefenseTotalFieldGoalsMade / $this->seasonDefenseTotalFieldGoalsAttempted), 3);
-        @$this->seasonDefenseFreeThrowPercentage = number_format(($this->seasonDefenseTotalFreeThrowsMade / $this->seasonDefenseTotalFreeThrowsAttempted), 3);
-        @$this->seasonDefenseThreePointPercentage = number_format(($this->seasonDefenseTotalThreePointersMade / $this->seasonDefenseTotalThreePointersAttempted), 3);
+        $this->seasonDefenseFieldGoalPercentage = ($this->seasonDefenseTotalFieldGoalsAttempted) ? number_format(($this->seasonDefenseTotalFieldGoalsMade / $this->seasonDefenseTotalFieldGoalsAttempted), 3) : "0.000";
+        $this->seasonDefenseFreeThrowPercentage = ($this->seasonDefenseTotalFreeThrowsAttempted) ? number_format(($this->seasonDefenseTotalFreeThrowsMade / $this->seasonDefenseTotalFreeThrowsAttempted), 3) : "0.000";
+        $this->seasonDefenseThreePointPercentage = ($this->seasonDefenseTotalThreePointersAttempted) ? number_format(($this->seasonDefenseTotalThreePointersMade / $this->seasonDefenseTotalThreePointersAttempted), 3) : "0.000";
     }
 }

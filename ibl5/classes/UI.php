@@ -283,25 +283,25 @@ class UI
                 $playerNameDecorated = $player->name;
             }
     
-            @$stats_fgm = number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonFieldGoalsMade), 1);
-            @$stats_fga = number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonFieldGoalsAttempted), 1);
-            @$stats_fgp = number_format(($stats_fgm / $stats_fga), 3);
-            @$stats_ftm = number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonFreeThrowsMade), 1);
-            @$stats_fta = number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonFreeThrowsAttempted), 1);
-            @$stats_ftp = number_format(($stats_ftm / $stats_fta), 3);
-            @$stats_tgm = number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonThreePointersMade), 1);
-            @$stats_tga = number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonThreePointersAttempted), 1);
-            @$stats_tgp = number_format(($stats_tgm / $stats_tga), 3);
-            @$stats_mpg = number_format(($playerStats->seasonMinutes / $playerStats->seasonGamesPlayed), 1);
-            @$stats_per36Min = number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonMinutes), 1);
-            @$stats_opg = number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonOffensiveRebounds), 1);
-            @$stats_rpg = number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonTotalRebounds), 1);
-            @$stats_apg = number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonAssists), 1);
-            @$stats_spg = number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonSteals), 1);
-            @$stats_tpg = number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonTurnovers), 1);
-            @$stats_bpg = number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonBlocks), 1);
-            @$stats_fpg = number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonPersonalFouls), 1);
-            @$stats_ppg = number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonPoints), 1);
+            $stats_fgm = ($playerStats->seasonMinutes != 0) ? number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonFieldGoalsMade), 1) : "0.0";
+            $stats_fga = ($playerStats->seasonMinutes != 0) ? number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonFieldGoalsAttempted), 1) : "0.0";
+            $stats_fgp = ($stats_fga != 0) ? number_format(($stats_fgm / $stats_fga), 3) : "0.000";
+            $stats_ftm = ($playerStats->seasonMinutes != 0) ? number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonFreeThrowsMade), 1) : "0.0";
+            $stats_fta = ($playerStats->seasonMinutes != 0) ? number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonFreeThrowsAttempted), 1) : "0.0";
+            $stats_ftp = ($stats_fta != 0) ? number_format(($stats_ftm / $stats_fta), 3) : "0.000";
+            $stats_tgm = ($playerStats->seasonMinutes != 0) ? number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonThreePointersMade), 1) : "0.0";
+            $stats_tga = ($playerStats->seasonMinutes != 0) ? number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonThreePointersAttempted), 1) : "0.0";
+            $stats_tgp = ($stats_tga != 0) ? number_format(($stats_tgm / $stats_tga), 3) : "0.000";
+            $stats_mpg = ($playerStats->seasonMinutes != 0) ? number_format(($playerStats->seasonMinutes / $playerStats->seasonGamesPlayed), 1) : "0.0";
+            $stats_per36Min = ($playerStats->seasonMinutes != 0) ? number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonMinutes), 1) : "0.0";
+            $stats_opg = ($playerStats->seasonMinutes != 0) ? number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonOffensiveRebounds), 1) : "0.0";
+            $stats_rpg = ($playerStats->seasonMinutes != 0) ? number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonTotalRebounds), 1) : "0.0";
+            $stats_apg = ($playerStats->seasonMinutes != 0) ? number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonAssists), 1) : "0.0";
+            $stats_spg = ($playerStats->seasonMinutes != 0) ? number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonSteals), 1) : "0.0";
+            $stats_tpg = ($playerStats->seasonMinutes != 0) ? number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonTurnovers), 1) : "0.0";
+            $stats_bpg = ($playerStats->seasonMinutes != 0) ? number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonBlocks), 1) : "0.0";
+            $stats_fpg = ($playerStats->seasonMinutes != 0) ? number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonPersonalFouls), 1) : "0.0";
+            $stats_ppg = ($playerStats->seasonMinutes != 0) ? number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonPoints), 1) : "0.0";
         
             (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
         

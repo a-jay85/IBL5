@@ -61,7 +61,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     function links()
     {
         global $prefix, $db, $admin_file;
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         OpenTable();
         $ThemeSel = get_theme();
@@ -339,7 +339,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     function LinksModLink($lid)
     {
         global $prefix, $db, $admin_file, $bgcolor1, $bgcolor2, $sitename;
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         global $anonymous;
         $lid = intval($lid);
@@ -599,7 +599,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     function LinksEditBrokenLinks($lid)
     {
         global $prefix, $db, $admin_file;
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"option\"><b>" . _EZBROKENLINKS . "</b></font></center><br><br>";
@@ -652,7 +652,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     function LinksListBrokenLinks()
     {
         global $bgcolor1, $bgcolor2, $prefix, $db, $user_prefix, $admin_file;
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _WEBLINKSADMIN . "</b></font></center>";
@@ -746,7 +746,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     function LinksListModRequests()
     {
         global $bgcolor2, $prefix, $db, $user_prefix, $admin_file;
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _WEBLINKSADMIN . "</b></font></center>";
@@ -931,7 +931,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     function LinksModCat($cat)
     {
         global $prefix, $db, $admin_file;
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _WEBLINKSADMIN . "</b></font></center>";
@@ -1004,7 +1004,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     function LinksDelCat($cid, $sid, $sub, $ok = 0)
     {
         global $prefix, $db, $admin_file;
-        include "header.php";
+        NukeHeader::header();
         $cid = intval($cid);
         $sid = intval($sid);
         $sub = intval($sub);
@@ -1062,7 +1062,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
         $result = $db->sql_query("SELECT cid from " . $prefix . "_links_categories where title='$title'");
         $numrows = $db->sql_numrows($result);
         if ($numrows > 0) {
-            include "header.php";
+            NukeHeader::header();
             GraphicAdmin();
             OpenTable();
             echo "<br><center><font class=\"option\">"
@@ -1085,7 +1085,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
         $result = $db->sql_query("SELECT cid from " . $prefix . "_links_categories where title='$title' AND cid='$cid'");
         $numrows = $db->sql_numrows($result);
         if ($numrows > 0) {
-            include "header.php";
+            NukeHeader::header();
             GraphicAdmin();
             OpenTable();
             echo "<br><center>";
@@ -1106,7 +1106,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
         $editorialtext = filter($editorialtext, "", 1);
         $editorialtitle = filter($editorialtitle, "nohtml", 1);
         $db->sql_query("insert into " . $prefix . "_links_editorials values ('$linkid', '$aid', now(), '$editorialtext', '$editorialtitle')");
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><br>"
@@ -1126,7 +1126,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
         $editorialtitle = filter($editorialtitle, "nohtml", 1);
         $editorialtext = stripslashes(FixQuotes($editorialtext));
         $db->sql_query("update " . $prefix . "_links_editorials set editorialtext='$editorialtext', editorialtitle='$editorialtitle' where linkid='$linkid'");
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         OpenTable();
         echo "<br><center>"
@@ -1142,7 +1142,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
         global $prefix, $db, $admin_file;
         $linkid = intval($linkid);
         $db->sql_query("delete from " . $prefix . "_links_editorials where linkid='$linkid'");
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         OpenTable();
         echo "<br><center>"
@@ -1156,7 +1156,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     function LinksLinkCheck()
     {
         global $prefix, $db, $admin_file;
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _WEBLINKSADMIN . "</b></font></center>";
@@ -1185,7 +1185,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
         $cid = intval($cid);
         $sid = intval($sid);
         $title = filter($title, "nohtml");
-        include "header.php";
+        NukeHeader::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _WEBLINKSADMIN . "</b></font></center>";
@@ -1246,7 +1246,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
         $result = $db->sql_query("SELECT url from " . $prefix . "_links_links where url='$url'");
         $numrows = $db->sql_numrows($result);
         if ($numrows > 0) {
-            include "header.php";
+            NukeHeader::header();
             GraphicAdmin();
             OpenTable();
             echo "<center><font class=\"title\"><b>" . _WEBLINKSADMIN . "</b></font></center>";
@@ -1262,7 +1262,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
         } else {
             /* Check if Title exist */
             if (empty($title)) {
-                include "header.php";
+                NukeHeader::header();
                 GraphicAdmin();
                 OpenTable();
                 echo "<center><font class=\"title\"><b>" . _WEBLINKSADMIN . "</b></font></center>";
@@ -1278,7 +1278,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
             }
             /* Check if URL exist */
             if (empty($url)) {
-                include "header.php";
+                NukeHeader::header();
                 GraphicAdmin();
                 OpenTable();
                 echo "<center><font class=\"title\"><b>" . _WEBLINKSADMIN . "</b></font></center>";
@@ -1294,7 +1294,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
             }
             // Check if Description exist
             if (empty($description)) {
-                include "header.php";
+                NukeHeader::header();
                 GraphicAdmin();
                 OpenTable();
                 echo "<center><font class=\"title\"><b>" . _WEBLINKSADMIN . "</b></font></center>";
@@ -1314,7 +1314,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
             }
             $db->sql_query("insert into " . $prefix . "_links_links values (NULL, '$cat[0]', '$cat[1]', '$title', '$url', '$description', now(), '$name', '$email', '0', '$submitter', '0', '0', '0')");
             global $nukeurl, $sitename;
-            include "header.php";
+            NukeHeader::header();
             GraphicAdmin();
             OpenTable();
             echo "<br><center>";
@@ -1449,7 +1449,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     }
 
 } else {
-    include "header.php";
+    NukeHeader::header();
     GraphicAdmin();
     OpenTable();
     echo "<center><b>" . _ERROR . "</b><br><br>You do not have administration permission for module \"$module_name\"</center>";

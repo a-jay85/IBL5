@@ -530,8 +530,8 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
                 $sql5 = "SELECT sitename, headlinesurl FROM " . $prefix . "_headlines WHERE hid='$hid'";
                 $result5 = $db->sql_query($sql5);
                 $row5 = $db->sql_fetchrow($result5);
-                $nsitename = filter($row5[sitename], "nohtml");
-                $url = filter($row5[headlinesurl], "nohtml");
+                $nsitename = filter($row5['sitename'], "nohtml");
+                $url = filter($row5['headlinesurl'], "nohtml");
                 $title = filter($nsitename, "nohtml");
                 $siteurl = mb_eregi_replace("http://", "", $url);
                 $siteurl = explode("/", $siteurl);
@@ -828,10 +828,11 @@ function logout()
     cookiedecode($user);
     $r_uid = $cookie[0];
     $r_username = $cookie[1];
-    setcookie("user", false);
+    setcookie("user", false, time()-3600);
     $db->sql_query("DELETE FROM " . $prefix . "_session WHERE uname='$r_username'");
     $db->sql_query("DELETE FROM " . $prefix . "_bbsessions WHERE session_user_id='$r_uid'");
     $user = "";
+    $cookie = "";
     NukeHeader::header();
     OpenTable();
     if (!empty($redirect)) {

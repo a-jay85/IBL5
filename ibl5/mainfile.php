@@ -134,14 +134,13 @@ if (!function_exists('stripos')) {
     }
 }
 
-if (isset($admin) && $admin == $_COOKIE['admin']) {
-    $admin = base64_decode($admin);
+if (isset($_COOKIE['admin'])) {
+    $admin = base64_decode($_COOKIE['admin']);
     $admin = addslashes($admin);
     $admin = base64_encode($admin);
 }
-
-if (isset($user) && $user == $_COOKIE['user']) {
-    $user = base64_decode($user);
+if (isset($_COOKIE['user'])) {
+    $user = base64_decode($_COOKIE['user']);
     $user = addslashes($user);
     $user = base64_encode($user);
 }

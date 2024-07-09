@@ -134,7 +134,7 @@ function downloadinfomenu($lid)
 function index()
 {
     global $prefix, $db, $show_links_num, $module_name;
-    include "header.php";
+    NukeHeader::header();
     $maindownload = 0;
     menu($maindownload);
     echo "<br>";
@@ -206,7 +206,7 @@ function index()
 function AddDownload()
 {
     global $prefix, $db, $cookie, $user, $downloads_anonadddownloadlock, $module_name;
-    include "header.php";
+    NukeHeader::header();
     $maindownload = 1;
     menu(1);
     echo "<br>";
@@ -266,7 +266,7 @@ function Add($title, $url, $auth_name, $cat, $description, $email, $filesize, $v
     $result = $db->sql_query($sql);
     $numrows = $db->sql_numrows($result);
     if ($numrows > 0) {
-        include "header.php";
+        NukeHeader::header();
         menu(1);
         echo "<br>";
         OpenTable();
@@ -284,7 +284,7 @@ function Add($title, $url, $auth_name, $cat, $description, $email, $filesize, $v
         }
 // Check if Title exist
         if (empty($title)) {
-            include "header.php";
+            NukeHeader::header();
             menu(1);
             echo "<br>";
             OpenTable();
@@ -295,7 +295,7 @@ function Add($title, $url, $auth_name, $cat, $description, $email, $filesize, $v
         }
 // Check if URL exist
         if (empty($url)) {
-            include "header.php";
+            NukeHeader::header();
             menu(1);
             echo "<br>";
             OpenTable();
@@ -306,7 +306,7 @@ function Add($title, $url, $auth_name, $cat, $description, $email, $filesize, $v
         }
 // Check if Description exist
         if (empty($description)) {
-            include "header.php";
+            NukeHeader::header();
             menu(1);
             echo "<br>";
             OpenTable();
@@ -334,7 +334,7 @@ function Add($title, $url, $auth_name, $cat, $description, $email, $filesize, $v
         if ($num_new == 0) {
             $db->sql_query("INSERT INTO " . $prefix . "_downloads_newdownload VALUES (NULL, '$cat[0]', '$cat[1]', '" . addslashes($title) . "', '" . addslashes($url) . "', '" . addslashes($description) . "', '" . addslashes($auth_name) . "', '" . addslashes($email) . "', '" . addslashes($submitter) . "', '" . addslashes($filesize) . "', '" . addslashes($version) . "', '" . addslashes($homepage) . "')");
         }
-        include "header.php";
+        NukeHeader::header();
         menu(1);
         echo "<br>";
         OpenTable();
@@ -350,7 +350,7 @@ function Add($title, $url, $auth_name, $cat, $description, $email, $filesize, $v
 function NewDownloads($newdownloadshowdays)
 {
     global $prefix, $db, $module_name;
-    include "header.php";
+    NukeHeader::header();
     $newdownloadshowdays = intval(trim($newdownloadshowdays));
     menu(1);
     echo "<br>";
@@ -406,7 +406,7 @@ function NewDownloadsDate($selectdate)
     global $prefix, $db, $module_name, $admin, $user, $admin_file, $datetime, $transfertitle, $locale;
     $dateDB = (date("d-M-Y", $selectdate));
     $dateView = (date("F d, Y", $selectdate));
-    include "header.php";
+    NukeHeader::header();
     menu(1);
     echo "<br>";
     OpenTable();
@@ -488,7 +488,7 @@ function NewDownloadsDate($selectdate)
 function TopRated($ratenum, $ratetype)
 {
     global $prefix, $db, $admin, $module_name, $user, $admin_file, $datetime, $transfertitle, $locale;
-    include "header.php";
+    NukeHeader::header();
     include "modules/$module_name/d_config.php";
     menu(1);
     echo "<br>";
@@ -597,7 +597,7 @@ function TopRated($ratenum, $ratetype)
 function MostPopular($ratenum, $ratetype)
 {
     global $prefix, $db, $admin, $module_name, $user, $admin_file, $datetime, $transfertitle, $locale;
-    include "header.php";
+    NukeHeader::header();
     include "modules/$module_name/d_config.php";
     menu(1);
     echo "<br>";
@@ -700,7 +700,7 @@ function MostPopular($ratenum, $ratetype)
 function viewdownload($cid, $min, $orderby, $show)
 {
     global $prefix, $db, $admin, $perpage, $module_name, $user, $admin_file, $mainvotedecimal, $datetime, $transfertitle, $locale;
-    include "header.php";
+    NukeHeader::header();
     if (!isset($min)) {
         $min = 0;
     }
@@ -894,7 +894,7 @@ function viewsdownload($sid, $min, $orderby, $show)
 {
     global $prefix, $db, $admin, $module_name, $user, $admin_file, $datetime, $transfertitle, $locale;
     include "modules/$module_name/d_config.php";
-    include "header.php";
+    NukeHeader::header();
     $sid = intval($sid);
     menu(1);
     if (!isset($min)) {
@@ -1287,7 +1287,7 @@ function search($query, $min, $orderby, $show)
 {
     global $prefix, $db, $admin, $bgcolor2, $module_name, $admin_file, $datetime, $transfertitle, $locale;
     include "modules/$module_name/d_config.php";
-    include "header.php";
+    NukeHeader::header();
     if (!isset($min)) {
         $min = 0;
     }
@@ -1475,7 +1475,7 @@ function search($query, $min, $orderby, $show)
 function viewdownloadeditorial($lid)
 {
     global $prefix, $db, $admin, $module_name;
-    include "header.php";
+    NukeHeader::header();
     include "modules/$module_name/d_config.php";
     menu(1);
     $row = $db->sql_fetchrow($db->sql_query("SELECT title FROM " . $prefix . "_downloads_downloads WHERE lid='$lid'"));
@@ -1534,7 +1534,7 @@ function detecteditorial($lid, $img)
 function viewdownloadcomments($lid)
 {
     global $prefix, $db, $admin, $bgcolor2, $module_name, $admin_file;
-    include "header.php";
+    NukeHeader::header();
     include "modules/$module_name/d_config.php";
     menu(1);
     $row = $db->sql_fetchrow($db->sql_query("SELECT title FROM " . $prefix . "_downloads_downloads WHERE lid='$lid'"));
@@ -1608,7 +1608,7 @@ function viewdownloadcomments($lid)
 function viewdownloaddetails($lid)
 {
     global $prefix, $db, $admin, $bgcolor1, $bgcolor2, $bgcolor3, $bgcolor4, $module_name, $anonymous;
-    include "header.php";
+    NukeHeader::header();
     include "modules/$module_name/d_config.php";
     menu(1);
     $lid = intval($lid);
@@ -2081,7 +2081,7 @@ function outsidedownloadsetup($lid)
 {
     global $module_name, $sitename, $nukeurl;
     $lid = intval($lid);
-    include "header.php";
+    NukeHeader::header();
     include "modules/$module_name/d_config.php";
     menu(1);
     echo "<br>";
@@ -2198,7 +2198,7 @@ function brokendownload($lid)
 {
     global $prefix, $db, $user, $cookie, $module_name;
     if (is_user($user)) {
-        include "header.php";
+        NukeHeader::header();
         include "modules/$module_name/d_config.php";
         $user2 = base64_decode($user);
         $user2 = addslashes($user2);
@@ -2233,7 +2233,7 @@ function brokendownloadS($lid, $modifysubmitter)
         $ratinguser = $cookie[1];
         $lid = intval($lid);
         $db->sql_query("insert into " . $prefix . "_downloads_modrequest values (NULL, '$lid', '0', '0', '', '', '', '" . addslashes($ratinguser) . "', '1', '" . addslashes($auth_name) . "', '" . addslashes($email) . "', '" . addslashes($filesize) . "', '" . addslashes($version) . "', '" . addslashes($homepage) . "')");
-        include "header.php";
+        NukeHeader::header();
         menu(1);
         echo "<br>";
         OpenTable();
@@ -2248,7 +2248,7 @@ function brokendownloadS($lid, $modifysubmitter)
 function modifydownloadrequest($lid)
 {
     global $prefix, $db, $user, $module_name;
-    include "header.php";
+    NukeHeader::header();
     include "modules/$module_name/d_config.php";
     if (is_user($user)) {
         $user2 = base64_decode($user);
@@ -2332,7 +2332,7 @@ function modifydownloadrequestS($lid, $cat, $title, $url, $description, $modifys
     }
     $blocknow = 0;
     if ($blockunregmodify == 1 && $ratinguser == "$anonymous") {
-        include "header.php";
+        NukeHeader::header();
         menu(1);
         echo "<br>";
         OpenTable();
@@ -2353,7 +2353,7 @@ function modifydownloadrequestS($lid, $cat, $title, $url, $description, $modifys
         $cat[0] = intval($cat[0]);
         $cat[1] = intval($cat[1]);
         $db->sql_query("insert into " . $prefix . "_downloads_modrequest values (NULL, '$lid', '$cat[0]', '$cat[1]', '" . addslashes($title) . "', '" . addslashes($url) . "', '" . addslashes($description) . "', '" . addslashes($ratinguser) . "', '0', '" . addslashes($auth_name) . "', '" . addslashes($email) . "', '" . addslashes($filesize) . "', '" . addslashes($version) . "', '" . addslashes($homepage) . "')");
-        include "header.php";
+        NukeHeader::header();
         menu(1);
         echo "<br>";
         OpenTable();
@@ -2377,7 +2377,7 @@ function addrating($ratinglid, $ratinguser, $rating, $ratinghost_name, $ratingco
 {
     global $prefix, $db, $cookie, $user, $module_name;
     $passtest = "yes";
-    include "header.php";
+    NukeHeader::header();
     include "modules/$module_name/d_config.php";
     $ratinglid = intval($ratinglid);
     completevoteheader();
@@ -2551,7 +2551,7 @@ function completevote($error)
 function ratedownload($lid, $user)
 {
     global $prefix, $cookie, $datetime, $module_name, $user_prefix;
-    include "header.php";
+    NukeHeader::header();
     menu(1);
     $row = $db->sql_fetchrow($db->sql_query("SELECT title FROM " . $prefix . "_downloads_downloads WHERE lid='$lid'"));
     $displaytitle = filter($row['title'], "nohtml");

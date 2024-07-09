@@ -79,7 +79,7 @@ function userCheck($username, $user_email)
 function confirmNewUser($username, $user_email, $user_password, $user_password2, $random_num, $gfx_check)
 {
     global $stop, $EditedMessage, $sitename, $module_name, $minpass;
-    include "header.php";
+    NukeHeader::header();
     include "config.php";
     $username = substr(htmlspecialchars(str_replace("\'", "'", trim($username))), 0, 25);
     $username = rtrim($username, "\\");
@@ -148,7 +148,7 @@ function confirmNewUser($username, $user_email, $user_password, $user_password2,
 function finishNewUser($username, $user_email, $user_password, $random_num, $gfx_check)
 {
     global $stop, $EditedMessage, $adminmail, $sitename, $Default_Theme, $user_prefix, $db, $storyhome, $module_name, $nukeurl;
-    include "header.php";
+    NukeHeader::header();
     include "config.php";
     userCheck($username, $user_email);
     $user_email = validate_mail($user_email);
@@ -219,7 +219,7 @@ function activate($username, $check_num)
             $group_id = $db->sql_nextid();
             $db->sql_query("INSERT INTO " . $prefix . "_bbuser_group (user_id, group_id, user_pending) VALUES ('$guserid', '$group_id', '0')");
             $db->sql_query("DELETE FROM " . $user_prefix . "_users_temp WHERE username='$username' AND check_num='$check_num'");
-            include "header.php";
+            NukeHeader::header();
             title("" . _ACTIVATIONYES . "");
             OpenTable();
             echo "<center><b>" . $row['username'] . ":</b> " . _ACTMSG . "</center>";
@@ -227,7 +227,7 @@ function activate($username, $check_num)
             include "footer.php";
             die();
         } else {
-            include "header.php";
+            NukeHeader::header();
             title("" . _ACTIVATIONERROR . "");
             OpenTable();
             echo "<center>" . _ACTERROR1 . "</center>";
@@ -236,7 +236,7 @@ function activate($username, $check_num)
             die();
         }
     } else {
-        include "header.php";
+        NukeHeader::header();
         title("" . _ACTIVATIONERROR . "");
         OpenTable();
         echo "<center>" . _ACTERROR2 . "</center>";
@@ -270,7 +270,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
         cookiedecode($user);
     }
 
-    include "header.php";
+    NukeHeader::header();
     OpenTable();
     echo "<center>";
     if ($username != '') // SecurityReason.com Fix 2005 [sp3x]
@@ -663,7 +663,7 @@ function main($user)
 {
     global $stop, $module_name, $redirect, $mode, $t, $f, $gfx_chk;
     if (!is_user($user)) {
-        include "header.php";
+        NukeHeader::header();
         if ($stop) {
             OpenTable();
             echo "<center><font class=\"title\"><b>" . _LOGININCOR . "</b></font></center>\n";
@@ -714,7 +714,7 @@ function new_user()
         mt_srand((double) microtime() * 1000000);
         $maxran = 1000000;
         $random_num = mt_rand(0, $maxran);
-        include "header.php";
+        NukeHeader::header();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _USERREGLOGIN . "</b></font></center>\n";
         CloseTable();
@@ -798,7 +798,7 @@ function pass_lost()
 {
     global $user, $module_name;
     if (!is_user($user)) {
-        include "header.php";
+        NukeHeader::header();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _USERREGLOGIN . "</b></font></center>\n";
         CloseTable();
@@ -832,7 +832,7 @@ function logout()
     $db->sql_query("DELETE FROM " . $prefix . "_session WHERE uname='$r_username'");
     $db->sql_query("DELETE FROM " . $prefix . "_bbsessions WHERE session_user_id='$r_uid'");
     $user = "";
-    include "header.php";
+    NukeHeader::header();
     OpenTable();
     if (!empty($redirect)) {
         echo "<META HTTP-EQUIV=\"refresh\" content=\"3;URL=modules.php?name=$redirect\">";
@@ -853,7 +853,7 @@ function mail_password($username, $code)
     $sql = "SELECT user_email, user_password FROM " . $user_prefix . "_users WHERE username='$username'";
     $result = $db->sql_query($sql);
     if ($db->sql_numrows($result) == 0) {
-        include "header.php";
+        NukeHeader::header();
         OpenTable();
         echo "<center>" . _SORRYNOUSERINFO . "</center>";
         CloseTable();
@@ -876,7 +876,7 @@ function mail_password($username, $code)
             if (!$db->sql_query($query)) {
                 echo "" . _UPDATEFAILED . "";
             }
-            include "header.php";
+            NukeHeader::header();
             OpenTable();
             echo "<center>" . _PASSWORD4 . " $username " . _MAILED . "<br><br>" . _GOBACK . "</center>";
             CloseTable();
@@ -886,7 +886,7 @@ function mail_password($username, $code)
             $sql = "SELECT user_email, user_password FROM " . $user_prefix . "_users WHERE username='$username'";
             $result = $db->sql_query($sql);
             if ($db->sql_numrows($result) == 0) {
-                include "header.php";
+                NukeHeader::header();
                 OpenTable();
                 echo "<center>" . _SORRYNOUSERINFO . "</center>";
                 CloseTable();
@@ -900,7 +900,7 @@ function mail_password($username, $code)
                 $message = "" . _USERACCOUNT . " '$username' " . _AT . " $sitename " . _HASTHISEMAIL . " " . _AWEBUSERFROM . " $host_name " . _CODEREQUESTED . "\n\n" . _YOURCODEIS . " $areyou \n\n" . _WITHTHISCODE . " $nukeurl/modules.php?name=$module_name&op=pass_lost\n" . _IFYOUDIDNOTASK2 . "";
                 $subject = "" . _CODEFOR . " $username";
                 mail($user_email, $subject, $message, "From: $adminmail\nX-Mailer: PHP/" . phpversion());
-                include "header.php";
+                NukeHeader::header();
                 OpenTable();
                 echo "<center>" . _CODEFOR . " $username " . _MAILED . "<br><br>" . _GOBACK . "</center>";
                 CloseTable();
@@ -980,7 +980,7 @@ function edituser()
     cookiedecode($user);
     getusrinfo($user);
     if ((is_user($user)) and (strtolower($userinfo['username']) == strtolower($cookie[1])) and ($userinfo['user_password'] == $cookie[2])) {
-        include "header.php";
+        NukeHeader::header();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _PERSONALINFO . "</b></font></center>";
         CloseTable();
@@ -1328,7 +1328,7 @@ function edithome()
     cookiedecode($user);
     getusrinfo($user);
     if ((is_user($user)) and (strtolower($userinfo['username']) == strtolower($cookie[1])) and ($userinfo['user_password'] == $cookie[2])) {
-        include "header.php";
+        NukeHeader::header();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _HOMECONFIG . "</b></font></center>";
         CloseTable();
@@ -1394,7 +1394,7 @@ function chgtheme()
             Header("Location: modules.php?name=$module_name");
             die();
         }
-        include "header.php";
+        NukeHeader::header();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _THEMESELECTION . "</b></font></center>";
         CloseTable();
@@ -1508,7 +1508,7 @@ function editcomm()
     cookiedecode($user);
     getusrinfo($user);
     if ((is_user($user)) and (strtolower($userinfo['username']) == strtolower($cookie[1])) and ($userinfo['user_password'] == $cookie[2])) {
-        include "header.php";
+        NukeHeader::header();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _COMMENTSCONFIG . "</b></font></center>";
         CloseTable();
@@ -1598,7 +1598,7 @@ function avatarlist($avatarcategory)
     global $user, $userinfo, $cookie, $module_name;
     cookiedecode($user);
     getusrinfo($user);
-    include "header.php";
+    NukeHeader::header();
     if ((is_user($user)) and (strtolower($userinfo['username']) == strtolower($cookie[1])) and ($userinfo['user_password'] == $cookie[2])) { // SecurityReason Fix 2005 - sp3x -> check if we are user if not then Access Denied
         $avatarcatname = ereg_replace("_", "&nbsp;", $avatarcategory);
         $avatarcategory = htmlspecialchars($avatarcategory); //SecurityReason Fix 2005 - sp3x
@@ -1667,7 +1667,7 @@ function avatarsave($avatar, $category)
     if (is_user($user) and $allow_avatar_local) {
         getusrinfo($user);
         cookiedecode($user);
-        include "header.php";
+        NukeHeader::header();
         title("Avatar Selection Successful!");
         OpenTable();
         nav();
@@ -1698,7 +1698,7 @@ function avatarlinksave($avatar)
     if (is_user($user) and $allow_avatar_remote) {
         getusrinfo($user);
         cookiedecode($user);
-        include "header.php";
+        NukeHeader::header();
         title("Avatar Selection Successful!");
         OpenTable();
         nav();
@@ -1732,7 +1732,7 @@ function broadcast($the_message, $who)
         $who = $cookie[1];
         $the_message = filter($the_message, "nohtml", 1);
         if ($broadcast_msg == 1) {
-            include "header.php";
+            NukeHeader::header();
             title("" . _BROADCAST . "");
             OpenTable();
             $numrows = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_public_messages WHERE who='$who'"));

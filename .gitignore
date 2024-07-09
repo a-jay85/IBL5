@@ -1,8 +1,10 @@
 .DS_Store
 .env
 .ftpquota
+.vscode
 error_log
 node_modules
+nohup.out
 /phpmyadmin
 
 config.json
@@ -13,4 +15,5 @@ Discord.php
 
 backups
 depthcharts
+/ibl/IBL/
 /ibl5/joe/ibl_draft/includes/classes/Discord.php

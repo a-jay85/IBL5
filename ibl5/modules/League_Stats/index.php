@@ -182,23 +182,23 @@ foreach ($resultAllTeams as $teamRow) {
     $t++;
 }
 
-@$leagueOffenseFieldGoalsMadePerGame = number_format($leagueOffenseTotalFieldGoalsMade / $leagueOffenseGamesPlayed, 1);
-@$leagueOffenseFieldGoalsAttemptedPerGame = number_format($leagueOffenseTotalFieldGoalsAttempted / $leagueOffenseGamesPlayed, 1);
-@$leagueOffenseFieldGoalPercentage = number_format($leagueOffenseTotalFieldGoalsMade / $leagueOffenseTotalFieldGoalsAttempted, 3);
-@$leagueOffenseFreeThrowsMadePerGame = number_format($leagueOffenseTotalFreeThrowsMade / $leagueOffenseGamesPlayed, 1);
-@$leagueOffenseFreeThrowsAttemptedPerGame = number_format($leagueOffenseTotalFreeThrowsAttempted / $leagueOffenseGamesPlayed, 1);
-@$leagueOffenseFreeThrowPercentage = number_format($leagueOffenseTotalFreeThrowsMade / $leagueOffenseTotalFreeThrowsAttempted, 3);
-@$leagueOffenseThreePointersMadePerGame = number_format($leagueOffenseTotalThreePointersMade / $leagueOffenseGamesPlayed, 1);
-@$leagueOffenseThreePointersAttemptedPerGame = number_format($leagueOffenseTotalThreePointersAttempted / $leagueOffenseGamesPlayed, 1);
-@$leagueOffenseThreePointPercentage = number_format($leagueOffenseTotalThreePointersMade / $leagueOffenseTotalThreePointersAttempted, 3);
-@$leagueOffenseOffensiveReboundsPerGame = number_format($leagueOffenseTotalOffensiveRebounds / $leagueOffenseGamesPlayed, 1);
-@$leagueOffenseTotalReboundsPerGame = number_format($leagueOffenseTotalRebounds / $leagueOffenseGamesPlayed, 1);
-@$leagueOffenseAssistsPerGame = number_format($leagueOffenseTotalAssists / $leagueOffenseGamesPlayed, 1);
-@$leagueOffenseStealsPerGame = number_format($leagueOffenseTotalSteals / $leagueOffenseGamesPlayed, 1);
-@$leagueOffenseTurnoversPerGame = number_format($leagueOffenseTotalTurnovers / $leagueOffenseGamesPlayed, 1);
-@$leagueOffenseBlocksPerGame = number_format($leagueOffenseTotalBlocks / $leagueOffenseGamesPlayed, 1);
-@$leagueOffensePersonalFoulsPerGame = number_format($leagueOffenseTotalPersonalFouls / $leagueOffenseGamesPlayed, 1);
-@$leagueOffensePointsPerGame = number_format($leagueOffenseTotalPoints / $leagueOffenseGamesPlayed, 1);
+$leagueOffenseFieldGoalsMadePerGame = ($leagueOffenseGamesPlayed != 0) ? number_format($leagueOffenseTotalFieldGoalsMade / $leagueOffenseGamesPlayed, 1) : "0.0";
+$leagueOffenseFieldGoalsAttemptedPerGame = ($leagueOffenseGamesPlayed != 0) ? number_format($leagueOffenseTotalFieldGoalsAttempted / $leagueOffenseGamesPlayed, 1) : "0.0";
+$leagueOffenseFieldGoalPercentage = ($leagueOffenseGamesPlayed != 0) ? number_format($leagueOffenseTotalFieldGoalsMade / $leagueOffenseTotalFieldGoalsAttempted, 3) : "0.00";
+$leagueOffenseFreeThrowsMadePerGame = ($leagueOffenseGamesPlayed != 0) ? number_format($leagueOffenseTotalFreeThrowsMade / $leagueOffenseGamesPlayed, 1) : "0.0";
+$leagueOffenseFreeThrowsAttemptedPerGame = ($leagueOffenseGamesPlayed != 0) ? number_format($leagueOffenseTotalFreeThrowsAttempted / $leagueOffenseGamesPlayed, 1) : "0.0";
+$leagueOffenseFreeThrowPercentage = ($leagueOffenseGamesPlayed != 0) ? number_format($leagueOffenseTotalFreeThrowsMade / $leagueOffenseTotalFreeThrowsAttempted, 3) : "0.00";
+$leagueOffenseThreePointersMadePerGame = ($leagueOffenseGamesPlayed != 0) ? number_format($leagueOffenseTotalThreePointersMade / $leagueOffenseGamesPlayed, 1) : "0.0";
+$leagueOffenseThreePointersAttemptedPerGame = ($leagueOffenseGamesPlayed != 0) ? number_format($leagueOffenseTotalThreePointersAttempted / $leagueOffenseGamesPlayed, 1) : "0.0";
+$leagueOffenseThreePointPercentage = ($leagueOffenseGamesPlayed != 0) ? number_format($leagueOffenseTotalThreePointersMade / $leagueOffenseTotalThreePointersAttempted, 3) : "0.00";
+$leagueOffenseOffensiveReboundsPerGame = ($leagueOffenseGamesPlayed != 0) ? number_format($leagueOffenseTotalOffensiveRebounds / $leagueOffenseGamesPlayed, 1) : "0.0";
+$leagueOffenseTotalReboundsPerGame = ($leagueOffenseGamesPlayed != 0) ? number_format($leagueOffenseTotalRebounds / $leagueOffenseGamesPlayed, 1) : "0.0";
+$leagueOffenseAssistsPerGame = ($leagueOffenseGamesPlayed != 0) ? number_format($leagueOffenseTotalAssists / $leagueOffenseGamesPlayed, 1) : "0.0";
+$leagueOffenseStealsPerGame = ($leagueOffenseGamesPlayed != 0) ? number_format($leagueOffenseTotalSteals / $leagueOffenseGamesPlayed, 1) : "0.0";
+$leagueOffenseTurnoversPerGame = ($leagueOffenseGamesPlayed != 0) ? number_format($leagueOffenseTotalTurnovers / $leagueOffenseGamesPlayed, 1) : "0.0";
+$leagueOffenseBlocksPerGame = ($leagueOffenseGamesPlayed != 0) ? number_format($leagueOffenseTotalBlocks / $leagueOffenseGamesPlayed, 1) : "0.0";
+$leagueOffensePersonalFoulsPerGame = ($leagueOffenseGamesPlayed != 0) ? number_format($leagueOffenseTotalPersonalFouls / $leagueOffenseGamesPlayed, 1) : "0.0";
+$leagueOffensePointsPerGame = ($leagueOffenseGamesPlayed != 0) ? number_format($leagueOffenseTotalPoints / $leagueOffenseGamesPlayed, 1) : "0.0";
 
 $league_totals = "<tr style=\"font-weight:bold\">
     <td>LEAGUE TOTALS</td>

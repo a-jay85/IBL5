@@ -25,7 +25,7 @@
 if (!mb_eregi("index.php|modules.php", $_SERVER['PHP_SELF'])) {
     die("Access Denied");
 }
-include "header.php";
+NukeHeader::header();
 
 OpenTable();
 

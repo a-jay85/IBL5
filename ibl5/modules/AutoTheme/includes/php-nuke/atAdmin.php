@@ -35,7 +35,7 @@ function atPlatformAdminInit()
 
 function atAdminHeader($title = "")
 {
-    include "header.php";
+    NukeHeader::header();
     $adminlinks = "admin.php?module=AutoTheme";
     atAdminOpenTable();
     atAdminOpenTable();

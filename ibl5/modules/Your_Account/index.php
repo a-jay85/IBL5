@@ -828,7 +828,7 @@ function logout()
     cookiedecode($user);
     $r_uid = $cookie[0];
     $r_username = $cookie[1];
-    setcookie("user", false, time()-3600);
+    setcookie("user", false, 1);
     $db->sql_query("DELETE FROM " . $prefix . "_session WHERE uname='$r_username'");
     $db->sql_query("DELETE FROM " . $prefix . "_bbsessions WHERE session_user_id='$r_uid'");
     $user = "";

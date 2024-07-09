@@ -521,7 +521,7 @@ function team_info_right($team)
 
         $h++;
     }
-    @$wlpct = number_format($wintot / ($wintot + $lostot), 3);
+    $wlpct = ($wintot + $lostot != 0) ? number_format($wintot / ($wintot + $lostot), 3) : "0.000";
 
     $output .= "</div></td></tr>
 		<tr><td><b>Totals:</b> $wintot - $lostot ($wlpct)</td></tr>";
@@ -550,7 +550,7 @@ function team_info_right($team)
 
         $h++;
     }
-    @$wlpct = number_format($wintot / ($wintot + $lostot), 3);
+    $wlpct = ($wintot + $lostot != 0) ? number_format($wintot / ($wintot + $lostot), 3) : "0.000";
 
     $output .= "</div></td></tr>
 		<tr><td><b>Totals:</b> $wintot - $lostot ($wlpct)</td></tr>";
@@ -662,18 +662,18 @@ function team_info_right($team)
         $pp++;
     }
 
-    @$pwlpct = number_format($totalplayoffwins / ($totalplayoffwins + $totalplayofflosses), 3);
-    @$r1wlpct = number_format($first_round_victories / ($first_round_victories + $first_round_losses), 3);
-    @$r2wlpct = number_format($second_round_victories / ($second_round_victories + $second_round_losses), 3);
-    @$r3wlpct = number_format($third_round_victories / ($third_round_victories + $third_round_losses), 3);
-    @$r4wlpct = number_format($fourth_round_victories / ($fourth_round_victories + $fourth_round_losses), 3);
+    $pwlpct = ($totalplayoffwins + $totalplayofflosses != 0) ? number_format($totalplayoffwins / ($totalplayoffwins + $totalplayofflosses), 3) : "0.000";
+    $r1wlpct = ($first_round_victories + $first_round_losses != 0) ? number_format($first_round_victories / ($first_round_victories + $first_round_losses), 3) : "0.000";
+    $r2wlpct = ($second_round_victories + $second_round_losses != 0) ? number_format($second_round_victories / ($second_round_victories + $second_round_losses), 3) : "0.000";
+    $r3wlpct = ($third_round_victories + $third_round_losses) ? number_format($third_round_victories / ($third_round_victories + $third_round_losses), 3) : "0.000";
+    $r4wlpct = ($fourth_round_victories + $fourth_round_losses) ? number_format($fourth_round_victories / ($fourth_round_victories + $fourth_round_losses), 3) : "0.000";
     $round_victories = $first_round_victories + $second_round_victories + $third_round_victories + $fourth_round_victories;
     $round_losses = $first_round_losses + $second_round_losses + $third_round_losses + $fourth_round_losses;
-    @$swlpct = number_format($round_victories / ($round_victories + $round_losses), 3);
-    @$firstpct = number_format($first_wins / ($first_wins + $first_losses), 3);
-    @$secondpct = number_format($second_wins / ($second_wins + $second_losses), 3);
-    @$thirdpct = number_format($third_wins / ($third_wins + $third_losses), 3);
-    @$fourthpct = number_format($fourth_wins / ($fourth_wins + $fourth_losses), 3);
+    $swlpct = ($round_victories + $round_losses) ? number_format($round_victories / ($round_victories + $round_losses), 3) : "0.000";
+    $firstpct = ($first_wins + $first_losses) ? number_format($first_wins / ($first_wins + $first_losses), 3) : "0.000";
+    $secondpct = ($second_wins + $second_losses) ? number_format($second_wins / ($second_wins + $second_losses), 3) : "0.000";
+    $thirdpct = ($third_wins + $third_losses) ? number_format($third_wins / ($third_wins + $third_losses), 3) : "0.000";
+    $fourthpct = ($fourth_wins + $fourth_losses) ? number_format($fourth_wins / ($fourth_wins + $fourth_losses), 3) : "0.000";
 
     if ($round_one_output != "") {
         $output .= "<tr bgcolor=\"#$team->color1\"><td align=center><font color=\"#$team->color2\"><b>First-Round Playoff Results</b></font></td></tr>

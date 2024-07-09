@@ -310,7 +310,7 @@ $start_time = $mtime;
 $pagetitle = "";
 
 // Error reporting, to be set in config.php
-error_reporting(E_ALL ^ E_NOTICE);
+error_reporting(E_ERROR);
 if ($display_errors == 1) {
     @ini_set('display_errors', 1);
 } else {

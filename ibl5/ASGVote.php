@@ -122,7 +122,7 @@ else if (count($_POST['ECF']) > 4) {
     WHERE team_name = '$Team_Name'";
 
     if ($db->sql_query($queryUpdateVotes)) {
-        echo "</font><b>Thank you for voting - the $Team_Name vote has been recorded!</b><p>
+        echo "</font><b>Thank you for voting - the $Team_Name vote has been recorded!</b><p>";
 
         $queryUpdateASGVoteSubmissionTime = "UPDATE ibl_team_history SET asg_vote = NOW() + INTERVAL 2 HOUR WHERE team_name = '$Team_Name'";
         $resultUpdateASGVoteSubmissionTime = $db->sql_query($queryUpdateASGVoteSubmissionTime);

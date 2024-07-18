@@ -24,7 +24,29 @@ $WCB2 = $_POST['WCB'][1];
 $WCB3 = $_POST['WCB'][2];
 $WCB4 = $_POST['WCB'][3];
 
+echo "
+        Eastern Frontcourt Player: $ECF1<br>
+        Eastern Frontcourt Player: $ECF2<br>
+        Eastern Frontcourt Player: $ECF3<br>
+        Eastern Frontcourt Player: $ECF4<br>
+        <br>
+        Eastern Backcourt Player: $ECB1<br>
+        Eastern Backcourt Player: $ECB2<br>
+        Eastern Backcourt Player: $ECB3<br>
+        Eastern Backcourt Player: $ECB4<br>
+        <br>
+        Western Frontcourt Player: $WCF1<br>
+        Western Frontcourt Player: $WCF2<br>
+        Western Frontcourt Player: $WCF3<br>
+        Western Frontcourt Player: $WCF4<br>
+        <br>
+        Western Backcourt Player: $WCB1<br>
+        Western Backcourt Player: $WCB2<br>
+        Western Backcourt Player: $WCB3<br>
+        Western Backcourt Player: $WCB4";
+
 // VOTING FOR OWN PLAYERS
+echo "<font color=red>";
 if (strpos($WCF1, $Team_Name) !== false) {
     echo "Sorry, you cannot vote for your own player (Frontcourt: $WCF1).<p>Please go back, unselect that player, select a different player not on your team, and try again.<br>";
 } else if (strpos($WCF2, $Team_Name) !== false) {
@@ -100,27 +122,7 @@ else if (count($_POST['ECF']) > 4) {
     WHERE team_name = '$Team_Name'";
 
     if ($db->sql_query($queryUpdateVotes)) {
-        echo "The $Team_Name vote has been recorded.<p>
-
-        Eastern Frontcourt Player: $ECF1<br>
-        Eastern Frontcourt Player: $ECF2<br>
-        Eastern Frontcourt Player: $ECF3<br>
-        Eastern Frontcourt Player: $ECF4<br>
-        <br>
-        Eastern Backcourt Player: $ECB1<br>
-        Eastern Backcourt Player: $ECB2<br>
-        Eastern Backcourt Player: $ECB3<br>
-        Eastern Backcourt Player: $ECB4<br>
-        <br>
-        Western Frontcourt Player: $WCF1<br>
-        Western Frontcourt Player: $WCF2<br>
-        Western Frontcourt Player: $WCF3<br>
-        Western Frontcourt Player: $WCF4<br>
-        <br>
-        Western Backcourt Player: $WCB1<br>
-        Western Backcourt Player: $WCB2<br>
-        Western Backcourt Player: $WCB3<br>
-        Western Backcourt Player: $WCB4";
+        echo "</font><b>Thank you for voting - the $Team_Name vote has been recorded!</b><p>
 
         $queryUpdateASGVoteSubmissionTime = "UPDATE ibl_team_history SET asg_vote = NOW() + INTERVAL 2 HOUR WHERE team_name = '$Team_Name'";
         $resultUpdateASGVoteSubmissionTime = $db->sql_query($queryUpdateASGVoteSubmissionTime);

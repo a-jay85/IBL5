@@ -20,6 +20,21 @@ $GM1 = $_POST['GM'][1];
 $GM2 = $_POST['GM'][2];
 $GM3 = $_POST['GM'][3];
 
+echo "
+    MVP Choice 1: $MVP1<br>
+    MVP Choice 2: $MVP2<br>
+    MVP Choice 3: $MVP3<br><br>
+    6th Man Choice 1: $Six1<br>
+    6th Man Choice 2: $Six2<br>
+    6th Man Choice 3: $Six3<br><br>
+    ROY Choice 1: $ROY1<br>
+    ROY Choice 2: $ROY2<br>
+    ROY Choice 3: $ROY3<br><br>
+    GM Choice 1: $GM1<br>
+    GM Choice 2: $GM2<br>
+    GM Choice 3: $GM3<br><br>";
+
+echo "<font color=red>";
 if (strpos($MVP1, $Team_Name) !== false) {
     echo "Sorry, you cannot vote for your own player. Try again.<br>";
 } else if (strpos($MVP2, $Team_Name) !== false) {
@@ -93,22 +108,7 @@ if (strpos($MVP1, $Team_Name) !== false) {
 } else if ($GM2 == $GM3) {
     echo "Sorry, you have selected the same player for multiple GM of the Year slots. Try again.<br>";
 } else {
-    echo "Thank you for voting. The $Team_Name vote has been recorded.</br><br>
-
-MVP Choice 1: $MVP1<br>
-MVP Choice 2: $MVP2<br>
-MVP Choice 3: $MVP3<br><br>
-6th Man Choice 1: $Six1<br>
-6th Man Choice 2: $Six2<br>
-6th Man Choice 3: $Six3<br><br>
-ROY Choice 1: $ROY1<br>
-ROY Choice 2: $ROY2<br>
-ROY Choice 3: $ROY3<br><br>
-GM Choice 1: $GM1<br>
-GM Choice 2: $GM2<br>
-GM Choice 3: $GM3<br><br>
-
-";
+    echo "</font><b>Thank you for voting - the $Team_Name vote has been recorded!<b>";
 
 // ==== UPDATE SELECTED VOTES IN DATABASE ====
 

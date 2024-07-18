@@ -24,6 +24,13 @@ if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
+if (!function_exists('str_contains')) {
+    function str_contains($haystack, $needle)
+    {
+        return $needle !== '' && mb_strpos($haystack, $needle) !== false;
+    }
+}
+
 function userinfo($username)
 {
     global $prefix, $db;
@@ -129,13 +136,6 @@ function userinfo($username)
             (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
 
             $output .= "<tr bgcolor=$bgcolor>";
-
-            if (!function_exists('str_contains')) {
-                function str_contains($haystack, $needle)
-                {
-                    return $needle !== '' && mb_strpos($haystack, $needle) !== false;
-                }
-            }
 
             if (!str_contains($teamname, $voterTeamName)) {
                 if ($season->phase == "Regular Season") {

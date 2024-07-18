@@ -201,12 +201,7 @@ function userinfo($username)
         return $output;
     }
 
-    if ($season->phase == "Regular Season") {
-        $formName = "ASGVote";
-    } else {
-        $formName = "EOYVote";
-    }
-
+    $formName = ($season->phase == "Regular Season") ? "ASGVote" : "EOYVote";
     $voterTeamName = $userinfo['user_ibl_team'];
     $tid = $sharedFunctions->getTidFromTeamname($voterTeamName);
 

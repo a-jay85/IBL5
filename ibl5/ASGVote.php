@@ -43,7 +43,8 @@ echo "
         Western Backcourt Player: $WCB1<br>
         Western Backcourt Player: $WCB2<br>
         Western Backcourt Player: $WCB3<br>
-        Western Backcourt Player: $WCB4";
+        Western Backcourt Player: $WCB4<br>
+        <br>";
 
 // VOTING FOR OWN PLAYERS
 echo "<font color=red>";

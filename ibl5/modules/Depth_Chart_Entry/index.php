@@ -355,7 +355,9 @@ function main($user)
 
 function submit()
 {
-    global $db, $sharedFunctions;
+    global $db;
+
+    $season = new Season($db);
 
     NukeHeader::header();
     OpenTable();
@@ -534,6 +536,7 @@ function submit()
         $minPositionDepth = 2;
     }
 
+    $errorText = "";
     if ($activePlayers < $minActivePlayers) {
         $errorText .= "<font color=red><b>You must have at least $minActivePlayers active players in your lineup; you have $activePlayers.</b></font><p>
 			Please press the \"Back\" button on your browser and activate " . ($minActivePlayers - $activePlayers) . " player(s).</center><p>";

@@ -19,15 +19,15 @@ if (!defined('BLOCK_FILE')) {
 
 global $db, $cookie;
 
-$actual_url = "$_SERVER[REQUEST_URI]";
+$url = "$_SERVER[REQUEST_URI]";
 
 $boxstuff = "<span class=\"content\">";
 
 if (
-    $actual_url != "/"
-    AND $actual_url != "/index.php"
-    AND $actual_url != "/ibl5/"
-    AND $actual_url != "/ibl5/index.php"
+    $url != "/"
+    AND $url != "/index.php"
+    AND $url != "/ibl5/"
+    AND $url != "/ibl5/index.php"
 ) {
     $boxstuff .= '<a href="index.php"><img src="images/ibl/logocorner.jpg" border="0"></a>';
 }
@@ -39,10 +39,8 @@ $content = $boxstuff;
 // A-Jay's localhost/production switch for development
 if ($cookie[1] == "A-Jay") {
     if ($_SERVER['SERVER_NAME'] != "localhost") {
-        $localURL = str_replace("ibl5/", "", $actual_url);
-        echo "<a href=\"http://localhost:8888$localURL\">switch to localhost</a>";
+        echo "<a href=\"http://localhost$url\">switch to localhost</a>";
     } elseif ($_SERVER['SERVER_NAME'] == "localhost") {
-        $prodURL = "/ibl5" . $actual_url;
-        echo "<a href=\"http://www.iblhoops.net$prodURL\">switch to production</a>";
+        echo "<a href=\"http://www.iblhoops.net$url\">switch to production</a>";
     }
 }

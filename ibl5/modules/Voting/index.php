@@ -211,6 +211,10 @@ function userinfo($username)
 
     echo "<input type=\"submit\" value=\"Submit Votes!\">";
 
+    $easternConferenceFrontcourt = $easternConferenceBackcourt = "";
+    $westernConferenceFrontcourt = $westernConferenceBackcourt = "";
+    $mostValuablePlayers = $sixthPersons = $rookiesOfTheYear = $generalManagers = "";
+
     if ($season->phase == "Regular Season") {
         $easternConferenceFrontcourt .= getCandidates('ECF', $voterTeamName);
         $easternConferenceBackcourt .= getCandidates('ECB', $voterTeamName);

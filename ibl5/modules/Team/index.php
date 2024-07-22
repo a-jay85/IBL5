@@ -833,8 +833,7 @@ function schedule($tid)
     $result = $db->sql_query($query);
     $year = $db->sql_result($result, 0, "Year");
     $year1 = $year + 1;
-    $wins = 0;
-    $losses = 0;
+    $wins = $losses = $winStreak = $lossStreak = 0;
     echo "<center>
 		<img src=\"./images/logo/$tid.jpg\">
 		<table width=600 border=1>

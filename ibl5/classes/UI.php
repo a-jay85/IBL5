@@ -770,33 +770,37 @@ class UI
 
     public static function simAverages($db, $team, $season)
     {
-        $table_simAverages = "<table align=\"center\" class=\"sortable\"><thead><tr bgcolor=$team->color1>
-            <th><font color=$team->color2>Pos</font></th>
-            <th colspan=3><font color=$team->color2>Player</font></th>
-            <th><font color=$team->color2>g</font></th>
-            <th><font color=$team->color2>min</font></th>
-            <td bgcolor=$team->color1 width=0></td>
-            <th><font color=$team->color2>fgm</font></th>
-            <th><font color=$team->color2>fga</font></th>
-            <th><font color=$team->color2>fgp</font></th>
-            <td bgcolor=#CCCCCC width=0></td>
-            <th><font color=$team->color2>ftm</font></th>
-            <th><font color=$team->color2>fta</font></th>
-            <th><font color=$team->color2>ftp</font></th>
-            <td bgcolor=#CCCCCC width=0></td>
-            <th><font color=$team->color2>3gm</font></th>
-            <th><font color=$team->color2>3ga</font></th>
-            <th><font color=$team->color2>3gp</font></th>
-            <td bgcolor=$team->color1 width=0></td>
-            <th><font color=$team->color2>orb</font></th>
-            <th><font color=$team->color2>reb</font></th>
-            <th><font color=$team->color2>ast</font></th>
-            <th><font color=$team->color2>stl</font></th>
-            <th><font color=$team->color2>to</font></th>
-            <th><font color=$team->color2>blk</font></th>
-            <th><font color=$team->color2>pf</font></th>
-            <th><font color=$team->color2>pts</font></th>
-        </tr></thead><tbody>";
+        $table_simAverages = "<table align=\"center\" class=\"sortable\">
+            <thead>
+                <tr bgcolor=$team->color1>
+                    <th><font color=$team->color2>Pos</font></th>
+                    <th colspan=3><font color=$team->color2>Player</font></th>
+                    <th><font color=$team->color2>g</font></th>
+                    <th><font color=$team->color2>min</font></th>
+                    <td bgcolor=$team->color1 width=0></td>
+                    <th><font color=$team->color2>fgm</font></th>
+                    <th><font color=$team->color2>fga</font></th>
+                    <th><font color=$team->color2>fgp</font></th>
+                    <td bgcolor=#CCCCCC width=0></td>
+                    <th><font color=$team->color2>ftm</font></th>
+                    <th><font color=$team->color2>fta</font></th>
+                    <th><font color=$team->color2>ftp</font></th>
+                    <td bgcolor=#CCCCCC width=0></td>
+                    <th><font color=$team->color2>3gm</font></th>
+                    <th><font color=$team->color2>3ga</font></th>
+                    <th><font color=$team->color2>3gp</font></th>
+                    <td bgcolor=$team->color1 width=0></td>
+                    <th><font color=$team->color2>orb</font></th>
+                    <th><font color=$team->color2>reb</font></th>
+                    <th><font color=$team->color2>ast</font></th>
+                    <th><font color=$team->color2>stl</font></th>
+                    <th><font color=$team->color2>to</font></th>
+                    <th><font color=$team->color2>blk</font></th>
+                    <th><font color=$team->color2>pf</font></th>
+                    <th><font color=$team->color2>pts</font></th>
+                </tr>
+            </thead>
+        <tbody>";
 
         $resultPlayerSimBoxScores = $db->sql_query("SELECT name,
             pos,

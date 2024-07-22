@@ -768,35 +768,44 @@ class UI
         return $table_totals;
     }
 
-    public static function simAverages($db, $team, $season)
+    public static function periodAverages($db, $team, $season, $startDate = NULL, $endDate = NULL)
     {
-        $table_simAverages = "<table align=\"center\" class=\"sortable\"><thead><tr bgcolor=$team->color1>
-            <th><font color=$team->color2>Pos</font></th>
-            <th colspan=3><font color=$team->color2>Player</font></th>
-            <th><font color=$team->color2>g</font></th>
-            <th><font color=$team->color2>min</font></th>
-            <td bgcolor=$team->color1 width=0></td>
-            <th><font color=$team->color2>fgm</font></th>
-            <th><font color=$team->color2>fga</font></th>
-            <th><font color=$team->color2>fgp</font></th>
-            <td bgcolor=#CCCCCC width=0></td>
-            <th><font color=$team->color2>ftm</font></th>
-            <th><font color=$team->color2>fta</font></th>
-            <th><font color=$team->color2>ftp</font></th>
-            <td bgcolor=#CCCCCC width=0></td>
-            <th><font color=$team->color2>3gm</font></th>
-            <th><font color=$team->color2>3ga</font></th>
-            <th><font color=$team->color2>3gp</font></th>
-            <td bgcolor=$team->color1 width=0></td>
-            <th><font color=$team->color2>orb</font></th>
-            <th><font color=$team->color2>reb</font></th>
-            <th><font color=$team->color2>ast</font></th>
-            <th><font color=$team->color2>stl</font></th>
-            <th><font color=$team->color2>to</font></th>
-            <th><font color=$team->color2>blk</font></th>
-            <th><font color=$team->color2>pf</font></th>
-            <th><font color=$team->color2>pts</font></th>
-        </tr></thead><tbody>";
+        $table_periodAverages = "<table align=\"center\" class=\"sortable\">
+            <thead>
+                <tr bgcolor=$team->color1>
+                    <th><font color=$team->color2>Pos</font></th>
+                    <th colspan=3><font color=$team->color2>Player</font></th>
+                    <th><font color=$team->color2>g</font></th>
+                    <th><font color=$team->color2>min</font></th>
+                    <td bgcolor=$team->color1 width=0></td>
+                    <th><font color=$team->color2>fgm</font></th>
+                    <th><font color=$team->color2>fga</font></th>
+                    <th><font color=$team->color2>fgp</font></th>
+                    <td bgcolor=#CCCCCC width=0></td>
+                    <th><font color=$team->color2>ftm</font></th>
+                    <th><font color=$team->color2>fta</font></th>
+                    <th><font color=$team->color2>ftp</font></th>
+                    <td bgcolor=#CCCCCC width=0></td>
+                    <th><font color=$team->color2>3gm</font></th>
+                    <th><font color=$team->color2>3ga</font></th>
+                    <th><font color=$team->color2>3gp</font></th>
+                    <td bgcolor=$team->color1 width=0></td>
+                    <th><font color=$team->color2>orb</font></th>
+                    <th><font color=$team->color2>reb</font></th>
+                    <th><font color=$team->color2>ast</font></th>
+                    <th><font color=$team->color2>stl</font></th>
+                    <th><font color=$team->color2>to</font></th>
+                    <th><font color=$team->color2>blk</font></th>
+                    <th><font color=$team->color2>pf</font></th>
+                    <th><font color=$team->color2>pts</font></th>
+                </tr>
+            </thead>
+        <tbody>";
+
+        if ($startDate == NULL AND $endDate == NULL) {
+            $startDate = $season->lastSimStartDate;
+            $endDate = $season->lastSimEndDate;
+        }
 
         $resultPlayerSimBoxScores = $db->sql_query("SELECT name,
             pos,
@@ -821,7 +830,7 @@ class UI
             ROUND(SUM(gamePF)/COUNT(DISTINCT `Date`) , 1) as gamePFavg,
             ROUND(((2 * SUM(gameFGM)) + SUM(gameFTM) + (3 * SUM(game3GM)))/COUNT(DISTINCT `Date`) , 1) as gamePTSavg
         FROM   ibl_box_scores
-        WHERE  date BETWEEN '$season->lastSimStartDate' AND '$season->lastSimEndDate'
+        WHERE  date BETWEEN '$startDate' AND '$endDate'
             AND ( hometid = $team->teamID
                 OR visitortid = $team->teamID )
             AND gameMIN > 0
@@ -833,70 +842,70 @@ class UI
         GROUP  BY name, pos, pid
         ORDER  BY name ASC;");
 
-        $simAverageMIN = $simAverageFGM = $simAverageFGA = $simAverageFGP = $simAverageFTM = $simAverageFTA = $simAverageFTP = 0;
-        $simAverage3GM = $simAverage3GA = $simAverage3GP = $simAverageORB = $simAverageREB = $simAverageAST = $simAverageSTL = 0;
-        $simAverageTOV = $simAverageBLK = $simAveragePF = $simAveragePTS = $i = 0;
+        $periodAverageMIN = $periodAverageFGM = $periodAverageFGA = $periodAverageFGP = $periodAverageFTM = $periodAverageFTA = $periodAverageFTP = 0;
+        $periodAverage3GM = $periodAverage3GA = $periodAverage3GP = $periodAverageORB = $periodAverageREB = $periodAverageAST = $periodAverageSTL = 0;
+        $periodAverageTOV = $periodAverageBLK = $periodAveragePF = $periodAveragePTS = $i = 0;
 
         while ($row = $db->sql_fetch_assoc($resultPlayerSimBoxScores)) {
             $name = $row['name'];
             $pos = $row['pos'];
             $pid = $row['pid'];
             $numberOfGamesPlayedInSim = $row['games'];
-            $simAverageMIN = $row['gameMINavg'];
-            $simAverageFGM = $row['gameFGMavg'];
-            $simAverageFGA = $row['gameFGAavg'];
-            $simAverageFGP = $row['gameFGPavg'] ?? '0.000';
-            $simAverageFTM = $row['gameFTMavg'];
-            $simAverageFTA = $row['gameFTAavg'];
-            $simAverageFTP = $row['gameFTPavg'] ?? '0.000';
-            $simAverage3GM = $row['game3GMavg'];
-            $simAverage3GA = $row['game3GAavg'];
-            $simAverage3GP = $row['game3GPavg'] ?? '0.000';
-            $simAverageORB = $row['gameORBavg'];
-            $simAverageREB = $row['gameREBavg'];
-            $simAverageAST = $row['gameASTavg'];
-            $simAverageSTL = $row['gameSTLavg'];
-            $simAverageTOV = $row['gameTOVavg'];
-            $simAverageBLK = $row['gameBLKavg'];
-            $simAveragePF = $row['gamePFavg'];
-            $simAveragePTS = $row['gamePTSavg'];
+            $periodAverageMIN = $row['gameMINavg'];
+            $periodAverageFGM = $row['gameFGMavg'];
+            $periodAverageFGA = $row['gameFGAavg'];
+            $periodAverageFGP = $row['gameFGPavg'] ?? '0.000';
+            $periodAverageFTM = $row['gameFTMavg'];
+            $periodAverageFTA = $row['gameFTAavg'];
+            $periodAverageFTP = $row['gameFTPavg'] ?? '0.000';
+            $periodAverage3GM = $row['game3GMavg'];
+            $periodAverage3GA = $row['game3GAavg'];
+            $periodAverage3GP = $row['game3GPavg'] ?? '0.000';
+            $periodAverageORB = $row['gameORBavg'];
+            $periodAverageREB = $row['gameREBavg'];
+            $periodAverageAST = $row['gameASTavg'];
+            $periodAverageSTL = $row['gameSTLavg'];
+            $periodAverageTOV = $row['gameTOVavg'];
+            $periodAverageBLK = $row['gameBLKavg'];
+            $periodAveragePF = $row['gamePFavg'];
+            $periodAveragePTS = $row['gamePTSavg'];
 
             (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
 
-            $table_simAverages .= "<tr bgcolor=$bgcolor>
+            $table_periodAverages .= "<tr bgcolor=$bgcolor>
                 <td>$pos</td>
                 <td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>
                 <td><center>$numberOfGamesPlayedInSim</center></td>
-                <td><center>$simAverageMIN</center></td>
+                <td><center>$periodAverageMIN</center></td>
                 <td bgcolor=$team->color1 width=0></td>
-                <td><center>$simAverageFGM</center></td>
-                <td><center>$simAverageFGA</center></td>
-                <td><center>$simAverageFGP</center></td>
+                <td><center>$periodAverageFGM</center></td>
+                <td><center>$periodAverageFGA</center></td>
+                <td><center>$periodAverageFGP</center></td>
                 <td bgcolor=#CCCCCC width=0></td>
-                <td><center>$simAverageFTM</center></td>
-                <td><center>$simAverageFTA</center></td>
-                <td><center>$simAverageFTP</center></td>
+                <td><center>$periodAverageFTM</center></td>
+                <td><center>$periodAverageFTA</center></td>
+                <td><center>$periodAverageFTP</center></td>
                 <td bgcolor=#CCCCCC width=0></td>
-                <td><center>$simAverage3GM</center></td>
-                <td><center>$simAverage3GA</center></td>
-                <td><center>$simAverage3GP</center></td>
+                <td><center>$periodAverage3GM</center></td>
+                <td><center>$periodAverage3GA</center></td>
+                <td><center>$periodAverage3GP</center></td>
                 <td bgcolor=$team->color1 width=0></td>
-                <td><center>$simAverageORB</center></td>
-                <td><center>$simAverageREB</center></td>
-                <td><center>$simAverageAST</center></td>
-                <td><center>$simAverageSTL</center></td>
-                <td><center>$simAverageTOV</center></td>
-                <td><center>$simAverageBLK</center></td>
-                <td><center>$simAveragePF</center></td>
-                <td><center>$simAveragePTS</center></td>
+                <td><center>$periodAverageORB</center></td>
+                <td><center>$periodAverageREB</center></td>
+                <td><center>$periodAverageAST</center></td>
+                <td><center>$periodAverageSTL</center></td>
+                <td><center>$periodAverageTOV</center></td>
+                <td><center>$periodAverageBLK</center></td>
+                <td><center>$periodAveragePF</center></td>
+                <td><center>$periodAveragePTS</center></td>
             </tr>";
 
             $i++;
         }
     
-        $table_simAverages .= "</tbody>
+        $table_periodAverages .= "</tbody>
             </table>";
     
-        return $table_simAverages;
+        return $table_periodAverages;
     }
 }

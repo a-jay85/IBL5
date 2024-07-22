@@ -138,6 +138,24 @@ function team($tid)
     }
     $tabs .= "<a href=\"modules.php?name=Team&op=team&tid=$tid&display=chunk$insertyear\">Sim Averages</a></td>";
 
+    if (
+        $season->phase == "Playoffs"
+        OR $season->phase == "Draft"
+        OR $season->phase == "Free Agency"
+    ) {
+        $playoffsStartDate = $season->endingYear . "-" . Season::IBL_PLAYOFF_MONTH . "-01";
+        $playoffsEndDate = $season->endingYear . "-" . Season::IBL_PLAYOFF_MONTH . "-30";
+        if ($display == "playoffs") {
+            $showing = "Playoff Averages";
+            $table_periodAverages = UI::periodAverages($db, $team, $season, $playoffsStartDate, $playoffsEndDate);
+            $table_output = $table_periodAverages;
+            $tabs .= "<td bgcolor=#BBBBBB style=\"font-weight:bold\">";
+        } else {
+            $tabs .= "<td>";
+        }
+        $tabs .= "<a href=\"modules.php?name=Team&op=team&tid=$tid&display=playoffs$insertyear\">Playoffs Averages</a></td>";
+    }
+
     if ($display == "contracts") {
         $showing = "Contracts";
         $table_contracts = UI::contracts($db, $result, $team, $sharedFunctions);

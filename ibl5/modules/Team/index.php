@@ -88,6 +88,7 @@ function team($tid)
         $insertyear = "";
     }
 
+    $tabs = "";
     if ($display == "ratings") {
         $showing = "Player Ratings";
         $table_ratings = UI::ratings($db, $result, $team, $yr, $season);

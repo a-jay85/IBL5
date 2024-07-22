@@ -768,7 +768,7 @@ class UI
         return $table_totals;
     }
 
-    public static function periodAverages($db, $team, $season)
+    public static function periodAverages($db, $team, $season, $startDate = NULL, $endDate = NULL)
     {
         $table_periodAverages = "<table align=\"center\" class=\"sortable\">
             <thead>
@@ -802,6 +802,11 @@ class UI
             </thead>
         <tbody>";
 
+        if ($startDate == NULL AND $endDate == NULL) {
+            $startDate = $season->lastSimStartDate;
+            $endDate = $season->lastSimEndDate;
+        }
+
         $resultPlayerSimBoxScores = $db->sql_query("SELECT name,
             pos,
             pid,
@@ -825,7 +830,7 @@ class UI
             ROUND(SUM(gamePF)/COUNT(DISTINCT `Date`) , 1) as gamePFavg,
             ROUND(((2 * SUM(gameFGM)) + SUM(gameFTM) + (3 * SUM(game3GM)))/COUNT(DISTINCT `Date`) , 1) as gamePTSavg
         FROM   ibl_box_scores
-        WHERE  date BETWEEN '$season->lastSimStartDate' AND '$season->lastSimEndDate'
+        WHERE  date BETWEEN '$startDate' AND '$endDate'
             AND ( hometid = $team->teamID
                 OR visitortid = $team->teamID )
             AND gameMIN > 0

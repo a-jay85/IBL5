@@ -88,6 +88,7 @@ function team($tid)
         $insertyear = "";
     }
 
+    $tabs = "";
     if ($display == "ratings") {
         $showing = "Player Ratings";
         $table_ratings = UI::ratings($db, $result, $team, $yr, $season);
@@ -130,13 +131,31 @@ function team($tid)
 
     if ($display == "chunk") {
         $showing = "Chunk Averages";
-        $table_simAverages = UI::simAverages($db, $team, $season);
-        $table_output = $table_simAverages;
+        $table_periodAverages = UI::periodAverages($db, $team, $season);
+        $table_output = $table_periodAverages;
         $tabs .= "<td bgcolor=#BBBBBB style=\"font-weight:bold\">";
     } else {
         $tabs .= "<td>";
     }
     $tabs .= "<a href=\"modules.php?name=Team&op=team&tid=$tid&display=chunk$insertyear\">Sim Averages</a></td>";
+
+    if (
+        $season->phase == "Playoffs"
+        OR $season->phase == "Draft"
+        OR $season->phase == "Free Agency"
+    ) {
+        $playoffsStartDate = $season->endingYear . "-" . Season::IBL_PLAYOFF_MONTH . "-01";
+        $playoffsEndDate = $season->endingYear . "-" . Season::IBL_PLAYOFF_MONTH . "-30";
+        if ($display == "playoffs") {
+            $showing = "Playoff Averages";
+            $table_periodAverages = UI::periodAverages($db, $team, $season, $playoffsStartDate, $playoffsEndDate);
+            $table_output = $table_periodAverages;
+            $tabs .= "<td bgcolor=#BBBBBB style=\"font-weight:bold\">";
+        } else {
+            $tabs .= "<td>";
+        }
+        $tabs .= "<a href=\"modules.php?name=Team&op=team&tid=$tid&display=playoffs$insertyear\">Playoffs Averages</a></td>";
+    }
 
     if ($display == "contracts") {
         $showing = "Contracts";
@@ -814,8 +833,7 @@ function schedule($tid)
     $result = $db->sql_query($query);
     $year = $db->sql_result($result, 0, "Year");
     $year1 = $year + 1;
-    $wins = 0;
-    $losses = 0;
+    $wins = $losses = $winStreak = $lossStreak = 0;
     echo "<center>
 		<img src=\"./images/logo/$tid.jpg\">
 		<table width=600 border=1>

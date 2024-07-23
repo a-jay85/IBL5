@@ -14,7 +14,7 @@ $pagetitle = "- $module_name";
 $username = $cookie[1];
 $userTeam = Team::withTeamName($db, $sharedFunctions->getTeamnameFromUsername($username));
 
-$queryAllTeams = "SELECT * FROM ibl_team_info WHERE teamid != 35;";
+$queryAllTeams = "SELECT * FROM ibl_team_info WHERE teamid != " . League::FREE_AGENTS_TEAMID . ";";
 $resultAllTeams = $db->sql_query($queryAllTeams);
 $numteams = $db->sql_numrows($resultAllTeams);
 

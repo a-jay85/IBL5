@@ -1,0 +1,62 @@
+<?php
+class Discord
+{
+    public static function sendCurlPOST($url, $arrayContent)
+    {
+        $payload = json_encode(array("content" => $arrayContent));
+        
+        $curl = curl_init();
+
+        curl_setopt_array($curl, array(
+            CURLOPT_URL => $url,
+            CURLOPT_POSTFIELDS => $payload,
+            CURLOPT_HEADER => true,
+            CURLOPT_HTTPHEADER => array('Content-Type: application/json'),
+            CURLOPT_RETURNTRANSFER => true,
+        ));
+
+        $response = curl_exec($curl);
+
+        if ($error = curl_error($curl)) {
+            throw new Exception($error);
+        }
+
+        curl_close($curl);
+        $response = json_decode($response, true);
+    }
+
+    public static function postToChannel($channelName, $messageContent)
+    {
+        if ($_SERVER['SERVER_NAME'] != "localhost") {
+            switch ($channelName) {
+                case '#1v1-games':
+                    $url = 'INSERTWEBHOOKURLHERE';
+                    break;
+                case '#draft-picks':
+                    $url = 'INSERTWEBHOOKURLHERE';
+                    break;
+                case '#extensions':
+                    $url = 'INSERTWEBHOOKURLHERE';
+                    break;
+                case '#free-agency':
+                    $url = 'INSERTWEBHOOKURLHERE';
+                    break;
+                case '#rookie-options':
+                    $url = 'INSERTWEBHOOKURLHERE';
+                    break;
+                case '#trades':
+                    $url = 'INSERTWEBHOOKURLHERE';
+                    break;
+                case '#waiver-wire':
+                    $url = 'INSERTWEBHOOKURLHERE';
+                    break;
+            }
+        } else {
+            $url = 'INSERTWEBHOOKURLHERE';
+        }
+
+        $messageContent = str_replace('<br>', "\n", $messageContent);
+
+        Discord::sendCurlPOST($url, $messageContent);
+    }
+}

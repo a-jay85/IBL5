@@ -6,6 +6,7 @@ if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
 
 $sharedFunctions = new Shared($db);
 $season = new Season($db);
+$isFreeAgencyModuleActive = $sharedFunctions->isFreeAgencyModuleActive();
 
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
@@ -57,13 +58,24 @@ while ($i < $numberOfTeams) {
 			<a href=\"modules.php?name=Team&op=team&tid=$team->teamID&display=contracts\">
 				<font color=#$team->color2>$team->city $team->name
 			</a>
-		</td>
+		</td>";
+
+    if (!$isFreeAgencyModuleActive) {
+         $table_echo .= "<td align=center>" . (Team::HARD_CAP_MAX - $team->currentSeasonTotalSalary) . "</td>";
+    }
+
+    $table_echo .= "
 		<td align=center>$teamTotalSalaryYear1[$i]</td>
 		<td align=center>$teamTotalSalaryYear2[$i]</td>
 		<td align=center>$teamTotalSalaryYear3[$i]</td>
 		<td align=center>$teamTotalSalaryYear4[$i]</td>
-		<td align=center>$teamTotalSalaryYear5[$i]</td>
-		<td align=center>$teamTotalSalaryYear6[$i]</td>
+		<td align=center>$teamTotalSalaryYear5[$i]</td>";
+
+    if ($isFreeAgencyModuleActive) {
+        $table_echo .= "<td align=center>$teamTotalSalaryYear6[$i]</td>";
+    }
+
+	$table_echo .= "	
         <td bgcolor=#AAA></td>
         <td align=center>$teamTotalPGNextSeasonSalary</td>
         <td align=center>$teamTotalSGNextSeasonSalary</td>
@@ -81,13 +93,26 @@ while ($i < $numberOfTeams) {
 
 $text .= "<table class=\"sortable\" border=1>
 	<tr>
-		<th>Team</th>
+		<th>Team</th>";
+
+
+if (!$isFreeAgencyModuleActive) {
+    $text .= "<th>" . ($season->beginningYear) . "-<br>" . ($season->endingYear) . "<br>Total</th>";
+}
+		
+$text .= "
 		<th>" . ($season->endingYear + 0) . "-<br>" . ($season->endingYear + 1) . "<br>Total</th>
 		<th>" . ($season->endingYear + 1) . "-<br>" . ($season->endingYear + 2) . "<br>Total</th>
 		<th>" . ($season->endingYear + 2) . "-<br>" . ($season->endingYear + 3) . "<br>Total</th>
 		<th>" . ($season->endingYear + 3) . "-<br>" . ($season->endingYear + 4) . "<br>Total</th>
-		<th>" . ($season->endingYear + 4) . "-<br>" . ($season->endingYear + 5) . "<br>Total</th>
-		<th>" . ($season->endingYear + 5) . "-<br>" . ($season->endingYear + 6) . "<br>Total</th>
+		<th>" . ($season->endingYear + 4) . "-<br>" . ($season->endingYear + 5) . "<br>Total</th>";
+
+
+if ($isFreeAgencyModuleActive) {
+    $text .= "<th>" . ($season->endingYear + 5) . "-<br>" . ($season->endingYear + 6) . "<br>Total</th>";
+}
+
+$text .= "
         <td bgcolor=#AAA></td>
 		<th>" . ($season->endingYear + 0) . "-<br>" . ($season->endingYear + 1) . "<br>PG</th>
 		<th>" . ($season->endingYear + 0) . "-<br>" . ($season->endingYear + 1) . "<br>SG</th>

@@ -121,7 +121,7 @@ function theindex($new_topic = "0")
         $morelink .= " | " . _SCORE . " $rated";
         $morelink .= " ";
         $morelink = str_replace(" |  | ", " | ", $morelink);
-        themeindex($aid, $informant, $datetime, $title, $counter, $topic, $hometext, $notes, $morelink, $topicname, $topicimage, $topictext);
+        themeindex($aid, $informant, $time, $title, $counter, $topic, $hometext, $notes, $morelink, $topicname, $topicimage, $topictext);
     }
     include "footer.php";
 }

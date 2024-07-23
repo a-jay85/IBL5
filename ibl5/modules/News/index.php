@@ -23,7 +23,7 @@ get_lang($module_name);
 
 function theindex($new_topic = "0")
 {
-    global $db, $storyhome, $topicname, $topicimage, $topictext, $datetime, $user, $cookie, $nukeurl, $prefix, $multilingual, $currentlang, $articlecomm, $sitename, $user_news, $userinfo;
+    global $db, $storyhome, $topicname, $topicimage, $topictext, $user, $prefix, $multilingual, $currentlang, $articlecomm, $sitename, $user_news, $userinfo;
     if (is_user($user)) {getusrinfo($user);}
     $new_topic = intval($new_topic);
     if ($multilingual == 1) {

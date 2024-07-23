@@ -6,6 +6,7 @@ if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
 
 $sharedFunctions = new Shared($db);
 $season = new Season($db);
+$isFreeAgencyModuleActive = $sharedFunctions->isFreeAgencyModuleActive();
 
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
@@ -59,7 +60,7 @@ while ($i < $numberOfTeams) {
 			</a>
 		</td>";
 
-    if (!$sharedFunctions->isFreeAgencyModuleActive()) {
+    if (!$isFreeAgencyModuleActive) {
          $table_echo .= "<td align=center>" . (Team::HARD_CAP_MAX - $team->currentSeasonTotalSalary) . "</td>";
     }
 
@@ -70,7 +71,7 @@ while ($i < $numberOfTeams) {
 		<td align=center>$teamTotalSalaryYear4[$i]</td>
 		<td align=center>$teamTotalSalaryYear5[$i]</td>";
 
-    if ($sharedFunctions->isFreeAgencyModuleActive()) {
+    if ($isFreeAgencyModuleActive) {
         $table_echo .= "<td align=center>$teamTotalSalaryYear6[$i]</td>";
     }
 
@@ -95,7 +96,7 @@ $text .= "<table class=\"sortable\" border=1>
 		<th>Team</th>";
 
 
-if (!$sharedFunctions->isFreeAgencyModuleActive()) {
+if (!$isFreeAgencyModuleActive) {
     $text .= "<th>" . ($season->beginningYear) . "-<br>" . ($season->endingYear) . "<br>Total</th>";
 }
 		
@@ -107,7 +108,7 @@ $text .= "
 		<th>" . ($season->endingYear + 4) . "-<br>" . ($season->endingYear + 5) . "<br>Total</th>";
 
 
-if ($sharedFunctions->isFreeAgencyModuleActive()) {
+if ($isFreeAgencyModuleActive) {
     $text .= "<th>" . ($season->endingYear + 5) . "-<br>" . ($season->endingYear + 6) . "<br>Total</th>";
 }
 

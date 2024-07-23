@@ -27,6 +27,8 @@ class Team
     public $numberOfOpenRosterSpots;
     public $numberOfHealthyOpenRosterSpots;
 
+    public $currentSeasonTotalSalary;
+
     const SOFT_CAP_MAX = 5000;
     const HARD_CAP_MAX = 7000;
     const BUYOUT_PERCENTAGE_MAX = 0.40;
@@ -106,6 +108,8 @@ class Team
         $this->numberOfHealthyPlayers = $this->db->sql_numrows($this->getHealthyPlayersOrderedByNameResult());
         $this->numberOfOpenRosterSpots = 15 - $this->numberOfPlayers;
         $this->numberOfHealthyOpenRosterSpots = 15 - $this->numberOfHealthyPlayers;
+
+        $this->currentSeasonTotalSalary = $this->getTotalCurrentSeasonSalariesFromPlrResult($this->getRosterUnderContractOrderedByNameResult());
     }
 
     public function getBuyoutsResult()
@@ -118,7 +122,7 @@ class Team
         $result = $this->db->sql_query($query);
         return $result;
     }
-
+    
     public function getDraftHistoryResult()
     {
         $query = "SELECT *

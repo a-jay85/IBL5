@@ -77,7 +77,7 @@ function queryTeamInfo()
 
     $query = "SELECT teamid, team_city, team_name, color1, color2
 		FROM ibl_team_info
-		WHERE teamid != 99 AND teamid != 35
+		WHERE teamid != 99 AND teamid != " . League::FREE_AGENTS_TEAMID . "
 		ORDER BY teamid ASC;";
     $result = $db->sql_query($query);
     return $result;

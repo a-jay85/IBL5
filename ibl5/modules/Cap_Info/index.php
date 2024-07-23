@@ -68,8 +68,13 @@ while ($i < $numberOfTeams) {
 		<td align=center>$teamTotalSalaryYear2[$i]</td>
 		<td align=center>$teamTotalSalaryYear3[$i]</td>
 		<td align=center>$teamTotalSalaryYear4[$i]</td>
-		<td align=center>$teamTotalSalaryYear5[$i]</td>
-		<td align=center>$teamTotalSalaryYear6[$i]</td>
+		<td align=center>$teamTotalSalaryYear5[$i]</td>";
+
+    if ($sharedFunctions->isFreeAgencyModuleActive()) {
+        $table_echo .= "<td align=center>$teamTotalSalaryYear6[$i]</td>";
+    }
+
+	$table_echo .= "	
         <td bgcolor=#AAA></td>
         <td align=center>$teamTotalPGNextSeasonSalary</td>
         <td align=center>$teamTotalSGNextSeasonSalary</td>
@@ -99,8 +104,14 @@ $text .= "
 		<th>" . ($season->endingYear + 1) . "-<br>" . ($season->endingYear + 2) . "<br>Total</th>
 		<th>" . ($season->endingYear + 2) . "-<br>" . ($season->endingYear + 3) . "<br>Total</th>
 		<th>" . ($season->endingYear + 3) . "-<br>" . ($season->endingYear + 4) . "<br>Total</th>
-		<th>" . ($season->endingYear + 4) . "-<br>" . ($season->endingYear + 5) . "<br>Total</th>
-		<th>" . ($season->endingYear + 5) . "-<br>" . ($season->endingYear + 6) . "<br>Total</th>
+		<th>" . ($season->endingYear + 4) . "-<br>" . ($season->endingYear + 5) . "<br>Total</th>";
+
+
+if ($sharedFunctions->isFreeAgencyModuleActive()) {
+    $text .= "<th>" . ($season->endingYear + 5) . "-<br>" . ($season->endingYear + 6) . "<br>Total</th>";
+}
+
+$text .= "
         <td bgcolor=#AAA></td>
 		<th>" . ($season->endingYear + 0) . "-<br>" . ($season->endingYear + 1) . "<br>PG</th>
 		<th>" . ($season->endingYear + 0) . "-<br>" . ($season->endingYear + 1) . "<br>SG</th>

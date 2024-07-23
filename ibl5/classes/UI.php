@@ -19,7 +19,7 @@ class UI
     public static function displaytopmenu($db, $teamID)
     {
         if (!$teamID) {
-            $teamID = 35;
+            $teamID = League::FREE_AGENTS_TEAMID;
         }
         $team = Team::withTeamID($db, $teamID);
 

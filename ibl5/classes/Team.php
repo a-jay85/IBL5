@@ -58,7 +58,7 @@ class Team
 
     protected function loadByID($db, int $teamID)
     {
-        ($teamID) ? $teamID : $teamID = 35;
+        ($teamID) ? $teamID : $teamID = League::FREE_AGENTS_TEAMID;
 
         $query = "SELECT *
             FROM ibl_team_info

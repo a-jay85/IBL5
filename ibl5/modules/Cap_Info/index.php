@@ -57,8 +57,13 @@ while ($i < $numberOfTeams) {
 			<a href=\"modules.php?name=Team&op=team&tid=$team->teamID&display=contracts\">
 				<font color=#$team->color2>$team->city $team->name
 			</a>
-		</td>
-		<td align=center>" . (Team::HARD_CAP_MAX - $team->currentSeasonTotalSalary) . "</td>
+		</td>";
+
+    if (!$sharedFunctions->isFreeAgencyModuleActive()) {
+         $table_echo .= "<td align=center>" . (Team::HARD_CAP_MAX - $team->currentSeasonTotalSalary) . "</td>";
+    }
+
+    $table_echo .= "
 		<td align=center>$teamTotalSalaryYear1[$i]</td>
 		<td align=center>$teamTotalSalaryYear2[$i]</td>
 		<td align=center>$teamTotalSalaryYear3[$i]</td>
@@ -82,8 +87,14 @@ while ($i < $numberOfTeams) {
 
 $text .= "<table class=\"sortable\" border=1>
 	<tr>
-		<th>Team</th>
-		<th>" . ($season->beginningYear) . "-<br>" . ($season->endingYear) . "<br>Total</th>
+		<th>Team</th>";
+
+
+if (!$sharedFunctions->isFreeAgencyModuleActive()) {
+    $text .= "<th>" . ($season->beginningYear) . "-<br>" . ($season->endingYear) . "<br>Total</th>";
+}
+		
+$text .= "
 		<th>" . ($season->endingYear + 0) . "-<br>" . ($season->endingYear + 1) . "<br>Total</th>
 		<th>" . ($season->endingYear + 1) . "-<br>" . ($season->endingYear + 2) . "<br>Total</th>
 		<th>" . ($season->endingYear + 2) . "-<br>" . ($season->endingYear + 3) . "<br>Total</th>

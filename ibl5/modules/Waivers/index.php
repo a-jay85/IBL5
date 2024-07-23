@@ -365,7 +365,7 @@ function waiverexecute($username, $action)
         </tr></form></table></center>";
     
         
-    $teamFreeAgency = Team::withTeamID($db, 35);
+    $teamFreeAgency = Team::withTeamID($db, League::FREE_AGENTS_TEAMID);
     $season = new Season($db);
     $table_ratings = UI::ratings($db, $resultListOfPlayersForWaiverOperation, $teamFreeAgency, "", $season);
     echo $table_ratings;

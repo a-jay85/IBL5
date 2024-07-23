@@ -20,7 +20,7 @@ $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 NukeHeader::header();
 
-$query2 = "SELECT * FROM ibl_team_history WHERE teamid != 35 ORDER BY teamid ASC"; // Grab all teams except for the Free Agents
+$query2 = "SELECT * FROM ibl_team_history WHERE teamid != " . League::FREE_AGENTS_TEAMID . " ORDER BY teamid ASC";
 $result2 = $db->sql_query($query2);
 $num2 = $db->sql_numrows($result2);
 

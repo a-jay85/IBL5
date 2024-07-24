@@ -806,22 +806,22 @@ function showpage($playerID, $spec)
             printf('%01.1f', $playerStats->seasonPointsPerGame);
             echo "</center></td></tr>";
 
-            $car_gm = $car_gm + $stats_gm;
-            $car_min = $car_min + $stats_min;
-            $car_fgm = $car_fgm + $stats_fgm;
-            $car_fga = $car_fga + $stats_fga;
-            $car_ftm = $car_ftm + $stats_ftm;
-            $car_fta = $car_fta + $stats_fta;
-            $car_3gm = $car_3gm + $stats_tgm;
-            $car_3ga = $car_3ga + $stats_tga;
-            $car_orb = $car_orb + $stats_orb;
-            $car_reb = $car_reb + $stats_reb;
-            $car_ast = $car_ast + $stats_ast;
-            $car_stl = $car_stl + $stats_stl;
-            $car_blk = $car_blk + $stats_blk;
-            $car_tvr = $car_tvr + $stats_to;
-            $car_pf = $car_pf + $stats_pf;
-            $car_pts = $car_pts + $stats_pts;
+            $car_gm += $playerStats->seasonGamesPlayed;
+            $car_min += $playerStats->seasonMinutes;
+            $car_fgm += $playerStats->seasonFieldGoalsMade;
+            $car_fga += $playerStats->seasonFieldGoalsAttempted;
+            $car_ftm += $playerStats->seasonFreeThrowsMade;
+            $car_fta += $playerStats->seasonFreeThrowsAttempted;
+            $car_3gm += $playerStats->seasonThreePointersMade;
+            $car_3ga += $playerStats->seasonThreePointersAttempted;
+            $car_orb += $playerStats->seasonOffensiveRebounds;
+            $car_reb += $playerStats->seasonTotalRebounds;
+            $car_ast += $playerStats->seasonAssists;
+            $car_stl += $playerStats->seasonSteals;
+            $car_blk += $playerStats->seasonBlocks;
+            $car_tvr += $playerStats->seasonTurnovers;
+            $car_pf += $playerStats->seasonPersonalFouls;
+            $car_pts += $playerStats->seasonPoints;
         }
 
         $car_avgm = ($car_gm) ? $car_min / $car_gm : "0.0";

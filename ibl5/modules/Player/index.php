@@ -1941,13 +1941,11 @@ function negotiate($pid)
             //$modfactor2 = (0.00125*($tf_trdw-$tf_trdl)*($player_tradition-1));
             $traditionFactor = (0.025 * ($tf_trdw - $tf_trdl) / ($tf_trdw + $tf_trdl) * ($player_tradition - 1));
             //$modfactor3 = (.01*($tf_coach)*($player_coach=1));
-            //$coachFactor = (0.0025*($tf_coach)*($player_coach-1));
             //$modfactor4 = (.025*($player_loyalty-1));
             $loyaltyFactor = (0.025 * ($player_loyalty - 1));
-            //$securityFactor = (0.01*$demyrs-0.025)*($player_security-1);
             $PTFactor = (($tf_millions * -0.00005) + 0.025) * ($player_playingtime - 1);
 
-            $modifier = 1 + $PFWFactor + $traditionFactor + $coachFactor + $loyaltyFactor + $securityFactor + $PTFactor;
+            $modifier = 1 + $PFWFactor + $traditionFactor + $loyaltyFactor + $PTFactor;
             //echo "Wins: $tf_wins<br>Loses: $tf_loss<br>Tradition Wins: $tf_trdw<br> Tradition Loses: $tf_trdl<br>Coach: $tf_coach<br>Loyalty: $player_loyalty<br>Play Time: $tf_millions<br>ModW: $modfactor1<br>ModT: $modfactor2<br>ModC: $modfactor3<br>ModL: $modfactor4<br>ModS: $modfactor5<br>ModP: $modfactor6<br>Mod: $modifier<br>Demand 1: $dem1<br>Demand 2: $dem2<br>Demand 3: $dem3<br>Demand 4: $dem4<br>Demand 5: $dem5<br>";
             
             $dem1 = round($dem1 / $modifier);

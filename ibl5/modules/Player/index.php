@@ -418,18 +418,18 @@ function showpage($playerID, $spec)
                 $simTotalPTS += (2 * $row['gameFGM']) + $row['gameFTM'] + (3 * $row['game3GM']);
             }
 
-            @$simAverageMIN = $simTotalMIN / $numberOfGamesPlayedInSim;
-            @$simAverageFTP = $simTotalFTM / $simTotalFTA;
-            @$simAverage3GP = $simTotal3GM / $simTotal3GA;
-            @$simAverageFGP = ($simTotal2GM + $simTotal3GM) / ($simTotal2GA + $simTotal3GA);
-            @$simAverageORB = $simTotalORB / $numberOfGamesPlayedInSim;
-            @$simAverageREB = ($simTotalORB + $simTotalDRB) / $numberOfGamesPlayedInSim;
-            @$simAverageAST = $simTotalAST / $numberOfGamesPlayedInSim;
-            @$simAverageSTL = $simTotalSTL / $numberOfGamesPlayedInSim;
-            @$simAverageTOV = $simTotalTOV / $numberOfGamesPlayedInSim;
-            @$simAverageBLK = $simTotalBLK / $numberOfGamesPlayedInSim;
-            @$simAveragePF = $simTotalPF / $numberOfGamesPlayedInSim;
-            @$simAveragePTS = $simTotalPTS / $numberOfGamesPlayedInSim;
+            $simAverageMIN = ($numberOfGamesPlayedInSim) ? $simTotalMIN / $numberOfGamesPlayedInSim : "0.0";
+            $simAverageFGP = ($simTotal2GA + $simTotal3GA) ? ($simTotal2GM + $simTotal3GM) / ($simTotal2GA + $simTotal3GA) : "0.000";
+            $simAverageFTP = ($simTotalFTA) ? $simTotalFTM / $simTotalFTA : "0.000";
+            $simAverage3GP = ($simTotal3GA) ? $simTotal3GM / $simTotal3GA : "0.000";
+            $simAverageORB = ($numberOfGamesPlayedInSim) ? $simTotalORB / $numberOfGamesPlayedInSim : "0.0";
+            $simAverageREB = ($numberOfGamesPlayedInSim) ? ($simTotalORB + $simTotalDRB) / $numberOfGamesPlayedInSim : "0.0";
+            $simAverageAST = ($numberOfGamesPlayedInSim) ? $simTotalAST / $numberOfGamesPlayedInSim : "0.0";
+            $simAverageSTL = ($numberOfGamesPlayedInSim) ? $simTotalSTL / $numberOfGamesPlayedInSim : "0.0";
+            $simAverageTOV = ($numberOfGamesPlayedInSim) ? $simTotalTOV / $numberOfGamesPlayedInSim : "0.0";
+            $simAverageBLK = ($numberOfGamesPlayedInSim) ? $simTotalBLK / $numberOfGamesPlayedInSim : "0.0";
+            $simAveragePF = ($numberOfGamesPlayedInSim) ? $simTotalPF / $numberOfGamesPlayedInSim : "0.0";
+            $simAveragePTS = ($numberOfGamesPlayedInSim) ? $simTotalPTS / $numberOfGamesPlayedInSim : "0.0";
 
             echo "<td>$simNumber</td>
             <td>$numberOfGamesPlayedInSim</td><td>";
@@ -506,13 +506,13 @@ function showpage($playerID, $spec)
             $hist_min = stripslashes(check_html($row44['min'], "nohtml"));
             $hist_fgm = stripslashes(check_html($row44['fgm'], "nohtml"));
             $hist_fga = stripslashes(check_html($row44['fga'], "nohtml"));
-            @$hist_fgp = ($hist_fgm / $hist_fga);
+            $hist_fgp = ($hist_fga) ? ($hist_fgm / $hist_fga) : "0.000";
             $hist_ftm = stripslashes(check_html($row44['ftm'], "nohtml"));
             $hist_fta = stripslashes(check_html($row44['fta'], "nohtml"));
-            @$hist_ftp = ($hist_ftm / $hist_fta);
+            $hist_ftp = ($hist_fta) ? ($hist_ftm / $hist_fta) : "0.000";
             $hist_tgm = stripslashes(check_html($row44['3gm'], "nohtml"));
             $hist_tga = stripslashes(check_html($row44['3ga'], "nohtml"));
-            @$hist_tgp = ($hist_tgm / $hist_tga);
+            $hist_tgp = ($hist_tga) ? ($hist_tgm / $hist_tga) : "0.000";
             $hist_orb = stripslashes(check_html($row44['orb'], "nohtml"));
             $hist_reb = stripslashes(check_html($row44['reb'], "nohtml"));
             $hist_ast = stripslashes(check_html($row44['ast'], "nohtml"));
@@ -595,18 +595,18 @@ function showpage($playerID, $spec)
             $car_pts = $car_pts + $stats_pts;
         }
 
-        @$car_fgp = $car_fgm / $car_fga;
-        @$car_ftp = $car_ftm / $car_fta;
-        @$car_tgp = $car_3gm / $car_3ga;
-        @$car_avgm = $car_min / $car_gm;
-        @$car_avgo = $car_orb / $car_gm;
-        @$car_avgr = $car_reb / $car_gm;
-        @$car_avga = $car_ast / $car_gm;
-        @$car_avgs = $car_stl / $car_gm;
-        @$car_avgb = $car_blk / $car_gm;
-        @$car_avgt = $car_tvr / $car_gm;
-        @$car_avgf = $car_pf / $car_gm;
-        @$car_avgp = $car_pts / $car_gm;
+        $car_fgp = ($car_fga) ? $car_fgm / $car_fga : "0.000";
+        $car_ftp = ($car_fta) ? $car_ftm / $car_fta : "0.000";
+        $car_tgp = ($car_3ga) ? $car_3gm / $car_3ga : "0.000";
+        $car_avgm = ($car_gm) ? $car_min / $car_gm : "0.0";
+        $car_avgo = ($car_gm) ? $car_orb / $car_gm : "0.0";
+        $car_avgr = ($car_gm) ? $car_reb / $car_gm : "0.0";
+        $car_avga = ($car_gm) ? $car_ast / $car_gm : "0.0";
+        $car_avgs = ($car_gm) ? $car_stl / $car_gm : "0.0";
+        $car_avgb = ($car_gm) ? $car_blk / $car_gm : "0.0";
+        $car_avgt = ($car_gm) ? $car_tvr / $car_gm : "0.0";
+        $car_avgf = ($car_gm) ? $car_pf / $car_gm : "0.0";
+        $car_avgp = ($car_gm) ? $car_pts / $car_gm : "0.0";
 
         echo "<tr>
             <td colspan=2 >Career Totals</td>
@@ -670,13 +670,13 @@ function showpage($playerID, $spec)
             $hist_min = stripslashes(check_html($row44['min'], "nohtml"));
             $hist_fgm = stripslashes(check_html($row44['fgm'], "nohtml"));
             $hist_fga = stripslashes(check_html($row44['fga'], "nohtml"));
-            @$hist_fgp = ($hist_fgm / $hist_fga);
+            $hist_fgp = ($hist_fga) ? ($hist_fgm / $hist_fga) : "0.000";
             $hist_ftm = stripslashes(check_html($row44['ftm'], "nohtml"));
             $hist_fta = stripslashes(check_html($row44['fta'], "nohtml"));
-            @$hist_ftp = ($hist_ftm / $hist_fta);
+            $hist_ftp = ($hist_fta) ? ($hist_ftm / $hist_fta) : "0.000";
             $hist_tgm = stripslashes(check_html($row44['3gm'], "nohtml"));
             $hist_tga = stripslashes(check_html($row44['3ga'], "nohtml"));
-            @$hist_tgp = ($hist_tgm / $hist_tga);
+            $hist_tgp = ($hist_tga) ? ($hist_tgm / $hist_tga) : '0.000';
             $hist_orb = stripslashes(check_html($row44['orb'], "nohtml"));
             $hist_reb = stripslashes(check_html($row44['reb'], "nohtml"));
             $hist_ast = stripslashes(check_html($row44['ast'], "nohtml"));
@@ -686,21 +686,21 @@ function showpage($playerID, $spec)
             $hist_pf = stripslashes(check_html($row44['pf'], "nohtml"));
             $hist_pts = $hist_fgm + $hist_fgm + $hist_ftm + $hist_tgm;
 
-            @$hist_mpg = ($hist_min / $hist_gm);
-            @$hist_fgmpg = ($hist_fgm / $hist_gm);
-            @$hist_fgapg = ($hist_fga / $hist_gm);
-            @$hist_ftmpg = ($hist_ftm / $hist_gm);
-            @$hist_ftapg = ($hist_fta / $hist_gm);
-            @$hist_3gmpg = ($hist_tgm / $hist_gm);
-            @$hist_3gapg = ($hist_tga / $hist_gm);
-            @$hist_opg = ($hist_orb / $hist_gm);
-            @$hist_rpg = ($hist_reb / $hist_gm);
-            @$hist_apg = ($hist_ast / $hist_gm);
-            @$hist_spg = ($hist_stl / $hist_gm);
-            @$hist_tpg = ($hist_tvr / $hist_gm);
-            @$hist_bpg = ($hist_blk / $hist_gm);
-            @$hist_fpg = ($hist_pf / $hist_gm);
-            @$hist_ppg = ($hist_pts / $hist_gm);
+            $hist_mpg = ($hist_gm) ? ($hist_min / $hist_gm) : "0.0";
+            $hist_fgmpg = ($hist_gm) ? ($hist_fgm / $hist_gm) : "0.0";
+            $hist_fgapg = ($hist_gm) ? ($hist_fga / $hist_gm) : "0.0";
+            $hist_ftmpg = ($hist_gm) ? ($hist_ftm / $hist_gm) : "0.0";
+            $hist_ftapg = ($hist_gm) ? ($hist_fta / $hist_gm) : "0.0";
+            $hist_3gmpg = ($hist_gm) ? ($hist_tgm / $hist_gm) : "0.0";
+            $hist_3gapg = ($hist_gm) ? ($hist_tga / $hist_gm) : "0.0";
+            $hist_opg = ($hist_gm) ? ($hist_orb / $hist_gm) : "0.0";
+            $hist_rpg = ($hist_gm) ? ($hist_reb / $hist_gm) : "0.0";
+            $hist_apg = ($hist_gm) ? ($hist_ast / $hist_gm) : "0.0";
+            $hist_spg = ($hist_gm) ? ($hist_stl / $hist_gm) : "0.0";
+            $hist_tpg = ($hist_gm) ? ($hist_tvr / $hist_gm) : "0.0";
+            $hist_bpg = ($hist_gm) ? ($hist_blk / $hist_gm) : "0.0";
+            $hist_fpg = ($hist_gm) ? ($hist_pf / $hist_gm) : "0.0";
+            $hist_ppg = ($hist_gm) ? ($hist_pts / $hist_gm) : "0.0";
 
             $car_gm = $car_gm + $hist_gm;
             $car_min = $car_min + $hist_min;
@@ -824,24 +824,24 @@ function showpage($playerID, $spec)
             $car_pts = $car_pts + $stats_pts;
         }
 
-        @$car_avgm = $car_min / $car_gm;
-        @$car_fgmpg = $car_fgm / $car_gm;
-        @$car_fgapg = $car_fga / $car_gm;
-        @$car_fgp = $car_fgm / $car_fga;
-        @$car_ftmpg = $car_ftm / $car_gm;
-        @$car_ftapg = $car_fta / $car_gm;
-        @$car_ftp = $car_ftm / $car_fta;
-        @$car_3gmpg = $car_3gm / $car_gm;
-        @$car_3gapg = $car_3ga / $car_gm;
-        @$car_tgp = $car_3gm / $car_3ga;
-        @$car_avgo = $car_orb / $car_gm;
-        @$car_avgr = $car_reb / $car_gm;
-        @$car_avga = $car_ast / $car_gm;
-        @$car_avgs = $car_stl / $car_gm;
-        @$car_avgb = $car_blk / $car_gm;
-        @$car_avgt = $car_tvr / $car_gm;
-        @$car_avgf = $car_pf / $car_gm;
-        @$car_avgp = $car_pts / $car_gm;
+        $car_avgm = ($car_gm) ? $car_min / $car_gm : "0.0";
+        $car_fgmpg = ($car_gm) ? $car_fgm / $car_gm : "0.0";
+        $car_fgapg = ($car_gm) ? $car_fga / $car_gm : "0.0";
+        $car_fgp = ($car_fga) ?$car_fgm / $car_fga : "0.000";
+        $car_ftmpg = ($car_gm) ? $car_ftm / $car_gm : "0.0";
+        $car_ftapg = ($car_gm) ? $car_fta / $car_gm : "0.0";
+        $car_ftp = ($car_fta) ? $car_ftm / $car_fta : "0.000";
+        $car_3gmpg = ($car_gm) ? $car_3gm / $car_gm : "0.0";
+        $car_3gapg = ($car_gm) ? $car_3ga / $car_gm : "0.0";
+        $car_tgp = ($car_3ga) ? $car_3gm / $car_3ga : "0.000";
+        $car_avgo = ($car_gm) ? $car_orb / $car_gm : "0.0";
+        $car_avgr = ($car_gm) ? $car_reb / $car_gm : "0.0";
+        $car_avga = ($car_gm) ? $car_ast / $car_gm : "0.0";
+        $car_avgs = ($car_gm) ? $car_stl / $car_gm : "0.0";
+        $car_avgb = ($car_gm) ? $car_blk / $car_gm : "0.0";
+        $car_avgt = ($car_gm) ? $car_tvr / $car_gm : "0.0";
+        $car_avgf = ($car_gm) ? $car_pf / $car_gm : "0.0";
+        $car_avgp = ($car_gm) ? $car_pts / $car_gm : "0.0";
 
         echo "<tr>
             <td colspan=2>Career Averages</td>
@@ -925,13 +925,13 @@ function showpage($playerID, $spec)
             $hist_min = stripslashes(check_html($rowplayoff4['minutes'], "nohtml"));
             $hist_fgm = stripslashes(check_html($rowplayoff4['fgm'], "nohtml"));
             $hist_fga = stripslashes(check_html($rowplayoff4['fga'], "nohtml"));
-            @$hist_fgp = ($hist_fgm / $hist_fga);
+            $hist_fgp = ($hist_fga) ? ($hist_fgm / $hist_fga) : "0.000";
             $hist_ftm = stripslashes(check_html($rowplayoff4['ftm'], "nohtml"));
             $hist_fta = stripslashes(check_html($rowplayoff4['fta'], "nohtml"));
-            @$hist_ftp = ($hist_ftm / $hist_fta);
+            $hist_ftp = ($hist_fta) ? ($hist_ftm / $hist_fta) : "0.000";
             $hist_tgm = stripslashes(check_html($rowplayoff4['tgm'], "nohtml"));
             $hist_tga = stripslashes(check_html($rowplayoff4['tga'], "nohtml"));
-            @$hist_tgp = ($hist_tgm / $hist_tga);
+            $hist_tgp = ($hist_tga) ? ($hist_tgm / $hist_tga) : "0.000";
             $hist_orb = stripslashes(check_html($rowplayoff4['orb'], "nohtml"));
             $hist_reb = stripslashes(check_html($rowplayoff4['reb'], "nohtml"));
             $hist_ast = stripslashes(check_html($rowplayoff4['ast'], "nohtml"));
@@ -977,18 +977,18 @@ function showpage($playerID, $spec)
 
         }
 
-        @$car_fgp = $car_fgm / $car_fga;
-        @$car_ftp = $car_ftm / $car_fta;
-        @$car_tgp = $car_3gm / $car_3ga;
-        @$car_avgm = $car_min / $car_gm;
-        @$car_avgo = $car_orb / $car_gm;
-        @$car_avgr = $car_reb / $car_gm;
-        @$car_avga = $car_ast / $car_gm;
-        @$car_avgs = $car_stl / $car_gm;
-        @$car_avgb = $car_blk / $car_gm;
-        @$car_avgt = $car_tvr / $car_gm;
-        @$car_avgf = $car_pf / $car_gm;
-        @$car_avgp = $car_pts / $car_gm;
+        $car_fgp = ($car_fga) ? $car_fgm / $car_fga : "0.000";
+        $car_ftp = ($car_fta) ? $car_ftm / $car_fta : "0.000";
+        $car_tgp = ($car_3ga) ? $car_3gm / $car_3ga : "0.000";
+        $car_avgm = ($car_gm) ? $car_min / $car_gm : "0.0";
+        $car_avgo = ($car_gm) ? $car_orb / $car_gm : "0.0";
+        $car_avgr = ($car_gm) ? $car_reb / $car_gm : "0.0";
+        $car_avga = ($car_gm) ? $car_ast / $car_gm : "0.0";
+        $car_avgs = ($car_gm) ? $car_stl / $car_gm : "0.0";
+        $car_avgb = ($car_gm) ? $car_blk / $car_gm : "0.0";
+        $car_avgt = ($car_gm) ? $car_tvr / $car_gm : "0.0";
+        $car_avgf = ($car_gm) ? $car_pf / $car_gm : "0.0";
+        $car_avgp = ($car_gm) ? $car_pts / $car_gm : "0.0";
 
         echo "<tr>
             <td colspan=2>Playoff Totals</td>
@@ -1046,13 +1046,13 @@ function showpage($playerID, $spec)
             $hist_min = stripslashes(check_html($rowplayoff4['minutes'], "nohtml"));
             $hist_fgm = stripslashes(check_html($rowplayoff4['fgm'], "nohtml"));
             $hist_fga = stripslashes(check_html($rowplayoff4['fga'], "nohtml"));
-            @$hist_fgp = ($hist_fgm / $hist_fga);
+            $hist_fgp = ($hist_fga) ? ($hist_fgm / $hist_fga) : "0.000";
             $hist_ftm = stripslashes(check_html($rowplayoff4['ftm'], "nohtml"));
             $hist_fta = stripslashes(check_html($rowplayoff4['fta'], "nohtml"));
-            @$hist_ftp = ($hist_ftm / $hist_fta);
+            $hist_ftp = ($hist_fta) ? ($hist_ftm / $hist_fta) : "0.000";
             $hist_tgm = stripslashes(check_html($rowplayoff4['tgm'], "nohtml"));
             $hist_tga = stripslashes(check_html($rowplayoff4['tga'], "nohtml"));
-            @$hist_tgp = ($hist_tgm / $hist_tga);
+            $hist_tgp = ($hist_tga) ? ($hist_tgm / $hist_tga) : "0.000";
             $hist_orb = stripslashes(check_html($rowplayoff4['orb'], "nohtml"));
             $hist_reb = stripslashes(check_html($rowplayoff4['reb'], "nohtml"));
             $hist_ast = stripslashes(check_html($rowplayoff4['ast'], "nohtml"));
@@ -1062,15 +1062,15 @@ function showpage($playerID, $spec)
             $hist_pf = stripslashes(check_html($rowplayoff4['pf'], "nohtml"));
             $hist_pts = $hist_fgm + $hist_fgm + $hist_ftm + $hist_tgm;
 
-            @$hist_mpg = ($hist_min / $hist_gm);
-            @$hist_opg = ($hist_orb / $hist_gm);
-            @$hist_rpg = ($hist_reb / $hist_gm);
-            @$hist_apg = ($hist_ast / $hist_gm);
-            @$hist_spg = ($hist_stl / $hist_gm);
-            @$hist_tpg = ($hist_tvr / $hist_gm);
-            @$hist_bpg = ($hist_blk / $hist_gm);
-            @$hist_fpg = ($hist_pf / $hist_gm);
-            @$hist_ppg = ($hist_pts / $hist_gm);
+            $hist_mpg = ($hist_gm) ? ($hist_min / $hist_gm) : "0.0";
+            $hist_opg = ($hist_gm) ? ($hist_orb / $hist_gm) : "0.0";
+            $hist_rpg = ($hist_gm) ? ($hist_reb / $hist_gm) : "0.0";
+            $hist_apg = ($hist_gm) ? ($hist_ast / $hist_gm) : "0.0";
+            $hist_spg = ($hist_gm) ? ($hist_stl / $hist_gm) : "0.0";
+            $hist_tpg = ($hist_gm) ? ($hist_tvr / $hist_gm) : "0.0";
+            $hist_bpg = ($hist_gm) ? ($hist_blk / $hist_gm) : "0.0";
+            $hist_fpg = ($hist_gm) ? ($hist_pf / $hist_gm) : "0.0";
+            $hist_ppg = ($hist_gm) ? ($hist_pts / $hist_gm) : "0.0";
 
             echo "<td><center>$hist_year</center></td>
                 <td><center>$hist_team</center></td>
@@ -1120,18 +1120,18 @@ function showpage($playerID, $spec)
 
         }
 
-        @$car_fgp = $car_fgm / $car_fga;
-        @$car_ftp = $car_ftm / $car_fta;
-        @$car_tgp = $car_3gm / $car_3ga;
-        @$car_avgm = $car_min / $car_gm;
-        @$car_avgo = $car_orb / $car_gm;
-        @$car_avgr = $car_reb / $car_gm;
-        @$car_avga = $car_ast / $car_gm;
-        @$car_avgs = $car_stl / $car_gm;
-        @$car_avgb = $car_blk / $car_gm;
-        @$car_avgt = $car_tvr / $car_gm;
-        @$car_avgf = $car_pf / $car_gm;
-        @$car_avgp = $car_pts / $car_gm;
+        $car_fgp = ($car_fga) ? $car_fgm / $car_fga : "0.000";
+        $car_ftp = ($car_fta) ? $car_ftm / $car_fta : "0.000";
+        $car_tgp = ($car_3ga) ? $car_3gm / $car_3ga : "0.000";
+        $car_avgm = ($car_gm) ? $car_min / $car_gm : "0.0";
+        $car_avgo = ($car_gm) ? $car_orb / $car_gm : "0.0";
+        $car_avgr = ($car_gm) ? $car_reb / $car_gm : "0.0";
+        $car_avga = ($car_gm) ? $car_ast / $car_gm : "0.0";
+        $car_avgs = ($car_gm) ? $car_stl / $car_gm : "0.0";
+        $car_avgb = ($car_gm) ? $car_blk / $car_gm : "0.0";
+        $car_avgt = ($car_gm) ? $car_tvr / $car_gm : "0.0";
+        $car_avgf = ($car_gm) ? $car_pf / $car_gm : "0.0";
+        $car_avgp = ($car_gm) ? $car_pts / $car_gm : "0.0";
 
         echo "<tr>
             <td colspan=2>Playoff Averages</td>
@@ -1203,13 +1203,13 @@ function showpage($playerID, $spec)
             $hist_min = stripslashes(check_html($rowplayoff4['minutes'], "nohtml"));
             $hist_fgm = stripslashes(check_html($rowplayoff4['fgm'], "nohtml"));
             $hist_fga = stripslashes(check_html($rowplayoff4['fga'], "nohtml"));
-            @$hist_fgp = ($hist_fgm / $hist_fga);
+            $hist_fgp = ($hist_fga) ? ($hist_fgm / $hist_fga) : "0.000";
             $hist_ftm = stripslashes(check_html($rowplayoff4['ftm'], "nohtml"));
             $hist_fta = stripslashes(check_html($rowplayoff4['fta'], "nohtml"));
-            @$hist_ftp = ($hist_ftm / $hist_fta);
+            $hist_ftp = ($hist_fta) ? ($hist_ftm / $hist_fta) : "0.000";
             $hist_tgm = stripslashes(check_html($rowplayoff4['tgm'], "nohtml"));
             $hist_tga = stripslashes(check_html($rowplayoff4['tga'], "nohtml"));
-            @$hist_tgp = ($hist_tgm / $hist_tga);
+            $hist_tgp = ($hist_tga) ? ($hist_tgm / $hist_tga) : "0.000";
             $hist_orb = stripslashes(check_html($rowplayoff4['orb'], "nohtml"));
             $hist_reb = stripslashes(check_html($rowplayoff4['reb'], "nohtml"));
             $hist_ast = stripslashes(check_html($rowplayoff4['ast'], "nohtml"));
@@ -1254,18 +1254,18 @@ function showpage($playerID, $spec)
             $car_pts = $car_pts + $hist_pts;
         }
 
-        @$car_fgp = $car_fgm / $car_fga;
-        @$car_ftp = $car_ftm / $car_fta;
-        @$car_tgp = $car_3gm / $car_3ga;
-        @$car_avgm = $car_min / $car_gm;
-        @$car_avgo = $car_orb / $car_gm;
-        @$car_avgr = $car_reb / $car_gm;
-        @$car_avga = $car_ast / $car_gm;
-        @$car_avgs = $car_stl / $car_gm;
-        @$car_avgb = $car_blk / $car_gm;
-        @$car_avgt = $car_tvr / $car_gm;
-        @$car_avgf = $car_pf / $car_gm;
-        @$car_avgp = $car_pts / $car_gm;
+        $car_fgp = ($car_fga) ? $car_fgm / $car_fga : "0.000";
+        $car_ftp = ($car_fta) ? $car_ftm / $car_fta : "0.000";
+        $car_tgp = ($car_3ga) ? $car_3gm / $car_3ga : "0.000";
+        $car_avgm = ($car_gm) ? $car_min / $car_gm : "0.0";
+        $car_avgo = ($car_gm) ? $car_orb / $car_gm : "0.0";
+        $car_avgr = ($car_gm) ? $car_reb / $car_gm : "0.0";
+        $car_avga = ($car_gm) ? $car_ast / $car_gm : "0.0";
+        $car_avgs = ($car_gm) ? $car_stl / $car_gm : "0.0";
+        $car_avgb = ($car_gm) ? $car_blk / $car_gm : "0.0";
+        $car_avgt = ($car_gm) ? $car_tvr / $car_gm : "0.0";
+        $car_avgf = ($car_gm) ? $car_pf / $car_gm : "0.0";
+        $car_avgp = ($car_gm) ? $car_pts / $car_gm : "0.0";
 
         echo "<tr>
             <td colspan=2>H.E.A.T. Totals</td>
@@ -1323,13 +1323,13 @@ function showpage($playerID, $spec)
             $hist_min = stripslashes(check_html($rowplayoff4['minutes'], "nohtml"));
             $hist_fgm = stripslashes(check_html($rowplayoff4['fgm'], "nohtml"));
             $hist_fga = stripslashes(check_html($rowplayoff4['fga'], "nohtml"));
-            @$hist_fgp = ($hist_fgm / $hist_fga);
+            $hist_fgp = ($hist_fga) ? ($hist_fgm / $hist_fga) : "0.000";
             $hist_ftm = stripslashes(check_html($rowplayoff4['ftm'], "nohtml"));
             $hist_fta = stripslashes(check_html($rowplayoff4['fta'], "nohtml"));
-            @$hist_ftp = ($hist_ftm / $hist_fta);
+            $hist_ftp = ($hist_fta) ? ($hist_ftm / $hist_fta) : "0.000";
             $hist_tgm = stripslashes(check_html($rowplayoff4['tgm'], "nohtml"));
             $hist_tga = stripslashes(check_html($rowplayoff4['tga'], "nohtml"));
-            @$hist_tgp = ($hist_tgm / $hist_tga);
+            $hist_tgp = ($hist_tga) ? ($hist_tgm / $hist_tga) : "0.000";
             $hist_orb = stripslashes(check_html($rowplayoff4['orb'], "nohtml"));
             $hist_reb = stripslashes(check_html($rowplayoff4['reb'], "nohtml"));
             $hist_ast = stripslashes(check_html($rowplayoff4['ast'], "nohtml"));
@@ -1339,15 +1339,15 @@ function showpage($playerID, $spec)
             $hist_pf = stripslashes(check_html($rowplayoff4['pf'], "nohtml"));
             $hist_pts = $hist_fgm + $hist_fgm + $hist_ftm + $hist_tgm;
 
-            @$hist_mpg = ($hist_min / $hist_gm);
-            @$hist_opg = ($hist_orb / $hist_gm);
-            @$hist_rpg = ($hist_reb / $hist_gm);
-            @$hist_apg = ($hist_ast / $hist_gm);
-            @$hist_spg = ($hist_stl / $hist_gm);
-            @$hist_tpg = ($hist_tvr / $hist_gm);
-            @$hist_bpg = ($hist_blk / $hist_gm);
-            @$hist_fpg = ($hist_pf / $hist_gm);
-            @$hist_ppg = ($hist_pts / $hist_gm);
+            $hist_mpg = ($hist_gm) ? ($hist_min / $hist_gm) : "0.0";
+            $hist_opg = ($hist_gm) ? ($hist_orb / $hist_gm) : "0.0";
+            $hist_rpg = ($hist_gm) ? ($hist_reb / $hist_gm) : "0.0";
+            $hist_apg = ($hist_gm) ? ($hist_ast / $hist_gm) : "0.0";
+            $hist_spg = ($hist_gm) ? ($hist_stl / $hist_gm) : "0.0";
+            $hist_tpg = ($hist_gm) ? ($hist_tvr / $hist_gm) : "0.0";
+            $hist_bpg = ($hist_gm) ? ($hist_blk / $hist_gm) : "0.0";
+            $hist_fpg = ($hist_gm) ? ($hist_pf / $hist_gm) : "0.0";
+            $hist_ppg = ($hist_gm) ? ($hist_pts / $hist_gm) : "0.0";
 
             echo "<td><center>$hist_year</center></td>
                 <td><center>$hist_team</center></td>
@@ -1396,18 +1396,18 @@ function showpage($playerID, $spec)
             $car_pts = $car_pts + $hist_pts;
         }
 
-        @$car_fgp = $car_fgm / $car_fga;
-        @$car_ftp = $car_ftm / $car_fta;
-        @$car_tgp = $car_3gm / $car_3ga;
-        @$car_avgm = $car_min / $car_gm;
-        @$car_avgo = $car_orb / $car_gm;
-        @$car_avgr = $car_reb / $car_gm;
-        @$car_avga = $car_ast / $car_gm;
-        @$car_avgs = $car_stl / $car_gm;
-        @$car_avgb = $car_blk / $car_gm;
-        @$car_avgt = $car_tvr / $car_gm;
-        @$car_avgf = $car_pf / $car_gm;
-        @$car_avgp = $car_pts / $car_gm;
+        $car_fgp = ($car_fga) ? $car_fgm / $car_fga : "0.000";
+        $car_ftp = ($car_fta) ? $car_ftm / $car_fta : "0.000";
+        $car_tgp = ($car_3ga) ? $car_3gm / $car_3ga : "0.000";
+        $car_avgm = ($car_gm) ? $car_min / $car_gm : "0.0";
+        $car_avgo = ($car_gm) ? $car_orb / $car_gm : "0.0";
+        $car_avgr = ($car_gm) ? $car_reb / $car_gm : "0.0";
+        $car_avga = ($car_gm) ? $car_ast / $car_gm : "0.0";
+        $car_avgs = ($car_gm) ? $car_stl / $car_gm : "0.0";
+        $car_avgb = ($car_gm) ? $car_blk / $car_gm : "0.0";
+        $car_avgt = ($car_gm) ? $car_tvr / $car_gm : "0.0";
+        $car_avgf = ($car_gm) ? $car_pf / $car_gm : "0.0";
+        $car_avgp = ($car_gm) ? $car_pts / $car_gm : "0.0";
 
         echo "<tr><td colspan=2>H.E.A.T. Averages</td>
             <td><center>$car_gm</center></td>
@@ -1681,6 +1681,10 @@ function showpage($playerID, $spec)
         ';
 
         while ($row = $db->sql_fetch_assoc($result)) {
+            $fieldGoalPercentage = ($row['gameFGA'] + $row['game3GA']) ? number_format(($row['gameFGM'] + $row['game3GM']) / ($row['gameFGA'] + $row['game3GA']), 3, '.', '') : "0.000";
+            $freeThrowPercentage = ($row['gameFTA']) ? number_format($row['gameFTM'] / $row['gameFTA'], 3, '.', '') : "0.000";
+            $threePointPercentage = ($row['game3GA']) ? number_format($row['game3GM'] / $row['game3GA'], 3, '.', '') : "0.000";
+
             echo "<style>
                     td {}
                     .gamelog {text-align: center;}
@@ -1693,13 +1697,13 @@ function showpage($playerID, $spec)
                     <td class=\"gamelog\">" . ((2 * $row['gameFGM']) + (3 * $row['game3GM']) + $row['gameFTM']) . "</td>
                     <td class=\"gamelog\">" . ($row['gameFGM'] + $row['game3GM']) . "</td>
                     <td class=\"gamelog\">" . ($row['gameFGA'] + $row['game3GA']) . "</td>
-                    <td class=\"gamelog\">" . number_format(($row['gameFGM'] + $row['game3GM']) / ($row['gameFGA'] + $row['game3GA']), 3, '.', '') . "</td>
+                    <td class=\"gamelog\">" . $fieldGoalPercentage . "</td>
                     <td class=\"gamelog\">" . $row['gameFTM'] . "</td>
                     <td class=\"gamelog\">" . $row['gameFTA'] . "</td>
-                    <td class=\"gamelog\">" . number_format($row['gameFTM'] / $row['gameFTA'], 3, '.', '') . "</td>
+                    <td class=\"gamelog\">" . $freeThrowPercentage . "</td>
                     <td class=\"gamelog\">" . $row['game3GM'] . "</td>
                     <td class=\"gamelog\">" . $row['game3GA'] . "</td>
-                    <td class=\"gamelog\">" . number_format($row['game3GM'] / $row['game3GA'], 3, '.', '') . "</td>
+                    <td class=\"gamelog\">" . $threePointPercentage . "</td>
                     <td class=\"gamelog\">" . $row['gameORB'] . "</td>
                     <td class=\"gamelog\">" . $row['gameDRB'] . "</td>
                     <td class=\"gamelog\">" . ($row['gameORB'] + $row['gameDRB']) . "</td>

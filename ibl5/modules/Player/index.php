@@ -702,22 +702,22 @@ function showpage($playerID, $spec)
             $hist_fpg = ($hist_gm) ? ($hist_pf / $hist_gm) : "0.0";
             $hist_ppg = ($hist_gm) ? ($hist_pts / $hist_gm) : "0.0";
 
-            $car_gm = $car_gm + $hist_gm;
-            $car_min = $car_min + $hist_min;
-            $car_fgm = $car_fgm + $hist_fgm;
-            $car_fga = $car_fga + $hist_fga;
-            $car_ftm = $car_ftm + $hist_ftm;
-            $car_fta = $car_fta + $hist_fta;
-            $car_3gm = $car_3gm + $hist_tgm;
-            $car_3ga = $car_3ga + $hist_tga;
-            $car_orb = $car_orb + $hist_orb;
-            $car_reb = $car_reb + $hist_reb;
-            $car_ast = $car_ast + $hist_ast;
-            $car_stl = $car_stl + $hist_stl;
-            $car_blk = $car_blk + $hist_blk;
-            $car_tvr = $car_tvr + $hist_tvr;
-            $car_pf = $car_pf + $hist_pf;
-            $car_pts = $car_pts + $hist_pts;
+            $car_gm += $hist_gm;
+            $car_min += $hist_min;
+            $car_fgm += $hist_fgm;
+            $car_fga += $hist_fga;
+            $car_ftm += $hist_ftm;
+            $car_fta += $hist_fta;
+            $car_3gm += $hist_tgm;
+            $car_3ga += $hist_tga;
+            $car_orb += $hist_orb;
+            $car_reb += $hist_reb;
+            $car_ast += $hist_ast;
+            $car_stl += $hist_stl;
+            $car_blk += $hist_blk;
+            $car_tvr += $hist_tvr;
+            $car_pf += $hist_pf;
+            $car_pts += $hist_pts;
 
             echo "<td><center>$hist_year</center></td>
                 <td><center>$hist_team</center></td>

@@ -19,7 +19,7 @@ if (!defined('BLOCK_FILE')) {
 global $db;
 
 $query = "SELECT TeamID, Team, ranking, win, loss, color1, color2
-    FROM ibl_power rankings
+    FROM ibl_power
     INNER JOIN ibl_team_info info USING (teamid)
     ORDER BY ranking DESC;";
 $result = $db->sql_query($query);

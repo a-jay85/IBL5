@@ -18,18 +18,23 @@ $queryAllTeams = "SELECT * FROM ibl_team_info WHERE teamid != " . League::FREE_A
 $resultAllTeams = $db->sql_query($queryAllTeams);
 $numteams = $db->sql_numrows($resultAllTeams);
 
+function trHighlight($userTeamID, $operatingTeamID)
+{
+    if ($userTeamID == $operatingTeamID) {
+        return "<tr bgcolor=#DDDD00 align=right>";
+    } else {
+        return "<tr align=right>";
+    }
+}
+
 $t = 0;
 foreach ($resultAllTeams as $teamRow) {
     $team = Team::withTeamRow($db, $teamRow);
     $teamStats = TeamStats::withTeamName($db, $team->name);
 
-    if ($userTeam->teamID == $team->teamID) {
-        $trSubstitute = "<tr bgcolor=#DDDD00 align=right>";
-    } else {
-        $trSubstitute = "<tr align=right>";
-    }
+    $trHighlight = trHighlight($userTeam->teamID, $team->teamID);
 
-    $offense_totals .= "$trSubstitute
+    $offense_totals .= "$trHighlight
         <td bgcolor=\"$team->color1\">
             <a href=\"modules.php?name=Team&op=team&tid=$team->teamID\"><font color=\"$team->color2\">$team->city $team->name Offense</font></a>
         </td>
@@ -50,7 +55,7 @@ foreach ($resultAllTeams as $teamRow) {
         <td>$teamStats->seasonOffenseTotalPoints</td>
     </tr>";
 
-    $offense_averages .= "$trSubstitute
+    $offense_averages .= "$trHighlight
         <td bgcolor=\"$team->color1\">
             <a href=\"modules.php?name=Team&op=team&tid=$team->teamID\"><font color=\"$team->color2\">$team->city $team->name Offense</font></a>
         </td>
@@ -73,7 +78,7 @@ foreach ($resultAllTeams as $teamRow) {
         <td>$teamStats->seasonOffensePointsPerGame</td>
     </tr>";
 
-    $defense_totals .= "$trSubstitute
+    $defense_totals .= "$trHighlight
         <td bgcolor=\"$team->color1\">
             <a href=\"modules.php?name=Team&op=team&tid=$team->teamID\"><font color=\"$team->color2\">$team->city $team->name Offense</font></a>
         </td>
@@ -94,7 +99,7 @@ foreach ($resultAllTeams as $teamRow) {
         <td>$teamStats->seasonDefenseTotalPoints</td>
     </tr>";
 
-    $defense_averages .= "$trSubstitute
+    $defense_averages .= "$trHighlight
         <td bgcolor=\"$team->color1\">
             <a href=\"modules.php?name=Team&op=team&tid=$team->teamID\"><font color=\"$team->color2\">$team->city $team->name Defense</font></a>
         </td>
@@ -202,13 +207,9 @@ $leagueOffensePointsPerGame = ($leagueOffenseGamesPlayed) ? number_format($leagu
 
 $i = 0;
 while ($i < $numteams) {
-    if ($userTeam->name == $teamOffenseAveragesArray[$i][0]) {
-        $trSubstitute = "<tr bgcolor=#DDDD00 align=right>";
-    } else {
-        $trSubstitute = "<tr align=right>";
-    }
+    $trHighlight = trHighlight($userTeam->name, $teamOffenseAveragesArray[$i][0]);
 
-    $league_differentials .= $trSubstitute;
+    $league_differentials .= $trHighlight;
     $league_differentials .= $teamHeaderCells[$i];
 
     $j = 1;

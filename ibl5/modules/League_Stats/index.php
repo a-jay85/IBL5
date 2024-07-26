@@ -200,46 +200,6 @@ $leagueOffenseBlocksPerGame = ($leagueOffenseGamesPlayed) ? number_format($leagu
 $leagueOffensePersonalFoulsPerGame = ($leagueOffenseGamesPlayed) ? number_format($leagueOffenseTotalPersonalFouls / $leagueOffenseGamesPlayed, 1) : "0.0";
 $leagueOffensePointsPerGame = ($leagueOffenseGamesPlayed) ? number_format($leagueOffenseTotalPoints / $leagueOffenseGamesPlayed, 1) : "0.0";
 
-$league_totals = "<tr style=\"font-weight:bold\">
-    <td>LEAGUE TOTALS</td>
-    <td>$leagueOffenseGamesPlayed</td>
-    <td>$leagueOffenseTotalFieldGoalsMade</td>
-    <td>$leagueOffenseTotalFieldGoalsAttempted</td>
-    <td>$leagueOffenseTotalFreeThrowsMade</td>
-    <td>$leagueOffenseTotalFreeThrowsAttempted</td>
-    <td>$leagueOffenseTotalThreePointersMade</td>
-    <td>$leagueOffenseTotalThreePointersAttempted</td>
-    <td>$leagueOffenseTotalOffensiveRebounds</td>
-    <td>$leagueOffenseTotalRebounds</td>
-    <td>$leagueOffenseTotalAssists</td>
-    <td>$leagueOffenseTotalSteals</td>
-    <td>$leagueOffenseTotalTurnovers</td>
-    <td>$leagueOffenseTotalBlocks</td>
-    <td>$leagueOffenseTotalPersonalFouls</td>
-    <td>$leagueOffenseTotalPoints</td>
-</tr>";
-
-$league_averages = "<tr style=\"font-weight:bold\">
-    <td>LEAGUE AVERAGES</td>
-    <td>$leagueOffenseFieldGoalsMadePerGame</td>
-    <td>$leagueOffenseFieldGoalsAttemptedPerGame</td>
-    <td>$leagueOffenseFieldGoalPercentage</td>
-    <td>$leagueOffenseFreeThrowsMadePerGame</td>
-    <td>$leagueOffenseFreeThrowsAttemptedPerGame</td>
-    <td>$leagueOffenseFreeThrowPercentage</td>
-    <td>$leagueOffenseThreePointersMadePerGame</td>
-    <td>$leagueOffenseThreePointersAttemptedPerGame</td>
-    <td>$leagueOffenseThreePointPercentage</td>
-    <td>$leagueOffenseOffensiveReboundsPerGame</td>
-    <td>$leagueOffenseTotalReboundsPerGame</td>
-    <td>$leagueOffenseAssistsPerGame</td>
-    <td>$leagueOffenseStealsPerGame</td>
-    <td>$leagueOffenseTurnoversPerGame</td>
-    <td>$leagueOffenseBlocksPerGame</td>
-    <td>$leagueOffensePersonalFoulsPerGame</td>
-    <td>$leagueOffensePointsPerGame</td>
-</tr>";
-
 $i = 0;
 while ($i < $numteams) {
     if ($userTeam->name == $teamOffenseAveragesArray[$i][0]) {

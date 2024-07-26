@@ -118,7 +118,8 @@ echo "<center>
     <table class=\"sortable\">
         <thead>$averagesHeaderRow</thead>
         <tbody>$league_differentials</tbody>
-    </table>";
+    </table>
+</center>";
 
 CloseTable();
 include "footer.php";

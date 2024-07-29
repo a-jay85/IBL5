@@ -2,6 +2,7 @@
 
 require 'mainfile.php';
 $sharedFunctions = new Shared($db);
+$season = new Season($db);
 
 $query0 = "SELECT * FROM ibl_trade_autocounter ORDER BY `counter` DESC";
 $result0 = $db->sql_query($query0);
@@ -18,7 +19,6 @@ $switchCounter = $_POST['half'];
 $fieldsCounter = $_POST['counterfields'];
 $fieldsCounter += 1;
 
-$i = 1;
 while ($i < 7) {
     $userSendsCash[$i] = $_POST['userSendsCash' . $i];
     $partnerSendsCash[$i] = $_POST['partnerSendsCash' . $i];
@@ -51,10 +51,23 @@ while ($j < $switchCounter) {
     $j++;
 }
 
-if ($userSendsCash[1] != 0) {
-    $userCurrentSeasonCapTotal += $userSendsCash[1];
-    $partnerCurrentSeasonCapTotal -= $userSendsCash[1];
-    echo "Cash Consideration sent to them this season: $userSendsCash[1]<br>";
+// If the current season phase shifts cap situations to next season, evaluate next season's cap limits.
+if (
+    $season->phase == "Playoffs"
+    OR $season->phase == "Draft"
+    OR $season->phase == "Free Agency"
+) {
+    $cashConsiderationSentToThemThisSeason = $userSendsCash[2];
+    $cashConsiderationSentToMeThisSeason = $partnerSendsCash[2];
+} else {
+    $cashConsiderationSentToThemThisSeason = $userSendsCash[1];
+    $cashConsiderationSentToMeThisSeason = $partnerSendsCash[1];
+}
+
+if ($cashConsiderationSentToThemThisSeason != 0) {
+    $userCurrentSeasonCapTotal += $cashConsiderationSentToThemThisSeason;
+    $partnerCurrentSeasonCapTotal -= $cashConsiderationSentToThemThisSeason;
+    echo "Cash Consideration sent to them this season: $$cashConsiderationSentToThemThisSeason<br>";
 }
 
 echo "My Payroll: $userCurrentSeasonCapTotal<br><br>";
@@ -70,10 +83,10 @@ while ($j < $fieldsCounter) {
     $j++;
 }
 
-if ($partnerSendsCash[1] != 0) {
-    $partnerCurrentSeasonCapTotal += $partnerSendsCash[1];
-    $userCurrentSeasonCapTotal -= $partnerSendsCash[1];
-    echo "Cash Consideration sent to me this season: $partnerSendsCash[1]<br>";
+if ($cashConsiderationSentToMeThisSeason != 0) {
+    $partnerCurrentSeasonCapTotal += $cashConsiderationSentToMeThisSeason;
+    $userCurrentSeasonCapTotal -= $cashConsiderationSentToMeThisSeason;
+    echo "Cash Consideration sent to me this season: $cashConsiderationSentToMeThisSeason<br>";
 }
 
 echo "Their Payroll this season: $partnerCurrentSeasonCapTotal<br><br>";

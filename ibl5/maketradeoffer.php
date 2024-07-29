@@ -162,24 +162,12 @@ VALUES        ( '$tradeofferid',
         $k++;
     }
 
-    if ($userSendsCash[1] == NULL) {
-        $userSendsCash[1] = 0;
-    }
-    if ($userSendsCash[2] == NULL) {
-        $userSendsCash[2] = 0;
-    }
-    if ($userSendsCash[3] == NULL) {
-        $userSendsCash[3] = 0;
-    }
-    if ($userSendsCash[4] == NULL) {
-        $userSendsCash[4] = 0;
-    }
-    if ($userSendsCash[5] == NULL) {
-        $userSendsCash[5] = 0;
-    }
-    if ($userSendsCash[6] == NULL) {
-        $userSendsCash[6] = 0;
-    }
+    $userSendsCash[1] = $userSendsCash[1] ?? 0;
+    $userSendsCash[2] = $userSendsCash[2] ?? 0;
+    $userSendsCash[3] = $userSendsCash[3] ?? 0;
+    $userSendsCash[4] = $userSendsCash[4] ?? 0;
+    $userSendsCash[5] = $userSendsCash[5] ?? 0;
+    $userSendsCash[6] = $userSendsCash[6] ?? 0;
 
     if (
         $userSendsCash[1] != 0
@@ -281,24 +269,12 @@ VALUES        ( '$tradeofferid',
         $k++;
     }
 
-    if ($partnerSendsCash[1] == NULL) {
-        $partnerSendsCash[1] = 0;
-    }
-    if ($partnerSendsCash[2] == NULL) {
-        $partnerSendsCash[2] = 0;
-    }
-    if ($partnerSendsCash[3] == NULL) {
-        $partnerSendsCash[3] = 0;
-    }
-    if ($partnerSendsCash[4] == NULL) {
-        $partnerSendsCash[4] = 0;
-    }
-    if ($partnerSendsCash[5] == NULL) {
-        $partnerSendsCash[5] = 0;
-    }
-    if ($partnerSendsCash[6] == NULL) {
-        $partnerSendsCash[6] = 0;
-    }
+    $partnerSendsCash[1] = $partnerSendsCash[1] ?? 0;
+    $partnerSendsCash[2] = $partnerSendsCash[2] ?? 0;
+    $partnerSendsCash[3] = $partnerSendsCash[3] ?? 0;
+    $partnerSendsCash[4] = $partnerSendsCash[4] ?? 0;
+    $partnerSendsCash[5] = $partnerSendsCash[5] ?? 0;
+    $partnerSendsCash[6] = $partnerSendsCash[6] ?? 0;
 
     if (
         $partnerSendsCash[1] != 0

@@ -10,14 +10,24 @@ if ($numdec > 0) {
     $dec = 0;
 }
 
-$output .= "<tr bgcolor=\"#$team->color1\"><td align=\"center\">
-    <font color=\"#$team->color2\"><b>GM History</b></font>
-    </td></tr>
-    <tr><td>";
+$output .= "<tr bgcolor=\"#$team->color1\">
+    <td align=\"center\">
+        <font color=\"#$team->color2\"><b>GM History</b></font>
+    </td>
+</tr>
+<tr>
+    <td>";
+
 while ($dec < $numdec) {
     $dec_year = $db->sql_result($resultdec, $dec, "year");
     $dec_Award = $db->sql_result($resultdec, $dec, "Award");
-    $output .= "<table border=0 cellpadding=0 cellspacing=0><tr><td>$dec_year $dec_Award</td></tr></table>";
+    $output .= "<table border=0 cellpadding=0 cellspacing=0>
+        <tr>
+            <td>$dec_year $dec_Award</td>
+        </tr>
+    </table>";
     $dec++;
 }
-$output .= "</td></tr>";
+
+$output .= "</td>
+</tr>";

@@ -23,7 +23,6 @@ if (stristr($_SERVER['QUERY_STRING'], '%25')) {
     header("Location: index.php");
 }
 
-require_once "mainfile.php";
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 

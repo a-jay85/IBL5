@@ -18,7 +18,6 @@ if (!strpos($_SERVER['PHP_SELF'], 'admin.php')) {
 if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
-require_once "mainfile.php";
 if (stripos_clone($_SERVER['QUERY_STRING'], '%25')) {
     header("Location: index.php");
 }

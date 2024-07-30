@@ -10,8 +10,14 @@ $h = 0;
 $wintot = 0;
 $lostot = 0;
 
-$output .= "<tr bgcolor=\"#$team->color1\"><td align=center><font color=\"#$team->color2\"><b>Regular Season History</b></font></td></tr>
-    <tr><td><div id=\"History-R\" style=\"overflow:auto\">";
+$output .= "<tr bgcolor=\"#$team->color1\">
+    <td align=center>
+        <font color=\"#$team->color2\"><b>Regular Season History</b></font>
+    </td>
+</tr>
+<tr>
+    <td>
+        <div id=\"History-R\" style=\"overflow:auto\">";
 
 while ($h < $numwl) {
     $yearwl = $db->sql_result($resultwl, $h, "year");
@@ -25,7 +31,14 @@ while ($h < $numwl) {
 
     $h++;
 }
-$wlpct = ($wintot + $lostot != 0) ? number_format($wintot / ($wintot + $lostot), 3) : "0.000";
 
-$output .= "</div></td></tr>
-    <tr><td><b>Totals:</b> $wintot - $lostot ($wlpct)</td></tr>";
+$wlpct = ($wintot + $lostot) ? number_format($wintot / ($wintot + $lostot), 3) : "0.000";
+
+$output .= "</div>
+    </td>
+</tr>
+<tr>
+    <td>
+        <b>Totals:</b> $wintot-$lostot ($wlpct)
+    </td>
+</tr>";

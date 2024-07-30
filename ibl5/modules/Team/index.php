@@ -310,6 +310,8 @@ function team_info_right($team)
 {
     global $db;
 
+    $output = "<table bgcolor=#eeeeee width=220>";
+
     require "currentSeason.php";
     require "gmHistory.php";
     require "championshipBanners.php";
@@ -317,6 +319,8 @@ function team_info_right($team)
     require "resultsRegularSeason.php";
     require "resultsHEAT.php";
     require "resultsPlayoffs.php";
+
+    $output .= "</table>";
 
     $ultimate_output[0] = $output;
 

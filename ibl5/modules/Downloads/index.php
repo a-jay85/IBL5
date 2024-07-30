@@ -28,7 +28,6 @@ if (isset($show)) {
     $show = intval($show);
 }
 
-require_once "mainfile.php";
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 $pagetitle = "- " . _UDOWNLOADS . "";

@@ -21,7 +21,6 @@ if (!defined('MODULE_FILE')) {
 }
 $module_name = basename(dirname(__FILE__));
 require "modules/$module_name/l_config.php";
-require_once "mainfile.php";
 
 $outsidevotes = 0;
 $anonvotes = 0;

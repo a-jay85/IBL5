@@ -18,7 +18,6 @@ if (!strpos($_SERVER['PHP_SELF'], 'admin.php')) {
 if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
-require_once "mainfile.php";
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
@@ -1120,8 +1119,7 @@ switch ($op) {
 
     case "moderate":
         if (!isset($admin)) {
-            require_once "mainfile.php";
-        }
+                    }
         global $userinfo;
         if (($admintest == 1) || ($moderate == 2)) {
             while (list($tdw, $emp) = each($_POST)) {

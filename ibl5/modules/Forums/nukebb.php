@@ -51,7 +51,6 @@ $nuke_root_path = "modules.php?name=" . $module_name;
 $nuke_file_path = "modules.php?name=" . $module_name . "&file=";
 $phpbb_root_path = "modules/" . $module_name . "/";
 $phpbb_root_dir = "./../";
-require_once "mainfile.php";
 get_lang($module_name);
 if (isset($f)) {
     $f = intval($f);

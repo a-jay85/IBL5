@@ -17,7 +17,6 @@ if (!defined('MODULE_FILE')) {
 }
 
 define('INDEX_FILE', true);
-require_once "mainfile.php";
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 

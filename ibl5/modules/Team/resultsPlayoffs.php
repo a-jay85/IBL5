@@ -151,5 +151,4 @@ if ($round_four_output != "") {
 
 $output .= "<tr bgcolor=\"#$team->color1\"><td align=center><font color=\"#$team->color2\"><b>Post-Season Totals</b></font></td></tr>
     <tr><td><b>Games:</b> $totalplayoffwins - $totalplayofflosses ($pwlpct)</td></tr>
-    <tr><td><b>Series:</b> $round_victories - $round_losses ($swlpct)</td></tr>
-    </table>";
+    <tr><td><b>Series:</b> $round_victories - $round_losses ($swlpct)</td></tr>";

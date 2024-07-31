@@ -26,7 +26,7 @@ while ($h < $numwl) {
     $losses = $db->sql_result($resultwl, $h, "losses");
     $wintot += $wins;
     $lostot += $losses;
-    @$winpct = number_format($wins / ($wins + $losses), 3);
+    $winpct = ($wins + $losses) ? number_format($wins / ($wins + $losses), 3) : "0.000";
     $output .= "<a href=\"./modules.php?name=Team&op=team&tid=$team->teamID&yr=$yearwl\">" . ($yearwl - 1) . "-$yearwl $namewl</a>: $wins-$losses ($winpct)<br>";
 
     $h++;

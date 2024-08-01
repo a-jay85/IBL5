@@ -1,8 +1,64 @@
-
-
 RewriteEngine on
 
 <Files 403.shtml>
 order allow,deny
 allow from all
 </Files>
+
+RewriteCond %{HTTP_REFERER} !^http://iblhoops.net/.*$      [NC]
+RewriteCond %{HTTP_REFERER} !^http://iblhoops.net$      [NC]
+RewriteCond %{HTTP_REFERER} !^http://wh1082539.ispot.cc/.*$      [NC]
+RewriteCond %{HTTP_REFERER} !^http://wh1082539.ispot.cc$      [NC]
+RewriteCond %{HTTP_REFERER} !^http://www.iblhoops.net/.*$      [NC]
+RewriteCond %{HTTP_REFERER} !^http://www.iblhoops.net$      [NC]
+RewriteCond %{HTTP_REFERER} !^http://www.wh1082539.ispot.cc/.*$      [NC]
+RewriteCond %{HTTP_REFERER} !^http://www.wh1082539.ispot.cc$      [NC]
+RewriteCond %{HTTP_REFERER} !^https://iblhoops.net/.*$      [NC]
+RewriteCond %{HTTP_REFERER} !^https://iblhoops.net$      [NC]
+RewriteCond %{HTTP_REFERER} !^https://wh1082539.ispot.cc/.*$      [NC]
+RewriteCond %{HTTP_REFERER} !^https://wh1082539.ispot.cc$      [NC]
+RewriteCond %{HTTP_REFERER} !^https://www.iblhoops.net/.*$      [NC]
+RewriteCond %{HTTP_REFERER} !^https://www.iblhoops.net$      [NC]
+RewriteCond %{HTTP_REFERER} !^https://www.wh1082539.ispot.cc/.*$      [NC]
+RewriteCond %{HTTP_REFERER} !^https://www.wh1082539.ispot.cc$      [NC]
+RewriteRule .*\.(jpg|jpeg|gif|png|bmp)$ - [F,NC]
+
+deny from 173.252.107.0/24
+deny from 69.171.230.0/24
+deny from 69.171.249.0/24
+deny from 173.252.83.0/24
+
+deny from 173.252.69.0/24
+deny from 173.252.70.0/24
+deny from 173.252.87.0/24
+deny from 173.252.127.0/24
+
+# BEGIN cPanel-generated php ini directives, do not edit
+# Manual editing of this file may result in unexpected behavior.
+# To make changes to this file, use the cPanel MultiPHP INI Editor (Home >> Software >> MultiPHP INI Editor)
+# For more information, read our documentation (https://go.cpanel.net/EA4ModifyINI)
+<IfModule php7_module>
+   php_flag display_errors Off
+   php_value max_execution_time 30
+   php_value max_input_time 60
+   php_value max_input_vars 1000
+   php_value memory_limit 256M
+   php_value post_max_size 32M
+   php_value session.gc_maxlifetime 1440
+   php_value session.save_path "/var/cpanel/php/sessions/ea-php72"
+   php_value upload_max_filesize 32M
+   php_flag zlib.output_compression Off
+</IfModule>
+<IfModule lsapi_module>
+   php_flag display_errors Off
+   php_value max_execution_time 30
+   php_value max_input_time 60
+   php_value max_input_vars 1000
+   php_value memory_limit 256M
+   php_value post_max_size 32M
+   php_value session.gc_maxlifetime 1440
+   php_value session.save_path "/var/cpanel/php/sessions/ea-php72"
+   php_value upload_max_filesize 32M
+   php_flag zlib.output_compression Off
+</IfModule>
+# END cPanel-generated php ini directives, do not edit

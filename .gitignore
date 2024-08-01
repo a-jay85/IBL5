@@ -15,5 +15,7 @@ Discord.php
 
 backups
 depthcharts
-/ibl/IBL/
+/ibl5/ibl/IBL/
+!/ibl5/ibl/IBL/Schedule.htm
+!/ibl5/ibl/IBL/Standings.htm
 /ibl5/joe/ibl_draft/includes/classes/Discord.php

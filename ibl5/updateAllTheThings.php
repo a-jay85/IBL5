@@ -29,7 +29,6 @@ function extractDate($rawDate)
     if ($rawDate != false) {
         if (substr($rawDate, 0, 4) === "Post") {
             $rawDate = substr_replace($rawDate, 'June', 0, 4); // TODO: recognize "Post" instead of hacking it into June
-            var_dump($rawDate);
         }
 
         $month = ltrim(date('m', strtotime($rawDate)), '0');

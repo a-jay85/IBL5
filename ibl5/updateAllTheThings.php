@@ -134,9 +134,11 @@ foreach ($rows as $row) {
     Hscore = $hScore
     "; */
 
-    if ($db->sql_query($sqlQueryString)) {
-        echo $sqlQueryString . '<br>';
-    } // DO NOT use 'else die('Invalid query: '.$db->sql_error()' here -- script depends on being able to pass broken SQL strings for now.
+    if ($visitorTID != NULL AND $homeTID != NULL) {
+        if ($db->sql_query($sqlQueryString)) {
+            echo $sqlQueryString . '<br>';
+        }
+    }
 
     unset($visitorName,
         $homeName,

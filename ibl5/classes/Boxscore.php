@@ -96,11 +96,11 @@ class Boxscore
     protected function fillGameInfo($gameInfoLine, $seasonEndingYear, $seasonPhase)
     {
         $this->gameYear = $seasonEndingYear;
-        @$this->gameMonth = sprintf("%02u", substr($gameInfoLine, 0, 2) + 10); // sprintf() prepends 0 if the result isn't in double-digits
-        @$this->gameDay = sprintf("%02u", substr($gameInfoLine, 2, 2) + 1);
-        @$this->gameOfThatDay = substr($gameInfoLine, 4, 2) + 1;
-        @$this->visitorTeamID = substr($gameInfoLine, 6, 2) + 1;
-        @$this->homeTeamID = substr($gameInfoLine, 8, 2) + 1;
+        $this->gameMonth = sprintf("%02u", intval(substr($gameInfoLine, 0, 2)) + 10); // sprintf() prepends 0 if the result isn't in double-digits
+        $this->gameDay = sprintf("%02u", intval(substr($gameInfoLine, 2, 2)) + 1);
+        $this->gameOfThatDay = intval(substr($gameInfoLine, 4, 2)) + 1;
+        $this->visitorTeamID = intval(substr($gameInfoLine, 6, 2)) + 1;
+        $this->homeTeamID = intval(substr($gameInfoLine, 8, 2)) + 1;
         $this->attendance = substr($gameInfoLine, 10, 5);
         $this->capacity = substr($gameInfoLine, 15, 5);
         $this->visitorWins = substr($gameInfoLine, 20, 2);

@@ -366,7 +366,6 @@ function checkIfRegionIsClinched($region)
         if ($db->sql_query($querySetTeamToClinched)) {
             echo "The $winningestTeamName have clinched the $region $grouping!";
         }
-        ;
     } else {
         echo "Nope: the $region $grouping is still up for grabs!<p>";
     }
@@ -419,7 +418,6 @@ function checkIfPlayoffsClinched($conference)
             if ($db->sql_query($querySetTeamToClinched)) {
                 echo "The $contendingTeamName have clinched a playoff spot!<br>";
             }
-            ;
         }
 
         $i++;

@@ -60,13 +60,13 @@ while ($i < $num1) {
         $avg_minutes = $tot_minutes + $minutes / $tot_games;
         $tot_fgm = $tot_fgm + $fgm / $tot_games;
         $tot_fga = $tot_fga + $fga / $tot_games;
-        $tot_fgpct = $fgm / $fga;
+        $tot_fgpct = $fga ? $fgm / $fga : "0.000";
         $tot_ftm = $tot_ftm + $ftm / $tot_games;
         $tot_fta = $tot_fta + $fta / $tot_games;
-        $tot_ftpct = $ftm / $fta;
+        $tot_ftpct = $fta ? $ftm / $fta : "0.000";
         $tot_tgm = $tot_tgm + $tgm / $tot_games;
         $tot_tga = $tot_tga + $tga / $tot_games;
-        $tot_tpct = $tgm / $tga;
+        $tot_tpct = $tga ? $tgm / $tga : "0.000";
         $tot_orpg = $tot_orb + $orb / $tot_games;
         $tot_rpg = $tot_reb + $reb / $tot_games;
         $tot_apg = $tot_ast + $ast / $tot_games;

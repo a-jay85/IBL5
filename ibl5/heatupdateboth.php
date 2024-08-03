@@ -146,24 +146,24 @@ while ($i < $num1) {
         $pts = $db->sql_result($result2, $j, "pts");
 
         $tot_games = $tot_games + $games;
-        $avg_minutes = $tot_minutes + $minutes / $tot_games;
-        $tot_fgm = $tot_fgm + $fgm / $tot_games;
-        $tot_fga = $tot_fga + $fga / $tot_games;
-        $tot_fgpct = $fgm / $fga;
-        $tot_ftm = $tot_ftm + $ftm / $tot_games;
-        $tot_fta = $tot_fta + $fta / $tot_games;
-        $tot_ftpct = $ftm / $fta;
-        $tot_tgm = $tot_tgm + $tgm / $tot_games;
-        $tot_tga = $tot_tga + $tga / $tot_games;
-        $tot_tpct = $tgm / $tga;
-        $tot_orpg = $tot_orb + $orb / $tot_games;
-        $tot_rpg = $tot_reb + $reb / $tot_games;
-        $tot_apg = $tot_ast + $ast / $tot_games;
-        $tot_spg = $tot_stl + $stl / $tot_games;
-        $tot_tpg = $tot_tvr + $tvr / $tot_games;
-        $tot_bpg = $tot_blk + $blk / $tot_games;
-        $tot_fpg = $tot_pf + $pf / $tot_games;
-        $tot_ppg = $tot_pts + $pts / $tot_games;
+        $avg_minutes = $tot_games ? $tot_minutes + $minutes / $tot_games : "0.00";
+        $tot_fgm = $tot_games ? $tot_fgm + $fgm / $tot_games : "0.00";
+        $tot_fga = $tot_games ? $tot_fga + $fga / $tot_games : "0.00";
+        $tot_fgpct = $fga ? $fgm / $fga : "0.000";
+        $tot_ftm = $tot_games ? $tot_ftm + $ftm / $tot_games : "0.00";
+        $tot_fta = $tot_games ? $tot_fta + $fta / $tot_games : "0.00";
+        $tot_ftpct = $fta ? $ftm / $fta : "0.000";
+        $tot_tgm = $tot_games ? $tot_tgm + $tgm / $tot_games : "0.00";
+        $tot_tga = $tot_games ? $tot_tga + $tga / $tot_games : "0.00";
+        $tot_tpct = $tga ? $tgm / $tga : "0.000";
+        $tot_orpg = $tot_games ? $tot_orb + $orb / $tot_games : "0.00";
+        $tot_rpg = $tot_games ? $tot_reb + $reb / $tot_games : "0.00";
+        $tot_apg = $tot_games ? $tot_ast + $ast / $tot_games : "0.00";
+        $tot_spg = $tot_games ? $tot_stl + $stl / $tot_games : "0.00";
+        $tot_tpg = $tot_games ? $tot_tvr + $tvr / $tot_games : "0.00";
+        $tot_bpg = $tot_games ? $tot_blk + $blk / $tot_games : "0.00";
+        $tot_fpg = $tot_games ? $tot_pf + $pf / $tot_games : "0.00";
+        $tot_ppg = $tot_games ? $tot_pts + $pts / $tot_games : "0.00";
 
         $j++;
     }

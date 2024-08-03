@@ -1809,27 +1809,27 @@ function negotiate($pid)
             $negotiatingPlayerTD = intval($playerinfo['td']);
 
             // Pull max values of each stat category
-            $marketMaxFGA = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_fga) FROM ibl_plr"));
-            $marketMaxFGP = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_fgp) FROM ibl_plr"));
-            $marketMaxFTA = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_fta) FROM ibl_plr"));
-            $marketMaxFTP = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_ftp) FROM ibl_plr"));
-            $marketMaxTGA = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_tga) FROM ibl_plr"));
-            $marketMaxTGP = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_tgp) FROM ibl_plr"));
-            $marketMaxORB = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_orb) FROM ibl_plr"));
-            $marketMaxDRB = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_drb) FROM ibl_plr"));
-            $marketMaxAST = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_ast) FROM ibl_plr"));
-            $marketMaxSTL = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_stl) FROM ibl_plr"));
-            $marketMaxTOV = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_to) FROM ibl_plr"));
-            $marketMaxBLK = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_blk) FROM ibl_plr"));
-            $marketMaxFOUL = $db->sql_fetchrow($db->sql_query("SELECT MAX(r_foul) FROM ibl_plr"));
-            $marketMaxOO = $db->sql_fetchrow($db->sql_query("SELECT MAX(oo) FROM ibl_plr"));
-            $marketMaxOD = $db->sql_fetchrow($db->sql_query("SELECT MAX(od) FROM ibl_plr"));
-            $marketMaxDO = $db->sql_fetchrow($db->sql_query("SELECT MAX(do) FROM ibl_plr"));
-            $marketMaxDD = $db->sql_fetchrow($db->sql_query("SELECT MAX(dd) FROM ibl_plr"));
-            $marketMaxPO = $db->sql_fetchrow($db->sql_query("SELECT MAX(po) FROM ibl_plr"));
-            $marketMaxPD = $db->sql_fetchrow($db->sql_query("SELECT MAX(pd) FROM ibl_plr"));
-            $marketMaxTO = $db->sql_fetchrow($db->sql_query("SELECT MAX(to) FROM ibl_plr"));
-            $marketMaxTD = $db->sql_fetchrow($db->sql_query("SELECT MAX(td) FROM ibl_plr"));
+            $marketMaxFGA = $db->sql_fetchrow($db->sql_query("SELECT MAX(`r_fga`) FROM ibl_plr"));
+            $marketMaxFGP = $db->sql_fetchrow($db->sql_query("SELECT MAX(`r_fgp`) FROM ibl_plr"));
+            $marketMaxFTA = $db->sql_fetchrow($db->sql_query("SELECT MAX(`r_fta`) FROM ibl_plr"));
+            $marketMaxFTP = $db->sql_fetchrow($db->sql_query("SELECT MAX(`r_ftp`) FROM ibl_plr"));
+            $marketMaxTGA = $db->sql_fetchrow($db->sql_query("SELECT MAX(`r_tga`) FROM ibl_plr"));
+            $marketMaxTGP = $db->sql_fetchrow($db->sql_query("SELECT MAX(`r_tgp`) FROM ibl_plr"));
+            $marketMaxORB = $db->sql_fetchrow($db->sql_query("SELECT MAX(`r_orb`) FROM ibl_plr"));
+            $marketMaxDRB = $db->sql_fetchrow($db->sql_query("SELECT MAX(`r_drb`) FROM ibl_plr"));
+            $marketMaxAST = $db->sql_fetchrow($db->sql_query("SELECT MAX(`r_ast`) FROM ibl_plr"));
+            $marketMaxSTL = $db->sql_fetchrow($db->sql_query("SELECT MAX(`r_stl`) FROM ibl_plr"));
+            $marketMaxTOV = $db->sql_fetchrow($db->sql_query("SELECT MAX(`r_to`) FROM ibl_plr"));
+            $marketMaxBLK = $db->sql_fetchrow($db->sql_query("SELECT MAX(`r_blk`) FROM ibl_plr"));
+            $marketMaxFOUL = $db->sql_fetchrow($db->sql_query("SELECT MAX(`r_foul`) FROM ibl_plr"));
+            $marketMaxOO = $db->sql_fetchrow($db->sql_query("SELECT MAX(`oo`) FROM ibl_plr"));
+            $marketMaxOD = $db->sql_fetchrow($db->sql_query("SELECT MAX(`od`) FROM ibl_plr"));
+            $marketMaxDO = $db->sql_fetchrow($db->sql_query("SELECT MAX(`do`) FROM ibl_plr"));
+            $marketMaxDD = $db->sql_fetchrow($db->sql_query("SELECT MAX(`dd`) FROM ibl_plr"));
+            $marketMaxPO = $db->sql_fetchrow($db->sql_query("SELECT MAX(`po`) FROM ibl_plr"));
+            $marketMaxPD = $db->sql_fetchrow($db->sql_query("SELECT MAX(`pd`) FROM ibl_plr"));
+            $marketMaxTO = $db->sql_fetchrow($db->sql_query("SELECT MAX(`to`) FROM ibl_plr"));
+            $marketMaxTD = $db->sql_fetchrow($db->sql_query("SELECT MAX(`td`) FROM ibl_plr"));
 
             // Determine raw score for each stat
             $rawFGA = intval(round($negotiatingPlayerFGA / intval($marketMaxFGA[0]) * 100));

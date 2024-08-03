@@ -1887,7 +1887,7 @@ function negotiate($pid)
             $tf_trdw = stripslashes(check_html($teamfactors['Contract_AvgW'], "nohtml"));
             $tf_trdl = stripslashes(check_html($teamfactors['Contract_AvgL'], "nohtml"));
 
-            $millionsatposition = $db->sql_query("SELECT * FROM ibl_plr WHERE teamname = '$userteam' AND pos IN ($player_pos) AND name != '$player_name'");
+            $millionsatposition = $db->sql_query("SELECT * FROM ibl_plr WHERE teamname = '$userteam' AND pos = '$player_pos' AND name != '$player_name'");
             // LOOP TO GET MILLIONS COMMITTED AT POSITION
 
             $tf_millions = 0;

@@ -669,19 +669,23 @@ while ($i < $numTeams) {
     // Update teams' total wins in ibl_team_history by summing up a team's wins in ibl_team_win_loss
     $query8 = "UPDATE ibl_team_history a
 		SET totwins = (SELECT SUM(b.wins)
-		FROM ibl_team_win_loss AS b
-		WHERE a.team_name = b.currentname)";
+		    FROM ibl_team_win_loss AS b
+		    WHERE a.team_name = b.currentname)
+        WHERE a.team_name != 'Free Agents';";
     $result8 = $db->sql_query($query8);
 
     // Update teams' total losses in ibl_team_history by summing up a team's losses in ibl_team_win_loss
     $query9 = "UPDATE ibl_team_history a
 		SET totloss = (SELECT SUM(b.losses)
-		FROM ibl_team_win_loss AS b
-		WHERE a.team_name = b.currentname)";
+		    FROM ibl_team_win_loss AS b
+		    WHERE a.team_name = b.currentname)
+        WHERE a.team_name != 'Free Agents';";
     $result9 = $db->sql_query($query9);
 
     // Update teams' win percentage in ibl_team_history
-    $query12 = "UPDATE ibl_team_history a SET winpct = a.totwins / (a.totwins + a.totloss)";
+    $query12 = "UPDATE ibl_team_history a 
+        SET winpct = a.totwins / (a.totwins + a.totloss)
+        WHERE a.team_name != 'Free Agents';";
     $result12 = $db->sql_query($query12);
 
     $i++;

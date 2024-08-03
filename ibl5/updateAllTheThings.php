@@ -553,11 +553,7 @@ while ($i < $numTeams) {
                     if ($j >= $numGames - 10) {
                         $winsInLast10Games++;
                     }
-                    if ($streakType == "W") {
-                        $streak++;
-                    } else {
-                        $streak = 1;
-                    }
+                    $streak = ($streakType == "W") ? ++$streak : 1;
                     $streakType = "W";
                 } else {
                     $losses++;
@@ -566,11 +562,7 @@ while ($i < $numTeams) {
                     if ($j >= $numGames - 10) {
                         $lossesInLast10Games++;
                     }
-                    if ($streakType == "L") {
-                        $streak++;
-                    } else {
-                        $streak = 1;
-                    }
+                    $streak = ($streakType == "L") ? ++$streak : 1;
                     $streakType = "L";
                 }
             } elseif ($tid == $homeTeam) {
@@ -588,11 +580,7 @@ while ($i < $numTeams) {
                     if ($j >= $numGames - 10) {
                         $lossesInLast10Games++;
                     }
-                    if ($streakType == "L") {
-                        $streak++;
-                    } else {
-                        $streak = 1;
-                    }
+                    $streak = ($streakType == "L") ? ++$streak : 1;
                     $streakType = "L";
                 } else {
                     $wins++;
@@ -601,11 +589,7 @@ while ($i < $numTeams) {
                     if ($j >= $numGames - 10) {
                         $winsInLast10Games++;
                     }
-                    if ($streakType == "W") {
-                        $streak++;
-                    } else {
-                        $streak = 1;
-                    }
+                    $streak = ($streakType == "W") ? ++$streak : 1;
                     $streakType = "W";
                 }
             }
@@ -617,11 +601,7 @@ while ($i < $numTeams) {
 
     $winPoints = $winPoints + $wins;
     $lossPoints = $lossPoints + $losses;
-    if ($winPoints + $lossPoints != 0) {
-        $ranking = round(($winPoints / ($winPoints + $lossPoints)) * 100, 1);
-    } else {
-        $ranking = 0; // avoids division by zero warnings
-    }
+    $ranking = ($winPoints + $lossPoints) ? round(($winPoints / ($winPoints + $lossPoints)) * 100, 1) : 0;
 
     // Update ibl_power with each team's win/loss info and current power ranking score
     $query3 = "UPDATE ibl_power

@@ -141,13 +141,13 @@ function chunkstats()
         $stats_min = $db->sql_result($result, $i, "stats_min");
         $stats_fgm = $db->sql_result($result, $i, "stats_fgm");
         $stats_fga = $db->sql_result($result, $i, "stats_fga");
-        @$stats_fgp = number_format(($stats_fgm / $stats_fga * 100), 1);
+        $stats_fgp = $stats_fga ? number_format(($stats_fgm / $stats_fga * 100), 1) : "0.000";
         $stats_ftm = $db->sql_result($result, $i, "stats_ftm");
         $stats_fta = $db->sql_result($result, $i, "stats_fta");
-        @$stats_ftp = number_format(($stats_ftm / $stats_fta * 100), 1);
+        $stats_ftp = $stats_fta ? number_format(($stats_ftm / $stats_fta * 100), 1) : "0.000";
         $stats_tgm = $db->sql_result($result, $i, "stats_3gm");
         $stats_tga = $db->sql_result($result, $i, "stats_3ga");
-        @$stats_tgp = number_format(($stats_tgm / $stats_tga * 100), 1);
+        $stats_tgp = $stats_tga ? number_format(($stats_tgm / $stats_tga * 100), 1) : "0.000";
         $stats_orb = $db->sql_result($result, $i, "stats_orb");
         $stats_drb = $db->sql_result($result, $i, "stats_drb");
         $stats_reb = $stats_orb + $stats_drb;
@@ -158,21 +158,21 @@ function chunkstats()
         $stats_pf = $db->sql_result($result, $i, "stats_pf");
         $stats_pts = 2 * $stats_fgm + $stats_ftm + $stats_tgm;
 
-        @$stats_mpg = number_format(($stats_min / $stats_gm), 1);
-        @$stats_fgmpg = number_format(($stats_fgm / $stats_gm), 1);
-        @$stats_fgapg = number_format(($stats_fga / $stats_gm), 1);
-        @$stats_ftmpg = number_format(($stats_ftm / $stats_gm), 1);
-        @$stats_ftapg = number_format(($stats_fta / $stats_gm), 1);
-        @$stats_tgmpg = number_format(($stats_tgm / $stats_gm), 1);
-        @$stats_tgapg = number_format(($stats_tga / $stats_gm), 1);
-        @$stats_orbpg = number_format(($stats_orb / $stats_gm), 1);
-        @$stats_rpg = number_format(($stats_reb / $stats_gm), 1);
-        @$stats_apg = number_format(($stats_ast / $stats_gm), 1);
-        @$stats_spg = number_format(($stats_stl / $stats_gm), 1);
-        @$stats_tpg = number_format(($stats_to / $stats_gm), 1);
-        @$stats_bpg = number_format(($stats_blk / $stats_gm), 1);
-        @$stats_fpg = number_format(($stats_pf / $stats_gm), 1);
-        @$stats_ppg = number_format(($stats_pts / $stats_gm), 1);
+        $stats_mpg = $stats_gm ? number_format(($stats_min / $stats_gm), 1) : "0.00";
+        $stats_fgmpg = $stats_gm ? number_format(($stats_fgm / $stats_gm), 1) : "0.00";
+        $stats_fgapg = $stats_gm ? number_format(($stats_fga / $stats_gm), 1) : "0.00";
+        $stats_ftmpg = $stats_gm ? number_format(($stats_ftm / $stats_gm), 1) : "0.00";
+        $stats_ftapg = $stats_gm ? number_format(($stats_fta / $stats_gm), 1) : "0.00";
+        $stats_tgmpg = $stats_gm ? number_format(($stats_tgm / $stats_gm), 1) : "0.00";
+        $stats_tgapg = $stats_gm ? number_format(($stats_tga / $stats_gm), 1) : "0.00";
+        $stats_orbpg = $stats_gm ? number_format(($stats_orb / $stats_gm), 1) : "0.00";
+        $stats_rpg = $stats_gm ? number_format(($stats_reb / $stats_gm), 1) : "0.00";
+        $stats_apg = $stats_gm ? number_format(($stats_ast / $stats_gm), 1) : "0.00";
+        $stats_spg = $stats_gm ? number_format(($stats_stl / $stats_gm), 1) : "0.00";
+        $stats_tpg = $stats_gm ? number_format(($stats_to / $stats_gm), 1) : "0.00";
+        $stats_bpg = $stats_gm ? number_format(($stats_blk / $stats_gm), 1) : "0.00";
+        $stats_fpg = $stats_gm ? number_format(($stats_pf / $stats_gm), 1) : "0.00";
+        $stats_ppg = $stats_gm ? number_format(($stats_pts / $stats_gm), 1) : "0.00";
 
         if (($i % 2) == 0) {
             $bgcolor = "DDDDDD";
@@ -312,13 +312,13 @@ function seasonstats()
         $stats_min = $db->sql_result($result, $i, "stats_min");
         $stats_fgm = $db->sql_result($result, $i, "stats_fgm");
         $stats_fga = $db->sql_result($result, $i, "stats_fga");
-        @$stats_fgp = number_format(($stats_fgm / $stats_fga * 100), 1);
+        $stats_fgp = $stats_fga ? number_format(($stats_fgm / $stats_fga * 100), 1) : "0.000";
         $stats_ftm = $db->sql_result($result, $i, "stats_ftm");
         $stats_fta = $db->sql_result($result, $i, "stats_fta");
-        @$stats_ftp = number_format(($stats_ftm / $stats_fta * 100), 1);
+        $stats_ftp = $stats_fta ? number_format(($stats_ftm / $stats_fta * 100), 1) : "0.000";
         $stats_tgm = $db->sql_result($result, $i, "stats_3gm");
         $stats_tga = $db->sql_result($result, $i, "stats_3ga");
-        @$stats_tgp = number_format(($stats_tgm / $stats_tga * 100), 1);
+        $stats_tgp = $stats_tga ? number_format(($stats_tgm / $stats_tga * 100), 1) : "0.000";
         $stats_orb = $db->sql_result($result, $i, "stats_orb");
         $stats_drb = $db->sql_result($result, $i, "stats_drb");
         $stats_reb = $stats_orb + $stats_drb;
@@ -329,21 +329,21 @@ function seasonstats()
         $stats_pf = $db->sql_result($result, $i, "stats_pf");
         $stats_pts = 2 * $stats_fgm + $stats_ftm + $stats_tgm;
 
-        @$stats_mpg = number_format(($stats_min / $stats_gm), 1);
-        @$stats_fgmpg = number_format(($stats_fgm / $stats_gm), 1);
-        @$stats_fgapg = number_format(($stats_fga / $stats_gm), 1);
-        @$stats_ftmpg = number_format(($stats_ftm / $stats_gm), 1);
-        @$stats_ftapg = number_format(($stats_fta / $stats_gm), 1);
-        @$stats_tgmpg = number_format(($stats_tgm / $stats_gm), 1);
-        @$stats_tgapg = number_format(($stats_tga / $stats_gm), 1);
-        @$stats_orbpg = number_format(($stats_orb / $stats_gm), 1);
-        @$stats_rpg = number_format(($stats_reb / $stats_gm), 1);
-        @$stats_apg = number_format(($stats_ast / $stats_gm), 1);
-        @$stats_spg = number_format(($stats_stl / $stats_gm), 1);
-        @$stats_tpg = number_format(($stats_to / $stats_gm), 1);
-        @$stats_bpg = number_format(($stats_blk / $stats_gm), 1);
-        @$stats_fpg = number_format(($stats_pf / $stats_gm), 1);
-        @$stats_ppg = number_format(($stats_pts / $stats_gm), 1);
+        @$stats_mpg = $stats_gm ? number_format(($stats_min / $stats_gm), 1) : "0.00";
+        @$stats_fgmpg = $stats_gm ? number_format(($stats_fgm / $stats_gm), 1) : "0.00";
+        @$stats_fgapg = $stats_gm ? number_format(($stats_fga / $stats_gm), 1) : "0.00";
+        @$stats_ftmpg = $stats_gm ? number_format(($stats_ftm / $stats_gm), 1) : "0.00";
+        @$stats_ftapg = $stats_gm ? number_format(($stats_fta / $stats_gm), 1) : "0.00";
+        @$stats_tgmpg = $stats_gm ? number_format(($stats_tgm / $stats_gm), 1) : "0.00";
+        @$stats_tgapg = $stats_gm ? number_format(($stats_tga / $stats_gm), 1) : "0.00";
+        @$stats_orbpg = $stats_gm ? number_format(($stats_orb / $stats_gm), 1) : "0.00";
+        @$stats_rpg = $stats_gm ? number_format(($stats_reb / $stats_gm), 1) : "0.00";
+        @$stats_apg = $stats_gm ? number_format(($stats_ast / $stats_gm), 1) : "0.00";
+        @$stats_spg = $stats_gm ? number_format(($stats_stl / $stats_gm), 1) : "0.00";
+        @$stats_tpg = $stats_gm ? number_format(($stats_to / $stats_gm), 1) : "0.00";
+        @$stats_bpg = $stats_gm ? number_format(($stats_blk / $stats_gm), 1) : "0.00";
+        @$stats_fpg = $stats_gm ? number_format(($stats_pf / $stats_gm), 1) : "0.00";
+        @$stats_ppg = $stats_gm ? number_format(($stats_pts / $stats_gm), 1) : "0.00";
 
         if ($stats_gm > 0) {
             $qa = number_format((($stats_pts + $stats_orb + $stats_drb + (2 * $stats_ast) + (2 * $stats_stl) + (2 * $stats_blk)) - (($stats_fga - $stats_fgm) + ($stats_fta - $stats_ftm) + $stats_to + $stats_pf)) / $stats_gm, 1);

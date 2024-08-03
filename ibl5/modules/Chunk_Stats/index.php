@@ -36,6 +36,7 @@ function chunkstats()
     $team = $_POST['team'];
     $position = $_POST['position'];
     $sortby = $_POST['sortby'];
+    $argument = "";
 
     if ($chunk == '') {
         $argument = $argument . "chunk = $row[maxchunk]";
@@ -129,6 +130,7 @@ function chunkstats()
     $result = $db->sql_query($query);
     $num = $db->sql_numrows($result);
 
+    $i = 0;
     while ($i < $num) {
         $pid = $db->sql_result($result, $i, "pid");
         $pos = $db->sql_result($result, $i, "pos");
@@ -224,6 +226,7 @@ function seasonstats()
     $team = $_POST['team'];
     $position = $_POST['position'];
     $sortby = $_POST['sortby'];
+    $argument = "";
 
     if ($position == '') {
         $argument = $argument . "";
@@ -300,6 +303,7 @@ function seasonstats()
             <th align=right><b>qa</td>
         </tr>";
 
+    $i = 0;
     while ($i < $num) {
         $pid = $db->sql_result($result, $i, "pid");
         $pos = $db->sql_result($result, $i, "pos");

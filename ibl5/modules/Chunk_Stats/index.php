@@ -23,6 +23,7 @@ $pagetitle = "Sim Stats";
 
 function chunkstats()
 {
+    global $db;
     NukeHeader::header();
     OpenTable();
     echo "<center><font class=\"storytitle\">Sim Stats</font></center><br><br>";
@@ -217,6 +218,7 @@ function chunkstats()
 
 function seasonstats()
 {
+    global $db;
     NukeHeader::header();
     OpenTable();
     $team = $_POST['team'];

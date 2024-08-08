@@ -312,36 +312,19 @@ function team_info_right($team)
 
     $output = "<table bgcolor=#eeeeee width=220>";
 
-    require "currentSeason.php";
-    require "gmHistory.php";
-    require "championshipBanners.php";
-    require "teamAccomplishments.php";
-    require "resultsRegularSeason.php";
-    require "resultsHEAT.php";
-    require "resultsPlayoffs.php";
+    $output .= UI\Modules\Team::currentSeason($db, $team);
+    $output .= UI\Modules\Team::gmHistory($db, $team);
+    $ultimate_output[1] = UI\Modules\Team::championshipBanners($db, $team);
+    $output .= UI\Modules\Team::teamAccomplishments($db, $team);
+    $output .= UI\Modules\Team::resultsRegularSeason($db, $team);
+    $output .= UI\Modules\Team::resultsHEAT($db, $team);
+    $output .= UI\Modules\Team::resultsPlayoffs($db, $team);
 
     $output .= "</table>";
 
     $ultimate_output[0] = $output;
 
     return $ultimate_output;
-}
-
-function leaguestats()
-{
-    NukeHeader::header();
-    OpenTable();
-
-    echo "This section has moved: <a href=\"modules.php?name=League_Stats\">https://www.iblhoops.net/modules.php?name=League_Stats</a>
-        <p>
-        Please update your browser's bookmarks. Thanks!
-        <p>
-        You will now be redirected to the new page in less than three seconds...";
-
-    echo "<meta http-equiv=\"refresh\" content=\"3;url=modules.php?name=League_Stats\">";
-
-    CloseTable();
-    include "footer.php";
 }
 
 function schedule($tid)
@@ -642,10 +625,6 @@ function menu()
 switch ($op) {
     case "team":
         team($tid);
-        break;
-
-    case "leaguestats":
-        leaguestats();
         break;
 
     case "schedule":

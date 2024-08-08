@@ -8,6 +8,14 @@ $successText = "";
 
 if (isset($_POST['query'])) {
     switch ($_POST['query']) {
+        case 'Activate Player and Season Leaders modules after Trivia':
+            $queryString = "UPDATE nuke_modules SET active = 1 WHERE title = 'Player' OR title = 'Season_Leaders';";
+            $successText = "Player and Season Leaders modules have been activated.";
+            break;
+        case 'Deactivate Player and Season Leaders modules for Trivia':
+            $queryString = "UPDATE nuke_modules SET active = 0 WHERE title = 'Player' OR title = 'Season_Leaders';";
+            $successText = "Player and Season Leaders modules have been deactivated.";
+            break;
         case 'Insert new `ibl_heat_win_loss` database entries':
             $currentSeasonHEATYear = $season->beginningYear;
             $queryHEATEntriesAlreadyExist = "SELECT currentname FROM ibl_heat_win_loss WHERE year = $currentSeasonHEATYear;";
@@ -33,24 +41,6 @@ if (isset($_POST['query'])) {
                 $failureText = "`ibl_heat_win_loss` database entries already exist for the $currentSeasonHEATYear season! New entries were NOT inserted.";
             }
             break;
-        case 'Set Season Phase':
-            if (isset($_POST['SeasonPhase'])) {
-                $queryString = "UPDATE ibl_settings SET value = '{$_POST['SeasonPhase']}' WHERE name = 'Current Season Phase';";
-            }
-            $successText = "Season Phase has been set to {$_POST['SeasonPhase']}.";
-            break;
-        case 'Set Waiver Wire Status':
-            if (isset($_POST['Waivers'])) {
-                $queryString = "UPDATE ibl_settings SET value = '{$_POST['Waivers']}' WHERE name = 'Allow Waiver Moves';";
-            }
-            $successText = "Waiver Wire Status has been set to {$_POST['Waivers']}.";
-            break;
-        case 'Set Allow Trades Status':
-            if (isset($_POST['Trades'])) {
-                $queryString = "UPDATE ibl_settings SET value = '{$_POST['Trades']}' WHERE name = 'Allow Trades';";
-            }
-            $successText = "Allow Trades Status has been set to {$_POST['Trades']}.";
-            break;
         case 'Reset All Contract Extensions':
             $queryString = "UPDATE ibl_team_info SET Used_Extension_This_Season = 0;";
             $successText = "All teams' contract extensions have been reset.";
@@ -63,11 +53,17 @@ if (isset($_POST['query'])) {
             $queryString = "UPDATE ibl_plr SET teamname = 'Free Agents', bird = 0 WHERE retired != 1 AND ordinal >= 960;";
             $successText = "All players currently on waivers have their teamname set to Free Agents and 0 Bird years.";
             break;
+        case 'Set Allow Trades Status':
+            if (isset($_POST['Trades'])) {
+                $queryString = "UPDATE ibl_settings SET value = '{$_POST['Trades']}' WHERE name = 'Allow Trades';";
+            }
+            $successText = "Allow Trades Status has been set to {$_POST['Trades']}.";
+            break;
         case 'Set Free Agency factors for PFW':
             if ($season->phase == 'Draft' or $season->phase == 'Free Agency') {
                 $queryString = "UPDATE ibl_team_info info, ibl_power power
                     SET Contract_Wins = power.win,
-                    	Contract_Losses = power.loss
+                        Contract_Losses = power.loss
                     WHERE power.TeamID = info.teamid;";
                 $successText = "The columns that affect each team's Play For Winner demand factor have been updated to match this past season's ($season->endingYear) win/loss records.";
             } else {
@@ -75,13 +71,17 @@ if (isset($_POST['query'])) {
                     The FA demands formula requires the current season to be finished before calculating factors.";
             }
             break;
-        case 'Deactivate Player and Season Leaders modules for Trivia':
-            $queryString = "UPDATE nuke_modules SET active = 0 WHERE title = 'Player' OR title = 'Season_Leaders';";
-            $successText = "Player and Season Leaders modules have been deactivated.";
+        case 'Set Season Phase':
+            if (isset($_POST['SeasonPhase'])) {
+                $queryString = "UPDATE ibl_settings SET value = '{$_POST['SeasonPhase']}' WHERE name = 'Current Season Phase';";
+            }
+            $successText = "Season Phase has been set to {$_POST['SeasonPhase']}.";
             break;
-        case 'Activate Player and Season Leaders modules after Trivia':
-            $queryString = "UPDATE nuke_modules SET active = 1 WHERE title = 'Player' OR title = 'Season_Leaders';";
-            $successText = "Player and Season Leaders modules have been activated.";
+        case 'Set Waiver Wire Status':
+            if (isset($_POST['Waivers'])) {
+                $queryString = "UPDATE ibl_settings SET value = '{$_POST['Waivers']}' WHERE name = 'Allow Waiver Moves';";
+            }
+            $successText = "Waiver Wire Status has been set to {$_POST['Waivers']}.";
             break;
     }
 

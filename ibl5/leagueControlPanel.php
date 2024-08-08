@@ -49,6 +49,16 @@ if (isset($_POST['query'])) {
             $queryString = "UPDATE ibl_team_info SET HasMLE = 1, HasLLE = 1;";
             $successText = "All teams' MLEs and LLEs have been reset.";
             break;
+        case 'Reset All-Star Voting':
+            $multiQueryString = "UPDATE ibl_votes_ASG 
+                SET East_F1 = NULL, East_F2 = NULL, East_F3 = NULL, East_F4 = NULL,
+                    West_F1 = NULL, West_F2 = NULL, West_F3 = NULL, West_F4 = NULL,
+                    East_B1 = NULL, East_B2 = NULL, East_B3 = NULL, East_B4 = NULL,
+                    West_B1 = NULL, West_B2 = NULL, West_B3 = NULL, West_B4 = NULL;
+                UPDATE ibl_settings SET value = 'Yes' where name = 'ASG Voting';
+                UPDATE ibl_team_history SET asg_vote = 'No Vote';";
+            $successText = "ASG Voting has been reset!";
+            break;
         case 'Set all players on waivers to Free Agents and reset their Bird years':
             $queryString = "UPDATE ibl_plr SET teamname = 'Free Agents', bird = 0 WHERE retired != 1 AND ordinal >= 960;";
             $successText = "All players currently on waivers have their teamname set to Free Agents and 0 Bird years.";
@@ -85,21 +95,28 @@ if (isset($_POST['query'])) {
             break;
     }
 
-    if ($db->sql_query($queryString)) {
-        $querySuccessful = true;
-        if (isset($_POST['SeasonPhase'])) {
-            $season->phase = $_POST['SeasonPhase'];
+    if ($queryString != NULL) {
+        if ($db->sql_query($queryString)) {
+            $querySuccessful = true;
+            if (isset($_POST['SeasonPhase'])) {
+                $season->phase = $_POST['SeasonPhase'];
+            }
+            if (isset($_POST['Waivers'])) {
+                $season->allowWaivers = $_POST['Waivers'];
+            }
+            if (isset($_POST['Trades'])) {
+                $season->allowTrades = $_POST['Trades'];
+            }
+        } else {
+            $querySuccessful = false;
         }
-        if (isset($_POST['Waivers'])) {
-            $season->allowWaivers = $_POST['Waivers'];
+    } elseif ($multiQueryString != NULL) {
+        if (mysqli_multi_query($db->db_connect_id, $multiQueryString)) {
+            $querySuccessful = true;
+        } else {
+            $querySuccessful = false;
         }
-        if (isset($_POST['Trades'])) {
-            $season->allowTrades = $_POST['Trades'];
-        }
-    } else {
-        $querySuccessful = false;
     }
-    ;
 }
 
 echo "
@@ -142,7 +159,7 @@ switch ($season->phase) {
     case 'Regular Season':
         echo "<A HREF=\"updateAllTheThings.php\">Update All The Things</A><p>
             <A HREF=\"scoParser.php\">Run scoParser.php</A><p>
-            <A HREF=\"asg_vote_reset.php\">Reset All-Star Voting</A><p>
+            <INPUT type='submit' name='query' value='Reset All-Star Voting'><p>
             <A HREF=\"eoy_vote_reset.php\">Reset End of the Year Voting</A><p>
             <select name=\"Trades\">
                 <option value = \"Yes\"" . ($season->allowTrades == "Yes" ? " SELECTED" : "") . ">Yes</option>
@@ -180,6 +197,7 @@ echo "<INPUT type='submit' name='query' value='Deactivate Player and Season Lead
     </FORM><p><hr><p>";
 
 if ($querySuccessful == true) {
+    $queryString = $queryString ?: $multiQueryString;
     echo "<code>" . $queryString . "</code>";
     echo "<p>";
     echo "<b>" . $successText . "</b>";
@@ -190,7 +208,6 @@ if ($querySuccessful == true) {
     <FONT color=red>$failureText</FONT><p>
     Let A-Jay know what you were trying to do and he'll look into it.";
 }
-;
 
 echo "
 </BODY>

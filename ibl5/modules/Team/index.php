@@ -327,23 +327,6 @@ function team_info_right($team)
     return $ultimate_output;
 }
 
-function leaguestats()
-{
-    NukeHeader::header();
-    OpenTable();
-
-    echo "This section has moved: <a href=\"modules.php?name=League_Stats\">https://www.iblhoops.net/modules.php?name=League_Stats</a>
-        <p>
-        Please update your browser's bookmarks. Thanks!
-        <p>
-        You will now be redirected to the new page in less than three seconds...";
-
-    echo "<meta http-equiv=\"refresh\" content=\"3;url=modules.php?name=League_Stats\">";
-
-    CloseTable();
-    include "footer.php";
-}
-
 function schedule($tid)
 {
     global $db;
@@ -642,10 +625,6 @@ function menu()
 switch ($op) {
     case "team":
         team($tid);
-        break;
-
-    case "leaguestats":
-        leaguestats();
         break;
 
     case "schedule":

@@ -59,6 +59,16 @@ if (isset($_POST['query'])) {
                 UPDATE ibl_team_history SET asg_vote = 'No Vote';";
             $successText = "ASG Voting has been reset!";
             break;
+        case 'Reset End of the Year Voting':
+            $multiQueryString = "UPDATE ibl_votes_EOY
+                SET MVP_1 = NULL, MVP_2 = NULL, MVP_3 = NULL,
+                    Six_1 = NULL, Six_2 = NULL, Six_3 = NULL,
+                    ROY_1 = NULL, ROY_2 = NULL, ROY_3 = NULL,
+                    GM_1 = NULL, GM_2 = NULL, GM_3 = NULL;
+                UPDATE ibl_settings SET value = 'Yes' where name = 'EOY Voting';
+                UPDATE ibl_team_history SET eoy_vote = 'No Vote';";
+            $successText = "EOY Voting has been reset!";
+            break;
         case 'Set all players on waivers to Free Agents and reset their Bird years':
             $queryString = "UPDATE ibl_plr SET teamname = 'Free Agents', bird = 0 WHERE retired != 1 AND ordinal >= 960;";
             $successText = "All players currently on waivers have their teamname set to Free Agents and 0 Bird years.";
@@ -160,7 +170,7 @@ switch ($season->phase) {
         echo "<A HREF=\"updateAllTheThings.php\">Update All The Things</A><p>
             <A HREF=\"scoParser.php\">Run scoParser.php</A><p>
             <INPUT type='submit' name='query' value='Reset All-Star Voting'><p>
-            <A HREF=\"eoy_vote_reset.php\">Reset End of the Year Voting</A><p>
+            <INPUT type='submit' name='query' value='Reset End of the Year Voting'><p>
             <select name=\"Trades\">
                 <option value = \"Yes\"" . ($season->allowTrades == "Yes" ? " SELECTED" : "") . ">Yes</option>
                 <option value = \"No\"" . ($season->allowTrades == "No" ? " SELECTED" : "") . ">No</option>
@@ -170,7 +180,7 @@ switch ($season->phase) {
     case 'Playoffs':
         echo "<A HREF=\"updateAllTheThings.php\">Update All The Things</A><p>
             <A HREF=\"scoParser.php\">Run scoParser.php</A><p>
-            <A HREF=\"eoy_vote_reset.php\">Reset End of the Year Voting</A><p>
+            <INPUT type='submit' name='query' value='Reset End of the Year Voting'><p>
             <select name=\"Trades\">
                 <option value = \"Yes\"" . ($season->allowTrades == "Yes" ? " SELECTED" : "") . ">Yes</option>
                 <option value = \"No\"" . ($season->allowTrades == "No" ? " SELECTED" : "") . ">No</option>

@@ -37,7 +37,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     function check_download($lid)
     {
         global $prefix, $db, $admin_file;
-        NukeHeader::header();
+        Nuke/Header::header();
         GraphicAdmin();
         $lid = intval($lid);
         $row = $db->sql_fetchrow($db->sql_query("SELECT lid, cid, sid, title, url, description, name, email, submitter, filesize, version, homepage from " . $prefix . "_downloads_newdownload WHERE lid='$lid'"));
@@ -123,7 +123,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     function downloads()
     {
         global $prefix, $db, $admin_file;
-        NukeHeader::header();
+        Nuke/Header::header();
         GraphicAdmin();
         OpenTable();
         $ThemeSel = get_theme();
@@ -360,7 +360,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     function DownloadsModDownload($lid)
     {
         global $prefix, $db, $sitename, $admin_file, $bgcolor1, $bgcolor2;
-        NukeHeader::header();
+        Nuke/Header::header();
         GraphicAdmin();
         global $anonymous;
         $lid = intval($lid);
@@ -633,7 +633,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     function DownloadsListBrokenDownloads()
     {
         global $bgcolor1, $bgcolor2, $prefix, $db, $user_prefix, $admin_file;
-        NukeHeader::header();
+        Nuke/Header::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _WEBDOWNLOADSADMIN . "</b></font></center>";
@@ -729,7 +729,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     {
         global $bgcolor2, $prefix, $db, $user_prefix, $admin_file;
         $lid = intval($lid);
-        NukeHeader::header();
+        Nuke/Header::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _WEBDOWNLOADSADMIN . "</b></font></center>";
@@ -943,7 +943,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     function DownloadsModCat($cat)
     {
         global $prefix, $db, $admin_file;
-        NukeHeader::header();
+        Nuke/Header::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _WEBDOWNLOADSADMIN . "</b></font></center>";
@@ -1039,7 +1039,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
                 $result4 = $db->sql_query("SELECT * from " . $prefix . "_downloads_downloads where cid='$cid2'");
                 $nblink = $db->sql_numrows($result4);
             }
-            NukeHeader::header();
+            Nuke/Header::header();
             GraphicAdmin();
             OpenTable();
             echo "<br><center><font class=\"option\">";
@@ -1066,7 +1066,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
         $result = $db->sql_query("SELECT cid from " . $prefix . "_downloads_categories where title='$title'");
         $numrows = $db->sql_numrows($result);
         if ($numrows > 0) {
-            NukeHeader::header();
+            Nuke/Header::header();
             GraphicAdmin();
             OpenTable();
             echo "<br><center><font class=\"content\">"
@@ -1089,7 +1089,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
         $result = $db->sql_query("SELECT cid from " . $prefix . "_downloads_categories where title='$title' AND cid='$cid'");
         $numrows = $db->sql_numrows($result);
         if ($numrows > 0) {
-            NukeHeader::header();
+            Nuke/Header::header();
             GraphicAdmin();
             OpenTable();
             echo "<br><center>";
@@ -1111,7 +1111,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
         $editorialtitle = filter($editorialtitle, "nohtml", 1);
         $editorialtext = filter($editorialtext, "", 1);
         $db->sql_query("insert into " . $prefix . "_downloads_editorials values ('$downloadid', '$aid', now(), '$editorialtext', '$editorialtitle')");
-        NukeHeader::header();
+        Nuke/Header::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><br>"
@@ -1129,7 +1129,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
         $editorialtitle = filter($editorialtitle, "nohtml", 1);
         $editorialtext = filter($editorialtext, "", 1);
         $db->sql_query("update " . $prefix . "_downloads_editorials set editorialtext='$editorialtext', editorialtitle='$editorialtitle' where downloadid='$downloadid'");
-        NukeHeader::header();
+        Nuke/Header::header();
         GraphicAdmin();
         OpenTable();
         echo "<br><center>"
@@ -1145,7 +1145,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
         global $prefix, $db, $admin_file;
         $downloadid = intval($downloadid);
         $db->sql_query("delete from " . $prefix . "_downloads_editorials where downloadid='$downloadid'");
-        NukeHeader::header();
+        Nuke/Header::header();
         GraphicAdmin();
         OpenTable();
         echo "<br><center>"
@@ -1160,7 +1160,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     {
         global $prefix, $db, $admin_file;
         $cid = intval($cid);
-        NukeHeader::header();
+        Nuke/Header::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _WEBDOWNLOADSADMIN . "</b></font></center>";
@@ -1186,7 +1186,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     function DownloadsValidate($cid, $sid, $ttitle)
     {
         global $bgcolor2, $prefix, $db, $admin_file;
-        NukeHeader::header();
+        Nuke/Header::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _WEBDOWNLOADSADMIN . "</b></font></center>";
@@ -1242,7 +1242,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
         $result = $db->sql_query("SELECT url from " . $prefix . "_downloads_downloads where url='$url'");
         $numrows = $db->sql_numrows($result);
         if ($numrows > 0) {
-            NukeHeader::header();
+            Nuke/Header::header();
             GraphicAdmin();
             OpenTable();
             echo "<center><font class=\"title\"><b>" . _WEBDOWNLOADSADMIN . "</b></font></center>";
@@ -1258,7 +1258,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
         } else {
             /* Check if Title exist */
             if (empty($title)) {
-                NukeHeader::header();
+                Nuke/Header::header();
                 GraphicAdmin();
                 OpenTable();
                 echo "<center><font class=\"title\"><b>" . _WEBDOWNLOADSADMIN . "</b></font></center>";
@@ -1274,7 +1274,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
             }
             /* Check if URL exist */
             if (empty($url)) {
-                NukeHeader::header();
+                Nuke/Header::header();
                 GraphicAdmin();
                 OpenTable();
                 echo "<center><font class=\"title\"><b>" . _WEBDOWNLOADSADMIN . "</b></font></center>";
@@ -1290,7 +1290,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
             }
             // Check if Description exist
             if (empty($description)) {
-                NukeHeader::header();
+                Nuke/Header::header();
                 GraphicAdmin();
                 OpenTable();
                 echo "<center><font class=\"title\"><b>" . _WEBDOWNLOADSADMIN . "</b></font></center>";
@@ -1315,7 +1315,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
             $email = filter($email, "nohtml");
             $db->sql_query("insert into " . $prefix . "_downloads_downloads values (NULL, '$cat[0]', '$cat[1]', '$title', '$url', '$description', now(), '$name', '$email', '$hits','$submitter',0,0,0, '$filesize', '$version', '$homepage')");
             global $nukeurl, $sitename;
-            NukeHeader::header();
+            Nuke/Header::header();
             GraphicAdmin();
             OpenTable();
             echo "<br><center>";
@@ -1443,7 +1443,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     }
 
 } else {
-    NukeHeader::header();
+    Nuke/Header::header();
     GraphicAdmin();
     OpenTable();
     echo "<center><b>" . _ERROR . "</b><br><br>You do not have administration permission for module \"$module_name\"</center>";

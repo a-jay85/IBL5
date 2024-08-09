@@ -8,7 +8,7 @@ $index = 0;
 
 function f2one()
 {
-    Nuke\Header::header();
+    NukeHeader::header();
     OpenTable();
     echo "Addon Sample File (f2.php) function \"f2one\" CALLED FROM Sand_Journey Theme<br><br>";
     echo "<ul>";
@@ -16,13 +16,13 @@ function f2one()
     echo "<li><a href=\"modules.php?name=Addon_Sample&amp;file=index\">Go to index.php</a>";
     echo "</ul>";
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 
 }
 
 function f2go()
 {
-    Nuke\Header::header();
+    NukeHeader::header();
     OpenTable();
     echo "Addon Sample File (f2.php) CALLED FROM Sand_Journey Theme<br>";
     echo "<ul>";
@@ -32,7 +32,7 @@ function f2go()
     echo "As you can see now, this page doesn't show the Right Blocks, this is because at the begining "
         . "of this file we set \$index variable to \"0\"";
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 switch ($func) {

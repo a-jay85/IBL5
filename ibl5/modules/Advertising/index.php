@@ -73,13 +73,13 @@ function themenu()
 function theindex()
 {
     global $prefix, $db, $sitename;
-    Nuke\Header::header();
+    NukeHeader::header();
     title("$sitename " . _ADVERTISING . "");
     OpenTable();
     echo "" . _WELCOMEADS . "";
     CloseTable();
     themenu();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function sitestats()
@@ -125,7 +125,7 @@ function sitestats()
     $row = $db->sql_fetchrow($db->sql_query("SELECT count FROM " . $prefix . "_counter WHERE type='total'"));
     $views_t = $row['count'];
     $regusers = $db->sql_numrows($db->sql_query("SELECT user_id FROM " . $user_prefix . "_users"));
-    Nuke\Header::header();
+    NukeHeader::header();
     title("$sitename: " . _GENERALSTATS . "");
     OpenTable();
     echo "" . _HEREARENUMBERS . "<br><br><br>"
@@ -140,13 +140,13 @@ function sitestats()
     }
     CloseTable();
     themenu();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function plans()
 {
     global $module_name, $prefix, $db, $bgcolor2, $sitename;
-    Nuke\Header::header();
+    NukeHeader::header();
     title("$sitename: " . _PLANSPRICES . "");
     OpenTable();
     $numrows = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_banner_plans WHERE active='1'"));
@@ -175,7 +175,7 @@ function plans()
     }
     CloseTable();
     themenu();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function terms()
@@ -185,7 +185,7 @@ function terms()
     $month = $today['mon'];
     if ($month == 1) {$month = _JANUARY;} elseif ($month == 2) {$month = _FEBRUARY;} elseif ($month == 3) {$month = _MARCH;} elseif ($month == 4) {$month = _APRIL;} elseif ($month == 5) {$month = _MAY;} elseif ($month == 6) {$month = _JUNE;} elseif ($month == 7) {$month = _JULY;} elseif ($month == 8) {$month = _AUGUST;} elseif ($month == 9) {$month = _SEPTEMBER;} elseif ($month == 10) {$month = _OCTOBER;} elseif ($month == 11) {$month = _NOVEMBER;} elseif ($month == 12) {$month = _DECEMBER;}
     $year = $today['year'];
-    Nuke\Header::header();
+    NukeHeader::header();
     title("$sitename: " . _TERMSCONDITIONS . "");
     $row = $db->sql_fetchrow($db->sql_query("SELECT * FROM " . $prefix . "_banner_terms"));
     $terms = mb_eregi_replace("\[sitename\]", $sitename, $row['terms_body']);
@@ -196,7 +196,7 @@ function terms()
         . "<p align='right'>" . $row['country'] . ", $month $year</p>";
     CloseTable();
     themenu();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function client()
@@ -205,7 +205,7 @@ function client()
     if (is_client($client)) {
         Header("Location: modules.php?name=$module_name&op=client_home");
     } else {
-        Nuke\Header::header();
+        NukeHeader::header();
         title("$sitename: " . _ADSYSTEM . "");
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _CLIENTLOGIN . "</b></font></center><br>";
@@ -215,7 +215,7 @@ function client()
         echo "<td>&nbsp;</td><td><input type=\"hidden\" name=\"op\" value=\"client_valid\"><input type=\"submit\" value=\"" . _ENTER . "\"></tr></td></table></form>";
         CloseTable();
         themenu();
-        Nuke\Footer::footer();
+        NukeFooter::footer();
     }
 }
 
@@ -339,13 +339,13 @@ function client_valid($login, $pass)
     $pass = filter($pass, "nohtml");
     $numrows = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_banner_clients WHERE login='$login' AND passwd='$pass'"));
     if ($numrows != 1) {
-        Nuke\Header::header();
+        NukeHeader::header();
         title("$sitename: " . _ADSYSTEM . "");
         OpenTable();
         echo "<center>" . _LOGININCORRECT . "<br><br>" . _GOBACK . "</center>";
         CloseTable();
         themenu();
-        Nuke\Footer::footer();
+        NukeFooter::footer();
         die();
     } else {
         $row = $db->sql_fetchrow($db->sql_query("SELECT cid FROM " . $prefix . "_banner_clients WHERE login='$login' AND passwd='$pass'"));
@@ -368,7 +368,7 @@ function client_home()
         $client = explode(":", $client);
         $cid = $client[0];
         $row = $db->sql_fetchrow($db->sql_query("SELECT * FROM " . $prefix . "_banner_clients WHERE cid='$cid'"));
-        Nuke\Header::header();
+        NukeHeader::header();
         title("$sitename " . _ADSYSTEM . "");
         OpenTable();
         echo "<center>" . _ACTIVEADSFOR . " " . $row['name'] . "</center><br>"
@@ -480,7 +480,7 @@ function client_home()
         echo "</table><br><br><center>[ <a href=\"modules.php?name=$module_name&op=client_logout\">" . _LOGOUT . "</a> ]</center>";
         CloseTable();
         themenu();
-        Nuke\Footer::footer();
+        NukeFooter::footer();
     }
 }
 
@@ -496,16 +496,16 @@ function view_banner($cid, $bid)
         $client = explode(":", $client);
         $client_id = $client[0];
         if ($cid != $client_id) {
-            Nuke\Header::header();
+            NukeHeader::header();
             title("$sitename " . _ADSYSTEM . "");
             OpenTable();
             echo "<center>" . _ADISNTYOUR . "<br><br>" . _GOBACK . "</center>";
             CloseTable();
             themenu();
-            Nuke\Footer::footer();
+            NukeFooter::footer();
             die();
         } else {
-            Nuke\Header::header();
+            NukeHeader::header();
             title("$sitename " . _ADSYSTEM . "");
             OpenTable();
             $row = $db->sql_fetchrow($db->sql_query("SELECT * FROM " . $prefix . "_banner WHERE bid='$bid'"));
@@ -594,7 +594,7 @@ function view_banner($cid, $bid)
                 . "[ <a href=\"modules.php?name=$module_name&op=client_report&cid=$cid&bid=$bid\">" . _EMAILSTATS . "</a> | <a href=\"modules.php?name=$module_name&op=logout\">" . _LOGOUT . "</a> ]";
             CloseTable();
             themenu();
-            Nuke\Footer::footer();
+            NukeFooter::footer();
         }
     }
 }
@@ -611,16 +611,16 @@ function client_report($cid, $bid)
         $client = explode(":", $client);
         $client_id = $client[0];
         if ($cid != $client_id) {
-            Nuke\Header::header();
+            NukeHeader::header();
             title("$sitename: " . _ADSYSTEM . "");
             OpenTable();
             echo "<center>" . _FUNCTIONSNOTALLOWED . "<br><br>" . _GOBACK . "</center>";
             CloseTable();
             themenu();
-            Nuke\Footer::footer();
+            NukeFooter::footer();
             die();
         } else {
-            Nuke\Header::header();
+            NukeHeader::header();
             title("$sitename: " . _ADSYSTEM . "");
             OpenTable();
             $bid = intval($bid);
@@ -636,7 +636,7 @@ function client_report($cid, $bid)
                     . "<a href=\"javascript:history.go(-1)\">" . _GOBACK . "</a>";
                 CloseTable();
                 themenu();
-                Nuke\Footer::footer();
+                NukeFooter::footer();
                 die();
             } else {
                 $sql2 = "SELECT bid, name, imptotal, impmade, clicks, imageurl, clickurl, date, ad_class FROM " . $prefix . "_banner WHERE bid='$bid' AND cid='$cid'";
@@ -680,7 +680,7 @@ function client_report($cid, $bid)
                     . "[ <a href=\"javascript:history.go(-1)\">" . _GOBACK . "</a> ]";
                 CloseTable();
                 themenu();
-                Nuke\Footer::footer();
+                NukeFooter::footer();
             }
         }
     }

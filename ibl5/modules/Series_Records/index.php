@@ -39,21 +39,21 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
     $teamlogo = $userinfo['user_ibl_team'];
     $tid = $sharedFunctions->getTidFromTeamname($teamlogo);
 
-    Nuke\Header::header();
+    NukeHeader::header();
     OpenTable();
     UI::displaytopmenu($db, $tid);
 
     displaySeriesRecords($tid);
 
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function main($user)
 {
     global $stop;
     if (!is_user($user)) {
-        Nuke\Header::header();
+        NukeHeader::header();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . ($stop ? _LOGININCOR : _USERREGLOGIN) . "</b></font></center>";
         CloseTable();
@@ -63,7 +63,7 @@ function main($user)
             loginbox();
             CloseTable();
         }
-        Nuke\Footer::footer();
+        NukeFooter::footer();
     } elseif (is_user($user)) {
         global $cookie;
         cookiedecode($user);

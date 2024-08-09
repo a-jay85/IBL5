@@ -45,7 +45,7 @@ get_lang($module_name);
 
 if (!isset($jid) or !is_numeric($jid)) {die("No journal specified.");}
 $pagetitle = "- " . _USERSJOURNAL;
-Nuke\Header::header();
+NukeHeader::header();
 include "modules/$module_name/functions.php";
 if (is_user($user)) {
     cookiedecode($user);
@@ -103,5 +103,5 @@ $pagetitle = filter($pagetitle, "nohtml");
 OpenTable();
 echo "<center><b>" . _YOUMUSTBEMEMBER . "</b></center>";
 CloseTable();
-Nuke\Footer::footer();
+NukeFooter::footer();
 die();

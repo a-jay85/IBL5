@@ -18,7 +18,7 @@ if (!defined('MODULE_FILE')) {
 
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
-Nuke\Header::header();
+NukeHeader::header();
 global $db, $prefix;
 $query = filter($query);
 if ((isset($query) and !isset($eid)) and (!empty($query))) {
@@ -113,4 +113,4 @@ if ((isset($query) and !isset($eid)) and (!empty($query))) {
     CloseTable();
 }
 
-Nuke\Footer::footer();
+NukeFooter::footer();

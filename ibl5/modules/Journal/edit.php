@@ -46,7 +46,7 @@ get_lang($module_name);
 
 $pagetitle = "- " . _USERSJOURNAL . "";
 
-Nuke\Header::header();
+NukeHeader::header();
 include "modules/$module_name/functions.php";
 include "modules/$module_name/kses.php";
 if (is_user($user)) {
@@ -431,6 +431,6 @@ if (is_admin($admin)) {
     OpenTable();
     echo "<center><b>" . _YOUMUSTBEMEMBER . "</b></center>";
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
     die();
 }

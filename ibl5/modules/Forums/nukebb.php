@@ -73,4 +73,4 @@ if (isset($t)) {
         $pagetitle = check_html($pagetitle, "nohtml");
     }
 }
-Nuke\Header::header();
+NukeHeader::header();

@@ -79,7 +79,7 @@ if (stripos_clone($name, "..") || (isset($file) && stripos_clone($file, "..")) |
         include $modpath;
     } else {
         define('INDEX_FILE', true);
-        Nuke\Header::header();
+        NukeHeader::header();
         OpenTable();
         if (is_admin($admin)) {
             echo "<center><font class=\"\"><b>" . _HOMEPROBLEM . "</b></font><br><br>[ <a href=\"" . $admin_file . ".php?op=modules\">" . _ADDAHOME . "</a> ]</center>";
@@ -87,6 +87,6 @@ if (stripos_clone($name, "..") || (isset($file) && stripos_clone($file, "..")) |
             echo "<center>" . _HOMEPROBLEMUSER . "</center>";
         }
         CloseTable();
-        Nuke\Footer::footer();
+        NukeFooter::footer();
     }
 }

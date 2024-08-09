@@ -35,7 +35,7 @@ function atPlatformAdminInit()
 
 function atAdminHeader($title = "")
 {
-    Nuke\Header::header();
+    NukeHeader::header();
     $adminlinks = "admin.php?module=AutoTheme";
     atAdminOpenTable();
     atAdminOpenTable();
@@ -70,7 +70,7 @@ function atAdminFooter()
         . "</div>\n";
     atAdminCloseTable();
 
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function at_preview_url($module, $modops, $theme)

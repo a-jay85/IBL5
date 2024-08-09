@@ -22,7 +22,7 @@ $pagetitle = "- " . _SUBMITNEWS . "";
 function defaultDisplay()
 {
     global $AllowableHTML, $prefix, $user, $cookie, $anonymous, $currentlang, $multilingual, $db, $module_name, $nuke_editor;
-    Nuke\Header::header();
+    NukeHeader::header();
     OpenTable();
     echo "<center><font class=\"title\"><b>" . _SUBMITNEWS . "</b></font>";
     CloseTable();
@@ -116,13 +116,13 @@ function defaultDisplay()
     echo "<tr><td>&nbsp;</td><td><input type=\"submit\" name=\"op\" value=\"" . _PREVIEW . "\"> (" . _SUBPREVIEW . ")</font></form>";
     echo "</td></tr></table>";
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function PreviewStory($name, $address, $subject, $story, $storyext, $topic, $alanguage)
 {
     global $user, $cookie, $bgcolor1, $bgcolor2, $anonymous, $prefix, $multilingual, $AllowableHTML, $db, $module_name, $nuke_editor;
-    Nuke\Header::header();
+    NukeHeader::header();
     $f_story = filter($story);
     $f_storyext = filter($storyext);
     $subject = filter($subject, "nohtml", 0, preview);
@@ -228,7 +228,7 @@ function PreviewStory($name, $address, $subject, $story, $storyext, $topic, $ala
         . "<input type=\"submit\" name=\"op\" value=\"" . _OK . "\"></form>"
         . "</td></tr></table>";
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function submitStory($name, $address, $subject, $story, $storyext, $topic, $alanguage)
@@ -257,7 +257,7 @@ function submitStory($name, $address, $subject, $story, $storyext, $topic, $alan
         $notify_message = "$notify_message\n\n\n========================================================\n$subject\n\n\n$story\n\n$storyext\n\n$name";
         mail($notify_email, $notify_subject, $notify_message, "From: $notify_from\nX-Mailer: PHP/" . phpversion());
     }
-    Nuke\Header::header();
+    NukeHeader::header();
     OpenTable();
     $waiting = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_queue"));
     echo "<center><font class=\"title\">" . _SUBSENT . "</font><br><br>"
@@ -265,7 +265,7 @@ function submitStory($name, $address, $subject, $story, $storyext, $topic, $alan
         . "" . _SUBTEXT . ""
         . "<br>" . _WEHAVESUB . " $waiting " . _WAITING . "";
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 if (!isset($address)) {$address = "";}

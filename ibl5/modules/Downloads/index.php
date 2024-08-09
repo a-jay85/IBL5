@@ -133,7 +133,7 @@ function downloadinfomenu($lid)
 function index()
 {
     global $prefix, $db, $show_links_num, $module_name;
-    Nuke\Header::header();
+    NukeHeader::header();
     $maindownload = 0;
     menu($maindownload);
     echo "<br>";
@@ -199,13 +199,13 @@ function index()
     $catnum = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_downloads_categories"));
     echo "<center><font class=\"content\">" . _THEREARE . " <b>$numrows</b> " . _DOWNLOADS . " " . _AND . " <b>$catnum</b> " . _CATEGORIES . " " . _INDB . "</font></center>";
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function AddDownload()
 {
     global $prefix, $db, $cookie, $user, $downloads_anonadddownloadlock, $module_name;
-    Nuke\Header::header();
+    NukeHeader::header();
     $maindownload = 1;
     menu(1);
     echo "<br>";
@@ -255,7 +255,7 @@ function AddDownload()
             . "" . _DOWNLOADSNOTUSER8 . "";
     }
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function Add($title, $url, $auth_name, $cat, $description, $email, $filesize, $version, $homepage)
@@ -265,14 +265,14 @@ function Add($title, $url, $auth_name, $cat, $description, $email, $filesize, $v
     $result = $db->sql_query($sql);
     $numrows = $db->sql_numrows($result);
     if ($numrows > 0) {
-        Nuke\Header::header();
+        NukeHeader::header();
         menu(1);
         echo "<br>";
         OpenTable();
         echo "<center><b>" . _DOWNLOADALREADYEXT . "</b><br><br>"
             . "" . _GOBACK . "";
         CloseTable();
-        Nuke\Footer::footer();
+        NukeFooter::footer();
     } else {
         if (is_user($user)) {
             $user2 = base64_decode($user);
@@ -283,36 +283,36 @@ function Add($title, $url, $auth_name, $cat, $description, $email, $filesize, $v
         }
 // Check if Title exist
         if (empty($title)) {
-            Nuke\Header::header();
+            NukeHeader::header();
             menu(1);
             echo "<br>";
             OpenTable();
             echo "<center><b>" . _DOWNLOADNOTITLE . "</b><br><br>"
                 . "" . _GOBACK . "";
             CloseTable();
-            Nuke\Footer::footer();
+            NukeFooter::footer();
         }
 // Check if URL exist
         if (empty($url)) {
-            Nuke\Header::header();
+            NukeHeader::header();
             menu(1);
             echo "<br>";
             OpenTable();
             echo "<center><b>" . _DOWNLOADNOURL . "</b><br><br>"
                 . "" . _GOBACK . "";
             CloseTable();
-            Nuke\Footer::footer();
+            NukeFooter::footer();
         }
 // Check if Description exist
         if (empty($description)) {
-            Nuke\Header::header();
+            NukeHeader::header();
             menu(1);
             echo "<br>";
             OpenTable();
             echo "<center><b>" . _DOWNLOADNODESC . "</b><br><br>"
                 . "" . _GOBACK . "";
             CloseTable();
-            Nuke\Footer::footer();
+            NukeFooter::footer();
         }
         $cat = explode("-", $cat);
         if (empty($cat[1])) {
@@ -333,7 +333,7 @@ function Add($title, $url, $auth_name, $cat, $description, $email, $filesize, $v
         if ($num_new == 0) {
             $db->sql_query("INSERT INTO " . $prefix . "_downloads_newdownload VALUES (NULL, '$cat[0]', '$cat[1]', '" . addslashes($title) . "', '" . addslashes($url) . "', '" . addslashes($description) . "', '" . addslashes($auth_name) . "', '" . addslashes($email) . "', '" . addslashes($submitter) . "', '" . addslashes($filesize) . "', '" . addslashes($version) . "', '" . addslashes($homepage) . "')");
         }
-        Nuke\Header::header();
+        NukeHeader::header();
         menu(1);
         echo "<br>";
         OpenTable();
@@ -342,14 +342,14 @@ function Add($title, $url, $auth_name, $cat, $description, $email, $filesize, $v
             echo _CHECKFORIT;
         }
         CloseTable();
-        Nuke\Footer::footer();
+        NukeFooter::footer();
     }
 }
 
 function NewDownloads($newdownloadshowdays)
 {
     global $prefix, $db, $module_name;
-    Nuke\Header::header();
+    NukeHeader::header();
     $newdownloadshowdays = intval(trim($newdownloadshowdays));
     menu(1);
     echo "<br>";
@@ -397,7 +397,7 @@ function NewDownloads($newdownloadshowdays)
     $allmonthdownloads = 0;
     echo "</center>";
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function NewDownloadsDate($selectdate)
@@ -405,7 +405,7 @@ function NewDownloadsDate($selectdate)
     global $prefix, $db, $module_name, $admin, $user, $admin_file, $datetime, $transfertitle, $locale;
     $dateDB = (date("d-M-Y", $selectdate));
     $dateView = (date("F d, Y", $selectdate));
-    Nuke\Header::header();
+    NukeHeader::header();
     menu(1);
     echo "<br>";
     OpenTable();
@@ -481,13 +481,13 @@ function NewDownloadsDate($selectdate)
     }
     echo "</font></td></tr></table>";
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function TopRated($ratenum, $ratetype)
 {
     global $prefix, $db, $admin, $module_name, $user, $admin_file, $datetime, $transfertitle, $locale;
-    Nuke\Header::header();
+    NukeHeader::header();
     include "modules/$module_name/d_config.php";
     menu(1);
     echo "<br>";
@@ -590,13 +590,13 @@ function TopRated($ratenum, $ratetype)
     }
     echo "</font></td></tr></table>";
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function MostPopular($ratenum, $ratetype)
 {
     global $prefix, $db, $admin, $module_name, $user, $admin_file, $datetime, $transfertitle, $locale;
-    Nuke\Header::header();
+    NukeHeader::header();
     include "modules/$module_name/d_config.php";
     menu(1);
     echo "<br>";
@@ -693,13 +693,13 @@ function MostPopular($ratenum, $ratetype)
     }
     echo "</font></td></tr></table>";
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function viewdownload($cid, $min, $orderby, $show)
 {
     global $prefix, $db, $admin, $perpage, $module_name, $user, $admin_file, $mainvotedecimal, $datetime, $transfertitle, $locale;
-    Nuke\Header::header();
+    NukeHeader::header();
     if (!isset($min)) {
         $min = 0;
     }
@@ -886,14 +886,14 @@ function viewdownload($cid, $min, $orderby, $show)
     }
     echo "</td></tr></table>";
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function viewsdownload($sid, $min, $orderby, $show)
 {
     global $prefix, $db, $admin, $module_name, $user, $admin_file, $datetime, $transfertitle, $locale;
     include "modules/$module_name/d_config.php";
-    Nuke\Header::header();
+    NukeHeader::header();
     $sid = intval($sid);
     menu(1);
     if (!isset($min)) {
@@ -1077,7 +1077,7 @@ function viewsdownload($sid, $min, $orderby, $show)
     }
     echo "</td></tr></table>";
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function newdownloadgraphic($datetime, $time)
@@ -1286,7 +1286,7 @@ function search($query, $min, $orderby, $show)
 {
     global $prefix, $db, $admin, $bgcolor2, $module_name, $admin_file, $datetime, $transfertitle, $locale;
     include "modules/$module_name/d_config.php";
-    Nuke\Header::header();
+    NukeHeader::header();
     if (!isset($min)) {
         $min = 0;
     }
@@ -1468,13 +1468,13 @@ function search($query, $min, $orderby, $show)
         echo "<center><font class=\"option\"><b>" . _NOMATCHES . "</b></font></center><br><br>";
     }
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function viewdownloadeditorial($lid)
 {
     global $prefix, $db, $admin, $module_name;
-    Nuke\Header::header();
+    NukeHeader::header();
     include "modules/$module_name/d_config.php";
     menu(1);
     $row = $db->sql_fetchrow($db->sql_query("SELECT title FROM " . $prefix . "_downloads_downloads WHERE lid='$lid'"));
@@ -1512,7 +1512,7 @@ function viewdownloadeditorial($lid)
     downloadfooter($lid);
     echo "</center>";
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function detecteditorial($lid, $img)
@@ -1533,7 +1533,7 @@ function detecteditorial($lid, $img)
 function viewdownloadcomments($lid)
 {
     global $prefix, $db, $admin, $bgcolor2, $module_name, $admin_file;
-    Nuke\Header::header();
+    NukeHeader::header();
     include "modules/$module_name/d_config.php";
     menu(1);
     $row = $db->sql_fetchrow($db->sql_query("SELECT title FROM " . $prefix . "_downloads_downloads WHERE lid='$lid'"));
@@ -1601,13 +1601,13 @@ function viewdownloadcomments($lid)
     downloadfooter($lid);
     echo "</center>";
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function viewdownloaddetails($lid)
 {
     global $prefix, $db, $admin, $bgcolor1, $bgcolor2, $bgcolor3, $bgcolor4, $module_name, $anonymous;
-    Nuke\Header::header();
+    NukeHeader::header();
     include "modules/$module_name/d_config.php";
     menu(1);
     $lid = intval($lid);
@@ -2057,7 +2057,7 @@ function viewdownloaddetails($lid)
     downloadfooter($lid);
     echo "</center>";
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function downloadfooter($lid)
@@ -2080,7 +2080,7 @@ function outsidedownloadsetup($lid)
 {
     global $module_name, $sitename, $nukeurl;
     $lid = intval($lid);
-    Nuke\Header::header();
+    NukeHeader::header();
     include "modules/$module_name/d_config.php";
     menu(1);
     echo "<br>";
@@ -2190,14 +2190,14 @@ function outsidedownloadsetup($lid)
     - $sitename " . _STAFF . "
     <br><br></center>";
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function brokendownload($lid)
 {
     global $prefix, $db, $user, $cookie, $module_name;
     if (is_user($user)) {
-        Nuke\Header::header();
+        NukeHeader::header();
         include "modules/$module_name/d_config.php";
         $user2 = base64_decode($user);
         $user2 = addslashes($user2);
@@ -2214,7 +2214,7 @@ function brokendownload($lid)
         echo "" . _THANKSBROKEN . "<br>" . _SECURITYBROKEN . "<br><br>";
         echo "<input type=\"hidden\" name=\"d_op\" value=\"brokendownloadS\"><input type=\"submit\" value=\"" . _REPORTBROKEN . "\"></center></form>";
         CloseTable();
-        Nuke\Footer::footer();
+        NukeFooter::footer();
     } else {
         Header("Location: modules.php?name=$module_name");
     }
@@ -2232,13 +2232,13 @@ function brokendownloadS($lid, $modifysubmitter)
         $ratinguser = $cookie[1];
         $lid = intval($lid);
         $db->sql_query("insert into " . $prefix . "_downloads_modrequest values (NULL, '$lid', '0', '0', '', '', '', '" . addslashes($ratinguser) . "', '1', '" . addslashes($auth_name) . "', '" . addslashes($email) . "', '" . addslashes($filesize) . "', '" . addslashes($version) . "', '" . addslashes($homepage) . "')");
-        Nuke\Header::header();
+        NukeHeader::header();
         menu(1);
         echo "<br>";
         OpenTable();
         echo "<br><center>" . _THANKSFORINFO . "<br><br>" . _LOOKTOREQUEST . "</center><br>";
         CloseTable();
-        Nuke\Footer::footer();
+        NukeFooter::footer();
     } else {
         Header("Location: modules.php?name=$module_name");
     }
@@ -2247,7 +2247,7 @@ function brokendownloadS($lid, $modifysubmitter)
 function modifydownloadrequest($lid)
 {
     global $prefix, $db, $user, $module_name;
-    Nuke\Header::header();
+    NukeHeader::header();
     include "modules/$module_name/d_config.php";
     if (is_user($user)) {
         $user2 = base64_decode($user);
@@ -2313,7 +2313,7 @@ function modifydownloadrequest($lid)
         }
     }
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function modifydownloadrequestS($lid, $cat, $title, $url, $description, $modifysubmitter, $auth_name, $email, $filesize, $version, $homepage)
@@ -2331,14 +2331,14 @@ function modifydownloadrequestS($lid, $cat, $title, $url, $description, $modifys
     }
     $blocknow = 0;
     if ($blockunregmodify == 1 && $ratinguser == "$anonymous") {
-        Nuke\Header::header();
+        NukeHeader::header();
         menu(1);
         echo "<br>";
         OpenTable();
         echo "<center><font class=\"content\">" . _DONLYREGUSERSMODIFY . "</font></center>";
         $blocknow = 1;
         CloseTable();
-        Nuke\Footer::footer();
+        NukeFooter::footer();
     }
     if ($blocknow != 1) {
         $cat = explode("-", $cat);
@@ -2352,13 +2352,13 @@ function modifydownloadrequestS($lid, $cat, $title, $url, $description, $modifys
         $cat[0] = intval($cat[0]);
         $cat[1] = intval($cat[1]);
         $db->sql_query("insert into " . $prefix . "_downloads_modrequest values (NULL, '$lid', '$cat[0]', '$cat[1]', '" . addslashes($title) . "', '" . addslashes($url) . "', '" . addslashes($description) . "', '" . addslashes($ratinguser) . "', '0', '" . addslashes($auth_name) . "', '" . addslashes($email) . "', '" . addslashes($filesize) . "', '" . addslashes($version) . "', '" . addslashes($homepage) . "')");
-        Nuke\Header::header();
+        NukeHeader::header();
         menu(1);
         echo "<br>";
         OpenTable();
         echo "<center><font class=\"content\">" . _THANKSFORINFO . " " . _LOOKTOREQUEST . "</font></center>";
         CloseTable();
-        Nuke\Footer::footer();
+        NukeFooter::footer();
     }
 }
 
@@ -2376,7 +2376,7 @@ function addrating($ratinglid, $ratinguser, $rating, $ratinghost_name, $ratingco
 {
     global $prefix, $db, $cookie, $user, $module_name;
     $passtest = "yes";
-    Nuke\Header::header();
+    NukeHeader::header();
     include "modules/$module_name/d_config.php";
     $ratinglid = intval($ratinglid);
     completevoteheader();
@@ -2485,7 +2485,7 @@ function addrating($ratinglid, $ratinguser, $rating, $ratinghost_name, $ratingco
         completevote($error);
     }
     completevotefooter($ratinglid, $ratinguser);
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function completevoteheader()
@@ -2550,7 +2550,7 @@ function completevote($error)
 function ratedownload($lid, $user)
 {
     global $prefix, $cookie, $datetime, $module_name, $user_prefix;
-    Nuke\Header::header();
+    NukeHeader::header();
     menu(1);
     $row = $db->sql_fetchrow($db->sql_query("SELECT title FROM " . $prefix . "_downloads_downloads WHERE lid='$lid'"));
     $displaytitle = filter($row['title'], "nohtml");
@@ -2617,7 +2617,7 @@ function ratedownload($lid, $user)
     downloadfooterchild($lid);
     echo "</center>";
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function CoolSize($size)

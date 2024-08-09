@@ -11,7 +11,7 @@ $isFreeAgencyModuleActive = $sharedFunctions->isFreeAgencyModuleActive();
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
-NukeHeader::header();
+Nuke\Header::header();
 
 $queryTeamInfo = "SELECT * FROM ibl_team_info WHERE teamid != " . League::FREE_AGENTS_TEAMID . " ORDER BY teamid ASC";
 $resultTeamInfo = $db->sql_query($queryTeamInfo);
@@ -129,7 +129,7 @@ $text .= "
 echo $text;
 
 CloseTable();
-NukeFooter::footer();
+Nuke\Footer::footer();
 
 function get_salary($tid)
 {

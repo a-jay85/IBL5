@@ -62,7 +62,7 @@ global $admin_file;
 $the_first = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_authors"));
 if ($the_first == 0) {
     if (!$name) {
-        NukeHeader::header();
+        Nuke\Header::header();
         title("$sitename: " . _ADMINISTRATION . "");
         OpenTable();
         echo "<center><b>" . _NOADMINYET . "</b></center><br><br>"
@@ -77,7 +77,7 @@ if ($the_first == 0) {
             . "<input type=\"submit\" value=\"" . _SUBMIT . "\">"
             . "</td></tr></table></form>";
         CloseTable();
-        NukeFooter::footer();
+        Nuke\Footer::footer();
     }
     switch ($fop) {
         case "create_first":
@@ -158,7 +158,7 @@ $pagetitle = "- " . _ADMINMENU . "";
 function login()
 {
     global $gfx_chk, $admin_file;
-    NukeHeader::header();
+    Nuke\Header::header();
     mt_srand((double) microtime() * 1000000);
     $maxran = 1000000;
     $random_num = mt_rand(0, $maxran);
@@ -184,7 +184,7 @@ function login()
         . "</td></tr></table>"
         . "</form>";
     CloseTable();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 function deleteNotice($id)
@@ -309,7 +309,7 @@ function GraphicAdmin()
 function adminMain()
 {
     global $language, $admin, $aid, $prefix, $file, $db, $sitename, $user_prefix, $admin_file, $bgcolor1, $locale;
-    NukeHeader::header();
+    Nuke\Header::header();
     $dummy = 0;
     $month = date('M');
     $curDate2 = "%" . $month[0] . $month[1] . $month[2] . "%" . date('d') . "%" . date('Y') . "%";
@@ -458,7 +458,7 @@ function adminMain()
         CloseTable();
     }
     unset($title);
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 if ($admintest) {
@@ -484,12 +484,12 @@ if ($admintest) {
         case "logout":
             setcookie("admin", false);
             $admin = "";
-            NukeHeader::header();
+            Nuke\Header::header();
             OpenTable();
             echo "<center><font class=\"title\"><b>" . _YOUARELOGGEDOUT . "</b></font></center>";
             CloseTable();
             Header("Refresh: 3; url=" . $admin_file . ".php");
-            NukeFooter::footer();
+            Nuke\Footer::footer();
             break;
 
         case "login";

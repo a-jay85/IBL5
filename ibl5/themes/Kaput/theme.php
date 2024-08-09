@@ -147,7 +147,7 @@ function themefooter()
     echo "<br>";
     OpenTable();
     echo "<center>";
-    NukeFooter::footmsg();
+    Nuke\Footer::footmsg();
     echo "</center>";
     CloseTable();
 }

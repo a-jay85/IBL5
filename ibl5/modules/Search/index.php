@@ -62,7 +62,7 @@ switch ($op) {
         $max = intval($max);
         $query = stripslashes(check_html($query, "nohtml"));
         $pagetitle = "- " . _SEARCH . "";
-        NukeHeader::header();
+        Nuke\Header::header();
         $topic = intval($topic);
         if ($topic > 0) {
             $row = $db->sql_fetchrow($db->sql_query("SELECT topicimage, topictext from " . $prefix . "_topics where topicid='$topic'"));
@@ -501,7 +501,7 @@ $sel1 = $sel2 = $sel3 = $sel4 = "";
                 . "</ul>";
             CloseTable();
         }
-        NukeFooter::footer();
+        Nuke\Footer::footer();
         break;
 }
 

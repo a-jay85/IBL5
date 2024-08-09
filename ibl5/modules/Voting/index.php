@@ -41,7 +41,7 @@ function userinfo($username)
     $result2 = $db->sql_query($sql2);
     $userinfo = $db->sql_fetchrow($result2);
 
-    NukeHeader::header();
+    Nuke\Header::header();
 
 // === CODE TO INSERT IBL DEPTH CHART ===
 
@@ -284,14 +284,14 @@ function userinfo($username)
 
     CloseTable();
 
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 function main($user)
 {
     global $stop;
     if (!is_user($user)) {
-        NukeHeader::header();
+        Nuke\Header::header();
         if ($stop) {
             OpenTable();
             echo "<center><font class=\"title\"><b>" . _LOGININCOR . "</b></font></center>\n";
@@ -306,7 +306,7 @@ function main($user)
         if (!is_user($user)) {
             loginbox();
         }
-        NukeFooter::footer();
+        Nuke\Footer::footer();
     } elseif (is_user($user)) {
         global $cookie;
         userinfo($cookie[1]);

@@ -42,7 +42,7 @@ get_lang($module_name);
 
 $pagetitle = "- " . _USERSJOURNAL . "";
 
-NukeHeader::header();
+Nuke\Header::header();
 include "modules/$module_name/functions.php";
 if (is_user($user)) {
     cookiedecode($user);
@@ -79,6 +79,6 @@ if (!is_user($user) && !is_admin($admin)) {
     OpenTable();
     echo "<center><b>" . _YOUMUSTBEMEMBER . "</b></center>";
     CloseTable();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
     die();
 }

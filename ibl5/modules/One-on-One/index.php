@@ -27,7 +27,7 @@ oneonone();
 function oneonone()
 {
     global $prefix, $db, $user, $cookie;
-    NukeHeader::header();
+    Nuke\Header::header();
 
     cookiedecode($user);
 
@@ -124,7 +124,7 @@ function oneonone()
     }
 
     CloseTable();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 // ==================================
@@ -896,4 +896,4 @@ function printgame($gameid)
 }
 
 CloseTable();
-NukeFooter::footer();
+Nuke\Footer::footer();

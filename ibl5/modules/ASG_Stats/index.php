@@ -22,7 +22,7 @@ get_lang($module_name);
 $pagetitle = "All-Star Game Stats";
 
 {
-    NukeHeader::header();
+    Nuke\Header::header();
     OpenTable();
     $team = $_POST['team'];
     $position = $_POST['position'];
@@ -141,7 +141,7 @@ $pagetitle = "All-Star Game Stats";
 
     echo "</table></form>";
     CloseTable();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 function chunk_option($num, $chunk_selected)

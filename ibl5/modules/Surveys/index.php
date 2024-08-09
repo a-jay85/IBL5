@@ -25,9 +25,9 @@ if (isset($pollID)) {
 }
 
 if (!isset($pollID)) {
-    NukeHeader::header();
+    Nuke\Header::header();
     pollList();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 } elseif ($pollID <= 0) {
     Header("Location: modules.php?name=$module_name");
     die();
@@ -35,7 +35,7 @@ if (!isset($pollID)) {
     if (isset($tid)) {
         Header("Location: modules.php?name=$module_name"); // SecurityReason Fix 2005 - sp3x -> Now should be OK.
     }
-    NukeHeader::header();
+    Nuke\Header::header();
     OpenTable();
     echo "<center><font class=\"title\"><b>" . _CURRENTPOLLRESULTS . "</b></font></center>";
     CloseTable();
@@ -68,11 +68,11 @@ if (!isset($pollID)) {
         echo "<br>";
         include "modules/Surveys/comments.php";
     }
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 } elseif (isset($voteID) and ($voteID > 0)) {
     pollCollector($pollID, $voteID);
 } elseif ($pollID != pollLatest()) {
-    NukeHeader::header();
+    Nuke\Header::header();
     OpenTable();
     echo "<center><font class=\"option\"><b>" . _SURVEY . "</b></font></center>";
     CloseTable();
@@ -80,16 +80,16 @@ if (!isset($pollID)) {
     echo "<table border=\"0\" align=\"center\"><tr><td>";
     pollMain($pollID);
     echo "</td></tr></table>";
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 } else {
-    NukeHeader::header();
+    Nuke\Header::header();
     OpenTable();
     echo "<center><font class=\"option\"><b>" . _CURRENTSURVEY . "</b></font></center>";
     CloseTable();
     echo "<br><br><table border=\"0\" align=\"center\"><tr><td>";
     pollNewest();
     echo "</td></tr></table>";
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 /*********************************************************/

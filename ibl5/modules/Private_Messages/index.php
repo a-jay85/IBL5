@@ -52,7 +52,7 @@ if (!isset($popup) or ($popup != "1")) {
     title("$sitename: $mod_name");
     if (is_user($user)) {
         OpenTable();
-        NukeNavbar::nav();
+        Nuke\Navbar::nav();
         CloseTable();
         echo "<br>";
     }

@@ -37,7 +37,7 @@ $nowyear = $dot[2];
 function Stats_Main()
 {
     global $prefix, $db, $startdate, $sitename, $ThemeSel, $user_prefix, $Version_Num, $module_name, $textcolor2;
-    Nuke\Header::header();
+    NukeHeader::header();
     $result = $db->sql_query("SELECT type, var, count from " . $prefix . "_counter order by type desc");
     while ($row = $db->sql_fetchrow($result)) {
         $type = stripslashes(check_html($row['type'], "nohtml"));
@@ -175,7 +175,7 @@ function Stats_Main()
     echo "</table>\n";
     CloseTable2();
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function Stats($total)
@@ -183,7 +183,7 @@ function Stats($total)
     global $hlpfile, $nowyear, $nowmonth, $nowdate, $nowhour, $sitename, $startdate, $prefix, $db, $now, $module_name;
     $row = $db->sql_query("SELECT count from " . $prefix . "_counter order by type desc");
     list($total) = $db->sql_fetchrow($row);
-    Nuke\Header::header();
+    NukeHeader::header();
     title("$sitename " . _STATS . "");
     $total++;
     OpenTable();
@@ -228,13 +228,13 @@ function Stats($total)
     showHourlyStats($nowyear, $nowmonth, $nowdate);
     echo "<br><br><center>" . _GOBACK . "</center><br><br>";
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function YearlyStats($year)
 {
     global $hlpfile, $nowyear, $nowmonth, $nowdate, $sitename, $module_name;
-    Nuke\Header::header();
+    NukeHeader::header();
     title("$sitename " . _STATS . "");
     opentable();
     $year = intval($year);
@@ -243,13 +243,13 @@ function YearlyStats($year)
     echo "<BR>";
     echo "<center>[ <a href=\"modules.php?name=$module_name\">" . _BACKTOMAIN . "</a> | <a href=\"modules.php?name=$module_name&amp;op=Stats\">" . _BACKTODETSTATS . "</a> ]</center>";
     closetable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function MonthlyStats($year, $month)
 {
     global $sitename, $module_name, $nowdate;
-    Nuke\Header::header();
+    NukeHeader::header();
     title("$sitename " . _STATS . "");
     opentable();
     $year = intval($year);
@@ -259,13 +259,13 @@ function MonthlyStats($year, $month)
     echo "<BR>";
     echo "<center>[ <a href=\"modules.php?name=$module_name\">" . _BACKTOMAIN . "</a> | <a href=\"modules.php?name=$module_name&amp;op=Stats\">" . _BACKTODETSTATS . "</a> ]</center>";
     closetable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function DailyStats($year, $month, $date)
 {
     global $sitename, $module_name;
-    Nuke\Header::header();
+    NukeHeader::header();
     title("$sitename " . _STATS . "");
     opentable();
     $year = intval($year);
@@ -275,7 +275,7 @@ function DailyStats($year, $month, $date)
     echo "<BR>";
     echo "<center>[ <a href=\"modules.php?name=$module_name\">" . _BACKTOMAIN . "</a> | <a href=\"modules.php?name=$module_name&amp;op=Stats\">" . _BACKTODETSTATS . "</a> ]</center>";
     closetable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function showYearStats($nowyear)

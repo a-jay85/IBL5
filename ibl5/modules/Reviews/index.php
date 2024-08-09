@@ -78,7 +78,7 @@ function display_score($score)
 function write_review()
 {
     global $admin, $sitename, $user, $cookie, $user_prefix, $currentlang, $multilingual, $db, $module_name;
-    Nuke\Header::header();
+    NukeHeader::header();
     OpenTable();
     echo "
     <b>" . _WRITEREVIEWFOR . " $sitename</b><br><br>
@@ -167,7 +167,7 @@ function write_review()
     	<input type=\"submit\" value=\"" . _PREVIEW . "\"> <input type=\"button\" onClick=\"history.go(-1)\" value=\"" . _CANCEL . "\"></form>
     ";
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function preview_review($date, $title, $text, $reviewer, $email, $score, $cover, $url, $url_title, $hits, $id, $rlanguage)
@@ -184,7 +184,7 @@ function preview_review($date, $title, $text, $reviewer, $email, $score, $cover,
     $url_title = filter($url_title, "nohtml", 0, preview);
     $hits = intval($hits);
     $id = intval($id);
-    Nuke\Header::header();
+    NukeHeader::header();
     OpenTable();
     echo "<form method=\"post\" action=\"modules.php?name=$module_name\">";
 
@@ -289,13 +289,13 @@ function preview_review($date, $title, $text, $reviewer, $email, $score, $cover,
 
     }
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function send_review($date, $title, $text, $reviewer, $email, $score, $cover, $url, $url_title, $hits, $id, $rlanguage)
 {
     global $admin, $prefix, $db, $module_name;
-    Nuke\Header::header();
+    NukeHeader::header();
     $id = intval($id);
     $title = filter($title, "nohtml", 1);
     $text = filter($text, "", 1);
@@ -334,13 +334,13 @@ function send_review($date, $title, $text, $reviewer, $email, $score, $cover, $u
     }
     echo "<br><br>[ <a href=\"modules.php?name=$module_name\">" . _RBACK . "</a> ]<br></center>";
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function reviews_index()
 {
     global $bgcolor3, $bgcolor2, $prefix, $multilingual, $currentlang, $db, $module_name;
-    Nuke\Header::header();
+    NukeHeader::header();
     if ($multilingual == 1) {
         $querylang = "WHERE rlanguage='$currentlang'";
     } else {
@@ -380,13 +380,13 @@ function reviews_index()
     $numresults = $db->sql_numrows($result2);
     echo "<tr><td colspan=\"2\"><br><center>" . _THEREARE . " $numresults " . _REVIEWSINDB . "</center></td></tr></table>";
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function reviews($letter, $field, $order)
 {
     global $bgcolor4, $sitename, $prefix, $multilingual, $currentlang, $db, $module_name;
-    Nuke\Header::header();
+    NukeHeader::header();
     $letter = substr("$letter", 0, 1);
     if ($multilingual == 1) {
         $querylang = "AND rlanguage='$currentlang'";
@@ -458,22 +458,22 @@ function reviews($letter, $field, $order)
     }
     echo "[ <a href=\"modules.php?name=$module_name\">" . _RETURN2MAIN . "</a> ]";
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function postcomment($id, $title)
 {
     global $user, $cookie, $AllowableHTML, $anonymous, $module_name, $anonpost;
     if (!is_user($user) && $anonpost == 0) {
-        Nuke\Header::header();
+        NukeHeader::header();
         title("$module_name");
         OpenTable();
         echo "<center><b>" . _RESTRICTEDAREA . "</b><br><br>" . _MODULEUSERS . "";
         CloseTable();
-        Nuke\Footer::footer();
+        NukeFooter::footer();
         die();
     }
-    Nuke\Header::header();
+    NukeHeader::header();
     cookiedecode($user);
     $title = filter($title, "nohtml");
     OpenTable();
@@ -516,19 +516,19 @@ function postcomment($id, $title)
     </form>
     ";
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function savecomment($xanonpost, $uname, $id, $score, $comments)
 {
     global $anonymous, $user, $cookie, $prefix, $db, $module_name, $user_prefix, $anonpost;
     if (!is_user($user) && $anonpost == 0) {
-        Nuke\Header::header();
+        NukeHeader::header();
         title("$module_name");
         OpenTable();
         echo "<center><b>" . _RESTRICTEDAREA . "</b><br><br>" . _MODULEUSERS . "";
         CloseTable();
-        Nuke\Footer::footer();
+        NukeFooter::footer();
         die();
     }
     if ($xanonpost) {
@@ -542,13 +542,13 @@ function savecomment($xanonpost, $uname, $id, $score, $comments)
         $krow = $db->sql_fetchrow($db->sql_query("SELECT karma FROM " . $user_prefix . "_users WHERE username='$uname'"));
         if ($krow['karma'] == 2) {
             $db->sql_query("insert into " . $prefix . "_reviews_comments_moderated values (NULL, '$id', '$uname', now(), '$comments', '$score')");
-            Nuke\Header::header();
+            NukeHeader::header();
             title("" . _MODERATEDTITLE . "");
             OpenTable();
             echo "<center>" . _COMMENTMODERATED . "";
             echo "<br><br><a href=\"modules.php?name=$module_name&rop=showcontent&id=$id\">" . _MODERATEDTITLE . "</a>";
             CloseTable();
-            Nuke\Footer::footer();
+            NukeFooter::footer();
             die();
         } elseif ($krow['karma'] == 3) {
             Header("Location: modules.php?name=$module_name&rop=showcontent&id=$id");
@@ -597,7 +597,7 @@ function showcontent($id, $page)
     global $admin, $uimages, $prefix, $db, $module_name;
     $id = intval($id);
     $page = intval($page);
-    Nuke\Header::header();
+    NukeHeader::header();
     OpenTable();
     if (($page == 1) or (empty($page))) {
         $db->sql_query("UPDATE " . $prefix . "_reviews SET hits=hits+1 WHERE id='$id'");
@@ -690,14 +690,14 @@ function showcontent($id, $page)
         echo "<br>";
         r_comments($id, $title);
     }
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function mod_review($id)
 {
     global $admin, $prefix, $db, $module_name;
     $id = intval($id);
-    Nuke\Header::header();
+    NukeHeader::header();
     OpenTable();
     if (($id == 0) || (!is_admin($admin))) {
         echo "This function must be passed argument id, or you are not admin.";
@@ -789,7 +789,7 @@ function mod_review($id)
         echo "<input type=hidden name=rop value=preview_review><input type=submit value=\"" . _PREMODS . "\">&nbsp;&nbsp;<input type=button onClick=history.go(-1) value=" . _CANCEL . "></form>";
     }
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function del_review($id_del)

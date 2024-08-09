@@ -2,7 +2,7 @@
 
 require 'mainfile.php';
 
-Nuke\Header::header();
+NukeHeader::header();
 
 echo "<HTML><HEAD><TITLE>End of Year Voting Result</TITLE></HEAD><BODY>";
 
@@ -152,4 +152,4 @@ if (strpos($MVP1, $Team_Name) !== false) {
     $result13 = $db->sql_query($query13);
 
 }
-Nuke\Footer::footer();
+NukeFooter::footer();

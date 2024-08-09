@@ -23,7 +23,7 @@ $pagetitle = "Chunk Stats";
 
 function chunkstats()
 {
-    Nuke\Header::header();
+    NukeHeader::header();
     OpenTable();
     echo "<center><font class=\"storytitle\">2049 Chunk Stats</font></center><br><br>";
 
@@ -151,12 +151,12 @@ function chunkstats()
 
     echo "</table></form>";
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function seasonstats()
 {
-    Nuke\Header::header();
+    NukeHeader::header();
     OpenTable();
     $team = $_POST['team'];
     $position = $_POST['position'];
@@ -275,7 +275,7 @@ function seasonstats()
 
     echo "</table></form>";
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function chunk_option($num, $chunk_selected)

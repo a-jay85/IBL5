@@ -222,7 +222,7 @@ function themefooter()
         . "<table width=\"750\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" align=\"center\">\n"
         . "<tr align=\"center\">\n"
         . "<td width=\"100%\" colspan=\"3\">\n";
-    Nuke\Footer::footmsg();
+    NukeFooter::footmsg();
     echo "</td>\n"
         . "</tr>\n"
         . "</table>\n";

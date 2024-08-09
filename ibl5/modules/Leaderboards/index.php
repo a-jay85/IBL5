@@ -26,7 +26,7 @@ get_lang($module_name);
 
 $pagetitle = "- Player Archives";
 
-Nuke\Header::header();
+NukeHeader::header();
 OpenTable();
 UI::playerMenu();
 
@@ -382,4 +382,4 @@ if ($submitted != null) {
 }
 
 CloseTable();
-Nuke\Footer::footer();
+NukeFooter::footer();

@@ -42,7 +42,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
         cookiedecode($user);
     }
 
-    Nuke\Header::header();
+    NukeHeader::header();
 
     OpenTable();
 
@@ -200,14 +200,14 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
     }
 
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function main($user)
 {
     global $stop;
     if (!is_user($user)) {
-        Nuke\Header::header();
+        NukeHeader::header();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . ($stop ? _LOGININCOR : _USERREGLOGIN) . "</b></font></center>";
         CloseTable();
@@ -217,7 +217,7 @@ function main($user)
             loginbox();
             CloseTable();
         }
-        Nuke\Footer::footer();
+        NukeFooter::footer();
     } elseif (is_user($user)) {
         global $cookie;
         cookiedecode($user);

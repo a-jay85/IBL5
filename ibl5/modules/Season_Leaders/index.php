@@ -22,7 +22,7 @@ get_lang($module_name);
 $pagetitle = "Season Stats";
 
 {
-    Nuke\Header::header();
+    NukeHeader::header();
     OpenTable();
     $year = $_POST['year'];
     $team = $_POST['team'];
@@ -169,7 +169,7 @@ $pagetitle = "Season Stats";
 
     echo "</table></form>";
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function team_option($team_selected)

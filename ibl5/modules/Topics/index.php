@@ -19,7 +19,7 @@ if (!defined('MODULE_FILE')) {
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 $pagetitle = "- " . _ACTIVETOPICS . "";
-Nuke\Header::header();
+NukeHeader::header();
 OpenTable();
 
 global $db, $prefix, $tipath;
@@ -75,4 +75,4 @@ if ($db->sql_numrows($result) > 0) {
 }
 
 CloseTable();
-Nuke\Footer::footer();
+NukeFooter::footer();

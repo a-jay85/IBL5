@@ -33,7 +33,7 @@ function theindex($catid)
     } else {
         $querylang = "";
     }
-    Nuke\Header::header();
+    NukeHeader::header();
     if (isset($userinfo['storynum'])) {
         $storynum = $userinfo['storynum'];
     } else {
@@ -104,7 +104,7 @@ function theindex($catid)
             $db->sql_query("delete from " . $prefix . "_referer");
         }
     }
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 switch ($op) {

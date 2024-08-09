@@ -13,13 +13,13 @@ function menu()
 {
     global $db;
 
-    Nuke\Header::header();
+    NukeHeader::header();
     OpenTable();
 
     UI::displaytopmenu($db, 0);
 
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function buildTeamFutureSalary($resultTeamPlayers, $k)
@@ -170,7 +170,7 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
         cookiedecode($user);
     }
 
-    Nuke\Header::header();
+    NukeHeader::header();
 
     $currentSeasonEndingYear = $season->endingYear; // we use this as an incrementer
 
@@ -332,7 +332,7 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 
     CloseTable();
 
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
@@ -357,7 +357,7 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
 
     // ===== END OF INFO PICKUP
 
-    Nuke\Header::header();
+    NukeHeader::header();
 
     OpenTable();
 
@@ -506,7 +506,7 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
 	</table>";
 
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function reviewtrade($user)
@@ -515,7 +515,7 @@ function reviewtrade($user)
     $season = new Season($db);
 
     if (!is_user($user)) {
-        Nuke\Header::header();
+        NukeHeader::header();
         if ($stop) {
             OpenTable();
             echo "<center><font class=\"title\"><b>" . _LOGININCOR . "</b></font></center>\n";
@@ -531,14 +531,14 @@ function reviewtrade($user)
             loginbox();
             CloseTable();
         }
-        Nuke\Footer::footer();
+        NukeFooter::footer();
     } elseif (is_user($user)) {
         if ($season->allowTrades == 'Yes') {
             global $cookie;
             cookiedecode($user);
             tradereview($cookie[1]);
         } else {
-            Nuke\Header::header();
+            NukeHeader::header();
             OpenTable();
             UI::displaytopmenu($db, 0);
             echo "Sorry, but trades are not allowed right now.";
@@ -549,7 +549,7 @@ function reviewtrade($user)
                 echo "<br>The waiver wire is also closed.";
             }
             CloseTable();
-            Nuke\Footer::footer();
+            NukeFooter::footer();
         }
     }
 }
@@ -559,7 +559,7 @@ function offertrade($user)
     global $db, $stop;
 
     if (!is_user($user)) {
-        Nuke\Header::header();
+        NukeHeader::header();
         if ($stop) {
             OpenTable();
             echo "<center><font class=\"title\"><b>" . _LOGININCOR . "</b></font></center>\n";
@@ -575,7 +575,7 @@ function offertrade($user)
             loginbox();
             CloseTable();
         }
-        Nuke\Footer::footer();
+        NukeFooter::footer();
     } elseif (is_user($user)) {
         global $cookie;
         cookiedecode($user);

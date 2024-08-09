@@ -19,7 +19,7 @@ if (!defined('MODULE_FILE')) {
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
-Nuke\Header::header();
+NukeHeader::header();
 
 if ($multilingual == 1) {
     $queryalang = "WHERE (alanguage='$currentlang' OR alanguage='')"; /* top stories */
@@ -269,4 +269,4 @@ if ($db->sql_numrows($result14) > 0) {
 }
 
 CloseTable();
-Nuke\Footer::footer();
+NukeFooter::footer();

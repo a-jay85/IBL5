@@ -28,7 +28,7 @@ if ($row['radminsuper'] == 1) {
     function Groups()
     {
         global $bgcolor2, $bgcolor4, $prefix, $user_prefix, $db, $admin_file;
-        Nuke/Header::header();
+        Nuke\Header::header();
         GraphicAdmin();
         title("" . _GROUPSADMIN . "");
         $grp_num = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_groups"));
@@ -302,7 +302,7 @@ if ($row['radminsuper'] == 1) {
     {
         global $prefix, $db, $admin_file;
         if (!is_numeric($points) || mb_ereg("-", $points)) {
-            Nuke/Header::header();
+            Nuke\Header::header();
             GraphicAdmin();
             title("" . _GROUPSADMIN . "");
             OpenTable();
@@ -323,7 +323,7 @@ if ($row['radminsuper'] == 1) {
     function grp_edit($id)
     {
         global $prefix, $db, $admin_file;
-        Nuke/Header::header();
+        Nuke\Header::header();
         GraphicAdmin();
         title("" . _GROUPSADMIN . "");
         $id = intval($id);
@@ -352,7 +352,7 @@ if ($row['radminsuper'] == 1) {
         global $prefix, $db, $admin_file;
         $id = intval($id);
         if (!is_numeric($points)) {
-            Nuke/Header::header();
+            Nuke\Header::header();
             GraphicAdmin();
             title("" . _GROUPSADMIN . "");
             OpenTable();
@@ -376,7 +376,7 @@ if ($row['radminsuper'] == 1) {
         global $prefix, $db, $admin_file;
         $id = intval($id);
         if ($ok == 0) {
-            Nuke/Header::header();
+            Nuke\Header::header();
             GraphicAdmin();
             title("" . _GROUPSADMIN . "");
             OpenTable();

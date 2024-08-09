@@ -39,14 +39,14 @@ if (!defined('MODULE_FILE')) {
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 $pagetitle = "- " . _USERSJOURNAL . "";
-NukeHeader::header();
+Nuke\Header::header();
 include "modules/$module_name/functions.php";
 include "modules/$module_name/kses.php";
 if (empty($title) or empty($jbodytext) or empty($status)) {
     OpenTable();
     echo "<center><b>" . _YOUMUSTFILLFIELDS . "</b><br><br>" . _GOBACK . "</center>";
     CloseTable();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
     die();
 } elseif (is_user($user)) {
     cookiedecode($user);
@@ -107,6 +107,6 @@ if (empty($title) or empty($jbodytext) or empty($status)) {
     OpenTable();
     echo "<center><b>" . _YOUMUSTBEMEMBER . "</b></center>";
     CloseTable();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
     die();
 }

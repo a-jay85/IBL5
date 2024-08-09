@@ -23,7 +23,7 @@ $pagetitle = "- $module_name";
 
 global $db;
 
-NukeHeader::header();
+Nuke\Header::header();
 OpenTable();
 UI::playerMenu();
 
@@ -457,4 +457,4 @@ if ($form_submitted_check == 1) {
 echo "</table></center>";
 
 CloseTable();
-NukeFooter::footer();
+Nuke\Footer::footer();

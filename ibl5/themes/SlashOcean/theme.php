@@ -90,7 +90,7 @@ function themefooter()
         blocks("right");
     }
     echo "</tr></table></td></tr></table>";
-    NukeFooter::footmsg();
+    Nuke\Footer::footmsg();
 }
 
 function themeindex($aid, $informant, $datetime, $title, $counter, $topic, $thetext, $notes, $morelink, $topicname, $topicimage, $topictext)

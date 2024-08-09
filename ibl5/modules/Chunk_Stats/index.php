@@ -24,7 +24,7 @@ $pagetitle = "Sim Stats";
 function chunkstats()
 {
     global $db;
-    NukeHeader::header();
+    Nuke\Header::header();
     OpenTable();
     echo "<center><font class=\"storytitle\">Sim Stats</font></center><br><br>";
 
@@ -215,13 +215,13 @@ function chunkstats()
 
     echo "</table></form>";
     CloseTable();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 function seasonstats()
 {
     global $db;
-    NukeHeader::header();
+    Nuke\Header::header();
     OpenTable();
     $team = $_POST['team'];
     $position = $_POST['position'];
@@ -368,7 +368,7 @@ function seasonstats()
 
     echo "</table></form>";
     CloseTable();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 function chunk_option($num, $chunk_selected)

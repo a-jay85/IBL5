@@ -47,7 +47,7 @@ function select_month()
         . "</form><br><br>"
         . "[ <a href=\"modules.php?name=$module_name&amp;sa=show_all\">" . _SHOWALLSTORIES . "</a> ]</center>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function show_month($year, $month, $month_l)
@@ -161,7 +161,7 @@ function show_month($year, $month, $month_l)
         . "</form>"
         . "[ <a href=\"modules.php?name=$module_name\">" . _ARCHIVESINDEX . "</a> | <a href=\"modules.php?name=$module_name&amp;sa=show_all\">" . _SHOWALLSTORIES . "</a> ]</center>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function show_all($min)
@@ -276,7 +276,7 @@ function show_all($min)
         . "</form>"
         . "[ <a href=\"modules.php?name=$module_name\">" . _ARCHIVESINDEX . "</a> ]</center>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 $sa = isset($sa) ? $sa : "";

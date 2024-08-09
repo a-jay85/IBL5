@@ -124,7 +124,7 @@ function oneonone()
     }
 
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 // ==================================
@@ -896,4 +896,4 @@ function printgame($gameid)
 }
 
 CloseTable();
-include "footer.php";
+NukeFooter::footer();

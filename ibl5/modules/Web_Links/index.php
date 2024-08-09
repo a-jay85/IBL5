@@ -183,7 +183,7 @@ function index()
     $catnum = intval($catnum);
     echo "<br><br><center><font class=\"content\">" . _THEREARE . " <b>$numrows</b> " . _LINKS . " " . _AND . " <b>$catnum</b> " . _CATEGORIES . " " . _INDB . "</font></center>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function AddLink()
@@ -233,7 +233,7 @@ function AddLink()
             . "" . _LINKSNOTUSER8 . "";
     }
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function Add($title, $url, $auth_name, $cat, $description, $email)
@@ -250,7 +250,7 @@ function Add($title, $url, $auth_name, $cat, $description, $email)
         echo "<center><b>" . _LINKALREADYEXT . "</b><br><br>"
             . "" . _GOBACK . "";
         CloseTable();
-        include "footer.php";
+        NukeFooter::footer();
     } else {
         if (is_user($user)) {
             $user2 = base64_decode($user);
@@ -268,7 +268,7 @@ function Add($title, $url, $auth_name, $cat, $description, $email)
             echo "<center><b>" . _LINKNOTITLE . "</b><br><br>"
                 . "" . _GOBACK . "";
             CloseTable();
-            include "footer.php";
+            NukeFooter::footer();
         }
         // Check if URL exist
         if (empty($url)) {
@@ -279,7 +279,7 @@ function Add($title, $url, $auth_name, $cat, $description, $email)
             echo "<center><b>" . _LINKNOURL . "</b><br><br>"
                 . "" . _GOBACK . "";
             CloseTable();
-            include "footer.php";
+            NukeFooter::footer();
         }
         // Check if Description exist
         if (empty($description)) {
@@ -290,7 +290,7 @@ function Add($title, $url, $auth_name, $cat, $description, $email)
             echo "<center><b>" . _LINKNODESC . "</b><br><br>"
                 . "" . _GOBACK . "";
             CloseTable();
-            include "footer.php";
+            NukeFooter::footer();
         }
         $cat = explode("-", $cat);
         if (empty($cat[1])) {
@@ -318,7 +318,7 @@ function Add($title, $url, $auth_name, $cat, $description, $email)
             echo _CHECKFORIT;
         }
         CloseTable();
-        include "footer.php";
+        NukeFooter::footer();
     }
 }
 
@@ -376,7 +376,7 @@ function NewLinks($newlinkshowdays)
     $allmonthlinks = 0;
     echo "</center>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function NewLinksDate($selectdate)
@@ -460,7 +460,7 @@ function NewLinksDate($selectdate)
     }
     echo "</font></td></tr></table>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function TopRated($ratenum, $ratetype)
@@ -560,7 +560,7 @@ function TopRated($ratenum, $ratetype)
     }
     echo "</font></td></tr></table>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function MostPopular($ratenum, $ratetype)
@@ -673,7 +673,7 @@ function MostPopular($ratenum, $ratetype)
     }
     echo "</font></td></tr></table>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function RandomLink()
@@ -895,7 +895,7 @@ function viewlink($cid, $min, $orderby, $show)
     }
     echo "</td></tr></table>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function newlinkgraphic($datetime, $time)
@@ -1280,7 +1280,7 @@ function search($query, $min, $orderby, $show)
         echo "<center><font class=\"option\"><b>" . _NOMATCHES . "</b></font></center><br><br>";
     }
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function viewlinkeditorial($lid)
@@ -1325,7 +1325,7 @@ function viewlinkeditorial($lid)
     linkfooter($lid);
     echo "</center>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function detecteditorial($lid)
@@ -1412,7 +1412,7 @@ function viewlinkcomments($lid)
     linkfooter($lid);
     echo "</center>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function viewlinkdetails($lid)
@@ -1842,7 +1842,7 @@ function viewlinkdetails($lid)
     linkfooter($lid);
     echo "</center>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function linkfooter($lid)
@@ -1974,7 +1974,7 @@ function outsidelinksetup($lid)
     - $sitename " . _STAFF . "
     <br><br></center>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function brokenlink($lid)
@@ -2008,7 +2008,7 @@ function brokenlink($lid)
         echo "" . _THANKSBROKEN . "<br><br>";
         echo "<input type=\"hidden\" name=\"l_op\" value=\"brokenlinkS\"><input type=\"submit\" value=\"" . _REPORTBROKEN . "\"></center></form>";
         CloseTable();
-        include "footer.php";
+        NukeFooter::footer();
     } else {
         Header("Location: modules.php?name=$module_name");
     }
@@ -2037,7 +2037,7 @@ function brokenlinkS($lid, $cid, $title, $url, $description, $modifysubmitter)
         OpenTable();
         echo "<br><center>" . _THANKSFORINFO . "<br><br>" . _LOOKTOREQUEST . "</center><br>";
         CloseTable();
-        include "footer.php";
+        NukeFooter::footer();
     } else {
         Header("Location: modules.php?name=$module_name");
     }
@@ -2106,7 +2106,7 @@ function modifylinkrequest($lid)
         }
     }
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function modifylinkrequestS($lid, $cat, $title, $url, $description, $modifysubmitter)
@@ -2131,7 +2131,7 @@ function modifylinkrequestS($lid, $cat, $title, $url, $description, $modifysubmi
         echo "<center><font class=\"content\">" . _ONLYREGUSERSMODIFY . "</font></center>";
         $blocknow = 1;
         CloseTable();
-        include "footer.php";
+        NukeFooter::footer();
     }
     if ($blocknow != 1) {
         $cat = explode("-", $cat);
@@ -2151,7 +2151,7 @@ function modifylinkrequestS($lid, $cat, $title, $url, $description, $modifysubmi
         OpenTable();
         echo "<center><font class=\"content\">" . _THANKSFORINFO . " " . _LOOKTOREQUEST . "</font></center>";
         CloseTable();
-        include "footer.php";
+        NukeFooter::footer();
     }
 }
 
@@ -2275,7 +2275,7 @@ function addrating($ratinglid, $ratinguser, $rating, $ratinghost_name, $ratingco
         }
     }
     completevotefooter($ratinglid, $ratinguser);
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function completevoteheader()
@@ -2407,7 +2407,7 @@ function ratelink($lid, $user)
     linkfooterchild($lid);
     echo "</center>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 if (isset($ratinglid) && isset($ratinguser) && isset($rating)) {

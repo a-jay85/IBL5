@@ -59,7 +59,7 @@ function RecommendSite($mess = "0")
     }
     echo "<tr><td>&nbsp;</td><td><input type=submit value=" . _SEND . "></form></td></tr></table>\n";
     CloseTable();
-    include 'footer.php';
+    NukeFooter::footer();
 }
 
 function SendSite($yname, $ymail, $fname, $fmail, $random_num = "0", $gfx_check)
@@ -71,7 +71,7 @@ function SendSite($yname, $ymail, $fname, $fmail, $random_num = "0", $gfx_check)
         OpenTable();
         echo "<center>" . _SENDSITEERROR . "<br><br>" . _GOBACK . "";
         CloseTable();
-        include "footer.php";
+        NukeFooter::footer();
         die();
     }
     $fname = removecrlf(filter($fname, "nohtml"));
@@ -100,7 +100,7 @@ function SiteSent($fname)
     OpenTable();
     echo "<center><font class=\"content\">" . _FREFERENCE . " $fname...<br><br>" . _THANKSREC . "</font></center>";
     CloseTable();
-    include 'footer.php';
+    NukeFooter::footer();
 }
 
 if (!isset($mess)) {$mess = 0;}

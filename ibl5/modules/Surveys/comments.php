@@ -686,7 +686,7 @@ function DisplayTopic($pollID, $pid = 0, $tid = 0, $mode = "thread", $order = 0,
     if ($pid == 0) {
         return array($pollID, $pid, $subject);
     } else {
-        include_once "footer.php";
+        NukeFooter::footer();
     }
 
 }
@@ -750,7 +750,7 @@ function singlecomment($tid, $pollID, $mode, $order, $thold)
     modtwo($tid, $score, $reason);
     echo " ]";
     modthree($pollID, $mode, $order, $thold);
-    include_once "footer.php";
+    NukeFooter::footer();
 }
 
 function reply($pid, $pollID, $mode, $order, $thold)
@@ -876,7 +876,7 @@ function reply($pid, $pollID, $mode, $order, $thold)
             . "<INPUT type=submit name=op value=\"" . _OK . "\"></FORM>";
         CloseTable();
     }
-    include_once "footer.php";
+    NukeFooter::footer();
 }
 
 function replyPreview($pid, $pollID, $subject, $comment, $xanonpost, $mode, $order, $thold)
@@ -962,7 +962,7 @@ function replyPreview($pid, $pollID, $subject, $comment, $xanonpost, $mode, $ord
         . "<br><INPUT type=submit name=op value=\"" . _PREVIEW . "\"> "
         . "<INPUT type=submit name=op value=\"" . _OK . "\"></FORM>";
     CloseTable();
-    include_once "footer.php";
+    NukeFooter::footer();
 }
 
 function CreateTopic($xanonpost, $subject, $comment, $pid, $pollID, $host_name, $mode, $order, $thold)
@@ -1025,7 +1025,7 @@ function CreateTopic($xanonpost, $subject, $comment, $pid, $pollID, $host_name, 
                     echo "<center>" . _COMMENTMODERATED . "";
                     echo "<br><br><a href=\"modules.php?name=$module_name&op=results&pollID=$pollID$koptions\">" . _MODERATEDTITLE . "</a>";
                     CloseTable();
-                    include_once "footer.php";
+                    NukeFooter::footer();
                     die();
                 } elseif ($krow['karma'] == 3) {
                     Header("Location: modules.php?name=$module_name&op=results&pollID=$pollID$koptions");
@@ -1043,7 +1043,7 @@ function CreateTopic($xanonpost, $subject, $comment, $pid, $pollID, $host_name, 
         echo "According to my records, the topic you are trying "
             . "to reply to does not exist. If you're just trying to be "
             . "annoying, well then too bad.";
-        include_once "footer.php";
+        NukeFooter::footer();
         die();
     }
     if ($pollcomm == 1) {

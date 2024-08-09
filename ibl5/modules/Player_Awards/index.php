@@ -156,4 +156,4 @@ while ($i < $num) {
 echo "</table></center>";
 
 CloseTable();
-include "footer.php";
+NukeFooter::footer();

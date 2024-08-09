@@ -173,4 +173,4 @@ include "modules/$module_name/associates.php";
 if (((empty($mode) or ($mode != "nocomments")) or ($acomm == 0)) or ($articlecomm == 1)) {
     include "modules/News/comments.php";
 }
-include "footer.php";
+NukeFooter::footer();

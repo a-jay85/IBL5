@@ -77,7 +77,7 @@ if ($the_first == 0) {
             . "<input type=\"submit\" value=\"" . _SUBMIT . "\">"
             . "</td></tr></table></form>";
         CloseTable();
-        include "footer.php";
+        NukeFooter::footer();
     }
     switch ($fop) {
         case "create_first":
@@ -184,7 +184,7 @@ function login()
         . "</td></tr></table>"
         . "</form>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function deleteNotice($id)
@@ -458,7 +458,7 @@ function adminMain()
         CloseTable();
     }
     unset($title);
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 if ($admintest) {
@@ -489,7 +489,7 @@ if ($admintest) {
             echo "<center><font class=\"title\"><b>" . _YOUARELOGGEDOUT . "</b></font></center>";
             CloseTable();
             Header("Refresh: 3; url=" . $admin_file . ".php");
-            include "footer.php";
+            NukeFooter::footer();
             break;
 
         case "login";

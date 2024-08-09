@@ -90,7 +90,7 @@ function showpage($pid, $page = 0)
         }
     }
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function list_pages()
@@ -167,7 +167,7 @@ function list_pages()
         echo "</blockquote>";
     }
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function list_pages_categories($cid)
@@ -227,7 +227,7 @@ function list_pages_categories($cid)
     }
     echo "<center>" . _GOBACK . "</center>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 if (!isset($page)) {$page = "";}

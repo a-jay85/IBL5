@@ -130,4 +130,4 @@ else if (count($_POST['ECF']) > 4) {
     }
 }
 
-include "footer.php";
+NukeFooter::footer();

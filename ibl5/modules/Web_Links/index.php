@@ -127,7 +127,7 @@ function linkinfomenu($lid)
 function index()
 {
     global $prefix, $db;
-    NukeHeader::header();
+    Nuke\Header::header();
     $mainlink = 0;
     menu($mainlink);
     echo "<br>";
@@ -183,13 +183,13 @@ function index()
     $catnum = intval($catnum);
     echo "<br><br><center><font class=\"content\">" . _THEREARE . " <b>$numrows</b> " . _LINKS . " " . _AND . " <b>$catnum</b> " . _CATEGORIES . " " . _INDB . "</font></center>";
     CloseTable();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 function AddLink()
 {
     global $prefix, $db, $user, $links_anonaddlinklock, $module_name;
-    NukeHeader::header();
+    Nuke\Header::header();
     $mainlink = 1;
     menu(1);
     echo "<br>";
@@ -233,7 +233,7 @@ function AddLink()
             . "" . _LINKSNOTUSER8 . "";
     }
     CloseTable();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 function Add($title, $url, $auth_name, $cat, $description, $email)
@@ -243,14 +243,14 @@ function Add($title, $url, $auth_name, $cat, $description, $email)
     $result = $db->sql_query("SELECT url from " . $prefix . "_links_links where url='$url'");
     $numrows = $db->sql_numrows($result);
     if ($numrows > 0) {
-        NukeHeader::header();
+        Nuke\Header::header();
         menu(1);
         echo "<br>";
         OpenTable();
         echo "<center><b>" . _LINKALREADYEXT . "</b><br><br>"
             . "" . _GOBACK . "";
         CloseTable();
-        NukeFooter::footer();
+        Nuke\Footer::footer();
     } else {
         if (is_user($user)) {
             $user2 = base64_decode($user);
@@ -261,36 +261,36 @@ function Add($title, $url, $auth_name, $cat, $description, $email)
         }
         // Check if Title exist
         if (empty($title)) {
-            NukeHeader::header();
+            Nuke\Header::header();
             menu(1);
             echo "<br>";
             OpenTable();
             echo "<center><b>" . _LINKNOTITLE . "</b><br><br>"
                 . "" . _GOBACK . "";
             CloseTable();
-            NukeFooter::footer();
+            Nuke\Footer::footer();
         }
         // Check if URL exist
         if (empty($url)) {
-            NukeHeader::header();
+            Nuke\Header::header();
             menu(1);
             echo "<br>";
             OpenTable();
             echo "<center><b>" . _LINKNOURL . "</b><br><br>"
                 . "" . _GOBACK . "";
             CloseTable();
-            NukeFooter::footer();
+            Nuke\Footer::footer();
         }
         // Check if Description exist
         if (empty($description)) {
-            NukeHeader::header();
+            Nuke\Header::header();
             menu(1);
             echo "<br>";
             OpenTable();
             echo "<center><b>" . _LINKNODESC . "</b><br><br>"
                 . "" . _GOBACK . "";
             CloseTable();
-            NukeFooter::footer();
+            Nuke\Footer::footer();
         }
         $cat = explode("-", $cat);
         if (empty($cat[1])) {
@@ -307,7 +307,7 @@ function Add($title, $url, $auth_name, $cat, $description, $email)
         if ($num_new == 0) {
             $db->sql_query("insert into " . $prefix . "_links_newlink values (NULL, '$cat[0]', '$cat[1]', '$title', '$url', '$description', '$auth_name', '$email', '$submitter')");
         }
-        NukeHeader::header();
+        Nuke\Header::header();
         menu(1);
         echo "<br>";
         OpenTable();
@@ -318,14 +318,14 @@ function Add($title, $url, $auth_name, $cat, $description, $email)
             echo _CHECKFORIT;
         }
         CloseTable();
-        NukeFooter::footer();
+        Nuke\Footer::footer();
     }
 }
 
 function NewLinks($newlinkshowdays)
 {
     global $prefix, $db, $module_name;
-    NukeHeader::header();
+    Nuke\Header::header();
     $newlinkshowdays = intval(trim($newlinkshowdays));
     menu(1);
     echo "<br>";
@@ -376,7 +376,7 @@ function NewLinks($newlinkshowdays)
     $allmonthlinks = 0;
     echo "</center>";
     CloseTable();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 function NewLinksDate($selectdate)
@@ -390,7 +390,7 @@ function NewLinksDate($selectdate)
     $radminsuper = intval($row['radminsuper']);
     $dateDB = (date("d-M-Y", $selectdate));
     $dateView = (date("F d, Y", $selectdate));
-    NukeHeader::header();
+    Nuke\Header::header();
     menu(1);
     echo "<br>";
     OpenTable();
@@ -460,13 +460,13 @@ function NewLinksDate($selectdate)
     }
     echo "</font></td></tr></table>";
     CloseTable();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 function TopRated($ratenum, $ratetype)
 {
     global $prefix, $db, $admin, $module_name, $user, $locale, $mainvotedecimal, $datetime, $admin_file;
-    NukeHeader::header();
+    Nuke\Header::header();
     include "modules/$module_name/l_config.php";
     menu(1);
     echo "<br>";
@@ -560,7 +560,7 @@ function TopRated($ratenum, $ratetype)
     }
     echo "</font></td></tr></table>";
     CloseTable();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 function MostPopular($ratenum, $ratetype)
@@ -572,7 +572,7 @@ function MostPopular($ratenum, $ratetype)
     $aid = "$admin[0]";
     $row = $db->sql_fetchrow($db->sql_query("SELECT radminsuper from " . $prefix . "_authors where aid='$aid'"));
     $radminsuper = intval($row['radminsuper']);
-    NukeHeader::header();
+    Nuke\Header::header();
     include "modules/$module_name/l_config.php";
     menu(1);
     echo "<br>";
@@ -673,7 +673,7 @@ function MostPopular($ratenum, $ratetype)
     }
     echo "</font></td></tr></table>";
     CloseTable();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 function RandomLink()
@@ -710,7 +710,7 @@ function viewlink($cid, $min, $orderby, $show)
     $aid = "$admin[0]";
     $row = $db->sql_fetchrow($db->sql_query("SELECT radminsuper from " . $prefix . "_authors where aid='$aid'"));
     $radminsuper = intval($row['radminsuper']);
-    NukeHeader::header();
+    Nuke\Header::header();
     if (!isset($min)) {
         $min = 0;
     }
@@ -895,7 +895,7 @@ function viewlink($cid, $min, $orderby, $show)
     }
     echo "</td></tr></table>";
     CloseTable();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 function newlinkgraphic($datetime, $time)
@@ -1104,7 +1104,7 @@ function search($query, $min, $orderby, $show)
 {
     global $prefix, $db, $admin, $bgcolor2, $module_name, $locale, $mainvotedecimal, $datetime, $admin_file;
     include "modules/$module_name/l_config.php";
-    NukeHeader::header();
+    Nuke\Header::header();
     if (!isset($min)) {
         $min = 0;
     }
@@ -1280,13 +1280,13 @@ function search($query, $min, $orderby, $show)
         echo "<center><font class=\"option\"><b>" . _NOMATCHES . "</b></font></center><br><br>";
     }
     CloseTable();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 function viewlinkeditorial($lid)
 {
     global $prefix, $db, $admin, $module_name;
-    NukeHeader::header();
+    Nuke\Header::header();
     include "modules/$module_name/l_config.php";
     menu(1);
     $row = $db->sql_fetchrow($db->sql_query("SELECT title FROM " . $prefix . "_links_links WHERE lid='$lid'"));
@@ -1325,7 +1325,7 @@ function viewlinkeditorial($lid)
     linkfooter($lid);
     echo "</center>";
     CloseTable();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 function detecteditorial($lid)
@@ -1342,7 +1342,7 @@ function detecteditorial($lid)
 function viewlinkcomments($lid)
 {
     global $prefix, $db, $admin, $bgcolor2, $module_name, $admin_file;
-    NukeHeader::header();
+    Nuke\Header::header();
     include "modules/$module_name/l_config.php";
     menu(1);
     $row = $db->sql_fetchrow($db->sql_query("SELECT title FROM " . $prefix . "_links_links WHERE lid='$lid'"));
@@ -1412,13 +1412,13 @@ function viewlinkcomments($lid)
     linkfooter($lid);
     echo "</center>";
     CloseTable();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 function viewlinkdetails($lid)
 {
     global $prefix, $db, $admin, $bgcolor1, $bgcolor2, $bgcolor3, $bgcolor4, $module_name, $anonymous;
-    NukeHeader::header();
+    Nuke\Header::header();
     include "modules/$module_name/l_config.php";
     menu(1);
     $lid = intval($lid);
@@ -1842,7 +1842,7 @@ function viewlinkdetails($lid)
     linkfooter($lid);
     echo "</center>";
     CloseTable();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 function linkfooter($lid)
@@ -1864,7 +1864,7 @@ function linkfooterchild($lid)
 function outsidelinksetup($lid)
 {
     global $module_name, $sitename, $nukeurl;
-    NukeHeader::header();
+    Nuke\Header::header();
     include "modules/$module_name/l_config.php";
     menu(1);
     echo "<br>";
@@ -1974,14 +1974,14 @@ function outsidelinksetup($lid)
     - $sitename " . _STAFF . "
     <br><br></center>";
     CloseTable();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 function brokenlink($lid)
 {
     global $prefix, $db, $user, $cookie, $module_name;
     if (is_user($user)) {
-        NukeHeader::header();
+        Nuke\Header::header();
         include "modules/$module_name/l_config.php";
         $user2 = base64_decode($user);
         $user2 = addslashes($user2);
@@ -2008,7 +2008,7 @@ function brokenlink($lid)
         echo "" . _THANKSBROKEN . "<br><br>";
         echo "<input type=\"hidden\" name=\"l_op\" value=\"brokenlinkS\"><input type=\"submit\" value=\"" . _REPORTBROKEN . "\"></center></form>";
         CloseTable();
-        NukeFooter::footer();
+        Nuke\Footer::footer();
     } else {
         Header("Location: modules.php?name=$module_name");
     }
@@ -2031,13 +2031,13 @@ function brokenlinkS($lid, $cid, $title, $url, $description, $modifysubmitter)
         $url = filter($url, "nohtml", 1);
         $modifysubmitter = filter($modifysubmitter, "nohtml", 1);
         $db->sql_query("insert into " . $prefix . "_links_modrequest values (NULL, '$lid', '$cid', '0', '" . addslashes($title) . "', '" . addslashes($url) . "', '" . addslashes($description) . "', '" . addslashes($ratinguser) . "', '1')");
-        NukeHeader::header();
+        Nuke\Header::header();
         menu(1);
         echo "<br>";
         OpenTable();
         echo "<br><center>" . _THANKSFORINFO . "<br><br>" . _LOOKTOREQUEST . "</center><br>";
         CloseTable();
-        NukeFooter::footer();
+        Nuke\Footer::footer();
     } else {
         Header("Location: modules.php?name=$module_name");
     }
@@ -2046,7 +2046,7 @@ function brokenlinkS($lid, $cid, $title, $url, $description, $modifysubmitter)
 function modifylinkrequest($lid)
 {
     global $prefix, $db, $user, $module_name, $anonymous;
-    NukeHeader::header();
+    Nuke\Header::header();
     include "modules/$module_name/l_config.php";
     if (is_user($user)) {
         $user2 = base64_decode($user);
@@ -2106,7 +2106,7 @@ function modifylinkrequest($lid)
         }
     }
     CloseTable();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 function modifylinkrequestS($lid, $cat, $title, $url, $description, $modifysubmitter)
@@ -2124,14 +2124,14 @@ function modifylinkrequestS($lid, $cat, $title, $url, $description, $modifysubmi
     }
     $blocknow = 0;
     if ($blockunregmodify == 1 && $ratinguser == "$anonymous") {
-        NukeHeader::header();
+        Nuke\Header::header();
         menu(1);
         echo "<br>";
         OpenTable();
         echo "<center><font class=\"content\">" . _ONLYREGUSERSMODIFY . "</font></center>";
         $blocknow = 1;
         CloseTable();
-        NukeFooter::footer();
+        Nuke\Footer::footer();
     }
     if ($blocknow != 1) {
         $cat = explode("-", $cat);
@@ -2145,13 +2145,13 @@ function modifylinkrequestS($lid, $cat, $title, $url, $description, $modifysubmi
         $cat[0] = intval($cat[0]);
         $cat[1] = intval($cat[1]);
         $db->sql_query("insert into " . $prefix . "_links_modrequest values (NULL, '$lid', '$cat[0]', '$cat[1]', '" . addslashes($title) . "', '" . addslashes($url) . "', '" . addslashes($description) . "', '" . addslashes($ratinguser) . "', 0)");
-        NukeHeader::header();
+        Nuke\Header::header();
         menu(1);
         echo "<br>";
         OpenTable();
         echo "<center><font class=\"content\">" . _THANKSFORINFO . " " . _LOOKTOREQUEST . "</font></center>";
         CloseTable();
-        NukeFooter::footer();
+        Nuke\Footer::footer();
     }
 }
 
@@ -2169,7 +2169,7 @@ function addrating($ratinglid, $ratinguser, $rating, $ratinghost_name, $ratingco
 {
     global $prefix, $db, $cookie, $user, $module_name, $anonymous;
     $passtest = "yes";
-    NukeHeader::header();
+    Nuke\Header::header();
     include "modules/$module_name/l_config.php";
     $ratinglid = intval($ratinglid);
     completevoteheader();
@@ -2275,7 +2275,7 @@ function addrating($ratinglid, $ratinguser, $rating, $ratinghost_name, $ratingco
         }
     }
     completevotefooter($ratinglid, $ratinguser);
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 function completevoteheader()
@@ -2340,7 +2340,7 @@ function completevote($error)
 function ratelink($lid, $user)
 {
     global $prefix, $cookie, $datetime, $module_name, $user_prefix;
-    NukeHeader::header();
+    Nuke\Header::header();
     menu(1);
     echo "<br>";
     OpenTable();
@@ -2407,7 +2407,7 @@ function ratelink($lid, $user)
     linkfooterchild($lid);
     echo "</center>";
     CloseTable();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 if (isset($ratinglid) && isset($ratinguser) && isset($rating)) {

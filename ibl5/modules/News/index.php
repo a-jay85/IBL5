@@ -30,7 +30,7 @@ function theindex($new_topic = "0")
     } else {
         $querylang = "";
     }
-    NukeHeader::header();
+    Nuke\Header::header();
     automated_news();
     if (isset($userinfo['storynum']) and $user_news == 1) {
         $storynum = $userinfo['storynum'];
@@ -122,7 +122,7 @@ function theindex($new_topic = "0")
         $morelink = str_replace(" |  | ", " | ", $morelink);
         themeindex($aid, $informant, $time, $title, $counter, $topic, $hometext, $notes, $morelink, $topicname, $topicimage, $topictext);
     }
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 function rate_article($sid, $score, $gfx_check, $random_num = "0")
@@ -136,7 +136,7 @@ function rate_article($sid, $score, $gfx_check, $random_num = "0")
             mt_srand((double) microtime() * 1000000);
             $maxran = 1000000;
             $random_num = mt_rand(0, $maxran);
-            NukeHeader::header();
+            Nuke\Header::header();
             title("$sitename: " . _ARTICLERATING . "");
             OpenTable();
             $row = $db->sql_fetchrow($db->sql_query("SELECT title FROM " . $prefix . "_stories WHERE sid='$sid'"));
@@ -152,7 +152,7 @@ function rate_article($sid, $score, $gfx_check, $random_num = "0")
             echo "<input type=\"hidden\" name=\"op\" value=\"rate_article\">";
             echo "<input type=\"submit\" value=\"" . _CASTMYVOTE . "\"></font></center></form>";
             CloseTable();
-            NukeFooter::footer();
+            Nuke\Footer::footer();
             die();
         } else {
             $score = intval($score);
@@ -192,13 +192,13 @@ function rate_article($sid, $score, $gfx_check, $random_num = "0")
                     Header("Location: modules.php?name=News&op=rate_complete&sid=$sid&score=$score");
                 }
             } else {
-                NukeHeader::header();
+                Nuke\Header::header();
                 title("$sitename: " . _ARTICLERATING . "");
                 OpenTable();
                 echo "<center>" . _DIDNTRATE . "<br><br>"
                     . "" . _GOBACK . "</center>";
                 CloseTable();
-                NukeFooter::footer();
+                Nuke\Footer::footer();
             }
         }
     } else {
@@ -206,7 +206,7 @@ function rate_article($sid, $score, $gfx_check, $random_num = "0")
         $maxran = 1000000;
         $random_num = mt_rand(0, $maxran);
         if (extension_loaded("gd") and $gfx_chk != 0) {
-            NukeHeader::header();
+            Nuke\Header::header();
             title("$sitename: " . _ARTICLERATING . "");
             OpenTable();
             $row = $db->sql_fetchrow($db->sql_query("SELECT title FROM " . $prefix . "_stories WHERE sid='$sid'"));
@@ -221,7 +221,7 @@ function rate_article($sid, $score, $gfx_check, $random_num = "0")
             echo "<input type=\"hidden\" name=\"op\" value=\"rate_article\">";
             echo "<input type=\"submit\" value=\"" . _CASTMYVOTE . "\"></font></center></form>";
             CloseTable();
-            NukeFooter::footer();
+            Nuke\Footer::footer();
         } else {
             $random_num = "$random_num";
             $gfx_check = "$code";
@@ -240,7 +240,7 @@ function rate_complete($sid, $score, $rated = 0)
         if (isset($userinfo['uorder'])) {$r_options .= "&amp;order=" . $userinfo['uorder'];}
         if (isset($userinfo['thold'])) {$r_options .= "&amp;thold=" . $userinfo['thold'];}
     }
-    NukeHeader::header();
+    Nuke\Header::header();
     title("$sitename: " . _ARTICLERATING . "");
     OpenTable();
     if ($rated == 0) {
@@ -254,7 +254,7 @@ function rate_complete($sid, $score, $rated = 0)
             . "[ <a href=\"modules.php?name=$module_name&amp;file=article&amp;sid=$sid$r_options\">" . _BACKTOARTICLEPAGE . "</a> ]</center>";
     }
     CloseTable();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 if (!(isset($new_topic))) {$new_topic = 0;}

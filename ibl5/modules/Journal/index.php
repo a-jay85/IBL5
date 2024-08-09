@@ -36,7 +36,7 @@ if (!defined('MODULE_FILE')) {
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 $pagetitle = "- " . _USERSJOURNAL . "";
-NukeHeader::header();
+Nuke\Header::header();
 include "modules/$module_name/functions.php";
 if (is_user($user)) {
     cookiedecode($user);

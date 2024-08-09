@@ -27,7 +27,7 @@ define('INDEX_FILE', true);
 $subject = $sitename . " " . _FEEDBACK;
 define('NO_EDITOR', true);
 
-NukeHeader::header();
+Nuke\Header::header();
 
 if (!isset($opi) or ($opi != "ds")) {
     $intcookie = intval($cookie[0]);
@@ -108,4 +108,4 @@ if ($_POST['opi'] != "ds") {
 }
 
 CloseTable();
-NukeFooter::footer();
+Nuke\Footer::footer();

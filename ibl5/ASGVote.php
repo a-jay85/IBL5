@@ -2,7 +2,7 @@
 
 require 'mainfile.php';
 
-NukeHeader::header();
+Nuke\Header::header();
 
 echo "<HTML><HEAD><TITLE>ASG Voting Result</TITLE></HEAD><BODY>";
 
@@ -130,4 +130,4 @@ else if (count($_POST['ECF']) > 4) {
     }
 }
 
-NukeFooter::footer();
+Nuke\Footer::footer();

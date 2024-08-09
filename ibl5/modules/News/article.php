@@ -78,7 +78,7 @@ $db->sql_query("UPDATE " . $prefix . "_stories SET counter=counter+1 where sid='
 
 $artpage = 1;
 $pagetitle = "- $title";
-NukeHeader::header();
+Nuke\Header::header();
 $artpage = 0;
 
 formatTimestamp($time);
@@ -173,4 +173,4 @@ include "modules/$module_name/associates.php";
 if (((empty($mode) or ($mode != "nocomments")) or ($acomm == 0)) or ($articlecomm == 1)) {
     include "modules/News/comments.php";
 }
-NukeFooter::footer();
+Nuke\Footer::footer();

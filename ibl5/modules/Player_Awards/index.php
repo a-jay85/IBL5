@@ -23,7 +23,7 @@ $pagetitle = "- $module_name";
 
 global $db;
 
-NukeHeader::header();
+Nuke\Header::header();
 OpenTable();
 UI::playerMenu();
 
@@ -156,4 +156,4 @@ while ($i < $num) {
 echo "</table></center>";
 
 CloseTable();
-NukeFooter::footer();
+Nuke\Footer::footer();

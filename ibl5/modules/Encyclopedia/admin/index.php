@@ -62,7 +62,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     function encyclopedia()
     {
         global $prefix, $db, $language, $multilingual, $bgcolor2, $admin_file;
-        Nuke/Header::header();
+        Nuke\Header::header();
         GraphicAdmin();
         title("" . _ENCYCLOPEDIAMANAGER . "");
         OpenTable();
@@ -207,7 +207,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     function encyclopedia_edit($eid)
     {
         global $prefix, $db, $language, $multilingual, $bgcolor2, $admin_file;
-        Nuke/Header::header();
+        Nuke\Header::header();
         GraphicAdmin();
         title("" . _ENCYCLOPEDIAMANAGER . "");
         $eid = intval($eid);
@@ -272,7 +272,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     function encyclopedia_terms($eid, $ltr)
     {
         global $prefix, $db, $admin_file;
-        Nuke/Header::header();
+        Nuke\Header::header();
         $eid = intval($eid);
         GraphicAdmin();
         title("" . _ENCYCLOPEDIAMANAGER . "");
@@ -302,7 +302,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     function encyclopedia_text_edit($tid)
     {
         global $prefix, $db, $language, $multilingual, $bgcolor2, $admin_file;
-        Nuke/Header::header();
+        Nuke\Header::header();
         GraphicAdmin();
         title("" . _ENCYCLOPEDIAMANAGER . "");
         $tid = intval($tid);
@@ -402,7 +402,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
             $db->sql_query("delete from " . $prefix . "_encyclopedia_text where eid='$eid'");
             Header("Location: " . $admin_file . ".php?op=encyclopedia");
         } else {
-            Nuke/Header::header();
+            Nuke\Header::header();
             GraphicAdmin();
             title("" . _ENCYCLOPEDIAMANAGER . "");
             $result = $db->sql_query("select title from " . $prefix . "_encyclopedia where eid='$eid'");
@@ -425,7 +425,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
             $db->sql_query("delete from " . $prefix . "_encyclopedia_text where tid='$tid'");
             Header("Location: " . $admin_file . ".php?op=encyclopedia");
         } else {
-            Nuke/Header::header();
+            Nuke\Header::header();
             GraphicAdmin();
             title("" . _ENCYCLOPEDIAMANAGER . "");
             $result = $db->sql_query("select title from " . $prefix . "_encyclopedia_text where tid='$tid'");
@@ -504,7 +504,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     }
 
 } else {
-    Nuke/Header::header();
+    Nuke\Header::header();
     GraphicAdmin();
     OpenTable();
     echo "<center><b>" . _ERROR . "</b><br><br>You do not have administration permission for module \"$module_name\"</center>";

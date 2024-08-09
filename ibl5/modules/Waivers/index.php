@@ -27,7 +27,7 @@ function waivers($user)
     $season = new Season($db);
 
     if (!is_user($user)) {
-        NukeHeader::header();
+        Nuke\Header::header();
         if ($stop) {
             OpenTable();
             UI::displaytopmenu($db, $tid);
@@ -46,7 +46,7 @@ function waivers($user)
             loginbox();
             CloseTable();
         }
-        NukeFooter::footer();
+        Nuke\Footer::footer();
     } elseif (is_user($user)) {
         if (
             ($season->phase == "Preseason" AND $season->allowWaivers == "Yes")
@@ -57,12 +57,12 @@ function waivers($user)
             global $cookie;
             waiverexecute($cookie[1], $action);
         } else {
-            NukeHeader::header();
+            Nuke\Header::header();
             OpenTable();
             UI::displaytopmenu($db, $tid);
             echo "Sorry, but players may not be added from or dropped to waivers at the present time.";
             CloseTable();
-            NukeFooter::footer();
+            Nuke\Footer::footer();
         }
     }
 }
@@ -76,7 +76,7 @@ function waiverexecute($username, $action)
     $num = $db->sql_numrows($result2);
     $userinfo = $db->sql_fetchrow($result2);
 
-    NukeHeader::header();
+    Nuke\Header::header();
 
     $Team_Offering = $_POST['Team_Name'];
     $Type_Of_Action = $_POST['Action'];
@@ -372,7 +372,7 @@ function waiverexecute($username, $action)
 
     CloseTable();
 
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 waivers($user, $action);

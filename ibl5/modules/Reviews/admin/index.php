@@ -46,7 +46,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     function reviews()
     {
         global $prefix, $db, $multilingual, $admin_file;
-        NukeHeader::header();
+        Nuke/Header::header();
 
         GraphicAdmin();
         OpenTable();
@@ -164,7 +164,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     }
 
 } else {
-    NukeHeader::header();
+    Nuke/Header::header();
     GraphicAdmin();
     OpenTable();
     echo "<center><b>" . _ERROR . "</b><br><br>You do not have administration permission for module \"$module_name\"</center>";

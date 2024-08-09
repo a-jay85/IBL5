@@ -37,7 +37,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     function content()
     {
         global $prefix, $db, $language, $multilingual, $bgcolor2, $admin_file;
-        NukeHeader::header();
+        Nuke/Header::header();
         GraphicAdmin();
         title("" . _CONTENTMANAGER . "");
         OpenTable();
@@ -178,7 +178,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     function edit_category($cid)
     {
         global $prefix, $db, $admin_file;
-        NukeHeader::header();
+        Nuke/Header::header();
         GraphicAdmin();
         title("" . _CONTENTMANAGER . "");
         OpenTable();
@@ -224,7 +224,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
             }
             Header("Location: " . $admin_file . ".php?op=content");
         } else {
-            NukeHeader::header();
+            Nuke/Header::header();
             GraphicAdmin();
             title("" . _CONTENTMANAGER . "");
             $cid = intval($cid);
@@ -242,7 +242,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     function content_edit($pid)
     {
         global $prefix, $db, $language, $multilingual, $admin_file;
-        NukeHeader::header();
+        Nuke/Header::header();
         GraphicAdmin();
         title("" . _CONTENTMANAGER . "");
         $pid = intval($pid);
@@ -387,7 +387,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
             $db->sql_query("delete from " . $prefix . "_pages where pid='$pid'");
             Header("Location: " . $admin_file . ".php?op=content");
         } else {
-            NukeHeader::header();
+            Nuke/Header::header();
             GraphicAdmin();
             title("" . _CONTENTMANAGER . "");
             $row = $db->sql_fetchrow($db->sql_query("SELECT title from " . $prefix . "_pages where pid='$pid'"));
@@ -449,7 +449,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     }
 
 } else {
-    NukeHeader::header();
+    Nuke/Header::header();
     GraphicAdmin();
     OpenTable();
     echo "<center><b>" . _ERROR . "</b><br><br>You do not have administration permission for module \"$module_name\"</center>";

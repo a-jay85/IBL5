@@ -24,7 +24,7 @@ $pagetitle = "- $module_name";
 function showpage($pid, $page = 0)
 {
     global $prefix, $db, $sitename, $admin, $module_name;
-    NukeHeader::header();
+    Nuke\Header::header();
     OpenTable();
     $pid = intval($pid);
     $mypage = $db->sql_fetchrow($db->sql_query("SELECT * FROM " . $prefix . "_pages WHERE pid='$pid'"));
@@ -90,13 +90,13 @@ function showpage($pid, $page = 0)
         }
     }
     CloseTable();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 function list_pages()
 {
     global $prefix, $db, $sitename, $admin, $multilingual, $module_name, $admin_file;
-    NukeHeader::header();
+    Nuke\Header::header();
     title("$sitename: " . _PAGESLIST . "");
     OpenTable();
     echo "<center><font class=\"content\">" . _LISTOFCONTENT . " $sitename:</center><br><br>";
@@ -167,13 +167,13 @@ function list_pages()
         echo "</blockquote>";
     }
     CloseTable();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 function list_pages_categories($cid)
 {
     global $prefix, $db, $sitename, $admin, $multilingual, $module_name, $admin_file;
-    NukeHeader::header();
+    Nuke\Header::header();
     title("$sitename: " . _PAGESLIST . "");
     OpenTable();
     echo "<center><font class=\"content\">" . _LISTOFCONTENT . " $sitename:</center><br><br>";
@@ -227,7 +227,7 @@ function list_pages_categories($cid)
     }
     echo "<center>" . _GOBACK . "</center>";
     CloseTable();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 if (!isset($page)) {$page = "";}

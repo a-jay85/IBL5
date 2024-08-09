@@ -99,7 +99,7 @@ function confirmNewUser($username, $user_email, $user_password, $user_password2,
             echo "<center><b>" . _SECCODEINCOR . "</b><br><br>"
                 . "" . _GOBACK . "</center>";
             CloseTable();
-            include "footer.php";
+            NukeFooter::footer();
             die();
         }
         if (empty($user_password) and empty($user_password2)) {
@@ -109,14 +109,14 @@ function confirmNewUser($username, $user_email, $user_password, $user_password2,
             OpenTable();
             echo "<center><b>" . _PASSDIFFERENT . "</b><br><br>" . _GOBACK . "</center>";
             CloseTable();
-            include "footer.php";
+            NukeFooter::footer();
             die();
         } elseif ($user_password == $user_password2 and strlen($user_password) < $minpass) {
             title("" . _NEWUSERERROR . "");
             OpenTable();
             echo "<center>" . _YOUPASSMUSTBE . " <b>$minpass</b> " . _CHARLONG . "<br><br>" . _GOBACK . "</center>";
             CloseTable();
-            include "footer.php";
+            NukeFooter::footer();
             die();
         }
         title("$sitename: " . _USERREGLOGIN . "");
@@ -141,7 +141,7 @@ function confirmNewUser($username, $user_email, $user_password, $user_password2,
         echo "<font class=\"content\">$stop<br>" . _GOBACK . "</font></center>";
         CloseTable();
     }
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function finishNewUser($username, $user_email, $user_password, $random_num, $gfx_check)
@@ -193,7 +193,7 @@ function finishNewUser($username, $user_email, $user_password, $random_num, $gfx
     } else {
         echo "$stop";
     }
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function activate($username, $check_num)
@@ -223,7 +223,7 @@ function activate($username, $check_num)
             OpenTable();
             echo "<center><b>" . $row['username'] . ":</b> " . _ACTMSG . "</center>";
             CloseTable();
-            include "footer.php";
+            NukeFooter::footer();
             die();
         } else {
             NukeHeader::header();
@@ -231,7 +231,7 @@ function activate($username, $check_num)
             OpenTable();
             echo "<center>" . _ACTERROR1 . "</center>";
             CloseTable();
-            include "footer.php";
+            NukeFooter::footer();
             die();
         }
     } else {
@@ -240,7 +240,7 @@ function activate($username, $check_num)
         OpenTable();
         echo "<center>" . _ACTERROR2 . "</center>";
         CloseTable();
-        include "footer.php";
+        NukeFooter::footer();
         die();
     }
 
@@ -655,7 +655,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
         echo "<li><a href=\"modules.php?name=News&file=article&sid=$sid\">$title</a><br>";
     }
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function main($user)
@@ -698,7 +698,7 @@ function main($user)
                 . "<center><font class=\"content\">[ <a href=\"modules.php?name=$module_name&amp;op=pass_lost\">" . _PASSWORDLOST . "</a> | <a href=\"modules.php?name=$module_name&amp;op=new_user\">" . _REGNEWUSER . "</a> ]</font></center>\n";
             CloseTable();
         }
-        include "footer.php";
+        NukeFooter::footer();
     } elseif (is_user($user)) {
         global $cookie;
         cookiedecode($user);
@@ -785,7 +785,7 @@ function new_user()
             . "" . _WEDONTGIVE . "<br><br>\n"
             . "<center><font class=\"content\">[ <a href=\"modules.php?name=$module_name\">" . _USERLOGIN . "</a> | <a href=\"modules.php?name=$module_name&amp;op=pass_lost\">" . _PASSWORDLOST . "</a> ]</font></center>\n";
         CloseTable();
-        include "footer.php";
+        NukeFooter::footer();
     } elseif (is_user($user)) {
         global $cookie;
         cookiedecode($user);
@@ -813,7 +813,7 @@ function pass_lost()
             . "<input type=\"submit\" value=\"" . _SENDPASSWORD . "\"></form><br>\n"
             . "<center><font class=\"content\">[ <a href=\"modules.php?name=$module_name\">" . _USERLOGIN . "</a> | <a href=\"modules.php?name=$module_name&amp;op=new_user\">" . _REGNEWUSER . "</a> ]</font></center>\n";
         CloseTable();
-        include "footer.php";
+        NukeFooter::footer();
     } elseif (is_user($user)) {
         global $cookie;
         cookiedecode($user);
@@ -841,7 +841,7 @@ function logout()
     }
     echo "<center><font class=\"option\"><b>" . _YOUARELOGGEDOUT . "</b></font></center>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function mail_password($username, $code)
@@ -857,7 +857,7 @@ function mail_password($username, $code)
         OpenTable();
         echo "<center>" . _SORRYNOUSERINFO . "</center>";
         CloseTable();
-        include "footer.php";
+        NukeFooter::footer();
     } else {
         $host_name = $_SERVER['REMOTE_ADDR'];
         $row = $db->sql_fetchrow($result);
@@ -880,7 +880,7 @@ function mail_password($username, $code)
             OpenTable();
             echo "<center>" . _PASSWORD4 . " $username " . _MAILED . "<br><br>" . _GOBACK . "</center>";
             CloseTable();
-            include "footer.php";
+            NukeFooter::footer();
             /* If no Code, send it */
         } else {
             $sql = "SELECT user_email, user_password FROM " . $user_prefix . "_users WHERE username='$username'";
@@ -890,7 +890,7 @@ function mail_password($username, $code)
                 OpenTable();
                 echo "<center>" . _SORRYNOUSERINFO . "</center>";
                 CloseTable();
-                include "footer.php";
+                NukeFooter::footer();
             } else {
                 $host_name = $_SERVER['REMOTE_ADDR'];
                 $row = $db->sql_fetchrow($result);
@@ -904,7 +904,7 @@ function mail_password($username, $code)
                 OpenTable();
                 echo "<center>" . _CODEFOR . " $username " . _MAILED . "<br><br>" . _GOBACK . "</center>";
                 CloseTable();
-                include "footer.php";
+                NukeFooter::footer();
             }
         }
     }
@@ -1242,7 +1242,7 @@ function edituser()
             . "<INPUT class=mainoption type=submit value=Save&nbsp;Avatar>"
             . "</form></TD></TR></TABLE>";
         CloseTable();
-        include "footer.php";
+        NukeFooter::footer();
     } else {
         main($user);
     }
@@ -1376,7 +1376,7 @@ function edithome()
             . "<input type=\"submit\" value=\"" . _SAVECHANGES . "\">"
             . "</form>";
         CloseTable();
-        include "footer.php";
+        NukeFooter::footer();
     } else {
         main($user);
     }
@@ -1440,7 +1440,7 @@ function chgtheme()
             . "<input type=\"submit\" value=\"" . _SAVECHANGES . "\">"
             . "</form>";
         CloseTable();
-        include "footer.php";
+        NukeFooter::footer();
     } else {
         main($user);
     }
@@ -1562,7 +1562,7 @@ function editcomm()
     <?php
 CloseTable();
         echo "<br><br>";
-        include "footer.php";
+        NukeFooter::footer();
     } else {
         main($user);
     }
@@ -1649,7 +1649,7 @@ function avatarlist($avatarcategory)
             . "<br></center>";
         $d->close();
         CloseTable();
-        include "footer.php";
+        NukeFooter::footer();
     } else {
         die("Access Denied");
     }
@@ -1683,7 +1683,7 @@ function avatarsave($avatar, $category)
             echo "<center><b>Error:</b> Wrong avatar format! Avatars can only be gif, jpg, or png format.<br />" . _GOBACK . "</center>";
         }
         CloseTable();
-        include "footer.php";
+        NukeFooter::footer();
     }
 }
 
@@ -1714,7 +1714,7 @@ function avatarlinksave($avatar)
             echo "<center><b>Error:</b> Wrong avatar format! Avatars can only be gif, jpg, or png format.<br />" . _GOBACK . "</center>";
         }
         CloseTable();
-        include "footer.php";
+        NukeFooter::footer();
     }
 }
 
@@ -1746,7 +1746,7 @@ function broadcast($the_message, $who)
                 echo "<center>" . _BROADCASTNOTSENT . "<br><br>[ <a href=\"modules.php?name=$module_name\">" . _RETURNPAGE . "</a> ]</center>";
             }
             CloseTable();
-            include "footer.php";
+            NukeFooter::footer();
         } else {
             echo "I don't like you...";
         }

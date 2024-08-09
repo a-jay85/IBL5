@@ -92,6 +92,6 @@ if (!is_user($user) && !is_admin($admin)) {
     OpenTable();
     echo "<center><b>" . _YOUMUSTBEMEMBER . "</b></center>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
     die();
 }

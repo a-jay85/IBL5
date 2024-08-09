@@ -33,7 +33,7 @@ function showmenu()
     UI::playerMenu();
 
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function showpage($playerID, $spec)
@@ -1719,7 +1719,7 @@ function showpage($playerID, $spec)
     echo "</td></tr></table></table>";
 
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 
     // END OF DISPLAY PAGE
 }
@@ -2121,7 +2121,7 @@ function negotiate($pid)
     // RENEGOTIATION STUFF END
 
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function rookieoption($pid)

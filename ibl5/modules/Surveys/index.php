@@ -27,7 +27,7 @@ if (isset($pollID)) {
 if (!isset($pollID)) {
     NukeHeader::header();
     pollList();
-    include 'footer.php';
+    NukeFooter::footer();
 } elseif ($pollID <= 0) {
     Header("Location: modules.php?name=$module_name");
     die();
@@ -68,7 +68,7 @@ if (!isset($pollID)) {
         echo "<br>";
         include "modules/Surveys/comments.php";
     }
-    include "footer.php";
+    NukeFooter::footer();
 } elseif (isset($voteID) and ($voteID > 0)) {
     pollCollector($pollID, $voteID);
 } elseif ($pollID != pollLatest()) {
@@ -80,7 +80,7 @@ if (!isset($pollID)) {
     echo "<table border=\"0\" align=\"center\"><tr><td>";
     pollMain($pollID);
     echo "</td></tr></table>";
-    include 'footer.php';
+    NukeFooter::footer();
 } else {
     NukeHeader::header();
     OpenTable();
@@ -89,7 +89,7 @@ if (!isset($pollID)) {
     echo "<br><br><table border=\"0\" align=\"center\"><tr><td>";
     pollNewest();
     echo "</td></tr></table>";
-    include 'footer.php';
+    NukeFooter::footer();
 }
 
 /*********************************************************/

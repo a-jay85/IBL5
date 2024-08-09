@@ -100,4 +100,4 @@ $text .= "
 echo $text;
 
 CloseTable();
-include "footer.php";
+NukeFooter::footer();

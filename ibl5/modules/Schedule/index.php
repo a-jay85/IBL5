@@ -52,7 +52,7 @@ while ($chunk_start_date < $max_date) {
 }
 
 CloseTable();
-include "footer.php";
+NukeFooter::footer();
 
 function chunk($chunk_start_date, $chunk_end_date, $j)
 {

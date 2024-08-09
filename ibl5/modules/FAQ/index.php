@@ -89,11 +89,11 @@ if (!isset($myfaq)) {
     }
     echo "</td></tr></table>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 } else {
     NukeHeader::header();
     ShowFaq($id_cat, $categories);
     ShowFaqAll($id_cat);
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }

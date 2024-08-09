@@ -457,4 +457,4 @@ if ($form_submitted_check == 1) {
 echo "</table></center>";
 
 CloseTable();
-include "footer.php";
+NukeFooter::footer();

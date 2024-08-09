@@ -701,7 +701,7 @@ function DisplayTopic($sid, $pid = 0, $tid = 0, $mode = "thread", $order = 0, $t
         return array($sid, $pid, $subject);
 
     } else {
-        include "footer.php";
+        NukeFooter::footer();
     }
 }
 
@@ -752,7 +752,7 @@ function singlecomment($tid, $sid, $mode, $order, $thold)
     echo " ]";
     modthree($sid, $mode, $order, $thold);
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function reply($pid, $sid, $mode, $order, $thold)
@@ -896,7 +896,7 @@ function reply($pid, $sid, $mode, $order, $thold)
             . "</font></form>\n";
         CloseTable();
     }
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function replyPreview($pid, $sid, $subject, $comment, $xanonpost, $mode, $order, $thold)
@@ -986,7 +986,7 @@ function replyPreview($pid, $sid, $subject, $comment, $xanonpost, $mode, $order,
         . "<input type=submit name=op value=\"" . _OK . "\">\n"
         . "</font></form>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function CreateTopic($xanonpost, $subject, $comment, $pid, $sid, $host_name, $mode, $order, $thold)
@@ -1006,7 +1006,7 @@ function CreateTopic($xanonpost, $subject, $comment, $pid, $sid, $host_name, $mo
         OpenTable();
         echo "<center>" . _COMMENTPOSTERROR . "<br><br>" . _GOBACK . "</center>";
         CloseTable();
-        include "footer.php";
+        NukeFooter::footer();
         die();
     }
     //$comment = filter($comment);
@@ -1043,7 +1043,7 @@ function CreateTopic($xanonpost, $subject, $comment, $pid, $sid, $host_name, $mo
                     echo "<center>" . _COMMENTMODERATED . "";
                     echo "<br><br><a href=\"modules.php?name=$module_name&file=article&sid=$sid$koptions\">" . _MODERATEDRETURN . "</a>";
                     CloseTable();
-                    include "footer.php";
+                    NukeFooter::footer();
                     die();
                 } elseif ($krow['karma'] == 3) {
                     Header("Location: modules.php?name=$module_name&file=article&sid=$sid$koptions");
@@ -1062,7 +1062,7 @@ function CreateTopic($xanonpost, $subject, $comment, $pid, $sid, $host_name, $mo
         echo "According to my records, the topic you are trying "
             . "to reply to does not exist. If you're just trying to be "
             . "annoying, well then too bad.";
-        include "footer.php";
+        NukeFooter::footer();
         die();
     }
     $options = "";

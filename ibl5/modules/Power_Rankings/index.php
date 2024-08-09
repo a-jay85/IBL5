@@ -98,4 +98,4 @@ while ($i < $num) {
 
 CloseTable();
 
-include "footer.php";
+NukeFooter::footer();

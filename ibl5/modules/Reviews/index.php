@@ -167,7 +167,7 @@ function write_review()
     	<input type=\"submit\" value=\"" . _PREVIEW . "\"> <input type=\"button\" onClick=\"history.go(-1)\" value=\"" . _CANCEL . "\"></form>
     ";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function preview_review($date, $title, $text, $reviewer, $email, $score, $cover, $url, $url_title, $hits, $id, $rlanguage)
@@ -289,7 +289,7 @@ function preview_review($date, $title, $text, $reviewer, $email, $score, $cover,
 
     }
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function send_review($date, $title, $text, $reviewer, $email, $score, $cover, $url, $url_title, $hits, $id, $rlanguage)
@@ -334,7 +334,7 @@ function send_review($date, $title, $text, $reviewer, $email, $score, $cover, $u
     }
     echo "<br><br>[ <a href=\"modules.php?name=$module_name\">" . _RBACK . "</a> ]<br></center>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function reviews_index()
@@ -380,7 +380,7 @@ function reviews_index()
     $numresults = $db->sql_numrows($result2);
     echo "<tr><td colspan=\"2\"><br><center>" . _THEREARE . " $numresults " . _REVIEWSINDB . "</center></td></tr></table>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function reviews($letter, $field, $order)
@@ -458,7 +458,7 @@ function reviews($letter, $field, $order)
     }
     echo "[ <a href=\"modules.php?name=$module_name\">" . _RETURN2MAIN . "</a> ]";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function postcomment($id, $title)
@@ -470,7 +470,7 @@ function postcomment($id, $title)
         OpenTable();
         echo "<center><b>" . _RESTRICTEDAREA . "</b><br><br>" . _MODULEUSERS . "";
         CloseTable();
-        include "footer.php";
+        NukeFooter::footer();
         die();
     }
     NukeHeader::header();
@@ -516,7 +516,7 @@ function postcomment($id, $title)
     </form>
     ";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function savecomment($xanonpost, $uname, $id, $score, $comments)
@@ -528,7 +528,7 @@ function savecomment($xanonpost, $uname, $id, $score, $comments)
         OpenTable();
         echo "<center><b>" . _RESTRICTEDAREA . "</b><br><br>" . _MODULEUSERS . "";
         CloseTable();
-        include "footer.php";
+        NukeFooter::footer();
         die();
     }
     if ($xanonpost) {
@@ -548,7 +548,7 @@ function savecomment($xanonpost, $uname, $id, $score, $comments)
             echo "<center>" . _COMMENTMODERATED . "";
             echo "<br><br><a href=\"modules.php?name=$module_name&rop=showcontent&id=$id\">" . _MODERATEDTITLE . "</a>";
             CloseTable();
-            include "footer.php";
+            NukeFooter::footer();
             die();
         } elseif ($krow['karma'] == 3) {
             Header("Location: modules.php?name=$module_name&rop=showcontent&id=$id");
@@ -690,7 +690,7 @@ function showcontent($id, $page)
         echo "<br>";
         r_comments($id, $title);
     }
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function mod_review($id)
@@ -789,7 +789,7 @@ function mod_review($id)
         echo "<input type=hidden name=rop value=preview_review><input type=submit value=\"" . _PREMODS . "\">&nbsp;&nbsp;<input type=button onClick=history.go(-1) value=" . _CANCEL . "></form>";
     }
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function del_review($id_del)

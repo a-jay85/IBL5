@@ -87,6 +87,6 @@ if (stripos_clone($name, "..") || (isset($file) && stripos_clone($file, "..")) |
             echo "<center>" . _HOMEPROBLEMUSER . "</center>";
         }
         CloseTable();
-        include "footer.php";
+        NukeFooter::footer();
     }
 }

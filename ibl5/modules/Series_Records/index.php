@@ -46,7 +46,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
     displaySeriesRecords($tid);
 
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function main($user)
@@ -63,7 +63,7 @@ function main($user)
             loginbox();
             CloseTable();
         }
-        include "footer.php";
+        NukeFooter::footer();
     } elseif (is_user($user)) {
         global $cookie;
         cookiedecode($user);

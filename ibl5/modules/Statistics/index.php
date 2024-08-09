@@ -175,7 +175,7 @@ function Stats_Main()
     echo "</table>\n";
     CloseTable2();
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function Stats($total)
@@ -228,7 +228,7 @@ function Stats($total)
     showHourlyStats($nowyear, $nowmonth, $nowdate);
     echo "<br><br><center>" . _GOBACK . "</center><br><br>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function YearlyStats($year)
@@ -243,7 +243,7 @@ function YearlyStats($year)
     echo "<BR>";
     echo "<center>[ <a href=\"modules.php?name=$module_name\">" . _BACKTOMAIN . "</a> | <a href=\"modules.php?name=$module_name&amp;op=Stats\">" . _BACKTODETSTATS . "</a> ]</center>";
     closetable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function MonthlyStats($year, $month)
@@ -259,7 +259,7 @@ function MonthlyStats($year, $month)
     echo "<BR>";
     echo "<center>[ <a href=\"modules.php?name=$module_name\">" . _BACKTOMAIN . "</a> | <a href=\"modules.php?name=$module_name&amp;op=Stats\">" . _BACKTODETSTATS . "</a> ]</center>";
     closetable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function DailyStats($year, $month, $date)
@@ -275,7 +275,7 @@ function DailyStats($year, $month, $date)
     echo "<BR>";
     echo "<center>[ <a href=\"modules.php?name=$module_name\">" . _BACKTOMAIN . "</a> | <a href=\"modules.php?name=$module_name&amp;op=Stats\">" . _BACKTODETSTATS . "</a> ]</center>";
     closetable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function showYearStats($nowyear)

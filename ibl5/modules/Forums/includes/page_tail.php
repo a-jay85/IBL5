@@ -51,5 +51,5 @@ $db->sql_close();
 // Compress buffered output if required and send to browser
 //
 if ($popup != "1") {
-    include "footer.php";
+    NukeFooter::footer();
 }

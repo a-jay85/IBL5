@@ -27,4 +27,4 @@ OpenTable();
 echo "Module works!";
 
 CloseTable();
-include "footer.php";
+NukeFooter::footer();

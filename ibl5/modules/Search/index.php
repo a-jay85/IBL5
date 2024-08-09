@@ -501,7 +501,7 @@ $sel1 = $sel2 = $sel3 = $sel4 = "";
                 . "</ul>";
             CloseTable();
         }
-        include "footer.php";
+        NukeFooter::footer();
         break;
 }
 

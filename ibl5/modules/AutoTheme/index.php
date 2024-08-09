@@ -35,4 +35,4 @@ echo "This site is running the AutoTheme HTML Theme System.  AutoTheme is curren
 
 CloseTable();
 
-include "footer.php";
+NukeFooter::footer();

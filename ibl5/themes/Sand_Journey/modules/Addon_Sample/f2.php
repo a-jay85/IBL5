@@ -16,7 +16,7 @@ function f2one()
     echo "<li><a href=\"modules.php?name=Addon_Sample&amp;file=index\">Go to index.php</a>";
     echo "</ul>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 
 }
 
@@ -32,7 +32,7 @@ function f2go()
     echo "As you can see now, this page doesn't show the Right Blocks, this is because at the begining "
         . "of this file we set \$index variable to \"0\"";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 switch ($func) {

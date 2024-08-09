@@ -106,4 +106,4 @@ echo $text3;
 
 CloseTable();
 
-include "footer.php";
+NukeFooter::footer();

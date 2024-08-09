@@ -83,7 +83,7 @@ function list_content($eid)
     OpenTable();
     echo "<center><font class=\"tiny\">" . _COPYRIGHT . " &copy; " . _BY . " $sitename</font></center>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function terms($eid, $ltr)
@@ -124,7 +124,7 @@ function terms($eid, $ltr)
             . "" . _GOBACK . "</center>";
     }
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function content($tid, $ltr, $page = 0, $query = "")
@@ -197,7 +197,7 @@ function content($tid, $ltr, $page = 0, $query = "")
         echo "Sorry, This page isn't active...";
     }
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function list_themes()
@@ -255,7 +255,7 @@ function list_themes()
         echo "</blockquote>";
     }
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 if (!isset($ltr)) {$ltr = "";}

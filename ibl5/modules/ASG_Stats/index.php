@@ -141,7 +141,7 @@ $pagetitle = "All-Star Game Stats";
 
     echo "</table></form>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function chunk_option($num, $chunk_selected)

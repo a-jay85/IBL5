@@ -70,7 +70,7 @@ function atAdminFooter()
         . "</div>\n";
     atAdminCloseTable();
 
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function at_preview_url($module, $modops, $theme)

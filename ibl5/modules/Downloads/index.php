@@ -199,7 +199,7 @@ function index()
     $catnum = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_downloads_categories"));
     echo "<center><font class=\"content\">" . _THEREARE . " <b>$numrows</b> " . _DOWNLOADS . " " . _AND . " <b>$catnum</b> " . _CATEGORIES . " " . _INDB . "</font></center>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function AddDownload()
@@ -255,7 +255,7 @@ function AddDownload()
             . "" . _DOWNLOADSNOTUSER8 . "";
     }
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function Add($title, $url, $auth_name, $cat, $description, $email, $filesize, $version, $homepage)
@@ -272,7 +272,7 @@ function Add($title, $url, $auth_name, $cat, $description, $email, $filesize, $v
         echo "<center><b>" . _DOWNLOADALREADYEXT . "</b><br><br>"
             . "" . _GOBACK . "";
         CloseTable();
-        include "footer.php";
+        NukeFooter::footer();
     } else {
         if (is_user($user)) {
             $user2 = base64_decode($user);
@@ -290,7 +290,7 @@ function Add($title, $url, $auth_name, $cat, $description, $email, $filesize, $v
             echo "<center><b>" . _DOWNLOADNOTITLE . "</b><br><br>"
                 . "" . _GOBACK . "";
             CloseTable();
-            include "footer.php";
+            NukeFooter::footer();
         }
 // Check if URL exist
         if (empty($url)) {
@@ -301,7 +301,7 @@ function Add($title, $url, $auth_name, $cat, $description, $email, $filesize, $v
             echo "<center><b>" . _DOWNLOADNOURL . "</b><br><br>"
                 . "" . _GOBACK . "";
             CloseTable();
-            include "footer.php";
+            NukeFooter::footer();
         }
 // Check if Description exist
         if (empty($description)) {
@@ -312,7 +312,7 @@ function Add($title, $url, $auth_name, $cat, $description, $email, $filesize, $v
             echo "<center><b>" . _DOWNLOADNODESC . "</b><br><br>"
                 . "" . _GOBACK . "";
             CloseTable();
-            include "footer.php";
+            NukeFooter::footer();
         }
         $cat = explode("-", $cat);
         if (empty($cat[1])) {
@@ -342,7 +342,7 @@ function Add($title, $url, $auth_name, $cat, $description, $email, $filesize, $v
             echo _CHECKFORIT;
         }
         CloseTable();
-        include "footer.php";
+        NukeFooter::footer();
     }
 }
 
@@ -397,7 +397,7 @@ function NewDownloads($newdownloadshowdays)
     $allmonthdownloads = 0;
     echo "</center>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function NewDownloadsDate($selectdate)
@@ -481,7 +481,7 @@ function NewDownloadsDate($selectdate)
     }
     echo "</font></td></tr></table>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function TopRated($ratenum, $ratetype)
@@ -590,7 +590,7 @@ function TopRated($ratenum, $ratetype)
     }
     echo "</font></td></tr></table>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function MostPopular($ratenum, $ratetype)
@@ -693,7 +693,7 @@ function MostPopular($ratenum, $ratetype)
     }
     echo "</font></td></tr></table>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function viewdownload($cid, $min, $orderby, $show)
@@ -886,7 +886,7 @@ function viewdownload($cid, $min, $orderby, $show)
     }
     echo "</td></tr></table>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function viewsdownload($sid, $min, $orderby, $show)
@@ -1077,7 +1077,7 @@ function viewsdownload($sid, $min, $orderby, $show)
     }
     echo "</td></tr></table>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function newdownloadgraphic($datetime, $time)
@@ -1468,7 +1468,7 @@ function search($query, $min, $orderby, $show)
         echo "<center><font class=\"option\"><b>" . _NOMATCHES . "</b></font></center><br><br>";
     }
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function viewdownloadeditorial($lid)
@@ -1512,7 +1512,7 @@ function viewdownloadeditorial($lid)
     downloadfooter($lid);
     echo "</center>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function detecteditorial($lid, $img)
@@ -1601,7 +1601,7 @@ function viewdownloadcomments($lid)
     downloadfooter($lid);
     echo "</center>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function viewdownloaddetails($lid)
@@ -2057,7 +2057,7 @@ function viewdownloaddetails($lid)
     downloadfooter($lid);
     echo "</center>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function downloadfooter($lid)
@@ -2190,7 +2190,7 @@ function outsidedownloadsetup($lid)
     - $sitename " . _STAFF . "
     <br><br></center>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function brokendownload($lid)
@@ -2214,7 +2214,7 @@ function brokendownload($lid)
         echo "" . _THANKSBROKEN . "<br>" . _SECURITYBROKEN . "<br><br>";
         echo "<input type=\"hidden\" name=\"d_op\" value=\"brokendownloadS\"><input type=\"submit\" value=\"" . _REPORTBROKEN . "\"></center></form>";
         CloseTable();
-        include "footer.php";
+        NukeFooter::footer();
     } else {
         Header("Location: modules.php?name=$module_name");
     }
@@ -2238,7 +2238,7 @@ function brokendownloadS($lid, $modifysubmitter)
         OpenTable();
         echo "<br><center>" . _THANKSFORINFO . "<br><br>" . _LOOKTOREQUEST . "</center><br>";
         CloseTable();
-        include "footer.php";
+        NukeFooter::footer();
     } else {
         Header("Location: modules.php?name=$module_name");
     }
@@ -2313,7 +2313,7 @@ function modifydownloadrequest($lid)
         }
     }
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function modifydownloadrequestS($lid, $cat, $title, $url, $description, $modifysubmitter, $auth_name, $email, $filesize, $version, $homepage)
@@ -2338,7 +2338,7 @@ function modifydownloadrequestS($lid, $cat, $title, $url, $description, $modifys
         echo "<center><font class=\"content\">" . _DONLYREGUSERSMODIFY . "</font></center>";
         $blocknow = 1;
         CloseTable();
-        include "footer.php";
+        NukeFooter::footer();
     }
     if ($blocknow != 1) {
         $cat = explode("-", $cat);
@@ -2358,7 +2358,7 @@ function modifydownloadrequestS($lid, $cat, $title, $url, $description, $modifys
         OpenTable();
         echo "<center><font class=\"content\">" . _THANKSFORINFO . " " . _LOOKTOREQUEST . "</font></center>";
         CloseTable();
-        include "footer.php";
+        NukeFooter::footer();
     }
 }
 
@@ -2485,7 +2485,7 @@ function addrating($ratinglid, $ratinguser, $rating, $ratinghost_name, $ratingco
         completevote($error);
     }
     completevotefooter($ratinglid, $ratinguser);
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function completevoteheader()
@@ -2617,7 +2617,7 @@ function ratedownload($lid, $user)
     downloadfooterchild($lid);
     echo "</center>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function CoolSize($size)

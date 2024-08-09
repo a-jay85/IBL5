@@ -169,7 +169,7 @@ $pagetitle = "Season Stats";
 
     echo "</table></form>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function team_option($team_selected)

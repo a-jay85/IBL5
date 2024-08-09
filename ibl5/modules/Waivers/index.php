@@ -46,7 +46,7 @@ function waivers($user)
             loginbox();
             CloseTable();
         }
-        include "footer.php";
+        NukeFooter::footer();
     } elseif (is_user($user)) {
         if (
             ($season->phase == "Preseason" AND $season->allowWaivers == "Yes")
@@ -62,7 +62,7 @@ function waivers($user)
             UI::displaytopmenu($db, $tid);
             echo "Sorry, but players may not be added from or dropped to waivers at the present time.";
             CloseTable();
-            include "footer.php";
+            NukeFooter::footer();
         }
     }
 }
@@ -372,7 +372,7 @@ function waiverexecute($username, $action)
 
     CloseTable();
 
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 waivers($user, $action);

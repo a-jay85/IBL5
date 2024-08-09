@@ -535,10 +535,10 @@ function DisplayTopic($sid, $pid = 0, $tid = 0, $mode = "thread", $order = 0, $t
         global $title, $bgcolor1, $bgcolor2, $bgcolor3;
     } else {
         global $title, $bgcolor1, $bgcolor2, $bgcolor3;
-        NukeHeader::header();
+        Nuke\Header::header();
     }
     if ($pid != 0) {
-        NukeHeader::header();
+        Nuke\Header::header();
     }
     $count_times = 0;
     cookiedecode($user);
@@ -701,14 +701,14 @@ function DisplayTopic($sid, $pid = 0, $tid = 0, $mode = "thread", $order = 0, $t
         return array($sid, $pid, $subject);
 
     } else {
-        NukeFooter::footer();
+        Nuke\Footer::footer();
     }
 }
 
 function singlecomment($tid, $sid, $mode, $order, $thold)
 {
     global $module_name, $user, $cookie, $datetime, $bgcolor1, $bgcolor2, $bgcolor3, $bgcolor4, $admin, $anonpost, $prefix, $textcolor2, $db;
-    NukeHeader::header();
+    Nuke\Header::header();
     cookiedecode($user);
     getusrinfo($user);
     $sid = intval($sid);
@@ -752,13 +752,13 @@ function singlecomment($tid, $sid, $mode, $order, $thold)
     echo " ]";
     modthree($sid, $mode, $order, $thold);
     CloseTable();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 function reply($pid, $sid, $mode, $order, $thold)
 {
     //include("config.php");  // globalized - Quake
-    NukeHeader::header();
+    Nuke\Header::header();
     global $prefix, $module_name, $user, $cookie, $datetime, $bgcolor1, $bgcolor2, $bgcolor3, $db, $anonpost, $anonymous, $admin;
     cookiedecode($user);
     getusrinfo($user);
@@ -896,13 +896,13 @@ function reply($pid, $sid, $mode, $order, $thold)
             . "</font></form>\n";
         CloseTable();
     }
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 function replyPreview($pid, $sid, $subject, $comment, $xanonpost, $mode, $order, $thold)
 {
     global $module_name, $user, $cookie, $AllowableHTML, $anonymous, $anonpost, $userinfo;
-    NukeHeader::header();
+    Nuke\Header::header();
     cookiedecode($user);
     getusrinfo($user);
     $sid = intval($sid);
@@ -986,7 +986,7 @@ function replyPreview($pid, $sid, $subject, $comment, $xanonpost, $mode, $order,
         . "<input type=submit name=op value=\"" . _OK . "\">\n"
         . "</font></form>";
     CloseTable();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 function CreateTopic($xanonpost, $subject, $comment, $pid, $sid, $host_name, $mode, $order, $thold)
@@ -1001,12 +1001,12 @@ function CreateTopic($xanonpost, $subject, $comment, $pid, $sid, $host_name, $mo
     $comment = format_url($comment);
     $comment = filter($comment, "", 1);
     if (empty($subject) or empty($comment)) {
-        NukeHeader::header();
+        Nuke\Header::header();
         title("$sitename - " . _COMMENTSSYSTEM . "");
         OpenTable();
         echo "<center>" . _COMMENTPOSTERROR . "<br><br>" . _GOBACK . "</center>";
         CloseTable();
-        NukeFooter::footer();
+        Nuke\Footer::footer();
         die();
     }
     //$comment = filter($comment);
@@ -1037,13 +1037,13 @@ function CreateTopic($xanonpost, $subject, $comment, $pid, $sid, $host_name, $mo
                 $koptions .= "&thold=" . $thold;
                 if ($krow['karma'] == 2) {
                     $db->sql_query("INSERT INTO " . $prefix . "_comments_moderated VALUES (NULL, '$pid', '$sid', now(), '$name', '$email', '$url', '$ip', '$subject', '$comment', '$score', '0', '0')");
-                    NukeHeader::header();
+                    Nuke\Header::header();
                     title(_MODERATEDTITLE);
                     OpenTable();
                     echo "<center>" . _COMMENTMODERATED . "";
                     echo "<br><br><a href=\"modules.php?name=$module_name&file=article&sid=$sid$koptions\">" . _MODERATEDRETURN . "</a>";
                     CloseTable();
-                    NukeFooter::footer();
+                    Nuke\Footer::footer();
                     die();
                 } elseif ($krow['karma'] == 3) {
                     Header("Location: modules.php?name=$module_name&file=article&sid=$sid$koptions");
@@ -1058,11 +1058,11 @@ function CreateTopic($xanonpost, $subject, $comment, $pid, $sid, $host_name, $mo
             die("Nice try..");
         }
     } else {
-        NukeHeader::header();
+        Nuke\Header::header();
         echo "According to my records, the topic you are trying "
             . "to reply to does not exist. If you're just trying to be "
             . "annoying, well then too bad.";
-        NukeFooter::footer();
+        Nuke\Footer::footer();
         die();
     }
     $options = "";

@@ -23,7 +23,7 @@ get_lang($module_name);
 
 $pagetitle = "- $module_name";
 
-NukeHeader::header();
+Nuke\Header::header();
 
 OpenTable();
 echo "<center><font class=\"storytitle\">" . ($season->endingYear - 1) . "-$season->endingYear IBL Power Rankings</font></center>\n\n";
@@ -98,4 +98,4 @@ while ($i < $num) {
 
 CloseTable();
 
-NukeFooter::footer();
+Nuke\Footer::footer();

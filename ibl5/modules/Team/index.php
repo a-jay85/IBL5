@@ -42,7 +42,7 @@ function team($tid)
         $display = "ratings";
     }
 
-    NukeHeader::header();
+    Nuke\Header::header();
     OpenTable();
 
     //=============================
@@ -205,7 +205,7 @@ function team($tid)
     echo "</td><td valign=top>$team_info_right</td></tr></table>";
 
     CloseTable();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 function lastSimsStarters($db, $result, $color1, $color2)
@@ -332,7 +332,7 @@ function schedule($tid)
     global $db;
 
     $tid = intval($tid);
-    NukeHeader::header();
+    Nuke\Header::header();
     OpenTable();
     //============================
     // GRAB TEAM COLORS, ET AL
@@ -382,7 +382,7 @@ function schedule($tid)
     CloseTable();
 
     CloseTable();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 function boxscore($year, $month, $tid, $wins, $losses, $winStreak, $lossStreak)
@@ -522,7 +522,7 @@ function viewinjuries($tid)
     global $db;
     $league = new League($db);
 
-    NukeHeader::header();
+    Nuke\Header::header();
     OpenTable();
 
     UI::displaytopmenu($db, $tid);
@@ -561,14 +561,14 @@ function viewinjuries($tid)
     echo "</table></table>";
 
     CloseTable();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 function drafthistory($tid)
 {
     global $db;
 
-    NukeHeader::header();
+    Nuke\Header::header();
     OpenTable();
     UI::displaytopmenu($db, $tid);
 
@@ -606,20 +606,20 @@ function drafthistory($tid)
     echo "</table>";
 
     CloseTable();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 function menu()
 {
     global $db;
 
-    NukeHeader::header();
+    Nuke\Header::header();
     OpenTable();
 
     UI::displaytopmenu($db, 0);
 
     CloseTable();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 switch ($op) {

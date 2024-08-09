@@ -69,7 +69,7 @@ function list_content($eid)
     $row = $db->sql_fetchrow($db->sql_query("SELECT title, description FROM " . $prefix . "_encyclopedia WHERE eid='$eid'"));
     $title = filter($row['title'], "nohtml");
     $description = filter($row['description']);
-    NukeHeader::header();
+    Nuke\Header::header();
     title("$title");
     OpenTable();
     echo "<center><b>$title</b></center><br>"
@@ -83,7 +83,7 @@ function list_content($eid)
     OpenTable();
     echo "<center><font class=\"tiny\">" . _COPYRIGHT . " &copy; " . _BY . " $sitename</font></center>";
     CloseTable();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 function terms($eid, $ltr)
@@ -98,7 +98,7 @@ function terms($eid, $ltr)
     $active = intval($row['active']);
     $row2 = $db->sql_fetchrow($db->sql_query("SELECT title FROM " . $prefix . "_encyclopedia WHERE eid='$eid'"));
     $title = filter($row2['title'], "nohtml");
-    NukeHeader::header();
+    Nuke\Header::header();
     title("$title");
     OpenTable();
     if (($active == 1) or (is_admin($admin))) {
@@ -124,14 +124,14 @@ function terms($eid, $ltr)
             . "" . _GOBACK . "</center>";
     }
     CloseTable();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 function content($tid, $ltr, $page = 0, $query = "")
 {
     global $prefix, $db, $sitename, $admin, $module_name, $admin_file;
     $tid = intval($tid);
-    NukeHeader::header();
+    Nuke\Header::header();
     OpenTable();
     $ency = $db->sql_fetchrow($db->sql_query("SELECT * FROM " . $prefix . "_encyclopedia_text WHERE tid='$tid'"));
     $etid = intval($ency['tid']);
@@ -197,13 +197,13 @@ function content($tid, $ltr, $page = 0, $query = "")
         echo "Sorry, This page isn't active...";
     }
     CloseTable();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 function list_themes()
 {
     global $prefix, $db, $sitename, $admin, $multilingual, $module_name, $admin_file;
-    NukeHeader::header();
+    Nuke\Header::header();
     title("$sitename: " . _ENCYCLOPEDIA . "");
     OpenTable();
     echo "<center><font class=\"content\">" . _AVAILABLEENCYLIST . " $sitename:</center><br><br>";
@@ -255,7 +255,7 @@ function list_themes()
         echo "</blockquote>";
     }
     CloseTable();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 if (!isset($ltr)) {$ltr = "";}

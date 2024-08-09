@@ -27,13 +27,13 @@ $pagetitle = "- Player Archives";
 
 function showmenu()
 {
-    NukeHeader::header();
+    Nuke\Header::header();
     OpenTable();
 
     UI::playerMenu();
 
     CloseTable();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 function showpage($playerID, $spec)
@@ -50,7 +50,7 @@ function showpage($playerID, $spec)
 
     // DISPLAY PAGE
 
-    NukeHeader::header();
+    Nuke\Header::header();
     OpenTable();
     UI::playerMenu();
 
@@ -1719,7 +1719,7 @@ function showpage($playerID, $spec)
     echo "</td></tr></table></table>";
 
     CloseTable();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 
     // END OF DISPLAY PAGE
 }
@@ -1739,7 +1739,7 @@ function negotiate($pid)
     $player_playingtime = stripslashes(check_html($playerinfo['playingTime'], "nohtml"));
     $player_tradition = stripslashes(check_html($playerinfo['tradition'], "nohtml"));
 
-    NukeHeader::header();
+    Nuke\Header::header();
     OpenTable();
     UI::playerMenu();
 
@@ -2121,7 +2121,7 @@ function negotiate($pid)
     // RENEGOTIATION STUFF END
 
     CloseTable();
-    NukeFooter::footer();
+    Nuke\Footer::footer();
 }
 
 function rookieoption($pid)

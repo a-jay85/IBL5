@@ -61,7 +61,7 @@ if ($row['radminsuper'] == 1) {
             }
             Header("Location: modules.php?name=News&file=article&sid=$sid");
         } else {
-            Nuke/Header::header();
+            Nuke\Header::header();
             GraphicAdmin();
             OpenTable();
             echo "<center><font class=\"title\"><b>" . _REMOVECOMMENTS . "</b></font></center>";
@@ -101,7 +101,7 @@ if ($row['radminsuper'] == 1) {
             removePollSubComments($tid);
             Header("Location: modules.php?name=Surveys&op=results&pollID=$pollID");
         } else {
-            Nuke/Header::header();
+            Nuke\Header::header();
             GraphicAdmin();
             OpenTable();
             echo "<center><font class=\"title\"><b>" . _REMOVECOMMENTS . "</b></font></center>";

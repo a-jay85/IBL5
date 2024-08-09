@@ -37,7 +37,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     function displayUsers()
     {
         global $admin, $admin_file;
-        Nuke/Header::header();
+        Nuke\Header::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _USERADMIN . "</b></font></center>";
@@ -101,7 +101,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     function modifyUser($chng_user)
     {
         global $prefix, $user_prefix, $db, $admin_file;
-        Nuke/Header::header();
+        Nuke\Header::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _USERADMIN . "</b></font></center>";
@@ -277,7 +277,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
         $tmp = 0;
         if (!empty($chng_pass2)) {
             if ($chng_pass != $chng_pass2) {
-                Nuke/Header::header();
+                Nuke\Header::header();
                 GraphicAdmin();
                 OpenTable();
                 echo "<center><font class=\"title\"><b>" . _USERADMIN . "</b></font></center>";
@@ -367,7 +367,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
             break;
 
         case "delUser":
-            Nuke/Header::header();
+            Nuke\Header::header();
             GraphicAdmin();
             OpenTable();
             echo "<center><font class=\"title\"><b>" . _USERADMIN . "</b></font></center>";
@@ -412,7 +412,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
         case "addUser":
             $add_pass = md5($add_pass);
             if (!($add_uname && $add_email && $add_pass)) {
-                Nuke/Header::header();
+                Nuke\Header::header();
                 GraphicAdmin();
                 OpenTable();
                 echo "<center><font class=\"title\"><b>" . _USERADMIN . "</b></font></center>";
@@ -427,7 +427,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
             }
             $numrow = $db->sql_numrows($db->sql_query("SELECT user_id FROM " . $user_prefix . "_users WHERE username='$add_uname'"));
             if ($numrow > 0) {
-                Nuke/Header::header();
+                Nuke\Header::header();
                 GraphicAdmin();
                 OpenTable();
                 echo "<center><font class=\"title\"><b>" . _USERADMIN . "</b></font></center>";
@@ -480,7 +480,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     }
 
 } else {
-    Nuke/Header::header();
+    Nuke\Header::header();
     GraphicAdmin();
     OpenTable();
     echo "<center><b>" . _ERROR . "</b><br><br>You do not have administration permission for module \"$module_name\"</center>";

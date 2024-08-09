@@ -79,7 +79,7 @@ function theindex()
     echo "" . _WELCOMEADS . "";
     CloseTable();
     themenu();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function sitestats()
@@ -140,7 +140,7 @@ function sitestats()
     }
     CloseTable();
     themenu();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function plans()
@@ -175,7 +175,7 @@ function plans()
     }
     CloseTable();
     themenu();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function terms()
@@ -196,7 +196,7 @@ function terms()
         . "<p align='right'>" . $row['country'] . ", $month $year</p>";
     CloseTable();
     themenu();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function client()
@@ -215,7 +215,7 @@ function client()
         echo "<td>&nbsp;</td><td><input type=\"hidden\" name=\"op\" value=\"client_valid\"><input type=\"submit\" value=\"" . _ENTER . "\"></tr></td></table></form>";
         CloseTable();
         themenu();
-        include "footer.php";
+        NukeFooter::footer();
     }
 }
 
@@ -345,7 +345,7 @@ function client_valid($login, $pass)
         echo "<center>" . _LOGININCORRECT . "<br><br>" . _GOBACK . "</center>";
         CloseTable();
         themenu();
-        include "footer.php";
+        NukeFooter::footer();
         die();
     } else {
         $row = $db->sql_fetchrow($db->sql_query("SELECT cid FROM " . $prefix . "_banner_clients WHERE login='$login' AND passwd='$pass'"));
@@ -480,7 +480,7 @@ function client_home()
         echo "</table><br><br><center>[ <a href=\"modules.php?name=$module_name&op=client_logout\">" . _LOGOUT . "</a> ]</center>";
         CloseTable();
         themenu();
-        include "footer.php";
+        NukeFooter::footer();
     }
 }
 
@@ -502,7 +502,7 @@ function view_banner($cid, $bid)
             echo "<center>" . _ADISNTYOUR . "<br><br>" . _GOBACK . "</center>";
             CloseTable();
             themenu();
-            include "footer.php";
+            NukeFooter::footer();
             die();
         } else {
             NukeHeader::header();
@@ -594,7 +594,7 @@ function view_banner($cid, $bid)
                 . "[ <a href=\"modules.php?name=$module_name&op=client_report&cid=$cid&bid=$bid\">" . _EMAILSTATS . "</a> | <a href=\"modules.php?name=$module_name&op=logout\">" . _LOGOUT . "</a> ]";
             CloseTable();
             themenu();
-            include "footer.php";
+            NukeFooter::footer();
         }
     }
 }
@@ -617,7 +617,7 @@ function client_report($cid, $bid)
             echo "<center>" . _FUNCTIONSNOTALLOWED . "<br><br>" . _GOBACK . "</center>";
             CloseTable();
             themenu();
-            include "footer.php";
+            NukeFooter::footer();
             die();
         } else {
             NukeHeader::header();
@@ -636,7 +636,7 @@ function client_report($cid, $bid)
                     . "<a href=\"javascript:history.go(-1)\">" . _GOBACK . "</a>";
                 CloseTable();
                 themenu();
-                include "footer.php";
+                NukeFooter::footer();
                 die();
             } else {
                 $sql2 = "SELECT bid, name, imptotal, impmade, clicks, imageurl, clickurl, date, ad_class FROM " . $prefix . "_banner WHERE bid='$bid' AND cid='$cid'";
@@ -680,7 +680,7 @@ function client_report($cid, $bid)
                     . "[ <a href=\"javascript:history.go(-1)\">" . _GOBACK . "</a> ]";
                 CloseTable();
                 themenu();
-                include "footer.php";
+                NukeFooter::footer();
             }
         }
     }

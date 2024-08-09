@@ -19,7 +19,7 @@ function menu()
     UI::displaytopmenu($db, 0);
 
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function buildTeamFutureSalary($resultTeamPlayers, $k)
@@ -332,7 +332,7 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 
     CloseTable();
 
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
@@ -506,7 +506,7 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
 	</table>";
 
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function reviewtrade($user)
@@ -531,7 +531,7 @@ function reviewtrade($user)
             loginbox();
             CloseTable();
         }
-        include "footer.php";
+        NukeFooter::footer();
     } elseif (is_user($user)) {
         if ($season->allowTrades == 'Yes') {
             global $cookie;
@@ -549,7 +549,7 @@ function reviewtrade($user)
                 echo "<br>The waiver wire is also closed.";
             }
             CloseTable();
-            include "footer.php";
+            NukeFooter::footer();
         }
     }
 }
@@ -575,7 +575,7 @@ function offertrade($user)
             loginbox();
             CloseTable();
         }
-        include "footer.php";
+        NukeFooter::footer();
     } elseif (is_user($user)) {
         global $cookie;
         cookiedecode($user);

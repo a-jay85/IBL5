@@ -152,4 +152,4 @@ if (strpos($MVP1, $Team_Name) !== false) {
     $result13 = $db->sql_query($query13);
 
 }
-include "footer.php";
+NukeFooter::footer();

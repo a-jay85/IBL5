@@ -77,7 +77,7 @@ if (is_user($user)) {
                 CloseTable();
                 CloseTable();
                 journalfoot();
-                include "footer.php";
+                NukeFooter::footer();
                 die();
             endif;
         endif;
@@ -113,7 +113,7 @@ if (is_user($user)) {
                 OpenTable();
                 echo "<center><b>" . _ANERROR . "</b></center>";
                 CloseTable();
-                include "footer.php";
+                NukeFooter::footer();
                 exit;
             }
         }
@@ -223,7 +223,7 @@ if (is_admin($admin)) {
                 OpenTable();
                 echo "<center><b>" . _ANERROR . "</b></center>";
                 CloseTable();
-                include "footer.php";
+                NukeFooter::footer();
                 exit;
             }
         }
@@ -282,5 +282,5 @@ $pagetitle = filter($pagetitle, "nohtml");
 OpenTable();
 echo "<center><b>" . _YOUMUSTBEMEMBER . "</b></center>";
 CloseTable();
-include "footer.php";
+NukeFooter::footer();
 die();

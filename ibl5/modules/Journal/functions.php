@@ -80,7 +80,7 @@ function ADVT_stripslashes($text)
 }
 function journalfoot()
 {
-    include "footer.php";
+    NukeFooter::footer();
 }
 function startjournal($sitename, $user)
 {

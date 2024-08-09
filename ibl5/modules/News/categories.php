@@ -104,7 +104,7 @@ function theindex($catid)
             $db->sql_query("delete from " . $prefix . "_referer");
         }
     }
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 switch ($op) {

@@ -103,5 +103,5 @@ $pagetitle = filter($pagetitle, "nohtml");
 OpenTable();
 echo "<center><b>" . _YOUMUSTBEMEMBER . "</b></center>";
 CloseTable();
-include "footer.php";
+NukeFooter::footer();
 die();

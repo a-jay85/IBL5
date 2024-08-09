@@ -62,7 +62,7 @@ function FriendSend($sid)
         . "<input type=\"submit\" value=" . _SEND . ">\n"
         . "</form>\n";
     CloseTable();
-    include 'footer.php';
+    NukeFooter::footer();
 }
 
 function SendStory($sid, $yname, $ymail, $fname, $fmail)
@@ -96,7 +96,7 @@ function StorySent($title, $fname)
     OpenTable();
     echo "<center><font class=\"content\">" . _FSTORY . " <b>$title</b> " . _HASSENT . " $fname... " . _THANKS . "</font></center>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 switch ($op) {

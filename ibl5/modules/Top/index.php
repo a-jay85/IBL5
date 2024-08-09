@@ -269,4 +269,4 @@ if ($db->sql_numrows($result14) > 0) {
 }
 
 CloseTable();
-include "footer.php";
+NukeFooter::footer();

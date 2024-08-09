@@ -46,7 +46,7 @@ if (empty($title) or empty($jbodytext) or empty($status)) {
     OpenTable();
     echo "<center><b>" . _YOUMUSTFILLFIELDS . "</b><br><br>" . _GOBACK . "</center>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
     die();
 } elseif (is_user($user)) {
     cookiedecode($user);
@@ -107,6 +107,6 @@ if (empty($title) or empty($jbodytext) or empty($status)) {
     OpenTable();
     echo "<center><b>" . _YOUMUSTBEMEMBER . "</b></center>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
     die();
 }

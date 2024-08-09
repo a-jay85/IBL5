@@ -113,4 +113,4 @@ if ((isset($query) and !isset($eid)) and (!empty($query))) {
     CloseTable();
 }
 
-include "footer.php";
+NukeFooter::footer();

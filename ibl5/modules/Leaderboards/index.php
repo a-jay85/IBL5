@@ -382,4 +382,4 @@ if ($submitted != null) {
 }
 
 CloseTable();
-include "footer.php";
+NukeFooter::footer();

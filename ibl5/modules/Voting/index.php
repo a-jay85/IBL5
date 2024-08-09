@@ -284,7 +284,7 @@ function userinfo($username)
 
     CloseTable();
 
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function main($user)
@@ -306,7 +306,7 @@ function main($user)
         if (!is_user($user)) {
             loginbox();
         }
-        include "footer.php";
+        NukeFooter::footer();
     } elseif (is_user($user)) {
         global $cookie;
         userinfo($cookie[1]);

@@ -108,4 +108,4 @@ if ($_POST['opi'] != "ds") {
 }
 
 CloseTable();
-include "footer.php";
+NukeFooter::footer();

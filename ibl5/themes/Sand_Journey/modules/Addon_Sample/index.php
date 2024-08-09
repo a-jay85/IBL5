@@ -15,7 +15,7 @@ function one()
     echo "<li><a href=\"modules.php?name=Addon_Sample&amp;file=index\">Go to index.php</a>";
     echo "</ul>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 
 }
 
@@ -28,7 +28,7 @@ function two()
     echo "<li><a href=\"modules.php?name=Addon_Sample&amp;file=index\">Go to index.php</a>";
     echo "</ul>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 
 }
 
@@ -45,7 +45,7 @@ function AddonSample()
     echo "You can now use Administration interface to activate or deactivate any module. As an Admin you can always "
         . "access to your Inactive modules for testing purpouses.";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 switch ($func) {

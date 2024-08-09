@@ -328,7 +328,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 
     // === END INSERT OF IBL DEPTH CHART ===
 
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function main($user)
@@ -345,7 +345,7 @@ function main($user)
             loginbox();
             CloseTable();
         }
-        include "footer.php";
+        NukeFooter::footer();
     } elseif (is_user($user)) {
         global $cookie;
         cookiedecode($user);
@@ -604,7 +604,7 @@ function submit()
     // DISPLAYS DEPTH CHART
 
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 switch ($op) {

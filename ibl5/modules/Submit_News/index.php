@@ -116,7 +116,7 @@ function defaultDisplay()
     echo "<tr><td>&nbsp;</td><td><input type=\"submit\" name=\"op\" value=\"" . _PREVIEW . "\"> (" . _SUBPREVIEW . ")</font></form>";
     echo "</td></tr></table>";
     CloseTable();
-    include 'footer.php';
+    NukeFooter::footer();
 }
 
 function PreviewStory($name, $address, $subject, $story, $storyext, $topic, $alanguage)
@@ -228,7 +228,7 @@ function PreviewStory($name, $address, $subject, $story, $storyext, $topic, $ala
         . "<input type=\"submit\" name=\"op\" value=\"" . _OK . "\"></form>"
         . "</td></tr></table>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function submitStory($name, $address, $subject, $story, $storyext, $topic, $alanguage)
@@ -265,7 +265,7 @@ function submitStory($name, $address, $subject, $story, $storyext, $topic, $alan
         . "" . _SUBTEXT . ""
         . "<br>" . _WEHAVESUB . " $waiting " . _WAITING . "";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 if (!isset($address)) {$address = "";}

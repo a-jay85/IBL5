@@ -122,7 +122,7 @@ function theindex($new_topic = "0")
         $morelink = str_replace(" |  | ", " | ", $morelink);
         themeindex($aid, $informant, $time, $title, $counter, $topic, $hometext, $notes, $morelink, $topicname, $topicimage, $topictext);
     }
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function rate_article($sid, $score, $gfx_check, $random_num = "0")
@@ -152,7 +152,7 @@ function rate_article($sid, $score, $gfx_check, $random_num = "0")
             echo "<input type=\"hidden\" name=\"op\" value=\"rate_article\">";
             echo "<input type=\"submit\" value=\"" . _CASTMYVOTE . "\"></font></center></form>";
             CloseTable();
-            include "footer.php";
+            NukeFooter::footer();
             die();
         } else {
             $score = intval($score);
@@ -198,7 +198,7 @@ function rate_article($sid, $score, $gfx_check, $random_num = "0")
                 echo "<center>" . _DIDNTRATE . "<br><br>"
                     . "" . _GOBACK . "</center>";
                 CloseTable();
-                include "footer.php";
+                NukeFooter::footer();
             }
         }
     } else {
@@ -221,7 +221,7 @@ function rate_article($sid, $score, $gfx_check, $random_num = "0")
             echo "<input type=\"hidden\" name=\"op\" value=\"rate_article\">";
             echo "<input type=\"submit\" value=\"" . _CASTMYVOTE . "\"></font></center></form>";
             CloseTable();
-            include "footer.php";
+            NukeFooter::footer();
         } else {
             $random_num = "$random_num";
             $gfx_check = "$code";
@@ -254,7 +254,7 @@ function rate_complete($sid, $score, $rated = 0)
             . "[ <a href=\"modules.php?name=$module_name&amp;file=article&amp;sid=$sid$r_options\">" . _BACKTOARTICLEPAGE . "</a> ]</center>";
     }
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 if (!(isset($new_topic))) {$new_topic = 0;}

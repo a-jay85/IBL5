@@ -21,10 +21,10 @@ get_lang($module_name);
 
 $pagetitle = "- $module_name";
 
-NukeHeader::header();
+Nuke\Header::header();
 OpenTable();
 
 echo "Module works!";
 
 CloseTable();
-NukeFooter::footer();
+Nuke\Footer::footer();

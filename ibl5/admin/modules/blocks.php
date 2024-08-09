@@ -28,7 +28,7 @@ if ($row['radminsuper'] == 1) {
     function BlocksAdmin()
     {
         global $bgcolor2, $bgcolor4, $prefix, $db, $currentlang, $multilingual, $admin_file;
-        NukeHeader::header();
+        Nuke/Header::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _BLOCKSADMIN . "</b></font></center>";
@@ -242,7 +242,7 @@ if ($row['radminsuper'] == 1) {
     function block_show($bid)
     {
         global $prefix, $db, $admin_file;
-        NukeHeader::header();
+        Nuke/Header::header();
         GraphicAdmin();
         title("" . _BLOCKSADMIN . "");
         OpenTable();
@@ -349,7 +349,7 @@ if ($row['radminsuper'] == 1) {
 
     function rssfail()
     {
-        NukeHeader::header();
+        Nuke/Header::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _BLOCKSADMIN . "</b></font></center>";
@@ -444,7 +444,7 @@ if ($row['radminsuper'] == 1) {
     function BlocksEdit($bid)
     {
         global $bgcolor2, $bgcolor4, $prefix, $db, $multilingual, $admin_file, $AllowableHTML;
-        NukeHeader::header();
+        Nuke/Header::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _EDITBLOCK . "</b></font></center>";
@@ -793,7 +793,7 @@ if ($row['radminsuper'] == 1) {
             $row3 = $db->sql_fetchrow($db->sql_query("select title, content from " . $prefix . "_blocks where bid='$bid'"));
             $title = filter($row3['title'], "nohtml");
             $content = filter($row3['content']);
-            NukeHeader::header();
+            Nuke/Header::header();
             GraphicAdmin();
             echo "<br>";
             OpenTable();
@@ -834,7 +834,7 @@ if ($row['radminsuper'] == 1) {
         } else {
             $row3 = $db->sql_fetchrow($db->sql_query("select title from " . $prefix . "_blocks where bid='$bid'"));
             $title = $row3['title'];
-            NukeHeader::header();
+            Nuke/Header::header();
             GraphicAdmin();
             OpenTable();
             echo "<center><font class=\"title\"><b>" . _BLOCKSADMIN . "</b></font></center>";
@@ -851,7 +851,7 @@ if ($row['radminsuper'] == 1) {
     function HeadlinesAdmin()
     {
         global $bgcolor1, $bgcolor2, $prefix, $db, $admin_file;
-        NukeHeader::header();
+        Nuke/Header::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _HEADLINESADMIN . "</b></font></center>";
@@ -893,7 +893,7 @@ if ($row['radminsuper'] == 1) {
     function HeadlinesEdit($hid)
     {
         global $prefix, $db, $admin_file;
-        NukeHeader::header();
+        Nuke/Header::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _HEADLINESADMIN . "</b></font></center>";
@@ -946,7 +946,7 @@ if ($row['radminsuper'] == 1) {
             $db->sql_query("delete from " . $prefix . "_headlines where hid='$hid'");
             Header("Location: " . $admin_file . ".php?op=HeadlinesAdmin");
         } else {
-            NukeHeader::header();
+            Nuke/Header::header();
             GraphicAdmin();
             OpenTable();
             echo "<center><br>";

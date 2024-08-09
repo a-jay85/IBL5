@@ -28,7 +28,7 @@ if ($row['radminsuper'] == 1) {
     function hreferer()
     {
         global $bgcolor2, $prefix, $db, $admin_file;
-        NukeHeader::header();
+        Nuke/Header::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _HTTPREFERERS . "</b></font></center>";

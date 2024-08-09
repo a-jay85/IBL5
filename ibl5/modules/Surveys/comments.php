@@ -505,10 +505,10 @@ function DisplayTopic($pollID, $pid = 0, $tid = 0, $mode = "thread", $order = 0,
     } else {
         global $title, $bgcolor1, $bgcolor2, $bgcolor3;
         include "mainfile.php";
-        Nuke\Header::header();
+        NukeHeader::header();
     }
     if ($pid != 0) {
-        Nuke\Header::header();
+        NukeHeader::header();
     }
     $count_times = 0;
     cookiedecode($user);
@@ -686,14 +686,14 @@ function DisplayTopic($pollID, $pid = 0, $tid = 0, $mode = "thread", $order = 0,
     if ($pid == 0) {
         return array($pollID, $pid, $subject);
     } else {
-        Nuke\Footer::footer();
+        NukeFooter::footer();
     }
 
 }
 
 function singlecomment($tid, $pollID, $mode, $order, $thold)
 {
-    Nuke\Header::header();
+    NukeHeader::header();
     global $userinfo, $user, $cookie, $datetime, $bgcolor1, $bgcolor2, $bgcolor3, $anonpost, $admin, $anonymous, $prefix, $db, $module_name;
     cookiedecode($user);
     getusrinfo($user);
@@ -750,12 +750,12 @@ function singlecomment($tid, $pollID, $mode, $order, $thold)
     modtwo($tid, $score, $reason);
     echo " ]";
     modthree($pollID, $mode, $order, $thold);
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function reply($pid, $pollID, $mode, $order, $thold)
 {
-    Nuke\Header::header();
+    NukeHeader::header();
     global $userinfo, $user, $cookie, $datetime, $bgcolor1, $bgcolor2, $bgcolor3, $AllowableHTML, $anonymous, $prefix, $anonpost, $module_name, $db, $nuke_editor;
     cookiedecode($user);
     getusrinfo($user);
@@ -876,12 +876,12 @@ function reply($pid, $pollID, $mode, $order, $thold)
             . "<INPUT type=submit name=op value=\"" . _OK . "\"></FORM>";
         CloseTable();
     }
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function replyPreview($pid, $pollID, $subject, $comment, $xanonpost, $mode, $order, $thold)
 {
-    Nuke\Header::header();
+    NukeHeader::header();
     global $userinfo, $user, $cookie, $AllowableHTML, $anonymous, $module_name, $nuke_editor;
     cookiedecode($user);
     getusrinfo($user);
@@ -962,7 +962,7 @@ function replyPreview($pid, $pollID, $subject, $comment, $xanonpost, $mode, $ord
         . "<br><INPUT type=submit name=op value=\"" . _PREVIEW . "\"> "
         . "<INPUT type=submit name=op value=\"" . _OK . "\"></FORM>";
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 function CreateTopic($xanonpost, $subject, $comment, $pid, $pollID, $host_name, $mode, $order, $thold)
@@ -1019,13 +1019,13 @@ function CreateTopic($xanonpost, $subject, $comment, $pid, $pollID, $host_name, 
                 $koptions = "&mode=" . $mode . "&order=" . $order . "&thold=" . $thold;
                 if ($krow['karma'] == 2) {
                     $db->sql_query("INSERT INTO " . $prefix . "_pollcomments_moderated VALUES (NULL, '$pid', '$pollID', now(), '$name', '$email', '$url', '$ip', '$subject', '$comment', '$score', '0', '0')");
-                    Nuke\Header::header();
+                    NukeHeader::header();
                     title("" . _MODERATEDTITLE . "");
                     OpenTable();
                     echo "<center>" . _COMMENTMODERATED . "";
                     echo "<br><br><a href=\"modules.php?name=$module_name&op=results&pollID=$pollID$koptions\">" . _MODERATEDTITLE . "</a>";
                     CloseTable();
-                    Nuke\Footer::footer();
+                    NukeFooter::footer();
                     die();
                 } elseif ($krow['karma'] == 3) {
                     Header("Location: modules.php?name=$module_name&op=results&pollID=$pollID$koptions");
@@ -1039,11 +1039,11 @@ function CreateTopic($xanonpost, $subject, $comment, $pid, $pollID, $host_name, 
             die("Nice try...");
         }
     } else {
-        Nuke\Header::header();
+        NukeHeader::header();
         echo "According to my records, the topic you are trying "
             . "to reply to does not exist. If you're just trying to be "
             . "annoying, well then too bad.";
-        Nuke\Footer::footer();
+        NukeFooter::footer();
         die();
     }
     if ($pollcomm == 1) {

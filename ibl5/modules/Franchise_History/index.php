@@ -19,7 +19,7 @@ if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
 $sharedFunctions = new Shared($db);
 $season = new Season($db);
 
-Nuke\Header::header();
+NukeHeader::header();
 
 $fiveSeasonsAgoEndingYear = $season->endingYear - 4;
 
@@ -100,4 +100,4 @@ $text .= "
 echo $text;
 
 CloseTable();
-Nuke\Footer::footer();
+NukeFooter::footer();

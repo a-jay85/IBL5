@@ -45,7 +45,7 @@ include "modules/$module_name/functions.php";
 include "modules/$module_name/kses.php";
 if (!isset($jid) or !is_numeric($jid)) {die("No journal specified.");}
 $pagetitle = "- " . _USERSJOURNAL . "";
-Nuke\Header::header();
+NukeHeader::header();
 if (is_user($user)) {
     cookiedecode($user);
     $username = $cookie[1];
@@ -77,7 +77,7 @@ if (is_user($user)) {
                 CloseTable();
                 CloseTable();
                 journalfoot();
-                Nuke\Footer::footer();
+                NukeFooter::footer();
                 die();
             endif;
         endif;
@@ -113,7 +113,7 @@ if (is_user($user)) {
                 OpenTable();
                 echo "<center><b>" . _ANERROR . "</b></center>";
                 CloseTable();
-                Nuke\Footer::footer();
+                NukeFooter::footer();
                 exit;
             }
         }
@@ -219,11 +219,11 @@ if (is_admin($admin)) {
             if (is_file($file) && strtolower(substr($file, -4)) == '.gif' || '.jpg') {
                 $filelist[] = $file;
             } else {
-                Nuke\Header::header();
+                NukeHeader::header();
                 OpenTable();
                 echo "<center><b>" . _ANERROR . "</b></center>";
                 CloseTable();
-                Nuke\Footer::footer();
+                NukeFooter::footer();
                 exit;
             }
         }
@@ -282,5 +282,5 @@ $pagetitle = filter($pagetitle, "nohtml");
 OpenTable();
 echo "<center><b>" . _YOUMUSTBEMEMBER . "</b></center>";
 CloseTable();
-Nuke\Footer::footer();
+NukeFooter::footer();
 die();

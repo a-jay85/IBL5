@@ -76,7 +76,7 @@ if (!isset($myfaq)) {
     } else {
         $querylang = "";
     }
-    Nuke\Header::header();
+    NukeHeader::header();
     OpenTable();
     echo "<center><font class=\"option\">" . _FAQ2 . "</font></center><br><br>"
         . "<table width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\">"
@@ -89,11 +89,11 @@ if (!isset($myfaq)) {
     }
     echo "</td></tr></table>";
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 } else {
-    Nuke\Header::header();
+    NukeHeader::header();
     ShowFaq($id_cat, $categories);
     ShowFaqAll($id_cat);
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }

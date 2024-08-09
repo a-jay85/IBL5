@@ -82,7 +82,7 @@ function themefooter()
         echo "</td>";
     }
     echo "</td></tr></table></td></tr></table>";
-    Nuke\Footer::footmsg();
+    NukeFooter::footmsg();
 }
 
 function themeindex($aid, $informant, $time, $title, $counter, $topic, $thetext, $notes, $morelink, $topicname, $topicimage, $topictext)

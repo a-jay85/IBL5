@@ -21,7 +21,7 @@ get_lang($module_name);
 
 $pagetitle = "- $module_name";
 
-Nuke\Header::header();
+NukeHeader::header();
 OpenTable();
 
 $min_date_query = "SELECT MIN(Date) as mindate FROM ibl_schedule";
@@ -52,7 +52,7 @@ while ($chunk_start_date < $max_date) {
 }
 
 CloseTable();
-Nuke\Footer::footer();
+NukeFooter::footer();
 
 function chunk($chunk_start_date, $chunk_end_date, $j)
 {

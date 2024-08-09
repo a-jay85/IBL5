@@ -8,33 +8,33 @@ $index = 1;
 
 function one()
 {
-    Nuke\Header::header();
+    NukeHeader::header();
     OpenTable();
     echo "Addon Sample File (index.php) function \"one\" CALLED FROM Sand_Journey Theme<br><br>";
     echo "<ul>";
     echo "<li><a href=\"modules.php?name=Addon_Sample&amp;file=index\">Go to index.php</a>";
     echo "</ul>";
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 
 }
 
 function two()
 {
-    Nuke\Header::header();
+    NukeHeader::header();
     OpenTable();
     echo "Addon Sample File (index.php) function \"two\" CALLED FROM Sand_Journey Theme";
     echo "<ul>";
     echo "<li><a href=\"modules.php?name=Addon_Sample&amp;file=index\">Go to index.php</a>";
     echo "</ul>";
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 
 }
 
 function AddonSample()
 {
-    Nuke\Header::header();
+    NukeHeader::header();
     OpenTable();
     echo "Addon Sample File (index.php) CALLED FROM Sand_Journey Theme<br><br>";
     echo "<ul>";
@@ -45,7 +45,7 @@ function AddonSample()
     echo "You can now use Administration interface to activate or deactivate any module. As an Admin you can always "
         . "access to your Inactive modules for testing purpouses.";
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 switch ($func) {

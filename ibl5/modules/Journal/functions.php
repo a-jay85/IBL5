@@ -80,7 +80,7 @@ function ADVT_stripslashes($text)
 }
 function journalfoot()
 {
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 function startjournal($sitename, $user)
 {
@@ -97,7 +97,7 @@ function startjournal($sitename, $user)
     title("$sitename: " . _USERSJOURNAL . "");
     if (is_user($user)) {
         OpenTable();
-        Nuke\Navbar::nav();
+        NukeNavbar::nav();
         CloseTable();
         echo "<br>";
     }

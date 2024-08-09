@@ -32,7 +32,7 @@ function main($user)
 {
     global $stop;
     if (!is_user($user)) {
-        Nuke\Header::header();
+        NukeHeader::header();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . ($stop ? _LOGININCOR : _USERREGLOGIN) . "</b></font></center>";
         CloseTable();
@@ -42,7 +42,7 @@ function main($user)
             loginbox();
             CloseTable();
         }
-        Nuke\Footer::footer();
+        NukeFooter::footer();
     } elseif (is_user($user)) {
         display();
     }
@@ -54,7 +54,7 @@ function display()
     $sharedFunctions = new Shared($db);
     $season = new Season($db);
 
-    Nuke\Header::header();
+    NukeHeader::header();
     OpenTable();
 
     $username = $cookie[1];
@@ -783,7 +783,7 @@ function display()
     echo "</table>";
 
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 // === START NEGOTIATE FUNCTION ===
@@ -812,7 +812,7 @@ function negotiate($pid)
     $player_pos = $playerinfo['pos'];
     $player_team_name = $playerinfo['teamname'];
 
-    Nuke\Header::header();
+    NukeHeader::header();
     OpenTable();
 
     $player_exp = $playerinfo['exp'];
@@ -1643,7 +1643,7 @@ function negotiate($pid)
 		</form>";
 
     CloseTable();
-    Nuke\Footer::footer();
+    NukeFooter::footer();
 }
 
 switch ($pa) {

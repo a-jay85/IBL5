@@ -1,6 +1,6 @@
 <?php
 
-Nuke\Header::header();
+NukeHeader::header();
 OpenTable();
 
 $totalsHeaderRow = "<tr>
@@ -122,4 +122,4 @@ echo "<center>
 </center>";
 
 CloseTable();
-Nuke\Footer::footer();
+NukeFooter::footer();

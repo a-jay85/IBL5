@@ -205,7 +205,7 @@ function team($tid)
     echo "</td><td valign=top>$team_info_right</td></tr></table>";
 
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function lastSimsStarters($db, $result, $color1, $color2)
@@ -382,7 +382,7 @@ function schedule($tid)
     CloseTable();
 
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function boxscore($year, $month, $tid, $wins, $losses, $winStreak, $lossStreak)
@@ -561,7 +561,7 @@ function viewinjuries($tid)
     echo "</table></table>";
 
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function drafthistory($tid)
@@ -606,7 +606,7 @@ function drafthistory($tid)
     echo "</table>";
 
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function menu()
@@ -619,7 +619,7 @@ function menu()
     UI::displaytopmenu($db, 0);
 
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 switch ($op) {

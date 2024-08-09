@@ -47,7 +47,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
     comparePlayers();
 
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function comparePlayers()
@@ -392,7 +392,7 @@ function main($user)
             loginbox();
             CloseTable();
         }
-        include "footer.php";
+        NukeFooter::footer();
     } elseif (is_user($user)) {
         global $cookie;
         cookiedecode($user);

@@ -63,4 +63,4 @@ $text .= "<table class=\"sortable\" border=1>
 echo $text;
 
 CloseTable();
-include "footer.php";
+NukeFooter::footer();

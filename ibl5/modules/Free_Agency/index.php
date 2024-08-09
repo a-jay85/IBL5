@@ -42,7 +42,7 @@ function main($user)
             loginbox();
             CloseTable();
         }
-        include "footer.php";
+        NukeFooter::footer();
     } elseif (is_user($user)) {
         display();
     }
@@ -783,7 +783,7 @@ function display()
     echo "</table>";
 
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 // === START NEGOTIATE FUNCTION ===
@@ -1643,7 +1643,7 @@ function negotiate($pid)
 		</form>";
 
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 switch ($pa) {

@@ -122,4 +122,4 @@ echo "<center>
 </center>";
 
 CloseTable();
-include "footer.php";
+NukeFooter::footer();

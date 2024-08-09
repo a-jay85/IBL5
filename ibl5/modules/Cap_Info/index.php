@@ -129,7 +129,7 @@ $text .= "
 echo $text;
 
 CloseTable();
-include "footer.php";
+NukeFooter::footer();
 
 function get_salary($tid)
 {

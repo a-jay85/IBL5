@@ -215,7 +215,7 @@ function chunkstats()
 
     echo "</table></form>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function seasonstats()
@@ -368,7 +368,7 @@ function seasonstats()
 
     echo "</table></form>";
     CloseTable();
-    include "footer.php";
+    NukeFooter::footer();
 }
 
 function chunk_option($num, $chunk_selected)

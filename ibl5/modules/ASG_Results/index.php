@@ -190,4 +190,4 @@ displayVotingResultsTable($queryWesternBackcourt);
 
 CloseTable();
 
-include "footer.php";
+NukeFooter::footer();

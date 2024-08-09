@@ -43,7 +43,7 @@ if ($row['radminsuper'] == 1) {
     function BannersAdmin()
     {
         global $prefix, $db, $bgcolor2, $banners, $admin_file, $ad_admin_menu_main, $bgcolor1;
-        Nuke/Header::header();
+        Nuke\Header::header();
         GraphicAdmin();
         OpenTable();
         echo "$ad_admin_menu_main";
@@ -235,7 +235,7 @@ if ($row['radminsuper'] == 1) {
     {
         global $prefix, $db, $banners, $admin_file, $ad_admin_menu;
         define('NO_EDITOR', 1);
-        Nuke/Header::header();
+        Nuke\Header::header();
         GraphicAdmin();
         OpenTable();
         echo "$ad_admin_menu";
@@ -291,7 +291,7 @@ if ($row['radminsuper'] == 1) {
     function add_client()
     {
         global $prefix, $db, $banners, $admin_file, $ad_admin_menu;
-        Nuke/Header::header();
+        Nuke\Header::header();
         GraphicAdmin();
         OpenTable();
         echo "$ad_admin_menu";
@@ -340,7 +340,7 @@ if ($row['radminsuper'] == 1) {
         if (($ad_class == "image" or $ad_class == "flash") and ((!is_numeric($ad_width) || !is_numeric($ad_height)))) {$a = 1;}
         if (($ad_class == "code") and ($ad_code == "")) {$a = 1;}
         if ($a == 1) {
-            Nuke/Header::header();
+            Nuke\Header::header();
             GraphicAdmin();
             OpenTable();
             echo "$ad_admin_menu";
@@ -388,7 +388,7 @@ if ($row['radminsuper'] == 1) {
             $db->sql_query("delete from " . $prefix . "_banner where bid='$bid'");
             Header("Location: " . $admin_file . ".php?op=BannersAdmin");
         } else {
-            Nuke/Header::header();
+            Nuke\Header::header();
             GraphicAdmin();
             OpenTable();
             echo "$ad_admin_menu";
@@ -465,7 +465,7 @@ if ($row['radminsuper'] == 1) {
     {
         global $prefix, $db, $admin_file, $ad_admin_menu;
         define('NO_EDITOR', true);
-        Nuke/Header::header();
+        Nuke\Header::header();
         GraphicAdmin();
         OpenTable();
         echo "$ad_admin_menu";
@@ -629,7 +629,7 @@ if ($row['radminsuper'] == 1) {
             $db->sql_query("delete from " . $prefix . "_banner_clients where cid='$cid'");
             Header("Location: " . $admin_file . ".php?op=BannersAdmin");
         } else {
-            Nuke/Header::header();
+            Nuke\Header::header();
             GraphicAdmin();
             OpenTable();
             echo "$ad_admin_menu";
@@ -666,7 +666,7 @@ if ($row['radminsuper'] == 1) {
     function BannerClientEdit($cid)
     {
         global $prefix, $db, $admin_file, $ad_admin_menu;
-        Nuke/Header::header();
+        Nuke\Header::header();
         GraphicAdmin();
         OpenTable();
         echo "$ad_admin_menu";
@@ -714,7 +714,7 @@ if ($row['radminsuper'] == 1) {
     function ad_positions()
     {
         global $prefix, $db, $banners, $admin_file, $ad_admin_menu, $bgcolor1, $bgcolor2;
-        Nuke/Header::header();
+        Nuke\Header::header();
         GraphicAdmin();
         OpenTable();
         echo "$ad_admin_menu";
@@ -762,7 +762,7 @@ if ($row['radminsuper'] == 1) {
     {
         global $prefix, $db, $admin_file, $ad_admin_menu;
         if ($ad_position_name == "") {
-            Nuke/Header::header();
+            Nuke\Header::header();
             GraphicAdmin();
             OpenTable();
             echo "$ad_admin_menu";
@@ -794,7 +794,7 @@ if ($row['radminsuper'] == 1) {
             Header("Location: " . $admin_file . ".php?op=ad_positions");
             die();
         }
-        Nuke/Header::header();
+        Nuke\Header::header();
         GraphicAdmin();
         OpenTable();
         echo "$ad_admin_menu";
@@ -816,7 +816,7 @@ if ($row['radminsuper'] == 1) {
         global $prefix, $db, $admin_file, $ad_admin_menu;
         $numrows = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_banner_positions"));
         if ($numrows == 1) {
-            Nuke/Header::header();
+            Nuke\Header::header();
             GraphicAdmin();
             OpenTable();
             echo "$ad_admin_menu";
@@ -863,7 +863,7 @@ if ($row['radminsuper'] == 1) {
             Header("Location: " . $admin_file . ".php?op=ad_positions");
             die();
         } else {
-            Nuke/Header::header();
+            Nuke\Header::header();
             GraphicAdmin();
             OpenTable();
             echo "$ad_admin_menu";
@@ -908,7 +908,7 @@ if ($row['radminsuper'] == 1) {
             Header("Location: " . $admin_file . ".php?op=ad_terms");
             die();
         }
-        Nuke/Header::header();
+        Nuke\Header::header();
         GraphicAdmin();
         OpenTable();
         echo "$ad_admin_menu";
@@ -941,7 +941,7 @@ if ($row['radminsuper'] == 1) {
     {
         global $prefix, $db, $admin_file, $ad_admin_menu, $bgcolor1, $bgcolor2;
         define('NO_EDITOR', true);
-        Nuke/Header::header();
+        Nuke\Header::header();
         GraphicAdmin();
         OpenTable();
         echo "$ad_admin_menu";
@@ -1017,7 +1017,7 @@ if ($row['radminsuper'] == 1) {
             Header("Location: " . $admin_file . ".php?op=ad_plans");
             die();
         } else {
-            Nuke/Header::header();
+            Nuke\Header::header();
             GraphicAdmin();
             OpenTable();
             echo "$ad_admin_menu";
@@ -1034,7 +1034,7 @@ if ($row['radminsuper'] == 1) {
     {
         global $prefix, $db, $banners, $admin_file, $ad_admin_menu;
         define('NO_EDITOR', true);
-        Nuke/Header::header();
+        Nuke\Header::header();
         GraphicAdmin();
         OpenTable();
         echo "$ad_admin_menu";
@@ -1097,7 +1097,7 @@ if ($row['radminsuper'] == 1) {
             Header("Location: " . $admin_file . ".php?op=ad_plans");
             die();
         } else {
-            Nuke/Header::header();
+            Nuke\Header::header();
             GraphicAdmin();
             OpenTable();
             echo "$ad_admin_menu";
@@ -1118,7 +1118,7 @@ if ($row['radminsuper'] == 1) {
             Header("Location: " . $admin_file . ".php?op=ad_plans");
             die();
         } else {
-            Nuke/Header::header();
+            Nuke\Header::header();
             GraphicAdmin();
             OpenTable();
             echo "$ad_admin_menu";

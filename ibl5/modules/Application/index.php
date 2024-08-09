@@ -18,7 +18,7 @@ if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
 
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
-NukeHeader::header();
+Nuke\Header::header();
 
 ?>
 

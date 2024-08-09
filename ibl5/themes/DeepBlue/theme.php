@@ -114,7 +114,7 @@ function themefooter()
     }
     echo "<br><br></td></tr></table>\n"
         . "<br><center>";
-    NukeFooter::footmsg();
+    Nuke\Footer::footmsg();
     echo "</center>";
 }
 

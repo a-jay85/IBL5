@@ -20,14 +20,13 @@ if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
     die("You can't access this file directly...");
 }
 
-require_once "mainfile.php";
 
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
 $pagetitle = "- Player Archives";
 
-NukeHeader::header();
+Nuke\Header::header();
 OpenTable();
 UI::playerMenu();
 
@@ -51,6 +50,8 @@ $typeArray = array(
     'PLA' => 'Playoff Averages',
     'HET' => 'H.E.A.T. Totals',
     'HEA' => 'H.E.A.T. Averages',
+    'OLY' => 'Olympic Totals',
+    'OLM' => 'Olympic Averages',
 );
 
 foreach ($typeArray as $key => $value) {
@@ -151,6 +152,16 @@ if ($submitted != null) {
         $restriction2 = "games > 0";
     }
 
+    if ($boards_type == 'OLY') {
+        $tableforquery = "ibl_olympics_career_totals";
+        $restriction2 = "games > 0";
+    }
+
+    if ($boards_type == 'OLM') {
+        $tableforquery = "ibl_olympics_career_avgs";
+        $restriction2 = "games > 0";
+    }
+
     if ($active == 1) {
         $restriction1 = " retired = '0' AND ";
     }
@@ -232,13 +243,13 @@ if ($submitted != null) {
                 $min = number_format($db->sql_result($result, $i, "car_min"));
                 $fgm = number_format($db->sql_result($result, $i, "car_fgm"));
                 $fga = number_format($db->sql_result($result, $i, "car_fga"));
-                $fgpct = number_format($db->sql_result($result, $i, "car_fgm") / $db->sql_result($result, $i, "car_fga"), 3);
+                $fgpct = ($db->sql_result($result, $i, "car_fga")) ? number_format($db->sql_result($result, $i, "car_fgm") / $db->sql_result($result, $i, "car_fga"), 3) : "0.000";
                 $ftm = number_format($db->sql_result($result, $i, "car_ftm"));
                 $fta = number_format($db->sql_result($result, $i, "car_fta"));
-                $ftpct = number_format($db->sql_result($result, $i, "car_ftm") / $db->sql_result($result, $i, "car_fta"), 3);
+                $ftpct = ($db->sql_result($result, $i, "car_fta")) ? number_format($db->sql_result($result, $i, "car_ftm") / $db->sql_result($result, $i, "car_fta"), 3) : "0.000";
                 $tgm = number_format($db->sql_result($result, $i, "car_tgm"));
                 $tga = number_format($db->sql_result($result, $i, "car_tga"));
-                $tpct = number_format($db->sql_result($result, $i, "car_tgm") / $db->sql_result($result, $i, "car_tga"), 3);
+                $tpct = ($db->sql_result($result, $i, "car_tga")) ? number_format($db->sql_result($result, $i, "car_tgm") / $db->sql_result($result, $i, "car_tga"), 3) : "0.000";
                 $orb = number_format($db->sql_result($result, $i, "car_orb"));
                 $reb = number_format($db->sql_result($result, $i, "car_reb"));
                 $ast = number_format($db->sql_result($result, $i, "car_ast"));
@@ -273,13 +284,13 @@ if ($submitted != null) {
                 $min = number_format($db->sql_result($result_iblhist, 0, "min"));
                 $fgm = number_format($db->sql_result($result_iblhist, 0, "fgm"));
                 $fga = number_format($db->sql_result($result_iblhist, 0, "fga"));
-                $fgpct = number_format($db->sql_result($result_iblhist, 0, "fgm") / $db->sql_result($result_iblhist, 0, "fga"), 3);
+                $fgpct = ($db->sql_result($result_iblhist, 0, "fga")) ? number_format($db->sql_result($result_iblhist, 0, "fgm") / $db->sql_result($result_iblhist, 0, "fga"), 3) : "0.000";
                 $ftm = number_format($db->sql_result($result_iblhist, 0, "ftm"));
                 $fta = number_format($db->sql_result($result_iblhist, 0, "fta"));
-                $ftpct = number_format($db->sql_result($result_iblhist, 0, "ftm") / $db->sql_result($result_iblhist, 0, "fta"), 3);
+                $ftpct = ($db->sql_result($result_iblhist, 0, "fta")) ? number_format($db->sql_result($result_iblhist, 0, "ftm") / $db->sql_result($result_iblhist, 0, "fta"), 3) : "0.000";
                 $tgm = number_format($db->sql_result($result_iblhist, 0, "3gm"));
                 $tga = number_format($db->sql_result($result_iblhist, 0, "3ga"));
-                $tpct = number_format($db->sql_result($result_iblhist, 0, "3gm") / $db->sql_result($result_iblhist, 0, "3ga"), 3);
+                $tpct = ($db->sql_result($result_iblhist, 0, "3ga")) ? number_format($db->sql_result($result_iblhist, 0, "3gm") / $db->sql_result($result_iblhist, 0, "3ga"), 3) : "0.000";
                 $orb = number_format($db->sql_result($result_iblhist, 0, "orb"));
                 $reb = number_format($db->sql_result($result_iblhist, 0, "reb"));
                 $ast = number_format($db->sql_result($result_iblhist, 0, "ast"));
@@ -294,6 +305,7 @@ if ($submitted != null) {
         if (
             $tableforquery == "ibl_season_career_avgs" or
             $tableforquery == "ibl_heat_career_avgs" or
+            $tableforquery == "ibl_olympics_career_avgs" or
             $tableforquery == "ibl_playoff_career_avgs"
         ) {
             $plyr_name = $db->sql_result($result, $i, "name");
@@ -321,6 +333,7 @@ if ($submitted != null) {
 
         if (
             $tableforquery == "ibl_heat_career_totals" or
+            $tableforquery == "ibl_olympics_career_totals" or
             $tableforquery == "ibl_playoff_career_totals"
         ) {
             $plyr_name = $db->sql_result($result, $i, "name");
@@ -329,13 +342,13 @@ if ($submitted != null) {
             $min = number_format($db->sql_result($result, $i, "minutes"));
             $fgm = number_format($db->sql_result($result, $i, "fgm"));
             $fga = number_format($db->sql_result($result, $i, "fga"));
-            $fgpct = number_format(($db->sql_result($result, $i, "fgm")) / ($db->sql_result($result, $i, "fga")), 3);
+            $fgpct = ($db->sql_result($result, $i, "fga")) ? number_format(($db->sql_result($result, $i, "fgm")) / ($db->sql_result($result, $i, "fga")), 3) : "0.000";
             $ftm = number_format($db->sql_result($result, $i, "ftm"));
             $fta = number_format($db->sql_result($result, $i, "fta"));
-            $ftpct = number_format(($db->sql_result($result, $i, "ftm")) / ($db->sql_result($result, $i, "fta")), 3);
+            $ftpct = ($db->sql_result($result, $i, "fta")) ? number_format(($db->sql_result($result, $i, "ftm")) / ($db->sql_result($result, $i, "fta")), 3) : "0.000";
             $tgm = number_format($db->sql_result($result, $i, "tgm"));
             $tga = number_format($db->sql_result($result, $i, "tga"));
-            $tpct = number_format(($db->sql_result($result, $i, "tgm")) / ($db->sql_result($result, $i, "tga")), 3);
+            $tpct = ($db->sql_result($result, $i, "tga")) ? number_format(($db->sql_result($result, $i, "tgm")) / ($db->sql_result($result, $i, "tga")), 3) : "0.000";
             $orb = number_format($db->sql_result($result, $i, "orb"));
             $reb = number_format($db->sql_result($result, $i, "reb"));
             $ast = number_format($db->sql_result($result, $i, "ast"));
@@ -383,4 +396,4 @@ if ($submitted != null) {
 }
 
 CloseTable();
-include "footer.php";
+Nuke\Footer::footer();

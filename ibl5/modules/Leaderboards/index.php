@@ -50,6 +50,8 @@ $typeArray = array(
     'PLA' => 'Playoff Averages',
     'HET' => 'H.E.A.T. Totals',
     'HEA' => 'H.E.A.T. Averages',
+    'OLY' => 'Olympic Totals',
+    'OLM' => 'Olympic Averages',
 );
 
 foreach ($typeArray as $key => $value) {
@@ -147,6 +149,16 @@ if ($submitted != null) {
 
     if ($boards_type == 'HEA') {
         $tableforquery = "ibl_heat_career_avgs";
+        $restriction2 = "games > 0";
+    }
+
+    if ($boards_type == 'OLY') {
+        $tableforquery = "ibl_olympics_career_totals";
+        $restriction2 = "games > 0";
+    }
+
+    if ($boards_type == 'OLM') {
+        $tableforquery = "ibl_olympics_career_avgs";
         $restriction2 = "games > 0";
     }
 
@@ -293,6 +305,7 @@ if ($submitted != null) {
         if (
             $tableforquery == "ibl_season_career_avgs" or
             $tableforquery == "ibl_heat_career_avgs" or
+            $tableforquery == "ibl_olympics_career_avgs" or
             $tableforquery == "ibl_playoff_career_avgs"
         ) {
             $plyr_name = $db->sql_result($result, $i, "name");
@@ -320,6 +333,7 @@ if ($submitted != null) {
 
         if (
             $tableforquery == "ibl_heat_career_totals" or
+            $tableforquery == "ibl_olympics_career_totals" or
             $tableforquery == "ibl_playoff_career_totals"
         ) {
             $plyr_name = $db->sql_result($result, $i, "name");

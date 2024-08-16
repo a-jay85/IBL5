@@ -1116,15 +1116,15 @@ function negotiate($pid)
 		<form name=\"FAOffer\" method=\"post\" action=\"freeagentoffer.php\">
 		<tr><td>Please enter your offer in this row:</td><td>";
         if ($player_exp > 0) {
-            echo "<INPUT TYPE=\"text\" NAME=\"offeryear1\" SIZE=\"4\" VALUE=\"$prefill1\"></td><td>
-                  <INPUT TYPE=\"text\" NAME=\"offeryear2\" SIZE=\"4\" VALUE=\"$prefill2\"></td><td>
-                  <INPUT TYPE=\"text\" NAME=\"offeryear3\" SIZE=\"4\" VALUE=\"$prefill3\"></td><td>
-                  <INPUT TYPE=\"text\" NAME=\"offeryear4\" SIZE=\"4\" VALUE=\"$prefill4\"></td><td>
-                  <INPUT TYPE=\"text\" NAME=\"offeryear5\" SIZE=\"4\" VALUE=\"$prefill5\"></td><td>
-                  <INPUT TYPE=\"text\" NAME=\"offeryear6\" SIZE=\"4\" VALUE=\"$prefill6\"></td>";
+            echo "<INPUT TYPE=\"number\" style=\"width: 4em\" NAME=\"offeryear1\" SIZE=\"4\" VALUE=\"$prefill1\"></td><td>
+                  <INPUT TYPE=\"number\" style=\"width: 4em\" NAME=\"offeryear2\" SIZE=\"4\" VALUE=\"$prefill2\"></td><td>
+                  <INPUT TYPE=\"number\" style=\"width: 4em\" NAME=\"offeryear3\" SIZE=\"4\" VALUE=\"$prefill3\"></td><td>
+                  <INPUT TYPE=\"number\" style=\"width: 4em\" NAME=\"offeryear4\" SIZE=\"4\" VALUE=\"$prefill4\"></td><td>
+                  <INPUT TYPE=\"number\" style=\"width: 4em\" NAME=\"offeryear5\" SIZE=\"4\" VALUE=\"$prefill5\"></td><td>
+                  <INPUT TYPE=\"number\" style=\"width: 4em\" NAME=\"offeryear6\" SIZE=\"4\" VALUE=\"$prefill6\"></td>";
         } else { // Limit undrafted rookie FA contracts to two years
-            echo "<INPUT TYPE=\"text\" NAME=\"offeryear1\" SIZE=\"4\" VALUE=\"$prefill3\"></td><td>
-			      <INPUT TYPE=\"text\" NAME=\"offeryear2\" SIZE=\"4\" VALUE=\"$prefill4\"></td>";
+            echo "<INPUT TYPE=\"number\" style=\"width: 4em\" NAME=\"offeryear1\" SIZE=\"4\" VALUE=\"$prefill3\"></td><td>
+			      <INPUT TYPE=\"number\" style=\"width: 4em\" NAME=\"offeryear2\" SIZE=\"4\" VALUE=\"$prefill4\"></td>";
         }
         $amendedCapSpaceYear1 = $capnumber + $offer1;
         echo "<input type=\"hidden\" name=\"amendedCapSpaceYear1\" value=\"$amendedCapSpaceYear1\">

@@ -21,7 +21,7 @@ $numteams = $db->sql_numrows($resultAllTeams);
 function trHighlight($userTeamID, $operatingTeamID)
 {
     if ($userTeamID == $operatingTeamID) {
-        return "<tr bgcolor=#DDDD00 align=right>";
+        return "<tr bgcolor=#AA0 align=right>";
     } else {
         return "<tr align=right>";
     }

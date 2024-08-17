@@ -75,7 +75,7 @@ echo "My Payroll: $userCurrentSeasonCapTotal<br><br>";
 while ($j < $fieldsCounter) {
     $check = $_POST['check' . $j];
     $salary = $_POST['contract' . $j];
-    $partnerCurrentSeasonCapTotal += $salary;
+    (int) $partnerCurrentSeasonCapTotal += (int) $salary;
     if ($check == "on") {
         $partnerCapSentToUser += $salary;
         echo "Total Trade Salary Their Team: $partnerCapSentToUser<br>";

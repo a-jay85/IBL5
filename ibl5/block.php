@@ -100,8 +100,8 @@ while ($i < $num) {
                 <TD>$MLE</TD>
                 <TD>$LLE</TD>
             </TR>";
-            $text = $text . $name . " accepts the " . $team . " offer of a " . $offeryears . "-year deal worth a total of " . $offertotal . " million dollars.<br> ";
-            $code = $code . "UPDATE `ibl_plr`
+            $text .= $name . " accepts the " . $team . " offer of a " . $offeryears . "-year deal worth a total of " . $offertotal . " million dollars.<br> ";
+            $code .= "UPDATE `ibl_plr`
 				SET `cy` = '0',
 					`cy1` = '" . $offer1 . "',
 					`cy2` = '" . $offer2 . "',
@@ -115,10 +115,10 @@ while ($i < $num) {
 				WHERE `name` = '" . $name . "'
 				LIMIT 1;";
             if ($MLE == 1) {
-                $code = $code . "UPDATE `ibl_team_info` SET `HasMLE` = '0' WHERE `team_name` = '" . $team . "' LIMIT 1;";
+                $code .= "UPDATE `ibl_team_info` SET `HasMLE` = '0' WHERE `team_name` = '" . $team . "' LIMIT 1;";
             }
             if ($LLE == 1) {
-                $code = $code . "UPDATE `ibl_team_info` SET `HasLLE` = '0' WHERE `team_name` = '" . $team . "' LIMIT 1;";
+                $code .= "UPDATE `ibl_team_info` SET `HasLLE` = '0' WHERE `team_name` = '" . $team . "' LIMIT 1;";
             }
         }
     }
@@ -183,7 +183,7 @@ while ($i < $num) {
     }
     $offertotal = ($offer1 + $offer2 + $offer3 + $offer4 + $offer5 + $offer6) / 100;
 
-    $exttext = $exttext . "The " . $team . " offered " . $name . " a " . $offeryears . "-year deal worth a total of " . $offertotal . " million dollars.<br> ";
+    $exttext .= "The " . $team . " offered " . $name . " a " . $offeryears . "-year deal worth a total of " . $offertotal . " million dollars.<br> ";
     $i = $i + 1;
 }
 

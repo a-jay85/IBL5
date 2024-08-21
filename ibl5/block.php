@@ -12,6 +12,7 @@ $num = $db->sql_numrows($result);
 echo "<HTML>
 	<HEAD><TITLE>Free Agent Processing</TITLE></HEAD>
 	<BODY>
+        <H1>You are viewing <font color=red>Day " . ($val + 1) . "</font> results!</H1>
 		<TABLE BORDER=1>
 			<TR>
 				<TD COLSPAN=8>Free Agent Signings</TD>

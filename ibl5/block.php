@@ -15,7 +15,7 @@ echo "<HTML>
         <H1>You are viewing <font color=red>Day " . ($val + 1) . "</font> results!</H1>
         <H2>Total number of offers: $num</H2>
 		<TABLE BORDER=1>
-			<TR>
+			<TR style=\"font-weight:bold\">
 				<TD COLSPAN=8>Free Agent Signings</TD>
 				<TD>MLE</TD>
 				<TD>LLE</TD>
@@ -178,7 +178,7 @@ if ($offerAccepted) {
 }
 
 $i = 0;
-echo "<TR>
+echo "<TR style=\"font-weight:bold\">
     <TD COLSPAN=8>ALL OFFERS MADE</TD>
     <TD>MLE</TD>
     <TD>LLE</TD>

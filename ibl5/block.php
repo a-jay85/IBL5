@@ -124,7 +124,7 @@ while ($i < $num) {
     }
 
     $nameholder = $name;
-    $i = $i + 1;
+    $i++;
 }
 
 $i = 0;
@@ -184,7 +184,7 @@ while ($i < $num) {
     $offertotal = ($offer1 + $offer2 + $offer3 + $offer4 + $offer5 + $offer6) / 100;
 
     $exttext .= "The " . $team . " offered " . $name . " a " . $offeryears . "-year deal worth a total of " . $offertotal . " million dollars.<br> ";
-    $i = $i + 1;
+    $i++;
 }
 
 echo "</TABLE>

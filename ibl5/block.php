@@ -88,7 +88,18 @@ while ($i < $num) {
     if ($nameholder == $name) {
     } else {
         if ($perceivedvalue > $demands) {
-            echo " <TR><TD>$name</TD><TD>$team</TD><TD>$offer1</TD><TD>$offer2</TD><TD>$offer3</TD><TD>$offer4</TD><TD>$offer5</TD><TD>$offer6</TD><TD>$MLE</TD><TD>$LLE</TD></TR>";
+            echo " <TR>
+                <TD>$name</TD>
+                <TD>$team</TD>
+                <TD>$offer1</TD>
+                <TD>$offer2</TD>
+                <TD>$offer3</TD>
+                <TD>$offer4</TD>
+                <TD>$offer5</TD>
+                <TD>$offer6</TD>
+                <TD>$MLE</TD>
+                <TD>$LLE</TD>
+            </TR>";
             $text = $text . $name . " accepts the " . $team . " offer of a " . $offeryears . "-year deal worth a total of " . $offertotal . " million dollars.<br> ";
             $code = $code . "UPDATE `ibl_plr`
 				SET `cy` = '0',
@@ -117,7 +128,12 @@ while ($i < $num) {
 }
 
 $i = 0;
-echo "<TR><TD COLSPAN=8>ALL OFFERS MADE</TD><TD>MLE</TD><TD>LLE</TD><TD>RANDOM</TD></TR> ";
+echo "<TR>
+    <TD COLSPAN=8>ALL OFFERS MADE</TD>
+    <TD>MLE</TD>
+    <TD>LLE</TD>
+    <TD>RANDOM</TD>
+</TR> ";
 
 while ($i < $num) {
     $name = $db->sql_result($result, $i, "name");
@@ -135,7 +151,20 @@ while ($i < $num) {
     $LLE = $db->sql_result($result, $i, "LLE");
     $random = $db->sql_result($result, $i, "random");
 
-    echo "<TR><TD>$name</TD><TD>$team</TD><TD>$offer1</TD><TD>$offer2</TD><TD>$offer3</TD><TD>$offer4</TD><TD>$offer5</TD><TD>$offer6</TD><TD>$MLE</TD><TD>$LLE</TD><TD>$random</TD><TD>$perceivedvalue</TD></TR>";
+    echo "<TR>
+        <TD>$name</TD>
+        <TD>$team</TD>
+        <TD>$offer1</TD>
+        <TD>$offer2</TD>
+        <TD>$offer3</TD>
+        <TD>$offer4</TD>
+        <TD>$offer5</TD>
+        <TD>$offer6</TD>
+        <TD>$MLE</TD>
+        <TD>$LLE</TD>
+        <TD>$random</TD>
+        <TD>$perceivedvalue</TD>
+    </TR>";
     $offeryears = 6;
     if ($offer6 == 0) {
         $offeryears = 5;
@@ -158,4 +187,24 @@ while ($i < $num) {
     $i = $i + 1;
 }
 
-echo "</TABLE><hr> <h2>SQL QUERY BOX</h2><br> <FORM><TEXTAREA COLS=125 ROWS=20>$code</TEXTAREA> <hr> <h2>ACCEPTED OFFERS IN HTML FORMAT (FOR NEWS ARTICLE)</h2><br> <TEXTAREA COLS=125 ROWS=20>$text</TEXTAREA> <hr> <h2>ALL OFFERS IN HTML FORMAT (FOR NEWS ARTICLE EXTENDED TEXT)</h2><br> <TEXTAREA COLS=125 ROWS=20>$exttext</TEXTAREA></FORM> <hr> </HTML>";
+echo "</TABLE>
+    <hr>
+    <h2>SQL QUERY BOX</h2>
+    <br>
+    <FORM>
+        <TEXTAREA COLS=125 ROWS=20>$code</TEXTAREA>
+        <hr> 
+        <h2>ACCEPTED OFFERS IN HTML FORMAT (FOR NEWS ARTICLE)</h2>
+        <br>
+        <TEXTAREA COLS=125 ROWS=20>$text</TEXTAREA>
+        <hr>
+        <h2>ALL OFFERS IN HTML FORMAT (FOR NEWS ARTICLE EXTENDED TEXT)</h2>
+        <br>
+        <TEXTAREA COLS=125 ROWS=20>$exttext</TEXTAREA>
+        <hr>
+        <h2>ALL OFFERS IN DISCORD FORMAT (FOR <a href=\"https://discord.com/channels/666986450889474053/682990441641279531\">#live-sims</a>)</h2>
+        <br>
+        <TEXTAREA COLS=125 ROWS=20>$discordText</TEXTAREA>
+    </FORM>
+    <hr>
+</HTML>";

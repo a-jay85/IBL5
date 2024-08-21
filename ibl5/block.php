@@ -242,7 +242,7 @@ echo "</TABLE>
     <hr>
     <FORM>
         <h2 style=\"color:red\">AUTO-REJECTED OFFERS</H2>
-        <TEXTAREA style=\"font-size: 24px\" COLS=85 ROWS=20>$autoRejectedText</TEXTAREA>
+        <TEXTAREA COLS=85 ROWS=20>$autoRejectedText</TEXTAREA>
         <hr>
         <h2 style=\"color:#7289da\">ALL REMAINING OFFERS IN DISCORD FORMAT (FOR <a href=\"https://discord.com/channels/666986450889474053/682990441641279531\">#live-sims</a>)</h2>
         <TEXTAREA style=\"font-size: 24px\" COLS=85 ROWS=20>$discordText</TEXTAREA>

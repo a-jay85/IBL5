@@ -24,6 +24,7 @@ echo "<HTML>
 $discordText = "";
 $offerText = "";
 $outcomeText = "";
+$autoRejectedText = "These offers have been **auto-rejected** for being under half of the player's demands:";
 $lastPlayerIteratedOn = "";
 $i = 0;
 while ($i < $num) {
@@ -40,7 +41,7 @@ while ($i < $num) {
         $offerText = "";
         if ($outcomeText) {
             $discordText .= $outcomeText;
-            if ($accepted) {
+            if ($offerAccepted) {
                 $discordText .= " <@!$offeringTeam->discordID>\n\n";
             }
         }
@@ -53,14 +54,6 @@ while ($i < $num) {
     $offer4 = $db->sql_result($result, $i, "offer4");
     $offer5 = $db->sql_result($result, $i, "offer5");
     $offer6 = $db->sql_result($result, $i, "offer6");
-
-    $offerText .= "$offeringTeamName - $offer1";
-    if ($offer2 != 0) {$offerText .= "/$offer2";}
-    if ($offer3 != 0) {$offerText .= "/$offer3";}
-    if ($offer4 != 0) {$offerText .= "/$offer4";}
-    if ($offer5 != 0) {$offerText .= "/$offer5";}
-    if ($offer6 != 0) {$offerText .= "/$offer6";}
-    $offerText .= " <@!$offeringTeam->discordID>\n";
 
     $MLE = $db->sql_result($result, $i, "MLE");
     $LLE = $db->sql_result($result, $i, "LLE");
@@ -113,6 +106,24 @@ while ($i < $num) {
     }
     $demands = ($dem1 + $dem2 + $dem3 + $dem4 + $dem5 + $dem6) / $demyrs * ((11 - $val) / 10);
 
+    if ($perceivedvalue > $demands / 2) {
+        $offerText .= "$offeringTeamName - $offer1";
+        if ($offer2 != 0) {$offerText .= "/$offer2";}
+        if ($offer3 != 0) {$offerText .= "/$offer3";}
+        if ($offer4 != 0) {$offerText .= "/$offer4";}
+        if ($offer5 != 0) {$offerText .= "/$offer5";}
+        if ($offer6 != 0) {$offerText .= "/$offer6";}
+        $offerText .= " <@!$offeringTeam->discordID>\n";
+    } else {
+        $autoRejectedText .= "\n<@!$offeringTeam->discordID>'s offer for $player->name: ";
+        $autoRejectedText .= "$offeringTeamName - $offer1";
+        if ($offer2 != 0) {$autoRejectedText .= "/$offer2";}
+        if ($offer3 != 0) {$autoRejectedText .= "/$offer3";}
+        if ($offer4 != 0) {$autoRejectedText .= "/$offer4";}
+        if ($offer5 != 0) {$autoRejectedText .= "/$offer5";}
+        if ($offer6 != 0) {$autoRejectedText .= "/$offer6";}
+    }
+
     if ($lastPlayerIteratedOn != $name) {
         if ($perceivedvalue > $demands) {
             echo " <TR>
@@ -127,7 +138,7 @@ while ($i < $num) {
                 <TD>$MLE</TD>
                 <TD>$LLE</TD>
             </TR>";
-            $accepted = TRUE;
+            $offerAccepted = TRUE;
             $outcomeText = $name . " accepts the " . $offeringTeamName . " offer of a " . $offeryears . "-year deal worth a total of " . $offertotal . " million dollars.";
             $text .= $outcomeText . "<br>\n";
             $code .= "UPDATE `ibl_plr`
@@ -151,7 +162,7 @@ while ($i < $num) {
             }
         } else {
             $outcomeText = "**REJECTED**\n\n";
-            $accepted = FALSE;
+            $offerAccepted = FALSE;
         }
     }
 
@@ -162,8 +173,8 @@ while ($i < $num) {
 
 $discordText .= $offerText;
 $discordText .= $outcomeText;
-if ($accepted) {
-    $discordText .= " <@!$offeringTeam->discordID>\n\n";
+if ($offerAccepted) {
+    $discordText .= " <@!$offeringTeam->discordID>";
 }
 
 $i = 0;
@@ -230,6 +241,9 @@ while ($i < $num) {
 echo "</TABLE>
     <hr>
     <FORM>
+        <h2 style=\"color:red\">AUTO-REJECTED OFFERS</H2>
+        <TEXTAREA COLS=125 ROWS=20>$autoRejectedText</TEXTAREA>
+        <hr>
         <h2 style=\"color:#7289da\">ALL OFFERS IN DISCORD FORMAT (FOR <a href=\"https://discord.com/channels/666986450889474053/682990441641279531\">#live-sims</a>)</h2>
         <TEXTAREA COLS=125 ROWS=20>$discordText</TEXTAREA>
         <hr>

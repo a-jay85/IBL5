@@ -152,7 +152,7 @@ while ($i < $num) {
 					`cy6` = '" . $offer6 . "',
 					`teamname` = '" . $offeringTeamName . "',
 					`cyt` = '" . $offeryears . "',
-					`tid` = $tid
+					`tid` = $offeringTeam->teamID
 				WHERE `name` = '" . $name . "'
 				LIMIT 1;";
             if ($MLE == 1) {

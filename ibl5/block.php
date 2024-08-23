@@ -12,7 +12,7 @@ $num = $db->sql_numrows($result);
 echo "<HTML>
 	<HEAD><TITLE>Free Agent Processing</TITLE></HEAD>
 	<BODY>
-        <H1>You are viewing <font color=red>Day " . ($val + 1) . "</font> results!</H1>
+        <H1>You are viewing <font color=red>Day " . ($val) . "</font> results!</H1>
         <H2>Total number of offers: $num</H2>
 		<TABLE BORDER=1>
 			<TR style=\"font-weight:bold\">

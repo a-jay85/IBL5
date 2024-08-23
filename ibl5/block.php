@@ -139,6 +139,7 @@ while ($i < $num) {
                 <TD>$LLE</TD>
             </TR>";
             $offerAccepted = TRUE;
+            $acceptedTeamDiscordID = $offeringTeam->discordID;
             $outcomeText = $name . " accepts the " . $offeringTeamName . " offer of a " . $offeryears . "-year deal worth a total of " . $offertotal . " million dollars.";
             $text .= $outcomeText . "<br>\n";
             $code .= "UPDATE `ibl_plr`
@@ -174,7 +175,7 @@ while ($i < $num) {
 $discordText .= $offerText;
 $discordText .= $outcomeText;
 if ($offerAccepted) {
-    $discordText .= " <@!$offeringTeam->discordID>";
+    $discordText .= " <@!$acceptedTeamDiscordID>";
 }
 
 $i = 0;

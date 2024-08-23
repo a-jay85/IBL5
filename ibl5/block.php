@@ -42,7 +42,7 @@ while ($i < $num) {
         if ($outcomeText) {
             $discordText .= $outcomeText;
             if ($offerAccepted) {
-                $discordText .= " <@!$offeringTeam->discordID>\n\n";
+                $discordText .= " <@!$acceptedTeamDiscordID>\n\n";
             }
         }
         $discordText .= "**" . strtoupper("$player->name, $teamOfPlayer->city $player->teamName") . "** <@!$teamOfPlayer->discordID>\n";

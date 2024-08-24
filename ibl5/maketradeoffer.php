@@ -20,8 +20,8 @@ $fieldsCounter = $_POST['counterfields'];
 $fieldsCounter += 1;
 
 while ($i < 7) {
-    $userSendsCash[$i] = $_POST['userSendsCash' . $i];
-    $partnerSendsCash[$i] = $_POST['partnerSendsCash' . $i];
+    $userSendsCash[$i] = (int) $_POST['userSendsCash' . $i];
+    $partnerSendsCash[$i] = (int) $_POST['partnerSendsCash' . $i];
     $i++;
 }
 
@@ -42,7 +42,7 @@ if (!empty($filteredPartnerSendsCash) AND min($filteredPartnerSendsCash) < 100) 
 $j = 0;
 while ($j < $switchCounter) {
     $check = $_POST['check' . $j];
-    $salary = $_POST['contract' . $j];
+    $salary = (int) $_POST['contract' . $j];
     $userCurrentSeasonCapTotal += $salary;
     if ($check == "on") {
         $userCapSentToPartner += $salary;
@@ -75,7 +75,7 @@ echo "My Payroll: $userCurrentSeasonCapTotal<br><br>";
 while ($j < $fieldsCounter) {
     $check = $_POST['check' . $j];
     $salary = $_POST['contract' . $j];
-    (int) $partnerCurrentSeasonCapTotal += (int) $salary;
+    $partnerCurrentSeasonCapTotal += (int) $salary;
     if ($check == "on") {
         $partnerCapSentToUser += $salary;
         echo "Total Trade Salary Their Team: $partnerCapSentToUser<br>";

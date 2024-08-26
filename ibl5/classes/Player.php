@@ -231,7 +231,13 @@ class Player
 
     public function getCurrentSeasonSalary()
     {
-        $currentSeasonSalary = $this->{"contractYear" . $this->contractCurrentYear . "Salary"};
+        if ("contractYear" . $this->contractCurrentYear . "Salary" == "contractYear0Salary") {
+            $currentSeasonSalary = $this->contractYear1Salary;
+        } elseif ("contractYear" . $this->contractCurrentYear . "Salary" == "contractYear7Salary") {
+            $currentSeasonSalary = 0;
+        } else {
+            $currentSeasonSalary = $this->{"contractYear" . $this->contractCurrentYear . "Salary"};
+        }
         return $currentSeasonSalary;
     }
 

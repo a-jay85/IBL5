@@ -302,7 +302,7 @@ function waiverexecute($username, $action)
         $wait_time = '';
 
         $fullContract = "";
-        if ($playerForWaiverOperation->currentSeasonSalary == '' and $playerForWaiverOperation->currentSeasonSalary == 0) {
+        if ($playerForWaiverOperation->currentSeasonSalary == 0) {
             if ($playerForWaiverOperation->yearsOfExperience > 9) {
                 $fullContract = 103;
             } elseif ($playerForWaiverOperation->yearsOfExperience > 8) {

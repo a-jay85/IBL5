@@ -106,6 +106,16 @@ foreach ($rows as $row) {
         $visitorTID = $sharedFunctions->getTidFromTeamname($visitorName);
         $homeTID = $sharedFunctions->getTidFromTeamname($homeName);
     }
+    
+    if (
+        $vScore != 0
+        AND $hScore != 0
+        AND $boxID == NULL
+    ) {
+        echo "<b><font color=red>Script Error: box scores for games haven't been generated.<br>
+            Please delete and reupload the JSB HTML export with the box scores, then try again.</font></b>";
+        die();
+    }
 
     $sqlQueryString = "INSERT INTO ibl_schedule (
 		Year,

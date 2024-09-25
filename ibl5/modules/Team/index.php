@@ -410,17 +410,17 @@ function boxscore($year, $month, $tid, $wins, $losses, $winStreak, $lossStreak)
 
     // override $projectedNextSimEndDate to account for the blank week at end of HEAT
     if (
-        $projectedNextSimEndDate >= date_create("$season->beginningYear-10-23")
-        AND $projectedNextSimEndDate < date_create("$season->beginningYear-11-01")
+        $projectedNextSimEndDate > date_create("$season->beginningYear-10-21")
+        AND $projectedNextSimEndDate < date_create("$season->beginningYear-11-02")
     ) {
-        $projectedNextSimEndDate = date_create("$season->beginningYear-11-08");
+        $projectedNextSimEndDate = date_create("$season->beginningYear-11-05");
     }
     // override $projectedNextSimEndDate to account for the All-Star Break
     if (
-        $projectedNextSimEndDate >= date_create("$season->endingYear-02-01")
-        AND $projectedNextSimEndDate < date_create("$season->endingYear-02-11")
+        $projectedNextSimEndDate > date_create("$season->endingYear-01-31")
+        AND $projectedNextSimEndDate < date_create("$season->endingYear-02-05")
     ) {
-        $projectedNextSimEndDate = date_create("$season->endingYear-02-11");
+        $projectedNextSimEndDate = date_create("$season->endingYear-02-08");
     }
 
     while ($i < $num) {

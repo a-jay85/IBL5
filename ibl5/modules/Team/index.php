@@ -346,7 +346,7 @@ function schedule(int $tid)
                 <td colspan=26>
                     <h1>Team Schedule</h1>
                     <p>
-                    <i>games highlighted in yellow are projected to be run next sim (4 days)</i>
+                    <i>games highlighted in yellow are projected to be run next sim (" . Sim::LENGTH_IN_DAYS . " days)</i>
                 </td>
             </tr>
 			<tr bgcolor=$team->color2 style=\"font-weight:bold; color:#$team->color1; text-align:center\">
@@ -374,7 +374,7 @@ function schedule(int $tid)
     $teamSeasonRecordsResult = $db->sql_query($teamSeasonRecordsQuery);
     
     $season->lastSimEndDate = date_create($season->lastSimEndDate);
-    $projectedNextSimEndDate = date_add($season->lastSimEndDate, date_interval_create_from_date_string('4 days'));
+    $projectedNextSimEndDate = date_add($season->lastSimEndDate, date_interval_create_from_date_string(Sim::LENGTH_IN_DAYS . ' days'));
     
     // override $projectedNextSimEndDate to account for the blank week at end of HEAT
     if (

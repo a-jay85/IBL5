@@ -327,11 +327,10 @@ function team_info_right($team)
     return $ultimate_output;
 }
 
-function schedule($tid)
+function schedule(int $tid)
 {
     global $db;
 
-    $tid = intval($tid);
     Nuke\Header::header();
     OpenTable();
     //============================

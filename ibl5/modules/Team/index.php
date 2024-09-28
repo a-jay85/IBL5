@@ -366,8 +366,7 @@ function schedule(int $tid)
 
     //TODO: unify this code with the Schedule module's chunk function
 
-    $query = "SELECT * FROM `ibl_schedule` WHERE Visitor = $tid OR Home = $tid ORDER BY Date ASC;";
-    $result = $db->sql_query($query);
+    $result = Schedule\TeamSchedule::getSchedule($db, $team->teamID);
     $num = $db->sql_numrows($result);
     
     $teamSeasonRecordsQuery = "SELECT tid, leagueRecord FROM ibl_standings ORDER BY tid ASC;";

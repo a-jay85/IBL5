@@ -348,22 +348,8 @@ function schedule(int $tid)
                     <p>
                     <i>games highlighted in yellow are projected to be run next sim (" . Sim::LENGTH_IN_DAYS . " days)</i>
                 </td>
-            </tr>
-			<tr bgcolor=$team->color2 style=\"font-weight:bold; color:#$team->color1; text-align:center\">
-                <td colspan=26>November</td>
-            </tr>
-			<tr bgcolor=$team->color2 style=\"font-weight:bold; color:#$team->color1\">
-                <td>Date</td>
-                <td>Visitor</td>
-                <td>Score</td>
-                <td>Home</td>
-                <td>Score</td>
-                <td>Box Score</td>
-                <td>Record</td>
-                <td>Streak</td>
             </tr>";
     
-
     //TODO: unify this code with the Schedule module's chunk function
 
     $result = Schedule\TeamSchedule::getSchedule($db, $team->teamID);
@@ -392,7 +378,8 @@ function schedule(int $tid)
         $postAllStarStartDate = date_create("$season->endingYear-" . Season::IBL_ALL_STAR_MONTH . "-04");
         $projectedNextSimEndDate = date_add($postAllStarStartDate, date_interval_create_from_date_string(Sim::LENGTH_IN_DAYS . ' days'));
     }
-            
+    
+    $lastMonthIteratedOver = "";
     $i = 0;
     while ($i < $num) {
         $date = $db->sql_result($result, $i, "Date");
@@ -402,10 +389,30 @@ function schedule(int $tid)
         $homeScore = $db->sql_result($result, $i, "HScore");
         $boxID = $db->sql_result($result, $i, "BoxID");
 
+        $dateObject = date_create($date);
+
         $visitorTeamname = $sharedFunctions->getTeamnameFromTid($visitor);
         $homeTeamname = $sharedFunctions->getTeamnameFromTid($home);
         $visitorRecord = $db->sql_result($teamSeasonRecordsResult, $visitor - 1, "leagueRecord");
         $homeRecord = $db->sql_result($teamSeasonRecordsResult, $home - 1, "leagueRecord");
+
+        $currentMonthBeingIteratedOver = $dateObject->format('m');
+        if ($currentMonthBeingIteratedOver != $lastMonthIteratedOver) {
+            $fullMonthName = $dateObject->format('F');
+            echo "<tr bgcolor=$team->color2 style=\"font-weight:bold; color:#$team->color1; text-align:center\">
+                <td colspan=8>$fullMonthName</td>
+            </tr>
+            <tr bgcolor=$team->color2 style=\"font-weight:bold; color:#$team->color1\">
+                <td>Date</td>
+                <td>Visitor</td>
+                <td>Score</td>
+                <td>Home</td>
+                <td>Score</td>
+                <td>Box Score</td>
+                <td>Record</td>
+                <td>Streak</td>
+            </tr>";
+        }
 
         if ($visitorScore == $homeScore) {
             if (date_create($date) <= $projectedNextSimEndDate) {
@@ -482,6 +489,7 @@ function schedule(int $tid)
             }
         }
 
+        $lastMonthIteratedOver = $currentMonthBeingIteratedOver;
         $i++;
     }
 

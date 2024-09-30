@@ -382,7 +382,14 @@ function schedule(int $tid)
     $i = 0;
     foreach ($teamSchedule as $row) {
         $game = new Game($db, $row);
-
+        if ($game->visitorTeamID == $team->teamID) {
+            $visitorTeamName = $team->name;
+            $homeTeamName = $sharedFunctions->getTeamnameFromTid($game->homeTeamID);
+        } else {
+            $homeTeamName = $team->name;
+            $visitorTeamName = $sharedFunctions->getTeamnameFromTid($game->visitorTeamID);
+        }
+        
         $visitorRecord = $db->sql_result($teamSeasonRecordsResult, $game->visitorTeamID - 1, "leagueRecord");
         $homeRecord = $db->sql_result($teamSeasonRecordsResult, $game->homeTeamID - 1, "leagueRecord");
 
@@ -410,9 +417,9 @@ function schedule(int $tid)
                 echo "<tr>";
             }
             echo "<td>$game->date</td>
-                <td><a href=\"modules.php?name=Team&op=team&tid=$game->visitorTeamID\">" . $game->visitorTeam->name . " ($visitorRecord)</a></td>
+                <td><a href=\"modules.php?name=Team&op=team&tid=$game->visitorTeamID\">$visitorTeamName ($visitorRecord)</a></td>
                 <td></td>
-                <td><a href=\"modules.php?name=Team&op=team&tid=$game->homeTeamID\">" . $game->homeTeam->name . " ($homeRecord)</a></td>
+                <td><a href=\"modules.php?name=Team&op=team&tid=$game->homeTeamID\">$homeTeamName ($homeRecord)</a></td>
                 <td></td>
                 <td></td>
                 <td></td>
@@ -455,9 +462,9 @@ function schedule(int $tid)
             if ($game->visitorScore > $game->homeScore) {
                 echo "<tr bgcolor=$bgcolor>
                     <td><a href=\"./ibl/IBL/box$game->boxScoreID.htm\">$game->date</a></td>
-                    <td><b><a href=\"modules.php?name=Team&op=team&tid=$game->visitorTeamID\">" . $game->visitorTeam->name . " ($visitorRecord)</a></b></td>
+                    <td><b><a href=\"modules.php?name=Team&op=team&tid=$game->visitorTeamID\">$visitorTeamName ($visitorRecord)</a></b></td>
                     <td><b><a href=\"./ibl/IBL/box$game->boxScoreID.htm\"><font color=$winlosscolor>$game->visitorScore</font></a></b></td>
-                    <td><a href=\"modules.php?name=Team&op=team&tid=$game->homeTeamID\">" . $game->homeTeam->name . " ($homeRecord)</a></td>
+                    <td><a href=\"modules.php?name=Team&op=team&tid=$game->homeTeamID\">$homeTeamName ($homeRecord)</a></td>
                     <td><b><a href=\"./ibl/IBL/box$game->boxScoreID.htm\"><font color=$winlosscolor>$game->homeScore</font></a></b></td>
                     <td>$wins - $losses</td>
                     <td>$streak</td>
@@ -465,9 +472,9 @@ function schedule(int $tid)
             } else if ($game->visitorScore < $game->homeScore) {
                 echo "<tr bgcolor=$bgcolor>
                     <td><a href=\"./ibl/IBL/box$game->boxScoreID.htm\">$game->date</a></td>
-                    <td><a href=\"modules.php?name=Team&op=team&tid=$game->visitorTeamID\">" . $game->visitorTeam->name . " ($visitorRecord)</a></td>
+                    <td><a href=\"modules.php?name=Team&op=team&tid=$game->visitorTeamID\">$visitorTeamName ($visitorRecord)</a></td>
                     <td><b><a href=\"./ibl/IBL/box$game->boxScoreID.htm\"><font color=$winlosscolor>$game->visitorScore</font></a></b></td>
-                    <td><b><a href=\"modules.php?name=Team&op=team&tid=$game->homeTeamID\">" . $game->homeTeam->name . " ($homeRecord)</a></b></td>
+                    <td><b><a href=\"modules.php?name=Team&op=team&tid=$game->homeTeamID\">$homeTeamName ($homeRecord)</a></b></td>
                     <td><b><a href=\"./ibl/IBL/box$game->boxScoreID.htm\"><font color=$winlosscolor>$game->homeScore</font></a></b></td>
                     <td>$wins - $losses</td>
                     <td>$streak</td>

@@ -327,20 +327,20 @@ function team_info_right($team)
     return $ultimate_output;
 }
 
-function schedule(int $tid)
+function schedule(int $teamID)
 {
     global $db;
     $sharedFunctions = new Shared($db);
     $season = new Season($db);
-    $team = Team::withTeamID($db, $tid);
+    $team = Team::withTeamID($db, $teamID);
     $wins = $losses = $winStreak = $lossStreak = 0;
 
     Nuke\Header::header();
     OpenTable();
-    UI::displaytopmenu($db, $tid);
+    UI::displaytopmenu($db, $teamID);
 
     echo "<center>
-		<img src=\"./images/logo/$tid.jpg\">
+		<img src=\"./images/logo/$teamID.jpg\">
 		<table width=600 border=1>
 			<tr bgcolor=$team->color1 style=\"color:#$team->color2; text-align:center\">
                 <td colspan=26>
@@ -404,7 +404,7 @@ function schedule(int $tid)
                 <td></td>
             </tr>";
         } else {
-            if ($tid == $game->visitorTeamID) {
+            if ($teamID == $game->visitorTeamID) {
                 if ($game->visitorScore > $game->homeScore) {
                     $wins++;
                     $winStreak++;

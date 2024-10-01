@@ -358,7 +358,6 @@ function schedule(int $teamID)
     $teamSeasonRecordsResult = $db->sql_query($teamSeasonRecordsQuery);
     
     $lastMonthIteratedOver = "";
-    $i = 0;
     foreach ($teamSchedule as $row) {
         $game = new Game($db, $row);
         $opponentTeamID = $game->visitorTeamID == $team->teamID ? $game->homeTeamID : $game->visitorTeamID;
@@ -425,7 +424,6 @@ function schedule(int $teamID)
         }
 
         $lastMonthIteratedOver = $currentMonthBeingIteratedOver;
-        $i++;
     }
 
     echo "</table></center>";

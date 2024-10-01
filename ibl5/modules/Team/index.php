@@ -428,8 +428,7 @@ function schedule(int $teamID)
         $i++;
     }
 
-    echo "</center>";
-    CloseTable();
+    echo "</table></center>";
     CloseTable();
     Nuke\Footer::footer();
 }

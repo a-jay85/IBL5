@@ -341,9 +341,9 @@ function schedule(int $teamID)
 
     echo "<center>
 		<img src=\"./images/logo/$teamID.jpg\">
-		<table width=600 border=1>
+		<table width=400 border=1>
 			<tr bgcolor=$team->color1 style=\"color:#$team->color2; text-align:center\">
-                <td colspan=26>
+                <td colspan=5>
                     <h1>Team Schedule</h1>
                     <p>
                     <i>games highlighted in yellow are projected to be run next sim (" . Sim::LENGTH_IN_DAYS . " days)</i>
@@ -361,17 +361,12 @@ function schedule(int $teamID)
     $i = 0;
     foreach ($teamSchedule as $row) {
         $game = new Game($db, $row);
-        if ($game->visitorTeamID == $team->teamID) {
-            $visitorTeamName = $team->name;
-            $homeTeamName = $sharedFunctions->getTeamnameFromTid($game->homeTeamID);
-        } else {
-            $homeTeamName = $team->name;
-            $visitorTeamName = $sharedFunctions->getTeamnameFromTid($game->visitorTeamID);
-        }
+        $opponentTeamID = $game->visitorTeamID == $team->teamID ? $game->homeTeamID : $game->visitorTeamID;
+        $opponentTeamName = $sharedFunctions->getTeamnameFromTid($opponentTeamID);
+        $opponentRecord = $db->sql_result($teamSeasonRecordsResult, $opponentTeamID - 1, "leagueRecord");
+        $opponentLocation = $game->visitorTeamID == $team->teamID ? "@" : "vs";
+        $opponentText = $opponentLocation . " $opponentTeamName ($opponentRecord)";
         
-        $visitorRecord = $db->sql_result($teamSeasonRecordsResult, $game->visitorTeamID - 1, "leagueRecord");
-        $homeRecord = $db->sql_result($teamSeasonRecordsResult, $game->homeTeamID - 1, "leagueRecord");
-
         $currentMonthBeingIteratedOver = $game->dateObject->format('m');
         if ($currentMonthBeingIteratedOver != $lastMonthIteratedOver) {
             $fullMonthName = $game->dateObject->format('F');
@@ -380,11 +375,9 @@ function schedule(int $teamID)
             </tr>
             <tr bgcolor=$team->color2 style=\"font-weight:bold; color:#$team->color1\">
                 <td>Date</td>
-                <td>Visitor</td>
-                <td>Score</td>
-                <td>Home</td>
-                <td>Score</td>
-                <td>Record</td>
+                <td>Opponent</td>
+                <td>Result</td>
+                <td>W - L</td>
                 <td>Streak</td>
             </tr>";
         }
@@ -396,59 +389,54 @@ function schedule(int $teamID)
                 echo "<tr>";
             }
             echo "<td>$game->date</td>
-                <td><a href=\"modules.php?name=Team&op=team&tid=$game->visitorTeamID\">$visitorTeamName ($visitorRecord)</a></td>
-                <td></td>
-                <td><a href=\"modules.php?name=Team&op=team&tid=$game->homeTeamID\">$homeTeamName ($homeRecord)</a></td>
+                <td><a href=\"modules.php?name=Team&op=team&tid=$opponentTeamID\">$opponentText</a></td>
                 <td></td>
                 <td></td>
                 <td></td>
             </tr>";
         } else {
-            $visitorStyle = $homeStyle = "";
             if ($teamID == $game->visitorTeamID) {
                 if ($game->visitorScore > $game->homeScore) {
+                    $gameResult = "W";
                     $wins++;
                     $winStreak++;
                     $lossStreak = 0;
                     $winlosscolor = "green";
-                    $visitorStyle = "font-weight:bold;";
                 } else {
+                    $gameResult = "L";
                     $losses++;
                     $lossStreak++;
                     $winStreak = 0;
                     $winlosscolor = "red";
-                    $homeStyle = "font-weight:bold;";
                 }
             } else {
                 if ($game->visitorScore > $game->homeScore) {
+                    $gameResult = "L";
                     $losses++;
                     $lossStreak++;
                     $winStreak = 0;
                     $winlosscolor = "red";
-                    $visitorStyle = "font-weight:bold;";
                 } else {
+                    $gameResult = "W";
                     $wins++;
                     $winStreak++;
                     $lossStreak = 0;
                     $winlosscolor = "green";
-                    $homeStyle = "font-weight:bold;";
                 }
             }
 
-            if ($winStreak > $lossStreak) {
-                $streak = "W $winStreak";
-            } else {
-                $streak = "L $lossStreak";
-            }
+            $streak = ($winStreak > $lossStreak) ? "W $winStreak" : "L $lossStreak";
 
             echo "<tr bgcolor=FFFFFF>
                     <td><a href=\"./ibl/IBL/box$game->boxScoreID.htm\">$game->date</a></td>
-                    <td><a href=\"modules.php?name=Team&op=team&tid=$game->visitorTeamID\" style=\"$visitorStyle\">$visitorTeamName ($visitorRecord)</a></b></td>
-                    <td><b><a href=\"./ibl/IBL/box$game->boxScoreID.htm\"><font color=$winlosscolor>$game->visitorScore</font></a></b></td>
-                    <td><a href=\"modules.php?name=Team&op=team&tid=$game->homeTeamID\"style=\"$homeStyle\">$homeTeamName ($homeRecord)</a></td>
-                    <td><b><a href=\"./ibl/IBL/box$game->boxScoreID.htm\"><font color=$winlosscolor>$game->homeScore</font></a></b></td>
-                    <td>$wins - $losses</td>
-                    <td>$streak</td>
+                    <td><a href=\"modules.php?name=Team&op=team&tid=$game->visitorTeamID\">$opponentText</a></b></td>
+                    <td>
+                        <a href=\"./ibl/IBL/box$game->boxScoreID.htm\" style=\"color:$winlosscolor; font-weight:bold; font-family:monospace,monospace;\">
+                            $gameResult $game->visitorScore - $game->homeScore
+                        </a>
+                    </td>
+                    <td style=\"font-family:monospace,monospace;\">$wins-$losses</td>
+                    <td style=\"font-family:monospace,monospace;\">$streak</td>
                 </tr>";
         }
 
@@ -458,7 +446,6 @@ function schedule(int $teamID)
 
     echo "</center>";
     CloseTable();
-
     CloseTable();
     Nuke\Footer::footer();
 }

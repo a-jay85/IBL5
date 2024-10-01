@@ -382,7 +382,7 @@ function schedule(int $teamID)
         }
 
         if ($game->visitorScore == $game->homeScore) {
-            $highlight = ($game->dateObject <= $season->projectedNextSimEndDate) ? "bgcolor=#DDDD00>" : "";
+            $highlight = ($game->dateObject <= $season->projectedNextSimEndDate) ? "bgcolor=#DDDD00" : "";
             echo "<tr $highlight>
                 <td>$game->date</td>
                 <td><a href=\"modules.php?name=Team&op=team&tid=$opponentTeamID\">$opponentText</a></td>

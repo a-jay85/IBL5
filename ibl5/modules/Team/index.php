@@ -436,10 +436,8 @@ function schedule(int $teamID)
                 $streak = "L $lossStreak";
             }
 
-            (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
-
             if ($game->visitorScore > $game->homeScore) {
-                echo "<tr bgcolor=$bgcolor>
+                echo "<tr bgcolor=FFFFFF>
                     <td><a href=\"./ibl/IBL/box$game->boxScoreID.htm\">$game->date</a></td>
                     <td><b><a href=\"modules.php?name=Team&op=team&tid=$game->visitorTeamID\">$visitorTeamName ($visitorRecord)</a></b></td>
                     <td><b><a href=\"./ibl/IBL/box$game->boxScoreID.htm\"><font color=$winlosscolor>$game->visitorScore</font></a></b></td>
@@ -449,7 +447,7 @@ function schedule(int $teamID)
                     <td>$streak</td>
                 </tr>";
             } else if ($game->visitorScore < $game->homeScore) {
-                echo "<tr bgcolor=$bgcolor>
+                echo "<tr bgcolor=FFFFFF>
                     <td><a href=\"./ibl/IBL/box$game->boxScoreID.htm\">$game->date</a></td>
                     <td><a href=\"modules.php?name=Team&op=team&tid=$game->visitorTeamID\">$visitorTeamName ($visitorRecord)</a></td>
                     <td><b><a href=\"./ibl/IBL/box$game->boxScoreID.htm\"><font color=$winlosscolor>$game->visitorScore</font></a></b></td>

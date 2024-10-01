@@ -1,10 +1,20 @@
 <?php
 
-$teamID = intval($_GET['teamID']);
+global $db, $cookie;
 
-global $db;
 $sharedFunctions = new Shared($db);
 $season = new Season($db);
+
+$teamID = intval($_GET['teamID']);
+if (!$teamID) {
+    if ($cookie[1]) {
+        $userTeamName = $sharedFunctions->getTeamnameFromUsername($cookie[1]);
+        $userTeamID = $sharedFunctions->getTidFromTeamname($userTeamName);
+        $teamID = $userTeamID;
+    } else {
+        $teamID = 0;
+    }
+}
 $team = Team::withTeamID($db, $teamID);
 $wins = $losses = $winStreak = $lossStreak = 0;
 

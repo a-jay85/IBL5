@@ -45,15 +45,6 @@ function team($tid)
     Nuke\Header::header();
     OpenTable();
 
-    //=============================
-    //DISPLAY TOP MENU
-    //=============================
-
-    UI::displaytopmenu($db, $team->teamID);
-
-    //=============================
-    //GET CONTRACT AMOUNTS CORRECT
-    //=============================
 
     $isFreeAgencyModuleActive = $sharedFunctions->isFreeAgencyModuleActive();
 
@@ -78,8 +69,14 @@ function team($tid)
         }
     }
 
-    echo "<table><tr><td align=center valign=top><img src=\"./images/logo/$tid.jpg\">";
-
+    echo "<table>
+        <tr>
+            <td align=center valign=top>";
+            
+    UI::displaytopmenu($db, $team->teamID);
+            
+    echo "<img src=\"./images/logo/$tid.jpg\">";
+            
     if ($yr != "") {
         echo "<center><h1>$yr $team->name</h1></center>";
         $insertyear = "&yr=$yr";

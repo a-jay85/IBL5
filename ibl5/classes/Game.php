@@ -11,6 +11,7 @@ class Game
 
     public $visitorScore;
     public $homeScore;
+    public $winningTeamID;
 
     public function __construct($db, $scheduleRow)
     {
@@ -23,5 +24,7 @@ class Game
 
         $this->visitorScore = $scheduleRow['VScore'];
         $this->homeScore = $scheduleRow['HScore'];
+
+        $this->winningTeamID = $this->visitorScore > $this->homeScore ? $this->visitorTeamID : $this->homeTeamID;
     }
 }

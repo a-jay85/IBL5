@@ -369,10 +369,10 @@ function schedule(int $teamID)
         $currentMonthBeingIteratedOver = $game->dateObject->format('m');
         if ($currentMonthBeingIteratedOver != $lastMonthIteratedOver) {
             $fullMonthName = $game->dateObject->format('F');
-            echo "<tr bgcolor=$team->color2 style=\"font-weight:bold; color:#$team->color1; text-align:center\">
+            echo "<tr bgcolor=$team->color1 style=\"font-weight:bold; color:#$team->color2; text-align:center\">
                 <td colspan=7>$fullMonthName</td>
             </tr>
-            <tr bgcolor=$team->color2 style=\"font-weight:bold; color:#$team->color1\">
+            <tr bgcolor=$team->color1 style=\"font-weight:bold; color:#$team->color2\">
                 <td>Date</td>
                 <td>Opponent</td>
                 <td>Result</td>

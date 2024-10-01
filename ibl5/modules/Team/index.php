@@ -376,7 +376,7 @@ function schedule(int $teamID)
                 <td>Date</td>
                 <td>Opponent</td>
                 <td>Result</td>
-                <td>W - L</td>
+                <td>W-L</td>
                 <td>Streak</td>
             </tr>";
         }

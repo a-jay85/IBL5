@@ -357,27 +357,6 @@ function schedule(int $tid)
     $teamSeasonRecordsQuery = "SELECT tid, leagueRecord FROM ibl_standings ORDER BY tid ASC;";
     $teamSeasonRecordsResult = $db->sql_query($teamSeasonRecordsQuery);
     
-    $season->lastSimEndDate = date_create($season->lastSimEndDate);
-    $projectedNextSimEndDate = date_add($season->lastSimEndDate, date_interval_create_from_date_string(Sim::LENGTH_IN_DAYS . ' days'));
-
-    // override $projectedNextSimEndDate to account for the blank week at end of HEAT
-    if (
-        $projectedNextSimEndDate > date_create("$season->beginningYear-10-21")
-        AND $projectedNextSimEndDate < date_create("$season->beginningYear-11-02")
-    ) {
-        $seasonStartDate = date_create("$season->beginningYear-" . Season::IBL_REGULAR_SEASON_STARTING_MONTH . "-01");
-        $projectedNextSimEndDate = date_add($seasonStartDate, date_interval_create_from_date_string(Sim::LENGTH_IN_DAYS . ' days'));
-    }
-
-    // override $projectedNextSimEndDate to account for the All-Star Break
-    if (
-        $projectedNextSimEndDate > date_create("$season->endingYear-01-31")
-        AND $projectedNextSimEndDate <= date_create("$season->endingYear-02-05")
-    ) {
-        $postAllStarStartDate = date_create("$season->endingYear-" . Season::IBL_ALL_STAR_MONTH . "-04");
-        $projectedNextSimEndDate = date_add($postAllStarStartDate, date_interval_create_from_date_string(Sim::LENGTH_IN_DAYS . ' days'));
-    }
-    
     $lastMonthIteratedOver = "";
     $i = 0;
     foreach ($teamSchedule as $row) {
@@ -411,7 +390,7 @@ function schedule(int $tid)
         }
 
         if ($game->visitorScore == $game->homeScore) {
-            if ($game->dateObject <= $projectedNextSimEndDate) {
+            if ($game->dateObject <= $season->projectedNextSimEndDate) {
                 echo "<tr bgcolor=#DDDD00>";
             } else {
                 echo "<tr>";

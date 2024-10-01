@@ -9,9 +9,14 @@ class Season
     public $beginningYear;
     public $endingYear;
 
+    public $regularSeasonStartDate;
+    public $postAllStarStartDate;
+
     public $lastSimNumber;
     public $lastSimStartDate;
     public $lastSimEndDate;
+
+    public $projectedNextSimEndDate;
 
     public $allowTrades;
     public $allowWaivers;
@@ -19,6 +24,7 @@ class Season
     const IBL_PRESEASON_MONTH = 9;
     const IBL_HEAT_MONTH = 10;
     const IBL_REGULAR_SEASON_STARTING_MONTH = 11;
+    const IBL_ALL_STAR_MONTH = 02;
     const IBL_REGULAR_SEASON_ENDING_MONTH = 05;
     const IBL_PLAYOFF_MONTH = 06;
     const JSB_PLAYOFF_MONTH = 22;
@@ -32,10 +38,15 @@ class Season
         $this->endingYear = $this->getSeasonEndingYear();
         $this->beginningYear = $this->endingYear - 1;
 
+        $this->regularSeasonStartDate = date_create("$this->beginningYear-" . Season::IBL_REGULAR_SEASON_STARTING_MONTH . "-01");
+        $this->postAllStarStartDate = date_create("$this->endingYear-" . Season::IBL_ALL_STAR_MONTH . "-04");
+
         $arrayLastSimDates = $this->getLastSimDatesArray();
         $this->lastSimNumber = $arrayLastSimDates["Sim"];
         $this->lastSimStartDate = $arrayLastSimDates["Start Date"];
         $this->lastSimEndDate = $arrayLastSimDates["End Date"];
+
+        $this->projectedNextSimEndDate = $this->getProjectedNextSimEndDate($this->lastSimEndDate);
 
         $this->allowTrades = $this->getAllowTradesStatus();
         $this->allowWaivers = $this->getAllowWaiversStatus();
@@ -102,6 +113,30 @@ class Season
                     '$newSimEndDate'); ");
 
         return $querySimDates;
+    }
+
+    public function getProjectedNextSimEndDate($lastSimEndDate)
+    {
+        $lastSimEndDate = date_create($lastSimEndDate);
+        $projectedNextSimEndDate = date_add($lastSimEndDate, date_interval_create_from_date_string(Sim::LENGTH_IN_DAYS . ' days'));
+
+        // override $projectedNextSimEndDate to account for the blank week at end of HEAT
+        if (
+            $projectedNextSimEndDate > date_create("$this->beginningYear-10-21")
+            AND $projectedNextSimEndDate < date_create("$this->beginningYear-11-02")
+        ) {
+            $projectedNextSimEndDate = date_add($this->regularSeasonStartDate, date_interval_create_from_date_string(Sim::LENGTH_IN_DAYS . ' days'));
+        }
+    
+        // override $projectedNextSimEndDate to account for the All-Star Break
+        if (
+            $projectedNextSimEndDate > date_create("$this->endingYear-01-31")
+            AND $projectedNextSimEndDate <= date_create("$this->endingYear-02-05")
+        ) {
+            $projectedNextSimEndDate = date_add($this->postAllStarStartDate, date_interval_create_from_date_string(Sim::LENGTH_IN_DAYS . ' days'));
+        }
+
+        return $projectedNextSimEndDate;
     }
 
     public function getAllowTradesStatus()

@@ -395,34 +395,18 @@ function schedule(int $teamID)
                 <td></td>
             </tr>";
         } else {
-            if ($teamID == $game->visitorTeamID) {
-                if ($game->visitorScore > $game->homeScore) {
-                    $gameResult = "W";
-                    $wins++;
-                    $winStreak++;
-                    $lossStreak = 0;
-                    $winlosscolor = "green";
-                } else {
-                    $gameResult = "L";
-                    $losses++;
-                    $lossStreak++;
-                    $winStreak = 0;
-                    $winlosscolor = "red";
-                }
+            if ($teamID == $game->winningTeamID) {
+                $gameResult = "W";
+                $wins++;
+                $winStreak++;
+                $lossStreak = 0;
+                $winlosscolor = "green";
             } else {
-                if ($game->visitorScore > $game->homeScore) {
-                    $gameResult = "L";
-                    $losses++;
-                    $lossStreak++;
-                    $winStreak = 0;
-                    $winlosscolor = "red";
-                } else {
-                    $gameResult = "W";
-                    $wins++;
-                    $winStreak++;
-                    $lossStreak = 0;
-                    $winlosscolor = "green";
-                }
+                $gameResult = "L";
+                $losses++;
+                $lossStreak++;
+                $winStreak = 0;
+                $winlosscolor = "red";
             }
 
             $streak = ($winStreak > $lossStreak) ? "W $winStreak" : "L $lossStreak";

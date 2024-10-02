@@ -12,6 +12,7 @@ config.php
 config.inc.php
 discordWebhooks (not CURL).php
 Discord.php
+/ibl5/joe/ibl_draft/includes/classes/Discord.php
 
 backups
 depthcharts
@@ -19,4 +20,5 @@ depthcharts
 /ibl5/ibl/IBL/
 !/ibl5/ibl/IBL/Schedule.htm
 !/ibl5/ibl/IBL/Standings.htm
-/ibl5/joe/ibl_draft/includes/classes/Discord.php
+!/ibl5/classes/
+!/ibl5/modules/

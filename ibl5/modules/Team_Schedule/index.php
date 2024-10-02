@@ -36,9 +36,7 @@ echo "<center>
 //TODO: unify this code with the Schedule module's chunk function
 
 $teamSchedule = Schedule\TeamSchedule::getSchedule($db, $team->teamID);
-
-$teamSeasonRecordsQuery = "SELECT tid, leagueRecord FROM ibl_standings ORDER BY tid ASC;";
-$teamSeasonRecordsResult = $db->sql_query($teamSeasonRecordsQuery);
+$seasonRecords = $season->getSeasonRecordsArray();
 
 $lastMonthIteratedOver = "";
 foreach ($teamSchedule as $row) {

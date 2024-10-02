@@ -41,11 +41,10 @@ $lastMonthIteratedOver = "";
 foreach ($teamSchedule as $row) {
     $game = new Game($row);
     
-    $currentMonthBeingIteratedOver = $game->dateObject->format('m');
+    $currentMonthBeingIteratedOver = $game->dateObject->format('F');
     if ($currentMonthBeingIteratedOver != $lastMonthIteratedOver) {
-        $fullMonthName = $game->dateObject->format('F');
         echo "<tr bgcolor=$userTeam->color1 style=\"font-weight:bold; color:#$userTeam->color2; text-align:center\">
-            <td colspan=7>$fullMonthName</td>
+            <td colspan=7>$currentMonthBeingIteratedOver</td>
         </tr>
         <tr bgcolor=$userTeam->color1 style=\"font-weight:bold; color:#$userTeam->color2\">
             <td>Date</td>

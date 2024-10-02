@@ -35,7 +35,7 @@ function team($tid)
     $sharedFunctions = new Shared($db);
     $season = new Season($db);
 
-    $yr = intval($_REQUEST['yr']);
+    $yr = $_REQUEST['yr'];
 
     $display = $_REQUEST['display'];
     if ($display == null) {
@@ -44,6 +44,7 @@ function team($tid)
 
     Nuke\Header::header();
     OpenTable();
+
 
     $isFreeAgencyModuleActive = $sharedFunctions->isFreeAgencyModuleActive();
 

@@ -13,6 +13,9 @@ class Game
     public $homeScore;
     public $winningTeamID;
 
+    public $opposingTeamID;
+    public $userTeamLocationPrefix;
+
     public function __construct($scheduleRow)
     {
         $this->date = $scheduleRow['Date'];
@@ -26,5 +29,17 @@ class Game
         $this->homeScore = $scheduleRow['HScore'];
 
         $this->winningTeamID = $this->visitorScore > $this->homeScore ? $this->visitorTeamID : $this->homeTeamID;
+    }
+
+    public function getOpposingTeamID($userTeamID)
+    {
+        $this->opposingTeamID = $this->visitorTeamID == $userTeamID ? $this->homeTeamID : $this->visitorTeamID;
+        return $this->opposingTeamID;
+    }
+
+    public function getUserTeamLocationPrefix($userTeamID)
+    {
+        $this->userTeamLocationPrefix = $this->visitorTeamID == $userTeamID ? "@" : "vs";
+        return $this->userTeamLocationPrefix;
     }
 }

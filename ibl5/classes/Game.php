@@ -13,7 +13,7 @@ class Game
     public $homeScore;
     public $winningTeamID;
 
-    public function __construct($db, $scheduleRow)
+    public function __construct($scheduleRow)
     {
         $this->date = $scheduleRow['Date'];
         $this->dateObject = date_create($this->date);

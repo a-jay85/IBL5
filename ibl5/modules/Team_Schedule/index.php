@@ -40,28 +40,26 @@ $seasonRecords = $season->getSeasonRecordsArray();
 
 $lastMonthIteratedOver = "";
 foreach ($teamSchedule as $row) {
-    $game = new Game($db, $row);
-    $opponentTeamID = $game->visitorTeamID == $team->teamID ? $game->homeTeamID : $game->visitorTeamID;
-    $opponentTeamName = $sharedFunctions->getTeamnameFromTid($opponentTeamID);
-    $opponentRecord = $db->sql_result($teamSeasonRecordsResult, $opponentTeamID - 1, "leagueRecord");
-    $opponentLocation = $game->visitorTeamID == $team->teamID ? "@" : "vs";
-    $opponentText = $opponentLocation . " $opponentTeamName ($opponentRecord)";
+    $game = new Game($row);
     
     $currentMonthBeingIteratedOver = $game->dateObject->format('m');
     if ($currentMonthBeingIteratedOver != $lastMonthIteratedOver) {
         $fullMonthName = $game->dateObject->format('F');
         echo "<tr bgcolor=$team->color1 style=\"font-weight:bold; color:#$team->color2; text-align:center\">
-            <td colspan=7>$fullMonthName</td>
+        <td colspan=7>$fullMonthName</td>
         </tr>
         <tr bgcolor=$team->color1 style=\"font-weight:bold; color:#$team->color2\">
-            <td>Date</td>
-            <td>Opponent</td>
-            <td>Result</td>
-            <td>W-L</td>
-            <td>Streak</td>
+        <td>Date</td>
+        <td>Opponent</td>
+        <td>Result</td>
+        <td>W-L</td>
+        <td>Streak</td>
         </tr>";
     }
-
+    
+    $opposingTeam = new OpposingTeam($db, $game->getOpposingTeamID($teamID), $sharedFunctions, $seasonRecords);
+    
+    $opponentText = $game->getUserTeamLocationPrefix($teamID) . " $opposingTeam->name ($opposingTeam->seasonRecord)";
     if ($game->visitorScore == $game->homeScore) {
         $highlight = ($game->dateObject <= $season->projectedNextSimEndDate) ? "bgcolor=#DDDD00" : "";
         echo "<tr $highlight>
@@ -104,6 +102,18 @@ foreach ($teamSchedule as $row) {
     $lastMonthIteratedOver = $currentMonthBeingIteratedOver;
 }
 
-echo "</table></center>";
+
+
+
+?>
+
+
+
+</table></center>
+
+<?php 
+
 CloseTable();
 Nuke\Footer::footer();
+?>
+</html>

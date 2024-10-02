@@ -5,27 +5,26 @@ global $db, $cookie;
 $sharedFunctions = new Shared($db);
 $season = new Season($db);
 
-$teamID = intval($_GET['teamID']);
-if (!$teamID) {
+$userTeamID = intval($_GET['teamID']);
+if (!$userTeamID) {
     if ($cookie[1]) {
         $userTeamName = $sharedFunctions->getTeamnameFromUsername($cookie[1]);
         $userTeamID = $sharedFunctions->getTidFromTeamname($userTeamName);
-        $teamID = $userTeamID;
     } else {
-        $teamID = 0;
+        $userTeamID = 0;
     }
 }
-$team = Team::withTeamID($db, $teamID);
+$userTeam = Team::withTeamID($db, $userTeamID);
 $wins = $losses = $winStreak = $lossStreak = 0;
 
 Nuke\Header::header();
 OpenTable();
-UI::displaytopmenu($db, $teamID);
+UI::displaytopmenu($db, $userTeamID);
 
 echo "<center>
-    <img src=\"./images/logo/$teamID.jpg\">
+    <img src=\"./images/logo/$userTeamID.jpg\">
     <table width=400 border=1>
-        <tr bgcolor=$team->color1 style=\"color:#$team->color2; text-align:center\">
+        <tr bgcolor=$userTeam->color1 style=\"color:#$userTeam->color2; text-align:center\">
             <td colspan=5>
                 <h1>Team Schedule</h1>
                 <p>
@@ -35,7 +34,7 @@ echo "<center>
 
 //TODO: unify this code with the Schedule module's chunk function
 
-$teamSchedule = Schedule\TeamSchedule::getSchedule($db, $team->teamID);
+$teamSchedule = Schedule\TeamSchedule::getSchedule($db, $userTeam->teamID);
 $seasonRecords = $season->getSeasonRecordsArray();
 
 $lastMonthIteratedOver = "";
@@ -45,10 +44,10 @@ foreach ($teamSchedule as $row) {
     $currentMonthBeingIteratedOver = $game->dateObject->format('m');
     if ($currentMonthBeingIteratedOver != $lastMonthIteratedOver) {
         $fullMonthName = $game->dateObject->format('F');
-        echo "<tr bgcolor=$team->color1 style=\"font-weight:bold; color:#$team->color2; text-align:center\">
+        echo "<tr bgcolor=$userTeam->color1 style=\"font-weight:bold; color:#$userTeam->color2; text-align:center\">
         <td colspan=7>$fullMonthName</td>
         </tr>
-        <tr bgcolor=$team->color1 style=\"font-weight:bold; color:#$team->color2\">
+        <tr bgcolor=$userTeam->color1 style=\"font-weight:bold; color:#$userTeam->color2\">
         <td>Date</td>
         <td>Opponent</td>
         <td>Result</td>
@@ -57,9 +56,9 @@ foreach ($teamSchedule as $row) {
         </tr>";
     }
     
-    $opposingTeam = new OpposingTeam($db, $game->getOpposingTeamID($teamID), $sharedFunctions, $seasonRecords);
+    $opposingTeam = new OpposingTeam($db, $game->getOpposingTeamID($userTeamID), $sharedFunctions, $seasonRecords);
     
-    $opponentText = $game->getUserTeamLocationPrefix($teamID) . " $opposingTeam->name ($opposingTeam->seasonRecord)";
+    $opponentText = $game->getUserTeamLocationPrefix($userTeamID) . " $opposingTeam->name ($opposingTeam->seasonRecord)";
     if ($game->visitorScore == $game->homeScore) {
         $highlight = ($game->dateObject <= $season->projectedNextSimEndDate) ? "bgcolor=#DDDD00" : "";
         echo "<tr $highlight>
@@ -70,7 +69,7 @@ foreach ($teamSchedule as $row) {
             <td></td>
         </tr>";
     } else {
-        if ($teamID == $game->winningTeamID) {
+        if ($userTeamID == $game->winningTeamID) {
             $gameResult = "W";
             $wins++;
             $winStreak++;

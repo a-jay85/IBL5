@@ -45,14 +45,14 @@ foreach ($teamSchedule as $row) {
     if ($currentMonthBeingIteratedOver != $lastMonthIteratedOver) {
         $fullMonthName = $game->dateObject->format('F');
         echo "<tr bgcolor=$userTeam->color1 style=\"font-weight:bold; color:#$userTeam->color2; text-align:center\">
-        <td colspan=7>$fullMonthName</td>
+            <td colspan=7>$fullMonthName</td>
         </tr>
         <tr bgcolor=$userTeam->color1 style=\"font-weight:bold; color:#$userTeam->color2\">
-        <td>Date</td>
-        <td>Opponent</td>
-        <td>Result</td>
-        <td>W-L</td>
-        <td>Streak</td>
+            <td>Date</td>
+            <td>Opponent</td>
+            <td>Result</td>
+            <td>W-L</td>
+            <td>Streak</td>
         </tr>";
     }
     

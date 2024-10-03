@@ -66,25 +66,25 @@ foreach ($teamSchedule as $row) {
 ?>
 
 <div style="text-align: center;">
-    <img src="./images/logo/<?php echo $userTeamID; ?>.jpg">
+    <img src="./images/logo/<?= $userTeamID ?>.jpg">
 </div>
 
     <table width=400 border=1 align=center>
-        <tr bgcolor=<?php echo $userTeam->color1 ?> style="color:#<?php echo $userTeam->color2 ?>; text-align:center;">
+        <tr bgcolor=<?= $userTeam->color1 ?> style="color:#<?= $userTeam->color2 ?>; text-align:center;">
             <td colspan=5>
                 <h1>Team Schedule</h1>
                 <p>
-                <i>games highlighted in yellow are projected to be run next sim (<?php echo Sim::LENGTH_IN_DAYS; ?> days)</i>
+                <i>games highlighted in yellow are projected to be run next sim (<?= Sim::LENGTH_IN_DAYS ?> days)</i>
             </td>
         </tr>
 
 <?php $lastMonthIteratedOver = "" ?>
 <?php foreach ($teamScheduleRows as $row) : ?>
     <?php if ($row["currentMonthBeingIteratedOver"] !== $lastMonthIteratedOver) : ?>
-        <tr bgcolor=<?php echo $userTeam->color1 ?> style="font-weight:bold; color:#<?php echo $userTeam->color2 ?>; text-align:center;">
-            <td colspan=7><?php echo $row["currentMonthBeingIteratedOver"] ?></td>
+        <tr bgcolor=<?= $userTeam->color1 ?> style="font-weight:bold; color:#<?= $userTeam->color2 ?>; text-align:center;">
+            <td colspan=7><?= $row["currentMonthBeingIteratedOver"] ?></td>
         </tr>
-        <tr bgcolor=<?php echo $userTeam->color1 ?> style="font-weight:bold; color:#<?php echo $userTeam->color2 ?>;">
+        <tr bgcolor=<?= $userTeam->color1 ?> style="font-weight:bold; color:#<?= $userTeam->color2 ?>;">
             <td>Date</td>
             <td>Opponent</td>
             <td>Result</td>
@@ -95,28 +95,27 @@ foreach ($teamSchedule as $row) {
     
     <?php $lastMonthIteratedOver = $row["currentMonthBeingIteratedOver"]; ?>
 
-    <?php if ($row['game']->visitorScore == $row['game']->homeScore) { ?>
-        <tr <?php echo $row['highlight'] ?>>
-            <td><?php echo $row['game']->date ?></td>
-            <td><a href="modules.php?name=Team&op=team&tid=<?php echo $row['opposingTeam']->teamID; ?>"><?php echo $row['opponentText'] ?></a></td>
+    <?php if ($row['game']->visitorScore == $row['game']->homeScore) : ?>
+        <tr <?= $row['highlight'] ?>>
+            <td><?= $row['game']->date ?></td>
+            <td><a href="modules.php?name=Team&op=team&tid=<?= $row['opposingTeam']->teamID ?>"><?= $row['opponentText'] ?></a></td>
             <td></td>
             <td></td>
             <td></td>
         </tr>
-    <?php } else { ?>
+    <?php else : ?>
         <tr bgcolor=FFFFFF>
-            <td><a href="./ibl/IBL/box<?php echo $row['game']->boxScoreID; ?>.htm"><?php echo $row['game']->date; ?></a></td>
-            <td><a href="modules.php?name=Team&op=team&tid=<?php echo $row['opposingTeam']->teamID; ?>"><?php echo $row['opponentText'] ?></a></b></td>
+            <td><a href="./ibl/IBL/box<?= $row['game']->boxScoreID ?>.htm"><?= $row['game']->date ?></a></td>
+            <td><a href="modules.php?name=Team&op=team&tid=<?= $row['opposingTeam']->teamID ?>"><?= $row['opponentText'] ?></a></b></td>
             <td>
-                <a href="./ibl/IBL/box<?php echo $row['game']->boxScoreID; ?>.htm" style="color:<?php echo $row['winlosscolor']; ?>; font-weight:bold; font-family:monospace,monospace;">
-                    <?php echo $row['gameResult'] . " " . $row['game']->visitorScore . " - " . $row['game']->homeScore;?>
+                <a href="./ibl/IBL/box<?= $row['game']->boxScoreID ?>.htm" style="color:<?= $row['winlosscolor'] ?>; font-weight:bold; font-family:monospace,monospace;">
+                    <?= $row['gameResult'] . " " . $row['game']->visitorScore . " - " . $row['game']->homeScore ?>
                 </a>
             </td>
-            <td style="font-family:monospace,monospace;"><?php echo $row['wins'] . "-" . $row['losses']; ?></td>
-            <td style="font-family:monospace,monospace;"><?php echo $row['streak']; ?></td>
+            <td style="font-family:monospace,monospace;"><?= $row['wins'] . "-" . $row['losses'] ?></td>
+            <td style="font-family:monospace,monospace;"><?= $row['streak'] ?></td>
         </tr>
-    <?php } ?>
-
+    <?php endif; ?>
 <?php endforeach; ?>
 
     </table>

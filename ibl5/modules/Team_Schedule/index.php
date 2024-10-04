@@ -31,7 +31,7 @@ foreach ($teamSchedule as $row) {
     $teamScheduleRows[$i]['opposingTeam'] = new OpposingTeam($db, $teamScheduleRows[$i]['game']->getOpposingTeamID($userTeamID), $sharedFunctions, $seasonRecords);
     $teamScheduleRows[$i]['opponentText'] = $teamScheduleRows[$i]['game']->getUserTeamLocationPrefix($userTeamID) . " " . $teamScheduleRows[$i]['opposingTeam']->name . " (" . $teamScheduleRows[$i]['opposingTeam']->seasonRecord . ")";
     $teamScheduleRows[$i]['highlight'] = "";
-    if ($teamScheduleRows[$i]['game']->visitorScore == $teamScheduleRows[$i]['game']->homeScore) {
+    if ($teamScheduleRows[$i]['game']->isUnplayed) {
         $teamScheduleRows[$i]['highlight'] = ($teamScheduleRows[$i]['game']->dateObject <= $season->projectedNextSimEndDate) ? "bgcolor=#DDDD00" : "";
     } else {
         if ($userTeamID == $teamScheduleRows[$i]['game']->winningTeamID) {

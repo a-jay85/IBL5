@@ -11,6 +11,8 @@ class Game
 
     public $visitorScore;
     public $homeScore;
+
+    public $isUnplayed;
     public $winningTeamID;
 
     public $opposingTeamID;
@@ -28,6 +30,7 @@ class Game
         $this->visitorScore = $scheduleRow['VScore'];
         $this->homeScore = $scheduleRow['HScore'];
 
+        $this->isUnplayed = ($this->visitorScore == $this->homeScore);
         $this->winningTeamID = $this->visitorScore > $this->homeScore ? $this->visitorTeamID : $this->homeTeamID;
     }
 

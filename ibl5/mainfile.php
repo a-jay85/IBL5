@@ -152,7 +152,8 @@ $htmltags .= "[ <a href=\"javascript:history.go(-1)\"><b>Go Back</b></a> ]</cent
 
 if (!defined('ADMIN_FILE')) {
     foreach ($_GET as $sec_key => $secvalue) {
-        if ((mb_eregi("<[^>]*script*\"?[^>]*", $secvalue)) ||
+        if (
+            (mb_eregi("<[^>]*script*\"?[^>]*", $secvalue)) ||
             (mb_eregi("<[^>]*object*\"?[^>]*", $secvalue)) ||
             (mb_eregi("<[^>]*iframe*\"?[^>]*", $secvalue)) ||
             (mb_eregi("<[^>]*applet*\"?[^>]*", $secvalue)) ||
@@ -165,21 +166,42 @@ if (!defined('ADMIN_FILE')) {
             (mb_eregi("\([^>]*\"?[^)]*\)", $secvalue)) ||
             (mb_eregi("\"", $secvalue)) ||
             (mb_eregi("forum_admin", $sec_key)) ||
-            (mb_eregi("inside_mod", $sec_key))) {
+            (mb_eregi("inside_mod", $sec_key))
+        ) {
             die($htmltags);
         }
     }
 
     foreach ($_POST as $secvalue) {
-        if ((mb_eregi("<[^>]*iframe*\"?[^>]*", $secvalue)) ||
-            (mb_eregi("<[^>]*object*\"?[^>]*", $secvalue)) ||
-            (mb_eregi("<[^>]*applet*\"?[^>]*", $secvalue)) ||
-            (mb_eregi("<[^>]*meta*\"?[^>]*", $secvalue)) ||
-            (mb_eregi("<[^>]*onmouseover*\"?[^>]*", $secvalue)) ||
-            (mb_eregi("<[^>]script*\"?[^>]*", $secvalue)) ||
-            (mb_eregi("<[^>]*body*\"?[^>]*", $secvalue)) ||
-            (mb_eregi("<[^>]style*\"?[^>]*", $secvalue))) {
-            die($htmltags);
+        if (is_array($secvalue)) {
+            foreach ($secvalue as $arrayElementValue) {
+                if (
+                    (mb_eregi("<[^>]*iframe*\"?[^>]*", $arrayElementValue)) ||
+                    (mb_eregi("<[^>]*object*\"?[^>]*", $arrayElementValue)) ||
+                    (mb_eregi("<[^>]*applet*\"?[^>]*", $arrayElementValue)) ||
+                    (mb_eregi("<[^>]*meta*\"?[^>]*", $arrayElementValue)) ||
+                    (mb_eregi("<[^>]*onmouseover*\"?[^>]*", $arrayElementValue)) ||
+                    (mb_eregi("<[^>]script*\"?[^>]*", $arrayElementValue)) ||
+                    (mb_eregi("<[^>]*body*\"?[^>]*", $arrayElementValue)) ||
+                    (mb_eregi("<[^>]style*\"?[^>]*", $arrayElementValue))
+                ) {
+                    die($htmltags);
+                }
+            }
+        } else {
+            if (
+                (mb_eregi("<[^>]*iframe*\"?[^>]*", $secvalue)) ||
+                (mb_eregi("<[^>]*object*\"?[^>]*", $secvalue)) ||
+                (mb_eregi("<[^>]*applet*\"?[^>]*", $secvalue)) ||
+                (mb_eregi("<[^>]*meta*\"?[^>]*", $secvalue)) ||
+                (mb_eregi("<[^>]*onmouseover*\"?[^>]*", $secvalue)) ||
+                (mb_eregi("<[^>]script*\"?[^>]*", $secvalue)) ||
+                (mb_eregi("<[^>]*body*\"?[^>]*", $secvalue)) ||
+                (mb_eregi("<[^>]style*\"?[^>]*", $secvalue))
+            ) {
+                die($htmltags);
+            } 
+            
         }
     }
 }

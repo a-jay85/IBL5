@@ -1924,8 +1924,10 @@ function showpage($playerID, $spec)
     if ($spec == 0) {
         if ($season->phase == "Preseason") {
             $query = "SELECT * FROM ibl_box_scores WHERE Date BETWEEN '$season->beginningYear-" . Season::IBL_PRESEASON_MONTH . "-01' AND '$season->endingYear-07-01' AND pid = $playerID ORDER BY Date ASC";
-        } else {
+        } elseif ($season->phase == "HEAT") {
             $query = "SELECT * FROM ibl_box_scores WHERE Date BETWEEN '$season->beginningYear-" . Season::IBL_HEAT_MONTH . "-01' AND '$season->endingYear-07-01' AND pid = $playerID ORDER BY Date ASC";
+        } else {
+            $query = "SELECT * FROM ibl_box_scores WHERE Date BETWEEN '$season->beginningYear-" . Season::IBL_REGULAR_SEASON_STARTING_MONTH . "-01' AND '$season->endingYear-07-01' AND pid = $playerID ORDER BY Date ASC";
         }
         $result = $db->sql_query($query);
 

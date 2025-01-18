@@ -11,6 +11,7 @@ Disallow: /modules/
 Disallow: /language/
 Disallow: /ibl/
 Disallow: /IBL/
+Disallow: /ibl5/
 
 User-agent: Barkrowler
 Disallow: /

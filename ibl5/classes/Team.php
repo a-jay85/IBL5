@@ -37,42 +37,39 @@ class Team
     {
     }
 
-    public static function withTeamID($db, int $teamID)
+    public static function initialize($db, $identifier)
     {
         $instance = new self();
-        $instance->loadByID($db, $teamID);
+        $instance->load($db, $identifier);
         return $instance;
     }
 
-    public static function withTeamName($db, string $teamName)
+    protected function load($db, $identifier)
     {
-        $instance = new self();
-        $instance->loadByName($db, $teamName);
-        return $instance;
-    }
+        ($identifier) ? $identifier : $identifier = League::FREE_AGENTS_TEAMID;
 
-    public static function withTeamRow($db, array $teamRow)
-    {
-        $instance = new self();
-        $instance->fill($db, $teamRow);
-        return $instance;
-    }
-
-    protected function loadByID($db, int $teamID)
-    {
-        ($teamID) ? $teamID : $teamID = League::FREE_AGENTS_TEAMID;
+        if (is_numeric($identifier)) {
+            $whereCondition = "tid = '$identifier'";
+            $joinWhereCondition = "ibl_team_info.teamid = $identifier";
+        } elseif (is_string($identifier)) {
+            $whereCondition = "teamname = '$identifier'";
+            $joinWhereCondition = "ibl_team_info.team_name = '$identifier'";
+        } elseif (is_array($identifier)) {
+            $this->fill($db, $identifier);
+            return $this;
+        }
 
         $query = "SELECT
             *,
             (SELECT COUNT(*)
                 FROM ibl_plr
-                WHERE tid = '$teamID'
+                WHERE $whereCondition
                   AND retired = '0'
                   AND ordinal <= '960'
             ) AS numberOfPlayers,
             (SELECT COUNT(*)
                 FROM ibl_plr
-                WHERE tid = '$teamID'
+                WHERE $whereCondition
                   AND retired = '0'
                   AND ordinal <= '960'
                   AND injured = '0'
@@ -80,35 +77,8 @@ class Team
             FROM ibl_team_info
                 LEFT JOIN ibl_standings
                 ON ibl_team_info.teamid = ibl_standings.tid
-            WHERE ibl_team_info.teamid = $teamID
+            WHERE $joinWhereCondition
             LIMIT 1;";
-        $result = $db->sql_query($query);
-        $teamRow = $db->sql_fetch_assoc($result);
-        $this->fill($db, $teamRow);
-    }
-
-    protected function loadByName($db, string $name)
-    {
-        $query = "SELECT
-            *,
-            (SELECT COUNT(*)
-                FROM ibl_plr
-                WHERE teamname = '$name'
-                  AND retired = '0'
-                  AND ordinal <= '960'
-            ) AS numberOfPlayers,
-            (SELECT COUNT(*)
-                FROM ibl_plr
-                WHERE teamname = '$name'
-                  AND retired = '0'
-                  AND ordinal <= '960'
-                  AND injured = '0'
-            ) AS numberOfHealthyPlayers
-            FROM ibl_team_info
-                LEFT JOIN ibl_standings
-                ON ibl_team_info.teamid = ibl_standings.tid
-            WHERE ibl_team_info.team_name = '$name'
-            LIMIT 1";
         $result = $db->sql_query($query);
         $teamRow = $db->sql_fetch_assoc($result);
         $this->fill($db, $teamRow);

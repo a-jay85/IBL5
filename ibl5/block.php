@@ -31,9 +31,9 @@ while ($i < $num) {
     $name = $db->sql_result($result, $i, "name");
     $playerID = $sharedFunctions->getPlayerIDFromPlayerName($name);
     $player = Player::withPlayerID($db, $playerID);
-    $teamOfPlayer = Team::withTeamName($db, $player->teamName);
+    $teamOfPlayer = Team::initialize($db, $player->teamName);
     $offeringTeamName = $db->sql_result($result, $i, "team");
-    $offeringTeam = Team::withTeamName($db, $offeringTeamName);
+    $offeringTeam = Team::initialize($db, $offeringTeamName);
     $perceivedvalue = $db->sql_result($result, $i, "perceivedvalue");
 
     if ($lastPlayerIteratedOn != $player->name) {
@@ -190,7 +190,7 @@ while ($i < $num) {
     $name = $db->sql_result($result, $i, "name");
     $perceivedvalue = $db->sql_result($result, $i, "perceivedvalue");
     $offeringTeamName = $db->sql_result($result, $i, "team");
-    $offeringTeam = Team::withTeamName($db, $offeringTeamName);
+    $offeringTeam = Team::initialize($db, $offeringTeamName);
 
     $offer1 = $db->sql_result($result, $i, "offer1");
     $offer2 = $db->sql_result($result, $i, "offer2");

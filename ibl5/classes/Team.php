@@ -64,6 +64,8 @@ class Team
 
         $query = "SELECT *
             FROM ibl_team_info
+                LEFT JOIN ibl_standings
+                ON ibl_team_info.teamid = ibl_standings.tid
             WHERE teamid = $teamID
             LIMIT 1;";
         $result = $db->sql_query($query);
@@ -75,8 +77,10 @@ class Team
     {
         $query = "SELECT *
             FROM ibl_team_info
-            WHERE team_name = '$name'
-            LIMIT 1;";
+                LEFT JOIN ibl_standings
+                ON ibl_team_info.teamid = ibl_standings.tid
+            WHERE ibl_team_info.team_name = '$name'
+            LIMIT 1";
         $result = $db->sql_query($query);
         $teamRow = $db->sql_fetch_assoc($result);
         $this->fill($db, $teamRow);

@@ -28,7 +28,7 @@ $i = 0;
 foreach ($teamSchedule as $row) {
     $teamScheduleRows[$i]['game'] = new Game($row);
     $teamScheduleRows[$i]['currentMonthBeingIteratedOver'] = strval($teamScheduleRows[$i]['game']->dateObject->format('F'));
-    $teamScheduleRows[$i]['opposingTeam'] = new OpposingTeam($db, $teamScheduleRows[$i]['game']->getOpposingTeamID($userTeamID), $sharedFunctions, $seasonRecords);
+    $teamScheduleRows[$i]['opposingTeam'] = Team::withTeamID($db, $teamScheduleRows[$i]['game']->getOpposingTeamID($userTeamID));
     $teamScheduleRows[$i]['opponentText'] = $teamScheduleRows[$i]['game']->getUserTeamLocationPrefix($userTeamID) . " " . $teamScheduleRows[$i]['opposingTeam']->name . " (" . $teamScheduleRows[$i]['opposingTeam']->seasonRecord . ")";
     $teamScheduleRows[$i]['highlight'] = "";
     if ($teamScheduleRows[$i]['game']->isUnplayed) {

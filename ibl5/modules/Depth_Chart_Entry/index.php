@@ -49,7 +49,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 
     $teamlogo = $userinfo['user_ibl_team'];
     $tid = $sharedFunctions->getTidFromTeamname($teamlogo);
-    $team = Team::withTeamID($db, $tid);
+    $team = Team::initialize($db, $tid);
 
     Nuke\Header::header();
     OpenTable();

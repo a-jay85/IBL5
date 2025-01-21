@@ -66,13 +66,13 @@ class Team
             *,
             (SELECT COUNT(*)
                 FROM ibl_plr
-                WHERE teamname = '$this->name'
+                WHERE tid = '$teamID'
                   AND retired = '0'
                   AND ordinal <= '960'
             ) AS numberOfPlayers,
             (SELECT COUNT(*)
                 FROM ibl_plr
-                WHERE teamname = '$this->name'
+                WHERE tid = '$teamID'
                   AND retired = '0'
                   AND ordinal <= '960'
                   AND injured = '0'
@@ -93,10 +93,17 @@ class Team
             *,
             (SELECT COUNT(*)
                 FROM ibl_plr
-                WHERE teamname = '$this->name'
+                WHERE teamname = '$name'
                   AND retired = '0'
                   AND ordinal <= '960'
-            ) AS numberOfPlayers
+            ) AS numberOfPlayers,
+            (SELECT COUNT(*)
+                FROM ibl_plr
+                WHERE teamname = '$name'
+                  AND retired = '0'
+                  AND ordinal <= '960'
+                  AND injured = '0'
+            ) AS numberOfHealthyPlayers
             FROM ibl_team_info
                 LEFT JOIN ibl_standings
                 ON ibl_team_info.teamid = ibl_standings.tid

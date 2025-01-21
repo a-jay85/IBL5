@@ -29,6 +29,8 @@ class Team
 
     public $currentSeasonTotalSalary;
 
+    public $seasonRecord;
+
     const SOFT_CAP_MAX = 5000;
     const HARD_CAP_MAX = 7000;
     const BUYOUT_PERCENTAGE_MAX = 0.40;
@@ -114,6 +116,8 @@ class Team
         $this->numberOfHealthyOpenRosterSpots = 15 - $this->numberOfHealthyPlayers;
 
         $this->currentSeasonTotalSalary = $this->getTotalCurrentSeasonSalariesFromPlrResult($this->getRosterUnderContractOrderedByNameResult());
+
+        $this->seasonRecord = $teamRow['leagueRecord'];
     }
 
     public function getBuyoutsResult()

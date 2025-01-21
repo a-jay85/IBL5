@@ -12,7 +12,7 @@ get_lang($module_name);
 $pagetitle = "- $module_name";
 
 $username = $cookie[1];
-$userTeam = Team::withTeamName($db, $sharedFunctions->getTeamnameFromUsername($username));
+$userTeam = Team::initialize($db, $sharedFunctions->getTeamnameFromUsername($username));
 
 $queryAllTeams = "SELECT * FROM ibl_team_info WHERE teamid != " . League::FREE_AGENTS_TEAMID . ";";
 $resultAllTeams = $db->sql_query($queryAllTeams);
@@ -29,7 +29,7 @@ function trHighlight($userTeamID, $operatingTeamID)
 
 $t = 0;
 foreach ($resultAllTeams as $teamRow) {
-    $team = Team::withTeamRow($db, $teamRow);
+    $team = Team::initialize($db, $teamRow);
     $teamStats = TeamStats::withTeamName($db, $team->name);
 
     $trHighlight = trHighlight($userTeam->teamID, $team->teamID);

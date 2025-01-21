@@ -30,7 +30,7 @@ function team($tid)
     global $db;
     $tid = intval($tid);
     if ($tid > 0) {
-        $team = Team::withTeamID($db, $tid);
+        $team = Team::initialize($db, $tid);
     }
     $sharedFunctions = new Shared($db);
     $season = new Season($db);
@@ -349,7 +349,7 @@ function viewinjuries($tid)
     $i = 0;
     foreach ($league->getInjuredPlayersResult() as $injuredPlayer) {
         $player = Player::withPlrRow($db, $injuredPlayer);
-        $team = Team::withTeamID($db, $player->teamID);
+        $team = Team::initialize($db, $player->teamID);
 
         (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "DDDDDD";
 
@@ -379,7 +379,7 @@ function drafthistory($tid)
     OpenTable();
     UI::displaytopmenu($db, $tid);
 
-    $team = Team::withTeamID($db, $tid);
+    $team = Team::initialize($db, $tid);
 
     echo "$team->name Draft History
         <table class=\"sortable\">

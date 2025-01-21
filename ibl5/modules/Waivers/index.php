@@ -283,7 +283,7 @@ function waiverexecute($username, $action)
 
     OpenTable();
 
-    $team = Team::withTeamName($db, $userinfo['user_ibl_team']);
+    $team = Team::initialize($db, $userinfo['user_ibl_team']);
     $league = new League($db);
 
     UI::displaytopmenu($db, $team->teamID);
@@ -365,7 +365,7 @@ function waiverexecute($username, $action)
         </tr></form></table></center>";
     
         
-    $teamFreeAgency = Team::withTeamID($db, League::FREE_AGENTS_TEAMID);
+    $teamFreeAgency = Team::initialize($db, League::FREE_AGENTS_TEAMID);
     $season = new Season($db);
     $table_ratings = UI::ratings($db, $resultListOfPlayersForWaiverOperation, $teamFreeAgency, "", $season);
     echo $table_ratings;

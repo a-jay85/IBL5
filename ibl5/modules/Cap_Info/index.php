@@ -53,6 +53,8 @@ while ($i < $numberOfTeams) {
     $MLEicon = ($team->hasMLE == "1") ? "\u{2705}" : "\u{274C}";
     $LLEicon = ($team->hasLLE == "1") ? "\u{2705}" : "\u{274C}";
 
+    $teamCurrentSeasonTotalSalary = $team->getTotalCurrentSeasonSalariesFromPlrResult($team->getRosterUnderContractOrderedByNameResult());
+
     $table_echo .= "<tr>
 		<td bgcolor=#$team->color1>
 			<a href=\"modules.php?name=Team&op=team&tid=$team->teamID&display=contracts\">
@@ -61,7 +63,7 @@ while ($i < $numberOfTeams) {
 		</td>";
 
     if (!$isFreeAgencyModuleActive) {
-         $table_echo .= "<td align=center>" . (Team::HARD_CAP_MAX - $team->currentSeasonTotalSalary) . "</td>";
+         $table_echo .= "<td align=center>" . (Team::HARD_CAP_MAX - $teamCurrentSeasonTotalSalary) . "</td>";
     }
 
     $table_echo .= "

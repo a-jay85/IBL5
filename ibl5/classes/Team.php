@@ -27,8 +27,6 @@ class Team
     public $numberOfOpenRosterSpots;
     public $numberOfHealthyOpenRosterSpots;
 
-    public $currentSeasonTotalSalary;
-
     public $seasonRecord;
 
     const SOFT_CAP_MAX = 5000;
@@ -64,11 +62,25 @@ class Team
     {
         ($teamID) ? $teamID : $teamID = League::FREE_AGENTS_TEAMID;
 
-        $query = "SELECT *
+        $query = "SELECT
+            *,
+            (SELECT COUNT(*)
+                FROM ibl_plr
+                WHERE teamname = '$this->name'
+                  AND retired = '0'
+                  AND ordinal <= '960'
+            ) AS numberOfPlayers,
+            (SELECT COUNT(*)
+                FROM ibl_plr
+                WHERE teamname = '$this->name'
+                  AND retired = '0'
+                  AND ordinal <= '960'
+                  AND injured = '0'
+            ) AS numberOfHealthyPlayers
             FROM ibl_team_info
                 LEFT JOIN ibl_standings
                 ON ibl_team_info.teamid = ibl_standings.tid
-            WHERE teamid = $teamID
+            WHERE ibl_team_info.teamid = $teamID
             LIMIT 1;";
         $result = $db->sql_query($query);
         $teamRow = $db->sql_fetch_assoc($result);
@@ -77,7 +89,14 @@ class Team
 
     protected function loadByName($db, string $name)
     {
-        $query = "SELECT *
+        $query = "SELECT
+            *,
+            (SELECT COUNT(*)
+                FROM ibl_plr
+                WHERE teamname = '$this->name'
+                  AND retired = '0'
+                  AND ordinal <= '960'
+            ) AS numberOfPlayers
             FROM ibl_team_info
                 LEFT JOIN ibl_standings
                 ON ibl_team_info.teamid = ibl_standings.tid
@@ -110,12 +129,10 @@ class Team
         $this->hasMLE = $teamRow['HasMLE'];
         $this->hasLLE = $teamRow['HasLLE'];
 
-        $this->numberOfPlayers = $this->db->sql_numrows($this->getHealthyAndInjuredPlayersOrderedByNameResult());
-        $this->numberOfHealthyPlayers = $this->db->sql_numrows($this->getHealthyPlayersOrderedByNameResult());
+        $this->numberOfPlayers = $teamRow['numberOfPlayers'];
+        $this->numberOfHealthyPlayers = $teamRow['numberOfHealthyPlayers'];
         $this->numberOfOpenRosterSpots = 15 - $this->numberOfPlayers;
         $this->numberOfHealthyOpenRosterSpots = 15 - $this->numberOfHealthyPlayers;
-
-        $this->currentSeasonTotalSalary = $this->getTotalCurrentSeasonSalariesFromPlrResult($this->getRosterUnderContractOrderedByNameResult());
 
         $this->seasonRecord = $teamRow['leagueRecord'];
     }

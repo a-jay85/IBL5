@@ -22,7 +22,7 @@ OpenTable();
 $i = 0;
 while ($i < $numberOfTeams) {
     $teamRow = $db->sql_fetch_assoc($resultTeamInfo);
-    $team = Team::withTeamRow($db, $teamRow);
+    $team = Team::initialize($db, $teamRow);
 
     $positions = ['PG', 'SG', 'SF', 'PF', 'C'];
     foreach ($positions as $position) {

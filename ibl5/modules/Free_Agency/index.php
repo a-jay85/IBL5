@@ -59,7 +59,7 @@ function display()
 
     $username = $cookie[1];
     $teamName = $sharedFunctions->getTeamnameFromUsername($username);
-    $team = Team::withTeamName($db, $teamName);
+    $team = Team::initialize($db, $teamName);
 
     UI::displaytopmenu($db, $team->teamID);
 

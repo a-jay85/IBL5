@@ -72,7 +72,7 @@ function showpage($playerID, $spec)
     // RENEGOTIATION BUTTON START
 
     $userTeamName = $sharedFunctions->getTeamnameFromUsername($cookie[1]);
-    $userTeam = Team::withTeamName($db, $userTeamName);
+    $userTeam = Team::initialize($db, $userTeamName);
 
     if ($player->wasRookieOptioned()) {
         echo "<table align=right bgcolor=#ff0000>

@@ -21,7 +21,7 @@ class UI
         if (!$teamID) {
             $teamID = League::FREE_AGENTS_TEAMID;
         }
-        $team = Team::withTeamID($db, $teamID);
+        $team = Team::initialize($db, $teamID);
 
         echo "<center><table width=400 border=0><tr>";
 

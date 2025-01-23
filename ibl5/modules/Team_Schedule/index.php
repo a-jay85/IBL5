@@ -22,36 +22,36 @@ $wins = $losses = $winStreak = $lossStreak = 0;
 $teamSchedule = Schedule\TeamSchedule::getSchedule($db, $userTeam->teamID);
 $seasonRecords = $season->getSeasonRecordsArray();
 
-$teamScheduleRows = array();
+$rows = array();
 $lastMonthIteratedOver = "";
 $i = 0;
 foreach ($teamSchedule as $row) {
-    $teamScheduleRows[$i]['game'] = new Game($row);
-    $teamScheduleRows[$i]['currentMonthBeingIteratedOver'] = strval($teamScheduleRows[$i]['game']->dateObject->format('F'));
-    $teamScheduleRows[$i]['opposingTeam'] = Team::initialize($db, $teamScheduleRows[$i]['game']->getOpposingTeamID($userTeamID));
-    $teamScheduleRows[$i]['opponentText'] = $teamScheduleRows[$i]['game']->getUserTeamLocationPrefix($userTeamID) . " " . $teamScheduleRows[$i]['opposingTeam']->name . " (" . $teamScheduleRows[$i]['opposingTeam']->seasonRecord . ")";
-    $teamScheduleRows[$i]['highlight'] = "";
-    if ($teamScheduleRows[$i]['game']->isUnplayed) {
-        $teamScheduleRows[$i]['highlight'] = ($teamScheduleRows[$i]['game']->dateObject <= $season->projectedNextSimEndDate) ? "bgcolor=#DDDD00" : "";
+    $rows[$i]['game'] = new Game($row);
+    $rows[$i]['currentMonthBeingIteratedOver'] = strval($rows[$i]['game']->dateObject->format('F'));
+    $rows[$i]['opposingTeam'] = Team::initialize($db, $rows[$i]['game']->getOpposingTeamID($userTeamID));
+    $rows[$i]['opponentText'] = $rows[$i]['game']->getUserTeamLocationPrefix($userTeamID) . " " . $rows[$i]['opposingTeam']->name . " (" . $rows[$i]['opposingTeam']->seasonRecord . ")";
+    $rows[$i]['highlight'] = "";
+    if ($rows[$i]['game']->isUnplayed) {
+        $rows[$i]['highlight'] = ($rows[$i]['game']->dateObject <= $season->projectedNextSimEndDate) ? "bgcolor=#DDDD00" : "";
     } else {
-        if ($userTeamID == $teamScheduleRows[$i]['game']->winningTeamID) {
-            $teamScheduleRows[$i]['gameResult'] = "W";
+        if ($userTeamID == $rows[$i]['game']->winningTeamID) {
+            $rows[$i]['gameResult'] = "W";
             $wins++;
             $winstreak++;
-            $teamScheduleRows[$i]['winStreak'] = $winstreak;
-            $lossStreak = $teamScheduleRows[$i]['lossStreak'] = 0;
-            $teamScheduleRows[$i]['winlosscolor'] = "green";
+            $rows[$i]['winStreak'] = $winstreak;
+            $lossStreak = $rows[$i]['lossStreak'] = 0;
+            $rows[$i]['winlosscolor'] = "green";
         } else {
-            $teamScheduleRows[$i]['gameResult'] = "L";
+            $rows[$i]['gameResult'] = "L";
             $losses++;
             $lossStreak++;
-            $teamScheduleRows[$i]['lossStreak'] = $lossStreak;
-            $winstreak = $teamScheduleRows[$i]['winStreak'] = 0;
-            $teamScheduleRows[$i]['winlosscolor'] = "red";
+            $rows[$i]['lossStreak'] = $lossStreak;
+            $winstreak = $rows[$i]['winStreak'] = 0;
+            $rows[$i]['winlosscolor'] = "red";
         }
-        $teamScheduleRows[$i]['wins'] = $wins;
-        $teamScheduleRows[$i]['losses'] = $losses;
-        $teamScheduleRows[$i]['streak'] = ($teamScheduleRows[$i]['winStreak'] > $teamScheduleRows[$i]['lossStreak']) ? "W " . $teamScheduleRows[$i]['winStreak'] : "L " . $teamScheduleRows[$i]['lossStreak'];
+        $rows[$i]['wins'] = $wins;
+        $rows[$i]['losses'] = $losses;
+        $rows[$i]['streak'] = ($rows[$i]['winStreak'] > $rows[$i]['lossStreak']) ? "W " . $rows[$i]['winStreak'] : "L " . $rows[$i]['lossStreak'];
     }
 
     $i++;
@@ -79,7 +79,7 @@ foreach ($teamSchedule as $row) {
         </tr>
 
 <?php $lastMonthIteratedOver = "" ?>
-<?php foreach ($teamScheduleRows as $row) : ?>
+<?php foreach ($rows as $row) : ?>
     <?php if ($row["currentMonthBeingIteratedOver"] !== $lastMonthIteratedOver) : ?>
         <tr bgcolor=<?= $userTeam->color1 ?> style="font-weight:bold; color:#<?= $userTeam->color2 ?>; text-align:center;">
             <td colspan=7><?= $row["currentMonthBeingIteratedOver"] ?></td>

@@ -27,9 +27,12 @@ $lastMonthIteratedOver = "";
 $i = 0;
 foreach ($teamSchedule as $row) {
     $rows[$i]['game'] = new Game($row);
+
     $rows[$i]['currentMonthBeingIteratedOver'] = strval($rows[$i]['game']->dateObject->format('F'));
+
     $rows[$i]['opposingTeam'] = Team::initialize($db, $rows[$i]['game']->getOpposingTeamID($userTeamID));
     $rows[$i]['opponentText'] = $rows[$i]['game']->getUserTeamLocationPrefix($userTeamID) . " " . $rows[$i]['opposingTeam']->name . " (" . $rows[$i]['opposingTeam']->seasonRecord . ")";
+    
     $rows[$i]['highlight'] = "";
     if ($rows[$i]['game']->isUnplayed) {
         $rows[$i]['highlight'] = ($rows[$i]['game']->dateObject <= $season->projectedNextSimEndDate) ? "bgcolor=#DDDD00" : "";

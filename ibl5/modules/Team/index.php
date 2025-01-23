@@ -163,7 +163,7 @@ function team($tid)
     }
     $tabs .= "<a href=\"modules.php?name=Team&op=team&tid=$tid&display=contracts$insertyear\">Contracts</a></td>";
 
-    if ($tid != 0 AND $yr == "") {
+    if ($tid > 0 AND $yr == "") {
         $starters_table = lastSimsStarters($db, $result, $team->color1, $team->color2);
     }
 

@@ -164,7 +164,7 @@ function team($tid)
     $tabs .= "<a href=\"modules.php?name=Team&op=team&tid=$tid&display=contracts$insertyear\">Contracts</a></td>";
 
     if ($tid > 0 AND $yr == "") {
-        $starters_table = lastSimsStarters($db, $result, $team->color1, $team->color2);
+        $starters_table = lastSimsStarters($db, $result, $team);
     }
 
     $table_draftpicks = draftPicks($db, $team->name);
@@ -205,7 +205,7 @@ function team($tid)
     Nuke\Footer::footer();
 }
 
-function lastSimsStarters($db, $result, $color1, $color2)
+function lastSimsStarters($db, $result, $team)
 {
     $num = $db->sql_numrows($result);
     $i = 0;
@@ -234,8 +234,8 @@ function lastSimsStarters($db, $result, $color1, $color2)
     }
 
     $starters_table = "<table align=\"center\" border=1 cellpadding=1 cellspacing=1>
-        <tr bgcolor=$color1>
-            <td colspan=5><font color=$color2><center><b>Last Sim's Starters</b></center></font></td>
+        <tr bgcolor=$team->color1>
+            <td colspan=5><font color=$team->color2><center><b>Last Sim's Starters</b></center></font></td>
         </tr>
         <tr>
             <td><center><b>PG</b><br><img src=\"./images/player/$startingPGpid.jpg\" height=\"90\" width=\"65\"><br><a href=\"./modules.php?name=Player&pa=showpage&pid=$startingPGpid\">$startingPG</a></td>

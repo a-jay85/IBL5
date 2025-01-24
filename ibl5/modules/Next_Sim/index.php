@@ -45,10 +45,13 @@ foreach ($resultUserTeamProjectedGamesNextSim as $gameRow) {
 <center>
     <h1>Next Sim</h1>
 
-    <table>
+    <table width=400 align=center>
         <?php for ($i = 0; $i < Sim::LENGTH_IN_DAYS; $i++) : ?>
             <tr>
-                <td><?= $rows[$i]['game']->date . $rows[$i]['opposingTeam']->name ?></td>
+                <td style="text-align: center;">
+                    <h2><?= $rows[$i]['game']->date ?></h2>
+                    <img src="./images/logo/<?= $rows[$i]['opposingTeam']->teamID ?>.jpg">
+                </td>
             </tr>
         <?php endfor; ?>
     </table>

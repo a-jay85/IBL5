@@ -46,7 +46,11 @@ foreach ($resultUserTeamProjectedGamesNextSim as $gameRow) {
     <h1>Next Sim</h1>
 
     <table>
-        <tr></tr>
+        <?php for ($i = 0; $i <= Sim::LENGTH_IN_DAYS; $i++) : ?>
+            <tr>
+                <td><?= $rows[$i]['game']->date . $rows[$i]['opposingTeam']->name ?></td>
+            </tr>
+        <?php endfor; ?>
     </table>
 
 <?php

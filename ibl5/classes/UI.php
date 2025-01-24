@@ -2,20 +2,6 @@
 
 class UI
 {
-    public static function decoratePlayerName($player)
-    {
-        if ($player->teamID == 0) {
-            $playerNameDecorated = "$player->name";
-        } elseif ($player->ordinal >= 960) { // on waivers
-            $playerNameDecorated = "($player->name)*";
-        } elseif ($player->contractCurrentYear == $player->contractTotalYears) { // eligible for Free Agency at the end of this season
-            $playerNameDecorated = "$player->name^";
-        } else {
-            $playerNameDecorated = "$player->name";
-        }
-        return $playerNameDecorated;
-    }
-
     public static function displaytopmenu($db, $teamID)
     {
         if (!$teamID) {
@@ -120,8 +106,6 @@ class UI
         foreach ($result as $plrRow) {
             $player = Player::withPlrRow($db, $plrRow);
     
-            $playerNameDecorated = UI::decoratePlayerName($player);
-    
             if ($sharedFunctions->isFreeAgencyModuleActive() == 0) {
                 $year1 = $player->contractCurrentYear;
                 $year2 = $player->contractCurrentYear + 1;
@@ -158,7 +142,7 @@ class UI
             $table_contracts .= "
                 <tr bgcolor=$bgcolor>
                 <td align=center>$player->position</td>
-                <td colspan=2><a href=\"./modules.php?name=Player&pa=showpage&pid=$player->playerID\">$playerNameDecorated</a></td>
+                <td colspan=2><a href=\"./modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->decoratedName</a></td>
                 <td align=center>$player->age</td>
                 <td align=center>$player->yearsOfExperience</td>
                 <td align=center>$player->birdYears</td>
@@ -268,16 +252,12 @@ class UI
                 $playerStats = PlayerStats::withPlrRow($db, $plrRow);
 
                 $firstCharacterOfPlayerName = substr($player->name, 0, 1); // if player name starts with '|' (pipe symbol), then skip them
-                if ($firstCharacterOfPlayerName !== '|') {
-                    $playerNameDecorated = UI::decoratePlayerName($player);
-                } else {
+                if ($firstCharacterOfPlayerName == '|') {
                     continue;
                 }
             } else {
                 $player = Player::withHistoricalPlrRow($db, $plrRow);
                 $playerStats = PlayerStats::withHistoricalPlrRow($db, $plrRow);
-
-                $playerNameDecorated = $player->name;
             }
     
             $stats_fgm = ($playerStats->seasonMinutes != 0) ? number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonFieldGoalsMade), 1) : "0.0";
@@ -304,7 +284,7 @@ class UI
         
             $table_per36Minutes .= "<tr bgcolor=$bgcolor>
                 <td>$player->position</td>
-                <td colspan=3><a href=\"modules.php?name=Player&pa=showpage&pid=$player->playerID\">$playerNameDecorated</a></td>
+                <td colspan=3><a href=\"modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->decoratedName</a></td>
                 <td><center>$playerStats->seasonGamesPlayed</center></td>
                 <td><center>$playerStats->seasonGamesStarted</center></td>
                 <td><center>$stats_mpg</center></td>
@@ -392,15 +372,11 @@ class UI
                 $player = Player::withPlrRow($db, $plrRow);
 
                 $firstCharacterOfPlayerName = substr($player->name, 0, 1); // if player name starts with '|' (pipe symbol), then skip them
-                if ($firstCharacterOfPlayerName !== '|') {
-                    $playerNameDecorated = UI::decoratePlayerName($player);
-                } else {
+                if ($firstCharacterOfPlayerName == '|') {
                     continue;
                 }
             } else {
                 $player = Player::withHistoricalPlrRow($db, $plrRow);
-                
-                $playerNameDecorated = $player->name;
             }
     
             $injuryInfo = $player->getInjuryReturnDate($season->lastSimEndDate);
@@ -412,7 +388,7 @@ class UI
 
             $table_ratings .= "<tr bgcolor=$bgcolor>
                 <td align=center>$player->position</td>
-                <td><a href=\"./modules.php?name=Player&pa=showpage&pid=$player->playerID\">$playerNameDecorated</a></td>
+                <td><a href=\"./modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->decoratedName</a></td>
                 <td align=center>$player->age</td>
                 <td bgcolor=$team->color1></td>
                 <td align=center>$player->ratingFieldGoalAttempts</td>
@@ -500,23 +476,19 @@ class UI
                 $playerStats = PlayerStats::withPlrRow($db, $plrRow);
 
                 $firstCharacterOfPlayerName = substr($player->name, 0, 1); // if player name starts with '|' (pipe symbol), then skip them
-                if ($firstCharacterOfPlayerName !== '|') {
-                    $playerNameDecorated = UI::decoratePlayerName($player);
-                } else {
+                if ($firstCharacterOfPlayerName == '|') {
                     continue;
                 }
             } else {
                 $player = Player::withHistoricalPlrRow($db, $plrRow);
                 $playerStats = PlayerStats::withHistoricalPlrRow($db, $plrRow);
-
-                $playerNameDecorated = $player->name;
             }
         
             (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
         
             $table_averages .= "<tr bgcolor=$bgcolor>
                 <td>$player->position</td>
-                <td colspan=3><a href=\"modules.php?name=Player&pa=showpage&pid=$player->playerID\">$playerNameDecorated</a></td>
+                <td colspan=3><a href=\"modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->decoratedName</a></td>
                 <td><center>$playerStats->seasonGamesPlayed</center></td>
                 <td><center>$playerStats->seasonGamesStarted</center></td>
                 <td><center>$playerStats->seasonMinutesPerGame</center></td>
@@ -657,23 +629,19 @@ class UI
                 $playerStats = PlayerStats::withPlrRow($db, $plrRow);
 
                 $firstCharacterOfPlayerName = substr($player->name, 0, 1); // if player name starts with '|' (pipe symbol), then skip them
-                if ($firstCharacterOfPlayerName !== '|') {
-                    $playerNameDecorated = UI::decoratePlayerName($player);
-                } else {
+                if ($firstCharacterOfPlayerName == '|') {
                     continue;
                 }
             } else {
                 $player = Player::withHistoricalPlrRow($db, $plrRow);
                 $playerStats = PlayerStats::withHistoricalPlrRow($db, $plrRow);
-
-                $playerNameDecorated = $player->name;
             }
         
             (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
     
             $table_totals .= "<tr bgcolor=$bgcolor>
                 <td>$player->position</td>
-                <td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$player->playerID\">$playerNameDecorated</a></td>
+                <td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->decoratedName</a></td>
                 <td><center>$playerStats->seasonGamesPlayed</center></td>
                 <td><center>$playerStats->seasonGamesStarted</center></td>
                 <td><center>$playerStats->seasonMinutes</center></td>

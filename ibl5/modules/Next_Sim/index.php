@@ -14,4 +14,21 @@ $pagetitle = "- $module_name";
 $username = $cookie[1];
 $userTeam = Team::initialize($db, $sharedFunctions->getTeamnameFromUsername($username));
 
-require "view.php";
+?>
+
+<?php
+    Nuke\Header::header();
+    OpenTable();
+?>
+
+<center>
+    <h1>Next Sim</h1>
+
+    <table>
+        <tr></tr>
+    </table>
+
+<?php
+    CloseTable();
+    Nuke\Footer::footer();
+?>

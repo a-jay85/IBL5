@@ -79,6 +79,8 @@ class Player
     public $isRetired;
 
     public $timeDroppedOnWaivers;
+    
+    public $decoratedName;
 
     public function __construct()
     {
@@ -191,6 +193,8 @@ class Player
         $this->isRetired = $plrRow['retired'];
     
         $this->timeDroppedOnWaivers = $plrRow['droptime'];
+
+        $this->decoratedName = $this->decoratePlayerName();
     }
 
     protected function fillHistorical($db, array $plrRow)
@@ -227,6 +231,22 @@ class Player
         $this->ratingTransitionDefense = $plrRow['r_td'];
 
         $this->salaryJSB = $plrRow['salary'];
+
+        $this->decoratedName = $this->name;
+    }
+
+    public function decoratePlayerName()
+    {
+        if ($this->teamID == 0) {
+            $decoratedName = "$this->name";
+        } elseif ($this->ordinal >= 960) { // on waivers
+            $decoratedName = "($this->name)*";
+        } elseif ($this->contractCurrentYear == $this->contractTotalYears) { // eligible for Free Agency at the end of this season
+            $decoratedName = "$this->name^";
+        } else {
+            $decoratedName = "$this->name";
+        }
+        return $decoratedName;
     }
 
     public function getCurrentSeasonSalary()

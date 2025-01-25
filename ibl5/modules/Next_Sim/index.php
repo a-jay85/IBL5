@@ -14,11 +14,11 @@ $pagetitle = "- $module_name";
 
 $username = $cookie[1];
 $userTeam = Team::initialize($db, $sharedFunctions->getTeamnameFromUsername($username));
-$userStartingPG = Player::withPlayerID($db, $userTeam->getLastSimStarterPlayerIDForPosition('PG') ?? 4040404);
-$userStartingSG = Player::withPlayerID($db, $userTeam->getLastSimStarterPlayerIDForPosition('SG') ?? 4040404);
-$userStartingSF = Player::withPlayerID($db, $userTeam->getLastSimStarterPlayerIDForPosition('SF') ?? 4040404);
-$userStartingPF = Player::withPlayerID($db, $userTeam->getLastSimStarterPlayerIDForPosition('PF') ?? 4040404);
-$userStartingC = Player::withPlayerID($db, $userTeam->getLastSimStarterPlayerIDForPosition('C') ?? 4040404);
+$userStartingPG = Player::withPlayerID($db, $userTeam->getCurrentlySetStarterPlayerIDForPosition('PG') ?? 4040404);
+$userStartingSG = Player::withPlayerID($db, $userTeam->getCurrentlySetStarterPlayerIDForPosition('SG') ?? 4040404);
+$userStartingSF = Player::withPlayerID($db, $userTeam->getCurrentlySetStarterPlayerIDForPosition('SF') ?? 4040404);
+$userStartingPF = Player::withPlayerID($db, $userTeam->getCurrentlySetStarterPlayerIDForPosition('PF') ?? 4040404);
+$userStartingC = Player::withPlayerID($db, $userTeam->getCurrentlySetStarterPlayerIDForPosition('C') ?? 4040404);
 
 $resultUserTeamProjectedGamesNextSim = Schedule\TeamSchedule::getProjectedGamesNextSimResult($db, $userTeam->teamID, $season->lastSimEndDate);
 

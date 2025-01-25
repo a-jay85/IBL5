@@ -53,6 +53,11 @@ foreach ($resultUserTeamProjectedGamesNextSim as $gameRow) {
                     <img src="./images/logo/<?= $rows[$i]['opposingTeam']->teamID ?>.jpg">
                 </td>
             </tr>
+            <tr>
+                <td>
+                    <?= UI::ratings($db, $rows[$i], $rows[$i]['opposingTeam'], "", $season) ?>
+                </td>
+            </tr>
         <?php endfor; ?>
     </table>
 

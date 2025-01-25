@@ -321,7 +321,7 @@ class UI
         return $table_per36Minutes;
     }
     
-    public static function ratings($db, $result, $team, $yr, $season)
+    public static function ratings($db, $data, $team, $yr, $season)
     {
         $table_ratings = "<table align=\"center\" class=\"sortable\">
             <colgroup span=2><colgroup span=2><colgroup span=6><colgroup span=6><colgroup span=4><colgroup span=4><colgroup span=1>
@@ -365,11 +365,17 @@ class UI
                 </tr>
             </thead>
         <tbody>";
-    
+
         $i = 0;
-        foreach ($result as $plrRow) {
+        foreach ($data as $plrRow) {
             if ($yr == "") {
-                $player = Player::withPlrRow($db, $plrRow);
+                if (is_object($data)) {
+                    $player = Player::withPlrRow($db, $plrRow);
+                } elseif ($plrRow instanceof Player) {
+                    $player = $plrRow;
+                } else {
+                    continue;
+                }
 
                 $firstCharacterOfPlayerName = substr($player->name, 0, 1); // if player name starts with '|' (pipe symbol), then skip them
                 if ($firstCharacterOfPlayerName == '|') {

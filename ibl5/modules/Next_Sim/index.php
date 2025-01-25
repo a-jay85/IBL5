@@ -27,10 +27,15 @@ foreach ($resultUserTeamProjectedGamesNextSim as $gameRow) {
     $rows[$i]['game'] = new Game($gameRow);
     $rows[$i]['opposingTeam'] = Team::initialize($db, $rows[$i]['game']->getOpposingTeamID($userTeam->teamID));
     $rows[$i]['opposingStartingPG'] = Player::withPlayerID($db, $rows[$i]['opposingTeam']->getLastSimStarterPlayerIDForPosition('PG') ?? 4040404);
+    $rows[$i]['userStartingPG'] = $userStartingPG ?? 4040404;
     $rows[$i]['opposingStartingSG'] = Player::withPlayerID($db, $rows[$i]['opposingTeam']->getLastSimStarterPlayerIDForPosition('SG') ?? 4040404);
+    $rows[$i]['userStartingSG'] = $userStartingSG ?? 4040404;
     $rows[$i]['opposingStartingSF'] = Player::withPlayerID($db, $rows[$i]['opposingTeam']->getLastSimStarterPlayerIDForPosition('SF') ?? 4040404);
+    $rows[$i]['userStartingSF'] = $userStartingSF ?? 4040404;
     $rows[$i]['opposingStartingPF'] = Player::withPlayerID($db, $rows[$i]['opposingTeam']->getLastSimStarterPlayerIDForPosition('PF') ?? 4040404);
+    $rows[$i]['userStartingPF'] = $userStartingPF ?? 4040404;
     $rows[$i]['opposingStartingC'] = Player::withPlayerID($db, $rows[$i]['opposingTeam']->getLastSimStarterPlayerIDForPosition('C') ?? 4040404);
+    $rows[$i]['userStartingC'] = $userStartingC ?? 4040404;
 
     $i++;
 }
@@ -45,7 +50,7 @@ foreach ($resultUserTeamProjectedGamesNextSim as $gameRow) {
 <center>
     <h1>Next Sim</h1>
 
-    <table width=400 align=center>
+    <table width=100% align=center>
         <?php for ($i = 0; $i < Sim::LENGTH_IN_DAYS; $i++) : ?>
             <tr>
                 <td style="text-align: center;">

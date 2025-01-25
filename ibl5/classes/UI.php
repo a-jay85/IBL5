@@ -371,8 +371,10 @@ class UI
             if ($yr == "") {
                 if (is_object($data)) {
                     $player = Player::withPlrRow($db, $plrRow);
+                    (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
                 } elseif ($plrRow instanceof Player) {
                     $player = $plrRow;
+                    (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "FFFFAA";
                 } else {
                     continue;
                 }
@@ -390,7 +392,12 @@ class UI
                 $injuryInfo .= " ($player->daysRemainingForInjury)";
             }
 
-            (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
+            if (($i % 2) == 0 AND $plrRow instanceof Player) {
+                $table_ratings .= "<tr>
+                <td colspan=55 bgcolor=$team->color1>
+                </td>
+                </tr>";
+            }
 
             $table_ratings .= "<tr bgcolor=$bgcolor>
                 <td align=center>$player->position</td>
@@ -429,7 +436,7 @@ class UI
                 <td bgcolor=$team->color1></td>
                 <td align=center>$injuryInfo</td>
             </tr>";
-    
+
             $i++;
         }
     

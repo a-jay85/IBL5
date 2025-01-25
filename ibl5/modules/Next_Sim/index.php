@@ -74,6 +74,7 @@ foreach ($resultUserTeamProjectedGamesNextSim as $gameRow) {
                     <?= UI::ratings($db, $rows[$i], $rows[$i]['opposingTeam'], "", $season) ?>
                 </td>
             </tr>
+            <tr style="height: 15px"></tr>
         <?php endfor; ?>
     </table>
 

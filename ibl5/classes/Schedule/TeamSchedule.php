@@ -19,7 +19,7 @@ class TeamSchedule extends Schedule
         $query = "SELECT *
             FROM `ibl_schedule`
             WHERE (Visitor = $teamID OR Home = $teamID)
-              AND Date BETWEEN '$lastSimEndDate' AND ADDDATE('$lastSimEndDate', " . \Sim::LENGTH_IN_DAYS . ")
+              AND Date BETWEEN ADDDATE('$lastSimEndDate', 1) AND ADDDATE('$lastSimEndDate', " . \Sim::LENGTH_IN_DAYS . ")
             ORDER BY Date ASC;";
         return $db->sql_query($query);
     }

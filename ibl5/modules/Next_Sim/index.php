@@ -81,4 +81,3 @@ foreach ($resultUserTeamProjectedGamesNextSim as $gameRow) {
 <?php
     CloseTable();
     Nuke\Footer::footer();
-?>

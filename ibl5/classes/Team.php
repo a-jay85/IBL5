@@ -185,6 +185,28 @@ class Team
         return $result;
     }
 
+    public function getLastSimStarterPlayerIDForPosition(string $position)
+    {
+        $query = "SELECT pid
+            FROM ibl_plr
+            WHERE tid = $this->teamID
+              AND retired = 0
+              AND " . $position . "Depth = 1";
+        $result = $this->db->sql_query($query);
+        return $this->db->sql_result($result, 0);
+    }
+
+    public function getCurrentlySetStarterPlayerIDForPosition(string $position)
+    {
+        $query = "SELECT pid
+            FROM ibl_plr
+            WHERE tid = $this->teamID
+              AND retired = 0
+              AND dc_" . $position . "Depth = 1";
+        $result = $this->db->sql_query($query);
+        return $this->db->sql_result($result, 0);
+    }
+
     public function getPlayersUnderContractByPositionResult($position)
     {
         $query = "SELECT * 

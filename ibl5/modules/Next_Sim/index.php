@@ -53,9 +53,20 @@ foreach ($resultUserTeamProjectedGamesNextSim as $gameRow) {
     <table width=100% align=center>
         <?php for ($i = 0; $i < Sim::LENGTH_IN_DAYS; $i++) : ?>
             <tr>
-                <td style="text-align: center;">
-                    <h2><?= $rows[$i]['game']->date ?></h2>
-                    <img src="./images/logo/<?= $rows[$i]['opposingTeam']->teamID ?>.jpg">
+                <td>
+                    <table align=center>
+                        <tr>
+                            <td style="text-align: right;" width=150>
+                                <h2><?= $rows[$i]['game']->date . ": " . $rows[$i]['game']->getUserTeamLocationPrefix($userTeam->teamID) ?></h2>
+                            </td>
+                            <td style="text-align: center; padding-left: 4px; padding-right: 4px">
+                                <img src="./images/logo/<?= $rows[$i]['opposingTeam']->teamID ?>.jpg">
+                            </td>
+                            <td style="text-align: left;" width=150>
+                                <h2><?= $rows[$i]['opposingTeam']->seasonRecord ?></h2>
+                            </td>
+                        </tr>
+                    </table>    
                 </td>
             </tr>
             <tr>

@@ -49,7 +49,9 @@ foreach ($resultUserTeamProjectedGamesNextSim as $gameRow) {
 
 <center>
     <h1>Next Sim</h1>
-
+<?php if (mysqli_num_rows($resultUserTeamProjectedGamesNextSim) == 0) : ?>
+    No games projected next sim!
+<?php else : ?>
     <table width=100% align=center>
         <?php for ($i = 0; $i < Sim::LENGTH_IN_DAYS; $i++) : ?>
             <tr>
@@ -77,7 +79,7 @@ foreach ($resultUserTeamProjectedGamesNextSim as $gameRow) {
             <tr style="height: 15px"></tr>
         <?php endfor; ?>
     </table>
-
+<?php endif ?>
 <?php
     CloseTable();
     Nuke\Footer::footer();

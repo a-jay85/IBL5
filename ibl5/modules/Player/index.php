@@ -2410,8 +2410,9 @@ function rookieoption($pid)
     $player = Player::withPlayerID($db, $pid);
 
     $userteam = $sharedFunctions->getTeamnameFromUsername($cookie[1]);
+    $userTeamID = $sharedFunctions->getTidFromTeamname($userteam);
 
-    if ($userteam != $player->teamName) {
+    if ($userTeamID != $player->teamID) {
         echo "$player->position $player->name is not on your team.<br>
             <a href=\"javascript:history.back()\">Go Back</a>";
         return;

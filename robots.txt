@@ -1,16 +1,5 @@
 User-agent: *
-Disallow: /admin.php
-Disallow: /admin/
-Disallow: /db/
-Disallow: /images/
-Disallow: /includes/
-Disallow: /install/
-Disallow: /themes/
-Disallow: /blocks/
-Disallow: /modules/
-Disallow: /language/
 Disallow: /ibl/
-Disallow: /IBL/
 Disallow: /ibl5/
 Disallow: /iblforum/
 Disallow: /previous-ibl-archive/

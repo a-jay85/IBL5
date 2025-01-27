@@ -213,7 +213,8 @@ class Team
             FROM ibl_plr
             WHERE teamname = '$this->name'
               AND pos = '$position'
-              AND cy1 != 0";
+              AND cy1 != 0
+              AND retired = 0";
         $result = $this->db->sql_query($query);
         return $result;
     }

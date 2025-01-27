@@ -72,18 +72,6 @@ class Season
         return $this->db->sql_result($querySeasonEndingYear, 0);
     }
 
-    public function getSeasonRecordsArray()
-    {
-        $query = "SELECT tid, leagueRecord
-            FROM ibl_standings
-            ORDER BY tid ASC;";
-        $result = $this->db->sql_query($query);
-        foreach ($result as $teamSeasonRecord) {
-            $seasonRecords[$teamSeasonRecord['tid']] = $teamSeasonRecord['leagueRecord'];
-        }
-        return $seasonRecords;
-    }
-
     public function getFirstBoxScoreDate()
     {
         $queryFirstBoxScoreDate = $this->db->sql_query("SELECT Date

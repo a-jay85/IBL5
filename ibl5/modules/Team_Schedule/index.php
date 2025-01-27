@@ -20,7 +20,6 @@ $wins = $losses = $winStreak = $lossStreak = 0;
 //TODO: unify this code with the Schedule module's chunk function
 
 $teamSchedule = Schedule\TeamSchedule::getSchedule($db, $userTeam->teamID);
-$seasonRecords = $season->getSeasonRecordsArray();
 
 $rows = array();
 $lastMonthIteratedOver = "";

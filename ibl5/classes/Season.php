@@ -21,6 +21,8 @@ class Season
     public $allowTrades;
     public $allowWaivers;
 
+    public $freeAgencyNotificationsState;
+
     const IBL_PRESEASON_MONTH = 9;
     const IBL_HEAT_MONTH = 10;
     const IBL_REGULAR_SEASON_STARTING_MONTH = 11;
@@ -50,6 +52,8 @@ class Season
 
         $this->allowTrades = $this->getAllowTradesStatus();
         $this->allowWaivers = $this->getAllowWaiversStatus();
+
+        $this->freeAgencyNotificationsState = $this->getFreeAgencyNotificationsState();
     }
 
     public function getSeasonPhase()
@@ -157,5 +161,15 @@ class Season
             LIMIT 1");
 
         return $this->db->sql_result($queryAllowWaiversStatus, 0);
+    }
+
+    public function getFreeAgencyNotificationsState()
+    {
+        $queryFreeAgencyNotificationsState = $this->db->sql_query("SELECT value
+            FROM ibl_settings
+            WHERE name = 'Free Agency Notifications'
+            LIMIT 1");
+
+        return $this->db->sql_result($queryFreeAgencyNotificationsState, 0);
     }
 }

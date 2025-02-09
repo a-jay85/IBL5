@@ -103,6 +103,12 @@ if (isset($_POST['query'])) {
             }
             $successText = "Waiver Wire Status has been set to {$_POST['Waivers']}.";
             break;
+        case 'Toggle Free Agency Notifications':
+            if (isset($_POST['FANotifs'])) {
+                $queryString = "UPDATE ibl_settings SET value = '{$_POST['FANotifs']}' WHERE name = 'Free Agency Notifications';";
+            }
+            $successText = "Free Agency Notifications are now {$_POST['FANotifs']}.";
+            break;
     }
 
     if ($queryString != NULL) {
@@ -116,6 +122,9 @@ if (isset($_POST['query'])) {
             }
             if (isset($_POST['Trades'])) {
                 $season->allowTrades = $_POST['Trades'];
+            }
+            if (isset($_POST['FANotifs'])) {
+                $season->freeAgencyNotificationsState = $_POST['FANotifs'];
             }
         } else {
             $querySuccessful = false;
@@ -198,7 +207,12 @@ switch ($season->phase) {
             <INPUT type='submit' name='query' value='Reset All MLEs/LLEs'><p>
             <INPUT type='submit' name='query' value='Set Free Agency factors for PFW'><p>
             <A HREF=\"tradition.php\">Set Free Agency factors for Tradition</A><p>
-            <INPUT type='submit' name='query' value='Set all players on waivers to Free Agents and reset their Bird years'><p>";
+            <INPUT type='submit' name='query' value='Set all players on waivers to Free Agents and reset their Bird years'><p>
+            <select name=\"FANotifs\">
+                <option value = \"On\"" . ($season->freeAgencyNotificationsState == "On" ? " SELECTED" : "") . ">On</option>
+                <option value = \"Off\"" . ($season->freeAgencyNotificationsState == "Off" ? " SELECTED" : "") . ">Off</option>
+            </select>
+            <INPUT type='submit' name='query' value='Toggle Free Agency Notifications'><p>";
         break;
 }
 

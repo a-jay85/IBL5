@@ -475,7 +475,10 @@ _**$player_teamName** GM <@!$playerTeamDiscordID> could not be reached for comme
         }
 
         if ($Offer_1 > 145) {
-            // Discord::postToChannel('#free-agency', $discordMessage);
+            $season = new Season($db);
+            if ($season->freeAgencyNotificationsState == "On") {
+                Discord::postToChannel('#free-agency', $discordMessage);
+            }
         }
 
         echo "Your offer is legal. It should be immediately reflected in your Free Agency module.<br>

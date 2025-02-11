@@ -219,7 +219,8 @@ function waiverexecute($username, $action)
                     }
                 }
                 $queryi .= "`teamname` = '$Team_Offering',
-                            `tid` = '$teamid'
+                            `tid` = '$teamid',
+                            `droptime` = 0
                     WHERE `pid` = '$Player_to_Process'
                     LIMIT 1;";
 

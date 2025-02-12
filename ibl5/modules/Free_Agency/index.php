@@ -1628,7 +1628,6 @@ function negotiate($pid)
 		<li>The first year of the contract must be at least the veteran's minimum ($vetmin for this player).</li>
 		<li><b>For Players who do not have Bird Rights with your team:</b> You may add no more than 10% of your the amount you offer in the first year as a raise between years (for instance, if you offer 500 in Year 1, you cannot offer a raise of more than 50 between any two subsequent years.)</li>
 		<li><b>Bird Rights Player on Your Team:</b> You may add no more than 12.5% of your the amount you offer in the first year as a raise between years (for instance, if you offer 500 in Year 1, you cannot offer a raise of more than 62 between any two subsequent years.)</li>
-		<li>For reference, \"100\" entered in the fields above corresponds to 1 million dollars; e.g. a 50 million dollar soft cap thus means you have 5000 to play with.</li>
 		</ul></td></tr>
 		</table>
 

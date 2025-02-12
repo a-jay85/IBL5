@@ -22,7 +22,7 @@ if (isset($_POST['query'])) {
             $resultHEATEntriesAlreadyExist = $db->sql_query($queryHEATEntriesAlreadyExist);
 
             if ($db->sql_numrows($resultHEATEntriesAlreadyExist) == 0) {
-                $queryTeamNames = "SELECT team_name FROM ibl_team_info WHERE teamid != " . JSB::FREE_AGENTS_TEAMID . " ORDER BY teamid ASC;";
+                $queryTeamNames = "SELECT team_name FROM ibl_team_info WHERE teamid != " . League::FREE_AGENTS_TEAMID . " ORDER BY teamid ASC;";
                 $resultTeamNames = $db->sql_query($queryTeamNames);
                 $numTeamNames = $db->sql_numrows($resultTeamNames);
     

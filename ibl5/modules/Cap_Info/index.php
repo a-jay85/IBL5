@@ -62,7 +62,7 @@ while ($i < $numberOfTeams) {
 		</td>";
 
     if (!$isFreeAgencyModuleActive) {
-         $table_echo .= "<td align=center>" . (Team::HARD_CAP_MAX - $teamCurrentSeasonTotalSalary) . "</td>";
+         $table_echo .= "<td align=center>" . (League::HARD_CAP_MAX - $teamCurrentSeasonTotalSalary) . "</td>";
     }
 
     $table_echo .= "

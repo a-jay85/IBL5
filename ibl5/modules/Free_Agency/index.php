@@ -223,7 +223,7 @@ function display()
                 echo "<a href=\"modules.php?name=Player&pa=rookieoption&pid=$player->playerID\">Rookie Option</a>";
             }
 
-            if ($player->ordinal > 960) {
+            if ($player->ordinal > JSB::WAIVERS_ORDINAL) {
                 $player->name .= "*";
             }
 
@@ -995,7 +995,7 @@ function negotiate($pid)
             $capnumber -= $capcy6;
         }
 
-        if ($capcy != $capcyt && $ordinal <= 960) {
+        if ($capcy != $capcyt && $ordinal <= JSB::WAIVERS_ORDINAL) {
             $rosterspots -= 1;
         }
 

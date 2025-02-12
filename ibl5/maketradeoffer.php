@@ -99,11 +99,11 @@ echo "Their Payroll this season, if this trade is accepted: $partnerPostTradeCap
 
 $error = 0;
 
-if ($userPostTradeCapTotal > 7000) {
+if ($userPostTradeCapTotal > League::HARD_CAP_MAX) {
     echo "This trade is illegal since it puts you over the hard cap.";
     $error = 1;
 }
-if ($partnerPostTradeCapTotal > 7000) {
+if ($partnerPostTradeCapTotal > League::HARD_CAP_MAX) {
     echo "This trade is illegal since it puts other team over the hard cap.";
     $error = 1;
 }

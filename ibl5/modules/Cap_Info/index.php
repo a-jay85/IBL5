@@ -40,12 +40,12 @@ while ($i < $numberOfTeams) {
     $team_array = get_salary($team->teamID);
     $team_array1 = get_salary1($team->teamID);
 
-    $teamTotalSalaryYear1[$i] = 7000 - $team_array[1]["salary"];
-    $teamTotalSalaryYear2[$i] = 7000 - $team_array[2]["salary"];
-    $teamTotalSalaryYear3[$i] = 7000 - $team_array[3]["salary"];
-    $teamTotalSalaryYear4[$i] = 7000 - $team_array[4]["salary"];
-    $teamTotalSalaryYear5[$i] = 7000 - $team_array[5]["salary"];
-    $teamTotalSalaryYear6[$i] = 7000 - $team_array[6]["salary"];
+    $teamTotalSalaryYear1[$i] = League::HARD_CAP_MAX - $team_array[1]["salary"];
+    $teamTotalSalaryYear2[$i] = League::HARD_CAP_MAX - $team_array[2]["salary"];
+    $teamTotalSalaryYear3[$i] = League::HARD_CAP_MAX - $team_array[3]["salary"];
+    $teamTotalSalaryYear4[$i] = League::HARD_CAP_MAX - $team_array[4]["salary"];
+    $teamTotalSalaryYear5[$i] = League::HARD_CAP_MAX - $team_array[5]["salary"];
+    $teamTotalSalaryYear6[$i] = League::HARD_CAP_MAX - $team_array[6]["salary"];
 
     $teamFreeAgencySlots[$i] = $teamFreeAgencySlots[$i] - $team_array1[1]["roster"];
 

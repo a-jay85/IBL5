@@ -118,7 +118,7 @@ function waiverexecute($username, $action)
         $player_exp = $db->sql_result($waiverresult, 0, "exp");
 
         if ($Type_Of_Action == 'drop') {
-            if ($Roster_Slots > 2 and $TotalSalary > 7000) { // TODO: Change 7000 to hard cap variable
+            if ($Roster_Slots > 2 and $TotalSalary > League::HARD_CAP_MAX) {
                 $errortext = "You have 12 players and are over $70 mill hard cap.  Therefore you can't drop a player!";
             } else {
                 $queryi = "UPDATE ibl_plr SET `ordinal` = '1000', `droptime` = '$Timestamp' WHERE `pid` = '$Player_to_Process' LIMIT 1;";
@@ -193,9 +193,9 @@ function waiverexecute($username, $action)
 
             if ($Player_to_Process == NULL OR $Player_to_Process == "") {
                 $errortext = "You didn't select a valid player. Please select a player and try again.";
-            } elseif ($Healthy_Roster_Slots < 4 and $TotalSalary + $cy1 > 7000) { // TODO: Change 7000 to hard cap variable
+            } elseif ($Healthy_Roster_Slots < 4 and $TotalSalary + $cy1 > League::HARD_CAP_MAX) {
                 $errortext = "You have 12 or more healthy players and this signing will put you over $70 million. Therefore you cannot make this signing.";
-            } elseif ($Healthy_Roster_Slots > 3 and $TotalSalary + $cy1 > 7000 and $cy1 > 103) { // TODO: Change 7000 to hard cap variable
+            } elseif ($Healthy_Roster_Slots > 3 and $TotalSalary + $cy1 > League::HARD_CAP_MAX and $cy1 > 103) {
                 $errortext = "You are over the hard cap and therefore can only sign players who are making veteran minimum!";
             } elseif ($Healthy_Roster_Slots < 1) {
                 $errortext = "You have full roster of 15 players. You can't sign another player at this time!";

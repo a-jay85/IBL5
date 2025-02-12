@@ -239,7 +239,7 @@ class Player
     {
         if ($this->teamID == 0) {
             $decoratedName = "$this->name";
-        } elseif ($this->ordinal >= 960) { // on waivers
+        } elseif ($this->ordinal > JSB::WAIVERS_ORDINAL) {
             $decoratedName = "($this->name)*";
         } elseif ($this->contractCurrentYear == $this->contractTotalYears) { // eligible for Free Agency at the end of this season
             $decoratedName = "$this->name^";

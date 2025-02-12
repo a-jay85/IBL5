@@ -29,7 +29,6 @@ class Season
     const IBL_ALL_STAR_MONTH = 02;
     const IBL_REGULAR_SEASON_ENDING_MONTH = 05;
     const IBL_PLAYOFF_MONTH = 06;
-    const JSB_PLAYOFF_MONTH = 22;
 
     public function __construct($db)
     {

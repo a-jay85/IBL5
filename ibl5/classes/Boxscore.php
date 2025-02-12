@@ -119,9 +119,9 @@ class Boxscore
         $this->homeOTpoints = substr($gameInfoLine, 55, 3);
 
         $seasonStartingYear = $seasonEndingYear - 1;
-        if ($this->gameMonth > 12 and $this->gameMonth != Season::JSB_PLAYOFF_MONTH) {
+        if ($this->gameMonth > 12 and $this->gameMonth != JSB::PLAYOFF_MONTH) {
             $this->gameMonth = sprintf("%02u", $this->gameMonth - 12);
-        } elseif ($this->gameMonth == Season::JSB_PLAYOFF_MONTH) {
+        } elseif ($this->gameMonth == JSB::PLAYOFF_MONTH) {
             $this->gameMonth = sprintf("%02u", $this->gameMonth - 16); // This hacks the Playoffs to be in "June"
         } elseif ($this->gameMonth > 10) {
             $this->gameYear = $seasonStartingYear;

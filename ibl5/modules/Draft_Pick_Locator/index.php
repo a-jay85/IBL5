@@ -2,7 +2,7 @@
 
 $season = new Season($db);
 
-$query = "SELECT * FROM ibl_team_info WHERE teamid != " . League::FREE_AGENTS_TEAMID . " ORDER BY teamid ASC";
+$query = "SELECT * FROM ibl_team_info WHERE teamid != " . JSB::FREE_AGENTS_TEAMID . " ORDER BY teamid ASC";
 $result = $db->sql_query($query);
 $num = $db->sql_numrows($result);
 

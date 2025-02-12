@@ -13,7 +13,7 @@ get_lang($module_name);
 
 Nuke\Header::header();
 
-$queryTeamInfo = "SELECT * FROM ibl_team_info WHERE teamid != " . League::FREE_AGENTS_TEAMID . " ORDER BY teamid ASC";
+$queryTeamInfo = "SELECT * FROM ibl_team_info WHERE teamid != " . JSB::FREE_AGENTS_TEAMID . " ORDER BY teamid ASC";
 $resultTeamInfo = $db->sql_query($queryTeamInfo);
 $numberOfTeams = $db->sql_numrows($resultTeamInfo);
 

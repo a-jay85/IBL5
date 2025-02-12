@@ -52,8 +52,8 @@ while ($i < $numberOfActiveTeamAccounts) {
         WHERE teamname = '$teamname'
         AND retired = '0'
         AND injured < 7
-        AND ordinal < 960
-        AND name NOT LIKE '%|%'"; // "ordinal < 960" excludes waived players from this query
+        AND ordinal <= " . JSB::WAIVERS_ORDINAL . "
+        AND name NOT LIKE '%|%'";
     $resultHealthyPlayersOnTeam = $db->sql_query($queryHealthyPlayersOnTeam);
     $numberOfHealthyPlayersOnTeam = $db->sql_numrows($resultHealthyPlayersOnTeam);
 

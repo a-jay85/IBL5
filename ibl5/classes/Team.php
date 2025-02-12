@@ -46,7 +46,7 @@ class Team
 
     protected function load($db, $identifier)
     {
-        ($identifier) ? $identifier : $identifier = League::FREE_AGENTS_TEAMID;
+        ($identifier) ? $identifier : $identifier = JSB::FREE_AGENTS_TEAMID;
 
         if (is_numeric($identifier)) {
             $whereCondition = "tid = '$identifier'";

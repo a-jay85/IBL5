@@ -30,7 +30,7 @@ $query2 = "SELECT *,
 	ROUND((SUM(ibl_team_win_loss.wins) / (SUM(ibl_team_win_loss.wins) + SUM(ibl_team_win_loss.losses))), 3) as five_season_winpct
 FROM ibl_team_history
 INNER JOIN ibl_team_win_loss ON ibl_team_win_loss.currentname = ibl_team_history.team_name
-WHERE teamid != " . JSB::FREE_AGENTS_TEAMID . "
+WHERE teamid != " . League::FREE_AGENTS_TEAMID . "
 AND year BETWEEN $fiveSeasonsAgoEndingYear AND $season->endingYear
 GROUP BY currentname
 ORDER BY teamid ASC;";

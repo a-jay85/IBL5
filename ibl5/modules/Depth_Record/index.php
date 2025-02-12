@@ -20,7 +20,7 @@ $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 Nuke\Header::header();
 
-$query2 = "SELECT * FROM ibl_team_history WHERE teamid != " . JSB::FREE_AGENTS_TEAMID . " ORDER BY teamid ASC";
+$query2 = "SELECT * FROM ibl_team_history WHERE teamid != " . League::FREE_AGENTS_TEAMID . " ORDER BY teamid ASC";
 $result2 = $db->sql_query($query2);
 $num2 = $db->sql_numrows($result2);
 

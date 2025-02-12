@@ -13,6 +13,8 @@ class League
     const SOFT_CAP_MAX = 5000;
     const HARD_CAP_MAX = 7000;
 
+    const FREE_AGENTS_TEAMID = 35;
+
     public function __construct($db)
     {
         $this->db = $db;
@@ -113,7 +115,7 @@ class League
     {
         $query = "SELECT owner_name, team_city, team_name
             FROM ibl_team_info
-            WHERE teamid != " . JSB::FREE_AGENTS_TEAMID . "
+            WHERE teamid != " . League::FREE_AGENTS_TEAMID . "
             ORDER BY owner_name";
         $result = $this->db->sql_query($query);
         return $result;

@@ -441,17 +441,17 @@ function display()
     // ==== END INSERT OF PLAYERS WITH OFFERS
 
     $year1AvailableSoftCap = League::SOFT_CAP_MAX - $year1TotalSalary;
-    $year1AvailableHardCap = Team::HARD_CAP_MAX - $year1TotalSalary;
+    $year1AvailableHardCap = League::HARD_CAP_MAX - $year1TotalSalary;
     $year2AvailableSoftCap = League::SOFT_CAP_MAX - $year2TotalSalary;
-    $year2AvailableHardCap = Team::HARD_CAP_MAX - $year2TotalSalary;
+    $year2AvailableHardCap = League::HARD_CAP_MAX - $year2TotalSalary;
     $year3AvailableSoftCap = League::SOFT_CAP_MAX - $year3TotalSalary;
-    $year3AvailableHardCap = Team::HARD_CAP_MAX - $year3TotalSalary;
+    $year3AvailableHardCap = League::HARD_CAP_MAX - $year3TotalSalary;
     $year4AvailableSoftCap = League::SOFT_CAP_MAX - $year4TotalSalary;
-    $year4AvailableHardCap = Team::HARD_CAP_MAX - $year4TotalSalary;
+    $year4AvailableHardCap = League::HARD_CAP_MAX - $year4TotalSalary;
     $year5AvailableSoftCap = League::SOFT_CAP_MAX - $year5TotalSalary;
-    $year5AvailableHardCap = Team::HARD_CAP_MAX - $year5TotalSalary;
+    $year5AvailableHardCap = League::HARD_CAP_MAX - $year5TotalSalary;
     $year6AvailableSoftCap = League::SOFT_CAP_MAX - $year6TotalSalary;
-    $year6AvailableHardCap = Team::HARD_CAP_MAX - $year6TotalSalary;
+    $year6AvailableHardCap = League::HARD_CAP_MAX - $year6TotalSalary;
 
     // ===== CAP AND ROSTER SLOT INFO =====
 

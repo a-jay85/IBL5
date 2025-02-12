@@ -9,8 +9,9 @@ class League
 
     const ALL_STAR_BACKCOURT_POSITIONS = "'PG', 'SG'";
     const ALL_STAR_FRONTCOURT_POSITIONS = "'C', 'SF', 'PF'";
-    
+
     const SOFT_CAP_MAX = 5000;
+    const HARD_CAP_MAX = 7000;
 
     public function __construct($db)
     {

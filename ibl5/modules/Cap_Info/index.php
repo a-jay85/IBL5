@@ -24,8 +24,7 @@ while ($i < $numberOfTeams) {
     $teamRow = $db->sql_fetch_assoc($resultTeamInfo);
     $team = Team::initialize($db, $teamRow);
 
-    $positions = ['PG', 'SG', 'SF', 'PF', 'C'];
-    foreach ($positions as $position) {
+    foreach (JSB::PLAYER_POSITIONS as $position) {
         ${"team" . $position . "sResult"} = $team->getPlayersUnderContractByPositionResult($position);
         ${"teamTotal" . $position . "NextSeasonSalary"} = $team->getTotalNextSeasonSalariesFromPlrResult(${"team" . $position . "sResult"});
     }

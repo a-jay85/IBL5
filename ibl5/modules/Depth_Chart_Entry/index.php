@@ -88,7 +88,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
     $result7 = $db->sql_query($sql7);
     $num7 = $db->sql_numrows($result7);
 
-    $queryPlayersOnTeam = "SELECT * FROM ibl_plr WHERE teamname = '$teamlogo' AND tid = $tid AND retired = '0' AND ordinal <= 960 ORDER BY ordinal ASC"; // 960 is the cut-off ordinal for players on waivers
+    $queryPlayersOnTeam = "SELECT * FROM ibl_plr WHERE teamname = '$teamlogo' AND tid = $tid AND retired = '0' AND ordinal <= " . JSB::WAIVERS_ORDINAL ." ORDER BY ordinal ASC";
     $playersOnTeam = $db->sql_query($queryPlayersOnTeam);
 
     if ($useset == null) {

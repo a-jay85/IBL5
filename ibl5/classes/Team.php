@@ -63,13 +63,13 @@ class Team
                 FROM ibl_plr
                 WHERE $whereCondition
                   AND retired = '0'
-                  AND ordinal <= '960'
+                  AND ordinal <= '" . JSB::WAIVERS_ORDINAL ."'
             ) AS numberOfPlayers,
             (SELECT COUNT(*)
                 FROM ibl_plr
                 WHERE $whereCondition
                   AND retired = '0'
-                  AND ordinal <= '960'
+                  AND ordinal <= '" . JSB::WAIVERS_ORDINAL ."'
                   AND injured = '0'
             ) AS numberOfHealthyPlayers
             FROM ibl_team_info
@@ -164,7 +164,7 @@ class Team
             FROM ibl_plr
             WHERE teamname = '$this->name'
               AND retired = '0'
-              AND ordinal <= '960'
+              AND ordinal <= '" . JSB::WAIVERS_ORDINAL . "'
             ORDER BY name ASC";
         $result = $this->db->sql_query($query);
         return $result;
@@ -176,7 +176,7 @@ class Team
             FROM ibl_plr
             WHERE teamname = '$this->name'
               AND retired = '0'
-              AND ordinal <= '960'
+              AND ordinal <= '" . JSB::WAIVERS_ORDINAL ."'
               AND injured = '0'
             ORDER BY name ASC";
         $result = $this->db->sql_query($query);

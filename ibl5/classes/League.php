@@ -66,7 +66,7 @@ class League
     {
         $query = "SELECT *
             FROM ibl_plr
-            WHERE ordinal > '960'
+            WHERE ordinal > '" . JSB::WAIVERS_ORDINAL . "'
               AND retired = '0'
               AND name NOT LIKE '%|%'
             ORDER BY name ASC";

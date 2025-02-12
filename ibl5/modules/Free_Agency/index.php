@@ -440,17 +440,17 @@ function display()
 
     // ==== END INSERT OF PLAYERS WITH OFFERS
 
-    $year1AvailableSoftCap = Team::SOFT_CAP_MAX - $year1TotalSalary;
+    $year1AvailableSoftCap = League::SOFT_CAP_MAX - $year1TotalSalary;
     $year1AvailableHardCap = Team::HARD_CAP_MAX - $year1TotalSalary;
-    $year2AvailableSoftCap = Team::SOFT_CAP_MAX - $year2TotalSalary;
+    $year2AvailableSoftCap = League::SOFT_CAP_MAX - $year2TotalSalary;
     $year2AvailableHardCap = Team::HARD_CAP_MAX - $year2TotalSalary;
-    $year3AvailableSoftCap = Team::SOFT_CAP_MAX - $year3TotalSalary;
+    $year3AvailableSoftCap = League::SOFT_CAP_MAX - $year3TotalSalary;
     $year3AvailableHardCap = Team::HARD_CAP_MAX - $year3TotalSalary;
-    $year4AvailableSoftCap = Team::SOFT_CAP_MAX - $year4TotalSalary;
+    $year4AvailableSoftCap = League::SOFT_CAP_MAX - $year4TotalSalary;
     $year4AvailableHardCap = Team::HARD_CAP_MAX - $year4TotalSalary;
-    $year5AvailableSoftCap = Team::SOFT_CAP_MAX - $year5TotalSalary;
+    $year5AvailableSoftCap = League::SOFT_CAP_MAX - $year5TotalSalary;
     $year5AvailableHardCap = Team::HARD_CAP_MAX - $year5TotalSalary;
-    $year6AvailableSoftCap = Team::SOFT_CAP_MAX - $year6TotalSalary;
+    $year6AvailableSoftCap = League::SOFT_CAP_MAX - $year6TotalSalary;
     $year6AvailableHardCap = Team::HARD_CAP_MAX - $year6TotalSalary;
 
     // ===== CAP AND ROSTER SLOT INFO =====
@@ -936,12 +936,12 @@ function negotiate($pid)
 
     // LOOP TO GET SOFT CAP SPACE
 
-    $capnumber = Team::SOFT_CAP_MAX;
-    $capnumber2 = Team::SOFT_CAP_MAX;
-    $capnumber3 = Team::SOFT_CAP_MAX;
-    $capnumber4 = Team::SOFT_CAP_MAX;
-    $capnumber5 = Team::SOFT_CAP_MAX;
-    $capnumber6 = Team::SOFT_CAP_MAX;
+    $capnumber = League::SOFT_CAP_MAX;
+    $capnumber2 = League::SOFT_CAP_MAX;
+    $capnumber3 = League::SOFT_CAP_MAX;
+    $capnumber4 = League::SOFT_CAP_MAX;
+    $capnumber5 = League::SOFT_CAP_MAX;
+    $capnumber6 = League::SOFT_CAP_MAX;
 
     $rosterspots = 15;
 

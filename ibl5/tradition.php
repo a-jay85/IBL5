@@ -4,7 +4,7 @@ require 'mainfile.php';
 
 $query1 = "SELECT *
     FROM ibl_team_info
-    WHERE teamid != " . League::FREE_AGENTS_TEAMID . ";";
+    WHERE teamid != " . JSB::FREE_AGENTS_TEAMID . ";";
 $result1 = $db->sql_query($query1);
 $num1 = $db->sql_numrows($result1);
 

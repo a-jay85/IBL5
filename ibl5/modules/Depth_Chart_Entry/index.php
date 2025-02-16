@@ -596,7 +596,10 @@ function submit()
 
             echo "<center><u>Your depth chart has been submitted and e-mailed successfully. Thank you.</u></center><p>";
         } else {
-            echo "<font color=red>Depth chart failed to save properly; please contact the commissioner.</font></center><p>";
+            echo "<font color=red>Depth chart failed to save properly; please contact the commissioner with the following details:</font></center><p>";
+
+            var_dump($filename);
+            var_dump($filetext);
         }
     }
 

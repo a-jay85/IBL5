@@ -27,7 +27,7 @@ while (!feof($plrFile)) {
         if ($bird < 10) {
             $bird = " " . $bird;
         }
-        // fwrite($plrFile, $bird, 2);
+        fwrite($plrFile, $bird, 2);
         echo "$name's new bird years = " . $bird . "<br>";
         echo "<br>";
         

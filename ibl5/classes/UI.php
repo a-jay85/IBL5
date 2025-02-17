@@ -374,7 +374,11 @@ class UI
                     (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
                 } elseif ($plrRow instanceof Player) {
                     $player = $plrRow;
-                    (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "FFFFAA";
+                    if ($moduleName == "Next_Sim") {
+                        (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "FFFFAA";
+                    } else {
+                        (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
+                    }
                 } else {
                     continue;
                 }

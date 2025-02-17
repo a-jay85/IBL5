@@ -14,8 +14,7 @@ $pagetitle = "- $module_name";
 $username = $cookie[1];
 $userTeam = Team::initialize($db, $sharedFunctions->getTeamnameFromUsername($username));
 
-$queryAllTeams = "SELECT * FROM ibl_team_info WHERE teamid != " . League::FREE_AGENTS_TEAMID . ";";
-$resultAllTeams = $db->sql_query($queryAllTeams);
+$resultAllTeams = League::getAllTeamsResult($db);
 $numteams = $db->sql_numrows($resultAllTeams);
 
 function trHighlight($userTeamID, $operatingTeamID)

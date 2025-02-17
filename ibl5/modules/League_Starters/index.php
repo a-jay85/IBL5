@@ -25,7 +25,10 @@ foreach ($teams as $team) {
     $rows['startingSF'][$i] = Player::withPlayerID($db, $rows['team'][$i]->getLastSimStarterPlayerIDForPosition('SF') ?? 4040404);
     $rows['startingPF'][$i] = Player::withPlayerID($db, $rows['team'][$i]->getLastSimStarterPlayerIDForPosition('PF') ?? 4040404);
     $rows['startingC'][$i] = Player::withPlayerID($db, $rows['team'][$i]->getLastSimStarterPlayerIDForPosition('C') ?? 4040404);
-
+    
+    $rows['startingPG'][$i]->teamName = $rows['startingSG'][$i]->teamName = $rows['startingSF'][$i]->teamName = 
+        $rows['startingPF'][$i]->teamName = $rows['startingC'][$i]->teamName = $rows['team'][$i]->name;
+        
     $i++;
 }
 

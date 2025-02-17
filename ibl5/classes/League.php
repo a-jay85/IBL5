@@ -120,4 +120,14 @@ class League
         $result = $this->db->sql_query($query);
         return $result;
     }
+
+    public static function getAllTeamsResult($db)
+    {
+        $query = "SELECT *
+            FROM ibl_team_info
+            WHERE teamid != " . League::FREE_AGENTS_TEAMID . "
+            ORDER BY teamid ASC;";
+        $result = $db->sql_query($query);
+        return $result;
+    }
 }

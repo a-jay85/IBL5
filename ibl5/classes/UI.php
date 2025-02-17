@@ -326,7 +326,13 @@ class UI
         $table_ratings = "<table align=\"center\" class=\"sortable\">
             <colgroup span=2><colgroup span=2><colgroup span=6><colgroup span=6><colgroup span=4><colgroup span=4><colgroup span=1>
             <thead bgcolor=$team->color1>
-                <tr bgcolor=$team->color1>
+                <tr bgcolor=$team->color1>";
+
+        if ($moduleName == "League_Starters") {
+            $table_ratings .= "<th><font color=$team->color2>Team</font></th>";
+        }
+
+        $table_ratings .= "
                     <th><font color=$team->color2>Pos</font></th>
                     <th><font color=$team->color2>Player</font></th>
                     <th><font color=$team->color2>Age</font></th>
@@ -376,6 +382,12 @@ class UI
                     $player = $plrRow;
                     if ($moduleName == "Next_Sim") {
                         (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "FFFFAA";
+                    } elseif ($moduleName == "League_Starters") {
+                        if ($player->teamID == $team->teamID) {
+                            $bgcolor = "FFFFAA";
+                        } else {
+                            $bgcolor = "FFFFFF";
+                        }
                     } else {
                         (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
                     }
@@ -403,7 +415,13 @@ class UI
                 </tr>";
             }
 
-            $table_ratings .= "<tr bgcolor=$bgcolor>
+            $table_ratings .= "<tr bgcolor=$bgcolor>";
+
+            if ($moduleName == "League_Starters") {
+                $table_ratings .= "<td>$player->teamName</td>";
+            }
+
+            $table_ratings .= "
                 <td align=center>$player->position</td>
                 <td><a href=\"./modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->decoratedName</a></td>
                 <td align=center>$player->age</td>

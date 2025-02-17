@@ -321,7 +321,7 @@ class UI
         return $table_per36Minutes;
     }
     
-    public static function ratings($db, $data, $team, $yr, $season)
+    public static function ratings($db, $data, $team, $yr, $season, $moduleName = "")
     {
         $table_ratings = "<table align=\"center\" class=\"sortable\">
             <colgroup span=2><colgroup span=2><colgroup span=6><colgroup span=6><colgroup span=4><colgroup span=4><colgroup span=1>
@@ -392,7 +392,7 @@ class UI
                 $injuryInfo .= " ($player->daysRemainingForInjury)";
             }
 
-            if (($i % 2) == 0 AND $plrRow instanceof Player) {
+            if (($i % 2) == 0 AND $moduleName == "Next_Sim") {
                 $table_ratings .= "<tr>
                 <td colspan=55 bgcolor=$team->color1>
                 </td>

@@ -2,8 +2,7 @@
 
 $season = new Season($db);
 
-$query = "SELECT * FROM ibl_team_info WHERE teamid != " . League::FREE_AGENTS_TEAMID . " ORDER BY teamid ASC";
-$result = $db->sql_query($query);
+$result = League::getAllTeamsResult($db);
 $num = $db->sql_numrows($result);
 
 echo "<HTML><HEAD><TITLE>Draft Pick Matrix</TITLE></HEAD>

@@ -257,8 +257,7 @@ function draftPicks($db, $team_name)
     $resultpicks = $db->sql_query($querypicks);
     $numpicks = $db->sql_numrows($resultpicks);
 
-    $query_all_team_colors = "SELECT * FROM ibl_team_info ORDER BY teamid ASC";
-    $colors = $db->sql_query($query_all_team_colors);
+    $colors = League::getAllTeamsResult($db);
     $num_all_team_colors = $db->sql_numrows($colors);
 
     $i = 0;

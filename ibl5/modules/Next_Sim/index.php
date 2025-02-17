@@ -68,7 +68,7 @@ foreach ($resultUserTeamProjectedGamesNextSim as $gameRow) {
                                 <h2><?= $rows[$i]['opposingTeam']->seasonRecord ?></h2>
                             </td>
                         </tr>
-                    </table>    
+                    </table>
                 </td>
             </tr>
             <tr>

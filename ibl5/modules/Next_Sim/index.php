@@ -73,7 +73,7 @@ foreach ($resultUserTeamProjectedGamesNextSim as $gameRow) {
             </tr>
             <tr>
                 <td>
-                    <?= UI::ratings($db, $rows[$i], $rows[$i]['opposingTeam'], "", $season) ?>
+                    <?= UI::ratings($db, $rows[$i], $rows[$i]['opposingTeam'], "", $season, $module_name) ?>
                 </td>
             </tr>
             <tr style="height: 15px"></tr>

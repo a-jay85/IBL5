@@ -15,7 +15,8 @@ while (!feof($plrFile)) {
     if ($pid != 0 
         AND $tid != 0
         AND $contractYear1 != 0
-        AND $bird <= $exp) {
+        AND $bird <= $exp
+    ) {
         echo $line . "<br>";
         echo "$name's original bird years = " . $bird . "<br>";
         

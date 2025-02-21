@@ -106,9 +106,9 @@ while (!feof($plrFile)) {
     // 322,4 = ? (always 1111)
     $draftRound = substr($line, 326, 2);
     $draftPickNumber = substr($line, 328, 2);
-    // 330-331 = ?
-    $contractOwnedBy = substr($line, 332, 2);
-    // 334-340 = ?
+    // 330 = ?
+    $contractOwnedBy = substr($line, 331, 2);
+    // 333-340 = ?
     $seasonHighPTS = substr($line, 341, 2);
     $seasonHighREB = substr($line, 343, 2);
     $seasonHighAST = substr($line, 345, 2);

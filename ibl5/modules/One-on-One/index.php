@@ -833,9 +833,9 @@ function rungame($p1, $p2, $owner)
 
     echo "$playbyplay";
 
-    $querygetgameid = "SELECT * FROM ibl_one_on_one";
-    $resultgetgameid = $db->sql_query($querygetgameid);
-    $gameid = $db->sql_numrows($resultgetgameid) + 1;
+    $queryGetHighestGameID = "SELECT gameid FROM ibl_one_on_one ORDER BY gameid DESC LIMIT 1;";
+    $resultGetHighestGameID = $db->sql_query($queryGetHighestGameID);
+    $newGameID = $db->sql_result($resultGetHighestGameID, 0) + 1;
 
     if ($score1 > $score2) {
         $winner = addslashes($p1_name);
@@ -851,10 +851,10 @@ function rungame($p1, $p2, $owner)
 
     $playbyplay2 = addslashes($playbyplay);
 
-    $queryinsertgame = "INSERT INTO ibl_one_on_one (gameid, playbyplay, winner, loser, winscore, lossscore, owner) VALUES ('$gameid', '$playbyplay2', '$winner', '$loser', '$winscore', '$lossscore', '$owner')";
+    $queryinsertgame = "INSERT INTO ibl_one_on_one (gameid, playbyplay, winner, loser, winscore, lossscore, owner) VALUES ('$newGameID', '$playbyplay2', '$winner', '$loser', '$winscore', '$lossscore', '$owner')";
     $resultinsert = $db->sql_query($queryinsertgame);
 
-    echo "GAME ID: $gameid";
+    echo "GAME ID: $newGameID";
 
     $discordText = "";
     $bang = "";
@@ -865,14 +865,14 @@ function rungame($p1, $p2, $owner)
             $bang = "__**BANG! BANG! OH WHAT A SHOT FROM $gamewinner!!!**__\n";
         }
         $discordText .= $bang;
-        $discordText .= "**$p1_name $score1**, $p2_name $score2\n\t*(Game played by $owner)*\nhttp://$_SERVER[HTTP_HOST]$_SERVER[PHP_SELF]?name=One-on-One&gameid=$gameid";
+        $discordText .= "**$p1_name $score1**, $p2_name $score2\n\t*(Game played by $owner)*\nhttp://$_SERVER[HTTP_HOST]$_SERVER[PHP_SELF]?name=One-on-One&gameid=$newGameID";
     } else {
         $gamewinner = strtoupper($p2_name);
         if (abs($score1 - $score2) <= 3) {
             $bang = "__**BANG! BANG! OH WHAT A SHOT FROM $gamewinner!!!**__\n";
         }
         $discordText .= $bang;
-        $discordText .= "$p1_name $score1, **$p2_name $score2**\n\t*(Game played by $owner)*\nhttp://$_SERVER[HTTP_HOST]$_SERVER[PHP_SELF]?name=One-on-One&gameid=$gameid";
+        $discordText .= "$p1_name $score1, **$p2_name $score2**\n\t*(Game played by $owner)*\nhttp://$_SERVER[HTTP_HOST]$_SERVER[PHP_SELF]?name=One-on-One&gameid=$newGameID";
     }
 
     Discord::postToChannel('#1v1-games', $discordText);

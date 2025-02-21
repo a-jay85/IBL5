@@ -103,7 +103,7 @@ while (!feof($plrFile)) {
     $contractYear4 = substr($line, 310, 4);
     $contractYear5 = substr($line, 314, 4);
     $contractYear6 = substr($line, 318, 4);
-    // 322,4 = ?
+    // 322,4 = ? (always 1111)
     $draftRound = substr($line, 326, 2);
     $draftPickNumber = substr($line, 328, 2);
     // 330-331 = ?

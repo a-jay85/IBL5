@@ -136,6 +136,16 @@ class Team
         return $result;
     }
 
+    public function getDraftPicksResult()
+    {
+        $query = "SELECT *
+            FROM ibl_draft_picks
+            WHERE ownerofpick = '$this->name'
+            ORDER BY year, round ASC;";
+        $result = $this->db->sql_query($query);
+        return $result;
+    }
+
     public function getFreeAgencyOffersResult()
     {
         $query = "SELECT *

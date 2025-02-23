@@ -252,7 +252,6 @@ function lastSimsStarters($db, $result, $team)
 function draftPicks($db, Team $team)
 {
     $resultPicks = $team->getDraftPicksResult();
-    $numPicks = $db->sql_numrows($resultPicks);
 
     $allTeamsResult = League::getAllTeamsResult($db);
 
@@ -262,27 +261,21 @@ function draftPicks($db, Team $team)
 
     $tableDraftPicks = "<table align=\"center\">";
 
-    $hh = 0;
-    while ($hh < $numPicks) {
-        $teampick = $db->sql_result($resultPicks, $hh, "teampick");
-        $year = $db->sql_result($resultPicks, $hh, "year");
-        $round = $db->sql_result($resultPicks, $hh, "round");
-        $notes = $db->sql_result($resultPicks, $hh, "notes");
+    foreach ($resultPicks as $draftPickRow) {
+        $draftPick = new DraftPick($draftPickRow);
 
-        $pick_team_id = $teamsArray[$teampick]->teamID;
-        $pick_team_city = $teamsArray[$teampick]->city;
+        $draftPickOriginalTeamID = $teamsArray[$draftPick->originalTeam]->teamID;
+        $draftPickOriginalTeamCity = $teamsArray[$draftPick->originalTeam]->city;
 
         $tableDraftPicks .= "<tr>
-            <td valign=\"center\"><a href=\"modules.php?name=Team&op=team&tid=$pick_team_id\"><img src=\"images/logo/$teampick.png\" height=33 width=33></a></td>
-            <td valign=\"center\"><a href=\"modules.php?name=Team&op=team&tid=$pick_team_id\">$year $pick_team_city $teampick (Round $round)</a></td>
+            <td valign=\"center\"><a href=\"modules.php?name=Team&op=team&tid=$draftPickOriginalTeamID\"><img src=\"images/logo/$draftPick->originalTeam.png\" height=33 width=33></a></td>
+            <td valign=\"center\"><a href=\"modules.php?name=Team&op=team&tid=$draftPickOriginalTeamID\">$draftPick->year $draftPickOriginalTeamCity $draftPick->originalTeam (Round $draftPick->round)</a></td>
         </tr>";
-        if ($notes != NULL) {
+        if ($draftPick->notes != NULL) {
             $tableDraftPicks .= "<tr>
-                <td width=200 colspan=2 valign=\"top\"><i>$notes</i><br>&nbsp;</td>
+                <td width=200 colspan=2 valign=\"top\"><i>$draftPick->notes</i><br>&nbsp;</td>
             </tr>";
         }
-
-        $hh++;
     }
 
     $tableDraftPicks .= "</table>";

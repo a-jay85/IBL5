@@ -148,14 +148,12 @@ function get_salary($tid)
 
     foreach ($resultMoneyOwedUnderContractAfterThisSeason as $contract) {
         $yearUnderContract = $contract['cy'];
-        $totalYearsUnderContract = $contract['cyt'];
 
         $i = 1;
-        while ($yearUnderContract < $totalYearsUnderContract) {
+        while ($yearUnderContract < $contract['cyt']) {
             $yearUnderContract++;
             $fieldString = "cy" . $yearUnderContract;
             $contract_amt[$i]["salary"] += $contract["$fieldString"];
-            $contract_amt[$i]["roster"]++;
             $i++;
         }
     }
@@ -178,7 +176,7 @@ function get_salary1($tid)
 
         $j = 1;
         while ($yearUnderContract < $totalYearsUnderContract) {
-            $yearUnderContract = $yearUnderContract + 1;
+            $yearUnderContract++;
             $contract_amt[$j]["roster"]++;
             $j++;
         }

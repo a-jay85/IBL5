@@ -167,7 +167,7 @@ function team($tid)
         $starters_table = lastSimsStarters($db, $result, $team);
     }
 
-    $table_draftpicks = draftPicks($db, $team->name);
+    $table_draftpicks = draftPicks($db, $team);
 
     $inforight = team_info_right($team);
     $team_info_right = $inforight[0];
@@ -249,12 +249,11 @@ function lastSimsStarters($db, $result, $team)
     return $starters_table;
 }
 
-function draftPicks($db, $team_name)
+function draftPicks($db, Team $team)
 {
     $table_draftpicks = "<table align=\"center\">";
 
-    $querypicks = "SELECT * FROM ibl_draft_picks WHERE ownerofpick = '$team_name' ORDER BY year, round ASC";
-    $resultpicks = $db->sql_query($querypicks);
+    $resultpicks = $team->getDraftPicksResult();
     $numpicks = $db->sql_numrows($resultpicks);
 
     $colors = League::getAllTeamsResult($db);

@@ -141,7 +141,7 @@ class Team
         $query = "SELECT *
             FROM ibl_draft_picks
             WHERE ownerofpick = '$this->name'
-            ORDER BY year, round ASC;";
+            ORDER BY year, round, teampick ASC;";
         $result = $this->db->sql_query($query);
         return $result;
     }

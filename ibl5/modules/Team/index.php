@@ -258,10 +258,8 @@ function draftPicks($db, Team $team)
 
     $allTeamsResult = League::getAllTeamsResult($db);
 
-    $i = 0;
     foreach ($allTeamsResult as $teamRow) {
-        $teamsArray[$i] = Team::initialize($db, $teamRow);
-        $i++;
+        $teamsArray[$teamRow['team_name']] = Team::initialize($db, $teamRow);
     }
 
     $hh = 0;
@@ -271,15 +269,9 @@ function draftPicks($db, Team $team)
         $round = $db->sql_result($resultPicks, $hh, "round");
         $notes = $db->sql_result($resultPicks, $hh, "notes");
 
-        $j = 0;
-        while ($j < $i) {
-            $pick_team_name = $teamsArray[$j]->name;
-            if ($pick_team_name == $teampick) {
-                $pick_team_id = $teamsArray[$j]->teamID;
-                $pick_team_city = $teamsArray[$j]->city;
-            }
-            $j++;
-        }
+        $pick_team_id = $teamsArray[$teampick]->teamID;
+        $pick_team_city = $teamsArray[$teampick]->city;
+
         $tableDraftPicks .= "<tr>
             <td valign=\"center\"><a href=\"modules.php?name=Team&op=team&tid=$pick_team_id\"><img src=\"images/logo/$teampick.png\" height=33 width=33></a></td>
             <td valign=\"center\"><a href=\"modules.php?name=Team&op=team&tid=$pick_team_id\">$year $pick_team_city $teampick (Round $round)</a></td>

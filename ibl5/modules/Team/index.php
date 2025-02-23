@@ -167,7 +167,7 @@ function team($tid)
         $starters_table = lastSimsStarters($db, $result, $team);
     }
 
-    $table_draftpicks = draftPicks($db, $team);
+    $tableDraftPicks = draftPicks($db, $team);
 
     $inforight = team_info_right($team);
     $team_info_right = $inforight[0];
@@ -191,7 +191,7 @@ function team($tid)
             <td><font color=$team->color2><b><center>Draft Picks</center></b></font></td>
         </tr>
 		<tr>
-            <td>$table_draftpicks</td>
+            <td>$tableDraftPicks</td>
         </tr>
 		<tr>
             <td>$rafters</td>
@@ -251,44 +251,44 @@ function lastSimsStarters($db, $result, $team)
 
 function draftPicks($db, Team $team)
 {
-    $table_draftpicks = "<table align=\"center\">";
+    $tableDraftPicks = "<table align=\"center\">";
 
-    $resultpicks = $team->getDraftPicksResult();
-    $numpicks = $db->sql_numrows($resultpicks);
+    $resultPicks = $team->getDraftPicksResult();
+    $numPicks = $db->sql_numrows($resultPicks);
 
-    $colors = League::getAllTeamsResult($db);
-    $num_all_team_colors = $db->sql_numrows($colors);
+    $allTeamsResult = League::getAllTeamsResult($db);
+    $numberOfTeams = $db->sql_numrows($allTeamsResult);
 
     $i = 0;
-    while ($i < $num_all_team_colors) {
-        $color_array[$i]['team_id'] = $db->sql_result($colors, $i, "teamid");
-        $color_array[$i]['team_city'] = $db->sql_result($colors, $i, "team_city");
-        $color_array[$i]['team_name'] = $db->sql_result($colors, $i, "team_name");
+    while ($i < $numberOfTeams) {
+        $teamsArray[$i]['team_id'] = $db->sql_result($allTeamsResult, $i, "teamid");
+        $teamsArray[$i]['team_city'] = $db->sql_result($allTeamsResult, $i, "team_city");
+        $teamsArray[$i]['team_name'] = $db->sql_result($allTeamsResult, $i, "team_name");
         $i++;
     }
 
     $hh = 0;
-    while ($hh < $numpicks) {
-        $teampick = $db->sql_result($resultpicks, $hh, "teampick");
-        $year = $db->sql_result($resultpicks, $hh, "year");
-        $round = $db->sql_result($resultpicks, $hh, "round");
-        $notes = $db->sql_result($resultpicks, $hh, "notes");
+    while ($hh < $numPicks) {
+        $teampick = $db->sql_result($resultPicks, $hh, "teampick");
+        $year = $db->sql_result($resultPicks, $hh, "year");
+        $round = $db->sql_result($resultPicks, $hh, "round");
+        $notes = $db->sql_result($resultPicks, $hh, "notes");
 
         $j = 0;
         while ($j < $i) {
-            $pick_team_name = $color_array[$j]['team_name'];
+            $pick_team_name = $teamsArray[$j]['team_name'];
             if ($pick_team_name == $teampick) {
-                $pick_team_id = $color_array[$j]['team_id'];
-                $pick_team_city = $color_array[$j]['team_city'];
+                $pick_team_id = $teamsArray[$j]['team_id'];
+                $pick_team_city = $teamsArray[$j]['team_city'];
             }
             $j++;
         }
-        $table_draftpicks .= "<tr>
+        $tableDraftPicks .= "<tr>
             <td valign=\"center\"><a href=\"modules.php?name=Team&op=team&tid=$pick_team_id\"><img src=\"images/logo/$teampick.png\" height=33 width=33></a></td>
             <td valign=\"center\"><a href=\"modules.php?name=Team&op=team&tid=$pick_team_id\">$year $pick_team_city $teampick (Round $round)</a></td>
         </tr>";
         if ($notes != NULL) {
-            $table_draftpicks .= "<tr>
+            $tableDraftPicks .= "<tr>
                 <td width=200 colspan=2 valign=\"top\"><i>$notes</i><br>&nbsp;</td>
             </tr>";
         }
@@ -296,9 +296,9 @@ function draftPicks($db, Team $team)
         $hh++;
     }
 
-    $table_draftpicks .= "</table>";
+    $tableDraftPicks .= "</table>";
 
-    return $table_draftpicks;
+    return $tableDraftPicks;
 }
 
 function team_info_right($team)

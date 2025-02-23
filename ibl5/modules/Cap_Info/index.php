@@ -28,23 +28,23 @@ while ($i < $numberOfTeams) {
         ${"teamTotal" . $position . "NextSeasonSalary"} = $team->getTotalNextSeasonSalariesFromPlrResult(${"team" . $position . "sResult"});
     }
 
-    $teamTotalSalaryYear1[$i] = 0;
-    $teamTotalSalaryYear2[$i] = 0;
-    $teamTotalSalaryYear3[$i] = 0;
-    $teamTotalSalaryYear4[$i] = 0;
-    $teamTotalSalaryYear5[$i] = 0;
-    $teamTotalSalaryYear6[$i] = 0;
+    $teamTotalAvailableSalaryYear1[$i] = 0;
+    $teamTotalAvailableSalaryYear2[$i] = 0;
+    $teamTotalAvailableSalaryYear3[$i] = 0;
+    $teamTotalAvailableSalaryYear4[$i] = 0;
+    $teamTotalAvailableSalaryYear5[$i] = 0;
+    $teamTotalAvailableSalaryYear6[$i] = 0;
     $teamFreeAgencySlots[$i] = 15;
 
     $team_array = get_salary($team->teamID);
     $team_array1 = get_salary1($team->teamID);
 
-    $teamTotalSalaryYear1[$i] = League::HARD_CAP_MAX - $team_array[1]["salary"];
-    $teamTotalSalaryYear2[$i] = League::HARD_CAP_MAX - $team_array[2]["salary"];
-    $teamTotalSalaryYear3[$i] = League::HARD_CAP_MAX - $team_array[3]["salary"];
-    $teamTotalSalaryYear4[$i] = League::HARD_CAP_MAX - $team_array[4]["salary"];
-    $teamTotalSalaryYear5[$i] = League::HARD_CAP_MAX - $team_array[5]["salary"];
-    $teamTotalSalaryYear6[$i] = League::HARD_CAP_MAX - $team_array[6]["salary"];
+    $teamTotalAvailableSalaryYear1[$i] = League::HARD_CAP_MAX - $team_array[1]["salary"];
+    $teamTotalAvailableSalaryYear2[$i] = League::HARD_CAP_MAX - $team_array[2]["salary"];
+    $teamTotalAvailableSalaryYear3[$i] = League::HARD_CAP_MAX - $team_array[3]["salary"];
+    $teamTotalAvailableSalaryYear4[$i] = League::HARD_CAP_MAX - $team_array[4]["salary"];
+    $teamTotalAvailableSalaryYear5[$i] = League::HARD_CAP_MAX - $team_array[5]["salary"];
+    $teamTotalAvailableSalaryYear6[$i] = League::HARD_CAP_MAX - $team_array[6]["salary"];
 
     $teamFreeAgencySlots[$i] = $teamFreeAgencySlots[$i] - $team_array1[1]["roster"];
 
@@ -65,14 +65,14 @@ while ($i < $numberOfTeams) {
     }
 
     $table_echo .= "
-		<td align=center>$teamTotalSalaryYear1[$i]</td>
-		<td align=center>$teamTotalSalaryYear2[$i]</td>
-		<td align=center>$teamTotalSalaryYear3[$i]</td>
-		<td align=center>$teamTotalSalaryYear4[$i]</td>
-		<td align=center>$teamTotalSalaryYear5[$i]</td>";
+		<td align=center>$teamTotalAvailableSalaryYear1[$i]</td>
+		<td align=center>$teamTotalAvailableSalaryYear2[$i]</td>
+		<td align=center>$teamTotalAvailableSalaryYear3[$i]</td>
+		<td align=center>$teamTotalAvailableSalaryYear4[$i]</td>
+		<td align=center>$teamTotalAvailableSalaryYear5[$i]</td>";
 
     if ($isFreeAgencyModuleActive) {
-        $table_echo .= "<td align=center>$teamTotalSalaryYear6[$i]</td>";
+        $table_echo .= "<td align=center>$teamTotalAvailableSalaryYear6[$i]</td>";
     }
 
 	$table_echo .= "	
@@ -137,23 +137,21 @@ function get_salary($tid)
 
     $queryMoneyOwedUnderContractAfterThisSeason = "SELECT * FROM ibl_plr WHERE retired = 0 AND tid = $tid AND cy <> cyt";
     $resultMoneyOwedUnderContractAfterThisSeason = $db->sql_query($queryMoneyOwedUnderContractAfterThisSeason);
-    $numberOfMoneyOwedUnderContractAfterThisSeason = $db->sql_numrows($resultMoneyOwedUnderContractAfterThisSeason);
 
     $contract_amt[][] = 0;
-    $i = 0;
-    while ($i < $numberOfMoneyOwedUnderContractAfterThisSeason) {
-        $yearUnderContract = $db->sql_result($resultMoneyOwedUnderContractAfterThisSeason, $i, "cy");
-        $totalYearsUnderContract = $db->sql_result($resultMoneyOwedUnderContractAfterThisSeason, $i, "cyt");
 
-        $j = 1;
+    foreach ($resultMoneyOwedUnderContractAfterThisSeason as $contract) {
+        $yearUnderContract = $contract['cy'];
+        $totalYearsUnderContract = $contract['cyt'];
+
+        $i = 1;
         while ($yearUnderContract < $totalYearsUnderContract) {
-            $yearUnderContract = $yearUnderContract + 1;
-            $contract_current_year[$yearUnderContract] = "cy" . $yearUnderContract;
-            $contract_amt[$j]["salary"] = $contract_amt[$j]["salary"] + $db->sql_result($resultMoneyOwedUnderContractAfterThisSeason, $i, $contract_current_year[$yearUnderContract]);
-            $contract_amt[$j]["roster"]++;
-            $j++;
+            $yearUnderContract++;
+            $contractCurrentYear[$yearUnderContract] = "cy" . $yearUnderContract;
+            $contract_amt[$i]["salary"] += $contract["$contractCurrentYear[$yearUnderContract]"];
+            $contract_amt[$i]["roster"]++;
+            $i++;
         }
-        $i++;
     }
     return $contract_amt;
 }

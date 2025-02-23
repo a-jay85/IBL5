@@ -135,21 +135,21 @@ function get_salary($tid)
 {
     global $db;
 
-    $queryPlayersUnderContractAfterThisSeason = "SELECT * FROM ibl_plr WHERE retired = 0 AND tid = $tid AND cy <> cyt";
-    $resultPlayersUnderContractAfterThisSeason = $db->sql_query($queryPlayersUnderContractAfterThisSeason);
-    $numberOfPlayersUnderContractAfterThisSeason = $db->sql_numrows($resultPlayersUnderContractAfterThisSeason);
+    $queryMoneyOwedUnderContractAfterThisSeason = "SELECT * FROM ibl_plr WHERE retired = 0 AND tid = $tid AND cy <> cyt";
+    $resultMoneyOwedUnderContractAfterThisSeason = $db->sql_query($queryMoneyOwedUnderContractAfterThisSeason);
+    $numberOfMoneyOwedUnderContractAfterThisSeason = $db->sql_numrows($resultMoneyOwedUnderContractAfterThisSeason);
 
     $contract_amt[][] = 0;
     $i = 0;
-    while ($i < $numberOfPlayersUnderContractAfterThisSeason) {
-        $yearUnderContract = $db->sql_result($resultPlayersUnderContractAfterThisSeason, $i, "cy");
-        $totalYearsUnderContract = $db->sql_result($resultPlayersUnderContractAfterThisSeason, $i, "cyt");
+    while ($i < $numberOfMoneyOwedUnderContractAfterThisSeason) {
+        $yearUnderContract = $db->sql_result($resultMoneyOwedUnderContractAfterThisSeason, $i, "cy");
+        $totalYearsUnderContract = $db->sql_result($resultMoneyOwedUnderContractAfterThisSeason, $i, "cyt");
 
         $j = 1;
         while ($yearUnderContract < $totalYearsUnderContract) {
             $yearUnderContract = $yearUnderContract + 1;
             $contract_current_year[$yearUnderContract] = "cy" . $yearUnderContract;
-            $contract_amt[$j]["salary"] = $contract_amt[$j]["salary"] + $db->sql_result($resultPlayersUnderContractAfterThisSeason, $i, $contract_current_year[$yearUnderContract]);
+            $contract_amt[$j]["salary"] = $contract_amt[$j]["salary"] + $db->sql_result($resultMoneyOwedUnderContractAfterThisSeason, $i, $contract_current_year[$yearUnderContract]);
             $contract_amt[$j]["roster"]++;
             $j++;
         }

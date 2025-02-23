@@ -257,13 +257,10 @@ function draftPicks($db, Team $team)
     $numPicks = $db->sql_numrows($resultPicks);
 
     $allTeamsResult = League::getAllTeamsResult($db);
-    $numberOfTeams = $db->sql_numrows($allTeamsResult);
 
     $i = 0;
-    while ($i < $numberOfTeams) {
-        $teamsArray[$i]['team_id'] = $db->sql_result($allTeamsResult, $i, "teamid");
-        $teamsArray[$i]['team_city'] = $db->sql_result($allTeamsResult, $i, "team_city");
-        $teamsArray[$i]['team_name'] = $db->sql_result($allTeamsResult, $i, "team_name");
+    foreach ($allTeamsResult as $teamRow) {
+        $teamsArray[$i] = Team::initialize($db, $teamRow);
         $i++;
     }
 
@@ -276,10 +273,10 @@ function draftPicks($db, Team $team)
 
         $j = 0;
         while ($j < $i) {
-            $pick_team_name = $teamsArray[$j]['team_name'];
+            $pick_team_name = $teamsArray[$j]->name;
             if ($pick_team_name == $teampick) {
-                $pick_team_id = $teamsArray[$j]['team_id'];
-                $pick_team_city = $teamsArray[$j]['team_city'];
+                $pick_team_id = $teamsArray[$j]->teamID;
+                $pick_team_city = $teamsArray[$j]->city;
             }
             $j++;
         }

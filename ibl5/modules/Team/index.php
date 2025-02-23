@@ -167,7 +167,7 @@ function team($tid)
         $starters_table = lastSimsStarters($db, $result, $team);
     }
 
-    $tableDraftPicks = draftPicks($db, $team);
+    $tableDraftPicks = UI\Modules\Team::draftPicks($db, $team);
 
     $inforight = team_info_right($team);
     $team_info_right = $inforight[0];
@@ -247,40 +247,6 @@ function lastSimsStarters($db, $result, $team)
     </table>";
 
     return $starters_table;
-}
-
-function draftPicks($db, Team $team)
-{
-    $resultPicks = $team->getDraftPicksResult();
-
-    $allTeamsResult = League::getAllTeamsResult($db);
-
-    foreach ($allTeamsResult as $teamRow) {
-        $teamsArray[$teamRow['team_name']] = Team::initialize($db, $teamRow);
-    }
-
-    $tableDraftPicks = "<table align=\"center\">";
-
-    foreach ($resultPicks as $draftPickRow) {
-        $draftPick = new DraftPick($draftPickRow);
-
-        $draftPickOriginalTeamID = $teamsArray[$draftPick->originalTeam]->teamID;
-        $draftPickOriginalTeamCity = $teamsArray[$draftPick->originalTeam]->city;
-
-        $tableDraftPicks .= "<tr>
-            <td valign=\"center\"><a href=\"modules.php?name=Team&op=team&tid=$draftPickOriginalTeamID\"><img src=\"images/logo/$draftPick->originalTeam.png\" height=33 width=33></a></td>
-            <td valign=\"center\"><a href=\"modules.php?name=Team&op=team&tid=$draftPickOriginalTeamID\">$draftPick->year $draftPickOriginalTeamCity $draftPick->originalTeam (Round $draftPick->round)</a></td>
-        </tr>";
-        if ($draftPick->notes != NULL) {
-            $tableDraftPicks .= "<tr>
-                <td width=200 colspan=2 valign=\"top\"><i>$draftPick->notes</i><br>&nbsp;</td>
-            </tr>";
-        }
-    }
-
-    $tableDraftPicks .= "</table>";
-
-    return $tableDraftPicks;
 }
 
 function team_info_right($team)

@@ -251,8 +251,6 @@ function lastSimsStarters($db, $result, $team)
 
 function draftPicks($db, Team $team)
 {
-    $tableDraftPicks = "<table align=\"center\">";
-
     $resultPicks = $team->getDraftPicksResult();
     $numPicks = $db->sql_numrows($resultPicks);
 
@@ -261,6 +259,8 @@ function draftPicks($db, Team $team)
     foreach ($allTeamsResult as $teamRow) {
         $teamsArray[$teamRow['team_name']] = Team::initialize($db, $teamRow);
     }
+
+    $tableDraftPicks = "<table align=\"center\">";
 
     $hh = 0;
     while ($hh < $numPicks) {

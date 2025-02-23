@@ -4,9 +4,13 @@ if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
     die("You can't access this file directly...");
 }
 
+global $db, $cookie;
 $sharedFunctions = new Shared($db);
 $season = new Season($db);
 $isFreeAgencyModuleActive = $sharedFunctions->isFreeAgencyModuleActive();
+
+$username = $cookie[1];
+$userTeam = Team::initialize($db, $sharedFunctions->getTeamnameFromUsername($username));
 
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
@@ -53,6 +57,8 @@ while ($i < $numberOfTeams) {
 
     $teamCurrentSeasonTotalSalary = $team->getTotalCurrentSeasonSalariesFromPlrResult($team->getRosterUnderContractOrderedByNameResult());
 
+    $bgcolor = ($userTeam->name == $team->name) ? $bgcolor = "bgcolor=FFFFAA" : $bgcolor = "";
+
     $table_echo .= "<tr>
 		<td bgcolor=#$team->color1>
 			<a href=\"modules.php?name=Team&op=team&tid=$team->teamID&display=contracts\">
@@ -65,11 +71,11 @@ while ($i < $numberOfTeams) {
     }
 
     $table_echo .= "
-		<td align=center>$teamTotalAvailableSalaryYear1[$i]</td>
-		<td align=center>$teamTotalAvailableSalaryYear2[$i]</td>
-		<td align=center>$teamTotalAvailableSalaryYear3[$i]</td>
-		<td align=center>$teamTotalAvailableSalaryYear4[$i]</td>
-		<td align=center>$teamTotalAvailableSalaryYear5[$i]</td>";
+		<td $bgcolor align=center>$teamTotalAvailableSalaryYear1[$i]</td>
+		<td $bgcolor align=center>$teamTotalAvailableSalaryYear2[$i]</td>
+		<td $bgcolor align=center>$teamTotalAvailableSalaryYear3[$i]</td>
+		<td $bgcolor align=center>$teamTotalAvailableSalaryYear4[$i]</td>
+		<td $bgcolor align=center>$teamTotalAvailableSalaryYear5[$i]</td>";
 
     if ($isFreeAgencyModuleActive) {
         $table_echo .= "<td align=center>$teamTotalAvailableSalaryYear6[$i]</td>";
@@ -77,15 +83,15 @@ while ($i < $numberOfTeams) {
 
 	$table_echo .= "	
         <td bgcolor=#AAA></td>
-        <td align=center>$teamTotalPGNextSeasonSalary</td>
-        <td align=center>$teamTotalSGNextSeasonSalary</td>
-        <td align=center>$teamTotalSFNextSeasonSalary</td>
-        <td align=center>$teamTotalPFNextSeasonSalary</td>
-        <td align=center>$teamTotalCNextSeasonSalary</td>
+        <td $bgcolor align=center>$teamTotalPGNextSeasonSalary</td>
+        <td $bgcolor align=center>$teamTotalSGNextSeasonSalary</td>
+        <td $bgcolor align=center>$teamTotalSFNextSeasonSalary</td>
+        <td $bgcolor align=center>$teamTotalPFNextSeasonSalary</td>
+        <td $bgcolor align=center>$teamTotalCNextSeasonSalary</td>
         <td bgcolor=#AAA></td>
-		<td align=center>$teamFreeAgencySlots[$i]</td>
-        <td align=center>$MLEicon</td>
-        <td align=center>$LLEicon</td>
+		<td $bgcolor align=center>$teamFreeAgencySlots[$i]</td>
+        <td $bgcolor align=center>$MLEicon</td>
+        <td $bgcolor align=center>$LLEicon</td>
 	</tr>";
 
     $i++;

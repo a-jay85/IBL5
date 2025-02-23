@@ -153,8 +153,8 @@ function get_salary($tid)
         $i = 1;
         while ($yearUnderContract < $totalYearsUnderContract) {
             $yearUnderContract++;
-            $contractCurrentYear[$yearUnderContract] = "cy" . $yearUnderContract;
-            $contract_amt[$i]["salary"] += $contract["$contractCurrentYear[$yearUnderContract]"];
+            $fieldString = "cy" . $yearUnderContract;
+            $contract_amt[$i]["salary"] += $contract["$fieldString"];
             $contract_amt[$i]["roster"]++;
             $i++;
         }

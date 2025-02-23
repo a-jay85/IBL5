@@ -57,7 +57,7 @@ while ($i < $numberOfTeams) {
 
     $teamCurrentSeasonTotalSalary = $team->getTotalCurrentSeasonSalariesFromPlrResult($team->getRosterUnderContractOrderedByNameResult());
 
-    $bgcolor = ($userTeam->name == $team->name) ? $bgcolor = "bgcolor=FFFFAA" : $bgcolor = "";
+    ($userTeam->name == $team->name) ? $bgcolor = "bgcolor=FFFFAA" : $bgcolor = "";
 
     $table_echo .= "<tr>
 		<td bgcolor=#$team->color1>

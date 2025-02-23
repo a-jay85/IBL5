@@ -383,11 +383,7 @@ class UI
                     if ($moduleName == "Next_Sim") {
                         (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "FFFFAA";
                     } elseif ($moduleName == "League_Starters") {
-                        if ($player->teamID == $team->teamID) {
-                            $bgcolor = "FFFFAA";
-                        } else {
-                            $bgcolor = "FFFFFF";
-                        }
+                        ($player->teamID == $team->teamID) ? $bgcolor = "FFFFAA" : $bgcolor = "FFFFFF";
                     } else {
                         (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
                     }

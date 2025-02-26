@@ -1,7 +1,6 @@
 .DS_Store
 .env
 .ftpquota
-.htaccess
 .vscode
 error_log
 node_modules
@@ -23,3 +22,4 @@ depthcharts
 !/ibl5/ibl/IBL/Standings.htm
 !/ibl5/classes/
 !/ibl5/modules/
+.htaccess

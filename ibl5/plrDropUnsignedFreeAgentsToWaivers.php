@@ -11,6 +11,7 @@ while (!feof($plrFile)) {
     $tid = substr($line, 44, 2);
     $currentContractYear = substr($line, 290, 2);
     $totalContractYears = substr($line, 292, 2);
+    $contractOwnedBy = substr($line, 331, 2);
 
     if ($tid != 0
         AND is_numeric($tid)
@@ -18,7 +19,6 @@ while (!feof($plrFile)) {
         AND $currentContractYear == $totalContractYears
     ) {
         echo $line . "<br>";
-        echo "$name's original teamID = " . $tid . "<br>";
         
         echo "tid = $tid<br>";
         fseek($plrFile, -565, SEEK_CUR);
@@ -27,10 +27,20 @@ while (!feof($plrFile)) {
 
         $tid = " 0";
         fwrite($plrFile, $tid, 2);
+        // fseek($plrFile, +2, SEEK_CUR);
         echo "$name's new teamID = " . $tid . "<br>";
         echo "<br>";
-        
-        fseek($plrFile, +563, SEEK_CUR);
+
+        echo "contractOwnedBy = $contractOwnedBy<br>";
+        fseek($plrFile, 285, SEEK_CUR);
+        echo "contractOwnedBy check = " . fread($plrFile, 2) . "<br>";
+        fseek($plrFile, -2, SEEK_CUR);
+
+        $contractOwnedBy = " 0";
+        fwrite($plrFile, $contractOwnedBy, 2);
+        // fseek($plrFile, +2, SEEK_CUR);
+        echo "$name's new contractOwnedBy = " . $contractOwnedBy . "<br>";
+        echo "<br>";
     }
 
 }

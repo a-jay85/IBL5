@@ -317,6 +317,8 @@ function extractStandingsValues()
     foreach ($rowsByDivision as $row) {
         if (!is_null($row->childNodes)) {
             $teamName = $row->childNodes->item(0)->nodeValue;
+            $teamID = $sharedFunctions->getTidFromTeamname($teamName);
+
             if (in_array($teamName, array("Atlantic", "Central", "Midwest", "Pacific"))) {
                 $division = $teamName;
             }
@@ -324,11 +326,13 @@ function extractStandingsValues()
                 $divGB = $row->childNodes->item(3)->nodeValue;
 
                 $sqlQueryString = "INSERT INTO ibl_standings (
+                    tid,
 					team_name,
 					division,
 					divGB
 				)
 				VALUES (
+                    '$teamID',
 					'$teamName',
 					'$division',
 					'$divGB'
@@ -448,7 +452,7 @@ function updateMagicNumbers($region)
     echo "<p>Updating the magic numbers for the $region...<br>";
     list($grouping, $groupingGB, $groupingMagicNumber) = assignGroupingsFor($region);
 
-    $query = "SELECT team_name, homeWins, homeLosses, awayWins, awayLosses
+    $query = "SELECT tid, team_name, homeWins, homeLosses, awayWins, awayLosses
 		FROM ibl_standings
 		WHERE $grouping = '$region'
 		ORDER BY pct DESC";
@@ -457,20 +461,23 @@ function updateMagicNumbers($region)
 
     $i = 0;
     while ($i < $limit) {
-        $teamName = $db->sql_result($result, $i, 0);
-        $teamTotalWins = $db->sql_result($result, $i, 1) + $db->sql_result($result, $i, 3);
+        $teamID = $db->sql_result($result, $i, 0);
+        $teamName = $db->sql_result($result, $i, 1);
+        $teamTotalWins = $db->sql_result($result, $i, 2) + $db->sql_result($result, $i, 4);
         if ($i + 1 != $limit) {
-            $belowTeamTotalLosses = $db->sql_result($result, $i + 1, 2) + $db->sql_result($result, $i + 1, 4);
+            $belowTeamTotalLosses = $db->sql_result($result, $i + 1, 3) + $db->sql_result($result, $i + 1, 5);
         } else {
             $belowTeamTotalLosses = 0; // This results in an inaccurate Magic Number for the bottom team in the $region, but prevents query errors
         }
         $magicNumber = 82 + 1 - $teamTotalWins - $belowTeamTotalLosses; // TODO: Make number of games in a season dynamic
 
         $sqlQueryString = "INSERT INTO ibl_standings (
+            tid,
 			team_name,
 			$groupingMagicNumber
 		)
 		VALUES (
+            '$teamID',
 			'$teamName',
 			'$magicNumber'
 		)

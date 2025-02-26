@@ -24,18 +24,25 @@ $schedule->preserveWhiteSpace = false;
 
 $rows = $schedule->getElementsByTagName('tr');
 
-function extractDate($rawDate)
+function extractDate($rawDate, Season $season)
 {
     if ($rawDate != false) {
         if (substr($rawDate, 0, 4) === "Post") {
             $rawDate = substr_replace($rawDate, 'June', 0, 4); // TODO: recognize "Post" instead of hacking it into June
         }
-
+        
         $month = ltrim(date('m', strtotime($rawDate)), '0');
         $day = ltrim(date('d', strtotime($rawDate)), '0');
         $year = date('Y', strtotime($rawDate));
-        $date = $year . "-" . $month . "-" . $day;
 
+        if ($season->phase == "Preseason") {
+            $month = Season::IBL_PRESEASON_MONTH;
+        } elseif ($season->phase == "HEAT") {
+            $month = Season::IBL_HEAT_MONTH;
+        }
+        
+        $date = $year . "-" . $month . "-" . $day;
+        
         $dateArray = array(
             "date" => $date,
             "year" => $year,
@@ -77,7 +84,7 @@ foreach ($rows as $row) {
     $checkFirstCell = $row->childNodes->item(0)->nodeValue;
 
     if ($checkSecondCell === null/*AND substr($checkFirstCell,0,4) !== "Post"*/) {
-        $fullDate = extractDate($row->textContent);
+        $fullDate = extractDate($row->textContent, $season);
         $date = $fullDate['date'];
         $year = $fullDate['year'];
     }

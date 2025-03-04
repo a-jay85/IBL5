@@ -533,11 +533,19 @@ while ($i < $numTeams) {
     $tid = $db->sql_result($resultTeams, $i, "TeamID");
     $teamName = $db->sql_result($resultTeams, $i, "Team");
 
+    if ($season->phase == "Preseason") {
+        $month = " " . Season::IBL_PRESEASON_MONTH;
+    } elseif ($season->phase == "HEAT") {
+        $month = Season::IBL_HEAT_MONTH;
+    } else {
+        $month = Season::IBL_REGULAR_SEASON_STARTING_MONTH;
+    }
+
     $queryGames = "SELECT Visitor, VScore, Home, HScore
 		FROM ibl_schedule
 		WHERE (Visitor = $tid OR Home = $tid)
 		AND (BoxID > 0 AND BoxID < 100000)
-		AND Date BETWEEN '" . ($season->beginningYear) . "-10-31' AND '$season->endingYear-05-30'
+		AND Date BETWEEN '" . ($season->beginningYear) . "-$month-01' AND '$season->endingYear-05-30'
 		ORDER BY Date ASC";
 
     $resultGames = $db->sql_query($queryGames);

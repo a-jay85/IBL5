@@ -418,7 +418,7 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
                 if ($hashammer == 1) {
                     echo "<form name=\"tradeaccept\" method=\"post\" action=\"accepttradeoffer.php\">
 						<input type=\"hidden\" name=\"offer\" value=\"$offerid\">
-						<input type=\"submit\" value=\"Accept\">
+						<input type=\"submit\" value=\"Accept\" onclick=\"this.disabled=true;this.value='Submitting...'; this.form.submit();\">
 					</form>";
                 } else {
                     echo "(Awaiting Approval)";

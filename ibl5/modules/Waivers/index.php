@@ -362,7 +362,7 @@ function waiverexecute($username, $action)
     echo "<input type=\"hidden\" name=\"healthyrosterslots\" value=\"$team->numberOfHealthyOpenRosterSpots\">";
     echo "
         <tr>
-            <td colspan=3><center><input type=\"submit\" value=\"Click to $action player(s) to/from Waiver Pool\"></center></td>
+            <td colspan=3><center><input type=\"submit\" value=\"Click to $action player(s) to/from Waiver Pool\" onclick=\"this.disabled=true;this.value='Submitting...'; this.form.submit();\"></center></td>
         </tr></form></table></center>";
     
         

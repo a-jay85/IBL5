@@ -91,6 +91,10 @@ foreach ($rows as $row) {
         $year = $fullDate['year'];
     }
 
+    if ($season->phase == "HEAT" AND $fullDate['month'] != Season::IBL_HEAT_MONTH) {
+        continue;
+    }
+
     if ($checkThirdCell !== null and $checkThirdCell !== "" and $checkFirstCell !== "visitor") {
         if ($row->childNodes->item(1)->getElementsByTagName('a')->length !== 0) {
             $boxLink = $row->childNodes->item(1)->getElementsByTagName('a')->item(0)->getAttribute('href');

@@ -38,7 +38,9 @@ function extractDate($rawDate, Season $season)
         if ($season->phase == "Preseason") {
             $month = Season::IBL_PRESEASON_MONTH;
         } elseif ($season->phase == "HEAT") {
-            $month = Season::IBL_HEAT_MONTH;
+            if ($month == 11) {
+                $month = Season::IBL_HEAT_MONTH;
+            }
         }
         
         $date = $year . "-" . $month . "-" . $day;

@@ -47,31 +47,15 @@ class Team
         ($identifier) ? $identifier : $identifier = League::FREE_AGENTS_TEAMID;
 
         if (is_numeric($identifier)) {
-            $whereCondition = "tid = '$identifier'";
             $joinWhereCondition = "ibl_team_info.teamid = $identifier";
         } elseif (is_string($identifier)) {
-            $whereCondition = "teamname = '$identifier'";
             $joinWhereCondition = "ibl_team_info.team_name = '$identifier'";
         } elseif (is_array($identifier)) {
             $this->fill($db, $identifier);
             return $this;
         }
 
-        $query = "SELECT
-            *,
-            (SELECT COUNT(*)
-                FROM ibl_plr
-                WHERE $whereCondition
-                  AND retired = '0'
-                  AND ordinal <= '" . JSB::WAIVERS_ORDINAL ."'
-            ) AS numberOfPlayers,
-            (SELECT COUNT(*)
-                FROM ibl_plr
-                WHERE $whereCondition
-                  AND retired = '0'
-                  AND ordinal <= '" . JSB::WAIVERS_ORDINAL ."'
-                  AND injured = '0'
-            ) AS numberOfHealthyPlayers
+        $query = "SELECT * 
             FROM ibl_team_info
                 LEFT JOIN ibl_standings
                 ON ibl_team_info.teamid = ibl_standings.tid
@@ -103,11 +87,6 @@ class Team
         $this->hasUsedExtensionThisSeason = $teamRow['Used_Extension_This_Season'];
         $this->hasMLE = $teamRow['HasMLE'];
         $this->hasLLE = $teamRow['HasLLE'];
-
-        $this->numberOfPlayers = $teamRow['numberOfPlayers'];
-        $this->numberOfHealthyPlayers = $teamRow['numberOfHealthyPlayers'];
-        $this->numberOfOpenRosterSpots = 15 - $this->numberOfPlayers;
-        $this->numberOfHealthyOpenRosterSpots = 15 - $this->numberOfHealthyPlayers;
 
         $this->seasonRecord = $teamRow['leagueRecord'];
     }

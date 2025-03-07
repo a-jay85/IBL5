@@ -7,7 +7,6 @@ if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
 global $db, $cookie;
 $sharedFunctions = new Shared($db);
 $season = new Season($db);
-$isFreeAgencyModuleActive = $sharedFunctions->isFreeAgencyModuleActive();
 
 $username = $cookie[1];
 $userTeam = Team::initialize($db, $sharedFunctions->getTeamnameFromUsername($username));
@@ -27,35 +26,29 @@ while ($i < $numberOfTeams) {
     $teamRow = $db->sql_fetch_assoc($resultTeamInfo);
     $team = Team::initialize($db, $teamRow);
 
+    $teamTotalAvailableSalaryYear1[$i] = $teamTotalAvailableSalaryYear2[$i] = $teamTotalAvailableSalaryYear3[$i] = 0;
+    $teamTotalAvailableSalaryYear4[$i] = $teamTotalAvailableSalaryYear5[$i] = $teamTotalAvailableSalaryYear6[$i] = 0;
+    $teamFreeAgencySlots[$i] = 15;
+
+    $salaryCapSpent = $team->getSalaryCapArray($season);
+    $team_array1 = get_salary1($team->teamID);
+
+    $teamTotalAvailableSalaryYear1[$i] = League::HARD_CAP_MAX - $salaryCapSpent["year1"];
+    $teamTotalAvailableSalaryYear2[$i] = League::HARD_CAP_MAX - $salaryCapSpent["year2"];
+    $teamTotalAvailableSalaryYear3[$i] = League::HARD_CAP_MAX - $salaryCapSpent["year3"];
+    $teamTotalAvailableSalaryYear4[$i] = League::HARD_CAP_MAX - $salaryCapSpent["year4"];
+    $teamTotalAvailableSalaryYear5[$i] = League::HARD_CAP_MAX - $salaryCapSpent["year5"];
+    $teamTotalAvailableSalaryYear6[$i] = League::HARD_CAP_MAX - $salaryCapSpent["year6"];
+
     foreach (JSB::PLAYER_POSITIONS as $position) {
         ${"team" . $position . "sResult"} = $team->getPlayersUnderContractByPositionResult($position);
         ${"teamTotal" . $position . "NextSeasonSalary"} = $team->getTotalNextSeasonSalariesFromPlrResult(${"team" . $position . "sResult"});
     }
 
-    $teamTotalAvailableSalaryYear1[$i] = 0;
-    $teamTotalAvailableSalaryYear2[$i] = 0;
-    $teamTotalAvailableSalaryYear3[$i] = 0;
-    $teamTotalAvailableSalaryYear4[$i] = 0;
-    $teamTotalAvailableSalaryYear5[$i] = 0;
-    $teamTotalAvailableSalaryYear6[$i] = 0;
-    $teamFreeAgencySlots[$i] = 15;
-
-    $team_array = $team->getSalaryArray();
-    $team_array1 = get_salary1($team->teamID);
-
-    $teamTotalAvailableSalaryYear1[$i] = League::HARD_CAP_MAX - $team_array["year1Salary"];
-    $teamTotalAvailableSalaryYear2[$i] = League::HARD_CAP_MAX - $team_array["year2Salary"];
-    $teamTotalAvailableSalaryYear3[$i] = League::HARD_CAP_MAX - $team_array["year3Salary"];
-    $teamTotalAvailableSalaryYear4[$i] = League::HARD_CAP_MAX - $team_array["year4Salary"];
-    $teamTotalAvailableSalaryYear5[$i] = League::HARD_CAP_MAX - $team_array["year5Salary"];
-    $teamTotalAvailableSalaryYear6[$i] = League::HARD_CAP_MAX - $team_array["year6Salary"];
-
     $teamFreeAgencySlots[$i] = $teamFreeAgencySlots[$i] - $team_array1[1]["roster"];
 
     $MLEicon = ($team->hasMLE == "1") ? "\u{2705}" : "\u{274C}";
     $LLEicon = ($team->hasLLE == "1") ? "\u{2705}" : "\u{274C}";
-
-    $teamCurrentSeasonTotalSalary = $team->getTotalCurrentSeasonSalariesFromPlrResult($team->getRosterUnderContractOrderedByNameResult());
 
     ($userTeam->name == $team->name) ? $bgcolor = "bgcolor=FFFFAA" : $bgcolor = "";
 
@@ -64,24 +57,13 @@ while ($i < $numberOfTeams) {
 			<a href=\"modules.php?name=Team&op=team&tid=$team->teamID&display=contracts\">
 				<font color=#$team->color2>$team->city $team->name
 			</a>
-		</td>";
-
-    if (!$isFreeAgencyModuleActive) {
-         $table_echo .= "<td $bgcolor align=center>" . (League::HARD_CAP_MAX - $teamCurrentSeasonTotalSalary) . "</td>";
-    }
-
-    $table_echo .= "
-		<td $bgcolor align=center>$teamTotalAvailableSalaryYear1[$i]</td>
-		<td $bgcolor align=center>$teamTotalAvailableSalaryYear2[$i]</td>
-		<td $bgcolor align=center>$teamTotalAvailableSalaryYear3[$i]</td>
-		<td $bgcolor align=center>$teamTotalAvailableSalaryYear4[$i]</td>
-		<td $bgcolor align=center>$teamTotalAvailableSalaryYear5[$i]</td>";
-
-    if ($isFreeAgencyModuleActive) {
-        $table_echo .= "<td align=center>$teamTotalAvailableSalaryYear6[$i]</td>";
-    }
-
-	$table_echo .= "	
+		</td>
+        <td $bgcolor align=center>$teamTotalAvailableSalaryYear1[$i]</td>
+        <td $bgcolor align=center>$teamTotalAvailableSalaryYear2[$i]</td>
+        <td $bgcolor align=center>$teamTotalAvailableSalaryYear3[$i]</td>
+        <td $bgcolor align=center>$teamTotalAvailableSalaryYear4[$i]</td>
+        <td $bgcolor align=center>$teamTotalAvailableSalaryYear5[$i]</td>
+        <td $bgcolor align=center>$teamTotalAvailableSalaryYear6[$i]</td>
         <td bgcolor=#AAA></td>
         <td $bgcolor align=center>$teamTotalPGNextSeasonSalary</td>
         <td $bgcolor align=center>$teamTotalSGNextSeasonSalary</td>
@@ -97,34 +79,24 @@ while ($i < $numberOfTeams) {
     $i++;
 }
 
+$beginningYear = ($season->phase == "Free Agency") ? $season->beginningYear + 1 : $season->beginningYear;
+$endingYear = ($season->phase == "Free Agency") ? $season->endingYear + 1 : $season->endingYear;
+
 $text .= "<table class=\"sortable\" border=1>
 	<tr>
-		<th>Team</th>";
-
-
-if (!$isFreeAgencyModuleActive) {
-    $text .= "<th>" . ($season->beginningYear) . "-<br>" . ($season->endingYear) . "<br>Total</th>";
-}
-		
-$text .= "
-		<th>" . ($season->endingYear + 0) . "-<br>" . ($season->endingYear + 1) . "<br>Total</th>
-		<th>" . ($season->endingYear + 1) . "-<br>" . ($season->endingYear + 2) . "<br>Total</th>
-		<th>" . ($season->endingYear + 2) . "-<br>" . ($season->endingYear + 3) . "<br>Total</th>
-		<th>" . ($season->endingYear + 3) . "-<br>" . ($season->endingYear + 4) . "<br>Total</th>
-		<th>" . ($season->endingYear + 4) . "-<br>" . ($season->endingYear + 5) . "<br>Total</th>";
-
-
-if ($isFreeAgencyModuleActive) {
-    $text .= "<th>" . ($season->endingYear + 5) . "-<br>" . ($season->endingYear + 6) . "<br>Total</th>";
-}
-
-$text .= "
+		<th>Team</th>
+		<th>" . ($beginningYear + 0) . "-<br>" . ($endingYear + 0) . "<br>Total</th>
+		<th>" . ($beginningYear + 1) . "-<br>" . ($endingYear + 1) . "<br>Total</th>
+		<th>" . ($beginningYear + 2) . "-<br>" . ($endingYear + 2) . "<br>Total</th>
+		<th>" . ($beginningYear + 3) . "-<br>" . ($endingYear + 3) . "<br>Total</th>
+		<th>" . ($beginningYear + 4) . "-<br>" . ($endingYear + 4) . "<br>Total</th>
+		<th>" . ($beginningYear + 5) . "-<br>" . ($endingYear + 5) . "<br>Total</th>
         <td bgcolor=#AAA></td>
-		<th>" . ($season->endingYear + 0) . "-<br>" . ($season->endingYear + 1) . "<br>PG</th>
-		<th>" . ($season->endingYear + 0) . "-<br>" . ($season->endingYear + 1) . "<br>SG</th>
-		<th>" . ($season->endingYear + 0) . "-<br>" . ($season->endingYear + 1) . "<br>SF</th>
-		<th>" . ($season->endingYear + 0) . "-<br>" . ($season->endingYear + 1) . "<br>PF</th>
-		<th>" . ($season->endingYear + 0) . "-<br>" . ($season->endingYear + 1) . "<br>C</th>
+		<th>" . ($beginningYear) . "-<br>" . ($endingYear) . "<br>PG</th>
+		<th>" . ($beginningYear) . "-<br>" . ($endingYear) . "<br>SG</th>
+		<th>" . ($beginningYear) . "-<br>" . ($endingYear) . "<br>SF</th>
+		<th>" . ($beginningYear) . "-<br>" . ($endingYear) . "<br>PF</th>
+		<th>" . ($beginningYear) . "-<br>" . ($endingYear) . "<br>C</th>
         <td bgcolor=#AAA></td>
 		<th>FA Slots</th>
         <th>Has MLE</th>

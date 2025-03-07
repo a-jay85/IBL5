@@ -249,25 +249,27 @@ class Team
         return $result;
     }
 
-    public function getSalaryArray()
+    public function getSalaryCapArray(Season $season)
     {  
-        $queryMoneyOwedUnderContractAfterThisSeason = "SELECT * FROM ibl_plr WHERE retired = 0 AND tid = $this->teamID AND cy <> cyt";
-        $resultMoneyOwedUnderContractAfterThisSeason = $this->db->sql_query($queryMoneyOwedUnderContractAfterThisSeason);
+        $salaryCapSpent[] = 0;
+        $resultContracts = $this->getRosterUnderContractOrderedByNameResult();
     
-        $contract_amt[] = 0;
-    
-        foreach ($resultMoneyOwedUnderContractAfterThisSeason as $contract) {
+        foreach ($resultContracts as $contract) {
             $yearUnderContract = $contract['cy'];
-    
-            $i = 1;
-            while ($yearUnderContract < $contract['cyt']) {
+            if ($season->phase == "Free Agency") {
                 $yearUnderContract++;
+            }
+            
+            $i = 1;
+            while ($yearUnderContract <= $contract['cyt']) {
                 $fieldString = "cy" . $yearUnderContract;
-                $contract_amt["year" . $i . "Salary"] += $contract["$fieldString"];
+                $salaryCapSpent["year" . $i] += $contract["$fieldString"];
+                $yearUnderContract++;
                 $i++;
             }
         }
-        return $contract_amt;
+
+        return $salaryCapSpent;
     }
 
     public function getTotalCurrentSeasonSalariesFromPlrResult($result)

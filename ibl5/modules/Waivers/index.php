@@ -344,11 +344,14 @@ function waiverexecute($username, $action)
         $k++;
     }
 
+    $numberOfOpenRosterSpots = 15 - $team->getHealthyAndInjuredPlayersOrderedByNameResult()->num_rows;
+    $numberOfHealthyOpenRosterSpots = 15 - $team->getHealthyPlayersOrderedByNameResult()->num_rows;
+
     echo "<center><font color=red><b>$errortext</b></font></center>";
     echo "<form name=\"Waiver_Move\" method=\"post\" action=\"\"><input type=\"hidden\" name=\"Team_Name\" value=\"$team->name\">";
     echo "<center><img src=\"images/logo/$team->teamID.jpg\"><br><table border=1 cellspacing=0 cellpadding=0>
         <tr>
-            <th colspan=3><center>WAIVER WIRE - YOUR TEAM CURRENTLY HAS $team->numberOfOpenRosterSpots EMPTY ROSTER SPOTS and $team->numberOfHealthyOpenRosterSpots HEALTHY ROSTER SPOTS</center></th>
+            <th colspan=3><center>WAIVER WIRE - YOUR TEAM CURRENTLY HAS $numberOfOpenRosterSpots EMPTY ROSTER SPOTS and $numberOfHealthyOpenRosterSpots HEALTHY ROSTER SPOTS</center></th>
         </tr>
         <tr>
             <td valign=top><center><b><u>$userinfo[user_ibl_team]</u></b>
@@ -358,8 +361,8 @@ function waiverexecute($username, $action)
             </td>
         </tr>";
     echo "<input type=\"hidden\" name=\"Action\" value=\"$action\">";
-    echo "<input type=\"hidden\" name=\"rosterslots\" value=\"$team->numberOfOpenRosterSpots\">";
-    echo "<input type=\"hidden\" name=\"healthyrosterslots\" value=\"$team->numberOfHealthyOpenRosterSpots\">";
+    echo "<input type=\"hidden\" name=\"rosterslots\" value=\"$numberOfOpenRosterSpots\">";
+    echo "<input type=\"hidden\" name=\"healthyrosterslots\" value=\"$numberOfHealthyOpenRosterSpots\">";
     echo "
         <tr>
             <td colspan=3><center><input type=\"submit\" value=\"Click to $action player(s) to/from Waiver Pool\" onclick=\"this.disabled=true;this.value='Submitting...'; this.form.submit();\"></center></td>

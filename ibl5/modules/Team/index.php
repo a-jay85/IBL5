@@ -167,7 +167,7 @@ function team($tid)
         $starters_table = lastSimsStarters($db, $result, $team);
     }
 
-    $tableDraftPicks = UI\Modules\Team::draftPicks($db, $team);
+    $tableDraftPicks = $team ? UI\Modules\Team::draftPicks($db, $team) : "";
 
     $inforight = team_info_right($team);
     $team_info_right = $inforight[0];

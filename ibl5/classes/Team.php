@@ -88,7 +88,7 @@ class Team
         $this->hasMLE = $teamRow['HasMLE'];
         $this->hasLLE = $teamRow['HasLLE'];
 
-        $this->seasonRecord = $teamRow['leagueRecord'];
+        $this->seasonRecord = $teamRow['leagueRecord']; // only available if the object is not loaded from an array
     }
 
     public function getBuyoutsResult()

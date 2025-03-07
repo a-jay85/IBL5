@@ -43,12 +43,12 @@ while ($i < $numberOfTeams) {
     $team_array = get_salary($team->teamID);
     $team_array1 = get_salary1($team->teamID);
 
-    $teamTotalAvailableSalaryYear1[$i] = League::HARD_CAP_MAX - $team_array[1]["salary"];
-    $teamTotalAvailableSalaryYear2[$i] = League::HARD_CAP_MAX - $team_array[2]["salary"];
-    $teamTotalAvailableSalaryYear3[$i] = League::HARD_CAP_MAX - $team_array[3]["salary"];
-    $teamTotalAvailableSalaryYear4[$i] = League::HARD_CAP_MAX - $team_array[4]["salary"];
-    $teamTotalAvailableSalaryYear5[$i] = League::HARD_CAP_MAX - $team_array[5]["salary"];
-    $teamTotalAvailableSalaryYear6[$i] = League::HARD_CAP_MAX - $team_array[6]["salary"];
+    $teamTotalAvailableSalaryYear1[$i] = League::HARD_CAP_MAX - $team_array["year1Salary"];
+    $teamTotalAvailableSalaryYear2[$i] = League::HARD_CAP_MAX - $team_array["year2Salary"];
+    $teamTotalAvailableSalaryYear3[$i] = League::HARD_CAP_MAX - $team_array["year3Salary"];
+    $teamTotalAvailableSalaryYear4[$i] = League::HARD_CAP_MAX - $team_array["year4Salary"];
+    $teamTotalAvailableSalaryYear5[$i] = League::HARD_CAP_MAX - $team_array["year5Salary"];
+    $teamTotalAvailableSalaryYear6[$i] = League::HARD_CAP_MAX - $team_array["year6Salary"];
 
     $teamFreeAgencySlots[$i] = $teamFreeAgencySlots[$i] - $team_array1[1]["roster"];
 
@@ -144,7 +144,7 @@ function get_salary($tid)
     $queryMoneyOwedUnderContractAfterThisSeason = "SELECT * FROM ibl_plr WHERE retired = 0 AND tid = $tid AND cy <> cyt";
     $resultMoneyOwedUnderContractAfterThisSeason = $db->sql_query($queryMoneyOwedUnderContractAfterThisSeason);
 
-    $contract_amt[][] = 0;
+    $contract_amt[] = 0;
 
     foreach ($resultMoneyOwedUnderContractAfterThisSeason as $contract) {
         $yearUnderContract = $contract['cy'];
@@ -153,7 +153,7 @@ function get_salary($tid)
         while ($yearUnderContract < $contract['cyt']) {
             $yearUnderContract++;
             $fieldString = "cy" . $yearUnderContract;
-            $contract_amt[$i]["salary"] += $contract["$fieldString"];
+            $contract_amt["year" . $i . "Salary"] += $contract["$fieldString"];
             $i++;
         }
     }

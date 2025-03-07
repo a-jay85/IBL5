@@ -40,7 +40,7 @@ while ($i < $numberOfTeams) {
     $teamTotalAvailableSalaryYear6[$i] = 0;
     $teamFreeAgencySlots[$i] = 15;
 
-    $team_array = get_salary($team->teamID);
+    $team_array = $team->getSalaryArray();
     $team_array1 = get_salary1($team->teamID);
 
     $teamTotalAvailableSalaryYear1[$i] = League::HARD_CAP_MAX - $team_array["year1Salary"];
@@ -136,29 +136,6 @@ echo $text;
 
 CloseTable();
 Nuke\Footer::footer();
-
-function get_salary($tid)
-{
-    global $db;
-
-    $queryMoneyOwedUnderContractAfterThisSeason = "SELECT * FROM ibl_plr WHERE retired = 0 AND tid = $tid AND cy <> cyt";
-    $resultMoneyOwedUnderContractAfterThisSeason = $db->sql_query($queryMoneyOwedUnderContractAfterThisSeason);
-
-    $contract_amt[] = 0;
-
-    foreach ($resultMoneyOwedUnderContractAfterThisSeason as $contract) {
-        $yearUnderContract = $contract['cy'];
-
-        $i = 1;
-        while ($yearUnderContract < $contract['cyt']) {
-            $yearUnderContract++;
-            $fieldString = "cy" . $yearUnderContract;
-            $contract_amt["year" . $i . "Salary"] += $contract["$fieldString"];
-            $i++;
-        }
-    }
-    return $contract_amt;
-}
 
 function get_salary1($tid)
 {

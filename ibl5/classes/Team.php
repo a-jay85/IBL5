@@ -249,6 +249,27 @@ class Team
         return $result;
     }
 
+    public function getSalaryArray()
+    {  
+        $queryMoneyOwedUnderContractAfterThisSeason = "SELECT * FROM ibl_plr WHERE retired = 0 AND tid = $this->teamID AND cy <> cyt";
+        $resultMoneyOwedUnderContractAfterThisSeason = $this->db->sql_query($queryMoneyOwedUnderContractAfterThisSeason);
+    
+        $contract_amt[] = 0;
+    
+        foreach ($resultMoneyOwedUnderContractAfterThisSeason as $contract) {
+            $yearUnderContract = $contract['cy'];
+    
+            $i = 1;
+            while ($yearUnderContract < $contract['cyt']) {
+                $yearUnderContract++;
+                $fieldString = "cy" . $yearUnderContract;
+                $contract_amt["year" . $i . "Salary"] += $contract["$fieldString"];
+                $i++;
+            }
+        }
+        return $contract_amt;
+    }
+
     public function getTotalCurrentSeasonSalariesFromPlrResult($result)
     {
         $totalCurrentSeasonSalaries = 0;

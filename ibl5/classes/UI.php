@@ -2,11 +2,8 @@
 
 class UI
 {
-    public static function displaytopmenu($db, $teamID)
+    public static function displaytopmenu($db, $teamID = League::FREE_AGENTS_TEAMID)
     {
-        if (!$teamID) {
-            $teamID = League::FREE_AGENTS_TEAMID;
-        }
         $team = Team::initialize($db, $teamID);
 
         echo "<center><table width=400 border=0><tr>";

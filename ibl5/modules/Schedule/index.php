@@ -73,7 +73,7 @@ function chunk($chunk_start_date, $chunk_end_date, $j)
     $teamSeasonRecordsResult = $db->sql_query($teamSeasonRecordsQuery);
 
     $season->lastSimEndDate = date_create($season->lastSimEndDate);
-    $projectedNextSimEndDate = date_add($season->lastSimEndDate, date_interval_create_from_date_string(Sim::LENGTH_IN_DAYS . ' days'));
+    $projectedNextSimEndDate = date_add($season->lastSimEndDate, date_interval_create_from_date_string(League::getSimLengthInDays($db) . ' days'));
 
     // override $projectedNextSimEndDate to account for the blank week at end of HEAT
     if ($projectedNextSimEndDate >= date_create("$season->beginningYear-10-23") and $projectedNextSimEndDate < date_create("$season->beginningYear-11-01")) {

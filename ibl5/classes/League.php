@@ -26,6 +26,16 @@ class League
         return $tidsFormattedForQuery;
     }
 
+    public static function getSimLengthInDays($db)
+    {
+        $querySimLengthInDays = $db->sql_query("SELECT value
+            FROM ibl_settings
+            WHERE name = 'Sim Length in Days'
+            LIMIT 1");
+
+        return $db->sql_result($querySimLengthInDays, 0);
+    }
+
     public function getAllStarCandidatesResult($votingCategory)
     {
         if (strpos($votingCategory, 'EC') !== false) {

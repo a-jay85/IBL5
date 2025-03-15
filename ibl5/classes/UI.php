@@ -579,11 +579,8 @@ class UI
                 <td><center><b>$teamStats->seasonOffenseBlocksPerGame</center></td>
                 <td><center><b>$teamStats->seasonOffensePersonalFoulsPerGame</center></td>
                 <td><center><b>$teamStats->seasonOffensePointsPerGame</center></td>
-            </tr>";
-        }
-    
-        if ($yr == "") {
-            $table_averages .= "<tr>
+            </tr>
+            <tr>
                 <td colspan=4><b>$team->name Defense</td>
                 <td><center><b>$teamStats->seasonDefenseGamesPlayed</center></td>
                 <td><b>$teamStats->seasonDefenseGamesPlayed</td>

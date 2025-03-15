@@ -548,7 +548,8 @@ class UI
 
         // ========= TEAM AVERAGES DISPLAY
     
-        $table_averages = $table_averages . "</tbody><tfoot>";
+        $table_averages .= "</tbody>
+            <tfoot>";
     
         $teamStats = TeamStats::withTeamName($db, $team->name);
     

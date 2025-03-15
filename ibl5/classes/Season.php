@@ -47,7 +47,7 @@ class Season
         $this->lastSimStartDate = $arrayLastSimDates["Start Date"];
         $this->lastSimEndDate = $arrayLastSimDates["End Date"];
 
-        $this->projectedNextSimEndDate = $this->getProjectedNextSimEndDate($this->lastSimEndDate);
+        $this->projectedNextSimEndDate = $this->getProjectedNextSimEndDate($db, $this->lastSimEndDate);
 
         $this->allowTrades = $this->getAllowTradesStatus();
         $this->allowWaivers = $this->getAllowWaiversStatus();
@@ -118,17 +118,17 @@ class Season
         return $querySimDates;
     }
 
-    public function getProjectedNextSimEndDate($lastSimEndDate)
+    public function getProjectedNextSimEndDate($db, $lastSimEndDate)
     {
         $lastSimEndDate = date_create($lastSimEndDate);
-        $projectedNextSimEndDate = date_add($lastSimEndDate, date_interval_create_from_date_string(Sim::LENGTH_IN_DAYS . ' days'));
+        $projectedNextSimEndDate = date_add($lastSimEndDate, date_interval_create_from_date_string(League::getSimLengthInDays($db) . ' days'));
 
         // override $projectedNextSimEndDate to account for the blank week at end of HEAT
         if (
             $projectedNextSimEndDate > date_create("$this->beginningYear-10-21")
             AND $projectedNextSimEndDate < date_create("$this->beginningYear-11-02")
         ) {
-            $projectedNextSimEndDate = date_add($this->regularSeasonStartDate, date_interval_create_from_date_string(Sim::LENGTH_IN_DAYS . ' days'));
+            $projectedNextSimEndDate = date_add($this->regularSeasonStartDate, date_interval_create_from_date_string(League::getSimLengthInDays($db) . ' days'));
         }
     
         // override $projectedNextSimEndDate to account for the All-Star Break
@@ -136,7 +136,7 @@ class Season
             $projectedNextSimEndDate > date_create("$this->endingYear-01-31")
             AND $projectedNextSimEndDate <= date_create("$this->endingYear-02-05")
         ) {
-            $projectedNextSimEndDate = date_add($this->postAllStarStartDate, date_interval_create_from_date_string(Sim::LENGTH_IN_DAYS . ' days'));
+            $projectedNextSimEndDate = date_add($this->postAllStarStartDate, date_interval_create_from_date_string(League::getSimLengthInDays($db) . ' days'));
         }
 
         return $projectedNextSimEndDate;

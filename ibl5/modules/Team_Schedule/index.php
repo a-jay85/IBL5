@@ -76,7 +76,7 @@ foreach ($teamSchedule as $row) {
             <td colspan=5>
                 <h1>Team Schedule</h1>
                 <p>
-                <i>games highlighted in yellow are projected to be run next sim (<?= Sim::LENGTH_IN_DAYS ?> days)</i>
+                <i>games highlighted in yellow are projected to be run next sim (<?= League::getSimLengthInDays($db) ?> days)</i>
             </td>
         </tr>
 

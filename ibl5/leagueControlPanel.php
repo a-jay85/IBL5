@@ -97,6 +97,12 @@ if (isset($_POST['query'])) {
             }
             $successText = "Season Phase has been set to {$_POST['SeasonPhase']}.";
             break;
+        case 'Set Sim Length in Days':
+            if (isset($_POST['SimLengthInDays'])) {
+                $queryString = "UPDATE ibl_settings SET value = '{$_POST['SimLengthInDays']}' WHERE name = 'Sim Length in Days';";
+            }
+            $successText = "Sim Length in Days has been set to {$_POST['SimLengthInDays']}.";
+            break;
         case 'Set Waiver Wire Status':
             if (isset($_POST['Waivers'])) {
                 $queryString = "UPDATE ibl_settings SET value = '{$_POST['Waivers']}' WHERE name = 'Allow Waiver Moves';";
@@ -178,6 +184,8 @@ switch ($season->phase) {
     case 'Regular Season':
         echo "<A HREF=\"updateAllTheThings.php\">Update All The Things</A><p>
             <A HREF=\"scoParser.php\">Run scoParser.php</A><p>
+            <INPUT type='number' name='SimLengthInDays' min=1 max=180 size=3 value='" . League::getSimLengthInDays($db) . "'>
+            <INPUT type='submit' name='query' value='Set Sim Length in Days'> <i>(you HAVE to click this button to set the days – unfortunately you can't just hit return/enter)<p>
             <INPUT type='submit' name='query' value='Reset All-Star Voting'><p>
             <INPUT type='submit' name='query' value='Reset End of the Year Voting'><p>
             <select name=\"Trades\">

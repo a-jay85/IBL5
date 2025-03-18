@@ -54,28 +54,30 @@ foreach ($resultUserTeamProjectedGamesNextSim as $gameRow) {
 <?php else : ?>
     <table width=100% align=center>
         <?php for ($i = 0; $i < League::getSimLengthInDays($db) - 1; $i++) : ?>
-            <tr>
-                <td>
-                    <table align=center>
-                        <tr>
-                            <td style="text-align: right;" width=150>
-                                <h2><?= $rows[$i]['game']->date . ": " . $rows[$i]['game']->getUserTeamLocationPrefix($userTeam->teamID) ?></h2>
-                            </td>
-                            <td style="text-align: center; padding-left: 4px; padding-right: 4px">
-                                <img src="./images/logo/<?= $rows[$i]['opposingTeam']->teamID ?>.jpg">
-                            </td>
-                            <td style="text-align: left;" width=150>
-                                <h2><?= $rows[$i]['opposingTeam']->seasonRecord ?></h2>
-                            </td>
-                        </tr>
-                    </table>
-                </td>
-            </tr>
-            <tr>
-                <td>
-                    <?= UI::ratings($db, $rows[$i], $rows[$i]['opposingTeam'], "", $season, $module_name) ?>
-                </td>
-            </tr>
+            <?php if (isset($rows[$i]['game']) && $rows[$i]['game'] != NULL) : ?>
+                <tr>
+                    <td>
+                        <table align=center>
+                            <tr>
+                                <td style="text-align: right;" width=150>
+                                    <h2><?= $rows[$i]['game']->date . ": " . $rows[$i]['game']->getUserTeamLocationPrefix($userTeam->teamID) ?></h2>
+                                </td>
+                                <td style="text-align: center; padding-left: 4px; padding-right: 4px">
+                                    <img src="./images/logo/<?= $rows[$i]['opposingTeam']->teamID ?>.jpg">
+                                </td>
+                                <td style="text-align: left;" width=150>
+                                    <h2><?= $rows[$i]['opposingTeam']->seasonRecord ?></h2>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <?= UI::ratings($db, $rows[$i], $rows[$i]['opposingTeam'], "", $season, $module_name) ?>
+                    </td>
+                </tr>
+            <?php endif; ?>
             <tr style="height: 15px"></tr>
         <?php endfor; ?>
     </table>

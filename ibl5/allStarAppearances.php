@@ -16,8 +16,8 @@ echo "<table cellpadding=5 border=1>";
 
 while ($row = $db->sql_fetchrow($result)) {
     echo "<tr>
-        <td>" . $row[name] . "</td>
-        <td>" . $row[appearances] . "</td>
+        <td>" . $row['name'] . "</td>
+        <td>" . $row['appearances'] . "</td>
     </tr>";
 }
 

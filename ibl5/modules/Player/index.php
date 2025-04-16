@@ -2316,11 +2316,11 @@ function negotiate($pid)
                         <td>";
 
                 if ($dem1 < $maxyr1) {
-                    echo "<INPUT TYPE=\"text\" NAME=\"offeryear1\" SIZE=\"4\" VALUE=\"$dem1\"></td>
-                        <td><INPUT TYPE=\"text\" NAME=\"offeryear2\" SIZE=\"4\" VALUE=\"$dem2\"></td>
-                        <td><INPUT TYPE=\"text\" NAME=\"offeryear3\" SIZE=\"4\" VALUE=\"$dem3\"></td>
-                        <td><INPUT TYPE=\"text\" NAME=\"offeryear4\" SIZE=\"4\" VALUE=\"$dem4\"></td>
-                        <td><INPUT TYPE=\"text\" NAME=\"offeryear5\" SIZE=\"4\" VALUE=\"$dem5\"></td>
+                    echo "<INPUT TYPE=\"number\" style=\"width: 4em\" NAME=\"offeryear1\" SIZE=\"4\" VALUE=\"$dem1\"></td>
+                        <td><INPUT TYPE=\"number\" style=\"width: 4em\" NAME=\"offeryear2\" SIZE=\"4\" VALUE=\"$dem2\"></td>
+                        <td><INPUT TYPE=\"number\" style=\"width: 4em\" NAME=\"offeryear3\" SIZE=\"4\" VALUE=\"$dem3\"></td>
+                        <td><INPUT TYPE=\"number\" style=\"width: 4em\" NAME=\"offeryear4\" SIZE=\"4\" VALUE=\"$dem4\"></td>
+                        <td><INPUT TYPE=\"number\" style=\"width: 4em\" NAME=\"offeryear5\" SIZE=\"4\" VALUE=\"$dem5\"></td>
                     </tr>";
                 } else {
                     if ($player_bird >= 3) {

@@ -11,11 +11,11 @@ $Demands_Total = $_POST['demtot'] * 100;
 $Cap_Space = $_POST['capnumber'];
 $Offer_Max = $_POST['maxyr1'];
 $Bird = $_POST['bird'];
-$Offer_1 = $_POST['offeryear1'];
-$Offer_2 = $_POST['offeryear2'];
-$Offer_3 = $_POST['offeryear3'];
-$Offer_4 = $_POST['offeryear4'];
-$Offer_5 = $_POST['offeryear5'];
+$Offer_1 = (int) $_POST['offeryear1'];
+$Offer_2 = (int) $_POST['offeryear2'];
+$Offer_3 = (int) $_POST['offeryear3'];
+$Offer_4 = (int) $_POST['offeryear4'];
+$Offer_5 = (int) $_POST['offeryear5'];
 
 $Offer_max_increase = round($Offer_1 * 0.1, 0);
 

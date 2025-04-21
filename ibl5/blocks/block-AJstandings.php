@@ -20,12 +20,24 @@ if (!defined('BLOCK_FILE')) {
 global $db;
 $season = new Season($db);
 
-$content .= '<table width=150>';
-$content .= "<center><u>Recent Sim Dates:</u></center>";
-$content .= "<center><strong>$season->lastSimStartDate</strong></center>";
-$content .= "<center>-to-</center>";
-$content .= "<center><strong>$season->lastSimEndDate</strong></center>";
-$content .= '<tr><td colspan=2><hr></td></tr>';
+$content .= "<table width=150>
+    <center>
+        <u>Recent Sim Dates:</u>
+        <br>
+        <strong>
+            $season->lastSimStartDate
+        </strong>
+        <br>
+        -to-
+        <br>
+        <strong>
+            $season->lastSimEndDate
+        </strong>
+        <tr>
+            <td colspan=2>
+                <hr>
+            </td>
+        </tr>";
 
 $queryEasternConference = "SELECT tid, team_name, leagueRecord, confGB, clinchedConference, clinchedDivision, clinchedPlayoffs
     FROM ibl_standings

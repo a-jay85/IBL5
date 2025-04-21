@@ -20,9 +20,11 @@ if (!defined('BLOCK_FILE')) {
 global $db;
 $season = new Season($db);
 
-$content .= "<table width=150>
+$content .= "
     <center>
-        <u>Recent Sim Dates:</u>
+        <u>
+            Recent Sim Dates:
+        </u>
         <br>
         <strong>
             $season->lastSimStartDate
@@ -33,11 +35,12 @@ $content .= "<table width=150>
         <strong>
             $season->lastSimEndDate
         </strong>
-        <tr>
-            <td colspan=2>
-                <hr>
-            </td>
-        </tr>";
+        <table style=\"width:150px;\">
+            <tr>
+                <td colspan=3>
+                    <hr>
+                </td>
+            </tr>";
 
 $queryEasternConference = "SELECT tid, team_name, leagueRecord, confGB, clinchedConference, clinchedDivision, clinchedPlayoffs
     FROM ibl_standings
@@ -46,20 +49,23 @@ $queryEasternConference = "SELECT tid, team_name, leagueRecord, confGB, clinched
 $resultEasternConference = $db->sql_query($queryEasternConference);
 $limitEasternConference = $db->sql_numrows($resultEasternConference);
 
-$content .= '
+$content .= "
     <tr>
-        <td colspan=2>
+        <td colspan=3>
             <center><font color=#fd004d><b>Eastern Conference</b></font></center>
         </td>
     </tr>
     <tr bgcolor=#006cb3>
         <td>
-            <center><font color=#ffffff><b>Team (W-L)</b></font></center>
+            <center><font color=#ffffff><b>Team</b></font></center>
+        </td>
+        <td>
+            <center><font color=#ffffff><b>W-L</b></font></center>
         </td>
         <td>
             <center><font color=#ffffff><b>GB</b></font></center>
         </td>
-    </tr>';
+    </tr>";
 
 $i = 0;
 while ($i < $limitEasternConference) {
@@ -80,13 +86,13 @@ while ($i < $limitEasternConference) {
 
     $content .= "
         <tr>
-            <td style=\"white-space: nowrap; width: 10px;\">
+            <td style=\"white-space: nowrap;\">
                 <a href=\"modules.php?name=Team&op=team&tid=$tid\">$team_name</a>
             </td>
-            <td>
+            <td style=\"text-align: left;\">
                 $leagueRecord
             </td>
-            <td>
+            <td style=\"text-align: right;\">
                 $confGB
             </td>
         </tr>";
@@ -100,25 +106,28 @@ $queryWesternConference = "SELECT tid, team_name, leagueRecord, confGB, clinched
 $resultWesternConference = $db->sql_query($queryWesternConference);
 $limitWesternConference = $db->sql_numrows($resultWesternConference);
 
-$content .= '
+$content .= "
     <tr>
-        <td colspan=2>
+        <td colspan=3>
             <hr>
         </td>
     </tr>
     <tr>
-        <td colspan=2>
+        <td colspan=3>
             <center><font color=#fd004d><b>Western Conference</b></font></center>
         </td>
     </tr>
     <tr bgcolor=#006cb3>
         <td>
-            <center><font color=#ffffff><b>Team (W-L)</b></font></center>
+            <center><font color=#ffffff><b>Team</b></font></center>
+        </td>
+        <td>
+            <center><font color=#ffffff><b>W-L</b></font></center>
         </td>
         <td>
             <center><font color=#ffffff><b>GB</b></font></center>
         </td>
-    </tr>';
+    </tr>";
 
 $i = 0;
 while ($i < $limitWesternConference) {
@@ -137,22 +146,25 @@ while ($i < $limitWesternConference) {
         $team_name = "<b>X</b>-" . $team_name;
     }
 
-    $content .= '
+    $content .= "
         <tr>
-            <td nowrap>
-                <a href="modules.php?name=Team&op=team&tid=' . $tid . '">' . $team_name . '</a> (' . $leagueRecord . ')
+            <td style=\"white-space: nowrap; width: 10px;\">
+                <a href=\"modules.php?name=Team&op=team&tid=$tid\">$team_name</a>
             </td>
-            <td>
-                ' . $confGB . '
+            <td style=\"text-align: left;\">
+                $leagueRecord
             </td>
-        </tr>';
+            <td style=\"text-align: right;\">
+                $confGB
+            </td>
+        </tr>";
     $i++;
 }
 
-$content .= '
+$content .= "
     <tr>
-        <td colspan=2>
-            <center><a href="modules.php?name=Content&pa=showpage&pid=4"><font color=#aaaaaa><i>-- Full Standings --</i></font></a></center>
+        <td colspan=3>
+            <center><a href=\"modules.php?name=Content&pa=showpage&pid=4\"><font color=#aaaaaa><i>-- Full Standings --</i></font></a></center>
         </td>
     </tr>
-</table>';
+</table>";

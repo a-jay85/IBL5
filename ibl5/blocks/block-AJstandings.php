@@ -78,15 +78,18 @@ while ($i < $limitEasternConference) {
         $team_name = "<b>X</b>-" . $team_name;
     }
 
-    $content .= '
+    $content .= "
         <tr>
-            <td nowrap>
-                <a href="modules.php?name=Team&op=team&tid=' . $tid . '">' . $team_name . '</a> (' . $leagueRecord . ')
+            <td style=\"white-space: nowrap; width: 10px;\">
+                <a href=\"modules.php?name=Team&op=team&tid=$tid\">$team_name</a>
             </td>
             <td>
-                ' . $confGB . '
+                $leagueRecord
             </td>
-        </tr>';
+            <td>
+                $confGB
+            </td>
+        </tr>";
     $i++;
 }
 

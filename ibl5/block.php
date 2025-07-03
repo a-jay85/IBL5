@@ -5,7 +5,10 @@ $sharedFunctions = new Shared($db);
 
 $val = $_GET['day'];
 
-$query = "SELECT * FROM `ibl_fa_offers` ORDER BY name ASC, perceivedvalue DESC";
+$query = "SELECT ibl_fa_offers.*, ibl_plr.bird
+FROM ibl_fa_offers
+JOIN ibl_plr ON ibl_fa_offers.name = ibl_plr.name
+ORDER BY ibl_fa_offers.name ASC, ibl_fa_offers.perceivedvalue DESC";
 $result = $db->sql_query($query);
 $num = $db->sql_numrows($result);
 
@@ -17,6 +20,7 @@ echo "<HTML>
 		<TABLE BORDER=1>
 			<TR style=\"font-weight:bold\">
 				<TD COLSPAN=8>Free Agent Signings</TD>
+                <TD>Bird</TD>
 				<TD>MLE</TD>
 				<TD>LLE</TD>
 			</TR>";
@@ -55,6 +59,7 @@ while ($i < $num) {
     $offer5 = $db->sql_result($result, $i, "offer5");
     $offer6 = $db->sql_result($result, $i, "offer6");
 
+    $birdYears = $db->sql_result($result, $i, "bird");
     $MLE = $db->sql_result($result, $i, "MLE");
     $LLE = $db->sql_result($result, $i, "LLE");
     $random = $db->sql_result($result, $i, "random");
@@ -135,6 +140,7 @@ while ($i < $num) {
                 <TD>$offer4</TD>
                 <TD>$offer5</TD>
                 <TD>$offer6</TD>
+                <TD>$birdYears</TD>
                 <TD>$MLE</TD>
                 <TD>$LLE</TD>
             </TR>";
@@ -181,6 +187,7 @@ if ($offerAccepted) {
 $i = 0;
 echo "<TR style=\"font-weight:bold\">
     <TD COLSPAN=8>ALL OFFERS MADE</TD>
+    <TD>Bird</TD>
     <TD>MLE</TD>
     <TD>LLE</TD>
     <TD>RANDOM</TD>
@@ -199,6 +206,7 @@ while ($i < $num) {
     $offer5 = $db->sql_result($result, $i, "offer5");
     $offer6 = $db->sql_result($result, $i, "offer6");
 
+    $birdYears = $db->sql_result($result, $i, "bird");
     $MLE = $db->sql_result($result, $i, "MLE");
     $LLE = $db->sql_result($result, $i, "LLE");
     $random = $db->sql_result($result, $i, "random");
@@ -212,6 +220,7 @@ while ($i < $num) {
         <TD>$offer4</TD>
         <TD>$offer5</TD>
         <TD>$offer6</TD>
+        <TD>$birdYears</TD>
         <TD>$MLE</TD>
         <TD>$LLE</TD>
         <TD>$random</TD>

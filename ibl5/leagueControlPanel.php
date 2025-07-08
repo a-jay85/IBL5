@@ -215,12 +215,17 @@ switch ($season->phase) {
             <INPUT type='submit' name='query' value='Reset All MLEs/LLEs'><p>
             <INPUT type='submit' name='query' value='Set Free Agency factors for PFW'><p>
             <A HREF=\"tradition.php\">Set Free Agency factors for Tradition</A><p>
-            <INPUT type='submit' name='query' value='Set all players on waivers to Free Agents and reset their Bird years'><p>
             <select name=\"FANotifs\">
                 <option value = \"On\"" . ($season->freeAgencyNotificationsState == "On" ? " SELECTED" : "") . ">On</option>
                 <option value = \"Off\"" . ($season->freeAgencyNotificationsState == "Off" ? " SELECTED" : "") . ">Off</option>
             </select>
-            <INPUT type='submit' name='query' value='Toggle Free Agency Notifications'><p>";
+            <INPUT type='submit' name='query' value='Toggle Free Agency Notifications'><p>
+            <select name=\"Waivers\">
+                <option value = \"Yes\"" . ($season->allowWaivers == "Yes" ? " SELECTED" : "") . ">Yes</option>
+                <option value = \"No\"" . ($season->allowWaivers == "No" ? " SELECTED" : "") . ">No</option>
+            </select>
+            <INPUT type='submit' name='query' value='Set Waiver Wire Status'><p>
+            <INPUT type='submit' name='query' value='Set all players on waivers to Free Agents and reset their Bird years'><p>";
         break;
 }
 

@@ -18,7 +18,7 @@ $queryCurrentDraftSelection = "SELECT `player`
     WHERE `round` = '$draft_round' 
        AND `pick` = '$draft_pick';";
 $resultCurrentDraftSelection = $db->sql_query($queryCurrentDraftSelection);
-$currentDraftSelection = $db->sql_result($resultCurrentDraftSelection, 0);
+$currentDraftSelection = $db->sql_result($resultCurrentDraftSelection, 0, 'player');
 
 if (($currentDraftSelection == NULL OR $currentDraftSelection == "") AND $playerToBeDrafted != NULL) {
     // NOTE: $queryUpdateDraftTable and $queryUpdateRookieTable are formatted with single quotes to allow for apostrophes in player names.
@@ -42,15 +42,15 @@ if (($currentDraftSelection == NULL OR $currentDraftSelection == "") AND $player
     
         $queryNextTeamDraftPick = "SELECT team from ibl_draft WHERE player = '' ORDER BY round ASC, pick ASC LIMIT 1";
         $resultNextTeamDraftPick = $db->sql_query($queryNextTeamDraftPick);
-        $nextTeamDraftPick = $db->sql_result($resultNextTeamDraftPick, 0);
+        $nextTeamDraftPick = $db->sql_result($resultNextTeamDraftPick, 0, 'team');
 
         $teamOnTheClock = $sharedFunctions->getCurrentOwnerOfDraftPick($season->endingYear, $draft_round, $nextTeamDraftPick);
 
         if ($teamOnTheClock != NULL) {
             $queryDiscordIDOfTeamOnTheClock = "SELECT discordID from ibl_team_info WHERE team_name = '$teamOnTheClock' LIMIT 1;";
             $resultDiscordIDOfTeamOnTheClock = $db->sql_query($queryDiscordIDOfTeamOnTheClock);
-            $discordIDOfTeamOnTheClock = $db->sql_result($resultDiscordIDOfTeamOnTheClock, 0);
-    
+            $discordIDOfTeamOnTheClock = $db->sql_result($resultDiscordIDOfTeamOnTheClock, 0, 'discordID');
+
             $message .= '
     **<@!' . $discordIDOfTeamOnTheClock . '>** is on the clock!';
         } else {

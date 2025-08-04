@@ -28,7 +28,7 @@ if (isset($_POST['query'])) {
     
                 $i = 0;
                 while ($i < $numTeamNames) {
-                    $values .= "($currentSeasonHEATYear, '" . $db->sql_result($resultTeamNames, $i) . "', '" . $db->sql_result($resultTeamNames, $i) . "', 0, 0)";
+                    $values .= "($currentSeasonHEATYear, '" . $db->sql_result($resultTeamNames, $i, 'team_name') . "', '" . $db->sql_result($resultTeamNames, $i, 'team_name') . "', 0, 0)";
                     if ($i < $numTeamNames - 1) {
                         $values .= ", ";
                     }

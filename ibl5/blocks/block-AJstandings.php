@@ -69,13 +69,13 @@ $content .= "
 
 $i = 0;
 while ($i < $limitEasternConference) {
-    $tid = $db->sql_result($resultEasternConference, $i, 0);
-    $team_name = trim($db->sql_result($resultEasternConference, $i, 1));
-    $leagueRecord = $db->sql_result($resultEasternConference, $i, 2);
-    $confGB = $db->sql_result($resultEasternConference, $i, 3);
-    $clinchedConference = $db->sql_result($resultEasternConference, $i, 4);
-    $clinchedDivision = $db->sql_result($resultEasternConference, $i, 5);
-    $clinchedPlayoffs = $db->sql_result($resultEasternConference, $i, 6);
+    $tid = $db->sql_result($resultEasternConference, $i, 'tid');
+    $team_name = trim($db->sql_result($resultEasternConference, $i, 'team_name'));
+    $leagueRecord = $db->sql_result($resultEasternConference, $i, 'leagueRecord');
+    $confGB = $db->sql_result($resultEasternConference, $i, 'confGB');
+    $clinchedConference = $db->sql_result($resultEasternConference, $i, 'clinchedConference');
+    $clinchedDivision = $db->sql_result($resultEasternConference, $i, 'clinchedDivision');
+    $clinchedPlayoffs = $db->sql_result($resultEasternConference, $i, 'clinchedPlayoffs');
     if ($clinchedConference == 1) {
         $team_name = "<b>Z</b>-" . $team_name;
     } elseif ($clinchedDivision == 1) {
@@ -131,13 +131,13 @@ $content .= "
 
 $i = 0;
 while ($i < $limitWesternConference) {
-    $tid = $db->sql_result($resultWesternConference, $i, 0);
-    $team_name = trim($db->sql_result($resultWesternConference, $i, 1));
-    $leagueRecord = $db->sql_result($resultWesternConference, $i, 2);
-    $confGB = $db->sql_result($resultWesternConference, $i, 3);
-    $clinchedConference = $db->sql_result($resultWesternConference, $i, 4);
-    $clinchedDivision = $db->sql_result($resultWesternConference, $i, 5);
-    $clinchedPlayoffs = $db->sql_result($resultWesternConference, $i, 6);
+    $tid = $db->sql_result($resultWesternConference, $i, 'tid');
+    $team_name = trim($db->sql_result($resultWesternConference, $i, 'team_name'));
+    $leagueRecord = $db->sql_result($resultWesternConference, $i, 'leagueRecord');
+    $confGB = $db->sql_result($resultWesternConference, $i, 'confGB');
+    $clinchedConference = $db->sql_result($resultWesternConference, $i, 'clinchedConference');
+    $clinchedDivision = $db->sql_result($resultWesternConference, $i, 'clinchedDivision');
+    $clinchedPlayoffs = $db->sql_result($resultWesternConference, $i, 'clinchedPlayoffs');
     if ($clinchedConference == 1) {
         $team_name = "<b>Z</b>-" . $team_name;
     } elseif ($clinchedDivision == 1) {

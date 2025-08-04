@@ -180,7 +180,7 @@ class Team
               AND retired = 0
               AND " . $position . "Depth = 1";
         $result = $this->db->sql_query($query);
-        return $this->db->sql_result($result, 0);
+        return $this->db->sql_result($result, 0, 'pid');
     }
 
     public function getCurrentlySetStarterPlayerIDForPosition(string $position)
@@ -191,7 +191,7 @@ class Team
               AND retired = 0
               AND dc_" . $position . "Depth = 1";
         $result = $this->db->sql_query($query);
-        return $this->db->sql_result($result, 0);
+        return $this->db->sql_result($result, 0, 'pid');
     }
 
     public function getPlayersUnderContractByPositionResult($position)

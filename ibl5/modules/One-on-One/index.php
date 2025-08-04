@@ -835,7 +835,7 @@ function rungame($p1, $p2, $owner)
 
     $queryGetHighestGameID = "SELECT gameid FROM ibl_one_on_one ORDER BY gameid DESC LIMIT 1;";
     $resultGetHighestGameID = $db->sql_query($queryGetHighestGameID);
-    $newGameID = $db->sql_result($resultGetHighestGameID, 0) + 1;
+    $newGameID = $db->sql_result($resultGetHighestGameID, 0, 'gameid') + 1;
 
     if ($score1 > $score2) {
         $winner = addslashes($p1_name);

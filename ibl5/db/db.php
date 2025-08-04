@@ -63,7 +63,7 @@ switch ($dbtype) {
         break;
 
     case 'sqlite':
-        include "" . $the_include . "/sqlite.php";
+        // include "" . $the_include . "/sqlite.php";
         break;
 
     case 'postgres':
@@ -92,9 +92,11 @@ switch ($dbtype) {
 
 }
 
-if ($dbtype = 'MySQL') {
+if ($dbtype == 'MySQL') {
     $db = new MySQL($dbhost, $dbuname, $dbpass, $dbname, false);
     $mysqli_db = new mysqli($dbhost, $dbuname, $dbpass, $dbname);
+} else if ($dbtype == 'sqlite') {
+    $db = new SQLite($dbhost);
 } else {
     $db = new sql_db($dbhost, $dbuname, $dbpass, $dbname, false);
 }

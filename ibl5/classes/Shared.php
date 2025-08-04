@@ -16,7 +16,7 @@ class Shared
             WHERE team_name = '$teamname'
             LIMIT 1;");
 
-        return $this->db->sql_result($queryDiscordIDFromTeamname, 0);
+        return $this->db->sql_result($queryDiscordIDFromTeamname, 0, 'discordID');
     }
 
     public function getDiscordIDFromUsername($username)
@@ -27,7 +27,7 @@ class Shared
             WHERE username = '$username'
             LIMIT 1;");
 
-        return $this->db->sql_result($queryDiscordIDFromUsername, 0);
+        return $this->db->sql_result($queryDiscordIDFromUsername, 0, 'discordID');
     }
 
     public function getNumberOfTitles($teamname, $titleName)
@@ -37,7 +37,7 @@ class Shared
         	WHERE name = '$teamname'
         	  AND Award LIKE '%$titleName%';");
 
-        return $this->db->sql_result($queryNumberOfTitles, 0);
+        return $this->db->sql_result($queryNumberOfTitles, 0, 'COUNT(name)');
     }
 
     public function getCurrentOwnerOfDraftPick($draftYear, $draftRound, $teamNameOfDraftPickOrigin)
@@ -49,7 +49,7 @@ class Shared
               AND teampick = '$teamNameOfDraftPickOrigin'
             LIMIT 1;");
 
-        return $this->db->sql_result($queryCurrentOwnerOfDraftPick, 0);
+        return $this->db->sql_result($queryCurrentOwnerOfDraftPick, 0, 'ownerofpick');
     }
     
     public function getPlayerIDFromPlayerName($playerName)
@@ -58,8 +58,8 @@ class Shared
             FROM ibl_plr
             WHERE name = '$playerName'
             LIMIT 1;");
-    
-        return $this->db->sql_result($queryPlayerIDFromPlayerName, 0);
+
+        return $this->db->sql_result($queryPlayerIDFromPlayerName, 0, 'pid');
     }
 
     public function getTeamnameFromTid($tid)
@@ -69,7 +69,7 @@ class Shared
             WHERE teamid = $tid
             LIMIT 1;");
 
-        return $this->db->sql_result($queryTeamnameFromTid, 0);
+        return $this->db->sql_result($queryTeamnameFromTid, 0, 'team_name');
     }
 
     public function getTeamnameFromUsername($username)
@@ -80,7 +80,7 @@ class Shared
                 WHERE username = '$username'
                 LIMIT 1;");
 
-            return $this->db->sql_result($queryTeamnameFromUsername, 0);
+            return $this->db->sql_result($queryTeamnameFromUsername, 0, 'user_ibl_team');
         } else {
             return "Free Agents";
         }
@@ -93,7 +93,7 @@ class Shared
             WHERE team_name = '$teamname'
             LIMIT 1;");
 
-        return $this->db->sql_result($queryTidFromTeamname, 0);
+        return $this->db->sql_result($queryTidFromTeamname, 0, 'teamid');
     }
 
     public function isFreeAgencyModuleActive()

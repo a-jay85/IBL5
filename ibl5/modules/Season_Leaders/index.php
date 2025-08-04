@@ -223,7 +223,7 @@ function year_option($year_selected)
     $yearsArray = array();
     $i = 0;
     while ($i < $db->sql_numrows($years)) {
-        $yearsArray[] = $db->sql_result($years, $i);
+        $yearsArray[] = $db->sql_result($years, $i, 'year');
         $i++;
     }
 

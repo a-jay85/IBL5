@@ -159,7 +159,7 @@ function displayVotingResultsTable($query)
 
     while ($i < $num_rows) {
         $player[$i] = $db->sql_result($result, $i, "name");
-        $votes[$i] = $db->sql_result($result, $i);
+        $votes[$i] = $db->sql_result($result, $i, "votes");
 
         $row .= "<tr><td>" . $player[$i] . "</td><td>" . $votes[$i] . "</td></tr>";
 

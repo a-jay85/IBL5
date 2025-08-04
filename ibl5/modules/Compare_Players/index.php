@@ -359,7 +359,7 @@ function getPlayerNamesArray()
     $numRows = $db->sql_numrows($result);
     $i = 0;
     while ($i < $numRows) {
-        $array[$i] = $db->sql_result($result, $i);
+        $array[$i] = $db->sql_result($result, $i, "name");
         $i++;
     }
     return $array;

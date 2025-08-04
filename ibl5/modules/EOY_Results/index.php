@@ -49,7 +49,7 @@ $m = 0;
 while ($k < $num1) {
 
     $player[$k] = $db->sql_result($result1, $k, "name");
-    $votes[$k] = $db->sql_result($result1, $k);
+    $votes[$k] = $db->sql_result($result1, $k, "votes");
 
     $table_echo = $table_echo . "<tr><td>" . $player[$k] . "</td><td>" . $votes[$k] . "</td></tr>";
 
@@ -62,7 +62,7 @@ $text = $text . "<table class=\"sortable\" border=1>
 while ($h < $num2) {
 
     $player[$h] = $db->sql_result($result2, $h, "name");
-    $votes[$h] = $db->sql_result($result2, $h);
+    $votes[$h] = $db->sql_result($result2, $h, "votes");
 
     $table_echo1 = $table_echo1 . "<tr><td>" . $player[$h] . "</td><td>" . $votes[$h] . "</td></tr>";
 
@@ -74,7 +74,7 @@ $text1 = $text1 . "<table class=\"sortable\" border=1>
 while ($i < $num3) {
 
     $player[$i] = $db->sql_result($result3, $i, "name");
-    $votes[$i] = $db->sql_result($result3, $i);
+    $votes[$i] = $db->sql_result($result3, $i, "votes");
 
     $table_echo2 = $table_echo2 . "<tr><td>" . $player[$i] . "</td><td>" . $votes[$i] . "</td></tr>";
 
@@ -86,7 +86,7 @@ $text2 = $text2 . "<table class=\"sortable\" border=1>
 while ($m < $num4) {
 
     $player[$m] = $db->sql_result($result4, $m, "name");
-    $votes[$m] = $db->sql_result($result4, $m);
+    $votes[$m] = $db->sql_result($result4, $m, "votes");
 
     $table_echo3 = $table_echo3 . "<tr><td>" . $player[$m] . "</td><td>" . $votes[$m] . "</td></tr>";
 

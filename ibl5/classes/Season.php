@@ -36,7 +36,7 @@ class Season
 
         $this->phase = $this->getSeasonPhase();
 
-        $this->endingYear = $this->getSeasonEndingYear();
+        $this->endingYear = (int)$this->getSeasonEndingYear(); // Cast to integer since column type is VARCHAR
         $this->beginningYear = $this->endingYear - 1;
 
         $this->regularSeasonStartDate = date_create("$this->beginningYear-" . Season::IBL_REGULAR_SEASON_STARTING_MONTH . "-01");
@@ -62,7 +62,7 @@ class Season
             WHERE name = 'Current Season Phase'
             LIMIT 1");
 
-        return $this->db->sql_result($querySeasonPhase, 0);
+        return $this->db->sql_result($querySeasonPhase, 0, 'value');
     }
 
     public function getSeasonEndingYear()
@@ -72,7 +72,7 @@ class Season
             WHERE name = 'Current Season Ending Year'
             LIMIT 1");
 
-        return $this->db->sql_result($querySeasonEndingYear, 0);
+        return $this->db->sql_result($querySeasonEndingYear, 0, 'value');
     }
 
     public function getFirstBoxScoreDate()
@@ -82,7 +82,7 @@ class Season
             ORDER BY Date ASC
             LIMIT 1");
 
-        return $this->db->sql_result($queryFirstBoxScoreDate, 0);
+        return $this->db->sql_result($queryFirstBoxScoreDate, 0, 'Date');
     }
 
     public function getLastBoxScoreDate()
@@ -92,7 +92,7 @@ class Season
             ORDER BY Date DESC
             LIMIT 1");
 
-        return $this->db->sql_result($queryLastBoxScoreDate, 0);
+        return $this->db->sql_result($queryLastBoxScoreDate, 0, 'Date');
     }
 
     public function getLastSimDatesArray()
@@ -149,7 +149,7 @@ class Season
             WHERE name = 'Allow Trades'
             LIMIT 1");
 
-        return $this->db->sql_result($queryAllowTradesStatus, 0);
+        return $this->db->sql_result($queryAllowTradesStatus, 0, 'value');
     }
 
     public function getAllowWaiversStatus()
@@ -159,7 +159,7 @@ class Season
             WHERE name = 'Allow Waiver Moves'
             LIMIT 1");
 
-        return $this->db->sql_result($queryAllowWaiversStatus, 0);
+        return $this->db->sql_result($queryAllowWaiversStatus, 0, 'value');
     }
 
     public function getFreeAgencyNotificationsState()
@@ -169,6 +169,6 @@ class Season
             WHERE name = 'Free Agency Notifications'
             LIMIT 1");
 
-        return $this->db->sql_result($queryFreeAgencyNotificationsState, 0);
+        return $this->db->sql_result($queryFreeAgencyNotificationsState, 0, 'value');
     }
 }

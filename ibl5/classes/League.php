@@ -33,7 +33,7 @@ class League
             WHERE name = 'Sim Length in Days'
             LIMIT 1");
 
-        return $db->sql_result($querySimLengthInDays, 0);
+        return $db->sql_result($querySimLengthInDays, 0, 'value');
     }
 
     public function getAllStarCandidatesResult($votingCategory)

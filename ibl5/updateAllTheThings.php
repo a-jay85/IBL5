@@ -760,20 +760,20 @@ function displayStandings($region)
 
     $i = 0;
     while ($i < $limit) {
-        $tid = $db->sql_result($result, $i, 0);
-        $team_name = $db->sql_result($result, $i, 1);
-        $leagueRecord = $db->sql_result($result, $i, 2);
-        $pct = $db->sql_result($result, $i, 3);
-        $GB = $db->sql_result($result, $i, 4);
-        $confRecord = $db->sql_result($result, $i, 5);
-        $divRecord = $db->sql_result($result, $i, 6);
-        $homeRecord = $db->sql_result($result, $i, 7);
-        $awayRecord = $db->sql_result($result, $i, 8);
-        $gamesUnplayed = $db->sql_result($result, $i, 9);
-        $magicNumber = $db->sql_result($result, $i, 10);
-        $clinchedConference = $db->sql_result($result, $i, 11);
-        $clinchedDivision = $db->sql_result($result, $i, 12);
-        $clinchedPlayoffs = $db->sql_result($result, $i, 13);
+        $tid = $db->sql_result($result, $i, 'tid');
+        $team_name = $db->sql_result($result, $i, 'team_name');
+        $leagueRecord = $db->sql_result($result, $i, 'leagueRecord');
+        $pct = $db->sql_result($result, $i, 'pct');
+        $GB = $db->sql_result($result, $i, $groupingGB);
+        $confRecord = $db->sql_result($result, $i, 'confRecord');
+        $divRecord = $db->sql_result($result, $i, 'divRecord');
+        $homeRecord = $db->sql_result($result, $i, 'homeRecord');
+        $awayRecord = $db->sql_result($result, $i, 'awayRecord');
+        $gamesUnplayed = $db->sql_result($result, $i, 'gamesUnplayed');
+        $magicNumber = $db->sql_result($result, $i, $groupingMagicNumber);
+        $clinchedConference = $db->sql_result($result, $i, 'clinchedConference');
+        $clinchedDivision = $db->sql_result($result, $i, 'clinchedDivision');
+        $clinchedPlayoffs = $db->sql_result($result, $i, 'clinchedPlayoffs');
         $homeGames = $db->sql_result($result, $i, "homeGames");
         $awayGames = $db->sql_result($result, $i, "awayGames");
         if ($clinchedConference == 1) {
@@ -786,10 +786,10 @@ function displayStandings($region)
 
         $queryLast10Games = "SELECT last_win, last_loss, streak_type, streak FROM ibl_power WHERE TeamID = $tid";
         $resultLast10Games = $db->sql_query($queryLast10Games);
-        $winsInLast10Games = $db->sql_result($resultLast10Games, 0, 0);
-        $lossesInLast10Games = $db->sql_result($resultLast10Games, 0, 1);
-        $streakType = $db->sql_result($resultLast10Games, 0, 2);
-        $streak = $db->sql_result($resultLast10Games, 0, 3);
+        $winsInLast10Games = $db->sql_result($resultLast10Games, 0, 'last_win');
+        $lossesInLast10Games = $db->sql_result($resultLast10Games, 0, 'last_loss');
+        $streakType = $db->sql_result($resultLast10Games, 0, 'streak_type');
+        $streak = $db->sql_result($resultLast10Games, 0, 'streak');
 
         $standingsHTML .= '<tr><td><a href="modules.php?name=Team&op=team&tid=' . $tid . '">' . $team_name . '</td>
 			<td>' . $leagueRecord . '</td>
@@ -848,7 +848,7 @@ if (
     $i = 0;
     while ($i < $db->sql_numrows($postseasonTradeQueueResult)) {
         $queuedTradeQuery = $db->sql_result($postseasonTradeQueueResult, $i);
-        $tradeLine = $db->sql_result($postseasonTradeQueueResult, $i, 1);
+        $tradeLine = $db->sql_result($postseasonTradeQueueResult, $i, 'tradeline');
         if ($db->sql_query($queuedTradeQuery)) {
             echo $tradeLine . "\n";
         }

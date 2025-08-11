@@ -18,7 +18,7 @@ while (!feof($plrFile)) {
     $pid = intval(substr($line, 38, 6));
     $tid = intval(substr($line, 44, 2));
     $peak = intval(substr($line, 46, 4));
-    $pos = substr($line, 50, 2);
+    $pos = trim(substr($line, 50, 2));
     $realLifeGP = intval(substr($line, 52, 4));
     $realLifeMIN = intval(substr($line, 56, 4));
     $realLifeFGM = intval(substr($line, 60, 4));

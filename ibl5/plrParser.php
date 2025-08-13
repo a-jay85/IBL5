@@ -4,9 +4,11 @@ require 'mainfile.php';
 $sharedFunctions = new Shared($db);
 $season = new Season($db);
 
-$stringTeamIDsNames = "SELECT teamid,team_name FROM ibl_team_info ORDER BY teamid ASC;";
+$stringTeamIDsNames = "SELECT teamid, team_name FROM ibl_team_info ORDER BY teamid ASC;";
 $queryTeamIDsNames = $db->sql_query($stringTeamIDsNames);
 $numRowsTeamIDsNames = $db->sql_numrows($queryTeamIDsNames);
+
+$tidOffenseStats = $tidDefenseStats = 0;
 
 $plrFile = fopen("IBL5.plr", "rb");
 while (!feof($plrFile)) {
@@ -562,37 +564,40 @@ while (!feof($plrFile)) {
             }
         }
     } elseif ($ordinal >= 1441 && $ordinal <= 1504) {
-        // if ($ordinal >= 1441 && $ordinal <= 1472) {
-        //     $sideOfTheBall = 'offense';
-        // }
+        if ($ordinal >= 1441 && $ordinal <= 1472) {
+            $tidOffenseStats++;
+            $sideOfTheBall = 'offense';
+            $teamName = $sharedFunctions->getTeamnameFromTid($tidOffenseStats);
+        }
 
-        // if ($ordinal >= 1473 && $ordinal <= 1504) {
-        //     $ordinal = $ordinal - 32; // Must use and adjust ordinal because JSB bugs out on team names for defensive stats
-        //     $sideOfTheBall = 'defense';
-        // }
+        if ($ordinal >= 1473 && $ordinal <= 1504) {
+            $tidDefenseStats++;
+            $sideOfTheBall = 'defense';
+            $teamName = $sharedFunctions->getTeamnameFromTid($tidDefenseStats);
+        }
 
-        // $teamUpdateQuery = 'UPDATE `ibl_team_' . $sideOfTheBall . '_stats__test`
-        //     SET
-        //     `games` = ' . $seasonGamesPlayed . ',
-        //     `minutes` = ' . ($seasonGamesPlayed * 48) . ',
-        //     `fgm` = ' . ($season2GM + $season3GM) . ',
-        //     `fga` = ' . ($season2GA + $season3GA) . ',
-        //     `ftm` = ' . $seasonFTM . ',
-        //     `fta` = ' . $seasonFTA . ',
-        //     `tgm` = ' . $season3GM . ',
-        //     `tga` = ' . $season3GA . ',
-        //     `orb` = ' . $seasonORB . ',
-        //     `reb` = ' . ($seasonORB + $seasonDRB) . ',
-        //     `ast` = ' . $seasonAST . ',
-        //     `stl` = ' . $seasonSTL . ',
-        //     `tvr` = ' . $seasonTVR . ',
-        //     `blk` = ' . $seasonBLK . ',
-        //     `pf` = ' . $seasonPF . '
-        //     WHERE
-        //     `ordinal` = \'' . $ordinal . '\';';
-        // if ($db->sql_query($teamUpdateQuery)) {
-        //     echo $teamUpdateQuery . '<br>';
-        // }
+        $teamUpdateQuery = 'UPDATE `ibl_team_' . $sideOfTheBall . '_stats__test`
+            SET
+            `games` = ' . $seasonGamesPlayed . ',
+            `minutes` = ' . ($seasonGamesPlayed * 48) . ',
+            `fgm` = ' . ($season2GM + $season3GM) . ',
+            `fga` = ' . ($season2GA + $season3GA) . ',
+            `ftm` = ' . $seasonFTM . ',
+            `fta` = ' . $seasonFTA . ',
+            `tgm` = ' . $season3GM . ',
+            `tga` = ' . $season3GA . ',
+            `orb` = ' . $seasonORB . ',
+            `reb` = ' . ($seasonORB + $seasonDRB) . ',
+            `ast` = ' . $seasonAST . ',
+            `stl` = ' . $seasonSTL . ',
+            `tvr` = ' . $seasonTVR . ',
+            `blk` = ' . $seasonBLK . ',
+            `pf` = ' . $seasonPF . '
+            WHERE
+            `team` = \'' . $teamName . '\';';
+        if ($db->sql_query($teamUpdateQuery)) {
+            echo $teamUpdateQuery . '<br>';
+        }
     }
 }
 fclose($plrFile);

@@ -557,9 +557,7 @@ while (!feof($plrFile)) {
             `retired` = 0,
             `r_foul` = $minutesPerPF;";
         if ($pid != 0) {
-            if ($db->sql_query($playerUpdateQuery)) {
-                echo $pid . '<p>';
-            } else {
+            if (!$db->sql_query($playerUpdateQuery)) {
                 die('Invalid query: ' . $db->sql_error());
             }
         }

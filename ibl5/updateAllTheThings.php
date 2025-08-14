@@ -2,7 +2,6 @@
 error_reporting(E_ALL);
 libxml_use_internal_errors(true);
 
-require 'config.php';
 require 'mainfile.php';
 
 $sharedFunctions = new Shared($db);

@@ -187,9 +187,9 @@ while (!feof($plrFile)) {
     $heightIN = $heightInches % 12;
     $draftYear = $season->endingYear - $exp;
     if ($realLifePF != 0) {
-        $minutesPerPF = round($realLifeMIN / $realLifePF);
+        $personalFoulsPerMinute = round($realLifePF / $realLifeMIN);
     } else {
-        $minutesPerPF = 0;
+        $personalFoulsPerMinute = 0;
     }
 
     if ($ordinal <= 1440) {
@@ -435,7 +435,7 @@ while (!feof($plrFile)) {
             $weight,
             $draftYear,
             0,
-            $minutesPerPF
+            $personalFoulsPerMinute
         )
         ON DUPLICATE KEY UPDATE
             `ordinal` = $ordinal,
@@ -557,7 +557,7 @@ while (!feof($plrFile)) {
             `wt` = $weight,
             `draftyear` = $draftYear,
             `retired` = 0,
-            `r_foul` = $minutesPerPF;";
+            `r_foul` = $personalFoulsPerMinute;";
         if ($pid != 0) {
             if (!$db->sql_query($playerUpdateQuery)) {
                 die('Invalid query: ' . $db->sql_error());

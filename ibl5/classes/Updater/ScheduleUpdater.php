@@ -48,8 +48,11 @@ class ScheduleUpdater {
 
     public function update() {
         echo 'Updating the ibl_schedule database table...<p>';
+
+        $log = '';
+
         if ($this->db->sql_query('TRUNCATE TABLE ibl_schedule')) {
-            echo 'TRUNCATE TABLE ibl_schedule<p>';
+            $log .= 'TRUNCATE TABLE ibl_schedule<p>';
         }
 
         $scheduleFilePath = 'ibl/IBL/Schedule.htm';
@@ -129,11 +132,15 @@ class ScheduleUpdater {
                     )";
 
                     if ($this->db->sql_query($sqlQueryString)) {
-                        echo $sqlQueryString . '<br>';
+                        $log .= $sqlQueryString . '<br>';
+                    } else {
+                        echo "<b><font color=red>Script Error: Failed to insert schedule data for game between $visitorName and $homeName.</font></b>";
+                        die();
                     }
                 }
             }
         }
+        \UI::displayDebugOutput($log, 'ibl_schedule SQL Queries');
 
         echo 'ibl_schedule database table has been updated.<p>';
     }

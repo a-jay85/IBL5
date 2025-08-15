@@ -65,11 +65,13 @@ class StandingsUpdater {
         $rowsByConference = $getRows->item(0)->childNodes->item(0)->childNodes->item(0)->childNodes;
         $rowsByDivision = $getRows->item(0)->childNodes->item(1)->childNodes->item(0)->childNodes;
 
-        $this->processConferenceRows($rowsByConference);
-        $this->processDivisionRows($rowsByDivision);
+        \UI::displayDebugOutput($this->processConferenceRows($rowsByConference), 'Conference Standings');
+        \UI::displayDebugOutput($this->processDivisionRows($rowsByDivision), 'Division Standings');
     }
 
     private function processConferenceRows($rowsByConference) {
+        $log = '';
+
         foreach ($rowsByConference as $row) {
             if (!is_null($row->childNodes)) {
                 $teamName = $row->childNodes->item(0)->nodeValue;
@@ -77,13 +79,17 @@ class StandingsUpdater {
                     $conference = $teamName;
                 }
                 if (!in_array($teamName, array("Eastern", "Western", "team", ""))) {
-                    $this->processTeamStandings($row, $conference);
+                    $log .= $this->processTeamStandings($row, $conference);
                 }
             }
         }
+
+        return $log;
     }
 
     private function processTeamStandings($row, $conference) {
+        $log = '';
+
         $tid = $this->sharedFunctions->getTidFromTeamname($row->childNodes->item(0)->nodeValue);
         $leagueRecord = $row->childNodes->item(1)->nodeValue;
         $pct = $row->childNodes->item(2)->nodeValue;
@@ -147,11 +153,14 @@ class StandingsUpdater {
         )";
 
         if ($this->db->sql_query($sqlQueryString)) {
-            echo $sqlQueryString . '<br>';
+            $log .= $sqlQueryString . '<br>';
         }
+        return $log;
     }
 
     private function processDivisionRows($rowsByDivision) {
+        $log = '';
+
         foreach ($rowsByDivision as $row) {
             if (!is_null($row->childNodes)) {
                 $teamName = $row->childNodes->item(0)->nodeValue;
@@ -160,13 +169,17 @@ class StandingsUpdater {
                     $division = $teamName;
                 }
                 if (!in_array($teamName, array("Atlantic", "Central", "Midwest", "Pacific", "team", ""))) {
-                    $this->updateTeamDivision($row, $division);
+                    $log .= $this->updateTeamDivision($row, $division);
                 }
             }
         }
+
+        return $log;
     }
 
     private function updateTeamDivision($row, $division) {
+        $log = '';
+        
         $teamName = $row->childNodes->item(0)->nodeValue;
         $teamID = $this->sharedFunctions->getTidFromTeamname($teamName);
         $divGB = $row->childNodes->item(3)->nodeValue;
@@ -177,8 +190,9 @@ class StandingsUpdater {
             WHERE tid = '$teamID'";
 
         if ($this->db->sql_query($sqlQueryString)) {
-            echo $sqlQueryString . '<br>';
+            $log .= $sqlQueryString . '<br>';
         }
+        return $log;
     }
 
     private function updateMagicNumbers($region) {
@@ -193,6 +207,8 @@ class StandingsUpdater {
         $result = $this->db->sql_query($query);
         $limit = $this->db->sql_numrows($result);
 
+        $log = '';
+
         for ($i = 0; $i < $limit; $i++) {
             $teamID = $this->db->sql_result($result, $i, 0);
             $teamName = $this->db->sql_result($result, $i, 1);
@@ -206,8 +222,10 @@ class StandingsUpdater {
             
             $magicNumber = 82 + 1 - $teamTotalWins - $belowTeamTotalLosses;
 
-            $this->updateTeamMagicNumber($teamID, $teamName, $magicNumber, $groupingMagicNumber);
+            $log .= $this->updateTeamMagicNumber($teamID, $teamName, $magicNumber, $groupingMagicNumber);
         }
+
+        \UI::displayDebugOutput($log, "$region Magic Number Update Log");
 
         $this->checkIfRegionIsClinched($region);
         if ($grouping == 'conference') {
@@ -216,13 +234,17 @@ class StandingsUpdater {
     }
 
     private function updateTeamMagicNumber($teamID, $teamName, $magicNumber, $groupingMagicNumber) {
+        $log = '';
+
         $sqlQueryString = "UPDATE ibl_standings 
             SET $groupingMagicNumber = '$magicNumber'
             WHERE tid = '$teamID'";
 
         if ($this->db->sql_query($sqlQueryString)) {
-            echo $sqlQueryString . '<br>';
+            $log .= $sqlQueryString . '<br>';
         }
+
+        return $log;
     }
 
     private function checkIfRegionIsClinched($region) {

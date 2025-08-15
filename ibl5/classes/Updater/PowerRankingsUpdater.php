@@ -13,6 +13,8 @@ class PowerRankingsUpdater {
     public function update() {
         echo '<p>Updating the ibl_power database table...<p>';
 
+        $log = '';
+
         $queryTeams = "SELECT TeamID, Team, streak_type, streak
             FROM ibl_power
             WHERE TeamID
@@ -31,8 +33,10 @@ class PowerRankingsUpdater {
             $numGames = $this->db->sql_numrows($resultGames);
 
             $stats = $this->calculateTeamStats($resultGames, $numGames, $tid);
-            $this->updateTeamStats($tid, $teamName, $stats);
+            $log .= $this->updateTeamStats($tid, $teamName, $stats);
         }
+
+        \UI::displayDebugOutput($log, 'Power Rankings Update Log');
 
         // Reset the sim's Depth Chart sent status
         $query = "UPDATE ibl_team_history SET sim_depth = 'No Depth Chart'";
@@ -132,6 +136,8 @@ class PowerRankingsUpdater {
     }
 
     private function updateTeamStats($tid, $teamName, $stats) {
+        $log = '';
+
         $gb = ($stats['wins'] / 2) - ($stats['losses'] / 2);
         $stats['winPoints'] += $stats['wins'];
         $stats['lossPoints'] += $stats['losses'];
@@ -157,7 +163,7 @@ class PowerRankingsUpdater {
         
         $this->db->sql_query($query);
 
-        echo "Updating $teamName: {$stats['wins']} wins, {$stats['losses']} losses, $gb games back, 
+        $log .= "Updating $teamName: {$stats['wins']} wins, {$stats['losses']} losses, $gb games back, 
             {$stats['homeWins']} home wins, {$stats['homeLosses']} home losses, 
             {$stats['awayWins']} away wins, {$stats['awayLosses']} away losses, 
             streak = {$stats['streakType']}{$stats['streak']}, 
@@ -171,6 +177,8 @@ class PowerRankingsUpdater {
         }
 
         $this->updateHistoricalRecords();
+
+        return $log;
     }
 
     private function updateSeasonRecords($teamName) {

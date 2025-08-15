@@ -29,9 +29,6 @@ if (!empty($foulRatioArray) && max($foulRatioArray) > 0) {
     echo "Foul baseline calculated!<br><br>";
 }
 
-echo "Parsing .plr file...<br><br>";
-
-echo '<div style="padding-left: 2em;">';
 echo "Updating ibl_plr...<br>";
 
 $plrFile = fopen("IBL5.plr", "rb");
@@ -631,8 +628,6 @@ while (!feof($plrFile)) {
 fclose($plrFile);
 
 echo "ibl_team_offense_stats updated!<br><br>";
-echo '</div>';
-echo ".plr file parsed successfully!<br><br>";
 
 echo "Assigning team names to players...<br>";
 

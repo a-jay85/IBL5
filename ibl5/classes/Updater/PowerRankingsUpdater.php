@@ -42,7 +42,7 @@ class PowerRankingsUpdater {
         $query = "UPDATE ibl_team_history SET sim_depth = 'No Depth Chart'";
         $this->db->sql_query($query);
 
-        echo '<p>Power Rankings have been updated.<p>';
+        echo '<p>The ibl_power table has been updated.<p><br>';
     }
 
     private function determineMonth() {

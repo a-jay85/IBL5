@@ -581,9 +581,7 @@ while (!feof($plrFile)) {
             $tidOffenseStats++;
             $sideOfTheBall = 'offense';
             $teamName = $sharedFunctions->getTeamnameFromTid($tidOffenseStats);
-        }
-
-        if ($ordinal >= 1473 && $ordinal <= 1504) {
+        } elseif ($ordinal >= 1473 && $ordinal <= 1504) {
             $tidDefenseStats++;
             $sideOfTheBall = 'defense';
             $teamName = $sharedFunctions->getTeamnameFromTid($tidDefenseStats);

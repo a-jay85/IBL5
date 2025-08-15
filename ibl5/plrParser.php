@@ -627,7 +627,7 @@ while (!feof($plrFile)) {
 }
 fclose($plrFile);
 
-echo "ibl_team_offense_stats updated!<br><br>";
+echo "ibl_team_defense_stats updated!<br><br>";
 
 echo "Assigning team names to players...<br>";
 

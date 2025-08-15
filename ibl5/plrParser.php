@@ -10,6 +10,8 @@ $numRowsTeamIDsNames = $db->sql_numrows($queryTeamIDsNames);
 
 $tidOffenseStats = $tidDefenseStats = 0;
 
+echo "Calculating foul baseline...<br>";
+
 $plrFile = fopen("IBL5.plr", "rb");
 $foulRatioArray = [];
 while (!feof($plrFile)) {
@@ -23,7 +25,14 @@ while (!feof($plrFile)) {
 }
 fclose($plrFile);
 
-echo max($foulRatioArray);
+if (!empty($foulRatioArray) && max($foulRatioArray) > 0) {
+    echo "Foul baseline calculated!<br><br>";
+}
+
+echo "Parsing .plr file...<br><br>";
+
+echo '<div style="padding-left: 2em;">';
+echo "Updating ibl_plr...<br>";
 
 $plrFile = fopen("IBL5.plr", "rb");
 while (!feof($plrFile)) {
@@ -578,10 +587,18 @@ while (!feof($plrFile)) {
         }
     } elseif ($ordinal >= 1441 && $ordinal <= 1504) {
         if ($ordinal >= 1441 && $ordinal <= 1472) {
+            if ($ordinal == 1441) {
+                echo "ibl_plr updated!<br><br>";
+                echo "Updating ibl_team_offense_stats...<br>";
+            }
             $tidOffenseStats++;
             $sideOfTheBall = 'offense';
             $teamName = $sharedFunctions->getTeamnameFromTid($tidOffenseStats);
         } elseif ($ordinal >= 1473 && $ordinal <= 1504) {
+            if ($ordinal == 1473) {
+                echo "ibl_team_offense_stats updated!<br><br>";
+                echo "Updating ibl_team_defense_stats...<br>";
+            }
             $tidDefenseStats++;
             $sideOfTheBall = 'defense';
             $teamName = $sharedFunctions->getTeamnameFromTid($tidDefenseStats);
@@ -606,23 +623,31 @@ while (!feof($plrFile)) {
             `pf` = ' . $seasonPF . '
             WHERE
             `team` = \'' . $teamName . '\';';
-        if ($db->sql_query($teamUpdateQuery)) {
-            echo $teamUpdateQuery . '<br>';
+        if (!$db->sql_query($teamUpdateQuery)) {
+            die('Invalid query: ' . $db->sql_error());
         }
     }
 }
 fclose($plrFile);
+
+echo "ibl_team_offense_stats updated!<br><br>";
+echo '</div>';
+echo ".plr file parsed successfully!<br><br>";
+
+echo "Assigning team names to players...<br>";
 
 $i = 0;
 while ($i < $numRowsTeamIDsNames) {
     $teamname = $db->sql_result($queryTeamIDsNames, $i, 'team_name');
     $teamID = $db->sql_result($queryTeamIDsNames, $i, 'teamid');
     $teamnameUpdateQuery = "UPDATE `ibl_plr__test` SET `teamname` = '$teamname' WHERE `tid` = $teamID;";
-    if ($db->sql_query($teamnameUpdateQuery)) {
-        echo $teamnameUpdateQuery . '<br>';
+    if (!$db->sql_query($teamnameUpdateQuery)) {
+        die('Invalid query: ' . $db->sql_error());
     }
 
     $i++;
 }
 
-echo "done.";
+echo "Team names successfully assigned to players!<br><br>";
+
+echo "<b>plrParser complete!</b>";

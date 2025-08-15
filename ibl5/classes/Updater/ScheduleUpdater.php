@@ -142,6 +142,6 @@ class ScheduleUpdater {
         }
         \UI::displayDebugOutput($log, 'ibl_schedule SQL Queries');
 
-        echo 'ibl_schedule database table has been updated.<p>';
+        echo 'The ibl_schedule database table has been updated.<p><br>';
     }
 }

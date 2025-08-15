@@ -604,7 +604,6 @@ while (!feof($plrFile)) {
         $teamUpdateQuery = 'UPDATE `ibl_team_' . $sideOfTheBall . '_stats__test`
             SET
             `games` = ' . $seasonGamesPlayed . ',
-            `minutes` = ' . ($seasonGamesPlayed * 48) . ',
             `fgm` = ' . ($season2GM + $season3GM) . ',
             `fga` = ' . ($season2GA + $season3GA) . ',
             `ftm` = ' . $seasonFTM . ',

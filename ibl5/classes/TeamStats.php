@@ -5,7 +5,6 @@ class TeamStats
     protected $db;
 
     public $seasonOffenseGamesPlayed;
-    public $seasonOffenseTotalMinutes;
     public $seasonOffenseTotalFieldGoalsMade;
     public $seasonOffenseTotalFieldGoalsAttempted;
     public $seasonOffenseTotalFreeThrowsMade;
@@ -22,7 +21,6 @@ class TeamStats
     public $seasonOffenseTotalPersonalFouls;
     public $seasonOffenseTotalPoints;
     
-    public $seasonOffenseMinutesPerGame;
     public $seasonOffenseFieldGoalsMadePerGame;
     public $seasonOffenseFieldGoalsAttemptedPerGame;
     public $seasonOffenseFreeThrowsMadePerGame;
@@ -44,7 +42,6 @@ class TeamStats
     public $seasonOffenseThreePointPercentage;
 
     public $seasonDefenseGamesPlayed;
-    public $seasonDefenseTotalMinutes;
     public $seasonDefenseTotalFieldGoalsMade;
     public $seasonDefenseTotalFieldGoalsAttempted;
     public $seasonDefenseTotalFreeThrowsMade;
@@ -61,7 +58,6 @@ class TeamStats
     public $seasonDefenseTotalPersonalFouls;
     public $seasonDefenseTotalPoints;
     
-    public $seasonDefenseMinutesPerGame;
     public $seasonDefenseFieldGoalsMadePerGame;
     public $seasonDefenseFieldGoalsAttemptedPerGame;
     public $seasonDefenseFreeThrowsMadePerGame;
@@ -115,7 +111,6 @@ class TeamStats
     protected function fillOffenseTotals(array $offenseTotalsRow)
     {
         $this->seasonOffenseGamesPlayed = $offenseTotalsRow['games'];
-        $this->seasonOffenseTotalMinutes = $offenseTotalsRow['minutes'];
         $this->seasonOffenseTotalFieldGoalsMade = $offenseTotalsRow['fgm'];
         $this->seasonOffenseTotalFieldGoalsAttempted = $offenseTotalsRow['fga'];
         $this->seasonOffenseTotalFreeThrowsMade = $offenseTotalsRow['ftm'];
@@ -132,7 +127,6 @@ class TeamStats
         $this->seasonOffenseTotalPersonalFouls = $offenseTotalsRow['pf'];
         $this->seasonOffenseTotalPoints = 2 * $this->seasonOffenseTotalFieldGoalsMade + $this->seasonOffenseTotalFreeThrowsMade + $this->seasonOffenseTotalThreePointersMade;
 
-        $this->seasonOffenseMinutesPerGame = ($this->seasonOffenseGamesPlayed) ? number_format(($this->seasonOffenseTotalMinutes / $this->seasonOffenseGamesPlayed), 1) : "0";
         $this->seasonOffenseFieldGoalsMadePerGame = ($this->seasonOffenseGamesPlayed) ? number_format(($this->seasonOffenseTotalFieldGoalsMade / $this->seasonOffenseGamesPlayed), 1) : "0";
         $this->seasonOffenseFieldGoalsAttemptedPerGame = ($this->seasonOffenseGamesPlayed) ? number_format(($this->seasonOffenseTotalFieldGoalsAttempted / $this->seasonOffenseGamesPlayed), 1) : "0";
         $this->seasonOffenseFreeThrowsMadePerGame = ($this->seasonOffenseGamesPlayed) ? number_format(($this->seasonOffenseTotalFreeThrowsMade / $this->seasonOffenseGamesPlayed), 1) : "0";
@@ -157,7 +151,6 @@ class TeamStats
     protected function fillDefenseTotals(array $defenseTotalsRow)
     {
         $this->seasonDefenseGamesPlayed = $defenseTotalsRow['games'];
-        $this->seasonDefenseTotalMinutes = $defenseTotalsRow['minutes'];
         $this->seasonDefenseTotalFieldGoalsMade = $defenseTotalsRow['fgm'];
         $this->seasonDefenseTotalFieldGoalsAttempted = $defenseTotalsRow['fga'];
         $this->seasonDefenseTotalFreeThrowsMade = $defenseTotalsRow['ftm'];
@@ -174,7 +167,6 @@ class TeamStats
         $this->seasonDefenseTotalPersonalFouls = $defenseTotalsRow['pf'];
         $this->seasonDefenseTotalPoints = 2 * $this->seasonDefenseTotalFieldGoalsMade + $this->seasonDefenseTotalFreeThrowsMade + $this->seasonDefenseTotalThreePointersMade;
 
-        $this->seasonDefenseMinutesPerGame = ($this->seasonDefenseGamesPlayed) ? number_format(($this->seasonDefenseTotalMinutes / $this->seasonDefenseGamesPlayed), 1) : "0";
         $this->seasonDefenseFieldGoalsMadePerGame = ($this->seasonDefenseGamesPlayed) ? number_format(($this->seasonDefenseTotalFieldGoalsMade / $this->seasonDefenseGamesPlayed), 1) : "0";
         $this->seasonDefenseFieldGoalsAttemptedPerGame = ($this->seasonDefenseGamesPlayed) ? number_format(($this->seasonDefenseTotalFieldGoalsAttempted / $this->seasonDefenseGamesPlayed), 1) : "0";
         $this->seasonDefenseFreeThrowsMadePerGame = ($this->seasonDefenseGamesPlayed) ? number_format(($this->seasonDefenseTotalFreeThrowsMade / $this->seasonDefenseGamesPlayed), 1) : "0";

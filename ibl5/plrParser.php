@@ -11,6 +11,21 @@ $numRowsTeamIDsNames = $db->sql_numrows($queryTeamIDsNames);
 $tidOffenseStats = $tidDefenseStats = 0;
 
 $plrFile = fopen("IBL5.plr", "rb");
+$foulRatioArray = [];
+while (!feof($plrFile)) {
+    $line = fgets($plrFile);
+
+    $realLifeMIN = intval(substr($line, 56, 4));
+    $realLifePF = intval(substr($line, 108, 4));
+
+    $personalFoulsPerMinute = ($realLifePF != 0) ? round($realLifePF / $realLifeMIN, 6) : 0;
+    $foulRatioArray[] = $personalFoulsPerMinute;
+}
+fclose($plrFile);
+
+echo max($foulRatioArray);
+
+$plrFile = fopen("IBL5.plr", "rb");
 while (!feof($plrFile)) {
     $line = fgets($plrFile);
 
@@ -186,11 +201,9 @@ while (!feof($plrFile)) {
     $heightFT = floor($heightInches / 12);
     $heightIN = $heightInches % 12;
     $draftYear = $season->endingYear - $exp;
-    if ($realLifePF != 0) {
-        $personalFoulsPerMinute = round($realLifePF / $realLifeMIN);
-    } else {
-        $personalFoulsPerMinute = 0;
-    }
+
+    $personalFoulsPerMinute = ($realLifePF != 0) ? round($realLifePF / $realLifeMIN, 6) : 0;
+    $ratingFOUL = intval(100-round($personalFoulsPerMinute / max($foulRatioArray) * 100, 0));
 
     if ($ordinal <= 1440) {
         $playerUpdateQuery = "INSERT INTO ibl_plr__test
@@ -435,7 +448,7 @@ while (!feof($plrFile)) {
             $weight,
             $draftYear,
             0,
-            $personalFoulsPerMinute
+            $ratingFOUL
         )
         ON DUPLICATE KEY UPDATE
             `ordinal` = $ordinal,
@@ -557,7 +570,7 @@ while (!feof($plrFile)) {
             `wt` = $weight,
             `draftyear` = $draftYear,
             `retired` = 0,
-            `r_foul` = $personalFoulsPerMinute;";
+            `r_foul` = $ratingFOUL;";
         if ($pid != 0) {
             if (!$db->sql_query($playerUpdateQuery)) {
                 die('Invalid query: ' . $db->sql_error());

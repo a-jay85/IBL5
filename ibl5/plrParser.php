@@ -1,4 +1,75 @@
 <?php
+if (!isset($_POST['confirmed'])) {
+    ?>
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            .modal-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 1000;
+            }
+            .modal-content {
+                background: white;
+                padding: 20px;
+                border-radius: 5px;
+                text-align: center;
+                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            }
+            .modal-buttons {
+                margin-top: 20px;
+            }
+            .btn-run {
+                background: #dc3545;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                margin: 0 10px;
+                border-radius: 5px;
+                cursor: pointer;
+            }
+            .btn-cancel {
+                background: white;
+                color: black;
+                border: 1px solid #ccc;
+                padding: 10px 20px;
+                margin: 0 10px;
+                border-radius: 5px;
+                cursor: pointer;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="modal-overlay">
+            <div class="modal-content">
+                <h2>WARNING</h2>
+                <p>Are you sure you want to run the PLR Parser script?</p>
+                This will <u><b>erase all player changes</b></u> that aren't in JSB.<br>
+                (i.e. trades, add/drops, extensions, etc.)
+                <p>Make sure you have uploaded a new .plr file with<br>
+                all the current player changes before proceeding.</p>
+                <div class="modal-buttons">
+                    <form method="POST">
+                        <input type="hidden" name="confirmed" value="1">
+                        <button type="submit" class="btn-run">Run script</button>
+                        <button type="button" class="btn-cancel" onclick="window.history.back()">Cancel</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+    <?php
+    exit();
+}
 
 require 'mainfile.php';
 $sharedFunctions = new Shared($db);

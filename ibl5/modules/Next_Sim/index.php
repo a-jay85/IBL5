@@ -56,7 +56,7 @@ foreach ($resultUserTeamProjectedGamesNextSim as $gameRow) {
     No games projected next sim!
 <?php else : ?>
     <table width=100% align=center>
-        <?php for ($i = 0; $i < League::getSimLengthInDays($db) - 1; $i++) : ?>
+        <?php for ($i = 0; $i <= League::getSimLengthInDays($db) - 1; $i++) : ?>
             <?php if (isset($rows[$i]['game']) && $rows[$i]['game'] != NULL) : ?>
                 <tr>
                     <td>

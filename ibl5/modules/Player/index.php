@@ -526,7 +526,7 @@ function showpage($playerID, $pageView)
         printf('%01.1f', $car_avgf);
         echo "</center></td><td><center>";
         printf('%01.1f', $car_avgp);
-        echo "</center></td></tr>";
+        echo "</center></td></tr></table>";
 
         // END PAST STATS GRAB
     }
@@ -649,7 +649,7 @@ function showpage($playerID, $pageView)
             <td><center>$car_blk</center></td>
             <td><center>$car_pf</center></td>
             <td><center>$car_pts</td>
-        </tr>";
+        </tr></table>";
     }
 
     // CAREER PLAYOFF AVERAGES
@@ -804,7 +804,7 @@ function showpage($playerID, $pageView)
         printf('%01.1f', $car_avgf);
         echo "</center></td><td><center>";
         printf('%01.1f', $car_avgp);
-        echo "</center></td></tr>";
+        echo "</center></td></tr></table>";
 
         // END PAST PLAYOFF STATS GRAB
     }
@@ -926,7 +926,8 @@ function showpage($playerID, $pageView)
             <td><center>$car_blk</center></td>
             <td><center>$car_pf</center></td>
             <td><center>$car_pts</td>
-        </tr>";
+        </tr>
+        </table>";
     }
 
     // CAREER H.E.A.T. AVERAGES
@@ -1079,7 +1080,7 @@ function showpage($playerID, $pageView)
         printf('%01.1f', $car_avgf);
         echo "</center></td><td><center>";
         printf('%01.1f', $car_avgp);
-        echo "</center></td></tr>";
+        echo "</center></td></tr></table>";
 
         // END PAST H.E.A.T. STATS GRAB
     }
@@ -1201,7 +1202,8 @@ function showpage($playerID, $pageView)
             <td><center>$car_blk</center></td>
             <td><center>$car_pf</center></td>
             <td><center>$car_pts</td>
-        </tr>";
+        </tr>
+        </table>";
     }
 
     // CAREER OLYMPICS AVERAGES
@@ -1354,7 +1356,7 @@ function showpage($playerID, $pageView)
         printf('%01.1f', $car_avgf);
         echo "</center></td><td><center>";
         printf('%01.1f', $car_avgp);
-        echo "</center></td></tr>";
+        echo "</center></td></tr></table>";
 
         // END PAST OLYMPICS STATS GRAB
     }
@@ -1459,7 +1461,8 @@ function showpage($playerID, $pageView)
 
         echo "<tr>
             <td colspan=24><center><b>Total Career Salary Earned:</b> $totalsalary million dollars</td>
-        </tr>";
+        </tr>
+        </table>";
 
         // END PLAYER RATINGS SECTION
     }
@@ -1499,17 +1502,20 @@ function showpage($playerID, $pageView)
 
         readfile("http://iblhoops.net/ibl5/articles.php?player=$urlwanted"); // Relative URL paths don't seem to work for this
 
+        echo "</table>";
+
         // END NEWS ARTICLE PICKUP
     }
 
     if ($pageView == PlayerPageType::ONE_ON_ONE) {
         // OPEN ONE-ON-ONE RESULTS
 
-        echo "<tr>
-            <td bgcolor=#0000cc align=center><b><font color=#ffffff>ONE-ON-ONE RESULTS</font></b></td>
-        </tr>
-        <tr>
-            <td>";
+        echo "<table>
+            <tr>
+                <td bgcolor=#0000cc align=center><b><font color=#ffffff>ONE-ON-ONE RESULTS</font></b></td>
+            </tr>
+            <tr>
+                <td>";
 
         //$oneononeurlwanted=str_replace(" ", "%20", $player->name);
 
@@ -1557,7 +1563,8 @@ function showpage($playerID, $pageView)
             $i++;
         }
 
-        echo "<b><center>Record: $wins - $losses</center></b><br>";
+        echo "<b><center>Record: $wins - $losses</center></b><br>
+            </table>";
 
         // END ONE-ON-ONE RESULTS
     }
@@ -1574,70 +1581,74 @@ function showpage($playerID, $pageView)
         }
         $result = $db->sql_query($query);
 
-        echo '<p><H1><center>GAME LOG</center></H1><p><table class=\"sortable\" width="100%">
-              <tr>
-              <th>Date</th>
-              <th>Away</th>
-              <th>Home</th>
-              <th>MIN</th>
-              <th>PTS</th>
-              <th>FGM</th>
-              <th>FGA</th>
-              <th>FG%</th>
-              <th>FTM</th>
-              <th>FTA</th>
-              <th>FT%</th>
-              <th>3GM</th>
-              <th>3GA</th>
-              <th>3G%</th>
-              <th>ORB</th>
-              <th>DRB</th>
-              <th>REB</th>
-              <th>AST</th>
-              <th>STL</th>
-              <th>TO</th>
-              <th>BLK</th>
-              <th>PF</th>
-              </tr>
-        ';
+        echo "<p>
+            <H1><center>GAME LOG</center></H1>
+            <p>
+            <table class=\"sortable\" width=\"100%\">
+                <tr>
+                    <th>Date</th>
+                    <th>Away</th>
+                    <th>Home</th>
+                    <th>MIN</th>
+                    <th>PTS</th>
+                    <th>FGM</th>
+                    <th>FGA</th>
+                    <th>FG%</th>
+                    <th>FTM</th>
+                    <th>FTA</th>
+                    <th>FT%</th>
+                    <th>3GM</th>
+                    <th>3GA</th>
+                    <th>3G%</th>
+                    <th>ORB</th>
+                    <th>DRB</th>
+                    <th>REB</th>
+                    <th>AST</th>
+                    <th>STL</th>
+                    <th>TO</th>
+                    <th>BLK</th>
+                    <th>PF</th>
+                </tr>";
+
+        echo "<style>
+            td {}
+            .gamelog {text-align: center;}
+        </style>";
 
         while ($row = $db->sql_fetch_assoc($result)) {
             $fieldGoalPercentage = ($row['gameFGA'] + $row['game3GA']) ? number_format(($row['gameFGM'] + $row['game3GM']) / ($row['gameFGA'] + $row['game3GA']), 3, '.', '') : "0.000";
             $freeThrowPercentage = ($row['gameFTA']) ? number_format($row['gameFTM'] / $row['gameFTA'], 3, '.', '') : "0.000";
             $threePointPercentage = ($row['game3GA']) ? number_format($row['game3GM'] / $row['game3GA'], 3, '.', '') : "0.000";
 
-            echo "<style>
-                    td {}
-                    .gamelog {text-align: center;}
-                </style>
-                <tr>
-                    <td class=\"gamelog\">" . $row['Date'] . "</td>
-                    <td class=\"gamelog\">" . $sharedFunctions->getTeamnameFromTid($row['visitorTID']) . "</td>
-                    <td class=\"gamelog\">" . $sharedFunctions->getTeamnameFromTid($row['homeTID']) . "</td>
-                    <td class=\"gamelog\">" . $row['gameMIN'] . "</td>
-                    <td class=\"gamelog\">" . ((2 * $row['gameFGM']) + (3 * $row['game3GM']) + $row['gameFTM']) . "</td>
-                    <td class=\"gamelog\">" . ($row['gameFGM'] + $row['game3GM']) . "</td>
-                    <td class=\"gamelog\">" . ($row['gameFGA'] + $row['game3GA']) . "</td>
-                    <td class=\"gamelog\">" . $fieldGoalPercentage . "</td>
-                    <td class=\"gamelog\">" . $row['gameFTM'] . "</td>
-                    <td class=\"gamelog\">" . $row['gameFTA'] . "</td>
-                    <td class=\"gamelog\">" . $freeThrowPercentage . "</td>
-                    <td class=\"gamelog\">" . $row['game3GM'] . "</td>
-                    <td class=\"gamelog\">" . $row['game3GA'] . "</td>
-                    <td class=\"gamelog\">" . $threePointPercentage . "</td>
-                    <td class=\"gamelog\">" . $row['gameORB'] . "</td>
-                    <td class=\"gamelog\">" . $row['gameDRB'] . "</td>
-                    <td class=\"gamelog\">" . ($row['gameORB'] + $row['gameDRB']) . "</td>
-                    <td class=\"gamelog\">" . $row['gameAST'] . "</td>
-                    <td class=\"gamelog\">" . $row['gameSTL'] . "</td>
-                    <td class=\"gamelog\">" . $row['gameTOV'] . "</td>
-                    <td class=\"gamelog\">" . $row['gameBLK'] . "</td>
-                    <td class=\"gamelog\">" . $row['gamePF'] . "</td>
-                </tr>";
+            echo "<tr>
+                <td class=\"gamelog\">" . $row['Date'] . "</td>
+                <td class=\"gamelog\">" . $sharedFunctions->getTeamnameFromTid($row['visitorTID']) . "</td>
+                <td class=\"gamelog\">" . $sharedFunctions->getTeamnameFromTid($row['homeTID']) . "</td>
+                <td class=\"gamelog\">" . $row['gameMIN'] . "</td>
+                <td class=\"gamelog\">" . ((2 * $row['gameFGM']) + (3 * $row['game3GM']) + $row['gameFTM']) . "</td>
+                <td class=\"gamelog\">" . ($row['gameFGM'] + $row['game3GM']) . "</td>
+                <td class=\"gamelog\">" . ($row['gameFGA'] + $row['game3GA']) . "</td>
+                <td class=\"gamelog\">" . $fieldGoalPercentage . "</td>
+                <td class=\"gamelog\">" . $row['gameFTM'] . "</td>
+                <td class=\"gamelog\">" . $row['gameFTA'] . "</td>
+                <td class=\"gamelog\">" . $freeThrowPercentage . "</td>
+                <td class=\"gamelog\">" . $row['game3GM'] . "</td>
+                <td class=\"gamelog\">" . $row['game3GA'] . "</td>
+                <td class=\"gamelog\">" . $threePointPercentage . "</td>
+                <td class=\"gamelog\">" . $row['gameORB'] . "</td>
+                <td class=\"gamelog\">" . $row['gameDRB'] . "</td>
+                <td class=\"gamelog\">" . ($row['gameORB'] + $row['gameDRB']) . "</td>
+                <td class=\"gamelog\">" . $row['gameAST'] . "</td>
+                <td class=\"gamelog\">" . $row['gameSTL'] . "</td>
+                <td class=\"gamelog\">" . $row['gameTOV'] . "</td>
+                <td class=\"gamelog\">" . $row['gameBLK'] . "</td>
+                <td class=\"gamelog\">" . $row['gamePF'] . "</td>
+            </tr>";
         }
+        echo "</table>";
     }
 
-    echo "</td></tr></table></table>";
+    echo "</table>";
 
     CloseTable();
     Nuke\Footer::footer();

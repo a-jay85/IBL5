@@ -20,9 +20,9 @@ class PlayerPageType
     /**
      * Get a human-readable description of the page type
      */
-    public static function getDescription($spec): string
+    public static function getDescription($pageView): string
     {
-        switch ($spec) {
+        switch ($pageView) {
             case self::GAME_LOG:
                 return "Game Log";
             case self::OVERVIEW:
@@ -59,8 +59,8 @@ class PlayerPageType
     /**
      * Get the URL for a specific page type
      */
-    public static function getUrl($playerID, $spec): string
+    public static function getUrl($playerID, $pageView): string
     {
-        return "modules.php?name=Player&pa=showpage&pid=$playerID" . ($spec !== self::OVERVIEW ? "&spec=$spec" : "");
+        return "modules.php?name=Player&pa=showpage&pid=$playerID" . ($pageView !== self::OVERVIEW ? "&pageView=$pageView" : "");
     }
 }

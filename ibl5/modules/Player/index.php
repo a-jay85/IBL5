@@ -9,17 +9,6 @@ get_lang($module_name);
 
 $pagetitle = "- Player Archives";
 
-function showmenu()
-{
-    Nuke\Header::header();
-    OpenTable();
-
-    UI::playerMenu();
-
-    CloseTable();
-    Nuke\Footer::footer();
-}
-
 function showpage($playerID, $pageView)
 {
     global $db, $cookie;

@@ -44,7 +44,7 @@ function showpage($playerID, $spec)
     
     $player = Player::withPlayerID($db, $playerID);
     $playerStats = PlayerStats::withPlayerID($db, $playerID);
-    $spec = intval($spec);
+    $spec = ($spec !== null) ? intval($spec) : null;
 
     $year = $player->draftYear + $player->yearsOfExperience; 
 
@@ -259,14 +259,21 @@ function showpage($playerID, $spec)
     </tr>
     <tr>
         <td colspan=2><b><center>PLAYER MENU</center></b><br>
-            <center>
-            <a href=\"modules.php?name=Player&pa=showpage&pid=$playerID\">Player Overview</a> | <a href=\"modules.php?name=Player&pa=showpage&pid=$playerID&spec=1\">Bio (Awards, News)</a><br>
-            <a href=\"modules.php?name=Player&pa=showpage&pid=$playerID&spec=2\">One-on-one Results</a> | <a href=\"modules.php?name=Player&pa=showpage&pid=$playerID&spec=10\">Season Sim Stats</a> | <a href=\"modules.php?name=Player&pa=showpage&pid=$playerID&spec=0\">Game Log</font></a><br>
-            <a href=\"modules.php?name=Player&pa=showpage&pid=$playerID&spec=3\">Regular-Season Totals</a> | <a href=\"modules.php?name=Player&pa=showpage&pid=$playerID&spec=4\">Regular-Season Averages</a><br>
-            <a href=\"modules.php?name=Player&pa=showpage&pid=$playerID&spec=5\">Playoff Totals</a> | <a href=\"modules.php?name=Player&pa=showpage&pid=$playerID&spec=6\">Playoff Averages</a><br>
-            <a href=\"modules.php?name=Player&pa=showpage&pid=$playerID&spec=7\">H.E.A.T. Totals</a> | <a href=\"modules.php?name=Player&pa=showpage&pid=$playerID&spec=8\">H.E.A.T. Averages</a><br>
-            <a href=\"modules.php?name=Player&pa=showpage&pid=$playerID&spec=11\">Olympic Totals</a> | <a href=\"modules.php?name=Player&pa=showpage&pid=$playerID&spec=12\">Olympic Averages</a><br>
-            <a href=\"modules.php?name=Player&pa=showpage&pid=$playerID&spec=9\">Ratings and Salary History</a>
+            <center>" .
+            "<a href=\"" . PlayerPageType::getUrl($playerID, PlayerPageType::OVERVIEW) . "\">" . PlayerPageType::getDescription(PlayerPageType::OVERVIEW) . "</a> | " .
+            "<a href=\"" . PlayerPageType::getUrl($playerID, PlayerPageType::AWARDS_AND_NEWS) . "\">" . PlayerPageType::getDescription(PlayerPageType::AWARDS_AND_NEWS) . "</a><br>" .
+            "<a href=\"" . PlayerPageType::getUrl($playerID, PlayerPageType::ONE_ON_ONE) . "\">" . PlayerPageType::getDescription(PlayerPageType::ONE_ON_ONE) . "</a> | " .
+            "<a href=\"" . PlayerPageType::getUrl($playerID, PlayerPageType::SIM_STATS) . "\">" . PlayerPageType::getDescription(PlayerPageType::SIM_STATS) . "</a> | " .
+            "<a href=\"" . PlayerPageType::getUrl($playerID, PlayerPageType::GAME_LOG) . "\">" . PlayerPageType::getDescription(PlayerPageType::GAME_LOG) . "</a><br>" .
+            "<a href=\"" . PlayerPageType::getUrl($playerID, PlayerPageType::REGULAR_SEASON_TOTALS) . "\">" . PlayerPageType::getDescription(PlayerPageType::REGULAR_SEASON_TOTALS) . "</a> | " .
+            "<a href=\"" . PlayerPageType::getUrl($playerID, PlayerPageType::REGULAR_SEASON_AVERAGES) . "\">" . PlayerPageType::getDescription(PlayerPageType::REGULAR_SEASON_AVERAGES) . "</a><br>" .
+            "<a href=\"" . PlayerPageType::getUrl($playerID, PlayerPageType::PLAYOFF_TOTALS) . "\">" . PlayerPageType::getDescription(PlayerPageType::PLAYOFF_TOTALS) . "</a> | " .
+            "<a href=\"" . PlayerPageType::getUrl($playerID, PlayerPageType::PLAYOFF_AVERAGES) . "\">" . PlayerPageType::getDescription(PlayerPageType::PLAYOFF_AVERAGES) . "</a><br>" .
+            "<a href=\"" . PlayerPageType::getUrl($playerID, PlayerPageType::HEAT_TOTALS) . "\">" . PlayerPageType::getDescription(PlayerPageType::HEAT_TOTALS) . "</a> | " .
+            "<a href=\"" . PlayerPageType::getUrl($playerID, PlayerPageType::HEAT_AVERAGES) . "\">" . PlayerPageType::getDescription(PlayerPageType::HEAT_AVERAGES) . "</a><br>" .
+            "<a href=\"" . PlayerPageType::getUrl($playerID, PlayerPageType::OLYMPIC_TOTALS) . "\">" . PlayerPageType::getDescription(PlayerPageType::OLYMPIC_TOTALS) . "</a> | " .
+            "<a href=\"" . PlayerPageType::getUrl($playerID, PlayerPageType::OLYMPIC_AVERAGES) . "\">" . PlayerPageType::getDescription(PlayerPageType::OLYMPIC_AVERAGES) . "</a><br>" .
+            "<a href=\"" . PlayerPageType::getUrl($playerID, PlayerPageType::RATINGS_AND_SALARY) . "\">" . PlayerPageType::getDescription(PlayerPageType::RATINGS_AND_SALARY) . "</a>
             </center>
         </td>
     </tr>
@@ -276,7 +283,7 @@ function showpage($playerID, $spec)
 
     // PLAYER OVERVIEW
 
-    if ($spec == null) {
+    if ($spec == PlayerPageType::OVERVIEW) {
         // NOTE ALL-STAR WEEKEND APPEARANCES
 
         echo "<tr>
@@ -361,7 +368,7 @@ function showpage($playerID, $spec)
 
     // SIM STATS
 
-    if ($spec == 10) {
+    if ($spec == PlayerPageType::SIM_STATS) {
         echo "<table align=center border=1 cellpadding=3 cellspacing=0 style=\"text-align: center\">
             <tr>
                 <td colspan=16><b><font class=\"content\">Sim Averages</font></b></td>
@@ -467,7 +474,7 @@ function showpage($playerID, $spec)
 
     // CAREER TOTALS
 
-    if ($spec == 3) {
+    if ($spec == PlayerPageType::REGULAR_SEASON_TOTALS) {
         // GET PAST STATS
 
         $car_gm = $car_min = $car_fgm = $car_fga = $car_ftm = $car_fta = $car_3gm = $car_3ga = 0;
@@ -629,7 +636,7 @@ function showpage($playerID, $spec)
 
     // CAREER TOTALS
 
-    if ($spec == 4) {
+    if ($spec == PlayerPageType::REGULAR_SEASON_AVERAGES) {
         // SWITCH FROM CAREER TOTALS TO CAREER AVERAGES
 
         echo "<table border=1 cellspacing=0 class=\"sortable\>
@@ -890,7 +897,7 @@ function showpage($playerID, $spec)
 
     // CAREER PLAYOFF TOTALS
 
-    if ($spec == 5) {
+    if ($spec == PlayerPageType::PLAYOFF_TOTALS) {
         // GET PAST PLAYOFF STATS
 
         $car_gm = $car_min = $car_fgm = $car_fga = $car_ftm = $car_fta = $car_3gm = $car_3ga = 0;
@@ -1011,7 +1018,7 @@ function showpage($playerID, $spec)
 
     // CAREER PLAYOFF AVERAGES
 
-    if ($spec == 6) {
+    if ($spec == PlayerPageType::PLAYOFF_AVERAGES) {
         // SWITCH FROM CAREER TOTALS TO CAREER AVERAGES
 
         echo "<table border=1 cellspacing=0 class=\"sortable\>
@@ -1168,7 +1175,7 @@ function showpage($playerID, $spec)
 
     // CAREER H.E.A.T. TOTALS
 
-    if ($spec == 7) {
+    if ($spec == PlayerPageType::HEAT_TOTALS) {
         // GET PAST H.E.A.T. STATS
 
         $car_gm = $car_min = $car_fgm = $car_fga = $car_ftm = $car_fta = $car_3gm = $car_3ga = 0;
@@ -1288,7 +1295,7 @@ function showpage($playerID, $spec)
 
     // CAREER H.E.A.T. AVERAGES
 
-    if ($spec == 8) {
+    if ($spec == PlayerPageType::HEAT_AVERAGES) {
         // SWITCH FROM CAREER TOTALS TO CAREER AVERAGES
 
         echo "<table border=1 cellspacing=0 class=\"sortable\>
@@ -1443,7 +1450,7 @@ function showpage($playerID, $spec)
 
     // CAREER OLYMPICS TOTALS
 
-    if ($spec == 11) {
+    if ($spec == PlayerPageType::OLYMPIC_TOTALS) {
         // GET PAST OLYMPICS STATS
 
         $car_gm = $car_min = $car_fgm = $car_fga = $car_ftm = $car_fta = $car_3gm = $car_3ga = 0;
@@ -1563,7 +1570,7 @@ function showpage($playerID, $spec)
 
     // CAREER OLYMPICS AVERAGES
 
-    if ($spec == 12) {
+    if ($spec == PlayerPageType::OLYMPIC_AVERAGES) {
         // SWITCH FROM CAREER TOTALS TO CAREER AVERAGES
 
         echo "<table border=1 cellspacing=0 class=\"sortable\>
@@ -1718,7 +1725,7 @@ function showpage($playerID, $spec)
 
     // PLAYER RATINGS
 
-    if ($spec == 9) {
+    if ($spec == PlayerPageType::RATINGS_AND_SALARY) {
         // PLAYER RATINGS BY YEAR
 
         $rowcolor = 0;
@@ -1823,7 +1830,7 @@ function showpage($playerID, $spec)
 
     // START AWARDS SCRIPT
 
-    if ($spec == 1) {
+    if ($spec == PlayerPageType::AWARDS_AND_NEWS) {
         // START AWARDS SCRIPT
 
         $awardsquery = $db->sql_query("SELECT * FROM ibl_awards WHERE name='$player->name' ORDER BY year ASC");
@@ -1859,7 +1866,7 @@ function showpage($playerID, $spec)
         // END NEWS ARTICLE PICKUP
     }
 
-    if ($spec == 2) {
+    if ($spec == PlayerPageType::ONE_ON_ONE) {
         // OPEN ONE-ON-ONE RESULTS
 
         echo "<tr>
@@ -1921,7 +1928,7 @@ function showpage($playerID, $spec)
 
     // GAME LOG
 
-    if ($spec == 0) {
+    if ($spec == PlayerPageType::GAME_LOG) {
         if ($season->phase == "Preseason") {
             $query = "SELECT * FROM ibl_box_scores WHERE Date BETWEEN '$season->beginningYear-" . Season::IBL_PRESEASON_MONTH . "-01' AND '$season->endingYear-07-01' AND pid = $playerID ORDER BY Date ASC";
         } elseif ($season->phase == "HEAT") {

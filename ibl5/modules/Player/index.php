@@ -20,7 +20,7 @@ function showmenu()
     Nuke\Footer::footer();
 }
 
-function showpage($playerID, $spec)
+function showpage($playerID, $pageView)
 {
     global $db, $cookie;
     $sharedFunctions = new Shared($db);
@@ -28,7 +28,7 @@ function showpage($playerID, $spec)
     
     $player = Player::withPlayerID($db, $playerID);
     $playerStats = PlayerStats::withPlayerID($db, $playerID);
-    $spec = ($spec !== null) ? intval($spec) : null;
+    $pageView = ($pageView !== null) ? intval($pageView) : null;
 
     $year = $player->draftYear + $player->yearsOfExperience; 
 
@@ -147,7 +147,7 @@ function showpage($playerID, $spec)
         </table></center>
     <b>BIRD YEARS:</b> $player->birdYears | <b>Remaining Contract:</b> $contract_display </td>";
 
-    if ($spec == null) {
+    if ($pageView == null) {
         // ==== PLAYER SEASON AND CAREER HIGHS ====
 
         echo "<td rowspan=3 valign=top>
@@ -267,7 +267,7 @@ function showpage($playerID, $spec)
 
     // PLAYER OVERVIEW
 
-    if ($spec == PlayerPageType::OVERVIEW) {
+    if ($pageView == PlayerPageType::OVERVIEW) {
         // NOTE ALL-STAR WEEKEND APPEARANCES
 
         echo "<tr>
@@ -352,7 +352,7 @@ function showpage($playerID, $spec)
 
     // SIM STATS
 
-    if ($spec == PlayerPageType::SIM_STATS) {
+    if ($pageView == PlayerPageType::SIM_STATS) {
         echo "<table align=center border=1 cellpadding=3 cellspacing=0 style=\"text-align: center\">
             <tr>
                 <td colspan=16><b><font class=\"content\">Sim Averages</font></b></td>
@@ -458,7 +458,7 @@ function showpage($playerID, $spec)
 
     // CAREER TOTALS
 
-    if ($spec == PlayerPageType::REGULAR_SEASON_TOTALS) {
+    if ($pageView == PlayerPageType::REGULAR_SEASON_TOTALS) {
         // GET PAST STATS
 
         $car_gm = $car_min = $car_fgm = $car_fga = $car_ftm = $car_fta = $car_3gm = $car_3ga = 0;
@@ -620,7 +620,7 @@ function showpage($playerID, $spec)
 
     // CAREER TOTALS
 
-    if ($spec == PlayerPageType::REGULAR_SEASON_AVERAGES) {
+    if ($pageView == PlayerPageType::REGULAR_SEASON_AVERAGES) {
         // SWITCH FROM CAREER TOTALS TO CAREER AVERAGES
 
         echo "<table border=1 cellspacing=0 class=\"sortable\>
@@ -881,7 +881,7 @@ function showpage($playerID, $spec)
 
     // CAREER PLAYOFF TOTALS
 
-    if ($spec == PlayerPageType::PLAYOFF_TOTALS) {
+    if ($pageView == PlayerPageType::PLAYOFF_TOTALS) {
         // GET PAST PLAYOFF STATS
 
         $car_gm = $car_min = $car_fgm = $car_fga = $car_ftm = $car_fta = $car_3gm = $car_3ga = 0;
@@ -1002,7 +1002,7 @@ function showpage($playerID, $spec)
 
     // CAREER PLAYOFF AVERAGES
 
-    if ($spec == PlayerPageType::PLAYOFF_AVERAGES) {
+    if ($pageView == PlayerPageType::PLAYOFF_AVERAGES) {
         // SWITCH FROM CAREER TOTALS TO CAREER AVERAGES
 
         echo "<table border=1 cellspacing=0 class=\"sortable\>
@@ -1159,7 +1159,7 @@ function showpage($playerID, $spec)
 
     // CAREER H.E.A.T. TOTALS
 
-    if ($spec == PlayerPageType::HEAT_TOTALS) {
+    if ($pageView == PlayerPageType::HEAT_TOTALS) {
         // GET PAST H.E.A.T. STATS
 
         $car_gm = $car_min = $car_fgm = $car_fga = $car_ftm = $car_fta = $car_3gm = $car_3ga = 0;
@@ -1279,7 +1279,7 @@ function showpage($playerID, $spec)
 
     // CAREER H.E.A.T. AVERAGES
 
-    if ($spec == PlayerPageType::HEAT_AVERAGES) {
+    if ($pageView == PlayerPageType::HEAT_AVERAGES) {
         // SWITCH FROM CAREER TOTALS TO CAREER AVERAGES
 
         echo "<table border=1 cellspacing=0 class=\"sortable\>
@@ -1434,7 +1434,7 @@ function showpage($playerID, $spec)
 
     // CAREER OLYMPICS TOTALS
 
-    if ($spec == PlayerPageType::OLYMPIC_TOTALS) {
+    if ($pageView == PlayerPageType::OLYMPIC_TOTALS) {
         // GET PAST OLYMPICS STATS
 
         $car_gm = $car_min = $car_fgm = $car_fga = $car_ftm = $car_fta = $car_3gm = $car_3ga = 0;
@@ -1554,7 +1554,7 @@ function showpage($playerID, $spec)
 
     // CAREER OLYMPICS AVERAGES
 
-    if ($spec == PlayerPageType::OLYMPIC_AVERAGES) {
+    if ($pageView == PlayerPageType::OLYMPIC_AVERAGES) {
         // SWITCH FROM CAREER TOTALS TO CAREER AVERAGES
 
         echo "<table border=1 cellspacing=0 class=\"sortable\>
@@ -1709,7 +1709,7 @@ function showpage($playerID, $spec)
 
     // PLAYER RATINGS
 
-    if ($spec == PlayerPageType::RATINGS_AND_SALARY) {
+    if ($pageView == PlayerPageType::RATINGS_AND_SALARY) {
         // PLAYER RATINGS BY YEAR
 
         $rowcolor = 0;
@@ -1814,7 +1814,7 @@ function showpage($playerID, $spec)
 
     // START AWARDS SCRIPT
 
-    if ($spec == PlayerPageType::AWARDS_AND_NEWS) {
+    if ($pageView == PlayerPageType::AWARDS_AND_NEWS) {
         // START AWARDS SCRIPT
 
         $awardsquery = $db->sql_query("SELECT * FROM ibl_awards WHERE name='$player->name' ORDER BY year ASC");
@@ -1850,7 +1850,7 @@ function showpage($playerID, $spec)
         // END NEWS ARTICLE PICKUP
     }
 
-    if ($spec == PlayerPageType::ONE_ON_ONE) {
+    if ($pageView == PlayerPageType::ONE_ON_ONE) {
         // OPEN ONE-ON-ONE RESULTS
 
         echo "<tr>
@@ -1912,7 +1912,7 @@ function showpage($playerID, $spec)
 
     // GAME LOG
 
-    if ($spec == PlayerPageType::GAME_LOG) {
+    if ($pageView == PlayerPageType::GAME_LOG) {
         if ($season->phase == "Preseason") {
             $query = "SELECT * FROM ibl_box_scores WHERE Date BETWEEN '$season->beginningYear-" . Season::IBL_PRESEASON_MONTH . "-01' AND '$season->endingYear-07-01' AND pid = $playerID ORDER BY Date ASC";
         } elseif ($season->phase == "HEAT") {
@@ -2447,6 +2447,6 @@ switch ($pa) {
         break;
 
     case "showpage":
-        showpage($pid, $spec);
+        showpage($pid, $pageView);
         break;
 }

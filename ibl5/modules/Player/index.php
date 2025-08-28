@@ -302,68 +302,10 @@ function showpage($playerID, $pageView)
         require_once __DIR__ . '/views/AwardsAndNewsView.php';
         $view = new AwardsAndNewsView($db, $player, $playerStats);
         $view->render();
-    }
-
-    if ($pageView == PlayerPageType::ONE_ON_ONE) {
-        // OPEN ONE-ON-ONE RESULTS
-
-        echo "<table>
-            <tr>
-                <td bgcolor=#0000cc align=center><b><font color=#ffffff>ONE-ON-ONE RESULTS</font></b></td>
-            </tr>
-            <tr>
-                <td>";
-
-        //$oneononeurlwanted=str_replace(" ", "%20", $player->name);
-
-        //echo (readfile("online/1on1results.php?player=$oneononeurlwanted"));
-
-        $player2 = str_replace("%20", " ", $player->name);
-
-        $query = "SELECT * FROM ibl_one_on_one WHERE winner = '$player2' ORDER BY gameid ASC";
-        $result = $db->sql_query($query);
-        $num = $db->sql_numrows($result);
-
-        $wins = 0;
-        $losses = 0;
-
-        $i = 0;
-
-        while ($i < $num) {
-            $gameid = $db->sql_result($result, $i, "gameid");
-            $winner = $db->sql_result($result, $i, "winner");
-            $loser = $db->sql_result($result, $i, "loser");
-            $winscore = $db->sql_result($result, $i, "winscore");
-            $lossscore = $db->sql_result($result, $i, "lossscore");
-
-            echo "* def. $loser, $winscore-$lossscore (# $gameid)<br>";
-
-            $wins++;
-            $i++;
-        }
-
-        $query = "SELECT * FROM ibl_one_on_one WHERE loser = '$player2' ORDER BY gameid ASC";
-        $result = $db->sql_query($query);
-        $num = $db->sql_numrows($result);
-        $i = 0;
-
-        while ($i < $num) {
-            $gameid = $db->sql_result($result, $i, "gameid");
-            $winner = $db->sql_result($result, $i, "winner");
-            $loser = $db->sql_result($result, $i, "loser");
-            $winscore = $db->sql_result($result, $i, "winscore");
-            $lossscore = $db->sql_result($result, $i, "lossscore");
-
-            echo "* lost to $winner, $lossscore-$winscore (# $gameid)<br>";
-
-            $losses++;
-            $i++;
-        }
-
-        echo "<b><center>Record: $wins - $losses</center></b><br>
-            </table>";
-
-        // END ONE-ON-ONE RESULTS
+    } elseif ($pageView == PlayerPageType::ONE_ON_ONE) {
+        require_once __DIR__ . '/views/OneOnOneView.php';
+        $view = new OneOnOneView($db, $player, $playerStats);
+        $view->render();
     }
 
     // GAME LOG

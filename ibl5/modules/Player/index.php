@@ -258,96 +258,50 @@ function showpage($playerID, $pageView)
         require_once __DIR__ . '/views/OverviewView.php';
         $view = new OverviewView($db, $player, $playerStats);
         $view->render();
-    }
-    elseif ($pageView == PlayerPageType::SIM_STATS) {
+    } elseif ($pageView == PlayerPageType::SIM_STATS) {
         require_once __DIR__ . '/views/SimStatsView.php';
         $view = new SimStatsView($db, $player, $playerStats);
         $view->render();
-    }
-    elseif ($pageView == PlayerPageType::REGULAR_SEASON_TOTALS) {
+    } elseif ($pageView == PlayerPageType::REGULAR_SEASON_TOTALS) {
         require_once __DIR__ . '/views/RegularSeasonTotalsView.php';
         $view = new RegularSeasonTotalsView($db, $player, $playerStats);
         $view->render();
-    }
-    elseif ($pageView == PlayerPageType::REGULAR_SEASON_AVERAGES) {
+    } elseif ($pageView == PlayerPageType::REGULAR_SEASON_AVERAGES) {
         require_once __DIR__ . '/views/RegularSeasonAveragesView.php';
         $view = new RegularSeasonAveragesView($db, $player, $playerStats);
         $view->render();
-    }
-    elseif ($pageView == PlayerPageType::PLAYOFF_TOTALS) {
+    } elseif ($pageView == PlayerPageType::PLAYOFF_TOTALS) {
         require_once __DIR__ . '/views/PlayoffTotalsView.php';
         $view = new PlayoffTotalsView($db, $player, $playerStats);
         $view->render();
-    }
-    elseif ($pageView == PlayerPageType::PLAYOFF_AVERAGES) {
+    } elseif ($pageView == PlayerPageType::PLAYOFF_AVERAGES) {
         require_once __DIR__ . '/views/PlayoffAveragesView.php';
         $view = new PlayoffAveragesView($db, $player, $playerStats);
         $view->render();
-    }
-    elseif ($pageView == PlayerPageType::HEAT_TOTALS) {
+    } elseif ($pageView == PlayerPageType::HEAT_TOTALS) {
         require_once __DIR__ . '/views/HeatTotalsView.php';
         $view = new HeatTotalsView($db, $player, $playerStats);
         $view->render();
-    }
-    elseif ($pageView == PlayerPageType::HEAT_AVERAGES) {
+    } elseif ($pageView == PlayerPageType::HEAT_AVERAGES) {
         require_once __DIR__ . '/views/HeatAveragesView.php';
         $view = new HeatAveragesView($db, $player, $playerStats);
         $view->render();
-    }
-    elseif ($pageView == PlayerPageType::OLYMPIC_TOTALS) {
+    } elseif ($pageView == PlayerPageType::OLYMPIC_TOTALS) {
         require_once __DIR__ . '/views/OlympicTotalsView.php';
         $view = new OlympicTotalsView($db, $player, $playerStats);
         $view->render();
-    }
-    elseif ($pageView == PlayerPageType::OLYMPIC_AVERAGES) {
+    } elseif ($pageView == PlayerPageType::OLYMPIC_AVERAGES) {
         require_once __DIR__ . '/views/OlympicAveragesView.php';
         $view = new OlympicAveragesView($db, $player, $playerStats);
         $view->render();
-    }
-    elseif ($pageView == PlayerPageType::RATINGS_AND_SALARY) {
+    } elseif ($pageView == PlayerPageType::RATINGS_AND_SALARY) {
         require_once __DIR__ . '/views/RatingsAndSalaryView.php';
         $view = new RatingsAndSalaryView($db, $player, $playerStats);
         $view->render();
-    }
-
-    // START AWARDS SCRIPT
-
-    if ($pageView == PlayerPageType::AWARDS_AND_NEWS) {
-        // START AWARDS SCRIPT
-
-        $awardsquery = $db->sql_query("SELECT * FROM ibl_awards WHERE name='$player->name' ORDER BY year ASC");
-
-        echo "<table border=1 cellspacing=0 cellpadding=0 valign=top>
-            <tr>
-                <td bgcolor=#0000cc align=center><b><font color=#ffffff>AWARDS</font></b></td>
-            </tr>";
-
-        while ($awardsrow = $db->sql_fetchrow($awardsquery)) {
-            $award_year = stripslashes(check_html($awardsrow['year'], "nohtml"));
-            $award_type = stripslashes(check_html($awardsrow['Award'], "nohtml"));
-
-            echo "<tr>
-                <td>$award_year $award_type</td>
-            </tr>";
-        }
-
-        // END AWARDS SCRIPT
-
-        // START NEWS ARTICLE PICKUP
-
-        echo "<tr>
-            <td bgcolor=#0000cc align=center><b><font color=#ffffff>ARTICLES MENTIONING THIS PLAYER</font></b></td>
-        </tr>
-        <tr>
-            <td>";
-
-        $urlwanted = str_replace(" ", "%20", $player->name);
-
-        readfile("http://iblhoops.net/ibl5/articles.php?player=$urlwanted"); // Relative URL paths don't seem to work for this
-
-        echo "</table>";
-
-        // END NEWS ARTICLE PICKUP
+    } elseif ($pageView == PlayerPageType::AWARDS_AND_NEWS) {
+        require_once __DIR__ . '/views/AwardsAndNewsView.php';
+        $view = new AwardsAndNewsView($db, $player, $playerStats);
+        $view->render();
     }
 
     if ($pageView == PlayerPageType::ONE_ON_ONE) {

@@ -4,7 +4,7 @@ require_once __DIR__ . '/BaseView.php';
 
 class OneOnOneView extends BaseView {
     public function render() {
-        echo "<table>
+        echo "<table style='margin: 0 auto;'>
             <tr>
                 <td bgcolor=#0000cc align=center><b><font color=#ffffff>ONE-ON-ONE RESULTS</font></b></td>
             </tr>

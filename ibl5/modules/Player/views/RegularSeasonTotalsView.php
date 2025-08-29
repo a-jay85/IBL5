@@ -94,9 +94,8 @@ class RegularSeasonTotalsView extends BaseView {
         // CURRENT YEAR TOTALS
 
         if ($this->player->isRetired == 0) {
-            $year = $this->player->draftYear + $this->player->yearsOfExperience;
             echo "<tr>
-                <td><center>$year</center></td>
+                <td><center>$this->currentYear</center></td>
                 <td><center>" . $this->player->teamName . "</center></td>
                 <td><center>" . $this->playerStats->seasonGamesPlayed . "</center></td>
                 <td><center>" . $this->playerStats->seasonMinutes . "</center></td>

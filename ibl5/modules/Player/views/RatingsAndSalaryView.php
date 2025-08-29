@@ -4,35 +4,35 @@ require_once __DIR__ . '/BaseView.php';
 
 class RatingsAndSalaryView extends BaseView {
     public function render() {
-        echo "<table border=1 cellspacing=0 class=\"sortable\>
+        echo "<table border=1 cellspacing=0 class=\"sortable\" style='margin: 0 auto;'>
             <tr>
-                <td colspan=24><center><b><font class=\"content\">(Past) Career Ratings by Year</font></b></center></td>
+                <td colspan=24 style='font-weight:bold;text-align:center;background-color:#00c;color:#fff;'>Ratings by Year</td>
             </tr>
             <tr>
-                <td>year</td>
-                <td>2ga</td>
-                <td>2gp</td>
-                <td>fta</td>
-                <td>ftp</td>
-                <td>3ga</td>
-                <td>3gp</td>
-                <td>orb</td>
-                <td>drb</td>
-                <td>ast</td>
-                <td>stl</td>
-                <td>blk</td>
-                <td>tvr</td>
-                <td>oo</td>
-                <td>do</td>
-                <td>po</td>
-                <td>to</td>
-                <td>od</td>
-                <td>dd</td>
-                <td>pd</td>
-                <td>td</td>
-                <td>Off</td>
-                <td>Def</td>
-                <td>Salary</td>
+                <th>year</th>
+                <th>2ga</th>
+                <th>2gp</th>
+                <th>fta</th>
+                <th>ftp</th>
+                <th>3ga</th>
+                <th>3gp</th>
+                <th>orb</th>
+                <th>drb</th>
+                <th>ast</th>
+                <th>stl</th>
+                <th>blk</th>
+                <th>tvr</th>
+                <th>oo</th>
+                <th>do</th>
+                <th>po</th>
+                <th>to</th>
+                <th>od</th>
+                <th>dd</th>
+                <th>pd</th>
+                <th>td</th>
+                <th>Off</th>
+                <th>Def</th>
+                <th>Salary</th>
             </tr>";
 
         $totalsalary = 0;

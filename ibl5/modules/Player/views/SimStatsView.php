@@ -4,25 +4,25 @@ require_once __DIR__ . '/BaseView.php';
 
 class SimStatsView extends BaseView {
     public function render() {
-        echo "<table align=center border=1 cellpadding=3 cellspacing=0 style=\"text-align: center\">
+        echo "<table border=1 cellspacing=0 class=\"sortable\" style='margin: 0 auto;'>
             <tr>
-                <td colspan=16><b><font class=\"content\">Sim Averages</font></b></td>
+                <td colspan=16 style='font-weight:bold;text-align:center;background-color:#00c;color:#fff;'>Sim Averages</td>
             </tr>
             <tr style=\"font-weight: bold\">
-                <td>sim</td>
-                <td>g</td>
-                <td>min</td>
-                <td>FGP</td>
-                <td>FTP</td>
-                <td>3GP</td>
-                <td>orb</td>
-                <td>reb</td>
-                <td>ast</td>
-                <td>stl</td>
-                <td>to</td>
-                <td>blk</td>
-                <td>pf</td>
-                <td>pts</td>
+                <th>sim</th>
+                <th>g</th>
+                <th>min</th>
+                <th>FGP</th>
+                <th>FTP</th>
+                <th>3GP</th>
+                <th>orb</th>
+                <th>reb</th>
+                <th>ast</th>
+                <th>stl</th>
+                <th>to</th>
+                <th>blk</th>
+                <th>pf</th>
+                <th>pts</th>
             </tr>";
 
         $resultSimDates = $this->db->sql_query("SELECT *

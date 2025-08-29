@@ -6,7 +6,7 @@ class AwardsAndNewsView extends BaseView {
     public function render() {
         $awardsquery = $this->db->sql_query("SELECT * FROM ibl_awards WHERE name='" . $this->player->name . "' ORDER BY year ASC");
 
-        echo "<table border=1 cellspacing=0 cellpadding=0 valign=top>
+        echo "<table border=1 cellspacing=0 cellpadding=0 valign=top style='margin: 0 auto;'>
             <tr>
                 <td bgcolor=#0000cc align=center><b><font color=#ffffff>AWARDS</font></b></td>
             </tr>";

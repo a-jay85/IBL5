@@ -4,9 +4,9 @@ require_once __DIR__ . '/BaseView.php';
 
 class PlayoffAveragesView extends BaseView {
     public function render() {
-        echo "<table border=1 cellspacing=0 class=\"sortable\>
+        echo "<table border=1 cellspacing=0 class=\"sortable\" style='margin: 0 auto;'>
             <tr>
-                <td colspan=15><center><b><font class=\"content\">Playoffs Career Averages</font></b></center></td>
+                <td colspan=15 style='font-weight:bold;text-align:center;background-color:#00c;color:#fff;'>Playoffs Career Averages</td>
             </tr>
             <tr>
                 <td>year</td>
@@ -125,7 +125,7 @@ class PlayoffAveragesView extends BaseView {
         $car_avgp = ($car_gm) ? $car_pts / $car_gm : "0.0";
 
         echo "<tr>
-            <td colspan=2>Playoff Averages</td>
+            <td colspan=2 style='font-weight:bold;'>Playoff Averages</td>
             <td><center>$car_gm</center></td>
             <td><center>";
         printf('%01.1f', $car_avgm);

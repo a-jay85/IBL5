@@ -4,26 +4,26 @@ require_once __DIR__ . '/BaseView.php';
 
 class HeatAveragesView extends BaseView {
     public function render() {
-        echo "<table border=1 cellspacing=0 class=\"sortable\>
+        echo "<table border=1 cellspacing=0 class=\"sortable\" style='margin: 0 auto;'>
             <tr>
-                <td colspan=15><center><b><font class=\"content\">H.E.A.T. Career Averages</font></b></center></td>
+                <td colspan=15 style='font-weight:bold;text-align:center;background-color:#00c;color:#fff;'>H.E.A.T. Averages</td>
             </tr>
             <tr>
-                <td>year</td>
-                <td>team</td>
-                <td>g</td>
-                <td>min</td>
-                <td>FGP</td>
-                <td>FTP</td>
-                <td>3GP</td>
-                <td>orb</td>
-                <td>reb</td>
-                <td>ast</td>
-                <td>stl</td>
-                <td>to</td>
-                <td>blk</td>
-                <td>pf</td>
-                <td>pts</td>
+                <th>year</th>
+                <th>team</th>
+                <th>g</th>
+                <th>min</th>
+                <th>FGP</th>
+                <th>FTP</th>
+                <th>3GP</th>
+                <th>orb</th>
+                <th>reb</th>
+                <th>ast</th>
+                <th>stl</th>
+                <th>to</th>
+                <th>blk</th>
+                <th>pf</th>
+                <th>pts</th>
             </tr>";
 
         $car_gm = $car_min = $car_fgm = $car_fga = $car_ftm = $car_fta = $car_3gm = $car_3ga = 0;
@@ -123,7 +123,7 @@ class HeatAveragesView extends BaseView {
         $car_avgf = ($car_gm) ? $car_pf / $car_gm : "0.0";
         $car_avgp = ($car_gm) ? $car_pts / $car_gm : "0.0";
 
-        echo "<tr><td colspan=2>H.E.A.T. Averages</td>
+        echo "<tr><td colspan=2 style='font-weight:bold;'>H.E.A.T. Averages</td>
             <td><center>$car_gm</center></td>
             <td><center>";
         printf('%01.1f', $car_avgm);

@@ -19,8 +19,6 @@ function showpage($playerID, $pageView)
     $playerStats = PlayerStats::withPlayerID($db, $playerID);
     $pageView = ($pageView !== null) ? intval($pageView) : null;
 
-    $year = $player->draftYear + $player->yearsOfExperience; 
-
     // DISPLAY PAGE
 
     Nuke\Header::header();

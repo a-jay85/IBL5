@@ -136,11 +136,7 @@ function showpage($playerID, $pageView)
         </table></center>
     <b>BIRD YEARS:</b> $player->birdYears | <b>Remaining Contract:</b> $contract_display </td>";
 
-    if ($pageView == null) {
-        // ==== PLAYER SEASON AND CAREER HIGHS ====
-
-        echo "<td rowspan=3 valign=top>
-
+    echo "<td rowspan=3 valign=top>
         <table border=1 cellspacing=0 cellpadding=0>
             <tr bgcolor=#0000cc>
                 <td align=center colspan=3><font color=#ffffff><b>PLAYER HIGHS</b></font></td>
@@ -223,10 +219,6 @@ function showpage($playerID, $pageView)
             </tr>
         </table></td>";
 
-        // ==== END PLAYER SEASON AND CAREER HIGHS ====
-
-    }
-
     echo "<tr>
         <td colspan=2><hr></td>
     </tr>
@@ -236,8 +228,7 @@ function showpage($playerID, $pageView)
             "<a href=\"" . PlayerPageType::getUrl($playerID, PlayerPageType::OVERVIEW) . "\">" . PlayerPageType::getDescription(PlayerPageType::OVERVIEW) . "</a> | " .
             "<a href=\"" . PlayerPageType::getUrl($playerID, PlayerPageType::AWARDS_AND_NEWS) . "\">" . PlayerPageType::getDescription(PlayerPageType::AWARDS_AND_NEWS) . "</a><br>" .
             "<a href=\"" . PlayerPageType::getUrl($playerID, PlayerPageType::ONE_ON_ONE) . "\">" . PlayerPageType::getDescription(PlayerPageType::ONE_ON_ONE) . "</a> | " .
-            "<a href=\"" . PlayerPageType::getUrl($playerID, PlayerPageType::SIM_STATS) . "\">" . PlayerPageType::getDescription(PlayerPageType::SIM_STATS) . "</a> | " .
-            "<a href=\"" . PlayerPageType::getUrl($playerID, PlayerPageType::GAME_LOG) . "\">" . PlayerPageType::getDescription(PlayerPageType::GAME_LOG) . "</a><br>" .
+            "<a href=\"" . PlayerPageType::getUrl($playerID, PlayerPageType::SIM_STATS) . "\">" . PlayerPageType::getDescription(PlayerPageType::SIM_STATS) . "</a><br>" .
             "<a href=\"" . PlayerPageType::getUrl($playerID, PlayerPageType::REGULAR_SEASON_TOTALS) . "\">" . PlayerPageType::getDescription(PlayerPageType::REGULAR_SEASON_TOTALS) . "</a> | " .
             "<a href=\"" . PlayerPageType::getUrl($playerID, PlayerPageType::REGULAR_SEASON_AVERAGES) . "\">" . PlayerPageType::getDescription(PlayerPageType::REGULAR_SEASON_AVERAGES) . "</a><br>" .
             "<a href=\"" . PlayerPageType::getUrl($playerID, PlayerPageType::PLAYOFF_TOTALS) . "\">" . PlayerPageType::getDescription(PlayerPageType::PLAYOFF_TOTALS) . "</a> | " .
@@ -256,7 +247,7 @@ function showpage($playerID, $pageView)
 
     if ($pageView == PlayerPageType::OVERVIEW) {
         require_once __DIR__ . '/views/OverviewView.php';
-        $view = new OverviewView($db, $player, $playerStats);
+        $view = new OverviewView($db, $player, $playerStats, $season, $sharedFunctions);
         $view->render();
     } elseif ($pageView == PlayerPageType::SIM_STATS) {
         require_once __DIR__ . '/views/SimStatsView.php';
@@ -306,85 +297,6 @@ function showpage($playerID, $pageView)
         require_once __DIR__ . '/views/OneOnOneView.php';
         $view = new OneOnOneView($db, $player, $playerStats);
         $view->render();
-    }
-
-    // GAME LOG
-
-    if ($pageView == PlayerPageType::GAME_LOG) {
-        if ($season->phase == "Preseason") {
-            $query = "SELECT * FROM ibl_box_scores WHERE Date BETWEEN '$season->beginningYear-" . Season::IBL_PRESEASON_MONTH . "-01' AND '$season->endingYear-07-01' AND pid = $playerID ORDER BY Date ASC";
-        } elseif ($season->phase == "HEAT") {
-            $query = "SELECT * FROM ibl_box_scores WHERE Date BETWEEN '$season->beginningYear-" . Season::IBL_HEAT_MONTH . "-01' AND '$season->endingYear-07-01' AND pid = $playerID ORDER BY Date ASC";
-        } else {
-            $query = "SELECT * FROM ibl_box_scores WHERE Date BETWEEN '$season->beginningYear-" . Season::IBL_REGULAR_SEASON_STARTING_MONTH . "-01' AND '$season->endingYear-07-01' AND pid = $playerID ORDER BY Date ASC";
-        }
-        $result = $db->sql_query($query);
-
-        echo "<p>
-            <H1><center>GAME LOG</center></H1>
-            <p>
-            <table class=\"sortable\" width=\"100%\">
-                <tr>
-                    <th>Date</th>
-                    <th>Away</th>
-                    <th>Home</th>
-                    <th>MIN</th>
-                    <th>PTS</th>
-                    <th>FGM</th>
-                    <th>FGA</th>
-                    <th>FG%</th>
-                    <th>FTM</th>
-                    <th>FTA</th>
-                    <th>FT%</th>
-                    <th>3GM</th>
-                    <th>3GA</th>
-                    <th>3G%</th>
-                    <th>ORB</th>
-                    <th>DRB</th>
-                    <th>REB</th>
-                    <th>AST</th>
-                    <th>STL</th>
-                    <th>TO</th>
-                    <th>BLK</th>
-                    <th>PF</th>
-                </tr>";
-
-        echo "<style>
-            td {}
-            .gamelog {text-align: center;}
-        </style>";
-
-        while ($row = $db->sql_fetch_assoc($result)) {
-            $fieldGoalPercentage = ($row['gameFGA'] + $row['game3GA']) ? number_format(($row['gameFGM'] + $row['game3GM']) / ($row['gameFGA'] + $row['game3GA']), 3, '.', '') : "0.000";
-            $freeThrowPercentage = ($row['gameFTA']) ? number_format($row['gameFTM'] / $row['gameFTA'], 3, '.', '') : "0.000";
-            $threePointPercentage = ($row['game3GA']) ? number_format($row['game3GM'] / $row['game3GA'], 3, '.', '') : "0.000";
-
-            echo "<tr>
-                <td class=\"gamelog\">" . $row['Date'] . "</td>
-                <td class=\"gamelog\">" . $sharedFunctions->getTeamnameFromTid($row['visitorTID']) . "</td>
-                <td class=\"gamelog\">" . $sharedFunctions->getTeamnameFromTid($row['homeTID']) . "</td>
-                <td class=\"gamelog\">" . $row['gameMIN'] . "</td>
-                <td class=\"gamelog\">" . ((2 * $row['gameFGM']) + (3 * $row['game3GM']) + $row['gameFTM']) . "</td>
-                <td class=\"gamelog\">" . ($row['gameFGM'] + $row['game3GM']) . "</td>
-                <td class=\"gamelog\">" . ($row['gameFGA'] + $row['game3GA']) . "</td>
-                <td class=\"gamelog\">" . $fieldGoalPercentage . "</td>
-                <td class=\"gamelog\">" . $row['gameFTM'] . "</td>
-                <td class=\"gamelog\">" . $row['gameFTA'] . "</td>
-                <td class=\"gamelog\">" . $freeThrowPercentage . "</td>
-                <td class=\"gamelog\">" . $row['game3GM'] . "</td>
-                <td class=\"gamelog\">" . $row['game3GA'] . "</td>
-                <td class=\"gamelog\">" . $threePointPercentage . "</td>
-                <td class=\"gamelog\">" . $row['gameORB'] . "</td>
-                <td class=\"gamelog\">" . $row['gameDRB'] . "</td>
-                <td class=\"gamelog\">" . ($row['gameORB'] + $row['gameDRB']) . "</td>
-                <td class=\"gamelog\">" . $row['gameAST'] . "</td>
-                <td class=\"gamelog\">" . $row['gameSTL'] . "</td>
-                <td class=\"gamelog\">" . $row['gameTOV'] . "</td>
-                <td class=\"gamelog\">" . $row['gameBLK'] . "</td>
-                <td class=\"gamelog\">" . $row['gamePF'] . "</td>
-            </tr>";
-        }
-        echo "</table>";
     }
 
     echo "</table>";

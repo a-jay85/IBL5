@@ -134,8 +134,6 @@ class RegularSeasonAveragesView extends BaseView {
             echo "</center></td></tr>";
         }
 
-        // CURRENT YEAR AVERAGES
-
         if (!$this->player->isRetired) {
             echo "<tr align=center>
                 <td><center>$this->currentYear</center></td>

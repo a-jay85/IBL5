@@ -39,13 +39,10 @@ class RegularSeasonTotalsView extends BaseView {
             $hist_min = stripslashes(check_html($row44['min'], "nohtml"));
             $hist_fgm = stripslashes(check_html($row44['fgm'], "nohtml"));
             $hist_fga = stripslashes(check_html($row44['fga'], "nohtml"));
-            $hist_fgp = ($hist_fga) ? ($hist_fgm / $hist_fga) : "0.000";
             $hist_ftm = stripslashes(check_html($row44['ftm'], "nohtml"));
             $hist_fta = stripslashes(check_html($row44['fta'], "nohtml"));
-            $hist_ftp = ($hist_fta) ? ($hist_ftm / $hist_fta) : "0.000";
             $hist_tgm = stripslashes(check_html($row44['3gm'], "nohtml"));
             $hist_tga = stripslashes(check_html($row44['3ga'], "nohtml"));
-            $hist_tgp = ($hist_tga) ? ($hist_tgm / $hist_tga) : "0.000";
             $hist_orb = stripslashes(check_html($row44['orb'], "nohtml"));
             $hist_reb = stripslashes(check_html($row44['reb'], "nohtml"));
             $hist_ast = stripslashes(check_html($row44['ast'], "nohtml"));
@@ -129,19 +126,6 @@ class RegularSeasonTotalsView extends BaseView {
             $car_pf += $this->playerStats->seasonPersonalFouls;
             $car_pts += $this->playerStats->seasonPoints;
         }
-
-        $car_fgp = ($car_fga) ? $car_fgm / $car_fga : "0.000";
-        $car_ftp = ($car_fta) ? $car_ftm / $car_fta : "0.000";
-        $car_tgp = ($car_3ga) ? $car_3gm / $car_3ga : "0.000";
-        $car_avgm = ($car_gm) ? $car_min / $car_gm : "0.0";
-        $car_avgo = ($car_gm) ? $car_orb / $car_gm : "0.0";
-        $car_avgr = ($car_gm) ? $car_reb / $car_gm : "0.0";
-        $car_avga = ($car_gm) ? $car_ast / $car_gm : "0.0";
-        $car_avgs = ($car_gm) ? $car_stl / $car_gm : "0.0";
-        $car_avgb = ($car_gm) ? $car_blk / $car_gm : "0.0";
-        $car_avgt = ($car_gm) ? $car_tvr / $car_gm : "0.0";
-        $car_avgf = ($car_gm) ? $car_pf / $car_gm : "0.0";
-        $car_avgp = ($car_gm) ? $car_pts / $car_gm : "0.0";
 
         echo "<tr>
             <td colspan=2 >Career Totals</td>

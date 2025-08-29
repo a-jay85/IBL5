@@ -4,7 +4,6 @@ require_once __DIR__ . '/BaseView.php';
 
 class RegularSeasonAveragesView extends BaseView {
     public function render() {
-        $year = $this->player->draftYear + $this->player->yearsOfExperience;
         echo "<table border=1 cellspacing=0 class=\"sortable\">
             <tr>
                 <td colspan=21><center><b><font class=\"content\">Career Averages</font></b></center></td>
@@ -139,7 +138,7 @@ class RegularSeasonAveragesView extends BaseView {
 
         if (!$this->player->isRetired) {
             echo "<tr align=center>
-                <td><center>$year</center></td>
+                <td><center>$this->currentYear</center></td>
                 <td><center>" . $this->player->teamName . "</center></td>
                 <td><center>" . $this->playerStats->seasonGamesPlayed . "</center></td>
                 <td><center>";

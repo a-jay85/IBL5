@@ -2,7 +2,6 @@
 
 class PlayerPageType
 {
-    const GAME_LOG = 0;
     const OVERVIEW = null;
     const AWARDS_AND_NEWS = 1;
     const ONE_ON_ONE = 2;
@@ -23,8 +22,6 @@ class PlayerPageType
     public static function getDescription($pageView): string
     {
         switch ($pageView) {
-            case self::GAME_LOG:
-                return "Game Log";
             case self::OVERVIEW:
                 return "Player Overview";
             case self::AWARDS_AND_NEWS:

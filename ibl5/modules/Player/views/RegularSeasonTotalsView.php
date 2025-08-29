@@ -4,31 +4,30 @@ require_once __DIR__ . '/BaseView.php';
 
 class RegularSeasonTotalsView extends BaseView {
     public function render() {
-        $car_gm = $car_min = $car_fgm = $car_fga = $car_ftm = $car_fta = $car_3gm = $car_3ga = 0;
-        $car_orb = $car_reb = $car_ast = $car_stl = $car_blk = $car_tvr = $car_pf = $car_pts = 0;
-
-        echo "<table border=1 cellspacing=0 class=\"sortable\>
+        echo "<table border=1 cellspacing=0 class=\"sortable\" style='margin: 0 auto;'>
             <tr>
-                <td colspan=15><center><font class=\"content\" color=\"#000000\"><b>Career Totals</b></font></center></td>
+                <td colspan=15 style='font-weight:bold; text-align:center; background-color:#00c; color:#fff;'>Regular Season Totals</td>
             </tr>
             <tr>
-                <td>year</td>
-                <td>team</td>
-                <td>g</td>
-                <td>min</td>
-                <td>FGM-FGA</td>
-                <td>FTM-FTA</td>
-                <td>3GM-3GA</td>
-                <td>orb</td>
-                <td>reb</td>
-                <td>ast</td>
-                <td>stl</td>
-                <td>to</td>
-                <td>blk</td>
-                <td>pf</td>
-                <td>pts</td>
+                <th>year</th>
+                <th>team</th>
+                <th>g</th>
+                <th>min</th>
+                <th>FGM-FGA</th>
+                <th>FTM-FTA</th>
+                <th>3GM-3GA</th>
+                <th>orb</th>
+                <th>reb</th>
+                <th>ast</th>
+                <th>stl</th>
+                <th>to</th>
+                <th>blk</th>
+                <th>pf</th>
+                <th>pts</th>
             </tr>";
-
+        
+        $car_gm = $car_min = $car_fgm = $car_fga = $car_ftm = $car_fta = $car_3gm = $car_3ga = 0;
+        $car_orb = $car_reb = $car_ast = $car_stl = $car_blk = $car_tvr = $car_pf = $car_pts = 0;
         $result44 = $this->db->sql_query("SELECT * FROM ibl_hist WHERE pid=" . $this->player->playerID . " ORDER BY year ASC");
 
         while ($row44 = $this->db->sql_fetchrow($result44)) {
@@ -88,8 +87,6 @@ class RegularSeasonTotalsView extends BaseView {
             $car_pts = $car_pts + $hist_pts;
         }
 
-        // CURRENT YEAR TOTALS
-
         if ($this->player->isRetired == 0) {
             echo "<tr>
                 <td><center>$this->currentYear</center></td>
@@ -128,7 +125,7 @@ class RegularSeasonTotalsView extends BaseView {
         }
 
         echo "<tr>
-            <td colspan=2 >Career Totals</td>
+            <td colspan=2 style=\"font-weight:bold;\"><b>Career Totals</b></td>
             <td><center>$car_gm</center></td>
             <td><center>$car_min</center></td>
             <td><center>$car_fgm-$car_fga</center></td>

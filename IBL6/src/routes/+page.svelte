@@ -2,7 +2,8 @@
 	import '../app.css';
     import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
     import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from 'firebase/auth';
-    import { db } from '../lib/firebase/firebase';
+    import { app, db, auth } from '../lib/firebase/firebase';
+
 
 	let fields = [
 		'Pos',

@@ -1,9 +1,9 @@
-<script>
+<script lang='ts'>
 	import '../app.css';
-    import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
-    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from 'firebase/auth';
-    import { app, db, auth } from '../lib/firebase/firebase';
-
+	import { collection, getDocs } from 'firebase/firestore';
+	import { db } from '$lib/firebase/firebase';
+	import { type IblPlayer } from '$lib/models/IblPlayer';
+	import { onMount } from 'svelte';
 
 	let fields = [
 		'Pos',
@@ -24,110 +24,17 @@
 		'tov',
 		'pf'
 	];
-	let items = [
-		{
-			id: 1,
-			pos: 'PG',
-			name: 'Stephon Marbury',
-			min: 38,
-			fgm: 11,
-			fga: 22,
-			ftm: 5,
-			fta: 7,
-			'3pm': 2,
-			'3pa': 6,
-			pts: 29,
-			orb: 1,
-			reb: 0,
-			ast: 8,
-			stl: 1,
-			blk: 0,
-			tov: 3,
-			pf: 2
-		},
-		{
-			id: 2,
-			pos: 'SG',
-			name: 'Joe Smith',
-			min: 36,
-			fgm: 9,
-			fga: 18,
-			ftm: 4,
-			fta: 5,
-			'3pm': 1,
-			'3pa': 4,
-			pts: 23,
-			oreb: 2,
-			dreb: 5,
-			ast: 4,
-			stl: 2,
-			blk: 1,
-			tov: 2,
-			pf: 3
-		},
-		{
-			id: 3,
-			pos: 'SF',
-			name: 'Kenyon Martin',
-			min: 34,
-			fgm: 8,
-			fga: 15,
-			ftm: 6,
-			fta: 8,
-			'3pm': 0,
-			'3pa': 1,
-			pts: 22,
-			oreb: 3,
-			dreb: 7,
-			ast: 2,
-			stl: 1,
-			blk: 2,
-			tov: 1,
-			pf: 4
-		},
-		{
-			id: 4,
-			pos: 'PF',
-			name: 'Kris Humphries',
-			min: 32,
-			fgm: 7,
-			fga: 14,
-			ftm: 3,
-			fta: 4,
-			'3pm': 0,
-			'3pa': 0,
-			pts: 17,
-			oreb: 4,
-			dreb: 6,
-			ast: 1,
-			stl: 0,
-			blk: 1,
-			tov: 2,
-			pf: 5
-		},
-		{
-			id: 5,
-			pos: 'C',
-			name: 'Zaza Pachulia',
-			min: 30,
-			fgm: 6,
-			fga: 12,
-			ftm: 2,
-			fta: 3,
-			'3pm': 0,
-			'3pa': 0,
-			pts: 14,
-			oreb: 5,
-			dreb: 8,
-			ast: 1,
-			stl: 0,
-			blk: 3,
-			tov: 1,
-			pf: 4
-		}
 
-		// Add more items as needed
-	];
+	let playerData: IblPlayer[] = [];
+
+	async function fetchPlayers() {
+		const players = await getDocs(collection(db, 'iblPlayers'));
+		return players.docs.map((doc) => doc.data() as IblPlayer);
+	}
+
+	onMount( async () => {
+		playerData = await fetchPlayers();
+	});
 </script>
 
 <div>
@@ -196,7 +103,7 @@
 							d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
 						/>
 					</svg>
-					<span class="indicator-item badge badge-xs badge-primary"></span>
+					<span class="indicator-player badge badge-xs badge-primary"></span>
 				</div>
 			</button>
 		</div>
@@ -214,28 +121,34 @@
 			</tr>
 		</thead>
 		<tbody>
-			{#each items as item, i}
+			{#if playerData.length === 0}
 				<tr>
-					<th>{item.id}</th>
-					<td>{item.pos}</td>
-					<td>{item.name}</td>
-					<td>{item.min}</td>
-					<td>{item.fgm}</td>
-					<td>{item.fga}</td>
-					<td>{item.ftm}</td>
-					<td>{item.fta}</td>
-					<td>{item['3pm']}</td>
-					<td>{item['3pa']}</td>
-					<td>{item.pts}</td>
-					<td>{item.oreb}</td>
-					<td>{item.dreb}</td>
-					<td>{item.ast}</td>
-					<td>{item.stl}</td>
-					<td>{item.blk}</td>
-					<td>{item.tov}</td>
-					<td>{item.pf}</td>
+					<td colspan="{fields.length + 2}">Loading player data...</td>
 				</tr>
-			{/each}
+			{:else}
+				{#each playerData as player, i}
+					<tr>
+						<th>{player.id}</th>
+						<td>{player.pos}</td>
+						<td>{player.name}</td>
+						<td>{player.min}</td>
+						<td>{player.fgm}</td>
+						<td>{player.fga}</td>
+						<td>{player.ftm}</td>
+						<td>{player.fta}</td>
+						<td>{player['3pm']}</td>
+						<td>{player['3pa']}</td>
+						<td>{player.pts}</td>
+						<td>{player.orb}</td>
+						<td>{player.reb}</td>
+						<td>{player.ast}</td>
+						<td>{player.stl}</td>
+						<td>{player.blk}</td>
+						<td>{player.tov}</td>
+						<td>{player.pf}</td>
+					</tr>
+				{/each}
+			{/if}
 		</tbody>
 		<tfoot>
 			<tr>
@@ -247,6 +160,32 @@
 			</tr>
 		</tfoot>
 	</table>
+</div>
+<div class="flex justify-center flex-col gap-2 p-4">
+    <label for="name" class="floating-label">Name:</label>
+    <input id="name" type="text" class="input input-xs"/>
+
+    <label for="pos">Position:</label>
+    <input id="pos" type="text" class="input input-xs"/>
+
+    <label for="id">ID:</label>
+    <input id="id" type="number" class="input input-xs"/>
+
+    <label for="min">Minutes:</label>
+    <input id="min" type="number" class="input input-xs"/>
+
+    <label for="fgm">Field Goals Made:</label>
+    <input id="fgm" type="number" class="input input-xs"/>
+
+    <label for="fga">Field Goals Attempted:</label>
+    <input id="fga" type="number" class="input input-xs"/>
+
+    <button type="submit" class="btn">Add Player</button>
+
+</div>
+<div>
+    <h2>Create A Player</h2>
+    <button id='' class="btn">Create Player</button>
 </div>
 
 <style>

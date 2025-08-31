@@ -1,7 +1,7 @@
 import { addDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
 
-interface IblPlayer {
+export interface IblPlayer {
 	id: number;
 	pos: string;
 	name: string;
@@ -22,7 +22,7 @@ interface IblPlayer {
 	pf: number;
 }
 
-export function addIblPlayer(data: IblPlayer) {
+export async function addIblPlayer(data: IblPlayer) {
 	return addDoc(collection(db, 'iblPlayers'), data);
 }
 

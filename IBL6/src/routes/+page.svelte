@@ -2,7 +2,7 @@
 	import '../app.css';
 	import { collection, getDocs } from 'firebase/firestore';
 	import { db } from '$lib/firebase/firebase';
-	import { type IblPlayer } from '$lib/models/IblPlayer';
+	import { getAllIblPlayers, type IblPlayer } from '$lib/models/IblPlayer';
 	import { onMount } from 'svelte';
 
 	let fields = [
@@ -28,8 +28,7 @@
 	let playerData: IblPlayer[] = [];
 
 	async function fetchPlayers() {
-		const players = await getDocs(collection(db, 'iblPlayers'));
-		return players.docs.map((doc) => doc.data() as IblPlayer);
+        return await getAllIblPlayers();
 	}
 
 	onMount( async () => {

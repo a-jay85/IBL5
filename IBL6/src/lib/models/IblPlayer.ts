@@ -2,7 +2,8 @@ import { addDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
 
 export interface IblPlayer {
-	id: number;
+	id: string;
+	cd: number;
 	pos: string;
 	name: string;
 	min: number;
@@ -26,7 +27,7 @@ export async function addIblPlayer(data: IblPlayer) {
 	return addDoc(collection(db, 'iblPlayers'), data);
 }
 
-export async function getIblPlayer(id: number): Promise<IblPlayer> {
+export async function getIblPlayer(id: string): Promise<IblPlayer> {
 	const querySnapshot = await getDocs(collection(db, 'iblPlayers'));
 	const player = querySnapshot.docs
 		.map((doc) => doc.data() as IblPlayer)

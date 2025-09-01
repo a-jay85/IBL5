@@ -72,14 +72,15 @@ if (!isset($_POST['confirmed'])) {
 }
 
 require 'mainfile.php';
+
 $sharedFunctions = new Shared($db);
 $season = new Season($db);
+
+$tidOffenseStats = $tidDefenseStats = 0;
 
 $queryTeamIDsNames = "SELECT teamid, team_name FROM ibl_team_info ORDER BY teamid ASC;";
 $resultTeamIDsNames = $db->sql_query($queryTeamIDsNames);
 $numRowsTeamIDsNames = $db->sql_numrows($resultTeamIDsNames);
-
-$tidOffenseStats = $tidDefenseStats = 0;
 
 echo "Calculating foul baseline...<br>";
 

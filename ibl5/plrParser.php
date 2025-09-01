@@ -272,8 +272,8 @@ while (!feof($plrFile)) {
 
     $careerFGM = $career2GM + $career3GM;
     $careerFGA = $career2GA + $career3GA;
-    $careerPTS = $season2GM * 2 + $seasonFTM + $season3GM * 3 + $career2GM * 2 + $careerFTM + $career3GM * 3;
-    $careerREB = $seasonORB + $seasonDRB + $careerORB + $careerDRB;
+    $careerPTS = $career2GM * 2 + $careerFTM + $career3GM * 3;
+    $careerREB = $careerORB + $careerDRB;
 
     $heightFT = floor($heightInches / 12);
     $heightIN = $heightInches % 12;
@@ -283,7 +283,7 @@ while (!feof($plrFile)) {
     $ratingFOUL = intval(100-round($personalFoulsPerMinute / max($foulRatioArray) * 100, 0));
 
     if ($ordinal <= 1440) {
-        $playerUpdateQuery = "INSERT INTO ibl_plr__test
+        $playerUpdateQuery = "INSERT INTO ibl_plr
             (   `ordinal`,
                 `name`,
                 `age`,
@@ -376,13 +376,13 @@ while (!feof($plrFile)) {
                 `car_tga`,
                 `car_orb`,
                 `car_drb`,
+                `car_reb`,
                 `car_ast`,
                 `car_stl`,
                 `car_to`,
                 `car_blk`,
                 `car_pf`,
                 `car_pts`,
-                `car_reb`,
                 `r_fga`,
                 `r_fgp`,
                 `r_fta`,
@@ -498,13 +498,13 @@ while (!feof($plrFile)) {
             $career3GA,
             $careerORB,
             $careerDRB,
+            $careerREB,
             $careerAST,
             $careerSTL,
             $careerTVR,
             $careerBLK,
             $careerPF,
             $careerPTS,
-            $careerREB,
             $rating2GA,
             $rating2GP,
             $ratingFTA,
@@ -620,13 +620,13 @@ while (!feof($plrFile)) {
             `car_tga` = $career3GA,
             `car_orb` = $careerORB,
             `car_drb` = $careerDRB,
+            `car_reb` = $careerREB,
             `car_ast` = $careerAST,
             `car_stl` = $careerSTL,
             `car_to` = $careerTVR,
             `car_blk` = $careerBLK,
             `car_pf` = $careerPF,
             `car_pts` = $careerPTS,
-            `car_reb` = $careerREB,
             `r_fga` = $rating2GA,
             `r_fgp` = $rating2GP,
             `r_fta` = $ratingFTA,
@@ -672,7 +672,7 @@ while (!feof($plrFile)) {
             $teamName = $sharedFunctions->getTeamnameFromTid($tidDefenseStats);
         }
 
-        $teamUpdateQuery = 'UPDATE `ibl_team_' . $sideOfTheBall . '_stats__test`
+        $teamUpdateQuery = 'UPDATE `ibl_team_' . $sideOfTheBall . '_stats`
             SET
             `games` = ' . $seasonGamesPlayed . ',
             `fgm` = ' . ($season2GM + $season3GM) . ',

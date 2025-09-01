@@ -272,8 +272,8 @@ while (!feof($plrFile)) {
 
     $careerFGM = $career2GM + $career3GM;
     $careerFGA = $career2GA + $career3GA;
-    $careerPTS = $season2GM * 2 + $seasonFTM + $season3GM * 3 + $career2GM * 2 + $careerFTM + $career3GM * 3;
-    $careerREB = $seasonORB + $seasonDRB + $careerORB + $careerDRB;
+    $careerPTS = $career2GM * 2 + $careerFTM + $career3GM * 3;
+    $careerREB = $careerORB + $careerDRB;
 
     $heightFT = floor($heightInches / 12);
     $heightIN = $heightInches % 12;

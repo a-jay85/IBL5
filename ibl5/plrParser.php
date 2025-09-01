@@ -272,11 +272,12 @@ while (!feof($plrFile)) {
     $seasonFGM = $season2GM + $season3GM;
     $seasonFGA = $season2GA + $season3GA;
     $seasonREB = $seasonORB + $seasonDRB;
+    $seasonPTS = $season2GM * 2 + $seasonFTM + $season3GM * 3;
 
     $careerFGM = $career2GM + $career3GM;
     $careerFGA = $career2GA + $career3GA;
-    $careerPTS = $career2GM * 2 + $careerFTM + $career3GM * 3;
     $careerREB = $careerORB + $careerDRB;
+    $careerPTS = $career2GM * 2 + $careerFTM + $career3GM * 3;
 
     // HACK: The following is adapted from Player::getCurrentSeasonSalary().
     if ("contractYear" . $currentContractYear . "Salary" == "contractYear0Salary") {
@@ -681,6 +682,7 @@ while (!feof($plrFile)) {
             `blk`,
             `tvr`,
             `pf`,
+            `pts`,
             `name`,
             `r_2ga`,
             `r_2gp`,
@@ -723,6 +725,7 @@ while (!feof($plrFile)) {
             $seasonBLK,
             $seasonTVR,
             $seasonPF,
+            $seasonPTS,
             '$name',
             $rating2GA,
             $rating2GP,
@@ -764,6 +767,7 @@ while (!feof($plrFile)) {
             `blk` = $seasonBLK,
             `tvr` = $seasonTVR,
             `pf` = $seasonPF,
+            `pts` = $seasonPTS,
             `r_2ga` = $rating2GA,
             `r_2gp` = $rating2GP,
             `r_fta` = $ratingFTA,

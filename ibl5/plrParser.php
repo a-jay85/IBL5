@@ -283,7 +283,7 @@ while (!feof($plrFile)) {
     $ratingFOUL = intval(100-round($personalFoulsPerMinute / max($foulRatioArray) * 100, 0));
 
     if ($ordinal <= 1440) {
-        $playerUpdateQuery = "INSERT INTO ibl_plr__test
+        $playerUpdateQuery = "INSERT INTO ibl_plr
             (   `ordinal`,
                 `name`,
                 `age`,
@@ -672,7 +672,7 @@ while (!feof($plrFile)) {
             $teamName = $sharedFunctions->getTeamnameFromTid($tidDefenseStats);
         }
 
-        $teamUpdateQuery = 'UPDATE `ibl_team_' . $sideOfTheBall . '_stats__test`
+        $teamUpdateQuery = 'UPDATE `ibl_team_' . $sideOfTheBall . '_stats`
             SET
             `games` = ' . $seasonGamesPlayed . ',
             `fgm` = ' . ($season2GM + $season3GM) . ',

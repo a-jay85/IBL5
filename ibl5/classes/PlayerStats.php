@@ -9,6 +9,7 @@ class PlayerStats
 
     public $name;
     public $position;
+    public $isRetired;
     
     public $seasonGamesStarted;
     public $seasonGamesPlayed;
@@ -94,6 +95,7 @@ class PlayerStats
     public $careerTurnovers;
     public $careerBlocks;
     public $careerPersonalFouls;
+    public $careerPoints;
 
     public $gameMinutesPlayed;
     public $gameFieldGoalsMade;
@@ -162,6 +164,11 @@ class PlayerStats
 
     protected function fill(array $plrRow)
     {
+        $this->playerID = $plrRow['pid'];
+        $this->name = $plrRow['name'];
+        $this->position = $plrRow['pos'];
+        $this->isRetired = $plrRow['retired'];
+
         $this->seasonGamesStarted = $plrRow['stats_gs'];
         $this->seasonGamesPlayed = $plrRow['stats_gm'];
         $this->seasonMinutes = $plrRow['stats_min'];
@@ -246,6 +253,7 @@ class PlayerStats
         $this->careerTurnovers = $plrRow['car_to'];
         $this->careerBlocks = $plrRow['car_blk'];
         $this->careerPersonalFouls = $plrRow['car_pf'];
+        $this->careerPoints = 2 * $this->careerFieldGoalsMade + $this->careerFreeThrowsMade + $this->careerThreePointersMade;
     }
 
     protected function fillHistorical(array $plrRow)

@@ -87,43 +87,6 @@ class RegularSeasonTotalsView extends BaseView {
             $car_pts = $car_pts + $hist_pts;
         }
 
-        if ($this->player->isRetired == 0) {
-            echo "<tr>
-                <td><center>$this->currentYear</center></td>
-                <td><center>" . $this->player->teamName . "</center></td>
-                <td><center>" . $this->playerStats->seasonGamesPlayed . "</center></td>
-                <td><center>" . $this->playerStats->seasonMinutes . "</center></td>
-                <td><center>" . $this->playerStats->seasonFieldGoalsMade . "-" . $this->playerStats->seasonFieldGoalsAttempted . "</center></td>
-                <td><center>" . $this->playerStats->seasonFreeThrowsMade . "-" . $this->playerStats->seasonFreeThrowsAttempted . "</center></td>
-                <td><center>" . $this->playerStats->seasonThreePointersMade . "-" . $this->playerStats->seasonThreePointersAttempted . "</center></td>
-                <td><center>" . $this->playerStats->seasonOffensiveRebounds . "</center></td>
-                <td><center>" . $this->playerStats->seasonTotalRebounds . "</center></td>
-                <td><center>" . $this->playerStats->seasonAssists . "</center></td>
-                <td><center>" . $this->playerStats->seasonSteals . "</center></td>
-                <td><center>" . $this->playerStats->seasonTurnovers . "</center></td>
-                <td><center>" . $this->playerStats->seasonBlocks . "</center></td>
-                <td><center>" . $this->playerStats->seasonPersonalFouls . "</center></td>
-                <td><center>" . $this->playerStats->seasonPoints . "</td>
-            </tr>";
-
-            $car_gm += $this->playerStats->seasonGamesPlayed;
-            $car_min += $this->playerStats->seasonMinutes;
-            $car_fgm += $this->playerStats->seasonFieldGoalsMade;
-            $car_fga += $this->playerStats->seasonFieldGoalsAttempted;
-            $car_ftm += $this->playerStats->seasonFreeThrowsMade;
-            $car_fta += $this->playerStats->seasonFreeThrowsAttempted;
-            $car_3gm += $this->playerStats->seasonThreePointersMade;
-            $car_3ga += $this->playerStats->seasonThreePointersAttempted;
-            $car_orb += $this->playerStats->seasonOffensiveRebounds;
-            $car_reb += $this->playerStats->seasonTotalRebounds;
-            $car_ast += $this->playerStats->seasonAssists;
-            $car_stl += $this->playerStats->seasonSteals;
-            $car_blk += $this->playerStats->seasonBlocks;
-            $car_tvr += $this->playerStats->seasonTurnovers;
-            $car_pf += $this->playerStats->seasonPersonalFouls;
-            $car_pts += $this->playerStats->seasonPoints;
-        }
-
         echo "<tr>
             <td colspan=2 style=\"font-weight:bold;\"><b>Career Totals</b></td>
             <td><center>$car_gm</center></td>

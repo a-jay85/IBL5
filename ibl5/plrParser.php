@@ -75,9 +75,9 @@ require 'mainfile.php';
 $sharedFunctions = new Shared($db);
 $season = new Season($db);
 
-$stringTeamIDsNames = "SELECT teamid, team_name FROM ibl_team_info ORDER BY teamid ASC;";
-$queryTeamIDsNames = $db->sql_query($stringTeamIDsNames);
-$numRowsTeamIDsNames = $db->sql_numrows($queryTeamIDsNames);
+$queryTeamIDsNames = "SELECT teamid, team_name FROM ibl_team_info ORDER BY teamid ASC;";
+$resultTeamIDsNames = $db->sql_query($queryTeamIDsNames);
+$numRowsTeamIDsNames = $db->sql_numrows($resultTeamIDsNames);
 
 $tidOffenseStats = $tidDefenseStats = 0;
 
@@ -703,8 +703,8 @@ echo "Assigning team names to players...<br>";
 
 $i = 0;
 while ($i < $numRowsTeamIDsNames) {
-    $teamname = $db->sql_result($queryTeamIDsNames, $i, 'team_name');
-    $teamID = $db->sql_result($queryTeamIDsNames, $i, 'teamid');
+    $teamname = $db->sql_result($resultTeamIDsNames, $i, 'team_name');
+    $teamID = $db->sql_result($resultTeamIDsNames, $i, 'teamid');
     $teamnameUpdateQuery = "UPDATE `ibl_plr` SET `teamname` = '$teamname' WHERE `tid` = $teamID;";
     if (!$db->sql_query($teamnameUpdateQuery)) {
         die('Invalid query: ' . $db->sql_error());

@@ -705,7 +705,7 @@ $i = 0;
 while ($i < $numRowsTeamIDsNames) {
     $teamname = $db->sql_result($queryTeamIDsNames, $i, 'team_name');
     $teamID = $db->sql_result($queryTeamIDsNames, $i, 'teamid');
-    $teamnameUpdateQuery = "UPDATE `ibl_plr__test` SET `teamname` = '$teamname' WHERE `tid` = $teamID;";
+    $teamnameUpdateQuery = "UPDATE `ibl_plr` SET `teamname` = '$teamname' WHERE `tid` = $teamID;";
     if (!$db->sql_query($teamnameUpdateQuery)) {
         die('Invalid query: ' . $db->sql_error());
     }

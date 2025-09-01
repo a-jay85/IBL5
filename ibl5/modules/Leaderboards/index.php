@@ -87,11 +87,11 @@ echo "</select></td>
 // ===== RUN QUERY IF FORM HAS BEEN SUBMITTED
 
 if ($submitted != null) {
-    $tableforquery = "ibl_plr";
+    $tableforquery = "ibl_hist";
 
     if ($boards_type == 'Reg') {
-        $tableforquery = "ibl_plr";
-        $restriction2 = "car_gm > 0 ";
+        $tableforquery = "ibl_hist";
+        $restriction2 = "gm > 0 ";
     } elseif ($boards_type == 'Rav') {
         $tableforquery = "ibl_season_career_avgs";
         $restriction2 = "games > 0";
@@ -116,7 +116,7 @@ if ($submitted != null) {
     }
 
     if ($active == 1) {
-        $restriction1 = " retired = '0' AND ";
+        $restriction1 = "retired = '0' AND ";
     }
 
     $sortby = "pts";
@@ -126,18 +126,47 @@ if ($submitted != null) {
         }
     }
 
-    if ($tableforquery == "ibl_plr") {
-        $sortby = "car_" . $sortby;
+    if ($tableforquery == "ibl_hist") {
         if ($sort_cat == 'Games') {
-            $sortby = "car_gm";
+            $sortby = "gm";
         } elseif ($sort_cat == 'Minutes') {
-            $sortby = "car_min";
+            $sortby = "min";
         } elseif ($sort_cat == 'Turnovers') {
-            $sortby = "car_to";
+            $sortby = "tvr";
         }
+
+        $query = "SELECT
+            h.pid,
+            h.name,
+            sum(h.gm) as gm,
+            sum(h.min) as min,
+            sum(h.fgm) as fgm,
+            sum(h.fga) as fga,
+            sum(h.ftm) as ftm,
+            sum(h.fta) as fta,
+            sum(h.3gm) as 3gm,
+            sum(h.3ga) as 3ga,
+            sum(h.orb) as orb,
+            sum(h.reb) as reb,
+            sum(h.ast) as ast,
+            sum(h.stl) as stl,
+            sum(h.blk) as blk,
+            sum(h.tvr) as tvr,
+            sum(h.pf) as pf,
+            sum(h.pts) as pts,
+            p.retired
+            FROM ibl_hist h
+            LEFT JOIN ibl_plr p ON h.pid = p.pid
+            WHERE " . ($active == 1 ? "p." : "") . "$restriction1 $restriction2
+            GROUP BY pid
+            ORDER BY $sortby DESC" . (is_numeric($display) ? " LIMIT $display" : "") . ";";
+    } else {
+        $query = "SELECT *
+            FROM $tableforquery
+            WHERE $restriction1 $restriction2
+            ORDER BY $sortby DESC" . (is_numeric($display) ? " LIMIT $display" : "");
     }
 
-    $query = "SELECT * FROM $tableforquery WHERE $restriction1 $restriction2 ORDER BY $sortby DESC" . (is_numeric($display) ? " LIMIT $display" : "");
     $result = $db->sql_query($query);
     $num = $db->sql_numrows($result);
 
@@ -173,74 +202,28 @@ if ($submitted != null) {
 
     $rank = 1;
     while ($row = $db->sql_fetchrow($result)) {
-        if ($tableforquery == "ibl_plr") {
-            $playerStats = PlayerStats::withPlrRow($db, $row);
-            $retired = $playerStats->isRetired;
-            if ($retired == 0) {
-                $name = $playerStats->name;
-                $pid = $playerStats->playerID;
-                $gm = number_format($playerStats->careerGamesPlayed);
-                $min = number_format($playerStats->careerMinutesPlayed);
-                $fgm = number_format($playerStats->careerFieldGoalsMade);
-                $fga = number_format($playerStats->careerFieldGoalsAttempted);
-                $fgp = number_format($playerStats->careerFieldGoalsAttempted ? round($playerStats->careerFieldGoalsMade / $playerStats->careerFieldGoalsAttempted, 3) : "0.000", 3);
-                $ftm = number_format($playerStats->careerFreeThrowsMade);
-                $fta = number_format($playerStats->careerFreeThrowsAttempted);
-                $ftp = number_format($playerStats->careerFreeThrowsAttempted ? round($playerStats->careerFreeThrowsMade / $playerStats->careerFreeThrowsAttempted, 3) : "0.000", 3);
-                $tgm = number_format($playerStats->careerThreePointersMade);
-                $tga = number_format($playerStats->careerThreePointersAttempted);
-                $tgp = number_format($playerStats->careerThreePointersAttempted ? round($playerStats->careerThreePointersMade / $playerStats->careerThreePointersAttempted, 3) : "0.000", 3);
-                $orb = number_format($playerStats->careerOffensiveRebounds);
-                $reb = number_format($playerStats->careerTotalRebounds);
-                $ast = number_format($playerStats->careerAssists);
-                $stl = number_format($playerStats->careerSteals);
-                $to = number_format($playerStats->careerTurnovers);
-                $blk = number_format($playerStats->careerBlocks);
-                $pf = number_format($playerStats->careerPersonalFouls);
-                $pts = number_format($playerStats->careerPoints);
-            } else {
-                $name = $row["name"] . "*";
-                $pid = $row["pid"];
-                $result_iblhist = $db->sql_query("SELECT
-                    sum(gm) as gm,
-                    sum(min) as min,
-                    sum(fgm) as fgm,
-                    sum(fga) as fga,
-                    sum(ftm) as ftm,
-                    sum(fta) as fta,
-                    sum(3gm) as 3gm,
-                    sum(3ga) as 3ga,
-                    sum(orb) as orb,
-                    sum(reb) as reb,
-                    sum(ast) as ast,
-                    sum(stl) as stl,
-                    sum(blk) as blk,
-                    sum(tvr) as tvr,
-                    sum(pf) as pf,
-                    sum(ftm) + sum(3gm) + (2 * sum(fgm)) as pts
-                    FROM ibl_hist
-                    WHERE pid = $pid;");
-                $hist = $db->sql_fetchrow($result_iblhist);
-                $gm = number_format($hist["gm"]);
-                $min = number_format($hist["min"]);
-                $fgm = number_format($hist["fgm"]);
-                $fga = number_format($hist["fga"]);
-                $fgp = number_format($hist["fga"] ? round($hist["fgm"] / $hist["fga"], 3) : 0.000, 3);
-                $ftm = number_format($hist["ftm"]);
-                $fta = number_format($hist["fta"]);
-                $ftp = number_format($hist["fta"] ? round($hist["ftm"] / $hist["fta"], 3) : 0.000, 3);
-                $tgm = number_format($hist["3gm"]);
-                $tga = number_format($hist["3ga"]);
-                $tgp = number_format($hist["3ga"] ? round($hist["3gm"] / $hist["3ga"], 3) : 0.000, 3);
-                $orb = number_format($hist["orb"]);
-                $reb = number_format($hist["reb"]);
-                $ast = number_format($hist["ast"]);
-                $stl = number_format($hist["stl"]);
-                $to = number_format($hist["tvr"]);
-                $blk = number_format($hist["blk"]);
-                $pf = number_format($hist["pf"]);
-                $pts = number_format($hist["pts"]);
-            }
+        if ($tableforquery == "ibl_hist") {
+            $name = $row["name"] . ($row["retired"] ? "*" : "");
+            $pid = $row["pid"];
+            $gm = number_format($row["gm"]);
+            $min = number_format($row["min"]);
+            $fgm = number_format($row["fgm"]);
+            $fga = number_format($row["fga"]);
+            $fgp = number_format($row["fga"] ? round($row["fgm"] / $row["fga"], 3) : 0.000, 3);
+            $ftm = number_format($row["ftm"]);
+            $fta = number_format($row["fta"]);
+            $ftp = number_format($row["fta"] ? round($row["ftm"] / $row["fta"], 3) : 0.000, 3);
+            $tgm = number_format($row["3gm"]);
+            $tga = number_format($row["3ga"]);
+            $tgp = number_format($row["3ga"] ? round($row["3gm"] / $row["3ga"], 3) : 0.000, 3);
+            $orb = number_format($row["orb"]);
+            $reb = number_format($row["reb"]);
+            $ast = number_format($row["ast"]);
+            $stl = number_format($row["stl"]);
+            $to = number_format($row["tvr"]);
+            $blk = number_format($row["blk"]);
+            $pf = number_format($row["pf"]);
+            $pts = number_format($row["pts"]);
         } elseif (
             $tableforquery == "ibl_season_career_avgs" ||
             $tableforquery == "ibl_heat_career_avgs" ||
@@ -295,7 +278,7 @@ if ($submitted != null) {
             $pf = number_format($row["pf"]);
             $pts = number_format($row["pts"]);
         }
-
+        
         echo "<tr>
             <td style=\"text-align: center;\">" . $rank . "</td>
             <td style=\"text-align: center;\"><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>

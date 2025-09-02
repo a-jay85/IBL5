@@ -56,10 +56,10 @@ echo "<form name=\"Leaderboards\" method=\"post\" action=\"modules.php?name=Lead
     <table style=\"margin: auto;\">
         <tr>
             <td>
-                Type: <select name=\"boards_type\">";
+                Type: <select name=\"boards_type\">\n";
             
 foreach ($typeArray as $key => $value) {
-    echo "<option value=\"$key\"" . ($boards_type == $key ? ' SELECTED' : '') . ">$value</option>";
+    echo "<option value=\"$key\"" . ($boards_type == $key ? ' SELECTED' : '') . ">$value</option>\n";
 }
 
 echo "</select></td>
@@ -67,7 +67,7 @@ echo "</select></td>
         Category: <select name=\"sort_cat\">";
 
 foreach ($sort_cat_array as $key => $value) {
-    echo "<option value=\"$value\"" . ($sort_cat == $value ? ' SELECTED' : '') . ">$value</option>";
+    echo "<option value=\"$value\"" . ($sort_cat == $value ? ' SELECTED' : '') . ">$value</option>\n";
 }
 
 echo "</select></td>

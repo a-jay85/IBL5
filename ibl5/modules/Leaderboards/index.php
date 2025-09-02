@@ -70,9 +70,9 @@ foreach ($sort_cat_array as $key => $value) {
 
 echo "</select></td>
     <td>
-        Search: <select name=\"active\">
-        <option value=\"0\"" . ($active == '0' ? ' SELECTED' : '') . ">All Players</option>
-        <option value=\"1\"" . ($active == '1' ? ' SELECTED' : '') . ">Active Players Only</option>
+        Include Retirees: <select name=\"active\">
+        <option value=\"0\"" . ($active == '0' ? ' SELECTED' : '') . ">Yes</option>
+        <option value=\"1\"" . ($active == '1' ? ' SELECTED' : '') . ">No</option>
         </select>
     </td>
     <td>

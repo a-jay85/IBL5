@@ -115,10 +115,6 @@ if ($submitted != null) {
         $restriction2 = "games > 0";
     }
 
-    if ($active == 1) {
-        $restriction1 = "retired = '0' AND ";
-    }
-
     $sortby = "pts";
     foreach ($sort_cat_array as $key => $value) {
         if ($sort_cat == $value) {
@@ -157,7 +153,7 @@ if ($submitted != null) {
             p.retired
             FROM ibl_hist h
             LEFT JOIN ibl_plr p ON h.pid = p.pid
-            WHERE " . ($active == 1 ? "p." : "") . "$restriction1 $restriction2
+            WHERE " . ($active == 1 ? "p.retired = '0' AND " : "") . " $restriction2
             GROUP BY pid
             ORDER BY $sortby DESC" . (is_numeric($display) ? " LIMIT $display" : "") . ";";
     } else {

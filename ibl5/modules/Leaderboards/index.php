@@ -127,8 +127,6 @@ if ($submitted != null) {
             $sortby = "gm";
         } elseif ($sort_cat == 'Minutes') {
             $sortby = "min";
-        } elseif ($sort_cat == 'Turnovers') {
-            $sortby = "tvr";
         }
 
         $query = "SELECT

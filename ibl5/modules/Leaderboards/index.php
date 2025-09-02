@@ -172,7 +172,7 @@ if ($submitted != null) {
             $tableforquery == "ibl_olympics_career_avgs" ||
             $tableforquery == "ibl_playoff_career_avgs"
         ) {
-            $name = $row["name"];
+            $name = $row["name"] . ($row["retired"] ? "*" : "");
             $pid = $row["pid"];
             $games = round($row["games"]);
             $minutes = number_format(round($row["minutes"], 2), 2);
@@ -199,7 +199,7 @@ if ($submitted != null) {
             $tableforquery == "ibl_olympics_career_totals" ||
             $tableforquery == "ibl_playoff_career_totals"
         ) {
-            $name = $row["name"];
+            $name = $row["name"] . ($row["retired"] ? "*" : "");
             $pid = $row["pid"];
             $games = number_format($row["games"]);
             $minutes = number_format($row["minutes"]);

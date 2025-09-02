@@ -20,14 +20,14 @@ $sort_cat = $_POST['sort_cat'];
 $submitted = $_POST['submitted'];
 
 $typeArray = array(
-    'Reg' => 'Regular Season Totals',
-    'Rav' => 'Regular Season Averages',
-    'Ply' => 'Playoff Totals',
-    'PLA' => 'Playoff Averages',
-    'HET' => 'H.E.A.T. Totals',
-    'HEA' => 'H.E.A.T. Averages',
-    'OLY' => 'Olympic Totals',
-    'OLM' => 'Olympic Averages',
+    'ibl_hist' => 'Regular Season Totals',
+    'ibl_season_career_avgs' => 'Regular Season Averages',
+    'ibl_playoff_career_totals' => 'Playoff Totals',
+    'ibl_playoff_career_avgs' => 'Playoff Averages',
+    'ibl_heat_career_totals' => 'H.E.A.T. Totals',
+    'ibl_heat_career_avgs' => 'H.E.A.T. Averages',
+    'ibl_olympics_career_totals' => 'Olympic Totals',
+    'ibl_olympics_career_avgs' => 'Olympic Averages',
 );
 
 $sort_cat_array = array(
@@ -89,25 +89,7 @@ echo "</select></td>
 // ===== RUN QUERY IF FORM HAS BEEN SUBMITTED
 
 if ($submitted != null) {
-    $tableforquery = "ibl_hist";
-
-    if ($boards_type == 'Reg') {
-        $tableforquery = "ibl_hist";
-    } elseif ($boards_type == 'Rav') {
-        $tableforquery = "ibl_season_career_avgs";
-    } elseif ($boards_type == 'Ply') {
-        $tableforquery = "ibl_playoff_career_totals";
-    } elseif ($boards_type == 'PLA') {
-        $tableforquery = "ibl_playoff_career_avgs";
-    } elseif ($boards_type == 'HET') {
-        $tableforquery = "ibl_heat_career_totals";
-    } elseif ($boards_type == 'HEA') {
-        $tableforquery = "ibl_heat_career_avgs";
-    } elseif ($boards_type == 'OLY') {
-        $tableforquery = "ibl_olympics_career_totals";
-    } elseif ($boards_type == 'OLM') {
-        $tableforquery = "ibl_olympics_career_avgs";
-    }
+    $tableforquery = $boards_type;
 
     $sortby = "pts";
     foreach ($sort_cat_array as $key => $value) {

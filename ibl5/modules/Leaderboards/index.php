@@ -93,28 +93,20 @@ if ($submitted != null) {
 
     if ($boards_type == 'Reg') {
         $tableforquery = "ibl_hist";
-        $restriction2 = "gm > 0 ";
     } elseif ($boards_type == 'Rav') {
         $tableforquery = "ibl_season_career_avgs";
-        $restriction2 = "games > 0";
     } elseif ($boards_type == 'Ply') {
         $tableforquery = "ibl_playoff_career_totals";
-        $restriction2 = "games > 0";
     } elseif ($boards_type == 'PLA') {
         $tableforquery = "ibl_playoff_career_avgs";
-        $restriction2 = "games > 0";
     } elseif ($boards_type == 'HET') {
         $tableforquery = "ibl_heat_career_totals";
-        $restriction2 = "games > 0";
     } elseif ($boards_type == 'HEA') {
         $tableforquery = "ibl_heat_career_avgs";
-        $restriction2 = "games > 0";
     } elseif ($boards_type == 'OLY') {
         $tableforquery = "ibl_olympics_career_totals";
-        $restriction2 = "games > 0";
     } elseif ($boards_type == 'OLM') {
         $tableforquery = "ibl_olympics_career_avgs";
-        $restriction2 = "games > 0";
     }
 
     $sortby = "pts";
@@ -125,23 +117,17 @@ if ($submitted != null) {
     }
 
     if ($tableforquery == "ibl_hist") {
-        if ($sort_cat == 'Games') {
-            $sortby = "gm";
-        } elseif ($sort_cat == 'Minutes') {
-            $sortby = "min";
-        }
-
         $query = "SELECT
             h.pid,
             h.name,
-            sum(h.gm) as gm,
-            sum(h.min) as min,
+            sum(h.games) as games,
+            sum(h.minutes) as minutes,
             sum(h.fgm) as fgm,
             sum(h.fga) as fga,
             sum(h.ftm) as ftm,
             sum(h.fta) as fta,
-            sum(h.3gm) as 3gm,
-            sum(h.3ga) as 3ga,
+            sum(h.tgm) as tgm,
+            sum(h.tga) as tga,
             sum(h.orb) as orb,
             sum(h.reb) as reb,
             sum(h.ast) as ast,
@@ -153,13 +139,13 @@ if ($submitted != null) {
             p.retired
             FROM ibl_hist h
             LEFT JOIN ibl_plr p ON h.pid = p.pid
-            WHERE " . ($active == 1 ? "p.retired = '0' AND" : "") . " $restriction2
+            WHERE " . ($active == 1 ? "p.retired = '0' AND" : "") . " games > 0
             GROUP BY pid
             ORDER BY $sortby DESC" . (is_numeric($display) ? " LIMIT $display" : "") . ";";
     } else {
         $query = "SELECT *
             FROM $tableforquery
-            WHERE " . ($active == 1 ? "retired = '0' AND" : "") . " $restriction2
+            WHERE " . ($active == 1 ? "retired = '0' AND" : "") . " games > 0
             ORDER BY $sortby DESC" . (is_numeric($display) ? " LIMIT $display" : "") . ";";
     }
 
@@ -171,8 +157,8 @@ if ($submitted != null) {
             <tr>
                 <th style=\"text-align: center;\">Rank</th>
                 <th style=\"text-align: center;\">Name</th>
-                <th style=\"text-align: center;\">Gm</th>
-                <th style=\"text-align: center;\">Min</th>
+                <th style=\"text-align: center;\">Games</th>
+                <th style=\"text-align: center;\">Minutes</th>
                 <th style=\"text-align: center;\">FGM</th>
                 <th style=\"text-align: center;\">FGA</th>
                 <th style=\"text-align: center;\">FG%</th>
@@ -198,29 +184,7 @@ if ($submitted != null) {
 
     $rank = 1;
     while ($row = $db->sql_fetchrow($result)) {
-        if ($tableforquery == "ibl_hist") {
-            $name = $row["name"] . ($row["retired"] ? "*" : "");
-            $pid = $row["pid"];
-            $gm = number_format($row["gm"]);
-            $min = number_format($row["min"]);
-            $fgm = number_format($row["fgm"]);
-            $fga = number_format($row["fga"]);
-            $fgp = number_format($row["fga"] ? round($row["fgm"] / $row["fga"], 3) : 0.000, 3);
-            $ftm = number_format($row["ftm"]);
-            $fta = number_format($row["fta"]);
-            $ftp = number_format($row["fta"] ? round($row["ftm"] / $row["fta"], 3) : 0.000, 3);
-            $tgm = number_format($row["3gm"]);
-            $tga = number_format($row["3ga"]);
-            $tgp = number_format($row["3ga"] ? round($row["3gm"] / $row["3ga"], 3) : 0.000, 3);
-            $orb = number_format($row["orb"]);
-            $reb = number_format($row["reb"]);
-            $ast = number_format($row["ast"]);
-            $stl = number_format($row["stl"]);
-            $to = number_format($row["tvr"]);
-            $blk = number_format($row["blk"]);
-            $pf = number_format($row["pf"]);
-            $pts = number_format($row["pts"]);
-        } elseif (
+        if (
             $tableforquery == "ibl_season_career_avgs" ||
             $tableforquery == "ibl_heat_career_avgs" ||
             $tableforquery == "ibl_olympics_career_avgs" ||
@@ -228,8 +192,8 @@ if ($submitted != null) {
         ) {
             $name = $row["name"];
             $pid = $row["pid"];
-            $gm = round($row["games"]);
-            $min = number_format(round($row["minutes"], 2), 2);
+            $games = round($row["games"]);
+            $minutes = number_format(round($row["minutes"], 2), 2);
             $fgm = number_format(round($row["fgm"], 2), 2);
             $fga = number_format(round($row["fga"], 2), 2);
             $fgp = number_format(round($row["fgpct"], 3), 3);
@@ -248,14 +212,15 @@ if ($submitted != null) {
             $pf = number_format(round($row["pf"], 2), 2);
             $pts = number_format(round($row["pts"], 2), 2);
         } elseif (
+            $tableforquery == "ibl_hist" ||
             $tableforquery == "ibl_heat_career_totals" ||
             $tableforquery == "ibl_olympics_career_totals" ||
             $tableforquery == "ibl_playoff_career_totals"
         ) {
             $name = $row["name"];
             $pid = $row["pid"];
-            $gm = number_format($row["games"]);
-            $min = number_format($row["minutes"]);
+            $games = number_format($row["games"]);
+            $minutes = number_format($row["minutes"]);
             $fgm = number_format($row["fgm"]);
             $fga = number_format($row["fga"]);
             $fgp = number_format($row["fga"] ? round($row["fgm"] / $row["fga"], 3) : 0.000, 3);
@@ -278,8 +243,8 @@ if ($submitted != null) {
         echo "<tr>
             <td style=\"text-align: center;\">" . $rank . "</td>
             <td style=\"text-align: center;\"><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>
-            <td style=\"text-align: center;\">" . $gm . "</td>
-            <td style=\"text-align: center;\">" . $min . "</td>
+            <td style=\"text-align: center;\">" . $games . "</td>
+            <td style=\"text-align: center;\">" . $minutes . "</td>
             <td style=\"text-align: center;\">" . $fgm . "</td>
             <td style=\"text-align: center;\">" . $fga . "</td>
             <td style=\"text-align: center;\">" . $fgp . "</td>

@@ -125,9 +125,10 @@ if ($submitted != null) {
             GROUP BY pid
             ORDER BY $sortby DESC" . (is_numeric($display) ? " LIMIT $display" : "") . ";";
     } else {
-        $query = "SELECT *
-            FROM $tableforquery
-            WHERE " . ($active == 1 ? "retired = '0' AND" : "") . " games > 0
+        $query = "SELECT h.*, p.retired
+            FROM $tableforquery h
+            LEFT JOIN ibl_plr p ON h.pid = p.pid
+            WHERE " . ($active == 1 ? "p.retired = '0' AND" : "") . " games > 0
             ORDER BY $sortby DESC" . (is_numeric($display) ? " LIMIT $display" : "") . ";";
     }
 

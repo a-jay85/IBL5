@@ -59,7 +59,7 @@ echo "<form name=\"Leaderboards\" method=\"post\" action=\"modules.php?name=Lead
                 Type: <select name=\"boards_type\">\n";
             
 foreach ($typeArray as $key => $value) {
-    echo "<option value=\"$key\"" . ($boards_type == $key ? ' SELECTED' : '') . ">$value</option>\n";
+    echo "<option value=\"$value\"" . ($boards_type == $value ? ' SELECTED' : '') . ">$value</option>\n";
 }
 
 echo "</select></td>
@@ -89,12 +89,16 @@ echo "</select></td>
 // ===== RUN QUERY IF FORM HAS BEEN SUBMITTED
 
 if ($submitted != null) {
-    $tableforquery = $boards_type;
-
-    $sortby = "pts";
+    foreach ($typeArray as $key => $value) {
+        if ($boards_type == $value) {
+            $tableforquery = $key;
+            break;
+        }
+    }
     foreach ($sort_cat_array as $key => $value) {
         if ($sort_cat == $value) {
             $sortby = $key;
+            break;
         }
     }
 
@@ -131,7 +135,6 @@ if ($submitted != null) {
             WHERE " . ($active == 1 ? "p.retired = '0' AND" : "") . " games > 0
             ORDER BY $sortby DESC" . (is_numeric($display) ? " LIMIT $display" : "") . ";";
     }
-
     $result = $db->sql_query($query);
     $num = $db->sql_numrows($result);
 

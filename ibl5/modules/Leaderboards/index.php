@@ -153,14 +153,14 @@ if ($submitted != null) {
             p.retired
             FROM ibl_hist h
             LEFT JOIN ibl_plr p ON h.pid = p.pid
-            WHERE " . ($active == 1 ? "p.retired = '0' AND " : "") . " $restriction2
+            WHERE " . ($active == 1 ? "p.retired = '0' AND" : "") . " $restriction2
             GROUP BY pid
             ORDER BY $sortby DESC" . (is_numeric($display) ? " LIMIT $display" : "") . ";";
     } else {
         $query = "SELECT *
             FROM $tableforquery
-            WHERE $restriction1 $restriction2
-            ORDER BY $sortby DESC" . (is_numeric($display) ? " LIMIT $display" : "");
+            WHERE " . ($active == 1 ? "retired = '0' AND" : "") . " $restriction2
+            ORDER BY $sortby DESC" . (is_numeric($display) ? " LIMIT $display" : "") . ";";
     }
 
     $result = $db->sql_query($query);

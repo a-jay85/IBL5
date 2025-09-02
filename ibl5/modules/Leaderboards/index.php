@@ -78,7 +78,7 @@ echo "</select></td>
         </select>
     </td>
     <td>
-        Limit: <input type=\"text\" name=\"display\" size=\"4\" value=\"$display\"> Records
+        Limit: <input type=\"number\" name=\"display\" style=\"width: 4em\" value=\"$display\"> Records
     </td>
     <td>
         <input type=\"hidden\" name=\"submitted\" value=\"1\">

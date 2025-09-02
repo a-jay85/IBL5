@@ -55,13 +55,15 @@ $sort_cat_array = array(
 echo "<form name=\"Leaderboards\" method=\"post\" action=\"modules.php?name=Leaderboards\">
     <table style=\"margin: auto;\">
         <tr>
-            <td>Type: <select name=\"boards_type\">";
+            <td>
+                Type: <select name=\"boards_type\">";
             
 foreach ($typeArray as $key => $value) {
     echo "<option value=\"$key\"" . ($boards_type == $key ? ' SELECTED' : '') . ">$value</option>";
 }
 
-echo "</select></td><td>
+echo "</select></td>
+    <td>
         Category: <select name=\"sort_cat\">";
 
 foreach ($sort_cat_array as $key => $value) {

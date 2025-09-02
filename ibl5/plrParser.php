@@ -538,8 +538,7 @@ while (!feof($plrFile)) {
             $weight,
             $draftYear,
             0,
-            $ratingFOUL
-        )
+            $ratingFOUL)
         ON DUPLICATE KEY UPDATE
             `ordinal` = $ordinal,
             `name` = '$name',
@@ -747,8 +746,7 @@ while (!feof($plrFile)) {
             $ratingPD,
             $ratingTO,
             $ratingTD,
-            $currentSeasonSalary
-        )
+            $currentSeasonSalary)
         ON DUPLICATE KEY UPDATE
             `team` = '" . $sharedFunctions->getTeamnameFromTid($tid) . "',
             `teamid` = $tid,

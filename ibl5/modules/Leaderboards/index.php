@@ -127,13 +127,13 @@ if ($submitted != null) {
             LEFT JOIN ibl_plr p ON h.pid = p.pid
             WHERE " . ($active == 1 ? "p.retired = '0' AND" : "") . " games > 0
             GROUP BY pid
-            ORDER BY $sortby DESC" . (is_numeric($display) ? " LIMIT $display" : "") . ";";
+            ORDER BY $sortby DESC" . (is_numeric($display) && $display > 0 ? " LIMIT $display" : "") . ";";
     } else {
         $query = "SELECT h.*, p.retired
             FROM $tableforquery h
             LEFT JOIN ibl_plr p ON h.pid = p.pid
             WHERE " . ($active == 1 ? "p.retired = '0' AND" : "") . " games > 0
-            ORDER BY $sortby DESC" . (is_numeric($display) ? " LIMIT $display" : "") . ";";
+            ORDER BY $sortby DESC" . (is_numeric($display) && $display > 0 ? " LIMIT $display" : "") . ";";
     }
     $result = $db->sql_query($query);
     $num = $db->sql_numrows($result);

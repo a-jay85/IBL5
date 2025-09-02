@@ -72,14 +72,15 @@ if (!isset($_POST['confirmed'])) {
 }
 
 require 'mainfile.php';
+
 $sharedFunctions = new Shared($db);
 $season = new Season($db);
 
-$stringTeamIDsNames = "SELECT teamid, team_name FROM ibl_team_info ORDER BY teamid ASC;";
-$queryTeamIDsNames = $db->sql_query($stringTeamIDsNames);
-$numRowsTeamIDsNames = $db->sql_numrows($queryTeamIDsNames);
-
 $tidOffenseStats = $tidDefenseStats = 0;
+
+$queryTeamIDsNames = "SELECT teamid, team_name FROM ibl_team_info ORDER BY teamid ASC;";
+$resultTeamIDsNames = $db->sql_query($queryTeamIDsNames);
+$numRowsTeamIDsNames = $db->sql_numrows($resultTeamIDsNames);
 
 echo "Calculating foul baseline...<br>";
 
@@ -100,12 +101,13 @@ if (!empty($foulRatioArray) && max($foulRatioArray) > 0) {
     echo "Foul baseline calculated!<br><br>";
 }
 
-echo "Updating ibl_plr...<br>";
+echo "Updating ibl_plr and ibl_hist...<br>";
 
 $plrFile = fopen("IBL5.plr", "rb");
 while (!feof($plrFile)) {
     $line = fgets($plrFile);
 
+    // TODO: Refactor the parser to load all the data into a Player object.
     $ordinal = intval(substr($line, 0, 4));
     $name = trim(addslashes(substr($line, 4, 32)));
     $age = intval(substr($line, 36, 2));
@@ -269,11 +271,22 @@ while (!feof($plrFile)) {
 
     $seasonFGM = $season2GM + $season3GM;
     $seasonFGA = $season2GA + $season3GA;
+    $seasonREB = $seasonORB + $seasonDRB;
+    $seasonPTS = $season2GM * 2 + $seasonFTM + $season3GM * 3;
 
     $careerFGM = $career2GM + $career3GM;
     $careerFGA = $career2GA + $career3GA;
-    $careerPTS = $career2GM * 2 + $careerFTM + $career3GM * 3;
     $careerREB = $careerORB + $careerDRB;
+    $careerPTS = $career2GM * 2 + $careerFTM + $career3GM * 3;
+
+    // HACK: The following is adapted from Player::getCurrentSeasonSalary().
+    if ("contractYear" . $currentContractYear . "Salary" == "contractYear0Salary") {
+        $currentSeasonSalary = $contractYear1;
+    } elseif ("contractYear" . $currentContractYear . "Salary" == "contractYear7Salary") {
+        $currentSeasonSalary = 0;
+    } else {
+        $currentSeasonSalary = ${"contractYear" . $currentContractYear};
+    }
 
     $heightFT = floor($heightInches / 12);
     $heightIN = $heightInches % 12;
@@ -282,7 +295,7 @@ while (!feof($plrFile)) {
     $personalFoulsPerMinute = ($realLifePF != 0) ? round($realLifePF / $realLifeMIN, 6) : 0;
     $ratingFOUL = intval(100-round($personalFoulsPerMinute / max($foulRatioArray) * 100, 0));
 
-    if ($ordinal <= 1440) {
+    if ($ordinal <= 1440 AND $pid != 0) {
         $playerUpdateQuery = "INSERT INTO ibl_plr
             (   `ordinal`,
                 `name`,
@@ -525,8 +538,7 @@ while (!feof($plrFile)) {
             $weight,
             $draftYear,
             0,
-            $ratingFOUL
-        )
+            $ratingFOUL)
         ON DUPLICATE KEY UPDATE
             `ordinal` = $ordinal,
             `name` = '$name',
@@ -648,15 +660,145 @@ while (!feof($plrFile)) {
             `draftyear` = $draftYear,
             `retired` = 0,
             `r_foul` = $ratingFOUL;";
+
+        $historicalStatsUpdateQuery = "INSERT INTO ibl_hist
+            (`pid`,
+            `year`,
+            `team`,
+            `teamid`,
+            `games`,
+            `minutes`,
+            `fgm`,
+            `fga`,
+            `ftm`,
+            `fta`,
+            `tgm`,
+            `tga`,
+            `orb`,
+            `reb`,
+            `ast`,
+            `stl`,
+            `blk`,
+            `tvr`,
+            `pf`,
+            `pts`,
+            `name`,
+            `r_2ga`,
+            `r_2gp`,
+            `r_fta`,
+            `r_ftp`,
+            `r_3ga`,
+            `r_3gp`,
+            `r_orb`,
+            `r_drb`,
+            `r_ast`,
+            `r_stl`,
+            `r_blk`,
+            `r_tvr`,
+            `r_oo`,
+            `r_od`,
+            `r_do`,
+            `r_dd`,
+            `r_po`,
+            `r_pd`,
+            `r_to`,
+            `r_td`,
+            `salary`)
+        VALUES
+            ($pid,
+            $season->endingYear,
+            '" . $sharedFunctions->getTeamnameFromTid($tid) . "',
+            $tid,
+            $seasonGamesPlayed,
+            $seasonMIN,
+            $seasonFGM,
+            $seasonFGA,
+            $seasonFTM,
+            $seasonFTA,
+            $season3GM,
+            $season3GA,
+            $seasonORB,
+            $seasonREB,
+            $seasonAST,
+            $seasonSTL,
+            $seasonBLK,
+            $seasonTVR,
+            $seasonPF,
+            $seasonPTS,
+            '$name',
+            $rating2GA,
+            $rating2GP,
+            $ratingFTA,
+            $ratingFTP,
+            $rating3GA,
+            $rating3GP,
+            $ratingORB,
+            $ratingDRB,
+            $ratingAST,
+            $ratingSTL,
+            $ratingBLK,
+            $ratingTVR,
+            $ratingOO,
+            $ratingOD,
+            $ratingDO,
+            $ratingDD,
+            $ratingPO,
+            $ratingPD,
+            $ratingTO,
+            $ratingTD,
+            $currentSeasonSalary)
+        ON DUPLICATE KEY UPDATE
+            `team` = '" . $sharedFunctions->getTeamnameFromTid($tid) . "',
+            `teamid` = $tid,
+            `games` = $seasonGamesPlayed,
+            `minutes` = $seasonMIN,
+            `fgm` = $seasonFGM,
+            `fga` = $seasonFGA,
+            `ftm` = $seasonFTM,
+            `fta` = $seasonFTA,
+            `tgm` = $season3GM,
+            `tga` = $season3GA,
+            `orb` = $seasonORB,
+            `reb` = $seasonREB,
+            `ast` = $seasonAST,
+            `stl` = $seasonSTL,
+            `blk` = $seasonBLK,
+            `tvr` = $seasonTVR,
+            `pf` = $seasonPF,
+            `pts` = $seasonPTS,
+            `r_2ga` = $rating2GA,
+            `r_2gp` = $rating2GP,
+            `r_fta` = $ratingFTA,
+            `r_ftp` = $ratingFTP,
+            `r_3ga` = $rating3GA,
+            `r_3gp` = $rating3GP,
+            `r_orb` = $ratingORB,
+            `r_drb` = $ratingDRB,
+            `r_ast` = $ratingAST,
+            `r_stl` = $ratingSTL,
+            `r_blk` = $ratingBLK,
+            `r_tvr` = $ratingTVR,
+            `r_oo` = $ratingOO,
+            `r_od` = $ratingOD,
+            `r_do` = $ratingDO,
+            `r_dd` = $ratingDD,
+            `r_po` = $ratingPO,
+            `r_pd` = $ratingPD,
+            `r_to` = $ratingTO,
+            `r_td` = $ratingTD,
+            `salary` = $currentSeasonSalary;";
         if ($pid != 0) {
             if (!$db->sql_query($playerUpdateQuery)) {
+                die('Invalid query: ' . $db->sql_error());
+            }
+            if (!$db->sql_query($historicalStatsUpdateQuery)) {
                 die('Invalid query: ' . $db->sql_error());
             }
         }
     } elseif ($ordinal >= 1441 && $ordinal <= 1504) {
         if ($ordinal >= 1441 && $ordinal <= 1472) {
             if ($ordinal == 1441) {
-                echo "ibl_plr updated!<br><br>";
+                echo "ibl_plr and ibl_hist updated!<br><br>";
                 echo "Updating ibl_team_offense_stats...<br>";
             }
             $tidOffenseStats++;
@@ -703,9 +845,9 @@ echo "Assigning team names to players...<br>";
 
 $i = 0;
 while ($i < $numRowsTeamIDsNames) {
-    $teamname = $db->sql_result($queryTeamIDsNames, $i, 'team_name');
-    $teamID = $db->sql_result($queryTeamIDsNames, $i, 'teamid');
-    $teamnameUpdateQuery = "UPDATE `ibl_plr__test` SET `teamname` = '$teamname' WHERE `tid` = $teamID;";
+    $teamname = $db->sql_result($resultTeamIDsNames, $i, 'team_name');
+    $teamID = $db->sql_result($resultTeamIDsNames, $i, 'teamid');
+    $teamnameUpdateQuery = "UPDATE `ibl_plr` SET `teamname` = '$teamname' WHERE `tid` = $teamID;";
     if (!$db->sql_query($teamnameUpdateQuery)) {
         die('Invalid query: ' . $db->sql_error());
     }

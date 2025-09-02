@@ -134,67 +134,6 @@ class RegularSeasonAveragesView extends BaseView {
             echo "</center></td></tr>";
         }
 
-        if (!$this->player->isRetired) {
-            echo "<tr align=center>
-                <td><center>$this->currentYear</center></td>
-                <td><center>" . $this->player->teamName . "</center></td>
-                <td><center>" . $this->playerStats->seasonGamesPlayed . "</center></td>
-                <td><center>";
-            printf('%01.1f', $this->playerStats->seasonMinutesPerGame);
-            echo "</center></td><td><center>";
-            printf('%01.1f', $this->playerStats->seasonFieldGoalsMadePerGame);
-            echo "</center></td><td><center>";
-            printf('%01.1f', $this->playerStats->seasonFieldGoalsAttemptedPerGame);
-            echo "</center></td><td><center>";
-            printf('%01.3f', $this->playerStats->seasonFieldGoalPercentage);
-            echo "</center></td><td><center>";
-            printf('%01.1f', $this->playerStats->seasonFreeThrowsMadePerGame);
-            echo "</center></td><td><center>";
-            printf('%01.1f', $this->playerStats->seasonFreeThrowsAttemptedPerGame);
-            echo "</center></td><td><center>";
-            printf('%01.3f', $this->playerStats->seasonFreeThrowPercentage);
-            echo "</center></td><td><center>";
-            printf('%01.1f', $this->playerStats->seasonThreePointersMadePerGame);
-            echo "</center></td><td><center>";
-            printf('%01.1f', $this->playerStats->seasonThreePointersAttemptedPerGame);
-            echo "</center></td><td><center>";
-            printf('%01.3f', $this->playerStats->seasonThreePointPercentage);
-            echo "</center></td><td><center>";
-            printf('%01.1f', $this->playerStats->seasonOffensiveReboundsPerGame);
-            echo "</center></td><td><center>";
-            printf('%01.1f', $this->playerStats->seasonTotalReboundsPerGame);
-            echo "</center></td><td><center>";
-            printf('%01.1f', $this->playerStats->seasonAssistsPerGame);
-            echo "</center></td><td><center>";
-            printf('%01.1f', $this->playerStats->seasonStealsPerGame);
-            echo "</center></td><td><center>";
-            printf('%01.1f', $this->playerStats->seasonTurnoversPerGame);
-            echo "</center></td><td><center>";
-            printf('%01.1f', $this->playerStats->seasonBlocksPerGame);
-            echo "</center></td><td><center>";
-            printf('%01.1f', $this->playerStats->seasonPersonalFoulsPerGame);
-            echo "</center></td><td><center>";
-            printf('%01.1f', $this->playerStats->seasonPointsPerGame);
-            echo "</center></td></tr>";
-
-            $car_gm += $this->playerStats->seasonGamesPlayed;
-            $car_min += $this->playerStats->seasonMinutes;
-            $car_fgm += $this->playerStats->seasonFieldGoalsMade;
-            $car_fga += $this->playerStats->seasonFieldGoalsAttempted;
-            $car_ftm += $this->playerStats->seasonFreeThrowsMade;
-            $car_fta += $this->playerStats->seasonFreeThrowsAttempted;
-            $car_3gm += $this->playerStats->seasonThreePointersMade;
-            $car_3ga += $this->playerStats->seasonThreePointersAttempted;
-            $car_orb += $this->playerStats->seasonOffensiveRebounds;
-            $car_reb += $this->playerStats->seasonTotalRebounds;
-            $car_ast += $this->playerStats->seasonAssists;
-            $car_stl += $this->playerStats->seasonSteals;
-            $car_blk += $this->playerStats->seasonBlocks;
-            $car_tvr += $this->playerStats->seasonTurnovers;
-            $car_pf += $this->playerStats->seasonPersonalFouls;
-            $car_pts += $this->playerStats->seasonPoints;
-        }
-
         $car_avgm = ($car_gm) ? $car_min / $car_gm : "0.0";
         $car_fgmpg = ($car_gm) ? $car_fgm / $car_gm : "0.0";
         $car_fgapg = ($car_gm) ? $car_fga / $car_gm : "0.0";

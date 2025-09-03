@@ -5,6 +5,7 @@
 	import { getAllIblPlayers, type IblPlayer } from '$lib/models/IblPlayer';
 	import { onMount } from 'svelte';
 	import PlayerCard from '../components/PlayerCard.svelte';
+    import LeaderCard from '../components/LeaderCard.svelte';
 
 	let fields = [
 		'Pos',
@@ -109,7 +110,10 @@
 		</div>
 	</div>
 </div>
-<PlayerCard />
+<div class="flex justify-center p-4 carousel">
+    <!-- <PlayerCard /> -->
+    <LeaderCard />
+</div>
 <div class="overflow-x-auto">
 	<table class="table-pin-rows table-pin-cols table table-xs">
 		<thead>

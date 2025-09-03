@@ -14,8 +14,8 @@
         logo: 'https://placecats.com/150/225'
     }
 </script>
-<div class="card bg-base-100 w-96 shadow-sm">
-    <figure class="join rounded-box">
+<div class="card bg-base-100 w-96 p-5border-2 border-rose-300 shadow-sm carousel-item">
+    <figure class="join rounded-box w-full">
         <img class="join-item" src={player.img_url} alt="{player.name}" />
         <img class="join-item" src={team.logo} alt="{team.name}" />
     </figure>

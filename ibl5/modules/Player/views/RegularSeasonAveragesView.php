@@ -39,8 +39,8 @@ class RegularSeasonAveragesView extends BaseView {
         while ($row44 = $this->db->sql_fetchrow($result44)) {
             $hist_year = intval($row44['year']);
             $hist_team = $row44['team'];
-            $hist_gm = intval($row44['gm']);
-            $hist_min = intval($row44['min']);
+            $hist_gm = intval($row44['games']);
+            $hist_min = intval($row44['minutes']);
             $hist_fgm = intval($row44['fgm']);
             $hist_fga = intval($row44['fga']);
             $hist_fgp = ($hist_fga) ? ($hist_fgm / $hist_fga) : "0.000";

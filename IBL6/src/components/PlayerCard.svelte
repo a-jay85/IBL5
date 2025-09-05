@@ -1,7 +1,7 @@
 <script>
     let player = {
         id: '1',
-        name: 'Micheal Jordan',
+        name: 'Michael Jordan',
         pos: 'SG',
         pts: 25.3,
         reb: 5.1,

@@ -7,7 +7,7 @@
 	import PlayerCard from '../components/PlayerCard.svelte';
     import LeaderCard from '../components/LeaderCard.svelte';
 
-	let fields = [
+	let headers = [
 		'Pos',
 		'Name',
 		'min',
@@ -111,57 +111,72 @@
 	</div>
 </div>
 <div class="flex justify-center p-4 carousel">
-    <!-- <PlayerCard /> -->
-    <LeaderCard />
+    <PlayerCard />
+    <!-- <LeaderCard /> -->
 </div>
 <div class="overflow-x-auto">
-	<table class="table-pin-rows table-pin-cols table table-xs">
+	<table class="table table-zebra table-pin-rows table-xs min-w-full">
 		<thead>
-			<tr>
-				<th></th>
-				{#each fields as field}
-					<th>{field}</th>
+			<tr class="transition-colors">
+                {#each headers as header, index}
+  					<th 
+                        class="
+                        {header === 'Name'? 'sticky z-20 left-0 bg-base-100' : ''}
+                        {index === 0 ? 'left-0 shadow-[2px_0_5px_rgba(0,0,0,0.1)]' : ''}
+                        {index > 1 ? 'left-24 shadow-[2px_0_5px_rgba(0,0,0,0.1)]' : ''}
+                        min-w-10 px-4 py-3 whitespace-nowrap font-semibold
+                        "
+                    >
+                        {#if index > 1}
+                            {header.toUpperCase()}
+                        {:else}
+                            {header}
+                        {/if}
+                    </th>
 				{/each}
-				<th></th>
 			</tr>
 		</thead>
 		<tbody>
 			{#if playerData.length === 0}
 				<tr>
-					<td colspan="{fields.length + 2}">Loading player data...</td>
+					<td colspan="{headers.length + 2}">Loading player data...</td>
 				</tr>
 			{:else}
-				{#each playerData as player, i}
-					<tr>
-						<th>{player.id}</th>
-						<td>{player.pos}</td>
-						<td>{player.name}</td>
-						<td>{player.min}</td>
-						<td>{player.fgm}</td>
-						<td>{player.fga}</td>
-						<td>{player.ftm}</td>
-						<td>{player.fta}</td>
-						<td>{player['3pm']}</td>
-						<td>{player['3pa']}</td>
-						<td>{player.pts}</td>
-						<td>{player.orb}</td>
-						<td>{player.reb}</td>
-						<td>{player.ast}</td>
-						<td>{player.stl}</td>
-						<td>{player.blk}</td>
-						<td>{player.tov}</td>
-						<td>{player.pf}</td>
+				{#each playerData as player, rowIndex}
+					<tr class="transition-colors">
+                        {#each headers as label}
+                            <td
+                                class="
+                                {label === 'Name'? 'sticky z-20 left-0 bg-base-100' : ''}
+                                {rowIndex === 0 ? 'left-0 shadow-[2px_0_5px_rgba(0,0,0,0.08)]' : ''}
+                                {rowIndex === 1 ? 'left-10 shadow-[2px_0_5px_rgba(0,0,0,0.08)]' : ''}
+                                min-w-10 px-4 py-3 whitespace-nowrap
+                                "
+                            >
+                                {player[label.toLowerCase() as keyof IblPlayer]}
+                            </td>
+                        {/each}
 					</tr>
 				{/each}
 			{/if}
 		</tbody>
 		<tfoot>
 			<tr>
-				<th></th>
-				{#each fields as field}
-					<th>{field}</th>
+                {#each headers as header, index}
+  					<th 
+                        class="
+                        {header === 'Name'? 'sticky z-20 left-0 bg-base-100' : ''}
+                        {index === 0 ? 'left-0 shadow-[2px_0_5px_rgba(0,0,0,0.1)]' : ''}
+                        min-w-10 px-4 py-3 whitespace-nowrap font-semibold
+                        "
+                    >
+                        {#if index > 1}
+                            {header.toUpperCase()}
+                        {:else}
+                            {header}
+                        {/if}
+                    </th>
 				{/each}
-				<th></th>
 			</tr>
 		</tfoot>
 	</table>
@@ -194,21 +209,5 @@
 </div>
 
 <style>
-	/* Freeze the first column */
-	.table-container th:nth-child(2),
-	.table-container td:nth-child(2) {
-		position: sticky;
-		left: 0;
-		z-index: 1; /* Ensure it stays above other content */
-	}
 
-	/* Freeze the second column (example) */
-	.table-container th:nth-child(3),
-	.table-container th:nth-child(4),
-	.table-container th:nth-child(5),
-	.table-container td:nth-child(6) {
-		position: sticky;
-		left: 100px; /* Adjust based on the width of the first column */
-		z-index: 2; /* Lower z-index than the first frozen column */
-	}
 </style>

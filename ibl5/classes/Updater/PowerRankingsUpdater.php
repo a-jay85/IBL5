@@ -59,7 +59,7 @@ class PowerRankingsUpdater {
         return "SELECT Visitor, VScore, Home, HScore
             FROM ibl_schedule
             WHERE (Visitor = $tid OR Home = $tid)
-            AND (BoxID > 0 AND BoxID < 100000)
+            AND (VScore > 0 AND HScore > 0)
             AND Date BETWEEN '" . ($this->season->beginningYear) . "-$month-01' AND '" . $this->season->endingYear . "-05-30'
             ORDER BY Date ASC";
     }

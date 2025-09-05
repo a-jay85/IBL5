@@ -182,10 +182,9 @@ switch ($season->phase) {
             <INPUT type='submit' name='query' value='Insert new `ibl_heat_win_loss` database entries'><p>";
         break;
     case 'Regular Season':
-        echo "<A HREF=\"updateAllTheThings.php\">Update All The Things</A><p>
+        echo "<A HREF=\"plrParser.php\">Run plrParser.php</A>
+                <br><b>(but make sure you've uploaded the updated PLR file before you run this!)</b><p><A HREF=\"updateAllTheThings.php\">Update All The Things</A><p>
             <A HREF=\"scoParser.php\">Run scoParser.php</A><p>
-            <A HREF=\"plrParser.php\">Run plrParser.php</A>
-                <br><b>(but make sure you've uploaded the updated PLR file before you run this!)</b><p>
             <INPUT type='number' name='SimLengthInDays' min=1 max=180 size=3 value='" . League::getSimLengthInDays($db) . "'>
             <INPUT type='submit' name='query' value='Set Sim Length in Days'> <i>
                 <br>(you HAVE to CLICK to set the days – you unfortunately can't just hit Return/Enter)<p>

@@ -183,7 +183,8 @@ switch ($season->phase) {
         break;
     case 'Regular Season':
         echo "<A HREF=\"plrParser.php\">Run plrParser.php</A>
-                <br><b>(but make sure you've uploaded the updated PLR file before you run this!)</b><p><A HREF=\"updateAllTheThings.php\">Update All The Things</A><p>
+                <br><b>(but make sure you've uploaded the updated PLR file before you run this!)</b><p>
+            <A HREF=\"updateAllTheThings.php\">Update All The Things</A><p>
             <A HREF=\"scoParser.php\">Run scoParser.php</A><p>
             <INPUT type='number' name='SimLengthInDays' min=1 max=180 size=3 value='" . League::getSimLengthInDays($db) . "'>
             <INPUT type='submit' name='query' value='Set Sim Length in Days'> <i>

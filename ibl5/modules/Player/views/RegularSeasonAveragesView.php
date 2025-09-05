@@ -37,26 +37,26 @@ class RegularSeasonAveragesView extends BaseView {
 
         $result44 = $this->db->sql_query("SELECT * FROM ibl_hist WHERE pid=" . $this->player->playerID . " ORDER BY year ASC");
         while ($row44 = $this->db->sql_fetchrow($result44)) {
-            $hist_year = stripslashes(check_html($row44['year'], "nohtml"));
-            $hist_team = stripslashes(check_html($row44['team'], "nohtml"));
-            $hist_gm = stripslashes(check_html($row44['gm'], "nohtml"));
-            $hist_min = stripslashes(check_html($row44['min'], "nohtml"));
-            $hist_fgm = stripslashes(check_html($row44['fgm'], "nohtml"));
-            $hist_fga = stripslashes(check_html($row44['fga'], "nohtml"));
+            $hist_year = intval($row44['year']);
+            $hist_team = $row44['team'];
+            $hist_gm = intval($row44['games']);
+            $hist_min = intval($row44['minutes']);
+            $hist_fgm = intval($row44['fgm']);
+            $hist_fga = intval($row44['fga']);
             $hist_fgp = ($hist_fga) ? ($hist_fgm / $hist_fga) : "0.000";
-            $hist_ftm = stripslashes(check_html($row44['ftm'], "nohtml"));
-            $hist_fta = stripslashes(check_html($row44['fta'], "nohtml"));
+            $hist_ftm = intval($row44['ftm']);
+            $hist_fta = intval($row44['fta']);
             $hist_ftp = ($hist_fta) ? ($hist_ftm / $hist_fta) : "0.000";
-            $hist_tgm = stripslashes(check_html($row44['3gm'], "nohtml"));
-            $hist_tga = stripslashes(check_html($row44['3ga'], "nohtml"));
+            $hist_tgm = intval($row44['3gm']);
+            $hist_tga = intval($row44['3ga']);
             $hist_tgp = ($hist_tga) ? ($hist_tgm / $hist_tga) : '0.000';
-            $hist_orb = stripslashes(check_html($row44['orb'], "nohtml"));
-            $hist_reb = stripslashes(check_html($row44['reb'], "nohtml"));
-            $hist_ast = stripslashes(check_html($row44['ast'], "nohtml"));
-            $hist_stl = stripslashes(check_html($row44['stl'], "nohtml"));
-            $hist_tvr = stripslashes(check_html($row44['tvr'], "nohtml"));
-            $hist_blk = stripslashes(check_html($row44['blk'], "nohtml"));
-            $hist_pf = stripslashes(check_html($row44['pf'], "nohtml"));
+            $hist_orb = intval($row44['orb']);
+            $hist_reb = intval($row44['reb']);
+            $hist_ast = intval($row44['ast']);
+            $hist_stl = intval($row44['stl']);
+            $hist_tvr = intval($row44['tvr']);
+            $hist_blk = intval($row44['blk']);
+            $hist_pf = intval($row44['pf']);
             $hist_pts = $hist_fgm + $hist_fgm + $hist_ftm + $hist_tgm;
 
             $hist_mpg = ($hist_gm) ? ($hist_min / $hist_gm) : "0.0";

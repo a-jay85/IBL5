@@ -7,7 +7,7 @@ class OlympicTotalsView extends BaseView {
         $car_gm = $car_min = $car_fgm = $car_fga = $car_ftm = $car_fta = $car_3gm = $car_3ga = 0;
         $car_orb = $car_reb = $car_ast = $car_stl = $car_blk = $car_tvr = $car_pf = $car_pts = 0;
 
-        echo "<table border=1 cellspacing=0 class=\"sortable\">
+        echo "<table border=1 cellspacing=0 class=\"sortable\" style='margin: 0 auto;'>
             <tr>
                 <td colspan=15 style='font-weight:bold;text-align:center;background-color:#00c;color:#fff;'>Olympics Totals</td>
             </tr>

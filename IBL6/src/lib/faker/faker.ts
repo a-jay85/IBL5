@@ -26,3 +26,7 @@ export const createRandomPlayer = (): IblPlayer => {
 		pf: faker.number.int({ min: 0, max: 20 })
 	};
 };
+
+export const createRandomPlayers = (count: number): IblPlayer[] => {
+	return Array.from({ length: count }, () => createRandomPlayer());
+};

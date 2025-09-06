@@ -27,13 +27,27 @@ export async function addIblPlayer(data: IblPlayer) {
 	return addDoc(collection(db, 'iblPlayers'), data);
 }
 
-export async function getIblPlayer(id: string): Promise<IblPlayer> {
+export async function getIblPlayerById(id: string): Promise<IblPlayer> {
 	const querySnapshot = await getDocs(collection(db, 'iblPlayers'));
 	const player = querySnapshot.docs
 		.map((doc) => doc.data() as IblPlayer)
 		.find((player) => player.id === id);
 	if (!player) throw new Error('Player not found');
 	return player;
+}
+
+export async function getPlayerByName(name: string): Promise<IblPlayer[]> {
+	const querySnapshot = await getDocs(collection(db, 'iblPlayers'));
+	return querySnapshot.docs
+		.map((doc) => doc.data() as IblPlayer)
+		.filter((player) => player.name.toLowerCase().includes(name.toLowerCase()));
+}
+
+export async function getIblPlayersByTeamId(teamId: string): Promise<IblPlayer[]> {
+	const querySnapshot = await getDocs(collection(db, 'iblPlayers'));
+	return querySnapshot.docs
+		.map((doc) => doc.data() as IblPlayer)
+		.filter((player) => player.id.startsWith(teamId));
 }
 
 export async function getAllIblPlayers(): Promise<IblPlayer[]> {

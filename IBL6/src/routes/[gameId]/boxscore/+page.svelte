@@ -96,7 +96,6 @@
                             class="
                             {label === 'Name'? 'sticky z-20 left-0 bg-base-100' : ''}
                             {rowIndex === 0 ? 'left-0 shadow-[2px_0_5px_rgba(0,0,0,0.08)]' : ''}
-                            {rowIndex === 1 ? 'left-10 shadow-[2px_0_5px_rgba(0,0,0,0.08)]' : ''}
                             min-w-10 px-4 py-3 whitespace-nowrap
                             "
                         >

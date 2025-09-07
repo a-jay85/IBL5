@@ -1,21 +1,20 @@
-import { db } from '$lib/firebase/firebase';
-import { doc, getDoc } from 'firebase/firestore';
 import type { PageServerLoad } from './$types';
+import { getGameById } from '$lib/models/Game';
 import { error } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async ({ params }) => {
 	try {
-		const gameDoc = await getDoc(doc(db, 'games', params.gameId));
+		console.log('Loading game with ID:', params.gameId); // Debug log
+		const game = await getGameById(params.gameId);
 
-		if (!gameDoc.exists()) {
+		if (!game) {
+			console.log('Game not found:', params.gameId); // Debug log
 			throw error(404, 'Game not found');
 		}
 
+		console.log('Game loaded successfully:', game); // Debug log
 		return {
-			game: {
-				id: gameDoc.id,
-				...gameDoc.data()
-			}
+			game
 		};
 	} catch (err) {
 		console.error('Error loading game:', err);

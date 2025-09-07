@@ -4,7 +4,8 @@ node_modules
 # Output
 .output
 .vercel
-.netlify
+.netlify/*
+!.netlify/secrets-ignore
 .wrangler
 /.svelte-kit
 /build

@@ -7,6 +7,7 @@
 	import PlayerCard from '../components/PlayerCard.svelte';
     import LeaderCard from '../components/LeaderCard.svelte';
     import SlideButtonSelector from '../components/SlideButtonSelector.svelte';
+	import StatsHorizontal from '../components/StatsHorizontal.svelte';
 
 	let headers = [
 		'Pos',
@@ -56,62 +57,28 @@
 <div class="overflow-x-auto">
 	<table class="table table-zebra table-pin-rows table-xs min-w-full">
 		<thead>
-			<tr class="transition-colors">
-                {#each headers as header, index}
-  					<th 
-                        class="
-                        {header === 'Name'? 'sticky z-20 left-0 bg-base-100' : ''}
-                        {index === 0 ? 'left-0 shadow-[2px_0_5px_rgba(0,0,0,0.1)]' : ''}
-                        {index > 1 ? 'left-24 shadow-[2px_0_5px_rgba(0,0,0,0.1)]' : ''}
-                        min-w-10 px-4 py-3 whitespace-nowrap font-semibold
-                        "
-                    >
-                        {#if index > 1}
-                            {header.toUpperCase()}
-                        {:else}
-                            {header}
-                        {/if}
-                    </th>
-				{/each}
-			</tr>
+			<StatsHorizontal {headers} />
 		</thead>
 		<tbody>
-
-				{#each playerData as player, rowIndex}
-					<tr class="transition-colors">
-                        {#each headers as label}
-                            <td
-                                class="
-                                {label === 'Name'? 'sticky z-20 left-0 bg-base-100' : ''}
-                                {rowIndex === 0 ? 'left-0 shadow-[2px_0_5px_rgba(0,0,0,0.08)]' : ''}
-                                {rowIndex === 1 ? 'left-10 shadow-[2px_0_5px_rgba(0,0,0,0.08)]' : ''}
-                                min-w-10 px-4 py-3 whitespace-nowrap
-                                "
-                            >
-                                {player[label.toLowerCase() as keyof IblPlayer]}
-                            </td>
-                        {/each}
-					</tr>
-				{/each}
-            </tbody>
+            {#each playerData as player, rowIndex}
+                <tr class="transition-colors">
+                    {#each headers as label}
+                        <td
+                            class="
+                            {label === 'Name'? 'sticky z-20 left-0 bg-base-100' : ''}
+                            {rowIndex === 0 ? 'left-0 shadow-[2px_0_5px_rgba(0,0,0,0.08)]' : ''}
+                            {rowIndex === 1 ? 'left-10 shadow-[2px_0_5px_rgba(0,0,0,0.08)]' : ''}
+                            min-w-10 px-4 py-3 whitespace-nowrap
+                            "
+                        >
+                            {player[label.toLowerCase() as keyof IblPlayer]}
+                        </td>
+                    {/each}
+                </tr>
+            {/each}
+        </tbody>
 		<tfoot>
-			<tr>
-                {#each headers as header, index}
-  					<th 
-                        class="
-                        {header === 'Name'? 'sticky z-20 left-0 bg-base-100' : ''}
-                        {index === 0 ? 'left-0 shadow-[2px_0_5px_rgba(0,0,0,0.1)]' : ''}
-                        min-w-10 px-4 py-3 whitespace-nowrap font-semibold
-                        "
-                    >
-                        {#if index > 1}
-                            {header.toUpperCase()}
-                        {:else}
-                            {header}
-                        {/if}
-                    </th>
-				{/each}
-			</tr>
+			<StatsHorizontal {headers} />
 		</tfoot>
 	</table>
 </div>

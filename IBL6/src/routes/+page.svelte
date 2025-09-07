@@ -6,6 +6,7 @@
 	import { onMount } from 'svelte';
 	import PlayerCard from '../components/PlayerCard.svelte';
     import LeaderCard from '../components/LeaderCard.svelte';
+    import SlideButtonSelector from '../components/SlideButtonSelector.svelte';
 
 	let headers = [
 		'Pos',
@@ -41,6 +42,17 @@
     <PlayerCard />
     <!-- <LeaderCard /> -->
 </div>
+<div class="flex justify-center p-4">
+    <SlideButtonSelector />
+</div>
+{#if playerData.length === 0}
+<div class="flex justify-center p-4">
+    <button class="flex justify-center items-center btn">
+        <span class="loading loading-spinner"></span>
+        loading
+    </button>
+</div>
+{:else}
 <div class="overflow-x-auto">
 	<table class="table table-zebra table-pin-rows table-xs min-w-full">
 		<thead>
@@ -64,11 +76,7 @@
 			</tr>
 		</thead>
 		<tbody>
-			{#if playerData.length === 0}
-				<tr>
-					<td colspan="{headers.length + 2}">Loading player data...</td>
-				</tr>
-			{:else}
+
 				{#each playerData as player, rowIndex}
 					<tr class="transition-colors">
                         {#each headers as label}
@@ -85,8 +93,7 @@
                         {/each}
 					</tr>
 				{/each}
-			{/if}
-		</tbody>
+            </tbody>
 		<tfoot>
 			<tr>
                 {#each headers as header, index}
@@ -108,6 +115,7 @@
 		</tfoot>
 	</table>
 </div>
+{/if}
 <div class="flex justify-center flex-col gap-2 p-4">
     <label for="name" class="floating-label">Name:</label>
     <input id="name" type="text" class="input input-xs"/>

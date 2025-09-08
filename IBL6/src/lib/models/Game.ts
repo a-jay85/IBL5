@@ -22,6 +22,9 @@ export interface Game {
 }
 
 export async function addGame(data: Omit<Game, 'id' | 'cd'>): Promise<string> {
+	if (!db) {
+		throw new Error('Database not initialized');
+	}
 	const gameData = {
 		...data,
 		cd: Math.floor(Date.now() / 1000) // Current Unix timestamp
@@ -31,6 +34,9 @@ export async function addGame(data: Omit<Game, 'id' | 'cd'>): Promise<string> {
 }
 
 export async function getGameById(id: string): Promise<Game | null> {
+	if (!db) {
+		throw new Error('Database not initialized');
+	}
 	const docRef = doc(db, 'games', id);
 	const docSnap = await getDoc(docRef);
 
@@ -50,6 +56,9 @@ export async function getGameById(id: string): Promise<Game | null> {
 }
 
 export async function getGamesByTeam(teamId: string): Promise<Game[]> {
+	if (!db) {
+		throw new Error('Database not initialized');
+	}
 	const querySnapshot = await getDocs(collection(db, 'games'));
 	const games: Game[] = [];
 
@@ -69,10 +78,14 @@ export async function getGamesByTeam(teamId: string): Promise<Game[]> {
 //TODO: Implement this function
 export async function getGamesByTeamName(teamName: string): Promise<Game[]> {
 	// This would require you to first get the team ID from the team name
-	// then call getGamesByTeam(teamId)
+	// For now, return an empty array until implementation is complete
+	return [];
 }
 
 export async function getGamesBySeason(season: string): Promise<Game[]> {
+	if (!db) {
+		throw new Error('Database not initialized');
+	}
 	const querySnapshot = await getDocs(collection(db, 'games'));
 	const games: Game[] = [];
 
@@ -90,6 +103,9 @@ export async function getGamesBySeason(season: string): Promise<Game[]> {
 }
 
 export async function getAllGames(): Promise<Game[]> {
+	if (!db) {
+		throw new Error('Database not initialized');
+	}
 	try {
 		const querySnapshot = await getDocs(collection(db, 'games'));
 		const games: Game[] = [];
@@ -103,12 +119,15 @@ export async function getAllGames(): Promise<Game[]> {
 
 		return games;
 	} catch (error) {
-		console.error('Error fetching games:', error);
-		return []; // Return empty array on error
+		console.error('Error fetching all games:', error);
+		return [];
 	}
 }
 
 export async function getRecentGames(limitCount: number = 10): Promise<Game[]> {
+	if (!db) {
+		throw new Error('Database not initialized');
+	}
 	try {
 		const q = query(
 			collection(db, 'games'),

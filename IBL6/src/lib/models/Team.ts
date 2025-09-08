@@ -13,11 +13,12 @@ export interface Team {
 }
 
 export async function addTeam(data: Omit<Team, 'id'>): Promise<string> {
+	if (!db) throw new Error('Database not initialized');
 	const docRef = await addDoc(collection(db, 'teams'), data);
 	return docRef.id;
 }
-
 export async function getTeamById(id: string): Promise<Team | null> {
+	if (!db) throw new Error('Database not initialized');
 	const docRef = doc(db, 'teams', id);
 	const docSnap = await getDoc(docRef);
 
@@ -30,8 +31,8 @@ export async function getTeamById(id: string): Promise<Team | null> {
 
 	return null;
 }
-
 export async function getTeamByName(name: string): Promise<Team[]> {
+	if (!db) throw new Error('Database not initialized');
 	const querySnapshot = await getDocs(collection(db, 'teams'));
 	const teams: Team[] = [];
 
@@ -47,8 +48,8 @@ export async function getTeamByName(name: string): Promise<Team[]> {
 
 	return teams;
 }
-
 export async function getAllTeams(): Promise<Team[]> {
+	if (!db) throw new Error('Database not initialized');
 	const querySnapshot = await getDocs(collection(db, 'teams'));
 	const teams: Team[] = [];
 

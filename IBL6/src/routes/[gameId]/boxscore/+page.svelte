@@ -33,6 +33,8 @@
     $: game = data.game;
     $: homeTeamName = getTeamName(game.homeTeamId, $teamsStore);
     $: awayTeamName = getTeamName(game.awayTeamId, $teamsStore);
+    $: homeTeamScore = game.homeScore;
+    $: awayTeamScore = game.awayScore;
 
     let playerData: IblPlayer[] = [];
     let teamsLoaded = false;
@@ -52,8 +54,10 @@
     });
 </script>
 
-<div class="flex justify-center p-4">
-    <h1>Boxscore: {awayTeamName} @ {homeTeamName}</h1>
+<div class="flex justify-around p-4">
+    <div><span class="font-bold text-4xl">{awayTeamScore}</span></div>
+        <h1 class="font-bold text-2xl"> {awayTeamName} @ {homeTeamName} </h1>
+    <div><span class="font-bold text-4xl">{homeTeamScore}</span></div>
 </div>
 
 <div class="flex justify-center p-4 carousel">

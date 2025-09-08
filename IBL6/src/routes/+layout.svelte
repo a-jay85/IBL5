@@ -1,6 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import favicon from '$lib/assets/favicon.svg';
+    import logo from '$lib/assets/logo.jpg';
 
 	let { children } = $props();
 </script>
@@ -32,9 +33,12 @@
 					tabindex="0"
 					class="dropdown-content menu z-1 mt-3 w-52 menu-sm rounded-box bg-base-100 p-2 shadow"
 				>
-					<li><a href="www.iblhoops.net">Homepage</a></li>
-					<li><a>Portfolio</a></li>
-					<li><a>About</a></li>
+					<li><a href="/">Homepage</a></li>
+                    <li><a href="/standings">Standings (Under Construction)</a></li>
+					<li><a href="/teams">Teams (Under Construction)</a></li>
+					<li><a href="/players">Players (Under Construction)</a></li>
+					<li><a href="/games">Games (Under Construction)</a></li>
+					<li><a href="/about">About (Under Construction)</a></li>
 				</ul>
 			</div>
 		</div>

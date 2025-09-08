@@ -3,6 +3,7 @@
     import type { PageData } from './$types';
     import { onMount } from 'svelte';
     import { teamsStore, loadAllTeams, getTeamName } from '$lib/stores/teamsStore';
+    import logo from '$lib/assets/logo.jpg';
 
     let { data }: { data: PageData } = $props();
     let { games } = data;
@@ -15,7 +16,7 @@
         await loadAllTeams();
     });
 </script>
-
+<img src={logo} alt="IBL Logo" class="mx-auto my-4" />
 <div>
     <h1 class="flex justify-center text-3xl font-bold underline">Welcome to AYE-BEE-EL!</h1>
 </div>

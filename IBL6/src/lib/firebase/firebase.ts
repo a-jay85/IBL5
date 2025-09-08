@@ -46,7 +46,7 @@ if (dev) {
 			app = initializeApp(firebaseConfig);
 			db = getFirestore(app);
 		}
-	} catch (error) {
+	} catch {
 		console.log('Firebase not available in production');
 	}
 }

@@ -26,11 +26,11 @@ class AwardsAndNewsView extends BaseView {
         <tr>
             <td>";
 
-        $player = $this->player->name;
+        $playerName = $this->player->name;
         $query = "SELECT *
             FROM nuke_stories
-            WHERE (hometext LIKE '%$player%' OR bodytext LIKE '%$player%')
-                AND (hometext NOT LIKE '%$player II%' OR bodytext NOT LIKE '%$player II%')
+            WHERE (hometext LIKE '%$playerName%' OR bodytext LIKE '%$playerName%')
+                AND (hometext NOT LIKE '%$playerName II%' OR bodytext NOT LIKE '%$playerName II%')
                 ORDER BY time DESC;";
         $result = $this->db->sql_query($query);
         $num = $this->db->sql_numrows($result);

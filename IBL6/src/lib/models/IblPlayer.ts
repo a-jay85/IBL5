@@ -24,10 +24,11 @@ export interface IblPlayer {
 }
 
 export async function addIblPlayer(data: IblPlayer) {
+	if (!db) throw new Error('Database not initialized');
 	return addDoc(collection(db, 'iblPlayers'), data);
 }
-
 export async function getIblPlayerById(id: string): Promise<IblPlayer> {
+	if (!db) throw new Error('Database not initialized');
 	const querySnapshot = await getDocs(collection(db, 'iblPlayers'));
 	const player = querySnapshot.docs
 		.map((doc) => doc.data() as IblPlayer)
@@ -35,22 +36,22 @@ export async function getIblPlayerById(id: string): Promise<IblPlayer> {
 	if (!player) throw new Error('Player not found');
 	return player;
 }
-
 export async function getPlayerByName(name: string): Promise<IblPlayer[]> {
+	if (!db) throw new Error('Database not initialized');
 	const querySnapshot = await getDocs(collection(db, 'iblPlayers'));
 	return querySnapshot.docs
 		.map((doc) => doc.data() as IblPlayer)
 		.filter((player) => player.name.toLowerCase().includes(name.toLowerCase()));
 }
-
 export async function getIblPlayersByTeamId(teamId: string): Promise<IblPlayer[]> {
+	if (!db) throw new Error('Database not initialized');
 	const querySnapshot = await getDocs(collection(db, 'iblPlayers'));
 	return querySnapshot.docs
 		.map((doc) => doc.data() as IblPlayer)
 		.filter((player) => player.id.startsWith(teamId));
 }
-
 export async function getAllIblPlayers(): Promise<IblPlayer[]> {
+	if (!db) throw new Error('Database not initialized');
 	const querySnapshot = await getDocs(collection(db, 'iblPlayers'));
 	return querySnapshot.docs.map((doc) => doc.data() as IblPlayer);
 }

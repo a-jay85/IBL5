@@ -2,10 +2,11 @@ import { addDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '$lib/firebase/firebase';
 
 export interface IblPlayer {
-	id: string;
-	cd: number;
-	pos: string;
+	docId?: string; // Document ID from Firestore
+	id?: string; // Player ID
+	cd: number; // Player creation date
 	name: string;
+	pos: string;
 	min: number;
 	fgm: number;
 	fga: number;
@@ -48,10 +49,25 @@ export async function getIblPlayersByTeamId(teamId: string): Promise<IblPlayer[]
 	const querySnapshot = await getDocs(collection(db, 'iblPlayers'));
 	return querySnapshot.docs
 		.map((doc) => doc.data() as IblPlayer)
-		.filter((player) => player.id.startsWith(teamId));
+		.filter((player) => player.docId && player.docId.startsWith(teamId));
 }
 export async function getAllIblPlayers(): Promise<IblPlayer[]> {
-	if (!db) throw new Error('Database not initialized');
-	const querySnapshot = await getDocs(collection(db, 'iblPlayers'));
-	return querySnapshot.docs.map((doc) => doc.data() as IblPlayer);
+	if (!db) return []; // Handle case where Firebase is not initialized
+
+	try {
+		const querySnapshot = await getDocs(collection(db, 'iblPlayers'));
+		const players: IblPlayer[] = [];
+
+		querySnapshot.forEach((doc) => {
+			players.push({
+				docId: doc.id,
+				...doc.data()
+			} as IblPlayer);
+		});
+
+		return players;
+	} catch (error) {
+		console.error('Error fetching players:', error);
+		return [];
+	}
 }

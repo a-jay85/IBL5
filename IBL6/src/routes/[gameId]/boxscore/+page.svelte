@@ -25,6 +25,35 @@
     // State for players
     let playerData = $state<IblPlayer[]>([]);
     let playersLoading = $state(true);
+    
+    // Selected team state
+    let selectedTeamName = $state('');
+
+    // Filter players using team's player array
+    const filteredPlayers = $derived.by(() => {
+        console.log('Filtering players for selected team:', selectedTeamName);
+        if (!selectedTeamName || !teamsLoaded) return [];
+        
+        // Get the selected team ID
+        const selectedTeamId = selectedTeamName === homeTeamName ? game.homeTeamId : game.awayTeamId;
+        console.log('Filtering players for team ID:', selectedTeamId, 'Team Name:', selectedTeamName);
+        
+        // Get the team from the store
+        const selectedTeam = $teamsStore.get(selectedTeamId);
+        if (!selectedTeam || !selectedTeam.players) {
+            console.log('No team found or no players array for team:', selectedTeamId);
+            return [];
+        }
+
+        console.log('Team players array:', selectedTeam.players);
+
+        // Filter playerData to only include players whose DOCUMENT IDs are in the team's players array
+        return playerData.filter(player => {
+            const isInTeam = selectedTeam.players.includes(player.docId || player.id || '');
+            console.log('Checking player:', player.name, 'Document ID:', player.docId || player.id, 'In team:', isInTeam);
+            return isInTeam;
+        });
+    });
 
     // Form state
     let formData = $state({
@@ -37,11 +66,12 @@
         return await getAllIblPlayers();
     }
 
-    function handleFormSubmit() {
-        console.log('Form submitted:', formData);
-        // Add your submit logic here
-        
-        // Reset form
+    function handleTeamSelection(teamName: string) {
+        selectedTeamName = teamName;
+        console.log('Selected team:', selectedTeamName);
+    }
+    
+    function resetForm() {
         formData = {
             name: '',
             position: '',
@@ -49,12 +79,12 @@
         };
     }
 
-    function resetForm() {
-        formData = {
-            name: '',
-            position: '',
-            minutes: 0
-        };
+    function handleFormSubmit(event: Event) {
+        event.preventDefault();
+        console.log('Form submitted:', formData);
+        //TODO Add submit logic
+        
+        resetForm();
     }
 
     onMount(async () => {
@@ -64,10 +94,23 @@
                 loadAllTeams()
             ]);
             playerData = players;
+            
+            // Set initial selected team to home team (wait for teams to load)
+            if (homeTeamName) {
+                selectedTeamName = homeTeamName;
+            }
         } catch (error) {
             console.error('Error loading data:', error);
         } finally {
             playersLoading = false;
+        }
+    });
+
+    // Set initial team selection when teams are loaded
+    $effect(() => {
+        if (teamsLoaded && homeTeamName && !selectedTeamName) {
+            selectedTeamName = homeTeamName;
+            console.log('Setting initial team to:', homeTeamName);
         }
     });
 </script>
@@ -120,37 +163,50 @@
             <PlayerCard />
         {/each}
     </div>
-
     <!-- Team Selector -->
     <div class="flex justify-center p-4">
         <SlideButtonSelector 
             options={[homeTeamName, awayTeamName]} 
-            selected={homeTeamName} 
+            selected={selectedTeamName || homeTeamName}
+            onSelectionChange={handleTeamSelection}
         />
     </div>
 
     <!-- Stats Table -->
-    {#if playersLoading}
+    {#if !selectedTeamName}
+        <div class="flex flex-col items-center justify-center p-12 text-center">
+            <div class="text-6xl mb-4">👆</div>
+            <h3 class="text-lg font-semibold mb-2">Select a Team</h3>
+            <p class="text-base-content/60">Choose a team above to view player statistics.</p>
+        </div>
+    {:else if playersLoading}
         <div class="flex justify-center p-4">
             <div class="flex justify-center items-center btn">
                 <span class="loading loading-spinner"></span>
                 Loading players...
             </div>
         </div>
-    {:else if playerData.length === 0}
+    {:else if filteredPlayers.length === 0}
         <div class="flex flex-col items-center justify-center p-12 text-center">
             <div class="text-6xl mb-4">🏀</div>
-            <h3 class="text-lg font-semibold mb-2">No Player Stats Available</h3>
-            <p class="text-base-content/60">Player statistics will appear here once available.</p>
+            <h3 class="text-lg font-semibold mb-2">No Players Found</h3>
+            <p class="text-base-content/60">
+                No players found for {selectedTeamName}.
+            </p>
         </div>
     {:else}
+        <div class="mb-4">
+            <h2 class="text-xl font-bold text-center">
+                {selectedTeamName} Players ({filteredPlayers.length})
+            </h2>
+        </div>
         <div class="overflow-x-auto">
             <table class="table table-zebra table-pin-rows table-xs min-w-full">
                 <thead>
                     <StatsHorizontal {headers} />
                 </thead>
                 <tbody>
-                    {#each playerData as player, rowIndex (player.id || rowIndex)}
+                    {#each filteredPlayers as player, rowIndex (player.id || rowIndex)}
                         <tr class="transition-colors">
                             {#each headers as label}
                                 <td class="{label === 'Name' ? 'sticky z-20 left-0 bg-base-100' : ''} min-w-10 px-4 py-3 whitespace-nowrap">
@@ -167,7 +223,7 @@
         </div>
     {/if}
 
-    <!-- Form section with proper form handling -->
+    <!-- Form section -->
     <div class="card bg-base-100 shadow-xl mt-8">
         <div class="card-header p-6">
             <h2 class="card-title">Add New Player</h2>

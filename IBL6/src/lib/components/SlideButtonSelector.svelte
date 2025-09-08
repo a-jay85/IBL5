@@ -1,9 +1,11 @@
 <script lang="ts">
   export let options: string[] = ['Team A', 'Team B'];
   export let selected: string = options[0];
-  
+  export let onSelectionChange: ((option: string) => void) | undefined = undefined;
+
   function selectOption(option: string) {
     selected = option;
+    onSelectionChange?.(option);
   }
 </script>
 

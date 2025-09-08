@@ -16,6 +16,10 @@ export async function POST({ request }) {
 	}
 
 	try {
+		if (!db) {
+			throw error(500, 'Database connection not available');
+		}
+
 		const teams = [
 			{
 				id: 'lakers',
@@ -54,7 +58,10 @@ export async function POST({ request }) {
 		teams.forEach((team, index) => {
 			const startIndex = index * playersPerTeam;
 			const endIndex = startIndex + playersPerTeam;
-			team.players = players.slice(startIndex, endIndex).map((p) => p.id);
+			team.players = players
+				.slice(startIndex, endIndex)
+				.map((p) => p.id)
+				.filter((id): id is string => id !== undefined);
 		});
 
 		for (const team of teams) {

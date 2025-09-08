@@ -6,7 +6,7 @@ type PlayerPos = 'PG' | 'SG' | 'SF' | 'PF' | 'C';
 export const createRandomPlayer = (): IblPlayer => {
 	return {
 		id: faker.string.uuid(),
-		cd: faker.number.int(),
+		cd: faker.date.past().getTime(),
 		pos: faker.helpers.arrayElement<PlayerPos>(['PG', 'SG', 'SF', 'PF', 'C']),
 		name: faker.person.fullName(),
 		min: faker.number.int({ min: 0, max: 48 }),

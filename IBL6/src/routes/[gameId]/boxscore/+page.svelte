@@ -21,6 +21,8 @@
     const awayTeamName = $derived(teamsLoaded ? getTeamName(game.awayTeamId, $teamsStore) : '');
     const homeTeamScore = $derived(game.homeScore);
     const awayTeamScore = $derived(game.awayScore);
+    const homeTeamLogo = $derived(teamsLoaded ? ($teamsStore.get(game.homeTeamId)?.logoUrl || '') : '');
+    const awayTeamLogo = $derived(teamsLoaded ? ($teamsStore.get(game.awayTeamId)?.logoUrl || '') : '');
 
     // State for players
     let playerData = $state<IblPlayer[]>([]);
@@ -131,7 +133,11 @@
             <div class="flex items-center space-x-4">
                 <div class="text-center">
                     <div class="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-2">
-                        <span class="text-2xl font-bold text-gray-800">{awayTeamName[0] || '?'}</span>
+                        {#if !awayTeamLogo}
+                            <span class="text-2xl font-bold text-gray-800">{awayTeamName[0] || '?'}</span>
+                        {:else}
+                            <img src={awayTeamLogo} alt="{awayTeamName} Logo" class="w-12 h-12 object-contain" />
+                        {/if}
                     </div>
                     <div class="text-sm opacity-90">{awayTeamName || 'Loading...'}</div>
                 </div>
@@ -149,7 +155,11 @@
                 <div class="text-4xl font-bold">{homeTeamScore}</div>
                 <div class="text-center">
                     <div class="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-2">
-                        <span class="text-2xl font-bold text-gray-800">{homeTeamName[0] || '?'}</span>
+                        {#if !homeTeamLogo}
+                            <span class="text-2xl font-bold text-gray-800">{homeTeamName[0] || '?'}</span>
+                        {:else}
+                            <img src={homeTeamLogo} alt="{homeTeamName} Logo" class="w-12 h-12 object-contain" />
+                        {/if}
                     </div>
                     <div class="text-sm opacity-90">{homeTeamName || 'Loading...'}</div>
                 </div>

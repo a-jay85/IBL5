@@ -15,20 +15,25 @@ function createAuthStore() {
 		error: null
 	});
 
-	onAuthStateChanged(auth, async (user) => {
-		update((state: AuthState) => ({
-			...state,
-			user,
-			loading: false,
-			error: null
-		}));
-	});
+	if (auth) {
+		onAuthStateChanged(auth, async (user) => {
+			update((state: AuthState) => ({
+				...state,
+				user,
+				loading: false,
+				error: null
+			}));
+		});
+	}
 
 	return {
 		subscribe,
 		signIn: async (email: string, password: string) => {
 			try {
 				update((state) => ({ ...state, loading: true, error: null }));
+				if (!auth) {
+					throw new Error('Auth not initialized');
+				}
 				await signInWithEmailAndPassword(auth, email, password);
 			} catch (error: unknown) {
 				update((state) => ({
@@ -40,6 +45,9 @@ function createAuthStore() {
 		},
 		signOut: async () => {
 			try {
+				if (!auth) {
+					throw new Error('Auth not initialized');
+				}
 				await signOut(auth);
 			} catch (error: unknown) {
 				update((state) => ({

@@ -47,8 +47,8 @@ class RegularSeasonAveragesView extends BaseView {
             $hist_ftm = intval($row44['ftm']);
             $hist_fta = intval($row44['fta']);
             $hist_ftp = ($hist_fta) ? ($hist_ftm / $hist_fta) : "0.000";
-            $hist_tgm = intval($row44['3gm']);
-            $hist_tga = intval($row44['3ga']);
+            $hist_tgm = intval($row44['tgm']);
+            $hist_tga = intval($row44['tga']);
             $hist_tgp = ($hist_tga) ? ($hist_tgm / $hist_tga) : '0.000';
             $hist_orb = intval($row44['orb']);
             $hist_reb = intval($row44['reb']);

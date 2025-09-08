@@ -43,6 +43,10 @@ export async function POST({ url, request, getClientAddress }) {
 	}
 
 	try {
+		if (!db) {
+			throw error(500, 'Database connection not available');
+		}
+
 		const players = createRandomPlayers(count);
 
 		for (const player of players) {

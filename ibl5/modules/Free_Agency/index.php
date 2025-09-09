@@ -785,7 +785,7 @@ function negotiate($pid)
     $userinfo = $db->sql_fetchrow($result2);
 
     $userteam = $userinfo['user_ibl_team'];
-    $tid = $sharedFunctions->getTidFromTeamname($userteam);
+    $teamID = $sharedFunctions->getTidFromTeamname($userteam); // This function now returns an integer
 
     $exceptioninfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_team_info WHERE team_name='$userteam'"));
 
@@ -931,7 +931,7 @@ function negotiate($pid)
 
     $rosterspots = 15;
 
-    $capquery = "SELECT * FROM ibl_plr WHERE (tid=$tid AND retired='0') ORDER BY ordinal ASC;";
+    $capquery = "SELECT * FROM ibl_plr WHERE (tid=$teamID AND retired='0') ORDER BY ordinal ASC;";
     $capresult = $db->sql_query($capquery);
 
     while ($capdecrementer = $db->sql_fetchrow($capresult)) {

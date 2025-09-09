@@ -9,18 +9,18 @@ $num = $db->sql_numrows($result);
 $i = 0;
 
 while ($i < $num) {
-    $tid = $db->sql_result($result, $i, "TeamID");
+    $teamID = (int) $db->sql_result($result, $i, "TeamID"); // Ensure teamID is an integer
     $Team = $db->sql_result($result, $i, "Team");
     $i++;
-    list($wins, $losses, $gb, $homewin, $homeloss, $visitorwin, $visitorloss) = record($tid);
-    $query3 = "UPDATE ibl_power SET win = $wins, loss = $losses, gb = $gb, home_win = $homewin, home_loss = $homeloss, road_win = $visitorwin, road_loss = $visitorloss WHERE TeamID = $tid;";
+    list($wins, $losses, $gb, $homewin, $homeloss, $visitorwin, $visitorloss) = record($teamID);
+    $query3 = "UPDATE ibl_power SET win = $wins, loss = $losses, gb = $gb, home_win = $homewin, home_loss = $homeloss, road_win = $visitorwin, road_loss = $visitorloss WHERE TeamID = $teamID;";
     $result3 = $db->sql_query($query3);
 
     $query3a = "UPDATE ibl_heat_win_loss a, ibl_power b  SET a.wins = b.win, a.losses = b.loss WHERE a.currentname = b.Team and a.year = '2001';";
     $result3a = $db->sql_query($query3a);
 
-    list($lastwins, $lastlosses) = last($tid);
-    $query5 = "UPDATE ibl_power SET last_win = $lastwins, last_loss = $lastlosses WHERE TeamID = $tid;";
+    list($lastwins, $lastlosses) = last($teamID);
+    $query5 = "UPDATE ibl_power SET last_win = $lastwins, last_loss = $lastlosses WHERE TeamID = $teamID;";
     $result5 = $db->sql_query($query5);
 
     $query6 = "UPDATE ibl_team_history SET sim_depth = 'No Depth Chart'";
@@ -62,18 +62,19 @@ SET iblhoops_iblv2forums. forum_stats.ast_num = (select round((stats_ast)/stats_
 SET iblhoops_iblv2forums.forum_stats.ast_pid= (SELECT pid FROM iblhoops_ibl5.ibl_plr WHERE iblhoops_iblv2forums. forum_stats.teamname = iblhoops_ibl5.ibl_plr.teamname order by (stats_ast/stats_gm) desc limit 1)";
     $result22 = $db->sql_query($query22);
 
-    $ranking = ranking($tid, $wins, $losses);
-    $query4 = "UPDATE ibl_power SET ranking = $ranking WHERE TeamID = $tid;";
+    $ranking = ranking($teamID, $wins, $losses);
+    $query4 = "UPDATE ibl_power SET ranking = $ranking WHERE TeamID = $teamID;";
     $result4 = $db->sql_query($query4);
 
     echo "Updating $Team wins $wins and losses $losses and ranking $ranking<br>";
 }
 
-function record($tid)
+function record($teamID)
 {
     global $db;
+    $teamID = (int) $teamID; // Ensure teamID is an integer
 
-    $query = "SELECT * FROM ibl_schedule WHERE (Visitor = $tid OR Home = $tid) AND BoxID > 0 ORDER BY Date ASC";
+    $query = "SELECT * FROM ibl_schedule WHERE (Visitor = $teamID OR Home = $teamID) AND BoxID > 0 ORDER BY Date ASC";
     $result = $db->sql_query($query);
     $num = $db->sql_numrows($result);
     $wins = 0;
@@ -89,7 +90,7 @@ function record($tid)
         $home = $db->sql_result($result, $i, "Home");
         $HScore = $db->sql_result($result, $i, "HScore");
 
-        if ($tid == $visitor) {
+        if ($teamID == $visitor) {
             if ($VScore > $HScore) {
                 $wins = $wins + 1;
                 $visitorwin = $visitorwin + 1;
@@ -113,11 +114,12 @@ function record($tid)
     return array($wins, $losses, $gb, $homewin, $homeloss, $visitorwin, $visitorloss);
 }
 
-function last($tid)
+function last($teamID)
 {
     global $db;
+    $teamID = (int) $teamID; // Ensure teamID is an integer
 
-    $query = "SELECT * FROM ibl_schedule WHERE (Visitor = $tid OR Home = $tid) AND BoxID > 0 ORDER BY Date DESC limit 10";
+    $query = "SELECT * FROM ibl_schedule WHERE (Visitor = $teamID OR Home = $teamID) AND BoxID > 0 ORDER BY Date DESC limit 10";
     $result = $db->sql_query($query);
     $num = $db->sql_numrows($result);
     $lastwins = 0;
@@ -129,7 +131,7 @@ function last($tid)
         $home = $db->sql_result($result, $i, "Home");
         $HScore = $db->sql_result($result, $i, "HScore");
 
-        if ($tid == $visitor) {
+        if ($teamID == $visitor) {
             if ($VScore > $HScore) {
                 $lastwins = $lastwins + 1;
             } else {
@@ -147,11 +149,12 @@ function last($tid)
     return array($lastwins, $lastlosses);
 }
 
-function ranking($tid, $wins, $losses)
+function ranking($teamID, $wins, $losses)
 {
     global $db;
+    $teamID = (int) $teamID; // Ensure teamID is an integer
 
-    $query = "SELECT * FROM ibl_schedule WHERE Visitor = $tid AND BoxID > 0 ORDER BY Date ASC";
+    $query = "SELECT * FROM ibl_schedule WHERE Visitor = $teamID AND BoxID > 0 ORDER BY Date ASC";
     $result = $db->sql_query($query);
     $num = $db->sql_numrows($result);
     $winpoints = 0;
@@ -176,7 +179,7 @@ function ranking($tid, $wins, $losses)
         $i++;
     }
 
-    $query = "SELECT * FROM ibl_schedule WHERE Home = $tid AND BoxID > 0 ORDER BY Date ASC";
+    $query = "SELECT * FROM ibl_schedule WHERE Home = $teamID AND BoxID > 0 ORDER BY Date ASC";
     $result = $db->sql_query($query);
     $num = $db->sql_numrows($result);
     $i = 0;

@@ -62,14 +62,15 @@ class Shared
         return $this->db->sql_result($queryPlayerIDFromPlayerName, 0, 'pid');
     }
 
-    public function getTeamnameFromTid($tid)
+    public function getTeamnameFromTeamID($teamID)
     {
-        $queryTeamnameFromTid = $this->db->sql_query("SELECT team_name
+        $teamID = (int) $teamID; // Ensure teamID is an integer
+        $queryTeamnameFromTeamID = $this->db->sql_query("SELECT team_name
             FROM ibl_team_info
-            WHERE teamid = $tid
+            WHERE teamid = $teamID
             LIMIT 1;");
 
-        return $this->db->sql_result($queryTeamnameFromTid, 0, 'team_name');
+        return $this->db->sql_result($queryTeamnameFromTeamID, 0, 'team_name');
     }
 
     public function getTeamnameFromUsername($username)

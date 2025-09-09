@@ -8,12 +8,12 @@ while (!feof($plrFile)) {
 
     $name = trim(addslashes(substr($line, 4, 32)));
     $pid = substr($line, 38, 6);
-    $tid = substr($line, 44, 2);
+    $teamID = (int) substr($line, 44, 2); // Ensure teamID is an integer
     $exp = substr($line, 286, 2);
     $bird = substr($line, 288, 2);
     $contractYear1 = substr($line, 298, 4);
     if ($pid != 0 
-        AND $tid != 0
+        AND $teamID != 0
         AND $contractYear1 != 0
         AND $bird <= $exp
     ) {

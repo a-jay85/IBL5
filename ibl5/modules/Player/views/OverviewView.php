@@ -129,8 +129,8 @@ class OverviewView extends BaseView {
 
             echo "<tr>
                 <td class=\"gamelog\">" . $row['Date'] . "</td>
-                <td class=\"gamelog\">" . $this->sharedFunctions->getTeamnameFromTid($row['homeTID']) . "</td>
-                <td class=\"gamelog\">" . $this->sharedFunctions->getTeamnameFromTid($row['visitorTID']) . "</td>
+                <td class=\"gamelog\">" . $this->sharedFunctions->getTeamnameFromTeamID($row['homeTID']) . "</td>
+                <td class=\"gamelog\">" . $this->sharedFunctions->getTeamnameFromTeamID($row['visitorTID']) . "</td>
                 <td class=\"gamelog\">" . $row['gameMIN'] . "</td>
                 <td class=\"gamelog\">" . ((2 * $row['gameFGM']) + (3 * $row['game3GM']) + $row['gameFTM']) . "</td>
                 <td class=\"gamelog\">" . ($row['gameFGM'] + $row['game3GM']) . "</td>

@@ -47,7 +47,8 @@ class Team
         ($identifier) ? $identifier : $identifier = League::FREE_AGENTS_TEAMID;
 
         if (is_numeric($identifier)) {
-            $joinWhereCondition = "ibl_team_info.teamid = $identifier";
+            $teamID = (int) $identifier; // Ensure teamID is an integer
+            $joinWhereCondition = "ibl_team_info.teamid = $teamID";
         } elseif (is_string($identifier)) {
             $joinWhereCondition = "ibl_team_info.team_name = '$identifier'";
         } elseif (is_array($identifier)) {
@@ -70,7 +71,7 @@ class Team
     {
         $this->db = $db;
 
-        $this->teamID = $teamRow['teamid'];
+        $this->teamID = (int) $teamRow['teamid']; // Ensure teamID is an integer
 
         $this->city = $teamRow['team_city'];
         $this->name = $teamRow['team_name'];

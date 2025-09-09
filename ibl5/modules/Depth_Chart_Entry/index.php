@@ -48,12 +48,12 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
     }
 
     $teamlogo = $userinfo['user_ibl_team'];
-    $tid = $sharedFunctions->getTidFromTeamname($teamlogo);
-    $team = Team::initialize($db, $tid);
+    $teamID = $sharedFunctions->getTidFromTeamname($teamlogo); // This function now returns an integer
+    $team = Team::initialize($db, $teamID);
 
     Nuke\Header::header();
     OpenTable();
-    UI::displaytopmenu($db, $tid);
+    UI::displaytopmenu($db, $teamID);
 
     // === CODE TO INSERT IBL DEPTH CHART ===
 
@@ -88,7 +88,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
     $result7 = $db->sql_query($sql7);
     $num7 = $db->sql_numrows($result7);
 
-    $queryPlayersOnTeam = "SELECT * FROM ibl_plr WHERE teamname = '$teamlogo' AND tid = $tid AND retired = '0' AND ordinal <= " . JSB::WAIVERS_ORDINAL ." ORDER BY ordinal ASC";
+    $queryPlayersOnTeam = "SELECT * FROM ibl_plr WHERE teamname = '$teamlogo' AND tid = $teamID AND retired = '0' AND ordinal <= " . JSB::WAIVERS_ORDINAL ." ORDER BY ordinal ASC";
     $playersOnTeam = $db->sql_query($queryPlayersOnTeam);
 
     if ($useset == null) {
@@ -133,7 +133,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 		<form name=\"Depth_Chart\" method=\"post\" action=\"modules.php?name=Depth_Chart_Entry&op=submit\">
 		    <input type=\"hidden\" name=\"Team_Name\" value=\"$teamlogo\">
             <input type=\"hidden\" name=\"Set_Name\" value=\"$offense_name\">
-		<center><img src=\"images/logo/$tid.jpg\"><br>";
+		<center><img src=\"images/logo/$teamID.jpg\"><br>";
 
     $table_ratings = UI::ratings($db, $playersOnTeam, $team, "", $season);
     echo $table_ratings;

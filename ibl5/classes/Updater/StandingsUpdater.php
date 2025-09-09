@@ -90,7 +90,7 @@ class StandingsUpdater {
     private function processTeamStandings($row, $conference) {
         $log = '';
 
-        $tid = $this->sharedFunctions->getTidFromTeamname($row->childNodes->item(0)->nodeValue);
+        $teamID = $this->sharedFunctions->getTidFromTeamname($row->childNodes->item(0)->nodeValue); // This function now returns an integer
         $leagueRecord = $row->childNodes->item(1)->nodeValue;
         $pct = $row->childNodes->item(2)->nodeValue;
         $confGB = $row->childNodes->item(3)->nodeValue;
@@ -131,7 +131,7 @@ class StandingsUpdater {
             awayWins,
             awayLosses
         ) VALUES (
-            '$tid',
+            '$teamID',
             '" . rtrim($row->childNodes->item(0)->nodeValue) . "',
             '$leagueRecord',
             '$pct',

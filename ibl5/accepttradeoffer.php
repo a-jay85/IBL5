@@ -36,8 +36,8 @@ if ($offer_id != NULL) {
             if ($itemtype == 'cash') {
                 $itemid = checkIfPidExists($itemid, $db);
                 
-                $tidSendingTeam = $sharedFunctions->getTidFromTeamname($from);
-                $tidReceivingTeam = $sharedFunctions->getTidFromTeamname($to);
+                $teamIDSendingTeam = $sharedFunctions->getTidFromTeamname($from); // This function now returns an integer
+                $teamIDReceivingTeam = $sharedFunctions->getTidFromTeamname($to); // This function now returns an integer
                 $queryCashDetails = "SELECT * FROM ibl_trade_cash WHERE tradeOfferID = $offer_id AND sendingTeam = '$from';";
                 $cashDetails = $db->sql_fetchrow($db->sql_query($queryCashDetails));
     
@@ -83,7 +83,7 @@ if ($offer_id != NULL) {
                     ('100000',
                     '$itemid',
                     '| <B>Cash to $to</B>',
-                    '$tidSendingTeam',
+                    '$teamIDSendingTeam',
                     '$from',
                     '$contractCurrentYear',
                     '$contractCurrentYear',
@@ -117,7 +117,7 @@ if ($offer_id != NULL) {
                     ('100000',
                     '$itemid',
                     '| <B>Cash from $from</B>',
-                    '$tidReceivingTeam',
+                    '$teamIDReceivingTeam',
                     '$to',
                     '$contractCurrentYear',
                     '$contractCurrentYear',
@@ -143,7 +143,7 @@ if ($offer_id != NULL) {
                 $queryi = 'UPDATE ibl_draft_picks SET `ownerofpick` = "' . $to . '" WHERE `pickid` = ' . $itemid . ' LIMIT 1;';
                 $resulti = $db->sql_query($queryi);
             } elseif ($itemtype == 1) {
-                $tid = $sharedFunctions->getTidFromTeamname($to);
+                $teamID = $sharedFunctions->getTidFromTeamname($to); // This function now returns an integer
         
                 $queryk = "SELECT * FROM ibl_plr WHERE pid = '$itemid'";
                 $resultk = $db->sql_query($queryk);
@@ -151,7 +151,7 @@ if ($offer_id != NULL) {
                 $tradeLine = "The $from send " . $db->sql_result($resultk, 0, "pos") . " " . $db->sql_result($resultk, 0, "name") . " to the $to.<br>";
                 $storytext .= $tradeLine;
         
-                $queryi = 'UPDATE ibl_plr SET `teamname` = "' . $to . '", `tid` = ' . $tid . ' WHERE `pid` = ' . $itemid . ' LIMIT 1;';
+                $queryi = 'UPDATE ibl_plr SET `teamname` = "' . $to . '", `tid` = ' . $teamID . ' WHERE `pid` = ' . $itemid . ' LIMIT 1;';
                 $resulti = $db->sql_query($queryi);
             }
         

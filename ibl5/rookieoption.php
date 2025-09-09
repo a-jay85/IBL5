@@ -8,7 +8,7 @@ $Team_Name = $_POST['teamname'];
 $player = Player::withPlayerID($db, $_POST['playerID']);
 $ExtensionAmount = $_POST['rookieOptionValue'];
 
-$tid = $sharedFunctions->getTidFromTeamname($Team_Name);
+$teamID = $sharedFunctions->getTidFromTeamname($Team_Name); // This function now returns an integer
 
 $recipient = 'ibldepthcharts@gmail.com';
 $emailsubject = "Rookie Extension Option - " . $player->name;
@@ -31,7 +31,7 @@ Your rookie option has been updated in the database and should reflect on your t
 if ($season->phase == "Free Agency") {
     echo "Please <a href=\"modules.php?name=Free_Agency\">click here to return to the Free Agency Screen</a>.";
 } else {
-    echo "Please <a href=\"modules.php?name=Team&op=team&tid=$tid\">click here to return to your team page</a>.";
+    echo "Please <a href=\"modules.php?name=Team&op=team&tid=$teamID\">click here to return to your team page</a>.";
 }
 
 Discord::postToChannel('#rookie-options', $filetext);

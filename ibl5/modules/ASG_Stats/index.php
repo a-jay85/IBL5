@@ -81,7 +81,7 @@ $pagetitle = "All-Star Game Stats";
         $pos = $db->sql_result($result, $i, "pos");
         $name = $db->sql_result($result, $i, "name");
         $teamname = $db->sql_result($result, $i, "teamname");
-        $teamid = $db->sql_result($result, $i, "tid");
+        $teamID = (int) $db->sql_result($result, $i, "tid"); // Ensure teamID is an integer
         //$chunknumber=$db->sql_result($result,$i,"chunk");
         //$qa=$db->sql_result($result,$i,"qa");
         $stats_gm = $db->sql_result($result, $i, "stats_gm");
@@ -135,7 +135,7 @@ $pagetitle = "All-Star Game Stats";
         }
 
         $i++;
-        echo "<tr bgcolor=$bgcolor><td>$i.</td><td><a href=modules.php?name=Player&pa=showpage&pid=$pid>$name</a></td><td>$pos</td><td><a href=modules.php?name=Team&op=team&tid=$teamid>$teamname</a></td><td>$stats_gm</td><td>$stats_gs</td><td align=right>$stats_mpg</td><td align=right>$stats_fgmpg</td><td align=right>$stats_fgapg</td><td align=right>$stats_fgp</td><td align=right>$stats_ftmpg</td><td align=right>$stats_ftapg</td><td align=right>$stats_ftp</td><td align=right>$stats_tgmpg</td><td align=right>$stats_tgapg</td><td align=right>$stats_tgp</td><td align=right>$stats_orbpg</td><td align=right>$stats_rpg</td><td align=right>$stats_apg</td><td align=right>$stats_spg</td><td align=right>$stats_tpg</td><td align=right>$stats_bpg</td><td align=right>$stats_fpg</td><td align=right>$stats_ppg</td></tr>";
+        echo "<tr bgcolor=$bgcolor><td>$i.</td><td><a href=modules.php?name=Player&pa=showpage&pid=$pid>$name</a></td><td>$pos</td><td><a href=modules.php?name=Team&op=team&tid=$teamID>$teamname</a></td><td>$stats_gm</td><td>$stats_gs</td><td align=right>$stats_mpg</td><td align=right>$stats_fgmpg</td><td align=right>$stats_fgapg</td><td align=right>$stats_fgp</td><td align=right>$stats_ftmpg</td><td align=right>$stats_ftapg</td><td align=right>$stats_ftp</td><td align=right>$stats_tgmpg</td><td align=right>$stats_tgapg</td><td align=right>$stats_tgp</td><td align=right>$stats_orbpg</td><td align=right>$stats_rpg</td><td align=right>$stats_apg</td><td align=right>$stats_spg</td><td align=right>$stats_tpg</td><td align=right>$stats_bpg</td><td align=right>$stats_fpg</td><td align=right>$stats_ppg</td></tr>";
 
     }
 

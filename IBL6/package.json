@@ -48,6 +48,7 @@
 	},
 	"dependencies": {
 		"daisyui": "^5.0.54",
+		"dotenv": "^17.2.2",
 		"firebase": "^12.2.1",
 		"mysql2": "^3.14.5"
 	}

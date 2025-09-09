@@ -7,15 +7,6 @@ class DatabaseConnection {
 
 	private async getPool(): Promise<mysql.Pool> {
 		if (!this.pool) {
-			// Debug: Log the actual config being used
-			console.log('🔍 Database Config:', {
-				host: dbConfig.mysql.host,
-				port: dbConfig.mysql.port,
-				database: dbConfig.mysql.database,
-				user: dbConfig.mysql.user,
-				password: dbConfig.mysql.password ? '***hidden***' : 'empty'
-			});
-
 			this.pool = mysql.createPool({
 				host: dbConfig.mysql.host,
 				port: dbConfig.mysql.port,

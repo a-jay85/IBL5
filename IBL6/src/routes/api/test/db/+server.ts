@@ -4,14 +4,6 @@ import { query, queryOne } from '$lib/database/connection.js';
 
 export async function GET() {
 	try {
-		console.log('🔍 All process.env keys:', Object.keys(process.env));
-		console.log('🔍 DB variables:', {
-			DB_HOST: process.env.DB_HOST,
-			DB_PORT: process.env.DB_PORT,
-			DB_NAME: process.env.DB_NAME,
-			DB_USER: process.env.DB_USER,
-			DB_PASSWORD: process.env.DB_PASSWORD ? '***set***' : 'undefined'
-		});
 		// Test basic connection
 		const result = await query('SELECT 1 as test_value, NOW() as current_time');
 

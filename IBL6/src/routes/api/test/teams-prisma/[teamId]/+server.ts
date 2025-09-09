@@ -1,35 +1,9 @@
 // src/routes/api/test/teams-prisma/[teamId]/+server.ts
 import { json, error } from '@sveltejs/kit';
 import { PrismaClient } from '@prisma/client';
+import { serializeBigInt } from '$lib/utils/utils';
 
 const prisma = new PrismaClient();
-
-// Helper function to convert BigInt to string
-function serializeBigInt(obj: any): any {
-	if (obj === null || obj === undefined) {
-		return obj;
-	}
-
-	if (typeof obj === 'bigint') {
-		return obj.toString();
-	}
-
-	if (Array.isArray(obj)) {
-		return obj.map(serializeBigInt);
-	}
-
-	if (typeof obj === 'object') {
-		const serialized: any = {};
-		for (const key in obj) {
-			if (obj.hasOwnProperty(key)) {
-				serialized[key] = serializeBigInt(obj[key]);
-			}
-		}
-		return serialized;
-	}
-
-	return obj;
-}
 
 export async function GET({ params }) {
 	try {
@@ -44,10 +18,10 @@ export async function GET({ params }) {
 		// Get single team using Prisma
 		const team = await prisma.team.findUnique({
 			where: {
-				teamid: teamId
+				teamId: teamId
 			},
 			select: {
-				teamid: true,
+				teamId: true,
 				city: true,
 				name: true,
 				color1: true,

@@ -14,7 +14,7 @@ datasource db {
 }
 
 model Team {
-  teamId         Int     @id @default(autoincrement()) @map("teamid")
+  teamId         Int     @id @default(autoincrement()) @map("teamId")
   city           String  @map("team_city") @db.VarChar(24)
   name           String  @map("team_name") @db.VarChar(16)
   color1         String  @map("color1") @db.VarChar(6)

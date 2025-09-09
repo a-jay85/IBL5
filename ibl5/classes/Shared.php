@@ -94,7 +94,7 @@ class Shared
             WHERE team_name = '$teamname'
             LIMIT 1;");
 
-        return $this->db->sql_result($queryTidFromTeamname, 0, 'teamid');
+        return (int) $this->db->sql_result($queryTidFromTeamname, 0, 'teamid'); // Ensure teamID is an integer
     }
 
     public function isFreeAgencyModuleActive()

@@ -177,12 +177,12 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
     OpenTable();
 
     $teamlogo = $userinfo['user_ibl_team'];
-    $tid = $sharedFunctions->getTidFromTeamname($teamlogo);
-    UI::displaytopmenu($db, $tid);
+    $teamID = $sharedFunctions->getTidFromTeamname($teamlogo); // This function now returns an integer
+    UI::displaytopmenu($db, $teamID);
 
     $queryUserTeamPlayers = "SELECT pos, name, pid, ordinal, cy, cy1, cy2, cy3, cy4, cy5, cy6
 		FROM ibl_plr
-		WHERE tid = $tid
+		WHERE tid = $teamID
 		AND retired = '0'
 		ORDER BY ordinal ASC ";
     $resultUserTeamPlayers = $db->sql_query($queryUserTeamPlayers);
@@ -196,7 +196,7 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
     echo "<form name=\"Trade_Offer\" method=\"post\" action=\"maketradeoffer.php\">
 		<input type=\"hidden\" name=\"Team_Name\" value=\"$teamlogo\">
 		<center>
-			<img src=\"images/logo/$tid.jpg\"><br>
+			<img src=\"images/logo/$teamID.jpg\"><br>
 			<table border=1 cellspacing=0 cellpadding=5>
 				<tr>
 					<th colspan=4><center>TRADING MENU</center></th>
@@ -237,10 +237,10 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 					<td valign=top><b>Salary</b></td>
 				</tr>";
 
-    $partnerTid = $sharedFunctions->getTidFromTeamname($partner);
+    $partnerTeamID = $sharedFunctions->getTidFromTeamname($partner); // This function now returns an integer
     $queryPartnerTeamPlayers = "SELECT pos, name, pid, ordinal, cy, cy1, cy2, cy3, cy4, cy5, cy6
 		FROM ibl_plr
-		WHERE tid = $partnerTid
+		WHERE tid = $partnerTeamID
 		AND retired = '0'
 		ORDER BY ordinal ASC ";
     $resultPartnerTeamPlayers = $db->sql_query($queryPartnerTeamPlayers);
@@ -362,10 +362,10 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
     OpenTable();
 
     $teamlogo = $userinfo['user_ibl_team'];
-    $tid = $sharedFunctions->getTidFromTeamname($teamlogo);
-    UI::displaytopmenu($db, $tid);
+    $teamID = $sharedFunctions->getTidFromTeamname($teamlogo); // This function now returns an integer
+    UI::displaytopmenu($db, $teamID);
 
-    echo "<center><img src=\"images/logo/$tid.jpg\"><br>";
+    echo "<center><img src=\"images/logo/$teamID.jpg\"><br>";
 
     $sql3 = "SELECT * FROM ibl_trade_info ORDER BY tradeofferid ASC";
     $result3 = $db->sql_query($sql3);
@@ -571,7 +571,7 @@ function offertrade($user)
         }
         if (!is_user($user)) {
             OpenTable();
-            UI::displaytopmenu($db, $tid);
+            UI::displaytopmenu($db, 0); // Default to Free Agents for login screen
             loginbox();
             CloseTable();
         }

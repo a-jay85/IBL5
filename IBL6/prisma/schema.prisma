@@ -1,0 +1,111 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Team {
+  teamid         Int       @id @default(autoincrement())
+  city           String    @map("team_city")
+  name           String    @map("team_name")
+  color1         String    @map("color1")
+  color2         String    @map("color2")
+  arena          String    @map("arena")
+  owner          String    @map("owner_name")
+  ownerEmail     String?   @map("owner_email")
+  discord        String?   @map("discordID")
+  skype          String?   @map("skype")
+  aim            String?   @map("aim")
+  msn            String?   @map("msn")
+  fka            String    @map("formerly_known_as")
+  contractWins   Int       @default(0) @map("Contract_Wins")
+  contractLosses Int       @default(0) @map("Contract_Losses")
+  contractAvgW   Int       @default(0) @map("Contract_AvgW")
+  contractAvgL   Int       @default(0) @map("Contract_AvgL")
+  contractCoach  String    @map("Contract_Coach")
+  usedExtChunk   Int       @default(0) @map("Used_Extension_This_Chunk")
+  usedExtSeason  Int       @default(0) @map("Used_Extension_This_Season")
+  hasMLE         Int       @default(0) @map("Has_MLE")
+  hasLLE         Int       @default(0) @map("Has_LLE")
+  chart          String    @map("chart") @db.Char(2)
+  abbreviation   String?   @map("abbreviation") @db.Char(3)
+  seasonWins     Int?      @default(0) @map("season_wins")
+  seasonLosses   Int?      @default(0) @map("season_losses")
+  createdAt      DateTime? @default(now()) @map("created_at")
+
+  @@map("ibl_team_info")
+}
+
+model Player {
+  gameDate   DateTime @default(now()) @map("Date")
+  name       String
+  pos        String?
+  pid        Int      @id @default(autoincrement())
+  awayTeamId Int?     @map("visitorTID")
+  homeTeamId Int?     @map("homeTID")
+  min        Int      @default(0) @map("gameMIN")
+  fgm        Int      @default(0) @map("gameFGM")
+  fga        Int      @default(0) @map("gameFGA")
+  ftm        Int      @default(0) @map("gameFTM")
+  fta        Int      @default(0) @map("gameFTA")
+  tpm        Int      @default(0) @map("game3GM")
+  tpa        Int      @default(0) @map("game3GA")
+  orb        Int      @default(0) @map("gameORB")
+  drb        Int      @default(0) @map("gameDRB")
+  ast        Int      @default(0) @map("gameAST")
+  stl        Int      @default(0) @map("gameSTL")
+  tov        Int      @default(0) @map("gameTOV")
+  blk        Int      @default(0) @map("gameBLK")
+  pf         Int      @default(0) @map("gamePF")
+
+  @@map("ibl_box_scores")
+}
+
+model Game {
+  id            Int      @id @default(autoincrement())
+  date          DateTime @default(now()) @map("Date")
+  gameOfThatDay Int      @map("gameOfThatDay")
+  awayTeamId    Int?     @map("visitorTeamID")
+  homeTeamId    Int?     @map("homeTeamID")
+  attendance    Int?     @map("attendance")
+  capacity      Int?     @map("capacity")
+  visitorWins   Int      @default(0) @map("visitorWins")
+  visitorLosses Int      @default(0) @map("visitorLosses")
+  homeWins      Int      @default(0) @map("homeWins")
+  homeLosses    Int      @default(0) @map("homeLosses")
+  visitorQ1pts  Int      @default(0) @map("visitorQ1points")
+  visitorQ2pts  Int      @default(0) @map("visitorQ2points")
+  visitorQ3pts  Int      @default(0) @map("visitorQ3points")
+  visitorQ4pts  Int      @default(0) @map("visitorQ4points")
+  visitorOTpts  Int      @default(0) @map("visitorOTpoints")
+  homeQ1pts     Int      @default(0) @map("homeQ1points")
+  homeQ2pts     Int      @default(0) @map("homeQ2points")
+  homeQ3pts     Int      @default(0) @map("homeQ3points")
+  homeQ4pts     Int      @default(0) @map("homeQ4points")
+  homeOTpts     Int      @default(0) @map("homeOTpoints")
+  min           Int      @default(0) @map("gameMIN")
+  fgm           Int      @default(0) @map("gameFGM")
+  fga           Int      @default(0) @map("gameFGA")
+  ftm           Int      @default(0) @map("gameFTM")
+  fta           Int      @default(0) @map("gameFTA")
+  tpm           Int      @default(0) @map("game3GM")
+  tpa           Int      @default(0) @map("game3GA")
+  orb           Int      @default(0) @map("gameORB")
+  drb           Int      @default(0) @map("gameDRB")
+  ast           Int      @default(0) @map("gameAST")
+  stl           Int      @default(0) @map("gameSTL")
+  tov           Int      @default(0) @map("gameTOV")
+  blk           Int      @default(0) @map("gameBLK")
+  pf            Int      @default(0) @map("gamePF")
+
+  @@map("ibl_box_scores_teams")
+}

@@ -37,10 +37,10 @@ while ($k < $num2) {
     $simdepth[$k] = $db->sql_result($result2, $k, "sim_depth");
     $asg_vote[$k] = $db->sql_result($result2, $k, "asg_vote");
     $eoy_vote[$k] = $db->sql_result($result2, $k, "eoy_vote");
-    $teamid[$k] = $db->sql_result($result2, $k, "teamid");
+    $teamID[$k] = (int) $db->sql_result($result2, $k, "teamid"); // Ensure teamID is an integer
 
     $table_echo .= "<tr>
-		<td bgcolor=#" . $teamcolor1[$k] . "><a href=\"modules.php?name=Team&op=team&tid=" . $teamid[$k] . "\"><font color=#" . $teamcolor2[$k] . ">" . $teamcity[$k] . " " . $teamname[$k] . "</a></td>
+		<td bgcolor=#" . $teamcolor1[$k] . "><a href=\"modules.php?name=Team&op=team&tid=" . $teamID[$k] . "\"><font color=#" . $teamcolor2[$k] . ">" . $teamcity[$k] . " " . $teamname[$k] . "</a></td>
 		<td>" . $simdepth[$k] . "</td>
 		<td>" . $depth[$k] . "</td>
 		<td>" . $asg_vote[$k] . "</td>

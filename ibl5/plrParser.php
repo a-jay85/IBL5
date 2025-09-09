@@ -707,7 +707,7 @@ while (!feof($plrFile)) {
         VALUES
             ($pid,
             $season->endingYear,
-            '" . $sharedFunctions->getTeamnameFromTid($tid) . "',
+            '" . $sharedFunctions->getTeamnameFromTeamID($tid) . "',
             $tid,
             $seasonGamesPlayed,
             $seasonMIN,
@@ -748,7 +748,7 @@ while (!feof($plrFile)) {
             $ratingTD,
             $currentSeasonSalary)
         ON DUPLICATE KEY UPDATE
-            `team` = '" . $sharedFunctions->getTeamnameFromTid($tid) . "',
+            `team` = '" . $sharedFunctions->getTeamnameFromTeamID($tid) . "',
             `teamid` = $tid,
             `games` = $seasonGamesPlayed,
             `minutes` = $seasonMIN,
@@ -803,7 +803,7 @@ while (!feof($plrFile)) {
             }
             $tidOffenseStats++;
             $sideOfTheBall = 'offense';
-            $teamName = $sharedFunctions->getTeamnameFromTid($tidOffenseStats);
+            $teamName = $sharedFunctions->getTeamnameFromTeamID($tidOffenseStats);
         } elseif ($ordinal >= 1473 && $ordinal <= 1504) {
             if ($ordinal == 1473) {
                 echo "ibl_team_offense_stats updated!<br><br>";
@@ -811,7 +811,7 @@ while (!feof($plrFile)) {
             }
             $tidDefenseStats++;
             $sideOfTheBall = 'defense';
-            $teamName = $sharedFunctions->getTeamnameFromTid($tidDefenseStats);
+            $teamName = $sharedFunctions->getTeamnameFromTeamID($tidDefenseStats);
         }
 
         $teamUpdateQuery = 'UPDATE `ibl_team_' . $sideOfTheBall . '_stats`

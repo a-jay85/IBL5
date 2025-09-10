@@ -333,8 +333,8 @@ VALUES    ( '$tradeofferid',
     $tradeText = str_replace('<i>', "_", $tradeText);
     $tradeText = str_replace('</i>', "_", $tradeText);
 
-    $offeringUserDiscordID = $sharedFunctions->getDiscordIDFromTeamname($offeringTeam);
-    $receivingUserDiscordID = $sharedFunctions->getDiscordIDFromTeamname($receivingTeam);
+    $offeringUserDiscordID = Discord::getDiscordIDFromTeamname($db, $offeringTeam);
+    $receivingUserDiscordID = Discord::getDiscordIDFromTeamname($db, $receivingTeam);
     $discordDMmessage = 'New trade proposal from <@!' . $offeringUserDiscordID . '>!
 '. $tradeText .'
 Go here to accept or decline: http://www.iblhoops.net/ibl5/modules.php?name=Trading&op=reviewtrade';

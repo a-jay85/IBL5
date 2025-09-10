@@ -107,7 +107,6 @@ function themeheader()
     }
     echo "<body bgcolor=\"#ffffff\" text=\"#000000\" link=\"#363636\" vlink=\"#363636\" alink=\"#d5ae83\">\n"
         . "<br>\n";
-    ads(0);
     echo "<br>\n"
         . "<table cellpadding=\"0\" cellspacing=\"0\" width=\"750\" border=\"0\" align=\"center\" bgcolor=\"#ffffff\">\n"
         . "<tr>\n"

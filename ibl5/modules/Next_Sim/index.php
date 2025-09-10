@@ -66,7 +66,7 @@ foreach ($resultUserTeamProjectedGamesNextSim as $gameRow) {
                                     <h2 title="<?= $rows[$i]['game']->date ?>"><?= "Day " . $rows[$i]['day'] . " " . $rows[$i]['game']->getUserTeamLocationPrefix($userTeam->teamID) ?></h2>
                                 </td>
                                 <td style="text-align: center; padding-left: 4px; padding-right: 4px">
-                                    <a href="modules.php?name=Team&op=team&tid=<?= $rows[$i]['opposingTeam']->teamID ?>">
+                                    <a href="modules.php?name=Team&op=team&teamID=<?= $rows[$i]['opposingTeam']->teamID ?>">
                                         <img src="./images/logo/<?= $rows[$i]['opposingTeam']->teamID ?>.jpg">
                                     </a>
                                 </td>

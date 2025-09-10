@@ -35,7 +35,7 @@ foreach ($resultAllTeams as $teamRow) {
 
     $offense_totals .= "$trHighlight
         <td bgcolor=\"$team->color1\">
-            <a href=\"modules.php?name=Team&op=team&tid=$team->teamID\"><font color=\"$team->color2\">$team->city $team->name Offense</font></a>
+            <a href=\"modules.php?name=Team&op=team&teamID=$team->teamID\"><font color=\"$team->color2\">$team->city $team->name Offense</font></a>
         </td>
         <td>$teamStats->seasonOffenseGamesPlayed</td>
         <td>$teamStats->seasonOffenseTotalFieldGoalsMade</td>
@@ -56,7 +56,7 @@ foreach ($resultAllTeams as $teamRow) {
 
     $offense_averages .= "$trHighlight
         <td bgcolor=\"$team->color1\">
-            <a href=\"modules.php?name=Team&op=team&tid=$team->teamID\"><font color=\"$team->color2\">$team->city $team->name Offense</font></a>
+            <a href=\"modules.php?name=Team&op=team&teamID=$team->teamID\"><font color=\"$team->color2\">$team->city $team->name Offense</font></a>
         </td>
         <td>$teamStats->seasonOffenseFieldGoalsMadePerGame</td>
         <td>$teamStats->seasonOffenseFieldGoalsAttemptedPerGame</td>
@@ -79,7 +79,7 @@ foreach ($resultAllTeams as $teamRow) {
 
     $defense_totals .= "$trHighlight
         <td bgcolor=\"$team->color1\">
-            <a href=\"modules.php?name=Team&op=team&tid=$team->teamID\"><font color=\"$team->color2\">$team->city $team->name Offense</font></a>
+            <a href=\"modules.php?name=Team&op=team&teamID=$team->teamID\"><font color=\"$team->color2\">$team->city $team->name Offense</font></a>
         </td>
         <td>$teamStats->seasonDefenseGamesPlayed</td>
         <td>$teamStats->seasonDefenseTotalFieldGoalsMade</td>
@@ -100,7 +100,7 @@ foreach ($resultAllTeams as $teamRow) {
 
     $defense_averages .= "$trHighlight
         <td bgcolor=\"$team->color1\">
-            <a href=\"modules.php?name=Team&op=team&tid=$team->teamID\"><font color=\"$team->color2\">$team->city $team->name Defense</font></a>
+            <a href=\"modules.php?name=Team&op=team&teamID=$team->teamID\"><font color=\"$team->color2\">$team->city $team->name Defense</font></a>
         </td>
         <td>$teamStats->seasonDefenseFieldGoalsMadePerGame</td>
         <td>$teamStats->seasonDefenseFieldGoalsAttemptedPerGame</td>
@@ -122,7 +122,7 @@ foreach ($resultAllTeams as $teamRow) {
     </tr>";
 
     $teamHeaderCells[$t] = "<td bgcolor=\"$team->color1\">
-        <a href=\"modules.php?name=Team&op=team&tid=$team->teamID\"><font color=\"$team->color2\">$team->city $team->name Diff</font></a>
+        <a href=\"modules.php?name=Team&op=team&teamID=$team->teamID\"><font color=\"$team->color2\">$team->city $team->name Diff</font></a>
     </td>";
 
     $teamOffenseAveragesArray[$t] = array(

@@ -217,7 +217,15 @@ class Team
                     <tr>
                         <td align='right'><b>Arena:</td>
                         <td>$team->arena</td>
-                    </tr>
+                    </tr>";
+        if ($team->capacity != 0) {
+            $output .= "
+                    <tr>
+                        <td align='right'><b>Capacity:</td>
+                        <td>$team->capacity</td>
+                    </tr>";
+        }
+                    $output .= "
                     <tr>
                         <td align='right'><b>Conference:</td>
                         <td>$conference</td>

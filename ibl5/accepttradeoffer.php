@@ -196,8 +196,8 @@ if ($offer_id != NULL) {
             mail($recipient, $storytitle, $storytext, "From: trades@iblhoops.net");
         }
         
-        $fromDiscordID = $sharedFunctions->getDiscordIDFromTeamname($from);
-        $toDiscordID = $sharedFunctions->getDiscordIDFromTeamname($to);
+        $fromDiscordID = Discord::getDiscordIDFromTeamname($db, $from);
+        $toDiscordID = Discord::getDiscordIDFromTeamname($db, $to);
         $discordText = "<@!$fromDiscordID> and <@!$toDiscordID> agreed to a trade:<br>" . $storytext;
         
         Discord::postToChannel('#trades', $discordText);

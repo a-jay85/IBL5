@@ -9,16 +9,6 @@ class Shared
         $this->db = $db;
     }
 
-    public function getDiscordIDFromTeamname($teamname)
-    {
-        $queryDiscordIDFromTeamname = $this->db->sql_query("SELECT discordID
-            FROM nuke_users
-            WHERE user_ibl_team = '$teamname'
-            LIMIT 1;");
-
-        return $this->db->sql_result($queryDiscordIDFromTeamname, 0, 'discordID');
-    }
-
     public function getNumberOfTitles($teamname, $titleName)
     {
         $queryNumberOfTitles = $this->db->sql_query("SELECT COUNT(name)

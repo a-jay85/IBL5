@@ -77,7 +77,7 @@ function team($teamID)
     } else {
         $tabs .= "<td>";
     }
-    $tabs .= "<a href=\"modules.php?name=Team&op=team&tid=$teamID&display=ratings$insertyear\">Ratings</a></td>";
+    $tabs .= "<a href=\"modules.php?name=Team&op=team&teamID=$teamID&display=ratings$insertyear\">Ratings</a></td>";
 
     if ($display == "total_s") {
         $showing = "Season Totals";
@@ -87,7 +87,7 @@ function team($teamID)
     } else {
         $tabs .= "<td>";
     }
-    $tabs .= "<a href=\"modules.php?name=Team&op=team&tid=$teamID&display=total_s$insertyear\">Season Totals</a></td>";
+    $tabs .= "<a href=\"modules.php?name=Team&op=team&teamID=$teamID&display=total_s$insertyear\">Season Totals</a></td>";
 
     if ($display == "avg_s") {
         $showing = "Season Averages";
@@ -97,7 +97,7 @@ function team($teamID)
     } else {
         $tabs .= "<td>";
     }
-    $tabs .= "<a href=\"modules.php?name=Team&op=team&tid=$teamID&display=avg_s$insertyear\">Season Averages</a></td>";
+    $tabs .= "<a href=\"modules.php?name=Team&op=team&teamID=$teamID&display=avg_s$insertyear\">Season Averages</a></td>";
 
     if ($display == "per36mins") {
         $showing = "Per 36 Minutes";
@@ -107,7 +107,7 @@ function team($teamID)
     } else {
         $tabs .= "<td>";
     }
-    $tabs .= "<a href=\"modules.php?name=Team&op=team&tid=$teamID&display=per36mins$insertyear\">Per 36 Minutes</a></td>";
+    $tabs .= "<a href=\"modules.php?name=Team&op=team&teamID=$teamID&display=per36mins$insertyear\">Per 36 Minutes</a></td>";
 
     if ($display == "chunk") {
         $showing = "Chunk Averages";
@@ -117,7 +117,7 @@ function team($teamID)
     } else {
         $tabs .= "<td>";
     }
-    $tabs .= "<a href=\"modules.php?name=Team&op=team&tid=$teamID&display=chunk$insertyear\">Sim Averages</a></td>";
+    $tabs .= "<a href=\"modules.php?name=Team&op=team&teamID=$teamID&display=chunk$insertyear\">Sim Averages</a></td>";
 
     if (
         $season->phase == "Playoffs"
@@ -134,7 +134,7 @@ function team($teamID)
         } else {
             $tabs .= "<td>";
         }
-        $tabs .= "<a href=\"modules.php?name=Team&op=team&tid=$teamID&display=playoffs$insertyear\">Playoffs Averages</a></td>";
+        $tabs .= "<a href=\"modules.php?name=Team&op=team&teamID=$teamID&display=playoffs$insertyear\">Playoffs Averages</a></td>";
     }
 
     if ($display == "contracts") {
@@ -145,9 +145,9 @@ function team($teamID)
     } else {
         $tabs .= "<td>";
     }
-    $tabs .= "<a href=\"modules.php?name=Team&op=team&tid=$teamID&display=contracts$insertyear\">Contracts</a></td>";
+    $tabs .= "<a href=\"modules.php?name=Team&op=team&teamID=$teamID&display=contracts$insertyear\">Contracts</a></td>";
 
-    if ($tid > 0 AND $yr == "") {
+    if ($teamID > 0 AND $yr == "") {
         $starters_table = lastSimsStarters($db, $result, $team);
     }
 
@@ -288,7 +288,7 @@ function viewinjuries($teamID)
             <td>$player->position</td>
             <td><a href=\"./modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->name</a></td>
             <td bgcolor=\"#$team->color1\">
-                <font color=\"#$team->color2\"><a href=\"./modules.php?name=Team&op=team&tid=$player->teamID\">$team->city $player->teamName</a></font>
+                <font color=\"#$team->color2\"><a href=\"./modules.php?name=Team&op=team&teamID=$player->teamID\">$team->city $player->teamName</a></font>
             </td>
             <td>$player->daysRemainingForInjury</td>
         </tr>";
@@ -361,8 +361,7 @@ function menu()
     Nuke\Footer::footer();
 }
 
-// Convert URL parameter 'tid' to standardized $teamID
-$teamID = isset($tid) ? (int) $tid : 0;
+$teamID = isset($teamID) ? (int) $teamID : 0;
 
 switch ($op) {
     case "team":

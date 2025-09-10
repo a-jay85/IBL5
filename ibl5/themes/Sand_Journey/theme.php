@@ -58,7 +58,6 @@ function themeheader()
 {
     global $prefix, $db, $user, $cookie, $bgcolor1, $bgcolor2, $bgcolor3, $banners, $sitename, $anonymous, $user;
     echo "<body bgcolor=\"$bgcolor1\">";
-    ads(0);
     if (is_user($user)) {
         cookiedecode($user);
         $username = $cookie[1];

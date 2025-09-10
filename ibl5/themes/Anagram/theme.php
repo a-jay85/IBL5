@@ -106,7 +106,6 @@ function themeheader()
         $username = $anonymous;
     }
     echo "<body bgcolor=\"#ffffff\" text=\"#000000\">\n";
-    ads(0);
     echo "<br>\n"
         . "<table cellpadding=\"0\" cellspacing=\"10\" width=\"780\" border=\"0\" align=\"center\" bgcolor=\"#EEEEEE\">\n"
         . "<tr>\n"

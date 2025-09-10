@@ -57,7 +57,6 @@ function themeheader()
     global $slogan, $sitename, $banners;
     echo "<body bgcolor=FFFFFF text=000000 link=101070 vlink=101070>
 <br>";
-    ads(0);
     echo "<br>
 <center>
 <table cellpadding=0 cellspacing=0 border=0 width=99% align=center><tr><td align=left>

@@ -62,7 +62,7 @@ function standings($division)
             $bgcolor = "EEEEEE";
         }
 
-        $stangings = $stangings . "<tr bgcolor=$bgcolor><td nowrap><a href=\"http://www.ijbl.net/modules.php?name=Team&op=team&tid=$tid\">$Team</a> ($win-$loss)</td><td>$gb</td></tr>";
+        $stangings = $stangings . "<tr bgcolor=$bgcolor><td nowrap><a href=\"http://www.ijbl.net/modules.php?name=Team&op=team&teamID=$tid\">$Team</a> ($win-$loss)</td><td>$gb</td></tr>";
         $i++;
     }
     $stangings = $stangings . "<tr><td colspan=2><hr></td></tr>";

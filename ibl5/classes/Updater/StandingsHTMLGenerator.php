@@ -105,7 +105,7 @@ class StandingsHTMLGenerator {
     }
 
     private function generateTeamRow($result, $i, $tid, $team_name, $resultLast10Games) {
-        return '<tr><td><a href="modules.php?name=Team&op=team&tid=' . $tid . '">' . $team_name . '</td>
+        return '<tr><td><a href="modules.php?name=Team&op=team&teamID=' . $tid . '">' . $team_name . '</td>
             <td>' . $this->db->sql_result($result, $i, 'leagueRecord') . '</td>
             <td>' . $this->db->sql_result($result, $i, 'pct') . '</td>
             <td><center>' . $this->db->sql_result($result, $i, 'confGB') . '</center></td>

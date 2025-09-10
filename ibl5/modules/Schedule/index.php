@@ -126,9 +126,9 @@ function chunk($chunk_start_date, $chunk_end_date, $j)
         if ($date == $datebase) {
             echo "<tr bgcolor=$bgcolor>
 				<td>$date</td>
-				<td><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$visitorTeamname ($visitorRecord)</a></td>
+				<td><a href=\"modules.php?name=Team&op=team&teamID=$visitor\">$visitorTeamname ($visitorRecord)</a></td>
 				<td align=right>$visitorScore</td>
-				<td><a href=\"modules.php?name=Team&op=team&tid=$home\">$homeTeamname ($homeRecord)</a></td>
+				<td><a href=\"modules.php?name=Team&op=team&teamID=$home\">$homeTeamname ($homeRecord)</a></td>
 				<td align=right>$homeScore</td>
 				<td><a href=\"ibl/IBL/box$boxid.htm\">View</a></td>
 			</tr>";
@@ -146,9 +146,9 @@ function chunk($chunk_start_date, $chunk_end_date, $j)
 			</tr>";
             echo "<tr bgcolor=$bgcolor>
 				<td>$date</td>
-				<td><a href=\"modules.php?name=Team&op=team&tid=$visitor\">$visitorTeamname ($visitorRecord)</a></td>
+				<td><a href=\"modules.php?name=Team&op=team&teamID=$visitor\">$visitorTeamname ($visitorRecord)</a></td>
 				<td align=right>$visitorScore</td>
-				<td><a href=\"modules.php?name=Team&op=team&tid=$home\">$homeTeamname ($homeRecord)</a></td>
+				<td><a href=\"modules.php?name=Team&op=team&teamID=$home\">$homeTeamname ($homeRecord)</a></td>
 				<td align=right>$homeScore</td>
 				<td><a href=\"ibl/IBL/box$boxid.htm\">View</a></td>
 			</tr>";

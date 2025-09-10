@@ -53,7 +53,7 @@ class RegularSeasonTotalsView extends BaseView {
 
             echo "<tr>
                 <td><center>$hist_year</center></td>
-                <td><center><a href=\"modules.php?name=Team&op=team&tid=$hist_tid&yr=$hist_year\">$hist_team</a></center></td>
+                <td><center><a href=\"modules.php?name=Team&op=team&teamID=$hist_tid&yr=$hist_year\">$hist_team</a></center></td>
                 <td><center>$hist_gm</center></td>
                 <td><center>$hist_min</center></td>
                 <td><center>$hist_fgm-$hist_fga</center></td>

@@ -137,7 +137,7 @@ function displaySeriesRecords($tid)
         $team = $db->sql_fetch_assoc($resultTeamInfo);
         echo "<tr>
 			<td bgcolor=$team[color1]>
-				<a href=\"modules.php?name=Team&op=team&tid=$team[teamid]\">
+				<a href=\"modules.php?name=Team&op=team&teamID=$team[teamid]\">
 					<font color=\"$team[color2]\">", ($tid == $tidRow ? "<b>" : ""), "
 						$team[team_city] $team[team_name]
 					</font>", ($tid == $tidRow ? "</b>" : ""), "

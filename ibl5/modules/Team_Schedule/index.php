@@ -100,7 +100,7 @@ foreach ($teamSchedule as $row) {
     <?php if ($row['game']->visitorScore == $row['game']->homeScore) : ?>
         <tr <?= $row['highlight'] ?>>
             <td><?= $row['game']->date ?></td>
-            <td><a href="modules.php?name=Team&op=team&tid=<?= $row['opposingTeam']->teamID ?>"><?= $row['opponentText'] ?></a></td>
+            <td><a href="modules.php?name=Team&op=team&teamID=<?= $row['opposingTeam']->teamID ?>"><?= $row['opponentText'] ?></a></td>
             <td></td>
             <td></td>
             <td></td>
@@ -108,7 +108,7 @@ foreach ($teamSchedule as $row) {
     <?php else : ?>
         <tr bgcolor=FFFFFF>
             <td><a href="./ibl/IBL/box<?= $row['game']->boxScoreID ?>.htm"><?= $row['game']->date ?></a></td>
-            <td><a href="modules.php?name=Team&op=team&tid=<?= $row['opposingTeam']->teamID ?>"><?= $row['opponentText'] ?></a></b></td>
+            <td><a href="modules.php?name=Team&op=team&teamID=<?= $row['opposingTeam']->teamID ?>"><?= $row['opponentText'] ?></a></b></td>
             <td>
                 <a href="./ibl/IBL/box<?= $row['game']->boxScoreID ?>.htm" style="color:<?= $row['winlosscolor'] ?>; font-weight:bold; font-family:monospace,monospace;">
                     <?= $row['gameResult'] . " " . $row['game']->visitorScore . " - " . $row['game']->homeScore ?>

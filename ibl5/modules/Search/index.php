@@ -477,17 +477,6 @@ $sel1 = $sel2 = $sel3 = $sel4 = "";
                 $lcnt = $db->sql_numrows($db->sql_query("SELECT * from " . $prefix . "_links_links WHERE title LIKE '%$query2%' OR description LIKE '%$query3%'"));
                 $mod2 = "<li> <a href=\"modules.php?name=Web_Links&amp;l_op=search&amp;query=$query\">" . _WEBLINKS . "</a> ($lcnt " . _SEARCHRESULTS . ")";
             }
-            if (is_active("Encyclopedia")) {
-                $ecnt1 = $db->sql_query("SELECT eid from " . $prefix . "_encyclopedia WHERE active='1'");
-                $ecnt = 0;
-                while ($row_e = $db->sql_fetchrow($ecnt1)) {
-                    $eid = intval($row_e['eid']);
-                    $ecnt2 = $db->sql_numrows($db->sql_query("select * from " . $prefix . "_encyclopedia WHERE title LIKE '%$query2%' OR description LIKE '%$query3%' AND eid='$eid'"));
-                    $ecnt3 = $db->sql_numrows($db->sql_query("select * from " . $prefix . "_encyclopedia_text WHERE title LIKE '%$query2%' OR text LIKE '%$query3%' AND eid='$eid'"));
-                    $ecnt = $ecnt + $ecnt2 + $ecnt3;
-                }
-                $mod3 = "<li> <a href=\"modules.php?name=Encyclopedia&amp;file=search&amp;query=$query\">" . _ENCYCLOPEDIA . "</a> ($ecnt " . _SEARCHRESULTS . ")";
-            }
             OpenTable();
             echo "<font class=\"title\">" . _FINDMORE . "<br><br>"
                 . "" . _DIDNOTFIND . "</font><br><br>"

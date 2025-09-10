@@ -58,7 +58,6 @@ function themeheader()
     <?php
 
     echo "<body>";
-    //ads(0);
     $topics_list = "<select name=\"topic\" onChange='submit()'>\n";
     $topics_list .= "<option value=\"\">All Topics</option>\n";
     $toplist = $db->sql_query("select topicid, topictext from " . $prefix . "_topics order by topictext");

@@ -12,8 +12,8 @@ $resultClearInfo = $db->sql_query($queryClearInfo);
 $queryClearCash = "DELETE FROM ibl_trade_cash WHERE `tradeOfferID` = '$offer_id'";
 $resultClearCash = $db->sql_query($queryClearCash);
 
-$rejectingUserDiscordID = $sharedFunctions->getDiscordIDFromTeamname($teamRejecting);
-$receivingUserDiscordID = $sharedFunctions->getDiscordIDFromTeamname($teamReceiving);
+$rejectingUserDiscordID = Discord::getDiscordIDFromTeamname($db, $teamRejecting);
+$receivingUserDiscordID = Discord::getDiscordIDFromTeamname($db, $teamReceiving);
 $discordDMmessage = 'Sorry, trade proposal declined by <@!' . $rejectingUserDiscordID . '>.
 
 Go here to make another offer: http://www.iblhoops.net/ibl5/modules.php?name=Trading&op=reviewtrade';

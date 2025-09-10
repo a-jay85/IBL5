@@ -40,7 +40,7 @@ while ($k < $num2) {
     $teamID[$k] = (int) $db->sql_result($result2, $k, "teamid"); // Ensure teamID is an integer
 
     $table_echo .= "<tr>
-		<td bgcolor=#" . $teamcolor1[$k] . "><a href=\"modules.php?name=Team&op=team&tid=" . $teamID[$k] . "\"><font color=#" . $teamcolor2[$k] . ">" . $teamcity[$k] . " " . $teamname[$k] . "</a></td>
+		<td bgcolor=#" . $teamcolor1[$k] . "><a href=\"modules.php?name=Team&op=team&teamID=" . $teamID[$k] . "\"><font color=#" . $teamcolor2[$k] . ">" . $teamcity[$k] . " " . $teamname[$k] . "</a></td>
 		<td>" . $simdepth[$k] . "</td>
 		<td>" . $depth[$k] . "</td>
 		<td>" . $asg_vote[$k] . "</td>

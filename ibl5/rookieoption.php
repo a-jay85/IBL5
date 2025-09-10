@@ -31,7 +31,7 @@ Your rookie option has been updated in the database and should reflect on your t
 if ($season->phase == "Free Agency") {
     echo "Please <a href=\"modules.php?name=Free_Agency\">click here to return to the Free Agency Screen</a>.";
 } else {
-    echo "Please <a href=\"modules.php?name=Team&op=team&tid=$teamID\">click here to return to your team page</a>.";
+    echo "Please <a href=\"modules.php?name=Team&op=team&teamID=$teamID\">click here to return to your team page</a>.";
 }
 
 Discord::postToChannel('#rookie-options', $filetext);

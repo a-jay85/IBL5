@@ -33,7 +33,7 @@ function showpage($playerID, $pageView)
         echo "- Nickname: \"$player->nickname\" ";
     }
 
-    echo "(<a href=\"modules.php?name=Team&op=team&tid=$player->teamID\">$player->teamName</a>)</font>
+    echo "(<a href=\"modules.php?name=Team&op=team&teamID=$player->teamID\">$player->teamName</a>)</font>
         <hr>
         <table>
             <tr>

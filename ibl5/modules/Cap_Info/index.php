@@ -54,7 +54,7 @@ while ($i < $numberOfTeams) {
 
     $table_echo .= "<tr>
 		<td bgcolor=#$team->color1>
-			<a href=\"modules.php?name=Team&op=team&tid=$team->teamID&display=contracts\">
+			<a href=\"modules.php?name=Team&op=team&teamID=$team->teamID&display=contracts\">
 				<font color=#$team->color2>$team->city $team->name
 			</a>
 		</td>

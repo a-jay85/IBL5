@@ -52,7 +52,7 @@ while ($i < $num) {
     $result2 = $db->sql_query($query2);
     $num2 = $db->sql_numrows($result2);
 
-    echo "<TR><TD bgcolor=#$color1><CENTER><a href=\"../modules.php?name=Team&op=team&tid=$teamID\"><font color=#$color2>$team_city $team_name</font></a></CENTER></TD>";
+    echo "<TR><TD bgcolor=#$color1><CENTER><a href=\"../modules.php?name=Team&op=team&teamID=$teamID\"><font color=#$color2>$team_city $team_name</font></a></CENTER></TD>";
 
     while ($j < $num2) {
 

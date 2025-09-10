@@ -216,7 +216,7 @@ function display()
             echo "</td>
                 <td>$player->position</td>
                 <td><a href=\"modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->name</a></td>
-                <td><a href=\"modules.php?name=Team&op=team&tid=$player->teamID\">$player->teamName</a></td>
+                <td><a href=\"modules.php?name=Team&op=team&teamID=$player->teamID\">$player->teamName</a></td>
                 <td>$player->age</td>
                 <td>$player->ratingFieldGoalAttempts</td>
                 <td>$player->ratingFieldGoalPercentage</td>
@@ -358,7 +358,7 @@ function display()
             <td><a href=\"modules.php?name=Free_Agency&pa=negotiate&pid=$player->playerID\">Negotiate</a></td>
             <td>$player->position</td>
             <td><a href=\"modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->name</a></td>
-            <td><a href=\"modules.php?name=Team&op=team&tid=$player->teamID\">$player->teamName</a></td>
+            <td><a href=\"modules.php?name=Team&op=team&teamID=$player->teamID\">$player->teamName</a></td>
             <td>$player->age</td>
             <td>$player->ratingFieldGoalAttempts</td>
             <td>$player->ratingFieldGoalPercentage</td>
@@ -577,7 +577,7 @@ function display()
             }
 
             echo "</a></td>
-				<td><a href=\"modules.php?name=Team&op=team&tid=$player->teamID\">$player->teamName</a></td>
+				<td><a href=\"modules.php?name=Team&op=team&teamID=$player->teamID\">$player->teamName</a></td>
                 <td>$player->age</td>
                 <td>$player->ratingFieldGoalAttempts</td>
                 <td>$player->ratingFieldGoalPercentage</td>
@@ -707,7 +707,7 @@ function display()
             echo "</td>
 				<td>$player->position</td>
 				<td><a href=\"modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->name</a></td>
-				<td><a href=\"modules.php?name=Team&op=team&tid=$player->teamID\">$player->teamName</a></td>
+				<td><a href=\"modules.php?name=Team&op=team&teamID=$player->teamID\">$player->teamName</a></td>
                 <td>$player->age</td>
                 <td>$player->ratingFieldGoalAttempts</td>
                 <td>$player->ratingFieldGoalPercentage</td>

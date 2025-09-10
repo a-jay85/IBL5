@@ -58,22 +58,22 @@ function displayColumnLastSimStatLeaders($array, $statName, $content)
     $content .= "<td>
         <table><tr><td style=\"min-width:155px\" colspan=2>
         <center><a href=modules.php?name=Player&pa=showpage&pid=" . $array[1]["pid"] . "><img src=\"./images/player/" . $array[1]["pid"] . ".jpg\" height=\"90\" width=\"65\"></a>&nbsp;
-        <a href=modules.php?name=Team&op=team&tid=" . $array[1]["tid"] . "><img src=\"./images/logo/new" . $array[1]["tid"] . ".png\" height=\"75\" width=\"75\"></a></center></td></tr>
+        <a href=modules.php?name=Team&op=team&teamID=" . $array[1]["tid"] . "><img src=\"./images/logo/new" . $array[1]["tid"] . ".png\" height=\"75\" width=\"75\"></a></center></td></tr>
         <tr><td bgcolor=#000066 colspan=2><b><font color=#ffffff>$statName Per Game</td></tr>
         <tr><td><b><a href=modules.php?name=Player&pa=showpage&pid=" . $array[1]["pid"] . "><font color=#000066>" . $array[1]["name"] . "</font></a><br>
-        <font color=#000066><a href=modules.php?name=Team&op=team&tid=" . $array[1]["tid"] . ">" . $array[1]["teamname"] . "</a></font></td>
+        <font color=#000066><a href=modules.php?name=Team&op=team&teamID=" . $array[1]["tid"] . ">" . $array[1]["teamname"] . "</a></font></td>
         <td valign=top>" . $array[1]["stat"] . "</td></tr>
         <tr><td><a href=modules.php?name=Player&pa=showpage&pid=" . $array[2]["pid"] . "><font color=#000066>" . $array[2]["name"] . "</font></a><br>
-        <font color=#000066><a href=modules.php?name=Team&op=team&tid=" . $array[2]["tid"] . ">" . $array[2]["teamname"] . "</a></font></td>
+        <font color=#000066><a href=modules.php?name=Team&op=team&teamID=" . $array[2]["tid"] . ">" . $array[2]["teamname"] . "</a></font></td>
         <td valign=top>" . $array[2]["stat"] . "</td></tr>
         <tr><td><a href=modules.php?name=Player&pa=showpage&pid=" . $array[3]["pid"] . "><font color=#000066>" . $array[3]["name"] . "</font></a><br>
-        <font color=#000066><a href=modules.php?name=Team&op=team&tid=" . $array[3]["tid"] . ">" . $array[3]["teamname"] . "</a></font></td>
+        <font color=#000066><a href=modules.php?name=Team&op=team&teamID=" . $array[3]["tid"] . ">" . $array[3]["teamname"] . "</a></font></td>
         <td valign=top>" . $array[3]["stat"] . "</td></tr>
         <tr><td><a href=modules.php?name=Player&pa=showpage&pid=" . $array[4]["pid"] . "><font color=#000066>" . $array[4]["name"] . "</font></a><br>
-        <font color=#000066><a href=modules.php?name=Team&op=team&tid=" . $array[4]["tid"] . ">" . $array[4]["teamname"] . "</a></font></td>
+        <font color=#000066><a href=modules.php?name=Team&op=team&teamID=" . $array[4]["tid"] . ">" . $array[4]["teamname"] . "</a></font></td>
         <td valign=top>" . $array[4]["stat"] . "</td></tr>
         <tr><td><a href=modules.php?name=Player&pa=showpage&pid=" . $array[5]["pid"] . "><font color=#000066>" . $array[5]["name"] . "</font></a><br>
-        <font color=#000066><a href=modules.php?name=Team&op=team&tid=" . $array[5]["tid"] . ">" . $array[5]["teamname"] . "</a></font></td>
+        <font color=#000066><a href=modules.php?name=Team&op=team&teamID=" . $array[5]["tid"] . ">" . $array[5]["teamname"] . "</a></font></td>
         <td valign=top>" . $array[5]["stat"] . "</td></tr>
         </table></td>";
 

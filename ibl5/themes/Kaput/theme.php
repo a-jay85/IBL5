@@ -102,7 +102,6 @@ function themeheader()
     }
     echo "<body bgcolor=\"#FFFFFF\" text=\"#000000\" link=\"#363636\" vlink=\"#363636\" alink=\"#d5ae83\">\n"
         . "<br>\n";
-    ads(0);
     OpenTable();
     echo "<table border=\"0\"><tr><td rowspan=\"2\">"
         . "<a href=\"index.php\"><img src=\"themes/Kaput/images/logo.gif\" border=\"0\" alt=\"" . _WELCOMETO . " $sitename\" align=\"left\"></a></td>"

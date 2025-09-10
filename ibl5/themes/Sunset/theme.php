@@ -69,7 +69,6 @@ function themeheader()
     echo "<a href=$nuke_url><img src=themes/Sunset/images/logo.gif Alt=\"" . _WELCOMETO . " $sitename\" border=0></a>\n";
     echo "</td>\n";
     echo "<td>";
-    ads(0);
     echo "</td>";
     echo "<td align=right>\n";
     echo "<form action=modules.php?name=Search method=post><font size=2 color=000000>\n";

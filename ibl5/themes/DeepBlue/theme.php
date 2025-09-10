@@ -61,8 +61,6 @@ function themeheader()
     global $banners, $sitename;
     echo "<body bgcolor=\"#0E3259\" text=\"#000000\" link=\"0000ff\">"
         . "<br>";
-    $ads = ads(0);
-    echo "$ads";
     echo "<br>";
     echo "<table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"840\" align=\"center\">\n"
         . "<tr><td width=\"100%\">\n"

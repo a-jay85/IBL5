@@ -56,7 +56,6 @@ function themeheader()
 {
     echo "<body bgcolor=\"ffffff\" text=\"000000\" link=\"0000ff\" vlink=\"0000ff\">"
         . "<br>";
-    ads(0);
     echo "<br>"
         . "<table border=\"0 cellpadding=\"4\" cellspacing=\"0\" width=\"100%\" align=\"center\"><tr><td bgcolor=\"ffffff\">"
         . "<table border=\"0\" cellspacing=\"0\" cellpadding=\"3\" width=\"100%\" bgcolor=\"ffffff\"><tr><td>"

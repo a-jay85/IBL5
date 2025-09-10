@@ -62,7 +62,7 @@ while ($k < $num2) {
     $ibl[$k] = $db->sql_result($result2, $k, "ibl_titles");
 
     $table_echo .= "<tr>
-		<td bgcolor=#" . $teamcolor1[$k] . "><a href=\"modules.php?name=Team&op=team&tid=" . $teamid[$k] . "\"><font color=#" . $teamcolor2[$k] . ">" . $teamcity[$k] . " " . $teamname[$k] . "</a></td>
+		<td bgcolor=#" . $teamcolor1[$k] . "><a href=\"modules.php?name=Team&op=team&teamID=" . $teamid[$k] . "\"><font color=#" . $teamcolor2[$k] . ">" . $teamcity[$k] . " " . $teamname[$k] . "</a></td>
 		<td>" . $totwins[$k] . "</td>
 		<td>" . $totloss[$k] . "</td>
 		<td>" . $pct[$k] . "</td>

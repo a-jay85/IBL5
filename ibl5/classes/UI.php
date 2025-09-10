@@ -47,31 +47,31 @@ class UI
         echo '<select name="teamSelectCity" onchange="location = this.options[this.selectedIndex].value;">';
         echo '<option value="">Location</option>';
         while ($row = $db->sql_fetch_assoc($teamCityResult)) {
-            echo '<option value="./modules.php?name=Team&op=team&tid=' . $row["teamid"] . '">' . $row["team_city"] . '	' . $row["team_name"] . '</option>';
+            echo '<option value="./modules.php?name=Team&op=team&teamID=' . $row["teamid"] . '">' . $row["team_city"] . '	' . $row["team_name"] . '</option>';
         }
         echo '</select>';
 
         echo '<select name="teamSelectName" onchange="location = this.options[this.selectedIndex].value;">';
         echo '<option value="">Namesake</option>';
         while ($row = $db->sql_fetch_assoc($teamNameResult)) {
-            echo '<option value="./modules.php?name=Team&op=team&tid=' . $row["teamid"] . '">' . $row["team_name"] . '</option>';
+            echo '<option value="./modules.php?name=Team&op=team&teamID=' . $row["teamid"] . '">' . $row["team_name"] . '</option>';
         }
         echo '</select>';
 
         echo '<select name="teamSelectID" onchange="location = this.options[this.selectedIndex].value;">';
         echo '<option value="">ID#</option>';
         while ($row = $db->sql_fetch_assoc($teamIDResult)) {
-            echo '<option value="./modules.php?name=Team&op=team&tid=' . $row["teamid"] . '">' . $row["teamid"] . '	' . $row["team_city"] . '	' . $row["team_name"] . '</option>';
+            echo '<option value="./modules.php?name=Team&op=team&teamID=' . $row["teamid"] . '">' . $row["teamid"] . '	' . $row["team_city"] . '	' . $row["team_name"] . '</option>';
         }
         echo '</select>';
 
-        echo "<td nowrap=\"nowrap\"><a style=\"font:bold 11px Helvetica;text-decoration: none;background-color: #$team->color2;color: #$team->color1;padding: 2px 6px 2px 6px;border-top: 1px solid #000000;border-right: 1px solid #000000;border-bottom: 1px solid #000000;border-left: 1px solid #000000;\" href=\"modules.php?name=Team&op=team&tid=$teamID\">Team Page</a></td>";
+        echo "<td nowrap=\"nowrap\"><a style=\"font:bold 11px Helvetica;text-decoration: none;background-color: #$team->color2;color: #$team->color1;padding: 2px 6px 2px 6px;border-top: 1px solid #000000;border-right: 1px solid #000000;border-bottom: 1px solid #000000;border-left: 1px solid #000000;\" href=\"modules.php?name=Team&op=team&teamID=$teamID\">Team Page</a></td>";
         echo "<td nowrap=\"nowrap\"><a style=\"font:bold 11px Helvetica;text-decoration: none;background-color: #$team->color2;color: #$team->color1;padding: 2px 6px 2px 6px;border-top: 1px solid #000000;border-right: 1px solid #000000;border-bottom: 1px solid #000000;border-left: 1px solid #000000;\" href=\"modules.php?name=Team_Schedule&teamID=$teamID\">Team Schedule</a></td>";
-        echo "<td nowrap=\"nowrap\"><a style=\"font:bold 11px Helvetica;text-decoration: none;background-color: #$team->color2;color: #$team->color1;padding: 2px 6px 2px 6px;border-top: 1px solid #000000;border-right: 1px solid #000000;border-bottom: 1px solid #000000;border-left: 1px solid #000000;\" href=\"modules.php?name=Team&op=drafthistory&tid=$teamID\">Draft History</a></td>";
+        echo "<td nowrap=\"nowrap\"><a style=\"font:bold 11px Helvetica;text-decoration: none;background-color: #$team->color2;color: #$team->color1;padding: 2px 6px 2px 6px;border-top: 1px solid #000000;border-right: 1px solid #000000;border-bottom: 1px solid #000000;border-left: 1px solid #000000;\" href=\"modules.php?name=Team&op=drafthistory&teamID=$teamID\">Draft History</a></td>";
         echo "<td nowrap=\"nowrap\" valign=center><font style=\"font:bold 14px Helvetica;text-decoration: none;\"> | </td>";
         echo "<td nowrap=\"nowrap\"><a style=\"font:bold 11px Helvetica;text-decoration: none;background-color: #$team->color2;color: #$team->color1;padding: 2px 6px 2px 6px;border-top: 1px solid #000000;border-right: 1px solid #000000;border-bottom: 1px solid #000000;border-left: 1px solid #000000;\" href=\"modules.php?name=Depth_Chart_Entry\">Depth Chart Entry</a></td>";
         echo "<td nowrap=\"nowrap\"><a style=\"font:bold 11px Helvetica;text-decoration: none;background-color: #$team->color2;color: #$team->color1;padding: 2px 6px 2px 6px;border-top: 1px solid #000000;border-right: 1px solid #000000;border-bottom: 1px solid #000000;border-left: 1px solid #000000;\" href=\"modules.php?name=Trading&op=reviewtrade\">Trades/Waivers</a></td>";
-        //echo "<td nowrap=\"nowrap\"><a style=\"font:bold 11px Helvetica;text-decoration: none;background-color: #$color2;color: #$color1;padding: 2px 6px 2px 6px;border-top: 1px solid #000000;border-right: 1px solid #000000;border-bottom: 1px solid #000000;border-left: 1px solid #000000;\" href=\"modules.php?name=Team&op=injuries&tid=$tid\">Injuries</a></td></tr>";
+        //echo "<td nowrap=\"nowrap\"><a style=\"font:bold 11px Helvetica;text-decoration: none;background-color: #$color2;color: #$color1;padding: 2px 6px 2px 6px;border-top: 1px solid #000000;border-right: 1px solid #000000;border-bottom: 1px solid #000000;border-left: 1px solid #000000;\" href=\"modules.php?name=Team&op=injuries&teamID=$tid\">Injuries</a></td></tr>";
         echo "</tr></table></center>";
         echo "<hr>";
     }

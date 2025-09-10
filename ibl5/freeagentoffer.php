@@ -465,7 +465,7 @@ if ($nooffer == 0) {
     $resultchunk = $db->sql_query($querychunk);
 
     if ($resultchunk) {
-        $playerTeamDiscordID = $sharedFunctions->getDiscordIDFromTeamname($player_teamName);
+        $playerTeamDiscordID = Discord::getDiscordIDFromTeamname($db, $player_teamName);
         if ($Team_Name == $player_teamName) {
             $discordMessage = "Free agent **$Player_Name** has been offered a contract to _stay_ with the **$player_teamName**.
 _**$player_teamName** GM <@!$playerTeamDiscordID> could not be reached for comment._";

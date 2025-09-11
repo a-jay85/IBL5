@@ -1,12 +1,15 @@
 // src/lib/database/connection.ts
 import mysql from 'mysql2/promise';
-import { dbConfig } from './config.js';
+import { dbConfig, validateDbConfig } from './config';
 
 class DatabaseConnection {
 	private pool: mysql.Pool | null = null;
 
 	private async getPool(): Promise<mysql.Pool> {
 		if (!this.pool) {
+			// ✅ Only validate when actually creating the pool
+			validateDbConfig();
+
 			this.pool = mysql.createPool({
 				host: dbConfig.mysql.host,
 				port: dbConfig.mysql.port,
@@ -59,6 +62,11 @@ class DatabaseConnection {
 			await this.pool.end();
 			this.pool = null;
 		}
+	}
+
+	// ✅ Add method to check if connection is available
+	public isConfigured(): boolean {
+		return !!(process.env.DB_HOST && process.env.DB_NAME && process.env.DB_USER);
 	}
 }
 

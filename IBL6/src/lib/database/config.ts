@@ -12,16 +12,16 @@ if (dev) {
 
 export const dbConfig = {
 	mysql: {
-		host: process.env.DB_HOST || (dev ? 'localhost' : undefined),
+		host: process.env.DB_HOST || 'localhost',
 		port: parseInt(process.env.DB_PORT || '3306'),
-		database: process.env.DB_NAME || (dev ? 'ibl_dev' : undefined),
-		user: process.env.DB_USER || (dev ? 'root' : undefined),
-		password: process.env.DB_PASSWORD || (dev ? '' : undefined)
+		database: process.env.DB_NAME || 'defaultdb',
+		user: process.env.DB_USER || 'root',
+		password: process.env.DB_PASSWORD || ''
 	}
 };
 
-// Validate required config in production
-if (!dev) {
+// ✅ Only validate if you're actually using the connection
+export function validateDbConfig() {
 	const required = ['DB_HOST', 'DB_NAME', 'DB_USER'];
 	const missing = required.filter((key) => !process.env[key]);
 

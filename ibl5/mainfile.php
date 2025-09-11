@@ -70,7 +70,7 @@ if ($phpver >= '4.1.0') {
 // After doing those superglobals we can now use one
 // and check if this file isnt being accessed directly
 
-if (stristr(htmlentities($_SERVER['PHP_SELF']), "mainfile.php")) {
+if (realpath(__FILE__) === realpath($_SERVER['SCRIPT_FILENAME'])) {
     header("Location: index.php");
     exit();
 }

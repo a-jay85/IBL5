@@ -38,7 +38,7 @@ if (($currentDraftSelection == NULL OR $currentDraftSelection == "") AND $player
     if ($resultUpdateDraftTable AND $resultUpdateRookieTable) {
         $message = "With pick #$draft_pick in round $draft_round of the $season->endingYear IBL Draft, the **" . $teamname . "** select **" . $playerToBeDrafted . "!**";
         echo "$message<p>
-        <a href=\"modules.php?name=College_Scouting\">Go back to the Draft module</a>";
+        <a href=\"" . BASE_URL . "modules.php?name=College_Scouting\">Go back to the Draft module</a>";
     
         $queryNextTeamDraftPick = "SELECT team from ibl_draft WHERE player = '' ORDER BY round ASC, pick ASC LIMIT 1";
         $resultNextTeamDraftPick = $db->sql_query($queryNextTeamDraftPick);
@@ -63,12 +63,12 @@ if (($currentDraftSelection == NULL OR $currentDraftSelection == "") AND $player
         echo "Oops, something went wrong, and at least one of the draft database tables wasn't updated.<p>
             Let A-Jay know what happened and he'll look into it.<p>
             
-            <a href=\"modules.php?name=College_Scouting\">Go back to the Draft module</a>";
+            <a href=\"" . BASE_URL . "modules.php?name=College_Scouting\">Go back to the Draft module</a>";
     }
 } elseif ($playerToBeDrafted == NULL) {
     echo "Oops, you didn't select a player.<p>
-        <a href=\"modules.php?name=College_Scouting\">Click here to return to the Draft module</a> and please select a player before hitting the Draft button.";
+        <a href=\"" . BASE_URL . "modules.php?name=College_Scouting\">Click here to return to the Draft module</a> and please select a player before hitting the Draft button.";
 } elseif ($currentDraftSelection != NULL) {
     echo "Oops, it looks like you've already drafted a player with this draft pick.<p>
-        <a href=\"modules.php?name=College_Scouting\">Click here to return to the Draft module</a> and if it's your turn, try drafting again.";
+        <a href=\"" . BASE_URL . "modules.php?name=College_Scouting\">Click here to return to the Draft module</a> and if it's your turn, try drafting again.";
 }

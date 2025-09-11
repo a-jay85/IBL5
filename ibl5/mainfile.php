@@ -215,6 +215,17 @@ if (defined('FORUM_ADMIN')) {
     define('INCLUDE_PATH', './');
 }
 
+// Define BASE_URL for subdirectory files to reference root files
+$script_dir = dirname($_SERVER['SCRIPT_NAME']);
+$base_path = '';
+if (strpos($script_dir, '/web/') !== false || strpos($script_dir, '/includes/') !== false) {
+    // Files in subdirectories need to go back to root
+    $base_path = '../../';
+}
+if (!defined('BASE_URL')) {
+    define('BASE_URL', $base_path);
+}
+
 // Include the required files
 @require_once INCLUDE_PATH . "config.php";
 

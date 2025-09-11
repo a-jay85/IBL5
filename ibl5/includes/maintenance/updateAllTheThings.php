@@ -27,4 +27,4 @@ $standingsHTMLGenerator->generateStandingsPage();
 
 echo '<p><b>All the things have been updated!</br><p>';
 
-echo '<a href="index.php">Return to the IBL homepage</a>';
+echo '<a href="' . BASE_URL . 'index.php">Return to the IBL homepage</a>';

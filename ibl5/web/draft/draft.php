@@ -56,9 +56,9 @@ if ($num == 0) {
 
         echo "<td>$round</td>
             <td>$draftpickno</td>
-            <td><a href=\"../ibl5/modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>
+            <td><a href=\"<?php echo BASE_URL; ?>modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>
             <td>$draftedby</td>
-            <td><img height=50 src=\"../ibl5/images/player/$pid.jpg\"></td>
+            <td><img height=50 src=\"<?php echo BASE_URL; ?>images/player/$pid.jpg\"></td>
             <td>$college</td>
         </tr>
 ";

@@ -346,5 +346,5 @@ Go here to accept or decline: http://www.iblhoops.net/ibl5/modules.php?name=Trad
     // $response = Discord::sendCurlPOST('http://localhost:50000/discordDM', $arrayContent);
 
     echo "<p>";
-    echo "Trade Offer Entered Into Database. Go back <a href='modules.php?name=Trading&op=reviewtrade'>Trade Review Page</a>";
+    echo "Trade Offer Entered Into Database. Go back <a href='" . BASE_URL . "modules.php?name=Trading&op=reviewtrade'>Trade Review Page</a>";
 }

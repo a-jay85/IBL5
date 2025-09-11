@@ -107,8 +107,8 @@ if ($tid == null) {
                     $j = 0;
                 }
                 echo "<td>$pos</td>
-                    <td><a href=\"modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>
-                    <td><a href=\"team.php?tid=$tid\">$team</a></td>
+                    <td><a href=\"" . BASE_URL . "modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>
+                    <td><a href=\"" . BASE_URL . "modules.php?name=Team&op=team&teamID=$tid\">$team</a></td>
                     <td>$age</td>
                     <td>$r_2ga</td>
                     <td>$r_2gp</td>

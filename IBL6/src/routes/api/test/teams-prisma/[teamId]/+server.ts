@@ -1,11 +1,12 @@
 // src/routes/api/test/teams-prisma/[teamId]/+server.ts
 import { json, error } from '@sveltejs/kit';
 import { PrismaClient } from '@prisma/client';
-import { serializeBigInt } from '$lib/utils/utils';
+import { serializePrismaData } from '$lib/utils/utils';
+import type { RequestHandler } from './$types';
 
 const prisma = new PrismaClient();
 
-export async function GET({ params }) {
+export const GET: RequestHandler = async ({ params }) => {
 	try {
 		const teamId = parseInt(params.teamId);
 
@@ -18,10 +19,10 @@ export async function GET({ params }) {
 		// Get single team using Prisma
 		const team = await prisma.team.findUnique({
 			where: {
-				teamId: teamId
+				teamid: teamId
 			},
 			select: {
-				teamId: true,
+				teamid: true,
 				city: true,
 				name: true,
 				color1: true,
@@ -44,15 +45,15 @@ export async function GET({ params }) {
 
 		console.log(`✅ Found team: ${team.city} ${team.name}`);
 
-		// Serialize BigInt values before returning
-		const serializedTeam = serializeBigInt(team);
+		// Serialize all problematic types before returning
+		const serializedTeam = serializePrismaData(team);
 
 		return json({
 			success: true,
 			team: serializedTeam,
 			timestamp: new Date().toISOString()
 		});
-	} catch (err) {
+	} catch (err: any) {
 		console.error('❌ Failed to fetch team with Prisma:', err);
 
 		// Handle Prisma-specific errors
@@ -60,15 +61,19 @@ export async function GET({ params }) {
 			throw error(404, 'Team not found');
 		}
 
-		return json(
-			{
-				success: false,
-				error: err.message,
-				prismaError: err.code
-			},
-			{ status: err.status || 500 }
-		);
+		if (err.code === 'P2022') {
+			throw error(500, 'Database schema mismatch');
+		}
+
+		// Don't return response after throwing error
+		if (err.status) {
+			throw error(err.status, err.message);
+		}
+
+		throw error(500, 'Internal server error');
 	} finally {
-		await prisma.$disconnect();
+		await prisma.$disconnect().catch((disconnectErr) => {
+			console.error('Failed to disconnect Prisma client:', disconnectErr);
+		});
 	}
-}
+};

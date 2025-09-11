@@ -35,8 +35,9 @@ function serializePrismaData<T>(data: T): T {
 
 export const load: PageServerLoad = async () => {
 	try {
-		console.log('🔍 Loading homepage data...');
-		console.log('🗄️ DATABASE_URL exists:', !!process.env.DATABASE_URL);
+		console.log('🔍 Environment check:');
+		console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
+		console.log('DATABASE_URL starts with:', process.env.DATABASE_URL?.substring(0, 20));
 
 		// ✅ Test database connection
 		const connectionTest = await prisma.$queryRaw`SELECT 1 as test`;

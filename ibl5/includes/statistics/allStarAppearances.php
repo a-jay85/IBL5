@@ -1,6 +1,6 @@
 <?php
 
-require 'mainfile.php';
+require '../../mainfile.php';
 
 $query = "SELECT name, COUNT(*) as appearances
 FROM ibl_awards

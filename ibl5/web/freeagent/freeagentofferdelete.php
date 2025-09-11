@@ -1,6 +1,6 @@
 <?php
 
-require 'mainfile.php';
+require '../../mainfile.php';
 
 echo "<HTML><HEAD><TITLE>Free Agency Offer Deletion</TITLE></HEAD><BODY>";
 

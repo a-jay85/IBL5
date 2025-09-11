@@ -1,6 +1,6 @@
 <?php
 
-require 'mainfile.php';
+require '../../mainfile.php';
 
 $team = $_POST['team'];
 $position = $_POST['position'];

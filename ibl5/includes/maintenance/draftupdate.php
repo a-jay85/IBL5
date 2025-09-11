@@ -1,6 +1,6 @@
 <?php
 
-require 'mainfile.php';
+require '../../mainfile.php';
 
 $name = null;
 $team = null;

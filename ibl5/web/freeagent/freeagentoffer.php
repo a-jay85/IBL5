@@ -1,6 +1,6 @@
 <?php
 
-require 'mainfile.php';
+require '../../mainfile.php';
 
 echo "<HTML><HEAD><TITLE>Free Agency Offer Entry</TITLE></HEAD><BODY>";
 

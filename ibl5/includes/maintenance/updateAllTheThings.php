@@ -2,7 +2,7 @@
 error_reporting(E_ALL);
 libxml_use_internal_errors(true);
 
-require 'mainfile.php';
+require '../../mainfile.php';
 
 $sharedFunctions = new Shared($db);
 $season = new Season($db);

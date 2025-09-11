@@ -1,6 +1,6 @@
 <?php
 
-require 'mainfile.php';
+require '../../mainfile.php';
 $season = new Season($db);
 
 $tid = $_REQUEST['tid'];

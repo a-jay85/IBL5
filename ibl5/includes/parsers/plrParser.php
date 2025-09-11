@@ -71,7 +71,7 @@ if (!isset($_POST['confirmed'])) {
     exit();
 }
 
-require 'mainfile.php';
+require '../../mainfile.php';
 
 $sharedFunctions = new Shared($db);
 $season = new Season($db);
@@ -84,7 +84,7 @@ $numRowsTeamIDsNames = $db->sql_numrows($resultTeamIDsNames);
 
 echo "Calculating foul baseline...<br>";
 
-$plrFile = fopen("IBL5.plr", "rb");
+$plrFile = fopen("../../IBL5.plr", "rb");
 $foulRatioArray = [];
 while (!feof($plrFile)) {
     $line = fgets($plrFile);
@@ -103,7 +103,7 @@ if (!empty($foulRatioArray) && max($foulRatioArray) > 0) {
 
 echo "Updating ibl_plr and ibl_hist...<br>";
 
-$plrFile = fopen("IBL5.plr", "rb");
+$plrFile = fopen("../../IBL5.plr", "rb");
 while (!feof($plrFile)) {
     $line = fgets($plrFile);
 

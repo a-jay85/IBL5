@@ -1,13 +1,13 @@
 <?php
 
-require 'mainfile.php';
+require '../../mainfile.php';
 
 function scoParser($uploadedFilePath, $operatingSeasonEndingYear, $operatingSeasonPhase)
 {
     global $db, $mysqli_db;
     $season = new Season($db);
 
-    $scoFilePath = ($uploadedFilePath) ? $uploadedFilePath : "IBL5.sco";
+    $scoFilePath = ($uploadedFilePath) ? $uploadedFilePath : "../../IBL5.sco";
     $operatingSeasonEndingYear = ($operatingSeasonEndingYear) ? $operatingSeasonEndingYear : $season->endingYear;
     $operatingSeasonStartingYear = $operatingSeasonEndingYear - 1;
     $operatingSeasonPhase = ($operatingSeasonPhase) ? $operatingSeasonPhase : $season->phase;

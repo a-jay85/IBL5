@@ -1,6 +1,6 @@
 <?php
 
-require 'mainfile.php';
+require '../../mainfile.php';
 
 $query = "SELECT * FROM ibl_plr WHERE `retired` = '0' ORDER BY ordinal ASC";
 $result = $db->sql_query($query);

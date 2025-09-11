@@ -4,7 +4,7 @@
 //#8.) From the IBL HTML, open "Schedule.htm" IN INTERNET EXPLORER. Select the entire content of this page and copy it. Then paste into A1 of the "Schedule" tab.
 //#9.) In the Schedule tab, copy Column Q and paste into the database and run it.
 
-require 'mainfile.php';
+require '../../mainfile.php';
 
 $scheduleFilePath = 'ibl/IBL/Schedule.htm';
 

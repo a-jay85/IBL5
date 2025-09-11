@@ -1,6 +1,6 @@
 <?php
 
-require 'mainfile.php';
+require '../../mainfile.php';
 
 $query1 = "SELECT * FROM ibl_plr";
 $result1 = $db->sql_query($query1);

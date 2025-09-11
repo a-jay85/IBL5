@@ -83,7 +83,7 @@ function showpage($playerID, $pageView)
     $contract_display = implode("/", $player->getRemainingContractArray());
 
     echo "<font class=\"content\">Age: $player->age | Height: $player->heightFeet-$player->heightInches | Weight: $player->weightPounds | College: $player->collegeName<br>
-        <i>Drafted by the $player->draftTeamOriginalName with the # $player->draftPickNumber pick of round $player->draftRound in the <a href=\"draft.php?year=$player->draftYear\">$player->draftYear Draft</a></i><br>
+        <i>Drafted by the $player->draftTeamOriginalName with the # $player->draftPickNumber pick of round $player->draftRound in the <a href=\"web/draft/draft.php?year=$player->draftYear\">$player->draftYear Draft</a></i><br>
         <center><table>
             <tr>
                 <td align=center><b>2ga</b></td>

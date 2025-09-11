@@ -193,7 +193,7 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 		ORDER BY year, round ASC ";
     $resultUserTeamDraftPicks = $db->sql_query($queryUserTeamDraftPicks);
 
-    echo "<form name=\"Trade_Offer\" method=\"post\" action=\"maketradeoffer.php\">
+    echo "<form name=\"Trade_Offer\" method=\"post\" action=\"web/trade/maketradeoffer.php\">
 		<input type=\"hidden\" name=\"Team_Name\" value=\"$teamlogo\">
 		<center>
 			<img src=\"images/logo/$teamID.jpg\"><br>
@@ -217,7 +217,7 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 
     $future_salary_array = buildTeamFutureSalary($resultUserTeamPlayers, 0);
     $future_salary_array = buildTeamFuturePicks($resultUserTeamDraftPicks, $future_salary_array);
-    $k = $future_salary_array['k']; // pull $k value out to populate $Fields_Counter in maketradeoffer.php
+    $k = $future_salary_array['k']; // pull $k value out to populate $Fields_Counter in web/trade/maketradeoffer.php
 
     echo "</table>
 		</td>
@@ -253,7 +253,7 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 
     $future_salary_arrayb = buildTeamFutureSalary($resultPartnerTeamPlayers, $k);
     $future_salary_arrayb = buildTeamFuturePicks($resultPartnerTeamDraftPicks, $future_salary_arrayb);
-    $k = $future_salary_arrayb['k']; // pull $k value out to populate $Fields_Counter in maketradeoffer.php
+    $k = $future_salary_arrayb['k']; // pull $k value out to populate $Fields_Counter in web/trade/maketradeoffer.php
 
     $k--;
     echo "</table>
@@ -416,7 +416,7 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
 									<tr>
 										<td valign=center>";
                 if ($hashammer == 1) {
-                    echo "<form name=\"tradeaccept\" method=\"post\" action=\"accepttradeoffer.php\">
+                    echo "<form name=\"tradeaccept\" method=\"post\" action=\"web/trade/accepttradeoffer.php\">
 						<input type=\"hidden\" name=\"offer\" value=\"$offerid\">
 						<input type=\"submit\" value=\"Accept\" onclick=\"this.disabled=true;this.value='Submitting...'; this.form.submit();\">
 					</form>";

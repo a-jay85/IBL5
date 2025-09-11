@@ -425,7 +425,7 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
                 }
                 echo "</td>
 						<td valign=center>
-							<form name=\"tradereject\" method=\"post\" action=\"rejecttradeoffer.php\">
+							<form name=\"tradereject\" method=\"post\" action=\"web/trade/rejecttradeoffer.php\">
 								<input type=\"hidden\" name=\"offer\" value=\"$offerid\">
                                 <input type=\"hidden\" name=\"teamRejecting\" value=\"$teamlogo\">
                                 <input type=\"hidden\" name=\"teamReceiving\" value=\"$oppositeTeam\">

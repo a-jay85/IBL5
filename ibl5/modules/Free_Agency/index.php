@@ -1620,7 +1620,7 @@ function negotiate($pid)
 		</form>
 	";
 
-    echo "<form name=\"FAOfferDelete\" method=\"post\" action=\"freeagentofferdelete.php\">
+    echo "<form name=\"FAOfferDelete\" method=\"post\" action=\"web/freeagent/freeagentofferdelete.php\">
 		<input type=\"submit\" value=\"Retract All Offers to this Player!\">
 		<input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
         <input type=\"hidden\" name=\"player_teamname\" value=\"$player_team_name\">

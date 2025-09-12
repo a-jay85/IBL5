@@ -215,8 +215,22 @@ if (defined('FORUM_ADMIN')) {
     define('INCLUDE_PATH', './');
 }
 
+// Define BASE_URL for subdirectory files to reference root files
+$script_dir = dirname($_SERVER['SCRIPT_NAME']);
+$base_path = '';
+if (strpos($script_dir, '/web/') !== false || strpos($script_dir, '/includes/') !== false) {
+    // Files in subdirectories need to go back to root
+    $base_path = '../../';
+} elseif (strpos($script_dir, '/modules/') !== false) {
+    // Files in module subdirectories need to go back to root
+    $base_path = '../../';
+}
+if (!defined('BASE_URL')) {
+    define('BASE_URL', $base_path);
+}
+
 // Include the required files
-@require_once INCLUDE_PATH . "config.php";
+@require_once __DIR__ . '/config.php';
 
 if (!$dbname) {
     die("<br><br><center><img src=images/logo.gif><br><br><b>There seems that PHP-Nuke isn't installed yet.<br>(The values in config.php file are the default ones)<br><br>You can proceed with the <a href='./install/index.php'>web installation</a> now.</center></b>");
@@ -256,22 +270,17 @@ function mlaphp_autoloader($class)
 // register it with SPL
 spl_autoload_register('mlaphp_autoloader');
 
-@require_once INCLUDE_PATH . "db/db.php";
+@require_once __DIR__ . "/db/db.php";
 
-/* FOLLOWING TWO LINES ARE DEPRECATED BUT ARE HERE FOR OLD MODULES COMPATIBILITY */
-/* PLEASE START USING THE NEW SQL ABSTRACTION LAYER. SEE MODULES DOC FOR DETAILS */
-// @require_once(INCLUDE_PATH."includes/sql_layer.php");
-// $dbi = sql_connect($dbhost, $dbuname, $dbpass, $dbname);
-
-@require_once INCLUDE_PATH . "includes/ipban.php";
-if (file_exists(INCLUDE_PATH . "includes/custom_files/custom_mainfile.php")) {
-    @include_once INCLUDE_PATH . "includes/custom_files/custom_mainfile.php";
+@require_once __DIR__ . "/includes/ipban.php";
+if (file_exists(__DIR__ . "/includes/custom_files/custom_mainfile.php")) {
+    @include_once __DIR__ . "/includes/custom_files/custom_mainfile.php";
 }
 
 if (!defined('FORUM_ADMIN')) {
     if (empty($admin_file)) {
         die("You must set a value for admin_file in config.php");
-    } elseif (!empty($admin_file) && !file_exists(INCLUDE_PATH . $admin_file . ".php")) {
+    } elseif (!empty($admin_file) && !file_exists(__DIR__ . "/" . $admin_file . ".php")) {
         die("The admin_file you defined in config.php does not exist");
     }
 }

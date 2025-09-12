@@ -221,6 +221,9 @@ $base_path = '';
 if (strpos($script_dir, '/web/') !== false || strpos($script_dir, '/includes/') !== false) {
     // Files in subdirectories need to go back to root
     $base_path = '../../';
+} elseif (strpos($script_dir, '/modules/') !== false) {
+    // Files in module subdirectories need to go back to root
+    $base_path = '../../';
 }
 if (!defined('BASE_URL')) {
     define('BASE_URL', $base_path);

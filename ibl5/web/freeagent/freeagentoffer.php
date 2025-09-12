@@ -38,7 +38,7 @@ $currentContractYearOfOfferedPlayer = $db->sql_result($resultOfferedPlayer, 0, "
 $year1ContractOfOfferedPlayer = $db->sql_result($resultOfferedPlayer, 0, "cy1");
 if ($currentContractYearOfOfferedPlayer == 0 AND ($year1ContractOfOfferedPlayer != "0")) {
     echo "Sorry, this player was previously signed to a team this Free Agency period.<p>
-        Please <a href=\"<?php echo BASE_URL; ?>modules.php?name=Free_Agency\">click here to return to the Free Agency main page</a>.";
+        Please <a href=\"" . BASE_URL . "modules.php?name=Free_Agency\">click here to return to the Free Agency main page</a>.";
     exit();
 }
 
@@ -482,7 +482,7 @@ _**$player_teamName** GM <@!$playerTeamDiscordID> could not be reached for comme
         }
 
         echo "Your offer is legal. It should be immediately reflected in your Free Agency module.<br>
-            Please <a href=\"<?php echo BASE_URL; ?>modules.php?name=Free_Agency\">click here to return to the Free Agency module</a>.";
+            Please <a href=\"" . BASE_URL . "modules.php?name=Free_Agency\">click here to return to the Free Agency module</a>.";
     }
 
 } else {

@@ -193,7 +193,7 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 		ORDER BY year, round ASC ";
     $resultUserTeamDraftPicks = $db->sql_query($queryUserTeamDraftPicks);
 
-    echo "<form name=\"Trade_Offer\" method=\"post\" action=\"maketradeoffer.php\">
+    echo "<form name=\"Trade_Offer\" method=\"post\" action=\"modules/Trading/maketradeoffer.php\">
 		<input type=\"hidden\" name=\"Team_Name\" value=\"$teamlogo\">
 		<center>
 			<img src=\"images/logo/$teamID.jpg\"><br>
@@ -416,7 +416,7 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
 									<tr>
 										<td valign=center>";
                 if ($hashammer == 1) {
-                    echo "<form name=\"tradeaccept\" method=\"post\" action=\"accepttradeoffer.php\">
+                    echo "<form name=\"tradeaccept\" method=\"post\" action=\"modules/Trading/accepttradeoffer.php\">
 						<input type=\"hidden\" name=\"offer\" value=\"$offerid\">
 						<input type=\"submit\" value=\"Accept\" onclick=\"this.disabled=true;this.value='Submitting...'; this.form.submit();\">
 					</form>";
@@ -425,7 +425,7 @@ function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
                 }
                 echo "</td>
 						<td valign=center>
-							<form name=\"tradereject\" method=\"post\" action=\"rejecttradeoffer.php\">
+							<form name=\"tradereject\" method=\"post\" action=\"modules/Trading/rejecttradeoffer.php\">
 								<input type=\"hidden\" name=\"offer\" value=\"$offerid\">
                                 <input type=\"hidden\" name=\"teamRejecting\" value=\"$teamlogo\">
                                 <input type=\"hidden\" name=\"teamReceiving\" value=\"$oppositeTeam\">

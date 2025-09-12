@@ -740,7 +740,7 @@ function rookieoption($pid)
     	Their contract value the season after this one will be <b>$rookieOptionValue</b>.<br>
     	However, by exercising this option, <b>you can't use an in-season contract extension on them next season</b>.<br>
     	<b>They will become a free agent</b>.<br>
-    	<form name=\"RookieExtend\" method=\"post\" action=\"rookieoption.php\">
+    	<form name=\"RookieExtend\" method=\"post\" action=\"includes/utilities/rookieoption.php\">
             <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
             <input type=\"hidden\" name=\"playerID\" value=\"$player->playerID\">
             <input type=\"hidden\" name=\"rookieOptionValue\" value=\"$rookieOptionValue\">

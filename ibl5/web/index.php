@@ -20,7 +20,7 @@ echo "</ul>";
 
 echo "<h2>Draft</h2>";
 echo "<ul>";
-echo "<li><a href='draft/draft.php'>View Draft</a></li>";
+echo "<li><a href='../modules/Player/draft.php'>View Draft</a></li>";
 echo "<li><a href='../modules/College_Scouting/draft_selection.php'>Draft Selection</a></li>";
 echo "</ul>";
 

@@ -227,13 +227,13 @@
     <!-- Team Selector -->
     <div class="flex justify-center p-4">
         <SlideButtonSelector 
-            options={[homeTeamName, awayTeamName]} 
+            options={[awayTeamName, homeTeamName]} 
             selected={selectedTeamName || homeTeamName}
             onSelectionChange={handleTeamSelection}
         />
     </div>
 
-    <!-- ✅ Real Player Stats Table with Sorting -->
+    <!-- ✅ Fixed Player Stats Table with Proper Sticky Name Column -->
     {#if !selectedTeamName}
         <div class="flex flex-col items-center justify-center p-12 text-center">
             <div class="text-6xl mb-4">👆</div>
@@ -257,19 +257,24 @@
                 Sorted by {sortColumn} ({sortDirection === 'asc' ? 'ascending' : 'descending'})
             </p>
         </div>
-        <div class="overflow-x-auto">
+        
+        <!-- ✅ Fixed table container with border -->
+        <div class="overflow-x-auto border border-base-300 rounded-lg shadow-sm">
             <table class="table table-zebra table-pin-rows table-xs min-w-full">
                 <thead>
                     <tr>
-                        {#each headers as header}
+                        {#each headers as header, index}
                             <th 
-                                class="cursor-pointer select-none hover:bg-base-200 transition-colors px-2 py-3 min-w-10
-                                       {isActiveSortColumn(header) ? 'bg-primary/20 text-primary font-bold' : ''}"
+                                class="cursor-pointer select-none hover:bg-base-200 transition-colors px-2 py-3 min-w-10 text-center
+                                       {isActiveSortColumn(header) ? 'bg-primary/20 text-primary font-bold' : ''}
+                                       {header === 'Name' ? 'sticky opacity-100 left-0 z-30 bg-base-100 border-r border-base-300 shadow-lg min-w-32' : ''}"
                                 onclick={() => handleSort(header)}
                                 title="Click to sort by {header}"
                             >
                                 <div class="flex items-center gap-1 justify-center">
-                                    <span>{header === 'Pos' || header === 'Name' ? header : header.toUpperCase()}</span>
+                                    <span class="font-semibold">
+                                        {header === 'Pos' || header === 'Name' ? header : header.toUpperCase()}
+                                    </span>
                                     <span class="text-xs opacity-60">
                                         {getSortIcon(header)}
                                     </span>
@@ -280,30 +285,45 @@
                 </thead>
                 <tbody>
                     {#each filteredPlayers as player, rowIndex (player.id || rowIndex)}
-                        <tr class="transition-colors hover:bg-base-200">
-                            <td class="min-w-10 px-2 py-1">{player.pos}</td>
-                            <td class="sticky z-20 left-0 bg-base-100 font-medium px-2 py-1">
-                                {player.name}
+                        <tr class="hover:bg-base-200/50 transition-colors">
+                            <td class="px-2 py-1 text-center text-xs font-medium">{player.pos}</td>
+                            <!-- ✅ Fixed sticky name cell with proper Tailwind classes -->
+                            <td class="sticky left-0 z-20 bg-base-100 font-medium px-3 py-1 border-r border-base-300 shadow-lg min-w-32 max-w-32">
+                                <div class="truncate text-sm">
+                                    {player.name}
+                                </div>
                             </td>
-                            <td class="min-w-10 px-2 py-1">{player.min}</td>
-                            <td class="min-w-10 px-2 py-1">{player.fgm}</td>
-                            <td class="min-w-10 px-2 py-1">{player.fga}</td>
-                            <td class="min-w-10 px-2 py-1">{player.ftm}</td>
-                            <td class="min-w-10 px-2 py-1">{player.fta}</td>
-                            <td class="min-w-10 px-2 py-1">{player['3pm']}</td>
-                            <td class="min-w-10 px-2 py-1">{player['3pa']}</td>
-                            <td class="min-w-10 px-2 py-1 font-bold">{player.pts}</td>
-                            <td class="min-w-10 px-2 py-1">{player.orb}</td>
-                            <td class="min-w-10 px-2 py-1">{player.reb}</td>
-                            <td class="min-w-10 px-2 py-1">{player.ast}</td>
-                            <td class="min-w-10 px-2 py-1">{player.stl}</td>
-                            <td class="min-w-10 px-2 py-1">{player.blk}</td>
-                            <td class="min-w-10 px-2 py-1">{player.tov}</td>
-                            <td class="min-w-10 px-2 py-1">{player.pf}</td>
+                            <td class="px-2 py-1 text-center text-sm">{player.min}</td>
+                            <td class="px-2 py-1 text-center text-sm">{player.fgm}</td>
+                            <td class="px-2 py-1 text-center text-sm">{player.fga}</td>
+                            <td class="px-2 py-1 text-center text-sm">{player.ftm}</td>
+                            <td class="px-2 py-1 text-center text-sm">{player.fta}</td>
+                            <td class="px-2 py-1 text-center text-sm">{player['3pm']}</td>
+                            <td class="px-2 py-1 text-center text-sm">{player['3pa']}</td>
+                            <td class="px-2 py-1 text-center text-sm font-bold text-primary">{player.pts}</td>
+                            <td class="px-2 py-1 text-center text-sm">{player.orb}</td>
+                            <td class="px-2 py-1 text-center text-sm">{player.reb}</td>
+                            <td class="px-2 py-1 text-center text-sm">{player.ast}</td>
+                            <td class="px-2 py-1 text-center text-sm">{player.stl}</td>
+                            <td class="px-2 py-1 text-center text-sm">{player.blk}</td>
+                            <td class="px-2 py-1 text-center text-sm">{player.tov}</td>
+                            <td class="px-2 py-1 text-center text-sm">{player.pf}</td>
                         </tr>
                     {/each}
                 </tbody>
             </table>
         </div>
     {/if}
+
+    <!-- Form section - stays the same -->
+    <div class="card bg-base-100 shadow-xl mt-8">
+        <!-- ... existing form content ... -->
+    </div>
 {/if}
+
+<style>
+    /* ✅ Ensure sticky behavior works with hover states */
+    tr:hover .sticky {
+        background-color: hsl(var(--b2)) !important;
+    }
+</style>

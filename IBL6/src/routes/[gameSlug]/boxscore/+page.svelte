@@ -183,7 +183,11 @@
             <div class="flex items-center space-x-4">
                 <div class="text-center">
                     <div class="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-2">
-                        <span class="text-2xl font-bold text-gray-800">{awayTeam?.name?.[0] || 'A'}</span>
+                        {#if awayTeam?.teamid}
+                            <img src={`/teamlogo/new${awayTeam.teamid}.png`} alt="{awayTeamName} Logo" class="w-12 h-12 object-contain" />
+                        {:else}
+                            <span class="text-2xl font-bold text-gray-800">{awayTeam?.name?.[0] || 'A'}</span>
+                        {/if}
                     </div>
                     <div class="text-sm opacity-90">{awayTeamName}</div>
                     <div class="text-xs opacity-70">{awayPlayers.length} players</div>
@@ -207,7 +211,11 @@
                 <div class="text-4xl font-bold">{homeTeamScore}</div>
                 <div class="text-center">
                     <div class="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-2">
-                        <span class="text-2xl font-bold text-gray-800">{homeTeam?.name?.[0] || 'H'}</span>
+                        {#if homeTeam?.teamid}
+                            <img src={`/teamlogo/new${homeTeam.teamid}.png`} alt="{homeTeamName} Logo" class="w-12 h-12 object-contain" />
+                        {:else}
+                            <span class="text-2xl font-bold text-gray-800">{homeTeam?.name?.[0] || 'H'}</span>
+                        {/if}
                     </div>
                     <div class="text-sm opacity-90">{homeTeamName}</div>
                     <div class="text-xs opacity-70">{homePlayers.length} players</div>
@@ -298,69 +306,4 @@
             </table>
         </div>
     {/if}
-
-    <!-- Form section -->
-    <div class="card bg-base-100 shadow-xl mt-8">
-        <div class="card-header p-6">
-            <h2 class="card-title">Add New Player</h2>
-        </div>
-        <form class="card-body" onsubmit={handleFormSubmit}>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="form-control">
-                    <label class="label" for="player-name">
-                        <span class="label-text">Player Name</span>
-                    </label>
-                    <input 
-                        id="player-name"
-                        type="text" 
-                        class="input input-bordered" 
-                        bind:value={formData.name}
-                        required
-                    />
-                </div>
-                
-                <div class="form-control">
-                    <label class="label" for="player-position">
-                        <span class="label-text">Position</span>
-                    </label>
-                    <select 
-                        id="player-position"
-                        class="select select-bordered"
-                        bind:value={formData.position}
-                        required
-                    >
-                        <option value="" disabled>Select position</option>
-                        <option value="PG">PG</option>
-                        <option value="SG">SG</option>
-                        <option value="SF">SF</option>
-                        <option value="PF">PF</option>
-                        <option value="C">C</option>
-                    </select>
-                </div>
-                
-                <div class="form-control">
-                    <label class="label" for="player-minutes">
-                        <span class="label-text">Minutes</span>
-                    </label>
-                    <input 
-                        id="player-minutes"
-                        type="number" 
-                        class="input input-bordered" 
-                        bind:value={formData.minutes}
-                        min="0" 
-                        max="48" 
-                    />
-                </div>
-            </div>
-            
-            <div class="card-actions justify-end mt-6">
-                <button type="button" class="btn btn-outline" onclick={resetForm}>
-                    Cancel
-                </button>
-                <button type="submit" class="btn btn-primary">
-                    Add Player
-                </button>
-            </div>
-        </form>
-    </div>
 {/if}

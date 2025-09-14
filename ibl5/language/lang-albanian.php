@@ -131,8 +131,6 @@ define("_BREG", "Regjister");
 define("_BROADCAST", "Broadcast Publik Mesazh");
 define("_BROADCASTFROM", "Mesazh Publik nga");
 define("_TURNOFFMSG", "Ndalo Mesazhet Publik�");
-define("_JOURNAL", "Ditore");
-define("_READMYJOURNAL", "Lexo Ditoren Time");
 define("_ADD", "Shto");
 define("_YES", "Po");
 define("_NO", "Jo");

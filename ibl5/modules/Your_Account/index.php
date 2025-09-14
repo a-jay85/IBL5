@@ -428,15 +428,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
                 }
             }
         }
-        if (is_active("Journal") and $cookie[1] != $username) {
-            $sql3 = "SELECT jid FROM " . $prefix . "_journal WHERE aid='$username' AND status='yes' ORDER BY pdate,jid DESC LIMIT 0,1";
-            $result3 = $db->sql_query($sql3);
-            $row3 = $db->sql_fetchrow($result3);
-            $jid = intval($row3['jid']);
-            if (!empty($jid) and isset($jid)) {
-                echo "[ <a href=\"modules.php?name=Journal&amp;file=search&amp;bywhat=aid&amp;forwhat=$username\">" . _READMYJOURNAL . "</a> ]<br>";
-            }
-        }
+
         if (is_admin($admin)) {
             echo "<br>";
             OpenTable2();
@@ -773,9 +765,7 @@ function new_user()
                 echo "<li>" . _ACCESSTO . " $b_title\n";
             }
         }
-        if (is_active("Journal")) {
-            echo "<li>" . _CREATEJOURNAL . "\n";
-        }
+
         if ($my_headlines == 1) {
             echo "<li>" . _READHEADLINES . "\n";
         }

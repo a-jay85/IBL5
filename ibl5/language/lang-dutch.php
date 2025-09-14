@@ -131,8 +131,6 @@ define("_BREG", "Registreer");
 define("_BROADCAST", "Uitgezonden Publieke Berichten");
 define("_BROADCASTFROM", "Publieke Berichten van");
 define("_TURNOFFMSG", "Zet Publieke Berichten uit");
-define("_JOURNAL", "Journaal");
-define("_READMYJOURNAL", "Lees mijn Journaal");
 define("_ADD", "Toevoegen");
 define("_YES", "Ja");
 define("_NO", "Nee");

@@ -131,8 +131,6 @@ define("_BREG", "Registreeri");
 define("_BROADCAST", "Avalda avalik s�num");
 define("_BROADCASTFROM", "Avalik s�num liikmelt");
 define("_TURNOFFMSG", "L�lita v�lja avalikud s�numid");
-define("_JOURNAL", "P�evik");
-define("_READMYJOURNAL", "Loe mu p�evikut");
 define("_ADD", "Lisa");
 define("_YES", "Jah");
 define("_NO", "Ei");

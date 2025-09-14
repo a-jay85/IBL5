@@ -138,8 +138,6 @@ define("_BREG", "Registrova?");
 define("_BROADCAST", "Rozposla? hromadn� spr�vu");
 define("_BROADCASTFROM", "Hromadn� spr�va od u��vate�a");
 define("_TURNOFFMSG", "Vypn�? hromadn� spr�vy");
-define("_JOURNAL", "Denn�k");
-define("_READMYJOURNAL", "��ta? vlastn� denn��ek");
 define("_ADD", "Prida?");
 define("_YES", "�no");
 define("_NO", "Nie");

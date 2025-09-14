@@ -183,7 +183,7 @@ if ($db->sql_numrows($result8) > 0) {
             $sum = (int) $sum + $optionCount;
         }
         $pollTitle = filter($pollTitle, "nohtml");
-        echo "<strong><big>&middot;</big></strong>&nbsp;$lugar: <a href=\"modules.php?name=Surveys&amp;pollID=$id\">$pollTitle</a> - ($sum " . _LVOTES . ")<br>\n";
+        echo "<strong><big>&middot;</big></strong>&nbsp;$lugar: $pollTitle - ($sum " . _LVOTES . ")<br>\n";
         $lugar++;
         $sum = 0;
     }

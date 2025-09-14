@@ -54,7 +54,6 @@ define("_PAGE", "������");
 define("_PAGES", "�������");
 define("_INSECTION", "���� ������� ���� ");
 define("_NONAME", "��� ���� �������� �����");
-define("_DOWNLOADS", "Downloads");
 define("_WEBLINKS", "Web Links");
 define("_FINDMORE", "... more");
 define("_DIDNOTFIND", "Didn't find what you're looking for?");

@@ -378,7 +378,6 @@ define("_DEVKARMAUSERS", "Kuratliku karmaga kasutajad");
 define("_CURRENTKARMA", "Praegune karma");
 define("_USERNAME", "Kasutajanimi");
 define("_BANNERS", "Banners");
-define("_DOWNLOAD", "Downloads");
 define("_ENCYCLOPEDIA", "Encyclopedia");
 define("_FAQ", "F.A.Q.");
 define("_NEWS", "News");

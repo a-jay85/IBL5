@@ -54,7 +54,6 @@ define("_ATTACHART", "Vedlagt artikkelen");
 define("_PAGES", "Sider");
 define("_REVIEWSCORE", "Poengsum for denne artikkelen");
 define("_PAGE", "Side");
-define("_DOWNLOADS", "Nedlastinger");
 define("_WEBLINKS", "Weblinker");
 define("_FINDMORE", "... mer");
 define("_DIDNOTFIND", "Fant du ikke det du s�kte?");

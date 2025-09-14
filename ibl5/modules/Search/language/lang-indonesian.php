@@ -54,7 +54,6 @@ define("_ATTACHART", "pada artikel");
 define("_PAGES", "Halaman");
 define("_REVIEWSCORE", "Nilai pada Ulasan ini");
 define("_PAGE", "Halaman");
-define("_DOWNLOADS", "Download");
 define("_WEBLINKS", "Web Link");
 define("_FINDMORE", "... lagi");
 define("_DIDNOTFIND", "Tidak menemukan yang anda cari?");

@@ -54,7 +54,6 @@ define("_ATTACHART", "��ǡ��ҡѺ������");
 define("_PAGES", "˹��");
 define("_REVIEWSCORE", "��ṹ����Ѻ���йӹ��");
 define("_PAGE", "˹��");
-define("_DOWNLOADS", "��ǹ���Ŵ");
 define("_WEBLINKS", "����ԧ��");
 define("_FINDMORE", "... �ҵ��");
 define("_DIDNOTFIND", "��辺��觷��س�ͧ��?");

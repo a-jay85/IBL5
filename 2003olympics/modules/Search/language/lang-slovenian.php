@@ -54,7 +54,6 @@ define("_ATTACHART", "Dodano �lanku");
 define("_PAGES", "Strani");
 define("_REVIEWSCORE", "Ocena te recenzije");
 define("_PAGE", "Strani");
-define("_DOWNLOADS", "Downloads");
 define("_WEBLINKS", "Web Links");
 define("_FINDMORE", "... more");
 define("_DIDNOTFIND", "Didn't find what you're looking for?");

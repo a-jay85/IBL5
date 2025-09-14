@@ -31,8 +31,6 @@ define("_VOTEDPOLLS", "��������� ������");
 define("_MOSTACTIVEAUTHORS", "��������� ������");
 define("_NEWSPUBLISHED", "������� �����");
 define("_READREVIEWS", "�������� �������");
-define("_DOWNLOADEDFILES", "����������� ��������");
-define("_LDOWNLOADS", "���������");
 define("_MOSTREADPAGES", "�������� ������");
 define("_MOSTVOTEDSTORIES", "��������� �����");
 define("_POINTS", "������");

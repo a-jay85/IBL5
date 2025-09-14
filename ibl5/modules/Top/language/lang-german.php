@@ -32,7 +32,6 @@ define("_VOTEDPOLLS", "aktivste Umfragen");
 define("_MOSTACTIVEAUTHORS", "aktivste Autoren");
 define("_NEWSPUBLISHED", "Nachrichten geschrieben");
 define("_READREVIEWS", "am meisten gelesene Testberichte");
-define("_DOWNLOADEDFILES", "am meisten gezogene Downloads");
 define("_MOSTREADPAGES", "meist gelesene Seiten");
 define("_MOSTVOTEDSTORIES", "am h&auml;ufigsten bewertete Artikel");
 define("_POINTS", "Punkte");

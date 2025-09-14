@@ -226,28 +226,7 @@ if ($db->sql_numrows($result12) > 0) {
     echo "</font></td></tr></table><br>\n";
 }
 
-/* Top 10 downloads */
 
-$result13 = $db->sql_query("SELECT lid, cid, title, hits FROM " . $prefix . "_downloads_downloads ORDER BY hits DESC LIMIT 0,$top");
-if ($db->sql_numrows($result13) > 0) {
-    echo "<table border=\"0\" cellpadding=\"10\" width=\"100%\"><tr><td align=\"left\">\n"
-        . "<font class=\"option\"><b>$top " . _DOWNLOADEDFILES . "</b></font><br><br><font class=\"content\">\n";
-    $lugar = 1;
-    while ($row13 = $db->sql_fetchrow($result13)) {
-        $lid = intval($row13['lid']);
-        $cid = intval($row13['cid']);
-        $title = filter($row13['title'], "nohtml");
-        $hits = intval($row13['hits']);
-        if ($hits > 0) {
-            $row_res = $db->sql_fetchrow($db->sql_query("SELECT title FROM " . $prefix . "_downloads_categories WHERE cid='$cid'"));
-            $ctitle = filter($row_res['title'], "nohtml");
-            $utitle = mb_ereg_replace(" ", "_", $title);
-            echo "<strong><big>&middot;</big></strong>&nbsp;$lugar: <a href=\"modules.php?name=Downloads&amp;d_op=viewdownloaddetails&amp;lid=$lid&amp;ttitle=$utitle\">$title</a> (" . _CATEGORY . ": $ctitle) - ($hits " . _LDOWNLOADS . ")<br>\n";
-            $lugar++;
-        }
-    }
-    echo "</font></td></tr></table>\n\n";
-}
 
 /* Top 10 Pages in Content */
 

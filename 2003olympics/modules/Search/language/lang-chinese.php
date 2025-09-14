@@ -55,7 +55,6 @@ define("_ATTACHART", "�峹����");
 define("_PAGES", "��");
 define("_REVIEWSCORE", "�@�~���׵���");
 define("_PAGE", "��");
-define("_DOWNLOADS", "�U���귽");
 define("_WEBLINKS", "��������");
 define("_FINDMORE", "... ��h");
 define("_DIDNOTFIND", "�䤣��z�Q�䪺�F��H");

@@ -32,7 +32,6 @@ define("_VOTEDPOLLS", "��nestetyimm�t ��nestykset");
 define("_MOSTACTIVEAUTHORS", "Aktiivisimmat kirjoittajat");
 define("_NEWSPUBLISHED", "Uutista julkaistu");
 define("_READREVIEWS", "Luetuimmat arvostelut");
-define("_DOWNLOADEDFILES", "Useimmin imuroidut tiedostot");
 define("_MOSTREADPAGES", "most read pages");
 define("_MOSTVOTEDSTORIES", "most voted stories");
 define("_POINTS", "points");

@@ -31,7 +31,6 @@ define("_VOTEDPOLLS", "anketa z najve� glasovi");
 define("_MOSTACTIVEAUTHORS", "najaktivnij�e administratorje");
 define("_NEWSPUBLISHED", "�lankov objavljeno");
 define("_READREVIEWS", "nabolj brane recenzija");
-define("_DOWNLOADEDFILES", "najve� downloadanih datotek");
 define("_MOSTREADPAGES", "most read pages");
 define("_MOSTVOTEDSTORIES", "most voted stories");
 define("_POINTS", "points");

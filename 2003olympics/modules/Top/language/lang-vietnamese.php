@@ -31,8 +31,6 @@ define("_VOTEDPOLLS", "most voted polls");
 define("_MOSTACTIVEAUTHORS", "tác gi&#7843; h&#259;ng say");
 define("_NEWSPUBLISHED", "news published");
 define("_READREVIEWS", "most read reviews");
-define("_DOWNLOADEDFILES", "most downloaded files");
-define("_LDOWNLOADS", "downloads");
 define("_MOSTREADPAGES", "most read pages");
 define("_MOSTVOTEDSTORIES", "most voted stories");
 define("_POINTS", "&#273;i&#7875;m");

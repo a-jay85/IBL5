@@ -31,7 +31,6 @@ define("_VOTEDPOLLS", "mest r�ster i unders�kningar");
 define("_MOSTACTIVEAUTHORS", "mest aktiva skribent");
 define("_NEWSPUBLISHED", "nyheter publicerade");
 define("_READREVIEWS", "mest l�sta recensioner");
-define("_DOWNLOADEDFILES", "mest nedladdade filer");
 define("_MOSTREADPAGES", "most read pages");
 define("_MOSTVOTEDSTORIES", "most voted stories");
 define("_POINTS", "points");

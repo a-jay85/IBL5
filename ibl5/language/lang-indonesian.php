@@ -131,8 +131,6 @@ define("_BREG", "Daftar");
 define("_BROADCAST", "Sampaikan pesan umum");
 define("_BROADCASTFROM", "Pesan umum dari");
 define("_TURNOFFMSG", "Nonaktifkan pesan umum");
-define("_JOURNAL", "Jurnal");
-define("_READMYJOURNAL", "Baca JournalKu");
 define("_ADD", "Tambah");
 define("_YES", "Ya");
 define("_NO", "Tidak");

@@ -131,8 +131,6 @@ define("_BREG", "Registrer");
 define("_BROADCAST", "Kringkast offentlige beskjeder");
 define("_BROADCASTFROM", "Offentlig beskjed fra");
 define("_TURNOFFMSG", "Sl� av offentlige beskjeder");
-define("_JOURNAL", "Journal");
-define("_READMYJOURNAL", "Les min journal");
 define("_ADD", "Legg til");
 define("_YES", "Ja");
 define("_NO", "Nei");

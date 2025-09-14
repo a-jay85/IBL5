@@ -132,8 +132,6 @@ define("_BREG", "&#259;ng ký");
 define("_BROADCAST", "Broadcast Public Message");
 define("_BROADCASTFROM", "Public Message from");
 define("_TURNOFFMSG", "Turn Off Public Messages");
-define("_JOURNAL", "T&#7853;p san");
-define("_READMYJOURNAL", "&#7885;c T&#7853;p san c&#7911;a tôi");
 define("_ADD", "Thêm");
 define("_YES", "Yes");
 define("_NO", "No");

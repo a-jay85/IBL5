@@ -193,7 +193,6 @@ define("_WEBMAIL", "WebMail");
 define("_MESSAGES", "Berichten");
 define("_RETURNACCOUNT", "Terugkeren naar Uw Profiel Pagina");
 define("_ACCESSTO", "Toegang tot");
-define("_CREATEJOURNAL", "Cre�er uw Journaal");
 define("_READHEADLINES", "Lees aangepaste hoofdlijnen");
 define("_AVATARNOTE", "You can select your avatar once you have been registered");
 define("_USRNICKNAME", "Nickname/Username");

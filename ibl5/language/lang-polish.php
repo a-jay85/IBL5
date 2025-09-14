@@ -134,8 +134,6 @@ define("_BREG", "Zarejestruj si�");
 define("_BROADCAST", "Wy�lij wiadomo�� publiczn�");
 define("_BROADCASTFROM", "Wiadomo�� publiczna od");
 define("_TURNOFFMSG", "Wy��cz wiadomo�ci publiczne");
-define("_JOURNAL", "Dziennik");
-define("_READMYJOURNAL", "Czytaj m�j dziennik");
 define("_ADD", "Dodaj");
 define("_YES", "Tak");
 define("_NO", "Nie");

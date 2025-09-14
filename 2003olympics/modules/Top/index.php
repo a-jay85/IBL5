@@ -159,8 +159,8 @@ if ($db->sql_numrows($result7) > 0) {
     echo "</font></td></tr></table><br>\n";
 }
 
-/* Top 10 Polls */
-
+/* Top 10 Polls - Disabled since Surveys module was removed */
+/*
 $result8 = $db->sql_query("select * from " . $prefix . "_poll_desc $queryplang");
 if ($db->sql_numrows($result8) > 0) {
     echo "<table border=\"0\" cellpadding=\"10\" width=\"100%\"><tr><td align=\"left\">\n"
@@ -189,6 +189,7 @@ if ($db->sql_numrows($result8) > 0) {
     }
     echo "</font></td></tr></table><br>\n";
 }
+*/
 
 /* Top 10 authors */
 

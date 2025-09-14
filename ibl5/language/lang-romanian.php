@@ -131,8 +131,6 @@ define("_BREG", "Register");
 define("_BROADCAST", "Broadcast Public Message");
 define("_BROADCASTFROM", "Public Message from");
 define("_TURNOFFMSG", "Turn Off Public Messages");
-define("_JOURNAL", "Journal");
-define("_READMYJOURNAL", "Read My Journal");
 define("_ADD", "Add");
 define("_YES", "Yes");
 define("_NO", "No");

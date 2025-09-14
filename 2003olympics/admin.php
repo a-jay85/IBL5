@@ -187,14 +187,6 @@ function login()
     include "footer.php";
 }
 
-function deleteNotice($id)
-{
-    global $prefix, $db, $admin_file;
-    $id = intval($id);
-    $db->sql_query("DELETE FROM " . $prefix . "_reviews_add WHERE id = '$id'");
-    Header("Location: " . $admin_file . ".php?op=reviews");
-}
-
 /*********************************************************/
 /* Administration Menu Function                          */
 /*********************************************************/

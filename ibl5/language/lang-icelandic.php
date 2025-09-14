@@ -131,8 +131,6 @@ define("_BREG", "Skr� sig");
 define("_BROADCAST", "Senda opinber skilabo�");
 define("_BROADCASTFROM", "Opinber skilabo� fr�");
 define("_TURNOFFMSG", "Sl�kkva � opinberum skilabo�um");
-define("_JOURNAL", "Dagb�k");
-define("_READMYJOURNAL", "Lesa dagb�kina m�na");
 define("_ADD", "B�ta vi�");
 define("_YES", "J�");
 define("_NO", "Nei");

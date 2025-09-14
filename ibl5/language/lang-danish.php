@@ -129,8 +129,6 @@ define("_BREG", "Registrer");
 define("_BROADCAST", "Udsende en Offenlig meddelse");
 define("_BROADCASTFROM", "Offenlig meddelse fra");
 define("_TURNOFFMSG", "Sluk for offenlig meddelser");
-define("_JOURNAL", "Dagbog");
-define("_READMYJOURNAL", "L�s min dagbog");
 define("_ADD", "Tilf�j");
 define("_YES", "Ja");
 define("_NO", "Nej");

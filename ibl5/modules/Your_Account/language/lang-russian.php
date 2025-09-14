@@ -200,13 +200,10 @@ define("_WEBMAIL", "WebMail");
 define("_MESSAGES", "���������");
 define("_RETURNACCOUNT", "������� �� �������� ����� ������� ������");
 define("_ACCESSTO", "������ �");
-define("_CREATEJOURNAL", "������� ��� ����������� ������");
 define("_READHEADLINES", "������ ����������� ���������");
 define("_ACCESSTO", "������ �");
-define("_CREATEJOURNAL", "������� ��� ����������� ������");
 define("_READHEADLINES", "������ ����������� ���������"); /* 14.03.2004. ������ ������, �������� ��� �������� ������������� � ���������� �������. */
 define("_POPMSGACTIVE", "�������������� ���������� ������� ���������?");
-define("_READMYJOURNAL", "������ ��� ������");
 define("_AVATARNOTE", "�� ������� ������� ���� ����������� ����� ����� ����������� �����������.");
 define("_USRNICKNAME", "�����");
 define("_ALWAYSSHOWEMAIL", "������ ���������� ��� E-mail");

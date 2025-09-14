@@ -137,8 +137,6 @@ define("_BREG", "Registe-se");
 define("_BROADCAST", "Exponha a sua mensagem p�blica");
 define("_BROADCASTFROM", "Mensagem P�blica de");
 define("_TURNOFFMSG", "Desligar Mensagens Publicas");
-define("_JOURNAL", "Di�rio");
-define("_READMYJOURNAL", "Leia o meu di�rio");
 define("_ADD", "Adicionar");
 define("_YES", "Sim");
 define("_NO", "N�o");

@@ -193,11 +193,9 @@ define("_WEBMAIL", "WebMail");
 define("_MESSAGES", "Nachrichten");
 define("_RETURNACCOUNT", "Zur&uuml;ck zu der Seite Ihr Account");
 define("_ACCESSTO", "Zugriff auf");
-define("_CREATEJOURNAL", "Erstellen Sie ihr eigenes Journal");
 define("_READHEADLINES", "lesen Sie eigene &Uuml;berschriften");
 define("_POPMSGACTIVE", "akiviere PopUp f&uuml;r private Nachrichten?");
 
-define("_READMYJOURNAL", "Mein Journal lesen");
 define("_AVATARNOTE", "Sie k�nnen Ihren Avatar w�hlen, wenn Sie registriert bzw. angemeldet sind");
 define("_USRNICKNAME", "Nickname/Username");
 define("_ALWAYSSHOWEMAIL", "Email angezeigen");

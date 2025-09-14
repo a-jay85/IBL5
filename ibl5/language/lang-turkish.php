@@ -131,8 +131,6 @@ define("_BREG", "Kay�t Ol");
 define("_BROADCAST", "Herkese A��k Mesaj Yay�nla");
 define("_BROADCASTFROM", "Genel Mesaj:");
 define("_TURNOFFMSG", "Herkese A��k Mesajlar� Kapat");
-define("_JOURNAL", "G�nl�k");
-define("_READMYJOURNAL", "G�nl���m� Oku");
 define("_ADD", "Ekle");
 define("_YES", "Evet");
 define("_NO", "Hay�r");

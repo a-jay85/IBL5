@@ -59,13 +59,7 @@ class Navbar
                 . "</center></form></font></td>";
         }
     
-        if (is_active("Journal")) {
-            $menuimg = Navbar::menuimg("journal.gif");
-            echo "<td width=\"10%\"><font class=\"content\">"
-                . "<center><a href=\"modules.php?name=Journal&amp;file=edit\"><img src=\"$menuimg\" border=\"0\" alt=\"" . _JOURNAL . "\" title=\"" . _JOURNAL . "\"></a><br>"
-                . "<a href=\"modules.php?name=Journal&amp;file=edit\">" . _JOURNAL . "</a>"
-                . "</center></form></font></td>";
-        }
+
     
         if ($thmcount > 1 and $overwrite_theme == 1) {
             $menuimg = Navbar::menuimg("themes.gif");

@@ -629,16 +629,7 @@ function DisplayTopic($sid, $pid = 0, $tid = 0, $mode = "thread", $order = 0, $t
         /* If you are admin you can see the Poster IP address */
         /* with this you can see who is flaming you...*/
 
-        $journal = "";
-        if (is_active("Journal")) {
-            $row = $db->sql_fetchrow($db->sql_query("SELECT jid FROM " . $prefix . "_journal WHERE aid='$c_name' AND status='yes' ORDER BY pdate,jid DESC LIMIT 0,1"));
-            $jid = intval($row['jid']);
-            if (!empty($jid) and isset($jid)) {
-                $journal = " | <a href=\"modules.php?name=Journal&amp;file=display&amp;jid=$jid\">" . _JOURNAL . "</a>";
-            } else {
-                $journal = "";
-            }
-        }
+
         if ($c_name != $anonymous) {
             $row2 = $db->sql_fetchrow($db->sql_query("SELECT user_id FROM " . $user_prefix . "_users WHERE username='$c_name'"));
             $r_uid = intval($row2['user_id']);
@@ -646,7 +637,7 @@ function DisplayTopic($sid, $pid = 0, $tid = 0, $mode = "thread", $order = 0, $t
             if (is_active("Private_Messages")) {
                 echo "| <a href=\"modules.php?name=Private_Messages&amp;mode=post&amp;u=$r_uid\">" . _SENDAMSG . "</a>";
             }
-            echo "$journal) ";
+            echo ") ";
         }
         $row_url = $db->sql_fetchrow($db->sql_query("SELECT user_website FROM " . $user_prefix . "_users WHERE username='$c_name'"));
         $url = filter($row_url['user_website'], "nohtml");

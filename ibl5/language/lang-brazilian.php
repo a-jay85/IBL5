@@ -135,8 +135,6 @@ define("_BREG", "Cadastre-se");
 define("_BROADCAST", "Enviar Mensagem P�blica");
 define("_BROADCASTFROM", "Mensagem P�blica de");
 define("_TURNOFFMSG", "Desligar Mensagem P�blica");
-define("_JOURNAL", "Blog");
-define("_READMYJOURNAL", "Leia meu Blog");
 define("_ADD", "Adicionar");
 define("_YES", "Sim");
 define("_NO", "N�o");

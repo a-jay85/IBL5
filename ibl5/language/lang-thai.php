@@ -131,8 +131,6 @@ define("_BREG", "��Ѥ���Ҫԡ");
 define("_BROADCAST", "��Ш�¢�������Ҹ�ó�");
 define("_BROADCASTFROM", "��������Ҹ�óШҡ");
 define("_TURNOFFMSG", "�Դ��������Ҹ�ó�");
-define("_JOURNAL", "�����");
-define("_READMYJOURNAL", "��ҹ����âͧ���");
 define("_ADD", "����");
 define("_YES", "��");
 define("_NO", "���");

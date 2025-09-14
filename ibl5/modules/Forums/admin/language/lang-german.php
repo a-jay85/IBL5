@@ -768,10 +768,7 @@ define("_NONUMVALUE", "Der Punktewert ist nicht nummerisch! Zur�ck gehen und &
 define("_GROUP", "Gruppe");
 define("_UGROUP", "Benutzergruppe");
 define("_VALIDIFREG", "Nur g&uuml;ltig, wenn registrierte Benutzer ausgew&auml;hlt");
-define("_POINTS01", "Journaleintrag");
-define("_DESC01", "Pers&ouml;nlicher Benutzereintrag ins Journal. Wertung f�r �ffentliche und private Eintr&auml;ge");
-define("_POINTS02", "Journal-Kommentar");
-define("_DESC02", "Punkte f�r jeden geposteten Kommentar in einem &ouml;ffentlichen Benutzer-Journal");
+
 define("_POINTS03", "Seiten-Weiterempfehlung");
 define("_DESC03", "Punkte f�r jede Weiterempfehlung, die �ber das 'Recommend Us Module' versendet wurde");
 define("_POINTS04", "News-Ver&ouml;ffentlichung");

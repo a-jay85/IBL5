@@ -193,13 +193,10 @@ define("_WEBMAIL", "�����l��");
 define("_MESSAGES", "�p�H�T��");
 define("_RETURNACCOUNT", "�^��z���ӤH�]�w��");
 define("_ACCESSTO", "�s��");
-define("_CREATEJOURNAL", "�إ߭ӤH�O��");
 define("_READHEADLINES", "Ū���ۭq���Y���s�D");
 //define("_ACCESSTO", "Access to"); //Remarked by Chego This variable dual define in line 195.
-//define("_CREATEJOURNAL", "Create your own Journal"); //Remarked by Chego This variable dual define in line 196.
 //define("_READHEADLINES", "Read custom headlines"); //Remarked by Chego This variable dual define in line 197.
 //define("_POPMSGACTIVE","Activate Private Message PopUp?"); //Remarked by Chego This variable not to use.
-//define("_READMYJOURNAL","Read My Journal"); //Remarked by Chego This variable had define in the language\lang-xxxxx.php
 //define("_AVATARNOTE","You can select your avatar once you have been registered"); //Remarked by Chego This variable not to use.
 define("_USRNICKNAME", "�|���W��");
 define("_ALWAYSSHOWEMAIL", "��ܹq�l�l��H�c");

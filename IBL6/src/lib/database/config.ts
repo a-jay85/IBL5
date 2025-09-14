@@ -20,7 +20,7 @@ export const dbConfig = {
 	}
 };
 
-// ✅ Only validate if you're actually using the connection
+// Only validate if you're actually using the connection
 export function validateDbConfig() {
 	const required = ['DB_HOST', 'DB_NAME', 'DB_USER'];
 	const missing = required.filter((key) => !process.env[key]);

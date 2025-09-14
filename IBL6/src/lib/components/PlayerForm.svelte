@@ -3,11 +3,12 @@
 
     const dispatch = createEventDispatcher();
 
-    let formData = {
+    // Form state
+    let formData = $state({
         name: '',
         position: '',
-        minutes: ''
-    };
+        minutes: 0
+    });
 
     function handleFormSubmit(event) {
         event.preventDefault();
@@ -19,7 +20,7 @@
         formData = {
             name: '',
             position: '',
-            minutes: ''
+            minutes: 0
         };
     }
 </script>

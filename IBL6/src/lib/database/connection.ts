@@ -7,7 +7,7 @@ class DatabaseConnection {
 
 	private async getPool(): Promise<mysql.Pool> {
 		if (!this.pool) {
-			// ✅ Only validate when actually creating the pool
+			// Only validate when actually creating the pool
 			validateDbConfig();
 
 			this.pool = mysql.createPool({
@@ -64,7 +64,7 @@ class DatabaseConnection {
 		}
 	}
 
-	// ✅ Add method to check if connection is available
+	// Add method to check if connection is available
 	public isConfigured(): boolean {
 		return !!(process.env.DB_HOST && process.env.DB_NAME && process.env.DB_USER);
 	}

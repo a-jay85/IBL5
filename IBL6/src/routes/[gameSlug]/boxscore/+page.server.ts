@@ -1,9 +1,7 @@
 import type { PageServerLoad } from './$types';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '$lib/database/prisma';
 import { serializePrismaData } from '$lib/utils/utils';
 import { error } from '@sveltejs/kit';
-
-const prisma = new PrismaClient();
 
 export const load: PageServerLoad = async ({ params }) => {
 	try {
@@ -18,15 +16,15 @@ export const load: PageServerLoad = async ({ params }) => {
 
 		const gameDate = new Date(year, month - 1, day);
 
-		// ✅ Get game data
-		const game = (await prisma.$queryRaw`
-            SELECT 
-                g.Date,
-                g.gameOfThatDay,
-                g.visitorTeamID as awayTeamId,
-                g.homeTeamID as homeTeamId,
-                (g.visitorQ1points + g.visitorQ2points + g.visitorQ3points + g.visitorQ4points + COALESCE(g.visitorOTpoints, 0)) as awayScore,
-                (g.homeQ1points + g.homeQ2points + g.homeQ3points + g.homeQ4points + COALESCE(g.homeOTpoints, 0)) as homeScore,
+		// Get game info
+		const gameInfo = (await prisma.$queryRaw`
+            SELECT DISTINCT
+                game.Date,
+                game.visitorTeamID as awayTeamId,
+                game.homeTeamID as homeTeamId,
+                game.gameOfThatDay,
+                (game.visitorQ1points + game.visitorQ2points + game.visitorQ3points + game.visitorQ4points + COALESCE(game.visitorOTpoints, 0)) as awayScore,
+                (game.homeQ1points + game.homeQ2points + game.homeQ3points + game.homeQ4points + COALESCE(game.homeOTpoints, 0)) as homeScore,
                 away.teamid as away_teamid,
                 away.team_city as away_city,
                 away.team_name as away_name,
@@ -37,42 +35,41 @@ export const load: PageServerLoad = async ({ params }) => {
                 home.team_name as home_name,
                 home.color1 as home_color1,
                 home.color2 as home_color2
-            FROM ibl_box_scores_teams g
-            LEFT JOIN ibl_team_info away ON g.visitorTeamID = away.teamid
-            LEFT JOIN ibl_team_info home ON g.homeTeamID = home.teamid
-            WHERE DATE(g.Date) = DATE(${gameDate})
-            AND g.gameOfThatDay = ${gameNumber}
+            FROM ibl_box_scores_teams game
+            LEFT JOIN ibl_team_info home ON game.homeTeamID = home.teamid
+            LEFT JOIN ibl_team_info away ON game.visitorTeamID = away.teamid
+            WHERE DATE(game.Date) = DATE(${gameDate})
+            AND game.gameOfThatDay = ${gameNumber}
             LIMIT 1
         `) as any[];
 
-		if (!game || game.length === 0) {
+		if (!gameInfo || gameInfo.length === 0) {
 			throw error(404, `Game not found`);
 		}
 
-		const gameData = game[0];
+		const gameData = gameInfo[0];
+		console.log(
+			'✅ Found game on',
+			gameData.Date.toISOString().split('T')[0],
+			`(Game #${gameData.gameOfThatDay})`
+		);
+		console.log('🔍 Game data:', gameData);
 		console.log('🏀 Game teams:', {
 			away: `${gameData.away_city} ${gameData.away_name} (ID: ${gameData.awayTeamId})`,
 			home: `${gameData.home_city} ${gameData.home_name} (ID: ${gameData.homeTeamId})`
 		});
 
-		// ✅ Get ALL players for this game with proper team identification
+		// Get players with correct team ID references
 		const players = (await prisma.$queryRaw`
             SELECT 
                 bp.Date,
                 bp.name,
                 bp.pos,
                 bp.pid,
-                bp.visitorTID as awayTeamId,
-                bp.homeTID as homeTeamId,
-                -- ✅ Determine which team this player belongs to
+                plr.tid as playerTeamId,
+                -- Check if player's team matches away team
                 CASE 
-                    WHEN bp.visitorTID IS NOT NULL THEN bp.visitorTID
-                    WHEN bp.homeTID IS NOT NULL THEN bp.homeTID
-                    ELSE NULL 
-                END as playerTeamId,
-                -- ✅ Flag if this is an away team player
-                CASE 
-                    WHEN bp.visitorTID = ${gameData.awayTeamId} THEN 1
+                    WHEN plr.tid = ${gameData.awayTeamId} THEN 1
                     ELSE 0
                 END as isAwayPlayer,
                 bp.gameMIN as min,
@@ -89,31 +86,31 @@ export const load: PageServerLoad = async ({ params }) => {
                 bp.gameTOV as tov,
                 bp.gameBLK as blk,
                 bp.gamePF as pf,
-                -- Calculate derived stats
                 (bp.gameORB + bp.gameDRB) as reb,
                 (bp.gameFGM * 2 + bp.game3GM + bp.gameFTM) as pts
             FROM ibl_box_scores bp
+            LEFT JOIN ibl_plr plr ON bp.pid = plr.pid
             WHERE DATE(bp.Date) = DATE(${gameDate})
-            AND (bp.visitorTID = ${gameData.awayTeamId} OR bp.homeTID = ${gameData.homeTeamId})
-            ORDER BY bp.visitorTID DESC, bp.gameMIN DESC
+            AND plr.tid IN (${gameData.awayTeamId}, ${gameData.homeTeamId})
+            ORDER BY plr.tid DESC, bp.gameMIN DESC
         `) as any[];
 
 		console.log(`✅ Found ${players.length} total players for this game`);
 
-		// ✅ Separate players by team using the correct logic
+		// Separate players by team
 		const awayPlayers = players.filter((p: any) => p.isAwayPlayer === 1);
 		const homePlayers = players.filter((p: any) => p.isAwayPlayer === 0);
 
 		console.log(`👥 Away players: ${awayPlayers.length}, Home players: ${homePlayers.length}`);
 
-		// ✅ Debug first few players
+		// Debug first few players
 		if (players.length > 0) {
 			console.log(
 				'🔍 First 3 players:',
 				players.slice(0, 3).map((p) => ({
 					name: p.name,
-					awayTeamId: p.awayTeamId,
-					homeTeamId: p.homeTeamId,
+					visitorTID: p.visitorTID,
+					homeTID: p.homeTID,
 					playerTeamId: p.playerTeamId,
 					isAwayPlayer: p.isAwayPlayer
 				}))
@@ -150,13 +147,13 @@ export const load: PageServerLoad = async ({ params }) => {
 				: null
 		};
 
-		// ✅ Transform player data
+		// Transform player data
 		const formatPlayers = (playerList: any[]) => {
 			return playerList.map((player: any) => ({
 				id: player.pid,
 				pos: player.pos || 'N/A',
 				name: player.name || 'Unknown',
-				teamId: Number(player.playerTeamId), // ✅ Add team ID for debugging
+				teamId: Number(player.playerTeamId), // Add team ID for debugging
 				min: Number(player.min) || 0,
 				fgm: Number(player.fgm) || 0,
 				fga: Number(player.fga) || 0,
@@ -186,7 +183,5 @@ export const load: PageServerLoad = async ({ params }) => {
 			throw err;
 		}
 		throw error(500, 'Error loading game data');
-	} finally {
-		await prisma.$disconnect().catch(console.error);
 	}
 };

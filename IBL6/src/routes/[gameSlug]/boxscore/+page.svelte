@@ -12,7 +12,7 @@
 
     let { data }: { data: PageData } = $props();
 
-    // ✅ Use real data from server
+    // Use real data from server
     const game = $derived(data.game);
     const awayPlayers = $derived(data.awayPlayers || []);
     const homePlayers = $derived(data.homePlayers || []);
@@ -31,11 +31,11 @@
     // Selected team state
     let selectedTeamName = $state('');
     
-    // ✅ Sorting state
+    // Sorting state
     let sortColumn = $state<string>('min'); // Default sort by minutes
     let sortDirection = $state<'asc' | 'desc'>('desc'); // Default descending (highest first)
 
-    // ✅ Map header display names to actual property names
+    // Map header display names to actual property names
     const columnMap: Record<string, string> = {
         'Pos': 'pos',
         'Name': 'name', 
@@ -56,7 +56,7 @@
         'pf': 'pf'
     };
 
-    // ✅ Filter and sort players based on selected team and sort criteria
+    // Filter and sort players based on selected team and sort criteria
     const filteredPlayers = $derived.by(() => {
         if (!selectedTeamName) return [];
         
@@ -88,72 +88,20 @@
         return sortedPlayers;
     });
 
-    // ✅ Handle column header clicks for sorting
-    function handleSort(header: string) {
-        const column = columnMap[header] || header;
-        
-        if (sortColumn === column) {
-            // Same column - toggle direction
-            sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
-        } else {
-            // New column - set default direction based on column type
-            sortColumn = column;
-            // Most stats should default to descending (highest first)
-            // Name and position should default to ascending (alphabetical)
-            sortDirection = ['name', 'pos'].includes(column) ? 'asc' : 'desc';
-        }
-        
-        console.log(`Sorting by ${column} ${sortDirection}`);
-    }
-
-    // ✅ Get sort icon for column header
-    function getSortIcon(header: string): string {
-        const column = columnMap[header] || header;
-        if (sortColumn !== column) return '↕️'; // Unsorted
-        return sortDirection === 'asc' ? '↑' : '↓';
-    }
-
-    // ✅ Check if column is currently being sorted
-    function isActiveSortColumn(header: string): boolean {
-        const column = columnMap[header] || header;
-        return sortColumn === column;
-    }
-
-    // Form state
-    let formData = $state({
-        name: '',
-        position: '',
-        minutes: 0
-    });
-
     function handleTeamSelection(teamName: string) {
         selectedTeamName = teamName;
         console.log('Selected team:', selectedTeamName);
         console.log('Players for this team:', filteredPlayers.length);
     }
     
-    function resetForm() {
-        formData = {
-            name: '',
-            position: '',
-            minutes: 0
-        };
-    }
-
-    function handleFormSubmit(event: Event) {
-        event.preventDefault();
-        console.log('Form submitted:', formData);
-        resetForm();
-    }
-
-    // ✅ Set initial team selection when component mounts
+    // Set initial team selection when component mounts
     onMount(() => {
         if (homeTeamName) {
             selectedTeamName = homeTeamName;
         }
     });
 
-    // ✅ Log the data for debugging
+    // Log the data for debugging
     $effect(() => {
         if (game) {
             console.log('🏀 Game loaded:', {
@@ -166,7 +114,7 @@
     });
 </script>
 
-<!-- ✅ Show game data with real player stats -->
+<!-- Show game data with real player stats -->
 {#if !game}
     <div class="flex justify-center items-center p-12">
         <div class="text-center">
@@ -233,7 +181,7 @@
         />
     </div>
 
-    <!-- ✅ Fixed Player Stats Table with Proper Sticky Name Column -->
+    <!-- Player Stats Table -->
     {#if !selectedTeamName}
         <div class="flex flex-col items-center justify-center p-12 text-center">
             <div class="text-6xl mb-4">👆</div>
@@ -257,37 +205,15 @@
                 Sorted by {sortColumn} ({sortDirection === 'asc' ? 'ascending' : 'descending'})
             </p>
         </div>
-        
-        <!-- ✅ Fixed table container with border -->
         <div class="overflow-x-auto border border-base-300 rounded-lg shadow-sm">
             <table class="table table-zebra table-pin-rows table-xs min-w-full">
                 <thead>
-                    <tr>
-                        {#each headers as header, index}
-                            <th 
-                                class="cursor-pointer select-none hover:bg-base-200 transition-colors px-2 py-3 min-w-10 text-center
-                                       {isActiveSortColumn(header) ? 'bg-primary/20 text-primary font-bold' : ''}
-                                       {header === 'Name' ? 'sticky opacity-100 left-0 z-30 bg-base-100 border-r border-base-300 shadow-lg min-w-32' : ''}"
-                                onclick={() => handleSort(header)}
-                                title="Click to sort by {header}"
-                            >
-                                <div class="flex items-center gap-1 justify-center">
-                                    <span class="font-semibold">
-                                        {header === 'Pos' || header === 'Name' ? header : header.toUpperCase()}
-                                    </span>
-                                    <span class="text-xs opacity-60">
-                                        {getSortIcon(header)}
-                                    </span>
-                                </div>
-                            </th>
-                        {/each}
-                    </tr>
+                    <StatsHorizontal {headers} bind:sortColumn bind:sortDirection />
                 </thead>
                 <tbody>
                     {#each filteredPlayers as player, rowIndex (player.id || rowIndex)}
                         <tr class="hover:bg-base-200/50 transition-colors">
                             <td class="px-2 py-1 text-center text-xs font-medium">{player.pos}</td>
-                            <!-- ✅ Fixed sticky name cell with proper Tailwind classes -->
                             <td class="sticky left-0 z-20 bg-base-100 font-medium px-3 py-1 border-r border-base-300 shadow-lg min-w-32 max-w-32">
                                 <div class="truncate text-sm">
                                     {player.name}
@@ -311,18 +237,16 @@
                         </tr>
                     {/each}
                 </tbody>
+                <tfoot>
+                    <StatsHorizontal {headers} bind:sortColumn bind:sortDirection />
+                </tfoot>
             </table>
         </div>
     {/if}
-
-    <!-- Form section - stays the same -->
-    <div class="card bg-base-100 shadow-xl mt-8">
-        <!-- ... existing form content ... -->
-    </div>
 {/if}
 
 <style>
-    /* ✅ Ensure sticky behavior works with hover states */
+    /* Ensure sticky behavior works with hover states */
     tr:hover .sticky {
         background-color: hsl(var(--b2)) !important;
     }

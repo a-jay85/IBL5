@@ -276,10 +276,6 @@ define("_NONUMVALUE", "The value of the Points isn't numeric. Go back and fix it
 define("_GROUP", "Group");
 define("_UGROUP", "Users Group");
 define("_VALIDIFREG", "Valid only if Registered Users are selected above");
-define("_POINTS01", "Journal Entry");
-define("_DESC01", "Personal user's Journal entry. Valid for publics and privates entries");
-define("_POINTS02", "Journal Comment");
-define("_DESC02", "Each comment posted in a public user's Journal");
 define("_POINTS03", "Recommendation to a Friend");
 define("_DESC03", "Each time a user send the link to our site to a friend via Recommend Us Module");
 define("_POINTS04", "News Submission Published");

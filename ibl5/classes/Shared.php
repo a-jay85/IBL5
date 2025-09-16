@@ -85,4 +85,17 @@ class Shared
 
         return $this->db->sql_result($queryIsFreeAgencyModuleActive, 0, "active");
     }
+
+    public function resetAllTeamsContractExtensionAttempts() : bool
+    {
+        echo '<p>Resetting all teams\' contract extension attempts...<p>';
+        $queryReset = $this->db->sql_query("UPDATE ibl_team_info SET Used_Extension_This_Chunk = 0;");
+        if ($queryReset) {
+            \UI::displayDebugOutput("UPDATE ibl_team_info SET Used_Extension_This_Chunk = 0;", 'Reset All Teams Contract Extensions');
+            echo '<p>All teams\' contract extension attempts have been reset.<p><br>';
+            return true;
+        } else {
+            die('Invalid query: ' . $this->db->sql_error());
+        }
+    }
 }

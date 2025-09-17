@@ -8698,7 +8698,7 @@ INSERT INTO nuke_modules VALUES (9, 'Members_List', 'Members List', 0, 1, 1, 0, 
 INSERT INTO nuke_modules VALUES (10, 'News', 'News', 1, 0, 1, 0, '');
 INSERT INTO nuke_modules VALUES (11, 'Private_Messages', 'Private Messages', 1, 0, 1, 0, '');
 INSERT INTO nuke_modules VALUES (12, 'Recommend_Us', 'Recommend Us', 1, 0, 1, 0, '');
-INSERT INTO nuke_modules VALUES (13, 'Reviews', 'Reviews', 0, 0, 1, 0, '');
+
 INSERT INTO nuke_modules VALUES (14, 'Search', 'Search', 1, 0, 1, 0, '');
 INSERT INTO nuke_modules VALUES (15, 'Statistics', 'Statistics', 1, 0, 1, 0, '');
 INSERT INTO nuke_modules VALUES (16, 'Stories_Archive', 'Stories Archive', 1, 0, 1, 0, '');
@@ -8967,120 +8967,6 @@ CREATE TABLE nuke_related (
 # Volcar la base de datos para la tabla `nuke_related`
 #
 
-# --------------------------------------------------------
-
-#
-# Estructura de tabla para la tabla `nuke_reviews`
-#
-
-CREATE TABLE nuke_reviews (
-  id int(10) NOT NULL auto_increment,
-  `date` date NOT NULL default '0000-00-00',
-  title varchar(150) NOT NULL default '',
-  `text` text NOT NULL,
-  reviewer varchar(20) default NULL,
-  email varchar(60) default NULL,
-  score int(10) NOT NULL default '0',
-  cover varchar(100) NOT NULL default '',
-  url varchar(100) NOT NULL default '',
-  url_title varchar(50) NOT NULL default '',
-  hits int(10) NOT NULL default '0',
-  rlanguage varchar(30) NOT NULL default '',
-  PRIMARY KEY  (id),
-  KEY id (id)
-);
-
-#
-# Volcar la base de datos para la tabla `nuke_reviews`
-#
-
-# --------------------------------------------------------
-
-#
-# Estructura de tabla para la tabla `nuke_reviews_add`
-#
-
-CREATE TABLE nuke_reviews_add (
-  id int(10) NOT NULL auto_increment,
-  `date` date default NULL,
-  title varchar(150) NOT NULL default '',
-  `text` text NOT NULL,
-  reviewer varchar(20) NOT NULL default '',
-  email varchar(60) default NULL,
-  score int(10) NOT NULL default '0',
-  url varchar(100) NOT NULL default '',
-  url_title varchar(50) NOT NULL default '',
-  rlanguage varchar(30) NOT NULL default '',
-  PRIMARY KEY  (id),
-  KEY id (id)
-);
-
-#
-# Volcar la base de datos para la tabla `nuke_reviews_add`
-#
-
-# --------------------------------------------------------
-
-#
-# Estructura de tabla para la tabla `nuke_reviews_comments`
-#
-
-CREATE TABLE nuke_reviews_comments (
-  cid int(10) NOT NULL auto_increment,
-  rid int(10) NOT NULL default '0',
-  userid varchar(25) NOT NULL default '',
-  `date` datetime default NULL,
-  comments text,
-  score int(10) NOT NULL default '0',
-  PRIMARY KEY  (cid),
-  KEY cid (cid),
-  KEY rid (rid),
-  KEY userid (userid)
-);
-
-#
-# Volcar la base de datos para la tabla `nuke_reviews_comments`
-#
-
-# --------------------------------------------------------
-
-#
-# Estructura de tabla para la tabla `nuke_reviews_comments_moderated`
-#
-
-CREATE TABLE nuke_reviews_comments_moderated (
-  cid int(10) NOT NULL auto_increment,
-  rid int(10) NOT NULL default '0',
-  userid varchar(25) NOT NULL default '',
-  `date` datetime default NULL,
-  comments text,
-  score int(10) NOT NULL default '0',
-  PRIMARY KEY  (cid),
-  KEY cid (cid),
-  KEY rid (rid),
-  KEY userid (userid)
-);
-
-#
-# Volcar la base de datos para la tabla `nuke_reviews_comments_moderated`
-#
-
-# --------------------------------------------------------
-
-#
-# Estructura de tabla para la tabla `nuke_reviews_main`
-#
-
-CREATE TABLE nuke_reviews_main (
-  title varchar(100) default NULL,
-  description text
-);
-
-#
-# Volcar la base de datos para la tabla `nuke_reviews_main`
-#
-
-INSERT INTO nuke_reviews_main VALUES ('Reviews Section Title', 'Reviews Section Long Description');
 # --------------------------------------------------------
 
 #

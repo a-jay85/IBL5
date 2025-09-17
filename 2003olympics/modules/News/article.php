@@ -121,7 +121,8 @@ if ($multilingual == 1) {
     $querylang = "";
 }
 
-/* Determine if the article has attached a poll */
+/* Poll functionality disabled - Surveys module removed */
+/*
 if ($haspoll == 1) {
     $url = sprintf("modules.php?name=Surveys&amp;op=results&amp;pollID=%d", $pollID);
     $boxContent = "<form action=\"modules.php?name=Surveys\" method=\"post\">";
@@ -164,6 +165,7 @@ if ($haspoll == 1) {
     $boxContent .= "</font></center></form>\n\n";
     themesidebox($boxTitle, $boxContent);
 }
+*/
 
 /* old modules */
 

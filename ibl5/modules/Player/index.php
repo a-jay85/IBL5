@@ -83,7 +83,7 @@ function showpage($playerID, $pageView)
     $contract_display = implode("/", $player->getRemainingContractArray());
 
     echo "<font class=\"content\">Age: $player->age | Height: $player->heightFeet-$player->heightInches | Weight: $player->weightPounds | College: $player->collegeName<br>
-        <i>Drafted by the $player->draftTeamOriginalName with the # $player->draftPickNumber pick of round $player->draftRound in the <a href=\"draft.php?year=$player->draftYear\">$player->draftYear Draft</a></i><br>
+        <i>Drafted by the $player->draftTeamOriginalName with the # $player->draftPickNumber pick of round $player->draftRound in the <a href=\"modules/Player/draft.php?year=$player->draftYear\">$player->draftYear Draft</a></i><br>
         <center><table>
             <tr>
                 <td align=center><b>2ga</b></td>
@@ -740,7 +740,7 @@ function rookieoption($pid)
     	Their contract value the season after this one will be <b>$rookieOptionValue</b>.<br>
     	However, by exercising this option, <b>you can't use an in-season contract extension on them next season</b>.<br>
     	<b>They will become a free agent</b>.<br>
-    	<form name=\"RookieExtend\" method=\"post\" action=\"rookieoption.php\">
+    	<form name=\"RookieExtend\" method=\"post\" action=\"modules/Player/rookieoption.php\">
             <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
             <input type=\"hidden\" name=\"playerID\" value=\"$player->playerID\">
             <input type=\"hidden\" name=\"rookieOptionValue\" value=\"$rookieOptionValue\">

@@ -39,7 +39,7 @@ class StandingsHTMLGenerator {
         $sqlQueryString = "UPDATE nuke_pages SET text = '$this->standingsHTML' WHERE pid = 4";
         if ($this->db->sql_query($sqlQueryString)) {
             \UI::displayDebugOutput($sqlQueryString, 'Standings HTML SQL Query');
-            echo '<p>Full standings page has been updated.<p><br>';
+            echo '<p>Full standings page has been updated.<p>';
         } else {
             die('Invalid query: ' . $this->db->sql_error());
         }

@@ -54,7 +54,6 @@ define("_ATTACHART", "Csatolva a cikkhez");
 define("_PAGES", "oldal");
 define("_REVIEWSCORE", "Az ismertet� oszt�lyoz�sa");
 define("_PAGE", "oldal");
-define("_DOWNLOADS", "Downloads");
 define("_WEBLINKS", "Web Links");
 define("_FINDMORE", "... more");
 define("_DIDNOTFIND", "Didn't find what you're looking for?");

@@ -167,7 +167,6 @@ define("_STAFF", "Ekipi");
 define("_THANKSBROKEN", "Faleminderit p�r ndihm�n e dh�n� n� mbajtjen e integritetit t� k�saj directory.");
 define("_THANKSFORINFO", "Faleminderit p�r informacionin.");
 define("_LOOKTOREQUEST", "Do ta shqyrtojm� s� shpejti k�rkes�n tuaj.");
-define("_ONLYREGUSERSMODIFY", "Vet�m P�rdoruesit e Regjistruar mund t� propozojn� ndryshime p�r Downloads.  <a href=\"modules.php?name=Your_Account\">Regjistrim/Login</a>.");
 define("_REQUESTLINKMOD", "K�rkes� P�r Modifikim Lidhje");
 define("_LINKID", "ID e Lidhjes");
 define("_SENDREQUEST", "D�rgoje K�rkes�n");

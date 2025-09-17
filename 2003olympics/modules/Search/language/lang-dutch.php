@@ -54,7 +54,6 @@ define("_ATTACHART", "Aan artikel toegevoegd");
 define("_PAGES", "Pagina's");
 define("_REVIEWSCORE", "Score voor deze recensie");
 define("_PAGE", "Pagina");
-define("_DOWNLOADS", "Downloads");
 define("_WEBLINKS", "Web Links");
 define("_FINDMORE", "... meer");
 define("_DIDNOTFIND", "Niet gevonden waarnaar u zocht?");

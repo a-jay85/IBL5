@@ -54,7 +54,6 @@ define("_ATTACHART", "Attached to Article");
 define("_PAGES", "Pages");
 define("_REVIEWSCORE", "Score for this Review");
 define("_PAGE", "Page");
-define("_DOWNLOADS", "Downloads");
 define("_WEBLINKS", "Web Links");
 define("_FINDMORE", "... more");
 define("_DIDNOTFIND", "Didn't find what you're looking for?");

@@ -63,7 +63,6 @@ define("_ADMIN", "Administratzailea:");
 define("_WERECEIVED", "Sistemak jaso izan duen bisita zenbakia:");
 define("_PAGESVIEWS", "fetxa honetatik hasita:");
 define("_TOPIC", "Gaia");
-define("_UDOWNLOADS", "Deskargak");
 define("_VOTE", "bozkatu");
 define("_VOTES", "botoak");
 define("_MVIEWADMIN", "Ikusi: Bakarrik administratzaileak");

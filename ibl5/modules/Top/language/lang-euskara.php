@@ -32,7 +32,6 @@ define("_VOTEDPOLLS", "Gehien bozkatu diren Inkestak");
 define("_MOSTACTIVEAUTHORS", "Autore aktiboenak");
 define("_NEWSPUBLISHED", "notizi publikatuta");
 define("_READREVIEWS", "Berrikuspen irakurrienak");
-define("_DOWNLOADEDFILES", "Gehien jaso diren artxiboak");
 define("_MOSTREADPAGES", "orri irakurrienak");
 define("_MOSTVOTEDSTORIES", "most voted stories");
 define("_POINTS", "points");

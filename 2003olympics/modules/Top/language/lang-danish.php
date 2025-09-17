@@ -29,7 +29,6 @@ define("_VOTEDPOLLS", "mest brugte afstemninger");
 define("_MOSTACTIVEAUTHORS", "mest aktive forfattere");
 define("_NEWSPUBLISHED", "artikel(er) publiceret");
 define("_READREVIEWS", "mest l�ste anmeldelser");
-define("_DOWNLOADEDFILES", "mest hentede filer");
 define("_MOSTREADPAGES", "mest l�ste side");
 define("_MOSTVOTEDSTORIES", "Historie med flest stemmer");
 define("_POINTS", "points");

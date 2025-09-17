@@ -60,7 +60,6 @@ define("_ATTACHART", "Anexar ao Artigo");
 define("_PAGES", "P�ginas");
 define("_REVIEWSCORE", "Pontua��o para esta Revis�o");
 define("_PAGE", "P�ginas");
-define("_DOWNLOADS", "Downloads");
 define("_WEBLINKS", "Web Links");
 define("_FINDMORE", "... mais");
 define("_DIDNOTFIND", "N�o encontrou o que estava � procura?");

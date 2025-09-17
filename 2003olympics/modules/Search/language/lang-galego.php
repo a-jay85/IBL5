@@ -54,7 +54,6 @@ define("_ATTACHART", "Adxuntar � artigo");
 define("_PAGES", "P�xinas");
 define("_REVIEWSCORE", "Valoraci�n para esta rese�a");
 define("_PAGE", "p�xina(s) ");
-define("_DOWNLOADS", "Downloads");
 define("_WEBLINKS", "Web Links");
 define("_FINDMORE", "... more");
 define("_DIDNOTFIND", "Didn't find what you're looking for?");

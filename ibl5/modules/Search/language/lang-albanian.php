@@ -54,7 +54,6 @@ define("_ATTACHART", "BashkaNgjitur Artikullit");
 define("_PAGES", "Faqe");
 define("_REVIEWSCORE", "Vot� p�r k�t� Recensim");
 define("_PAGE", "Faqja");
-define("_DOWNLOADS", "Downloads");
 define("_WEBLINKS", "Lidhje Web");
 define("_FINDMORE", "... akoma");
 define("_DIDNOTFIND", "Nuk e gjet�t �far� po k�rkonit?");

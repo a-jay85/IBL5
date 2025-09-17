@@ -32,7 +32,6 @@ define("_NOMATCHES", "Nebyl nalezen z�znam na v� po�adavek");
 define("_SCOMMENTS", "Koment��e");
 define("_DESCRIPTION", "Popis");
 define("_ONLYREGUSERSMODIFY", "Pouze registrovan� u�ivatel� mohou hl�sit �pravy. Pros�m <a href=\"modules.php?name=Your_Account\">Registrujte se nebo se p�ihla�te</a>.");
-define("_RATENOTE4", "M��ete si prohl�dnout <a href=\"modules.php?name=Downloads&amp;d_op=TopRated\">�eb���ek nejl�pe hodnocen�ch</a>.");
 define("_DATE", "Datum");
 define("_TO", "Komu");
 define("_ADDLINK", "P�idat odkaz");

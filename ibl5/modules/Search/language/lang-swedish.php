@@ -54,7 +54,6 @@ define("_ATTACHART", "Bifogad artikeln");
 define("_PAGES", "Sidor");
 define("_REVIEWSCORE", "Betyg f�r denna recension");
 define("_PAGE", "Sida");
-define("_DOWNLOADS", "Downloads");
 define("_WEBLINKS", "Web Links");
 define("_FINDMORE", "... more");
 define("_DIDNOTFIND", "Didn't find what you're looking for?");

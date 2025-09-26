@@ -113,6 +113,7 @@ function themeheader()
         . "<td align=\"right\" valign=\"bottom\" width=\"100%\">"
         . "<font class=\"content\"><b>"
         . "<A href=\"/\">Home</a>&nbsp;&middot;&nbsp;<A href=\"modules.php?name=Topics\">Topics</a>&nbsp;&middot;&nbsp"
+        . "<A href=\"modules.php?name=Downloads\">Downloads</a>&nbsp;&middot;&nbsp;<A href=\"modules.php?name=Your_Account\">Your Account</a>"
         . "&nbsp;&middot;&nbsp;<A href=\"modules.php?name=Forum\">Forums</a>&nbsp;&middot;&nbsp;<A href=\"modules.php?name=Top\">Top 10</a>"
         . "</b></font></td></tr></table>\n";
     CloseTable();

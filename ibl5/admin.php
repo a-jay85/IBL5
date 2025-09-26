@@ -457,14 +457,6 @@ if ($admintest) {
 
     switch ($op) {
 
-        case "do_gfx":
-            do_gfx();
-            break;
-
-        case "deleteNotice":
-            deleteNotice($id);
-            break;
-
         case "GraphicAdmin":
             GraphicAdmin();
             break;

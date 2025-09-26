@@ -22,4 +22,5 @@ depthcharts
 !/ibl5/classes/
 !/ibl5/modules/
 !/ibl5/ibl-laravel/
+!/IBL6
 .htaccess

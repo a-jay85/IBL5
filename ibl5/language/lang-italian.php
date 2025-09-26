@@ -38,7 +38,6 @@ define("_ON", "il");
 define("_LOGOUT", "Logout");
 define("_WAITINGCONT", "In Attesa");
 define("_SUBMISSIONS", "Articoli");
-define("_WREVIEWS", "Recensioni");
 define("_WLINKS", "Links");
 define("_EPHEMERIDS", "Eventi Storici");
 define("_ONEDAY", "In questo giorno...");

@@ -30,7 +30,6 @@ define("_NEWSSENT", "nieuws ingezonden");
 define("_VOTEDPOLLS", "vaakst gestemde peilingen");
 define("_MOSTACTIVEAUTHORS", "vaakst actieve auteurs");
 define("_NEWSPUBLISHED", "nieuws gepubliceerd");
-define("_READREVIEWS", "vaakst gelezen recensies");
 define("_DOWNLOADEDFILES", "vaakst gedownloade bestanden");
 define("_MOSTREADPAGES", "meest geraadpleegde pagina's");
 define("_MOSTVOTEDSTORIES", "meest gestemde verhalen");

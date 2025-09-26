@@ -20,7 +20,6 @@
 define("_ALLTOPICS", "Alla �mnen");
 define("_NOCOMMENTS", "Inga kommentarer");
 define("_UCOMMENT", "Kommentar");
-define("_REVIEWS", "Recensioner");
 define("_SEARCHUSERS", "S�k i medlemsdatabasen");
 define("_SEARCHSECTIONS", "S�k i specialavdelningarna");
 define("_SEARCHREVIEWS", "S�k bland recensionerna");
@@ -52,7 +51,6 @@ define("_SREPLY", "Svara");
 define("_SREPLIES", "Svar");
 define("_ATTACHART", "Bifogad artikeln");
 define("_PAGES", "Sidor");
-define("_REVIEWSCORE", "Betyg f�r denna recension");
 define("_PAGE", "Sida");
 define("_DOWNLOADS", "Downloads");
 define("_WEBLINKS", "Web Links");

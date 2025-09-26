@@ -38,7 +38,6 @@ define("_ON", "��");
 define("_LOGOUT", "�n�X");
 define("_WAITINGCONT", "���e���ݤ�");
 define("_SUBMISSIONS", "�뻼");
-define("_WREVIEWS", "�@�~���׵��ݤ�");
 define("_WLINKS", "�쵲���ݤ�");
 define("_EPHEMERIDS", "�{�ɤ��i");
 define("_ONEDAY", "���v�W������...");

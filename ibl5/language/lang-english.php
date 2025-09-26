@@ -39,7 +39,6 @@ define("_ON", "on");
 define("_LOGOUT", "Logout");
 define("_WAITINGCONT", "Waiting Content");
 define("_SUBMISSIONS", "Submissions");
-define("_WREVIEWS", "Waiting Reviews");
 define("_WLINKS", "Waiting Links");
 define("_EPHEMERIDS", "Ephemerids");
 define("_ONEDAY", "One Day like Today...");

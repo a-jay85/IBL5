@@ -20,7 +20,6 @@
 define("_ALLTOPICS", "V�echna t�mata");
 define("_NOCOMMENTS", "Bez koment��e");
 define("_UCOMMENT", "Koment��");
-define("_REVIEWS", "Recenze");
 define("_SEARCHUSERS", "Hledat v datab�zi u�ivatel�");
 define("_SEARCHSECTIONS", "Hledat ve speci�ln� sekci");
 define("_SEARCHREVIEWS", "Hledat v recenz�ch");
@@ -52,7 +51,6 @@ define("_SREPLY", "Odpov��");
 define("_SREPLIES", "Odpov�di");
 define("_ATTACHART", "P��davky k �l�nku");
 define("_PAGES", "Str�nky");
-define("_REVIEWSCORE", "Hodnocen� pro tuto recenzi");
 define("_PAGE", "Str�nka");
 define("_DOWNLOADS", "Downloads");
 define("_WEBLINKS", "Web Links");

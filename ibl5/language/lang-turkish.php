@@ -38,7 +38,6 @@ define("_ON", "Tarih:");
 define("_LOGOUT", "��k��");
 define("_WAITINGCONT", "Bekleyen ��erik");
 define("_SUBMISSIONS", "Haber");
-define("_WREVIEWS", "�zlenim");
 define("_WLINKS", "Ba�lant�");
 define("_EPHEMERIDS", "Ge�iciler");
 define("_ONEDAY", "Tarihte Bu G�n...");

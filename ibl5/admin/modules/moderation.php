@@ -26,7 +26,6 @@ if ($row['radminsuper'] == 1) {
         global $prefix, $db, $user_prefix, $admin_file;
         $num_news = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_comments_moderated"));
         $num_surveys = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_pollcomments_moderated"));
-        $num_reviews = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_reviews_comments_moderated"));
         $num_users = $db->sql_numrows($db->sql_query("SELECT user_id FROM " . $user_prefix . "_users WHERE karma!=0"));
         title("" . _MODERATIONKARMA . "");
         OpenTable();
@@ -40,11 +39,6 @@ if ($row['radminsuper'] == 1) {
             echo "<a href=\"" . $admin_file . ".php?op=moderation_surveys\">" . _SURVEYCOMMENTS . "</a> (<b>" . $num_surveys . "</b>) | ";
         } else {
             echo "" . _SURVEYCOMMENTS . " (<b>" . $num_surveys . "</b>) | ";
-        }
-        if ($num_reviews != 0) {
-            echo "<a href=\"" . $admin_file . ".php?op=moderation_reviews\">" . _REVIEWSCOMMENTS . "</a> (<b>" . $num_reviews . "</b>) | ";
-        } else {
-            echo "" . _REVIEWSCOMMENTS . " (<b>" . $num_reviews . "</b>) | ";
         }
         if ($num_users != 0) {
             echo "<a href=\"" . $admin_file . ".php?op=moderation_users_list\">" . _ALLMARKEDUSERS . "</a> (<b>" . $num_users . "</b>) ]</center>";
@@ -213,66 +207,6 @@ if ($row['radminsuper'] == 1) {
         include "footer.php";
     }
 
-    function moderation_reviews()
-    {
-        global $prefix, $db, $user_prefix, $bgcolor2, $bgcolor1, $admin_file;
-        Nuke\Header::header();
-        GraphicAdmin();
-        mod_menu();
-        OpenTable();
-        echo "<center><font class=\"title\"><b>" . _REVIEWSPENDING . "</b></font></center><br>";
-        echo "<table border=\"1\" align=\"center\" width=\"100%\"><tr>";
-        echo "<td bgcolor=\"$bgcolor2\" width=\"100%\">&nbsp;<b>" . _COMMENTTITLE . "</b></td>";
-        echo "<td bgcolor=\"$bgcolor2\" align=\"center\">&nbsp;<b>" . _USER . "</b>&nbsp;</td>";
-        echo "<td bgcolor=\"$bgcolor2\" align=\"center\">&nbsp;<b>" . _FUNCTIONS . "</b>&nbsp;</td></tr>";
-        $sql = $db->sql_query("SELECT cid, rid, userid FROM " . $prefix . "_reviews_comments_moderated");
-        while ($row = $db->sql_fetchrow($sql)) {
-            $row['rid'] = intval($row['rid']);
-            $row['cid'] = intval($row['cid']);
-            $row['userid'] = intval($row['userid']);
-            $row2 = $db->sql_fetchrow($db->sql_query("SELECT title FROM " . $prefix . "_reviews WHERE id='" . $row['rid'] . "'"));
-            $row2['title'] = filter($row2['title'], "nohtml");
-            echo "<td bgcolor=\"$bgcolor1\">&nbsp;<a href=\"" . $admin_file . ".php?op=moderation_reviews_view&id=" . $row['cid'] . "\">For Review: " . $row2['title'] . "</a>&nbsp;</td>";
-            echo "<td bgcolor=\"$bgcolor1\">&nbsp;<a href=\"modules.php?name=Your_Account&op=userinfo&username=$row[userid]\" target=\"_blank\">$row[userid]</a>&nbsp;</td>";
-            echo "<td bgcolor=\"$bgcolor1\" align=\"center\">&nbsp;<a href=\"" . $admin_file . ".php?op=moderation_approval&section=reviews&id=" . $row['cid'] . "\"><img src=\"images/karma/approve.gif\" alt=\"" . _APPROVE . "\" title=\"" . _APPROVE . "\" width=\"15\" heigh=\"15\" border=\"0\"></a> &nbsp; <a href=\"" . $admin_file . ".php?op=moderation_reject&section=reviews&id=" . intval($row['cid']) . "\"><img src=\"images/karma/reject.gif\" alt=\"" . _REJECT . "\" title=\"" . _REJECT . "\" width=\"15\" heigh=\"15\" border=\"0\"></a>&nbsp;</td></tr>";
-            $a = 1;
-        }
-        if ($a != 1) {
-            echo "<td bgcolor=\"$bgcolor1\" colspan=\"3\" align=\"center\">&nbsp;<i>" . _NOCONTENT . "</i>&nbsp;</td></tr>";
-        }
-        echo "</table>";
-        CloseTable();
-        include "footer.php";
-    }
-
-    function moderation_reviews_view($id)
-    {
-        global $prefix, $db, $admin_file;
-        $id = intval($id);
-        Nuke\Header::header();
-        GraphicAdmin();
-        mod_menu();
-        OpenTable();
-        $comm = $db->sql_fetchrow($db->sql_query("SELECT * FROM " . $prefix . "_reviews_comments_moderated WHERE cid='$id'"));
-        $comm['userid'] = intval($comm['userid']);
-        $comm['score'] = intval($comm['score']);
-        $comm['comments'] = filter($comm['comments']);
-        $revi = $db->sql_fetchrow($db->sql_query("SELECT title FROM " . $prefix . "_reviews WHERE id=" . intval($comm['rid'])));
-        $revi['title'] = filter($revi['title'], "nohtml");
-        echo "<center><b>Comment to the Review:</b></center><br>";
-        OpenTable2();
-        echo "<center><i>" . $revi['title'] . "</i></center>";
-        CloseTable2();
-        echo "<br><br><center><b>" . _COMMENTAPPPENDING . "</b></center><br>";
-        OpenTable2();
-        echo "<b>" . $revi['title'] . "</b><br>" . _BY . " " . $comm['userid'] . " " . _WITHSCORE . " " . $comm['score'] . "/10<br><br>" . $comm['comments'] . "<br><br>";
-        echo "<center><hr size=\"1\" width=\"80%\"><a href=\"" . $admin_file . ".php?op=moderation_approval&section=reviews&id=$id\"><img src=\"images/karma/approve.gif\" alt=\"" . _APPROVE . "\" title=\"" . _APPROVE . "\" width=\"15\" heigh=\"15\" border=\"0\"></a> &nbsp; <a href=\"" . $admin_file . ".php?op=moderation_reject&section=reviews&id=$id\"><img src=\"images/karma/reject.gif\" alt=\"" . _REJECT . "\" title=\"" . _REJECT . "\" width=\"15\" heigh=\"15\" border=\"0\"></a></center>";
-        CloseTable2();
-        echo "<br>";
-        CloseTable();
-        include "footer.php";
-    }
-
     function moderation_approval($section, $id)
     {
         global $prefix, $db, $admin_file;
@@ -292,13 +226,6 @@ if ($row['radminsuper'] == 1) {
             Header("Location: " . $admin_file . ".php?op=moderation_surveys");
             die();
         }
-        if ($section == "reviews") {
-            $row = $db->sql_fetchrow($db->sql_query("SELECT * FROM " . $prefix . "_reviews_comments_moderated WHERE cid='$id'"));
-            $db->sql_query("INSERT INTO " . $prefix . "_reviews_comments VALUES (NULL, '" . intval($row['rid']) . "', '" . $row['userid'] . "', '" . $row['date'] . "', '" . $row['comments'] . "', '" . intval($row['score']) . "')");
-            $db->sql_query("DELETE FROM " . $prefix . "_reviews_comments_moderated WHERE cid='$id'");
-            Header("Location: " . $admin_file . ".php?op=moderation_reviews");
-            die();
-        }
     }
 
     function moderation_reject($section, $id)
@@ -312,11 +239,6 @@ if ($row['radminsuper'] == 1) {
         if ($section == "surveys") {
             $db->sql_query("DELETE FROM " . $prefix . "_pollcomments_moderated WHERE tid='$id'");
             Header("Location: " . $admin_file . ".php?op=moderation_surveys");
-            die();
-        }
-        if ($section == "reviews") {
-            $db->sql_query("DELETE FROM " . $prefix . "_reviews_comments_moderated WHERE cid='$id'");
-            Header("Location: " . $admin_file . ".php?op=moderation_reviews");
             die();
         }
     }
@@ -396,14 +318,6 @@ if ($row['radminsuper'] == 1) {
 
         case "moderation_surveys_view":
             moderation_surveys_view($id);
-            break;
-
-        case "moderation_reviews":
-            moderation_reviews();
-            break;
-
-        case "moderation_reviews_view":
-            moderation_reviews_view($id);
             break;
 
         case "moderation_approval":

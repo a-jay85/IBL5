@@ -38,7 +38,6 @@ define("_ON", "auf");
 define("_LOGOUT", "Abmelden");
 define("_WAITINGCONT", "Wartende News");
 define("_SUBMISSIONS", "Artikel");
-define("_WREVIEWS", "Testberichte");
 define("_WLINKS", "Links");
 define("_EPHEMERIDS", "Tagesmotto");
 define("_ONEDAY", "Ein Tag wie heute...");

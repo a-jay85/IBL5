@@ -38,7 +38,6 @@ define("_ON", " ");
 define("_LOGOUT", "Logga ut");
 define("_WAITINGCONT", "V�ntande Inneh�ll");
 define("_SUBMISSIONS", "Postningar");
-define("_WREVIEWS", "Recensioner");
 define("_WLINKS", "L�nkar");
 define("_EPHEMERIDS", "Dagens Ord");
 define("_ONEDAY", "P� en dag som denna...");

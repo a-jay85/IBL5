@@ -22,8 +22,6 @@ switch ($op) {
     case "moderation_news_view":
     case "moderation_surveys":
     case "moderation_surveys_view":
-    case "moderation_reviews":
-    case "moderation_reviews_view":
     case "moderation_users_list":
     case "moderation_approval":
     case "moderation_reject":

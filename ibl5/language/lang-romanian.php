@@ -38,7 +38,6 @@ define("_ON", "on");
 define("_LOGOUT", "Iesire");
 define("_WAITINGCONT", "Continut in asteptare");
 define("_SUBMISSIONS", "Trimiteri");
-define("_WREVIEWS", "Revizuiri in asteptare");
 define("_WLINKS", "Linkuri in asteptare");
 define("_EPHEMERIDS", "Temporare");
 define("_ONEDAY", "O zi ca astazi...");

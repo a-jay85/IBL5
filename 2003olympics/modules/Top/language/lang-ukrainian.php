@@ -31,7 +31,6 @@ define("_NEWSSENT", "��������� �����");
 define("_VOTEDPOLLS", "����� �������� ����������");
 define("_MOSTACTIVEAUTHORS", "����� �������� ������");
 define("_NEWSPUBLISHED", "������������ �����");
-define("_READREVIEWS", "����� ���������� ������");
 define("_DOWNLOADEDFILES", "����� ���������� ����� ��� ����������");
 define("_MOSTREADPAGES", "most read pages");
 define("_MOSTVOTEDSTORIES", "most voted stories");

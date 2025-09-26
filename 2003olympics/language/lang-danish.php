@@ -36,7 +36,6 @@ define("_ON", "Dato:");
 define("_LOGOUT", "Log ud");
 define("_WAITINGCONT", "Bidrag");
 define("_SUBMISSIONS", "Artikler");
-define("_WREVIEWS", "Anmeldelser");
 define("_WLINKS", "Links");
 define("_EPHEMERIDS", "Begivenhedssystemet");
 define("_ONEDAY", "P� en dag som i dag...");

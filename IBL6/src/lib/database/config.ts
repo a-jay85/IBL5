@@ -1,0 +1,31 @@
+import { dev } from '$app/environment';
+import dotenv from 'dotenv';
+
+if (dev) {
+	const result = dotenv.config();
+
+	if (result.error) {
+		console.warn('Could not load .env file:', result.error.message);
+		console.warn('Using system environment variables or defaults');
+	}
+}
+
+export const dbConfig = {
+	mysql: {
+		host: process.env.DB_HOST || 'localhost',
+		port: parseInt(process.env.DB_PORT || '3306'),
+		database: process.env.DB_NAME || 'defaultdb',
+		user: process.env.DB_USER || 'root',
+		password: process.env.DB_PASSWORD || ''
+	}
+};
+
+// Only validate if you're actually using the connection
+export function validateDbConfig() {
+	const required = ['DB_HOST', 'DB_NAME', 'DB_USER'];
+	const missing = required.filter((key) => !process.env[key]);
+
+	if (missing.length > 0) {
+		throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+	}
+}

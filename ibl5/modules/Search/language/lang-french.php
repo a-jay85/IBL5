@@ -20,7 +20,6 @@
 define("_ALLTOPICS", "Tous les Sujets");
 define("_NOCOMMENTS", "Pas de commentaires");
 define("_UCOMMENT", "Commentaire");
-define("_REVIEWS", "Comptes rendus");
 define("_SEARCHUSERS", "Rechercher dans la base de donn&eacute;es des utilisateurs");
 define("_SEARCHSECTIONS", "Rechercher dans les rubriques sp&eacute;ciales");
 define("_SEARCHREVIEWS", "Rechercher dans les comptes rendus");
@@ -52,6 +51,5 @@ define("_SREPLY", "R&eacute;pondre");
 define("_SREPLIES", "R&eacute;ponses");
 define("_ATTACHART", "Attach&eacute; &agrave; l'article");
 define("_PAGES", "Pages");
-define("_REVIEWSCORE", "Score pour ce compte rendu");
 define("_PAGE", "Page");
 define("_SEARCHCHARACTERS", "<center><b>Search System Error</b><br><br>Your query should be at least 3 characters long to be processed.<br>Please, fix the problem and try again...</center>");

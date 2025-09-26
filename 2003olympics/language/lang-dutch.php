@@ -38,7 +38,6 @@ define("_ON", "op");
 define("_LOGOUT", "Afmelden");
 define("_WAITINGCONT", "Wachtende inhoud");
 define("_SUBMISSIONS", "Ingeleverde stukken");
-define("_WREVIEWS", "Wachtende periodieken");
 define("_WLINKS", "Wachtende links");
 define("_EPHEMERIDS", "Ephemerids");
 define("_ONEDAY", "Een dag zoals vandaag...");

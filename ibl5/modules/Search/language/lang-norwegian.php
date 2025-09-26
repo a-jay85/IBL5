@@ -20,7 +20,6 @@
 define("_ALLTOPICS", "Alle emner");
 define("_NOCOMMENTS", "Ingen kommentarer");
 define("_UCOMMENT", "Kommentar");
-define("_REVIEWS", "Anmeldelser");
 define("_SEARCHUSERS", "S�k i medlemsdatabasen");
 define("_SEARCHSECTIONS", "S�k i spesialavdelingene");
 define("_SEARCHREVIEWS", "S�k blant anmeldelsene");
@@ -52,7 +51,6 @@ define("_SREPLY", "Svar");
 define("_SREPLIES", "Svar");
 define("_ATTACHART", "Vedlagt artikkelen");
 define("_PAGES", "Sider");
-define("_REVIEWSCORE", "Poengsum for denne artikkelen");
 define("_PAGE", "Side");
 define("_DOWNLOADS", "Nedlastinger");
 define("_WEBLINKS", "Weblinker");

@@ -38,7 +38,6 @@ define("_ON", "noiz");
 define("_LOGOUT", "Irten");
 define("_WAITINGCONT", "Edukiak itxaroten");
 define("_SUBMISSIONS", "Notizi bidalketak");
-define("_WREVIEWS", "Berrikuspenak");
 define("_WLINKS", "Loturak");
 define("_EPHEMERIDS", "Efemerideak");
 define("_ONEDAY", "Gaurko egun berdinean...");

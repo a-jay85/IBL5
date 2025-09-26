@@ -38,7 +38,6 @@ define("_ON", "le");
 define("_LOGOUT", "Sortie");
 define("_WAITINGCONT", "Contenu en attente");
 define("_SUBMISSIONS", "Propositions");
-define("_WREVIEWS", "Comptes rendus en attente");
 define("_WLINKS", "Liens en attente");
 define("_EPHEMERIDS", "Eph&eacute;m&eacute;rides");
 define("_ONEDAY", "Un Jour comme Aujourd'hui...");

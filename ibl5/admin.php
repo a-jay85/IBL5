@@ -187,14 +187,6 @@ function login()
     Nuke\Footer::footer();
 }
 
-function deleteNotice($id)
-{
-    global $prefix, $db, $admin_file;
-    $id = intval($id);
-    $db->sql_query("DELETE FROM " . $prefix . "_reviews_add WHERE id = '$id'");
-    Header("Location: " . $admin_file . ".php?op=reviews");
-}
-
 /*********************************************************/
 /* Administration Menu Function                          */
 /*********************************************************/
@@ -464,14 +456,6 @@ function adminMain()
 if ($admintest) {
 
     switch ($op) {
-
-        case "do_gfx":
-            do_gfx();
-            break;
-
-        case "deleteNotice":
-            deleteNotice($id);
-            break;
 
         case "GraphicAdmin":
             GraphicAdmin();

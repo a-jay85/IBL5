@@ -20,7 +20,6 @@
 define("_ALLTOPICS", "T�do-los temas");
 define("_NOCOMMENTS", "Sen comentarios");
 define("_UCOMMENT", "Comentario");
-define("_REVIEWS", "Rese�as");
 define("_SEARCHUSERS", "Buscar nos Usuarios");
 define("_SEARCHSECTIONS", "Buscar nas Secci�ns Especiales");
 define("_SEARCHREVIEWS", "Buscar nas Rese�as");
@@ -52,7 +51,6 @@ define("_SREPLY", "respostan");
 define("_SREPLIES", "resposta");
 define("_ATTACHART", "Adxuntar � artigo");
 define("_PAGES", "P�xinas");
-define("_REVIEWSCORE", "Valoraci�n para esta rese�a");
 define("_PAGE", "p�xina(s) ");
 define("_DOWNLOADS", "Downloads");
 define("_WEBLINKS", "Web Links");

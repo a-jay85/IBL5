@@ -34,7 +34,6 @@
 define("_ALLTOPICS", "V�etky t�my");
 define("_NOCOMMENTS", "Bez koment�ra");
 define("_UCOMMENT", "Koment�r");
-define("_REVIEWS", "Recenzie");
 define("_SEARCHUSERS", "H�ada� v datab�ze u��vate�ov");
 define("_SEARCHSECTIONS", "H�ada� v z�ujmov�ch oblastiach");
 define("_SEARCHREVIEWS", "H�ada� v recenzi�ch");
@@ -66,7 +65,6 @@ define("_SREPLY", "Odpove�");
 define("_SREPLIES", "Odpovede");
 define("_ATTACHART", "Pr�davky k �l�nku");
 define("_PAGES", "Str�nky");
-define("_REVIEWSCORE", "Sk�re pre t�to recenziu");
 define("_PAGE", "Strana");
 define("_DOWNLOADS", "Downloady");
 define("_WEBLINKS", "Web linky");

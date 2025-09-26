@@ -27,13 +27,11 @@ if ($multilingual == 1) {
     $querya1lang = "WHERE (alanguage='$currentlang' OR alanguage='') AND"; /* top stories */
     $queryslang = "WHERE slanguage='$currentlang' "; /* top section articles */
     $queryplang = "WHERE planguage='$currentlang' "; /* top polls */
-    $queryrlang = "WHERE rlanguage='$currentlang' "; /* top reviews */
 } else {
     $queryalang = "";
     $querya1lang = "WHERE";
     $queryslang = "";
     $queryplang = "";
-    $queryrlang = "";
 }
 
 OpenTable();
@@ -202,25 +200,6 @@ if ($db->sql_numrows($result11) > 0) {
         $counter = intval($row11['counter']);
         if ($counter > 0) {
             echo "<strong><big>&middot;</big></strong>&nbsp;$lugar: <a href=\"modules.php?name=Search&amp;query=&amp;author=$aid\">$aid</a> - ($counter " . _NEWSPUBLISHED . ")<br>\n";
-            $lugar++;
-        }
-    }
-    echo "</font></td></tr></table><br>\n";
-}
-
-/* Top 10 reviews */
-
-$result12 = $db->sql_query("SELECT id, title, hits FROM " . $prefix . "_reviews $queryrlang ORDER BY hits DESC LIMIT 0,$top");
-if ($db->sql_numrows($result12) > 0) {
-    echo "<table border=\"0\" cellpadding=\"10\" width=\"100%\"><tr><td align=\"left\">\n"
-        . "<font class=\"option\"><b>$top " . _READREVIEWS . "</b></font><br><br><font class=\"content\">\n";
-    $lugar = 1;
-    while ($row12 = $db->sql_fetchrow($result12)) {
-        $id = intval($row12['id']);
-        $title = filter($row12['title'], "nohtml");
-        $hits = intval($row12['hits']);
-        if ($hits > 0) {
-            echo "<strong><big>&middot;</big></strong>&nbsp;$lugar: <a href=\"modules.php?name=Reviews&amp;op=showcontent&amp;id=$id\">$title</a> - ($hits " . _READS . ")<br>\n";
             $lugar++;
         }
     }

@@ -21,7 +21,6 @@ define("_ALLTOPICS", "�Ҧ����s�D�D�D");
 define("_NOCOMMENTS", "����ܷN��");
 
 define("_UCOMMENT", "����");
-define("_REVIEWS", "�@�~����");
 define("_SEARCHUSERS", "�j�M�ϥΪ̸�Ʈw");
 define("_SEARCHSECTIONS", "�j�M�M��");
 define("_SEARCHREVIEWS", "�j�M�@�~�N��");
@@ -53,7 +52,6 @@ define("_SREPLY", "�^��");
 define("_SREPLIES", "�^��");
 define("_ATTACHART", "�峹����");
 define("_PAGES", "��");
-define("_REVIEWSCORE", "�@�~���׵���");
 define("_PAGE", "��");
 define("_DOWNLOADS", "�U���귽");
 define("_WEBLINKS", "��������");

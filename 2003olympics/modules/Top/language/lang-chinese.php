@@ -31,7 +31,6 @@ define("_NEWSSENT", "�s�D�H�e");
 define("_VOTEDPOLLS", "���o���Ƴ̦h���벼�լd");
 define("_MOSTACTIVEAUTHORS", "��̬��D���@��");
 define("_NEWSPUBLISHED", "�s�D�o��");
-define("_READREVIEWS", "�̨��w�諸�@�~����");
 define("_DOWNLOADEDFILES", "�̱`�Q�U�����ɮ�");
 define("_LDOWNLOADS", "�U������");
 define("_MOSTREADPAGES", "�̱`�Q�\Ū������");

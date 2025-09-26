@@ -28,7 +28,6 @@ define("_ON", "el");
 define("_LOGOUT", "Sortir");
 define("_WAITINGCONT", "Contingut Esperant");
 define("_SUBMISSIONS", "Enviaments");
-define("_WREVIEWS", "Reviews");
 define("_WLINKS", "Enlla�os");
 define("_EPHEMERIDS", "Efem�rides");
 define("_ONEDAY", "Tal dia com avui...");

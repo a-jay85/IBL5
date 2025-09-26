@@ -38,7 +38,6 @@ define("_ON", "-");
 define("_LOGOUT", "Izhod/odjava");
 define("_WAITINGCONT", "Vsebina na �akanju");
 define("_SUBMISSIONS", "Novo poslani �lanki");
-define("_WREVIEWS", "Recenzije na �akanju");
 define("_WLINKS", "Povezave na �akanju");
 define("_EPHEMERIDS", "Neko� davno...");
 define("_ONEDAY", "Dan kot dana�nji...");

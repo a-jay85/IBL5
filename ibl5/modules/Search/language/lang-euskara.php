@@ -20,7 +20,6 @@
 define("_ALLTOPICS", "Gai guztiak");
 define("_NOCOMMENTS", "Komentariorik gabe");
 define("_UCOMMENT", "Komentarioa");
-define("_REVIEWS", "Berrikuspenak");
 define("_SEARCHUSERS", "Kideetan bilatu");
 define("_SEARCHSECTIONS", "Atal Berezietan bilatu");
 define("_SEARCHREVIEWS", "Berrikuspenetan bilatu");
@@ -52,6 +51,5 @@ define("_SREPLY", "bat egiten du");
 define("_SREPLIES", "bat egiten dute");
 define("_ATTACHART", "Berriari eranztu");
 define("_PAGES", "Orrialde");
-define("_REVIEWSCORE", "Berrikuspen honi balorazioa");
 define("_PAGE", "orrialde ");
 define("_SEARCHCHARACTERS", "<center><b>Search System Error</b><br><br>Your query should be at least 3 characters long to be processed.<br>Please, fix the problem and try again...</center>");

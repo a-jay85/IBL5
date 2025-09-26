@@ -45,7 +45,6 @@ define("_ON", "v");
 define("_LOGOUT", "Odhl�si? sa");
 define("_WAITINGCONT", "Na overenie �ak�");
 define("_SUBMISSIONS", "Pr�spevky");
-define("_WREVIEWS", "Recenzie");
 define("_WLINKS", "Odkazy");
 define("_EPHEMERIDS", "Udalosti");
 define("_ONEDAY", "De� ako ka�d� in�...");

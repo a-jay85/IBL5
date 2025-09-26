@@ -38,7 +38,6 @@ define("_ON", "o");
 define("_LOGOUT", "Sair");
 define("_WAITINGCONT", "Contido Esperando");
 define("_SUBMISSIONS", "Env�os");
-define("_WREVIEWS", "Rese�as esperando");
 define("_WLINKS", "Enlaces esperando");
 define("_EPHEMERIDS", "Efem�rides");
 define("_ONEDAY", "Tal d�a coma hoxe ...");

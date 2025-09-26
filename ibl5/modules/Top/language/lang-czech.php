@@ -30,7 +30,6 @@ define("_NEWSSENT", "poslan�ch zpr�v");
 define("_VOTEDPOLLS", "anket s nejv�ce hlasy");
 define("_MOSTACTIVEAUTHORS", "nejaktivn�j��ch autor�");
 define("_NEWSPUBLISHED", "�l�nky(�)");
-define("_READREVIEWS", "nej�ten�j��ch recenz�");
 define("_DOWNLOADEDFILES", "nejstahovan�j��ch soubor�");
 define("_MOSTREADPAGES", "most read pages");
 define("_MOSTVOTEDSTORIES", "most voted stories");

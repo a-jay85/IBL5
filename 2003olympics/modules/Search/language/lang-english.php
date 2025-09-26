@@ -20,7 +20,6 @@
 define("_ALLTOPICS", "All Topics");
 define("_NOCOMMENTS", "No Comments");
 define("_UCOMMENT", "Comment");
-define("_REVIEWS", "Reviews");
 define("_SEARCHUSERS", "Search in User's Database");
 define("_SEARCHSECTIONS", "Search in Special Sections");
 define("_SEARCHREVIEWS", "Search in Reviews");
@@ -52,7 +51,6 @@ define("_SREPLY", "Reply");
 define("_SREPLIES", "Replies");
 define("_ATTACHART", "Attached to Article");
 define("_PAGES", "Pages");
-define("_REVIEWSCORE", "Score for this Review");
 define("_PAGE", "Page");
 define("_DOWNLOADS", "Downloads");
 define("_WEBLINKS", "Web Links");

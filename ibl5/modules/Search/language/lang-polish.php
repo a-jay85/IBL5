@@ -23,7 +23,6 @@
 define("_ALLTOPICS", "Wszystkie tematy");
 define("_NOCOMMENTS", "Bez komentarza");
 define("_UCOMMENT", "Komentarz");
-define("_REVIEWS", "Recenzje");
 define("_SEARCHUSERS", "Szukaj w bazie u�ytkownik�w");
 define("_SEARCHSECTIONS", "Szukaj w sekcjach specjalnych");
 define("_SEARCHREVIEWS", "Szukaj w recenzjach");
@@ -55,7 +54,6 @@ define("_SREPLY", "Odpowiedz");
 define("_SREPLIES", "Odpowiedzi");
 define("_ATTACHART", "Do��czony do artyku�u");
 define("_PAGES", "Strony");
-define("_REVIEWSCORE", "Wynik dla tej recenzji");
 define("_PAGE", "Strona");
 define("_DOWNLOADS", "Pliki");
 define("_WEBLINKS", "Linki");

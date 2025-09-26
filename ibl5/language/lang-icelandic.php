@@ -38,7 +38,6 @@ define("_ON", "�ann");
 define("_LOGOUT", "Skr� �ig �t");
 define("_WAITINGCONT", "Efni � bi�r��");
 define("_SUBMISSIONS", "Fr�ttir");
-define("_WREVIEWS", "Umsagnir � bi�");
 define("_WLINKS", "Veftenglar � bi�");
 define("_EPHEMERIDS", "Dagb�karbrot");
 define("_ONEDAY", "�essi dagur � s�gunni...");

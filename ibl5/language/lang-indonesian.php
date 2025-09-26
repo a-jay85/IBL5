@@ -38,7 +38,6 @@ define("_ON", "pada");
 define("_LOGOUT", "Logout");
 define("_WAITINGCONT", "Daftar Tunggu");
 define("_SUBMISSIONS", "Berita");
-define("_WREVIEWS", "Ulasan");
 define("_WLINKS", "Links");
 define("_EPHEMERIDS", "Ephemerids");
 define("_ONEDAY", "Hari ini tahunan lampau...");

@@ -31,7 +31,6 @@ define("_NEWSSENT", "nouvelles envoy&eacute;es");
 define("_VOTEDPOLLS", "votes les plus importants sur les sondages");
 define("_MOSTACTIVEAUTHORS", "auteurs/mod&eacute;rateurs les plus actifs");
 define("_NEWSPUBLISHED", "nouvelles publi&eacute;es");
-define("_READREVIEWS", "comptes rendus les plus lus");
 define("_DOWNLOADEDFILES", "fichiers les plus t&eacute;l&eacute;charg&eacute;s");
 define("_MOSTREADPAGES", "pages les plus lues");
 define("_MOSTVOTEDSTORIES", "most voted stories");

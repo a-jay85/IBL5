@@ -43,7 +43,6 @@ define("_ON", "em");
 define("_LOGOUT", "Sair");
 define("_WAITINGCONT", "Aguardando conte�do");
 define("_SUBMISSIONS", "Envios");
-define("_WREVIEWS", "Aguardando revis�o");
 define("_WLINKS", "Aguardando links");
 define("_EPHEMERIDS", "Eventos");
 define("_ONEDAY", "Um dia...");

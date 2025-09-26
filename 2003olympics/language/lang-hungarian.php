@@ -38,7 +38,6 @@ define("_ON", "Ideje:");
 define("_LOGOUT", "Kil�p�s");
 define("_WAITINGCONT", "J�v�hagy�sra v�r� tartalom");
 define("_SUBMISSIONS", "J�v�hagy�sra v�r� tartalom");
-define("_WREVIEWS", "J�v�hagy�sra v�r� ismertet�k");
 define("_WLINKS", "J�v�hagy�sra v�r� linkek");
 define("_EPHEMERIDS", "�vfordul�k");
 define("_ONEDAY", "�vfordul�k");

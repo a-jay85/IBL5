@@ -20,7 +20,6 @@
 define("_ALLTOPICS", "�ء��Ǣ��");
 define("_NOCOMMENTS", "����դ������");
 define("_UCOMMENT", "�������");
-define("_REVIEWS", "���Ԩ�ó�");
 define("_SEARCHUSERS", "����㹰ҹ�����ż����");
 define("_SEARCHSECTIONS", "����㹻����������");
 define("_SEARCHREVIEWS", "����㹢�鹡�õ�Ǩ�ͺ");
@@ -52,7 +51,6 @@ define("_SREPLY", "�ͺ��Ѻ");
 define("_SREPLIES", "�ͺ��Ѻ");
 define("_ATTACHART", "��ǡ��ҡѺ������");
 define("_PAGES", "˹��");
-define("_REVIEWSCORE", "��ṹ����Ѻ���йӹ��");
 define("_PAGE", "˹��");
 define("_DOWNLOADS", "��ǹ���Ŵ");
 define("_WEBLINKS", "����ԧ��");

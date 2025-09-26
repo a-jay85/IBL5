@@ -38,7 +38,6 @@ define("_ON", "��");
 define("_LOGOUT", "����");
 define("_WAITINGCONT", "������� ��������");
 define("_SUBMISSIONS", "������");
-define("_WREVIEWS", "������� ��������");
 define("_WLINKS", "����� ��������");
 define("_EPHEMERIDS", "������� ���������");
 define("_ONEDAY", "�� ��� ��� �����...");

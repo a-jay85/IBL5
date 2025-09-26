@@ -41,7 +41,6 @@ define("_ON", "dnia");
 define("_LOGOUT", "Wyloguj");
 define("_WAITINGCONT", "Oczekuj�ca tre��");
 define("_SUBMISSIONS", "Wys�anie");
-define("_WREVIEWS", "Oczekuj�ce recenzje");
 define("_WLINKS", "Oczekuj�ce linki");
 define("_EPHEMERIDS", "Ephemeridy");
 define("_ONEDAY", "Pewnego dnia, jak dzisiaj...");

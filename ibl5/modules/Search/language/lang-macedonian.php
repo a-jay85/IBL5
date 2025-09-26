@@ -20,7 +20,6 @@
 define("_ALLTOPICS", "���� ����");
 define("_NOCOMMENTS", "���� ���������");
 define("_UCOMMENT", "��������");
-define("_REVIEWS", "�������");
 define("_SEARCHUSERS", "���� �� ������ �� ���������");
 define("_SEARCHSECTIONS", "���� �� ��������� ������");
 define("_SEARCHREVIEWS", "���� �� �����������");
@@ -52,6 +51,5 @@ define("_SREPLY", "�������");
 define("_SREPLIES", "��������");
 define("_ATTACHART", "�������� �� �����");
 define("_PAGES", "������");
-define("_REVIEWSCORE", "����� �� ����������");
 define("_PAGE", "������");
 define("_SEARCHCHARACTERS", "<center><b>Search System Error</b><br><br>Your query should be at least 3 characters long to be processed.<br>Please, fix the problem and try again...</center>");

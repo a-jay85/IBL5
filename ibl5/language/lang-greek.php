@@ -44,7 +44,6 @@ define("_DATESTRING2", "%A, %B %d");
 define("_OLDERARTICLES", "���������� �����");
 define("_WAITINGCONT", "����������� �� �������");
 define("_SUBMISSIONS", "��������");
-define("_WREVIEWS", "������������ �� �������");
 define("_WLINKS", "��������� �� �������");
 define("_EPHEMERIDS", "�������");
 define("_ONEDAY", "��� ���� ��� ������...");

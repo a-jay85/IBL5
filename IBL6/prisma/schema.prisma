@@ -1,0 +1,351 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Team {
+  teamid         Int     @id @default(0)
+  city           String  @default("") @map("team_city") @db.VarChar(24)
+  name           String  @default("") @map("team_name") @db.VarChar(16)
+  color1         String  @default("") @map("color1") @db.VarChar(6)
+  color2         String  @default("") @map("color2") @db.VarChar(6)
+  arena          String  @default("") @map("arena") @db.VarChar(255)
+  owner          String  @default("") @map("owner_name") @db.VarChar(32)
+  ownerEmail     String  @default("") @map("owner_email") @db.VarChar(48)
+  discord        BigInt? @map("discordID") @db.UnsignedBigInt
+  skype          String  @map("skype") @db.VarChar(16)
+  aim            String  @default("") @map("aim") @db.VarChar(48)
+  msn            String  @default("") @map("msn") @db.VarChar(48)
+  fka            String? @map("formerly_known_as") @db.VarChar(255)
+  contractWins   Int     @default(0) @map("Contract_Wins")
+  contractLosses Int     @default(0) @map("Contract_Losses")
+  contractAvgW   Int     @default(0) @map("Contract_AvgW")
+  contractAvgL   Int     @default(0) @map("Contract_AvgL")
+  contractCoach  Float   @default(0.00) @map("Contract_Coach")
+  usedExtChunk   Int     @default(0) @map("Used_Extension_This_Chunk")
+  usedExtSeason  Int?    @default(0) @map("Used_Extension_This_Season")
+  hasMLE         Int     @default(0) @map("HasMLE")
+  hasLLE         Int     @default(0) @map("HasLLE")
+  chart          String  @default("") @map("chart") @db.Char(2)
+
+  // Relations
+  homeGames BoxGame[] @relation("homeTeam")
+  awayGames BoxGame[] @relation("awayTeam")
+  awayTeamPlayers BoxPlayer[] @relation("awayTeamPlayers")
+  homeTeamPlayers BoxPlayer[] @relation("homeTeamPlayers")
+
+  currentPlayers IblPlayer[] @relation("currentTeamPlayers")
+
+  @@index([name], map: "team_name")
+  @@map("ibl_team_info")
+}
+
+model BoxPlayer {
+  gameDate   DateTime @map("Date") @db.Date
+  name       String?  @default("") @db.VarChar(16)
+  pos        String?  @default("") @db.VarChar(2)
+  pid        Int      @map("pid")
+  awayTeamId Int?     @map("visitorTID")
+  homeTeamId Int?     @map("homeTID")
+  min        Int?     @map("gameMIN")
+  fgm        Int?     @map("gameFGM")
+  fga        Int?     @map("gameFGA")
+  ftm        Int?     @map("gameFTM")
+  fta        Int?     @map("gameFTA")
+  tpm        Int?     @map("game3GM")
+  tpa        Int?     @map("game3GA")
+  orb        Int?     @map("gameORB")
+  drb        Int?     @map("gameDRB")
+  ast        Int?     @map("gameAST")
+  stl        Int?     @map("gameSTL")
+  tov        Int?     @map("gameTOV")
+  blk        Int?     @map("gameBLK")
+  pf         Int?     @map("gamePF")
+
+  player IblPlayer @relation(fields: [pid], references: [pid])
+  awayTeam Team? @relation("awayTeamPlayers", fields: [awayTeamId], references: [teamid])
+  homeTeam Team? @relation("homeTeamPlayers", fields: [homeTeamId], references: [teamid])
+
+  @@id([gameDate, pid])
+  @@map("ibl_box_scores")
+}
+
+model IblPlayer {
+  ordinal              Int?    @default(0)
+  pid                  Int     @id @default(0)
+  name                 String? @default("") @db.VarChar(32)
+  nickname             String? @default("") @db.VarChar(64)
+  age                  String? @default("") @db.Char(2)
+  peak                 Int?    @default(0)
+  teamId               Int?    @default(0) @map("tid")
+  teamname             String? @default("") @db.VarChar(32)
+  pos                  String? @default("") @db.VarChar(4)
+  sta                  Int?    @default(0)
+  oo                   Int?    @default(0)
+  od                   Int?    @default(0)
+  do                   Int?    @default(0)
+  dd                   Int?    @default(0)
+  po                   Int?    @default(0)
+  pd                   Int?    @default(0)
+  to                   Int?    @default(0)
+  td                   Int?    @default(0)
+  Clutch               String? @default("") @db.VarChar(32)
+  Consistency          String? @default("") @db.VarChar(32)
+  PGDepth              Int?    @default(0)
+  SGDepth              Int?    @default(0)
+  SFDepth              Int?    @default(0)
+  PFDepth              Int?    @default(0)
+  CDepth               Int?    @default(0)
+  active               Int?    @default(0)
+  dc_PGDepth           Int?    @default(0)
+  dc_SGDepth           Int?    @default(0)
+  dc_SFDepth           Int?    @default(0)
+  dc_PFDepth           Int?    @default(0)
+  dc_CDepth            Int?    @default(0)
+  dc_active            Int?    @default(1)
+  dc_minutes           Int?    @default(0)
+  dc_of                Int?    @default(0)
+  dc_df                Int?    @default(0)
+  dc_oi                Int?    @default(0)
+  dc_di                Int?    @default(0)
+  dc_bh                Int?    @default(0)
+  stats_gs             Int?    @default(0)
+  stats_gm             Int?    @default(0)
+  stats_min            Int?    @default(0)
+  stats_fgm            Int?    @default(0)
+  stats_fga            Int?    @default(0)
+  stats_ftm            Int?    @default(0)
+  stats_fta            Int?    @default(0)
+  stats_tpm            Int?    @default(0) @map("stats_3gm")
+  stats_tpa            Int?    @default(0) @map("stats_3ga")
+  stats_orb            Int?    @default(0)
+  stats_drb            Int?    @default(0)
+  stats_ast            Int?    @default(0)
+  stats_stl            Int?    @default(0)
+  stats_to             Int?    @default(0)
+  stats_blk            Int?    @default(0)
+  stats_pf             Int?    @default(0)
+  talent               Int?    @default(0)
+  skill                Int?    @default(0)
+  intangibles          Int?    @default(0)
+  coach                String? @default("") @db.VarChar(16)
+  loyalty              String? @default("") @db.VarChar(16)
+  playingTime          String? @default("") @db.VarChar(16)
+  winner               String? @default("") @db.VarChar(16)
+  tradition            String? @default("") @db.VarChar(16)
+  security             String? @default("") @db.VarChar(16)
+  exp                  Int?    @default(0)
+  bird                 Int?    @default(0)
+  cy                   Int?    @default(0)
+  cyt                  Int?    @default(0)
+  cy1                  Int?    @default(0)
+  cy2                  Int?    @default(0)
+  cy3                  Int?    @default(0)
+  cy4                  Int?    @default(0)
+  cy5                  Int?    @default(0)
+  cy6                  Int?    @default(0)
+  sh_pts               Int?    @default(0)
+  sh_reb               Int?    @default(0)
+  sh_ast               Int?    @default(0)
+  sh_stl               Int?    @default(0)
+  sh_blk               Int?    @default(0)
+  s_dd                 Int?    @default(0)
+  s_td                 Int?    @default(0)
+  sp_pts               Int?    @default(0)
+  sp_reb               Int?    @default(0)
+  sp_ast               Int?    @default(0)
+  sp_stl               Int?    @default(0)
+  sp_blk               Int?    @default(0)
+  ch_pts               Int?    @default(0)
+  ch_reb               Int?    @default(0)
+  ch_ast               Int?    @default(0)
+  ch_stl               Int?    @default(0)
+  ch_blk               Int?    @default(0)
+  c_dd                 Int?    @default(0)
+  c_td                 Int?    @default(0)
+  cp_pts               Int?    @default(0)
+  cp_reb               Int?    @default(0)
+  cp_ast               Int?    @default(0)
+  cp_stl               Int?    @default(0)
+  cp_blk               Int?    @default(0)
+  car_gm               Int?    @default(0)
+  car_min              Int?    @default(0)
+  car_fgm              Int?    @default(0)
+  car_fga              Int?    @default(0)
+  car_ftm              Int?    @default(0)
+  car_fta              Int?    @default(0)
+  car_tgm              Int?    @default(0)
+  car_tga              Int?    @default(0)
+  car_orb              Int?    @default(0)
+  car_drb              Int?    @default(0)
+  car_reb              Int?    @default(0)
+  car_ast              Int?    @default(0)
+  car_stl              Int?    @default(0)
+  car_to               Int?    @default(0)
+  car_blk              Int?    @default(0)
+  car_pf               Int?    @default(0)
+  car_pts              Int?    @default(0)
+  r_fga                Int?    @default(0)
+  r_fgp                Int?    @default(0)
+  r_fta                Int?    @default(0)
+  r_ftp                Int?    @default(0)
+  r_tga                Int?    @default(0)
+  r_tgp                Int?    @default(0)
+  r_orb                Int?    @default(0)
+  r_drb                Int?    @default(0)
+  r_ast                Int?    @default(0)
+  r_stl                Int?    @default(0)
+  r_to                 Int?    @default(0)
+  r_blk                Int?    @default(0)
+  r_foul               Int?    @default(0)
+  draftround           Int?    @default(0)
+  draftedby            String? @default("") @db.VarChar(32)
+  draftedbycurrentname String? @default("") @db.VarChar(32)
+  draftyear            Int?    @default(0)
+  draftpickno          Int?    @default(0)
+  injured              Int?    @default(0)
+  htft                 String? @default("") @db.VarChar(8)
+  htin                 String? @default("") @db.VarChar(8)
+  wt                   String? @default("") @db.VarChar(8)
+  retired              Int?    @default(0) @db.SmallInt
+  college              String? @default("") @db.VarChar(48)
+  car_playoff_min      Int?    @default(0)
+  car_preseason_min    Int?    @default(0)
+  droptime             Int?    @default(0)
+  temp                 Int?    @default(0)
+
+  // Relations
+  boxScores BoxPlayer[]
+  currentTeam Team? @relation("currentTeamPlayers", fields: [teamId], references: [teamid])
+
+  @@index([name], map: "name")
+  @@index([teamname], map: "teamname")
+  @@map("ibl_plr")
+}
+
+model BoxGame {
+  date          DateTime @map("Date") @db.Date
+  name          String?  @default("") @db.VarChar(16)
+  gameOfThatDay Int      @map("gameOfThatDay")
+  awayTeamId    Int?     @map("visitorTeamID")
+  homeTeamId    Int?     @map("homeTeamID")
+  attendance    Int?     @map("attendance")
+  capacity      Int?     @map("capacity")
+  visitorWins   Int?     @map("visitorWins")
+  visitorLosses Int?     @map("visitorLosses")
+  homeWins      Int?     @map("homeWins")
+  homeLosses    Int?     @map("homeLosses")
+  visitorQ1pts  Int?     @map("visitorQ1points")
+  visitorQ2pts  Int?     @map("visitorQ2points")
+  visitorQ3pts  Int?     @map("visitorQ3points")
+  visitorQ4pts  Int?     @map("visitorQ4points")
+  visitorOTpts  Int?     @map("visitorOTpoints")
+  homeQ1pts     Int?     @map("homeQ1points")
+  homeQ2pts     Int?     @map("homeQ2points")
+  homeQ3pts     Int?     @map("homeQ3points")
+  homeQ4pts     Int?     @map("homeQ4points")
+  homeOTpts     Int?     @map("homeOTpoints")
+  min           Int?     @map("gameMIN")
+  fgm           Int?     @map("gameFGM")
+  fga           Int?     @map("gameFGA")
+  ftm           Int?     @map("gameFTM")
+  fta           Int?     @map("gameFTA")
+  tpm           Int?     @map("game3GM")
+  tpa           Int?     @map("game3GA")
+  orb           Int?     @map("gameORB")
+  drb           Int?     @map("gameDRB")
+  ast           Int?     @map("gameAST")
+  stl           Int?     @map("gameSTL")
+  tov           Int?     @map("gameTOV")
+  blk           Int?     @map("gameBLK")
+  pf            Int?     @map("gamePF")
+
+  // Relations
+  awayTeam Team? @relation("awayTeam", fields: [awayTeamId], references: [teamid])
+  homeTeam Team? @relation("homeTeam", fields: [homeTeamId], references: [teamid])
+
+  @@id([date, gameOfThatDay])
+  @@map("ibl_box_scores_teams")
+}
+
+model ibl_power {
+  TeamID      Int     @default(0) @db.SmallInt
+  Team        String  @id @default("") @db.VarChar(20)
+  Division    String  @default("") @db.VarChar(20)
+  Conference  String  @default("") @db.VarChar(20)
+  ranking     Decimal @default(0.0) @db.Decimal(6, 1)
+  win         Int     @default(0) @db.SmallInt
+  loss        Int     @default(0) @db.SmallInt
+  gb          Decimal @default(0.0) @db.Decimal(6, 1)
+  conf_win    Int
+  conf_loss   Int
+  div_win     Int
+  div_loss    Int
+  home_win    Int
+  home_loss   Int
+  road_win    Int
+  road_loss   Int
+  last_win    Int
+  last_loss   Int
+  streak_type String  @default("") @db.VarChar(1)
+  streak      Int
+}
+
+model ibl_schedule {
+  Year    Int      @default(0) @db.Year
+  BoxID   Int      @default(0)
+  Date    DateTime @db.Date
+  Visitor Int      @default(0)
+  VScore  Int      @default(0)
+  Home    Int      @default(0)
+  HScore  Int      @default(0)
+  SchedID Int      @id @default(autoincrement())
+
+  @@index([BoxID], map: "BoxID")
+}
+
+model ibl_standings {
+  tid                Int      @id @db.UnsignedInt
+  team_name          String   @default("") @db.VarChar(16)
+  pct                Float?   @db.Float
+  leagueRecord       String?  @default("") @db.VarChar(5)
+  conference         String?  @default("") @db.VarChar(7)
+  confRecord         String   @default("") @db.VarChar(5)
+  confGB             Decimal? @db.Decimal(3, 1)
+  division           String?  @default("") @db.VarChar(16)
+  divRecord          String   @default("") @db.VarChar(5)
+  divGB              Decimal? @db.Decimal(3, 1)
+  homeRecord         String   @default("") @db.VarChar(5)
+  awayRecord         String   @default("") @db.VarChar(5)
+  gamesUnplayed      Int?     @db.UnsignedInt
+  confWins           Int?     @db.UnsignedInt
+  confLosses         Int?     @db.UnsignedInt
+  divWins            Int?     @db.UnsignedInt
+  divLosses          Int?     @db.UnsignedInt
+  homeWins           Int?     @db.UnsignedInt
+  homeLosses         Int?     @db.UnsignedInt
+  awayWins           Int?     @db.UnsignedInt
+  awayLosses         Int?     @db.UnsignedInt
+  confMagicNumber    Int?
+  divMagicNumber     Int?
+  clinchedConference Boolean?
+  clinchedDivision   Boolean?
+  clinchedPlayoffs   Boolean?
+
+  @@index([team_name], map: "team_name")
+}
+
+model users {
+  id                BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  name              String    @db.VarChar(255)
+  email             String    @unique(map: "users_email_unique") @db.VarChar(255)
+  email_verified_at DateTime? @db.Timestamp(0)
+  password          String    @db.VarChar(255)
+  remember_token    String?   @db.VarChar(100)
+  created_at        DateTime? @db.Timestamp(0)
+  updated_at        DateTime? @db.Timestamp(0)
+}

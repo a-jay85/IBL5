@@ -217,7 +217,15 @@ class Team
                     <tr>
                         <td align='right'><b>Arena:</td>
                         <td>$team->arena</td>
-                    </tr>
+                    </tr>";
+        if ($team->capacity != 0) {
+            $output .= "
+                    <tr>
+                        <td align='right'><b>Capacity:</td>
+                        <td>$team->capacity</td>
+                    </tr>";
+        }
+                    $output .= "
                     <tr>
                         <td align='right'><b>Conference:</td>
                         <td>$conference</td>
@@ -276,8 +284,8 @@ class Team
             $draftPickOriginalTeamCity = $teamsArray[$draftPick->originalTeam]->city;
     
             $tableDraftPicks .= "<tr>
-                <td valign=\"center\"><a href=\"modules.php?name=Team&op=team&tid=$draftPickOriginalTeamID\"><img src=\"images/logo/$draftPick->originalTeam.png\" height=33 width=33></a></td>
-                <td valign=\"center\"><a href=\"modules.php?name=Team&op=team&tid=$draftPickOriginalTeamID\">$draftPick->year $draftPickOriginalTeamCity $draftPick->originalTeam (Round $draftPick->round)</a></td>
+                <td valign=\"center\"><a href=\"modules.php?name=Team&op=team&teamID=$draftPickOriginalTeamID\"><img src=\"images/logo/$draftPick->originalTeam.png\" height=33 width=33></a></td>
+                <td valign=\"center\"><a href=\"modules.php?name=Team&op=team&teamID=$draftPickOriginalTeamID\">$draftPick->year $draftPickOriginalTeamCity $draftPick->originalTeam (Round $draftPick->round)</a></td>
             </tr>";
             if ($draftPick->notes != NULL) {
                 $tableDraftPicks .= "<tr>
@@ -352,7 +360,7 @@ class Team
             $wintot += $wins;
             $lostot += $losses;
             $winpct = ($wins + $losses) ? number_format($wins / ($wins + $losses), 3) : "0.000";
-            $output .= "<a href=\"./modules.php?name=Team&op=team&tid=$team->teamID&yr=$yearwl\">$yearwl $namewl</a>: $wins-$losses ($winpct)<br>";
+            $output .= "<a href=\"./modules.php?name=Team&op=team&teamID=$team->teamID&yr=$yearwl\">$yearwl $namewl</a>: $wins-$losses ($winpct)<br>";
         
             $h++;
         }
@@ -593,7 +601,7 @@ class Team
             $wintot += $wins;
             $lostot += $losses;
             $winpct = ($wins + $losses) ? number_format($wins / ($wins + $losses), 3) : "0.000";
-            $output .= "<a href=\"./modules.php?name=Team&op=team&tid=$team->teamID&yr=$yearwl\">" . ($yearwl - 1) . "-$yearwl $namewl</a>: $wins-$losses ($winpct)<br>";
+            $output .= "<a href=\"./modules.php?name=Team&op=team&teamID=$team->teamID&yr=$yearwl\">" . ($yearwl - 1) . "-$yearwl $namewl</a>: $wins-$losses ($winpct)<br>";
 
             $h++;
         }

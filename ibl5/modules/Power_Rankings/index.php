@@ -79,7 +79,7 @@ while ($i < $num) {
     echo "\t<td align=right>";
     echo "\t\t<font class=\"option\">$i.</td>";
     echo "\t<td align=center>";
-    echo "\t\t<a href=\"modules.php?name=Team&op=team&tid=$tid\"><img src=\"images/logo/$tid.jpg\"></a>";
+    echo "\t\t<a href=\"modules.php?name=Team&op=team&teamID=$tid\"><img src=\"images/logo/$tid.jpg\"></a>";
     echo "\t</td>";
     echo "\t<td align=center>";
     echo "\t\t<font class=\"option\">$wins-$losses";

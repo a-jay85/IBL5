@@ -70,7 +70,7 @@ if ($phpver >= '4.1.0') {
 // After doing those superglobals we can now use one
 // and check if this file isnt being accessed directly
 
-if (stristr(htmlentities($_SERVER['PHP_SELF']), "mainfile.php")) {
+if (realpath(__FILE__) === realpath($_SERVER['SCRIPT_FILENAME'])) {
     header("Location: index.php");
     exit();
 }
@@ -1592,94 +1592,6 @@ function paid()
     } else {
         return 0;
     }
-}
-
-function ads($position)
-{
-    global $prefix, $db, $admin, $sitename, $adminmail, $nukeurl;
-    $position = intval($position);
-    if (paid()) {
-        return;
-    }
-    $numrows = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_banner WHERE position='$position' AND active='1'"));
-    /* Get a random banner if exist any. */
-    if ($numrows > 1) {
-        $numrows = $numrows - 1;
-        mt_srand((double) microtime() * 1000000);
-        $bannum = mt_rand(0, $numrows);
-    } else {
-        $bannum = 0;
-    }
-    if ($numrows > 0) {
-        $sql = "SELECT bid, impmade, imageurl, clickurl, alttext FROM " . $prefix . "_banner WHERE position='$position' AND active='1' LIMIT $bannum,1";
-        $result = $db->sql_query($sql);
-        list($bid, $impmade, $imageurl, $clickurl, $alttext) = $db->sql_fetchrow($result);
-        $bid = intval($bid);
-        $imageurl = filter($imageurl, "nohtml");
-        $clickurl = filter($clickurl, "nohtml");
-        $alttext = filter($alttext, "nohtml");
-        $db->sql_query("UPDATE " . $prefix . "_banner SET impmade=impmade+1 WHERE bid='$bid'");
-        $sql2 = "SELECT cid, imptotal, impmade, clicks, date, ad_class, ad_code, ad_width, ad_height FROM " . $prefix . "_banner WHERE bid='$bid'";
-        $result2 = $db->sql_query($sql2);
-        list($cid, $imptotal, $impmade, $clicks, $date, $ad_class, $ad_code, $ad_width, $ad_height) = $db->sql_fetchrow($result2);
-        $cid = intval($cid);
-        $imptotal = intval($imptotal);
-        $impmade = intval($impmade);
-        $clicks = intval($clicks);
-        $ad_class = filter($ad_class, "nohtml");
-        $ad_width = intval($ad_width);
-        $ad_height = intval($ad_height);
-        /* Check if this impression is the last one and print the banner */
-        if (($imptotal <= $impmade) and ($imptotal != 0)) {
-            $db->sql_query("UPDATE " . $prefix . "_banner SET active='0' WHERE bid='$bid'");
-            $sql3 = "SELECT name, contact, email FROM " . $prefix . "_banner_clients WHERE cid='$cid'";
-            $result3 = $db->sql_query($sql3);
-            list($c_name, $c_contact, $c_email) = $db->sql_fetchrow($result3);
-            $c_name = filter($c_name, "nohtml");
-            $c_contact = filter($c_contact, "nohtml");
-            $c_email = filter($c_email, "nohtml");
-            if (!empty($c_email)) {
-                $from = "$sitename <$adminmail>";
-                $to = "$c_contact <$c_email>";
-                $message = _HELLO . " $c_contact:\n\n";
-                $message .= _THISISAUTOMATED . "\n\n";
-                $message .= _THERESULTS . "\n\n";
-                $message .= _TOTALIMPRESSIONS . " $imptotal\n";
-                $message .= _CLICKSRECEIVED . " $clicks\n";
-                $message .= _IMAGEURL . " $imageurl\n";
-                $message .= _CLICKURL . " $clickurl\n";
-                $message .= _ALTERNATETEXT . " $alttext\n\n";
-                $message .= _HOPEYOULIKED . "\n\n";
-                $message .= _THANKSUPPORT . "\n\n";
-                $message .= "- $sitename " . _TEAM . "\n";
-                $message .= "$nukeurl";
-                $subject = "$sitename: " . _BANNERSFINNISHED . "";
-                mail($to, $subject, $message, "From: $from\nX-Mailer: PHP/" . phpversion());
-            }
-        }
-        if ($ad_class == "code") {
-            $ad_code = stripslashes(FixQuotes($ad_code));
-            $ads = "<center>$ad_code</center>";
-        } elseif ($ad_class == "flash") {
-            $ads = "<center>
-				<OBJECT classid=\"clsid:D27CDB6E-AE6D-11cf-96B8-444553540000\"
-				codebase=\"http://download.macromedia.com/pub/shockwave/cabs/flash/swflash.cab#version=6,0,40,0\"
-				WIDTH=\"$ad_width\" HEIGHT=\"$ad_height\" id=\"$bid\">
-				<PARAM NAME=movie VALUE=\"$imageurl\">
-				<PARAM NAME=quality VALUE=high>
-				<EMBED src=\"$imageurl\" quality=high WIDTH=\"$ad_width\" HEIGHT=\"$ad_height\"
-				NAME=\"$bid\" ALIGN=\"\" TYPE=\"application/x-shockwave-flash\"
-				PLUGINSPAGE=\"http://www.macromedia.com/go/getflashplayer\">
-				</EMBED>
-				</OBJECT>
-				</center>";
-        } else {
-            $ads = "<center><a href=\"index.php?op=ad_click&amp;bid=$bid\" target=\"_blank\"><img src=\"$imageurl\" border=\"0\" alt=\"$alttext\" title=\"$alttext\"></a></center>";
-        }
-    } else {
-        $ads = "";
-    }
-    return $ads;
 }
 
 function redir($content)

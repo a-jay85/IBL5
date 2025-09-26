@@ -14,18 +14,6 @@
 require_once "mainfile.php";
 global $prefix, $db, $admin_file;
 
-if (isset($op) and ($op == "ad_click") and isset($bid)) {
-    $bid = intval($bid);
-    $sql = "SELECT clickurl FROM " . $prefix . "_banner WHERE bid='$bid'";
-    $result = $db->sql_query($sql);
-    list($clickurl) = $db->sql_fetchrow($result);
-    $clickurl = filter($clickurl, "nohtml");
-    $db->sql_query("UPDATE " . $prefix . "_banner SET clicks=clicks+1 WHERE bid='$bid'");
-    update_points(21);
-    Header("Location: " . htmlentities($clickurl));
-    die();
-}
-
 $modpath = '';
 define('MODULE_FILE', true);
 $_SERVER['PHP_SELF'] = "modules.php";

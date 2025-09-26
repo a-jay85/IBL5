@@ -11,6 +11,7 @@ class Team
     public $color1;
     public $color2;
     public $arena;
+    public $capacity;
     public $formerlyKnownAs;
 
     public $ownerName;
@@ -47,7 +48,8 @@ class Team
         ($identifier) ? $identifier : $identifier = League::FREE_AGENTS_TEAMID;
 
         if (is_numeric($identifier)) {
-            $joinWhereCondition = "ibl_team_info.teamid = $identifier";
+            $teamID = (int) $identifier; // Ensure teamID is an integer
+            $joinWhereCondition = "ibl_team_info.teamid = $teamID";
         } elseif (is_string($identifier)) {
             $joinWhereCondition = "ibl_team_info.team_name = '$identifier'";
         } elseif (is_array($identifier)) {
@@ -70,13 +72,14 @@ class Team
     {
         $this->db = $db;
 
-        $this->teamID = $teamRow['teamid'];
+        $this->teamID = (int) $teamRow['teamid']; // Ensure teamID is an integer
 
         $this->city = $teamRow['team_city'];
         $this->name = $teamRow['team_name'];
         $this->color1 = $teamRow['color1'];
         $this->color2 = $teamRow['color2'];
         $this->arena = $teamRow['arena'];
+        $this->capacity = $teamRow['capacity'];
         $this->formerlyKnownAs = $teamRow['formerly_known_as'];
     
         $this->ownerName = $teamRow['owner_name'];

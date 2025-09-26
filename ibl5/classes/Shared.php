@@ -9,27 +9,6 @@ class Shared
         $this->db = $db;
     }
 
-    public function getDiscordIDFromTeamname($teamname)
-    {
-        $queryDiscordIDFromTeamname = $this->db->sql_query("SELECT discordID
-            FROM ibl_team_info
-            WHERE team_name = '$teamname'
-            LIMIT 1;");
-
-        return $this->db->sql_result($queryDiscordIDFromTeamname, 0, 'discordID');
-    }
-
-    public function getDiscordIDFromUsername($username)
-    {
-        $queryDiscordIDFromUsername = $this->db->sql_query("SELECT discordID
-            FROM ibl_team_info
-            INNER JOIN nuke_users ON ibl_team_info.team_name = nuke_users.user_ibl_team
-            WHERE username = '$username'
-            LIMIT 1;");
-
-        return $this->db->sql_result($queryDiscordIDFromUsername, 0, 'discordID');
-    }
-
     public function getNumberOfTitles($teamname, $titleName)
     {
         $queryNumberOfTitles = $this->db->sql_query("SELECT COUNT(name)
@@ -62,14 +41,15 @@ class Shared
         return $this->db->sql_result($queryPlayerIDFromPlayerName, 0, 'pid');
     }
 
-    public function getTeamnameFromTid($tid)
+    public function getTeamnameFromTeamID($teamID)
     {
-        $queryTeamnameFromTid = $this->db->sql_query("SELECT team_name
+        $teamID = (int) $teamID; // Ensure teamID is an integer
+        $queryTeamnameFromTeamID = $this->db->sql_query("SELECT team_name
             FROM ibl_team_info
-            WHERE teamid = $tid
+            WHERE teamid = $teamID
             LIMIT 1;");
 
-        return $this->db->sql_result($queryTeamnameFromTid, 0, 'team_name');
+        return $this->db->sql_result($queryTeamnameFromTeamID, 0, 'team_name');
     }
 
     public function getTeamnameFromUsername($username)
@@ -93,7 +73,7 @@ class Shared
             WHERE team_name = '$teamname'
             LIMIT 1;");
 
-        return $this->db->sql_result($queryTidFromTeamname, 0, 'teamid');
+        return (int) $this->db->sql_result($queryTidFromTeamname, 0, 'teamid'); // Ensure teamID is an integer
     }
 
     public function isFreeAgencyModuleActive()

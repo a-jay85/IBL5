@@ -34,14 +34,14 @@ class RegularSeasonTotalsView extends BaseView {
             $hist_year = intval($row44['year']);
             $hist_team = $row44['team'];
             $hist_tid = intval($row44['teamid']);
-            $hist_gm = intval($row44['gm']);
-            $hist_min = intval($row44['min']);
+            $hist_gm = intval($row44['games']);
+            $hist_min = intval($row44['minutes']);
             $hist_fgm = intval($row44['fgm']);
             $hist_fga = intval($row44['fga']);
             $hist_ftm = intval($row44['ftm']);
             $hist_fta = intval($row44['fta']);
-            $hist_tgm = intval($row44['3gm']);
-            $hist_tga = intval($row44['3ga']);
+            $hist_tgm = intval($row44['tgm']);
+            $hist_tga = intval($row44['tga']);
             $hist_orb = intval($row44['orb']);
             $hist_reb = intval($row44['reb']);
             $hist_ast = intval($row44['ast']);
@@ -53,7 +53,7 @@ class RegularSeasonTotalsView extends BaseView {
 
             echo "<tr>
                 <td><center>$hist_year</center></td>
-                <td><center><a href=\"modules.php?name=Team&op=team&tid=$hist_tid&yr=$hist_year\">$hist_team</a></center></td>
+                <td><center><a href=\"modules.php?name=Team&op=team&teamID=$hist_tid&yr=$hist_year\">$hist_team</a></center></td>
                 <td><center>$hist_gm</center></td>
                 <td><center>$hist_min</center></td>
                 <td><center>$hist_fgm-$hist_fga</center></td>

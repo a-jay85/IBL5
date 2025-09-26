@@ -16,11 +16,11 @@ Discord.php
 
 backups
 depthcharts
-/*
 /ibl5/ibl/IBL/
 !/ibl5/ibl/IBL/Schedule.htm
 !/ibl5/ibl/IBL/Standings.htm
 !/ibl5/classes/
 !/ibl5/modules/
+!/ibl5/ibl-laravel/
 !/IBL6
 .htaccess

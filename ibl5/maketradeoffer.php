@@ -12,9 +12,9 @@ $query0a = "INSERT INTO ibl_trade_autocounter ( `counter` ) VALUES ( '$tradeoffe
 $result0a = $db->sql_query($query0a);
 
 $offeringTeam = $_POST['Team_Name'];
-$tidOfferingTeam = $sharedFunctions->getTidFromTeamname($offeringTeam);
+$teamIDOfferingTeam = $sharedFunctions->getTidFromTeamname($offeringTeam); // This function now returns an integer
 $receivingTeam = $_POST['Team_Name2'];
-$tidReceivingTeam = $sharedFunctions->getTidFromTeamname($receivingTeam);
+$teamIDReceivingTeam = $sharedFunctions->getTidFromTeamname($receivingTeam); // This function now returns an integer
 $switchCounter = $_POST['half'];
 $fieldsCounter = $_POST['counterfields'];
 $fieldsCounter += 1;
@@ -206,7 +206,7 @@ VALUES    ( '$tradeofferid',
             `to`,
             `approval` )
 VALUES    ( '$tradeofferid',
-            '$tidOfferingTeam" . '0' . "$tidReceivingTeam" . '0' . "',
+            '$teamIDOfferingTeam" . '0' . "$teamIDReceivingTeam" . '0' . "',
             'cash',
             '$offeringTeam',
             '$receivingTeam',
@@ -313,7 +313,7 @@ VALUES    ( '$tradeofferid',
             `to`,
             `approval` )
 VALUES    ( '$tradeofferid',
-            '$tidReceivingTeam" . '0' . "$tidOfferingTeam" . '0' . "',
+            '$teamIDReceivingTeam" . '0' . "$teamIDOfferingTeam" . '0' . "',
             'cash',
             '$receivingTeam',
             '$offeringTeam',
@@ -333,8 +333,8 @@ VALUES    ( '$tradeofferid',
     $tradeText = str_replace('<i>', "_", $tradeText);
     $tradeText = str_replace('</i>', "_", $tradeText);
 
-    $offeringUserDiscordID = $sharedFunctions->getDiscordIDFromTeamname($offeringTeam);
-    $receivingUserDiscordID = $sharedFunctions->getDiscordIDFromTeamname($receivingTeam);
+    $offeringUserDiscordID = Discord::getDiscordIDFromTeamname($db, $offeringTeam);
+    $receivingUserDiscordID = Discord::getDiscordIDFromTeamname($db, $receivingTeam);
     $discordDMmessage = 'New trade proposal from <@!' . $offeringUserDiscordID . '>!
 '. $tradeText .'
 Go here to accept or decline: http://www.iblhoops.net/ibl5/modules.php?name=Trading&op=reviewtrade';

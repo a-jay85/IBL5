@@ -9,12 +9,12 @@ get_lang($module_name);
 
 $pagetitle = "- Team Pages";
 
-function team($tid)
+function team($teamID)
 {
     global $db;
-    $tid = intval($tid);
-    if ($tid > 0) {
-        $team = Team::initialize($db, $tid);
+    $teamID = (int) $teamID; // Ensure teamID is an integer
+    if ($teamID > 0) {
+        $team = Team::initialize($db, $teamID);
     }
     $sharedFunctions = new Shared($db);
     $season = new Season($db);
@@ -32,19 +32,19 @@ function team($tid)
 
     $isFreeAgencyModuleActive = $sharedFunctions->isFreeAgencyModuleActive();
 
-    if ($tid == 0) { // Team 0 is the Free Agents; we want a query that will pick up all of their players.
+    if ($teamID == 0) { // Team 0 is the Free Agents; we want a query that will pick up all of their players.
         if ($isFreeAgencyModuleActive == 0) {
             $query = "SELECT * FROM ibl_plr WHERE ordinal > '959' AND retired = 0 ORDER BY ordinal ASC";
         } else {
             $query = "SELECT * FROM ibl_plr WHERE ordinal > '959' AND retired = 0 AND cyt != cy ORDER BY ordinal ASC";
         }
         $result = $db->sql_query($query);
-    } else if ($tid == "-1") { // SHOW ENTIRE LEAGUE
+    } else if ($teamID == "-1") { // SHOW ENTIRE LEAGUE
         $query = "SELECT * FROM ibl_plr WHERE retired = 0 AND name NOT LIKE '%Buyouts' ORDER BY ordinal ASC";
         $result = $db->sql_query($query);
     } else { // If not Free Agents, use the code below instead.
         if ($yr != "") {
-            $query = "SELECT * FROM ibl_hist WHERE teamid = '$tid' AND year = '$yr' ORDER BY name ASC";
+            $query = "SELECT * FROM ibl_hist WHERE teamid = '$teamID' AND year = '$yr' ORDER BY name ASC";
             $result = $db->sql_query($query);
         } else if ($isFreeAgencyModuleActive == 1) {
             $result = $team->getFreeAgencyRosterOrderedByNameResult();
@@ -59,7 +59,7 @@ function team($tid)
             
     UI::displaytopmenu($db, $team->teamID);
             
-    echo "<img src=\"./images/logo/$tid.jpg\">";
+    echo "<img src=\"./images/logo/$teamID.jpg\">";
             
     if ($yr != "") {
         echo "<center><h1>$yr $team->name</h1></center>";
@@ -77,7 +77,7 @@ function team($tid)
     } else {
         $tabs .= "<td>";
     }
-    $tabs .= "<a href=\"modules.php?name=Team&op=team&tid=$tid&display=ratings$insertyear\">Ratings</a></td>";
+    $tabs .= "<a href=\"modules.php?name=Team&op=team&teamID=$teamID&display=ratings$insertyear\">Ratings</a></td>";
 
     if ($display == "total_s") {
         $showing = "Season Totals";
@@ -87,7 +87,7 @@ function team($tid)
     } else {
         $tabs .= "<td>";
     }
-    $tabs .= "<a href=\"modules.php?name=Team&op=team&tid=$tid&display=total_s$insertyear\">Season Totals</a></td>";
+    $tabs .= "<a href=\"modules.php?name=Team&op=team&teamID=$teamID&display=total_s$insertyear\">Season Totals</a></td>";
 
     if ($display == "avg_s") {
         $showing = "Season Averages";
@@ -97,7 +97,7 @@ function team($tid)
     } else {
         $tabs .= "<td>";
     }
-    $tabs .= "<a href=\"modules.php?name=Team&op=team&tid=$tid&display=avg_s$insertyear\">Season Averages</a></td>";
+    $tabs .= "<a href=\"modules.php?name=Team&op=team&teamID=$teamID&display=avg_s$insertyear\">Season Averages</a></td>";
 
     if ($display == "per36mins") {
         $showing = "Per 36 Minutes";
@@ -107,7 +107,7 @@ function team($tid)
     } else {
         $tabs .= "<td>";
     }
-    $tabs .= "<a href=\"modules.php?name=Team&op=team&tid=$tid&display=per36mins$insertyear\">Per 36 Minutes</a></td>";
+    $tabs .= "<a href=\"modules.php?name=Team&op=team&teamID=$teamID&display=per36mins$insertyear\">Per 36 Minutes</a></td>";
 
     if ($display == "chunk") {
         $showing = "Chunk Averages";
@@ -117,7 +117,7 @@ function team($tid)
     } else {
         $tabs .= "<td>";
     }
-    $tabs .= "<a href=\"modules.php?name=Team&op=team&tid=$tid&display=chunk$insertyear\">Sim Averages</a></td>";
+    $tabs .= "<a href=\"modules.php?name=Team&op=team&teamID=$teamID&display=chunk$insertyear\">Sim Averages</a></td>";
 
     if (
         $season->phase == "Playoffs"
@@ -134,7 +134,7 @@ function team($tid)
         } else {
             $tabs .= "<td>";
         }
-        $tabs .= "<a href=\"modules.php?name=Team&op=team&tid=$tid&display=playoffs$insertyear\">Playoffs Averages</a></td>";
+        $tabs .= "<a href=\"modules.php?name=Team&op=team&teamID=$teamID&display=playoffs$insertyear\">Playoffs Averages</a></td>";
     }
 
     if ($display == "contracts") {
@@ -145,9 +145,9 @@ function team($tid)
     } else {
         $tabs .= "<td>";
     }
-    $tabs .= "<a href=\"modules.php?name=Team&op=team&tid=$tid&display=contracts$insertyear\">Contracts</a></td>";
+    $tabs .= "<a href=\"modules.php?name=Team&op=team&teamID=$teamID&display=contracts$insertyear\">Contracts</a></td>";
 
-    if ($tid > 0 AND $yr == "") {
+    if ($teamID > 0 AND $yr == "") {
         $starters_table = lastSimsStarters($db, $result, $team);
     }
 
@@ -254,15 +254,16 @@ function team_info_right($team)
     return $ultimate_output;
 }
 
-function viewinjuries($tid)
+function viewinjuries($teamID)
 {
     global $db;
+    $teamID = (int) $teamID; // Ensure teamID is an integer
     $league = new League($db);
 
     Nuke\Header::header();
     OpenTable();
 
-    UI::displaytopmenu($db, $tid);
+    UI::displaytopmenu($db, $teamID);
 
     echo "<center><h2>INJURED PLAYERS</h2></center>
 		<table>
@@ -287,7 +288,7 @@ function viewinjuries($tid)
             <td>$player->position</td>
             <td><a href=\"./modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->name</a></td>
             <td bgcolor=\"#$team->color1\">
-                <font color=\"#$team->color2\"><a href=\"./modules.php?name=Team&op=team&tid=$player->teamID\">$team->city $player->teamName</a></font>
+                <font color=\"#$team->color2\"><a href=\"./modules.php?name=Team&op=team&teamID=$player->teamID\">$team->city $player->teamName</a></font>
             </td>
             <td>$player->daysRemainingForInjury</td>
         </tr>";
@@ -301,15 +302,16 @@ function viewinjuries($tid)
     Nuke\Footer::footer();
 }
 
-function drafthistory($tid)
+function drafthistory($teamID)
 {
     global $db;
+    $teamID = (int) $teamID; // Ensure teamID is an integer
 
     Nuke\Header::header();
     OpenTable();
-    UI::displaytopmenu($db, $tid);
+    UI::displaytopmenu($db, $teamID);
 
-    $team = Team::initialize($db, $tid);
+    $team = Team::initialize($db, $teamID);
 
     echo "$team->name Draft History
         <table class=\"sortable\">
@@ -359,17 +361,19 @@ function menu()
     Nuke\Footer::footer();
 }
 
+$teamID = isset($teamID) ? (int) $teamID : 0;
+
 switch ($op) {
     case "team":
-        team($tid);
+        team($teamID);
         break;
 
     case "injuries":
-        viewinjuries($tid);
+        viewinjuries($teamID);
         break;
 
     case "drafthistory":
-        drafthistory($tid);
+        drafthistory($teamID);
         break;
 
     default:

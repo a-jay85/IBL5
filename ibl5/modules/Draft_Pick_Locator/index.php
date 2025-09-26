@@ -39,7 +39,7 @@ echo "<HTML><HEAD><TITLE>Draft Pick Matrix</TITLE></HEAD>
 $i = 0;
 
 while ($i < $num) {
-    $teamid = $db->sql_result($result, $i, "teamid");
+    $teamID = (int) $db->sql_result($result, $i, "teamid"); // Ensure teamID is an integer
     $team_city = $db->sql_result($result, $i, "team_city");
     $team_name = $db->sql_result($result, $i, "team_name");
     $color1 = $db->sql_result($result, $i, "color1");
@@ -52,7 +52,7 @@ while ($i < $num) {
     $result2 = $db->sql_query($query2);
     $num2 = $db->sql_numrows($result2);
 
-    echo "<TR><TD bgcolor=#$color1><CENTER><a href=\"../modules.php?name=Team&op=team&tid=$teamid\"><font color=#$color2>$team_city $team_name</font></a></CENTER></TD>";
+    echo "<TR><TD bgcolor=#$color1><CENTER><a href=\"../modules.php?name=Team&op=team&teamID=$teamID\"><font color=#$color2>$team_city $team_name</font></a></CENTER></TD>";
 
     while ($j < $num2) {
 

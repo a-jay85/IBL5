@@ -216,7 +216,7 @@ function display()
             echo "</td>
                 <td>$player->position</td>
                 <td><a href=\"modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->name</a></td>
-                <td><a href=\"modules.php?name=Team&op=team&tid=$player->teamID\">$player->teamName</a></td>
+                <td><a href=\"modules.php?name=Team&op=team&teamID=$player->teamID\">$player->teamName</a></td>
                 <td>$player->age</td>
                 <td>$player->ratingFieldGoalAttempts</td>
                 <td>$player->ratingFieldGoalPercentage</td>
@@ -358,7 +358,7 @@ function display()
             <td><a href=\"modules.php?name=Free_Agency&pa=negotiate&pid=$player->playerID\">Negotiate</a></td>
             <td>$player->position</td>
             <td><a href=\"modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->name</a></td>
-            <td><a href=\"modules.php?name=Team&op=team&tid=$player->teamID\">$player->teamName</a></td>
+            <td><a href=\"modules.php?name=Team&op=team&teamID=$player->teamID\">$player->teamName</a></td>
             <td>$player->age</td>
             <td>$player->ratingFieldGoalAttempts</td>
             <td>$player->ratingFieldGoalPercentage</td>
@@ -577,7 +577,7 @@ function display()
             }
 
             echo "</a></td>
-				<td><a href=\"modules.php?name=Team&op=team&tid=$player->teamID\">$player->teamName</a></td>
+				<td><a href=\"modules.php?name=Team&op=team&teamID=$player->teamID\">$player->teamName</a></td>
                 <td>$player->age</td>
                 <td>$player->ratingFieldGoalAttempts</td>
                 <td>$player->ratingFieldGoalPercentage</td>
@@ -707,7 +707,7 @@ function display()
             echo "</td>
 				<td>$player->position</td>
 				<td><a href=\"modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->name</a></td>
-				<td><a href=\"modules.php?name=Team&op=team&tid=$player->teamID\">$player->teamName</a></td>
+				<td><a href=\"modules.php?name=Team&op=team&teamID=$player->teamID\">$player->teamName</a></td>
                 <td>$player->age</td>
                 <td>$player->ratingFieldGoalAttempts</td>
                 <td>$player->ratingFieldGoalPercentage</td>
@@ -785,7 +785,7 @@ function negotiate($pid)
     $userinfo = $db->sql_fetchrow($result2);
 
     $userteam = $userinfo['user_ibl_team'];
-    $tid = $sharedFunctions->getTidFromTeamname($userteam);
+    $teamID = $sharedFunctions->getTidFromTeamname($userteam); // This function now returns an integer
 
     $exceptioninfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_team_info WHERE team_name='$userteam'"));
 
@@ -931,7 +931,7 @@ function negotiate($pid)
 
     $rosterspots = 15;
 
-    $capquery = "SELECT * FROM ibl_plr WHERE (tid=$tid AND retired='0') ORDER BY ordinal ASC;";
+    $capquery = "SELECT * FROM ibl_plr WHERE (tid=$teamID AND retired='0') ORDER BY ordinal ASC;";
     $capresult = $db->sql_query($capquery);
 
     while ($capdecrementer = $db->sql_fetchrow($capresult)) {

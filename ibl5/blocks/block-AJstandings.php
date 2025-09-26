@@ -87,7 +87,7 @@ while ($i < $limitEasternConference) {
     $content .= "
         <tr>
             <td style=\"white-space: nowrap;\">
-                <a href=\"modules.php?name=Team&op=team&tid=$tid\">$team_name</a>
+                <a href=\"modules.php?name=Team&op=team&teamID=$tid\">$team_name</a>
             </td>
             <td style=\"text-align: left;\">
                 $leagueRecord
@@ -149,7 +149,7 @@ while ($i < $limitWesternConference) {
     $content .= "
         <tr>
             <td style=\"white-space: nowrap; width: 10px;\">
-                <a href=\"modules.php?name=Team&op=team&tid=$tid\">$team_name</a>
+                <a href=\"modules.php?name=Team&op=team&teamID=$tid\">$team_name</a>
             </td>
             <td style=\"text-align: left;\">
                 $leagueRecord

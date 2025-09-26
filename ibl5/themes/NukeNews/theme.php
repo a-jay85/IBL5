@@ -47,7 +47,6 @@ function themeheader()
         $username = $anonymous;
     }
     echo "<body bgcolor=\"#505050\" text=\"#000000\" link=\"#363636\" vlink=\"#363636\" alink=\"#d5ae83\">";
-    ads(0);
     $topics_list = "<select name=\"new_topic\" onChange='submit()'>\n";
     $topics_list .= "<option value=\"\">All Topics</option>\n";
     $toplist = $db->sql_query("select topicid, topictext from " . $prefix . "_topics order by topictext");

@@ -11,6 +11,8 @@ class Season
 
     public $regularSeasonStartDate;
     public $postAllStarStartDate;
+    public $playoffsStartDate;
+    public $playoffsEndDate;
 
     public $lastSimNumber;
     public $lastSimStartDate;
@@ -41,6 +43,8 @@ class Season
 
         $this->regularSeasonStartDate = date_create("$this->beginningYear-" . Season::IBL_REGULAR_SEASON_STARTING_MONTH . "-01");
         $this->postAllStarStartDate = date_create("$this->endingYear-" . Season::IBL_ALL_STAR_MONTH . "-04");
+        $this->playoffsStartDate = date_create("$this->endingYear-" . Season::IBL_PLAYOFF_MONTH . "-01");
+        $this->playoffsEndDate = date_create("$this->endingYear-" . Season::IBL_PLAYOFF_MONTH . "-30");
 
         $arrayLastSimDates = $this->getLastSimDatesArray();
         $this->lastSimNumber = $arrayLastSimDates["Sim"];

@@ -34,8 +34,6 @@ define("_NEWSSENT", "Enviar Not�cia");
 define("_VOTEDPOLLS", "Pesquisas mais votadas");
 define("_MOSTACTIVEAUTHORS", "Autores mais ativos");
 define("_NEWSPUBLISHED", "Not�cias publicadas");
-define("_DOWNLOADEDFILES", "Arquivos mais baixados");
-define("_LDOWNLOADS", "downloads");
 define("_MOSTREADPAGES", "P�ginas mais visitadas");
 define("_MOSTVOTEDSTORIES", "Not�cias mais votadas");
 define("_POINTS", "pontos");

@@ -50,7 +50,6 @@ define("_SREPLIES", "Svar");
 define("_ATTACHART", "Vedh�ftet artikel");
 define("_PAGES", "Sider");
 define("_PAGE", "Side");
-define("_DOWNLOADS", "Downloads");
 define("_WEBLINKS", "Web Links");
 define("_FINDMORE", "... more");
 define("_DIDNOTFIND", "Fandt de ikke hvad de ledte efter?");

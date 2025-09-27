@@ -31,7 +31,6 @@ define("_THEREARE", "Ci sono");
 define("_NOMATCHES", "Nessun Risultato per la tua ricerca");
 define("_SCOMMENTS", "Commenti");
 define("_DESCRIPTION", "Descrizione");
-define("_ONLYREGUSERSMODIFY", "Solo gli Utenti Registrati possono suggerire modifiche ai Downloads.  <a href=\"modules.php?name=Your_Account\">Registrazione/Login</a>.");
 define("_DATE", "Data");
 define("_TO", "A");
 define("_ADDLINK", "Aggiungi Sito");

@@ -816,6 +816,7 @@ while (!feof($plrFile)) {
 
         $teamUpdateQuery = 'UPDATE `ibl_team_' . $sideOfTheBall . '_stats`
             SET
+            `teamID` = ' . ${'tid' . ucfirst($sideOfTheBall) . 'Stats'} . ',
             `games` = ' . $seasonGamesPlayed . ',
             `fgm` = ' . ($season2GM + $season3GM) . ',
             `fga` = ' . ($season2GA + $season3GA) . ',
@@ -831,7 +832,7 @@ while (!feof($plrFile)) {
             `blk` = ' . $seasonBLK . ',
             `pf` = ' . $seasonPF . '
             WHERE
-            `team` = \'' . $teamName . '\';';
+            `name` = \'' . $teamName . '\';';
         if (!$db->sql_query($teamUpdateQuery)) {
             die('Invalid query: ' . $db->sql_error());
         }

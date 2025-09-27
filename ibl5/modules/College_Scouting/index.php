@@ -106,7 +106,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
     echo "<input type='hidden' name='draft_round' value='$draft_round'>";
     echo "<input type='hidden' name='draft_pick' value='$draft_pick'>";
 
-    $sql3 = "SELECT * FROM ibl_scout_rookieratings ORDER BY drafted, name";
+    $sql3 = "SELECT * FROM ibl_draft_class ORDER BY drafted, name";
     $result3 = $db->sql_query($sql3);
 
     $i = 0;

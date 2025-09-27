@@ -17,7 +17,7 @@ if ($name == null) {
     <input type=\"submit\" name=\"UPDATE!\" />
     </form>";
 } else {
-    $query2 = "UPDATE `ibl_scout_rookieratings` SET `drafted` = '1' WHERE `name` = '$name'";
+    $query2 = "UPDATE `ibl_draft_class` SET `drafted` = '1' WHERE `name` = '$name'";
     $result2 = $db->sql_query($query2);
 
     echo "<html><head><title>Draft Update Page</title></head><body>";

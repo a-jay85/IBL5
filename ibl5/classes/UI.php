@@ -585,7 +585,7 @@ class UI
                 <td colspan=4><b>$team->name Offense</td>
                 <td><b><center>$teamStats->seasonOffenseGamesPlayed</center></td>
                 <td><b><center>$teamStats->seasonOffenseGamesPlayed</center></td>
-                <td><center><b>$teamStats->seasonOffenseMinutesPerGame</center></td>
+                <td></td>
                 <td bgcolor=$team->color1 width=0></td>
                 <td><center><b>$teamStats->seasonOffenseFieldGoalsMadePerGame</center></td>
                 <td><center><b>$teamStats->seasonOffenseFieldGoalsAttemptedPerGame</center></td>
@@ -612,7 +612,7 @@ class UI
                 <td colspan=4><b>$team->name Defense</td>
                 <td><center><b>$teamStats->seasonDefenseGamesPlayed</center></td>
                 <td><b>$teamStats->seasonDefenseGamesPlayed</td>
-                <td><center><b>$teamStats->seasonDefenseMinutesPerGame</center></td>
+                <td></td>
                 <td bgcolor=$team->color1 width=0></td>
                 <td><center><b>$teamStats->seasonDefenseFieldGoalsMadePerGame</center></td>
                 <td><center><b>$teamStats->seasonDefenseFieldGoalsAttemptedPerGame</center></td>
@@ -733,7 +733,7 @@ class UI
                 <td colspan=4><b>$team->name Offense</td>
                 <td><center><b>$teamStats->seasonOffenseGamesPlayed</center></td>
                 <td><center><b>$teamStats->seasonOffenseGamesPlayed</center></td>
-                <td><center><b>$teamStats->seasonOffenseTotalMinutes</center></td>
+                <td></td>
                 <td bgcolor=$team->color1 width=0></td>
                 <td><center><b>$teamStats->seasonOffenseTotalFieldGoalsMade</center></td>
                 <td><center><b>$teamStats->seasonOffenseTotalFieldGoalsAttempted</b></center></td>
@@ -758,7 +758,7 @@ class UI
                 <td colspan=4><b>$team->name Defense</td>
                 <td><center><b>$teamStats->seasonDefenseGamesPlayed</center></td>
                 <td><center><b>$teamStats->seasonDefenseGamesPlayed</center></td>
-                <td><center><b>$teamStats->seasonDefenseTotalMinutes</center></td>
+                <td>/td>
                 <td bgcolor=$team->color1 width=0></td>
                 <td><center><b>$teamStats->seasonDefenseTotalFieldGoalsMade</center></td>
                 <td><center><b>$teamStats->seasonDefenseTotalFieldGoalsAttempted</b></center></td>

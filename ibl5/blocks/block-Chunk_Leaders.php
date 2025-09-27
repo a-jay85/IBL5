@@ -1,97 +1,153 @@
 <?php
-/************************************************************************/
-/* PHP-NUKE: Web Portal System                                          */
-/* ===========================                                          */
-/*                                                                      */
-/* Copyright (c) 2005 by Francisco Burzi                                */
-/* http://phpnuke.org                                                   */
-/*                                                                      */
-/* This program is free software. You can redistribute it and/or modify */
-/* it under the terms of the GNU General Public License as published by */
-/* the Free Software Foundation; either version 2 of the License.       */
-/************************************************************************/
 
 if (!defined('BLOCK_FILE')) {
     Header("Location: ./index.php");
     die();
 }
 
-$content .= "<center><a href=modules.php?name=Chunk_Stats&op=chunk>Sim Stats Search Engine</a></center><br>";
+global $db;
 
-function getLastSimStatLeaders($statName, $query)
-{
-    global $db;
+$queryLastSimDates = $db->sql_query("SELECT * FROM ibl_sim_dates ORDER BY Sim DESC LIMIT 1");
+$lastSimStartDate = $db->sql_result($queryLastSimDates, 0, "Start Date");
+$lastSimEndDate = $db->sql_result($queryLastSimDates, 0, "End Date");
 
-    $queryLastSimDates = $db->sql_query("SELECT * FROM ibl_sim_dates ORDER BY Sim DESC LIMIT 1");
-    $lastSimStartDate = $db->sql_result($queryLastSimDates, 0, "Start Date");
-    $lastSimEndDate = $db->sql_result($queryLastSimDates, 0, "End Date");
+$querySimStatLeaders = "SELECT *
+FROM (
+    SELECT
+        players.name,
+        boxes.pid,
+        players.teamname,
+        players.tid,
+        CAST(FORMAT((2 * SUM(boxes.gameFGM) + SUM(boxes.gameFTM) + 3 * SUM(boxes.game3GM)) / COUNT(players.name), 1) AS DECIMAL(3,1)) AS stat_value,
+        'Points' AS stat_type,
+        ROW_NUMBER() OVER (ORDER BY (2 * SUM(boxes.gameFGM) + SUM(boxes.gameFTM) + 3 * SUM(boxes.game3GM)) / COUNT(players.name) DESC) AS rn
+    FROM ibl_box_scores boxes
+    INNER JOIN ibl_plr players USING(pid)
+    WHERE boxes.Date BETWEEN '$lastSimStartDate' AND '$lastSimEndDate'
+    GROUP BY players.name, boxes.pid, players.teamname, players.tid
 
-    $querySimStatLeaders = $db->sql_query("SELECT players.name, boxes.pid, teamname, players.tid, CAST(FORMAT(($query / COUNT(players.NAME)), 1) AS DECIMAL(3,1)) as `$statName`
-        FROM ibl_box_scores boxes
-        INNER JOIN ibl_plr players USING(pid)
-        WHERE Date BETWEEN '$lastSimStartDate' AND '$lastSimEndDate'
-        GROUP BY name
-        ORDER BY $statName DESC
-        LIMIT 5;");
-        // the previous query throws an error in MySQL 5.7.34 that can be fixed by running the following SQL query:
-        // SET GLOBAL sql_mode=(SELECT REPLACE(@@sql_mode,'ONLY_FULL_GROUP_BY',''));
-        // source: https://stackoverflow.com/questions/41887460/select-list-is-not-in-group-by-clause-and-contains-nonaggregated-column-inc
+    UNION ALL
 
-    $i = 1;
-    $numrows = $db->sql_numrows($querySimStatLeaders);
-    while ($i <= $numrows) {
-        $row = $db->sql_fetch_assoc($querySimStatLeaders);
-        $array[$i]["name"] = $row["name"];
-        $array[$i]["pid"] = $row["pid"];
-        $array[$i]["teamname"] = $row["teamname"];
-        $array[$i]["tid"] = $row["tid"];
-        $array[$i]["stat"] = $row["$statName"];
+    SELECT
+        players.name,
+        boxes.pid,
+        players.teamname,
+        players.tid,
+        CAST(FORMAT((SUM(boxes.gameORB) + SUM(boxes.gameDRB)) / COUNT(players.name), 1) AS DECIMAL(3,1)) AS stat_value,
+        'Rebounds' AS stat_type,
+        ROW_NUMBER() OVER (ORDER BY (SUM(boxes.gameORB) + SUM(boxes.gameDRB)) / COUNT(players.name) DESC) AS rn
+    FROM ibl_box_scores boxes
+    INNER JOIN ibl_plr players USING(pid)
+    WHERE boxes.Date BETWEEN '$lastSimStartDate' AND '$lastSimEndDate'
+    GROUP BY players.name, boxes.pid, players.teamname, players.tid
 
-        $i++;
+    UNION ALL
+
+    SELECT
+        players.name,
+        boxes.pid,
+        players.teamname,
+        players.tid,
+        CAST(FORMAT(SUM(boxes.gameAST) / COUNT(players.name), 1) AS DECIMAL(3,1)) AS stat_value,
+        'Assists' AS stat_type,
+        ROW_NUMBER() OVER (ORDER BY SUM(boxes.gameAST) / COUNT(players.name) DESC) AS rn
+    FROM ibl_box_scores boxes
+    INNER JOIN ibl_plr players USING(pid)
+    WHERE boxes.Date BETWEEN '$lastSimStartDate' AND '$lastSimEndDate'
+    GROUP BY players.name, boxes.pid, players.teamname, players.tid
+
+    UNION ALL
+
+    SELECT
+        players.name,
+        boxes.pid,
+        players.teamname,
+        players.tid,
+        CAST(FORMAT(SUM(boxes.gameSTL) / COUNT(players.name), 1) AS DECIMAL(3,1)) AS stat_value,
+        'Steals' AS stat_type,
+        ROW_NUMBER() OVER (ORDER BY SUM(boxes.gameSTL) / COUNT(players.name) DESC) AS rn
+    FROM ibl_box_scores boxes
+    INNER JOIN ibl_plr players USING(pid)
+    WHERE boxes.Date BETWEEN '$lastSimStartDate' AND '$lastSimEndDate'
+    GROUP BY players.name, boxes.pid, players.teamname, players.tid
+
+    UNION ALL
+
+    SELECT
+        players.name,
+        boxes.pid,
+        players.teamname,
+        players.tid,
+        CAST(FORMAT(SUM(boxes.gameBLK) / COUNT(players.name), 1) AS DECIMAL(3,1)) AS stat_value,
+        'Blocks' AS stat_type,
+        ROW_NUMBER() OVER (ORDER BY SUM(boxes.gameBLK) / COUNT(players.name) DESC) AS rn
+    FROM ibl_box_scores boxes
+    INNER JOIN ibl_plr players USING(pid)
+    WHERE boxes.Date BETWEEN '$lastSimStartDate' AND '$lastSimEndDate'
+    GROUP BY players.name, boxes.pid, players.teamname, players.tid
+) t
+WHERE rn <= 5
+ORDER BY FIELD(stat_type, 'Points', 'Rebounds', 'Assists', 'Steals', 'Blocks'), rn;";
+$resultSimStatLeaders = $db->sql_query($querySimStatLeaders);
+
+$rows = $resultSimStatLeaders->fetch_all(MYSQLI_ASSOC);
+$rowNumber = 0;
+
+$content = "<center><a href=modules.php?name=Chunk_Stats&op=chunk>Sim Stats Search Engine</a></center><br>";
+$content .= '<table style="border:1px solid #000066; margin: 0 auto;">
+    <tr>';
+for ($i = 1; $i <= 5; $i++) {
+    $content .= '<td style="border:1px solid #000066;">
+                <table>
+                    <tr>
+                        <td style="min-width:155px;" colspan=2>
+                            <div style="text-align:center;">
+                                <img src="./images/player/' . $rows[$rowNumber]['pid'] . '.jpg" height="90" width="65">
+                                <img src="./images/logo/new' . $rows[$rowNumber]['tid'] . '.png" height="75" width="75">
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="2" style="background-color:#000066; color:#ffffff; font-weight:bold;">
+                            ' . $rows[$rowNumber]['stat_type'] . ' Per Game
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight:bold;">
+                            <a href="modules.php?name=Player&pa=showpage&pid=' . $rows[$rowNumber]['pid'] . '" style="color:#000066;">
+                                ' . $rows[$rowNumber]['name'] . '
+                            </a>
+                            <br>
+                            <a href="modules.php?name=Team&op=team&teamID=' . $rows[$rowNumber]['tid'] . '" style="color:#000066;">
+                                ' . $rows[$rowNumber]['teamname'] . '
+                            </a>
+                        </td>
+                        <td valign="top" style="font-weight:bold;">
+                            ' . $rows[$rowNumber]['stat_value'] . '
+                        </td>
+                    </tr>';
+    $rowNumber++;
+    for ($j = 2; $j <= 5; $j++) {
+        $content .= '<tr>
+                        <td>
+                            <a href="modules.php?name=Player&pa=showpage&pid=' . $rows[$rowNumber]['pid'] . '" style="color:#000066;">
+                                ' . $rows[$rowNumber]['name'] . '
+                            </a>
+                            <br>
+                            <a href="modules.php?name=Team&op=team&teamID=' . $rows[$rowNumber]['tid'] . '" style="color:#000066;">
+                                ' . $rows[$rowNumber]['teamname'] . '
+                            </a>
+                        </td>
+                        <td valign="top">
+                            ' . $rows[$rowNumber]['stat_value'] . '
+                        </td>
+                    </tr>';
+        $rowNumber++;
     }
-
-    return $array;
+    $content .= '</table>
+            </td>';
 }
+$content .= '</tr>
+</table>';
 
-function displayColumnLastSimStatLeaders($array, $statName, $content)
-{
-    $content .= "<td>
-        <table><tr><td style=\"min-width:155px\" colspan=2>
-        <center><a href=modules.php?name=Player&pa=showpage&pid=" . $array[1]["pid"] . "><img src=\"./images/player/" . $array[1]["pid"] . ".jpg\" height=\"90\" width=\"65\"></a>&nbsp;
-        <a href=modules.php?name=Team&op=team&teamID=" . $array[1]["tid"] . "><img src=\"./images/logo/new" . $array[1]["tid"] . ".png\" height=\"75\" width=\"75\"></a></center></td></tr>
-        <tr><td bgcolor=#000066 colspan=2><b><font color=#ffffff>$statName Per Game</td></tr>
-        <tr><td><b><a href=modules.php?name=Player&pa=showpage&pid=" . $array[1]["pid"] . "><font color=#000066>" . $array[1]["name"] . "</font></a><br>
-        <font color=#000066><a href=modules.php?name=Team&op=team&teamID=" . $array[1]["tid"] . ">" . $array[1]["teamname"] . "</a></font></td>
-        <td valign=top>" . $array[1]["stat"] . "</td></tr>
-        <tr><td><a href=modules.php?name=Player&pa=showpage&pid=" . $array[2]["pid"] . "><font color=#000066>" . $array[2]["name"] . "</font></a><br>
-        <font color=#000066><a href=modules.php?name=Team&op=team&teamID=" . $array[2]["tid"] . ">" . $array[2]["teamname"] . "</a></font></td>
-        <td valign=top>" . $array[2]["stat"] . "</td></tr>
-        <tr><td><a href=modules.php?name=Player&pa=showpage&pid=" . $array[3]["pid"] . "><font color=#000066>" . $array[3]["name"] . "</font></a><br>
-        <font color=#000066><a href=modules.php?name=Team&op=team&teamID=" . $array[3]["tid"] . ">" . $array[3]["teamname"] . "</a></font></td>
-        <td valign=top>" . $array[3]["stat"] . "</td></tr>
-        <tr><td><a href=modules.php?name=Player&pa=showpage&pid=" . $array[4]["pid"] . "><font color=#000066>" . $array[4]["name"] . "</font></a><br>
-        <font color=#000066><a href=modules.php?name=Team&op=team&teamID=" . $array[4]["tid"] . ">" . $array[4]["teamname"] . "</a></font></td>
-        <td valign=top>" . $array[4]["stat"] . "</td></tr>
-        <tr><td><a href=modules.php?name=Player&pa=showpage&pid=" . $array[5]["pid"] . "><font color=#000066>" . $array[5]["name"] . "</font></a><br>
-        <font color=#000066><a href=modules.php?name=Team&op=team&teamID=" . $array[5]["tid"] . ">" . $array[5]["teamname"] . "</a></font></td>
-        <td valign=top>" . $array[5]["stat"] . "</td></tr>
-        </table></td>";
-
-    return $content;
-}
-
-$lastSimPointsLeaders = getLastSimStatLeaders('POINTS', '(2 * SUM(gameFGM) + SUM(gameFTM) + 3 * SUM(game3GM))');
-$lastSimReboundsLeaders = getLastSimStatLeaders('REBOUNDS', '(SUM(gameORB) + SUM(gameDRB))');
-$lastSimAssistsLeaders = getLastSimStatLeaders('ASSISTS', 'SUM(gameAST)');
-$lastSimStealsLeaders = getLastSimStatLeaders('STEALS', 'SUM(gameSTL)');
-$lastSimBlocksLeaders = getLastSimStatLeaders('BLOCKS', 'SUM(gameBLK)');
-
-$content .= "<center><table border=1 bordercolor=#000066><tr>";
-
-$content = displayColumnLastSimStatLeaders($lastSimPointsLeaders, "Points", $content);
-$content = displayColumnLastSimStatLeaders($lastSimReboundsLeaders, "Rebounds", $content);
-$content = displayColumnLastSimStatLeaders($lastSimAssistsLeaders, "Assists", $content);
-$content = displayColumnLastSimStatLeaders($lastSimStealsLeaders, "Steals", $content);
-$content = displayColumnLastSimStatLeaders($lastSimBlocksLeaders, "Blocks", $content);
-
-$content .= "</tr></table>";
+?>

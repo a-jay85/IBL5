@@ -20,7 +20,6 @@ $author_name = "Francisco Burzi";
 $author_email = "";
 $author_homepage = "http://phpnuke.org";
 $license = "GNU/GPL";
-$download_location = "http://phpnuke.org/modules.php?name=Downloads";
 $module_version = "1.0";
 $module_description = "Encyclopedia system to manage big lists of terms.";
 

@@ -30,8 +30,6 @@ define("_NEWSSENT", "haber");
 define("_VOTEDPOLLS", "en �ok oylanan anket");
 define("_MOSTACTIVEAUTHORS", "en aktif edit�r");
 define("_NEWSPUBLISHED", "haber");
-define("_DOWNLOADEDFILES", "en �ok indirilen dosya");
-define("_LDOWNLOADS", "dosyalar");
 define("_MOSTREADPAGES", "en �ok okunan sayfa");
 define("_MOSTVOTEDSTORIES", "en �ok oylanan haber");
 define("_POINTS", "puanlar");

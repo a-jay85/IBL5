@@ -36,7 +36,6 @@ define("_PROMOTE03", "Si vols algo m�s que un simple text, pots utilizar un pe
 define("_PROMOTE04", "Si menteixes amb aix�, esborrarem el teu enlla�. Un cop dit aix�, aix� �s com es veu el formulari de valoraci�.");
 define("_ONLYREGUSERSMODIFY", "Solsament els usuaris registrats poden proposar modificacions. Si us plau, <a href=\"modules.php?name=Your_Account\">Reg�strat o Con�ctat</a>.");
 define("_LETSDECIDE", "La teva informaci� permetr� a altres visitants decidir millor sobre quins enlla�os escollir.");
-define("_RATENOTE4", "Pots veure una llista <a href=\"modules.php?name=Downloads&d_op=TopRated\">dels recursos m�s valorats</a>.");
 define("_DATE", "Data");
 define("_TO", "Per a");
 define("_ADDLINK", "Afegir Enlla�");

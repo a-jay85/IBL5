@@ -52,7 +52,6 @@ define("_SREPLIES", "Vastused");
 define("_ATTACHART", "Lisatud Artiklisse");
 define("_PAGES", "Lehed");
 define("_PAGE", "Leht");
-define("_DOWNLOADS", "Failid");
 define("_WEBLINKS", "Lingid");
 define("_FINDMORE", "... veel");
 define("_DIDNOTFIND", "Kas sa ei leidnud mida otsisid?");

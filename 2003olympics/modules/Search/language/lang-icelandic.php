@@ -52,7 +52,6 @@ define("_SREPLIES", "sv�r");
 define("_ATTACHART", "Tengt grein");
 define("_PAGES", "S��ur");
 define("_PAGE", "S��a");
-define("_DOWNLOADS", "N� � skr�r");
 define("_WEBLINKS", "Vef tenglar");
 define("_FINDMORE", "... meira");
 define("_DIDNOTFIND", "Fannstu ekki �a� sem �� leita�ir a�?");

@@ -52,7 +52,6 @@ define("_SREPLIES", "������");
 define("_ATTACHART", "������ ������");
 define("_PAGES", "�����");
 define("_PAGE", "����");
-define("_DOWNLOADS", "�������");
 define("_WEBLINKS", "���� �������");
 define("_FINDMORE", "... �����");
 define("_DIDNOTFIND", "�� ��� ������ ���");

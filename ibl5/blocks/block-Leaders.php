@@ -7,78 +7,132 @@ if (!defined('BLOCK_FILE')) {
 
 global $db;
 
-function topFiveSeasonPerGameAverage($db, $statName, $statQuery) {
-    $queryStatPerGame= "SELECT
-        pid,
-        tid,
-        name,
-        teamname,
-        ROUND(" . $statQuery . " / `stats_gm`, 1) as " . $statName . "
-    FROM ibl_plr 
-    WHERE 
-        retired = 0
-        AND stats_gm > 0
-        AND name NOT LIKE \"%Buyouts%\"
-    ORDER BY " . $statName . " DESC
-    LIMIT 5;";
-    $resultStatPerGame = $db->sql_query($queryStatPerGame);
+$queryTopFiveInStatAverages = "SELECT *
+    FROM (
+        SELECT
+            pid,
+            tid,
+            name,
+            teamname,
+            ROUND((2 * `stats_fgm` + `stats_ftm` + `stats_3gm`) / `stats_gm`, 1) AS stat_value,
+            'Points' AS stat_type,
+            ROW_NUMBER() OVER (ORDER BY (2 * `stats_fgm` + `stats_ftm` + `stats_3gm`) / `stats_gm` DESC) AS rn
+        FROM ibl_plr
+        WHERE retired = 0 AND stats_gm > 0 AND name NOT LIKE '%Buyouts%'
 
-    $i = 1;
-    foreach ($resultStatPerGame as $row) {
-        $array[$i] = $row;
-        $i++;
+        UNION ALL
+
+        SELECT
+            pid,
+            tid,
+            name,
+            teamname,
+            ROUND((`stats_orb` + `stats_drb`) / `stats_gm`, 1) AS stat_value,
+            'Rebounds' AS stat_type,
+            ROW_NUMBER() OVER (ORDER BY (`stats_orb` + `stats_drb`) / `stats_gm` DESC) AS rn
+        FROM ibl_plr
+        WHERE retired = 0 AND stats_gm > 0 AND name NOT LIKE '%Buyouts%'
+
+        UNION ALL
+
+        SELECT
+            pid,
+            tid,
+            name,
+            teamname,
+            ROUND(`stats_ast` / `stats_gm`, 1) AS stat_value,
+            'Assists' AS stat_type,
+            ROW_NUMBER() OVER (ORDER BY `stats_ast` / `stats_gm` DESC) AS rn
+        FROM ibl_plr
+        WHERE retired = 0 AND stats_gm > 0 AND name NOT LIKE '%Buyouts%'
+
+        UNION ALL
+
+        SELECT
+            pid,
+            tid,
+            name,
+            teamname,
+            ROUND(`stats_stl` / `stats_gm`, 1) AS stat_value,
+            'Steals' AS stat_type,
+            ROW_NUMBER() OVER (ORDER BY `stats_stl` / `stats_gm` DESC) AS rn
+        FROM ibl_plr
+        WHERE retired = 0 AND stats_gm > 0 AND name NOT LIKE '%Buyouts%'
+
+        UNION ALL
+
+        SELECT
+            pid,
+            tid,
+            name,
+            teamname,
+            ROUND(`stats_blk` / `stats_gm`, 1) AS stat_value,
+            'Blocks' AS stat_type,
+            ROW_NUMBER() OVER (ORDER BY `stats_blk` / `stats_gm` DESC) AS rn
+        FROM ibl_plr
+        WHERE retired = 0 AND stats_gm > 0 AND name NOT LIKE '%Buyouts%'
+    ) t
+    WHERE rn <= 5
+    ORDER BY FIELD(stat_type, 'Points', 'Rebounds', 'Assists', 'Steals', 'Blocks'), rn;";
+$resultTopFiveInStatAverages = $db->sql_query($queryTopFiveInStatAverages);
+
+$rows = $resultTopFiveInStatAverages->fetch_all(MYSQLI_ASSOC);
+$rowNumber = 0;
+
+$content = '<table style="border:1px solid #000066; margin: 0 auto;">
+    <tr>';
+for ($i = 1; $i <= 5; $i++) {
+    $content .= '<td style="border:1px solid #000066;">
+                <table>
+                    <tr>
+                        <td style="min-width:155px;" colspan=2>
+                            <div style="text-align:center;">
+                                <img src="./images/player/' . $rows[$rowNumber]['pid'] . '.jpg" height="90" width="65">
+                                <img src="./images/logo/new' . $rows[$rowNumber]['tid'] . '.png" height="75" width="75">
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="2" style="background-color:#000066; color:#ffffff; font-weight:bold;">
+                            ' . $rows[$rowNumber]['stat_type'] . ' Per Game
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight:bold;">
+                            <a href="modules.php?name=Player&pa=showpage&pid=' . $rows[$rowNumber]['pid'] . '" style="color:#000066;">
+                                ' . $rows[$rowNumber]['name'] . '
+                            </a>
+                            <br>
+                            <a href="modules.php?name=Team&op=team&teamID=' . $rows[$rowNumber]['tid'] . '" style="color:#000066;">
+                                ' . $rows[$rowNumber]['teamname'] . '
+                            </a>
+                        </td>
+                        <td valign="top" style="font-weight:bold;">
+                            ' . $rows[$rowNumber]['stat_value'] . '
+                        </td>
+                    </tr>';
+    $rowNumber++;
+    for ($j = 2; $j <= 5; $j++) {
+        $content .= '<tr>
+                        <td>
+                            <a href="modules.php?name=Player&pa=showpage&pid=' . $rows[$rowNumber]['pid'] . '" style="color:#000066;">
+                                ' . $rows[$rowNumber]['name'] . '
+                            </a>
+                            <br>
+                            <a href="modules.php?name=Team&op=team&teamID=' . $rows[$rowNumber]['tid'] . '" style="color:#000066;">
+                                ' . $rows[$rowNumber]['teamname'] . '
+                            </a>
+                        </td>
+                        <td valign="top">
+                            ' . $rows[$rowNumber]['stat_value'] . '
+                        </td>
+                    </tr>';
+        $rowNumber++;
     }
-
-    $content = "<td>
-        <table>
-            <tr>
-                <td style=\"min-width:155px\" colspan=2>
-                    <center>
-                        <img src=\"./images/player/" . $array[1]['pid'] . ".jpg\" height=\"90\" width=\"65\">
-                        <img src=\"./images/logo/new" . $array[1]['tid'] . ".png\" height=\"75\" width=\"75\">
-                    </center>
-                </td>
-            </tr>
-            <tr>
-                <td bgcolor=#000066 colspan=2><b><font color=#ffffff>$statName Per Game</td>
-            </tr>
-            <tr>
-                <td>
-                    <b>
-                        <a href=modules.php?name=Player&pa=showpage&pid=" . $array[1]['pid'] . "><font color=#000066>" . $array[1]['name'] . "</font></a>
-                        <br>
-                        <font color=#000066>" . $array[1]['teamname'] . "</font>
-                    </b>
-                </td>
-                <td valign=top><b>" . $array[1][$statName] . "</b></td>
-            </tr>";
-
-    $j = 2;
-    while ($j <= 5) {
-        $content .= "<tr>
-            <td>
-                <a href=modules.php?name=Player&pa=showpage&pid=" . $array[$j]['pid'] . "><font color=#000066>" . $array[$j]['name'] . "</font></a>
-                <br>
-                <font color=#000066>" . $array[$j]['teamname'] . "</font>
-            </td>
-            <td valign=top>" . $array[$j][$statName] . "</td>
-        </tr>";
-        $j++;
-    }
-
-    $content .= "</table></td>";
-
-    return $content;
+    $content .= '</table>
+            </td>';
 }
+$content .= '</tr>
+</table>';
 
-$content .= "<center>
-    <table border=1 bordercolor=#000066>
-        <tr>";
-$content .= topFiveSeasonPerGameAverage($db, 'Points', '(2 * `stats_fgm` + `stats_ftm` + `stats_3gm`)');
-$content .= topFiveSeasonPerGameAverage($db, 'Rebounds', '(`stats_orb` + `stats_drb`)');
-$content .= topFiveSeasonPerGameAverage($db, 'Assists', '`stats_ast`');
-$content .= topFiveSeasonPerGameAverage($db, 'Steals', '`stats_stl`');
-$content .= topFiveSeasonPerGameAverage($db, 'Blocks', '`stats_blk`');
-$content .= "
-        </tr>
-    </table>";
+?>

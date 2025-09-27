@@ -93,7 +93,7 @@ class TeamStats
     {
         $queryOffenseTotals = "SELECT *
             FROM ibl_team_offense_stats
-            WHERE team = '$teamName'
+            WHERE name = '$teamName'
             LIMIT 1;";
         $resulOffenseTotals = $db->sql_query($queryOffenseTotals);
         $offenseTotalsRow = $db->sql_fetch_assoc($resulOffenseTotals);
@@ -101,7 +101,7 @@ class TeamStats
 
         $queryDefenseTotals = "SELECT *
             FROM ibl_team_defense_stats
-            WHERE team = '$teamName'
+            WHERE name = '$teamName'
             LIMIT 1;";
         $resulDefenseTotals = $db->sql_query($queryDefenseTotals);
         $defenseTotalsRow = $db->sql_fetch_assoc($resulDefenseTotals);

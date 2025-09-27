@@ -30,7 +30,6 @@ define("_NEWSSENT", "noticia enviada");
 define("_VOTEDPOLLS", "primeras encuestas m�s votadas");
 define("_MOSTACTIVEAUTHORS", "autores m�s activos");
 define("_NEWSPUBLISHED", "noticias publicadas");
-define("_DOWNLOADEDFILES", "archivos m�s descargados");
 define("_MOSTREADPAGES", "p�ginas m�s le�das");
 define("_MOSTVOTEDSTORIES", "historias m�s votadas");
 define("_POINTS", "puntos");

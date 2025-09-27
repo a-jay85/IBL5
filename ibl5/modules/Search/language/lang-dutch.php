@@ -52,7 +52,6 @@ define("_SREPLIES", "Antwoorden");
 define("_ATTACHART", "Aan artikel toegevoegd");
 define("_PAGES", "Pagina's");
 define("_PAGE", "Pagina");
-define("_DOWNLOADS", "Downloads");
 define("_WEBLINKS", "Web Links");
 define("_FINDMORE", "... meer");
 define("_DIDNOTFIND", "Niet gevonden waarnaar u zocht?");

@@ -52,7 +52,6 @@ define("_SREPLIES", "Cevap");
 define("_ATTACHART", "Habere Eklenmi�");
 define("_PAGES", "Sayfa");
 define("_PAGE", "Sayfa");
-define("_DOWNLOADS", "Dosyalar");
 define("_WEBLINKS", "Web Ba�lant�lar�");
 define("_FINDMORE", "... devam�");
 define("_DIDNOTFIND", "Arad���n�z� bulamad�n�z m�?");

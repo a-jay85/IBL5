@@ -42,7 +42,6 @@ define("_SREPLIES", "respon");
 define("_ATTACHART", "Adjuntar l'Article");
 define("_PAGES", "P�gines");
 define("_PAGE", "p�gina(es) ");
-define("_DOWNLOADS", "Desc�rregues");
 define("_WEBLINKS", "Enlla�os (Web Links)");
 define("_FINDMORE", "... m�s");
 define("_DIDNOTFIND", "No has trobat el que estaves cercant?");

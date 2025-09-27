@@ -788,6 +788,11 @@ class UI
 
     public static function periodAverages($db, $team, $season, $startDate = NULL, $endDate = NULL)
     {
+        if ($startDate == NULL AND $endDate == NULL) {
+            $startDate = $season->lastSimStartDate;
+            $endDate = $season->lastSimEndDate;
+        }
+
         $table_periodAverages = "<table align=\"center\" class=\"sortable\">
             <thead>
                 <tr bgcolor=$team->color1>
@@ -819,11 +824,6 @@ class UI
                 </tr>
             </thead>
         <tbody>";
-
-        if ($startDate == NULL AND $endDate == NULL) {
-            $startDate = $season->lastSimStartDate;
-            $endDate = $season->lastSimEndDate;
-        }
 
         $resultPlayerSimBoxScores = $db->sql_query("SELECT name,
             pos,

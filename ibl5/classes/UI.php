@@ -789,6 +789,7 @@ class UI
     public static function periodAverages($db, $team, $season, $startDate = NULL, $endDate = NULL)
     {
         if ($startDate == NULL AND $endDate == NULL) {
+            // default to last simulated period
             $startDate = $season->lastSimStartDate;
             $endDate = $season->lastSimEndDate;
         }

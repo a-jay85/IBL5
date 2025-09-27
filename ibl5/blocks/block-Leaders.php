@@ -7,7 +7,7 @@ if (!defined('BLOCK_FILE')) {
 
 global $db;
 
-$queryTopFiveInStatAverages = "SELECT *
+$queryTopFiveInSeasonStatAverages = "SELECT *
     FROM (
         SELECT
             pid,
@@ -74,9 +74,9 @@ $queryTopFiveInStatAverages = "SELECT *
     ) t
     WHERE rn <= 5
     ORDER BY FIELD(stat_type, 'Points', 'Rebounds', 'Assists', 'Steals', 'Blocks'), rn;";
-$resultTopFiveInStatAverages = $db->sql_query($queryTopFiveInStatAverages);
+$resultTopFiveInSeasonStatAverages = $db->sql_query($queryTopFiveInSeasonStatAverages);
 
-$rows = $resultTopFiveInStatAverages->fetch_all(MYSQLI_ASSOC);
+$rows = $resultTopFiveInSeasonStatAverages->fetch_all(MYSQLI_ASSOC);
 $rowNumber = 0;
 
 $content = '<table style="border:1px solid #000066; margin: 0 auto;">

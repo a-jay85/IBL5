@@ -758,7 +758,7 @@ class UI
                 <td colspan=4><b>$team->name Defense</td>
                 <td><center><b>$teamStats->seasonDefenseGamesPlayed</center></td>
                 <td><center><b>$teamStats->seasonDefenseGamesPlayed</center></td>
-                <td>/td>
+                <td></td>
                 <td bgcolor=$team->color1 width=0></td>
                 <td><center><b>$teamStats->seasonDefenseTotalFieldGoalsMade</center></td>
                 <td><center><b>$teamStats->seasonDefenseTotalFieldGoalsAttempted</b></center></td>

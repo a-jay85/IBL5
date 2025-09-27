@@ -20,7 +20,6 @@
 define("_ALLTOPICS", "Vse teme");
 define("_NOCOMMENTS", "Brez komentarja");
 define("_UCOMMENT", "Komentar");
-define("_REVIEWS", "Recenzije");
 define("_SEARCHUSERS", "I��i v bazi podatkov uporabnikov");
 define("_SEARCHSECTIONS", "I��i v posebnih oddelkih");
 define("_SEARCHREVIEWS", "I��i v recenzijah");
@@ -52,7 +51,6 @@ define("_SREPLY", "Odgovor");
 define("_SREPLIES", "Odgovori");
 define("_ATTACHART", "Dodano �lanku");
 define("_PAGES", "Strani");
-define("_REVIEWSCORE", "Ocena te recenzije");
 define("_PAGE", "Strani");
 define("_WEBLINKS", "Web Links");
 define("_FINDMORE", "... more");

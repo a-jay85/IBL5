@@ -35,7 +35,6 @@ define("_NEWSSENT", "����� �����");
 define("_VOTEDPOLLS", "������ �� ��� ���� ������");
 define("_MOSTACTIVEAUTHORS", "������ ��� ����");
 define("_NEWSPUBLISHED", "����� �������");
-define("_READREVIEWS", "�������� ������� �����");
 define("_MOSTREADPAGES", "����� ������� �����");
 define("_MOSTVOTEDSTORIES", "�������� �� ��� ���� ������");
 define("_POINTS", "������");

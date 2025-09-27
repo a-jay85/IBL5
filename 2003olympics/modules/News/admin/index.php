@@ -105,22 +105,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
         echo "</select> &nbsp; <a href=\"" . $admin_file . ".php?op=AddCategory\"><img src=\"images/add.gif\" alt=\"" . _ADD . "\" title=\"" . _ADD . "\" border=\"0\" width=\"17\" height=\"17\"></a>  <a href=\"" . $admin_file . ".php?op=EditCategory\"><img src=\"images/edit.gif\" alt=\"" . _EDIT . "\" title=\"" . _EDIT . "\" border=\"0\" width=\"17\" height=\"17\"></a>  <a href=\"" . $admin_file . ".php?op=DelCategory\"><img src=\"images/delete.gif\" alt=\"" . _DELETE . "\" title=\"" . _DELETE . "\" border=\"0\" width=\"17\" height=\"17\"></a>";
     }
 
-    function putpoll($pollTitle, $optionText)
-    {
-        OpenTable();
-        echo "<center><font class=\"title\"><b>" . _ATTACHAPOLL . "</b></font><br>"
-            . "<font class=\"tiny\">" . _LEAVEBLANKTONOTATTACH . "</font><br>"
-            . "<br><br>" . _POLLTITLE . ": <input type=\"text\" name=\"pollTitle\" size=\"50\" maxlength=\"100\" value=\"$pollTitle\"><br><br>"
-            . "<font class=\"content\">" . _POLLEACHFIELD . "<br>"
-            . "<table border=\"0\">";
-        for ($i = 1; $i <= 12; $i++) {
-            echo "<tr>"
-                . "<td>" . _OPTION . " $i:</td><td><input type=\"text\" name=\"optionText[$i]\" size=\"50\" maxlength=\"50\" value=\"$optionText[$i]\"></td>"
-                . "</tr>";
-        }
-        echo "</table>";
-        CloseTable();
-    }
+
 
     function AddCategory()
     {
@@ -919,7 +904,6 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
             . "</td></tr></table>";
         CloseTable();
         echo "<br>";
-        putpoll($pollTitle, $optionText);
         echo "</form>";
         include 'footer.php';
     }
@@ -1185,7 +1169,6 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
             . "</td></tr></table>";
         CloseTable();
         echo "<br>";
-        putpoll($pollTitle, $optionText);
         echo "</form>";
         include 'footer.php';
     }
@@ -1246,33 +1229,13 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
             $hometext = filter($hometext, "", 1);
             $bodytext = filter($bodytext, "", 1);
             $notes = filter($notes, "", 1);
-            if ((!empty($pollTitle)) and (!empty($optionText[1])) and (!empty($optionText[2]))) {
-                $haspoll = 1;
-                $timeStamp = time();
-                $pollTitle = filter($pollTitle, "nohtml", 1);
-                if (!$db->sql_query("INSERT INTO " . $prefix . "_poll_desc VALUES (NULL, '$pollTitle', '$timeStamp', '0', '$alanguage', '0', '0')")) {
-                    return;
-                }
-                $object = $db->sql_fetchrow($db->sql_query("SELECT pollID FROM " . $prefix . "_poll_desc WHERE pollTitle='$pollTitle'"));
-                $id = $object['pollID'];
-                $id = intval($id);
-                for ($i = 1; $i <= sizeof($optionText); $i++) {
-                    if ($optionText[$i] != "") {
-                        $optionText[$i] = filter($optionText[$i], "nohtml", 1);
-                    }
-                    if (!$db->sql_query("INSERT INTO " . $prefix . "_poll_data (pollID, optionText, optionCount, voteID) VALUES ('$id', '$optionText[$i]', '0', '$i')")) {
-                        return;
-                    }
-                }
-            } else {
-                $haspoll = 0;
-                $id = 0;
-            }
+            // Always disable polls since Surveys module is removed
+            $haspoll = 0;
+            $id = 0;
             $result = $db->sql_query("insert into " . $prefix . "_stories values (NULL, '$catid', '$aid', '$subject', now(), '$hometext', '$bodytext', '0', '0', '$topic', '$author', '$notes', '$ihome', '$alanguage', '$acomm', '$haspoll', '$id', '0', '0', '0', '$associated')");
             $result = $db->sql_query("select sid from " . $prefix . "_stories WHERE title='$subject' order by time DESC limit 0,1");
             list($artid) = $db->sql_fetchrow($result);
             $artid = intval($artid);
-            $db->sql_query("UPDATE " . $prefix . "_poll_desc SET artid='$artid' WHERE pollID='$id'");
             if (!$result) {
                 return;
             }
@@ -1473,7 +1436,6 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
                 $counter--;
                 $db->sql_query("DELETE FROM " . $prefix . "_stories where sid='$sid'");
                 $db->sql_query("DELETE FROM " . $prefix . "_comments where sid='$sid'");
-                $db->sql_query("update " . $prefix . "_poll_desc set artid='0' where artid='$sid'");
                 $result = $db->sql_query("update " . $prefix . "_authors set counter='$counter' where aid='$aid'");
                 if ($ultramode) {
                     ultramode();
@@ -1754,8 +1716,6 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
             . "</select>"
             . "&nbsp;&nbsp;<input type=\"submit\" value=\"" . _OK . "\"></td></tr></table>";
         CloseTable();
-        echo "<br>";
-        putpoll("", array_fill(1, 12, ""));
         echo "</form>";
         include 'footer.php';
     }
@@ -2004,9 +1964,6 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
             . "<option value=\"PostAdminStory\">" . _POSTSTORY . "</option>"
             . "</select>"
             . "&nbsp;&nbsp;<input type=\"submit\" value=\"" . _OK . "\"></td></tr></table>";
-        CloseTable();
-        echo "<br>";
-        putpoll($pollTitle, $optionText);
         echo "</form>";
         include 'footer.php';
     }
@@ -2044,33 +2001,13 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
             $subject = filter($subject, "nohtml", 1);
             $hometext = filter($hometext, "", 1);
             $bodytext = filter($bodytext, "", 1);
-            if (($pollTitle != "") and ($optionText[1] != "") and ($optionText[2] != "")) {
-                $haspoll = 1;
-                $timeStamp = time();
-                $pollTitle = filter($pollTitle, "nohtml", 1);
-                if (!$db->sql_query("INSERT INTO " . $prefix . "_poll_desc VALUES (NULL, '$pollTitle', '$timeStamp', '0', '$alanguage', '0', '0')")) {
-                    return;
-                }
-                $object = $db->sql_fetchrow($db->sql_query("SELECT pollID FROM " . $prefix . "_poll_desc WHERE pollTitle='$pollTitle'"));
-                $id = $object['pollID'];
-                $id = intval($id);
-                for ($i = 1; $i <= sizeof($optionText); $i++) {
-                    if (!empty($optionText[$i])) {
-                        $optionText[$i] = filter($optionText[$i], "nohtml", 1);
-                    }
-                    if (!$db->sql_query("INSERT INTO " . $prefix . "_poll_data (pollID, optionText, optionCount, voteID) VALUES ('$id', '$optionText[$i]', '0', '$i')")) {
-                        return;
-                    }
-                }
-            } else {
-                $haspoll = 0;
-                $id = 0;
-            }
+            // Always disable polls since Surveys module is removed
+            $haspoll = 0;
+            $id = 0;
             $result = $db->sql_query("insert into " . $prefix . "_stories values (NULL, '$catid', '$aid', '$subject', now(), '$hometext', '$bodytext', '0', '0', '$topic', '$aid', '$notes', '$ihome', '$alanguage', '$acomm', '$haspoll', '$id', '0', '0', '0', '$associated')");
             $result = $db->sql_query("select sid from " . $prefix . "_stories WHERE title='$subject' order by time DESC limit 0,1");
             list($artid) = $db->sql_fetchrow($result);
             $artid = intval($artid);
-            $db->sql_query("UPDATE " . $prefix . "_poll_desc SET artid='$artid' WHERE pollID='$id'");
             if (!$result) {
                 die();
             }

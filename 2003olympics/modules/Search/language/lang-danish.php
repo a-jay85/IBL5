@@ -18,7 +18,6 @@
 define("_ALLTOPICS", "Alle emner");
 define("_NOCOMMENTS", "Ingen kommentarer");
 define("_UCOMMENT", "Kommentar");
-define("_REVIEWS", "Administration af anmeldelser");
 define("_SEARCHUSERS", "S�g i brugerdatabasen");
 define("_SEARCHSECTIONS", "S�g i Specialsektioner");
 define("_SEARCHREVIEWS", "S�g i anmeldelser");
@@ -50,7 +49,6 @@ define("_SREPLY", "Svar");
 define("_SREPLIES", "Svar");
 define("_ATTACHART", "Vedh�ftet artikel");
 define("_PAGES", "Sider");
-define("_REVIEWSCORE", "Score til denne anmeldelse");
 define("_PAGE", "Side");
 define("_WEBLINKS", "Web Links");
 define("_FINDMORE", "... more");

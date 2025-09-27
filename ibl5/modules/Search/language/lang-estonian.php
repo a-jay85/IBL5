@@ -20,7 +20,6 @@
 define("_ALLTOPICS", "K�ikidest teemadest");
 define("_NOCOMMENTS", "Kommentaare pole");
 define("_UCOMMENT", "Kommentaari");
-define("_REVIEWS", "�levaadet");
 define("_SEARCHUSERS", "Otsi kasutajaid andmebaasisit");
 define("_SEARCHSECTIONS", "Otsi t�psest rubriigist");
 define("_SEARCHREVIEWS", "Otsi �levaadetest");
@@ -52,7 +51,6 @@ define("_SREPLY", "Vasta");
 define("_SREPLIES", "Vastused");
 define("_ATTACHART", "Lisatud Artiklisse");
 define("_PAGES", "Lehed");
-define("_REVIEWSCORE", "Selle �levaate skoor");
 define("_PAGE", "Leht");
 define("_WEBLINKS", "Lingid");
 define("_FINDMORE", "... veel");

@@ -30,7 +30,6 @@ define("_NEWSSENT", "artikujt e d�rguar");
 define("_VOTEDPOLLS", "Sondazhi m� i votuar");
 define("_MOSTACTIVEAUTHORS", "Autor�t m� aktiv�");
 define("_NEWSPUBLISHED", "artikujt e publikuar");
-define("_READREVIEWS", "Recensimet m� t� lexuara");
 define("_MOSTREADPAGES", "faqet m� t� vizituara");
 define("_MOSTVOTEDSTORIES", "artikujt m� t� votuar");
 define("_POINTS", "pik�");

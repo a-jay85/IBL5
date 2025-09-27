@@ -20,7 +20,6 @@
 define("_ALLTOPICS", "Todos los T�picos");
 define("_NOCOMMENTS", "Sin Comentarios");
 define("_UCOMMENT", "Comentario");
-define("_REVIEWS", "Reviews");
 define("_SEARCHUSERS", "Buscar Usuarios");
 define("_SEARCHSECTIONS", "Buscar en Secciones Especiales");
 define("_SEARCHREVIEWS", "Buscar en Reviews");
@@ -52,7 +51,6 @@ define("_SREPLY", "responden");
 define("_SREPLIES", "responde");
 define("_ATTACHART", "Adjuntar al Art�culo");
 define("_PAGES", "P�ginas");
-define("_REVIEWSCORE", "Puntuaci�n de este Review");
 define("_PAGE", "p�gina(s) ");
 define("_WEBLINKS", "Enlaces (Web Links)");
 define("_FINDMORE", "... m�s");

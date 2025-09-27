@@ -36,7 +36,6 @@ define("_NEWSSENT", "enviar not�cia");
 define("_VOTEDPOLLS", "vota��es com mais ades�o");
 define("_MOSTACTIVEAUTHORS", "autores mais activos");
 define("_NEWSPUBLISHED", "not�cias publicadas");
-define("_READREVIEWS", "revis�es mais lidas");
 define("_MOSTREADPAGES", "p�ginas mais lidas");
 define("_MOSTVOTEDSTORIES", "artigos com mais vota��es");
 define("_POINTS", "pontos");

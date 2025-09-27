@@ -30,7 +30,6 @@ define("_NEWSSENT", "berita yang dikirim");
 define("_VOTEDPOLLS", "polling yang terbanyak diikuti");
 define("_MOSTACTIVEAUTHORS", "redaktur teraktif");
 define("_NEWSPUBLISHED", "berita yang dipublikasi");
-define("_READREVIEWS", "ulasan yang terbanyak dibaca");
 define("_MOSTREADPAGES", "halaman yang terbanyak dibaca");
 define("_MOSTVOTEDSTORIES", "berita yang terbanyak dinilai");
 define("_POINTS", "poin");

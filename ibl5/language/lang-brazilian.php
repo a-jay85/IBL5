@@ -42,7 +42,6 @@ define("_ON", "em");
 define("_LOGOUT", "Logout");
 define("_WAITINGCONT", "No aguardo...");
 define("_SUBMISSIONS", "Envios");
-define("_WREVIEWS", "Revis�es");
 define("_WLINKS", "Links");
 define("_EPHEMERIDS", "Efem�rides");
 define("_ONEDAY", "Um dia como hoje...");

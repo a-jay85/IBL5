@@ -20,7 +20,6 @@
 define("_ALLTOPICS", "Allir efnisflokkar");
 define("_NOCOMMENTS", "Engar athugasemdir");
 define("_UCOMMENT", "Athugasemd");
-define("_REVIEWS", "umsagnir");
 define("_SEARCHUSERS", "Leita � notendagrunni");
 define("_SEARCHSECTIONS", "Leita � greinasafni");
 define("_SEARCHREVIEWS", "Leita � ums�gnum");
@@ -52,7 +51,6 @@ define("_SREPLY", "svar");
 define("_SREPLIES", "sv�r");
 define("_ATTACHART", "Tengt grein");
 define("_PAGES", "S��ur");
-define("_REVIEWSCORE", "Einkunn");
 define("_PAGE", "S��a");
 define("_WEBLINKS", "Vef tenglar");
 define("_FINDMORE", "... meira");

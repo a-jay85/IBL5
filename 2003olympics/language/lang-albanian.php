@@ -38,7 +38,6 @@ define("_ON", "dit�n");
 define("_LOGOUT", "Logout");
 define("_WAITINGCONT", "N� Pritje");
 define("_SUBMISSIONS", "Artikuj");
-define("_WREVIEWS", "Recensime");
 define("_WLINKS", "Links");
 define("_EPHEMERIDS", "Ngjarje Historike");
 define("_ONEDAY", "Nj� dit� si Sot...");

@@ -38,7 +38,6 @@ define("_ON", "v");
 define("_LOGOUT", "Odhl�sit");
 define("_WAITINGCONT", "A tohle �ek�");
 define("_SUBMISSIONS", "P��sp�vky");
-define("_WREVIEWS", "Recenze");
 define("_WLINKS", "Odkazy");
 define("_EPHEMERIDS", "Ud�losti");
 define("_ONEDAY", "Den jako ka�d� jin�...");

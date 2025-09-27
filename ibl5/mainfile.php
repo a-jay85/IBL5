@@ -1214,8 +1214,6 @@ function adminblock()
         $num = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_queue"));
         $content = "<span class=\"content\">";
         $content .= "<strong><big>&middot;</big></strong>&nbsp;<a href=\"" . $admin_file . ".php?op=submissions\">" . _SUBMISSIONS . "</a>: $num<br>";
-        $num = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_reviews_add"));
-        $content .= "<strong><big>&middot;</big></strong>&nbsp;<a href=\"" . $admin_file . ".php?op=reviews\">" . _WREVIEWS . "</a>: $num<br>";
         $num = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_links_newlink"));
         $brokenl = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_links_modrequest WHERE brokenlink='1'"));
         $modreql = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_links_modrequest WHERE brokenlink='0'"));

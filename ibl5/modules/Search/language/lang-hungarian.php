@@ -20,7 +20,6 @@
 define("_ALLTOPICS", "Minden t�ma");
 define("_NOCOMMENTS", "Nincs hozz�sz�l�s!");
 define("_UCOMMENT", "Hozz�sz�l�s");
-define("_REVIEWS", "Ismertet�k");
 define("_SEARCHUSERS", "Keres�s a felhaszn�l�i adatb�zisban");
 define("_SEARCHSECTIONS", "Keres�s a hosszabb �r�sokban");
 define("_SEARCHREVIEWS", "Keres�s az ismertet�k k�z�tt");
@@ -52,7 +51,6 @@ define("_SREPLY", "v�lasz");
 define("_SREPLIES", "v�lasz");
 define("_ATTACHART", "Csatolva a cikkhez");
 define("_PAGES", "oldal");
-define("_REVIEWSCORE", "Az ismertet� oszt�lyoz�sa");
 define("_PAGE", "oldal");
 define("_WEBLINKS", "Web Links");
 define("_FINDMORE", "... more");

@@ -121,50 +121,6 @@ if ($multilingual == 1) {
     $querylang = "";
 }
 
-/* Determine if the article has attached a poll */
-if ($haspoll == 1) {
-    $url = sprintf("modules.php?name=Surveys&amp;op=results&amp;pollID=%d", $pollID);
-    $boxContent = "<form action=\"modules.php?name=Surveys\" method=\"post\">";
-    $boxContent .= "<input type=\"hidden\" name=\"pollID\" value=\"" . $pollID . "\">";
-    $row3 = $db->sql_fetchrow($db->sql_query("SELECT pollTitle, voters FROM " . $prefix . "_poll_desc WHERE pollID='$pollID'"));
-    $pollTitle = filter($row3['pollTitle'], "nohtml");
-    $voters = $row3['voters'];
-    $boxTitle = _ARTICLEPOLL;
-    //$boxContent .= "<font class=\"content\"><b>$pollTitle</b></font><br><br>\n";
-    //$boxContent .= "<table border=\"0\" width=\"100%\">";
-    for ($i = 1; $i <= 12; $i++) {
-        $result4 = $db->sql_query("SELECT pollID, optionText, optionCount, voteID FROM " . $prefix . "_poll_data WHERE (pollID='$pollID') AND (voteID='$i')");
-        $row4 = $db->sql_fetchrow($result4);
-        $numrows = $db->sql_numrows($result4);
-        if ($numrows != 0) {
-            $optionText = $row4['optionText'];
-            if (!empty($optionText)) {
-                //$boxContent .= "<tr><td valign=\"top\"><input type=\"radio\" name=\"voteID\" value=\"".$i."\"></td><td width=\"100%\"><font class=\"content\">$optionText</font></td></tr>\n";
-            }
-        }
-    }
-    //$boxContent .= "</table><br><center><font class=\"content\"><input type=\"submit\" value=\""._VOTE."\"></font><br>";
-    if (is_user($user)) {
-        cookiedecode($user);
-    }
-    for ($i = 0; $i < 12; $i++) {
-        $row5 = $db->sql_fetchrow($db->sql_query("SELECT optionCount FROM " . $prefix . "_poll_data WHERE (pollID='$pollID') AND (voteID='$i')"));
-        $optionCount = $row5['optionCount'];
-        $sum = (int) $sum + $optionCount;
-    }
-    $boxContent .= "<font class=\"content\">[ <a href=\"modules.php?name=Surveys&amp;op=results&amp;pollID=$pollID&amp;mode=" . $userinfo['umode'] . "&amp;order=" . $userinfo['uorder'] . "&amp;thold=" . $userinfo['thold'] . "\"><b>" . _RESULTS . "</b></a> | <a href=\"modules.php?name=Surveys\"><b>" . _POLLS . "</b></a> ]<br>";
-
-    if ($pollcomm) {
-        $result6 = $db->sql_query("select * from " . $prefix . "_pollcomments where pollID='$pollID'");
-        $numcom = $db->sql_numrows($result6);
-        $boxContent .= "<br>" . _VOTES . ": <b>$sum</b><br>" . _PCOMMENTS . " <b>$numcom</b>\n\n";
-    } else {
-        $boxContent .= "<br>" . _VOTES . " <b>$sum</b>\n\n";
-    }
-    $boxContent .= "</font></center></form>\n\n";
-    themesidebox($boxTitle, $boxContent);
-}
-
 /* old modules */
 
 //echo "</td></tr></table>\n";

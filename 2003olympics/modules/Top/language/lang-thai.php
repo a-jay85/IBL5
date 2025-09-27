@@ -30,7 +30,6 @@ define("_NEWSSENT", "��������ش");
 define("_VOTEDPOLLS", "Ẻ���Ǩ�ʹ�Ե");
 define("_MOSTACTIVEAUTHORS", "�ѡ��¹�ʹ�Ե");
 define("_NEWSPUBLISHED", "����ͧ����ʴ�");
-define("_READREVIEWS", "���Ԩ�ó������ʹ��ҹ�٧�ش");
 define("_MOSTREADPAGES", "�����ҷ����ҹ�ҡ����ش");
 define("_MOSTVOTEDSTORIES", "����ͧ���١��ǵ�ҡ����ش");
 define("_POINTS", "��ṹ");

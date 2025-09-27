@@ -30,7 +30,6 @@ define("_NEWSSENT", "bek�ld�tt h�r");
 define("_VOTEDPOLLS", "a legt�bb szavazatot kapott szavaz�sok toplist�ja");
 define("_MOSTACTIVEAUTHORS", "Akt�v szerz�k:");
 define("_NEWSPUBLISHED", "k�zz�tett cikk");
-define("_READREVIEWS", "legolvasottabb ismeretet�k topllist�ja");
 define("_MOSTREADPAGES", "most read pages");
 define("_MOSTVOTEDSTORIES", "most voted stories");
 define("_POINTS", "points");

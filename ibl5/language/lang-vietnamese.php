@@ -38,7 +38,6 @@ define("_ON", "vào");
 define("_LOGOUT", "Thoát");
 define("_WAITINGCONT", "N&#7897;i dung &#273;ang &#273;&#7907;i");
 define("_SUBMISSIONS", "Bài g&#7917;i");
-define("_WREVIEWS", "&#272;ánh giá");
 define("_WLINKS", "Liên k&#7871;t");
 define("_EPHEMERIDS", "L&#7883;ch thiên v&#259;n");
 define("_ONEDAY", "One Day like Today...");

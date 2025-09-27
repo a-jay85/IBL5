@@ -30,7 +30,6 @@ define("_NEWSSENT", "news sent");
 define("_VOTEDPOLLS", "most voted polls");
 define("_MOSTACTIVEAUTHORS", "most active authors");
 define("_NEWSPUBLISHED", "news published");
-define("_READREVIEWS", "most read reviews");
 define("_MOSTREADPAGES", "most read pages");
 define("_MOSTVOTEDSTORIES", "most voted stories");
 define("_POINTS", "points");

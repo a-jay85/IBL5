@@ -30,7 +30,6 @@ define("_NEWSSENT", "nyheter sendt");
 define("_VOTEDPOLLS", "mest stemmer i avstemmingene");
 define("_MOSTACTIVEAUTHORS", "mest aktive skribent");
 define("_NEWSPUBLISHED", "nyheter publisert");
-define("_READREVIEWS", "mest leste anmeldelser");
 define("_MOSTREADPAGES", "mest leste sider");
 define("_MOSTVOTEDSTORIES", "mest stemte artikler");
 define("_POINTS", "poeng");

@@ -26,13 +26,11 @@ if ($multilingual == 1) {
     $querya1lang = "WHERE (alanguage='$currentlang' OR alanguage='') AND"; /* top stories */
     $queryslang = "WHERE slanguage='$currentlang' "; /* top section articles */
     $queryplang = "WHERE planguage='$currentlang' "; /* top polls */
-    $queryrlang = "WHERE rlanguage='$currentlang' "; /* top reviews */
 } else {
     $queryalang = "";
     $querya1lang = "WHERE";
     $queryslang = "";
     $queryplang = "";
-    $queryrlang = "";
 }
 
 OpenTable();
@@ -158,37 +156,6 @@ if ($db->sql_numrows($result7) > 0) {
     echo "</font></td></tr></table><br>\n";
 }
 
-/* Top 10 Polls */
-
-$result8 = $db->sql_query("select * from " . $prefix . "_poll_desc $queryplang");
-if ($db->sql_numrows($result8) > 0) {
-    echo "<table border=\"0\" cellpadding=\"10\" width=\"100%\"><tr><td align=\"left\">\n"
-        . "<font class=\"option\"><b>$top " . _VOTEDPOLLS . "</b></font><br><br><font class=\"content\">\n";
-    $lugar = 1;
-    $result9 = $db->sql_query("SELECT pollID, pollTitle, timeStamp, voters FROM " . $prefix . "_poll_desc $queryplang order by voters DESC limit 0,$top");
-    $counter = 0;
-    while ($row9 = $db->sql_fetchrow($result9)) {
-        $resultArray[$counter] = array($row9['pollID'], $row9['pollTitle'], $row9['timeStamp'], $row9['voters']);
-        $counter++;
-    }
-    for ($count = 0; $count < count($resultArray); $count++) {
-        $id = $resultArray[$count][0];
-        $pollTitle = $resultArray[$count][1];
-        $voters = $resultArray[$count][3];
-        for ($i = 0; $i < 12; $i++) {
-            $result10 = $db->sql_query("SELECT optionCount FROM " . $prefix . "_poll_data WHERE (pollID='$id') AND (voteID='$i')");
-            $row10 = $db->sql_fetchrow($result10);
-            $optionCount = $row10['optionCount'];
-            $sum = (int) $sum + $optionCount;
-        }
-        $pollTitle = filter($pollTitle, "nohtml");
-        echo "<strong><big>&middot;</big></strong>&nbsp;$lugar: <a href=\"modules.php?name=Surveys&amp;pollID=$id\">$pollTitle</a> - ($sum " . _LVOTES . ")<br>\n";
-        $lugar++;
-        $sum = 0;
-    }
-    echo "</font></td></tr></table><br>\n";
-}
-
 /* Top 10 authors */
 
 $result11 = $db->sql_query("SELECT aid, counter FROM " . $prefix . "_authors ORDER BY counter DESC LIMIT 0,$top");
@@ -206,27 +173,6 @@ if ($db->sql_numrows($result11) > 0) {
     }
     echo "</font></td></tr></table><br>\n";
 }
-
-/* Top 10 reviews */
-
-$result12 = $db->sql_query("SELECT id, title, hits FROM " . $prefix . "_reviews $queryrlang ORDER BY hits DESC LIMIT 0,$top");
-if ($db->sql_numrows($result12) > 0) {
-    echo "<table border=\"0\" cellpadding=\"10\" width=\"100%\"><tr><td align=\"left\">\n"
-        . "<font class=\"option\"><b>$top " . _READREVIEWS . "</b></font><br><br><font class=\"content\">\n";
-    $lugar = 1;
-    while ($row12 = $db->sql_fetchrow($result12)) {
-        $id = intval($row12['id']);
-        $title = filter($row12['title'], "nohtml");
-        $hits = intval($row12['hits']);
-        if ($hits > 0) {
-            echo "<strong><big>&middot;</big></strong>&nbsp;$lugar: <a href=\"modules.php?name=Reviews&amp;op=showcontent&amp;id=$id\">$title</a> - ($hits " . _READS . ")<br>\n";
-            $lugar++;
-        }
-    }
-    echo "</font></td></tr></table><br>\n";
-}
-
-
 
 /* Top 10 Pages in Content */
 

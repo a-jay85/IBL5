@@ -26,7 +26,6 @@
 define("_ALLTOPICS", "Todos os temas");
 define("_NOCOMMENTS", "Sem Coment�rios");
 define("_UCOMMENT", "Coment�rio");
-define("_REVIEWS", "Revis�o");
 define("_SEARCHUSERS", "Localizar utilizadores");
 define("_SEARCHSECTIONS", "Localizar em sec��es especiais");
 define("_SEARCHREVIEWS", "Localizar em Revis�es");
@@ -58,7 +57,6 @@ define("_SREPLY", "Responder");
 define("_SREPLIES", "Respostas");
 define("_ATTACHART", "Anexar ao Artigo");
 define("_PAGES", "P�ginas");
-define("_REVIEWSCORE", "Pontua��o para esta Revis�o");
 define("_PAGE", "P�ginas");
 define("_WEBLINKS", "Web Links");
 define("_FINDMORE", "... mais");

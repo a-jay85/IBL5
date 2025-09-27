@@ -30,7 +30,6 @@ define("_NEWSSENT", "articoli inviati");
 define("_VOTEDPOLLS", "Sondaggio pi&ugrave; votato");
 define("_MOSTACTIVEAUTHORS", "Autori pi&ugrave; attivi");
 define("_NEWSPUBLISHED", "articoli pubblicati");
-define("_READREVIEWS", "Recensioni pi&ugrave; lette");
 define("_MOSTREADPAGES", "pagine pi&ugrave; lette");
 define("_MOSTVOTEDSTORIES", "most voted stories");
 define("_POINTS", "points");

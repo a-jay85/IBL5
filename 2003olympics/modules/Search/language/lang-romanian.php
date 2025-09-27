@@ -20,7 +20,6 @@
 define("_ALLTOPICS", "Toate topic-urile");
 define("_NOCOMMENTS", "Fara comentarii");
 define("_UCOMMENT", "Comentariu");
-define("_REVIEWS", "Revizuiri");
 define("_SEARCHUSERS", "Cauta in baza de date a a utilizatorului");
 define("_SEARCHSECTIONS", "Cauta in sectiunile speciale");
 define("_SEARCHREVIEWS", "Search in Revizuiri");
@@ -52,7 +51,6 @@ define("_SREPLY", "Raspuns");
 define("_SREPLIES", "Raspunsuri");
 define("_ATTACHART", "Atasat la articol");
 define("_PAGES", "Pagini");
-define("_REVIEWSCORE", "Scor pt. aceasta revizuire");
 define("_PAGE", "Pagina");
 define("_WEBLINKS", "Web Links");
 define("_FINDMORE", "... more");

@@ -10,7 +10,6 @@
 define("_ALLTOPICS", "Tots els T�pics");
 define("_NOCOMMENTS", "Sense Comentaris");
 define("_UCOMMENT", "Comentari");
-define("_REVIEWS", "Reviews");
 define("_SEARCHUSERS", "Buscar Usuaris");
 define("_SEARCHSECTIONS", "Buscar a Seccions Especials");
 define("_SEARCHREVIEWS", "Buscar a Reviews");
@@ -42,7 +41,6 @@ define("_SREPLY", "responen");
 define("_SREPLIES", "respon");
 define("_ATTACHART", "Adjuntar l'Article");
 define("_PAGES", "P�gines");
-define("_REVIEWSCORE", "Puntuaci� d'aquest Review");
 define("_PAGE", "p�gina(es) ");
 define("_WEBLINKS", "Enlla�os (Web Links)");
 define("_FINDMORE", "... m�s");

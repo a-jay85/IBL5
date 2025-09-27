@@ -33,7 +33,6 @@ define("_NEWSSENT", "wys�anych news�w");
 define("_VOTEDPOLLS", "ankiet w kt�rych g�osowano najcz�ciej");
 define("_MOSTACTIVEAUTHORS", "najaktywniejszych autor�w");
 define("_NEWSPUBLISHED", "opublikowanych news�w");
-define("_READREVIEWS", "najcz�ciej czytanych recenzji");
 define("_MOSTREADPAGES", "najcz�ciej czytanych stron");
 define("_MOSTVOTEDSTORIES", "najcz�ciej ocenianych news�w");
 define("_POINTS", "punkt�w");

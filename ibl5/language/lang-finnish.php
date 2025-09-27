@@ -38,7 +38,6 @@ define("_ON", "Milloin:");
 define("_LOGOUT", "Kirjaudu ulos");
 define("_WAITINGCONT", "Odottava sis�lt�");
 define("_SUBMISSIONS", "Uutisia");
-define("_WREVIEWS", "Arvostelut");
 define("_WLINKS", "Linkkej�");
 define("_EPHEMERIDS", "Historiassa");
 define("_ONEDAY", "P�iv� kuin t�m�...");

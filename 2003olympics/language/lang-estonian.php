@@ -38,7 +38,6 @@ define("_ON", ""); /** Oli enne t�hi ? **/
 define("_LOGOUT", "Logi v�lja");
 define("_WAITINGCONT", "Saadetised");
 define("_SUBMISSIONS", "Saadetised");
-define("_WREVIEWS", "Ootan �levaateid");
 define("_WLINKS", "Saadetud lingid");
 define("_EPHEMERIDS", "P�evas�ndmused");
 define("_ONEDAY", "�hel p�eval nagu t�na...");

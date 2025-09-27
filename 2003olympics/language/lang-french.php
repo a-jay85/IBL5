@@ -62,7 +62,6 @@ define("_ADMIN", "Admin:");
 define("_WERECEIVED", "Nous avons re&ccedil;us");
 define("_PAGESVIEWS", "pages vues depuis");
 define("_TOPIC", "Sujet");
-define("_UDOWNLOADS", "T&eacute;l&eacute;chargements");
 define("_VOTE", "Vote");
 define("_VOTES", "Votes");
 define("_MVIEWADMIN", "Visualisation: Administrateurs seulement");

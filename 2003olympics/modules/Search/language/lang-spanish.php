@@ -52,7 +52,6 @@ define("_SREPLIES", "responde");
 define("_ATTACHART", "Adjuntar al Art�culo");
 define("_PAGES", "P�ginas");
 define("_PAGE", "p�gina(s) ");
-define("_DOWNLOADS", "Downloads");
 define("_WEBLINKS", "Enlaces (Web Links)");
 define("_FINDMORE", "... m�s");
 define("_DIDNOTFIND", "�No encontraste lo que estabas buscando?");

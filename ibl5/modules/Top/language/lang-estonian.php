@@ -30,8 +30,6 @@ define("_NEWSSENT", "uudist saatnud");
 define("_VOTEDPOLLS", "enim h��letatud k�sitlused");
 define("_MOSTACTIVEAUTHORS", "k�ige aktiivsemad autorid");
 define("_NEWSPUBLISHED", "uudist avalikustanud");
-define("_DOWNLOADEDFILES", "enim allalaetud faili");
-define("_LDOWNLOADS", "korda allalaetud");
 define("_MOSTREADPAGES", "enim loetud lehed");
 define("_MOSTVOTEDSTORIES", "enim h��letatud juttu");
 define("_POINTS", "punkt(i)");

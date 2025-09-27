@@ -1221,7 +1221,13 @@ function adminblock()
         $modreql = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_links_modrequest WHERE brokenlink='0'"));
         $content .= "<strong><big>&middot;</big></strong>&nbsp;<a href=\"" . $admin_file . ".php?op=Links\">" . _WLINKS . "</a>: $num<br>";
         $content .= "<strong><big>&middot;</big></strong>&nbsp;<a href=\"" . $admin_file . ".php?op=LinksListModRequests\">" . _MODREQLINKS . "</a>: $modreql<br>";
-        $content .= "<strong><big>&middot;</big></strong>&nbsp;<a href=\"" . $admin_file . ".php?op=LinksListBrokenLinks\">" . _BROKENLINKS . "</a>: $brokenl<br></span>";
+        $content .= "<strong><big>&middot;</big></strong>&nbsp;<a href=\"" . $admin_file . ".php?op=LinksListBrokenLinks\">" . _BROKENLINKS . "</a>: $brokenl<br>";
+        $num = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_downloads_newdownload"));
+        $brokend = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_downloads_modrequest WHERE brokendownload='1'"));
+        $modreqd = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_downloads_modrequest WHERE brokendownload='0'"));
+        $content .= "<strong><big>&middot;</big></strong>&nbsp;<a href=\"" . $admin_file . ".php?op=downloads\">" . _UDOWNLOADS . "</a>: $num<br>";
+        $content .= "<strong><big>&middot;</big></strong>&nbsp;<a href=\"" . $admin_file . ".php?op=DownloadsListModRequests\">" . _MODREQDOWN . "</a>: $modreqd<br>";
+        $content .= "<strong><big>&middot;</big></strong>&nbsp;<a href=\"" . $admin_file . ".php?op=DownloadsListBrokenDownloads\">" . _BROKENDOWN . "</a>: $brokend<br></span>";
         themesidebox($title, $content);
     }
 }

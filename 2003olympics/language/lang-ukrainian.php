@@ -62,7 +62,6 @@ define("_ADMIN", "����:");
 define("_WERECEIVED", "");
 define("_PAGESVIEWS", "������������ ������� ��������� �");
 define("_TOPIC", "����");
-define("_UDOWNLOADS", "���������");
 define("_VOTE", " �����");
 define("_VOTES", "������");
 define("_MVIEWADMIN", "��������: ����� ��� �������������");

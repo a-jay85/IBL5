@@ -373,7 +373,6 @@ define("_DEVKARMAUSERS", "Usuarios con Karma de Demonio");
 define("_CURRENTKARMA", "Karma Actual");
 define("_USERNAME", "Nombre de Usuario");
 define("_BANNERS", "Banners");
-define("_DOWNLOAD", "Downloads");
 define("_ENCYCLOPEDIA", "Encyclopedia");
 define("_FAQ", "F.A.Q.");
 define("_NEWS", "News");

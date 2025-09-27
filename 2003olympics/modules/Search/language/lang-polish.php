@@ -55,7 +55,6 @@ define("_SREPLIES", "Odpowiedzi");
 define("_ATTACHART", "Do��czony do artyku�u");
 define("_PAGES", "Strony");
 define("_PAGE", "Strona");
-define("_DOWNLOADS", "Pliki");
 define("_WEBLINKS", "Linki");
 define("_FINDMORE", "... wi�cej");
 define("_DIDNOTFIND", "Nie znalaz�e�(a�) tego czego szuka�e�(a�)?");

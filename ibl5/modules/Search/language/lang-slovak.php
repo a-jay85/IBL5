@@ -66,7 +66,6 @@ define("_SREPLIES", "Odpovede");
 define("_ATTACHART", "Pr�davky k �l�nku");
 define("_PAGES", "Str�nky");
 define("_PAGE", "Strana");
-define("_DOWNLOADS", "Downloady");
 define("_WEBLINKS", "Web linky");
 define("_FINDMORE", ".. viac");
 define("_DIDNOTFIND", "Nena�li ste, �o ste chceli?");

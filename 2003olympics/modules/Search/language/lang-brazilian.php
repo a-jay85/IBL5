@@ -55,7 +55,6 @@ define("_SREPLIES", "Responder");
 define("_ATTACHART", "Anexar ao artigo");
 define("_PAGES", "P�ginas");
 define("_PAGE", "P�ginas");
-define("_DOWNLOADS", "Downloads");
 define("_WEBLINKS", "Links");
 define("_FINDMORE", "... mais...");
 define("_DIDNOTFIND", "N�o encontrou o que estava procurando?");

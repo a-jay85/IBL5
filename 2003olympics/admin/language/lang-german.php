@@ -325,7 +325,6 @@ define("_DESC17", "Punkte f�r jeden aufgerufenen bzw. gezogenen Download im Do
 define("_POINTS18", "Download bewertet");
 define("_DESC18", "Punkte f�r jede Bewertung eines Eintrages im Download Modul.");
 define("_POINTS19", "Download kommentiert");
-define("_DESC19", "Punkte f�r jeden geposteten Kommentar im Downloads Modul");
 define("_POINTS20", "Broadcast Nachricht");
 define("_DESC20", "Punkte f�r jede &ouml;ffentliche Nachricht unter Nutzung des Broadcast-Nachrichtensystem");
 define("_POINTS21", "Klick auf irgendeinen Banner");
@@ -374,7 +373,6 @@ define("_DEVKARMAUSERS", "Devil Karma Users");
 define("_CURRENTKARMA", "Current Karma");
 define("_USERNAME", "Username");
 define("_BANNERS", "Banners");
-define("_DOWNLOAD", "Downloads");
 define("_ENCYCLOPEDIA", "Encyclopedia");
 define("_FAQ", "F.A.Q.");
 define("_NEWS", "News");

@@ -44,8 +44,6 @@ define("_NEWSSENT", "poslan�ch noviniek:");
 define("_VOTEDPOLLS", "Najnav�tevovanej��ch ankiet");
 define("_MOSTACTIVEAUTHORS", "najakt�vnej��ch autorov");
 define("_NEWSPUBLISHED", "publikovan�ch �l�nkov:");
-define("_DOWNLOADEDFILES", "najs�ahovanej��ch s�borov:");
-define("_LDOWNLOADS", "downloads");
 define("_MOSTREADPAGES", "Naj��tanej�ie strany");
 define("_MOSTVOTEDSTORIES", "Najviac hodnoten� �l�nky");
 define("_POINTS", "body");

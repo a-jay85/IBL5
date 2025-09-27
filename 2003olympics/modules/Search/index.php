@@ -414,10 +414,7 @@ $sel1 = $sel2 = $sel3 = "";
         $mod1 = $mod2 = $mod3 = "";
         if (isset($query) and !empty($query)) {
             echo "<br>";
-            if (is_active("Downloads")) {
-                $dcnt = $db->sql_numrows($db->sql_query("SELECT * from " . $prefix . "_downloads_downloads WHERE title LIKE '%$query2%' OR description LIKE '%$query3%'"));
-                $mod1 = "<li> <a href=\"modules.php?name=Downloads&amp;d_op=search&amp;query=$query3\">" . _DOWNLOADS . "</a> ($dcnt " . _SEARCHRESULTS . ")";
-            }
+
             if (is_active("Web_Links")) {
                 $lcnt = $db->sql_numrows($db->sql_query("SELECT * from " . $prefix . "_links_links WHERE title LIKE '%$query2%' OR description LIKE '%$query3%'"));
                 $mod2 = "<li> <a href=\"modules.php?name=Web_Links&amp;l_op=search&amp;query=$query\">" . _WEBLINKS . "</a> ($lcnt " . _SEARCHRESULTS . ")";

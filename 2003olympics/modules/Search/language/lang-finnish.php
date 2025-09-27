@@ -52,7 +52,6 @@ define("_SREPLIES", "Vastaukset");
 define("_ATTACHART", "Liitetty artikkeliin");
 define("_PAGES", "Sivut");
 define("_PAGE", "sivu");
-define("_DOWNLOADS", "Downloads");
 define("_WEBLINKS", "Web Links");
 define("_FINDMORE", "... more");
 define("_DIDNOTFIND", "Didn't find what you're looking for?");

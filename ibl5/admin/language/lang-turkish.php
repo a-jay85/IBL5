@@ -374,7 +374,6 @@ define("_DEVKARMAUSERS", "Devil Karma Users");
 define("_CURRENTKARMA", "Current Karma");
 define("_USERNAME", "Username");
 define("_BANNERS", "Banners");
-define("_DOWNLOAD", "Downloads");
 define("_ENCYCLOPEDIA", "Encyclopedia");
 define("_FAQ", "F.A.Q.");
 define("_NEWS", "News");

@@ -52,7 +52,6 @@ define("_SREPLIES", "Odpov�di");
 define("_ATTACHART", "P��davky k �l�nku");
 define("_PAGES", "Str�nky");
 define("_PAGE", "Str�nka");
-define("_DOWNLOADS", "Downloads");
 define("_WEBLINKS", "Web Links");
 define("_FINDMORE", "... more");
 define("_DIDNOTFIND", "Didn't find what you're looking for?");

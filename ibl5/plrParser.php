@@ -663,6 +663,7 @@ while (!feof($plrFile)) {
 
         $historicalStatsUpdateQuery = "INSERT INTO ibl_hist
             (`pid`,
+            `name`,
             `year`,
             `team`,
             `teamid`,
@@ -682,7 +683,6 @@ while (!feof($plrFile)) {
             `tvr`,
             `pf`,
             `pts`,
-            `name`,
             `r_2ga`,
             `r_2gp`,
             `r_fta`,
@@ -706,6 +706,7 @@ while (!feof($plrFile)) {
             `salary`)
         VALUES
             ($pid,
+            '$name',
             $season->endingYear,
             '" . $sharedFunctions->getTeamnameFromTeamID($tid) . "',
             $tid,
@@ -725,7 +726,6 @@ while (!feof($plrFile)) {
             $seasonTVR,
             $seasonPF,
             $seasonPTS,
-            '$name',
             $rating2GA,
             $rating2GP,
             $ratingFTA,

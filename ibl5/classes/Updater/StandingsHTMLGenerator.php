@@ -11,12 +11,12 @@ class StandingsHTMLGenerator {
     }
 
     private function assignGroupingsFor($region) {
-        if (in_array($region, array("Eastern", "Western"))) {
+        if (in_array($region, \League::CONFERENCE_NAMES)) {
             $grouping = 'conference';
             $groupingGB = 'confGB';
             $groupingMagicNumber = 'confMagicNumber';
         }
-        if (in_array($region, array("Atlantic", "Central", "Midwest", "Pacific"))) {
+        if (in_array($region, \League::DIVISION_NAMES)) {
             $grouping = 'division';
             $groupingGB = 'divGB';
             $groupingMagicNumber = 'divMagicNumber';

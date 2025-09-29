@@ -11,7 +11,7 @@
 /* the Free Software Foundation; either version 2 of the License.       */
 /************************************************************************/
 
-require_once "mainfile.php";
+require_once $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 global $prefix, $db, $admin_file;
 
 $modpath = '';

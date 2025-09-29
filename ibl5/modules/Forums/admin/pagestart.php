@@ -29,7 +29,7 @@ define('IN_ADMIN', true);
 define('FORUM_ADMIN', true);
 define("PHPBB_ROOT_PATH", $phpbb_root_path);
 define("PHPBB_PHPEX", $phpEx);
-include "../../../mainfile.php";
+include $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 $phpbb_root_path = PHPBB_ROOT_PATH;
 $phpEx = PHPBB_PHPEX;
 include $phpbb_root_path . 'common.' . $phpEx;

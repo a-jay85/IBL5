@@ -1,6 +1,6 @@
 <?php
 
-require 'mainfile.php';
+require '../../mainfile.php';
 $sharedFunctions = new Shared($db);
 $season = new Season($db);
 

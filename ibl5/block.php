@@ -1,6 +1,6 @@
 <?php
 
-require_once "mainfile.php";
+require_once $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 $sharedFunctions = new Shared($db);
 
 $val = $_GET['day'];

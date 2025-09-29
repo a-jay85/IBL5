@@ -1,6 +1,6 @@
 <?php
 
-require 'mainfile.php';
+require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 $sharedFunctions = new Shared($db);
 
 $offer_id = $_POST['offer'];

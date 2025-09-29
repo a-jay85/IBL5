@@ -71,7 +71,7 @@ if (!isset($_POST['confirmed'])) {
     exit();
 }
 
-require 'mainfile.php';
+require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
 $sharedFunctions = new Shared($db);
 $season = new Season($db);

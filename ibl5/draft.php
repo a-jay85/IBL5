@@ -1,6 +1,6 @@
 <?php
 
-require 'mainfile.php';
+require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
 $queryfirstyear = "SELECT draftyear FROM ibl_plr ORDER BY draftyear ASC";
 $resultfirstyear = $db->sql_query($queryfirstyear);

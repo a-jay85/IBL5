@@ -1,6 +1,6 @@
 <?php
 
-require 'mainfile.php';
+require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
 $queryi = "UPDATE ibl_team_history SET div_titles = (SELECT COUNT(*) FROM ibl_team_awards WHERE ibl_team_awards.Award like '%Div.%' and ibl_team_history.team_name = ibl_team_awards.name)";
 $resulti = $db->sql_query($queryi);

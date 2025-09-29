@@ -3,7 +3,7 @@
 //This section stores Standings values in a database table called 'ibl_standings' so that they can be retrieved quickly.
 //The file 'block-AJstandings.php' relies on 'ibl_standings' to automate the sidebar standings display.
 
-require 'mainfile.php';
+require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
 $standingsFilePath = 'ibl/IBL/Standings.htm';
 

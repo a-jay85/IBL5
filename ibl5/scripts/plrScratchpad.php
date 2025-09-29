@@ -1,6 +1,6 @@
 <?php
 
-require 'mainfile.php';
+require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
 $plrFile = fopen("IBL5.plr", "rb+");
 while (!feof($plrFile)) {

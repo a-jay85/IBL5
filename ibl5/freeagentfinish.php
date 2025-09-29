@@ -1,6 +1,6 @@
 <?php
 
-require 'mainfile.php';
+require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
 $query = "SELECT * FROM ibl_plr WHERE retired = 0 AND exp > 0 AND cy = 0 AND teamname <> 'Free Agents' ORDER BY ordinal ASC";
 $result = $db->sql_query($query);

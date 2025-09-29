@@ -48,7 +48,23 @@ class StandingsHTMLGenerator {
     private function displayStandings($region) {
         list($grouping, $groupingGB, $groupingMagicNumber) = $this->assignGroupingsFor($region);
 
-        $query = "SELECT tid, team_name, leagueRecord, pct, $groupingGB, confRecord, divRecord, homeRecord, awayRecord, gamesUnplayed, $groupingMagicNumber, clinchedConference, clinchedDivision, clinchedPlayoffs, (homeWins + homeLosses) AS homeGames, (awayWins + awayLosses) AS awayGames
+        $query = "SELECT
+            tid,
+            team_name,
+            leagueRecord,
+            pct,
+            $groupingGB,
+            confRecord,
+            divRecord,
+            homeRecord,
+            awayRecord,
+            gamesUnplayed,
+            $groupingMagicNumber,
+            clinchedConference,
+            clinchedDivision,
+            clinchedPlayoffs,
+            (homeWins + homeLosses) AS homeGames,
+            (awayWins + awayLosses) AS awayGames
             FROM ibl_standings
             WHERE $grouping = '$region' ORDER BY $groupingGB ASC";
         

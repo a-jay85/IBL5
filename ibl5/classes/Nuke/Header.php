@@ -85,7 +85,7 @@ class Header
     public static function header()
     {
         define('NUKE_HEADER', true);
-        require_once "mainfile.php";
+        require_once $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
         online();
         Header::head();

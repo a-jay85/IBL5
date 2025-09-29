@@ -56,7 +56,7 @@ class StandingsHTMLGenerator {
         $limit = $this->db->sql_numrows($result);
 
         $this->standingsHTML .= $this->generateStandingsHeader($region, $grouping);
-        $this->standingsHTML .= $this->generateStandingsRows($result, $limit);
+        $this->standingsHTML .= $this->generateStandingsRows($result, $limit, $region);
         $this->standingsHTML .= '<tr><td colspan=10><hr></td></tr></table><p>';
     }
 
@@ -82,7 +82,7 @@ class StandingsHTMLGenerator {
         return $html;
     }
 
-    private function generateStandingsRows($result, $limit) {
+    private function generateStandingsRows($result, $limit, $region) {
         $html = '';
         for ($i = 0; $i < $limit; $i++) {
             $tid = $this->db->sql_result($result, $i, 'tid');
@@ -99,17 +99,19 @@ class StandingsHTMLGenerator {
             $queryLast10Games = "SELECT last_win, last_loss, streak_type, streak FROM ibl_power WHERE TeamID = $tid";
             $resultLast10Games = $this->db->sql_query($queryLast10Games);
             
-            $html .= $this->generateTeamRow($result, $i, $tid, $team_name, $resultLast10Games);
+            $html .= $this->generateTeamRow($result, $i, $tid, $team_name, $resultLast10Games, $region);
         }
         return $html;
     }
 
-    private function generateTeamRow($result, $i, $tid, $team_name, $resultLast10Games) {
+    private function generateTeamRow($result, $i, $tid, $team_name, $resultLast10Games, $region) {
+        list($grouping, $groupingGB, $groupingMagicNumber) = $this->assignGroupingsFor($region);
+
         return '<tr><td><a href="modules.php?name=Team&op=team&teamID=' . $tid . '">' . $team_name . '</td>
             <td>' . $this->db->sql_result($result, $i, 'leagueRecord') . '</td>
             <td>' . $this->db->sql_result($result, $i, 'pct') . '</td>
-            <td><center>' . $this->db->sql_result($result, $i, 'confGB') . '</center></td>
-            <td><center>' . $this->db->sql_result($result, $i, 'confMagicNumber') . '</center></td>
+            <td><center>' . $this->db->sql_result($result, $i, $groupingGB) . '</center></td>
+            <td><center>' . $this->db->sql_result($result, $i, $groupingMagicNumber) . '</center></td>
             <td>' . $this->db->sql_result($result, $i, 'gamesUnplayed') . '</td>
             <td>' . $this->db->sql_result($result, $i, 'confRecord') . '</td>
             <td>' . $this->db->sql_result($result, $i, 'divRecord') . '</td>

@@ -53,10 +53,9 @@ class StandingsHTMLGenerator {
             WHERE $grouping = '$region' ORDER BY $groupingGB ASC";
         
         $result = $this->db->sql_query($query);
-        $limit = $this->db->sql_numrows($result);
 
         $this->standingsHTML .= $this->generateStandingsHeader($region, $grouping);
-        $this->standingsHTML .= $this->generateStandingsRows($result, $limit, $region);
+        $this->standingsHTML .= $this->generateStandingsRows($result, $region);
         $this->standingsHTML .= '<tr><td colspan=10><hr></td></tr></table><p>';
     }
 
@@ -82,43 +81,43 @@ class StandingsHTMLGenerator {
         return $html;
     }
 
-    private function generateStandingsRows($result, $limit, $region) {
+    private function generateStandingsRows($result, $region) {
         $html = '';
-        for ($i = 0; $i < $limit; $i++) {
-            $tid = $this->db->sql_result($result, $i, 'tid');
-            $team_name = $this->db->sql_result($result, $i, 'team_name');
-            
-            if ($this->db->sql_result($result, $i, 'clinchedConference') == 1) {
+        foreach ($result as $row) {
+            $tid = $row['tid'];
+            $team_name = $row['team_name'];
+
+            if ($row['clinchedConference'] == 1) {
                 $team_name = "<b>Z</b>-" . $team_name;
-            } elseif ($this->db->sql_result($result, $i, 'clinchedDivision') == 1) {
+            } elseif ($row['clinchedDivision'] == 1) {
                 $team_name = "<b>Y</b>-" . $team_name;
-            } elseif ($this->db->sql_result($result, $i, 'clinchedPlayoffs') == 1) {
+            } elseif ($row['clinchedPlayoffs'] == 1) {
                 $team_name = "<b>X</b>-" . $team_name;
             }
 
             $queryLast10Games = "SELECT last_win, last_loss, streak_type, streak FROM ibl_power WHERE TeamID = $tid";
             $resultLast10Games = $this->db->sql_query($queryLast10Games);
             
-            $html .= $this->generateTeamRow($result, $i, $tid, $team_name, $resultLast10Games, $region);
+            $html .= $this->generateTeamRow($row, $tid, $team_name, $resultLast10Games, $region);
         }
         return $html;
     }
 
-    private function generateTeamRow($result, $i, $tid, $team_name, $resultLast10Games, $region) {
+    private function generateTeamRow($row, $tid, $team_name, $resultLast10Games, $region) {
         list($grouping, $groupingGB, $groupingMagicNumber) = $this->assignGroupingsFor($region);
 
         return '<tr><td><a href="modules.php?name=Team&op=team&teamID=' . $tid . '">' . $team_name . '</td>
-            <td>' . $this->db->sql_result($result, $i, 'leagueRecord') . '</td>
-            <td>' . $this->db->sql_result($result, $i, 'pct') . '</td>
-            <td><center>' . $this->db->sql_result($result, $i, $groupingGB) . '</center></td>
-            <td><center>' . $this->db->sql_result($result, $i, $groupingMagicNumber) . '</center></td>
-            <td>' . $this->db->sql_result($result, $i, 'gamesUnplayed') . '</td>
-            <td>' . $this->db->sql_result($result, $i, 'confRecord') . '</td>
-            <td>' . $this->db->sql_result($result, $i, 'divRecord') . '</td>
-            <td>' . $this->db->sql_result($result, $i, 'homeRecord') . '</td>
-            <td>' . $this->db->sql_result($result, $i, 'awayRecord') . '</td>
-            <td><center>' . $this->db->sql_result($result, $i, 'homeGames') . '</center></td>
-            <td><center>' . $this->db->sql_result($result, $i, 'awayGames') . '</center></td>
+            <td>' . $row['leagueRecord'] . '</td>
+            <td>' . $row['pct'] . '</td>
+            <td><center>' . $row[$groupingGB] . '</center></td>
+            <td><center>' . $row[$groupingMagicNumber] . '</center></td>
+            <td>' . $row['gamesUnplayed'] . '</td>
+            <td>' . $row['confRecord'] . '</td>
+            <td>' . $row['divRecord'] . '</td>
+            <td>' . $row['homeRecord'] . '</td>
+            <td>' . $row['awayRecord'] . '</td>
+            <td><center>' . $row['homeGames'] . '</center></td>
+            <td><center>' . $row['awayGames'] . '</center></td>
             <td>' . $this->db->sql_result($resultLast10Games, 0, 'last_win') . '-' . $this->db->sql_result($resultLast10Games, 0, 'last_loss') . '</td>
             <td>' . $this->db->sql_result($resultLast10Games, 0, 'streak_type') . ' ' . $this->db->sql_result($resultLast10Games, 0, 'streak') . '</td></tr>';
     }

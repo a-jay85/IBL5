@@ -13,7 +13,7 @@
 /************************************************************************/
 
 define('MODULE_FILE', true);
-require_once "mainfile.php";
+require_once $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
 if (isset($name) && $name == $_REQUEST['name']) {
     $name = addslashes(trim($name));

@@ -1,6 +1,6 @@
 <?php
 
-require 'mainfile.php';
+require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
 echo "<HTML><HEAD><TITLE>Free Agency Offer Deletion</TITLE></HEAD><BODY>";
 

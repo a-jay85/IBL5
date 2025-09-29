@@ -1,6 +1,6 @@
 <?php
 
-require 'mainfile.php';
+require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
 $player2=str_replace("%20", " ", $pa);
 

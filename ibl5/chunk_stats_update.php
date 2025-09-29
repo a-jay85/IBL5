@@ -1,6 +1,6 @@
 <?php
 
-require 'mainfile.php';
+require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
 $query = "SELECT * FROM ibl_plr WHERE retired = 0 ORDER BY pid ASC";
 $result = $db->sql_query($query);

@@ -1,6 +1,6 @@
 <?php
 
-require_once "mainfile.php";
+require_once $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 $theme = "DeepBlue";
 $sql = "UPDATE " . $prefix . "_config SET Default_Theme = '" . $theme . "'";
 $result = $db->sql_query($sql);

@@ -1,6 +1,6 @@
 <?php
 
-require 'mainfile.php';
+require '../../mainfile.php';
 $sharedFunctions = new Shared($db);
 
 $query0 = "SELECT * FROM ibl_trade_autocounter ORDER BY `counter` DESC";

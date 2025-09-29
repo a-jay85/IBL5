@@ -30,47 +30,47 @@ $pagetitle = "Season Stats";
     }
 
     if ($sortby == "1") {
-        $sort = "((2*`fgm`+`ftm`+`3gm`)/`gm`)";
+        $sort = "((2*`fgm`+`ftm`+`tgm`)/`games`)";
     } else if ($sortby == "2") {
-        $sort = "((reb)/`gm`)";
+        $sort = "((reb)/`games`)";
     } else if ($sortby == "3") {
-        $sort = "((orb)/`gm`)";
+        $sort = "((orb)/`games`)";
     } else if ($sortby == "4") {
-        $sort = "((ast)/`gm`)";
+        $sort = "((ast)/`games`)";
     } else if ($sortby == "5") {
-        $sort = "((stl)/`gm`)";
+        $sort = "((stl)/`games`)";
     } else if ($sortby == "6") {
-        $sort = "((blk)/`gm`)";
+        $sort = "((blk)/`games`)";
     } else if ($sortby == "7") {
-        $sort = "((tvr)/`gm`)";
+        $sort = "((tvr)/`games`)";
     } else if ($sortby == "8") {
-        $sort = "((pf)/`gm`)";
+        $sort = "((pf)/`games`)";
     } else if ($sortby == "9") {
-        $sort = "((((2*fgm+ftm+3gm)+reb+(2*ast)+(2*stl)+(2*blk))-((fga-fgm)+(fta-ftm)+tvr+pf))/gm)";
+        $sort = "((((2*fgm+ftm+tgm)+reb+(2*ast)+(2*stl)+(2*blk))-((fga-fgm)+(fta-ftm)+tvr+pf))/gm)";
     } else if ($sortby == "10") {
-        $sort = "((fgm)/`gm`)";
+        $sort = "((fgm)/`games`)";
     } else if ($sortby == "11") {
-        $sort = "((fga)/`gm`)";
+        $sort = "((fga)/`games`)";
     } else if ($sortby == "12") {
         $sort = "(fgm/fga)";
     } else if ($sortby == "13") {
-        $sort = "((ftm)/`gm`)";
+        $sort = "((ftm)/`games`)";
     } else if ($sortby == "14") {
-        $sort = "((fta)/`gm`)";
+        $sort = "((fta)/`games`)";
     } else if ($sortby == "15") {
         $sort = "(ftm/fta)";
     } else if ($sortby == "16") {
-        $sort = "((3gm)/`gm`)";
+        $sort = "((tgm)/`games`)";
     } else if ($sortby == "17") {
-        $sort = "((3ga)/`gm`)";
+        $sort = "((tga)/`games`)";
     } else if ($sortby == "18") {
-        $sort = "(3gm/3ga)";
+        $sort = "(tgm/tga)";
     } else if ($sortby == "19") {
         $sort = "(gm)";
     } else if ($sortby == "20") {
-        $sort = "((min)/`gm`)";
+        $sort = "((min)/`games`)";
     } else {
-        $sort = "((2*`fgm`+`ftm`+`3gm`)/`gm`)";
+        $sort = "((2*`fgm`+`ftm`+`tgm`)/`games`)";
     }
 
     $query = "SELECT * FROM ibl_hist where name is not null $argument ORDER BY $sort DESC";
@@ -101,7 +101,7 @@ $pagetitle = "Season Stats";
         $teamid = $db->sql_result($result, $i, "teamid");
         //$chunknumber=$db->sql_result($result,$i,"chunk");
         //$qa=$db->sql_result($result,$i,"qa");
-        $stats_gm = $db->sql_result($result, $i, "gm");
+        $stats_gm = $db->sql_result($result, $i, "games");
         $stats_min = $db->sql_result($result, $i, "min");
         $stats_fgm = $db->sql_result($result, $i, "fgm");
         $stats_fga = $db->sql_result($result, $i, "fga");
@@ -109,8 +109,8 @@ $pagetitle = "Season Stats";
         $stats_ftm = $db->sql_result($result, $i, "ftm");
         $stats_fta = $db->sql_result($result, $i, "fta");
         @$stats_ftp = number_format(($stats_ftm / $stats_fta * 100), 1);
-        $stats_tgm = $db->sql_result($result, $i, "3gm");
-        $stats_tga = $db->sql_result($result, $i, "3ga");
+        $stats_tgm = $db->sql_result($result, $i, "tgm");
+        $stats_tga = $db->sql_result($result, $i, "tga");
         @$stats_tgp = number_format(($stats_tgm / $stats_tga * 100), 1);
         $stats_orb = $db->sql_result($result, $i, "orb");
         $stats_reb = $db->sql_result($result, $i, "reb");

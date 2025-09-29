@@ -59,7 +59,7 @@ foreach ($positions as $abbreviation => $label) {
         $varName = $abbreviation . $i;
         if (strpos($$varName, $Team_Name) !== false) {
             $court = (strpos($abbreviation, 'F') !== false) ? 'Frontcourt' : 'Backcourt';
-            echo "Sorry, you cannot vote for your own player ($court: {$$varName}).<p>Please go back, unselect that player, select a different player not on your team, and try again.<br>";
+            echo "<font color='red'>Sorry, you cannot vote for your own player ($court: {$$varName}).<p>Please go back, unselect that player, select a different player not on your team, and try again.<br></font>";
             Nuke\Footer::footer();
             exit;
         }
@@ -71,7 +71,7 @@ foreach ($positions as $abbreviation => $label) {
     for ($i = 1; $i <= 4; $i++) {
         $varName = $abbreviation . $i;
         if (empty($$varName)) {
-            echo "Sorry, you selected less than FOUR $label Players.<p>Please go back, select FOUR players, and try again.<br>";
+            echo "<font color='red'>Sorry, you selected less than FOUR $label players.<p>Please go back, select FOUR players, and try again.<br></font>";
             Nuke\Footer::footer();
             exit;
         }
@@ -81,7 +81,7 @@ foreach ($positions as $abbreviation => $label) {
 // TOO MANY VOTES
 foreach ($positions as $abbreviation => $label) {
     if (isset($_POST[$abbreviation]) && count($_POST[$abbreviation]) > 4) {
-        echo "Oops, you've selected more than four $label Players.<p>Please go back, select FOUR players, and try again.";
+        echo "<font color='red'>Sorry, you selected more than four $label players.<p>Please go back, select FOUR players, and try again.</font>";
         Nuke\Footer::footer();
         exit;
     }

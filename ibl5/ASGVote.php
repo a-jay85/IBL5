@@ -111,6 +111,8 @@ if ($db->sql_query($queryUpdateVotes)) {
 
     $queryUpdateASGVoteSubmissionTime = "UPDATE ibl_team_history SET asg_vote = NOW() + INTERVAL 2 HOUR WHERE team_name = '$Team_Name'";
     $resultUpdateASGVoteSubmissionTime = $db->sql_query($queryUpdateASGVoteSubmissionTime);
+} else {
+    echo "There was an error recording your vote. Please contact the IBL Commissioner.<br>";
 }
 
 Nuke\Footer::footer();

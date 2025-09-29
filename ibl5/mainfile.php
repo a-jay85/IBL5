@@ -812,6 +812,7 @@ function selectlanguage()
         $title = _SELECTLANGUAGE;
         $content = "<center><font class=\"content\">" . _SELECTGUILANG . "<br><br>";
         $langdir = dir("language");
+        $menulist = "";
         while ($func = $langdir->read()) {
             if (substr($func, 0, 5) == "lang-") {
                 $menulist .= "$func ";
@@ -866,7 +867,7 @@ function ultramode()
     $ultra = "ultramode.txt";
     $file = fopen($ultra, "w");
     fwrite($file, "General purpose self-explanatory file with news headlines\n");
-    $sql = "SELECT s.sid, s.catid, s.aid, s.title, s.time, s.hometext, s.comments, s.topic, t.topictext, t.topicimage FROM " . $prefix . "_stories s LEFT JOIN " . $prefix . "_topics t ON t.topicid = s.topic WHERE s.ihome = '0' " . $querylang . " ORDER BY s.time DESC LIMIT 0,10";
+    $sql = "SELECT s.sid, s.catid, s.aid, s.title, s.time, s.hometext, s.comments, s.topic, t.topictext, t.topicimage FROM " . $prefix . "_stories s LEFT JOIN " . $prefix . "_topics t ON t.topicid = s.topic WHERE s.ihome = '0' ORDER BY s.time DESC LIMIT 0,10";
     $result = $db->sql_query($sql);
     while ($row = $db->sql_fetchrow($result)) {
         $rsid = intval($row['sid']);
@@ -1580,6 +1581,7 @@ function redir($content)
     $links = array();
     $hrefs = array();
     $pos = 0;
+    $linkpos = 0;
     while (!(($pos = strpos($content, "<", $pos)) === false)) {
         $pos++;
         $endpos = strpos($content, ">", $pos);

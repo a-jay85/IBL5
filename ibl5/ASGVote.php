@@ -25,25 +25,25 @@ $WCB3 = $_POST['WCB'][2];
 $WCB4 = $_POST['WCB'][3];
 
 echo "
-        Eastern Frontcourt Player: $ECF1<br>
-        Eastern Frontcourt Player: $ECF2<br>
-        Eastern Frontcourt Player: $ECF3<br>
-        Eastern Frontcourt Player: $ECF4<br>
+        Eastern Frontcourt: $ECF1<br>
+        Eastern Frontcourt: $ECF2<br>
+        Eastern Frontcourt: $ECF3<br>
+        Eastern Frontcourt: $ECF4<br>
         <br>
-        Eastern Backcourt Player: $ECB1<br>
-        Eastern Backcourt Player: $ECB2<br>
-        Eastern Backcourt Player: $ECB3<br>
-        Eastern Backcourt Player: $ECB4<br>
+        Eastern Backcourt: $ECB1<br>
+        Eastern Backcourt: $ECB2<br>
+        Eastern Backcourt: $ECB3<br>
+        Eastern Backcourt: $ECB4<br>
         <br>
-        Western Frontcourt Player: $WCF1<br>
-        Western Frontcourt Player: $WCF2<br>
-        Western Frontcourt Player: $WCF3<br>
-        Western Frontcourt Player: $WCF4<br>
+        Western Frontcourt: $WCF1<br>
+        Western Frontcourt: $WCF2<br>
+        Western Frontcourt: $WCF3<br>
+        Western Frontcourt: $WCF4<br>
         <br>
-        Western Backcourt Player: $WCB1<br>
-        Western Backcourt Player: $WCB2<br>
-        Western Backcourt Player: $WCB3<br>
-        Western Backcourt Player: $WCB4<br>
+        Western Backcourt: $WCB1<br>
+        Western Backcourt: $WCB2<br>
+        Western Backcourt: $WCB3<br>
+        Western Backcourt: $WCB4<br>
         <br>";
 
 $positions = [

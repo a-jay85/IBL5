@@ -205,7 +205,7 @@ function userinfo($username)
     $voterTeamName = $userinfo['user_ibl_team'];
     $tid = $sharedFunctions->getTidFromTeamname($voterTeamName);
 
-    $formAction = ($season->phase == "Regular Season") ? "modules/Voting/ASGVote.php" : "EOYVote.php";
+    $formAction = ($season->phase == "Regular Season") ? "modules/Voting/ASGVote.php" : "modules/Voting/EOYVote.php";
     echo "<form name=\"$formName\" method=\"post\" action=\"$formAction\">
 		<center>
 			<img src=\"images/logo/$tid.jpg\"><br><br>";

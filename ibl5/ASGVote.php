@@ -54,11 +54,11 @@ $positions = [
 ];
 
 // VOTING FOR OWN PLAYERS
-foreach ($positions as $prefix => $label) {
+foreach ($positions as $abbreviation => $label) {
     for ($i = 1; $i <= 4; $i++) {
-        $varName = $prefix . $i;
+        $varName = $abbreviation . $i;
         if (strpos($$varName, $Team_Name) !== false) {
-            $court = (strpos($prefix, 'F') !== false) ? 'Frontcourt' : 'Backcourt';
+            $court = (strpos($abbreviation, 'F') !== false) ? 'Frontcourt' : 'Backcourt';
             echo "Sorry, you cannot vote for your own player ($court: {$$varName}).<p>Please go back, unselect that player, select a different player not on your team, and try again.<br>";
             Nuke\Footer::footer();
             exit;
@@ -67,9 +67,9 @@ foreach ($positions as $prefix => $label) {
 }
 
 // MISSING VOTES
-foreach ($positions as $prefix => $label) {
+foreach ($positions as $abbreviation => $label) {
     for ($i = 1; $i <= 4; $i++) {
-        $varName = $prefix . $i;
+        $varName = $abbreviation . $i;
         if (empty($$varName)) {
             echo "Sorry, you selected less than FOUR $label Players.<p>Please go back, select FOUR players, and try again.<br>";
             Nuke\Footer::footer();
@@ -79,8 +79,8 @@ foreach ($positions as $prefix => $label) {
 }
 
 // TOO MANY VOTES
-foreach ($positions as $prefix => $label) {
-    if (isset($_POST[$prefix]) && count($_POST[$prefix]) > 4) {
+foreach ($positions as $abbreviation => $label) {
+    if (isset($_POST[$abbreviation]) && count($_POST[$abbreviation]) > 4) {
         echo "Oops, you've selected more than four $label Players.<p>Please go back, select FOUR players, and try again.";
         Nuke\Footer::footer();
         exit;

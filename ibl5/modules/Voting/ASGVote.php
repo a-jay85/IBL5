@@ -2,14 +2,7 @@
 
 require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
-// Change to root directory so theme paths work correctly
-$originalDir = getcwd();
-chdir($_SERVER['DOCUMENT_ROOT'] . '/ibl5');
-
 Nuke\Header::header();
-
-// Change back to original directory
-chdir($originalDir);
 
 echo "<HTML><HEAD><TITLE>ASG Voting Result</TITLE></HEAD><BODY>";
 

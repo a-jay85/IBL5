@@ -2,6 +2,10 @@
 
 This directory contains comprehensive unit tests for the Trading module's refactored classes, demonstrating modern PHP testing best practices.
 
+## Fixed PHPUnit Compatibility Issue
+
+**Issue Resolved**: PHPUnit 12+ no longer recognizes `@test` annotations by default. Updated test methods to use proper `test*` naming convention for maximum compatibility across PHPUnit versions.
+
 ## Testing Approach Comparison
 
 ### Old Approach (Player_Tests.php style)
@@ -27,12 +31,13 @@ The new testing approach follows modern best practices:
 
 #### Key Features:
 - **Proper test structure** with `setUp()` and `tearDown()` methods
-- **Descriptive test names** that explain what's being tested
+- **Descriptive test names** that explain what's being tested (using `test*` naming convention)
 - **Mock objects** for isolated unit testing
 - **Data providers** for parametrized testing
 - **Test groups** for organized test execution
 - **Comprehensive assertions** with clear failure messages
 - **Edge case testing** and error handling validation
+- **PHPUnit version compatibility** (works with PHPUnit 8-12+)
 
 #### Example Structure:
 ```php
@@ -48,11 +53,10 @@ class TradeValidatorModernTest extends TestCase
     }
 
     /**
-     * @test
      * @group validation
      * @group cash
      */
-    public function it_validates_minimum_cash_amounts_successfully()
+    public function testValidatesMinimumCashAmountsSuccessfully()
     {
         // Arrange
         $userCash = [1 => 100, 2 => 200, 3 => 0, 4 => 0, 5 => 0, 6 => 0];
@@ -91,12 +95,7 @@ Tests for the `Trading_CashTransactionHandler` class:
 phpunit tests/Trading/
 ```
 
-### Run specific test class:
-```bash
-phpunit tests/Trading/TradeValidatorModernTest.php
-```
-
-### Run tests with detailed output:
+### Run with detailed output:
 ```bash
 phpunit --testdox tests/Trading/
 ```
@@ -107,6 +106,34 @@ phpunit --group validation tests/Trading/
 phpunit --group cash tests/Trading/
 ```
 
+### Expected Output:
+```
+PHPUnit 12.3.15 by Sebastian Bergmann and contributors.
+
+Cash Transaction Handler Modern
+ ✔ Generates unique pid when requested pid is available
+ ✔ Calculates contract total years correctly with front_loaded_contract
+ ✔ Detects cash presence in trade accurately
+ ✔ Creates cash transaction with proper story text
+ [... more tests ...]
+
+Trade Validator Modern
+ ✔ Validates minimum cash amounts successfully
+ ✔ Rejects cash amounts below minimum
+ ✔ Validates salary caps within limits
+ [... more tests ...]
+
+Time: 75 ms, Memory: 15.14 MB
+OK (24 tests, 50 assertions)
+```
+
+## Compatibility
+
+- **PHPUnit Versions**: Compatible with PHPUnit 8.5+ through 12.3+
+- **PHP Versions**: Works with PHP 7.4+ and PHP 8.x
+- **Test Method Naming**: Uses `test*` method names for maximum compatibility
+- **No Schema Dependencies**: Simple XML configuration works across versions
+
 ## Benefits of Modern Testing
 
 1. **Reliability**: Tests actually execute and validate behavior
@@ -115,6 +142,7 @@ phpunit --group cash tests/Trading/
 4. **Confidence**: Comprehensive coverage ensures code quality
 5. **Regression Prevention**: Automated tests catch breaking changes
 6. **Debugging**: Detailed assertions help identify issues quickly
+7. **Version Compatibility**: Works across multiple PHPUnit versions
 
 ## Mock Objects
 

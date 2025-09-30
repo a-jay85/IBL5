@@ -30,11 +30,10 @@ class TradeValidatorModernTest extends TestCase
     }
 
     /**
-     * @test
      * @group validation
      * @group cash
      */
-    public function it_validates_minimum_cash_amounts_successfully()
+    public function testValidatesMinimumCashAmountsSuccessfully()
     {
         // Arrange
         $userCash = [1 => 100, 2 => 200, 3 => 0, 4 => 0, 5 => 0, 6 => 0];
@@ -49,12 +48,11 @@ class TradeValidatorModernTest extends TestCase
     }
 
     /**
-     * @test
      * @group validation
      * @group cash
      * @dataProvider invalidCashAmountProvider
      */
-    public function it_rejects_cash_amounts_below_minimum($userCash, $partnerCash, $expectedErrorText)
+    public function testRejectsCashAmountsBelowMinimum($userCash, $partnerCash, $expectedErrorText)
     {
         // Act
         $result = $this->validator->validateMinimumCashAmounts($userCash, $partnerCash);
@@ -65,11 +63,10 @@ class TradeValidatorModernTest extends TestCase
     }
 
     /**
-     * @test
      * @group validation
      * @group salary-cap
      */
-    public function it_validates_salary_caps_within_limits()
+    public function testValidatesSalaryeCapsWithinLimits()
     {
         // Arrange
         $tradeData = [
@@ -90,12 +87,11 @@ class TradeValidatorModernTest extends TestCase
     }
 
     /**
-     * @test
      * @group validation
      * @group salary-cap
      * @dataProvider salaryCapViolationProvider
      */
-    public function it_rejects_trades_exceeding_salary_caps($tradeData, $expectedErrorCount)
+    public function testRejectsTradesExceedingSalaryCaps($tradeData, $expectedErrorCount)
     {
         // Act
         $result = $this->validator->validateSalaryCaps($tradeData);
@@ -106,10 +102,9 @@ class TradeValidatorModernTest extends TestCase
     }
 
     /**
-     * @test
      * @group cash-considerations
      */
-    public function it_calculates_current_season_cash_considerations_correctly()
+    public function testCalculatesCurrentSeasonCashConsiderationsCorrectly()
     {
         // Arrange
         $userCash = [1 => 100, 2 => 200, 3 => 0, 4 => 0, 5 => 0, 6 => 0];
@@ -126,10 +121,9 @@ class TradeValidatorModernTest extends TestCase
     }
 
     /**
-     * @test
      * @group player-validation
      */
-    public function it_determines_player_tradability_correctly()
+    public function testDeterminesPlayerTradabilityCorrectly()
     {
         // Arrange - Valid tradeable player
         $playerId = 12345;
@@ -145,11 +139,10 @@ class TradeValidatorModernTest extends TestCase
     }
 
     /**
-     * @test
      * @group player-validation
      * @dataProvider nonTradeablePlayerProvider
      */
-    public function it_prevents_trading_ineligible_players($mockData, $expectedResult, $reason)
+    public function testPreventsTradeingIneligiblePlayers($mockData, $expectedResult, $reason)
     {
         // Arrange
         $playerId = 12345;

@@ -30,10 +30,9 @@ class CashTransactionHandlerModernTest extends TestCase
     }
 
     /**
-     * @test
      * @group pid-generation
      */
-    public function it_generates_unique_pid_when_requested_pid_is_available()
+    public function testGeneratesUniquePidWhenRequestedPidIsAvailable()
     {
         // Arrange
         $requestedPid = 99999;
@@ -48,11 +47,10 @@ class CashTransactionHandlerModernTest extends TestCase
     }
 
     /**
-     * @test
      * @group contract-calculations
      * @dataProvider contractYearScenarios
      */
-    public function it_calculates_contract_total_years_correctly($cashDistribution, $expectedYears, $description)
+    public function testCalculatesContractTotalYearsCorrectly($cashDistribution, $expectedYears, $description)
     {
         // Act
         $result = $this->cashHandler->calculateContractTotalYears($cashDistribution);
@@ -62,10 +60,9 @@ class CashTransactionHandlerModernTest extends TestCase
     }
 
     /**
-     * @test
      * @group cash-detection
      */
-    public function it_detects_cash_presence_in_trade_accurately()
+    public function testDetectsCashPresenceInTradeAccurately()
     {
         // Test cases for cash detection
         $testCases = [
@@ -88,10 +85,9 @@ class CashTransactionHandlerModernTest extends TestCase
     }
 
     /**
-     * @test
      * @group cash-transactions
      */
-    public function it_creates_cash_transaction_with_proper_story_text()
+    public function testCreatesCashTransactionWithProperStoryText()
     {
         // Arrange
         $itemId = 12345;
@@ -111,10 +107,9 @@ class CashTransactionHandlerModernTest extends TestCase
     }
 
     /**
-     * @test
      * @group database-operations
      */
-    public function it_inserts_cash_trade_data_successfully()
+    public function testInsertsCashTradeDataSuccessfully()
     {
         // Arrange
         $tradeOfferId = 999;
@@ -137,10 +132,9 @@ class CashTransactionHandlerModernTest extends TestCase
     }
 
     /**
-     * @test
      * @group database-operations
      */
-    public function it_handles_partial_cash_data_by_filling_missing_years_with_zeros()
+    public function testHandlesPartialCashDataByFillingMissingYearsWithZeros()
     {
         // Arrange
         $tradeOfferId = 999;
@@ -163,10 +157,9 @@ class CashTransactionHandlerModernTest extends TestCase
     }
 
     /**
-     * @test
      * @group edge-cases
      */
-    public function it_handles_edge_cases_gracefully()
+    public function testHandlesEdgeCasesGracefully()
     {
         // Test various edge cases
         $edgeCases = [
@@ -235,10 +228,9 @@ class CashTransactionHandlerModernTest extends TestCase
     }
 
     /**
-     * @test
      * @group integration
      */
-    public function it_performs_complete_cash_transaction_workflow()
+    public function testPerformsCompleteCashTransactionWorkflow()
     {
         // This is an integration-style test that combines multiple operations
         

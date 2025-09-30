@@ -7,6 +7,7 @@ This directory contains comprehensive unit tests for the Trading module's refact
 **Issues Resolved**: 
 1. PHPUnit 12+ no longer recognizes `@test` annotations by default → Updated test methods to use proper `test*` naming convention
 2. PHPUnit 10+ requires data provider methods to be static → Made all data provider methods `static`
+3. PHPUnit 12+ prefers attributes over annotations for data providers → Added `#[DataProvider]` attributes alongside `@dataProvider` annotations for maximum compatibility
 
 ## Testing Approach Comparison
 
@@ -75,6 +76,7 @@ class TradeValidatorModernTest extends TestCase
     /**
      * @dataProvider invalidCashAmountProvider
      */
+    #[\PHPUnit\Framework\Attributes\DataProvider('invalidCashAmountProvider')]
     public function testRejectsCashAmountsBelowMinimum($userCash, $partnerCash, $expectedErrorText)
     {
         // Test implementation
@@ -82,6 +84,7 @@ class TradeValidatorModernTest extends TestCase
     
     /**
      * Data provider methods must be static in PHPUnit 10+
+     * Use both @dataProvider annotation and #[DataProvider] attribute for PHPUnit 8-12+ compatibility
      */
     public static function invalidCashAmountProvider()
     {

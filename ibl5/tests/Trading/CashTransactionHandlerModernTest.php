@@ -50,6 +50,7 @@ class CashTransactionHandlerModernTest extends TestCase
      * @group contract-calculations
      * @dataProvider contractYearScenarios
      */
+    #[\PHPUnit\Framework\Attributes\DataProvider('contractYearScenarios')]
     public function testCalculatesContractTotalYearsCorrectly($cashDistribution, $expectedYears, $description)
     {
         // Act

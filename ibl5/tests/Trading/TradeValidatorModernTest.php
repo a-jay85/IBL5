@@ -52,6 +52,7 @@ class TradeValidatorModernTest extends TestCase
      * @group cash
      * @dataProvider invalidCashAmountProvider
      */
+    #[\PHPUnit\Framework\Attributes\DataProvider('invalidCashAmountProvider')]
     public function testRejectsCashAmountsBelowMinimum($userCash, $partnerCash, $expectedErrorText)
     {
         // Act
@@ -91,6 +92,7 @@ class TradeValidatorModernTest extends TestCase
      * @group salary-cap
      * @dataProvider salaryCapViolationProvider
      */
+    #[\PHPUnit\Framework\Attributes\DataProvider('salaryCapViolationProvider')]
     public function testRejectsTradesExceedingSalaryCaps($tradeData, $expectedErrorCount)
     {
         // Act
@@ -142,6 +144,7 @@ class TradeValidatorModernTest extends TestCase
      * @group player-validation
      * @dataProvider nonTradeablePlayerProvider
      */
+    #[\PHPUnit\Framework\Attributes\DataProvider('nonTradeablePlayerProvider')]
     public function testPreventsTradeingIneligiblePlayers($mockData, $expectedResult, $reason)
     {
         // Arrange

@@ -2,9 +2,11 @@
 
 This directory contains comprehensive unit tests for the Trading module's refactored classes, demonstrating modern PHP testing best practices.
 
-## Fixed PHPUnit Compatibility Issue
+## Fixed PHPUnit Compatibility Issues
 
-**Issue Resolved**: PHPUnit 12+ no longer recognizes `@test` annotations by default. Updated test methods to use proper `test*` naming convention for maximum compatibility across PHPUnit versions.
+**Issues Resolved**: 
+1. PHPUnit 12+ no longer recognizes `@test` annotations by default → Updated test methods to use proper `test*` naming convention
+2. PHPUnit 10+ requires data provider methods to be static → Made all data provider methods `static`
 
 ## Testing Approach Comparison
 
@@ -68,6 +70,25 @@ class TradeValidatorModernTest extends TestCase
         // Assert
         $this->assertTrue($result['valid'], 'Valid cash amounts should pass validation');
         $this->assertNull($result['error'], 'No error should be returned for valid amounts');
+    }
+    
+    /**
+     * @dataProvider invalidCashAmountProvider
+     */
+    public function testRejectsCashAmountsBelowMinimum($userCash, $partnerCash, $expectedErrorText)
+    {
+        // Test implementation
+    }
+    
+    /**
+     * Data provider methods must be static in PHPUnit 10+
+     */
+    public static function invalidCashAmountProvider()
+    {
+        return [
+            'User cash below minimum' => [[...], [...], 'error message'],
+            'Partner cash below minimum' => [[...], [...], 'error message']
+        ];
     }
 }
 ```

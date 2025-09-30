@@ -158,7 +158,7 @@ class TradeValidatorModernTest extends TestCase
     /**
      * Data provider for invalid cash amounts
      */
-    public function invalidCashAmountProvider()
+    public static function invalidCashAmountProvider()
     {
         return [
             'User cash below minimum' => [
@@ -177,7 +177,7 @@ class TradeValidatorModernTest extends TestCase
     /**
      * Data provider for salary cap violations
      */
-    public function salaryCapViolationProvider()
+    public static function salaryCapViolationProvider()
     {
         return [
             'User exceeds hard cap' => [
@@ -204,7 +204,7 @@ class TradeValidatorModernTest extends TestCase
     /**
      * Data provider for non-tradeable players
      */
-    public function nonTradeablePlayerProvider()
+    public static function nonTradeablePlayerProvider()
     {
         return [
             'Waived player' => [

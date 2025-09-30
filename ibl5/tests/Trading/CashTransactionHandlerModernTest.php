@@ -191,7 +191,7 @@ class CashTransactionHandlerModernTest extends TestCase
     /**
      * Data provider for contract year calculation scenarios
      */
-    public function contractYearScenarios()
+    public static function contractYearScenarios()
     {
         return [
             'front_loaded_contract' => [

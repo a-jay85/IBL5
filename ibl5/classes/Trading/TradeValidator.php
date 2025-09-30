@@ -80,16 +80,19 @@ class Trading_TradeValidator
      */
     public function canPlayerBeTraded($playerId)
     {
-        $query = "SELECT ordinal, cy FROM ibl_plr WHERE pid = ?";
         $result = $this->db->sql_query("SELECT ordinal, cy FROM ibl_plr WHERE pid = $playerId");
         $player = $this->db->sql_fetchrow($result);
 
-        if (!$player) {
+        if (!$player || !is_array($player) || count($player) < 2) {
             return false;
         }
 
+        // Extract ordinal and cy from the indexed array
+        $ordinal = isset($player[0]) ? $player[0] : 99999; // Default to high ordinal if missing
+        $cy = isset($player[1]) ? $player[1] : 0; // Default to 0 salary if missing
+
         // Player cannot be traded if they are waived (ordinal > JSB::WAIVERS_ORDINAL) or have 0 salary
-        return $player['cy'] != 0 && $player['ordinal'] <= JSB::WAIVERS_ORDINAL;
+        return $cy != 0 && $ordinal <= JSB::WAIVERS_ORDINAL;
     }
 
     /**

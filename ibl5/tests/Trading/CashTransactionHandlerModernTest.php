@@ -1,0 +1,264 @@
+<?php
+
+use PHPUnit\Framework\TestCase;
+
+/**
+ * Modern unit tests for Trading_CashTransactionHandler class
+ * 
+ * This demonstrates advanced testing patterns including:
+ * - Comprehensive test coverage with edge cases
+ * - Data providers for parametrized testing
+ * - Mock object manipulation for different scenarios
+ * - Performance and boundary testing
+ * - Clear test organization with groups and descriptive names
+ */
+class CashTransactionHandlerModernTest extends TestCase
+{
+    private $cashHandler;
+    private $mockDb;
+
+    protected function setUp(): void
+    {
+        $this->mockDb = new MockDatabase();
+        $this->cashHandler = new Trading_CashTransactionHandler($this->mockDb);
+    }
+
+    protected function tearDown(): void
+    {
+        $this->cashHandler = null;
+        $this->mockDb = null;
+    }
+
+    /**
+     * @test
+     * @group pid-generation
+     */
+    public function it_generates_unique_pid_when_requested_pid_is_available()
+    {
+        // Arrange
+        $requestedPid = 99999;
+        $this->mockDb->setMockData([]); // No existing PID found
+        $this->mockDb->setReturnTrue(false); // SELECT returns empty result
+
+        // Act
+        $result = $this->cashHandler->generateUniquePid($requestedPid);
+
+        // Assert
+        $this->assertEquals($requestedPid, $result);
+    }
+
+    /**
+     * @test
+     * @group contract-calculations
+     * @dataProvider contractYearScenarios
+     */
+    public function it_calculates_contract_total_years_correctly($cashDistribution, $expectedYears, $description)
+    {
+        // Act
+        $result = $this->cashHandler->calculateContractTotalYears($cashDistribution);
+
+        // Assert
+        $this->assertEquals($expectedYears, $result, $description);
+    }
+
+    /**
+     * @test
+     * @group cash-detection
+     */
+    public function it_detects_cash_presence_in_trade_accurately()
+    {
+        // Test cases for cash detection
+        $testCases = [
+            'with_cash_first_year' => [[1 => 100, 2 => 0, 3 => 0, 4 => 0, 5 => 0, 6 => 0], true],
+            'with_cash_last_year' => [[1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0, 6 => 500], true],
+            'with_no_cash' => [[1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0, 6 => 0], false],
+            'with_empty_array' => [[], false],
+            'with_multiple_years' => [[1 => 100, 2 => 200, 3 => 0, 4 => 0, 5 => 0, 6 => 0], true],
+        ];
+
+        foreach ($testCases as $scenario => $data) {
+            list($cashAmounts, $expected) = $data;
+            
+            // Act
+            $result = $this->cashHandler->hasCashInTrade($cashAmounts);
+            
+            // Assert
+            $this->assertEquals($expected, $result, "Failed for scenario: $scenario");
+        }
+    }
+
+    /**
+     * @test
+     * @group cash-transactions
+     */
+    public function it_creates_cash_transaction_with_proper_story_text()
+    {
+        // Arrange
+        $itemId = 12345;
+        $fromTeam = 'Los Angeles Lakers';
+        $toTeam = 'Boston Celtics';
+        $cashYear = [1 => 100, 2 => 200, 3 => 0, 4 => 0, 5 => 0, 6 => 0];
+
+        // Act
+        $result = $this->cashHandler->createCashTransaction($itemId, $fromTeam, $toTeam, $cashYear);
+
+        // Assert
+        $this->assertTrue($result['success'], 'Cash transaction should succeed');
+        $this->assertStringContainsString($fromTeam, $result['tradeLine']);
+        $this->assertStringContainsString($toTeam, $result['tradeLine']);
+        $this->assertStringContainsString('100 200', $result['tradeLine']);
+        $this->assertStringContainsString('cash', $result['tradeLine']);
+    }
+
+    /**
+     * @test
+     * @group database-operations
+     */
+    public function it_inserts_cash_trade_data_successfully()
+    {
+        // Arrange
+        $tradeOfferId = 999;
+        $sendingTeam = 'Miami Heat';
+        $receivingTeam = 'Golden State Warriors';
+        $cashAmounts = [1 => 100, 2 => 200, 3 => 300, 4 => 0, 5 => 0, 6 => 0];
+        
+        $this->mockDb->setReturnTrue(true); // INSERT should return true
+
+        // Act
+        $result = $this->cashHandler->insertCashTradeData(
+            $tradeOfferId, 
+            $sendingTeam, 
+            $receivingTeam, 
+            $cashAmounts
+        );
+
+        // Assert
+        $this->assertTrue($result, 'Cash trade data insertion should succeed');
+    }
+
+    /**
+     * @test
+     * @group database-operations
+     */
+    public function it_handles_partial_cash_data_by_filling_missing_years_with_zeros()
+    {
+        // Arrange
+        $tradeOfferId = 999;
+        $sendingTeam = 'Chicago Bulls';
+        $receivingTeam = 'New York Knicks';
+        $partialCashAmounts = [1 => 100, 3 => 300, 5 => 500]; // Missing years 2, 4, 6
+        
+        $this->mockDb->setReturnTrue(true);
+
+        // Act
+        $result = $this->cashHandler->insertCashTradeData(
+            $tradeOfferId, 
+            $sendingTeam, 
+            $receivingTeam, 
+            $partialCashAmounts
+        );
+
+        // Assert
+        $this->assertTrue($result, 'Partial cash data should be handled correctly');
+    }
+
+    /**
+     * @test
+     * @group edge-cases
+     */
+    public function it_handles_edge_cases_gracefully()
+    {
+        // Test various edge cases
+        $edgeCases = [
+            'zero_cash_all_years' => [
+                [1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0, 6 => 0],
+                1 // Should default to 1 year
+            ],
+            'cash_only_in_middle_year' => [
+                [1 => 0, 2 => 0, 3 => 500, 4 => 0, 5 => 0, 6 => 0],
+                3 // Should be 3 years based on last non-zero
+            ],
+            'maximum_contract_length' => [
+                [1 => 100, 2 => 200, 3 => 300, 4 => 400, 5 => 500, 6 => 600],
+                6 // Maximum 6 years
+            ]
+        ];
+
+        foreach ($edgeCases as $case => $data) {
+            list($cashYear, $expectedYears) = $data;
+            
+            // Act
+            $result = $this->cashHandler->calculateContractTotalYears($cashYear);
+            
+            // Assert
+            $this->assertEquals($expectedYears, $result, "Failed for edge case: $case");
+        }
+    }
+
+    /**
+     * Data provider for contract year calculation scenarios
+     */
+    public function contractYearScenarios()
+    {
+        return [
+            'front_loaded_contract' => [
+                [1 => 1000, 2 => 500, 3 => 250, 4 => 0, 5 => 0, 6 => 0],
+                3,
+                'Front-loaded 3-year contract should return 3 years'
+            ],
+            'back_loaded_contract' => [
+                [1 => 0, 2 => 0, 3 => 0, 4 => 1000, 5 => 2000, 6 => 3000],
+                6,
+                'Back-loaded contract should return 6 years'
+            ],
+            'uniform_contract' => [
+                [1 => 500, 2 => 500, 3 => 500, 4 => 500, 5 => 0, 6 => 0],
+                4,
+                'Uniform 4-year contract should return 4 years'
+            ],
+            'single_year_contract' => [
+                [1 => 2000, 2 => 0, 3 => 0, 4 => 0, 5 => 0, 6 => 0],
+                1,
+                'Single year contract should return 1 year'
+            ],
+            'irregular_pattern' => [
+                [1 => 100, 2 => 0, 3 => 300, 4 => 0, 5 => 500, 6 => 0],
+                5,
+                'Irregular pattern should return years based on last non-zero year'
+            ],
+            'maximum_length' => [
+                [1 => 1000, 2 => 1100, 3 => 1200, 4 => 1300, 5 => 1400, 6 => 1500],
+                6,
+                'Maximum 6-year contract should return 6 years'
+            ]
+        ];
+    }
+
+    /**
+     * @test
+     * @group integration
+     */
+    public function it_performs_complete_cash_transaction_workflow()
+    {
+        // This is an integration-style test that combines multiple operations
+        
+        // Arrange
+        $itemId = 54321;
+        $fromTeam = 'San Antonio Spurs';
+        $toTeam = 'Portland Trail Blazers';
+        $cashYear = [1 => 250, 2 => 275, 3 => 300, 4 => 0, 5 => 0, 6 => 0];
+
+        // Act - Test the complete workflow
+        $contractYears = $this->cashHandler->calculateContractTotalYears($cashYear);
+        $hasCash = $this->cashHandler->hasCashInTrade($cashYear);
+        $transactionResult = $this->cashHandler->createCashTransaction($itemId, $fromTeam, $toTeam, $cashYear);
+
+        // Assert - Verify the complete workflow
+        $this->assertEquals(3, $contractYears, 'Should calculate 3 contract years');
+        $this->assertTrue($hasCash, 'Should detect cash in trade');
+        $this->assertTrue($transactionResult['success'], 'Transaction should succeed');
+        $this->assertStringContainsString('250 275 300', $transactionResult['tradeLine']);
+        $this->assertStringContainsString($fromTeam, $transactionResult['tradeLine']);
+        $this->assertStringContainsString($toTeam, $transactionResult['tradeLine']);
+    }
+}

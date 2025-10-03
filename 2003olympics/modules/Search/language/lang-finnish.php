@@ -20,7 +20,6 @@
 define("_ALLTOPICS", "Kaikki kanavat");
 define("_NOCOMMENTS", "Ei kommentteja");
 define("_UCOMMENT", "Kommenttia");
-define("_REVIEWS", "Arvostelut");
 define("_SEARCHUSERS", "Etsi k�ytt�jist�:");
 define("_SEARCHSECTIONS", "Etsi erikoisaihealueista:");
 define("_SEARCHREVIEWS", "Etsi arvosteluista:");
@@ -52,9 +51,7 @@ define("_SREPLY", "Vastaa");
 define("_SREPLIES", "Vastaukset");
 define("_ATTACHART", "Liitetty artikkeliin");
 define("_PAGES", "Sivut");
-define("_REVIEWSCORE", "Arvostelun pisteet");
 define("_PAGE", "sivu");
-define("_DOWNLOADS", "Downloads");
 define("_WEBLINKS", "Web Links");
 define("_FINDMORE", "... more");
 define("_DIDNOTFIND", "Didn't find what you're looking for?");

@@ -12,7 +12,7 @@
 /* the Free Software Foundation; either version 2 of the License.       */
 /************************************************************************/
 
-include "mainfile.php";
+include $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 include "includes/ipban.php";
 global $prefix, $db, $nukeurl;
 header("Content-Type: text/xml");

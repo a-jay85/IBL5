@@ -71,7 +71,7 @@ if (!isset($_POST['confirmed'])) {
     exit();
 }
 
-require 'mainfile.php';
+require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
 $sharedFunctions = new Shared($db);
 $season = new Season($db);
@@ -663,6 +663,7 @@ while (!feof($plrFile)) {
 
         $historicalStatsUpdateQuery = "INSERT INTO ibl_hist
             (`pid`,
+            `name`,
             `year`,
             `team`,
             `teamid`,
@@ -682,7 +683,6 @@ while (!feof($plrFile)) {
             `tvr`,
             `pf`,
             `pts`,
-            `name`,
             `r_2ga`,
             `r_2gp`,
             `r_fta`,
@@ -706,6 +706,7 @@ while (!feof($plrFile)) {
             `salary`)
         VALUES
             ($pid,
+            '$name',
             $season->endingYear,
             '" . $sharedFunctions->getTeamnameFromTeamID($tid) . "',
             $tid,
@@ -725,7 +726,6 @@ while (!feof($plrFile)) {
             $seasonTVR,
             $seasonPF,
             $seasonPTS,
-            '$name',
             $rating2GA,
             $rating2GP,
             $ratingFTA,
@@ -816,6 +816,7 @@ while (!feof($plrFile)) {
 
         $teamUpdateQuery = 'UPDATE `ibl_team_' . $sideOfTheBall . '_stats`
             SET
+            `teamID` = ' . ${'tid' . ucfirst($sideOfTheBall) . 'Stats'} . ',
             `games` = ' . $seasonGamesPlayed . ',
             `fgm` = ' . ($season2GM + $season3GM) . ',
             `fga` = ' . ($season2GA + $season3GA) . ',
@@ -831,7 +832,7 @@ while (!feof($plrFile)) {
             `blk` = ' . $seasonBLK . ',
             `pf` = ' . $seasonPF . '
             WHERE
-            `team` = \'' . $teamName . '\';';
+            `name` = \'' . $teamName . '\';';
         if (!$db->sql_query($teamUpdateQuery)) {
             die('Invalid query: ' . $db->sql_error());
         }

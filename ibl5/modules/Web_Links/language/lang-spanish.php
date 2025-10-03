@@ -46,7 +46,6 @@ define("_PROMOTE03", "Si quieres m�s que un simple texto, puedes utilizar un p
 define("_PROMOTE04", "Si haces trampas en esto, quitaremos tu enlace. Una vez aclarado esto, as� es como se ve el formulario de valoraci�n.");
 define("_ONLYREGUSERSMODIFY", "Solamente los usuarios registrados pueden proponer modificaciones. Por favor, <a href=\"modules.php?name=Your_Account\">Reg�strate o Con�ctate</a>.");
 define("_LETSDECIDE", "Tu informaci�n permitir� a otros visitantes decidir mejor sobre qu� enlaces escoger.");
-define("_RATENOTE4", "Puedes ver una lista de <a href=\"modules.php?name=Downloads&d_op=TopRated\">los recursos m�s valorados</a>.");
 define("_DATE", "Fecha");
 define("_TO", "Para");
 define("_ADDLINK", "A�adir Enlace");

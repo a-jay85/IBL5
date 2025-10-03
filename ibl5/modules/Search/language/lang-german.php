@@ -20,7 +20,6 @@
 define("_ALLTOPICS", "Alle &Uuml;berschriften");
 define("_NOCOMMENTS", "kein Kommentar");
 define("_UCOMMENT", "Kommentar");
-define("_REVIEWS", "Testberichte");
 define("_SEARCHUSERS", "Suchen in Benutzerdatenbank");
 define("_SEARCHSECTIONS", "Suchen in Themenbereichen");
 define("_SEARCHREVIEWS", "Suchen in den Testberichten");
@@ -52,9 +51,7 @@ define("_SREPLY", "Antworten");
 define("_SREPLIES", "Antworten");
 define("_ATTACHART", "zugeh&ouml;rig zum Artikel");
 define("_PAGES", "Seiten");
-define("_REVIEWSCORE", "Bewertung f&uuml;r diesen Testbericht");
 define("_PAGE", "Seite");
-define("_DOWNLOADS", "Downloads");
 define("_WEBLINKS", "Web Links");
 define("_FINDMORE", "... mehr");
 define("_DIDNOTFIND", "haben Sie nicht das gefunden, was Sie wollten?");

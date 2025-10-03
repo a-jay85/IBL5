@@ -20,7 +20,6 @@
 define("_ALLTOPICS", "T� Gjith� Argumentet");
 define("_NOCOMMENTS", "Asnj� Koment");
 define("_UCOMMENT", "Komenti");
-define("_REVIEWS", "Recensime");
 define("_SEARCHUSERS", "K�rko n� Database e P�rdoruesve");
 define("_SEARCHSECTIONS", "K�rko tek Seksionet Special�");
 define("_SEARCHREVIEWS", "K�rko n�p�r Recensime");
@@ -52,9 +51,7 @@ define("_SREPLY", "P�rgjigje");
 define("_SREPLIES", "P�rgjigje");
 define("_ATTACHART", "BashkaNgjitur Artikullit");
 define("_PAGES", "Faqe");
-define("_REVIEWSCORE", "Vot� p�r k�t� Recensim");
 define("_PAGE", "Faqja");
-define("_DOWNLOADS", "Downloads");
 define("_WEBLINKS", "Lidhje Web");
 define("_FINDMORE", "... akoma");
 define("_DIDNOTFIND", "Nuk e gjet�t �far� po k�rkonit?");

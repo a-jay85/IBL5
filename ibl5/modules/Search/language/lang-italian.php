@@ -20,7 +20,6 @@
 define("_ALLTOPICS", "Tutti gli Argomenti");
 define("_NOCOMMENTS", "Nessun Commento");
 define("_UCOMMENT", "Commento");
-define("_REVIEWS", "Recensioni");
 define("_SEARCHUSERS", "Cerca nel Database Utenti");
 define("_SEARCHSECTIONS", "Cerca nelle Sezioni Speciali");
 define("_SEARCHREVIEWS", "Cerca nelle Recensioni");
@@ -52,9 +51,7 @@ define("_SREPLY", "Replica");
 define("_SREPLIES", "Repliche");
 define("_ATTACHART", "Allegato all'Articolo");
 define("_PAGES", "Pagine");
-define("_REVIEWSCORE", "Voto per questa Recensione");
 define("_PAGE", "Pagina");
-define("_DOWNLOADS", "Downloads");
 define("_WEBLINKS", "Web Links");
 define("_FINDMORE", "... more");
 define("_DIDNOTFIND", "Didn't find what you're looking for?");

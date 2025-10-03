@@ -22,7 +22,7 @@ if (isset($aid)) {
     }
 }
 
-require_once "mainfile.php";
+require_once $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
 //Uncomment the following lines after setting the site url in the Administration
 //global $nukeurl;
@@ -185,14 +185,6 @@ function login()
         . "</form>";
     CloseTable();
     Nuke\Footer::footer();
-}
-
-function deleteNotice($id)
-{
-    global $prefix, $db, $admin_file;
-    $id = intval($id);
-    $db->sql_query("DELETE FROM " . $prefix . "_reviews_add WHERE id = '$id'");
-    Header("Location: " . $admin_file . ".php?op=reviews");
 }
 
 /*********************************************************/
@@ -464,14 +456,6 @@ function adminMain()
 if ($admintest) {
 
     switch ($op) {
-
-        case "do_gfx":
-            do_gfx();
-            break;
-
-        case "deleteNotice":
-            deleteNotice($id);
-            break;
 
         case "GraphicAdmin":
             GraphicAdmin();

@@ -20,7 +20,6 @@
 define("_ALLTOPICS", "Alle onderwerpen");
 define("_NOCOMMENTS", "Geen opmerkingen");
 define("_UCOMMENT", "Opmerking");
-define("_REVIEWS", "Recensies");
 define("_SEARCHUSERS", "Zoeken in de gebruikersdatabank");
 define("_SEARCHSECTIONS", "Zoeken in speciale sectie");
 define("_SEARCHREVIEWS", "Zoeken in recensies");
@@ -52,9 +51,7 @@ define("_SREPLY", "Antwoord");
 define("_SREPLIES", "Antwoorden");
 define("_ATTACHART", "Aan artikel toegevoegd");
 define("_PAGES", "Pagina's");
-define("_REVIEWSCORE", "Score voor deze recensie");
 define("_PAGE", "Pagina");
-define("_DOWNLOADS", "Downloads");
 define("_WEBLINKS", "Web Links");
 define("_FINDMORE", "... meer");
 define("_DIDNOTFIND", "Niet gevonden waarnaar u zocht?");

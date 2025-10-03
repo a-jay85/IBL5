@@ -206,17 +206,8 @@ if (!defined('ADMIN_FILE')) {
     }
 }
 
-// Define the INCLUDE PATH
-if (defined('FORUM_ADMIN')) {
-    define('INCLUDE_PATH', '../../../');
-} elseif (defined('INSIDE_MOD')) {
-    define('INCLUDE_PATH', '../../');
-} else {
-    define('INCLUDE_PATH', './');
-}
-
 // Include the required files
-@require_once INCLUDE_PATH . "config.php";
+@require_once __DIR__ . '/config.php';
 
 if (!$dbname) {
     die("<br><br><center><img src=images/logo.gif><br><br><b>There seems that PHP-Nuke isn't installed yet.<br>(The values in config.php file are the default ones)<br><br>You can proceed with the <a href='./install/index.php'>web installation</a> now.</center></b>");
@@ -256,22 +247,17 @@ function mlaphp_autoloader($class)
 // register it with SPL
 spl_autoload_register('mlaphp_autoloader');
 
-@require_once INCLUDE_PATH . "db/db.php";
+@require_once __DIR__ . "/db/db.php";
 
-/* FOLLOWING TWO LINES ARE DEPRECATED BUT ARE HERE FOR OLD MODULES COMPATIBILITY */
-/* PLEASE START USING THE NEW SQL ABSTRACTION LAYER. SEE MODULES DOC FOR DETAILS */
-// @require_once(INCLUDE_PATH."includes/sql_layer.php");
-// $dbi = sql_connect($dbhost, $dbuname, $dbpass, $dbname);
-
-@require_once INCLUDE_PATH . "includes/ipban.php";
-if (file_exists(INCLUDE_PATH . "includes/custom_files/custom_mainfile.php")) {
-    @include_once INCLUDE_PATH . "includes/custom_files/custom_mainfile.php";
+@require_once __DIR__ . "/includes/ipban.php";
+if (file_exists(__DIR__ . "/includes/custom_files/custom_mainfile.php")) {
+    @include_once __DIR__ . "/includes/custom_files/custom_mainfile.php";
 }
 
 if (!defined('FORUM_ADMIN')) {
     if (empty($admin_file)) {
         die("You must set a value for admin_file in config.php");
-    } elseif (!empty($admin_file) && !file_exists(INCLUDE_PATH . $admin_file . ".php")) {
+    } elseif (!empty($admin_file) && !file_exists(__DIR__ . "/" . $admin_file . ".php")) {
         die("The admin_file you defined in config.php does not exist");
     }
 }
@@ -826,6 +812,7 @@ function selectlanguage()
         $title = _SELECTLANGUAGE;
         $content = "<center><font class=\"content\">" . _SELECTGUILANG . "<br><br>";
         $langdir = dir("language");
+        $menulist = "";
         while ($func = $langdir->read()) {
             if (substr($func, 0, 5) == "lang-") {
                 $menulist .= "$func ";
@@ -880,7 +867,7 @@ function ultramode()
     $ultra = "ultramode.txt";
     $file = fopen($ultra, "w");
     fwrite($file, "General purpose self-explanatory file with news headlines\n");
-    $sql = "SELECT s.sid, s.catid, s.aid, s.title, s.time, s.hometext, s.comments, s.topic, t.topictext, t.topicimage FROM " . $prefix . "_stories s LEFT JOIN " . $prefix . "_topics t ON t.topicid = s.topic WHERE s.ihome = '0' " . $querylang . " ORDER BY s.time DESC LIMIT 0,10";
+    $sql = "SELECT s.sid, s.catid, s.aid, s.title, s.time, s.hometext, s.comments, s.topic, t.topictext, t.topicimage FROM " . $prefix . "_stories s LEFT JOIN " . $prefix . "_topics t ON t.topicid = s.topic WHERE s.ihome = '0' ORDER BY s.time DESC LIMIT 0,10";
     $result = $db->sql_query($sql);
     while ($row = $db->sql_fetchrow($result)) {
         $rsid = intval($row['sid']);
@@ -1214,20 +1201,12 @@ function adminblock()
         $num = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_queue"));
         $content = "<span class=\"content\">";
         $content .= "<strong><big>&middot;</big></strong>&nbsp;<a href=\"" . $admin_file . ".php?op=submissions\">" . _SUBMISSIONS . "</a>: $num<br>";
-        $num = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_reviews_add"));
-        $content .= "<strong><big>&middot;</big></strong>&nbsp;<a href=\"" . $admin_file . ".php?op=reviews\">" . _WREVIEWS . "</a>: $num<br>";
         $num = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_links_newlink"));
         $brokenl = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_links_modrequest WHERE brokenlink='1'"));
         $modreql = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_links_modrequest WHERE brokenlink='0'"));
         $content .= "<strong><big>&middot;</big></strong>&nbsp;<a href=\"" . $admin_file . ".php?op=Links\">" . _WLINKS . "</a>: $num<br>";
         $content .= "<strong><big>&middot;</big></strong>&nbsp;<a href=\"" . $admin_file . ".php?op=LinksListModRequests\">" . _MODREQLINKS . "</a>: $modreql<br>";
         $content .= "<strong><big>&middot;</big></strong>&nbsp;<a href=\"" . $admin_file . ".php?op=LinksListBrokenLinks\">" . _BROKENLINKS . "</a>: $brokenl<br>";
-        $num = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_downloads_newdownload"));
-        $brokend = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_downloads_modrequest WHERE brokendownload='1'"));
-        $modreqd = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_downloads_modrequest WHERE brokendownload='0'"));
-        $content .= "<strong><big>&middot;</big></strong>&nbsp;<a href=\"" . $admin_file . ".php?op=downloads\">" . _UDOWNLOADS . "</a>: $num<br>";
-        $content .= "<strong><big>&middot;</big></strong>&nbsp;<a href=\"" . $admin_file . ".php?op=DownloadsListModRequests\">" . _MODREQDOWN . "</a>: $modreqd<br>";
-        $content .= "<strong><big>&middot;</big></strong>&nbsp;<a href=\"" . $admin_file . ".php?op=DownloadsListBrokenDownloads\">" . _BROKENDOWN . "</a>: $brokend<br></span>";
         themesidebox($title, $content);
     }
 }
@@ -1602,6 +1581,7 @@ function redir($content)
     $links = array();
     $hrefs = array();
     $pos = 0;
+    $linkpos = 0;
     while (!(($pos = strpos($content, "<", $pos)) === false)) {
         $pos++;
         $endpos = strpos($content, ">", $pos);

@@ -20,7 +20,6 @@
 define("_ALLTOPICS", "T�m Konular");
 define("_NOCOMMENTS", "Yorum Yok");
 define("_UCOMMENT", "Yorum");
-define("_REVIEWS", "�zlenimler");
 define("_SEARCHUSERS", "Kullan�c� Veritaban�nda Ara");
 define("_SEARCHSECTIONS", "�zel B�l�mlerde Ara");
 define("_SEARCHREVIEWS", "�zlenimlerde Ara");
@@ -52,9 +51,7 @@ define("_SREPLY", "Cevap");
 define("_SREPLIES", "Cevap");
 define("_ATTACHART", "Habere Eklenmi�");
 define("_PAGES", "Sayfa");
-define("_REVIEWSCORE", "�zlenim Puan�");
 define("_PAGE", "Sayfa");
-define("_DOWNLOADS", "Dosyalar");
 define("_WEBLINKS", "Web Ba�lant�lar�");
 define("_FINDMORE", "... devam�");
 define("_DIDNOTFIND", "Arad���n�z� bulamad�n�z m�?");

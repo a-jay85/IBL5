@@ -124,11 +124,9 @@ function team($teamID)
         OR $season->phase == "Draft"
         OR $season->phase == "Free Agency"
     ) {
-        $playoffsStartDate = $season->endingYear . "-" . Season::IBL_PLAYOFF_MONTH . "-01";
-        $playoffsEndDate = $season->endingYear . "-" . Season::IBL_PLAYOFF_MONTH . "-30";
         if ($display == "playoffs") {
             $showing = "Playoff Averages";
-            $table_periodAverages = UI::periodAverages($db, $team, $season, $playoffsStartDate, $playoffsEndDate);
+            $table_periodAverages = UI::periodAverages($db, $team, $season, $season->playoffsStartDate, $season->playoffsEndDate);
             $table_output = $table_periodAverages;
             $tabs .= "<td bgcolor=#BBBBBB style=\"font-weight:bold\">";
         } else {

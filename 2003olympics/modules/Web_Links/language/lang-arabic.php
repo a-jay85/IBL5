@@ -46,7 +46,6 @@ define("_PROMOTE03", "��� ��� ���� ����� ���
 define("_PROMOTE04", "��� ��� �������� �� ������� ���� ���� ������� �� ����� ��������. ���� ��� ����� ����� �������� �������.");
 define("_ONLYREGUSERSMODIFY", "�������� ����� ��� �������� ������� �� ���� �������. ������ <a href=\"modules.php?name=Your_Account\">������� �� ������</a>.");
 define("_LETSDECIDE", "������� �� ������ ���� ����� ������ ������� ��� ������� ���� ������ ����.");
-define("_RATENOTE4", "������ ������� ����� <a href=\"modules.php?name=Downloads&amp;d_op=TopRated\">����� �������</a>.");
 define("_DATE", "�������");
 define("_TO", "���");
 define("_ADDLINK", "��� ����");

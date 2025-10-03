@@ -89,8 +89,6 @@ switch ($op) {
         OpenTable();
         if ($type == "users") {
             echo "<center><font class=\"title\"><b>" . _SEARCHUSERS . "</b></font></center><br>";
-        } elseif ($type == "reviews") {
-            echo "<center><font class=\"title\"><b>" . _SEARCHREVIEWS . "</b></font></center><br>";
         } elseif ($type == "comments" and isset($sid)) {
             $res = $db->sql_query("select title from " . $prefix . "_stories where sid='$sid'");
             list($st_title) = $db->sql_fetchrow($res);
@@ -160,26 +158,20 @@ switch ($op) {
                         <option <?php echo $days == 90 ? "selected " : ""; ?> value="90">3 <?php echo _MONTHS ?></option>
                 </select><br>
 		<?php
-$sel1 = $sel2 = $sel3 = $sel4 = "";
+$sel1 = $sel2 = $sel3 = "";
         if (($type == "stories") or (empty($type))) {
             $sel1 = "checked";
         } elseif ($type == "comments") {
             $sel2 = "checked";
         } elseif ($type == "users") {
             $sel3 = "checked";
-        } elseif ($type == "reviews") {
-            $sel4 = "checked";
         }
-        $num_rev = $db->sql_numrows($db->sql_query("SELECT * from " . $prefix . "_reviews"));
         echo "" . _SEARCHON . "";
         echo "<input type=\"radio\" name=\"type\" value=\"stories\" $sel1> " . _SSTORIES . "";
         if ($articlecomm == 1) {
             echo "<input type=\"radio\" name=\"type\" value=\"comments\" $sel2> " . _SCOMMENTS . "";
         }
         echo "<input type=\"radio\" name=\"type\" value=\"users\" $sel3> " . _SUSERS . "";
-        if ($num_rev > 0) {
-            echo "<input type=\"radio\" name=\"type\" value=\"reviews\" $sel4> " . _REVIEWS . "";
-        }
         echo "</form></td></tr></table>";
         if ($qlen == 1) {
             OpenTable();
@@ -374,54 +366,6 @@ $sel1 = $sel2 = $sel3 = $sel4 = "";
                     print "<b>" . _NEXTMATCHES . "</b></a></center>";
                 }
             }
-        } elseif ($type == "reviews") {
-            $res_n = $db->sql_query("SELECT id, title, text, reviewer, score from " . $prefix . "_reviews where (title like '%$query2%' OR text like '%$query3%') $queryrlang order by date DESC limit $min,$offset");
-            $nrows = $db->sql_numrows($res_n);
-            $x = 0;
-            if (!empty($query)) {
-                echo "<br><hr noshade size=\"1\"><center><b>" . _SEARCHRESULTS . "</b></center><br><br>";
-                echo "<table width=\"99%\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\">\n";
-                if ($nrows > 0) {
-                    while ($rown = $db->sql_fetchrow($res_n)) {
-                        $id = intval($rown['id']);
-                        $title = filter($rown['title'], "nohtml");
-                        $text = filter($rown['text']);
-                        $reviewer = filter($rown['reviewer'], nohmtl);
-                        $score = intval($rown['score']);
-                        $furl = "modules.php?name=Reviews&amp;op=showcontent&amp;id=$id";
-                        $pages = count(explode("[--pagebreak--]", $text));
-                        echo "<tr><td><img src=\"images/folders.gif\" border=\"0\" alt=\"\">&nbsp;<font class=\"option\"><a href=\"$furl\"><b>$title</b></a></font><br>"
-                            . "<font class=\"content\">" . _POSTEDBY . " $reviewer<br>"
-                            . "" . _REVIEWSCORE . ": $score/10<br>";
-                        if ($pages == 1) {
-                            echo "($pages " . _PAGE . ")";
-                        } else {
-                            echo "($pages " . _PAGES . ")";
-                        }
-                        if (is_admin($admin)) {
-                            echo " [ <a href=\"modules.php?name=Reviews&amp;op=mod_review&amp;id=$id\">" . _EDIT . "</a> | <a href=\"modules.php?name=Reviews.php&amp;op=del_review&amp;id_del=$id\">" . _DELETE . "</a> ]";
-                        }
-                        print "<br><br><br></font></td></tr>\n";
-                        $x++;
-                    }
-                    echo "</table>";
-                } else {
-                    echo "<tr><td><center><font class=\"option\"><b>" . _NOMATCHES . "</b></font></center><br><br>";
-                    echo "</td></tr></table>";
-                }
-
-                $prev = $min - $offset;
-                if ($prev >= 0) {
-                    print "<br><br><center><a href=\"modules.php?name=$module_name&amp;author=$author&amp;topic=$t&amp;min=$prev&amp;query=$query&amp;type=$type\">";
-                    print "<b>$min " . _PREVMATCHES . "</b></a></center>";
-                }
-
-                $next = $min + $offset;
-                if ($x >= 9) {
-                    print "<br><br><center><a href=\"modules.php?name=$module_name&amp;author=$author&amp;topic=$t&amp;min=$max&amp;query=$query&amp;type=$type\">";
-                    print "<b>" . _NEXTMATCHES . "</b></a></center>";
-                }
-            }
         } elseif ($type == "users") {
             $res_n3 = $db->sql_query("SELECT user_id, username, name from " . $user_prefix . "_users where (username like '%$query2%' OR name like '%$query2%' OR bio like '%$query3%') order by username ASC limit $min,$offset");
             $nrows = $db->sql_numrows($res_n3);
@@ -469,10 +413,7 @@ $sel1 = $sel2 = $sel3 = $sel4 = "";
         $mod1 = $mod2 = $mod3 = "";
         if (isset($query) and !empty($query)) {
             echo "<br>";
-            if (is_active("Downloads")) {
-                $dcnt = $db->sql_numrows($db->sql_query("SELECT * from " . $prefix . "_downloads_downloads WHERE title LIKE '%$query2%' OR description LIKE '%$query3%'"));
-                $mod1 = "<li> <a href=\"modules.php?name=Downloads&amp;d_op=search&amp;query=$query3\">" . _DOWNLOADS . "</a> ($dcnt " . _SEARCHRESULTS . ")";
-            }
+
             if (is_active("Web_Links")) {
                 $lcnt = $db->sql_numrows($db->sql_query("SELECT * from " . $prefix . "_links_links WHERE title LIKE '%$query2%' OR description LIKE '%$query3%'"));
                 $mod2 = "<li> <a href=\"modules.php?name=Web_Links&amp;l_op=search&amp;query=$query\">" . _WEBLINKS . "</a> ($lcnt " . _SEARCHRESULTS . ")";

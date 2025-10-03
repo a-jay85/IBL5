@@ -1,6 +1,6 @@
 <?php
 
-require 'mainfile.php';
+require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
 $query1 = "SELECT * FROM ibl_hist";
 $result1 = $db->sql_query($query1);

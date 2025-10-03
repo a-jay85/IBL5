@@ -99,7 +99,8 @@ if ($row['radminsuper'] == 1) {
         if ($ok) {
             $db->sql_query("update " . $prefix . "_poll_desc set comments=comments-1 where pollID='" . intval($pollID) . "'");
             removePollSubComments($tid);
-            Header("Location: modules.php?name=Surveys&op=results&pollID=$pollID");
+            // Surveys module removed - redirect to admin main instead
+            Header("Location: " . $admin_file . ".php?op=adminMain");
         } else {
             Nuke\Header::header();
             GraphicAdmin();

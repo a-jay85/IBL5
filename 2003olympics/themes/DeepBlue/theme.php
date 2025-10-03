@@ -74,7 +74,6 @@ function themeheader()
         . "<tr><td width=\"100%\" bgcolor=\"#000000\" height=\"19\" valign=\"bottom\">\n"
         . "<a href=\"index.php\"><img border=\"0\" src=\"themes/DeepBlue/images/home.gif\" width=\"140\" height=\"18\"></a>"
         . "<a href=\"modules.php?name=Your_Account\"><img border=\"0\" src=\"themes/DeepBlue/images/account.gif\" width=\"140\" height=\"18\"></a>"
-        . "<a href=\"modules.php?name=Downloads\"><img border=\"0\" src=\"themes/DeepBlue/images/downloads.gif\" width=\"140\" height=\"18\"></a>"
         . "<a href=\"modules.php?name=Submit_News\"><img border=\"0\" src=\"themes/DeepBlue/images/submit.gif\" width=\"140\" height=\"18\"></a>"
         . "<a href=\"modules.php?name=Topics\"><img border=\"0\" src=\"themes/DeepBlue/images/topics.gif\" width=\"140\" height=\"18\"></a>"
         . "<a href=\"modules.php?name=Top\"><img border=\"0\" src=\"themes/DeepBlue/images/top10.gif\" width=\"140\" height=\"18\"></a>"

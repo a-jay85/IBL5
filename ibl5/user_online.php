@@ -4,7 +4,7 @@ $session = session_id();
 $time = time();
 $time_check = $time - 300; //SET TIME 5 Minute
 
-require 'mainfile.php';
+require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
 $tbl_name = "user_online"; // Table name
 

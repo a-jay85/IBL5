@@ -30,8 +30,6 @@ define("_NEWSSENT", "innsendar fr�ttir");
 define("_VOTEDPOLLS", "vins�lustu kannanirnar");
 define("_MOSTACTIVEAUTHORS", "virkustu ritararnir");
 define("_NEWSPUBLISHED", "innsendar fr�ttir");
-define("_READREVIEWS", "vins�lustu umsagnirnar");
-define("_DOWNLOADEDFILES", "mest s�ttu skr�rnar");
 define("_MOSTREADPAGES", "mest lesnu s��urnar");
 define("_MOSTVOTEDSTORIES", "greinar sem flestir hafa greitt atkv��i um");
 define("_POINTS", "punktar");

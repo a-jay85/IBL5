@@ -20,7 +20,6 @@
 define("_ALLTOPICS", "Semua Topik");
 define("_NOCOMMENTS", "Tidak ada komentar");
 define("_UCOMMENT", "Komentar");
-define("_REVIEWS", "Ulasan");
 define("_SEARCHUSERS", "Pencarian pada Database User");
 define("_SEARCHSECTIONS", "Pencarian pada Kategori Artikel");
 define("_SEARCHREVIEWS", "Pencarian pada Ulasan");
@@ -52,9 +51,7 @@ define("_SREPLY", "Tanggapan");
 define("_SREPLIES", "Tanggapan");
 define("_ATTACHART", "pada artikel");
 define("_PAGES", "Halaman");
-define("_REVIEWSCORE", "Nilai pada Ulasan ini");
 define("_PAGE", "Halaman");
-define("_DOWNLOADS", "Download");
 define("_WEBLINKS", "Web Link");
 define("_FINDMORE", "... lagi");
 define("_DIDNOTFIND", "Tidak menemukan yang anda cari?");

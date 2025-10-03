@@ -1,6 +1,6 @@
 <?php
 
-require 'mainfile.php';
+require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
 global $db;
 
@@ -29,7 +29,7 @@ if (($currentDraftSelection == NULL OR $currentDraftSelection == "") AND $player
            AND `pick` = "' . $draft_pick . '"';
     $resultUpdateDraftTable = $db->sql_query($queryUpdateDraftTable);
     
-    $queryUpdateRookieTable = 'UPDATE `ibl_scout_rookieratings`
+    $queryUpdateRookieTable = 'UPDATE `ibl_draft_class`
           SET `team` = "' . $teamname . '", 
            `drafted` = "1"
         WHERE `name` = "' . $playerToBeDrafted . '"';

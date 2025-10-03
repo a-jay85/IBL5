@@ -1,0 +1,243 @@
+<?php
+/**
+ * PHPUnit Bootstrap for Trading Module Tests
+ * 
+ * This bootstrap file sets up the testing environment for the Trading module
+ * without requiring the full IBL5 application context.
+ */
+
+// Define constants that might be needed
+if (!defined('DIRECTORY_SEPARATOR')) {
+    define('DIRECTORY_SEPARATOR', '/');
+}
+
+// Mock the autoloader for Trading classes
+spl_autoload_register(function ($class) {
+    // Handle Trading classes
+    if (strpos($class, 'Trading_') === 0) {
+        $classFile = str_replace('Trading_', '', $class);
+        $file = __DIR__ . '/../classes/Trading/' . $classFile . '.php';
+        if (file_exists($file)) {
+            require_once $file;
+            return true;
+        }
+    }
+    
+    // For other classes, don't auto-load them if we have mocks
+    // This prevents loading the real Season, Shared, etc. classes
+    return false;
+});
+
+// Define mock classes for testing
+class MockDatabase
+{
+    private $mockData = [];
+    private $returnTrue = false;
+    
+    public function sql_query($query)
+    {
+        // For queries that expect boolean return (INSERT, UPDATE, DELETE)
+        if ($this->returnTrue || 
+            stripos($query, 'INSERT') === 0 || 
+            stripos($query, 'UPDATE') === 0 || 
+            stripos($query, 'DELETE') === 0) {
+            return true;
+        }
+        
+        // Return a mock result for SELECT queries
+        return new MockDatabaseResult($this->mockData);
+    }
+    
+    public function sql_result($result, $row, $field = null)
+    {
+        if ($result instanceof MockDatabaseResult) {
+            return $result->getResult($row, $field);
+        }
+        return null;
+    }
+    
+    public function sql_fetchrow($result)
+    {
+        if ($result instanceof MockDatabaseResult) {
+            return $result->fetchRow();
+        }
+        return false;
+    }
+    
+    public function sql_fetch_assoc($result)
+    {
+        if ($result instanceof MockDatabaseResult) {
+            return $result->fetchAssoc();
+        }
+        return false;
+    }
+    
+    public function sql_numrows($result)
+    {
+        if ($result instanceof MockDatabaseResult) {
+            return $result->numRows();
+        }
+        return 0;
+    }
+    
+    public function setMockData($data)
+    {
+        $this->mockData = $data;
+    }
+    
+    public function setReturnTrue($returnTrue = true)
+    {
+        $this->returnTrue = $returnTrue;
+    }
+}
+
+class MockDatabaseResult
+{
+    private $data;
+    private $position = 0;
+    
+    public function __construct($data = [])
+    {
+        $this->data = is_array($data) ? $data : [];
+    }
+    
+    public function getResult($row, $field)
+    {
+        return isset($this->data[$row][$field]) ? $this->data[$row][$field] : null;
+    }
+    
+    public function fetchRow()
+    {
+        if ($this->position < count($this->data)) {
+            return array_values($this->data[$this->position++]);
+        }
+        return false;
+    }
+    
+    public function fetchAssoc()
+    {
+        if ($this->position < count($this->data)) {
+            return $this->data[$this->position++];
+        }
+        return false;
+    }
+    
+    public function numRows()
+    {
+        return count($this->data);
+    }
+}
+
+// Mock external dependencies that Trading classes might need
+if (!class_exists('League')) {
+    class League
+    {
+        const HARD_CAP_MAX = 75000;
+    }
+}
+
+if (!class_exists('JSB')) {
+    class JSB
+    {
+        const WAIVERS_ORDINAL = 50000;
+    }
+}
+
+if (!class_exists('Discord')) {
+    class Discord
+    {
+        public static function getDiscordIDFromTeamname($db, $teamname)
+        {
+            return '123456789';
+        }
+        
+        public static function postToChannel($channel, $message)
+        {
+            return true;
+        }
+    }
+}
+
+if (!class_exists('Shared')) {
+    class Shared
+    {
+        protected $db;
+        
+        public function __construct($db)
+        {
+            $this->db = $db;
+        }
+        
+        public function getTidFromTeamname($teamname)
+        {
+            return 1; // Mock team ID
+        }
+    }
+}
+
+if (!class_exists('Season')) {
+    class Season
+    {
+        public $phase = 'Regular Season';
+        public $endingYear = 2024;
+        public $beginningYear = 2023;
+        public $regularSeasonStartDate;
+        public $postAllStarStartDate;
+        public $playoffsStartDate;
+        public $playoffsEndDate;
+        public $lastSimNumber = 1;
+        public $lastSimStartDate = '2024-01-01';
+        public $lastSimEndDate = '2024-01-02';
+        public $projectedNextSimEndDate = '2024-01-03';
+        public $allowTrades = 'Yes';
+        public $allowWaivers = 'Yes';
+        public $freeAgencyNotificationsState = 'Off';
+        
+        const IBL_PRESEASON_MONTH = 9;
+        const IBL_HEAT_MONTH = 10;
+        const IBL_REGULAR_SEASON_STARTING_MONTH = 11;
+        const IBL_ALL_STAR_MONTH = 2;
+        const IBL_REGULAR_SEASON_ENDING_MONTH = 5;
+        const IBL_PLAYOFF_MONTH = 6;
+        
+        protected $db;
+        
+        public function __construct($db)
+        {
+            $this->db = $db;
+            // Initialize properties without database calls for testing
+            $this->phase = 'Regular Season';
+            $this->endingYear = 2024;
+            $this->beginningYear = 2023;
+            $this->regularSeasonStartDate = date_create("2023-11-01");
+            $this->postAllStarStartDate = date_create("2024-02-04");
+            $this->playoffsStartDate = date_create("2024-06-01");
+            $this->playoffsEndDate = date_create("2024-06-30");
+        }
+        
+        // Mock the methods that would normally query the database
+        private function getSeasonPhase()
+        {
+            return $this->phase;
+        }
+        
+        private function getSeasonEndingYear()
+        {
+            return $this->endingYear;
+        }
+        
+        private function getLastSimDatesArray()
+        {
+            return [
+                'Sim' => $this->lastSimNumber,
+                'Start Date' => $this->lastSimStartDate,
+                'End Date' => $this->lastSimEndDate
+            ];
+        }
+        
+        private function getProjectedNextSimEndDate($db, $lastSimEndDate)
+        {
+            return $this->projectedNextSimEndDate;
+        }
+    }
+}

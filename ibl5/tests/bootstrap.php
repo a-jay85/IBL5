@@ -32,16 +32,27 @@ spl_autoload_register(function ($class) {
 class MockDatabase
 {
     private $mockData = [];
+    private $mockTradeInfo = [];
+    private $numRows = null;
     private $returnTrue = false;
+    private $executedQueries = [];
     
     public function sql_query($query)
     {
+        // Track all executed queries for verification
+        $this->executedQueries[] = $query;
+        
         // For queries that expect boolean return (INSERT, UPDATE, DELETE)
         if ($this->returnTrue || 
             stripos($query, 'INSERT') === 0 || 
             stripos($query, 'UPDATE') === 0 || 
             stripos($query, 'DELETE') === 0) {
             return true;
+        }
+        
+        // Special handling for trade info queries
+        if (stripos($query, 'ibl_trade_info') !== false && !empty($this->mockTradeInfo)) {
+            return new MockDatabaseResult($this->mockTradeInfo);
         }
         
         // Return a mock result for SELECT queries
@@ -74,6 +85,11 @@ class MockDatabase
     
     public function sql_numrows($result)
     {
+        // Allow manual override for testing
+        if ($this->numRows !== null) {
+            return $this->numRows;
+        }
+        
         if ($result instanceof MockDatabaseResult) {
             return $result->numRows();
         }
@@ -85,9 +101,31 @@ class MockDatabase
         $this->mockData = $data;
     }
     
+    public function setMockTradeInfo($data)
+    {
+        $this->mockTradeInfo = $data;
+        // Also set numRows to match trade info count
+        $this->numRows = count($data);
+    }
+    
+    public function setNumRows($numRows)
+    {
+        $this->numRows = $numRows;
+    }
+    
     public function setReturnTrue($returnTrue = true)
     {
         $this->returnTrue = $returnTrue;
+    }
+    
+    public function getExecutedQueries()
+    {
+        return $this->executedQueries;
+    }
+    
+    public function clearQueries()
+    {
+        $this->executedQueries = [];
     }
 }
 
@@ -103,13 +141,25 @@ class MockDatabaseResult
     
     public function getResult($row, $field)
     {
+        // Handle numeric field access
+        if (is_numeric($field)) {
+            $values = array_values($this->data[$row] ?? []);
+            return $values[$field] ?? null;
+        }
+        // Handle associative field access
         return isset($this->data[$row][$field]) ? $this->data[$row][$field] : null;
     }
     
     public function fetchRow()
     {
         if ($this->position < count($this->data)) {
-            return array_values($this->data[$this->position++]);
+            $row = $this->data[$this->position++];
+            // Return both numeric and associative keys for compatibility
+            if (is_array($row) && !isset($row[0])) {
+                // Only has associative keys, add numeric ones
+                $row = array_merge(array_values($row), $row);
+            }
+            return $row;
         }
         return false;
     }

@@ -793,6 +793,14 @@ class UI
             $startDate = $season->lastSimStartDate;
             $endDate = $season->lastSimEndDate;
         }
+        
+        // convert to Y-m-d format if DateTime object
+        if ($startDate instanceof DateTime) {
+            $startDate = $startDate->format('Y-m-d');
+        }
+        if ($endDate instanceof DateTime) {
+            $endDate = $endDate->format('Y-m-d');
+        }
 
         $table_periodAverages = "<table align=\"center\" class=\"sortable\">
             <thead>

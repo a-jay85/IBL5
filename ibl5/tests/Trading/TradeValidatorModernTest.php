@@ -145,7 +145,7 @@ class TradeValidatorModernTest extends TestCase
      * @dataProvider nonTradeablePlayerProvider
      */
     #[\PHPUnit\Framework\Attributes\DataProvider('nonTradeablePlayerProvider')]
-    public function testPreventsTradeingIneligiblePlayers($mockData, $expectedResult, $reason)
+    public function testPreventsTradingIneligiblePlayers($mockData, $expectedResult, $reason)
     {
         // Arrange
         $playerId = 12345;

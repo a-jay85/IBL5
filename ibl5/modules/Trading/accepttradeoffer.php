@@ -1,8 +1,6 @@
 <?php
 
 require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
-$sharedFunctions = new Shared($db);
-$season = new Season($db);
 
 $offer_id = $_POST['offer'];
 

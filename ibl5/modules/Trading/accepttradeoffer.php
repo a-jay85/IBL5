@@ -10,7 +10,7 @@ if ($offer_id != NULL) {
     
     if ($result['success']) {
         // Trade processed successfully
-        echo "Trade processed successfully!";
+        echo "Trade accepted!<p>";
     } else {
         echo "Error processing trade: " . ($result['error'] ?? 'Unknown error');
         exit;
@@ -25,8 +25,6 @@ if ($offer_id != NULL) {
 <HTML><HEAD><TITLE>Trade Offer Processing</TITLE>
 <meta http-equiv="refresh" content="3;url=/ibl5/modules.php?name=Trading&op=reviewtrade">
 </HEAD><BODY>
-Trade Offer accepted!
-<p>
 <a href="/ibl5/modules.php?name=Trading&op=reviewtrade">Click here to go back to the Trade Review page,</a><br>
 or wait 3 seconds to be redirected automatically!
 </BODY></HTML>

@@ -349,7 +349,6 @@ Go here to accept or decline: http://www.iblhoops.net/ibl5/modules.php?name=Trad
             'receivingUserDiscordID' => $receivingUserDiscordID,
         ];
 
-        // Note: Discord sending is commented out in original code
         // $response = Discord::sendCurlPOST('http://localhost:50000/discordDM', $arrayContent);
     }
 }

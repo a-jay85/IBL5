@@ -38,6 +38,13 @@ for ($j = 0; $j < $tradeData['fieldsCounter']; $j++) {
 $tradeOffer = new Trading_TradeOffer($db);
 $result = $tradeOffer->createTradeOffer($tradeData);
 
+// Display trade cap details
+if (isset($result['capData'])) {
+    echo "Your Payroll this season, if this trade is accepted: {$result['capData']['userPostTradeCapTotal']}<br>";
+    echo "Their Payroll this season, if this trade is accepted: {$result['capData']['partnerPostTradeCapTotal']}<p>";
+}
+
+// Display any errors and exit if trade creation failed
 if (!$result['success']) {
     if (isset($result['error'])) {
         echo $result['error'];
@@ -46,16 +53,13 @@ if (!$result['success']) {
             echo $error . "<br>";
         }
     }
+    echo "<a href='javascript:history.back()'>Please go back and adjust your trade proposal.</a>";
     exit;
-}
-// Display success message and trade details
-if (isset($result['capData'])) {
-    echo "Your Payroll this season, if this trade is accepted: {$result['capData']['userPostTradeCapTotal']}<br>";
-    echo "Their Payroll this season, if this trade is accepted: {$result['capData']['partnerPostTradeCapTotal']}<p>";
 }
 
 echo $result['tradeText'] ?? '';
 
 echo "<p>";
-echo "Trade Offer Entered Into Database. Go back <a href='/ibl5/modules.php?name=Trading&op=reviewtrade'>Trade Review Page</a>";
+echo "Trade Offer Sent!<br>
+    <a href='/ibl5/modules.php?name=Trading&op=reviewtrade'>Back to Trade Review</a>";
 ?>

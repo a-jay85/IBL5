@@ -51,7 +51,7 @@ if (!$result['success']) {
             echo $error . "<br>";
         }
     }
-    echo "<a href='javascript:history.back()'>Please go back and adjust your trade proposal.</a>";
+    echo "<p><a href='javascript:history.back()'>Please go back and adjust your trade proposal.</a>";
     exit;
 }
 

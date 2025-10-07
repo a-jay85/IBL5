@@ -44,7 +44,7 @@ The new testing approach follows modern best practices:
 
 #### Example Structure:
 ```php
-class TradeValidatorModernTest extends TestCase
+class TradeValidatorTest extends TestCase
 {
     private $validator;
     private $mockDb;
@@ -98,7 +98,7 @@ class TradeValidatorModernTest extends TestCase
 
 ## Test Classes
 
-### TradeValidatorModernTest.php
+### TradeValidatorTest.php
 Tests for the `Trading_TradeValidator` class:
 - Cash amount validation
 - Salary cap validation 

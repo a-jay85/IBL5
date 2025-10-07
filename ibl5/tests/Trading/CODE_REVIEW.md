@@ -74,7 +74,7 @@ if ($season->phase == "Playoffs" OR $season->phase == "Draft" OR $season->phase 
 
 **Unit Tests (24 tests)**:
 - `CashTransactionHandlerModernTest`: 13 tests for PID generation, contract years, cash operations
-- `TradeValidatorModernTest`: 11 tests for validation logic, player tradability, cash considerations
+- `TradeValidatorTest`: 11 tests for validation logic, player tradability, cash considerations
 
 **Integration Tests (8 tests)**:
 - `SeasonPhaseTest`: 8 tests verifying season-specific behavior across all phases

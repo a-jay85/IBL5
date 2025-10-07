@@ -12,7 +12,7 @@ use PHPUnit\Framework\TestCase;
  * - Descriptive test names and clear assertions
  * - Edge case testing and error handling
  */
-class TradeValidatorModernTest extends TestCase
+class TradeValidatorTest extends TestCase
 {
     private $validator;
     private $mockDb;

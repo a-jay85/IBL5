@@ -266,35 +266,4 @@ class Trading_UIHelper
         }
         return $html;
     }
-
-    /**
-     * Render future salary cap display
-     * @param array $userSalaryArray User team salary data
-     * @param array $partnerSalaryArray Partner team salary data
-     * @param string $userTeamName User team name
-     * @param string $partnerTeamName Partner team name
-     * @param int $currentSeasonEndingYear Current season ending year
-     * @param int $seasonsToDisplay Number of seasons to display
-     * @return string HTML for salary cap display
-     */
-    public function renderFutureSalaryCaps($userSalaryArray, $partnerSalaryArray, $userTeamName, $partnerTeamName, $currentSeasonEndingYear, $seasonsToDisplay)
-    {
-        $html = '';
-        for ($z = 0; $z < $seasonsToDisplay; $z++) {
-            $seasonStart = $currentSeasonEndingYear + $z - 1;
-            $seasonEnd = $currentSeasonEndingYear + $z;
-            $userTotal = $userSalaryArray['player'][$z] ?? 0;
-            $partnerTotal = $partnerSalaryArray['player'][$z] ?? 0;
-
-            $html .= "<tr>
-                <td>
-                    <b>$userTeamName Cap Total in $seasonStart-$seasonEnd:</b> $userTotal
-                </td>
-                <td align=right>
-                    <b>$partnerTeamName Cap Total in $seasonStart-$seasonEnd:</b> $partnerTotal
-                </td>
-            </tr>";
-        }
-        return $html;
-    }
 }

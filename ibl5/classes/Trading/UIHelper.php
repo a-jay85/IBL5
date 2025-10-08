@@ -189,45 +189,6 @@ class Trading_UIHelper
     }
 
     /**
-     * Render cash input fields for a trade form
-     * @param string $teamName Team name
-     * @param string $fieldPrefix Field name prefix (userSendsCash or partnerSendsCash)
-     * @param int $currentSeasonEndingYear Current season ending year
-     * @param string $align Text alignment for the cell
-     * @return string HTML for cash input fields
-     */
-    public function renderCashInputs($teamName, $fieldPrefix, $currentSeasonEndingYear, $align = '')
-    {
-        $html = '';
-        $i = 1;
-
-        // Adjust starting year if in certain phases
-        if (
-            $this->season->phase == "Playoffs"
-            || $this->season->phase == "Draft"
-            || $this->season->phase == "Free Agency"
-        ) {
-            $i++;
-        }
-
-        while ($i <= 6) {
-            $seasonStartYear = $currentSeasonEndingYear - 2 + $i;
-            $seasonEndYear = $currentSeasonEndingYear - 1 + $i;
-            
-            $html .= "<tr>
-                <td" . ($align ? " align=\"$align\"" : "") . ">
-                    <b>$teamName send
-                    <input type=\"number\" name=\"{$fieldPrefix}$i\" value=\"0\" min=\"0\" max=\"2000\">
-                    for $seasonStartYear-$seasonEndYear</b>
-                </td>
-            </tr>";
-            $i++;
-        }
-
-        return $html;
-    }
-
-    /**
      * Get list of all teams for partner selection dropdown
      * @return array Array of team data
      */

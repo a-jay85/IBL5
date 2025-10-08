@@ -2,11 +2,11 @@
 
 require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
-$offer_id = $_POST['offer'];
+$offerId = $_POST['offer'];
 
-if ($offer_id != NULL) {
+if ($offerId != NULL) {
     $tradeProcessor = new Trading_TradeProcessor($db);
-    $result = $tradeProcessor->processTrade($offer_id);
+    $result = $tradeProcessor->processTrade($offerId);
     
     if ($result['success']) {
         // Trade processed successfully

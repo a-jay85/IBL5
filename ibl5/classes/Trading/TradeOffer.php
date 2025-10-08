@@ -90,24 +90,24 @@ class Trading_TradeOffer
         // Calculate user team salary data
         $switchCounter = $tradeData['switchCounter'];
         for ($j = 0; $j < $switchCounter; $j++) {
-            $check = $tradeData['check'][$j] ?? null;
-            $salary = (int)($tradeData['contract'][$j] ?? 0);
-            $userCurrentSeasonCapTotal += $salary;
+            $isChecked = $tradeData['check'][$j] ?? null;
+            $salaryAmount = (int)($tradeData['contract'][$j] ?? 0);
+            $userCurrentSeasonCapTotal += $salaryAmount;
             
-            if ($check == "on") {
-                $userCapSentToPartner += $salary;
+            if ($isChecked == "on") {
+                $userCapSentToPartner += $salaryAmount;
             }
         }
 
         // Calculate partner team salary data
         $fieldsCounter = $tradeData['fieldsCounter'];
         for ($j = $switchCounter; $j < $fieldsCounter; $j++) {
-            $check = $tradeData['check'][$j] ?? null;
-            $salary = (int)($tradeData['contract'][$j] ?? 0);
-            $partnerCurrentSeasonCapTotal += $salary;
+            $isChecked = $tradeData['check'][$j] ?? null;
+            $salaryAmount = (int)($tradeData['contract'][$j] ?? 0);
+            $partnerCurrentSeasonCapTotal += $salaryAmount;
             
-            if ($check == "on") {
-                $partnerCapSentToUser += $salary;
+            if ($isChecked == "on") {
+                $partnerCapSentToUser += $salaryAmount;
             }
         }
 
@@ -208,12 +208,12 @@ class Trading_TradeOffer
      * @param int $tradeOfferId Trade offer ID
      * @param int $itemId Item ID
      * @param int $itemType Item type (0=pick, 1=player)
-     * @param string $from From team
-     * @param string $to To team
-     * @param string $approval Team that needs to approve
+     * @param string $fromTeam From team
+     * @param string $toTeam To team
+     * @param string $approvalTeam Team that needs to approve
      * @return array Result
      */
-    protected function insertTradeItem($tradeOfferId, $itemId, $itemType, $from, $to, $approval)
+    protected function insertTradeItem($tradeOfferId, $itemId, $itemType, $fromTeam, $toTeam, $approvalTeam)
     {
         $query = "INSERT INTO ibl_trade_info 
           ( `tradeofferid`, 
@@ -225,17 +225,17 @@ class Trading_TradeOffer
         VALUES        ( '$tradeOfferId', 
             '$itemId', 
             '$itemType', 
-            '$from', 
-            '$to', 
-            '$approval' )";
+            '$fromTeam', 
+            '$toTeam', 
+            '$approvalTeam' )";
         
         $this->db->sql_query($query);
 
         $tradeText = "";
         if ($itemType == 0) {
-            $tradeText = $this->getPickTradeText($itemId, $from, $to);
+            $tradeText = $this->getPickTradeText($itemId, $fromTeam, $toTeam);
         } else {
-            $tradeText = $this->getPlayerTradeText($itemId, $from, $to);
+            $tradeText = $this->getPlayerTradeText($itemId, $fromTeam, $toTeam);
         }
 
         return ['tradeText' => $tradeText];
@@ -244,24 +244,24 @@ class Trading_TradeOffer
     /**
      * Get trade text for a draft pick
      * @param int $pickId Pick ID
-     * @param string $from From team
-     * @param string $to To team
+     * @param string $fromTeam From team
+     * @param string $toTeam To team
      * @return string Trade text
      */
-    protected function getPickTradeText($pickId, $from, $to)
+    protected function getPickTradeText($pickId, $fromTeam, $toTeam)
     {
         $sqlgetpick = "SELECT * FROM ibl_draft_picks WHERE pickid = '$pickId'";
         $resultgetpick = $this->db->sql_query($sqlgetpick);
         $rowsgetpick = $this->db->sql_fetchrow($resultgetpick);
 
-        $pickteam = $rowsgetpick['teampick'];
-        $pickyear = $rowsgetpick['year'];
-        $pickround = $rowsgetpick['round'];
-        $picknotes = $rowsgetpick['notes'];
+        $pickTeam = $rowsgetpick['teampick'];
+        $pickYear = $rowsgetpick['year'];
+        $pickRound = $rowsgetpick['round'];
+        $pickNotes = $rowsgetpick['notes'];
 
-        $tradeText = "The $from send the $pickteam $pickyear Round $pickround draft pick to the $to.<br>";
-        if ($picknotes != NULL) {
-            $tradeText .= "<i>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;" . $picknotes . "</i><br>";
+        $tradeText = "The $fromTeam send the $pickTeam $pickYear Round $pickRound draft pick to the $toTeam.<br>";
+        if ($pickNotes != NULL) {
+            $tradeText .= "<i>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;" . $pickNotes . "</i><br>";
         }
 
         return $tradeText;
@@ -270,20 +270,20 @@ class Trading_TradeOffer
     /**
      * Get trade text for a player
      * @param int $playerId Player ID
-     * @param string $from From team
-     * @param string $to To team
+     * @param string $fromTeam From team
+     * @param string $toTeam To team
      * @return string Trade text
      */
-    protected function getPlayerTradeText($playerId, $from, $to)
+    protected function getPlayerTradeText($playerId, $fromTeam, $toTeam)
     {
         $sqlgetplyr = "SELECT * FROM ibl_plr WHERE pid = '$playerId'";
         $resultgetplyr = $this->db->sql_query($sqlgetplyr);
         $rowsgetplyr = $this->db->sql_fetchrow($resultgetplyr);
 
-        $plyrname = $rowsgetplyr['name'];
-        $plyrpos = $rowsgetplyr['pos'];
+        $playerName = $rowsgetplyr['name'];
+        $playerPosition = $rowsgetplyr['pos'];
 
-        return "The $from send $plyrpos $plyrname to the $to.<br>";
+        return "The $fromTeam send $playerPosition $playerName to the $toTeam.<br>";
     }
 
     /**
@@ -300,8 +300,8 @@ class Trading_TradeOffer
         $this->cashHandler->insertCashTradeData($tradeOfferId, $sendingTeam, $receivingTeam, $cashAmounts);
 
         // Insert trade info record for cash
-        $teamIDSending = $this->sharedFunctions->getTidFromTeamname($sendingTeam);
-        $teamIDReceiving = $this->sharedFunctions->getTidFromTeamname($receivingTeam);
+        $sendingTeamId = $this->sharedFunctions->getTidFromTeamname($sendingTeam);
+        $receivingTeamId = $this->sharedFunctions->getTidFromTeamname($receivingTeam);
         
         $query = "INSERT INTO ibl_trade_info
           ( `tradeofferid`,

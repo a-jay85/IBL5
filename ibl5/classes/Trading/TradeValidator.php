@@ -15,7 +15,8 @@ class Trading_TradeValidator
 
     /**
      * Validate minimum cash amounts in a trade
-     * @param array $cashArray Array of cash amounts by year
+     * @param array $userSendsCash Array of cash amounts sent by user team
+     * @param array $partnerSendsCash Array of cash amounts sent by partner team
      * @return array with 'valid' boolean and 'error' message
      */
     public function validateMinimumCashAmounts($userSendsCash, $partnerSendsCash)
@@ -97,9 +98,9 @@ class Trading_TradeValidator
 
     /**
      * Get cash considerations for current season based on phase
-     * @param array $userSendsCash
-     * @param array $partnerSendsCash
-     * @return array
+     * @param array $userSendsCash Cash sent by user team
+     * @param array $partnerSendsCash Cash sent by partner team
+     * @return array Cash considerations for current season
      */
     public function getCurrentSeasonCashConsiderations($userSendsCash, $partnerSendsCash)
     {
@@ -109,16 +110,16 @@ class Trading_TradeValidator
             || $this->season->phase == "Draft"
             || $this->season->phase == "Free Agency"
         ) {
-            $cashConsiderationSentToThemThisSeason = $userSendsCash[2] ?? 0;
-            $cashConsiderationSentToMeThisSeason = $partnerSendsCash[2] ?? 0;
+            $cashSentToThemThisSeason = $userSendsCash[2] ?? 0;
+            $cashSentToMeThisSeason = $partnerSendsCash[2] ?? 0;
         } else {
-            $cashConsiderationSentToThemThisSeason = $userSendsCash[1] ?? 0;
-            $cashConsiderationSentToMeThisSeason = $partnerSendsCash[1] ?? 0;
+            $cashSentToThemThisSeason = $userSendsCash[1] ?? 0;
+            $cashSentToMeThisSeason = $partnerSendsCash[1] ?? 0;
         }
 
         return [
-            'cashSentToThem' => $cashConsiderationSentToThemThisSeason,
-            'cashSentToMe' => $cashConsiderationSentToMeThisSeason
+            'cashSentToThem' => $cashSentToThemThisSeason,
+            'cashSentToMe' => $cashSentToMeThisSeason
         ];
     }
 }

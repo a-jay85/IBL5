@@ -21,18 +21,18 @@ class Trading_UIHelper
      */
     public function buildTeamFutureSalary($resultTeamPlayers, $k)
     {
-        $future_salary_array = [
+        $futureSalaryArray = [
             'player' => [],
             'hold' => [],
             'picks' => []
         ];
         
         while ($rowTeamPlayers = $this->db->sql_fetch_assoc($resultTeamPlayers)) {
-            $player_pos = $rowTeamPlayers["pos"];
-            $player_name = $rowTeamPlayers["name"];
-            $player_pid = $rowTeamPlayers["pid"];
-            $player_ordinal = $rowTeamPlayers["ordinal"];
-            $contract_year = $rowTeamPlayers["cy"];
+            $playerPosition = $rowTeamPlayers["pos"];
+            $playerName = $rowTeamPlayers["name"];
+            $playerPid = $rowTeamPlayers["pid"];
+            $playerOrdinal = $rowTeamPlayers["ordinal"];
+            $contractYear = $rowTeamPlayers["cy"];
 
             // Adjust contract year based on season phase
             if (
@@ -40,79 +40,79 @@ class Trading_UIHelper
                 || $this->season->phase == "Draft"
                 || $this->season->phase == "Free Agency"
             ) {
-                $contract_year++;
+                $contractYear++;
             }
-            if ($contract_year == 0) {
-                $contract_year = 1;
+            if ($contractYear == 0) {
+                $contractYear = 1;
             }
 
-            $player_contract = $rowTeamPlayers["cy$contract_year"];
-            if ($contract_year == 7) {
-                $player_contract = 0;
+            $playerContractAmount = $rowTeamPlayers["cy$contractYear"];
+            if ($contractYear == 7) {
+                $playerContractAmount = 0;
             }
 
             // Calculate future salary commitments
             $i = 0;
-            while ($contract_year < 7) {
-                $future_salary_array['player'][$i] += $rowTeamPlayers["cy$contract_year"];
-                if ($rowTeamPlayers["cy$contract_year"] > 0) {
-                    $future_salary_array['hold'][$i]++;
+            while ($contractYear < 7) {
+                $futureSalaryArray['player'][$i] += $rowTeamPlayers["cy$contractYear"];
+                if ($rowTeamPlayers["cy$contractYear"] > 0) {
+                    $futureSalaryArray['hold'][$i]++;
                 }
-                $contract_year++;
+                $contractYear++;
                 $i++;
             }
 
-            echo $this->renderPlayerRow($k, $player_pid, $player_contract, $player_pos, $player_name, $player_ordinal);
+            echo $this->renderPlayerRow($k, $playerPid, $playerContractAmount, $playerPosition, $playerName, $playerOrdinal);
             $k++;
         }
 
-        $future_salary_array['k'] = $k;
-        return $future_salary_array;
+        $futureSalaryArray['k'] = $k;
+        return $futureSalaryArray;
     }
 
     /**
      * Build team future draft picks data and HTML for trade form
      * @param resource $resultTeamPicks Database result for team draft picks
-     * @param array $future_salary_array Existing future salary array
+     * @param array $futureSalaryArray Existing future salary array
      * @return array Updated future salary array
      */
-    public function buildTeamFuturePicks($resultTeamPicks, $future_salary_array)
+    public function buildTeamFuturePicks($resultTeamPicks, $futureSalaryArray)
     {
-        $k = $future_salary_array['k'];
+        $k = $futureSalaryArray['k'];
 
         while ($rowTeamDraftPicks = $this->db->sql_fetch_assoc($resultTeamPicks)) {
-            $pick_year = $rowTeamDraftPicks["year"];
-            $pick_team = $rowTeamDraftPicks["teampick"];
-            $pick_round = $rowTeamDraftPicks["round"];
-            $pick_notes = $rowTeamDraftPicks["notes"];
-            $pick_id = $rowTeamDraftPicks["pickid"];
+            $pickYear = $rowTeamDraftPicks["year"];
+            $pickTeam = $rowTeamDraftPicks["teampick"];
+            $pickRound = $rowTeamDraftPicks["round"];
+            $pickNotes = $rowTeamDraftPicks["notes"];
+            $pickId = $rowTeamDraftPicks["pickid"];
 
-            echo $this->renderDraftPickRow($k, $pick_id, $pick_year, $pick_team, $pick_round, $pick_notes);
+            echo $this->renderDraftPickRow($k, $pickId, $pickYear, $pickTeam, $pickRound, $pickNotes);
             $k++;
         }
 
-        $future_salary_array['k'] = $k;
-        return $future_salary_array;
+        $futureSalaryArray['k'] = $k;
+        return $futureSalaryArray;
     }
 
     /**
      * Render a player row in the trade form
      * @param int $k Row number
-     * @param int $player_pid Player ID
-     * @param int $player_contract Player contract amount
-     * @param string $player_pos Player position
-     * @param string $player_name Player name
-     * @param int $player_ordinal Player ordinal (waiver status)
+     * @param int $playerPid Player ID
+     * @param int $playerContractAmount Player contract amount
+     * @param string $playerPosition Player position
+     * @param string $playerName Player name
+     * @param int $playerOrdinal Player ordinal (waiver status)
      * @return string HTML for player row
      */
-    protected function renderPlayerRow($k, $player_pid, $player_contract, $player_pos, $player_name, $player_ordinal)
+    protected function renderPlayerRow($k, $playerPid, $playerContractAmount, $playerPosition, $playerName, $playerOrdinal)
     {
         $html = "<tr>
-            <input type=\"hidden\" name=\"index$k\" value=\"$player_pid\">
-            <input type=\"hidden\" name=\"contract$k\" value=\"$player_contract\">
+            <input type=\"hidden\" name=\"index$k\" value=\"$playerPid\">
+            <input type=\"hidden\" name=\"contract$k\" value=\"$playerContractAmount\">
             <input type=\"hidden\" name=\"type$k\" value=\"1\">";
 
-        if ($player_contract != 0 && $player_ordinal <= JSB::WAIVERS_ORDINAL) {
+        if ($playerContractAmount != 0 && $playerOrdinal <= JSB::WAIVERS_ORDINAL) {
             // Player can be traded
             $html .= "<td align=\"center\"><input type=\"checkbox\" name=\"check$k\"></td>";
         } else {
@@ -121,9 +121,9 @@ class Trading_UIHelper
         }
 
         $html .= "
-            <td>$player_pos</td>
-            <td>$player_name</td>
-            <td align=\"right\">$player_contract</td>
+            <td>$playerPosition</td>
+            <td>$playerName</td>
+            <td align=\"right\">$playerContractAmount</td>
         </tr>";
 
         return $html;
@@ -132,29 +132,29 @@ class Trading_UIHelper
     /**
      * Render a draft pick row in the trade form
      * @param int $k Row number
-     * @param int $pick_id Pick ID
-     * @param int $pick_year Pick year
-     * @param string $pick_team Original team
-     * @param int $pick_round Pick round
-     * @param string $pick_notes Pick notes
+     * @param int $pickId Pick ID
+     * @param int $pickYear Pick year
+     * @param string $pickTeam Original team
+     * @param int $pickRound Pick round
+     * @param string $pickNotes Pick notes
      * @return string HTML for draft pick row
      */
-    protected function renderDraftPickRow($k, $pick_id, $pick_year, $pick_team, $pick_round, $pick_notes)
+    protected function renderDraftPickRow($k, $pickId, $pickYear, $pickTeam, $pickRound, $pickNotes)
     {
         $html = "<tr>
             <td align=\"center\">
-                <input type=\"hidden\" name=\"index$k\" value=\"$pick_id\">
+                <input type=\"hidden\" name=\"index$k\" value=\"$pickId\">
                 <input type=\"hidden\" name=\"type$k\" value=\"0\">
                 <input type=\"checkbox\" name=\"check$k\">
             </td>
             <td colspan=3>
-                $pick_year $pick_team Round $pick_round
+                $pickYear $pickTeam Round $pickRound
             </td>
         </tr>";
 
-        if ($pick_notes != NULL) {
+        if ($pickNotes != NULL) {
             $html .= "<tr>
-                <td colspan=3 width=150>$pick_notes</td>
+                <td colspan=3 width=150>$pickNotes</td>
             </tr>";
         }
 
@@ -172,14 +172,14 @@ class Trading_UIHelper
         $resultListOfAllTeams = $this->db->sql_query($queryListOfAllTeams);
 
         while ($rowInListOfAllTeams = $this->db->sql_fetchrow($resultListOfAllTeams)) {
-            $team_name = $rowInListOfAllTeams['team_name'];
-            $team_city = $rowInListOfAllTeams['team_city'];
+            $teamName = $rowInListOfAllTeams['team_name'];
+            $teamCity = $rowInListOfAllTeams['team_city'];
 
-            if ($team_name != 'Free Agents') {
+            if ($teamName != 'Free Agents') {
                 $teams[] = [
-                    'name' => $team_name,
-                    'city' => $team_city,
-                    'full_name' => "$team_city $team_name"
+                    'name' => $teamName,
+                    'city' => $teamCity,
+                    'fullName' => "$teamCity $teamName"
                 ];
             }
         }
@@ -196,7 +196,7 @@ class Trading_UIHelper
     {
         $html = '';
         foreach ($teams as $team) {
-            $html .= "<a href=\"modules.php?name=Trading&op=offertrade&partner={$team['name']}\">{$team['full_name']}</a><br>";
+            $html .= "<a href=\"modules.php?name=Trading&op=offertrade&partner={$team['name']}\">{$team['fullName']}</a><br>";
         }
         return $html;
     }

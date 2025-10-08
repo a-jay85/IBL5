@@ -54,16 +54,16 @@ class Trading_CashTransactionHandler
 
     /**
      * Create cash transaction entries in the database
-     * @param int $itemid Unique item ID for the transaction
-     * @param string $from Sending team name
-     * @param string $to Receiving team name
+     * @param int $itemId Unique item ID for the transaction
+     * @param string $fromTeam Sending team name
+     * @param string $toTeam Receiving team name
      * @param array $cashYear Cash amounts by year
      * @return array Result with success status and trade line text
      */
-    public function createCashTransaction($itemid, $from, $to, $cashYear)
+    public function createCashTransaction($itemId, $fromTeam, $toTeam, $cashYear)
     {
-        $teamIDSendingTeam = $this->sharedFunctions->getTidFromTeamname($from);
-        $teamIDReceivingTeam = $this->sharedFunctions->getTidFromTeamname($to);
+        $sendingTeamId = $this->sharedFunctions->getTidFromTeamname($fromTeam);
+        $receivingTeamId = $this->sharedFunctions->getTidFromTeamname($toTeam);
         
         $contractCurrentYear = 1;
         $contractTotalYears = $this->calculateContractTotalYears($cashYear);
@@ -86,10 +86,10 @@ class Trading_CashTransactionHandler
             `cy6`) 
         VALUES
             ('100000',
-            '$itemid',
-            '| <B>Cash to $to</B>',
-            '$teamIDSendingTeam',
-            '$from',
+            '$itemId',
+            '| <B>Cash to $toTeam</B>',
+            '$sendingTeamId',
+            '$fromTeam',
             '$contractCurrentYear',
             '$contractCurrentYear',
             '$contractTotalYears',
@@ -102,7 +102,7 @@ class Trading_CashTransactionHandler
 
         $resultInsertPositiveCashRow = $this->db->sql_query($queryInsertPositiveCashRow);
 
-        $itemid++;
+        $itemId++;
 
         // Insert negative cash row (for receiving team)
         $queryInsertNegativeCashRow = "INSERT INTO `ibl_plr` 
@@ -122,10 +122,10 @@ class Trading_CashTransactionHandler
             `cy6`)
         VALUES
             ('100000',
-            '$itemid',
-            '| <B>Cash from $from</B>',
-            '$teamIDReceivingTeam',
-            '$to',
+            '$itemId',
+            '| <B>Cash from $fromTeam</B>',
+            '$receivingTeamId',
+            '$toTeam',
             '$contractCurrentYear',
             '$contractCurrentYear',
             '$contractTotalYears',
@@ -142,7 +142,7 @@ class Trading_CashTransactionHandler
         $tradeLine = "";
 
         if ($success) {
-            $tradeLine = "The $from send {$cashYear[1]} {$cashYear[2]} {$cashYear[3]} {$cashYear[4]} {$cashYear[5]} {$cashYear[6]} in cash to the $to.<br>";
+            $tradeLine = "The $fromTeam send {$cashYear[1]} {$cashYear[2]} {$cashYear[3]} {$cashYear[4]} {$cashYear[5]} {$cashYear[6]} in cash to the $toTeam.<br>";
         }
 
         return [

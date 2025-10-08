@@ -37,12 +37,12 @@ class Trading_TradeProcessor
         $i = 0;
 
         while ($i < $numTradeRows) {
-            $itemid = $this->db->sql_result($resultTradeRows, $i, "itemid");
-            $itemtype = $this->db->sql_result($resultTradeRows, $i, "itemtype");
-            $from = $this->db->sql_result($resultTradeRows, $i, "from");
-            $to = $this->db->sql_result($resultTradeRows, $i, "to");
+            $itemId = $this->db->sql_result($resultTradeRows, $i, "itemid");
+            $itemType = $this->db->sql_result($resultTradeRows, $i, "itemtype");
+            $fromTeam = $this->db->sql_result($resultTradeRows, $i, "from");
+            $toTeam = $this->db->sql_result($resultTradeRows, $i, "to");
 
-            $result = $this->processTradeItem($itemid, $itemtype, $from, $to, $offerId);
+            $result = $this->processTradeItem($itemId, $itemType, $fromTeam, $toTeam, $offerId);
             
             if ($result['success']) {
                 $storytext .= $result['tradeLine'];
@@ -53,10 +53,10 @@ class Trading_TradeProcessor
 
         // Create news story and notifications
         $timestamp = date('Y-m-d H:i:s', time());
-        $storytitle = "$from and $to make a trade.";
+        $storytitle = "$fromTeam and $toTeam make a trade.";
         
         $this->createNewsStory($storytitle, $storytext, $timestamp);
-        $this->sendNotifications($from, $to, $storytext);
+        $this->sendNotifications($fromTeam, $toTeam, $storytext);
         $this->cleanupTradeData($offerId);
 
         return [
@@ -68,21 +68,21 @@ class Trading_TradeProcessor
 
     /**
      * Process a single trade item (player, pick, or cash)
-     * @param mixed $itemid Item ID
-     * @param mixed $itemtype Item type (1=player, 0=pick, 'cash'=cash)
-     * @param string $from From team
-     * @param string $to To team
+     * @param mixed $itemId Item ID
+     * @param mixed $itemType Item type (1=player, 0=pick, 'cash'=cash)
+     * @param string $fromTeam From team
+     * @param string $toTeam To team
      * @param int $offerId Trade offer ID
      * @return array Result with success status and trade line
      */
-    protected function processTradeItem($itemid, $itemtype, $from, $to, $offerId)
+    protected function processTradeItem($itemId, $itemType, $fromTeam, $toTeam, $offerId)
     {
-        if ($itemtype == 'cash') {
-            return $this->processCashTransaction($itemid, $from, $to, $offerId);
-        } elseif ($itemtype == 0) {
-            return $this->processDraftPick($itemid, $from, $to);
-        } elseif ($itemtype == 1) {
-            return $this->processPlayer($itemid, $from, $to);
+        if ($itemType == 'cash') {
+            return $this->processCashTransaction($itemId, $fromTeam, $toTeam, $offerId);
+        } elseif ($itemType == 0) {
+            return $this->processDraftPick($itemId, $fromTeam, $toTeam);
+        } elseif ($itemType == 1) {
+            return $this->processPlayer($itemId, $fromTeam, $toTeam);
         }
 
         return ['success' => false, 'tradeLine' => ''];
@@ -90,17 +90,17 @@ class Trading_TradeProcessor
 
     /**
      * Process cash transaction
-     * @param int $itemid Item ID
-     * @param string $from From team
-     * @param string $to To team
+     * @param int $itemId Item ID
+     * @param string $fromTeam From team
+     * @param string $toTeam To team
      * @param int $offerId Trade offer ID
      * @return array Result
      */
-    protected function processCashTransaction($itemid, $from, $to, $offerId)
+    protected function processCashTransaction($itemId, $fromTeam, $toTeam, $offerId)
     {
-        $itemid = $this->cashHandler->generateUniquePid($itemid);
+        $itemId = $this->cashHandler->generateUniquePid($itemId);
         
-        $queryCashDetails = "SELECT * FROM ibl_trade_cash WHERE tradeOfferID = $offerId AND sendingTeam = '$from'";
+        $queryCashDetails = "SELECT * FROM ibl_trade_cash WHERE tradeOfferID = $offerId AND sendingTeam = '$fromTeam'";
         $cashDetails = $this->db->sql_fetchrow($this->db->sql_query($queryCashDetails));
 
         $cashYear = [
@@ -112,27 +112,27 @@ class Trading_TradeProcessor
             6 => $cashDetails['cy6']
         ];
 
-        return $this->cashHandler->createCashTransaction($itemid, $from, $to, $cashYear);
+        return $this->cashHandler->createCashTransaction($itemId, $fromTeam, $toTeam, $cashYear);
     }
 
     /**
      * Process draft pick transfer
-     * @param int $itemid Pick ID
-     * @param string $from From team
-     * @param string $to To team
+     * @param int $itemId Pick ID
+     * @param string $fromTeam From team
+     * @param string $toTeam To team
      * @return array Result
      */
-    protected function processDraftPick($itemid, $from, $to)
+    protected function processDraftPick($itemId, $fromTeam, $toTeam)
     {
-        $queryj = "SELECT * FROM ibl_draft_picks WHERE `pickid` = '$itemid'";
+        $queryj = "SELECT * FROM ibl_draft_picks WHERE `pickid` = '$itemId'";
         $resultj = $this->db->sql_query($queryj);
         
-        $tradeLine = "The $from send the " . 
+        $tradeLine = "The $fromTeam send the " . 
                     $this->db->sql_result($resultj, 0, "year") . " " . 
                     $this->db->sql_result($resultj, 0, "teampick") . " Round " . 
-                    $this->db->sql_result($resultj, 0, "round") . " draft pick to the $to.<br>";
+                    $this->db->sql_result($resultj, 0, "round") . " draft pick to the $toTeam.<br>";
 
-        $queryi = 'UPDATE ibl_draft_picks SET `ownerofpick` = "' . $to . '" WHERE `pickid` = ' . $itemid . ' LIMIT 1';
+        $queryi = 'UPDATE ibl_draft_picks SET `ownerofpick` = "' . $toTeam . '" WHERE `pickid` = ' . $itemId . ' LIMIT 1';
         $resulti = $this->db->sql_query($queryi);
 
         $this->queueTradeQuery($queryi, $tradeLine);
@@ -145,23 +145,23 @@ class Trading_TradeProcessor
 
     /**
      * Process player transfer
-     * @param int $itemid Player ID
-     * @param string $from From team
-     * @param string $to To team
+     * @param int $itemId Player ID
+     * @param string $fromTeam From team
+     * @param string $toTeam To team
      * @return array Result
      */
-    protected function processPlayer($itemid, $from, $to)
+    protected function processPlayer($itemId, $fromTeam, $toTeam)
     {
-        $teamID = $this->sharedFunctions->getTidFromTeamname($to);
+        $receivingTeamId = $this->sharedFunctions->getTidFromTeamname($toTeam);
 
-        $queryk = "SELECT * FROM ibl_plr WHERE pid = '$itemid'";
+        $queryk = "SELECT * FROM ibl_plr WHERE pid = '$itemId'";
         $resultk = $this->db->sql_query($queryk);
 
-        $tradeLine = "The $from send " . 
+        $tradeLine = "The $fromTeam send " . 
                     $this->db->sql_result($resultk, 0, "pos") . " " . 
-                    $this->db->sql_result($resultk, 0, "name") . " to the $to.<br>";
+                    $this->db->sql_result($resultk, 0, "name") . " to the $toTeam.<br>";
 
-        $queryi = 'UPDATE ibl_plr SET `teamname` = "' . $to . '", `tid` = ' . $teamID . ' WHERE `pid` = ' . $itemid . ' LIMIT 1';
+        $queryi = 'UPDATE ibl_plr SET `teamname` = "' . $toTeam . '", `tid` = ' . $receivingTeamId . ' WHERE `pid` = ' . $itemId . ' LIMIT 1';
         $resulti = $this->db->sql_query($queryi);
 
         $this->queueTradeQuery($queryi, $tradeLine);
@@ -227,15 +227,15 @@ class Trading_TradeProcessor
 
     /**
      * Send notifications (Discord, email) for the trade
-     * @param string $from From team
-     * @param string $to To team
+     * @param string $fromTeam From team
+     * @param string $toTeam To team
      * @param string $storytext Story text
      */
-    protected function sendNotifications($from, $to, $storytext)
+    protected function sendNotifications($fromTeam, $toTeam, $storytext)
     {
-        $fromDiscordID = Discord::getDiscordIDFromTeamname($this->db, $from);
-        $toDiscordID = Discord::getDiscordIDFromTeamname($this->db, $to);
-        $discordText = "<@!$fromDiscordID> and <@!$toDiscordID> agreed to a trade:<br>" . $storytext;
+        $fromDiscordId = Discord::getDiscordIDFromTeamname($this->db, $fromTeam);
+        $toDiscordId = Discord::getDiscordIDFromTeamname($this->db, $toTeam);
+        $discordText = "<@!$fromDiscordId> and <@!$toDiscordId> agreed to a trade:<br>" . $storytext;
         
         Discord::postToChannel('#trades', $discordText);
     }

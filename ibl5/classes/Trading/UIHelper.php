@@ -87,10 +87,6 @@ class Trading_UIHelper
             $pick_notes = $rowTeamDraftPicks["notes"];
             $pick_id = $rowTeamDraftPicks["pickid"];
 
-            // Calculate pick impact on future salary
-            $y = $pick_year - $this->season->endingYear + 1;
-            $this->addPickSalaryImpact($future_salary_array, $pick_round, $y);
-
             echo $this->renderDraftPickRow($k, $pick_id, $pick_year, $pick_team, $pick_round, $pick_notes);
             $k++;
         }
@@ -163,29 +159,6 @@ class Trading_UIHelper
         }
 
         return $html;
-    }
-
-    /**
-     * Add draft pick salary impact to future salary calculations
-     * @param array &$future_salary_array Reference to salary array
-     * @param int $pick_round Draft round
-     * @param int $y Year offset
-     */
-    protected function addPickSalaryImpact(&$future_salary_array, $pick_round, $y)
-    {
-        if ($pick_round == 1) {
-            // First round picks have higher impact over 3 years
-            for ($i = 0; $i < 3; $i++) {
-                $future_salary_array['picks'][$y + $i] += 75;
-                $future_salary_array['hold'][$y + $i]++;
-            }
-        } else {
-            // Other round picks have lower impact over 2 years
-            for ($i = 0; $i < 2; $i++) {
-                $future_salary_array['picks'][$y + $i] += 75;
-                $future_salary_array['hold'][$y + $i]++;
-            }
-        }
     }
 
     /**

@@ -107,7 +107,7 @@ function tradeoffer($username)
 					<td valign=top><b>Salary</b></td>
 				</tr>";
 
-    $partnerTeamID = $sharedFunctions->getTidFromTeamname($partner); // This function now returns an integer
+    $partnerTeamID = $sharedFunctions->getTidFromTeamname($partner);
     $queryPartnerTeamPlayers = "SELECT pos, name, pid, ordinal, cy, cy1, cy2, cy3, cy4, cy5, cy6
 		FROM ibl_plr
 		WHERE tid = $partnerTeamID

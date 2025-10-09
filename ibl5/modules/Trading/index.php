@@ -110,7 +110,7 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 			<table cellspacing=3>
 				<tr>
 					<td valign=top align=center colspan=4>
-						<input type=\"hidden\" name=\"half\" value=\"$k\">
+						<input type=\"hidden\" name=\"switchCounter\" value=\"$k\">
 						<input type=\"hidden\" name=\"Team_Name2\" value=\"$partner\">
 						<b><u>$partner</u></b>
 					</td>

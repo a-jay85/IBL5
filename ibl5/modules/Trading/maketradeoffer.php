@@ -6,7 +6,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 $tradeData = [
     'offeringTeam' => $_POST['Team_Name'],
     'receivingTeam' => $_POST['Team_Name2'],
-    'switchCounter' => $_POST['half'],
+    'switchCounter' => $_POST['switchCounter'],
     'fieldsCounter' => $_POST['counterfields'] + 1,
     'userSendsCash' => [],
     'partnerSendsCash' => [],

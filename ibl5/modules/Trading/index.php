@@ -38,23 +38,16 @@ function buildTeamFuturePicks($resultTeamPicks, $future_salary_array)
 
 function tradeoffer($username)
 {
-    global $user, $user_prefix, $db, $partner;
+    global $db, $partner;
     $sharedFunctions = new Shared($db);
     $season = new Season($db);
 
-    $sql2 = "SELECT * FROM " . $user_prefix . "_users WHERE username = '$username'";
-    $result2 = $db->sql_query($sql2);
-    $userinfo = $db->sql_fetchrow($result2);
-    cookiedecode($user);
-
-    Nuke\Header::header();
-
+    $teamlogo = $sharedFunctions->getTeamnameFromUsername($username);
+    $teamID = $sharedFunctions->getTidFromTeamname($teamlogo);
     $currentSeasonEndingYear = $season->endingYear; // we use this as an incrementer
 
+    Nuke\Header::header();
     OpenTable();
-
-    $teamlogo = $userinfo['user_ibl_team'];
-    $teamID = $sharedFunctions->getTidFromTeamname($teamlogo); // This function now returns an integer
     UI::displaytopmenu($db, $teamID);
 
     $queryUserTeamPlayers = "SELECT pos, name, pid, ordinal, cy, cy1, cy2, cy3, cy4, cy5, cy6
@@ -207,24 +200,14 @@ function tradeoffer($username)
 
 function tradereview($username)
 {
-    global $user, $user_prefix, $db;
+    global $db;
     $sharedFunctions = new Shared($db);
 
-    // ==== PICKUP LOGGED-IN USER INFO
-
-    $sql2 = "SELECT * FROM " . $user_prefix . "_users WHERE username = '$username'";
-    $result2 = $db->sql_query($sql2);
-    $userinfo = $db->sql_fetchrow($result2);
-    cookiedecode($user);
-
-    // ===== END OF INFO PICKUP
+    $teamlogo = $sharedFunctions->getTeamnameFromUsername($username);
+    $teamID = $sharedFunctions->getTidFromTeamname($teamlogo);
 
     Nuke\Header::header();
-
     OpenTable();
-
-    $teamlogo = $userinfo['user_ibl_team'];
-    $teamID = $sharedFunctions->getTidFromTeamname($teamlogo); // This function now returns an integer
     UI::displaytopmenu($db, $teamID);
 
     echo "<center><img src=\"images/logo/$teamID.jpg\"><br>";

@@ -31,7 +31,8 @@ function reviewtrade($user)
 
 function offertrade($user)
 {
-    global $db, $partner;
+    global $db;
+    $partner = $_GET['partner'] ?? '';
     $controller = new Trading_TradeController($db);
     $controller->routeToTradeOffer($user, $partner);
 }

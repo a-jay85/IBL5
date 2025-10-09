@@ -38,15 +38,9 @@ function buildTeamFuturePicks($resultTeamPicks, $future_salary_array)
 
 function tradeoffer($username)
 {
-    global $user, $prefix, $user_prefix, $db, $partner;
+    global $user, $user_prefix, $db, $partner;
     $sharedFunctions = new Shared($db);
     $season = new Season($db);
-
-    $sql = "SELECT * FROM " . $prefix . "_bbconfig";
-    $result = $db->sql_query($sql);
-    while ($row = $db->sql_fetchrow($result)) {
-        $board_config[$row['config_name']] = $row['config_value'];
-    }
 
     $sql2 = "SELECT * FROM " . $user_prefix . "_users WHERE username = '$username'";
     $result2 = $db->sql_query($sql2);
@@ -213,14 +207,8 @@ function tradeoffer($username)
 
 function tradereview($username)
 {
-    global $user, $prefix, $user_prefix, $db;
+    global $user, $user_prefix, $db;
     $sharedFunctions = new Shared($db);
-
-    $sql = "SELECT * FROM " . $prefix . "_bbconfig";
-    $result = $db->sql_query($sql);
-    while ($row = $db->sql_fetchrow($result)) {
-        $board_config[$row['config_name']] = $row['config_value'];
-    }
 
     // ==== PICKUP LOGGED-IN USER INFO
 

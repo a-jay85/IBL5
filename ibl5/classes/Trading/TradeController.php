@@ -50,28 +50,17 @@ class Trading_TradeController
         // Get user team data
         $userTeamData = $this->dataBuilder->getTeamTradeData($teamlogo);
         
-        // Build future salary data for user team
-        $futureSalaryUser = $this->uiHelper->buildTeamFutureSalary($userTeamData['players'], 0);
-        $futureSalaryUser = $this->uiHelper->buildTeamFuturePicks($userTeamData['picks'], $futureSalaryUser);
-
         // Get partner team data
         $partnerTeamData = $this->dataBuilder->getTeamTradeData($partner);
-        
-        // Build future salary data for partner team
-        $switchCounter = $futureSalaryUser['k'];
-        $futureSalaryPartner = $this->uiHelper->buildTeamFutureSalary($partnerTeamData['players'], $switchCounter);
-        $futureSalaryPartner = $this->uiHelper->buildTeamFuturePicks($partnerTeamData['picks'], $futureSalaryPartner);
 
         // Get all teams for selection dropdown
         $allTeams = $this->uiHelper->getAllTeamsForTrading();
 
-        // Render the page
+        // Render the page (which will call UIHelper to build salary data and render rows)
         $this->pageRenderer->renderTradeOfferPage(
             $userinfo,
             $userTeamData,
             $partnerTeamData,
-            $futureSalaryUser,
-            $futureSalaryPartner,
             $allTeams
         );
 

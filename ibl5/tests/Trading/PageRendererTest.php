@@ -43,8 +43,6 @@ class PageRendererTest extends TestCase
             'players' => $this->mockDb->sql_query('SELECT * FROM ibl_plr'),
             'picks' => $this->mockDb->sql_query('SELECT * FROM ibl_draft_picks')
         ];
-        $futureSalaryUser = ['k' => 5, 'player' => [5000, 5000, 5000, 5000, 5000, 5000]];
-        $futureSalaryPartner = ['k' => 10, 'player' => [6000, 6000, 6000, 6000, 6000, 6000]];
         $allTeams = [
             ['name' => 'Lakers', 'city' => 'Los Angeles', 'fullName' => 'Los Angeles Lakers'],
             ['name' => 'Celtics', 'city' => 'Boston', 'fullName' => 'Boston Celtics']
@@ -56,8 +54,6 @@ class PageRendererTest extends TestCase
             $userData,
             $userTeamData,
             $partnerTeamData,
-            $futureSalaryUser,
-            $futureSalaryPartner,
             $allTeams
         );
         $output = ob_get_clean();
@@ -160,8 +156,6 @@ class PageRendererTest extends TestCase
             'players' => $this->mockDb->sql_query('SELECT * FROM ibl_plr'),
             'picks' => $this->mockDb->sql_query('SELECT * FROM ibl_draft_picks')
         ];
-        $futureSalaryUser = ['k' => 5, 'player' => [5000, 5000, 5000, 5000, 5000, 5000]];
-        $futureSalaryPartner = ['k' => 10, 'player' => [6000, 6000, 6000, 6000, 6000, 6000]];
         $allTeams = [];
 
         // Act
@@ -170,8 +164,6 @@ class PageRendererTest extends TestCase
             $userData,
             $userTeamData,
             $partnerTeamData,
-            $futureSalaryUser,
-            $futureSalaryPartner,
             $allTeams
         );
         $output = ob_get_clean();
@@ -201,8 +193,6 @@ class PageRendererTest extends TestCase
             'players' => $this->mockDb->sql_query('SELECT * FROM ibl_plr'),
             'picks' => $this->mockDb->sql_query('SELECT * FROM ibl_draft_picks')
         ];
-        $futureSalaryUser = ['k' => 5, 'player' => [5000, 5000, 5000, 5000, 5000, 5000]];
-        $futureSalaryPartner = ['k' => 10, 'player' => [6000, 6000, 6000, 6000, 6000, 6000]];
         $allTeams = [];
 
         // Act
@@ -211,15 +201,11 @@ class PageRendererTest extends TestCase
             $userData,
             $userTeamData,
             $partnerTeamData,
-            $futureSalaryUser,
-            $futureSalaryPartner,
             $allTeams
         );
         $output = ob_get_clean();
 
         // Assert
         $this->assertStringContainsString('Cap Total', $output);
-        $this->assertStringContainsString('5000', $output);
-        $this->assertStringContainsString('6000', $output);
     }
 }

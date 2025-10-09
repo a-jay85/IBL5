@@ -24,17 +24,13 @@ class Trading_PageRenderer
      * @param array $userData User data
      * @param array $userTeamData User team data
      * @param array $partnerTeamData Partner team data
-     * @param array $futureSalaryUser User's future salary data
-     * @param array $futureSalaryPartner Partner's future salary data
      * @param array $allTeams All teams for selection
      */
-    public function renderTradeOfferPage($userData, $userTeamData, $partnerTeamData, $futureSalaryUser, $futureSalaryPartner, $allTeams)
+    public function renderTradeOfferPage($userData, $userTeamData, $partnerTeamData, $allTeams)
     {
         $teamlogo = $userTeamData['teamname'];
         $teamID = $userTeamData['teamID'];
         $partner = $partnerTeamData['teamname'];
-        $k = $futureSalaryUser['k'];
-        $fieldsCounter = $futureSalaryPartner['k'] - 1;
 
         echo "<form name=\"Trade_Offer\" method=\"post\" action=\"/ibl5/modules/Trading/maketradeoffer.php\">
             <input type=\"hidden\" name=\"offeringTeam\" value=\"$teamlogo\">
@@ -58,13 +54,18 @@ class Trading_PageRenderer
                                     <td valign=top><b>Name</b></td>
                                     <td valign=top><b>Salary</b></td>";
 
+        // Build and render user team salary data (this echoes player/pick rows)
+        $futureSalaryUser = $this->uiHelper->buildTeamFutureSalary($userTeamData['players'], 0);
+        $futureSalaryUser = $this->uiHelper->buildTeamFuturePicks($userTeamData['picks'], $futureSalaryUser);
+        $switchCounter = $futureSalaryUser['k'];
+
         echo "</table>
             </td>
             <td valign=top>
                 <table cellspacing=3>
                     <tr>
                         <td valign=top align=center colspan=4>
-                            <input type=\"hidden\" name=\"switchCounter\" value=\"$k\">
+                            <input type=\"hidden\" name=\"switchCounter\" value=\"$switchCounter\">
                             <input type=\"hidden\" name=\"listeningTeam\" value=\"$partner\">
                             <b><u>$partner</u></b>
                         </td>
@@ -75,6 +76,11 @@ class Trading_PageRenderer
                         <td valign=top><b>Name</b></td>
                         <td valign=top><b>Salary</b></td>
                     </tr>";
+
+        // Build and render partner team salary data (this echoes player/pick rows)
+        $futureSalaryPartner = $this->uiHelper->buildTeamFutureSalary($partnerTeamData['players'], $switchCounter);
+        $futureSalaryPartner = $this->uiHelper->buildTeamFuturePicks($partnerTeamData['picks'], $futureSalaryPartner);
+        $fieldsCounter = $futureSalaryPartner['k'] - 1;
 
         echo "</table>
             </td>

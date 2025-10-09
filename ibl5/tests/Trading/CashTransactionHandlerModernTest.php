@@ -114,8 +114,8 @@ class CashTransactionHandlerModernTest extends TestCase
     {
         // Arrange
         $tradeOfferId = 999;
-        $sendingTeamName = 'Miami Heat';
-        $receivingTeamName = 'Golden State Warriors';
+        $offeringTeamName = 'Miami Heat';
+        $listeningTeamName = 'Golden State Warriors';
         $cashAmounts = [1 => 100, 2 => 200, 3 => 300, 4 => 0, 5 => 0, 6 => 0];
         
         $this->mockDb->setReturnTrue(true); // INSERT should return true
@@ -123,8 +123,8 @@ class CashTransactionHandlerModernTest extends TestCase
         // Act
         $result = $this->cashHandler->insertCashTradeData(
             $tradeOfferId, 
-            $sendingTeamName, 
-            $receivingTeamName, 
+            $offeringTeamName, 
+            $listeningTeamName, 
             $cashAmounts
         );
 
@@ -139,8 +139,8 @@ class CashTransactionHandlerModernTest extends TestCase
     {
         // Arrange
         $tradeOfferId = 999;
-        $sendingTeamName = 'Chicago Bulls';
-        $receivingTeamName = 'New York Knicks';
+        $offeringTeamName = 'Chicago Bulls';
+        $listeningTeamName = 'New York Knicks';
         $partialCashAmounts = [1 => 100, 3 => 300, 5 => 500]; // Missing years 2, 4, 6
         
         $this->mockDb->setReturnTrue(true);
@@ -148,8 +148,8 @@ class CashTransactionHandlerModernTest extends TestCase
         // Act
         $result = $this->cashHandler->insertCashTradeData(
             $tradeOfferId, 
-            $sendingTeamName, 
-            $receivingTeamName, 
+            $offeringTeamName, 
+            $listeningTeamName, 
             $partialCashAmounts
         );
 

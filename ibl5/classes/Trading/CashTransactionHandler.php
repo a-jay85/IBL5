@@ -55,20 +55,20 @@ class Trading_CashTransactionHandler
     /**
      * Create cash transaction entries in the database
      * @param int $itemId Unique item ID for the transaction
-     * @param string $sendingTeamName Sending team name
-     * @param string $receivingTeamName Receiving team name
+     * @param string $offeringTeamName Offering team name
+     * @param string $listeningTeamName Listening team name
      * @param array $cashYear Cash amounts by year
      * @return array Result with success status and trade line text
      */
-    public function createCashTransaction($itemId, $sendingTeamName, $receivingTeamName, $cashYear)
+    public function createCashTransaction($itemId, $offeringTeamName, $listeningTeamName, $cashYear)
     {
-        $sendingTeamId = $this->sharedFunctions->getTidFromTeamname($sendingTeamName);
-        $receivingTeamId = $this->sharedFunctions->getTidFromTeamname($receivingTeamName);
+        $offeringTeamId = $this->sharedFunctions->getTidFromTeamname($offeringTeamName);
+        $listeningTeamId = $this->sharedFunctions->getTidFromTeamname($listeningTeamName);
         
         $contractCurrentYear = 1;
         $contractTotalYears = $this->calculateContractTotalYears($cashYear);
 
-        // Insert positive cash row (for sending team)
+        // Insert positive cash row (for offering team)
         $queryInsertPositiveCashRow = "INSERT INTO `ibl_plr` 
             (`ordinal`, 
             `pid`, 
@@ -87,9 +87,9 @@ class Trading_CashTransactionHandler
         VALUES
             ('100000',
             '$itemId',
-            '| <B>Cash to $receivingTeamName</B>',
-            '$sendingTeamId',
-            '$sendingTeamName',
+            '| <B>Cash to $listeningTeamName</B>',
+            '$offeringTeamId',
+            '$offeringTeamName',
             '$contractCurrentYear',
             '$contractCurrentYear',
             '$contractTotalYears',
@@ -104,7 +104,7 @@ class Trading_CashTransactionHandler
 
         $itemId++;
 
-        // Insert negative cash row (for receiving team)
+        // Insert negative cash row (for listening team)
         $queryInsertNegativeCashRow = "INSERT INTO `ibl_plr` 
             (`ordinal`,
             `pid`,
@@ -123,9 +123,9 @@ class Trading_CashTransactionHandler
         VALUES
             ('100000',
             '$itemId',
-            '| <B>Cash from $sendingTeamName</B>',
-            '$receivingTeamId',
-            '$receivingTeamName',
+            '| <B>Cash from $offeringTeamName</B>',
+            '$listeningTeamId',
+            '$listeningTeamName',
             '$contractCurrentYear',
             '$contractCurrentYear',
             '$contractTotalYears',
@@ -142,7 +142,7 @@ class Trading_CashTransactionHandler
         $tradeLine = "";
 
         if ($success) {
-            $tradeLine = "The $sendingTeamName send {$cashYear[1]} {$cashYear[2]} {$cashYear[3]} {$cashYear[4]} {$cashYear[5]} {$cashYear[6]} in cash to the $receivingTeamName.<br>";
+            $tradeLine = "The $offeringTeamName send {$cashYear[1]} {$cashYear[2]} {$cashYear[3]} {$cashYear[4]} {$cashYear[5]} {$cashYear[6]} in cash to the $listeningTeamName.<br>";
         }
 
         return [
@@ -154,12 +154,12 @@ class Trading_CashTransactionHandler
     /**
      * Insert cash trade data into ibl_trade_cash table
      * @param int $tradeOfferId Trade offer ID
-     * @param string $sendingTeamName Sending team name
-     * @param string $receivingTeamName Receiving team name
+     * @param string $offeringTeamName Offering team name
+     * @param string $listeningTeamName Listening team name
      * @param array $cashAmounts Cash amounts by year (1-6)
      * @return bool Success status
      */
-    public function insertCashTradeData($tradeOfferId, $sendingTeamName, $receivingTeamName, $cashAmounts)
+    public function insertCashTradeData($tradeOfferId, $offeringTeamName, $listeningTeamName, $cashAmounts)
     {
         // Ensure all cash year values are set
         for ($i = 1; $i <= 6; $i++) {
@@ -177,8 +177,8 @@ class Trading_CashTransactionHandler
             `cy5`,
             `cy6` )
         VALUES    ( '$tradeOfferId',
-            '$sendingTeamName',
-            '$receivingTeamName',
+            '$offeringTeamName',
+            '$listeningTeamName',
             '{$cashAmounts[1]}',
             '{$cashAmounts[2]}',
             '{$cashAmounts[3]}',

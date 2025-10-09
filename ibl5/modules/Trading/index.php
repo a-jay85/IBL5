@@ -79,7 +79,7 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
     $resultUserTeamDraftPicks = $db->sql_query($queryUserTeamDraftPicks);
 
     echo "<form name=\"Trade_Offer\" method=\"post\" action=\"/ibl5/modules/Trading/maketradeoffer.php\">
-		<input type=\"hidden\" name=\"Team_Name\" value=\"$teamlogo\">
+		<input type=\"hidden\" name=\"offeringTeam\" value=\"$teamlogo\">
 		<center>
 			<img src=\"images/logo/$teamID.jpg\"><br>
 			<table border=1 cellspacing=0 cellpadding=5>
@@ -111,7 +111,7 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 				<tr>
 					<td valign=top align=center colspan=4>
 						<input type=\"hidden\" name=\"switchCounter\" value=\"$k\">
-						<input type=\"hidden\" name=\"Team_Name2\" value=\"$partner\">
+						<input type=\"hidden\" name=\"listeningTeam\" value=\"$partner\">
 						<b><u>$partner</u></b>
 					</td>
 				</tr>

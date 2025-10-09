@@ -36,7 +36,7 @@ function buildTeamFuturePicks($resultTeamPicks, $future_salary_array)
     return $uiHelper->buildTeamFuturePicks($resultTeamPicks, $future_salary_array);
 }
 
-function tradeoffer($username, $bypass = 0)
+function tradeoffer($username)
 {
     global $user, $prefix, $user_prefix, $db, $partner;
     $sharedFunctions = new Shared($db);
@@ -51,9 +51,7 @@ function tradeoffer($username, $bypass = 0)
     $sql2 = "SELECT * FROM " . $user_prefix . "_users WHERE username = '$username'";
     $result2 = $db->sql_query($sql2);
     $userinfo = $db->sql_fetchrow($result2);
-    if (!$bypass) {
-        cookiedecode($user);
-    }
+    cookiedecode($user);
 
     Nuke\Header::header();
 
@@ -213,7 +211,7 @@ function tradeoffer($username, $bypass = 0)
     Nuke\Footer::footer();
 }
 
-function tradereview($username, $bypass = 0)
+function tradereview($username)
 {
     global $user, $prefix, $user_prefix, $db;
     $sharedFunctions = new Shared($db);
@@ -229,9 +227,7 @@ function tradereview($username, $bypass = 0)
     $sql2 = "SELECT * FROM " . $user_prefix . "_users WHERE username = '$username'";
     $result2 = $db->sql_query($sql2);
     $userinfo = $db->sql_fetchrow($result2);
-    if (!$bypass) {
-        cookiedecode($user);
-    }
+    cookiedecode($user);
 
     // ===== END OF INFO PICKUP
 

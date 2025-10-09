@@ -55,15 +55,15 @@ class Trading_CashTransactionHandler
     /**
      * Create cash transaction entries in the database
      * @param int $itemId Unique item ID for the transaction
-     * @param string $fromTeam Sending team name
-     * @param string $toTeam Receiving team name
+     * @param string $sendingTeam Sending team name
+     * @param string $receivingTeam Receiving team name
      * @param array $cashYear Cash amounts by year
      * @return array Result with success status and trade line text
      */
-    public function createCashTransaction($itemId, $fromTeam, $toTeam, $cashYear)
+    public function createCashTransaction($itemId, $sendingTeam, $receivingTeam, $cashYear)
     {
-        $sendingTeamId = $this->sharedFunctions->getTidFromTeamname($fromTeam);
-        $receivingTeamId = $this->sharedFunctions->getTidFromTeamname($toTeam);
+        $sendingTeamId = $this->sharedFunctions->getTidFromTeamname($sendingTeam);
+        $receivingTeamId = $this->sharedFunctions->getTidFromTeamname($receivingTeam);
         
         $contractCurrentYear = 1;
         $contractTotalYears = $this->calculateContractTotalYears($cashYear);
@@ -87,9 +87,9 @@ class Trading_CashTransactionHandler
         VALUES
             ('100000',
             '$itemId',
-            '| <B>Cash to $toTeam</B>',
+            '| <B>Cash to $receivingTeam</B>',
             '$sendingTeamId',
-            '$fromTeam',
+            '$sendingTeam',
             '$contractCurrentYear',
             '$contractCurrentYear',
             '$contractTotalYears',
@@ -123,9 +123,9 @@ class Trading_CashTransactionHandler
         VALUES
             ('100000',
             '$itemId',
-            '| <B>Cash from $fromTeam</B>',
+            '| <B>Cash from $sendingTeam</B>',
             '$receivingTeamId',
-            '$toTeam',
+            '$receivingTeam',
             '$contractCurrentYear',
             '$contractCurrentYear',
             '$contractTotalYears',
@@ -142,7 +142,7 @@ class Trading_CashTransactionHandler
         $tradeLine = "";
 
         if ($success) {
-            $tradeLine = "The $fromTeam send {$cashYear[1]} {$cashYear[2]} {$cashYear[3]} {$cashYear[4]} {$cashYear[5]} {$cashYear[6]} in cash to the $toTeam.<br>";
+            $tradeLine = "The $sendingTeam send {$cashYear[1]} {$cashYear[2]} {$cashYear[3]} {$cashYear[4]} {$cashYear[5]} {$cashYear[6]} in cash to the $receivingTeam.<br>";
         }
 
         return [

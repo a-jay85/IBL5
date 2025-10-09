@@ -208,12 +208,12 @@ class Trading_TradeOffer
      * @param int $tradeOfferId Trade offer ID
      * @param int $itemId Item ID
      * @param int $itemType Item type (0=pick, 1=player)
-     * @param string $fromTeam From team
-     * @param string $toTeam To team
+     * @param string $sendingTeam Sending team
+     * @param string $receivingTeam Receiving team
      * @param string $approvalTeam Team that needs to approve
      * @return array Result
      */
-    protected function insertTradeItem($tradeOfferId, $itemId, $itemType, $fromTeam, $toTeam, $approvalTeam)
+    protected function insertTradeItem($tradeOfferId, $itemId, $itemType, $sendingTeam, $receivingTeam, $approvalTeam)
     {
         $query = "INSERT INTO ibl_trade_info 
           ( `tradeofferid`, 
@@ -225,17 +225,17 @@ class Trading_TradeOffer
         VALUES        ( '$tradeOfferId', 
             '$itemId', 
             '$itemType', 
-            '$fromTeam', 
-            '$toTeam', 
+            '$sendingTeam', 
+            '$receivingTeam', 
             '$approvalTeam' )";
         
         $this->db->sql_query($query);
 
         $tradeText = "";
         if ($itemType == 0) {
-            $tradeText = $this->getPickTradeText($itemId, $fromTeam, $toTeam);
+            $tradeText = $this->getPickTradeText($itemId, $sendingTeam, $receivingTeam);
         } else {
-            $tradeText = $this->getPlayerTradeText($itemId, $fromTeam, $toTeam);
+            $tradeText = $this->getPlayerTradeText($itemId, $sendingTeam, $receivingTeam);
         }
 
         return ['tradeText' => $tradeText];
@@ -244,11 +244,11 @@ class Trading_TradeOffer
     /**
      * Get trade text for a draft pick
      * @param int $pickId Pick ID
-     * @param string $fromTeam From team
-     * @param string $toTeam To team
+     * @param string $sendingTeam Sending team
+     * @param string $receivingTeam Receiving team
      * @return string Trade text
      */
-    protected function getPickTradeText($pickId, $fromTeam, $toTeam)
+    protected function getPickTradeText($pickId, $sendingTeam, $receivingTeam)
     {
         $sqlgetpick = "SELECT * FROM ibl_draft_picks WHERE pickid = '$pickId'";
         $resultgetpick = $this->db->sql_query($sqlgetpick);
@@ -259,7 +259,7 @@ class Trading_TradeOffer
         $pickRound = $rowsgetpick['round'];
         $pickNotes = $rowsgetpick['notes'];
 
-        $tradeText = "The $fromTeam send the $pickTeam $pickYear Round $pickRound draft pick to the $toTeam.<br>";
+        $tradeText = "The $sendingTeam send the $pickTeam $pickYear Round $pickRound draft pick to the $receivingTeam.<br>";
         if ($pickNotes != NULL) {
             $tradeText .= "<i>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;" . $pickNotes . "</i><br>";
         }
@@ -270,11 +270,11 @@ class Trading_TradeOffer
     /**
      * Get trade text for a player
      * @param int $playerId Player ID
-     * @param string $fromTeam From team
-     * @param string $toTeam To team
+     * @param string $sendingTeam Sending team
+     * @param string $receivingTeam Receiving team
      * @return string Trade text
      */
-    protected function getPlayerTradeText($playerId, $fromTeam, $toTeam)
+    protected function getPlayerTradeText($playerId, $sendingTeam, $receivingTeam)
     {
         $sqlgetplyr = "SELECT * FROM ibl_plr WHERE pid = '$playerId'";
         $resultgetplyr = $this->db->sql_query($sqlgetplyr);
@@ -283,7 +283,7 @@ class Trading_TradeOffer
         $playerName = $rowsgetplyr['name'];
         $playerPosition = $rowsgetplyr['pos'];
 
-        return "The $fromTeam send $playerPosition $playerName to the $toTeam.<br>";
+        return "The $sendingTeam send $playerPosition $playerName to the $receivingTeam.<br>";
     }
 
     /**
@@ -311,7 +311,7 @@ class Trading_TradeOffer
             `to`,
             `approval` )
         VALUES    ( '$tradeOfferId',
-            '$teamIDSending" . "0" . "$teamIDReceiving" . "0',
+            '$sendingTeamId" . "0" . "$receivingTeamId" . "0',
             'cash',
             '$sendingTeam',
             '$receivingTeam',

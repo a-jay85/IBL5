@@ -140,7 +140,7 @@ class Trading_TradeOffer
     {
         $tradeText = "";
         $offeringTeamName = $tradeData['offeringTeam'];
-        $listeningTeamName = $tradeData['receivingTeam'];
+        $listeningTeamName = $tradeData['listeningTeam'];
 
         // Process offering team items
         $switchCounter = $tradeData['switchCounter'];
@@ -333,7 +333,7 @@ class Trading_TradeOffer
     protected function sendTradeNotification($tradeData, $tradeText)
     {
         $offeringTeamName = $tradeData['offeringTeam'];
-        $listeningTeamName = $tradeData['receivingTeam'];
+        $listeningTeamName = $tradeData['listeningTeam'];
 
         $offeringUserDiscordID = Discord::getDiscordIDFromTeamname($this->db, $offeringTeamName);
         $receivingUserDiscordID = Discord::getDiscordIDFromTeamname($this->db, $listeningTeamName);

@@ -5,7 +5,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 // Prepare trade data from POST
 $tradeData = [
     'offeringTeam' => $_POST['offeringTeam'],
-    'receivingTeam' => $_POST['listeningTeam'],
+    'listeningTeam' => $_POST['listeningTeam'],
     'switchCounter' => $_POST['switchCounter'],
     'fieldsCounter' => $_POST['fieldsCounter'] + 1,
     'userSendsCash' => [],

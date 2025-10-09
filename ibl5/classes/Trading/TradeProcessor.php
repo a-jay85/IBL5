@@ -152,7 +152,7 @@ class Trading_TradeProcessor
      */
     protected function processPlayer($itemId, $offeringTeamName, $listeningTeamName)
     {
-        $receivingTeamId = $this->sharedFunctions->getTidFromTeamname($listeningTeamName);
+        $listeningTeamId = $this->sharedFunctions->getTidFromTeamname($listeningTeamName);
 
         $queryk = "SELECT * FROM ibl_plr WHERE pid = '$itemId'";
         $resultk = $this->db->sql_query($queryk);
@@ -161,7 +161,7 @@ class Trading_TradeProcessor
                     $this->db->sql_result($resultk, 0, "pos") . " " . 
                     $this->db->sql_result($resultk, 0, "name") . " to the $listeningTeamName.<br>";
 
-        $queryi = 'UPDATE ibl_plr SET `teamname` = "' . $listeningTeamName . '", `tid` = ' . $receivingTeamId . ' WHERE `pid` = ' . $itemId . ' LIMIT 1';
+        $queryi = 'UPDATE ibl_plr SET `teamname` = "' . $listeningTeamName . '", `tid` = ' . $listeningTeamId . ' WHERE `pid` = ' . $itemId . ' LIMIT 1';
         $resulti = $this->db->sql_query($queryi);
 
         $this->queueTradeQuery($queryi, $tradeLine);

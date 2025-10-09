@@ -207,13 +207,13 @@ class Trading_TradeOffer
      * Insert a single trade item (player or pick)
      * @param int $tradeOfferId Trade offer ID
      * @param int $itemId Item ID
-     * @param int $itemType Item type (0=pick, 1=player)
+     * @param int $assetType Asset type (0=pick, 1=player)
      * @param string $sendingTeamName Sending team name
      * @param string $receivingTeamName Receiving team name
      * @param string $approvalTeamName Name of team that needs to approve
      * @return array Result
      */
-    protected function insertTradeItem($tradeOfferId, $itemId, $itemType, $sendingTeamName, $receivingTeamName, $approvalTeamName)
+    protected function insertTradeItem($tradeOfferId, $itemId, $assetType, $sendingTeamName, $receivingTeamName, $approvalTeamName)
     {
         $query = "INSERT INTO ibl_trade_info 
           ( `tradeofferid`, 
@@ -224,7 +224,7 @@ class Trading_TradeOffer
             `approval` ) 
         VALUES        ( '$tradeOfferId', 
             '$itemId', 
-            '$itemType', 
+            '$assetType', 
             '$sendingTeamName', 
             '$receivingTeamName', 
             '$approvalTeamName' )";
@@ -232,7 +232,7 @@ class Trading_TradeOffer
         $this->db->sql_query($query);
 
         $tradeText = "";
-        if ($itemType == 0) {
+        if ($assetType == 0) {
             $tradeText = $this->getPickTradeText($itemId, $sendingTeamName, $receivingTeamName);
         } else {
             $tradeText = $this->getPlayerTradeText($itemId, $sendingTeamName, $receivingTeamName);

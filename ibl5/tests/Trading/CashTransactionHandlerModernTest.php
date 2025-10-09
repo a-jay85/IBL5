@@ -92,17 +92,17 @@ class CashTransactionHandlerModernTest extends TestCase
     {
         // Arrange
         $itemId = 12345;
-        $sendingTeam = 'Los Angeles Lakers';
-        $receivingTeam = 'Boston Celtics';
+        $fromTeamName = 'Los Angeles Lakers';
+        $toTeamName = 'Boston Celtics';
         $cashYear = [1 => 100, 2 => 200, 3 => 0, 4 => 0, 5 => 0, 6 => 0];
 
         // Act
-        $result = $this->cashHandler->createCashTransaction($itemId, $sendingTeam, $receivingTeam, $cashYear);
+        $result = $this->cashHandler->createCashTransaction($itemId, $fromTeamName, $toTeamName, $cashYear);
 
         // Assert
         $this->assertTrue($result['success'], 'Cash transaction should succeed');
-        $this->assertStringContainsString($sendingTeam, $result['tradeLine']);
-        $this->assertStringContainsString($receivingTeam, $result['tradeLine']);
+        $this->assertStringContainsString($fromTeamName, $result['tradeLine']);
+        $this->assertStringContainsString($toTeamName, $result['tradeLine']);
         $this->assertStringContainsString('100 200', $result['tradeLine']);
         $this->assertStringContainsString('cash', $result['tradeLine']);
     }
@@ -114,8 +114,8 @@ class CashTransactionHandlerModernTest extends TestCase
     {
         // Arrange
         $tradeOfferId = 999;
-        $sendingTeam = 'Miami Heat';
-        $receivingTeam = 'Golden State Warriors';
+        $sendingTeamName = 'Miami Heat';
+        $receivingTeamName = 'Golden State Warriors';
         $cashAmounts = [1 => 100, 2 => 200, 3 => 300, 4 => 0, 5 => 0, 6 => 0];
         
         $this->mockDb->setReturnTrue(true); // INSERT should return true
@@ -123,8 +123,8 @@ class CashTransactionHandlerModernTest extends TestCase
         // Act
         $result = $this->cashHandler->insertCashTradeData(
             $tradeOfferId, 
-            $sendingTeam, 
-            $receivingTeam, 
+            $sendingTeamName, 
+            $receivingTeamName, 
             $cashAmounts
         );
 
@@ -139,8 +139,8 @@ class CashTransactionHandlerModernTest extends TestCase
     {
         // Arrange
         $tradeOfferId = 999;
-        $sendingTeam = 'Chicago Bulls';
-        $receivingTeam = 'New York Knicks';
+        $sendingTeamName = 'Chicago Bulls';
+        $receivingTeamName = 'New York Knicks';
         $partialCashAmounts = [1 => 100, 3 => 300, 5 => 500]; // Missing years 2, 4, 6
         
         $this->mockDb->setReturnTrue(true);
@@ -148,8 +148,8 @@ class CashTransactionHandlerModernTest extends TestCase
         // Act
         $result = $this->cashHandler->insertCashTradeData(
             $tradeOfferId, 
-            $sendingTeam, 
-            $receivingTeam, 
+            $sendingTeamName, 
+            $receivingTeamName, 
             $partialCashAmounts
         );
 
@@ -237,21 +237,21 @@ class CashTransactionHandlerModernTest extends TestCase
         
         // Arrange
         $itemId = 54321;
-        $sendingTeam = 'San Antonio Spurs';
-        $receivingTeam = 'Portland Trail Blazers';
+        $fromTeamName = 'San Antonio Spurs';
+        $toTeamName = 'Portland Trail Blazers';
         $cashYear = [1 => 250, 2 => 275, 3 => 300, 4 => 0, 5 => 0, 6 => 0];
 
         // Act - Test the complete workflow
         $contractYears = $this->cashHandler->calculateContractTotalYears($cashYear);
         $hasCash = $this->cashHandler->hasCashInTrade($cashYear);
-        $transactionResult = $this->cashHandler->createCashTransaction($itemId, $sendingTeam, $receivingTeam, $cashYear);
+        $transactionResult = $this->cashHandler->createCashTransaction($itemId, $fromTeamName, $toTeamName, $cashYear);
 
         // Assert - Verify the complete workflow
         $this->assertEquals(3, $contractYears, 'Should calculate 3 contract years');
         $this->assertTrue($hasCash, 'Should detect cash in trade');
         $this->assertTrue($transactionResult['success'], 'Transaction should succeed');
         $this->assertStringContainsString('250 275 300', $transactionResult['tradeLine']);
-        $this->assertStringContainsString($sendingTeam, $transactionResult['tradeLine']);
-        $this->assertStringContainsString($receivingTeam, $transactionResult['tradeLine']);
+        $this->assertStringContainsString($fromTeamName, $transactionResult['tradeLine']);
+        $this->assertStringContainsString($toTeamName, $transactionResult['tradeLine']);
     }
 }

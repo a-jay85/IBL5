@@ -139,8 +139,8 @@ class Trading_TradeOffer
     protected function insertTradeOfferData($tradeOfferId, $tradeData)
     {
         $tradeText = "";
-        $offeringTeam = $tradeData['offeringTeam'];
-        $receivingTeam = $tradeData['receivingTeam'];
+        $offeringTeamName = $tradeData['offeringTeam'];
+        $receivingTeamName = $tradeData['receivingTeam'];
 
         // Process offering team items
         $switchCounter = $tradeData['switchCounter'];
@@ -150,9 +150,9 @@ class Trading_TradeOffer
                     $tradeOfferId,
                     $tradeData['index'][$k],
                     $tradeData['type'][$k],
-                    $offeringTeam,
-                    $receivingTeam,
-                    $receivingTeam
+                    $offeringTeamName,
+                    $receivingTeamName,
+                    $receivingTeamName
                 );
                 $tradeText .= $result['tradeText'];
             }
@@ -162,8 +162,8 @@ class Trading_TradeOffer
         if ($this->cashHandler->hasCashInTrade($tradeData['userSendsCash'])) {
             $result = $this->insertCashTradeOffer(
                 $tradeOfferId,
-                $offeringTeam,
-                $receivingTeam,
+                $offeringTeamName,
+                $receivingTeamName,
                 $tradeData['userSendsCash']
             );
             $tradeText .= $result['tradeText'];
@@ -177,9 +177,9 @@ class Trading_TradeOffer
                     $tradeOfferId,
                     $tradeData['index'][$k],
                     $tradeData['type'][$k],
-                    $receivingTeam,
-                    $offeringTeam,
-                    $receivingTeam
+                    $receivingTeamName,
+                    $offeringTeamName,
+                    $receivingTeamName
                 );
                 $tradeText .= $result['tradeText'];
             }
@@ -189,8 +189,8 @@ class Trading_TradeOffer
         if ($this->cashHandler->hasCashInTrade($tradeData['partnerSendsCash'])) {
             $result = $this->insertCashTradeOffer(
                 $tradeOfferId,
-                $receivingTeam,
-                $offeringTeam,
+                $receivingTeamName,
+                $offeringTeamName,
                 $tradeData['partnerSendsCash']
             );
             $tradeText .= $result['tradeText'];
@@ -208,12 +208,12 @@ class Trading_TradeOffer
      * @param int $tradeOfferId Trade offer ID
      * @param int $itemId Item ID
      * @param int $itemType Item type (0=pick, 1=player)
-     * @param string $sendingTeam Sending team
-     * @param string $receivingTeam Receiving team
+     * @param string $fromTeam From team
+     * @param string $toTeam To team
      * @param string $approvalTeam Team that needs to approve
      * @return array Result
      */
-    protected function insertTradeItem($tradeOfferId, $itemId, $itemType, $sendingTeam, $receivingTeam, $approvalTeam)
+    protected function insertTradeItem($tradeOfferId, $itemId, $itemType, $fromTeam, $toTeam, $approvalTeam)
     {
         $query = "INSERT INTO ibl_trade_info 
           ( `tradeofferid`, 
@@ -225,17 +225,17 @@ class Trading_TradeOffer
         VALUES        ( '$tradeOfferId', 
             '$itemId', 
             '$itemType', 
-            '$sendingTeam', 
-            '$receivingTeam', 
+            '$fromTeam', 
+            '$toTeam', 
             '$approvalTeam' )";
         
         $this->db->sql_query($query);
 
         $tradeText = "";
         if ($itemType == 0) {
-            $tradeText = $this->getPickTradeText($itemId, $sendingTeam, $receivingTeam);
+            $tradeText = $this->getPickTradeText($itemId, $fromTeam, $toTeam);
         } else {
-            $tradeText = $this->getPlayerTradeText($itemId, $sendingTeam, $receivingTeam);
+            $tradeText = $this->getPlayerTradeText($itemId, $fromTeam, $toTeam);
         }
 
         return ['tradeText' => $tradeText];
@@ -244,11 +244,11 @@ class Trading_TradeOffer
     /**
      * Get trade text for a draft pick
      * @param int $pickId Pick ID
-     * @param string $sendingTeam Sending team
-     * @param string $receivingTeam Receiving team
+     * @param string $sendingTeamName From team
+     * @param string $receivingTeamName To team
      * @return string Trade text
      */
-    protected function getPickTradeText($pickId, $sendingTeam, $receivingTeam)
+    protected function getPickTradeText($pickId, $sendingTeamName, $receivingTeamName)
     {
         $sqlgetpick = "SELECT * FROM ibl_draft_picks WHERE pickid = '$pickId'";
         $resultgetpick = $this->db->sql_query($sqlgetpick);
@@ -259,7 +259,7 @@ class Trading_TradeOffer
         $pickRound = $rowsgetpick['round'];
         $pickNotes = $rowsgetpick['notes'];
 
-        $tradeText = "The $sendingTeam send the $pickTeam $pickYear Round $pickRound draft pick to the $receivingTeam.<br>";
+        $tradeText = "The $fromTeam send the $pickTeam $pickYear Round $pickRound draft pick to the $toTeam.<br>";
         if ($pickNotes != NULL) {
             $tradeText .= "<i>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;" . $pickNotes . "</i><br>";
         }
@@ -270,11 +270,11 @@ class Trading_TradeOffer
     /**
      * Get trade text for a player
      * @param int $playerId Player ID
-     * @param string $sendingTeam Sending team
-     * @param string $receivingTeam Receiving team
+     * @param string $fromTeam From team
+     * @param string $toTeam To team
      * @return string Trade text
      */
-    protected function getPlayerTradeText($playerId, $sendingTeam, $receivingTeam)
+    protected function getPlayerTradeText($playerId, $fromTeam, $toTeam)
     {
         $sqlgetplyr = "SELECT * FROM ibl_plr WHERE pid = '$playerId'";
         $resultgetplyr = $this->db->sql_query($sqlgetplyr);
@@ -283,7 +283,7 @@ class Trading_TradeOffer
         $playerName = $rowsgetplyr['name'];
         $playerPosition = $rowsgetplyr['pos'];
 
-        return "The $sendingTeam send $playerPosition $playerName to the $receivingTeam.<br>";
+        return "The $fromTeam send $playerPosition $playerName to the $toTeam.<br>";
     }
 
     /**
@@ -313,14 +313,14 @@ class Trading_TradeOffer
         VALUES    ( '$tradeOfferId',
             '$sendingTeamId" . "0" . "$receivingTeamId" . "0',
             'cash',
-            '$sendingTeam',
-            '$receivingTeam',
-            '$receivingTeam' )";
+            '$sendingTeamName',
+            '$receivingTeamName',
+            '$receivingTeamName' )";
         
         $this->db->sql_query($query);
 
         $cashText = implode(' ', array_filter($cashAmounts));
-        $tradeText = "The $sendingTeam send $cashText in cash to the $receivingTeam.<br>";
+        $tradeText = "The $sendingTeamName send $cashText in cash to the $receivingTeamName.<br>";
 
         return ['tradeText' => $tradeText];
     }
@@ -332,11 +332,11 @@ class Trading_TradeOffer
      */
     protected function sendTradeNotification($tradeData, $tradeText)
     {
-        $offeringTeam = $tradeData['offeringTeam'];
-        $receivingTeam = $tradeData['receivingTeam'];
+        $offeringTeamName = $tradeData['offeringTeam'];
+        $receivingTeamName = $tradeData['receivingTeam'];
 
-        $offeringUserDiscordID = Discord::getDiscordIDFromTeamname($this->db, $offeringTeam);
-        $receivingUserDiscordID = Discord::getDiscordIDFromTeamname($this->db, $receivingTeam);
+        $offeringUserDiscordID = Discord::getDiscordIDFromTeamname($this->db, $offeringTeamName);
+        $receivingUserDiscordID = Discord::getDiscordIDFromTeamname($this->db, $receivingTeamName);
 
         $cleanTradeText = str_replace(['<br>', '&nbsp;', '<i>', '</i>'], ["\n", " ", "_", "_"], $tradeText);
 

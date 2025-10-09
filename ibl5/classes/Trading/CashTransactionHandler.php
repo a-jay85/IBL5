@@ -55,15 +55,15 @@ class Trading_CashTransactionHandler
     /**
      * Create cash transaction entries in the database
      * @param int $itemId Unique item ID for the transaction
-     * @param string $sendingTeam Sending team name
-     * @param string $receivingTeam Receiving team name
+     * @param string $sendingTeamName Sending team name
+     * @param string $receivingTeamName Receiving team name
      * @param array $cashYear Cash amounts by year
      * @return array Result with success status and trade line text
      */
-    public function createCashTransaction($itemId, $sendingTeam, $receivingTeam, $cashYear)
+    public function createCashTransaction($itemId, $sendingTeamName, $receivingTeamName, $cashYear)
     {
-        $sendingTeamId = $this->sharedFunctions->getTidFromTeamname($sendingTeam);
-        $receivingTeamId = $this->sharedFunctions->getTidFromTeamname($receivingTeam);
+        $sendingTeamId = $this->sharedFunctions->getTidFromTeamname($sendingTeamName);
+        $receivingTeamId = $this->sharedFunctions->getTidFromTeamname($receivingTeamName);
         
         $contractCurrentYear = 1;
         $contractTotalYears = $this->calculateContractTotalYears($cashYear);
@@ -87,9 +87,9 @@ class Trading_CashTransactionHandler
         VALUES
             ('100000',
             '$itemId',
-            '| <B>Cash to $receivingTeam</B>',
+            '| <B>Cash to $receivingTeamName</B>',
             '$sendingTeamId',
-            '$sendingTeam',
+            '$sendingTeamName',
             '$contractCurrentYear',
             '$contractCurrentYear',
             '$contractTotalYears',
@@ -123,9 +123,9 @@ class Trading_CashTransactionHandler
         VALUES
             ('100000',
             '$itemId',
-            '| <B>Cash from $sendingTeam</B>',
+            '| <B>Cash from $sendingTeamName</B>',
             '$receivingTeamId',
-            '$receivingTeam',
+            '$receivingTeamName',
             '$contractCurrentYear',
             '$contractCurrentYear',
             '$contractTotalYears',
@@ -142,7 +142,7 @@ class Trading_CashTransactionHandler
         $tradeLine = "";
 
         if ($success) {
-            $tradeLine = "The $sendingTeam send {$cashYear[1]} {$cashYear[2]} {$cashYear[3]} {$cashYear[4]} {$cashYear[5]} {$cashYear[6]} in cash to the $receivingTeam.<br>";
+            $tradeLine = "The $sendingTeamName send {$cashYear[1]} {$cashYear[2]} {$cashYear[3]} {$cashYear[4]} {$cashYear[5]} {$cashYear[6]} in cash to the $receivingTeamName.<br>";
         }
 
         return [
@@ -154,12 +154,12 @@ class Trading_CashTransactionHandler
     /**
      * Insert cash trade data into ibl_trade_cash table
      * @param int $tradeOfferId Trade offer ID
-     * @param string $sendingTeam Sending team name
-     * @param string $receivingTeam Receiving team name
+     * @param string $sendingTeamName Sending team name
+     * @param string $receivingTeamName Receiving team name
      * @param array $cashAmounts Cash amounts by year (1-6)
      * @return bool Success status
      */
-    public function insertCashTradeData($tradeOfferId, $sendingTeam, $receivingTeam, $cashAmounts)
+    public function insertCashTradeData($tradeOfferId, $sendingTeamName, $receivingTeamName, $cashAmounts)
     {
         // Ensure all cash year values are set
         for ($i = 1; $i <= 6; $i++) {
@@ -177,8 +177,8 @@ class Trading_CashTransactionHandler
             `cy5`,
             `cy6` )
         VALUES    ( '$tradeOfferId',
-            '$sendingTeam',
-            '$receivingTeam',
+            '$sendingTeamName',
+            '$receivingTeamName',
             '{$cashAmounts[1]}',
             '{$cashAmounts[2]}',
             '{$cashAmounts[3]}',

@@ -36,7 +36,7 @@ function buildTeamFuturePicks($resultTeamPicks, $future_salary_array)
     return $uiHelper->buildTeamFuturePicks($resultTeamPicks, $future_salary_array);
 }
 
-function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
+function tradeoffer($username, $bypass = 0)
 {
     global $user, $prefix, $user_prefix, $db, $partner;
     $sharedFunctions = new Shared($db);
@@ -213,7 +213,7 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
     Nuke\Footer::footer();
 }
 
-function tradereview($username, $bypass = 0, $hid = 0, $url = 0)
+function tradereview($username, $bypass = 0)
 {
     global $user, $prefix, $user_prefix, $db;
     $sharedFunctions = new Shared($db);

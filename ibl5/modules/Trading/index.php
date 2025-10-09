@@ -202,7 +202,7 @@ function tradeoffer($username, $bypass = 0, $hid = 0, $url = 0)
 
     echo "<tr>
             <td colspan=3 align=center>
-                <input type=\"hidden\" name=\"counterfields\" value=\"$k\">
+                <input type=\"hidden\" name=\"fieldsCounter\" value=\"$k\">
                 <input type=\"submit\" value=\"Make Trade Offer\">
             </td>
         </tr>

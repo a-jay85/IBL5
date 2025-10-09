@@ -131,6 +131,7 @@ if (isset($_POST['query'])) {
             }
             if (isset($_POST['FANotifs'])) {
                 $season->freeAgencyNotificationsState = $_POST['FANotifs'];
+                Discord::postToChannel('#free-agency', $successText);
             }
         } else {
             $querySuccessful = false;

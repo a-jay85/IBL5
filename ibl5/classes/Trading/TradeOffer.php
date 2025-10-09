@@ -210,10 +210,10 @@ class Trading_TradeOffer
      * @param int $itemType Item type (0=pick, 1=player)
      * @param string $sendingTeamName Sending team name
      * @param string $receivingTeamName Receiving team name
-     * @param string $approvalTeam Team that needs to approve
+     * @param string $approvalTeamName Name of team that needs to approve
      * @return array Result
      */
-    protected function insertTradeItem($tradeOfferId, $itemId, $itemType, $sendingTeamName, $receivingTeamName, $approvalTeam)
+    protected function insertTradeItem($tradeOfferId, $itemId, $itemType, $sendingTeamName, $receivingTeamName, $approvalTeamName)
     {
         $query = "INSERT INTO ibl_trade_info 
           ( `tradeofferid`, 
@@ -227,7 +227,7 @@ class Trading_TradeOffer
             '$itemType', 
             '$sendingTeamName', 
             '$receivingTeamName', 
-            '$approvalTeam' )";
+            '$approvalTeamName' )";
         
         $this->db->sql_query($query);
 
@@ -289,20 +289,20 @@ class Trading_TradeOffer
     /**
      * Insert cash trade offer
      * @param int $tradeOfferId Trade offer ID
-     * @param string $sendingTeam Sending team
-     * @param string $receivingTeam Receiving team
+     * @param string $sendingTeamName Sending team name
+     * @param string $receivingTeamName Receiving team name
      * @param array $cashAmounts Cash amounts by year
      * @return array Result
      */
-    protected function insertCashTradeOffer($tradeOfferId, $sendingTeam, $receivingTeam, $cashAmounts)
+    protected function insertCashTradeOffer($tradeOfferId, $sendingTeamName, $receivingTeamName, $cashAmounts)
     {
         // Insert cash data
-        $this->cashHandler->insertCashTradeData($tradeOfferId, $sendingTeam, $receivingTeam, $cashAmounts);
+        $this->cashHandler->insertCashTradeData($tradeOfferId, $sendingTeamName, $receivingTeamName, $cashAmounts);
 
         // Insert trade info record for cash
-        $sendingTeamId = $this->sharedFunctions->getTidFromTeamname($sendingTeam);
-        $receivingTeamId = $this->sharedFunctions->getTidFromTeamname($receivingTeam);
-        
+        $sendingTeamId = $this->sharedFunctions->getTidFromTeamname($sendingTeamName);
+        $receivingTeamId = $this->sharedFunctions->getTidFromTeamname($receivingTeamName);
+
         $query = "INSERT INTO ibl_trade_info
           ( `tradeofferid`,
             `itemid`,

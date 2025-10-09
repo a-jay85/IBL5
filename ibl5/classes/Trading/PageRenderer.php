@@ -124,12 +124,15 @@ class Trading_PageRenderer
         }
 
         while ($z < $seasonsToDisplay) {
+            $userCapTotal = $futureSalaryUser['player'][$z] ?? 0;
+            $partnerCapTotal = $futureSalaryPartner['player'][$z] ?? 0;
+            
             echo "<tr>
                 <td>
-                    <b>$teamlogo Cap Total in " . ($currentSeasonEndingYear + $z - 1) . "-" . ($currentSeasonEndingYear + $z) . ":</b> " . $futureSalaryUser['player'][$z] . "
+                    <b>$teamlogo Cap Total in " . ($currentSeasonEndingYear + $z - 1) . "-" . ($currentSeasonEndingYear + $z) . ":</b> " . $userCapTotal . "
                 </td>
                 <td align=right>
-                    <b>$partner Cap Total in " . ($currentSeasonEndingYear + $z - 1) . "-" . ($currentSeasonEndingYear + $z) . ":</b> " . $futureSalaryPartner['player'][$z] . "
+                    <b>$partner Cap Total in " . ($currentSeasonEndingYear + $z - 1) . "-" . ($currentSeasonEndingYear + $z) . ":</b> " . $partnerCapTotal . "
                 </td>";
             $z++;
         }
@@ -288,23 +291,27 @@ class Trading_PageRenderer
             $dataBuilder = new Trading_TradeDataBuilder($this->db);
             $pickDetails = $dataBuilder->getDraftPickDetails($itemid);
             
-            $pickteam = $pickDetails['teampick'];
-            $pickyear = $pickDetails['year'];
-            $pickround = $pickDetails['round'];
-            $picknotes = $pickDetails['notes'];
+            if ($pickDetails) {
+                $pickteam = $pickDetails['teampick'] ?? '';
+                $pickyear = $pickDetails['year'] ?? '';
+                $pickround = $pickDetails['round'] ?? '';
+                $picknotes = $pickDetails['notes'] ?? null;
 
-            echo "The $from send the $pickteam $pickyear Round $pickround draft pick to the $to.<br>";
-            if ($picknotes != NULL) {
-                echo "<i>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;" . $picknotes . "</i><br>";
+                echo "The $from send the $pickteam $pickyear Round $pickround draft pick to the $to.<br>";
+                if ($picknotes != NULL) {
+                    echo "<i>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;" . $picknotes . "</i><br>";
+                }
             }
         } elseif ($itemtype == 1) {
             $dataBuilder = new Trading_TradeDataBuilder($this->db);
             $playerDetails = $dataBuilder->getPlayerDetails($itemid);
             
-            $plyrname = $playerDetails['name'];
-            $plyrpos = $playerDetails['pos'];
+            if ($playerDetails) {
+                $plyrname = $playerDetails['name'] ?? '';
+                $plyrpos = $playerDetails['pos'] ?? '';
 
-            echo "The $from send $plyrpos $plyrname to the $to.<br>";
+                echo "The $from send $plyrpos $plyrname to the $to.<br>";
+            }
         }
     }
 

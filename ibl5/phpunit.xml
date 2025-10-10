@@ -6,5 +6,8 @@
         <testsuite name="Trading Module Tests">
             <directory>tests/Trading</directory>
         </testsuite>
+        <testsuite name="Extension Module Tests">
+            <directory>tests/Extension</directory>
+        </testsuite>
     </testsuites>
 </phpunit>

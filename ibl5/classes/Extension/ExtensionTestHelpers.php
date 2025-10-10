@@ -3,9 +3,9 @@
  * Extension Test Helper Classes
  * 
  * These are stub/mock implementations of the extension logic classes
- * to support the comprehensive PHPUnit test suite for extension.php.
+ * to support the comprehensive PHPUnit test suite for modules/Player/extension.php.
  * 
- * These classes encapsulate the business logic from extension.php
+ * These classes encapsulate the business logic from modules/Player/extension.php
  * in a testable, object-oriented way.
  */
 

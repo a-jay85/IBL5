@@ -66,7 +66,7 @@ The test verified the expected behavior correctly.
 
 ### ❌ Red = Failing  
 The test found unexpected behavior. Check:
-1. Was extension.php modified?
+1. Was modules/Player/extension.php modified?
 2. Was a business rule changed?
 3. Does the test need updating?
 
@@ -221,7 +221,7 @@ stage('Test Extensions') {
 - **Usage Guide**: See `README.md`
 - **Code Analysis**: See `CODE_REVIEW.md`
 - **Project Overview**: See `FINAL_SUMMARY.md`
-- **Original Code**: See `../../extension.php`
+- **Original Code**: See `../../modules/Player/extension.php`
 - **Main Entry Point**: See `../../modules/Player/index.php`
 
 ## Quick Reference Card

@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-This document provides a comprehensive overview of the PHPUnit test suite created for `ibl5/extension.php`. The test suite consists of **59 test methods** across **4 test classes**, providing extensive coverage of contract extension functionality.
+This document provides a comprehensive overview of the PHPUnit test suite created for `ibl5/modules/Player/extension.php`. The test suite consists of **59 test methods** across **4 test classes**, providing extensive coverage of contract extension functionality.
 
 ## Test Statistics
 
@@ -297,11 +297,11 @@ The test suite is ready for continuous integration:
 
 ## Refactoring Guidance
 
-The test suite demonstrates how extension.php can be refactored:
+The test suite demonstrates how modules/Player/extension.php can be refactored:
 
 ### Current Structure (Procedural)
 ```php
-// extension.php - 310 lines of procedural code
+// modules/Player/extension.php - 310 lines of procedural code
 if ($Offer_1 == 0) { echo "error"; $nooffer = 1; }
 if ($UsedExtensionSeason == 1) { echo "error"; $nooffer = 1; }
 // ... many more validations
@@ -343,7 +343,7 @@ Benefits:
 
 ### Adding New Tests
 
-When adding features to extension.php:
+When adding features to modules/Player/extension.php:
 
 1. **Write test first** (TDD approach)
 2. **Add to appropriate test class**:
@@ -357,7 +357,7 @@ When adding features to extension.php:
 
 ### Modifying Existing Tests
 
-When changing extension.php behavior:
+When changing modules/Player/extension.php behavior:
 
 1. **Identify affected tests** (run suite first)
 2. **Update test expectations** to match new behavior

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This directory contains a comprehensive PHPUnit test suite for the contract extension functionality in `ibl5/extension.php`. These tests are designed to verify the contract extension system's behavior after refactoring and relocation in the codebase.
+This directory contains a comprehensive PHPUnit test suite for the contract extension functionality in `ibl5/modules/Player/extension.php`. These tests are designed to verify the contract extension system's behavior after refactoring and relocation in the codebase.
 
 ## Test Structure
 
@@ -102,7 +102,7 @@ Tests are organized with the following groups for selective execution:
 
 ## Test Coverage
 
-The test suite covers the following aspects of extension.php:
+The test suite covers the following aspects of modules/Player/extension.php:
 
 ### Input Validation (100% coverage)
 - ✓ Zero amount checks for years 1-3
@@ -143,7 +143,7 @@ The test suite includes helper implementation classes in `classes/Extension/Exte
 - **ExtensionDatabaseOperations**: Manages all database interactions
 - **ExtensionProcessor**: Orchestrates the complete workflow
 
-These classes provide a clean, testable API that can replace the procedural logic in extension.php during refactoring.
+These classes provide a clean, testable API that can replace the procedural logic in modules/Player/extension.php during refactoring.
 
 ## Key Business Rules Tested
 
@@ -187,7 +187,7 @@ The test suite uses `MockDatabase` class from `tests/bootstrap.php`:
 
 ## Notes for Refactoring
 
-When refactoring extension.php, consider:
+When refactoring modules/Player/extension.php, consider:
 
 1. **Extract validation logic** into ExtensionValidator
 2. **Extract evaluation logic** into ExtensionOfferEvaluator  
@@ -213,7 +213,7 @@ Possible improvements to the test suite:
 
 ## Maintenance
 
-When modifying extension.php:
+When modifying modules/Player/extension.php:
 1. Run the full test suite first
 2. Update tests to match new requirements
 3. Ensure all tests pass before committing
@@ -222,4 +222,4 @@ When modifying extension.php:
 
 ## Contact
 
-For questions about these tests, refer to the original extension.php implementation or the test code itself, which is heavily documented with clear assertions and test names.
+For questions about these tests, refer to the original modules/Player/extension.php implementation or the test code itself, which is heavily documented with clear assertions and test names.

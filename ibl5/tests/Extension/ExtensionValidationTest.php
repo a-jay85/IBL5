@@ -5,7 +5,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * Comprehensive tests for contract extension validation logic
  * 
- * Tests all validation rules from extension.php including:
+ * Tests all validation rules from modules/Player/extension.php including:
  * - Zero contract amount validation
  * - Extension usage validation (per chunk and per season)
  * - Maximum offer validation

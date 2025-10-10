@@ -599,7 +599,7 @@ function negotiate($pid)
             if ($fa_active == 1) {
                 echo "Sorry, the contract extension feature is not available during free agency.";
             } else {
-                echo "<form name=\"ExtensionOffer\" method=\"post\" action=\"extension.php\">";
+                echo "<form name=\"ExtensionOffer\" method=\"post\" action=\"modules/Player/extension.php\">";
 
                 $maxyr1 = 1063;
                 if ($player_exp > 6) {

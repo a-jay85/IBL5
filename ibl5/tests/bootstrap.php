@@ -23,6 +23,15 @@ spl_autoload_register(function ($class) {
         }
     }
     
+    // Handle Extension classes
+    if (strpos($class, 'Extension') === 0) {
+        $file = __DIR__ . '/../classes/Extension/ExtensionTestHelpers.php';
+        if (file_exists($file)) {
+            require_once $file;
+            return true;
+        }
+    }
+    
     // For other classes, don't auto-load them if we have mocks
     // This prevents loading the real Season, Shared, etc. classes
     return false;

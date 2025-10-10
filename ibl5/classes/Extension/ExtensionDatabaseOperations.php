@@ -254,4 +254,59 @@ class ExtensionDatabaseOperations
         }
         return $years;
     }
+    
+    /**
+     * Process a complete accepted extension workflow
+     * 
+     * @param string $playerName Player name
+     * @param string $teamName Team name
+     * @param array $offer Offer array
+     * @param int $currentSalary Current salary
+     * @return array Success status
+     */
+    public function processAcceptedExtension($playerName, $teamName, $offer, $currentSalary)
+    {
+        $this->updatePlayerContract($playerName, $offer, $currentSalary);
+        $this->markExtensionUsedThisSeason($teamName);
+        $offerYears = $this->calculateOfferYears($offer);
+        $offerTotal = $offer['year1'] + $offer['year2'] + $offer['year3'] + $offer['year4'] + $offer['year5'];
+        $offerInMillions = $offerTotal / 100;
+        $offerDetails = $offer['year1'] . " " . $offer['year2'] . " " . $offer['year3'] . " " . $offer['year4'] . " " . $offer['year5'];
+        $this->createAcceptedExtensionStory($playerName, $teamName, $offerInMillions, $offerYears, $offerDetails);
+        return ['success' => true];
+    }
+    
+    /**
+     * Process a complete rejected extension workflow
+     * 
+     * @param string $playerName Player name
+     * @param string $teamName Team name
+     * @param array $offer Offer array
+     * @return array Success status
+     */
+    public function processRejectedExtension($playerName, $teamName, $offer)
+    {
+        $offerYears = $this->calculateOfferYears($offer);
+        $offerTotal = $offer['year1'] + $offer['year2'] + $offer['year3'] + $offer['year4'] + $offer['year5'];
+        $offerInMillions = $offerTotal / 100;
+        $this->createRejectedExtensionStory($playerName, $teamName, $offerInMillions, $offerYears);
+        return ['success' => true];
+    }
+    
+    /**
+     * Increments the contract extensions counter
+     * 
+     * @return bool Success status
+     */
+    public function incrementExtensionsCounter()
+    {
+        $query = "SELECT counter FROM nuke_stories_cat WHERE title = 'Contract Extensions'";
+        $result = $this->db->sql_query($query);
+        $counter = $this->db->sql_result($result, 0, 'counter');
+        $newCounter = $counter + 1;
+        
+        $query = "UPDATE nuke_stories_cat SET counter = $newCounter WHERE title = 'Contract Extensions'";
+        $result = $this->db->sql_query($query);
+        return $result !== false;
+    }
 }

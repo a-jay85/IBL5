@@ -25,7 +25,9 @@ spl_autoload_register(function ($class) {
     
     // Handle Extension classes
     if (strpos($class, 'Extension') === 0) {
-        $file = __DIR__ . '/../classes/Extension/ExtensionTestHelpers.php';
+        // Map class names to production files
+        $classFile = $class . '.php';
+        $file = __DIR__ . '/../classes/Extension/' . $classFile;
         if (file_exists($file)) {
             require_once $file;
             return true;
@@ -135,6 +137,12 @@ class MockDatabase
     public function clearQueries()
     {
         $this->executedQueries = [];
+    }
+    
+    public function sql_escape_string($string)
+    {
+        // Simple escaping for mock - in production this would use mysqli_real_escape_string
+        return addslashes($string);
     }
 }
 

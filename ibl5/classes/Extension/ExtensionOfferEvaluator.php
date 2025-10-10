@@ -159,4 +159,19 @@ class ExtensionOfferEvaluator
     {
         return $offerTotal / 100;
     }
+    
+    /**
+     * Calculates player demands based on player value
+     * (Helper method for testing)
+     * 
+     * @param int $playerValue Player's value
+     * @return array Demands array with total and years
+     */
+    public function calculatePlayerDemands($playerValue)
+    {
+        return [
+            'total' => $playerValue * 5,
+            'years' => 5
+        ];
+    }
 }

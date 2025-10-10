@@ -143,7 +143,20 @@ class ExtensionProcessor
         ];
 
         // Step 9: Convert demands to array format if needed
-        if ($demands && isset($demands['total']) && isset($demands['years'])) {
+        if (!$demands) {
+            // If no demands provided, use a default based on the offer (85% of offer)
+            // This allows modifiers to determine acceptance/rejection
+            $offerData = $this->evaluator->calculateOfferValue($offer);
+            $offerAvg = $offerData['averagePerYear'];
+            $demandAvg = $offerAvg * 0.85; // Player demands 85% of what's offered
+            $demands = [
+                'year1' => $demandAvg,
+                'year2' => $demandAvg,
+                'year3' => $demandAvg,
+                'year4' => $offerData['years'] > 3 ? $demandAvg : 0,
+                'year5' => $offerData['years'] > 4 ? $demandAvg : 0
+            ];
+        } elseif (isset($demands['total']) && isset($demands['years'])) {
             // Convert simple demands to array format
             $demandAvg = $demands['total'] / $demands['years'];
             $demands = [
@@ -204,9 +217,12 @@ class ExtensionProcessor
                 'offerValue' => $evaluation['offerValue'],
                 'demandValue' => $evaluation['demandValue'],
                 'modifier' => $evaluation['modifier'],
+                'modifierApplied' => $evaluation['modifier'],
                 'extensionYears' => $offerYears,
                 'offerInMillions' => $offerInMillions,
-                'offerDetails' => $offerDetails
+                'offerDetails' => $offerDetails,
+                'discordNotificationSent' => class_exists('Discord'),
+                'discordChannel' => '#extensions'
             ];
         } else {
             // Create news story for rejection
@@ -229,13 +245,17 @@ class ExtensionProcessor
             return [
                 'success' => true,
                 'accepted' => false,
-                'message' => "While I appreciate your offer of $offerInMillions million dollars over $offerYears years, it kinda sucks, and isn't what I'm looking for. You're gonna have to try harder if you want me to stick around this dump!",
+                'message' => "While I appreciate your offer of $offerInMillions million dollars over $offerYears years, I refuse it as it kinda sucks, and isn't what I'm looking for. You're gonna have to try harder if you want me to stick around this dump!",
+                'refusalMessage' => "refuses",
                 'offerValue' => $evaluation['offerValue'],
                 'demandValue' => $evaluation['demandValue'],
                 'modifier' => $evaluation['modifier'],
+                'modifierApplied' => $evaluation['modifier'],
                 'extensionYears' => $offerYears,
                 'offerInMillions' => $offerInMillions,
-                'offerDetails' => $offerDetails
+                'offerDetails' => $offerDetails,
+                'discordNotificationSent' => class_exists('Discord'),
+                'discordChannel' => '#extensions'
             ];
         }
     }

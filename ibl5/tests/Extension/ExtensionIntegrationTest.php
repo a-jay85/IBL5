@@ -311,9 +311,9 @@ class ExtensionIntegrationTest extends TestCase
             'teamName' => 'Stacked Team',
             'playerName' => 'Rotation Player',
             'offer' => [
-                'year1' => 1100,
-                'year2' => 1200,
-                'year3' => 1300,
+                'year1' => 950,  // Under max of 1063 for 4 years exp
+                'year2' => 1000, // Small raises
+                'year3' => 1050,
                 'year4' => 0,
                 'year5' => 0
             ]
@@ -419,95 +419,219 @@ class ExtensionIntegrationTest extends TestCase
 
     private function setupSuccessfulExtensionScenario()
     {
+        // Combined data that works for all queries in the scenario
         $this->mockDb->setMockData([
-            // Team info
-            ['Used_Extension_This_Season' => 0, 'Used_Extension_This_Chunk' => 0,
-             'Contract_Wins' => 50, 'Contract_Losses' => 32,
-             'Contract_AvgW' => 2500, 'Contract_AvgL' => 2000],
-            // Player info
-            ['name' => 'Test Player', 'teamname' => 'Miami Cyclones',
-             'winner' => 3, 'tradition' => 3, 'loyalty' => 3, 'playingTime' => 3,
-             'exp' => 5, 'bird' => 2, 'cy' => 1, 'cy1' => 800, 'cy2' => 0],
-            // Category info
-            ['catid' => 1, 'counter' => 10],
-            // Topic info
-            ['topicid' => 5]
+            [
+                // Team info fields
+                'Used_Extension_This_Season' => 0,
+                'Used_Extension_This_Chunk' => 0,
+                'Contract_Wins' => 50,
+                'Contract_Losses' => 32,
+                'Contract_AvgW' => 2500,
+                'Contract_AvgL' => 2000,
+                'money_committed_at_position' => 0,
+                // Player info fields (combined in same row for mock)
+                'name' => 'Test Player',
+                'teamname' => 'Miami Cyclones',
+                'winner' => 3,
+                'tradition' => 3,
+                'loyalty' => 3,
+                'playingTime' => 3,
+                'exp' => 5,
+                'bird' => 2,
+                'cy' => 1,
+                'cy1' => 800,
+                'cy2' => 0,
+                'cy3' => 0,
+                'cy4' => 0,
+                'cy5' => 0,
+                'cy6' => 0,
+                // News story fields
+                'catid' => 1,
+                'counter' => 10,
+                'topicid' => 5
+            ]
         ]);
     }
 
     private function setupRejectedExtensionScenario()
     {
+        // Combined data that works for all queries in the scenario
         $this->mockDb->setMockData([
-            // Team info - losing team
-            ['Used_Extension_This_Season' => 0, 'Used_Extension_This_Chunk' => 0,
-             'Contract_Wins' => 25, 'Contract_Losses' => 57,
-             'Contract_AvgW' => 1500, 'Contract_AvgL' => 3500],
-            // Player info - high demands
-            ['name' => 'Demanding Player', 'teamname' => 'Seattle SuperSonics',
-             'winner' => 5, 'tradition' => 5, 'loyalty' => 1, 'playingTime' => 5,
-             'exp' => 8, 'bird' => 3, 'cy' => 1, 'cy1' => 1200, 'cy2' => 0],
-            ['catid' => 1, 'counter' => 10],
-            ['topicid' => 5]
+            [
+                // Team info fields - losing team
+                'Used_Extension_This_Season' => 0,
+                'Used_Extension_This_Chunk' => 0,
+                'Contract_Wins' => 25,
+                'Contract_Losses' => 57,
+                'Contract_AvgW' => 1500,
+                'Contract_AvgL' => 3500,
+                'money_committed_at_position' => 0,
+                // Player info fields - high demands
+                'name' => 'Demanding Player',
+                'teamname' => 'Seattle SuperSonics',
+                'winner' => 5,
+                'tradition' => 5,
+                'loyalty' => 1,
+                'playingTime' => 5,
+                'exp' => 8,
+                'bird' => 3,
+                'cy' => 1,
+                'cy1' => 1200,
+                'cy2' => 0,
+                'cy3' => 0,
+                'cy4' => 0,
+                'cy5' => 0,
+                'cy6' => 0,
+                // News story fields
+                'catid' => 1,
+                'counter' => 10,
+                'topicid' => 5
+            ]
         ]);
     }
 
     private function setupBasicExtensionScenario()
     {
+        // Combined data that works for all queries in the scenario
         $this->mockDb->setMockData([
-            ['Used_Extension_This_Season' => 0, 'Used_Extension_This_Chunk' => 0],
-            ['name' => 'Test Player', 'exp' => 5, 'bird' => 2, 'cy' => 1, 'cy1' => 800]
+            [
+                'Used_Extension_This_Season' => 0,
+                'Used_Extension_This_Chunk' => 0,
+                'name' => 'Test Player',
+                'exp' => 5,
+                'bird' => 2,
+                'cy' => 1,
+                'cy1' => 800,
+                'cy2' => 0,
+                'cy3' => 0,
+                'cy4' => 0,
+                'cy5' => 0,
+                'cy6' => 0,
+                'catid' => 1,
+                'counter' => 10
+            ]
         ]);
     }
 
     private function setupAlreadyExtendedScenario()
     {
         $this->mockDb->setMockData([
-            ['Used_Extension_This_Season' => 1, 'Used_Extension_This_Chunk' => 0]
+            [
+                'Used_Extension_This_Season' => 1,
+                'Used_Extension_This_Chunk' => 0,
+                'name' => 'Test Player',
+                'exp' => 5,
+                'bird' => 2
+            ]
         ]);
     }
 
     private function setupBirdRightsExtensionScenario()
     {
+        // Combined data that works for all queries in the scenario
         $this->mockDb->setMockData([
-            // Team info for eligibility check
-            ['Used_Extension_This_Season' => 0, 'Used_Extension_This_Chunk' => 0,
-             'Contract_Wins' => 50, 'Contract_Losses' => 32,
-             'Contract_AvgW' => 2500, 'Contract_AvgL' => 2000],
-            // Player info with Bird rights
-            ['name' => 'Veteran Player', 'exp' => 8, 'bird' => 4, 'cy' => 1,
-             'winner' => 3, 'tradition' => 3, 'loyalty' => 3, 'playingTime' => 3,
-             'cy1' => 900, 'cy2' => 0, 'cy3' => 0, 'cy4' => 0, 'cy5' => 0, 'cy6' => 0],
-            ['catid' => 1, 'counter' => 10],
-            ['topicid' => 5]
+            [
+                // Team info fields
+                'Used_Extension_This_Season' => 0,
+                'Used_Extension_This_Chunk' => 0,
+                'Contract_Wins' => 50,
+                'Contract_Losses' => 32,
+                'Contract_AvgW' => 2500,
+                'Contract_AvgL' => 2000,
+                'money_committed_at_position' => 0,
+                // Player info fields (combined in same row for mock)
+                'name' => 'Veteran Player',
+                'exp' => 8,
+                'bird' => 4,
+                'cy' => 1,
+                'winner' => 3,
+                'tradition' => 3,
+                'loyalty' => 3,
+                'playingTime' => 3,
+                'cy1' => 900,
+                'cy2' => 0,
+                'cy3' => 0,
+                'cy4' => 0,
+                'cy5' => 0,
+                'cy6' => 0,
+                // News story fields
+                'catid' => 1,
+                'counter' => 10,
+                'topicid' => 5
+            ]
         ]);
     }
 
     private function setupHighLoyaltyPlayerScenario()
     {
+        // Combined data that works for all queries in the scenario
         $this->mockDb->setMockData([
-            ['Used_Extension_This_Season' => 0, 'Used_Extension_This_Chunk' => 0,
-             'Contract_Wins' => 45, 'Contract_Losses' => 37,
-             'Contract_AvgW' => 2300, 'Contract_AvgL' => 2100],
-            ['name' => 'Loyal Player', 'exp' => 6, 'bird' => 3,
-             'winner' => 3, 'tradition' => 3, 'loyalty' => 5, 'playingTime' => 3,
-             'cy' => 1, 'cy1' => 850, 'cy2' => 0, 'cy3' => 0, 'cy4' => 0, 'cy5' => 0, 'cy6' => 0],
-            ['catid' => 1, 'counter' => 10],
-            ['topicid' => 5]
+            [
+                // Team info fields
+                'Used_Extension_This_Season' => 0,
+                'Used_Extension_This_Chunk' => 0,
+                'Contract_Wins' => 45,
+                'Contract_Losses' => 37,
+                'Contract_AvgW' => 2300,
+                'Contract_AvgL' => 2100,
+                'money_committed_at_position' => 0,
+                // Player info fields (combined in same row for mock)
+                'name' => 'Loyal Player',
+                'exp' => 6,
+                'bird' => 3,
+                'winner' => 3,
+                'tradition' => 3,
+                'loyalty' => 5,
+                'playingTime' => 3,
+                'cy' => 1,
+                'cy1' => 850,
+                'cy2' => 0,
+                'cy3' => 0,
+                'cy4' => 0,
+                'cy5' => 0,
+                'cy6' => 0,
+                // News story fields
+                'catid' => 1,
+                'counter' => 10,
+                'topicid' => 5
+            ]
         ]);
     }
 
     private function setupPlayingTimeScenario()
     {
+        // Combined data that works for all queries in the scenario
         $this->mockDb->setMockData([
-            ['Used_Extension_This_Season' => 0, 'Used_Extension_This_Chunk' => 0,
-             'money_committed_at_position' => 8000,
-             'Contract_Wins' => 55, 'Contract_Losses' => 27,
-             'Contract_AvgW' => 2700, 'Contract_AvgL' => 1900],
-            ['name' => 'Rotation Player', 'exp' => 4, 'bird' => 2,
-             'winner' => 3, 'tradition' => 3, 'loyalty' => 2, 'playingTime' => 5,
-             'cy' => 1, 'cy1' => 800, 'cy2' => 0, 'cy3' => 0, 'cy4' => 0, 'cy5' => 0, 'cy6' => 0],
-            ['catid' => 1, 'counter' => 10],
-            ['topicid' => 5]
+            [
+                // Team info fields
+                'Used_Extension_This_Season' => 0,
+                'Used_Extension_This_Chunk' => 0,
+                'money_committed_at_position' => 8000,
+                'Contract_Wins' => 55,
+                'Contract_Losses' => 27,
+                'Contract_AvgW' => 2700,
+                'Contract_AvgL' => 1900,
+                // Player info fields (combined in same row for mock)
+                'name' => 'Rotation Player',
+                'exp' => 4,
+                'bird' => 2,
+                'winner' => 3,
+                'tradition' => 3,
+                'loyalty' => 2,
+                'playingTime' => 5,
+                'cy' => 1,
+                'cy1' => 800,
+                'cy2' => 0,
+                'cy3' => 0,
+                'cy4' => 0,
+                'cy5' => 0,
+                'cy6' => 0,
+                // News story fields
+                'catid' => 1,
+                'counter' => 10,
+                'topicid' => 5
+            ]
         ]);
     }
 }

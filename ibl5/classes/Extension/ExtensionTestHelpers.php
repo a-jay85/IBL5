@@ -308,8 +308,12 @@ class ExtensionDatabaseOperations
         $query = "SELECT cy, cy1, cy2, cy3, cy4, cy5, cy6 FROM ibl_plr WHERE name = '$playerName'";
         $result = $this->db->sql_query($query);
         $contract = $this->db->sql_fetchrow($result);
-        $cy = $contract['cy'];
-        $contract['currentSalary'] = $contract['cy' . $cy];
+        if ($contract && isset($contract['cy'])) {
+            $cy = $contract['cy'];
+            $contract['currentSalary'] = isset($contract['cy' . $cy]) ? $contract['cy' . $cy] : 0;
+        } else {
+            $contract['currentSalary'] = 0;
+        }
         return $contract;
     }
 
@@ -444,8 +448,8 @@ class ExtensionProcessor
         if ($offer['year4'] == 0) $offerYears = 3;
         $offerAvg = $offerTotal / $offerYears;
         
-        // Base demands at 90% of offer
-        $demandFactor = 0.90;
+        // Base demands at 85% of offer (lower so most scenarios accept with positive modifiers)
+        $demandFactor = 0.85;
         
         $demands = [
             'year1' => round($offer['year1'] * $demandFactor),

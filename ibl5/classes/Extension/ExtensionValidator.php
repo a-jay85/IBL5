@@ -1,0 +1,199 @@
+<?php
+
+/**
+ * Extension Validator Class
+ * 
+ * Handles all validation logic for contract extension offers.
+ * Encapsulates business rules for:
+ * - Zero amount validation
+ * - Extension eligibility
+ * - Maximum offer validation
+ * - Raise percentage validation
+ * - Salary decrease validation
+ */
+class ExtensionValidator
+{
+    private $db;
+
+    const MAX_SALARY_0_TO_6_YEARS = 1063;
+    const MAX_SALARY_7_TO_9_YEARS = 1275;
+    const MAX_SALARY_10_PLUS_YEARS = 1451;
+    
+    const RAISE_PERCENTAGE_WITHOUT_BIRD = 0.10;
+    const RAISE_PERCENTAGE_WITH_BIRD = 0.125;
+    const BIRD_RIGHTS_THRESHOLD = 3;
+
+    public function __construct($db)
+    {
+        $this->db = $db;
+    }
+
+    /**
+     * Validates that the first three years of the offer have non-zero amounts
+     * 
+     * @param array $offer Array with keys: year1, year2, year3, year4, year5
+     * @return array ['valid' => bool, 'error' => string|null]
+     */
+    public function validateOfferAmounts($offer)
+    {
+        if ($offer['year1'] == 0) {
+            return [
+                'valid' => false, 
+                'error' => 'Sorry, you must enter an amount greater than zero for each of the first three contract years when making an extension offer. Your offer in Year 1 was zero, so this offer is not valid.'
+            ];
+        }
+        if ($offer['year2'] == 0) {
+            return [
+                'valid' => false, 
+                'error' => 'Sorry, you must enter an amount greater than zero for each of the first three contract years when making an extension offer. Your offer in Year 2 was zero, so this offer is not valid.'
+            ];
+        }
+        if ($offer['year3'] == 0) {
+            return [
+                'valid' => false, 
+                'error' => 'Sorry, you must enter an amount greater than zero for each of the first three contract years when making an extension offer. Your offer in Year 3 was zero, so this offer is not valid.'
+            ];
+        }
+        return ['valid' => true, 'error' => null];
+    }
+
+    /**
+     * Validates that the team hasn't already used their extension
+     * 
+     * @param string $teamName Team name to check
+     * @return array ['valid' => bool, 'error' => string|null]
+     */
+    public function validateExtensionEligibility($teamName)
+    {
+        $query = "SELECT Used_Extension_This_Season, Used_Extension_This_Chunk FROM ibl_team_info WHERE team_name = '" . $this->db->sql_escape_string($teamName) . "'";
+        $result = $this->db->sql_query($query);
+        
+        if (!$result || $this->db->sql_numrows($result) == 0) {
+            return ['valid' => false, 'error' => 'Team not found in database.'];
+        }
+        
+        $usedThisSeason = $this->db->sql_result($result, 0, 'Used_Extension_This_Season');
+        $usedThisChunk = $this->db->sql_result($result, 0, 'Used_Extension_This_Chunk');
+        
+        if ($usedThisSeason == 1) {
+            return ['valid' => false, 'error' => 'Sorry, you have already used your extension for this season.'];
+        }
+        if ($usedThisChunk == 1) {
+            return ['valid' => false, 'error' => 'Sorry, you have already used your extension for this Chunk.'];
+        }
+        return ['valid' => true, 'error' => null];
+    }
+
+    /**
+     * Validates that the offer doesn't exceed the maximum allowed for player's experience
+     * 
+     * @param array $offer Offer array
+     * @param int $yearsExperience Player's years of experience
+     * @return array ['valid' => bool, 'error' => string|null]
+     */
+    public function validateMaximumOffer($offer, $yearsExperience)
+    {
+        $maxOffer = $this->getMaximumOffer($yearsExperience);
+        if ($offer['year1'] > $maxOffer) {
+            return ['valid' => false, 'error' => 'Sorry, this offer is over the maximum allowed offer for a player with their years of service.'];
+        }
+        return ['valid' => true, 'error' => null];
+    }
+
+    /**
+     * Validates that raises between years don't exceed allowed percentages
+     * 
+     * @param array $offer Offer array
+     * @param int $birdYears Years with Bird rights
+     * @return array ['valid' => bool, 'error' => string|null]
+     */
+    public function validateRaises($offer, $birdYears)
+    {
+        $maxRaisePercentage = ($birdYears >= self::BIRD_RIGHTS_THRESHOLD) 
+            ? self::RAISE_PERCENTAGE_WITH_BIRD 
+            : self::RAISE_PERCENTAGE_WITHOUT_BIRD;
+        $maxIncrease = round($offer['year1'] * $maxRaisePercentage, 0);
+        
+        if ($offer['year2'] > $offer['year1'] + $maxIncrease) {
+            $legaloffer = $offer['year1'] + $maxIncrease;
+            return [
+                'valid' => false, 
+                'error' => "Sorry, you tried to offer a larger raise than is permitted. Your first year offer was {$offer['year1']} which means the maximum raise allowed each year is $maxIncrease. Your offer in Year 2 was {$offer['year2']}, which is more than your Year 1 offer, {$offer['year1']}, plus the max increase of $maxIncrease. Given your offer in Year 1, the most you can offer in Year 2 is $legaloffer."
+            ];
+        }
+        if ($offer['year3'] > $offer['year2'] + $maxIncrease) {
+            $legaloffer = $offer['year2'] + $maxIncrease;
+            return [
+                'valid' => false, 
+                'error' => "Sorry, you tried to offer a larger raise than is permitted. Your first year offer was {$offer['year1']} which means the maximum raise allowed each year is $maxIncrease. Your offer in Year 3 was {$offer['year3']}, which is more than your Year 2 offer, {$offer['year2']}, plus the max increase of $maxIncrease. Given your offer in Year 2, the most you can offer in Year 3 is $legaloffer."
+            ];
+        }
+        if ($offer['year4'] > 0 && $offer['year4'] > $offer['year3'] + $maxIncrease) {
+            $legaloffer = $offer['year3'] + $maxIncrease;
+            return [
+                'valid' => false, 
+                'error' => "Sorry, you tried to offer a larger raise than is permitted. Your first year offer was {$offer['year1']} which means the maximum raise allowed each year is $maxIncrease. Your offer in Year 4 was {$offer['year4']}, which is more than your Year 3 offer, {$offer['year3']}, plus the max increase of $maxIncrease. Given your offer in Year 3, the most you can offer in Year 4 is $legaloffer."
+            ];
+        }
+        if ($offer['year5'] > 0 && $offer['year5'] > $offer['year4'] + $maxIncrease) {
+            $legaloffer = $offer['year4'] + $maxIncrease;
+            return [
+                'valid' => false, 
+                'error' => "Sorry, you tried to offer a larger raise than is permitted. Your first year offer was {$offer['year1']} which means the maximum raise allowed each year is $maxIncrease. Your offer in Year 5 was {$offer['year5']}, which is more than your Year 4 offer, {$offer['year4']}, plus the max increase of $maxIncrease. Given your offer in Year 4, the most you can offer in Year 5 is $legaloffer."
+            ];
+        }
+        return ['valid' => true, 'error' => null];
+    }
+
+    /**
+     * Validates that salaries don't decrease in later years (except to zero)
+     * 
+     * @param array $offer Offer array
+     * @return array ['valid' => bool, 'error' => string|null]
+     */
+    public function validateSalaryDecreases($offer)
+    {
+        if ($offer['year2'] < $offer['year1'] && $offer['year2'] != 0) {
+            return [
+                'valid' => false, 
+                'error' => "Sorry, you cannot decrease salary in later years of a contract. You offered {$offer['year2']} in the second year, which is less than you offered in the first year, {$offer['year1']}."
+            ];
+        }
+        if ($offer['year3'] < $offer['year2'] && $offer['year3'] != 0) {
+            return [
+                'valid' => false, 
+                'error' => "Sorry, you cannot decrease salary in later years of a contract. You offered {$offer['year3']} in the third year, which is less than you offered in the second year, {$offer['year2']}."
+            ];
+        }
+        if ($offer['year4'] < $offer['year3'] && $offer['year4'] != 0) {
+            return [
+                'valid' => false, 
+                'error' => "Sorry, you cannot decrease salary in later years of a contract. You offered {$offer['year4']} in the fourth year, which is less than you offered in the third year, {$offer['year3']}."
+            ];
+        }
+        if ($offer['year5'] < $offer['year4'] && $offer['year5'] != 0) {
+            return [
+                'valid' => false, 
+                'error' => "Sorry, you cannot decrease salary in later years of a contract. You offered {$offer['year5']} in the fifth year, which is less than you offered in the fourth year, {$offer['year4']}."
+            ];
+        }
+        return ['valid' => true, 'error' => null];
+    }
+
+    /**
+     * Gets the maximum offer allowed based on years of experience
+     * 
+     * @param int $yearsExperience Player's years of experience
+     * @return int Maximum offer amount
+     */
+    private function getMaximumOffer($yearsExperience)
+    {
+        if ($yearsExperience > 9) {
+            return self::MAX_SALARY_10_PLUS_YEARS;
+        }
+        if ($yearsExperience > 6) {
+            return self::MAX_SALARY_7_TO_9_YEARS;
+        }
+        return self::MAX_SALARY_0_TO_6_YEARS;
+    }
+}

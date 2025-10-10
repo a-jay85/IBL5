@@ -177,15 +177,24 @@ class ExtensionDatabaseOperationsTest extends TestCase
         $this->assertTrue($result);
         $queries = $this->mockDb->getExecutedQueries();
         
-        // Should have 3 queries: SELECT category, UPDATE counter, INSERT story
+        // Should have multiple queries: SELECT category, INSERT story
         $this->assertGreaterThanOrEqual(2, count($queries));
+        
+        // Check for SELECT category query
+        $foundSelect = false;
+        foreach ($queries as $query) {
+            if (strpos($query, 'SELECT catid, counter FROM nuke_stories_cat') !== false) {
+                $foundSelect = true;
+                $this->assertStringContainsString('Contract Extensions', $query);
+            }
+        }
+        $this->assertTrue($foundSelect, 'Should have queried for Contract Extensions category');
         
         // Check for INSERT INTO nuke_stories
         $foundInsert = false;
         foreach ($queries as $query) {
             if (strpos($query, 'INSERT INTO nuke_stories') !== false) {
                 $foundInsert = true;
-                $this->assertStringContainsString('Contract Extensions', $query);
                 $this->assertStringContainsString($playerName, $query);
                 $this->assertStringContainsString($teamName, $query);
                 $this->assertStringContainsString('accepted', $query);

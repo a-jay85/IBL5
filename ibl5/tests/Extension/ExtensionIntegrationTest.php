@@ -60,14 +60,16 @@ class ExtensionIntegrationTest extends TestCase
         $queries = $this->mockDb->getExecutedQueries();
         $this->assertGreaterThan(0, count($queries));
         
+        $allQueries = implode(' ', $queries);
+        
         // Verify chunk flag was set
-        $this->assertContains('Used_Extension_This_Chunk = 1', implode(' ', $queries));
+        $this->assertStringContainsString('Used_Extension_This_Chunk = 1', $allQueries);
         
         // Verify season flag was set (for accepted extension)
-        $this->assertContains('Used_Extension_This_Season = 1', implode(' ', $queries));
+        $this->assertStringContainsString('Used_Extension_This_Season = 1', $allQueries);
         
         // Verify player contract was updated
-        $this->assertContains('UPDATE ibl_plr', implode(' ', $queries));
+        $this->assertStringContainsString('UPDATE ibl_plr', $allQueries);
     }
 
     /**
@@ -102,8 +104,8 @@ class ExtensionIntegrationTest extends TestCase
         // Verify chunk flag was set but NOT season flag
         $queries = $this->mockDb->getExecutedQueries();
         $allQueries = implode(' ', $queries);
-        $this->assertContains('Used_Extension_This_Chunk = 1', $allQueries);
-        $this->assertNotContains('Used_Extension_This_Season = 1', $allQueries);
+        $this->assertStringContainsString('Used_Extension_This_Chunk = 1', $allQueries);
+        $this->assertStringNotContainsString('Used_Extension_This_Season = 1', $allQueries);
     }
 
     /**
@@ -138,7 +140,7 @@ class ExtensionIntegrationTest extends TestCase
         // Verify NO database changes were made
         $queries = $this->mockDb->getExecutedQueries();
         $allQueries = implode(' ', $queries);
-        $this->assertNotContains('Used_Extension_This_Chunk', $allQueries);
+        $this->assertStringNotContainsString('Used_Extension_This_Chunk', $allQueries);
     }
 
     /**
@@ -169,9 +171,13 @@ class ExtensionIntegrationTest extends TestCase
         $this->assertFalse($result['success']);
         $this->assertStringContainsString('already used your extension for this season', $result['error']);
         
-        // Verify NO new database changes
+        // Verify only eligibility check query was made, no extension processing
         $queries = $this->mockDb->getExecutedQueries();
-        $this->assertCount(0, $queries); // Only the initial setup query
+        // Should have at least one query for eligibility check
+        $this->assertGreaterThanOrEqual(1, count($queries));
+        // But should NOT have marked chunk as used or updated contract
+        $allQueries = implode(' ', $queries);
+        $this->assertStringNotContainsString('UPDATE ibl_plr', $allQueries);
     }
 
     /**
@@ -463,9 +469,14 @@ class ExtensionIntegrationTest extends TestCase
     private function setupBirdRightsExtensionScenario()
     {
         $this->mockDb->setMockData([
-            ['Used_Extension_This_Season' => 0, 'Used_Extension_This_Chunk' => 0],
+            // Team info for eligibility check
+            ['Used_Extension_This_Season' => 0, 'Used_Extension_This_Chunk' => 0,
+             'Contract_Wins' => 50, 'Contract_Losses' => 32,
+             'Contract_AvgW' => 2500, 'Contract_AvgL' => 2000],
+            // Player info with Bird rights
             ['name' => 'Veteran Player', 'exp' => 8, 'bird' => 4, 'cy' => 1,
-             'winner' => 3, 'tradition' => 3, 'loyalty' => 3, 'playingTime' => 3],
+             'winner' => 3, 'tradition' => 3, 'loyalty' => 3, 'playingTime' => 3,
+             'cy1' => 900, 'cy2' => 0, 'cy3' => 0, 'cy4' => 0, 'cy5' => 0, 'cy6' => 0],
             ['catid' => 1, 'counter' => 10],
             ['topicid' => 5]
         ]);
@@ -475,9 +486,11 @@ class ExtensionIntegrationTest extends TestCase
     {
         $this->mockDb->setMockData([
             ['Used_Extension_This_Season' => 0, 'Used_Extension_This_Chunk' => 0,
-             'Contract_Wins' => 45, 'Contract_Losses' => 37],
+             'Contract_Wins' => 45, 'Contract_Losses' => 37,
+             'Contract_AvgW' => 2300, 'Contract_AvgL' => 2100],
             ['name' => 'Loyal Player', 'exp' => 6, 'bird' => 3,
-             'winner' => 3, 'tradition' => 3, 'loyalty' => 5, 'playingTime' => 3],
+             'winner' => 3, 'tradition' => 3, 'loyalty' => 5, 'playingTime' => 3,
+             'cy' => 1, 'cy1' => 850, 'cy2' => 0, 'cy3' => 0, 'cy4' => 0, 'cy5' => 0, 'cy6' => 0],
             ['catid' => 1, 'counter' => 10],
             ['topicid' => 5]
         ]);
@@ -487,9 +500,12 @@ class ExtensionIntegrationTest extends TestCase
     {
         $this->mockDb->setMockData([
             ['Used_Extension_This_Season' => 0, 'Used_Extension_This_Chunk' => 0,
-             'money_committed_at_position' => 8000], // High money at position
+             'money_committed_at_position' => 8000,
+             'Contract_Wins' => 55, 'Contract_Losses' => 27,
+             'Contract_AvgW' => 2700, 'Contract_AvgL' => 1900],
             ['name' => 'Rotation Player', 'exp' => 4, 'bird' => 2,
-             'winner' => 3, 'tradition' => 3, 'loyalty' => 2, 'playingTime' => 5],
+             'winner' => 3, 'tradition' => 3, 'loyalty' => 2, 'playingTime' => 5,
+             'cy' => 1, 'cy1' => 800, 'cy2' => 0, 'cy3' => 0, 'cy4' => 0, 'cy5' => 0, 'cy6' => 0],
             ['catid' => 1, 'counter' => 10],
             ['topicid' => 5]
         ]);

@@ -29,6 +29,26 @@ class ExtensionValidator
     }
 
     /**
+     * Escapes a string for SQL queries
+     * Works with both real MySQL class and mock database
+     * 
+     * @param string $string String to escape
+     * @return string Escaped string
+     */
+    private function escapeString($string)
+    {
+        // Check if this is the real MySQL class with db_connect_id
+        if (isset($this->db->db_connect_id) && $this->db->db_connect_id) {
+            return mysqli_real_escape_string($this->db->db_connect_id, $string);
+        }
+        // Otherwise use the mock's sql_escape_string or fallback to addslashes
+        if (method_exists($this->db, 'sql_escape_string')) {
+            return $this->db->sql_escape_string($string);
+        }
+        return addslashes($string);
+    }
+
+    /**
      * Validates that the first three years of the offer have non-zero amounts
      * 
      * @param array $offer Array with keys: year1, year2, year3, year4, year5
@@ -65,7 +85,8 @@ class ExtensionValidator
      */
     public function validateExtensionEligibility($teamName)
     {
-        $query = "SELECT Used_Extension_This_Season, Used_Extension_This_Chunk FROM ibl_team_info WHERE team_name = '" . $this->db->sql_escape_string($teamName) . "'";
+        $teamNameEscaped = $this->escapeString($teamName);
+        $query = "SELECT Used_Extension_This_Season, Used_Extension_This_Chunk FROM ibl_team_info WHERE team_name = '$teamNameEscaped'";
         $result = $this->db->sql_query($query);
         
         if (!$result || $this->db->sql_numrows($result) == 0) {

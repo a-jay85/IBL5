@@ -1,6 +1,7 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
+use Extension\ExtensionValidator;
 
 /**
  * Comprehensive tests for contract extension validation logic

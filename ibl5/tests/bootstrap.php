@@ -23,11 +23,11 @@ spl_autoload_register(function ($class) {
         }
     }
     
-    // Handle Extension classes
-    if (strpos($class, 'Extension') === 0) {
-        // Map class names to production files
-        $classFile = $class . '.php';
-        $file = __DIR__ . '/../classes/Extension/' . $classFile;
+    // Handle Extension classes with namespace
+    if (strpos($class, 'Extension\\') === 0) {
+        // Remove namespace prefix to get just the class name
+        $className = str_replace('Extension\\', '', $class);
+        $file = __DIR__ . '/../classes/Extension/' . $className . '.php';
         if (file_exists($file)) {
             require_once $file;
             return true;

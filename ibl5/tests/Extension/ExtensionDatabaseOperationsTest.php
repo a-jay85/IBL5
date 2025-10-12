@@ -1,6 +1,7 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
+use Extension\ExtensionDatabaseOperations;
 
 /**
  * Tests for contract extension database operations

@@ -1,6 +1,7 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
+use Extension\ExtensionProcessor;
 
 /**
  * Integration tests for complete contract extension workflows

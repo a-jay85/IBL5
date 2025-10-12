@@ -1,6 +1,7 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
+use Extension\ExtensionOfferEvaluator;
 
 /**
  * Tests for contract extension offer evaluation logic

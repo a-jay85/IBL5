@@ -1,5 +1,7 @@
 <?php
 
+namespace Extension;
+
 /**
  * Extension Database Operations Class
  * 

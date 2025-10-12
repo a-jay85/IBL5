@@ -1,7 +1,6 @@
 <?php
 
 require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
-require_once $_SERVER['DOCUMENT_ROOT'] . '/ibl5/classes/Extension/ExtensionProcessor.php';
 
 echo "<HTML><HEAD><TITLE>Contract Extension Offer Result</TITLE></HEAD><BODY>";
 
@@ -37,7 +36,7 @@ $extensionData = [
 ];
 
 // Process extension using new architecture
-$processor = new ExtensionProcessor($db);
+$processor = new \Extension\ExtensionProcessor($db);
 $result = $processor->processExtension($extensionData);
 
 // Display results

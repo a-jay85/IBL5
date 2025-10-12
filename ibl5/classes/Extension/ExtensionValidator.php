@@ -1,5 +1,7 @@
 <?php
 
+namespace Extension;
+
 /**
  * Extension Validator Class
  * 

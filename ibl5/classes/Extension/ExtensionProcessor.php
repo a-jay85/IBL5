@@ -1,8 +1,6 @@
 <?php
 
-require_once 'ExtensionValidator.php';
-require_once 'ExtensionOfferEvaluator.php';
-require_once 'ExtensionDatabaseOperations.php';
+namespace Extension;
 
 /**
  * Extension Processor Class
@@ -196,7 +194,7 @@ class ExtensionProcessor
             // Send Discord notification
             if (class_exists('Discord')) {
                 $hometext = "$playerName today accepted a contract extension offer from the $teamName worth $offerInMillions million dollars over $offerYears years:<br>" . $offerDetails;
-                Discord::postToChannel('#extensions', $hometext);
+                \Discord::postToChannel('#extensions', $hometext);
             }
             
             // Send email notification (only on non-localhost)
@@ -231,7 +229,7 @@ class ExtensionProcessor
             // Send Discord notification
             if (class_exists('Discord')) {
                 $hometext = "$playerName today rejected a contract extension offer from the $teamName worth $offerInMillions million dollars over $offerYears years.";
-                Discord::postToChannel('#extensions', $hometext);
+                \Discord::postToChannel('#extensions', $hometext);
             }
             
             // Send email notification

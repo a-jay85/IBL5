@@ -1,5 +1,7 @@
 <?php
 
+namespace Extension;
+
 /**
  * Extension Offer Evaluator Class
  * 

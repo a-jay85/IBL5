@@ -102,7 +102,7 @@ class ExtensionOfferEvaluator
         $moneyCommitted = isset($teamFactors['money_committed_at_position']) 
             ? $teamFactors['money_committed_at_position'] 
             : 0;
-        return -(.0025 * $moneyCommitted / 100 - 0.025) * ($playerPreferences['playing_time'] - 1);
+        return -0.0025 * ($moneyCommitted / 100) * ($playerPreferences['playing_time'] - 1);
     }
 
     /**

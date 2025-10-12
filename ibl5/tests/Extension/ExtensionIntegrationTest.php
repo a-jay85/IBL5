@@ -615,6 +615,7 @@ class ExtensionIntegrationTest extends TestCase
                 'Contract_AvgL' => 1900,
                 // Player info fields (combined in same row for mock)
                 'name' => 'Rotation Player',
+                'pos' => 'G',  // Add position field
                 'exp' => 4,
                 'bird' => 2,
                 'winner' => 3,

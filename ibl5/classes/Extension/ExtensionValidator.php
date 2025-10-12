@@ -245,28 +245,4 @@ class ExtensionValidator
         
         return ['valid' => true, 'error' => null];
     }
-
-    /**
-     * Validates maximum year one offer using a Player object
-     * 
-     * @param array $offer Offer array with year1-year5
-     * @param \Player $player Player object
-     * @return array ['valid' => bool, 'error' => string|null]
-     */
-    public function validateMaximumYearOneOfferWithPlayer($offer, $player)
-    {
-        return $this->validateMaximumYearOneOffer($offer, $player->yearsOfExperience);
-    }
-
-    /**
-     * Validates raises using a Player object
-     * 
-     * @param array $offer Offer array with year1-year5
-     * @param \Player $player Player object
-     * @return array ['valid' => bool, 'error' => string|null]
-     */
-    public function validateRaisesWithPlayer($offer, $player)
-    {
-        return $this->validateRaises($offer, $player->birdYears);
-    }
 }

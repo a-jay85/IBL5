@@ -92,8 +92,8 @@ class ExtensionProcessor
             ];
         }
 
-        // Step 4: Validate maximum offer using Player object
-        $maxOfferValidation = $this->validator->validateMaximumYearOneOfferWithPlayer($offer, $player);
+        // Step 4: Validate maximum offer using player's years of experience
+        $maxOfferValidation = $this->validator->validateMaximumYearOneOffer($offer, $player->yearsOfExperience);
         if (!$maxOfferValidation['valid']) {
             return [
                 'success' => false,
@@ -101,8 +101,8 @@ class ExtensionProcessor
             ];
         }
 
-        // Step 5: Validate raises using Player object
-        $raisesValidation = $this->validator->validateRaisesWithPlayer($offer, $player);
+        // Step 5: Validate raises using player's bird years
+        $raisesValidation = $this->validator->validateRaises($offer, $player->birdYears);
         if (!$raisesValidation['valid']) {
             return [
                 'success' => false,

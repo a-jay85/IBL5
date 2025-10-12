@@ -2,6 +2,10 @@
 
 namespace Extension;
 
+// Include required classes
+require_once __DIR__ . '/../Team.php';
+require_once __DIR__ . '/../Player.php';
+
 /**
  * Extension Processor Class
  * 
@@ -125,12 +129,23 @@ class ExtensionProcessor
             ];
         }
 
+        // Calculate money committed at player's position
+        $playerPosition = isset($playerInfo['pos']) ? $playerInfo['pos'] : '';
+        
+        // First check if money_committed_at_position is provided in team info (for testing)
+        if (isset($teamInfo['money_committed_at_position'])) {
+            $moneyCommittedAtPosition = $teamInfo['money_committed_at_position'];
+        } else {
+            // Otherwise calculate it using Team methods (production)
+            $moneyCommittedAtPosition = $this->calculateMoneyCommittedAtPosition($teamName, $playerPosition);
+        }
+
         $teamFactors = [
             'wins' => isset($teamInfo['Contract_Wins']) ? $teamInfo['Contract_Wins'] : 41,
             'losses' => isset($teamInfo['Contract_Losses']) ? $teamInfo['Contract_Losses'] : 41,
             'tradition_wins' => isset($teamInfo['Contract_AvgW']) ? $teamInfo['Contract_AvgW'] : 41,
             'tradition_losses' => isset($teamInfo['Contract_AvgL']) ? $teamInfo['Contract_AvgL'] : 41,
-            'money_committed_at_position' => isset($teamInfo['money_committed_at_position']) ? $teamInfo['money_committed_at_position'] : 0
+            'money_committed_at_position' => $moneyCommittedAtPosition
         ];
 
         $playerPreferences = [
@@ -255,6 +270,32 @@ class ExtensionProcessor
                 'discordNotificationSent' => class_exists('Discord'),
                 'discordChannel' => '#extensions'
             ];
+        }
+    }
+
+    /**
+     * Calculates the total money committed at a player's position for next season
+     * 
+     * @param string $teamName Team name
+     * @param string $playerPosition Player's position (C, PF, SF, SG, PG)
+     * @return int Total salary committed at that position for next season
+     */
+    private function calculateMoneyCommittedAtPosition($teamName, $playerPosition)
+    {
+        try {
+            // Create Team object
+            $team = \Team::initialize($this->db, $teamName);
+            
+            // Get players under contract at this position
+            $result = $team->getPlayersUnderContractByPositionResult($playerPosition);
+            
+            // Calculate total next season salaries
+            $totalSalaries = $team->getTotalNextSeasonSalariesFromPlrResult($result);
+            
+            return (int) $totalSalaries;
+        } catch (\Exception $e) {
+            // If there's an error, return 0 as a safe default
+            return 0;
         }
     }
 }

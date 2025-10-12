@@ -58,23 +58,13 @@ class ExtensionValidator
      */
     public function validateOfferAmounts($offer)
     {
-        if ($offer['year1'] == 0) {
+        foreach (['year1', 'year2', 'year3'] as $year) {
+            if (empty($offer[$year])) {
             return [
-                'valid' => false, 
-                'error' => 'Sorry, you must enter an amount greater than zero for each of the first three contract years when making an extension offer. Your offer in Year 1 was zero, so this offer is not valid.'
+                'valid' => false,
+                'error' => "Sorry, you must enter an amount greater than zero for each of the first three contract years when making an extension offer. Your offer in " . ucfirst($year) . " was zero, so this offer is not valid."
             ];
-        }
-        if ($offer['year2'] == 0) {
-            return [
-                'valid' => false, 
-                'error' => 'Sorry, you must enter an amount greater than zero for each of the first three contract years when making an extension offer. Your offer in Year 2 was zero, so this offer is not valid.'
-            ];
-        }
-        if ($offer['year3'] == 0) {
-            return [
-                'valid' => false, 
-                'error' => 'Sorry, you must enter an amount greater than zero for each of the first three contract years when making an extension offer. Your offer in Year 3 was zero, so this offer is not valid.'
-            ];
+            }
         }
         return ['valid' => true, 'error' => null];
     }

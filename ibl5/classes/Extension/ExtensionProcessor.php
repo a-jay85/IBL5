@@ -128,8 +128,8 @@ class ExtensionProcessor
         $teamFactors = [
             'wins' => isset($teamInfo['Contract_Wins']) ? $teamInfo['Contract_Wins'] : 41,
             'losses' => isset($teamInfo['Contract_Losses']) ? $teamInfo['Contract_Losses'] : 41,
-            'tradition_wins' => isset($teamInfo['Contract_AvgW']) ? $teamInfo['Contract_AvgW'] : 2000,
-            'tradition_losses' => isset($teamInfo['Contract_AvgL']) ? $teamInfo['Contract_AvgL'] : 2000,
+            'tradition_wins' => isset($teamInfo['Contract_AvgW']) ? $teamInfo['Contract_AvgW'] : 41,
+            'tradition_losses' => isset($teamInfo['Contract_AvgL']) ? $teamInfo['Contract_AvgL'] : 41,
             'money_committed_at_position' => isset($teamInfo['money_committed_at_position']) ? $teamInfo['money_committed_at_position'] : 0
         ];
 

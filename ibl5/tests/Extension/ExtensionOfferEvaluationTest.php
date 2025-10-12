@@ -107,8 +107,8 @@ class ExtensionOfferEvaluationTest extends TestCase
     {
         // Arrange
         $teamFactors = [
-            'tradition_wins' => 3000,
-            'tradition_losses' => 2000
+            'tradition_wins' => 60,
+            'tradition_losses' => 22
         ];
         $playerPreferences = [
             'tradition' => 4 // Moderate tradition preference

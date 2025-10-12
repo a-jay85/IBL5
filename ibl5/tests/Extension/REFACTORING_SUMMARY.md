@@ -58,7 +58,7 @@ classes/Extension/
 **Key Methods**:
 - `validateOfferAmounts()` - Ensures years 1-3 have non-zero amounts
 - `validateExtensionEligibility()` - Checks if team can make extension
-- `validateMaximumOffer()` - Validates against experience-based maximums
+- `validateMaximumYearOneOffer()` - Validates against experience-based maximums
 - `validateRaises()` - Ensures raises don't exceed 10% or 12.5% (Bird rights)
 - `validateSalaryDecreases()` - Prevents salary decreases
 

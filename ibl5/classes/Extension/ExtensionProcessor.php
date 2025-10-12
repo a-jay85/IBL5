@@ -87,7 +87,7 @@ class ExtensionProcessor
         $birdYears = isset($playerInfo['bird']) ? $playerInfo['bird'] : $bird;
 
         // Step 4: Validate maximum offer
-        $maxOfferValidation = $this->validator->validateMaximumOffer($offer, $yearsExperience);
+        $maxOfferValidation = $this->validator->validateMaximumYearOneOffer($offer, $yearsExperience);
         if (!$maxOfferValidation['valid']) {
             return [
                 'success' => false,

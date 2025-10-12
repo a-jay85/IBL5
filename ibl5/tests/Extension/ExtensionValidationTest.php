@@ -192,7 +192,7 @@ class ExtensionValidationTest extends TestCase
         $yearsExperience = 5;
 
         // Act
-        $result = $this->extensionValidator->validateMaximumOffer($offer, $yearsExperience);
+        $result = $this->extensionValidator->validateMaximumYearOneOffer($offer, $yearsExperience);
 
         // Assert
         $this->assertFalse($result['valid']);
@@ -210,7 +210,7 @@ class ExtensionValidationTest extends TestCase
         $yearsExperience = 5;
 
         // Act
-        $result = $this->extensionValidator->validateMaximumOffer($offer, $yearsExperience);
+        $result = $this->extensionValidator->validateMaximumYearOneOffer($offer, $yearsExperience);
 
         // Assert
         $this->assertTrue($result['valid']);
@@ -227,7 +227,7 @@ class ExtensionValidationTest extends TestCase
         $yearsExperience = 8;
 
         // Act
-        $result = $this->extensionValidator->validateMaximumOffer($offer, $yearsExperience);
+        $result = $this->extensionValidator->validateMaximumYearOneOffer($offer, $yearsExperience);
 
         // Assert
         $this->assertFalse($result['valid']);
@@ -244,7 +244,7 @@ class ExtensionValidationTest extends TestCase
         $yearsExperience = 12;
 
         // Act
-        $result = $this->extensionValidator->validateMaximumOffer($offer, $yearsExperience);
+        $result = $this->extensionValidator->validateMaximumYearOneOffer($offer, $yearsExperience);
 
         // Assert
         $this->assertTrue($result['valid']);

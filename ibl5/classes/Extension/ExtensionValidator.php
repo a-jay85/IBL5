@@ -17,9 +17,9 @@ class ExtensionValidator
 {
     private $db;
 
-    const MAX_SALARY_0_TO_6_YEARS = 1063;
-    const MAX_SALARY_7_TO_9_YEARS = 1275;
-    const MAX_SALARY_10_PLUS_YEARS = 1451;
+    const MAX_YEAR_ONE_0_TO_6_YEARS = 1063;
+    const MAX_YEAR_ONE_7_TO_9_YEARS = 1275;
+    const MAX_YEAR_ONE_10_PLUS_YEARS = 1451;
     
     const RAISE_PERCENTAGE_WITHOUT_BIRD = 0.10;
     const RAISE_PERCENTAGE_WITH_BIRD = 0.125;
@@ -104,11 +104,11 @@ class ExtensionValidator
      * @param int $yearsExperience Player's years of experience
      * @return array ['valid' => bool, 'error' => string|null]
      */
-    public function validateMaximumOffer($offer, $yearsExperience)
+    public function validateMaximumYearOneOffer($offer, $yearsExperience)
     {
-        $maxOffer = $this->getMaximumOffer($yearsExperience);
-        if ($offer['year1'] > $maxOffer) {
-            return ['valid' => false, 'error' => 'Sorry, this offer is over the maximum allowed offer for a player with their years of service.'];
+        $maxYearOneOffer = $this->getMaximumYearOneOffer($yearsExperience);
+        if ($offer['year1'] > $maxYearOneOffer) {
+            return ['valid' => false, 'error' => 'Sorry, the first year of your offer is over the maximum allowed for a player with their years of service.'];
         }
         return ['valid' => true, 'error' => null];
     }
@@ -199,14 +199,14 @@ class ExtensionValidator
      * @param int $yearsExperience Player's years of experience
      * @return int Maximum offer amount
      */
-    private function getMaximumOffer($yearsExperience)
+    private function getMaximumYearOneOffer($yearsExperience)
     {
         if ($yearsExperience > 9) {
-            return self::MAX_SALARY_10_PLUS_YEARS;
+            return self::MAX_YEAR_ONE_10_PLUS_YEARS;
         }
         if ($yearsExperience > 6) {
-            return self::MAX_SALARY_7_TO_9_YEARS;
+            return self::MAX_YEAR_ONE_7_TO_9_YEARS;
         }
-        return self::MAX_SALARY_0_TO_6_YEARS;
+        return self::MAX_YEAR_ONE_0_TO_6_YEARS;
     }
 }

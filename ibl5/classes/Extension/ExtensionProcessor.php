@@ -54,7 +54,7 @@ class ExtensionProcessor
         $playerName = $extensionData['playerName'];
         $offer = $extensionData['offer'];
         $demands = isset($extensionData['demands']) ? $extensionData['demands'] : null;
-        $bird = isset($extensionData['bird']) ? $extensionData['bird'] : 2;
+        $bird = isset($extensionData['bird']) ? $extensionData['bird'] : 0;
 
         // Step 1: Validate offer amounts
         $amountValidation = $this->validator->validateOfferAmounts($offer);
@@ -83,7 +83,7 @@ class ExtensionProcessor
             ];
         }
 
-        $yearsExperience = isset($playerInfo['exp']) ? $playerInfo['exp'] : 5;
+        $yearsExperience = isset($playerInfo['exp']) ? $playerInfo['exp'] : 0;
         $birdYears = isset($playerInfo['bird']) ? $playerInfo['bird'] : $bird;
 
         // Step 4: Validate maximum offer

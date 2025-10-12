@@ -51,6 +51,17 @@ class ExtensionValidator
     }
 
     /**
+     * Public wrapper for escapeString to be used by ExtensionProcessor
+     * 
+     * @param string $string String to escape
+     * @return string Escaped string
+     */
+    public function escapeStringPublic($string)
+    {
+        return $this->escapeString($string);
+    }
+
+    /**
      * Validates that the first three years of the offer have non-zero amounts
      * 
      * @param array $offer Array with keys: year1, year2, year3, year4, year5
@@ -208,5 +219,54 @@ class ExtensionValidator
             return self::MAX_YEAR_ONE_7_TO_9_YEARS;
         }
         return self::MAX_YEAR_ONE_0_TO_6_YEARS;
+    }
+
+    /**
+     * Validates extension eligibility using a Team object
+     * 
+     * @param \Team $team Team object
+     * @return array ['valid' => bool, 'error' => string|null]
+     */
+    public function validateExtensionEligibilityWithTeam($team)
+    {
+        if ($team->hasUsedExtensionThisSeason == 1) {
+            return [
+                'valid' => false,
+                'error' => 'Sorry, you have already used your extension for this season.'
+            ];
+        }
+        
+        if ($team->hasUsedExtensionThisSim == 1) {
+            return [
+                'valid' => false,
+                'error' => 'Sorry, you have already used your extension for this Chunk.'
+            ];
+        }
+        
+        return ['valid' => true, 'error' => null];
+    }
+
+    /**
+     * Validates maximum year one offer using a Player object
+     * 
+     * @param array $offer Offer array with year1-year5
+     * @param \Player $player Player object
+     * @return array ['valid' => bool, 'error' => string|null]
+     */
+    public function validateMaximumYearOneOfferWithPlayer($offer, $player)
+    {
+        return $this->validateMaximumYearOneOffer($offer, $player->yearsOfExperience);
+    }
+
+    /**
+     * Validates raises using a Player object
+     * 
+     * @param array $offer Offer array with year1-year5
+     * @param \Player $player Player object
+     * @return array ['valid' => bool, 'error' => string|null]
+     */
+    public function validateRaisesWithPlayer($offer, $player)
+    {
+        return $this->validateRaises($offer, $player->birdYears);
     }
 }

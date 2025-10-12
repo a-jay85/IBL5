@@ -37,11 +37,11 @@ class ExtensionProcessor
      * Processes a contract extension offer through the complete workflow
      * 
      * @param array $extensionData Array containing:
-     *   - teamName: string
-     *   - playerName: string
+     *   - teamName: string (or Team object)
+     *   - playerName: string (or Player object)
      *   - offer: array [year1, year2, year3, year4, year5]
      *   - demands: array [total, years]
-     *   - bird: int (Bird rights years)
+     *   - bird: int (Bird rights years) - optional if Player object provided
      * @return array Result array with:
      *   - success: bool
      *   - accepted: bool (if successful)
@@ -54,11 +54,25 @@ class ExtensionProcessor
      */
     public function processExtension($extensionData)
     {
-        $teamName = $extensionData['teamName'];
-        $playerName = $extensionData['playerName'];
         $offer = $extensionData['offer'];
         $demands = isset($extensionData['demands']) ? $extensionData['demands'] : null;
-        $bird = isset($extensionData['bird']) ? $extensionData['bird'] : 0;
+
+        // Create Player and Team objects if not already provided
+        $player = $this->getPlayerObject($extensionData);
+        if (!$player) {
+            return [
+                'success' => false,
+                'error' => 'Player not found in database.'
+            ];
+        }
+
+        $team = $this->getTeamObject($extensionData, $player);
+        if (!$team) {
+            return [
+                'success' => false,
+                'error' => 'Team not found in database.'
+            ];
+        }
 
         // Step 1: Validate offer amounts
         $amountValidation = $this->validator->validateOfferAmounts($offer);
@@ -69,8 +83,8 @@ class ExtensionProcessor
             ];
         }
 
-        // Step 2: Check extension eligibility
-        $eligibilityValidation = $this->validator->validateExtensionEligibility($teamName);
+        // Step 2: Check extension eligibility using Team object
+        $eligibilityValidation = $this->validator->validateExtensionEligibilityWithTeam($team);
         if (!$eligibilityValidation['valid']) {
             return [
                 'success' => false,
@@ -78,20 +92,8 @@ class ExtensionProcessor
             ];
         }
 
-        // Step 3: Get player info for validation
-        $playerInfo = $this->dbOps->getPlayerPreferences($playerName);
-        if (!$playerInfo) {
-            return [
-                'success' => false,
-                'error' => 'Player not found in database.'
-            ];
-        }
-
-        $yearsExperience = isset($playerInfo['exp']) ? $playerInfo['exp'] : 0;
-        $birdYears = isset($playerInfo['bird']) ? $playerInfo['bird'] : $bird;
-
-        // Step 4: Validate maximum offer
-        $maxOfferValidation = $this->validator->validateMaximumYearOneOffer($offer, $yearsExperience);
+        // Step 4: Validate maximum offer using Player object
+        $maxOfferValidation = $this->validator->validateMaximumYearOneOfferWithPlayer($offer, $player);
         if (!$maxOfferValidation['valid']) {
             return [
                 'success' => false,
@@ -99,8 +101,8 @@ class ExtensionProcessor
             ];
         }
 
-        // Step 5: Validate raises
-        $raisesValidation = $this->validator->validateRaises($offer, $birdYears);
+        // Step 5: Validate raises using Player object
+        $raisesValidation = $this->validator->validateRaisesWithPlayer($offer, $player);
         if (!$raisesValidation['valid']) {
             return [
                 'success' => false,
@@ -118,41 +120,29 @@ class ExtensionProcessor
         }
 
         // Step 7: Mark extension used for this chunk (legal offer made)
-        $this->dbOps->markExtensionUsedThisChunk($teamName);
+        $this->dbOps->markExtensionUsedThisChunkWithTeam($team);
 
-        // Step 8: Get team factors for evaluation
-        $teamInfo = $this->dbOps->getTeamExtensionInfo($teamName);
-        if (!$teamInfo) {
-            return [
-                'success' => false,
-                'error' => 'Team not found in database.'
-            ];
-        }
+        // Step 8: Calculate money committed at player's position using Team object
+        $moneyCommittedAtPosition = $this->calculateMoneyCommittedAtPositionWithTeam($team, $player);
 
-        // Calculate money committed at player's position
-        $playerPosition = isset($playerInfo['pos']) ? $playerInfo['pos'] : '';
-        
-        // First check if money_committed_at_position is provided in team info (for testing)
-        if (isset($teamInfo['money_committed_at_position'])) {
-            $moneyCommittedAtPosition = $teamInfo['money_committed_at_position'];
-        } else {
-            // Otherwise calculate it using Team methods (production)
-            $moneyCommittedAtPosition = $this->calculateMoneyCommittedAtPosition($teamName, $playerPosition);
-        }
+        // Get tradition data (not available in Team object, requires separate query)
+        $traditionData = $this->getTeamTraditionData($team->name);
 
+        // Build team factors using Team object properties
         $teamFactors = [
-            'wins' => isset($teamInfo['Contract_Wins']) ? $teamInfo['Contract_Wins'] : 41,
-            'losses' => isset($teamInfo['Contract_Losses']) ? $teamInfo['Contract_Losses'] : 41,
-            'tradition_wins' => isset($teamInfo['Contract_AvgW']) ? $teamInfo['Contract_AvgW'] : 41,
-            'tradition_losses' => isset($teamInfo['Contract_AvgL']) ? $teamInfo['Contract_AvgL'] : 41,
+            'wins' => $team->seasonRecord ? $this->extractWins($team->seasonRecord) : 41,
+            'losses' => $team->seasonRecord ? $this->extractLosses($team->seasonRecord) : 41,
+            'tradition_wins' => $traditionData['tradition_wins'],
+            'tradition_losses' => $traditionData['tradition_losses'],
             'money_committed_at_position' => $moneyCommittedAtPosition
         ];
 
+        // Build player preferences using Player object properties
         $playerPreferences = [
-            'winner' => isset($playerInfo['winner']) ? $playerInfo['winner'] : 3,
-            'tradition' => isset($playerInfo['tradition']) ? $playerInfo['tradition'] : 3,
-            'loyalty' => isset($playerInfo['loyalty']) ? $playerInfo['loyalty'] : 3,
-            'playing_time' => isset($playerInfo['playingTime']) ? $playerInfo['playingTime'] : 3
+            'winner' => $player->freeAgencyPlayForWinner ?? 3,
+            'tradition' => $player->freeAgencyTradition ?? 3,
+            'loyalty' => $player->freeAgencyLoyalty ?? 3,
+            'playing_time' => $player->freeAgencyPlayingTime ?? 3
         ];
 
         // Step 9: Convert demands to array format if needed
@@ -193,30 +183,29 @@ class ExtensionProcessor
 
         // Step 12: Process based on acceptance
         if ($evaluation['accepted']) {
-            // Get current contract info
-            $currentContract = $this->dbOps->getPlayerCurrentContract($playerName);
-            $currentSalary = isset($currentContract['currentSalary']) ? $currentContract['currentSalary'] : 0;
+            // Get current salary from Player object
+            $currentSalary = $player->currentSeasonSalary ?? 0;
 
-            // Update player contract
-            $this->dbOps->updatePlayerContract($playerName, $offer, $currentSalary);
+            // Update player contract using Player and Team objects
+            $this->dbOps->updatePlayerContractWithPlayer($player, $offer, $currentSalary);
             
-            // Mark extension used for season
-            $this->dbOps->markExtensionUsedThisSeason($teamName);
+            // Mark extension used for season using Team object
+            $this->dbOps->markExtensionUsedThisSeasonWithTeam($team);
             
             // Create news story
-            $this->dbOps->createAcceptedExtensionStory($playerName, $teamName, $offerInMillions, $offerYears, $offerDetails);
+            $this->dbOps->createAcceptedExtensionStoryWithObjects($player, $team, $offerInMillions, $offerYears, $offerDetails);
             
             // Send Discord notification
             if (class_exists('Discord')) {
-                $hometext = "$playerName today accepted a contract extension offer from the $teamName worth $offerInMillions million dollars over $offerYears years:<br>" . $offerDetails;
+                $hometext = "{$player->name} today accepted a contract extension offer from the {$team->name} worth $offerInMillions million dollars over $offerYears years:<br>" . $offerDetails;
                 \Discord::postToChannel('#extensions', $hometext);
             }
             
             // Send email notification (only on non-localhost)
             if ($_SERVER['SERVER_NAME'] != "localhost") {
                 $recipient = 'ibldepthcharts@gmail.com';
-                $emailsubject = "Successful Extension - " . $playerName;
-                $filetext = "$playerName accepts an extension offer from the $teamName of $offerTotal for $offerYears years.\n";
+                $emailsubject = "Successful Extension - " . $player->name;
+                $filetext = "{$player->name} accepts an extension offer from the {$team->name} of $offerTotal for $offerYears years.\n";
                 $filetext .= "For reference purposes: the offer was " . $offerDetails;
                 $filetext .= " and the offer value was thus considered to be " . $evaluation['offerValue'];
                 $filetext .= "; the player wanted an offer with a value of " . $evaluation['demandValue'];
@@ -226,7 +215,7 @@ class ExtensionProcessor
             return [
                 'success' => true,
                 'accepted' => true,
-                'message' => "$playerName accepts your extension offer of $offerInMillions million dollars over $offerYears years. Thank you! (Can't believe you gave me that much...sucker!)",
+                'message' => "{$player->name} accepts your extension offer of $offerInMillions million dollars over $offerYears years. Thank you! (Can't believe you gave me that much...sucker!)",
                 'offerValue' => $evaluation['offerValue'],
                 'demandValue' => $evaluation['demandValue'],
                 'modifier' => $evaluation['modifier'],
@@ -238,19 +227,19 @@ class ExtensionProcessor
                 'discordChannel' => '#extensions'
             ];
         } else {
-            // Create news story for rejection
-            $this->dbOps->createRejectedExtensionStory($playerName, $teamName, $offerInMillions, $offerYears);
+            // Create news story for rejection using Player and Team objects
+            $this->dbOps->createRejectedExtensionStoryWithObjects($player, $team, $offerInMillions, $offerYears);
             
             // Send Discord notification
             if (class_exists('Discord')) {
-                $hometext = "$playerName today rejected a contract extension offer from the $teamName worth $offerInMillions million dollars over $offerYears years.";
+                $hometext = "{$player->name} today rejected a contract extension offer from the {$team->name} worth $offerInMillions million dollars over $offerYears years.";
                 \Discord::postToChannel('#extensions', $hometext);
             }
             
             // Send email notification
             $recipient = 'ibldepthcharts@gmail.com';
-            $emailsubject = "Unsuccessful Extension - " . $playerName;
-            $filetext = "$playerName refuses an extension offer from the $teamName of $offerTotal for $offerYears years.\n";
+            $emailsubject = "Unsuccessful Extension - " . $player->name;
+            $filetext = "{$player->name} refuses an extension offer from the {$team->name} of $offerTotal for $offerYears years.\n";
             $filetext .= "For reference purposes: the offer was " . $offerDetails;
             $filetext .= " and the offer value was thus considered to be " . $evaluation['offerValue'] . ".";
             mail($recipient, $emailsubject, $filetext, "From: rejected-extensions@iblhoops.net");
@@ -274,7 +263,164 @@ class ExtensionProcessor
     }
 
     /**
+     * Gets a Player object from extension data
+     * 
+     * @param array $extensionData Extension data array
+     * @return \Player|null Player object or null if not found
+     */
+    private function getPlayerObject($extensionData)
+    {
+        // If Player object already provided, return it
+        if (isset($extensionData['player']) && $extensionData['player'] instanceof \Player) {
+            return $extensionData['player'];
+        }
+
+        // Otherwise, load player by name
+        $playerName = $extensionData['playerName'] ?? null;
+        if (!$playerName) {
+            return null;
+        }
+
+        return $this->loadPlayerByName($playerName);
+    }
+
+    /**
+     * Gets a Team object from extension data
+     * 
+     * @param array $extensionData Extension data array
+     * @param \Player $player Player object
+     * @return \Team|null Team object or null if not found
+     */
+    private function getTeamObject($extensionData, $player)
+    {
+        // If Team object already provided, return it
+        if (isset($extensionData['team']) && $extensionData['team'] instanceof \Team) {
+            return $extensionData['team'];
+        }
+
+        // Try to get team name from extension data or Player object
+        $teamName = $extensionData['teamName'] ?? $player->teamName ?? null;
+        if (!$teamName) {
+            return null;
+        }
+
+        try {
+            return \Team::initialize($this->db, $teamName);
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Loads a Player by name from the database
+     * 
+     * @param string $playerName Player name
+     * @return \Player|null Player object or null if not found
+     */
+    private function loadPlayerByName($playerName)
+    {
+        try {
+            // Use the validator's escape method for consistency
+            $playerNameEscaped = $this->validator->escapeStringPublic($playerName);
+            $query = "SELECT * FROM ibl_plr WHERE name = '$playerNameEscaped' LIMIT 1";
+            $result = $this->db->sql_query($query);
+            
+            if ($this->db->sql_numrows($result) > 0) {
+                $plrRow = $this->db->sql_fetch_assoc($result);
+                return \Player::withPlrRow($this->db, $plrRow);
+            }
+        } catch (\Exception $e) {
+            // Log error if needed
+        }
+        
+        return null;
+    }
+
+    /**
+     * Calculates the total money committed at a player's position using Team object
+     * 
+     * @param \Team $team Team object
+     * @param \Player $player Player object
+     * @return int Total salary committed at that position for next season
+     */
+    private function calculateMoneyCommittedAtPositionWithTeam($team, $player)
+    {
+        try {
+            // Get players under contract at this position
+            $result = $team->getPlayersUnderContractByPositionResult($player->position);
+            
+            // Calculate total next season salaries
+            $totalSalaries = $team->getTotalNextSeasonSalariesFromPlrResult($result);
+            
+            return (int) $totalSalaries;
+        } catch (\Exception $e) {
+            // If there's an error, return 0 as a safe default
+            return 0;
+        }
+    }
+
+    /**
+     * Extracts wins from season record string
+     * 
+     * @param string $seasonRecord Season record (e.g., "50-32")
+     * @return int Number of wins
+     */
+    private function extractWins($seasonRecord)
+    {
+        if (!$seasonRecord || !is_string($seasonRecord)) {
+            return 41;
+        }
+        
+        $parts = explode('-', $seasonRecord);
+        return isset($parts[0]) ? (int) $parts[0] : 41;
+    }
+
+    /**
+     * Extracts losses from season record string
+     * 
+     * @param string $seasonRecord Season record (e.g., "50-32")
+     * @return int Number of losses
+     */
+    private function extractLosses($seasonRecord)
+    {
+        if (!$seasonRecord || !is_string($seasonRecord)) {
+            return 41;
+        }
+        
+        $parts = explode('-', $seasonRecord);
+        return isset($parts[1]) ? (int) $parts[1] : 41;
+    }
+
+    /**
+     * Gets team tradition data (Contract_AvgW and Contract_AvgL)
+     * 
+     * @param string $teamName Team name
+     * @return array ['tradition_wins' => int, 'tradition_losses' => int]
+     */
+    private function getTeamTraditionData($teamName)
+    {
+        try {
+            $teamNameEscaped = $this->validator->escapeStringPublic($teamName);
+            $query = "SELECT Contract_AvgW, Contract_AvgL FROM ibl_team_info WHERE team_name = '$teamNameEscaped' LIMIT 1";
+            $result = $this->db->sql_query($query);
+            
+            if ($this->db->sql_numrows($result) > 0) {
+                $row = $this->db->sql_fetch_assoc($result);
+                return [
+                    'tradition_wins' => isset($row['Contract_AvgW']) ? (int) $row['Contract_AvgW'] : 41,
+                    'tradition_losses' => isset($row['Contract_AvgL']) ? (int) $row['Contract_AvgL'] : 41
+                ];
+            }
+        } catch (\Exception $e) {
+            // Log error if needed
+        }
+        
+        return ['tradition_wins' => 41, 'tradition_losses' => 41];
+    }
+
+    /**
      * Calculates the total money committed at a player's position for next season
+     * @deprecated Use calculateMoneyCommittedAtPositionWithTeam() instead
      * 
      * @param string $teamName Team name
      * @param string $playerPosition Player's position (C, PF, SF, SG, PG)

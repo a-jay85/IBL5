@@ -50,7 +50,7 @@ class ExtensionValidationTest extends TestCase
 
         // Assert
         $this->assertFalse($result['valid']);
-        $this->assertStringContainsString('Year 1', $result['error']);
+        $this->assertStringContainsString('Year1', $result['error']);
         $this->assertStringContainsString('zero', $result['error']);
     }
 
@@ -74,7 +74,7 @@ class ExtensionValidationTest extends TestCase
 
         // Assert
         $this->assertFalse($result['valid']);
-        $this->assertStringContainsString('Year 2', $result['error']);
+        $this->assertStringContainsString('Year2', $result['error']);
     }
 
     /**
@@ -97,7 +97,7 @@ class ExtensionValidationTest extends TestCase
 
         // Assert
         $this->assertFalse($result['valid']);
-        $this->assertStringContainsString('Year 3', $result['error']);
+        $this->assertStringContainsString('Year3', $result['error']);
     }
 
     /**

@@ -135,7 +135,7 @@ class ExtensionIntegrationTest extends TestCase
 
         // Assert
         $this->assertFalse($result['success']);
-        $this->assertStringContainsString('Year 1', $result['error']);
+        $this->assertStringContainsString('Year1', $result['error']);
         $this->assertStringContainsString('zero', $result['error']);
         
         // Verify NO database changes were made

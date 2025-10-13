@@ -177,29 +177,14 @@ class ExtensionValidator
      */
     public function validateSalaryDecreases($offer)
     {
-        if ($offer['year2'] < $offer['year1'] && $offer['year2'] != 0) {
+        $years = ['year1', 'year2', 'year3', 'year4', 'year5'];
+        for ($i = 1; $i < count($years); $i++) {
+            if ($offer[$years[$i]] < $offer[$years[$i - 1]] && $offer[$years[$i]] != 0) {
             return [
-                'valid' => false, 
-                'error' => "Sorry, you cannot decrease salary in later years of a contract. You offered {$offer['year2']} in the second year, which is less than you offered in the first year, {$offer['year1']}."
+                'valid' => false,
+                'error' => "Sorry, you cannot decrease salary in later years of a contract. You offered {$offer[$years[$i]]} in the " . ($i + 1) . " year, which is less than you offered in the previous year, {$offer[$years[$i - 1]]}."
             ];
-        }
-        if ($offer['year3'] < $offer['year2'] && $offer['year3'] != 0) {
-            return [
-                'valid' => false, 
-                'error' => "Sorry, you cannot decrease salary in later years of a contract. You offered {$offer['year3']} in the third year, which is less than you offered in the second year, {$offer['year2']}."
-            ];
-        }
-        if ($offer['year4'] < $offer['year3'] && $offer['year4'] != 0) {
-            return [
-                'valid' => false, 
-                'error' => "Sorry, you cannot decrease salary in later years of a contract. You offered {$offer['year4']} in the fourth year, which is less than you offered in the third year, {$offer['year3']}."
-            ];
-        }
-        if ($offer['year5'] < $offer['year4'] && $offer['year5'] != 0) {
-            return [
-                'valid' => false, 
-                'error' => "Sorry, you cannot decrease salary in later years of a contract. You offered {$offer['year5']} in the fifth year, which is less than you offered in the fourth year, {$offer['year4']}."
-            ];
+            }
         }
         return ['valid' => true, 'error' => null];
     }

@@ -116,7 +116,7 @@ class ExtensionProcessor
         }
 
         // Step 7: Mark extension used for this chunk (legal offer made)
-        $this->dbOps->markExtensionUsedThisChunkWithTeam($team);
+        $this->dbOps->markExtensionUsedThisChunk($team->name);
 
         // Step 8: Calculate money committed at player's position using Team object
         $moneyCommittedAtPosition = $this->calculateMoneyCommittedAtPositionWithTeam($team, $player);
@@ -182,14 +182,14 @@ class ExtensionProcessor
             // Get current salary from Player object
             $currentSalary = $player->currentSeasonSalary ?? 0;
 
-            // Update player contract using Player and Team objects
-            $this->dbOps->updatePlayerContractWithPlayer($player, $offer, $currentSalary);
+            // Update player contract using player name and offer details
+            $this->dbOps->updatePlayerContract($player->name, $offer, $currentSalary);
             
-            // Mark extension used for season using Team object
-            $this->dbOps->markExtensionUsedThisSeasonWithTeam($team);
+            // Mark extension used for season using team name
+            $this->dbOps->markExtensionUsedThisSeason($team->name);
             
             // Create news story
-            $this->dbOps->createAcceptedExtensionStoryWithObjects($player, $team, $offerInMillions, $offerYears, $offerDetails);
+            $this->dbOps->createAcceptedExtensionStory($player->name, $team->name, $offerInMillions, $offerYears, $offerDetails);
             
             // Send Discord notification
             if (class_exists('Discord')) {
@@ -223,8 +223,8 @@ class ExtensionProcessor
                 'discordChannel' => '#extensions'
             ];
         } else {
-            // Create news story for rejection using Player and Team objects
-            $this->dbOps->createRejectedExtensionStoryWithObjects($player, $team, $offerInMillions, $offerYears);
+            // Create news story for rejection
+            $this->dbOps->createRejectedExtensionStory($player->name, $team->name, $offerInMillions, $offerYears);
             
             // Send Discord notification
             if (class_exists('Discord')) {

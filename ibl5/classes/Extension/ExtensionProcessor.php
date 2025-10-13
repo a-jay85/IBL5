@@ -392,30 +392,4 @@ class ExtensionProcessor
         ];
     }
 
-    /**
-     * Calculates the total money committed at a player's position for next season
-     * @deprecated Use calculateMoneyCommittedAtPositionWithTeam() instead
-     * 
-     * @param string $teamName Team name
-     * @param string $playerPosition Player's position (C, PF, SF, SG, PG)
-     * @return int Total salary committed at that position for next season
-     */
-    private function calculateMoneyCommittedAtPosition($teamName, $playerPosition)
-    {
-        try {
-            // Create Team object
-            $team = \Team::initialize($this->db, $teamName);
-            
-            // Get players under contract at this position
-            $result = $team->getPlayersUnderContractByPositionResult($playerPosition);
-            
-            // Calculate total next season salaries
-            $totalSalaries = $team->getTotalNextSeasonSalariesFromPlrResult($result);
-            
-            return (int) $totalSalaries;
-        } catch (\Exception $e) {
-            // If there's an error, return 0 as a safe default
-            return 0;
-        }
-    }
 }

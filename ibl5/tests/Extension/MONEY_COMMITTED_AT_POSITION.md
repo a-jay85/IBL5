@@ -112,24 +112,24 @@ $teamInfo = $this->dbOps->getTeamExtensionInfo($teamName);
 // Query 3: Get current contract
 $currentContract = $this->dbOps->getPlayerCurrentContract($playerName);
 
-// Query 4-5: Get players at position + calculate salaries (via Team methods)
-$moneyCommitted = $this->calculateMoneyCommittedAtPosition($teamName, $position);
+// Query 4-5: Get players at position + calculate salaries (now deprecated)
+// DEPRECATED: $moneyCommitted = $this->calculateMoneyCommittedAtPosition($teamName, $position);
 
 // TOTAL: 5+ database queries
 ```
 
 ### After Full Refactoring
 ```php
-// Query 1: Load Player object (includes ALL player data)
-$player = $this->loadPlayerByName($playerName);
+// Query 1: Load Player object (includes ALL player data) using playerID
+$player = \Player::withPlayerID($this->db, $playerID);
 
 // Query 2: Load Team object (includes ALL team data)
-$team = \Team::initialize($this->db, $teamName);
+$team = \Team::initialize($this->db, $player->teamName);
 
 // Query 3: Get tradition data (not in Team object)
 $traditionData = $this->getTeamTraditionData($team->name);
 
-// Query 4: Calculate money committed (uses already-loaded Team object)
+// Query 4: Calculate money committed using Team object methods
 $moneyCommitted = $this->calculateMoneyCommittedAtPositionWithTeam($team, $player);
 
 // TOTAL: 4 database queries (was 5+)

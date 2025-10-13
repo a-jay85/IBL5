@@ -49,19 +49,25 @@ try {
 
 echo "\n";
 
-// Test 2: Verify ExtensionProcessor can calculate money_committed_at_position
-echo "Test 2: Testing ExtensionProcessor.calculateMoneyCommittedAtPosition()...\n";
+// Test 2: Verify ExtensionProcessor can calculate money_committed_at_position with Team and Player objects
+echo "Test 2: Testing ExtensionProcessor.calculateMoneyCommittedAtPositionWithTeam()...\n";
 try {
     // Get a real player from the database
-    $query = "SELECT name, teamname, pos FROM ibl_plr WHERE retired = 0 AND cy1 != 0 LIMIT 1";
+    $query = "SELECT pid, name, teamname, pos FROM ibl_plr WHERE retired = 0 AND cy1 != 0 LIMIT 1";
     $result = $db->sql_query($query);
     if ($db->sql_numrows($result) > 0) {
         $playerRow = $db->sql_fetchrow($result);
+        $playerID = $playerRow['pid'];
         $playerName = $playerRow['name'];
         $teamName = $playerRow['teamname'];
         $playerPosition = $playerRow['pos'];
         
         echo "  Using player: $playerName ($playerPosition) on $teamName\n";
+        
+        // Create Player and Team objects
+        $player = Player::withPlayerID($db, $playerID);
+        $team = Team::initialize($db, $teamName);
+        echo "  ✓ Player and Team objects created successfully\n";
         
         // Create processor
         $processor = new \Extension\ExtensionProcessor($db);
@@ -69,12 +75,12 @@ try {
         
         // Use reflection to test the private method
         $reflection = new ReflectionClass($processor);
-        $method = $reflection->getMethod('calculateMoneyCommittedAtPosition');
+        $method = $reflection->getMethod('calculateMoneyCommittedAtPositionWithTeam');
         $method->setAccessible(true);
         
         // Call the method
-        $moneyCommitted = $method->invoke($processor, $teamName, $playerPosition);
-        echo "  ✓ calculateMoneyCommittedAtPosition() works\n";
+        $moneyCommitted = $method->invoke($processor, $team, $player);
+        echo "  ✓ calculateMoneyCommittedAtPositionWithTeam() works\n";
         echo "  Money committed at position $playerPosition for $teamName: $moneyCommitted\n";
         
         if ($moneyCommitted >= 0) {

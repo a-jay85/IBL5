@@ -5,36 +5,34 @@ require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 echo "<HTML><HEAD><TITLE>Contract Extension Offer Result</TITLE></HEAD><BODY>";
 
 // Collect input data
-$Team_Name = $_POST['teamname'];
+$teamName = $_POST['teamName'];
 $playerID = $_POST['playerID'];
-$Player_Name = $_POST['playername'];
-$Demands_Years = $_POST['demyrs'];
-$Demands_Total = $_POST['demtot'] * 100;
-$Bird = $_POST['bird'];
+$playerName = $_POST['playerName'];
+$demandsYears = $_POST['demandsYears'];
+$demandsTotal = $_POST['demandsTotal'];
 
 // Build offer array
 $offer = [
-    'year1' => (int) $_POST['offeryear1'],
-    'year2' => (int) $_POST['offeryear2'],
-    'year3' => (int) $_POST['offeryear3'],
-    'year4' => (int) $_POST['offeryear4'],
-    'year5' => (int) $_POST['offeryear5']
+    'year1' => (int) $_POST['offerYear1'],
+    'year2' => (int) $_POST['offerYear2'],
+    'year3' => (int) $_POST['offerYear3'],
+    'year4' => (int) $_POST['offerYear4'],
+    'year5' => (int) $_POST['offerYear5']
 ];
 
 // Build demands array
 $demands = [
-    'total' => $Demands_Total,
-    'years' => $Demands_Years
+    'total' => $demandsTotal,
+    'years' => $demandsYears
 ];
 
 // Build extension data for processor
 $extensionData = [
+    'teamName' => $teamName,
     'playerID' => $playerID,
-    'teamName' => $Team_Name,
-    'playerName' => $Player_Name,
+    'playerName' => $playerName,
     'offer' => $offer,
-    'demands' => $demands,
-    'bird' => $Bird
+    'demands' => $demands
 ];
 
 // Process extension using new architecture
@@ -52,7 +50,7 @@ if (!$result['success']) {
     
     if ($result['accepted']) {
         // Offer was accepted
-        echo "<table bgcolor=#cccccc><tr><td><b>Response from $Player_Name:</b> " . $result['message'] . "</td></tr></table>";
+        echo "<table bgcolor=#cccccc><tr><td><b>Response from $playerName:</b> " . $result['message'] . "</td></tr></table>";
         echo "Note from the commissioner's office: <font color=#cc0000>Please note that you have used up your successful extension for this season and may not make any more extension attempts.</font><br>";
         
         if ($_SERVER['SERVER_NAME'] != "localhost") {
@@ -60,7 +58,7 @@ if (!$result['success']) {
         }
     } else {
         // Offer was rejected
-        echo "<table bgcolor=#cccccc><tr><td><b>Response from $Player_Name:</b> " . $result['message'] . "</td></tr></table>";
+        echo "<table bgcolor=#cccccc><tr><td><b>Response from $playerName:</b> " . $result['message'] . "</td></tr></table>";
         echo "Note from the commissioner's office: <font color=#cc0000>Please note that you will be able to make another attempt next sim as you have not yet used up your successful extension for this season.</font><br>";
     }
 }

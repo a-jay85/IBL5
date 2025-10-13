@@ -37,7 +37,6 @@ class ExtensionProcessor
      *   - teamName: string (or Team object)
      *   - offer: array [year1, year2, year3, year4, year5]
      *   - demands: array [total, years]
-     *   - bird: int (Bird rights years) - optional if Player object provided
      * @return array Result array with:
      *   - success: bool
      *   - accepted: bool (if successful)

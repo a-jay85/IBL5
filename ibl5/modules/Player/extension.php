@@ -6,6 +6,7 @@ echo "<HTML><HEAD><TITLE>Contract Extension Offer Result</TITLE></HEAD><BODY>";
 
 // Collect input data
 $Team_Name = $_POST['teamname'];
+$playerID = $_POST['playerID'];
 $Player_Name = $_POST['playername'];
 $Demands_Years = $_POST['demyrs'];
 $Demands_Total = $_POST['demtot'] * 100;

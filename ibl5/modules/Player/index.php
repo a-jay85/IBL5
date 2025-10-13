@@ -305,12 +305,12 @@ function showpage($playerID, $pageView)
     // END OF DISPLAY PAGE
 }
 
-function negotiate($pid)
+function negotiate($playerID)
 {
     global $prefix, $db, $user, $cookie;
 
-    $pid = intval($pid);
-    $playerinfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_plr WHERE pid = '$pid'"));
+    $playerID = intval($playerID);
+    $playerinfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_plr WHERE pid = '$playerID'"));
     $player_name = stripslashes(check_html($playerinfo['name'], "nohtml"));
     $player_pos = stripslashes(check_html($playerinfo['pos'], "nohtml"));
     $player_team_name = stripslashes(check_html($playerinfo['teamname'], "nohtml"));
@@ -687,6 +687,7 @@ function negotiate($pid)
                     <input type=\"hidden\" name=\"demyrs\" value=\"$demyrs\">
                     <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
                     <input type=\"hidden\" name=\"playername\" value=\"$player_name\">
+                    <input type=\"hidden\" name=\"playerID\" value=\"$playerID\">
                 </table>";
 
                 echo "<input type=\"submit\" value=\"Offer Extension!\"></form>";

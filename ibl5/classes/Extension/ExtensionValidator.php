@@ -139,31 +139,31 @@ class ExtensionValidator
         $maxIncrease = round($offer['year1'] * $maxRaisePercentage, 0);
         
         if ($offer['year2'] > $offer['year1'] + $maxIncrease) {
-            $legaloffer = $offer['year1'] + $maxIncrease;
+            $legalOffer = $offer['year1'] + $maxIncrease;
             return [
                 'valid' => false, 
-                'error' => "Sorry, you tried to offer a larger raise than is permitted. Your first year offer was {$offer['year1']} which means the maximum raise allowed each year is $maxIncrease. Your offer in Year 2 was {$offer['year2']}, which is more than your Year 1 offer, {$offer['year1']}, plus the max increase of $maxIncrease. Given your offer in Year 1, the most you can offer in Year 2 is $legaloffer."
+                'error' => "Sorry, you tried to offer a larger raise than is permitted. Your first year offer was {$offer['year1']} which means the maximum raise allowed each year is $maxIncrease. Your offer in Year 2 was {$offer['year2']}, which is more than your Year 1 offer, {$offer['year1']}, plus the max increase of $maxIncrease. Given your offer in Year 1, the most you can offer in Year 2 is $legalOffer."
             ];
         }
         if ($offer['year3'] > $offer['year2'] + $maxIncrease) {
-            $legaloffer = $offer['year2'] + $maxIncrease;
+            $legalOffer = $offer['year2'] + $maxIncrease;
             return [
                 'valid' => false, 
-                'error' => "Sorry, you tried to offer a larger raise than is permitted. Your first year offer was {$offer['year1']} which means the maximum raise allowed each year is $maxIncrease. Your offer in Year 3 was {$offer['year3']}, which is more than your Year 2 offer, {$offer['year2']}, plus the max increase of $maxIncrease. Given your offer in Year 2, the most you can offer in Year 3 is $legaloffer."
+                'error' => "Sorry, you tried to offer a larger raise than is permitted. Your first year offer was {$offer['year1']} which means the maximum raise allowed each year is $maxIncrease. Your offer in Year 3 was {$offer['year3']}, which is more than your Year 2 offer, {$offer['year2']}, plus the max increase of $maxIncrease. Given your offer in Year 2, the most you can offer in Year 3 is $legalOffer."
             ];
         }
         if ($offer['year4'] > 0 && $offer['year4'] > $offer['year3'] + $maxIncrease) {
-            $legaloffer = $offer['year3'] + $maxIncrease;
+            $legalOffer = $offer['year3'] + $maxIncrease;
             return [
                 'valid' => false, 
-                'error' => "Sorry, you tried to offer a larger raise than is permitted. Your first year offer was {$offer['year1']} which means the maximum raise allowed each year is $maxIncrease. Your offer in Year 4 was {$offer['year4']}, which is more than your Year 3 offer, {$offer['year3']}, plus the max increase of $maxIncrease. Given your offer in Year 3, the most you can offer in Year 4 is $legaloffer."
+                'error' => "Sorry, you tried to offer a larger raise than is permitted. Your first year offer was {$offer['year1']} which means the maximum raise allowed each year is $maxIncrease. Your offer in Year 4 was {$offer['year4']}, which is more than your Year 3 offer, {$offer['year3']}, plus the max increase of $maxIncrease. Given your offer in Year 3, the most you can offer in Year 4 is $legalOffer."
             ];
         }
         if ($offer['year5'] > 0 && $offer['year5'] > $offer['year4'] + $maxIncrease) {
-            $legaloffer = $offer['year4'] + $maxIncrease;
+            $legalOffer = $offer['year4'] + $maxIncrease;
             return [
                 'valid' => false, 
-                'error' => "Sorry, you tried to offer a larger raise than is permitted. Your first year offer was {$offer['year1']} which means the maximum raise allowed each year is $maxIncrease. Your offer in Year 5 was {$offer['year5']}, which is more than your Year 4 offer, {$offer['year4']}, plus the max increase of $maxIncrease. Given your offer in Year 4, the most you can offer in Year 5 is $legaloffer."
+                'error' => "Sorry, you tried to offer a larger raise than is permitted. Your first year offer was {$offer['year1']} which means the maximum raise allowed each year is $maxIncrease. Your offer in Year 5 was {$offer['year5']}, which is more than your Year 4 offer, {$offer['year4']}, plus the max increase of $maxIncrease. Given your offer in Year 4, the most you can offer in Year 5 is $legalOffer."
             ];
         }
         return ['valid' => true, 'error' => null];

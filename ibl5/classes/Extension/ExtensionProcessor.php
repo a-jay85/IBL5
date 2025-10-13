@@ -37,8 +37,8 @@ class ExtensionProcessor
      * Processes a contract extension offer through the complete workflow
      * 
      * @param array $extensionData Array containing:
+     *   - playerID: int (or Player object)
      *   - teamName: string (or Team object)
-     *   - playerName: string (or Player object)
      *   - offer: array [year1, year2, year3, year4, year5]
      *   - demands: array [total, years]
      *   - bird: int (Bird rights years) - optional if Player object provided
@@ -275,13 +275,17 @@ class ExtensionProcessor
             return $extensionData['player'];
         }
 
-        // Otherwise, load player by name
-        $playerName = $extensionData['playerName'] ?? null;
-        if (!$playerName) {
-            return null;
+        // Load player by playerID if provided
+        $playerID = $extensionData['playerID'] ?? null;
+        if ($playerID) {
+            try {
+                return \Player::withPlayerID($this->db, (int)$playerID);
+            } catch (\Exception $e) {
+                return null;
+            }
         }
 
-        return $this->loadPlayerByName($playerName);
+        return null;
     }
 
     /**
@@ -309,31 +313,6 @@ class ExtensionProcessor
         } catch (\Exception $e) {
             return null;
         }
-    }
-
-    /**
-     * Loads a Player by name from the database
-     * 
-     * @param string $playerName Player name
-     * @return \Player|null Player object or null if not found
-     */
-    private function loadPlayerByName($playerName)
-    {
-        try {
-            // Use the validator's escape method for consistency
-            $playerNameEscaped = $this->validator->escapeStringPublic($playerName);
-            $query = "SELECT * FROM ibl_plr WHERE name = '$playerNameEscaped' LIMIT 1";
-            $result = $this->db->sql_query($query);
-            
-            if ($this->db->sql_numrows($result) > 0) {
-                $plrRow = $this->db->sql_fetch_assoc($result);
-                return \Player::withPlrRow($this->db, $plrRow);
-            }
-        } catch (\Exception $e) {
-            // Log error if needed
-        }
-        
-        return null;
     }
 
     /**

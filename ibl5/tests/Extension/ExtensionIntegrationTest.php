@@ -39,7 +39,7 @@ class ExtensionIntegrationTest extends TestCase
         
         $extensionData = [
             'teamName' => 'Miami Cyclones',
-            'playerName' => 'Test Player',
+            'playerID' => 1, // 'playerName' => 'Test Player',
             'offer' => [
                 'year1' => 1000,
                 'year2' => 1100,
@@ -84,7 +84,7 @@ class ExtensionIntegrationTest extends TestCase
         
         $extensionData = [
             'teamName' => 'Seattle SuperSonics',
-            'playerName' => 'Demanding Player',
+            'playerID' => 1, // 'playerName' => 'Demanding Player',
             'offer' => [
                 'year1' => 800,
                 'year2' => 850,
@@ -120,7 +120,7 @@ class ExtensionIntegrationTest extends TestCase
         
         $extensionData = [
             'teamName' => 'Miami Cyclones',
-            'playerName' => 'Test Player',
+            'playerID' => 1, // 'playerName' => 'Test Player',
             'offer' => [
                 'year1' => 0, // Invalid!
                 'year2' => 1000,
@@ -155,7 +155,7 @@ class ExtensionIntegrationTest extends TestCase
         
         $extensionData = [
             'teamName' => 'Miami Cyclones',
-            'playerName' => 'Test Player',
+            'playerID' => 1, // 'playerName' => 'Test Player',
             'offer' => [
                 'year1' => 1000,
                 'year2' => 1100,
@@ -192,7 +192,7 @@ class ExtensionIntegrationTest extends TestCase
         
         $extensionData = [
             'teamName' => 'Miami Cyclones',
-            'playerName' => 'Test Player',
+            'playerID' => 1, // 'playerName' => 'Test Player',
             'offer' => [
                 'year1' => 1000,
                 'year2' => 1200, // 20% raise, but max is 10% without Bird rights
@@ -221,7 +221,7 @@ class ExtensionIntegrationTest extends TestCase
         
         $extensionData = [
             'teamName' => 'Miami Cyclones',
-            'playerName' => 'Young Player', // Only 3 years experience
+            'playerID' => 1, // 'playerName' => 'Young Player', // Only 3 years experience
             'offer' => [
                 'year1' => 1500, // Over max of 1063 for 0-6 years exp
                 'year2' => 1600,
@@ -250,7 +250,7 @@ class ExtensionIntegrationTest extends TestCase
         
         $extensionData = [
             'teamName' => 'Miami Cyclones',
-            'playerName' => 'Veteran Player',
+            'playerID' => 1, // 'playerName' => 'Veteran Player',
             'offer' => [
                 'year1' => 1000,
                 'year2' => 1125, // 12.5% raise allowed with Bird rights
@@ -279,7 +279,7 @@ class ExtensionIntegrationTest extends TestCase
         
         $extensionData = [
             'teamName' => 'Miami Cyclones',
-            'playerName' => 'Loyal Player',
+            'playerID' => 1, // 'playerName' => 'Loyal Player',
             'offer' => [
                 'year1' => 900,
                 'year2' => 950,
@@ -310,7 +310,7 @@ class ExtensionIntegrationTest extends TestCase
         
         $extensionData = [
             'teamName' => 'Stacked Team',
-            'playerName' => 'Rotation Player',
+            'playerID' => 1, // 'playerName' => 'Rotation Player',
             'offer' => [
                 'year1' => 950,  // Under max of 1063 for 4 years exp
                 'year2' => 1000, // Small raises
@@ -339,7 +339,7 @@ class ExtensionIntegrationTest extends TestCase
         
         $extensionData = [
             'teamName' => 'Miami Cyclones',
-            'playerName' => 'Test Player',
+            'playerID' => 1, // 'playerName' => 'Test Player',
             'offer' => [
                 'year1' => 1000,
                 'year2' => 1100,
@@ -368,7 +368,7 @@ class ExtensionIntegrationTest extends TestCase
         
         $extensionData = [
             'teamName' => 'Miami Cyclones',
-            'playerName' => 'Test Player',
+            'playerID' => 1, // 'playerName' => 'Test Player',
             'offer' => [
                 'year1' => 1000,
                 'year2' => 1100,
@@ -397,7 +397,7 @@ class ExtensionIntegrationTest extends TestCase
         
         $extensionData = [
             'teamName' => 'Miami Cyclones',
-            'playerName' => 'Test Player',
+            'playerID' => 1, // 'playerName' => 'Test Player',
             'offer' => [
                 'year1' => 1000,
                 'year2' => 1100,

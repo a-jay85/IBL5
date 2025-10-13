@@ -29,6 +29,7 @@ $demands = [
 
 // Build extension data for processor
 $extensionData = [
+    'playerID' => $playerID,
     'teamName' => $Team_Name,
     'playerName' => $Player_Name,
     'offer' => $offer,

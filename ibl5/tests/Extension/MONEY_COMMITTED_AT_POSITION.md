@@ -245,7 +245,7 @@ ExtensionProcessor::processExtension($extensionData)
     • Team object (all team data)
     ↓
 [Validation] - Uses object properties
-    • validateExtensionEligibilityWithTeam($team)
+    • validateExtensionEligibility($team)
     • validateMaximumYearOneOfferWithPlayer($offer, $player)
     • validateRaisesWithPlayer($offer, $player)
     ↓
@@ -268,7 +268,7 @@ ExtensionProcessor::processExtension($extensionData)
   - Refactored processExtension() to use objects throughout
   
 - `ibl5/classes/Extension/ExtensionValidator.php`
-  - Added validateExtensionEligibilityWithTeam()
+  - Added validateExtensionEligibility()
   - Added validateMaximumYearOneOfferWithPlayer()
   - Added validateRaisesWithPlayer()
   - Added escapeStringPublic() for safe SQL escaping

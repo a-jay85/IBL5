@@ -140,7 +140,7 @@ class ExtensionValidationTest extends TestCase
         $team = \Team::initialize($this->mockDb, $teamName);
 
         // Act
-        $result = $this->extensionValidator->validateExtensionEligibilityWithTeam($team);
+        $result = $this->extensionValidator->validateExtensionEligibility($team);
 
         // Assert
         $this->assertFalse($result['valid']);
@@ -165,7 +165,7 @@ class ExtensionValidationTest extends TestCase
         $team = \Team::initialize($this->mockDb, $teamName);
 
         // Act
-        $result = $this->extensionValidator->validateExtensionEligibilityWithTeam($team);
+        $result = $this->extensionValidator->validateExtensionEligibility($team);
 
         // Assert
         $this->assertFalse($result['valid']);
@@ -190,7 +190,7 @@ class ExtensionValidationTest extends TestCase
         $team = \Team::initialize($this->mockDb, $teamName);
 
         // Act
-        $result = $this->extensionValidator->validateExtensionEligibilityWithTeam($team);
+        $result = $this->extensionValidator->validateExtensionEligibility($team);
 
         // Assert
         $this->assertTrue($result['valid']);

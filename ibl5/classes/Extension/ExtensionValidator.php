@@ -184,7 +184,7 @@ class ExtensionValidator
      * @param \Team $team Team object
      * @return array ['valid' => bool, 'error' => string|null]
      */
-    public function validateExtensionEligibilityWithTeam($team)
+    public function validateExtensionEligibility($team)
     {
         if ($team->hasUsedExtensionThisSeason == 1) {
             return [

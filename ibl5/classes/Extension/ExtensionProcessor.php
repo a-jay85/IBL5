@@ -80,7 +80,7 @@ class ExtensionProcessor
         }
 
         // Check extension eligibility using Team object
-        $eligibilityValidation = $this->validator->validateExtensionEligibilityWithTeam($team);
+        $eligibilityValidation = $this->validator->validateExtensionEligibility($team);
         if (!$eligibilityValidation['valid']) {
             return [
                 'success' => false,

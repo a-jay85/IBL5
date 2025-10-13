@@ -2,10 +2,6 @@
 
 namespace Extension;
 
-// Include required classes
-require_once __DIR__ . '/../Team.php';
-require_once __DIR__ . '/../Player.php';
-
 /**
  * Extension Processor Class
  * 

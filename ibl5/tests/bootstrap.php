@@ -34,6 +34,15 @@ spl_autoload_register(function ($class) {
         }
     }
     
+    // Handle global namespace classes like Player and Team
+    if (in_array($class, ['Player', 'Team'])) {
+        $file = __DIR__ . '/../classes/' . $class . '.php';
+        if (file_exists($file)) {
+            require_once $file;
+            return true;
+        }
+    }
+    
     // For other classes, don't auto-load them if we have mocks
     // This prevents loading the real Season, Shared, etc. classes
     return false;

@@ -246,8 +246,8 @@ ExtensionProcessor::processExtension($extensionData)
     ↓
 [Validation] - Uses object properties
     • validateExtensionEligibility($team)
-    • validateMaximumYearOneOfferWithPlayer($offer, $player)
-    • validateRaisesWithPlayer($offer, $player)
+    • validateMaximumYearOneOffer($offer, $player)
+    • validateRaises($offer, $player)
     ↓
 [Evaluation] - Uses object properties
     • teamFactors from $team->seasonRecord, tradition data
@@ -256,8 +256,8 @@ ExtensionProcessor::processExtension($extensionData)
     ↓
 [Database Operations] - Uses objects
     • updatePlayerContractWithPlayer($player, ...)
-    • markExtensionUsedThisSeasonWithTeam($team)
-    • createAcceptedExtensionStoryWithObjects($player, $team, ...)
+    • markExtensionUsedThisSeason($team)
+    • createAcceptedExtensionStory($player, $team, ...)
 ```
 
 ## Files Modified
@@ -269,16 +269,16 @@ ExtensionProcessor::processExtension($extensionData)
   
 - `ibl5/classes/Extension/ExtensionValidator.php`
   - Added validateExtensionEligibility()
-  - Added validateMaximumYearOneOfferWithPlayer()
-  - Added validateRaisesWithPlayer()
+  - Added validateMaximumYearOneOffer()
+  - Added validateRaises()
   - Added escapeStringPublic() for safe SQL escaping
 
 - `ibl5/classes/Extension/ExtensionDatabaseOperations.php`
   - Added markExtensionUsedThisSim()
   - Added markExtensionUsedThisSeason()
-  - Added updatePlayerContractWithPlayer()
-  - Added createAcceptedExtensionStoryWithObjects()
-  - Added createRejectedExtensionStoryWithObjects()
+  - Added updatePlayerContract()
+  - Added createAcceptedExtensionStory()
+  - Added createRejectedExtensionStory()
 
 ## Backward Compatibility
 

@@ -23,9 +23,20 @@ spl_autoload_register(function ($class) {
         }
     }
     
-    // Handle Extension classes
-    if (strpos($class, 'Extension') === 0) {
-        $file = __DIR__ . '/../classes/Extension/ExtensionTestHelpers.php';
+    // Handle Extension classes with namespace
+    if (strpos($class, 'Extension\\') === 0) {
+        // Remove namespace prefix to get just the class name
+        $className = str_replace('Extension\\', '', $class);
+        $file = __DIR__ . '/../classes/Extension/' . $className . '.php';
+        if (file_exists($file)) {
+            require_once $file;
+            return true;
+        }
+    }
+    
+    // Handle global namespace classes like Player and Team
+    if (in_array($class, ['Player', 'Team'])) {
+        $file = __DIR__ . '/../classes/' . $class . '.php';
         if (file_exists($file)) {
             require_once $file;
             return true;
@@ -135,6 +146,12 @@ class MockDatabase
     public function clearQueries()
     {
         $this->executedQueries = [];
+    }
+    
+    public function sql_escape_string($string)
+    {
+        // Simple escaping for mock - in production this would use mysqli_real_escape_string
+        return addslashes($string);
     }
 }
 

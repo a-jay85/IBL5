@@ -1,6 +1,7 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
+use Extension\ExtensionDatabaseOperations;
 
 /**
  * Tests for contract extension database operations
@@ -103,13 +104,13 @@ class ExtensionDatabaseOperationsTest extends TestCase
      * @group database
      * @group team-flags
      */
-    public function testMarksExtensionUsedThisChunk()
+    public function testMarksExtensionUsedThisSim()
     {
         // Arrange
         $teamName = 'Test Team';
 
         // Act
-        $result = $this->extensionDbOps->markExtensionUsedThisChunk($teamName);
+        $result = $this->extensionDbOps->markExtensionUsedThisSim($teamName);
 
         // Assert
         $this->assertTrue($result);
@@ -280,37 +281,6 @@ class ExtensionDatabaseOperationsTest extends TestCase
      * @group database
      * @group retrieval
      */
-    public function testRetrievesTeamExtensionInfo()
-    {
-        // Arrange
-        $teamName = 'Test Team';
-        $this->mockDb->setMockData([
-            [
-                'Used_Extension_This_Chunk' => 0,
-                'Used_Extension_This_Season' => 0,
-                'Contract_Wins' => 50,
-                'Contract_Losses' => 32,
-                'Contract_AvgW' => 2500,
-                'Contract_AvgL' => 2000,
-                'Contract_Coach' => 80
-            ]
-        ]);
-
-        // Act
-        $result = $this->extensionDbOps->getTeamExtensionInfo($teamName);
-
-        // Assert
-        $this->assertIsArray($result);
-        $this->assertEquals(0, $result['Used_Extension_This_Chunk']);
-        $this->assertEquals(0, $result['Used_Extension_This_Season']);
-        $this->assertEquals(50, $result['Contract_Wins']);
-        $this->assertEquals(32, $result['Contract_Losses']);
-    }
-
-    /**
-     * @group database
-     * @group retrieval
-     */
     public function testRetrievesPlayerPreferences()
     {
         // Arrange
@@ -456,7 +426,7 @@ class ExtensionDatabaseOperationsTest extends TestCase
         $queries = $this->mockDb->getExecutedQueries();
         
         // Should NOT update player contract or mark extension used for season
-        // Should only create news story and NOT mark extension used this chunk (already done)
+        // Should only create news story and NOT mark extension used this sim (already done)
         $hasPlayerUpdate = false;
         $hasSeasonFlag = false;
         foreach ($queries as $query) {

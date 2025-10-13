@@ -149,7 +149,7 @@ tests/Extension/
 
 ### Extension Limits
 - Per season: **1 successful extension**
-- Per chunk (sim): **1 attempt** (successful or not)
+- Per sim: **1 attempt** (successful or not)
 
 ## Helper Classes
 

@@ -239,7 +239,7 @@ class ExtensionValidator
         if ($team->hasUsedExtensionThisSim == 1) {
             return [
                 'valid' => false,
-                'error' => 'Sorry, you have already used your extension for this Chunk.'
+                'error' => 'Sorry, you have already used your extension for this sim.'
             ];
         }
         

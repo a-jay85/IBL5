@@ -211,7 +211,7 @@ class ExtensionProcessor
             return [
                 'success' => true,
                 'accepted' => true,
-                'message' => "{$player->name} accepts your extension offer of $offerInMillions million dollars over $offerYears years. Thank you! (Can't believe you gave me that much...sucker!)",
+                'message' => "{$player->name} accepts your extension offer of $offerInMillions million dollars over $offerYears years. Thank you! (Can't believe you gave me that much... sucker!)",
                 'offerValue' => $evaluation['offerValue'],
                 'demandValue' => $evaluation['demandValue'],
                 'modifier' => $evaluation['modifier'],

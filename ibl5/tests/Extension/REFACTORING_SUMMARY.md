@@ -23,8 +23,15 @@ if ($nooffer == 0) {
 
 ### After: Object-Oriented Code (68 lines)
 ```php
-// Clear separation: collect data, process, display results
-$extensionData = ['teamName' => $Team_Name, 'playerName' => $Player_Name, ...];
+// Clear separation: collect data using playerID, process with objects, display results
+$extensionData = [
+    'teamName' => $Team_Name,
+    'playerID' => $playerID,
+    'offer' => $offer,
+    'demands' => $demands,
+    'bird' => $Bird
+];
+
 $processor = new ExtensionProcessor($db);
 $result = $processor->processExtension($extensionData);
 
@@ -41,13 +48,13 @@ if (!$result['success']) {
 
 ```
 classes/Extension/
-├── ExtensionValidator.php (229 lines)
-│   └── Validates all business rules
-├── ExtensionOfferEvaluator.php (165 lines)
+├── ExtensionValidator.php (187 lines)
+│   └── Validates all business rules using Team objects
+├── ExtensionOfferEvaluator.php (177 lines)
 │   └── Evaluates offers with player preferences
-├── ExtensionDatabaseOperations.php (261 lines)
-│   └── Handles all database interactions
-└── ExtensionProcessor.php (267 lines)
+├── ExtensionDatabaseOperations.php (312 lines)
+│   └── Handles all database interactions with Player/Team objects
+└── ExtensionProcessor.php (274 lines)
     └── Orchestrates the complete workflow
 ```
 

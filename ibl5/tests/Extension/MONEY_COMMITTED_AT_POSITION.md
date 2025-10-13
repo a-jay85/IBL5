@@ -24,9 +24,16 @@ Enhanced to use Player and Team objects throughout entire workflow:
 3. **Pass objects through workflow** - All components use object properties
 4. **Calculate money committed** - Uses Player and Team objects seamlessly
 
+### Phase 3: PlayerID Optimization (Commit decf423)
+Simplified Player object creation to use playerID instead of name lookup:
+1. **Use Player::withPlayerID()** - Direct ID-based lookup
+2. **Remove loadPlayerByName()** - No longer needed
+3. **Eliminate SQL escaping** - Integer IDs are type-safe
+4. **Improve efficiency** - Faster ID lookups vs string comparisons
+
 ## Current Implementation
 
-### Player Object Creation
+### Player Object Creation (Using PlayerID)
 
 ```php
 private function getPlayerObject($extensionData)
@@ -36,18 +43,14 @@ private function getPlayerObject($extensionData)
         return $extensionData['player'];
     }
 
-    // Otherwise, load player by name
-    $playerName = $extensionData['playerName'] ?? null;
-    if (!$playerName) {
-        return null;
+    // Create Player object using playerID for efficiency
+    $playerID = $extensionData['playerID'] ?? null;
+    if ($playerID) {
+        return \Player::withPlayerID($this->db, (int)$playerID);
     }
 
-    return $this->loadPlayerByName($playerName);
+    return null;
 }
-
-private function loadPlayerByName($playerName)
-{
-    $playerNameEscaped = $this->validator->escapeStringPublic($playerName);
     $query = "SELECT * FROM ibl_plr WHERE name = '$playerNameEscaped' LIMIT 1";
     $result = $this->db->sql_query($query);
     

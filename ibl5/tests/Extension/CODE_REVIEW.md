@@ -111,10 +111,10 @@ if ($Offer_1 == 0 || $Offer_2 == 0 || $Offer_3 == 0) {
 // Can only use extension once per season
 if ($UsedExtensionSeason == 1) { /* reject */ }
 
-// Can only attempt once per chunk (sim)
-if ($UsedExtensionChunk == 1) { /* reject */ }
+// Can only attempt once per sim
+if ($UsedExtensionSim == 1) { /* reject */ }
 ```
-**Tests**: `testRejectsExtensionWhenAlreadyUsedThisSeason`, `testRejectsExtensionWhenAlreadyUsedThisChunk`
+**Tests**: `testRejectsExtensionWhenAlreadyUsedThisSeason`, `testRejectsExtensionWhenAlreadyUsedThisSim`
 
 #### Maximum Offer Rules
 ```php
@@ -199,10 +199,10 @@ INSERT INTO nuke_stories (...)
 
 #### On Any Legal Attempt
 ```php
-// Mark extension attempt for this chunk
+// Mark extension attempt for this sim
 UPDATE ibl_team_info SET Used_Extension_This_Chunk = 1
 ```
-**Tests**: `testMarksExtensionUsedThisChunk`
+**Tests**: `testMarksExtensionUsedThisSim`
 
 ## Test Data Providers
 

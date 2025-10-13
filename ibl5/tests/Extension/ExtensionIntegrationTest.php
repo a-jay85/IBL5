@@ -1,6 +1,7 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
+use Extension\ExtensionProcessor;
 
 /**
  * Integration tests for complete contract extension workflows
@@ -38,7 +39,7 @@ class ExtensionIntegrationTest extends TestCase
         
         $extensionData = [
             'teamName' => 'Miami Cyclones',
-            'playerName' => 'Test Player',
+            'playerID' => 1, // 'playerName' => 'Test Player',
             'offer' => [
                 'year1' => 1000,
                 'year2' => 1100,
@@ -62,7 +63,7 @@ class ExtensionIntegrationTest extends TestCase
         
         $allQueries = implode(' ', $queries);
         
-        // Verify chunk flag was set
+        // Verify sim flag was set
         $this->assertStringContainsString('Used_Extension_This_Chunk = 1', $allQueries);
         
         // Verify season flag was set (for accepted extension)
@@ -83,7 +84,7 @@ class ExtensionIntegrationTest extends TestCase
         
         $extensionData = [
             'teamName' => 'Seattle SuperSonics',
-            'playerName' => 'Demanding Player',
+            'playerID' => 1, // 'playerName' => 'Demanding Player',
             'offer' => [
                 'year1' => 800,
                 'year2' => 850,
@@ -101,7 +102,7 @@ class ExtensionIntegrationTest extends TestCase
         $this->assertFalse($result['accepted']); // But offer was rejected
         $this->assertStringContainsString('refuse', $result['message']);
         
-        // Verify chunk flag was set but NOT season flag
+        // Verify sim flag was set but NOT season flag
         $queries = $this->mockDb->getExecutedQueries();
         $allQueries = implode(' ', $queries);
         $this->assertStringContainsString('Used_Extension_This_Chunk = 1', $allQueries);
@@ -119,7 +120,7 @@ class ExtensionIntegrationTest extends TestCase
         
         $extensionData = [
             'teamName' => 'Miami Cyclones',
-            'playerName' => 'Test Player',
+            'playerID' => 1, // 'playerName' => 'Test Player',
             'offer' => [
                 'year1' => 0, // Invalid!
                 'year2' => 1000,
@@ -134,7 +135,7 @@ class ExtensionIntegrationTest extends TestCase
 
         // Assert
         $this->assertFalse($result['success']);
-        $this->assertStringContainsString('Year 1', $result['error']);
+        $this->assertStringContainsString('Year1', $result['error']);
         $this->assertStringContainsString('zero', $result['error']);
         
         // Verify NO database changes were made
@@ -154,7 +155,7 @@ class ExtensionIntegrationTest extends TestCase
         
         $extensionData = [
             'teamName' => 'Miami Cyclones',
-            'playerName' => 'Test Player',
+            'playerID' => 1, // 'playerName' => 'Test Player',
             'offer' => [
                 'year1' => 1000,
                 'year2' => 1100,
@@ -175,7 +176,7 @@ class ExtensionIntegrationTest extends TestCase
         $queries = $this->mockDb->getExecutedQueries();
         // Should have at least one query for eligibility check
         $this->assertGreaterThanOrEqual(1, count($queries));
-        // But should NOT have marked chunk as used or updated contract
+        // But should NOT have marked sim as used or updated contract
         $allQueries = implode(' ', $queries);
         $this->assertStringNotContainsString('UPDATE ibl_plr', $allQueries);
     }
@@ -191,7 +192,7 @@ class ExtensionIntegrationTest extends TestCase
         
         $extensionData = [
             'teamName' => 'Miami Cyclones',
-            'playerName' => 'Test Player',
+            'playerID' => 1, // 'playerName' => 'Test Player',
             'offer' => [
                 'year1' => 1000,
                 'year2' => 1200, // 20% raise, but max is 10% without Bird rights
@@ -220,7 +221,7 @@ class ExtensionIntegrationTest extends TestCase
         
         $extensionData = [
             'teamName' => 'Miami Cyclones',
-            'playerName' => 'Young Player', // Only 3 years experience
+            'playerID' => 1, // 'playerName' => 'Young Player', // Only 3 years experience
             'offer' => [
                 'year1' => 1500, // Over max of 1063 for 0-6 years exp
                 'year2' => 1600,
@@ -249,7 +250,7 @@ class ExtensionIntegrationTest extends TestCase
         
         $extensionData = [
             'teamName' => 'Miami Cyclones',
-            'playerName' => 'Veteran Player',
+            'playerID' => 1, // 'playerName' => 'Veteran Player',
             'offer' => [
                 'year1' => 1000,
                 'year2' => 1125, // 12.5% raise allowed with Bird rights
@@ -278,7 +279,7 @@ class ExtensionIntegrationTest extends TestCase
         
         $extensionData = [
             'teamName' => 'Miami Cyclones',
-            'playerName' => 'Loyal Player',
+            'playerID' => 1, // 'playerName' => 'Loyal Player',
             'offer' => [
                 'year1' => 900,
                 'year2' => 950,
@@ -294,8 +295,8 @@ class ExtensionIntegrationTest extends TestCase
         // Assert
         $this->assertTrue($result['success']);
         $this->assertTrue($result['accepted']);
-        $this->assertArrayHasKey('modifierApplied', $result);
-        $this->assertGreaterThan(1.0, $result['modifierApplied']); // Loyalty increases modifier
+        $this->assertArrayHasKey('modifier', $result);
+        $this->assertGreaterThan(1.0, $result['modifier']); // Loyalty increases modifier
     }
 
     /**
@@ -309,7 +310,7 @@ class ExtensionIntegrationTest extends TestCase
         
         $extensionData = [
             'teamName' => 'Stacked Team',
-            'playerName' => 'Rotation Player',
+            'playerID' => 1, // 'playerName' => 'Rotation Player',
             'offer' => [
                 'year1' => 950,  // Under max of 1063 for 4 years exp
                 'year2' => 1000, // Small raises
@@ -338,7 +339,7 @@ class ExtensionIntegrationTest extends TestCase
         
         $extensionData = [
             'teamName' => 'Miami Cyclones',
-            'playerName' => 'Test Player',
+            'playerID' => 1, // 'playerName' => 'Test Player',
             'offer' => [
                 'year1' => 1000,
                 'year2' => 1100,
@@ -367,7 +368,7 @@ class ExtensionIntegrationTest extends TestCase
         
         $extensionData = [
             'teamName' => 'Miami Cyclones',
-            'playerName' => 'Test Player',
+            'playerID' => 1, // 'playerName' => 'Test Player',
             'offer' => [
                 'year1' => 1000,
                 'year2' => 1100,
@@ -396,7 +397,7 @@ class ExtensionIntegrationTest extends TestCase
         
         $extensionData = [
             'teamName' => 'Miami Cyclones',
-            'playerName' => 'Test Player',
+            'playerID' => 1, // 'playerName' => 'Test Player',
             'offer' => [
                 'year1' => 1000,
                 'year2' => 1100,
@@ -421,7 +422,7 @@ class ExtensionIntegrationTest extends TestCase
     {
         // Combined data that works for all queries in the scenario
         $this->mockDb->setMockData([
-            [
+            array_merge($this->getBasePlayerData(), [
                 // Team info fields
                 'Used_Extension_This_Season' => 0,
                 'Used_Extension_This_Chunk' => 0,
@@ -430,16 +431,21 @@ class ExtensionIntegrationTest extends TestCase
                 'Contract_AvgW' => 2500,
                 'Contract_AvgL' => 2000,
                 'money_committed_at_position' => 0,
-                // Player info fields (combined in same row for mock)
+                // Player info fields (scenario-specific overrides)
                 'name' => 'Test Player',
+                'nickname' => 'Tester',
                 'teamname' => 'Miami Cyclones',
+                // Free agency preferences
                 'winner' => 3,
                 'tradition' => 3,
                 'loyalty' => 3,
                 'playingTime' => 3,
+                'security' => 3,
+                // Contract details
                 'exp' => 5,
                 'bird' => 2,
                 'cy' => 1,
+                'cyt' => 1,
                 'cy1' => 800,
                 'cy2' => 0,
                 'cy3' => 0,
@@ -450,7 +456,7 @@ class ExtensionIntegrationTest extends TestCase
                 'catid' => 1,
                 'counter' => 10,
                 'topicid' => 5
-            ]
+            ])
         ]);
     }
 
@@ -458,7 +464,7 @@ class ExtensionIntegrationTest extends TestCase
     {
         // Combined data that works for all queries in the scenario
         $this->mockDb->setMockData([
-            [
+            array_merge($this->getBasePlayerData(), [
                 // Team info fields - losing team
                 'Used_Extension_This_Season' => 0,
                 'Used_Extension_This_Chunk' => 0,
@@ -467,27 +473,65 @@ class ExtensionIntegrationTest extends TestCase
                 'Contract_AvgW' => 1500,
                 'Contract_AvgL' => 3500,
                 'money_committed_at_position' => 0,
-                // Player info fields - high demands
+                // Player info fields - high demands (scenario-specific overrides)
+                'pid' => 2,
+                'ordinal' => 2,
                 'name' => 'Demanding Player',
+                'nickname' => 'Diva',
+                'age' => 28,
+                'tid' => 2,
                 'teamname' => 'Seattle SuperSonics',
+                'pos' => 'SG',
+                // Ratings (higher than base)
+                'r_fga' => 60,
+                'r_fgp' => 60,
+                'r_fta' => 60,
+                'r_ftp' => 60,
+                'r_tga' => 60,
+                'r_tgp' => 60,
+                'r_orb' => 60,
+                'r_drb' => 60,
+                'r_ast' => 60,
+                'r_stl' => 60,
+                'r_to' => 60,
+                'r_blk' => 60,
+                'r_foul' => 60,
+                'oo' => 60,
+                'od' => 60,
+                'do' => 60,
+                'dd' => 60,
+                'po' => 60,
+                'pd' => 60,
+                'to' => 60,
+                'td' => 60,
+                'Clutch' => 60,
+                'Consistency' => 60,
+                'talent' => 60,
+                'skill' => 60,
+                'intangibles' => 60,
+                // Free agency preferences
                 'winner' => 5,
                 'tradition' => 5,
                 'loyalty' => 1,
                 'playingTime' => 5,
+                'security' => 1,
+                // Contract details
                 'exp' => 8,
                 'bird' => 3,
                 'cy' => 1,
+                'cyt' => 1,
                 'cy1' => 1200,
                 'cy2' => 0,
                 'cy3' => 0,
                 'cy4' => 0,
                 'cy5' => 0,
                 'cy6' => 0,
+                'draftyear' => 2015,
                 // News story fields
                 'catid' => 1,
                 'counter' => 10,
                 'topicid' => 5
-            ]
+            ])
         ]);
     }
 
@@ -495,13 +539,16 @@ class ExtensionIntegrationTest extends TestCase
     {
         // Combined data that works for all queries in the scenario
         $this->mockDb->setMockData([
-            [
+            array_merge($this->getBasePlayerData(), [
                 'Used_Extension_This_Season' => 0,
                 'Used_Extension_This_Chunk' => 0,
                 'name' => 'Test Player',
+                'pid' => 3,
+                'ordinal' => 3,
                 'exp' => 5,
                 'bird' => 2,
                 'cy' => 1,
+                'cyt' => 1,
                 'cy1' => 800,
                 'cy2' => 0,
                 'cy3' => 0,
@@ -510,20 +557,22 @@ class ExtensionIntegrationTest extends TestCase
                 'cy6' => 0,
                 'catid' => 1,
                 'counter' => 10
-            ]
+            ])
         ]);
     }
 
     private function setupAlreadyExtendedScenario()
     {
         $this->mockDb->setMockData([
-            [
+            array_merge($this->getBasePlayerData(), [
                 'Used_Extension_This_Season' => 1,
                 'Used_Extension_This_Chunk' => 0,
                 'name' => 'Test Player',
+                'pid' => 4,
+                'ordinal' => 4,
                 'exp' => 5,
                 'bird' => 2
-            ]
+            ])
         ]);
     }
 
@@ -531,7 +580,7 @@ class ExtensionIntegrationTest extends TestCase
     {
         // Combined data that works for all queries in the scenario
         $this->mockDb->setMockData([
-            [
+            array_merge($this->getBasePlayerData(), [
                 // Team info fields
                 'Used_Extension_This_Season' => 0,
                 'Used_Extension_This_Chunk' => 0,
@@ -541,14 +590,20 @@ class ExtensionIntegrationTest extends TestCase
                 'Contract_AvgL' => 2000,
                 'money_committed_at_position' => 0,
                 // Player info fields (combined in same row for mock)
+                'pid' => 5,
+                'ordinal' => 5,
                 'name' => 'Veteran Player',
+                'nickname' => 'Vet',
+                'age' => 30,
                 'exp' => 8,
                 'bird' => 4,
                 'cy' => 1,
+                'cyt' => 1,
                 'winner' => 3,
                 'tradition' => 3,
                 'loyalty' => 3,
                 'playingTime' => 3,
+                'security' => 3,
                 'cy1' => 900,
                 'cy2' => 0,
                 'cy3' => 0,
@@ -559,7 +614,7 @@ class ExtensionIntegrationTest extends TestCase
                 'catid' => 1,
                 'counter' => 10,
                 'topicid' => 5
-            ]
+            ])
         ]);
     }
 
@@ -567,7 +622,7 @@ class ExtensionIntegrationTest extends TestCase
     {
         // Combined data that works for all queries in the scenario
         $this->mockDb->setMockData([
-            [
+            array_merge($this->getBasePlayerData(), [
                 // Team info fields
                 'Used_Extension_This_Season' => 0,
                 'Used_Extension_This_Chunk' => 0,
@@ -577,14 +632,20 @@ class ExtensionIntegrationTest extends TestCase
                 'Contract_AvgL' => 2100,
                 'money_committed_at_position' => 0,
                 // Player info fields (combined in same row for mock)
+                'pid' => 6,
+                'ordinal' => 6,
                 'name' => 'Loyal Player',
+                'nickname' => 'Loyal',
+                'age' => 27,
                 'exp' => 6,
                 'bird' => 3,
                 'winner' => 3,
                 'tradition' => 3,
                 'loyalty' => 5,
                 'playingTime' => 3,
+                'security' => 3,
                 'cy' => 1,
+                'cyt' => 1,
                 'cy1' => 850,
                 'cy2' => 0,
                 'cy3' => 0,
@@ -595,7 +656,7 @@ class ExtensionIntegrationTest extends TestCase
                 'catid' => 1,
                 'counter' => 10,
                 'topicid' => 5
-            ]
+            ])
         ]);
     }
 
@@ -603,7 +664,7 @@ class ExtensionIntegrationTest extends TestCase
     {
         // Combined data that works for all queries in the scenario
         $this->mockDb->setMockData([
-            [
+            array_merge($this->getBasePlayerData(), [
                 // Team info fields
                 'Used_Extension_This_Season' => 0,
                 'Used_Extension_This_Chunk' => 0,
@@ -613,14 +674,21 @@ class ExtensionIntegrationTest extends TestCase
                 'Contract_AvgW' => 2700,
                 'Contract_AvgL' => 1900,
                 // Player info fields (combined in same row for mock)
+                'pid' => 7,
+                'ordinal' => 7,
                 'name' => 'Rotation Player',
+                'nickname' => 'Roto',
+                'age' => 24,
+                'pos' => 'G',  // Position field required
                 'exp' => 4,
                 'bird' => 2,
                 'winner' => 3,
                 'tradition' => 3,
                 'loyalty' => 2,
                 'playingTime' => 5,
+                'security' => 3,
                 'cy' => 1,
+                'cyt' => 1,
                 'cy1' => 800,
                 'cy2' => 0,
                 'cy3' => 0,
@@ -631,7 +699,100 @@ class ExtensionIntegrationTest extends TestCase
                 'catid' => 1,
                 'counter' => 10,
                 'topicid' => 5
-            ]
+            ])
         ]);
+    }
+
+    /**
+     * Helper method that returns base Player data fields to avoid duplication
+     * and ensure all required fields are present in mock data
+     */
+    private function getBasePlayerData()
+    {
+        return [
+            // Basic info
+            'pid' => 1,
+            'ordinal' => 1,
+            'nickname' => 'Test',
+            'age' => 25,
+            'tid' => 1,
+            'teamname' => 'Test Team',
+            'pos' => 'SF',
+            // Ratings
+            'r_fga' => 50,
+            'r_fgp' => 50,
+            'r_fta' => 50,
+            'r_ftp' => 50,
+            'r_tga' => 50,
+            'r_tgp' => 50,
+            'r_orb' => 50,
+            'r_drb' => 50,
+            'r_ast' => 50,
+            'r_stl' => 50,
+            'r_to' => 50,
+            'r_blk' => 50,
+            'r_foul' => 50,
+            'oo' => 50,
+            'od' => 50,
+            'do' => 50,
+            'dd' => 50,
+            'po' => 50,
+            'pd' => 50,
+            'to' => 50,
+            'td' => 50,
+            'Clutch' => 50,
+            'Consistency' => 50,
+            'talent' => 50,
+            'skill' => 50,
+            'intangibles' => 50,
+            // Draft info
+            'draftyear' => 2018,
+            'draftround' => 1,
+            'draftpickno' => 15,
+            'draftedby' => 'Test Team',
+            'draftedbycurrentname' => 'Test Team',
+            'college' => 'Test University',
+            // Physical attributes
+            'htft' => 6,
+            'htin' => 8,
+            'wt' => 210,
+            // Status
+            'injured' => 0,
+            'retired' => 0,
+            'droptime' => 0,
+            // Team info fields
+            'teamid' => 1,
+            'team_city' => 'Test',
+            'team_name' => 'Team',
+            'color1' => 'Blue',
+            'color2' => 'White',
+            'arena' => 'Test Arena',
+            'capacity' => 20000,
+            'formerly_known_as' => '',
+            'owner_name' => 'Test Owner',
+            'owner_email' => 'owner@test.com',
+            'discordID' => '123456',
+            'HasMLE' => 0,
+            'HasLLE' => 0,
+            'leagueRecord' => '0-0',
+            'SERVER_NAME' => 'test.ibl.com',
+            // Free agency preferences (required by Player.php line 162-163)
+            'loyalty' => 3,
+            'playingTime' => 3,
+            'winner' => 3,
+            'tradition' => 3,
+            'security' => 3,
+            // Contract details
+            'exp' => 5,
+            'bird' => 2,
+            'cy' => 1,
+            'cyt' => 1,
+            'cy1' => 800,
+            'cy2' => 0,
+            'cy3' => 0,
+            'cy4' => 0,
+            'cy5' => 0,
+            'cy6' => 0,
+        ];
     }
 }

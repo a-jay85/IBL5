@@ -442,7 +442,7 @@ function negotiate($playerID)
             $avgDemands = $adjustedScore * $demandsFactor;
             $totalDemands = $avgDemands * 5;
             $baseDemands = $totalDemands / 6;
-            $maxRaise = round($baseDemands * 0.1);
+            $maxRaise = floor($baseDemands * 0.1);
 
             $dem1 = $baseDemands;
             $dem2 = $baseDemands + $maxRaise;

@@ -108,7 +108,7 @@ class ExtensionValidator
         $maxRaisePercentage = ($birdYears >= self::BIRD_RIGHTS_THRESHOLD) 
             ? self::RAISE_PERCENTAGE_WITH_BIRD 
             : self::RAISE_PERCENTAGE_WITHOUT_BIRD;
-        $maxIncrease = round($offer['year1'] * $maxRaisePercentage, 0);
+        $maxIncrease = floor($offer['year1'] * $maxRaisePercentage);
         
         if ($offer['year2'] > $offer['year1'] + $maxIncrease) {
             $legalOffer = $offer['year1'] + $maxIncrease;

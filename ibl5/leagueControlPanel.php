@@ -162,7 +162,7 @@ echo "<FORM action=\"leagueControlPanel.php\" method=\"POST\">
         <option value = \"Free Agency\"" . ($season->phase == "Free Agency" ? " SELECTED" : "") . ">Free Agency</option>
     </select>
     <INPUT type='submit' name='query' value='Set Season Phase'><p>
-    <A HREF=\"statLeaders.php\">Season Highs</A><p>";
+    <A HREF=\"/ibl5/pages/seasonHighs.php\">Season Highs</A><p>";
 
 switch ($season->phase) {
     case 'Preseason':

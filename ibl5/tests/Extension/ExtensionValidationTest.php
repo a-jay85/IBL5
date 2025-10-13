@@ -131,11 +131,16 @@ class ExtensionValidationTest extends TestCase
         // Arrange
         $teamName = 'Test Team';
         $this->mockDb->setMockData([
-            ['Used_Extension_This_Season' => 1, 'Used_Extension_This_Chunk' => 0]
+            array_merge($this->getBaseTeamData(), [
+                'team_name' => $teamName,
+                'Used_Extension_This_Season' => 1,
+                'Used_Extension_This_Chunk' => 0
+            ])
         ]);
+        $team = \Team::initialize($this->mockDb, $teamName);
 
         // Act
-        $result = $this->extensionValidator->validateExtensionEligibility($teamName);
+        $result = $this->extensionValidator->validateExtensionEligibilityWithTeam($team);
 
         // Assert
         $this->assertFalse($result['valid']);
@@ -151,11 +156,16 @@ class ExtensionValidationTest extends TestCase
         // Arrange
         $teamName = 'Test Team';
         $this->mockDb->setMockData([
-            ['Used_Extension_This_Season' => 0, 'Used_Extension_This_Chunk' => 1]
+            array_merge($this->getBaseTeamData(), [
+                'team_name' => $teamName,
+                'Used_Extension_This_Season' => 0,
+                'Used_Extension_This_Chunk' => 1
+            ])
         ]);
+        $team = \Team::initialize($this->mockDb, $teamName);
 
         // Act
-        $result = $this->extensionValidator->validateExtensionEligibility($teamName);
+        $result = $this->extensionValidator->validateExtensionEligibilityWithTeam($team);
 
         // Assert
         $this->assertFalse($result['valid']);
@@ -171,14 +181,47 @@ class ExtensionValidationTest extends TestCase
         // Arrange
         $teamName = 'Test Team';
         $this->mockDb->setMockData([
-            ['Used_Extension_This_Season' => 0, 'Used_Extension_This_Chunk' => 0]
+            array_merge($this->getBaseTeamData(), [
+                'team_name' => $teamName,
+                'Used_Extension_This_Season' => 0,
+                'Used_Extension_This_Chunk' => 0
+            ])
         ]);
+        $team = \Team::initialize($this->mockDb, $teamName);
 
         // Act
-        $result = $this->extensionValidator->validateExtensionEligibility($teamName);
+        $result = $this->extensionValidator->validateExtensionEligibilityWithTeam($team);
 
         // Assert
         $this->assertTrue($result['valid']);
+    }
+
+    /**
+     * Helper method to get base team data for Team object initialization
+     */
+    private function getBaseTeamData()
+    {
+        return [
+            'team_name' => 'Test Team',
+            'teamid' => 1,
+            'team_city' => 'Test',
+            'team_nick' => 'Team',
+            'seasonRecord' => '0-0',
+            'HasMLE' => 0,
+            'HasLLE' => 0,
+            'leagueRecord' => '0-0',
+            'capRoom' => 0,
+            'capacity' => 20000,
+            'formerly_known_as' => '',
+            'owner_name' => 'Test Owner',
+            'owner_email' => 'test@example.com',
+            'color1' => '#000000',
+            'color2' => '#FFFFFF',
+            'arena' => 'Test Arena',
+            'discordID' => '',
+            'Used_Extension_This_Season' => 0,
+            'Used_Extension_This_Chunk' => 0
+        ];
     }
 
     /**

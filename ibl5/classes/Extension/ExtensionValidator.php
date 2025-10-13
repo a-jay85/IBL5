@@ -81,34 +81,6 @@ class ExtensionValidator
     }
 
     /**
-     * Validates that the team hasn't already used their extension
-     * 
-     * @param string $teamName Team name to check
-     * @return array ['valid' => bool, 'error' => string|null]
-     */
-    public function validateExtensionEligibility($teamName)
-    {
-        $teamNameEscaped = $this->escapeString($teamName);
-        $query = "SELECT Used_Extension_This_Season, Used_Extension_This_Chunk FROM ibl_team_info WHERE team_name = '$teamNameEscaped'";
-        $result = $this->db->sql_query($query);
-        
-        if (!$result || $this->db->sql_numrows($result) == 0) {
-            return ['valid' => false, 'error' => 'Team not found in database.'];
-        }
-        
-        $usedThisSeason = $this->db->sql_result($result, 0, 'Used_Extension_This_Season');
-        $usedThisSim = $this->db->sql_result($result, 0, 'Used_Extension_This_Chunk');
-        
-        if ($usedThisSeason == 1) {
-            return ['valid' => false, 'error' => 'Sorry, you have already used your extension for this season.'];
-        }
-        if ($usedThisSim == 1) {
-            return ['valid' => false, 'error' => 'Sorry, you have already used your extension for this sim.'];
-        }
-        return ['valid' => true, 'error' => null];
-    }
-
-    /**
      * Validates that the offer doesn't exceed the maximum allowed for player's experience
      * 
      * @param array $offer Offer array

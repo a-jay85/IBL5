@@ -126,8 +126,8 @@ class ExtensionProcessor
 
         // Build team factors using Team object properties
         $teamFactors = [
-            'wins' => $team->seasonRecord ? $this->extractWins($team->seasonRecord) : 41,
-            'losses' => $team->seasonRecord ? $this->extractLosses($team->seasonRecord) : 41,
+            'wins' => $traditionData['currentSeasonWins'],
+            'losses' => $traditionData['currentSeasonLosses'],
             'tradition_wins' => $traditionData['tradition_wins'],
             'tradition_losses' => $traditionData['tradition_losses'],
             'money_committed_at_position' => $moneyCommittedAtPosition
@@ -354,53 +354,28 @@ class ExtensionProcessor
     }
 
     /**
-     * Extracts wins from season record string
-     * 
-     * @param string $seasonRecord Season record (e.g., "50-32")
-     * @return int Number of wins
-     */
-    private function extractWins($seasonRecord)
-    {
-        if (!$seasonRecord || !is_string($seasonRecord)) {
-            return 41;
-        }
-        
-        $parts = explode('-', $seasonRecord);
-        return isset($parts[0]) ? (int) $parts[0] : 41;
-    }
-
-    /**
-     * Extracts losses from season record string
-     * 
-     * @param string $seasonRecord Season record (e.g., "50-32")
-     * @return int Number of losses
-     */
-    private function extractLosses($seasonRecord)
-    {
-        if (!$seasonRecord || !is_string($seasonRecord)) {
-            return 41;
-        }
-        
-        $parts = explode('-', $seasonRecord);
-        return isset($parts[1]) ? (int) $parts[1] : 41;
-    }
-
-    /**
-     * Gets team tradition data (Contract_AvgW and Contract_AvgL)
+     * Gets team play for winner (Contract_Wins and Contract_Losses) and tradition data (Contract_AvgW and Contract_AvgL)
      * 
      * @param string $teamName Team name
-     * @return array ['tradition_wins' => int, 'tradition_losses' => int]
+     * @return array [
+     *     'currentSeasonWins' => int,
+     *     'currentSeasonLosses' => int,
+     *     'tradition_wins' => int,
+     *     'tradition_losses' => int
+     * ]
      */
     private function getTeamTraditionData($teamName)
     {
         try {
             $teamNameEscaped = $this->validator->escapeStringPublic($teamName);
-            $query = "SELECT Contract_AvgW, Contract_AvgL FROM ibl_team_info WHERE team_name = '$teamNameEscaped' LIMIT 1";
+            $query = "SELECT Contract_Wins, Contract_Losses, Contract_AvgW, Contract_AvgL FROM ibl_team_info WHERE team_name = '$teamNameEscaped' LIMIT 1";
             $result = $this->db->sql_query($query);
             
             if ($this->db->sql_numrows($result) > 0) {
                 $row = $this->db->sql_fetch_assoc($result);
                 return [
+                    'currentSeasonWins' => isset($row['Contract_Wins']) ? (int) $row['Contract_Wins'] : 41,
+                    'currentSeasonLosses' => isset($row['Contract_Losses']) ? (int) $row['Contract_Losses'] : 41,
                     'tradition_wins' => isset($row['Contract_AvgW']) ? (int) $row['Contract_AvgW'] : 41,
                     'tradition_losses' => isset($row['Contract_AvgL']) ? (int) $row['Contract_AvgL'] : 41
                 ];
@@ -409,7 +384,12 @@ class ExtensionProcessor
             // Log error if needed
         }
         
-        return ['tradition_wins' => 41, 'tradition_losses' => 41];
+        return [
+            'currentSeasonWins' => 41,
+            'currentSeasonLosses' => 41,
+            'tradition_wins' => 41,
+            'tradition_losses' => 41
+        ];
     }
 
     /**

@@ -45,7 +45,7 @@ $result = $processor->processExtension($extensionData);
 if (!$result['success']) {
     // Validation error - offer not legal
     echo "<font color=#ff0000>" . $result['error'] . "<br>";
-    echo "Your extension attempt was not legal and will not be recorded as an attempt. If you have not yet successfully extended a player this season, and have not yet made a successful offer this Chunk, you may press the \"Back\" Button on your browser to try again.</font>";
+    echo "Your extension attempt was not legal and will not be recorded as an attempt. If you have not yet successfully extended a player this season, and have not yet made a successful offer this sim, you may press the \"Back\" Button on your browser to try again.</font>";
 } else {
     // Legal offer was made
     echo "Message from the commissioner's office: <font color=#0000cc>Your offer is legal, and is therefore an extension attempt. Please note that you may make no further extension attempts until after the next sim.</font><br>";
@@ -61,7 +61,7 @@ if (!$result['success']) {
     } else {
         // Offer was rejected
         echo "<table bgcolor=#cccccc><tr><td><b>Response from $Player_Name:</b> " . $result['message'] . "</td></tr></table>";
-        echo "Note from the commissioner's office: <font color=#cc0000>Please note that you will be able to make another attempt next Chunk as you have not yet used up your successful extension for this season.</font><br>";
+        echo "Note from the commissioner's office: <font color=#cc0000>Please note that you will be able to make another attempt next sim as you have not yet used up your successful extension for this season.</font><br>";
     }
 }
 

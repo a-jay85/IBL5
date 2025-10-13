@@ -70,7 +70,7 @@ class ExtensionProcessor
             ];
         }
 
-        // Step 1: Validate offer amounts
+        // Validate offer amounts
         $amountValidation = $this->validator->validateOfferAmounts($offer);
         if (!$amountValidation['valid']) {
             return [
@@ -79,7 +79,7 @@ class ExtensionProcessor
             ];
         }
 
-        // Step 2: Check extension eligibility using Team object
+        // Check extension eligibility using Team object
         $eligibilityValidation = $this->validator->validateExtensionEligibilityWithTeam($team);
         if (!$eligibilityValidation['valid']) {
             return [
@@ -88,7 +88,7 @@ class ExtensionProcessor
             ];
         }
 
-        // Step 4: Validate maximum offer using player's years of experience
+        // Validate maximum offer using player's years of experience
         $maxOfferValidation = $this->validator->validateMaximumYearOneOffer($offer, $player->yearsOfExperience);
         if (!$maxOfferValidation['valid']) {
             return [
@@ -97,7 +97,7 @@ class ExtensionProcessor
             ];
         }
 
-        // Step 5: Validate raises using player's bird years
+        // Validate raises using player's bird years
         $raisesValidation = $this->validator->validateRaises($offer, $player->birdYears);
         if (!$raisesValidation['valid']) {
             return [
@@ -106,7 +106,7 @@ class ExtensionProcessor
             ];
         }
 
-        // Step 6: Validate salary decreases
+        // Validate salary decreases
         $decreasesValidation = $this->validator->validateSalaryDecreases($offer);
         if (!$decreasesValidation['valid']) {
             return [
@@ -115,10 +115,10 @@ class ExtensionProcessor
             ];
         }
 
-        // Step 7: Mark extension used for this chunk (legal offer made)
+        // Mark extension used for this chunk (legal offer made)
         $this->dbOps->markExtensionUsedThisChunk($team->name);
 
-        // Step 8: Calculate money committed at player's position using Team object
+        // Calculate money committed at player's position using Team object
         $moneyCommittedAtPosition = $this->calculateMoneyCommittedAtPosition($team, $player->position);
 
         // Get tradition data (not available in Team object, requires separate query)
@@ -141,7 +141,7 @@ class ExtensionProcessor
             'playing_time' => $player->freeAgencyPlayingTime ?? 3
         ];
 
-        // Step 9: Convert demands to array format if needed
+        // Convert demands to array format if needed
         if (!$demands) {
             // If no demands provided, use a default based on the offer (85% of offer)
             // This allows modifiers to determine acceptance/rejection
@@ -167,17 +167,17 @@ class ExtensionProcessor
             ];
         }
 
-        // Step 10: Evaluate offer
+        // Evaluate offer
         $evaluation = $this->evaluator->evaluateOffer($offer, $demands, $teamFactors, $playerPreferences);
 
-        // Step 11: Calculate values for reporting
+        // Calculate values for reporting
         $offerData = $this->evaluator->calculateOfferValue($offer);
         $offerTotal = $offerData['total'];
         $offerYears = $offerData['years'];
         $offerInMillions = $this->evaluator->convertToMillions($offerTotal);
         $offerDetails = $offer['year1'] . " " . $offer['year2'] . " " . $offer['year3'] . " " . $offer['year4'] . " " . $offer['year5'];
 
-        // Step 12: Process based on acceptance
+        // Process based on acceptance
         if ($evaluation['accepted']) {
             // Get current salary from Player object
             $currentSalary = $player->currentSeasonSalary ?? 0;

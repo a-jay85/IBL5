@@ -95,7 +95,6 @@ RAISE_PERCENTAGE_WITH_BIRD = 0.125
 - `markExtensionUsedThisSeason()` - Marks season usage
 - `createAcceptedExtensionStory()` - Creates news story
 - `createRejectedExtensionStory()` - Creates news story
-- `getTeamExtensionInfo()` - Retrieves team data
 - `getPlayerPreferences()` - Retrieves player data
 - `getPlayerCurrentContract()` - Retrieves contract data
 

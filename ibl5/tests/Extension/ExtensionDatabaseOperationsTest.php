@@ -281,37 +281,6 @@ class ExtensionDatabaseOperationsTest extends TestCase
      * @group database
      * @group retrieval
      */
-    public function testRetrievesTeamExtensionInfo()
-    {
-        // Arrange
-        $teamName = 'Test Team';
-        $this->mockDb->setMockData([
-            [
-                'Used_Extension_This_Chunk' => 0,
-                'Used_Extension_This_Season' => 0,
-                'Contract_Wins' => 50,
-                'Contract_Losses' => 32,
-                'Contract_AvgW' => 2500,
-                'Contract_AvgL' => 2000,
-                'Contract_Coach' => 80
-            ]
-        ]);
-
-        // Act
-        $result = $this->extensionDbOps->getTeamExtensionInfo($teamName);
-
-        // Assert
-        $this->assertIsArray($result);
-        $this->assertEquals(0, $result['Used_Extension_This_Chunk']);
-        $this->assertEquals(0, $result['Used_Extension_This_Season']);
-        $this->assertEquals(50, $result['Contract_Wins']);
-        $this->assertEquals(32, $result['Contract_Losses']);
-    }
-
-    /**
-     * @group database
-     * @group retrieval
-     */
     public function testRetrievesPlayerPreferences()
     {
         // Arrange

@@ -196,25 +196,6 @@ class ExtensionDatabaseOperations
     }
 
     /**
-     * Retrieves team information needed for extension processing
-     * 
-     * @param string $teamName Team name
-     * @return array|null Team info array or null if not found
-     */
-    public function getTeamExtensionInfo($teamName)
-    {
-        $teamNameEscaped = $this->escapeString($teamName);
-        $query = "SELECT * FROM ibl_team_info WHERE team_name = '$teamNameEscaped'";
-        $result = $this->db->sql_query($query);
-        
-        if (!$result || $this->db->sql_numrows($result) == 0) {
-            return null;
-        }
-        
-        return $this->db->sql_fetchrow($result);
-    }
-
-    /**
      * Retrieves player preferences and info
      * 
      * @param string $playerName Player name

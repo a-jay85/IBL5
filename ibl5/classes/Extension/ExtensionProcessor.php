@@ -202,7 +202,7 @@ class ExtensionProcessor
             }
             
             // Send email notification (only on non-localhost)
-            if ($_SERVER['SERVER_NAME'] != "localhost") {
+            if (isset($_SERVER['SERVER_NAME']) && $_SERVER['SERVER_NAME'] != "localhost") {
                 $recipient = 'ibldepthcharts@gmail.com';
                 $emailsubject = "Successful Extension - " . $player->name;
                 $filetext = "{$player->name} accepts an extension offer from the {$team->name} of $offerTotal for $offerYears years.\n";

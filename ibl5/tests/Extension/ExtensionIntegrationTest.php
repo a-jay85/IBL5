@@ -422,7 +422,7 @@ class ExtensionIntegrationTest extends TestCase
     {
         // Combined data that works for all queries in the scenario
         $this->mockDb->setMockData([
-            [
+            array_merge($this->getBasePlayerData(), [
                 // Team info fields
                 'Used_Extension_This_Season' => 0,
                 'Used_Extension_This_Chunk' => 0,
@@ -431,42 +431,10 @@ class ExtensionIntegrationTest extends TestCase
                 'Contract_AvgW' => 2500,
                 'Contract_AvgL' => 2000,
                 'money_committed_at_position' => 0,
-                // Player info fields (combined in same row for mock)
-                'pid' => 1,
-                'ordinal' => 1,
+                // Player info fields (scenario-specific overrides)
                 'name' => 'Test Player',
                 'nickname' => 'Tester',
-                'age' => 25,
-                'tid' => 1,
                 'teamname' => 'Miami Cyclones',
-                'pos' => 'SF',
-                // Ratings
-                'r_fga' => 50,
-                'r_fgp' => 50,
-                'r_fta' => 50,
-                'r_ftp' => 50,
-                'r_tga' => 50,
-                'r_tgp' => 50,
-                'r_orb' => 50,
-                'r_drb' => 50,
-                'r_ast' => 50,
-                'r_stl' => 50,
-                'r_to' => 50,
-                'r_blk' => 50,
-                'r_foul' => 50,
-                'oo' => 50,
-                'od' => 50,
-                'do' => 50,
-                'dd' => 50,
-                'po' => 50,
-                'pd' => 50,
-                'to' => 50,
-                'td' => 50,
-                'Clutch' => 50,
-                'Consistency' => 50,
-                'talent' => 50,
-                'skill' => 50,
-                'intangibles' => 50,
                 // Free agency preferences
                 'winner' => 3,
                 'tradition' => 3,
@@ -484,12 +452,11 @@ class ExtensionIntegrationTest extends TestCase
                 'cy4' => 0,
                 'cy5' => 0,
                 'cy6' => 0,
-                'draftyear' => 2018,
                 // News story fields
                 'catid' => 1,
                 'counter' => 10,
                 'topicid' => 5
-            ]
+            ])
         ]);
     }
 
@@ -497,7 +464,7 @@ class ExtensionIntegrationTest extends TestCase
     {
         // Combined data that works for all queries in the scenario
         $this->mockDb->setMockData([
-            [
+            array_merge($this->getBasePlayerData(), [
                 // Team info fields - losing team
                 'Used_Extension_This_Season' => 0,
                 'Used_Extension_This_Chunk' => 0,
@@ -506,7 +473,7 @@ class ExtensionIntegrationTest extends TestCase
                 'Contract_AvgW' => 1500,
                 'Contract_AvgL' => 3500,
                 'money_committed_at_position' => 0,
-                // Player info fields - high demands
+                // Player info fields - high demands (scenario-specific overrides)
                 'pid' => 2,
                 'ordinal' => 2,
                 'name' => 'Demanding Player',
@@ -515,7 +482,7 @@ class ExtensionIntegrationTest extends TestCase
                 'tid' => 2,
                 'teamname' => 'Seattle SuperSonics',
                 'pos' => 'SG',
-                // Ratings
+                // Ratings (higher than base)
                 'r_fga' => 60,
                 'r_fgp' => 60,
                 'r_fta' => 60,
@@ -564,7 +531,7 @@ class ExtensionIntegrationTest extends TestCase
                 'catid' => 1,
                 'counter' => 10,
                 'topicid' => 5
-            ]
+            ])
         ]);
     }
 
@@ -808,6 +775,24 @@ class ExtensionIntegrationTest extends TestCase
             'HasMLE' => 0,
             'HasLLE' => 0,
             'leagueRecord' => '0-0',
+            'SERVER_NAME' => 'test.ibl.com',
+            // Free agency preferences (required by Player.php line 162-163)
+            'loyalty' => 3,
+            'playingTime' => 3,
+            'winner' => 3,
+            'tradition' => 3,
+            'security' => 3,
+            // Contract details
+            'exp' => 5,
+            'bird' => 2,
+            'cy' => 1,
+            'cyt' => 1,
+            'cy1' => 800,
+            'cy2' => 0,
+            'cy3' => 0,
+            'cy4' => 0,
+            'cy5' => 0,
+            'cy6' => 0,
         ];
     }
 }

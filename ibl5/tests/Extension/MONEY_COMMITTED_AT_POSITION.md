@@ -83,7 +83,7 @@ private function getTeamObject($extensionData, $player)
 ### Money Committed Calculation
 
 ```php
-private function calculateMoneyCommittedAtPositionWithTeam($team, $player)
+private function calculateMoneyCommittedAtPosition($team, $player)
 {
     try {
         // Get players under contract at this position
@@ -130,7 +130,7 @@ $team = \Team::initialize($this->db, $player->teamName);
 $traditionData = $this->getTeamTraditionData($team->name);
 
 // Query 4: Calculate money committed using Team object methods
-$moneyCommitted = $this->calculateMoneyCommittedAtPositionWithTeam($team, $player);
+$moneyCommitted = $this->calculateMoneyCommittedAtPosition($team, $player);
 
 // TOTAL: 4 database queries (was 5+)
 // But more importantly: All data is in objects, no array manipulation needed
@@ -252,7 +252,7 @@ ExtensionProcessor::processExtension($extensionData)
 [Evaluation] - Uses object properties
     • teamFactors from $team->seasonRecord, tradition data
     • playerPreferences from $player->freeAgency* properties
-    • moneyCommitted from calculateMoneyCommittedAtPositionWithTeam($team, $player)
+    • moneyCommitted from calculateMoneyCommittedAtPosition($team, $player)
     ↓
 [Database Operations] - Uses objects
     • updatePlayerContractWithPlayer($player, ...)

@@ -50,7 +50,7 @@ try {
 echo "\n";
 
 // Test 2: Verify ExtensionProcessor can calculate money_committed_at_position with Team and Player objects
-echo "Test 2: Testing ExtensionProcessor.calculateMoneyCommittedAtPositionWithTeam()...\n";
+echo "Test 2: Testing ExtensionProcessor.calculateMoneyCommittedAtPosition()...\n";
 try {
     // Get a real player from the database
     $query = "SELECT pid, name, teamname, pos FROM ibl_plr WHERE retired = 0 AND cy1 != 0 LIMIT 1";
@@ -80,7 +80,7 @@ try {
         
         // Call the method
         $moneyCommitted = $method->invoke($processor, $team, $player);
-        echo "  ✓ calculateMoneyCommittedAtPositionWithTeam() works\n";
+        echo "  ✓ calculateMoneyCommittedAtPosition() works\n";
         echo "  Money committed at position $playerPosition for $teamName: $moneyCommitted\n";
         
         if ($moneyCommitted >= 0) {

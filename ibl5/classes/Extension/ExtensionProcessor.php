@@ -119,7 +119,7 @@ class ExtensionProcessor
         $this->dbOps->markExtensionUsedThisChunk($team->name);
 
         // Step 8: Calculate money committed at player's position using Team object
-        $moneyCommittedAtPosition = $this->calculateMoneyCommittedAtPositionWithTeam($team, $player);
+        $moneyCommittedAtPosition = $this->calculateMoneyCommittedAtPosition($team, $player);
 
         // Get tradition data (not available in Team object, requires separate query)
         $traditionData = $this->getTeamTraditionData($team->name);
@@ -318,7 +318,7 @@ class ExtensionProcessor
      * @param \Player $player Player object
      * @return int Total salary committed at that position for next season
      */
-    private function calculateMoneyCommittedAtPositionWithTeam($team, $player)
+    private function calculateMoneyCommittedAtPosition($team, $player)
     {
         try {
             // First, try to get from mock database (for tests)

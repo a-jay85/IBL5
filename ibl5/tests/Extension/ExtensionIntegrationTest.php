@@ -295,8 +295,8 @@ class ExtensionIntegrationTest extends TestCase
         // Assert
         $this->assertTrue($result['success']);
         $this->assertTrue($result['accepted']);
-        $this->assertArrayHasKey('modifierApplied', $result);
-        $this->assertGreaterThan(1.0, $result['modifierApplied']); // Loyalty increases modifier
+        $this->assertArrayHasKey('modifier', $result);
+        $this->assertGreaterThan(1.0, $result['modifier']); // Loyalty increases modifier
     }
 
     /**

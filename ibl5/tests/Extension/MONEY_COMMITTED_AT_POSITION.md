@@ -274,8 +274,8 @@ ExtensionProcessor::processExtension($extensionData)
   - Added escapeStringPublic() for safe SQL escaping
 
 - `ibl5/classes/Extension/ExtensionDatabaseOperations.php`
-  - Added markExtensionUsedThisChunkWithTeam()
-  - Added markExtensionUsedThisSeasonWithTeam()
+  - Added markExtensionUsedThisSim()
+  - Added markExtensionUsedThisSeason()
   - Added updatePlayerContractWithPlayer()
   - Added createAcceptedExtensionStoryWithObjects()
   - Added createRejectedExtensionStoryWithObjects()

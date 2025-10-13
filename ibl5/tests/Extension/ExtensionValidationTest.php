@@ -8,7 +8,7 @@ use Extension\ExtensionValidator;
  * 
  * Tests all validation rules from modules/Player/extension.php including:
  * - Zero contract amount validation
- * - Extension usage validation (per chunk and per season)
+ * - Extension usage validation (per sim and per season)
  * - Maximum offer validation
  * - Raise percentage validation (Bird vs non-Bird)
  * - Salary decrease validation
@@ -146,7 +146,7 @@ class ExtensionValidationTest extends TestCase
      * @group validation
      * @group extension-usage
      */
-    public function testRejectsExtensionWhenAlreadyUsedThisChunk()
+    public function testRejectsExtensionWhenAlreadyUsedThisSim()
     {
         // Arrange
         $teamName = 'Test Team';
@@ -159,7 +159,7 @@ class ExtensionValidationTest extends TestCase
 
         // Assert
         $this->assertFalse($result['valid']);
-        $this->assertStringContainsString('already used your extension for this Chunk', $result['error']);
+        $this->assertStringContainsString('already used your extension for this sim', $result['error']);
     }
 
     /**

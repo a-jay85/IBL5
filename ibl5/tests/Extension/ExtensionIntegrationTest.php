@@ -63,7 +63,7 @@ class ExtensionIntegrationTest extends TestCase
         
         $allQueries = implode(' ', $queries);
         
-        // Verify chunk flag was set
+        // Verify sim flag was set
         $this->assertStringContainsString('Used_Extension_This_Chunk = 1', $allQueries);
         
         // Verify season flag was set (for accepted extension)
@@ -102,7 +102,7 @@ class ExtensionIntegrationTest extends TestCase
         $this->assertFalse($result['accepted']); // But offer was rejected
         $this->assertStringContainsString('refuse', $result['message']);
         
-        // Verify chunk flag was set but NOT season flag
+        // Verify sim flag was set but NOT season flag
         $queries = $this->mockDb->getExecutedQueries();
         $allQueries = implode(' ', $queries);
         $this->assertStringContainsString('Used_Extension_This_Chunk = 1', $allQueries);
@@ -176,7 +176,7 @@ class ExtensionIntegrationTest extends TestCase
         $queries = $this->mockDb->getExecutedQueries();
         // Should have at least one query for eligibility check
         $this->assertGreaterThanOrEqual(1, count($queries));
-        // But should NOT have marked chunk as used or updated contract
+        // But should NOT have marked sim as used or updated contract
         $allQueries = implode(' ', $queries);
         $this->assertStringNotContainsString('UPDATE ibl_plr', $allQueries);
     }

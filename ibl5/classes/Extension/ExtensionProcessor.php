@@ -115,8 +115,8 @@ class ExtensionProcessor
             ];
         }
 
-        // Mark extension used for this chunk (legal offer made)
-        $this->dbOps->markExtensionUsedThisChunk($team->name);
+        // Mark extension used for this sim (legal offer made)
+        $this->dbOps->markExtensionUsedThisSim($team->name);
 
         // Calculate money committed at player's position using Team object
         $moneyCommittedAtPosition = $this->calculateMoneyCommittedAtPosition($team, $player->position);

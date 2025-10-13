@@ -75,12 +75,12 @@ class ExtensionDatabaseOperations
     }
 
     /**
-     * Marks that a team has used their extension attempt for this chunk (sim)
+     * Marks that a team has used their extension attempt for this sim
      * 
      * @param string $teamName Team name
      * @return bool Success status
      */
-    public function markExtensionUsedThisChunk($teamName)
+    public function markExtensionUsedThisSim($teamName)
     {
         $teamNameEscaped = $this->escapeString($teamName);
         $query = "UPDATE ibl_team_info SET Used_Extension_This_Chunk = 1 WHERE team_name = '$teamNameEscaped'";

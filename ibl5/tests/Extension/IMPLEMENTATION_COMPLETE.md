@@ -96,7 +96,7 @@ All business rules are now enforced through testable classes:
 - ✅ Raise limits: 10% (non-Bird) or 12.5% (Bird rights)
 - ✅ No salary decreases (except to 0)
 - ✅ One extension per season limit
-- ✅ One attempt per chunk limit
+- ✅ One attempt per sim limit
 
 ### Offer Evaluation
 - ✅ Winner modifier: 0.000153 × (wins - losses) × (player_winner - 1)

@@ -104,13 +104,13 @@ class ExtensionDatabaseOperationsTest extends TestCase
      * @group database
      * @group team-flags
      */
-    public function testMarksExtensionUsedThisChunk()
+    public function testMarksExtensionUsedThisSim()
     {
         // Arrange
         $teamName = 'Test Team';
 
         // Act
-        $result = $this->extensionDbOps->markExtensionUsedThisChunk($teamName);
+        $result = $this->extensionDbOps->markExtensionUsedThisSim($teamName);
 
         // Assert
         $this->assertTrue($result);
@@ -426,7 +426,7 @@ class ExtensionDatabaseOperationsTest extends TestCase
         $queries = $this->mockDb->getExecutedQueries();
         
         // Should NOT update player contract or mark extension used for season
-        // Should only create news story and NOT mark extension used this chunk (already done)
+        // Should only create news story and NOT mark extension used this sim (already done)
         $hasPlayerUpdate = false;
         $hasSeasonFlag = false;
         foreach ($queries as $query) {

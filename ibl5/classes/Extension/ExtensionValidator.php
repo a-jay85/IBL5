@@ -97,13 +97,13 @@ class ExtensionValidator
         }
         
         $usedThisSeason = $this->db->sql_result($result, 0, 'Used_Extension_This_Season');
-        $usedThisChunk = $this->db->sql_result($result, 0, 'Used_Extension_This_Chunk');
+        $usedThisSim = $this->db->sql_result($result, 0, 'Used_Extension_This_Chunk');
         
         if ($usedThisSeason == 1) {
             return ['valid' => false, 'error' => 'Sorry, you have already used your extension for this season.'];
         }
-        if ($usedThisChunk == 1) {
-            return ['valid' => false, 'error' => 'Sorry, you have already used your extension for this Chunk.'];
+        if ($usedThisSim == 1) {
+            return ['valid' => false, 'error' => 'Sorry, you have already used your extension for this sim.'];
         }
         return ['valid' => true, 'error' => null];
     }

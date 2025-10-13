@@ -11,7 +11,7 @@ The test suite is organized into four main test classes:
 ### 1. ExtensionValidationTest.php
 Tests all validation rules for contract extension offers:
 - **Zero Amount Validation**: Ensures first three years have non-zero amounts
-- **Extension Usage Validation**: Checks chunk and season extension limits
+- **Extension Usage Validation**: Checks sim and season extension limits
 - **Maximum Offer Validation**: Validates offers against experience-based maximums
   - 0-6 years: 1,063 maximum
   - 7-9 years: 1,275 maximum
@@ -33,7 +33,7 @@ Tests the offer evaluation and player preference logic:
 ### 3. ExtensionDatabaseOperationsTest.php
 Tests all database interactions:
 - **Player Contract Updates**: Updating contract years and salaries
-- **Team Flag Updates**: Marking extension used (chunk and season)
+- **Team Flag Updates**: Marking extension used (sim and season)
 - **News Story Creation**: Creating accepted/rejected extension stories
 - **Counter Updates**: Incrementing contract extensions counter
 - **Data Retrieval**: Getting team info, player preferences, and contracts
@@ -106,7 +106,7 @@ The test suite covers the following aspects of modules/Player/extension.php:
 
 ### Input Validation (100% coverage)
 - ✓ Zero amount checks for years 1-3
-- ✓ Extension usage checks (chunk and season)
+- ✓ Extension usage checks (sim and season)
 - ✓ Maximum offer validation by experience
 - ✓ Raise percentage limits (Bird vs non-Bird)
 - ✓ Salary decrease prevention
@@ -150,7 +150,7 @@ These classes provide a clean, testable API that has replaced the procedural log
 ### Contract Validation
 1. First three years must have non-zero amounts
 2. Teams can only extend one player per season
-3. Teams can only make one extension attempt per chunk (sim)
+3. Teams can only make one extension attempt per sim
 4. Offers cannot exceed maximum based on experience
 5. Raises limited to 10% (non-Bird) or 12.5% (Bird)
 6. Salaries cannot decrease in later years
@@ -164,7 +164,7 @@ These classes provide a clean, testable API that has replaced the procedural log
 6. Player accepts if offer_value >= demand_value
 
 ### Database Updates
-1. On chunk start: Reset Used_Extension_This_Chunk to 0
+1. On sim start: Reset Used_Extension_This_Chunk to 0
 2. On legal offer: Set Used_Extension_This_Chunk = 1
 3. On accepted offer: Set Used_Extension_This_Season = 1
 4. On accepted offer: Update player contract (cy, cyt, cy1-cy6)

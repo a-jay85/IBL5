@@ -91,7 +91,7 @@ RAISE_PERCENTAGE_WITH_BIRD = 0.125
 
 **Key Methods**:
 - `updatePlayerContract()` - Updates player contract with extension
-- `markExtensionUsedThisChunk()` - Marks chunk usage
+- `markExtensionUsedThisSim()` - Marks sim usage
 - `markExtensionUsedThisSeason()` - Marks season usage
 - `createAcceptedExtensionStory()` - Creates news story
 - `createRejectedExtensionStory()` - Creates news story

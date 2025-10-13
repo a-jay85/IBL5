@@ -1,13 +1,14 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
+use Extension\ExtensionValidator;
 
 /**
  * Comprehensive tests for contract extension validation logic
  * 
  * Tests all validation rules from modules/Player/extension.php including:
  * - Zero contract amount validation
- * - Extension usage validation (per chunk and per season)
+ * - Extension usage validation (per sim and per season)
  * - Maximum offer validation
  * - Raise percentage validation (Bird vs non-Bird)
  * - Salary decrease validation
@@ -49,7 +50,7 @@ class ExtensionValidationTest extends TestCase
 
         // Assert
         $this->assertFalse($result['valid']);
-        $this->assertStringContainsString('Year 1', $result['error']);
+        $this->assertStringContainsString('Year1', $result['error']);
         $this->assertStringContainsString('zero', $result['error']);
     }
 
@@ -73,7 +74,7 @@ class ExtensionValidationTest extends TestCase
 
         // Assert
         $this->assertFalse($result['valid']);
-        $this->assertStringContainsString('Year 2', $result['error']);
+        $this->assertStringContainsString('Year2', $result['error']);
     }
 
     /**
@@ -96,7 +97,7 @@ class ExtensionValidationTest extends TestCase
 
         // Assert
         $this->assertFalse($result['valid']);
-        $this->assertStringContainsString('Year 3', $result['error']);
+        $this->assertStringContainsString('Year3', $result['error']);
     }
 
     /**
@@ -130,11 +131,16 @@ class ExtensionValidationTest extends TestCase
         // Arrange
         $teamName = 'Test Team';
         $this->mockDb->setMockData([
-            ['Used_Extension_This_Season' => 1, 'Used_Extension_This_Chunk' => 0]
+            array_merge($this->getBaseTeamData(), [
+                'team_name' => $teamName,
+                'Used_Extension_This_Season' => 1,
+                'Used_Extension_This_Chunk' => 0
+            ])
         ]);
+        $team = \Team::initialize($this->mockDb, $teamName);
 
         // Act
-        $result = $this->extensionValidator->validateExtensionEligibility($teamName);
+        $result = $this->extensionValidator->validateExtensionEligibility($team);
 
         // Assert
         $this->assertFalse($result['valid']);
@@ -145,20 +151,25 @@ class ExtensionValidationTest extends TestCase
      * @group validation
      * @group extension-usage
      */
-    public function testRejectsExtensionWhenAlreadyUsedThisChunk()
+    public function testRejectsExtensionWhenAlreadyUsedThisSim()
     {
         // Arrange
         $teamName = 'Test Team';
         $this->mockDb->setMockData([
-            ['Used_Extension_This_Season' => 0, 'Used_Extension_This_Chunk' => 1]
+            array_merge($this->getBaseTeamData(), [
+                'team_name' => $teamName,
+                'Used_Extension_This_Season' => 0,
+                'Used_Extension_This_Chunk' => 1
+            ])
         ]);
+        $team = \Team::initialize($this->mockDb, $teamName);
 
         // Act
-        $result = $this->extensionValidator->validateExtensionEligibility($teamName);
+        $result = $this->extensionValidator->validateExtensionEligibility($team);
 
         // Assert
         $this->assertFalse($result['valid']);
-        $this->assertStringContainsString('already used your extension for this Chunk', $result['error']);
+        $this->assertStringContainsString('already used your extension for this sim', $result['error']);
     }
 
     /**
@@ -170,14 +181,47 @@ class ExtensionValidationTest extends TestCase
         // Arrange
         $teamName = 'Test Team';
         $this->mockDb->setMockData([
-            ['Used_Extension_This_Season' => 0, 'Used_Extension_This_Chunk' => 0]
+            array_merge($this->getBaseTeamData(), [
+                'team_name' => $teamName,
+                'Used_Extension_This_Season' => 0,
+                'Used_Extension_This_Chunk' => 0
+            ])
         ]);
+        $team = \Team::initialize($this->mockDb, $teamName);
 
         // Act
-        $result = $this->extensionValidator->validateExtensionEligibility($teamName);
+        $result = $this->extensionValidator->validateExtensionEligibility($team);
 
         // Assert
         $this->assertTrue($result['valid']);
+    }
+
+    /**
+     * Helper method to get base team data for Team object initialization
+     */
+    private function getBaseTeamData()
+    {
+        return [
+            'team_name' => 'Test Team',
+            'teamid' => 1,
+            'team_city' => 'Test',
+            'team_nick' => 'Team',
+            'seasonRecord' => '0-0',
+            'HasMLE' => 0,
+            'HasLLE' => 0,
+            'leagueRecord' => '0-0',
+            'capRoom' => 0,
+            'capacity' => 20000,
+            'formerly_known_as' => '',
+            'owner_name' => 'Test Owner',
+            'owner_email' => 'test@example.com',
+            'color1' => '#000000',
+            'color2' => '#FFFFFF',
+            'arena' => 'Test Arena',
+            'discordID' => '',
+            'Used_Extension_This_Season' => 0,
+            'Used_Extension_This_Chunk' => 0
+        ];
     }
 
     /**
@@ -191,7 +235,7 @@ class ExtensionValidationTest extends TestCase
         $yearsExperience = 5;
 
         // Act
-        $result = $this->extensionValidator->validateMaximumOffer($offer, $yearsExperience);
+        $result = $this->extensionValidator->validateMaximumYearOneOffer($offer, $yearsExperience);
 
         // Assert
         $this->assertFalse($result['valid']);
@@ -209,7 +253,7 @@ class ExtensionValidationTest extends TestCase
         $yearsExperience = 5;
 
         // Act
-        $result = $this->extensionValidator->validateMaximumOffer($offer, $yearsExperience);
+        $result = $this->extensionValidator->validateMaximumYearOneOffer($offer, $yearsExperience);
 
         // Assert
         $this->assertTrue($result['valid']);
@@ -226,7 +270,7 @@ class ExtensionValidationTest extends TestCase
         $yearsExperience = 8;
 
         // Act
-        $result = $this->extensionValidator->validateMaximumOffer($offer, $yearsExperience);
+        $result = $this->extensionValidator->validateMaximumYearOneOffer($offer, $yearsExperience);
 
         // Assert
         $this->assertFalse($result['valid']);
@@ -243,7 +287,7 @@ class ExtensionValidationTest extends TestCase
         $yearsExperience = 12;
 
         // Act
-        $result = $this->extensionValidator->validateMaximumOffer($offer, $yearsExperience);
+        $result = $this->extensionValidator->validateMaximumYearOneOffer($offer, $yearsExperience);
 
         // Assert
         $this->assertTrue($result['valid']);

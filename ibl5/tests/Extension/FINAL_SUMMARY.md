@@ -76,7 +76,7 @@ A comprehensive PHPUnit test suite has been successfully created for `ibl5/modul
 
 ### Validation Rules (100% Coverage) ✅
 - ✅ Zero amount checks for years 1-3
-- ✅ Extension usage per chunk (sim)
+- ✅ Extension usage per sim
 - ✅ Extension usage per season
 - ✅ Maximum offer by experience (1063/1275/1451)
 - ✅ Raise limits (10% non-Bird, 12.5% Bird rights)
@@ -93,7 +93,7 @@ A comprehensive PHPUnit test suite has been successfully created for `ibl5/modul
 
 ### Database Operations (95% Coverage) ✅
 - ✅ Player contract updates (all 6 years)
-- ✅ Team extension chunk flag
+- ✅ Team extension sim flag
 - ✅ Team extension season flag
 - ✅ News story creation (accepted)
 - ✅ News story creation (rejected)
@@ -118,8 +118,8 @@ A comprehensive PHPUnit test suite has been successfully created for `ibl5/modul
 
 ### Extension Limits
 1. **One Per Season**: Team can successfully extend only 1 player per season
-2. **One Attempt Per Chunk**: Only 1 extension attempt per sim (successful or not)
-3. **Chunk Resets**: Used_Extension_This_Chunk resets between sims
+2. **One Attempt Per Sim**: Only 1 extension attempt per sim (successful or not)
+3. **Sim Resets**: Used_Extension_This_Chunk resets between sims
 
 ### Maximum Offers by Experience
 ```

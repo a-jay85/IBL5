@@ -10,7 +10,7 @@ The test suite is designed to verify Free Agency functionality after refactoring
 
 ### Test Classes
 
-1. **FreeAgencyOfferValidationTest.php** (26 tests)
+1. **FreeAgencyOfferValidationTest.php** (21 tests)
    - Zero contract amount validation
    - Minimum salary validation
    - Bird Rights handling
@@ -21,7 +21,7 @@ The test suite is designed to verify Free Agency functionality after refactoring
    - Player already signed validation
    - MLE/LLE/Veteran Minimum special cases
 
-2. **FreeAgencyOfferProcessingTest.php** (17 tests)
+2. **FreeAgencyOfferProcessingTest.php** (18 tests)
    - Offer insertion into database
    - Offer amendment (replacing existing offers)
    - Offer deletion
@@ -31,7 +31,7 @@ The test suite is designed to verify Free Agency functionality after refactoring
    - Millions committed at position calculation
    - Discord notification triggers
 
-3. **FreeAgencyModuleDisplayTest.php** (20 tests)
+3. **FreeAgencyModuleDisplayTest.php** (22 tests)
    - Free agent identification based on contract year
    - Cap space calculations (soft and hard)
    - Roster spot tracking
@@ -42,7 +42,7 @@ The test suite is designed to verify Free Agency functionality after refactoring
    - MLE/LLE availability display
    - Player demand display for veterans and undrafted rookies
 
-4. **FreeAgencyIntegrationTest.php** (10 tests)
+4. **FreeAgencyIntegrationTest.php** (9 tests)
    - Complete offer submission workflow
    - Offer amendment workflow
    - Offer deletion workflow
@@ -220,7 +220,7 @@ The test suite provides comprehensive coverage of:
 - ✅ Maximum contract and veteran minimum calculations
 - ✅ End-to-end integration workflows
 
-**Total Tests**: 73 tests covering all major Free Agency functionality
+**Total Tests**: 70 tests covering all major Free Agency functionality
 
 ## Future Enhancements
 

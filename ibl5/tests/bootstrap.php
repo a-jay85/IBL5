@@ -300,10 +300,10 @@ if (!class_exists('Shared')) {
         
         public function resetSimContractExtensionAttempts()
         {
-            echo '<p>Resetting sim contract extension attempts...<p>';
+            echo '<p>Resetting sim contract extension attempts...</p>';
             $sqlQueryString = "UPDATE ibl_team_info SET Used_Extension_This_Chunk = 0;";
             if ($this->db->sql_query($sqlQueryString)) {
-                echo '<p>Sim contract extension attempts have been reset.<p>';
+                echo '<p>Sim contract extension attempts have been reset.</p>';
                 return;
             }
         }

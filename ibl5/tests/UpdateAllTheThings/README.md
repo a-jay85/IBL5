@@ -161,7 +161,7 @@ The test suite provides comprehensive coverage:
 
 ## Expected Warnings
 
-The test suite produces 7 warnings from tests that attempt to call `update()` methods which try to load HTML files. These are expected because:
+The test suite produces some warnings from tests that attempt to call `update()` methods which try to load HTML files. These are expected because:
 1. The HTML files don't exist in the test environment
 2. These tests verify that database operations (TRUNCATE) are attempted before file loading fails
 3. Full update testing requires actual HTML files and is beyond the scope of unit testing

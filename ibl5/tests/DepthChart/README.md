@@ -158,7 +158,7 @@ tests/DepthChart/
 └── README.md                           - This documentation
 ```
 
-**Total: 123 comprehensive tests**
+**Total: 88 comprehensive tests**
 
 ## Running the Tests
 
@@ -254,6 +254,8 @@ Name,PG,SG,SF,PF,C,ACTIVE,MIN,OF,DF,OI,DI
 Player Name,1,0,0,0,0,1,35,0,0,0,0
 ...
 ```
+
+**Note:** Ball handling (BH) is saved to the database (`dc_bh` field) but is NOT included in the CSV export file. The CSV contains 12 fields while the database tracks 13 depth chart settings per player.
 
 Saved to: `depthcharts/{TeamName}.txt`
 

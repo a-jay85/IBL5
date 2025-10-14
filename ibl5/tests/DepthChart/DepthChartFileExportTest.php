@@ -191,9 +191,10 @@ class DepthChartFileExportTest extends TestCase
         $df = '2';
         $oi = '0';
         $di = '-1';
-        $bh = '2';
+        $bh = '2'; // Note: BH is saved to database but not included in CSV export
         
         // Act
+        // CSV export format matches actual module: 12 fields without BH
         $csvLine = "$playerName,$pg,$sg,$sf,$pf,$c,$active,$min,$of,$df,$oi,$di\n";
         
         // Assert

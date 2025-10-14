@@ -54,7 +54,7 @@ class DepthChartIntegrationTest extends TestCase
         $this->assertNotFalse($fileWritten, 'File should be written successfully');
         $this->assertFileExists($this->testFilePath);
         $this->assertCount(12, $databaseUpdates, 'Should perform updates for 12 players');
-        // File contains player data, not team name
+        // Verify file contains player data
         $this->assertStringContainsString('Player 1', file_get_contents($this->testFilePath));
     }
     

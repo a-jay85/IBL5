@@ -9,5 +9,8 @@
         <testsuite name="Extension Module Tests">
             <directory>tests/Extension</directory>
         </testsuite>
+        <testsuite name="Free Agency Module Tests">
+            <directory>tests/FreeAgency</directory>
+        </testsuite>
     </testsuites>
 </phpunit>

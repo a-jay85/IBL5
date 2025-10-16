@@ -219,10 +219,7 @@ class MockDatabaseResult
 if (!class_exists('League')) {
     class League
     {
-        const HARD_CAP_MAX = 75000;
-        const FREE_AGENTS_TEAMID = 35;
-        const CONFERENCE_NAMES = ['Eastern', 'Western'];
-        const DIVISION_NAMES = ['Atlantic', 'Central', 'Midwest', 'Pacific'];
+        const HARD_CAP_MAX = 7000;
     }
 }
 

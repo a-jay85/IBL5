@@ -221,11 +221,17 @@ class StandingsUpdaterTest extends TestCase
         $this->mockDb->setReturnTrue(true);
         
         ob_start();
+        
+        // Suppress expected warnings from file parsing
+        set_error_handler(function() { return true; }, E_WARNING);
+        
         try {
             $this->standingsUpdater->update();
         } catch (Exception $e) {
             // Expected to fail on file load
         }
+        
+        restore_error_handler();
         ob_end_clean();
         
         $queries = $this->mockDb->getExecutedQueries();

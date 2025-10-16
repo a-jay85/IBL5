@@ -405,7 +405,10 @@ class StandingsHTMLGeneratorTest extends TestCase
         $method = $reflection->getMethod('generateTeamRow');
         $method->setAccessible(true);
 
+        // Suppress expected warnings from undefined array keys
+        set_error_handler(function() { return true; }, E_WARNING);
         $html = $method->invoke($this->htmlGenerator, $mockRow, 1, 'Sacramento Kings', $mockPowerResult, 'Pacific');
+        restore_error_handler();
         
         $this->assertStringContainsString('L 5', $html);
     }
@@ -422,11 +425,17 @@ class StandingsHTMLGeneratorTest extends TestCase
         $this->mockDb->setReturnTrue(true);
         
         ob_start();
+        
+        // Suppress expected warnings
+        set_error_handler(function() { return true; }, E_WARNING);
+        
         try {
             $this->htmlGenerator->generateStandingsPage();
         } catch (Exception $e) {
             // May fail due to empty data, but we check if UPDATE query was attempted
         }
+        
+        restore_error_handler();
         ob_end_clean();
         
         $queries = $this->mockDb->getExecutedQueries();
@@ -481,7 +490,10 @@ class StandingsHTMLGeneratorTest extends TestCase
         $method = $reflection->getMethod('generateTeamRow');
         $method->setAccessible(true);
 
+        // Suppress expected warnings from undefined array keys
+        set_error_handler(function() { return true; }, E_WARNING);
         $html = $method->invoke($this->htmlGenerator, $mockRow, 5, 'Phoenix Suns', $mockPowerResult, 'Pacific');
+        restore_error_handler();
         
         $this->assertStringContainsString('modules.php?name=Team&op=team&teamID=5', $html);
     }

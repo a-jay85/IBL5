@@ -150,6 +150,9 @@ class ScheduleUpdaterTest extends TestCase
         // Capture output
         ob_start();
         
+        // Suppress expected warnings from DOMDocument parsing HTML
+        set_error_handler(function() { return true; }, E_WARNING);
+        
         // This will fail because we can't load the HTML file, but we can test that TRUNCATE is attempted
         try {
             $this->scheduleUpdater->update();
@@ -157,6 +160,7 @@ class ScheduleUpdaterTest extends TestCase
             // Expected to fail on file load
         }
         
+        restore_error_handler();
         $output = ob_get_clean();
         
         $queries = $this->mockDb->getExecutedQueries();

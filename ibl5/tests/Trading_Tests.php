@@ -25,7 +25,7 @@ class MockSeason {
 }
 
 class MockLeague {
-    const HARD_CAP_MAX = 75000;
+    const HARD_CAP_MAX = 7000;
 }
 
 class MockJSB {
@@ -38,7 +38,7 @@ class MockDiscord {
 }
 
 // Define mock classes
-class League { const HARD_CAP_MAX = 75000; }
+class League { const HARD_CAP_MAX = 7000; }
 class JSB { const WAIVERS_ORDINAL = 50000; }
 class Discord {
     public static function getDiscordIDFromTeamname($db, $teamname) { return '123456789'; }

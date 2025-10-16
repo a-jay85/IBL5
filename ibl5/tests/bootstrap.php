@@ -45,8 +45,8 @@ spl_autoload_register(function ($class) {
         }
     }
     
-    // Handle global namespace classes like Player and Team
-    if (in_array($class, ['Player', 'Team'])) {
+    // Handle global namespace classes like Player, Team, and League
+    if (in_array($class, ['Player', 'Team', 'League'])) {
         $file = __DIR__ . '/../classes/' . $class . '.php';
         if (file_exists($file)) {
             require_once $file;
@@ -216,12 +216,13 @@ class MockDatabaseResult
 }
 
 // Mock external dependencies that Trading classes might need
-if (!class_exists('League')) {
-    class League
-    {
-        const HARD_CAP_MAX = 7000;
-    }
-}
+// Note: League class is now loaded from the real class file
+// if (!class_exists('League')) {
+//     class League
+//     {
+//         const HARD_CAP_MAX = 7000;
+//     }
+// }
 
 if (!class_exists('JSB')) {
     class JSB

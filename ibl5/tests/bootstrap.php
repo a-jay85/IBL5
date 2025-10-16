@@ -45,8 +45,8 @@ spl_autoload_register(function ($class) {
         }
     }
     
-    // Handle global namespace classes like Player, Team, League
-    if (in_array($class, ['Player', 'Team', 'League'])) {
+    // Handle global namespace classes like Player and Team
+    if (in_array($class, ['Player', 'Team'])) {
         $file = __DIR__ . '/../classes/' . $class . '.php';
         if (file_exists($file)) {
             require_once $file;

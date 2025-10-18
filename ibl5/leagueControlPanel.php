@@ -166,7 +166,9 @@ echo "<FORM action=\"leagueControlPanel.php\" method=\"POST\">
 
 switch ($season->phase) {
     case 'Preseason':
-        echo "<A HREF=\"updateAllTheThings.php\">Update All The Things</A><p>
+        echo "<A HREF=\"/ibl5/scripts/plrParser.php\">Run plrParser.php</A>
+                <br><b>(but make sure you've uploaded the updated PLR file before you run this!)</b><p>
+            <A HREF=\"updateAllTheThings.php\">Update All The Things</A><p>
             <A HREF=\"/ibl5/scripts/scoParser.php\">Run scoParser.php</A><p>
             <select name=\"Waivers\">
                 <option value = \"Yes\"" . ($season->allowWaivers == "Yes" ? " SELECTED" : "") . ">Yes</option>
@@ -176,7 +178,9 @@ switch ($season->phase) {
             <INPUT type='submit' name='query' value='Set all players on waivers to Free Agents and reset their Bird years'><p>";
         break;
     case 'HEAT':
-        echo "<A HREF=\"updateAllTheThings.php\">Update All The Things</A><p>
+        echo "<A HREF=\"/ibl5/scripts/plrParser.php\">Run plrParser.php</A>
+                <br><b>(but make sure you've uploaded the updated PLR file before you run this!)</b><p>
+            <A HREF=\"updateAllTheThings.php\">Update All The Things</A><p>
             <A HREF=\"/ibl5/scripts/scoParser.php\">Run scoParser.php</A><p>
             <A HREF=\"heatupdateboth.php\">Update HEAT Leaderboards</A><p>
             <A HREF=\"history_update.php\">IBL History Update</A><p>
@@ -199,7 +203,9 @@ switch ($season->phase) {
             <INPUT type='submit' name='query' value='Set Allow Trades Status'><p>";
         break;
     case 'Playoffs':
-        echo "<A HREF=\"updateAllTheThings.php\">Update All The Things</A><p>
+        echo "<A HREF=\"/ibl5/scripts/plrParser.php\">Run plrParser.php</A>
+                <br><b>(but make sure you've uploaded the updated PLR file before you run this!)</b><p>
+            <A HREF=\"updateAllTheThings.php\">Update All The Things</A><p>
             <A HREF=\"/ibl5/scripts/scoParser.php\">Run scoParser.php</A><p>
             <INPUT type='submit' name='query' value='Reset End of the Year Voting'><p>
             <select name=\"Trades\">

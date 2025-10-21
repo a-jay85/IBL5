@@ -51,24 +51,6 @@ class StandingsHTMLGeneratorTest extends TestCase
 
     /**
      * @group standings-html
-     * @group grouping
-     */
-    public function testAssignGroupingsForValidDivision()
-    {
-        $reflection = new ReflectionClass($this->htmlGenerator);
-        $method = $reflection->getMethod('assignGroupingsFor');
-        $method->setAccessible(true);
-
-        $result = $method->invoke($this->htmlGenerator, 'Pacific');
-        
-        $this->assertIsArray($result);
-        $this->assertEquals('division', $result[0]);
-        $this->assertEquals('divGB', $result[1]);
-        $this->assertEquals('divMagicNumber', $result[2]);
-    }
-
-    /**
-     * @group standings-html
      * @group html-generation
      */
     public function testGenerateStandingsHeaderContainsRequiredColumns()

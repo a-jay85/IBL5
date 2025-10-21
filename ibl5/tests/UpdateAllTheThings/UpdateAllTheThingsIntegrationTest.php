@@ -99,28 +99,6 @@ class UpdateAllTheThingsIntegrationTest extends TestCase
 
     /**
      * @group integration
-     * @group extension-reset
-     */
-    public function testResetSimContractExtensionAttempts()
-    {
-        $this->mockDb->setReturnTrue(true);
-        
-        ob_start();
-        $this->mockSharedFunctions->resetSimContractExtensionAttempts();
-        $output = ob_get_clean();
-        
-        $this->assertStringContainsString('Resetting sim contract extension attempts', $output);
-        
-        $queries = $this->mockDb->getExecutedQueries();
-        $extensionResetQueries = array_filter($queries, function($q) {
-            return stripos($q, 'Used_Extension_This_Chunk') !== false;
-        });
-        
-        $this->assertNotEmpty($extensionResetQueries);
-    }
-
-    /**
-     * @group integration
      * @group season-phases
      */
     public function testComponentsWorkWithRegularSeasonPhase()

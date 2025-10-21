@@ -153,9 +153,6 @@ class PowerRankingsUpdaterTest extends TestCase
         ];
         $mockResult = new MockDatabaseResult($mockGames);
         
-        // Mock opponent's win-loss record
-        $this->mockDb->setMockData([['win' => 20, 'loss' => 10]]);
-        
         $reflection = new ReflectionClass($this->powerRankingsUpdater);
         $method = $reflection->getMethod('calculateTeamStats');
         $method->setAccessible(true);
@@ -182,9 +179,6 @@ class PowerRankingsUpdaterTest extends TestCase
         ];
         $mockResult = new MockDatabaseResult($mockGames);
         
-        // Mock opponent's win-loss record
-        $this->mockDb->setMockData([['win' => 20, 'loss' => 10]]);
-        
         $reflection = new ReflectionClass($this->powerRankingsUpdater);
         $method = $reflection->getMethod('calculateTeamStats');
         $method->setAccessible(true);
@@ -208,9 +202,6 @@ class PowerRankingsUpdaterTest extends TestCase
             ['Visitor' => 2, 'VScore' => 90, 'Home' => 1, 'HScore' => 100]
         ];
         $mockResult = new MockDatabaseResult($mockGames);
-        
-        // Mock opponent's win-loss record
-        $this->mockDb->setMockData([['win' => 15, 'loss' => 15]]);
         
         $reflection = new ReflectionClass($this->powerRankingsUpdater);
         $method = $reflection->getMethod('calculateTeamStats');
@@ -237,13 +228,6 @@ class PowerRankingsUpdaterTest extends TestCase
         ];
         $mockResult = new MockDatabaseResult($mockGames);
         
-        // Mock opponent records
-        $this->mockDb->setMockData([
-            ['win' => 20, 'loss' => 10],
-            ['win' => 15, 'loss' => 15],
-            ['win' => 10, 'loss' => 20],
-        ]);
-        
         $reflection = new ReflectionClass($this->powerRankingsUpdater);
         $method = $reflection->getMethod('calculateTeamStats');
         $method->setAccessible(true);
@@ -267,12 +251,6 @@ class PowerRankingsUpdaterTest extends TestCase
             ['Visitor' => 3, 'VScore' => 100, 'Home' => 1, 'HScore' => 90],
         ];
         $mockResult = new MockDatabaseResult($mockGames);
-        
-        // Mock opponent records
-        $this->mockDb->setMockData([
-            ['win' => 20, 'loss' => 10],
-            ['win' => 15, 'loss' => 15],
-        ]);
         
         $reflection = new ReflectionClass($this->powerRankingsUpdater);
         $method = $reflection->getMethod('calculateTeamStats');
@@ -298,12 +276,6 @@ class PowerRankingsUpdaterTest extends TestCase
             ['Visitor' => 3, 'VScore' => 100, 'Home' => 1, 'HScore' => 90],
         ];
         $mockResult = new MockDatabaseResult($mockGames);
-        
-        // Mock opponent records
-        $this->mockDb->setMockData([
-            ['win' => 20, 'loss' => 10],
-            ['win' => 15, 'loss' => 15],
-        ]);
         
         $reflection = new ReflectionClass($this->powerRankingsUpdater);
         $method = $reflection->getMethod('calculateTeamStats');

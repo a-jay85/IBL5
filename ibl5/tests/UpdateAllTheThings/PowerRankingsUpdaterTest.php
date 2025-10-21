@@ -373,13 +373,6 @@ class PowerRankingsUpdaterTest extends TestCase
         }
         $mockResult = new MockDatabaseResult($mockGames);
         
-        // Mock opponent records for all games
-        $opponentRecords = [];
-        for ($i = 0; $i < 15; $i++) {
-            $opponentRecords[] = ['win' => 20, 'loss' => 10];
-        }
-        $this->mockDb->setMockData($opponentRecords);
-        
         $reflection = new ReflectionClass($this->powerRankingsUpdater);
         $method = $reflection->getMethod('calculateTeamStats');
         $method->setAccessible(true);

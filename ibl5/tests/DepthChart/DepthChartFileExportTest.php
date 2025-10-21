@@ -33,11 +33,11 @@ class DepthChartFileExportTest extends TestCase
     public function testCSVFormatGeneration()
     {
         // Tests the CSV generation logic from submit() function
-        $header = "Name,PG,SG,SF,PF,C,ACTIVE,MIN,OF,DF,OI,DI\n";
+        $header = "Name,PG,SG,SF,PF,C,ACTIVE,MIN,OF,DF,OI,DI,BH\n";
         $rows = [
-            "John Doe,1,0,0,0,0,1,35,0,0,1,0\n",
-            "Jane Smith,2,1,0,0,0,1,30,1,2,0,1\n",
-            "Bob Johnson,0,2,1,0,0,1,28,2,0,-1,2\n"
+            "John Doe,1,0,0,0,0,1,35,0,0,1,0,0\n",
+            "Jane Smith,2,1,0,0,0,1,30,1,2,0,1,1\n",
+            "Bob Johnson,0,2,1,0,0,1,28,2,0,-1,2,-1\n"
         ];
         
         $fileContent = $header . implode('', $rows);
@@ -49,11 +49,11 @@ class DepthChartFileExportTest extends TestCase
         
         // Verify field count
         $headerFields = explode(',', $lines[0]);
-        $this->assertCount(12, $headerFields, 'Header should have 12 fields');
+        $this->assertCount(13, $headerFields, 'Header should have 13 fields');
         
         foreach (array_slice($lines, 1) as $line) {
             $fields = explode(',', $line);
-            $this->assertCount(12, $fields, 'Each row should have 12 fields');
+            $this->assertCount(13, $fields, 'Each row should have 13 fields');
         }
     }
     
@@ -64,7 +64,7 @@ class DepthChartFileExportTest extends TestCase
     public function testFileWritingOperations()
     {
         // Tests file_put_contents logic from submit()
-        $content = "Name,PG,SG,SF,PF,C,ACTIVE,MIN,OF,DF,OI,DI\nTest Player,1,0,0,0,0,1,30,0,0,0,0\n";
+        $content = "Name,PG,SG,SF,PF,C,ACTIVE,MIN,OF,DF,OI,DI,BH\nTest Player,1,0,0,0,0,1,30,0,0,0,0,0\n";
         
         // Write file
         $result = file_put_contents($this->testFilePath, $content);
@@ -76,7 +76,7 @@ class DepthChartFileExportTest extends TestCase
         $this->assertEquals($content, $readContent);
         
         // Test overwrite
-        $newContent = "Name,PG,SG,SF,PF,C,ACTIVE,MIN,OF,DF,OI,DI\nNew Player,2,0,0,0,0,1,25,0,0,0,0\n";
+        $newContent = "Name,PG,SG,SF,PF,C,ACTIVE,MIN,OF,DF,OI,DI,BH\nNew Player,2,0,0,0,0,1,25,0,0,0,0,0\n";
         file_put_contents($this->testFilePath, $newContent);
         $this->assertEquals($newContent, file_get_contents($this->testFilePath));
     }
@@ -109,17 +109,17 @@ class DepthChartFileExportTest extends TestCase
     public function testFullRosterExport()
     {
         // Tests complete file generation for a 15-player roster
-        $header = "Name,PG,SG,SF,PF,C,ACTIVE,MIN,OF,DF,OI,DI\n";
+        $header = "Name,PG,SG,SF,PF,C,ACTIVE,MIN,OF,DF,OI,DI,BH\n";
         $content = $header;
         
         // 12 active players
         for ($i = 1; $i <= 12; $i++) {
-            $content .= "Player $i,0,0,0,0,0,1,30,0,0,0,0\n";
+            $content .= "Player $i,0,0,0,0,0,1,30,0,0,0,0,0\n";
         }
         
         // 3 inactive players
         for ($i = 13; $i <= 15; $i++) {
-            $content .= "Player $i,0,0,0,0,0,0,0,0,0,0,0\n";
+            $content .= "Player $i,0,0,0,0,0,0,0,0,0,0,0,0\n";
         }
         
         file_put_contents($this->testFilePath, $content);

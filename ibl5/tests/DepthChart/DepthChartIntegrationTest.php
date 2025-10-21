@@ -185,7 +185,7 @@ class DepthChartIntegrationTest extends TestCase
         $lines = explode("\n", trim($readContent));
         
         // Assert
-        $this->assertStringStartsWith('Name,PG,SG,SF,PF,C,ACTIVE,MIN,OF,DF,OI,DI', $lines[0]);
+        $this->assertStringStartsWith('Name,PG,SG,SF,PF,C,ACTIVE,MIN,OF,DF,OI,DI,BH', $lines[0]);
         $this->assertGreaterThanOrEqual(13, count($lines), 'Should have header + at least 12 player lines');
     }
     
@@ -431,7 +431,7 @@ class DepthChartIntegrationTest extends TestCase
     
     private function generateFileContent($postData)
     {
-        $content = "Name,PG,SG,SF,PF,C,ACTIVE,MIN,OF,DF,OI,DI\n";
+        $content = "Name,PG,SG,SF,PF,C,ACTIVE,MIN,OF,DF,OI,DI,BH\n";
         
         for ($i = 1; $i <= 15; $i++) {
             if (isset($postData["Name$i"])) {
@@ -446,7 +446,8 @@ class DepthChartIntegrationTest extends TestCase
                 $content .= ($postData["OF$i"] ?? 0) . ",";
                 $content .= ($postData["DF$i"] ?? 0) . ",";
                 $content .= ($postData["OI$i"] ?? 0) . ",";
-                $content .= ($postData["DI$i"] ?? 0) . "\n";
+                $content .= ($postData["DI$i"] ?? 0) . ",";
+                $content .= ($postData["BH$i"] ?? 0) . "\n";
             }
         }
         

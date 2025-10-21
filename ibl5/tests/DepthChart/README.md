@@ -73,8 +73,8 @@ php vendor/bin/phpunit tests/DepthChart/ --group integration --testdox
 - All other rules apply
 
 ### File Export
-CSV format: `Name,PG,SG,SF,PF,C,ACTIVE,MIN,OF,DF,OI,DI`
-**Note:** Ball handling (BH) saved to database but NOT exported to CSV
+CSV format: `Name,PG,SG,SF,PF,C,ACTIVE,MIN,OF,DF,OI,DI,BH`
+**Note:** Ball handling (BH) is now included in CSV export (updated from previous version)
 
 Saved to: `depthcharts/{TeamName}.txt`
 

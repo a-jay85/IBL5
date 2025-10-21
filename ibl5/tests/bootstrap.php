@@ -45,8 +45,8 @@ spl_autoload_register(function ($class) {
         }
     }
     
-    // Handle global namespace classes like Player, Team, and League
-    if (in_array($class, ['Player', 'Team', 'League'])) {
+    // Handle global namespace classes like Player, Team, League, and JSB
+    if (in_array($class, ['Player', 'Team', 'League', 'JSB'])) {
         $file = __DIR__ . '/../classes/' . $class . '.php';
         if (file_exists($file)) {
             require_once $file;
@@ -212,13 +212,6 @@ class MockDatabaseResult
     public function numRows()
     {
         return count($this->data);
-    }
-}
-
-if (!class_exists('JSB')) {
-    class JSB
-    {
-        const WAIVERS_ORDINAL = 50000;
     }
 }
 

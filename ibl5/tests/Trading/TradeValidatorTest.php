@@ -130,7 +130,7 @@ class TradeValidatorTest extends TestCase
         // Arrange - Valid tradeable player
         $playerId = 12345;
         $this->mockDb->setMockData([
-            [1000, 5000] // ordinal, cy (salary)
+            [500, 5000] // ordinal <= 960, cy (salary)
         ]);
 
         // Act
@@ -211,12 +211,12 @@ class TradeValidatorTest extends TestCase
     {
         return [
             'Waived player' => [
-                [[60000, 5000]], // High ordinal (waived), has salary
+                [[1500, 5000]], // High ordinal > 960 (waived), has salary
                 false,
                 'Waived players should not be tradeable'
             ],
             'Player with no salary' => [
-                [[1000, 0]], // Low ordinal, no salary
+                [[500, 0]], // Low ordinal <= 960, no salary
                 false,
                 'Players with zero salary should not be tradeable'
             ],

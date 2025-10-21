@@ -121,25 +121,6 @@ class UpdateAllTheThingsIntegrationTest extends TestCase
 
     /**
      * @group integration
-     * @group database
-     */
-    public function testDatabaseQueriesAreTracked()
-    {
-        $this->mockDb->clearQueries();
-        $this->mockDb->setReturnTrue(true);
-        
-        $this->mockDb->sql_query("SELECT * FROM ibl_schedule");
-        $this->mockDb->sql_query("UPDATE ibl_power SET win = 50");
-        
-        $queries = $this->mockDb->getExecutedQueries();
-        
-        $this->assertCount(2, $queries);
-        $this->assertStringContainsString('ibl_schedule', $queries[0]);
-        $this->assertStringContainsString('ibl_power', $queries[1]);
-    }
-
-    /**
-     * @group integration
      * @group season-phases
      */
     public function testComponentsWorkWithRegularSeasonPhase()

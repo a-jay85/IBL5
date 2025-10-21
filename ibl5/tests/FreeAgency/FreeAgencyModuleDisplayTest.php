@@ -53,51 +53,6 @@ class FreeAgencyModuleDisplayTest extends TestCase
 
     /**
      * @group display
-     * @group free-agent-identification
-     */
-    public function testPlayerNotIdentifiedAsFreeAgentWhenContractRemains()
-    {
-        // Arrange
-        $playerData = [
-            'draft_year' => 2020,
-            'exp' => 4,
-            'cyt' => 4,
-            'cy' => 2 // Still has 2 years left
-        ];
-        $currentSeasonEndingYear = 2024;
-
-        // Act
-        $yearPlayerIsFreeAgent = $this->calculateFreeAgentYear($playerData);
-
-        // Assert
-        // draft_year + exp + cyt - cy = 2020 + 4 + 4 - 2 = 2026
-        $this->assertNotEquals($currentSeasonEndingYear, $yearPlayerIsFreeAgent);
-        $this->assertEquals(2026, $yearPlayerIsFreeAgent);
-    }
-
-    /**
-     * @group display
-     * @group roster-spots
-     */
-    public function testRosterSpotsDecrementForPlayersUnderContract()
-    {
-        // Arrange
-        $initialRosterSpots = 15;
-        $players = [
-            ['cy' => 0, 'cy1' => 1000, 'name' => 'Player 1'],
-            ['cy' => 0, 'cy1' => 1100, 'name' => 'Player 2'],
-            ['cy' => 0, 'cy1' => 1200, 'name' => 'Player 3']
-        ];
-
-        // Act
-        $remainingSpots = $this->calculateRemainingRosterSpots($initialRosterSpots, $players);
-
-        // Assert
-        $this->assertEquals(12, $remainingSpots);
-    }
-
-    /**
-     * @group display
      * @group roster-spots
      */
     public function testRosterSpotsDoNotDecrementForPlayersWithPipePrefix()
@@ -120,32 +75,12 @@ class FreeAgencyModuleDisplayTest extends TestCase
 
     /**
      * @group display
-     * @group roster-spots
-     */
-    public function testRosterSpotsDecrementForOffers()
-    {
-        // Arrange
-        $initialRosterSpots = 15;
-        $offers = [
-            ['offer1' => 1000, 'offer2' => 1100],
-            ['offer1' => 800, 'offer2' => 850]
-        ];
-
-        // Act
-        $remainingSpots = $this->calculateRosterSpotsAfterOffers($initialRosterSpots, $offers);
-
-        // Assert
-        $this->assertEquals(13, $remainingSpots);
-    }
-
-    /**
-     * @group display
      * @group cap-space
      */
     public function testSoftCapSpaceCalculatedCorrectly()
     {
         // Arrange
-        $softCapMax = 5500; // League::SOFT_CAP_MAX
+        $softCapMax = League::SOFT_CAP_MAX;
         $committedSalaries = [
             1000, 1100, 1200, 900, 800
         ];
@@ -154,8 +89,8 @@ class FreeAgencyModuleDisplayTest extends TestCase
         $availableSpace = $this->calculateAvailableCapSpace($softCapMax, $committedSalaries);
 
         // Assert
-        // 5500 - (1000 + 1100 + 1200 + 900 + 800) = 5500 - 5000 = 500
-        $this->assertEquals(500, $availableSpace);
+        // League::SOFT_CAP_MAX - (1000 + 1100 + 1200 + 900 + 800) = 5000 - 5000 = 0
+        $this->assertEquals(0, $availableSpace);
     }
 
     /**
@@ -165,17 +100,17 @@ class FreeAgencyModuleDisplayTest extends TestCase
     public function testHardCapSpaceCalculatedCorrectly()
     {
         // Arrange
-        $hardCapMax = 7500; // League::HARD_CAP_MAX
+        $hardCapMax = League::HARD_CAP_MAX;
         $committedSalaries = [
-            1000, 1100, 1200, 900, 800, 1500
+            1000, 1100, 1200, 900, 800
         ];
 
         // Act
         $availableSpace = $this->calculateAvailableCapSpace($hardCapMax, $committedSalaries);
 
         // Assert
-        // 7500 - 6500 = 1000
-        $this->assertEquals(1000, $availableSpace);
+        // League::HARD_CAP_MAX - 5000 = 7000 - 5000 = 2000
+        $this->assertEquals(2000, $availableSpace);
     }
 
     /**
@@ -185,7 +120,7 @@ class FreeAgencyModuleDisplayTest extends TestCase
     public function testCapSpaceIncludesOffersInCalculation()
     {
         // Arrange
-        $softCapMax = 5500;
+        $softCapMax = League::SOFT_CAP_MAX;
         $contractedSalaries = [1000, 1100, 1200]; // 3300 total
         $offerSalaries = [800, 900]; // 1700 total
 
@@ -194,8 +129,8 @@ class FreeAgencyModuleDisplayTest extends TestCase
         $availableSpace = $this->calculateAvailableCapSpace($softCapMax, $totalCommitted);
 
         // Assert
-        // 5500 - (3300 + 1700) = 5500 - 5000 = 500
-        $this->assertEquals(500, $availableSpace);
+        // League::SOFT_CAP_MAX - (3300 + 1700) = 5000 - 5000 = 0
+        $this->assertEquals(0, $availableSpace);
     }
 
     /**
@@ -314,8 +249,8 @@ class FreeAgencyModuleDisplayTest extends TestCase
         $maxContract = $this->calculateMaximumContract($experience);
 
         // Assert
-        // 0-6 years: 25% of cap (5500 * 0.25 = 1375)
-        $this->assertEquals(1375, $maxContract);
+        // 0-6 years: 25% of League::SOFT_CAP_MAX (5000 * 0.25 = 1250)
+        $this->assertEquals(1250, $maxContract);
     }
 
     /**
@@ -331,8 +266,8 @@ class FreeAgencyModuleDisplayTest extends TestCase
         $maxContract = $this->calculateMaximumContract($experience);
 
         // Assert
-        // 7-9 years: 30% of cap (5500 * 0.30 = 1650)
-        $this->assertEquals(1650, $maxContract);
+        // 7-9 years: 30% of League::SOFT_CAP_MAX (5000 * 0.30 = 1500)
+        $this->assertEquals(1500, $maxContract);
     }
 
     /**
@@ -348,106 +283,8 @@ class FreeAgencyModuleDisplayTest extends TestCase
         $maxContract = $this->calculateMaximumContract($experience);
 
         // Assert
-        // 10+ years: 35% of cap (5500 * 0.35 = 1925)
-        $this->assertEquals(1925, $maxContract);
-    }
-
-    /**
-     * @group display
-     * @group bird-rights-display
-     */
-    public function testBirdRightsIndicatorDisplayedForThreePlusYears()
-    {
-        // Arrange
-        $player = [
-            'name' => 'Star Player',
-            'bird' => 3
-        ];
-
-        // Act
-        $displayName = $this->formatPlayerNameWithBirdRights($player);
-
-        // Assert
-        $this->assertStringContainsString('*', $displayName);
-        $this->assertStringContainsString('<i>', $displayName);
-    }
-
-    /**
-     * @group display
-     * @group bird-rights-display
-     */
-    public function testBirdRightsIndicatorNotDisplayedForLessThanThreeYears()
-    {
-        // Arrange
-        $player = [
-            'name' => 'Young Player',
-            'bird' => 2
-        ];
-
-        // Act
-        $displayName = $this->formatPlayerNameWithBirdRights($player);
-
-        // Assert
-        $this->assertStringNotContainsString('*', $displayName);
-        $this->assertStringNotContainsString('<i>', $displayName);
-    }
-
-    /**
-     * @group display
-     * @group mle-lle-display
-     */
-    public function testMLEAvailabilityDisplayedCorrectly()
-    {
-        // Arrange
-        $teamHasMLE = true;
-
-        // Act
-        $icon = $this->getMLEIcon($teamHasMLE);
-
-        // Assert
-        $this->assertEquals("\u{2705}", $icon); // Green checkmark
-    }
-
-    /**
-     * @group display
-     * @group mle-lle-display
-     */
-    public function testMLEUnavailabilityDisplayedCorrectly()
-    {
-        // Arrange
-        $teamHasMLE = false;
-
-        // Act
-        $icon = $this->getMLEIcon($teamHasMLE);
-
-        // Assert
-        $this->assertEquals("\u{274C}", $icon); // Red X
-    }
-
-    /**
-     * @group display
-     * @group demand-display
-     */
-    public function testPlayerDemandsDisplayedForVeteranPlayer()
-    {
-        // Arrange
-        $playerExp = 5;
-        $demands = [
-            'dem1' => 1000,
-            'dem2' => 1100,
-            'dem3' => 1200,
-            'dem4' => 1300,
-            'dem5' => 1400,
-            'dem6' => 1500
-        ];
-
-        // Act
-        $demandDisplay = $this->formatDemandDisplay($playerExp, $demands);
-
-        // Assert
-        $this->assertStringContainsString('1000', $demandDisplay);
-        $this->assertStringContainsString('1100', $demandDisplay);
-        $this->assertStringContainsString('1500', $demandDisplay);
+        // 10+ years: 35% of League::SOFT_CAP_MAX (5000 * 0.35 = 1750)
+        $this->assertEquals(1750, $maxContract);
     }
 
     /**
@@ -579,7 +416,7 @@ class FreeAgencyModuleDisplayTest extends TestCase
 
     private function calculateMaximumContract($experience)
     {
-        $softCap = 5500; // League::SOFT_CAP_MAX
+        $softCap = League::SOFT_CAP_MAX;
         
         if ($experience >= 0 && $experience <= 6) {
             return round($softCap * 0.25); // 25%

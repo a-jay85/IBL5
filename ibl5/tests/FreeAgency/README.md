@@ -10,7 +10,7 @@ The test suite is designed to verify Free Agency functionality after refactoring
 
 ### Test Classes
 
-1. **FreeAgencyOfferValidationTest.php** (21 tests)
+1. **FreeAgencyOfferValidationTest.php** (16 tests)
    - Zero contract amount validation
    - Minimum salary validation
    - Bird Rights handling
@@ -21,26 +21,18 @@ The test suite is designed to verify Free Agency functionality after refactoring
    - Player already signed validation
    - MLE/LLE/Veteran Minimum special cases
 
-2. **FreeAgencyOfferProcessingTest.php** (18 tests)
-   - Offer insertion into database
-   - Offer amendment (replacing existing offers)
-   - Offer deletion
+2. **FreeAgencyOfferProcessingTest.php** (8 tests)
    - Modifier calculations (loyalty, tradition, security, playing time, winner)
-   - Perceived value calculations
-   - Contract years calculation
    - Millions committed at position calculation
-   - Discord notification triggers
 
-3. **FreeAgencyModuleDisplayTest.php** (22 tests)
+3. **FreeAgencyModuleDisplayTest.php** (14 tests)
    - Free agent identification based on contract year
    - Cap space calculations (soft and hard)
    - Roster spot tracking
    - Future salary calculations
    - Veteran minimum calculations by experience
    - Maximum contract calculations by experience
-   - Bird Rights display indicators
-   - MLE/LLE availability display
-   - Player demand display for veterans and undrafted rookies
+   - Player demand display for undrafted rookies
 
 4. **FreeAgencyIntegrationTest.php** (9 tests)
    - Complete offer submission workflow
@@ -209,18 +201,19 @@ The test suite uses `MockDatabase` class from `tests/bootstrap.php`:
 ## Test Coverage
 
 The test suite provides comprehensive coverage of:
-- ✅ All validation rules from freeagentoffer.php
-- ✅ All modifier calculations
-- ✅ Offer creation, amendment, and deletion workflows
+- ✅ All core validation rules from freeagentoffer.php
+- ✅ All modifier calculations (loyalty, tradition, security, playing time, winner)
 - ✅ Display logic from modules/Free_Agency/index.php
 - ✅ Cap space and roster spot calculations
 - ✅ Special cases (MLE, LLE, Veteran Minimum, Bird Rights)
-- ✅ Discord notification triggers
 - ✅ Free agent identification logic
 - ✅ Maximum contract and veteran minimum calculations
 - ✅ End-to-end integration workflows
 
-**Total Tests**: 70 tests covering all major Free Agency functionality
+**Total Tests**: 47 tests covering all major Free Agency functionality
+**Total Assertions**: 100+ assertions
+
+**Note**: This test suite focuses on testing business logic and validation rules. Tests that merely verified mock database operations, simple arithmetic calculations, or redundant inverse conditions have been removed to maintain a lean, focused test suite.
 
 ## Future Enhancements
 

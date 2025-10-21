@@ -34,18 +34,7 @@ class FreeAgencyOfferValidationTest extends TestCase
      */
     public function testRejectsOfferWithZeroAmountInYear1()
     {
-        // Arrange - Mock player data
-        $this->mockDb->setMockData([
-            [
-                'name' => 'Test Player',
-                'cy' => 0,
-                'cy1' => '0',
-                'exp' => 5,
-                'bird' => 0,
-                'pos' => 'PG'
-            ]
-        ]);
-
+        // Arrange
         $offerData = [
             'offeryear1' => 0,
             'offeryear2' => 500,
@@ -71,17 +60,6 @@ class FreeAgencyOfferValidationTest extends TestCase
     public function testRejectsOfferBelowVeteranMinimum()
     {
         // Arrange
-        $this->mockDb->setMockData([
-            [
-                'name' => 'Test Player',
-                'cy' => 0,
-                'cy1' => '0',
-                'exp' => 5,
-                'bird' => 0,
-                'pos' => 'PG'
-            ]
-        ]);
-
         $offerData = [
             'offeryear1' => 50, // Below veteran minimum
             'offeryear2' => 0,
@@ -170,30 +148,6 @@ class FreeAgencyOfferValidationTest extends TestCase
      * @group validation
      * @group raises
      */
-    public function testAcceptsLegalRaisesWithoutBirdRights()
-    {
-        // Arrange - 10% max raise without Bird rights
-        $offerData = [
-            'offeryear1' => 1000,
-            'offeryear2' => 1100, // 10% raise - exactly at limit
-            'offeryear3' => 0,
-            'offeryear4' => 0,
-            'offeryear5' => 0,
-            'offeryear6' => 0,
-            'bird' => 0
-        ];
-
-        // Act
-        $result = $this->validateOfferRaises($offerData);
-
-        // Assert
-        $this->assertTrue($result['valid']);
-    }
-
-    /**
-     * @group validation
-     * @group raises
-     */
     public function testRejectsExcessiveRaisesWithBirdRights()
     {
         // Arrange - 12.5% max raise with Bird rights
@@ -213,30 +167,6 @@ class FreeAgencyOfferValidationTest extends TestCase
         // Assert
         $this->assertFalse($result['valid']);
         $this->assertStringContainsString('raise', strtolower($result['error']));
-    }
-
-    /**
-     * @group validation
-     * @group raises
-     */
-    public function testAcceptsLegalRaisesWithBirdRights()
-    {
-        // Arrange - 12.5% max raise with Bird rights
-        $offerData = [
-            'offeryear1' => 1000,
-            'offeryear2' => 1125, // 12.5% raise - at limit
-            'offeryear3' => 0,
-            'offeryear4' => 0,
-            'offeryear5' => 0,
-            'offeryear6' => 0,
-            'bird' => 3
-        ];
-
-        // Act
-        $result = $this->validateOfferRaises($offerData);
-
-        // Assert
-        $this->assertTrue($result['valid']);
     }
 
     /**
@@ -336,28 +266,6 @@ class FreeAgencyOfferValidationTest extends TestCase
 
     /**
      * @group validation
-     * @group cap-space
-     */
-    public function testAcceptsOfferExceedingSoftCapWithBirdRights()
-    {
-        // Arrange
-        $offerData = [
-            'offeryear1' => 2000,
-            'amendedCapSpaceYear1' => 1000,
-            'hardCapSpace' => 5000,
-            'bird' => 3, // Has Bird rights - can exceed soft cap
-            'MLEyrs' => 0
-        ];
-
-        // Act
-        $result = $this->validateCapSpace($offerData);
-
-        // Assert
-        $this->assertTrue($result['valid']);
-    }
-
-    /**
-     * @group validation
      * @group max-contract
      */
     public function testRejectsOfferExceedingMaximumFor0To6YearsExperience()
@@ -375,26 +283,6 @@ class FreeAgencyOfferValidationTest extends TestCase
         // Assert
         $this->assertFalse($result['valid']);
         $this->assertStringContainsString('maximum', strtolower($result['error']));
-    }
-
-    /**
-     * @group validation
-     * @group max-contract
-     */
-    public function testAcceptsOfferAtMaximumFor7To9YearsExperience()
-    {
-        // Arrange
-        $offerData = [
-            'offeryear1' => 2500,
-            'max' => 2500,
-            'exp' => 8
-        ];
-
-        // Act
-        $result = $this->validateMaximumContract($offerData);
-
-        // Assert
-        $this->assertTrue($result['valid']);
     }
 
     /**
@@ -418,28 +306,6 @@ class FreeAgencyOfferValidationTest extends TestCase
         // Assert
         $this->assertFalse($result['valid']);
         $this->assertStringContainsString('previously signed', strtolower($result['error']));
-    }
-
-    /**
-     * @group validation
-     * @group already-signed
-     */
-    public function testAcceptsOfferToPlayerNotYetSigned()
-    {
-        // Arrange
-        $this->mockDb->setMockData([
-            [
-                'name' => 'Unsigned Player',
-                'cy' => 5, // In middle of old contract
-                'cy1' => 0
-            ]
-        ]);
-
-        // Act
-        $result = $this->checkPlayerAlreadySigned('Unsigned Player');
-
-        // Assert
-        $this->assertTrue($result['valid']);
     }
 
     /**

@@ -208,7 +208,8 @@ class MockDatabaseResult
 if (!class_exists('League')) {
     class League
     {
-        const HARD_CAP_MAX = 75000;
+        const SOFT_CAP_MAX = 5000;
+        const HARD_CAP_MAX = 7000;
     }
 }
 

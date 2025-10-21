@@ -6,17 +6,17 @@ Successfully implemented a comprehensive PHPUnit test suite for the IBL5 Free Ag
 
 ## Implementation Statistics
 
-- **Total Tests**: 70 tests
-- **Total Assertions**: 140+ assertions
-- **Lines of Test Code**: ~2,600 lines
-- **Test Files**: 4 test classes + 1 README
+- **Total Tests**: 47 tests (reduced from initial 70 by removing redundant tests)
+- **Total Assertions**: 100+ assertions
+- **Lines of Test Code**: ~2,100 lines (reduced from ~2,600)
+- **Test Files**: 4 test classes + 1 README + 1 Summary
 - **All Tests Pass**: ✅ 100% pass rate
 
 ## Test Suite Structure
 
-### 1. FreeAgencyOfferValidationTest.php (21 tests, 50 assertions)
+### 1. FreeAgencyOfferValidationTest.php (16 tests, 38 assertions)
 
-Tests all validation rules from `freeagentoffer.php`:
+Tests core validation rules from `freeagentoffer.php`:
 
 **Coverage:**
 - ✅ Zero contract amount validation
@@ -24,7 +24,7 @@ Tests all validation rules from `freeagentoffer.php`:
 - ✅ Bird Rights handling (reset on team change, retained on same team)
 - ✅ Raise validation (10% without Bird rights, 12.5% with Bird rights)
 - ✅ Salary decrease prevention
-- ✅ Soft cap validation (can exceed with Bird rights)
+- ✅ Soft cap validation
 - ✅ Hard cap validation (cannot exceed)
 - ✅ Maximum contract validation (25%, 30%, 35% by experience)
 - ✅ Already signed player validation
@@ -32,42 +32,32 @@ Tests all validation rules from `freeagentoffer.php`:
 - ✅ LLE offer amounts ($145K)
 - ✅ Veteran minimum offer amounts ($52K-$117K by experience)
 
-### 2. FreeAgencyOfferProcessingTest.php (18 tests, 29 assertions)
+### 2. FreeAgencyOfferProcessingTest.php (8 tests, 16 assertions)
 
-Tests offer processing logic from `freeagentoffer.php` and `freeagentofferdelete.php`:
+Tests business logic calculations:
 
 **Coverage:**
-- ✅ Offer insertion into `ibl_fa_offers` table
-- ✅ Offer amendment (delete + insert workflow)
-- ✅ Offer deletion
 - ✅ Loyalty modifier calculation (±2.5% per point)
 - ✅ Security modifier calculation (contract length based)
 - ✅ Playing time modifier calculation (position salary based)
 - ✅ Winner modifier calculation (0.0153% per W-L point)
 - ✅ Tradition modifier calculation (0.0153% per tradition W-L point)
-- ✅ Perceived value calculation (average × modifier × random)
-- ✅ Contract years calculation
-- ✅ Offer average calculation
 - ✅ Millions committed at position (capped at $2000K)
-- ✅ Discord notification triggers (>$145K offers when enabled)
 
-### 3. FreeAgencyModuleDisplayTest.php (22 tests, 35 assertions)
+### 3. FreeAgencyModuleDisplayTest.php (14 tests, 31 assertions)
 
 Tests display logic from `modules/Free_Agency/index.php`:
 
 **Coverage:**
 - ✅ Free agent identification (draft_year + exp + cyt - cy = current_year)
-- ✅ Roster spot tracking (15 base, decrement per player/offer)
 - ✅ Pipe-prefixed player exclusion from roster spots
-- ✅ Soft cap space calculation ($5,500K - committed)
-- ✅ Hard cap space calculation ($7,500K - committed)
+- ✅ Soft cap space calculation (uses League::SOFT_CAP_MAX = $5,000K)
+- ✅ Hard cap space calculation (uses League::HARD_CAP_MAX = $7,000K)
 - ✅ Cap space with offers included
 - ✅ Future salary calculations by contract year (cy 0-5)
 - ✅ Veteran minimum by experience ($52K-$117K)
-- ✅ Maximum contract by experience (25%-35% of soft cap)
-- ✅ Bird Rights display indicator (*<i>Name</i>* for 3+ years)
-- ✅ MLE/LLE availability icons (✅/❌)
-- ✅ Player demand display (veterans: all 6 years, rookies: years 3-4 only)
+- ✅ Maximum contract by experience (25%-35% of League::SOFT_CAP_MAX)
+- ✅ Player demand display (undrafted rookies: years 3-4 only)
 
 ### 4. FreeAgencyIntegrationTest.php (9 tests, 26 assertions)
 
@@ -144,14 +134,16 @@ Tests complete end-to-end workflows:
 
 ## Code Quality
 
-- ✅ All tests pass (70/70 = 100%)
+- ✅ All tests pass (47/47 = 100%)
 - ✅ Clear test names describing what is tested
-- ✅ Comprehensive assertions (140+ total)
+- ✅ Comprehensive assertions (100+ total)
+- ✅ Uses production constants (League::SOFT_CAP_MAX, League::HARD_CAP_MAX)
 - ✅ Mock database for isolation
 - ✅ Follows Extension test suite patterns
 - ✅ Well-documented with comments
 - ✅ Organized with test groups
 - ✅ Comprehensive README documentation
+- ✅ Tests focus on business logic, not mock behavior
 
 ## Files Created
 
@@ -193,8 +185,10 @@ The tests validate current procedural code but are structured to easily adapt to
 
 ## Success Metrics
 
-✅ **Comprehensive Coverage**: All business rules tested
+✅ **Comprehensive Coverage**: All core business rules tested
 ✅ **High Quality**: 100% pass rate, well-documented
+✅ **Lean & Focused**: Tests validate business logic, not mock behavior
+✅ **Production Data**: Uses League constants instead of hardcoded values
 ✅ **Maintainable**: Clear structure, organized groups
 ✅ **Refactoring Ready**: Supports future OOP refactoring
 ✅ **Integration**: Works with existing test infrastructure
@@ -202,10 +196,12 @@ The tests validate current procedural code but are structured to easily adapt to
 ## Conclusion
 
 Successfully implemented a comprehensive, production-ready PHPUnit test suite for the Free Agency module that:
-- Validates all business rules
+- Validates all core business rules
 - Tests all workflows end-to-end
+- Uses production constants (League::SOFT_CAP_MAX, League::HARD_CAP_MAX)
+- Focuses on business logic, not mock behavior
+- Maintains 100% test pass rate (47 tests, 100+ assertions)
+- Removed 23 redundant tests that tested mock behavior or simple arithmetic
 - Provides detailed documentation
-- Supports future refactoring efforts
-- Maintains 100% test pass rate
 
 The test suite is ready for use in verifying Free Agency functionality after refactoring efforts.

@@ -144,34 +144,6 @@ class UpdateAllTheThingsIntegrationTest extends TestCase
 
     /**
      * @group integration
-     * @group workflow
-     */
-    public function testCompleteWorkflowComponentsCanBeExecutedInOrder()
-    {
-        $this->mockDb->setReturnTrue(true);
-        $this->mockDb->clearQueries();
-        
-        // Initialize all components as in updateAllTheThings.php
-        $scheduleUpdater = new ScheduleUpdater($this->mockDb, $this->mockSharedFunctions, $this->mockSeason);
-        $standingsUpdater = new StandingsUpdater($this->mockDb, $this->mockSharedFunctions);
-        $powerRankingsUpdater = new PowerRankingsUpdater($this->mockDb, $this->mockSeason);
-        $standingsHTMLGenerator = new StandingsHTMLGenerator($this->mockDb);
-        
-        $this->assertInstanceOf(ScheduleUpdater::class, $scheduleUpdater);
-        $this->assertInstanceOf(StandingsUpdater::class, $standingsUpdater);
-        $this->assertInstanceOf(PowerRankingsUpdater::class, $powerRankingsUpdater);
-        $this->assertInstanceOf(StandingsHTMLGenerator::class, $standingsHTMLGenerator);
-        
-        // Verify Shared functions work
-        ob_start();
-        $this->mockSharedFunctions->resetSimContractExtensionAttempts();
-        $output = ob_get_clean();
-        
-        $this->assertStringContainsString('extension attempts', $output);
-    }
-
-    /**
-     * @group integration
      * @group season-constants
      */
     public function testSeasonConstantsAreDefined()

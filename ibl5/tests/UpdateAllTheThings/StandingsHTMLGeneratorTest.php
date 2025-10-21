@@ -35,25 +35,7 @@ class StandingsHTMLGeneratorTest extends TestCase
      * @group standings-html
      * @group grouping
      */
-    public function testAssignGroupingsForEasternConference()
-    {
-        $reflection = new ReflectionClass($this->htmlGenerator);
-        $method = $reflection->getMethod('assignGroupingsFor');
-        $method->setAccessible(true);
-
-        $result = $method->invoke($this->htmlGenerator, 'Eastern');
-        
-        $this->assertIsArray($result);
-        $this->assertEquals('conference', $result[0]);
-        $this->assertEquals('confGB', $result[1]);
-        $this->assertEquals('confMagicNumber', $result[2]);
-    }
-
-    /**
-     * @group standings-html
-     * @group grouping
-     */
-    public function testAssignGroupingsForWesternConference()
+    public function testAssignGroupingsForValidConference()
     {
         $reflection = new ReflectionClass($this->htmlGenerator);
         $method = $reflection->getMethod('assignGroupingsFor');
@@ -71,25 +53,7 @@ class StandingsHTMLGeneratorTest extends TestCase
      * @group standings-html
      * @group grouping
      */
-    public function testAssignGroupingsForAtlanticDivision()
-    {
-        $reflection = new ReflectionClass($this->htmlGenerator);
-        $method = $reflection->getMethod('assignGroupingsFor');
-        $method->setAccessible(true);
-
-        $result = $method->invoke($this->htmlGenerator, 'Atlantic');
-        
-        $this->assertIsArray($result);
-        $this->assertEquals('division', $result[0]);
-        $this->assertEquals('divGB', $result[1]);
-        $this->assertEquals('divMagicNumber', $result[2]);
-    }
-
-    /**
-     * @group standings-html
-     * @group grouping
-     */
-    public function testAssignGroupingsForPacificDivision()
+    public function testAssignGroupingsForValidDivision()
     {
         $reflection = new ReflectionClass($this->htmlGenerator);
         $method = $reflection->getMethod('assignGroupingsFor');
@@ -97,7 +61,10 @@ class StandingsHTMLGeneratorTest extends TestCase
 
         $result = $method->invoke($this->htmlGenerator, 'Pacific');
         
+        $this->assertIsArray($result);
         $this->assertEquals('division', $result[0]);
+        $this->assertEquals('divGB', $result[1]);
+        $this->assertEquals('divMagicNumber', $result[2]);
     }
 
     /**

@@ -52,7 +52,8 @@ class DepthChartValidationTest extends TestCase
             $errors[] = "active_players_max";
         }
         
-        foreach (['pg', 'sg', 'sf', 'pf', 'c'] as $pos) {
+        foreach (JSB::PLAYER_POSITIONS as $pos) {
+            $pos = strtolower($pos);
             if (isset($positionDepths[$pos]) && $positionDepths[$pos] < $minPositionDepth) {
                 $errors[] = "position_depth_$pos";
             }

@@ -215,9 +215,6 @@ class MockDatabaseResult
     }
 }
 
-// Load production JSB class
-require_once __DIR__ . '/../classes/JSB.php';
-
 if (!class_exists('Discord')) {
     class Discord
     {

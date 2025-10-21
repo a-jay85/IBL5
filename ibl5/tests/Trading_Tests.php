@@ -29,8 +29,11 @@ class MockLeague {
 }
 
 class MockJSB {
-    const WAIVERS_ORDINAL = 50000;
+    // Removed - using production JSB class
 }
+
+// Load production JSB class
+require "../classes/JSB.php";
 
 class MockDiscord {
     public static function getDiscordIDFromTeamname($db, $teamname) { return '123456789'; }
@@ -39,7 +42,7 @@ class MockDiscord {
 
 // Define mock classes
 class League { const HARD_CAP_MAX = 7000; }
-class JSB { const WAIVERS_ORDINAL = 50000; }
+// JSB is loaded from production class
 class Discord {
     public static function getDiscordIDFromTeamname($db, $teamname) { return '123456789'; }
     public static function postToChannel($channel, $message) { return true; }

@@ -12,5 +12,8 @@
         <testsuite name="Depth Chart Module Tests">
             <directory>tests/DepthChart</directory>
         </testsuite>
+        <testsuite name="UpdateAllTheThings Tests">
+            <directory>tests/UpdateAllTheThings</directory>
+        </testsuite>
     </testsuites>
 </phpunit>

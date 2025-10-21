@@ -71,10 +71,10 @@ class TradeValidatorTest extends TestCase
     {
         // Arrange
         $tradeData = [
-            'userCurrentSeasonCapTotal' => 50000,
-            'partnerCurrentSeasonCapTotal' => 55000,
-            'userCapSentToPartner' => 5000,
-            'partnerCapSentToUser' => 4000
+            'userCurrentSeasonCapTotal' => 5000,
+            'partnerCurrentSeasonCapTotal' => 5500,
+            'userCapSentToPartner' => 500,
+            'partnerCapSentToUser' => 400
         ];
 
         // Act
@@ -83,8 +83,8 @@ class TradeValidatorTest extends TestCase
         // Assert
         $this->assertTrue($result['valid'], 'Valid salary caps should pass validation');
         $this->assertEmpty($result['errors'], 'No errors should be returned for valid caps');
-        $this->assertEquals(49000, $result['userPostTradeCapTotal']); // 50000 - 5000 + 4000
-        $this->assertEquals(56000, $result['partnerPostTradeCapTotal']); // 55000 - 4000 + 5000
+        $this->assertEquals(4900, $result['userPostTradeCapTotal']); // 5000 - 500 + 400
+        $this->assertEquals(5600, $result['partnerPostTradeCapTotal']); // 5500 - 400 + 500
     }
 
     /**
@@ -185,19 +185,19 @@ class TradeValidatorTest extends TestCase
         return [
             'User exceeds hard cap' => [
                 [
-                    'userCurrentSeasonCapTotal' => 70000,
-                    'partnerCurrentSeasonCapTotal' => 50000,
-                    'userCapSentToPartner' => 1000,
-                    'partnerCapSentToUser' => 10000
+                    'userCurrentSeasonCapTotal' => 6000,
+                    'partnerCurrentSeasonCapTotal' => 5000,
+                    'userCapSentToPartner' => 100,
+                    'partnerCapSentToUser' => 1500
                 ],
                 1 // Expected error count
             ],
             'Partner exceeds hard cap' => [
                 [
-                    'userCurrentSeasonCapTotal' => 50000,
-                    'partnerCurrentSeasonCapTotal' => 70000,
-                    'userCapSentToPartner' => 10000,
-                    'partnerCapSentToUser' => 1000
+                    'userCurrentSeasonCapTotal' => 5000,
+                    'partnerCurrentSeasonCapTotal' => 6000,
+                    'userCapSentToPartner' => 1500,
+                    'partnerCapSentToUser' => 100
                 ],
                 1 // Expected error count
             ]

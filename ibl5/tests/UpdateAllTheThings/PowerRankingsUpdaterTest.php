@@ -187,6 +187,8 @@ class PowerRankingsUpdaterTest extends TestCase
         
         $this->assertEquals(0, $result['wins']);
         $this->assertEquals(1, $result['losses']);
+        $this->assertEquals(0, $result['homeLosses']);
+        $this->assertEquals(1, $result['awayLosses']);
         $this->assertEquals('L', $result['streakType']);
         $this->assertEquals(1, $result['streak']);
     }

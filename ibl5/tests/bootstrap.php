@@ -215,15 +215,6 @@ class MockDatabaseResult
     }
 }
 
-// Mock external dependencies that Trading classes might need
-// Note: League class is now loaded from the real class file
-// if (!class_exists('League')) {
-//     class League
-//     {
-//         const HARD_CAP_MAX = 7000;
-//     }
-// }
-
 if (!class_exists('JSB')) {
     class JSB
     {

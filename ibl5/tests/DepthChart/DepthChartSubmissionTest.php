@@ -8,7 +8,7 @@ use PHPUnit\Framework\TestCase;
  * Tests the submission process from modules/Depth_Chart_Entry/index.php including:
  * - POST data processing and counting logic
  * - Active player counting
- * - Position depth calculation with injury handling
+ * - Position counting with injury handling
  */
 class DepthChartSubmissionTest extends TestCase
 {
@@ -93,14 +93,14 @@ class DepthChartSubmissionTest extends TestCase
      */
     public function testCountsPositionDepthCorrectly()
     {
-        // Simulates the depth counting logic from submit() function
+        // Simulates the counting logic from submit() function
         $pgDepth = 0;
         $playerDepths = [
             ['pg' => 1, 'injury' => 0], // Counts
             ['pg' => 2, 'injury' => 0], // Counts
             ['pg' => 3, 'injury' => 0], // Counts
             ['pg' => 1, 'injury' => 15], // Doesn't count - injured
-            ['pg' => 0, 'injury' => 0]  // Doesn't count - not in depth chart
+            ['pg' => 0, 'injury' => 0]  // Doesn't count - not assigned to position
         ];
         
         foreach ($playerDepths as $player) {
@@ -109,7 +109,7 @@ class DepthChartSubmissionTest extends TestCase
             }
         }
         
-        $this->assertEquals(3, $pgDepth, 'Should count 3 healthy PG-eligible players');
+        $this->assertEquals(3, $pgDepth, 'Should count 3 healthy PG-assigned players');
     }
     
     /**

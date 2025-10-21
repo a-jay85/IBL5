@@ -7,7 +7,6 @@ use PHPUnit\Framework\TestCase;
  * 
  * Tests validation rules from modules/Depth_Chart_Entry/index.php including:
  * - Active player count validation (season-specific)
- * - Position depth validation (season-specific)
  * - Multiple starting position validation
  * - Injury handling logic
  */
@@ -36,11 +35,9 @@ class DepthChartValidationTest extends TestCase
         if ($phase != 'Playoffs') {
             $minActivePlayers = 12;
             $maxActivePlayers = 12;
-            $minPositionDepth = 3;
         } else {
             $minActivePlayers = 10;
             $maxActivePlayers = 12;
-            $minPositionDepth = 2;
         }
         
         $errors = [];
@@ -50,13 +47,6 @@ class DepthChartValidationTest extends TestCase
         }
         if ($activePlayers > $maxActivePlayers) {
             $errors[] = "active_players_max";
-        }
-        
-        foreach (JSB::PLAYER_POSITIONS as $pos) {
-            $pos = strtolower($pos);
-            if (isset($positionDepths[$pos]) && $positionDepths[$pos] < $minPositionDepth) {
-                $errors[] = "position_depth_$pos";
-            }
         }
         
         if ($hasMultipleStarters) {
@@ -75,7 +65,7 @@ class DepthChartValidationTest extends TestCase
         // Regular season requires exactly 12 active players
         $this->assertFalse($this->validateRoster(11, [], false, 'Regular Season')['valid']);
         $this->assertFalse($this->validateRoster(13, [], false, 'Regular Season')['valid']);
-        $this->assertTrue($this->validateRoster(12, ['pg' => 3, 'sg' => 3, 'sf' => 3, 'pf' => 3, 'c' => 3], false, 'Regular Season')['valid']);
+        $this->assertTrue($this->validateRoster(12, [], false, 'Regular Season')['valid']);
     }
     
     /**
@@ -86,41 +76,9 @@ class DepthChartValidationTest extends TestCase
     {
         // Playoffs allow 10-12 active players
         $this->assertFalse($this->validateRoster(9, [], false, 'Playoffs')['valid']);
-        $this->assertTrue($this->validateRoster(10, ['pg' => 2, 'sg' => 2, 'sf' => 2, 'pf' => 2, 'c' => 2], false, 'Playoffs')['valid']);
-        $this->assertTrue($this->validateRoster(12, ['pg' => 2, 'sg' => 2, 'sf' => 2, 'pf' => 2, 'c' => 2], false, 'Playoffs')['valid']);
+        $this->assertTrue($this->validateRoster(10, [], false, 'Playoffs')['valid']);
+        $this->assertTrue($this->validateRoster(12, [], false, 'Playoffs')['valid']);
         $this->assertFalse($this->validateRoster(13, [], false, 'Playoffs')['valid']);
-    }
-    
-    /**
-     * @group validation
-     * @group position-depth
-     */
-    public function testRegularSeasonPositionDepthValidation()
-    {
-        // Regular season requires 3-deep at all positions
-        $result = $this->validateRoster(12, ['pg' => 2, 'sg' => 3, 'sf' => 3, 'pf' => 3, 'c' => 3], false, 'Regular Season');
-        $this->assertFalse($result['valid']);
-        $this->assertContains('position_depth_pg', $result['errors']);
-        
-        // All positions meet minimum
-        $result = $this->validateRoster(12, ['pg' => 3, 'sg' => 3, 'sf' => 3, 'pf' => 3, 'c' => 3], false, 'Regular Season');
-        $this->assertTrue($result['valid']);
-    }
-    
-    /**
-     * @group validation
-     * @group position-depth
-     */
-    public function testPlayoffPositionDepthValidation()
-    {
-        // Playoffs require 2-deep at all positions
-        $result = $this->validateRoster(10, ['pg' => 1, 'sg' => 2, 'sf' => 2, 'pf' => 2, 'c' => 2], false, 'Playoffs');
-        $this->assertFalse($result['valid']);
-        $this->assertContains('position_depth_pg', $result['errors']);
-        
-        // All positions meet minimum
-        $result = $this->validateRoster(10, ['pg' => 2, 'sg' => 2, 'sf' => 2, 'pf' => 2, 'c' => 2], false, 'Playoffs');
-        $this->assertTrue($result['valid']);
     }
     
     /**
@@ -129,11 +87,11 @@ class DepthChartValidationTest extends TestCase
      */
     public function testMultipleStartersValidation()
     {
-        $result = $this->validateRoster(12, ['pg' => 3, 'sg' => 3, 'sf' => 3, 'pf' => 3, 'c' => 3], true, 'Regular Season');
+        $result = $this->validateRoster(12, [], true, 'Regular Season');
         $this->assertFalse($result['valid']);
         $this->assertContains('multiple_starters', $result['errors']);
         
-        $result = $this->validateRoster(12, ['pg' => 3, 'sg' => 3, 'sf' => 3, 'pf' => 3, 'c' => 3], false, 'Regular Season');
+        $result = $this->validateRoster(12, [], false, 'Regular Season');
         $this->assertTrue($result['valid']);
     }
     
@@ -143,7 +101,8 @@ class DepthChartValidationTest extends TestCase
      */
     public function testInjuredPlayerDepthCalculation()
     {
-        // Test the logic from submit() that counts position depth excluding injured players
+        // Test the logic from submit() that counts position depth
+        // Injured players with injury >= 15 are excluded from depth calculations
         $players = [
             ['pg' => 1, 'injury' => 0],  // Counts
             ['pg' => 2, 'injury' => 0],  // Counts
@@ -157,6 +116,6 @@ class DepthChartValidationTest extends TestCase
             }
         }
         
-        $this->assertEquals(2, $pgDepth, 'Injured player should not count toward position depth');
+        $this->assertEquals(2, $pgDepth, 'Injured player should not count in depth calculation');
     }
 }

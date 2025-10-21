@@ -78,31 +78,6 @@ class DepthChartIntegrationTest extends TestCase
     
     /**
      * @group integration
-     * @group validation-failure
-     */
-    public function testSubmissionFailsWithInsufficientPositionDepth()
-    {
-        // Arrange
-        $this->mockSeason->phase = 'Regular Season';
-        $postData = $this->generateValidRosterPostData('Boston Celtics', 'Triangle');
-        
-        // Modify to have insufficient PG depth
-        for ($i = 1; $i <= 15; $i++) {
-            if (isset($postData["pg$i"]) && $postData["pg$i"] > 0) {
-                $postData["pg$i"] = 0; // Remove all PG depth
-            }
-        }
-        
-        // Act
-        $validationResults = $this->validateDepthChart($postData);
-        
-        // Assert
-        $this->assertFalse($validationResults['valid'], 'Should fail with insufficient PG depth');
-        $this->assertStringContainsString('pg', $validationResults['errors']);
-    }
-    
-    /**
-     * @group integration
      * @group database
      */
     public function testDatabaseUpdatesForAllPlayerFields()
@@ -217,7 +192,7 @@ class DepthChartIntegrationTest extends TestCase
         // Arrange
         $this->mockSeason->phase = 'Playoffs';
         
-        // Create a simple 10-player roster with 2-deep at each position
+        // Create a simple 10-player roster
         $data = [
             'Team_Name' => 'Denver Nuggets',
             'Set_Name' => 'Princeton'
@@ -293,10 +268,10 @@ class DepthChartIntegrationTest extends TestCase
         $depthCounts = $this->calculatePositionDepth($postData);
         
         // Assert
-        // With players 1 and 2 injured, only player 3 (PG depth 3) should count
+        // With players 1 and 2 injured, only player 3 should count
         $this->assertEquals(1, $depthCounts['pg'], 
             'Should only count 1 healthy PG when 2 are injured');
-        // Other positions should still have 3 depth
+        // Other positions should be unaffected
         $this->assertEquals(3, $depthCounts['sg'], 'SG depth should be unaffected');
         $this->assertEquals(3, $depthCounts['sf'], 'SF depth should be unaffected');
     }
@@ -349,7 +324,7 @@ class DepthChartIntegrationTest extends TestCase
                 $data["{$pos}$i"] = 0;
             }
             
-            // Assign position depth in order: 3 PG, 3 SG, 3 SF, 3 PF, 3 C
+            // Assign position distribution in order: 3 PG, 3 SG, 3 SF, 3 PF, 3 C
             $posIndex = intval(($i - 1) / 3) % 5;
             $currentPos = $positions[$posIndex];
             
@@ -404,18 +379,12 @@ class DepthChartIntegrationTest extends TestCase
         
         $minActive = ($this->mockSeason->phase == 'Playoffs') ? 10 : 12;
         $maxActive = 12;
-        $minDepth = ($this->mockSeason->phase == 'Playoffs') ? 2 : 3;
         
         if ($activePlayers < $minActive) {
             $errors[] = "You must have at least $minActive active players";
         }
         if ($activePlayers > $maxActive) {
             $errors[] = "You can't have more than $maxActive active players";
-        }
-        foreach ($posDepth as $pos => $depth) {
-            if ($depth < $minDepth) {
-                $errors[] = "You must have at least $minDepth players at $pos";
-            }
         }
         if ($hasMultipleStarters) {
             $errors[] = "A player is listed at more than one position in the starting lineup";

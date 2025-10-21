@@ -49,7 +49,7 @@ class PowerRankingsUpdaterTest extends TestCase
 
         $result = $method->invoke($this->powerRankingsUpdater);
         
-        $this->assertEquals(' ' . Season::IBL_PRESEASON_MONTH, $result);
+        $this->assertEquals(Season::IBL_PRESEASON_MONTH, $result);
     }
 
     /**

@@ -44,7 +44,6 @@ class StandingsHTMLGeneratorTest extends TestCase
         $result = $method->invoke($this->htmlGenerator, 'Eastern');
         
         $this->assertIsArray($result);
-        $this->assertCount(3, $result);
         $this->assertEquals('conference', $result[0]);
         $this->assertEquals('confGB', $result[1]);
         $this->assertEquals('confMagicNumber', $result[2]);

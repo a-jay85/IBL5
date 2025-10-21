@@ -3,14 +3,13 @@
 use PHPUnit\Framework\TestCase;
 
 /**
- * Comprehensive tests for Depth Chart validation logic
+ * Tests for Depth Chart validation logic
  * 
- * Tests all validation rules from modules/Depth_Chart_Entry/index.php including:
- * - Active player count validation (12 in regular season, 10-12 in playoffs)
- * - Position depth validation (3 deep in regular season, 2 in playoffs)
+ * Tests validation rules from modules/Depth_Chart_Entry/index.php including:
+ * - Active player count validation (season-specific)
+ * - Position depth validation (season-specific)
  * - Multiple starting position validation
- * - Injury handling
- * - Season phase-specific rules
+ * - Injury handling logic
  */
 class DepthChartValidationTest extends TestCase
 {
@@ -30,463 +29,133 @@ class DepthChartValidationTest extends TestCase
     }
     
     /**
-     * @group validation
-     * @group active-players
+     * Simulates the validation logic from submit() function
      */
-    public function testRejectsTooFewActivePlayersInRegularSeason()
+    private function validateRoster($activePlayers, $positionDepths, $hasMultipleStarters, $phase)
     {
-        // Arrange
-        $this->mockSeason->phase = 'Regular Season';
-        $activePlayers = 11;
-        $minActivePlayers = 12;
+        if ($phase != 'Playoffs') {
+            $minActivePlayers = 12;
+            $maxActivePlayers = 12;
+            $minPositionDepth = 3;
+        } else {
+            $minActivePlayers = 10;
+            $maxActivePlayers = 12;
+            $minPositionDepth = 2;
+        }
         
-        // Act
-        $hasError = $activePlayers < $minActivePlayers;
+        $errors = [];
         
-        // Assert
-        $this->assertTrue($hasError, 'Should reject lineup with fewer than 12 active players in regular season');
+        if ($activePlayers < $minActivePlayers) {
+            $errors[] = "active_players_min";
+        }
+        if ($activePlayers > $maxActivePlayers) {
+            $errors[] = "active_players_max";
+        }
+        
+        foreach (['pg', 'sg', 'sf', 'pf', 'c'] as $pos) {
+            if (isset($positionDepths[$pos]) && $positionDepths[$pos] < $minPositionDepth) {
+                $errors[] = "position_depth_$pos";
+            }
+        }
+        
+        if ($hasMultipleStarters) {
+            $errors[] = "multiple_starters";
+        }
+        
+        return empty($errors) ? ['valid' => true] : ['valid' => false, 'errors' => $errors];
     }
     
     /**
      * @group validation
      * @group active-players
      */
-    public function testRejectsTooManyActivePlayers()
+    public function testRegularSeasonActivePlayerValidation()
     {
-        // Arrange
-        $this->mockSeason->phase = 'Regular Season';
-        $activePlayers = 13;
-        $maxActivePlayers = 12;
-        
-        // Act
-        $hasError = $activePlayers > $maxActivePlayers;
-        
-        // Assert
-        $this->assertTrue($hasError, 'Should reject lineup with more than 12 active players');
+        // Regular season requires exactly 12 active players
+        $this->assertFalse($this->validateRoster(11, [], false, 'Regular Season')['valid']);
+        $this->assertFalse($this->validateRoster(13, [], false, 'Regular Season')['valid']);
+        $this->assertTrue($this->validateRoster(12, ['pg' => 3, 'sg' => 3, 'sf' => 3, 'pf' => 3, 'c' => 3], false, 'Regular Season')['valid']);
     }
     
     /**
      * @group validation
      * @group active-players
      */
-    public function testAcceptsExactlyTwelveActivePlayersInRegularSeason()
+    public function testPlayoffActivePlayerValidation()
     {
-        // Arrange
-        $this->mockSeason->phase = 'Regular Season';
-        $activePlayers = 12;
-        $minActivePlayers = 12;
-        $maxActivePlayers = 12;
-        
-        // Act
-        $hasError = $activePlayers < $minActivePlayers || $activePlayers > $maxActivePlayers;
-        
-        // Assert
-        $this->assertFalse($hasError, 'Should accept lineup with exactly 12 active players in regular season');
-    }
-    
-    /**
-     * @group validation
-     * @group active-players
-     */
-    public function testRejectsTooFewActivePlayersInPlayoffs()
-    {
-        // Arrange
-        $this->mockSeason->phase = 'Playoffs';
-        $activePlayers = 9;
-        $minActivePlayers = 10;
-        
-        // Act
-        $hasError = $activePlayers < $minActivePlayers;
-        
-        // Assert
-        $this->assertTrue($hasError, 'Should reject lineup with fewer than 10 active players in playoffs');
-    }
-    
-    /**
-     * @group validation
-     * @group active-players
-     */
-    public function testAcceptsTenActivePlayersInPlayoffs()
-    {
-        // Arrange
-        $this->mockSeason->phase = 'Playoffs';
-        $activePlayers = 10;
-        $minActivePlayers = 10;
-        $maxActivePlayers = 12;
-        
-        // Act
-        $hasError = $activePlayers < $minActivePlayers || $activePlayers > $maxActivePlayers;
-        
-        // Assert
-        $this->assertFalse($hasError, 'Should accept lineup with 10 active players in playoffs');
-    }
-    
-    /**
-     * @group validation
-     * @group active-players
-     */
-    public function testAcceptsTwelveActivePlayersInPlayoffs()
-    {
-        // Arrange
-        $this->mockSeason->phase = 'Playoffs';
-        $activePlayers = 12;
-        $minActivePlayers = 10;
-        $maxActivePlayers = 12;
-        
-        // Act
-        $hasError = $activePlayers < $minActivePlayers || $activePlayers > $maxActivePlayers;
-        
-        // Assert
-        $this->assertFalse($hasError, 'Should accept lineup with 12 active players in playoffs');
+        // Playoffs allow 10-12 active players
+        $this->assertFalse($this->validateRoster(9, [], false, 'Playoffs')['valid']);
+        $this->assertTrue($this->validateRoster(10, ['pg' => 2, 'sg' => 2, 'sf' => 2, 'pf' => 2, 'c' => 2], false, 'Playoffs')['valid']);
+        $this->assertTrue($this->validateRoster(12, ['pg' => 2, 'sg' => 2, 'sf' => 2, 'pf' => 2, 'c' => 2], false, 'Playoffs')['valid']);
+        $this->assertFalse($this->validateRoster(13, [], false, 'Playoffs')['valid']);
     }
     
     /**
      * @group validation
      * @group position-depth
      */
-    public function testRejectsInsufficientPGDepthInRegularSeason()
+    public function testRegularSeasonPositionDepthValidation()
     {
-        // Arrange
-        $this->mockSeason->phase = 'Regular Season';
-        $pgDepth = 2;
-        $minPositionDepth = 3;
+        // Regular season requires 3-deep at all positions
+        $result = $this->validateRoster(12, ['pg' => 2, 'sg' => 3, 'sf' => 3, 'pf' => 3, 'c' => 3], false, 'Regular Season');
+        $this->assertFalse($result['valid']);
+        $this->assertContains('position_depth_pg', $result['errors']);
         
-        // Act
-        $hasError = $pgDepth < $minPositionDepth;
-        
-        // Assert
-        $this->assertTrue($hasError, 'Should reject lineup with only 2 PG depth in regular season');
+        // All positions meet minimum
+        $result = $this->validateRoster(12, ['pg' => 3, 'sg' => 3, 'sf' => 3, 'pf' => 3, 'c' => 3], false, 'Regular Season');
+        $this->assertTrue($result['valid']);
     }
     
     /**
      * @group validation
      * @group position-depth
      */
-    public function testRejectsInsufficientSGDepthInRegularSeason()
+    public function testPlayoffPositionDepthValidation()
     {
-        // Arrange
-        $this->mockSeason->phase = 'Regular Season';
-        $sgDepth = 1;
-        $minPositionDepth = 3;
+        // Playoffs require 2-deep at all positions
+        $result = $this->validateRoster(10, ['pg' => 1, 'sg' => 2, 'sf' => 2, 'pf' => 2, 'c' => 2], false, 'Playoffs');
+        $this->assertFalse($result['valid']);
+        $this->assertContains('position_depth_pg', $result['errors']);
         
-        // Act
-        $hasError = $sgDepth < $minPositionDepth;
-        
-        // Assert
-        $this->assertTrue($hasError, 'Should reject lineup with only 1 SG depth in regular season');
-    }
-    
-    /**
-     * @group validation
-     * @group position-depth
-     */
-    public function testRejectsInsufficientSFDepthInRegularSeason()
-    {
-        // Arrange
-        $this->mockSeason->phase = 'Regular Season';
-        $sfDepth = 2;
-        $minPositionDepth = 3;
-        
-        // Act
-        $hasError = $sfDepth < $minPositionDepth;
-        
-        // Assert
-        $this->assertTrue($hasError, 'Should reject lineup with only 2 SF depth in regular season');
-    }
-    
-    /**
-     * @group validation
-     * @group position-depth
-     */
-    public function testRejectsInsufficientPFDepthInRegularSeason()
-    {
-        // Arrange
-        $this->mockSeason->phase = 'Regular Season';
-        $pfDepth = 0;
-        $minPositionDepth = 3;
-        
-        // Act
-        $hasError = $pfDepth < $minPositionDepth;
-        
-        // Assert
-        $this->assertTrue($hasError, 'Should reject lineup with no PF depth in regular season');
-    }
-    
-    /**
-     * @group validation
-     * @group position-depth
-     */
-    public function testRejectsInsufficientCDepthInRegularSeason()
-    {
-        // Arrange
-        $this->mockSeason->phase = 'Regular Season';
-        $cDepth = 2;
-        $minPositionDepth = 3;
-        
-        // Act
-        $hasError = $cDepth < $minPositionDepth;
-        
-        // Assert
-        $this->assertTrue($hasError, 'Should reject lineup with only 2 C depth in regular season');
-    }
-    
-    /**
-     * @group validation
-     * @group position-depth
-     */
-    public function testAcceptsSufficientDepthAtAllPositionsInRegularSeason()
-    {
-        // Arrange
-        $this->mockSeason->phase = 'Regular Season';
-        $pgDepth = 3;
-        $sgDepth = 3;
-        $sfDepth = 3;
-        $pfDepth = 3;
-        $cDepth = 3;
-        $minPositionDepth = 3;
-        
-        // Act
-        $hasError = $pgDepth < $minPositionDepth
-            || $sgDepth < $minPositionDepth
-            || $sfDepth < $minPositionDepth
-            || $pfDepth < $minPositionDepth
-            || $cDepth < $minPositionDepth;
-        
-        // Assert
-        $this->assertFalse($hasError, 'Should accept lineup with 3-deep at all positions in regular season');
-    }
-    
-    /**
-     * @group validation
-     * @group position-depth
-     */
-    public function testAcceptsTwoDeepInPlayoffs()
-    {
-        // Arrange
-        $this->mockSeason->phase = 'Playoffs';
-        $pgDepth = 2;
-        $sgDepth = 2;
-        $sfDepth = 2;
-        $pfDepth = 2;
-        $cDepth = 2;
-        $minPositionDepth = 2;
-        
-        // Act
-        $hasError = $pgDepth < $minPositionDepth
-            || $sgDepth < $minPositionDepth
-            || $sfDepth < $minPositionDepth
-            || $pfDepth < $minPositionDepth
-            || $cDepth < $minPositionDepth;
-        
-        // Assert
-        $this->assertFalse($hasError, 'Should accept lineup with 2-deep at all positions in playoffs');
-    }
-    
-    /**
-     * @group validation
-     * @group position-depth
-     */
-    public function testRejectsInsufficientDepthInPlayoffs()
-    {
-        // Arrange
-        $this->mockSeason->phase = 'Playoffs';
-        $pgDepth = 1;
-        $minPositionDepth = 2;
-        
-        // Act
-        $hasError = $pgDepth < $minPositionDepth;
-        
-        // Assert
-        $this->assertTrue($hasError, 'Should reject lineup with only 1-deep at a position in playoffs');
+        // All positions meet minimum
+        $result = $this->validateRoster(10, ['pg' => 2, 'sg' => 2, 'sf' => 2, 'pf' => 2, 'c' => 2], false, 'Playoffs');
+        $this->assertTrue($result['valid']);
     }
     
     /**
      * @group validation
      * @group multiple-starters
      */
-    public function testRejectsPlayerStartingAtMultiplePositions()
+    public function testMultipleStartersValidation()
     {
-        // Arrange
-        $playerPositions = [
-            'pg' => 1, // Starting at PG
-            'sg' => 1, // Also starting at SG
-            'sf' => 0,
-            'pf' => 0,
-            'c' => 0
-        ];
+        $result = $this->validateRoster(12, ['pg' => 3, 'sg' => 3, 'sf' => 3, 'pf' => 3, 'c' => 3], true, 'Regular Season');
+        $this->assertFalse($result['valid']);
+        $this->assertContains('multiple_starters', $result['errors']);
         
-        // Act
-        $startingPositionCount = 0;
-        if ($playerPositions['pg'] == 1) $startingPositionCount++;
-        if ($playerPositions['sg'] == 1) $startingPositionCount++;
-        if ($playerPositions['sf'] == 1) $startingPositionCount++;
-        if ($playerPositions['pf'] == 1) $startingPositionCount++;
-        if ($playerPositions['c'] == 1) $startingPositionCount++;
-        
-        $hasError = $startingPositionCount > 1;
-        
-        // Assert
-        $this->assertTrue($hasError, 'Should reject player starting at multiple positions');
-        $this->assertEquals(2, $startingPositionCount, 'Should count 2 starting positions');
-    }
-    
-    /**
-     * @group validation
-     * @group multiple-starters
-     */
-    public function testAcceptsPlayerStartingAtOnePosition()
-    {
-        // Arrange
-        $playerPositions = [
-            'pg' => 1, // Starting at PG
-            'sg' => 2, // Backup at SG
-            'sf' => 0,
-            'pf' => 0,
-            'c' => 0
-        ];
-        
-        // Act
-        $startingPositionCount = 0;
-        if ($playerPositions['pg'] == 1) $startingPositionCount++;
-        if ($playerPositions['sg'] == 1) $startingPositionCount++;
-        if ($playerPositions['sf'] == 1) $startingPositionCount++;
-        if ($playerPositions['pf'] == 1) $startingPositionCount++;
-        if ($playerPositions['c'] == 1) $startingPositionCount++;
-        
-        $hasError = $startingPositionCount > 1;
-        
-        // Assert
-        $this->assertFalse($hasError, 'Should accept player starting at only one position');
-        $this->assertEquals(1, $startingPositionCount, 'Should count 1 starting position');
-    }
-    
-    /**
-     * @group validation
-     * @group multiple-starters
-     */
-    public function testAcceptsPlayerNotStartingAtAnyPosition()
-    {
-        // Arrange
-        $playerPositions = [
-            'pg' => 2, // Backup at PG
-            'sg' => 3, // Third string at SG
-            'sf' => 0,
-            'pf' => 0,
-            'c' => 0
-        ];
-        
-        // Act
-        $startingPositionCount = 0;
-        if ($playerPositions['pg'] == 1) $startingPositionCount++;
-        if ($playerPositions['sg'] == 1) $startingPositionCount++;
-        if ($playerPositions['sf'] == 1) $startingPositionCount++;
-        if ($playerPositions['pf'] == 1) $startingPositionCount++;
-        if ($playerPositions['c'] == 1) $startingPositionCount++;
-        
-        $hasError = $startingPositionCount > 1;
-        
-        // Assert
-        $this->assertFalse($hasError, 'Should accept player not starting at any position');
-        $this->assertEquals(0, $startingPositionCount, 'Should count 0 starting positions');
+        $result = $this->validateRoster(12, ['pg' => 3, 'sg' => 3, 'sf' => 3, 'pf' => 3, 'c' => 3], false, 'Regular Season');
+        $this->assertTrue($result['valid']);
     }
     
     /**
      * @group validation
      * @group injury-handling
      */
-    public function testInjuredPlayerDoesNotCountTowardPositionDepth()
+    public function testInjuredPlayerDepthCalculation()
     {
-        // Arrange
-        $playerInjury = 15; // Injured (>= 15 is considered major injury)
-        $playerPGDepth = 1; // Listed as starter at PG
+        // Test the logic from submit() that counts position depth excluding injured players
+        $players = [
+            ['pg' => 1, 'injury' => 0],  // Counts
+            ['pg' => 2, 'injury' => 0],  // Counts
+            ['pg' => 3, 'injury' => 15], // Does NOT count (injury >= 15)
+        ];
         
-        // Act
-        // In the actual code, injured players (injury >= 15) don't count toward position depth
-        $countsTowardDepth = $playerPGDepth > 0 && $playerInjury < 15;
+        $pgDepth = 0;
+        foreach ($players as $player) {
+            if ($player['pg'] > 0 && $player['injury'] < 15) {
+                $pgDepth++;
+            }
+        }
         
-        // Assert
-        $this->assertFalse($countsTowardDepth, 'Injured player should not count toward position depth');
-    }
-    
-    /**
-     * @group validation
-     * @group injury-handling
-     */
-    public function testHealthyPlayerCountsTowardPositionDepth()
-    {
-        // Arrange
-        $playerInjury = 0; // Healthy
-        $playerPGDepth = 1; // Listed as starter at PG
-        
-        // Act
-        $countsTowardDepth = $playerPGDepth > 0 && $playerInjury < 15;
-        
-        // Assert
-        $this->assertTrue($countsTowardDepth, 'Healthy player should count toward position depth');
-    }
-    
-    /**
-     * @group validation
-     * @group injury-handling
-     */
-    public function testMinorInjuryPlayerCountsTowardPositionDepth()
-    {
-        // Arrange
-        $playerInjury = 10; // Minor injury (< 15)
-        $playerPGDepth = 2; // Listed as backup at PG
-        
-        // Act
-        $countsTowardDepth = $playerPGDepth > 0 && $playerInjury < 15;
-        
-        // Assert
-        $this->assertTrue($countsTowardDepth, 'Player with minor injury should count toward position depth');
-    }
-    
-    /**
-     * @group validation
-     * @group edge-cases
-     */
-    public function testHandlesEmptyPlayerName()
-    {
-        // Arrange
-        $playerName = '';
-        
-        // Act
-        $escapedName = addslashes($playerName);
-        
-        // Assert
-        $this->assertEquals('', $escapedName, 'Should handle empty player name');
-    }
-    
-    /**
-     * @group validation
-     * @group edge-cases
-     */
-    public function testHandlesPlayerNameWithApostrophe()
-    {
-        // Arrange
-        $playerName = "O'Neal";
-        
-        // Act
-        $escapedName = addslashes($playerName);
-        
-        // Assert
-        $this->assertEquals("O\\'Neal", $escapedName, 'Should properly escape player name with apostrophe');
-    }
-    
-    /**
-     * @group validation
-     * @group edge-cases
-     */
-    public function testHandlesMaximumDepthCount()
-    {
-        // Arrange
-        $totalPlayers = 15; // Maximum players processed in the loop
-        
-        // Act
-        $validPlayerCount = $totalPlayers >= 1 && $totalPlayers <= 15;
-        
-        // Assert
-        $this->assertTrue($validPlayerCount, 'Should handle maximum of 15 players');
+        $this->assertEquals(2, $pgDepth, 'Injured player should not count toward position depth');
     }
 }

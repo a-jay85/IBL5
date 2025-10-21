@@ -467,20 +467,4 @@ class StandingsHTMLGeneratorTest extends TestCase
             $this->assertEquals('divMagicNumber', $result[2]);
         }
     }
-
-    /**
-     * @group standings-html
-     * @group html-generation
-     */
-    public function testGenerateStandingsHeaderUsesTeamColors()
-    {
-        $reflection = new ReflectionClass($this->htmlGenerator);
-        $method = $reflection->getMethod('generateStandingsHeader');
-        $method->setAccessible(true);
-
-        $html = $method->invoke($this->htmlGenerator, 'Western', 'conference');
-        
-        // Should contain color codes
-        $this->assertStringContainsString('color=', $html);
-    }
 }

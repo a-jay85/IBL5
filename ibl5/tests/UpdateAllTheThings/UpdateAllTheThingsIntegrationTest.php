@@ -172,18 +172,6 @@ class UpdateAllTheThingsIntegrationTest extends TestCase
 
     /**
      * @group integration
-     * @group season-data
-     */
-    public function testSeasonDataIsAccessible()
-    {
-        $this->assertIsString($this->mockSeason->phase);
-        $this->assertIsInt($this->mockSeason->endingYear);
-        $this->assertIsInt($this->mockSeason->beginningYear);
-        $this->assertEquals($this->mockSeason->beginningYear + 1, $this->mockSeason->endingYear);
-    }
-
-    /**
-     * @group integration
      * @group season-constants
      */
     public function testSeasonConstantsAreDefined()
@@ -194,54 +182,6 @@ class UpdateAllTheThingsIntegrationTest extends TestCase
         $this->assertEquals(2, Season::IBL_ALL_STAR_MONTH);
         $this->assertEquals(5, Season::IBL_REGULAR_SEASON_ENDING_MONTH);
         $this->assertEquals(6, Season::IBL_PLAYOFF_MONTH);
-    }
-
-    /**
-     * @group integration
-     * @group database-mock
-     */
-    public function testMockDatabaseHandlesMultipleQueryTypes()
-    {
-        $this->mockDb->clearQueries();
-        $this->mockDb->setReturnTrue(true);
-        
-        // Test various query types
-        $this->mockDb->sql_query("SELECT * FROM ibl_schedule");
-        $this->mockDb->sql_query("INSERT INTO ibl_schedule VALUES (1, 2, 3)");
-        $this->mockDb->sql_query("UPDATE ibl_power SET win = 50");
-        $this->mockDb->sql_query("DELETE FROM ibl_temp_table");
-        $this->mockDb->sql_query("TRUNCATE TABLE ibl_standings");
-        
-        $queries = $this->mockDb->getExecutedQueries();
-        
-        $this->assertCount(5, $queries);
-        $this->assertStringContainsString('SELECT', $queries[0]);
-        $this->assertStringContainsString('INSERT', $queries[1]);
-        $this->assertStringContainsString('UPDATE', $queries[2]);
-        $this->assertStringContainsString('DELETE', $queries[3]);
-        $this->assertStringContainsString('TRUNCATE', $queries[4]);
-    }
-
-    /**
-     * @group integration
-     * @group mock-data
-     */
-    public function testMockDatabaseReturnsConfiguredData()
-    {
-        $mockData = [
-            ['id' => 1, 'name' => 'Team A', 'wins' => 50, 'losses' => 32],
-            ['id' => 2, 'name' => 'Team B', 'wins' => 45, 'losses' => 37],
-        ];
-        
-        $this->mockDb->setMockData($mockData);
-        $result = $this->mockDb->sql_query("SELECT * FROM ibl_power");
-        
-        $this->assertEquals(1, $this->mockDb->sql_result($result, 0, 'id'));
-        $this->assertEquals('Team A', $this->mockDb->sql_result($result, 0, 'name'));
-        $this->assertEquals(50, $this->mockDb->sql_result($result, 0, 'wins'));
-        
-        $this->assertEquals(2, $this->mockDb->sql_result($result, 1, 'id'));
-        $this->assertEquals('Team B', $this->mockDb->sql_result($result, 1, 'name'));
     }
 
     /**

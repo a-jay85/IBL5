@@ -153,63 +153,19 @@ class StandingsUpdaterTest extends TestCase
      * @group standings-updater
      * @group grouping
      */
-    public function testAssignGroupingsForAtlanticDivision()
+    public function testAssignGroupingsForAllDivisions()
     {
         $reflection = new ReflectionClass($this->standingsUpdater);
         $method = $reflection->getMethod('assignGroupingsFor');
         $method->setAccessible(true);
 
-        $result = $method->invoke($this->standingsUpdater, 'Atlantic');
-        
-        $this->assertIsArray($result);
-        $this->assertEquals('division', $result[0]);
-        $this->assertEquals('divGB', $result[1]);
-        $this->assertEquals('divMagicNumber', $result[2]);
-    }
-
-    /**
-     * @group standings-updater
-     * @group grouping
-     */
-    public function testAssignGroupingsForCentralDivision()
-    {
-        $reflection = new ReflectionClass($this->standingsUpdater);
-        $method = $reflection->getMethod('assignGroupingsFor');
-        $method->setAccessible(true);
-
-        $result = $method->invoke($this->standingsUpdater, 'Central');
-        
-        $this->assertEquals('division', $result[0]);
-    }
-
-    /**
-     * @group standings-updater
-     * @group grouping
-     */
-    public function testAssignGroupingsForMidwestDivision()
-    {
-        $reflection = new ReflectionClass($this->standingsUpdater);
-        $method = $reflection->getMethod('assignGroupingsFor');
-        $method->setAccessible(true);
-
-        $result = $method->invoke($this->standingsUpdater, 'Midwest');
-        
-        $this->assertEquals('division', $result[0]);
-    }
-
-    /**
-     * @group standings-updater
-     * @group grouping
-     */
-    public function testAssignGroupingsForPacificDivision()
-    {
-        $reflection = new ReflectionClass($this->standingsUpdater);
-        $method = $reflection->getMethod('assignGroupingsFor');
-        $method->setAccessible(true);
-
-        $result = $method->invoke($this->standingsUpdater, 'Pacific');
-        
-        $this->assertEquals('division', $result[0]);
+        foreach (\League::DIVISION_NAMES as $division) {
+            $result = $method->invoke($this->standingsUpdater, $division);
+            $this->assertIsArray($result);
+            $this->assertEquals('division', $result[0]);
+            $this->assertEquals('divGB', $result[1]);
+            $this->assertEquals('divMagicNumber', $result[2]);
+        }
     }
 
     /**

@@ -116,6 +116,29 @@ class StandingsUpdaterTest extends TestCase
      * @group standings-updater
      * @group grouping
      */
+    public function testAssignGroupingsReturnsArrayWithCorrectStructure()
+    {
+        $reflection = new ReflectionClass($this->standingsUpdater);
+        $method = $reflection->getMethod('assignGroupingsFor');
+        $method->setAccessible(true);
+
+        $regions = ['Eastern', 'Western', 'Atlantic', 'Central', 'Midwest', 'Pacific'];
+        
+        foreach ($regions as $region) {
+            $result = $method->invoke($this->standingsUpdater, $region);
+            
+            $this->assertIsArray($result);
+            $this->assertCount(3, $result);
+            $this->assertIsString($result[0]); // grouping
+            $this->assertIsString($result[1]); // groupingGB
+            $this->assertIsString($result[2]); // groupingMagicNumber
+        }
+    }
+
+    /**
+     * @group standings-updater
+     * @group grouping
+     */
     public function testAssignGroupingsForAllConferences()
     {
         $reflection = new ReflectionClass($this->standingsUpdater);
@@ -306,29 +329,6 @@ class StandingsUpdaterTest extends TestCase
             $output = ob_get_clean();
             
             $this->assertStringContainsString($region, $output);
-        }
-    }
-
-    /**
-     * @group standings-updater
-     * @group grouping
-     */
-    public function testAssignGroupingsReturnsArrayWithCorrectStructure()
-    {
-        $reflection = new ReflectionClass($this->standingsUpdater);
-        $method = $reflection->getMethod('assignGroupingsFor');
-        $method->setAccessible(true);
-
-        $regions = ['Eastern', 'Western', 'Atlantic', 'Central', 'Midwest', 'Pacific'];
-        
-        foreach ($regions as $region) {
-            $result = $method->invoke($this->standingsUpdater, $region);
-            
-            $this->assertIsArray($result);
-            $this->assertCount(3, $result);
-            $this->assertIsString($result[0]); // grouping
-            $this->assertIsString($result[1]); // groupingGB
-            $this->assertIsString($result[2]); // groupingMagicNumber
         }
     }
 }

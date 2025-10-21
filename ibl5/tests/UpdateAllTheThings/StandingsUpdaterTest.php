@@ -116,37 +116,19 @@ class StandingsUpdaterTest extends TestCase
      * @group standings-updater
      * @group grouping
      */
-    public function testAssignGroupingsForEasternConference()
+    public function testAssignGroupingsForAllConferences()
     {
         $reflection = new ReflectionClass($this->standingsUpdater);
         $method = $reflection->getMethod('assignGroupingsFor');
         $method->setAccessible(true);
 
-        $result = $method->invoke($this->standingsUpdater, 'Eastern');
-        
-        $this->assertIsArray($result);
-        $this->assertCount(3, $result);
-        $this->assertEquals('conference', $result[0]);
-        $this->assertEquals('confGB', $result[1]);
-        $this->assertEquals('confMagicNumber', $result[2]);
-    }
-
-    /**
-     * @group standings-updater
-     * @group grouping
-     */
-    public function testAssignGroupingsForWesternConference()
-    {
-        $reflection = new ReflectionClass($this->standingsUpdater);
-        $method = $reflection->getMethod('assignGroupingsFor');
-        $method->setAccessible(true);
-
-        $result = $method->invoke($this->standingsUpdater, 'Western');
-        
-        $this->assertIsArray($result);
-        $this->assertEquals('conference', $result[0]);
-        $this->assertEquals('confGB', $result[1]);
-        $this->assertEquals('confMagicNumber', $result[2]);
+        foreach (League::CONFERENCE_NAMES as $conference) {
+            $result = $method->invoke($this->standingsUpdater, $conference);
+            $this->assertIsArray($result);
+            $this->assertEquals('conference', $result[0]);
+            $this->assertEquals('confGB', $result[1]);
+            $this->assertEquals('confMagicNumber', $result[2]);
+        }
     }
 
     /**
@@ -159,7 +141,7 @@ class StandingsUpdaterTest extends TestCase
         $method = $reflection->getMethod('assignGroupingsFor');
         $method->setAccessible(true);
 
-        foreach (\League::DIVISION_NAMES as $division) {
+        foreach (League::DIVISION_NAMES as $division) {
             $result = $method->invoke($this->standingsUpdater, $division);
             $this->assertIsArray($result);
             $this->assertEquals('division', $result[0]);

@@ -35,18 +35,19 @@ class StandingsHTMLGeneratorTest extends TestCase
      * @group standings-html
      * @group grouping
      */
-    public function testAssignGroupingsForValidConference()
+    public function testAssignGroupingsForAllConferences()
     {
         $reflection = new ReflectionClass($this->htmlGenerator);
         $method = $reflection->getMethod('assignGroupingsFor');
         $method->setAccessible(true);
 
-        $result = $method->invoke($this->htmlGenerator, 'Western');
-        
-        $this->assertIsArray($result);
-        $this->assertEquals('conference', $result[0]);
-        $this->assertEquals('confGB', $result[1]);
-        $this->assertEquals('confMagicNumber', $result[2]);
+        foreach (League::CONFERENCE_NAMES as $conference) {
+            $result = $method->invoke($this->htmlGenerator, $conference);
+            $this->assertIsArray($result);
+            $this->assertEquals('conference', $result[0]);
+            $this->assertEquals('confGB', $result[1]);
+            $this->assertEquals('confMagicNumber', $result[2]);
+        }
     }
 
     /**

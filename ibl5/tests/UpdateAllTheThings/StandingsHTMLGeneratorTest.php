@@ -455,10 +455,8 @@ class StandingsHTMLGeneratorTest extends TestCase
         $reflection = new ReflectionClass($this->htmlGenerator);
         $method = $reflection->getMethod('assignGroupingsFor');
         $method->setAccessible(true);
-
-        $divisions = ['Atlantic', 'Central', 'Midwest', 'Pacific'];
         
-        foreach ($divisions as $division) {
+        foreach (League::DIVISION_NAMES as $division) {
             $result = $method->invoke($this->htmlGenerator, $division);
             
             $this->assertIsArray($result);

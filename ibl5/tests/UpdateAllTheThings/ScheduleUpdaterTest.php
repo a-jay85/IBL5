@@ -69,6 +69,7 @@ class ScheduleUpdaterTest extends TestCase
         $method = $reflection->getMethod('extractDate');
         $method->setAccessible(true);
 
+        // Month should be overridden to preseason month
         $result = $method->invoke($this->scheduleUpdater, 'November 1, 2023');
         
         $this->assertIsArray($result);
@@ -87,6 +88,7 @@ class ScheduleUpdaterTest extends TestCase
         $method = $reflection->getMethod('extractDate');
         $method->setAccessible(true);
 
+        // Month should be overridden to HEAT month
         $result = $method->invoke($this->scheduleUpdater, 'November 1, 2023');
         
         $this->assertIsArray($result);

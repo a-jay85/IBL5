@@ -379,8 +379,7 @@ class PowerRankingsUpdaterTest extends TestCase
 
         $result = $method->invoke($this->powerRankingsUpdater, $mockResult, 15, 1);
         
-        // Last 10 games should include 2 losses (games 6-7 of first 8) and 7 wins (last 7)
-        // Actually games 5-14 are the last 10, so: games 5-7 are losses (3), games 8-14 are wins (7)
+        // Games 6-15 are the last 10, so: games 6-8 are losses (3), games 9-15 are wins (7)
         $this->assertEquals(7, $result['wins']);
         $this->assertEquals(8, $result['losses']);
         $this->assertEquals(7, $result['winsInLast10Games']);

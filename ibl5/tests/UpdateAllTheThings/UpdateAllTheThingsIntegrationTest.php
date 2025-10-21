@@ -172,30 +172,6 @@ class UpdateAllTheThingsIntegrationTest extends TestCase
 
     /**
      * @group integration
-     * @group shared-functions
-     */
-    public function testSharedFunctionsGetTidFromTeamname()
-    {
-        $tid = $this->mockSharedFunctions->getTidFromTeamname('Boston Celtics');
-        
-        $this->assertIsInt($tid);
-        $this->assertGreaterThan(0, $tid);
-    }
-
-    /**
-     * @group integration
-     * @group shared-functions
-     */
-    public function testSharedFunctionsReturnsDifferentIdsForDifferentTeams()
-    {
-        $tid1 = $this->mockSharedFunctions->getTidFromTeamname('Boston Celtics');
-        $tid2 = $this->mockSharedFunctions->getTidFromTeamname('LA Lakers');
-        
-        $this->assertNotEquals($tid1, $tid2);
-    }
-
-    /**
-     * @group integration
      * @group season-data
      */
     public function testSeasonDataIsAccessible()

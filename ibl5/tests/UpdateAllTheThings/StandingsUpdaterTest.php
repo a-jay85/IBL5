@@ -249,17 +249,6 @@ class StandingsUpdaterTest extends TestCase
 
     /**
      * @group standings-updater
-     * @group constructor
-     */
-    public function testConstructorInitializesCorrectly()
-    {
-        $updater = new StandingsUpdater($this->mockDb, $this->mockSharedFunctions);
-        
-        $this->assertInstanceOf(StandingsUpdater::class, $updater);
-    }
-
-    /**
-     * @group standings-updater
      * @group record-parsing
      */
     public function testExtractWinsHandlesZeroWins()

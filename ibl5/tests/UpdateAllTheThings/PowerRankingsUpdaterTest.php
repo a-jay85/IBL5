@@ -345,17 +345,6 @@ class PowerRankingsUpdaterTest extends TestCase
 
     /**
      * @group power-rankings
-     * @group constructor
-     */
-    public function testConstructorInitializesCorrectly()
-    {
-        $updater = new PowerRankingsUpdater($this->mockDb, $this->mockSeason);
-        
-        $this->assertInstanceOf(PowerRankingsUpdater::class, $updater);
-    }
-
-    /**
-     * @group power-rankings
      * @group stats-calculation
      */
     public function testCalculateTeamStatsTracksLast10Games()

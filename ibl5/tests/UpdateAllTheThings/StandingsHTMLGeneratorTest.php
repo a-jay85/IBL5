@@ -397,17 +397,6 @@ class StandingsHTMLGeneratorTest extends TestCase
 
     /**
      * @group standings-html
-     * @group constructor
-     */
-    public function testConstructorInitializesCorrectly()
-    {
-        $generator = new StandingsHTMLGenerator($this->mockDb);
-        
-        $this->assertInstanceOf(StandingsHTMLGenerator::class, $generator);
-    }
-
-    /**
-     * @group standings-html
      * @group html-generation
      */
     public function testGenerateTeamRowIncludesTeamLink()

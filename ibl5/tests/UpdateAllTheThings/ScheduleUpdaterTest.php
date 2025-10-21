@@ -235,17 +235,6 @@ class ScheduleUpdaterTest extends TestCase
 
     /**
      * @group schedule-updater
-     * @group constructor
-     */
-    public function testConstructorInitializesCorrectly()
-    {
-        $updater = new ScheduleUpdater($this->mockDb, $this->mockSharedFunctions, $this->mockSeason);
-        
-        $this->assertInstanceOf(ScheduleUpdater::class, $updater);
-    }
-
-    /**
-     * @group schedule-updater
      * @group date-extraction
      */
     public function testExtractDateHandlesVariousDateFormats()

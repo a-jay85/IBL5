@@ -380,7 +380,7 @@ function submit()
 		<td><b>DI</td>
 		<td><b>BH</td>
 	</tr>";
-    $filetext = "Name,PG,SG,SF,PF,C,ACTIVE,MIN,OF,DF,OI,DI
+    $filetext = "Name,PG,SG,SF,PF,C,ACTIVE,MIN,OF,DF,OI,DI,BH
 ";
 
     $activePlayers = 0;

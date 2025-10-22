@@ -215,8 +215,8 @@ switch ($season->phase) {
             <INPUT type='submit' name='query' value='Set Allow Trades Status'><p>";
         break;
     case 'Draft':
-        echo "<A HREF=\"playoffupdate.php\">Playoff Leaderboard Update #1</A><p>
-            <A HREF=\"playofflbupdate.php\">Playoff Leaderboard Update #2</A><p>
+        echo "<A HREF=\"/ibl5/scripts/playoffupdate.php\">Playoff Leaderboard Update #1</A><p>
+            <A HREF=\"/ibl5/scripts/playofflbupdate.php\">Playoff Leaderboard Update #2</A><p>
             <A HREF=\"seasonlbupdate.php\">Season Leaderboard Update</A><p>
             <A HREF=\"/ibl5/scripts/history_update.php\">IBL History Update</A><p>";
         break;

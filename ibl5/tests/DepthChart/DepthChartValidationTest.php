@@ -30,7 +30,7 @@ class DepthChartValidationTest extends TestCase
     /**
      * Simulates the validation logic from submit() function
      */
-    private function validateRoster($activePlayers, $positionDepths, $hasMultipleStarters, $phase)
+    private function validateRoster($activePlayers, $hasMultipleStarters, $phase)
     {
         if ($phase != 'Playoffs') {
             $minActivePlayers = 12;
@@ -63,9 +63,9 @@ class DepthChartValidationTest extends TestCase
     public function testRegularSeasonActivePlayerValidation()
     {
         // Regular season requires exactly 12 active players
-        $this->assertFalse($this->validateRoster(11, [], false, 'Regular Season')['valid']);
-        $this->assertFalse($this->validateRoster(13, [], false, 'Regular Season')['valid']);
-        $this->assertTrue($this->validateRoster(12, [], false, 'Regular Season')['valid']);
+    $this->assertFalse($this->validateRoster(11, false, 'Regular Season')['valid']);
+    $this->assertFalse($this->validateRoster(13, false, 'Regular Season')['valid']);
+    $this->assertTrue($this->validateRoster(12, false, 'Regular Season')['valid']);
     }
     
     /**
@@ -75,10 +75,10 @@ class DepthChartValidationTest extends TestCase
     public function testPlayoffActivePlayerValidation()
     {
         // Playoffs allow 10-12 active players
-        $this->assertFalse($this->validateRoster(9, [], false, 'Playoffs')['valid']);
-        $this->assertTrue($this->validateRoster(10, [], false, 'Playoffs')['valid']);
-        $this->assertTrue($this->validateRoster(12, [], false, 'Playoffs')['valid']);
-        $this->assertFalse($this->validateRoster(13, [], false, 'Playoffs')['valid']);
+    $this->assertFalse($this->validateRoster(9, false, 'Playoffs')['valid']);
+    $this->assertTrue($this->validateRoster(10, false, 'Playoffs')['valid']);
+    $this->assertTrue($this->validateRoster(12, false, 'Playoffs')['valid']);
+    $this->assertFalse($this->validateRoster(13, false, 'Playoffs')['valid']);
     }
     
     /**
@@ -87,12 +87,12 @@ class DepthChartValidationTest extends TestCase
      */
     public function testMultipleStartersValidation()
     {
-        $result = $this->validateRoster(12, [], true, 'Regular Season');
-        $this->assertFalse($result['valid']);
-        $this->assertContains('multiple_starters', $result['errors']);
+    $result = $this->validateRoster(12, true, 'Regular Season');
+    $this->assertFalse($result['valid']);
+    $this->assertContains('multiple_starters', $result['errors']);
         
-        $result = $this->validateRoster(12, [], false, 'Regular Season');
-        $this->assertTrue($result['valid']);
+    $result = $this->validateRoster(12, false, 'Regular Season');
+    $this->assertTrue($result['valid']);
     }
     
     /**

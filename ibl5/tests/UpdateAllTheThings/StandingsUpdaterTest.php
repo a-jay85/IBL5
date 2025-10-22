@@ -21,16 +21,16 @@ class StandingsUpdaterTest extends TestCase
 
     protected function setUp(): void
     {
-    $this->mockDb = new MockDatabase();
-    $this->mockSharedFunctions = new Shared($this->mockDb);
-    $this->standingsUpdater = new StandingsUpdater($this->mockDb, $this->mockSharedFunctions);
+        $this->mockDb = new MockDatabase();
+        $this->mockSharedFunctions = new Shared($this->mockDb);
+        $this->standingsUpdater = new StandingsUpdater($this->mockDb, $this->mockSharedFunctions);
     }
 
     protected function tearDown(): void
     {
-    $this->standingsUpdater = null;
-    $this->mockDb = null;
-    $this->mockSharedFunctions = null;
+        $this->standingsUpdater = null;
+        $this->mockDb = null;
+        $this->mockSharedFunctions = null;
     }
 
     /**

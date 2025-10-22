@@ -12,19 +12,12 @@ use PHPUnit\Framework\TestCase;
  */
 class DepthChartValidationTest extends TestCase
 {
-    private $mockDb;
-    private $mockSeason;
-    
     protected function setUp(): void
     {
-        $this->mockDb = new MockDatabase();
-        $this->mockSeason = new Season($this->mockDb);
     }
     
     protected function tearDown(): void
     {
-        $this->mockDb = null;
-        $this->mockSeason = null;
     }
     
     /**

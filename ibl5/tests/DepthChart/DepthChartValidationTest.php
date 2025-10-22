@@ -11,15 +11,7 @@ use PHPUnit\Framework\TestCase;
  * - Injury handling logic
  */
 class DepthChartValidationTest extends TestCase
-{
-    protected function setUp(): void
-    {
-    }
-    
-    protected function tearDown(): void
-    {
-    }
-    
+{  
     /**
      * Simulates the validation logic from submit() function
      */

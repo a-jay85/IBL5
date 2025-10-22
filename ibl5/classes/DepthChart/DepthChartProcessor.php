@@ -32,22 +32,23 @@ class DepthChartProcessor
             }
             
             $startingPositionCount = 0;
-            $injury = $postData['Injury' . $i] ?? 0;
+            $injury = (int) ($postData['Injury' . $i] ?? 0);
             
+            // Sanitize and validate all inputs
             $player = [
-                'name' => $postData['Name' . $i],
-                'pg' => $postData['pg' . $i],
-                'sg' => $postData['sg' . $i],
-                'sf' => $postData['sf' . $i],
-                'pf' => $postData['pf' . $i],
-                'c' => $postData['c' . $i],
-                'active' => $postData['active' . $i],
-                'min' => $postData['min' . $i],
-                'of' => $postData['OF' . $i],
-                'df' => $postData['DF' . $i],
-                'oi' => $postData['OI' . $i],
-                'di' => $postData['DI' . $i],
-                'bh' => $postData['BH' . $i],
+                'name' => $this->sanitizePlayerName($postData['Name' . $i]),
+                'pg' => $this->sanitizeDepthValue($postData['pg' . $i] ?? 0),
+                'sg' => $this->sanitizeDepthValue($postData['sg' . $i] ?? 0),
+                'sf' => $this->sanitizeDepthValue($postData['sf' . $i] ?? 0),
+                'pf' => $this->sanitizeDepthValue($postData['pf' . $i] ?? 0),
+                'c' => $this->sanitizeDepthValue($postData['c' . $i] ?? 0),
+                'active' => $this->sanitizeActiveValue($postData['active' . $i] ?? 0),
+                'min' => $this->sanitizeMinutesValue($postData['min' . $i] ?? 0),
+                'of' => $this->sanitizeFocusValue($postData['OF' . $i] ?? 0),
+                'df' => $this->sanitizeFocusValue($postData['DF' . $i] ?? 0),
+                'oi' => $this->sanitizeSettingValue($postData['OI' . $i] ?? 0),
+                'di' => $this->sanitizeSettingValue($postData['DI' . $i] ?? 0),
+                'bh' => $this->sanitizeSettingValue($postData['BH' . $i] ?? 0),
                 'injury' => $injury
             ];
             
@@ -99,6 +100,81 @@ class DepthChartProcessor
             'hasStarterAtMultiplePositions' => $hasStarterAtMultiplePositions,
             'nameOfProblemStarter' => $nameOfProblemStarter
         ];
+    }
+    
+    /**
+     * Sanitizes player name input
+     * 
+     * @param string $name Player name
+     * @return string Sanitized name
+     */
+    private function sanitizePlayerName(string $name): string
+    {
+        // Remove any HTML tags and trim whitespace
+        return trim(strip_tags($name));
+    }
+    
+    /**
+     * Sanitizes depth value (0-5)
+     * 
+     * @param mixed $value Depth value
+     * @return int Sanitized value
+     */
+    private function sanitizeDepthValue($value): int
+    {
+        $value = (int) $value;
+        // Depth values must be between 0 and 5
+        return max(0, min(5, $value));
+    }
+    
+    /**
+     * Sanitizes active value (0 or 1)
+     * 
+     * @param mixed $value Active value
+     * @return int Sanitized value (0 or 1)
+     */
+    private function sanitizeActiveValue($value): int
+    {
+        return ((int) $value) === 1 ? 1 : 0;
+    }
+    
+    /**
+     * Sanitizes minutes value (0-40)
+     * 
+     * @param mixed $value Minutes value
+     * @return int Sanitized value
+     */
+    private function sanitizeMinutesValue($value): int
+    {
+        $value = (int) $value;
+        // Minutes must be between 0 and 40
+        return max(0, min(40, $value));
+    }
+    
+    /**
+     * Sanitizes offensive/defensive focus value (0-3)
+     * 
+     * @param mixed $value Focus value
+     * @return int Sanitized value
+     */
+    private function sanitizeFocusValue($value): int
+    {
+        $value = (int) $value;
+        // Focus values must be between 0 and 3
+        return max(0, min(3, $value));
+    }
+    
+    /**
+     * Sanitizes OI/DI/BH setting value (-2 to 2)
+     * 
+     * @param mixed $value Setting value
+     * @return int Sanitized value
+     */
+    private function sanitizeSettingValue($value): int
+    {
+        $value = (int) $value;
+        // Setting values must be between -2 and 2
+        return max(-2, min(2, $value));
     }
     
     /**

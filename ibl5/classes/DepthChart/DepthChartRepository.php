@@ -15,6 +15,26 @@ class DepthChartRepository
     }
     
     /**
+     * Escapes a string for SQL queries using mysqli_real_escape_string
+     * Works with both real MySQL class and mock database
+     * 
+     * @param string $string String to escape
+     * @return string Escaped string
+     */
+    private function escapeString(string $string): string
+    {
+        // Check if this is the real MySQL class with db_connect_id
+        if (isset($this->db->db_connect_id) && $this->db->db_connect_id) {
+            return mysqli_real_escape_string($this->db->db_connect_id, $string);
+        }
+        // Otherwise use the mock's sql_escape_string or fallback to addslashes
+        if (method_exists($this->db, 'sql_escape_string')) {
+            return $this->db->sql_escape_string($string);
+        }
+        return addslashes($string);
+    }
+    
+    /**
      * Gets offensive sets for a team
      * 
      * @param string $teamName Team name
@@ -22,7 +42,8 @@ class DepthChartRepository
      */
     public function getOffenseSets(string $teamName)
     {
-        $sql = "SELECT * FROM ibl_offense_sets WHERE TeamName = '$teamName' ORDER BY SetNumber ASC";
+        $teamNameEscaped = $this->escapeString($teamName);
+        $sql = "SELECT * FROM ibl_offense_sets WHERE TeamName = '$teamNameEscaped' ORDER BY SetNumber ASC";
         return $this->db->sql_query($sql);
     }
     
@@ -35,7 +56,9 @@ class DepthChartRepository
      */
     public function getPlayersOnTeam(string $teamName, int $teamID)
     {
-        $query = "SELECT * FROM ibl_plr WHERE teamname = '$teamName' AND tid = $teamID AND retired = '0' AND ordinal <= " . \JSB::WAIVERS_ORDINAL . " ORDER BY ordinal ASC";
+        $teamNameEscaped = $this->escapeString($teamName);
+        $teamID = (int) $teamID; // Cast to int for safety
+        $query = "SELECT * FROM ibl_plr WHERE teamname = '$teamNameEscaped' AND tid = $teamID AND retired = '0' AND ordinal <= " . \JSB::WAIVERS_ORDINAL . " ORDER BY ordinal ASC";
         return $this->db->sql_query($query);
     }
     
@@ -48,7 +71,9 @@ class DepthChartRepository
      */
     public function getOffenseSet(string $teamName, int $setNumber): array
     {
-        $query = "SELECT * FROM ibl_offense_sets WHERE TeamName = '$teamName' AND SetNumber = '$setNumber'";
+        $teamNameEscaped = $this->escapeString($teamName);
+        $setNumber = (int) $setNumber; // Cast to int for safety
+        $query = "SELECT * FROM ibl_offense_sets WHERE TeamName = '$teamNameEscaped' AND SetNumber = $setNumber";
         $result = $this->db->sql_query($query);
         return $this->db->sql_fetchrow($result);
     }
@@ -62,21 +87,35 @@ class DepthChartRepository
      */
     public function updatePlayerDepthChart(string $playerName, array $depthChartValues): bool
     {
-        $playerName = addslashes($playerName);
+        $playerNameEscaped = $this->escapeString($playerName);
+        
+        // Sanitize and validate all numeric values
+        $pg = (int) $depthChartValues['pg'];
+        $sg = (int) $depthChartValues['sg'];
+        $sf = (int) $depthChartValues['sf'];
+        $pf = (int) $depthChartValues['pf'];
+        $c = (int) $depthChartValues['c'];
+        $active = (int) $depthChartValues['active'];
+        $min = (int) $depthChartValues['min'];
+        $of = (int) $depthChartValues['of'];
+        $df = (int) $depthChartValues['df'];
+        $oi = (int) $depthChartValues['oi'];
+        $di = (int) $depthChartValues['di'];
+        $bh = (int) $depthChartValues['bh'];
         
         $queries = [
-            "UPDATE ibl_plr SET dc_PGDepth = '{$depthChartValues['pg']}' WHERE name = '$playerName'",
-            "UPDATE ibl_plr SET dc_SGDepth = '{$depthChartValues['sg']}' WHERE name = '$playerName'",
-            "UPDATE ibl_plr SET dc_SFDepth = '{$depthChartValues['sf']}' WHERE name = '$playerName'",
-            "UPDATE ibl_plr SET dc_PFDepth = '{$depthChartValues['pf']}' WHERE name = '$playerName'",
-            "UPDATE ibl_plr SET dc_CDepth = '{$depthChartValues['c']}' WHERE name = '$playerName'",
-            "UPDATE ibl_plr SET dc_active = '{$depthChartValues['active']}' WHERE name = '$playerName'",
-            "UPDATE ibl_plr SET dc_minutes = '{$depthChartValues['min']}' WHERE name = '$playerName'",
-            "UPDATE ibl_plr SET dc_of = '{$depthChartValues['of']}' WHERE name = '$playerName'",
-            "UPDATE ibl_plr SET dc_df = '{$depthChartValues['df']}' WHERE name = '$playerName'",
-            "UPDATE ibl_plr SET dc_oi = '{$depthChartValues['oi']}' WHERE name = '$playerName'",
-            "UPDATE ibl_plr SET dc_di = '{$depthChartValues['di']}' WHERE name = '$playerName'",
-            "UPDATE ibl_plr SET dc_bh = '{$depthChartValues['bh']}' WHERE name = '$playerName'"
+            "UPDATE ibl_plr SET dc_PGDepth = $pg WHERE name = '$playerNameEscaped'",
+            "UPDATE ibl_plr SET dc_SGDepth = $sg WHERE name = '$playerNameEscaped'",
+            "UPDATE ibl_plr SET dc_SFDepth = $sf WHERE name = '$playerNameEscaped'",
+            "UPDATE ibl_plr SET dc_PFDepth = $pf WHERE name = '$playerNameEscaped'",
+            "UPDATE ibl_plr SET dc_CDepth = $c WHERE name = '$playerNameEscaped'",
+            "UPDATE ibl_plr SET dc_active = $active WHERE name = '$playerNameEscaped'",
+            "UPDATE ibl_plr SET dc_minutes = $min WHERE name = '$playerNameEscaped'",
+            "UPDATE ibl_plr SET dc_of = $of WHERE name = '$playerNameEscaped'",
+            "UPDATE ibl_plr SET dc_df = $df WHERE name = '$playerNameEscaped'",
+            "UPDATE ibl_plr SET dc_oi = $oi WHERE name = '$playerNameEscaped'",
+            "UPDATE ibl_plr SET dc_di = $di WHERE name = '$playerNameEscaped'",
+            "UPDATE ibl_plr SET dc_bh = $bh WHERE name = '$playerNameEscaped'"
         ];
         
         foreach ($queries as $query) {
@@ -96,9 +135,11 @@ class DepthChartRepository
      */
     public function updateTeamHistory(string $teamName): bool
     {
+        $teamNameEscaped = $this->escapeString($teamName);
+        
         $queries = [
-            "UPDATE ibl_team_history SET depth = NOW() WHERE team_name = '$teamName'",
-            "UPDATE ibl_team_history SET sim_depth = NOW() WHERE team_name = '$teamName'"
+            "UPDATE ibl_team_history SET depth = NOW() WHERE team_name = '$teamNameEscaped'",
+            "UPDATE ibl_team_history SET sim_depth = NOW() WHERE team_name = '$teamNameEscaped'"
         ];
         
         foreach ($queries as $query) {

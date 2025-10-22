@@ -149,12 +149,39 @@ POST to modules.php?name=Depth_Chart_Entry&op=submit
 - Form submissions work exactly as before
 - Email notifications continue to function
 
+## Security Features
+
+The refactored module includes comprehensive security improvements:
+
+### SQL Injection Prevention
+- **mysqli_real_escape_string**: All user input passed to SQL queries is properly escaped using `mysqli_real_escape_string()`
+- **Type Casting**: Numeric values are cast to integers before use in queries
+- **Parameterized Values**: All database queries use escaped and validated parameters
+
+### Input Validation & Sanitization
+- **Player Names**: HTML tags stripped, whitespace trimmed
+- **Depth Values**: Validated to be between 0-5
+- **Active Status**: Validated to be 0 or 1
+- **Minutes**: Validated to be between 0-40
+- **Focus Values**: Validated to be between 0-3
+- **Setting Values**: Validated to be between -2 and 2
+- **Team/Set Names**: HTML tags stripped, validated for non-empty
+
+### Path Traversal Prevention
+- **Filename Sanitization**: Team names sanitized to prevent directory traversal attacks
+- **Path Validation**: File paths verified to be within expected directory
+- **Character Filtering**: Only alphanumeric, spaces, underscores, and hyphens allowed in filenames
+
+### Email Security
+- **Header Injection Prevention**: Email subjects properly sanitized using `filter_var()`
+- **Proper Headers**: RFC-compliant email headers used to prevent header injection
+
 ## Future Improvements
 
 ### Security
-- Consider using prepared statements instead of string interpolation
-- Implement CSRF token validation
-- Add input sanitization layer
+- Implement CSRF token validation for form submissions
+- Add rate limiting for submission attempts
+- Consider using prepared statements if database layer is upgraded
 
 ### Features
 - Add drag-and-drop interface for depth chart management

@@ -32,8 +32,14 @@ class DepthChartSubmissionHandler
     {
         $season = new \Season($this->db);
         
-        $teamName = $postData['Team_Name'];
-        $setName = $postData['Set_Name'];
+        // Validate and sanitize team and set names
+        $teamName = $this->sanitizeInput($postData['Team_Name'] ?? '');
+        $setName = $this->sanitizeInput($postData['Set_Name'] ?? '');
+        
+        if (empty($teamName) || empty($setName)) {
+            echo "<font color=red><b>Error: Missing required team or set information.</b></font>";
+            return;
+        }
         
         // Process the submission data
         $processedData = $this->processor->processSubmission($postData);
@@ -56,6 +62,17 @@ class DepthChartSubmissionHandler
         
         // Display success
         $this->view->renderSubmissionResult($teamName, $processedData['playerData'], true);
+    }
+    
+    /**
+     * Sanitizes input string
+     * 
+     * @param string $input Input string
+     * @return string Sanitized string
+     */
+    private function sanitizeInput(string $input): string
+    {
+        return trim(strip_tags($input));
     }
     
     /**
@@ -84,20 +101,42 @@ class DepthChartSubmissionHandler
      */
     private function saveDepthChartFile(string $teamName, string $setName, array $playerData): void
     {
-        $csvContent = $this->processor->generateCsvContent($playerData);
-        $filename = 'depthcharts/' . $teamName . '.txt';
+        // Sanitize team name for file path (prevent directory traversal)
+        $safeTeamName = preg_replace('/[^a-zA-Z0-9_\-\s]/', '', $teamName);
+        $safeTeamName = str_replace(['..', '/', '\\'], '', $safeTeamName);
         
-        if (file_put_contents($filename, $csvContent)) {
-            // Send email if not on localhost
-            if ($_SERVER['SERVER_NAME'] != "localhost") {
-                $emailSubject = $teamName . " Depth Chart - $setName Offensive Set";
-                $recipient = 'ibldepthcharts@gmail.com';
-                mail($recipient, $emailSubject, $csvContent, "From: ibldepthcharts@gmail.com");
+        if (empty($safeTeamName)) {
+            echo "<font color=red>Invalid team name for file creation.</font>";
+            return;
+        }
+        
+        $csvContent = $this->processor->generateCsvContent($playerData);
+        $filename = 'depthcharts/' . $safeTeamName . '.txt';
+        
+        // Verify the final path is within the expected directory
+        $realPath = realpath(dirname($filename));
+        $expectedPath = realpath('depthcharts');
+        
+        if ($realPath !== false && $expectedPath !== false && strpos($realPath, $expectedPath) === 0) {
+            if (file_put_contents($filename, $csvContent)) {
+                // Send email if not on localhost
+                if (isset($_SERVER['SERVER_NAME']) && $_SERVER['SERVER_NAME'] != "localhost") {
+                    // Sanitize email subject
+                    $emailSubject = filter_var($teamName . " Depth Chart - $setName Offensive Set", FILTER_SANITIZE_STRING);
+                    $recipient = 'ibldepthcharts@gmail.com';
+                    
+                    // Use proper email headers
+                    $headers = "From: ibldepthcharts@gmail.com\r\n";
+                    $headers .= "Reply-To: ibldepthcharts@gmail.com\r\n";
+                    $headers .= "X-Mailer: PHP/" . phpversion();
+                    
+                    mail($recipient, $emailSubject, $csvContent, $headers);
+                }
+            } else {
+                echo "<font color=red>Depth chart failed to save properly; please contact the commissioner.</font>";
             }
         } else {
-            echo "<font color=red>Depth chart failed to save properly; please contact the commissioner with the following details:</font></center><p>";
-            var_dump($filename);
-            var_dump($csvContent);
+            echo "<font color=red>Invalid file path detected. Please contact the commissioner.</font>";
         }
     }
 }

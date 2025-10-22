@@ -51,6 +51,7 @@ ibl5/
 - Always run the full test suite before marking a PR as complete
 - Add tests for new functionality
 - Update tests when refactoring existing code
+- Whenever possible, tests should use static production data instead of mocks
 
 ### Database Considerations
 - Current queries use MySQL-specific syntax

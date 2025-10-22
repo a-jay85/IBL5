@@ -21,16 +21,16 @@ class StandingsUpdaterTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->mockDb = new MockDatabase();
-        $this->mockSharedFunctions = new Shared($this->mockDb);
-        $this->standingsUpdater = new StandingsUpdater($this->mockDb, $this->mockSharedFunctions);
+    $this->mockDb = new MockDatabase();
+    $this->mockSharedFunctions = new Shared($this->mockDb);
+    $this->standingsUpdater = new StandingsUpdater($this->mockDb, $this->mockSharedFunctions);
     }
 
     protected function tearDown(): void
     {
-        $this->standingsUpdater = null;
-        $this->mockDb = null;
-        $this->mockSharedFunctions = null;
+    $this->standingsUpdater = null;
+    $this->mockDb = null;
+    $this->mockSharedFunctions = null;
     }
 
     /**
@@ -180,21 +180,18 @@ class StandingsUpdaterTest extends TestCase
     public function testUpdateTruncatesStandingsTable()
     {
         $this->mockDb->setReturnTrue(true);
-        
+
+        // Create a StandingsUpdater with extractStandingsValues stubbed to do nothing
+        $this->standingsUpdater = new class($this->mockDb, $this->mockSharedFunctions) extends \Updater\StandingsUpdater {
+            protected function extractStandingsValues() {
+                // Do nothing
+            }
+        };
+
         ob_start();
-        
-        // Suppress expected warnings from file parsing
-        set_error_handler(function() { return true; }, E_WARNING);
-        
-        try {
-            $this->standingsUpdater->update();
-        } catch (Exception $e) {
-            // Expected to fail on file load
-        }
-        
-        restore_error_handler();
+        $this->standingsUpdater->update();
         ob_end_clean();
-        
+
         $queries = $this->mockDb->getExecutedQueries();
         $this->assertNotEmpty($queries);
         $this->assertEquals('TRUNCATE TABLE ibl_standings', $queries[0]);

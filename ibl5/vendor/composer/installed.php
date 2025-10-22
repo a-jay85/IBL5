@@ -1,9 +1,9 @@
 <?php return array(
     'root' => array(
         'name' => '__root__',
-        'pretty_version' => 'dev-master',
-        'version' => 'dev-master',
-        'reference' => 'aca0862aaac5bc212950aceebc578c6a3ff2eb27',
+        'pretty_version' => 'dev-copilot/refactor-depth-chart-entry-module',
+        'version' => 'dev-copilot/refactor-depth-chart-entry-module',
+        'reference' => '481237008224c7b47d25f3e9d54e70763f7bdac8',
         'type' => 'library',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
@@ -11,9 +11,9 @@
     ),
     'versions' => array(
         '__root__' => array(
-            'pretty_version' => 'dev-master',
-            'version' => 'dev-master',
-            'reference' => 'aca0862aaac5bc212950aceebc578c6a3ff2eb27',
+            'pretty_version' => 'dev-copilot/refactor-depth-chart-entry-module',
+            'version' => 'dev-copilot/refactor-depth-chart-entry-module',
+            'reference' => '481237008224c7b47d25f3e9d54e70763f7bdac8',
             'type' => 'library',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),

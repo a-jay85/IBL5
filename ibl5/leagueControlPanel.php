@@ -182,7 +182,7 @@ switch ($season->phase) {
                 <br><b>(but make sure you've uploaded the updated PLR file before you run this!)</b><p>
             <A HREF=\"updateAllTheThings.php\">Update All The Things</A><p>
             <A HREF=\"/ibl5/scripts/scoParser.php\">Run scoParser.php</A><p>
-            <A HREF=\"heatupdateboth.php\">Update HEAT Leaderboards</A><p>
+            <A HREF=\"/ibl5/scripts/heatupdateboth.php\">Update HEAT Leaderboards</A><p>
             <A HREF=\"history_update.php\">IBL History Update</A><p>
             <INPUT type='submit' name='query' value='Insert new `ibl_heat_win_loss` database entries'><p>";
         break;

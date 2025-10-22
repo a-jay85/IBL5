@@ -168,7 +168,7 @@ switch ($season->phase) {
     case 'Preseason':
         echo "<A HREF=\"/ibl5/scripts/plrParser.php\">Run plrParser.php</A>
                 <br><b>(but make sure you've uploaded the updated PLR file before you run this!)</b><p>
-            <A HREF=\"updateAllTheThings.php\">Update All The Things</A><p>
+            <A HREF=\"/ibl5/scripts/updateAllTheThings.php\">Update All The Things</A><p>
             <A HREF=\"/ibl5/scripts/scoParser.php\">Run scoParser.php</A><p>
             <select name=\"Waivers\">
                 <option value = \"Yes\"" . ($season->allowWaivers == "Yes" ? " SELECTED" : "") . ">Yes</option>
@@ -180,16 +180,16 @@ switch ($season->phase) {
     case 'HEAT':
         echo "<A HREF=\"/ibl5/scripts/plrParser.php\">Run plrParser.php</A>
                 <br><b>(but make sure you've uploaded the updated PLR file before you run this!)</b><p>
-            <A HREF=\"updateAllTheThings.php\">Update All The Things</A><p>
+            <A HREF=\"/ibl5/scripts/updateAllTheThings.php\">Update All The Things</A><p>
             <A HREF=\"/ibl5/scripts/scoParser.php\">Run scoParser.php</A><p>
-            <A HREF=\"heatupdateboth.php\">Update HEAT Leaderboards</A><p>
-            <A HREF=\"history_update.php\">IBL History Update</A><p>
+            <A HREF=\"/ibl5/scripts/heatupdateboth.php\">Update HEAT Leaderboards</A><p>
+            <A HREF=\"/ibl5/scripts/history_update.php\">IBL History Update</A><p>
             <INPUT type='submit' name='query' value='Insert new `ibl_heat_win_loss` database entries'><p>";
         break;
     case 'Regular Season':
         echo "<A HREF=\"/ibl5/scripts/plrParser.php\">Run plrParser.php</A>
                 <br><b>(but make sure you've uploaded the updated PLR file before you run this!)</b><p>
-            <A HREF=\"updateAllTheThings.php\">Update All The Things</A><p>
+            <A HREF=\"/ibl5/scripts/updateAllTheThings.php\">Update All The Things</A><p>
             <A HREF=\"/ibl5/scripts/scoParser.php\">Run scoParser.php</A><p>
             <INPUT type='number' name='SimLengthInDays' min=1 max=180 size=3 value='" . League::getSimLengthInDays($db) . "'>
             <INPUT type='submit' name='query' value='Set Sim Length in Days'> <i>
@@ -205,7 +205,7 @@ switch ($season->phase) {
     case 'Playoffs':
         echo "<A HREF=\"/ibl5/scripts/plrParser.php\">Run plrParser.php</A>
                 <br><b>(but make sure you've uploaded the updated PLR file before you run this!)</b><p>
-            <A HREF=\"updateAllTheThings.php\">Update All The Things</A><p>
+            <A HREF=\"/ibl5/scripts/updateAllTheThings.php\">Update All The Things</A><p>
             <A HREF=\"/ibl5/scripts/scoParser.php\">Run scoParser.php</A><p>
             <INPUT type='submit' name='query' value='Reset End of the Year Voting'><p>
             <select name=\"Trades\">
@@ -215,10 +215,10 @@ switch ($season->phase) {
             <INPUT type='submit' name='query' value='Set Allow Trades Status'><p>";
         break;
     case 'Draft':
-        echo "<A HREF=\"playoffupdate.php\">Playoff Leaderboard Update #1</A><p>
-            <A HREF=\"playofflbupdate.php\">Playoff Leaderboard Update #2</A><p>
-            <A HREF=\"seasonlbupdate.php\">Season Leaderboard Update</A><p>
-            <A HREF=\"history_update.php\">IBL History Update</A><p>";
+        echo "<A HREF=\"/ibl5/scripts/playoffupdate.php\">Playoff Leaderboard Update #1</A><p>
+            <A HREF=\"/ibl5/scripts/playofflbupdate.php\">Playoff Leaderboard Update #2</A><p>
+            <A HREF=\"/ibl5/scripts/seasonlbupdate.php\">Season Leaderboard Update</A><p>
+            <A HREF=\"/ibl5/scripts/history_update.php\">IBL History Update</A><p>";
         break;
     case 'Free Agency':
         echo "<INPUT type='submit' name='query' value='Reset All Contract Extensions'><p>

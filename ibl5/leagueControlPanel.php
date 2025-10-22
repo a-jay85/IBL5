@@ -183,7 +183,7 @@ switch ($season->phase) {
             <A HREF=\"updateAllTheThings.php\">Update All The Things</A><p>
             <A HREF=\"/ibl5/scripts/scoParser.php\">Run scoParser.php</A><p>
             <A HREF=\"/ibl5/scripts/heatupdateboth.php\">Update HEAT Leaderboards</A><p>
-            <A HREF=\"history_update.php\">IBL History Update</A><p>
+            <A HREF=\"/ibl5/scripts/history_update.php\">IBL History Update</A><p>
             <INPUT type='submit' name='query' value='Insert new `ibl_heat_win_loss` database entries'><p>";
         break;
     case 'Regular Season':
@@ -218,7 +218,7 @@ switch ($season->phase) {
         echo "<A HREF=\"playoffupdate.php\">Playoff Leaderboard Update #1</A><p>
             <A HREF=\"playofflbupdate.php\">Playoff Leaderboard Update #2</A><p>
             <A HREF=\"seasonlbupdate.php\">Season Leaderboard Update</A><p>
-            <A HREF=\"history_update.php\">IBL History Update</A><p>";
+            <A HREF=\"/ibl5/scripts/history_update.php\">IBL History Update</A><p>";
         break;
     case 'Free Agency':
         echo "<INPUT type='submit' name='query' value='Reset All Contract Extensions'><p>

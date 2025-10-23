@@ -20,17 +20,6 @@ if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
     die("You can't access this file directly...");
 }
 
-// Load DepthChart classes
-spl_autoload_register(function ($class) {
-    if (strpos($class, 'DepthChart\\') === 0) {
-        $className = str_replace('DepthChart\\', '', $class);
-        $file = __DIR__ . '/../../classes/DepthChart/' . $className . '.php';
-        if (file_exists($file)) {
-            require_once $file;
-        }
-    }
-});
-
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 

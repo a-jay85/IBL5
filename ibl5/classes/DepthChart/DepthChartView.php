@@ -8,10 +8,21 @@ namespace DepthChart;
 class DepthChartView
 {
     private $processor;
-    
+
     public function __construct(DepthChartProcessor $processor)
     {
         $this->processor = $processor;
+    }
+    
+    /**
+     * Renders the team logo image for the given team ID.
+     *
+     * @param int $teamID The team ID used to locate the logo image.
+     * @return void Echoes the HTML for the team logo image.
+     */
+    public function renderTeamLogo(int $teamID): void
+    {
+        echo "<center><img src=\"images/logo/$teamID.jpg\"></center><br>";
     }
     
     /**
@@ -118,10 +129,9 @@ class DepthChartView
     public function renderFormHeader(string $teamLogo, int $teamID, array $slotNames): void
     {
         echo "<form name=\"Depth_Chart\" method=\"post\" action=\"modules.php?name=Depth_Chart_Entry&op=submit\">
-            <input type=\"hidden\" name=\"Team_Name\" value=\"$teamLogo\">
-        <center><img src=\"images/logo/$teamID.jpg\"><br>";
+            <input type=\"hidden\" name=\"Team_Name\" value=\"$teamLogo\">";
         
-        echo "<p><table>
+        echo "<p><center><table>
             <tr>
                 <th colspan=14><center>DEPTH CHART ENTRY</center></th>
             </tr>

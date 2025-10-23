@@ -108,42 +108,22 @@ class DepthChartView
     }
     
     /**
-     * Renders offensive set selector links
-     * 
-     * @param mixed $offenseSetsResult Database result with offensive sets
-     * @param object $db Database object
-     * @return void Echoes HTML
-     */
-    public function renderOffenseSetLinks($offenseSetsResult, $db): void
-    {
-        echo "SELECT OFFENSIVE SET TO USE: ";
-        
-        for ($i = 0; $i < 3; $i++) {
-            $name_of_set = $db->sql_result($offenseSetsResult, $i, "offense_name");
-            $setNumber = $i + 1;
-            echo "<a href=\"modules.php?name=Depth_Chart_Entry&useset=$setNumber\">$name_of_set</a> | ";
-        }
-    }
-    
-    /**
      * Renders the depth chart form header
      * 
      * @param string $teamLogo Team name
      * @param int $teamID Team ID
-     * @param string $offenseName Offensive set name
      * @param array $slotNames Names of the 5 position slots
      * @return void Echoes HTML
      */
-    public function renderFormHeader(string $teamLogo, int $teamID, string $offenseName, array $slotNames): void
+    public function renderFormHeader(string $teamLogo, int $teamID, array $slotNames): void
     {
         echo "<form name=\"Depth_Chart\" method=\"post\" action=\"modules.php?name=Depth_Chart_Entry&op=submit\">
             <input type=\"hidden\" name=\"Team_Name\" value=\"$teamLogo\">
-            <input type=\"hidden\" name=\"Set_Name\" value=\"$offenseName\">
         <center><img src=\"images/logo/$teamID.jpg\"><br>";
         
         echo "<p><table>
             <tr>
-                <th colspan=14><center>DEPTH CHART ENTRY - Offensive Set: $offenseName</center></th>
+                <th colspan=14><center>DEPTH CHART ENTRY</center></th>
             </tr>
             <tr>
                 <th>Pos</th>
@@ -168,10 +148,9 @@ class DepthChartView
      * 
      * @param array $player Player data from database
      * @param int $depthCount Row counter
-     * @param array $slotRanges Min/max position values for each slot
      * @return void Echoes HTML
      */
-    public function renderPlayerRow(array $player, int $depthCount, array $slotRanges): void
+    public function renderPlayerRow(array $player, int $depthCount): void
     {
         $player_pid = $player['pid'];
         $player_pos = $player['pos'];
@@ -191,16 +170,10 @@ class DepthChartView
                 <a href=\"./modules.php?name=Player&pa=showpage&pid=$player_pid\">$player_name</a>
             </td>";
         
-        // Render each position slot
+        // Render each position slot - all players can play at all positions
         $positions = ['pg', 'sg', 'sf', 'pf', 'c'];
-        foreach ($positions as $index => $posKey) {
-            $this->renderPositionCell(
-                $player,
-                $posKey,
-                $depthCount,
-                $slotRanges[$index]['min'],
-                $slotRanges[$index]['max']
-            );
+        foreach ($positions as $posKey) {
+            $this->renderPositionCell($player, $posKey, $depthCount);
         }
         
         // Render active dropdown
@@ -240,35 +213,22 @@ class DepthChartView
     }
     
     /**
-     * Renders a position cell (either dropdown or hidden input)
+     * Renders a position cell with dropdown
      * 
      * @param array $player Player data
      * @param string $posKey Position key (pg, sg, sf, pf, c)
      * @param int $depthCount Row counter
-     * @param int $slotMin Minimum position value
-     * @param int $slotMax Maximum position value
      * @return void Echoes HTML
      */
-    private function renderPositionCell(array $player, string $posKey, int $depthCount, int $slotMin, int $slotMax): void
+    private function renderPositionCell(array $player, string $posKey, int $depthCount): void
     {
         $fieldName = $posKey . $depthCount;
         $dcField = 'dc_' . strtoupper($posKey) . 'Depth';
         $currentValue = $player[$dcField];
         
-        $canPlay = $this->processor->canPlayAtPosition(
-            $player['pos'],
-            $slotMin,
-            $slotMax,
-            $player['injured']
-        );
-        
-        if ($canPlay) {
-            echo "<td><select name=\"$fieldName\">";
-            $this->renderPositionOptions($currentValue);
-            echo "</select></td>";
-        } else {
-            echo "<td><input type=\"hidden\" name=\"$fieldName\" value=\"0\">no</td>";
-        }
+        echo "<td><select name=\"$fieldName\">";
+        $this->renderPositionOptions($currentValue);
+        echo "</select></td>";
     }
     
     /**

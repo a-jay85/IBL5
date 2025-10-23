@@ -3,6 +3,13 @@
 ## Overview
 The Depth Chart Entry module has been refactored to follow best practices for testability, maintainability, and separation of concerns.
 
+## Recent Updates (2025)
+**Offensive Sets and Position Restrictions Removed**
+- The site no longer uses offensive sets (previously allowed 3 different offensive set configurations per team)
+- Position restrictions have been removed - all players can now play at all positions regardless of their natural position
+- Simplified user interface without offensive set selector
+- Reduced complexity in validation and form rendering logic
+
 ## Architecture
 
 ### Namespace: `DepthChart\`
@@ -19,7 +26,6 @@ The module is now organized into the following classes:
 #### 2. **DepthChartRepository**
 - **Purpose**: Handles all database operations
 - **Responsibilities**:
-  - Fetches offensive sets for a team
   - Retrieves team player data
   - Updates player depth chart settings
   - Updates team history timestamps
@@ -28,7 +34,6 @@ The module is now organized into the following classes:
 - **Purpose**: Processes and transforms depth chart data
 - **Responsibilities**:
   - Processes form submission data
-  - Validates position eligibility
   - Counts active players and position depth
   - Detects invalid configurations (e.g., multiple starting positions)
   - Generates CSV export format
@@ -46,9 +51,8 @@ The module is now organized into the following classes:
 - **Purpose**: Renders all HTML output for the module
 - **Responsibilities**:
   - Renders form elements (dropdowns, inputs)
-  - Renders player rows with position eligibility
+  - Renders player rows (all players can play at all positions)
   - Renders submission results
-  - Generates offensive set selector links
 
 #### 6. **DepthChartSubmissionHandler**
 - **Purpose**: Handles form submissions
@@ -64,7 +68,7 @@ The module is now organized into the following classes:
 - Each class has a single, well-defined responsibility
 - Classes can be unit tested in isolation
 - Mock objects can be injected for database operations
-- 13 unit tests cover core validation and processing logic
+- 20 unit tests cover core validation and processing logic
 
 ### 2. **Maintainability**
 - Clear separation of concerns makes code easier to understand
@@ -118,36 +122,34 @@ vendor/bin/phpunit
 ```
 
 ### Test Coverage
-- **13 tests** covering validation and processing logic
+- **20 tests** covering validation and processing logic
 - Tests for regular season and playoff validation rules
-- Tests for position eligibility logic
 - Tests for CSV generation
 - Tests for detecting invalid configurations
+- All tests passing (100% success rate)
 
 ## Usage
 
-The refactored module maintains the same external interface as the original:
+The refactored module maintains a simplified interface:
 
 ```php
-// Entry point remains the same
+// Entry point
 modules.php?name=Depth_Chart_Entry
 
-// Set selection remains the same
-modules.php?name=Depth_Chart_Entry&useset=1
-modules.php?name=Depth_Chart_Entry&useset=2
-modules.php?name=Depth_Chart_Entry&useset=3
-
-// Submission remains the same
+// Submission
 POST to modules.php?name=Depth_Chart_Entry&op=submit
 ```
 
+**Note**: Offensive set selection (useset parameter) has been removed as the site no longer uses offensive sets.
+
 ## Migration Notes
 
-- **No breaking changes** - External interface remains identical
-- All existing functionality preserved
-- Database schema unchanged
-- Form submissions work exactly as before
-- Email notifications continue to function
+- **Simplified interface** - Offensive set selection removed
+- Core depth chart functionality preserved
+- Database schema unchanged (offense_sets table no longer queried)
+- Form submissions work with simplified structure
+- Email notifications continue to function without offensive set references
+- Position restrictions removed - all players can now play at all positions
 
 ## Security Features
 
@@ -197,11 +199,15 @@ The refactored module includes comprehensive security improvements:
 4. **Dependency Injection** - Dependencies passed via constructor
 5. **Factory Pattern** - Controller creates dependent objects
 
-## Backward Compatibility
+## Changes from Original Implementation
 
-The refactoring maintains 100% backward compatibility:
-- Same URLs and parameters
-- Same form structure and field names
-- Same validation rules and error messages
+### Removed Features
+- **Offensive Sets**: Previously allowed 3 different offensive set configurations (useset=1, useset=2, useset=3)
+- **Position Restrictions**: Previously restricted which positions could play at which slots based on position value ranges
+
+### Maintained Features
+- Core depth chart submission and validation
+- Same form field names for player settings
+- Same validation rules for active players and position depth
 - Same database updates and file operations
-- Same email notifications
+- Email notifications (without offensive set references)

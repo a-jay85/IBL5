@@ -121,8 +121,11 @@ class DepthChartSubmissionHandler
             if (file_put_contents($filename, $csvContent)) {
                 // Send email if not on localhost
                 if (isset($_SERVER['SERVER_NAME']) && $_SERVER['SERVER_NAME'] != "localhost") {
-                    // Sanitize email subject
-                    $emailSubject = filter_var($teamName . " Depth Chart - $setName Offensive Set", FILTER_SANITIZE_STRING);
+                    // Sanitize email subject (PHP 8.1+ safe)
+                    $rawSubject = $teamName . " Depth Chart - $setName Offensive Set";
+                    // Remove HTML tags and encode special characters
+                    $emailSubject = filter_var($rawSubject, FILTER_UNSAFE_RAW, FILTER_FLAG_STRIP_LOW | FILTER_FLAG_STRIP_HIGH);
+                    $emailSubject = strip_tags($emailSubject);
                     $recipient = 'ibldepthcharts@gmail.com';
                     
                     // Use proper email headers

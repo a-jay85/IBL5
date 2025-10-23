@@ -68,7 +68,7 @@ The module is now organized into the following classes:
 - Each class has a single, well-defined responsibility
 - Classes can be unit tested in isolation
 - Mock objects can be injected for database operations
-- 13 unit tests cover core validation and processing logic
+- 20 unit tests cover core validation and processing logic
 
 ### 2. **Maintainability**
 - Clear separation of concerns makes code easier to understand
@@ -199,11 +199,15 @@ The refactored module includes comprehensive security improvements:
 4. **Dependency Injection** - Dependencies passed via constructor
 5. **Factory Pattern** - Controller creates dependent objects
 
-## Backward Compatibility
+## Changes from Original Implementation
 
-The refactoring maintains 100% backward compatibility:
-- Same URLs and parameters
-- Same form structure and field names
-- Same validation rules and error messages
+### Removed Features
+- **Offensive Sets**: Previously allowed 3 different offensive set configurations (useset=1, useset=2, useset=3)
+- **Position Restrictions**: Previously restricted which positions could play at which slots based on position value ranges
+
+### Maintained Features
+- Core depth chart submission and validation
+- Same form field names for player settings
+- Same validation rules for active players and position depth
 - Same database updates and file operations
-- Same email notifications
+- Email notifications (without offensive set references)

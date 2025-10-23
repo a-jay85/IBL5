@@ -35,19 +35,6 @@ class DepthChartRepository
     }
     
     /**
-     * Gets offensive sets for a team
-     * 
-     * @param string $teamName Team name
-     * @return mixed Database result
-     */
-    public function getOffenseSets(string $teamName)
-    {
-        $teamNameEscaped = $this->escapeString($teamName);
-        $sql = "SELECT * FROM ibl_offense_sets WHERE TeamName = '$teamNameEscaped' ORDER BY SetNumber ASC";
-        return $this->db->sql_query($sql);
-    }
-    
-    /**
      * Gets players on a team
      * 
      * @param string $teamName Team name
@@ -60,22 +47,6 @@ class DepthChartRepository
         $teamID = (int) $teamID; // Cast to int for safety
         $query = "SELECT * FROM ibl_plr WHERE teamname = '$teamNameEscaped' AND tid = $teamID AND retired = '0' AND ordinal <= " . \JSB::WAIVERS_ORDINAL . " ORDER BY ordinal ASC";
         return $this->db->sql_query($query);
-    }
-    
-    /**
-     * Gets a specific offensive set
-     * 
-     * @param string $teamName Team name
-     * @param int $setNumber Set number (1-3)
-     * @return array Offensive set data
-     */
-    public function getOffenseSet(string $teamName, int $setNumber): array
-    {
-        $teamNameEscaped = $this->escapeString($teamName);
-        $setNumber = (int) $setNumber; // Cast to int for safety
-        $query = "SELECT * FROM ibl_offense_sets WHERE TeamName = '$teamNameEscaped' AND SetNumber = $setNumber";
-        $result = $this->db->sql_query($query);
-        return $this->db->sql_fetchrow($result);
     }
     
     /**

@@ -48,10 +48,13 @@ ibl5/
 - **Framework**: PHPUnit 12.4+ compatibility required
 - **Test Location**: All tests in `ibl5/tests/` directory
 - **PR Completion Criteria**: No warnings or failures allowed
-- Always run the full test suite before marking a PR as complete
+- Always run the full test suite before stopping work on a PR
 - Add tests for new functionality
 - Update tests when refactoring existing code
-- Whenever possible, tests should use static production data instead of mocks
+- Static production data (when available) is preferred over mock data
+- Mock functionality should not be used unless absolutely necessary
+- Instantiation of classes should be done via the class autoloader
+- Do not write tests that only test mocks or instantiation
 
 ### Database Considerations
 - Current queries use MySQL-specific syntax

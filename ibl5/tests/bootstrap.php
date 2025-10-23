@@ -34,6 +34,17 @@ spl_autoload_register(function ($class) {
         }
     }
     
+    // Handle DepthChart classes with namespace
+    if (strpos($class, 'DepthChart\\') === 0) {
+        // Remove namespace prefix to get just the class name
+        $className = str_replace('DepthChart\\', '', $class);
+        $file = __DIR__ . '/../classes/DepthChart/' . $className . '.php';
+        if (file_exists($file)) {
+            require_once $file;
+            return true;
+        }
+    }
+    
     // Handle Updater classes with namespace
     if (strpos($class, 'Updater\\') === 0) {
         // Remove namespace prefix to get just the class name

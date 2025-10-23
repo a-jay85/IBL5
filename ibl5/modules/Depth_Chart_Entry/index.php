@@ -27,14 +27,10 @@ $pagetitle = " - Depth Chart Entry";
 
 function userinfo($username)
 {
-    global $db, $useset;
-
-    if ($useset == null) {
-        $useset = 1;
-    }
+    global $db;
 
     $controller = new DepthChart\DepthChartController($db);
-    $controller->displayForm($username, $useset);
+    $controller->displayForm($username);
 }
 
 function main($user)

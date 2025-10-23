@@ -24,10 +24,9 @@ class DepthChartController
      * Displays the depth chart entry form
      * 
      * @param string $username Username of logged-in user
-     * @param int $useSet Selected offensive set (1-3)
      * @return void Renders the form
      */
-    public function displayForm(string $username, int $useSet = 1): void
+    public function displayForm(string $username): void
     {
         $sharedFunctions = new \Shared($this->db);
         $season = new \Season($this->db);
@@ -42,47 +41,23 @@ class DepthChartController
         OpenTable();
         \UI::displaytopmenu($this->db, $teamID);
         
-        // Get offensive sets
-        $offenseSetsResult = $this->repository->getOffenseSets($teamName);
-        $offenseSet = $this->repository->getOffenseSet($teamName, $useSet);
-        
         // Get team players
         $playersResult = $this->repository->getPlayersOnTeam($teamName, $teamID);
-        
-        // Render offensive set selector
-        $this->view->renderOffenseSetLinks($offenseSetsResult, $this->db);
-        
-        echo "<hr>";
         
         // Display ratings table
         $table_ratings = \UI::ratings($this->db, $playersResult, $team, "", $season);
         echo $table_ratings;
         
-        // Render form header
-        $slotNames = [
-            $offenseSet['PG_Depth_Name'],
-            $offenseSet['SG_Depth_Name'],
-            $offenseSet['SF_Depth_Name'],
-            $offenseSet['PF_Depth_Name'],
-            $offenseSet['C_Depth_Name']
-        ];
+        // Render form header with standard position names
+        $slotNames = ['PG', 'SG', 'SF', 'PF', 'C'];
         
-        $this->view->renderFormHeader($teamName, $teamID, $offenseSet['offense_name'], $slotNames);
-        
-        // Define slot ranges (position eligibility)
-        $slotRanges = [
-            ['min' => 1, 'max' => 9],  // PG
-            ['min' => 1, 'max' => 9],  // SG
-            ['min' => 1, 'max' => 9],  // SF
-            ['min' => 1, 'max' => 9],  // PF
-            ['min' => 1, 'max' => 9]   // C
-        ];
+        $this->view->renderFormHeader($teamName, $teamID, $slotNames);
         
         // Render player rows
         $depthCount = 1;
         mysqli_data_seek($playersResult, 0);
         while ($player = $this->db->sql_fetchrow($playersResult)) {
-            $this->view->renderPlayerRow($player, $depthCount, $slotRanges);
+            $this->view->renderPlayerRow($player, $depthCount);
             $depthCount++;
         }
         

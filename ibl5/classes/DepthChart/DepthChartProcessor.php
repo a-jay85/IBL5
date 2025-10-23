@@ -209,48 +209,5 @@ class DepthChartProcessor
         return $csv;
     }
     
-    /**
-     * Gets position value from position string
-     * 
-     * @param string $position Position string (e.g., 'PG', 'C', 'GF')
-     * @return int Position value (1-9)
-     */
-    public function getPositionValue(string $position): int
-    {
-        $positionMap = [
-            'PG' => 1,
-            'G' => 2,
-            'SG' => 3,
-            'GF' => 4,
-            'SF' => 5,
-            'F' => 6,
-            'PF' => 7,
-            'FC' => 8,
-            'C' => 9
-        ];
-        
-        return $positionMap[$position] ?? 0;
-    }
-    
-    /**
-     * Checks if a player can play at a position based on their natural position
-     * 
-     * @param string $playerPosition Player's natural position
-     * @param int $slotMin Minimum position value for slot
-     * @param int $slotMax Maximum position value for slot
-     * @param int $injuryLevel Player's injury level
-     * @return bool True if player can play at position
-     */
-    public function canPlayAtPosition(string $playerPosition, int $slotMin, int $slotMax, int $injuryLevel): bool
-    {
-        $posValue = $this->getPositionValue($playerPosition);
-        
-        // Player must not be severely injured (injury < 15 days)
-        if ($injuryLevel >= 15) {
-            return false;
-        }
-        
-        // Player's position must be within the slot's range
-        return $posValue >= $slotMin && $posValue <= $slotMax;
-    }
+
 }

@@ -1,0 +1,169 @@
+<?php
+
+namespace DepthChart;
+
+/**
+ * Handles database operations for depth chart data
+ */
+class DepthChartRepository
+{
+    private $db;
+    
+    public function __construct($db)
+    {
+        $this->db = $db;
+    }
+    
+    /**
+     * Escapes a string for SQL queries using mysqli_real_escape_string
+     * Works with both real MySQL class and mock database
+     * 
+     * @param string $string String to escape
+     * @return string Escaped string
+     */
+    private function escapeString(string $string): string
+    {
+        // Check if this is the real MySQL class with db_connect_id
+        if (isset($this->db->db_connect_id) && $this->db->db_connect_id) {
+            return mysqli_real_escape_string($this->db->db_connect_id, $string);
+        }
+        // Otherwise use the mock's sql_escape_string or fallback to addslashes
+        if (method_exists($this->db, 'sql_escape_string')) {
+            return $this->db->sql_escape_string($string);
+        }
+        return addslashes($string);
+    }
+    
+    /**
+     * Gets offensive sets for a team
+     * 
+     * @param string $teamName Team name
+     * @return mixed Database result
+     */
+    public function getOffenseSets(string $teamName)
+    {
+        $teamNameEscaped = $this->escapeString($teamName);
+        $sql = "SELECT * FROM ibl_offense_sets WHERE TeamName = '$teamNameEscaped' ORDER BY SetNumber ASC";
+        return $this->db->sql_query($sql);
+    }
+    
+    /**
+     * Gets players on a team
+     * 
+     * @param string $teamName Team name
+     * @param int $teamID Team ID
+     * @return mixed Database result
+     */
+    public function getPlayersOnTeam(string $teamName, int $teamID)
+    {
+        $teamNameEscaped = $this->escapeString($teamName);
+        $teamID = (int) $teamID; // Cast to int for safety
+        $query = "SELECT * FROM ibl_plr WHERE teamname = '$teamNameEscaped' AND tid = $teamID AND retired = '0' AND ordinal <= " . \JSB::WAIVERS_ORDINAL . " ORDER BY ordinal ASC";
+        return $this->db->sql_query($query);
+    }
+    
+    /**
+     * Gets a specific offensive set
+     * 
+     * @param string $teamName Team name
+     * @param int $setNumber Set number (1-3)
+     * @return array Offensive set data
+     */
+    public function getOffenseSet(string $teamName, int $setNumber): array
+    {
+        $teamNameEscaped = $this->escapeString($teamName);
+        $setNumber = (int) $setNumber; // Cast to int for safety
+        $query = "SELECT * FROM ibl_offense_sets WHERE TeamName = '$teamNameEscaped' AND SetNumber = $setNumber";
+        $result = $this->db->sql_query($query);
+        return $this->db->sql_fetchrow($result);
+    }
+    
+    /**
+     * Updates player depth chart data
+     * 
+     * @param string $playerName Player name
+     * @param array $depthChartValues Array of depth chart values
+     * @return bool Success status
+     */
+    public function updatePlayerDepthChart(string $playerName, array $depthChartValues): bool
+    {
+        $playerNameEscaped = $this->escapeString($playerName);
+        
+        // Sanitize and validate all numeric values
+        $pg = (int) $depthChartValues['pg'];
+        $sg = (int) $depthChartValues['sg'];
+        $sf = (int) $depthChartValues['sf'];
+        $pf = (int) $depthChartValues['pf'];
+        $c = (int) $depthChartValues['c'];
+        $active = (int) $depthChartValues['active'];
+        $min = (int) $depthChartValues['min'];
+        $of = (int) $depthChartValues['of'];
+        $df = (int) $depthChartValues['df'];
+        $oi = (int) $depthChartValues['oi'];
+        $di = (int) $depthChartValues['di'];
+        $bh = (int) $depthChartValues['bh'];
+        
+        $queries = [
+            "UPDATE ibl_plr SET dc_PGDepth = $pg WHERE name = '$playerNameEscaped'",
+            "UPDATE ibl_plr SET dc_SGDepth = $sg WHERE name = '$playerNameEscaped'",
+            "UPDATE ibl_plr SET dc_SFDepth = $sf WHERE name = '$playerNameEscaped'",
+            "UPDATE ibl_plr SET dc_PFDepth = $pf WHERE name = '$playerNameEscaped'",
+            "UPDATE ibl_plr SET dc_CDepth = $c WHERE name = '$playerNameEscaped'",
+            "UPDATE ibl_plr SET dc_active = $active WHERE name = '$playerNameEscaped'",
+            "UPDATE ibl_plr SET dc_minutes = $min WHERE name = '$playerNameEscaped'",
+            "UPDATE ibl_plr SET dc_of = $of WHERE name = '$playerNameEscaped'",
+            "UPDATE ibl_plr SET dc_df = $df WHERE name = '$playerNameEscaped'",
+            "UPDATE ibl_plr SET dc_oi = $oi WHERE name = '$playerNameEscaped'",
+            "UPDATE ibl_plr SET dc_di = $di WHERE name = '$playerNameEscaped'",
+            "UPDATE ibl_plr SET dc_bh = $bh WHERE name = '$playerNameEscaped'"
+        ];
+        
+        foreach ($queries as $query) {
+            if (!$this->db->sql_query($query)) {
+                return false;
+            }
+        }
+        
+        return true;
+    }
+    
+    /**
+     * Updates team history with depth chart submission timestamps
+     * 
+     * @param string $teamName Team name
+     * @return bool Success status
+     */
+    public function updateTeamHistory(string $teamName): bool
+    {
+        $teamNameEscaped = $this->escapeString($teamName);
+        
+        $queries = [
+            "UPDATE ibl_team_history SET depth = NOW() WHERE team_name = '$teamNameEscaped'",
+            "UPDATE ibl_team_history SET sim_depth = NOW() WHERE team_name = '$teamNameEscaped'"
+        ];
+        
+        foreach ($queries as $query) {
+            if (!$this->db->sql_query($query)) {
+                return false;
+            }
+        }
+        
+        return true;
+    }
+    
+    /**
+     * Gets board configuration
+     * 
+     * @return array Board configuration
+     */
+    public function getBoardConfig(): array
+    {
+        $sql = "SELECT * FROM nuke_bbconfig";
+        $result = $this->db->sql_query($sql);
+        $config = [];
+        while ($row = $this->db->sql_fetchrow($result)) {
+            $config[$row['config_name']] = $row['config_value'];
+        }
+        return $config;
+    }
+}

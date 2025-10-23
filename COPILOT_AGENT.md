@@ -39,7 +39,9 @@ ibl5/
 ```
 
 ### Class Autoloading
-- **Location**: The class autoloader is defined in `mainfile.php`
+- **Location**: The class autoloader is defined in `mainfile.php:216-248`
+- Modules have access to the autoloader via `require_once` in their entry point files (modules.php)
+- Use the existing class autoloader for all new classes
 - All classes should be placed in `ibl5/classes/` directory
 - Follow PSR-4 autoloading conventions when creating new classes
 - Use proper namespacing for new classes to facilitate future Laravel migration

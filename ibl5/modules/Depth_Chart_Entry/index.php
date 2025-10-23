@@ -25,7 +25,7 @@ get_lang($module_name);
 
 $pagetitle = " - Depth Chart Entry";
 
-function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
+function userinfo($username)
 {
     global $db, $useset;
 

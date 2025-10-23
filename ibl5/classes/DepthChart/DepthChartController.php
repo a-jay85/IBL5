@@ -40,6 +40,9 @@ class DepthChartController
         \Nuke\Header::header();
         OpenTable();
         \UI::displaytopmenu($this->db, $teamID);
+
+        // Render team logo
+        $this->view->renderTeamLogo($teamID);
         
         // Get team players
         $playersResult = $this->repository->getPlayersOnTeam($teamName, $teamID);

@@ -32,12 +32,11 @@ class DepthChartSubmissionHandler
     {
         $season = new \Season($this->db);
         
-        // Validate and sanitize team and set names
+        // Validate and sanitize team name
         $teamName = $this->sanitizeInput($postData['Team_Name'] ?? '');
-        $setName = $this->sanitizeInput($postData['Set_Name'] ?? '');
         
-        if (empty($teamName) || empty($setName)) {
-            echo "<font color=red><b>Error: Missing required team or set information.</b></font>";
+        if (empty($teamName)) {
+            echo "<font color=red><b>Error: Missing required team information.</b></font>";
             return;
         }
         
@@ -58,7 +57,7 @@ class DepthChartSubmissionHandler
         $this->saveDepthChart($processedData['playerData'], $teamName);
         
         // Save to file and send email
-        $this->saveDepthChartFile($teamName, $setName, $processedData['playerData']);
+        $this->saveDepthChartFile($teamName, $processedData['playerData']);
         
         // Display success
         $this->view->renderSubmissionResult($teamName, $processedData['playerData'], true);
@@ -95,11 +94,10 @@ class DepthChartSubmissionHandler
      * Saves depth chart to file and sends email
      * 
      * @param string $teamName Team name
-     * @param string $setName Offensive set name
      * @param array $playerData Player data
      * @return void
      */
-    private function saveDepthChartFile(string $teamName, string $setName, array $playerData): void
+    private function saveDepthChartFile(string $teamName, array $playerData): void
     {
         // Sanitize team name for file path (prevent directory traversal)
         $safeTeamName = preg_replace('/[^a-zA-Z0-9_\-\s]/', '', $teamName);
@@ -122,7 +120,7 @@ class DepthChartSubmissionHandler
                 // Send email if not on localhost
                 if (isset($_SERVER['SERVER_NAME']) && $_SERVER['SERVER_NAME'] != "localhost") {
                     // Sanitize email subject (PHP 8.1+ safe)
-                    $rawSubject = $teamName . " Depth Chart - $setName Offensive Set";
+                    $rawSubject = $teamName . " Depth Chart";
                     // Remove HTML tags and encode special characters
                     $emailSubject = filter_var($rawSubject, FILTER_UNSAFE_RAW, FILTER_FLAG_STRIP_LOW | FILTER_FLAG_STRIP_HIGH);
                     $emailSubject = strip_tags($emailSubject);

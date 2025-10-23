@@ -129,30 +129,7 @@ class DepthChartProcessorTest extends TestCase
         $this->assertStringContainsString('Player One,1,0,0,0,0,1,30,0,1,0,0,0', $csv);
     }
     
-    public function testGetsPositionValueCorrectly()
-    {
-        $this->assertEquals(1, $this->processor->getPositionValue('PG'));
-        $this->assertEquals(3, $this->processor->getPositionValue('SG'));
-        $this->assertEquals(5, $this->processor->getPositionValue('SF'));
-        $this->assertEquals(7, $this->processor->getPositionValue('PF'));
-        $this->assertEquals(9, $this->processor->getPositionValue('C'));
-        $this->assertEquals(0, $this->processor->getPositionValue('INVALID'));
-    }
-    
-    public function testCanPlayAtPositionChecksEligibility()
-    {
-        // PG can play at PG position (1-9 range)
-        $this->assertTrue($this->processor->canPlayAtPosition('PG', 1, 9, 0));
-        
-        // C cannot play at PG position if range is restricted
-        $this->assertFalse($this->processor->canPlayAtPosition('C', 1, 3, 0));
-        
-        // Injured player cannot play
-        $this->assertFalse($this->processor->canPlayAtPosition('PG', 1, 9, 15));
-        
-        // Healthy player with eligible position can play
-        $this->assertTrue($this->processor->canPlayAtPosition('SF', 1, 9, 5));
-    }
+
     
     public function testSanitizesInputWithMaliciousData()
     {

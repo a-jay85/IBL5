@@ -125,7 +125,7 @@ class DepthChartProcessorTest extends TestCase
         
         $csv = $this->processor->generateCsvContent($playerData);
         
-        $this->assertStringContainsString('Name,PG,SG,SF,PF,C,ACTIVE,MIN,OF,DF,OI,DI', $csv);
+        $this->assertStringContainsString('Name,PG,SG,SF,PF,C,ACTIVE,MIN,OF,DF,OI,DI,BH', $csv);
         $this->assertStringContainsString('Player One,1,0,0,0,0,1,30,0,1,0,0,0', $csv);
     }
     

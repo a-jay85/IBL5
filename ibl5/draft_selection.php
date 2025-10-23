@@ -59,6 +59,7 @@ if (($currentDraftSelection == NULL OR $currentDraftSelection == "") AND $player
         }
 
         Discord::postToChannel('#draft-picks', $message);
+        Discord::postToChannel('#general-chat', $message);
     } else {
         echo "Oops, something went wrong, and at least one of the draft database tables wasn't updated.<p>
             Let A-Jay know what happened and he'll look into it.<p>

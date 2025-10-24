@@ -34,7 +34,7 @@ $renderer = new VotingResultsTableRenderer();
 $controller = new VotingResultsController($service, $renderer, $season);
 
 OpenTable();
-echo $controller->renderEndOfYearView();
+echo $controller->render();
 CloseTable();
 
 Nuke\Footer::footer();

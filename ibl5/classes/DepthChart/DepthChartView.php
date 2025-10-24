@@ -289,13 +289,12 @@ class DepthChartView
         
         foreach ($playerData as $player) {
             echo "<tr>
-                <td>{$player['name']}</td>
-                <td>{$player['pg']}</td>
-                <td>{$player['sg']}</td>
-                <td>{$player['sf']}</td>
-                <td>{$player['pf']}</td>
-                <td>{$player['c']}</td>
-                <td>{$player['active']}</td>
+                <td>{$player['name']}</td>";
+            foreach (\JSB::PLAYER_POSITIONS as $position) {
+                $posKey = strtolower($position);
+                echo "<td>{$player[$posKey]}</td>";
+            }
+            echo "<td>{$player['active']}</td>
                 <td>{$player['min']}</td>
                 <td>{$player['of']}</td>
                 <td>{$player['df']}</td>

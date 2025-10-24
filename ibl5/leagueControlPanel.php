@@ -103,11 +103,11 @@ if (isset($_POST['query'])) {
             }
             $successText = "Sim Length in Days has been set to {$_POST['SimLengthInDays']}.";
             break;
-        case 'Set Waiver Wire Status':
+        case 'Set Allow Waiver Moves Status':
             if (isset($_POST['Waivers'])) {
                 $queryString = "UPDATE ibl_settings SET value = '{$_POST['Waivers']}' WHERE name = 'Allow Waiver Moves';";
             }
-            $successText = "Waiver Wire Status has been set to {$_POST['Waivers']}.";
+            $successText = "Allow Waiver Moves Status has been set to {$_POST['Waivers']}.";
             break;
         case 'Toggle Free Agency Notifications':
             if (isset($_POST['FANotifs'])) {

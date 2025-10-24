@@ -53,7 +53,7 @@ $content = '
     <li><a href="modules.php?name=Content&pa=showpage&pid=8">Record Holders</a></li>
     <li><a href="modules.php?name=Stories_Archive">Transaction History</a></li>
     <li><a href="modules.php?name=Player_Awards">Award History</a></li>
-    <li><a href="allStarAppearances.php">All-Star Appearances</a></li>
+    <li><a href="/ibl5/pages/allStarAppearances.php">All-Star Appearances</a></li>
     <li><a href="modules.php?name=Season_Leaders">Season Leaderboards</a></li>
     <li><a href="modules.php?name=Leaderboards">Career Leaderboards</a></li>
     <li><a href="draft.php">Draft History</a></li>

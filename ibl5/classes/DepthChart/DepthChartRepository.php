@@ -14,25 +14,7 @@ class DepthChartRepository
         $this->db = $db;
     }
     
-    /**
-     * Escapes a string for SQL queries using mysqli_real_escape_string
-     * Works with both real MySQL class and mock database
-     * 
-     * @param string $string String to escape
-     * @return string Escaped string
-     */
-    private function escapeString(string $string): string
-    {
-        // Check if this is the real MySQL class with db_connect_id
-        if (isset($this->db->db_connect_id) && $this->db->db_connect_id) {
-            return mysqli_real_escape_string($this->db->db_connect_id, $string);
-        }
-        // Otherwise use the mock's sql_escape_string or fallback to addslashes
-        if (method_exists($this->db, 'sql_escape_string')) {
-            return $this->db->sql_escape_string($string);
-        }
-        return addslashes($string);
-    }
+
     
     /**
      * Gets players on a team
@@ -43,7 +25,7 @@ class DepthChartRepository
      */
     public function getPlayersOnTeam(string $teamName, int $teamID)
     {
-        $teamNameEscaped = $this->escapeString($teamName);
+        $teamNameEscaped = \Services\DatabaseService::escapeString($this->db, $teamName);
         $teamID = (int) $teamID; // Cast to int for safety
         $query = "SELECT * FROM ibl_plr WHERE teamname = '$teamNameEscaped' AND tid = $teamID AND retired = '0' AND ordinal <= " . \JSB::WAIVERS_ORDINAL . " ORDER BY ordinal ASC";
         return $this->db->sql_query($query);
@@ -58,7 +40,7 @@ class DepthChartRepository
      */
     public function updatePlayerDepthChart(string $playerName, array $depthChartValues): bool
     {
-        $playerNameEscaped = $this->escapeString($playerName);
+        $playerNameEscaped = \Services\DatabaseService::escapeString($this->db, $playerName);
         
         // Sanitize and validate all numeric values
         $pg = (int) $depthChartValues['pg'];
@@ -106,7 +88,7 @@ class DepthChartRepository
      */
     public function updateTeamHistory(string $teamName): bool
     {
-        $teamNameEscaped = $this->escapeString($teamName);
+        $teamNameEscaped = \Services\DatabaseService::escapeString($this->db, $teamName);
         
         $queries = [
             "UPDATE ibl_team_history SET depth = NOW() WHERE team_name = '$teamNameEscaped'",

@@ -225,7 +225,7 @@ switch ($season->phase) {
         echo "<INPUT type='submit' name='query' value='Reset All Contract Extensions'><p>
             <INPUT type='submit' name='query' value='Reset All MLEs/LLEs'><p>
             <INPUT type='submit' name='query' value='Set Free Agency factors for PFW'><p>
-            <A HREF=\"tradition.php\">Set Free Agency factors for Tradition</A><p>
+            <A HREF=\"/ibl5/scripts/tradition.php\">Set Free Agency factors for Tradition</A><p>
             <select name=\"FANotifs\">
                 <option value = \"On\"" . ($season->freeAgencyNotificationsState == "On" ? " SELECTED" : "") . ">On</option>
                 <option value = \"Off\"" . ($season->freeAgencyNotificationsState == "Off" ? " SELECTED" : "") . ">Off</option>

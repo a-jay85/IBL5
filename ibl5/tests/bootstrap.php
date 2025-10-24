@@ -56,6 +56,16 @@ spl_autoload_register(function ($class) {
         }
     }
     
+    // Handle Services namespace (for DatabaseService and future services)
+    if (strpos($class, 'Services\\') === 0) {
+        $className = str_replace('Services\\', '', $class);
+        $file = __DIR__ . '/../classes/Services/' . $className . '.php';
+        if (file_exists($file)) {
+            require_once $file;
+            return true;
+        }
+    }
+    
     // Handle global namespace classes like Player, Team, League, and JSB
     if (in_array($class, ['Player', 'Team', 'League', 'JSB'])) {
         $file = __DIR__ . '/../classes/' . $class . '.php';

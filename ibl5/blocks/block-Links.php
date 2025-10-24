@@ -56,7 +56,7 @@ $content = '
     <li><a href="/ibl5/pages/allStarAppearances.php">All-Star Appearances</a></li>
     <li><a href="modules.php?name=Season_Leaders">Season Leaderboards</a></li>
     <li><a href="modules.php?name=Leaderboards">Career Leaderboards</a></li>
-    <li><a href="/ibl5/pages/draft.php">Draft History</a></li>
+    <li><a href="/ibl5/pages/draftHistory.php">Draft History</a></li>
     <li><a href="../iblforum/forum.php">Forums [archived]</a></li>
     <li><a href="../previous-ibl-archive">v2/v3 Archive</a></li>
 </ul>

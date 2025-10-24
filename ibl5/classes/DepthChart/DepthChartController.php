@@ -79,29 +79,10 @@ class DepthChartController
      */
     private function getUserTeamName(string $username): string
     {
-        $usernameEscaped = $this->escapeString($username);
+        $usernameEscaped = \Services\DatabaseService::escapeString($this->db, $username);
         $sql = "SELECT user_ibl_team FROM nuke_users WHERE username='$usernameEscaped'";
         $result = $this->db->sql_query($sql);
         $userinfo = $this->db->sql_fetchrow($result);
         return $userinfo['user_ibl_team'] ?? '';
-    }
-    
-    /**
-     * Escapes a string for SQL queries using mysqli_real_escape_string
-     * 
-     * @param string $string String to escape
-     * @return string Escaped string
-     */
-    private function escapeString(string $string): string
-    {
-        // Check if this is the real MySQL class with db_connect_id
-        if (isset($this->db->db_connect_id) && $this->db->db_connect_id) {
-            return mysqli_real_escape_string($this->db->db_connect_id, $string);
-        }
-        // Otherwise use the mock's sql_escape_string or fallback to addslashes
-        if (method_exists($this->db, 'sql_escape_string')) {
-            return $this->db->sql_escape_string($string);
-        }
-        return addslashes($string);
     }
 }

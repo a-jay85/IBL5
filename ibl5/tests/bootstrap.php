@@ -65,6 +65,16 @@ spl_autoload_register(function ($class) {
             return true;
         }
     }
+
+    // Handle Voting namespace
+    if (strpos($class, 'Voting\\') === 0) {
+        $className = str_replace('Voting\\', '', $class);
+        $file = __DIR__ . '/../classes/Voting/' . $className . '.php';
+        if (file_exists($file)) {
+            require_once $file;
+            return true;
+        }
+    }
     
     // Handle global namespace classes like Player, Team, League, and JSB
     if (in_array($class, ['Player', 'Team', 'League', 'JSB'])) {

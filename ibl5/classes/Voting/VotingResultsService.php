@@ -1,0 +1,212 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Voting;
+
+use function array_map;
+use function implode;
+use function sprintf;
+use function strcmp;
+use function trim;
+use function usort;
+
+/**
+ * Retrieves aggregated voting results for All-Star and end-of-year awards.
+ */
+final class VotingResultsService implements VotingResultsProvider
+{
+    private const ASG_TABLE = 'ibl_votes_ASG';
+    private const EOY_TABLE = 'ibl_votes_EOY';
+    public const BLANK_BALLOT_LABEL = '(No Selection Recorded)';
+
+    /**
+     * Ballot columns grouped by All-Star voting category.
+     *
+     * @var array<string, array<int, string>>
+     */
+    private const ALL_STAR_CATEGORIES = [
+        'Eastern Conference Frontcourt' => ['East_F1', 'East_F2', 'East_F3', 'East_F4'],
+        'Eastern Conference Backcourt' => ['East_B1', 'East_B2', 'East_B3', 'East_B4'],
+        'Western Conference Frontcourt' => ['West_F1', 'West_F2', 'West_F3', 'West_F4'],
+        'Western Conference Backcourt' => ['West_B1', 'West_B2', 'West_B3', 'West_B4'],
+    ];
+
+    /**
+     * Ballot columns grouped by end-of-year award category and weighted score.
+     *
+     * @var array<string, array<string, int>>
+     */
+    private const END_OF_YEAR_CATEGORIES = [
+        'Most Valuable Player' => ['MVP_1' => 3, 'MVP_2' => 2, 'MVP_3' => 1],
+        'Sixth Man of the Year' => ['Six_1' => 3, 'Six_2' => 2, 'Six_3' => 1],
+        'Rookie of the Year' => ['ROY_1' => 3, 'ROY_2' => 2, 'ROY_3' => 1],
+        'GM of the Year' => ['GM_1' => 3, 'GM_2' => 2, 'GM_3' => 1],
+    ];
+
+    /**
+     * @var object Database connection implementing sql_* helpers.
+     */
+    private $db;
+
+    public function __construct(object $db)
+    {
+        $this->db = $db;
+    }
+
+    public function getAllStarResults(): array
+    {
+        $results = [];
+        foreach (self::ALL_STAR_CATEGORIES as $title => $columns) {
+            $results[] = [
+                'title' => $title,
+                'rows' => $this->fetchAllStarTotals($columns),
+            ];
+        }
+
+        return $results;
+    }
+
+    public function getEndOfYearResults(): array
+    {
+        $results = [];
+        foreach (self::END_OF_YEAR_CATEGORIES as $title => $ballots) {
+            $results[] = [
+                'title' => $title,
+                'rows' => $this->fetchEndOfYearTotals($ballots),
+            ];
+        }
+
+        return $results;
+    }
+
+    /**
+     * @param array<int, string> $ballotColumns
+     * @return array<int, array{name: string, votes: int}>
+     */
+    private function fetchAllStarTotals(array $ballotColumns): array
+    {
+        $query = $this->buildAllStarQuery($ballotColumns);
+
+        return $this->executeVoteQuery($query);
+    }
+
+    /**
+     * @param array<string, int> $ballotColumnsWithWeights
+     * @return array<int, array{name: string, votes: int}>
+     */
+    private function fetchEndOfYearTotals(array $ballotColumnsWithWeights): array
+    {
+        $query = $this->buildEndOfYearQuery($ballotColumnsWithWeights);
+
+        return $this->executeVoteQuery($query);
+    }
+
+    /**
+     * @param array<int, string> $ballotColumns
+     */
+    private function buildAllStarQuery(array $ballotColumns): string
+    {
+        $selectStatements = array_map(
+            static fn (string $column): string => sprintf(
+                "            SELECT %s AS name\n            FROM %s",
+                $column,
+                self::ASG_TABLE
+            ),
+            $ballotColumns
+        );
+
+        $unionStatements = implode("\n        UNION ALL\n", $selectStatements);
+
+        return <<<SQL
+SELECT
+    COUNT(name) AS votes,
+    name
+FROM
+    (
+$unionStatements
+    ) AS ballot
+GROUP BY
+    name
+HAVING
+    COUNT(name) > 0
+ORDER BY
+    votes DESC,
+    name ASC;
+SQL;
+    }
+
+    /**
+     * @param array<string, int> $ballotColumnsWithWeights
+     */
+    private function buildEndOfYearQuery(array $ballotColumnsWithWeights): string
+    {
+        $selectStatements = [];
+        foreach ($ballotColumnsWithWeights as $column => $score) {
+            $selectStatements[] = sprintf(
+                "            SELECT %s AS name, %d AS score\n            FROM %s",
+                $column,
+                $score,
+                self::EOY_TABLE
+            );
+        }
+
+        $unionStatements = implode("\n        UNION ALL\n", $selectStatements);
+
+        return <<<SQL
+SELECT
+    SUM(score) AS votes,
+    name
+FROM
+    (
+$unionStatements
+    ) AS ballot
+GROUP BY
+    name
+HAVING
+    SUM(score) > 0
+ORDER BY
+    votes DESC,
+    name ASC;
+SQL;
+    }
+
+    /**
+     * @return array<int, array{name: string, votes: int}>
+     */
+    private function executeVoteQuery(string $query): array
+    {
+        $result = $this->db->sql_query($query);
+        if ($result === false) {
+            return [];
+        }
+
+        $rows = [];
+        while ($record = $this->db->sql_fetch_assoc($result)) {
+            $name = trim((string) ($record['name'] ?? ''));
+            if ($name === '') {
+                $name = self::BLANK_BALLOT_LABEL;
+            }
+
+            $votes = (int) ($record['votes'] ?? 0);
+            $rows[] = [
+                'name' => $name,
+                'votes' => $votes,
+            ];
+        }
+
+        usort(
+            $rows,
+            static function (array $left, array $right): int {
+                $voteComparison = $right['votes'] <=> $left['votes'];
+                if ($voteComparison !== 0) {
+                    return $voteComparison;
+                }
+
+                return strcmp($left['name'], $right['name']);
+            }
+        );
+
+        return $rows;
+    }
+}

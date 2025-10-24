@@ -185,7 +185,7 @@ class DepthChartProcessor
      */
     public function generateCsvContent(array $playerData): string
     {
-        $csv = "Name,PG,SG,SF,PF,C,ACTIVE,MIN,OF,DF,OI,DI,BH\n";
+        $csv = "Name," . implode(',', \JSB::PLAYER_POSITIONS) . ",ACTIVE,MIN,OF,DF,OI,DI,BH\n";
         
         foreach ($playerData as $player) {
             $csv .= sprintf(

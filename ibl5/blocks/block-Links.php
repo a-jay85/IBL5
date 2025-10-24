@@ -14,7 +14,7 @@ $content = '
 <strong>Community</strong>
 <ul>
     <li><a href="https://discord.gg/QXwBQxR">Discord Server</a></li>
-    <li><a href="owners.php">GM Contact List</a></li>
+    <li><a href="/ibl5/pages/contactList.php">GM Contact List</a></li>
 </ul>
 
 <strong>Associated Leagues</strong>

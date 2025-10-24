@@ -52,7 +52,7 @@ class DepthChartController
         echo $table_ratings;
         
         // Render form header with standard position names
-        $slotNames = ['PG', 'SG', 'SF', 'PF', 'C'];
+        $slotNames = \JSB::PLAYER_POSITIONS;
         
         $this->view->renderFormHeader($teamName, $teamID, $slotNames);
         

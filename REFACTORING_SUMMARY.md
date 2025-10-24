@@ -1,3 +1,24 @@
+# Voting Results Module - Refactoring Summary
+
+## Transformation Overview
+- Combined `modules/ASG_Results` and `modules/EOY_Results` into a unified `modules/Voting_Results` entry point that detects the season phase.
+- Introduced shared infrastructure under `classes/Voting/` (service, controller, renderer, provider interface) for reusable vote aggregation.
+- Updated legacy modules to delegate to the new controller for backward compatibility with existing links.
+- Ensured consistent All-Star table styling across both All-Star and End-of-Year contexts.
+- Added a dedicated PHPUnit suite (`tests/VotingResults/`) covering service query generation, rendering, and controller orchestration.
+
+## Architectural Improvements
+- **VotingResultsService** centralizes SQL generation for both All-Star and end-of-year voting, reducing four duplicated query blocks down to declarative category maps.
+- **VotingResultsTableRenderer** encapsulates legacy HTML structure with proper encoding, delivering DRY, testable markup.
+- **VotingResultsController** coordinates season-aware rendering and exposes explicit helpers for legacy modules.
+- **VotingResultsProvider interface** enables dependency inversion, making controller behavior straightforward to unit test and extend.
+
+## Testing
+- Added `VotingResultsServiceTest`, `VotingResultsTableRendererTest`, and `VotingResultsControllerTest` (7 new assertions) to prevent regressions and document expected behavior.
+- Test doubles ensure deterministic coverage of SQL construction, HTML escaping, and season phase branching without hitting a live database.
+
+---
+
 # Depth Chart Entry Module - Refactoring Summary
 
 ## Transformation Overview

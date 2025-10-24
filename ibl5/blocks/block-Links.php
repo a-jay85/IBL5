@@ -7,13 +7,13 @@ if (!defined('BLOCK_FILE')) {
 
 $content = '
 <center>
-    <a href="https://discordapp.com/invite/QXwBQxR"><img border="0" src="images/discord.png"></a><a href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=YP2VUUQ7MYQTW&lc=US%C2%A4cy_code=USD&bn=PP-DonationsBF:btn_donateCC_LG.gif:NonHosted"><img border="0" src="images/ibl/donate.png"></a>
+    <a href="https://discord.com/invite/QXwBQxR"><img border="0" src="images/discord.png"></a><a href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=YP2VUUQ7MYQTW&lc=US%C2%A4cy_code=USD&bn=PP-DonationsBF:btn_donateCC_LG.gif:NonHosted"><img border="0" src="images/ibl/donate.png"></a>
 </center>
 <br><br>
 
 <strong>Community</strong>
 <ul>
-    <li><a href="https://discord.gg/QXwBQxR">Discord Server</a></li>
+    <li><a href="https://discord.com/invite/QXwBQxR">Discord Server</a></li>
     <li><a href="/ibl5/pages/contactList.php">GM Contact List</a></li>
 </ul>
 

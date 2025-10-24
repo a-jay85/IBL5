@@ -274,13 +274,11 @@ class DepthChartView
         // Display submitted data
         echo "$teamName Depth Chart Submission<br><table>";
         echo "<tr>
-            <td><b>Name</td>
-            <td><b>PG</td>
-            <td><b>SG</td>
-            <td><b>SF</td>
-            <td><b>PF</td>
-            <td><b>C</td>
-            <td><b>Active</td>
+            <td><b>Name</td>";
+        foreach (\JSB::PLAYER_POSITIONS as $position) {
+            echo "<td><b>$position</td>";
+        }
+        echo "<td><b>Active</td>
             <td><b>Min</td>
             <td><b>OF</td>
             <td><b>DF</td>

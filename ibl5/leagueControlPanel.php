@@ -219,6 +219,10 @@ switch ($season->phase) {
             <A HREF=\"/ibl5/scripts/playofflbupdate.php\">Playoff Leaderboard Update #2</A><p>
             <A HREF=\"/ibl5/scripts/seasonlbupdate.php\">Season Leaderboard Update</A><p>
             <A HREF=\"/ibl5/scripts/history_update.php\">IBL History Update</A><p>
+            <select name=\"Waivers\">
+                <option value = \"Yes\"" . ($season->allowWaivers == "Yes" ? " SELECTED" : "") . ">Yes</option>
+                <option value = \"No\"" . ($season->allowWaivers == "No" ? " SELECTED" : "") . ">No</option>
+            </select>
             <INPUT type='submit' name='query' value='Set Waiver Wire Status'><p>";
         break;
     case 'Free Agency':

@@ -174,7 +174,7 @@ switch ($season->phase) {
                 <option value = \"Yes\"" . ($season->allowWaivers == "Yes" ? " SELECTED" : "") . ">Yes</option>
                 <option value = \"No\"" . ($season->allowWaivers == "No" ? " SELECTED" : "") . ">No</option>
             </select>
-            <INPUT type='submit' name='query' value='Set Waiver Wire Status'><p>
+            <INPUT type='submit' name='query' value='Set Allow Waiver Moves Status'><p>
             <INPUT type='submit' name='query' value='Set all players on waivers to Free Agents and reset their Bird years'><p>";
         break;
     case 'HEAT':
@@ -223,7 +223,7 @@ switch ($season->phase) {
                 <option value = \"Yes\"" . ($season->allowWaivers == "Yes" ? " SELECTED" : "") . ">Yes</option>
                 <option value = \"No\"" . ($season->allowWaivers == "No" ? " SELECTED" : "") . ">No</option>
             </select>
-            <INPUT type='submit' name='query' value='Set Waiver Wire Status'><p>";
+            <INPUT type='submit' name='query' value='Set Allow Waiver Moves Status'><p>";
         break;
     case 'Free Agency':
         echo "<INPUT type='submit' name='query' value='Reset All Contract Extensions'><p>
@@ -239,7 +239,7 @@ switch ($season->phase) {
                 <option value = \"Yes\"" . ($season->allowWaivers == "Yes" ? " SELECTED" : "") . ">Yes</option>
                 <option value = \"No\"" . ($season->allowWaivers == "No" ? " SELECTED" : "") . ">No</option>
             </select>
-            <INPUT type='submit' name='query' value='Set Waiver Wire Status'><p>
+            <INPUT type='submit' name='query' value='Set Allow Waiver Moves Status'><p>
             <INPUT type='submit' name='query' value='Set all players on waivers to Free Agents and reset their Bird years'><p>";
         break;
 }

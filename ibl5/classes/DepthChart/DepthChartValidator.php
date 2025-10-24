@@ -39,11 +39,12 @@ class DepthChartValidator
         );
         
         // Validate position depths
-        $this->validatePositionDepth($depthChartData['pos_1'], 'PG', $minPositionDepth);
-        $this->validatePositionDepth($depthChartData['pos_2'], 'SG', $minPositionDepth);
-        $this->validatePositionDepth($depthChartData['pos_3'], 'SF', $minPositionDepth);
-        $this->validatePositionDepth($depthChartData['pos_4'], 'PF', $minPositionDepth);
-        $this->validatePositionDepth($depthChartData['pos_5'], 'C', $minPositionDepth);
+        $positions = \JSB::PLAYER_POSITIONS;
+        $this->validatePositionDepth($depthChartData['pos_1'], $positions[0], $minPositionDepth);
+        $this->validatePositionDepth($depthChartData['pos_2'], $positions[1], $minPositionDepth);
+        $this->validatePositionDepth($depthChartData['pos_3'], $positions[2], $minPositionDepth);
+        $this->validatePositionDepth($depthChartData['pos_4'], $positions[3], $minPositionDepth);
+        $this->validatePositionDepth($depthChartData['pos_5'], $positions[4], $minPositionDepth);
         
         // Validate no player is starting at multiple positions
         $this->validateNoMultipleStartingPositions(

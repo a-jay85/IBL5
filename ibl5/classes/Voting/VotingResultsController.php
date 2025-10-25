@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Voting;
 
 /**
- * Coordinates fetching and rendering of voting results based on the season phase.
+ * Coordinates fetching and rendering of voting results based on the season phase
  */
-final class VotingResultsController
+class VotingResultsController
 {
     public function __construct(
         private readonly VotingResultsProvider $provider,
@@ -17,7 +17,9 @@ final class VotingResultsController
     }
 
     /**
-     * Renders the appropriate voting results for the active season phase.
+     * Renders the appropriate voting results for the active season phase
+     * 
+     * @return string HTML output
      */
     public function render(): string
     {
@@ -29,7 +31,9 @@ final class VotingResultsController
     }
 
     /**
-     * Renders All-Star voting results regardless of season phase.
+     * Renders All-Star voting results regardless of season phase
+     * 
+     * @return string HTML output
      */
     public function renderAllStarView(): string
     {
@@ -37,7 +41,9 @@ final class VotingResultsController
     }
 
     /**
-     * Renders end-of-year awards voting results regardless of season phase.
+     * Renders end-of-year awards voting results regardless of season phase
+     * 
+     * @return string HTML output
      */
     public function renderEndOfYearView(): string
     {

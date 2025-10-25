@@ -4,17 +4,10 @@ declare(strict_types=1);
 
 namespace Voting;
 
-use function array_map;
-use function implode;
-use function sprintf;
-use function strcmp;
-use function trim;
-use function usort;
-
 /**
  * Retrieves aggregated voting results for All-Star and end-of-year awards
  */
-class VotingResultsService implements VotingResultsProvider
+class VotingResultsService
 {
     private const ASG_TABLE = 'ibl_votes_ASG';
     private const EOY_TABLE = 'ibl_votes_EOY';
@@ -116,33 +109,16 @@ class VotingResultsService implements VotingResultsProvider
      */
     private function buildAllStarQuery(array $ballotColumns): string
     {
-        $selectStatements = array_map(
-            static fn (string $column): string => sprintf(
-                "            SELECT %s AS name\n            FROM %s",
-                $column,
-                self::ASG_TABLE
-            ),
-            $ballotColumns
-        );
+        $selectStatements = [];
+        foreach ($ballotColumns as $column) {
+            $selectStatements[] = "SELECT {$column} AS name FROM " . self::ASG_TABLE;
+        }
 
-        $unionStatements = implode("\n        UNION ALL\n", $selectStatements);
+        $unionQuery = implode(' UNION ALL ', $selectStatements);
 
-        return <<<SQL
-SELECT
-    COUNT(name) AS votes,
-    name
-FROM
-    (
-$unionStatements
-    ) AS ballot
-GROUP BY
-    name
-HAVING
-    COUNT(name) > 0
-ORDER BY
-    votes DESC,
-    name ASC;
-SQL;
+        $query = "SELECT COUNT(name) AS votes, name FROM ({$unionQuery}) AS ballot GROUP BY name HAVING COUNT(name) > 0 ORDER BY votes DESC, name ASC;";
+
+        return $query;
     }
 
     /**
@@ -155,32 +131,14 @@ SQL;
     {
         $selectStatements = [];
         foreach ($ballotColumnsWithWeights as $column => $score) {
-            $selectStatements[] = sprintf(
-                "            SELECT %s AS name, %d AS score\n            FROM %s",
-                $column,
-                $score,
-                self::EOY_TABLE
-            );
+            $selectStatements[] = "SELECT {$column} AS name, {$score} AS score FROM " . self::EOY_TABLE;
         }
 
-        $unionStatements = implode("\n        UNION ALL\n", $selectStatements);
+        $unionQuery = implode(' UNION ALL ', $selectStatements);
 
-        return <<<SQL
-SELECT
-    SUM(score) AS votes,
-    name
-FROM
-    (
-$unionStatements
-    ) AS ballot
-GROUP BY
-    name
-HAVING
-    SUM(score) > 0
-ORDER BY
-    votes DESC,
-    name ASC;
-SQL;
+        $query = "SELECT SUM(score) AS votes, name FROM ({$unionQuery}) AS ballot GROUP BY name HAVING SUM(score) > 0 ORDER BY votes DESC, name ASC;";
+
+        return $query;
     }
 
     /**
@@ -209,18 +167,6 @@ SQL;
                 'votes' => $votes,
             ];
         }
-
-        usort(
-            $rows,
-            static function (array $left, array $right): int {
-                $voteComparison = $right['votes'] <=> $left['votes'];
-                if ($voteComparison !== 0) {
-                    return $voteComparison;
-                }
-
-                return strcmp($left['name'], $right['name']);
-            }
-        );
 
         return $rows;
     }

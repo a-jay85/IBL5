@@ -6,56 +6,56 @@ require_once __DIR__ . '/../bootstrap.php';
 
 use PHPUnit\Framework\TestCase;
 use Voting\VotingResultsController;
-use Voting\VotingResultsProvider;
+use Voting\VotingResultsService;
 use Voting\VotingResultsTableRenderer;
 
 final class VotingResultsControllerTest extends TestCase
 {
     public function testRenderUsesAllStarResultsDuringRegularSeason(): void
     {
-        $provider = new StubVotingResultsProvider();
+        $service = new StubVotingResultsService();
         $renderer = new StubVotingResultsRenderer();
         $season = $this->createSeason('Regular Season');
 
-        $controller = new VotingResultsController($provider, $renderer, $season);
+        $controller = new VotingResultsController($service, $renderer, $season);
         $output = $controller->render();
 
-        $this->assertSame(1, $provider->allStarCalls);
-        $this->assertSame(0, $provider->endOfYearCalls);
+        $this->assertSame(1, $service->allStarCalls);
+        $this->assertSame(0, $service->endOfYearCalls);
         $this->assertSame('All-Star', $output);
-        $this->assertSame($provider->allStarResponse, $renderer->lastRenderedTables);
+        $this->assertSame($service->allStarResponse, $renderer->lastRenderedTables);
     }
 
     public function testRenderUsesEndOfYearResultsOutsideRegularSeason(): void
     {
-        $provider = new StubVotingResultsProvider();
+        $service = new StubVotingResultsService();
         $renderer = new StubVotingResultsRenderer();
         $season = $this->createSeason('Playoffs');
 
-        $controller = new VotingResultsController($provider, $renderer, $season);
+        $controller = new VotingResultsController($service, $renderer, $season);
         $output = $controller->render();
 
-        $this->assertSame(0, $provider->allStarCalls);
-        $this->assertSame(1, $provider->endOfYearCalls);
+        $this->assertSame(0, $service->allStarCalls);
+        $this->assertSame(1, $service->endOfYearCalls);
         $this->assertSame('End-Of-Year', $output);
-        $this->assertSame($provider->endOfYearResponse, $renderer->lastRenderedTables);
+        $this->assertSame($service->endOfYearResponse, $renderer->lastRenderedTables);
     }
 
     public function testExplicitRenderMethodsBypassSeasonPhase(): void
     {
-        $provider = new StubVotingResultsProvider();
+        $service = new StubVotingResultsService();
         $renderer = new StubVotingResultsRenderer();
         $season = $this->createSeason('Free Agency');
 
-        $controller = new VotingResultsController($provider, $renderer, $season);
+        $controller = new VotingResultsController($service, $renderer, $season);
 
         $allStar = $controller->renderAllStarView();
         $endOfYear = $controller->renderEndOfYearView();
 
         $this->assertSame('All-Star', $allStar);
         $this->assertSame('End-Of-Year', $endOfYear);
-        $this->assertSame(1, $provider->allStarCalls);
-        $this->assertSame(1, $provider->endOfYearCalls);
+        $this->assertSame(1, $service->allStarCalls);
+        $this->assertSame(1, $service->endOfYearCalls);
     }
 
     private function createSeason(string $phase): Season
@@ -67,12 +67,17 @@ final class VotingResultsControllerTest extends TestCase
     }
 }
 
-final class StubVotingResultsProvider implements VotingResultsProvider
+final class StubVotingResultsService extends VotingResultsService
 {
     public array $allStarResponse = [['title' => 'All-Star', 'rows' => []]];
     public array $endOfYearResponse = [['title' => 'End-Of-Year', 'rows' => []]];
     public int $allStarCalls = 0;
     public int $endOfYearCalls = 0;
+
+    public function __construct()
+    {
+        // Don't call parent constructor - we don't need a database for stub
+    }
 
     public function getAllStarResults(): array
     {

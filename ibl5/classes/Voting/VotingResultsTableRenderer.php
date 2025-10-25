@@ -9,9 +9,9 @@ use function implode;
 use function sprintf;
 
 /**
- * Renders voting results tables using the legacy module styling.
+ * Renders voting results tables using the legacy module styling
  */
-final class VotingResultsTableRenderer
+class VotingResultsTableRenderer
 {
     private const METRIC_LABEL = 'Votes';
     private const TABLE_STYLE = 'width: min(100%, 420px); border-collapse: collapse; margin: 0 auto 1.5rem;';
@@ -20,7 +20,10 @@ final class VotingResultsTableRenderer
     private const ROW_CELL_ALT_STYLE = 'border-bottom: 1px solid #eee; padding: 0.35rem 0.75rem; background-color: #f8f9fb;';
 
     /**
-     * @param array<int, array{title: string, rows: array<int, array{name: string, votes: int}>}> $tables
+     * Renders multiple voting result tables
+     * 
+     * @param array $tables Array of tables with title and rows
+     * @return string HTML output
      */
     public function renderTables(array $tables): string
     {
@@ -35,7 +38,11 @@ final class VotingResultsTableRenderer
     }
 
     /**
-     * @param array<int, array{name: string, votes: int}> $rows
+     * Renders a single voting result table
+     * 
+     * @param string $title Table title
+     * @param array $rows Table rows with name and votes
+     * @return string HTML output
      */
     private function renderTable(string $title, array $rows): string
     {

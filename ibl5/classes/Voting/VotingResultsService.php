@@ -127,7 +127,7 @@ class VotingResultsService implements VotingResultsProvider
         $unionQuery = implode(' UNION ALL ', $selectStatements);
 
         $query = sprintf(
-            "SELECT COUNT(name) AS votes, name FROM (%s) AS ballot GROUP BY name HAVING COUNT(name) > 0 ORDER BY votes DESC, name ASC",
+            "SELECT COUNT(name) AS votes, name FROM (%s) AS ballot GROUP BY name HAVING COUNT(name) > 0 ORDER BY votes DESC, name ASC;",
             $unionQuery
         );
 
@@ -155,7 +155,7 @@ class VotingResultsService implements VotingResultsProvider
         $unionQuery = implode(' UNION ALL ', $selectStatements);
 
         $query = sprintf(
-            "SELECT SUM(score) AS votes, name FROM (%s) AS ballot GROUP BY name HAVING SUM(score) > 0 ORDER BY votes DESC, name ASC",
+            "SELECT SUM(score) AS votes, name FROM (%s) AS ballot GROUP BY name HAVING SUM(score) > 0 ORDER BY votes DESC, name ASC;",
             $unionQuery
         );
 

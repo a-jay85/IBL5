@@ -22,10 +22,10 @@ final class VotingResultsServiceTest extends TestCase
     {
         $this->database->queueResults([
             [
-                ['name' => 'Zeke Adams', 'votes' => '2'],
                 ['name' => '', 'votes' => '9'],
-                ['name' => 'Aaron Smith', 'votes' => '2'],
                 ['name' => 'Mason Lee', 'votes' => '5'],
+                ['name' => 'Aaron Smith', 'votes' => '2'],
+                ['name' => 'Zeke Adams', 'votes' => '2'],
             ],
             [],
             [],

@@ -168,19 +168,6 @@ class VotingResultsService implements VotingResultsProvider
             ];
         }
 
-        // Sort rows by votes descending, then name ascending without using usort()
-        $sortedRows = [];
-        foreach ($rows as $row) {
-            $sortedRows[] = $row;
-        }
-
-        // Use array_multisort for sorting
-        $votes = array_column($sortedRows, 'votes');
-        $names = array_column($sortedRows, 'name');
-        array_multisort($votes, SORT_DESC, $names, SORT_ASC, $sortedRows);
-
-        $rows = $sortedRows;
-
         return $rows;
     }
 }

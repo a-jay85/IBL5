@@ -4,10 +4,6 @@ declare(strict_types=1);
 
 namespace Voting;
 
-use function htmlspecialchars;
-use function implode;
-use function sprintf;
-
 /**
  * Renders voting results tables using the legacy module styling
  */

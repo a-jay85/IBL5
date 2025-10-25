@@ -7,7 +7,7 @@ namespace Voting;
 /**
  * Retrieves aggregated voting results for All-Star and end-of-year awards
  */
-class VotingResultsService implements VotingResultsProvider
+class VotingResultsService
 {
     private const ASG_TABLE = 'ibl_votes_ASG';
     private const EOY_TABLE = 'ibl_votes_EOY';

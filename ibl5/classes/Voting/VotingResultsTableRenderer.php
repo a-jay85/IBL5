@@ -4,10 +4,6 @@ declare(strict_types=1);
 
 namespace Voting;
 
-use function htmlspecialchars;
-use function implode;
-use function sprintf;
-
 /**
  * Renders voting results tables using the legacy module styling
  */
@@ -63,18 +59,17 @@ class VotingResultsTableRenderer
         }
 
         $tableRowsHtml = $rowsHtml ? "\n" . implode("\n", $rowsHtml) . "\n" : "\n";
-        $metricLabel = self::METRIC_LABEL;
-        $tableStyle = self::TABLE_STYLE;
-        $headerStyle = self::HEADER_CELL_STYLE;
+        
+        $html =
+            '<h2 style="text-align: center;">' . $escapedTitle . '</h2>' .
+            '<table class="sortable" style="' . self::TABLE_STYLE . '">' .
+            '<tr>' .
+            '<th style="' . self::HEADER_CELL_STYLE . '">Player</th>' .
+            '<th style="' . self::HEADER_CELL_STYLE . '">' . self::METRIC_LABEL . '</th>' .
+            '</tr>' .
+            $tableRowsHtml .
+            '</table>';
 
-        return <<<HTML
-<h2 style="text-align: center;">{$escapedTitle}</h2>
-<table class="sortable" style="{$tableStyle}">
-    <tr>
-        <th style="{$headerStyle}">Player</th>
-        <th style="{$headerStyle}">{$metricLabel}</th>
-    </tr>{$tableRowsHtml}</table>
-
-HTML;
+        return $html;
     }
 }

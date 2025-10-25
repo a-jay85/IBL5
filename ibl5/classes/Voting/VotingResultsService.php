@@ -12,18 +12,18 @@ use function trim;
 use function usort;
 
 /**
- * Retrieves aggregated voting results for All-Star and end-of-year awards.
+ * Retrieves aggregated voting results for All-Star and end-of-year awards
  */
-final class VotingResultsService implements VotingResultsProvider
+class VotingResultsService implements VotingResultsProvider
 {
     private const ASG_TABLE = 'ibl_votes_ASG';
     private const EOY_TABLE = 'ibl_votes_EOY';
     public const BLANK_BALLOT_LABEL = '(No Selection Recorded)';
 
     /**
-     * Ballot columns grouped by All-Star voting category.
-     *
-     * @var array<string, array<int, string>>
+     * Ballot columns grouped by All-Star voting category
+     * 
+     * @var array
      */
     private const ALL_STAR_CATEGORIES = [
         'Eastern Conference Frontcourt' => ['East_F1', 'East_F2', 'East_F3', 'East_F4'],
@@ -33,9 +33,9 @@ final class VotingResultsService implements VotingResultsProvider
     ];
 
     /**
-     * Ballot columns grouped by end-of-year award category and weighted score.
-     *
-     * @var array<string, array<string, int>>
+     * Ballot columns grouped by end-of-year award category and weighted score
+     * 
+     * @var array
      */
     private const END_OF_YEAR_CATEGORIES = [
         'Most Valuable Player' => ['MVP_1' => 3, 'MVP_2' => 2, 'MVP_3' => 1],
@@ -45,7 +45,9 @@ final class VotingResultsService implements VotingResultsProvider
     ];
 
     /**
-     * @var object Database connection implementing sql_* helpers.
+     * Database connection implementing sql_* helpers
+     * 
+     * @var object
      */
     private $db;
 
@@ -81,8 +83,10 @@ final class VotingResultsService implements VotingResultsProvider
     }
 
     /**
-     * @param array<int, string> $ballotColumns
-     * @return array<int, array{name: string, votes: int}>
+     * Fetches All-Star voting totals for specified ballot columns
+     * 
+     * @param array $ballotColumns Array of ballot column names
+     * @return array Array of rows with name and votes
      */
     private function fetchAllStarTotals(array $ballotColumns): array
     {
@@ -92,8 +96,10 @@ final class VotingResultsService implements VotingResultsProvider
     }
 
     /**
-     * @param array<string, int> $ballotColumnsWithWeights
-     * @return array<int, array{name: string, votes: int}>
+     * Fetches end-of-year voting totals with weighted scores
+     * 
+     * @param array $ballotColumnsWithWeights Array of ballot columns and their point weights
+     * @return array Array of rows with name and votes
      */
     private function fetchEndOfYearTotals(array $ballotColumnsWithWeights): array
     {
@@ -103,7 +109,10 @@ final class VotingResultsService implements VotingResultsProvider
     }
 
     /**
-     * @param array<int, string> $ballotColumns
+     * Builds SQL query for All-Star voting totals
+     * 
+     * @param array $ballotColumns Array of ballot column names
+     * @return string SQL query
      */
     private function buildAllStarQuery(array $ballotColumns): string
     {
@@ -137,7 +146,10 @@ SQL;
     }
 
     /**
-     * @param array<string, int> $ballotColumnsWithWeights
+     * Builds SQL query for end-of-year voting totals with weighted scores
+     * 
+     * @param array $ballotColumnsWithWeights Array of ballot columns and their point weights
+     * @return string SQL query
      */
     private function buildEndOfYearQuery(array $ballotColumnsWithWeights): string
     {
@@ -172,7 +184,10 @@ SQL;
     }
 
     /**
-     * @return array<int, array{name: string, votes: int}>
+     * Executes a voting query and returns sorted results
+     * 
+     * @param string $query SQL query to execute
+     * @return array Array of rows with name and votes
      */
     private function executeVoteQuery(string $query): array
     {

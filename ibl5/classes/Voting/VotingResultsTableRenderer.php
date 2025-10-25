@@ -63,18 +63,27 @@ class VotingResultsTableRenderer
         }
 
         $tableRowsHtml = $rowsHtml ? "\n" . implode("\n", $rowsHtml) . "\n" : "\n";
-        $metricLabel = self::METRIC_LABEL;
-        $tableStyle = self::TABLE_STYLE;
-        $headerStyle = self::HEADER_CELL_STYLE;
+        
+        $html = sprintf(
+            '<h2 style="text-align: center;">%s</h2>',
+            $escapedTitle
+        );
+        
+        $html .= sprintf(
+            '<table class="sortable" style="%s">',
+            self::TABLE_STYLE
+        );
+        
+        $html .= sprintf(
+            "\n    <tr>\n        <th style=\"%s\">Player</th>\n        <th style=\"%s\">%s</th>\n    </tr>",
+            self::HEADER_CELL_STYLE,
+            self::HEADER_CELL_STYLE,
+            self::METRIC_LABEL
+        );
+        
+        $html .= $tableRowsHtml;
+        $html .= "</table>\n\n";
 
-        return <<<HTML
-<h2 style="text-align: center;">{$escapedTitle}</h2>
-<table class="sortable" style="{$tableStyle}">
-    <tr>
-        <th style="{$headerStyle}">Player</th>
-        <th style="{$headerStyle}">{$metricLabel}</th>
-    </tr>{$tableRowsHtml}</table>
-
-HTML;
+        return $html;
     }
 }

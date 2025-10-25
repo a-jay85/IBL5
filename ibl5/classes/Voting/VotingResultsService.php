@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Voting;
 
-use function array_map;
 use function implode;
 use function sprintf;
 use function strcmp;
@@ -116,33 +115,23 @@ class VotingResultsService implements VotingResultsProvider
      */
     private function buildAllStarQuery(array $ballotColumns): string
     {
-        $selectStatements = array_map(
-            static fn (string $column): string => sprintf(
-                "            SELECT %s AS name\n            FROM %s",
+        $selectStatements = [];
+        foreach ($ballotColumns as $column) {
+            $selectStatements[] = sprintf(
+                "SELECT %s AS name FROM %s",
                 $column,
                 self::ASG_TABLE
-            ),
-            $ballotColumns
+            );
+        }
+
+        $unionQuery = implode(' UNION ALL ', $selectStatements);
+
+        $query = sprintf(
+            "SELECT COUNT(name) AS votes, name FROM (%s) AS ballot GROUP BY name HAVING COUNT(name) > 0 ORDER BY votes DESC, name ASC",
+            $unionQuery
         );
 
-        $unionStatements = implode("\n        UNION ALL\n", $selectStatements);
-
-        return <<<SQL
-SELECT
-    COUNT(name) AS votes,
-    name
-FROM
-    (
-$unionStatements
-    ) AS ballot
-GROUP BY
-    name
-HAVING
-    COUNT(name) > 0
-ORDER BY
-    votes DESC,
-    name ASC;
-SQL;
+        return $query;
     }
 
     /**
@@ -156,31 +145,21 @@ SQL;
         $selectStatements = [];
         foreach ($ballotColumnsWithWeights as $column => $score) {
             $selectStatements[] = sprintf(
-                "            SELECT %s AS name, %d AS score\n            FROM %s",
+                "SELECT %s AS name, %d AS score FROM %s",
                 $column,
                 $score,
                 self::EOY_TABLE
             );
         }
 
-        $unionStatements = implode("\n        UNION ALL\n", $selectStatements);
+        $unionQuery = implode(' UNION ALL ', $selectStatements);
 
-        return <<<SQL
-SELECT
-    SUM(score) AS votes,
-    name
-FROM
-    (
-$unionStatements
-    ) AS ballot
-GROUP BY
-    name
-HAVING
-    SUM(score) > 0
-ORDER BY
-    votes DESC,
-    name ASC;
-SQL;
+        $query = sprintf(
+            "SELECT SUM(score) AS votes, name FROM (%s) AS ballot GROUP BY name HAVING SUM(score) > 0 ORDER BY votes DESC, name ASC",
+            $unionQuery
+        );
+
+        return $query;
     }
 
     /**

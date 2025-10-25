@@ -4,12 +4,6 @@ declare(strict_types=1);
 
 namespace Voting;
 
-use function implode;
-use function sprintf;
-use function strcmp;
-use function trim;
-use function usort;
-
 /**
  * Retrieves aggregated voting results for All-Star and end-of-year awards
  */
@@ -117,19 +111,12 @@ class VotingResultsService implements VotingResultsProvider
     {
         $selectStatements = [];
         foreach ($ballotColumns as $column) {
-            $selectStatements[] = sprintf(
-                "SELECT %s AS name FROM %s",
-                $column,
-                self::ASG_TABLE
-            );
+            $selectStatements[] = "SELECT {$column} AS name FROM " . self::ASG_TABLE;
         }
 
         $unionQuery = implode(' UNION ALL ', $selectStatements);
 
-        $query = sprintf(
-            "SELECT COUNT(name) AS votes, name FROM (%s) AS ballot GROUP BY name HAVING COUNT(name) > 0 ORDER BY votes DESC, name ASC;",
-            $unionQuery
-        );
+        $query = "SELECT COUNT(name) AS votes, name FROM ({$unionQuery}) AS ballot GROUP BY name HAVING COUNT(name) > 0 ORDER BY votes DESC, name ASC;";
 
         return $query;
     }
@@ -144,20 +131,12 @@ class VotingResultsService implements VotingResultsProvider
     {
         $selectStatements = [];
         foreach ($ballotColumnsWithWeights as $column => $score) {
-            $selectStatements[] = sprintf(
-                "SELECT %s AS name, %d AS score FROM %s",
-                $column,
-                $score,
-                self::EOY_TABLE
-            );
+            $selectStatements[] = "SELECT {$column} AS name, {$score} AS score FROM " . self::EOY_TABLE;
         }
 
         $unionQuery = implode(' UNION ALL ', $selectStatements);
 
-        $query = sprintf(
-            "SELECT SUM(score) AS votes, name FROM (%s) AS ballot GROUP BY name HAVING SUM(score) > 0 ORDER BY votes DESC, name ASC;",
-            $unionQuery
-        );
+        $query = "SELECT SUM(score) AS votes, name FROM ({$unionQuery}) AS ballot GROUP BY name HAVING SUM(score) > 0 ORDER BY votes DESC, name ASC;";
 
         return $query;
     }
@@ -189,17 +168,18 @@ class VotingResultsService implements VotingResultsProvider
             ];
         }
 
-        usort(
-            $rows,
-            static function (array $left, array $right): int {
-                $voteComparison = $right['votes'] <=> $left['votes'];
-                if ($voteComparison !== 0) {
-                    return $voteComparison;
-                }
+        // Sort rows by votes descending, then name ascending without using usort()
+        $sortedRows = [];
+        foreach ($rows as $row) {
+            $sortedRows[] = $row;
+        }
 
-                return strcmp($left['name'], $right['name']);
-            }
-        );
+        // Use array_multisort for sorting
+        $votes = array_column($sortedRows, 'votes');
+        $names = array_column($sortedRows, 'name');
+        array_multisort($votes, SORT_DESC, $names, SORT_ASC, $sortedRows);
+
+        $rows = $sortedRows;
 
         return $rows;
     }

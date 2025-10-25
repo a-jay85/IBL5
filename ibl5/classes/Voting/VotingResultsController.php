@@ -10,7 +10,7 @@ namespace Voting;
 class VotingResultsController
 {
     public function __construct(
-        private readonly VotingResultsProvider $provider,
+        private readonly VotingResultsService $service,
         private readonly VotingResultsTableRenderer $renderer,
         private readonly \Season $season
     ) {
@@ -37,7 +37,7 @@ class VotingResultsController
      */
     public function renderAllStarView(): string
     {
-        return $this->renderer->renderTables($this->provider->getAllStarResults());
+        return $this->renderer->renderTables($this->service->getAllStarResults());
     }
 
     /**
@@ -47,7 +47,7 @@ class VotingResultsController
      */
     public function renderEndOfYearView(): string
     {
-        return $this->renderer->renderTables($this->provider->getEndOfYearResults());
+        return $this->renderer->renderTables($this->service->getEndOfYearResults());
     }
 
     private function isRegularSeason(): bool

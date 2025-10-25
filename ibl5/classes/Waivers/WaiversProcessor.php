@@ -10,6 +10,17 @@ class WaiversProcessor
     /**
      * Calculates veteran minimum salary based on years of experience
      * 
+     * Salary tiers are determined by the NBA collective bargaining agreement:
+     * - 10+ years: $103k (maximum veteran minimum)
+     * - 9 years: $100k
+     * - 8 years: $89k
+     * - 7 years: $82k
+     * - 6 years: $76k
+     * - 5 years: $70k
+     * - 4 years: $64k
+     * - 3 years: $61k
+     * - 0-2 years: $51k (rookie minimum)
+     * 
      * @param int $experience Years of experience
      * @return int Veteran minimum salary in thousands
      */

@@ -40,7 +40,8 @@ class WaiversValidator
         $this->clearErrors();
         
         if ($rosterSlots > 2 && $totalSalary > $hardCapMax) {
-            $this->errors[] = "You have 12 players and are over $70 mill hard cap. Therefore you can't drop a player!";
+            $hardCapInMillions = $hardCapMax / 1000;
+            $this->errors[] = "You have 12 players and are over $$hardCapInMillions mill hard cap. Therefore you can't drop a player!";
             return false;
         }
         
@@ -77,10 +78,11 @@ class WaiversValidator
         }
         
         $newTotalSalary = $totalSalary + $playerSalary;
+        $hardCapInMillions = $hardCapMax / 1000;
         
         // If 12+ healthy players and signing puts over hard cap
         if ($healthyRosterSlots < 4 && $newTotalSalary > $hardCapMax) {
-            $this->errors[] = "You have 12 or more healthy players and this signing will put you over $70 million. Therefore you cannot make this signing.";
+            $this->errors[] = "You have 12 or more healthy players and this signing will put you over $$hardCapInMillions million. Therefore you cannot make this signing.";
             return false;
         }
         

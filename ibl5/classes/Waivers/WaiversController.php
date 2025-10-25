@@ -7,6 +7,11 @@ namespace Waivers;
  */
 class WaiversController
 {
+    // Configuration constants
+    private const DISCORD_BUGS_CHANNEL_URL = 'https://discord.com/channels/666986450889474053/671435182502576169';
+    private const NOTIFICATION_EMAIL_RECIPIENT = 'ibldepthcharts@gmail.com';
+    private const NOTIFICATION_EMAIL_SENDER = 'waivers@iblhoops.net';
+    
     private $db;
     private $repository;
     private $processor;
@@ -188,7 +193,7 @@ class WaiversController
         $teamID = (int) $team['teamid'];
         
         if (!$this->repository->signPlayerFromWaivers($playerID, $teamName, $teamID, $contractData)) {
-            return "Oops, something went wrong. Post what you were trying to do in <A HREF=\"https://discord.com/channels/666986450889474053/671435182502576169\">#site-bugs-and-to-do</A> and we'll fix it asap. Sorry!";
+            return "Oops, something went wrong. Post what you were trying to do in <A HREF=\"" . self::DISCORD_BUGS_CHANNEL_URL . "\">#site-bugs-and-to-do</A> and we'll fix it asap. Sorry!";
         }
         
         // Create news story
@@ -197,8 +202,7 @@ class WaiversController
         // Send email notification
         $storytitle = $teamName . " make waiver additions";
         $hometext = "The " . $teamName . " sign " . $player['name'] . " from waivers for " . $contractData['finalContract'] . ".";
-        $recipient = 'ibldepthcharts@gmail.com';
-        mail($recipient, $storytitle, $hometext, "From: waivers@iblhoops.net");
+        mail(self::NOTIFICATION_EMAIL_RECIPIENT, $storytitle, $hometext, "From: " . self::NOTIFICATION_EMAIL_SENDER);
         
         // Send Discord notification
         \Discord::postToChannel('#waiver-wire', $hometext);

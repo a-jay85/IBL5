@@ -107,12 +107,11 @@ class WaiversController
         }
         
         $totalSalary = $this->repository->getTeamTotalSalary($teamName);
-        $hardCapMax = \League::HARD_CAP_MAX;
         
         if ($action === 'drop') {
-            return $this->processDrop($playerID, $teamName, $rosterSlots, $totalSalary, $hardCapMax);
+            return $this->processDrop($playerID, $teamName, $rosterSlots, $totalSalary);
         } else {
-            return $this->processAdd($playerID, $teamName, $healthyRosterSlots, $totalSalary, $hardCapMax);
+            return $this->processAdd($playerID, $teamName, $healthyRosterSlots, $totalSalary);
         }
     }
     
@@ -123,12 +122,11 @@ class WaiversController
      * @param string $teamName Team name
      * @param int $rosterSlots Roster slots
      * @param int $totalSalary Total salary
-     * @param int $hardCapMax Hard cap maximum
      * @return string Status message
      */
-    private function processDrop(?int $playerID, string $teamName, int $rosterSlots, int $totalSalary, int $hardCapMax): string
+    private function processDrop(?int $playerID, string $teamName, int $rosterSlots, int $totalSalary): string
     {
-        if (!$this->validator->validateDrop($rosterSlots, $totalSalary, $hardCapMax)) {
+        if (!$this->validator->validateDrop($rosterSlots, $totalSalary, \League::HARD_CAP_MAX)) {
             return implode(' ', $this->validator->getErrors());
         }
         
@@ -164,10 +162,9 @@ class WaiversController
      * @param string $teamName Team name
      * @param int $healthyRosterSlots Healthy roster slots available
      * @param int $totalSalary Total salary
-     * @param int $hardCapMax Hard cap maximum
      * @return string Status message
      */
-    private function processAdd(?int $playerID, string $teamName, int $healthyRosterSlots, int $totalSalary, int $hardCapMax): string
+    private function processAdd(?int $playerID, string $teamName, int $healthyRosterSlots, int $totalSalary): string
     {
         if ($playerID === null || $playerID === 0) {
             return "You didn't select a valid player. Please select a player and try again.";
@@ -181,7 +178,7 @@ class WaiversController
         $contractData = $this->processor->prepareContractData($player);
         $playerSalary = isset($contractData['cy1']) ? (int) $contractData['cy1'] : (int) ($player['cy1'] ?? 0);
         
-        if (!$this->validator->validateAdd($playerID, $healthyRosterSlots, $totalSalary, $playerSalary, $hardCapMax)) {
+        if (!$this->validator->validateAdd($playerID, $healthyRosterSlots, $totalSalary, $playerSalary, \League::HARD_CAP_MAX)) {
             return implode(' ', $this->validator->getErrors());
         }
         

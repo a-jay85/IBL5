@@ -32,15 +32,14 @@ class WaiversValidator
      * 
      * @param int $rosterSlots Total roster slots filled
      * @param int $totalSalary Total team salary
-     * @param int $hardCapMax Maximum hard cap
      * @return bool True if valid, false otherwise
      */
-    public function validateDrop(int $rosterSlots, int $totalSalary, int $hardCapMax): bool
+    public function validateDrop(int $rosterSlots, int $totalSalary): bool
     {
         $this->clearErrors();
         
-        if ($rosterSlots > 2 && $totalSalary > $hardCapMax) {
-            $hardCapInMillions = $hardCapMax / 1000;
+        if ($rosterSlots > 2 && $totalSalary > \League::HARD_CAP_MAX) {
+            $hardCapInMillions = \League::HARD_CAP_MAX / 1000;
             $this->errors[] = "You have 12 players and are over $$hardCapInMillions mill hard cap. Therefore you can't drop a player!";
             return false;
         }
@@ -55,15 +54,13 @@ class WaiversValidator
      * @param int $healthyRosterSlots Number of healthy roster slots available
      * @param int $totalSalary Current team salary
      * @param int $playerSalary Salary of player being added
-     * @param int $hardCapMax Maximum hard cap
      * @return bool True if valid, false otherwise
      */
     public function validateAdd(
         ?int $playerID,
         int $healthyRosterSlots,
         int $totalSalary,
-        int $playerSalary,
-        int $hardCapMax
+        int $playerSalary
     ): bool {
         $this->clearErrors();
         
@@ -78,16 +75,16 @@ class WaiversValidator
         }
         
         $newTotalSalary = $totalSalary + $playerSalary;
-        $hardCapInMillions = $hardCapMax / 1000;
+        $hardCapInMillions = \League::HARD_CAP_MAX / 1000;
         
         // If 12+ healthy players and signing puts over hard cap
-        if ($healthyRosterSlots < 4 && $newTotalSalary > $hardCapMax) {
+        if ($healthyRosterSlots < 4 && $newTotalSalary > \League::HARD_CAP_MAX) {
             $this->errors[] = "You have 12 or more healthy players and this signing will put you over $$hardCapInMillions million. Therefore you cannot make this signing.";
             return false;
         }
         
         // If under 12 healthy players but over hard cap and player salary > vet min
-        if ($healthyRosterSlots > 3 && $newTotalSalary > $hardCapMax && $playerSalary > 103) {
+        if ($healthyRosterSlots > 3 && $newTotalSalary > \League::HARD_CAP_MAX && $playerSalary > 103) {
             $this->errors[] = "You are over the hard cap and therefore can only sign players who are making veteran minimum!";
             return false;
         }

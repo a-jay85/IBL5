@@ -16,8 +16,7 @@ class WaiversValidatorTest extends TestCase
     {
         $result = $this->validator->validateDrop(
             10, // roster slots
-            60000, // total salary (under cap)
-            70000  // hard cap max
+            6000 // total salary (under cap)
         );
         
         $this->assertTrue($result);
@@ -28,23 +27,21 @@ class WaiversValidatorTest extends TestCase
     {
         $result = $this->validator->validateDrop(
             13, // more than 2 roster slots (12+ players)
-            75000, // over hard cap
-            70000  // hard cap max
+            7500 // over hard cap
         );
         
         $this->assertFalse($result);
         $errors = $this->validator->getErrors();
         $this->assertCount(1, $errors);
         $this->assertStringContainsString("12 players", $errors[0]);
-        $this->assertStringContainsString("over $70 mill hard cap", $errors[0]);
+        $this->assertStringContainsString("over $7 mill hard cap", $errors[0]);
     }
     
     public function testValidateDropSucceedsWithFullRosterUnderCap()
     {
         $result = $this->validator->validateDrop(
             13, // more than 2 roster slots
-            60000, // under hard cap
-            70000  // hard cap max
+            6000 // under hard cap
         );
         
         $this->assertTrue($result);
@@ -56,9 +53,8 @@ class WaiversValidatorTest extends TestCase
         $result = $this->validator->validateAdd(
             null,  // no player selected
             5,     // healthy roster slots
-            60000, // total salary
-            100,   // player salary
-            70000  // hard cap max
+            6000,  // total salary
+            100    // player salary
         );
         
         $this->assertFalse($result);
@@ -72,9 +68,8 @@ class WaiversValidatorTest extends TestCase
         $result = $this->validator->validateAdd(
             0,     // invalid player ID
             5,     // healthy roster slots
-            60000, // total salary
-            100,   // player salary
-            70000  // hard cap max
+            6000,  // total salary
+            100    // player salary
         );
         
         $this->assertFalse($result);
@@ -88,9 +83,8 @@ class WaiversValidatorTest extends TestCase
         $result = $this->validator->validateAdd(
             123,   // valid player ID
             0,     // no healthy roster slots available
-            60000, // total salary
-            100,   // player salary
-            70000  // hard cap max
+            6000,  // total salary
+            100    // player salary
         );
         
         $this->assertFalse($result);
@@ -104,16 +98,15 @@ class WaiversValidatorTest extends TestCase
         $result = $this->validator->validateAdd(
             123,   // valid player ID
             3,     // 12 healthy players (4-1)
-            68000, // current salary
-            3000,  // player salary (would put over cap)
-            70000  // hard cap max
+            6800,  // current salary
+            300    // player salary (would put over cap)
         );
         
         $this->assertFalse($result);
         $errors = $this->validator->getErrors();
         $this->assertCount(1, $errors);
         $this->assertStringContainsString("12 or more healthy players", $errors[0]);
-        $this->assertStringContainsString("over $70 million", $errors[0]);
+        $this->assertStringContainsString("over $7 million", $errors[0]);
     }
     
     public function testValidateAddSucceedsWith12HealthyPlayersUnderCap()
@@ -121,9 +114,8 @@ class WaiversValidatorTest extends TestCase
         $result = $this->validator->validateAdd(
             123,   // valid player ID
             3,     // 12 healthy players
-            60000, // current salary
-            100,   // player salary (stays under cap)
-            70000  // hard cap max
+            6000,  // current salary
+            100    // player salary (stays under cap)
         );
         
         $this->assertTrue($result);
@@ -135,9 +127,8 @@ class WaiversValidatorTest extends TestCase
         $result = $this->validator->validateAdd(
             123,   // valid player ID
             5,     // under 12 healthy players
-            69800, // current salary
-            400,   // player salary above vet min (103), would put over cap
-            70000  // hard cap max
+            6980,  // current salary
+            400    // player salary above vet min (103), would put over cap
         );
         
         $this->assertFalse($result);
@@ -152,9 +143,8 @@ class WaiversValidatorTest extends TestCase
         $result = $this->validator->validateAdd(
             123,   // valid player ID
             5,     // under 12 healthy players
-            71000, // over hard cap
-            103,   // vet min salary
-            70000  // hard cap max
+            7100,  // over hard cap
+            103    // vet min salary
         );
         
         $this->assertTrue($result);
@@ -166,9 +156,8 @@ class WaiversValidatorTest extends TestCase
         $result = $this->validator->validateAdd(
             123,   // valid player ID
             5,     // healthy roster slots available
-            60000, // total salary
-            500,   // player salary
-            70000  // hard cap max
+            6000,  // total salary
+            500    // player salary
         );
         
         $this->assertTrue($result);
@@ -178,7 +167,7 @@ class WaiversValidatorTest extends TestCase
     public function testClearErrorsRemovesAllErrors()
     {
         // First create an error
-        $this->validator->validateAdd(null, 5, 60000, 100, 70000);
+        $this->validator->validateAdd(null, 5, 6000, 100);
         $this->assertNotEmpty($this->validator->getErrors());
         
         // Clear errors
@@ -191,9 +180,8 @@ class WaiversValidatorTest extends TestCase
         $result = $this->validator->validateAdd(
             123,   // valid player ID
             5,     // healthy roster slots
-            69900, // current salary
-            100,   // player salary brings to exactly 70000
-            70000  // hard cap max
+            6900,  // current salary
+            100    // player salary brings to exactly 7000
         );
         
         $this->assertTrue($result);

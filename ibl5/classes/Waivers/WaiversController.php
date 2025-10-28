@@ -11,6 +11,7 @@ class WaiversController
     private const DISCORD_BUGS_CHANNEL_URL = 'https://discord.com/channels/666986450889474053/671435182502576169';
     private const NOTIFICATION_EMAIL_RECIPIENT = 'ibldepthcharts@gmail.com';
     private const NOTIFICATION_EMAIL_SENDER = 'waivers@iblhoops.net';
+    public const WAIVER_POOL_MOVES_CATEGORY_ID = 1;
     
     private $db;
     private $repository;
@@ -217,11 +218,6 @@ class WaiversController
      */
     private function createWaiverNewsStory(string $teamName, string $playerName, string $action, string $contract): void
     {
-        $catID = $this->repository->getWaiverPoolMovesCategory();
-        if (!$catID) {
-            return;
-        }
-        
         $this->repository->incrementWaiverPoolMovesCounter();
         
         if ($action === 'drop') {
@@ -234,7 +230,7 @@ class WaiversController
             $hometext = "The " . $teamName . " sign " . $playerName . " from waivers for " . $contract . ".";
         }
         
-        $this->repository->createNewsStory($catID, $topicID, $storytitle, $hometext);
+        $this->repository->createNewsStory($topicID, $storytitle, $hometext);
     }
     
     /**

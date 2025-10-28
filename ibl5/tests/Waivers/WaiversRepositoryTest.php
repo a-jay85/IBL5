@@ -231,7 +231,6 @@ class WaiversRepositoryTest extends TestCase
         $this->mockDb->setReturnTrue(true);
         
         $result = $this->repository->createNewsStory(
-            5,
             32,
             'Test Team make waiver cuts',
             'The Test Team cut Test Player to waivers.'

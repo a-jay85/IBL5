@@ -192,15 +192,13 @@ class WaiversRepository
     /**
      * Creates a news story for a waiver transaction
      * 
-     * @param int $catID Category ID
      * @param int $topicID Topic ID
      * @param string $title Story title
      * @param string $hometext Story content
      * @return bool Success status
      */
-    public function createNewsStory(int $catID, int $topicID, string $title, string $hometext): bool
+    public function createNewsStory(int $topicID, string $title, string $hometext): bool
     {
-        $catID = (int) $catID;
         $topicID = (int) $topicID;
         $titleEscaped = \Services\DatabaseService::escapeString($this->db, $title);
         $hometextEscaped = \Services\DatabaseService::escapeString($this->db, $hometext);
@@ -217,7 +215,7 @@ class WaiversRepository
                    counter,
                    alanguage)
                   VALUES
-                  ($catID,
+                  (" . WaiversController::WAIVER_POOL_MOVES_CATEGORY_ID . ",
                    'Associated Press',
                    '$titleEscaped',
                    '$timestamp',

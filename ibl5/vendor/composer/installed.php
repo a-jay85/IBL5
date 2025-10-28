@@ -1,9 +1,9 @@
 <?php return array(
     'root' => array(
         'name' => '__root__',
-        'pretty_version' => 'dev-master',
-        'version' => 'dev-master',
-        'reference' => 'b9c8bcdd271ec0ccc54faac5fbc25fc163ac9e6a',
+        'pretty_version' => 'dev-copilot/fix-draft-module-player-selection',
+        'version' => 'dev-copilot/fix-draft-module-player-selection',
+        'reference' => '32ed3a8cb91ca271e8a6a71f0dc129dfd2001c21',
         'type' => 'library',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
@@ -11,9 +11,9 @@
     ),
     'versions' => array(
         '__root__' => array(
-            'pretty_version' => 'dev-master',
-            'version' => 'dev-master',
-            'reference' => 'b9c8bcdd271ec0ccc54faac5fbc25fc163ac9e6a',
+            'pretty_version' => 'dev-copilot/fix-draft-module-player-selection',
+            'version' => 'dev-copilot/fix-draft-module-player-selection',
+            'reference' => '32ed3a8cb91ca271e8a6a71f0dc129dfd2001c21',
             'type' => 'library',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),

@@ -63,10 +63,13 @@ class TradeApprovalTest extends TestCase
             if (strpos($query, "'Atlanta Hawks'") !== false && strpos($query, "'Boston Celtics'") !== false) {
                 // This is an item from Atlanta to Boston
                 // Check that approval is Boston Celtics
-                preg_match("/approval\s*\)\s*VALUES\s*\([^)]+,\s*'([^']+)'\s*\)/i", $query, $matches);
-                if (!empty($matches[1])) {
-                    $this->assertEquals('Boston Celtics', $matches[1], 
-                        'For items from offering team (Atlanta) to listening team (Boston), approval should be Boston');
+                // Pattern matches: VALUES ('tradeid', 'itemid', 'type', 'from', 'to', 'approval')
+                if (preg_match("/VALUES\s*\(\s*'[^']+'\s*,\s*'[^']+'\s*,\s*'[^']+'\s*,\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*'([^']+)'\s*\)/i", $query, $matches)) {
+                    $from = $matches[1];
+                    $to = $matches[2];
+                    $approval = $matches[3];
+                    $this->assertEquals('Boston Celtics', $approval, 
+                        "For items from {$from} to {$to}, approval should be Boston Celtics");
                 }
             }
             
@@ -74,7 +77,8 @@ class TradeApprovalTest extends TestCase
             if (strpos($query, "'cash'") !== false) {
                 // This is a cash item
                 // Extract the from and to teams and approval
-                if (preg_match("/VALUES\s*\([^,]+,\s*[^,]+,\s*'cash',\s*'([^']+)',\s*'([^']+)',\s*'([^']+)'\s*\)/i", $query, $matches)) {
+                // Pattern matches: VALUES ('tradeid', 'itemid', 'cash', 'from', 'to', 'approval')
+                if (preg_match("/VALUES\s*\(\s*'[^']+'\s*,\s*'[^']+'\s*,\s*'cash'\s*,\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*'([^']+)'\s*\)/i", $query, $matches)) {
                     $from = $matches[1];
                     $to = $matches[2];
                     $approval = $matches[3];
@@ -124,16 +128,16 @@ class TradeApprovalTest extends TestCase
                 strpos($query, "'Atlanta Hawks'") !== false) {
                 
                 // Extract approval value
-                if (preg_match("/VALUES\s*\([^,]+,\s*[^,]+,\s*'cash',\s*'([^']+)',\s*'([^']+)',\s*'([^']+)'\s*\)/i", $query, $matches)) {
+                // Pattern matches: VALUES ('tradeid', 'itemid', 'cash', 'from', 'to', 'approval')
+                if (preg_match("/VALUES\s*\(\s*'[^']+'\s*,\s*'[^']+'\s*,\s*'cash'\s*,\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*'([^']+)'\s*\)/i", $query, $matches)) {
                     $from = $matches[1];
                     $to = $matches[2];
                     $approval = $matches[3];
                     
-                    // BUG: currently approval would be 'Atlanta Hawks' (offering team)
-                    // FIX: approval should be 'Boston Celtics' (listening team)
+                    // This test verifies the fix: approval should always be the listening team (Boston Celtics)
                     $this->assertEquals('Boston Celtics', $approval, 
-                        "BUG FOUND: When Boston (listening) sends cash to Atlanta (offering), " .
-                        "approval is set to {$approval} but should be Boston Celtics");
+                        "When Boston (listening) sends cash to Atlanta (offering), " .
+                        "approval must be Boston Celtics (the listening team). Got: {$approval}");
                 }
             }
         }

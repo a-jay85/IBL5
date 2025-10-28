@@ -106,7 +106,7 @@ class WaiversValidatorTest extends TestCase
         $errors = $this->validator->getErrors();
         $this->assertCount(1, $errors);
         $this->assertStringContainsString("12 or more healthy players", $errors[0]);
-        $this->assertStringContainsString("over $7 million", $errors[0]);
+        $this->assertStringContainsString("over the hard cap", $errors[0]);
     }
     
     public function testValidateAddSucceedsWith12HealthyPlayersUnderCap()

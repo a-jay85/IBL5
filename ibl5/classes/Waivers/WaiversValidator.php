@@ -74,11 +74,10 @@ class WaiversValidator
         }
         
         $newTotalSalary = $totalSalary + $playerSalary;
-        $hardCapInMillions = \League::HARD_CAP_MAX / 1000;
         
         // If 12+ healthy players and signing puts over hard cap
         if ($healthyRosterSlots < 4 && $newTotalSalary > \League::HARD_CAP_MAX) {
-            $this->errors[] = "You have 12 or more healthy players and this signing will put you over $$hardCapInMillions million. Therefore you cannot make this signing.";
+            $this->errors[] = "You have 12 or more healthy players and this signing will put you over the hard cap. Therefore you cannot make this signing.";
             return false;
         }
         

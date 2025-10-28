@@ -247,6 +247,17 @@ function mlaphp_autoloader($class)
         }
     }
 
+    // Special handling for Player classes (ibl5/classes/Player)
+    $playerClasses = ['Player', 'PlayerData', 'PlayerRepository', 'PlayerContractCalculator', 
+                      'PlayerContractValidator', 'PlayerNameDecorator', 'PlayerInjuryCalculator'];
+    if (in_array($class, $playerClasses)) {
+        $file = $dir . DIRECTORY_SEPARATOR . 'Player' . DIRECTORY_SEPARATOR . $class . '.php';
+        if (file_exists($file)) {
+            require $file;
+            return;
+        }
+    }
+
     // Default: prefix with the central directory location and suffix with .php,
     // then require it.
     $file = $dir . DIRECTORY_SEPARATOR . $subpath . '.php';

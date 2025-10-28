@@ -126,7 +126,7 @@ class WaiversController
      */
     private function processDrop(?int $playerID, string $teamName, int $rosterSlots, int $totalSalary): string
     {
-        if (!$this->validator->validateDrop($rosterSlots, $totalSalary, \League::HARD_CAP_MAX)) {
+        if (!$this->validator->validateDrop($rosterSlots, $totalSalary)) {
             return implode(' ', $this->validator->getErrors());
         }
         
@@ -178,7 +178,7 @@ class WaiversController
         $contractData = $this->processor->prepareContractData($player);
         $playerSalary = isset($contractData['cy1']) ? (int) $contractData['cy1'] : (int) ($player['cy1'] ?? 0);
         
-        if (!$this->validator->validateAdd($playerID, $healthyRosterSlots, $totalSalary, $playerSalary, \League::HARD_CAP_MAX)) {
+        if (!$this->validator->validateAdd($playerID, $healthyRosterSlots, $totalSalary, $playerSalary)) {
             return implode(' ', $this->validator->getErrors());
         }
         

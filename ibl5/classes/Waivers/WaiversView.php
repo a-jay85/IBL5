@@ -107,10 +107,7 @@ class WaiversView
         \Nuke\Header::header();
         OpenTable();
         \UI::displaytopmenu($GLOBALS['db'], 0);
-        echo "<center><font class=\"title\"><b>" . htmlspecialchars($message, ENT_QUOTES, 'UTF-8') . "</b></font></center>\n";
-        CloseTable();
-        echo "<br>\n";
-        OpenTable();
+        echo "<center><font class=\"title\"><b>" . htmlspecialchars($message, ENT_QUOTES, 'UTF-8') . "</b></font></center>";
         loginbox();
         CloseTable();
         \Nuke\Footer::footer();

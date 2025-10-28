@@ -32,28 +32,6 @@ Restructured the HTML so the form properly wraps the entire sortable table:
 
 ## Files Modified
 1. `ibl5/modules/College_Scouting/index.php` - Fixed HTML structure (lines 72-200)
-2. `ibl5/phpunit.xml` - Added test suite configuration
-3. `ibl5/tests/CollegeScouting/DraftSelectionTest.php` - New test file with 11 tests
-
-## Testing
-All tests pass:
-- 236 total tests (225 existing + 11 new)
-- 708 total assertions (678 existing + 30 new)
-- 0 failures
-- 0 errors
-
-### New Test Coverage
-1. ✓ Player selection from POST data
-2. ✓ Player names with apostrophes (e.g., "Shaquille O'Neal")
-3. ✓ Missing player selection detection
-4. ✓ Draft pick validation (available vs. taken)
-5. ✓ Draft pick availability checking
-6. ✓ Query formation with special characters
-7. ✓ Successful draft selection workflow
-8. ✓ Radio button value format validation
-9. ✓ Radio button values with apostrophes
-10. ✓ Form structure validation
-11. ✓ Complete draft workflow integration
 
 ## Expected Behavior After Fix
 Users can now:

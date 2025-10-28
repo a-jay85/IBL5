@@ -1,9 +1,9 @@
 <?php return array(
     'root' => array(
         'name' => '__root__',
-        'pretty_version' => 'dev-master',
-        'version' => 'dev-master',
-        'reference' => 'b9c8bcdd271ec0ccc54faac5fbc25fc163ac9e6a',
+        'pretty_version' => 'dev-copilot/fix-trading-module-bug',
+        'version' => 'dev-copilot/fix-trading-module-bug',
+        'reference' => 'e9f1917d899e136be37b2a63e859128524795e44',
         'type' => 'library',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
@@ -11,9 +11,9 @@
     ),
     'versions' => array(
         '__root__' => array(
-            'pretty_version' => 'dev-master',
-            'version' => 'dev-master',
-            'reference' => 'b9c8bcdd271ec0ccc54faac5fbc25fc163ac9e6a',
+            'pretty_version' => 'dev-copilot/fix-trading-module-bug',
+            'version' => 'dev-copilot/fix-trading-module-bug',
+            'reference' => 'e9f1917d899e136be37b2a63e859128524795e44',
             'type' => 'library',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),

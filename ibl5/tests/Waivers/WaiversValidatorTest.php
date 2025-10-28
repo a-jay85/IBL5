@@ -90,7 +90,7 @@ class WaiversValidatorTest extends TestCase
         $this->assertFalse($result);
         $errors = $this->validator->getErrors();
         $this->assertCount(1, $errors);
-        $this->assertStringContainsString("full roster of 15 players", $errors[0]);
+        $this->assertStringContainsString("full roster", $errors[0]);
     }
     
     public function testValidateAddFailsWith12PlusHealthyPlayersOverCap()

@@ -69,7 +69,7 @@ class WaiversValidator
         }
         
         if ($healthyRosterSlots < 1) {
-            $this->errors[] = "You have full roster of 15 players. You can't sign another player at this time!";
+            $this->errors[] = "You have a full roster. You can't sign another player at this time!";
             return false;
         }
         

@@ -39,8 +39,7 @@ class WaiversValidator
         $this->clearErrors();
         
         if ($rosterSlots > 2 && $totalSalary > \League::HARD_CAP_MAX) {
-            $hardCapInMillions = \League::HARD_CAP_MAX / 1000;
-            $this->errors[] = "You have 12 players and are over $$hardCapInMillions mill hard cap. Therefore you can't drop a player!";
+            $this->errors[] = "You have 12 players and are over the hard cap. Therefore you can't drop a player!";
             return false;
         }
         

@@ -34,7 +34,7 @@ class WaiversValidatorTest extends TestCase
         $errors = $this->validator->getErrors();
         $this->assertCount(1, $errors);
         $this->assertStringContainsString("12 players", $errors[0]);
-        $this->assertStringContainsString("over $7 mill hard cap", $errors[0]);
+        $this->assertStringContainsString("over the hard cap", $errors[0]);
     }
     
     public function testValidateDropSucceedsWithFullRosterUnderCap()

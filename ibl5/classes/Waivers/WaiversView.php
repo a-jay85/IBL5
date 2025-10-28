@@ -35,29 +35,39 @@ class WaiversView
         }
         
         echo "<form name=\"Waiver_Move\" method=\"post\" action=\"\">";
-        echo "<input type=\"hidden\" name=\"Team_Name\" value=\"$teamNameEscaped\">";
-        echo "<center><img src=\"images/logo/$teamID.jpg\"><br>";
-        echo "<table border=1 cellspacing=0 cellpadding=0>";
-        echo "<tr>";
-        echo "<th colspan=3><center>WAIVER WIRE - YOUR TEAM CURRENTLY HAS $openRosterSpots EMPTY ROSTER SPOTS and $healthyOpenRosterSpots HEALTHY ROSTER SPOTS</center></th>";
-        echo "</tr>";
-        echo "<tr>";
-        echo "<td valign=top><center><b><u>$teamNameEscaped</u></b>";
-        echo "<select name=\"Player_ID\"><option value=\"\">Select player...</option>";
+        echo "    <input type=\"hidden\" name=\"Team_Name\" value=\"$teamNameEscaped\">";
+        echo "    <center>";
+        echo "        <img src=\"images/logo/$teamID.jpg\"><br>";
+        echo "        <table border=1 cellspacing=0 cellpadding=0>";
+        echo "            <tr>";
+        echo "                <th colspan=3><center>WAIVER WIRE - YOUR TEAM CURRENTLY HAS $openRosterSpots EMPTY ROSTER SPOTS and $healthyOpenRosterSpots HEALTHY ROSTER SPOTS</center></th>";
+        echo "            </tr>";
+        echo "            <tr>";
+        echo "                <td valign=top>";
+        echo "                    <center><b><u>$teamNameEscaped</u></b>";
+        echo "                    <select name=\"Player_ID\">";
+        echo "                        <option value=\"\">Select player...</option>";
         
         foreach ($players as $optionHtml) {
             echo $optionHtml;
         }
         
-        echo "</select></center>";
-        echo "</td>";
-        echo "</tr>";
-        echo "<input type=\"hidden\" name=\"Action\" value=\"$actionEscaped\">";
-        echo "<input type=\"hidden\" name=\"rosterslots\" value=\"$openRosterSpots\">";
-        echo "<input type=\"hidden\" name=\"healthyrosterslots\" value=\"$healthyOpenRosterSpots\">";
-        echo "<tr>";
-        echo "<td colspan=3><center><input type=\"submit\" value=\"Click to $actionEscaped player(s) to/from Waiver Pool\" onclick=\"this.disabled=true;this.value='Submitting...'; this.form.submit();\"></center></td>";
-        echo "</tr></form></table></center>";
+        echo "                    </select></center>";
+        echo "                </td>";
+        echo "            </tr>";
+        echo "            <input type=\"hidden\" name=\"Action\" value=\"$actionEscaped\">";
+        echo "            <input type=\"hidden\" name=\"rosterslots\" value=\"$openRosterSpots\">";
+        echo "            <input type=\"hidden\" name=\"healthyrosterslots\" value=\"$healthyOpenRosterSpots\">";
+        echo "            <tr>";
+        echo "                <td colspan=3>";
+        echo "                    <center>";
+        echo "                        <input type=\"submit\" value=\"Click to $actionEscaped player(s) to/from Waiver Pool\" onclick=\"this.disabled=true;this.value='Submitting...'; this.form.submit();\">";
+        echo "                    </center>";
+        echo "                </td>";
+        echo "            </tr>";
+        echo "        </table>";
+        echo "    </center>";
+        echo "</form>";
     }
     
     /**

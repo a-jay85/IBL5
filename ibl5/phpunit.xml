@@ -15,5 +15,8 @@
         <testsuite name="DepthChart Module Tests">
             <directory>tests/DepthChart</directory>
         </testsuite>
+        <testsuite name="Waivers Module Tests">
+            <directory>tests/Waivers</directory>
+        </testsuite>
     </testsuites>
 </phpunit>

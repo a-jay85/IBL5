@@ -1,12 +1,5 @@
 <?php
 
-require_once __DIR__ . '/PlayerData.php';
-require_once __DIR__ . '/PlayerRepository.php';
-require_once __DIR__ . '/PlayerContractCalculator.php';
-require_once __DIR__ . '/PlayerContractValidator.php';
-require_once __DIR__ . '/PlayerNameDecorator.php';
-require_once __DIR__ . '/PlayerInjuryCalculator.php';
-
 /**
  * Player - Facade for player-related operations
  * 

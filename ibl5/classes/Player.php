@@ -1,9 +1,29 @@
 <?php
 
+require_once __DIR__ . '/PlayerData.php';
+require_once __DIR__ . '/PlayerRepository.php';
+require_once __DIR__ . '/PlayerContractCalculator.php';
+require_once __DIR__ . '/PlayerContractValidator.php';
+require_once __DIR__ . '/PlayerNameDecorator.php';
+require_once __DIR__ . '/PlayerInjuryCalculator.php';
+
+/**
+ * Player - Facade for player-related operations
+ * 
+ * This class now acts as a facade, delegating responsibilities to specialized classes
+ * while maintaining backward compatibility with existing code.
+ */
 class Player
 {
     protected $db;
+    protected $playerData;
+    protected $repository;
+    protected $contractCalculator;
+    protected $contractValidator;
+    protected $nameDecorator;
+    protected $injuryCalculator;
 
+    // Keep all public properties for backward compatibility
     public $playerID;
     public $plr;
 
@@ -84,6 +104,10 @@ class Player
 
     public function __construct()
     {
+        $this->contractCalculator = new PlayerContractCalculator();
+        $this->contractValidator = new PlayerContractValidator();
+        $this->nameDecorator = new PlayerNameDecorator();
+        $this->injuryCalculator = new PlayerInjuryCalculator();
     }
 
     public static function withPlayerID($db, int $playerID)
@@ -109,278 +133,167 @@ class Player
 
     protected function loadByID($db, int $playerID)
     {
-        $query = "SELECT *
-            FROM ibl_plr
-            WHERE pid = $playerID
-            LIMIT 1;";
-        $result = $db->sql_query($query);
-        $plrRow = $db->sql_fetch_assoc($result);
-        $this->fill($db, $plrRow);
+        $this->db = $db;
+        $this->repository = new PlayerRepository($db);
+        $this->playerData = $this->repository->loadByID($playerID);
+        $this->syncPropertiesFromPlayerData();
     }
 
     protected function fill($db, array $plrRow)
     {
         $this->db = $db;
-
-        $this->playerID = $plrRow['pid'];
-        $this->ordinal = $plrRow['ordinal'];
-        $this->name = $plrRow['name'];
-        $this->nickname = $plrRow['nickname'];
-        $this->age = $plrRow['age'];
-
-        $this->teamID = $plrRow['tid'];
-        $this->teamName = $plrRow['teamname'];
-        $this->position = $plrRow['pos'];
-        
-        $this->ratingFieldGoalAttempts = $plrRow['r_fga'];
-        $this->ratingFieldGoalPercentage = $plrRow['r_fgp'];
-        $this->ratingFreeThrowAttempts = $plrRow['r_fta'];
-        $this->ratingFreeThrowPercentage = $plrRow['r_ftp'];
-        $this->ratingThreePointAttempts = $plrRow['r_tga'];
-        $this->ratingThreePointPercentage = $plrRow['r_tgp'];
-        $this->ratingOffensiveRebounds = $plrRow['r_orb'];
-        $this->ratingDefensiveRebounds = $plrRow['r_drb'];
-        $this->ratingAssists = $plrRow['r_ast'];
-        $this->ratingSteals = $plrRow['r_stl'];
-        $this->ratingTurnovers = $plrRow['r_to'];
-        $this->ratingBlocks = $plrRow['r_blk'];
-        $this->ratingFouls = $plrRow['r_foul'];
-        $this->ratingOutsideOffense = $plrRow['oo'];
-        $this->ratingOutsideDefense = $plrRow['od'];
-        $this->ratingDriveOffense = $plrRow['do'];
-        $this->ratingDriveDefense = $plrRow['dd'];
-        $this->ratingPostOffense = $plrRow['po'];
-        $this->ratingPostDefense = $plrRow['pd'];
-        $this->ratingTransitionOffense = $plrRow['to'];
-        $this->ratingTransitionDefense = $plrRow['td'];
-        $this->ratingClutch = $plrRow['Clutch'];
-        $this->ratingConsistency = $plrRow['Consistency'];
-        $this->ratingTalent = $plrRow['talent'];
-        $this->ratingSkill = $plrRow['skill'];
-        $this->ratingIntangibles = $plrRow['intangibles'];
-
-        $this->freeAgencyLoyalty = $plrRow['loyalty'];
-        $this->freeAgencyPlayingTime = $plrRow['playingTime'];
-        $this->freeAgencyPlayForWinner = $plrRow['winner'];
-        $this->freeAgencyTradition = $plrRow['tradition'];
-        $this->freeAgencySecurity = $plrRow['security'];
-
-        $this->yearsOfExperience = $plrRow['exp'];
-        $this->birdYears = $plrRow['bird'];
-        $this->contractCurrentYear = $plrRow['cy'];
-        $this->contractTotalYears = $plrRow['cyt'];
-        $this->contractYear1Salary = $plrRow['cy1'];
-        $this->contractYear2Salary = $plrRow['cy2'];
-        $this->contractYear3Salary = $plrRow['cy3'];
-        $this->contractYear4Salary = $plrRow['cy4'];
-        $this->contractYear5Salary = $plrRow['cy5'];
-        $this->contractYear6Salary = $plrRow['cy6'];
-        $this->currentSeasonSalary = $this->getCurrentSeasonSalary();
-    
-        $this->draftYear = $plrRow['draftyear'];
-        $this->draftRound = $plrRow['draftround'];
-        $this->draftPickNumber = $plrRow['draftpickno'];
-        $this->draftTeamOriginalName = $plrRow['draftedby'];
-        $this->draftTeamCurrentName = $plrRow['draftedbycurrentname'];
-        $this->collegeName = $plrRow['college'];
-    
-        $this->daysRemainingForInjury = $plrRow['injured'];
-    
-        $this->heightFeet = $plrRow['htft'];
-        $this->heightInches = $plrRow['htin'];
-        $this->weightPounds = $plrRow['wt'];
-    
-        $this->isRetired = $plrRow['retired'];
-    
-        $this->timeDroppedOnWaivers = $plrRow['droptime'];
-
-        $this->decoratedName = $this->decoratePlayerName();
+        $this->repository = new PlayerRepository($db);
+        $this->playerData = $this->repository->fillFromCurrentRow($plrRow);
+        $this->syncPropertiesFromPlayerData();
     }
 
     protected function fillHistorical($db, array $plrRow)
     {
         $this->db = $db;
+        $this->repository = new PlayerRepository($db);
+        $this->playerData = $this->repository->fillFromHistoricalRow($plrRow);
+        $this->syncPropertiesFromPlayerData();
+    }
 
-        $this->playerID = $plrRow['pid'];
-        $this->historicalYear = $plrRow['year'];
-        $this->name = $plrRow['name'];
+    /**
+     * Sync all public properties from PlayerData for backward compatibility
+     */
+    protected function syncPropertiesFromPlayerData()
+    {
+        $this->playerID = $this->playerData->playerID;
+        $this->ordinal = $this->playerData->ordinal;
+        $this->name = $this->playerData->name;
+        $this->nickname = $this->playerData->nickname;
+        $this->age = $this->playerData->age;
+        $this->historicalYear = $this->playerData->historicalYear;
 
-        $this->teamName = $plrRow['team'];
-        $this->teamID = $plrRow['teamid'];
+        $this->teamID = $this->playerData->teamID;
+        $this->teamName = $this->playerData->teamName;
+        $this->position = $this->playerData->position;
         
-        $this->ratingFieldGoalAttempts = $plrRow['r_2ga'];
-        $this->ratingFieldGoalPercentage = $plrRow['r_2gp'];
-        $this->ratingFreeThrowAttempts = $plrRow['r_fta'];
-        $this->ratingFreeThrowPercentage = $plrRow['r_ftp'];
-        $this->ratingThreePointAttempts = $plrRow['r_3ga'];
-        $this->ratingThreePointPercentage = $plrRow['r_3gp'];
-        $this->ratingOffensiveRebounds = $plrRow['r_orb'];
-        $this->ratingDefensiveRebounds = $plrRow['r_drb'];
-        $this->ratingAssists = $plrRow['r_ast'];
-        $this->ratingSteals = $plrRow['r_stl'];
-        $this->ratingBlocks = $plrRow['r_blk'];
-        $this->ratingTurnovers = $plrRow['r_tvr'];
+        $this->ratingFieldGoalAttempts = $this->playerData->ratingFieldGoalAttempts;
+        $this->ratingFieldGoalPercentage = $this->playerData->ratingFieldGoalPercentage;
+        $this->ratingFreeThrowAttempts = $this->playerData->ratingFreeThrowAttempts;
+        $this->ratingFreeThrowPercentage = $this->playerData->ratingFreeThrowPercentage;
+        $this->ratingThreePointAttempts = $this->playerData->ratingThreePointAttempts;
+        $this->ratingThreePointPercentage = $this->playerData->ratingThreePointPercentage;
+        $this->ratingOffensiveRebounds = $this->playerData->ratingOffensiveRebounds;
+        $this->ratingDefensiveRebounds = $this->playerData->ratingDefensiveRebounds;
+        $this->ratingAssists = $this->playerData->ratingAssists;
+        $this->ratingSteals = $this->playerData->ratingSteals;
+        $this->ratingTurnovers = $this->playerData->ratingTurnovers;
+        $this->ratingBlocks = $this->playerData->ratingBlocks;
+        $this->ratingFouls = $this->playerData->ratingFouls;
+        $this->ratingOutsideOffense = $this->playerData->ratingOutsideOffense;
+        $this->ratingOutsideDefense = $this->playerData->ratingOutsideDefense;
+        $this->ratingDriveOffense = $this->playerData->ratingDriveOffense;
+        $this->ratingDriveDefense = $this->playerData->ratingDriveDefense;
+        $this->ratingPostOffense = $this->playerData->ratingPostOffense;
+        $this->ratingPostDefense = $this->playerData->ratingPostDefense;
+        $this->ratingTransitionOffense = $this->playerData->ratingTransitionOffense;
+        $this->ratingTransitionDefense = $this->playerData->ratingTransitionDefense;
+        $this->ratingClutch = $this->playerData->ratingClutch;
+        $this->ratingConsistency = $this->playerData->ratingConsistency;
+        $this->ratingTalent = $this->playerData->ratingTalent;
+        $this->ratingSkill = $this->playerData->ratingSkill;
+        $this->ratingIntangibles = $this->playerData->ratingIntangibles;
 
-        $this->ratingOutsideOffense = $plrRow['r_oo'];
-        $this->ratingOutsideDefense = $plrRow['r_od'];
-        $this->ratingDriveOffense = $plrRow['r_do'];
-        $this->ratingDriveDefense = $plrRow['r_dd'];
-        $this->ratingPostOffense = $plrRow['r_po'];
-        $this->ratingPostDefense = $plrRow['r_pd'];
-        $this->ratingTransitionOffense = $plrRow['r_to'];
-        $this->ratingTransitionDefense = $plrRow['r_td'];
+        $this->freeAgencyLoyalty = $this->playerData->freeAgencyLoyalty;
+        $this->freeAgencyPlayingTime = $this->playerData->freeAgencyPlayingTime;
+        $this->freeAgencyPlayForWinner = $this->playerData->freeAgencyPlayForWinner;
+        $this->freeAgencyTradition = $this->playerData->freeAgencyTradition;
+        $this->freeAgencySecurity = $this->playerData->freeAgencySecurity;
 
-        $this->salaryJSB = $plrRow['salary'];
+        $this->yearsOfExperience = $this->playerData->yearsOfExperience;
+        $this->birdYears = $this->playerData->birdYears;
+        $this->contractCurrentYear = $this->playerData->contractCurrentYear;
+        $this->contractTotalYears = $this->playerData->contractTotalYears;
+        $this->contractYear1Salary = $this->playerData->contractYear1Salary;
+        $this->contractYear2Salary = $this->playerData->contractYear2Salary;
+        $this->contractYear3Salary = $this->playerData->contractYear3Salary;
+        $this->contractYear4Salary = $this->playerData->contractYear4Salary;
+        $this->contractYear5Salary = $this->playerData->contractYear5Salary;
+        $this->contractYear6Salary = $this->playerData->contractYear6Salary;
+        $this->currentSeasonSalary = $this->contractCalculator->getCurrentSeasonSalary($this->playerData);
+        $this->salaryJSB = $this->playerData->salaryJSB;
+    
+        $this->draftYear = $this->playerData->draftYear;
+        $this->draftRound = $this->playerData->draftRound;
+        $this->draftPickNumber = $this->playerData->draftPickNumber;
+        $this->draftTeamOriginalName = $this->playerData->draftTeamOriginalName;
+        $this->draftTeamCurrentName = $this->playerData->draftTeamCurrentName;
+        $this->collegeName = $this->playerData->collegeName;
+    
+        $this->daysRemainingForInjury = $this->playerData->daysRemainingForInjury;
+    
+        $this->heightFeet = $this->playerData->heightFeet;
+        $this->heightInches = $this->playerData->heightInches;
+        $this->weightPounds = $this->playerData->weightPounds;
+    
+        $this->isRetired = $this->playerData->isRetired;
+    
+        $this->timeDroppedOnWaivers = $this->playerData->timeDroppedOnWaivers;
 
-        $this->decoratedName = $this->name;
+        $this->decoratedName = $this->decoratePlayerName();
     }
 
     public function decoratePlayerName()
     {
-        if ($this->teamID == 0) {
-            $decoratedName = "$this->name";
-        } elseif ($this->ordinal > JSB::WAIVERS_ORDINAL) {
-            $decoratedName = "($this->name)*";
-        } elseif ($this->contractCurrentYear == $this->contractTotalYears) { // eligible for Free Agency at the end of this season
-            $decoratedName = "$this->name^";
-        } else {
-            $decoratedName = "$this->name";
-        }
-        return $decoratedName;
+        return $this->nameDecorator->decoratePlayerName($this->playerData);
     }
 
     public function getCurrentSeasonSalary()
     {
-        if ("contractYear" . $this->contractCurrentYear . "Salary" == "contractYear0Salary") {
-            $currentSeasonSalary = $this->contractYear1Salary;
-        } elseif ("contractYear" . $this->contractCurrentYear . "Salary" == "contractYear7Salary") {
-            $currentSeasonSalary = 0;
-        } else {
-            $currentSeasonSalary = $this->{"contractYear" . $this->contractCurrentYear . "Salary"};
-        }
-        return $currentSeasonSalary;
+        return $this->contractCalculator->getCurrentSeasonSalary($this->playerData);
     }
 
     public function getFreeAgencyDemands()
     {
-        $query = "SELECT *
-            FROM ibl_demands
-            WHERE name='$this->name'";
-        $result = $this->db->sql_query($query);
-        return $result;
+        return $this->repository->getFreeAgencyDemands($this->name);
     }
 
     public function getInjuryReturnDate($rawLastSimEndDate)
     {
-        if ($this->daysRemainingForInjury > 0) {
-            $properLastSimEndDate = date_create($rawLastSimEndDate);
-            $injuryDateString = $this->daysRemainingForInjury + 1 . ' days';
-            $injuryReturnDate = date_add($properLastSimEndDate, date_interval_create_from_date_string($injuryDateString));
-            return $injuryReturnDate->format('Y-m-d');
-        } else {
-            return "";
-        }
+        return $this->injuryCalculator->getInjuryReturnDate($this->playerData, $rawLastSimEndDate);
     }
 
     public function getNextSeasonSalary()
     {
-        $contractNextYear = $this->contractCurrentYear + 1;
-        $nextSeasonSalary = $this->{"contractYear" . $contractNextYear . "Salary"};
-        return $nextSeasonSalary;
+        return $this->contractCalculator->getNextSeasonSalary($this->playerData);
     }
 
     public function getLongBuyoutArray()
     {
-        $totalRemainingSalary = $this->getTotalRemainingSalary();
-        $oneSixthOfTotalRemainingSalary = round($totalRemainingSalary / 6);
-        $longBuyoutArray[1] = $longBuyoutArray[2] = $longBuyoutArray[3] = $longBuyoutArray[4] = $longBuyoutArray[5] = $longBuyoutArray[6] = $oneSixthOfTotalRemainingSalary;
-        return $longBuyoutArray;
+        return $this->contractCalculator->getLongBuyoutArray($this->playerData);
     }
 
     public function getShortBuyoutArray()
     {
-        $totalRemainingSalary = $this->getTotalRemainingSalary();
-        $oneHalfOfTotalRemainingSalary = round($totalRemainingSalary / 2);
-        $shortBuyoutArray[1] = $shortBuyoutArray[2] = $oneHalfOfTotalRemainingSalary;
-        return $shortBuyoutArray;
+        return $this->contractCalculator->getShortBuyoutArray($this->playerData);
     }
 
     public function getRemainingContractArray()
     {
-        $contractCurrentYear = ($this->contractCurrentYear != 0) ? $this->contractCurrentYear : 1;
-        $contractTotalYears = ($this->contractTotalYears != 0) ? $this->contractTotalYears : 1;
-
-        $contractArray = array();
-        $remainingContractYear = 1;
-        for ($i = $contractCurrentYear; $i <= $contractTotalYears; $i++) {
-            if ($this->{"contractYear" . $i . "Salary"} != 0) {
-                $contractArray[$remainingContractYear] = $this->{"contractYear" . $i . "Salary"};
-            }
-            $remainingContractYear++;
-        }
-
-        $contractArray[1] = ($contractArray) ? $contractArray[1] : 0;
-        return $contractArray;
+        return $this->contractCalculator->getRemainingContractArray($this->playerData);
     }
 
     public function getTotalRemainingSalary()
     {
-        $contractArray = $this->getRemainingContractArray();
-        return array_sum($contractArray);
+        return $this->contractCalculator->getTotalRemainingSalary($this->playerData);
     }
 
     public function canRenegotiateContract()
     {
-        if (
-            (($this->contractCurrentYear == 0 OR $this->contractCurrentYear == 1) AND $this->contractYear2Salary == 0)
-            OR $this->contractCurrentYear == 1 AND $this->contractYear2Salary == 0
-            OR $this->contractCurrentYear == 2 AND $this->contractYear3Salary == 0
-            OR $this->contractCurrentYear == 3 AND $this->contractYear4Salary == 0
-            OR $this->contractCurrentYear == 4 AND $this->contractYear5Salary == 0
-            OR $this->contractCurrentYear == 5 AND $this->contractYear6Salary == 0
-            OR $this->contractCurrentYear == 6
-        ) {
-            return TRUE;
-        }
-        return FALSE;
+        return $this->contractValidator->canRenegotiateContract($this->playerData);
     }
 
     public function canRookieOption($seasonPhase)
     {
-        if ($seasonPhase == "Free Agency") {
-            if (
-                ($this->draftRound == 1 AND $this->yearsOfExperience == 2 AND $this->contractYear4Salary == 0)
-                OR ($this->draftRound == 2 AND $this->yearsOfExperience == 1 AND $this->contractYear3Salary == 0)
-            ) {
-                return TRUE;
-            }
-        } elseif ($seasonPhase == "Preseason" or $seasonPhase == "HEAT") {
-            if (
-                ($this->draftRound == 1 AND $this->yearsOfExperience == 3 AND $this->contractYear4Salary == 0)
-                OR ($this->draftRound == 2 AND $this->yearsOfExperience == 2 AND $this->contractYear3Salary == 0)
-            ) {
-                return TRUE;
-            }
-        } else {
-            return FALSE;
-        }
+        return $this->contractValidator->canRookieOption($this->playerData, $seasonPhase);
     }
 
     public function wasRookieOptioned()
     {
-        if ((
-            $this->yearsOfExperience == 4 
-            AND $this->draftRound == 1
-            AND $this->contractYear4Salary != 0
-            AND 2 * $this->contractYear3Salary == $this->contractYear4Salary
-        ) OR (
-            $this->yearsOfExperience == 3
-            AND $this->draftRound == 2
-            AND $this->contractYear3Salary != 0
-            AND 2 * $this->contractYear2Salary == $this->contractYear3Salary
-        )) {
-            return TRUE;
-        }
-        return FALSE;
+        return $this->contractValidator->wasRookieOptioned($this->playerData);
     }
 }

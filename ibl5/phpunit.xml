@@ -18,5 +18,8 @@
         <testsuite name="Waivers Module Tests">
             <directory>tests/Waivers</directory>
         </testsuite>
+        <testsuite name="College Scouting Module Tests">
+            <directory>tests/CollegeScouting</directory>
+        </testsuite>
     </testsuites>
 </phpunit>

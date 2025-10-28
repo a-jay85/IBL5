@@ -76,6 +76,16 @@ spl_autoload_register(function ($class) {
         }
     }
     
+    // Handle Waivers namespace
+    if (strpos($class, 'Waivers\\') === 0) {
+        $className = str_replace('Waivers\\', '', $class);
+        $file = __DIR__ . '/../classes/Waivers/' . $className . '.php';
+        if (file_exists($file)) {
+            require_once $file;
+            return true;
+        }
+    }
+    
     // Handle global namespace classes like Player, Team, League, and JSB
     if (in_array($class, ['Player', 'Team', 'League', 'JSB'])) {
         $file = __DIR__ . '/../classes/' . $class . '.php';

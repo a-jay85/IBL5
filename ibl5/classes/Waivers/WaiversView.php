@@ -45,8 +45,8 @@ class WaiversView
         echo "<td valign=top><center><b><u>$teamNameEscaped</u></b>";
         echo "<select name=\"Player_ID\"><option value=\"\">Select player...</option>";
         
-        foreach ($players as $player) {
-            echo $player['optionHtml'];
+        foreach ($players as $optionHtml) {
+            echo $optionHtml;
         }
         
         echo "</select></center>";

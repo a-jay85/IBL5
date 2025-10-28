@@ -316,14 +316,12 @@ class WaiversController
                 $waitTime = $this->processor->getWaiverWaitTime($player->timeDroppedOnWaivers, $timeNow);
             }
             
-            $players[] = [
-                'optionHtml' => $this->view->buildPlayerOption(
-                    $player->playerID,
-                    $player->name,
-                    $contract,
-                    $waitTime
-                )
-            ];
+            $players[] = $this->view->buildPlayerOption(
+                $player->playerID,
+                $player->name,
+                $contract,
+                $waitTime
+            );
         }
         
         return $players;

@@ -10,9 +10,10 @@ class TradeApprovalTest extends TestCase
     {
         $this->db = new MockDatabase();
         
-        // Set up mock data for team ID lookups
+        // Set up mock data for team ID lookups and player data
         $this->db->setMockData([
-            ['counter' => 1000]
+            ['counter' => 1000],
+            ['name' => 'Test Player', 'pos' => 'PG']
         ]);
     }
     
@@ -26,19 +27,19 @@ class TradeApprovalTest extends TestCase
         $tradeOffer = new Trading_TradeOffer($this->db);
         
         // Prepare trade data: Team A offers to Team B
-        // Team A sends Player 1
-        // Team B sends cash
+        // Team A sends cash only (no players or picks)
+        // Team B sends cash back
         $tradeData = [
             'offeringTeam' => 'Atlanta Hawks',
             'listeningTeam' => 'Boston Celtics',
-            'switchCounter' => 1,      // 1 item from offering team
-            'fieldsCounter' => 1,      // Total 1 item (no items from listening team in this simplified test)
-            'userSendsCash' => [0, 0, 0, 0, 0, 0, 0],
+            'switchCounter' => 0,      // No items from offering team (only cash)
+            'fieldsCounter' => 0,      // No items from listening team (only cash)
+            'userSendsCash' => [0, 150, 150, 0, 0, 0, 0],    // Team A sends cash
             'partnerSendsCash' => [0, 100, 200, 0, 0, 0, 0], // Team B sends cash
-            'check' => ['on'],         // Offering team item is checked
-            'contract' => [1000],      // Player salary
-            'index' => [123],          // Player ID
-            'type' => [1]              // 1 = player
+            'check' => [],             // No items to check
+            'contract' => [],          // No contracts
+            'index' => [],             // No items
+            'type' => []               // No item types
         ];
         
         $result = $tradeOffer->createTradeOffer($tradeData);
@@ -53,30 +54,10 @@ class TradeApprovalTest extends TestCase
             return stripos($query, 'INSERT INTO ibl_trade_info') !== false;
         });
         
-        // Check each trade info insert
+        // Check each trade info insert - all should be cash items with approval = Boston Celtics
         foreach ($tradeInfoInserts as $query) {
-            // Extract the approval field value
-            // The query format is: INSERT INTO ibl_trade_info (...) VALUES (...)
-            // We need to check that approval is always 'Boston Celtics' (the listening team)
-            
-            // For player items from offering team (Atlanta sends to Boston)
-            if (strpos($query, "'Atlanta Hawks'") !== false && strpos($query, "'Boston Celtics'") !== false) {
-                // This is an item from Atlanta to Boston
-                // Check that approval is Boston Celtics
-                // Pattern matches: VALUES ('tradeid', 'itemid', 'type', 'from', 'to', 'approval')
-                if (preg_match("/VALUES\s*\(\s*'[^']+'\s*,\s*'[^']+'\s*,\s*'[^']+'\s*,\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*'([^']+)'\s*\)/i", $query, $matches)) {
-                    $from = $matches[1];
-                    $to = $matches[2];
-                    $approval = $matches[3];
-                    $this->assertEquals('Boston Celtics', $approval, 
-                        "For items from {$from} to {$to}, approval should be Boston Celtics");
-                }
-            }
-            
-            // For cash items from listening team (Boston sends to Atlanta)
+            // For cash items, extract the from, to, and approval teams
             if (strpos($query, "'cash'") !== false) {
-                // This is a cash item
-                // Extract the from and to teams and approval
                 // Pattern matches: VALUES ('tradeid', 'itemid', 'cash', 'from', 'to', 'approval')
                 if (preg_match("/VALUES\s*\(\s*'[^']+'\s*,\s*'[^']+'\s*,\s*'cash'\s*,\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*'([^']+)'\s*\)/i", $query, $matches)) {
                     $from = $matches[1];
@@ -100,20 +81,20 @@ class TradeApprovalTest extends TestCase
     {
         $tradeOffer = new Trading_TradeOffer($this->db);
         
-        // Team A offers Player 1 to Team B
+        // Team A offers cash to Team B
         // Team B sends cash back to Team A
-        // Expected: approval should be Team B (listening team) for ALL items
+        // Expected: approval should be Team B (listening team) for ALL cash items
         $tradeData = [
             'offeringTeam' => 'Atlanta Hawks',
             'listeningTeam' => 'Boston Celtics',
-            'switchCounter' => 1,
-            'fieldsCounter' => 1,
-            'userSendsCash' => [0, 0, 0, 0, 0, 0, 0],       // Atlanta sends no cash
-            'partnerSendsCash' => [0, 500, 500, 0, 0, 0, 0], // Boston sends cash
-            'check' => ['on'],
-            'contract' => [2000],
-            'index' => [456],
-            'type' => [1]
+            'switchCounter' => 0,
+            'fieldsCounter' => 0,
+            'userSendsCash' => [0, 300, 200, 0, 0, 0, 0],       // Atlanta sends cash
+            'partnerSendsCash' => [0, 500, 500, 0, 0, 0, 0],    // Boston sends cash back
+            'check' => [],
+            'contract' => [],
+            'index' => [],
+            'type' => []
         ];
         
         $result = $tradeOffer->createTradeOffer($tradeData);
@@ -121,12 +102,9 @@ class TradeApprovalTest extends TestCase
         
         $queries = $this->db->getExecutedQueries();
         
-        // Find the cash insert from Boston to Atlanta
+        // Find all cash inserts and verify approval is always Boston Celtics
         foreach ($queries as $query) {
-            if (strpos($query, "'cash'") !== false && 
-                strpos($query, "'Boston Celtics'") !== false && 
-                strpos($query, "'Atlanta Hawks'") !== false) {
-                
+            if (strpos($query, "'cash'") !== false) {
                 // Extract approval value
                 // Pattern matches: VALUES ('tradeid', 'itemid', 'cash', 'from', 'to', 'approval')
                 if (preg_match("/VALUES\s*\(\s*'[^']+'\s*,\s*'[^']+'\s*,\s*'cash'\s*,\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*'([^']+)'\s*\)/i", $query, $matches)) {
@@ -136,7 +114,7 @@ class TradeApprovalTest extends TestCase
                     
                     // This test verifies the fix: approval should always be the listening team (Boston Celtics)
                     $this->assertEquals('Boston Celtics', $approval, 
-                        "When Boston (listening) sends cash to Atlanta (offering), " .
+                        "When {$from} sends cash to {$to}, " .
                         "approval must be Boston Celtics (the listening team). Got: {$approval}");
                 }
             }

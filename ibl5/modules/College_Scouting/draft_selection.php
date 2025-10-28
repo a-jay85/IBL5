@@ -53,7 +53,8 @@ if (($currentDraftSelection == NULL OR $currentDraftSelection == "") AND $player
 
             Discord::postToChannel('#general-chat', $message);
             $message .= '
-    **<@!' . $discordIDOfTeamOnTheClock . '>** is on the clock!';
+    **<@!' . $discordIDOfTeamOnTheClock . '>** is on the clock!
+https://www.iblhoops.net/ibl5/modules.php?name=College_Scouting';
         } else {
             $message .= "
     **🏁 __The $season->endingYear IBL Draft has officially concluded!__ 🏁**";

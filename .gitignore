@@ -5,6 +5,7 @@
 .vscode
 error_log
 node_modules
+vendor/
 nohup.out
 /phpmyadmin
 

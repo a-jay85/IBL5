@@ -62,9 +62,8 @@ class PlayerContractValidator
             ) {
                 return TRUE;
             }
-        } else {
-            return FALSE;
         }
+        return FALSE;
     }
 
     /**

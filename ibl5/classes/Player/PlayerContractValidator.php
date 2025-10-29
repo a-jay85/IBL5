@@ -76,12 +76,12 @@ class PlayerContractValidator
             $playerData->yearsOfExperience == 4 
             AND $playerData->draftRound == 1
             AND $playerData->contractYear4Salary != 0
-            AND 2 * $playerData->contractYear3Salary == $playerData->contractYear4Salary
+            AND $playerData->contractYear3Salary * 2 == $playerData->contractYear4Salary
         ) OR (
             $playerData->yearsOfExperience == 3
             AND $playerData->draftRound == 2
             AND $playerData->contractYear3Salary != 0
-            AND 2 * $playerData->contractYear2Salary == $playerData->contractYear3Salary
+            AND $playerData->contractYear2Salary * 2 == $playerData->contractYear3Salary
         )) {
             return TRUE;
         }

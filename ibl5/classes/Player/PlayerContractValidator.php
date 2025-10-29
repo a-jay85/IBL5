@@ -34,31 +34,31 @@ class PlayerContractValidator
     {
         if ($seasonPhase == "Free Agency") {
             if (
-                (
-                    $playerData->draftRound == 1
-                    && $playerData->yearsOfExperience == 2
-                    && $playerData->contractYear4Salary == 0
-                )
-                OR (
-                    $playerData->draftRound == 2
-                    && $playerData->yearsOfExperience == 1
-                    && $playerData->contractYear3Salary == 0
-                )
+                $playerData->draftRound == 1
+                && $playerData->yearsOfExperience == 2
+                && $playerData->contractYear4Salary == 0
+            ) {
+                return TRUE;
+            }
+            if (
+                $playerData->draftRound == 2
+                && $playerData->yearsOfExperience == 1
+                && $playerData->contractYear3Salary == 0
             ) {
                 return TRUE;
             }
         } elseif ($seasonPhase == "Preseason" or $seasonPhase == "HEAT") {
             if (
-                (
-                    $playerData->draftRound == 1
-                    && $playerData->yearsOfExperience == 3
-                    && $playerData->contractYear4Salary == 0
-                )
-                || (
-                    $playerData->draftRound == 2
-                    && $playerData->yearsOfExperience == 2
-                    && $playerData->contractYear3Salary == 0
-                )
+                $playerData->draftRound == 1
+                && $playerData->yearsOfExperience == 3
+                && $playerData->contractYear4Salary == 0
+            ) {
+                return TRUE;
+            }
+            if (
+                $playerData->draftRound == 2
+                && $playerData->yearsOfExperience == 2
+                && $playerData->contractYear3Salary == 0
             ) {
                 return TRUE;
             }
@@ -71,17 +71,20 @@ class PlayerContractValidator
      */
     public function wasRookieOptioned(PlayerData $playerData): bool
     {
-        if ((
+        if (
             $playerData->yearsOfExperience == 4 
-            AND $playerData->draftRound == 1
-            AND $playerData->contractYear4Salary != 0
-            AND $playerData->contractYear3Salary * 2 == $playerData->contractYear4Salary
-        ) OR (
+            && $playerData->draftRound == 1
+            && $playerData->contractYear4Salary != 0
+            && $playerData->contractYear3Salary * 2 == $playerData->contractYear4Salary
+        ) {
+            return TRUE;
+        }
+        if (
             $playerData->yearsOfExperience == 3
-            AND $playerData->draftRound == 2
-            AND $playerData->contractYear3Salary != 0
-            AND $playerData->contractYear2Salary * 2 == $playerData->contractYear3Salary
-        )) {
+            && $playerData->draftRound == 2
+            && $playerData->contractYear3Salary != 0
+            && $playerData->contractYear2Salary * 2 == $playerData->contractYear3Salary
+        ) {
             return TRUE;
         }
         return FALSE;

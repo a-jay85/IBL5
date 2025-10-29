@@ -34,15 +34,31 @@ class PlayerContractValidator
     {
         if ($seasonPhase == "Free Agency") {
             if (
-                ($playerData->draftRound == 1 AND $playerData->yearsOfExperience == 2 AND $playerData->contractYear4Salary == 0)
-                OR ($playerData->draftRound == 2 AND $playerData->yearsOfExperience == 1 AND $playerData->contractYear3Salary == 0)
+                (
+                    $playerData->draftRound == 1
+                    && $playerData->yearsOfExperience == 2
+                    && $playerData->contractYear4Salary == 0
+                )
+                OR (
+                    $playerData->draftRound == 2
+                    && $playerData->yearsOfExperience == 1
+                    && $playerData->contractYear3Salary == 0
+                )
             ) {
                 return TRUE;
             }
         } elseif ($seasonPhase == "Preseason" or $seasonPhase == "HEAT") {
             if (
-                ($playerData->draftRound == 1 AND $playerData->yearsOfExperience == 3 AND $playerData->contractYear4Salary == 0)
-                OR ($playerData->draftRound == 2 AND $playerData->yearsOfExperience == 2 AND $playerData->contractYear3Salary == 0)
+                (
+                    $playerData->draftRound == 1
+                    && $playerData->yearsOfExperience == 3
+                    && $playerData->contractYear4Salary == 0
+                )
+                || (
+                    $playerData->draftRound == 2
+                    && $playerData->yearsOfExperience == 2
+                    && $playerData->contractYear3Salary == 0
+                )
             ) {
                 return TRUE;
             }

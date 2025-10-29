@@ -58,6 +58,7 @@ https://www.iblhoops.net/ibl5/modules.php?name=College_Scouting';
         } else {
             $message .= "
     **🏁 __The $season->endingYear IBL Draft has officially concluded!__ 🏁**";
+            Discord::postToChannel('#general-chat', $message);
         }
 
         Discord::postToChannel('#draft-picks', $message);

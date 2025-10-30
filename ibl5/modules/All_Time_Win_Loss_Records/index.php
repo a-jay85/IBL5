@@ -33,6 +33,12 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 
     // Get season type from URL parameter, default to 'combined'
     $seasonType = isset($_GET['seasonType']) ? $_GET['seasonType'] : 'combined';
+    
+    // Sanitize season type to prevent injection
+    $validSeasonTypes = array('combined', 'regular', 'playoffs', 'heat');
+    if (!in_array($seasonType, $validSeasonTypes)) {
+        $seasonType = 'combined';
+    }
 
     displayNavigationMenu($seasonType);
     displayAllTimeWinLossRecords($tid, $seasonType);

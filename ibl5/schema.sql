@@ -70,7 +70,7 @@ CREATE TABLE `ibl_awards` (
   `name` varchar(32) NOT NULL DEFAULT '',
   `table_ID` int(11) NOT NULL AUTO_INCREMENT,
   PRIMARY KEY (`table_ID`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -82,7 +82,7 @@ CREATE TABLE `ibl_banners` (
   `currentname` varchar(16) NOT NULL DEFAULT '',
   `bannername` varchar(16) NOT NULL DEFAULT '',
   `bannertype` int(11) NOT NULL DEFAULT 0
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -110,7 +110,7 @@ CREATE TABLE `ibl_box_scores` (
   `gameTOV` int(11) DEFAULT NULL,
   `gameBLK` int(11) DEFAULT NULL,
   `gamePF` int(11) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -153,7 +153,7 @@ CREATE TABLE `ibl_box_scores_teams` (
   `gameTOV` int(11) DEFAULT NULL,
   `gameBLK` int(11) DEFAULT NULL,
   `gamePF` int(11) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -169,7 +169,7 @@ CREATE TABLE `ibl_demands` (
   `dem5` int(11) NOT NULL DEFAULT 0,
   `dem6` int(11) NOT NULL DEFAULT 0,
   PRIMARY KEY (`name`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -185,7 +185,7 @@ CREATE TABLE `ibl_draft` (
   `pick` int(11) NOT NULL DEFAULT 0,
   `date` datetime DEFAULT NULL,
   UNIQUE KEY `draft_id` (`draft_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -226,7 +226,7 @@ CREATE TABLE `ibl_draft_class` (
   `sta` int(11) DEFAULT 0,
   `id` int(11) NOT NULL AUTO_INCREMENT,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -241,7 +241,7 @@ CREATE TABLE `ibl_draft_picks` (
   `round` char(1) NOT NULL DEFAULT '',
   `notes` varchar(280) DEFAULT NULL,
   PRIMARY KEY (`pickid`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -264,7 +264,7 @@ CREATE TABLE `ibl_fa_offers` (
   `LLE` int(11) NOT NULL DEFAULT 0,
   `primary_key` int(11) unsigned NOT NULL AUTO_INCREMENT,
   PRIMARY KEY (`primary_key`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -277,7 +277,7 @@ CREATE TABLE `ibl_gm_history` (
   `Award` varchar(350) NOT NULL,
   `prim` int(11) NOT NULL,
   PRIMARY KEY (`prim`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -307,7 +307,7 @@ CREATE TABLE `ibl_heat_career_avgs` (
   `pf` decimal(8,2) NOT NULL DEFAULT 0.00,
   `pts` decimal(8,2) NOT NULL DEFAULT 0.00,
   `retired` int(11) NOT NULL DEFAULT 0
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -334,7 +334,7 @@ CREATE TABLE `ibl_heat_career_totals` (
   `pf` int(11) NOT NULL DEFAULT 0,
   `pts` int(11) NOT NULL DEFAULT 0,
   `retired` int(11) NOT NULL DEFAULT 0
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -364,7 +364,7 @@ CREATE TABLE `ibl_heat_stats` (
   `pf` int(11) NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`),
   UNIQUE KEY `id` (`id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -379,7 +379,7 @@ CREATE TABLE `ibl_heat_win_loss` (
   `losses` tinyint(2) unsigned NOT NULL DEFAULT 0,
   `table_ID` int(11) NOT NULL AUTO_INCREMENT,
   PRIMARY KEY (`table_ID`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -432,7 +432,7 @@ CREATE TABLE `ibl_hist` (
   `nuke_iblhist` int(11) NOT NULL AUTO_INCREMENT,
   PRIMARY KEY (`nuke_iblhist`),
   UNIQUE KEY `unique_composite_key` (`pid`,`name`,`year`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -462,7 +462,7 @@ CREATE TABLE `ibl_olympics_career_avgs` (
   `pf` decimal(8,2) NOT NULL DEFAULT 0.00,
   `pts` decimal(8,2) NOT NULL DEFAULT 0.00,
   `retired` int(11) NOT NULL DEFAULT 0
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -489,7 +489,7 @@ CREATE TABLE `ibl_olympics_career_totals` (
   `pf` int(11) NOT NULL DEFAULT 0,
   `pts` int(11) NOT NULL DEFAULT 0,
   `retired` int(11) NOT NULL DEFAULT 0
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -519,7 +519,7 @@ CREATE TABLE `ibl_olympics_stats` (
   `pf` int(11) NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`),
   UNIQUE KEY `id` (`id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -535,7 +535,7 @@ CREATE TABLE `ibl_one_on_one` (
   `lossscore` int(11) NOT NULL DEFAULT 0,
   `owner` varchar(25) NOT NULL DEFAULT '',
   PRIMARY KEY (`gameid`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -565,7 +565,7 @@ CREATE TABLE `ibl_playoff_career_avgs` (
   `pf` decimal(8,2) NOT NULL DEFAULT 0.00,
   `pts` decimal(8,2) NOT NULL DEFAULT 0.00,
   `retired` int(11) NOT NULL DEFAULT 0
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -592,7 +592,7 @@ CREATE TABLE `ibl_playoff_career_totals` (
   `pf` int(11) NOT NULL DEFAULT 0,
   `pts` int(11) NOT NULL DEFAULT 0,
   `retired` int(11) NOT NULL DEFAULT 0
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -607,7 +607,7 @@ CREATE TABLE `ibl_playoff_results` (
   `loser_games` int(11) NOT NULL DEFAULT 0,
   `id` int(11) NOT NULL AUTO_INCREMENT,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -634,7 +634,7 @@ CREATE TABLE `ibl_playoff_stats` (
   `tvr` int(11) NOT NULL DEFAULT 0,
   `blk` int(11) NOT NULL DEFAULT 0,
   `pf` int(11) NOT NULL DEFAULT 0
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -787,7 +787,7 @@ CREATE TABLE `ibl_plr` (
   PRIMARY KEY (`pid`),
   KEY `name` (`name`),
   KEY `teamname` (`teamname`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -824,7 +824,7 @@ CREATE TABLE `ibl_plr_chunk` (
   `Season` int(11) NOT NULL,
   KEY `pid` (`pid`),
   KEY `pid_2` (`pid`) USING BTREE
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -853,7 +853,7 @@ CREATE TABLE `ibl_power` (
   `streak_type` varchar(1) NOT NULL DEFAULT '',
   `streak` int(11) NOT NULL,
   PRIMARY KEY (`Team`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -871,7 +871,7 @@ CREATE TABLE `ibl_schedule` (
   `SchedID` int(11) NOT NULL AUTO_INCREMENT,
   PRIMARY KEY (`SchedID`),
   KEY `BoxID` (`BoxID`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -901,7 +901,7 @@ CREATE TABLE `ibl_season_career_avgs` (
   `pf` decimal(8,2) NOT NULL DEFAULT 0.00,
   `pts` decimal(8,2) NOT NULL DEFAULT 0.00,
   `retired` int(11) NOT NULL DEFAULT 0
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -912,7 +912,7 @@ CREATE TABLE `ibl_settings` (
   `name` varchar(128) NOT NULL,
   `value` varchar(128) NOT NULL,
   PRIMARY KEY (`name`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -960,7 +960,7 @@ CREATE TABLE `ibl_standings` (
   `clinchedPlayoffs` tinyint(1) DEFAULT NULL,
   PRIMARY KEY (`tid`),
   KEY `team_name` (`team_name`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -973,7 +973,7 @@ CREATE TABLE `ibl_team_awards` (
   `Award` varchar(350) NOT NULL,
   `ID` int(11) NOT NULL,
   PRIMARY KEY (`ID`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -998,7 +998,7 @@ CREATE TABLE `ibl_team_defense_stats` (
   `blk` int(11) NOT NULL DEFAULT 0,
   `pf` int(11) NOT NULL DEFAULT 0,
   `minutes` int(11) DEFAULT 0
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1024,7 +1024,7 @@ CREATE TABLE `ibl_team_history` (
   `ibl_titles` int(11) NOT NULL,
   `heat_titles` int(11) NOT NULL,
   PRIMARY KEY (`teamid`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1057,7 +1057,7 @@ CREATE TABLE `ibl_team_info` (
   `chart` char(2) NOT NULL DEFAULT '',
   PRIMARY KEY (`teamid`),
   KEY `team_name` (`team_name`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1082,7 +1082,7 @@ CREATE TABLE `ibl_team_offense_stats` (
   `blk` int(11) NOT NULL DEFAULT 0,
   `pf` int(11) NOT NULL DEFAULT 0,
   `minutes` int(11) DEFAULT 0
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1097,7 +1097,7 @@ CREATE TABLE `ibl_team_win_loss` (
   `losses` varchar(75) NOT NULL DEFAULT '0',
   `table_ID` int(11) NOT NULL AUTO_INCREMENT,
   PRIMARY KEY (`table_ID`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1107,7 +1107,7 @@ CREATE TABLE `ibl_team_win_loss` (
 CREATE TABLE `ibl_trade_autocounter` (
   `counter` int(11) NOT NULL AUTO_INCREMENT,
   PRIMARY KEY (`counter`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1124,7 +1124,7 @@ CREATE TABLE `ibl_trade_cash` (
   `cy4` int(11) DEFAULT NULL,
   `cy5` int(11) DEFAULT NULL,
   `cy6` int(11) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1138,7 +1138,7 @@ CREATE TABLE `ibl_trade_info` (
   `from` varchar(128) NOT NULL DEFAULT '',
   `to` varchar(128) NOT NULL DEFAULT '',
   `approval` varchar(128) NOT NULL DEFAULT ''
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1148,7 +1148,7 @@ CREATE TABLE `ibl_trade_info` (
 CREATE TABLE `ibl_trade_queue` (
   `query` tinytext NOT NULL,
   `tradeline` tinytext DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1175,7 +1175,7 @@ CREATE TABLE `ibl_votes_ASG` (
   `West_B2` varchar(255) DEFAULT NULL,
   `West_B3` varchar(255) DEFAULT NULL,
   `West_B4` varchar(255) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1199,7 +1199,7 @@ CREATE TABLE `ibl_votes_EOY` (
   `GM_2` varchar(255) DEFAULT NULL,
   `GM_3` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`teamid`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1259,7 +1259,7 @@ CREATE TABLE `nuke_antiflood` (
   `time` varchar(14) NOT NULL DEFAULT '',
   KEY `ip_addr` (`ip_addr`),
   KEY `time` (`time`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1276,7 +1276,7 @@ CREATE TABLE `nuke_authors` (
   `radminsuper` tinyint(1) NOT NULL DEFAULT 1,
   `admlanguage` varchar(30) NOT NULL DEFAULT '',
   PRIMARY KEY (`aid`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1299,7 +1299,7 @@ CREATE TABLE `nuke_autonews` (
   `acomm` int(11) NOT NULL DEFAULT 0,
   `associated` text NOT NULL,
   PRIMARY KEY (`anid`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1312,7 +1312,7 @@ CREATE TABLE `nuke_banned_ip` (
   `reason` varchar(255) NOT NULL DEFAULT '',
   `date` date NOT NULL DEFAULT '0000-00-00',
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1339,7 +1339,7 @@ CREATE TABLE `nuke_banner` (
   `ad_height` int(11) DEFAULT 0,
   PRIMARY KEY (`bid`),
   KEY `cid` (`cid`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1355,7 +1355,7 @@ CREATE TABLE `nuke_banner_clients` (
   `passwd` varchar(10) NOT NULL DEFAULT '',
   `extrainfo` text NOT NULL,
   PRIMARY KEY (`cid`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1372,7 +1372,7 @@ CREATE TABLE `nuke_banner_plans` (
   `price` varchar(25) NOT NULL DEFAULT '0',
   `buy_links` text NOT NULL,
   PRIMARY KEY (`pid`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1385,7 +1385,7 @@ CREATE TABLE `nuke_banner_positions` (
   `position_name` varchar(255) NOT NULL DEFAULT '',
   PRIMARY KEY (`apid`),
   KEY `position_number` (`position_number`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1395,7 +1395,7 @@ CREATE TABLE `nuke_banner_positions` (
 CREATE TABLE `nuke_banner_terms` (
   `terms_body` text NOT NULL,
   `country` varchar(255) NOT NULL DEFAULT ''
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1419,7 +1419,7 @@ CREATE TABLE `nuke_bbauth_access` (
   `auth_mod` tinyint(1) NOT NULL DEFAULT 0,
   KEY `group_id` (`group_id`),
   KEY `forum_id` (`forum_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1439,7 +1439,7 @@ CREATE TABLE `nuke_bbbanlist` (
   `ban_pub_reason` text DEFAULT NULL,
   PRIMARY KEY (`ban_id`),
   KEY `ban_ip_user_id` (`ban_ip`,`ban_userid`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1452,7 +1452,7 @@ CREATE TABLE `nuke_bbcategories` (
   `cat_order` mediumint(8) unsigned NOT NULL DEFAULT 0,
   PRIMARY KEY (`cat_id`),
   KEY `cat_order` (`cat_order`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1463,7 +1463,7 @@ CREATE TABLE `nuke_bbconfig` (
   `config_name` varchar(255) NOT NULL DEFAULT '',
   `config_value` varchar(255) NOT NULL DEFAULT '',
   PRIMARY KEY (`config_name`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1474,7 +1474,7 @@ CREATE TABLE `nuke_bbdisallow` (
   `disallow_id` mediumint(8) unsigned NOT NULL AUTO_INCREMENT,
   `disallow_username` varchar(25) DEFAULT NULL,
   PRIMARY KEY (`disallow_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1488,7 +1488,7 @@ CREATE TABLE `nuke_bbforum_prune` (
   `prune_freq` tinyint(3) unsigned NOT NULL DEFAULT 0,
   PRIMARY KEY (`prune_id`),
   KEY `forum_id` (`forum_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1522,7 +1522,7 @@ CREATE TABLE `nuke_bbforums` (
   KEY `forums_order` (`forum_order`),
   KEY `cat_id` (`cat_id`),
   KEY `forum_last_post_id` (`forum_last_post_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1538,7 +1538,7 @@ CREATE TABLE `nuke_bbgroups` (
   `group_single_user` tinyint(1) NOT NULL DEFAULT 1,
   PRIMARY KEY (`group_id`),
   KEY `group_single_user` (`group_single_user`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1564,7 +1564,7 @@ CREATE TABLE `nuke_bbposts` (
   KEY `topic_id` (`topic_id`),
   KEY `poster_id` (`poster_id`),
   KEY `post_time` (`post_time`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1577,7 +1577,7 @@ CREATE TABLE `nuke_bbposts_text` (
   `post_subject` varchar(60) DEFAULT NULL,
   `post_text` text DEFAULT NULL,
   PRIMARY KEY (`post_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1599,7 +1599,7 @@ CREATE TABLE `nuke_bbprivmsgs` (
   PRIMARY KEY (`privmsgs_id`),
   KEY `privmsgs_from_userid` (`privmsgs_from_userid`),
   KEY `privmsgs_to_userid` (`privmsgs_to_userid`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1611,7 +1611,7 @@ CREATE TABLE `nuke_bbprivmsgs_text` (
   `privmsgs_bbcode_uid` varchar(10) NOT NULL DEFAULT '0',
   `privmsgs_text` text DEFAULT NULL,
   PRIMARY KEY (`privmsgs_text_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1626,7 +1626,7 @@ CREATE TABLE `nuke_bbranks` (
   `rank_special` tinyint(1) DEFAULT 0,
   `rank_image` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`rank_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1640,7 +1640,7 @@ CREATE TABLE `nuke_bbsearch_results` (
   `search_time` int(11) NOT NULL DEFAULT 0,
   PRIMARY KEY (`search_id`),
   KEY `session_id` (`session_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1653,7 +1653,7 @@ CREATE TABLE `nuke_bbsearch_wordlist` (
   `word_common` tinyint(3) unsigned NOT NULL DEFAULT 0,
   PRIMARY KEY (`word_text`),
   KEY `word_id` (`word_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1665,7 +1665,7 @@ CREATE TABLE `nuke_bbsearch_wordmatch` (
   `word_id` mediumint(8) unsigned NOT NULL DEFAULT 0,
   `title_match` tinyint(1) NOT NULL DEFAULT 0,
   KEY `word_id` (`word_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1684,7 +1684,7 @@ CREATE TABLE `nuke_bbsessions` (
   PRIMARY KEY (`session_id`),
   KEY `session_user_id` (`session_user_id`),
   KEY `session_id_ip_user_id` (`session_id`,`session_ip`,`session_user_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1697,7 +1697,7 @@ CREATE TABLE `nuke_bbsmilies` (
   `smile_url` varchar(100) DEFAULT NULL,
   `emoticon` varchar(75) DEFAULT NULL,
   PRIMARY KEY (`smilies_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1749,7 +1749,7 @@ CREATE TABLE `nuke_bbthemes` (
   `img_size_poll` smallint(5) unsigned DEFAULT NULL,
   `img_size_privmsg` smallint(5) unsigned DEFAULT NULL,
   PRIMARY KEY (`themes_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1789,7 +1789,7 @@ CREATE TABLE `nuke_bbthemes_name` (
   `span_class2_name` char(50) DEFAULT NULL,
   `span_class3_name` char(50) DEFAULT NULL,
   PRIMARY KEY (`themes_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1815,7 +1815,7 @@ CREATE TABLE `nuke_bbtopics` (
   KEY `topic_moved_id` (`topic_moved_id`),
   KEY `topic_status` (`topic_status`),
   KEY `topic_type` (`topic_type`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1829,7 +1829,7 @@ CREATE TABLE `nuke_bbtopics_watch` (
   KEY `topic_id` (`topic_id`),
   KEY `user_id` (`user_id`),
   KEY `notify_status` (`notify_status`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1842,7 +1842,7 @@ CREATE TABLE `nuke_bbuser_group` (
   `user_pending` tinyint(1) DEFAULT NULL,
   KEY `group_id` (`group_id`),
   KEY `user_id` (`user_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1857,7 +1857,7 @@ CREATE TABLE `nuke_bbvote_desc` (
   `vote_length` int(11) NOT NULL DEFAULT 0,
   PRIMARY KEY (`vote_id`),
   KEY `topic_id` (`topic_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1871,7 +1871,7 @@ CREATE TABLE `nuke_bbvote_results` (
   `vote_result` int(11) NOT NULL DEFAULT 0,
   KEY `vote_option_id` (`vote_option_id`),
   KEY `vote_id` (`vote_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1885,7 +1885,7 @@ CREATE TABLE `nuke_bbvote_voters` (
   KEY `vote_id` (`vote_id`),
   KEY `vote_user_id` (`vote_user_id`),
   KEY `vote_user_ip` (`vote_user_ip`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1897,7 +1897,7 @@ CREATE TABLE `nuke_bbwords` (
   `word` char(100) NOT NULL DEFAULT '',
   `replacement` char(100) NOT NULL DEFAULT '',
   PRIMARY KEY (`word_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1923,7 +1923,7 @@ CREATE TABLE `nuke_blocks` (
   `subscription` int(11) NOT NULL DEFAULT 0,
   PRIMARY KEY (`bid`),
   KEY `title` (`title`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1937,7 +1937,7 @@ CREATE TABLE `nuke_cities` (
   `cc` char(2) NOT NULL DEFAULT '',
   `country` varchar(35) NOT NULL DEFAULT '',
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1961,7 +1961,7 @@ CREATE TABLE `nuke_comments` (
   PRIMARY KEY (`tid`),
   KEY `pid` (`pid`),
   KEY `sid` (`sid`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1985,7 +1985,7 @@ CREATE TABLE `nuke_comments_moderated` (
   PRIMARY KEY (`tid`),
   KEY `pid` (`pid`),
   KEY `sid` (`sid`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2042,7 +2042,7 @@ CREATE TABLE `nuke_config` (
   `nuke_editor` tinyint(1) NOT NULL DEFAULT 1,
   `display_errors` tinyint(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`sitename`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2054,7 +2054,7 @@ CREATE TABLE `nuke_confirm` (
   `session_id` char(32) NOT NULL DEFAULT '',
   `code` char(6) NOT NULL DEFAULT '',
   PRIMARY KEY (`session_id`,`confirm_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2065,7 +2065,7 @@ CREATE TABLE `nuke_counter` (
   `type` varchar(80) NOT NULL DEFAULT '',
   `var` varchar(80) NOT NULL DEFAULT '',
   `count` int(10) unsigned NOT NULL DEFAULT 0
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2079,7 +2079,7 @@ CREATE TABLE `nuke_faqanswer` (
   `answer` text DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `id_cat` (`id_cat`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2091,7 +2091,7 @@ CREATE TABLE `nuke_faqcategories` (
   `categories` varchar(255) DEFAULT NULL,
   `flanguage` varchar(30) NOT NULL DEFAULT '',
   PRIMARY KEY (`id_cat`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2104,7 +2104,7 @@ CREATE TABLE `nuke_groups` (
   `description` text NOT NULL,
   `points` int(11) NOT NULL DEFAULT 0,
   KEY `id` (`id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2115,7 +2115,7 @@ CREATE TABLE `nuke_groups_points` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `points` int(11) NOT NULL DEFAULT 0,
   KEY `id` (`id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2127,7 +2127,7 @@ CREATE TABLE `nuke_headlines` (
   `sitename` varchar(30) NOT NULL DEFAULT '',
   `headlinesurl` varchar(200) NOT NULL DEFAULT '',
   PRIMARY KEY (`hid`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2140,7 +2140,7 @@ CREATE TABLE `nuke_links_categories` (
   `cdescription` text NOT NULL,
   `parentid` int(11) NOT NULL DEFAULT 0,
   PRIMARY KEY (`cid`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2154,7 +2154,7 @@ CREATE TABLE `nuke_links_editorials` (
   `editorialtext` text NOT NULL,
   `editorialtitle` varchar(100) NOT NULL DEFAULT '',
   PRIMARY KEY (`linkid`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2179,7 +2179,7 @@ CREATE TABLE `nuke_links_links` (
   PRIMARY KEY (`lid`),
   KEY `cid` (`cid`),
   KEY `sid` (`sid`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2197,7 +2197,7 @@ CREATE TABLE `nuke_links_modrequest` (
   `modifysubmitter` varchar(60) NOT NULL DEFAULT '',
   `brokenlink` int(11) NOT NULL DEFAULT 0,
   PRIMARY KEY (`requestid`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2217,7 +2217,7 @@ CREATE TABLE `nuke_links_newlink` (
   PRIMARY KEY (`lid`),
   KEY `cid` (`cid`),
   KEY `sid` (`sid`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2233,7 +2233,7 @@ CREATE TABLE `nuke_links_votedata` (
   `ratingcomments` text NOT NULL,
   `ratingtimestamp` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
   PRIMARY KEY (`ratingdbid`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2242,7 +2242,7 @@ CREATE TABLE `nuke_links_votedata` (
 
 CREATE TABLE `nuke_main` (
   `main_module` varchar(255) NOT NULL DEFAULT ''
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2259,7 +2259,7 @@ CREATE TABLE `nuke_message` (
   `view` int(11) NOT NULL DEFAULT 1,
   `mlanguage` varchar(30) NOT NULL DEFAULT '',
   PRIMARY KEY (`mid`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2278,7 +2278,7 @@ CREATE TABLE `nuke_modules` (
   PRIMARY KEY (`mid`),
   KEY `title` (`title`),
   KEY `custom_title` (`custom_title`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2287,7 +2287,7 @@ CREATE TABLE `nuke_modules` (
 
 CREATE TABLE `nuke_optimize_gain` (
   `gain` decimal(10,3) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2309,7 +2309,7 @@ CREATE TABLE `nuke_pages` (
   `clanguage` varchar(30) NOT NULL DEFAULT '',
   PRIMARY KEY (`pid`),
   KEY `cid` (`cid`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2321,7 +2321,7 @@ CREATE TABLE `nuke_pages_categories` (
   `title` varchar(255) NOT NULL DEFAULT '',
   `description` text NOT NULL,
   PRIMARY KEY (`cid`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2337,7 +2337,7 @@ CREATE TABLE `nuke_poll_desc` (
   `artid` int(11) NOT NULL DEFAULT 0,
   `comments` int(11) DEFAULT 0,
   PRIMARY KEY (`pollID`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2361,7 +2361,7 @@ CREATE TABLE `nuke_pollcomments` (
   PRIMARY KEY (`tid`),
   KEY `pid` (`pid`),
   KEY `pollID` (`pollID`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2385,7 +2385,7 @@ CREATE TABLE `nuke_pollcomments_moderated` (
   PRIMARY KEY (`tid`),
   KEY `pid` (`pid`),
   KEY `pollID` (`pollID`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2398,7 +2398,7 @@ CREATE TABLE `nuke_public_messages` (
   `date` varchar(14) DEFAULT NULL,
   `who` varchar(25) NOT NULL DEFAULT '',
   PRIMARY KEY (`mid`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2418,7 +2418,7 @@ CREATE TABLE `nuke_queue` (
   PRIMARY KEY (`qid`),
   KEY `uid` (`uid`),
   KEY `uname` (`uname`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2429,7 +2429,7 @@ CREATE TABLE `nuke_referer` (
   `rid` int(11) NOT NULL AUTO_INCREMENT,
   `url` varchar(100) NOT NULL DEFAULT '',
   PRIMARY KEY (`rid`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2443,7 +2443,7 @@ CREATE TABLE `nuke_related` (
   `url` varchar(200) NOT NULL DEFAULT '',
   PRIMARY KEY (`rid`),
   KEY `tid` (`tid`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2457,7 +2457,7 @@ CREATE TABLE `nuke_session` (
   `guest` int(11) NOT NULL DEFAULT 0,
   KEY `time` (`time`),
   KEY `guest` (`guest`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2469,7 +2469,7 @@ CREATE TABLE `nuke_stats_date` (
   `month` tinyint(4) NOT NULL DEFAULT 0,
   `date` tinyint(4) NOT NULL DEFAULT 0,
   `hits` bigint(20) NOT NULL DEFAULT 0
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2482,7 +2482,7 @@ CREATE TABLE `nuke_stats_hour` (
   `date` tinyint(4) NOT NULL DEFAULT 0,
   `hour` tinyint(4) NOT NULL DEFAULT 0,
   `hits` int(11) NOT NULL DEFAULT 0
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2493,7 +2493,7 @@ CREATE TABLE `nuke_stats_month` (
   `year` smallint(6) NOT NULL DEFAULT 0,
   `month` tinyint(4) NOT NULL DEFAULT 0,
   `hits` bigint(20) NOT NULL DEFAULT 0
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2503,7 +2503,7 @@ CREATE TABLE `nuke_stats_month` (
 CREATE TABLE `nuke_stats_year` (
   `year` smallint(6) NOT NULL DEFAULT 0,
   `hits` bigint(20) NOT NULL DEFAULT 0
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2536,7 +2536,7 @@ CREATE TABLE `nuke_stories` (
   KEY `catid` (`catid`),
   KEY `counter` (`counter`),
   KEY `topic` (`topic`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2548,7 +2548,7 @@ CREATE TABLE `nuke_stories_cat` (
   `title` varchar(20) NOT NULL DEFAULT '',
   `counter` int(11) NOT NULL DEFAULT 0,
   PRIMARY KEY (`catid`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2560,7 +2560,7 @@ CREATE TABLE `nuke_subscriptions` (
   `userid` int(11) DEFAULT 0,
   `subscription_expire` varchar(50) NOT NULL DEFAULT '',
   KEY `id` (`id`,`userid`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2576,7 +2576,7 @@ CREATE TABLE `nuke_topics` (
   `id` int(11) NOT NULL,
   PRIMARY KEY (`id`),
   KEY `topicid` (`topicid`) USING BTREE
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2657,7 +2657,7 @@ CREATE TABLE `nuke_users` (
   KEY `user_session_time` (`user_session_time`),
   KEY `karma` (`karma`),
   KEY `user_email` (`user_email`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2673,7 +2673,7 @@ CREATE TABLE `nuke_users_temp` (
   `check_num` varchar(50) NOT NULL DEFAULT '',
   `time` varchar(14) NOT NULL DEFAULT '',
   PRIMARY KEY (`user_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2703,7 +2703,7 @@ CREATE TABLE `olympic_stats` (
   `pf` int(11) NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`),
   UNIQUE KEY `id` (`id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2713,7 +2713,7 @@ CREATE TABLE `olympic_stats` (
 CREATE TABLE `online` (
   `username` text NOT NULL,
   `timeout` text NOT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2736,7 +2736,7 @@ CREATE TABLE `poll` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `name` varchar(255) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_general_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2748,7 +2748,7 @@ CREATE TABLE `questions` (
   `pid` int(11) NOT NULL,
   `question` varchar(255) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_general_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2760,7 +2760,7 @@ CREATE TABLE `responses` (
   `qid` int(11) NOT NULL,
   `ip` varchar(16) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_general_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -2787,7 +2787,7 @@ CREATE TABLE `sessions` (
 CREATE TABLE `user_online` (
   `session` char(100) NOT NULL DEFAULT '',
   `time` int(11) NOT NULL DEFAULT 0
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 

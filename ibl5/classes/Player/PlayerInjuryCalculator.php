@@ -1,5 +1,7 @@
 <?php
 
+namespace Player;
+
 /**
  * PlayerInjuryCalculator - Handles injury-related date calculations
  * 

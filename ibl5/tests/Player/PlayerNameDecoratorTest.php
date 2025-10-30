@@ -1,6 +1,8 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
+use Player\PlayerNameDecorator;
+use Player\PlayerData;
 
 class PlayerNameDecoratorTest extends TestCase
 {

@@ -1,5 +1,7 @@
 <?php
 
+namespace Player;
+
 /**
  * PlayerRepository - Handles data loading and persistence for players
  * 

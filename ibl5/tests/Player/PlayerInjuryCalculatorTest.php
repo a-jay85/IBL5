@@ -1,6 +1,8 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
+use Player\PlayerInjuryCalculator;
+use Player\PlayerData;
 
 class PlayerInjuryCalculatorTest extends TestCase
 {

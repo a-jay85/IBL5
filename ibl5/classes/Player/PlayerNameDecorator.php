@@ -1,5 +1,7 @@
 <?php
 
+namespace Player;
+
 /**
  * PlayerNameDecorator - Handles player name formatting and decoration
  * 
@@ -15,7 +17,7 @@ class PlayerNameDecorator
     {
         if ($playerData->teamID == 0) {
             $decoratedName = "$playerData->name";
-        } elseif ($playerData->ordinal > JSB::WAIVERS_ORDINAL) {
+        } elseif ($playerData->ordinal > \JSB::WAIVERS_ORDINAL) {
             $decoratedName = "($playerData->name)*";
         } elseif ($playerData->contractCurrentYear == $playerData->contractTotalYears) { // eligible for Free Agency at the end of this season
             $decoratedName = "$playerData->name^";

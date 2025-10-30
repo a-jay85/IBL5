@@ -247,16 +247,6 @@ function mlaphp_autoloader($class)
         }
     }
 
-    // Try to load from subdirectory if class name starts with a known prefix
-    // This handles classes organized in subdirectories like Player/PlayerData.php
-    if (strpos($class, 'Player') === 0 && $class !== 'PlayerStats' && $class !== 'PlayerPageType') {
-        $file = $dir . DIRECTORY_SEPARATOR . 'Player' . DIRECTORY_SEPARATOR . $class . '.php';
-        if (file_exists($file)) {
-            require $file;
-            return;
-        }
-    }
-
     // Default: prefix with the central directory location and suffix with .php,
     // then require it.
     $file = $dir . DIRECTORY_SEPARATOR . $subpath . '.php';

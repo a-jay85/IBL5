@@ -1,6 +1,8 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
+use Player\PlayerContractValidator;
+use Player\PlayerData;
 
 class PlayerContractValidatorTest extends TestCase
 {

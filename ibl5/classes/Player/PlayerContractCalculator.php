@@ -1,5 +1,7 @@
 <?php
 
+namespace Player;
+
 /**
  * PlayerContractCalculator - Handles salary and contract calculations
  * 

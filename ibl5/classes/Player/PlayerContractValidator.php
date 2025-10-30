@@ -1,5 +1,7 @@
 <?php
 
+namespace Player;
+
 /**
  * PlayerContractValidator - Validates contract eligibility rules
  * 

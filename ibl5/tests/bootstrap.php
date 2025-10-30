@@ -86,17 +86,17 @@ spl_autoload_register(function ($class) {
         }
     }
     
-    // Handle global namespace classes like Player, Team, League, and JSB
-    $playerClasses = ['Player', 'PlayerData', 'PlayerRepository', 'PlayerContractCalculator', 
-                      'PlayerContractValidator', 'PlayerNameDecorator', 'PlayerInjuryCalculator'];
-    if (in_array($class, $playerClasses)) {
-        $file = __DIR__ . '/../classes/Player/' . $class . '.php';
+    // Handle Player namespace classes
+    if (strpos($class, 'Player\\') === 0) {
+        $className = substr($class, 7); // Remove "Player\" prefix
+        $file = __DIR__ . '/../classes/Player/' . $className . '.php';
         if (file_exists($file)) {
             require_once $file;
             return true;
         }
     }
     
+    // Handle global namespace classes like Team, League, and JSB
     if (in_array($class, ['Team', 'League', 'JSB'])) {
         $file = __DIR__ . '/../classes/' . $class . '.php';
         if (file_exists($file)) {

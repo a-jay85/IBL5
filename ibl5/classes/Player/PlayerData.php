@@ -1,5 +1,7 @@
 <?php
 
+namespace Player;
+
 /**
  * PlayerData - Value object representing player information
  * 

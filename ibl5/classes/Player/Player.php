@@ -1,5 +1,7 @@
 <?php
 
+namespace Player;
+
 /**
  * Player - Facade for player-related operations
  * 

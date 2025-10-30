@@ -1,6 +1,8 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
+use Player\PlayerContractCalculator;
+use Player\PlayerData;
 
 class PlayerContractCalculatorTest extends TestCase
 {

@@ -1,5 +1,7 @@
 <?php
 
+use Player\Player;
+
 require_once __DIR__ . '/BaseView.php';
 
 class OverviewView extends BaseView {

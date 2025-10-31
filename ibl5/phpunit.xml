@@ -3,6 +3,9 @@
          colors="true"
          testdox="true">
     <testsuites>
+        <testsuite name="Player Module Tests">
+            <directory>tests/Player</directory>
+        </testsuite>
         <testsuite name="Trading Module Tests">
             <directory>tests/Trading</directory>
         </testsuite>

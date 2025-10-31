@@ -41,7 +41,7 @@ class PlayerRepository
         $playerData->playerID = $plrRow['pid'];
         $playerData->ordinal = $plrRow['ordinal'];
         $playerData->name = stripslashes($plrRow['name']); // Remove SQL escaping
-        $playerData->nickname = $plrRow['nickname'] ? stripslashes($plrRow['nickname']) : null; // Remove SQL escaping
+        $playerData->nickname = (isset($plrRow['nickname']) && $plrRow['nickname'] !== '') ? stripslashes($plrRow['nickname']) : null; // Remove SQL escaping
         $playerData->age = $plrRow['age'];
 
         $playerData->teamID = $plrRow['tid'];
@@ -95,9 +95,9 @@ class PlayerRepository
         $playerData->draftYear = $plrRow['draftyear'];
         $playerData->draftRound = $plrRow['draftround'];
         $playerData->draftPickNumber = $plrRow['draftpickno'];
-        $playerData->draftTeamOriginalName = $plrRow['draftedby'] ? stripslashes($plrRow['draftedby']) : null; // Remove SQL escaping
-        $playerData->draftTeamCurrentName = $plrRow['draftedbycurrentname'] ? stripslashes($plrRow['draftedbycurrentname']) : null; // Remove SQL escaping
-        $playerData->collegeName = $plrRow['college'] ? stripslashes($plrRow['college']) : null; // Remove SQL escaping
+        $playerData->draftTeamOriginalName = (isset($plrRow['draftedby']) && $plrRow['draftedby'] !== '') ? stripslashes($plrRow['draftedby']) : null; // Remove SQL escaping
+        $playerData->draftTeamCurrentName = (isset($plrRow['draftedbycurrentname']) && $plrRow['draftedbycurrentname'] !== '') ? stripslashes($plrRow['draftedbycurrentname']) : null; // Remove SQL escaping
+        $playerData->collegeName = (isset($plrRow['college']) && $plrRow['college'] !== '') ? stripslashes($plrRow['college']) : null; // Remove SQL escaping
     
         $playerData->daysRemainingForInjury = $plrRow['injured'];
     

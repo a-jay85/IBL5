@@ -46,13 +46,14 @@ class DatabaseService
 
     /**
      * Safely prepares a string from database for use in HTML attributes.
-     * This is an alias for safeHtmlOutput with ENT_QUOTES to ensure quotes are encoded.
+     * This is an alias for safeHtmlOutput to ensure quotes are properly encoded.
      *
      * @param string $string String from database
      * @return string String safe for use in HTML attributes (value="...")
      */
     public static function safeHtmlAttribute(string $string): string
     {
-        return self::safeHtmlOutput($string, ENT_QUOTES | ENT_HTML5);
+        // Explicitly use ENT_QUOTES to ensure both single and double quotes are encoded
+        return self::safeHtmlOutput($string);
     }
 }

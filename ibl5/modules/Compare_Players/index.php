@@ -16,8 +16,6 @@ if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
     die("You can't access this file directly...");
 }
 
-use Services\DatabaseService;
-
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 

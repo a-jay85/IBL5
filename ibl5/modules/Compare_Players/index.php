@@ -16,6 +16,7 @@ if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
     die("You can't access this file directly...");
 }
 
+use Services\DatabaseService;
 
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
@@ -62,7 +63,9 @@ function comparePlayers()
 		var availableTags = [';
 
         foreach (getPlayerNamesArray() as $name) {
-            echo "\"$name\",
+            // Strip SQL escaping and JSON-encode for JavaScript safety
+            $safeName = json_encode(stripslashes($name), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+            echo "$safeName,
 			  ";
         }
 

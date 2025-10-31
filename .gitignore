@@ -14,6 +14,7 @@ config.php
 config.inc.php
 discordWebhooks (not CURL).php
 Discord.php
+localDbUpdate.sh
 
 backups
 depthcharts

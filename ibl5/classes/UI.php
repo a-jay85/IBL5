@@ -1,6 +1,7 @@
 <?php
 
 use Player\Player;
+use Services\DatabaseService;
 
 class UI
 {
@@ -876,7 +877,7 @@ class UI
         $periodAverageTOV = $periodAverageBLK = $periodAveragePF = $periodAveragePTS = $i = 0;
 
         while ($row = $db->sql_fetch_assoc($resultPlayerSimBoxScores)) {
-            $name = $row['name'];
+            $name = DatabaseService::safeHtmlOutput($row['name']); // Safely escape for HTML output
             $pos = $row['pos'];
             $pid = $row['pid'];
             $numberOfGamesPlayedInSim = $row['games'];

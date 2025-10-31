@@ -43,17 +43,4 @@ class DatabaseService
         // Then apply HTML entity encoding to prevent XSS and HTML breakage
         return htmlspecialchars($unescaped, $flags, 'UTF-8');
     }
-
-    /**
-     * Safely prepares a string from database for use in HTML attributes.
-     * This is an alias for safeHtmlOutput to ensure quotes are properly encoded.
-     *
-     * @param string $string String from database
-     * @return string String safe for use in HTML attributes (value="...")
-     */
-    public static function safeHtmlAttribute(string $string): string
-    {
-        // Explicitly use ENT_QUOTES to ensure both single and double quotes are encoded
-        return self::safeHtmlOutput($string);
-    }
 }

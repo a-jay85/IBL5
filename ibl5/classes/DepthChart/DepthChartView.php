@@ -170,7 +170,6 @@ class DepthChartView
         $player_inj = $player['injured'];
         
         // Safely escape player name for HTML attribute and display
-        $player_name_html_attr = DatabaseService::safeHtmlAttribute($player_name);
         $player_name_html = DatabaseService::safeHtmlOutput($player_name);
         
         $player_staminacap = $player['sta'] + 40;
@@ -182,7 +181,7 @@ class DepthChartView
             <td>$player_pos</td>
             <td nowrap>
                 <input type=\"hidden\" name=\"Injury$depthCount\" value=\"$player_inj\">
-                <input type=\"hidden\" name=\"Name$depthCount\" value=\"$player_name_html_attr\">
+                <input type=\"hidden\" name=\"Name$depthCount\" value=\"$player_name_html\">
                 <a href=\"./modules.php?name=Player&pa=showpage&pid=$player_pid\">$player_name_html</a>
             </td>";
         

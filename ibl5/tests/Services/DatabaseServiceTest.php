@@ -52,12 +52,12 @@ class DatabaseServiceTest extends TestCase
         $this->assertEquals("&lt;script&gt;alert(&apos;xss&apos;)&lt;/script&gt;", $result);
     }
 
-    public function testSafeHtmlAttributeWithApostrophe()
+    public function testSafeHtmlOutputForHtmlAttributeWithApostrophe()
     {
         // Simulating data stored in database with addslashes()
         $dbValue = "Jermaine O\\'Neal";
         
-        $result = DatabaseService::safeHtmlAttribute($dbValue);
+        $result = DatabaseService::safeHtmlOutput($dbValue);
         
         // Should be safe for use in HTML attributes
         // Note: ENT_HTML5 encodes apostrophes as &apos;
@@ -100,11 +100,11 @@ class DatabaseServiceTest extends TestCase
         $this->assertEquals("José García", $result);
     }
 
-    public function testSafeHtmlAttributeInActualHTML()
+    public function testSafeHtmlOutputInActualHTML()
     {
         // Real-world scenario: name in hidden input
         $dbValue = "Shaquille O\\'Neal";
-        $safeName = DatabaseService::safeHtmlAttribute($dbValue);
+        $safeName = DatabaseService::safeHtmlOutput($dbValue);
         
         // Construct HTML like DepthChartView does
         $html = "<input type=\"hidden\" name=\"Name1\" value=\"$safeName\">";

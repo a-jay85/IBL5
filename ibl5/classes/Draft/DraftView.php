@@ -24,20 +24,25 @@ class DraftView
     public function renderValidationError($errorMessage)
     {
         $errorMessage = DatabaseService::safeHtmlOutput($errorMessage);
+        $retryInstructions = $this->getRetryInstructions($errorMessage);
         
         return "Oops, $errorMessage<p>
         <a href=\"/ibl5/modules.php?name=College_Scouting\">Click here to return to the Draft module</a>" 
-        . ($this->shouldShowRetryInstructions($errorMessage) ? " and please select a player before hitting the Draft button." : " and if it's your turn, try drafting again.");
+        . $retryInstructions;
     }
 
     /**
-     * Determine if retry instructions should be shown
+     * Get the appropriate retry instructions based on the error message
      * 
      * @param string $errorMessage The error message
-     * @return bool True if retry instructions should be shown
+     * @return string The retry instructions to append
      */
-    private function shouldShowRetryInstructions($errorMessage)
+    private function getRetryInstructions($errorMessage)
     {
-        return strpos($errorMessage, "didn't select") !== false;
+        if (strpos($errorMessage, "didn't select") !== false) {
+            return " and please select a player before hitting the Draft button.";
+        }
+        
+        return " and if it's your turn, try drafting again.";
     }
 }

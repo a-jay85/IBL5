@@ -12,6 +12,10 @@ namespace Draft;
  */
 class DraftProcessor
 {
+    // Configuration constants
+    const DRAFT_MODULE_URL = 'https://www.iblhoops.net/ibl5/modules.php?name=College_Scouting';
+    const ADMIN_CONTACT = 'the administrator';
+
     /**
      * Create a draft announcement message
      * 
@@ -41,7 +45,7 @@ class DraftProcessor
         if ($discordID !== null) {
             return $baseMessage . '
     **<@!' . $discordID . '>** is on the clock!
-https://www.iblhoops.net/ibl5/modules.php?name=College_Scouting';
+' . self::DRAFT_MODULE_URL;
         } else {
             return $baseMessage . "
     **🏁 __The $seasonYear IBL Draft has officially concluded!__ 🏁**";
@@ -68,7 +72,7 @@ https://www.iblhoops.net/ibl5/modules.php?name=College_Scouting';
     public function getDatabaseErrorMessage()
     {
         return "Oops, something went wrong, and at least one of the draft database tables wasn't updated.<p>
-            Let A-Jay know what happened and he'll look into it.<p>
+            Let " . self::ADMIN_CONTACT . " know what happened and they'll look into it.<p>
             
             <a href=\"/ibl5/modules.php?name=College_Scouting\">Go back to the Draft module</a>";
     }

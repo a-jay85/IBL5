@@ -1,5 +1,7 @@
 <?php
 
+use Player\Player;
+
 class UI
 {
     public static function displayDebugOutput($content, $title = 'Debug Output') 

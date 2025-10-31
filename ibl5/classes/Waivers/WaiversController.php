@@ -2,6 +2,8 @@
 
 namespace Waivers;
 
+use Player\Player;
+
 /**
  * Main controller for waiver wire operations
  */
@@ -301,7 +303,7 @@ class WaiversController
         }
         
         while ($playerRow = $this->db->sql_fetchrow($result)) {
-            $player = \Player::withPlrRow($this->db, $playerRow);
+            $player = Player::withPlrRow($this->db, $playerRow);
             $contract = $this->processor->getPlayerContractDisplay($playerRow);
             $waitTime = '';
             

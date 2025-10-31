@@ -40,12 +40,12 @@ class PlayerRepository
 
         $playerData->playerID = $plrRow['pid'];
         $playerData->ordinal = $plrRow['ordinal'];
-        $playerData->name = $plrRow['name'];
-        $playerData->nickname = $plrRow['nickname'];
+        $playerData->name = stripslashes($plrRow['name']); // Remove SQL escaping
+        $playerData->nickname = $plrRow['nickname'] ? stripslashes($plrRow['nickname']) : null; // Remove SQL escaping
         $playerData->age = $plrRow['age'];
 
         $playerData->teamID = $plrRow['tid'];
-        $playerData->teamName = $plrRow['teamname'];
+        $playerData->teamName = stripslashes($plrRow['teamname']); // Remove SQL escaping
         $playerData->position = $plrRow['pos'];
         
         $playerData->ratingFieldGoalAttempts = $plrRow['r_fga'];
@@ -95,9 +95,9 @@ class PlayerRepository
         $playerData->draftYear = $plrRow['draftyear'];
         $playerData->draftRound = $plrRow['draftround'];
         $playerData->draftPickNumber = $plrRow['draftpickno'];
-        $playerData->draftTeamOriginalName = $plrRow['draftedby'];
-        $playerData->draftTeamCurrentName = $plrRow['draftedbycurrentname'];
-        $playerData->collegeName = $plrRow['college'];
+        $playerData->draftTeamOriginalName = $plrRow['draftedby'] ? stripslashes($plrRow['draftedby']) : null; // Remove SQL escaping
+        $playerData->draftTeamCurrentName = $plrRow['draftedbycurrentname'] ? stripslashes($plrRow['draftedbycurrentname']) : null; // Remove SQL escaping
+        $playerData->collegeName = $plrRow['college'] ? stripslashes($plrRow['college']) : null; // Remove SQL escaping
     
         $playerData->daysRemainingForInjury = $plrRow['injured'];
     
@@ -121,9 +121,9 @@ class PlayerRepository
 
         $playerData->playerID = $plrRow['pid'];
         $playerData->historicalYear = $plrRow['year'];
-        $playerData->name = $plrRow['name'];
+        $playerData->name = stripslashes($plrRow['name']); // Remove SQL escaping
 
-        $playerData->teamName = $plrRow['team'];
+        $playerData->teamName = stripslashes($plrRow['team']); // Remove SQL escaping
         $playerData->teamID = $plrRow['teamid'];
         
         $playerData->ratingFieldGoalAttempts = $plrRow['r_2ga'];

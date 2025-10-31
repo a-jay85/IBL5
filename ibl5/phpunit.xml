@@ -24,5 +24,8 @@
         <testsuite name="Waivers Module Tests">
             <directory>tests/Waivers</directory>
         </testsuite>
+        <testsuite name="Draft Module Tests">
+            <directory>tests/Draft</directory>
+        </testsuite>
     </testsuites>
 </phpunit>

@@ -13,7 +13,7 @@ class PlayerContractCalculator
     /**
      * Calculate the current season salary based on contract year
      */
-    public function getCurrentSeasonSalary(PlayerData $playerData): int
+    public function getCurrentSeasonSalary(PlayerData $playerData): ?int
     {
         if ("contractYear" . $playerData->contractCurrentYear . "Salary" == "contractYear0Salary") {
             $currentSeasonSalary = $playerData->contractYear1Salary;

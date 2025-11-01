@@ -31,7 +31,7 @@ function select_month()
     $thismonth = "";
     while ($row = $db->sql_fetchrow($result)) {
         $time = $row['time'];
-        ereg("([0-9]{4})-([0-9]{1,2})-([0-9]{1,2}) ([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})", $time, $getdate);
+        preg_match("/([0-9]{4})-([0-9]{1,2})-([0-9]{1,2}) ([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})/", $time, $getdate);
         if ($getdate[2] == "01") {$month = _JANUARY;} elseif ($getdate[2] == "02") {$month = _FEBRUARY;} elseif ($getdate[2] == "03") {$month = _MARCH;} elseif ($getdate[2] == "04") {$month = _APRIL;} elseif ($getdate[2] == "05") {$month = _MAY;} elseif ($getdate[2] == "06") {$month = _JUNE;} elseif ($getdate[2] == "07") {$month = _JULY;} elseif ($getdate[2] == "08") {$month = _AUGUST;} elseif ($getdate[2] == "09") {$month = _SEPTEMBER;} elseif ($getdate[2] == "10") {$month = _OCTOBER;} elseif ($getdate[2] == "11") {$month = _NOVEMBER;} elseif ($getdate[2] == "12") {$month = _DECEMBER;}
         if ($month != $thismonth) {
             $year = $getdate[1];
@@ -92,7 +92,11 @@ function show_month($year, $month, $month_l)
         . "<td bgcolor=\"$bgcolor2\" align=\"center\"><b>" . _USCORE . "</b></td>"
         . "<td bgcolor=\"$bgcolor2\" align=\"center\"><b>" . _DATE . "</b></td>"
         . "<td bgcolor=\"$bgcolor2\" align=\"center\"><b>" . _ACTIONS . "</b></td></tr>";
-    $result = $db->sql_query("SELECT sid, catid, title, time, comments, counter, topic, alanguage, score, ratings from " . $prefix . "_stories WHERE time >= '$year-$month-01 00:00:00' AND time <= '$year-$month-31 23:59:59' order by sid DESC");
+    // Calculate last day of the month
+    $lastDay = date('t', strtotime("$year-$month-01"));
+    $startDate = "$year-$month-01 00:00:00";
+    $endDate = "$year-$month-$lastDay 23:59:59";
+    $result = $db->sql_query("SELECT sid, catid, title, time, comments, counter, topic, alanguage, score, ratings from " . $prefix . "_stories WHERE time >= '$startDate' AND time <= '$endDate' order by sid DESC");
     while ($row = $db->sql_fetchrow($result)) {
         $sid = intval($row['sid']);
         $catid = intval($row['catid']);
@@ -146,7 +150,7 @@ function show_month($year, $month, $month_l)
     $thismonth = "";
     while ($row2 = $db->sql_fetchrow($result2)) {
         $time = $row2['time'];
-        ereg("([0-9]{4})-([0-9]{1,2})-([0-9]{1,2}) ([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})", $time, $getdate);
+        preg_match("/([0-9]{4})-([0-9]{1,2})-([0-9]{1,2}) ([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})/", $time, $getdate);
         if ($getdate[2] == "01") {$month = _JANUARY;} elseif ($getdate[2] == "02") {$month = _FEBRUARY;} elseif ($getdate[2] == "03") {$month = _MARCH;} elseif ($getdate[2] == "04") {$month = _APRIL;} elseif ($getdate[2] == "05") {$month = _MAY;} elseif ($getdate[2] == "06") {$month = _JUNE;} elseif ($getdate[2] == "07") {$month = _JULY;} elseif ($getdate[2] == "08") {$month = _AUGUST;} elseif ($getdate[2] == "09") {$month = _SEPTEMBER;} elseif ($getdate[2] == "10") {$month = _OCTOBER;} elseif ($getdate[2] == "11") {$month = _NOVEMBER;} elseif ($getdate[2] == "12") {$month = _DECEMBER;}
         if ($month != $thismonth) {
             $year = $getdate[1];
@@ -261,7 +265,7 @@ function show_all($min)
     $thismonth = "";
     while ($row2 = $db->sql_fetchrow($result2)) {
         $time = $row2['time'];
-        ereg("([0-9]{4})-([0-9]{1,2})-([0-9]{1,2}) ([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})", $time, $getdate);
+        preg_match("/([0-9]{4})-([0-9]{1,2})-([0-9]{1,2}) ([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})/", $time, $getdate);
         if ($getdate[2] == "01") {$month = _JANUARY;} elseif ($getdate[2] == "02") {$month = _FEBRUARY;} elseif ($getdate[2] == "03") {$month = _MARCH;} elseif ($getdate[2] == "04") {$month = _APRIL;} elseif ($getdate[2] == "05") {$month = _MAY;} elseif ($getdate[2] == "06") {$month = _JUNE;} elseif ($getdate[2] == "07") {$month = _JULY;} elseif ($getdate[2] == "08") {$month = _AUGUST;} elseif ($getdate[2] == "09") {$month = _SEPTEMBER;} elseif ($getdate[2] == "10") {$month = _OCTOBER;} elseif ($getdate[2] == "11") {$month = _NOVEMBER;} elseif ($getdate[2] == "12") {$month = _DECEMBER;}
         if ($month != $thismonth) {
             $year = $getdate[1];

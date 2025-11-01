@@ -28,7 +28,7 @@ class PlayerContractCalculator
     /**
      * Calculate the next season's salary
      */
-    public function getNextSeasonSalary(PlayerData $playerData): int
+    public function getNextSeasonSalary(PlayerData $playerData): ?int
     {
         $contractNextYear = $playerData->contractCurrentYear + 1;
         $nextSeasonSalary = $playerData->{"contractYear" . $contractNextYear . "Salary"};

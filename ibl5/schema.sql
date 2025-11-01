@@ -7,7 +7,7 @@
 #
 # Host: iblhoops.net (MySQL 5.5.5-10.6.20-MariaDB-cll-lve)
 # Database: iblhoops_ibl5
-# Generation Time: 2025-10-29 23:40:08 +0000
+# Generation Time: 2025-11-01 01:56:35 +0000
 # ************************************************************
 
 
@@ -69,8 +69,10 @@ CREATE TABLE `ibl_awards` (
   `Award` varchar(128) NOT NULL DEFAULT '',
   `name` varchar(32) NOT NULL DEFAULT '',
   `table_ID` int(11) NOT NULL AUTO_INCREMENT,
-  PRIMARY KEY (`table_ID`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  PRIMARY KEY (`table_ID`),
+  KEY `idx_year` (`year`),
+  KEY `idx_name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -82,7 +84,7 @@ CREATE TABLE `ibl_banners` (
   `currentname` varchar(16) NOT NULL DEFAULT '',
   `bannername` varchar(16) NOT NULL DEFAULT '',
   `bannertype` int(11) NOT NULL DEFAULT 0
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -109,8 +111,16 @@ CREATE TABLE `ibl_box_scores` (
   `gameSTL` int(11) DEFAULT NULL,
   `gameTOV` int(11) DEFAULT NULL,
   `gameBLK` int(11) DEFAULT NULL,
-  `gamePF` int(11) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  `gamePF` int(11) DEFAULT NULL,
+  KEY `idx_date` (`Date`),
+  KEY `idx_pid` (`pid`),
+  KEY `idx_visitor_tid` (`visitorTID`),
+  KEY `idx_home_tid` (`homeTID`),
+  KEY `idx_date_pid` (`Date`,`pid`),
+  CONSTRAINT `fk_boxscore_home` FOREIGN KEY (`homeTID`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE,
+  CONSTRAINT `fk_boxscore_player` FOREIGN KEY (`pid`) REFERENCES `ibl_plr` (`pid`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_boxscore_visitor` FOREIGN KEY (`visitorTID`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -152,8 +162,13 @@ CREATE TABLE `ibl_box_scores_teams` (
   `gameSTL` int(11) DEFAULT NULL,
   `gameTOV` int(11) DEFAULT NULL,
   `gameBLK` int(11) DEFAULT NULL,
-  `gamePF` int(11) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  `gamePF` int(11) DEFAULT NULL,
+  KEY `idx_date` (`Date`),
+  KEY `idx_visitor_team` (`visitorTeamID`),
+  KEY `idx_home_team` (`homeTeamID`),
+  CONSTRAINT `fk_boxscoreteam_home` FOREIGN KEY (`homeTeamID`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE,
+  CONSTRAINT `fk_boxscoreteam_visitor` FOREIGN KEY (`visitorTeamID`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -168,8 +183,9 @@ CREATE TABLE `ibl_demands` (
   `dem4` int(11) NOT NULL DEFAULT 0,
   `dem5` int(11) NOT NULL DEFAULT 0,
   `dem6` int(11) NOT NULL DEFAULT 0,
-  PRIMARY KEY (`name`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  PRIMARY KEY (`name`),
+  CONSTRAINT `fk_demands_player` FOREIGN KEY (`name`) REFERENCES `ibl_plr` (`name`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -184,8 +200,15 @@ CREATE TABLE `ibl_draft` (
   `round` int(11) NOT NULL DEFAULT 0,
   `pick` int(11) NOT NULL DEFAULT 0,
   `date` datetime DEFAULT NULL,
-  UNIQUE KEY `draft_id` (`draft_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  UNIQUE KEY `draft_id` (`draft_id`),
+  KEY `idx_year` (`year`),
+  KEY `idx_team` (`team`),
+  KEY `idx_player` (`player`),
+  KEY `idx_year_round` (`year`,`round`),
+  KEY `idx_year_round_pick` (`year`,`round`,`pick`),
+  CONSTRAINT `fk_draft_team` FOREIGN KEY (`team`) REFERENCES `ibl_team_info` (`team_name`) ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -221,12 +244,15 @@ CREATE TABLE `ibl_draft_class` (
   `skl` int(11) NOT NULL DEFAULT 0,
   `int` int(11) NOT NULL DEFAULT 0,
   `ranking` float DEFAULT 0,
-  `invite` text DEFAULT NULL,
+  `invite` mediumtext DEFAULT NULL,
   `drafted` int(11) DEFAULT 0,
   `sta` int(11) DEFAULT 0,
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  PRIMARY KEY (`id`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  PRIMARY KEY (`id`),
+  KEY `idx_ranking` (`ranking`),
+  KEY `idx_drafted` (`drafted`),
+  KEY `idx_pos` (`pos`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -240,8 +266,14 @@ CREATE TABLE `ibl_draft_picks` (
   `year` varchar(4) NOT NULL DEFAULT '',
   `round` char(1) NOT NULL DEFAULT '',
   `notes` varchar(280) DEFAULT NULL,
-  PRIMARY KEY (`pickid`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  PRIMARY KEY (`pickid`),
+  KEY `idx_ownerofpick` (`ownerofpick`),
+  KEY `idx_year` (`year`),
+  KEY `idx_year_round` (`year`,`round`),
+  KEY `fk_draftpick_team` (`teampick`),
+  CONSTRAINT `fk_draftpick_owner` FOREIGN KEY (`ownerofpick`) REFERENCES `ibl_team_info` (`team_name`) ON UPDATE CASCADE,
+  CONSTRAINT `fk_draftpick_team` FOREIGN KEY (`teampick`) REFERENCES `ibl_team_info` (`team_name`) ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -263,8 +295,12 @@ CREATE TABLE `ibl_fa_offers` (
   `MLE` int(11) NOT NULL DEFAULT 0,
   `LLE` int(11) NOT NULL DEFAULT 0,
   `primary_key` int(11) unsigned NOT NULL AUTO_INCREMENT,
-  PRIMARY KEY (`primary_key`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  PRIMARY KEY (`primary_key`),
+  KEY `idx_name` (`name`),
+  KEY `idx_team` (`team`),
+  CONSTRAINT `fk_faoffer_player` FOREIGN KEY (`name`) REFERENCES `ibl_plr` (`name`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_faoffer_team` FOREIGN KEY (`team`) REFERENCES `ibl_team_info` (`team_name`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -277,7 +313,7 @@ CREATE TABLE `ibl_gm_history` (
   `Award` varchar(350) NOT NULL,
   `prim` int(11) NOT NULL,
   PRIMARY KEY (`prim`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -307,7 +343,7 @@ CREATE TABLE `ibl_heat_career_avgs` (
   `pf` decimal(8,2) NOT NULL DEFAULT 0.00,
   `pts` decimal(8,2) NOT NULL DEFAULT 0.00,
   `retired` int(11) NOT NULL DEFAULT 0
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -334,7 +370,7 @@ CREATE TABLE `ibl_heat_career_totals` (
   `pf` int(11) NOT NULL DEFAULT 0,
   `pts` int(11) NOT NULL DEFAULT 0,
   `retired` int(11) NOT NULL DEFAULT 0
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -363,8 +399,10 @@ CREATE TABLE `ibl_heat_stats` (
   `blk` int(11) NOT NULL DEFAULT 0,
   `pf` int(11) NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `id` (`id`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  UNIQUE KEY `id` (`id`),
+  KEY `fk_heat_stats_name` (`name`),
+  CONSTRAINT `fk_heat_stats_name` FOREIGN KEY (`name`) REFERENCES `ibl_plr` (`name`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -379,7 +417,7 @@ CREATE TABLE `ibl_heat_win_loss` (
   `losses` tinyint(2) unsigned NOT NULL DEFAULT 0,
   `table_ID` int(11) NOT NULL AUTO_INCREMENT,
   PRIMARY KEY (`table_ID`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -431,8 +469,13 @@ CREATE TABLE `ibl_hist` (
   `salary` int(11) NOT NULL DEFAULT 0,
   `nuke_iblhist` int(11) NOT NULL AUTO_INCREMENT,
   PRIMARY KEY (`nuke_iblhist`),
-  UNIQUE KEY `unique_composite_key` (`pid`,`name`,`year`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  UNIQUE KEY `unique_composite_key` (`pid`,`name`,`year`),
+  KEY `idx_pid_year` (`pid`,`year`),
+  KEY `idx_team_year` (`team`,`year`),
+  KEY `idx_teamid_year` (`teamid`,`year`),
+  KEY `idx_year` (`year`),
+  CONSTRAINT `fk_hist_player` FOREIGN KEY (`pid`) REFERENCES `ibl_plr` (`pid`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -462,7 +505,7 @@ CREATE TABLE `ibl_olympics_career_avgs` (
   `pf` decimal(8,2) NOT NULL DEFAULT 0.00,
   `pts` decimal(8,2) NOT NULL DEFAULT 0.00,
   `retired` int(11) NOT NULL DEFAULT 0
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -489,7 +532,7 @@ CREATE TABLE `ibl_olympics_career_totals` (
   `pf` int(11) NOT NULL DEFAULT 0,
   `pts` int(11) NOT NULL DEFAULT 0,
   `retired` int(11) NOT NULL DEFAULT 0
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -518,8 +561,10 @@ CREATE TABLE `ibl_olympics_stats` (
   `blk` int(11) NOT NULL DEFAULT 0,
   `pf` int(11) NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `id` (`id`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  UNIQUE KEY `id` (`id`),
+  KEY `fk_olympics_stats_name` (`name`),
+  CONSTRAINT `fk_olympics_stats_name` FOREIGN KEY (`name`) REFERENCES `ibl_plr` (`name`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -528,14 +573,14 @@ CREATE TABLE `ibl_olympics_stats` (
 
 CREATE TABLE `ibl_one_on_one` (
   `gameid` int(11) NOT NULL DEFAULT 0,
-  `playbyplay` text NOT NULL,
+  `playbyplay` mediumtext NOT NULL,
   `winner` varchar(32) NOT NULL DEFAULT '',
   `loser` varchar(32) NOT NULL DEFAULT '',
   `winscore` int(11) NOT NULL DEFAULT 0,
   `lossscore` int(11) NOT NULL DEFAULT 0,
   `owner` varchar(25) NOT NULL DEFAULT '',
   PRIMARY KEY (`gameid`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -565,7 +610,7 @@ CREATE TABLE `ibl_playoff_career_avgs` (
   `pf` decimal(8,2) NOT NULL DEFAULT 0.00,
   `pts` decimal(8,2) NOT NULL DEFAULT 0.00,
   `retired` int(11) NOT NULL DEFAULT 0
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -592,7 +637,7 @@ CREATE TABLE `ibl_playoff_career_totals` (
   `pf` int(11) NOT NULL DEFAULT 0,
   `pts` int(11) NOT NULL DEFAULT 0,
   `retired` int(11) NOT NULL DEFAULT 0
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -606,8 +651,10 @@ CREATE TABLE `ibl_playoff_results` (
   `loser` varchar(32) NOT NULL DEFAULT '',
   `loser_games` int(11) NOT NULL DEFAULT 0,
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  PRIMARY KEY (`id`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  PRIMARY KEY (`id`),
+  KEY `idx_year` (`year`),
+  KEY `idx_round` (`round`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -633,8 +680,12 @@ CREATE TABLE `ibl_playoff_stats` (
   `stl` int(11) NOT NULL DEFAULT 0,
   `tvr` int(11) NOT NULL DEFAULT 0,
   `blk` int(11) NOT NULL DEFAULT 0,
-  `pf` int(11) NOT NULL DEFAULT 0
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  `pf` int(11) NOT NULL DEFAULT 0,
+  KEY `idx_year` (`year`),
+  KEY `idx_team` (`team`),
+  KEY `idx_name` (`name`),
+  CONSTRAINT `fk_playoff_stats_player` FOREIGN KEY (`name`) REFERENCES `ibl_plr` (`name`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -646,8 +697,8 @@ CREATE TABLE `ibl_plr` (
   `pid` int(11) NOT NULL DEFAULT 0,
   `name` varchar(32) DEFAULT '',
   `nickname` varchar(64) DEFAULT '',
-  `age` char(2) DEFAULT '',
-  `peak` int(11) DEFAULT 0,
+  `age` tinyint(3) unsigned DEFAULT NULL,
+  `peak` tinyint(3) unsigned DEFAULT NULL,
   `tid` int(11) DEFAULT 0,
   `teamname` varchar(32) DEFAULT '',
   `pos` varchar(4) DEFAULT '',
@@ -667,7 +718,7 @@ CREATE TABLE `ibl_plr` (
   `SFDepth` int(11) DEFAULT 0,
   `PFDepth` int(11) DEFAULT 0,
   `CDepth` int(11) DEFAULT 0,
-  `active` int(11) DEFAULT 0,
+  `active` tinyint(1) DEFAULT NULL,
   `dc_PGDepth` int(11) DEFAULT 0,
   `dc_SGDepth` int(11) DEFAULT 0,
   `dc_SFDepth` int(11) DEFAULT 0,
@@ -706,7 +757,7 @@ CREATE TABLE `ibl_plr` (
   `tradition` varchar(16) DEFAULT '',
   `security` varchar(16) DEFAULT '',
   `exp` int(11) DEFAULT 0,
-  `bird` int(11) DEFAULT 0,
+  `bird` tinyint(1) DEFAULT NULL,
   `cy` int(11) DEFAULT 0,
   `cyt` int(11) DEFAULT 0,
   `cy1` int(11) DEFAULT 0,
@@ -774,20 +825,30 @@ CREATE TABLE `ibl_plr` (
   `draftedbycurrentname` varchar(32) DEFAULT '',
   `draftyear` int(11) DEFAULT 0,
   `draftpickno` int(11) DEFAULT 0,
-  `injured` int(11) DEFAULT 0,
+  `injured` tinyint(1) DEFAULT NULL,
   `htft` varchar(8) DEFAULT '',
   `htin` varchar(8) DEFAULT '',
   `wt` varchar(8) DEFAULT '',
-  `retired` smallint(6) DEFAULT 0,
+  `retired` tinyint(1) DEFAULT NULL,
   `college` varchar(48) DEFAULT '',
   `car_playoff_min` int(11) DEFAULT 0,
   `car_preseason_min` int(11) DEFAULT 0,
   `droptime` int(11) DEFAULT 0,
   `temp` int(11) DEFAULT 0 COMMENT '2028 Playoff Mins',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`pid`),
   KEY `name` (`name`),
-  KEY `teamname` (`teamname`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  KEY `teamname` (`teamname`),
+  KEY `idx_tid` (`tid`),
+  KEY `idx_active` (`active`),
+  KEY `idx_retired` (`retired`),
+  KEY `idx_tid_active` (`tid`,`active`),
+  KEY `idx_pos` (`pos`),
+  KEY `idx_draftyear` (`draftyear`),
+  KEY `idx_draftround` (`draftround`),
+  CONSTRAINT `fk_plr_team` FOREIGN KEY (`tid`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -824,7 +885,7 @@ CREATE TABLE `ibl_plr_chunk` (
   `Season` int(11) NOT NULL,
   KEY `pid` (`pid`),
   KEY `pid_2` (`pid`) USING BTREE
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -852,8 +913,9 @@ CREATE TABLE `ibl_power` (
   `last_loss` int(11) NOT NULL,
   `streak_type` varchar(1) NOT NULL DEFAULT '',
   `streak` int(11) NOT NULL,
-  PRIMARY KEY (`Team`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  PRIMARY KEY (`Team`),
+  CONSTRAINT `fk_power_team` FOREIGN KEY (`Team`) REFERENCES `ibl_team_info` (`team_name`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -869,9 +931,18 @@ CREATE TABLE `ibl_schedule` (
   `Home` int(11) NOT NULL DEFAULT 0,
   `HScore` int(11) NOT NULL DEFAULT 0,
   `SchedID` int(11) NOT NULL AUTO_INCREMENT,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`SchedID`),
-  KEY `BoxID` (`BoxID`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  KEY `BoxID` (`BoxID`),
+  KEY `idx_year` (`Year`),
+  KEY `idx_date` (`Date`),
+  KEY `idx_visitor` (`Visitor`),
+  KEY `idx_home` (`Home`),
+  KEY `idx_year_date` (`Year`,`Date`),
+  CONSTRAINT `fk_schedule_home` FOREIGN KEY (`Home`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE,
+  CONSTRAINT `fk_schedule_visitor` FOREIGN KEY (`Visitor`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -901,7 +972,7 @@ CREATE TABLE `ibl_season_career_avgs` (
   `pf` decimal(8,2) NOT NULL DEFAULT 0.00,
   `pts` decimal(8,2) NOT NULL DEFAULT 0.00,
   `retired` int(11) NOT NULL DEFAULT 0
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -912,7 +983,7 @@ CREATE TABLE `ibl_settings` (
   `name` varchar(128) NOT NULL,
   `value` varchar(128) NOT NULL,
   PRIMARY KEY (`name`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -924,7 +995,7 @@ CREATE TABLE `ibl_sim_dates` (
   `Start Date` varchar(11) DEFAULT NULL,
   `End Date` varchar(11) DEFAULT NULL,
   PRIMARY KEY (`Sim`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_unicode_ci;
 
 
 
@@ -932,7 +1003,7 @@ CREATE TABLE `ibl_sim_dates` (
 # ------------------------------------------------------------
 
 CREATE TABLE `ibl_standings` (
-  `tid` int(10) unsigned NOT NULL,
+  `tid` int(11) NOT NULL,
   `team_name` varchar(16) NOT NULL DEFAULT '',
   `pct` float(4,3) unsigned DEFAULT NULL,
   `leagueRecord` varchar(5) DEFAULT '',
@@ -959,8 +1030,11 @@ CREATE TABLE `ibl_standings` (
   `clinchedDivision` tinyint(1) DEFAULT NULL,
   `clinchedPlayoffs` tinyint(1) DEFAULT NULL,
   PRIMARY KEY (`tid`),
-  KEY `team_name` (`team_name`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  KEY `team_name` (`team_name`),
+  KEY `idx_conference` (`conference`),
+  KEY `idx_division` (`division`),
+  CONSTRAINT `fk_standings_team` FOREIGN KEY (`tid`) REFERENCES `ibl_team_info` (`teamid`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -973,7 +1047,7 @@ CREATE TABLE `ibl_team_awards` (
   `Award` varchar(350) NOT NULL,
   `ID` int(11) NOT NULL,
   PRIMARY KEY (`ID`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -997,8 +1071,10 @@ CREATE TABLE `ibl_team_defense_stats` (
   `tvr` int(11) NOT NULL DEFAULT 0,
   `blk` int(11) NOT NULL DEFAULT 0,
   `pf` int(11) NOT NULL DEFAULT 0,
-  `minutes` int(11) DEFAULT 0
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  `minutes` int(11) DEFAULT 0,
+  KEY `idx_teamID` (`teamID`),
+  CONSTRAINT `fk_team_defense_team` FOREIGN KEY (`teamID`) REFERENCES `ibl_team_info` (`teamid`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1024,7 +1100,7 @@ CREATE TABLE `ibl_team_history` (
   `ibl_titles` int(11) NOT NULL,
   `heat_titles` int(11) NOT NULL,
   PRIMARY KEY (`teamid`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1055,9 +1131,13 @@ CREATE TABLE `ibl_team_info` (
   `HasMLE` int(11) NOT NULL DEFAULT 0,
   `HasLLE` int(11) NOT NULL DEFAULT 0,
   `chart` char(2) NOT NULL DEFAULT '',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`teamid`),
-  KEY `team_name` (`team_name`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  KEY `team_name` (`team_name`),
+  KEY `idx_owner_email` (`owner_email`),
+  KEY `idx_discordID` (`discordID`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1081,8 +1161,10 @@ CREATE TABLE `ibl_team_offense_stats` (
   `tvr` int(11) NOT NULL DEFAULT 0,
   `blk` int(11) NOT NULL DEFAULT 0,
   `pf` int(11) NOT NULL DEFAULT 0,
-  `minutes` int(11) DEFAULT 0
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  `minutes` int(11) DEFAULT 0,
+  KEY `idx_teamID` (`teamID`),
+  CONSTRAINT `fk_team_offense_team` FOREIGN KEY (`teamID`) REFERENCES `ibl_team_info` (`teamid`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1097,7 +1179,7 @@ CREATE TABLE `ibl_team_win_loss` (
   `losses` varchar(75) NOT NULL DEFAULT '0',
   `table_ID` int(11) NOT NULL AUTO_INCREMENT,
   PRIMARY KEY (`table_ID`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1107,7 +1189,7 @@ CREATE TABLE `ibl_team_win_loss` (
 CREATE TABLE `ibl_trade_autocounter` (
   `counter` int(11) NOT NULL AUTO_INCREMENT,
   PRIMARY KEY (`counter`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1137,8 +1219,13 @@ CREATE TABLE `ibl_trade_info` (
   `itemtype` varchar(128) NOT NULL DEFAULT '',
   `from` varchar(128) NOT NULL DEFAULT '',
   `to` varchar(128) NOT NULL DEFAULT '',
-  `approval` varchar(128) NOT NULL DEFAULT ''
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  `approval` varchar(128) NOT NULL DEFAULT '',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  KEY `idx_tradeofferid` (`tradeofferid`),
+  KEY `idx_from` (`from`),
+  KEY `idx_to` (`to`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1146,8 +1233,8 @@ CREATE TABLE `ibl_trade_info` (
 # ------------------------------------------------------------
 
 CREATE TABLE `ibl_trade_queue` (
-  `query` tinytext NOT NULL,
-  `tradeline` tinytext DEFAULT NULL
+  `query` text NOT NULL,
+  `tradeline` text DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
@@ -1174,8 +1261,10 @@ CREATE TABLE `ibl_votes_ASG` (
   `West_B1` varchar(255) DEFAULT NULL,
   `West_B2` varchar(255) DEFAULT NULL,
   `West_B3` varchar(255) DEFAULT NULL,
-  `West_B4` varchar(255) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  `West_B4` varchar(255) DEFAULT NULL,
+  KEY `fk_asg_votes_team` (`teamid`),
+  CONSTRAINT `fk_asg_votes_team` FOREIGN KEY (`teamid`) REFERENCES `ibl_team_info` (`teamid`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1198,8 +1287,9 @@ CREATE TABLE `ibl_votes_EOY` (
   `GM_1` varchar(255) DEFAULT NULL,
   `GM_2` varchar(255) DEFAULT NULL,
   `GM_3` varchar(255) DEFAULT NULL,
-  PRIMARY KEY (`teamid`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  PRIMARY KEY (`teamid`),
+  CONSTRAINT `fk_eoy_votes_team` FOREIGN KEY (`teamid`) REFERENCES `ibl_team_info` (`teamid`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -1289,15 +1379,15 @@ CREATE TABLE `nuke_autonews` (
   `aid` varchar(30) NOT NULL DEFAULT '',
   `title` varchar(80) NOT NULL DEFAULT '',
   `time` varchar(19) NOT NULL DEFAULT '',
-  `hometext` text NOT NULL,
-  `bodytext` text NOT NULL,
+  `hometext` mediumtext NOT NULL,
+  `bodytext` mediumtext NOT NULL,
   `topic` int(11) NOT NULL DEFAULT 1,
   `informant` varchar(20) NOT NULL DEFAULT '',
-  `notes` text NOT NULL,
+  `notes` mediumtext NOT NULL,
   `ihome` int(11) NOT NULL DEFAULT 0,
   `alanguage` varchar(30) NOT NULL DEFAULT '',
   `acomm` int(11) NOT NULL DEFAULT 0,
-  `associated` text NOT NULL,
+  `associated` mediumtext NOT NULL,
   PRIMARY KEY (`anid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -1334,7 +1424,7 @@ CREATE TABLE `nuke_banner` (
   `position` int(11) NOT NULL DEFAULT 0,
   `active` tinyint(1) NOT NULL DEFAULT 1,
   `ad_class` varchar(5) NOT NULL DEFAULT '',
-  `ad_code` text NOT NULL,
+  `ad_code` mediumtext NOT NULL,
   `ad_width` int(11) DEFAULT 0,
   `ad_height` int(11) DEFAULT 0,
   PRIMARY KEY (`bid`),
@@ -1353,7 +1443,7 @@ CREATE TABLE `nuke_banner_clients` (
   `email` varchar(60) NOT NULL DEFAULT '',
   `login` varchar(10) NOT NULL DEFAULT '',
   `passwd` varchar(10) NOT NULL DEFAULT '',
-  `extrainfo` text NOT NULL,
+  `extrainfo` mediumtext NOT NULL,
   PRIMARY KEY (`cid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -1366,11 +1456,11 @@ CREATE TABLE `nuke_banner_plans` (
   `pid` int(11) NOT NULL AUTO_INCREMENT,
   `active` tinyint(1) NOT NULL DEFAULT 0,
   `name` varchar(255) NOT NULL DEFAULT '',
-  `description` text NOT NULL,
+  `description` mediumtext NOT NULL,
   `delivery` varchar(10) NOT NULL DEFAULT '',
   `delivery_type` varchar(25) NOT NULL DEFAULT '',
   `price` varchar(25) NOT NULL DEFAULT '0',
-  `buy_links` text NOT NULL,
+  `buy_links` mediumtext NOT NULL,
   PRIMARY KEY (`pid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -1393,7 +1483,7 @@ CREATE TABLE `nuke_banner_positions` (
 # ------------------------------------------------------------
 
 CREATE TABLE `nuke_banner_terms` (
-  `terms_body` text NOT NULL,
+  `terms_body` mediumtext NOT NULL,
   `country` varchar(255) NOT NULL DEFAULT ''
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -1434,9 +1524,9 @@ CREATE TABLE `nuke_bbbanlist` (
   `ban_time` int(11) DEFAULT NULL,
   `ban_expire_time` int(11) DEFAULT NULL,
   `ban_by_userid` mediumint(9) DEFAULT NULL,
-  `ban_priv_reason` text DEFAULT NULL,
+  `ban_priv_reason` mediumtext DEFAULT NULL,
   `ban_pub_reason_mode` tinyint(1) DEFAULT NULL,
-  `ban_pub_reason` text DEFAULT NULL,
+  `ban_pub_reason` mediumtext DEFAULT NULL,
   PRIMARY KEY (`ban_id`),
   KEY `ban_ip_user_id` (`ban_ip`,`ban_userid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -1463,7 +1553,7 @@ CREATE TABLE `nuke_bbconfig` (
   `config_name` varchar(255) NOT NULL DEFAULT '',
   `config_value` varchar(255) NOT NULL DEFAULT '',
   PRIMARY KEY (`config_name`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
 
 
 
@@ -1499,7 +1589,7 @@ CREATE TABLE `nuke_bbforums` (
   `forum_id` smallint(5) unsigned NOT NULL AUTO_INCREMENT,
   `cat_id` mediumint(8) unsigned NOT NULL DEFAULT 0,
   `forum_name` varchar(150) DEFAULT NULL,
-  `forum_desc` text DEFAULT NULL,
+  `forum_desc` mediumtext DEFAULT NULL,
   `forum_status` tinyint(4) NOT NULL DEFAULT 0,
   `forum_order` mediumint(8) unsigned NOT NULL DEFAULT 1,
   `forum_posts` mediumint(8) unsigned NOT NULL DEFAULT 0,
@@ -1575,7 +1665,7 @@ CREATE TABLE `nuke_bbposts_text` (
   `post_id` mediumint(8) unsigned NOT NULL DEFAULT 0,
   `bbcode_uid` varchar(10) NOT NULL DEFAULT '',
   `post_subject` varchar(60) DEFAULT NULL,
-  `post_text` text DEFAULT NULL,
+  `post_text` mediumtext DEFAULT NULL,
   PRIMARY KEY (`post_id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -1609,7 +1699,7 @@ CREATE TABLE `nuke_bbprivmsgs` (
 CREATE TABLE `nuke_bbprivmsgs_text` (
   `privmsgs_text_id` mediumint(8) unsigned NOT NULL DEFAULT 0,
   `privmsgs_bbcode_uid` varchar(10) NOT NULL DEFAULT '0',
-  `privmsgs_text` text DEFAULT NULL,
+  `privmsgs_text` mediumtext DEFAULT NULL,
   PRIMARY KEY (`privmsgs_text_id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -1636,7 +1726,7 @@ CREATE TABLE `nuke_bbranks` (
 CREATE TABLE `nuke_bbsearch_results` (
   `search_id` int(10) unsigned NOT NULL DEFAULT 0,
   `session_id` varchar(32) NOT NULL DEFAULT '',
-  `search_array` text NOT NULL,
+  `search_array` mediumtext NOT NULL,
   `search_time` int(11) NOT NULL DEFAULT 0,
   PRIMARY KEY (`search_id`),
   KEY `session_id` (`session_id`)
@@ -1852,7 +1942,7 @@ CREATE TABLE `nuke_bbuser_group` (
 CREATE TABLE `nuke_bbvote_desc` (
   `vote_id` mediumint(8) unsigned NOT NULL AUTO_INCREMENT,
   `topic_id` mediumint(8) unsigned NOT NULL DEFAULT 0,
-  `vote_text` text NOT NULL,
+  `vote_text` mediumtext NOT NULL,
   `vote_start` int(11) NOT NULL DEFAULT 0,
   `vote_length` int(11) NOT NULL DEFAULT 0,
   PRIMARY KEY (`vote_id`),
@@ -1908,7 +1998,7 @@ CREATE TABLE `nuke_blocks` (
   `bid` int(11) NOT NULL AUTO_INCREMENT,
   `bkey` varchar(15) NOT NULL DEFAULT '',
   `title` varchar(60) NOT NULL DEFAULT '',
-  `content` text NOT NULL,
+  `content` mediumtext NOT NULL,
   `url` varchar(200) NOT NULL DEFAULT '',
   `bposition` char(1) NOT NULL DEFAULT '',
   `weight` int(11) NOT NULL DEFAULT 1,
@@ -1954,7 +2044,7 @@ CREATE TABLE `nuke_comments` (
   `url` varchar(60) DEFAULT NULL,
   `host_name` varchar(60) DEFAULT NULL,
   `subject` varchar(85) NOT NULL DEFAULT '',
-  `comment` text NOT NULL,
+  `comment` mediumtext NOT NULL,
   `score` tinyint(4) NOT NULL DEFAULT 0,
   `reason` tinyint(4) NOT NULL DEFAULT 0,
   `last_moderation_ip` varchar(15) DEFAULT '0',
@@ -1978,7 +2068,7 @@ CREATE TABLE `nuke_comments_moderated` (
   `url` varchar(60) DEFAULT NULL,
   `host_name` varchar(60) DEFAULT NULL,
   `subject` varchar(85) NOT NULL DEFAULT '',
-  `comment` text NOT NULL,
+  `comment` mediumtext NOT NULL,
   `score` tinyint(4) NOT NULL DEFAULT 0,
   `reason` tinyint(4) NOT NULL DEFAULT 0,
   `last_moderation_ip` varchar(15) DEFAULT '0',
@@ -2042,7 +2132,7 @@ CREATE TABLE `nuke_config` (
   `nuke_editor` tinyint(1) NOT NULL DEFAULT 1,
   `display_errors` tinyint(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`sitename`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
 
 
 
@@ -2076,7 +2166,7 @@ CREATE TABLE `nuke_faqanswer` (
   `id` tinyint(4) NOT NULL AUTO_INCREMENT,
   `id_cat` tinyint(4) NOT NULL DEFAULT 0,
   `question` varchar(255) DEFAULT '',
-  `answer` text DEFAULT NULL,
+  `answer` mediumtext DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `id_cat` (`id_cat`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -2101,7 +2191,7 @@ CREATE TABLE `nuke_faqcategories` (
 CREATE TABLE `nuke_groups` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `name` varchar(255) NOT NULL DEFAULT '',
-  `description` text NOT NULL,
+  `description` mediumtext NOT NULL,
   `points` int(11) NOT NULL DEFAULT 0,
   KEY `id` (`id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -2137,7 +2227,7 @@ CREATE TABLE `nuke_headlines` (
 CREATE TABLE `nuke_links_categories` (
   `cid` int(11) NOT NULL AUTO_INCREMENT,
   `title` varchar(50) NOT NULL DEFAULT '',
-  `cdescription` text NOT NULL,
+  `cdescription` mediumtext NOT NULL,
   `parentid` int(11) NOT NULL DEFAULT 0,
   PRIMARY KEY (`cid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -2151,7 +2241,7 @@ CREATE TABLE `nuke_links_editorials` (
   `linkid` int(11) NOT NULL DEFAULT 0,
   `adminid` varchar(60) NOT NULL DEFAULT '',
   `editorialtimestamp` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `editorialtext` text NOT NULL,
+  `editorialtext` mediumtext NOT NULL,
   `editorialtitle` varchar(100) NOT NULL DEFAULT '',
   PRIMARY KEY (`linkid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -2167,7 +2257,7 @@ CREATE TABLE `nuke_links_links` (
   `sid` int(11) NOT NULL DEFAULT 0,
   `title` varchar(100) NOT NULL DEFAULT '',
   `url` varchar(100) NOT NULL DEFAULT '',
-  `description` text NOT NULL,
+  `description` mediumtext NOT NULL,
   `date` datetime DEFAULT NULL,
   `name` varchar(100) NOT NULL DEFAULT '',
   `email` varchar(100) NOT NULL DEFAULT '',
@@ -2193,7 +2283,7 @@ CREATE TABLE `nuke_links_modrequest` (
   `sid` int(11) NOT NULL DEFAULT 0,
   `title` varchar(100) NOT NULL DEFAULT '',
   `url` varchar(100) NOT NULL DEFAULT '',
-  `description` text NOT NULL,
+  `description` mediumtext NOT NULL,
   `modifysubmitter` varchar(60) NOT NULL DEFAULT '',
   `brokenlink` int(11) NOT NULL DEFAULT 0,
   PRIMARY KEY (`requestid`)
@@ -2210,7 +2300,7 @@ CREATE TABLE `nuke_links_newlink` (
   `sid` int(11) NOT NULL DEFAULT 0,
   `title` varchar(100) NOT NULL DEFAULT '',
   `url` varchar(100) NOT NULL DEFAULT '',
-  `description` text NOT NULL,
+  `description` mediumtext NOT NULL,
   `name` varchar(100) NOT NULL DEFAULT '',
   `email` varchar(100) NOT NULL DEFAULT '',
   `submitter` varchar(60) NOT NULL DEFAULT '',
@@ -2230,7 +2320,7 @@ CREATE TABLE `nuke_links_votedata` (
   `ratinguser` varchar(60) NOT NULL DEFAULT '',
   `rating` int(11) NOT NULL DEFAULT 0,
   `ratinghostname` varchar(60) NOT NULL DEFAULT '',
-  `ratingcomments` text NOT NULL,
+  `ratingcomments` mediumtext NOT NULL,
   `ratingtimestamp` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
   PRIMARY KEY (`ratingdbid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -2252,7 +2342,7 @@ CREATE TABLE `nuke_main` (
 CREATE TABLE `nuke_message` (
   `mid` int(11) NOT NULL AUTO_INCREMENT,
   `title` varchar(100) NOT NULL DEFAULT '',
-  `content` text NOT NULL,
+  `content` mediumtext NOT NULL,
   `date` varchar(14) NOT NULL DEFAULT '',
   `expire` int(11) NOT NULL DEFAULT 0,
   `active` int(11) NOT NULL DEFAULT 1,
@@ -2276,8 +2366,8 @@ CREATE TABLE `nuke_modules` (
   `mod_group` int(11) DEFAULT 0,
   `admins` varchar(255) NOT NULL DEFAULT '',
   PRIMARY KEY (`mid`),
-  KEY `title` (`title`),
-  KEY `custom_title` (`custom_title`)
+  KEY `title` (`title`(250)),
+  KEY `custom_title` (`custom_title`(250))
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
@@ -2300,10 +2390,10 @@ CREATE TABLE `nuke_pages` (
   `title` varchar(255) NOT NULL DEFAULT '',
   `subtitle` varchar(255) NOT NULL DEFAULT '',
   `active` int(11) NOT NULL DEFAULT 0,
-  `page_header` text NOT NULL,
-  `text` text NOT NULL,
-  `page_footer` text NOT NULL,
-  `signature` text NOT NULL,
+  `page_header` mediumtext NOT NULL,
+  `text` mediumtext NOT NULL,
+  `page_footer` mediumtext NOT NULL,
+  `signature` mediumtext NOT NULL,
   `date` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
   `counter` int(11) NOT NULL DEFAULT 0,
   `clanguage` varchar(30) NOT NULL DEFAULT '',
@@ -2319,7 +2409,7 @@ CREATE TABLE `nuke_pages` (
 CREATE TABLE `nuke_pages_categories` (
   `cid` int(11) NOT NULL AUTO_INCREMENT,
   `title` varchar(255) NOT NULL DEFAULT '',
-  `description` text NOT NULL,
+  `description` mediumtext NOT NULL,
   PRIMARY KEY (`cid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -2354,7 +2444,7 @@ CREATE TABLE `nuke_pollcomments` (
   `url` varchar(60) DEFAULT NULL,
   `host_name` varchar(60) DEFAULT NULL,
   `subject` varchar(60) NOT NULL DEFAULT '',
-  `comment` text NOT NULL,
+  `comment` mediumtext NOT NULL,
   `score` tinyint(4) NOT NULL DEFAULT 0,
   `reason` tinyint(4) NOT NULL DEFAULT 0,
   `last_moderation_ip` varchar(15) DEFAULT '0',
@@ -2378,7 +2468,7 @@ CREATE TABLE `nuke_pollcomments_moderated` (
   `url` varchar(60) DEFAULT NULL,
   `host_name` varchar(60) DEFAULT NULL,
   `subject` varchar(60) NOT NULL DEFAULT '',
-  `comment` text NOT NULL,
+  `comment` mediumtext NOT NULL,
   `score` tinyint(4) NOT NULL DEFAULT 0,
   `reason` tinyint(4) NOT NULL DEFAULT 0,
   `last_moderation_ip` varchar(15) DEFAULT '0',
@@ -2410,8 +2500,8 @@ CREATE TABLE `nuke_queue` (
   `uid` mediumint(9) NOT NULL DEFAULT 0,
   `uname` varchar(40) NOT NULL DEFAULT '',
   `subject` varchar(100) NOT NULL DEFAULT '',
-  `story` text DEFAULT NULL,
-  `storyext` text NOT NULL,
+  `story` mediumtext DEFAULT NULL,
+  `storyext` mediumtext NOT NULL,
   `timestamp` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
   `topic` varchar(20) NOT NULL DEFAULT '',
   `alanguage` varchar(30) NOT NULL DEFAULT '',
@@ -2516,13 +2606,13 @@ CREATE TABLE `nuke_stories` (
   `aid` varchar(30) NOT NULL DEFAULT '',
   `title` varchar(80) DEFAULT NULL,
   `time` datetime DEFAULT NULL,
-  `hometext` text DEFAULT NULL,
-  `bodytext` text DEFAULT NULL,
+  `hometext` mediumtext DEFAULT NULL,
+  `bodytext` mediumtext DEFAULT NULL,
   `comments` int(11) DEFAULT 0,
   `counter` mediumint(8) unsigned DEFAULT NULL,
   `topic` int(11) NOT NULL DEFAULT 1,
   `informant` varchar(20) NOT NULL DEFAULT '',
-  `notes` text DEFAULT NULL,
+  `notes` mediumtext DEFAULT NULL,
   `ihome` int(11) NOT NULL DEFAULT 0,
   `alanguage` varchar(30) NOT NULL DEFAULT '',
   `acomm` int(11) NOT NULL DEFAULT 0,
@@ -2531,7 +2621,7 @@ CREATE TABLE `nuke_stories` (
   `score` int(11) NOT NULL DEFAULT 0,
   `ratings` int(11) NOT NULL DEFAULT 0,
   `rating_ip` varchar(15) DEFAULT '0',
-  `associated` text DEFAULT NULL,
+  `associated` mediumtext DEFAULT NULL,
   PRIMARY KEY (`sid`),
   KEY `catid` (`catid`),
   KEY `counter` (`counter`),
@@ -2585,7 +2675,7 @@ CREATE TABLE `nuke_topics` (
 
 CREATE TABLE `nuke_users` (
   `user_id` int(11) NOT NULL AUTO_INCREMENT,
-  `date_started` varchar(4) CHARACTER SET utf8mb3 COLLATE utf8mb3_swedish_ci NOT NULL DEFAULT '',
+  `date_started` varchar(4) NOT NULL DEFAULT '',
   `name` varchar(60) NOT NULL DEFAULT '',
   `username` varchar(25) NOT NULL DEFAULT '',
   `user_email` varchar(255) NOT NULL DEFAULT '',
@@ -2611,9 +2701,9 @@ CREATE TABLE `nuke_users` (
   `uorder` tinyint(1) NOT NULL DEFAULT 0,
   `thold` tinyint(1) NOT NULL DEFAULT 0,
   `noscore` tinyint(1) NOT NULL DEFAULT 0,
-  `bio` tinytext NOT NULL,
+  `bio` text NOT NULL,
   `ublockon` tinyint(1) NOT NULL DEFAULT 0,
-  `ublock` tinytext NOT NULL,
+  `ublock` text NOT NULL,
   `theme` varchar(255) NOT NULL DEFAULT '',
   `commentmax` int(11) NOT NULL DEFAULT 4096,
   `counter` int(11) NOT NULL DEFAULT 0,
@@ -2656,7 +2746,7 @@ CREATE TABLE `nuke_users` (
   KEY `uname` (`username`),
   KEY `user_session_time` (`user_session_time`),
   KEY `karma` (`karma`),
-  KEY `user_email` (`user_email`)
+  KEY `user_email` (`user_email`(250))
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
@@ -2711,8 +2801,8 @@ CREATE TABLE `olympic_stats` (
 # ------------------------------------------------------------
 
 CREATE TABLE `online` (
-  `username` text NOT NULL,
-  `timeout` text NOT NULL
+  `username` mediumtext NOT NULL,
+  `timeout` mediumtext NOT NULL
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 

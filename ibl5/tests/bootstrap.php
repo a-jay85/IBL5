@@ -86,6 +86,16 @@ spl_autoload_register(function ($class) {
         }
     }
     
+    // Handle Draft namespace
+    if (strpos($class, 'Draft\\') === 0) {
+        $className = str_replace('Draft\\', '', $class);
+        $file = __DIR__ . '/../classes/Draft/' . $className . '.php';
+        if (file_exists($file)) {
+            require_once $file;
+            return true;
+        }
+    }
+    
     // Handle Player namespace classes
     if (strpos($class, 'Player\\') === 0) {
         $className = substr($class, 7); // Remove "Player\" prefix
@@ -339,6 +349,12 @@ if (!class_exists('Shared')) {
                 echo '<p>Sim contract extension attempts have been reset.</p>';
                 return;
             }
+        }
+        
+        public function getCurrentOwnerOfDraftPick($draftYear, $draftRound, $teamNameOfDraftPickOrigin)
+        {
+            // Mock implementation for testing
+            return $teamNameOfDraftPickOrigin;
         }
     }
 }

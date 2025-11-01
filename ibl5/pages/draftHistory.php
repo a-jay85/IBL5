@@ -28,7 +28,7 @@ echo "<center><h2>$year Draft</h2>
 $startyear = 1988; // magic number reasoning: we kept players' real life draft years intact, but IBLv5's first non-dispersal draft was held in 1988.
 
 while ($startyear < $endyear + 1) {
-    echo "<a href=\"draft.php?year=$startyear\">$startyear</a> |
+    echo "<a href=\"" . basename(__FILE__) . "?year=$startyear\">$startyear</a> |
 ";
     $startyear++;
 }
@@ -58,9 +58,9 @@ if ($num == 0) {
 
         echo "<td>$round</td>
             <td>$draftpickno</td>
-            <td><a href=\"../ibl5/modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>
+            <td><a href=\"/ibl5/modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>
             <td>$draftedby</td>
-            <td><img height=50 src=\"../ibl5/images/player/$pid.jpg\"></td>
+            <td><img height=50 src=\"/ibl5/images/player/$pid.jpg\"></td>
             <td>$college</td>
         </tr>
 ";

@@ -16,7 +16,7 @@ class League
     const SOFT_CAP_MAX = 5000;
     const HARD_CAP_MAX = 7000;
 
-    const FREE_AGENTS_TEAMID = 35;
+    const FREE_AGENTS_TEAMID = 0;
 
     public function __construct($db)
     {

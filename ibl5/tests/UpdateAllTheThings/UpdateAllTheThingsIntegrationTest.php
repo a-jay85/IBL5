@@ -68,7 +68,7 @@ class UpdateAllTheThingsIntegrationTest extends TestCase
         // League constants from production
         $this->assertEquals(['Eastern', 'Western'], League::CONFERENCE_NAMES);
         $this->assertEquals(['Atlantic', 'Central', 'Midwest', 'Pacific'], League::DIVISION_NAMES);
-        $this->assertEquals(35, League::FREE_AGENTS_TEAMID);
+        $this->assertEquals(0, League::FREE_AGENTS_TEAMID);
         $this->assertEquals(7000, League::HARD_CAP_MAX);
     }
 }

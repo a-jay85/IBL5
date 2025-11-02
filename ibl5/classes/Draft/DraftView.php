@@ -59,9 +59,16 @@ class DraftView
 
         $html .= $this->renderPlayerTable($players, $teamLogo, $pickOwner);
 
-        if ($teamLogo == $pickOwner && count($players) > 0) {
-            $lastPlayer = end($players);
-            if ($lastPlayer['drafted'] == 0) {
+        // Show draft button if user's team owns the pick and there are undrafted players
+        if ($teamLogo == $pickOwner) {
+            $hasUndraftedPlayers = false;
+            foreach ($players as $player) {
+                if ($player['drafted'] == 0) {
+                    $hasUndraftedPlayers = true;
+                    break;
+                }
+            }
+            if ($hasUndraftedPlayers) {
                 $html .= "<center><input type='submit' style=\"height:100px; width:150px\" value='Draft' onclick=\"this.disabled=true;this.value='Submitting...'; this.form.submit();\"></center>";
             }
         }

@@ -57,7 +57,7 @@ class DraftProcessorTest extends TestCase
         $this->assertStringContainsString($baseMessage, $message);
         $this->assertStringContainsString('<@!123456789>', $message);
         $this->assertStringContainsString('on the clock', $message);
-        $this->assertStringContainsString('College_Scouting', $message);
+        $this->assertStringContainsString('Draft', $message);
     }
 
     public function testCreateNextTeamMessageWhenDraftComplete()
@@ -82,7 +82,7 @@ class DraftProcessorTest extends TestCase
 
         $this->assertStringContainsString($announcement, $message);
         $this->assertStringContainsString('Go back to the Draft module', $message);
-        $this->assertStringContainsString('College_Scouting', $message);
+        $this->assertStringContainsString('name=Draft', $message);
     }
 
     public function testGetDatabaseErrorMessageContainsErrorAndLink()
@@ -92,7 +92,7 @@ class DraftProcessorTest extends TestCase
         $this->assertStringContainsString('went wrong', $message);
         $this->assertStringContainsString('database tables', $message);
         $this->assertStringContainsString('Go back to the Draft module', $message);
-        $this->assertStringContainsString('College_Scouting', $message);
+        $this->assertStringContainsString('name=Draft', $message);
     }
 
     public function testCreateDraftAnnouncementHandlesApostrophes()

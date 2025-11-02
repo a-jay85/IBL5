@@ -60,17 +60,8 @@ class DraftView
         $html .= $this->renderPlayerTable($players, $teamLogo, $pickOwner);
 
         // Show draft button if user's team owns the pick and there are undrafted players
-        if ($teamLogo == $pickOwner) {
-            $hasUndraftedPlayers = false;
-            foreach ($players as $player) {
-                if ($player['drafted'] == 0) {
-                    $hasUndraftedPlayers = true;
-                    break;
-                }
-            }
-            if ($hasUndraftedPlayers) {
-                $html .= "<center><input type='submit' style=\"height:100px; width:150px\" value='Draft' onclick=\"this.disabled=true;this.value='Submitting...'; this.form.submit();\"></center>";
-            }
+        if ($teamLogo == $pickOwner && $this->hasUndraftedPlayers($players)) {
+            $html .= "<center><input type='submit' style=\"height:100px; width:150px\" value='Draft' onclick=\"this.disabled=true;this.value='Submitting...'; this.form.submit();\"></center>";
         }
         
         $html .= "</form>";
@@ -194,5 +185,21 @@ class DraftView
         }
         
         return " and if it's your turn, try drafting again.";
+    }
+
+    /**
+     * Check if there are any undrafted players available
+     * 
+     * @param array $players Array of player records
+     * @return bool True if there is at least one undrafted player
+     */
+    private function hasUndraftedPlayers($players)
+    {
+        foreach ($players as $player) {
+            if ($player['drafted'] == 0) {
+                return true;
+            }
+        }
+        return false;
     }
 }

@@ -1,0 +1,112 @@
+<?php
+
+/************************************************************************/
+/* PHP-NUKE: Web Portal System                                          */
+/* ===========================                                          */
+/*                                                                      */
+/* Copyright (c) 2002 by Francisco Burzi                                */
+/* http://phpnuke.org                                                   */
+/*                                                                      */
+/* This program is free software. You can redistribute it and/or modify */
+/* it under the terms of the GNU General Public License as published by */
+/* the Free Software Foundation; either version 2 of the License.       */
+/*                                                                      */
+/* ibl College Scout Module added by Spencer Cooley                     */
+/* 3/22/2005                                                            */
+/*                                                                      */
+/************************************************************************/
+
+if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
+    die("You can't access this file directly...");
+}
+
+use Draft\DraftRepository;
+use Draft\DraftView;
+
+$module_name = basename(dirname(__FILE__));
+get_lang($module_name);
+
+function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
+{
+    global $user, $prefix, $user_prefix, $db;
+    $sharedFunctions = new Shared($db);
+    $season = new Season($db);
+    $repository = new DraftRepository($db);
+    $view = new DraftView();
+
+    $sql = "SELECT * FROM " . $prefix . "_bbconfig";
+    $result = $db->sql_query($sql);
+    while ($row = $db->sql_fetchrow($result)) {
+        $board_config[$row['config_name']] = $row['config_value'];
+    }
+    $sql2 = "SELECT * FROM " . $user_prefix . "_users WHERE username = '$username'";
+    $result2 = $db->sql_query($sql2);
+    $userinfo = $db->sql_fetchrow($result2);
+    if (!$bypass) {
+        cookiedecode($user);
+    }
+
+    Nuke\Header::header();
+
+    OpenTable();
+
+    $teamlogo = $userinfo['user_ibl_team'];
+    $tid = $sharedFunctions->getTidFromTeamname($teamlogo);
+
+    UI::displaytopmenu($db, $tid);
+
+    // Get current draft pick information
+    $currentPick = $repository->getCurrentDraftPick();
+    
+    if ($currentPick === null) {
+        echo "<center><h2>The draft has been completed!</h2></center>";
+        CloseTable();
+        Nuke\Footer::footer();
+        return;
+    }
+
+    $draft_team = $currentPick['team'];
+    $draft_round = $currentPick['round'];
+    $draft_pick = $currentPick['pick'];
+
+    $pickOwner = $sharedFunctions->getCurrentOwnerOfDraftPick($season->endingYear, $draft_round, $draft_team);
+
+    // Get all draft class players
+    $players = $repository->getAllDraftClassPlayers();
+
+    // Render the draft interface
+    echo $view->renderDraftInterface($players, $teamlogo, $pickOwner, $draft_round, $draft_pick, $season->endingYear, $tid);
+
+    CloseTable();
+    Nuke\Footer::footer();
+}
+
+function main($user)
+{
+    global $stop;
+    if (!is_user($user)) {
+        Nuke\Header::header();
+        OpenTable();
+        echo "<center><font class=\"title\"><b>" . ($stop ? _LOGININCOR : _USERREGLOGIN) . "</b></font></center>";
+        CloseTable();
+        echo "<br>";
+        if (!is_user($user)) {
+            OpenTable();
+            loginbox();
+            CloseTable();
+        }
+        Nuke\Footer::footer();
+    } elseif (is_user($user)) {
+        global $cookie;
+        cookiedecode($user);
+        userinfo($cookie[1]);
+    }
+}
+
+switch ($op) {
+
+    default:
+        main($user);
+        break;
+
+}

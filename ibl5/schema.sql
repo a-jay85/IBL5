@@ -7,7 +7,7 @@
 #
 # Host: iblhoops.net (MySQL 5.5.5-10.6.20-MariaDB-cll-lve)
 # Database: iblhoops_ibl5
-# Generation Time: 2025-11-01 01:56:35 +0000
+# Generation Time: 2025-11-01 07:32:47 +0000
 # ************************************************************
 
 
@@ -117,6 +117,7 @@ CREATE TABLE `ibl_box_scores` (
   KEY `idx_visitor_tid` (`visitorTID`),
   KEY `idx_home_tid` (`homeTID`),
   KEY `idx_date_pid` (`Date`,`pid`),
+  KEY `idx_date_home_visitor` (`Date`,`homeTID`,`visitorTID`),
   CONSTRAINT `fk_boxscore_home` FOREIGN KEY (`homeTID`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE,
   CONSTRAINT `fk_boxscore_player` FOREIGN KEY (`pid`) REFERENCES `ibl_plr` (`pid`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_boxscore_visitor` FOREIGN KEY (`visitorTID`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE
@@ -474,6 +475,7 @@ CREATE TABLE `ibl_hist` (
   KEY `idx_team_year` (`team`,`year`),
   KEY `idx_teamid_year` (`teamid`,`year`),
   KEY `idx_year` (`year`),
+  KEY `idx_pid_year_team` (`pid`,`year`,`team`),
   CONSTRAINT `fk_hist_player` FOREIGN KEY (`pid`) REFERENCES `ibl_plr` (`pid`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -847,6 +849,7 @@ CREATE TABLE `ibl_plr` (
   KEY `idx_pos` (`pos`),
   KEY `idx_draftyear` (`draftyear`),
   KEY `idx_draftround` (`draftround`),
+  KEY `idx_tid_pos_active` (`tid`,`pos`,`active`),
   CONSTRAINT `fk_plr_team` FOREIGN KEY (`tid`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

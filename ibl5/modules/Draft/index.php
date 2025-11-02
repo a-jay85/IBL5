@@ -15,9 +15,9 @@ use Draft\DraftView;
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
-function userinfo($username, $bypass = 0)
+function userinfo($username)
 {
-    global $user, $user_prefix, $db;
+    global $user_prefix, $db;
     $sharedFunctions = new Shared($db);
     $season = new Season($db);
     $repository = new DraftRepository($db);
@@ -26,9 +26,6 @@ function userinfo($username, $bypass = 0)
     $sql2 = "SELECT * FROM " . $user_prefix . "_users WHERE username = '$username'";
     $result2 = $db->sql_query($sql2);
     $userinfo = $db->sql_fetchrow($result2);
-    if (!$bypass) {
-        cookiedecode($user);
-    }
 
     Nuke\Header::header();
 
@@ -41,7 +38,7 @@ function userinfo($username, $bypass = 0)
 
     // Get current draft pick information
     $currentPick = $repository->getCurrentDraftPick();
-    
+
     $draft_team = $currentPick['team'];
     $draft_round = $currentPick['round'];
     $draft_pick = $currentPick['pick'];

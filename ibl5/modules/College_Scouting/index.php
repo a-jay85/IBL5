@@ -193,7 +193,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 
     echo "</table>";
 
-    if ($teamlogo == $pickOwner && $player_drafted == 0) {
+    if ($teamlogo == $pickOwner && $isPlayerDrafted == 0) {
         echo "<center><input type='submit' style=\"height:100px; width:150px\" value='Draft' onclick=\"this.disabled=true;this.value='Submitting...'; this.form.submit();\"></center>";
     }
     

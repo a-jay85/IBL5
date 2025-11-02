@@ -1,7 +1,6 @@
 <?php
 
 require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
-require_once $_SERVER['DOCUMENT_ROOT'] . '/ibl5/classes/Draft/DraftSelectionHandler.php';
 
 global $db;
 

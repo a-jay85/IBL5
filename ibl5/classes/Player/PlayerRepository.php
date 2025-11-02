@@ -160,7 +160,7 @@ class PlayerRepository
     {
         $query = "SELECT *
             FROM ibl_demands
-            WHERE name='$playerName'";
+            WHERE name=\"$playerName\"";
         return $this->db->sql_query($query);
     }
 }

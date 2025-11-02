@@ -13,7 +13,7 @@ namespace Draft;
 class DraftProcessor
 {
     // Configuration constants
-    const DRAFT_MODULE_URL = 'https://www.iblhoops.net/ibl5/modules.php?name=College_Scouting';
+    const DRAFT_MODULE_URL = 'https://www.iblhoops.net/ibl5/modules.php?name=Draft';
     const ADMIN_CONTACT = 'the administrator';
 
     /**
@@ -61,7 +61,7 @@ class DraftProcessor
     public function getSuccessMessage($message)
     {
         return "$message<p>
-        <a href=\"/ibl5/modules.php?name=College_Scouting\">Go back to the Draft module</a>";
+        <a href=\"/ibl5/modules.php?name=Draft\">Go back to the Draft module</a>";
     }
 
     /**
@@ -74,6 +74,6 @@ class DraftProcessor
         return "Oops, something went wrong, and at least one of the draft database tables wasn't updated.<p>
             Let " . self::ADMIN_CONTACT . " know what happened and they'll look into it.<p>
             
-            <a href=\"/ibl5/modules.php?name=College_Scouting\">Go back to the Draft module</a>";
+            <a href=\"/ibl5/modules.php?name=Draft\">Go back to the Draft module</a>";
     }
 }

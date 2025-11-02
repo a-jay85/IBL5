@@ -165,4 +165,47 @@ class DraftRepository
         
         return null;
     }
+
+    /**
+     * Get all players in the draft class
+     * 
+     * @return array Array of player records from the draft class
+     */
+    public function getAllDraftClassPlayers()
+    {
+        $query = "SELECT * FROM ibl_draft_class ORDER BY drafted, name";
+        
+        $result = $this->db->sql_query($query);
+        $players = [];
+        
+        if ($result) {
+            while ($row = $this->db->sql_fetchrow($result)) {
+                $players[] = $row;
+            }
+        }
+        
+        return $players;
+    }
+
+    /**
+     * Get the current draft pick information (next available pick)
+     * 
+     * @return array|null Array with 'team', 'round', 'pick' keys, or null if draft is complete
+     */
+    public function getCurrentDraftPick()
+    {
+        $query = "SELECT * FROM ibl_draft WHERE player = '' ORDER BY round ASC, pick ASC LIMIT 1";
+        
+        $result = $this->db->sql_query($query);
+        
+        if ($result && $this->db->sql_numrows($result) > 0) {
+            return [
+                'team' => $this->db->sql_result($result, 0, 'team'),
+                'round' => $this->db->sql_result($result, 0, 'round'),
+                'pick' => $this->db->sql_result($result, 0, 'pick')
+            ];
+        }
+        
+        return null;
+    }
 }

@@ -2,8 +2,6 @@
 
 namespace Draft;
 
-require_once $_SERVER['DOCUMENT_ROOT'] . '/ibl5/classes/Discord.php';
-
 /**
  * Orchestrates the draft selection workflow
  * 

@@ -2,8 +2,6 @@
 
 namespace Draft;
 
-require_once __DIR__ . '/../Services/DatabaseService.php';
-
 use Services\DatabaseService;
 
 /**

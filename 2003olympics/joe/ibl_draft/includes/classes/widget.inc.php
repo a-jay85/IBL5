@@ -34,7 +34,7 @@ class widget
       <a href="index.php" target="_blank">Draft-o-Matic</a>
     </div>
     <div class="widget_top_element">
-      <a href="javascript:popup(\'http://iblhoops.net/modules.php?name=College_Scouting\', \'scouting\', 800, 400)">Draft Scouting</a>
+      <a href="javascript:popup(\'http://iblhoops.net/modules.php?name=Draft\', \'scouting\', 800, 400)">Draft Scouting</a>
     </div>
   </div>';
 

@@ -118,7 +118,7 @@ class page
             // Get the current pick info
             $html .= '<li id="draft_status">' . $this->draft_status(false) . '</li>';
             $html .= '
-    <li><a href="javascript:popup(\'http://iblhoops.net/ibl5/modules.php?name=College_Scouting\', \'scouting\', 800, 400)">Draft Scouting</a></li>';
+    <li><a href="javascript:popup(\'http://iblhoops.net/ibl5/modules.php?name=Draft\', \'scouting\', 800, 400)">Draft Scouting</a></li>';
             if ($login->team_id()) {
                 $html .= '
     <li>Logged in as <b>' . $login->team_name() . '</b></li>

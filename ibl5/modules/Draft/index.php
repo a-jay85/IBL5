@@ -28,17 +28,12 @@ get_lang($module_name);
 
 function userinfo($username, $bypass = 0)
 {
-    global $user, $prefix, $user_prefix, $db;
+    global $user, $user_prefix, $db;
     $sharedFunctions = new Shared($db);
     $season = new Season($db);
     $repository = new DraftRepository($db);
     $view = new DraftView();
 
-    $sql = "SELECT * FROM " . $prefix . "_bbconfig";
-    $result = $db->sql_query($sql);
-    while ($row = $db->sql_fetchrow($result)) {
-        $board_config[$row['config_name']] = $row['config_value'];
-    }
     $sql2 = "SELECT * FROM " . $user_prefix . "_users WHERE username = '$username'";
     $result2 = $db->sql_query($sql2);
     $userinfo = $db->sql_fetchrow($result2);

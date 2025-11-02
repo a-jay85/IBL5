@@ -38,13 +38,39 @@ ibl5/
 └── mainfile.php      # Bootstrap file with class autoloader
 ```
 
-### Class Autoloading
+### ⚠️ CRITICAL: Class Autoloading (READ THIS FIRST)
+
+**The codebase has a functional class autoloader - DO NOT write `require()` or `require_once()` statements for classes!**
+
+#### How the Autoloader Works
 - **Location**: The class autoloader is defined in `mainfile.php:216-248`
-- Modules have access to the autoloader via `require_once` in their entry point files (modules.php)
-- Use the existing class autoloader for all new classes
-- All classes should be placed in `ibl5/classes/` directory
-- Follow PSR-4 autoloading conventions when creating new classes
-- Use proper namespacing for new classes to facilitate future Laravel migration
+- **Automatic Loading**: Classes are automatically loaded when referenced by name
+- **Entry Points**: `mainfile.php` is included in all PHP files that need class access
+- **No Manual Requires**: You should NEVER write `require()` or `require_once()` for class files
+
+#### Autoloader Rules - MUST FOLLOW
+1. **All classes MUST be placed in `ibl5/classes/` directory**
+2. **Class filenames MUST match the class name** (e.g., `Player.php` for `Player` class)
+3. **Simply reference classes by name** - the autoloader handles the rest
+4. **Use proper namespacing** for new classes to facilitate future Laravel migration
+5. **Follow PSR-4 conventions** when creating new classes
+
+#### Correct Usage Examples
+```php
+// ✅ CORRECT - Just use the class name
+$player = new Player($db);
+$team = Team::findById($teamId);
+$draft = new Draft($db);
+
+// ❌ WRONG - Do not write require statements
+require_once 'classes/Player.php';  // NEVER DO THIS
+$player = new Player($db);
+```
+
+#### Module Entry Points
+- Modules have access to the autoloader via `require_once('mainfile.php')` in their entry point files
+- Once `mainfile.php` is included, all classes in `ibl5/classes/` are available
+- No additional require statements needed for class files
 
 ### Testing Requirements
 - **Framework**: PHPUnit 12.4+ compatibility required
@@ -153,6 +179,8 @@ ibl5/
 
 ### 6. Code Quality Checklist
 - [ ] Code follows existing patterns and conventions
+- [ ] **No `require()` or `require_once()` statements for classes - use the autoloader**
+- [ ] All classes are placed in `ibl5/classes/` directory
 - [ ] All tests pass without warnings or failures
 - [ ] New functionality includes appropriate tests
 - [ ] Code is self-documenting with clear variable/function names
@@ -169,6 +197,8 @@ ibl5/
   - Respond to feedback and update PRs as needed
   - Run tests and ensure they pass before completing PRs
   - Consider architectural implications of all changes
+  - **Use the class autoloader and avoid manual `require()` statements for classes**
+  - Place all new classes in `ibl5/classes/` directory
 - The agent will **not** merge PRs automatically; human review is required
 
 ## Working with the Database Schema

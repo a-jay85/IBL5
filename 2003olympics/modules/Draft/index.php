@@ -111,6 +111,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
     $result3 = $db->sql_query($sql3);
 
     $i = 0;
+    $hasUndraftedPlayers = false;
     while ($row3 = $db->sql_fetchrow($result3)) {
         (($i % 2) == 0) ? $bgcolor = "EEEEEE" : $bgcolor = "DDDDDD";
         $i++;
@@ -143,6 +144,10 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
         $display_skl = $row3['skl'];
         $display_int = $row3['int'];
         $isPlayerDrafted = $row3['drafted'];
+
+        if ($isPlayerDrafted == 0) {
+            $hasUndraftedPlayers = true;
+        }
 
         if ($teamlogo == $pickOwner && $isPlayerDrafted == 0) {
             // NOTE: `value` in the following echo block is formatted with single quotes to allow for apostrophes in player names.
@@ -194,7 +199,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 
     echo "</table>";
 
-    if ($teamlogo == $pickOwner && $player_drafted == 0) {
+    if ($teamlogo == $pickOwner && $hasUndraftedPlayers) {
         echo "</table><center><input type='submit' style=\"height:100px; width:150px\" value='Draft'></center></form>";
     } else {
         echo "</table></form>";

@@ -41,14 +41,6 @@ function userinfo($username, $bypass = 0)
 
     // Get current draft pick information
     $currentPick = $repository->getCurrentDraftPick();
-    
-    if ($currentPick === null) {
-        echo "<center><h2>The draft has been completed!</h2></center>";
-        CloseTable();
-        Nuke\Footer::footer();
-        return;
-    }
-
     $draft_team = $currentPick['team'];
     $draft_round = $currentPick['round'];
     $draft_pick = $currentPick['pick'];

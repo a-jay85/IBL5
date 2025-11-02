@@ -11,116 +11,8 @@ if (!defined('DIRECTORY_SEPARATOR')) {
     define('DIRECTORY_SEPARATOR', '/');
 }
 
-// Mock the autoloader for Trading classes
-spl_autoload_register(function ($class) {
-    // Handle Trading classes
-    if (strpos($class, 'Trading_') === 0) {
-        $classFile = str_replace('Trading_', '', $class);
-        $file = __DIR__ . '/../classes/Trading/' . $classFile . '.php';
-        if (file_exists($file)) {
-            require_once $file;
-            return true;
-        }
-    }
-    
-    // Handle Extension classes with namespace
-    if (strpos($class, 'Extension\\') === 0) {
-        // Remove namespace prefix to get just the class name
-        $className = str_replace('Extension\\', '', $class);
-        $file = __DIR__ . '/../classes/Extension/' . $className . '.php';
-        if (file_exists($file)) {
-            require_once $file;
-            return true;
-        }
-    }
-    
-    // Handle DepthChart classes with namespace
-    if (strpos($class, 'DepthChart\\') === 0) {
-        // Remove namespace prefix to get just the class name
-        $className = str_replace('DepthChart\\', '', $class);
-        $file = __DIR__ . '/../classes/DepthChart/' . $className . '.php';
-        if (file_exists($file)) {
-            require_once $file;
-            return true;
-        }
-    }
-    
-    // Handle Updater classes with namespace
-    if (strpos($class, 'Updater\\') === 0) {
-        // Remove namespace prefix to get just the class name
-        $className = str_replace('Updater\\', '', $class);
-        $file = __DIR__ . '/../classes/Updater/' . $className . '.php';
-        if (file_exists($file)) {
-            require_once $file;
-            return true;
-        }
-    }
-    
-    // Handle Services namespace (for DatabaseService and future services)
-    if (strpos($class, 'Services\\') === 0) {
-        $className = str_replace('Services\\', '', $class);
-        $file = __DIR__ . '/../classes/Services/' . $className . '.php';
-        if (file_exists($file)) {
-            require_once $file;
-            return true;
-        }
-    }
-
-    // Handle Voting namespace
-    if (strpos($class, 'Voting\\') === 0) {
-        $className = str_replace('Voting\\', '', $class);
-        $file = __DIR__ . '/../classes/Voting/' . $className . '.php';
-        if (file_exists($file)) {
-            require_once $file;
-            return true;
-        }
-    }
-    
-    // Handle Waivers namespace
-    if (strpos($class, 'Waivers\\') === 0) {
-        $className = str_replace('Waivers\\', '', $class);
-        $file = __DIR__ . '/../classes/Waivers/' . $className . '.php';
-        if (file_exists($file)) {
-            require_once $file;
-            return true;
-        }
-    }
-    
-    // Handle Draft namespace
-    if (strpos($class, 'Draft\\') === 0) {
-        $className = str_replace('Draft\\', '', $class);
-        $file = __DIR__ . '/../classes/Draft/' . $className . '.php';
-        if (file_exists($file)) {
-            require_once $file;
-            return true;
-        }
-    }
-    
-    // Handle Player namespace classes
-    if (strpos($class, 'Player\\') === 0) {
-        $className = substr($class, 7); // Remove "Player\" prefix
-        $file = __DIR__ . '/../classes/Player/' . $className . '.php';
-        if (file_exists($file)) {
-            require_once $file;
-            return true;
-        }
-    }
-    
-    // Handle global namespace classes like Team, League, and JSB
-    if (in_array($class, ['Team', 'League', 'JSB'])) {
-        $file = __DIR__ . '/../classes/' . $class . '.php';
-        if (file_exists($file)) {
-            require_once $file;
-            return true;
-        }
-    }
-    
-    // For other classes, don't auto-load them if we have mocks
-    // This prevents loading the real Season, Shared, etc. classes
-    return false;
-});
-
-// Define mock classes for testing
+// Define mock classes for testing BEFORE loading the autoloader
+// This ensures mock classes take precedence over real classes
 class MockDatabase
 {
     private $mockData = [];
@@ -276,24 +168,21 @@ class MockDatabaseResult
     }
 }
 
-if (!class_exists('Discord')) {
-    class Discord
+class Discord
+{
+    public static function getDiscordIDFromTeamname($db, $teamname)
     {
-        public static function getDiscordIDFromTeamname($db, $teamname)
-        {
-            return '123456789';
-        }
-        
-        public static function postToChannel($channel, $message)
-        {
-            return true;
-        }
+        return '123456789';
+    }
+    
+    public static function postToChannel($channel, $message)
+    {
+        return true;
     }
 }
 
-if (!class_exists('Shared')) {
-    class Shared
-    {
+class Shared
+{
         protected $db;
         
         public function __construct($db)
@@ -356,14 +245,12 @@ if (!class_exists('Shared')) {
             // Mock implementation for testing
             return $teamNameOfDraftPickOrigin;
         }
-    }
 }
 
-if (!class_exists('UI')) {
-    class UI
+class UI
+{
+    public static function displayDebugOutput($content, $title = 'Debug Output')
     {
-        public static function displayDebugOutput($content, $title = 'Debug Output')
-        {
             // In test mode, don't output anything
             // This prevents test output pollution
             if (defined('PHPUNIT_RUNNING') || php_sapi_name() === 'cli') {
@@ -395,72 +282,74 @@ if (!class_exists('UI')) {
                 }
             </script>";
         }
+}
+
+class Season
+{
+    public $phase = 'Regular Season';
+    public $endingYear = 2024;
+    public $beginningYear = 2023;
+    public $regularSeasonStartDate;
+    public $postAllStarStartDate;
+    public $playoffsStartDate;
+    public $playoffsEndDate;
+    public $lastSimNumber = 1;
+    public $lastSimStartDate = '2024-01-01';
+    public $lastSimEndDate = '2024-01-02';
+    public $projectedNextSimEndDate = '2024-01-03';
+    public $allowTrades = 'Yes';
+    public $allowWaivers = 'Yes';
+    public $freeAgencyNotificationsState = 'Off';
+    
+    const IBL_PRESEASON_MONTH = 9;
+    const IBL_HEAT_MONTH = 10;
+    const IBL_REGULAR_SEASON_STARTING_MONTH = 11;
+    const IBL_ALL_STAR_MONTH = 2;
+    const IBL_REGULAR_SEASON_ENDING_MONTH = 5;
+    const IBL_PLAYOFF_MONTH = 6;
+    
+    protected $db;
+    
+    public function __construct($db)
+    {
+        $this->db = $db;
+        // Initialize properties without database calls for testing
+        $this->phase = 'Regular Season';
+        $this->endingYear = 2024;
+        $this->beginningYear = 2023;
+        $this->regularSeasonStartDate = date_create("2023-11-01");
+        $this->postAllStarStartDate = date_create("2024-02-04");
+        $this->playoffsStartDate = date_create("2024-06-01");
+        $this->playoffsEndDate = date_create("2024-06-30");
+    }
+    
+    // Mock the methods that would normally query the database
+    private function getSeasonPhase()
+    {
+        return $this->phase;
+    }
+    
+    private function getSeasonEndingYear()
+    {
+        return $this->endingYear;
+    }
+    
+    private function getLastSimDatesArray()
+    {
+        return [
+            'Sim' => $this->lastSimNumber,
+            'Start Date' => $this->lastSimStartDate,
+            'End Date' => $this->lastSimEndDate
+        ];
+    }
+    
+    private function getProjectedNextSimEndDate($db, $lastSimEndDate)
+    {
+        return $this->projectedNextSimEndDate;
     }
 }
 
-if (!class_exists('Season')) {
-    class Season
-    {
-        public $phase = 'Regular Season';
-        public $endingYear = 2024;
-        public $beginningYear = 2023;
-        public $regularSeasonStartDate;
-        public $postAllStarStartDate;
-        public $playoffsStartDate;
-        public $playoffsEndDate;
-        public $lastSimNumber = 1;
-        public $lastSimStartDate = '2024-01-01';
-        public $lastSimEndDate = '2024-01-02';
-        public $projectedNextSimEndDate = '2024-01-03';
-        public $allowTrades = 'Yes';
-        public $allowWaivers = 'Yes';
-        public $freeAgencyNotificationsState = 'Off';
-        
-        const IBL_PRESEASON_MONTH = 9;
-        const IBL_HEAT_MONTH = 10;
-        const IBL_REGULAR_SEASON_STARTING_MONTH = 11;
-        const IBL_ALL_STAR_MONTH = 2;
-        const IBL_REGULAR_SEASON_ENDING_MONTH = 5;
-        const IBL_PLAYOFF_MONTH = 6;
-        
-        protected $db;
-        
-        public function __construct($db)
-        {
-            $this->db = $db;
-            // Initialize properties without database calls for testing
-            $this->phase = 'Regular Season';
-            $this->endingYear = 2024;
-            $this->beginningYear = 2023;
-            $this->regularSeasonStartDate = date_create("2023-11-01");
-            $this->postAllStarStartDate = date_create("2024-02-04");
-            $this->playoffsStartDate = date_create("2024-06-01");
-            $this->playoffsEndDate = date_create("2024-06-30");
-        }
-        
-        // Mock the methods that would normally query the database
-        private function getSeasonPhase()
-        {
-            return $this->phase;
-        }
-        
-        private function getSeasonEndingYear()
-        {
-            return $this->endingYear;
-        }
-        
-        private function getLastSimDatesArray()
-        {
-            return [
-                'Sim' => $this->lastSimNumber,
-                'Start Date' => $this->lastSimStartDate,
-                'End Date' => $this->lastSimEndDate
-            ];
-        }
-        
-        private function getProjectedNextSimEndDate($db, $lastSimEndDate)
-        {
-            return $this->projectedNextSimEndDate;
-        }
-    }
-}
+// Load the IBL5 autoloader AFTER defining mock classes
+// This ensures mock classes take precedence over real classes
+require_once __DIR__ . '/../autoloader.php';
+

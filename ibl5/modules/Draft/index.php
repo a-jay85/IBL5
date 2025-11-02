@@ -41,6 +41,7 @@ function userinfo($username, $bypass = 0)
 
     // Get current draft pick information
     $currentPick = $repository->getCurrentDraftPick();
+    
     $draft_team = $currentPick['team'];
     $draft_round = $currentPick['round'];
     $draft_pick = $currentPick['pick'];

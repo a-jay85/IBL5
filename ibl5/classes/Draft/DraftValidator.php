@@ -19,9 +19,10 @@ class DraftValidator
      * 
      * @param string|null $playerName The name of the player to draft
      * @param string|null $currentDraftSelection The player already selected for this pick (if any)
+     * @param bool $isPlayerAlreadyDrafted Whether the player has already been drafted
      * @return bool True if validation passes, false otherwise
      */
-    public function validateDraftSelection($playerName, $currentDraftSelection)
+    public function validateDraftSelection($playerName, $currentDraftSelection, $isPlayerAlreadyDrafted = false)
     {
         $this->clearErrors();
 
@@ -34,6 +35,12 @@ class DraftValidator
         // Validate pick hasn't already been used
         if ($currentDraftSelection !== null && $currentDraftSelection !== '') {
             $this->errors[] = "It looks like you've already drafted a player with this draft pick.";
+            return false;
+        }
+
+        // Validate player hasn't already been drafted
+        if ($isPlayerAlreadyDrafted) {
+            $this->errors[] = "This player has already been drafted by another team.";
             return false;
         }
 

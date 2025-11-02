@@ -80,4 +80,32 @@ class DraftValidatorTest extends TestCase
         $this->assertTrue($result);
         $this->assertEmpty($this->validator->getErrors());
     }
+
+    public function testValidateFailsWhenPlayerAlreadyDrafted()
+    {
+        $result = $this->validator->validateDraftSelection('John Doe', null, true);
+        
+        $this->assertFalse($result);
+        $errors = $this->validator->getErrors();
+        $this->assertCount(1, $errors);
+        $this->assertStringContainsString("already been drafted by another team", $errors[0]);
+    }
+
+    public function testValidateSucceedsWhenPlayerNotAlreadyDrafted()
+    {
+        $result = $this->validator->validateDraftSelection('John Doe', null, false);
+        
+        $this->assertTrue($result);
+        $this->assertEmpty($this->validator->getErrors());
+    }
+
+    public function testValidateFailsWithPlayerAlreadyDraftedEvenIfPickNotUsed()
+    {
+        $result = $this->validator->validateDraftSelection('John Doe', '', true);
+        
+        $this->assertFalse($result);
+        $errors = $this->validator->getErrors();
+        $this->assertCount(1, $errors);
+        $this->assertStringContainsString("already been drafted by another team", $errors[0]);
+    }
 }

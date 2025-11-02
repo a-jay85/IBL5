@@ -46,8 +46,14 @@ class DraftSelectionHandler
         // Get current draft selection
         $currentDraftSelection = $this->repository->getCurrentDraftSelection($draftRound, $draftPick);
 
+        // Check if player is already drafted
+        $isPlayerAlreadyDrafted = false;
+        if ($playerName !== null && $playerName !== '') {
+            $isPlayerAlreadyDrafted = $this->repository->isPlayerAlreadyDrafted($playerName);
+        }
+
         // Validate the draft selection
-        if (!$this->validator->validateDraftSelection($playerName, $currentDraftSelection)) {
+        if (!$this->validator->validateDraftSelection($playerName, $currentDraftSelection, $isPlayerAlreadyDrafted)) {
             $errors = $this->validator->getErrors();
             return $this->view->renderValidationError($errors[0]);
         }

@@ -156,4 +156,60 @@ class DraftRepositoryTest extends TestCase
         $queries = $this->mockDb->getExecutedQueries();
         $this->assertStringContainsString("Team\\'s Name", $queries[0]);
     }
+
+    public function testIsPlayerAlreadyDraftedReturnsTrueWhenDrafted()
+    {
+        $this->mockDb->setMockData([
+            ['drafted' => '1']
+        ]);
+
+        $result = $this->repository->isPlayerAlreadyDrafted('John Doe');
+
+        $this->assertTrue($result);
+    }
+
+    public function testIsPlayerAlreadyDraftedReturnsTrueWhenDraftedInteger()
+    {
+        $this->mockDb->setMockData([
+            ['drafted' => 1]
+        ]);
+
+        $result = $this->repository->isPlayerAlreadyDrafted('John Doe');
+
+        $this->assertTrue($result);
+    }
+
+    public function testIsPlayerAlreadyDraftedReturnsFalseWhenNotDrafted()
+    {
+        $this->mockDb->setMockData([
+            ['drafted' => '0']
+        ]);
+
+        $result = $this->repository->isPlayerAlreadyDrafted('John Doe');
+
+        $this->assertFalse($result);
+    }
+
+    public function testIsPlayerAlreadyDraftedReturnsFalseWhenPlayerNotFound()
+    {
+        $this->mockDb->setMockData([]);
+        $this->mockDb->setNumRows(0);
+
+        $result = $this->repository->isPlayerAlreadyDrafted('Unknown Player');
+
+        $this->assertFalse($result);
+    }
+
+    public function testIsPlayerAlreadyDraftedEscapesPlayerName()
+    {
+        $this->mockDb->setMockData([
+            ['drafted' => '0']
+        ]);
+
+        $this->repository->isPlayerAlreadyDrafted("D'Angelo Russell");
+
+        $queries = $this->mockDb->getExecutedQueries();
+        $this->assertStringContainsString("D\\'Angelo Russell", $queries[0]);
+        $this->assertStringContainsString('ibl_draft_class', $queries[0]);
+    }
 }

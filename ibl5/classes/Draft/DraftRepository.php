@@ -96,6 +96,31 @@ class DraftRepository
     }
 
     /**
+     * Check if a player has already been drafted
+     * 
+     * @param string $playerName The name of the player to check
+     * @return bool True if player has been drafted, false otherwise
+     */
+    public function isPlayerAlreadyDrafted($playerName)
+    {
+        $playerName = DatabaseService::escapeString($this->db, $playerName);
+
+        $query = "SELECT drafted 
+            FROM ibl_draft_class 
+            WHERE name = '$playerName' 
+            LIMIT 1";
+        
+        $result = $this->db->sql_query($query);
+        
+        if ($result && $this->db->sql_numrows($result) > 0) {
+            $drafted = $this->db->sql_result($result, 0, 'drafted');
+            return $drafted == '1' || $drafted === 1;
+        }
+        
+        return false;
+    }
+
+    /**
      * Get the next team on the clock
      * 
      * @return string|null The team name with the next pick, or null if draft is complete

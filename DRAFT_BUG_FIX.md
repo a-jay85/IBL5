@@ -31,7 +31,7 @@ Restructured the HTML so the form properly wraps the entire sortable table:
 ```
 
 ## Files Modified
-1. `ibl5/modules/College_Scouting/index.php` - Fixed HTML structure (lines 72-200)
+1. `ibl5/modules/Draft/index.php` - Fixed HTML structure (lines 72-200)
 
 ## Expected Behavior After Fix
 Users can now:
@@ -46,7 +46,7 @@ The fix ensures the form-input relationship is maintained regardless of how Java
 ## Validation Steps
 To manually verify the fix works:
 1. Log in as a team with an active draft pick
-2. Navigate to the College Scouting / Draft module
+2. Navigate to the Draft module (formerly College Scouting)
 3. Click on any column header to sort the table (e.g., sort by "Name")
 4. Select a player using the radio button
 5. Click the "Draft" button

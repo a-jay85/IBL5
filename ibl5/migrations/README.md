@@ -8,10 +8,11 @@ These migrations implement the recommendations from `DATABASE_SCHEMA_IMPROVEMENT
 
 ## Migration Files
 
-### 001_critical_improvements.sql (Phase 1)
+### 001_critical_improvements.sql (Phase 1) ✅ COMPLETED
 **Priority:** Critical  
 **Estimated Time:** 30-60 minutes  
-**Risk Level:** Low
+**Risk Level:** Low  
+**Status:** Implemented in production schema
 
 Implements:
 - Conversion of MyISAM tables to InnoDB for ACID compliance
@@ -25,10 +26,11 @@ Implements:
 - Prepares database for foreign key constraints
 - Essential for reliable API operations
 
-### 002_add_foreign_keys.sql (Phase 2)
+### 002_add_foreign_keys.sql (Phase 2) ✅ COMPLETED
 **Priority:** High  
 **Estimated Time:** 10-20 minutes  
-**Risk Level:** Low
+**Risk Level:** Low  
+**Status:** Implemented in production schema
 
 **Prerequisites:**
 - Phase 1 must be completed (InnoDB conversion)
@@ -44,6 +46,47 @@ Implements:
 - Prevents orphaned records
 - Self-documenting relationships
 - Critical for API reliability
+
+### 003_api_preparation.sql (Phase 3) ⏭️ NEXT
+**Priority:** High (API Readiness)  
+**Estimated Time:** 30-45 minutes  
+**Risk Level:** Low  
+**Status:** Ready to implement
+
+**Prerequisites:**
+- Phase 1 and Phase 2 must be completed
+- InnoDB tables with foreign keys in place
+
+Implements:
+- **Part 1:** Complete timestamp columns on remaining tables
+  - Adds `created_at` and `updated_at` to historical stats, box scores, standings, draft, free agency, and trade tables
+  - Enables audit trails and API caching (ETags)
+  
+- **Part 2:** UUID support for secure public API identifiers
+  - Adds UUID columns to players, teams, schedule, draft, and box scores
+  - Generates UUIDs for all existing records
+  - Creates indexes for fast UUID lookups
+  
+- **Part 3:** API-friendly database views
+  - `vw_player_current` - Active players with team info
+  - `vw_team_standings` - Standings with calculated fields
+  - `vw_schedule_upcoming` - Schedule with team names
+  - `vw_player_career_stats` - Career statistics summary
+  - `vw_free_agency_offers` - Free agency market overview
+
+**Benefits:**
+- Secure public identifiers (UUIDs) prevent ID enumeration attacks
+- Database views simplify API queries and improve performance
+- Complete audit trail coverage for all core tables
+- ETags and Last-Modified headers for efficient API caching
+- Consistent data formatting across API endpoints
+- Simplified application code with pre-joined views
+
+**Impact:**
+- Prepares database for production API deployment
+- Enables modern API best practices (ETags, UUIDs)
+- Reduces API response time through optimized views
+- Improves API security with UUID-based endpoints
 
 ## Running Migrations
 
@@ -65,6 +108,73 @@ Implements:
    - Plan for downtime or read-only mode
 
 ### Execution Steps
+
+**Note:** Phases 1 and 2 are already completed and implemented in production. The steps below are for Phase 3.
+
+#### For Phase 3 (API Preparation) - NEXT STEP
+
+1. **Connect to database:**
+   ```bash
+   mysql -u username -p database_name
+   ```
+
+2. **Verify Prerequisites:**
+   ```sql
+   -- Verify InnoDB tables exist
+   SELECT COUNT(*) FROM information_schema.TABLES 
+   WHERE TABLE_SCHEMA = DATABASE() 
+   AND TABLE_NAME LIKE 'ibl_%' 
+   AND ENGINE = 'InnoDB';
+   
+   -- Verify foreign keys exist
+   SELECT COUNT(*) FROM information_schema.KEY_COLUMN_USAGE
+   WHERE TABLE_SCHEMA = DATABASE()
+   AND REFERENCED_TABLE_NAME IS NOT NULL;
+   ```
+
+3. **Run Phase 3 migration:**
+   ```bash
+   mysql -u username -p database_name < 003_api_preparation.sql
+   ```
+
+4. **Verify Phase 3:**
+   ```sql
+   -- Check that timestamp columns were added
+   SELECT TABLE_NAME, COLUMN_NAME 
+   FROM INFORMATION_SCHEMA.COLUMNS 
+   WHERE TABLE_SCHEMA = DATABASE() 
+     AND COLUMN_NAME IN ('created_at', 'updated_at')
+     AND TABLE_NAME LIKE 'ibl_%'
+   ORDER BY TABLE_NAME;
+   
+   -- Verify UUID columns were added and populated
+   SELECT 'ibl_plr' AS table_name, COUNT(*) AS total, COUNT(uuid) AS with_uuid FROM ibl_plr
+   UNION ALL
+   SELECT 'ibl_team_info', COUNT(*), COUNT(uuid) FROM ibl_team_info
+   UNION ALL
+   SELECT 'ibl_schedule', COUNT(*), COUNT(uuid) FROM ibl_schedule;
+   
+   -- Verify views were created
+   SHOW FULL TABLES WHERE Table_type = 'VIEW';
+   
+   -- Test view functionality
+   SELECT COUNT(*) AS active_players FROM vw_player_current;
+   SELECT COUNT(*) AS teams FROM vw_team_standings;
+   SELECT COUNT(*) AS games FROM vw_schedule_upcoming LIMIT 10;
+   ```
+
+5. **Test API Integration:**
+   - Test UUID-based player lookups
+   - Verify ETag generation using `updated_at` timestamps
+   - Test view-based API endpoints
+   - Monitor view query performance
+
+---
+
+#### Historical Reference: Phase 1 and 2 (Already Completed)
+
+<details>
+<summary>Phase 1 Execution (Completed)</summary>
 
 1. **Connect to database:**
    ```bash
@@ -296,10 +406,43 @@ For issues or questions:
 
 ## Next Steps
 
-After Phase 1 and Phase 2 are stable, consider:
+### ✅ Completed Phases
+- **Phase 1:** Critical Infrastructure (InnoDB, Indexes) - ✅ DONE
+- **Phase 2:** Foreign Key Relationships - ✅ DONE
+- **Phase 5.1:** Composite Indexes - ✅ DONE
 
-1. **Phase 3:** Schema normalization and cleanup
-2. **Phase 4:** API-specific enhancements (UUIDs, views)
-3. **Phase 5:** Advanced optimization (partitioning, etc.)
+### 🎯 Current Priority: Phase 3 - API Preparation
+**Status:** Ready to implement  
+**File:** `003_api_preparation.sql`
 
-See `DATABASE_SCHEMA_IMPROVEMENTS.md` for detailed roadmap.
+Execute Phase 3 to prepare database for production API deployment:
+- Complete timestamp columns for audit trails
+- Add UUID support for secure public identifiers
+- Create API-friendly database views
+
+This phase is critical for:
+- Enabling ETags and caching in API
+- Providing secure, non-enumerable public IDs
+- Simplifying API queries with pre-built views
+- Supporting modern API best practices
+
+### 📋 Future Phases
+
+After Phase 3 is complete, consider:
+
+1. **Phase 4:** Data Type Refinements
+   - Complete data type optimizations
+   - Add CHECK constraints (MySQL 8.0+)
+   - Implement ENUM types for fixed lists
+
+2. **Phase 5:** Advanced Optimization
+   - Table partitioning for historical data
+   - Additional composite indexes based on usage
+   - Column size optimization
+
+3. **Phase 6:** Schema Cleanup
+   - Legacy table evaluation and archival
+   - Schema normalization
+   - Naming convention standardization (breaking change)
+
+See `DATABASE_SCHEMA_IMPROVEMENTS.md` for detailed roadmap and `SCHEMA_IMPLEMENTATION_REVIEW.md` for current status.

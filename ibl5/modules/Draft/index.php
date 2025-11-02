@@ -26,7 +26,7 @@ use Draft\DraftView;
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
-function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
+function userinfo($username, $bypass = 0)
 {
     global $user, $prefix, $user_prefix, $db;
     $sharedFunctions = new Shared($db);

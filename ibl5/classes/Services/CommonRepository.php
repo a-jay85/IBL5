@@ -46,7 +46,7 @@ class CommonRepository
      * Gets the team name associated with a username
      * 
      * @param string $username Username to look up
-     * @return string|null Team name or null if not found, "Free Agents" for empty username
+     * @return string|null Team name if found, "Free Agents" if username is empty, or null if username not found
      */
     public function getTeamnameFromUsername(string $username): ?string
     {

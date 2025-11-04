@@ -82,9 +82,7 @@ class TeamController
         }
 
         // Build tabs
-        $tabs = $this->uiService->renderTabs($teamID, $display, $insertyear, $team);
-        $tabs .= $this->uiService->addPlayoffTab($display, $teamID, $insertyear, $season);
-        $tabs .= $this->uiService->addContractsTab($display, $teamID, $insertyear);
+        $tabs = $this->uiService->renderTabs($teamID, $display, $insertyear, $season);
 
         // Get display content
         $showing = $this->uiService->getDisplayTitle($display);

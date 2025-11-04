@@ -51,7 +51,7 @@ class TeamUIServiceTest extends TestCase
 
     public function testRenderTabsContainsRatingsTab()
     {
-        $tabs = $this->service->renderTabs(1, 'ratings', '', $this->team);
+        $tabs = $this->service->renderTabs(1, 'ratings', '', $this->season);
         
         $this->assertStringContainsString('Ratings</a>', $tabs);
         $this->assertStringContainsString('bgcolor=#BBBBBB', $tabs); // Active tab
@@ -59,7 +59,7 @@ class TeamUIServiceTest extends TestCase
 
     public function testRenderTabsContainsAllBasicTabs()
     {
-        $tabs = $this->service->renderTabs(1, 'ratings', '', $this->team);
+        $tabs = $this->service->renderTabs(1, 'ratings', '', $this->season);
         
         $this->assertStringContainsString('Ratings</a>', $tabs);
         $this->assertStringContainsString('Season Totals</a>', $tabs);
@@ -70,7 +70,7 @@ class TeamUIServiceTest extends TestCase
 
     public function testRenderTabsHighlightsActiveTab()
     {
-        $tabs = $this->service->renderTabs(1, 'total_s', '', $this->team);
+        $tabs = $this->service->renderTabs(1, 'total_s', '', $this->season);
         
         // Season Totals should be highlighted
         $this->assertStringContainsString('bgcolor=#BBBBBB', $tabs);
@@ -78,55 +78,67 @@ class TeamUIServiceTest extends TestCase
 
     public function testRenderTabsIncludesInsertYear()
     {
-        $tabs = $this->service->renderTabs(1, 'ratings', '&yr=2023', $this->team);
+        $tabs = $this->service->renderTabs(1, 'ratings', '&yr=2023', $this->season);
         
         $this->assertStringContainsString('&yr=2023', $tabs);
     }
 
-    public function testAddPlayoffTabDuringPlayoffs()
+    public function testRenderTabsIncludesPlayoffTabDuringPlayoffs()
     {
         $this->season->phase = 'Playoffs';
-        $tabs = $this->service->addPlayoffTab('playoffs', 1, '', $this->season);
+        $tabs = $this->service->renderTabs(1, 'playoffs', '', $this->season);
         
         $this->assertStringContainsString('Playoffs Averages</a>', $tabs);
+        $this->assertStringContainsString('bgcolor=#BBBBBB', $tabs); // Should be highlighted
     }
 
-    public function testAddPlayoffTabDuringDraft()
+    public function testRenderTabsIncludesPlayoffTabDuringDraft()
     {
         $this->season->phase = 'Draft';
-        $tabs = $this->service->addPlayoffTab('playoffs', 1, '', $this->season);
+        $tabs = $this->service->renderTabs(1, 'ratings', '', $this->season);
         
         $this->assertStringContainsString('Playoffs Averages</a>', $tabs);
     }
 
-    public function testAddPlayoffTabDuringFreeAgency()
+    public function testRenderTabsIncludesPlayoffTabDuringFreeAgency()
     {
         $this->season->phase = 'Free Agency';
-        $tabs = $this->service->addPlayoffTab('playoffs', 1, '', $this->season);
+        $tabs = $this->service->renderTabs(1, 'ratings', '', $this->season);
         
         $this->assertStringContainsString('Playoffs Averages</a>', $tabs);
     }
 
-    public function testAddPlayoffTabNotDuringRegularSeason()
+    public function testRenderTabsExcludesPlayoffTabDuringRegularSeason()
     {
         $this->season->phase = 'Regular Season';
-        $tabs = $this->service->addPlayoffTab('playoffs', 1, '', $this->season);
+        $tabs = $this->service->renderTabs(1, 'ratings', '', $this->season);
         
-        $this->assertEmpty($tabs);
+        $this->assertStringNotContainsString('Playoffs Averages</a>', $tabs);
     }
 
-    public function testAddContractsTabReturnsTab()
+    public function testRenderTabsIncludesContractsTab()
     {
-        $tabs = $this->service->addContractsTab('contracts', 1, '');
+        $tabs = $this->service->renderTabs(1, 'ratings', '', $this->season);
         
         $this->assertStringContainsString('Contracts</a>', $tabs);
     }
 
-    public function testAddContractsTabHighlightsWhenActive()
+    public function testRenderTabsHighlightsContractsWhenActive()
     {
-        $tabs = $this->service->addContractsTab('contracts', 1, '');
+        $tabs = $this->service->renderTabs(1, 'contracts', '', $this->season);
         
         $this->assertStringContainsString('bgcolor=#BBBBBB', $tabs);
+    }
+
+    public function testRenderTabsPlayoffTabAppearsBeforeContractsTab()
+    {
+        $this->season->phase = 'Playoffs';
+        $tabs = $this->service->renderTabs(1, 'ratings', '', $this->season);
+        
+        $playoffPos = strpos($tabs, 'Playoffs Averages');
+        $contractsPos = strpos($tabs, 'Contracts');
+        
+        $this->assertLessThan($contractsPos, $playoffPos);
     }
 
     public function testGetDisplayTitleReturnsCorrectTitles()

@@ -43,91 +43,39 @@ class TeamUIService
     /**
      * Render tab navigation for team displays
      */
-    public function renderTabs(int $teamID, string $display, string $insertyear, $team): string
+    public function renderTabs(int $teamID, string $display, string $insertyear, $season): string
     {
+        $tabDefinitions = [
+            'ratings' => 'Ratings',
+            'total_s' => 'Season Totals',
+            'avg_s' => 'Season Averages',
+            'per36mins' => 'Per 36 Minutes',
+            'chunk' => 'Sim Averages',
+        ];
+
+        // Add playoff tab if in appropriate phase
+        if (in_array($season->phase, ["Playoffs", "Draft", "Free Agency"])) {
+            $tabDefinitions['playoffs'] = 'Playoffs Averages';
+        }
+
+        // Contracts tab always comes last
+        $tabDefinitions['contracts'] = 'Contracts';
+
         $tabs = "";
-        
-        // Ratings tab
-        if ($display == "ratings") {
-            $tabs .= "<td bgcolor=#BBBBBB style=\"font-weight:bold\">";
-        } else {
-            $tabs .= "<td>";
+        foreach ($tabDefinitions as $tabKey => $tabLabel) {
+            $tabs .= $this->buildTab($tabKey, $tabLabel, $display, $teamID, $insertyear);
         }
-        $tabs .= "<a href=\"modules.php?name=Team&op=team&teamID=$teamID&display=ratings$insertyear\">Ratings</a></td>";
-
-        // Season Totals tab
-        if ($display == "total_s") {
-            $tabs .= "<td bgcolor=#BBBBBB style=\"font-weight:bold\">";
-        } else {
-            $tabs .= "<td>";
-        }
-        $tabs .= "<a href=\"modules.php?name=Team&op=team&teamID=$teamID&display=total_s$insertyear\">Season Totals</a></td>";
-
-        // Season Averages tab
-        if ($display == "avg_s") {
-            $tabs .= "<td bgcolor=#BBBBBB style=\"font-weight:bold\">";
-        } else {
-            $tabs .= "<td>";
-        }
-        $tabs .= "<a href=\"modules.php?name=Team&op=team&teamID=$teamID&display=avg_s$insertyear\">Season Averages</a></td>";
-
-        // Per 36 Minutes tab
-        if ($display == "per36mins") {
-            $tabs .= "<td bgcolor=#BBBBBB style=\"font-weight:bold\">";
-        } else {
-            $tabs .= "<td>";
-        }
-        $tabs .= "<a href=\"modules.php?name=Team&op=team&teamID=$teamID&display=per36mins$insertyear\">Per 36 Minutes</a></td>";
-
-        // Chunk Averages tab
-        if ($display == "chunk") {
-            $tabs .= "<td bgcolor=#BBBBBB style=\"font-weight:bold\">";
-        } else {
-            $tabs .= "<td>";
-        }
-        $tabs .= "<a href=\"modules.php?name=Team&op=team&teamID=$teamID&display=chunk$insertyear\">Sim Averages</a></td>";
 
         return $tabs;
     }
 
     /**
-     * Add playoff tab if in playoff/draft/free agency phase
+     * Build a single tab HTML element
      */
-    public function addPlayoffTab(string $display, int $teamID, string $insertyear, $season): string
+    private function buildTab(string $tabKey, string $tabLabel, string $display, int $teamID, string $insertyear): string
     {
-        $tabs = "";
-        
-        if (
-            $season->phase == "Playoffs"
-            OR $season->phase == "Draft"
-            OR $season->phase == "Free Agency"
-        ) {
-            if ($display == "playoffs") {
-                $tabs .= "<td bgcolor=#BBBBBB style=\"font-weight:bold\">";
-            } else {
-                $tabs .= "<td>";
-            }
-            $tabs .= "<a href=\"modules.php?name=Team&op=team&teamID=$teamID&display=playoffs$insertyear\">Playoffs Averages</a></td>";
-        }
-        
-        return $tabs;
-    }
-
-    /**
-     * Add contracts tab
-     */
-    public function addContractsTab(string $display, int $teamID, string $insertyear): string
-    {
-        $tabs = "";
-        
-        if ($display == "contracts") {
-            $tabs .= "<td bgcolor=#BBBBBB style=\"font-weight:bold\">";
-        } else {
-            $tabs .= "<td>";
-        }
-        $tabs .= "<a href=\"modules.php?name=Team&op=team&teamID=$teamID&display=contracts$insertyear\">Contracts</a></td>";
-        
-        return $tabs;
+        $isActive = ($display === $tabKey) ? " bgcolor=#BBBBBB style=\"font-weight:bold\"" : "";
+        return "<td{$isActive}><a href=\"modules.php?name=Team&op=team&teamID=$teamID&display=$tabKey$insertyear\">$tabLabel</a></td>";
     }
 
     /**

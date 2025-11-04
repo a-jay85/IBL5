@@ -124,38 +124,8 @@ class DraftRepositoryTest extends TestCase
         $this->assertStringContainsString('LIMIT 1', $queries[0]);
     }
 
-    public function testGetTeamDiscordIDReturnsDiscordID()
-    {
-        $this->mockDb->setMockData([
-            ['discordID' => '123456789']
-        ]);
-
-        $result = $this->repository->getTeamDiscordID('Chicago Bulls');
-
-        $this->assertEquals('123456789', $result);
-    }
-
-    public function testGetTeamDiscordIDReturnsNullWhenNotFound()
-    {
-        $this->mockDb->setMockData([]);
-        $this->mockDb->setNumRows(0);
-
-        $result = $this->repository->getTeamDiscordID('Unknown Team');
-
-        $this->assertNull($result);
-    }
-
-    public function testGetTeamDiscordIDEscapesTeamName()
-    {
-        $this->mockDb->setMockData([
-            ['discordID' => '123456789']
-        ]);
-
-        $this->repository->getTeamDiscordID("Team's Name");
-
-        $queries = $this->mockDb->getExecutedQueries();
-        $this->assertStringContainsString("Team\\'s Name", $queries[0]);
-    }
+    // Tests for getTeamDiscordID have been moved to CommonRepositoryTest
+    // as this method now delegates to CommonRepository
 
     public function testIsPlayerAlreadyDraftedReturnsTrueWhenDrafted()
     {

@@ -14,111 +14,8 @@ class WaiversRepositoryTest extends TestCase
         $this->repository = new WaiversRepository($this->mockDb);
     }
     
-    public function testGetUserByUsernameReturnsUserData()
-    {
-        $this->mockDb->setMockData([
-            [
-                'username' => 'testuser',
-                'user_ibl_team' => 'Boston Celtics',
-                'user_id' => 1
-            ]
-        ]);
-        $this->mockDb->setNumRows(1);
-        
-        $user = $this->repository->getUserByUsername('testuser');
-        
-        $this->assertIsArray($user);
-        $this->assertEquals('testuser', $user['username']);
-        $this->assertEquals('Boston Celtics', $user['user_ibl_team']);
-    }
-    
-    public function testGetUserByUsernameReturnsNullWhenNotFound()
-    {
-        $this->mockDb->setNumRows(0);
-        
-        $user = $this->repository->getUserByUsername('nonexistent');
-        
-        $this->assertNull($user);
-    }
-    
-    public function testGetTeamByNameReturnsTeamData()
-    {
-        $this->mockDb->setMockData([
-            [
-                'team_name' => 'Boston Celtics',
-                'teamid' => 2,
-                'ownerName' => 'Test Owner'
-            ]
-        ]);
-        $this->mockDb->setNumRows(1);
-        
-        $team = $this->repository->getTeamByName('Boston Celtics');
-        
-        $this->assertIsArray($team);
-        $this->assertEquals('Boston Celtics', $team['team_name']);
-        $this->assertEquals(2, $team['teamid']);
-    }
-    
-    public function testGetTeamByNameReturnsNullWhenNotFound()
-    {
-        $this->mockDb->setNumRows(0);
-        
-        $team = $this->repository->getTeamByName('Nonexistent Team');
-        
-        $this->assertNull($team);
-    }
-    
-    public function testGetTeamTotalSalaryCalculatesCorrectly()
-    {
-        $this->mockDb->setMockData([
-            ['cy' => 1, 'cy1' => 500],
-            ['cy' => 2, 'cy2' => 600],
-            ['cy' => 1, 'cy1' => 300]
-        ]);
-        $this->mockDb->setNumRows(3);
-        
-        $totalSalary = $this->repository->getTeamTotalSalary('Boston Celtics');
-        
-        $this->assertEquals(1400, $totalSalary);
-    }
-    
-    public function testGetTeamTotalSalaryReturnsZeroForEmptyTeam()
-    {
-        $this->mockDb->setNumRows(0);
-        
-        $totalSalary = $this->repository->getTeamTotalSalary('Empty Team');
-        
-        $this->assertEquals(0, $totalSalary);
-    }
-    
-    public function testGetPlayerByIDReturnsPlayerData()
-    {
-        $this->mockDb->setMockData([
-            [
-                'pid' => 123,
-                'name' => 'John Doe',
-                'cy1' => 500,
-                'exp' => 5
-            ]
-        ]);
-        $this->mockDb->setNumRows(1);
-        
-        $player = $this->repository->getPlayerByID(123);
-        
-        $this->assertIsArray($player);
-        $this->assertEquals(123, $player['pid']);
-        $this->assertEquals('John Doe', $player['name']);
-        $this->assertEquals(500, $player['cy1']);
-    }
-    
-    public function testGetPlayerByIDReturnsNullWhenNotFound()
-    {
-        $this->mockDb->setNumRows(0);
-        
-        $player = $this->repository->getPlayerByID(999);
-        
-        $this->assertNull($player);
-    }
+    // Tests for getUserByUsername, getTeamByName, getTeamTotalSalary, and getPlayerByID
+    // have been moved to CommonRepositoryTest as these methods now delegate to CommonRepository
     
     public function testDropPlayerToWaiversExecutesCorrectQuery()
     {
@@ -246,16 +143,4 @@ class WaiversRepositoryTest extends TestCase
         $this->assertStringContainsString('Associated Press', $queries[0]);
     }
     
-    public function testGetTeamTotalSalaryHandlesMissingContractYearField()
-    {
-        $this->mockDb->setMockData([
-            ['cy' => 1], // Missing cy1 field
-            ['cy' => 2, 'cy2' => 600]
-        ]);
-        $this->mockDb->setNumRows(2);
-        
-        $totalSalary = $this->repository->getTeamTotalSalary('Boston Celtics');
-        
-        $this->assertEquals(600, $totalSalary);
-    }
 }

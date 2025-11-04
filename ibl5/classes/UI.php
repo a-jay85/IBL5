@@ -2,6 +2,7 @@
 
 use Player\Player;
 use Services\DatabaseService;
+use Statistics\StatsFormatter;
 
 class UI
 {
@@ -287,25 +288,25 @@ class UI
                 $playerStats = PlayerStats::withHistoricalPlrRow($db, $plrRow);
             }
     
-            $stats_fgm = ($playerStats->seasonMinutes != 0) ? number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonFieldGoalsMade), 1) : "0.0";
-            $stats_fga = ($playerStats->seasonMinutes != 0) ? number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonFieldGoalsAttempted), 1) : "0.0";
-            $stats_fgp = ($stats_fga != 0) ? number_format(($stats_fgm / $stats_fga), 3) : "0.000";
-            $stats_ftm = ($playerStats->seasonMinutes != 0) ? number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonFreeThrowsMade), 1) : "0.0";
-            $stats_fta = ($playerStats->seasonMinutes != 0) ? number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonFreeThrowsAttempted), 1) : "0.0";
-            $stats_ftp = ($stats_fta != 0) ? number_format(($stats_ftm / $stats_fta), 3) : "0.000";
-            $stats_tgm = ($playerStats->seasonMinutes != 0) ? number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonThreePointersMade), 1) : "0.0";
-            $stats_tga = ($playerStats->seasonMinutes != 0) ? number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonThreePointersAttempted), 1) : "0.0";
-            $stats_tgp = ($stats_tga != 0) ? number_format(($stats_tgm / $stats_tga), 3) : "0.000";
-            $stats_mpg = ($playerStats->seasonMinutes != 0) ? number_format(($playerStats->seasonMinutes / $playerStats->seasonGamesPlayed), 1) : "0.0";
-            $stats_per36Min = ($playerStats->seasonMinutes != 0) ? number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonMinutes), 1) : "0.0";
-            $stats_opg = ($playerStats->seasonMinutes != 0) ? number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonOffensiveRebounds), 1) : "0.0";
-            $stats_rpg = ($playerStats->seasonMinutes != 0) ? number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonTotalRebounds), 1) : "0.0";
-            $stats_apg = ($playerStats->seasonMinutes != 0) ? number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonAssists), 1) : "0.0";
-            $stats_spg = ($playerStats->seasonMinutes != 0) ? number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonSteals), 1) : "0.0";
-            $stats_tpg = ($playerStats->seasonMinutes != 0) ? number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonTurnovers), 1) : "0.0";
-            $stats_bpg = ($playerStats->seasonMinutes != 0) ? number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonBlocks), 1) : "0.0";
-            $stats_fpg = ($playerStats->seasonMinutes != 0) ? number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonPersonalFouls), 1) : "0.0";
-            $stats_ppg = ($playerStats->seasonMinutes != 0) ? number_format((36 / $playerStats->seasonMinutes * $playerStats->seasonPoints), 1) : "0.0";
+            $stats_fgm = StatsFormatter::formatPer36Stat($playerStats->seasonFieldGoalsMade, $playerStats->seasonMinutes);
+            $stats_fga = StatsFormatter::formatPer36Stat($playerStats->seasonFieldGoalsAttempted, $playerStats->seasonMinutes);
+            $stats_fgp = StatsFormatter::formatPercentage($stats_fgm, $stats_fga);
+            $stats_ftm = StatsFormatter::formatPer36Stat($playerStats->seasonFreeThrowsMade, $playerStats->seasonMinutes);
+            $stats_fta = StatsFormatter::formatPer36Stat($playerStats->seasonFreeThrowsAttempted, $playerStats->seasonMinutes);
+            $stats_ftp = StatsFormatter::formatPercentage($stats_ftm, $stats_fta);
+            $stats_tgm = StatsFormatter::formatPer36Stat($playerStats->seasonThreePointersMade, $playerStats->seasonMinutes);
+            $stats_tga = StatsFormatter::formatPer36Stat($playerStats->seasonThreePointersAttempted, $playerStats->seasonMinutes);
+            $stats_tgp = StatsFormatter::formatPercentage($stats_tgm, $stats_tga);
+            $stats_mpg = StatsFormatter::formatPerGameAverage($playerStats->seasonMinutes, $playerStats->seasonGamesPlayed);
+            $stats_per36Min = StatsFormatter::formatPer36Stat($playerStats->seasonMinutes, $playerStats->seasonMinutes);
+            $stats_opg = StatsFormatter::formatPer36Stat($playerStats->seasonOffensiveRebounds, $playerStats->seasonMinutes);
+            $stats_rpg = StatsFormatter::formatPer36Stat($playerStats->seasonTotalRebounds, $playerStats->seasonMinutes);
+            $stats_apg = StatsFormatter::formatPer36Stat($playerStats->seasonAssists, $playerStats->seasonMinutes);
+            $stats_spg = StatsFormatter::formatPer36Stat($playerStats->seasonSteals, $playerStats->seasonMinutes);
+            $stats_tpg = StatsFormatter::formatPer36Stat($playerStats->seasonTurnovers, $playerStats->seasonMinutes);
+            $stats_bpg = StatsFormatter::formatPer36Stat($playerStats->seasonBlocks, $playerStats->seasonMinutes);
+            $stats_fpg = StatsFormatter::formatPer36Stat($playerStats->seasonPersonalFouls, $playerStats->seasonMinutes);
+            $stats_ppg = StatsFormatter::formatPer36Stat($playerStats->seasonPoints, $playerStats->seasonMinutes);
         
             (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
         

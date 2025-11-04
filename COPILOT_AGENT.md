@@ -188,6 +188,65 @@ $player = new Player($db);
 - [ ] No debugging code or commented-out blocks left behind
 - [ ] Database queries consider PostgreSQL compatibility
 - [ ] Changes support eventual Laravel migration where applicable
+- [ ] **All functions and methods have complete type hints** (parameters and return types)
+- [ ] Existing function calls verified for correctness and argument compatibility
+- [ ] All linter warnings and errors addressed and fixed
+- [ ] Strict types enabled where applicable (`declare(strict_types=1);`)
+
+### 7. Type Hinting & Error Handling Standards
+
+#### Mandatory Type Hints
+**ALL new functions and methods MUST include complete type hints:**
+- **Parameter types**: Every parameter must have a type declaration
+- **Return types**: Every function/method must declare its return type (use `void` for non-returning functions)
+- **Union types** (PHP 8+): `string|int|null`
+- **Nullable types**: `?Type` when parameter/return can be null
+- **Avoid `mixed`** unless truly necessary; prefer specific types
+- **When refactoring legacy code**: Add type hints as part of refactoring and update all call sites
+
+Common patterns in IBL5:
+```php
+// ✅ Database, players, arrays, calculations, booleans
+public function query(mysqli $db, string $sql): mixed
+public function getPlayer(int $playerId): ?Player
+public function getTeamRoster(int $teamId): array
+public function calculateAverage(array $values): float
+public function isPlayerActive(int $playerId): bool
+public function logEvent(string $message, ?string $userId = null): void
+```
+
+#### Error Detection & Fixing Workflow
+
+**Before each commit, the Copilot agent MUST:**
+1. **Identify all function/method calls** in changed code
+2. **Verify argument count and types match** function parameters
+3. **Check return value usage matches** declared return type
+4. **Run static analysis** (PHPStan level 5+, Psalm strict mode)
+5. **Fix all errors and warnings** - zero tolerance
+
+**Common error patterns to check:**
+- Argument count mismatches or type mismatches (e.g., `string` where `int` expected)
+- Null values passed to non-nullable parameters
+- Return values used from `void` functions
+- Array functions called on non-arrays
+- Missing methods or incorrect call signatures
+
+**Example fixes:**
+```php
+// ❌ WRONG → ✅ FIXED
+$team = Team::findById();              → $team = Team::findById($teamId);
+$player = Player::getById("12345");    → $player = Player::getById((int)"12345");
+$result = logEvent("Injured");         → logEvent("Injured");  // void return
+if ($result) { ... }
+```
+
+**Linter standards:** PHP_CodeSniffer (PSR-12), PHPStan, Psalm. All warnings/errors must be resolved before PR completion.
+
+#### Laravel Migration Compatibility
+- Use PHP 8 union types (compatible with Laravel 10+)
+- Prefer PHP 8+ features over PHP 7.4 syntax
+- Type hints enable easier future Eloquent ORM migration
+- Document complex array types: `@return array<string, mixed>`
 
 ## Copilot Coding Agent Configuration
 
@@ -199,6 +258,11 @@ $player = new Player($db);
   - Consider architectural implications of all changes
   - **Use the class autoloader and avoid manual `require()` statements for classes**
   - Place all new classes in `ibl5/classes/` directory
+  - **Add complete type hints to ALL functions and methods** (parameter types and return types)
+  - **Verify all existing function calls** for correctness against the function signatures
+  - **Fix all type mismatches, argument count errors, and linter warnings** before PR completion
+  - **Run static analysis** to detect and fix type errors and inconsistencies
+  - **Zero tolerance for warnings or errors**: PRs must pass all quality checks
 - The agent will **not** merge PRs automatically; human review is required
 
 ## Working with the Database Schema

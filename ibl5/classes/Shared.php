@@ -3,10 +3,12 @@
 class Shared
 {
     protected $db;
+    protected $commonRepository;
 
     public function __construct($db)
     {
         $this->db = $db;
+        $this->commonRepository = new \Services\CommonRepository($db);
     }
 
     public function getNumberOfTitles($teamname, $titleName)
@@ -31,49 +33,52 @@ class Shared
         return $this->db->sql_result($queryCurrentOwnerOfDraftPick, 0, 'ownerofpick');
     }
     
+    /**
+     * Gets player ID from player name
+     * 
+     * @deprecated Use CommonRepository::getPlayerIDFromPlayerName() instead
+     * @param string $playerName Player name to look up
+     * @return int|null Player ID or null if not found
+     */
     public function getPlayerIDFromPlayerName($playerName)
     {
-        $queryPlayerIDFromPlayerName = $this->db->sql_query("SELECT pid
-            FROM ibl_plr
-            WHERE name = '$playerName'
-            LIMIT 1;");
-
-        return $this->db->sql_result($queryPlayerIDFromPlayerName, 0, 'pid');
+        return $this->commonRepository->getPlayerIDFromPlayerName($playerName);
     }
 
+    /**
+     * Gets team name from team ID
+     * 
+     * @deprecated Use CommonRepository::getTeamnameFromTeamID() instead
+     * @param int $teamID Team ID to look up
+     * @return string|null Team name or null if not found
+     */
     public function getTeamnameFromTeamID($teamID)
     {
-        $teamID = (int) $teamID; // Ensure teamID is an integer
-        $queryTeamnameFromTeamID = $this->db->sql_query("SELECT team_name
-            FROM ibl_team_info
-            WHERE teamid = $teamID
-            LIMIT 1;");
-
-        return $this->db->sql_result($queryTeamnameFromTeamID, 0, 'team_name');
+        return $this->commonRepository->getTeamnameFromTeamID($teamID);
     }
 
+    /**
+     * Gets team name from username
+     * 
+     * @deprecated Use CommonRepository::getTeamnameFromUsername() instead
+     * @param string $username Username to look up
+     * @return string|null Team name, "Free Agents" for empty username, or null if not found
+     */
     public function getTeamnameFromUsername($username)
     {
-        if ($username) {
-            $queryTeamnameFromUsername = $this->db->sql_query("SELECT user_ibl_team
-                FROM nuke_users
-                WHERE username = '$username'
-                LIMIT 1;");
-
-            return $this->db->sql_result($queryTeamnameFromUsername, 0, 'user_ibl_team');
-        } else {
-            return "Free Agents";
-        }
+        return $this->commonRepository->getTeamnameFromUsername($username);
     }
 
+    /**
+     * Gets team ID from team name
+     * 
+     * @deprecated Use CommonRepository::getTidFromTeamname() instead
+     * @param string $teamname Team name to look up
+     * @return int|null Team ID or null if not found
+     */
     public function getTidFromTeamname($teamname)
     {
-        $queryTidFromTeamname = $this->db->sql_query("SELECT teamid
-            FROM ibl_team_info
-            WHERE team_name = '$teamname'
-            LIMIT 1;");
-
-        return (int) $this->db->sql_result($queryTidFromTeamname, 0, 'teamid'); // Ensure teamID is an integer
+        return $this->commonRepository->getTidFromTeamname($teamname);
     }
 
     public function isFreeAgencyModuleActive()

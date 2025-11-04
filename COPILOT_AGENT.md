@@ -233,7 +233,3 @@ The schema reveals:
 - [Copilot Coding Agent Best Practices](https://gh.io/copilot-coding-agent-tips)
 - [Conventional Commits](https://www.conventionalcommits.org/)
 - Database Schema Reference: `ibl5/schema.sql`
-
----
-
-_This file was generated to onboard the Copilot coding agent to this repository. Edit as needed to reflect your team's workflow._

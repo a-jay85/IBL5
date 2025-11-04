@@ -11,6 +11,7 @@ class DepthChartController
     private $repository;
     private $processor;
     private $view;
+    private $commonRepository;
     
     public function __construct($db)
     {
@@ -18,6 +19,7 @@ class DepthChartController
         $this->repository = new DepthChartRepository($db);
         $this->processor = new DepthChartProcessor();
         $this->view = new DepthChartView($this->processor);
+        $this->commonRepository = new \Services\CommonRepository($db);
     }
     
     /**
@@ -79,10 +81,7 @@ class DepthChartController
      */
     private function getUserTeamName(string $username): string
     {
-        $usernameEscaped = \Services\DatabaseService::escapeString($this->db, $username);
-        $sql = "SELECT user_ibl_team FROM nuke_users WHERE username='$usernameEscaped'";
-        $result = $this->db->sql_query($sql);
-        $userinfo = $this->db->sql_fetchrow($result);
-        return $userinfo['user_ibl_team'] ?? '';
+        $teamName = $this->commonRepository->getTeamnameFromUsername($username);
+        return $teamName ?? '';
     }
 }

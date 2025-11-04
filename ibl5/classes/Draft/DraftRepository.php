@@ -16,10 +16,12 @@ use Services\DatabaseService;
 class DraftRepository
 {
     private $db;
+    private $commonRepository;
 
     public function __construct($db)
     {
         $this->db = $db;
+        $this->commonRepository = new \Services\CommonRepository($db);
     }
 
     /**
@@ -145,25 +147,13 @@ class DraftRepository
     /**
      * Get the Discord ID for a team
      * 
+     * @deprecated Use CommonRepository::getTeamDiscordID() instead
      * @param string $teamName The team name
      * @return string|null The Discord ID, or null if not found
      */
     public function getTeamDiscordID($teamName)
     {
-        $teamName = DatabaseService::escapeString($this->db, $teamName);
-
-        $query = "SELECT discordID 
-            FROM ibl_team_info 
-            WHERE team_name = '$teamName' 
-            LIMIT 1";
-        
-        $result = $this->db->sql_query($query);
-        
-        if ($result && $this->db->sql_numrows($result) > 0) {
-            return $this->db->sql_result($result, 0, 'discordID');
-        }
-        
-        return null;
+        return $this->commonRepository->getTeamDiscordID($teamName);
     }
 
     /**

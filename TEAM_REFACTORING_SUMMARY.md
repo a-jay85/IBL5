@@ -24,9 +24,8 @@ The refactored Team module uses:
 
 ```
 Team Module (32 lines - 91% reduction from 383 lines)
-├── TeamController (249 lines)
+├── TeamController (197 lines)
 │   ├── displayTeamPage()
-│   ├── displayInjuries()
 │   ├── displayDraftHistory()
 │   └── displayMenu()
 ├── TeamRepository (175 lines)
@@ -218,3 +217,36 @@ The Team module refactoring successfully:
 - ✅ Enhanced code security and maintainability
 
 The refactored Team module is now easier to understand, test, maintain, and extend while preserving all existing functionality.
+
+## Post-Refactoring: Injuries Module Extraction
+
+### Objective
+Extract the `displayInjuries()` functionality from TeamController into its own standalone "Injuries" module.
+
+### Changes Made
+1. **Created New Module**: `ibl5/modules/Injuries/index.php` (58 lines)
+   - Standalone module following the pattern of simpler modules like Leaderboards
+   - Uses existing `League::getInjuredPlayersResult()` method
+   - No new Service classes needed for this simple functionality
+
+2. **Modified TeamController**: `ibl5/classes/Team/TeamController.php` (197 lines, reduced from 249)
+   - Removed `displayInjuries()` method (52 lines removed)
+
+3. **Modified Team Module**: `ibl5/modules/Team/index.php`
+   - Removed `injuries` case from switch statement
+
+4. **Updated References**: `ibl5/blocks/block-Links.php`
+   - Changed link from `modules.php?name=Team&op=injuries` to `modules.php?name=Injuries`
+
+### Design Decision
+The `League::getInjuredPlayersResult()` method was kept in the League class rather than moved to a new InjuriesService because:
+- It's a simple database query with no complex business logic
+- The League class already contains similar league-wide query methods (all-star candidates, waived players, MVP candidates)
+- Creating a service for a single simple query would add unnecessary complexity
+
+### Result
+- ✅ Injuries is now a standalone module independent of Team
+- ✅ Team module complexity reduced by 52 lines
+- ✅ Module follows established patterns for simple, read-only modules
+- ✅ No breaking changes to functionality
+- ✅ All existing tests continue to pass

@@ -290,13 +290,13 @@ class UI
     
             $stats_fgm = StatsFormatter::formatPer36Stat($playerStats->seasonFieldGoalsMade, $playerStats->seasonMinutes);
             $stats_fga = StatsFormatter::formatPer36Stat($playerStats->seasonFieldGoalsAttempted, $playerStats->seasonMinutes);
-            $stats_fgp = StatsFormatter::formatPercentage($stats_fgm, $stats_fga);
+            $stats_fgp = StatsFormatter::formatPercentage($playerStats->seasonFieldGoalsMade, $playerStats->seasonFieldGoalsAttempted);
             $stats_ftm = StatsFormatter::formatPer36Stat($playerStats->seasonFreeThrowsMade, $playerStats->seasonMinutes);
             $stats_fta = StatsFormatter::formatPer36Stat($playerStats->seasonFreeThrowsAttempted, $playerStats->seasonMinutes);
-            $stats_ftp = StatsFormatter::formatPercentage($stats_ftm, $stats_fta);
+            $stats_ftp = StatsFormatter::formatPercentage($playerStats->seasonFreeThrowsMade, $playerStats->seasonFreeThrowsAttempted);
             $stats_tgm = StatsFormatter::formatPer36Stat($playerStats->seasonThreePointersMade, $playerStats->seasonMinutes);
             $stats_tga = StatsFormatter::formatPer36Stat($playerStats->seasonThreePointersAttempted, $playerStats->seasonMinutes);
-            $stats_tgp = StatsFormatter::formatPercentage($stats_tgm, $stats_tga);
+            $stats_tgp = StatsFormatter::formatPercentage($playerStats->seasonThreePointersMade, $playerStats->seasonThreePointersAttempted);
             $stats_mpg = StatsFormatter::formatPerGameAverage($playerStats->seasonMinutes, $playerStats->seasonGamesPlayed);
             $stats_per36Min = StatsFormatter::formatPer36Stat($playerStats->seasonMinutes, $playerStats->seasonMinutes);
             $stats_opg = StatsFormatter::formatPer36Stat($playerStats->seasonOffensiveRebounds, $playerStats->seasonMinutes);

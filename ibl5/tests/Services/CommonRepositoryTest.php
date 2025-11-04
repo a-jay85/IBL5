@@ -152,6 +152,19 @@ class CommonRepositoryTest extends TestCase
         $this->assertNull($result);
     }
 
+    public function testGetTeamDiscordIDEscapesTeamName()
+    {
+        $teamName = "Team's Name";
+        
+        $this->mockDb->setMockData([['discordID' => '123456789']]);
+        $this->mockDb->setNumRows(1);
+        
+        $this->repository->getTeamDiscordID($teamName);
+        
+        $queries = $this->mockDb->getExecutedQueries();
+        $this->assertStringContainsString("Team\\'s Name", $queries[0]);
+    }
+
     // Player lookup tests
     
     public function testGetPlayerByIDReturnsPlayerData()

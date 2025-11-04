@@ -126,18 +126,6 @@ class DraftRepositoryTest extends TestCase
 
     // Tests for getTeamDiscordID have been moved to CommonRepositoryTest
     // as this method now delegates to CommonRepository
-    
-    public function testGetTeamDiscordIDEscapesTeamName()
-    {
-        $this->mockDb->setMockData([
-            ['discordID' => '123456789']
-        ]);
-
-        $this->repository->getTeamDiscordID("Team's Name");
-
-        $queries = $this->mockDb->getExecutedQueries();
-        $this->assertStringContainsString("Team\\'s Name", $queries[0]);
-    }
 
     public function testIsPlayerAlreadyDraftedReturnsTrueWhenDrafted()
     {

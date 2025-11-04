@@ -8,99 +8,60 @@ namespace Waivers;
 class WaiversRepository
 {
     private $db;
+    private $commonRepository;
     
     public function __construct($db)
     {
         $this->db = $db;
+        $this->commonRepository = new \Services\CommonRepository($db);
     }
     
     /**
      * Gets user information by username
      * 
+     * @deprecated Use CommonRepository::getUserByUsername() instead
      * @param string $username Username to look up
      * @return array|null User information or null if not found
      */
     public function getUserByUsername(string $username): ?array
     {
-        $usernameEscaped = \Services\DatabaseService::escapeString($this->db, $username);
-        $query = "SELECT * FROM nuke_users WHERE username = '$usernameEscaped'";
-        $result = $this->db->sql_query($query);
-        
-        if (!$result || $this->db->sql_numrows($result) === 0) {
-            return null;
-        }
-        
-        return $this->db->sql_fetchrow($result);
+        return $this->commonRepository->getUserByUsername($username);
     }
     
     /**
      * Gets team information by team name
      * 
+     * @deprecated Use CommonRepository::getTeamByName() instead
      * @param string $teamName Team name to look up
      * @return array|null Team information or null if not found
      */
     public function getTeamByName(string $teamName): ?array
     {
-        $teamNameEscaped = \Services\DatabaseService::escapeString($this->db, $teamName);
-        $query = "SELECT * FROM ibl_team_info WHERE team_name = '$teamNameEscaped'";
-        $result = $this->db->sql_query($query);
-        
-        if (!$result || $this->db->sql_numrows($result) === 0) {
-            return null;
-        }
-        
-        $row = $this->db->sql_fetchrow($result);
-        return $row;
+        return $this->commonRepository->getTeamByName($teamName);
     }
     
     /**
      * Gets total salary for a team for the current year
      * 
+     * @deprecated Use CommonRepository::getTeamTotalSalary() instead
      * @param string $teamName Team name
      * @return int Total salary in thousands
      */
     public function getTeamTotalSalary(string $teamName): int
     {
-        $teamNameEscaped = \Services\DatabaseService::escapeString($this->db, $teamName);
-        $query = "SELECT * FROM ibl_plr WHERE teamname = '$teamNameEscaped' AND retired = 0";
-        $result = $this->db->sql_query($query);
-        
-        if (!$result) {
-            return 0;
-        }
-        
-        $totalSalary = 0;
-        $numPlayers = $this->db->sql_numrows($result);
-        
-        for ($i = 0; $i < $numPlayers; $i++) {
-            $row = $this->db->sql_fetchrow($result);
-            $cy = (int) $row['cy'];
-            $contractYearField = "cy$cy";
-            if (isset($row[$contractYearField])) {
-                $totalSalary += (int) $row[$contractYearField];
-            }
-        }
-        
-        return $totalSalary;
+        return $this->commonRepository->getTeamTotalSalary($teamName);
     }
     
     /**
      * Gets player information by player ID
      * 
+     * @deprecated Use CommonRepository::getPlayerByID() instead
      * @param int $playerID Player ID
      * @return array|null Player information or null if not found
      */
     public function getPlayerByID(int $playerID): ?array
     {
-        $playerID = (int) $playerID;
-        $query = "SELECT * FROM ibl_plr WHERE pid = $playerID";
-        $result = $this->db->sql_query($query);
-        
-        if (!$result || $this->db->sql_numrows($result) === 0) {
-            return null;
-        }
-        
-        return $this->db->sql_fetchrow($result);
+        return $this->commonRepository->getPlayerByID($playerID);
     }
     
     /**

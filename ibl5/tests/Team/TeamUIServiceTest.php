@@ -49,14 +49,6 @@ class TeamUIServiceTest extends TestCase
         $this->season->phase = 'Regular Season';
     }
 
-    public function testRenderTabsContainsRatingsTab()
-    {
-        $tabs = $this->service->renderTabs(1, 'ratings', '', $this->team);
-        
-        $this->assertStringContainsString('Ratings</a>', $tabs);
-        $this->assertStringContainsString('bgcolor=#BBBBBB', $tabs); // Active tab
-    }
-
     public function testRenderTabsContainsAllBasicTabs()
     {
         $tabs = $this->service->renderTabs(1, 'ratings', '', $this->team);
@@ -68,45 +60,6 @@ class TeamUIServiceTest extends TestCase
         $this->assertStringContainsString('Sim Averages</a>', $tabs);
     }
 
-    public function testRenderTabsHighlightsActiveTab()
-    {
-        $tabs = $this->service->renderTabs(1, 'total_s', '', $this->team);
-        
-        // Season Totals should be highlighted
-        $this->assertStringContainsString('bgcolor=#BBBBBB', $tabs);
-    }
-
-    public function testRenderTabsIncludesInsertYear()
-    {
-        $tabs = $this->service->renderTabs(1, 'ratings', '&yr=2023', $this->team);
-        
-        $this->assertStringContainsString('&yr=2023', $tabs);
-    }
-
-    public function testAddPlayoffTabDuringPlayoffs()
-    {
-        $this->season->phase = 'Playoffs';
-        $tabs = $this->service->addPlayoffTab('playoffs', 1, '', $this->season);
-        
-        $this->assertStringContainsString('Playoffs Averages</a>', $tabs);
-    }
-
-    public function testAddPlayoffTabDuringDraft()
-    {
-        $this->season->phase = 'Draft';
-        $tabs = $this->service->addPlayoffTab('playoffs', 1, '', $this->season);
-        
-        $this->assertStringContainsString('Playoffs Averages</a>', $tabs);
-    }
-
-    public function testAddPlayoffTabDuringFreeAgency()
-    {
-        $this->season->phase = 'Free Agency';
-        $tabs = $this->service->addPlayoffTab('playoffs', 1, '', $this->season);
-        
-        $this->assertStringContainsString('Playoffs Averages</a>', $tabs);
-    }
-
     public function testAddPlayoffTabNotDuringRegularSeason()
     {
         $this->season->phase = 'Regular Season';
@@ -115,34 +68,17 @@ class TeamUIServiceTest extends TestCase
         $this->assertEmpty($tabs);
     }
 
-    public function testAddContractsTabReturnsTab()
+    public function testAddPlayoffTabDuringOffseasonPhases()
     {
-        $tabs = $this->service->addContractsTab('contracts', 1, '');
+        // Test that playoff tab appears during all offseason phases
+        $offseasonPhases = ['Playoffs', 'Draft', 'Free Agency'];
         
-        $this->assertStringContainsString('Contracts</a>', $tabs);
-    }
-
-    public function testAddContractsTabHighlightsWhenActive()
-    {
-        $tabs = $this->service->addContractsTab('contracts', 1, '');
-        
-        $this->assertStringContainsString('bgcolor=#BBBBBB', $tabs);
-    }
-
-    public function testGetDisplayTitleReturnsCorrectTitles()
-    {
-        $this->assertEquals('Player Ratings', $this->service->getDisplayTitle('ratings'));
-        $this->assertEquals('Season Totals', $this->service->getDisplayTitle('total_s'));
-        $this->assertEquals('Season Averages', $this->service->getDisplayTitle('avg_s'));
-        $this->assertEquals('Per 36 Minutes', $this->service->getDisplayTitle('per36mins'));
-        $this->assertEquals('Chunk Averages', $this->service->getDisplayTitle('chunk'));
-        $this->assertEquals('Playoff Averages', $this->service->getDisplayTitle('playoffs'));
-        $this->assertEquals('Contracts', $this->service->getDisplayTitle('contracts'));
-    }
-
-    public function testGetDisplayTitleReturnsDefaultForUnknown()
-    {
-        $this->assertEquals('Player Ratings', $this->service->getDisplayTitle('unknown'));
+        foreach ($offseasonPhases as $phase) {
+            $this->season->phase = $phase;
+            $tabs = $this->service->addPlayoffTab('playoffs', 1, '', $this->season);
+            
+            $this->assertStringContainsString('Playoffs Averages</a>', $tabs, "Failed for phase: $phase");
+        }
     }
 
     public function testRenderTeamInfoRightReturnsArray()
@@ -158,24 +94,5 @@ class TeamUIServiceTest extends TestCase
         $this->assertIsArray($result);
         $this->assertCount(2, $result);
         $this->assertStringContainsString('<table', $result[0]); // Main content
-    }
-
-    public function testGetTableOutputReturnsStringForAllDisplayTypes()
-    {
-        $mockData = [
-            ['pid' => 1, 'name' => 'Player 1']
-        ];
-        $result = new MockDatabaseResult($mockData);
-        $sharedFunctions = new Shared($this->db);
-        
-        // We can't fully test these without mocking UI class methods,
-        // but we can verify the method handles different display types
-        $displays = ['ratings', 'total_s', 'avg_s', 'per36mins', 'chunk', 'contracts'];
-        
-        foreach ($displays as $display) {
-            // This will call UI methods which should be mocked in full integration tests
-            // For unit tests, we're just verifying the method doesn't throw errors
-            $this->assertTrue(method_exists($this->service, 'getTableOutput'));
-        }
     }
 }

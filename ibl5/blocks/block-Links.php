@@ -26,7 +26,7 @@ $content = '
 <ul>
     <li><a href="modules.php?name=Content&pa=showpage&pid=4">Standings</a></li>
     <li><a href="modules.php?name=Schedule">Schedule</a></li>
-    <li><a href="modules.php?name=Team&op=injuries">Injuries</a></li>
+    <li><a href="modules.php?name=Injuries">Injuries</a></li>
     <li><a href="modules.php?name=Team&op=team&tid=0">Waiver Wire</a></li>
     <li><a href="modules.php?name=Player_Search">Player Database</a></li>
     <li><a href="modules.php?name=Draft_Pick_Locator">Draft Pick Locator</a></li>

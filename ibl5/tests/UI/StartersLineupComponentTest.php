@@ -30,12 +30,12 @@ class StartersLineupComponentTest extends TestCase
         $html = $this->component->render($starters, 'FF0000', '0000FF');
         
         // Check structure
-        $this->assertStringContainsString('<table align="center" border=1 cellpadding=1 cellspacing=1>', $html);
+        $this->assertStringContainsString('<table align="center" border="1" cellpadding="1" cellspacing="1">', $html);
         $this->assertStringContainsString('Last Sim\'s Starters', $html);
         
         // Check team colors
-        $this->assertStringContainsString('bgcolor=FF0000', $html);
-        $this->assertStringContainsString('color=0000FF', $html);
+        $this->assertStringContainsString('bgcolor="FF0000"', $html);
+        $this->assertStringContainsString('color="0000FF"', $html);
         
         // Check all positions are rendered
         $this->assertStringContainsString('<b>PG</b>', $html);
@@ -117,7 +117,78 @@ class StartersLineupComponentTest extends TestCase
         // Test with different color scheme
         $html = $this->component->render($starters, '00FF00', 'FFFFFF');
         
-        $this->assertStringContainsString('bgcolor=00FF00', $html);
-        $this->assertStringContainsString('color=FFFFFF', $html);
+        $this->assertStringContainsString('bgcolor="00FF00"', $html);
+        $this->assertStringContainsString('color="FFFFFF"', $html);
+    }
+
+    public function testRenderSanitizesPlayerNames()
+    {
+        $starters = [
+            'PG' => ['name' => 'John <script>alert("XSS")</script> Doe', 'pid' => 1],
+            'SG' => ['name' => 'Jane & Smith', 'pid' => 2],
+            'SF' => ['name' => 'Bob "The Builder" Johnson', 'pid' => 3],
+            'PF' => ['name' => 'Mike Williams', 'pid' => 4],
+            'C' => ['name' => 'Tom Brown', 'pid' => 5]
+        ];
+        
+        $html = $this->component->render($starters, 'FF0000', '0000FF');
+        
+        // Check that dangerous characters are escaped
+        $this->assertStringNotContainsString('<script>', $html);
+        $this->assertStringContainsString('&lt;script&gt;', $html);
+        $this->assertStringContainsString('&amp;', $html);
+        $this->assertStringContainsString('&quot;', $html);
+    }
+
+    public function testRenderSanitizesInvalidColors()
+    {
+        $starters = [
+            'PG' => ['name' => 'Player One', 'pid' => 1],
+            'SG' => ['name' => 'Player Two', 'pid' => 2],
+            'SF' => ['name' => 'Player Three', 'pid' => 3],
+            'PF' => ['name' => 'Player Four', 'pid' => 4],
+            'C' => ['name' => 'Player Five', 'pid' => 5]
+        ];
+        
+        // Test with invalid color values
+        $html = $this->component->render($starters, 'invalid<script>', 'XYZ');
+        
+        // Should use default color for invalid values
+        $this->assertStringContainsString('bgcolor="000000"', $html);
+        $this->assertStringContainsString('color="000000"', $html);
+    }
+
+    public function testRenderAcceptsThreeCharacterHexColors()
+    {
+        $starters = [
+            'PG' => ['name' => 'Player One', 'pid' => 1],
+            'SG' => ['name' => 'Player Two', 'pid' => 2],
+            'SF' => ['name' => 'Player Three', 'pid' => 3],
+            'PF' => ['name' => 'Player Four', 'pid' => 4],
+            'C' => ['name' => 'Player Five', 'pid' => 5]
+        ];
+        
+        // Test with 3-character hex colors
+        $html = $this->component->render($starters, 'F00', 'FFF');
+        
+        $this->assertStringContainsString('bgcolor="F00"', $html);
+        $this->assertStringContainsString('color="FFF"', $html);
+    }
+
+    public function testRenderHandlesColorWithHashPrefix()
+    {
+        $starters = [
+            'PG' => ['name' => 'Player One', 'pid' => 1],
+            'SG' => ['name' => 'Player Two', 'pid' => 2],
+            'SF' => ['name' => 'Player Three', 'pid' => 3],
+            'PF' => ['name' => 'Player Four', 'pid' => 4],
+            'C' => ['name' => 'Player Five', 'pid' => 5]
+        ];
+        
+        // Test with # prefix (should be stripped)
+        $html = $this->component->render($starters, '#00FF00', '#FFFFFF');
+        
+        $this->assertStringContainsString('bgcolor="00FF00"', $html);
+        $this->assertStringContainsString('color="FFFFFF"', $html);
     }
 }

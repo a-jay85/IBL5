@@ -29,8 +29,12 @@ class StartersLineupComponent
     {
         $positions = ['PG', 'SG', 'SF', 'PF', 'C'];
         
-        $headerRow = "<tr bgcolor=$color1>
-            <td colspan=5><font color=$color2><center><b>Last Sim's Starters</b></center></font></td>
+        // Sanitize color values to prevent HTML injection
+        $color1 = $this->sanitizeColor($color1);
+        $color2 = $this->sanitizeColor($color2);
+        
+        $headerRow = "<tr bgcolor=\"$color1\">
+            <td colspan=\"5\"><font color=\"$color2\"><center><b>Last Sim's Starters</b></center></font></td>
         </tr>";
         
         $starterRow = "<tr>";
@@ -42,7 +46,7 @@ class StartersLineupComponent
         }
         $starterRow .= "</tr>";
         
-        return "<table align=\"center\" border=1 cellpadding=1 cellspacing=1>
+        return "<table align=\"center\" border=\"1\" cellpadding=\"1\" cellspacing=\"1\">
             $headerRow
             $starterRow
         </table>";
@@ -58,9 +62,34 @@ class StartersLineupComponent
      */
     private function renderPlayerCell(string $position, string $name, $pid): string
     {
+        // Sanitize all output to prevent XSS
+        $position = htmlspecialchars($position, ENT_QUOTES, 'UTF-8');
+        $name = htmlspecialchars($name, ENT_QUOTES, 'UTF-8');
+        $pid = htmlspecialchars((string)$pid, ENT_QUOTES, 'UTF-8');
+        
         return "<td><center><b>$position</b><br>" .
                "<img src=\"./images/player/$pid.jpg\" height=\"90\" width=\"65\"><br>" .
                "<a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a>" .
                "</td>";
+    }
+    
+    /**
+     * Sanitize color value to prevent HTML injection
+     * 
+     * @param string $color Hex color value (with or without #)
+     * @return string Sanitized hex color value without #
+     */
+    private function sanitizeColor(string $color): string
+    {
+        // Remove # if present
+        $color = ltrim($color, '#');
+        
+        // Validate hex color format (3 or 6 characters)
+        if (preg_match('/^[0-9A-Fa-f]{3}$|^[0-9A-Fa-f]{6}$/', $color)) {
+            return $color;
+        }
+        
+        // Return safe default if invalid
+        return '000000';
     }
 }

@@ -75,7 +75,7 @@ class TeamUIServiceTest extends TestCase
         
         foreach ($offseasonPhases as $phase) {
             $this->season->phase = $phase;
-            $tabs = $this->service->addPlayoffTab('playoffs', 1, '', $this->season);
+            $tabs = $this->service->renderTabs(1, 'playoffs', '', $this->season);
             
             $this->assertStringContainsString('Playoffs Averages</a>', $tabs, "Failed for phase: $phase");
         }

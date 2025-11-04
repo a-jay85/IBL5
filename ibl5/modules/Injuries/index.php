@@ -43,7 +43,7 @@ foreach ($league->getInjuredPlayersResult() as $injuredPlayer) {
         <td>$player->position</td>
         <td><a href=\"./modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->name</a></td>
         <td bgcolor=\"#$team->color1\">
-            <font color=\"#$team->color2\"><a href=\"./modules.php?name=Team&op=team&teamID=$player->teamID\">$team->city $player->teamName</a></font>
+            <font color=\"#$team->color2\"><a href=\"./modules.php?name=Team&op=team&teamID=$player->teamID\">$team->city $team->name</a></font>
         </td>
         <td>$player->daysRemainingForInjury</td>
     </tr>";

@@ -30,5 +30,8 @@
         <testsuite name="Draft Module Tests">
             <directory>tests/Draft</directory>
         </testsuite>
+        <testsuite name="UI Component Tests">
+            <directory>tests/UI</directory>
+        </testsuite>
     </testsuites>
 </phpunit>

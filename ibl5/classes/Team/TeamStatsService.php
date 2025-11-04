@@ -2,7 +2,6 @@
 
 namespace Team;
 
-use Player\Player;
 use UI\Components\StartersLineupComponent;
 
 /**

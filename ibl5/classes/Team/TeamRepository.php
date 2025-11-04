@@ -64,9 +64,11 @@ class TeamRepository
 
     /**
      * Get GM history for a team
+     * Format: "OwnerName (TeamName)" - matches ibl_gm_history table format
      */
     public function getGMHistory($ownerName, $teamName)
     {
+        // The GM history table stores records in format: "Owner Name (Team Name)"
         $ownerAwardCode = $this->db->sql_escape_string($ownerName . " (" . $teamName . ")");
         $query = "SELECT * FROM ibl_gm_history WHERE name LIKE '$ownerAwardCode' ORDER BY year ASC";
         return $this->db->sql_query($query);

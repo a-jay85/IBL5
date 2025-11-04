@@ -28,6 +28,7 @@ class TeamStatsService
         $num = $this->db->sql_numrows($result);
         $i = 0;
         
+        // Initialize starters - will be null if position not found
         $startingPG = $startingPGpid = null;
         $startingSG = $startingSGpid = null;
         $startingSF = $startingSFpid = null;
@@ -58,6 +59,8 @@ class TeamStatsService
             $i++;
         }
 
+        // Note: NULL values for starter names/pids will render empty in HTML but structure is preserved
+        // This matches original behavior where missing starters would show empty cells
         $starters_table = "<table align=\"center\" border=1 cellpadding=1 cellspacing=1>
             <tr bgcolor=$team->color1>
                 <td colspan=5><font color=$team->color2><center><b>Last Sim's Starters</b></center></font></td>

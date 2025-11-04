@@ -20,7 +20,7 @@ class TeamRepository
     /**
      * Get team power rankings data
      */
-    public function getTeamPowerData($teamName)
+    public function getTeamPowerData(string $teamName): ?array
     {
         $teamName = $this->db->sql_escape_string($teamName);
         $query = "SELECT * FROM ibl_power WHERE Team = '$teamName'";
@@ -35,7 +35,7 @@ class TeamRepository
     /**
      * Get division standings for a specific division
      */
-    public function getDivisionStandings($division)
+    public function getDivisionStandings(string $division)
     {
         $division = $this->db->sql_escape_string($division);
         $query = "SELECT * FROM ibl_power WHERE Division = '$division' ORDER BY gb DESC";
@@ -45,7 +45,7 @@ class TeamRepository
     /**
      * Get conference standings for a specific conference
      */
-    public function getConferenceStandings($conference)
+    public function getConferenceStandings(string $conference)
     {
         $conference = $this->db->sql_escape_string($conference);
         $query = "SELECT * FROM ibl_power WHERE Conference = '$conference' ORDER BY gb DESC";
@@ -55,7 +55,7 @@ class TeamRepository
     /**
      * Get championship banners for a team
      */
-    public function getChampionshipBanners($teamName)
+    public function getChampionshipBanners(string $teamName)
     {
         $teamName = $this->db->sql_escape_string($teamName);
         $query = "SELECT * FROM ibl_banners WHERE currentname = '$teamName' ORDER BY year ASC";
@@ -66,7 +66,7 @@ class TeamRepository
      * Get GM history for a team
      * Format: "OwnerName (TeamName)" - matches ibl_gm_history table format
      */
-    public function getGMHistory($ownerName, $teamName)
+    public function getGMHistory(string $ownerName, string $teamName)
     {
         // The GM history table stores records in format: "Owner Name (Team Name)"
         $ownerAwardCode = $this->db->sql_escape_string($ownerName . " (" . $teamName . ")");
@@ -77,7 +77,7 @@ class TeamRepository
     /**
      * Get team accomplishments/awards
      */
-    public function getTeamAccomplishments($teamName)
+    public function getTeamAccomplishments(string $teamName)
     {
         $teamName = $this->db->sql_escape_string($teamName);
         $query = "SELECT * FROM ibl_team_awards WHERE name LIKE '$teamName' ORDER BY year DESC";
@@ -87,7 +87,7 @@ class TeamRepository
     /**
      * Get regular season win/loss history
      */
-    public function getRegularSeasonHistory($teamName)
+    public function getRegularSeasonHistory(string $teamName)
     {
         $teamName = $this->db->sql_escape_string($teamName);
         $query = "SELECT * FROM ibl_team_win_loss WHERE currentname = '$teamName' ORDER BY year DESC";
@@ -97,7 +97,7 @@ class TeamRepository
     /**
      * Get HEAT tournament history
      */
-    public function getHEATHistory($teamName)
+    public function getHEATHistory(string $teamName)
     {
         $teamName = $this->db->sql_escape_string($teamName);
         $query = "SELECT * FROM ibl_heat_win_loss WHERE currentname = '$teamName' ORDER BY year DESC";
@@ -116,7 +116,7 @@ class TeamRepository
     /**
      * Get team roster for free agency (players whose contract year doesn't match current year)
      */
-    public function getFreeAgencyRoster($teamID)
+    public function getFreeAgencyRoster(int $teamID)
     {
         $teamID = (int) $teamID;
         $query = "SELECT * 
@@ -131,7 +131,7 @@ class TeamRepository
     /**
      * Get team roster under contract
      */
-    public function getRosterUnderContract($teamID)
+    public function getRosterUnderContract(int $teamID)
     {
         $teamID = (int) $teamID;
         $query = "SELECT * 
@@ -145,7 +145,7 @@ class TeamRepository
     /**
      * Get free agents (team 0, players with ordinal > 959)
      */
-    public function getFreeAgents($includeFreeAgencyActive = false)
+    public function getFreeAgents(bool $includeFreeAgencyActive = false)
     {
         if ($includeFreeAgencyActive) {
             $query = "SELECT * FROM ibl_plr WHERE ordinal > '959' AND retired = 0 AND cyt != cy ORDER BY ordinal ASC";
@@ -167,7 +167,7 @@ class TeamRepository
     /**
      * Get historical roster for a specific year
      */
-    public function getHistoricalRoster($teamID, $year)
+    public function getHistoricalRoster(int $teamID, string $year)
     {
         $teamID = (int) $teamID;
         $year = $this->db->sql_escape_string($year);

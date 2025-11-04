@@ -250,8 +250,9 @@ class TeamRepositoryTest extends TestCase
     {
         $this->db->setMockData([]);
         
-        // Should not throw exception even with string input
-        $result = $this->repository->getRosterUnderContract("1; DROP TABLE ibl_plr;");
+        // With type hints, integer type is enforced at the method signature level
+        // This test verifies that valid integer inputs work correctly
+        $result = $this->repository->getRosterUnderContract(1);
         
         $this->assertNotNull($result);
     }

@@ -23,7 +23,7 @@ class TeamUIService
      * Render team info right sidebar
      * Returns array with [main content, rafters/banners]
      */
-    public function renderTeamInfoRight($team)
+    public function renderTeamInfoRight($team): array
     {
         $output = "<table bgcolor=#eeeeee width=220>";
 
@@ -43,7 +43,7 @@ class TeamUIService
     /**
      * Render tab navigation for team displays
      */
-    public function renderTabs($teamID, $display, $insertyear, $team)
+    public function renderTabs(int $teamID, string $display, string $insertyear, $team): string
     {
         $tabs = "";
         
@@ -93,7 +93,7 @@ class TeamUIService
     /**
      * Add playoff tab if in playoff/draft/free agency phase
      */
-    public function addPlayoffTab($display, $teamID, $insertyear, $season)
+    public function addPlayoffTab(string $display, int $teamID, string $insertyear, $season): string
     {
         $tabs = "";
         
@@ -116,7 +116,7 @@ class TeamUIService
     /**
      * Add contracts tab
      */
-    public function addContractsTab($display, $teamID, $insertyear)
+    public function addContractsTab(string $display, int $teamID, string $insertyear): string
     {
         $tabs = "";
         
@@ -133,7 +133,7 @@ class TeamUIService
     /**
      * Get the display title based on the current display type
      */
-    public function getDisplayTitle($display)
+    public function getDisplayTitle(string $display): string
     {
         $titles = [
             'ratings' => 'Player Ratings',
@@ -151,7 +151,7 @@ class TeamUIService
     /**
      * Get the table output based on display type
      */
-    public function getTableOutput($display, $db, $result, $team, $yr, $season, $sharedFunctions)
+    public function getTableOutput(string $display, $db, $result, $team, ?string $yr, $season, $sharedFunctions): string
     {
         switch ($display) {
             case 'ratings':

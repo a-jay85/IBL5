@@ -28,7 +28,7 @@ class TeamController
     /**
      * Display team page with roster and stats
      */
-    public function displayTeamPage($teamID)
+    public function displayTeamPage(int $teamID): void
     {
         $teamID = (int) $teamID;
         
@@ -138,7 +138,7 @@ class TeamController
     /**
      * Display injuries page
      */
-    public function displayInjuries($teamID)
+    public function displayInjuries(int $teamID): void
     {
         $teamID = (int) $teamID;
         $league = new \League($this->db);
@@ -188,7 +188,7 @@ class TeamController
     /**
      * Display draft history page
      */
-    public function displayDraftHistory($teamID)
+    public function displayDraftHistory(int $teamID): void
     {
         $teamID = (int) $teamID;
 
@@ -236,7 +236,7 @@ class TeamController
     /**
      * Display main menu
      */
-    public function displayMenu()
+    public function displayMenu(): void
     {
         \Nuke\Header::header();
         OpenTable();

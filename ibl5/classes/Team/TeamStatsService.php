@@ -23,7 +23,7 @@ class TeamStatsService
      * Get last sim's starting lineup for a team
      * Returns HTML table with starting 5 players
      */
-    public function getLastSimsStarters($result, $team)
+    public function getLastSimsStarters($result, $team): string
     {
         $num = $this->db->sql_numrows($result);
         $i = 0;

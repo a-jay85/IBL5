@@ -2,6 +2,8 @@
 
 namespace Team;
 
+use Services\DatabaseService;
+
 /**
  * TeamRepository - Handles all database operations related to teams
  * 
@@ -22,7 +24,7 @@ class TeamRepository
      */
     public function getTeamPowerData(string $teamName): ?array
     {
-        $teamName = $this->db->sql_escape_string($teamName);
+        $teamName = DatabaseService::escapeString($this->db, $teamName);
         $query = "SELECT * FROM ibl_power WHERE Team = '$teamName'";
         $result = $this->db->sql_query($query);
         
@@ -37,7 +39,7 @@ class TeamRepository
      */
     public function getDivisionStandings(string $division)
     {
-        $division = $this->db->sql_escape_string($division);
+        $division = DatabaseService::escapeString($this->db, $division);
         $query = "SELECT * FROM ibl_power WHERE Division = '$division' ORDER BY gb DESC";
         return $this->db->sql_query($query);
     }
@@ -47,7 +49,7 @@ class TeamRepository
      */
     public function getConferenceStandings(string $conference)
     {
-        $conference = $this->db->sql_escape_string($conference);
+        $conference = DatabaseService::escapeString($this->db, $conference);
         $query = "SELECT * FROM ibl_power WHERE Conference = '$conference' ORDER BY gb DESC";
         return $this->db->sql_query($query);
     }
@@ -57,7 +59,7 @@ class TeamRepository
      */
     public function getChampionshipBanners(string $teamName)
     {
-        $teamName = $this->db->sql_escape_string($teamName);
+        $teamName = DatabaseService::escapeString($this->db, $teamName);
         $query = "SELECT * FROM ibl_banners WHERE currentname = '$teamName' ORDER BY year ASC";
         return $this->db->sql_query($query);
     }
@@ -69,7 +71,7 @@ class TeamRepository
     public function getGMHistory(string $ownerName, string $teamName)
     {
         // The GM history table stores records in format: "Owner Name (Team Name)"
-        $ownerAwardCode = $this->db->sql_escape_string($ownerName . " (" . $teamName . ")");
+        $ownerAwardCode = DatabaseService::escapeString($this->db, $ownerName . " (" . $teamName . ")");
         $query = "SELECT * FROM ibl_gm_history WHERE name LIKE '$ownerAwardCode' ORDER BY year ASC";
         return $this->db->sql_query($query);
     }
@@ -79,7 +81,7 @@ class TeamRepository
      */
     public function getTeamAccomplishments(string $teamName)
     {
-        $teamName = $this->db->sql_escape_string($teamName);
+        $teamName = DatabaseService::escapeString($this->db, $teamName);
         $query = "SELECT * FROM ibl_team_awards WHERE name LIKE '$teamName' ORDER BY year DESC";
         return $this->db->sql_query($query);
     }
@@ -89,7 +91,7 @@ class TeamRepository
      */
     public function getRegularSeasonHistory(string $teamName)
     {
-        $teamName = $this->db->sql_escape_string($teamName);
+        $teamName = DatabaseService::escapeString($this->db, $teamName);
         $query = "SELECT * FROM ibl_team_win_loss WHERE currentname = '$teamName' ORDER BY year DESC";
         return $this->db->sql_query($query);
     }
@@ -99,7 +101,7 @@ class TeamRepository
      */
     public function getHEATHistory(string $teamName)
     {
-        $teamName = $this->db->sql_escape_string($teamName);
+        $teamName = DatabaseService::escapeString($this->db, $teamName);
         $query = "SELECT * FROM ibl_heat_win_loss WHERE currentname = '$teamName' ORDER BY year DESC";
         return $this->db->sql_query($query);
     }
@@ -170,7 +172,7 @@ class TeamRepository
     public function getHistoricalRoster(int $teamID, string $year)
     {
         $teamID = (int) $teamID;
-        $year = $this->db->sql_escape_string($year);
+        $year = DatabaseService::escapeString($this->db, $year);
         $query = "SELECT * FROM ibl_hist WHERE teamid = '$teamID' AND year = '$year' ORDER BY name ASC";
         return $this->db->sql_query($query);
     }

@@ -179,7 +179,7 @@ while ($i < $num) {
     }
 
     $nameholder = $name;
-    $lastPlayerIteratedOn = $name;
+    $lastPlayerIteratedOn = $playerData->name;
     $i++;
 }
 

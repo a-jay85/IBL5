@@ -17,31 +17,6 @@ get_lang($module_name);
 
 $pagetitle = "- Free Agency System";
 
-// Helper function to create Player from PlayerRepository row
-function createPlayerFromRow($db, $playerRow) {
-    $playerRepository = new PlayerRepository($db);
-    $playerData = $playerRepository->fillFromCurrentRow($playerRow);
-    
-    $player = new Player();
-    $reflectionProperty = new \ReflectionProperty(Player::class, 'playerData');
-    $reflectionProperty->setAccessible(true);
-    $reflectionProperty->setValue($player, $playerData);
-    
-    $reflectionDb = new \ReflectionProperty(Player::class, 'db');
-    $reflectionDb->setAccessible(true);
-    $reflectionDb->setValue($player, $db);
-    
-    $reflectionRepo = new \ReflectionProperty(Player::class, 'repository');
-    $reflectionRepo->setAccessible(true);
-    $reflectionRepo->setValue($player, $playerRepository);
-    
-    $syncMethod = new \ReflectionMethod(Player::class, 'syncPropertiesFromPlayerData');
-    $syncMethod->setAccessible(true);
-    $syncMethod->invoke($player);
-    
-    return $player;
-}
-
 function main($user)
 {
     global $stop;
@@ -145,7 +120,7 @@ function display()
 
 
     foreach ($team->getRosterUnderContractOrderedByOrdinalResult() as $playerRow) {
-        $player = createPlayerFromRow($db, $playerRow);
+        $player = Player::fromPlayerData($db, (new PlayerRepository($db))->fillFromCurrentRow($playerRow));
 
         $yearPlayerIsFreeAgent = $player->draftYear + $player->yearsOfExperience + $player->contractTotalYears - $player->contractCurrentYear;
         if ($yearPlayerIsFreeAgent != $season->endingYear) {
@@ -596,7 +571,7 @@ function display()
 		<tbody>";
 
     foreach ($team->getRosterUnderContractOrderedByOrdinalResult() as $playerRow) {
-        $player = createPlayerFromRow($db, $playerRow);
+        $player = Player::fromPlayerData($db, (new PlayerRepository($db))->fillFromCurrentRow($playerRow));
 
         $yearPlayerIsFreeAgent = $player->draftYear + $player->yearsOfExperience + $player->contractTotalYears - $player->contractCurrentYear;
         if ($yearPlayerIsFreeAgent == $season->endingYear) {
@@ -734,7 +709,7 @@ function display()
 
     $resultFreeAgentsNotOnUserTeam = $db->sql_query("SELECT * FROM ibl_plr WHERE teamname!='$team->name' AND retired='0' ORDER BY ordinal ASC");
     foreach ($resultFreeAgentsNotOnUserTeam as $playerRow) {
-        $player = createPlayerFromRow($db, $playerRow);
+        $player = Player::fromPlayerData($db, (new PlayerRepository($db))->fillFromCurrentRow($playerRow));
 
         $yearPlayerIsFreeAgent = $player->draftYear + $player->yearsOfExperience + $player->contractTotalYears - $player->contractCurrentYear;
         if ($yearPlayerIsFreeAgent == $season->endingYear) {

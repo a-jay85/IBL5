@@ -18,32 +18,11 @@ $pagetitle = "- $module_name";
 $username = $cookie[1];
 $userTeam = Team::initialize($db, $sharedFunctions->getTeamnameFromUsername($username));
 
-// Helper function to create Player from PlayerRepository
-$createPlayerFromID = function($db, $playerID) {
-    $playerRepository = new PlayerRepository($db);
-    $playerData = $playerRepository->loadByID($playerID);
-    
-    $player = new Player();
-    $reflectionProperty = new \ReflectionProperty(Player::class, 'playerData');
-    $reflectionProperty->setAccessible(true);
-    $reflectionProperty->setValue($player, $playerData);
-    
-    $reflectionDb = new \ReflectionProperty(Player::class, 'db');
-    $reflectionDb->setAccessible(true);
-    $reflectionDb->setValue($player, $db);
-    
-    $syncMethod = new \ReflectionMethod(Player::class, 'syncPropertiesFromPlayerData');
-    $syncMethod->setAccessible(true);
-    $syncMethod->invoke($player);
-    
-    return $player;
-};
-
-$userStartingPG = $createPlayerFromID($db, $userTeam->getCurrentlySetStarterPlayerIDForPosition('PG') ?? 4040404);
-$userStartingSG = $createPlayerFromID($db, $userTeam->getCurrentlySetStarterPlayerIDForPosition('SG') ?? 4040404);
-$userStartingSF = $createPlayerFromID($db, $userTeam->getCurrentlySetStarterPlayerIDForPosition('SF') ?? 4040404);
-$userStartingPF = $createPlayerFromID($db, $userTeam->getCurrentlySetStarterPlayerIDForPosition('PF') ?? 4040404);
-$userStartingC = $createPlayerFromID($db, $userTeam->getCurrentlySetStarterPlayerIDForPosition('C') ?? 4040404);
+$userStartingPG = Player::fromPlayerData($db, (new PlayerRepository($db))->loadByID($userTeam->getCurrentlySetStarterPlayerIDForPosition('PG') ?? 4040404));
+$userStartingSG = Player::fromPlayerData($db, (new PlayerRepository($db))->loadByID($userTeam->getCurrentlySetStarterPlayerIDForPosition('SG') ?? 4040404));
+$userStartingSF = Player::fromPlayerData($db, (new PlayerRepository($db))->loadByID($userTeam->getCurrentlySetStarterPlayerIDForPosition('SF') ?? 4040404));
+$userStartingPF = Player::fromPlayerData($db, (new PlayerRepository($db))->loadByID($userTeam->getCurrentlySetStarterPlayerIDForPosition('PF') ?? 4040404));
+$userStartingC = Player::fromPlayerData($db, (new PlayerRepository($db))->loadByID($userTeam->getCurrentlySetStarterPlayerIDForPosition('C') ?? 4040404));
 
 $resultUserTeamProjectedGamesNextSim = Schedule\TeamSchedule::getProjectedGamesNextSimResult($db, $userTeam->teamID, $season->lastSimEndDate);
 $lastSimEndDateObject = new DateTime($season->lastSimEndDate);
@@ -54,15 +33,15 @@ foreach ($resultUserTeamProjectedGamesNextSim as $gameRow) {
     $rows[$i]['date'] = new DateTime($rows[$i]['game']->date);
     $rows[$i]['day'] = $rows[$i]['date']->diff($lastSimEndDateObject)->format("%a");
     $rows[$i]['opposingTeam'] = Team::initialize($db, $rows[$i]['game']->getOpposingTeamID($userTeam->teamID));
-    $rows[$i]['opposingStartingPG'] = $createPlayerFromID($db, $rows[$i]['opposingTeam']->getLastSimStarterPlayerIDForPosition('PG') ?? 4040404);
+    $rows[$i]['opposingStartingPG'] = Player::fromPlayerData($db, (new PlayerRepository($db))->loadByID($rows[$i]['opposingTeam']->getLastSimStarterPlayerIDForPosition('PG') ?? 4040404));
     $rows[$i]['userStartingPG'] = $userStartingPG ?? 4040404;
-    $rows[$i]['opposingStartingSG'] = $createPlayerFromID($db, $rows[$i]['opposingTeam']->getLastSimStarterPlayerIDForPosition('SG') ?? 4040404);
+    $rows[$i]['opposingStartingSG'] = Player::fromPlayerData($db, (new PlayerRepository($db))->loadByID($rows[$i]['opposingTeam']->getLastSimStarterPlayerIDForPosition('SG') ?? 4040404));
     $rows[$i]['userStartingSG'] = $userStartingSG ?? 4040404;
-    $rows[$i]['opposingStartingSF'] = $createPlayerFromID($db, $rows[$i]['opposingTeam']->getLastSimStarterPlayerIDForPosition('SF') ?? 4040404);
+    $rows[$i]['opposingStartingSF'] = Player::fromPlayerData($db, (new PlayerRepository($db))->loadByID($rows[$i]['opposingTeam']->getLastSimStarterPlayerIDForPosition('SF') ?? 4040404));
     $rows[$i]['userStartingSF'] = $userStartingSF ?? 4040404;
-    $rows[$i]['opposingStartingPF'] = $createPlayerFromID($db, $rows[$i]['opposingTeam']->getLastSimStarterPlayerIDForPosition('PF') ?? 4040404);
+    $rows[$i]['opposingStartingPF'] = Player::fromPlayerData($db, (new PlayerRepository($db))->loadByID($rows[$i]['opposingTeam']->getLastSimStarterPlayerIDForPosition('PF') ?? 4040404));
     $rows[$i]['userStartingPF'] = $userStartingPF ?? 4040404;
-    $rows[$i]['opposingStartingC'] = $createPlayerFromID($db, $rows[$i]['opposingTeam']->getLastSimStarterPlayerIDForPosition('C') ?? 4040404);
+    $rows[$i]['opposingStartingC'] = Player::fromPlayerData($db, (new PlayerRepository($db))->loadByID($rows[$i]['opposingTeam']->getLastSimStarterPlayerIDForPosition('C') ?? 4040404));
     $rows[$i]['userStartingC'] = $userStartingC ?? 4040404;
 
     $i++;

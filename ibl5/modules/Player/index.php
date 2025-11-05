@@ -18,23 +18,10 @@ function showpage($playerID, $pageView)
     $sharedFunctions = new Shared($db);
     $season = new Season($db);
     
-    // Load player using PlayerRepository
+    // Load player using PlayerRepository and Player::fromPlayerData helper
     $playerRepository = new PlayerRepository($db);
     $playerData = $playerRepository->loadByID($playerID);
-    
-    // Wrap PlayerData in Player for backward compatibility with methods
-    $player = new Player();
-    $reflectionProperty = new \ReflectionProperty(Player::class, 'playerData');
-    $reflectionProperty->setAccessible(true);
-    $reflectionProperty->setValue($player, $playerData);
-    
-    $reflectionDb = new \ReflectionProperty(Player::class, 'db');
-    $reflectionDb->setAccessible(true);
-    $reflectionDb->setValue($player, $db);
-    
-    $syncMethod = new \ReflectionMethod(Player::class, 'syncPropertiesFromPlayerData');
-    $syncMethod->setAccessible(true);
-    $syncMethod->invoke($player);
+    $player = Player::fromPlayerData($db, $playerData);
     
     $playerStats = PlayerStats::withPlayerID($db, $playerID);
     $pageView = ($pageView !== null) ? intval($pageView) : null;
@@ -714,23 +701,10 @@ function rookieoption($pid)
     $sharedFunctions = new Shared($db);
     $season = new Season($db);
     
-    // Load player using PlayerRepository
+    // Load player using PlayerRepository and Player::fromPlayerData helper
     $playerRepository = new PlayerRepository($db);
     $playerData = $playerRepository->loadByID($pid);
-    
-    // Wrap PlayerData in Player for backward compatibility with methods
-    $player = new Player();
-    $reflectionProperty = new \ReflectionProperty(Player::class, 'playerData');
-    $reflectionProperty->setAccessible(true);
-    $reflectionProperty->setValue($player, $playerData);
-    
-    $reflectionDb = new \ReflectionProperty(Player::class, 'db');
-    $reflectionDb->setAccessible(true);
-    $reflectionDb->setValue($player, $db);
-    
-    $syncMethod = new \ReflectionMethod(Player::class, 'syncPropertiesFromPlayerData');
-    $syncMethod->setAccessible(true);
-    $syncMethod->invoke($player);
+    $player = Player::fromPlayerData($db, $playerData);
 
     $userteam = $sharedFunctions->getTeamnameFromUsername($cookie[1]);
     $userTeamID = $sharedFunctions->getTidFromTeamname($userteam);

@@ -277,18 +277,7 @@ class ExtensionProcessor
             try {
                 $repository = new PlayerRepository($this->db);
                 $playerData = $repository->loadByID((int)$playerID);
-                
-                // Wrap PlayerData in Player for backward compatibility
-                $player = new Player();
-                $reflectionProperty = new \ReflectionProperty(Player::class, 'playerData');
-                $reflectionProperty->setAccessible(true);
-                $reflectionProperty->setValue($player, $playerData);
-                
-                $syncMethod = new \ReflectionMethod(Player::class, 'syncPropertiesFromPlayerData');
-                $syncMethod->setAccessible(true);
-                $syncMethod->invoke($player);
-                
-                return $player;
+                return Player::fromPlayerData($this->db, $playerData);
             } catch (\Exception $e) {
                 return null;
             }

@@ -67,19 +67,10 @@ try {
         
         echo "  Using player: $playerName ($playerPosition) on $teamName\n";
         
-        // Create Player and Team objects
+        // Create Player and Team objects using Player::fromPlayerData helper
         $playerRepository = new PlayerRepository($db);
         $playerData = $playerRepository->loadByID($playerID);
-        
-        // Wrap PlayerData in Player for this test
-        $player = new Player();
-        $reflectionProperty = new \ReflectionProperty(Player::class, 'playerData');
-        $reflectionProperty->setAccessible(true);
-        $reflectionProperty->setValue($player, $playerData);
-        
-        $syncMethod = new \ReflectionMethod(Player::class, 'syncPropertiesFromPlayerData');
-        $syncMethod->setAccessible(true);
-        $syncMethod->invoke($player);
+        $player = Player::fromPlayerData($db, $playerData);
         
         $team = Team::initialize($db, $teamName);
         echo "  ✓ Player and Team objects created successfully\n";

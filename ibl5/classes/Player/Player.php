@@ -106,6 +106,40 @@ class Player
     }
 
     /**
+     * Create a Player instance from PlayerData using reflection (internal use)
+     * 
+     * This is a temporary helper method for migration purposes. It constructs a Player
+     * object from PlayerData when Player methods are still needed. Eventually, code should
+     * be refactored to work directly with PlayerData and specialized classes.
+     * 
+     * @param mixed $db Database connection
+     * @param PlayerData $playerData PlayerData instance
+     * @return Player
+     */
+    public static function fromPlayerData($db, PlayerData $playerData)
+    {
+        $player = new self();
+        
+        $reflectionProperty = new \ReflectionProperty(self::class, 'playerData');
+        $reflectionProperty->setAccessible(true);
+        $reflectionProperty->setValue($player, $playerData);
+        
+        $reflectionDb = new \ReflectionProperty(self::class, 'db');
+        $reflectionDb->setAccessible(true);
+        $reflectionDb->setValue($player, $db);
+        
+        $reflectionRepo = new \ReflectionProperty(self::class, 'repository');
+        $reflectionRepo->setAccessible(true);
+        $reflectionRepo->setValue($player, new PlayerRepository($db));
+        
+        $syncMethod = new \ReflectionMethod(self::class, 'syncPropertiesFromPlayerData');
+        $syncMethod->setAccessible(true);
+        $syncMethod->invoke($player);
+        
+        return $player;
+    }
+
+    /**
      * Factory method to create Player from player ID
      * 
      * @deprecated This facade method is deprecated. Use PlayerRepository::loadByID() instead:

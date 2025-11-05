@@ -182,7 +182,7 @@ class StandingsUpdaterTest extends TestCase
         $this->mockDb->setReturnTrue(true);
 
         // Create a StandingsUpdater with extractStandingsValues stubbed to do nothing
-        $this->standingsUpdater = new class($this->mockDb, $this->mockSharedFunctions) extends \Updater\StandingsUpdater {
+        $this->standingsUpdater = new class($this->mockDb, $this->mockCommonRepository) extends \Updater\StandingsUpdater {
             protected function extractStandingsValues() {
                 // Do nothing
             }

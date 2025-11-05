@@ -177,6 +177,11 @@ class ScheduleUpdaterTest extends TestCase
     public function testTeamIDResolutionUsesMockSharedFunctions()
     {
         $teamName = 'Boston Celtics';
+        
+        // Set up mock data for the team ID query
+        $this->mockDb->setMockData([['teamid' => 2]]);
+        $this->mockDb->setNumRows(1);
+        
         $teamID = $this->mockCommonRepository->getTidFromTeamname($teamName);
         
         $this->assertIsInt($teamID);

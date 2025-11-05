@@ -1,6 +1,7 @@
 <?php
 
 use Player\Player;
+use Player\PlayerRepository;
 
 if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
     die("You can't access this file directly...");
@@ -34,18 +35,19 @@ echo "<center><h2>INJURED PLAYERS</h2></center>
 
 $i = 0;
 foreach ($league->getInjuredPlayersResult() as $injuredPlayer) {
-    $player = Player::withPlrRow($db, $injuredPlayer);
-    $team = Team::initialize($db, $player->teamID);
+    $playerRepository = new PlayerRepository($db);
+    $playerData = $playerRepository->fillFromCurrentRow($injuredPlayer);
+    $team = Team::initialize($db, $playerData->teamID);
 
     (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "DDDDDD";
 
     echo "<tr bgcolor=$bgcolor>
-        <td>$player->position</td>
-        <td><a href=\"./modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->name</a></td>
+        <td>$playerData->position</td>
+        <td><a href=\"./modules.php?name=Player&pa=showpage&pid=$playerData->playerID\">$playerData->name</a></td>
         <td bgcolor=\"#$team->color1\">
-            <font color=\"#$team->color2\"><a href=\"./modules.php?name=Team&op=team&teamID=$player->teamID\">$team->city $team->name</a></font>
+            <font color=\"#$team->color2\"><a href=\"./modules.php?name=Team&op=team&teamID=$playerData->teamID\">$team->city $team->name</a></font>
         </td>
-        <td>$player->daysRemainingForInjury</td>
+        <td>$playerData->daysRemainingForInjury</td>
     </tr>";
 
     $i++;

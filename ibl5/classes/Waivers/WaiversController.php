@@ -3,6 +3,7 @@
 namespace Waivers;
 
 use Player\Player;
+use Player\PlayerRepository;
 
 /**
  * Main controller for waiver wire operations
@@ -303,17 +304,18 @@ class WaiversController
         }
         
         while ($playerRow = $this->db->sql_fetchrow($result)) {
-            $player = Player::withPlrRow($this->db, $playerRow);
+            $playerRepository = new PlayerRepository($this->db);
+            $playerData = $playerRepository->fillFromCurrentRow($playerRow);
             $contract = $this->processor->getPlayerContractDisplay($playerRow);
             $waitTime = '';
             
-            if ($action === 'add' && $player->timeDroppedOnWaivers > 0) {
-                $waitTime = $this->processor->getWaiverWaitTime($player->timeDroppedOnWaivers, $timeNow);
+            if ($action === 'add' && $playerData->timeDroppedOnWaivers > 0) {
+                $waitTime = $this->processor->getWaiverWaitTime($playerData->timeDroppedOnWaivers, $timeNow);
             }
             
             $players[] = $this->view->buildPlayerOption(
-                $player->playerID,
-                $player->name,
+                $playerData->playerID,
+                $playerData->name,
                 $contract,
                 $waitTime
             );

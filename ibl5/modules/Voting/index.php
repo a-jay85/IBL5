@@ -2,6 +2,7 @@
 <?php
 
 use Player\Player;
+use Player\PlayerRepository;
 
 /************************************************************************/
 /* PHP-NUKE: Web Portal System                                          */
@@ -127,9 +128,10 @@ function userinfo($username)
         $i = 0;
         while ($row = $db->sql_fetch_assoc($result)) {
             if ($votingCategory != "GM") {
-                $player = Player::withPlrRow($db, $row);
+                $playerRepository = new PlayerRepository($db);
+                $playerData = $playerRepository->fillFromCurrentRow($row);
                 $playerStats = PlayerStats::withPlrRow($db, $row);
-                $teamname = $player->teamName;
+                $teamname = $playerData->teamName;
             } else {
                 $name = $row['owner_name'];
                 $teamname = $row['team_city'] . " " . $row['team_name'];
@@ -141,16 +143,16 @@ function userinfo($username)
 
             if (!str_contains($teamname, $voterTeamName)) {
                 if ($season->phase == "Regular Season") {
-                    $output .= "<td><center><input type=\"checkbox\" name=\"" . $votingCategory . "[]\" value=\"$player->name, $player->teamName\"></center></td>";
+                    $output .= "<td><center><input type=\"checkbox\" name=\"" . $votingCategory . "[]\" value=\"$playerData->name, $playerData->teamName\"></center></td>";
                 } else {
                     if ($votingCategory == "GM") {
                         $output .= "<td><center><input type=\"radio\" name=\"" . $votingCategory . "[1]\" value=\"$name, $teamname\"></center></td>
                                     <td><center><input type=\"radio\" name=\"" . $votingCategory . "[2]\" value=\"$name, $teamname\"></center></td>
                                     <td><center><input type=\"radio\" name=\"" . $votingCategory . "[3]\" value=\"$name, $teamname\"></center></td>";
                     } else {
-                        $output .= "<td><center><input type=\"radio\" name=\"" . $votingCategory . "[1]\" value=\"$player->name, $player->teamName\"></center></td>
-                                    <td><center><input type=\"radio\" name=\"" . $votingCategory . "[2]\" value=\"$player->name, $player->teamName\"></center></td>
-                                    <td><center><input type=\"radio\" name=\"" . $votingCategory . "[3]\" value=\"$player->name, $player->teamName\"></center></td>";
+                        $output .= "<td><center><input type=\"radio\" name=\"" . $votingCategory . "[1]\" value=\"$playerData->name, $playerData->teamName\"></center></td>
+                                    <td><center><input type=\"radio\" name=\"" . $votingCategory . "[2]\" value=\"$playerData->name, $playerData->teamName\"></center></td>
+                                    <td><center><input type=\"radio\" name=\"" . $votingCategory . "[3]\" value=\"$playerData->name, $playerData->teamName\"></center></td>";
                     }
                 }
             } else {
@@ -164,7 +166,7 @@ function userinfo($username)
             }
 
             if ($votingCategory != "GM") {
-                $output .= "<td>$player->name, $player->teamName</td>
+                $output .= "<td>$playerData->name, $playerData->teamName</td>
 							<td>$playerStats->seasonGamesPlayed</td>
 							<td>$playerStats->seasonGamesStarted</td>
 							<td>$playerStats->seasonMinutesPerGame</td>

@@ -1,6 +1,7 @@
 <?php
 
 use Player\Player;
+use Player\PlayerRepository;
 
 require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
@@ -23,21 +24,22 @@ echo "$team->name Draft History
         </tr>";
 
 foreach ($team->getDraftHistoryResult() as $playerRow) {
-    $player = Player::withPlrRow($db, $playerRow);
+    $playerRepository = new PlayerRepository($db);
+    $playerData = $playerRepository->fillFromCurrentRow($playerRow);
 
     echo "<tr>";
 
-    if ($player->isRetired) {
-        echo "<td><a href=\"./modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->name</a> (retired)</td>";
+    if ($playerData->isRetired) {
+        echo "<td><a href=\"./modules.php?name=Player&pa=showpage&pid=$playerData->playerID\">$playerData->name</a> (retired)</td>";
     } else {
-        echo "<td><a href=\"./modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->name</a></td>";
+        echo "<td><a href=\"./modules.php?name=Player&pa=showpage&pid=$playerData->playerID\">$playerData->name</a></td>";
     }
 
     echo "
-        <td>$player->position</td>
-        <td>$player->draftYear</td>
-        <td>$player->draftRound</td>
-        <td>$player->draftPickNumber</td>
+        <td>$playerData->position</td>
+        <td>$playerData->draftYear</td>
+        <td>$playerData->draftRound</td>
+        <td>$playerData->draftPickNumber</td>
     </tr>";
 }
 

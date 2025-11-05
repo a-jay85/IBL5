@@ -18,10 +18,6 @@ switch ($op) {
         $controller->displayTeamPage($teamID);
         break;
 
-    case "drafthistory":
-        $controller->displayDraftHistory($teamID);
-        break;
-
     default:
         $controller->displayMenu();
         break;

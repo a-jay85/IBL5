@@ -31,7 +31,7 @@ class MockDatabase
         if (stripos($query, 'INSERT') === 0 || 
             stripos($query, 'UPDATE') === 0 || 
             stripos($query, 'DELETE') === 0) {
-            return $this->returnTrue ? true : false;
+            return $this->returnTrue;
         }
         
         // Special handling for trade info queries

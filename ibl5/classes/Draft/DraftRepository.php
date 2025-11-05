@@ -18,6 +18,10 @@ class DraftRepository
     private $db;
     private $commonRepository;
 
+    // Constants for player name matching
+    const IBL_PLR_NAME_MAX_LENGTH = 32;  // Matches varchar(32) in ibl_plr.name
+    const PARTIAL_NAME_MATCH_LENGTH = 30;  // For LIKE queries with diacritical differences
+
     public function __construct($db)
     {
         $this->db = $db;
@@ -136,7 +140,7 @@ class DraftRepository
         // If no exact match, try partial match (for truncated names or diacriticals)
         // Match if the ibl_plr name is a prefix of the full name from draft class
         // This handles truncation at 32 characters
-        $truncatedName = substr($playerName, 0, 32);
+        $truncatedName = substr($playerName, 0, self::IBL_PLR_NAME_MAX_LENGTH);
         $truncatedNameEscaped = DatabaseService::escapeString($this->db, $truncatedName);
         
         $query = "UPDATE ibl_plr
@@ -153,7 +157,7 @@ class DraftRepository
         // If still no match, try a LIKE match for diacritical differences
         // This uses % wildcards to match similar names
         // We'll match the first 30 characters to avoid matching wrong players
-        $partialName = substr($playerName, 0, 30);
+        $partialName = substr($playerName, 0, self::PARTIAL_NAME_MATCH_LENGTH);
         $partialNameEscaped = DatabaseService::escapeString($this->db, $partialName);
         
         $query = "UPDATE ibl_plr
@@ -164,7 +168,8 @@ class DraftRepository
         
         $result = $this->db->sql_query($query);
         
-        return (bool)$result;
+        // Check if this final attempt affected any rows
+        return (bool)($result && $this->db->sql_affectedrows() > 0);
     }
 
     /**

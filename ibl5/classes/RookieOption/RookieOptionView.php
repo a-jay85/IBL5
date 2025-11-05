@@ -17,7 +17,6 @@ class RookieOptionView
      */
     public function renderSuccessPage(string $teamName, int $teamID, string $phase, bool $emailSuccess): void
     {
-        $teamNameSafe = htmlspecialchars($teamName, ENT_QUOTES, 'UTF-8');
         $teamID = (int) $teamID;
         
         echo "<html><head><title>Rookie Option Page</title></head><body>\n\n";

@@ -1,5 +1,7 @@
 <?php
 
+use Statistics\StatsFormatter;
+
 if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
     die("You can't access this file directly...");
 }
@@ -179,24 +181,24 @@ if ($submitted != null) {
             $name = $row["name"] . ($row["retired"] ? "*" : "");
             $pid = $row["pid"];
             $games = round($row["games"]);
-            $minutes = number_format(round($row["minutes"], 2), 2);
-            $fgm = number_format(round($row["fgm"], 2), 2);
-            $fga = number_format(round($row["fga"], 2), 2);
-            $fgp = number_format(round($row["fgpct"], 3), 3);
-            $ftm = number_format(round($row["ftm"], 2), 2);
-            $fta = number_format(round($row["fta"], 2), 2);
-            $ftp = number_format(round($row["ftpct"], 3), 3);
-            $tgm = number_format(round($row["tgm"], 2), 2);
-            $tga = number_format(round($row["tga"], 2), 2);
-            $tgp = number_format(round($row["tpct"], 3), 3);
-            $orb = number_format(round($row["orb"], 2), 2);
-            $reb = number_format(round($row["reb"], 2), 2);
-            $ast = number_format(round($row["ast"], 2), 2);
-            $stl = number_format(round($row["stl"], 2), 2);
-            $to = number_format(round($row["tvr"], 2), 2);
-            $blk = number_format(round($row["blk"], 2), 2);
-            $pf = number_format(round($row["pf"], 2), 2);
-            $pts = number_format(round($row["pts"], 2), 2);
+            $minutes = StatsFormatter::formatAverage($row["minutes"]);
+            $fgm = StatsFormatter::formatAverage($row["fgm"]);
+            $fga = StatsFormatter::formatAverage($row["fga"]);
+            $fgp = StatsFormatter::formatPercentageWithDecimals($row["fgpct"], 1, 3);
+            $ftm = StatsFormatter::formatAverage($row["ftm"]);
+            $fta = StatsFormatter::formatAverage($row["fta"]);
+            $ftp = StatsFormatter::formatPercentageWithDecimals($row["ftpct"], 1, 3);
+            $tgm = StatsFormatter::formatAverage($row["tgm"]);
+            $tga = StatsFormatter::formatAverage($row["tga"]);
+            $tgp = StatsFormatter::formatPercentageWithDecimals($row["tpct"], 1, 3);
+            $orb = StatsFormatter::formatAverage($row["orb"]);
+            $reb = StatsFormatter::formatAverage($row["reb"]);
+            $ast = StatsFormatter::formatAverage($row["ast"]);
+            $stl = StatsFormatter::formatAverage($row["stl"]);
+            $to = StatsFormatter::formatAverage($row["tvr"]);
+            $blk = StatsFormatter::formatAverage($row["blk"]);
+            $pf = StatsFormatter::formatAverage($row["pf"]);
+            $pts = StatsFormatter::formatAverage($row["pts"]);
         } elseif (
             $tableforquery == "ibl_hist" ||
             $tableforquery == "ibl_heat_career_totals" ||
@@ -205,25 +207,25 @@ if ($submitted != null) {
         ) {
             $name = $row["name"] . ($row["retired"] ? "*" : "");
             $pid = $row["pid"];
-            $games = number_format($row["games"]);
-            $minutes = number_format($row["minutes"]);
-            $fgm = number_format($row["fgm"]);
-            $fga = number_format($row["fga"]);
-            $fgp = number_format($row["fga"] ? round($row["fgm"] / $row["fga"], 3) : 0.000, 3);
-            $ftm = number_format($row["ftm"]);
-            $fta = number_format($row["fta"]);
-            $ftp = number_format($row["fta"] ? round($row["ftm"] / $row["fta"], 3) : 0.000, 3);
-            $tgm = number_format($row["tgm"]);
-            $tga = number_format($row["tga"]);
-            $tgp = number_format($row["tga"] ? round($row["tgm"] / $row["tga"], 3) : 0.000, 3);
-            $orb = number_format($row["orb"]);
-            $reb = number_format($row["reb"]);
-            $ast = number_format($row["ast"]);
-            $stl = number_format($row["stl"]);
-            $to = number_format($row["tvr"]);
-            $blk = number_format($row["blk"]);
-            $pf = number_format($row["pf"]);
-            $pts = number_format($row["pts"]);
+            $games = StatsFormatter::formatTotal($row["games"]);
+            $minutes = StatsFormatter::formatTotal($row["minutes"]);
+            $fgm = StatsFormatter::formatTotal($row["fgm"]);
+            $fga = StatsFormatter::formatTotal($row["fga"]);
+            $fgp = StatsFormatter::formatPercentage($row["fgm"], $row["fga"]);
+            $ftm = StatsFormatter::formatTotal($row["ftm"]);
+            $fta = StatsFormatter::formatTotal($row["fta"]);
+            $ftp = StatsFormatter::formatPercentage($row["ftm"], $row["fta"]);
+            $tgm = StatsFormatter::formatTotal($row["tgm"]);
+            $tga = StatsFormatter::formatTotal($row["tga"]);
+            $tgp = StatsFormatter::formatPercentage($row["tgm"], $row["tga"]);
+            $orb = StatsFormatter::formatTotal($row["orb"]);
+            $reb = StatsFormatter::formatTotal($row["reb"]);
+            $ast = StatsFormatter::formatTotal($row["ast"]);
+            $stl = StatsFormatter::formatTotal($row["stl"]);
+            $to = StatsFormatter::formatTotal($row["tvr"]);
+            $blk = StatsFormatter::formatTotal($row["blk"]);
+            $pf = StatsFormatter::formatTotal($row["pf"]);
+            $pts = StatsFormatter::formatTotal($row["pts"]);
         }
         
         echo "<tr>

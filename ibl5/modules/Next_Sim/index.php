@@ -1,6 +1,5 @@
 <?php
 
-use Player\Player;
 use Player\PlayerRepository;
 
 global $db, $cookie;
@@ -19,11 +18,11 @@ $username = $cookie[1];
 $userTeam = Team::initialize($db, $sharedFunctions->getTeamnameFromUsername($username));
 
 $playerRepository = new PlayerRepository($db);
-$userStartingPG = Player::fromPlayerData($db, $playerRepository->loadByID($userTeam->getCurrentlySetStarterPlayerIDForPosition('PG') ?? 4040404));
-$userStartingSG = Player::fromPlayerData($db, $playerRepository->loadByID($userTeam->getCurrentlySetStarterPlayerIDForPosition('SG') ?? 4040404));
-$userStartingSF = Player::fromPlayerData($db, $playerRepository->loadByID($userTeam->getCurrentlySetStarterPlayerIDForPosition('SF') ?? 4040404));
-$userStartingPF = Player::fromPlayerData($db, $playerRepository->loadByID($userTeam->getCurrentlySetStarterPlayerIDForPosition('PF') ?? 4040404));
-$userStartingC = Player::fromPlayerData($db, $playerRepository->loadByID($userTeam->getCurrentlySetStarterPlayerIDForPosition('C') ?? 4040404));
+$userStartingPG = $playerRepository->loadByID($userTeam->getCurrentlySetStarterPlayerIDForPosition('PG') ?? 4040404);
+$userStartingSG = $playerRepository->loadByID($userTeam->getCurrentlySetStarterPlayerIDForPosition('SG') ?? 4040404);
+$userStartingSF = $playerRepository->loadByID($userTeam->getCurrentlySetStarterPlayerIDForPosition('SF') ?? 4040404);
+$userStartingPF = $playerRepository->loadByID($userTeam->getCurrentlySetStarterPlayerIDForPosition('PF') ?? 4040404);
+$userStartingC = $playerRepository->loadByID($userTeam->getCurrentlySetStarterPlayerIDForPosition('C') ?? 4040404);
 
 $resultUserTeamProjectedGamesNextSim = Schedule\TeamSchedule::getProjectedGamesNextSimResult($db, $userTeam->teamID, $season->lastSimEndDate);
 $lastSimEndDateObject = new DateTime($season->lastSimEndDate);
@@ -34,15 +33,15 @@ foreach ($resultUserTeamProjectedGamesNextSim as $gameRow) {
     $rows[$i]['date'] = new DateTime($rows[$i]['game']->date);
     $rows[$i]['day'] = $rows[$i]['date']->diff($lastSimEndDateObject)->format("%a");
     $rows[$i]['opposingTeam'] = Team::initialize($db, $rows[$i]['game']->getOpposingTeamID($userTeam->teamID));
-    $rows[$i]['opposingStartingPG'] = Player::fromPlayerData($db, $playerRepository->loadByID($rows[$i]['opposingTeam']->getLastSimStarterPlayerIDForPosition('PG') ?? 4040404));
+    $rows[$i]['opposingStartingPG'] = $playerRepository->loadByID($rows[$i]['opposingTeam']->getLastSimStarterPlayerIDForPosition('PG') ?? 4040404);
     $rows[$i]['userStartingPG'] = $userStartingPG ?? 4040404;
-    $rows[$i]['opposingStartingSG'] = Player::fromPlayerData($db, $playerRepository->loadByID($rows[$i]['opposingTeam']->getLastSimStarterPlayerIDForPosition('SG') ?? 4040404));
+    $rows[$i]['opposingStartingSG'] = $playerRepository->loadByID($rows[$i]['opposingTeam']->getLastSimStarterPlayerIDForPosition('SG') ?? 4040404);
     $rows[$i]['userStartingSG'] = $userStartingSG ?? 4040404;
-    $rows[$i]['opposingStartingSF'] = Player::fromPlayerData($db, $playerRepository->loadByID($rows[$i]['opposingTeam']->getLastSimStarterPlayerIDForPosition('SF') ?? 4040404));
+    $rows[$i]['opposingStartingSF'] = $playerRepository->loadByID($rows[$i]['opposingTeam']->getLastSimStarterPlayerIDForPosition('SF') ?? 4040404);
     $rows[$i]['userStartingSF'] = $userStartingSF ?? 4040404;
-    $rows[$i]['opposingStartingPF'] = Player::fromPlayerData($db, $playerRepository->loadByID($rows[$i]['opposingTeam']->getLastSimStarterPlayerIDForPosition('PF') ?? 4040404));
+    $rows[$i]['opposingStartingPF'] = $playerRepository->loadByID($rows[$i]['opposingTeam']->getLastSimStarterPlayerIDForPosition('PF') ?? 4040404);
     $rows[$i]['userStartingPF'] = $userStartingPF ?? 4040404;
-    $rows[$i]['opposingStartingC'] = Player::fromPlayerData($db, $playerRepository->loadByID($rows[$i]['opposingTeam']->getLastSimStarterPlayerIDForPosition('C') ?? 4040404));
+    $rows[$i]['opposingStartingC'] = $playerRepository->loadByID($rows[$i]['opposingTeam']->getLastSimStarterPlayerIDForPosition('C') ?? 4040404);
     $rows[$i]['userStartingC'] = $userStartingC ?? 4040404;
 
     $i++;

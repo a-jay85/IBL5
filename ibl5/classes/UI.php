@@ -1,26 +1,55 @@
 <?php
 
-use Player\Player;
 use Player\PlayerRepository;
+use Player\PlayerNameDecorator;
+use Player\PlayerInjuryCalculator;
 use Services\DatabaseService;
 use Statistics\StatsFormatter;
 
 class UI
 {
     /**
-     * Helper function to create Player from row data
+     * Helper function to load PlayerData from row data
+     * 
+     * @param mixed $db Database connection
+     * @param array $plrRow Player row data
+     * @param bool $isHistorical Whether this is historical data
+     * @return \Player\PlayerData PlayerData object
      */
-    private static function createPlayerFromRow($db, $plrRow, $isHistorical = false)
+    private static function loadPlayerDataFromRow($db, $plrRow, $isHistorical = false)
     {
         $playerRepository = new PlayerRepository($db);
         
         if ($isHistorical) {
-            $playerData = $playerRepository->fillFromHistoricalRow($plrRow);
+            return $playerRepository->fillFromHistoricalRow($plrRow);
         } else {
-            $playerData = $playerRepository->fillFromCurrentRow($plrRow);
+            return $playerRepository->fillFromCurrentRow($plrRow);
         }
-        
-        return Player::fromPlayerData($db, $playerData);
+    }
+    
+    /**
+     * Get decorated player name
+     * 
+     * @param \Player\PlayerData $playerData PlayerData object
+     * @return string Decorated player name
+     */
+    private static function getDecoratedPlayerName($playerData)
+    {
+        $nameDecorator = new PlayerNameDecorator();
+        return $nameDecorator->decoratePlayerName($playerData);
+    }
+    
+    /**
+     * Get injury return date information
+     * 
+     * @param \Player\PlayerData $playerData PlayerData object
+     * @param string $rawLastSimEndDate Last sim end date
+     * @return string Injury return date info
+     */
+    private static function getInjuryReturnDate($playerData, $rawLastSimEndDate)
+    {
+        $injuryCalculator = new PlayerInjuryCalculator();
+        return $injuryCalculator->getInjuryReturnDate($playerData, $rawLastSimEndDate);
     }
 
     public static function displayDebugOutput($content, $title = 'Debug Output') 
@@ -199,9 +228,9 @@ class UI
                 <td>$con5</td>
                 <td>$con6</td>
                 <td bgcolor=$team->color1></td>
-                <td align=center>$player->ratingTalent</td>
-                <td align=center>$player->ratingSkill</td>
-                <td align=center>$player->ratingIntangibles</td>
+                <td align=center>$playerData->ratingTalent</td>
+                <td align=center>$playerData->ratingSkill</td>
+                <td align=center>$playerData->ratingIntangibles</td>
                 <td bgcolor=$team->color1></td>
                 <td align=center>$player->freeAgencyLoyalty</td>
                 <td align=center>$player->freeAgencyPlayForWinner</td>
@@ -421,14 +450,14 @@ class UI
         foreach ($data as $plrRow) {
             if ($yr == "") {
                 if (is_object($data)) {
-                    $player = self::createPlayerFromRow($db, $plrRow);
+                    $playerData = self::loadPlayerDataFromRow($db, $plrRow);
                     (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
-                } elseif ($plrRow instanceof Player) {
-                    $player = $plrRow;
+                } elseif ($plrRow instanceof \Player\PlayerData) {
+                    $playerData = $plrRow;
                     if ($moduleName == "Next_Sim") {
                         (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "FFFFAA";
                     } elseif ($moduleName == "League_Starters") {
-                        ($player->teamID == $team->teamID) ? $bgcolor = "FFFFAA" : $bgcolor = "FFFFFF";
+                        ($playerData->teamID == $team->teamID) ? $bgcolor = "FFFFAA" : $bgcolor = "FFFFFF";
                     } else {
                         (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
                     }
@@ -436,17 +465,17 @@ class UI
                     continue;
                 }
 
-                $firstCharacterOfPlayerName = substr($player->name, 0, 1); // if player name starts with '|' (pipe symbol), then skip them
+                $firstCharacterOfPlayerName = substr($playerData->name, 0, 1); // if player name starts with '|' (pipe symbol), then skip them
                 if ($firstCharacterOfPlayerName == '|') {
                     continue;
                 }
             } else {
-                $player = self::createPlayerFromRow($db, $plrRow, true);
+                $playerData = self::loadPlayerDataFromRow($db, $plrRow, true);
             }
     
-            $injuryInfo = $player->getInjuryReturnDate($season->lastSimEndDate);
+            $injuryInfo = self::getInjuryReturnDate($playerData, $season->lastSimEndDate);
             if ($injuryInfo != "") {
-                $injuryInfo .= " ($player->daysRemainingForInjury)";
+                $injuryInfo .= " ($playerData->daysRemainingForInjury)";
             }
 
             if (($i % 2) == 0 AND $moduleName == "Next_Sim") {
@@ -459,43 +488,44 @@ class UI
             $table_ratings .= "<tr bgcolor=$bgcolor>";
 
             if ($moduleName == "League_Starters") {
-                $table_ratings .= "<td>$player->teamName</td>";
+                $table_ratings .= "<td>$playerData->teamName</td>";
             }
 
+            $decoratedName = self::getDecoratedPlayerName($playerData);
             $table_ratings .= "
-                <td align=center>$player->position</td>
-                <td><a href=\"./modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->decoratedName</a></td>
-                <td align=center>$player->age</td>
+                <td align=center>$playerData->position</td>
+                <td><a href=\"./modules.php?name=Player&pa=showpage&pid=$playerData->playerID\">$decoratedName</a></td>
+                <td align=center>$playerData->age</td>
                 <td bgcolor=$team->color1></td>
-                <td align=center>$player->ratingFieldGoalAttempts</td>
-                <td align=center>$player->ratingFieldGoalPercentage</td>
+                <td align=center>$playerData->ratingFieldGoalAttempts</td>
+                <td align=center>$playerData->ratingFieldGoalPercentage</td>
                 <td bgcolor=#CCCCCC width=0></td>
-                <td align=center>$player->ratingFreeThrowAttempts</td>
-                <td align=center>$player->ratingFreeThrowPercentage</td>
+                <td align=center>$playerData->ratingFreeThrowAttempts</td>
+                <td align=center>$playerData->ratingFreeThrowPercentage</td>
                 <td bgcolor=#CCCCCC width=0></td>
-                <td align=center>$player->ratingThreePointAttempts</td>
-                <td align=center>$player->ratingThreePointPercentage</td>
+                <td align=center>$playerData->ratingThreePointAttempts</td>
+                <td align=center>$playerData->ratingThreePointPercentage</td>
                 <td bgcolor=$team->color1></td>
-                <td align=center>$player->ratingOffensiveRebounds</td>
-                <td align=center>$player->ratingDefensiveRebounds</td>
-                <td align=center>$player->ratingAssists</td>
-                <td align=center>$player->ratingSteals</td>
-                <td align=center>$player->ratingTurnovers</td>
-                <td align=center>$player->ratingBlocks</td>
-                <td align=center>$player->ratingFouls</td>
+                <td align=center>$playerData->ratingOffensiveRebounds</td>
+                <td align=center>$playerData->ratingDefensiveRebounds</td>
+                <td align=center>$playerData->ratingAssists</td>
+                <td align=center>$playerData->ratingSteals</td>
+                <td align=center>$playerData->ratingTurnovers</td>
+                <td align=center>$playerData->ratingBlocks</td>
+                <td align=center>$playerData->ratingFouls</td>
                 <td bgcolor=$team->color1></td>
-                <td align=center>$player->ratingOutsideOffense</td>
-                <td align=center>$player->ratingDriveOffense</td>
-                <td align=center>$player->ratingPostOffense</td>
-                <td align=center>$player->ratingTransitionOffense</td>
+                <td align=center>$playerData->ratingOutsideOffense</td>
+                <td align=center>$playerData->ratingDriveOffense</td>
+                <td align=center>$playerData->ratingPostOffense</td>
+                <td align=center>$playerData->ratingTransitionOffense</td>
                 <td bgcolor=#CCCCCC width=0></td>
-                <td align=center>$player->ratingOutsideDefense</td>
-                <td align=center>$player->ratingDriveDefense</td>
-                <td align=center>$player->ratingPostDefense</td>
-                <td align=center>$player->ratingTransitionDefense</td>
+                <td align=center>$playerData->ratingOutsideDefense</td>
+                <td align=center>$playerData->ratingDriveDefense</td>
+                <td align=center>$playerData->ratingPostDefense</td>
+                <td align=center>$playerData->ratingTransitionDefense</td>
                 <td bgcolor=$team->color1></td>
-                <td align=center>$player->ratingClutch</td>
-                <td align=center>$player->ratingConsistency</td>
+                <td align=center>$playerData->ratingClutch</td>
+                <td align=center>$playerData->ratingConsistency</td>
                 <td bgcolor=$team->color1></td>
                 <td align=center>$injuryInfo</td>
             </tr>";

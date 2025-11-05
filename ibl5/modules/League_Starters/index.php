@@ -1,6 +1,5 @@
 <?php
 
-use Player\Player;
 use Player\PlayerRepository;
 
 global $db, $cookie;
@@ -24,11 +23,11 @@ $playerRepository = new PlayerRepository($db);
 $i = 0;
 foreach ($teams as $team) {
     $rows['team'][$i] = Team::initialize($db, $team);
-    $rows['startingPG'][$i] = Player::fromPlayerData($db, $playerRepository->loadByID($rows['team'][$i]->getLastSimStarterPlayerIDForPosition('PG') ?? 4040404));
-    $rows['startingSG'][$i] = Player::fromPlayerData($db, $playerRepository->loadByID($rows['team'][$i]->getLastSimStarterPlayerIDForPosition('SG') ?? 4040404));
-    $rows['startingSF'][$i] = Player::fromPlayerData($db, $playerRepository->loadByID($rows['team'][$i]->getLastSimStarterPlayerIDForPosition('SF') ?? 4040404));
-    $rows['startingPF'][$i] = Player::fromPlayerData($db, $playerRepository->loadByID($rows['team'][$i]->getLastSimStarterPlayerIDForPosition('PF') ?? 4040404));
-    $rows['startingC'][$i] = Player::fromPlayerData($db, $playerRepository->loadByID($rows['team'][$i]->getLastSimStarterPlayerIDForPosition('C') ?? 4040404));
+    $rows['startingPG'][$i] = $playerRepository->loadByID($rows['team'][$i]->getLastSimStarterPlayerIDForPosition('PG') ?? 4040404);
+    $rows['startingSG'][$i] = $playerRepository->loadByID($rows['team'][$i]->getLastSimStarterPlayerIDForPosition('SG') ?? 4040404);
+    $rows['startingSF'][$i] = $playerRepository->loadByID($rows['team'][$i]->getLastSimStarterPlayerIDForPosition('SF') ?? 4040404);
+    $rows['startingPF'][$i] = $playerRepository->loadByID($rows['team'][$i]->getLastSimStarterPlayerIDForPosition('PF') ?? 4040404);
+    $rows['startingC'][$i] = $playerRepository->loadByID($rows['team'][$i]->getLastSimStarterPlayerIDForPosition('C') ?? 4040404);
     
     $rows['startingPG'][$i]->teamName = $rows['startingSG'][$i]->teamName = $rows['startingSF'][$i]->teamName = 
         $rows['startingPF'][$i]->teamName = $rows['startingC'][$i]->teamName = $rows['team'][$i]->name;

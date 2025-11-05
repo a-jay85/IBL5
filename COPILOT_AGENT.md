@@ -293,7 +293,33 @@ The schema reveals:
 3. **Phase 3 (Target)**: Full Laravel with Eloquent ORM
 4. **Phase 4 (Future)**: PostgreSQL compatibility layer
 
+## Statistics Formatting & Sanitization
+
+### Using StatsFormatter and StatsSanitizer Classes
+
+**Location**: `ibl5/classes/Statistics/`
+
+When refactoring or adding statistics display code, use the unified `Statistics\StatsFormatter` class to replace repeated formatting patterns:
+
+#### Common Patterns to Replace
+- **Percentage formatting**: `($attempted) ? number_format($made / $attempted, 3) : "0.000"` → `StatsFormatter::formatPercentage($made, $attempted)`
+- **Per-game averages**: `($games) ? number_format($total / $games, 1) : "0"` → `StatsFormatter::formatPerGameAverage($total, $games)`
+- **Per-36 minutes**: `StatsFormatter::formatPer36Stat($total, $minutes)`
+- **Totals**: `number_format($value)` → `StatsFormatter::formatTotal($value)`
+- **Points calculation**: `(2 * $fgm + $ftm + $tgm)` → `StatsFormatter::calculatePoints($fgm, $ftm, $tgm)`
+
+All methods handle zero-division safely and return appropriate defaults.
+
+#### Already Refactored Files
+- `TeamStats.php` - Offense/defense averages and percentages
+- `PlayerStats.php` - Both `fill()` and `fillHistorical()` methods
+- `UI.php` - Per-36 minute calculations
+- `modules/Leaderboards/index.php` - Totals and averages displays
+
+**Reference**: See `STATISTICS_FORMATTING_GUIDE.md` for complete method signatures, examples, and testing details.
+
 ## Additional Resources
 - [Copilot Coding Agent Best Practices](https://gh.io/copilot-coding-agent-tips)
 - [Conventional Commits](https://www.conventionalcommits.org/)
 - Database Schema Reference: `ibl5/schema.sql`
+- Statistics Formatting Guide: `STATISTICS_FORMATTING_GUIDE.md`

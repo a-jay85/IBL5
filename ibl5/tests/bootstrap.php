@@ -196,7 +196,6 @@ class Shared
         {
             return $this->commonRepository->getTidFromTeamname($teamname);
         }
-        }
         
         public function resetSimContractExtensionAttempts()
         {

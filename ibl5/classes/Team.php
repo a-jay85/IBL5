@@ -1,6 +1,8 @@
 <?php
 
 use Player\Player;
+use Player\PlayerRepository;
+use Player\PlayerContractCalculator;
 
 class Team
 {
@@ -259,10 +261,12 @@ class Team
     public function getTotalCurrentSeasonSalariesFromPlrResult($result)
     {
         $totalCurrentSeasonSalaries = 0;
+        $repository = new PlayerRepository($this->db);
+        $contractCalculator = new PlayerContractCalculator();
 
-        $playerArray = $this->convertPlrResultIntoPlayerArray($result);
-        foreach ($playerArray as $player) {
-            $totalCurrentSeasonSalaries += $player->getCurrentSeasonSalary();
+        foreach ($result as $plrRow) {
+            $playerData = $repository->fillFromCurrentRow($plrRow);
+            $totalCurrentSeasonSalaries += $contractCalculator->getCurrentSeasonSalary($playerData);
         }
         return $totalCurrentSeasonSalaries;
     }
@@ -270,10 +274,12 @@ class Team
     public function getTotalNextSeasonSalariesFromPlrResult($result)
     {
         $totalNextSeasonSalaries = 0;
+        $repository = new PlayerRepository($this->db);
+        $contractCalculator = new PlayerContractCalculator();
 
-        $playerArray = $this->convertPlrResultIntoPlayerArray($result);
-        foreach ($playerArray as $player) {
-            $totalNextSeasonSalaries += $player->getNextSeasonSalary();
+        foreach ($result as $plrRow) {
+            $playerData = $repository->fillFromCurrentRow($plrRow);
+            $totalNextSeasonSalaries += $contractCalculator->getNextSeasonSalary($playerData);
         }
         return $totalNextSeasonSalaries;
     }
@@ -301,15 +307,5 @@ class Team
             return TRUE;
         }
         return FALSE;
-    }
-
-    public function convertPlrResultIntoPlayerArray($result)
-    {
-        $array = array();
-        foreach ($result as $plrRow) {
-            $playerID = $plrRow['pid'];
-            $array[$playerID] = Player::withPlayerID($this->db, $playerID);
-        }
-        return $array;
     }
 }

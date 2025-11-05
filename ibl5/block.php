@@ -3,6 +3,7 @@
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
 use Player\Player;
+use Player\PlayerRepository;
 
 $sharedFunctions = new Shared($db);
 
@@ -33,17 +34,18 @@ $offerText = "";
 $outcomeText = "";
 $autoRejectedText = "These offers have been **auto-rejected** for being under half of the player's demands:";
 $lastPlayerIteratedOn = "";
+$playerRepository = new PlayerRepository($db);
 $i = 0;
 while ($i < $num) {
     $name = $db->sql_result($result, $i, "name");
     $playerID = $sharedFunctions->getPlayerIDFromPlayerName($name);
-    $player = Player::withPlayerID($db, $playerID);
-    $teamOfPlayer = Team::initialize($db, $player->teamName);
+    $playerData = $playerRepository->loadByID($playerID);
+    $teamOfPlayer = Team::initialize($db, $playerData->teamName);
     $offeringTeamName = $db->sql_result($result, $i, "team");
     $offeringTeam = Team::initialize($db, $offeringTeamName);
     $perceivedvalue = $db->sql_result($result, $i, "perceivedvalue");
 
-    if ($lastPlayerIteratedOn != $player->name) {
+    if ($lastPlayerIteratedOn != $playerData->name) {
         $discordText .= $offerText;
         $offerText = "";
         if ($outcomeText) {
@@ -52,7 +54,7 @@ while ($i < $num) {
                 $discordText .= " <@!$acceptedTeamDiscordID>\n\n";
             }
         }
-        $discordText .= "**" . strtoupper("$player->name, $teamOfPlayer->city $player->teamName") . "** <@!$teamOfPlayer->discordID>\n";
+        $discordText .= "**" . strtoupper("$playerData->name, $teamOfPlayer->city $playerData->teamName") . "** <@!$teamOfPlayer->discordID>\n";
     }
 
     $offer1 = $db->sql_result($result, $i, "offer1");
@@ -123,7 +125,7 @@ while ($i < $num) {
         if ($offer6 != 0) {$offerText .= "/$offer6";}
         $offerText .= " <@!$offeringTeam->discordID>\n";
     } else {
-        $autoRejectedText .= "\n<@!$offeringTeam->discordID>'s offer for $player->name: ";
+        $autoRejectedText .= "\n<@!$offeringTeam->discordID>'s offer for $playerData->name: ";
         $autoRejectedText .= "$offeringTeamName - $offer1";
         if ($offer2 != 0) {$autoRejectedText .= "/$offer2";}
         if ($offer3 != 0) {$autoRejectedText .= "/$offer3";}

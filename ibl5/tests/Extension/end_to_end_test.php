@@ -11,6 +11,7 @@
  */
 
 use Player\Player;
+use Player\PlayerRepository;
 
 // Load the application environment
 require_once __DIR__ . '/../../mainfile.php';
@@ -67,7 +68,19 @@ try {
         echo "  Using player: $playerName ($playerPosition) on $teamName\n";
         
         // Create Player and Team objects
-        $player = Player::withPlayerID($db, $playerID);
+        $playerRepository = new PlayerRepository($db);
+        $playerData = $playerRepository->loadByID($playerID);
+        
+        // Wrap PlayerData in Player for this test
+        $player = new Player();
+        $reflectionProperty = new \ReflectionProperty(Player::class, 'playerData');
+        $reflectionProperty->setAccessible(true);
+        $reflectionProperty->setValue($player, $playerData);
+        
+        $syncMethod = new \ReflectionMethod(Player::class, 'syncPropertiesFromPlayerData');
+        $syncMethod->setAccessible(true);
+        $syncMethod->invoke($player);
+        
         $team = Team::initialize($db, $teamName);
         echo "  ✓ Player and Team objects created successfully\n";
         

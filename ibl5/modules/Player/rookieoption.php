@@ -1,25 +1,29 @@
 <?php
 
 use Player\Player;
+use Player\PlayerRepository;
+use Player\PlayerContractValidator;
 
 require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 $sharedFunctions = new Shared($db);
 $season = new Season($db);
 
 $Team_Name = $_POST['teamname'];
-$player = Player::withPlayerID($db, $_POST['playerID']);
+$playerRepository = new PlayerRepository($db);
+$playerData = $playerRepository->loadByID($_POST['playerID']);
+$contractValidator = new PlayerContractValidator();
 $ExtensionAmount = $_POST['rookieOptionValue'];
 
 $teamID = $sharedFunctions->getTidFromTeamname($Team_Name); // This function now returns an integer
 
 $recipient = 'ibldepthcharts@gmail.com';
-$emailsubject = "Rookie Extension Option - " . $player->name;
-$filetext = $Team_Name . " exercise the rookie extension option on " . $player->name . " in the amount of " . $ExtensionAmount . ".";
+$emailsubject = "Rookie Extension Option - " . $playerData->name;
+$filetext = $Team_Name . " exercise the rookie extension option on " . $playerData->name . " in the amount of " . $ExtensionAmount . ".";
 
-if ($player->draftRound == 1 AND $player->canRookieOption($season->phase)) {
-    $queryrookieoption = "UPDATE ibl_plr SET cy4 = '$ExtensionAmount' WHERE name = '$player->name'";
-} elseif ($player->draftRound == 2 AND $player->canRookieOption($season->phase)) {
-    $queryrookieoption = "UPDATE ibl_plr SET cy3 = '$ExtensionAmount' WHERE name = '$player->name'";
+if ($playerData->draftRound == 1 AND $contractValidator->canRookieOption($playerData, $season->phase)) {
+    $queryrookieoption = "UPDATE ibl_plr SET cy4 = '$ExtensionAmount' WHERE name = '$playerData->name'";
+} elseif ($playerData->draftRound == 2 AND $contractValidator->canRookieOption($playerData, $season->phase)) {
+    $queryrookieoption = "UPDATE ibl_plr SET cy3 = '$ExtensionAmount' WHERE name = '$playerData->name'";
 } else {
     die("This player's experience doesn't match their rookie status; please let the commish know about this error.");
 }
@@ -41,8 +45,8 @@ Discord::postToChannel('#rookie-options', $filetext);
 if (mail($recipient, $emailsubject, $filetext, "From: rookieoption@iblhoops.net")) {
     $rookieOptionInMillions = $ExtensionAmount / 100;
     $timestamp = date('Y-m-d H:i:s', time());
-    $storytitle = $player->name . " extends their contract with the " . $Team_Name;
-    $hometext = $Team_Name . " exercise the rookie extension option on " . $player->name . " in the amount of " . $rookieOptionInMillions . " million dollars.";
+    $storytitle = $playerData->name . " extends their contract with the " . $Team_Name;
+    $hometext = $Team_Name . " exercise the rookie extension option on " . $playerData->name . " in the amount of " . $rookieOptionInMillions . " million dollars.";
 
     $querytopic = "SELECT * FROM nuke_topics WHERE topicname = '$Team_Name'";
     $resulttopic = $db->sql_query($querytopic);

@@ -204,11 +204,8 @@ class Trading_TradeProcessor
         $categoryID = 2;
         $topicID = 31;
         
-        // Escape the title and text for security
-        $storytitleEscaped = \Services\DatabaseService::escapeString($this->db, $storytitle);
-        $storytextEscaped = \Services\DatabaseService::escapeString($this->db, $storytext);
-        
-        $this->newsService->createNewsStory($categoryID, $topicID, $storytitleEscaped, $storytextEscaped);
+        // NewsService handles escaping internally, so pass raw strings
+        $this->newsService->createNewsStory($categoryID, $topicID, $storytitle, $storytext);
         
         // Send email notification
         if ($_SERVER['SERVER_NAME'] != "localhost") {

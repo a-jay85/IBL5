@@ -1,11 +1,41 @@
 <?php
 
 use Player\Player;
+use Player\PlayerRepository;
 use Services\DatabaseService;
 use Statistics\StatsFormatter;
 
 class UI
 {
+    /**
+     * Helper function to create Player from row data
+     */
+    private static function createPlayerFromRow($db, $plrRow, $isHistorical = false)
+    {
+        $playerRepository = new PlayerRepository($db);
+        
+        if ($isHistorical) {
+            $playerData = $playerRepository->fillFromHistoricalRow($plrRow);
+        } else {
+            $playerData = $playerRepository->fillFromCurrentRow($plrRow);
+        }
+        
+        $player = new Player();
+        $reflectionProperty = new \ReflectionProperty(Player::class, 'playerData');
+        $reflectionProperty->setAccessible(true);
+        $reflectionProperty->setValue($player, $playerData);
+        
+        $reflectionDb = new \ReflectionProperty(Player::class, 'db');
+        $reflectionDb->setAccessible(true);
+        $reflectionDb->setValue($player, $db);
+        
+        $syncMethod = new \ReflectionMethod(Player::class, 'syncPropertiesFromPlayerData');
+        $syncMethod->setAccessible(true);
+        $syncMethod->invoke($player);
+        
+        return $player;
+    }
+
     public static function displayDebugOutput($content, $title = 'Debug Output') 
     {
         static $debugId = 0;
@@ -132,7 +162,7 @@ class UI
     
         $i = 0;
         foreach ($result as $plrRow) {
-            $player = Player::withPlrRow($db, $plrRow);
+            $player = self::createPlayerFromRow($db, $plrRow);
     
             if ($sharedFunctions->isFreeAgencyModuleActive() == 0) {
                 $year1 = $player->contractCurrentYear;
@@ -276,7 +306,7 @@ class UI
         $i = 0;
         foreach ($result as $plrRow) {
             if ($yr == "") {
-                $player = Player::withPlrRow($db, $plrRow);
+                $player = self::createPlayerFromRow($db, $plrRow);
                 $playerStats = PlayerStats::withPlrRow($db, $plrRow);
 
                 $firstCharacterOfPlayerName = substr($player->name, 0, 1); // if player name starts with '|' (pipe symbol), then skip them
@@ -284,7 +314,7 @@ class UI
                     continue;
                 }
             } else {
-                $player = Player::withHistoricalPlrRow($db, $plrRow);
+                $player = self::createPlayerFromRow($db, $plrRow, true);
                 $playerStats = PlayerStats::withHistoricalPlrRow($db, $plrRow);
             }
     
@@ -404,7 +434,7 @@ class UI
         foreach ($data as $plrRow) {
             if ($yr == "") {
                 if (is_object($data)) {
-                    $player = Player::withPlrRow($db, $plrRow);
+                    $player = self::createPlayerFromRow($db, $plrRow);
                     (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
                 } elseif ($plrRow instanceof Player) {
                     $player = $plrRow;
@@ -424,7 +454,7 @@ class UI
                     continue;
                 }
             } else {
-                $player = Player::withHistoricalPlrRow($db, $plrRow);
+                $player = self::createPlayerFromRow($db, $plrRow, true);
             }
     
             $injuryInfo = $player->getInjuryReturnDate($season->lastSimEndDate);
@@ -531,7 +561,7 @@ class UI
         $i = 0;
         foreach ($result as $plrRow) {
             if ($yr == "") {
-                $player = Player::withPlrRow($db, $plrRow);
+                $player = self::createPlayerFromRow($db, $plrRow);
                 $playerStats = PlayerStats::withPlrRow($db, $plrRow);
 
                 $firstCharacterOfPlayerName = substr($player->name, 0, 1); // if player name starts with '|' (pipe symbol), then skip them
@@ -539,7 +569,7 @@ class UI
                     continue;
                 }
             } else {
-                $player = Player::withHistoricalPlrRow($db, $plrRow);
+                $player = self::createPlayerFromRow($db, $plrRow, true);
                 $playerStats = PlayerStats::withHistoricalPlrRow($db, $plrRow);
             }
         
@@ -682,7 +712,7 @@ class UI
         $i = 0;
         foreach ($result as $plrRow) {
             if ($yr == "") {
-                $player = Player::withPlrRow($db, $plrRow);
+                $player = self::createPlayerFromRow($db, $plrRow);
                 $playerStats = PlayerStats::withPlrRow($db, $plrRow);
 
                 $firstCharacterOfPlayerName = substr($player->name, 0, 1); // if player name starts with '|' (pipe symbol), then skip them
@@ -690,7 +720,7 @@ class UI
                     continue;
                 }
             } else {
-                $player = Player::withHistoricalPlrRow($db, $plrRow);
+                $player = self::createPlayerFromRow($db, $plrRow, true);
                 $playerStats = PlayerStats::withHistoricalPlrRow($db, $plrRow);
             }
         

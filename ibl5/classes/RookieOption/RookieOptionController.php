@@ -13,11 +13,13 @@ class RookieOptionController
     private const NOTIFICATION_EMAIL_RECIPIENT = 'ibldepthcharts@gmail.com';
     private const NOTIFICATION_EMAIL_SENDER = 'rookieoption@iblhoops.net';
     private const DISCORD_CHANNEL = '#rookie-options';
+    private const ROOKIE_EXTENSION_CATEGORY = 'Rookie Extension';
     
     private $db;
     private $repository;
     private $processor;
     private $view;
+    private $newsService;
     
     public function __construct($db)
     {
@@ -25,6 +27,7 @@ class RookieOptionController
         $this->repository = new RookieOptionRepository($db);
         $this->processor = new RookieOptionProcessor();
         $this->view = new RookieOptionView();
+        $this->newsService = new \Services\NewsService($db);
     }
     
     /**
@@ -93,23 +96,23 @@ class RookieOptionController
         $hometext = $teamName . " exercise the rookie extension option on " . $playerName . " in the amount of " . $rookieOptionInMillions . " million dollars.";
         
         // Get topic ID for the team
-        $topicID = $this->repository->getTopicIDByTeamName($teamName);
+        $topicID = $this->newsService->getTopicIDByTeamName($teamName);
         if ($topicID === null) {
             // If no topic found, skip news story creation
             return;
         }
         
         // Get category ID for rookie extensions
-        $categoryID = $this->repository->getRookieExtensionCategoryID();
+        $categoryID = $this->newsService->getCategoryIDByTitle(self::ROOKIE_EXTENSION_CATEGORY);
         if ($categoryID === null) {
             // If no category found, skip news story creation
             return;
         }
         
         // Increment counter
-        $this->repository->incrementRookieExtensionCounter();
+        $this->newsService->incrementCategoryCounter(self::ROOKIE_EXTENSION_CATEGORY);
         
         // Create the news story
-        $this->repository->createNewsStory($categoryID, $topicID, $storytitle, $hometext);
+        $this->newsService->createNewsStory($categoryID, $topicID, $storytitle, $hometext);
     }
 }

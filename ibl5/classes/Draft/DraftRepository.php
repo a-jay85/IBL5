@@ -102,16 +102,56 @@ class DraftRepository
     }
 
     /**
-     * Update the player table to set team information for a drafted player
+     * Generate a unique player ID (PID) that doesn't exist in the database
      * 
-     * This method handles partial name matches since ibl_plr.name may be truncated
-     * (varchar 32) or missing diacriticals compared to the full name in ibl_draft_class.
+     * @param int $startingPid Starting PID to check (default: 1)
+     * @return int Available PID
+     */
+    private function generateUniquePid($startingPid = 1)
+    {
+        $pid = (int) $startingPid;
+        $query = "SELECT 1 FROM ibl_plr WHERE pid = $pid";
+        $result = $this->db->sql_query($query);
+        
+        if ($result && $this->db->sql_numrows($result) > 0) {
+            // PID exists, try next one
+            return $this->generateUniquePid($pid + 1);
+        }
+        
+        return $pid;
+    }
+
+    /**
+     * Get the next available player ID by finding the max PID and adding 1
+     * 
+     * @return int Next available PID
+     */
+    private function getNextAvailablePid()
+    {
+        $query = "SELECT MAX(pid) as max_pid FROM ibl_plr";
+        $result = $this->db->sql_query($query);
+        
+        if ($result && $this->db->sql_numrows($result) > 0) {
+            $maxPid = $this->db->sql_result($result, 0, 'max_pid');
+            if ($maxPid !== null && $maxPid !== '') {
+                return (int) $maxPid + 1;
+            }
+        }
+        
+        return 1; // Default to 1 if table is empty
+    }
+
+    /**
+     * Create a new player entry in ibl_plr from ibl_draft_class data
+     * 
+     * This method creates a new player record when they are drafted, mapping
+     * columns from ibl_draft_class to ibl_plr.
      * 
      * @param string $playerName The name of the drafted player (from ibl_draft_class)
      * @param string $teamName The name of the team that drafted the player
-     * @return bool True if update succeeded, false otherwise
+     * @return bool True if insert succeeded, false otherwise
      */
-    public function updatePlayerTable($playerName, $teamName)
+    public function createPlayerFromDraftClass($playerName, $teamName)
     {
         // Get the team ID from team name
         $teamId = $this->commonRepository->getTidFromTeamname($teamName);
@@ -121,58 +161,64 @@ class DraftRepository
             return false;
         }
 
-        // Ensure teamId is safely cast to int (getTidFromTeamname returns int|null)
+        // Ensure teamId is safely cast to int
         $teamId = (int) $teamId;
         
+        // Get player data from ibl_draft_class
         $playerNameEscaped = DatabaseService::escapeString($this->db, $playerName);
+        $query = "SELECT * FROM ibl_draft_class WHERE name = '$playerNameEscaped' LIMIT 1";
+        $result = $this->db->sql_query($query);
+        
+        if (!$result || $this->db->sql_numrows($result) === 0) {
+            // Player not found in draft class
+            return false;
+        }
+        
+        $draftClassPlayer = $this->db->sql_fetchrow($result);
+        
+        // Get next available PID
+        $pid = $this->getNextAvailablePid();
+        
+        // Map columns from ibl_draft_class to ibl_plr
+        // Truncate name to 32 characters to fit ibl_plr.name varchar(32)
+        $name = substr($playerName, 0, self::IBL_PLR_NAME_MAX_LENGTH);
+        $nameEscaped = DatabaseService::escapeString($this->db, $name);
         $teamNameEscaped = DatabaseService::escapeString($this->db, $teamName);
-
-        // First try exact match
-        $query = "UPDATE ibl_plr
-                  SET tid = $teamId, 
-                      teamname = '$teamNameEscaped'
-                  WHERE name = '$playerNameEscaped'";
+        $pos = DatabaseService::escapeString($this->db, $draftClassPlayer['pos']);
+        
+        // Map ratings from draft class to player table
+        // Offensive: offo->oo, offd->od, offp->po, offt->to
+        // Defensive: defo->do, defd->dd, defp->pd, deft->td
+        $oo = (int) $draftClassPlayer['offo'];
+        $od = (int) $draftClassPlayer['offd'];
+        $po = (int) $draftClassPlayer['offp'];
+        $to = (int) $draftClassPlayer['offt'];
+        $do = (int) $draftClassPlayer['defo'];
+        $dd = (int) $draftClassPlayer['defd'];
+        $pd = (int) $draftClassPlayer['defp'];
+        $td = (int) $draftClassPlayer['deft'];
+        
+        $age = (int) $draftClassPlayer['age'];
+        $sta = (int) $draftClassPlayer['sta'];
+        $talent = (int) $draftClassPlayer['tal'];
+        $skill = (int) $draftClassPlayer['skl'];
+        $intangibles = (int) $draftClassPlayer['int'];
+        
+        // Insert new player into ibl_plr
+        $query = "INSERT INTO ibl_plr (
+            pid, name, age, tid, teamname, pos,
+            sta, oo, od, po, `to`, `do`, dd, pd, td,
+            talent, skill, intangibles,
+            active, bird, exp, cy, cyt
+        ) VALUES (
+            $pid, '$nameEscaped', $age, $teamId, '$teamNameEscaped', '$pos',
+            $sta, $oo, $od, $po, $to, $do, $dd, $pd, $td,
+            $talent, $skill, $intangibles,
+            1, 0, 0, 0, 0
+        )";
         
         $result = $this->db->sql_query($query);
-        
-        // Check if the update affected any rows
-        if ($result && $this->db->sql_affectedrows() > 0) {
-            return true;
-        }
-
-        // If no exact match, try partial match (for truncated names or diacriticals)
-        // Match if the ibl_plr name is a prefix of the full name from draft class
-        // This handles truncation at 32 characters
-        $truncatedName = substr($playerName, 0, self::IBL_PLR_NAME_MAX_LENGTH);
-        $truncatedNameEscaped = DatabaseService::escapeString($this->db, $truncatedName);
-        
-        $query = "UPDATE ibl_plr
-                  SET tid = $teamId, 
-                      teamname = '$teamNameEscaped'
-                  WHERE name = '$truncatedNameEscaped'";
-        
-        $result = $this->db->sql_query($query);
-        
-        if ($result && $this->db->sql_affectedrows() > 0) {
-            return true;
-        }
-
-        // If still no match, try a LIKE match for diacritical differences
-        // This uses % wildcards to match similar names
-        // We'll match the first 30 characters to avoid matching wrong players
-        $partialName = substr($playerName, 0, self::PARTIAL_NAME_MATCH_LENGTH);
-        $partialNameEscaped = DatabaseService::escapeString($this->db, $partialName);
-        
-        $query = "UPDATE ibl_plr
-                  SET tid = $teamId, 
-                      teamname = '$teamNameEscaped'
-                  WHERE name LIKE '$partialNameEscaped%'
-                  LIMIT 1";
-        
-        $result = $this->db->sql_query($query);
-        
-        // Check if this final attempt affected any rows
-        return (bool)($result && $this->db->sql_affectedrows() > 0);
+        return (bool)$result;
     }
 
     /**

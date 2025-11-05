@@ -134,54 +134,6 @@ class TeamController
     }
 
     /**
-     * Display draft history page
-     */
-    public function displayDraftHistory(int $teamID): void
-    {
-        $teamID = (int) $teamID;
-
-        \Nuke\Header::header();
-        OpenTable();
-        \UI::displaytopmenu($this->db, $teamID);
-
-        $team = \Team::initialize($this->db, $teamID);
-
-        echo "$team->name Draft History
-            <table class=\"sortable\">
-                <tr>
-                    <th>Player</th>
-                    <th>Pos</th>
-                    <th>Year</th>
-                    <th>Round</th>
-                    <th>Pick</th>
-                </tr>";
-
-        foreach ($team->getDraftHistoryResult() as $playerRow) {
-            $player = Player::withPlrRow($this->db, $playerRow);
-
-            echo "<tr>";
-
-            if ($player->isRetired) {
-                echo "<td><a href=\"./modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->name</a> (retired)</td>";
-            } else {
-                echo "<td><a href=\"./modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->name</a></td>";
-            }
-
-            echo "
-                <td>$player->position</td>
-                <td>$player->draftYear</td>
-                <td>$player->draftRound</td>
-                <td>$player->draftPickNumber</td>
-            </tr>";
-        }
-
-        echo "</table>";
-
-        CloseTable();
-        \Nuke\Footer::footer();
-    }
-
-    /**
      * Display main menu
      */
     public function displayMenu(): void

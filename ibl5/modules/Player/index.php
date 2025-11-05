@@ -1,7 +1,7 @@
 <?php
 
-use Player\Player;
 use Player\PlayerRepository;
+use Player\PlayerContractValidator;
 
 if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
     die("You can't access this file directly...");
@@ -18,10 +18,9 @@ function showpage($playerID, $pageView)
     $sharedFunctions = new Shared($db);
     $season = new Season($db);
     
-    // Load player using PlayerRepository and Player::fromPlayerData helper
+    // Load player data using PlayerRepository
     $playerRepository = new PlayerRepository($db);
     $playerData = $playerRepository->loadByID($playerID);
-    $player = Player::fromPlayerData($db, $playerData);
     
     $playerStats = PlayerStats::withPlayerID($db, $playerID);
     $pageView = ($pageView !== null) ? intval($pageView) : null;
@@ -34,13 +33,13 @@ function showpage($playerID, $pageView)
 
     echo "<table>
         <tr>
-            <td valign=top><font class=\"title\">$player->position $player->name ";
+            <td valign=top><font class=\"title\">$playerData->position $playerData->name ";
 
-    if ($player->nickname != NULL) {
-        echo "- Nickname: \"$player->nickname\" ";
+    if ($playerData->nickname != NULL) {
+        echo "- Nickname: \"$playerData->nickname\" ";
     }
 
-    echo "(<a href=\"modules.php?name=Team&op=team&teamID=$player->teamID\">$player->teamName</a>)</font>
+    echo "(<a href=\"modules.php?name=Team&op=team&teamID=$playerData->teamID\">$playerData->teamName</a>)</font>
         <hr>
         <table>
             <tr>
@@ -51,8 +50,9 @@ function showpage($playerID, $pageView)
 
     $userTeamName = $sharedFunctions->getTeamnameFromUsername($cookie[1]);
     $userTeam = Team::initialize($db, $userTeamName);
+    $contractValidator = new PlayerContractValidator();
 
-    if ($player->wasRookieOptioned()) {
+    if ($contractValidator->wasRookieOptioned($playerData)) {
         echo "<table align=right bgcolor=#ff0000>
                 <tr>
                     <td align=center>ROOKIE OPTION<br>USED; RENEGOTIATION<br>IMPOSSIBLE</td>
@@ -61,8 +61,8 @@ function showpage($playerID, $pageView)
     } elseif (
         $userTeam->name != "Free Agents"
         AND $userTeam->hasUsedExtensionThisSeason == 0
-        AND $player->canRenegotiateContract()
-        AND $player->teamName == $userTeam->name
+        AND $contractValidator->canRenegotiateContract($playerData)
+        AND $playerData->teamName == $userTeam->name
         AND $season->phase != 'Draft'
         AND $season->phase != 'Free Agency'
     ) {
@@ -77,8 +77,8 @@ function showpage($playerID, $pageView)
 
     if (
         $userTeam->name != "Free Agents"
-        AND $player->canRookieOption($season->phase)
-        AND $player->teamName == $userTeam->name
+        AND $contractValidator->canRookieOption($playerData, $season->phase)
+        AND $playerData->teamName == $userTeam->name
         ) {
             echo "<table align=right bgcolor=#ffbb00>
                 <tr>
@@ -87,10 +87,10 @@ function showpage($playerID, $pageView)
             </table>";
     }
 
-    $contract_display = implode("/", $player->getRemainingContractArray());
+    $contract_display = implode("/", $playerData->getRemainingContractArray());
 
-    echo "<font class=\"content\">Age: $player->age | Height: $player->heightFeet-$player->heightInches | Weight: $player->weightPounds | College: $player->collegeName<br>
-        <i>Drafted by the $player->draftTeamOriginalName with the # $player->draftPickNumber pick of round $player->draftRound in the <a href=\"draft.php?year=$player->draftYear\">$player->draftYear Draft</a></i><br>
+    echo "<font class=\"content\">Age: $playerData->age | Height: $playerData->heightFeet-$playerData->heightInches | Weight: $playerData->weightPounds | College: $playerData->collegeName<br>
+        <i>Drafted by the $playerData->draftTeamOriginalName with the # $playerData->draftPickNumber pick of round $playerData->draftRound in the <a href=\"draft.php?year=$playerData->draftYear\">$playerData->draftYear Draft</a></i><br>
         <center><table>
             <tr>
                 <td align=center><b>2ga</b></td>
@@ -116,30 +116,30 @@ function showpage($playerID, $pageView)
                 <td align=center><b>td</b></td>
             </tr>
             <tr>
-                <td align=center>$player->ratingFieldGoalAttempts</td>
-                <td align=center>$player->ratingFieldGoalPercentage</td>
-                <td align=center>$player->ratingFreeThrowAttempts</td>
-                <td align=center>$player->ratingFreeThrowPercentage</td>
-                <td align=center>$player->ratingThreePointAttempts</td>
-                <td align=center>$player->ratingThreePointPercentage</td>
-                <td align=center>$player->ratingOffensiveRebounds</td>
-                <td align=center>$player->ratingDefensiveRebounds</td>
-                <td align=center>$player->ratingAssists</td>
-                <td align=center>$player->ratingSteals</td>
-                <td align=center>$player->ratingTurnovers</td>
-                <td align=center>$player->ratingBlocks</td>
-                <td align=center>$player->ratingFouls</td>
-                <td align=center>$player->ratingOutsideOffense</td>
-                <td align=center>$player->ratingDriveOffense</td>
-                <td align=center>$player->ratingPostOffense</td>
-                <td align=center>$player->ratingTransitionOffense</td>
-                <td align=center>$player->ratingOutsideDefense</td>
-                <td align=center>$player->ratingDriveDefense</td>
-                <td align=center>$player->ratingPostDefense</td>
-                <td align=center>$player->ratingTransitionDefense</td>
+                <td align=center>$playerData->ratingFieldGoalAttempts</td>
+                <td align=center>$playerData->ratingFieldGoalPercentage</td>
+                <td align=center>$playerData->ratingFreeThrowAttempts</td>
+                <td align=center>$playerData->ratingFreeThrowPercentage</td>
+                <td align=center>$playerData->ratingThreePointAttempts</td>
+                <td align=center>$playerData->ratingThreePointPercentage</td>
+                <td align=center>$playerData->ratingOffensiveRebounds</td>
+                <td align=center>$playerData->ratingDefensiveRebounds</td>
+                <td align=center>$playerData->ratingAssists</td>
+                <td align=center>$playerData->ratingSteals</td>
+                <td align=center>$playerData->ratingTurnovers</td>
+                <td align=center>$playerData->ratingBlocks</td>
+                <td align=center>$playerData->ratingFouls</td>
+                <td align=center>$playerData->ratingOutsideOffense</td>
+                <td align=center>$playerData->ratingDriveOffense</td>
+                <td align=center>$playerData->ratingPostOffense</td>
+                <td align=center>$playerData->ratingTransitionOffense</td>
+                <td align=center>$playerData->ratingOutsideDefense</td>
+                <td align=center>$playerData->ratingDriveDefense</td>
+                <td align=center>$playerData->ratingPostDefense</td>
+                <td align=center>$playerData->ratingTransitionDefense</td>
             </tr>
         </table></center>
-    <b>BIRD YEARS:</b> $player->birdYears | <b>Remaining Contract:</b> $contract_display </td>";
+    <b>BIRD YEARS:</b> $playerData->birdYears | <b>Remaining Contract:</b> $contract_display </td>";
 
     echo "<td rowspan=3 valign=top>
         <table border=1 cellspacing=0 cellpadding=0>
@@ -701,26 +701,26 @@ function rookieoption($pid)
     $sharedFunctions = new Shared($db);
     $season = new Season($db);
     
-    // Load player using PlayerRepository and Player::fromPlayerData helper
+    // Load player data using PlayerRepository
     $playerRepository = new PlayerRepository($db);
     $playerData = $playerRepository->loadByID($pid);
-    $player = Player::fromPlayerData($db, $playerData);
+    $contractValidator = new PlayerContractValidator();
 
     $userteam = $sharedFunctions->getTeamnameFromUsername($cookie[1]);
     $userTeamID = $sharedFunctions->getTidFromTeamname($userteam);
 
-    if ($userTeamID != $player->teamID) {
-        echo "$player->position $player->name is not on your team.<br>
+    if ($userTeamID != $playerData->teamID) {
+        echo "$playerData->position $playerData->name is not on your team.<br>
             <a href=\"javascript:history.back()\">Go Back</a>";
         return;
     }
 
-    if ($player->draftRound == 1 AND $player->canRookieOption($season->phase)) {
-        $finalYearOfRookieContract = $player->contractYear3Salary;
-    } elseif ($player->draftRound == 2 AND $player->canRookieOption($season->phase)) {
-        $finalYearOfRookieContract = $player->contractYear2Salary;
+    if ($playerData->draftRound == 1 AND $contractValidator->canRookieOption($playerData, $season->phase)) {
+        $finalYearOfRookieContract = $playerData->contractYear3Salary;
+    } elseif ($playerData->draftRound == 2 AND $contractValidator->canRookieOption($playerData, $season->phase)) {
+        $finalYearOfRookieContract = $playerData->contractYear2Salary;
     } else {
-        echo "Sorry, $player->position $player->name is not eligible for a rookie option.<p>
+        echo "Sorry, $playerData->position $playerData->name is not eligible for a rookie option.<p>
             Only draft picks are eligible for rookie options, and the option must be exercised
             before the final season of their rookie contract is underway.<p>
     		<a href=\"javascript:history.back()\">Go Back</a>";
@@ -730,13 +730,13 @@ function rookieoption($pid)
     $rookieOptionValue = 2 * $finalYearOfRookieContract;
 
     echo "<img align=left src=\"images/player/$pid.jpg\">
-    	You may exercise the rookie extension option on <b>$player->position $player->name</b>.<br>
+    	You may exercise the rookie extension option on <b>$playerData->position $playerData->name</b>.<br>
     	Their contract value the season after this one will be <b>$rookieOptionValue</b>.<br>
     	However, by exercising this option, <b>you can't use an in-season contract extension on them next season</b>.<br>
     	<b>They will become a free agent</b>.<br>
     	<form name=\"RookieExtend\" method=\"post\" action=\"/ibl5/modules/Player/rookieoption.php\">
             <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
-            <input type=\"hidden\" name=\"playerID\" value=\"$player->playerID\">
+            <input type=\"hidden\" name=\"playerID\" value=\"$playerData->playerID\">
             <input type=\"hidden\" name=\"rookieOptionValue\" value=\"$rookieOptionValue\">
             <input type=\"submit\" value=\"Activate Rookie Extension\">
         </form>";

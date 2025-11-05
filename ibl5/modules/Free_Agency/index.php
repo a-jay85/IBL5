@@ -1,6 +1,5 @@
 <?php
 
-use Player\Player;
 use Player\PlayerRepository;
 
 /************************************************************************/
@@ -120,87 +119,87 @@ function display()
 
 
     foreach ($team->getRosterUnderContractOrderedByOrdinalResult() as $playerRow) {
-        $player = Player::fromPlayerData($db, (new PlayerRepository($db))->fillFromCurrentRow($playerRow));
+        $playerData = (new PlayerRepository($db))->fillFromCurrentRow($playerRow);
 
-        $yearPlayerIsFreeAgent = $player->draftYear + $player->yearsOfExperience + $player->contractTotalYears - $player->contractCurrentYear;
+        $yearPlayerIsFreeAgent = $playerData->draftYear + $playerData->yearsOfExperience + $playerData->contractTotalYears - $playerData->contractCurrentYear;
         if ($yearPlayerIsFreeAgent != $season->endingYear) {
             // === MATCH UP CONTRACT AMOUNTS WITH FUTURE YEARS BASED ON CURRENT YEAR OF CONTRACT
 
             $year1Salary = $year2Salary = $year3Salary = $year4Salary = $year5Salary = $year6Salary = 0;
 
             // if player name doesn't start with '|' (pipe symbol), then don't occupy a roster slot
-            $firstCharacterOfPlayerName = substr($player->name, 0, 1); 
+            $firstCharacterOfPlayerName = substr($playerData->name, 0, 1); 
 
-            if ($player->contractCurrentYear == 0) {
-                $year1Salary = $player->contractYear1Salary;
-                $year2Salary = $player->contractYear2Salary;
-                $year3Salary = $player->contractYear3Salary;
-                $year4Salary = $player->contractYear4Salary;
-                $year5Salary = $player->contractYear5Salary;
-                $year6Salary = $player->contractYear6Salary;
+            if ($playerData->contractCurrentYear == 0) {
+                $year1Salary = $playerData->contractYear1Salary;
+                $year2Salary = $playerData->contractYear2Salary;
+                $year3Salary = $playerData->contractYear3Salary;
+                $year4Salary = $playerData->contractYear4Salary;
+                $year5Salary = $playerData->contractYear5Salary;
+                $year6Salary = $playerData->contractYear6Salary;
 
-                if ($player->teamName == $team->name AND $firstCharacterOfPlayerName !== '|') {
-                    if ($player->contractYear1Salary != 0) $rosterspots1--;
-                    if ($player->contractYear2Salary != 0) $rosterspots2--;
-                    if ($player->contractYear3Salary != 0) $rosterspots3--;
-                    if ($player->contractYear4Salary != 0) $rosterspots4--;
-                    if ($player->contractYear5Salary != 0) $rosterspots5--;
-                    if ($player->contractYear6Salary != 0) $rosterspots6--;
+                if ($playerData->teamName == $team->name AND $firstCharacterOfPlayerName !== '|') {
+                    if ($playerData->contractYear1Salary != 0) $rosterspots1--;
+                    if ($playerData->contractYear2Salary != 0) $rosterspots2--;
+                    if ($playerData->contractYear3Salary != 0) $rosterspots3--;
+                    if ($playerData->contractYear4Salary != 0) $rosterspots4--;
+                    if ($playerData->contractYear5Salary != 0) $rosterspots5--;
+                    if ($playerData->contractYear6Salary != 0) $rosterspots6--;
                 }
             }
-            if ($player->contractCurrentYear == 1) {
-                $year1Salary = $player->contractYear2Salary;
-                $year2Salary = $player->contractYear3Salary;
-                $year3Salary = $player->contractYear4Salary;
-                $year4Salary = $player->contractYear5Salary;
-                $year5Salary = $player->contractYear6Salary;
+            if ($playerData->contractCurrentYear == 1) {
+                $year1Salary = $playerData->contractYear2Salary;
+                $year2Salary = $playerData->contractYear3Salary;
+                $year3Salary = $playerData->contractYear4Salary;
+                $year4Salary = $playerData->contractYear5Salary;
+                $year5Salary = $playerData->contractYear6Salary;
 
-                if ($player->teamName == $team->name AND $firstCharacterOfPlayerName !== '|') {
-                    if ($player->contractYear2Salary != 0) $rosterspots1--;
-                    if ($player->contractYear3Salary != 0) $rosterspots2--;
-                    if ($player->contractYear4Salary != 0) $rosterspots3--;
-                    if ($player->contractYear5Salary != 0) $rosterspots4--;
-                    if ($player->contractYear6Salary != 0) $rosterspots5--;
+                if ($playerData->teamName == $team->name AND $firstCharacterOfPlayerName !== '|') {
+                    if ($playerData->contractYear2Salary != 0) $rosterspots1--;
+                    if ($playerData->contractYear3Salary != 0) $rosterspots2--;
+                    if ($playerData->contractYear4Salary != 0) $rosterspots3--;
+                    if ($playerData->contractYear5Salary != 0) $rosterspots4--;
+                    if ($playerData->contractYear6Salary != 0) $rosterspots5--;
                 }
             }
-            if ($player->contractCurrentYear == 2) {
-                $year1Salary = $player->contractYear3Salary;
-                $year2Salary = $player->contractYear4Salary;
-                $year3Salary = $player->contractYear5Salary;
-                $year4Salary = $player->contractYear6Salary;
+            if ($playerData->contractCurrentYear == 2) {
+                $year1Salary = $playerData->contractYear3Salary;
+                $year2Salary = $playerData->contractYear4Salary;
+                $year3Salary = $playerData->contractYear5Salary;
+                $year4Salary = $playerData->contractYear6Salary;
 
-                if ($player->teamName == $team->name AND $firstCharacterOfPlayerName !== '|') {
-                    if ($player->contractYear3Salary != 0) $rosterspots1--;
-                    if ($player->contractYear4Salary != 0) $rosterspots2--;
-                    if ($player->contractYear5Salary != 0) $rosterspots3--;
-                    if ($player->contractYear6Salary != 0) $rosterspots4--;
+                if ($playerData->teamName == $team->name AND $firstCharacterOfPlayerName !== '|') {
+                    if ($playerData->contractYear3Salary != 0) $rosterspots1--;
+                    if ($playerData->contractYear4Salary != 0) $rosterspots2--;
+                    if ($playerData->contractYear5Salary != 0) $rosterspots3--;
+                    if ($playerData->contractYear6Salary != 0) $rosterspots4--;
                 }
             }
-            if ($player->contractCurrentYear == 3) {
-                $year1Salary = $player->contractYear4Salary;
-                $year2Salary = $player->contractYear5Salary;
-                $year3Salary = $player->contractYear6Salary;
+            if ($playerData->contractCurrentYear == 3) {
+                $year1Salary = $playerData->contractYear4Salary;
+                $year2Salary = $playerData->contractYear5Salary;
+                $year3Salary = $playerData->contractYear6Salary;
 
-                if ($player->teamName == $team->name AND $firstCharacterOfPlayerName !== '|') {
-                    if ($player->contractYear4Salary != 0) $rosterspots1--;
-                    if ($player->contractYear5Salary != 0) $rosterspots2--;
-                    if ($player->contractYear6Salary != 0) $rosterspots3--;
+                if ($playerData->teamName == $team->name AND $firstCharacterOfPlayerName !== '|') {
+                    if ($playerData->contractYear4Salary != 0) $rosterspots1--;
+                    if ($playerData->contractYear5Salary != 0) $rosterspots2--;
+                    if ($playerData->contractYear6Salary != 0) $rosterspots3--;
                 }
             }
-            if ($player->contractCurrentYear == 4) {
-                $year1Salary = $player->contractYear5Salary;
-                $year2Salary = $player->contractYear6Salary;
+            if ($playerData->contractCurrentYear == 4) {
+                $year1Salary = $playerData->contractYear5Salary;
+                $year2Salary = $playerData->contractYear6Salary;
 
-                if ($player->teamName == $team->name AND $firstCharacterOfPlayerName !== '|') {
-                    if ($player->contractYear5Salary != 0) $rosterspots1--;
-                    if ($player->contractYear6Salary != 0) $rosterspots2--;
+                if ($playerData->teamName == $team->name AND $firstCharacterOfPlayerName !== '|') {
+                    if ($playerData->contractYear5Salary != 0) $rosterspots1--;
+                    if ($playerData->contractYear6Salary != 0) $rosterspots2--;
                 }
             }
-            if ($player->contractCurrentYear == 5) {
-                $year1Salary = $player->contractYear6Salary;
+            if ($playerData->contractCurrentYear == 5) {
+                $year1Salary = $playerData->contractYear6Salary;
 
-                if ($player->teamName == $team->name AND $firstCharacterOfPlayerName !== '|') {
-                    if ($player->contractYear6Salary != 0) $rosterspots1--;
+                if ($playerData->teamName == $team->name AND $firstCharacterOfPlayerName !== '|') {
+                    if ($playerData->contractYear6Salary != 0) $rosterspots1--;
                 }
             }
 
@@ -208,54 +207,54 @@ function display()
                 <td>";
 
             // ==== ROOKIE OPTIONS
-            if ($player->canRookieOption($season->phase)) {
-                echo "<a href=\"modules.php?name=Player&pa=rookieoption&pid=$player->playerID\">Rookie Option</a>";
+            if ($playerData->canRookieOption($season->phase)) {
+                echo "<a href=\"modules.php?name=Player&pa=rookieoption&pid=$playerData->playerID\">Rookie Option</a>";
             }
 
-            if ($player->ordinal > JSB::WAIVERS_ORDINAL) {
-                $player->name .= "*";
+            if ($playerData->ordinal > JSB::WAIVERS_ORDINAL) {
+                $playerData->name .= "*";
             }
 
             echo "</td>
-                <td>$player->position</td>
-                <td><a href=\"modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->name</a></td>
-                <td><a href=\"modules.php?name=Team&op=team&teamID=$player->teamID\">$player->teamName</a></td>
-                <td>$player->age</td>
-                <td>$player->ratingFieldGoalAttempts</td>
-                <td>$player->ratingFieldGoalPercentage</td>
-                <td>$player->ratingFreeThrowAttempts</td>
-                <td>$player->ratingFreeThrowPercentage</td>
-                <td>$player->ratingThreePointAttempts</td>
-                <td>$player->ratingThreePointPercentage</td>
-                <td>$player->ratingOffensiveRebounds</td>
-                <td>$player->ratingDefensiveRebounds</td>
-                <td>$player->ratingAssists</td>
-                <td>$player->ratingSteals</td>
-                <td>$player->ratingTurnovers</td>
-                <td>$player->ratingBlocks</td>
-                <td>$player->ratingFouls</td>
-                <td>$player->ratingOutsideOffense</td>
-                <td>$player->ratingDriveOffense</td>
-                <td>$player->ratingPostOffense</td>
-                <td>$player->ratingTransitionOffense</td>
-                <td>$player->ratingOutsideDefense</td>
-                <td>$player->ratingDriveDefense</td>
-                <td>$player->ratingPostDefense</td>
-                <td>$player->ratingTransitionDefense</td>
-                <td>$player->ratingTalent</td>
-                <td>$player->ratingSkill</td>
-                <td>$player->ratingIntangibles</td>
+                <td>$playerData->position</td>
+                <td><a href=\"modules.php?name=Player&pa=showpage&pid=$playerData->playerID\">$playerData->name</a></td>
+                <td><a href=\"modules.php?name=Team&op=team&teamID=$playerData->teamID\">$playerData->teamName</a></td>
+                <td>$playerData->age</td>
+                <td>$playerData->ratingFieldGoalAttempts</td>
+                <td>$playerData->ratingFieldGoalPercentage</td>
+                <td>$playerData->ratingFreeThrowAttempts</td>
+                <td>$playerData->ratingFreeThrowPercentage</td>
+                <td>$playerData->ratingThreePointAttempts</td>
+                <td>$playerData->ratingThreePointPercentage</td>
+                <td>$playerData->ratingOffensiveRebounds</td>
+                <td>$playerData->ratingDefensiveRebounds</td>
+                <td>$playerData->ratingAssists</td>
+                <td>$playerData->ratingSteals</td>
+                <td>$playerData->ratingTurnovers</td>
+                <td>$playerData->ratingBlocks</td>
+                <td>$playerData->ratingFouls</td>
+                <td>$playerData->ratingOutsideOffense</td>
+                <td>$playerData->ratingDriveOffense</td>
+                <td>$playerData->ratingPostOffense</td>
+                <td>$playerData->ratingTransitionOffense</td>
+                <td>$playerData->ratingOutsideDefense</td>
+                <td>$playerData->ratingDriveDefense</td>
+                <td>$playerData->ratingPostDefense</td>
+                <td>$playerData->ratingTransitionDefense</td>
+                <td>$playerData->ratingTalent</td>
+                <td>$playerData->ratingSkill</td>
+                <td>$playerData->ratingIntangibles</td>
                 <td>$year1Salary</td>
                 <td>$year2Salary</td>
                 <td>$year3Salary</td>
                 <td>$year4Salary</td>
                 <td>$year5Salary</td>
                 <td>$year6Salary</td>
-                <td>$player->freeAgencyLoyalty</td>
-                <td>$player->freeAgencyPlayForWinner</td>
-                <td>$player->freeAgencyPlayingTime</td>
-                <td>$player->freeAgencySecurity</td>
-                <td>$player->freeAgencyTradition</td>
+                <td>$playerData->freeAgencyLoyalty</td>
+                <td>$playerData->freeAgencyPlayForWinner</td>
+                <td>$playerData->freeAgencyPlayingTime</td>
+                <td>$playerData->freeAgencySecurity</td>
+                <td>$playerData->freeAgencyTradition</td>
             </tr>";
 
             $year1TotalSalary += $year1Salary;
@@ -349,10 +348,9 @@ function display()
     foreach ($team->getFreeAgencyOffersResult() as $offerRow) {
         $playerID = $sharedFunctions->getPlayerIDFromPlayerName($offerRow['name']);
         
-        // Load player using PlayerRepository and Player::fromPlayerData helper
+        // Load player data using PlayerRepository
         $playerRepository = new PlayerRepository($db);
         $playerData = $playerRepository->loadByID($playerID);
-        $player = Player::fromPlayerData($db, $playerData);
 
         $offer1 = $offerRow['offer1'];
         $offer2 = $offerRow['offer2'];
@@ -362,46 +360,46 @@ function display()
         $offer6 = $offerRow['offer6'];
 
         echo "<tr>
-            <td><a href=\"modules.php?name=Free_Agency&pa=negotiate&pid=$player->playerID\">Negotiate</a></td>
-            <td>$player->position</td>
-            <td><a href=\"modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->name</a></td>
-            <td><a href=\"modules.php?name=Team&op=team&teamID=$player->teamID\">$player->teamName</a></td>
-            <td>$player->age</td>
-            <td>$player->ratingFieldGoalAttempts</td>
-            <td>$player->ratingFieldGoalPercentage</td>
-            <td>$player->ratingFreeThrowAttempts</td>
-            <td>$player->ratingFreeThrowPercentage</td>
-            <td>$player->ratingThreePointAttempts</td>
-            <td>$player->ratingThreePointPercentage</td>
-            <td>$player->ratingOffensiveRebounds</td>
-            <td>$player->ratingDefensiveRebounds</td>
-            <td>$player->ratingAssists</td>
-            <td>$player->ratingSteals</td>
-            <td>$player->ratingTurnovers</td>
-            <td>$player->ratingBlocks</td>
-            <td>$player->ratingFouls</td>
-            <td>$player->ratingOutsideOffense</td>
-            <td>$player->ratingDriveOffense</td>
-            <td>$player->ratingPostOffense</td>
-            <td>$player->ratingTransitionOffense</td>
-            <td>$player->ratingOutsideDefense</td>
-            <td>$player->ratingDriveDefense</td>
-            <td>$player->ratingPostDefense</td>
-            <td>$player->ratingTransitionDefense</td>
-            <td>$player->ratingTalent</td>
-            <td>$player->ratingSkill</td>
-            <td>$player->ratingIntangibles</td>
+            <td><a href=\"modules.php?name=Free_Agency&pa=negotiate&pid=$playerData->playerID\">Negotiate</a></td>
+            <td>$playerData->position</td>
+            <td><a href=\"modules.php?name=Player&pa=showpage&pid=$playerData->playerID\">$playerData->name</a></td>
+            <td><a href=\"modules.php?name=Team&op=team&teamID=$playerData->teamID\">$playerData->teamName</a></td>
+            <td>$playerData->age</td>
+            <td>$playerData->ratingFieldGoalAttempts</td>
+            <td>$playerData->ratingFieldGoalPercentage</td>
+            <td>$playerData->ratingFreeThrowAttempts</td>
+            <td>$playerData->ratingFreeThrowPercentage</td>
+            <td>$playerData->ratingThreePointAttempts</td>
+            <td>$playerData->ratingThreePointPercentage</td>
+            <td>$playerData->ratingOffensiveRebounds</td>
+            <td>$playerData->ratingDefensiveRebounds</td>
+            <td>$playerData->ratingAssists</td>
+            <td>$playerData->ratingSteals</td>
+            <td>$playerData->ratingTurnovers</td>
+            <td>$playerData->ratingBlocks</td>
+            <td>$playerData->ratingFouls</td>
+            <td>$playerData->ratingOutsideOffense</td>
+            <td>$playerData->ratingDriveOffense</td>
+            <td>$playerData->ratingPostOffense</td>
+            <td>$playerData->ratingTransitionOffense</td>
+            <td>$playerData->ratingOutsideDefense</td>
+            <td>$playerData->ratingDriveDefense</td>
+            <td>$playerData->ratingPostDefense</td>
+            <td>$playerData->ratingTransitionDefense</td>
+            <td>$playerData->ratingTalent</td>
+            <td>$playerData->ratingSkill</td>
+            <td>$playerData->ratingIntangibles</td>
             <td>$offer1</td>
             <td>$offer2</td>
             <td>$offer3</td>
             <td>$offer4</td>
             <td>$offer5</td>
             <td>$offer6</td>
-            <td>$player->freeAgencyLoyalty</td>
-            <td>$player->freeAgencyPlayForWinner</td>
-            <td>$player->freeAgencyPlayingTime</td>
-            <td>$player->freeAgencySecurity</td>
-            <td>$player->freeAgencyTradition</td>
+            <td>$playerData->freeAgencyLoyalty</td>
+            <td>$playerData->freeAgencyPlayForWinner</td>
+            <td>$playerData->freeAgencyPlayingTime</td>
+            <td>$playerData->freeAgencySecurity</td>
+            <td>$playerData->freeAgencyTradition</td>
         </tr>";
 
         $year1TotalSalary += $offer1;
@@ -554,11 +552,12 @@ function display()
 		<tbody>";
 
     foreach ($team->getRosterUnderContractOrderedByOrdinalResult() as $playerRow) {
-        $player = Player::fromPlayerData($db, (new PlayerRepository($db))->fillFromCurrentRow($playerRow));
+        $playerRepository = new PlayerRepository($db);
+        $playerData = $playerRepository->fillFromCurrentRow($playerRow);
 
-        $yearPlayerIsFreeAgent = $player->draftYear + $player->yearsOfExperience + $player->contractTotalYears - $player->contractCurrentYear;
+        $yearPlayerIsFreeAgent = $playerData->draftYear + $playerData->yearsOfExperience + $playerData->contractTotalYears - $playerData->contractCurrentYear;
         if ($yearPlayerIsFreeAgent == $season->endingYear) {
-            $playerDemands = $db->sql_fetchrow($player->getFreeAgencyDemands());
+            $playerDemands = $db->sql_fetchrow($playerRepository->getFreeAgencyDemands($playerData->name));
             $year1PlayerDemands = $playerDemands['dem1'];
             $year2PlayerDemands = $playerDemands['dem2'];
             $year3PlayerDemands = $playerDemands['dem3'];
@@ -570,57 +569,57 @@ function display()
 				<td>";
 
             if ($rosterspots1 > 0) {
-                echo "<a href=\"modules.php?name=Free_Agency&pa=negotiate&pid=$player->playerID\">Negotiate</a>";
+                echo "<a href=\"modules.php?name=Free_Agency&pa=negotiate&pid=$playerData->playerID\">Negotiate</a>";
             }
 
             echo "</td>
-                <td>$player->position</td>
-                <td><a href=\"modules.php?name=Player&pa=showpage&pid=$player->playerID\">";
+                <td>$playerData->position</td>
+                <td><a href=\"modules.php?name=Player&pa=showpage&pid=$playerData->playerID\">";
 
-            if ($player->birdYears >= 3) {
-                echo "*<i>$player->name</i>*";
+            if ($playerData->birdYears >= 3) {
+                echo "*<i>$playerData->name</i>*";
             } else {
-                echo "$player->name";
+                echo "$playerData->name";
             }
 
             echo "</a></td>
-				<td><a href=\"modules.php?name=Team&op=team&teamID=$player->teamID\">$player->teamName</a></td>
-                <td>$player->age</td>
-                <td>$player->ratingFieldGoalAttempts</td>
-                <td>$player->ratingFieldGoalPercentage</td>
-                <td>$player->ratingFreeThrowAttempts</td>
-                <td>$player->ratingFreeThrowPercentage</td>
-                <td>$player->ratingThreePointAttempts</td>
-                <td>$player->ratingThreePointPercentage</td>
-                <td>$player->ratingOffensiveRebounds</td>
-                <td>$player->ratingDefensiveRebounds</td>
-                <td>$player->ratingAssists</td>
-                <td>$player->ratingSteals</td>
-                <td>$player->ratingTurnovers</td>
-                <td>$player->ratingBlocks</td>
-                <td>$player->ratingFouls</td>
-                <td>$player->ratingOutsideOffense</td>
-                <td>$player->ratingDriveOffense</td>
-                <td>$player->ratingPostOffense</td>
-                <td>$player->ratingTransitionOffense</td>
-                <td>$player->ratingOutsideDefense</td>
-                <td>$player->ratingDriveDefense</td>
-                <td>$player->ratingPostDefense</td>
-                <td>$player->ratingTransitionDefense</td>
-                <td>$player->ratingTalent</td>
-                <td>$player->ratingSkill</td>
-                <td>$player->ratingIntangibles</td>
+				<td><a href=\"modules.php?name=Team&op=team&teamID=$playerData->teamID\">$playerData->teamName</a></td>
+                <td>$playerData->age</td>
+                <td>$playerData->ratingFieldGoalAttempts</td>
+                <td>$playerData->ratingFieldGoalPercentage</td>
+                <td>$playerData->ratingFreeThrowAttempts</td>
+                <td>$playerData->ratingFreeThrowPercentage</td>
+                <td>$playerData->ratingThreePointAttempts</td>
+                <td>$playerData->ratingThreePointPercentage</td>
+                <td>$playerData->ratingOffensiveRebounds</td>
+                <td>$playerData->ratingDefensiveRebounds</td>
+                <td>$playerData->ratingAssists</td>
+                <td>$playerData->ratingSteals</td>
+                <td>$playerData->ratingTurnovers</td>
+                <td>$playerData->ratingBlocks</td>
+                <td>$playerData->ratingFouls</td>
+                <td>$playerData->ratingOutsideOffense</td>
+                <td>$playerData->ratingDriveOffense</td>
+                <td>$playerData->ratingPostOffense</td>
+                <td>$playerData->ratingTransitionOffense</td>
+                <td>$playerData->ratingOutsideDefense</td>
+                <td>$playerData->ratingDriveDefense</td>
+                <td>$playerData->ratingPostDefense</td>
+                <td>$playerData->ratingTransitionDefense</td>
+                <td>$playerData->ratingTalent</td>
+                <td>$playerData->ratingSkill</td>
+                <td>$playerData->ratingIntangibles</td>
 				<td>$year1PlayerDemands</td>
 				<td>$year2PlayerDemands</td>
 				<td>$year3PlayerDemands</td>
 				<td>$year4PlayerDemands</td>
 				<td>$year5PlayerDemands</td>
 				<td>$year6PlayerDemands</td>
-                <td>$player->freeAgencyLoyalty</td>
-                <td>$player->freeAgencyPlayForWinner</td>
-                <td>$player->freeAgencyPlayingTime</td>
-                <td>$player->freeAgencySecurity</td>
-                <td>$player->freeAgencyTradition</td>
+                <td>$playerData->freeAgencyLoyalty</td>
+                <td>$playerData->freeAgencyPlayForWinner</td>
+                <td>$playerData->freeAgencyPlayingTime</td>
+                <td>$playerData->freeAgencySecurity</td>
+                <td>$playerData->freeAgencyTradition</td>
 			</tr>";
         }
     }
@@ -692,11 +691,12 @@ function display()
 
     $resultFreeAgentsNotOnUserTeam = $db->sql_query("SELECT * FROM ibl_plr WHERE teamname!='$team->name' AND retired='0' ORDER BY ordinal ASC");
     foreach ($resultFreeAgentsNotOnUserTeam as $playerRow) {
-        $player = Player::fromPlayerData($db, (new PlayerRepository($db))->fillFromCurrentRow($playerRow));
+        $playerRepository = new PlayerRepository($db);
+        $playerData = $playerRepository->fillFromCurrentRow($playerRow);
 
-        $yearPlayerIsFreeAgent = $player->draftYear + $player->yearsOfExperience + $player->contractTotalYears - $player->contractCurrentYear;
+        $yearPlayerIsFreeAgent = $playerData->draftYear + $playerData->yearsOfExperience + $playerData->contractTotalYears - $playerData->contractCurrentYear;
         if ($yearPlayerIsFreeAgent == $season->endingYear) {
-            $playerDemands = $db->sql_fetchrow($player->getFreeAgencyDemands());
+            $playerDemands = $db->sql_fetchrow($playerRepository->getFreeAgencyDemands($playerData->name));
             $year1PlayerDemands = $playerDemands['dem1'];
             $year2PlayerDemands = $playerDemands['dem2'];
             $year3PlayerDemands = $playerDemands['dem3'];
@@ -708,40 +708,40 @@ function display()
                 <td>";
 
             if ($rosterspots1 > 0) {
-                echo "<a href=\"modules.php?name=Free_Agency&pa=negotiate&pid=$player->playerID\">Negotiate</a>";
+                echo "<a href=\"modules.php?name=Free_Agency&pa=negotiate&pid=$playerData->playerID\">Negotiate</a>";
             }
 
             echo "</td>
-				<td>$player->position</td>
-				<td><a href=\"modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->name</a></td>
-				<td><a href=\"modules.php?name=Team&op=team&teamID=$player->teamID\">$player->teamName</a></td>
-                <td>$player->age</td>
-                <td>$player->ratingFieldGoalAttempts</td>
-                <td>$player->ratingFieldGoalPercentage</td>
-                <td>$player->ratingFreeThrowAttempts</td>
-                <td>$player->ratingFreeThrowPercentage</td>
-                <td>$player->ratingThreePointAttempts</td>
-                <td>$player->ratingThreePointPercentage</td>
-                <td>$player->ratingOffensiveRebounds</td>
-                <td>$player->ratingDefensiveRebounds</td>
-                <td>$player->ratingAssists</td>
-                <td>$player->ratingSteals</td>
-                <td>$player->ratingTurnovers</td>
-                <td>$player->ratingBlocks</td>
-                <td>$player->ratingFouls</td>
-                <td>$player->ratingOutsideOffense</td>
-                <td>$player->ratingDriveOffense</td>
-                <td>$player->ratingPostOffense</td>
-                <td>$player->ratingTransitionOffense</td>
-                <td>$player->ratingOutsideDefense</td>
-                <td>$player->ratingDriveDefense</td>
-                <td>$player->ratingPostDefense</td>
-                <td>$player->ratingTransitionDefense</td>
-                <td>$player->ratingTalent</td>
-                <td>$player->ratingSkill</td>
-                <td>$player->ratingIntangibles</td>";
+				<td>$playerData->position</td>
+				<td><a href=\"modules.php?name=Player&pa=showpage&pid=$playerData->playerID\">$playerData->name</a></td>
+				<td><a href=\"modules.php?name=Team&op=team&teamID=$playerData->teamID\">$playerData->teamName</a></td>
+                <td>$playerData->age</td>
+                <td>$playerData->ratingFieldGoalAttempts</td>
+                <td>$playerData->ratingFieldGoalPercentage</td>
+                <td>$playerData->ratingFreeThrowAttempts</td>
+                <td>$playerData->ratingFreeThrowPercentage</td>
+                <td>$playerData->ratingThreePointAttempts</td>
+                <td>$playerData->ratingThreePointPercentage</td>
+                <td>$playerData->ratingOffensiveRebounds</td>
+                <td>$playerData->ratingDefensiveRebounds</td>
+                <td>$playerData->ratingAssists</td>
+                <td>$playerData->ratingSteals</td>
+                <td>$playerData->ratingTurnovers</td>
+                <td>$playerData->ratingBlocks</td>
+                <td>$playerData->ratingFouls</td>
+                <td>$playerData->ratingOutsideOffense</td>
+                <td>$playerData->ratingDriveOffense</td>
+                <td>$playerData->ratingPostOffense</td>
+                <td>$playerData->ratingTransitionOffense</td>
+                <td>$playerData->ratingOutsideDefense</td>
+                <td>$playerData->ratingDriveDefense</td>
+                <td>$playerData->ratingPostDefense</td>
+                <td>$playerData->ratingTransitionDefense</td>
+                <td>$playerData->ratingTalent</td>
+                <td>$playerData->ratingSkill</td>
+                <td>$playerData->ratingIntangibles</td>";
 
-            if ($player->yearsOfExperience > 0) {
+            if ($playerData->yearsOfExperience > 0) {
                 echo "
                 <td>$year1PlayerDemands</td>
 				<td>$year2PlayerDemands</td>
@@ -762,11 +762,11 @@ function display()
             }
 
             echo "
-                <td>$player->freeAgencyLoyalty</td>
-                <td>$player->freeAgencyPlayForWinner</td>
-                <td>$player->freeAgencyPlayingTime</td>
-                <td>$player->freeAgencySecurity</td>
-                <td>$player->freeAgencyTradition</td>
+                <td>$playerData->freeAgencyLoyalty</td>
+                <td>$playerData->freeAgencyPlayForWinner</td>
+                <td>$playerData->freeAgencyPlayingTime</td>
+                <td>$playerData->freeAgencySecurity</td>
+                <td>$playerData->freeAgencyTradition</td>
 			</tr>";
         }
     }

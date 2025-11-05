@@ -2,8 +2,8 @@
 
 namespace RookieOption;
 
-use Player\Player;
 use Player\PlayerRepository;
+use Player\PlayerContractValidator;
 
 /**
  * Main controller for rookie option operations
@@ -43,23 +43,23 @@ class RookieOptionController
         $sharedFunctions = new \Shared($this->db);
         $season = new \Season($this->db);
         
-        // Load player using PlayerRepository and Player::fromPlayerData helper
+        // Load player data using PlayerRepository
         $playerRepository = new PlayerRepository($this->db);
         $playerData = $playerRepository->loadByID($playerID);
-        $player = Player::fromPlayerData($this->db, $playerData);
         
-        // Validate player eligibility
-        if (!$player->canRookieOption($season->phase)) {
+        // Validate player eligibility using PlayerContractValidator
+        $contractValidator = new PlayerContractValidator();
+        if (!$contractValidator->canRookieOption($playerData, $season->phase)) {
             die("This player's experience doesn't match their rookie status; please let the commish know about this error.");
         }
         
         // Determine which contract year to update based on draft round
-        if ($player->draftRound != 1 && $player->draftRound != 2) {
+        if ($playerData->draftRound != 1 && $playerData->draftRound != 2) {
             die("This player's experience doesn't match their rookie status; please let the commish know about this error.");
         }
         
         // Update player's contract
-        if (!$this->repository->updatePlayerRookieOption($playerID, $player->draftRound, $extensionAmount)) {
+        if (!$this->repository->updatePlayerRookieOption($playerID, $playerData->draftRound, $extensionAmount)) {
             die("Failed to update player contract. Please contact the commissioner.");
         }
         
@@ -67,17 +67,17 @@ class RookieOptionController
         $teamID = $sharedFunctions->getTidFromTeamname($teamName);
         
         // Send Discord notification
-        $discordMessage = $teamName . " exercise the rookie extension option on " . $player->name . " in the amount of " . $extensionAmount . ".";
+        $discordMessage = $teamName . " exercise the rookie extension option on " . $playerData->name . " in the amount of " . $extensionAmount . ".";
         \Discord::postToChannel(self::DISCORD_CHANNEL, $discordMessage);
         
         // Send email notification
-        $emailSubject = "Rookie Extension Option - " . $player->name;
+        $emailSubject = "Rookie Extension Option - " . $playerData->name;
         $emailBody = $discordMessage;
         $emailSuccess = mail(self::NOTIFICATION_EMAIL_RECIPIENT, $emailSubject, $emailBody, "From: " . self::NOTIFICATION_EMAIL_SENDER);
         
         // Create news story if email succeeded
         if ($emailSuccess) {
-            $this->createRookieOptionNewsStory($teamName, $player->name, $extensionAmount);
+            $this->createRookieOptionNewsStory($teamName, $playerData->name, $extensionAmount);
         }
         
         // Display success page

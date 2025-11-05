@@ -55,16 +55,16 @@ class ExtensionProcessor
         $offer = $extensionData['offer'];
         $demands = isset($extensionData['demands']) ? $extensionData['demands'] : null;
 
-        // Create Player and Team objects if not already provided
-        $player = $this->getPlayerObject($extensionData);
-        if (!$player) {
+        // Get PlayerData if not already provided
+        $playerData = $this->getPlayerData($extensionData);
+        if (!$playerData) {
             return [
                 'success' => false,
                 'error' => 'Player not found in database.'
             ];
         }
 
-        $team = $this->getTeamObject($extensionData, $player);
+        $team = $this->getTeamObject($extensionData, $playerData);
         if (!$team) {
             return [
                 'success' => false,
@@ -91,7 +91,7 @@ class ExtensionProcessor
         }
 
         // Validate maximum offer using player's years of experience
-        $maxOfferValidation = $this->validator->validateMaximumYearOneOffer($offer, $player->yearsOfExperience);
+        $maxOfferValidation = $this->validator->validateMaximumYearOneOffer($offer, $playerData->yearsOfExperience);
         if (!$maxOfferValidation['valid']) {
             return [
                 'success' => false,
@@ -100,7 +100,7 @@ class ExtensionProcessor
         }
 
         // Validate raises using player's bird years
-        $raisesValidation = $this->validator->validateRaises($offer, $player->birdYears);
+        $raisesValidation = $this->validator->validateRaises($offer, $playerData->birdYears);
         if (!$raisesValidation['valid']) {
             return [
                 'success' => false,
@@ -121,7 +121,7 @@ class ExtensionProcessor
         $this->dbOps->markExtensionUsedThisSim($team->name);
 
         // Calculate money committed at player's position using Team object
-        $moneyCommittedAtPosition = $this->calculateMoneyCommittedAtPosition($team, $player->position);
+        $moneyCommittedAtPosition = $this->calculateMoneyCommittedAtPosition($team, $playerData->position);
 
         // Get tradition data (not available in Team object, requires separate query)
         $traditionData = $this->getTeamTraditionData($team->name);
@@ -135,12 +135,12 @@ class ExtensionProcessor
             'money_committed_at_position' => $moneyCommittedAtPosition
         ];
 
-        // Build player preferences using Player object properties
+        // Build player preferences using PlayerData properties
         $playerPreferences = [
-            'winner' => $player->freeAgencyPlayForWinner ?? 3,
-            'tradition' => $player->freeAgencyTradition ?? 3,
-            'loyalty' => $player->freeAgencyLoyalty ?? 3,
-            'playing_time' => $player->freeAgencyPlayingTime ?? 3
+            'winner' => $playerData->freeAgencyPlayForWinner ?? 3,
+            'tradition' => $playerData->freeAgencyTradition ?? 3,
+            'loyalty' => $playerData->freeAgencyLoyalty ?? 3,
+            'playing_time' => $playerData->freeAgencyPlayingTime ?? 3
         ];
 
         // Convert demands to array format if needed
@@ -181,29 +181,29 @@ class ExtensionProcessor
 
         // Process based on acceptance
         if ($evaluation['accepted']) {
-            // Get current salary from Player object
-            $currentSalary = $player->currentSeasonSalary ?? 0;
+            // Get current salary from PlayerData
+            $currentSalary = $playerData->currentSeasonSalary ?? 0;
 
             // Update player contract using player name and offer details
-            $this->dbOps->updatePlayerContract($player->name, $offer, $currentSalary);
+            $this->dbOps->updatePlayerContract($playerData->name, $offer, $currentSalary);
             
             // Mark extension used for season using team name
             $this->dbOps->markExtensionUsedThisSeason($team->name);
             
             // Create news story
-            $this->dbOps->createAcceptedExtensionStory($player->name, $team->name, $offerInMillions, $offerYears, $offerDetails);
+            $this->dbOps->createAcceptedExtensionStory($playerData->name, $team->name, $offerInMillions, $offerYears, $offerDetails);
             
             // Send Discord notification
             if (class_exists('Discord')) {
-                $hometext = "{$player->name} today accepted a contract extension offer from the {$team->name} worth $offerInMillions million dollars over $offerYears years:<br>" . $offerDetails;
+                $hometext = "{$playerData->name} today accepted a contract extension offer from the {$team->name} worth $offerInMillions million dollars over $offerYears years:<br>" . $offerDetails;
                 \Discord::postToChannel('#extensions', $hometext);
             }
             
             // Send email notification (only on non-localhost)
             if (isset($_SERVER['SERVER_NAME']) && $_SERVER['SERVER_NAME'] != "localhost") {
                 $recipient = 'ibldepthcharts@gmail.com';
-                $emailsubject = "Successful Extension - " . $player->name;
-                $filetext = "{$player->name} accepts an extension offer from the {$team->name} of $offerTotal for $offerYears years.\n";
+                $emailsubject = "Successful Extension - " . $playerData->name;
+                $filetext = "{$playerData->name} accepts an extension offer from the {$team->name} of $offerTotal for $offerYears years.\n";
                 $filetext .= "For reference purposes: the offer was " . $offerDetails;
                 $filetext .= " and the offer value was thus considered to be " . $evaluation['offerValue'];
                 $filetext .= "; the player wanted an offer with a value of " . $evaluation['demandValue'];
@@ -213,7 +213,7 @@ class ExtensionProcessor
             return [
                 'success' => true,
                 'accepted' => true,
-                'message' => "{$player->name} accepts your extension offer of $offerInMillions million dollars over $offerYears years. Thank you! (Can't believe you gave me that much... sucker!)",
+                'message' => "{$playerData->name} accepts your extension offer of $offerInMillions million dollars over $offerYears years. Thank you! (Can't believe you gave me that much... sucker!)",
                 'offerValue' => $evaluation['offerValue'],
                 'demandValue' => $evaluation['demandValue'],
                 'modifier' => $evaluation['modifier'],
@@ -225,18 +225,18 @@ class ExtensionProcessor
             ];
         } else {
             // Create news story for rejection
-            $this->dbOps->createRejectedExtensionStory($player->name, $team->name, $offerInMillions, $offerYears);
+            $this->dbOps->createRejectedExtensionStory($playerData->name, $team->name, $offerInMillions, $offerYears);
             
             // Send Discord notification
             if (class_exists('Discord')) {
-                $hometext = "{$player->name} today rejected a contract extension offer from the {$team->name} worth $offerInMillions million dollars over $offerYears years.";
+                $hometext = "{$playerData->name} today rejected a contract extension offer from the {$team->name} worth $offerInMillions million dollars over $offerYears years.";
                 \Discord::postToChannel('#extensions', $hometext);
             }
             
             // Send email notification
             $recipient = 'ibldepthcharts@gmail.com';
-            $emailsubject = "Unsuccessful Extension - " . $player->name;
-            $filetext = "{$player->name} refuses an extension offer from the {$team->name} of $offerTotal for $offerYears years.\n";
+            $emailsubject = "Unsuccessful Extension - " . $playerData->name;
+            $filetext = "{$playerData->name} refuses an extension offer from the {$team->name} of $offerTotal for $offerYears years.\n";
             $filetext .= "For reference purposes: the offer was " . $offerDetails;
             $filetext .= " and the offer value was thus considered to be " . $evaluation['offerValue'] . ".";
             mail($recipient, $emailsubject, $filetext, "From: rejected-extensions@iblhoops.net");
@@ -259,16 +259,24 @@ class ExtensionProcessor
     }
 
     /**
-     * Gets a Player object from extension data
+     * Gets PlayerData from extension data
      * 
      * @param array $extensionData Extension data array
-     * @return Player|null Player object or null if not found
+     * @return \Player\PlayerData|null PlayerData object or null if not found
      */
-    private function getPlayerObject($extensionData)
+    private function getPlayerData($extensionData)
     {
-        // If Player object already provided, return it
+        // If PlayerData object already provided, return it
+        if (isset($extensionData['playerData']) && $extensionData['playerData'] instanceof \Player\PlayerData) {
+            return $extensionData['playerData'];
+        }
+        
+        // For backward compatibility, check if Player object provided
         if (isset($extensionData['player']) && $extensionData['player'] instanceof \Player\Player) {
-            return $extensionData['player'];
+            // Extract playerData from Player using reflection
+            $reflection = new \ReflectionProperty(\Player\Player::class, 'playerData');
+            $reflection->setAccessible(true);
+            return $reflection->getValue($extensionData['player']);
         }
 
         // Load player by playerID if provided
@@ -276,8 +284,7 @@ class ExtensionProcessor
         if ($playerID) {
             try {
                 $repository = new PlayerRepository($this->db);
-                $playerData = $repository->loadByID((int)$playerID);
-                return Player::fromPlayerData($this->db, $playerData);
+                return $repository->loadByID((int)$playerID);
             } catch (\Exception $e) {
                 return null;
             }
@@ -290,18 +297,18 @@ class ExtensionProcessor
      * Gets a Team object from extension data
      * 
      * @param array $extensionData Extension data array
-     * @param \Player $player Player object
+     * @param \Player\PlayerData $playerData PlayerData object
      * @return \Team|null Team object or null if not found
      */
-    private function getTeamObject($extensionData, $player)
+    private function getTeamObject($extensionData, $playerData)
     {
         // If Team object already provided, return it
         if (isset($extensionData['team']) && $extensionData['team'] instanceof \Team) {
             return $extensionData['team'];
         }
 
-        // Try to get team name from extension data or Player object
-        $teamName = $extensionData['teamName'] ?? $player->teamName ?? null;
+        // Try to get team name from extension data or PlayerData object
+        $teamName = $extensionData['teamName'] ?? $playerData->teamName ?? null;
         if (!$teamName) {
             return null;
         }

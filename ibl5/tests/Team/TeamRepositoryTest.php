@@ -48,4 +48,43 @@ class TeamRepositoryTest extends TestCase
         
         $this->assertNull($result);
     }
+
+    public function testGetRosterUnderContractSortsByOrdinalThenName()
+    {
+        $this->repository->getRosterUnderContract(2);
+        
+        $queries = $this->db->getExecutedQueries();
+        $lastQuery = end($queries);
+        
+        // Verify the query includes ORDER BY ordinal ASC, name ASC
+        $this->assertStringContainsString('ORDER BY ordinal ASC, name ASC', $lastQuery);
+        $this->assertStringContainsString("tid = '2'", $lastQuery);
+        $this->assertStringContainsString('retired = 0', $lastQuery);
+    }
+
+    public function testGetFreeAgencyRosterSortsByOrdinalThenName()
+    {
+        $this->repository->getFreeAgencyRoster(2);
+        
+        $queries = $this->db->getExecutedQueries();
+        $lastQuery = end($queries);
+        
+        // Verify the query includes ORDER BY ordinal ASC, name ASC
+        $this->assertStringContainsString('ORDER BY ordinal ASC, name ASC', $lastQuery);
+        $this->assertStringContainsString("tid = '2'", $lastQuery);
+        $this->assertStringContainsString('cyt != cy', $lastQuery);
+    }
+
+    public function testGetHistoricalRosterSortsByOrdinalThenName()
+    {
+        $this->repository->getHistoricalRoster(2, '2023');
+        
+        $queries = $this->db->getExecutedQueries();
+        $lastQuery = end($queries);
+        
+        // Verify the query includes ORDER BY ordinal ASC, name ASC
+        $this->assertStringContainsString('ORDER BY ordinal ASC, name ASC', $lastQuery);
+        $this->assertStringContainsString("teamid = '2'", $lastQuery);
+        $this->assertStringContainsString("year = '2023'", $lastQuery);
+    }
 }

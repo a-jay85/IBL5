@@ -125,6 +125,11 @@ class WaiversRepositoryTest extends TestCase
     
     public function testCreateNewsStoryExecutesInsertQuery()
     {
+        // Mock the category lookup first
+        $this->mockDb->setMockData([
+            ['catid' => 1]
+        ]);
+        $this->mockDb->setNumRows(1);
         $this->mockDb->setReturnTrue(true);
         
         $result = $this->repository->createNewsStory(
@@ -136,11 +141,13 @@ class WaiversRepositoryTest extends TestCase
         $this->assertTrue($result);
         
         $queries = $this->mockDb->getExecutedQueries();
-        $this->assertCount(1, $queries);
-        $this->assertStringContainsString('INSERT INTO nuke_stories', $queries[0]);
-        $this->assertStringContainsString('Test Team make waiver cuts', $queries[0]);
-        $this->assertStringContainsString('The Test Team cut Test Player to waivers.', $queries[0]);
-        $this->assertStringContainsString('Associated Press', $queries[0]);
+        // Now we expect 2 queries: one for category lookup, one for insert
+        $this->assertCount(2, $queries);
+        $this->assertStringContainsString('SELECT catid FROM nuke_stories_cat', $queries[0]);
+        $this->assertStringContainsString('INSERT INTO nuke_stories', $queries[1]);
+        $this->assertStringContainsString('Test Team make waiver cuts', $queries[1]);
+        $this->assertStringContainsString('The Test Team cut Test Player to waivers.', $queries[1]);
+        $this->assertStringContainsString('Associated Press', $queries[1]);
     }
     
 }

@@ -14,12 +14,14 @@ class WaiversController
     private const NOTIFICATION_EMAIL_RECIPIENT = 'ibldepthcharts@gmail.com';
     private const NOTIFICATION_EMAIL_SENDER = 'waivers@iblhoops.net';
     public const WAIVER_POOL_MOVES_CATEGORY_ID = 1;
+    private const WAIVER_POOL_MOVES_CATEGORY = 'Waiver Pool Moves';
     
     private $db;
     private $repository;
     private $processor;
     private $validator;
     private $view;
+    private $newsService;
     
     public function __construct($db)
     {
@@ -28,6 +30,7 @@ class WaiversController
         $this->processor = new WaiversProcessor();
         $this->validator = new WaiversValidator();
         $this->view = new WaiversView();
+        $this->newsService = new \Services\NewsService($db);
     }
     
     /**
@@ -220,7 +223,7 @@ class WaiversController
      */
     private function createWaiverNewsStory(string $teamName, string $playerName, string $action, string $contract): void
     {
-        $this->repository->incrementWaiverPoolMovesCounter();
+        $this->newsService->incrementCategoryCounter(self::WAIVER_POOL_MOVES_CATEGORY);
         
         if ($action === 'drop') {
             $topicID = 32;
@@ -232,7 +235,10 @@ class WaiversController
             $hometext = "The " . $teamName . " sign " . $playerName . " from waivers for " . $contract . ".";
         }
         
-        $this->repository->createNewsStory($topicID, $storytitle, $hometext);
+        $categoryID = $this->newsService->getCategoryIDByTitle(self::WAIVER_POOL_MOVES_CATEGORY);
+        if ($categoryID !== null) {
+            $this->newsService->createNewsStory($categoryID, $topicID, $storytitle, $hometext);
+        }
     }
     
     /**

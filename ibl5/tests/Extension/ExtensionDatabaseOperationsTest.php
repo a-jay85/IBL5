@@ -159,11 +159,13 @@ class ExtensionDatabaseOperationsTest extends TestCase
         $offerYears = 5;
         $offerDetails = '1000 1100 1200 1300 1400';
         
-        // Mock the category and topic queries
+        // Mock the topic query, category query, and queries from NewsService
         $this->mockDb->setMockData([
-            ['catid' => 1, 'counter' => 10], // category data
-            ['topicid' => 5] // topic data
+            ['topicid' => 5],  // getTopicIDByTeamName
+            ['catid' => 1],    // getCategoryIDByTitle
         ]);
+        $this->mockDb->setNumRows(1);
+        $this->mockDb->setReturnTrue(true);
 
         // Act
         $result = $this->extensionDbOps->createAcceptedExtensionStory(
@@ -178,18 +180,28 @@ class ExtensionDatabaseOperationsTest extends TestCase
         $this->assertTrue($result);
         $queries = $this->mockDb->getExecutedQueries();
         
-        // Should have multiple queries: SELECT category, INSERT story
-        $this->assertGreaterThanOrEqual(2, count($queries));
+        // Should have: SELECT topic, SELECT category, UPDATE counter, INSERT story
+        $this->assertGreaterThanOrEqual(4, count($queries));
+        
+        // Check for SELECT topic query
+        $foundTopicSelect = false;
+        foreach ($queries as $query) {
+            if (strpos($query, 'SELECT topicid FROM nuke_topics') !== false) {
+                $foundTopicSelect = true;
+                $this->assertStringContainsString($teamName, $query);
+            }
+        }
+        $this->assertTrue($foundTopicSelect, 'Should have queried for team topic');
         
         // Check for SELECT category query
-        $foundSelect = false;
+        $foundCategorySelect = false;
         foreach ($queries as $query) {
-            if (strpos($query, 'SELECT catid, counter FROM nuke_stories_cat') !== false) {
-                $foundSelect = true;
+            if (strpos($query, 'SELECT catid FROM nuke_stories_cat') !== false) {
+                $foundCategorySelect = true;
                 $this->assertStringContainsString('Contract Extensions', $query);
             }
         }
-        $this->assertTrue($foundSelect, 'Should have queried for Contract Extensions category');
+        $this->assertTrue($foundCategorySelect, 'Should have queried for Contract Extensions category');
         
         // Check for INSERT INTO nuke_stories
         $foundInsert = false;
@@ -216,11 +228,13 @@ class ExtensionDatabaseOperationsTest extends TestCase
         $offerInMillions = 100;
         $offerYears = 5;
         
-        // Mock the category and topic queries
+        // Mock the topic and category queries
         $this->mockDb->setMockData([
-            ['catid' => 1, 'counter' => 10],
-            ['topicid' => 5]
+            ['topicid' => 5],  // getTopicIDByTeamName
+            ['catid' => 1],    // getCategoryIDByTitle
         ]);
+        $this->mockDb->setNumRows(1);
+        $this->mockDb->setReturnTrue(true);
 
         // Act
         $result = $this->extensionDbOps->createRejectedExtensionStory(
@@ -253,10 +267,8 @@ class ExtensionDatabaseOperationsTest extends TestCase
      */
     public function testIncrementsContractExtensionsCounter()
     {
-        // Arrange
-        $this->mockDb->setMockData([
-            ['catid' => 1, 'counter' => 10]
-        ]);
+        // Arrange - NewsService now handles this with a single UPDATE query
+        $this->mockDb->setReturnTrue(true);
 
         // Act
         $result = $this->extensionDbOps->incrementExtensionsCounter();
@@ -270,7 +282,7 @@ class ExtensionDatabaseOperationsTest extends TestCase
         foreach ($queries as $query) {
             if (strpos($query, 'UPDATE nuke_stories_cat') !== false) {
                 $foundUpdate = true;
-                $this->assertStringContainsString('counter =', $query);
+                $this->assertStringContainsString('counter = counter + 1', $query);
                 $this->assertStringContainsString('Contract Extensions', $query);
             }
         }
@@ -358,9 +370,10 @@ class ExtensionDatabaseOperationsTest extends TestCase
         $currentSalary = 800;
         
         $this->mockDb->setMockData([
-            ['catid' => 1, 'counter' => 10],
-            ['topicid' => 5]
+            ['topicid' => 5],  // getTopicIDByTeamName
+            ['catid' => 1],    // getCategoryIDByTitle
         ]);
+        $this->mockDb->setReturnTrue(true);
 
         // Act
         $result = $this->extensionDbOps->processAcceptedExtension(
@@ -377,9 +390,10 @@ class ExtensionDatabaseOperationsTest extends TestCase
         // Should have multiple queries:
         // 1. Update player contract
         // 2. Mark extension used this season
-        // 3. Get category info
-        // 4. Update counter
-        // 5. Insert news story
+        // 3. Get topic ID
+        // 4. Get category ID
+        // 5. Update counter
+        // 6. Insert news story
         $this->assertGreaterThanOrEqual(3, count($queries));
         
         // Verify player contract was updated
@@ -410,9 +424,10 @@ class ExtensionDatabaseOperationsTest extends TestCase
         ];
         
         $this->mockDb->setMockData([
-            ['catid' => 1, 'counter' => 10],
-            ['topicid' => 5]
+            ['topicid' => 5],  // getTopicIDByTeamName
+            ['catid' => 1],    // getCategoryIDByTitle
         ]);
+        $this->mockDb->setReturnTrue(true);
 
         // Act
         $result = $this->extensionDbOps->processRejectedExtension(

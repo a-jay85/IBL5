@@ -9,11 +9,13 @@ class WaiversRepository
 {
     private $db;
     private $commonRepository;
+    private $newsService;
     
     public function __construct($db)
     {
         $this->db = $db;
         $this->commonRepository = new \Services\CommonRepository($db);
+        $this->newsService = new \Services\NewsService($db);
     }
     
     /**
@@ -122,37 +124,29 @@ class WaiversRepository
     /**
      * Gets the category ID for waiver pool moves
      * 
+     * @deprecated Use NewsService::getCategoryIDByTitle('Waiver Pool Moves') instead
      * @return int|null Category ID or null if not found
      */
     public function getWaiverPoolMovesCategory(): ?int
     {
-        $query = "SELECT * FROM nuke_stories_cat WHERE title = 'Waiver Pool Moves'";
-        $result = $this->db->sql_query($query);
-        
-        if (!$result || $this->db->sql_numrows($result) === 0) {
-            return null;
-        }
-        
-        return (int) $this->db->sql_result($result, 0, "catid");
+        return $this->newsService->getCategoryIDByTitle('Waiver Pool Moves');
     }
     
     /**
      * Increments the waiver pool moves counter
      * 
+     * @deprecated Use NewsService::incrementCategoryCounter('Waiver Pool Moves') instead
      * @return bool Success status
      */
     public function incrementWaiverPoolMovesCounter(): bool
     {
-        $query = "UPDATE nuke_stories_cat 
-                  SET counter = counter + 1 
-                  WHERE title = 'Waiver Pool Moves'";
-        
-        return $this->db->sql_query($query) !== false;
+        return $this->newsService->incrementCategoryCounter('Waiver Pool Moves');
     }
     
     /**
      * Creates a news story for a waiver transaction
      * 
+     * @deprecated Use NewsService::createNewsStory() instead
      * @param int $topicID Topic ID
      * @param string $title Story title
      * @param string $hometext Story content
@@ -160,32 +154,11 @@ class WaiversRepository
      */
     public function createNewsStory(int $topicID, string $title, string $hometext): bool
     {
-        $topicID = (int) $topicID;
-        $titleEscaped = \Services\DatabaseService::escapeString($this->db, $title);
-        $hometextEscaped = \Services\DatabaseService::escapeString($this->db, $hometext);
-        $timestamp = date('Y-m-d H:i:s', time());
+        $categoryID = $this->newsService->getCategoryIDByTitle('Waiver Pool Moves');
+        if ($categoryID === null) {
+            return false;
+        }
         
-        $query = "INSERT INTO nuke_stories
-                  (catid,
-                   aid,
-                   title,
-                   time,
-                   hometext,
-                   topic,
-                   informant,
-                   counter,
-                   alanguage)
-                  VALUES
-                  (" . WaiversController::WAIVER_POOL_MOVES_CATEGORY_ID . ",
-                   'Associated Press',
-                   '$titleEscaped',
-                   '$timestamp',
-                   '$hometextEscaped',
-                   $topicID,
-                   'Associated Press',
-                   0,
-                   'english')";
-        
-        return $this->db->sql_query($query) !== false;
+        return $this->newsService->createNewsStory($categoryID, $topicID, $title, $hometext);
     }
 }

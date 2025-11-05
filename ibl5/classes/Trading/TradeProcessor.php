@@ -6,6 +6,7 @@ class Trading_TradeProcessor
     protected $sharedFunctions;
     protected $season;
     protected $cashHandler;
+    protected $newsService;
 
     public function __construct($db)
     {
@@ -13,6 +14,7 @@ class Trading_TradeProcessor
         $this->sharedFunctions = new Shared($db);
         $this->season = new Season($db);
         $this->cashHandler = new Trading_CashTransactionHandler($db);
+        $this->newsService = new \Services\NewsService($db);
     }
 
     /**
@@ -193,33 +195,23 @@ class Trading_TradeProcessor
      * Create news story for the trade
      * @param string $storytitle Story title
      * @param string $storytext Story text
-     * @param string $timestamp Timestamp
+     * @param string $timestamp Timestamp (not used with NewsService)
      */
     protected function createNewsStory($storytitle, $storytext, $timestamp)
     {
-        $querystor = "INSERT INTO nuke_stories
-                    (catid,
-                     aid,
-                     title,
-                     time,
-                     hometext,
-                     topic,
-                     informant,
-                     counter,
-                     alanguage)
-        VALUES      ('2',
-                     'Associated Press',
-                     '$storytitle',
-                     '$timestamp',
-                     '$storytext',
-                     '31',
-                     'Associated Press',
-                     '0',
-                     'english')";
+        // Category ID 2 is typically 'Trade News'
+        // Topic ID 31 is typically 'IBL News' or general league news
+        $categoryID = 2;
+        $topicID = 31;
         
-        $resultstor = $this->db->sql_query($querystor);
+        // Escape the title and text for security
+        $storytitleEscaped = \Services\DatabaseService::escapeString($this->db, $storytitle);
+        $storytextEscaped = \Services\DatabaseService::escapeString($this->db, $storytext);
         
-        if (isset($resultstor) && $_SERVER['SERVER_NAME'] != "localhost") {
+        $this->newsService->createNewsStory($categoryID, $topicID, $storytitleEscaped, $storytextEscaped);
+        
+        // Send email notification
+        if ($_SERVER['SERVER_NAME'] != "localhost") {
             $recipient = 'ibldepthcharts@gmail.com';
             mail($recipient, $storytitle, $storytext, "From: trades@iblhoops.net");
         }

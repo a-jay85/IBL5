@@ -3,6 +3,7 @@
 namespace Extension;
 
 use Player\Player;
+use Player\PlayerRepository;
 
 /**
  * Extension Processor Class
@@ -261,12 +262,12 @@ class ExtensionProcessor
      * Gets a Player object from extension data
      * 
      * @param array $extensionData Extension data array
-     * @return \Player|null Player object or null if not found
+     * @return Player|null Player object or null if not found
      */
     private function getPlayerObject($extensionData)
     {
         // If Player object already provided, return it
-        if (isset($extensionData['player']) && $extensionData['player'] instanceof \Player) {
+        if (isset($extensionData['player']) && $extensionData['player'] instanceof \Player\Player) {
             return $extensionData['player'];
         }
 
@@ -274,7 +275,20 @@ class ExtensionProcessor
         $playerID = $extensionData['playerID'] ?? null;
         if ($playerID) {
             try {
-                return Player::withPlayerID($this->db, (int)$playerID);
+                $repository = new PlayerRepository($this->db);
+                $playerData = $repository->loadByID((int)$playerID);
+                
+                // Wrap PlayerData in Player for backward compatibility
+                $player = new Player();
+                $reflectionProperty = new \ReflectionProperty(Player::class, 'playerData');
+                $reflectionProperty->setAccessible(true);
+                $reflectionProperty->setValue($player, $playerData);
+                
+                $syncMethod = new \ReflectionMethod(Player::class, 'syncPropertiesFromPlayerData');
+                $syncMethod->setAccessible(true);
+                $syncMethod->invoke($player);
+                
+                return $player;
             } catch (\Exception $e) {
                 return null;
             }

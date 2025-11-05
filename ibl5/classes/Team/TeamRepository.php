@@ -124,7 +124,7 @@ class TeamRepository
             WHERE tid = '$teamID' 
               AND retired = 0 
               AND cyt != cy 
-            ORDER BY ordinal ASC, name ASC";
+            ORDER BY CASE WHEN ordinal > 960 THEN 1 ELSE 0 END, name ASC";
         return $this->db->sql_query($query);
     }
 
@@ -138,7 +138,7 @@ class TeamRepository
             FROM ibl_plr 
             WHERE tid = '$teamID' 
               AND retired = 0 
-            ORDER BY ordinal ASC, name ASC";
+            ORDER BY CASE WHEN ordinal > 960 THEN 1 ELSE 0 END, name ASC";
         return $this->db->sql_query($query);
     }
 
@@ -171,7 +171,7 @@ class TeamRepository
     {
         $teamID = (int) $teamID;
         $year = $this->db->sql_escape_string($year);
-        $query = "SELECT * FROM ibl_hist WHERE teamid = '$teamID' AND year = '$year' ORDER BY ordinal ASC, name ASC";
+        $query = "SELECT * FROM ibl_hist WHERE teamid = '$teamID' AND year = '$year' ORDER BY CASE WHEN ordinal > 960 THEN 1 ELSE 0 END, name ASC";
         return $this->db->sql_query($query);
     }
 }

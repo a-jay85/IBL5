@@ -56,8 +56,8 @@ class TeamRepositoryTest extends TestCase
         $queries = $this->db->getExecutedQueries();
         $lastQuery = end($queries);
         
-        // Verify the query includes ORDER BY ordinal ASC, name ASC
-        $this->assertStringContainsString('ORDER BY ordinal ASC, name ASC', $lastQuery);
+        // Verify the query sorts regular players alphabetically, with waived players at the end
+        $this->assertStringContainsString('ORDER BY CASE WHEN ordinal > 960 THEN 1 ELSE 0 END, name ASC', $lastQuery);
         $this->assertStringContainsString("tid = '2'", $lastQuery);
         $this->assertStringContainsString('retired = 0', $lastQuery);
     }
@@ -69,8 +69,8 @@ class TeamRepositoryTest extends TestCase
         $queries = $this->db->getExecutedQueries();
         $lastQuery = end($queries);
         
-        // Verify the query includes ORDER BY ordinal ASC, name ASC
-        $this->assertStringContainsString('ORDER BY ordinal ASC, name ASC', $lastQuery);
+        // Verify the query sorts regular players alphabetically, with waived players at the end
+        $this->assertStringContainsString('ORDER BY CASE WHEN ordinal > 960 THEN 1 ELSE 0 END, name ASC', $lastQuery);
         $this->assertStringContainsString("tid = '2'", $lastQuery);
         $this->assertStringContainsString('cyt != cy', $lastQuery);
     }
@@ -82,8 +82,8 @@ class TeamRepositoryTest extends TestCase
         $queries = $this->db->getExecutedQueries();
         $lastQuery = end($queries);
         
-        // Verify the query includes ORDER BY ordinal ASC, name ASC
-        $this->assertStringContainsString('ORDER BY ordinal ASC, name ASC', $lastQuery);
+        // Verify the query sorts regular players alphabetically, with waived players at the end
+        $this->assertStringContainsString('ORDER BY CASE WHEN ordinal > 960 THEN 1 ELSE 0 END, name ASC', $lastQuery);
         $this->assertStringContainsString("teamid = '2'", $lastQuery);
         $this->assertStringContainsString("year = '2023'", $lastQuery);
     }

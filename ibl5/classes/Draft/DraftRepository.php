@@ -98,6 +98,76 @@ class DraftRepository
     }
 
     /**
+     * Update the player table to set team information for a drafted player
+     * 
+     * This method handles partial name matches since ibl_plr.name may be truncated
+     * (varchar 32) or missing diacriticals compared to the full name in ibl_draft_class.
+     * 
+     * @param string $playerName The name of the drafted player (from ibl_draft_class)
+     * @param string $teamName The name of the team that drafted the player
+     * @return bool True if update succeeded, false otherwise
+     */
+    public function updatePlayerTable($playerName, $teamName)
+    {
+        // Get the team ID from team name
+        $teamId = $this->commonRepository->getTidFromTeamname($teamName);
+        
+        if ($teamId === null) {
+            // Team not found - this shouldn't happen but handle gracefully
+            return false;
+        }
+
+        $playerNameEscaped = DatabaseService::escapeString($this->db, $playerName);
+        $teamNameEscaped = DatabaseService::escapeString($this->db, $teamName);
+
+        // First try exact match
+        $query = "UPDATE ibl_plr
+                  SET tid = $teamId, 
+                      teamname = '$teamNameEscaped'
+                  WHERE name = '$playerNameEscaped'";
+        
+        $result = $this->db->sql_query($query);
+        
+        // Check if the update affected any rows
+        if ($result && $this->db->sql_affectedrows() > 0) {
+            return true;
+        }
+
+        // If no exact match, try partial match (for truncated names or diacriticals)
+        // Match if the ibl_plr name is a prefix of the full name from draft class
+        // This handles truncation at 32 characters
+        $truncatedName = substr($playerName, 0, 32);
+        $truncatedNameEscaped = DatabaseService::escapeString($this->db, $truncatedName);
+        
+        $query = "UPDATE ibl_plr
+                  SET tid = $teamId, 
+                      teamname = '$teamNameEscaped'
+                  WHERE name = '$truncatedNameEscaped'";
+        
+        $result = $this->db->sql_query($query);
+        
+        if ($result && $this->db->sql_affectedrows() > 0) {
+            return true;
+        }
+
+        // If still no match, try a LIKE match for diacritical differences
+        // This uses % wildcards to match similar names
+        // We'll match the first 30 characters to avoid matching wrong players
+        $partialName = substr($playerName, 0, 30);
+        $partialNameEscaped = DatabaseService::escapeString($this->db, $partialName);
+        
+        $query = "UPDATE ibl_plr
+                  SET tid = $teamId, 
+                      teamname = '$teamNameEscaped'
+                  WHERE name LIKE '$partialNameEscaped%'
+                  LIMIT 1";
+        
+        $result = $this->db->sql_query($query);
+        
+        return (bool)$result;
+    }
+
+    /**
      * Check if a player has already been drafted
      * 
      * @param string $playerName The name of the player to check

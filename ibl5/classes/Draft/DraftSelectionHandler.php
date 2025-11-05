@@ -75,12 +75,13 @@ class DraftSelectionHandler
     {
         $date = date('Y-m-d h:i:s');
 
-        // Update both database tables
+        // Update all three database tables
         $draftTableUpdated = $this->repository->updateDraftTable($playerName, $date, $draftRound, $draftPick);
         $rookieTableUpdated = $this->repository->updateRookieTable($playerName, $teamName);
+        $playerTableUpdated = $this->repository->updatePlayerTable($playerName, $teamName);
 
-        // Check if both updates succeeded
-        if (!$draftTableUpdated || !$rookieTableUpdated) {
+        // Check if all updates succeeded
+        if (!$draftTableUpdated || !$rookieTableUpdated || !$playerTableUpdated) {
             return $this->processor->getDatabaseErrorMessage();
         }
 

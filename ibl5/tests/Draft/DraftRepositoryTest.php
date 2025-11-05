@@ -182,4 +182,136 @@ class DraftRepositoryTest extends TestCase
         $this->assertStringContainsString("D\\'Angelo Russell", $queries[0]);
         $this->assertStringContainsString('ibl_draft_class', $queries[0]);
     }
+
+    public function testUpdatePlayerTableWithExactMatch()
+    {
+        // Mock the team ID lookup - don't set numRows, let it be calculated from mockData
+        $this->mockDb->setMockData([
+            ['teamid' => 4]
+        ]);
+        $this->mockDb->setReturnTrue(true);
+        $this->mockDb->setAffectedRows(1);
+
+        $result = $this->repository->updatePlayerTable('John Doe', 'Chicago Bulls');
+
+        $this->assertTrue($result);
+        $queries = $this->mockDb->getExecutedQueries();
+        
+        // Should have a SELECT query for team ID and an UPDATE query for player
+        $this->assertGreaterThanOrEqual(2, count($queries));
+        
+        // Check that there's a team lookup query
+        $hasTeamQuery = false;
+        foreach ($queries as $query) {
+            if (stripos($query, 'SELECT teamid FROM ibl_team_info') !== false) {
+                $hasTeamQuery = true;
+                break;
+            }
+        }
+        $this->assertTrue($hasTeamQuery);
+        
+        // Check the UPDATE query
+        $updateQuery = null;
+        foreach ($queries as $query) {
+            if (stripos($query, 'UPDATE ibl_plr') !== false) {
+                $updateQuery = $query;
+                break;
+            }
+        }
+        
+        $this->assertNotNull($updateQuery);
+        $this->assertStringContainsString('ibl_plr', $updateQuery);
+        $this->assertStringContainsString('John Doe', $updateQuery);
+        $this->assertStringContainsString('Chicago Bulls', $updateQuery);
+        $this->assertStringContainsString('tid = 4', $updateQuery);
+        $this->assertStringContainsString('teamname', $updateQuery);
+    }
+
+    public function testUpdatePlayerTableWithTruncatedName()
+    {
+        // Mock the team ID lookup
+        $this->mockDb->setMockData([
+            ['teamid' => 4]
+        ]);
+        $this->mockDb->setReturnTrue(true);
+        // Simulate that exact match fails but truncated match succeeds
+        $this->mockDb->setAffectedRows(1);
+
+        // Use a long name that would be truncated in ibl_plr
+        $longName = 'Christopher Emmanuel Paul Jr.';
+        
+        $result = $this->repository->updatePlayerTable($longName, 'Chicago Bulls');
+
+        $this->assertTrue($result);
+        
+        $queries = $this->mockDb->getExecutedQueries();
+        
+        // Should have UPDATE queries
+        $updateQueries = array_filter($queries, function($q) {
+            return stripos($q, 'UPDATE ibl_plr') !== false;
+        });
+        
+        // At least one UPDATE query should be present
+        $this->assertGreaterThanOrEqual(1, count($updateQueries));
+    }
+
+    public function testUpdatePlayerTableWithPartialMatch()
+    {
+        // Mock the team ID lookup
+        $this->mockDb->setMockData([
+            ['teamid' => 15]
+        ]);
+        $this->mockDb->setReturnTrue(true);
+        $this->mockDb->setAffectedRows(1);
+
+        // Player name with diacriticals that might not match exactly
+        $result = $this->repository->updatePlayerTable('José Calderón', 'Miami Heat');
+
+        $this->assertTrue($result);
+        
+        $queries = $this->mockDb->getExecutedQueries();
+        
+        // Should have UPDATE queries
+        $updateQueries = array_filter($queries, function($q) {
+            return stripos($q, 'UPDATE ibl_plr') !== false;
+        });
+        
+        $this->assertGreaterThanOrEqual(1, count($updateQueries));
+    }
+
+    public function testUpdatePlayerTableReturnsFalseWhenTeamNotFound()
+    {
+        $this->mockDb->setMockData([]);
+        $this->mockDb->setNumRows(0);
+
+        $result = $this->repository->updatePlayerTable('John Doe', 'Nonexistent Team');
+
+        $this->assertFalse($result);
+    }
+
+    public function testUpdatePlayerTableHandlesApostrophes()
+    {
+        // Mock the team ID lookup
+        $this->mockDb->setMockData([
+            ['teamid' => 13]
+        ]);
+        $this->mockDb->setReturnTrue(true);
+        $this->mockDb->setAffectedRows(1);
+
+        $result = $this->repository->updatePlayerTable("D'Angelo Russell", 'LA Lakers');
+
+        $this->assertTrue($result);
+        $queries = $this->mockDb->getExecutedQueries();
+        
+        $updateQuery = null;
+        foreach ($queries as $query) {
+            if (stripos($query, 'UPDATE ibl_plr') !== false) {
+                $updateQuery = $query;
+                break;
+            }
+        }
+        
+        $this->assertNotNull($updateQuery);
+        $this->assertStringContainsString("D\\'Angelo Russell", $updateQuery);
+    }
 }

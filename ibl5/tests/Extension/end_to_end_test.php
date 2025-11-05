@@ -67,13 +67,12 @@ try {
         
         echo "  Using player: $playerName ($playerPosition) on $teamName\n";
         
-        // Create Player and Team objects using Player::fromPlayerData helper
+        // Load PlayerData using PlayerRepository
         $playerRepository = new PlayerRepository($db);
         $playerData = $playerRepository->loadByID($playerID);
-        $player = Player::fromPlayerData($db, $playerData);
         
         $team = Team::initialize($db, $teamName);
-        echo "  ✓ Player and Team objects created successfully\n";
+        echo "  ✓ PlayerData and Team objects created successfully\n";
         
         // Create processor
         $processor = new \Extension\ExtensionProcessor($db);
@@ -84,8 +83,8 @@ try {
         $method = $reflection->getMethod('calculateMoneyCommittedAtPositionWithTeam');
         $method->setAccessible(true);
         
-        // Call the method
-        $moneyCommitted = $method->invoke($processor, $team, $player);
+        // Call the method with team and position
+        $moneyCommitted = $method->invoke($processor, $team, $playerData->position);
         echo "  ✓ calculateMoneyCommittedAtPosition() works\n";
         echo "  Money committed at position $playerPosition for $teamName: $moneyCommitted\n";
         

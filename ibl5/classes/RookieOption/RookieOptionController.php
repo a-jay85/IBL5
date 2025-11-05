@@ -3,6 +3,7 @@
 namespace RookieOption;
 
 use Player\Player;
+use Player\PlayerRepository;
 
 /**
  * Main controller for rookie option operations
@@ -42,8 +43,10 @@ class RookieOptionController
         $sharedFunctions = new \Shared($this->db);
         $season = new \Season($this->db);
         
-        // Load player
-        $player = Player::withPlayerID($this->db, $playerID);
+        // Load player using PlayerRepository and Player::fromPlayerData helper
+        $playerRepository = new PlayerRepository($this->db);
+        $playerData = $playerRepository->loadByID($playerID);
+        $player = Player::fromPlayerData($this->db, $playerData);
         
         // Validate player eligibility
         if (!$player->canRookieOption($season->phase)) {

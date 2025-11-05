@@ -105,6 +105,19 @@ class Player
         $this->injuryCalculator = new PlayerInjuryCalculator();
     }
 
+    /**
+     * Factory method to create Player from player ID
+     * 
+     * @deprecated This facade method is deprecated. Use PlayerRepository::loadByID() instead:
+     *             $repository = new PlayerRepository($db);
+     *             $playerData = $repository->loadByID($playerID);
+     *             Then work with PlayerData directly or use specialized classes like
+     *             PlayerContractCalculator, PlayerContractValidator, etc.
+     * 
+     * @param mixed $db Database connection
+     * @param int $playerID Player ID
+     * @return Player
+     */
     public static function withPlayerID($db, int $playerID)
     {
         $instance = new self();
@@ -112,6 +125,19 @@ class Player
         return $instance;
     }
 
+    /**
+     * Factory method to create Player from current player row
+     * 
+     * @deprecated This facade method is deprecated. Use PlayerRepository::fillFromCurrentRow() instead:
+     *             $repository = new PlayerRepository($db);
+     *             $playerData = $repository->fillFromCurrentRow($plrRow);
+     *             Then work with PlayerData directly or use specialized classes like
+     *             PlayerContractCalculator, PlayerContractValidator, etc.
+     * 
+     * @param mixed $db Database connection
+     * @param array $plrRow Player row from database
+     * @return Player
+     */
     public static function withPlrRow($db, array $plrRow)
     {
         $instance = new self();
@@ -119,6 +145,19 @@ class Player
         return $instance;
     }
 
+    /**
+     * Factory method to create Player from historical player row
+     * 
+     * @deprecated This facade method is deprecated. Use PlayerRepository::fillFromHistoricalRow() instead:
+     *             $repository = new PlayerRepository($db);
+     *             $playerData = $repository->fillFromHistoricalRow($plrRow);
+     *             Then work with PlayerData directly or use specialized classes like
+     *             PlayerContractCalculator, PlayerContractValidator, etc.
+     * 
+     * @param mixed $db Database connection
+     * @param array $plrRow Historical player row from database
+     * @return Player
+     */
     public static function withHistoricalPlrRow($db, array $plrRow)
     {
         $instance = new self();

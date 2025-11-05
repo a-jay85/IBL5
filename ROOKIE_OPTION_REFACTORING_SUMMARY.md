@@ -8,14 +8,16 @@
 - **Testability**: Not testable (requires full application context)
 - **Concerns**: Mixed validation, business logic, database operations, and view rendering
 - **Security**: SQL injection vulnerability (using player name in WHERE clause)
+- **Code duplication**: News story methods duplicated across multiple modules
 
 ### After Refactoring
 - **Entry point**: `rookieoption.php` (15 lines) - 82% reduction
-- **Supporting classes**: 4 focused classes (370 lines total with documentation)
-- **Architecture**: Object-oriented with separation of concerns
-- **Testability**: Fully testable with PHPUnit (12 unit tests)
+- **Supporting classes**: 4 focused RookieOption classes + 1 shared NewsService
+- **Architecture**: Object-oriented with separation of concerns and DRY principle
+- **Testability**: Fully testable with PHPUnit (13 unit tests for RookieOption, 7 for NewsService)
 - **Concerns**: Properly separated across dedicated classes
 - **Security**: Enhanced with DatabaseService escaping, player ID in WHERE clause, input validation
+- **Code consolidation**: News story operations moved to shared NewsService
 
 ## Code Quality Metrics
 
@@ -23,29 +25,46 @@
 |--------|--------|-------|-------------|
 | Lines in rookieoption.php | 84 | 15 | 82% reduction |
 | Testable | No | Yes | ✅ |
-| Unit Tests | 0 | 12 | +12 tests |
-| Classes | 0 | 4 | +4 classes |
+| Unit Tests | 0 | 20 (13 RookieOption + 7 NewsService) | +20 tests |
+| Classes | 0 | 5 (4 RookieOption + 1 shared) | +5 classes |
 | Separation of Concerns | Poor | Excellent | ✅ |
 | Documentation | Minimal | Comprehensive | ✅ |
 | Security | Basic | Enhanced | ✅ |
+| Code Duplication | High | Eliminated | ✅ |
 
 ## What Was Refactored
 
-### 1. Database Operations → `RookieOptionRepository`
-**Original**: SQL queries mixed throughout the code (lines 20-78)
-**Refactored**: Centralized data access layer
-- updatePlayerRookieOption() - updates contract year based on draft round
+### 0. Shared Services → `NewsService` (NEW)
+**Purpose**: Consolidate duplicated news story operations across multiple modules
+**Location**: `classes/Services/NewsService.php`
+
+**Methods**:
+- createNewsStory() - creates news stories with proper escaping
 - getTopicIDByTeamName() - retrieves topic ID for news stories
-- getRookieExtensionCategoryID() - gets category ID for stories
-- incrementRookieExtensionCounter() - updates counter
-- createNewsStory() - creates news announcement
+- getCategoryIDByTitle() - gets category ID by title
+- incrementCategoryCounter() - increments category counter
 
 **Benefits**:
-- Single source of truth for queries
+- ✅ **Eliminates duplication**: News story code was duplicated in RookieOption, Waivers, Trading, and Extension
+- ✅ **Single source of truth**: All news operations go through one service
+- ✅ **Easy to maintain**: Changes to news story logic happen in one place
+- ✅ **Reusable**: Any module can use NewsService for news operations
+- ✅ **Fully tested**: 7 comprehensive unit tests (17 assertions)
+
+### 1. Database Operations → `RookieOptionRepository`
+**Original**: SQL queries mixed throughout the code (lines 20-78)
+**Refactored**: Focused data access layer for rookie options only
+
+**Methods**:
+- updatePlayerRookieOption() - updates contract year based on draft round
+
+**Benefits**:
+- Single responsibility: only rookie option database operations
 - SQL injection prevention with DatabaseService
 - Easy to modify database schema
-- Testable with mock database (8 tests)
+- Testable with mock database (2 tests)
 - Clear API for data operations
+- Uses shared NewsService for news operations (eliminated duplication)
 
 **Security Improvements**:
 - Changed from `WHERE name = '$player->name'` to `WHERE pid = $playerID`
@@ -229,10 +248,11 @@ $controller->processRookieOption($teamName, $playerID, $extensionAmount);
 ### For the Project
 - ✅ **Reduced technical debt**: Modern, maintainable architecture
 - ✅ **Improved code quality**: Following best practices
-- ✅ **Better reliability**: 12 unit tests catch regressions
+- ✅ **Better reliability**: 20 unit tests catch regressions (13 RookieOption + 7 NewsService)
 - ✅ **Faster development**: Clear structure speeds up changes
 - ✅ **Knowledge transfer**: Well-documented and organized
 - ✅ **Enhanced security**: Multiple layers of protection
+- ✅ **Eliminated duplication**: NewsService consolidates code across multiple modules
 
 ### For Users
 - ✅ **No disruption**: Same interface and behavior
@@ -257,10 +277,13 @@ This refactoring successfully transforms the Rookie Option module from a monolit
 
 **Key Achievements**: 
 - Reduced main file from 84 lines to 15 lines (82% reduction)
-- Added 12 comprehensive unit tests (35 assertions)
+- Added 20 comprehensive unit tests (13 RookieOption + 7 NewsService, 56 total assertions)
 - Maintained 100% backward compatibility
 - Implemented comprehensive security protections (SQL injection prevention, input validation)
+- Created shared NewsService to eliminate code duplication across modules
 - Created detailed documentation
-- All 342 existing tests continue to pass (953 total assertions)
+- All 343 existing tests continue to pass (957 total assertions)
 
 **Security Highlight**: Changed from using player name in WHERE clauses (SQL injection vulnerable) to using player ID (type-safe integer), significantly improving security and accuracy.
+
+**Code Quality Highlight**: Created NewsService to consolidate news story operations that were duplicated across RookieOption, Waivers, Trading, and Extension modules, following the DRY principle and improving maintainability.

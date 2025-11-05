@@ -8,12 +8,10 @@ namespace RookieOption;
 class RookieOptionRepository
 {
     private $db;
-    private $commonRepository;
     
     public function __construct($db)
     {
         $this->db = $db;
-        $this->commonRepository = new \Services\CommonRepository($db);
     }
     
     /**

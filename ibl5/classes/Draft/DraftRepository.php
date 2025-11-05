@@ -121,6 +121,9 @@ class DraftRepository
             return false;
         }
 
+        // Ensure teamId is safely cast to int (getTidFromTeamname returns int|null)
+        $teamId = (int) $teamId;
+        
         $playerNameEscaped = DatabaseService::escapeString($this->db, $playerName);
         $teamNameEscaped = DatabaseService::escapeString($this->db, $teamName);
 

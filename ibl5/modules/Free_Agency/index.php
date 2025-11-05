@@ -349,27 +349,10 @@ function display()
     foreach ($team->getFreeAgencyOffersResult() as $offerRow) {
         $playerID = $sharedFunctions->getPlayerIDFromPlayerName($offerRow['name']);
         
-        // Load player using PlayerRepository
+        // Load player using PlayerRepository and Player::fromPlayerData helper
         $playerRepository = new PlayerRepository($db);
         $playerData = $playerRepository->loadByID($playerID);
-        
-        // Wrap PlayerData in Player for backward compatibility with methods
-        $player = new Player();
-        $reflectionProperty = new \ReflectionProperty(Player::class, 'playerData');
-        $reflectionProperty->setAccessible(true);
-        $reflectionProperty->setValue($player, $playerData);
-        
-        $reflectionDb = new \ReflectionProperty(Player::class, 'db');
-        $reflectionDb->setAccessible(true);
-        $reflectionDb->setValue($player, $db);
-        
-        $reflectionRepo = new \ReflectionProperty(Player::class, 'repository');
-        $reflectionRepo->setAccessible(true);
-        $reflectionRepo->setValue($player, $playerRepository);
-        
-        $syncMethod = new \ReflectionMethod(Player::class, 'syncPropertiesFromPlayerData');
-        $syncMethod->setAccessible(true);
-        $syncMethod->invoke($player);
+        $player = Player::fromPlayerData($db, $playerData);
 
         $offer1 = $offerRow['offer1'];
         $offer2 = $offerRow['offer2'];

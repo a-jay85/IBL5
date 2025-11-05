@@ -20,20 +20,7 @@ class UI
             $playerData = $playerRepository->fillFromCurrentRow($plrRow);
         }
         
-        $player = new Player();
-        $reflectionProperty = new \ReflectionProperty(Player::class, 'playerData');
-        $reflectionProperty->setAccessible(true);
-        $reflectionProperty->setValue($player, $playerData);
-        
-        $reflectionDb = new \ReflectionProperty(Player::class, 'db');
-        $reflectionDb->setAccessible(true);
-        $reflectionDb->setValue($player, $db);
-        
-        $syncMethod = new \ReflectionMethod(Player::class, 'syncPropertiesFromPlayerData');
-        $syncMethod->setAccessible(true);
-        $syncMethod->invoke($player);
-        
-        return $player;
+        return Player::fromPlayerData($db, $playerData);
     }
 
     public static function displayDebugOutput($content, $title = 'Debug Output') 

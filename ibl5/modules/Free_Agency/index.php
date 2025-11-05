@@ -778,7 +778,7 @@ function display()
 function negotiate($pid)
 {
     global $prefix, $db, $cookie;
-    $sharedFunctions = new Shared($db);
+    $commonRepository = new \Services\CommonRepository($db);
 
     $pid = intval($pid);
 
@@ -787,7 +787,7 @@ function negotiate($pid)
     $userinfo = $db->sql_fetchrow($result2);
 
     $userteam = $userinfo['user_ibl_team'];
-    $teamID = $sharedFunctions->getTidFromTeamname($userteam); // This function now returns an integer
+    $teamID = $commonRepository->getTidFromTeamname($userteam); // This function now returns an integer
 
     $exceptioninfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_team_info WHERE team_name='$userteam'"));
 

@@ -184,50 +184,18 @@ class Discord
 class Shared
 {
         protected $db;
+        protected $commonRepository;
         
         public function __construct($db)
         {
             $this->db = $db;
+            $this->commonRepository = new \Services\CommonRepository($db);
         }
         
         public function getTidFromTeamname($teamname)
         {
-            // Mock team ID mapping
-            static $teamMap = [
-                'Atlanta Hawks' => 1,
-                'Boston Celtics' => 2,
-                'Charlotte Hornets' => 3,
-                'Chicago Bulls' => 4,
-                'Cleveland Cavaliers' => 5,
-                'Dallas Mavericks' => 6,
-                'Denver Nuggets' => 7,
-                'Detroit Pistons' => 8,
-                'Golden State Warriors' => 9,
-                'Houston Rockets' => 10,
-                'Indiana Pacers' => 11,
-                'LA Clippers' => 12,
-                'LA Lakers' => 13,
-                'Memphis Grizzlies' => 14,
-                'Miami Heat' => 15,
-                'Milwaukee Bucks' => 16,
-                'Minnesota Timberwolves' => 17,
-                'New Jersey Nets' => 18,
-                'New Orleans Hornets' => 19,
-                'New York Knicks' => 20,
-                'Orlando Magic' => 21,
-                'Philadelphia 76ers' => 22,
-                'Phoenix Suns' => 23,
-                'Portland Trail Blazers' => 24,
-                'Sacramento Kings' => 25,
-                'San Antonio Spurs' => 26,
-                'Seattle SuperSonics' => 27,
-                'Toronto Raptors' => 28,
-                'Utah Jazz' => 29,
-                'Vancouver Grizzlies' => 30,
-                'Washington Wizards' => 31,
-            ];
-            
-            return $teamMap[$teamname] ?? 1;
+            return $this->commonRepository->getTidFromTeamname($teamname);
+        }
         }
         
         public function resetSimContractExtensionAttempts()

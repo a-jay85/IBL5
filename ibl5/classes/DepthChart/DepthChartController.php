@@ -35,7 +35,7 @@ class DepthChartController
         
         // Get user's team information
         $teamName = $this->getUserTeamName($username);
-        $teamID = $sharedFunctions->getTidFromTeamname($teamName);
+        $teamID = $this->commonRepository->getTidFromTeamname($teamName);
         $team = \Team::initialize($this->db, $teamID);
         
         // Render header

@@ -18,7 +18,7 @@ get_lang($module_name);
 function userinfo($username)
 {
     global $user_prefix, $db;
-    $sharedFunctions = new Shared($db);
+    $commonRepository = new \Services\CommonRepository($db);
     $season = new Season($db);
     $repository = new DraftRepository($db);
     $view = new DraftView();
@@ -32,7 +32,7 @@ function userinfo($username)
     OpenTable();
 
     $teamlogo = $userinfo['user_ibl_team'];
-    $tid = $sharedFunctions->getTidFromTeamname($teamlogo);
+    $tid = $commonRepository->getTidFromTeamname($teamlogo);
 
     UI::displaytopmenu($db, $tid);
 

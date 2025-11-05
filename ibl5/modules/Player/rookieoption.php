@@ -3,14 +3,14 @@
 use Player\Player;
 
 require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
-$sharedFunctions = new Shared($db);
+$commonRepository = new \Services\CommonRepository($db);
 $season = new Season($db);
 
 $Team_Name = $_POST['teamname'];
 $player = Player::withPlayerID($db, $_POST['playerID']);
 $ExtensionAmount = $_POST['rookieOptionValue'];
 
-$teamID = $sharedFunctions->getTidFromTeamname($Team_Name); // This function now returns an integer
+$teamID = $commonRepository->getTidFromTeamname($Team_Name); // This function now returns an integer
 
 $recipient = 'ibldepthcharts@gmail.com';
 $emailsubject = "Rookie Extension Option - " . $player->name;

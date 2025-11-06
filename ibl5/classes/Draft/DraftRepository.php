@@ -122,23 +122,31 @@ class DraftRepository
     }
 
     /**
-     * Get the next available player ID by finding the max PID and adding 1
+     * Get the next available player ID for drafted players
      * 
-     * @return int Next available PID
+     * Uses a high PID range (starting at 90000) to avoid conflicts with JSB-assigned PIDs.
+     * These are temporary PIDs that allow drafted players to appear in rosters immediately.
+     * When plrParser.php runs with an updated .plr file, it will create proper entries
+     * with JSB-assigned PIDs using INSERT ... ON DUPLICATE KEY UPDATE based on pid.
+     * 
+     * @return int Next available PID in the draft range (>= 90000)
      */
     private function getNextAvailablePid()
     {
-        $query = "SELECT MAX(pid) as max_pid FROM ibl_plr";
+        // Use PID range starting at 90000 for drafted players to avoid JSB conflicts
+        $draftPidStart = 90000;
+        
+        $query = "SELECT MAX(pid) as max_pid FROM ibl_plr WHERE pid >= $draftPidStart";
         $result = $this->db->sql_query($query);
         
         if ($result && $this->db->sql_numrows($result) > 0) {
             $maxPid = $this->db->sql_result($result, 0, 'max_pid');
-            if ($maxPid !== null && $maxPid !== '') {
+            if ($maxPid !== null && $maxPid !== '' && $maxPid >= $draftPidStart) {
                 return (int) $maxPid + 1;
             }
         }
         
-        return 1; // Default to 1 if table is empty
+        return $draftPidStart; // Start at 90000 if no draft PIDs exist yet
     }
 
     /**

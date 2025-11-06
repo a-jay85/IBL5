@@ -21,6 +21,25 @@ Added a new `createPlayerFromDraftClass()` method to `DraftRepository` that:
 
 ## Implementation Details
 
+### PID Assignment Strategy
+
+To avoid collisions with `plrParser.php`, drafted players are assigned PIDs in a separate range:
+
+- **Draft PID Range**: 90000 and above
+- **JSB PID Range**: Typically 1-50000
+- **Reason**: plrParser.php uses `INSERT ... ON DUPLICATE KEY UPDATE` based on the PRIMARY KEY (`pid`). By using a non-overlapping PID range, we ensure:
+  - No errors when plrParser runs
+  - No unintended overwrites of drafted player data
+  - Both draft entries and JSB entries can coexist until properly reconciled
+
+**Workflow:**
+1. Player is drafted → Assigned temporary PID (e.g., 90001)
+2. Draft entry created with basic info from ibl_draft_class
+3. Player appears in rosters, depth charts immediately
+4. After JSB simulation → .plr file updated with official PIDs
+5. plrParser runs → Creates official entries with JSB PIDs (no collision)
+6. Optional: Clean up temporary draft entries (PID >= 90000) after confirmation
+
 ### Column Mapping from ibl_draft_class to ibl_plr
 
 | ibl_draft_class | ibl_plr | Notes |

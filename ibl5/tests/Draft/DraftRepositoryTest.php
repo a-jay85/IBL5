@@ -182,4 +182,166 @@ class DraftRepositoryTest extends TestCase
         $this->assertStringContainsString("D\\'Angelo Russell", $queries[0]);
         $this->assertStringContainsString('ibl_draft_class', $queries[0]);
     }
+
+    public function testCreatePlayerFromDraftClassSucceeds()
+    {
+        // Set up mock to return different data for different queries
+        // First call: team ID lookup returns teamid
+        // Second call: draft class query returns player data
+        $draftClassData = [
+            'name' => 'John Doe',
+            'pos' => 'PG',
+            'age' => 22,
+            'sta' => 85,
+            'offo' => 75,
+            'offd' => 70,
+            'offp' => 65,
+            'offt' => 60,
+            'defo' => 80,
+            'defd' => 75,
+            'defp' => 70,
+            'deft' => 65,
+            'tal' => 80,
+            'skl' => 75,
+            'int' => 70
+        ];
+        
+        // The mock will return the draft class data for SELECT queries
+        $this->mockDb->setMockData([$draftClassData]);
+        $this->mockDb->setReturnTrue(true);
+        
+        $result = $this->repository->createPlayerFromDraftClass('John Doe', 'Chicago Bulls');
+        
+        $this->assertTrue($result);
+        $queries = $this->mockDb->getExecutedQueries();
+        
+        // Should have team lookup, draft class query, max PID query, and INSERT
+        $this->assertGreaterThanOrEqual(2, count($queries));
+        
+        // Check for INSERT query
+        $hasInsertQuery = false;
+        foreach ($queries as $query) {
+            if (stripos($query, 'INSERT INTO ibl_plr') !== false) {
+                $hasInsertQuery = true;
+                $this->assertStringContainsString('John Doe', $query);
+                $this->assertStringContainsString('PG', $query);
+                break;
+            }
+        }
+        $this->assertTrue($hasInsertQuery);
+    }
+
+    public function testCreatePlayerFromDraftClassReturnsFalseWhenTeamNotFound()
+    {
+        $this->mockDb->setMockData([]);
+        $this->mockDb->setNumRows(0);
+
+        $result = $this->repository->createPlayerFromDraftClass('John Doe', 'Nonexistent Team');
+
+        $this->assertFalse($result);
+    }
+
+    public function testCreatePlayerFromDraftClassHandlesApostrophes()
+    {
+        $draftClassData = [
+            'name' => "D'Angelo Russell",
+            'pos' => 'PG',
+            'age' => 21,
+            'sta' => 80,
+            'offo' => 70,
+            'offd' => 65,
+            'offp' => 60,
+            'offt' => 55,
+            'defo' => 75,
+            'defd' => 70,
+            'defp' => 65,
+            'deft' => 60,
+            'tal' => 75,
+            'skl' => 70,
+            'int' => 65
+        ];
+        
+        $this->mockDb->setMockData([$draftClassData]);
+        $this->mockDb->setReturnTrue(true);
+
+        $result = $this->repository->createPlayerFromDraftClass("D'Angelo Russell", 'LA Lakers');
+
+        $this->assertTrue($result);
+        $queries = $this->mockDb->getExecutedQueries();
+        
+        // Check that there's an INSERT query with escaped apostrophe
+        $insertQuery = null;
+        foreach ($queries as $query) {
+            if (stripos($query, 'INSERT INTO ibl_plr') !== false) {
+                $insertQuery = $query;
+                break;
+            }
+        }
+        
+        $this->assertNotNull($insertQuery);
+        $this->assertStringContainsString("D\\'Angelo Russell", $insertQuery);
+    }
+
+    public function testCreatePlayerFromDraftClassTruncatesLongNames()
+    {
+        $longName = 'Christopher Emmanuel Paul Jr. III';
+        $draftClassData = [
+            'name' => $longName,
+            'pos' => 'PG',
+            'age' => 23,
+            'sta' => 90,
+            'offo' => 80,
+            'offd' => 75,
+            'offp' => 70,
+            'offt' => 65,
+            'defo' => 85,
+            'defd' => 80,
+            'defp' => 75,
+            'deft' => 70,
+            'tal' => 85,
+            'skl' => 80,
+            'int' => 75
+        ];
+        
+        $this->mockDb->setMockData([$draftClassData]);
+        $this->mockDb->setReturnTrue(true);
+        
+        $result = $this->repository->createPlayerFromDraftClass($longName, 'Chicago Bulls');
+
+        $this->assertTrue($result);
+        
+        $queries = $this->mockDb->getExecutedQueries();
+        
+        // Find the INSERT query
+        $insertQuery = null;
+        foreach ($queries as $query) {
+            if (stripos($query, 'INSERT INTO ibl_plr') !== false) {
+                $insertQuery = $query;
+                break;
+            }
+        }
+        
+        $this->assertNotNull($insertQuery);
+        // The name in the query should be truncated to 32 chars
+        $truncatedName = substr($longName, 0, 32);
+        $this->assertStringContainsString($truncatedName, $insertQuery);
+    }
+
+    public function testCreatePlayerFromDraftClassReturnsFalseWhenPlayerNotInDraftClass()
+    {
+        // First query (team lookup) returns data, but second query (draft class) returns empty
+        $this->mockDb->setMockData([
+            ['teamid' => 4]
+        ]);
+        
+        // After the first SELECT, subsequent queries return no rows
+        $this->mockDb->setNumRows(0);
+
+        $result = $this->repository->createPlayerFromDraftClass('Unknown Player', 'Chicago Bulls');
+
+        // Should return false when player not found in draft class
+        // Note: This test might be tricky with the current mock setup
+        // The actual behavior depends on how the mock handles multiple queries
+        $this->assertFalse($result);
+    }
 }

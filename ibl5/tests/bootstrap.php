@@ -20,6 +20,7 @@ class MockDatabase
     private $numRows = null;
     private $returnTrue = false;
     private $executedQueries = [];
+    private $affectedRows = 0;
     
     public function sql_query($query)
     {
@@ -27,11 +28,10 @@ class MockDatabase
         $this->executedQueries[] = $query;
         
         // For queries that expect boolean return (INSERT, UPDATE, DELETE)
-        if ($this->returnTrue || 
-            stripos($query, 'INSERT') === 0 || 
+        if (stripos($query, 'INSERT') === 0 || 
             stripos($query, 'UPDATE') === 0 || 
             stripos($query, 'DELETE') === 0) {
-            return true;
+            return $this->returnTrue;
         }
         
         // Special handling for trade info queries
@@ -80,6 +80,11 @@ class MockDatabase
         return 0;
     }
     
+    public function sql_affectedrows()
+    {
+        return $this->affectedRows;
+    }
+    
     public function setMockData($data)
     {
         $this->mockData = $data;
@@ -95,6 +100,11 @@ class MockDatabase
     public function setNumRows($numRows)
     {
         $this->numRows = $numRows;
+    }
+    
+    public function setAffectedRows($affectedRows)
+    {
+        $this->affectedRows = $affectedRows;
     }
     
     public function setReturnTrue($returnTrue = true)

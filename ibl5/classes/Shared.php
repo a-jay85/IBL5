@@ -32,54 +32,6 @@ class Shared
 
         return $this->db->sql_result($queryCurrentOwnerOfDraftPick, 0, 'ownerofpick');
     }
-    
-    /**
-     * Gets player ID from player name
-     * 
-     * @deprecated Use CommonRepository::getPlayerIDFromPlayerName() instead
-     * @param string $playerName Player name to look up
-     * @return int|null Player ID or null if not found
-     */
-    public function getPlayerIDFromPlayerName($playerName)
-    {
-        return $this->commonRepository->getPlayerIDFromPlayerName($playerName);
-    }
-
-    /**
-     * Gets team name from team ID
-     * 
-     * @deprecated Use CommonRepository::getTeamnameFromTeamID() instead
-     * @param int $teamID Team ID to look up
-     * @return string|null Team name or null if not found
-     */
-    public function getTeamnameFromTeamID($teamID)
-    {
-        return $this->commonRepository->getTeamnameFromTeamID($teamID);
-    }
-
-    /**
-     * Gets team name from username
-     * 
-     * @deprecated Use CommonRepository::getTeamnameFromUsername() instead
-     * @param string $username Username to look up
-     * @return string|null Team name, "Free Agents" for empty username, or null if not found
-     */
-    public function getTeamnameFromUsername($username)
-    {
-        return $this->commonRepository->getTeamnameFromUsername($username);
-    }
-
-    /**
-     * Gets team ID from team name
-     * 
-     * @deprecated Use CommonRepository::getTidFromTeamname() instead
-     * @param string $teamname Team name to look up
-     * @return int|null Team ID or null if not found
-     */
-    public function getTidFromTeamname($teamname)
-    {
-        return $this->commonRepository->getTidFromTeamname($teamname);
-    }
 
     public function isFreeAgencyModuleActive()
     {

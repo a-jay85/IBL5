@@ -3,11 +3,11 @@ namespace Updater;
 
 class StandingsUpdater {
     private $db;
-    private $sharedFunctions;
+    private $commonRepository;
 
-    public function __construct($db, $sharedFunctions) {
+    public function __construct($db, $commonRepository) {
         $this->db = $db;
-        $this->sharedFunctions = $sharedFunctions;
+        $this->commonRepository = $commonRepository;
     }
 
     private function extractWins($var) {
@@ -90,7 +90,7 @@ class StandingsUpdater {
     private function processTeamStandings($row, $conference) {
         $log = '';
 
-        $teamID = $this->sharedFunctions->getTidFromTeamname($row->childNodes->item(0)->nodeValue); // This function now returns an integer
+        $teamID = $this->commonRepository->getTidFromTeamname($row->childNodes->item(0)->nodeValue); // This function now returns an integer
         $leagueRecord = $row->childNodes->item(1)->nodeValue;
         $pct = $row->childNodes->item(2)->nodeValue;
         $confGB = $row->childNodes->item(3)->nodeValue;
@@ -181,7 +181,7 @@ class StandingsUpdater {
         $log = '';
         
         $teamName = $row->childNodes->item(0)->nodeValue;
-        $teamID = $this->sharedFunctions->getTidFromTeamname($teamName);
+        $teamID = $this->commonRepository->getTidFromTeamname($teamName);
         $divGB = $row->childNodes->item(3)->nodeValue;
 
         $sqlQueryString = "UPDATE ibl_standings 

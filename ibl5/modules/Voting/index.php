@@ -36,7 +36,7 @@ if (!function_exists('str_contains')) {
 function userinfo($username)
 {
     global $prefix, $db;
-    $sharedFunctions = new Shared($db);
+    $commonRepository = new \Services\CommonRepository($db);
     $season = new Season($db);
 
     $sql2 = "SELECT * FROM " . $prefix . "_users WHERE username = '$username'";
@@ -205,7 +205,7 @@ function userinfo($username)
 
     $formName = ($season->phase == "Regular Season") ? "ASGVote" : "EOYVote";
     $voterTeamName = $userinfo['user_ibl_team'];
-    $tid = $sharedFunctions->getTidFromTeamname($voterTeamName);
+    $tid = $commonRepository->getTidFromTeamname($voterTeamName);
 
     $formAction = ($season->phase == "Regular Season") ? "modules/Voting/ASGVote.php" : "modules/Voting/EOYVote.php";
     echo "<form name=\"$formName\" method=\"post\" action=\"$formAction\">

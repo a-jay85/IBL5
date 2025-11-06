@@ -17,20 +17,20 @@ use Updater\StandingsHTMLGenerator;
 class UpdateAllTheThingsIntegrationTest extends TestCase
 {
     private $mockDb;
-    private $mockSharedFunctions;
+    private $mockCommonRepository;
     private $mockSeason;
 
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
-        $this->mockSharedFunctions = new Shared($this->mockDb);
+        $this->mockCommonRepository = new \Services\CommonRepository($this->mockDb);
         $this->mockSeason = new Season($this->mockDb);
     }
 
     protected function tearDown(): void
     {
         $this->mockDb = null;
-        $this->mockSharedFunctions = null;
+        $this->mockCommonRepository = null;
         $this->mockSeason = null;
     }
 
@@ -40,8 +40,8 @@ class UpdateAllTheThingsIntegrationTest extends TestCase
      */
     public function testAllComponentsCanBeInitialized()
     {
-        $scheduleUpdater = new ScheduleUpdater($this->mockDb, $this->mockSharedFunctions, $this->mockSeason);
-        $standingsUpdater = new StandingsUpdater($this->mockDb, $this->mockSharedFunctions);
+        $scheduleUpdater = new ScheduleUpdater($this->mockDb, $this->mockCommonRepository, $this->mockSeason);
+        $standingsUpdater = new StandingsUpdater($this->mockDb, $this->mockCommonRepository);
         $powerRankingsUpdater = new PowerRankingsUpdater($this->mockDb, $this->mockSeason);
         $standingsHTMLGenerator = new StandingsHTMLGenerator($this->mockDb);
         

@@ -11,10 +11,10 @@ This is the repository for iblhoops.net, a small internet-based fantasy basketba
 ## 📚 Essential Documentation
 
 ### Core Guides
-- **[Development Guide](DEVELOPMENT_GUIDE.md)** - Refactoring priorities, module status, workflow
-- **[Database Guide](DATABASE_GUIDE.md)** - Schema reference, migrations, best practices
-- **[API Guide](API_GUIDE.md)** - API development with database views, UUIDs, caching
-- **[Copilot Agent Instructions](COPILOT_AGENT.md)** - Coding standards, patterns, security
+- **[Development Guide](DEVELOPMENT_GUIDE.md)** - Current priorities, refactoring workflow, testing standards, architecture patterns
+- **[Database Guide](DATABASE_GUIDE.md)** - Schema reference, table relationships, migrations, performance notes
+- **[API Guide](API_GUIDE.md)** - RESTful design, database views, UUIDs, authentication, caching strategies
+- **[Copilot Agent Instructions](COPILOT_AGENT.md)** - Coding standards, type hints, autoloader rules, security practices
 
 ### Database Status ✅
 - ✅ InnoDB conversion (52 tables) - 10-100x performance gain

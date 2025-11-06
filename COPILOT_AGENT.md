@@ -307,5 +307,6 @@ All methods handle zero-division safely and return appropriate defaults.
 - **[Database Guide](DATABASE_GUIDE.md)** - Schema reference, migrations, best practices
 - **[API Guide](API_GUIDE.md)** - API development with UUIDs, views, caching
 - **[Statistics Formatting Guide](STATISTICS_FORMATTING_GUIDE.md)** - StatsFormatter and StatsSanitizer usage
+- **[Copilot Agent Instructions](COPILOT_AGENT.md)** - Coding standards and practices
 - [Copilot Coding Agent Best Practices](https://gh.io/copilot-coding-agent-tips)
 - [Conventional Commits](https://www.conventionalcommits.org/)

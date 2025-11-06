@@ -382,7 +382,7 @@ paths:
 8. Deploy to staging environment
 
 ## Additional Resources
-- Database Schema: `DATABASE_GUIDE.md`
-- Development Standards: `COPILOT_AGENT.md`
-- Refactoring Guide: `DEVELOPMENT_GUIDE.md`
-- Production Deployment: `PRODUCTION_DEPLOYMENT_GUIDE.md`
+- **[Database Guide](DATABASE_GUIDE.md)** - Schema reference and best practices
+- **[Development Guide](DEVELOPMENT_GUIDE.md)** - Refactoring and testing standards
+- **[Copilot Instructions](COPILOT_AGENT.md)** - Coding standards and security
+- **[Production Deployment](PRODUCTION_DEPLOYMENT_GUIDE.md)** - Deployment procedures

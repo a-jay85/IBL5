@@ -86,9 +86,9 @@ git show <commit>:DATABASE_SCHEMA_IMPROVEMENTS.md
 - **Issues:** Significant overlap, duplicate information, outdated status tracking
 
 ### After Consolidation
-- **Active Files:** 7 markdown files (in root) + class/test READMEs
-- **Total Lines:** ~4,000 lines
-- **Reduction:** ~70% reduction in documentation token overhead
+- **Active Files:** 17 markdown files (8 root + 9 subdirectory)
+- **Total Lines:** ~3,815 lines
+- **Reduction:** ~73% reduction in documentation token overhead
 - **Improvements:** Better discoverability, reduced redundancy, clearer structure
 
 ## Last Updated

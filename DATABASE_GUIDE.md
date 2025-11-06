@@ -131,8 +131,9 @@ $query = "SELECT * FROM vw_player_current WHERE uuid = ?";
 ## Additional Resources
 - Schema Reference: `/ibl5/schema.sql`
 - Migration Scripts: `/ibl5/migrations/`
-- API Development: `API_GUIDE.md`
-- Copilot Instructions: `COPILOT_AGENT.md`
+- **[Development Guide](DEVELOPMENT_GUIDE.md)** - Refactoring and testing
+- **[API Guide](API_GUIDE.md)** - API development best practices
+- **[Copilot Instructions](COPILOT_AGENT.md)** - Coding standards
 
 ## Need Help?
 - Check schema.sql for table structures and relationships

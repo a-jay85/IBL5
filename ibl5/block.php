@@ -5,6 +5,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 use Player\Player;
 
 $sharedFunctions = new Shared($db);
+$commonRepository = new Services\CommonRepository($db);
 
 $val = $_GET['day'];
 
@@ -36,7 +37,7 @@ $lastPlayerIteratedOn = "";
 $i = 0;
 while ($i < $num) {
     $name = $db->sql_result($result, $i, "name");
-    $playerID = $sharedFunctions->getPlayerIDFromPlayerName($name);
+    $playerID = $commonRepository->getPlayerIDFromPlayerName($name);
     $player = Player::withPlayerID($db, $playerID);
     $teamOfPlayer = Team::initialize($db, $player->teamName);
     $offeringTeamName = $db->sql_result($result, $i, "team");

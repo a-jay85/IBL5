@@ -22,7 +22,7 @@ get_lang($module_name);
 function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 {
     global $user, $prefix, $user_prefix, $db;
-    $sharedFunctions = new Shared($db);
+    $commonRepository = new \Services\CommonRepository($db);
 
     $sql = "SELECT * FROM " . $prefix . "_bbconfig";
     $result = $db->sql_query($sql);
@@ -37,7 +37,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
     }
 
     $teamlogo = $userinfo['user_ibl_team'];
-    $tid = $sharedFunctions->getTidFromTeamname($teamlogo);
+    $tid = $commonRepository->getTidFromTeamname($teamlogo);
 
     Nuke\Header::header();
     OpenTable();

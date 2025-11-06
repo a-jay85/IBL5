@@ -693,12 +693,12 @@ function negotiate($playerID)
 function rookieoption($pid)
 {
     global $prefix, $db, $cookie;
-    $sharedFunctions = new Shared($db);
+    $commonRepository = new \Services\CommonRepository($db);
     $season = new Season($db);
     $player = Player::withPlayerID($db, $pid);
 
-    $userteam = $sharedFunctions->getTeamnameFromUsername($cookie[1]);
-    $userTeamID = $sharedFunctions->getTidFromTeamname($userteam);
+    $userteam = $commonRepository->getTeamnameFromUsername($cookie[1]);
+    $userTeamID = $commonRepository->getTidFromTeamname($userteam);
 
     if ($userTeamID != $player->teamID) {
         echo "$player->position $player->name is not on your team.<br>

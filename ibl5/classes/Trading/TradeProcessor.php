@@ -3,14 +3,14 @@
 class Trading_TradeProcessor
 {
     protected $db;
-    protected $sharedFunctions;
+    protected $commonRepository;
     protected $season;
     protected $cashHandler;
 
     public function __construct($db)
     {
         $this->db = $db;
-        $this->sharedFunctions = new Shared($db);
+        $this->commonRepository = new \Services\CommonRepository($db);
         $this->season = new Season($db);
         $this->cashHandler = new Trading_CashTransactionHandler($db);
     }
@@ -152,7 +152,7 @@ class Trading_TradeProcessor
      */
     protected function processPlayer($itemId, $offeringTeamName, $listeningTeamName)
     {
-        $listeningTeamId = $this->sharedFunctions->getTidFromTeamname($listeningTeamName);
+        $listeningTeamId = $this->commonRepository->getTidFromTeamname($listeningTeamName);
 
         $queryk = "SELECT * FROM ibl_plr WHERE pid = '$itemId'";
         $resultk = $this->db->sql_query($queryk);

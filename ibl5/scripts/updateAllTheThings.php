@@ -4,12 +4,13 @@ libxml_use_internal_errors(true);
 
 require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
+$commonRepository = new \Services\CommonRepository($db);
 $sharedFunctions = new Shared($db);
 $season = new Season($db);
 
 // Initialize components
-$scheduleUpdater = new Updater\ScheduleUpdater($db, $sharedFunctions, $season);
-$standingsUpdater = new Updater\StandingsUpdater($db, $sharedFunctions);
+$scheduleUpdater = new Updater\ScheduleUpdater($db, $commonRepository, $season);
+$standingsUpdater = new Updater\StandingsUpdater($db, $commonRepository);
 $powerRankingsUpdater = new Updater\PowerRankingsUpdater($db, $season);
 $standingsHTMLGenerator = new Updater\StandingsHTMLGenerator($db);
 

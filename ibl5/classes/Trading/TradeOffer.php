@@ -3,7 +3,7 @@
 class Trading_TradeOffer
 {
     protected $db;
-    protected $sharedFunctions;
+    protected $commonRepository;
     protected $season;
     protected $cashHandler;
     protected $validator;
@@ -11,7 +11,7 @@ class Trading_TradeOffer
     public function __construct($db)
     {
         $this->db = $db;
-        $this->sharedFunctions = new Shared($db);
+        $this->commonRepository = new \Services\CommonRepository($db);
         $this->season = new Season($db);
         $this->cashHandler = new Trading_CashTransactionHandler($db);
         $this->validator = new Trading_TradeValidator($db);
@@ -303,8 +303,8 @@ class Trading_TradeOffer
         $this->cashHandler->insertCashTradeData($tradeOfferId, $offeringTeamName, $listeningTeamName, $cashAmounts);
 
         // Insert trade info record for cash
-        $offeringTeamId = $this->sharedFunctions->getTidFromTeamname($offeringTeamName);
-        $listeningTeamId = $this->sharedFunctions->getTidFromTeamname($listeningTeamName);
+        $offeringTeamId = $this->commonRepository->getTidFromTeamname($offeringTeamName);
+        $listeningTeamId = $this->commonRepository->getTidFromTeamname($listeningTeamName);
 
         $query = "INSERT INTO ibl_trade_info
           ( `tradeofferid`,

@@ -87,65 +87,18 @@ $player = new Player($db);
 
 ### Database Schema & Considerations
 
-#### Schema Reference
+#### Quick Reference
 - **Schema Location**: `ibl5/schema.sql` (MariaDB 10.6.20 export)
-- The complete database schema is available in the repository for reference
-- Use the schema to understand table structures, relationships, and constraints
+- **Database Guide**: See `DATABASE_GUIDE.md` for complete schema documentation
+- **Status**: InnoDB conversion complete (52 tables), foreign keys added (24 constraints), API-ready ✅
 
-#### Database Architecture
-- **Current Engine**: MySQL 5.5.5-10.6.20-MariaDB-cll-lve
-- **Mixed Storage Engines**: MyISAM (legacy tables) and InnoDB (newer tables)
-- **Character Sets**: Mixed latin1 (legacy) and utf8mb4 (modern Laravel tables)
-
-#### Key Table Categories
-1. **IBL Core Tables** (prefix: `ibl_`)
-   - Player data: `ibl_plr`, `ibl_plr_chunk`, `ibl_hist`
-   - Statistics: `ibl_*_stats`, `ibl_*_career_avgs`, `ibl_*_career_totals`
-   - Game data: `ibl_box_scores`, `ibl_box_scores_teams`, `ibl_schedule`
-   - Team management: `ibl_team_info`, `ibl_team_history`, `ibl_standings`
-   - League operations: `ibl_draft`, `ibl_fa_offers`, `ibl_trade_*`
-   - Awards/voting: `ibl_awards`, `ibl_votes_ASG`, `ibl_votes_EOY`
-
-2. **PHP-Nuke Legacy Tables** (prefix: `nuke_`)
-   - Forum system: `nuke_bb*` (phpBB integration)
-   - User management: `nuke_users`, `nuke_authors`
-   - CMS: `nuke_stories`, `nuke_modules`, `nuke_blocks`
-
-3. **Laravel Migration Tables** (no prefix)
-   - Modern Laravel tables: `cache`, `jobs`, `migrations`, `sessions`, `users`
-   - Indicates gradual migration to Laravel framework
-
-#### Migration Considerations
-- **Storage Engine Migration**: Convert MyISAM tables to InnoDB for:
-  - Better transaction support
-  - Foreign key constraints
-  - Improved concurrency and crash recovery
-  - Required for modern ORM functionality
-
-- **Character Set Standardization**: 
-  - Legacy tables use `latin1_swedish_ci`
-  - Modern tables use `utf8mb4_unicode_ci`
-  - Consider charset migration for international character support
-
-- **PostgreSQL Compatibility**:
-  - Avoid MySQL-specific features (e.g., `MEDIUMINT`, `TINYINT`)
-  - Use standard SQL types where possible
-  - Be mindful of AUTO_INCREMENT vs SERIAL
-  - Watch for DATE/DATETIME format differences
-
-- **ORM Preparation**:
-  - Many tables lack proper PRIMARY KEYs (e.g., `ibl_playoff_stats`)
-  - Missing foreign key relationships despite logical connections
-  - Consider adding indexes for common query patterns
-  - Prepare for Eloquent model relationships
-
-#### Schema Best Practices
-- **Reference First**: Check `ibl5/schema.sql` before writing queries
-- **Index Usage**: Verify existing indexes before adding new ones
-- **Naming Conventions**: Follow existing patterns (`ibl_` prefix for league tables)
-- **Data Integrity**: Be aware that MyISAM tables lack foreign key constraints
-- **Future-Proof Queries**: Write SQL that can be easily converted to Eloquent
-- **Testing Data**: Production schema provides real-world structure for test data
+#### Essential Practices
+- Use `ibl5/schema.sql` to understand table structures before writing queries
+- Use prepared statements for all queries (security)
+- Leverage existing indexes for WHERE/JOIN clauses
+- Avoid MySQL-specific features for PostgreSQL compatibility (e.g., use INT not MEDIUMINT)
+- Write SQL that can be converted to Eloquent ORM
+- Place migrations in `ibl5/migrations/` directory
 
 ## Best Practices
 
@@ -306,31 +259,23 @@ oldFunction($value);  →  NewClass::newMethod($value);
 
 ## Working with the Database Schema
 
-### Schema File Usage
-- **Location**: `ibl5/schema.sql`
-- **Purpose**: Complete reference for all database tables, columns, and constraints
-- **Generated**: October 29, 2025 via Sequel Ace
+### Quick Reference
+- **Location**: `ibl5/schema.sql` - Complete reference for all tables, columns, constraints
+- **Comprehensive Guide**: See `DATABASE_GUIDE.md` for detailed schema documentation
 
 ### When to Reference the Schema
 - Before creating database queries or classes that interact with tables
 - When adding new database-related tests
-- When planning refactoring that touches data layer
-- When writing migration scripts or database documentation
+- When writing migration scripts
 
-### Understanding Table Relationships
-The schema reveals:
-- **Player Identity**: `ibl_plr.pid` is the primary player identifier
-- **Team Identity**: `ibl_team_info.teamid` is the primary team identifier
-- **Player-Team Link**: `ibl_plr.tid` and `ibl_plr.teamname` connect players to teams
-- **Historical Tracking**: `ibl_hist` maintains year-by-year player statistics
-- **Salary Cap**: Contract years stored as `cy1`-`cy6` in `ibl_plr` and `ibl_trade_cash`
-- **Depth Charts**: Multiple depth fields in `ibl_plr` (`PGDepth`, `SGDepth`, etc.)
+### Key Relationships (Quick Reference)
+- **Player ID**: `ibl_plr.pid` (primary), `ibl_plr.uuid` (public API)
+- **Team ID**: `ibl_team_info.teamid` (primary), `ibl_team_info.uuid` (public API)
+- **Player-Team**: `ibl_plr.tid` links to `ibl_team_info.teamid`
+- **History**: `ibl_hist` tracks year-by-year player statistics
+- **Contracts**: `cy1`-`cy6` fields in `ibl_plr` and `ibl_trade_cash`
 
-### Database Evolution Strategy
-1. **Phase 1 (Current)**: PHP-Nuke with direct SQL queries
-2. **Phase 2 (In Progress)**: Laravel coexistence (evidence: modern tables exist)
-3. **Phase 3 (Target)**: Full Laravel with Eloquent ORM
-4. **Phase 4 (Future)**: PostgreSQL compatibility layer
+For complete table documentation, relationships, indexes, and migration history, see `DATABASE_GUIDE.md`.
 
 ## Statistics Formatting & Sanitization
 
@@ -358,7 +303,9 @@ All methods handle zero-division safely and return appropriate defaults.
 **Reference**: See `STATISTICS_FORMATTING_GUIDE.md` for complete method signatures, examples, and testing details.
 
 ## Additional Resources
+- **[Development Guide](DEVELOPMENT_GUIDE.md)** - Refactoring priorities, module status, workflow
+- **[Database Guide](DATABASE_GUIDE.md)** - Schema reference, migrations, best practices
+- **[API Guide](API_GUIDE.md)** - API development with UUIDs, views, caching
+- **[Statistics Formatting Guide](STATISTICS_FORMATTING_GUIDE.md)** - StatsFormatter and StatsSanitizer usage
 - [Copilot Coding Agent Best Practices](https://gh.io/copilot-coding-agent-tips)
 - [Conventional Commits](https://www.conventionalcommits.org/)
-- Database Schema Reference: `ibl5/schema.sql`
-- Statistics Formatting Guide: `STATISTICS_FORMATTING_GUIDE.md`

@@ -2,6 +2,19 @@
 
 This is the repository for iblhoops.net, a small internet-based fantasy basketball site. The site uses Jump Shot Basketball to simulate the games and roster management.
 
+## 🚀 Refactoring & Development Priorities
+
+**NEW**: Comprehensive refactoring assessment and roadmap available!
+
+- 🎯 **[Refactoring Priorities Report](REFACTORING_PRIORITIES_REPORT.md)** - Detailed analysis and priorities (20+ pages)
+- 📋 **[Module Status Matrix](MODULE_STATUS_MATRIX.md)** - Quick reference for all 63 modules
+- 🗺️ **[Refactoring Roadmap](REFACTORING_ROADMAP.md)** - Visual guide with timeline
+- 📖 **[Next Steps Guide](NEXT_STEPS.md)** - Actionable implementation guide
+
+**Current State**: 12 modules fully refactored with 350+ tests, 30% test coverage  
+**Goal**: 80%+ test coverage with all critical features tested  
+**Next Priority**: Free Agency Module (business critical)
+
 ## 📚 Documentation
 
 ### Database Schema Review
@@ -35,8 +48,16 @@ For API development, ensure Phase 1 & 2 migrations are complete, then follow the
 
 ## 📖 Additional Documentation
 
+### Refactoring Documentation
+- [Refactoring Summary](REFACTORING_SUMMARY.md) - Overall refactoring approach
+- [Player Refactoring Summary](PLAYER_REFACTORING_SUMMARY.md) - Facade pattern example
+- [Team Refactoring Summary](TEAM_REFACTORING_SUMMARY.md) - MVC pattern example
+- [Common Repository Summary](COMMON_REPOSITORY_REFACTORING_SUMMARY.md) - DRY principle
+- [Rookie Option Summary](ROOKIE_OPTION_REFACTORING_SUMMARY.md) - Complete refactoring
+- [Draft Refactoring Summary](DRAFT_REFACTORING_SUMMARY.md) - Draft module patterns
+
+### Operational Documentation
 - [Copilot Agent Instructions](COPILOT_AGENT.md)
 - [Draft Bug Fix Summary](DRAFT_BUG_FIX.md)
-- [Player Refactoring Summary](PLAYER_REFACTORING_SUMMARY.md)
 - [Production Deployment Guide](PRODUCTION_DEPLOYMENT_GUIDE.md)
-- [Refactoring Summary](REFACTORING_SUMMARY.md)
+- [Statistics Formatting Guide](STATISTICS_FORMATTING_GUIDE.md)

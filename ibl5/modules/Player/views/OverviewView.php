@@ -8,11 +8,13 @@ require_once __DIR__ . '/BaseView.php';
 class OverviewView extends BaseView {
     private $season;
     private $sharedFunctions;
+    private $commonRepository;
 
     public function __construct($db, Player $player, PlayerStats $playerStats, Season $season, Shared $sharedFunctions) {
         parent::__construct($db, $player, $playerStats);
         $this->season = $season;
         $this->sharedFunctions = $sharedFunctions;
+        $this->commonRepository = new Services\CommonRepository($db);
     }
 
     public function render() {
@@ -134,8 +136,8 @@ class OverviewView extends BaseView {
 
             echo "<tr>
                 <td class=\"gamelog\">" . $row['Date'] . "</td>
-                <td class=\"gamelog\">" . $this->sharedFunctions->getTeamnameFromTeamID($row['homeTID']) . "</td>
-                <td class=\"gamelog\">" . $this->sharedFunctions->getTeamnameFromTeamID($row['visitorTID']) . "</td>
+                <td class=\"gamelog\">" . $this->commonRepository->getTeamnameFromTeamID($row['homeTID']) . "</td>
+                <td class=\"gamelog\">" . $this->commonRepository->getTeamnameFromTeamID($row['visitorTID']) . "</td>
                 <td class=\"gamelog\">" . $row['gameMIN'] . "</td>
                 <td class=\"gamelog\">" . ((2 * $row['game2GM']) + (3 * $row['game3GM']) + $row['gameFTM']) . "</td>
                 <td class=\"gamelog\">" . ($row['game2GM'] + $row['game3GM']) . "</td>

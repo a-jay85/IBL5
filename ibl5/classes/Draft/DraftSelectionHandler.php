@@ -15,6 +15,7 @@ class DraftSelectionHandler
     private $db;
     private $validator;
     private $repository;
+    private $commonRepository;
     private $processor;
     private $view;
     private $sharedFunctions;
@@ -28,6 +29,7 @@ class DraftSelectionHandler
         
         $this->validator = new DraftValidator();
         $this->repository = new DraftRepository($db);
+        $this->commonRepository = new \Services\CommonRepository($db);
         $this->processor = new DraftProcessor();
         $this->view = new DraftView();
     }
@@ -122,7 +124,7 @@ class DraftSelectionHandler
             );
 
             if ($teamOnTheClock !== null) {
-                $discordIDOfTeamOnTheClock = $this->repository->getTeamDiscordID($teamOnTheClock);
+                $discordIDOfTeamOnTheClock = $this->commonRepository->getTeamDiscordID($teamOnTheClock);
             }
         }
 

@@ -19,54 +19,6 @@ class WaiversRepository
     }
     
     /**
-     * Gets user information by username
-     * 
-     * @deprecated Use CommonRepository::getUserByUsername() instead
-     * @param string $username Username to look up
-     * @return array|null User information or null if not found
-     */
-    public function getUserByUsername(string $username): ?array
-    {
-        return $this->commonRepository->getUserByUsername($username);
-    }
-    
-    /**
-     * Gets team information by team name
-     * 
-     * @deprecated Use CommonRepository::getTeamByName() instead
-     * @param string $teamName Team name to look up
-     * @return array|null Team information or null if not found
-     */
-    public function getTeamByName(string $teamName): ?array
-    {
-        return $this->commonRepository->getTeamByName($teamName);
-    }
-    
-    /**
-     * Gets total salary for a team for the current year
-     * 
-     * @deprecated Use CommonRepository::getTeamTotalSalary() instead
-     * @param string $teamName Team name
-     * @return int Total salary in thousands
-     */
-    public function getTeamTotalSalary(string $teamName): int
-    {
-        return $this->commonRepository->getTeamTotalSalary($teamName);
-    }
-    
-    /**
-     * Gets player information by player ID
-     * 
-     * @deprecated Use CommonRepository::getPlayerByID() instead
-     * @param int $playerID Player ID
-     * @return array|null Player information or null if not found
-     */
-    public function getPlayerByID(int $playerID): ?array
-    {
-        return $this->commonRepository->getPlayerByID($playerID);
-    }
-    
-    /**
      * Drops a player to waivers
      * 
      * @param int $playerID Player ID to drop

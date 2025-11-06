@@ -85,6 +85,82 @@ $player = new Player($db);
 - Do not write tests that only test mocks or instantiation
 - **Schema Reference**: Use `ibl5/schema.sql` to understand table structures when creating test data
 
+#### Unit Test Quality Principles
+
+**ALL tests MUST follow these principles from ["Stop Vibe Coding Your Unit Tests"](https://www.andy-gallagher.com/blog/stop-vibe-coding-your-unit-tests/):**
+
+**✅ DO:**
+- **Test behaviors through public APIs only** - Focus on observable outcomes
+- **Use descriptive test names** that explain the behavior being tested
+- **Keep assertions focused on "what" not "how"** - Test outcomes, not implementation
+- **Test one behavior per test** - Each test should have a single, clear purpose
+- **Use data providers** for similar test cases with different inputs
+- **Verify success/failure of operations** - Not the internal mechanics
+- **Test edge cases and error conditions** through public method returns
+
+**❌ DON'T:**
+- **NEVER use `ReflectionClass` to test private methods** - Private methods are implementation details
+- **NEVER check SQL query structure** unless it's the actual behavior being tested (e.g., SQL injection prevention)
+- **NEVER depend on internal implementation details** - Tests should survive refactoring
+- **NEVER write redundant tests** that add no value beyond existing coverage
+- **NEVER test multiple unrelated behaviors** in a single test
+- **NEVER assert on method call counts** unless testing caching/memoization behavior
+
+**Examples:**
+
+```php
+// ❌ BAD - Testing private method with reflection
+public function testPrivateMethodLogic()
+{
+    $reflection = new ReflectionClass($this->service);
+    $method = $reflection->getMethod('privateHelper');
+    $method->setAccessible(true);
+    $result = $method->invoke($this->service, $input);
+    $this->assertEquals($expected, $result);
+}
+
+// ✅ GOOD - Testing behavior through public API
+public function testServiceProcessesDataCorrectly()
+{
+    $result = $this->service->processData($input);
+    $this->assertTrue($result->isValid());
+    $this->assertEquals($expectedOutput, $result->getOutput());
+}
+
+// ❌ BAD - Checking SQL query structure
+public function testUpdatePlayerContract()
+{
+    $this->repository->updateContract($playerId, $salary);
+    $queries = $this->mockDb->getExecutedQueries();
+    $this->assertStringContainsString('UPDATE ibl_plr', $queries[0]);
+    $this->assertStringContainsString('SET salary = 1000', $queries[0]);
+    $this->assertStringContainsString('WHERE pid = 123', $queries[0]);
+}
+
+// ✅ GOOD - Testing operation success
+public function testUpdatePlayerContractSucceeds()
+{
+    $result = $this->repository->updateContract($playerId, $salary);
+    $this->assertTrue($result, 'Contract update should succeed');
+    $this->assertEquals($salary, $this->repository->getPlayerSalary($playerId));
+}
+```
+
+**Security Testing Exception:**
+SQL query checking IS appropriate when testing security features:
+```php
+// ✅ GOOD - Testing SQL injection prevention
+public function testEscapesUserInput()
+{
+    $maliciousInput = "'; DROP TABLE ibl_plr; --";
+    $this->repository->findByName($maliciousInput);
+    $queries = $this->mockDb->getExecutedQueries();
+    $this->assertStringContainsString("\\'; DROP", $queries[0]);
+}
+```
+
+**Reference:** See `ibl5/TEST_REFACTORING_SUMMARY.md` for complete refactoring history and additional examples.
+
 ### Database Schema & Considerations
 
 #### Quick Reference

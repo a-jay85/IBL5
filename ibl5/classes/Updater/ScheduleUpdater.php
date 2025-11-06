@@ -3,12 +3,12 @@ namespace Updater;
 
 class ScheduleUpdater {
     private $db;
-    private $sharedFunctions;
+    private $commonRepository;
     private $season;
 
-    public function __construct($db, $sharedFunctions, $season) {
+    public function __construct($db, $commonRepository, $season) {
         $this->db = $db;
-        $this->sharedFunctions = $sharedFunctions;
+        $this->commonRepository = $commonRepository;
         $this->season = $season;
     }
 
@@ -103,8 +103,8 @@ class ScheduleUpdater {
                     }
                 }
 
-                $visitorTID = $this->sharedFunctions->getTidFromTeamname($visitorName);
-                $homeTID = $this->sharedFunctions->getTidFromTeamname($homeName);
+                $visitorTID = $this->commonRepository->getTidFromTeamname($visitorName);
+                $homeTID = $this->commonRepository->getTidFromTeamname($homeName);
 
                 if ($vScore != 0 && $hScore != 0 && $boxID == null) {
                     echo "<b><font color=red>Script Error: box scores for games haven't been generated.<br>

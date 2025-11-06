@@ -2,72 +2,60 @@
 
 This is the repository for iblhoops.net, a small internet-based fantasy basketball site. The site uses Jump Shot Basketball to simulate the games and roster management.
 
-## 🚀 Refactoring & Development Priorities
-
-**NEW**: Comprehensive refactoring assessment and roadmap available!
-
-- 🎯 **[Refactoring Priorities Report](REFACTORING_PRIORITIES_REPORT.md)** - Detailed analysis and priorities (20+ pages)
-- 📋 **[Module Status Matrix](MODULE_STATUS_MATRIX.md)** - Quick reference for all 63 modules
-- 🗺️ **[Refactoring Roadmap](REFACTORING_ROADMAP.md)** - Visual guide with timeline
-- 📖 **[Next Steps Guide](NEXT_STEPS.md)** - Actionable implementation guide
+## 🚀 Development Status
 
 **Current State**: 12 modules fully refactored with 350+ tests, 30% test coverage  
 **Goal**: 80%+ test coverage with all critical features tested  
 **Next Priority**: Free Agency Module (business critical)
 
-## 📚 Documentation
+## 📚 Essential Documentation
 
-### Database Schema Review
-A comprehensive review of the database schema has been completed with production-ready improvements including complete API preparation:
+### Core Guides
+- **[Development Guide](DEVELOPMENT_GUIDE.md)** - Current priorities, refactoring workflow, testing standards, architecture patterns
+- **[Database Guide](DATABASE_GUIDE.md)** - Schema reference, table relationships, migrations, performance notes
+- **[API Guide](API_GUIDE.md)** - RESTful design, database views, UUIDs, authentication, caching strategies
+- **[Copilot Agent Instructions](COPILOT_AGENT.md)** - Coding standards, type hints, autoloader rules, security practices
 
-- **[Start Here: Documentation Index](DATABASE_DOCUMENTATION_INDEX.md)** - Navigation hub for all documentation
-- **[Executive Summary](SCHEMA_REVIEW_SUMMARY.md)** - Quick overview for decision makers
-- **[Detailed Analysis](DATABASE_SCHEMA_IMPROVEMENTS.md)** - Complete recommendations (900+ lines)
-- **[Schema Guide](DATABASE_SCHEMA_GUIDE.md)** - Comprehensive guide with current status
-- **[ER Diagrams](DATABASE_ER_DIAGRAM.md)** - Visual entity relationships
-- **[API Development Guide](API_DEVELOPMENT_GUIDE.md)** - Best practices for API development
-- **[Migration Guide](ibl5/migrations/README.md)** - How to execute database improvements
-
-### Key Improvements Completed ✅
-- ✅ **Phase 1:** InnoDB conversion, critical indexes (10-100x performance gain)
-- ✅ **Phase 2:** Foreign keys for data integrity
-- ✅ **Phase 3:** API Preparation - Timestamps, UUIDs, Database Views
-- 📊 **Total:** 3,600+ lines of documentation, 750+ lines of production-ready SQL
-- 🚀 **Status:** Database is FULLY API-READY for public deployment!
+### Database Status ✅
+- ✅ InnoDB conversion (52 tables) - 10-100x performance gain
+- ✅ Foreign keys (24 constraints) - Data integrity
+- ✅ API Ready - Timestamps, UUIDs, Database Views
+- 🚀 Ready for production API deployment
 
 ### Quick Start
 ```bash
-# Review the documentation index first
-cat DATABASE_DOCUMENTATION_INDEX.md
+# Review development priorities
+cat DEVELOPMENT_GUIDE.md
 
-# All three phases have been successfully implemented!
-# Phase 1: Critical improvements (InnoDB, Indexes)
-# Phase 2: Foreign keys
-# Phase 3: API preparation (Timestamps, UUIDs, Views)
+# Check database schema
+cat DATABASE_GUIDE.md
 
-# Database is now fully API-ready! 🚀
+# Start API development
+cat API_GUIDE.md
 ```
 
 ## 🔧 Development
 
-The database schema is now fully prepared for API development! All critical phases (1, 2, 3, and 5.1) are complete. Follow the [API Development Guide](API_DEVELOPMENT_GUIDE.md) to start building your API using:
+Follow the [Development Guide](DEVELOPMENT_GUIDE.md) for:
+- Module refactoring priorities and workflow
+- Testing standards and coverage goals
+- Code quality requirements
+- Architecture patterns
+
+Follow the [API Guide](API_GUIDE.md) for:
+- RESTful endpoint design
+- Database views for efficient queries
 - UUIDs for secure public identifiers
-- Database views for simplified queries
-- Timestamps for efficient caching
-- Foreign keys for data integrity
+- Authentication and caching strategies
 
 ## 📖 Additional Documentation
 
-### Refactoring Documentation
-- [Refactoring Summary](REFACTORING_SUMMARY.md) - Overall refactoring approach
-- [Player Refactoring Summary](PLAYER_REFACTORING_SUMMARY.md) - Facade pattern example
-- [Team Refactoring Summary](TEAM_REFACTORING_SUMMARY.md) - MVC pattern example
-- [Common Repository Summary](COMMON_REPOSITORY_REFACTORING_SUMMARY.md) - DRY principle
-- [Rookie Option Summary](ROOKIE_OPTION_REFACTORING_SUMMARY.md) - Complete refactoring
-- [Draft Refactoring Summary](DRAFT_REFACTORING_SUMMARY.md) - Draft module patterns
+### Specialized Guides
+- [Statistics Formatting Guide](STATISTICS_FORMATTING_GUIDE.md) - StatsFormatter and StatsSanitizer usage
+- [Production Deployment Guide](PRODUCTION_DEPLOYMENT_GUIDE.md) - Deployment procedures
 
-### Operational Documentation
-- [Copilot Agent Instructions](COPILOT_AGENT.md)
-- [Draft Bug Fix Summary](DRAFT_BUG_FIX.md)
-- [Production Deployment Guide](PRODUCTION_DEPLOYMENT_GUIDE.md)
-- [Statistics Formatting Guide](STATISTICS_FORMATTING_GUIDE.md)
+### Class Documentation
+- [Draft Module](ibl5/classes/Draft/README.md)
+- [Depth Chart Module](ibl5/classes/DepthChart/README.md)
+- [Player Module](ibl5/classes/Player/README.md)
+- [Depth Chart Security](ibl5/classes/DepthChart/SECURITY.md)

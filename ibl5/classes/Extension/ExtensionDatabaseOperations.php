@@ -14,10 +14,12 @@ namespace Extension;
 class ExtensionDatabaseOperations
 {
     private $db;
+    private $newsService;
 
     public function __construct($db)
     {
         $this->db = $db;
+        $this->newsService = new \Services\NewsService($db);
     }
 
     /**
@@ -94,26 +96,24 @@ class ExtensionDatabaseOperations
      */
     public function createAcceptedExtensionStory($playerName, $teamName, $offerInMillions, $offerYears, $offerDetails)
     {
-        $timestamp = date('Y-m-d H:i:s', time());
-        
         // Get team's topic ID
-        $teamNameEscaped = \Services\DatabaseService::escapeString($this->db, $teamName);
-        $querytopic = "SELECT topicid FROM nuke_topics WHERE topicname = '$teamNameEscaped'";
-        $resulttopic = $this->db->sql_query($querytopic);
-        $topicid = $this->db->sql_result($resulttopic, 0, "topicid");
+        $topicID = $this->newsService->getTopicIDByTeamName($teamName);
+        if ($topicID === null) {
+            return false;
+        }
         
-        // Get category info and increment counter
-        $querycat = "SELECT catid, counter FROM nuke_stories_cat WHERE title = 'Contract Extensions'";
-        $resultcat = $this->db->sql_query($querycat);
-        $catid = $this->db->sql_result($resultcat, 0, "catid");
-        $counter = $this->db->sql_result($resultcat, 0, "counter");
+        // Get category ID
+        $categoryID = $this->newsService->getCategoryIDByTitle('Contract Extensions');
+        if ($categoryID === null) {
+            return false;
+        }
         
-        $newCounter = $counter + 1;
-        $queryUpdateCounter = "UPDATE nuke_stories_cat SET counter = $newCounter WHERE title = 'Contract Extensions'";
-        $this->db->sql_query($queryUpdateCounter);
+        // Increment counter
+        $this->newsService->incrementCategoryCounter('Contract Extensions');
         
         // Create the story
         $playerNameEscaped = \Services\DatabaseService::escapeString($this->db, $playerName);
+        $teamNameEscaped = \Services\DatabaseService::escapeString($this->db, $teamName);
         $title = "$playerNameEscaped extends their contract with the $teamNameEscaped";
         $hometext = "$playerNameEscaped today accepted a contract extension offer from the $teamNameEscaped worth $offerInMillions million dollars over $offerYears years";
         if ($offerDetails) {
@@ -121,14 +121,7 @@ class ExtensionDatabaseOperations
         }
         $hometext .= ".";
         
-        $hometextEscaped = \Services\DatabaseService::escapeString($this->db, $hometext);
-        $titleEscaped = \Services\DatabaseService::escapeString($this->db, $title);
-        
-        $querystor = "INSERT INTO nuke_stories (catid, aid, title, time, hometext, topic, informant, counter, alanguage)
-            VALUES ('$catid', 'Associated Press', '$titleEscaped', '$timestamp', '$hometextEscaped', '$topicid', 'Associated Press', '0', 'english')";
-        
-        $result = $this->db->sql_query($querystor);
-        return $result !== false;
+        return $this->newsService->createNewsStory($categoryID, $topicID, $title, $hometext);
     }
 
     /**
@@ -142,37 +135,28 @@ class ExtensionDatabaseOperations
      */
     public function createRejectedExtensionStory($playerName, $teamName, $offerInMillions, $offerYears)
     {
-        $timestamp = date('Y-m-d H:i:s', time());
-        
         // Get team's topic ID
-        $teamNameEscaped = \Services\DatabaseService::escapeString($this->db, $teamName);
-        $querytopic = "SELECT topicid FROM nuke_topics WHERE topicname = '$teamNameEscaped'";
-        $resulttopic = $this->db->sql_query($querytopic);
-        $topicid = $this->db->sql_result($resulttopic, 0, "topicid");
+        $topicID = $this->newsService->getTopicIDByTeamName($teamName);
+        if ($topicID === null) {
+            return false;
+        }
         
-        // Get category info and increment counter
-        $querycat = "SELECT catid, counter FROM nuke_stories_cat WHERE title = 'Contract Extensions'";
-        $resultcat = $this->db->sql_query($querycat);
-        $catid = $this->db->sql_result($resultcat, 0, "catid");
-        $counter = $this->db->sql_result($resultcat, 0, "counter");
+        // Get category ID
+        $categoryID = $this->newsService->getCategoryIDByTitle('Contract Extensions');
+        if ($categoryID === null) {
+            return false;
+        }
         
-        $newCounter = $counter + 1;
-        $queryUpdateCounter = "UPDATE nuke_stories_cat SET counter = $newCounter WHERE title = 'Contract Extensions'";
-        $this->db->sql_query($queryUpdateCounter);
+        // Increment counter
+        $this->newsService->incrementCategoryCounter('Contract Extensions');
         
         // Create the story
         $playerNameEscaped = \Services\DatabaseService::escapeString($this->db, $playerName);
+        $teamNameEscaped = \Services\DatabaseService::escapeString($this->db, $teamName);
         $title = "$playerNameEscaped turns down an extension offer from the $teamNameEscaped";
         $hometext = "$playerNameEscaped today rejected a contract extension offer from the $teamNameEscaped worth $offerInMillions million dollars over $offerYears years.";
         
-        $hometextEscaped = \Services\DatabaseService::escapeString($this->db, $hometext);
-        $titleEscaped = \Services\DatabaseService::escapeString($this->db, $title);
-        
-        $querystor = "INSERT INTO nuke_stories (catid, aid, title, time, hometext, topic, informant, counter, alanguage)
-            VALUES ('$catid', 'Associated Press', '$titleEscaped', '$timestamp', '$hometextEscaped', '$topicid', 'Associated Press', '0', 'english')";
-        
-        $result = $this->db->sql_query($querystor);
-        return $result !== false;
+        return $this->newsService->createNewsStory($categoryID, $topicID, $title, $hometext);
     }
 
     /**
@@ -274,22 +258,5 @@ class ExtensionDatabaseOperations
         $offerInMillions = $offerTotal / 100;
         $this->createRejectedExtensionStory($playerName, $teamName, $offerInMillions, $offerYears);
         return ['success' => true];
-    }
-    
-    /**
-     * Increments the contract extensions counter
-     * 
-     * @return bool Success status
-     */
-    public function incrementExtensionsCounter()
-    {
-        $query = "SELECT counter FROM nuke_stories_cat WHERE title = 'Contract Extensions'";
-        $result = $this->db->sql_query($query);
-        $counter = $this->db->sql_result($result, 0, 'counter');
-        $newCounter = $counter + 1;
-        
-        $query = "UPDATE nuke_stories_cat SET counter = $newCounter WHERE title = 'Contract Extensions'";
-        $result = $this->db->sql_query($query);
-        return $result !== false;
     }
 }

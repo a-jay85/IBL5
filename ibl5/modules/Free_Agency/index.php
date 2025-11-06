@@ -40,13 +40,14 @@ function display()
 {
     global $prefix, $db, $cookie;
     $sharedFunctions = new Shared($db);
+    $commonRepository = new Services\CommonRepository($db);
     $season = new Season($db);
 
     Nuke\Header::header();
     OpenTable();
 
     $username = $cookie[1];
-    $teamName = $sharedFunctions->getTeamnameFromUsername($username);
+    $teamName = $commonRepository->getTeamnameFromUsername($username);
     $team = Team::initialize($db, $teamName);
 
     UI::displaytopmenu($db, $team->teamID);
@@ -346,7 +347,7 @@ function display()
 		<tbody>";
 
     foreach ($team->getFreeAgencyOffersResult() as $offerRow) {
-        $playerID = $sharedFunctions->getPlayerIDFromPlayerName($offerRow['name']);
+        $playerID = $commonRepository->getPlayerIDFromPlayerName($offerRow['name']);
         $player = Player::withPlayerID($db, $playerID);
 
         $offer1 = $offerRow['offer1'];

@@ -6,10 +6,11 @@ if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
 
 global $db, $cookie;
 $sharedFunctions = new Shared($db);
+$commonRepository = new Services\CommonRepository($db);
 $season = new Season($db);
 
 $username = $cookie[1];
-$userTeam = Team::initialize($db, $sharedFunctions->getTeamnameFromUsername($username));
+$userTeam = Team::initialize($db, $commonRepository->getTeamnameFromUsername($username));
 
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);

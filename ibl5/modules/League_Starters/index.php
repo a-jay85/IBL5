@@ -4,6 +4,7 @@ use Player\Player;
 
 global $db, $cookie;
 $sharedFunctions = new Shared($db);
+$commonRepository = new Services\CommonRepository($db);
 $season = new Season($db);
 
 if (!defined('MODULE_FILE')) {
@@ -15,7 +16,7 @@ get_lang($module_name);
 $pagetitle = "- $module_name";
 
 $username = $cookie[1];
-$userTeam = Team::initialize($db, $sharedFunctions->getTeamnameFromUsername($username));
+$userTeam = Team::initialize($db, $commonRepository->getTeamnameFromUsername($username));
 
 $teams = League::getAllTeamsResult($db);
 

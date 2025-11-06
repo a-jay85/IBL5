@@ -18,7 +18,7 @@ class MockDatabase
     private $mockData = [];
     private $mockTradeInfo = [];
     private $numRows = null;
-    private $returnTrue = false;
+    private $returnTrue = true;
     private $executedQueries = [];
     private $affectedRows = 0;
     

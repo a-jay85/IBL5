@@ -259,15 +259,4 @@ class ExtensionDatabaseOperations
         $this->createRejectedExtensionStory($playerName, $teamName, $offerInMillions, $offerYears);
         return ['success' => true];
     }
-    
-    /**
-     * Increments the contract extensions counter
-     * 
-     * @deprecated Use NewsService::incrementCategoryCounter('Contract Extensions') instead
-     * @return bool Success status
-     */
-    public function incrementExtensionsCounter()
-    {
-        return $this->newsService->incrementCategoryCounter('Contract Extensions');
-    }
 }

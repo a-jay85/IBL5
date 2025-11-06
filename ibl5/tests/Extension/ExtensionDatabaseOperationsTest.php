@@ -263,34 +263,6 @@ class ExtensionDatabaseOperationsTest extends TestCase
 
     /**
      * @group database
-     * @group counter
-     */
-    public function testIncrementsContractExtensionsCounter()
-    {
-        // Arrange - NewsService now handles this with a single UPDATE query
-        $this->mockDb->setReturnTrue(true);
-
-        // Act
-        $result = $this->extensionDbOps->incrementExtensionsCounter();
-
-        // Assert
-        $this->assertTrue($result);
-        $queries = $this->mockDb->getExecutedQueries();
-        
-        // Should find UPDATE query for counter
-        $foundUpdate = false;
-        foreach ($queries as $query) {
-            if (strpos($query, 'UPDATE nuke_stories_cat') !== false) {
-                $foundUpdate = true;
-                $this->assertStringContainsString('counter = counter + 1', $query);
-                $this->assertStringContainsString('Contract Extensions', $query);
-            }
-        }
-        $this->assertTrue($foundUpdate, 'Should have incremented extensions counter');
-    }
-
-    /**
-     * @group database
      * @group retrieval
      */
     public function testRetrievesPlayerPreferences()

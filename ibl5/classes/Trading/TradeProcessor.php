@@ -54,10 +54,9 @@ class Trading_TradeProcessor
         }
 
         // Create news story and notifications
-        $timestamp = date('Y-m-d H:i:s', time());
         $storytitle = "$offeringTeamName and $listeningTeamName make a trade.";
         
-        $this->createNewsStory($storytitle, $storytext, $timestamp);
+        $this->createNewsStory($storytitle, $storytext);
         $this->sendNotifications($offeringTeamName, $listeningTeamName, $storytext);
         $this->cleanupTradeData($offerId);
 
@@ -195,9 +194,8 @@ class Trading_TradeProcessor
      * Create news story for the trade
      * @param string $storytitle Story title
      * @param string $storytext Story text
-     * @param string $timestamp Timestamp (not used with NewsService)
      */
-    protected function createNewsStory($storytitle, $storytext, $timestamp)
+    protected function createNewsStory($storytitle, $storytext)
     {
         // Category ID 2 is typically 'Trade News'
         // Topic ID 31 is typically 'IBL News' or general league news

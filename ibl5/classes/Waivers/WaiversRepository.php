@@ -120,45 +120,4 @@ class WaiversRepository
         
         return $this->db->sql_query($query) !== false;
     }
-    
-    /**
-     * Gets the category ID for waiver pool moves
-     * 
-     * @deprecated Use NewsService::getCategoryIDByTitle('Waiver Pool Moves') instead
-     * @return int|null Category ID or null if not found
-     */
-    public function getWaiverPoolMovesCategory(): ?int
-    {
-        return $this->newsService->getCategoryIDByTitle('Waiver Pool Moves');
-    }
-    
-    /**
-     * Increments the waiver pool moves counter
-     * 
-     * @deprecated Use NewsService::incrementCategoryCounter('Waiver Pool Moves') instead
-     * @return bool Success status
-     */
-    public function incrementWaiverPoolMovesCounter(): bool
-    {
-        return $this->newsService->incrementCategoryCounter('Waiver Pool Moves');
-    }
-    
-    /**
-     * Creates a news story for a waiver transaction
-     * 
-     * @deprecated Use NewsService::createNewsStory() instead
-     * @param int $topicID Topic ID
-     * @param string $title Story title
-     * @param string $hometext Story content
-     * @return bool Success status
-     */
-    public function createNewsStory(int $topicID, string $title, string $hometext): bool
-    {
-        $categoryID = $this->newsService->getCategoryIDByTitle('Waiver Pool Moves');
-        if ($categoryID === null) {
-            return false;
-        }
-        
-        return $this->newsService->createNewsStory($categoryID, $topicID, $title, $hometext);
-    }
 }

@@ -313,19 +313,19 @@ SELECT
   -- Career Totals
   p.car_gm AS career_games,
   p.car_min AS career_minutes,
-  ROUND((p.car_fgm * 2 + p.car_3gm + p.car_ftm), 0) AS career_points,
+  ROUND((p.car_fgm * 2 + p.car_tgm + p.car_ftm), 0) AS career_points,
   p.car_orb + p.car_drb AS career_rebounds,
   p.car_ast AS career_assists,
   p.car_stl AS career_steals,
   p.car_blk AS career_blocks,
   -- Career Averages
-  ROUND((p.car_fgm * 2 + p.car_3gm + p.car_ftm) / NULLIF(p.car_gm, 0), 1) AS ppg_career,
+  ROUND((p.car_fgm * 2 + p.car_tgm + p.car_ftm) / NULLIF(p.car_gm, 0), 1) AS ppg_career,
   ROUND((p.car_orb + p.car_drb) / NULLIF(p.car_gm, 0), 1) AS rpg_career,
   ROUND(p.car_ast / NULLIF(p.car_gm, 0), 1) AS apg_career,
   -- Career Percentages
   ROUND(p.car_fgm / NULLIF(p.car_fga, 0), 3) AS fg_pct_career,
   ROUND(p.car_ftm / NULLIF(p.car_fta, 0), 3) AS ft_pct_career,
-  ROUND(p.car_3gm / NULLIF(p.car_3ga, 0), 3) AS three_pt_pct_career,
+  ROUND(p.car_tgm / NULLIF(p.car_tga, 0), 3) AS three_pt_pct_career,
   -- Playoff Career Stats
   p.car_playoff_min AS playoff_minutes,
   -- Draft Information
@@ -346,7 +346,7 @@ FROM ibl_plr p;
 
 CREATE OR REPLACE VIEW vw_free_agency_offers AS
 SELECT
-  fa.offerID AS offer_id,
+  fa.primary_key AS offer_id,
   -- Player Information
   p.uuid AS player_uuid,
   p.pid,
@@ -360,21 +360,24 @@ SELECT
   t.team_name,
   CONCAT(t.team_city, ' ', t.team_name) AS full_team_name,
   -- Offer Details
-  fa.year AS offer_year,
-  fa.cy AS year1_amount,
-  fa.cy1 AS year2_amount,
-  fa.cy2 AS year3_amount,
-  fa.cy3 AS year4_amount,
-  fa.cy4 AS year5_amount,
-  fa.cy5 AS year6_amount,
-  (fa.cy + fa.cy1 + fa.cy2 + fa.cy3 + fa.cy4 + fa.cy5) AS total_contract_value,
-  -- Status
-  fa.accepted,
-  -- Timestamps
+  fa.offer1 AS year1_amount,
+  fa.offer2 AS year2_amount,
+  fa.offer3 AS year3_amount,
+  fa.offer4 AS year4_amount,
+  fa.offer5 AS year5_amount,
+  fa.offer6 AS year6_amount,
+  (fa.offer1 + fa.offer2 + fa.offer3 + fa.offer4 + fa.offer5 + fa.offer6) AS total_contract_value,
+  -- Offer Modifiers
+  fa.modifier,
+  fa.random,
+  fa.perceivedvalue AS perceived_value,
+  fa.MLE AS is_mle,
+  fa.LLE AS is_lle,
+  -- Timestamps (will be added by earlier part of this migration)
   fa.created_at,
   fa.updated_at
 FROM ibl_fa_offers fa
-INNER JOIN ibl_plr p ON fa.pid = p.pid
+INNER JOIN ibl_plr p ON fa.name = p.name
 INNER JOIN ibl_team_info t ON fa.team = t.team_name;
 
 -- ============================================================================

@@ -18,6 +18,7 @@ class WaiversController
     
     private $db;
     private $repository;
+    private $commonRepository;
     private $processor;
     private $validator;
     private $view;
@@ -27,6 +28,7 @@ class WaiversController
     {
         $this->db = $db;
         $this->repository = new WaiversRepository($db);
+        $this->commonRepository = new \Services\CommonRepository($db);
         $this->processor = new WaiversProcessor();
         $this->validator = new WaiversValidator();
         $this->view = new WaiversView();
@@ -76,7 +78,7 @@ class WaiversController
      */
     public function executeWaiverOperation(string $username, string $action): void
     {
-        $userInfo = $this->repository->getUserByUsername($username);
+        $userInfo = $this->commonRepository->getUserByUsername($username);
         
         if (!$userInfo) {
             $this->view->renderNotLoggedIn(_USERREGLOGIN);
@@ -112,7 +114,7 @@ class WaiversController
             return "Invalid submission data.";
         }
         
-        $totalSalary = $this->repository->getTeamTotalSalary($teamName);
+        $totalSalary = $this->commonRepository->getTeamTotalSalary($teamName);
         
         if ($action === 'drop') {
             return $this->processDrop($playerID, $teamName, $rosterSlots, $totalSalary);
@@ -140,7 +142,7 @@ class WaiversController
             return "You didn't select a valid player. Please select a player and try again.";
         }
         
-        $player = $this->repository->getPlayerByID($playerID);
+        $player = $this->commonRepository->getPlayerByID($playerID);
         if (!$player) {
             return "Player not found.";
         }
@@ -176,7 +178,7 @@ class WaiversController
             return "You didn't select a valid player. Please select a player and try again.";
         }
         
-        $player = $this->repository->getPlayerByID($playerID);
+        $player = $this->commonRepository->getPlayerByID($playerID);
         if (!$player) {
             return "Player not found.";
         }
@@ -188,7 +190,7 @@ class WaiversController
             return implode(' ', $this->validator->getErrors());
         }
         
-        $team = $this->repository->getTeamByName($teamName);
+        $team = $this->commonRepository->getTeamByName($teamName);
         if (!$team) {
             return "Team not found.";
         }

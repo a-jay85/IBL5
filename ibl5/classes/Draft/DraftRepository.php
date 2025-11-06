@@ -257,18 +257,6 @@ class DraftRepository
     }
 
     /**
-     * Get the Discord ID for a team
-     * 
-     * @deprecated Use CommonRepository::getTeamDiscordID() instead
-     * @param string $teamName The team name
-     * @return string|null The Discord ID, or null if not found
-     */
-    public function getTeamDiscordID($teamName)
-    {
-        return $this->commonRepository->getTeamDiscordID($teamName);
-    }
-
-    /**
      * Get all players in the draft class
      * 
      * @return array Array of player records from the draft class

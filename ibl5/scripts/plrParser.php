@@ -74,6 +74,7 @@ if (!isset($_POST['confirmed'])) {
 require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
 $sharedFunctions = new Shared($db);
+$commonRepository = new Services\CommonRepository($db);
 $season = new Season($db);
 
 $tidOffenseStats = $tidDefenseStats = 0;
@@ -708,7 +709,7 @@ while (!feof($plrFile)) {
             ($pid,
             '$name',
             $season->endingYear,
-            '" . $sharedFunctions->getTeamnameFromTeamID($tid) . "',
+            '" . $commonRepository->getTeamnameFromTeamID($tid) . "',
             $tid,
             $seasonGamesPlayed,
             $seasonMIN,
@@ -748,7 +749,7 @@ while (!feof($plrFile)) {
             $ratingTD,
             $currentSeasonSalary)
         ON DUPLICATE KEY UPDATE
-            `team` = '" . $sharedFunctions->getTeamnameFromTeamID($tid) . "',
+            `team` = '" . $commonRepository->getTeamnameFromTeamID($tid) . "',
             `teamid` = $tid,
             `games` = $seasonGamesPlayed,
             `minutes` = $seasonMIN,
@@ -803,7 +804,7 @@ while (!feof($plrFile)) {
             }
             $tidOffenseStats++;
             $sideOfTheBall = 'offense';
-            $teamName = $sharedFunctions->getTeamnameFromTeamID($tidOffenseStats);
+            $teamName = $commonRepository->getTeamnameFromTeamID($tidOffenseStats);
         } elseif ($ordinal >= 1473 && $ordinal <= 1504) {
             if ($ordinal == 1473) {
                 echo "ibl_team_offense_stats updated!<br><br>";
@@ -811,7 +812,7 @@ while (!feof($plrFile)) {
             }
             $tidDefenseStats++;
             $sideOfTheBall = 'defense';
-            $teamName = $sharedFunctions->getTeamnameFromTeamID($tidDefenseStats);
+            $teamName = $commonRepository->getTeamnameFromTeamID($tidDefenseStats);
         }
 
         $teamUpdateQuery = 'UPDATE `ibl_team_' . $sideOfTheBall . '_stats`

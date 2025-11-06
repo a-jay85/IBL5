@@ -60,6 +60,7 @@ function chunk($chunk_start_date, $chunk_end_date, $j)
 
     global $db;
     $sharedFunctions = new Shared($db);
+    $commonRepository = new Services\CommonRepository($db);
     $season = new Season($db);
 
     $query = "SELECT *
@@ -92,8 +93,8 @@ function chunk($chunk_start_date, $chunk_end_date, $j)
         $homeScore = $db->sql_result($result, $i, "HScore");
         $boxid = $db->sql_result($result, $i, "BoxID");
 
-        $visitorTeamname = $sharedFunctions->getTeamnameFromTeamID($visitor);
-        $homeTeamname = $sharedFunctions->getTeamnameFromTeamID($home);
+        $visitorTeamname = $commonRepository->getTeamnameFromTeamID($visitor);
+        $homeTeamname = $commonRepository->getTeamnameFromTeamID($home);
         $visitorRecord = $db->sql_result($teamSeasonRecordsResult, $visitor - 1, "leagueRecord");
         $homeRecord = $db->sql_result($teamSeasonRecordsResult, $home - 1, "leagueRecord");
 

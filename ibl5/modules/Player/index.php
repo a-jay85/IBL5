@@ -15,6 +15,7 @@ function showpage($playerID, $pageView)
 {
     global $db, $cookie;
     $sharedFunctions = new Shared($db);
+    $commonRepository = new Services\CommonRepository($db);
     $season = new Season($db);
     
     $player = Player::withPlayerID($db, $playerID);
@@ -44,7 +45,7 @@ function showpage($playerID, $pageView)
 
     // RENEGOTIATION BUTTON START
 
-    $userTeamName = $sharedFunctions->getTeamnameFromUsername($cookie[1]);
+    $userTeamName = $commonRepository->getTeamnameFromUsername($cookie[1]);
     $userTeam = Team::initialize($db, $userTeamName);
 
     if ($player->wasRookieOptioned()) {

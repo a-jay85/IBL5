@@ -39,11 +39,11 @@ function buildTeamFuturePicks($resultTeamPicks, $future_salary_array)
 function tradeoffer($username)
 {
     global $db, $partner;
-    $sharedFunctions = new Shared($db);
+    $commonRepository = new \Services\CommonRepository($db);
     $season = new Season($db);
 
-    $teamlogo = $sharedFunctions->getTeamnameFromUsername($username);
-    $teamID = $sharedFunctions->getTidFromTeamname($teamlogo);
+    $teamlogo = $commonRepository->getTeamnameFromUsername($username);
+    $teamID = $commonRepository->getTidFromTeamname($teamlogo);
     $currentSeasonEndingYear = $season->endingYear; // we use this as an incrementer
 
     Nuke\Header::header();
@@ -107,7 +107,7 @@ function tradeoffer($username)
 					<td valign=top><b>Salary</b></td>
 				</tr>";
 
-    $partnerTeamID = $sharedFunctions->getTidFromTeamname($partner);
+    $partnerTeamID = $commonRepository->getTidFromTeamname($partner);
     $queryPartnerTeamPlayers = "SELECT pos, name, pid, ordinal, cy, cy1, cy2, cy3, cy4, cy5, cy6
 		FROM ibl_plr
 		WHERE tid = $partnerTeamID
@@ -201,10 +201,10 @@ function tradeoffer($username)
 function tradereview($username)
 {
     global $db;
-    $sharedFunctions = new Shared($db);
+    $commonRepository = new \Services\CommonRepository($db);
 
-    $teamlogo = $sharedFunctions->getTeamnameFromUsername($username);
-    $teamID = $sharedFunctions->getTidFromTeamname($teamlogo);
+    $teamlogo = $commonRepository->getTeamnameFromUsername($username);
+    $teamID = $commonRepository->getTidFromTeamname($teamlogo);
 
     Nuke\Header::header();
     OpenTable();

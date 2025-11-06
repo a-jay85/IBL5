@@ -2,14 +2,14 @@
 
 global $db, $cookie;
 
-$sharedFunctions = new Shared($db);
+$commonRepository = new \Services\CommonRepository($db);
 $season = new Season($db);
 
 $userTeamID = intval($_GET['teamID']);
 if (!$userTeamID) {
     if ($cookie[1]) {
-        $userTeamName = $sharedFunctions->getTeamnameFromUsername($cookie[1]);
-        $userTeamID = $sharedFunctions->getTidFromTeamname($userTeamName);
+        $userTeamName = $commonRepository->getTeamnameFromUsername($cookie[1]);
+        $userTeamID = $commonRepository->getTidFromTeamname($userTeamName);
     } else {
         $userTeamID = 0;
     }

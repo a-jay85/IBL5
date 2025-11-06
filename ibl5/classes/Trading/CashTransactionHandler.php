@@ -3,12 +3,12 @@
 class Trading_CashTransactionHandler
 {
     protected $db;
-    protected $sharedFunctions;
+    protected $commonRepository;
 
     public function __construct($db)
     {
         $this->db = $db;
-        $this->sharedFunctions = new Shared($db);
+        $this->commonRepository = new \Services\CommonRepository($db);
     }
 
     /**
@@ -62,8 +62,8 @@ class Trading_CashTransactionHandler
      */
     public function createCashTransaction($itemId, $offeringTeamName, $listeningTeamName, $cashYear)
     {
-        $offeringTeamId = $this->sharedFunctions->getTidFromTeamname($offeringTeamName);
-        $listeningTeamId = $this->sharedFunctions->getTidFromTeamname($listeningTeamName);
+        $offeringTeamId = $this->commonRepository->getTidFromTeamname($offeringTeamName);
+        $listeningTeamId = $this->commonRepository->getTidFromTeamname($listeningTeamName);
         
         $contractCurrentYear = 1;
         $contractTotalYears = $this->calculateContractTotalYears($cashYear);

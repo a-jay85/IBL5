@@ -30,12 +30,11 @@ class DepthChartController
      */
     public function displayForm(string $username): void
     {
-        $sharedFunctions = new \Shared($this->db);
         $season = new \Season($this->db);
         
         // Get user's team information
         $teamName = $this->getUserTeamName($username);
-        $teamID = $sharedFunctions->getTidFromTeamname($teamName);
+        $teamID = $this->commonRepository->getTidFromTeamname($teamName);
         $team = \Team::initialize($this->db, $teamID);
         
         // Render header

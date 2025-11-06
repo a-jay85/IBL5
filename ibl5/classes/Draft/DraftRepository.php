@@ -102,26 +102,6 @@ class DraftRepository
     }
 
     /**
-     * Generate a unique player ID (PID) that doesn't exist in the database
-     * 
-     * @param int $startingPid Starting PID to check (default: 1)
-     * @return int Available PID
-     */
-    private function generateUniquePid($startingPid = 1)
-    {
-        $pid = (int) $startingPid;
-        $query = "SELECT 1 FROM ibl_plr WHERE pid = $pid";
-        $result = $this->db->sql_query($query);
-        
-        if ($result && $this->db->sql_numrows($result) > 0) {
-            // PID exists, try next one
-            return $this->generateUniquePid($pid + 1);
-        }
-        
-        return $pid;
-    }
-
-    /**
      * Get the next available player ID for drafted players
      * 
      * Uses a high PID range (starting at 90000) to avoid conflicts with JSB-assigned PIDs.

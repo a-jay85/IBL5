@@ -192,6 +192,7 @@ $player = new Player($db);
 - [ ] Existing function calls verified for correctness and argument compatibility
 - [ ] All linter warnings and errors addressed and fixed
 - [ ] Strict types enabled where applicable (`declare(strict_types=1);`)
+- [ ] **Deprecated functions removed and all call sites updated** to use new implementations
 
 ### 7. Type Hinting & Error Handling Standards
 
@@ -248,6 +249,43 @@ if ($result) { ... }
 - Type hints enable easier future Eloquent ORM migration
 - Document complex array types: `@return array<string, mixed>`
 
+### 8. Deprecated Function Handling
+
+**When encountering deprecated functions, the agent MUST:**
+
+1. **Identify all call sites** using `grep_search` or `semantic_search`
+2. **Update every call site** to use the new implementation
+3. **Verify the updates** by checking function signatures match
+4. **Delete the deprecated function** completely once all call sites are updated
+5. **Run tests** to ensure no breakage from the migration
+
+**Search patterns for deprecated code:**
+- Functions marked with `@deprecated` in docblocks
+- Comments like `// Deprecated`, `// TODO: Remove`, `// Legacy`
+- Old naming patterns (e.g., `snake_case` in classes using `camelCase`)
+
+**Migration workflow:**
+```php
+// 1. Find deprecated function
+/** @deprecated Use NewClass::newMethod() instead */
+function oldFunction($param) { ... }
+
+// 2. Search all usages: grep_search "oldFunction"
+
+// 3. Replace each call site
+oldFunction($value);  →  NewClass::newMethod($value);
+
+// 4. Delete deprecated function entirely
+
+// 5. Run full test suite to verify
+```
+
+**DO NOT:**
+- Leave deprecated functions "just in case"
+- Update some call sites but not others
+- Create new code that uses deprecated functions
+- Skip testing after deprecation cleanup
+
 ## Copilot Coding Agent Configuration
 
 - The Copilot agent will:
@@ -262,6 +300,7 @@ if ($result) { ... }
   - **Verify all existing function calls** for correctness against the function signatures
   - **Fix all type mismatches, argument count errors, and linter warnings** before PR completion
   - **Run static analysis** to detect and fix type errors and inconsistencies
+  - **Update all call sites of deprecated functions** and delete the deprecated code
   - **Zero tolerance for warnings or errors**: PRs must pass all quality checks
 - The agent will **not** merge PRs automatically; human review is required
 

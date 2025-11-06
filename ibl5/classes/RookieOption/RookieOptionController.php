@@ -40,6 +40,7 @@ class RookieOptionController
     public function processRookieOption(string $teamName, int $playerID, int $extensionAmount): void
     {
         $sharedFunctions = new \Shared($this->db);
+        $commonRepository = new \Services\CommonRepository($this->db);
         $season = new \Season($this->db);
         
         // Load player
@@ -61,7 +62,7 @@ class RookieOptionController
         }
         
         // Get team ID for redirect link
-        $teamID = $sharedFunctions->getTidFromTeamname($teamName);
+        $teamID = $commonRepository->getTidFromTeamname($teamName);
         
         // Send Discord notification
         $discordMessage = $teamName . " exercise the rookie extension option on " . $player->name . " in the amount of " . $extensionAmount . ".";

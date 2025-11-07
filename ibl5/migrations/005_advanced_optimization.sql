@@ -56,11 +56,16 @@ SHOW KEYS FROM ibl_hist;
 --   ADD UNIQUE KEY idx_hist_pid_year (pid, year);
 
 -- Then partition by year (IMPORTANT: Review and adjust partition ranges before enabling!)
--- The ranges below are examples only. You must:
--- 1. Query your data to find actual min/max years: SELECT MIN(year), MAX(year) FROM ibl_hist;
--- 2. Add partitions for each year in your data range
--- 3. Consider adding future partitions for upcoming seasons
--- 4. Update partition ranges annually or use a script to add new year partitions
+-- The ranges below are examples only. You MUST run these queries first:
+--
+-- Step 1: Find your actual data range:
+--   SELECT MIN(year) AS min_year, MAX(year) AS max_year FROM ibl_hist;
+--
+-- Step 2: Create one partition per year between min_year and max_year
+-- Step 3: Add partitions for future seasons as needed
+-- Step 4: Update partition ranges annually or use a maintenance script
+--
+-- Example partitioning (adjust year ranges based on Step 1 results):
 -- ALTER TABLE ibl_hist PARTITION BY RANGE (year) (
 --   PARTITION p_hist_2000 VALUES LESS THAN (2001),
 --   PARTITION p_hist_2001 VALUES LESS THAN (2002),
@@ -107,13 +112,16 @@ SELECT 'Checking current key structure on ibl_box_scores...' AS message;
 SHOW KEYS FROM ibl_box_scores;
 
 -- Box scores partitioning (by year extracted from Date column)
--- IMPORTANT: This is a template only. Before enabling, you MUST:
--- 1. Query your data: SELECT MIN(YEAR(Date)), MAX(YEAR(Date)) FROM ibl_box_scores;
--- 2. Create one partition per year in your data range (copy the pattern from ibl_hist above)
--- 3. Review foreign keys and indexes for compatibility
--- Note: Commented out - requires careful review before enabling
+-- IMPORTANT: This is a template only. Before enabling, run these queries first:
 --
--- Example pattern (add all years between min and max from your data):
+-- Step 1: Find your actual data range:
+--   SELECT MIN(YEAR(Date)) AS min_year, MAX(YEAR(Date)) AS max_year FROM ibl_box_scores;
+--
+-- Step 2: Create one partition per year between min_year and max_year
+-- Step 3: Review foreign keys and indexes for compatibility
+-- Step 4: Add partitions for future seasons as needed
+--
+-- Example partitioning (adjust year ranges based on Step 1 results):
 -- ALTER TABLE ibl_box_scores PARTITION BY RANGE (YEAR(Date)) (
 --   PARTITION p_box_2000 VALUES LESS THAN (2001),
 --   PARTITION p_box_2001 VALUES LESS THAN (2002),
@@ -279,9 +287,12 @@ SELECT
 FROM ibl_team_info;
 
 -- If max lengths are significantly less than 32, consider reducing:
+-- Example: If max length is 20, you could reduce to VARCHAR(24) (adds 20% buffer)
+-- Rationale: VARCHAR(24) saves 8 bytes per row compared to VARCHAR(32)
+-- Only reduce if max_length + buffer (20%) < new_size
 -- ALTER TABLE ibl_team_info
---   MODIFY team_name VARCHAR(24) NOT NULL,
---   MODIFY team_city VARCHAR(24) NOT NULL;
+--   MODIFY team_name VARCHAR(24) NOT NULL,  -- Adjust based on actual max_length from query above
+--   MODIFY team_city VARCHAR(24) NOT NULL;  -- Adjust based on actual max_length from query above
 
 -- ---------------------------------------------------------------------------
 -- Player Name Optimization
@@ -291,7 +302,10 @@ SELECT 'Checking actual player name lengths...' AS message;
 SELECT MAX(LENGTH(name)) AS max_player_name_length FROM ibl_plr;
 
 -- If significantly less than 32, consider reducing:
--- ALTER TABLE ibl_plr MODIFY name VARCHAR(28) NOT NULL DEFAULT '';
+-- Example: If max length is 23, you could reduce to VARCHAR(28) (adds 22% buffer)
+-- Rationale: VARCHAR(28) saves 4 bytes per row compared to VARCHAR(32)
+-- Only reduce if max_length + buffer (20%) < new_size
+-- ALTER TABLE ibl_plr MODIFY name VARCHAR(28) NOT NULL DEFAULT '';  -- Adjust based on actual max_length
 
 -- ============================================================================
 -- PART 4: QUERY PERFORMANCE TUNING

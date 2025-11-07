@@ -39,8 +39,8 @@ class StatisticsRepository
         );
 
         while ($row = $this->db->sql_fetchrow($result)) {
-            $type = stripslashes(check_html($row['type'], "nohtml"));
-            $var = stripslashes(check_html($row['var'], "nohtml"));
+            $type = $this->sanitizeString($row['type']);
+            $var = $this->sanitizeString($row['var']);
             $count = intval($row['count']);
 
             if ($type === 'total' && $var === 'hits') {
@@ -53,6 +53,21 @@ class StatisticsRepository
         }
 
         return $counters;
+    }
+
+    /**
+     * Sanitize string value
+     * 
+     * @param string $value Value to sanitize
+     * @return string Sanitized value
+     */
+    private function sanitizeString(string $value): string
+    {
+        // Use check_html if available, otherwise just stripslashes
+        if (function_exists('check_html')) {
+            return stripslashes(check_html($value, "nohtml"));
+        }
+        return stripslashes($value);
     }
 
     /**
@@ -152,6 +167,9 @@ class StatisticsRepository
      */
     public function getMiscCounts(): array
     {
+        $topicsActive = function_exists('is_active') ? is_active("Topics") : false;
+        $linksActive = function_exists('is_active') ? is_active("Web_Links") : false;
+        
         return [
             'users' => $this->db->sql_numrows(
                 $this->db->sql_query("SELECT user_id FROM {$this->userPrefix}_users")
@@ -168,13 +186,13 @@ class StatisticsRepository
             'submissions' => $this->db->sql_numrows(
                 $this->db->sql_query("SELECT * FROM {$this->prefix}_queue")
             ),
-            'topics' => is_active("Topics") ? $this->db->sql_numrows(
+            'topics' => $topicsActive ? $this->db->sql_numrows(
                 $this->db->sql_query("SELECT * FROM {$this->prefix}_topics")
             ) : 0,
-            'links' => is_active("Web_Links") ? $this->db->sql_numrows(
+            'links' => $linksActive ? $this->db->sql_numrows(
                 $this->db->sql_query("SELECT * FROM {$this->prefix}_links_links")
             ) : 0,
-            'linkCategories' => is_active("Web_Links") ? $this->db->sql_numrows(
+            'linkCategories' => $linksActive ? $this->db->sql_numrows(
                 $this->db->sql_query("SELECT * FROM {$this->prefix}_links_categories")
             ) : 0
         ];

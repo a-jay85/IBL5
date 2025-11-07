@@ -12,21 +12,20 @@ class PlayerContractValidator
 {
     /**
      * Check if a player can renegotiate their contract
+     * A player can renegotiate if they're in their last contract year or have no salary in the next year
      */
     public function canRenegotiateContract(PlayerData $playerData): bool
     {
-        if (
-            (($playerData->contractCurrentYear == 0 OR $playerData->contractCurrentYear == 1) AND $playerData->contractYear2Salary == 0)
-            OR $playerData->contractCurrentYear == 1 AND $playerData->contractYear2Salary == 0
-            OR $playerData->contractCurrentYear == 2 AND $playerData->contractYear3Salary == 0
-            OR $playerData->contractCurrentYear == 3 AND $playerData->contractYear4Salary == 0
-            OR $playerData->contractCurrentYear == 4 AND $playerData->contractYear5Salary == 0
-            OR $playerData->contractCurrentYear == 5 AND $playerData->contractYear6Salary == 0
-            OR $playerData->contractCurrentYear == 6
-        ) {
-            return TRUE;
+        $currentYear = $playerData->contractCurrentYear;
+        
+        // In final year (year 6) or beyond
+        if ($currentYear >= 6) {
+            return true;
         }
-        return FALSE;
+        
+        // Check if next year has no salary (eligible for renegotiation)
+        $nextYearProperty = "contractYear" . ($currentYear + 1) . "Salary";
+        return $playerData->$nextYearProperty == 0;
     }
 
     /**
@@ -34,61 +33,86 @@ class PlayerContractValidator
      */
     public function canRookieOption(PlayerData $playerData, string $seasonPhase): bool
     {
-        if ($seasonPhase == "Free Agency") {
-            if (
-                $playerData->draftRound == 1
-                && $playerData->yearsOfExperience == 2
-                && $playerData->contractYear4Salary == 0
-            ) {
-                return TRUE;
-            }
-            if (
-                $playerData->draftRound == 2
-                && $playerData->yearsOfExperience == 1
-                && $playerData->contractYear3Salary == 0
-            ) {
-                return TRUE;
-            }
-        } elseif ($seasonPhase == "Preseason" or $seasonPhase == "HEAT") {
-            if (
-                $playerData->draftRound == 1
-                && $playerData->yearsOfExperience == 3
-                && $playerData->contractYear4Salary == 0
-            ) {
-                return TRUE;
-            }
-            if (
-                $playerData->draftRound == 2
-                && $playerData->yearsOfExperience == 2
-                && $playerData->contractYear3Salary == 0
-            ) {
-                return TRUE;
-            }
+        $round = $playerData->draftRound;
+        
+        // Only first and second round picks are eligible
+        if ($round != 1 && $round != 2) {
+            return false;
         }
-        return FALSE;
+        
+        if ($seasonPhase == "Free Agency") {
+            return $this->checkRookieOptionEligibility($playerData, $round, 2, 1);
+        } elseif ($seasonPhase == "Preseason" || $seasonPhase == "HEAT") {
+            return $this->checkRookieOptionEligibility($playerData, $round, 3, 2);
+        }
+        
+        return false;
+    }
+
+    /**
+     * Check rookie option eligibility for a specific round and experience level
+     * 
+     * @param PlayerData $playerData The player data
+     * @param int $round Draft round (1 or 2)
+     * @param int $round1Experience Years of experience required for round 1
+     * @param int $round2Experience Years of experience required for round 2
+     */
+    private function checkRookieOptionEligibility(
+        PlayerData $playerData, 
+        int $round, 
+        int $round1Experience, 
+        int $round2Experience
+    ): bool {
+        if ($round == 1) {
+            return $playerData->yearsOfExperience == $round1Experience
+                && $playerData->contractYear4Salary == 0;
+        }
+        
+        if ($round == 2) {
+            return $playerData->yearsOfExperience == $round2Experience
+                && $playerData->contractYear3Salary == 0;
+        }
+        
+        return false;
     }
 
     /**
      * Check if a player's rookie option was previously exercised
+     * Rookie options double the salary from the previous year
      */
     public function wasRookieOptioned(PlayerData $playerData): bool
     {
-        if (
-            $playerData->yearsOfExperience == 4 
-            && $playerData->draftRound == 1
-            && $playerData->contractYear4Salary != 0
-            && $playerData->contractYear3Salary * 2 == $playerData->contractYear4Salary
-        ) {
-            return TRUE;
+        $round = $playerData->draftRound;
+        $experience = $playerData->yearsOfExperience;
+        
+        // First round: Check in year 4
+        if ($round == 1 && $experience == 4) {
+            return $this->isRookieOptionExercised($playerData, 3, 4);
         }
-        if (
-            $playerData->yearsOfExperience == 3
-            && $playerData->draftRound == 2
-            && $playerData->contractYear3Salary != 0
-            && $playerData->contractYear2Salary * 2 == $playerData->contractYear3Salary
-        ) {
-            return TRUE;
+        
+        // Second round: Check in year 3
+        if ($round == 2 && $experience == 3) {
+            return $this->isRookieOptionExercised($playerData, 2, 3);
         }
-        return FALSE;
+        
+        return false;
+    }
+
+    /**
+     * Check if rookie option was exercised by comparing salary years
+     * 
+     * @param PlayerData $playerData The player data
+     * @param int $baseYear The year to check as base
+     * @param int $optionYear The year that should be double the base
+     */
+    private function isRookieOptionExercised(PlayerData $playerData, int $baseYear, int $optionYear): bool
+    {
+        $baseProperty = "contractYear" . $baseYear . "Salary";
+        $optionProperty = "contractYear" . $optionYear . "Salary";
+        
+        $baseSalary = $playerData->$baseProperty;
+        $optionSalary = $playerData->$optionProperty;
+        
+        return $optionSalary != 0 && $baseSalary * 2 == $optionSalary;
     }
 }

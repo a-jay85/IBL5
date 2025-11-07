@@ -220,20 +220,20 @@ ALTER TABLE ibl_standings
 -- Box Scores - Game statistics
 -- ---------------------------------------------------------------------------
 ALTER TABLE ibl_box_scores
-  MODIFY min TINYINT UNSIGNED DEFAULT NULL COMMENT 'Minutes played',
-  MODIFY fgm TINYINT UNSIGNED DEFAULT NULL COMMENT 'Field goals made',
-  MODIFY fga TINYINT UNSIGNED DEFAULT NULL COMMENT 'Field goals attempted',
-  MODIFY ftm TINYINT UNSIGNED DEFAULT NULL COMMENT 'Free throws made',
-  MODIFY fta TINYINT UNSIGNED DEFAULT NULL COMMENT 'Free throws attempted',
-  MODIFY tpm TINYINT UNSIGNED DEFAULT NULL COMMENT 'Three pointers made',
-  MODIFY tpa TINYINT UNSIGNED DEFAULT NULL COMMENT 'Three pointers attempted',
-  MODIFY orb TINYINT UNSIGNED DEFAULT NULL COMMENT 'Offensive rebounds',
-  MODIFY reb TINYINT UNSIGNED DEFAULT NULL COMMENT 'Total rebounds',
-  MODIFY ast TINYINT UNSIGNED DEFAULT NULL COMMENT 'Assists',
-  MODIFY stl TINYINT UNSIGNED DEFAULT NULL COMMENT 'Steals',
-  MODIFY tvr TINYINT UNSIGNED DEFAULT NULL COMMENT 'Turnovers',
-  MODIFY blk TINYINT UNSIGNED DEFAULT NULL COMMENT 'Blocks',
-  MODIFY pf TINYINT UNSIGNED DEFAULT NULL COMMENT 'Personal fouls';
+  MODIFY gameMIN TINYINT UNSIGNED DEFAULT NULL COMMENT 'Minutes played',
+  MODIFY game2GM TINYINT UNSIGNED DEFAULT NULL COMMENT 'Field goals made',
+  MODIFY game2GA TINYINT UNSIGNED DEFAULT NULL COMMENT 'Field goals attempted',
+  MODIFY gameFTM TINYINT UNSIGNED DEFAULT NULL COMMENT 'Free throws made',
+  MODIFY gameFTA TINYINT UNSIGNED DEFAULT NULL COMMENT 'Free throws attempted',
+  MODIFY game3GM TINYINT UNSIGNED DEFAULT NULL COMMENT 'Three pointers made',
+  MODIFY game3GA TINYINT UNSIGNED DEFAULT NULL COMMENT 'Three pointers attempted',
+  MODIFY gameORB TINYINT UNSIGNED DEFAULT NULL COMMENT 'Offensive rebounds',
+  MODIFY gameDRB TINYINT UNSIGNED DEFAULT NULL COMMENT 'Defensive rebounds',
+  MODIFY gameAST TINYINT UNSIGNED DEFAULT NULL COMMENT 'Assists',
+  MODIFY gameSTL TINYINT UNSIGNED DEFAULT NULL COMMENT 'Steals',
+  MODIFY gameTOV TINYINT UNSIGNED DEFAULT NULL COMMENT 'Turnovers',
+  MODIFY gameBLK TINYINT UNSIGNED DEFAULT NULL COMMENT 'Blocks',
+  MODIFY gamePF TINYINT UNSIGNED DEFAULT NULL COMMENT 'Personal fouls';
 
 -- ---------------------------------------------------------------------------
 -- Team Stats Tables
@@ -442,7 +442,7 @@ ALTER TABLE ibl_plr
 -- Minutes in a game cannot exceed 48 (regulation) + ~15 overtimes (max realistic)
 ALTER TABLE ibl_box_scores
   ADD CONSTRAINT chk_box_minutes 
-  CHECK (min IS NULL OR (min >= 0 AND min <= 70));
+  CHECK (gameMIN IS NULL OR (gameMIN >= 0 AND gameMIN <= 70));
 
 -- ---------------------------------------------------------------------------
 -- Schedule Team ID and Scores Constraints

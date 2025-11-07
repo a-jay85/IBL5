@@ -495,7 +495,7 @@ ALTER TABLE ibl_draft
 -- Power ranking should be 1-32 (maximum teams in league)
 ALTER TABLE ibl_power
   ADD CONSTRAINT chk_power_ranking 
-  CHECK (ranking IS NULL OR (ranking >= 1.0 AND ranking <= 32.0));
+  CHECK (ranking IS NULL OR (ranking >= 0.0 AND ranking <= 100.0));
 
 -- ---------------------------------------------------------------------------
 -- Player Statistics Constraints

@@ -141,38 +141,6 @@ class Player
         $this->repository = new PlayerRepository($db);
     }
 
-    /**
-     * Legacy method - kept for backward compatibility
-     * @deprecated Use static factory methods instead
-     */
-    protected function loadByID($db, int $playerID)
-    {
-        $this->initialize($db);
-        $this->playerData = $this->repository->loadByID($playerID);
-        $this->syncPropertiesFromPlayerData();
-    }
-
-    /**
-     * Legacy method - kept for backward compatibility
-     * @deprecated Use static factory methods instead
-     */
-    protected function fill($db, array $plrRow)
-    {
-        $this->initialize($db);
-        $this->playerData = $this->repository->fillFromCurrentRow($plrRow);
-        $this->syncPropertiesFromPlayerData();
-    }
-
-    /**
-     * Legacy method - kept for backward compatibility
-     * @deprecated Use static factory methods instead
-     */
-    protected function fillHistorical($db, array $plrRow)
-    {
-        $this->initialize($db);
-        $this->playerData = $this->repository->fillFromHistoricalRow($plrRow);
-        $this->syncPropertiesFromPlayerData();
-    }
 
     /**
      * Sync all public properties from PlayerData for backward compatibility

@@ -33,7 +33,7 @@ class PlayerContractCalculator
     {
         // Year 0 defaults to year 1
         if ($year == 0) {
-            return $playerData->contractYear1Salary;
+            return $playerData->contractYear1Salary ?? 0;
         }
         
         // Year 7 or beyond means no salary (off the books)
@@ -43,7 +43,7 @@ class PlayerContractCalculator
         
         // Dynamically access the contract year property (years 1-6)
         $propertyName = "contractYear" . $year . "Salary";
-        return $playerData->$propertyName;
+        return $playerData->$propertyName ?? 0;
     }
 
     /**
@@ -57,8 +57,9 @@ class PlayerContractCalculator
         $contractArray = array();
         $remainingContractYear = 1;
         for ($i = $contractCurrentYear; $i <= $contractTotalYears; $i++) {
-            if ($playerData->{"contractYear" . $i . "Salary"} != 0) {
-                $contractArray[$remainingContractYear] = $playerData->{"contractYear" . $i . "Salary"};
+            $salary = $this->getSalaryForYear($playerData, $i);
+            if ($salary != 0) {
+                $contractArray[$remainingContractYear] = $salary;
             }
             $remainingContractYear++;
         }

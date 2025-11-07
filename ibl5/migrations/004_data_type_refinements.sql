@@ -476,7 +476,7 @@ ALTER TABLE ibl_draft
 -- Draft picks 1-30 per round
 ALTER TABLE ibl_draft
   ADD CONSTRAINT chk_draft_pick 
-  CHECK (pick >= 0 AND pick <= 30);
+  CHECK (pick >= 0 AND pick <= 32);
 
 ALTER TABLE ibl_draft_picks
   ADD CONSTRAINT chk_draft_picks_round 
@@ -484,7 +484,7 @@ ALTER TABLE ibl_draft_picks
 
 ALTER TABLE ibl_draft_picks
   ADD CONSTRAINT chk_draft_picks_pick 
-  CHECK (pick >= 0 AND pick <= 30);
+  CHECK (pick >= 0 AND pick <= 32);
 
 -- ---------------------------------------------------------------------------
 -- Power Rankings Constraint

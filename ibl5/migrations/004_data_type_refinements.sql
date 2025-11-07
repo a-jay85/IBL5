@@ -367,15 +367,17 @@ ALTER TABLE ibl_draft_class
 -- ---------------------------------------------------------------------------
 -- Player Age Constraints (ibl_plr)
 -- ---------------------------------------------------------------------------
+-- NOTE: can't run these because there are entries where age is irrelevant and blank
+
 -- Players must be between 18 and 50 years old
-ALTER TABLE ibl_plr
-  ADD CONSTRAINT chk_plr_age 
-  CHECK (age IS NULL OR (age >= 18 AND age <= 50));
+-- ALTER TABLE ibl_plr
+--   ADD CONSTRAINT chk_plr_age 
+--   CHECK (age IS NULL OR (age >= 18 AND age <= 50));
 
 -- Peak age should be >= current age (you can't have peaked before your current age)
-ALTER TABLE ibl_plr
-  ADD CONSTRAINT chk_plr_peak 
-  CHECK (peak IS NULL OR age IS NULL OR peak >= age);
+-- ALTER TABLE ibl_plr
+--   ADD CONSTRAINT chk_plr_peak 
+--   CHECK (peak IS NULL OR age IS NULL OR peak >= age);
 
 -- ---------------------------------------------------------------------------
 -- Standings Constraints (ibl_standings)

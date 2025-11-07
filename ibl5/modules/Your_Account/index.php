@@ -476,7 +476,6 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
             echo "<tr><td valign=\"middle\"><img src=\"images/karma/3.gif\" border=\"0\" alt=\"" . _KARMADEVIL . "\" title=\"" . _KARMADEVIL . "\"></td><td>" . _KARMADEVILREF . "</td></tr></table>";
             CloseTable2();
         }
-        if (((is_user($user) and $cookie[1] != $username) or is_admin($admin)) and is_active("Private_Messages")) {echo "<br>[ <a href=\"modules.php?name=Private_Messages&amp;mode=post&amp;u=" . intval($userinfo['user_id']) . "\">" . _USENDPRIVATEMSG . " $username_pm</a> ]<br>\n";}
         echo "</center></font>";
     } else {
         echo "<center>" . _NOINFOFOR . " " . htmlentities($username) . "</center>";
@@ -590,35 +589,6 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
             . "<input type=\"hidden\" name=\"who\" value=\"$username\">"
             . "<input type=\"hidden\" name=\"op\" value=\"broadcast\">"
             . "<input type=\"text\" size=\"60\" maxlength=\"255\" name=\"the_message\">&nbsp;&nbsp;<input type=\"submit\" value=\"" . _SEND . "\">"
-            . "</form></center>";
-        CloseTable();
-    }
-    if ((isset($cookie[1])) and is_active("Private_Messages") and ($username == $cookie[1]) and ($userinfo['user_password'] == $cookie[2])) {
-        echo "<br>";
-        OpenTable();
-        echo "<center><b>" . _PRIVATEMESSAGES . "</b><br><br>";
-        $numrow = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_bbprivmsgs WHERE privmsgs_to_userid='" . intval($userinfo['user_id']) . "' AND (privmsgs_type='1' OR privmsgs_type='5' OR privmsgs_type='0')"));
-        if (is_active("Members_List")) {
-            $mem_list = "<a href=\"modules.php?name=Members_List\">" . _BROWSEUSERS . "</a>";
-        } else {
-            $mem_list = "";
-        }
-        if (is_active("Search")) {
-            $mod_search = "<a href=\"modules.php?name=Search&amp;type=users\">" . _SEARCHUSERS . "</a>";
-        } else {
-            $mod_search = "";
-        }
-        if (!empty($mem_list) and !empty($mod_search)) {$a = " | ";} else { $a = "";}
-        if (!empty($mem_list) or !empty($mod_search)) {
-            $links = "[ $mem_list $a $mod_search ]";
-        } elseif (empty($mem_list) and empty($mod_search)) {
-            $links = "";
-        }
-
-        echo "" . _YOUHAVE . " <a href=\"modules.php?name=Private_Messages\"><b>$numrow</b></a> " . _PRIVATEMSG . "<br><br>"
-            . "<form action=\"modules.php?name=Private_Messages\" method=\"post\">"
-            . "" . _USENDPRIVATEMSG . ": <input type=\"text\" name=\"pm_uname\" size=\"20\">&nbsp;&nbsp;$links"
-            . "<input type=\"hidden\" name=\"send\" value=\"1\">"
             . "</form></center>";
         CloseTable();
     }
@@ -945,10 +915,6 @@ function login($username, $user_password, $redirect, $mode, $f, $t, $random_num,
             $uname = $_SERVER['REMOTE_ADDR'];
             $db->sql_query("DELETE FROM " . $prefix . "_session WHERE uname='$uname' AND guest='1'");
             $db->sql_query("UPDATE " . $prefix . "_users SET last_ip='$uname' WHERE username='$username'");
-        }
-        if (!empty($pm_login)) {
-            Header("Location: modules.php?name=Private_Messages&file=index&folder=inbox");
-            exit;
         }
         if (empty($redirect)) {
             Header("Location: modules.php?name=Your_Account&op=userinfo&bypass=1&username=$username");

@@ -85,6 +85,30 @@ $player = new Player($db);
 - Do not write tests that only test mocks or instantiation
 - **Schema Reference**: Use `ibl5/schema.sql` to understand table structures when creating test data
 
+#### ⚠️ CRITICAL: Never Skip Tests - Remove Them Instead
+**DO NOT use `$this->markTestSkipped()` to document removed tests.** Skipped tests:
+- Create technical debt and confusion about what's actually being tested
+- Clutter the test suite and make it harder to understand coverage
+- May accidentally be re-enabled by future developers without understanding the reason
+
+**Instead:**
+1. **COMPLETELY DELETE the entire test method** if it no longer serves a purpose
+2. **DOCUMENT the reason in related tests or code comments** if there's valuable context to preserve
+3. **Update integration tests** if the behavior now requires end-to-end testing instead
+4. **Never create placeholder tests** with `markTestSkipped()` - if a test doesn't run, it shouldn't exist
+
+Example:
+```php
+// ❌ WRONG - Don't do this
+public function testRemovedTest()
+{
+    $this->markTestSkipped('Removed following best practices');
+}
+
+// ✅ CORRECT - Either add the test back with proper implementation, or delete it entirely
+// If deleting, consider documenting the reason in related tests or commit messages
+```
+
 #### Unit Test Quality Principles
 
 **ALL tests MUST follow these principles from ["Stop Vibe Coding Your Unit Tests"](https://www.andy-gallagher.com/blog/stop-vibe-coding-your-unit-tests/):**

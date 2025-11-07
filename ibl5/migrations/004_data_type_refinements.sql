@@ -239,6 +239,8 @@ ALTER TABLE ibl_box_scores
 -- Team Stats Tables
 -- ---------------------------------------------------------------------------
 -- Note: ibl_team_win_loss has year, wins, losses as VARCHAR types
+-- Original migration also had case inconsistencies (Year vs year, Wins vs wins, Losses vs losses)
+-- and referenced non-existent SeasonType column
 -- Optimization would require data migration from VARCHAR to numeric types
 -- Commenting out for now - would need separate data migration
 -- ALTER TABLE ibl_team_win_loss
@@ -487,6 +489,7 @@ ALTER TABLE ibl_draft
 -- Power Rankings Constraint
 -- ---------------------------------------------------------------------------
 -- Note: Column is 'ranking' not 'powerRanking'
+-- ranking is DECIMAL(6,1) in schema, so using decimal literals in constraint
 -- Power ranking should be 1-32 (maximum teams in league)
 ALTER TABLE ibl_power
   ADD CONSTRAINT chk_power_ranking 

@@ -702,6 +702,9 @@ Implements:
   - Winning percentage bounds (0.000-1.000)
   - Rating ranges (0-100)
   - Contract value limits (salary values stored as integers)
+  - Team ID constraints (0-32, with 0 representing free agents)
+  - Schedule team IDs (1-32, reflecting maximum 32 teams in league)
+  - Power ranking constraints (1-32)
   - Statistics validation
   
 - **Part 4:** Add NOT NULL constraints for required fields

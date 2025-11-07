@@ -238,11 +238,13 @@ ALTER TABLE ibl_box_scores
 -- ---------------------------------------------------------------------------
 -- Team Stats Tables
 -- ---------------------------------------------------------------------------
-ALTER TABLE ibl_team_win_loss
-  MODIFY Year SMALLINT UNSIGNED NOT NULL COMMENT 'Season year',
-  MODIFY SeasonType TINYINT NOT NULL COMMENT 'Season type (0=regular, 1=playoff)',
-  MODIFY Wins TINYINT UNSIGNED DEFAULT 0 COMMENT 'Wins',
-  MODIFY Losses TINYINT UNSIGNED DEFAULT 0 COMMENT 'Losses';
+-- Note: ibl_team_win_loss has year, wins, losses as VARCHAR types
+-- Optimization would require data migration from VARCHAR to numeric types
+-- Commenting out for now - would need separate data migration
+-- ALTER TABLE ibl_team_win_loss
+--   MODIFY year SMALLINT UNSIGNED NOT NULL COMMENT 'Season year',
+--   MODIFY wins TINYINT UNSIGNED DEFAULT 0 COMMENT 'Wins',
+--   MODIFY losses TINYINT UNSIGNED DEFAULT 0 COMMENT 'Losses';
 
 -- ---------------------------------------------------------------------------
 -- Draft Tables
@@ -275,28 +277,33 @@ ALTER TABLE ibl_draft_class
   MODIFY defp TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Def post rating',
   MODIFY deft TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Def transition rating';
 
-ALTER TABLE ibl_draft_picks
-  MODIFY round TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Draft round',
-  MODIFY pick TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Pick number',
-  MODIFY year SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Draft year';
+-- Note: ibl_draft_picks.year is VARCHAR(4) and round is CHAR(1)
+-- ibl_draft_picks does not have a 'pick' column
+-- Optimization would require data migration from VARCHAR/CHAR to numeric types
+-- ALTER TABLE ibl_draft_picks
+--   MODIFY round TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Draft round',
+--   MODIFY year SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Draft year';
 
 -- ---------------------------------------------------------------------------
 -- Schedule Table
 -- ---------------------------------------------------------------------------
+-- Note: ibl_schedule does not have 'Day' or 'Neutral' columns
+-- Removed those columns from optimization
 ALTER TABLE ibl_schedule
   MODIFY Year SMALLINT UNSIGNED NOT NULL COMMENT 'Season year',
-  MODIFY Day TINYINT UNSIGNED NOT NULL COMMENT 'Day number',
   MODIFY Visitor SMALLINT UNSIGNED NOT NULL COMMENT 'Visiting team ID',
   MODIFY Home SMALLINT UNSIGNED NOT NULL COMMENT 'Home team ID',
   MODIFY VScore TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Visitor score',
-  MODIFY HScore TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Home score',
-  MODIFY Neutral TINYINT(1) NOT NULL DEFAULT 0 COMMENT 'Neutral site flag';
+  MODIFY HScore TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Home score';
 
 -- ---------------------------------------------------------------------------
 -- Power Rankings
 -- ---------------------------------------------------------------------------
-ALTER TABLE ibl_power
-  MODIFY powerRanking TINYINT UNSIGNED DEFAULT NULL COMMENT 'Power ranking (1-30)';
+-- Note: Column is 'ranking' not 'powerRanking' (DECIMAL(6,1) in schema)
+-- Optimization would change from DECIMAL to TINYINT - would lose precision
+-- Commenting out to preserve decimal precision
+-- ALTER TABLE ibl_power
+--   MODIFY ranking TINYINT UNSIGNED DEFAULT NULL COMMENT 'Power ranking (1-30)';
 
 -- ---------------------------------------------------------------------------
 -- Playoff Results
@@ -308,25 +315,13 @@ ALTER TABLE ibl_playoff_results
 -- ---------------------------------------------------------------------------
 -- Team History
 -- ---------------------------------------------------------------------------
-ALTER TABLE ibl_team_history
-  MODIFY Year SMALLINT UNSIGNED NOT NULL COMMENT 'Season year',
-  MODIFY SeasonType TINYINT NOT NULL COMMENT 'Season type (0=regular, 1=playoff)',
-  MODIFY Games TINYINT UNSIGNED DEFAULT 0 COMMENT 'Games played',
-  MODIFY Minutes MEDIUMINT UNSIGNED DEFAULT 0 COMMENT 'Total minutes',
-  MODIFY FieldGoalsMade SMALLINT UNSIGNED DEFAULT 0 COMMENT 'FGM',
-  MODIFY FieldGoalsAttempted SMALLINT UNSIGNED DEFAULT 0 COMMENT 'FGA',
-  MODIFY FreeThrowsMade SMALLINT UNSIGNED DEFAULT 0 COMMENT 'FTM',
-  MODIFY FreeThrowsAttempted SMALLINT UNSIGNED DEFAULT 0 COMMENT 'FTA',
-  MODIFY ThreePointersMade SMALLINT UNSIGNED DEFAULT 0 COMMENT '3PM',
-  MODIFY ThreePointersAttempted SMALLINT UNSIGNED DEFAULT 0 COMMENT '3PA',
-  MODIFY OffensiveRebounds SMALLINT UNSIGNED DEFAULT 0 COMMENT 'ORB',
-  MODIFY Rebounds SMALLINT UNSIGNED DEFAULT 0 COMMENT 'Total rebounds',
-  MODIFY Assists SMALLINT UNSIGNED DEFAULT 0 COMMENT 'Assists',
-  MODIFY Steals SMALLINT UNSIGNED DEFAULT 0 COMMENT 'Steals',
-  MODIFY Turnovers SMALLINT UNSIGNED DEFAULT 0 COMMENT 'Turnovers',
-  MODIFY Blocks SMALLINT UNSIGNED DEFAULT 0 COMMENT 'Blocks',
-  MODIFY PersonalFouls SMALLINT UNSIGNED DEFAULT 0 COMMENT 'Personal fouls',
-  MODIFY Points SMALLINT UNSIGNED DEFAULT 0 COMMENT 'Points';
+-- Note: ibl_team_history does not have statistical columns like Games, Minutes, FieldGoalsMade, etc.
+-- The actual table has: teamid, team_city, team_name, color1, color2, depth, sim_depth,
+-- asg_vote, eoy_vote, totwins, totloss, winpct, playoffs, div_titles, conf_titles,
+-- ibl_titles, heat_titles
+-- Removing this entire section as the columns don't exist
+-- If team historical statistics are stored elsewhere (e.g., ibl_box_scores_teams),
+-- those tables should be optimized instead
 
 -- ============================================================================
 -- PART 2: IMPLEMENT ENUM TYPES FOR FIXED VALUE LISTS
@@ -478,21 +473,24 @@ ALTER TABLE ibl_draft
   ADD CONSTRAINT chk_draft_pick 
   CHECK (pick >= 0 AND pick <= 32);
 
-ALTER TABLE ibl_draft_picks
-  ADD CONSTRAINT chk_draft_picks_round 
-  CHECK (round >= 0 AND round <= 7);
-
-ALTER TABLE ibl_draft_picks
-  ADD CONSTRAINT chk_draft_picks_pick 
-  CHECK (pick >= 0 AND pick <= 32);
+-- Note: ibl_draft_picks.round is CHAR(1), not numeric - CHECK constraint won't work
+-- Commenting out these constraints as they reference non-existent or incompatible columns
+-- ALTER TABLE ibl_draft_picks
+--   ADD CONSTRAINT chk_draft_picks_round 
+--   CHECK (round >= 0 AND round <= 7);
+--
+-- ALTER TABLE ibl_draft_picks
+--   ADD CONSTRAINT chk_draft_picks_pick 
+--   CHECK (pick >= 0 AND pick <= 32);
 
 -- ---------------------------------------------------------------------------
 -- Power Rankings Constraint
 -- ---------------------------------------------------------------------------
+-- Note: Column is 'ranking' not 'powerRanking'
 -- Power ranking should be 1-32 (maximum teams in league)
 ALTER TABLE ibl_power
   ADD CONSTRAINT chk_power_ranking 
-  CHECK (powerRanking IS NULL OR (powerRanking >= 1 AND powerRanking <= 32));
+  CHECK (ranking IS NULL OR (ranking >= 1.0 AND ranking <= 32.0));
 
 -- ---------------------------------------------------------------------------
 -- Player Statistics Constraints

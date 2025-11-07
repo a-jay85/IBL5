@@ -13,10 +13,24 @@ class PlayerContractValidator
     /**
      * Check if a player can renegotiate their contract
      * A player can renegotiate if they're in their last contract year or have no salary in the next year
+     * EXCEPT: A player cannot renegotiate if they were rookie optioned and are in the rookie option year
      */
     public function canRenegotiateContract(PlayerData $playerData): bool
     {
         $currentYear = $playerData->contractCurrentYear;
+        
+        // Check if player was rookie optioned and is currently in the rookie option year
+        if ($this->wasRookieOptioned($playerData)) {
+            $round = $playerData->draftRound;
+            // First round: rookie option is year 4
+            if ($round == 1 && $currentYear == 4) {
+                return false;
+            }
+            // Second round: rookie option is year 3
+            if ($round == 2 && $currentYear == 3) {
+                return false;
+            }
+        }
         
         // In final year (year 6) or beyond - always eligible
         if ($currentYear >= 6) {

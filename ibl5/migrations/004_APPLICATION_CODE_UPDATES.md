@@ -115,31 +115,38 @@ grep -r "Clutch\|Consistency\|PGDepth\|SGDepth\|SFDepth\|PFDepth\|CDepth" --incl
 These columns are heavily used throughout the codebase:
 
 ```bash
-# In SELECT, WHERE, ORDER BY clauses - be precise with context
-find . -name "*.php" -type f -exec sed -i 's/\bYear\s*=/season_year =/g' {} +
-find . -name "*.php" -type f -exec sed -i 's/\bBoxID\s*=/box_score_id =/g' {} +
-find . -name "*.php" -type f -exec sed -i 's/\bDate\s*=/game_date =/g' {} +
-find . -name "*.php" -type f -exec sed -i 's/\bVisitor\s*=/visitor_team_id =/g' {} +
-find . -name "*.php" -type f -exec sed -i 's/\bVScore\s*=/visitor_score =/g' {} +
-find . -name "*.php" -type f -exec sed -i 's/\bHome\s*=/home_team_id =/g' {} +
-find . -name "*.php" -type f -exec sed -i 's/\bHScore\s*=/home_score =/g' {} +
-find . -name "*.php" -type f -exec sed -i 's/\bSchedID\s*=/schedule_id =/g' {} +
+# IMPORTANT: These sed examples are DANGEROUS and overly broad!
+# The patterns below will match ANY occurrence of these words,
+# including variable names, JavaScript, HTML, and comments.
+# 
+# DO NOT RUN THESE COMMANDS BLINDLY!
+# They are provided as examples only to show the pattern.
+# You MUST manually review each change.
+#
+# RECOMMENDED: Use an IDE with search/replace that shows previews,
+# or manually update each file after reviewing its context.
 
-# In array access and object properties
+# Example patterns (DO NOT RUN without review):
+# In SQL queries only (look for database context)
+find . -name "*.php" -type f -exec sed -i 's/WHERE Year =/WHERE season_year =/g' {} +
+find . -name "*.php" -type f -exec sed -i 's/AND Date =/AND game_date =/g' {} +
+
+# In array access (still requires manual review)
 find . -name "*.php" -type f -exec sed -i "s/\['Year'\]/['season_year']/g" {} +
 find . -name "*.php" -type f -exec sed -i "s/\['BoxID'\]/['box_score_id']/g" {} +
-find . -name "*.php" -type f -exec sed -i "s/\['Date'\]/['game_date']/g" {} +
-find . -name "*.php" -type f -exec sed -i "s/\['Visitor'\]/['visitor_team_id']/g" {} +
-find . -name "*.php" -type f -exec sed -i "s/\['VScore'\]/['visitor_score']/g" {} +
-find . -name "*.php" -type f -exec sed -i "s/\['Home'\]/['home_team_id']/g" {} +
-find . -name "*.php" -type f -exec sed -i "s/\['HScore'\]/['home_score']/g" {} +
-find . -name "*.php" -type f -exec sed -i "s/\['SchedID'\]/['schedule_id']/g" {} +
 ```
 
-**WARNING:** The above `sed` commands are simplified examples. Do NOT run them blindly as they may:
-- Replace variable names that happen to match
-- Replace strings in comments
-- Replace values in HTML/JavaScript
+**⚠️ CRITICAL WARNING:** The above sed commands are simplified examples that will cause problems if run directly. They will:
+- Replace variable names that happen to match (e.g., `$currentYear`)
+- Replace strings in comments and HTML
+- Replace JavaScript Date objects
+- Replace non-database column references
+
+**SAFER APPROACH:**
+1. Use an IDE with "Find in Files" that shows previews
+2. Search for specific patterns like `"SELECT.*Year.*FROM ibl_schedule"`
+3. Manually review and update each occurrence
+4. Use version control to review all changes before committing
 
 ### Phase 2: Manual Code Review (REQUIRED)
 
@@ -505,16 +512,39 @@ After completing all code updates, run these validation queries:
 
 ### Check for Old Column Name References in Code
 
+**IMPORTANT:** These grep patterns are broad and will match:
+- Database column references (what we want to find)
+- JavaScript Date objects (false positive)
+- Variable names (false positive)
+- HTML/text content (false positive)
+
+Use these as a starting point, then manually review each match:
+
 ```bash
-# These should return NO results after migration
-grep -r "\\['Year'\\]" --include="*.php" /home/runner/work/IBL5/IBL5/ibl5/
-grep -r "\\['BoxID'\\]" --include="*.php" /home/runner/work/IBL5/IBL5/ibl5/
-grep -r "\\['Date'\\]" --include="*.php" /home/runner/work/IBL5/IBL5/ibl5/
-grep -r "\\['Home'\\]" --include="*.php" /home/runner/work/IBL5/IBL5/ibl5/
-grep -r "\\['Visitor'\\]" --include="*.php" /home/runner/work/IBL5/IBL5/ibl5/
-grep -r "\\['HScore'\\]" --include="*.php" /home/runner/work/IBL5/IBL5/ibl5/
-grep -r "\\['VScore'\\]" --include="*.php" /home/runner/work/IBL5/IBL5/ibl5/
+# Search for database column references in SQL context
+# Look for patterns like "SELECT Year" or "WHERE Date =" specifically in ibl_schedule queries
+
+# More specific: search for SQL queries containing old column names
+grep -r "ibl_schedule.*Year\|Year.*ibl_schedule" --include="*.php" /home/runner/work/IBL5/IBL5/ibl5/
+grep -r "ibl_schedule.*Date\|Date.*ibl_schedule" --include="*.php" /home/runner/work/IBL5/IBL5/ibl5/
+grep -r "ibl_schedule.*Home\|Home.*ibl_schedule" --include="*.php" /home/runner/work/IBL5/IBL5/ibl5/
+
+# Search for array access that might be database columns
+# NOTE: Will include false positives - manually review each result
+grep -r "\['Year'\]" --include="*.php" /home/runner/work/IBL5/IBL5/ibl5/
+grep -r "\['BoxID'\]" --include="*.php" /home/runner/work/IBL5/IBL5/ibl5/
+grep -r "\['Home'\]" --include="*.php" /home/runner/work/IBL5/IBL5/ibl5/
+grep -r "\['Visitor'\]" --include="*.php" /home/runner/work/IBL5/IBL5/ibl5/
+
+# After fixing all references, these should return only non-database matches
+# (e.g., JavaScript Date objects, PHP DateTime, etc.)
 ```
+
+**Better Approach:** Use an IDE's "Find in Files" feature to:
+1. Search for specific SQL patterns: `SELECT.*FROM ibl_schedule.*Year`
+2. Review each match in context
+3. Identify which are database columns vs. other uses
+4. Update only the database column references
 
 ### Database Validation
 

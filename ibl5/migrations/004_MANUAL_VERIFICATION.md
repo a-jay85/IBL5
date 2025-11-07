@@ -63,11 +63,15 @@ ORDER BY TABLE_NAME, ORDINAL_POSITION;
 **Purpose:** Verify data integrity after migration
 
 ```sql
--- Take sample data from key tables
+-- Take sample data from key tables (using OLD column names - BEFORE migration)
+-- Document these values to compare after migration
 SELECT * FROM ibl_schedule ORDER BY Date DESC LIMIT 5;
 SELECT * FROM ibl_box_scores ORDER BY Date DESC LIMIT 5;
 SELECT * FROM ibl_team_info LIMIT 3;
 SELECT * FROM ibl_plr WHERE pid IN (1, 100, 200);
+
+-- Note: Save the actual data values, not just the column names
+-- After migration, the column names will change but data values should remain the same
 ```
 
 **Checklist:**
@@ -253,14 +257,16 @@ SELECT COUNT(*) as player_count FROM ibl_plr;
 - [ ] No NULL values in previously populated columns
 
 ```sql
--- Verify sample data integrity
+-- Verify sample data integrity (using NEW column names post-migration)
 SELECT schedule_id, season_year, game_date, home_team_id, visitor_team_id, 
        home_score, visitor_score
 FROM ibl_schedule 
 ORDER BY game_date DESC 
 LIMIT 5;
 
--- Compare with pre-migration sample data
+-- Compare with pre-migration sample data (which used old column names:
+-- Date, Home, Visitor, HScore, VScore)
+-- Verify the DATA matches even though column names changed
 ```
 
 ---

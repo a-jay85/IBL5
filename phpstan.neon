@@ -1,0 +1,34 @@
+parameters:
+  # Strictness level (0..9). Increase as you fix issues.
+  level: 6
+
+  # Analyse the repository root. Excluded paths below reduce memory usage.
+  paths:
+    - .
+
+  # Load Composer autoload for class/function resolution
+  bootstrapFiles:
+    - vendor/autoload.php
+
+  # Exclude vendor and other large dirs from analysis to reduce memory footprint
+  excludePaths:
+    - vendor/*
+    - node_modules/*
+    - storage/*
+    - .git/*
+    - 2003olympics
+    - IBL6
+    - ibl5/vendor/*
+    - ibl5/node_modules/*
+    - ibl5/install/includes/database.php
+    - ibl5/modules/AutoTheme/includes/atAPI.php
+    - ibl5/modules/Forums/*
+    - ibl5/modules/Members_List/language/*
+    - ibl5/modules/Private_Messages/language/*
+    - ibl5/modules/Web_Links/language/*
+
+  # Show unmatched ignored errors as warnings (keeps baseline clean)
+  reportUnmatchedIgnoredErrors: true
+
+# To generate a baseline (use the script above or run the CLI below)
+# ./vendor/bin/phpstan analyse --generate-baseline --memory-limit=1G

@@ -139,7 +139,8 @@ CREATE TABLE `ibl_box_scores` (
   KEY `idx_date_home_visitor` (`Date`,`homeTID`,`visitorTID`),
   CONSTRAINT `fk_boxscore_home` FOREIGN KEY (`homeTID`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE,
   CONSTRAINT `fk_boxscore_player` FOREIGN KEY (`pid`) REFERENCES `ibl_plr` (`pid`) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT `fk_boxscore_visitor` FOREIGN KEY (`visitorTID`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE
+  CONSTRAINT `fk_boxscore_visitor` FOREIGN KEY (`visitorTID`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE,
+  CONSTRAINT `chk_box_minutes` CHECK (`gameMIN` is null or `gameMIN` >= 0 and `gameMIN` <= 70)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -244,7 +245,9 @@ CREATE TABLE `ibl_draft` (
   KEY `idx_player` (`player`),
   KEY `idx_year_round` (`year`,`round`),
   KEY `idx_year_round_pick` (`year`,`round`,`pick`),
-  CONSTRAINT `fk_draft_team` FOREIGN KEY (`team`) REFERENCES `ibl_team_info` (`team_name`) ON UPDATE CASCADE
+  CONSTRAINT `fk_draft_team` FOREIGN KEY (`team`) REFERENCES `ibl_team_info` (`team_name`) ON UPDATE CASCADE,
+  CONSTRAINT `chk_draft_round` CHECK (`round` >= 0 and `round` <= 7),
+  CONSTRAINT `chk_draft_pick` CHECK (`pick` >= 0 and `pick` <= 32)
 ) ENGINE=InnoDB AUTO_INCREMENT=57 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -257,7 +260,7 @@ DROP TABLE IF EXISTS `ibl_draft_class`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `ibl_draft_class` (
   `name` varchar(32) NOT NULL DEFAULT '',
-  `pos` char(2) NOT NULL DEFAULT '',
+  `pos` enum('PG','SG','SF','PF','C','G','F','GF','') NOT NULL DEFAULT '' COMMENT 'Draft prospect position',
   `age` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Player age',
   `team` varchar(128) NOT NULL DEFAULT '',
   `fga` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'FG attempts rating',
@@ -739,8 +742,8 @@ DROP TABLE IF EXISTS `ibl_playoff_results`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `ibl_playoff_results` (
-  `year` int(11) NOT NULL DEFAULT 0,
-  `round` int(11) NOT NULL DEFAULT 0,
+  `year` smallint(5) unsigned NOT NULL COMMENT 'Playoff year',
+  `round` tinyint(3) unsigned NOT NULL COMMENT 'Playoff round',
   `winner` varchar(32) NOT NULL DEFAULT '',
   `loser` varchar(32) NOT NULL DEFAULT '',
   `loser_games` int(11) NOT NULL DEFAULT 0,
@@ -795,13 +798,13 @@ DROP TABLE IF EXISTS `ibl_plr`;
 CREATE TABLE `ibl_plr` (
   `ordinal` int(11) DEFAULT 0,
   `pid` int(11) NOT NULL DEFAULT 0,
-  `name` varchar(32) DEFAULT '',
+  `name` varchar(32) NOT NULL DEFAULT '' COMMENT 'Player name',
   `nickname` varchar(64) DEFAULT '',
   `age` tinyint(3) unsigned DEFAULT NULL,
   `peak` tinyint(3) unsigned DEFAULT NULL,
-  `tid` int(11) DEFAULT 0,
+  `tid` smallint(5) unsigned NOT NULL DEFAULT 0 COMMENT 'Team ID (0 = free agent)',
   `teamname` varchar(32) DEFAULT '',
-  `pos` varchar(4) DEFAULT '',
+  `pos` enum('PG','SG','SF','PF','C','G','F','GF','') NOT NULL DEFAULT '' COMMENT 'Player position',
   `sta` tinyint(3) unsigned DEFAULT 0 COMMENT 'Stamina rating',
   `oo` tinyint(3) unsigned DEFAULT 0 COMMENT 'Outside offense rating',
   `od` tinyint(3) unsigned DEFAULT 0 COMMENT 'Outside defense rating',
@@ -951,7 +954,15 @@ CREATE TABLE `ibl_plr` (
   KEY `idx_draftyear` (`draftyear`),
   KEY `idx_draftround` (`draftround`),
   KEY `idx_tid_pos_active` (`tid`,`pos`,`active`),
-  CONSTRAINT `fk_plr_team` FOREIGN KEY (`tid`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE
+  CONSTRAINT `chk_plr_cy` CHECK (`cy` >= 0 and `cy` <= 6),
+  CONSTRAINT `chk_plr_cyt` CHECK (`cyt` >= 0 and `cyt` <= 6),
+  CONSTRAINT `chk_plr_cy1` CHECK (`cy1` >= -7000 and `cy1` <= 7000),
+  CONSTRAINT `chk_plr_cy2` CHECK (`cy2` >= -7000 and `cy2` <= 7000),
+  CONSTRAINT `chk_plr_cy3` CHECK (`cy3` >= -7000 and `cy3` <= 7000),
+  CONSTRAINT `chk_plr_cy4` CHECK (`cy4` >= -7000 and `cy4` <= 7000),
+  CONSTRAINT `chk_plr_cy5` CHECK (`cy5` >= -7000 and `cy5` <= 7000),
+  CONSTRAINT `chk_plr_cy6` CHECK (`cy6` >= -7000 and `cy6` <= 7000),
+  CONSTRAINT `chk_plr_tid` CHECK (`tid` >= 0 and `tid` <= 32)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1026,7 +1037,8 @@ CREATE TABLE `ibl_power` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`Team`),
-  CONSTRAINT `fk_power_team` FOREIGN KEY (`Team`) REFERENCES `ibl_team_info` (`team_name`) ON DELETE CASCADE ON UPDATE CASCADE
+  CONSTRAINT `fk_power_team` FOREIGN KEY (`Team`) REFERENCES `ibl_team_info` (`team_name`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `chk_power_ranking` CHECK (`ranking` is null or `ranking` >= 0.0 and `ranking` <= 100.0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1057,7 +1069,11 @@ CREATE TABLE `ibl_schedule` (
   KEY `idx_date` (`Date`),
   KEY `idx_visitor` (`Visitor`),
   KEY `idx_home` (`Home`),
-  KEY `idx_year_date` (`Year`,`Date`)
+  KEY `idx_year_date` (`Year`,`Date`),
+  CONSTRAINT `chk_schedule_visitor_id` CHECK (`Visitor` >= 1 and `Visitor` <= 32),
+  CONSTRAINT `chk_schedule_home_id` CHECK (`Home` >= 1 and `Home` <= 32),
+  CONSTRAINT `chk_schedule_vscore` CHECK (`VScore` >= 0 and `VScore` <= 200),
+  CONSTRAINT `chk_schedule_hscore` CHECK (`HScore` >= 0 and `HScore` <= 200)
 ) ENGINE=InnoDB AUTO_INCREMENT=1252 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1137,7 +1153,7 @@ CREATE TABLE `ibl_standings` (
   `team_name` varchar(16) NOT NULL DEFAULT '',
   `pct` float(4,3) unsigned DEFAULT NULL,
   `leagueRecord` varchar(5) DEFAULT '',
-  `conference` varchar(7) DEFAULT '',
+  `conference` enum('Eastern','Western','') DEFAULT '' COMMENT 'Conference affiliation',
   `confRecord` varchar(5) NOT NULL DEFAULT '',
   `confGB` decimal(3,1) DEFAULT NULL,
   `division` varchar(16) DEFAULT '',
@@ -1165,7 +1181,15 @@ CREATE TABLE `ibl_standings` (
   KEY `team_name` (`team_name`),
   KEY `idx_conference` (`conference`),
   KEY `idx_division` (`division`),
-  CONSTRAINT `fk_standings_team` FOREIGN KEY (`tid`) REFERENCES `ibl_team_info` (`teamid`) ON DELETE CASCADE ON UPDATE CASCADE
+  CONSTRAINT `fk_standings_team` FOREIGN KEY (`tid`) REFERENCES `ibl_team_info` (`teamid`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `chk_standings_pct` CHECK (`pct` is null or `pct` >= 0.000 and `pct` <= 1.000),
+  CONSTRAINT `chk_standings_games_unplayed` CHECK (`gamesUnplayed` is null or `gamesUnplayed` >= 0 and `gamesUnplayed` <= 82),
+  CONSTRAINT `chk_standings_conf_wins` CHECK (`confWins` is null or `confWins` <= 82),
+  CONSTRAINT `chk_standings_conf_losses` CHECK (`confLosses` is null or `confLosses` <= 82),
+  CONSTRAINT `chk_standings_home_wins` CHECK (`homeWins` is null or `homeWins` <= 41),
+  CONSTRAINT `chk_standings_home_losses` CHECK (`homeLosses` is null or `homeLosses` <= 41),
+  CONSTRAINT `chk_standings_away_wins` CHECK (`awayWins` is null or `awayWins` <= 41),
+  CONSTRAINT `chk_standings_away_losses` CHECK (`awayLosses` is null or `awayLosses` <= 41)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -3637,4 +3661,4 @@ SET character_set_client = @saved_cs_client;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2025-11-07 12:35:31
+-- Dump completed on 2025-11-07 13:09:24

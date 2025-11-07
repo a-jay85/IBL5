@@ -512,14 +512,14 @@ ALTER TABLE ibl_power
 -- ---------------------------------------------------------------------------
 -- Salary should be non-negative and reasonable (max ~50M per year)
 ALTER TABLE ibl_plr
-  ADD CONSTRAINT chk_plr_cy CHECK (cy >= 0 AND cy <= 50000000),
-  ADD CONSTRAINT chk_plr_cyt CHECK (cyt >= 0 AND cyt <= 50000000),
-  ADD CONSTRAINT chk_plr_cy1 CHECK (cy1 >= 0 AND cy1 <= 50000000),
-  ADD CONSTRAINT chk_plr_cy2 CHECK (cy2 >= 0 AND cy2 <= 50000000),
-  ADD CONSTRAINT chk_plr_cy3 CHECK (cy3 >= 0 AND cy3 <= 50000000),
-  ADD CONSTRAINT chk_plr_cy4 CHECK (cy4 >= 0 AND cy4 <= 50000000),
-  ADD CONSTRAINT chk_plr_cy5 CHECK (cy5 >= 0 AND cy5 <= 50000000),
-  ADD CONSTRAINT chk_plr_cy6 CHECK (cy6 >= 0 AND cy6 <= 50000000);
+  ADD CONSTRAINT chk_plr_cy CHECK (cy >= 0 AND cy <= 6),
+  ADD CONSTRAINT chk_plr_cyt CHECK (cyt >= 0 AND cyt <= 6),
+  ADD CONSTRAINT chk_plr_cy1 CHECK (cy1 >= 0 AND cy1 <= 2176),
+  ADD CONSTRAINT chk_plr_cy2 CHECK (cy2 >= 0 AND cy2 <= 2176),
+  ADD CONSTRAINT chk_plr_cy3 CHECK (cy3 >= 0 AND cy3 <= 2176),
+  ADD CONSTRAINT chk_plr_cy4 CHECK (cy4 >= 0 AND cy4 <= 2176),
+  ADD CONSTRAINT chk_plr_cy5 CHECK (cy5 >= 0 AND cy5 <= 2176),
+  ADD CONSTRAINT chk_plr_cy6 CHECK (cy6 >= 0 AND cy6 <= 2176);
 
 -- ---------------------------------------------------------------------------
 -- Team ID Constraints

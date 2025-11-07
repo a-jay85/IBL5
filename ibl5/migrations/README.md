@@ -483,12 +483,330 @@ After Phase 3 is complete, the next priority improvements are:
    - **Estimated Time:** 3-5 days
    - **Risk Level:** Medium
 
-4. **Phase 7:** Naming Convention Standardization (Priority 2.2)
+4. **Phase 7:** Naming Convention Standardization (Priority 2.2) - 📋 MIGRATION READY
    - Standardize column naming to snake_case
    - Rename ID columns to consistent *_id pattern
    - Remove reserved word column names
    - **NOTE:** This is a BREAKING CHANGE - defer to API v2
-   - **Estimated Time:** 5-7 days
-   - **Risk Level:** High (requires application code updates)
+   - **Estimated Time:** 5-7 days (migration) + 4-7 days (code updates)
+   - **Risk Level:** High (requires extensive application code updates)
+   - **Migration File:** `004_naming_convention_standardization.sql`
+   - **Documentation:**
+     - `004_APPLICATION_CODE_UPDATES.md` - Complete code update guide
+     - `004_MANUAL_VERIFICATION.md` - Step-by-step verification procedures
 
 See `DATABASE_SCHEMA_IMPROVEMENTS.md` for detailed roadmap and `SCHEMA_IMPLEMENTATION_REVIEW.md` for current status.
+
+---
+
+## Phase 7: Naming Convention Standardization (MIGRATION READY)
+
+### Overview
+
+**Migration File:** `004_naming_convention_standardization.sql`  
+**Priority:** 2.2 (Deferred to API v2)  
+**Status:** ⚠️ BREAKING CHANGE - Requires extensive application code updates  
+**Prerequisites:** Phases 1, 2, and 3 must be completed
+
+### What This Migration Does
+
+This migration standardizes database naming conventions across 14 tables, renaming 46 columns to follow consistent patterns:
+
+1. **snake_case Standardization**: All columns use lowercase with underscores (no PascalCase/camelCase)
+2. **ID Column Pattern**: All ID columns follow `*_id` pattern (not `*ID`, `*id`, or `id*`)
+3. **Reserved Words Removed**: Columns like `Date`, `Year`, `Name` renamed to avoid SQL reserved words
+4. **Spaces Removed**: Columns with spaces (`` `Start Date` ``) renamed with underscores
+
+### Tables and Columns Affected
+
+| Table | Columns Renamed | Impact Level |
+|-------|----------------|--------------|
+| **ibl_schedule** | 8 columns | 🔴 CRITICAL - Most used table |
+| **ibl_team_info** | 10 columns | 🔴 HIGH - Team management |
+| **ibl_plr** | 7 columns | 🟡 MEDIUM - Player attributes |
+| **ibl_box_scores** | 3 columns | 🔴 HIGH - Game results |
+| **ibl_box_scores_teams** | 3 columns | 🟡 MEDIUM - Team stats |
+| **ibl_power** | 4 columns | 🟡 MEDIUM - Power rankings |
+| **ibl_sim_dates** | 3 columns | 🟢 LOW - Sim management |
+| **ibl_team_awards** | 2 columns | 🟢 LOW - Awards |
+| **ibl_awards** | 1 column | 🟢 LOW - Awards |
+| **ibl_gm_history** | 1 column | 🟢 LOW - GM history |
+| **ibl_plr_chunk** | 1 column | 🟢 LOW - Player chunks |
+| **ibl_team_offense_stats** | 1 column | 🟡 MEDIUM - Stats |
+| **ibl_team_defense_stats** | 1 column | 🟡 MEDIUM - Stats |
+| **ibl_trade_cash** | 1 column | 🟢 LOW - Trades |
+
+### Key Column Renames (Most Impactful)
+
+**ibl_schedule** (used extensively in application):
+- `Year` → `season_year`
+- `BoxID` → `box_score_id`
+- `Date` → `game_date`
+- `Visitor` → `visitor_team_id`
+- `VScore` → `visitor_score`
+- `Home` → `home_team_id`
+- `HScore` → `home_score`
+- `SchedID` → `schedule_id`
+
+**ibl_box_scores**:
+- `Date` → `game_date`
+- `homeTID` → `home_team_id`
+- `visitorTID` → `visitor_team_id`
+
+**ibl_team_info**:
+- `Contract_Wins` → `contract_wins`
+- `Contract_Losses` → `contract_losses`
+- `discordID` → `discord_id`
+- `HasMLE` → `has_mle`
+- `HasLLE` → `has_lle`
+
+**ibl_plr** (Player attributes):
+- `Clutch` → `clutch`
+- `Consistency` → `consistency`
+- `PGDepth` → `pg_depth`, `SGDepth` → `sg_depth`, etc.
+
+### Database Changes Made by Migration
+
+1. **Foreign Keys Updated**: 5 foreign key constraints dropped and recreated
+2. **Indexes Updated**: 15+ indexes dropped and recreated with new column names
+3. **Views Updated**: `vw_schedule_upcoming` recreated to use new column names
+4. **Column Constraints**: All NOT NULL, DEFAULT, AUTO_INCREMENT preserved
+
+### Application Code Impact
+
+**⚠️ CRITICAL: This is a BREAKING CHANGE**
+
+All PHP code that references these columns must be updated before deploying this migration to production.
+
+**Estimated Code Update Effort:**
+- File identification: 4-6 hours
+- Repository/Model updates: 8-12 hours
+- View/Controller updates: 8-12 hours
+- JavaScript/AJAX updates: 4-6 hours
+- Testing: 8-16 hours
+- **Total: 32-52 hours (4-6.5 days)**
+
+**Files Requiring Updates:**
+- All files querying `ibl_schedule` (schedule pages, game pages, team schedules)
+- All files querying `ibl_box_scores` (box score pages, game results)
+- All files querying `ibl_team_info` (team management, contracts, Discord integration)
+- All files querying `ibl_plr` (player profiles, depth charts)
+- Any JavaScript making AJAX calls that return these columns
+- Repository/Service classes with SQL queries
+- View templates displaying data from these tables
+
+**See `004_APPLICATION_CODE_UPDATES.md` for:**
+- Complete column rename mapping
+- Search and replace strategies
+- Code update patterns (SQL, arrays, objects)
+- Testing strategies
+- Rollback procedures
+
+### Running the Migration
+
+**⚠️ DO NOT RUN IN PRODUCTION WITHOUT:**
+1. ✅ Completing all application code updates first
+2. ✅ Full database backup
+3. ✅ Testing in development/staging environment
+4. ✅ Extended maintenance window (45-90 minutes)
+5. ✅ Rollback plan ready
+
+#### Step 1: Pre-Migration Preparation
+
+```bash
+# 1. Create full database backup
+mysqldump -u username -p database_name > backup_phase7_$(date +%Y%m%d_%H%M%S).sql
+
+# 2. Verify backup was created
+ls -lh backup_phase7_*.sql
+
+# 3. Test in development environment first
+mysql -u username -p dev_database < 004_naming_convention_standardization.sql
+```
+
+#### Step 2: Application Code Updates
+
+Before running migration in production, complete all code updates per `004_APPLICATION_CODE_UPDATES.md`:
+
+1. Update all SQL queries to use new column names
+2. Update array/object property access
+3. Update WHERE/ORDER BY clauses
+4. Update JavaScript/AJAX code
+5. Test all affected features in development
+
+#### Step 3: Execute Migration in Production
+
+```bash
+# After code updates are complete and tested:
+mysql -u username -p database_name < 004_naming_convention_standardization.sql
+```
+
+**Estimated execution time:** 45-90 minutes depending on data size
+
+#### Step 4: Verify Migration
+
+Use `004_MANUAL_VERIFICATION.md` for complete verification:
+
+```sql
+-- Quick verification: Check new column names exist
+SELECT TABLE_NAME, COLUMN_NAME 
+FROM INFORMATION_SCHEMA.COLUMNS 
+WHERE TABLE_SCHEMA = DATABASE() 
+  AND TABLE_NAME = 'ibl_schedule'
+  AND COLUMN_NAME IN ('season_year', 'game_date', 'home_team_id', 'visitor_team_id')
+ORDER BY TABLE_NAME, ORDINAL_POSITION;
+-- Should return 4 rows
+
+-- Quick verification: Check old column names are gone
+SELECT TABLE_NAME, COLUMN_NAME 
+FROM INFORMATION_SCHEMA.COLUMNS 
+WHERE TABLE_SCHEMA = DATABASE() 
+  AND TABLE_NAME = 'ibl_schedule'
+  AND COLUMN_NAME IN ('Year', 'Date', 'Home', 'Visitor')
+ORDER BY TABLE_NAME;
+-- Should return 0 rows
+
+-- Verify foreign keys were recreated
+SELECT COUNT(*) as fk_count
+FROM information_schema.KEY_COLUMN_USAGE
+WHERE TABLE_SCHEMA = DATABASE()
+  AND REFERENCED_TABLE_NAME IS NOT NULL
+  AND TABLE_NAME IN ('ibl_schedule', 'ibl_box_scores', 'ibl_power');
+-- Should return at least 7
+
+-- Test the updated view
+SELECT * FROM vw_schedule_upcoming LIMIT 5;
+-- Should return data without errors
+```
+
+#### Step 5: Application Testing
+
+Complete all verification steps in `004_MANUAL_VERIFICATION.md`:
+
+**Critical Tests:**
+- [ ] Schedule pages load and display correctly
+- [ ] Box score pages load and display correctly
+- [ ] Team management pages work correctly
+- [ ] Player profile pages work correctly
+- [ ] No PHP errors in error log
+- [ ] No MySQL errors in error log
+
+### Rollback Procedure
+
+If critical issues arise:
+
+#### Option 1: Restore from Backup (Safest)
+
+```bash
+# Stop application
+# Restore database
+mysql -u username -p database_name < backup_phase7_YYYYMMDD_HHMMSS.sql
+# Restart application with pre-migration code
+```
+
+#### Option 2: Reverse Column Renames (If no data changes)
+
+See rollback section in `004_naming_convention_standardization.sql` for SQL to reverse column renames.
+
+**⚠️ WARNING:** Rollback requires reverting application code changes as well!
+
+### Migration Timeline
+
+**Recommended Approach:**
+
+1. **Week 1-2: Planning and Preparation**
+   - Review all documentation
+   - Identify all affected code files
+   - Create detailed update plan
+   - Set up comprehensive test environment
+
+2. **Week 3-4: Code Updates (Development)**
+   - Update repository/service classes
+   - Update controllers/views
+   - Update JavaScript/AJAX
+   - Run unit tests
+
+3. **Week 5: Testing (Staging)**
+   - Deploy to staging environment
+   - Run migration in staging database
+   - Deploy updated code to staging
+   - Execute full integration testing
+   - Performance testing
+   - User acceptance testing (if applicable)
+
+4. **Week 6: Production Deployment**
+   - Schedule extended maintenance window (2-4 hours)
+   - Create production backup
+   - Deploy updated code (but don't restart yet)
+   - Run migration
+   - Restart application with new code
+   - Execute verification procedures
+   - Monitor for 24-48 hours
+
+**Total Timeline: 6 weeks minimum**
+
+### Benefits After Migration
+
+Once complete, the database will have:
+
+✅ **Consistent Naming:** All columns follow snake_case convention  
+✅ **Clear IDs:** All ID columns follow `*_id` pattern  
+✅ **No Reserved Words:** Columns like `Date`, `Year` are renamed  
+✅ **Better IDE Support:** Consistent naming improves autocomplete  
+✅ **API Ready:** Clean column names for API v2  
+✅ **Reduced Errors:** No more quoting issues with reserved words  
+✅ **Maintainability:** Easier for new developers to understand schema  
+
+### Documentation Files
+
+1. **`004_naming_convention_standardization.sql`**
+   - Complete migration SQL
+   - Drops and recreates foreign keys
+   - Updates indexes
+   - Recreates database views
+   - Includes verification queries
+
+2. **`004_APPLICATION_CODE_UPDATES.md`**
+   - Complete column rename mapping (46 columns)
+   - Search and replace strategies
+   - Code update patterns and examples
+   - Repository update examples
+   - JavaScript update examples
+   - Testing strategies
+   - Timeline estimates
+
+3. **`004_MANUAL_VERIFICATION.md`**
+   - Pre-migration verification steps
+   - Post-migration database verification
+   - Application functionality testing
+   - Performance benchmarking
+   - Error log checking
+   - Integration test checklist
+   - Rollback decision matrix
+
+### When to Run This Migration
+
+**Recommended:** Defer to API v2 release
+
+**Reasons:**
+1. Breaking change requires extensive code updates
+2. Best done alongside major version release
+3. Allows time for thorough testing
+4. Can be combined with other API v2 improvements
+5. Minimizes disruption to current users
+
+**Alternatively:** Run during major refactoring initiative when significant code changes are already planned.
+
+**Do NOT run if:**
+- Active development is ongoing on affected tables
+- Cannot afford extended downtime
+- Code updates cannot be completed in timeframe
+- Testing resources are limited
+
+### Support
+
+For questions or issues:
+1. Review all three documentation files thoroughly
+2. Test in development environment first
+3. Consult `DATABASE_SCHEMA_IMPROVEMENTS.md` section 2.2
+4. Keep database backups for at least 30 days post-migration

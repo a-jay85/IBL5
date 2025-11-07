@@ -423,17 +423,17 @@ ALTER TABLE ibl_standings
 -- Ratings should be 0-100 scale
 ALTER TABLE ibl_plr
   ADD CONSTRAINT chk_plr_sta CHECK (sta >= 0 AND sta <= 100),
-  ADD CONSTRAINT chk_plr_oo CHECK (oo >= 0 AND oo <= 100),
-  ADD CONSTRAINT chk_plr_od CHECK (od >= 0 AND od <= 100),
-  ADD CONSTRAINT chk_plr_do CHECK (do >= 0 AND do <= 100),
-  ADD CONSTRAINT chk_plr_dd CHECK (dd >= 0 AND dd <= 100),
-  ADD CONSTRAINT chk_plr_po CHECK (po >= 0 AND po <= 100),
-  ADD CONSTRAINT chk_plr_pd CHECK (pd >= 0 AND pd <= 100),
-  ADD CONSTRAINT chk_plr_to CHECK (to >= 0 AND to <= 100),
-  ADD CONSTRAINT chk_plr_td CHECK (td >= 0 AND td <= 100),
-  ADD CONSTRAINT chk_plr_talent CHECK (talent >= 0 AND talent <= 100),
-  ADD CONSTRAINT chk_plr_skill CHECK (skill >= 0 AND skill <= 100),
-  ADD CONSTRAINT chk_plr_intangibles CHECK (intangibles >= 0 AND intangibles <= 100);
+  ADD CONSTRAINT chk_plr_oo CHECK (oo >= 1 AND oo <= 9),
+  ADD CONSTRAINT chk_plr_od CHECK (od >= 1 AND od <= 9),
+  ADD CONSTRAINT chk_plr_do CHECK (do >= 1 AND do <= 9),
+  ADD CONSTRAINT chk_plr_dd CHECK (dd >= 1 AND dd <= 9),
+  ADD CONSTRAINT chk_plr_po CHECK (po >= 1 AND po <= 9),
+  ADD CONSTRAINT chk_plr_pd CHECK (pd >= 1 AND pd <= 9),
+  ADD CONSTRAINT chk_plr_to CHECK (to >= 1 AND to <= 9),
+  ADD CONSTRAINT chk_plr_td CHECK (td >= 1 AND td <= 9),
+  ADD CONSTRAINT chk_plr_talent CHECK (talent >= 1 AND talent <= 5),
+  ADD CONSTRAINT chk_plr_skill CHECK (skill >= 1 AND skill <= 5),
+  ADD CONSTRAINT chk_plr_intangibles CHECK (intangibles >= 1 AND intangibles <= 5);
 
 -- ---------------------------------------------------------------------------
 -- Box Score Minutes Constraint

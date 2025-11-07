@@ -445,8 +445,17 @@ ALTER TABLE ibl_box_scores
   CHECK (min IS NULL OR (min >= 0 AND min <= 70));
 
 -- ---------------------------------------------------------------------------
--- Schedule Scores Constraint
+-- Schedule Team ID and Scores Constraints
 -- ---------------------------------------------------------------------------
+-- Team IDs must be between 1 and 32 (maximum teams in league)
+ALTER TABLE ibl_schedule
+  ADD CONSTRAINT chk_schedule_visitor_id 
+  CHECK (Visitor >= 1 AND Visitor <= 32);
+
+ALTER TABLE ibl_schedule
+  ADD CONSTRAINT chk_schedule_home_id 
+  CHECK (Home >= 1 AND Home <= 32);
+
 -- Scores should be reasonable (0-200, accounting for rare high-scoring games)
 ALTER TABLE ibl_schedule
   ADD CONSTRAINT chk_schedule_vscore 
@@ -480,10 +489,10 @@ ALTER TABLE ibl_draft_picks
 -- ---------------------------------------------------------------------------
 -- Power Rankings Constraint
 -- ---------------------------------------------------------------------------
--- Power ranking should be 1-30 (number of teams in league)
+-- Power ranking should be 1-32 (maximum teams in league)
 ALTER TABLE ibl_power
   ADD CONSTRAINT chk_power_ranking 
-  CHECK (powerRanking IS NULL OR (powerRanking >= 1 AND powerRanking <= 30));
+  CHECK (powerRanking IS NULL OR (powerRanking >= 1 AND powerRanking <= 32));
 
 -- ---------------------------------------------------------------------------
 -- Player Statistics Constraints
@@ -508,6 +517,14 @@ ALTER TABLE ibl_plr
   ADD CONSTRAINT chk_plr_cy4 CHECK (cy4 >= 0 AND cy4 <= 50000000),
   ADD CONSTRAINT chk_plr_cy5 CHECK (cy5 >= 0 AND cy5 <= 50000000),
   ADD CONSTRAINT chk_plr_cy6 CHECK (cy6 >= 0 AND cy6 <= 50000000);
+
+-- ---------------------------------------------------------------------------
+-- Team ID Constraints
+-- ---------------------------------------------------------------------------
+-- Team IDs must be between 0 (free agent) and 32 (maximum teams in league)
+ALTER TABLE ibl_plr
+  ADD CONSTRAINT chk_plr_tid 
+  CHECK (tid >= 0 AND tid <= 32);
 
 -- ============================================================================
 -- PART 4: ADD NOT NULL CONSTRAINTS WHERE APPROPRIATE

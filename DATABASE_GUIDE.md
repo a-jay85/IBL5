@@ -125,8 +125,9 @@ $query = "SELECT * FROM vw_player_current WHERE uuid = ?";
 
 ## Migration History
 - **Phase 1 (Nov 1, 2025):** InnoDB conversion, critical indexes ✅
-- **Phase 2 (Nov 2, 2025):** Foreign key constraints ✅
+- **Phase 2 (Nov 2, 2025):** Foreign key constraints ✅ (Note: 3 FKs need restoration - see RESTORE_MISSING_FOREIGN_KEYS.sql)
 - **Phase 3 (Nov 4, 2025):** API preparation (timestamps, UUIDs, views) ✅
+- **Phase 4 (Nov 7, 2025):** Data type refinements (TINYINT, SMALLINT, ENUM, CHECK constraints) ✅
 
 ## Additional Resources
 - Schema Reference: `/ibl5/schema.sql`

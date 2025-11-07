@@ -55,7 +55,12 @@ SHOW KEYS FROM ibl_hist;
 -- ALTER TABLE ibl_hist 
 --   ADD UNIQUE KEY idx_hist_pid_year (pid, year);
 
--- Then partition by year (adjust partition ranges based on your data):
+-- Then partition by year (IMPORTANT: Review and adjust partition ranges before enabling!)
+-- The ranges below are examples only. You must:
+-- 1. Query your data to find actual min/max years: SELECT MIN(year), MAX(year) FROM ibl_hist;
+-- 2. Add partitions for each year in your data range
+-- 3. Consider adding future partitions for upcoming seasons
+-- 4. Update partition ranges annually or use a script to add new year partitions
 -- ALTER TABLE ibl_hist PARTITION BY RANGE (year) (
 --   PARTITION p_hist_2000 VALUES LESS THAN (2001),
 --   PARTITION p_hist_2001 VALUES LESS THAN (2002),
@@ -102,11 +107,17 @@ SELECT 'Checking current key structure on ibl_box_scores...' AS message;
 SHOW KEYS FROM ibl_box_scores;
 
 -- Box scores partitioning (by year extracted from Date column)
--- Note: Commented out - requires careful consideration of foreign keys and indexes
+-- IMPORTANT: This is a template only. Before enabling, you MUST:
+-- 1. Query your data: SELECT MIN(YEAR(Date)), MAX(YEAR(Date)) FROM ibl_box_scores;
+-- 2. Create one partition per year in your data range (copy the pattern from ibl_hist above)
+-- 3. Review foreign keys and indexes for compatibility
+-- Note: Commented out - requires careful review before enabling
 -- ALTER TABLE ibl_box_scores PARTITION BY RANGE (YEAR(Date)) (
 --   PARTITION p_box_2000 VALUES LESS THAN (2001),
 --   PARTITION p_box_2001 VALUES LESS THAN (2002),
---   ... (similar to ibl_hist)
+--   PARTITION p_box_2002 VALUES LESS THAN (2003),
+--   ... add one partition per year following the ibl_hist pattern above ...
+--   PARTITION p_box_2025 VALUES LESS THAN (2026),
 --   PARTITION p_box_future VALUES LESS THAN MAXVALUE
 -- );
 

@@ -1,0 +1,12 @@
+{
+    "require-dev": {
+        "phpstan/phpstan": "^2.1",
+        "squizlabs/php_codesniffer": "^4.0"
+    },
+    "scripts": {
+        "lint:php": "vendor/bin/phpcs --standard=PSR12 src",
+        "lint:php:fix": "vendor/bin/phpcbf --standard=PSR12 src",
+        "analyse": "vendor/bin/phpstan analyse --configuration=phpstan.neon --memory-limit=1G",
+        "analyse:baseline": "vendor/bin/phpstan analyse --configuration=phpstan.neon --generate-baseline --memory-limit=1G"
+    }
+}

@@ -3,9 +3,8 @@
 -- ============================================================================
 -- This migration implements remaining data type optimizations:
 -- 1. Complete data type optimizations for all tables (Priority 2.3)
--- 2. Add CHECK constraints for data validation (MySQL 8.0+)
--- 3. Implement ENUM types for fixed value lists (positions, conferences, etc.)
--- 4. Convert monetary values to DECIMAL type
+-- 2. Implement ENUM types for fixed value lists (positions, conferences, etc.)
+-- 3. Add CHECK constraints for data validation (MySQL 8.0+)
 --
 -- PREREQUISITES:
 -- - Phase 1, 2, and 3 migrations must be completed
@@ -330,39 +329,7 @@ ALTER TABLE ibl_team_history
   MODIFY Points SMALLINT UNSIGNED DEFAULT 0 COMMENT 'Points';
 
 -- ============================================================================
--- PART 2: CONVERT MONETARY VALUES TO DECIMAL TYPE
--- ============================================================================
--- Contract amounts should use DECIMAL for accurate financial calculations
--- Format: DECIMAL(10,2) allows values up to 99,999,999.99
-
--- ---------------------------------------------------------------------------
--- Player Contracts (ibl_plr)
--- ---------------------------------------------------------------------------
--- Current year through year 6 contract values
-ALTER TABLE ibl_plr
-  MODIFY cy DECIMAL(10,2) DEFAULT 0.00 COMMENT 'Current year salary',
-  MODIFY cyt DECIMAL(10,2) DEFAULT 0.00 COMMENT 'Current year total',
-  MODIFY cy1 DECIMAL(10,2) DEFAULT 0.00 COMMENT 'Year 1 salary',
-  MODIFY cy2 DECIMAL(10,2) DEFAULT 0.00 COMMENT 'Year 2 salary',
-  MODIFY cy3 DECIMAL(10,2) DEFAULT 0.00 COMMENT 'Year 3 salary',
-  MODIFY cy4 DECIMAL(10,2) DEFAULT 0.00 COMMENT 'Year 4 salary',
-  MODIFY cy5 DECIMAL(10,2) DEFAULT 0.00 COMMENT 'Year 5 salary',
-  MODIFY cy6 DECIMAL(10,2) DEFAULT 0.00 COMMENT 'Year 6 salary';
-
--- ---------------------------------------------------------------------------
--- Trade Cash (ibl_trade_cash)
--- ---------------------------------------------------------------------------
--- Cash considerations in trades
-ALTER TABLE ibl_trade_cash
-  MODIFY cy1 DECIMAL(10,2) DEFAULT NULL COMMENT 'Year 1 cash',
-  MODIFY cy2 DECIMAL(10,2) DEFAULT NULL COMMENT 'Year 2 cash',
-  MODIFY cy3 DECIMAL(10,2) DEFAULT NULL COMMENT 'Year 3 cash',
-  MODIFY cy4 DECIMAL(10,2) DEFAULT NULL COMMENT 'Year 4 cash',
-  MODIFY cy5 DECIMAL(10,2) DEFAULT NULL COMMENT 'Year 5 cash',
-  MODIFY cy6 DECIMAL(10,2) DEFAULT NULL COMMENT 'Year 6 cash';
-
--- ============================================================================
--- PART 3: IMPLEMENT ENUM TYPES FOR FIXED VALUE LISTS
+-- PART 2: IMPLEMENT ENUM TYPES FOR FIXED VALUE LISTS
 -- ============================================================================
 -- Use ENUM for columns with a fixed set of possible values
 -- Provides data validation and reduces storage
@@ -395,7 +362,7 @@ ALTER TABLE ibl_draft_class
   COMMENT 'Draft prospect position';
 
 -- ============================================================================
--- PART 4: ADD CHECK CONSTRAINTS FOR DATA VALIDATION
+-- PART 3: ADD CHECK CONSTRAINTS FOR DATA VALIDATION
 -- ============================================================================
 -- MySQL 8.0+ supports CHECK constraints for data integrity
 -- These prevent invalid data from being inserted
@@ -543,7 +510,7 @@ ALTER TABLE ibl_plr
   ADD CONSTRAINT chk_plr_cy6 CHECK (cy6 >= 0 AND cy6 <= 50000000);
 
 -- ============================================================================
--- PART 5: ADD NOT NULL CONSTRAINTS WHERE APPROPRIATE
+-- PART 4: ADD NOT NULL CONSTRAINTS WHERE APPROPRIATE
 -- ============================================================================
 -- Enforce required fields that should never be NULL
 
@@ -578,7 +545,7 @@ SELECT
 FROM INFORMATION_SCHEMA.COLUMNS
 WHERE TABLE_SCHEMA = DATABASE()
   AND TABLE_NAME = 'ibl_plr'
-  AND COLUMN_NAME IN ('age', 'peak', 'stats_gm', 'stats_min', 'cy', 'cy1', 'pos')
+  AND COLUMN_NAME IN ('age', 'peak', 'stats_gm', 'stats_min', 'sta', 'oo', 'pos')
 ORDER BY COLUMN_NAME;
 
 -- Verify CHECK constraints were added
@@ -605,21 +572,6 @@ WHERE TABLE_SCHEMA = DATABASE()
   AND TABLE_NAME LIKE 'ibl_%'
 ORDER BY TABLE_NAME, COLUMN_NAME;
 
--- Verify DECIMAL types for monetary values
-SELECT 'Verifying DECIMAL types for monetary values...' AS message;
-SELECT 
-  TABLE_NAME,
-  COLUMN_NAME,
-  COLUMN_TYPE,
-  NUMERIC_PRECISION,
-  NUMERIC_SCALE
-FROM INFORMATION_SCHEMA.COLUMNS
-WHERE TABLE_SCHEMA = DATABASE()
-  AND DATA_TYPE = 'decimal'
-  AND TABLE_NAME LIKE 'ibl_%'
-  AND COLUMN_NAME LIKE 'cy%'
-ORDER BY TABLE_NAME, COLUMN_NAME;
-
 -- ============================================================================
 -- ROLLBACK PROCEDURES
 -- ============================================================================
@@ -636,10 +588,6 @@ ORDER BY TABLE_NAME, COLUMN_NAME;
 -- ALTER TABLE ibl_standings MODIFY conference VARCHAR(7) DEFAULT '';
 -- ALTER TABLE ibl_draft_class MODIFY pos CHAR(2) NOT NULL DEFAULT '';
 --
--- Revert DECIMAL to INT:
--- ALTER TABLE ibl_plr MODIFY cy INT DEFAULT 0;
--- ... etc for other monetary columns
---
 -- Revert integer sizes:
 -- ALTER TABLE ibl_plr MODIFY stats_gm INT DEFAULT 0;
 -- ... etc for other columns
@@ -651,5 +599,5 @@ ORDER BY TABLE_NAME, COLUMN_NAME;
 -- COMPLETION MESSAGE
 -- ============================================================================
 SELECT 'Phase 4 Migration Complete!' AS message;
-SELECT 'Data type refinements, CHECK constraints, ENUM types, and DECIMAL conversions have been applied.' AS details;
+SELECT 'Data type refinements, CHECK constraints, and ENUM types have been applied.' AS details;
 SELECT 'Please review the verification queries above to confirm all changes.' AS next_step;

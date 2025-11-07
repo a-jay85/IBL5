@@ -196,20 +196,6 @@ Implements:
      AND DATA_TYPE = 'enum'
      AND TABLE_NAME LIKE 'ibl_%'
    ORDER BY TABLE_NAME, COLUMN_NAME;
-   
-   -- Verify DECIMAL types for monetary values
-   SELECT 
-     TABLE_NAME,
-     COLUMN_NAME,
-     COLUMN_TYPE,
-     NUMERIC_PRECISION,
-     NUMERIC_SCALE
-   FROM INFORMATION_SCHEMA.COLUMNS
-   WHERE TABLE_SCHEMA = DATABASE()
-     AND DATA_TYPE = 'decimal'
-     AND TABLE_NAME LIKE 'ibl_%'
-     AND COLUMN_NAME LIKE 'cy%'
-   ORDER BY TABLE_NAME, COLUMN_NAME;
    ```
 
 6. **Test Data Validation:**
@@ -505,17 +491,6 @@ ALTER TABLE ibl_plr MODIFY pos VARCHAR(4) DEFAULT '';
 ALTER TABLE ibl_standings MODIFY conference VARCHAR(7) DEFAULT '';
 ALTER TABLE ibl_draft_class MODIFY pos CHAR(2) NOT NULL DEFAULT '';
 
--- Revert DECIMAL to INT for monetary values
-ALTER TABLE ibl_plr 
-  MODIFY cy INT DEFAULT 0,
-  MODIFY cyt INT DEFAULT 0,
-  MODIFY cy1 INT DEFAULT 0,
-  MODIFY cy2 INT DEFAULT 0,
-  MODIFY cy3 INT DEFAULT 0,
-  MODIFY cy4 INT DEFAULT 0,
-  MODIFY cy5 INT DEFAULT 0,
-  MODIFY cy6 INT DEFAULT 0;
-
 -- Revert integer sizes (example - repeat for affected columns)
 ALTER TABLE ibl_plr 
   MODIFY stats_gm INT DEFAULT 0,
@@ -591,25 +566,6 @@ SELECT pid, name, stats_gm FROM ibl_plr WHERE stats_gm > 65535;
 -- 1. Use larger data type for that column
 -- 2. Clean/cap the data
 UPDATE ibl_plr SET sta = 100 WHERE sta > 100;
-```
-
-#### 8. DECIMAL Precision Issues (Phase 4)
-
-**Issue:** Contract values appear truncated or have unexpected decimals
-
-**Cause:** INT to DECIMAL conversion with existing large values
-
-**Solution:**
-```sql
--- Check for contract values that might be affected
-SELECT pid, name, cy, cy1, cy2 FROM ibl_plr 
-WHERE cy > 99999999 OR cy1 > 99999999 OR cy2 > 99999999;
-
--- If values are stored in cents rather than dollars, divide by 100
--- UPDATE ibl_plr SET cy = cy / 100, cy1 = cy1 / 100, cy2 = cy2 / 100;
-
--- Verify display is correct
-SELECT name, FORMAT(cy, 2) as salary FROM ibl_plr WHERE cy > 0 LIMIT 10;
 ```
 
 ## Monitoring
@@ -735,32 +691,26 @@ Implements:
   - Reduces storage requirements for statistics, ratings, and counters
   - Over 200+ column optimizations across all core tables
   
-- **Part 2:** Convert monetary values to DECIMAL type
-  - All salary/contract columns (cy, cy1-cy6) to DECIMAL(10,2)
-  - Accurate financial calculations
-  - Prevents floating-point precision errors
-  
-- **Part 3:** Implement ENUM types for fixed value lists
+- **Part 2:** Implement ENUM types for fixed value lists
   - Player positions (PG, SG, SF, PF, C, G, F, GF)
   - Conference (Eastern, Western)
   - Data validation at database level
   
-- **Part 4:** Add CHECK constraints for data validation (MySQL 8.0+)
+- **Part 3:** Add CHECK constraints for data validation (MySQL 8.0+)
   - Age constraints (18-50 years)
   - Peak age validation (peak >= age)
   - Winning percentage bounds (0.000-1.000)
   - Rating ranges (0-100)
-  - Contract value limits
+  - Contract value limits (salary values stored as integers)
   - Statistics validation
   
-- **Part 5:** Add NOT NULL constraints for required fields
+- **Part 4:** Add NOT NULL constraints for required fields
   - Player name, position, team ID
   - Ensures data integrity
 
 **Benefits:**
 - ✅ Reduced storage requirements (30-50% for statistics columns)
 - ✅ Better query optimization from smaller data types
-- ✅ Accurate financial calculations with DECIMAL
 - ✅ Data validation at database level prevents invalid data
 - ✅ Self-documenting schema with ENUM types
 - ✅ Improved data quality and integrity

@@ -108,127 +108,92 @@ class Player
     public static function withPlayerID($db, int $playerID)
     {
         $instance = new self();
-        $instance->loadByID($db, $playerID);
+        $instance->initialize($db);
+        $instance->playerData = $instance->repository->loadByID($playerID);
+        $instance->syncPropertiesFromPlayerData();
         return $instance;
     }
 
     public static function withPlrRow($db, array $plrRow)
     {
         $instance = new self();
-        $instance->fill($db, $plrRow);
+        $instance->initialize($db);
+        $instance->playerData = $instance->repository->fillFromCurrentRow($plrRow);
+        $instance->syncPropertiesFromPlayerData();
         return $instance;
     }
 
     public static function withHistoricalPlrRow($db, array $plrRow)
     {
         $instance = new self();
-        $instance->fillHistorical($db, $plrRow);
+        $instance->initialize($db);
+        $instance->playerData = $instance->repository->fillFromHistoricalRow($plrRow);
+        $instance->syncPropertiesFromPlayerData();
         return $instance;
     }
 
-    protected function loadByID($db, int $playerID)
+    /**
+     * Initialize the Player instance with database and repository
+     */
+    protected function initialize($db): void
     {
         $this->db = $db;
         $this->repository = new PlayerRepository($db);
+    }
+
+    /**
+     * Legacy method - kept for backward compatibility
+     * @deprecated Use static factory methods instead
+     */
+    protected function loadByID($db, int $playerID)
+    {
+        $this->initialize($db);
         $this->playerData = $this->repository->loadByID($playerID);
         $this->syncPropertiesFromPlayerData();
     }
 
+    /**
+     * Legacy method - kept for backward compatibility
+     * @deprecated Use static factory methods instead
+     */
     protected function fill($db, array $plrRow)
     {
-        $this->db = $db;
-        $this->repository = new PlayerRepository($db);
+        $this->initialize($db);
         $this->playerData = $this->repository->fillFromCurrentRow($plrRow);
         $this->syncPropertiesFromPlayerData();
     }
 
+    /**
+     * Legacy method - kept for backward compatibility
+     * @deprecated Use static factory methods instead
+     */
     protected function fillHistorical($db, array $plrRow)
     {
-        $this->db = $db;
-        $this->repository = new PlayerRepository($db);
+        $this->initialize($db);
         $this->playerData = $this->repository->fillFromHistoricalRow($plrRow);
         $this->syncPropertiesFromPlayerData();
     }
 
     /**
      * Sync all public properties from PlayerData for backward compatibility
+     * Uses reflection to copy all properties from PlayerData to Player
      */
     protected function syncPropertiesFromPlayerData()
     {
-        $this->playerID = $this->playerData->playerID;
-        $this->ordinal = $this->playerData->ordinal;
-        $this->name = $this->playerData->name;
-        $this->nickname = $this->playerData->nickname;
-        $this->age = $this->playerData->age;
-        $this->historicalYear = $this->playerData->historicalYear;
-
-        $this->teamID = $this->playerData->teamID;
-        $this->teamName = $this->playerData->teamName;
-        $this->position = $this->playerData->position;
+        $reflection = new \ReflectionClass($this->playerData);
+        $properties = $reflection->getProperties(\ReflectionProperty::IS_PUBLIC);
         
-        $this->ratingFieldGoalAttempts = $this->playerData->ratingFieldGoalAttempts;
-        $this->ratingFieldGoalPercentage = $this->playerData->ratingFieldGoalPercentage;
-        $this->ratingFreeThrowAttempts = $this->playerData->ratingFreeThrowAttempts;
-        $this->ratingFreeThrowPercentage = $this->playerData->ratingFreeThrowPercentage;
-        $this->ratingThreePointAttempts = $this->playerData->ratingThreePointAttempts;
-        $this->ratingThreePointPercentage = $this->playerData->ratingThreePointPercentage;
-        $this->ratingOffensiveRebounds = $this->playerData->ratingOffensiveRebounds;
-        $this->ratingDefensiveRebounds = $this->playerData->ratingDefensiveRebounds;
-        $this->ratingAssists = $this->playerData->ratingAssists;
-        $this->ratingSteals = $this->playerData->ratingSteals;
-        $this->ratingTurnovers = $this->playerData->ratingTurnovers;
-        $this->ratingBlocks = $this->playerData->ratingBlocks;
-        $this->ratingFouls = $this->playerData->ratingFouls;
-        $this->ratingOutsideOffense = $this->playerData->ratingOutsideOffense;
-        $this->ratingOutsideDefense = $this->playerData->ratingOutsideDefense;
-        $this->ratingDriveOffense = $this->playerData->ratingDriveOffense;
-        $this->ratingDriveDefense = $this->playerData->ratingDriveDefense;
-        $this->ratingPostOffense = $this->playerData->ratingPostOffense;
-        $this->ratingPostDefense = $this->playerData->ratingPostDefense;
-        $this->ratingTransitionOffense = $this->playerData->ratingTransitionOffense;
-        $this->ratingTransitionDefense = $this->playerData->ratingTransitionDefense;
-        $this->ratingClutch = $this->playerData->ratingClutch;
-        $this->ratingConsistency = $this->playerData->ratingConsistency;
-        $this->ratingTalent = $this->playerData->ratingTalent;
-        $this->ratingSkill = $this->playerData->ratingSkill;
-        $this->ratingIntangibles = $this->playerData->ratingIntangibles;
-
-        $this->freeAgencyLoyalty = $this->playerData->freeAgencyLoyalty;
-        $this->freeAgencyPlayingTime = $this->playerData->freeAgencyPlayingTime;
-        $this->freeAgencyPlayForWinner = $this->playerData->freeAgencyPlayForWinner;
-        $this->freeAgencyTradition = $this->playerData->freeAgencyTradition;
-        $this->freeAgencySecurity = $this->playerData->freeAgencySecurity;
-
-        $this->yearsOfExperience = $this->playerData->yearsOfExperience;
-        $this->birdYears = $this->playerData->birdYears;
-        $this->contractCurrentYear = $this->playerData->contractCurrentYear;
-        $this->contractTotalYears = $this->playerData->contractTotalYears;
-        $this->contractYear1Salary = $this->playerData->contractYear1Salary;
-        $this->contractYear2Salary = $this->playerData->contractYear2Salary;
-        $this->contractYear3Salary = $this->playerData->contractYear3Salary;
-        $this->contractYear4Salary = $this->playerData->contractYear4Salary;
-        $this->contractYear5Salary = $this->playerData->contractYear5Salary;
-        $this->contractYear6Salary = $this->playerData->contractYear6Salary;
+        foreach ($properties as $property) {
+            $propertyName = $property->getName();
+            // Skip 'plr' property as it's not used in Player facade
+            if ($propertyName === 'plr') {
+                continue;
+            }
+            $this->$propertyName = $this->playerData->$propertyName;
+        }
+        
+        // Calculate derived properties
         $this->currentSeasonSalary = $this->contractCalculator->getCurrentSeasonSalary($this->playerData);
-        $this->salaryJSB = $this->playerData->salaryJSB;
-    
-        $this->draftYear = $this->playerData->draftYear;
-        $this->draftRound = $this->playerData->draftRound;
-        $this->draftPickNumber = $this->playerData->draftPickNumber;
-        $this->draftTeamOriginalName = $this->playerData->draftTeamOriginalName;
-        $this->draftTeamCurrentName = $this->playerData->draftTeamCurrentName;
-        $this->collegeName = $this->playerData->collegeName;
-    
-        $this->daysRemainingForInjury = $this->playerData->daysRemainingForInjury;
-    
-        $this->heightFeet = $this->playerData->heightFeet;
-        $this->heightInches = $this->playerData->heightInches;
-        $this->weightPounds = $this->playerData->weightPounds;
-    
-        $this->isRetired = $this->playerData->isRetired;
-    
-        $this->timeDroppedOnWaivers = $this->playerData->timeDroppedOnWaivers;
-
         $this->decoratedName = $this->decoratePlayerName();
     }
 

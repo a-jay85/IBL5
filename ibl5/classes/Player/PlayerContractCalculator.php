@@ -13,26 +13,37 @@ class PlayerContractCalculator
     /**
      * Calculate the current season salary based on contract year
      */
-    public function getCurrentSeasonSalary(PlayerData $playerData): ?int
+    public function getCurrentSeasonSalary(PlayerData $playerData): int
     {
-        if ("contractYear" . $playerData->contractCurrentYear . "Salary" == "contractYear0Salary") {
-            $currentSeasonSalary = $playerData->contractYear1Salary;
-        } elseif ("contractYear" . $playerData->contractCurrentYear . "Salary" == "contractYear7Salary") {
-            $currentSeasonSalary = 0;
-        } else {
-            $currentSeasonSalary = $playerData->{"contractYear" . $playerData->contractCurrentYear . "Salary"};
-        }
-        return $currentSeasonSalary;
+        return $this->getSalaryForYear($playerData, $playerData->contractCurrentYear);
     }
 
     /**
      * Calculate the next season's salary
      */
-    public function getNextSeasonSalary(PlayerData $playerData): ?int
+    public function getNextSeasonSalary(PlayerData $playerData): int
     {
-        $contractNextYear = $playerData->contractCurrentYear + 1;
-        $nextSeasonSalary = $playerData->{"contractYear" . $contractNextYear . "Salary"};
-        return $nextSeasonSalary;
+        return $this->getSalaryForYear($playerData, $playerData->contractCurrentYear + 1);
+    }
+
+    /**
+     * Get salary for a specific contract year
+     */
+    private function getSalaryForYear(PlayerData $playerData, int $year): int
+    {
+        // Year 0 defaults to year 1
+        if ($year == 0) {
+            return $playerData->contractYear1Salary ?? 0;
+        }
+        
+        // Year 7 or beyond means no salary (off the books)
+        if ($year >= 7) {
+            return 0;
+        }
+        
+        // Dynamically access the contract year property (years 1-6)
+        $propertyName = "contractYear" . $year . "Salary";
+        return $playerData->$propertyName ?? 0;
     }
 
     /**
@@ -46,8 +57,9 @@ class PlayerContractCalculator
         $contractArray = array();
         $remainingContractYear = 1;
         for ($i = $contractCurrentYear; $i <= $contractTotalYears; $i++) {
-            if ($playerData->{"contractYear" . $i . "Salary"} != 0) {
-                $contractArray[$remainingContractYear] = $playerData->{"contractYear" . $i . "Salary"};
+            $salary = $this->getSalaryForYear($playerData, $i);
+            if ($salary != 0) {
+                $contractArray[$remainingContractYear] = $salary;
             }
             $remainingContractYear++;
         }
@@ -70,10 +82,7 @@ class PlayerContractCalculator
      */
     public function getLongBuyoutArray(PlayerData $playerData): array
     {
-        $totalRemainingSalary = $this->getTotalRemainingSalary($playerData);
-        $oneSixthOfTotalRemainingSalary = round($totalRemainingSalary / 6);
-        $longBuyoutArray[1] = $longBuyoutArray[2] = $longBuyoutArray[3] = $longBuyoutArray[4] = $longBuyoutArray[5] = $longBuyoutArray[6] = $oneSixthOfTotalRemainingSalary;
-        return $longBuyoutArray;
+        return $this->getBuyoutArray($playerData, 6);
     }
 
     /**
@@ -81,9 +90,17 @@ class PlayerContractCalculator
      */
     public function getShortBuyoutArray(PlayerData $playerData): array
     {
+        return $this->getBuyoutArray($playerData, 2);
+    }
+
+    /**
+     * Calculate buyout terms spread over specified number of years
+     */
+    private function getBuyoutArray(PlayerData $playerData, int $years): array
+    {
         $totalRemainingSalary = $this->getTotalRemainingSalary($playerData);
-        $oneHalfOfTotalRemainingSalary = round($totalRemainingSalary / 2);
-        $shortBuyoutArray[1] = $shortBuyoutArray[2] = $oneHalfOfTotalRemainingSalary;
-        return $shortBuyoutArray;
+        $salaryPerYear = round($totalRemainingSalary / $years);
+        
+        return array_fill(1, $years, $salaryPerYear);
     }
 }

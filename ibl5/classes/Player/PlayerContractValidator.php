@@ -18,12 +18,13 @@ class PlayerContractValidator
     {
         $currentYear = $playerData->contractCurrentYear;
         
-        // In final year (year 6) or beyond
+        // In final year (year 6) or beyond - always eligible
         if ($currentYear >= 6) {
             return true;
         }
         
         // Check if next year has no salary (eligible for renegotiation)
+        // Safe to access: currentYear is 0-5, so nextYear is 1-6 which all exist as properties
         $nextYearProperty = "contractYear" . ($currentYear + 1) . "Salary";
         return $playerData->$nextYearProperty == 0;
     }

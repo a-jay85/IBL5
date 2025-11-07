@@ -10,6 +10,12 @@ namespace Player;
  */
 class Player
 {
+    /**
+     * Properties to exclude from automatic synchronization from PlayerData
+     * These properties are not synchronized because they're not used or have special handling
+     */
+    private const EXCLUDED_SYNC_PROPERTIES = ['plr'];
+
     protected $db;
     protected $playerData;
     protected $repository;
@@ -185,8 +191,8 @@ class Player
         
         foreach ($properties as $property) {
             $propertyName = $property->getName();
-            // Skip 'plr' property as it's not used in Player facade
-            if ($propertyName === 'plr') {
+            // Skip excluded properties (defined in EXCLUDED_SYNC_PROPERTIES constant)
+            if (in_array($propertyName, self::EXCLUDED_SYNC_PROPERTIES)) {
                 continue;
             }
             $this->$propertyName = $this->playerData->$propertyName;

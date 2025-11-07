@@ -13,7 +13,7 @@ class PlayerContractCalculator
     /**
      * Calculate the current season salary based on contract year
      */
-    public function getCurrentSeasonSalary(PlayerData $playerData): ?int
+    public function getCurrentSeasonSalary(PlayerData $playerData): int
     {
         return $this->getSalaryForYear($playerData, $playerData->contractCurrentYear);
     }
@@ -21,7 +21,7 @@ class PlayerContractCalculator
     /**
      * Calculate the next season's salary
      */
-    public function getNextSeasonSalary(PlayerData $playerData): ?int
+    public function getNextSeasonSalary(PlayerData $playerData): int
     {
         return $this->getSalaryForYear($playerData, $playerData->contractCurrentYear + 1);
     }
@@ -29,19 +29,19 @@ class PlayerContractCalculator
     /**
      * Get salary for a specific contract year
      */
-    private function getSalaryForYear(PlayerData $playerData, int $year): ?int
+    private function getSalaryForYear(PlayerData $playerData, int $year): int
     {
         // Year 0 defaults to year 1
         if ($year == 0) {
             return $playerData->contractYear1Salary;
         }
         
-        // Year 7 or beyond means no salary
+        // Year 7 or beyond means no salary (off the books)
         if ($year >= 7) {
             return 0;
         }
         
-        // Dynamically access the contract year property
+        // Dynamically access the contract year property (years 1-6)
         $propertyName = "contractYear" . $year . "Salary";
         return $playerData->$propertyName;
     }

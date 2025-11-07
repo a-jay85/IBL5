@@ -177,7 +177,8 @@ class PlayerRepository
      */
     private function getOptionalStrippedValue(array $row, string $key): ?string
     {
-        return (isset($row[$key]) && $row[$key] !== '') ? stripslashes($row[$key]) : null;
+        $value = $row[$key] ?? null;
+        return ($value !== null && $value !== '') ? stripslashes($value) : null;
     }
 
     /**

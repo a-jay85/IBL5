@@ -112,11 +112,34 @@ SHOW KEYS FROM ibl_box_scores;
 -- 2. Create one partition per year in your data range (copy the pattern from ibl_hist above)
 -- 3. Review foreign keys and indexes for compatibility
 -- Note: Commented out - requires careful review before enabling
+--
+-- Example pattern (add all years between min and max from your data):
 -- ALTER TABLE ibl_box_scores PARTITION BY RANGE (YEAR(Date)) (
 --   PARTITION p_box_2000 VALUES LESS THAN (2001),
 --   PARTITION p_box_2001 VALUES LESS THAN (2002),
 --   PARTITION p_box_2002 VALUES LESS THAN (2003),
---   ... add one partition per year following the ibl_hist pattern above ...
+--   PARTITION p_box_2003 VALUES LESS THAN (2004),
+--   PARTITION p_box_2004 VALUES LESS THAN (2005),
+--   PARTITION p_box_2005 VALUES LESS THAN (2006),
+--   PARTITION p_box_2006 VALUES LESS THAN (2007),
+--   PARTITION p_box_2007 VALUES LESS THAN (2008),
+--   PARTITION p_box_2008 VALUES LESS THAN (2009),
+--   PARTITION p_box_2009 VALUES LESS THAN (2010),
+--   PARTITION p_box_2010 VALUES LESS THAN (2011),
+--   PARTITION p_box_2011 VALUES LESS THAN (2012),
+--   PARTITION p_box_2012 VALUES LESS THAN (2013),
+--   PARTITION p_box_2013 VALUES LESS THAN (2014),
+--   PARTITION p_box_2014 VALUES LESS THAN (2015),
+--   PARTITION p_box_2015 VALUES LESS THAN (2016),
+--   PARTITION p_box_2016 VALUES LESS THAN (2017),
+--   PARTITION p_box_2017 VALUES LESS THAN (2018),
+--   PARTITION p_box_2018 VALUES LESS THAN (2019),
+--   PARTITION p_box_2019 VALUES LESS THAN (2020),
+--   PARTITION p_box_2020 VALUES LESS THAN (2021),
+--   PARTITION p_box_2021 VALUES LESS THAN (2022),
+--   PARTITION p_box_2022 VALUES LESS THAN (2023),
+--   PARTITION p_box_2023 VALUES LESS THAN (2024),
+--   PARTITION p_box_2024 VALUES LESS THAN (2025),
 --   PARTITION p_box_2025 VALUES LESS THAN (2026),
 --   PARTITION p_box_future VALUES LESS THAN MAXVALUE
 -- );

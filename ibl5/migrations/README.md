@@ -109,9 +109,147 @@ Implements:
 
 ### Execution Steps
 
-**Note:** Phases 1 and 2 are already completed and implemented in production. The steps below are for Phase 3.
+**Note:** Phases 1, 2, and 3 are already completed and implemented in production.
 
-#### For Phase 3 (API Preparation) - NEXT STEP
+#### For Phase 4 (Data Type Refinements) - NEXT STEP
+
+**IMPORTANT:** Requires MySQL 8.0 or higher for CHECK constraints
+
+1. **Verify MySQL Version:**
+   ```bash
+   mysql -u username -p -e "SELECT VERSION();"
+   ```
+   Ensure version is 8.0 or higher for CHECK constraint support.
+
+2. **Connect to database:**
+   ```bash
+   mysql -u username -p database_name
+   ```
+
+3. **Verify Prerequisites:**
+   ```sql
+   -- Verify InnoDB tables exist
+   SELECT COUNT(*) FROM information_schema.TABLES 
+   WHERE TABLE_SCHEMA = DATABASE() 
+   AND TABLE_NAME LIKE 'ibl_%' 
+   AND ENGINE = 'InnoDB';
+   
+   -- Verify foreign keys exist (should be 20+)
+   SELECT COUNT(*) FROM information_schema.KEY_COLUMN_USAGE
+   WHERE TABLE_SCHEMA = DATABASE()
+   AND REFERENCED_TABLE_NAME IS NOT NULL;
+   
+   -- Verify timestamps exist (should be 19+ tables)
+   SELECT COUNT(DISTINCT TABLE_NAME) as tables_with_timestamps
+   FROM INFORMATION_SCHEMA.COLUMNS 
+   WHERE TABLE_SCHEMA = DATABASE() 
+     AND COLUMN_NAME IN ('created_at', 'updated_at')
+     AND TABLE_NAME LIKE 'ibl_%';
+   ```
+
+4. **Run Phase 4 migration:**
+   ```bash
+   mysql -u username -p database_name < 004_data_type_refinements.sql
+   ```
+   
+   Expected time: 2-3 hours depending on table sizes
+
+5. **Verify Phase 4:**
+   ```sql
+   -- Verify data type changes (should show TINYINT, SMALLINT, etc.)
+   SELECT 
+     COLUMN_NAME, 
+     DATA_TYPE, 
+     COLUMN_TYPE,
+     IS_NULLABLE
+   FROM INFORMATION_SCHEMA.COLUMNS
+   WHERE TABLE_SCHEMA = DATABASE()
+     AND TABLE_NAME = 'ibl_plr'
+     AND COLUMN_NAME IN ('age', 'peak', 'stats_gm', 'stats_min', 'sta', 'oo')
+   ORDER BY COLUMN_NAME;
+   
+   -- Verify CHECK constraints were added (should be 30+)
+   SELECT 
+     COUNT(*) as check_constraints
+   FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+   WHERE TABLE_SCHEMA = DATABASE()
+     AND CONSTRAINT_TYPE = 'CHECK'
+     AND TABLE_NAME LIKE 'ibl_%';
+   
+   -- List all CHECK constraints
+   SELECT 
+     TABLE_NAME,
+     CONSTRAINT_NAME
+   FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+   WHERE TABLE_SCHEMA = DATABASE()
+     AND CONSTRAINT_TYPE = 'CHECK'
+     AND TABLE_NAME LIKE 'ibl_%'
+   ORDER BY TABLE_NAME, CONSTRAINT_NAME;
+   
+   -- Verify ENUM types were added
+   SELECT 
+     TABLE_NAME,
+     COLUMN_NAME,
+     COLUMN_TYPE
+   FROM INFORMATION_SCHEMA.COLUMNS
+   WHERE TABLE_SCHEMA = DATABASE()
+     AND DATA_TYPE = 'enum'
+     AND TABLE_NAME LIKE 'ibl_%'
+   ORDER BY TABLE_NAME, COLUMN_NAME;
+   
+   -- Verify DECIMAL types for monetary values
+   SELECT 
+     TABLE_NAME,
+     COLUMN_NAME,
+     COLUMN_TYPE,
+     NUMERIC_PRECISION,
+     NUMERIC_SCALE
+   FROM INFORMATION_SCHEMA.COLUMNS
+   WHERE TABLE_SCHEMA = DATABASE()
+     AND DATA_TYPE = 'decimal'
+     AND TABLE_NAME LIKE 'ibl_%'
+     AND COLUMN_NAME LIKE 'cy%'
+   ORDER BY TABLE_NAME, COLUMN_NAME;
+   ```
+
+6. **Test Data Validation:**
+   ```sql
+   -- Test CHECK constraints (these should fail)
+   -- Don't run these on production without reverting immediately!
+   
+   -- This should fail (age too low):
+   -- UPDATE ibl_plr SET age = 15 WHERE pid = 1;
+   
+   -- This should fail (rating too high):
+   -- UPDATE ibl_plr SET sta = 150 WHERE pid = 1;
+   
+   -- This should fail (pct out of range):
+   -- UPDATE ibl_standings SET pct = 1.500 WHERE tid = 1;
+   
+   -- Verify constraints are working by checking constraint names
+   SELECT 
+     CONSTRAINT_NAME,
+     CHECK_CLAUSE
+   FROM INFORMATION_SCHEMA.CHECK_CONSTRAINTS
+   WHERE CONSTRAINT_SCHEMA = DATABASE()
+     AND CONSTRAINT_NAME LIKE 'chk_%'
+   ORDER BY CONSTRAINT_NAME
+   LIMIT 10;
+   ```
+
+7. **Monitor Application:**
+   - Test player pages load correctly
+   - Test statistics display properly
+   - Test financial/contract information displays correctly
+   - Verify no application errors from type changes
+   - Monitor query performance (should be slightly improved)
+
+---
+
+#### Historical Reference: Phase 3 (Already Completed)
+
+<details>
+<summary>Phase 3 Execution (Completed)</summary>
 
 1. **Connect to database:**
    ```bash
@@ -168,6 +306,8 @@ Implements:
    - Verify ETag generation using `updated_at` timestamps
    - Test view-based API endpoints
    - Monitor view query performance
+
+</details>
 
 ---
 
@@ -349,6 +489,129 @@ mysql -u username -p database_name < backup_20241031_120000.sql
 
 **Note:** Rolling back Phase 1 requires full database restore as table engine conversions cannot be easily reversed without data loss.
 
+### Rollback Phase 4 (Data Type Refinements)
+
+If Phase 4 causes issues, changes can be reverted individually:
+
+```sql
+-- Remove CHECK constraints (example - repeat for each constraint)
+ALTER TABLE ibl_plr DROP CONSTRAINT chk_plr_age;
+ALTER TABLE ibl_plr DROP CONSTRAINT chk_plr_peak;
+ALTER TABLE ibl_standings DROP CONSTRAINT chk_standings_pct;
+-- ... etc for other constraints
+
+-- Revert ENUM to VARCHAR
+ALTER TABLE ibl_plr MODIFY pos VARCHAR(4) DEFAULT '';
+ALTER TABLE ibl_standings MODIFY conference VARCHAR(7) DEFAULT '';
+ALTER TABLE ibl_draft_class MODIFY pos CHAR(2) NOT NULL DEFAULT '';
+
+-- Revert DECIMAL to INT for monetary values
+ALTER TABLE ibl_plr 
+  MODIFY cy INT DEFAULT 0,
+  MODIFY cyt INT DEFAULT 0,
+  MODIFY cy1 INT DEFAULT 0,
+  MODIFY cy2 INT DEFAULT 0,
+  MODIFY cy3 INT DEFAULT 0,
+  MODIFY cy4 INT DEFAULT 0,
+  MODIFY cy5 INT DEFAULT 0,
+  MODIFY cy6 INT DEFAULT 0;
+
+-- Revert integer sizes (example - repeat for affected columns)
+ALTER TABLE ibl_plr 
+  MODIFY stats_gm INT DEFAULT 0,
+  MODIFY stats_min INT DEFAULT 0,
+  MODIFY age INT DEFAULT NULL,
+  MODIFY peak INT DEFAULT NULL;
+-- ... etc for other columns
+```
+
+**Note:** Data type changes are generally safe to rollback, but:
+- Test in development first
+- Ensure no data will be truncated (e.g., values > TINYINT max 255)
+- Full restore from backup is safest for complete rollback
+- CHECK constraints can be dropped without affecting existing data
+
+#### 5. CHECK Constraint Violations (Phase 4)
+
+**Error:** "Check constraint violation"
+
+**Cause:** Existing data violates new CHECK constraints, or application tries to insert invalid data
+
+**Solution:**
+```sql
+-- Find data that violates age constraint
+SELECT pid, name, age FROM ibl_plr WHERE age < 18 OR age > 50;
+
+-- Find data that violates peak constraint
+SELECT pid, name, age, peak FROM ibl_plr WHERE peak < age;
+
+-- Find data that violates rating constraints
+SELECT pid, name, sta FROM ibl_plr WHERE sta > 100;
+
+-- Fix data before running migration, or temporarily drop constraint
+ALTER TABLE ibl_plr DROP CONSTRAINT chk_plr_age;
+-- Fix data
+UPDATE ibl_plr SET age = 18 WHERE age < 18;
+-- Re-add constraint
+ALTER TABLE ibl_plr ADD CONSTRAINT chk_plr_age CHECK (age IS NULL OR (age >= 18 AND age <= 50));
+```
+
+#### 6. ENUM Value Issues (Phase 4)
+
+**Error:** "Data truncated for column 'pos'"
+
+**Cause:** Existing data contains values not in ENUM list
+
+**Solution:**
+```sql
+-- Find positions not in ENUM list
+SELECT DISTINCT pos FROM ibl_plr 
+WHERE pos NOT IN ('PG', 'SG', 'SF', 'PF', 'C', 'G', 'F', 'GF', '');
+
+-- Update invalid positions to empty string or correct value
+UPDATE ibl_plr SET pos = '' WHERE pos NOT IN ('PG', 'SG', 'SF', 'PF', 'C', 'G', 'F', 'GF', '');
+```
+
+#### 7. Data Type Overflow (Phase 4)
+
+**Error:** "Out of range value for column"
+
+**Cause:** Existing data exceeds new smaller integer type limits
+
+**Solution:**
+```sql
+-- Check for values that exceed TINYINT UNSIGNED (255)
+SELECT pid, name, sta FROM ibl_plr WHERE sta > 255;
+SELECT pid, name, PGDepth FROM ibl_plr WHERE PGDepth > 255;
+
+-- Check for values that exceed SMALLINT UNSIGNED (65,535)
+SELECT pid, name, stats_gm FROM ibl_plr WHERE stats_gm > 65535;
+
+-- If found, either:
+-- 1. Use larger data type for that column
+-- 2. Clean/cap the data
+UPDATE ibl_plr SET sta = 100 WHERE sta > 100;
+```
+
+#### 8. DECIMAL Precision Issues (Phase 4)
+
+**Issue:** Contract values appear truncated or have unexpected decimals
+
+**Cause:** INT to DECIMAL conversion with existing large values
+
+**Solution:**
+```sql
+-- Check for contract values that might be affected
+SELECT pid, name, cy, cy1, cy2 FROM ibl_plr 
+WHERE cy > 99999999 OR cy1 > 99999999 OR cy2 > 99999999;
+
+-- If values are stored in cents rather than dollars, divide by 100
+-- UPDATE ibl_plr SET cy = cy / 100, cy1 = cy1 / 100, cy2 = cy2 / 100;
+
+-- Verify display is correct
+SELECT name, FORMAT(cy, 2) as salary FROM ibl_plr WHERE cy > 0 LIMIT 10;
+```
+
 ## Monitoring
 
 After migrations, monitor:
@@ -455,19 +718,65 @@ The database is fully prepared for production API deployment with:
 - Efficient caching (Timestamps)
 - Simplified queries (Database Views)
 
+### 004_data_type_refinements.sql (Phase 4) 🔄 READY TO IMPLEMENT
+**Priority:** Medium (Data Quality & Validation)  
+**Estimated Time:** 2-3 hours  
+**Risk Level:** Low  
+**Status:** Migration file prepared, ready for implementation
+
+**Prerequisites:**
+- Phase 1, 2, and 3 must be completed
+- InnoDB tables with foreign keys and timestamps in place
+- MySQL 8.0 or higher (for CHECK constraints)
+
+Implements:
+- **Part 1:** Complete data type optimizations for all tables
+  - Integer size optimizations (TINYINT, SMALLINT, MEDIUMINT)
+  - Reduces storage requirements for statistics, ratings, and counters
+  - Over 200+ column optimizations across all core tables
+  
+- **Part 2:** Convert monetary values to DECIMAL type
+  - All salary/contract columns (cy, cy1-cy6) to DECIMAL(10,2)
+  - Accurate financial calculations
+  - Prevents floating-point precision errors
+  
+- **Part 3:** Implement ENUM types for fixed value lists
+  - Player positions (PG, SG, SF, PF, C, G, F, GF)
+  - Conference (Eastern, Western)
+  - Data validation at database level
+  
+- **Part 4:** Add CHECK constraints for data validation (MySQL 8.0+)
+  - Age constraints (18-50 years)
+  - Peak age validation (peak >= age)
+  - Winning percentage bounds (0.000-1.000)
+  - Rating ranges (0-100)
+  - Contract value limits
+  - Statistics validation
+  
+- **Part 5:** Add NOT NULL constraints for required fields
+  - Player name, position, team ID
+  - Ensures data integrity
+
+**Benefits:**
+- ✅ Reduced storage requirements (30-50% for statistics columns)
+- ✅ Better query optimization from smaller data types
+- ✅ Accurate financial calculations with DECIMAL
+- ✅ Data validation at database level prevents invalid data
+- ✅ Self-documenting schema with ENUM types
+- ✅ Improved data quality and integrity
+- ✅ Foundation for robust API data validation
+
+**Impact:**
+- Storage savings: Estimated 30-50% reduction in table sizes
+- Query performance: 10-20% improvement from smaller indexes
+- Data quality: Invalid data prevented at database level
+- API reliability: Better data validation for API responses
+
 ### 📋 Future Phases
 
-After Phase 3 is complete, the next priority improvements are:
+After Phase 4 is complete, the next priority improvements are:
 
-1. **Phase 4:** Data Type Refinements (Priority 2.3 - Remaining Items)
-   - Complete data type optimizations for all tables
-   - Add CHECK constraints for data validation (MySQL 8.0+)
-   - Implement ENUM types for fixed value lists (positions, conferences, etc.)
-   - Convert monetary values to DECIMAL type
-   - **Estimated Time:** 2-3 days
-   - **Risk Level:** Low
-
-2. **Phase 5:** Advanced Optimization (Priorities 5.2, 5.3)
+1. **Phase 5:** Advanced Optimization (Priorities 5.2, 5.3)
    - Table partitioning for historical data (ibl_hist, ibl_box_scores)
    - Additional composite indexes based on actual usage patterns
    - Column size optimization to reduce storage
@@ -475,7 +784,7 @@ After Phase 3 is complete, the next priority improvements are:
    - **Estimated Time:** 3-5 days
    - **Risk Level:** Medium
 
-3. **Phase 6:** Schema Cleanup (Priorities 3.1, 3.2)
+2. **Phase 6:** Schema Cleanup (Priorities 3.1, 3.2)
    - Legacy PhpNuke table evaluation and archival
    - Schema normalization (depth charts, career stats)
    - Separate legacy and active tables
@@ -483,7 +792,7 @@ After Phase 3 is complete, the next priority improvements are:
    - **Estimated Time:** 3-5 days
    - **Risk Level:** Medium
 
-4. **Phase 7:** Naming Convention Standardization (Priority 2.2)
+3. **Phase 7:** Naming Convention Standardization (Priority 2.2)
    - Standardize column naming to snake_case
    - Rename ID columns to consistent *_id pattern
    - Remove reserved word column names

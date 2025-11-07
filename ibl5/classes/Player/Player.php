@@ -108,47 +108,39 @@ class Player
     public static function withPlayerID($db, int $playerID)
     {
         $instance = new self();
-        $instance->loadByID($db, $playerID);
+        $instance->initialize($db);
+        $instance->playerData = $instance->repository->loadByID($playerID);
+        $instance->syncPropertiesFromPlayerData();
         return $instance;
     }
 
     public static function withPlrRow($db, array $plrRow)
     {
         $instance = new self();
-        $instance->fill($db, $plrRow);
+        $instance->initialize($db);
+        $instance->playerData = $instance->repository->fillFromCurrentRow($plrRow);
+        $instance->syncPropertiesFromPlayerData();
         return $instance;
     }
 
     public static function withHistoricalPlrRow($db, array $plrRow)
     {
         $instance = new self();
-        $instance->fillHistorical($db, $plrRow);
+        $instance->initialize($db);
+        $instance->playerData = $instance->repository->fillFromHistoricalRow($plrRow);
+        $instance->syncPropertiesFromPlayerData();
         return $instance;
     }
 
-    protected function loadByID($db, int $playerID)
+    /**
+     * Initialize the Player instance with database and repository
+     */
+    protected function initialize($db): void
     {
         $this->db = $db;
         $this->repository = new PlayerRepository($db);
-        $this->playerData = $this->repository->loadByID($playerID);
-        $this->syncPropertiesFromPlayerData();
     }
 
-    protected function fill($db, array $plrRow)
-    {
-        $this->db = $db;
-        $this->repository = new PlayerRepository($db);
-        $this->playerData = $this->repository->fillFromCurrentRow($plrRow);
-        $this->syncPropertiesFromPlayerData();
-    }
-
-    protected function fillHistorical($db, array $plrRow)
-    {
-        $this->db = $db;
-        $this->repository = new PlayerRepository($db);
-        $this->playerData = $this->repository->fillFromHistoricalRow($plrRow);
-        $this->syncPropertiesFromPlayerData();
-    }
 
     /**
      * Sync all public properties from PlayerData for backward compatibility

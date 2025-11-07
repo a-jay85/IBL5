@@ -38,16 +38,50 @@ class PlayerRepository
     {
         $playerData = new PlayerData();
 
+        // Basic player information
+        $this->mapBasicFields($playerData, $plrRow);
+        
+        // Ratings - use helper to map array of field pairs
+        $this->mapRatingsFromCurrentRow($playerData, $plrRow);
+        
+        // Free agency preferences
+        $this->mapFreeAgencyFields($playerData, $plrRow);
+        
+        // Contract information
+        $this->mapContractFields($playerData, $plrRow);
+        
+        // Draft information
+        $this->mapDraftFields($playerData, $plrRow);
+        
+        // Physical attributes
+        $this->mapPhysicalFields($playerData, $plrRow);
+        
+        // Status fields
+        $this->mapStatusFields($playerData, $plrRow);
+
+        return $playerData;
+    }
+
+    /**
+     * Map basic player fields
+     */
+    private function mapBasicFields(PlayerData $playerData, array $plrRow): void
+    {
         $playerData->playerID = $plrRow['pid'];
         $playerData->ordinal = $plrRow['ordinal'];
-        $playerData->name = stripslashes($plrRow['name']); // Remove SQL escaping
-        $playerData->nickname = (isset($plrRow['nickname']) && $plrRow['nickname'] !== '') ? stripslashes($plrRow['nickname']) : null; // Remove SQL escaping
+        $playerData->name = stripslashes($plrRow['name']);
+        $playerData->nickname = $this->getOptionalStrippedValue($plrRow, 'nickname');
         $playerData->age = $plrRow['age'];
-
         $playerData->teamID = $plrRow['tid'];
-        $playerData->teamName = stripslashes($plrRow['teamname']); // Remove SQL escaping
+        $playerData->teamName = stripslashes($plrRow['teamname']);
         $playerData->position = $plrRow['pos'];
-        
+    }
+
+    /**
+     * Map rating fields from current player row
+     */
+    private function mapRatingsFromCurrentRow(PlayerData $playerData, array $plrRow): void
+    {
         $playerData->ratingFieldGoalAttempts = $plrRow['r_fga'];
         $playerData->ratingFieldGoalPercentage = $plrRow['r_fgp'];
         $playerData->ratingFreeThrowAttempts = $plrRow['r_fta'];
@@ -74,13 +108,25 @@ class PlayerRepository
         $playerData->ratingTalent = $plrRow['talent'];
         $playerData->ratingSkill = $plrRow['skill'];
         $playerData->ratingIntangibles = $plrRow['intangibles'];
+    }
 
+    /**
+     * Map free agency preference fields
+     */
+    private function mapFreeAgencyFields(PlayerData $playerData, array $plrRow): void
+    {
         $playerData->freeAgencyLoyalty = $plrRow['loyalty'];
         $playerData->freeAgencyPlayingTime = $plrRow['playingTime'];
         $playerData->freeAgencyPlayForWinner = $plrRow['winner'];
         $playerData->freeAgencyTradition = $plrRow['tradition'];
         $playerData->freeAgencySecurity = $plrRow['security'];
+    }
 
+    /**
+     * Map contract fields
+     */
+    private function mapContractFields(PlayerData $playerData, array $plrRow): void
+    {
         $playerData->yearsOfExperience = $plrRow['exp'];
         $playerData->birdYears = $plrRow['bird'];
         $playerData->contractCurrentYear = $plrRow['cy'];
@@ -91,25 +137,48 @@ class PlayerRepository
         $playerData->contractYear4Salary = $plrRow['cy4'];
         $playerData->contractYear5Salary = $plrRow['cy5'];
         $playerData->contractYear6Salary = $plrRow['cy6'];
-    
+    }
+
+    /**
+     * Map draft fields
+     */
+    private function mapDraftFields(PlayerData $playerData, array $plrRow): void
+    {
         $playerData->draftYear = $plrRow['draftyear'];
         $playerData->draftRound = $plrRow['draftround'];
         $playerData->draftPickNumber = $plrRow['draftpickno'];
-        $playerData->draftTeamOriginalName = (isset($plrRow['draftedby']) && $plrRow['draftedby'] !== '') ? stripslashes($plrRow['draftedby']) : null; // Remove SQL escaping
-        $playerData->draftTeamCurrentName = (isset($plrRow['draftedbycurrentname']) && $plrRow['draftedbycurrentname'] !== '') ? stripslashes($plrRow['draftedbycurrentname']) : null; // Remove SQL escaping
-        $playerData->collegeName = (isset($plrRow['college']) && $plrRow['college'] !== '') ? stripslashes($plrRow['college']) : null; // Remove SQL escaping
-    
-        $playerData->daysRemainingForInjury = $plrRow['injured'];
-    
+        $playerData->draftTeamOriginalName = $this->getOptionalStrippedValue($plrRow, 'draftedby');
+        $playerData->draftTeamCurrentName = $this->getOptionalStrippedValue($plrRow, 'draftedbycurrentname');
+        $playerData->collegeName = $this->getOptionalStrippedValue($plrRow, 'college');
+    }
+
+    /**
+     * Map physical attribute fields
+     */
+    private function mapPhysicalFields(PlayerData $playerData, array $plrRow): void
+    {
         $playerData->heightFeet = $plrRow['htft'];
         $playerData->heightInches = $plrRow['htin'];
         $playerData->weightPounds = $plrRow['wt'];
-    
-        $playerData->isRetired = $plrRow['retired'];
-    
-        $playerData->timeDroppedOnWaivers = $plrRow['droptime'];
+    }
 
-        return $playerData;
+    /**
+     * Map status fields
+     */
+    private function mapStatusFields(PlayerData $playerData, array $plrRow): void
+    {
+        $playerData->daysRemainingForInjury = $plrRow['injured'];
+        $playerData->isRetired = $plrRow['retired'];
+        $playerData->timeDroppedOnWaivers = $plrRow['droptime'];
+    }
+
+    /**
+     * Helper method to get optional string value with stripslashes, or null if not set/empty
+     */
+    private function getOptionalStrippedValue(array $row, string $key): ?string
+    {
+        $value = $row[$key] ?? null;
+        return ($value !== null && $value !== '') ? stripslashes($value) : null;
     }
 
     /**
@@ -119,13 +188,27 @@ class PlayerRepository
     {
         $playerData = new PlayerData();
 
+        // Basic historical player information
         $playerData->playerID = $plrRow['pid'];
         $playerData->historicalYear = $plrRow['year'];
-        $playerData->name = stripslashes($plrRow['name']); // Remove SQL escaping
-
-        $playerData->teamName = stripslashes($plrRow['team']); // Remove SQL escaping
+        $playerData->name = stripslashes($plrRow['name']);
+        $playerData->teamName = stripslashes($plrRow['team']);
         $playerData->teamID = $plrRow['teamid'];
         
+        // Ratings from historical row (note different column names)
+        $this->mapRatingsFromHistoricalRow($playerData, $plrRow);
+        
+        // Salary
+        $playerData->salaryJSB = $plrRow['salary'];
+
+        return $playerData;
+    }
+
+    /**
+     * Map rating fields from historical player row (different column names than current)
+     */
+    private function mapRatingsFromHistoricalRow(PlayerData $playerData, array $plrRow): void
+    {
         $playerData->ratingFieldGoalAttempts = $plrRow['r_2ga'];
         $playerData->ratingFieldGoalPercentage = $plrRow['r_2gp'];
         $playerData->ratingFreeThrowAttempts = $plrRow['r_fta'];
@@ -138,7 +221,6 @@ class PlayerRepository
         $playerData->ratingSteals = $plrRow['r_stl'];
         $playerData->ratingBlocks = $plrRow['r_blk'];
         $playerData->ratingTurnovers = $plrRow['r_tvr'];
-
         $playerData->ratingOutsideOffense = $plrRow['r_oo'];
         $playerData->ratingOutsideDefense = $plrRow['r_od'];
         $playerData->ratingDriveOffense = $plrRow['r_do'];
@@ -147,10 +229,6 @@ class PlayerRepository
         $playerData->ratingPostDefense = $plrRow['r_pd'];
         $playerData->ratingTransitionOffense = $plrRow['r_to'];
         $playerData->ratingTransitionDefense = $plrRow['r_td'];
-
-        $playerData->salaryJSB = $plrRow['salary'];
-
-        return $playerData;
     }
 
     /**

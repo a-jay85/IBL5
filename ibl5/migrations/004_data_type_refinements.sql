@@ -510,16 +510,16 @@ ALTER TABLE ibl_power
 -- ---------------------------------------------------------------------------
 -- Contract Value Constraints
 -- ---------------------------------------------------------------------------
--- Salary should be non-negative and reasonable (max ~50M per year)
+-- Salary should not be larger than hard cap limits
 ALTER TABLE ibl_plr
   ADD CONSTRAINT chk_plr_cy CHECK (cy >= 0 AND cy <= 6),
   ADD CONSTRAINT chk_plr_cyt CHECK (cyt >= 0 AND cyt <= 6),
-  ADD CONSTRAINT chk_plr_cy1 CHECK (cy1 >= 0 AND cy1 <= 7000),
-  ADD CONSTRAINT chk_plr_cy2 CHECK (cy2 >= 0 AND cy2 <= 7000),
-  ADD CONSTRAINT chk_plr_cy3 CHECK (cy3 >= 0 AND cy3 <= 7000),
-  ADD CONSTRAINT chk_plr_cy4 CHECK (cy4 >= 0 AND cy4 <= 7000),
-  ADD CONSTRAINT chk_plr_cy5 CHECK (cy5 >= 0 AND cy5 <= 7000),
-  ADD CONSTRAINT chk_plr_cy6 CHECK (cy6 >= 0 AND cy6 <= 7000);
+  ADD CONSTRAINT chk_plr_cy1 CHECK (cy1 >= -7000 AND cy1 <= 7000),
+  ADD CONSTRAINT chk_plr_cy2 CHECK (cy2 >= -7000 AND cy2 <= 7000),
+  ADD CONSTRAINT chk_plr_cy3 CHECK (cy3 >= -7000 AND cy3 <= 7000),
+  ADD CONSTRAINT chk_plr_cy4 CHECK (cy4 >= -7000 AND cy4 <= 7000),
+  ADD CONSTRAINT chk_plr_cy5 CHECK (cy5 >= -7000 AND cy5 <= 7000),
+  ADD CONSTRAINT chk_plr_cy6 CHECK (cy6 >= -7000 AND cy6 <= 7000);
 
 -- ---------------------------------------------------------------------------
 -- Team ID Constraints

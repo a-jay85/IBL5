@@ -42,43 +42,4 @@ class SeasonPhaseTest extends PHPUnit\Framework\TestCase
         $this->assertGreaterThanOrEqual(0, $result['cashSentToThem']);
         $this->assertGreaterThanOrEqual(0, $result['cashSentToMe']);
     }
-
-    /**
-     * Note about removed tests
-     * @group removed
-     */
-    public function testRemovedReflectionBasedTests()
-    {
-        // REMOVED TESTS that used ReflectionClass:
-        // - testCashConsiderationsUseCy2DuringOffseasonPhases()
-        // - testCashConsiderationsUseCy1DuringRegularSeason()
-        // - testTradeQueriesAreQueuedDuringOffseasonPhases()
-        // - testTradeQueriesExecuteImmediatelyDuringRegularSeason()
-        //
-        // WHY REMOVED:
-        // These tests used reflection to inject mock Season objects into private properties,
-        // which tests implementation details rather than observable behavior.
-        //
-        // HOW TO TEST THIS BEHAVIOR:
-        // Season phase-dependent behavior should be tested through integration tests
-        // where the actual season phase is set in the database/environment, and the 
-        // behavior is observed through public method outcomes.
-        
-        $this->markTestSkipped('Removed reflection-based tests following best practices');
-    }
-}
-
-/**
- * Mock Season class for testing
- */
-class MockSeason
-{
-    public $phase;
-    public $allowTrades = 'Yes';
-    public $allowWaivers = 'Yes';
-
-    public function __construct($db)
-    {
-        $this->phase = "Regular Season";
-    }
 }

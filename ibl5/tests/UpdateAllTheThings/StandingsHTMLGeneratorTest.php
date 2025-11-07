@@ -62,34 +62,4 @@ class StandingsHTMLGeneratorTest extends TestCase
         
         $this->assertNotEmpty($updateQueries, 'Should attempt to update standings page');
     }
-
-    /**
-     * @group standings-html
-     */
-    public function testBehaviorFocusedTestingNote()
-    {
-        // This test documents the refactoring that was done
-        // 
-        // REMOVED TESTS (13 tests using ReflectionClass):
-        // - Tests of private method assignGroupingsFor()
-        // - Tests of private method generateStandingsHeader()  
-        // - Tests of private method generateTeamRow()
-        //
-        // WHY REMOVED:
-        // These tests violated the principle of testing behaviors, not implementation.
-        // Private methods are implementation details that may change. Tests should
-        // focus on the public API and observable outcomes.
-        //
-        // HOW TO TEST THESE FEATURES NOW:
-        // If you need to verify specific HTML output features (headers, clinch indicators,
-        // records, streaks, etc.), test them through the public generateStandingsPage()
-        // method by capturing its output and inspecting the generated HTML.
-        //
-        // BENEFITS:
-        // - Tests are less brittle (survive refactoring)
-        // - Tests focus on what users/callers care about
-        // - Tests don't break when internal implementation changes
-        
-        $this->assertTrue(true, 'Test suite now follows behavior-driven testing principles');
-    }
 }

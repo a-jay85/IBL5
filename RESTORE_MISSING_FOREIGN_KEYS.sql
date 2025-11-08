@@ -15,6 +15,12 @@
 -- Note: tid = 0 means free agent, which may not exist in ibl_team_info
 -- We use RESTRICT to prevent accidental team deletions that would affect players
 
+-- IMPORTANT: Drop the CHECK constraint first, as it conflicts with the foreign key
+-- The foreign key provides stronger validation (ensures tid exists in ibl_team_info)
+-- rather than just checking if it's between 0 and 32
+ALTER TABLE ibl_plr 
+  DROP CONSTRAINT IF EXISTS chk_plr_tid;
+
 ALTER TABLE ibl_plr 
   ADD CONSTRAINT fk_plr_team 
   FOREIGN KEY (tid) REFERENCES ibl_team_info(teamid)
@@ -26,6 +32,12 @@ ALTER TABLE ibl_plr
 -- ---------------------------------------------------------------------------
 -- Ensures that the visiting team ID in the schedule references a valid team
 
+-- IMPORTANT: Drop the CHECK constraint first, as it conflicts with the foreign key
+-- The foreign key provides stronger validation (ensures Visitor exists in ibl_team_info)
+-- rather than just checking if it's between 1 and 32
+ALTER TABLE ibl_schedule
+  DROP CONSTRAINT IF EXISTS chk_schedule_visitor_id;
+
 ALTER TABLE ibl_schedule
   ADD CONSTRAINT fk_schedule_visitor
   FOREIGN KEY (Visitor) REFERENCES ibl_team_info(teamid)
@@ -36,6 +48,12 @@ ALTER TABLE ibl_schedule
 -- Foreign Key 3: Schedule Home Team (fk_schedule_home)
 -- ---------------------------------------------------------------------------
 -- Ensures that the home team ID in the schedule references a valid team
+
+-- IMPORTANT: Drop the CHECK constraint first, as it conflicts with the foreign key
+-- The foreign key provides stronger validation (ensures Home exists in ibl_team_info)
+-- rather than just checking if it's between 1 and 32
+ALTER TABLE ibl_schedule
+  DROP CONSTRAINT IF EXISTS chk_schedule_home_id;
 
 ALTER TABLE ibl_schedule
   ADD CONSTRAINT fk_schedule_home
@@ -147,6 +165,11 @@ ORDER BY CONSTRAINT_NAME;
 ALTER TABLE ibl_plr DROP FOREIGN KEY fk_plr_team;
 ALTER TABLE ibl_schedule DROP FOREIGN KEY fk_schedule_visitor;
 ALTER TABLE ibl_schedule DROP FOREIGN KEY fk_schedule_home;
+
+-- Optionally, re-add the CHECK constraints if you remove the foreign keys:
+ALTER TABLE ibl_plr ADD CONSTRAINT chk_plr_tid CHECK (tid >= 0 AND tid <= 32);
+ALTER TABLE ibl_schedule ADD CONSTRAINT chk_schedule_visitor_id CHECK (Visitor >= 1 AND Visitor <= 32);
+ALTER TABLE ibl_schedule ADD CONSTRAINT chk_schedule_home_id CHECK (Home >= 1 AND Home <= 32);
 */
 
 -- ============================================================================
@@ -158,4 +181,11 @@ ALTER TABLE ibl_schedule DROP FOREIGN KEY fk_schedule_home;
 -- 4. The tid field in ibl_plr was changed to SMALLINT UNSIGNED in Phase 4
 --    but still references ibl_team_info.teamid which is INT
 --    MySQL allows this as long as the data ranges are compatible
+-- 5. The following CHECK constraints are dropped before adding foreign keys
+--    because MySQL/MariaDB doesn't allow foreign keys on columns with CHECK constraints:
+--    - chk_plr_tid (on ibl_plr.tid)
+--    - chk_schedule_visitor_id (on ibl_schedule.Visitor)
+--    - chk_schedule_home_id (on ibl_schedule.Home)
+--    The foreign keys provide stronger validation anyway (ensures values exist in ibl_team_info)
+-- ============================================================================
 -- ============================================================================

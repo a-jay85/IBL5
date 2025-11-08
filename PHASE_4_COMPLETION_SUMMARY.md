@@ -37,6 +37,7 @@ The missing foreign keys likely occurred because:
 2. Phase 4 migration changed `ibl_schedule.Home` and `ibl_schedule.Visitor` from `INT` to `SMALLINT UNSIGNED`
 3. Foreign keys may have needed to be dropped temporarily to perform the data type changes
 4. Foreign keys were not re-established after the data type changes
+5. Phase 4 also added a CHECK constraint `chk_plr_tid` on the `tid` column, which conflicts with foreign keys in MySQL/MariaDB
 
 ## Solution Delivered
 
@@ -45,11 +46,13 @@ The missing foreign keys likely occurred because:
 
 This comprehensive SQL script includes:
 - ✅ ALTER TABLE statements to re-establish all 3 missing foreign keys
+- ✅ Drops the `chk_plr_tid` CHECK constraint before adding the foreign key (MySQL/MariaDB limitation)
 - ✅ Pre-execution verification queries to check data integrity
 - ✅ Detailed comments explaining each constraint
 - ✅ Post-execution verification queries
 - ✅ Rollback procedures if needed
 - ✅ Notes about data type compatibility (SMALLINT → INT references)
+- ✅ Explanation that the foreign key provides stronger validation than the CHECK constraint
 
 ### 2. Phase 5 Migration File
 **File:** `/ibl5/migrations/005_advanced_optimization.sql`

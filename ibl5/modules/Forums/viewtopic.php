@@ -816,11 +816,8 @@ for ($i = 0; $i < $total_posts; $i++) {
         $profile_img = '<a href="' . $temp_url . '"><img src="' . $images['icon_profile'] . '" alt="' . $lang['Read_profile'] . '" title="' . $lang['Read_profile'] . '" border="0" /></a>';
         $profile = '<a href="' . $temp_url . '">' . $lang['Read_profile'] . '</a>';
 
-        $temp_url = append_sid("privmsg.$phpEx?mode=post&amp;" . POST_USERS_URL . "=$poster_id");
-        if (is_active("Private_Messages")) {
-            $pm_img = '<a href="' . $temp_url . '"><img src="' . $images['icon_pm'] . '" alt="' . $lang['Send_private_message'] . '" title="' . $lang['Send_private_message'] . '" border="0" /></a>';
-            $pm = '<a href="' . $temp_url . '">' . $lang['Send_private_message'] . '</a>';
-        }
+        $pm_img = '';
+        $pm = '';
 
         if (!empty($postrow[$i]['user_viewemail']) || $is_auth['auth_mod']) {
             $email_uri = ($board_config['board_email_form']) ? append_sid("profile.$phpEx?mode=email&amp;" . POST_USERS_URL . '=' . $poster_id) : 'mailto:' . $postrow[$i]['user_email'];

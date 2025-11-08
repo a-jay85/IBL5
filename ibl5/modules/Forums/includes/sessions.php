@@ -527,9 +527,6 @@ function append_sid($url, $non_html_amp = false)
         $url = str_replace("?", "&", $url); // As we are already in nuke, change the ? to &
         $url = str_replace(".php", "", $url); //  Strip the .php from all the files,
         $url = "../../../modules.php?name=Forums&file=$url";
-    } else if ((mb_ereg("privmsg", $url)) && (!mb_ereg("highlight=privmsg", $url))) {
-        $url = str_replace("?", "&", $url); // As we are already in nuke, change the ? to &
-        $url = str_replace("privmsg.php", "modules.php?name=Private_Messages&file=index", $url); //  and put it back for the modules.php
     } else if ((mb_ereg("profile", $url)) && (!mb_ereg("highlight", $url) && !mb_ereg("profile", $url))) {
         $url = str_replace("?", "&", $url); // As we are already in nuke, change the ? to &
         $url = str_replace("profile.php", "modules.php?name=Forums&file=profile", $url); //  and put it back for the modules.php

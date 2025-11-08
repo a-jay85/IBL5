@@ -942,7 +942,7 @@ function edituser()
         CloseTable();
         echo "<br>";
         OpenTable();
-        nav();
+        Nuke\Navbar::nav();
         CloseTable();
         echo "<br>";
         if (!preg_match('#^http[s]?:\/\/#i', $userinfo['user_website'])) {
@@ -1290,7 +1290,7 @@ function edithome()
         CloseTable();
         echo "<br>";
         OpenTable();
-        nav();
+        Nuke\Navbar::nav();
         CloseTable();
         echo "<br>";
         if (empty($userinfo['theme'])) {
@@ -1356,7 +1356,7 @@ function chgtheme()
         CloseTable();
         echo "<br>";
         OpenTable();
-        nav();
+        Nuke\Navbar::nav();
         CloseTable();
         echo "<br>";
         OpenTable();
@@ -1470,7 +1470,7 @@ function editcomm()
         CloseTable();
         echo "<br>";
         OpenTable();
-        nav();
+        Nuke\Navbar::nav();
         CloseTable();
         echo "<br>";
         OpenTable();
@@ -1560,7 +1560,7 @@ function avatarlist($avatarcategory)
         $avatarcategory = htmlspecialchars($avatarcategory); //SecurityReason Fix 2005 - sp3x
         title("" . $avatarcategory . " Avatar Gallery");
         Opentable();
-        nav();
+        Nuke\Navbar::nav();
         CloseTable();
         echo "<br>";
         Opentable();
@@ -1626,7 +1626,7 @@ function avatarsave($avatar, $category)
         Nuke\Header::header();
         title("Avatar Selection Successful!");
         OpenTable();
-        nav();
+        Nuke\Navbar::nav();
         CloseTable();
         OpenTable();
         $category = stripslashes(check_html($category, "nohtml"));
@@ -1657,7 +1657,7 @@ function avatarlinksave($avatar)
         Nuke\Header::header();
         title("Avatar Selection Successful!");
         OpenTable();
-        nav();
+        Nuke\Navbar::nav();
         CloseTable();
         OpenTable();
         if (!preg_match("#^http:\/\/#i", $avatar)) {

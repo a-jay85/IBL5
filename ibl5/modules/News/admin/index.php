@@ -722,7 +722,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
             $res = $db->sql_query("select user_email from " . $user_prefix . "_users where username='$uname'");
             list($email) = $db->sql_fetchrow($res);
             $email = filter($email, "nohtml");
-            echo "&nbsp;&nbsp;<font class=\"content\">[ <a href=\"mailto:$email?Subject=Re: $subject\">" . _EMAIL . "</a> | <a href='modules.php?name=Your_Account&op=userinfo&username=$uname'>" . _PROFILE . "</a> | <a href=\"modules.php?name=Private_Messages&amp;mode=post&amp;u=$uid\">" . _SENDPM . "</a> ]</font>";
+            echo "&nbsp;&nbsp;<font class=\"content\">[ <a href=\"mailto:$email?Subject=Re: $subject\">" . _EMAIL . "</a> | <a href='modules.php?name=Your_Account&op=userinfo&username=$uname'>" . _PROFILE . "</a> ]</font>";
         }
         echo "</td></tr><tr><td><b>" . _TITLE . ":</b></td><td><input type=\"text\" name=\"subject\" size=\"70\" value=\"$subject\"></td></tr>";
         echo "<tr><td><b>" . _TOPIC . ":</b></td><td><select name=\"topic\">";
@@ -961,7 +961,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
             $res = $db->sql_query("select user_id, user_email from " . $user_prefix . "_users where username='$author'");
             list($pm_userid, $email) = $db->sql_fetchrow($res);
             $pm_userid = intval($pm_userid);
-            echo "&nbsp;&nbsp;<font class=\"content\">[ <a href=\"mailto:$email?Subject=Re: $subject\">" . _USER . "</a> | <a href='modules.php?name=Your_Account&op=userinfo&username=$author'>" . _PROFILE . "</a> | <a href=\"modules.php?name=Private_Messages&amp;mode=post&amp;u=$uid\">" . _SENDPM . "</a> ]</font>";
+            echo "&nbsp;&nbsp;<font class=\"content\">[ <a href=\"mailto:$email?Subject=Re: $subject\">" . _USER . "</a> | <a href='modules.php?name=Your_Account&op=userinfo&username=$author'>" . _PROFILE . "</a> ]</font>";
         }
         echo "</td></tr><tr><td><b>" . _TITLE . ":</b></td><td>"
             . "<input type=\"text\" name=\"subject\" size=\"70\" value=\"$subject\"></td></tr>"

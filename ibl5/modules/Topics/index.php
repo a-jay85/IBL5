@@ -24,7 +24,7 @@ OpenTable();
 
 global $db, $prefix, $tipath;
 $ThemeSel = get_theme();
-$sql = "SELECT t.topicid, t.topicimage, t.topictext, count(s.sid) AS stories, SUM(s.counter) AS reads FROM " . $prefix . "_topics t LEFT JOIN " . $prefix . "_stories s ON (s.topic = t.topicid) GROUP BY t.topicid, t.topicimage, t.topictext ORDER BY t.topictext";
+$sql = "SELECT t.topicid, t.topicimage, t.topictext, COUNT(s.sid) AS stories, COALESCE(SUM(s.counter), 0) AS total_reads FROM " . $prefix . "_topics t LEFT JOIN " . $prefix . "_stories s ON (s.topic = t.topicid) GROUP BY t.topicid, t.topicimage, t.topictext ORDER BY t.topictext";
 $result = $db->sql_query($sql);
 if ($db->sql_numrows($result) > 0) {
     $output = "<center><font class=\"title\"><b>" . _ACTIVETOPICS . "</b></font><br>\n";
@@ -51,7 +51,7 @@ if ($db->sql_numrows($result) > 0) {
         $output .= "<font class=\"content\">";
         $output .= "<big><strong>&middot;</strong></big> <b>" . _TOPIC . ":</b> $topictext<br>\n";
         $output .= "<big><strong>&middot;</strong></big> <b>" . _TOTNEWS . ":</b> " . $row['stories'] . "<br>\n";
-        $output .= "<big><strong>&middot;</strong></big> <b>" . _TOTREADS . ":</b> " . (isset($row['reads']) ? $row['reads'] : 0) . "</font>";
+        $output .= "<big><strong>&middot;</strong></big> <b>" . _TOTREADS . ":</b> " . (isset($row['total_reads']) ? $row['total_reads'] : 0) . "</font>";
         $output .= "</td><td valign=\"top\">";
         echo $output;
 

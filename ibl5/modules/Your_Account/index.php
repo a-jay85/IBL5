@@ -1018,26 +1018,6 @@ function edituser()
         }
         echo "</td></tr>";
 
-        echo "<tr><td bgcolor='$bgcolor2'><b>" . _PMNOTIFY . ":</b></td><td bgcolor='$bgcolor3'>";
-        if ($userinfo['user_notify_pm'] == 1) {
-            echo "<input type=\"radio\" name=\"user_notify_pm\" value=\"1\" checked>" . _YES . " &nbsp;"
-                . "<input type=\"radio\" name=\"user_notify_pm\" value=\"0\">" . _NO . "";
-        } elseif ($userinfo['user_notify_pm'] == 0) {
-            echo "<input type=\"radio\" name=\"user_notify_pm\" value=\"1\">" . _YES . " &nbsp;"
-                . "<input type=\"radio\" name=\"user_notify_pm\" value=\"0\" checked>" . _NO . "";
-        }
-        echo "</td></tr>";
-
-        echo "<tr><td bgcolor='$bgcolor2'><b>" . _POPPM . ":</b><br>" . _POPPMMSG . "</td><td bgcolor='$bgcolor3'>";
-        if ($userinfo['user_popup_pm'] == 1) {
-            echo "<input type=\"radio\" name=\"user_popup_pm\" value=\"1\" checked>" . _YES . " &nbsp;"
-                . "<input type=\"radio\" name=\"user_popup_pm\" value=\"0\">" . _NO . "";
-        } elseif ($userinfo['user_popup_pm'] == 0) {
-            echo "<input type=\"radio\" name=\"user_popup_pm\" value=\"1\">" . _YES . " &nbsp;"
-                . "<input type=\"radio\" name=\"user_popup_pm\" value=\"0\" checked>" . _NO . "";
-        }
-        echo "</td></tr>";
-
         echo "<tr><td bgcolor='$bgcolor2'><b>" . _ATTACHSIG . ":</b></td><td bgcolor='$bgcolor3'>";
         if ($userinfo['user_attachsig'] == 1) {
             echo "<input type=\"radio\" name=\"user_attachsig\" value=\"1\" checked>" . _YES . " &nbsp;"
@@ -1204,7 +1184,7 @@ function edituser()
     }
 }
 
-function saveuser($realname, $user_email, $femail, $user_website, $user_icq, $user_aim, $user_yim, $user_msnm, $user_from, $user_occ, $user_interests, $newsletter, $user_viewemail, $user_allow_viewonline, $user_notify, $user_notify_pm, $user_popup_pm, $user_attachsig, $user_allowbbcode, $user_allowhtml, $user_allowsmile, $user_timezone, $user_dateformat, $user_sig, $bio, $user_password, $vpass, $username, $user_id)
+function saveuser($realname, $user_email, $femail, $user_website, $user_icq, $user_aim, $user_yim, $user_msnm, $user_from, $user_occ, $user_interests, $newsletter, $user_viewemail, $user_allow_viewonline, $user_notify, $user_attachsig, $user_allowbbcode, $user_allowhtml, $user_allowsmile, $user_timezone, $user_dateformat, $user_sig, $bio, $user_password, $vpass, $username, $user_id)
 {
     global $user, $cookie, $userinfo, $EditedMessage, $user_prefix, $db, $module_name, $minpass;
     $user_password = htmlspecialchars(stripslashes($user_password));
@@ -1254,13 +1234,11 @@ function saveuser($realname, $user_email, $femail, $user_website, $user_icq, $us
                 $newsletter = intval($newsletter);
                 $user_allow_viewonline = intval($user_allow_viewonline);
                 $user_notify = intval($user_notify);
-                $user_notify_pm = intval($user_notify_pm);
-                $user_popup_pm = intval($user_popup_pm);
                 $user_allowbbcode = intval($user_allowbbcode);
                 $user_allowhtml = intval($user_allowhtml);
                 $user_allowsmile = intval($user_allowsmile);
                 $user_id = intval($user_id);
-                $db->sql_query("UPDATE " . $user_prefix . "_users SET name='$realname', user_email='$user_email', femail='$femail', user_website='$user_website', user_password='$user_password', bio='$bio', user_icq='$user_icq', user_occ='$user_occ', user_from='$user_from', user_interests='$user_interests', user_sig='$user_sig', user_aim='$user_aim', user_yim='$user_yim', user_msnm='$user_msnm', newsletter='$newsletter', user_viewemail='$user_viewemail', user_allow_viewonline='$user_allow_viewonline', user_notify='$user_notify', user_notify_pm='$user_notify_pm', user_popup_pm='$user_popup_pm', user_attachsig='$user_attachsig', user_allowbbcode='$user_allowbbcode', user_allowhtml='$user_allowhtml', user_allowsmile='$user_allowsmile', user_timezone='$user_timezone', user_dateformat='$user_dateformat' WHERE user_id='$user_id'");
+                $db->sql_query("UPDATE " . $user_prefix . "_users SET name='$realname', user_email='$user_email', femail='$femail', user_website='$user_website', user_password='$user_password', bio='$bio', user_icq='$user_icq', user_occ='$user_occ', user_from='$user_from', user_interests='$user_interests', user_sig='$user_sig', user_aim='$user_aim', user_yim='$user_yim', user_msnm='$user_msnm', newsletter='$newsletter', user_viewemail='$user_viewemail', user_allow_viewonline='$user_allow_viewonline', user_notify='$user_notify', user_attachsig='$user_attachsig', user_allowbbcode='$user_allowbbcode', user_allowhtml='$user_allowhtml', user_allowsmile='$user_allowsmile', user_timezone='$user_timezone', user_dateformat='$user_dateformat' WHERE user_id='$user_id'");
                 $sql = "SELECT user_id, username, user_password, storynum, umode, uorder, thold, noscore, ublockon, theme FROM " . $user_prefix . "_users WHERE username='$username' AND user_password='$user_password'";
                 $result = $db->sql_query($sql);
                 if ($db->sql_numrows($result) == 1) {
@@ -1271,7 +1249,7 @@ function saveuser($realname, $user_email, $femail, $user_website, $user_icq, $us
                 }
                 $db->sql_query("UNLOCK TABLES");
             } else {
-                $db->sql_query("UPDATE " . $user_prefix . "_users SET name='$realname', user_email='$user_email', femail='$femail', user_website='$user_website', bio='$bio', user_icq='$user_icq', user_occ='$user_occ', user_from='$user_from', user_interests='$user_interests', user_sig='$user_sig', user_aim='$user_aim', user_yim='$user_yim', user_msnm='$user_msnm', newsletter='$newsletter', user_viewemail='$user_viewemail', user_allow_viewonline='$user_allow_viewonline', user_notify='$user_notify', user_notify_pm='$user_notify_pm', user_popup_pm='$user_popup_pm', user_attachsig='$user_attachsig', user_allowbbcode='$user_allowbbcode', user_allowhtml='$user_allowhtml', user_allowsmile='$user_allowsmile', user_timezone='$user_timezone', user_dateformat='$user_dateformat' WHERE user_id='$user_id'");
+                $db->sql_query("UPDATE " . $user_prefix . "_users SET name='$realname', user_email='$user_email', femail='$femail', user_website='$user_website', bio='$bio', user_icq='$user_icq', user_occ='$user_occ', user_from='$user_from', user_interests='$user_interests', user_sig='$user_sig', user_aim='$user_aim', user_yim='$user_yim', user_msnm='$user_msnm', newsletter='$newsletter', user_viewemail='$user_viewemail', user_allow_viewonline='$user_allow_viewonline', user_notify='$user_notify', user_attachsig='$user_attachsig', user_allowbbcode='$user_allowbbcode', user_allowhtml='$user_allowhtml', user_allowsmile='$user_allowsmile', user_timezone='$user_timezone', user_dateformat='$user_dateformat' WHERE user_id='$user_id'");
             }
             Header("Location: modules.php?name=$module_name");
         }
@@ -1844,7 +1822,7 @@ switch ($op) {
         break;
 
     case "saveuser":
-        saveuser($realname, $user_email, $femail, $user_website, $user_icq, $user_aim, $user_yim, $user_msnm, $user_from, $user_occ, $user_interests, $newsletter, $user_viewemail, $user_allow_viewonline, $user_notify, $user_notify_pm, $user_popup_pm, $user_attachsig, $user_allowbbcode, $user_allowhtml, $user_allowsmile, $user_timezone, $user_dateformat, $user_sig, $bio, $user_password, $vpass, $username, $user_id);
+        saveuser($realname, $user_email, $femail, $user_website, $user_icq, $user_aim, $user_yim, $user_msnm, $user_from, $user_occ, $user_interests, $newsletter, $user_viewemail, $user_allow_viewonline, $user_notify, $user_attachsig, $user_allowbbcode, $user_allowhtml, $user_allowsmile, $user_timezone, $user_dateformat, $user_sig, $bio, $user_password, $vpass, $username, $user_id);
         break;
 
     case "edithome":

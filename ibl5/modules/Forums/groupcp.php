@@ -68,9 +68,8 @@ function generate_user_info(&$row, $date_format, $group_mod, &$from, &$posts, &$
     $profile_img = '<a href="' . $temp_url . '"><img src="' . $images['icon_profile'] . '" alt="' . $lang['Read_profile'] . '" title="' . $lang['Read_profile'] . '" border="0" /></a>';
     $profile = '<a href="' . $temp_url . '">' . $lang['Read_profile'] . '</a>';
 
-    $temp_url = append_sid("privmsg.$phpEx?mode=post&amp;" . POST_USERS_URL . "=" . $row['user_id']);
-    $pm_img = '<a href="' . $temp_url . '"><img src="' . $images['icon_pm'] . '" alt="' . $lang['Send_private_message'] . '" title="' . $lang['Send_private_message'] . '" border="0" /></a>';
-    $pm = '<a href="' . $temp_url . '">' . $lang['Send_private_message'] . '</a>';
+    $pm_img = '';
+    $pm = '';
 
     $www_img = ($row['user_website']) ? '<a href="' . $row['user_website'] . '" target="_userwww"><img src="' . $images['icon_www'] . '" alt="' . $lang['Visit_website'] . '" title="' . $lang['Visit_website'] . '" border="0" /></a>' : '';
     $www = ($row['user_website']) ? '<a href="' . $row['user_website'] . '" target="_userwww">' . $lang['Visit_website'] . '</a>' : '';

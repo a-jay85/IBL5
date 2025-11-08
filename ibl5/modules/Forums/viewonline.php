@@ -171,10 +171,6 @@ while ($row = $db->sql_fetchrow($result)) {
                     $location = $lang['Viewing_member_list'];
                     $location_url = "memberlist.$phpEx";
                     break;
-                case PAGE_PRIVMSGS:
-                    $location = $lang['Viewing_priv_msgs'];
-                    $location_url = "privmsg.$phpEx";
-                    break;
                 case PAGE_FAQ:
                     $location = $lang['Viewing_FAQ'];
                     $location_url = "faq.$phpEx";

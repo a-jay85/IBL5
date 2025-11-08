@@ -41,25 +41,11 @@ $who_online = "<div style='padding:10px'><div align=\"center\"><span class=\"con
 
 $content = "$who_online";
 
-if (is_user($user)) {
-    if (is_active("Private_Messages")) {
-        $row = $db->sql_fetchrow($db->sql_query("SELECT user_id FROM " . $user_prefix . "_users WHERE username='$uname'"));
-        $uid = intval($row['user_id']);
-        $newpm = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_bbprivmsgs WHERE privmsgs_to_userid='$uid' AND (privmsgs_type='5' OR privmsgs_type='1')"));
-    }
-}
-
 $row2 = $db->sql_fetchrow($db->sql_query("SELECT title FROM " . $prefix . "_blocks WHERE bkey='online'"));
 $title = filter($row2['title'], "nohtml");
 
 if (is_user($user)) {
     $content .= "<br>" . _YOUARELOGGED . " <b>$uname</b>.<br>";
-    if (is_active("Private_Messages")) {
-        $row3 = $db->sql_fetchrow($db->sql_query("SELECT user_id FROM " . $user_prefix . "_users WHERE username='$uname'"));
-        $uid = intval($row3['user_id']);
-        $numrow = $db->sql_numrows($db->sql_query("SELECT privmsgs_to_userid FROM " . $prefix . "_bbprivmsgs WHERE privmsgs_to_userid='$uid' AND (privmsgs_type='1' OR privmsgs_type='5' OR privmsgs_type='0')"));
-        $content .= "" . _YOUHAVE . " <a href=\"modules.php?name=Private_Messages\"><b>$numrow</b></a> " . _PRIVATEMSG . "";
-    }
     $content .= "</span></div>";
 } else {
     $content .= "<br>" . _YOUAREANON . "</span></div>";

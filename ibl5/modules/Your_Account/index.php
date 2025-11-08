@@ -885,9 +885,6 @@ function login($username, $user_password, $redirect, $mode, $f, $t, $random_num,
     $result = $db->sql_query($sql);
     $setinfo = $db->sql_fetchrow($result);
     $forward = mb_ereg_replace("redirect=", "", "$redirect");
-    if (mb_ereg("privmsg", $forward)) {
-        $pm_login = "active";
-    }
     if (($db->sql_numrows($result) == 1) and ($setinfo['user_id'] != 1) and (!empty($setinfo['user_password']))) {
         $dbpass = $setinfo['user_password'];
         $non_crypt_pass = $user_password;
@@ -916,15 +913,7 @@ function login($username, $user_password, $redirect, $mode, $f, $t, $random_num,
             $db->sql_query("DELETE FROM " . $prefix . "_session WHERE uname='$uname' AND guest='1'");
             $db->sql_query("UPDATE " . $prefix . "_users SET last_ip='$uname' WHERE username='$username'");
         }
-        if (empty($redirect)) {
-            Header("Location: modules.php?name=Your_Account&op=userinfo&bypass=1&username=$username");
-        } else if (empty($mode)) {
-            Header("Location: modules.php?name=Forums&file=$forward");
-        } else if (!empty($t)) {
-            Header("Location: modules.php?name=Forums&file=$forward&mode=$mode&t=$t");
-        } else {
-            Header("Location: modules.php?name=Forums&file=$forward&mode=$mode&f=$f");
-        }
+        Header("Location: modules.php?name=Your_Account&op=userinfo&bypass=1&username=$username");
     } else {
         Header("Location: modules.php?name=$module_name&stop=1");
     }
@@ -1157,9 +1146,9 @@ function edituser()
         }
         if ($board_config['allow_avatar_upload']) {
             echo "<tr><td bgcolor='$bgcolor2'><b>Upload Avatar from your machine:</b></td>"
-                . "<td bgcolor='$bgcolor3'><a href=\"modules.php?name=Forums&file=profile&mode=editprofile\"><b>Upload Through Forum Profile</b></a></td></tr>"
+                . "<td bgcolor='$bgcolor3'><b>Currently Disabled</b></td></tr>"
                 . "<tr><td bgcolor='$bgcolor2'><b>Upload Avatar from a URL:</b><br><SPAN class=gensmall>Enter the URL of the location containing the Avatar image and click on the submit button below, the Avatar image will be copied to this site.</SPAN></td>"
-                . "<td bgcolor='$bgcolor3'><a href=\"modules.php?name=Forums&file=profile&mode=editprofile\"><b>Upload Through Forum Profile</b></a></td></tr>";
+                . "<td bgcolor='$bgcolor3'><b>Currently Disabled</b></td></tr>";
         } else {
             echo "<tr><td bgcolor='$bgcolor2'><b>Upload Avatar from your machine:</b></td>"
                 . "<td bgcolor='$bgcolor3'><b>Currently Disabled</b></td></tr>"

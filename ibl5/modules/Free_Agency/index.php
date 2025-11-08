@@ -817,6 +817,57 @@ function negotiate($pid)
     echo "<b>$player_pos $player_name</b> - Contract Demands:
 	<br>";
 
+    $player = Player::withPlayerID($db, $pid);
+
+    echo "<center><table>
+        <tr>
+            <td align=center><b>2ga</b></td>
+            <td align=center><b>2gp</b></td>
+            <td align=center><b>fta</b></td>
+            <td align=center><b>ftp</b></td>
+            <td align=center><b>3ga</b></td>
+            <td align=center><b>3gp</b></td>
+            <td align=center><b>orb</b></td>
+            <td align=center><b>drb</b></td>
+            <td align=center><b>ast</b></td>
+            <td align=center><b>stl</b></td>
+            <td align=center><b>tvr</b></td>
+            <td align=center><b>blk</b></td>
+            <td align=center><b>foul</b></td>
+            <td align=center><b>oo</b></td>
+            <td align=center><b>do</b></td>
+            <td align=center><b>po</b></td>
+            <td align=center><b>to</b></td>
+            <td align=center><b>od</b></td>
+            <td align=center><b>dd</b></td>
+            <td align=center><b>pd</b></td>
+            <td align=center><b>td</b></td>
+        </tr>
+        <tr>
+            <td align=center>$player->ratingFieldGoalAttempts</td>
+            <td align=center>$player->ratingFieldGoalPercentage</td>
+            <td align=center>$player->ratingFreeThrowAttempts</td>
+            <td align=center>$player->ratingFreeThrowPercentage</td>
+            <td align=center>$player->ratingThreePointAttempts</td>
+            <td align=center>$player->ratingThreePointPercentage</td>
+            <td align=center>$player->ratingOffensiveRebounds</td>
+            <td align=center>$player->ratingDefensiveRebounds</td>
+            <td align=center>$player->ratingAssists</td>
+            <td align=center>$player->ratingSteals</td>
+            <td align=center>$player->ratingTurnovers</td>
+            <td align=center>$player->ratingBlocks</td>
+            <td align=center>$player->ratingFouls</td>
+            <td align=center>$player->ratingOutsideOffense</td>
+            <td align=center>$player->ratingDriveOffense</td>
+            <td align=center>$player->ratingPostOffense</td>
+            <td align=center>$player->ratingTransitionOffense</td>
+            <td align=center>$player->ratingOutsideDefense</td>
+            <td align=center>$player->ratingDriveDefense</td>
+            <td align=center>$player->ratingPostDefense</td>
+            <td align=center>$player->ratingTransitionDefense</td>
+        </tr>
+    </table></center><br>";
+
     $demands = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_demands WHERE name='$player_name'"));
     $dem1 = $demands['dem1'];
     $dem2 = $demands['dem2'];

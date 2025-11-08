@@ -106,11 +106,8 @@ if ($profiledata['user_rank']) {
     }
 }
 
-$temp_url = append_sid("privmsg.$phpEx?mode=post&amp;" . POST_USERS_URL . "=" . $profiledata['user_id']);
-if (is_active("Private_Messages")) {
-    $pm_img = '<a href="' . $temp_url . '"><img src="' . $images['icon_pm'] . '" alt="' . $lang['Send_private_message'] . '" title="' . $lang['Send_private_message'] . '" border="0" /></a>';
-    $pm = '<a href="' . $temp_url . '">' . $lang['Send_private_message'] . '</a>';
-}
+$pm_img = '';
+$pm = '';
 
 if (!empty($profiledata['user_viewemail']) || $userdata['user_level'] == ADMIN) {
     $email_uri = ($board_config['board_email_form']) ? append_sid("profile.$phpEx?mode=email&amp;" . POST_USERS_URL . '=' . $profiledata['user_id']) : 'mailto:' . $profiledata['user_email'];

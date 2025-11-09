@@ -353,7 +353,7 @@ CREATE TABLE `ibl_fa_offers` (
   KEY `idx_team` (`team`),
   CONSTRAINT `fk_faoffer_player` FOREIGN KEY (`name`) REFERENCES `ibl_plr` (`name`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_faoffer_team` FOREIGN KEY (`team`) REFERENCES `ibl_team_info` (`team_name`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -961,8 +961,7 @@ CREATE TABLE `ibl_plr` (
   CONSTRAINT `chk_plr_cy3` CHECK (`cy3` >= -7000 and `cy3` <= 7000),
   CONSTRAINT `chk_plr_cy4` CHECK (`cy4` >= -7000 and `cy4` <= 7000),
   CONSTRAINT `chk_plr_cy5` CHECK (`cy5` >= -7000 and `cy5` <= 7000),
-  CONSTRAINT `chk_plr_cy6` CHECK (`cy6` >= -7000 and `cy6` <= 7000),
-  CONSTRAINT `chk_plr_tid` CHECK (`tid` >= 0 and `tid` <= 32)
+  CONSTRAINT `chk_plr_cy6` CHECK (`cy6` >= -7000 and `cy6` <= 7000)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1957,6 +1956,21 @@ CREATE TABLE `nuke_bbprivmsgs` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `nuke_bbprivmsgs_text`
+--
+
+DROP TABLE IF EXISTS `nuke_bbprivmsgs_text`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `nuke_bbprivmsgs_text` (
+  `privmsgs_text_id` mediumint(8) unsigned NOT NULL DEFAULT 0,
+  `privmsgs_bbcode_uid` varchar(10) NOT NULL DEFAULT '0',
+  `privmsgs_text` mediumtext DEFAULT NULL,
+  PRIMARY KEY (`privmsgs_text_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `nuke_bbranks`
 --
 
@@ -2269,21 +2283,6 @@ CREATE TABLE `nuke_bbvote_voters` (
   KEY `vote_id` (`vote_id`),
   KEY `vote_user_id` (`vote_user_id`),
   KEY `vote_user_ip` (`vote_user_ip`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_bbwords`
---
-
-DROP TABLE IF EXISTS `nuke_bbwords`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_bbwords` (
-  `word_id` mediumint(8) unsigned NOT NULL AUTO_INCREMENT,
-  `word` char(100) NOT NULL DEFAULT '',
-  `replacement` char(100) NOT NULL DEFAULT '',
-  PRIMARY KEY (`word_id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -2906,7 +2905,7 @@ CREATE TABLE `nuke_referer` (
   `rid` int(11) NOT NULL AUTO_INCREMENT,
   `url` varchar(100) NOT NULL DEFAULT '',
   PRIMARY KEY (`rid`)
-) ENGINE=MyISAM AUTO_INCREMENT=40187 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=40188 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -3034,7 +3033,7 @@ CREATE TABLE `nuke_stories` (
   KEY `catid` (`catid`),
   KEY `counter` (`counter`),
   KEY `topic` (`topic`)
-) ENGINE=MyISAM AUTO_INCREMENT=4162 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=4165 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -3181,7 +3180,7 @@ CREATE TABLE `nuke_users_temp` (
   `check_num` varchar(50) NOT NULL DEFAULT '',
   `time` varchar(14) NOT NULL DEFAULT '',
   PRIMARY KEY (`user_id`)
-) ENGINE=MyISAM AUTO_INCREMENT=10942 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=10947 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -3641,4 +3640,4 @@ SET character_set_client = @saved_cs_client;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2025-11-07 22:48:17
+-- Dump completed on 2025-11-09 13:54:02

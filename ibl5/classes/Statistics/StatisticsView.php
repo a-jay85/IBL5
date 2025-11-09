@@ -9,27 +9,29 @@ class StatisticsView
 {
     private string $moduleName;
     private string $themeSel;
-    private array $imageSizes;
+    private ?array $imageSizes = null;
 
     public function __construct(string $moduleName, string $themeSel)
     {
         $this->moduleName = $moduleName;
         $this->themeSel = $themeSel;
-        $this->imageSizes = $this->loadImageSizes();
     }
 
     /**
-     * Load theme bar image sizes
+     * Load theme bar image sizes (lazy-loaded on first use)
      * 
      * @return array Image dimensions
      */
-    private function loadImageSizes(): array
+    private function getImageSizes(): array
     {
-        return [
-            'left' => getimagesize("themes/{$this->themeSel}/images/leftbar.gif"),
-            'main' => getimagesize("themes/{$this->themeSel}/images/mainbar.gif"),
-            'right' => getimagesize("themes/{$this->themeSel}/images/rightbar.gif")
-        ];
+        if ($this->imageSizes === null) {
+            $this->imageSizes = [
+                'left' => @getimagesize("themes/{$this->themeSel}/images/leftbar.gif") ?: [0, 0],
+                'main' => @getimagesize("themes/{$this->themeSel}/images/mainbar.gif") ?: [0, 0],
+                'right' => @getimagesize("themes/{$this->themeSel}/images/rightbar.gif") ?: [0, 0]
+            ];
+        }
+        return $this->imageSizes;
     }
 
     /**
@@ -459,9 +461,10 @@ class StatisticsView
      */
     private function renderBar(string $alt, int $width): void
     {
-        $l = $this->imageSizes['left'];
-        $m = $this->imageSizes['main'];
-        $r = $this->imageSizes['right'];
+        $imageSizes = $this->getImageSizes();
+        $l = $imageSizes['left'];
+        $m = $imageSizes['main'];
+        $r = $imageSizes['right'];
         
         echo "<img src=\"themes/{$this->themeSel}/images/leftbar.gif\" Alt=\"{$alt}\" width=\"{$l[0]}\" height=\"{$l[1]}\">";
         echo "<img src=\"themes/{$this->themeSel}/images/mainbar.gif\" Alt=\"{$alt}\" height=\"{$m[1]}\" width=\"{$width}\">";

@@ -9,6 +9,21 @@
 -- ============================================================================
 
 -- ---------------------------------------------------------------------------
+-- CRITICAL: Fix Data Type Mismatch
+-- ---------------------------------------------------------------------------
+-- Phase 4 changed ibl_plr.tid, ibl_schedule.Visitor, and ibl_schedule.Home 
+-- to SMALLINT UNSIGNED, but ibl_team_info.teamid is still INT.
+-- Foreign keys require exact type matches, so we must change teamid to match.
+--
+-- This change is safe because:
+-- 1. SMALLINT UNSIGNED range (0-65535) is more than sufficient for team IDs
+-- 2. All existing foreign keys reference teamid and will be automatically updated
+-- 3. The change is applied before adding the new foreign keys
+
+ALTER TABLE ibl_team_info 
+  MODIFY teamid SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Team ID';
+
+-- ---------------------------------------------------------------------------
 -- Foreign Key 1: Player to Team Relationship (fk_plr_team)
 -- ---------------------------------------------------------------------------
 -- Ensures that every player's team ID (tid) references a valid team in ibl_team_info
@@ -160,11 +175,15 @@ ORDER BY CONSTRAINT_NAME;
 -- ============================================================================
 -- ROLLBACK PROCEDURES
 -- ============================================================================
--- If you need to remove these foreign keys, run:
+-- If you need to remove these foreign keys and revert changes, run:
 /*
+-- Remove the foreign keys
 ALTER TABLE ibl_plr DROP FOREIGN KEY fk_plr_team;
 ALTER TABLE ibl_schedule DROP FOREIGN KEY fk_schedule_visitor;
 ALTER TABLE ibl_schedule DROP FOREIGN KEY fk_schedule_home;
+
+-- Revert teamid back to INT (this will affect all existing foreign keys)
+ALTER TABLE ibl_team_info MODIFY teamid INT NOT NULL DEFAULT 0;
 
 -- Optionally, re-add the CHECK constraints if you remove the foreign keys:
 ALTER TABLE ibl_plr ADD CONSTRAINT chk_plr_tid CHECK (tid >= 0 AND tid <= 32);
@@ -178,14 +197,24 @@ ALTER TABLE ibl_schedule ADD CONSTRAINT chk_schedule_home_id CHECK (Home >= 1 AN
 -- 1. These foreign keys enforce referential integrity at the database level
 -- 2. ON DELETE RESTRICT prevents deletion of teams that have associated records
 -- 3. ON UPDATE CASCADE automatically updates related records when team IDs change
--- 4. The tid field in ibl_plr was changed to SMALLINT UNSIGNED in Phase 4
---    but still references ibl_team_info.teamid which is INT
---    MySQL allows this as long as the data ranges are compatible
--- 5. The following CHECK constraints are dropped before adding foreign keys
+-- 4. CRITICAL DATA TYPE FIX: ibl_team_info.teamid is changed from INT to SMALLINT UNSIGNED
+--    to match the referencing columns (ibl_plr.tid, ibl_schedule.Visitor, ibl_schedule.Home)
+--    which were changed in Phase 4. This is required because MySQL foreign keys need exact
+--    type matches between the referencing and referenced columns.
+-- 5. The teamid change affects all existing foreign keys that reference ibl_team_info.teamid:
+--    - fk_boxscore_home, fk_boxscore_visitor (ibl_box_scores)
+--    - fk_boxscoreteam_home, fk_boxscoreteam_visitor (ibl_box_scores_teams)
+--    - fk_standings_team (ibl_standings)
+--    - fk_team_defense_team (ibl_team_defense)
+--    - fk_team_offense_team (ibl_team_offense)
+--    - fk_asg_votes_team (ibl_votes_ASG)
+--    - fk_eoy_votes_team (ibl_votes_EOY)
+--    These existing foreign keys will continue to work because their columns are INT,
+--    which is compatible with SMALLINT UNSIGNED (larger type can reference smaller type).
+-- 6. The following CHECK constraints are dropped before adding foreign keys
 --    because MySQL/MariaDB doesn't allow foreign keys on columns with CHECK constraints:
 --    - chk_plr_tid (on ibl_plr.tid)
 --    - chk_schedule_visitor_id (on ibl_schedule.Visitor)
 --    - chk_schedule_home_id (on ibl_schedule.Home)
 --    The foreign keys provide stronger validation anyway (ensures values exist in ibl_team_info)
--- ============================================================================
 -- ============================================================================

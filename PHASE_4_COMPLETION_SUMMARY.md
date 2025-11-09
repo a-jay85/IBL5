@@ -32,12 +32,14 @@ November 7, 2025
   3. `fk_schedule_visitor` - Schedule Visitor Team (ibl_schedule.Visitor → ibl_team_info.teamid)
 
 ## Root Cause
-The missing foreign keys likely occurred because:
+The missing foreign keys occurred because:
 1. Phase 4 migration changed `ibl_plr.tid` from `INT` to `SMALLINT UNSIGNED`
 2. Phase 4 migration changed `ibl_schedule.Home` and `ibl_schedule.Visitor` from `INT` to `SMALLINT UNSIGNED`
-3. Foreign keys may have needed to be dropped temporarily to perform the data type changes
-4. Foreign keys were not re-established after the data type changes
-5. Phase 4 also added a CHECK constraint `chk_plr_tid` on the `tid` column, which conflicts with foreign keys in MySQL/MariaDB
+3. Phase 4 did NOT change `ibl_team_info.teamid` (the referenced column), leaving it as `INT`
+4. Foreign keys may have needed to be dropped temporarily to perform the data type changes
+5. Foreign keys were not re-established after the data type changes
+6. Phase 4 also added CHECK constraints on these columns, which conflict with foreign keys in MySQL/MariaDB
+7. **CRITICAL:** MySQL requires exact type matches for foreign keys - SMALLINT UNSIGNED cannot reference INT
 
 ## Solution Delivered
 
@@ -45,14 +47,15 @@ The missing foreign keys likely occurred because:
 **File:** `/RESTORE_MISSING_FOREIGN_KEYS.sql`
 
 This comprehensive SQL script includes:
+- ✅ **DATA TYPE FIX:** Changes `ibl_team_info.teamid` from `INT` to `SMALLINT UNSIGNED` to match referencing columns
 - ✅ ALTER TABLE statements to re-establish all 3 missing foreign keys
-- ✅ Drops the `chk_plr_tid` CHECK constraint before adding the foreign key (MySQL/MariaDB limitation)
+- ✅ Drops all 3 conflicting CHECK constraints before adding foreign keys (MySQL/MariaDB limitation)
 - ✅ Pre-execution verification queries to check data integrity
-- ✅ Detailed comments explaining each constraint
+- ✅ Detailed comments explaining each change and constraint
 - ✅ Post-execution verification queries
-- ✅ Rollback procedures if needed
-- ✅ Notes about data type compatibility (SMALLINT → INT references)
-- ✅ Explanation that the foreign key provides stronger validation than the CHECK constraint
+- ✅ Rollback procedures including reverting the data type change
+- ✅ Impact analysis of teamid type change on existing foreign keys
+- ✅ Explanation that foreign keys provide stronger validation than CHECK constraints
 
 ### 2. Phase 5 Migration File
 **File:** `/ibl5/migrations/005_advanced_optimization.sql`

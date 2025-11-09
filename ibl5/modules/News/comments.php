@@ -333,11 +333,7 @@ function DisplayKids($tid, $mode, $order = 0, $thold = 0, $level = 0, $dummy = 0
                 if ($r_name != $anonymous) {
                     $row2 = $db->sql_fetchrow($db->sql_query("SELECT user_id FROM " . $user_prefix . "_users WHERE username='$r_name'"));
                     $r_uid = intval($row2['user_id']);
-                    echo "<br>(<a href=\"modules.php?name=Your_Account&amp;op=userinfo&amp;username=$r_name\">" . _USERINFO . "</a> ";
-                    if (is_active("Private_Messages")) {
-                        echo "| <a href=\"modules.php?name=Private_Messages&amp;mode=post&amp;u=$r_uid\">" . _SENDAMSG . "</a>) ";
-                    }
-                    echo ")";
+                    echo "<br>(<a href=\"modules.php?name=Your_Account&amp;op=userinfo&amp;username=$r_name\">" . _USERINFO . "</a>)";
                 }
                 $row_url = $db->sql_fetchrow($db->sql_query("SELECT user_website FROM " . $user_prefix . "_users WHERE username='$r_name'"));
                 $url = filter($row_url['user_website'], "nohtml");
@@ -415,7 +411,7 @@ function DisplayKids($tid, $mode, $order = 0, $thold = 0, $level = 0, $dummy = 0
                 if ($r_name != $anonymous) {
                     $row3 = $db->sql_fetchrow($db->sql_query("SELECT user_id FROM " . $user_prefix . "_users WHERE username='$r_name'"));
                     $ruid = intval($row3['user_id']);
-                    echo "<br>(<a href=\"modules.php?name=Your_Account&amp;op=userinfo&amp;username=$r_name\">" . _USERINFO . "</a> | <a href=\"modules.php?name=Private_Messages&amp;mode=post&amp;u=$ruid\">" . _SENDAMSG . "</a>) ";
+                    echo "<br>(<a href=\"modules.php?name=Your_Account&amp;op=userinfo&amp;username=$r_name\">" . _USERINFO . "</a>)";
                 }
                 $row_url2 = $db->sql_fetchrow($db->sql_query("SELECT user_website FROM " . $user_prefix . "_users WHERE username='$r_name'"));
                 $url = filter($row_url2['user_website'], "nohtml");
@@ -633,11 +629,7 @@ function DisplayTopic($sid, $pid = 0, $tid = 0, $mode = "thread", $order = 0, $t
         if ($c_name != $anonymous) {
             $row2 = $db->sql_fetchrow($db->sql_query("SELECT user_id FROM " . $user_prefix . "_users WHERE username='$c_name'"));
             $r_uid = intval($row2['user_id']);
-            echo "<br>(<a href=\"modules.php?name=Your_Account&amp;op=userinfo&amp;username=$c_name\">" . _USERINFO . "</a> ";
-            if (is_active("Private_Messages")) {
-                echo "| <a href=\"modules.php?name=Private_Messages&amp;mode=post&amp;u=$r_uid\">" . _SENDAMSG . "</a>";
-            }
-            echo ") ";
+            echo "<br>(<a href=\"modules.php?name=Your_Account&amp;op=userinfo&amp;username=$c_name\">" . _USERINFO . "</a>)";
         }
         $row_url = $db->sql_fetchrow($db->sql_query("SELECT user_website FROM " . $user_prefix . "_users WHERE username='$c_name'"));
         $url = filter($row_url['user_website'], "nohtml");

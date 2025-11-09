@@ -30,7 +30,7 @@ if (file_exists("themes/" . $ThemeSel . "/style/editor.css")) {
 }
 
 if ($nuke_editor == 1) {
-    if (is_admin($admin) and $name != "Private_Messages" and $name != "Forums" and !defined('NO_EDITOR')) {
+    if (is_admin($admin) and $name != "Forums" and !defined('NO_EDITOR')) {
         echo "<!-- tinyMCE -->
 			<script language=\"javascript\" type=\"text/javascript\" src=\"includes/tiny_mce/tiny_mce.js\"></script>
 			<script language=\"javascript\" type=\"text/javascript\">
@@ -44,7 +44,7 @@ if ($nuke_editor == 1) {
 		   	});
 			</script>
 			<!-- /tinyMCE -->";
-    } elseif ($name != "Private_Messages" and $name != "Forums" and !defined('NO_EDITOR')) {
+    } elseif ($name != "Forums" and !defined('NO_EDITOR')) {
         echo "<!-- tinyMCE -->
 			<script language=\"javascript\" type=\"text/javascript\" src=\"includes/tiny_mce/tiny_mce.js\"></script>
 			<script language=\"javascript\" type=\"text/javascript\">

@@ -24,11 +24,6 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
     global $user, $prefix, $user_prefix, $db;
     $commonRepository = new \Services\CommonRepository($db);
 
-    $sql = "SELECT * FROM " . $prefix . "_bbconfig";
-    $result = $db->sql_query($sql);
-    while ($row = $db->sql_fetchrow($result)) {
-        $board_config[$row['config_name']] = $row['config_value'];
-    }
     $sql2 = "SELECT * FROM " . $user_prefix . "_users WHERE username = '$username'";
     $result2 = $db->sql_query($sql2);
     $userinfo = $db->sql_fetchrow($result2);

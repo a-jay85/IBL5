@@ -36,5 +36,8 @@
         <testsuite name="RookieOption Module Tests">
             <directory>tests/RookieOption</directory>
         </testsuite>
+        <testsuite name="Statistics Module Tests">
+            <directory>tests/Statistics</directory>
+        </testsuite>
     </testsuites>
 </phpunit>

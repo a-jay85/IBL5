@@ -275,12 +275,12 @@ CREATE TABLE `ibl_draft_class` (
   `stl` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Steals rating',
   `tvr` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Turnovers rating',
   `blk` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Blocks rating',
-  `offo` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Off offense rating',
-  `offd` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Off defense rating',
+  `offo` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Off outside rating',
+  `offd` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Off drive rating',
   `offp` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Off post rating',
   `offt` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Off transition rating',
-  `defo` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Def offense rating',
-  `defd` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Def defense rating',
+  `defo` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Def outside rating',
+  `defd` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Def drive rating',
   `defp` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Def post rating',
   `deft` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Def transition rating',
   `tal` int(11) NOT NULL DEFAULT 0,
@@ -802,7 +802,7 @@ CREATE TABLE `ibl_plr` (
   `nickname` varchar(64) DEFAULT '',
   `age` tinyint(3) unsigned DEFAULT NULL,
   `peak` tinyint(3) unsigned DEFAULT NULL,
-  `tid` smallint(5) unsigned NOT NULL DEFAULT 0 COMMENT 'Team ID (0 = free agent)',
+  `tid` int(11) NOT NULL DEFAULT 0 COMMENT 'Team ID (0 = free agent)',
   `teamname` varchar(32) DEFAULT '',
   `pos` enum('PG','SG','SF','PF','C','G','F','GF','') NOT NULL DEFAULT '' COMMENT 'Player position',
   `sta` tinyint(3) unsigned DEFAULT 0 COMMENT 'Stamina rating',
@@ -869,30 +869,30 @@ CREATE TABLE `ibl_plr` (
   `cy4` int(11) DEFAULT 0,
   `cy5` int(11) DEFAULT 0,
   `cy6` int(11) DEFAULT 0,
-  `sh_pts` smallint(5) unsigned DEFAULT 0 COMMENT 'Showcase points',
-  `sh_reb` smallint(5) unsigned DEFAULT 0 COMMENT 'Showcase rebounds',
-  `sh_ast` smallint(5) unsigned DEFAULT 0 COMMENT 'Showcase assists',
-  `sh_stl` smallint(5) unsigned DEFAULT 0 COMMENT 'Showcase steals',
-  `sh_blk` smallint(5) unsigned DEFAULT 0 COMMENT 'Showcase blocks',
+  `sh_pts` smallint(5) unsigned DEFAULT 0 COMMENT 'Season high points',
+  `sh_reb` smallint(5) unsigned DEFAULT 0 COMMENT 'Season high rebounds',
+  `sh_ast` smallint(5) unsigned DEFAULT 0 COMMENT 'Season high assists',
+  `sh_stl` smallint(5) unsigned DEFAULT 0 COMMENT 'Season high steals',
+  `sh_blk` smallint(5) unsigned DEFAULT 0 COMMENT 'Season high blocks',
   `s_dd` smallint(5) unsigned DEFAULT 0 COMMENT 'Season double doubles',
   `s_td` smallint(5) unsigned DEFAULT 0 COMMENT 'Season triple doubles',
-  `sp_pts` smallint(5) unsigned DEFAULT 0 COMMENT 'Showcase playoff points',
-  `sp_reb` smallint(5) unsigned DEFAULT 0 COMMENT 'Showcase playoff rebounds',
-  `sp_ast` smallint(5) unsigned DEFAULT 0 COMMENT 'Showcase playoff assists',
-  `sp_stl` smallint(5) unsigned DEFAULT 0 COMMENT 'Showcase playoff steals',
-  `sp_blk` smallint(5) unsigned DEFAULT 0 COMMENT 'Showcase playoff blocks',
-  `ch_pts` smallint(5) unsigned DEFAULT 0 COMMENT 'Championship points',
-  `ch_reb` smallint(5) unsigned DEFAULT 0 COMMENT 'Championship rebounds',
-  `ch_ast` smallint(5) unsigned DEFAULT 0 COMMENT 'Championship assists',
-  `ch_stl` smallint(5) unsigned DEFAULT 0 COMMENT 'Championship steals',
-  `ch_blk` smallint(5) unsigned DEFAULT 0 COMMENT 'Championship blocks',
+  `sp_pts` smallint(5) unsigned DEFAULT 0 COMMENT 'Playoff high points',
+  `sp_reb` smallint(5) unsigned DEFAULT 0 COMMENT 'Playoff high rebounds',
+  `sp_ast` smallint(5) unsigned DEFAULT 0 COMMENT 'Playoff high assists',
+  `sp_stl` smallint(5) unsigned DEFAULT 0 COMMENT 'Playoff high steals',
+  `sp_blk` smallint(5) unsigned DEFAULT 0 COMMENT 'Playoff high blocks',
+  `ch_pts` smallint(5) unsigned DEFAULT 0 COMMENT 'Career high points',
+  `ch_reb` smallint(5) unsigned DEFAULT 0 COMMENT 'Career high rebounds',
+  `ch_ast` smallint(5) unsigned DEFAULT 0 COMMENT 'Career high assists',
+  `ch_stl` smallint(5) unsigned DEFAULT 0 COMMENT 'Career high steals',
+  `ch_blk` smallint(5) unsigned DEFAULT 0 COMMENT 'Career high blocks',
   `c_dd` smallint(5) unsigned DEFAULT 0 COMMENT 'Career double doubles',
   `c_td` smallint(5) unsigned DEFAULT 0 COMMENT 'Career triple doubles',
-  `cp_pts` smallint(5) unsigned DEFAULT 0 COMMENT 'Championship playoff points',
-  `cp_reb` smallint(5) unsigned DEFAULT 0 COMMENT 'Championship playoff rebounds',
-  `cp_ast` smallint(5) unsigned DEFAULT 0 COMMENT 'Championship playoff assists',
-  `cp_stl` smallint(5) unsigned DEFAULT 0 COMMENT 'Championship playoff steals',
-  `cp_blk` smallint(5) unsigned DEFAULT 0 COMMENT 'Championship playoff blocks',
+  `cp_pts` smallint(5) unsigned DEFAULT 0 COMMENT 'Career playoff high points',
+  `cp_reb` smallint(5) unsigned DEFAULT 0 COMMENT 'Career playoff high rebounds',
+  `cp_ast` smallint(5) unsigned DEFAULT 0 COMMENT 'Career playoff high assists',
+  `cp_stl` smallint(5) unsigned DEFAULT 0 COMMENT 'Career playoff high steals',
+  `cp_blk` smallint(5) unsigned DEFAULT 0 COMMENT 'Career playoff high blocks',
   `car_gm` smallint(5) unsigned DEFAULT 0 COMMENT 'Career games',
   `car_min` mediumint(8) unsigned DEFAULT 0 COMMENT 'Career minutes',
   `car_fgm` mediumint(8) unsigned DEFAULT 0 COMMENT 'Career FGM',
@@ -910,19 +910,19 @@ CREATE TABLE `ibl_plr` (
   `car_blk` mediumint(8) unsigned DEFAULT 0 COMMENT 'Career blocks',
   `car_pf` mediumint(8) unsigned DEFAULT 0 COMMENT 'Career fouls',
   `car_pts` mediumint(8) unsigned DEFAULT 0 COMMENT 'Career points',
-  `r_fga` smallint(5) unsigned DEFAULT 0 COMMENT 'Rank FGA',
-  `r_fgp` smallint(5) unsigned DEFAULT 0 COMMENT 'Rank FG%',
-  `r_fta` smallint(5) unsigned DEFAULT 0 COMMENT 'Rank FTA',
-  `r_ftp` smallint(5) unsigned DEFAULT 0 COMMENT 'Rank FT%',
-  `r_tga` smallint(5) unsigned DEFAULT 0 COMMENT 'Rank 3PA',
-  `r_tgp` smallint(5) unsigned DEFAULT 0 COMMENT 'Rank 3P%',
-  `r_orb` smallint(5) unsigned DEFAULT 0 COMMENT 'Rank ORB',
-  `r_drb` smallint(5) unsigned DEFAULT 0 COMMENT 'Rank DRB',
-  `r_ast` smallint(5) unsigned DEFAULT 0 COMMENT 'Rank AST',
-  `r_stl` smallint(5) unsigned DEFAULT 0 COMMENT 'Rank STL',
-  `r_to` smallint(5) unsigned DEFAULT 0 COMMENT 'Rank TO',
-  `r_blk` smallint(5) unsigned DEFAULT 0 COMMENT 'Rank BLK',
-  `r_foul` smallint(5) unsigned DEFAULT 0 COMMENT 'Rank fouls',
+  `r_fga` smallint(5) unsigned DEFAULT 0 COMMENT 'Rating FGA',
+  `r_fgp` smallint(5) unsigned DEFAULT 0 COMMENT 'Rating FG%',
+  `r_fta` smallint(5) unsigned DEFAULT 0 COMMENT 'Rating FTA',
+  `r_ftp` smallint(5) unsigned DEFAULT 0 COMMENT 'Rating FT%',
+  `r_tga` smallint(5) unsigned DEFAULT 0 COMMENT 'Rating 3PA',
+  `r_tgp` smallint(5) unsigned DEFAULT 0 COMMENT 'Rating 3P%',
+  `r_orb` smallint(5) unsigned DEFAULT 0 COMMENT 'Rating ORB',
+  `r_drb` smallint(5) unsigned DEFAULT 0 COMMENT 'Rating DRB',
+  `r_ast` smallint(5) unsigned DEFAULT 0 COMMENT 'Rating AST',
+  `r_stl` smallint(5) unsigned DEFAULT 0 COMMENT 'Rating STL',
+  `r_to` smallint(5) unsigned DEFAULT 0 COMMENT 'Rating TO',
+  `r_blk` smallint(5) unsigned DEFAULT 0 COMMENT 'Rating BLK',
+  `r_foul` smallint(5) unsigned DEFAULT 0 COMMENT 'Rating fouls',
   `draftround` tinyint(3) unsigned DEFAULT 0 COMMENT 'Draft round (1-7)',
   `draftedby` varchar(32) DEFAULT '',
   `draftedbycurrentname` varchar(32) DEFAULT '',
@@ -961,7 +961,8 @@ CREATE TABLE `ibl_plr` (
   CONSTRAINT `chk_plr_cy3` CHECK (`cy3` >= -7000 and `cy3` <= 7000),
   CONSTRAINT `chk_plr_cy4` CHECK (`cy4` >= -7000 and `cy4` <= 7000),
   CONSTRAINT `chk_plr_cy5` CHECK (`cy5` >= -7000 and `cy5` <= 7000),
-  CONSTRAINT `chk_plr_cy6` CHECK (`cy6` >= -7000 and `cy6` <= 7000)
+  CONSTRAINT `chk_plr_cy6` CHECK (`cy6` >= -7000 and `cy6` <= 7000),
+  CONSTRAINT `chk_plr_tid` CHECK (`tid` >= 0 and `tid` <= 32)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1715,574 +1716,6 @@ DROP TABLE IF EXISTS `nuke_banner_terms`;
 CREATE TABLE `nuke_banner_terms` (
   `terms_body` mediumtext NOT NULL,
   `country` varchar(255) NOT NULL DEFAULT ''
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_bbauth_access`
---
-
-DROP TABLE IF EXISTS `nuke_bbauth_access`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_bbauth_access` (
-  `group_id` mediumint(9) NOT NULL DEFAULT 0,
-  `forum_id` smallint(5) unsigned NOT NULL DEFAULT 0,
-  `auth_view` tinyint(1) NOT NULL DEFAULT 0,
-  `auth_read` tinyint(1) NOT NULL DEFAULT 0,
-  `auth_post` tinyint(1) NOT NULL DEFAULT 0,
-  `auth_reply` tinyint(1) NOT NULL DEFAULT 0,
-  `auth_edit` tinyint(1) NOT NULL DEFAULT 0,
-  `auth_delete` tinyint(1) NOT NULL DEFAULT 0,
-  `auth_sticky` tinyint(1) NOT NULL DEFAULT 0,
-  `auth_announce` tinyint(1) NOT NULL DEFAULT 0,
-  `auth_vote` tinyint(1) NOT NULL DEFAULT 0,
-  `auth_pollcreate` tinyint(1) NOT NULL DEFAULT 0,
-  `auth_attachments` tinyint(1) NOT NULL DEFAULT 0,
-  `auth_mod` tinyint(1) NOT NULL DEFAULT 0,
-  KEY `group_id` (`group_id`),
-  KEY `forum_id` (`forum_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_bbbanlist`
---
-
-DROP TABLE IF EXISTS `nuke_bbbanlist`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_bbbanlist` (
-  `ban_id` mediumint(8) unsigned NOT NULL AUTO_INCREMENT,
-  `ban_userid` mediumint(9) NOT NULL DEFAULT 0,
-  `ban_ip` varchar(8) NOT NULL DEFAULT '',
-  `ban_email` varchar(255) DEFAULT NULL,
-  `ban_time` int(11) DEFAULT NULL,
-  `ban_expire_time` int(11) DEFAULT NULL,
-  `ban_by_userid` mediumint(9) DEFAULT NULL,
-  `ban_priv_reason` mediumtext DEFAULT NULL,
-  `ban_pub_reason_mode` tinyint(1) DEFAULT NULL,
-  `ban_pub_reason` mediumtext DEFAULT NULL,
-  PRIMARY KEY (`ban_id`),
-  KEY `ban_ip_user_id` (`ban_ip`,`ban_userid`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_bbcategories`
---
-
-DROP TABLE IF EXISTS `nuke_bbcategories`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_bbcategories` (
-  `cat_id` mediumint(8) unsigned NOT NULL AUTO_INCREMENT,
-  `cat_title` varchar(100) DEFAULT NULL,
-  `cat_order` mediumint(8) unsigned NOT NULL DEFAULT 0,
-  PRIMARY KEY (`cat_id`),
-  KEY `cat_order` (`cat_order`)
-) ENGINE=MyISAM AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_bbconfig`
---
-
-DROP TABLE IF EXISTS `nuke_bbconfig`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_bbconfig` (
-  `config_name` varchar(255) NOT NULL DEFAULT '',
-  `config_value` varchar(255) NOT NULL DEFAULT '',
-  PRIMARY KEY (`config_name`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_bbdisallow`
---
-
-DROP TABLE IF EXISTS `nuke_bbdisallow`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_bbdisallow` (
-  `disallow_id` mediumint(8) unsigned NOT NULL AUTO_INCREMENT,
-  `disallow_username` varchar(25) DEFAULT NULL,
-  PRIMARY KEY (`disallow_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_bbforum_prune`
---
-
-DROP TABLE IF EXISTS `nuke_bbforum_prune`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_bbforum_prune` (
-  `prune_id` mediumint(8) unsigned NOT NULL AUTO_INCREMENT,
-  `forum_id` smallint(5) unsigned NOT NULL DEFAULT 0,
-  `prune_days` tinyint(3) unsigned NOT NULL DEFAULT 0,
-  `prune_freq` tinyint(3) unsigned NOT NULL DEFAULT 0,
-  PRIMARY KEY (`prune_id`),
-  KEY `forum_id` (`forum_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_bbforums`
---
-
-DROP TABLE IF EXISTS `nuke_bbforums`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_bbforums` (
-  `forum_id` smallint(5) unsigned NOT NULL AUTO_INCREMENT,
-  `cat_id` mediumint(8) unsigned NOT NULL DEFAULT 0,
-  `forum_name` varchar(150) DEFAULT NULL,
-  `forum_desc` mediumtext DEFAULT NULL,
-  `forum_status` tinyint(4) NOT NULL DEFAULT 0,
-  `forum_order` mediumint(8) unsigned NOT NULL DEFAULT 1,
-  `forum_posts` mediumint(8) unsigned NOT NULL DEFAULT 0,
-  `forum_topics` mediumint(8) unsigned NOT NULL DEFAULT 0,
-  `forum_last_post_id` mediumint(8) unsigned NOT NULL DEFAULT 0,
-  `prune_next` int(11) DEFAULT NULL,
-  `prune_enable` tinyint(1) NOT NULL DEFAULT 1,
-  `auth_view` tinyint(4) NOT NULL DEFAULT 0,
-  `auth_read` tinyint(4) NOT NULL DEFAULT 0,
-  `auth_post` tinyint(4) NOT NULL DEFAULT 0,
-  `auth_reply` tinyint(4) NOT NULL DEFAULT 0,
-  `auth_edit` tinyint(4) NOT NULL DEFAULT 0,
-  `auth_delete` tinyint(4) NOT NULL DEFAULT 0,
-  `auth_sticky` tinyint(4) NOT NULL DEFAULT 0,
-  `auth_announce` tinyint(4) NOT NULL DEFAULT 0,
-  `auth_vote` tinyint(4) NOT NULL DEFAULT 0,
-  `auth_pollcreate` tinyint(4) NOT NULL DEFAULT 0,
-  `auth_attachments` tinyint(4) NOT NULL DEFAULT 0,
-  PRIMARY KEY (`forum_id`),
-  KEY `forums_order` (`forum_order`),
-  KEY `cat_id` (`cat_id`),
-  KEY `forum_last_post_id` (`forum_last_post_id`)
-) ENGINE=MyISAM AUTO_INCREMENT=14 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_bbgroups`
---
-
-DROP TABLE IF EXISTS `nuke_bbgroups`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_bbgroups` (
-  `group_id` mediumint(9) NOT NULL AUTO_INCREMENT,
-  `group_type` tinyint(4) NOT NULL DEFAULT 1,
-  `group_name` varchar(40) NOT NULL DEFAULT '',
-  `group_description` varchar(255) NOT NULL DEFAULT '',
-  `group_moderator` mediumint(9) NOT NULL DEFAULT 0,
-  `group_single_user` tinyint(1) NOT NULL DEFAULT 1,
-  PRIMARY KEY (`group_id`),
-  KEY `group_single_user` (`group_single_user`)
-) ENGINE=MyISAM AUTO_INCREMENT=585 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_bbposts`
---
-
-DROP TABLE IF EXISTS `nuke_bbposts`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_bbposts` (
-  `post_id` mediumint(8) unsigned NOT NULL AUTO_INCREMENT,
-  `topic_id` mediumint(8) unsigned NOT NULL DEFAULT 0,
-  `forum_id` smallint(5) unsigned NOT NULL DEFAULT 0,
-  `poster_id` mediumint(9) NOT NULL DEFAULT 0,
-  `post_time` int(11) NOT NULL DEFAULT 0,
-  `poster_ip` varchar(8) NOT NULL DEFAULT '',
-  `post_username` varchar(25) DEFAULT NULL,
-  `enable_bbcode` tinyint(1) NOT NULL DEFAULT 1,
-  `enable_html` tinyint(1) NOT NULL DEFAULT 0,
-  `enable_smilies` tinyint(1) NOT NULL DEFAULT 1,
-  `enable_sig` tinyint(1) NOT NULL DEFAULT 1,
-  `post_edit_time` int(11) DEFAULT NULL,
-  `post_edit_count` smallint(5) unsigned NOT NULL DEFAULT 0,
-  PRIMARY KEY (`post_id`),
-  KEY `forum_id` (`forum_id`),
-  KEY `topic_id` (`topic_id`),
-  KEY `poster_id` (`poster_id`),
-  KEY `post_time` (`post_time`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_bbposts_text`
---
-
-DROP TABLE IF EXISTS `nuke_bbposts_text`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_bbposts_text` (
-  `post_id` mediumint(8) unsigned NOT NULL DEFAULT 0,
-  `bbcode_uid` varchar(10) NOT NULL DEFAULT '',
-  `post_subject` varchar(60) DEFAULT NULL,
-  `post_text` mediumtext DEFAULT NULL,
-  PRIMARY KEY (`post_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_bbprivmsgs`
---
-
-DROP TABLE IF EXISTS `nuke_bbprivmsgs`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_bbprivmsgs` (
-  `privmsgs_id` mediumint(8) unsigned NOT NULL AUTO_INCREMENT,
-  `privmsgs_type` tinyint(4) NOT NULL DEFAULT 0,
-  `privmsgs_subject` varchar(255) NOT NULL DEFAULT '0',
-  `privmsgs_from_userid` mediumint(9) NOT NULL DEFAULT 0,
-  `privmsgs_to_userid` mediumint(9) NOT NULL DEFAULT 0,
-  `privmsgs_date` int(11) NOT NULL DEFAULT 0,
-  `privmsgs_ip` varchar(8) NOT NULL DEFAULT '',
-  `privmsgs_enable_bbcode` tinyint(1) NOT NULL DEFAULT 1,
-  `privmsgs_enable_html` tinyint(1) NOT NULL DEFAULT 0,
-  `privmsgs_enable_smilies` tinyint(1) NOT NULL DEFAULT 1,
-  `privmsgs_attach_sig` tinyint(1) NOT NULL DEFAULT 1,
-  PRIMARY KEY (`privmsgs_id`),
-  KEY `privmsgs_from_userid` (`privmsgs_from_userid`),
-  KEY `privmsgs_to_userid` (`privmsgs_to_userid`)
-) ENGINE=MyISAM AUTO_INCREMENT=759 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_bbprivmsgs_text`
---
-
-DROP TABLE IF EXISTS `nuke_bbprivmsgs_text`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_bbprivmsgs_text` (
-  `privmsgs_text_id` mediumint(8) unsigned NOT NULL DEFAULT 0,
-  `privmsgs_bbcode_uid` varchar(10) NOT NULL DEFAULT '0',
-  `privmsgs_text` mediumtext DEFAULT NULL,
-  PRIMARY KEY (`privmsgs_text_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_bbranks`
---
-
-DROP TABLE IF EXISTS `nuke_bbranks`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_bbranks` (
-  `rank_id` smallint(5) unsigned NOT NULL AUTO_INCREMENT,
-  `rank_title` varchar(50) NOT NULL DEFAULT '',
-  `rank_min` mediumint(9) NOT NULL DEFAULT 0,
-  `rank_max` mediumint(9) NOT NULL DEFAULT 0,
-  `rank_special` tinyint(1) DEFAULT 0,
-  `rank_image` varchar(255) DEFAULT NULL,
-  PRIMARY KEY (`rank_id`)
-) ENGINE=MyISAM AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_bbsearch_results`
---
-
-DROP TABLE IF EXISTS `nuke_bbsearch_results`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_bbsearch_results` (
-  `search_id` int(10) unsigned NOT NULL DEFAULT 0,
-  `session_id` varchar(32) NOT NULL DEFAULT '',
-  `search_array` mediumtext NOT NULL,
-  `search_time` int(11) NOT NULL DEFAULT 0,
-  PRIMARY KEY (`search_id`),
-  KEY `session_id` (`session_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_bbsearch_wordlist`
---
-
-DROP TABLE IF EXISTS `nuke_bbsearch_wordlist`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_bbsearch_wordlist` (
-  `word_text` varchar(50) NOT NULL DEFAULT '',
-  `word_id` mediumint(8) unsigned NOT NULL AUTO_INCREMENT,
-  `word_common` tinyint(3) unsigned NOT NULL DEFAULT 0,
-  PRIMARY KEY (`word_text`),
-  KEY `word_id` (`word_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_bbsearch_wordmatch`
---
-
-DROP TABLE IF EXISTS `nuke_bbsearch_wordmatch`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_bbsearch_wordmatch` (
-  `post_id` mediumint(8) unsigned NOT NULL DEFAULT 0,
-  `word_id` mediumint(8) unsigned NOT NULL DEFAULT 0,
-  `title_match` tinyint(1) NOT NULL DEFAULT 0,
-  KEY `word_id` (`word_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_bbsessions`
---
-
-DROP TABLE IF EXISTS `nuke_bbsessions`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_bbsessions` (
-  `session_id` char(32) NOT NULL DEFAULT '',
-  `session_user_id` mediumint(9) NOT NULL DEFAULT 0,
-  `session_start` int(11) NOT NULL DEFAULT 0,
-  `session_time` int(11) NOT NULL DEFAULT 0,
-  `session_ip` char(8) NOT NULL DEFAULT '0',
-  `session_page` int(11) NOT NULL DEFAULT 0,
-  `session_logged_in` tinyint(1) NOT NULL DEFAULT 0,
-  `session_admin` tinyint(4) NOT NULL DEFAULT 0,
-  PRIMARY KEY (`session_id`),
-  KEY `session_user_id` (`session_user_id`),
-  KEY `session_id_ip_user_id` (`session_id`,`session_ip`,`session_user_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_bbsmilies`
---
-
-DROP TABLE IF EXISTS `nuke_bbsmilies`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_bbsmilies` (
-  `smilies_id` smallint(5) unsigned NOT NULL AUTO_INCREMENT,
-  `code` varchar(50) DEFAULT NULL,
-  `smile_url` varchar(100) DEFAULT NULL,
-  `emoticon` varchar(75) DEFAULT NULL,
-  PRIMARY KEY (`smilies_id`)
-) ENGINE=MyISAM AUTO_INCREMENT=45 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_bbthemes`
---
-
-DROP TABLE IF EXISTS `nuke_bbthemes`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_bbthemes` (
-  `themes_id` mediumint(8) unsigned NOT NULL AUTO_INCREMENT,
-  `template_name` varchar(30) NOT NULL DEFAULT '',
-  `style_name` varchar(30) NOT NULL DEFAULT '',
-  `head_stylesheet` varchar(100) DEFAULT NULL,
-  `body_background` varchar(100) DEFAULT NULL,
-  `body_bgcolor` varchar(6) DEFAULT NULL,
-  `body_text` varchar(6) DEFAULT NULL,
-  `body_link` varchar(6) DEFAULT NULL,
-  `body_vlink` varchar(6) DEFAULT NULL,
-  `body_alink` varchar(6) DEFAULT NULL,
-  `body_hlink` varchar(6) DEFAULT NULL,
-  `tr_color1` varchar(6) DEFAULT NULL,
-  `tr_color2` varchar(6) DEFAULT NULL,
-  `tr_color3` varchar(6) DEFAULT NULL,
-  `tr_class1` varchar(25) DEFAULT NULL,
-  `tr_class2` varchar(25) DEFAULT NULL,
-  `tr_class3` varchar(25) DEFAULT NULL,
-  `th_color1` varchar(6) DEFAULT NULL,
-  `th_color2` varchar(6) DEFAULT NULL,
-  `th_color3` varchar(6) DEFAULT NULL,
-  `th_class1` varchar(25) DEFAULT NULL,
-  `th_class2` varchar(25) DEFAULT NULL,
-  `th_class3` varchar(25) DEFAULT NULL,
-  `td_color1` varchar(6) DEFAULT NULL,
-  `td_color2` varchar(6) DEFAULT NULL,
-  `td_color3` varchar(6) DEFAULT NULL,
-  `td_class1` varchar(25) DEFAULT NULL,
-  `td_class2` varchar(25) DEFAULT NULL,
-  `td_class3` varchar(25) DEFAULT NULL,
-  `fontface1` varchar(50) DEFAULT NULL,
-  `fontface2` varchar(50) DEFAULT NULL,
-  `fontface3` varchar(50) DEFAULT NULL,
-  `fontsize1` tinyint(4) DEFAULT NULL,
-  `fontsize2` tinyint(4) DEFAULT NULL,
-  `fontsize3` tinyint(4) DEFAULT NULL,
-  `fontcolor1` varchar(6) DEFAULT NULL,
-  `fontcolor2` varchar(6) DEFAULT NULL,
-  `fontcolor3` varchar(6) DEFAULT NULL,
-  `span_class1` varchar(25) DEFAULT NULL,
-  `span_class2` varchar(25) DEFAULT NULL,
-  `span_class3` varchar(25) DEFAULT NULL,
-  `img_size_poll` smallint(5) unsigned DEFAULT NULL,
-  `img_size_privmsg` smallint(5) unsigned DEFAULT NULL,
-  PRIMARY KEY (`themes_id`)
-) ENGINE=MyISAM AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_bbthemes_name`
---
-
-DROP TABLE IF EXISTS `nuke_bbthemes_name`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_bbthemes_name` (
-  `themes_id` smallint(5) unsigned NOT NULL DEFAULT 0,
-  `tr_color1_name` char(50) DEFAULT NULL,
-  `tr_color2_name` char(50) DEFAULT NULL,
-  `tr_color3_name` char(50) DEFAULT NULL,
-  `tr_class1_name` char(50) DEFAULT NULL,
-  `tr_class2_name` char(50) DEFAULT NULL,
-  `tr_class3_name` char(50) DEFAULT NULL,
-  `th_color1_name` char(50) DEFAULT NULL,
-  `th_color2_name` char(50) DEFAULT NULL,
-  `th_color3_name` char(50) DEFAULT NULL,
-  `th_class1_name` char(50) DEFAULT NULL,
-  `th_class2_name` char(50) DEFAULT NULL,
-  `th_class3_name` char(50) DEFAULT NULL,
-  `td_color1_name` char(50) DEFAULT NULL,
-  `td_color2_name` char(50) DEFAULT NULL,
-  `td_color3_name` char(50) DEFAULT NULL,
-  `td_class1_name` char(50) DEFAULT NULL,
-  `td_class2_name` char(50) DEFAULT NULL,
-  `td_class3_name` char(50) DEFAULT NULL,
-  `fontface1_name` char(50) DEFAULT NULL,
-  `fontface2_name` char(50) DEFAULT NULL,
-  `fontface3_name` char(50) DEFAULT NULL,
-  `fontsize1_name` char(50) DEFAULT NULL,
-  `fontsize2_name` char(50) DEFAULT NULL,
-  `fontsize3_name` char(50) DEFAULT NULL,
-  `fontcolor1_name` char(50) DEFAULT NULL,
-  `fontcolor2_name` char(50) DEFAULT NULL,
-  `fontcolor3_name` char(50) DEFAULT NULL,
-  `span_class1_name` char(50) DEFAULT NULL,
-  `span_class2_name` char(50) DEFAULT NULL,
-  `span_class3_name` char(50) DEFAULT NULL,
-  PRIMARY KEY (`themes_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_bbtopics`
---
-
-DROP TABLE IF EXISTS `nuke_bbtopics`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_bbtopics` (
-  `topic_id` mediumint(8) unsigned NOT NULL AUTO_INCREMENT,
-  `forum_id` smallint(5) unsigned NOT NULL DEFAULT 0,
-  `topic_title` char(60) NOT NULL DEFAULT '',
-  `topic_poster` mediumint(9) NOT NULL DEFAULT 0,
-  `topic_time` int(11) NOT NULL DEFAULT 0,
-  `topic_views` mediumint(8) unsigned NOT NULL DEFAULT 0,
-  `topic_replies` mediumint(8) unsigned NOT NULL DEFAULT 0,
-  `topic_status` tinyint(4) NOT NULL DEFAULT 0,
-  `topic_vote` tinyint(1) NOT NULL DEFAULT 0,
-  `topic_type` tinyint(4) NOT NULL DEFAULT 0,
-  `topic_last_post_id` mediumint(8) unsigned NOT NULL DEFAULT 0,
-  `topic_first_post_id` mediumint(8) unsigned NOT NULL DEFAULT 0,
-  `topic_moved_id` mediumint(8) unsigned NOT NULL DEFAULT 0,
-  PRIMARY KEY (`topic_id`),
-  KEY `forum_id` (`forum_id`),
-  KEY `topic_moved_id` (`topic_moved_id`),
-  KEY `topic_status` (`topic_status`),
-  KEY `topic_type` (`topic_type`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_bbtopics_watch`
---
-
-DROP TABLE IF EXISTS `nuke_bbtopics_watch`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_bbtopics_watch` (
-  `topic_id` mediumint(8) unsigned NOT NULL DEFAULT 0,
-  `user_id` mediumint(9) NOT NULL DEFAULT 0,
-  `notify_status` tinyint(1) NOT NULL DEFAULT 0,
-  KEY `topic_id` (`topic_id`),
-  KEY `user_id` (`user_id`),
-  KEY `notify_status` (`notify_status`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_bbuser_group`
---
-
-DROP TABLE IF EXISTS `nuke_bbuser_group`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_bbuser_group` (
-  `group_id` mediumint(9) NOT NULL DEFAULT 0,
-  `user_id` mediumint(9) NOT NULL DEFAULT 0,
-  `user_pending` tinyint(1) DEFAULT NULL,
-  KEY `group_id` (`group_id`),
-  KEY `user_id` (`user_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_bbvote_desc`
---
-
-DROP TABLE IF EXISTS `nuke_bbvote_desc`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_bbvote_desc` (
-  `vote_id` mediumint(8) unsigned NOT NULL AUTO_INCREMENT,
-  `topic_id` mediumint(8) unsigned NOT NULL DEFAULT 0,
-  `vote_text` mediumtext NOT NULL,
-  `vote_start` int(11) NOT NULL DEFAULT 0,
-  `vote_length` int(11) NOT NULL DEFAULT 0,
-  PRIMARY KEY (`vote_id`),
-  KEY `topic_id` (`topic_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_bbvote_results`
---
-
-DROP TABLE IF EXISTS `nuke_bbvote_results`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_bbvote_results` (
-  `vote_id` mediumint(8) unsigned NOT NULL DEFAULT 0,
-  `vote_option_id` tinyint(3) unsigned NOT NULL DEFAULT 0,
-  `vote_option_text` varchar(255) NOT NULL DEFAULT '',
-  `vote_result` int(11) NOT NULL DEFAULT 0,
-  KEY `vote_option_id` (`vote_option_id`),
-  KEY `vote_id` (`vote_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_bbvote_voters`
---
-
-DROP TABLE IF EXISTS `nuke_bbvote_voters`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_bbvote_voters` (
-  `vote_id` mediumint(8) unsigned NOT NULL DEFAULT 0,
-  `vote_user_id` mediumint(9) NOT NULL DEFAULT 0,
-  `vote_user_ip` char(8) NOT NULL DEFAULT '',
-  KEY `vote_id` (`vote_id`),
-  KEY `vote_user_id` (`vote_user_id`),
-  KEY `vote_user_ip` (`vote_user_ip`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -3640,4 +3073,4 @@ SET character_set_client = @saved_cs_client;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2025-11-09 13:54:02
+-- Dump completed on 2025-11-09 15:20:07

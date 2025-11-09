@@ -353,7 +353,7 @@ CREATE TABLE `ibl_fa_offers` (
   KEY `idx_team` (`team`),
   CONSTRAINT `fk_faoffer_player` FOREIGN KEY (`name`) REFERENCES `ibl_plr` (`name`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_faoffer_team` FOREIGN KEY (`team`) REFERENCES `ibl_team_info` (`team_name`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1957,21 +1957,6 @@ CREATE TABLE `nuke_bbprivmsgs` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `nuke_bbprivmsgs_text`
---
-
-DROP TABLE IF EXISTS `nuke_bbprivmsgs_text`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_bbprivmsgs_text` (
-  `privmsgs_text_id` mediumint(8) unsigned NOT NULL DEFAULT 0,
-  `privmsgs_bbcode_uid` varchar(10) NOT NULL DEFAULT '0',
-  `privmsgs_text` mediumtext DEFAULT NULL,
-  PRIMARY KEY (`privmsgs_text_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
 -- Table structure for table `nuke_bbranks`
 --
 
@@ -2921,7 +2906,7 @@ CREATE TABLE `nuke_referer` (
   `rid` int(11) NOT NULL AUTO_INCREMENT,
   `url` varchar(100) NOT NULL DEFAULT '',
   PRIMARY KEY (`rid`)
-) ENGINE=MyISAM AUTO_INCREMENT=40185 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=40187 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -3049,7 +3034,7 @@ CREATE TABLE `nuke_stories` (
   KEY `catid` (`catid`),
   KEY `counter` (`counter`),
   KEY `topic` (`topic`)
-) ENGINE=MyISAM AUTO_INCREMENT=4160 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=4162 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -3158,18 +3143,13 @@ CREATE TABLE `nuke_users` (
   `user_style` tinyint(4) DEFAULT NULL,
   `user_lang` varchar(255) NOT NULL DEFAULT 'english',
   `user_dateformat` varchar(14) NOT NULL DEFAULT 'D M d, Y g:i a',
-  `user_new_privmsg` smallint(5) unsigned NOT NULL DEFAULT 0,
-  `user_unread_privmsg` smallint(5) unsigned NOT NULL DEFAULT 0,
-  `user_last_privmsg` int(11) NOT NULL DEFAULT 0,
   `user_emailtime` int(11) DEFAULT NULL,
   `user_allowhtml` tinyint(1) DEFAULT 1,
   `user_allowbbcode` tinyint(1) DEFAULT 1,
   `user_allowsmile` tinyint(1) DEFAULT 1,
   `user_allowavatar` tinyint(1) NOT NULL DEFAULT 1,
-  `user_allow_pm` tinyint(1) NOT NULL DEFAULT 1,
   `user_allow_viewonline` tinyint(1) NOT NULL DEFAULT 1,
   `user_notify` tinyint(1) NOT NULL DEFAULT 0,
-  `user_notify_pm` tinyint(1) NOT NULL DEFAULT 0,
   `user_popup_pm` tinyint(1) NOT NULL DEFAULT 0,
   `user_avatar_type` tinyint(4) NOT NULL DEFAULT 3,
   `user_sig_bbcode_uid` varchar(10) DEFAULT NULL,
@@ -3201,7 +3181,7 @@ CREATE TABLE `nuke_users_temp` (
   `check_num` varchar(50) NOT NULL DEFAULT '',
   `time` varchar(14) NOT NULL DEFAULT '',
   PRIMARY KEY (`user_id`)
-) ENGINE=MyISAM AUTO_INCREMENT=10939 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=10942 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -3661,4 +3641,4 @@ SET character_set_client = @saved_cs_client;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2025-11-07 13:09:24
+-- Dump completed on 2025-11-07 22:48:17

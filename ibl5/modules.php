@@ -18,7 +18,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 if (isset($name) && $name == $_REQUEST['name']) {
     $name = addslashes(trim($name));
     $modstring = strtolower($_SERVER['QUERY_STRING']);
-    if (stripos_clone($name, "..") or ((stripos_clone($modstring, "&file=nickpage") || stripos_clone($modstring, "&user=")) and ($name == "Private_Messages" or $name == "Forums" or $name == "Members_List"))) {
+    if (stripos_clone($name, "..") or ((stripos_clone($modstring, "&file=nickpage") || stripos_clone($modstring, "&user=")) and ($name == "Forums" or $name == "Members_List"))) {
         header("Location: index.php");
     }
 

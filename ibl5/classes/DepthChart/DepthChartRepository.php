@@ -103,20 +103,4 @@ class DepthChartRepository
         
         return true;
     }
-    
-    /**
-     * Gets board configuration
-     * 
-     * @return array Board configuration
-     */
-    public function getBoardConfig(): array
-    {
-        $sql = "SELECT * FROM nuke_bbconfig";
-        $result = $this->db->sql_query($sql);
-        $config = [];
-        while ($row = $this->db->sql_fetchrow($result)) {
-            $config[$row['config_name']] = $row['config_value'];
-        }
-        return $config;
-    }
 }

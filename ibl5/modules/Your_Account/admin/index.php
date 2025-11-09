@@ -382,30 +382,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
             break;
 
         case "delUserConf":
-            $result = $db->sql_query("SELECT user_id from " . $user_prefix . "_users where username='$del_uid'");
-            $row = $db->sql_fetchrow($result);
-            $del_user_id = intval($row['user_id']);
-            $db->sql_query("UPDATE " . $user_prefix . "_bbposts SET poster_id = '1', post_username = '$del_uid' WHERE poster_id = '$del_user_id'");
-            $db->sql_query("UPDATE " . $user_prefix . "_bbtopics SET topic_poster = '1' WHERE topic_poster = '$del_user_id'");
-            $db->sql_query("UPDATE " . $user_prefix . "_bbvote_voters SET vote_user_id = '1' WHERE vote_user_id = '$del_user_id'");
             $db->sql_query("delete from " . $user_prefix . "_users where username='$del_uid'");
-            $db->sql_query("delete from " . $user_prefix . "_bbuser_group where user_id='$del_user_id'");
-            $result2 = $db->sql_query("SELECT group_id FROM " . $user_prefix . "_bbgroups WHERE group_moderator = '$del_user_id'");
-            $row2 = $db->sql_fetchrow($result2);
-            $del_group_id = intval($row2['group_id']);
-            if (intval($del_group_id) > 0) {
-                $db->sql_query("delete from " . $user_prefix . "_bbgroups where group_id='$del_group_id'");
-                $db->sql_query("delete from " . $user_prefix . "_bbauth_access where group_id='$del_group_id'");
-            }
-            $db->sql_query("delete from " . $user_prefix . "_bbtopics_watch where user_id='$del_user_id'");
-            $db->sql_query("delete from " . $user_prefix . "_bbbanlist where ban_userid='$del_user_id'");
-            $result3 = $db->sql_query("SELECT privmsgs_id FROM " . $user_prefix . "_bbprivmsgs WHERE privmsgs_from_userid = '$del_user_id' OR privmsgs_to_userid = '$del_user_id'");
-            while ($row_privmsgs = $db->sql_fetchrow($result3)) {
-                $mark_list[] = $row_privmsgs['privmsgs_id'];
-            }
-            $delete_sql_id = implode(', ', $mark_list);
-            $db->sql_query("delete from " . $user_prefix . "_bbprivmsgs_text where privmsgs_text_id IN ($delete_sql_id)");
-            $db->sql_query("delete from " . $user_prefix . "_bbprivmsgs where privmsgs_id IN ($delete_sql_id)");
             Header("Location: " . $admin_file . ".php?op=adminMain");
             break;
 
@@ -464,14 +441,6 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
                 $result = $db->sql_query($sql);
                 if (!$result) {
                     return;
-                }
-                if ($result) {
-                    $result2 = $db->sql_query("SELECT user_id FROM " . $user_prefix . "_users WHERE username='$add_uname'");
-                    $row2 = $db->sql_fetchrow($result2);
-                    $guserid = intval($row2['user_id']);
-                    $db->sql_query("INSERT INTO " . $prefix . "_bbgroups (group_name, group_description, group_single_user, group_moderator) VALUES ('', 'Personal User', '1', '0')");
-                    $group_id = $db->sql_nextid();
-                    $db->sql_query("INSERT INTO " . $prefix . "_bbuser_group (user_id, group_id, user_pending) VALUES ('$guserid', '$group_id', '0')");
                 }
             }
             Header("Location: " . $admin_file . ".php?op=adminMain");

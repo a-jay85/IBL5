@@ -832,13 +832,6 @@ function verchk()
     if ($resultNew) {
         list($config_value) = mysql_fetch_row($db->sql_query($sqlNew));
         $NCFver = $config_value;
-    } else {
-        $sqlToo = "select config_value from " . $prefix . "_bbconfig where config_name='version'";
-        $resultToo = $db->sql_query($sqlToo);
-        if ($resultToo) {
-            list($config_value) = mysql_fetch_row($db->sql_query($sqlToo));
-            $NCFver = $config_value;
-        }
     }
 }
 
@@ -846,12 +839,8 @@ function bulk()
 {
     global $prefix, $user_prefix, $dbtype, $dbname, $dbuname, $dbpass, $dbhost, $Default_Theme, $language, $locale, $Version_Num, $sitekey, $NCsitename, $NCVersion_Num, $SERVER_NAME, $NClanguage, $NClocale, $NCsitekey, $dbi, $NCDefault_Theme, $NCFver;
 
-    $sql = "select bc.config_value, bt.style_name, bt.template_name from " . $prefix . "_bbthemes bt, " . $prefix . "_bbconfig bc where bc.config_name='default_style' and bc.config_value=bt.themes_id";
+    $sql = "select bc.config_value, bt.style_name, bt.template_name from " . $prefix . "_themes bt, " . $prefix . "_config bc where bc.config_name='default_style' and bc.config_value=bt.themes_id";
     $result = $db->sql_query($sql);
-    if ($result < 1) {
-        $sql = "select bc.config_value, bt.style_name, bt.template_name from " . $prefix . "_themes bt, " . $prefix . "_config bc where bc.config_name='default_style' and bc.config_value=bt.themes_id";
-        $result = $db->sql_query($sql);
-    }
 
     echo "<B>MySQL Connection Transcript for $NCsitename</B>"
         . "<TABLE cellspacing=\"1\" cellpadding=\"3\" cellspacing=\"2\" border=\"1\">"
@@ -1100,47 +1089,9 @@ function ranks()
     global $prefix, $user_prefix, $dbtype, $dbname, $dbuname, $dbpass, $dbhost, $Default_Theme, $language, $locale, $Version_Num, $sitekey;
     global $NCsitename, $NCVersion_Num, $SERVER_NAME, $NClanguage, $NClocale, $NCsitekey, $dbi;
 
-    $sql = "select u.username, u.user_id, r.rank_title, u.user_level from " . $prefix . "_users u, " . $prefix . "_bbranks r where r.rank_id=u.user_rank";
-    $result = $db->sql_query($sql);
-    if ($result) {
-        echo "<B>Member Special Ranks for $NCsitename</B>"
-            . "<TABLE cellspacing=\"1\" cellpadding=\"3\" cellspacing=\"2\" border=\"1\">"
-            . "<TR bgcolor=#FFCC66><TD>phpBB2 Rank Title</TD><TD>PHP-Nuke Rank Level</TD><TD>Member Name</TD><TD>Member UID</TD></TR>";
-
-        while (list($username, $user_id, $rank_title, $user_level) = mysql_fetch_row($result)) {
-            $NCuname = $username;
-            $NCuid = $user_id;
-            $NCrank_title = $rank_title;
-            $NCuser_level = $user_level;
-            if ($NCuser_level == '2') {$NCuser_level = "2: Admin/Author";} elseif ($NCuser_level == '3') {$NCuser_level = "3: Forum Moderator";} else { $NCuser_level = "1: Regular Member";}
-            echo "<TR bgcolor=#FFFF99><TD>$NCrank_title</TD><TD>$NCuser_level</TD><TD>$NCuname</TD><TD>$NCuid</TD></TR>";
-        }
-        mysql_free_result($result);
-        echo "</TABLE>"
-            . "<BR>";
-
-    }
-
-    $sql = "select u.uname, u.uid, r.rank_title, u.user_level from " . $prefix . "_users u, " . $prefix . "_bbranks r where r.rank_id=u.user_rank";
-    $result = $db->sql_query($sql);
-    if ($result) {
-        echo "<B>Member Special Ranks for $NCsitename</B>"
-            . "<TABLE cellspacing=\"1\" cellpadding=\"3\" cellspacing=\"2\" border=\"1\">"
-            . "<TR bgcolor=#FFCC66><TD>phpBB2 Rank Title</TD><TD>PHP-Nuke Rank Level</TD><TD>Member Name</TD><TD>Member UID</TD></TR>";
-
-        while (list($uname, $uid, $rank_title, $user_level) = mysql_fetch_row($result)) {
-            $NCuname = $uname;
-            $NCuid = $uid;
-            $NCrank_title = $rank_title;
-            $NCuser_level = $user_level;
-            if ($NCuser_level == '2') {$NCuser_level = "2: Admin/Author";} elseif ($NCuser_level == '3') {$NCuser_level = "3: Forum Moderator";} else { $NCuser_level = "1: Regular Member";}
-            echo "<TR bgcolor=#FFFF99><TD>$NCrank_title</TD><TD>$NCuser_level</TD><TD>$NCuname</TD><TD>$NCuid</TD></TR>";
-        }
-        mysql_free_result($result);
-        echo "</TABLE>"
-            . "<BR>";
-
-    }
+    // Forum ranks table removed - this function is no longer applicable
+    echo "<B>Member Special Ranks for $NCsitename</B><BR>"
+        . "Forum ranks functionality has been removed.<BR><BR>";
 }
 
 function admins()
@@ -1499,21 +1450,15 @@ function phploc()
 function disablegzip()
 {
 
-    global $prefix, $dbtype, $dbname, $dbuname, $dbpass, $dbhost, $dbi;
+    global $prefix, $dbtype, $dbname, $dbuname, $dbpass, $dbhost, $dbi, $db;
 
     if ($_SERVER['SERVER_NAME'] != "castlecops.com") {
-        $sql = "update " . $prefix . "_bbconfig set config_value='0' where config_name='gzip_compress'";
+        $sql = "update " . $prefix . "_config set config_value='0' where config_name='gzip_compress'";
         $result = $db->sql_query($sql);
         if ($result) {
-            echo "GZIP Compression Setting has been disabled in Nuke Cops bbtonuke port<BR><BR>";
+            echo "GZIP Compression Setting has been disabled<BR><BR>";
         } else {
-            $sql2 = "update " . $prefix . "_config set config_value='0' where config_name='gzip_compress'";
-            $result2 = $db->sql_query($sql2);
-            if ($result2) {
-                echo "GZIP Compression Setting has been disabled<BR><BR>";
-            } else {
-                echo "ERROR: Unable to disable GZIP compression<BR><BR>";
-            }
+            echo "ERROR: Unable to disable GZIP compression<BR><BR>";
         }
     } else {echo "Function Disabled for Computer Cops Servers<BR><BR>";}
 

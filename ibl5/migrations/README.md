@@ -88,6 +88,89 @@ Implements:
 - Reduces API response time through optimized views
 - Improves API security with UUID-based endpoints
 
+### 004_data_type_refinements.sql (Phase 4) 🔄 READY FOR CORRECTION
+
+**Priority:** Medium (Data Quality & Validation)  
+**Estimated Time:** 2-3 hours production deployment  
+**Risk Level:** Low (after corrections applied)  
+**Status:** Migration file exists but requires corrections before implementation
+
+**⚠️ CRITICAL:** This migration has known issues that must be corrected before deployment:
+- Column name mismatches (see `MIGRATION_004_FIXES.md`)
+- Missing foreign key handling for tables with both FK and CHECK constraints
+- References to non-existent columns in several tables
+
+**Prerequisites:**
+- Phase 1, 2, and 3 must be completed ✅
+- InnoDB tables with foreign keys and timestamps in place ✅
+- MySQL 8.0 or higher (for CHECK constraints) ⚠️ VERIFY
+- Migration file corrections applied (see Priority Tasks below) ⚠️ TODO
+
+**Tables Requiring Special Handling:**
+These 4 tables have BOTH foreign keys AND CHECK constraints, requiring special migration approach:
+1. `ibl_box_scores` - 3 foreign keys + 1 CHECK constraint
+2. `ibl_draft` - 1 foreign key + 2 CHECK constraints
+3. `ibl_power` - 1 foreign key + 2 CHECK constraints
+4. `ibl_standings` - 1 foreign key + multiple CHECK constraints
+
+**Foreign Key Handling Required:**
+```sql
+-- For tables with both FK and CHECK constraints
+SET FOREIGN_KEY_CHECKS=0;
+-- Apply data type changes
+-- Add CHECK constraints
+SET FOREIGN_KEY_CHECKS=1;
+-- Verify constraints still valid
+```
+
+**Column Name Corrections Needed:**
+1. **ibl_schedule:** Remove references to `Day` and `Neutral` (columns don't exist)
+2. **ibl_team_win_loss:** Fix case sensitivity, remove `SeasonType` reference
+3. **ibl_draft_picks:** Remove reference to `pick` column (doesn't exist)
+4. **ibl_power:** Use `ranking` not `powerRanking`
+5. **ibl_team_history:** Complete table structure mismatch - remove entire section
+
+**What Will Be Implemented (After Corrections):**
+
+**Part 1 - Data Type Optimizations:**
+- Convert INT to SMALLINT for counts (games, wins, losses)
+- Convert INT to TINYINT for ratings (0-100 scale)  
+- Convert INT to MEDIUMINT for large counters
+- Over 200+ column optimizations across core tables
+
+**Part 2 - ENUM Type Conversions:**
+- Player positions: `ENUM('PG','SG','SF','PF','C','G','F','GF','')`
+- Conference: `ENUM('Eastern','Western')`
+- Data validation at database level
+
+**Part 3 - CHECK Constraints (MySQL 8.0+):**
+- Age constraints (18-50 years)
+- Peak age validation (peak >= age)
+- Winning percentage bounds (0.000-1.000)
+- Rating ranges (0-100)
+- Contract value limits
+- Team ID constraints (0-32)
+- Statistics validation
+
+**Part 4 - NOT NULL Constraints:**
+- Player name, position, team ID
+- Ensures data integrity
+
+**Expected Benefits:**
+- ✅ 30-50% storage reduction on statistics columns
+- ✅ 10-20% query performance improvement from smaller indexes
+- ✅ Data validation at database level prevents invalid data
+- ✅ Self-documenting schema with ENUM types
+- ✅ Improved data quality and integrity
+- ✅ Foundation for robust API data validation
+
+**Priority Tasks Before Implementation:**
+1. ⚠️ **MUST FIX:** Correct column name mismatches in migration file
+2. ⚠️ **MUST FIX:** Add foreign key handling for affected tables
+3. ⚠️ **MUST VERIFY:** Confirm MySQL 8.0+ on production server
+4. ⚠️ **MUST TEST:** Full migration test on development database
+5. ⚠️ **MUST DOCUMENT:** Rollback procedures for each change
+
 ## Running Migrations
 
 ### Prerequisites
@@ -111,9 +194,38 @@ Implements:
 
 **Note:** Phases 1, 2, and 3 are already completed and implemented in production.
 
-#### For Phase 4 (Data Type Refinements) - NEXT STEP
+#### For Phase 4 (Data Type Refinements) - BLOCKED PENDING CORRECTIONS
 
-**IMPORTANT:** Requires MySQL 8.0 or higher for CHECK constraints
+**⚠️ DO NOT RUN YET** - Migration file requires corrections before implementation
+
+**Prerequisites:**
+1. ✅ Phase 1, 2, 3 completed (verified in production schema)
+2. ⚠️ **MUST COMPLETE FIRST:** Correct migration file issues
+3. ⚠️ **MUST VERIFY:** MySQL 8.0+ on production server
+4. ⚠️ **MUST TEST:** Full migration on development database first
+
+**Required Corrections (See DATABASE_OPTIMIZATION_GUIDE.md for details):**
+
+Before Phase 4 can be executed, the following corrections must be applied to `004_data_type_refinements.sql`:
+
+1. **Add Foreign Key Handling:** 
+   - Add `SET FOREIGN_KEY_CHECKS=0;` before altering tables with both FK and CHECK constraints
+   - Add `SET FOREIGN_KEY_CHECKS=1;` after changes complete
+   - Affects: ibl_box_scores, ibl_draft, ibl_power, ibl_standings
+
+2. **Fix Column Name Mismatches:**
+   - Remove `Day` and `Neutral` from ibl_schedule (columns don't exist)
+   - Fix case sensitivity in ibl_team_win_loss
+   - Remove `pick` from ibl_draft_picks (column doesn't exist)
+   - Change `powerRanking` to `ranking` in ibl_power
+   - Remove entire ibl_team_history section (table structure completely different)
+
+3. **Add Data Validation:**
+   - Check for data that would violate new constraints
+   - Add pre-flight queries to detect issues
+   - Document data cleanup required
+
+**Once Corrections Are Applied:**
 
 1. **Verify MySQL Version:**
    ```bash
@@ -121,20 +233,28 @@ Implements:
    ```
    Ensure version is 8.0 or higher for CHECK constraint support.
 
-2. **Connect to database:**
+2. **Test on Development Database:**
    ```bash
-   mysql -u username -p database_name
+   # Create dev database copy
+   mysqldump -u username -p production_db | mysql -u username -p dev_db
+   
+   # Test migration on dev
+   mysql -u username -p dev_db < 004_data_type_refinements_CORRECTED.sql
+   
+   # Verify results
+   # Test application queries
+   # Check for errors
    ```
 
-3. **Verify Prerequisites:**
+3. **Verify Prerequisites on Production:**
    ```sql
-   -- Verify InnoDB tables exist
+   -- Verify InnoDB tables exist (should be 52+)
    SELECT COUNT(*) FROM information_schema.TABLES 
    WHERE TABLE_SCHEMA = DATABASE() 
    AND TABLE_NAME LIKE 'ibl_%' 
    AND ENGINE = 'InnoDB';
    
-   -- Verify foreign keys exist (should be 20+)
+   -- Verify foreign keys exist (should be 21)
    SELECT COUNT(*) FROM information_schema.KEY_COLUMN_USAGE
    WHERE TABLE_SCHEMA = DATABASE()
    AND REFERENCED_TABLE_NAME IS NOT NULL;
@@ -145,11 +265,28 @@ Implements:
    WHERE TABLE_SCHEMA = DATABASE() 
      AND COLUMN_NAME IN ('created_at', 'updated_at')
      AND TABLE_NAME LIKE 'ibl_%';
+     
+   -- Check for tables with both FK and CHECK constraints
+   SELECT DISTINCT tc.TABLE_NAME
+   FROM information_schema.TABLE_CONSTRAINTS tc
+   WHERE tc.TABLE_SCHEMA = DATABASE()
+     AND tc.TABLE_NAME LIKE 'ibl_%'
+     AND tc.CONSTRAINT_TYPE = 'FOREIGN KEY'
+     AND tc.TABLE_NAME IN (
+       SELECT TABLE_NAME 
+       FROM information_schema.TABLE_CONSTRAINTS
+       WHERE TABLE_SCHEMA = DATABASE()
+         AND CONSTRAINT_TYPE = 'CHECK'
+     );
    ```
 
-4. **Run Phase 4 migration:**
+4. **Only After Successful Dev Testing - Run on Production:**
    ```bash
-   mysql -u username -p database_name < 004_data_type_refinements.sql
+   # Full backup first!
+   mysqldump -u username -p database_name > backup_$(date +%Y%m%d_%H%M%S).sql
+   
+   # Run corrected migration
+   mysql -u username -p database_name < 004_data_type_refinements_CORRECTED.sql
    ```
    
    Expected time: 2-3 hours depending on table sizes
@@ -615,13 +752,83 @@ After migrations are complete, establish a maintenance schedule:
 - Plan for schema evolution
 - Archive old data
 
+## Re-Prioritized Optimization Roadmap (November 2025)
+
+Based on analysis of foreign key constraints and current production schema status, the optimization priorities have been re-assessed:
+
+### ✅ Completed Phases
+
+- **Phase 1:** Critical Infrastructure (InnoDB, Indexes) - November 1, 2025
+- **Phase 2:** Foreign Key Relationships (21 constraints) - November 2, 2025  
+- **Phase 3:** API Preparation (Timestamps, UUIDs, Views) - November 4, 2025
+- **Phase 5.1:** Composite Indexes - Implemented
+
+### 🔄 Current Priority: Fix Migration 004
+
+**Timeline:** Immediate (1-2 hours)  
+**Risk:** Low  
+**Value:** Critical for Phase 4 implementation
+
+**Required Actions:**
+1. Correct column name mismatches in 004_data_type_refinements.sql
+2. Add foreign key handling (`SET FOREIGN_KEY_CHECKS=0/1`)
+3. Remove sections referencing non-existent tables/columns
+4. Test corrected migration on development database
+5. Document specific rollback procedures
+
+### 🎯 Next Priority: Implement Phase 4 (After Corrections)
+
+**Timeline:** 2-3 hours (production deployment)  
+**Risk:** Low (with corrections)  
+**Value:** High (30-50% storage savings, better performance)
+
+**Dependencies:**
+- Migration 004 corrections completed
+- MySQL 8.0+ verified on production
+- Full database backup
+- Successful development testing
+
+### Future Priorities
+
+**Priority 3:** Composite Index Expansion (Phase 5.2)
+- Analyze actual query patterns from logs
+- Add targeted indexes for expensive queries
+- Estimated: 10-30% performance gains
+
+**Priority 4:** Legacy Table Evaluation (Phase 6)
+- Review 84 MyISAM PhpNuke tables
+- Identify and remove obsolete tables
+- Document remaining dependencies
+
+**Priority 5:** Advanced Optimizations (Phase 7+)
+- Table partitioning for historical data
+- Schema normalization opportunities
+- Consider PostgreSQL migration preparation
+
+**Deferred:** Column naming standardization (breaking change - defer to API v2)
+
+## Documentation Structure
+
+**Active Documentation:**
+- **DATABASE_OPTIMIZATION_GUIDE.md** - Authoritative optimization reference
+- **DATABASE_GUIDE.md** - Developer quick reference
+- **ibl5/migrations/README.md** - This file
+- **MIGRATION_004_FIXES.md** - Migration 004 correction details
+
+**Archived Documentation** (moved to `.archive/`):
+- DATABASE_SCHEMA_IMPROVEMENTS.md - Original recommendations
+- DATABASE_SCHEMA_GUIDE.md - Superseded by DATABASE_GUIDE.md
+- DATABASE_FUTURE_PHASES.md - Consolidated into optimization guide
+- SCHEMA_IMPLEMENTATION_REVIEW.md - Historical implementation review
+
 ## Support
 
 For issues or questions:
-1. Check troubleshooting section above
-2. Review logs: `/var/log/mysql/error.log`
-3. Check application logs
-4. Review `DATABASE_SCHEMA_IMPROVEMENTS.md` for context
+1. Check DATABASE_OPTIMIZATION_GUIDE.md for current strategy
+2. Check troubleshooting section above
+3. Review logs: `/var/log/mysql/error.log`
+4. Check application logs
+5. Consult archived documentation for historical context
 
 ## Next Steps
 

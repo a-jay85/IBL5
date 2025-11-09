@@ -3434,9 +3434,6 @@
   :41    Method DepthChart\DepthChartRepository::updatePlayerDepthChart() has parameter $depthChartValues with no value type specified in iterable type array.  
          🪪  missingType.iterableValue                                                                                                                          
          💡  See: https://phpstan.org/blog/solving-phpstan-no-value-type-specified-in-iterable-type                                                             
-  :112   Method DepthChart\DepthChartRepository::getBoardConfig() return type has no value type specified in iterable type array.                               
-         🪪  missingType.iterableValue                                                                                                                          
-         💡  See: https://phpstan.org/blog/solving-phpstan-no-value-type-specified-in-iterable-type                                                             
  ------ ------------------------------------------------------------------------------------------------------------------------------------------------------- 
 
  ------ ---------------------------------------------------------------------------------------------------------------------------------------------------- 

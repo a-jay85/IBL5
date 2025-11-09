@@ -211,12 +211,6 @@ function activate($username, $check_num)
         $user_password = htmlspecialchars(stripslashes($row['user_password']));
         if ($check_num == $row['check_num']) {
             $db->sql_query("INSERT INTO " . $user_prefix . "_users (user_id, username, user_email, user_password, user_avatar, user_avatar_type, user_regdate, user_lang) VALUES (NULL, '" . $row['username'] . "', '" . $row['user_email'] . "', '$user_password', 'gallery/blank.gif', '3', '" . $row['user_regdate'] . "', '$language')");
-            $result2 = $db->sql_query("SELECT user_id FROM " . $user_prefix . "_users WHERE username='" . $row['username'] . "'");
-            $row2 = $db->sql_fetchrow($result2);
-            $guserid = intval($row2['user_id']);
-            $db->sql_query("INSERT INTO " . $prefix . "_bbgroups (group_name, group_description, group_single_user, group_moderator) VALUES ('', 'Personal User', '1', '0')");
-            $group_id = $db->sql_nextid();
-            $db->sql_query("INSERT INTO " . $prefix . "_bbuser_group (user_id, group_id, user_pending) VALUES ('$guserid', '$group_id', '0')");
             $db->sql_query("DELETE FROM " . $user_prefix . "_users_temp WHERE username='$username' AND check_num='$check_num'");
             Nuke\Header::header();
             title("" . _ACTIVATIONYES . "");
@@ -252,11 +246,6 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
     $username = substr(htmlspecialchars(str_replace("\'", "'", trim($username))), 0, 25);
     $username = rtrim($username, "\\");
     $username = str_replace("'", "\'", $username);
-    $sql = "SELECT * FROM " . $prefix . "_bbconfig";
-    $result = $db->sql_query($sql);
-    while ($row = $db->sql_fetchrow($result)) {
-        $board_config[$row['config_name']] = $row['config_value'];
-    }
     $sql2 = "SELECT * FROM " . $user_prefix . "_users WHERE username='$username'";
     $result2 = $db->sql_query($sql2);
     $num = $db->sql_numrows($result2);
@@ -294,12 +283,13 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
             $userinfo['user_website'] = '';
         }
     }
-    if ($userinfo['user_avatar_type'] == 1) {
-        $userinfo['user_avatar'] = $board_config['avatar_path'] . "/" . $userinfo['user_avatar'];
-    } elseif ($userinfo['user_avatar_type'] == 2) {
+    // Avatar display - simplified without forum config
+    if ($userinfo['user_avatar_type'] == 2) {
+        // Remote URL - use as-is
         $userinfo['user_avatar'] = $userinfo['user_avatar'];
-    } else {
-        $userinfo['user_avatar'] = $board_config['avatar_gallery_path'] . "/" . $userinfo['user_avatar'];
+    } elseif (!empty($userinfo['user_avatar'])) {
+        // Local avatar - assume in modules/Forums/images/avatars (may not exist after forum removal)
+        $userinfo['user_avatar'] = "modules/Forums/images/avatars/" . $userinfo['user_avatar'];
     }
     if (($num == 1) && ($userinfo['user_website'] || $userinfo['femail'] || $userinfo['bio'] || $userinfo['user_avatar'] || $userinfo['user_icq'] || $userinfo['user_aim'] || $userinfo['user_yim'] || $userinfo['user_msnm'] || $userinfo['user_location'] || $userinfo['user_occ'] || $userinfo['user_interests'] || $userinfo['user_sig'])) {
         echo "<center><font class=\"content\">";
@@ -476,7 +466,6 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
             echo "<tr><td valign=\"middle\"><img src=\"images/karma/3.gif\" border=\"0\" alt=\"" . _KARMADEVIL . "\" title=\"" . _KARMADEVIL . "\"></td><td>" . _KARMADEVILREF . "</td></tr></table>";
             CloseTable2();
         }
-        if (((is_user($user) and $cookie[1] != $username) or is_admin($admin)) and is_active("Private_Messages")) {echo "<br>[ <a href=\"modules.php?name=Private_Messages&amp;mode=post&amp;u=" . intval($userinfo['user_id']) . "\">" . _USENDPRIVATEMSG . " $username_pm</a> ]<br>\n";}
         echo "</center></font>";
     } else {
         echo "<center>" . _NOINFOFOR . " " . htmlentities($username) . "</center>";
@@ -590,35 +579,6 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
             . "<input type=\"hidden\" name=\"who\" value=\"$username\">"
             . "<input type=\"hidden\" name=\"op\" value=\"broadcast\">"
             . "<input type=\"text\" size=\"60\" maxlength=\"255\" name=\"the_message\">&nbsp;&nbsp;<input type=\"submit\" value=\"" . _SEND . "\">"
-            . "</form></center>";
-        CloseTable();
-    }
-    if ((isset($cookie[1])) and is_active("Private_Messages") and ($username == $cookie[1]) and ($userinfo['user_password'] == $cookie[2])) {
-        echo "<br>";
-        OpenTable();
-        echo "<center><b>" . _PRIVATEMESSAGES . "</b><br><br>";
-        $numrow = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_bbprivmsgs WHERE privmsgs_to_userid='" . intval($userinfo['user_id']) . "' AND (privmsgs_type='1' OR privmsgs_type='5' OR privmsgs_type='0')"));
-        if (is_active("Members_List")) {
-            $mem_list = "<a href=\"modules.php?name=Members_List\">" . _BROWSEUSERS . "</a>";
-        } else {
-            $mem_list = "";
-        }
-        if (is_active("Search")) {
-            $mod_search = "<a href=\"modules.php?name=Search&amp;type=users\">" . _SEARCHUSERS . "</a>";
-        } else {
-            $mod_search = "";
-        }
-        if (!empty($mem_list) and !empty($mod_search)) {$a = " | ";} else { $a = "";}
-        if (!empty($mem_list) or !empty($mod_search)) {
-            $links = "[ $mem_list $a $mod_search ]";
-        } elseif (empty($mem_list) and empty($mod_search)) {
-            $links = "";
-        }
-
-        echo "" . _YOUHAVE . " <a href=\"modules.php?name=Private_Messages\"><b>$numrow</b></a> " . _PRIVATEMSG . "<br><br>"
-            . "<form action=\"modules.php?name=Private_Messages\" method=\"post\">"
-            . "" . _USENDPRIVATEMSG . ": <input type=\"text\" name=\"pm_uname\" size=\"20\">&nbsp;&nbsp;$links"
-            . "<input type=\"hidden\" name=\"send\" value=\"1\">"
             . "</form></center>";
         CloseTable();
     }
@@ -819,7 +779,6 @@ function logout()
     $r_username = $cookie[1];
     setcookie("user", false, 1);
     $db->sql_query("DELETE FROM " . $prefix . "_session WHERE uname='$r_username'");
-    $db->sql_query("DELETE FROM " . $prefix . "_bbsessions WHERE session_user_id='$r_uid'");
     $user = "";
     $cookie = "";
     Nuke\Header::header();
@@ -915,9 +874,6 @@ function login($username, $user_password, $redirect, $mode, $f, $t, $random_num,
     $result = $db->sql_query($sql);
     $setinfo = $db->sql_fetchrow($result);
     $forward = mb_ereg_replace("redirect=", "", "$redirect");
-    if (mb_ereg("privmsg", $forward)) {
-        $pm_login = "active";
-    }
     if (($db->sql_numrows($result) == 1) and ($setinfo['user_id'] != 1) and (!empty($setinfo['user_password']))) {
         $dbpass = $setinfo['user_password'];
         $non_crypt_pass = $user_password;
@@ -946,19 +902,7 @@ function login($username, $user_password, $redirect, $mode, $f, $t, $random_num,
             $db->sql_query("DELETE FROM " . $prefix . "_session WHERE uname='$uname' AND guest='1'");
             $db->sql_query("UPDATE " . $prefix . "_users SET last_ip='$uname' WHERE username='$username'");
         }
-        if (!empty($pm_login)) {
-            Header("Location: modules.php?name=Private_Messages&file=index&folder=inbox");
-            exit;
-        }
-        if (empty($redirect)) {
-            Header("Location: modules.php?name=Your_Account&op=userinfo&bypass=1&username=$username");
-        } else if (empty($mode)) {
-            Header("Location: modules.php?name=Forums&file=$forward");
-        } else if (!empty($t)) {
-            Header("Location: modules.php?name=Forums&file=$forward&mode=$mode&t=$t");
-        } else {
-            Header("Location: modules.php?name=Forums&file=$forward&mode=$mode&f=$f");
-        }
+        Header("Location: modules.php?name=Your_Account&op=userinfo&bypass=1&username=$username");
     } else {
         Header("Location: modules.php?name=$module_name&stop=1");
     }
@@ -976,7 +920,7 @@ function edituser()
         CloseTable();
         echo "<br>";
         OpenTable();
-        nav();
+        Nuke\Navbar::nav();
         CloseTable();
         echo "<br>";
         if (!preg_match('#^http[s]?:\/\/#i', $userinfo['user_website'])) {
@@ -1049,26 +993,6 @@ function edituser()
         } elseif ($userinfo['user_notify'] == 0) {
             echo "<input type=\"radio\" name=\"user_notify\" value=\"1\">" . _YES . " &nbsp;"
                 . "<input type=\"radio\" name=\"user_notify\" value=\"0\" checked>" . _NO . "";
-        }
-        echo "</td></tr>";
-
-        echo "<tr><td bgcolor='$bgcolor2'><b>" . _PMNOTIFY . ":</b></td><td bgcolor='$bgcolor3'>";
-        if ($userinfo['user_notify_pm'] == 1) {
-            echo "<input type=\"radio\" name=\"user_notify_pm\" value=\"1\" checked>" . _YES . " &nbsp;"
-                . "<input type=\"radio\" name=\"user_notify_pm\" value=\"0\">" . _NO . "";
-        } elseif ($userinfo['user_notify_pm'] == 0) {
-            echo "<input type=\"radio\" name=\"user_notify_pm\" value=\"1\">" . _YES . " &nbsp;"
-                . "<input type=\"radio\" name=\"user_notify_pm\" value=\"0\" checked>" . _NO . "";
-        }
-        echo "</td></tr>";
-
-        echo "<tr><td bgcolor='$bgcolor2'><b>" . _POPPM . ":</b><br>" . _POPPMMSG . "</td><td bgcolor='$bgcolor3'>";
-        if ($userinfo['user_popup_pm'] == 1) {
-            echo "<input type=\"radio\" name=\"user_popup_pm\" value=\"1\" checked>" . _YES . " &nbsp;"
-                . "<input type=\"radio\" name=\"user_popup_pm\" value=\"0\">" . _NO . "";
-        } elseif ($userinfo['user_popup_pm'] == 0) {
-            echo "<input type=\"radio\" name=\"user_popup_pm\" value=\"1\">" . _YES . " &nbsp;"
-                . "<input type=\"radio\" name=\"user_popup_pm\" value=\"0\" checked>" . _NO . "";
         }
         echo "</td></tr>";
 
@@ -1151,83 +1075,65 @@ function edituser()
         $direktori = "modules/Forums/images/avatars";
         $dir = @opendir($direktori);
         $avatar_images = array();
-        while ($file = @readdir($dir)) {
-            if ($file != '.' && $file != '..' && !is_file($direktori . '/' . $file) && !is_link($direktori . '/' . $file)) {
-                $sub_dir = @opendir($direktori . '/' . $file);
-                $avatar_row_count = 0;
-                $avatar_col_count = 0;
-                while ($sub_file = @readdir($sub_dir)) {
-                    if (preg_match('/(\.gif$|\.png$|\.jpg|\.jpeg)$/is', $sub_file)) {
-                        $avatar_images[$file][$avatar_row_count][$avatar_col_count] = $file . '/' . $sub_file;
-                        $avatar_name[$file][$avatar_row_count][$avatar_col_count] = ucfirst(str_replace("_", " ", preg_replace('/^(.*)\..*$/', '\1', $sub_file)));
-                        $avatar_col_count++;
-                        if ($avatar_col_count == 5) {
-                            $avatar_row_count++;
-                            $avatar_col_count = 0;
+        if ($dir !== false) {
+            while ($file = @readdir($dir)) {
+                if ($file != '.' && $file != '..' && !is_file($direktori . '/' . $file) && !is_link($direktori . '/' . $file)) {
+                    $sub_dir = @opendir($direktori . '/' . $file);
+                    if ($sub_dir !== false) {
+                        $avatar_row_count = 0;
+                        $avatar_col_count = 0;
+                        while ($sub_file = @readdir($sub_dir)) {
+                            if (preg_match('/(\.gif$|\.png$|\.jpg|\.jpeg)$/is', $sub_file)) {
+                                $avatar_images[$file][$avatar_row_count][$avatar_col_count] = $file . '/' . $sub_file;
+                                $avatar_name[$file][$avatar_row_count][$avatar_col_count] = ucfirst(str_replace("_", " ", preg_replace('/^(.*)\..*$/', '\1', $sub_file)));
+                                $avatar_col_count++;
+                                if ($avatar_col_count == 5) {
+                                    $avatar_row_count++;
+                                    $avatar_col_count = 0;
+                                }
+                            }
                         }
+                        @closedir($sub_dir);
                     }
                 }
             }
+            @closedir($dir);
         }
-        @closedir($dir);
         @ksort($avatar_images);
         @reset($avatar_images);
         if (empty($category)) {
-            list($category) = each($avatar_images);
+            $category = key($avatar_images);
         }
         @reset($avatar_images);
         $s_categories = '<select name="avatarcategory">';
-        while (list($key) = each($avatar_images)) {
+        foreach ($avatar_images as $key => $value) {
             $selected = ($key == $category) ? ' selected="selected"' : '';
             if (count($avatar_images[$key])) {
                 $s_categories .= '<option value="' . $key . '"' . $selected . '>' . ucfirst($key) . '</option>';
             }
         }
         $s_categories .= '</select>';
-        $sql = "SELECT * FROM " . $prefix . "_bbconfig";
-        $result = $db->sql_query($sql);
-        while ($row = $db->sql_fetchrow($result)) {
-            $board_config[$row['config_name']] = $row['config_value'];
-        }
-        if ($userinfo['user_avatar_type'] == 1) {
-            $userinfo['user_avatar'] = $board_config['avatar_path'] . "/" . $userinfo['user_avatar'];
-        } elseif ($userinfo['user_avatar_type'] == 2) {
+        // Avatar display - simplified without forum config
+        if ($userinfo['user_avatar_type'] == 2) {
+            // Remote URL - use as-is
             $userinfo['user_avatar'] = $userinfo['user_avatar'];
-        } else {
-            $userinfo['user_avatar'] = $board_config['avatar_gallery_path'] . "/" . $userinfo['user_avatar'];
+        } elseif (!empty($userinfo['user_avatar'])) {
+            // Local avatar - assume in modules/Forums/images/avatars (may not exist after forum removal)
+            $userinfo['user_avatar'] = "modules/Forums/images/avatars/" . $userinfo['user_avatar'];
         }
         echo "<tr><td bgcolor='$bgcolor3' colspan='2' align='center'>"
         . "<BR><b><h5>Avatar control panel</h5></b>"
-        . "<tr><td bgcolor='$bgcolor2'>Displays a small graphic image below your details in forum posts and on your profile. Only one image can be displayed at a time, its width can be no greater than " . $board_config['avatar_max_width'] . " pixels, the height no greater than " . $board_config['avatar_max_height'] . " pixels, and the file size no more than " . CoolSize($board_config['avatar_filesize']) . ".</td>";
+        . "<tr><td bgcolor='$bgcolor2'>Displays a small graphic image below your details in forum posts and on your profile.</td>";
         echo "<td bgcolor='$bgcolor3' align=center>Current Avatar<BR><BR><IMG alt=\"\" src=\"$userinfo[user_avatar]\"></td></tr><BR>";
-        if ($board_config['allow_avatar_local']) {
-            echo "<form action=\"modules.php?name=Your_Account&op=avatarlist\" method=\"post\">"
-                . "<tr><td bgcolor='$bgcolor2'><b>Select Avatar from gallery:</b></td>"
-                . "<td bgcolor='$bgcolor3'>" . $s_categories . "&nbsp;<img src=\"images/right.gif\" align=middle>&nbsp;<INPUT class=button type=submit value=\"Show Gallery\"></td></tr>"
-                . "</form>";
-        } else {
-            echo "<tr><td bgcolor='$bgcolor2'><b>Select Avatar from gallery:</b></td>"
-                . "<td bgcolor='$bgcolor3'><b>Gallery Avatars Currently Disabled</b></td></tr>";
-        }
-        if ($board_config['allow_avatar_upload']) {
-            echo "<tr><td bgcolor='$bgcolor2'><b>Upload Avatar from your machine:</b></td>"
-                . "<td bgcolor='$bgcolor3'><a href=\"modules.php?name=Forums&file=profile&mode=editprofile\"><b>Upload Through Forum Profile</b></a></td></tr>"
-                . "<tr><td bgcolor='$bgcolor2'><b>Upload Avatar from a URL:</b><br><SPAN class=gensmall>Enter the URL of the location containing the Avatar image and click on the submit button below, the Avatar image will be copied to this site.</SPAN></td>"
-                . "<td bgcolor='$bgcolor3'><a href=\"modules.php?name=Forums&file=profile&mode=editprofile\"><b>Upload Through Forum Profile</b></a></td></tr>";
-        } else {
-            echo "<tr><td bgcolor='$bgcolor2'><b>Upload Avatar from your machine:</b></td>"
-                . "<td bgcolor='$bgcolor3'><b>Currently Disabled</b></td></tr>"
-                . "<tr><td bgcolor='$bgcolor2'><b>Upload Avatar from a URL:</b><br><SPAN class=gensmall>Enter the URL of the location containing the Avatar image and click on the submit button below, the Avatar image will be copied to this site.</SPAN></td>"
-                . "<td bgcolor='$bgcolor3'><b>Currently Disabled</b></td></tr>";
-        }
-        if ($board_config['allow_avatar_remote']) {
-            echo "<form action=\"modules.php?name=Your_Account&op=avatarlinksave\" method=\"post\">"
-                . "<tr><td bgcolor='$bgcolor2'><b>Link to off-site Avatar:</b><br><SPAN class=gensmall>Enter the URL of the location containing the Avatar image you wish to link to and click on the submit button below.</SPAN></td>"
-                . "<td bgcolor='$bgcolor3'><INPUT class=post style=\"WIDTH: 200px\" size=40 name=avatar></td></tr>";
-        } else {
-            echo "<tr><td bgcolor='$bgcolor2'><b>Link to off-site Avatar:</b><br><SPAN class=gensmall>Enter the URL of the location containing the Avatar image you wish to link to and click on the submit button below.</SPAN></td>"
-                . "<td bgcolor='$bgcolor3'><b>Currently Disabled</b></td></tr>";
-        }
+        echo "<tr><td bgcolor='$bgcolor2'><b>Select Avatar from gallery:</b></td>"
+            . "<td bgcolor='$bgcolor3'><b>Gallery Avatars Currently Disabled</b></td></tr>";
+        echo "<tr><td bgcolor='$bgcolor2'><b>Upload Avatar from your machine:</b></td>"
+            . "<td bgcolor='$bgcolor3'><b>Currently Disabled</b></td></tr>"
+            . "<tr><td bgcolor='$bgcolor2'><b>Upload Avatar from a URL:</b><br><SPAN class=gensmall>Enter the URL of the location containing the Avatar image and click on the submit button below, the Avatar image will be copied to this site.</SPAN></td>"
+            . "<td bgcolor='$bgcolor3'><b>Currently Disabled</b></td></tr>";
+        echo "<form action=\"modules.php?name=Your_Account&op=avatarlinksave\" method=\"post\">"
+            . "<tr><td bgcolor='$bgcolor2'><b>Link to off-site Avatar:</b><br><SPAN class=gensmall>Enter the URL of the location containing the Avatar image you wish to link to and click on the submit button below.</SPAN></td>"
+            . "<td bgcolor='$bgcolor3'><INPUT class=post style=\"WIDTH: 200px\" size=40 name=avatar></td></tr>";
         echo "<tr><td bgcolor='$bgcolor3' colspan='2' align='center'>"
             . "<INPUT class=mainoption type=submit value=Save&nbsp;Avatar>"
             . "</form></TD></TR></TABLE>";
@@ -1238,7 +1144,7 @@ function edituser()
     }
 }
 
-function saveuser($realname, $user_email, $femail, $user_website, $user_icq, $user_aim, $user_yim, $user_msnm, $user_from, $user_occ, $user_interests, $newsletter, $user_viewemail, $user_allow_viewonline, $user_notify, $user_notify_pm, $user_popup_pm, $user_attachsig, $user_allowbbcode, $user_allowhtml, $user_allowsmile, $user_timezone, $user_dateformat, $user_sig, $bio, $user_password, $vpass, $username, $user_id)
+function saveuser($realname, $user_email, $femail, $user_website, $user_icq, $user_aim, $user_yim, $user_msnm, $user_from, $user_occ, $user_interests, $newsletter, $user_viewemail, $user_allow_viewonline, $user_notify, $user_attachsig, $user_allowbbcode, $user_allowhtml, $user_allowsmile, $user_timezone, $user_dateformat, $user_sig, $bio, $user_password, $vpass, $username, $user_id)
 {
     global $user, $cookie, $userinfo, $EditedMessage, $user_prefix, $db, $module_name, $minpass;
     $user_password = htmlspecialchars(stripslashes($user_password));
@@ -1288,13 +1194,11 @@ function saveuser($realname, $user_email, $femail, $user_website, $user_icq, $us
                 $newsletter = intval($newsletter);
                 $user_allow_viewonline = intval($user_allow_viewonline);
                 $user_notify = intval($user_notify);
-                $user_notify_pm = intval($user_notify_pm);
-                $user_popup_pm = intval($user_popup_pm);
                 $user_allowbbcode = intval($user_allowbbcode);
                 $user_allowhtml = intval($user_allowhtml);
                 $user_allowsmile = intval($user_allowsmile);
                 $user_id = intval($user_id);
-                $db->sql_query("UPDATE " . $user_prefix . "_users SET name='$realname', user_email='$user_email', femail='$femail', user_website='$user_website', user_password='$user_password', bio='$bio', user_icq='$user_icq', user_occ='$user_occ', user_from='$user_from', user_interests='$user_interests', user_sig='$user_sig', user_aim='$user_aim', user_yim='$user_yim', user_msnm='$user_msnm', newsletter='$newsletter', user_viewemail='$user_viewemail', user_allow_viewonline='$user_allow_viewonline', user_notify='$user_notify', user_notify_pm='$user_notify_pm', user_popup_pm='$user_popup_pm', user_attachsig='$user_attachsig', user_allowbbcode='$user_allowbbcode', user_allowhtml='$user_allowhtml', user_allowsmile='$user_allowsmile', user_timezone='$user_timezone', user_dateformat='$user_dateformat' WHERE user_id='$user_id'");
+                $db->sql_query("UPDATE " . $user_prefix . "_users SET name='$realname', user_email='$user_email', femail='$femail', user_website='$user_website', user_password='$user_password', bio='$bio', user_icq='$user_icq', user_occ='$user_occ', user_from='$user_from', user_interests='$user_interests', user_sig='$user_sig', user_aim='$user_aim', user_yim='$user_yim', user_msnm='$user_msnm', newsletter='$newsletter', user_viewemail='$user_viewemail', user_allow_viewonline='$user_allow_viewonline', user_notify='$user_notify', user_attachsig='$user_attachsig', user_allowbbcode='$user_allowbbcode', user_allowhtml='$user_allowhtml', user_allowsmile='$user_allowsmile', user_timezone='$user_timezone', user_dateformat='$user_dateformat' WHERE user_id='$user_id'");
                 $sql = "SELECT user_id, username, user_password, storynum, umode, uorder, thold, noscore, ublockon, theme FROM " . $user_prefix . "_users WHERE username='$username' AND user_password='$user_password'";
                 $result = $db->sql_query($sql);
                 if ($db->sql_numrows($result) == 1) {
@@ -1305,7 +1209,7 @@ function saveuser($realname, $user_email, $femail, $user_website, $user_icq, $us
                 }
                 $db->sql_query("UNLOCK TABLES");
             } else {
-                $db->sql_query("UPDATE " . $user_prefix . "_users SET name='$realname', user_email='$user_email', femail='$femail', user_website='$user_website', bio='$bio', user_icq='$user_icq', user_occ='$user_occ', user_from='$user_from', user_interests='$user_interests', user_sig='$user_sig', user_aim='$user_aim', user_yim='$user_yim', user_msnm='$user_msnm', newsletter='$newsletter', user_viewemail='$user_viewemail', user_allow_viewonline='$user_allow_viewonline', user_notify='$user_notify', user_notify_pm='$user_notify_pm', user_popup_pm='$user_popup_pm', user_attachsig='$user_attachsig', user_allowbbcode='$user_allowbbcode', user_allowhtml='$user_allowhtml', user_allowsmile='$user_allowsmile', user_timezone='$user_timezone', user_dateformat='$user_dateformat' WHERE user_id='$user_id'");
+                $db->sql_query("UPDATE " . $user_prefix . "_users SET name='$realname', user_email='$user_email', femail='$femail', user_website='$user_website', bio='$bio', user_icq='$user_icq', user_occ='$user_occ', user_from='$user_from', user_interests='$user_interests', user_sig='$user_sig', user_aim='$user_aim', user_yim='$user_yim', user_msnm='$user_msnm', newsletter='$newsletter', user_viewemail='$user_viewemail', user_allow_viewonline='$user_allow_viewonline', user_notify='$user_notify', user_attachsig='$user_attachsig', user_allowbbcode='$user_allowbbcode', user_allowhtml='$user_allowhtml', user_allowsmile='$user_allowsmile', user_timezone='$user_timezone', user_dateformat='$user_dateformat' WHERE user_id='$user_id'");
             }
             Header("Location: modules.php?name=$module_name");
         }
@@ -1324,7 +1228,7 @@ function edithome()
         CloseTable();
         echo "<br>";
         OpenTable();
-        nav();
+        Nuke\Navbar::nav();
         CloseTable();
         echo "<br>";
         if (empty($userinfo['theme'])) {
@@ -1390,7 +1294,7 @@ function chgtheme()
         CloseTable();
         echo "<br>";
         OpenTable();
-        nav();
+        Nuke\Navbar::nav();
         CloseTable();
         echo "<br>";
         OpenTable();
@@ -1504,7 +1408,7 @@ function editcomm()
         CloseTable();
         echo "<br>";
         OpenTable();
-        nav();
+        Nuke\Navbar::nav();
         CloseTable();
         echo "<br>";
         OpenTable();
@@ -1594,7 +1498,7 @@ function avatarlist($avatarcategory)
         $avatarcategory = htmlspecialchars($avatarcategory); //SecurityReason Fix 2005 - sp3x
         title("" . $avatarcategory . " Avatar Gallery");
         Opentable();
-        nav();
+        Nuke\Navbar::nav();
         CloseTable();
         echo "<br>";
         Opentable();
@@ -1648,19 +1552,16 @@ function avatarlist($avatarcategory)
 
 function avatarsave($avatar, $category)
 {
-    global $user_prefix, $db, $module_name, $user, $cookie, $prefix;
-    $sql = "SELECT * FROM " . $prefix . "_bbconfig WHERE config_name = 'allow_avatar_local'";
-    $result = $db->sql_query($sql);
-    if ($row = $db->sql_fetchrow($result)) {
-        $allow_avatar_local = $row['config_value'];
-    } else { $allow_avatar_local = 0;}
+    global $user_prefix, $db, $module_name, $user, $cookie;
+    // Avatar gallery functionality disabled after forum removal
+    $allow_avatar_local = 0;
     if (is_user($user) and $allow_avatar_local) {
         getusrinfo($user);
         cookiedecode($user);
         Nuke\Header::header();
         title("Avatar Selection Successful!");
         OpenTable();
-        nav();
+        Nuke\Navbar::nav();
         CloseTable();
         OpenTable();
         $category = stripslashes(check_html($category, "nohtml"));
@@ -1679,19 +1580,16 @@ function avatarsave($avatar, $category)
 
 function avatarlinksave($avatar)
 {
-    global $user_prefix, $db, $module_name, $user, $cookie, $prefix;
-    $sql = "SELECT * FROM " . $prefix . "_bbconfig WHERE config_name = 'allow_avatar_remote'";
-    $result = $db->sql_query($sql);
-    if ($row = $db->sql_fetchrow($result)) {
-        $allow_avatar_remote = $row['config_value'];
-    } else { $allow_avatar_remote = 0;}
+    global $user_prefix, $db, $module_name, $user, $cookie;
+    // Remote avatar linking is still allowed
+    $allow_avatar_remote = 1;
     if (is_user($user) and $allow_avatar_remote) {
         getusrinfo($user);
         cookiedecode($user);
         Nuke\Header::header();
         title("Avatar Selection Successful!");
         OpenTable();
-        nav();
+        Nuke\Navbar::nav();
         CloseTable();
         OpenTable();
         if (!preg_match("#^http:\/\/#i", $avatar)) {
@@ -1878,7 +1776,7 @@ switch ($op) {
         break;
 
     case "saveuser":
-        saveuser($realname, $user_email, $femail, $user_website, $user_icq, $user_aim, $user_yim, $user_msnm, $user_from, $user_occ, $user_interests, $newsletter, $user_viewemail, $user_allow_viewonline, $user_notify, $user_notify_pm, $user_popup_pm, $user_attachsig, $user_allowbbcode, $user_allowhtml, $user_allowsmile, $user_timezone, $user_dateformat, $user_sig, $bio, $user_password, $vpass, $username, $user_id);
+        saveuser($realname, $user_email, $femail, $user_website, $user_icq, $user_aim, $user_yim, $user_msnm, $user_from, $user_occ, $user_interests, $newsletter, $user_viewemail, $user_allow_viewonline, $user_notify, $user_attachsig, $user_allowbbcode, $user_allowhtml, $user_allowsmile, $user_timezone, $user_dateformat, $user_sig, $bio, $user_password, $vpass, $username, $user_id);
         break;
 
     case "edithome":

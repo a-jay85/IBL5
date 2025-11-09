@@ -29,7 +29,6 @@ class NegotiationViewHelper
         int $maxYearOneSalary
     ): string {
         $playerName = DatabaseService::safeHtmlOutput($player->name);
-        $playerPos = DatabaseService::safeHtmlOutput($player->position);
         $playerID = (int)$player->playerID;
         $teamName = DatabaseService::safeHtmlOutput($player->teamName);
         

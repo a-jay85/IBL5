@@ -39,6 +39,8 @@ class NegotiationProcessor
             $player = Player::withPlayerID($this->db, $playerID);
         } catch (\Exception $e) {
             return NegotiationViewHelper::renderError('Player not found.');
+        } catch (\TypeError $e) {
+            return NegotiationViewHelper::renderError('Player not found.');
         }
         
         // Render page header

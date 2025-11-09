@@ -442,14 +442,6 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
                 if (!$result) {
                     return;
                 }
-                if ($result) {
-                    $result2 = $db->sql_query("SELECT user_id FROM " . $user_prefix . "_users WHERE username='$add_uname'");
-                    $row2 = $db->sql_fetchrow($result2);
-                    $guserid = intval($row2['user_id']);
-                    $db->sql_query("INSERT INTO " . $prefix . "_bbgroups (group_name, group_description, group_single_user, group_moderator) VALUES ('', 'Personal User', '1', '0')");
-                    $group_id = $db->sql_nextid();
-                    $db->sql_query("INSERT INTO " . $prefix . "_bbuser_group (user_id, group_id, user_pending) VALUES ('$guserid', '$group_id', '0')");
-                }
             }
             Header("Location: " . $admin_file . ".php?op=adminMain");
             break;

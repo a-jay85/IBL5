@@ -211,12 +211,6 @@ function activate($username, $check_num)
         $user_password = htmlspecialchars(stripslashes($row['user_password']));
         if ($check_num == $row['check_num']) {
             $db->sql_query("INSERT INTO " . $user_prefix . "_users (user_id, username, user_email, user_password, user_avatar, user_avatar_type, user_regdate, user_lang) VALUES (NULL, '" . $row['username'] . "', '" . $row['user_email'] . "', '$user_password', 'gallery/blank.gif', '3', '" . $row['user_regdate'] . "', '$language')");
-            $result2 = $db->sql_query("SELECT user_id FROM " . $user_prefix . "_users WHERE username='" . $row['username'] . "'");
-            $row2 = $db->sql_fetchrow($result2);
-            $guserid = intval($row2['user_id']);
-            $db->sql_query("INSERT INTO " . $prefix . "_bbgroups (group_name, group_description, group_single_user, group_moderator) VALUES ('', 'Personal User', '1', '0')");
-            $group_id = $db->sql_nextid();
-            $db->sql_query("INSERT INTO " . $prefix . "_bbuser_group (user_id, group_id, user_pending) VALUES ('$guserid', '$group_id', '0')");
             $db->sql_query("DELETE FROM " . $user_prefix . "_users_temp WHERE username='$username' AND check_num='$check_num'");
             Nuke\Header::header();
             title("" . _ACTIVATIONYES . "");
@@ -252,11 +246,6 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
     $username = substr(htmlspecialchars(str_replace("\'", "'", trim($username))), 0, 25);
     $username = rtrim($username, "\\");
     $username = str_replace("'", "\'", $username);
-    $sql = "SELECT * FROM " . $prefix . "_bbconfig";
-    $result = $db->sql_query($sql);
-    while ($row = $db->sql_fetchrow($result)) {
-        $board_config[$row['config_name']] = $row['config_value'];
-    }
     $sql2 = "SELECT * FROM " . $user_prefix . "_users WHERE username='$username'";
     $result2 = $db->sql_query($sql2);
     $num = $db->sql_numrows($result2);
@@ -294,12 +283,13 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
             $userinfo['user_website'] = '';
         }
     }
-    if ($userinfo['user_avatar_type'] == 1) {
-        $userinfo['user_avatar'] = $board_config['avatar_path'] . "/" . $userinfo['user_avatar'];
-    } elseif ($userinfo['user_avatar_type'] == 2) {
+    // Avatar display - simplified without forum config
+    if ($userinfo['user_avatar_type'] == 2) {
+        // Remote URL - use as-is
         $userinfo['user_avatar'] = $userinfo['user_avatar'];
-    } else {
-        $userinfo['user_avatar'] = $board_config['avatar_gallery_path'] . "/" . $userinfo['user_avatar'];
+    } elseif (!empty($userinfo['user_avatar'])) {
+        // Local avatar - assume in modules/Forums/images/avatars (may not exist after forum removal)
+        $userinfo['user_avatar'] = "modules/Forums/images/avatars/" . $userinfo['user_avatar'];
     }
     if (($num == 1) && ($userinfo['user_website'] || $userinfo['femail'] || $userinfo['bio'] || $userinfo['user_avatar'] || $userinfo['user_icq'] || $userinfo['user_aim'] || $userinfo['user_yim'] || $userinfo['user_msnm'] || $userinfo['user_location'] || $userinfo['user_occ'] || $userinfo['user_interests'] || $userinfo['user_sig'])) {
         echo "<center><font class=\"content\">";
@@ -789,7 +779,6 @@ function logout()
     $r_username = $cookie[1];
     setcookie("user", false, 1);
     $db->sql_query("DELETE FROM " . $prefix . "_session WHERE uname='$r_username'");
-    $db->sql_query("DELETE FROM " . $prefix . "_bbsessions WHERE session_user_id='$r_uid'");
     $user = "";
     $cookie = "";
     Nuke\Header::header();
@@ -1119,50 +1108,27 @@ function edituser()
             }
         }
         $s_categories .= '</select>';
-        $sql = "SELECT * FROM " . $prefix . "_bbconfig";
-        $result = $db->sql_query($sql);
-        while ($row = $db->sql_fetchrow($result)) {
-            $board_config[$row['config_name']] = $row['config_value'];
-        }
-        if ($userinfo['user_avatar_type'] == 1) {
-            $userinfo['user_avatar'] = $board_config['avatar_path'] . "/" . $userinfo['user_avatar'];
-        } elseif ($userinfo['user_avatar_type'] == 2) {
+        // Avatar display - simplified without forum config
+        if ($userinfo['user_avatar_type'] == 2) {
+            // Remote URL - use as-is
             $userinfo['user_avatar'] = $userinfo['user_avatar'];
-        } else {
-            $userinfo['user_avatar'] = $board_config['avatar_gallery_path'] . "/" . $userinfo['user_avatar'];
+        } elseif (!empty($userinfo['user_avatar'])) {
+            // Local avatar - assume in modules/Forums/images/avatars (may not exist after forum removal)
+            $userinfo['user_avatar'] = "modules/Forums/images/avatars/" . $userinfo['user_avatar'];
         }
         echo "<tr><td bgcolor='$bgcolor3' colspan='2' align='center'>"
         . "<BR><b><h5>Avatar control panel</h5></b>"
-        . "<tr><td bgcolor='$bgcolor2'>Displays a small graphic image below your details in forum posts and on your profile. Only one image can be displayed at a time, its width can be no greater than " . $board_config['avatar_max_width'] . " pixels, the height no greater than " . $board_config['avatar_max_height'] . " pixels, and the file size no more than " . CoolSize($board_config['avatar_filesize']) . ".</td>";
+        . "<tr><td bgcolor='$bgcolor2'>Displays a small graphic image below your details in forum posts and on your profile.</td>";
         echo "<td bgcolor='$bgcolor3' align=center>Current Avatar<BR><BR><IMG alt=\"\" src=\"$userinfo[user_avatar]\"></td></tr><BR>";
-        if ($board_config['allow_avatar_local']) {
-            echo "<form action=\"modules.php?name=Your_Account&op=avatarlist\" method=\"post\">"
-                . "<tr><td bgcolor='$bgcolor2'><b>Select Avatar from gallery:</b></td>"
-                . "<td bgcolor='$bgcolor3'>" . $s_categories . "&nbsp;<img src=\"images/right.gif\" align=middle>&nbsp;<INPUT class=button type=submit value=\"Show Gallery\"></td></tr>"
-                . "</form>";
-        } else {
-            echo "<tr><td bgcolor='$bgcolor2'><b>Select Avatar from gallery:</b></td>"
-                . "<td bgcolor='$bgcolor3'><b>Gallery Avatars Currently Disabled</b></td></tr>";
-        }
-        if ($board_config['allow_avatar_upload']) {
-            echo "<tr><td bgcolor='$bgcolor2'><b>Upload Avatar from your machine:</b></td>"
-                . "<td bgcolor='$bgcolor3'><b>Currently Disabled</b></td></tr>"
-                . "<tr><td bgcolor='$bgcolor2'><b>Upload Avatar from a URL:</b><br><SPAN class=gensmall>Enter the URL of the location containing the Avatar image and click on the submit button below, the Avatar image will be copied to this site.</SPAN></td>"
-                . "<td bgcolor='$bgcolor3'><b>Currently Disabled</b></td></tr>";
-        } else {
-            echo "<tr><td bgcolor='$bgcolor2'><b>Upload Avatar from your machine:</b></td>"
-                . "<td bgcolor='$bgcolor3'><b>Currently Disabled</b></td></tr>"
-                . "<tr><td bgcolor='$bgcolor2'><b>Upload Avatar from a URL:</b><br><SPAN class=gensmall>Enter the URL of the location containing the Avatar image and click on the submit button below, the Avatar image will be copied to this site.</SPAN></td>"
-                . "<td bgcolor='$bgcolor3'><b>Currently Disabled</b></td></tr>";
-        }
-        if ($board_config['allow_avatar_remote']) {
-            echo "<form action=\"modules.php?name=Your_Account&op=avatarlinksave\" method=\"post\">"
-                . "<tr><td bgcolor='$bgcolor2'><b>Link to off-site Avatar:</b><br><SPAN class=gensmall>Enter the URL of the location containing the Avatar image you wish to link to and click on the submit button below.</SPAN></td>"
-                . "<td bgcolor='$bgcolor3'><INPUT class=post style=\"WIDTH: 200px\" size=40 name=avatar></td></tr>";
-        } else {
-            echo "<tr><td bgcolor='$bgcolor2'><b>Link to off-site Avatar:</b><br><SPAN class=gensmall>Enter the URL of the location containing the Avatar image you wish to link to and click on the submit button below.</SPAN></td>"
-                . "<td bgcolor='$bgcolor3'><b>Currently Disabled</b></td></tr>";
-        }
+        echo "<tr><td bgcolor='$bgcolor2'><b>Select Avatar from gallery:</b></td>"
+            . "<td bgcolor='$bgcolor3'><b>Gallery Avatars Currently Disabled</b></td></tr>";
+        echo "<tr><td bgcolor='$bgcolor2'><b>Upload Avatar from your machine:</b></td>"
+            . "<td bgcolor='$bgcolor3'><b>Currently Disabled</b></td></tr>"
+            . "<tr><td bgcolor='$bgcolor2'><b>Upload Avatar from a URL:</b><br><SPAN class=gensmall>Enter the URL of the location containing the Avatar image and click on the submit button below, the Avatar image will be copied to this site.</SPAN></td>"
+            . "<td bgcolor='$bgcolor3'><b>Currently Disabled</b></td></tr>";
+        echo "<form action=\"modules.php?name=Your_Account&op=avatarlinksave\" method=\"post\">"
+            . "<tr><td bgcolor='$bgcolor2'><b>Link to off-site Avatar:</b><br><SPAN class=gensmall>Enter the URL of the location containing the Avatar image you wish to link to and click on the submit button below.</SPAN></td>"
+            . "<td bgcolor='$bgcolor3'><INPUT class=post style=\"WIDTH: 200px\" size=40 name=avatar></td></tr>";
         echo "<tr><td bgcolor='$bgcolor3' colspan='2' align='center'>"
             . "<INPUT class=mainoption type=submit value=Save&nbsp;Avatar>"
             . "</form></TD></TR></TABLE>";
@@ -1581,12 +1547,9 @@ function avatarlist($avatarcategory)
 
 function avatarsave($avatar, $category)
 {
-    global $user_prefix, $db, $module_name, $user, $cookie, $prefix;
-    $sql = "SELECT * FROM " . $prefix . "_bbconfig WHERE config_name = 'allow_avatar_local'";
-    $result = $db->sql_query($sql);
-    if ($row = $db->sql_fetchrow($result)) {
-        $allow_avatar_local = $row['config_value'];
-    } else { $allow_avatar_local = 0;}
+    global $user_prefix, $db, $module_name, $user, $cookie;
+    // Avatar gallery functionality disabled after forum removal
+    $allow_avatar_local = 0;
     if (is_user($user) and $allow_avatar_local) {
         getusrinfo($user);
         cookiedecode($user);
@@ -1612,12 +1575,9 @@ function avatarsave($avatar, $category)
 
 function avatarlinksave($avatar)
 {
-    global $user_prefix, $db, $module_name, $user, $cookie, $prefix;
-    $sql = "SELECT * FROM " . $prefix . "_bbconfig WHERE config_name = 'allow_avatar_remote'";
-    $result = $db->sql_query($sql);
-    if ($row = $db->sql_fetchrow($result)) {
-        $allow_avatar_remote = $row['config_value'];
-    } else { $allow_avatar_remote = 0;}
+    global $user_prefix, $db, $module_name, $user, $cookie;
+    // Remote avatar linking is still allowed
+    $allow_avatar_remote = 1;
     if (is_user($user) and $allow_avatar_remote) {
         getusrinfo($user);
         cookiedecode($user);

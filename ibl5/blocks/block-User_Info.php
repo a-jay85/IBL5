@@ -94,17 +94,6 @@ $content .= "<form onsubmit=\"this.submit.disabled='true'\" action=\"modules.php
 if (is_user($user)) {
     $uname = $cookie[1];
     $content .= "<br><img src=\"images/blocks/group-4.gif\" height=\"14\" width=\"17\"> " . _BWEL . ", <b>$uname</b>.<br>\n<hr>\n";
-    $sql = "SELECT user_id FROM " . $user_prefix . "_users WHERE username='$uname'";
-    $query = $db->sql_query($sql);
-    list($user_id) = $db->sql_fetchrow($query);
-    $uid = intval($user_id);
-    $newpms_query = $db->sql_query("SELECT privmsgs_to_userid FROM " . $prefix . "_bbprivmsgs WHERE privmsgs_to_userid='$uid' AND (privmsgs_type='5' OR privmsgs_type='1')");
-    $oldpms_query = $db->sql_query("SELECT privmsgs_to_userid FROM " . $prefix . "_bbprivmsgs WHERE privmsgs_to_userid='$uid' AND privmsgs_type='0'");
-    $newpms = $db->sql_numrows($newpms_query);
-    $oldpms = $db->sql_numrows($oldpms_query);
-    $content .= "<img src=\"images/blocks/email-y.gif\" height=\"10\" width=\"14\"> <a href=\"modules.php?name=Private_Messages\"><b>" . _BPM . "</b></a><br>\n";
-    $content .= "<img src=\"images/blocks/email-r.gif\" height=\"10\" width=\"14\"> " . _BUNREAD . ": <b>" . intval($newpms) . "</b><br>\n";
-    $content .= "<img src=\"images/blocks/email-g.gif\" height=\"10\" width=\"14\"> " . _BREAD . ": <b>" . intval($oldpms) . "</b><br>\n<hr>\n";
 } else {
     $content .= "<img src=\"images/blocks/group-4.gif\" height=\"14\" width=\"17\"> " . _BWEL . ", <b>$anonymous</b>\n<hr>";
     $content .= _NICKNAME . " <input type=\"text\" name=\"username\" size=\"10\" maxlength=\"25\"><br>";

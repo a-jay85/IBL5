@@ -50,15 +50,7 @@ class Navbar
                 . "<a href=\"modules.php?name=Your_Account&amp;op=editcomm\">" . _CONFIGCOMMENTS . "</a>"
                 . "</center></form></font></td>";
         }
-    
-        if (is_active("Private_Messages")) {
-            $menuimg = Navbar::menuimg("messages.gif");
-            echo "<td width=\"10%\"><font class=\"content\">"
-                . "<center><a href=\"modules.php?name=Private_Messages\"><img src=\"$menuimg\" border=\"0\" alt=\"" . _PRIVATEMESSAGES . "\" title=\"" . _PRIVATEMESSAGES . "\"></a><br>"
-                . "<a href=\"modules.php?name=Private_Messages\">" . _MESSAGES . "</a>"
-                . "</center></form></font></td>";
-        }
-    
+        
 
     
         if ($thmcount > 1 and $overwrite_theme == 1) {

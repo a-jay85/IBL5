@@ -2,6 +2,8 @@
 
 namespace RookieOption;
 
+use Services\CommonValidator;
+
 /**
  * Rookie Option Validator
  * 
@@ -13,20 +15,16 @@ class RookieOptionValidator
     /**
      * Validates that the player is on the user's team
      * 
+     * Delegates to CommonValidator for consistent player ownership validation
+     * across the application.
+     * 
      * @param object $player Player object with teamName property
      * @param string $userTeamName The user's team name
      * @return array Validation result with 'valid' boolean and optional 'error' message
      */
     public function validatePlayerOwnership($player, string $userTeamName): array
     {
-        if ($player->teamName !== $userTeamName) {
-            return [
-                'valid' => false,
-                'error' => $player->position . ' ' . $player->name . ' is not on your team.'
-            ];
-        }
-        
-        return ['valid' => true];
+        return CommonValidator::validatePlayerOwnership($player, $userTeamName);
     }
     
     /**

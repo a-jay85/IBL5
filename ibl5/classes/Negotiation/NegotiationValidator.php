@@ -5,12 +5,14 @@ namespace Negotiation;
 use Player\Player;
 use Player\PlayerContractValidator;
 use Player\PlayerData;
+use Services\CommonValidator;
 
 /**
  * Negotiation Validator
  * 
  * Validates eligibility and business rules for contract negotiations.
  * Reuses existing PlayerContractValidator for contract eligibility checks.
+ * Delegates common validations like player ownership to CommonValidator.
  */
 class NegotiationValidator
 {
@@ -32,12 +34,10 @@ class NegotiationValidator
      */
     public function validateNegotiationEligibility(Player $player, string $userTeamName): array
     {
-        // Check if player is on user's team
-        if ($player->teamName !== $userTeamName) {
-            return [
-                'valid' => false,
-                'error' => 'Sorry, this player is not on your team.'
-            ];
+        // Check if player is on user's team using common validator
+        $ownershipResult = CommonValidator::validatePlayerOwnership($player, $userTeamName);
+        if (!$ownershipResult['valid']) {
+            return $ownershipResult;
         }
         
         // Create PlayerData object for contract validator

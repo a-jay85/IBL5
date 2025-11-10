@@ -190,10 +190,10 @@ class NegotiationDemandCalculator
     private function calculateModifier(Player $player, array $teamFactors): float
     {
         $playerPrefs = [
-            'winner' => $player->freeAgencyPlayForWinner ?? 3,
-            'tradition' => $player->freeAgencyTradition ?? 3,
-            'loyalty' => $player->freeAgencyLoyalty ?? 3,
-            'playingTime' => $player->freeAgencyPlayingTime ?? 3
+            'winner' => $player->freeAgencyPlayForWinner ?? 1,
+            'tradition' => $player->freeAgencyTradition ?? 1,
+            'loyalty' => $player->freeAgencyLoyalty ?? 1,
+            'playingTime' => $player->freeAgencyPlayingTime ?? 1
         ];
         
         // Play for winner factor

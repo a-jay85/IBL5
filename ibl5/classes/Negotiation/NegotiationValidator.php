@@ -61,9 +61,7 @@ class NegotiationValidator
      * @return array Validation result
      */
     public function validateFreeAgencyNotActive(string $prefix): array
-    {
-        global $db;
-        
+    {   
         $query = "SELECT active FROM {$prefix}_modules WHERE title = 'Free_Agency'";
         $result = $this->db->sql_query($query);
         $row = $this->db->sql_fetchrow($result);

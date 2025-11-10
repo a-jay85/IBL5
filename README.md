@@ -1,66 +1,60 @@
 # IBL5 - Internet Basketball League
 
-This is the repository for iblhoops.net, a small internet-based fantasy basketball site. The site uses Jump Shot Basketball to simulate the games and roster management.
+Internet-based fantasy basketball site powered by Jump Shot Basketball simulation engine.
 
-## 🚀 Development Status
+## 🚀 Quick Start by Role
 
-**Current State**: 13 modules fully refactored with 380+ tests, 35% test coverage  
-**Goal**: 80%+ test coverage with all critical features tested  
-**Next Priority**: Free Agency Module (business critical)
+### 👨‍💻 Application Developer
+1. [**DEVELOPMENT_GUIDE.md**](DEVELOPMENT_GUIDE.md) - Priorities, testing, refactoring workflow
+2. [**DATABASE_GUIDE.md**](DATABASE_GUIDE.md) - Schema, tables, query patterns
+3. [**API_GUIDE.md**](API_GUIDE.md) - API design, authentication, caching
 
-## 📚 Essential Documentation
+### 🗄️ Database Administrator
+1. [**DATABASE_OPTIMIZATION_GUIDE.md**](DATABASE_OPTIMIZATION_GUIDE.md) - Schema optimization, migration roadmap
+2. [**ibl5/migrations/README.md**](ibl5/migrations/README.md) - Migration procedures
+3. [**DATABASE_GUIDE.md**](DATABASE_GUIDE.md) - Schema reference
 
-### Core Guides
-- **[Development Guide](DEVELOPMENT_GUIDE.md)** - Current priorities, refactoring workflow, testing standards, architecture patterns
-- **[Database Guide](DATABASE_GUIDE.md)** - Schema reference, table relationships, common queries, performance notes
-- **[Database Optimization Guide](DATABASE_OPTIMIZATION_GUIDE.md)** ⭐ - Database optimization strategy, migration roadmap, FK handling
-- **[Documentation Index](DOCUMENTATION_INDEX.md)** - Complete documentation navigation by role and task
-- **[API Guide](API_GUIDE.md)** - RESTful design, database views, UUIDs, authentication, caching strategies
-- **[Copilot Agent Instructions](COPILOT_AGENT.md)** - Coding standards, type hints, autoloader rules, security practices
+### 🚀 DevOps/Deployment
+1. [**PRODUCTION_DEPLOYMENT_GUIDE.md**](PRODUCTION_DEPLOYMENT_GUIDE.md) - Deployment procedures
+2. [**DATABASE_OPTIMIZATION_GUIDE.md**](DATABASE_OPTIMIZATION_GUIDE.md) - Database changes context
 
-### Database Status ✅
-- ✅ InnoDB conversion (52 tables) - 10-100x performance gain
-- ✅ Foreign keys (21 constraints) - Data integrity
-- ✅ CHECK constraints (24 constraints) - Data validation
-- ✅ API Ready - Timestamps, UUIDs, Database Views
-- ✅ Phases 1-3 complete - Infrastructure, relationships, API preparation
-- 🚀 Ready for production API deployment
-- 📋 Phase 4 in progress - Data type optimizations (30-50% storage savings)
+## 📊 Current Status
 
-### Quick Start
-```bash
-# Review development priorities
-cat DEVELOPMENT_GUIDE.md
+**Code Quality:**
+- 13 modules refactored with 380+ tests
+- 35% test coverage (target: 80%)
+- Next priority: Free Agency Module
 
-# Check database schema
-cat DATABASE_GUIDE.md
+**Database:**
+- ✅ InnoDB (52 tables) - 10-100x faster
+- ✅ Foreign keys (21) - Data integrity
+- ✅ CHECK constraints (24) - Validation
+- ✅ API-ready - UUIDs, timestamps, views
+- ✅ Phases 1-4 complete
 
-# Start API development
-cat API_GUIDE.md
-```
+## 📚 Documentation
 
-## 🔧 Development
+### Core Guides (Root)
+- [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md) - Development standards & priorities
+- [DATABASE_GUIDE.md](DATABASE_GUIDE.md) - Schema reference for developers
+- [DATABASE_OPTIMIZATION_GUIDE.md](DATABASE_OPTIMIZATION_GUIDE.md) - Optimization roadmap
+- [API_GUIDE.md](API_GUIDE.md) - RESTful API development
+- [PRODUCTION_DEPLOYMENT_GUIDE.md](PRODUCTION_DEPLOYMENT_GUIDE.md) - Deployment procedures
 
-Follow the [Development Guide](DEVELOPMENT_GUIDE.md) for:
-- Module refactoring priorities and workflow
-- Testing standards and coverage goals
-- Code quality requirements
-- Architecture patterns
+### Component Documentation (ibl5/classes/)
+- [Statistics/](ibl5/classes/Statistics/) - StatsFormatter and StatsSanitizer
+- [UI/Components/](ibl5/classes/UI/Components/) - Reusable UI components
+- [Draft/](ibl5/classes/Draft/) - Draft module
+- [DepthChart/](ibl5/classes/DepthChart/) - Depth chart module
+- [Player/](ibl5/classes/Player/) - Player module
 
-Follow the [API Guide](API_GUIDE.md) for:
-- RESTful endpoint design
-- Database views for efficient queries
-- UUIDs for secure public identifiers
-- Authentication and caching strategies
+### Historical Documents (.archive/)
+Previous summaries and completion reports preserved for reference.
 
-## 📖 Additional Documentation
+## 🔍 Common Tasks
 
-### Specialized Guides
-- [Statistics Formatting Guide](STATISTICS_FORMATTING_GUIDE.md) - StatsFormatter and StatsSanitizer usage
-- [Production Deployment Guide](PRODUCTION_DEPLOYMENT_GUIDE.md) - Deployment procedures
-
-### Class Documentation
-- [Draft Module](ibl5/classes/Draft/README.md)
-- [Depth Chart Module](ibl5/classes/DepthChart/README.md)
-- [Player Module](ibl5/classes/Player/README.md)
-- [Depth Chart Security](ibl5/classes/DepthChart/SECURITY.md)
+**"How do I deploy to production?"** → [PRODUCTION_DEPLOYMENT_GUIDE.md](PRODUCTION_DEPLOYMENT_GUIDE.md)  
+**"How do I query the database?"** → [DATABASE_GUIDE.md](DATABASE_GUIDE.md)  
+**"What should I work on next?"** → [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md)  
+**"How do I build an API endpoint?"** → [API_GUIDE.md](API_GUIDE.md)  
+**"How do I format statistics?"** → [ibl5/classes/Statistics/](ibl5/classes/Statistics/)

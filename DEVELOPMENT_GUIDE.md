@@ -1,296 +1,108 @@
-# IBL5 Development Guide
+# Development Guide
 
-**Last Updated:** November 6, 2025
+**Status:** 13/63 modules refactored • 380+ tests • 35% coverage • Goal: 80%
 
-## Quick Start
+## Top Priorities
 
-### Current State
-- **Modules:** 63 total (13 fully refactored, 50 awaiting)
-- **Tests:** ~380 tests, 35% coverage
-- **Goal:** 80%+ coverage of critical features
+1. **Free Agency** (1,648 lines) - Contract signing, salary cap
+2. **Player Display** (749 lines) - Most viewed page  
+3. ~~Statistics~~ ✅ Complete
 
-### Top Priorities
-1. **Free Agency Module** (1,648 lines) - Contract signing, salary cap - #1 Priority
-2. **Player Display Module** (749 lines) - Most viewed page - #2 Priority
-3. ~~**Statistics Module** (513 lines) - Core feature~~ ✅ **COMPLETED**
+## Quick Workflow
 
-## Development Workflow
+**Before Starting:**
+- Review refactored modules: Waivers, Draft, Team, Player
+- Check `ibl5/schema.sql` for database structure
+- Run tests: `cd ibl5 && vendor/bin/phpunit tests/`
 
-### Before Starting
-1. Review existing refactored modules (Waivers, Draft, Team, Player)
-2. Check `schema.sql` for database structure
-3. Run existing tests to understand current state
-4. Read `COPILOT_AGENT.md` for coding standards
+**Refactoring Steps:**
+1. Analyze (1-2 days) - Identify responsibilities
+2. Design (1-2 days) - Plan class structure & tests
+3. Extract (1-2 weeks) - Repository → Validator → Processor → View → Controller
+4. Test (1 week) - Unit + integration tests
+5. Audit (2-3 days) - Security review
+6. Review (2-3 days) - Code review, performance
 
-### Refactoring Process
-1. **Analyze** (1-2 days): Read code, identify responsibilities
-2. **Design** (1-2 days): Sketch class structure, plan tests
-3. **Extract Classes** (1-2 weeks): Repository → Validator → Processor → View → Controller
-4. **Write Tests** (1 week): Unit + integration tests
-5. **Security Audit** (2-3 days): SQL injection, XSS prevention
-6. **Review** (2-3 days): Code review, performance testing
-
-### Class Structure Pattern
+**Class Pattern:**
 ```
 Module/
-├── Repository.php      - Database operations
-├── Validator.php       - Business rule validation
-├── Processor.php       - Core business logic
-├── View.php           - UI rendering
-└── Controller.php     - Request orchestration
+├── Repository.php    - Database
+├── Validator.php     - Validation
+├── Processor.php     - Business logic
+├── View.php         - UI
+└── Controller.php   - Orchestration
 ```
-
-## Module Status Matrix
-
-### ✅ Completed Modules
-- Waivers (50 tests, 93% reduction)
-- Draft (25 tests, 78% reduction)
-- Team (22 tests, 91% reduction)
-- Player (30 tests, facade pattern)
-- Extension (50+ tests)
-- Trading (44 tests)
-- Depth Chart (13 tests, 85% reduction)
-- Voting (7 tests)
-- Rookie Option (13 tests, 82% reduction)
-- **Statistics (37 tests, 89% reduction)** ⭐ NEW
-
-### 🔴⚠️ High Priority (Not Started)
-- Free Agency (1,648 lines) - #1 Priority
-- Player Display (749 lines) - #2 Priority
-- ~~Statistics (513 lines)~~ ✅ **COMPLETED**
-- Chunk Stats (462 lines) - #3 Priority
-- Player Search (461 lines) - #3 Priority
-- Compare Players (408 lines) - #4 Priority
 
 ## Testing Standards
 
-### Coverage Goals
-- **Current:** 35% coverage
-- **Phase 1 Target:** 60% (Top 3 modules done - Statistics ✅, Free Agency, Player Display)
-- **Phase 2 Target:** 75% (Top 5 modules done)
-- **Long-term:** 80%+ coverage
+**Coverage:** Current 35% → Phase 1: 60% → Phase 2: 75% → Goal: 80%
 
-### Test Pyramid
-```
-     /E2E\        ← Few (critical flows)
-    /------\
-   /Integr \     ← Some (database ops)
-  /----------\
- /   Unit     \  ← Many (business logic)
-```
+**Test Pyramid:** Few E2E tests → Some integration → Many unit tests
 
-### What to Test
-- All public methods
-- Edge cases and error conditions
+**Required:**
+- All public methods tested
+- Edge cases & error conditions
 - Business rule validation
-- Database operations (with real schema)
+- Database operations
 - Security (SQL injection, XSS)
 
-## Code Quality Standards
+## Code Quality
 
-### Required Type Hints
-All functions must have complete type hints:
+**Type Hints Required:**
 ```php
 // ✅ Good
 public function getPlayer(int $playerId): ?Player
 public function calculateAverage(array $values): float
-public function logEvent(string $message, ?string $userId = null): void
 
 // ❌ Bad
 public function getPlayer($playerId)
 ```
 
-### Class Autoloader
-- Place all classes in `ibl5/classes/` directory
-- Class filename must match class name
-- Never use `require()` for classes - autoloader handles it
-- Just reference: `$player = new Player($db);`
+**Class Autoloader:**
+- Place classes in `ibl5/classes/`
+- Filename = class name
+- Never use `require()` for classes
+- Reference: `$player = new Player($db);`
 
-### Security Checklist
-- [ ] SQL injection prevention (prepared statements)
-- [ ] XSS prevention (HTML escaping)
-- [ ] Input validation (type checking)
+**Security Checklist:**
+- [ ] Prepared statements (SQL injection)
+- [ ] HTML escaping (XSS)
+- [ ] Input validation
 - [ ] Authorization checks
-- [ ] CSRF protection where applicable
+- [ ] CSRF protection
 
-## Performance Best Practices
+## Performance
 
-### Database Queries
+**Database:**
 - Use prepared statements
-- Leverage existing indexes
+- Leverage indexes (see DATABASE_GUIDE.md)
 - Use database views for complex queries
 - Batch operations when possible
-- Reference `DATABASE_GUIDE.md` for schema
 
-### Code Optimization
-- Extract reusable logic to repositories
-- Use existing formatters (StatsFormatter, StatsSanitizer)
+**Code:**
+- Reuse repositories
+- Use formatters: StatsFormatter, StatsSanitizer
 - Avoid N+1 queries
 - Cache expensive operations
 
-## Architecture Patterns
-
-### Repository Pattern (Database)
-```php
-class PlayerRepository {
-    public function findById(int $id): ?array
-    public function findByTeam(int $teamId): array
-    public function save(array $data): int
-}
-```
-
-### Validator Pattern (Business Rules)
-```php
-class ContractValidator {
-    public function validateSalaryCap(array $contract): array
-    public function validateRosterSpace(int $teamId): array
-}
-```
-
-### Processor Pattern (Business Logic)
-```php
-class FreeAgencyProcessor {
-    public function processOffer(array $offer): bool
-    public function calculateCapHit(array $contract): float
-}
-```
-
-## Migration Path
-
-### Phase 1: Foundation (Months 1-3)
-- Free Agency, Player Display, Statistics
-- Target: 60% test coverage
-- Focus: Business-critical features
-
-### Phase 2: Expansion (Months 4-6)
-- Data operations (Chunk Stats, Player Search, Compare Players)
-- Developer tools (Docker, PHPStan, CodeSniffer)
-- Target: 75% test coverage
-
-### Phase 3: Advanced (Months 7-9)
-- RESTful API development
-- Event system for decoupling
-- Configuration management
-- Target: 80%+ test coverage
-
-## Success Metrics
-
-### Code Quality
-- Average entry point < 100 lines
-- Test coverage > 60% (Phase 1)
-- All critical modules have 30+ tests
-- Zero high-severity security issues
-
-### Developer Productivity
-- Add new feature in < 1 day
-- Fix bug in < 1 hour
-- New developer productive in < 1 week
-- Test suite runs in < 5 minutes
-
-### Business Impact
-- 70% reduction in production bugs
-- 2x feature velocity increase
-- Weekly deployment capability
-
-## Common Patterns to Follow
-
-### Free Agency Example (Priority #1)
-Expected structure after refactoring:
-```
-modules/Free_Agency/
-├── index.php (150 lines, down from 1,648)
-└── classes/FreeAgency/
-    ├── FreeAgencyRepository.php
-    ├── FreeAgencyValidator.php
-    ├── FreeAgencyProcessor.php
-    ├── FreeAgencyView.php
-    └── FreeAgencyController.php
-tests/FreeAgency/
-├── FreeAgencyRepositoryTest.php
-├── FreeAgencyValidatorTest.php
-├── FreeAgencyProcessorTest.php
-└── FreeAgencyIntegrationTest.php
-```
-
-### Statistics Formatting
-Use existing formatters instead of inline calculations:
-```php
-// ✅ Good
-$fgPct = StatsFormatter::formatPercentage($fgm, $fga);
-$ppg = StatsFormatter::formatPerGameAverage($points, $games);
-
-// ❌ Bad
-$fgPct = ($fga) ? number_format($fgm / $fga, 3) : "0.000";
-```
-
-## Developer Experience Tools
-
-### Recommended Setup
-```bash
-# Install quality tools
-composer require --dev phpstan/phpstan
-composer require --dev squizlabs/php_codesniffer
-
-# Run tests
-cd ibl5 && vendor/bin/phpunit tests/
-
-# Check code style
-vendor/bin/phpcs --standard=PSR12 ibl5/classes/
-```
-
-### Pre-commit Checklist
-- [ ] All tests pass
-- [ ] No linter warnings
-- [ ] Type hints complete
-- [ ] Security reviewed
-- [ ] Documentation updated
-
 ## Resources
 
-### Documentation
-- Database: `DATABASE_GUIDE.md`
-- API Development: `API_GUIDE.md`
-- Copilot Instructions: `COPILOT_AGENT.md`
-- Statistics Formatting: `STATISTICS_FORMATTING_GUIDE.md`
-- Production Deployment: `PRODUCTION_DEPLOYMENT_GUIDE.md`
+**Documentation:**
+- [DATABASE_GUIDE.md](DATABASE_GUIDE.md) - Schema reference
+- [API_GUIDE.md](API_GUIDE.md) - API development
+- [ibl5/classes/Statistics/](ibl5/classes/Statistics/) - Stats formatting
+- [PRODUCTION_DEPLOYMENT_GUIDE.md](PRODUCTION_DEPLOYMENT_GUIDE.md) - Deployment
 
-### Code Examples
-- Best refactoring: Waivers module (`tests/Waivers/`)
-- Facade pattern: Player class (`classes/Player/`)
-- MVC pattern: Team module (`classes/Team/`)
-- Security: Depth Chart (`classes/DepthChart/SECURITY.md`)
-
-### Testing Examples
-- Unit tests: `tests/Waivers/WaiversValidatorTest.php`
-- Integration tests: `tests/Trading/TradingIntegrationTest.php`
-- Mock database: `tests/MockDatabase.php`
+**Code Examples:**
+- Best refactoring: Waivers (`tests/Waivers/`)
+- Facade pattern: Player (`classes/Player/`)
+- MVC pattern: Team (`classes/Team/`)
+- Security: DepthChart (`classes/DepthChart/SECURITY.md`)
 
 ## FAQs
 
-**Q: Should I refactor everything at once?**  
-A: No! Focus on priorities 1-3 first for maximum business value.
-
-**Q: What if I find bugs during refactoring?**  
-A: Fix them! Write tests first to ensure they stay fixed.
-
-**Q: How much should I test?**  
-A: Aim for 80%+ coverage per module. Test all public methods and edge cases.
-
-**Q: Can I change existing APIs?**  
-A: Only if necessary. Maintain backward compatibility when possible.
-
-**Q: How do I handle database changes?**  
-A: Use migrations in `ibl5/migrations/`. Never modify schema directly.
-
-## Getting Started
-
-1. Read this guide and `COPILOT_AGENT.md`
-2. Review Waivers module as example
-3. Set up development environment
-4. Choose Free Agency module (Priority #1)
-5. Create feature branch
-6. Follow refactoring process above
-7. Write tests as you go
-8. Get code review before merging
-
-**Remember:** Focus on testable, maintainable, extensible code. Business value and developer experience matter most.
+**Refactor everything at once?** No - Focus on priorities 1-3 first.  
+**Found bugs during refactor?** Fix them! Write tests to prevent regression.  
+**How much to test?** 80%+ coverage per module, all public methods.  
+**Change existing APIs?** Only if necessary - maintain backward compatibility.  
+**Database changes?** Use `ibl5/migrations/` - never modify schema directly.

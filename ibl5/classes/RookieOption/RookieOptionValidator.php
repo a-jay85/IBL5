@@ -36,21 +36,14 @@ class RookieOptionValidator
      */
     public function validateEligibilityAndGetSalary($player, string $seasonPhase): array
     {
-        // Use PlayerContractValidator via Player object to check eligibility
-        if (!$player->canRookieOption($seasonPhase)) {
+        // Check eligibility: must pass canRookieOption check AND have non-zero final year salary
+        $canRookieOption = $player->canRookieOption($seasonPhase);
+        $finalYearSalary = $canRookieOption ? $player->getFinalYearRookieContractSalary() : 0;
+        
+        if (!$canRookieOption || $finalYearSalary === 0) {
             return [
                 'valid' => false,
-                'error' => 'Sorry, ' . $player->position . ' ' . $player->name . ' is not eligible for a rookie option. Only draft picks are eligible for rookie options, and the option must be exercised before the final season of their rookie contract is underway.'
-            ];
-        }
-        
-        // Get final year salary using PlayerContractValidator logic via Player object
-        $finalYearSalary = $player->getFinalYearRookieContractSalary();
-        
-        if ($finalYearSalary === 0) {
-            return [
-                'valid' => false,
-                'error' => 'Sorry, ' . $player->position . ' ' . $player->name . ' is not eligible for a rookie option. Only draft picks are eligible for rookie options, and the option must be exercised before the final season of their rookie contract is underway.'
+                'error' => $this->getIneligibilityError($player)
             ];
         }
         
@@ -58,5 +51,17 @@ class RookieOptionValidator
             'valid' => true,
             'finalYearSalary' => $finalYearSalary
         ];
+    }
+
+    /**
+     * Returns the ineligibility error message for a player
+     * 
+     * @param object $player Player object with position and name properties
+     * @return string Formatted error message
+     */
+    private function getIneligibilityError($player): string
+    {
+        return 'Sorry, ' . $player->position . ' ' . $player->name . ' is not eligible for a rookie option.' . "\n\n" .
+        'Only draft picks are eligible for rookie options, and the option must be exercised before the final season of their rookie contract is underway.';
     }
 }

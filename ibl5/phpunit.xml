@@ -39,5 +39,8 @@
         <testsuite name="Statistics Module Tests">
             <directory>tests/Statistics</directory>
         </testsuite>
+        <testsuite name="Negotiation Module Tests">
+            <directory>tests/Negotiation</directory>
+        </testsuite>
     </testsuites>
 </phpunit>

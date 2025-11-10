@@ -334,36 +334,38 @@ function rookieoption($pid)
 {
     global $db, $cookie;
     
-    // Initialize services
+    // Initialize dependencies
+    $commonRepository = new \Services\CommonRepository($db);
     $season = new Season($db);
-    $rookieOptionService = new \RookieOption\RookieOptionService($db);
-    $rookieOptionFormView = new \RookieOption\RookieOptionFormView();
+    $validator = new \RookieOption\RookieOptionValidator();
+    $processor = new \RookieOption\RookieOptionProcessor();
+    $formView = new \RookieOption\RookieOptionFormView();
+    
+    // Get user's team name
+    $userTeamName = $commonRepository->getTeamnameFromUsername($cookie[1]);
     
     // Load player
     $player = Player::withPlayerID($db, $pid);
     
-    // Validate ownership
-    if (!$rookieOptionService->validatePlayerOwnership($cookie[1], $player)) {
-        $rookieOptionFormView->renderNotOnTeamError($player);
+    // Validate player ownership
+    $ownershipValidation = $validator->validatePlayerOwnership($player, $userTeamName);
+    if (!$ownershipValidation['valid']) {
+        $formView->renderError($ownershipValidation['error']);
         return;
     }
     
-    // Check eligibility
-    $eligibility = $rookieOptionService->checkEligibilityAndGetSalary($player, $season->phase);
-    
-    if ($eligibility === null) {
-        $rookieOptionFormView->renderNotEligibleError($player);
+    // Validate eligibility and get final year salary
+    $eligibilityValidation = $validator->validateEligibilityAndGetSalary($player, $season->phase);
+    if (!$eligibilityValidation['valid']) {
+        $formView->renderError($eligibilityValidation['error']);
         return;
     }
     
     // Calculate rookie option value
-    $rookieOptionValue = $rookieOptionService->calculateRookieOptionValue($eligibility['finalYearSalary']);
-    
-    // Get team name for form
-    $userTeamName = $rookieOptionService->getTeamNameFromUsername($cookie[1]);
+    $rookieOptionValue = $processor->calculateRookieOptionValue($eligibilityValidation['finalYearSalary']);
     
     // Render form
-    $rookieOptionFormView->renderForm($player, $userTeamName, $rookieOptionValue);
+    $formView->renderForm($player, $userTeamName, $rookieOptionValue);
 }
 
 switch ($pa) {

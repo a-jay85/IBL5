@@ -8,6 +8,19 @@ namespace RookieOption;
 class RookieOptionFormView
 {
     /**
+     * Renders a generic error message with proper HTML escaping
+     * 
+     * @param string $errorMessage Error message to display
+     */
+    public function renderError(string $errorMessage): void
+    {
+        $errorMessageEscaped = htmlspecialchars($errorMessage, ENT_QUOTES, 'UTF-8');
+        
+        echo "{$errorMessageEscaped}<br>
+            <a href=\"javascript:history.back()\">Go Back</a>";
+    }
+    
+    /**
      * Renders the rookie option form for a player
      * 
      * @param object $player Player object with properties: playerID, position, name
@@ -34,35 +47,5 @@ class RookieOptionFormView
             <input type=\"hidden\" name=\"rookieOptionValue\" value=\"{$rookieOptionValueEscaped}\">
             <input type=\"submit\" value=\"Activate Rookie Extension\">
         </form>";
-    }
-    
-    /**
-     * Renders an error message when player is not on user's team
-     * 
-     * @param object $player Player object with properties: position, name
-     */
-    public function renderNotOnTeamError($player): void
-    {
-        $playerPosition = htmlspecialchars($player->position, ENT_QUOTES, 'UTF-8');
-        $playerName = htmlspecialchars($player->name, ENT_QUOTES, 'UTF-8');
-        
-        echo "{$playerPosition} {$playerName} is not on your team.<br>
-            <a href=\"javascript:history.back()\">Go Back</a>";
-    }
-    
-    /**
-     * Renders an error message when player is not eligible for rookie option
-     * 
-     * @param object $player Player object with properties: position, name
-     */
-    public function renderNotEligibleError($player): void
-    {
-        $playerPosition = htmlspecialchars($player->position, ENT_QUOTES, 'UTF-8');
-        $playerName = htmlspecialchars($player->name, ENT_QUOTES, 'UTF-8');
-        
-        echo "Sorry, {$playerPosition} {$playerName} is not eligible for a rookie option.<p>
-            Only draft picks are eligible for rookie options, and the option must be exercised
-            before the final season of their rookie contract is underway.<p>
-    		<a href=\"javascript:history.back()\">Go Back</a>";
     }
 }

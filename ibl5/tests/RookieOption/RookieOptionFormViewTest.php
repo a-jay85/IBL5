@@ -60,56 +60,29 @@ class RookieOptionFormViewTest extends TestCase
     }
     
     /**
-     * Test rendering not on team error
+     * Test rendering generic error message
      */
-    public function testRenderNotOnTeamError()
+    public function testRenderError()
     {
-        $mockPlayer = new stdClass();
-        $mockPlayer->position = 'SG';
-        $mockPlayer->name = 'Other Player';
-        
         ob_start();
-        $this->view->renderNotOnTeamError($mockPlayer);
+        $this->view->renderError('This is an error message.');
         $output = ob_get_clean();
         
-        $this->assertStringContainsString('SG Other Player', $output);
-        $this->assertStringContainsString('not on your team', $output);
+        $this->assertStringContainsString('This is an error message.', $output);
         $this->assertStringContainsString('Go Back', $output);
     }
     
     /**
-     * Test rendering not eligible error
+     * Test that error message escapes HTML
      */
-    public function testRenderNotEligibleError()
+    public function testRenderErrorEscapesHtml()
     {
-        $mockPlayer = new stdClass();
-        $mockPlayer->position = 'SF';
-        $mockPlayer->name = 'Ineligible Player';
-        
         ob_start();
-        $this->view->renderNotEligibleError($mockPlayer);
-        $output = ob_get_clean();
-        
-        $this->assertStringContainsString('SF Ineligible Player', $output);
-        $this->assertStringContainsString('not eligible', $output);
-        $this->assertStringContainsString('Go Back', $output);
-    }
-    
-    /**
-     * Test that error messages escape HTML
-     */
-    public function testErrorMessagesEscapeHtml()
-    {
-        $mockPlayer = new stdClass();
-        $mockPlayer->position = '<b>PG</b>';
-        $mockPlayer->name = '<script>test</script>';
-        
-        ob_start();
-        $this->view->renderNotOnTeamError($mockPlayer);
+        $this->view->renderError('<script>alert("xss")</script>');
         $output = ob_get_clean();
         
         // Verify HTML is escaped
-        $this->assertStringNotContainsString('<script>test</script>', $output);
-        $this->assertStringContainsString('&lt;', $output);
+        $this->assertStringNotContainsString('<script>alert("xss")</script>', $output);
+        $this->assertStringContainsString('&lt;script&gt;', $output);
     }
 }

@@ -40,6 +40,7 @@ Internet-based fantasy basketball site powered by Jump Shot Basketball simulatio
 - [DATABASE_OPTIMIZATION_GUIDE.md](DATABASE_OPTIMIZATION_GUIDE.md) - Optimization roadmap
 - [API_GUIDE.md](API_GUIDE.md) - RESTful API development
 - [PRODUCTION_DEPLOYMENT_GUIDE.md](PRODUCTION_DEPLOYMENT_GUIDE.md) - Deployment procedures
+- [COPILOT_AGENT.md](COPILOT_AGENT.md) - AI coding agent instructions
 
 ### Component Documentation (ibl5/classes/)
 - [Statistics/](ibl5/classes/Statistics/) - StatsFormatter and StatsSanitizer

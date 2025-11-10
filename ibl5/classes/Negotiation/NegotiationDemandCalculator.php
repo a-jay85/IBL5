@@ -233,8 +233,8 @@ class NegotiationDemandCalculator
      */
     private function applyModifier(array $baseDemands, float $modifier): array
     {
-        if ($modifier <= 0) {
-            $modifier = 1; // Prevent division by zero or negative
+        if ($modifier == 0) {
+            $modifier = 0.000001; // Prevent division by zero
         }
         
         return [

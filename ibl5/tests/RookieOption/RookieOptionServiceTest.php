@@ -4,6 +4,22 @@ use PHPUnit\Framework\TestCase;
 use RookieOption\RookieOptionService;
 
 /**
+ * Mock player class for testing
+ */
+class MockPlayerClass
+{
+    public int $draftRound;
+    public int $contractYear2Salary;
+    public int $contractYear3Salary;
+    public int $teamID;
+    
+    public function canRookieOption(string $seasonPhase): bool
+    {
+        return false;
+    }
+}
+
+/**
  * Tests for RookieOptionService
  */
 class RookieOptionServiceTest extends TestCase
@@ -106,8 +122,7 @@ class RookieOptionServiceTest extends TestCase
      */
     private function createMockPlayer(bool $canRookieOption, int $draftRound, int $cy2Salary, int $cy3Salary)
     {
-        $mockPlayer = $this->getMockBuilder(\stdClass::class)
-            ->addMethods(['canRookieOption'])
+        $mockPlayer = $this->getMockBuilder(MockPlayerClass::class)
             ->getMock();
         
         $mockPlayer->method('canRookieOption')

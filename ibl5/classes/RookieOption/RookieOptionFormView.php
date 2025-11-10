@@ -2,6 +2,8 @@
 
 namespace RookieOption;
 
+use Services\DatabaseService;
+
 /**
  * Handles rendering of the rookie option form
  */
@@ -14,7 +16,7 @@ class RookieOptionFormView
      */
     public function renderError(string $errorMessage): void
     {
-        $errorMessageEscaped = htmlspecialchars($errorMessage, ENT_QUOTES, 'UTF-8');
+        $errorMessageEscaped = DatabaseService::safeHtmlOutput($errorMessage);
         
         echo "{$errorMessageEscaped}<br>
             <a href=\"javascript:history.back()\">Go Back</a>";
@@ -31,17 +33,17 @@ class RookieOptionFormView
     {
         // Escape all output for security
         $playerID = (int) $player->playerID;
-        $playerPosition = htmlspecialchars($player->position, ENT_QUOTES, 'UTF-8');
-        $playerName = htmlspecialchars($player->name, ENT_QUOTES, 'UTF-8');
-        $teamNameEscaped = htmlspecialchars($teamName, ENT_QUOTES, 'UTF-8');
-        $rookieOptionValueEscaped = htmlspecialchars((string) $rookieOptionValue, ENT_QUOTES, 'UTF-8');
+        $playerPosition = DatabaseService::safeHtmlOutput($player->position);
+        $playerName = DatabaseService::safeHtmlOutput($player->name);
+        $teamNameEscaped = DatabaseService::safeHtmlOutput($teamName);
+        $rookieOptionValueEscaped = DatabaseService::safeHtmlOutput((string) $rookieOptionValue);
         
         echo "<img align=left src=\"images/player/{$playerID}.jpg\">
-    	You may exercise the rookie extension option on <b>{$playerPosition} {$playerName}</b>.<br>
-    	Their contract value the season after this one will be <b>{$rookieOptionValueEscaped}</b>.<br>
-    	However, by exercising this option, <b>you can't use an in-season contract extension on them next season</b>.<br>
-    	<b>They will become a free agent</b>.<br>
-    	<form name=\"RookieExtend\" method=\"post\" action=\"/ibl5/modules/Player/rookieoption.php\">
+        You may exercise the rookie extension option on <b>{$playerPosition} {$playerName}</b>.<br>
+        Their contract value the season after this one will be <b>{$rookieOptionValueEscaped}</b>.<br>
+        However, by exercising this option, <b>you can't use an in-season contract extension on them next season</b>.<br>
+        <b>They will become a free agent</b>.<br>
+        <form name=\"RookieExtend\" method=\"post\" action=\"/ibl5/modules/Player/rookieoption.php\">
             <input type=\"hidden\" name=\"teamname\" value=\"{$teamNameEscaped}\">
             <input type=\"hidden\" name=\"playerID\" value=\"{$playerID}\">
             <input type=\"hidden\" name=\"rookieOptionValue\" value=\"{$rookieOptionValueEscaped}\">

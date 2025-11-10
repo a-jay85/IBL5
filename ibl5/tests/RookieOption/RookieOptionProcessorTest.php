@@ -38,32 +38,4 @@ class RookieOptionProcessorTest extends TestCase
         $this->assertEquals(0.5, $this->processor->convertToMillions(50));
         $this->assertEquals(0.0, $this->processor->convertToMillions(0));
     }
-    
-    /**
-     * Test getting final year salary for first round pick
-     */
-    public function testGetFinalYearRookieContractSalaryFirstRound()
-    {
-        // First round picks have 3-year contracts (cy3 is final year)
-        $cy2Salary = 100;
-        $cy3Salary = 150;
-        
-        $result = $this->processor->getFinalYearRookieContractSalary(1, $cy2Salary, $cy3Salary);
-        
-        $this->assertEquals(150, $result);
-    }
-    
-    /**
-     * Test getting final year salary for second round pick
-     */
-    public function testGetFinalYearRookieContractSalarySecondRound()
-    {
-        // Second round picks have 2-year contracts (cy2 is final year)
-        $cy2Salary = 100;
-        $cy3Salary = 150;
-        
-        $result = $this->processor->getFinalYearRookieContractSalary(2, $cy2Salary, $cy3Salary);
-        
-        $this->assertEquals(100, $result);
-    }
 }

@@ -4,6 +4,8 @@ namespace RookieOption;
 
 /**
  * Processes rookie option business logic
+ * 
+ * Handles calculations related to rookie option values.
  */
 class RookieOptionProcessor
 {
@@ -29,20 +31,5 @@ class RookieOptionProcessor
     public function convertToMillions(int $salaryInThousands): float
     {
         return $salaryInThousands / 100;
-    }
-    
-    /**
-     * Gets the final year of rookie contract based on draft round
-     * 
-     * @param int $draftRound Draft round (1 or 2)
-     * @param int $cy2Salary Contract year 2 salary
-     * @param int $cy3Salary Contract year 3 salary
-     * @return int Final year salary
-     */
-    public function getFinalYearRookieContractSalary(int $draftRound, int $cy2Salary, int $cy3Salary): int
-    {
-        // First round picks have a 3-year contract (cy3 is final year)
-        // Second round picks have a 2-year contract (cy2 is final year)
-        return ($draftRound == 1) ? $cy3Salary : $cy2Salary;
     }
 }

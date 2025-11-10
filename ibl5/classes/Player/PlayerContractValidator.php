@@ -63,6 +63,30 @@ class PlayerContractValidator
         
         return false;
     }
+    
+    /**
+     * Gets the final year of rookie contract salary based on draft round
+     * 
+     * @param PlayerData $playerData The player data
+     * @return int Final year salary (0 if not a draft pick)
+     */
+    public function getFinalYearRookieContractSalary(PlayerData $playerData): int
+    {
+        $round = $playerData->draftRound;
+        
+        // First round picks have a 3-year contract (cy3 is final year)
+        if ($round == 1) {
+            return $playerData->contractYear3Salary;
+        }
+        
+        // Second round picks have a 2-year contract (cy2 is final year)
+        if ($round == 2) {
+            return $playerData->contractYear2Salary;
+        }
+        
+        // Not a draft pick
+        return 0;
+    }
 
     /**
      * Check rookie option eligibility for a specific round and experience level

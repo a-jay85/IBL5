@@ -19,6 +19,13 @@ class MockPlayerClass
     {
         return false;
     }
+    
+    public function getFinalYearRookieContractSalary(): int
+    {
+        // First round picks have a 3-year contract (cy3 is final year)
+        // Second round picks have a 2-year contract (cy2 is final year)
+        return ($this->draftRound == 1) ? $this->contractYear3Salary : $this->contractYear2Salary;
+    }
 }
 
 /**
@@ -136,6 +143,7 @@ class RookieOptionValidatorTest extends TestCase
     private function createMockPlayer(bool $canRookieOption, int $draftRound, int $cy2Salary, int $cy3Salary)
     {
         $mockPlayer = $this->getMockBuilder(MockPlayerClass::class)
+            ->onlyMethods(['canRookieOption'])
             ->getMock();
         
         $mockPlayer->method('canRookieOption')

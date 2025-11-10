@@ -6,16 +6,10 @@ namespace RookieOption;
  * Rookie Option Validator
  * 
  * Validates eligibility and business rules for rookie option exercises.
+ * Delegates contract validation to PlayerContractValidator via Player object.
  */
 class RookieOptionValidator
 {
-    private $processor;
-    
-    public function __construct()
-    {
-        $this->processor = new RookieOptionProcessor();
-    }
-    
     /**
      * Validates that the player is on the user's team
      * 
@@ -38,12 +32,13 @@ class RookieOptionValidator
     /**
      * Validates rookie option eligibility and returns final year salary if eligible
      * 
-     * @param object $player Player object with canRookieOption method and contract properties
+     * @param object $player Player object with canRookieOption and getFinalYearRookieContractSalary methods
      * @param string $seasonPhase Current season phase
      * @return array Validation result with 'valid' boolean, optional 'error' message, and 'finalYearSalary' if valid
      */
     public function validateEligibilityAndGetSalary($player, string $seasonPhase): array
     {
+        // Use PlayerContractValidator via Player object to check eligibility
         if (!$player->canRookieOption($seasonPhase)) {
             return [
                 'valid' => false,
@@ -51,11 +46,8 @@ class RookieOptionValidator
             ];
         }
         
-        $finalYearSalary = $this->processor->getFinalYearRookieContractSalary(
-            $player->draftRound,
-            $player->contractYear2Salary,
-            $player->contractYear3Salary
-        );
+        // Get final year salary using PlayerContractValidator logic via Player object
+        $finalYearSalary = $player->getFinalYearRookieContractSalary();
         
         if ($finalYearSalary === 0) {
             return [

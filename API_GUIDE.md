@@ -1,135 +1,121 @@
-# IBL5 API Guide
+# API Development Guide
 
-**Last Updated:** November 6, 2025  
-**Status:** Database is API-Ready ✅
+**Status:** Database is API-Ready ✅ | **API Endpoints:** Not Yet Implemented
 
-## Quick Start
+## Current State
 
-### Database Status
-The database schema is fully prepared for API development:
-- ✅ InnoDB tables with ACID transactions
-- ✅ Foreign key constraints for data integrity
-- ✅ Timestamps (`created_at`, `updated_at`) for caching
-- ✅ UUIDs for secure public identifiers
-- ✅ Database views for optimized queries
+### ✅ Database Preparation Complete
 
-### Core API Entities
+The database has been optimized and prepared for API development:
 
-#### Players (`ibl_plr`)
-- **Primary Key:** `pid` (int, internal)
-- **Public ID:** `uuid` (varchar(36), for API)
-- **Key Fields:** name, pos, tid, contract details, stats
-- **View:** `vw_player_current` (current season data)
+- **UUIDs:** Added to 5 core tables (players, teams, games, box scores, draft)
+- **Timestamps:** `created_at`/`updated_at` on 19 tables for ETag caching
+- **Database Views:** 5 optimized views ready for API queries
+- **Foreign Keys:** 21 constraints for data integrity
+- **ACID Transactions:** InnoDB engine on all core tables
 
-#### Teams (`ibl_team_info`)
-- **Primary Key:** `teamid` (int, internal)
-- **Public ID:** `uuid` (varchar(36), for API)
-- **Key Fields:** team_name, team_city, owner, cap info
-- **View:** `vw_team_standings` (real-time standings)
+### ❌ API Server Not Yet Built
 
-#### Games (`ibl_schedule`)
-- **Primary Key:** `Date` (varchar, internal)
-- **Public ID:** `uuid` (varchar(36), for API)
-- **Key Fields:** Visitor, Home, VScore, HScore
-- **View:** `vw_game_schedule` (with team details)
+No API endpoints currently exist. This guide provides the design blueprint for future API development.
 
-#### Statistics
-- **Tables:** `ibl_*_stats`, `ibl_*_career_avgs`, `ibl_*_career_totals`
-- **View:** `vw_player_stats_summary` (aggregated)
+## Database Resources Ready for API Use
 
-#### Trades
-- **Tables:** `ibl_trade_info`, `ibl_trade_players`, `ibl_trade_picks`, `ibl_trade_cash`
-- **View:** `vw_trade_history` (complete records)
+### Core Tables with UUIDs
 
-## API Design Best Practices
+**Players:** `ibl_plr`
+- Internal ID: `pid` (int)
+- Public ID: `uuid` (varchar)
 
-### Use Database Views
-Query optimized views instead of joining tables:
-```php
-// ✅ Good - Use database view
-$query = "SELECT * FROM vw_player_current WHERE uuid = ?";
+**Teams:** `ibl_team_info`
+- Internal ID: `teamid` (int)
+- Public ID: `uuid` (varchar)
 
-// ❌ Avoid - Complex joins in API
-$query = "SELECT p.*, h.*, t.* FROM ibl_plr p 
-          JOIN ibl_hist h ON p.pid = h.pid 
-          JOIN ibl_team_info t ON p.tid = t.teamid 
-          WHERE p.uuid = ?";
+**Games:** `ibl_schedule`
+- Internal ID: `SchedID` (int)
+- Public ID: `uuid` (varchar)
+
+**Box Scores:** `ibl_box_scores`
+- Public ID: `uuid` (varchar)
+
+**Draft:** `ibl_draft`
+- Public ID: `uuid` (varchar)
+
+### Pre-Built Database Views
+
+These views are already created and optimized for API queries:
+
+1. **`vw_player_current`** - Active players with current season stats and team info
+2. **`vw_team_standings`** - Real-time standings with calculated fields
+3. **`vw_schedule_upcoming`** - Schedule with team names and game status
+4. **`vw_player_career_stats`** - Career statistics summary with averages
+5. **`vw_free_agency_offers`** - Free agency market overview
+
+## Proposed API Design (Not Yet Implemented)
+
+### Suggested RESTful Endpoints
+
+```
+GET  /api/v1/players              - List players
+GET  /api/v1/players/{uuid}       - Get player details
+GET  /api/v1/players/{uuid}/stats - Get player statistics
+GET  /api/v1/teams                - List teams
+GET  /api/v1/teams/{uuid}         - Get team details
+GET  /api/v1/teams/{uuid}/roster  - Get team roster
+GET  /api/v1/games                - List games
+GET  /api/v1/games/{uuid}         - Get game details
+GET  /api/v1/stats/leaders        - League leaders
 ```
 
-### Use UUIDs for Public IDs
-Never expose internal integer IDs in API responses:
+## Implementation Guidelines (For Future Development)
+
+### 1. Use Database Views
+
+When building API endpoints, query the pre-built views instead of joining tables:
+
 ```php
-// ✅ Good
+// ✅ Recommended - Use optimized view
+$query = "SELECT * FROM vw_player_current WHERE uuid = ?";
+
+// ❌ Avoid - Complex joins in API code
+$query = "SELECT p.*, h.*, t.* FROM ibl_plr p JOIN ...";
+```
+
+### 2. Use UUIDs for Public IDs
+
+Always expose UUIDs in API responses, never internal integer IDs:
+
+```php
+// ✅ Secure - UUID prevents ID enumeration
 return json_encode(['player_id' => $player['uuid']]);
 
-// ❌ Bad - Exposes internal ID
+// ❌ Insecure - Exposes internal database ID
 return json_encode(['player_id' => $player['pid']]);
 ```
 
-### Implement ETags for Caching
-Use `updated_at` timestamps for efficient caching:
+### 3. Implement ETag Caching
+
+Use the `updated_at` timestamps for HTTP caching:
+
 ```php
 $etag = md5($player['updated_at']);
 header("ETag: \"{$etag}\"");
 
-if (isset($_SERVER['HTTP_IF_NONE_MATCH']) && 
-    $_SERVER['HTTP_IF_NONE_MATCH'] === "\"{$etag}\"") {
+if ($_SERVER['HTTP_IF_NONE_MATCH'] === "\"{$etag}\"") {
     http_response_code(304);
     exit;
 }
 ```
 
-### Use Prepared Statements
-Always use prepared statements for security:
+### 4. Always Use Prepared Statements
+
 ```php
-// ✅ Good
+// ✅ Safe from SQL injection
 $stmt = $db->prepare("SELECT * FROM vw_player_current WHERE uuid = ?");
 $stmt->bind_param("s", $uuid);
 $stmt->execute();
-
-// ❌ Bad - SQL injection risk
-$query = "SELECT * FROM vw_player_current WHERE uuid = '$uuid'";
 ```
 
-## RESTful Endpoint Structure
-
-### Players
-```
-GET    /api/v1/players              - List players
-GET    /api/v1/players/{uuid}       - Get player details
-GET    /api/v1/players/{uuid}/stats - Get player statistics
-POST   /api/v1/players/{uuid}/sign  - Sign player (protected)
-```
-
-### Teams
-```
-GET    /api/v1/teams                - List teams
-GET    /api/v1/teams/{uuid}         - Get team details
-GET    /api/v1/teams/{uuid}/roster  - Get team roster
-GET    /api/v1/teams/{uuid}/salary  - Get salary cap info
-```
-
-### Games
-```
-GET    /api/v1/games                - List games
-GET    /api/v1/games/{uuid}         - Get game details
-GET    /api/v1/games/{uuid}/boxscore - Get box score
-```
-
-### Statistics
-```
-GET    /api/v1/stats/leaders        - League leaders
-GET    /api/v1/stats/team/{uuid}    - Team statistics
-```
-
-### Trades
-```
-GET    /api/v1/trades               - List trades
-GET    /api/v1/trades/{uuid}        - Get trade details
-POST   /api/v1/trades               - Propose trade (protected)
-```
-
-## Response Format
+## Proposed Response Format
 
 ### Success Response
 ```json
@@ -139,10 +125,13 @@ POST   /api/v1/trades               - Propose trade (protected)
     "player_id": "550e8400-e29b-41d4-a716-446655440000",
     "name": "Michael Jordan",
     "position": "SG",
-    "team_id": "660e8400-e29b-41d4-a716-446655440001"
+    "team": {
+      "id": "660e8400-e29b-41d4-a716-446655440001",
+      "name": "Chicago Bulls"
+    }
   },
   "meta": {
-    "timestamp": "2025-11-06T19:53:45Z",
+    "timestamp": "2025-11-10T00:00:00Z",
     "version": "v1"
   }
 }
@@ -154,235 +143,198 @@ POST   /api/v1/trades               - Propose trade (protected)
   "status": "error",
   "error": {
     "code": "PLAYER_NOT_FOUND",
-    "message": "Player with UUID not found",
-    "details": "UUID: 550e8400-e29b-41d4-a716-446655440000"
+    "message": "Player with specified UUID not found"
   },
   "meta": {
-    "timestamp": "2025-11-06T19:53:45Z",
-    "version": "v1"
+    "timestamp": "2025-11-10T00:00:00Z"
   }
 }
 ```
 
-## Authentication & Authorization
+## Recommended Features
 
-### API Key Authentication
+### Authentication
 ```php
 $apiKey = $_SERVER['HTTP_X_API_KEY'] ?? '';
 if (!validateApiKey($apiKey)) {
     http_response_code(401);
-    echo json_encode(['error' => 'Invalid API key']);
     exit;
 }
 ```
 
-### Permission Levels
+**Suggested Permission Levels:**
 - **Public:** Read-only access (players, teams, games, stats)
-- **Team Owner:** Manage own team (depth chart, contract offers)
-- **Commissioner:** Full access (trades, salary cap adjustments)
+- **Team Owner:** Manage own team roster and settings
+- **Commissioner:** Full administrative access
 
-## Rate Limiting
+### Rate Limiting
 
-### Recommended Limits
+Suggested limits:
 - Public endpoints: 100 requests/minute
 - Authenticated endpoints: 1000 requests/minute
 - Write operations: 10 requests/minute
 
-### Implementation
-```php
-$key = "ratelimit:{$apiKey}:" . date('YmdHi');
-$count = $redis->incr($key);
-$redis->expire($key, 60);
+### Pagination
 
-if ($count > $limit) {
-    http_response_code(429);
-    echo json_encode(['error' => 'Rate limit exceeded']);
-    exit;
-}
-```
+Query parameters: `?page=1&per_page=25&sort=name&order=asc`
 
-## Pagination
-
-### Query Parameters
-```
-?page=1&per_page=25&sort=name&order=asc
-```
-
-### Response Headers
+Response headers:
 ```
 X-Total-Count: 450
 X-Page: 1
 X-Per-Page: 25
-X-Total-Pages: 18
+Link: <.../players?page=2>; rel="next"
 ```
 
-### Link Header (RFC 5988)
-```
-Link: <https://api.ibl.com/v1/players?page=2>; rel="next",
-      <https://api.ibl.com/v1/players?page=18>; rel="last"
-```
+## HTTP Status Codes
 
-## Filtering & Searching
-
-### Query Parameters
-```
-GET /api/v1/players?position=PG&team=550e8400&min_ppg=15
-GET /api/v1/players?search=jordan&active=true
-```
-
-### Implementation Tips
-- Use database indexes for filtered fields
-- Limit search results to prevent slow queries
-- Validate filter parameters
-
-## CORS Configuration
-
-### Headers for Public API
-```php
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization, X-API-Key');
-header('Access-Control-Max-Age: 3600');
-```
-
-## Versioning Strategy
-
-### URL Versioning (Recommended)
-```
-/api/v1/players
-/api/v2/players
-```
-
-### Header Versioning (Alternative)
-```
-Accept: application/vnd.ibl.v1+json
-```
-
-## Error Codes
-
-### HTTP Status Codes
 - **200** OK - Success
 - **201** Created - Resource created
-- **204** No Content - Success, no body
-- **304** Not Modified - ETag match
+- **304** Not Modified - ETag cache hit
 - **400** Bad Request - Invalid parameters
-- **401** Unauthorized - Missing/invalid auth
-- **403** Forbidden - Insufficient permissions
+- **401** Unauthorized - Missing/invalid authentication
 - **404** Not Found - Resource not found
-- **409** Conflict - Business rule violation
-- **429** Too Many Requests - Rate limit
-- **500** Internal Server Error - Server error
+- **429** Too Many Requests - Rate limit exceeded
+- **500** Internal Server Error
 
-### Custom Error Codes
-```
-PLAYER_NOT_FOUND
-INVALID_CONTRACT
-SALARY_CAP_EXCEEDED
-ROSTER_FULL
-INVALID_TRADE
-PERMISSION_DENIED
-```
+## Security Implementation Checklist
 
-## Performance Optimization
-
-### Caching Strategy
-1. **ETags:** Use timestamps for conditional requests
-2. **Redis:** Cache frequently accessed data (5-15 min TTL)
-3. **Database Views:** Pre-join common queries
-4. **CDN:** Cache static responses
-
-### Query Optimization
-- Use database views for complex queries
-- Leverage composite indexes
-- Implement query result pagination
-- Monitor slow query log
-
-## Security Checklist
-
-- [ ] All input validated and sanitized
+- [ ] Input validation on all parameters
 - [ ] Prepared statements for all queries
-- [ ] Output escaped (HTML, JSON)
-- [ ] API keys stored securely (hashed)
-- [ ] HTTPS enforced for all endpoints
+- [ ] Output escaping for all responses
+- [ ] API keys stored hashed in database
+- [ ] HTTPS enforced on all endpoints
 - [ ] Rate limiting implemented
-- [ ] SQL injection prevented
-- [ ] XSS prevention in responses
-- [ ] CSRF tokens for state changes
 - [ ] Authorization checks on protected endpoints
+- [ ] SQL injection prevention verified
+- [ ] XSS prevention in JSON responses
 
-## Testing API Endpoints
+## Getting Started with API Development
 
-### Example cURL Commands
+### Prerequisites
+
+1. Review the database schema: `ibl5/schema.sql`
+2. Understand the existing database views (already created)
+3. Familiarize yourself with UUID implementation
+
+### Step 1: Create API Directory Structure
+
 ```bash
-# Get player by UUID
-curl -X GET "https://api.ibl.com/v1/players/550e8400-e29b-41d4-a716-446655440000"
-
-# Get players with ETag
-curl -X GET "https://api.ibl.com/v1/players" \
-  -H "If-None-Match: \"abc123\""
-
-# Create trade (authenticated)
-curl -X POST "https://api.ibl.com/v1/trades" \
-  -H "X-API-Key: your-api-key" \
-  -H "Content-Type: application/json" \
-  -d '{"team1": "uuid1", "team2": "uuid2"}'
+mkdir -p ibl5/api/v1
+mkdir -p ibl5/api/v1/controllers
+mkdir -p ibl5/api/v1/middleware
 ```
 
-## OpenAPI Documentation
+### Step 2: Example Player Endpoint
 
-### Tools
-- **Swagger UI:** Interactive API documentation
-- **Postman:** API testing and documentation
-- **OpenAPI Spec:** Generate from annotations
+Here's a sample implementation for a player endpoint:
 
-### Example OpenAPI Schema
-```yaml
-openapi: 3.0.0
-info:
-  title: IBL5 API
-  version: 1.0.0
-paths:
-  /api/v1/players/{uuid}:
-    get:
-      summary: Get player by UUID
-      parameters:
-        - name: uuid
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        200:
-          description: Success
+```php
+<?php
+// ibl5/api/v1/players.php
+require_once '../../mainfile.php';
+
+header('Content-Type: application/json');
+
+$uuid = $_GET['uuid'] ?? null;
+
+if (!$uuid) {
+    http_response_code(400);
+    echo json_encode([
+        'status' => 'error',
+        'error' => [
+            'code' => 'MISSING_UUID',
+            'message' => 'Player UUID is required'
+        ]
+    ]);
+    exit;
+}
+
+// Use the pre-built database view
+$stmt = $db->prepare("SELECT * FROM vw_player_current WHERE uuid = ?");
+$stmt->bind_param("s", $uuid);
+$stmt->execute();
+$result = $stmt->get_result();
+
+if ($result->num_rows === 0) {
+    http_response_code(404);
+    echo json_encode([
+        'status' => 'error',
+        'error' => [
+            'code' => 'PLAYER_NOT_FOUND',
+            'message' => 'Player not found'
+        ]
+    ]);
+    exit;
+}
+
+$player = $result->fetch_assoc();
+
+// Implement ETag caching
+$etag = md5($player['updated_at']);
+header("ETag: \"{$etag}\"");
+
+if (isset($_SERVER['HTTP_IF_NONE_MATCH']) && 
+    $_SERVER['HTTP_IF_NONE_MATCH'] === "\"{$etag}\"") {
+    http_response_code(304);
+    exit;
+}
+
+echo json_encode([
+    'status' => 'success',
+    'data' => [
+        'player_id' => $player['player_uuid'],
+        'name' => $player['name'],
+        'position' => $player['position'],
+        'age' => $player['age'],
+        'team' => [
+            'id' => $player['team_uuid'],
+            'name' => $player['full_team_name']
+        ],
+        'stats' => [
+            'games' => $player['games_played'],
+            'ppg' => $player['points_per_game'],
+            'fg_pct' => $player['fg_percentage']
+        ]
+    ],
+    'meta' => [
+        'timestamp' => date('c'),
+        'version' => 'v1'
+    ]
+]);
 ```
 
-## Deployment Considerations
+### Step 3: Testing Your API
 
-### Environment Configuration
-- Use environment variables for sensitive data
-- Separate configs for dev/staging/production
-- Never commit API keys or secrets
+Once endpoints are created, test with curl:
 
-### Monitoring
-- Log all API requests (anonymized)
-- Monitor response times
-- Alert on error rate spikes
-- Track rate limit hits
+```bash
+# Test player endpoint (replace with actual UUID from database)
+curl http://localhost/ibl5/api/v1/players.php?uuid=YOUR-UUID-HERE
 
-## Next Steps
+# Test with ETag
+curl -H "If-None-Match: \"etag-value\"" \
+  http://localhost/ibl5/api/v1/players.php?uuid=YOUR-UUID-HERE
+```
 
-1. Review database views in `schema.sql`
-2. Implement authentication system
-3. Create base API controller class
-4. Build player endpoints first (most requested)
-5. Add comprehensive tests
-6. Document with OpenAPI/Swagger
-7. Set up monitoring and logging
-8. Deploy to staging environment
+## Next Steps for Implementation
 
-## Additional Resources
-- **[Database Guide](DATABASE_GUIDE.md)** - Schema reference and best practices
-- **[Development Guide](DEVELOPMENT_GUIDE.md)** - Refactoring and testing standards
-- **[Copilot Instructions](COPILOT_AGENT.md)** - Coding standards and security
-- **[Production Deployment](PRODUCTION_DEPLOYMENT_GUIDE.md)** - Deployment procedures
+1. **Create base API structure** - Directory structure and routing
+2. **Implement authentication** - API key validation
+3. **Add rate limiting** - Prevent API abuse
+4. **Build core endpoints** - Players, teams, games
+5. **Add pagination** - Handle large result sets
+6. **Implement caching** - Use ETags and Redis
+7. **Add documentation** - OpenAPI/Swagger specs
+8. **Write tests** - Unit and integration tests
+
+## Resources
+
+- [DATABASE_GUIDE.md](DATABASE_GUIDE.md) - Schema reference and query patterns
+- [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md) - Coding standards and security
+- `ibl5/schema.sql` - Complete database schema with views
+- `ibl5/migrations/` - Database migration history
+
+## Notes
+
+The database infrastructure is fully prepared and optimized for API development. All that remains is building the API endpoints themselves using the guidelines in this document.

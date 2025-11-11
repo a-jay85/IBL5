@@ -7,6 +7,54 @@ use Player\Player;
 $sharedFunctions = new Shared($db);
 $commonRepository = new Services\CommonRepository($db);
 
+// Handle POST requests for button actions
+$actionMessage = '';
+$actionCompleted = false;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (isset($_POST['action'])) {
+        if ($_POST['action'] === 'assign_free_agents' && isset($_POST['sql_queries'])) {
+            // Execute the SQL queries from $code
+            $queries = $_POST['sql_queries'];
+            if (!empty($queries)) {
+                // Split queries by semicolon and execute each one
+                $queryArray = array_filter(array_map('trim', explode(';', $queries)));
+                $successCount = 0;
+                $errorCount = 0;
+                
+                foreach ($queryArray as $query) {
+                    if (!empty($query)) {
+                        if ($db->sql_query($query)) {
+                            $successCount++;
+                        } else {
+                            $errorCount++;
+                        }
+                    }
+                }
+                
+                if ($errorCount === 0 && $successCount > 0) {
+                    $actionMessage = "Successfully executed $successCount SQL queries. Free agents have been assigned to teams.";
+                    $actionCompleted = true;
+                } elseif ($errorCount > 0) {
+                    $actionMessage = "Completed with errors: $successCount queries succeeded, $errorCount queries failed.";
+                } else {
+                    $actionMessage = "No queries were executed.";
+                }
+            } else {
+                $actionMessage = "No SQL queries found to execute.";
+            }
+        } elseif ($_POST['action'] === 'clear_offers') {
+            // Truncate the ibl_fa_offers table
+            $truncateQuery = "TRUNCATE TABLE ibl_fa_offers";
+            if ($db->sql_query($truncateQuery)) {
+                $actionMessage = "Successfully cleared all free agency offers from the database.";
+            } else {
+                $actionMessage = "Error: Failed to clear free agency offers - " . $db->sql_error();
+            }
+        }
+    }
+}
+
 $val = $_GET['day'];
 
 $query = "SELECT ibl_fa_offers.*, ibl_plr.bird
@@ -17,7 +65,67 @@ $result = $db->sql_query($query);
 $num = $db->sql_numrows($result);
 
 echo "<HTML>
-	<HEAD><TITLE>Free Agent Processing</TITLE></HEAD>
+	<HEAD>
+        <TITLE>Free Agent Processing</TITLE>
+        <style>
+            .modal-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                display: none;
+                justify-content: center;
+                align-items: center;
+                z-index: 1000;
+            }
+            .modal-overlay.active {
+                display: flex;
+            }
+            .modal-content {
+                background: white;
+                padding: 20px;
+                border-radius: 5px;
+                text-align: center;
+                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            }
+            .modal-buttons {
+                margin-top: 20px;
+            }
+            .btn-run {
+                background: #dc3545;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                margin: 0 10px;
+                border-radius: 5px;
+                cursor: pointer;
+            }
+            .btn-cancel {
+                background: white;
+                color: black;
+                border: 1px solid #ccc;
+                padding: 10px 20px;
+                margin: 0 10px;
+                border-radius: 5px;
+                cursor: pointer;
+            }
+            .action-button {
+                background: #007bff;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                margin-top: 10px;
+                border-radius: 5px;
+                cursor: pointer;
+                font-size: 14px;
+            }
+            .action-button:hover {
+                background: #0056b3;
+            }
+        </style>
+    </HEAD>
 	<BODY>
         <H1>You are viewing <font color=red>Day " . ($val) . "</font> results!</H1>
         <H2>Total number of offers: $num</H2>
@@ -265,13 +373,89 @@ if ($val < 12) {
 echo "  <h2 style=\"color:#7289da\">ALL REMAINING OFFERS IN DISCORD FORMAT (FOR <a href=\"https://discord.com/channels/666986450889474053/682990441641279531\">#live-sims</a>)</h2>
         <TEXTAREA style=\"font-size: 24px\" COLS=85 ROWS=20>$discordText</TEXTAREA>
         <hr>
-        <h2>SQL QUERY BOX</h2>
-        <TEXTAREA COLS=125 ROWS=20>$code</TEXTAREA>
-        <hr>
+        <h2>SQL QUERY BOX</h2>";
+
+// Display action message if any action was completed
+if (!empty($actionMessage)) {
+    echo "<TEXTAREA id=\"sqlQueryBox\" COLS=125 ROWS=20>$actionMessage</TEXTAREA>";
+} else {
+    echo "<TEXTAREA id=\"sqlQueryBox\" COLS=125 ROWS=20>$code</TEXTAREA>";
+}
+
+// Show the appropriate button based on whether action was completed
+if ($actionCompleted) {
+    echo '<br><button class="action-button" onclick="showClearOffersModal()">Clear All Free Agency Offers</button>';
+} else {
+    echo '<br><button class="action-button" onclick="showAssignFreeAgentsModal()">Assign Free Agent Signings to Teams</button>';
+}
+
+echo "  <hr>
         <h2>ACCEPTED OFFERS IN HTML FORMAT (FOR NEWS ARTICLE)</h2>
         <TEXTAREA COLS=125 ROWS=20>$text</TEXTAREA>
         <hr>
         <h2>ALL OFFERS IN HTML FORMAT (FOR NEWS ARTICLE EXTENDED TEXT)</h2>
         <TEXTAREA COLS=125 ROWS=20>$exttext</TEXTAREA>
     </FORM>
+    
+    <!-- Modal for Assign Free Agents -->
+    <div id=\"assignFreeAgentsModal\" class=\"modal-overlay\">
+        <div class=\"modal-content\">
+            <h2>WARNING</h2>
+            <p>Are you sure you want to assign the free agents to teams?</p>
+            <p>This will execute the SQL queries and update player contracts.</p>
+            <div class=\"modal-buttons\">
+                <form method=\"POST\" id=\"assignFreeAgentsForm\">
+                    <input type=\"hidden\" name=\"action\" value=\"assign_free_agents\">
+                    <input type=\"hidden\" name=\"sql_queries\" id=\"sqlQueriesInput\" value=\"\">
+                    <button type=\"submit\" class=\"btn-run\">Yes</button>
+                    <button type=\"button\" class=\"btn-cancel\" onclick=\"closeModal('assignFreeAgentsModal')\">No</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal for Clear Offers -->
+    <div id=\"clearOffersModal\" class=\"modal-overlay\">
+        <div class=\"modal-content\">
+            <h2>WARNING</h2>
+            <p>Are you sure you want to clear all Free Agency Offers?</p>
+            <p>This will truncate the ibl_fa_offers table and remove all offers.</p>
+            <div class=\"modal-buttons\">
+                <form method=\"POST\">
+                    <input type=\"hidden\" name=\"action\" value=\"clear_offers\">
+                    <button type=\"submit\" class=\"btn-run\">Yes</button>
+                    <button type=\"button\" class=\"btn-cancel\" onclick=\"closeModal('clearOffersModal')\">No</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        function showAssignFreeAgentsModal() {
+            // Get the SQL queries from the textarea
+            var sqlQueries = document.getElementById('sqlQueryBox').value;
+            document.getElementById('sqlQueriesInput').value = sqlQueries;
+            
+            // Show the modal
+            document.getElementById('assignFreeAgentsModal').classList.add('active');
+        }
+        
+        function showClearOffersModal() {
+            document.getElementById('clearOffersModal').classList.add('active');
+        }
+        
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+        
+        // Close modal when clicking outside of it
+        window.onclick = function(event) {
+            var modals = document.getElementsByClassName('modal-overlay');
+            for (var i = 0; i < modals.length; i++) {
+                if (event.target == modals[i]) {
+                    modals[i].classList.remove('active');
+                }
+            }
+        }
+    </script>
 </HTML>";

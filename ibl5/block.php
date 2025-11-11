@@ -384,9 +384,9 @@ if (!empty($actionMessage)) {
 
 // Show the appropriate button based on whether action was completed
 if ($actionCompleted) {
-    echo '<br><button class="action-button" onclick="showClearOffersModal()">Clear All Free Agency Offers</button>';
+    echo '<br><button type="button" class="action-button" onclick="showClearOffersModal()">Clear All Free Agency Offers</button>';
 } else {
-    echo '<br><button class="action-button" onclick="showAssignFreeAgentsModal()">Assign Free Agent Signings to Teams</button>';
+    echo '<br><button type="button" class="action-button" onclick="showAssignFreeAgentsModal()">Assign Free Agent Signings to Teams</button>';
 }
 
 echo "  <hr>

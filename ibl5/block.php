@@ -373,11 +373,11 @@ if ($val < 12) {
 echo "  <h2 style=\"color:#7289da\">ALL REMAINING OFFERS IN DISCORD FORMAT (FOR <a href=\"https://discord.com/channels/666986450889474053/682990441641279531\">#live-sims</a>)</h2>
         <TEXTAREA style=\"font-size: 24px\" COLS=85 ROWS=20>$discordText</TEXTAREA>
         <hr>
-        <h2>SQL QUERY BOX</h2>";
+        <h2 id=\"sqlQueryBoxHeader\">SQL QUERY BOX</h2>";
 
 // Display action message if any action was completed
 if (!empty($actionMessage)) {
-    echo "<TEXTAREA id=\"sqlQueryBox\" COLS=125 ROWS=20>$actionMessage</TEXTAREA>";
+    echo "<TEXTAREA id=\"sqlQueryBox\" style=\"color: #007bff;\" COLS=125 ROWS=20>$actionMessage</TEXTAREA>";
 } else {
     echo "<TEXTAREA id=\"sqlQueryBox\" COLS=125 ROWS=20>$code</TEXTAREA>";
 }
@@ -457,5 +457,16 @@ echo "  <hr>
                 }
             }
         }
+        
+        // Scroll to SQL QUERY BOX header after action is completed
+        window.addEventListener('load', function() {
+            var textarea = document.getElementById('sqlQueryBox');
+            if (textarea && textarea.style.color === 'rgb(0, 123, 255)') {
+                var header = document.getElementById('sqlQueryBoxHeader');
+                if (header) {
+                    header.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }
+        });
     </script>
 </HTML>";

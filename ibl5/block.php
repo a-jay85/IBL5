@@ -46,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $newsInsertQuery = "INSERT INTO `nuke_stories` 
                         (`catid`, `aid`, `title`, `time`, `hometext`, `bodytext`, `comments`, `counter`, `topic`, `informant`, `notes`, `ihome`, `alanguage`, `acomm`, `haspoll`, `pollID`, `score`, `ratings`, `rating_ip`, `associated`)
                         VALUES
-                        (8, 'chibul', '2006 IBL Free Agency, Days $day-$day', '$currentTime', '$hometext', '$bodytext', 0, 2, 29, 'chibul', '', 0, 'english', 0, 0, 0, 0, 0, '0', '29-')";
+                        (8, 'chibul', '2006 IBL Free Agency, Days " . ($day-1) . "-$day', '$currentTime', '$hometext', '$bodytext', 0, 0, 29, 'chibul', '', 0, 'english', 0, 0, 0, 0, 0, '0', '29-')";
                     
                     if ($db->sql_query($newsInsertQuery)) {
                         $successCount++;

@@ -532,6 +532,31 @@ echo "  </FORM>
             }
         }
         
+        // Handle Enter/Return key press in modals
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter' || event.keyCode === 13) {
+                // Check if assign free agents modal is active
+                var assignModal = document.getElementById('assignFreeAgentsModal');
+                if (assignModal && assignModal.classList.contains('active')) {
+                    event.preventDefault();
+                    document.getElementById('assignFreeAgentsForm').submit();
+                    return;
+                }
+                
+                // Check if clear offers modal is active
+                var clearModal = document.getElementById('clearOffersModal');
+                if (clearModal && clearModal.classList.contains('active')) {
+                    event.preventDefault();
+                    // Find and submit the form in the clear offers modal
+                    var form = clearModal.querySelector('form');
+                    if (form) {
+                        form.submit();
+                    }
+                    return;
+                }
+            }
+        });
+        
         // Scroll to SQL QUERY BOX header after action is completed
         window.addEventListener('load', function() {
             var textarea = document.getElementById('sqlQueryBox');

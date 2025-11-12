@@ -246,8 +246,52 @@ public function testEscapesUserInput()
 - [ ] All linter warnings and errors addressed and fixed
 - [ ] Strict types enabled where applicable (`declare(strict_types=1);`)
 - [ ] **Deprecated functions removed and all call sites updated** to use new implementations
+- [ ] **Domain-specific constants are class constants, not function arguments**
 
-### 7. Type Hinting & Error Handling Standards
+### 7. Constants and Magic Numbers
+
+#### Use Class Constants for Domain Values
+**NEVER pass domain-specific constants as function arguments.** Instead, define them as class constants and reference them directly within methods.
+
+**❌ DON'T - Pass constants as arguments:**
+```php
+// Bad: Passing constant values as arguments
+private function checkEligibility($player, int $minExperience, int $maxExperience): bool {
+    return $player->experience >= $minExperience && $player->experience <= $maxExperience;
+}
+
+// Called with magic numbers
+$result = $this->checkEligibility($player, 2, 5);
+```
+
+**✅ DO - Define and use class constants:**
+```php
+// Good: Define constants at class level
+class PlayerValidator {
+    private const MIN_ELIGIBLE_EXPERIENCE = 2;
+    private const MAX_ELIGIBLE_EXPERIENCE = 5;
+    
+    private function checkEligibility(PlayerData $player): bool {
+        return $player->experience >= self::MIN_ELIGIBLE_EXPERIENCE 
+            && $player->experience <= self::MAX_ELIGIBLE_EXPERIENCE;
+    }
+}
+```
+
+**When to Use Class Constants:**
+- Business rules (e.g., `MAX_CONTRACT_YEARS = 6`)
+- Thresholds (e.g., `ROOKIE_OPTION_ROUND1_EXPERIENCE = 2`)
+- Status codes (e.g., `STATUS_ACTIVE = 1`)
+- Configuration values (e.g., `DEFAULT_SALARY_CAP = 50000`)
+
+**Benefits:**
+- Self-documenting code with descriptive constant names
+- Single source of truth for domain values
+- Easier refactoring and maintenance
+- Better IDE support and autocomplete
+- Type safety and immutability
+
+### 8. Type Hinting & Error Handling Standards
 
 #### Mandatory Type Hints
 **ALL new functions and methods MUST include complete type hints:**
@@ -302,7 +346,7 @@ if ($result) { ... }
 - Type hints enable easier future Eloquent ORM migration
 - Document complex array types: `@return array<string, mixed>`
 
-### 8. Deprecated Function Handling
+### 9. Deprecated Function Handling
 
 **When encountering deprecated functions, the agent MUST:**
 

@@ -152,17 +152,6 @@ class ExtensionOfferEvaluator
     }
 
     /**
-     * Converts offer amount to millions for display
-     * 
-     * @param int $offerTotal Total offer amount
-     * @return float Amount in millions
-     */
-    public function convertToMillions($offerTotal)
-    {
-        return $offerTotal / 100;
-    }
-    
-    /**
      * Calculates player demands based on player value
      * (Helper method for testing)
      * 

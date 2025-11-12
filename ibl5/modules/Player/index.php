@@ -332,45 +332,40 @@ function negotiate($playerID)
 
 function rookieoption($pid)
 {
-    global $prefix, $db, $cookie;
+    global $db, $cookie;
+    
+    // Initialize dependencies
     $commonRepository = new \Services\CommonRepository($db);
     $season = new Season($db);
+    $validator = new \RookieOption\RookieOptionValidator();
+    $processor = new \RookieOption\RookieOptionProcessor();
+    $formView = new \RookieOption\RookieOptionFormView();
+    
+    // Get user's team name
+    $userTeamName = $commonRepository->getTeamnameFromUsername($cookie[1]);
+    
+    // Load player
     $player = Player::withPlayerID($db, $pid);
-
-    $userteam = $commonRepository->getTeamnameFromUsername($cookie[1]);
-    $userTeamID = $commonRepository->getTidFromTeamname($userteam);
-
-    if ($userTeamID != $player->teamID) {
-        echo "$player->position $player->name is not on your team.<br>
-            <a href=\"javascript:history.back()\">Go Back</a>";
+    
+    // Validate player ownership
+    $ownershipValidation = $validator->validatePlayerOwnership($player, $userTeamName);
+    if (!$ownershipValidation['valid']) {
+        $formView->renderError($ownershipValidation['error']);
         return;
     }
-
-    if ($player->draftRound == 1 AND $player->canRookieOption($season->phase)) {
-        $finalYearOfRookieContract = $player->contractYear3Salary;
-    } elseif ($player->draftRound == 2 AND $player->canRookieOption($season->phase)) {
-        $finalYearOfRookieContract = $player->contractYear2Salary;
-    } else {
-        echo "Sorry, $player->position $player->name is not eligible for a rookie option.<p>
-            Only draft picks are eligible for rookie options, and the option must be exercised
-            before the final season of their rookie contract is underway.<p>
-    		<a href=\"javascript:history.back()\">Go Back</a>";
+    
+    // Validate eligibility and get final year salary
+    $eligibilityValidation = $validator->validateEligibilityAndGetSalary($player, $season->phase);
+    if (!$eligibilityValidation['valid']) {
+        $formView->renderError($eligibilityValidation['error']);
         return;
     }
-
-    $rookieOptionValue = 2 * $finalYearOfRookieContract;
-
-    echo "<img align=left src=\"images/player/$pid.jpg\">
-    	You may exercise the rookie extension option on <b>$player->position $player->name</b>.<br>
-    	Their contract value the season after this one will be <b>$rookieOptionValue</b>.<br>
-    	However, by exercising this option, <b>you can't use an in-season contract extension on them next season</b>.<br>
-    	<b>They will become a free agent</b>.<br>
-    	<form name=\"RookieExtend\" method=\"post\" action=\"/ibl5/modules/Player/rookieoption.php\">
-            <input type=\"hidden\" name=\"teamname\" value=\"$userteam\">
-            <input type=\"hidden\" name=\"playerID\" value=\"$player->playerID\">
-            <input type=\"hidden\" name=\"rookieOptionValue\" value=\"$rookieOptionValue\">
-            <input type=\"submit\" value=\"Activate Rookie Extension\">
-        </form>";
+    
+    // Calculate rookie option value (2x final year salary)
+    $rookieOptionValue = 2 * $eligibilityValidation['finalYearSalary'];
+    
+    // Render form
+    $formView->renderForm($player, $userTeamName, $rookieOptionValue);
 }
 
 switch ($pa) {

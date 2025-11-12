@@ -2,6 +2,7 @@
 
 use PHPUnit\Framework\TestCase;
 use Extension\ExtensionOfferEvaluator;
+use Shared\SalaryConverter;
 
 /**
  * Tests for contract extension offer evaluation logic
@@ -370,7 +371,7 @@ class ExtensionOfferEvaluationTest extends TestCase
         $offerTotal = 12000; // 12000 in internal units
 
         // Act
-        $millions = $this->offerEvaluator->convertToMillions($offerTotal);
+        $millions = SalaryConverter::convertToMillions($offerTotal);
 
         // Assert
         $this->assertEquals(120, $millions); // 12000 / 100 = 120 million

@@ -3,6 +3,7 @@
 namespace RookieOption;
 
 use Player\Player;
+use Shared\SalaryConverter;
 
 /**
  * Main controller for rookie option operations
@@ -91,7 +92,7 @@ class RookieOptionController
      */
     private function createRookieOptionNewsStory(string $teamName, string $playerName, int $extensionAmount): void
     {
-        $rookieOptionInMillions = $this->processor->convertToMillions($extensionAmount);
+        $rookieOptionInMillions = SalaryConverter::convertToMillions($extensionAmount);
         
         $storytitle = $playerName . " extends their contract with the " . $teamName;
         $hometext = $teamName . " exercise the rookie extension option on " . $playerName . " in the amount of " . $rookieOptionInMillions . " million dollars.";

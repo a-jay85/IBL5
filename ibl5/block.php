@@ -430,7 +430,11 @@ echo "  <hr>
 
 // Display action message in news textareas if action was completed
 if (!empty($actionMessage)) {
-    echo "<TEXTAREA id=\"newsHometextArea\" style=\"color: #007bff;\" COLS=125 ROWS=20>News story successfully posted to the database.</TEXTAREA>";
+    if ($actionCompleted) {
+        echo "<TEXTAREA id=\"newsHometextArea\" style=\"color: #007bff;\" COLS=125 ROWS=20>News story successfully posted to the database.</TEXTAREA>";
+    } else {
+        echo "<TEXTAREA id=\"newsHometextArea\" style=\"color: #007bff;\" COLS=125 ROWS=20>$actionMessage</TEXTAREA>";
+    }
 } else {
     echo "<TEXTAREA id=\"newsHometextArea\" COLS=125 ROWS=20>$text</TEXTAREA>";
 }
@@ -439,7 +443,11 @@ echo "  <hr>
         <h2>ALL OFFERS IN HTML FORMAT (FOR NEWS ARTICLE EXTENDED TEXT)</h2>";
 
 if (!empty($actionMessage)) {
-    echo "<TEXTAREA id=\"newsBodytextArea\" style=\"color: #007bff;\" COLS=125 ROWS=20>News story successfully posted to the database.</TEXTAREA>";
+    if ($actionCompleted) {
+        echo "<TEXTAREA id=\"newsBodytextArea\" style=\"color: #007bff;\" COLS=125 ROWS=20>News story successfully posted to the database.</TEXTAREA>";
+    } else {
+        echo "<TEXTAREA id=\"newsBodytextArea\" style=\"color: #007bff;\" COLS=125 ROWS=20>$actionMessage</TEXTAREA>";
+    }
 } else {
     echo "<TEXTAREA id=\"newsBodytextArea\" COLS=125 ROWS=20>$exttext</TEXTAREA>";
 }

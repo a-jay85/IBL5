@@ -46,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $newsInsertQuery = "INSERT INTO `nuke_stories` 
                         (`catid`, `aid`, `title`, `time`, `hometext`, `bodytext`, `comments`, `counter`, `topic`, `informant`, `notes`, `ihome`, `alanguage`, `acomm`, `haspoll`, `pollID`, `score`, `ratings`, `rating_ip`, `associated`)
                         VALUES
-                        (8, 'chibul', '2006 IBL Free Agency, Days $day-$day', '$currentTime', '$hometext', '$bodytext', 0, 2, 29, 'chibul', '', 0, 'english', 0, 0, 0, 0, 0, '0', '29-')";
+                        (8, 'chibul', '2006 IBL Free Agency, Days " . ($day-1) . "-$day', '$currentTime', '$hometext', '$bodytext', 0, 0, 29, 'chibul', '', 0, 'english', 0, 0, 0, 0, 0, '0', '29-')";
                     
                     if ($db->sql_query($newsInsertQuery)) {
                         $successCount++;
@@ -56,7 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 
                 if ($errorCount === 0 && $successCount > 0) {
-                    $actionMessage = "Successfully executed $successCount SQL queries. Free agents have been assigned to teams.";
+                    $actionMessage = "Successfully executed $successCount SQL queries. Free agents have been assigned to teams.\nPlease double-check the player contracts and team rosters to ensure everything is correct before truncating the offers table.";
                     $actionCompleted = true;
                 } elseif ($errorCount > 0) {
                     $actionMessage = "Completed with errors: $successCount queries succeeded, $errorCount queries failed.";
@@ -450,8 +450,10 @@ echo "  </FORM>
     <div id=\"assignFreeAgentsModal\" class=\"modal-overlay\">
         <div class=\"modal-content\">
             <h2>WARNING</h2>
-            <p>Are you sure you want to assign the free agents to teams?</p>
-            <p>This will execute the SQL queries and update player contracts.</p>
+            <p>Are you sure?</p>
+            <p>Winning offers will be applied to players and teams.</p>
+            <p>A news story will be inserted into the database.</p>
+            <p><b>Please double-check everything before proceeding.</b></p>
             <div class=\"modal-buttons\">
                 <form method=\"POST\" id=\"assignFreeAgentsForm\">
                     <input type=\"hidden\" name=\"action\" value=\"assign_free_agents\">
@@ -472,6 +474,7 @@ echo "  </FORM>
             <h2>WARNING</h2>
             <p>Are you sure you want to clear all Free Agency Offers?</p>
             <p>This will truncate the ibl_fa_offers table and remove all offers.</p>
+            <p><b>Please double-check everything before proceeding.</b></p>
             <div class=\"modal-buttons\">
                 <form method=\"POST\">
                     <input type=\"hidden\" name=\"action\" value=\"clear_offers\">

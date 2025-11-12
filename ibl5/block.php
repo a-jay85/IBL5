@@ -147,6 +147,19 @@ echo "<HTML>
             .action-button:hover {
                 background: #0056b3;
             }
+            .action-button-red {
+                background: #dc3545;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                margin-top: 10px;
+                border-radius: 5px;
+                cursor: pointer;
+                font-size: 14px;
+            }
+            .action-button-red:hover {
+                background: #c82333;
+            }
         </style>
     </HEAD>
 	<BODY>
@@ -407,18 +420,31 @@ if (!empty($actionMessage)) {
 
 // Show the appropriate button based on whether action was completed
 if ($actionCompleted) {
-    echo '<br><button type="button" class="action-button" onclick="showClearOffersModal()">Clear All Free Agency Offers</button>';
+    echo '<br><button type="button" class="action-button-red" onclick="showClearOffersModal()">Clear All Free Agency Offers</button>';
 } else {
-    echo '<br><button type="button" class="action-button" onclick="showAssignFreeAgentsModal()">Assign Free Agent Signings to Teams</button>';
+    echo '<br><button type="button" class="action-button" onclick="showAssignFreeAgentsModal()">Assign Free Agents to Teams and Insert News Story</button>';
 }
 
 echo "  <hr>
-        <h2>ACCEPTED OFFERS IN HTML FORMAT (FOR NEWS ARTICLE)</h2>
-        <TEXTAREA id=\"newsHometextArea\" COLS=125 ROWS=20>$text</TEXTAREA>
-        <hr>
-        <h2>ALL OFFERS IN HTML FORMAT (FOR NEWS ARTICLE EXTENDED TEXT)</h2>
-        <TEXTAREA id=\"newsBodytextArea\" COLS=125 ROWS=20>$exttext</TEXTAREA>
-    </FORM>
+        <h2>ACCEPTED OFFERS IN HTML FORMAT (FOR NEWS ARTICLE)</h2>";
+
+// Display action message in news textareas if action was completed
+if (!empty($actionMessage)) {
+    echo "<TEXTAREA id=\"newsHometextArea\" style=\"color: #007bff;\" COLS=125 ROWS=20>News story successfully posted to the database.</TEXTAREA>";
+} else {
+    echo "<TEXTAREA id=\"newsHometextArea\" COLS=125 ROWS=20>$text</TEXTAREA>";
+}
+
+echo "  <hr>
+        <h2>ALL OFFERS IN HTML FORMAT (FOR NEWS ARTICLE EXTENDED TEXT)</h2>";
+
+if (!empty($actionMessage)) {
+    echo "<TEXTAREA id=\"newsBodytextArea\" style=\"color: #007bff;\" COLS=125 ROWS=20>News story successfully posted to the database.</TEXTAREA>";
+} else {
+    echo "<TEXTAREA id=\"newsBodytextArea\" COLS=125 ROWS=20>$exttext</TEXTAREA>";
+}
+
+echo "  </FORM>
     
     <!-- Modal for Assign Free Agents -->
     <div id=\"assignFreeAgentsModal\" class=\"modal-overlay\">

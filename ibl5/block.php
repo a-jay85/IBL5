@@ -46,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $newsInsertQuery = "INSERT INTO `nuke_stories` 
                         (`catid`, `aid`, `title`, `time`, `hometext`, `bodytext`, `comments`, `counter`, `topic`, `informant`, `notes`, `ihome`, `alanguage`, `acomm`, `haspoll`, `pollID`, `score`, `ratings`, `rating_ip`, `associated`)
                         VALUES
-                        (8, 'chibul', '2006 IBL Free Agency, Days " . ($day-1) . "-$day', '$currentTime', '$hometext', '$bodytext', 0, 0, 29, 'chibul', '', 0, 'english', 0, 0, 0, 0, 0, '0', '29-')";
+                        (8, 'chibul', '2006 IBL Free Agency, Days $day-$day', '$currentTime', '$hometext', '$bodytext', 0, 2, 29, 'chibul', '', 0, 'english', 0, 0, 0, 0, 0, '0', '29-')";
                     
                     if ($db->sql_query($newsInsertQuery)) {
                         $successCount++;
@@ -56,7 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 
                 if ($errorCount === 0 && $successCount > 0) {
-                    $actionMessage = "Successfully executed $successCount SQL queries. Free agents have been assigned to teams.\nPlease double-check the player contracts and team rosters to ensure everything is correct before truncating the offers table.";
+                    $actionMessage = "Successfully executed $successCount SQL queries. Free agents have been assigned to teams.";
                     $actionCompleted = true;
                 } elseif ($errorCount > 0) {
                     $actionMessage = "Completed with errors: $successCount queries succeeded, $errorCount queries failed.";

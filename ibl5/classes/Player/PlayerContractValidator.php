@@ -10,6 +10,12 @@ namespace Player;
  */
 class PlayerContractValidator
 {
+    // Rookie option experience requirements
+    private const ROOKIE_OPTION_ROUND1_FA_EXPERIENCE = 2;
+    private const ROOKIE_OPTION_ROUND1_INSEASON_EXPERIENCE = 3;
+    private const ROOKIE_OPTION_ROUND2_FA_EXPERIENCE = 1;
+    private const ROOKIE_OPTION_ROUND2_INSEASON_EXPERIENCE = 2;
+
     /**
      * Check if a player can renegotiate their contract
      * A player can renegotiate if they're in their last contract year or have no salary in the next year
@@ -61,9 +67,9 @@ class PlayerContractValidator
         }
         
         if ($seasonPhase == "Free Agency") {
-            return $this->checkRookieOptionEligibility($playerData, $round, 2, 1);
+            return $this->checkRookieOptionEligibility($playerData, $round, $seasonPhase);
         } elseif ($seasonPhase == "Preseason" || $seasonPhase == "HEAT") {
-            return $this->checkRookieOptionEligibility($playerData, $round, 3, 2);
+            return $this->checkRookieOptionEligibility($playerData, $round, $seasonPhase);
         }
         
         return false;
@@ -98,22 +104,26 @@ class PlayerContractValidator
      * 
      * @param PlayerData $playerData The player data
      * @param int $round Draft round (1 or 2)
-     * @param int $round1Experience Years of experience required for round 1
-     * @param int $round2Experience Years of experience required for round 2
+     * @param string $seasonPhase Current season phase ("Free Agency", "Preseason", or "HEAT")
      */
     private function checkRookieOptionEligibility(
         PlayerData $playerData, 
-        int $round, 
-        int $round1Experience, 
-        int $round2Experience
+        int $round,
+        string $seasonPhase
     ): bool {
         if ($round == 1) {
-            return $playerData->yearsOfExperience == $round1Experience
+            $requiredExperience = ($seasonPhase == "Free Agency") 
+                ? self::ROOKIE_OPTION_ROUND1_FA_EXPERIENCE 
+                : self::ROOKIE_OPTION_ROUND1_INSEASON_EXPERIENCE;
+            return $playerData->yearsOfExperience == $requiredExperience
                 && $playerData->contractYear4Salary == 0;
         }
         
         if ($round == 2) {
-            return $playerData->yearsOfExperience == $round2Experience
+            $requiredExperience = ($seasonPhase == "Free Agency") 
+                ? self::ROOKIE_OPTION_ROUND2_FA_EXPERIENCE 
+                : self::ROOKIE_OPTION_ROUND2_INSEASON_EXPERIENCE;
+            return $playerData->yearsOfExperience == $requiredExperience
                 && $playerData->contractYear3Salary == 0;
         }
         

@@ -279,6 +279,11 @@ class Player
         return $this->contractValidator->canRookieOption($this->playerData, $seasonPhase);
     }
 
+    public function getFinalYearRookieContractSalary()
+    {
+        return $this->contractValidator->getFinalYearRookieContractSalary($this->playerData);
+    }
+
     public function wasRookieOptioned()
     {
         return $this->contractValidator->wasRookieOptioned($this->playerData);

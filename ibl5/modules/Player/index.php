@@ -361,8 +361,8 @@ function rookieoption($pid)
         return;
     }
     
-    // Calculate rookie option value
-    $rookieOptionValue = $processor->calculateRookieOptionValue($eligibilityValidation['finalYearSalary']);
+    // Calculate rookie option value (2x final year salary)
+    $rookieOptionValue = 2 * $eligibilityValidation['finalYearSalary'];
     
     // Render form
     $formView->renderForm($player, $userTeamName, $rookieOptionValue);

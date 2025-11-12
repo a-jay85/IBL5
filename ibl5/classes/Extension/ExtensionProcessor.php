@@ -3,6 +3,7 @@
 namespace Extension;
 
 use Player\Player;
+use Shared\SalaryConverter;
 
 /**
  * Extension Processor Class
@@ -175,7 +176,7 @@ class ExtensionProcessor
         $offerData = $this->evaluator->calculateOfferValue($offer);
         $offerTotal = $offerData['total'];
         $offerYears = $offerData['years'];
-        $offerInMillions = $this->evaluator->convertToMillions($offerTotal);
+        $offerInMillions = SalaryConverter::convertToMillions($offerTotal);
         $offerDetails = $offer['year1'] . " " . $offer['year2'] . " " . $offer['year3'] . " " . $offer['year4'] . " " . $offer['year5'];
 
         // Process based on acceptance

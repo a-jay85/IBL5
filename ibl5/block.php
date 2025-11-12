@@ -32,6 +32,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
                 
+                // Add news story INSERT query
+                if ($successCount > 0 && isset($_POST['news_hometext']) && isset($_POST['news_bodytext']) && isset($_POST['day'])) {
+                    // Escape the text content for SQL
+                    $hometext = Services\DatabaseService::escapeString($db, $_POST['news_hometext']);
+                    $bodytext = Services\DatabaseService::escapeString($db, $_POST['news_bodytext']);
+                    $day = (int)$_POST['day'];
+                    
+                    // Get current timestamp in MySQL format
+                    $currentTime = date('Y-m-d H:i:s');
+                    
+                    // Build the INSERT query (sid will auto-increment)
+                    $newsInsertQuery = "INSERT INTO `nuke_stories` 
+                        (`catid`, `aid`, `title`, `time`, `hometext`, `bodytext`, `comments`, `counter`, `topic`, `informant`, `notes`, `ihome`, `alanguage`, `acomm`, `haspoll`, `pollID`, `score`, `ratings`, `rating_ip`, `associated`)
+                        VALUES
+                        (8, 'chibul', '2006 IBL Free Agency, Days $day-$day', '$currentTime', '$hometext', '$bodytext', 0, 2, 29, 'chibul', '', 0, 'english', 0, 0, 0, 0, 0, '0', '29-')";
+                    
+                    if ($db->sql_query($newsInsertQuery)) {
+                        $successCount++;
+                    } else {
+                        $errorCount++;
+                    }
+                }
+                
                 if ($errorCount === 0 && $successCount > 0) {
                     $actionMessage = "Successfully executed $successCount SQL queries. Free agents have been assigned to teams.";
                     $actionCompleted = true;
@@ -391,10 +414,10 @@ if ($actionCompleted) {
 
 echo "  <hr>
         <h2>ACCEPTED OFFERS IN HTML FORMAT (FOR NEWS ARTICLE)</h2>
-        <TEXTAREA COLS=125 ROWS=20>$text</TEXTAREA>
+        <TEXTAREA id=\"newsHometextArea\" COLS=125 ROWS=20>$text</TEXTAREA>
         <hr>
         <h2>ALL OFFERS IN HTML FORMAT (FOR NEWS ARTICLE EXTENDED TEXT)</h2>
-        <TEXTAREA COLS=125 ROWS=20>$exttext</TEXTAREA>
+        <TEXTAREA id=\"newsBodytextArea\" COLS=125 ROWS=20>$exttext</TEXTAREA>
     </FORM>
     
     <!-- Modal for Assign Free Agents -->
@@ -407,6 +430,9 @@ echo "  <hr>
                 <form method=\"POST\" id=\"assignFreeAgentsForm\">
                     <input type=\"hidden\" name=\"action\" value=\"assign_free_agents\">
                     <input type=\"hidden\" name=\"sql_queries\" id=\"sqlQueriesInput\" value=\"\">
+                    <input type=\"hidden\" name=\"news_hometext\" id=\"newsHometextInput\" value=\"\">
+                    <input type=\"hidden\" name=\"news_bodytext\" id=\"newsBodytextInput\" value=\"\">
+                    <input type=\"hidden\" name=\"day\" id=\"dayInput\" value=\"\">
                     <button type=\"submit\" class=\"btn-run\">Yes</button>
                     <button type=\"button\" class=\"btn-cancel\" onclick=\"closeModal('assignFreeAgentsModal')\">No</button>
                 </form>
@@ -435,6 +461,17 @@ echo "  <hr>
             // Get the SQL queries from the textarea
             var sqlQueries = document.getElementById('sqlQueryBox').value;
             document.getElementById('sqlQueriesInput').value = sqlQueries;
+            
+            // Get the news text from the textareas
+            var newsHometext = document.getElementById('newsHometextArea') ? document.getElementById('newsHometextArea').value : '';
+            var newsBodytext = document.getElementById('newsBodytextArea') ? document.getElementById('newsBodytextArea').value : '';
+            document.getElementById('newsHometextInput').value = newsHometext;
+            document.getElementById('newsBodytextInput').value = newsBodytext;
+            
+            // Get the day parameter from URL
+            var urlParams = new URLSearchParams(window.location.search);
+            var day = urlParams.get('day') || '';
+            document.getElementById('dayInput').value = day;
             
             // Show the modal
             document.getElementById('assignFreeAgentsModal').classList.add('active');

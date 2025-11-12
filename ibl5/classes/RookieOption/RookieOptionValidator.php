@@ -62,6 +62,6 @@ class RookieOptionValidator
     private function getIneligibilityError($player): string
     {
         return 'Sorry, ' . $player->position . ' ' . $player->name . ' is not eligible for a rookie option.' . "\n\n" .
-        'Only draft picks are eligible for rookie options, and the option must be exercised before the final season of their rookie contract is underway.';
+        'Only first or second round draft picks with 3 or fewer years of experience are eligible for rookie options, and the option must be exercised before the final season of their rookie contract is underway.';
     }
 }

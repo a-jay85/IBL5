@@ -238,4 +238,40 @@ class PlayerContractValidatorTest extends TestCase
         
         $this->assertEquals(0, $result, 'Non-draft picks should return 0');
     }
+
+    public function testCannotRookieOptionWithMoreThanThreeYearsExperience()
+    {
+        $playerData = new PlayerData();
+        $playerData->draftRound = 1;
+        $playerData->yearsOfExperience = 4; // More than 3 years
+        $playerData->contractYear4Salary = 0;
+        
+        $result = $this->validator->canRookieOption($playerData, 'Free Agency');
+        
+        $this->assertFalse($result, 'Players with more than 3 years of experience should not be eligible');
+    }
+
+    public function testCannotRookieOptionSecondRoundWithMoreThanThreeYearsExperience()
+    {
+        $playerData = new PlayerData();
+        $playerData->draftRound = 2;
+        $playerData->yearsOfExperience = 5; // More than 3 years
+        $playerData->contractYear3Salary = 0;
+        
+        $result = $this->validator->canRookieOption($playerData, 'Preseason');
+        
+        $this->assertFalse($result, 'Second round players with more than 3 years of experience should not be eligible');
+    }
+
+    public function testCannotRookieOptionWithExactlyFourYearsExperience()
+    {
+        $playerData = new PlayerData();
+        $playerData->draftRound = 1;
+        $playerData->yearsOfExperience = 4; // Exactly 4 years (more than 3)
+        $playerData->contractYear4Salary = 0;
+        
+        $result = $this->validator->canRookieOption($playerData, 'HEAT');
+        
+        $this->assertFalse($result, 'Players with exactly 4 years of experience (> 3) should not be eligible');
+    }
 }

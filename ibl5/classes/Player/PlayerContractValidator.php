@@ -55,6 +55,11 @@ class PlayerContractValidator
             return false;
         }
         
+        // Players with more than 3 years of experience are not eligible
+        if ($playerData->yearsOfExperience > 3) {
+            return false;
+        }
+        
         if ($seasonPhase == "Free Agency") {
             return $this->checkRookieOptionEligibility($playerData, $round, 2, 1);
         } elseif ($seasonPhase == "Preseason" || $seasonPhase == "HEAT") {

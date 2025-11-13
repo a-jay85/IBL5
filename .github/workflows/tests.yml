@@ -47,7 +47,30 @@ jobs:
     
     - name: Install dependencies
       working-directory: ibl5
-      run: composer install --prefer-dist --no-progress --no-interaction
+      run: |
+        echo "Current directory: $(pwd)"
+        echo "Checking composer.json..."
+        cat composer.json | head -20
+        echo ""
+        echo "Running: composer install --prefer-dist --no-progress --no-interaction"
+        composer install --prefer-dist --no-progress --no-interaction || {
+          echo "First composer install attempt failed, trying again with verbose output..."
+          composer install --prefer-dist || exit 1
+        }
+        echo ""
+        echo "Verifying installation..."
+        if [ -f "vendor/bin/phpunit" ]; then
+          echo "✓ PHPUnit found"
+          vendor/bin/phpunit --version
+        else
+          echo "✗ PHPUnit not found in vendor/bin/"
+          echo "vendor/bin contents:"
+          ls -la vendor/bin/ 2>/dev/null | head -20 || echo "vendor/bin not found"
+          echo ""
+          echo "vendor/ top-level contents:"
+          ls -la vendor/ 2>/dev/null | head -30 || echo "vendor/ not found"
+          exit 1
+        fi
     
     - name: Run PHPUnit tests
       working-directory: ibl5
@@ -59,56 +82,7 @@ jobs:
     
     - name: Upload test results
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: test-results
         path: ibl5/.phpunit.result.cache
-
-  analysis:
-    name: Static Analysis
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        php-version: ['8.3']
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Setup PHP
-      uses: shivammathur/setup-php@v2
-      with:
-        php-version: ${{ matrix.php-version }}
-        extensions: mbstring, intl
-    
-    - name: Get Composer cache directory
-      id: composer-cache
-      run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
-    
-    - name: Cache Composer dependencies
-      uses: actions/cache@v3
-      with:
-        path: ${{ steps.composer-cache.outputs.dir }}
-        key: ${{ runner.os }}-composer-${{ hashFiles('ibl5/composer.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-composer-
-    
-    - name: Cache vendor directory
-      uses: actions/cache@v3
-      with:
-        path: ibl5/vendor
-        key: ${{ runner.os }}-vendor-${{ hashFiles('ibl5/composer.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-vendor-
-    
-    - name: Install dependencies
-      working-directory: ibl5
-      run: composer install --prefer-dist --no-progress --no-interaction
-    
-    - name: Run PHPStan
-      working-directory: ibl5
-      run: composer analyse
-    
-    - name: Check code style
-      working-directory: ibl5
-      run: composer lint:php

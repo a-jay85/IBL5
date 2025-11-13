@@ -16,16 +16,10 @@ parameters:
     - node_modules/*
     - storage/*
     - .git/*
-    - 2003olympics
-    - IBL6
-    - ibl5/vendor/*
-    - ibl5/node_modules/*
-    - ibl5/install/includes/database.php
-    - ibl5/modules/AutoTheme/includes/atAPI.php
-    - ibl5/modules/Forums/*
-    - ibl5/modules/Members_List/language/*
-    - ibl5/modules/Private_Messages/language/*
-    - ibl5/modules/Web_Links/language/*
+    - install/includes/database.php
+    - modules/AutoTheme/includes/atAPI.php
+    - modules/Members_List/language/*
+    - modules/Web_Links/language/*
 
   # Show unmatched ignored errors as warnings (keeps baseline clean)
   reportUnmatchedIgnoredErrors: true

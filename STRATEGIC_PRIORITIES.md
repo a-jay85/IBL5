@@ -195,24 +195,35 @@ These are simpler display-only modules with limited business logic:
 Beyond module refactoring, consider these DX improvements:
 
 ### 1. Testing Infrastructure
-**Current State:** 50 test files, manual test running  
-**Improvements:**
-- Set up CI/CD pipeline (GitHub Actions)
+**Current State:** CI/CD pipeline implemented ✅  
+**Completed:**
+- ✅ GitHub Actions workflow (.github/workflows/tests.yml)
+- ✅ Automated PHPUnit tests on push/PR
+- ✅ Composer dependency caching
+- ✅ PHP 8.3 environment setup
+
+**Future Enhancements:**
 - Add PHPUnit configuration for parallel test execution
 - Create test data factories for consistent test setup
 - Add code coverage reporting (Codecov/Coveralls)
+- Re-enable static analysis (PHPStan) once errors are addressed
 
-**Estimated Effort:** 1 week
+**Estimated Effort for Enhancements:** 3-4 days
 
 ### 2. Development Environment
-**Current State:** Manual setup, local database  
-**Improvements:**
+**Current State:** Dev container and setup scripts implemented ✅  
+**Completed:**
+- ✅ Dev container configuration (.devcontainer/)
+- ✅ Post-create setup script for automated dependency installation
+- ✅ Setup script for manual installation (setup-dev.sh)
+- ✅ Comprehensive development environment documentation
+
+**Future Enhancements:**
 - Docker Compose for consistent dev environment
 - Database seeding scripts for test data
-- Local development documentation
 - Pre-commit hooks for linting
 
-**Estimated Effort:** 1 week
+**Estimated Effort for Enhancements:** 3-4 days
 
 ### 3. Code Quality Tools
 **Current State:** PHPStan configured  
@@ -251,10 +262,10 @@ Beyond module refactoring, consider these DX improvements:
 - Week 1-2: One-on-One refactoring
 - Week 3-4: Season Leaders refactoring
 
-**Month 3: Developer Experience**
-- Week 1: CI/CD pipeline setup
-- Week 2: Docker environment
-- Week 3: Code quality tools
+**Month 3: Developer Experience** ✅ Partially Complete
+- ~~Week 1: CI/CD pipeline setup~~ ✅ Complete (.github/workflows/tests.yml)
+- ~~Week 2: Docker environment~~ ✅ Complete (.devcontainer/, setup-dev.sh)
+- Week 3: Code quality tools (PHPStan re-enablement, pre-commit hooks)
 - Week 4: Documentation improvements
 
 ### Long-Term Vision (6-12 Months)
@@ -397,13 +408,15 @@ The Player module refactoring is complete and represents a significant achieveme
 
 **Immediate (This Week):**
 - Begin Free Agency module analysis
-- Set up CI/CD pipeline for automated testing
+- ~~Set up CI/CD pipeline for automated testing~~ ✅ Complete
+- ~~Set up development environment~~ ✅ Complete
 - Review this document with stakeholders
 
 **Short-term (Next 3 Months):**
 - Complete Free Agency refactoring
 - Refactor One-on-One and Season Leaders
-- Implement developer experience improvements
+- ~~Implement developer experience improvements~~ ✅ CI/CD and dev environment complete
+- Enhance code quality tools (PHPStan, coverage reporting)
 
 **Long-term (Next 6-12 Months):**
 - Batch-refactor stats modules

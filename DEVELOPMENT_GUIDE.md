@@ -73,7 +73,9 @@
 - Review refactored modules: Player, Waivers, Draft, Team, Extension, Trading
 - Check `ibl5/schema.sql` for database structure
 - See best practices in: `ibl5/classes/Player/README.md`, `ibl5/classes/DepthChart/SECURITY.md`
-- Run tests: `cd ibl5 && php vendor/phpunit/phpunit/phpunit tests/`
+- Set up dev environment: See `DEVELOPMENT_ENVIRONMENT.md` or use dev container (`.devcontainer/`)
+- Run tests: `cd ibl5 && vendor/bin/phpunit tests/`
+- CI/CD: Tests run automatically via GitHub Actions (`.github/workflows/tests.yml`)
 
 **Refactoring Steps:**
 1. Analyze (1-2 days) - Identify responsibilities
@@ -98,6 +100,11 @@ Module/
 **Coverage:** Current 35% → Phase 1: 60% → Phase 2: 75% → Goal: 80%
 
 **Test Pyramid:** Few E2E tests → Some integration → Many unit tests
+
+**CI/CD:** ✅ GitHub Actions workflow implemented
+- Automated PHPUnit tests on push/PR
+- Composer dependency caching
+- See `.github/workflows/tests.yml`
 
 **Required:**
 - All public methods tested

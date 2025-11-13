@@ -1,11 +1,9 @@
 #!/bin/bash
 
-set -e
-
 echo "🚀 Setting up IBL5 development environment..."
 
 # Navigate to the ibl5 directory
-cd "$(dirname "$0")/../ibl5"
+cd "$(dirname "$0")/../ibl5" || exit 1
 
 # Check if PHP is installed
 if ! command -v php &> /dev/null; then
@@ -18,22 +16,35 @@ echo "✓ PHP version: $(php -v | head -n 1)"
 # Check if Composer is installed
 if ! command -v composer &> /dev/null; then
     echo "📦 Installing Composer..."
-    php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
-    php composer-setup.php --install-dir=/usr/local/bin --filename=composer
-    php -r "unlink('composer-setup.php');"
+    if ! php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"; then
+        echo "❌ Failed to download Composer installer"
+        exit 1
+    fi
+    if ! php composer-setup.php --install-dir=/usr/local/bin --filename=composer; then
+        echo "❌ Failed to install Composer"
+        rm -f composer-setup.php
+        exit 1
+    fi
+    rm -f composer-setup.php
 else
     echo "✓ Composer is installed: $(composer --version)"
 fi
 
 # Install/update dependencies
 echo "📥 Installing Composer dependencies..."
-composer install --prefer-dist --no-progress
+if ! composer install --prefer-dist --no-progress --no-interaction; then
+    echo "❌ Composer install failed"
+    composer install --prefer-dist 2>&1 | tail -20
+    exit 1
+fi
 
 # Verify PHPUnit is available
 if [ -f "vendor/bin/phpunit" ]; then
     echo "✓ PHPUnit installed: $(vendor/bin/phpunit --version)"
 else
     echo "❌ PHPUnit installation failed"
+    echo "Looking for vendor/bin directory:"
+    ls -la vendor/bin 2>&1 | head -20 || echo "vendor/bin directory not found"
     exit 1
 fi
 

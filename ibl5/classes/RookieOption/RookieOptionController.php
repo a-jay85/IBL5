@@ -18,7 +18,6 @@ class RookieOptionController
     
     private $db;
     private $repository;
-    private $processor;
     private $view;
     private $newsService;
     
@@ -26,7 +25,6 @@ class RookieOptionController
     {
         $this->db = $db;
         $this->repository = new RookieOptionRepository($db);
-        $this->processor = new RookieOptionProcessor();
         $this->view = new RookieOptionView();
         $this->newsService = new \Services\NewsService($db);
     }

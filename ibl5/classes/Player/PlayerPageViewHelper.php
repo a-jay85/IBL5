@@ -108,15 +108,15 @@ class PlayerPageViewHelper
     {
         ob_start();
         ?>
-<span class="player-bio">Age: <?= htmlspecialchars($player->age) ?> | Height: <?= htmlspecialchars($player->heightFeet) ?>-<?= htmlspecialchars($player->heightInches) ?> | Weight: <?= htmlspecialchars($player->weightPounds) ?> | College: <?= htmlspecialchars($player->collegeName) ?><br>
-    <em>Drafted by the <?= htmlspecialchars($player->draftTeamOriginalName) ?> with the # <?= htmlspecialchars($player->draftPickNumber) ?> pick of round <?= htmlspecialchars($player->draftRound) ?> in the <a href="draft.php?year=<?= $player->draftYear ?>"><?= htmlspecialchars($player->draftYear) ?> Draft</a></em><br>
+<span class="player-bio">Age: <?= htmlspecialchars((string)$player->age) ?> | Height: <?= htmlspecialchars((string)$player->heightFeet) ?>-<?= htmlspecialchars((string)$player->heightInches) ?> | Weight: <?= htmlspecialchars((string)$player->weightPounds) ?> | College: <?= htmlspecialchars($player->collegeName) ?><br>
+    <em>Drafted by the <?= htmlspecialchars($player->draftTeamOriginalName) ?> with the # <?= htmlspecialchars((string)$player->draftPickNumber) ?> pick of round <?= htmlspecialchars((string)$player->draftRound) ?> in the <a href="draft.php?year=<?= $player->draftYear ?>"><?= htmlspecialchars((string)$player->draftYear) ?> Draft</a></em><br>
     <center><table>
         <?php
         echo $this->renderRatingsTableHeaders();
         echo $this->renderRatingsTableValues($player);
         ?>
     </table></center>
-<strong>BIRD YEARS:</strong> <?= htmlspecialchars($player->birdYears) ?> | <strong>Remaining Contract:</strong> <?= htmlspecialchars($contractDisplay) ?> </td>
+<strong>BIRD YEARS:</strong> <?= htmlspecialchars((string)$player->birdYears) ?> | <strong>Remaining Contract:</strong> <?= htmlspecialchars($contractDisplay) ?> </td>
         <?php
         return ob_get_clean();
     }
@@ -168,27 +168,27 @@ class PlayerPageViewHelper
         ob_start();
         ?>
 <tr>
-    <td style="text-align: center;"><?= htmlspecialchars($player->ratingFieldGoalAttempts) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars($player->ratingFieldGoalPercentage) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars($player->ratingFreeThrowAttempts) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars($player->ratingFreeThrowPercentage) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars($player->ratingThreePointAttempts) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars($player->ratingThreePointPercentage) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars($player->ratingOffensiveRebounds) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars($player->ratingDefensiveRebounds) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars($player->ratingAssists) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars($player->ratingSteals) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars($player->ratingTurnovers) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars($player->ratingBlocks) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars($player->ratingFouls) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars($player->ratingOutsideOffense) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars($player->ratingDriveOffense) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars($player->ratingPostOffense) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars($player->ratingTransitionOffense) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars($player->ratingOutsideDefense) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars($player->ratingDriveDefense) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars($player->ratingPostDefense) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars($player->ratingTransitionDefense) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$player->ratingFieldGoalAttempts) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$player->ratingFieldGoalPercentage) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$player->ratingFreeThrowAttempts) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$player->ratingFreeThrowPercentage) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$player->ratingThreePointAttempts) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$player->ratingThreePointPercentage) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$player->ratingOffensiveRebounds) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$player->ratingDefensiveRebounds) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$player->ratingAssists) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$player->ratingSteals) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$player->ratingTurnovers) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$player->ratingBlocks) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$player->ratingFouls) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$player->ratingOutsideOffense) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$player->ratingDriveOffense) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$player->ratingPostOffense) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$player->ratingTransitionOffense) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$player->ratingOutsideDefense) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$player->ratingDriveDefense) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$player->ratingPostDefense) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$player->ratingTransitionDefense) ?></td>
 </tr>
         <?php
         return ob_get_clean();
@@ -219,38 +219,38 @@ class PlayerPageViewHelper
         </tr>
         <tr>
             <td><strong>Points</strong></td>
-            <td><?= htmlspecialchars($playerStats->seasonHighPoints) ?></td>
-            <td><?= htmlspecialchars($playerStats->careerSeasonHighPoints) ?></td>
+            <td><?= htmlspecialchars((string)$playerStats->seasonHighPoints) ?></td>
+            <td><?= htmlspecialchars((string)$playerStats->careerSeasonHighPoints) ?></td>
         </tr>
         <tr>
             <td><strong>Rebounds</strong></td>
-            <td><?= htmlspecialchars($playerStats->seasonHighRebounds) ?></td>
-            <td><?= htmlspecialchars($playerStats->careerSeasonHighRebounds) ?></td>
+            <td><?= htmlspecialchars((string)$playerStats->seasonHighRebounds) ?></td>
+            <td><?= htmlspecialchars((string)$playerStats->careerSeasonHighRebounds) ?></td>
         </tr>
         <tr>
             <td><strong>Assists</strong></td>
-            <td><?= htmlspecialchars($playerStats->seasonHighAssists) ?></td>
-            <td><?= htmlspecialchars($playerStats->careerSeasonHighAssists) ?></td>
+            <td><?= htmlspecialchars((string)$playerStats->seasonHighAssists) ?></td>
+            <td><?= htmlspecialchars((string)$playerStats->careerSeasonHighAssists) ?></td>
         </tr>
         <tr>
             <td><strong>Steals</strong></td>
-            <td><?= htmlspecialchars($playerStats->seasonHighSteals) ?></td>
-            <td><?= htmlspecialchars($playerStats->careerSeasonHighSteals) ?></td>
+            <td><?= htmlspecialchars((string)$playerStats->seasonHighSteals) ?></td>
+            <td><?= htmlspecialchars((string)$playerStats->careerSeasonHighSteals) ?></td>
         </tr>
         <tr>
             <td><strong>Blocks</strong></td>
-            <td><?= htmlspecialchars($playerStats->seasonHighBlocks) ?></td>
-            <td><?= htmlspecialchars($playerStats->careerSeasonHighBlocks) ?></td>
+            <td><?= htmlspecialchars((string)$playerStats->seasonHighBlocks) ?></td>
+            <td><?= htmlspecialchars((string)$playerStats->careerSeasonHighBlocks) ?></td>
         </tr>
         <tr>
             <td>Double-Doubles</td>
-            <td><?= htmlspecialchars($playerStats->seasonDoubleDoubles) ?></td>
-            <td><?= htmlspecialchars($playerStats->careerDoubleDoubles) ?></td>
+            <td><?= htmlspecialchars((string)$playerStats->seasonDoubleDoubles) ?></td>
+            <td><?= htmlspecialchars((string)$playerStats->careerDoubleDoubles) ?></td>
         </tr>
         <tr>
             <td>Triple-Doubles</td>
-            <td><?= htmlspecialchars($playerStats->seasonTripleDoubles) ?></td>
-            <td><?= htmlspecialchars($playerStats->careerTripleDoubles) ?></td>
+            <td><?= htmlspecialchars((string)$playerStats->seasonTripleDoubles) ?></td>
+            <td><?= htmlspecialchars((string)$playerStats->careerTripleDoubles) ?></td>
         </tr>
         <tr style="background-color: #0000cc;">
             <td style="text-align: center; color: white;" colspan=3><strong>Playoffs</strong></td>
@@ -262,28 +262,28 @@ class PlayerPageViewHelper
         </tr>
         <tr>
             <td><strong>Points</strong></td>
-            <td><?= htmlspecialchars($playerStats->seasonPlayoffHighPoints) ?></td>
-            <td><?= htmlspecialchars($playerStats->careerPlayoffHighPoints) ?></td>
+            <td><?= htmlspecialchars((string)$playerStats->seasonPlayoffHighPoints) ?></td>
+            <td><?= htmlspecialchars((string)$playerStats->careerPlayoffHighPoints) ?></td>
         </tr>
         <tr>
             <td><strong>Rebounds</strong></td>
-            <td><?= htmlspecialchars($playerStats->seasonPlayoffHighRebounds) ?></td>
-            <td><?= htmlspecialchars($playerStats->careerPlayoffHighRebounds) ?></td>
+            <td><?= htmlspecialchars((string)$playerStats->seasonPlayoffHighRebounds) ?></td>
+            <td><?= htmlspecialchars((string)$playerStats->careerPlayoffHighRebounds) ?></td>
         </tr>
         <tr>
             <td><strong>Assists</strong></td>
-            <td><?= htmlspecialchars($playerStats->seasonPlayoffHighAssists) ?></td>
-            <td><?= htmlspecialchars($playerStats->careerPlayoffHighAssists) ?></td>
+            <td><?= htmlspecialchars((string)$playerStats->seasonPlayoffHighAssists) ?></td>
+            <td><?= htmlspecialchars((string)$playerStats->careerPlayoffHighAssists) ?></td>
         </tr>
         <tr>
             <td><strong>Steals</strong></td>
-            <td><?= htmlspecialchars($playerStats->seasonPlayoffHighSteals) ?></td>
-            <td><?= htmlspecialchars($playerStats->careerPlayoffHighSteals) ?></td>
+            <td><?= htmlspecialchars((string)$playerStats->seasonPlayoffHighSteals) ?></td>
+            <td><?= htmlspecialchars((string)$playerStats->careerPlayoffHighSteals) ?></td>
         </tr>
         <tr>
             <td><strong>Blocks</strong></td>
-            <td><?= htmlspecialchars($playerStats->seasonPlayoffHighBlocks) ?></td>
-            <td><?= htmlspecialchars($playerStats->careerPlayoffHighBlocks) ?></td>
+            <td><?= htmlspecialchars((string)$playerStats->seasonPlayoffHighBlocks) ?></td>
+            <td><?= htmlspecialchars((string)$playerStats->careerPlayoffHighBlocks) ?></td>
         </tr>
     </table>
 </td>

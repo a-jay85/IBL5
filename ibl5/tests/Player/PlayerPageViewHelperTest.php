@@ -5,7 +5,6 @@ declare(strict_types=1);
 use PHPUnit\Framework\TestCase;
 use Player\PlayerPageViewHelper;
 use Player\Player;
-use PlayerStats;
 
 class PlayerPageViewHelperTest extends TestCase
 {
@@ -46,7 +45,7 @@ class PlayerPageViewHelperTest extends TestCase
         $this->assertStringContainsString('ROOKIE OPTION', $html);
         $this->assertStringContainsString('USED; RENEGOTIATION', $html);
         $this->assertStringContainsString('IMPOSSIBLE', $html);
-        $this->assertStringContainsString('bgcolor=#ff0000', $html);
+        $this->assertStringContainsString('background-color: #ff0000', $html);
     }
 
     public function testRenderRenegotiationButton()
@@ -56,7 +55,7 @@ class PlayerPageViewHelperTest extends TestCase
         $this->assertStringContainsString('RENEGOTIATE', $html);
         $this->assertStringContainsString('CONTRACT', $html);
         $this->assertStringContainsString('modules.php?name=Player&pa=negotiate&pid=123', $html);
-        $this->assertStringContainsString('bgcolor=#ff0000', $html);
+        $this->assertStringContainsString('background-color: #ff0000', $html);
     }
 
     public function testRenderRookieOptionButton()
@@ -66,7 +65,7 @@ class PlayerPageViewHelperTest extends TestCase
         $this->assertStringContainsString('ROOKIE', $html);
         $this->assertStringContainsString('OPTION', $html);
         $this->assertStringContainsString('modules.php?name=Player&pa=rookieoption&pid=123', $html);
-        $this->assertStringContainsString('bgcolor=#ffbb00', $html);
+        $this->assertStringContainsString('background-color: #ffbb00', $html);
     }
 
     public function testRenderPlayerBioSection()
@@ -93,9 +92,9 @@ class PlayerPageViewHelperTest extends TestCase
         $this->assertStringContainsString('1000/1100/1200', $html);
         
         // Check ratings table headers are present
-        $this->assertStringContainsString('<b>2ga</b>', $html);
-        $this->assertStringContainsString('<b>fta</b>', $html);
-        $this->assertStringContainsString('<b>3ga</b>', $html);
+        $this->assertStringContainsString('<strong>2ga</strong>', $html);
+        $this->assertStringContainsString('<strong>fta</strong>', $html);
+        $this->assertStringContainsString('<strong>3ga</strong>', $html);
     }
 
     public function testRenderPlayerHighsTable()
@@ -171,39 +170,39 @@ class PlayerPageViewHelperTest extends TestCase
     private function createMockPlayerWithBio(): Player
     {
         $player = $this->createMock(Player::class);
-        $player->age = 25;
-        $player->heightFeet = 6;
-        $player->heightInches = 4;
-        $player->weightPounds = 200;
+        $player->age = '25';
+        $player->heightFeet = '6';
+        $player->heightInches = '4';
+        $player->weightPounds = '200';
         $player->collegeName = 'Test University';
         $player->draftTeamOriginalName = 'Test Franchise';
-        $player->draftPickNumber = 10;
-        $player->draftRound = 1;
+        $player->draftPickNumber = '10';
+        $player->draftRound = '1';
         $player->draftYear = 2020;
-        $player->birdYears = 3;
+        $player->birdYears = '3';
         
         // Add rating properties
-        $player->ratingFieldGoalAttempts = 80;
-        $player->ratingFieldGoalPercentage = 75;
-        $player->ratingFreeThrowAttempts = 70;
-        $player->ratingFreeThrowPercentage = 85;
-        $player->ratingThreePointAttempts = 65;
-        $player->ratingThreePointPercentage = 60;
-        $player->ratingOffensiveRebounds = 50;
-        $player->ratingDefensiveRebounds = 70;
-        $player->ratingAssists = 80;
-        $player->ratingSteals = 75;
-        $player->ratingTurnovers = 60;
-        $player->ratingBlocks = 40;
-        $player->ratingFouls = 55;
-        $player->ratingOutsideOffense = 85;
-        $player->ratingDriveOffense = 80;
-        $player->ratingPostOffense = 60;
-        $player->ratingTransitionOffense = 75;
-        $player->ratingOutsideDefense = 70;
-        $player->ratingDriveDefense = 75;
-        $player->ratingPostDefense = 65;
-        $player->ratingTransitionDefense = 80;
+        $player->ratingFieldGoalAttempts = '80';
+        $player->ratingFieldGoalPercentage = '75';
+        $player->ratingFreeThrowAttempts = '70';
+        $player->ratingFreeThrowPercentage = '85';
+        $player->ratingThreePointAttempts = '65';
+        $player->ratingThreePointPercentage = '60';
+        $player->ratingOffensiveRebounds = '50';
+        $player->ratingDefensiveRebounds = '70';
+        $player->ratingAssists = '80';
+        $player->ratingSteals = '75';
+        $player->ratingTurnovers = '60';
+        $player->ratingBlocks = '40';
+        $player->ratingFouls = '55';
+        $player->ratingOutsideOffense = '85';
+        $player->ratingDriveOffense = '80';
+        $player->ratingPostOffense = '60';
+        $player->ratingTransitionOffense = '75';
+        $player->ratingOutsideDefense = '70';
+        $player->ratingDriveDefense = '75';
+        $player->ratingPostDefense = '65';
+        $player->ratingTransitionDefense = '80';
         
         return $player;
     }

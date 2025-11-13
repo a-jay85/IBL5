@@ -27,15 +27,15 @@ class PlayerPageViewHelper
         ?>
 <table>
     <tr>
-        <td valign=top><font class="title"><?= $player->position ?> <?= $player->name ?>
+        <td valign=top><h2 class="player-title"><?= htmlspecialchars($player->position) ?> <?= htmlspecialchars($player->name) ?>
         <?php if ($player->nickname != NULL): ?>
-            - Nickname: "<?= $player->nickname ?>"
+            - Nickname: "<?= htmlspecialchars($player->nickname) ?>"
         <?php endif; ?>
-            (<a href="modules.php?name=Team&op=team&teamID=<?= $player->teamID ?>"><?= $player->teamName ?></a>)</font>
+            (<a href="modules.php?name=Team&op=team&teamID=<?= $player->teamID ?>"><?= htmlspecialchars($player->teamName) ?></a>)</h2>
         <hr>
         <table>
             <tr>
-                <td valign=center><img src="images/player/<?= $playerID ?>.jpg" height="90" width="65"></td>
+                <td valign=center><img src="images/player/<?= $playerID ?>.jpg" height="90" width="65" alt="<?= htmlspecialchars($player->name) ?>"></td>
                 <td>
         <?php
         return ob_get_clean();
@@ -50,9 +50,9 @@ class PlayerPageViewHelper
     {
         ob_start();
         ?>
-<table align=right bgcolor=#ff0000>
+<table class="rookie-option-used" style="float: right; background-color: #ff0000;">
     <tr>
-        <td align=center>ROOKIE OPTION<br>USED; RENEGOTIATION<br>IMPOSSIBLE</td>
+        <td style="text-align: center;">ROOKIE OPTION<br>USED; RENEGOTIATION<br>IMPOSSIBLE</td>
     </tr>
 </table>
         <?php
@@ -69,9 +69,9 @@ class PlayerPageViewHelper
     {
         ob_start();
         ?>
-<table align=right bgcolor=#ff0000>
+<table class="renegotiation-button" style="float: right; background-color: #ff0000;">
     <tr>
-        <td align=center><a href="modules.php?name=Player&pa=negotiate&pid=<?= $playerID ?>">RENEGOTIATE<BR>CONTRACT</a></td>
+        <td style="text-align: center;"><a href="modules.php?name=Player&pa=negotiate&pid=<?= $playerID ?>">RENEGOTIATE<BR>CONTRACT</a></td>
     </tr>
 </table>
         <?php
@@ -88,9 +88,9 @@ class PlayerPageViewHelper
     {
         ob_start();
         ?>
-<table align=right bgcolor=#ffbb00>
+<table class="rookie-option-button" style="float: right; background-color: #ffbb00;">
     <tr>
-        <td align=center><a href="modules.php?name=Player&pa=rookieoption&pid=<?= $playerID ?>">ROOKIE<BR>OPTION</a></td>
+        <td style="text-align: center;"><a href="modules.php?name=Player&pa=rookieoption&pid=<?= $playerID ?>">ROOKIE<BR>OPTION</a></td>
     </tr>
 </table>
         <?php
@@ -108,15 +108,15 @@ class PlayerPageViewHelper
     {
         ob_start();
         ?>
-<font class="content">Age: <?= $player->age ?> | Height: <?= $player->heightFeet ?>-<?= $player->heightInches ?> | Weight: <?= $player->weightPounds ?> | College: <?= $player->collegeName ?><br>
-    <i>Drafted by the <?= $player->draftTeamOriginalName ?> with the # <?= $player->draftPickNumber ?> pick of round <?= $player->draftRound ?> in the <a href="draft.php?year=<?= $player->draftYear ?>"><?= $player->draftYear ?> Draft</a></i><br>
+<span class="player-bio">Age: <?= htmlspecialchars($player->age) ?> | Height: <?= htmlspecialchars($player->heightFeet) ?>-<?= htmlspecialchars($player->heightInches) ?> | Weight: <?= htmlspecialchars($player->weightPounds) ?> | College: <?= htmlspecialchars($player->collegeName) ?><br>
+    <em>Drafted by the <?= htmlspecialchars($player->draftTeamOriginalName) ?> with the # <?= htmlspecialchars($player->draftPickNumber) ?> pick of round <?= htmlspecialchars($player->draftRound) ?> in the <a href="draft.php?year=<?= $player->draftYear ?>"><?= htmlspecialchars($player->draftYear) ?> Draft</a></em><br>
     <center><table>
         <?php
         echo $this->renderRatingsTableHeaders();
         echo $this->renderRatingsTableValues($player);
         ?>
     </table></center>
-<b>BIRD YEARS:</b> <?= $player->birdYears ?> | <b>Remaining Contract:</b> <?= $contractDisplay ?> </td>
+<strong>BIRD YEARS:</strong> <?= htmlspecialchars($player->birdYears) ?> | <strong>Remaining Contract:</strong> <?= htmlspecialchars($contractDisplay) ?> </td>
         <?php
         return ob_get_clean();
     }
@@ -131,27 +131,27 @@ class PlayerPageViewHelper
         ob_start();
         ?>
 <tr>
-    <td align=center><b>2ga</b></td>
-    <td align=center><b>2gp</b></td>
-    <td align=center><b>fta</b></td>
-    <td align=center><b>ftp</b></td>
-    <td align=center><b>3ga</b></td>
-    <td align=center><b>3gp</b></td>
-    <td align=center><b>orb</b></td>
-    <td align=center><b>drb</b></td>
-    <td align=center><b>ast</b></td>
-    <td align=center><b>stl</b></td>
-    <td align=center><b>tvr</b></td>
-    <td align=center><b>blk</b></td>
-    <td align=center><b>foul</b></td>
-    <td align=center><b>oo</b></td>
-    <td align=center><b>do</b></td>
-    <td align=center><b>po</b></td>
-    <td align=center><b>to</b></td>
-    <td align=center><b>od</b></td>
-    <td align=center><b>dd</b></td>
-    <td align=center><b>pd</b></td>
-    <td align=center><b>td</b></td>
+    <td style="text-align: center;"><strong>2ga</strong></td>
+    <td style="text-align: center;"><strong>2gp</strong></td>
+    <td style="text-align: center;"><strong>fta</strong></td>
+    <td style="text-align: center;"><strong>ftp</strong></td>
+    <td style="text-align: center;"><strong>3ga</strong></td>
+    <td style="text-align: center;"><strong>3gp</strong></td>
+    <td style="text-align: center;"><strong>orb</strong></td>
+    <td style="text-align: center;"><strong>drb</strong></td>
+    <td style="text-align: center;"><strong>ast</strong></td>
+    <td style="text-align: center;"><strong>stl</strong></td>
+    <td style="text-align: center;"><strong>tvr</strong></td>
+    <td style="text-align: center;"><strong>blk</strong></td>
+    <td style="text-align: center;"><strong>foul</strong></td>
+    <td style="text-align: center;"><strong>oo</strong></td>
+    <td style="text-align: center;"><strong>do</strong></td>
+    <td style="text-align: center;"><strong>po</strong></td>
+    <td style="text-align: center;"><strong>to</strong></td>
+    <td style="text-align: center;"><strong>od</strong></td>
+    <td style="text-align: center;"><strong>dd</strong></td>
+    <td style="text-align: center;"><strong>pd</strong></td>
+    <td style="text-align: center;"><strong>td</strong></td>
 </tr>
         <?php
         return ob_get_clean();
@@ -168,27 +168,27 @@ class PlayerPageViewHelper
         ob_start();
         ?>
 <tr>
-    <td align=center><?= $player->ratingFieldGoalAttempts ?></td>
-    <td align=center><?= $player->ratingFieldGoalPercentage ?></td>
-    <td align=center><?= $player->ratingFreeThrowAttempts ?></td>
-    <td align=center><?= $player->ratingFreeThrowPercentage ?></td>
-    <td align=center><?= $player->ratingThreePointAttempts ?></td>
-    <td align=center><?= $player->ratingThreePointPercentage ?></td>
-    <td align=center><?= $player->ratingOffensiveRebounds ?></td>
-    <td align=center><?= $player->ratingDefensiveRebounds ?></td>
-    <td align=center><?= $player->ratingAssists ?></td>
-    <td align=center><?= $player->ratingSteals ?></td>
-    <td align=center><?= $player->ratingTurnovers ?></td>
-    <td align=center><?= $player->ratingBlocks ?></td>
-    <td align=center><?= $player->ratingFouls ?></td>
-    <td align=center><?= $player->ratingOutsideOffense ?></td>
-    <td align=center><?= $player->ratingDriveOffense ?></td>
-    <td align=center><?= $player->ratingPostOffense ?></td>
-    <td align=center><?= $player->ratingTransitionOffense ?></td>
-    <td align=center><?= $player->ratingOutsideDefense ?></td>
-    <td align=center><?= $player->ratingDriveDefense ?></td>
-    <td align=center><?= $player->ratingPostDefense ?></td>
-    <td align=center><?= $player->ratingTransitionDefense ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars($player->ratingFieldGoalAttempts) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars($player->ratingFieldGoalPercentage) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars($player->ratingFreeThrowAttempts) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars($player->ratingFreeThrowPercentage) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars($player->ratingThreePointAttempts) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars($player->ratingThreePointPercentage) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars($player->ratingOffensiveRebounds) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars($player->ratingDefensiveRebounds) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars($player->ratingAssists) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars($player->ratingSteals) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars($player->ratingTurnovers) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars($player->ratingBlocks) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars($player->ratingFouls) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars($player->ratingOutsideOffense) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars($player->ratingDriveOffense) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars($player->ratingPostOffense) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars($player->ratingTransitionOffense) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars($player->ratingOutsideDefense) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars($player->ratingDriveDefense) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars($player->ratingPostDefense) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars($player->ratingTransitionDefense) ?></td>
 </tr>
         <?php
         return ob_get_clean();
@@ -204,88 +204,89 @@ class PlayerPageViewHelper
     {
         ob_start();
         ?>
-<td rowspan=3 valign=top>
-    <table border=1 cellspacing=0 cellpadding=0>
-        <tr bgcolor=#0000cc>
-            <td align=center colspan=3><font color=#ffffff><b>PLAYER HIGHS</b></font></td>
+<td rowspan=3 style="vertical-align: top;">
+    <table border=1 cellspacing=0 cellpadding=0 class="player-highs">
+        <tr style="background-color: #0000cc;">
+            <td style="text-align: center; color: white;" colspan=3><strong>PLAYER HIGHS</strong></td>
         </tr>
-        <tr bgcolor=#0000cc>
-            <td align=center colspan=3><font color=#ffffff><b>Regular-Season</b></font></td>
+        <tr style="background-color: #0000cc;">
+            <td style="text-align: center; color: white;" colspan=3><strong>Regular-Season</strong></td>
         </tr>
-        <tr bgcolor=#0000cc>
+        <tr style="background-color: #0000cc;">
             <td></td>
-            <td><font color=#ffffff>Ssn</font></td>
-            <td><font color=#ffffff>Car</td>
+            <td style="color: white;"><strong>Ssn</strong></td>
+            <td style="color: white;"><strong>Car</strong></td>
         </tr>
         <tr>
-            <td><b>Points</b></td>
-            <td><?= $playerStats->seasonHighPoints ?></td>
-            <td><?= $playerStats->careerSeasonHighPoints ?></td>
+            <td><strong>Points</strong></td>
+            <td><?= htmlspecialchars($playerStats->seasonHighPoints) ?></td>
+            <td><?= htmlspecialchars($playerStats->careerSeasonHighPoints) ?></td>
         </tr>
         <tr>
-            <td><b>Rebounds</b></td>
-            <td><?= $playerStats->seasonHighRebounds ?></td>
-            <td><?= $playerStats->careerSeasonHighRebounds ?></td>
+            <td><strong>Rebounds</strong></td>
+            <td><?= htmlspecialchars($playerStats->seasonHighRebounds) ?></td>
+            <td><?= htmlspecialchars($playerStats->careerSeasonHighRebounds) ?></td>
         </tr>
         <tr>
-            <td><b>Assists</b></td>
-            <td><?= $playerStats->seasonHighAssists ?></td>
-            <td><?= $playerStats->careerSeasonHighAssists ?></td>
+            <td><strong>Assists</strong></td>
+            <td><?= htmlspecialchars($playerStats->seasonHighAssists) ?></td>
+            <td><?= htmlspecialchars($playerStats->careerSeasonHighAssists) ?></td>
         </tr>
         <tr>
-            <td><b>Steals</b></td>
-            <td><?= $playerStats->seasonHighSteals ?></td>
-            <td><?= $playerStats->careerSeasonHighSteals ?></td>
+            <td><strong>Steals</strong></td>
+            <td><?= htmlspecialchars($playerStats->seasonHighSteals) ?></td>
+            <td><?= htmlspecialchars($playerStats->careerSeasonHighSteals) ?></td>
         </tr>
         <tr>
-            <td><b>Blocks</b></td>
-            <td><?= $playerStats->seasonHighBlocks ?></td>
-            <td><?= $playerStats->careerSeasonHighBlocks ?></td>
+            <td><strong>Blocks</strong></td>
+            <td><?= htmlspecialchars($playerStats->seasonHighBlocks) ?></td>
+            <td><?= htmlspecialchars($playerStats->careerSeasonHighBlocks) ?></td>
         </tr>
         <tr>
             <td>Double-Doubles</td>
-            <td><?= $playerStats->seasonDoubleDoubles ?></td>
-            <td><?= $playerStats->careerDoubleDoubles ?></td>
+            <td><?= htmlspecialchars($playerStats->seasonDoubleDoubles) ?></td>
+            <td><?= htmlspecialchars($playerStats->careerDoubleDoubles) ?></td>
         </tr>
         <tr>
             <td>Triple-Doubles</td>
-            <td><?= $playerStats->seasonTripleDoubles ?></td>
-            <td><?= $playerStats->careerTripleDoubles ?></td>
+            <td><?= htmlspecialchars($playerStats->seasonTripleDoubles) ?></td>
+            <td><?= htmlspecialchars($playerStats->careerTripleDoubles) ?></td>
         </tr>
-        <tr bgcolor=#0000cc>
-            <td align=center colspan=3><font color=#ffffff><b>Playoffs</b></font></td>
+        <tr style="background-color: #0000cc;">
+            <td style="text-align: center; color: white;" colspan=3><strong>Playoffs</strong></td>
         </tr>
-        <tr bgcolor=#0000cc>
+        <tr style="background-color: #0000cc;">
             <td></td>
-            <td><font color=#ffffff>Ssn</font></td>
-            <td><font color=#ffffff>Car</td>
+            <td style="color: white;"><strong>Ssn</strong></td>
+            <td style="color: white;"><strong>Car</strong></td>
         </tr>
         <tr>
-            <td><b>Points</b></td>
-            <td><?= $playerStats->seasonPlayoffHighPoints ?></td>
-            <td><?= $playerStats->careerPlayoffHighPoints ?></td>
+            <td><strong>Points</strong></td>
+            <td><?= htmlspecialchars($playerStats->seasonPlayoffHighPoints) ?></td>
+            <td><?= htmlspecialchars($playerStats->careerPlayoffHighPoints) ?></td>
         </tr>
         <tr>
-            <td><b>Rebounds</b></td>
-            <td><?= $playerStats->seasonPlayoffHighRebounds ?></td>
-            <td><?= $playerStats->careerPlayoffHighRebounds ?></td>
+            <td><strong>Rebounds</strong></td>
+            <td><?= htmlspecialchars($playerStats->seasonPlayoffHighRebounds) ?></td>
+            <td><?= htmlspecialchars($playerStats->careerPlayoffHighRebounds) ?></td>
         </tr>
         <tr>
-            <td><b>Assists</b></td>
-            <td><?= $playerStats->seasonPlayoffHighAssists ?></td>
-            <td><?= $playerStats->careerPlayoffHighAssists ?></td>
+            <td><strong>Assists</strong></td>
+            <td><?= htmlspecialchars($playerStats->seasonPlayoffHighAssists) ?></td>
+            <td><?= htmlspecialchars($playerStats->careerPlayoffHighAssists) ?></td>
         </tr>
         <tr>
-            <td><b>Steals</b></td>
-            <td><?= $playerStats->seasonPlayoffHighSteals ?></td>
-            <td><?= $playerStats->careerPlayoffHighSteals ?></td>
+            <td><strong>Steals</strong></td>
+            <td><?= htmlspecialchars($playerStats->seasonPlayoffHighSteals) ?></td>
+            <td><?= htmlspecialchars($playerStats->careerPlayoffHighSteals) ?></td>
         </tr>
         <tr>
-            <td><b>Blocks</b></td>
-            <td><?= $playerStats->seasonPlayoffHighBlocks ?></td>
-            <td><?= $playerStats->careerPlayoffHighBlocks ?></td>
+            <td><strong>Blocks</strong></td>
+            <td><?= htmlspecialchars($playerStats->seasonPlayoffHighBlocks) ?></td>
+            <td><?= htmlspecialchars($playerStats->careerPlayoffHighBlocks) ?></td>
         </tr>
-    </table></td>
+    </table>
+</td>
         <?php
         return ob_get_clean();
     }
@@ -304,8 +305,8 @@ class PlayerPageViewHelper
     <td colspan=2><hr></td>
 </tr>
 <tr>
-    <td colspan=2><b><center>PLAYER MENU</center></b><br>
-        <center>
+    <td colspan=2 style="text-align: center;"><strong>PLAYER MENU</strong><br>
+        <div style="text-align: center;">
         <a href="<?= \PlayerPageType::getUrl($playerID, \PlayerPageType::OVERVIEW) ?>"><?= \PlayerPageType::getDescription(\PlayerPageType::OVERVIEW) ?></a> | <a href="<?= \PlayerPageType::getUrl($playerID, \PlayerPageType::AWARDS_AND_NEWS) ?>"><?= \PlayerPageType::getDescription(\PlayerPageType::AWARDS_AND_NEWS) ?></a><br>
         <a href="<?= \PlayerPageType::getUrl($playerID, \PlayerPageType::ONE_ON_ONE) ?>"><?= \PlayerPageType::getDescription(\PlayerPageType::ONE_ON_ONE) ?></a> | <a href="<?= \PlayerPageType::getUrl($playerID, \PlayerPageType::SIM_STATS) ?>"><?= \PlayerPageType::getDescription(\PlayerPageType::SIM_STATS) ?></a><br>
         <a href="<?= \PlayerPageType::getUrl($playerID, \PlayerPageType::REGULAR_SEASON_TOTALS) ?>"><?= \PlayerPageType::getDescription(\PlayerPageType::REGULAR_SEASON_TOTALS) ?></a> | <a href="<?= \PlayerPageType::getUrl($playerID, \PlayerPageType::REGULAR_SEASON_AVERAGES) ?>"><?= \PlayerPageType::getDescription(\PlayerPageType::REGULAR_SEASON_AVERAGES) ?></a><br>
@@ -313,7 +314,7 @@ class PlayerPageViewHelper
         <a href="<?= \PlayerPageType::getUrl($playerID, \PlayerPageType::HEAT_TOTALS) ?>"><?= \PlayerPageType::getDescription(\PlayerPageType::HEAT_TOTALS) ?></a> | <a href="<?= \PlayerPageType::getUrl($playerID, \PlayerPageType::HEAT_AVERAGES) ?>"><?= \PlayerPageType::getDescription(\PlayerPageType::HEAT_AVERAGES) ?></a><br>
         <a href="<?= \PlayerPageType::getUrl($playerID, \PlayerPageType::OLYMPIC_TOTALS) ?>"><?= \PlayerPageType::getDescription(\PlayerPageType::OLYMPIC_TOTALS) ?></a> | <a href="<?= \PlayerPageType::getUrl($playerID, \PlayerPageType::OLYMPIC_AVERAGES) ?>"><?= \PlayerPageType::getDescription(\PlayerPageType::OLYMPIC_AVERAGES) ?></a><br>
         <a href="<?= \PlayerPageType::getUrl($playerID, \PlayerPageType::RATINGS_AND_SALARY) ?>"><?= \PlayerPageType::getDescription(\PlayerPageType::RATINGS_AND_SALARY) ?></a>
-        </center>
+        </div>
     </td>
 </tr>
 <tr>

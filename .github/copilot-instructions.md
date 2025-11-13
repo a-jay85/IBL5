@@ -385,6 +385,9 @@ oldFunction($value);  →  NewClass::newMethod($value);
 
 ## Copilot Coding Agent Configuration
 
+### Environment Setup (CRITICAL)
+The Copilot agent requires a pre-configured development environment to run tests efficiently. See the **Development Environment Setup** section below for details on how the agent initializes its environment.
+
 - The Copilot agent will:
   - Open PRs for code changes
   - Provide detailed PR descriptions and context
@@ -400,6 +403,99 @@ oldFunction($value);  →  NewClass::newMethod($value);
   - **Update all call sites of deprecated functions** and delete the deprecated code
   - **Zero tolerance for warnings or errors**: PRs must pass all quality checks
 - The agent will **not** merge PRs automatically; human review is required
+
+## Development Environment Setup (For Copilot Agent)
+
+### Problem Statement
+The Copilot agent cannot install dependencies from scratch on every run due to private repository access restrictions. Instead, it relies on a properly configured development environment that has dependencies pre-installed.
+
+### Solution Architecture
+
+#### 1. **Use Dev Container Configuration** (Recommended for Copilot Agent)
+The `.devcontainer/` directory contains configuration for a standardized PHP development environment:
+
+- **Location**: `.devcontainer/devcontainer.json` - VS Code Dev Container configuration
+- **Post-Create Hook**: `.devcontainer/post-create.sh` - Automatically installs dependencies
+
+**How it works:**
+1. Copilot agent initializes the dev container
+2. Dev container runs `post-create.sh` automatically
+3. All Composer dependencies are installed within the container
+4. PHPUnit and all dev tools are available immediately
+5. Tests can run without delays or network issues
+
+**Benefits:**
+- ✅ Reproducible environment across all agent runs
+- ✅ No network calls to private repositories
+- ✅ Fast test execution (dependencies cached)
+- ✅ Consistent PHP version and extensions (8.3)
+- ✅ Automatically handles Composer installation if missing
+
+#### 2. **Manual Setup for Local Development**
+Run the setup script before working:
+
+```bash
+# From repository root
+bash setup-dev.sh
+```
+
+This script:
+- Checks for PHP 8.3+
+- Installs Composer if needed
+- Runs `composer install` in the `ibl5/` directory
+- Verifies PHPUnit and all tools are available
+
+#### 3. **GitHub Actions CI/CD Caching**
+The `.github/workflows/tests.yml` workflow implements intelligent caching:
+
+- **Composer Cache**: Caches `~/.composer/cache` across runs
+- **Vendor Cache**: Caches `ibl5/vendor/` directory across runs
+- **Cache Key**: Uses `composer.lock` hash to invalidate cache when dependencies change
+- **No Network Calls**: Subsequent runs use cached dependencies
+
+**How it helps Copilot:**
+- Pulls from GitHub's cache instead of downloading from internet
+- Significantly faster dependency resolution
+- Reduces network errors from package downloads
+
+### Testing from Command Line
+
+Once setup is complete, tests run via:
+
+```bash
+cd ibl5
+phpunit                                    # Run all tests
+phpunit tests/Player/                      # Run specific test suite
+phpunit --filter testRenderPlayerHeader    # Run specific test
+```
+
+### Verifying Setup
+
+```bash
+cd ibl5
+vendor/bin/phpunit --version               # Should show PHPUnit 12.4.3+
+vendor/bin/phpstan --version               # Should show PHPStan version
+vendor/bin/phpcs --version                 # Should show PHP_CodeSniffer version
+```
+
+### Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| `Command 'phpunit' not found` | Run `cd ibl5 && composer install` |
+| `Composer not found` | Run setup script: `bash setup-dev.sh` |
+| `Permission denied` on setup script | Run: `chmod +x setup-dev.sh` |
+| `PHP version too old` | Install PHP 8.3+: Use `setup-dev.sh` for guidance |
+| Slow composer install | Clear cache: `composer clearcache` |
+
+### Key Files
+
+- `.devcontainer/devcontainer.json` - VS Code dev container config
+- `.devcontainer/post-create.sh` - Auto-setup hook for containers
+- `setup-dev.sh` - Manual setup script (repository root)
+- `.github/workflows/tests.yml` - CI/CD with dependency caching
+- `ibl5/composer.json` - Project dependencies (dev tools)
+- `ibl5/composer.lock` - Locked dependency versions
 
 ## Working with the Database Schema
 

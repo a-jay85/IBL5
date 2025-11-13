@@ -1,19 +1,81 @@
 # Development Guide
 
-**Status:** 13/63 modules refactored • 380+ tests • 35% coverage • Goal: 80%
+**Status:** 12/23 IBL modules refactored • 50 test files • ~35% coverage • Goal: 80%
 
-## Top Priorities
+## Refactoring Status
 
-1. **Free Agency** (1,648 lines) - Contract signing, salary cap
-2. **Player Display** (749 lines) - Most viewed page  
-3. ~~Statistics~~ ✅ Complete
+### ✅ Completed IBL Modules (12)
+1. ~~Player~~ ✅ Complete (9 classes, 6 tests) - Core player management & display
+2. ~~Statistics~~ ✅ Complete (6 classes, 5 tests) - Stats formatting & sanitization
+3. ~~Team~~ ✅ Complete (4 classes, 3 tests) - Team management
+4. ~~Draft~~ ✅ Complete (5 classes, 3 tests) - Draft operations
+5. ~~Waivers~~ ✅ Complete (5 classes, 3 tests) - Waiver system
+6. ~~Extension~~ ✅ Complete (4 classes, 4 tests) - Contract extensions
+7. ~~RookieOption~~ ✅ Complete (4 classes, 3 tests) - Rookie contract options
+8. ~~Trading~~ ✅ Complete (5 classes, 5 tests) - Trade processing
+9. ~~Negotiation~~ ✅ Complete (4 classes, 3 tests) - Contract negotiations
+10. ~~DepthChart~~ ✅ Complete (6 classes, 2 tests) - Depth chart management
+11. ~~Voting~~ ✅ Complete (3 classes, 0 tests) - Award voting
+12. ~~Schedule~~ ✅ Complete (2 classes, 0 tests) - Game scheduling
+
+### 🎯 Top Priorities (Next 3 Modules)
+
+1. **Free Agency** (2,206 lines) - Contract signing, FA offers, salary cap validation
+   - **Complexity:** Very High - Business logic for contract offers, salary cap, FA bidding
+   - **Business Value:** Critical - Core gameplay mechanic for team building
+   - **Tech Debt:** High - Legacy SQL, no prepared statements, mixed concerns
+   - **Estimated Effort:** 3-4 weeks
+
+2. **One-on-One** (887 lines) - Player comparison/matchup feature
+   - **Complexity:** Medium - Display logic, stats comparison
+   - **Business Value:** High - Frequently used by users
+   - **Tech Debt:** Medium - Legacy code patterns
+   - **Estimated Effort:** 1-2 weeks
+
+3. **Season Leaders** (865 lines) - Season-long statistical leaders
+   - **Complexity:** Medium - Stats queries, display formatting
+   - **Business Value:** High - Important for competitive engagement
+   - **Tech Debt:** Medium - Could leverage Statistics classes
+   - **Estimated Effort:** 1-2 weeks
+
+### 📋 Remaining IBL Modules (11)
+
+**Medium Priority (Display/Stats):**
+- Chunk_Stats (462 lines) - Statistical chunks/periods
+- Player_Search (461 lines) - Player search functionality
+- Compare_Players (403 lines) - Player comparison tool
+- Searchable_Stats (370 lines) - Advanced stats search
+- League_Stats (351 lines) - League-wide statistics
+- Leaderboards (264 lines) - Various leaderboards
+
+**Lower Priority (Info/Display):**
+- Series_Records (179 lines) - Historical series data
+- Player_Awards (159 lines) - Award history display
+- Cap_Info (136 lines) - Salary cap information
+- Team_Schedule (129 lines) - Team schedule display
+- Franchise_History (103 lines) - Team history
+- Power_Rankings (101 lines) - Power rankings display
+- Next_Sim (94 lines) - Next simulation info
+- League_Starters (85 lines) - Starting lineups
+- Draft_Pick_Locator (79 lines) - Draft pick finder
+- Injuries (57 lines) - Injury reports
+- EOY_Results (40 lines) - End of year results
+- ASG_Results (40 lines) - All-star game results
+- ASG_Stats (221 lines) - All-star game statistics
+- Player_Movement (35 lines) - Transaction history
+
+**Not IBL-Specific (Lowest Priority - Generic PHP-Nuke):**
+- Web_Links, Your_Account, News, AutoTheme, Content, Donate, FAQ, Topics, Search, Submit_News, Members_List, Top, Stories_Archive, Recommend_Us, Feedback, AvantGo (81,000+ total lines)
 
 ## Quick Workflow
 
 **Before Starting:**
-- Review refactored modules: Waivers, Draft, Team, Player
+- Review refactored modules: Player, Waivers, Draft, Team, Extension, Trading
 - Check `ibl5/schema.sql` for database structure
+- See best practices in: `ibl5/classes/Player/README.md`, `ibl5/classes/DepthChart/SECURITY.md`
+- Set up dev environment: See `DEVELOPMENT_ENVIRONMENT.md` or use dev container (`.devcontainer/`)
 - Run tests: `cd ibl5 && vendor/bin/phpunit tests/`
+- CI/CD: Tests run automatically via GitHub Actions (`.github/workflows/tests.yml`)
 
 **Refactoring Steps:**
 1. Analyze (1-2 days) - Identify responsibilities
@@ -38,6 +100,11 @@ Module/
 **Coverage:** Current 35% → Phase 1: 60% → Phase 2: 75% → Goal: 80%
 
 **Test Pyramid:** Few E2E tests → Some integration → Many unit tests
+
+**CI/CD:** ✅ GitHub Actions workflow implemented
+- Automated PHPUnit tests on push/PR
+- Composer dependency caching
+- See `.github/workflows/tests.yml`
 
 **Required:**
 - All public methods tested
@@ -94,10 +161,11 @@ public function getPlayer($playerId)
 - [PRODUCTION_DEPLOYMENT_GUIDE.md](PRODUCTION_DEPLOYMENT_GUIDE.md) - Deployment
 
 **Code Examples:**
-- Best refactoring: Waivers (`tests/Waivers/`)
-- Facade pattern: Player (`classes/Player/`)
-- MVC pattern: Team (`classes/Team/`)
-- Security: DepthChart (`classes/DepthChart/SECURITY.md`)
+- Best refactoring: Player (`classes/Player/`, `tests/Player/`)
+- Comprehensive tests: Waivers (`tests/Waivers/`)
+- Service + ViewHelper: Player display (`classes/Player/PlayerPageService.php`)
+- Security patterns: DepthChart (`classes/DepthChart/SECURITY.md`)
+- Stats formatting: Statistics (`classes/Statistics/README.md`)
 
 ## FAQs
 

@@ -84,8 +84,16 @@ cd "$PROJECT_ROOT" || {
 # Install dependencies
 if [ -f "composer.json" ]; then
     echo "Running: composer install --prefer-dist"
-    composer install --prefer-dist --no-progress --no-interaction 2>&1 | grep -E '(Installing|Generating|Creating|Loading)' || true
-    success "Composer dependencies installed"
+    if composer install --prefer-dist --no-progress --no-interaction; then
+        success "Composer dependencies installed"
+    else
+        error "Composer install failed. Run without --no-interaction for details:"
+        echo ""
+        echo "  cd $PROJECT_ROOT"
+        echo "  composer install --prefer-dist"
+        echo ""
+        exit 1
+    fi
 else
     error "composer.json not found in $PROJECT_ROOT"
     exit 1
@@ -94,11 +102,23 @@ fi
 # Verify PHPUnit
 echo ""
 echo "Verifying test environment..."
+echo "Current directory: $(pwd)"
+echo "Checking for vendor/bin/phpunit..."
 if [ -f "vendor/bin/phpunit" ]; then
     PHPUNIT_VERSION=$(vendor/bin/phpunit --version 2>/dev/null | grep -oP '(?<=PHPUnit )[0-9.]+')
     success "PHPUnit $PHPUNIT_VERSION ready"
 else
     error "PHPUnit not found. Composer install may have failed."
+    echo ""
+    echo "Diagnostics:"
+    echo "  vendor/ contents:"
+    ls -la vendor/ 2>/dev/null | head -20 || echo "    vendor/ directory not found"
+    echo ""
+    echo "  vendor/bin/ contents:"
+    ls -la vendor/bin/ 2>/dev/null | head -20 || echo "    vendor/bin/ directory not found"
+    echo ""
+    echo "  Trying to run composer again with verbose output..."
+    composer install --prefer-dist 2>&1 | tail -30
     exit 1
 fi
 

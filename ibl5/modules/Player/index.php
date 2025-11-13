@@ -23,8 +23,8 @@ function showpage($playerID, $pageView)
     $pageView = ($pageView !== null) ? intval($pageView) : null;
     
     // Initialize service and view helper
-    $pageService = new Player\PlayerPageService($db);
-    $viewHelper = new Player\PlayerPageViewHelper();
+    $pageService = new \Player\PlayerPageService($db);
+    $viewHelper = new \Player\PlayerPageViewHelper();
 
     // DISPLAY PAGE
 
@@ -151,7 +151,6 @@ function rookieoption($pid)
     $commonRepository = new \Services\CommonRepository($db);
     $season = new Season($db);
     $validator = new \RookieOption\RookieOptionValidator();
-    $processor = new \RookieOption\RookieOptionProcessor();
     $formView = new \RookieOption\RookieOptionFormView();
     
     // Get user's team name

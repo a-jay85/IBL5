@@ -47,7 +47,30 @@ jobs:
     
     - name: Install dependencies
       working-directory: ibl5
-      run: composer install --prefer-dist --no-progress --no-interaction
+      run: |
+        echo "Current directory: $(pwd)"
+        echo "Checking composer.json..."
+        cat composer.json | head -20
+        echo ""
+        echo "Running: composer install --prefer-dist --no-progress --no-interaction"
+        composer install --prefer-dist --no-progress --no-interaction || {
+          echo "First composer install attempt failed, trying again with verbose output..."
+          composer install --prefer-dist || exit 1
+        }
+        echo ""
+        echo "Verifying installation..."
+        if [ -f "vendor/bin/phpunit" ]; then
+          echo "✓ PHPUnit found"
+          vendor/bin/phpunit --version
+        else
+          echo "✗ PHPUnit not found in vendor/bin/"
+          echo "vendor/bin contents:"
+          ls -la vendor/bin/ 2>/dev/null | head -20 || echo "vendor/bin not found"
+          echo ""
+          echo "vendor/ top-level contents:"
+          ls -la vendor/ 2>/dev/null | head -30 || echo "vendor/ not found"
+          exit 1
+        fi
     
     - name: Run PHPUnit tests
       working-directory: ibl5

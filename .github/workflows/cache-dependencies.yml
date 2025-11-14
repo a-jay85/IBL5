@@ -1,0 +1,103 @@
+name: Cache PHP Dependencies
+
+# This workflow ensures the vendor directory is always cached for GitHub Copilot Agent
+# It runs on schedule and can also be triggered manually
+
+on:
+  # Run daily to keep cache fresh
+  schedule:
+    - cron: '0 0 * * *'  # Daily at midnight UTC
+  
+  # Allow manual trigger
+  workflow_dispatch:
+  
+  # Run when dependencies change
+  push:
+    paths:
+      - 'ibl5/composer.json'
+      - 'ibl5/composer.lock'
+    branches:
+      - master
+      - develop
+
+jobs:
+  cache-dependencies:
+    name: Pre-cache PHP Dependencies
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, intl, pdo, pdo_mysql
+      
+      - name: Get Composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+      
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('ibl5/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-
+      
+      - name: Cache vendor directory
+        uses: actions/cache@v4
+        id: vendor-cache
+        with:
+          path: ibl5/vendor
+          key: ${{ runner.os }}-vendor-${{ hashFiles('ibl5/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-vendor-
+      
+      - name: Install dependencies
+        if: steps.vendor-cache.outputs.cache-hit != 'true'
+        working-directory: ibl5
+        run: |
+          echo "Installing Composer dependencies..."
+          composer install --prefer-dist --no-progress --no-interaction || \
+          composer install --prefer-source --no-progress --no-interaction || \
+          composer install --no-progress --no-interaction
+      
+      - name: Verify PHPUnit
+        working-directory: ibl5
+        run: |
+          if [ -f "vendor/bin/phpunit" ]; then
+            echo "✅ PHPUnit cached successfully"
+            vendor/bin/phpunit --version
+          else
+            echo "❌ PHPUnit not found!"
+            exit 1
+          fi
+      
+      - name: Cache summary
+        run: |
+          echo "## Cache Update Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.vendor-cache.outputs.cache-hit }}" == "true" ]; then
+            echo "✅ Vendor cache was already up-to-date" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ Vendor cache has been updated" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Cache key: \`${{ runner.os }}-vendor-${{ hashFiles('ibl5/composer.lock') }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Installed Tools" >> $GITHUB_STEP_SUMMARY
+          echo "- PHP: $(php --version | head -n 1)" >> $GITHUB_STEP_SUMMARY
+          echo "- Composer: $(composer --version)" >> $GITHUB_STEP_SUMMARY
+          cd ibl5
+          if [ -f "vendor/bin/phpunit" ]; then
+            echo "- PHPUnit: $(vendor/bin/phpunit --version)" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ -f "vendor/bin/phpstan" ]; then
+            echo "- PHPStan: $(vendor/bin/phpstan --version 2>&1 | head -n 1)" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ -f "vendor/bin/phpcs" ]; then
+            echo "- PHP_CodeSniffer: $(vendor/bin/phpcs --version)" >> $GITHUB_STEP_SUMMARY
+          fi

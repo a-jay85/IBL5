@@ -1,10 +1,10 @@
 # Development Guide
 
-**Status:** 12/23 IBL modules refactored • 50 test files • ~35% coverage • Goal: 80%
+**Status:** 13/23 IBL modules refactored • 52 test files • ~40% coverage • Goal: 80%
 
 ## Refactoring Status
 
-### ✅ Completed IBL Modules (12)
+### ✅ Completed IBL Modules (13)
 1. ~~Player~~ ✅ Complete (9 classes, 6 tests) - Core player management & display
 2. ~~Statistics~~ ✅ Complete (6 classes, 5 tests) - Stats formatting & sanitization
 3. ~~Team~~ ✅ Complete (4 classes, 3 tests) - Team management
@@ -17,6 +17,7 @@
 10. ~~DepthChart~~ ✅ Complete (6 classes, 2 tests) - Depth chart management
 11. ~~Voting~~ ✅ Complete (3 classes, 0 tests) - Award voting
 12. ~~Schedule~~ ✅ Complete (2 classes, 0 tests) - Game scheduling
+13. ~~Season Leaders~~ ✅ Complete (3 classes, 2 tests) - Season-long statistical leaders
 
 ### 🎯 Top Priorities (Next 3 Modules)
 
@@ -32,13 +33,13 @@
    - **Tech Debt:** Medium - Legacy code patterns
    - **Estimated Effort:** 1-2 weeks
 
-3. **Season Leaders** (865 lines) - Season-long statistical leaders
+3. **Leaderboards** (264 lines) - Various statistical leaderboards
    - **Complexity:** Medium - Stats queries, display formatting
    - **Business Value:** High - Important for competitive engagement
-   - **Tech Debt:** Medium - Could leverage Statistics classes
-   - **Estimated Effort:** 1-2 weeks
+   - **Tech Debt:** Medium - Can leverage Statistics classes (similar to Season Leaders)
+   - **Estimated Effort:** 1 week
 
-### 📋 Remaining IBL Modules (11)
+### 📋 Remaining IBL Modules (10)
 
 **Medium Priority (Display/Stats):**
 - Chunk_Stats (462 lines) - Statistical chunks/periods

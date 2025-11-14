@@ -108,8 +108,8 @@ class PlayerPageViewHelper
     {
         ob_start();
         ?>
-<span class="player-bio">Age: <?= htmlspecialchars((string)$player->age) ?> | Height: <?= htmlspecialchars((string)$player->heightFeet) ?>-<?= htmlspecialchars((string)$player->heightInches) ?> | Weight: <?= htmlspecialchars((string)$player->weightPounds) ?> | College: <?= htmlspecialchars($player->collegeName) ?><br>
-    <em>Drafted by the <?= htmlspecialchars($player->draftTeamOriginalName) ?> with the # <?= htmlspecialchars((string)$player->draftPickNumber) ?> pick of round <?= htmlspecialchars((string)$player->draftRound) ?> in the <a href="draft.php?year=<?= $player->draftYear ?>"><?= htmlspecialchars((string)$player->draftYear) ?> Draft</a></em><br>
+<span class="player-bio">Age: <?= htmlspecialchars((string)$player->age) ?> | Height: <?= htmlspecialchars((string)$player->heightFeet) ?>-<?= htmlspecialchars((string)$player->heightInches) ?> | Weight: <?= htmlspecialchars((string)$player->weightPounds) ?> | College: <?= htmlspecialchars((string)($player->collegeName ?? '')) ?><br>
+    <em>Drafted by the <?= htmlspecialchars((string)($player->draftTeamOriginalName ?? '')) ?> with the # <?= htmlspecialchars((string)$player->draftPickNumber) ?> pick of round <?= htmlspecialchars((string)$player->draftRound) ?> in the <a href="draft.php?year=<?= $player->draftYear ?>"><?= htmlspecialchars((string)$player->draftYear) ?> Draft</a></em><br>
     <center><table>
         <?php
         echo $this->renderRatingsTableHeaders();

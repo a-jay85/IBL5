@@ -58,9 +58,13 @@ class StatisticsView
         OpenTable();
         OpenTable();
         
-        echo "<center><font class=\"option\"><b>$sitename " . _STATS . "</b></font><br><br>" 
-            . _WERECEIVED . " <b>$totalHits</b> " . _PAGESVIEWS . " $startDate<br><br>"
-            . "[ <a href=\"modules.php?name={$this->moduleName}&op=Stats\">" . _VIEWDETAILED . "</a> ]</center>";
+        ob_start();
+        ?>
+<div style="text-align: center;"><span class="option"><b><?= htmlspecialchars($sitename) ?> <?= _STATS ?></b></span><br><br>
+<?= _WERECEIVED ?> <b><?= htmlspecialchars((string)$totalHits) ?></b> <?= _PAGESVIEWS ?> <?= htmlspecialchars($startDate) ?><br><br>
+[ <a href="modules.php?name=<?= htmlspecialchars($this->moduleName) ?>&op=Stats"><?= _VIEWDETAILED ?></a> ]</div>
+        <?php
+        echo ob_get_clean();
         
         CloseTable();
         echo "<br><br>";
@@ -88,8 +92,13 @@ class StatisticsView
         global $textcolor2;
         
         OpenTable2();
-        echo "<table cellspacing=\"0\" cellpadding=\"2\" border=\"0\" align=\"center\"><tr><td colspan=\"2\">\n";
-        echo "<center><font color=\"$textcolor2\"><b>" . _BROWSERS . "</b></font></center><br></td></tr>\n";
+        
+        ob_start();
+        ?>
+<table style="border-spacing: 0; padding: 2px; border: 0;" style="text-align: center;"><tr><td colspan="2">
+<div style="text-align: center;"><span style="color: <?= htmlspecialchars($textcolor2) ?>;"><b><?= _BROWSERS ?></b></span></div><br></td></tr>
+        <?php
+        echo ob_get_clean();
         
         $this->renderBrowserRow('MSIE', 'explorer.gif', 'Internet Explorer', $browserStats['MSIE'] ?? ['count' => 0, 'percentage' => 0]);
         $this->renderBrowserRow('FireFox', 'firefox.gif', 'FireFox', $browserStats['FireFox'] ?? ['count' => 0, 'percentage' => 0]);
@@ -117,10 +126,16 @@ class StatisticsView
     {
         $width = (int)($data['percentage'] * 2);
         
-        echo "<tr><td><img src=\"modules/{$this->moduleName}/images/{$icon}\" border=\"0\" alt=\"\">&nbsp;{$label}: </td>";
-        echo "<td>";
+        ob_start();
+        ?>
+<tr><td><img src="modules/<?= htmlspecialchars($this->moduleName) ?>/images/<?= htmlspecialchars($icon) ?>" style="border: 0;" alt="">&nbsp;<?= htmlspecialchars($label) ?>: </td>
+<td>
+        <?php
         $this->renderBar($altText, $width);
-        echo " {$data['percentage']}% ({$data['count']})</td></tr>\n";
+        ?>
+ <?= htmlspecialchars((string)$data['percentage']) ?>% (<?= htmlspecialchars((string)$data['count']) ?>)</td></tr>
+        <?php
+        echo ob_get_clean();
     }
 
     /**
@@ -134,8 +149,13 @@ class StatisticsView
         global $textcolor2;
         
         OpenTable2();
-        echo "<table cellspacing=\"0\" cellpadding=\"2\" border=\"0\" align=\"center\"><tr><td colspan=\"2\">\n";
-        echo "<center><font color=\"$textcolor2\"><b>" . _OPERATINGSYS . "</b></font></center><br></td></tr>\n";
+        
+        ob_start();
+        ?>
+<table style="border-spacing: 0; padding: 2px; border: 0;" style="text-align: center;"><tr><td colspan="2">
+<div style="text-align: center;"><span style="color: <?= htmlspecialchars($textcolor2) ?>;"><b><?= _OPERATINGSYS ?></b></span></div><br></td></tr>
+        <?php
+        echo ob_get_clean();
         
         $this->renderOSRow('Windows', 'windows.gif', $osStats['Windows'] ?? ['count' => 0, 'percentage' => 0]);
         $this->renderOSRow('Linux', 'linux.gif', $osStats['Linux'] ?? ['count' => 0, 'percentage' => 0]);
@@ -164,10 +184,16 @@ class StatisticsView
     {
         $width = (int)($data['percentage'] * 2);
         
-        echo "<tr><td><img src=\"modules/{$this->moduleName}/images/{$icon}\" border=\"0\" alt=\"\">&nbsp;{$label}:</td>";
-        echo "<td>";
+        ob_start();
+        ?>
+<tr><td><img src="modules/<?= htmlspecialchars($this->moduleName) ?>/images/<?= htmlspecialchars($icon) ?>" style="border: 0;" alt="">&nbsp;<?= htmlspecialchars($label) ?>:</td>
+<td>
+        <?php
         $this->renderBar($label, $width);
-        echo " {$data['percentage']}% ({$data['count']})</td></tr>\n";
+        ?>
+ <?= htmlspecialchars((string)$data['percentage']) ?>% (<?= htmlspecialchars((string)$data['count']) ?>)</td></tr>
+        <?php
+        echo ob_get_clean();
     }
 
     /**
@@ -181,25 +207,27 @@ class StatisticsView
         global $textcolor2;
         
         OpenTable2();
-        echo "<table cellspacing=\"0\" cellpadding=\"2\" border=\"0\" align=\"center\"><tr><td colspan=\"2\">\n";
-        echo "<center><font color=\"$textcolor2\"><b>" . _MISCSTATS . "</b></font></center><br></td></tr>\n";
         
-        echo "<tr><td><img src=\"modules/{$this->moduleName}/images/users.gif\" border=\"0\" alt=\"\">&nbsp;" . _REGUSERS . "</td><td><b>{$counts['users']}</b></td></tr>\n";
-        echo "<tr><td><img src=\"modules/{$this->moduleName}/images/authors.gif\" border=\"0\" alt=\"\">&nbsp;" . _ACTIVEAUTHORS . "</td><td><b>{$counts['authors']}</b></td></tr>\n";
-        echo "<tr><td><img src=\"modules/{$this->moduleName}/images/news.gif\" border=\"0\" alt=\"\">&nbsp;" . _STORIESPUBLISHED . "</td><td><b>{$counts['stories']}</b></td></tr>\n";
+        ob_start();
+        ?>
+<table style="border-spacing: 0; padding: 2px; border: 0;" style="text-align: center;"><tr><td colspan="2">
+<div style="text-align: center;"><span style="color: <?= htmlspecialchars($textcolor2) ?>;"><b><?= _MISCSTATS ?></b></span></div><br></td></tr>
         
-        if ($counts['topics'] > 0) {
-            echo "<tr><td><img src=\"modules/{$this->moduleName}/images/topics.gif\" border=\"0\" alt=\"\">&nbsp;" . _SACTIVETOPICS . "</td><td><b>{$counts['topics']}</b></td></tr>\n";
-        }
+<tr><td><img src="modules/<?= htmlspecialchars($this->moduleName) ?>/images/users.gif" style="border: 0;" alt="">&nbsp;<?= _REGUSERS ?></td><td><b><?= htmlspecialchars((string)$counts['users']) ?></b></td></tr>
+<tr><td><img src="modules/<?= htmlspecialchars($this->moduleName) ?>/images/authors.gif" style="border: 0;" alt="">&nbsp;<?= _ACTIVEAUTHORS ?></td><td><b><?= htmlspecialchars((string)$counts['authors']) ?></b></td></tr>
+<tr><td><img src="modules/<?= htmlspecialchars($this->moduleName) ?>/images/news.gif" style="border: 0;" alt="">&nbsp;<?= _STORIESPUBLISHED ?></td><td><b><?= htmlspecialchars((string)$counts['stories']) ?></b></td></tr>
+        <?php if ($counts['topics'] > 0): ?>
+<tr><td><img src="modules/<?= htmlspecialchars($this->moduleName) ?>/images/topics.gif" style="border: 0;" alt="">&nbsp;<?= _SACTIVETOPICS ?></td><td><b><?= htmlspecialchars((string)$counts['topics']) ?></b></td></tr>
+        <?php endif; ?>
+<tr><td><img src="modules/<?= htmlspecialchars($this->moduleName) ?>/images/comments.gif" style="border: 0;" alt="">&nbsp;<?= _COMMENTSPOSTED ?></td><td><b><?= htmlspecialchars((string)$counts['comments']) ?></b></td></tr>
+        <?php if ($counts['links'] > 0): ?>
+<tr><td><img src="modules/<?= htmlspecialchars($this->moduleName) ?>/images/topics.gif" style="border: 0;" alt="">&nbsp;<?= _LINKSINLINKS ?></td><td><b><?= htmlspecialchars((string)$counts['links']) ?></b></td></tr>
+<tr><td><img src="modules/<?= htmlspecialchars($this->moduleName) ?>/images/sections.gif" style="border: 0;" alt="">&nbsp;<?= _LINKSCAT ?></td><td><b><?= htmlspecialchars((string)$counts['linkCategories']) ?></b></td></tr>
+        <?php endif; ?>
+</table>
+        <?php
+        echo ob_get_clean();
         
-        echo "<tr><td><img src=\"modules/{$this->moduleName}/images/comments.gif\" border=\"0\" alt=\"\">&nbsp;" . _COMMENTSPOSTED . "</td><td><b>{$counts['comments']}</b></td></tr>\n";
-        
-        if ($counts['links'] > 0) {
-            echo "<tr><td><img src=\"modules/{$this->moduleName}/images/topics.gif\" border=\"0\" alt=\"\">&nbsp;" . _LINKSINLINKS . "</td><td><b>{$counts['links']}</b></td></tr>\n";
-            echo "<tr><td><img src=\"modules/{$this->moduleName}/images/sections.gif\" border=\"0\" alt=\"\">&nbsp;" . _LINKSCAT . "</td><td><b>{$counts['linkCategories']}</b></td></tr>\n";
-        }
-        
-        echo "</table>\n";
         CloseTable2();
     }
 
@@ -233,24 +261,22 @@ class StatisticsView
         OpenTable();
         OpenTable();
         
-        echo "<center><font class=\"option\"><b>$sitename " . _STATS . "</b></font><br><br>"
-            . _WERECEIVED . " <b>$total</b> " . _PAGESVIEWS . " $startDate<br>"
-            . _TODAYIS . ": {$currentDate[0]}/{$currentDate[1]}/{$currentDate[2]}<br><br>";
-        
-        // Highest month
         $monthName = $processor->getMonthName($highestMonth['month']);
-        echo _MOSTMONTH . ": {$monthName} {$highestMonth['year']} ({$highestMonth['hits']} " . _HITS . ")<br>";
-        
-        // Highest day
-        $monthName = $processor->getMonthName($highestDay['month']);
-        echo _MOSTDAY . ": {$highestDay['date']} {$monthName} {$highestDay['year']} ({$highestDay['hits']} " . _HITS . ")<br>";
-        
-        // Highest hour
-        $monthName = $processor->getMonthName($highestHour['month']);
+        $dayMonthName = $processor->getMonthName($highestDay['month']);
+        $hourMonthName = $processor->getMonthName($highestHour['month']);
         $hourRange = $processor->formatHourRange($highestHour['hour']);
-        echo _MOSTHOUR . ": {$hourRange} " . _ON . " {$monthName} {$highestHour['date']}, {$highestHour['year']} ({$highestHour['hits']} " . _HITS . ")<br><br>";
         
-        echo "[ <a href=\"modules.php?name={$this->moduleName}\">" . _RETURNBASICSTATS . "</a> ]</center>";
+        ob_start();
+        ?>
+<div style="text-align: center;"><span class="option"><b><?= htmlspecialchars($sitename) ?> <?= _STATS ?></b></span><br><br>
+<?= _WERECEIVED ?> <b><?= htmlspecialchars((string)$total) ?></b> <?= _PAGESVIEWS ?> <?= htmlspecialchars($startDate) ?><br>
+<?= _TODAYIS ?>: <?= htmlspecialchars($currentDate[0]) ?>/<?= htmlspecialchars($currentDate[1]) ?>/<?= htmlspecialchars($currentDate[2]) ?><br><br>
+<?= _MOSTMONTH ?>: <?= htmlspecialchars($monthName) ?> <?= htmlspecialchars((string)$highestMonth['year']) ?> (<?= htmlspecialchars((string)$highestMonth['hits']) ?> <?= _HITS ?>)<br>
+<?= _MOSTDAY ?>: <?= htmlspecialchars((string)$highestDay['date']) ?> <?= htmlspecialchars($dayMonthName) ?> <?= htmlspecialchars((string)$highestDay['year']) ?> (<?= htmlspecialchars((string)$highestDay['hits']) ?> <?= _HITS ?>)<br>
+<?= _MOSTHOUR ?>: <?= htmlspecialchars($hourRange) ?> <?= _ON ?> <?= htmlspecialchars($hourMonthName) ?> <?= htmlspecialchars((string)$highestHour['date']) ?>, <?= htmlspecialchars((string)$highestHour['year']) ?> (<?= htmlspecialchars((string)$highestHour['hits']) ?> <?= _HITS ?>)<br><br>
+[ <a href="modules.php?name=<?= htmlspecialchars($this->moduleName) ?>"><?= _RETURNBASICSTATS ?></a> ]</div>
+        <?php
+        echo ob_get_clean();
         
         CloseTable();
     }
@@ -272,28 +298,30 @@ class StatisticsView
     ): void {
         global $bgcolor1, $bgcolor2;
         
-        echo "<br><br>";
-        echo "<center><b>" . _YEARLYSTATS . "</b></center><br>";
-        echo "<table align=\"center\" bgcolor=\"#000000\" cellspacing=\"1\" cellpadding=\"3\" border=\"0\">";
-        echo "<tr><td width=\"25%\" bgcolor=\"$bgcolor2\">" . _YEAR . "</td><td bgcolor=\"$bgcolor2\">" . _SPAGESVIEWS . "</td></tr>";
-        
-        foreach ($yearlyStats as $stat) {
+        ob_start();
+        ?>
+<br><br>
+<div style="text-align: center;"><b><?= _YEARLYSTATS ?></b></div><br>
+<table style="text-align: center; background-color: #000000; border-spacing: 1px; padding: 3px; border: 0;">
+<tr><td style="width: 25%; background-color: <?= htmlspecialchars($bgcolor2) ?>;"><?= _YEAR ?></td><td style="background-color: <?= htmlspecialchars($bgcolor2) ?>;"><?= _SPAGESVIEWS ?></td></tr>
+        <?php foreach ($yearlyStats as $stat):
             $year = $stat['year'];
             $hits = $stat['hits'];
             $width = $processor->calculateBarWidth($hits, $totalHits);
-            
-            echo "<tr bgcolor=\"$bgcolor1\"><td>";
-            if ($year != $currentYear) {
-                echo "<a href=\"modules.php?name={$this->moduleName}&amp;op=YearlyStats&amp;year={$year}\">{$year}</a>";
-            } else {
-                echo $year;
-            }
-            echo "</td><td>";
-            $this->renderBar('', $width);
-            echo " ({$hits})</td></tr>";
-        }
-        
-        echo "</table>";
+        ?>
+<tr style="background-color: <?= htmlspecialchars($bgcolor1) ?>;"><td>
+            <?php if ($year != $currentYear): ?>
+<a href="modules.php?name=<?= htmlspecialchars($this->moduleName) ?>&amp;op=YearlyStats&amp;year=<?= htmlspecialchars((string)$year) ?>"><?= htmlspecialchars((string)$year) ?></a>
+            <?php else: ?>
+<?= htmlspecialchars((string)$year) ?>
+            <?php endif; ?>
+</td><td>
+            <?php $this->renderBar('', $width); ?>
+ (<?= htmlspecialchars((string)$hits) ?>)</td></tr>
+        <?php endforeach; ?>
+</table>
+        <?php
+        echo ob_get_clean();
     }
 
     /**
@@ -315,29 +343,31 @@ class StatisticsView
     ): void {
         global $bgcolor1, $bgcolor2;
         
-        echo "<br><br>";
-        echo "<center><b>" . _MONTLYSTATS . " {$year}</b></center><br>";
-        echo "<table align=\"center\" bgcolor=\"#000000\" cellspacing=\"1\" cellpadding=\"3\" border=\"0\">";
-        echo "<tr><td width=\"25%\" bgcolor=\"$bgcolor2\">" . _UMONTH . "</td><td bgcolor=\"$bgcolor2\">" . _SPAGESVIEWS . "</td></tr>";
-        
-        foreach ($monthlyStats as $stat) {
+        ob_start();
+        ?>
+<br><br>
+<div style="text-align: center;"><b><?= _MONTLYSTATS ?> <?= htmlspecialchars((string)$year) ?></b></div><br>
+<table style="text-align: center; background-color: #000000; border-spacing: 1px; padding: 3px; border: 0;">
+<tr><td style="width: 25%; background-color: <?= htmlspecialchars($bgcolor2) ?>;"><?= _UMONTH ?></td><td style="background-color: <?= htmlspecialchars($bgcolor2) ?>;"><?= _SPAGESVIEWS ?></td></tr>
+        <?php foreach ($monthlyStats as $stat):
             $month = $stat['month'];
             $hits = $stat['hits'];
             $width = $processor->calculateBarWidth($hits, $totalHits);
             $monthName = $processor->getMonthName($month);
-            
-            echo "<tr bgcolor=\"$bgcolor1\"><td>";
-            if ($month != $currentMonth) {
-                echo "<a href=\"modules.php?name={$this->moduleName}&amp;op=MonthlyStats&amp;year={$year}&amp;month={$month}\" class=\"hover_orange\">{$monthName}</a>";
-            } else {
-                echo $monthName;
-            }
-            echo "</td><td>";
-            $this->renderBar('', $width);
-            echo " ({$hits})</td></tr>";
-        }
-        
-        echo "</table>";
+        ?>
+<tr style="background-color: <?= htmlspecialchars($bgcolor1) ?>;"><td>
+            <?php if ($month != $currentMonth): ?>
+<a href="modules.php?name=<?= htmlspecialchars($this->moduleName) ?>&amp;op=MonthlyStats&amp;year=<?= htmlspecialchars((string)$year) ?>&amp;month=<?= htmlspecialchars((string)$month) ?>" class="hover_orange"><?= htmlspecialchars($monthName) ?></a>
+            <?php else: ?>
+<?= htmlspecialchars($monthName) ?>
+            <?php endif; ?>
+</td><td>
+            <?php $this->renderBar('', $width); ?>
+ (<?= htmlspecialchars((string)$hits) ?>)</td></tr>
+        <?php endforeach; ?>
+</table>
+        <?php
+        echo ob_get_clean();
     }
 
     /**
@@ -363,29 +393,31 @@ class StatisticsView
         
         $monthName = $processor->getMonthName($month);
         
-        echo "<br><br>";
-        echo "<center><b>" . _DAILYSTATS . " {$monthName}, {$year}</b></center><br>";
-        echo "<table align=\"center\" bgcolor=\"#000000\" cellspacing=\"1\" cellpadding=\"3\" border=\"0\">";
-        echo "<tr><td width=\"25%\" bgcolor=\"$bgcolor2\">" . _DATE . "</td><td bgcolor=\"$bgcolor2\">" . _SPAGESVIEWS . "</td></tr>";
-        
-        foreach ($dailyStats as $stat) {
+        ob_start();
+        ?>
+<br><br>
+<div style="text-align: center;"><b><?= _DAILYSTATS ?> <?= htmlspecialchars($monthName) ?>, <?= htmlspecialchars((string)$year) ?></b></div><br>
+<table style="text-align: center; background-color: #000000; border-spacing: 1px; padding: 3px; border: 0;">
+<tr><td style="width: 25%; background-color: <?= htmlspecialchars($bgcolor2) ?>;"><?= _DATE ?></td><td style="background-color: <?= htmlspecialchars($bgcolor2) ?>;"><?= _SPAGESVIEWS ?></td></tr>
+        <?php foreach ($dailyStats as $stat):
             $date = $stat['date'];
             $hits = $stat['hits'];
             $percentage = $processor->calculatePercentage($hits, $totalHits, 3);
             $width = $processor->calculateBarWidth($hits, $totalHits);
-            
-            echo "<tr bgcolor=\"$bgcolor1\"><td>";
-            if ($date != $currentDate) {
-                echo "<a href=\"modules.php?name={$this->moduleName}&amp;op=DailyStats&amp;year={$year}&amp;month={$month}&amp;date={$date}\" class=\"hover_orange\">{$date}</a>";
-            } else {
-                echo $date;
-            }
-            echo "</td><td>";
-            $this->renderBar('', $width);
-            echo " {$percentage}% ({$hits})</td></tr>";
-        }
-        
-        echo "</table>";
+        ?>
+<tr style="background-color: <?= htmlspecialchars($bgcolor1) ?>;"><td>
+            <?php if ($date != $currentDate): ?>
+<a href="modules.php?name=<?= htmlspecialchars($this->moduleName) ?>&amp;op=DailyStats&amp;year=<?= htmlspecialchars((string)$year) ?>&amp;month=<?= htmlspecialchars((string)$month) ?>&amp;date=<?= htmlspecialchars((string)$date) ?>" class="hover_orange"><?= htmlspecialchars((string)$date) ?></a>
+            <?php else: ?>
+<?= htmlspecialchars((string)$date) ?>
+            <?php endif; ?>
+</td><td>
+            <?php $this->renderBar('', $width); ?>
+ <?= htmlspecialchars($percentage) ?>% (<?= htmlspecialchars((string)$hits) ?>)</td></tr>
+        <?php endforeach; ?>
+</table>
+        <?php
+        echo ob_get_clean();
     }
 
     /**
@@ -411,24 +443,26 @@ class StatisticsView
         
         $monthName = $processor->getMonthName($month);
         
-        echo "<br><br>";
-        echo "<center><b>" . _HOURLYSTATS . " {$monthName} {$date}, {$year}</b></center><br>";
-        echo "<table align=\"center\" bgcolor=\"#000000\" cellspacing=\"1\" cellpadding=\"3\" border=\"0\">";
-        echo "<tr><td width=\"25%\" bgcolor=\"$bgcolor2\">" . _HOUR . "</td><td bgcolor=\"$bgcolor2\" width=\"70%\">" . _SPAGESVIEWS . "</td></tr>";
-        
-        for ($hour = 0; $hour <= 23; $hour++) {
+        ob_start();
+        ?>
+<br><br>
+<div style="text-align: center;"><b><?= _HOURLYSTATS ?> <?= htmlspecialchars($monthName) ?> <?= htmlspecialchars((string)$date) ?>, <?= htmlspecialchars((string)$year) ?></b></div><br>
+<table style="text-align: center; background-color: #000000; border-spacing: 1px; padding: 3px; border: 0;">
+<tr><td style="width: 25%; background-color: <?= htmlspecialchars($bgcolor2) ?>;"><?= _HOUR ?></td><td style="width: 70%; background-color: <?= htmlspecialchars($bgcolor2) ?>;"><?= _SPAGESVIEWS ?></td></tr>
+        <?php for ($hour = 0; $hour <= 23; $hour++):
             $hits = $hourlyStats[$hour];
             $percentage = $processor->calculatePercentage($hits, $totalHits, 3);
             $width = $processor->calculateBarWidth($hits, $totalHits);
             $hourRange = $processor->formatHourRange($hour);
-            
-            echo "<tr><td bgcolor=\"$bgcolor1\">{$hourRange}</td>";
-            echo "<td bgcolor=\"$bgcolor1\">";
-            $this->renderBar('', $width);
-            echo " {$percentage}% ({$hits})</td></tr>";
-        }
-        
-        echo "</table>";
+        ?>
+<tr><td style="background-color: <?= htmlspecialchars($bgcolor1) ?>;"><?= htmlspecialchars($hourRange) ?></td>
+<td style="background-color: <?= htmlspecialchars($bgcolor1) ?>;">
+            <?php $this->renderBar('', $width); ?>
+ <?= htmlspecialchars($percentage) ?>% (<?= htmlspecialchars((string)$hits) ?>)</td></tr>
+        <?php endfor; ?>
+</table>
+        <?php
+        echo ob_get_clean();
     }
 
     /**
@@ -438,7 +472,11 @@ class StatisticsView
      */
     public function renderBackLinks(): void
     {
-        echo "<br><br><center>" . _GOBACK . "</center><br><br>";
+        ob_start();
+        ?>
+<br><br><div style="text-align: center;"><?= _GOBACK ?></div><br><br>
+        <?php
+        echo ob_get_clean();
     }
 
     /**
@@ -448,8 +486,12 @@ class StatisticsView
      */
     public function renderDetailNavigation(): void
     {
-        echo "<BR>";
-        echo "<center>[ <a href=\"modules.php?name={$this->moduleName}\">" . _BACKTOMAIN . "</a> | <a href=\"modules.php?name={$this->moduleName}&amp;op=Stats\">" . _BACKTODETSTATS . "</a> ]</center>";
+        ob_start();
+        ?>
+<br>
+<div style="text-align: center;">[ <a href="modules.php?name=<?= htmlspecialchars($this->moduleName) ?>"><?= _BACKTOMAIN ?></a> | <a href="modules.php?name=<?= htmlspecialchars($this->moduleName) ?>&amp;op=Stats"><?= _BACKTODETSTATS ?></a> ]</div>
+        <?php
+        echo ob_get_clean();
     }
 
     /**
@@ -466,8 +508,10 @@ class StatisticsView
         $m = $imageSizes['main'];
         $r = $imageSizes['right'];
         
-        echo "<img src=\"themes/{$this->themeSel}/images/leftbar.gif\" Alt=\"{$alt}\" width=\"{$l[0]}\" height=\"{$l[1]}\">";
-        echo "<img src=\"themes/{$this->themeSel}/images/mainbar.gif\" Alt=\"{$alt}\" height=\"{$m[1]}\" width=\"{$width}\">";
-        echo "<img src=\"themes/{$this->themeSel}/images/rightbar.gif\" Alt=\"{$alt}\" width=\"{$r[0]}\" height=\"{$r[1]}\">";
+        ob_start();
+        ?>
+<img src="themes/<?= htmlspecialchars($this->themeSel) ?>/images/leftbar.gif" alt="<?= htmlspecialchars($alt) ?>" style="width: <?= $l[0] ?>px; height: <?= $l[1] ?>px;"><img src="themes/<?= htmlspecialchars($this->themeSel) ?>/images/mainbar.gif" alt="<?= htmlspecialchars($alt) ?>" style="height: <?= $m[1] ?>px; width: <?= $width ?>px;"><img src="themes/<?= htmlspecialchars($this->themeSel) ?>/images/rightbar.gif" alt="<?= htmlspecialchars($alt) ?>" style="width: <?= $r[0] ?>px; height: <?= $r[1] ?>px;">
+        <?php
+        echo ob_get_clean();
     }
 }

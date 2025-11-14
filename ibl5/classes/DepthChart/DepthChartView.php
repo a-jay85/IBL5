@@ -24,11 +24,7 @@ class DepthChartView
      */
     public function renderTeamLogo(int $teamID): void
     {
-        ob_start();
-        ?>
-<div style="text-align: center;"><img src="images/logo/<?= $teamID ?>.jpg"></div><br>
-        <?php
-        echo ob_get_clean();
+        echo '<div style="text-align: center;"><img src="images/logo/' . $teamID . '.jpg"></div><br>';
     }
     
     /**
@@ -48,14 +44,13 @@ class DepthChartView
             5 => 'ok'
         ];
         
-        ob_start();
+        $html = '';
         foreach ($options as $value => $label) {
             $selected = ($selectedValue == $value) ? ' selected' : '';
-            ?>
-<option value="<?= $value ?>"<?= $selected ?>><?= htmlspecialchars($label) ?></option>
-            <?php
+            $html .= '<option value="' . $value . '"' . $selected . '>' . htmlspecialchars($label) . '</option>';
         }
-        echo ob_get_clean();
+        
+        echo $html;
     }
     
     /**
@@ -73,14 +68,13 @@ class DepthChartView
             3 => 'Post'
         ];
         
-        ob_start();
+        $html = '';
         foreach ($options as $value => $label) {
             $selected = ($selectedValue == $value) ? ' selected' : '';
-            ?>
-<option value="<?= $value ?>"<?= $selected ?>><?= htmlspecialchars($label) ?></option>
-            <?php
+            $html .= '<option value="' . $value . '"' . $selected . '>' . htmlspecialchars($label) . '</option>';
         }
-        echo ob_get_clean();
+        
+        echo $html;
     }
     
     /**
@@ -92,16 +86,15 @@ class DepthChartView
     public function renderSettingOptions(int $selectedValue): void
     {
         $options = [2, 1, 0, -1, -2];
+        $html = '';
         
-        ob_start();
         foreach ($options as $value) {
             $selected = ($selectedValue == $value) ? ' selected' : '';
             $label = ($value == 0) ? '-' : $value;
-            ?>
-<option value="<?= $value ?>"<?= $selected ?>><?= htmlspecialchars((string)$label) ?></option>
-            <?php
+            $html .= '<option value="' . $value . '"' . $selected . '>' . htmlspecialchars((string)$label) . '</option>';
         }
-        echo ob_get_clean();
+        
+        echo $html;
     }
     
     /**
@@ -112,15 +105,11 @@ class DepthChartView
      */
     public function renderActiveOptions(int $selectedValue): void
     {
-        ob_start();
-        ?>
-        <?php if ($selectedValue == 1): ?>
-<option value="1" selected>Yes</option><option value="0">No</option>
-        <?php else: ?>
-<option value="1">Yes</option><option value="0" selected>No</option>
-        <?php endif; ?>
-        <?php
-        echo ob_get_clean();
+        if ($selectedValue == 1) {
+            echo '<option value="1" selected>Yes</option><option value="0">No</option>';
+        } else {
+            echo '<option value="1">Yes</option><option value="0" selected>No</option>';
+        }
     }
     
     /**
@@ -255,13 +244,9 @@ class DepthChartView
         $dcField = 'dc_' . strtoupper($posKey) . 'Depth';
         $currentValue = $player[$dcField];
         
-        ob_start();
-        ?>
-<td><select name="<?= htmlspecialchars($fieldName) ?>">
-    <?php $this->renderPositionOptions($currentValue); ?>
-</select></td>
-        <?php
-        echo ob_get_clean();
+        echo '<td><select name="' . htmlspecialchars($fieldName) . '">';
+        $this->renderPositionOptions($currentValue);
+        echo '</select></td>';
     }
     
     /**

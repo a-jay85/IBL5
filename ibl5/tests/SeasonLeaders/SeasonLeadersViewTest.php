@@ -21,14 +21,15 @@ final class SeasonLeadersViewTest extends TestCase
     {
         $html = $this->view->renderTableHeader();
 
-        // Check for essential column headers
-        $this->assertStringContainsString('<b>Rank</b>', $html);
-        $this->assertStringContainsString('<b>Year</b>', $html);
-        $this->assertStringContainsString('<b>Name</b>', $html);
-        $this->assertStringContainsString('<b>Team</b>', $html);
-        $this->assertStringContainsString('<b>ppg</b>', $html);
-        $this->assertStringContainsString('<b>qa</b>', $html);
-        $this->assertStringContainsString('bgcolor="C2D69A"', $html);
+        // Check for essential column headers (now using <strong> tags)
+        $this->assertStringContainsString('<strong>Rank</strong>', $html);
+        $this->assertStringContainsString('<strong>Year</strong>', $html);
+        $this->assertStringContainsString('<strong>Name</strong>', $html);
+        $this->assertStringContainsString('<strong>Team</strong>', $html);
+        $this->assertStringContainsString('<strong>ppg</strong>', $html);
+        $this->assertStringContainsString('<strong>qa</strong>', $html);
+        // Check for CSS background color instead of deprecated bgcolor attribute
+        $this->assertStringContainsString('background-color: #C2D69A', $html);
     }
 
     public function testRenderPlayerRowFormatsCorrectly(): void
@@ -110,13 +111,13 @@ final class SeasonLeadersViewTest extends TestCase
             'qa' => '23.5'
         ];
 
-        // Odd rank should have DDDDDD background
+        // Odd rank should have DDDDDD background (CSS style instead of bgcolor)
         $html1 = $this->view->renderPlayerRow($stats, 1);
-        $this->assertStringContainsString('bgcolor="DDDDDD"', $html1);
+        $this->assertStringContainsString('background-color: #DDDDDD', $html1);
 
-        // Even rank should have FFFFFF background
+        // Even rank should have FFFFFF background (CSS style instead of bgcolor)
         $html2 = $this->view->renderPlayerRow($stats, 2);
-        $this->assertStringContainsString('bgcolor="FFFFFF"', $html2);
+        $this->assertStringContainsString('background-color: #FFFFFF', $html2);
     }
 
     public function testRenderTableFooterReturnsClosingTag(): void

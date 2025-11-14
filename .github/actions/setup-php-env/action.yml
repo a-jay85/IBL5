@@ -1,0 +1,147 @@
+name: 'Setup PHP Environment'
+description: 'Sets up PHP with Composer and installs dependencies with caching'
+inputs:
+  php-version:
+    description: 'PHP version to use'
+    required: false
+    default: '8.3'
+  working-directory:
+    description: 'Directory containing composer.json'
+    required: false
+    default: 'ibl5'
+  github-token:
+    description: 'GitHub token for Composer authentication'
+    required: false
+    default: ''
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Get Composer cache directory
+      id: composer-cache
+      shell: bash
+      run: |
+        echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+        
+    - name: Cache Composer dependencies
+      uses: actions/cache@v4
+      with:
+        path: ${{ steps.composer-cache.outputs.dir }}
+        key: ${{ runner.os }}-composer-${{ hashFiles(format('{0}/composer.lock', inputs.working-directory)) }}
+        restore-keys: |
+          ${{ runner.os }}-composer-
+          
+    - name: Cache vendor directory
+      uses: actions/cache@v4
+      id: vendor-cache
+      with:
+        path: ${{ inputs.working-directory }}/vendor
+        key: ${{ runner.os }}-vendor-${{ hashFiles(format('{0}/composer.lock', inputs.working-directory)) }}
+        restore-keys: |
+          ${{ runner.os }}-vendor-
+          
+    - name: Configure Composer GitHub authentication
+      if: inputs.github-token != ''
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        composer config github-oauth.github.com "${{ inputs.github-token }}"
+        
+    - name: Install dependencies from cache or source
+      if: steps.vendor-cache.outputs.cache-hit != 'true'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        echo "::group::Installing Composer dependencies"
+        
+        # Function to try composer install with different strategies
+        try_composer_install() {
+          local strategy="$1"
+          local desc="$2"
+          
+          echo "::notice::Trying to install dependencies using: $desc"
+          
+          if composer install $strategy --no-interaction --no-progress 2>&1; then
+            echo "::notice::✅ Successfully installed dependencies using $desc"
+            return 0
+          else
+            echo "::warning::❌ Failed to install using $desc"
+            return 1
+          fi
+        }
+        
+        # Try different installation strategies in order of preference
+        # 1. Try with dist (fastest, but may fail with network issues)
+        if try_composer_install "--prefer-dist" "distribution archives (fastest)"; then
+          exit 0
+        fi
+        
+        # 2. Try with source (git clone, more reliable but slower)
+        echo "::notice::Distribution install failed, trying source install..."
+        if try_composer_install "--prefer-source" "git source (more reliable)"; then
+          exit 0
+        fi
+        
+        # 3. Last resort: try without any preference flags
+        echo "::warning::Both dist and source failed, trying default method..."
+        if composer install --no-interaction 2>&1; then
+          echo "::notice::✅ Successfully installed dependencies using default method"
+          exit 0
+        fi
+        
+        # If all methods fail, provide helpful error message
+        echo "::error::All composer install methods failed. This is likely due to:"
+        echo "::error::  1. Network connectivity issues"
+        echo "::error::  2. GitHub API rate limiting"
+        echo "::error::  3. Authentication problems"
+        echo "::error::"
+        echo "::error::Please check:"
+        echo "::error::  - Network connectivity"
+        echo "::error::  - GitHub token permissions"
+        echo "::error::  - composer.lock file integrity"
+        
+        exit 1
+        
+        echo "::endgroup::"
+        
+    - name: Verify PHPUnit installation
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        if [ -f "vendor/bin/phpunit" ]; then
+          echo "::notice::✅ PHPUnit is ready: $(vendor/bin/phpunit --version)"
+        else
+          echo "::error::❌ PHPUnit not found in vendor/bin/"
+          echo "::error::Checking vendor directory contents..."
+          ls -la vendor/ 2>&1 | head -20 || echo "vendor/ not found"
+          exit 1
+        fi
+        
+    - name: Display setup summary
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        echo "::group::Development Environment Summary"
+        echo "✅ PHP: $(php --version | head -n 1)"
+        echo "✅ Composer: $(composer --version)"
+        
+        if [ -f "vendor/bin/phpunit" ]; then
+          echo "✅ PHPUnit: $(vendor/bin/phpunit --version)"
+        fi
+        
+        if [ -f "vendor/bin/phpstan" ]; then
+          echo "✅ PHPStan: $(vendor/bin/phpstan --version 2>&1 | head -n 1)"
+        fi
+        
+        if [ -f "vendor/bin/phpcs" ]; then
+          echo "✅ PHP_CodeSniffer: $(vendor/bin/phpcs --version)"
+        fi
+        
+        echo ""
+        echo "Cache status:"
+        if [ "${{ steps.vendor-cache.outputs.cache-hit }}" == "true" ]; then
+          echo "  📦 Vendor directory: Restored from cache"
+        else
+          echo "  📥 Vendor directory: Freshly installed"
+        fi
+        echo "::endgroup::"

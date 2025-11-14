@@ -202,7 +202,71 @@ public function testEscapesUserInput()
 
 ## Best Practices
 
-### 1. Use Clear, Actionable Pull Request Titles
+### 1. View Rendering Pattern (Output Buffering)
+
+**All view/presentation classes MUST use PHP output buffering instead of string concatenation.**
+
+Output buffering provides better readability, maintainability, and makes the HTML structure explicit and visible:
+
+#### Pattern
+```php
+public function renderExample(string $title): string
+{
+    ob_start();
+    ?>
+<div class="container">
+    <h1><?= htmlspecialchars($title) ?></h1>
+    <p>Content here</p>
+</div>
+    <?php
+    return ob_get_clean();
+}
+```
+
+#### Key Rules
+- **Always start with `ob_start()`** - Begin output buffering
+- **Switch to template mode** - Use `?>` to exit PHP and write HTML directly
+- **Use short echo tags** - `<?= ... ?>` for variables (replaces `<?php echo ... ?>`)
+- **Escape output** - Use `htmlspecialchars()` on all user/dynamic data for XSS prevention
+- **End with `<?php return ob_get_clean(); ?>`** - Capture and return buffered content
+
+#### Benefits
+- **Cleaner, more readable code** - HTML structure is immediately visible
+- **Better maintainability** - No escaped quotes or `\n` escape sequences
+- **Security** - Encourages proper output escaping with `htmlspecialchars()`
+- **Semantic HTML** - Easy to write proper semantic elements
+- **No performance impact** - Output buffering is efficient for this use case
+
+#### ❌ DON'T - String Concatenation
+```php
+public function renderExample(string $title): string
+{
+    $html = "<div class=\"container\">";
+    $html .= "<h1>$title</h1>";
+    $html .= "<p>Content here</p>";
+    $html .= "</div>";
+    return $html;
+}
+```
+
+#### ✅ DO - Output Buffering
+```php
+public function renderExample(string $title): string
+{
+    ob_start();
+    ?>
+<div class="container">
+    <h1><?= htmlspecialchars($title) ?></h1>
+    <p>Content here</p>
+</div>
+    <?php
+    return ob_get_clean();
+}
+```
+
+**Exception:** Very simple single-line returns can use concatenation if readability is maintained.
+
+### 2. Use Clear, Actionable Pull Request Titles
 - Start PR titles with a verb (e.g., "Add", "Fix", "Refactor", "Update")
 - Be concise but descriptive (e.g., "Fix player stats calculation bug")
 - Reference issue numbers when applicable

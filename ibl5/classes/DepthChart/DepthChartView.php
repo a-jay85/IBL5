@@ -113,15 +113,13 @@ class DepthChartView
     public function renderActiveOptions(int $selectedValue): void
     {
         ob_start();
-        if ($selectedValue == 1) {
-            ?>
+        ?>
+        <?php if ($selectedValue == 1): ?>
 <option value="1" selected>Yes</option><option value="0">No</option>
-            <?php
-        } else {
-            ?>
+        <?php else: ?>
 <option value="1">Yes</option><option value="0" selected>No</option>
-            <?php
-        }
+        <?php endif; ?>
+        <?php
         echo ob_get_clean();
     }
     
@@ -305,17 +303,13 @@ class DepthChartView
     {
         ob_start();
         
-        if (!$success) {
-            ?>
+        ?>
+        <?php if (!$success): ?>
 <div style="text-align: center;"><u>Your lineup has <b>not</b> been submitted:</u></div><br>
 <?= $errorHtml ?>
-            <?php
-        } else {
-            ?>
+        <?php else: ?>
 <div style="text-align: center;"><u>Your depth chart has been submitted and e-mailed successfully. Thank you.</u></div><p>
-            <?php
-        }
-        ?>
+        <?php endif; ?>
 
 <?= htmlspecialchars($teamName) ?> Depth Chart Submission<br><table>
 <tr>

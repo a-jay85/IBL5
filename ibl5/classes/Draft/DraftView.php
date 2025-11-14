@@ -125,27 +125,20 @@ Oops, <?= $errorMessage ?><p>
 
             $isPlayerDrafted = $player['drafted'];
             $playerName = DatabaseService::safeHtmlOutput($player['name']);
-
-            if ($teamLogo == $pickOwner && $isPlayerDrafted == 0) {
-                ?>
+            ?>
+            <?php if ($teamLogo == $pickOwner && $isPlayerDrafted == 0): ?>
 <tr style="background-color: #<?= $bgcolor ?>">
     <td style="text-align: center;"><input type='radio' name='player' value="<?= htmlspecialchars($player['name'], ENT_QUOTES) ?>"></td>
     <td style="white-space: nowrap;"><?= $playerName ?></td>
-                <?php
-            } elseif ($isPlayerDrafted == 1) {
-                ?>
+            <?php elseif ($isPlayerDrafted == 1): ?>
 <tr>
     <td></td>
     <td style="white-space: nowrap;"><span style="text-decoration: line-through;"><i><?= $playerName ?></i></span></td>
-                <?php
-            } else {
-                ?>
+            <?php else: ?>
 <tr style="background-color: #<?= $bgcolor ?>">
     <td></td>
     <td style="white-space: nowrap;"><?= $playerName ?></td>
-                <?php
-            }
-            ?>
+            <?php endif; ?>
     <td><?= DatabaseService::safeHtmlOutput($player['pos']) ?></td>
     <td><?= DatabaseService::safeHtmlOutput($player['team']) ?></td>
     <td><?= DatabaseService::safeHtmlOutput($player['age']) ?></td>
@@ -174,7 +167,7 @@ Oops, <?= $errorMessage ?><p>
     <td><?= DatabaseService::safeHtmlOutput($player['int']) ?></td>
 </tr>
             <?php
-        }
+        endforeach;
         ?>
 </table>
         <?php

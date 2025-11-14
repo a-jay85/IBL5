@@ -63,7 +63,7 @@ class LeaderboardsView
                 </select>
             </td>
             <td>
-                Limit: <input type="number" name="display" style="width: 4em" value="<?= htmlspecialchars($display) ?>"> Records
+                Limit: <input type="number" name="display" style="width: 4em" value="<?= htmlspecialchars((string)$display) ?>"> Records
             </td>
             <td>
                 <input type="hidden" name="submitted" value="1">
@@ -127,27 +127,27 @@ class LeaderboardsView
         ob_start();
         ?>
 <tr>
-    <td style="text-align: center;"><?= htmlspecialchars($rank) ?></td>
-    <td style="text-align: center;"><a href="modules.php?name=Player&pa=showpage&pid=<?= htmlspecialchars($stats['pid']) ?>"><?= htmlspecialchars($stats['name']) ?></a></td>
-    <td style="text-align: center;"><?= htmlspecialchars($stats['games']) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars($stats['minutes']) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars($stats['fgm']) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars($stats['fga']) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars($stats['fgp']) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars($stats['ftm']) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars($stats['fta']) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars($stats['ftp']) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars($stats['tgm']) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars($stats['tga']) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars($stats['tgp']) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars($stats['orb']) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars($stats['reb']) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars($stats['ast']) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars($stats['stl']) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars($stats['tvr']) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars($stats['blk']) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars($stats['pf']) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars($stats['pts']) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$rank) ?></td>
+    <td style="text-align: center;"><a href="modules.php?name=Player&pa=showpage&pid=<?= htmlspecialchars((string)$stats['pid']) ?>"><?= htmlspecialchars($stats['name']) ?></a></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$stats['games']) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$stats['minutes']) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$stats['fgm']) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$stats['fga']) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$stats['fgp']) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$stats['ftm']) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$stats['fta']) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$stats['ftp']) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$stats['tgm']) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$stats['tga']) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$stats['tgp']) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$stats['orb']) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$stats['reb']) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$stats['ast']) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$stats['stl']) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$stats['tvr']) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$stats['blk']) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$stats['pf']) ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars((string)$stats['pts']) ?></td>
 </tr>
         <?php
         return ob_get_clean();

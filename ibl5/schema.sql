@@ -353,7 +353,7 @@ CREATE TABLE `ibl_fa_offers` (
   KEY `idx_team` (`team`),
   CONSTRAINT `fk_faoffer_player` FOREIGN KEY (`name`) REFERENCES `ibl_plr` (`name`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_faoffer_team` FOREIGN KEY (`team`) REFERENCES `ibl_team_info` (`team_name`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=14 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -831,9 +831,9 @@ CREATE TABLE `ibl_plr` (
   `dc_minutes` tinyint(3) unsigned DEFAULT 0 COMMENT 'DC minutes',
   `dc_of` tinyint(3) unsigned DEFAULT 0 COMMENT 'DC offensive focus',
   `dc_df` tinyint(3) unsigned DEFAULT 0 COMMENT 'DC defensive focus',
-  `dc_oi` tinyint(3) unsigned DEFAULT 0 COMMENT 'DC offensive importance',
-  `dc_di` tinyint(3) unsigned DEFAULT 0 COMMENT 'DC defensive importance',
-  `dc_bh` tinyint(3) unsigned DEFAULT 0 COMMENT 'DC ball handling',
+  `dc_oi` tinyint(3) DEFAULT 0 COMMENT 'DC offensive importance',
+  `dc_di` tinyint(3) DEFAULT 0 COMMENT 'DC defensive importance',
+  `dc_bh` tinyint(3) DEFAULT 0 COMMENT 'DC ball handling',
   `stats_gs` smallint(5) unsigned DEFAULT 0 COMMENT 'Games started',
   `stats_gm` smallint(5) unsigned DEFAULT 0 COMMENT 'Games played',
   `stats_min` mediumint(8) unsigned DEFAULT 0 COMMENT 'Total minutes played',
@@ -2338,7 +2338,7 @@ CREATE TABLE `nuke_referer` (
   `rid` int(11) NOT NULL AUTO_INCREMENT,
   `url` varchar(100) NOT NULL DEFAULT '',
   PRIMARY KEY (`rid`)
-) ENGINE=MyISAM AUTO_INCREMENT=40201 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=40208 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -2466,7 +2466,7 @@ CREATE TABLE `nuke_stories` (
   KEY `catid` (`catid`),
   KEY `counter` (`counter`),
   KEY `topic` (`topic`)
-) ENGINE=MyISAM AUTO_INCREMENT=4166 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=4167 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -2788,4 +2788,4 @@ CREATE TABLE `users` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2025-11-12 21:27:11
+-- Dump completed on 2025-11-14  0:24:46

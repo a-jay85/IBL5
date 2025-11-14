@@ -18,8 +18,12 @@ class RookieOptionFormView
     {
         $errorMessageEscaped = nl2br(DatabaseService::safeHtmlOutput($errorMessage));
         
-        echo "{$errorMessageEscaped}<p>
-            <a href=\"javascript:history.back()\">Go Back</a>";
+        ob_start();
+        ?>
+<?= $errorMessageEscaped ?><p>
+<a href="javascript:history.back()">Go Back</a>
+        <?php
+        echo ob_get_clean();
     }
     
     /**
@@ -38,16 +42,20 @@ class RookieOptionFormView
         $teamNameEscaped = DatabaseService::safeHtmlOutput($teamName);
         $rookieOptionValueEscaped = DatabaseService::safeHtmlOutput((string) $rookieOptionValue);
         
-        echo "<img align=left src=\"images/player/{$playerID}.jpg\"><p>
-        You may exercise the rookie option on <b>{$playerPosition} {$playerName}</b>.<p>
-        Their contract value the season after this one will be <b>{$rookieOptionValueEscaped}</b>.<p>
-        WARNING: By exercising this option, <b>you can't use an in-season contract extension on them next season</b>.<p>
-        <b>They will become a free agent</b>.<p>
-        <form name=\"RookieExtend\" method=\"post\" action=\"/ibl5/modules/Player/rookieoption.php\">
-            <input type=\"hidden\" name=\"teamname\" value=\"{$teamNameEscaped}\">
-            <input type=\"hidden\" name=\"playerID\" value=\"{$playerID}\">
-            <input type=\"hidden\" name=\"rookieOptionValue\" value=\"{$rookieOptionValueEscaped}\">
-            <input type=\"submit\" value=\"Exercise Rookie Option\">
-        </form>";
+        ob_start();
+        ?>
+<img style="float: left;" src="images/player/<?= $playerID ?>.jpg"><p>
+You may exercise the rookie option on <b><?= $playerPosition ?> <?= $playerName ?></b>.<p>
+Their contract value the season after this one will be <b><?= $rookieOptionValueEscaped ?></b>.<p>
+WARNING: By exercising this option, <b>you can't use an in-season contract extension on them next season</b>.<p>
+<b>They will become a free agent</b>.<p>
+<form name="RookieExtend" method="post" action="/ibl5/modules/Player/rookieoption.php">
+    <input type="hidden" name="teamname" value="<?= $teamNameEscaped ?>">
+    <input type="hidden" name="playerID" value="<?= $playerID ?>">
+    <input type="hidden" name="rookieOptionValue" value="<?= $rookieOptionValueEscaped ?>">
+    <input type="submit" value="Exercise Rookie Option">
+</form>
+        <?php
+        echo ob_get_clean();
     }
 }

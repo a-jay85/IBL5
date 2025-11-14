@@ -24,9 +24,12 @@ class DraftView
         $errorMessage = DatabaseService::safeHtmlOutput($errorMessage);
         $retryInstructions = $this->getRetryInstructions($errorMessage);
         
-        return "Oops, $errorMessage<p>
-        <a href=\"/ibl5/modules.php?name=Draft\">Click here to return to the Draft module</a>" 
-        . $retryInstructions;
+        ob_start();
+        ?>
+Oops, <?= $errorMessage ?><p>
+<a href="/ibl5/modules.php?name=Draft">Click here to return to the Draft module</a><?= $retryInstructions ?>
+        <?php
+        return ob_get_clean();
     }
 
     /**
@@ -43,30 +46,32 @@ class DraftView
      */
     public function renderDraftInterface($players, $teamLogo, $pickOwner, $draftRound, $draftPick, $seasonYear, $tid)
     {
-        $html = "<center><img src=\"images/logo/$tid.jpg\"><br>
-	<table>
-		<tr>
-			<th colspan=27>
-				<center>Welcome to the $seasonYear IBL Draft!
-			</th>
-		</tr>
-	</table>";
+        ob_start();
+        ?>
+<div style="text-align: center;"><img src="images/logo/<?= $tid ?>.jpg"><br>
+<table>
+    <tr>
+        <th colspan="27">
+            <div style="text-align: center;">Welcome to the <?= htmlspecialchars((string)$seasonYear) ?> IBL Draft!</div>
+        </th>
+    </tr>
+</table>
 
-        $html .= "<form name='draft_form' action='/ibl5/modules/Draft/draft_selection.php' method='POST'>";
-        $html .= "<input type='hidden' name='teamname' value='" . DatabaseService::safeHtmlOutput($teamLogo) . "'>";
-        $html .= "<input type='hidden' name='draft_round' value='$draftRound'>";
-        $html .= "<input type='hidden' name='draft_pick' value='$draftPick'>";
+<form name='draft_form' action='/ibl5/modules/Draft/draft_selection.php' method='POST'>
+<input type='hidden' name='teamname' value='<?= DatabaseService::safeHtmlOutput($teamLogo) ?>'>
+<input type='hidden' name='draft_round' value='<?= htmlspecialchars((string)$draftRound) ?>'>
+<input type='hidden' name='draft_pick' value='<?= htmlspecialchars((string)$draftPick) ?>'>
 
-        $html .= $this->renderPlayerTable($players, $teamLogo, $pickOwner);
+<?= $this->renderPlayerTable($players, $teamLogo, $pickOwner) ?>
 
-        // Show draft button if user's team owns the pick and there are undrafted players
-        if ($teamLogo == $pickOwner && $this->hasUndraftedPlayers($players)) {
-            $html .= "<center><input type='submit' style=\"height:100px; width:150px\" value='Draft' onclick=\"this.disabled=true;this.value='Submitting...'; this.form.submit();\"></center>";
-        }
-        
-        $html .= "</form>";
-        
-        return $html;
+        <?php if ($teamLogo == $pickOwner && $this->hasUndraftedPlayers($players)): ?>
+<div style="text-align: center;"><input type='submit' style="height:100px; width:150px" value='Draft' onclick="this.disabled=true;this.value='Submitting...'; this.form.submit();"></div>
+        <?php endif; ?>
+
+</form>
+</div>
+        <?php
+        return ob_get_clean();
     }
 
     /**
@@ -79,38 +84,40 @@ class DraftView
      */
     private function renderPlayerTable($players, $teamLogo, $pickOwner)
     {
-        $html = "<table class=\"sortable\">
-    	<tr>
-			<th>Draft</th>
-			<th>Name</th>
-			<th>Pos</th>
-			<th>Team</th>
-			<th>Age</th>
-			<th>fga</th>
-			<th>fgp</th>
-			<th>fta</th>
-			<th>ftp</th>
-			<th>tga</th>
-			<th>tgp</th>
-			<th>orb</th>
-			<th>drb</th>
-			<th>ast</th>
-			<th>stl</th>
-			<th>to</th>
-			<th>blk</th>
-			<th>oo</th>
-			<th>do</th>
-			<th>po</th>
-			<th>to</th>
-			<th>od</th>
-			<th>dd</th>
-			<th>pd</th>
-			<th>td</th>
-			<th>Tal</th>
-			<th>Skl</th>
-			<th>Int</th>
-		</tr>";
-
+        ob_start();
+        ?>
+<table class="sortable">
+    <tr>
+        <th>Draft</th>
+        <th>Name</th>
+        <th>Pos</th>
+        <th>Team</th>
+        <th>Age</th>
+        <th>fga</th>
+        <th>fgp</th>
+        <th>fta</th>
+        <th>ftp</th>
+        <th>tga</th>
+        <th>tgp</th>
+        <th>orb</th>
+        <th>drb</th>
+        <th>ast</th>
+        <th>stl</th>
+        <th>to</th>
+        <th>blk</th>
+        <th>oo</th>
+        <th>do</th>
+        <th>po</th>
+        <th>to</th>
+        <th>od</th>
+        <th>dd</th>
+        <th>pd</th>
+        <th>td</th>
+        <th>Tal</th>
+        <th>Skl</th>
+        <th>Int</th>
+    </tr>
+        <?php
         $i = 0;
         foreach ($players as $player) {
             (($i % 2) == 0) ? $bgcolor = "EEEEEE" : $bgcolor = "DDDDDD";
@@ -120,56 +127,58 @@ class DraftView
             $playerName = DatabaseService::safeHtmlOutput($player['name']);
 
             if ($teamLogo == $pickOwner && $isPlayerDrafted == 0) {
-                // NOTE: `value` in the following echo block is formatted with single quotes to allow for apostrophes in player names.
-                $html .= "
-                <tr bgcolor=$bgcolor>
-                    <td align=center><input type='radio' name='player' value=\"" . htmlspecialchars($player['name'], ENT_QUOTES) . "\"></td>
-                    <td nowrap>$playerName</td>";
+                ?>
+<tr style="background-color: #<?= $bgcolor ?>">
+    <td style="text-align: center;"><input type='radio' name='player' value="<?= htmlspecialchars($player['name'], ENT_QUOTES) ?>"></td>
+    <td style="white-space: nowrap;"><?= $playerName ?></td>
+                <?php
             } elseif ($isPlayerDrafted == 1) {
-                $html .= "
-                <tr>
-                    <td></td>
-                    <td nowrap><strike><i>$playerName</i></strike></td>";
+                ?>
+<tr>
+    <td></td>
+    <td style="white-space: nowrap;"><span style="text-decoration: line-through;"><i><?= $playerName ?></i></span></td>
+                <?php
             } else {
-                $html .= "
-                <tr bgcolor=$bgcolor>
-                    <td></td>
-                    <td nowrap>$playerName</td>";
+                ?>
+<tr style="background-color: #<?= $bgcolor ?>">
+    <td></td>
+    <td style="white-space: nowrap;"><?= $playerName ?></td>
+                <?php
             }
-
-            $html .= "
-            <td>" . DatabaseService::safeHtmlOutput($player['pos']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['team']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['age']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['fga']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['fgp']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['fta']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['ftp']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['tga']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['tgp']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['orb']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['drb']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['ast']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['stl']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['tvr']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['blk']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['offo']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['offd']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['offp']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['offt']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['defo']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['defd']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['defp']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['deft']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['tal']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['skl']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['int']) . "</td>";
-            $html .= "</tr>";
+            ?>
+    <td><?= DatabaseService::safeHtmlOutput($player['pos']) ?></td>
+    <td><?= DatabaseService::safeHtmlOutput($player['team']) ?></td>
+    <td><?= DatabaseService::safeHtmlOutput($player['age']) ?></td>
+    <td><?= DatabaseService::safeHtmlOutput($player['fga']) ?></td>
+    <td><?= DatabaseService::safeHtmlOutput($player['fgp']) ?></td>
+    <td><?= DatabaseService::safeHtmlOutput($player['fta']) ?></td>
+    <td><?= DatabaseService::safeHtmlOutput($player['ftp']) ?></td>
+    <td><?= DatabaseService::safeHtmlOutput($player['tga']) ?></td>
+    <td><?= DatabaseService::safeHtmlOutput($player['tgp']) ?></td>
+    <td><?= DatabaseService::safeHtmlOutput($player['orb']) ?></td>
+    <td><?= DatabaseService::safeHtmlOutput($player['drb']) ?></td>
+    <td><?= DatabaseService::safeHtmlOutput($player['ast']) ?></td>
+    <td><?= DatabaseService::safeHtmlOutput($player['stl']) ?></td>
+    <td><?= DatabaseService::safeHtmlOutput($player['tvr']) ?></td>
+    <td><?= DatabaseService::safeHtmlOutput($player['blk']) ?></td>
+    <td><?= DatabaseService::safeHtmlOutput($player['offo']) ?></td>
+    <td><?= DatabaseService::safeHtmlOutput($player['offd']) ?></td>
+    <td><?= DatabaseService::safeHtmlOutput($player['offp']) ?></td>
+    <td><?= DatabaseService::safeHtmlOutput($player['offt']) ?></td>
+    <td><?= DatabaseService::safeHtmlOutput($player['defo']) ?></td>
+    <td><?= DatabaseService::safeHtmlOutput($player['defd']) ?></td>
+    <td><?= DatabaseService::safeHtmlOutput($player['defp']) ?></td>
+    <td><?= DatabaseService::safeHtmlOutput($player['deft']) ?></td>
+    <td><?= DatabaseService::safeHtmlOutput($player['tal']) ?></td>
+    <td><?= DatabaseService::safeHtmlOutput($player['skl']) ?></td>
+    <td><?= DatabaseService::safeHtmlOutput($player['int']) ?></td>
+</tr>
+            <?php
         }
-
-        $html .= "</table>";
-        
-        return $html;
+        ?>
+</table>
+        <?php
+        return ob_get_clean();
     }
 
     /**

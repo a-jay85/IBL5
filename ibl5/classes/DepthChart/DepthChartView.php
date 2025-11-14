@@ -211,9 +211,7 @@ class DepthChartView
         <a href="./modules.php?name=Player&pa=showpage&pid=<?= $player_pid ?>"><?= $player_name_html ?></a>
     </td>
         <?php
-        // Render each position slot - all players can play at all positions
-        $positions = ['pg', 'sg', 'sf', 'pf', 'c'];
-        foreach ($positions as $posKey) {
+        foreach (\JSB::PLAYER_POSITIONS as $posKey) {
             $this->renderPositionCell($player, $posKey, $depthCount);
         }
         ?>

@@ -132,17 +132,12 @@ class DepthChartView
      */
     public function renderMinutesOptions(int $selectedValue, int $staminaCap): void
     {
-        ob_start();
-        ?>
-<option value="0"<?= ($selectedValue == 0 ? ' selected' : '') ?>>Auto</option>
-        <?php
+        $html = '<option value="0"' . ($selectedValue == 0 ? ' selected' : '') . '>Auto</option>';
         for ($i = 1; $i <= $staminaCap; $i++) {
             $selected = ($selectedValue == $i) ? ' selected' : '';
-            ?>
-<option value="<?= $i ?>"<?= $selected ?>><?= $i ?></option>
-            <?php
+            $html .= '<option value="' . $i . '"' . $selected . '>' . $i . '</option>';
         }
-        echo ob_get_clean();
+        echo $html;
     }
     
     /**

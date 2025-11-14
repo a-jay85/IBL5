@@ -159,10 +159,10 @@ class DepthChartView
     {
         ob_start();
         ?>
+<div style="display: flex; justify-content: center; margin: 10px 0;">
 <form name="Depth_Chart" method="post" action="modules.php?name=Depth_Chart_Entry&op=submit">
     <input type="hidden" name="Team_Name" value="<?= htmlspecialchars($teamLogo) ?>">
-
-<p><div style="text-align: center;"><table>
+<table>
     <tr>
         <th colspan="14"><div style="text-align: center;">DEPTH CHART ENTRY</div></th>
     </tr>
@@ -284,7 +284,10 @@ class DepthChartView
         ?>
     <tr>
         <th colspan="14"><input type="radio" checked> Submit Depth Chart? <input type="submit" value="Submit"></th>
-    </tr></form></table></div>
+    </tr>
+</table>
+</form>
+</div>
         <?php
         echo ob_get_clean();
     }

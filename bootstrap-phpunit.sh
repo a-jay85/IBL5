@@ -81,7 +81,9 @@ if [ -d "vendor" ] && [ -f "vendor/bin/phpunit" ]; then
     echo "Available commands:"
     echo "  cd ibl5 && phpunit                     # Run all tests"
     echo "  cd ibl5 && phpunit tests/Player/       # Run specific test suite"
-    echo "  cd ibl5 && vendor/bin/phpstan analyse  # Run static analysis"
+    if [ -f "vendor/bin/phpstan" ]; then
+        echo "  cd ibl5 && vendor/bin/phpstan analyse  # Run static analysis"
+    fi
     echo ""
     exit 0
 fi
@@ -89,6 +91,12 @@ fi
 # Need to install dependencies
 info "Installing Composer dependencies..."
 echo ""
+
+# WORKAROUND: Disable GitHub API to use git cloning instead
+# This avoids authentication issues when GitHub token is not available
+info "Configuring Composer to use git sources instead of GitHub API..."
+composer config --global use-github-api false
+composer config --global secure-http false 2>/dev/null || true
 
 # Function to try composer install with different strategies
 try_composer_install() {
@@ -116,16 +124,16 @@ try_composer_install() {
 # Try installation with different strategies
 INSTALL_SUCCESS=false
 
-# Strategy 1: Use dist (fastest, but requires good network)
-if try_composer_install "--prefer-dist" "distribution archives (fastest)"; then
+# Strategy 1: Use source (git clone from cache, more reliable in our case)
+if try_composer_install "--prefer-source" "git source (uses cached repositories)"; then
     INSTALL_SUCCESS=true
 fi
 
-# Strategy 2: Use source (git clone, more reliable)
+# Strategy 2: Use dist if source failed
 if [ "$INSTALL_SUCCESS" = "false" ]; then
     echo ""
-    warning "Distribution install failed, trying source install..."
-    if try_composer_install "--prefer-source" "git source (more reliable)"; then
+    warning "Source install failed, trying distribution archives..."
+    if try_composer_install "--prefer-dist" "distribution archives"; then
         INSTALL_SUCCESS=true
     fi
 fi
@@ -133,7 +141,7 @@ fi
 # Strategy 3: Default method
 if [ "$INSTALL_SUCCESS" = "false" ]; then
     echo ""
-    warning "Both dist and source failed, trying default method..."
+    warning "Both source and dist failed, trying default method..."
     info "Trying: default method"
     
     if composer install --no-interaction 2>&1 | tee /tmp/composer-install.log; then
@@ -153,15 +161,17 @@ if [ "$INSTALL_SUCCESS" = "false" ]; then
     error "  1. Network connectivity issues (SSL timeouts)"
     error "  2. GitHub API rate limiting"
     error "  3. Firewall blocking GitHub API access"
-    error ""
+    error "  4. Missing GITHUB_TOKEN for authentication"
+    echo ""
     error "Possible solutions:"
     error "  1. Wait a few minutes and try again (rate limiting)"
     error "  2. Use a VPN or different network (firewall issues)"
     error "  3. Set COMPOSER_AUTH env var with GitHub token"
     error "  4. Run from a cached environment (GitHub Actions cache)"
+    error "  5. Manually trigger 'Cache PHP Dependencies' workflow"
     echo ""
     error "Full error log:"
-    cat /tmp/composer-install.log
+    cat /tmp/composer-install.log | tail -50
     exit 1
 fi
 
@@ -182,6 +192,8 @@ success "PHPUnit ready: $PHPUNIT_VERSION"
 if [ -f "vendor/bin/phpstan" ]; then
     PHPSTAN_VERSION=$(vendor/bin/phpstan --version 2>&1 | head -n 1)
     success "PHPStan ready: $PHPSTAN_VERSION"
+else
+    warning "PHPStan not installed (optional, requires GitHub API access)"
 fi
 
 if [ -f "vendor/bin/phpcs" ]; then
@@ -195,6 +207,8 @@ echo ""
 echo "Available commands:"
 echo "  cd ibl5 && phpunit                     # Run all tests"
 echo "  cd ibl5 && phpunit tests/Player/       # Run specific test suite"
-echo "  cd ibl5 && vendor/bin/phpstan analyse  # Run static analysis"
+if [ -f "vendor/bin/phpstan" ]; then
+    echo "  cd ibl5 && vendor/bin/phpstan analyse  # Run static analysis"
+fi
 echo "  cd ibl5 && composer lint:php           # Check code style"
 echo ""

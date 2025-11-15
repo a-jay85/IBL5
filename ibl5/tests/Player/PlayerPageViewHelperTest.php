@@ -170,6 +170,15 @@ class PlayerPageViewHelperTest extends TestCase
     private function createMockPlayerWithBio(): Player
     {
         $player = $this->createMock(Player::class);
+        
+        // Basic player info (needed for renderPlayerHeader)
+        $player->position = 'PG';
+        $player->name = 'Test Player';
+        $player->nickname = null;
+        $player->teamID = 1;
+        $player->teamName = 'Test Team';
+        
+        // Bio info
         $player->age = '25';
         $player->heightFeet = '6';
         $player->heightInches = '4';
@@ -240,5 +249,40 @@ class PlayerPageViewHelperTest extends TestCase
         $stats->careerPlayoffHighBlocks = 6;
         
         return $stats;
+    }
+
+    public function testCompleteHtmlStructureIsBalanced()
+    {
+        // This test validates that the combined HTML from renderPlayerHeader,
+        // renderPlayerBioSection, and renderPlayerHighsTable produces balanced HTML tags
+        $player = $this->createMockPlayerWithBio();
+        $playerStats = $this->createMockPlayerStats();
+        
+        // Simulate the actual rendering sequence from index.php
+        $html = $this->viewHelper->renderPlayerHeader($player, 123);
+        $html .= $this->viewHelper->renderPlayerBioSection($player, '1000/1100/1200');
+        $html .= $this->viewHelper->renderPlayerHighsTable($playerStats);
+        $html .= '</tr></table>'; // Final closing tags from index.php line 116
+        
+        // Count opening and closing tags
+        $openTable = substr_count($html, '<table');
+        $closeTable = substr_count($html, '</table>');
+        $openTr = substr_count($html, '<tr');
+        $closeTr = substr_count($html, '</tr>');
+        $openTd = substr_count($html, '<td');
+        $closeTd = substr_count($html, '</td>');
+        
+        // Assert all tags are balanced
+        $this->assertEquals($openTable, $closeTable, 
+            "Table tags are not balanced. Opening: $openTable, Closing: $closeTable");
+        $this->assertEquals($openTr, $closeTr, 
+            "TR tags are not balanced. Opening: $openTr, Closing: $closeTr");
+        $this->assertEquals($openTd, $closeTd, 
+            "TD tags are not balanced. Opening: $openTd, Closing: $closeTd");
+        
+        // Additional validation: the HTML should contain key elements in proper structure
+        $this->assertStringContainsString('player-title', $html);
+        $this->assertStringContainsString('player-bio', $html);
+        $this->assertStringContainsString('player-highs', $html);
     }
 }

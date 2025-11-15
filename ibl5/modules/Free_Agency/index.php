@@ -780,6 +780,7 @@ function negotiate($pid)
 {
     global $prefix, $db, $cookie;
     $commonRepository = new \Services\CommonRepository($db);
+    $databaseService = new \Services\DatabaseService();
 
     $pid = intval($pid);
 
@@ -790,7 +791,8 @@ function negotiate($pid)
     $userteam = $userinfo['user_ibl_team'];
     $teamID = $commonRepository->getTidFromTeamname($userteam); // This function now returns an integer
 
-    $exceptioninfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_team_info WHERE team_name='$userteam'"));
+    $escaped_userteam = $databaseService->escapeString($db, $userteam);
+    $exceptioninfo = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_team_info WHERE team_name='$escaped_userteam'"));
 
     $HasMLE = $exceptioninfo['HasMLE'];
     $HasLLE = $exceptioninfo['HasLLE'];
@@ -868,7 +870,8 @@ function negotiate($pid)
         </tr>
     </table></center><br>";
 
-    $demands = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_demands WHERE name='$player_name'"));
+    $escaped_player_name = $databaseService->escapeString($db, $player_name);
+    $demands = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_demands WHERE name='$escaped_player_name'"));
     $dem1 = $demands['dem1'];
     $dem2 = $demands['dem2'];
     $dem3 = $demands['dem3'];
@@ -876,7 +879,8 @@ function negotiate($pid)
     $dem5 = $demands['dem5'];
     $dem6 = $demands['dem6'];
 
-    $millionsatposition = $db->sql_query("SELECT * FROM ibl_plr WHERE teamname='$userteam' AND pos='$player_pos' AND name!='$player_name'");
+    $escaped_player_pos = $databaseService->escapeString($db, $player_pos);
+    $millionsatposition = $db->sql_query("SELECT * FROM ibl_plr WHERE teamname='$escaped_userteam' AND pos='$escaped_player_pos' AND name!='$escaped_player_name'");
 
     // LOOP TO GET MILLIONS COMMITTED AT POSITION
 
@@ -1071,7 +1075,7 @@ function negotiate($pid)
 
     // END LOOP
 
-    $offergrabber = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_fa_offers WHERE team='$userteam' AND name='$player_name'"));
+    $offergrabber = $db->sql_fetchrow($db->sql_query("SELECT * FROM ibl_fa_offers WHERE team='$escaped_userteam' AND name='$escaped_player_name'"));
 
     $offer1 = $offergrabber['offer1'];
     $offer2 = $offergrabber['offer2'];
@@ -1481,7 +1485,7 @@ function negotiate($pid)
         // ===== CHECK TO SEE IF MLE IS AVAILABLE =====
 
         if ($HasMLE == 1) {
-            $MLEoffers = $db->sql_numrows($db->sql_query("SELECT * FROM ibl_fa_offers WHERE MLE='1' AND team='$userteam'"));
+            $MLEoffers = $db->sql_numrows($db->sql_query("SELECT * FROM ibl_fa_offers WHERE MLE='1' AND team='$escaped_userteam'"));
             if ($MLEoffers == 0) {
                 echo "<tr><td>Mid-Level Exception (click the button that corresponds to the final year you wish to offer):</td>
 
@@ -1605,7 +1609,7 @@ function negotiate($pid)
         // ===== CHECK TO SEE IF LLE IS AVAILABLE =====
 
         if ($HasLLE == 1) {
-            $LLEoffers = $db->sql_numrows($db->sql_query("SELECT * FROM ibl_fa_offers WHERE LLE='1' AND team='$userteam'"));
+            $LLEoffers = $db->sql_numrows($db->sql_query("SELECT * FROM ibl_fa_offers WHERE LLE='1' AND team='$escaped_userteam'"));
             if ($LLEoffers == 0) {
                 echo "<tr><td>Lower-Level Exception:</td>
 				<td>

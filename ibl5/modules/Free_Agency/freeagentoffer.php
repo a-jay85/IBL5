@@ -440,6 +440,11 @@ if ($nooffer == 0) {
     $querydrop = "DELETE FROM `ibl_fa_offers` WHERE `name` = '$escaped_Player_Name' AND `team` = '$escaped_Team_Name' LIMIT 1";
     $resultdrop = $db->sql_query($querydrop);
 
+    // Escape modifier, random, and perceivedvalue for INSERT
+    $escaped_modifier = $databaseService->escapeString($db, $modifier);
+    $escaped_random = $databaseService->escapeString($db, $random);
+    $escaped_perceivedvalue = $databaseService->escapeString($db, $perceivedvalue);
+
     $querychunk = "INSERT INTO `ibl_fa_offers` 
     (`name`, 
      `team`, 
@@ -455,17 +460,17 @@ if ($nooffer == 0) {
      `mle`, 
      `lle`) 
         VALUES
-    ( '$Player_Name', 
-      '$Team_Name', 
+    ( '$escaped_Player_Name', 
+      '$escaped_Team_Name', 
       '$Offer_1', 
       '$Offer_2', 
       '$Offer_3', 
       '$Offer_4', 
       '$Offer_5', 
       '$Offer_6', 
-      '$modifier', 
-      '$random', 
-      '$perceivedvalue', 
+      '$escaped_modifier', 
+      '$escaped_random', 
+      '$escaped_perceivedvalue', 
       '$MLE', 
       '$LLE' )";
 

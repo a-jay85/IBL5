@@ -117,6 +117,9 @@ class PlayerPageViewHelper
         ?>
     </table></center>
 <strong>BIRD YEARS:</strong> <?= htmlspecialchars((string)$player->birdYears) ?> | <strong>Remaining Contract:</strong> <?= htmlspecialchars($contractDisplay) ?> </td>
+            </tr>
+        </table>
+    </td>
         <?php
         return ob_get_clean();
     }

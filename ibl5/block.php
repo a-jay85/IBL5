@@ -213,7 +213,8 @@ while ($i < $num) {
     $LLE = $db->sql_result($result, $i, "LLE");
     $random = $db->sql_result($result, $i, "random");
 
-    $query2 = "SELECT * FROM `ibl_demands` WHERE name = '$name'";
+    $escaped_name = DatabaseService::escapeString($db, $name);
+    $query2 = "SELECT * FROM `ibl_demands` WHERE name = '$escaped_name'";
     $result2 = $db->sql_query($query2);
     $num2 = $db->sql_numrows($result2);
 
@@ -297,6 +298,11 @@ while ($i < $num) {
             $acceptedTeamDiscordID = $offeringTeam->discordID;
             $outcomeText = DatabaseService::safeHtmlOutput($name) . " accepts the " . $offeringTeamName . " offer of a " . $offeryears . "-year deal worth a total of " . $offertotal . " million dollars.";
             $text .= $outcomeText . "<br>\n";
+            
+            // Escape variables for SQL
+            $escaped_offeringTeamName = DatabaseService::escapeString($db, $offeringTeamName);
+            $escaped_name = DatabaseService::escapeString($db, $name);
+            
             $code .= "UPDATE `ibl_plr`
 				SET `cy` = '0',
 					`cy1` = '" . $offer1 . "',
@@ -305,16 +311,16 @@ while ($i < $num) {
 					`cy4` = '" . $offer4 . "',
 					`cy5` = '" . $offer5 . "',
 					`cy6` = '" . $offer6 . "',
-					`teamname` = '" . $offeringTeamName . "',
+					`teamname` = '" . $escaped_offeringTeamName . "',
 					`cyt` = '" . $offeryears . "',
 					`tid` = $offeringTeam->teamID
-				WHERE `name` = '" . $name . "'
+				WHERE `name` = '" . $escaped_name . "'
 				LIMIT 1;";
             if ($MLE == 1) {
-                $code .= "UPDATE `ibl_team_info` SET `HasMLE` = '0' WHERE `team_name` = '" . $offeringTeamName . "' LIMIT 1;";
+                $code .= "UPDATE `ibl_team_info` SET `HasMLE` = '0' WHERE `team_name` = '" . $escaped_offeringTeamName . "' LIMIT 1;";
             }
             if ($LLE == 1) {
-                $code .= "UPDATE `ibl_team_info` SET `HasLLE` = '0' WHERE `team_name` = '" . $offeringTeamName . "' LIMIT 1;";
+                $code .= "UPDATE `ibl_team_info` SET `HasLLE` = '0' WHERE `team_name` = '" . $escaped_offeringTeamName . "' LIMIT 1;";
             }
         } else {
             $outcomeText = "**REJECTED**\n\n";

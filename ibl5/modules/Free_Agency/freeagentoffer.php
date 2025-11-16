@@ -30,9 +30,15 @@ $MLE = 0;
 $LLE = 0;
 
 $sharedFunctions = new Shared($db);
+$databaseService = new \Services\DatabaseService();
+
+// Escape user input for SQL queries
+$escaped_Team_Name = $databaseService->escapeString($db, $Team_Name);
+$escaped_Player_Name = $databaseService->escapeString($db, $Player_Name);
+$escaped_player_teamName = $databaseService->escapeString($db, $player_teamName);
 
 // Check if player being offered was previously signed to a team during this Free Agency period
-$queryOfferedPlayer = "SELECT * FROM ibl_plr WHERE name = '$Player_Name';";
+$queryOfferedPlayer = "SELECT * FROM ibl_plr WHERE name = '$escaped_Player_Name';";
 $resultOfferedPlayer = $db->sql_query($queryOfferedPlayer);
 $currentContractYearOfOfferedPlayer = $db->sql_result($resultOfferedPlayer, 0, "cy");
 $year1ContractOfOfferedPlayer = $db->sql_result($resultOfferedPlayer, 0, "cy1");
@@ -142,11 +148,12 @@ $Offer_Avg = ($Offer_1 + $Offer_2 + $Offer_3 + $Offer_4 + $Offer_5 + $Offer_6) /
 
 // LOOP TO GET MILLIONS COMMITTED AT POSITION
 
-$queryposition = "SELECT * FROM ibl_plr WHERE `name` ='$Player_Name'";
+$queryposition = "SELECT * FROM ibl_plr WHERE `name` ='$escaped_Player_Name'";
 $resultposition = $db->sql_query($queryposition);
 $player_pos = $db->sql_result($resultposition, 0, "pos");
 
-$querymillions = "SELECT * FROM ibl_plr WHERE `teamname`='$Team_Name' AND `pos`='$player_pos' AND `name`!='$Player_Name'";
+$escaped_player_pos = $databaseService->escapeString($db, $player_pos);
+$querymillions = "SELECT * FROM ibl_plr WHERE `teamname`='$escaped_Team_Name' AND `pos`='$escaped_player_pos' AND `name`!='$escaped_Player_Name'";
 $resultmillions = $db->sql_query($querymillions);
 $nummillions = $db->sql_numrows($resultmillions);
 
@@ -194,7 +201,7 @@ if ($tf_millions > 2000) {
     $tf_millions = 2000;
 }
 
-$query1 = "SELECT * FROM ibl_team_info WHERE team_name = '$Team_Name'";
+$query1 = "SELECT * FROM ibl_team_info WHERE team_name = '$escaped_Team_Name'";
 $result1 = $db->sql_query($query1);
 
 $tf_wins = $db->sql_result($result1, 0, "Contract_Wins");
@@ -202,7 +209,7 @@ $tf_loss = $db->sql_result($result1, 0, "Contract_Losses");
 $tf_trdw = $db->sql_result($result1, 0, "Contract_AvgW");
 $tf_trdl = $db->sql_result($result1, 0, "Contract_AvgL");
 
-$queryteam = "SELECT * FROM ibl_plr WHERE name = '$Player_Name'";
+$queryteam = "SELECT * FROM ibl_plr WHERE name = '$escaped_Player_Name'";
 $resultteam = $db->sql_query($queryteam);
 
 $player_team = $db->sql_result($resultteam, 0, "teamname");
@@ -430,8 +437,13 @@ if ($nooffer == 0) {
         $Offer_6 = 0;
     }
 
-    $querydrop = "DELETE FROM `ibl_fa_offers` WHERE `name` = '$Player_Name' AND `team` = '$Team_Name' LIMIT 1";
+    $querydrop = "DELETE FROM `ibl_fa_offers` WHERE `name` = '$escaped_Player_Name' AND `team` = '$escaped_Team_Name' LIMIT 1";
     $resultdrop = $db->sql_query($querydrop);
+
+    // Escape modifier, random, and perceivedvalue for INSERT
+    $escaped_modifier = $databaseService->escapeString($db, $modifier);
+    $escaped_random = $databaseService->escapeString($db, $random);
+    $escaped_perceivedvalue = $databaseService->escapeString($db, $perceivedvalue);
 
     $querychunk = "INSERT INTO `ibl_fa_offers` 
     (`name`, 
@@ -448,17 +460,17 @@ if ($nooffer == 0) {
      `mle`, 
      `lle`) 
         VALUES
-    ( '$Player_Name', 
-      '$Team_Name', 
+    ( '$escaped_Player_Name', 
+      '$escaped_Team_Name', 
       '$Offer_1', 
       '$Offer_2', 
       '$Offer_3', 
       '$Offer_4', 
       '$Offer_5', 
       '$Offer_6', 
-      '$modifier', 
-      '$random', 
-      '$perceivedvalue', 
+      '$escaped_modifier', 
+      '$escaped_random', 
+      '$escaped_perceivedvalue', 
       '$MLE', 
       '$LLE' )";
 

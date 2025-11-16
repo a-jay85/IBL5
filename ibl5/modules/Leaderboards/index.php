@@ -2,10 +2,6 @@
 
 declare(strict_types=1);
 
-use Leaderboards\LeaderboardsRepository;
-use Leaderboards\LeaderboardsService;
-use Leaderboards\LeaderboardsView;
-
 if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
@@ -16,9 +12,9 @@ get_lang($module_name);
 $pagetitle = "- Player Archives";
 
 // Initialize classes
-$repository = new LeaderboardsRepository($db);
-$service = new LeaderboardsService();
-$view = new LeaderboardsView($service);
+$repository = new \Leaderboards\LeaderboardsRepository($db);
+$service = new Leaderboards\LeaderboardsService();
+$view = new \Leaderboards\LeaderboardsView($service);
 
 // Get filter parameters from POST
 $filters = [

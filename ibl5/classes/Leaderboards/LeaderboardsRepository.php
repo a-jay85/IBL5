@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Leaderboards;
 
-use Services\DatabaseService;
-
 /**
  * LeaderboardsRepository - Handles all database operations for leaderboards
  * 

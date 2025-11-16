@@ -89,11 +89,11 @@ final class LeaderboardsServiceTest extends TestCase
         $this->assertEquals(456, $stats['pid']);
         $this->assertEquals('Average Player*', $stats['name']); // Has asterisk for retired
 
-        // Check averages formatting (should use 1 decimal)
+        // Check averages formatting (should use 2 decimal places)
         $this->assertEquals('82', $stats['games']); // Games are rounded
-        $this->assertEquals('36.5', $stats['minutes']);
-        $this->assertEquals('6.1', $stats['fgm']);
-        $this->assertEquals('12.2', $stats['fga']);
+        $this->assertEquals('36.50', $stats['minutes']);
+        $this->assertEquals('6.10', $stats['fgm']);
+        $this->assertEquals('12.20', $stats['fga']);
         
         // Check percentages (pre-calculated in db, formatted with decimals)
         $this->assertEquals('0.500', $stats['fgp']);

@@ -30,7 +30,7 @@ class LeaderboardsService
         
         // Process based on table type
         if ($tableType === 'averages') {
-            $stats['games'] = round($row['games']);
+            $stats['games'] = round((float)$row['games']);
             $stats['minutes'] = StatsFormatter::formatAverage($row['minutes']);
             $stats['fgm'] = StatsFormatter::formatAverage($row['fgm']);
             $stats['fga'] = StatsFormatter::formatAverage($row['fga']);

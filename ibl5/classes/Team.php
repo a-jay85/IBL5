@@ -154,11 +154,11 @@ class Team
 
     public function getHealthyAndInjuredPlayersOrderedByNameResult($season = null)
     {
-        $contractCondition = '';
+        $freeAgencyCondition = '';
         if ($season && $season->phase === 'Free Agency') {
             // During Free Agency, only count players who have a salary for next year
             // This is calculated as cy + 1 (if cy=1, check cy2; if cy=4, check cy5, etc.)
-            $contractCondition = " AND (
+            $freeAgencyCondition = " AND (
                 (cy = 0 AND cy1 > 0) OR
                 (cy = 0 AND cy2 > 0) OR
                 (cy = 1 AND cy2 > 0) OR
@@ -174,7 +174,7 @@ class Team
             WHERE teamname = '$this->name'
               AND tid = '$this->teamID'
               AND retired = '0'
-              AND ordinal <= '" . JSB::WAIVERS_ORDINAL . "'" . $contractCondition . "
+              AND ordinal <= '" . JSB::WAIVERS_ORDINAL . "'" . $freeAgencyCondition . "
             ORDER BY name ASC";
         $result = $this->db->sql_query($query);
         return $result;
@@ -182,11 +182,11 @@ class Team
 
     public function getHealthyPlayersOrderedByNameResult($season = null)
     {
-        $contractCondition = '';
+        $freeAgencyCondition = '';
         if ($season && $season->phase === 'Free Agency') {
             // During Free Agency, only count players who have a salary for next year
             // This is calculated as cy + 1 (if cy=1, check cy2; if cy=4, check cy5, etc.)
-            $contractCondition = " AND (
+            $freeAgencyCondition = " AND (
                 (cy = 0 AND cy1 > 0) OR
                 (cy = 0 AND cy2 > 0) OR
                 (cy = 1 AND cy2 > 0) OR
@@ -202,7 +202,7 @@ class Team
             WHERE teamname = '$this->name'
               AND tid = '$this->teamID'
               AND retired = '0'
-              AND ordinal <= '" . JSB::WAIVERS_ORDINAL ."'" . $contractCondition . "
+              AND ordinal <= '" . JSB::WAIVERS_ORDINAL ."'" . $freeAgencyCondition . "
               AND injured = '0'
             ORDER BY name ASC";
         $result = $this->db->sql_query($query);

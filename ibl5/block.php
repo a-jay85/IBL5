@@ -198,7 +198,7 @@ while ($i < $num) {
                 $discordText .= " <@!$acceptedTeamDiscordID>\n\n";
             }
         }
-        $discordText .= "**" . strtoupper(DatabaseService::safeHtmlOutput("$player->name, $teamOfPlayer->city $player->teamName")) . "** <@!$teamOfPlayer->discordID>\n";
+        $discordText .= "**" . strtoupper("$player->name, $teamOfPlayer->city $player->teamName") . "** <@!$teamOfPlayer->discordID>\n";
     }
 
     $offer1 = $db->sql_result($result, $i, "offer1");
@@ -270,7 +270,7 @@ while ($i < $num) {
         if ($offer6 != 0) {$offerText .= "/$offer6";}
         $offerText .= " <@!$offeringTeam->discordID>\n";
     } else {
-        $autoRejectedText .= "\n<@!$offeringTeam->discordID>'s offer for " . DatabaseService::safeHtmlOutput($player->name) . ": ";
+        $autoRejectedText .= "\n<@!$offeringTeam->discordID>'s offer for " . $player->name . ": ";
         $autoRejectedText .= "$offeringTeamName - $offer1";
         if ($offer2 != 0) {$autoRejectedText .= "/$offer2";}
         if ($offer3 != 0) {$autoRejectedText .= "/$offer3";}
@@ -296,7 +296,7 @@ while ($i < $num) {
             </TR>";
             $offerAccepted = TRUE;
             $acceptedTeamDiscordID = $offeringTeam->discordID;
-            $outcomeText = DatabaseService::safeHtmlOutput($name) . " accepts the " . $offeringTeamName . " offer of a " . $offeryears . "-year deal worth a total of " . $offertotal . " million dollars.";
+            $outcomeText = $name . " accepts the " . $offeringTeamName . " offer of a " . $offeryears . "-year deal worth a total of " . $offertotal . " million dollars.";
             $text .= $outcomeText . "<br>\n";
             
             // Escape variables for SQL

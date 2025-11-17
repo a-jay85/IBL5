@@ -83,7 +83,8 @@ class Trading_CashTransactionHandler
             `cy3`, 
             `cy4`, 
             `cy5`, 
-            `cy6`) 
+            `cy6`, 
+            `uuid`) 
         VALUES
             ('100000',
             '$itemId',
@@ -98,7 +99,8 @@ class Trading_CashTransactionHandler
             '{$cashYear[3]}',
             '{$cashYear[4]}',
             '{$cashYear[5]}',
-            '{$cashYear[6]}')";
+            '{$cashYear[6]}'),
+            UUID())";
 
         $resultInsertPositiveCashRow = $this->db->sql_query($queryInsertPositiveCashRow);
 
@@ -119,7 +121,8 @@ class Trading_CashTransactionHandler
             `cy3`,
             `cy4`,
             `cy5`,
-            `cy6`)
+            `cy6`,
+            `uuid`)
         VALUES
             ('100000',
             '$itemId',
@@ -134,7 +137,8 @@ class Trading_CashTransactionHandler
             '-{$cashYear[3]}',
             '-{$cashYear[4]}',
             '-{$cashYear[5]}',
-            '-{$cashYear[6]}')";
+            '-{$cashYear[6]}',
+            UUID())";
 
         $resultInsertNegativeCashRow = $this->db->sql_query($queryInsertNegativeCashRow);
 

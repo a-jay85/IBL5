@@ -2,6 +2,7 @@
 
 use PHPUnit\Framework\TestCase;
 use Waivers\WaiversProcessor;
+use Player\Player;
 
 class WaiversProcessorTest extends TestCase
 {
@@ -20,6 +21,46 @@ class WaiversProcessorTest extends TestCase
         // Create mock Season for free agency
         $this->mockSeasonFreeAgency = $this->createMock(Season::class);
         $this->mockSeasonFreeAgency->phase = 'Free Agency';
+    }
+    
+    /**
+     * Helper method to create a mock Player object with contract properties
+     * Maps array keys to Player properties:
+     * - 'cy' => contractCurrentYear
+     * - 'cyt' => contractTotalYears  
+     * - 'cy1' => contractYear1Salary
+     * - 'cy2' => contractYear2Salary
+     * - 'cy3' => contractYear3Salary
+     * - 'cy4' => contractYear4Salary
+     * - 'cy5' => contractYear5Salary
+     * - 'cy6' => contractYear6Salary
+     * - 'exp' => yearsOfExperience
+     */
+    private function createMockPlayer(array $properties): Player
+    {
+        $player = $this->getMockBuilder(Player::class)
+            ->disableOriginalConstructor()
+            ->getMock();
+        
+        // Map database array keys to Player property names
+        $propertyMap = [
+            'cy' => 'contractCurrentYear',
+            'cyt' => 'contractTotalYears',
+            'cy1' => 'contractYear1Salary',
+            'cy2' => 'contractYear2Salary',
+            'cy3' => 'contractYear3Salary',
+            'cy4' => 'contractYear4Salary',
+            'cy5' => 'contractYear5Salary',
+            'cy6' => 'contractYear6Salary',
+            'exp' => 'yearsOfExperience',
+        ];
+        
+        foreach ($properties as $key => $value) {
+            $propertyName = $propertyMap[$key] ?? $key;
+            $player->{$propertyName} = $value;
+        }
+        
+        return $player;
     }
     
     public function testCalculateVeteranMinimumSalaryFor10PlusYears()
@@ -87,54 +128,53 @@ class WaiversProcessorTest extends TestCase
     
     public function testGetPlayerContractDisplayWithNoSalary()
     {
-        $playerData = [
+        $player = $this->createMockPlayer([
             'cy1' => 0,
             'exp' => 5
-        ];
+        ]);
         
-        $contract = $this->processor->getPlayerContractDisplay($playerData, $this->mockSeasonRegular);
+        $contract = $this->processor->getPlayerContractDisplay($player, $this->mockSeasonRegular);
         $this->assertEquals('70', $contract);
     }
     
     public function testGetPlayerContractDisplayWithExistingContract()
     {
-        $playerData = [
+        $player = $this->createMockPlayer([
             'cy1' => 500,
             'cy' => 1,
             'cyt' => 3,
-            'cy1' => 500,
             'cy2' => 550,
             'cy3' => 600
-        ];
+        ]);
         
-        $contract = $this->processor->getPlayerContractDisplay($playerData, $this->mockSeasonRegular);
+        $contract = $this->processor->getPlayerContractDisplay($player, $this->mockSeasonRegular);
         $this->assertEquals('500 550 600', $contract);
     }
     
     public function testGetPlayerContractDisplayWithPartialContract()
     {
-        $playerData = [
+        $player = $this->createMockPlayer([
             'cy1' => 500,
             'cy' => 2,
             'cyt' => 3,
             'cy2' => 550,
             'cy3' => 600
-        ];
+        ]);
         
-        $contract = $this->processor->getPlayerContractDisplay($playerData, $this->mockSeasonRegular);
+        $contract = $this->processor->getPlayerContractDisplay($player, $this->mockSeasonRegular);
         $this->assertEquals('550 600', $contract);
     }
     
     public function testGetPlayerContractDisplayWithOneYearRemaining()
     {
-        $playerData = [
+        $player = $this->createMockPlayer([
             'cy1' => 500,
             'cy' => 3,
             'cyt' => 3,
             'cy3' => 600
-        ];
+        ]);
         
-        $contract = $this->processor->getPlayerContractDisplay($playerData, $this->mockSeasonRegular);
+        $contract = $this->processor->getPlayerContractDisplay($player, $this->mockSeasonRegular);
         $this->assertEquals('600', $contract);
     }
     
@@ -219,26 +259,27 @@ class WaiversProcessorTest extends TestCase
     
     public function testGetPlayerContractDisplayWithMissingExperience()
     {
-        $playerData = [
-            'cy1' => 0
-            // exp field missing
-        ];
+        $player = $this->createMockPlayer([
+            'cy1' => 0,
+            'exp' => 0
+        ]);
         
-        $contract = $this->processor->getPlayerContractDisplay($playerData, $this->mockSeasonRegular);
-        $this->assertEquals('51', $contract); // Default to rookie minimum
+        $contract = $this->processor->getPlayerContractDisplay($player, $this->mockSeasonRegular);
+        // With rookie experience (0), should return vet min for 0 experience = 51
+        $this->assertEquals('51', $contract);
     }
     
     public function testGetPlayerContractDisplayWithEmptyContract()
     {
-        $playerData = [
+        $player = $this->createMockPlayer([
             'cy1' => 0,
             'cy' => 1,
-            'cyt' => 1
-            // No cy1 field with value
-        ];
+            'cyt' => 1,
+            'exp' => 0
+        ]);
         
-        $contract = $this->processor->getPlayerContractDisplay($playerData, $this->mockSeasonRegular);
-        $this->assertEquals('51', $contract); // Should use vet min calculation
+        $contract = $this->processor->getPlayerContractDisplay($player, $this->mockSeasonRegular);
+        $this->assertEquals('51', $contract); // Should use vet min calculation for rookie
     }
     
     public function testPrepareContractDataForNewContractDuringFreeAgency()
@@ -260,29 +301,28 @@ class WaiversProcessorTest extends TestCase
     
     public function testGetPlayerContractDisplayDuringFreeAgency()
     {
-        $playerData = [
+        $player = $this->createMockPlayer([
             'cy1' => 0,
             'cy2' => 0,
             'exp' => 4
-        ];
+        ]);
         
-        $contract = $this->processor->getPlayerContractDisplay($playerData, $this->mockSeasonFreeAgency);
+        $contract = $this->processor->getPlayerContractDisplay($player, $this->mockSeasonFreeAgency);
         $this->assertEquals('64', $contract);
     }
     
     public function testGetPlayerContractDisplayWithExistingContractDuringFreeAgency()
     {
-        $playerData = [
+        $player = $this->createMockPlayer([
             'cy1' => 0,
             'cy2' => 500,
             'cy' => 2,
             'cyt' => 4,
-            'cy2' => 500,
             'cy3' => 550,
             'cy4' => 600
-        ];
+        ]);
         
-        $contract = $this->processor->getPlayerContractDisplay($playerData, $this->mockSeasonFreeAgency);
+        $contract = $this->processor->getPlayerContractDisplay($player, $this->mockSeasonFreeAgency);
         $this->assertEquals('500 550 600', $contract);
     }
 }

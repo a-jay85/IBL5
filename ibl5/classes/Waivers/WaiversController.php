@@ -265,10 +265,11 @@ class WaiversController
         $team = \Team::initialize($this->db, $userInfo['user_ibl_team']);
         \UI::displaytopmenu($this->db, $team->teamID);
         
+        $season = new \Season($this->db);
         $players = $this->getPlayersForAction($team, $action);
         
-        $openRosterSpots = 15 - $team->getHealthyAndInjuredPlayersOrderedByNameResult()->num_rows;
-        $healthyOpenRosterSpots = 15 - $team->getHealthyPlayersOrderedByNameResult()->num_rows;
+        $openRosterSpots = 15 - $team->getHealthyAndInjuredPlayersOrderedByNameResult($season)->num_rows;
+        $healthyOpenRosterSpots = 15 - $team->getHealthyPlayersOrderedByNameResult($season)->num_rows;
         
         $this->view->renderWaiverForm(
             $team->name,
@@ -282,10 +283,9 @@ class WaiversController
         
         // Display player ratings table
         $league = new \League($this->db);
-        $season = new \Season($this->db);
         
         if ($action === 'drop') {
-            $result = $team->getHealthyAndInjuredPlayersOrderedByNameResult();
+            $result = $team->getHealthyAndInjuredPlayersOrderedByNameResult($season);
         } elseif ($season->phase === 'Free Agency') {
             $queryString = "SELECT *
                 FROM ibl_plr

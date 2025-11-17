@@ -67,7 +67,8 @@ class Trading_TradeOffer
     {
         $query0 = "SELECT * FROM ibl_trade_autocounter ORDER BY `counter` DESC";
         $result0 = $this->db->sql_query($query0);
-        $tradeOfferId = $this->db->sql_result($result0, 0, "counter") + 1;
+        $currentCounter = $this->db->sql_result($result0, 0, "counter");
+        $tradeOfferId = ((int)$currentCounter) + 1;
 
         $query0a = "INSERT INTO ibl_trade_autocounter ( `counter` ) VALUES ( '$tradeOfferId')";
         $this->db->sql_query($query0a);

@@ -183,7 +183,7 @@ public function testEscapesUserInput()
 }
 ```
 
-**Reference:** See `ibl5/TEST_REFACTORING_SUMMARY.md` for complete refactoring history and additional examples.
+**Reference**: See `ibl5/docs/TEST_REFACTORING_SUMMARY.md` for complete refactoring history and additional examples.
 
 ### Database Schema & Considerations
 
@@ -583,13 +583,14 @@ All methods handle zero-division safely and return appropriate defaults.
 - `UI.php` - Per-36 minute calculations
 - `modules/Leaderboards/index.php` - Totals and averages displays
 
-**Reference**: See `STATISTICS_FORMATTING_GUIDE.md` for complete method signatures, examples, and testing details.
+**Reference**: See `ibl5/docs/STATISTICS_FORMATTING_GUIDE.md` for complete method signatures, examples, and testing details.
 
 ## Additional Resources
-- **[Development Guide](DEVELOPMENT_GUIDE.md)** - Refactoring priorities, module status, workflow
-- **[Database Guide](DATABASE_GUIDE.md)** - Schema reference, migrations, best practices
-- **[API Guide](API_GUIDE.md)** - API development with UUIDs, views, caching
-- **[Statistics Formatting Guide](STATISTICS_FORMATTING_GUIDE.md)** - StatsFormatter and StatsSanitizer usage
-- **[Copilot Agent Instructions](COPILOT_AGENT.md)** - Coding standards and practices
+- **[Development Guide](../DEVELOPMENT_GUIDE.md)** - Refactoring priorities, module status, workflow
+- **[Database Guide](../DATABASE_GUIDE.md)** - Schema reference, migrations, best practices
+- **[API Guide](../API_GUIDE.md)** - API development with UUIDs, views, caching
+- **[Strategic Priorities](../ibl5/docs/STRATEGIC_PRIORITIES.md)** - Strategic analysis & next priorities
+- **[Refactoring History](../ibl5/docs/REFACTORING_HISTORY.md)** - Complete refactoring timeline
+- **[Statistics Formatting Guide](../ibl5/docs/STATISTICS_FORMATTING_GUIDE.md)** - StatsFormatter and StatsSanitizer usage
 - [Copilot Coding Agent Best Practices](https://gh.io/copilot-coding-agent-tips)
 - [Conventional Commits](https://www.conventionalcommits.org/)

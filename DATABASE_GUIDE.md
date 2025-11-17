@@ -133,7 +133,7 @@ $query = "SELECT * FROM vw_player_current WHERE uuid = ?";
 - Migration Scripts: `/ibl5/migrations/`
 - **[Development Guide](DEVELOPMENT_GUIDE.md)** - Refactoring and testing
 - **[API Guide](API_GUIDE.md)** - API development best practices
-- **[Copilot Instructions](COPILOT_AGENT.md)** - Coding standards
+- **[Refactoring History](ibl5/docs/REFACTORING_HISTORY.md)** - Complete refactoring timeline
 
 ## Need Help?
 - Check schema.sql for table structures and relationships

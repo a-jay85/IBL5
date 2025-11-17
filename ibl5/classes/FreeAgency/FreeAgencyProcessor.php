@@ -13,13 +13,13 @@ namespace FreeAgency;
  */
 class FreeAgencyProcessor
 {
-    private \MySQLDatabase $db;
+    private $db;
     private FreeAgencyOfferValidator $validator;
     private FreeAgencyDemandCalculator $calculator;
     private FreeAgencyViewHelper $viewHelper;
     private \Services\DatabaseService $databaseService;
 
-    public function __construct(\MySQLDatabase $db)
+    public function __construct($db)
     {
         $this->db = $db;
         $this->validator = new FreeAgencyOfferValidator($db);

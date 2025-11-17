@@ -10,10 +10,10 @@ namespace FreeAgency;
  */
 class FreeAgencyViewHelper
 {
-    private \MySQLDatabase $db;
+    private $db;
     private \Services\DatabaseService $databaseService;
 
-    public function __construct(\MySQLDatabase $db)
+    public function __construct($db)
     {
         $this->db = $db;
         $this->databaseService = new \Services\DatabaseService();

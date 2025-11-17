@@ -19,9 +19,9 @@ class FreeAgencyOfferValidator
     private const STANDARD_RAISE_PERCENTAGE = 0.1;
     private const BIRD_RIGHTS_THRESHOLD = 3;
 
-    private \MySQLDatabase $db;
+    private $db;
 
-    public function __construct(\MySQLDatabase $db)
+    public function __construct($db)
     {
         $this->db = $db;
     }

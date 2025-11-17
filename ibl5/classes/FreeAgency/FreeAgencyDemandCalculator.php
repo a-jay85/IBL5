@@ -28,9 +28,9 @@ class FreeAgencyDemandCalculator
     private const RANDOM_VARIANCE_MAX = 5;
     private const RANDOM_VARIANCE_BASE = 100;
 
-    private \MySQLDatabase $db;
+    private $db;
 
-    public function __construct(\MySQLDatabase $db)
+    public function __construct($db)
     {
         $this->db = $db;
     }

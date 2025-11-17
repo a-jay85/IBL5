@@ -75,6 +75,17 @@ class League
         return $result;
     }
 
+    public function getFreeAgentsResult(Season $season)
+    {
+        $query = "SELECT *
+            FROM ibl_plr
+            WHERE retired = '0'
+              AND draftyear + exp + cyt - cy = " . $season->endingYear . "
+            ORDER BY name ASC";
+        $result = $this->db->sql_query($query);
+        return $result;
+    }
+
     public function getWaivedPlayersResult()
     {
         $query = "SELECT *

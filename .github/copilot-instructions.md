@@ -471,60 +471,42 @@ The Copilot agent requires a pre-configured development environment to run tests
 ## Development Environment Setup (For Copilot Agent)
 
 ### Problem Statement
-The Copilot agent cannot install dependencies from scratch on every run due to private repository access restrictions. Instead, it relies on a properly configured development environment that has dependencies pre-installed.
+The Copilot agent cannot install dependencies from scratch on every run due to private repository access restrictions. Instead, it relies on pre-cached dependencies through GitHub Actions.
 
 ### Solution Architecture
 
-#### 1. **Use Dev Container Configuration** (Recommended for Copilot Agent)
-The `.devcontainer/` directory contains configuration for a standardized PHP development environment:
+#### **GitHub Actions Dependency Caching** (Active Solution)
+The `.github/workflows/cache-dependencies.yml` and `.github/workflows/tests.yml` workflows implement intelligent dependency caching:
 
-- **Location**: `.devcontainer/devcontainer.json` - VS Code Dev Container configuration
-- **Post-Create Hook**: `.devcontainer/post-create.sh` - Automatically installs dependencies
+**Cache Dependencies Workflow** (`.github/workflows/cache-dependencies.yml`):
+- Runs daily to keep cache fresh
+- Runs when `composer.json` or `composer.lock` changes
+- Can be triggered manually
+- Pre-caches all PHP dependencies (PHPUnit, PHPStan, etc.)
 
 **How it works:**
-1. Copilot agent initializes the dev container
-2. Dev container runs `post-create.sh` automatically
-3. All Composer dependencies are installed within the container
-4. PHPUnit and all dev tools are available immediately
-5. Tests can run without delays or network issues
+1. Workflow runs `composer install` in GitHub Actions
+2. Vendor directory is cached using `composer.lock` hash as cache key
+3. Subsequent test runs restore from cache instead of downloading
+4. Cache invalidates automatically when dependencies change
+5. PHPUnit and all dev tools available immediately from cache
 
 **Benefits:**
-- ✅ Reproducible environment across all agent runs
-- ✅ No network calls to private repositories
+- ✅ No network calls to download dependencies
 - ✅ Fast test execution (dependencies cached)
 - ✅ Consistent PHP version and extensions (8.3)
-- ✅ Automatically handles Composer installation if missing
+- ✅ Automatic cache refresh on dependency changes
+- ✅ Manual cache refresh available via workflow dispatch
 
-#### 2. **Manual Setup for Local Development**
-Run the setup script before working:
-
-```bash
-# From repository root
-bash setup-dev.sh
-```
-
-This script:
-- Checks for PHP 8.3+
-- Installs Composer if needed
-- Runs `composer install` in the `ibl5/` directory
-- Verifies PHPUnit and all tools are available
-
-#### 3. **GitHub Actions CI/CD Caching**
-The `.github/workflows/tests.yml` workflow implements intelligent caching:
-
+**Test Workflow Integration** (`.github/workflows/tests.yml`):
 - **Composer Cache**: Caches `~/.composer/cache` across runs
-- **Vendor Cache**: Caches `ibl5/vendor/` directory across runs
+- **Vendor Cache**: Restores `ibl5/vendor/` from cache
 - **Cache Key**: Uses `composer.lock` hash to invalidate cache when dependencies change
-- **No Network Calls**: Subsequent runs use cached dependencies
-
-**How it helps Copilot:**
-- Pulls from GitHub's cache instead of downloading from internet
-- Significantly faster dependency resolution
-- Reduces network errors from package downloads
+- **Fallback**: If cache miss, runs `composer install` and caches result
 
 ### Testing from Command Line
 
-Once setup is complete, tests run via:
+When dependencies are cached, tests run via:
 
 ```bash
 cd ibl5
@@ -546,17 +528,14 @@ vendor/bin/phpcs --version                 # Should show PHP_CodeSniffer version
 
 | Issue | Solution |
 |-------|----------|
-| `Command 'phpunit' not found` | Run `cd ibl5 && composer install` |
-| `Composer not found` | Run setup script: `bash setup-dev.sh` |
-| `Permission denied` on setup script | Run: `chmod +x setup-dev.sh` |
-| `PHP version too old` | Install PHP 8.3+: Use `setup-dev.sh` for guidance |
-| Slow composer install | Clear cache: `composer clearcache` |
+| `Command 'phpunit' not found` | Dependencies not cached - run "Cache PHP Dependencies" workflow manually |
+| `Composer install fails` | Check `.github/workflows/cache-dependencies.yml` workflow logs |
+| `Tests fail to run` | Verify cache-dependencies workflow completed successfully |
+| `Cache outdated` | Manually trigger "Cache PHP Dependencies" workflow |
 
 ### Key Files
 
-- `.devcontainer/devcontainer.json` - VS Code dev container config
-- `.devcontainer/post-create.sh` - Auto-setup hook for containers
-- `setup-dev.sh` - Manual setup script (repository root)
+- `.github/workflows/cache-dependencies.yml` - Pre-cache workflow (runs daily)
 - `.github/workflows/tests.yml` - CI/CD with dependency caching
 - `ibl5/composer.json` - Project dependencies (dev tools)
 - `ibl5/composer.lock` - Locked dependency versions

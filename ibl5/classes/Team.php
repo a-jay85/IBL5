@@ -159,6 +159,8 @@ class Team
             // During Free Agency, only count players who have a salary for next year
             // This is calculated as cy + 1 (if cy=1, check cy2; if cy=4, check cy5, etc.)
             $contractCondition = " AND (
+                (cy = 0 AND cy1 > 0) OR
+                (cy = 0 AND cy2 > 0) OR
                 (cy = 1 AND cy2 > 0) OR
                 (cy = 2 AND cy3 > 0) OR
                 (cy = 3 AND cy4 > 0) OR
@@ -170,6 +172,7 @@ class Team
         $query = "SELECT *
             FROM ibl_plr
             WHERE teamname = '$this->name'
+              AND tid = '$this->teamID'
               AND retired = '0'
               AND ordinal <= '" . JSB::WAIVERS_ORDINAL . "'" . $contractCondition . "
             ORDER BY name ASC";
@@ -184,6 +187,8 @@ class Team
             // During Free Agency, only count players who have a salary for next year
             // This is calculated as cy + 1 (if cy=1, check cy2; if cy=4, check cy5, etc.)
             $contractCondition = " AND (
+                (cy = 0 AND cy1 > 0) OR
+                (cy = 0 AND cy2 > 0) OR
                 (cy = 1 AND cy2 > 0) OR
                 (cy = 2 AND cy3 > 0) OR
                 (cy = 3 AND cy4 > 0) OR
@@ -195,6 +200,7 @@ class Team
         $query = "SELECT *
             FROM ibl_plr
             WHERE teamname = '$this->name'
+              AND tid = '$this->teamID'
               AND retired = '0'
               AND ordinal <= '" . JSB::WAIVERS_ORDINAL ."'" . $contractCondition . "
               AND injured = '0'

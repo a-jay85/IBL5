@@ -45,7 +45,7 @@ class WaiversRepository
      * @param int $playerID Player ID to sign
      * @param string $teamName Team name
      * @param int $teamID Team ID
-     * @param array $contractData Contract data including cy1, cy (optional)
+     * @param array $contractData Contract data including salary, contractYearField, and contractYear
      * @return bool Success status
      */
     public function signPlayerFromWaivers(int $playerID, string $teamName, int $teamID, array $contractData): bool
@@ -58,10 +58,13 @@ class WaiversRepository
                   SET `ordinal` = '800',
                       `bird` = 0, ";
         
-        if (isset($contractData['cy1']) && $contractData['cy1'] > 0) {
-            $cy1 = (int) $contractData['cy1'];
-            $query .= "`cy1` = $cy1,
-                       `cy` = 1, ";
+        if (isset($contractData['salary']) && $contractData['salary'] > 0) {
+            $salary = (int) $contractData['salary'];
+            $contractYearField = $contractData['contractYearField'] ?? 'cy1';
+            $contractYear = $contractData['contractYear'] ?? 1;
+            
+            $query .= "`$contractYearField` = $salary,
+                       `cy` = $contractYear, ";
         }
         
         $query .= "`teamname` = '$teamNameEscaped',

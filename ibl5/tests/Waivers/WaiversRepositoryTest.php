@@ -40,7 +40,9 @@ class WaiversRepositoryTest extends TestCase
         $this->mockDb->setReturnTrue(true);
         
         $contractData = [
-            'cy1' => 103
+            'salary' => 103,
+            'contractYearField' => 'cy1',
+            'contractYear' => 1
         ];
         
         $result = $this->repository->signPlayerFromWaivers(
@@ -85,6 +87,37 @@ class WaiversRepositoryTest extends TestCase
         $this->assertStringContainsString('ordinal', $queries[0]);
         $this->assertStringContainsString('800', $queries[0]);
         $this->assertStringNotContainsString('cy1', $queries[0]);
+    }
+    
+    public function testSignPlayerFromWaiversWithNewContractDuringFreeAgency()
+    {
+        $this->mockDb->setReturnTrue(true);
+        
+        $contractData = [
+            'salary' => 76,
+            'contractYearField' => 'cy2',
+            'contractYear' => 2
+        ];
+        
+        $result = $this->repository->signPlayerFromWaivers(
+            456,
+            'Los Angeles Lakers',
+            14,
+            $contractData
+        );
+        
+        $this->assertTrue($result);
+        
+        $queries = $this->mockDb->getExecutedQueries();
+        $this->assertCount(1, $queries);
+        $this->assertStringContainsString('UPDATE ibl_plr', $queries[0]);
+        $this->assertStringContainsString('ordinal', $queries[0]);
+        $this->assertStringContainsString('800', $queries[0]);
+        $this->assertStringContainsString('cy2', $queries[0]);
+        $this->assertStringContainsString('76', $queries[0]);
+        $this->assertStringContainsString('cy` = 2', $queries[0]);
+        $this->assertStringContainsString('droptime', $queries[0]);
+        $this->assertStringContainsString('= 0', $queries[0]);
     }
     
 }

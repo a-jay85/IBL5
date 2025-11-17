@@ -110,18 +110,25 @@ class WaiversProcessor
      * Prepares contract data for a waiver signing
      * 
      * @param array $playerData Player data
-     * @return array Contract data with cy1, cy, and final contract display
+     * @param Season $season Season instance to determine phase
+     * @return array Contract data with cy field, contract year, and final contract display
      */
-    public function prepareContractData(array $playerData): array
+    public function prepareContractData(array $playerData, Season $season): array
     {
-        $currentSeasonSalary = (int) ($playerData['cy1'] ?? 0);
+        $isFreeAgency = $season->phase === 'Free Agency';
+        $contractYearField = $isFreeAgency ? 'cy2' : 'cy1';
+        $contractYear = $isFreeAgency ? 2 : 1;
+        
+        $currentSeasonSalary = (int) ($playerData[$contractYearField] ?? 0);
         
         if ($currentSeasonSalary == 0) {
             $experience = (int) ($playerData['exp'] ?? 0);
             $vetMinSalary = $this->calculateVeteranMinimumSalary($experience);
             
             return [
-                'cy1' => $vetMinSalary,
+                'contractYearField' => $contractYearField,
+                'contractYear' => $contractYear,
+                'salary' => $vetMinSalary,
                 'isNewContract' => true,
                 'finalContract' => (string) $vetMinSalary
             ];
@@ -133,9 +140,9 @@ class WaiversProcessor
         $contractParts = [];
         
         for ($year = $currentYear; $year <= $totalYears; $year++) {
-            $contractYearField = "cy$year";
-            if (isset($playerData[$contractYearField])) {
-                $contractParts[] = (int) $playerData[$contractYearField];
+            $cyField = "cy$year";
+            if (isset($playerData[$cyField])) {
+                $contractParts[] = (int) $playerData[$cyField];
             }
         }
         

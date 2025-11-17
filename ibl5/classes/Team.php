@@ -156,7 +156,15 @@ class Team
     {
         $contractCondition = '';
         if ($season && $season->phase === 'Free Agency') {
-            $contractCondition = " AND cy2 > 0";
+            // During Free Agency, only count players who have a salary for next year
+            // This is calculated as cy + 1 (if cy=1, check cy2; if cy=4, check cy5, etc.)
+            $contractCondition = " AND (
+                (cy = 1 AND cy2 > 0) OR
+                (cy = 2 AND cy3 > 0) OR
+                (cy = 3 AND cy4 > 0) OR
+                (cy = 4 AND cy5 > 0) OR
+                (cy = 5 AND cy6 > 0)
+            )";
         }
         
         $query = "SELECT *
@@ -173,7 +181,15 @@ class Team
     {
         $contractCondition = '';
         if ($season && $season->phase === 'Free Agency') {
-            $contractCondition = " AND cy2 > 0";
+            // During Free Agency, only count players who have a salary for next year
+            // This is calculated as cy + 1 (if cy=1, check cy2; if cy=4, check cy5, etc.)
+            $contractCondition = " AND (
+                (cy = 1 AND cy2 > 0) OR
+                (cy = 2 AND cy3 > 0) OR
+                (cy = 3 AND cy4 > 0) OR
+                (cy = 4 AND cy5 > 0) OR
+                (cy = 5 AND cy6 > 0)
+            )";
         }
         
         $query = "SELECT *

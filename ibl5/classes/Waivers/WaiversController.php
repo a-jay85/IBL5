@@ -308,18 +308,26 @@ class WaiversController
     private function getPlayersForAction($team, string $action): array
     {
         $league = new \League($this->db);
+        $season = new \Season($this->db);
         $timeNow = time();
         $players = [];
         
         if ($action === 'drop') {
             $result = $team->getHealthyAndInjuredPlayersOrderedByNameResult();
+        } elseif ($season->phase === 'Free Agency') {
+            $queryString = "SELECT *
+                FROM ibl_plr
+                WHERE retired='0'
+                    AND draftyear + exp + cyt - cy = " . $season->endingYear . "
+                ORDER BY name ASC";
+            $result = $this->db->sql_query($queryString);
         } else {
             $result = $league->getWaivedPlayersResult();
         }
         
         while ($playerRow = $this->db->sql_fetchrow($result)) {
             $player = Player::withPlrRow($this->db, $playerRow);
-            $contract = $this->processor->getPlayerContractDisplay($playerRow);
+            $contract = $this->processor->getPlayerContractDisplay($playerRow, $season);
             $waitTime = '';
             
             if ($action === 'add' && $player->timeDroppedOnWaivers > 0) {

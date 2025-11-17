@@ -183,8 +183,15 @@ class WaiversController
             return "Player not found.";
         }
         
-        $contractData = $this->processor->prepareContractData($player);
-        $playerSalary = isset($contractData['cy1']) ? (int) $contractData['cy1'] : (int) ($player['cy1'] ?? 0);
+        $season = new \Season($this->db);
+        $contractData = $this->processor->prepareContractData($player, $season);
+        $playerSalary = isset($contractData['salary']) ? (int) $contractData['salary'] : 0;
+        
+        // If no new contract, get salary from appropriate contract year field
+        if ($playerSalary === 0) {
+            $contractYearField = $season->phase === 'Free Agency' ? 'cy2' : 'cy1';
+            $playerSalary = (int) ($player[$contractYearField] ?? 0);
+        }
         
         if (!$this->validator->validateAdd($playerID, $healthyRosterSlots, $totalSalary, $playerSalary)) {
             return implode(' ', $this->validator->getErrors());

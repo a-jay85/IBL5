@@ -254,15 +254,17 @@ class PlayerPageViewHelperTest extends TestCase
     public function testCompleteHtmlStructureIsBalanced()
     {
         // This test validates that the combined HTML from renderPlayerHeader,
-        // renderPlayerBioSection, and renderPlayerHighsTable produces balanced HTML tags
+        // renderPlayerBioSection, renderPlayerHighsTable, and renderPlayerMenu produces balanced HTML tags
         $player = $this->createMockPlayerWithBio();
         $playerStats = $this->createMockPlayerStats();
         
-        // Simulate the actual rendering sequence from index.php
+        // Simulate the actual rendering sequence from index.php (lines 36-60, 116)
         $html = $this->viewHelper->renderPlayerHeader($player, 123);
         $html .= $this->viewHelper->renderPlayerBioSection($player, '1000/1100/1200');
         $html .= $this->viewHelper->renderPlayerHighsTable($playerStats);
-        $html .= '</tr></table>'; // Final closing tags from index.php line 116
+        $html .= '</tr>'; // Close outer row from renderPlayerHeader (index.php line 60)
+        $html .= $this->viewHelper->renderPlayerMenu(123);
+        $html .= '</table>'; // Final closing tag from index.php line 116
         
         // Count opening and closing tags
         $openTable = substr_count($html, '<table');
@@ -284,5 +286,12 @@ class PlayerPageViewHelperTest extends TestCase
         $this->assertStringContainsString('player-title', $html);
         $this->assertStringContainsString('player-bio', $html);
         $this->assertStringContainsString('player-highs', $html);
+        
+        // Critical: Verify the outer row is properly closed before the menu starts
+        // The structure should have: </td></tr> (from closing outer row) then <tr> (from menu)
+        // NOT: </td><tr> (which would indicate missing </tr>)
+        $this->assertStringContainsString('</tr><tr>', $html,
+            'Missing </tr> before menu <tr> - indicates unclosed outer row from renderPlayerHeader'
+        );
     }
 }

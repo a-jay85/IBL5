@@ -152,25 +152,35 @@ class Team
         return $result;
     }
 
-    public function getHealthyAndInjuredPlayersOrderedByNameResult()
+    public function getHealthyAndInjuredPlayersOrderedByNameResult($season = null)
     {
+        $contractCondition = '';
+        if ($season && $season->phase === 'Free Agency') {
+            $contractCondition = " AND cy2 > 0";
+        }
+        
         $query = "SELECT *
             FROM ibl_plr
             WHERE teamname = '$this->name'
               AND retired = '0'
-              AND ordinal <= '" . JSB::WAIVERS_ORDINAL . "'
+              AND ordinal <= '" . JSB::WAIVERS_ORDINAL . "'" . $contractCondition . "
             ORDER BY name ASC";
         $result = $this->db->sql_query($query);
         return $result;
     }
 
-    public function getHealthyPlayersOrderedByNameResult()
+    public function getHealthyPlayersOrderedByNameResult($season = null)
     {
+        $contractCondition = '';
+        if ($season && $season->phase === 'Free Agency') {
+            $contractCondition = " AND cy2 > 0";
+        }
+        
         $query = "SELECT *
             FROM ibl_plr
             WHERE teamname = '$this->name'
               AND retired = '0'
-              AND ordinal <= '" . JSB::WAIVERS_ORDINAL ."'
+              AND ordinal <= '" . JSB::WAIVERS_ORDINAL ."'" . $contractCondition . "
               AND injured = '0'
             ORDER BY name ASC";
         $result = $this->db->sql_query($query);

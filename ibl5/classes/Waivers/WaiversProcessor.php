@@ -2,6 +2,8 @@
 
 namespace Waivers;
 
+use Season;
+
 /**
  * Processes waiver wire business logic
  */
@@ -53,9 +55,13 @@ class WaiversProcessor
      * @param array $playerData Player data including contract info
      * @return string Formatted contract display
      */
-    public function getPlayerContractDisplay(array $playerData): string
+    public function getPlayerContractDisplay(array $playerData, Season $season): string
     {
-        $currentSeasonSalary = (int) ($playerData['cy1'] ?? 0);
+        if ($season->phase === 'Free Agency') {
+            $currentSeasonSalary = (int) ($playerData['cy2'] ?? 0);
+        } else {
+            $currentSeasonSalary = (int) ($playerData['cy1'] ?? 0);
+        }
         
         if ($currentSeasonSalary == 0) {
             $experience = (int) ($playerData['exp'] ?? 0);

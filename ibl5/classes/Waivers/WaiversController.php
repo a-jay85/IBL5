@@ -332,7 +332,7 @@ class WaiversController
         
         while ($playerRow = $this->db->sql_fetchrow($result)) {
             $player = Player::withPlrRow($this->db, $playerRow);
-            $contract = $this->processor->getPlayerContractDisplay($playerRow, $season);
+            $contract = $this->processor->getPlayerContractDisplay($player, $season);
             $waitTime = '';
             
             if ($action === 'add' && $player->timeDroppedOnWaivers > 0) {

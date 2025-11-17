@@ -3,8 +3,9 @@
 namespace Waivers;
 
 use Season;
-use Player\PlayerData;
+use Player\Player;
 use Player\PlayerContractCalculator;
+use Services\PlayerDataConverter;
 
 /**
  * Processes waiver wire business logic
@@ -18,26 +19,6 @@ class WaiversProcessor
         $this->contractCalculator = new PlayerContractCalculator();
     }
     
-    /**
-     * Convert player array data to PlayerData object
-     * 
-     * @param array $playerData Raw player data array
-     * @return PlayerData PlayerData object
-     */
-    private function arrayToPlayerData(array $playerData): PlayerData
-    {
-        $data = new PlayerData();
-        $data->contractCurrentYear = (int) ($playerData['cy'] ?? 0);
-        $data->contractTotalYears = (int) ($playerData['cyt'] ?? 0);
-        $data->contractYear1Salary = (int) ($playerData['cy1'] ?? 0);
-        $data->contractYear2Salary = (int) ($playerData['cy2'] ?? 0);
-        $data->contractYear3Salary = (int) ($playerData['cy3'] ?? 0);
-        $data->contractYear4Salary = (int) ($playerData['cy4'] ?? 0);
-        $data->contractYear5Salary = (int) ($playerData['cy5'] ?? 0);
-        $data->contractYear6Salary = (int) ($playerData['cy6'] ?? 0);
-        $data->yearsOfExperience = (int) ($playerData['exp'] ?? 0);
-        return $data;
-    }
     /**
      * Calculates veteran minimum salary based on years of experience
      * 
@@ -81,24 +62,36 @@ class WaiversProcessor
     /**
      * Gets the display contract for a player
      * 
-     * @param array $playerData Player data including contract info
+     * @param Player $player Player object
      * @return string Formatted contract display
      */
-    public function getPlayerContractDisplay(array $playerData, Season $season): string
+    public function getPlayerContractDisplay(Player $player, Season $season): string
     {
-        $data = $this->arrayToPlayerData($playerData);
+        // Convert Player object properties to array for conversion to PlayerData
+        $playerArray = [
+            'cy' => $player->contractCurrentYear,
+            'cyt' => $player->contractTotalYears,
+            'cy1' => $player->contractYear1Salary,
+            'cy2' => $player->contractYear2Salary,
+            'cy3' => $player->contractYear3Salary,
+            'cy4' => $player->contractYear4Salary,
+            'cy5' => $player->contractYear5Salary,
+            'cy6' => $player->contractYear6Salary,
+            'exp' => $player->yearsOfExperience,
+        ];
+        $playerData = PlayerDataConverter::arrayToPlayerData($playerArray);
         
         if ($season->phase === 'Free Agency') {
-            $currentSeasonSalary = $this->contractCalculator->getNextSeasonSalary($data);
+            $currentSeasonSalary = $this->contractCalculator->getNextSeasonSalary($playerData);
         } else {
-            $currentSeasonSalary = $this->contractCalculator->getCurrentSeasonSalary($data);
+            $currentSeasonSalary = $this->contractCalculator->getCurrentSeasonSalary($playerData);
         }
         
         if ($currentSeasonSalary == 0) {
-            return (string) $this->calculateVeteranMinimumSalary($data->yearsOfExperience);
+            return (string) $this->calculateVeteranMinimumSalary($player->yearsOfExperience);
         }
         
-        $remainingContract = $this->contractCalculator->getRemainingContractArray($data);
+        $remainingContract = $this->contractCalculator->getRemainingContractArray($playerData);
         return implode(" ", $remainingContract);
     }
     
@@ -129,25 +122,25 @@ class WaiversProcessor
     /**
      * Prepares contract data for a waiver signing
      * 
-     * @param array $playerData Player data
+     * @param array $playerData Player data array
      * @param Season $season Season instance to determine phase
      * @return array Contract data with cy field, contract year, and final contract display
      */
     public function prepareContractData(array $playerData, Season $season): array
     {
-        $data = $this->arrayToPlayerData($playerData);
         $isFreeAgency = $season->phase === 'Free Agency';
         $contractYearField = $isFreeAgency ? 'cy2' : 'cy1';
         $contractYear = $isFreeAgency ? 2 : 1;
         
         if ($isFreeAgency) {
-            $currentSeasonSalary = $this->contractCalculator->getNextSeasonSalary($data);
+            $currentSeasonSalary = (int) ($playerData['cy2'] ?? 0);
         } else {
-            $currentSeasonSalary = $this->contractCalculator->getCurrentSeasonSalary($data);
+            $currentSeasonSalary = (int) ($playerData['cy1'] ?? 0);
         }
         
         if ($currentSeasonSalary == 0) {
-            $vetMinSalary = $this->calculateVeteranMinimumSalary($data->yearsOfExperience);
+            $experience = (int) ($playerData['exp'] ?? 0);
+            $vetMinSalary = $this->calculateVeteranMinimumSalary($experience);
             
             return [
                 'contractYearField' => $contractYearField,
@@ -159,11 +152,20 @@ class WaiversProcessor
         }
         
         // Use existing contract
-        $remainingContract = $this->contractCalculator->getRemainingContractArray($data);
+        $currentYear = (int) ($playerData['cy'] ?? 1);
+        $totalYears = (int) ($playerData['cyt'] ?? 1);
+        $contractParts = [];
+        
+        for ($year = $currentYear; $year <= $totalYears; $year++) {
+            $cyField = "cy$year";
+            if (isset($playerData[$cyField])) {
+                $contractParts[] = (int) $playerData[$cyField];
+            }
+        }
         
         return [
             'isNewContract' => false,
-            'finalContract' => implode(" ", $remainingContract)
+            'finalContract' => implode(" ", $contractParts)
         ];
     }
 }

@@ -31,50 +31,48 @@ class WaiversView
         $actionEscaped = htmlspecialchars($action, ENT_QUOTES, 'UTF-8');
 
         ob_start();
-        if ($errorMessage) {
-            ?>
-            <center>
-                <font color="red"><b><?= htmlspecialchars($errorMessage, ENT_QUOTES, 'UTF-8') ?></b></font>
-            </center>
-            <?php
-        }
         ?>
+        <?php if ($errorMessage): ?>
+            <center>
+            <font color="red"><b><?= htmlspecialchars($errorMessage, ENT_QUOTES, 'UTF-8') ?></b></font>
+            </center>
+        <?php endif; ?>
         <form name="Waiver_Move" method="post" action="">
             <input type="hidden" name="Team_Name" value="<?= $teamNameEscaped ?>">
             <center>
-                <img src="images/logo/<?= $teamID ?>.jpg"><br>
-                <table border="1" cellspacing="0" cellpadding="0">
-                    <tr>
-                        <th colspan="3">
-                            <center>
-                                WAIVER WIRE - YOUR TEAM CURRENTLY HAS <?= $openRosterSpots ?> EMPTY ROSTER SPOTS and <?= $healthyOpenRosterSpots ?> HEALTHY ROSTER SPOTS
-                            </center>
-                        </th>
-                    </tr>
-                    <tr>
-                        <td valign="top">
-                            <center>
-                                <b><u><?= $teamNameEscaped ?></u></b>
-                                <select name="Player_ID">
-                                    <option value="">Select player...</option>
-                                    <?php foreach ($players as $optionHtml): ?>
-                                        <?= $optionHtml ?>
-                                    <?php endforeach; ?>
-                                </select>
-                            </center>
-                        </td>
-                    </tr>
-                    <input type="hidden" name="Action" value="<?= $actionEscaped ?>">
-                    <input type="hidden" name="rosterslots" value="<?= $openRosterSpots ?>">
-                    <input type="hidden" name="healthyrosterslots" value="<?= $healthyOpenRosterSpots ?>">
-                    <tr>
-                        <td colspan="3">
-                            <center>
-                                <input type="submit" value="Click to <?= $actionEscaped ?> player(s) to/from Waiver Pool" onclick="this.disabled=true;this.value='Submitting...'; this.form.submit();">
-                            </center>
-                        </td>
-                    </tr>
-                </table>
+            <img src="images/logo/<?= $teamID ?>.jpg"><br>
+            <table border="1" cellspacing="0" cellpadding="0">
+                <tr>
+                <th colspan="3">
+                    <center>
+                    WAIVER WIRE - YOUR TEAM CURRENTLY HAS <?= $openRosterSpots ?> EMPTY ROSTER SPOTS and <?= $healthyOpenRosterSpots ?> HEALTHY ROSTER SPOTS
+                    </center>
+                </th>
+                </tr>
+                <tr>
+                <td valign="top">
+                    <center>
+                    <b><u><?= $teamNameEscaped ?></u></b>
+                    <select name="Player_ID">
+                        <option value="">Select player...</option>
+                        <?php foreach ($players as $optionHtml): ?>
+                        <?= $optionHtml ?>
+                        <?php endforeach; ?>
+                    </select>
+                    </center>
+                </td>
+                </tr>
+                <input type="hidden" name="Action" value="<?= $actionEscaped ?>">
+                <input type="hidden" name="rosterslots" value="<?= $openRosterSpots ?>">
+                <input type="hidden" name="healthyrosterslots" value="<?= $healthyOpenRosterSpots ?>">
+                <tr>
+                <td colspan="3">
+                    <center>
+                    <input type="submit" value="Click to <?= $actionEscaped ?> player(s) to/from Waiver Pool" onclick="this.disabled=true;this.value='Submitting...'; this.form.submit();">
+                    </center>
+                </td>
+                </tr>
+            </table>
             </center>
         </form>
         <?php

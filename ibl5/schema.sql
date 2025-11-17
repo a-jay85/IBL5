@@ -353,7 +353,7 @@ CREATE TABLE `ibl_fa_offers` (
   KEY `idx_team` (`team`),
   CONSTRAINT `fk_faoffer_player` FOREIGN KEY (`name`) REFERENCES `ibl_plr` (`name`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_faoffer_team` FOREIGN KEY (`team`) REFERENCES `ibl_team_info` (`team_name`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=14 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=103 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1369,7 +1369,7 @@ DROP TABLE IF EXISTS `ibl_trade_autocounter`;
 CREATE TABLE `ibl_trade_autocounter` (
   `counter` int(11) NOT NULL AUTO_INCREMENT,
   PRIMARY KEY (`counter`)
-) ENGINE=InnoDB AUTO_INCREMENT=11925 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=11934 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -2338,7 +2338,7 @@ CREATE TABLE `nuke_referer` (
   `rid` int(11) NOT NULL AUTO_INCREMENT,
   `url` varchar(100) NOT NULL DEFAULT '',
   PRIMARY KEY (`rid`)
-) ENGINE=MyISAM AUTO_INCREMENT=40208 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=40211 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -2466,7 +2466,7 @@ CREATE TABLE `nuke_stories` (
   KEY `catid` (`catid`),
   KEY `counter` (`counter`),
   KEY `topic` (`topic`)
-) ENGINE=MyISAM AUTO_INCREMENT=4167 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=4171 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -2594,7 +2594,7 @@ CREATE TABLE `nuke_users` (
   KEY `user_session_time` (`user_session_time`),
   KEY `karma` (`karma`),
   KEY `user_email` (`user_email`(250))
-) ENGINE=MyISAM AUTO_INCREMENT=774 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=775 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -2613,7 +2613,7 @@ CREATE TABLE `nuke_users_temp` (
   `check_num` varchar(50) NOT NULL DEFAULT '',
   `time` varchar(14) NOT NULL DEFAULT '',
   PRIMARY KEY (`user_id`)
-) ENGINE=MyISAM AUTO_INCREMENT=10948 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=10952 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -2788,4 +2788,4 @@ CREATE TABLE `users` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2025-11-14  0:24:46
+-- Dump completed on 2025-11-16 21:59:27

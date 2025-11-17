@@ -287,12 +287,7 @@ class WaiversController
         if ($action === 'drop') {
             $result = $team->getHealthyAndInjuredPlayersOrderedByNameResult($season);
         } elseif ($season->phase === 'Free Agency') {
-            $queryString = "SELECT *
-                FROM ibl_plr
-                WHERE retired='0'
-                    AND draftyear + exp + cyt - cy = " . $season->endingYear . "
-                ORDER BY name ASC";
-            $result = $this->db->sql_query($queryString);
+            $result = $league->getFreeAgentsResult($season);
         } else {
             $result = $league->getWaivedPlayersResult();
         }
@@ -322,12 +317,7 @@ class WaiversController
         if ($action === 'drop') {
             $result = $team->getHealthyAndInjuredPlayersOrderedByNameResult();
         } elseif ($season->phase === 'Free Agency') {
-            $queryString = "SELECT *
-                FROM ibl_plr
-                WHERE retired='0'
-                    AND draftyear + exp + cyt - cy = " . $season->endingYear . "
-                ORDER BY name ASC";
-            $result = $this->db->sql_query($queryString);
+            $result = $league->getFreeAgentsResult($season);
         } else {
             $result = $league->getWaivedPlayersResult();
         }

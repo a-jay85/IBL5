@@ -74,7 +74,7 @@
 - Review refactored modules: Player, Waivers, Draft, Team, Extension, Trading
 - Check `ibl5/schema.sql` for database structure
 - See best practices in: `ibl5/classes/Player/README.md`, `ibl5/classes/DepthChart/SECURITY.md`
-- Set up dev environment: See `DEVELOPMENT_ENVIRONMENT.md` or use dev container (`.devcontainer/`)
+- Dependencies are cached via GitHub Actions (`.github/workflows/cache-dependencies.yml`)
 - Run tests: `cd ibl5 && vendor/bin/phpunit tests/`
 - CI/CD: Tests run automatically via GitHub Actions (`.github/workflows/tests.yml`)
 

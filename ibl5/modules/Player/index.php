@@ -55,6 +55,9 @@ function showpage($playerID, $pageView)
 
     // Render player highs table
     echo $viewHelper->renderPlayerHighsTable($playerStats);
+    
+    // Close the outer row started in renderPlayerHeader
+    echo "</tr>";
 
     // Render player menu
     echo $viewHelper->renderPlayerMenu($playerID);

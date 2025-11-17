@@ -3,6 +3,8 @@
 namespace Waivers;
 
 use Player\Player;
+use Player\PlayerContractCalculator;
+use Services\PlayerDataConverter;
 
 /**
  * Main controller for waiver wire operations
@@ -23,6 +25,7 @@ class WaiversController
     private $validator;
     private $view;
     private $newsService;
+    private PlayerContractCalculator $contractCalculator;
     
     public function __construct($db)
     {
@@ -33,6 +36,7 @@ class WaiversController
         $this->validator = new WaiversValidator();
         $this->view = new WaiversView();
         $this->newsService = new \Services\NewsService($db);
+        $this->contractCalculator = new PlayerContractCalculator();
     }
     
     /**
@@ -187,10 +191,14 @@ class WaiversController
         $contractData = $this->processor->prepareContractData($player, $season);
         $playerSalary = isset($contractData['salary']) ? (int) $contractData['salary'] : 0;
         
-        // If no new contract, get salary from appropriate contract year field
+        // If no new contract, get salary using PlayerContractCalculator
         if ($playerSalary === 0) {
-            $contractYearField = $season->phase === 'Free Agency' ? 'cy2' : 'cy1';
-            $playerSalary = (int) ($player[$contractYearField] ?? 0);
+            $playerData = PlayerDataConverter::arrayToPlayerData($player);
+            if ($season->phase === 'Free Agency') {
+                $playerSalary = $this->contractCalculator->getNextSeasonSalary($playerData);
+            } else {
+                $playerSalary = $this->contractCalculator->getCurrentSeasonSalary($playerData);
+            }
         }
         
         if (!$this->validator->validateAdd($playerID, $healthyRosterSlots, $totalSalary, $playerSalary)) {

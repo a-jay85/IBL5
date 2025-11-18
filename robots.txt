@@ -1,5 +1,21 @@
 User-agent: *
+Disallow: /admin/
 Disallow: /ibl/
 Disallow: /ibl5/
 Disallow: /iblforum/
 Disallow: /previous-ibl-archive/
+Disallow: /.git/
+Disallow: /vendor/
+Disallow: /tests/
+Disallow: /docs/
+Disallow: /config.php
+Disallow: /mainfile.php
+
+# Crawl-Delay for all bots
+Crawl-delay: 10
+
+# Block bad bots
+User-agent: MJ12bot
+User-agent: AhrefsBot
+User-agent: SemrushBot
+Disallow: /

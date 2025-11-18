@@ -482,23 +482,12 @@ class FreeAgencyDisplayHelper
     private function renderPlayerDemands(Player $player, array $demands): string
     {
         ob_start();
-        
-        if ($player->yearsOfExperience > 0) {
-            // Veteran - show all years
-            echo htmlspecialchars($demands['dem1']);
-            if ($demands['dem2'] != 0) echo "</td><td>" . htmlspecialchars($demands['dem2']);
-            if ($demands['dem3'] != 0) echo "</td><td>" . htmlspecialchars($demands['dem3']);
-            if ($demands['dem4'] != 0) echo "</td><td>" . htmlspecialchars($demands['dem4']);
-            if ($demands['dem5'] != 0) echo "</td><td>" . htmlspecialchars($demands['dem5']);
-            if ($demands['dem6'] != 0) echo "</td><td>" . htmlspecialchars($demands['dem6']);
-            echo "</td><td></td>";
-        } else {
-            // Undrafted rookie - limit to years 3 and 4
-            echo htmlspecialchars($demands['dem3']);
-            if ($demands['dem4'] != 0) echo "</td><td>" . htmlspecialchars($demands['dem4']);
-            echo "</td><td></td>";
-        }
-        
+        if ($demands['dem1'] != 0) echo "<td>" . htmlspecialchars($demands['dem1']) . "</td>"; else echo "<td></td>";
+        if ($demands['dem2'] != 0) echo "<td>" . htmlspecialchars($demands['dem2']) . "</td>"; else echo "<td></td>";
+        if ($demands['dem3'] != 0) echo "<td>" . htmlspecialchars($demands['dem3']) . "</td>"; else echo "<td></td>";
+        if ($demands['dem4'] != 0) echo "<td>" . htmlspecialchars($demands['dem4']) . "</td>"; else echo "<td></td>";
+        if ($demands['dem5'] != 0) echo "<td>" . htmlspecialchars($demands['dem5']) . "</td>"; else echo "<td></td>";
+        if ($demands['dem6'] != 0) echo "<td>" . htmlspecialchars($demands['dem6']) . "</td>"; else echo "<td></td>";
         return ob_get_clean();
     }
 

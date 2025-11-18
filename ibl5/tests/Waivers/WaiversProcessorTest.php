@@ -207,23 +207,20 @@ class WaiversProcessorTest extends TestCase
         $this->assertStringContainsString('1 h', $waitTime); // Should be 1 hour remaining
     }
     
-    public function testPrepareContractDataForNewContract()
+    public function testDetermineContractDataForNewContract()
     {
         $playerData = [
             'cy1' => 0,
             'exp' => 8
         ];
         
-        $contractData = $this->processor->prepareContractData($playerData, $this->mockSeasonRegular);
+        $contractData = $this->processor->determineContractData($playerData, $this->mockSeasonRegular);
         
-        $this->assertTrue($contractData['isNewContract']);
-        $this->assertEquals('cy1', $contractData['contractYearField']);
-        $this->assertEquals(1, $contractData['contractYear']);
+        $this->assertFalse($contractData['hasExistingContract']);
         $this->assertEquals(89, $contractData['salary']);
-        $this->assertEquals('89', $contractData['finalContract']);
     }
     
-    public function testPrepareContractDataForExistingContract()
+    public function testDetermineContractDataForExistingContract()
     {
         $playerData = [
             'cy1' => 500,
@@ -233,14 +230,13 @@ class WaiversProcessorTest extends TestCase
             'cy3' => 600
         ];
         
-        $contractData = $this->processor->prepareContractData($playerData, $this->mockSeasonRegular);
+        $contractData = $this->processor->determineContractData($playerData, $this->mockSeasonRegular);
         
-        $this->assertFalse($contractData['isNewContract']);
+        $this->assertTrue($contractData['hasExistingContract']);
         $this->assertEquals(500, $contractData['salary']);
-        $this->assertEquals('500 550 600', $contractData['finalContract']);
     }
     
-    public function testPrepareContractDataForMidContract()
+    public function testDetermineContractDataForMidContract()
     {
         $playerData = [
             'cy1' => 500,
@@ -250,10 +246,10 @@ class WaiversProcessorTest extends TestCase
             'cy3' => 600
         ];
         
-        $contractData = $this->processor->prepareContractData($playerData, $this->mockSeasonRegular);
+        $contractData = $this->processor->determineContractData($playerData, $this->mockSeasonRegular);
         
-        $this->assertFalse($contractData['isNewContract']);
-        $this->assertEquals('550 600', $contractData['finalContract']);
+        $this->assertTrue($contractData['hasExistingContract']);
+        $this->assertEquals(550, $contractData['salary']);
     }
     
     public function testGetPlayerContractDisplayWithMissingExperience()
@@ -281,7 +277,7 @@ class WaiversProcessorTest extends TestCase
         $this->assertEquals('51', $contract); // Should use vet min calculation for rookie
     }
     
-    public function testPrepareContractDataForNewContractDuringFreeAgency()
+    public function testDetermineContractDataForNewContractDuringFreeAgency()
     {
         $playerData = [
             'cy1' => 0,
@@ -289,13 +285,10 @@ class WaiversProcessorTest extends TestCase
             'exp' => 6
         ];
         
-        $contractData = $this->processor->prepareContractData($playerData, $this->mockSeasonFreeAgency);
+        $contractData = $this->processor->determineContractData($playerData, $this->mockSeasonFreeAgency);
         
-        $this->assertTrue($contractData['isNewContract']);
-        $this->assertEquals('cy2', $contractData['contractYearField']);
-        $this->assertEquals(2, $contractData['contractYear']);
+        $this->assertFalse($contractData['hasExistingContract']);
         $this->assertEquals(76, $contractData['salary']);
-        $this->assertEquals('76', $contractData['finalContract']);
     }
     
     public function testGetPlayerContractDisplayDuringFreeAgency()

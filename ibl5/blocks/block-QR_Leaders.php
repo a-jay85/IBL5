@@ -17,6 +17,7 @@ if (!defined('BLOCK_FILE')) {
 }
 
 use Services\DatabaseService;
+use Player\PlayerImageHelper;
 
 global $db;
 
@@ -124,8 +125,10 @@ function all_chunk($pos, $row)
     $stats_stl = sprintf('%04.2f', $stats_stl);
     $stats_blk = sprintf('%04.2f', $stats_blk);
 
+    $playerImageUrl = PlayerImageHelper::getImageUrl($pid, '../images/player/');
+
     if ($pospoc == $pos) {
-        $all_chunk_player = "<td><table border=3 bordercolor=#FFD700><tbody><tr><td colspan=2><img src=\"../images/player/$pid.jpg\"> <img width=65 height=90 src=\"../images/logo/new$tid.gif\"></td>
+        $all_chunk_player = "<td><table border=3 bordercolor=#FFD700><tbody><tr><td colspan=2><img src=\"$playerImageUrl\"> <img width=65 height=90 src=\"../images/logo/new$tid.gif\"></td>
 	<tr><td colspan=2><b><a href=modules.php?name=Player&pa=showpage&pid=$pid><font color=#006666>$name</font></a></td></tr>
 	<tr><td bgcolor=#006666 colspan=2><b><center><font color=#ffffff>$pos</font></center></b></td></tr>
 	<td><font color=#006666>Points:</font></td><td align=right><font color=#006666>$stats_ppg</font></td></tr>
@@ -134,7 +137,7 @@ function all_chunk($pos, $row)
 	<td><font color=#006666>Steals:</font></td><td align=right><font color=#006666>$stats_stl</font></td></tr>
 	<td><font color=#006666>Blocks:</font></td><td align=right><font color=#006666>$stats_blk</font></td></tr></table></td>";
     } else {
-        $all_chunk_player = "<td><table border=1 bordercolor=#006666><tbody><tr><td colspan=2><img src=\"../images/player/$pid.jpg\"> <img width=65 height=90 src=\"../images/logo/new$tid.gif\"></td>
+        $all_chunk_player = "<td><table border=1 bordercolor=#006666><tbody><tr><td colspan=2><img src=\"$playerImageUrl\"> <img width=65 height=90 src=\"../images/logo/new$tid.gif\"></td>
 	<tr><td colspan=2><b><a href=modules.php?name=Player&pa=showpage&pid=$pid><font color=#006666>$name</font></a></td></tr>
 	<tr><td bgcolor=#006666 colspan=2><b><center><font color=#ffffff>$pos</font></center></b></td></tr>
 	<td><font color=#006666>Points:</font></td><td align=right><font color=#006666>$stats_ppg</font></td></tr>

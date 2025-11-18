@@ -5,6 +5,8 @@ if (!defined('BLOCK_FILE')) {
     die();
 }
 
+use Player\PlayerImageHelper;
+
 global $db;
 
 $queryLastSimDates = $db->sql_query("SELECT * FROM ibl_sim_dates ORDER BY Sim DESC LIMIT 1");
@@ -102,7 +104,7 @@ for ($i = 1; $i <= 5; $i++) {
                     <tr>
                         <td style="min-width:155px;" colspan=2>
                             <div style="text-align:center;">
-                                <img src="./images/player/' . $rows[$rowNumber]['pid'] . '.jpg" height="90" width="65">
+                                <img src="./images/player/' . PlayerImageHelper::getImageUrl($rows[$rowNumber]['pid']) . '" height="90" width="65">
                                 <img src="./images/logo/new' . $rows[$rowNumber]['tid'] . '.png" height="75" width="75">
                             </div>
                         </td>

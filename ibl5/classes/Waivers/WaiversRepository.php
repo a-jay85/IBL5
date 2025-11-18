@@ -52,7 +52,7 @@ class WaiversRepository
     public function signPlayerFromWaivers(int $playerID, array $team, array $contractData): bool
     {
         $playerID = (int) $playerID;
-        $teamName = $team['teamname'] ?? '';
+        $teamName = $team['team_name'] ?? '';
         $teamID = (int) ($team['teamid'] ?? 0);
         $teamNameEscaped = \Services\DatabaseService::escapeString($this->db, $teamName);
         

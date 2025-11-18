@@ -53,8 +53,23 @@ function showpage($playerID, $pageView)
     $contract_display = implode("/", $player->getRemainingContractArray());
     echo $viewHelper->renderPlayerBioSection($player, $contract_display);
 
-    // Render player highs table
-    echo $viewHelper->renderPlayerHighsTable($playerStats);
+    // Query All-Star Activity data
+    $escapedName = Services\DatabaseService::escapeString($db, $player->name);
+    
+    $allstarquery = $db->sql_query("SELECT * FROM ibl_awards WHERE name='" . $escapedName . "' AND Award LIKE '%Conference All-Star'");
+    $asg = $db->sql_numrows($allstarquery);
+
+    $allstarquery2 = $db->sql_query("SELECT * FROM ibl_awards WHERE name='" . $escapedName . "' AND Award LIKE 'Three-Point Contest%'");
+    $threepointcontests = $db->sql_numrows($allstarquery2);
+
+    $allstarquery3 = $db->sql_query("SELECT * FROM ibl_awards WHERE name='" . $escapedName . "' AND Award LIKE 'Slam Dunk Competition%'");
+    $dunkcontests = $db->sql_numrows($allstarquery3);
+    
+    $allstarquery4 = $db->sql_query("SELECT * FROM ibl_awards WHERE name='" . $escapedName . "' AND Award LIKE 'Rookie-Sophomore Challenge'");
+    $rooksoph = $db->sql_numrows($allstarquery4);
+
+    // Render player highs table with All-Star Activity data
+    echo $viewHelper->renderPlayerHighsTable($playerStats, $asg, $threepointcontests, $dunkcontests, $rooksoph);
     
     // Close the outer row started in renderPlayerHeader
     echo "</tr>";

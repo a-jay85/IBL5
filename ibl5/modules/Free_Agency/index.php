@@ -1,6 +1,7 @@
 <?php
 
 use Player\Player;
+use Player\PlayerImageHelper;
 
 /************************************************************************/
 /*                     IBL Free Agency Module                           */
@@ -1148,7 +1149,8 @@ function negotiate($pid)
     $maxstartsatbird5 = $maxstartsatbird4 + $Offer_max_increase_bird;
     $maxstartsatbird6 = $maxstartsatbird5 + $Offer_max_increase_bird;
 
-    echo "<img align=left src=\"images/player/$pid.jpg\">";
+    $playerImageUrl = PlayerImageHelper::getImageUrl($pid);
+    echo "<img align=left src=\"$playerImageUrl\">";
 
     echo "Here are my demands (note these are not adjusted for your team's attributes; I will adjust the offer you make to me accordingly):";
 

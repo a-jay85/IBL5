@@ -37,8 +37,9 @@ class RookieOptionFormView
         $playerName = DatabaseService::safeHtmlOutput($player->name);
         $teamNameEscaped = DatabaseService::safeHtmlOutput($teamName);
         $rookieOptionValueEscaped = DatabaseService::safeHtmlOutput((string) $rookieOptionValue);
+        $playerImageUrl = \Player\PlayerImageHelper::getImageUrl($playerID);
         
-        echo "<img align=left src=\"images/player/{$playerID}.jpg\"><p>
+        echo "<img align=left src=\"{$playerImageUrl}\"><p>
         You may exercise the rookie option on <b>{$playerPosition} {$playerName}</b>.<p>
         Their contract value the season after this one will be <b>{$rookieOptionValueEscaped}</b>.<p>
         WARNING: By exercising this option, <b>you can't use an in-season contract extension on them next season</b>.<p>

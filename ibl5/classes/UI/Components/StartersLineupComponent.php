@@ -71,7 +71,7 @@ class StartersLineupComponent
         
         return "<td><center><b>$position</b><br>" .
                "<img src=\"{$playerImageUrl}\" height=\"90\" width=\"65\"><br>" .
-               "<a href=\"./modules.php?name=Player&pa=showpage&pid=" . htmlspecialchars((string)$pid, ENT_QUOTES, 'UTF-8') . "\">$name</a>" .
+               "<a href=\"./modules.php?name=Player&pa=showpage&pid=" . htmlspecialchars((string)$pid, ENT_QUOTES, 'UTF-8') . "\">" . ($name ?: '&nbsp;') . "</a>" .
                "</td>";
     }
     

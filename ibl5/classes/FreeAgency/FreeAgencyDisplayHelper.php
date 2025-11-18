@@ -33,7 +33,7 @@ class FreeAgencyDisplayHelper
      * @param \Season $season Current season
      * @return string HTML output
      */
-    public function renderMainPage(\Team $team, \Season $season): string
+    public function renderMainPage($team, $season): string
     {
         $capCalculator = new FreeAgencyCapCalculator($this->db);
         $capData = $capCalculator->calculateTeamCapSpace($team);
@@ -68,7 +68,7 @@ class FreeAgencyDisplayHelper
      * @param array<string, mixed> $capData
      * @return string HTML table
      */
-    private function renderPlayersUnderContract(\Team $team, \Season $season, array $capData): string
+    private function renderPlayersUnderContract($team, $season, array $capData): string
     {
         ob_start();
         ?>
@@ -129,7 +129,7 @@ class FreeAgencyDisplayHelper
      * @param array<string, mixed> $capData
      * @return string HTML table
      */
-    private function renderContractOffers(\Team $team, array $capData): string
+    private function renderContractOffers($team, array $capData): string
     {
         $commonRepository = new \Services\CommonRepository($this->db);
         
@@ -185,7 +185,7 @@ class FreeAgencyDisplayHelper
      * @param array<string, mixed> $capData
      * @return string HTML table
      */
-    private function renderTeamFreeAgents(\Team $team, \Season $season, array $capData): string
+    private function renderTeamFreeAgents($team, $season, array $capData): string
     {
         ob_start();
         ?>
@@ -239,7 +239,7 @@ class FreeAgencyDisplayHelper
      * @param \Season $season
      * @return string HTML table
      */
-    private function renderOtherFreeAgents(\Team $team, \Season $season): string
+    private function renderOtherFreeAgents($team, $season): string
     {
         ob_start();
         ?>
@@ -459,7 +459,7 @@ class FreeAgencyDisplayHelper
      * @param array<string, mixed> $capData
      * @return string HTML table rows
      */
-    private function renderCapSpaceFooter(\Team $team, array $capData): string
+    private function renderCapSpaceFooter($team, array $capData): string
     {
         $MLEicon = ($team->hasMLE == "1") ? "\u{2705}" : "\u{274C}";
         $LLEicon = ($team->hasLLE == "1") ? "\u{2705}" : "\u{274C}";

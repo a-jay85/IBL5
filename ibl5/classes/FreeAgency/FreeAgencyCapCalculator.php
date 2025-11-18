@@ -31,7 +31,7 @@ class FreeAgencyCapCalculator
      * @param \Team $team
      * @return array<string, mixed> Cap space and roster data
      */
-    public function calculateTeamCapSpace(\Team $team): array
+    public function calculateTeamCapSpace($team): array
     {
         $year1TotalSalary = $year2TotalSalary = $year3TotalSalary = 0;
         $year4TotalSalary = $year5TotalSalary = $year6TotalSalary = 0;

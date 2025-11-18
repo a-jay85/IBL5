@@ -174,7 +174,7 @@ class TeamRepository
         $teamID = (int) $teamID;
 
         $year = DatabaseService::escapeString($this->db, $year);
-        $query = "SELECT * FROM ibl_hist WHERE teamid = '$teamID' AND year = '$year' ORDER BY CASE WHEN ordinal > 960 THEN 1 ELSE 0 END, name ASC";
+        $query = "SELECT * FROM ibl_hist WHERE teamid = '$teamID' AND year = '$year' ORDER BY name ASC";
         return $this->db->sql_query($query);
     }
 }

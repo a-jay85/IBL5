@@ -158,7 +158,9 @@ public function getPlayer($playerId)
 **Documentation:**
 - [DATABASE_GUIDE.md](DATABASE_GUIDE.md) - Schema reference
 - [API_GUIDE.md](API_GUIDE.md) - API development
-- [ibl5/classes/Statistics/](ibl5/classes/Statistics/) - Stats formatting
+- [STRATEGIC_PRIORITIES.md](ibl5/docs/STRATEGIC_PRIORITIES.md) - Strategic analysis & priorities
+- [REFACTORING_HISTORY.md](ibl5/docs/REFACTORING_HISTORY.md) - Complete refactoring timeline
+- [STATISTICS_FORMATTING_GUIDE.md](ibl5/docs/STATISTICS_FORMATTING_GUIDE.md) - Stats formatting
 - [PRODUCTION_DEPLOYMENT_GUIDE.md](PRODUCTION_DEPLOYMENT_GUIDE.md) - Deployment
 
 **Code Examples:**

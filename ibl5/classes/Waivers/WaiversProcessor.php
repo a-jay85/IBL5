@@ -132,10 +132,14 @@ class WaiversProcessor
         $contractYearField = $isFreeAgency ? 'cy2' : 'cy1';
         $contractYear = $isFreeAgency ? 2 : 1;
         
+        // Convert array to PlayerData for calculator methods
+        $playerDataObj = PlayerDataConverter::arrayToPlayerData($playerData);
+        
+        // Determine current season salary based on phase
         if ($isFreeAgency) {
-            $currentSeasonSalary = (int) ($playerData['cy2'] ?? 0);
+            $currentSeasonSalary = $this->contractCalculator->getNextSeasonSalary($playerDataObj);
         } else {
-            $currentSeasonSalary = (int) ($playerData['cy1'] ?? 0);
+            $currentSeasonSalary = $this->contractCalculator->getCurrentSeasonSalary($playerDataObj);
         }
         
         if ($currentSeasonSalary == 0) {
@@ -151,17 +155,8 @@ class WaiversProcessor
             ];
         }
         
-        // Use existing contract
-        $currentYear = (int) ($playerData['cy'] ?? 1);
-        $totalYears = (int) ($playerData['cyt'] ?? 1);
-        $contractParts = [];
-        
-        for ($year = $currentYear; $year <= $totalYears; $year++) {
-            $cyField = "cy$year";
-            if (isset($playerData[$cyField])) {
-                $contractParts[] = (int) $playerData[$cyField];
-            }
-        }
+        // Use remaining contract from calculator
+        $contractParts = $this->contractCalculator->getRemainingContractArray($playerDataObj);
         
         return [
             'isNewContract' => false,

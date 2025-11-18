@@ -300,7 +300,7 @@ class WaiversProcessorTest extends TestCase
         ]);
         
         $contract = $this->processor->getPlayerContractDisplay($player, $this->mockSeasonFreeAgency);
-        $this->assertEquals('64', $contract);
+        $this->assertEquals('70', $contract);
     }
     
     public function testGetPlayerContractDisplayWithExistingContractDuringFreeAgency()

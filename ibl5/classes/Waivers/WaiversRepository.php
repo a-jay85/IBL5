@@ -46,10 +46,10 @@ class WaiversRepository
      * 
      * @param int $playerID Player ID to sign
      * @param array $team Team data array with 'teamname' and 'teamid' keys
-     * @param array $contractData Contract data including salary, contractYearField, and contractYear
+     * @param array $contractData Contract data including salary
      * @return bool Success status
      */
-    public function signPlayerFromWaivers(int $playerID, array $team, array $contractData, Season $season): bool
+    public function signPlayerFromWaivers(int $playerID, array $team, array $contractData): bool
     {
         $playerID = (int) $playerID;
         $teamName = $team['teamname'] ?? '';

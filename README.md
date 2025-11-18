@@ -35,6 +35,8 @@ Internet-based fantasy basketball site powered by Jump Shot Basketball simulatio
 
 ## 📚 Documentation
 
+**📖 [Complete Documentation Index](ibl5/docs/README.md)** - Navigate all documentation
+
 ### Core Guides (Root)
 - [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md) - Development standards & priorities
 - [DATABASE_GUIDE.md](DATABASE_GUIDE.md) - Schema reference for developers
@@ -42,20 +44,27 @@ Internet-based fantasy basketball site powered by Jump Shot Basketball simulatio
 - [API_GUIDE.md](API_GUIDE.md) - RESTful API development
 - [PRODUCTION_DEPLOYMENT_GUIDE.md](PRODUCTION_DEPLOYMENT_GUIDE.md) - Deployment procedures
 
-### Component Documentation (ibl5/classes/)
+### Project Documentation (ibl5/docs/)
+- [REFACTORING_HISTORY.md](ibl5/docs/REFACTORING_HISTORY.md) - Complete refactoring timeline
+- [STRATEGIC_PRIORITIES.md](ibl5/docs/STRATEGIC_PRIORITIES.md) - Strategic analysis & next priorities
+- [STATISTICS_FORMATTING_GUIDE.md](ibl5/docs/STATISTICS_FORMATTING_GUIDE.md) - StatsFormatter usage
+
+### Component Documentation (With Code)
 - [Statistics/](ibl5/classes/Statistics/) - StatsFormatter and StatsSanitizer
-- [UI/Components/](ibl5/classes/UI/Components/) - Reusable UI components
+- [Player/](ibl5/classes/Player/) - Player module architecture
+- [DepthChart/](ibl5/classes/DepthChart/) - Depth chart module + security patterns
 - [Draft/](ibl5/classes/Draft/) - Draft module
-- [DepthChart/](ibl5/classes/DepthChart/) - Depth chart module
-- [Player/](ibl5/classes/Player/) - Player module
+- [Negotiation/](ibl5/classes/Negotiation/) - Contract negotiation
+- [Migrations/](ibl5/migrations/) - Database migration procedures
 
 ### Historical Documents (.archive/)
-Previous summaries and completion reports preserved for reference.
+Previous completion summaries and detailed reports preserved for reference.
 
 ## 🔍 Common Tasks
 
 **"How do I deploy to production?"** → [PRODUCTION_DEPLOYMENT_GUIDE.md](PRODUCTION_DEPLOYMENT_GUIDE.md)  
 **"How do I query the database?"** → [DATABASE_GUIDE.md](DATABASE_GUIDE.md)  
-**"What should I work on next?"** → [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md)  
+**"What should I work on next?"** → [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md) or [STRATEGIC_PRIORITIES.md](ibl5/docs/STRATEGIC_PRIORITIES.md)  
 **"How do I build an API endpoint?"** → [API_GUIDE.md](API_GUIDE.md)  
-**"How do I format statistics?"** → [ibl5/classes/Statistics/](ibl5/classes/Statistics/)
+**"How do I format statistics?"** → [STATISTICS_FORMATTING_GUIDE.md](ibl5/docs/STATISTICS_FORMATTING_GUIDE.md)  
+**"What's been refactored?"** → [REFACTORING_HISTORY.md](ibl5/docs/REFACTORING_HISTORY.md)

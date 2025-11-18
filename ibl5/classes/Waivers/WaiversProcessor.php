@@ -120,48 +120,41 @@ class WaiversProcessor
     }
     
     /**
-     * Prepares contract data for a waiver signing
+     * Determines if a player has an existing contract for the current/next season
      * 
-     * @param array $playerData Player data array
-     * @param Season $season Season instance to determine phase
-     * @return array Contract data with cy field, contract year, salary, and final contract display
+     * Clarifies contract responsibility when picking up a player from waivers:
+     * - If player HAS an existing contract: team inherits remaining contract obligations
+     * - If player has NO contract: team assigns veteran minimum based on experience
+     * 
+     * @param array $playerData Player data array with contract and experience fields
+     * @param Season $season Season instance to determine phase (affects which season we check)
+     * @return array ['hasExistingContract' => bool, 'salary' => int]
      */
-    public function prepareContractData(array $playerData, Season $season): array
+    public function determineContractData(array $playerData, Season $season): array
     {
-        $isFreeAgency = $season->phase === 'Free Agency';
-        $contractYearField = $isFreeAgency ? 'cy2' : 'cy1';
-        $contractYear = $isFreeAgency ? 2 : 1;
-        
-        // Convert array to PlayerData for calculator methods
         $playerDataObj = PlayerDataConverter::arrayToPlayerData($playerData);
         
         // Determine current season salary based on phase
-        if ($isFreeAgency) {
-            $currentSeasonSalary = $this->contractCalculator->getNextSeasonSalary($playerDataObj);
-        } else {
-            $currentSeasonSalary = $this->contractCalculator->getCurrentSeasonSalary($playerDataObj);
-        }
+        $currentSeasonSalary = ($season->phase === 'Free Agency')
+            ? $this->contractCalculator->getNextSeasonSalary($playerDataObj)
+            : $this->contractCalculator->getCurrentSeasonSalary($playerDataObj);
+    
+        $hasExistingContract = $currentSeasonSalary > 0;
         
-        if ($currentSeasonSalary == 0) {
-            $experience = (int) ($playerData['exp'] ?? 0);
-            $vetMinSalary = $this->calculateVeteranMinimumSalary($experience);
-            
+        if ($hasExistingContract) {
             return [
-                'contractYearField' => $contractYearField,
-                'contractYear' => $contractYear,
-                'salary' => $vetMinSalary,
-                'isNewContract' => true,
-                'finalContract' => (string) $vetMinSalary
+                'hasExistingContract' => true,
+                'salary' => $currentSeasonSalary
             ];
         }
-        
-        // Use remaining contract from calculator
-        $contractParts = $this->contractCalculator->getRemainingContractArray($playerDataObj);
+            
+        // No existing contract: assign veteran minimum
+        $experience = (int) ($playerData['exp'] ?? 0);
+        $vetMinSalary = $this->calculateVeteranMinimumSalary($experience);
         
         return [
-            'isNewContract' => false,
-            'salary' => $currentSeasonSalary,
-            'finalContract' => implode(" ", $contractParts)
+            'hasExistingContract' => false,
+            'salary' => $vetMinSalary
         ];
     }
 }

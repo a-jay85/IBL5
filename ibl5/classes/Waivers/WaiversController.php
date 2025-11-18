@@ -188,7 +188,7 @@ class WaiversController
         }
         
         $season = new \Season($this->db);
-        $contractData = $this->processor->prepareContractData($player, $season);
+        $contractData = $this->processor->determineContractData($player, $season);
         $playerSalary = (int) ($contractData['salary'] ?? 0);
         
         if (!$this->validator->validateAdd($playerID, $healthyRosterSlots, $totalSalary, $playerSalary)) {
@@ -200,16 +200,16 @@ class WaiversController
             return "Team not found.";
         }
         
-        if (!$this->repository->signPlayerFromWaivers($playerID, $team, $contractData)) {
+        if (!$this->repository->signPlayerFromWaivers($playerID, $team, $contractData, $season)) {
             return "Oops, something went wrong. Post what you were trying to do in <A HREF=\"" . self::DISCORD_BUGS_CHANNEL_URL . "\">#site-bugs-and-to-do</A> and we'll fix it asap. Sorry!";
         }
         
         // Create news story
-        $this->createWaiverNewsStory($teamName, $player['name'], 'add', $contractData['finalContract']);
+        $this->createWaiverNewsStory($teamName, $player['name'], 'add', $contractData['salary']);
         
         // Send email notification
         $storytitle = $teamName . " make waiver additions";
-        $hometext = "The " . $teamName . " sign " . $player['name'] . " from waivers for " . $contractData['finalContract'] . ".";
+        $hometext = "The " . $teamName . " sign " . $player['name'] . " from waivers for " . $contractData['salary'] . ".";
         mail(self::NOTIFICATION_EMAIL_RECIPIENT, $storytitle, $hometext, "From: " . self::NOTIFICATION_EMAIL_SENDER);
         
         // Send Discord notification

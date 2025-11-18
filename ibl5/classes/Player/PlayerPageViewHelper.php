@@ -24,6 +24,7 @@ class PlayerPageViewHelper
     public function renderPlayerHeader(Player $player, int $playerID): string
     {
         ob_start();
+        $playerImageUrl = PlayerImageHelper::getImageUrl($playerID);
         ?>
 <table>
     <tr>
@@ -35,7 +36,7 @@ class PlayerPageViewHelper
         <hr>
         <table>
             <tr>
-                <td valign=center><img src="images/player/<?= $playerID ?>.jpg" height="90" width="65" alt="<?= htmlspecialchars($player->name) ?>"></td>
+                <td valign=center><img src="<?= $playerImageUrl ?>" height="90" width="65" alt="<?= htmlspecialchars($player->name) ?>"></td>
                 <td>
         <?php
         return ob_get_clean();

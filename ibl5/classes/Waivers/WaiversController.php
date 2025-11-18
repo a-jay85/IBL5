@@ -200,7 +200,7 @@ class WaiversController
             return "Team not found.";
         }
         
-        if (!$this->repository->signPlayerFromWaivers($playerID, $team, $contractData, $season)) {
+        if (!$this->repository->signPlayerFromWaivers($playerID, $team, $contractData)) {
             return "Oops, something went wrong. Post what you were trying to do in <A HREF=\"" . self::DISCORD_BUGS_CHANNEL_URL . "\">#site-bugs-and-to-do</A> and we'll fix it asap. Sorry!";
         }
         

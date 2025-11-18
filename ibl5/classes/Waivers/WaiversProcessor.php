@@ -83,12 +83,14 @@ class WaiversProcessor
         
         if ($season->phase === 'Free Agency') {
             $currentSeasonSalary = $this->contractCalculator->getNextSeasonSalary($playerData);
+            $experience = $playerData->yearsOfExperience + 1;
         } else {
             $currentSeasonSalary = $this->contractCalculator->getCurrentSeasonSalary($playerData);
+            $experience = $playerData->yearsOfExperience;
         }
         
         if ($currentSeasonSalary == 0) {
-            return (string) $this->calculateVeteranMinimumSalary($player->yearsOfExperience);
+            return (string) $this->calculateVeteranMinimumSalary($experience);
         }
         
         $remainingContract = $this->contractCalculator->getRemainingContractArray($playerData);

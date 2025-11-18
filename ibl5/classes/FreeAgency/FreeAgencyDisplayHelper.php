@@ -286,7 +286,63 @@ class FreeAgencyDisplayHelper
      */
     private function renderTableHeader(): string
     {
-        return $this->viewHelper->renderPlayerRatings(new Player($this->db)); // Use existing method
+        ob_start();
+        ?>
+    <colgroup>
+        <col span="5">
+        <col span="6" style="background-color: #ddd">
+        <col span="7">
+        <col span="8" style="background-color: #ddd">
+        <col span="3">
+        <col span="6" style="background-color: #ddd">
+        <col span="5">
+    </colgroup>
+    <thead>
+        <tr>
+            <td><b>Options</b></td>
+            <td><b>Pos</b></td>
+            <td><b>Player</b></td>
+            <td><b>Team</b></td>
+            <td><b>Age</b></td>
+            <td><b>2ga</b></td>
+            <td><b>2g%</b></td>
+            <td><b>fta</b></td>
+            <td><b>ft%</b></td>
+            <td><b>3ga</b></td>
+            <td><b>3g%</b></td>
+            <td><b>orb</b></td>
+            <td><b>drb</b></td>
+            <td><b>ast</b></td>
+            <td><b>stl</b></td>
+            <td><b>to</b></td>
+            <td><b>blk</b></td>
+            <td><b>foul</b></td>
+            <td><b>oo</b></td>
+            <td><b>do</b></td>
+            <td><b>po</b></td>
+            <td><b>to</b></td>
+            <td><b>od</b></td>
+            <td><b>dd</b></td>
+            <td><b>pd</b></td>
+            <td><b>td</b></td>
+            <td><b>T</b></td>
+            <td><b>S</b></td>
+            <td><b>I</b></td>
+            <td><b>Yr1</b></td>
+            <td><b>Yr2</b></td>
+            <td><b>Yr3</b></td>
+            <td><b>Yr4</b></td>
+            <td><b>Yr5</b></td>
+            <td><b>Yr6</b></td>
+            <td><b>Loy</b></td>
+            <td><b>PFW</b></td>
+            <td><b>PT</b></td>
+            <td><b>Sec</b></td>
+            <td><b>Trad</b></td>
+        </tr>
+    </thead>
+        <?php
+        return ob_get_clean();
     }
 
     /**

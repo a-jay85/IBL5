@@ -152,25 +152,57 @@ class Team
         return $result;
     }
 
-    public function getHealthyAndInjuredPlayersOrderedByNameResult()
+    public function getHealthyAndInjuredPlayersOrderedByNameResult($season = null)
     {
+        $freeAgencyCondition = '';
+        if ($season && $season->phase === 'Free Agency') {
+            // During Free Agency, only count players who have a salary for next year
+            // This is calculated as cy + 1 (if cy=1, check cy2; if cy=4, check cy5, etc.)
+            $freeAgencyCondition = " AND (
+                (cy = 0 AND cy1 > 0) OR
+                (cy = 0 AND cy2 > 0) OR
+                (cy = 1 AND cy2 > 0) OR
+                (cy = 2 AND cy3 > 0) OR
+                (cy = 3 AND cy4 > 0) OR
+                (cy = 4 AND cy5 > 0) OR
+                (cy = 5 AND cy6 > 0)
+            )";
+        }
+        
         $query = "SELECT *
             FROM ibl_plr
             WHERE teamname = '$this->name'
+              AND tid = '$this->teamID'
               AND retired = '0'
-              AND ordinal <= '" . JSB::WAIVERS_ORDINAL . "'
+              AND ordinal <= '" . JSB::WAIVERS_ORDINAL . "'" . $freeAgencyCondition . "
             ORDER BY name ASC";
         $result = $this->db->sql_query($query);
         return $result;
     }
 
-    public function getHealthyPlayersOrderedByNameResult()
+    public function getHealthyPlayersOrderedByNameResult($season = null)
     {
+        $freeAgencyCondition = '';
+        if ($season && $season->phase === 'Free Agency') {
+            // During Free Agency, only count players who have a salary for next year
+            // This is calculated as cy + 1 (if cy=1, check cy2; if cy=4, check cy5, etc.)
+            $freeAgencyCondition = " AND (
+                (cy = 0 AND cy1 > 0) OR
+                (cy = 0 AND cy2 > 0) OR
+                (cy = 1 AND cy2 > 0) OR
+                (cy = 2 AND cy3 > 0) OR
+                (cy = 3 AND cy4 > 0) OR
+                (cy = 4 AND cy5 > 0) OR
+                (cy = 5 AND cy6 > 0)
+            )";
+        }
+        
         $query = "SELECT *
             FROM ibl_plr
             WHERE teamname = '$this->name'
+              AND tid = '$this->teamID'
               AND retired = '0'
-              AND ordinal <= '" . JSB::WAIVERS_ORDINAL ."'
+              AND ordinal <= '" . JSB::WAIVERS_ORDINAL ."'" . $freeAgencyCondition . "
               AND injured = '0'
             ORDER BY name ASC";
         $result = $this->db->sql_query($query);

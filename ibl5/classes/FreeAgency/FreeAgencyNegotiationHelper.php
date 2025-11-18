@@ -52,7 +52,10 @@ class FreeAgencyNegotiationHelper
         $existingOffer = $this->getExistingOffer($teamName, $player->name);
         
         // Adjust cap space to account for existing offer
-        $amendedCapSpace = $capData['softCap']['year1'] + ($existingOffer['offer1'] ?? 0);
+        $amendedCapSpace = $capData['softCap']['year1'] + $existingOffer['offer1'];
+        
+        // Check if there's an existing offer
+        $hasExistingOffer = $existingOffer['offer1'] > 0;
         
         ob_start();
         ?>
@@ -65,7 +68,7 @@ class FreeAgencyNegotiationHelper
 
 Here are my demands (note these are not adjusted for your team's attributes; I will adjust the offer you make to me accordingly):
 
-<?php if ($capData['rosterSpots'] < 1 && !isset($existingOffer['offer1'])): ?>
+<?php if ($capData['rosterSpots'] < 1 && !$hasExistingOffer): ?>
     <table cellspacing="0" border="1">
         <tr>
             <td colspan="8">Sorry, you have no roster spots remaining and cannot offer me a contract!</td>
@@ -113,7 +116,7 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
         <?= $this->renderLLERow($teamName, $player, $veteranMinimum, $amendedCapSpace, $capData) ?>
         <?= $this->renderVetMinRow($teamName, $player, $veteranMinimum, $amendedCapSpace, $capData) ?>
         
-        <?php if (isset($existingOffer['offer1'])): ?>
+        <?php if ($hasExistingOffer): ?>
         <tr>
             <td colspan="8">
                 <form method="post" action="/ibl5/modules/Free_Agency/freeagentofferdelete.php">
@@ -333,22 +336,22 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
         
         if (!$offer) {
             return [
-                'offer1' => '',
-                'offer2' => '',
-                'offer3' => '',
-                'offer4' => '',
-                'offer5' => '',
-                'offer6' => '',
+                'offer1' => 0,
+                'offer2' => 0,
+                'offer3' => 0,
+                'offer4' => 0,
+                'offer5' => 0,
+                'offer6' => 0,
             ];
         }
         
         return [
-            'offer1' => $offer['offer1'] ?: '',
-            'offer2' => $offer['offer2'] ?: '',
-            'offer3' => $offer['offer3'] ?: '',
-            'offer4' => $offer['offer4'] ?: '',
-            'offer5' => $offer['offer5'] ?: '',
-            'offer6' => $offer['offer6'] ?: '',
+            'offer1' => (int) ($offer['offer1'] ?: 0),
+            'offer2' => (int) ($offer['offer2'] ?: 0),
+            'offer3' => (int) ($offer['offer3'] ?: 0),
+            'offer4' => (int) ($offer['offer4'] ?: 0),
+            'offer5' => (int) ($offer['offer5'] ?: 0),
+            'offer6' => (int) ($offer['offer6'] ?: 0),
         ];
     }
 

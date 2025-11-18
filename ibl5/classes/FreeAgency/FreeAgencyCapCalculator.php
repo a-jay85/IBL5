@@ -73,19 +73,19 @@ class FreeAgencyCapCalculator
 
         // Add contract offers
         foreach ($team->getFreeAgencyOffersResult() as $offerRow) {
-            $year1TotalSalary += $offerRow['offer1'];
-            $year2TotalSalary += $offerRow['offer2'];
-            $year3TotalSalary += $offerRow['offer3'];
-            $year4TotalSalary += $offerRow['offer4'];
-            $year5TotalSalary += $offerRow['offer5'];
-            $year6TotalSalary += $offerRow['offer6'];
+            $year1TotalSalary += (int) $offerRow['offer1'];
+            $year2TotalSalary += (int) $offerRow['offer2'];
+            $year3TotalSalary += (int) $offerRow['offer3'];
+            $year4TotalSalary += (int) $offerRow['offer4'];
+            $year5TotalSalary += (int) $offerRow['offer5'];
+            $year6TotalSalary += (int) $offerRow['offer6'];
             
-            if ($offerRow['offer1'] != 0) $rosterspots1--;
-            if ($offerRow['offer2'] != 0) $rosterspots2--;
-            if ($offerRow['offer3'] != 0) $rosterspots3--;
-            if ($offerRow['offer4'] != 0) $rosterspots4--;
-            if ($offerRow['offer5'] != 0) $rosterspots5--;
-            if ($offerRow['offer6'] != 0) $rosterspots6--;
+            if ((int) $offerRow['offer1'] != 0) $rosterspots1--;
+            if ((int) $offerRow['offer2'] != 0) $rosterspots2--;
+            if ((int) $offerRow['offer3'] != 0) $rosterspots3--;
+            if ((int) $offerRow['offer4'] != 0) $rosterspots4--;
+            if ((int) $offerRow['offer5'] != 0) $rosterspots5--;
+            if ((int) $offerRow['offer6'] != 0) $rosterspots6--;
         }
 
         // Calculate available cap space
@@ -146,43 +146,43 @@ class FreeAgencyCapCalculator
         $result = $this->db->sql_query($query);
         
         foreach ($result as $row) {
-            $ordinal = $row['ordinal'];
-            $cy = $row['cy'];
-            $cyt = $row['cyt'];
+            $ordinal = (int) $row['ordinal'];
+            $cy = (int) $row['cy'];
+            $cyt = (int) $row['cyt'];
             
             switch ($cy) {
                 case 0:
-                    $capSpace['year1'] -= $row['cy1'];
-                    $capSpace['year2'] -= $row['cy2'];
-                    $capSpace['year3'] -= $row['cy3'];
-                    $capSpace['year4'] -= $row['cy4'];
-                    $capSpace['year5'] -= $row['cy5'];
-                    $capSpace['year6'] -= $row['cy6'];
+                    $capSpace['year1'] -= (int) $row['cy1'];
+                    $capSpace['year2'] -= (int) $row['cy2'];
+                    $capSpace['year3'] -= (int) $row['cy3'];
+                    $capSpace['year4'] -= (int) $row['cy4'];
+                    $capSpace['year5'] -= (int) $row['cy5'];
+                    $capSpace['year6'] -= (int) $row['cy6'];
                     break;
                 case 1:
-                    $capSpace['year1'] -= $row['cy2'];
-                    $capSpace['year2'] -= $row['cy3'];
-                    $capSpace['year3'] -= $row['cy4'];
-                    $capSpace['year4'] -= $row['cy5'];
-                    $capSpace['year5'] -= $row['cy6'];
+                    $capSpace['year1'] -= (int) $row['cy2'];
+                    $capSpace['year2'] -= (int) $row['cy3'];
+                    $capSpace['year3'] -= (int) $row['cy4'];
+                    $capSpace['year4'] -= (int) $row['cy5'];
+                    $capSpace['year5'] -= (int) $row['cy6'];
                     break;
                 case 2:
-                    $capSpace['year1'] -= $row['cy3'];
-                    $capSpace['year2'] -= $row['cy4'];
-                    $capSpace['year3'] -= $row['cy5'];
-                    $capSpace['year4'] -= $row['cy6'];
+                    $capSpace['year1'] -= (int) $row['cy3'];
+                    $capSpace['year2'] -= (int) $row['cy4'];
+                    $capSpace['year3'] -= (int) $row['cy5'];
+                    $capSpace['year4'] -= (int) $row['cy6'];
                     break;
                 case 3:
-                    $capSpace['year1'] -= $row['cy4'];
-                    $capSpace['year2'] -= $row['cy5'];
-                    $capSpace['year3'] -= $row['cy6'];
+                    $capSpace['year1'] -= (int) $row['cy4'];
+                    $capSpace['year2'] -= (int) $row['cy5'];
+                    $capSpace['year3'] -= (int) $row['cy6'];
                     break;
                 case 4:
-                    $capSpace['year1'] -= $row['cy5'];
-                    $capSpace['year2'] -= $row['cy6'];
+                    $capSpace['year1'] -= (int) $row['cy5'];
+                    $capSpace['year2'] -= (int) $row['cy6'];
                     break;
                 case 5:
-                    $capSpace['year1'] -= $row['cy6'];
+                    $capSpace['year1'] -= (int) $row['cy6'];
                     break;
             }
             
@@ -199,12 +199,12 @@ class FreeAgencyCapCalculator
         $result = $this->db->sql_query($query);
         
         foreach ($result as $offer) {
-            $capSpace['year1'] -= $offer['offer1'];
-            $capSpace['year2'] -= $offer['offer2'];
-            $capSpace['year3'] -= $offer['offer3'];
-            $capSpace['year4'] -= $offer['offer4'];
-            $capSpace['year5'] -= $offer['offer5'];
-            $capSpace['year6'] -= $offer['offer6'];
+            $capSpace['year1'] -= (int) $offer['offer1'];
+            $capSpace['year2'] -= (int) $offer['offer2'];
+            $capSpace['year3'] -= (int) $offer['offer3'];
+            $capSpace['year4'] -= (int) $offer['offer4'];
+            $capSpace['year5'] -= (int) $offer['offer5'];
+            $capSpace['year6'] -= (int) $offer['offer6'];
             $rosterSpots--;
         }
         

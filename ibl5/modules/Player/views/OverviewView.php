@@ -98,7 +98,7 @@ class OverviewView extends BaseView {
         echo "<p>
             <H1><center>GAME LOG</center></H1>
             <p>
-            <table class=\"sortable\" width=\"100%\">
+            <table class=\"sortable\">
                 <tr>
                     <th>Date</th>
                     <th>Away</th>

@@ -25,40 +25,6 @@ global $module, $name, $admin, $advanced_editor, $lang, $nuke_editor;
 
 if (file_exists("themes/" . $ThemeSel . "/style/editor.css")) {
     $edtcss = "editor_css : \"themes/" . $ThemeSel . "/style/editor.css\",";
-} else {
-    $edtcss = "editor_css : \"includes/tiny_mce/themes/default/editor_ui.css\",";
-}
-
-if ($nuke_editor == 1) {
-    if (is_admin($admin) and $name != "Forums" and !defined('NO_EDITOR')) {
-        echo "<!-- tinyMCE -->
-			<script language=\"javascript\" type=\"text/javascript\" src=\"includes/tiny_mce/tiny_mce.js\"></script>
-			<script language=\"javascript\" type=\"text/javascript\">
-		   	tinyMCE.init({
-	      		mode : \"textareas\",
-				theme : \"basic\",
-				language : \"$lang\",
-				$edtcss
-				force_p_newlines: \"false\",
-				force_br_newlines: \"true\"
-		   	});
-			</script>
-			<!-- /tinyMCE -->";
-    } elseif ($name != "Forums" and !defined('NO_EDITOR')) {
-        echo "<!-- tinyMCE -->
-			<script language=\"javascript\" type=\"text/javascript\" src=\"includes/tiny_mce/tiny_mce.js\"></script>
-			<script language=\"javascript\" type=\"text/javascript\">
-		   	tinyMCE.init({
-	      		mode : \"textareas\",
-				theme : \"default\",
-				language : \"$lang\",
-				$edtcss
-				force_p_newlines: \"false\",
-				force_br_newlines: \"true\"
-		   	});
-			</script>
-			<!-- /tinyMCE -->";
-    }
 }
 
 if (defined('MODULE_FILE') and file_exists("modules/" . $name . "/copyright.php")) {

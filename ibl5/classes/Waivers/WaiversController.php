@@ -3,6 +3,8 @@
 namespace Waivers;
 
 use Player\Player;
+use Player\PlayerContractCalculator;
+use Services\PlayerDataConverter;
 
 /**
  * Main controller for waiver wire operations
@@ -23,6 +25,7 @@ class WaiversController
     private $validator;
     private $view;
     private $newsService;
+    private PlayerContractCalculator $contractCalculator;
     
     public function __construct($db)
     {
@@ -33,6 +36,7 @@ class WaiversController
         $this->validator = new WaiversValidator();
         $this->view = new WaiversView();
         $this->newsService = new \Services\NewsService($db);
+        $this->contractCalculator = new PlayerContractCalculator();
     }
     
     /**
@@ -183,8 +187,9 @@ class WaiversController
             return "Player not found.";
         }
         
-        $contractData = $this->processor->prepareContractData($player);
-        $playerSalary = isset($contractData['cy1']) ? (int) $contractData['cy1'] : (int) ($player['cy1'] ?? 0);
+        $season = new \Season($this->db);
+        $contractData = $this->processor->determineContractData($player, $season);
+        $playerSalary = (int) ($contractData['salary'] ?? 0);
         
         if (!$this->validator->validateAdd($playerID, $healthyRosterSlots, $totalSalary, $playerSalary)) {
             return implode(' ', $this->validator->getErrors());
@@ -195,18 +200,16 @@ class WaiversController
             return "Team not found.";
         }
         
-        $teamID = (int) $team['teamid'];
-        
-        if (!$this->repository->signPlayerFromWaivers($playerID, $teamName, $teamID, $contractData)) {
+        if (!$this->repository->signPlayerFromWaivers($playerID, $team, $contractData)) {
             return "Oops, something went wrong. Post what you were trying to do in <A HREF=\"" . self::DISCORD_BUGS_CHANNEL_URL . "\">#site-bugs-and-to-do</A> and we'll fix it asap. Sorry!";
         }
         
         // Create news story
-        $this->createWaiverNewsStory($teamName, $player['name'], 'add', $contractData['finalContract']);
+        $this->createWaiverNewsStory($teamName, $player['name'], 'add', $contractData['salary']);
         
         // Send email notification
         $storytitle = $teamName . " make waiver additions";
-        $hometext = "The " . $teamName . " sign " . $player['name'] . " from waivers for " . $contractData['finalContract'] . ".";
+        $hometext = "The " . $teamName . " sign " . $player['name'] . " from waivers for " . $contractData['salary'] . ".";
         mail(self::NOTIFICATION_EMAIL_RECIPIENT, $storytitle, $hometext, "From: " . self::NOTIFICATION_EMAIL_SENDER);
         
         // Send Discord notification
@@ -258,10 +261,11 @@ class WaiversController
         $team = \Team::initialize($this->db, $userInfo['user_ibl_team']);
         \UI::displaytopmenu($this->db, $team->teamID);
         
+        $season = new \Season($this->db);
         $players = $this->getPlayersForAction($team, $action);
         
-        $openRosterSpots = 15 - $team->getHealthyAndInjuredPlayersOrderedByNameResult()->num_rows;
-        $healthyOpenRosterSpots = 15 - $team->getHealthyPlayersOrderedByNameResult()->num_rows;
+        $openRosterSpots = 15 - $team->getHealthyAndInjuredPlayersOrderedByNameResult($season)->num_rows;
+        $healthyOpenRosterSpots = 15 - $team->getHealthyPlayersOrderedByNameResult($season)->num_rows;
         
         $this->view->renderWaiverForm(
             $team->name,
@@ -275,10 +279,11 @@ class WaiversController
         
         // Display player ratings table
         $league = new \League($this->db);
-        $season = new \Season($this->db);
         
         if ($action === 'drop') {
-            $result = $team->getHealthyAndInjuredPlayersOrderedByNameResult();
+            $result = $team->getHealthyAndInjuredPlayersOrderedByNameResult($season);
+        } elseif ($season->phase === 'Free Agency') {
+            $result = $league->getFreeAgentsResult($season);
         } else {
             $result = $league->getWaivedPlayersResult();
         }
@@ -301,18 +306,21 @@ class WaiversController
     private function getPlayersForAction($team, string $action): array
     {
         $league = new \League($this->db);
+        $season = new \Season($this->db);
         $timeNow = time();
         $players = [];
         
         if ($action === 'drop') {
             $result = $team->getHealthyAndInjuredPlayersOrderedByNameResult();
+        } elseif ($season->phase === 'Free Agency') {
+            $result = $league->getFreeAgentsResult($season);
         } else {
             $result = $league->getWaivedPlayersResult();
         }
         
         while ($playerRow = $this->db->sql_fetchrow($result)) {
             $player = Player::withPlrRow($this->db, $playerRow);
-            $contract = $this->processor->getPlayerContractDisplay($playerRow);
+            $contract = $this->processor->getPlayerContractDisplay($player, $season);
             $waitTime = '';
             
             if ($action === 'add' && $player->timeDroppedOnWaivers > 0) {

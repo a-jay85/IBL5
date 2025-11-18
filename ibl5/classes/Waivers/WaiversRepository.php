@@ -2,6 +2,8 @@
 
 namespace Waivers;
 
+use Season;
+
 /**
  * Handles database operations for waiver wire transactions
  */
@@ -43,32 +45,38 @@ class WaiversRepository
      * Signs a player from waivers
      * 
      * @param int $playerID Player ID to sign
-     * @param string $teamName Team name
-     * @param int $teamID Team ID
-     * @param array $contractData Contract data including cy1, cy (optional)
+     * @param array $team Team data array with 'teamname' and 'teamid' keys
+     * @param array $contractData Contract data including salary
      * @return bool Success status
      */
-    public function signPlayerFromWaivers(int $playerID, string $teamName, int $teamID, array $contractData): bool
+    public function signPlayerFromWaivers(int $playerID, array $team, array $contractData): bool
     {
-        $playerID = (int) $playerID;
+        $teamName = $team['team_name'] ?? '';
+        $teamID = (int) ($team['teamid'] ?? 0);
         $teamNameEscaped = \Services\DatabaseService::escapeString($this->db, $teamName);
-        $teamID = (int) $teamID;
         
+        if (!$contractData['hasExistingContract']) {
+            $queryContractSection = "`cy` = 0,
+                                     `cyt` = 1,
+                                     `cy1` = " . (int) $contractData['salary'] . ",
+                                     `cy2` = 0,
+                                     `cy3` = 0,
+                                     `cy4` = 0,
+                                     `cy5` = 0,
+                                     `cy6` = 0, ";
+        } else {
+            $queryContractSection = '';
+        }
+
         $query = "UPDATE ibl_plr
                   SET `ordinal` = '800',
                       `bird` = 0, ";
-        
-        if (isset($contractData['cy1']) && $contractData['cy1'] > 0) {
-            $cy1 = (int) $contractData['cy1'];
-            $query .= "`cy1` = $cy1,
-                       `cy` = 1, ";
-        }
-        
-        $query .= "`teamname` = '$teamNameEscaped',
-                   `tid` = $teamID,
-                   `droptime` = 0
-                   WHERE `pid` = $playerID
-                   LIMIT 1";
+        $query .= $queryContractSection;
+        $query .= "   `teamname` = '$teamNameEscaped',
+                      `tid` = $teamID,
+                      `droptime` = 0
+                  WHERE `pid` = $playerID
+                  LIMIT 1";
         
         return $this->db->sql_query($query) !== false;
     }

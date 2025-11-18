@@ -39,14 +39,19 @@ class WaiversRepositoryTest extends TestCase
     {
         $this->mockDb->setReturnTrue(true);
         
+        $team = [
+            'teamname' => 'Boston Celtics',
+            'teamid' => 2
+        ];
+        
         $contractData = [
-            'cy1' => 103
+            'hasExistingContract' => false,
+            'salary' => 103
         ];
         
         $result = $this->repository->signPlayerFromWaivers(
             123,
-            'Boston Celtics',
-            2,
+            $team,
             $contractData
         );
         
@@ -59,7 +64,8 @@ class WaiversRepositoryTest extends TestCase
         $this->assertStringContainsString('800', $queries[0]);
         $this->assertStringContainsString('cy1', $queries[0]);
         $this->assertStringContainsString('103', $queries[0]);
-        $this->assertStringContainsString('cy` = 1', $queries[0]);
+        $this->assertStringContainsString('`cy` = 0', $queries[0]);
+        $this->assertStringContainsString('`cyt` = 1', $queries[0]);
         $this->assertStringContainsString('droptime', $queries[0]);
         $this->assertStringContainsString('= 0', $queries[0]);
     }
@@ -68,12 +74,19 @@ class WaiversRepositoryTest extends TestCase
     {
         $this->mockDb->setReturnTrue(true);
         
-        $contractData = []; // No new contract
+        $team = [
+            'teamname' => 'Boston Celtics',
+            'teamid' => 2
+        ];
+        
+        $contractData = [
+            'hasExistingContract' => true,
+            'salary' => 500
+        ];
         
         $result = $this->repository->signPlayerFromWaivers(
             123,
-            'Boston Celtics',
-            2,
+            $team,
             $contractData
         );
         
@@ -85,6 +98,40 @@ class WaiversRepositoryTest extends TestCase
         $this->assertStringContainsString('ordinal', $queries[0]);
         $this->assertStringContainsString('800', $queries[0]);
         $this->assertStringNotContainsString('cy1', $queries[0]);
+    }
+    
+    public function testSignPlayerFromWaiversWithNewContractDuringFreeAgency()
+    {
+        $this->mockDb->setReturnTrue(true);
+        
+        $team = [
+            'teamname' => 'Los Angeles Lakers',
+            'teamid' => 14
+        ];
+        
+        $contractData = [
+            'hasExistingContract' => false,
+            'salary' => 76
+        ];
+        
+        $result = $this->repository->signPlayerFromWaivers(
+            456,
+            $team,
+            $contractData
+        );
+        
+        $this->assertTrue($result);
+        
+        $queries = $this->mockDb->getExecutedQueries();
+        $this->assertCount(1, $queries);
+        $this->assertStringContainsString('UPDATE ibl_plr', $queries[0]);
+        $this->assertStringContainsString('ordinal', $queries[0]);
+        $this->assertStringContainsString('800', $queries[0]);
+        $this->assertStringContainsString('`cy1` = 76', $queries[0]);
+        $this->assertStringContainsString('`cy` = 0', $queries[0]);
+        $this->assertStringContainsString('`cyt` = 1', $queries[0]);
+        $this->assertStringContainsString('droptime', $queries[0]);
+        $this->assertStringContainsString('= 0', $queries[0]);
     }
     
 }

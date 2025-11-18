@@ -42,19 +42,13 @@ class FreeAgencyDisplayHelper
         ?>
 <center><img src="images/logo/<?= htmlspecialchars($team->teamID) ?>.jpg"></center>
 <p>
-
 <?= $this->renderPlayersUnderContract($team, $season, $capData) ?>
-
 <p>
-
 <?= $this->renderContractOffers($team, $capData) ?>
-
 <p>
 <hr>
 <p>
-
 <?= $this->renderTeamFreeAgents($team, $season, $capData) ?>
-
 <?= $this->renderOtherFreeAgents($team, $season) ?>
         <?php
         return ob_get_clean();

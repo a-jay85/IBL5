@@ -3,6 +3,7 @@
 use Player\Player;
 use FreeAgency\FreeAgencyDisplayHelper;
 use FreeAgency\FreeAgencyNegotiationHelper;
+use FreeAgency\FreeAgencyProcessor;
 
 /************************************************************************/
 /*                     IBL Free Agency Module                           */
@@ -82,9 +83,29 @@ function negotiate($pid)
     Nuke\Footer::footer();
 }
 
+function processOffer()
+{
+    global $db;
+    $processor = new FreeAgencyProcessor($db);
+    echo $processor->processOfferSubmission($_POST);
+}
+
+function deleteOffer()
+{
+    global $db;
+    $processor = new FreeAgencyProcessor($db);
+    echo $processor->deleteOffers($_POST['teamname'], $_POST['playername']);
+}
+
 switch ($pa) {
     case 'negotiate':
         negotiate($pid);
+        break;
+    case 'processoffer':
+        processOffer();
+        break;
+    case 'deleteoffer':
+        deleteOffer();
         break;
     default:
         main($user);

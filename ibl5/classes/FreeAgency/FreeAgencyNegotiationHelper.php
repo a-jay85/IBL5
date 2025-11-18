@@ -81,7 +81,7 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
             <td><?= $this->viewHelper->renderDemandDisplay($demands, $player->yearsOfExperience) ?></td>
         </tr>
         
-        <form name="FAOffer" method="post" action="/ibl5/modules/Free_Agency/freeagentoffer.php">
+        <form name="FAOffer" method="post" action="modules.php?name=Free_Agency&pa=processoffer">
         <tr>
             <td>Please enter your offer in this row:</td>
             <td><?= $this->viewHelper->renderOfferInputs($player->yearsOfExperience, $existingOffer) ?></td>
@@ -121,7 +121,7 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
         <?php if ($hasExistingOffer): ?>
         <tr>
             <td colspan="8">
-                <form method="post" action="/ibl5/modules/Free_Agency/freeagentofferdelete.php">
+                <form method="post" action="modules.php?name=Free_Agency&pa=deleteoffer">
                     <input type="hidden" name="teamname" value="<?= htmlspecialchars($teamName) ?>">
                     <input type="hidden" name="playername" value="<?= htmlspecialchars($player->name) ?>">
                     <center><input type="submit" value="DELETE this offer"></center>

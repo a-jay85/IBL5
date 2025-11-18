@@ -198,7 +198,7 @@ class FreeAgencyViewHelper
     {
         ob_start();
         ?>
-<form name="FAOffer" method="post" action="/ibl5/modules/Free_Agency/freeagentoffer.php">
+<form name="FAOffer" method="post" action="modules.php?name=Free_Agency&pa=processoffer">
     <?= $this->renderHiddenFields($formData, $offers) ?>
     <input type="submit" value="<?= htmlspecialchars($offers[$finalYear - 1]) ?>">
 </form>

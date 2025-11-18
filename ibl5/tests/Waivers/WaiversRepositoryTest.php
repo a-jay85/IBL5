@@ -39,6 +39,11 @@ class WaiversRepositoryTest extends TestCase
     {
         $this->mockDb->setReturnTrue(true);
         
+        $team = [
+            'teamname' => 'Boston Celtics',
+            'teamid' => 2
+        ];
+        
         $contractData = [
             'salary' => 103,
             'contractYearField' => 'cy1',
@@ -47,8 +52,7 @@ class WaiversRepositoryTest extends TestCase
         
         $result = $this->repository->signPlayerFromWaivers(
             123,
-            'Boston Celtics',
-            2,
+            $team,
             $contractData
         );
         
@@ -70,12 +74,16 @@ class WaiversRepositoryTest extends TestCase
     {
         $this->mockDb->setReturnTrue(true);
         
+        $team = [
+            'teamname' => 'Boston Celtics',
+            'teamid' => 2
+        ];
+        
         $contractData = []; // No new contract
         
         $result = $this->repository->signPlayerFromWaivers(
             123,
-            'Boston Celtics',
-            2,
+            $team,
             $contractData
         );
         
@@ -93,6 +101,11 @@ class WaiversRepositoryTest extends TestCase
     {
         $this->mockDb->setReturnTrue(true);
         
+        $team = [
+            'teamname' => 'Los Angeles Lakers',
+            'teamid' => 14
+        ];
+        
         $contractData = [
             'salary' => 76,
             'contractYearField' => 'cy2',
@@ -101,8 +114,7 @@ class WaiversRepositoryTest extends TestCase
         
         $result = $this->repository->signPlayerFromWaivers(
             456,
-            'Los Angeles Lakers',
-            14,
+            $team,
             $contractData
         );
         

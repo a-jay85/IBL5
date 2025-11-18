@@ -152,8 +152,7 @@ class WaiversProcessor
             ];
         }
             
-        // No existing contract: assign veteran minimum
-        $experience = (int) ($playerData['exp'] ?? 0);
+        // No existing contract: assign veteran minimum based on experience
         $vetMinSalary = $this->calculateVeteranMinimumSalary($experience);
         
         return [

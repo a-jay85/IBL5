@@ -19,10 +19,10 @@ namespace Player;
 class PlayerImageHelper
 {
     /**
-     * Data URI for a 1x1 transparent PNG pixel (prevents 404 errors without needing a file)
+     * Data URI for a 1x1 fully transparent PNG pixel (prevents 404 errors without needing a file)
      * This is a valid PNG image that can be used as a placeholder.
      */
-    private const PLACEHOLDER_DATA_URI = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+    private const PLACEHOLDER_DATA_URI = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGBgAAAABQABpfZFQAAAAABJRU5ErkJggg==';
     
     /**
      * Generate a safe player image URL

@@ -57,11 +57,14 @@ class WaiversRepository
         $teamNameEscaped = \Services\DatabaseService::escapeString($this->db, $teamName);
         
         if (!$contractData['hasExistingContract']) {
-            $contractYearField = $season->phase === 'Free Agency' ? 'cy2' : 'cy1';
-            $contractTotalYears = $season->phase === 'Free Agency' ? 2 : 1;
-            $queryContractSection = "`$contractYearField` = " . (int) $contractData['salary'] . ",
-                                     `cy` = 1,
-                                     `cyt` = $contractTotalYears, ";
+            $queryContractSection = "`cy` = 0,
+                                     `cyt` = 1,
+                                     `cy1` = " . (int) $contractData['salary'] . ",
+                                     `cy2` = 0,
+                                     `cy3` = 0,
+                                     `cy4` = 0,
+                                     `cy5` = 0,
+                                     `cy6` = 0, ";
         } else {
             $queryContractSection = '';
         }

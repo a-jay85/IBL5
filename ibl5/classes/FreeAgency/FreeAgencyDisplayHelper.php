@@ -1,0 +1,497 @@
+<?php
+
+namespace FreeAgency;
+
+use Player\Player;
+
+/**
+ * Handles Free Agency main display page rendering
+ * 
+ * Renders tables for:
+ * - Players under contract
+ * - Contract offers
+ * - Team free agents
+ * - All other free agents
+ */
+class FreeAgencyDisplayHelper
+{
+    private $db;
+    private \Services\DatabaseService $databaseService;
+    private FreeAgencyViewHelper $viewHelper;
+
+    public function __construct($db)
+    {
+        $this->db = $db;
+        $this->databaseService = new \Services\DatabaseService();
+        $this->viewHelper = new FreeAgencyViewHelper($db);
+    }
+
+    /**
+     * Render the complete free agency main page
+     * 
+     * @param \Team $team User's team
+     * @param \Season $season Current season
+     * @return string HTML output
+     */
+    public function renderMainPage(\Team $team, \Season $season): string
+    {
+        $capCalculator = new FreeAgencyCapCalculator($this->db);
+        $capData = $capCalculator->calculateTeamCapSpace($team);
+
+        ob_start();
+        ?>
+<center><img src="images/logo/<?= htmlspecialchars($team->teamID) ?>.jpg"></center>
+<p>
+
+<?= $this->renderPlayersUnderContract($team, $season, $capData) ?>
+
+<p>
+
+<?= $this->renderContractOffers($team, $capData) ?>
+
+<p>
+<hr>
+<p>
+
+<?= $this->renderTeamFreeAgents($team, $season, $capData) ?>
+
+<?= $this->renderOtherFreeAgents($team, $season) ?>
+        <?php
+        return ob_get_clean();
+    }
+
+    /**
+     * Render players under contract table
+     * 
+     * @param \Team $team
+     * @param \Season $season
+     * @param array<string, mixed> $capData
+     * @return string HTML table
+     */
+    private function renderPlayersUnderContract(\Team $team, \Season $season, array $capData): string
+    {
+        ob_start();
+        ?>
+<table border="1" cellspacing="0" class="sortable">
+    <caption style="background-color: #0000cc">
+        <center><b><font color="white"><?= htmlspecialchars($team->name) ?> Players Under Contract</font></b></center>
+    </caption>
+    <?= $this->renderTableHeader() ?>
+    <tbody>
+        <?php foreach ($team->getRosterUnderContractOrderedByOrdinalResult() as $playerRow): ?>
+            <?php
+            $player = Player::withPlrRow($this->db, $playerRow);
+            $yearPlayerIsFreeAgent = $player->draftYear + $player->yearsOfExperience + $player->contractTotalYears - $player->contractCurrentYear;
+            
+            if ($yearPlayerIsFreeAgent != $season->endingYear):
+                $futureSalaries = $this->calculateFutureSalaries($player);
+                $playerName = $player->name;
+                if ($player->ordinal > \JSB::WAIVERS_ORDINAL) {
+                    $playerName .= "*";
+                }
+            ?>
+        <tr>
+            <td>
+                <?php if ($player->canRookieOption($season->phase)): ?>
+                    <a href="modules.php?name=Player&pa=rookieoption&pid=<?= htmlspecialchars($player->playerID) ?>">Rookie Option</a>
+                <?php endif; ?>
+            </td>
+            <td><?= htmlspecialchars($player->position) ?></td>
+            <td><a href="modules.php?name=Player&pa=showpage&pid=<?= htmlspecialchars($player->playerID) ?>"><?= htmlspecialchars($playerName) ?></a></td>
+            <td><a href="modules.php?name=Team&op=team&teamID=<?= htmlspecialchars($player->teamID) ?>"><?= htmlspecialchars($player->teamName) ?></a></td>
+            <td><?= htmlspecialchars($player->age) ?></td>
+            <?= $this->renderPlayerRatings($player) ?>
+            <?php foreach ($futureSalaries as $salary): ?>
+                <td><?= htmlspecialchars($salary) ?></td>
+            <?php endforeach; ?>
+            <?= $this->renderPlayerPreferences($player) ?>
+        </tr>
+            <?php endif; ?>
+        <?php endforeach; ?>
+    </tbody>
+    <tfoot>
+        <tr>
+            <td colspan="29" align="right"><b><i><?= htmlspecialchars($team->name) ?> Total Salary</i></b></td>
+            <?php for ($i = 1; $i <= 6; $i++): ?>
+                <td><b><i><?= htmlspecialchars($capData["year{$i}TotalSalary"]) ?></i></b></td>
+            <?php endfor; ?>
+        </tr>
+    </tfoot>
+</table>
+        <?php
+        return ob_get_clean();
+    }
+
+    /**
+     * Render contract offers table
+     * 
+     * @param \Team $team
+     * @param array<string, mixed> $capData
+     * @return string HTML table
+     */
+    private function renderContractOffers(\Team $team, array $capData): string
+    {
+        $commonRepository = new \Services\CommonRepository($this->db);
+        
+        ob_start();
+        ?>
+<table border="1" cellspacing="0" class="sortable">
+    <caption style="background-color: #0000cc">
+        <center><b><font color="white"><?= htmlspecialchars($team->name) ?> Contract Offers</font></b></center>
+    </caption>
+    <?= $this->renderTableHeader() ?>
+    <tbody>
+        <?php foreach ($team->getFreeAgencyOffersResult() as $offerRow): ?>
+            <?php
+            $playerID = $commonRepository->getPlayerIDFromPlayerName($offerRow['name']);
+            $player = Player::withPlayerID($this->db, $playerID);
+            ?>
+        <tr>
+            <td><a href="modules.php?name=Free_Agency&pa=negotiate&pid=<?= htmlspecialchars($player->playerID) ?>">Negotiate</a></td>
+            <td><?= htmlspecialchars($player->position) ?></td>
+            <td><a href="modules.php?name=Player&pa=showpage&pid=<?= htmlspecialchars($player->playerID) ?>"><?= htmlspecialchars($player->name) ?></a></td>
+            <td><a href="modules.php?name=Team&op=team&teamID=<?= htmlspecialchars($player->teamID) ?>"><?= htmlspecialchars($player->teamName) ?></a></td>
+            <td><?= htmlspecialchars($player->age) ?></td>
+            <?= $this->renderPlayerRatings($player) ?>
+            <td><?= htmlspecialchars($offerRow['offer1']) ?></td>
+            <td><?= htmlspecialchars($offerRow['offer2']) ?></td>
+            <td><?= htmlspecialchars($offerRow['offer3']) ?></td>
+            <td><?= htmlspecialchars($offerRow['offer4']) ?></td>
+            <td><?= htmlspecialchars($offerRow['offer5']) ?></td>
+            <td><?= htmlspecialchars($offerRow['offer6']) ?></td>
+            <?= $this->renderPlayerPreferences($player) ?>
+        </tr>
+        <?php endforeach; ?>
+    </tbody>
+    <tfoot>
+        <tr>
+            <td colspan="29" align="right"><b><i><?= htmlspecialchars($team->name) ?> Total Salary Plus Contract Offers</i></b></td>
+            <?php for ($i = 1; $i <= 6; $i++): ?>
+                <td><b><i><?= htmlspecialchars($capData["year{$i}TotalSalary"]) ?></i></b></td>
+            <?php endfor; ?>
+        </tr>
+        <?= $this->renderCapSpaceFooter($team, $capData) ?>
+    </tfoot>
+</table>
+        <?php
+        return ob_get_clean();
+    }
+
+    /**
+     * Render team free agents table
+     * 
+     * @param \Team $team
+     * @param \Season $season
+     * @param array<string, mixed> $capData
+     * @return string HTML table
+     */
+    private function renderTeamFreeAgents(\Team $team, \Season $season, array $capData): string
+    {
+        ob_start();
+        ?>
+<table border="1" cellspacing="0" class="sortable">
+    <caption style="background-color: #0000cc">
+        <center><b><font color="white"><?= htmlspecialchars($team->name) ?> Unsigned Free Agents</b><br>
+        (Note: * and <i>italicized</i> indicates player has Bird Rights)</font></b></center>
+    </caption>
+    <?= $this->renderTableHeader() ?>
+    <tbody>
+        <?php foreach ($team->getRosterUnderContractOrderedByOrdinalResult() as $playerRow): ?>
+            <?php
+            $player = Player::withPlrRow($this->db, $playerRow);
+            $yearPlayerIsFreeAgent = $player->draftYear + $player->yearsOfExperience + $player->contractTotalYears - $player->contractCurrentYear;
+            
+            if ($yearPlayerIsFreeAgent == $season->endingYear):
+                $demands = $this->db->sql_fetchrow($player->getFreeAgencyDemands());
+            ?>
+        <tr>
+            <td>
+                <?php if ($capData['rosterspots1'] > 0): ?>
+                    <a href="modules.php?name=Free_Agency&pa=negotiate&pid=<?= htmlspecialchars($player->playerID) ?>">Negotiate</a>
+                <?php endif; ?>
+            </td>
+            <td><?= htmlspecialchars($player->position) ?></td>
+            <td><a href="modules.php?name=Player&pa=showpage&pid=<?= htmlspecialchars($player->playerID) ?>">
+                <?php if ($player->birdYears >= 3): ?>
+                    *<i><?= htmlspecialchars($player->name) ?></i>*
+                <?php else: ?>
+                    <?= htmlspecialchars($player->name) ?>
+                <?php endif; ?>
+            </a></td>
+            <td><a href="modules.php?name=Team&op=team&teamID=<?= htmlspecialchars($player->teamID) ?>"><?= htmlspecialchars($player->teamName) ?></a></td>
+            <td><?= htmlspecialchars($player->age) ?></td>
+            <?= $this->renderPlayerRatings($player) ?>
+            <?= $this->renderPlayerDemands($player, $demands) ?>
+            <?= $this->renderPlayerPreferences($player) ?>
+        </tr>
+            <?php endif; ?>
+        <?php endforeach; ?>
+    </tbody>
+</table>
+        <?php
+        return ob_get_clean();
+    }
+
+    /**
+     * Render other free agents table
+     * 
+     * @param \Team $team
+     * @param \Season $season
+     * @return string HTML table
+     */
+    private function renderOtherFreeAgents(\Team $team, \Season $season): string
+    {
+        ob_start();
+        ?>
+<table border="1" cellspacing="0" class="sortable">
+    <caption style="background-color: #0000cc">
+        <center><b><font color="white">All Other Free Agents</font></b></center>
+    </caption>
+    <?= $this->renderTableHeader() ?>
+    <tbody>
+        <?php
+        $escapedTeamName = $this->databaseService->escapeString($this->db, $team->name);
+        $query = "SELECT * FROM ibl_plr WHERE teamname!='$escapedTeamName' AND retired='0' ORDER BY ordinal ASC";
+        $result = $this->db->sql_query($query);
+        
+        foreach ($result as $playerRow):
+            $player = Player::withPlrRow($this->db, $playerRow);
+            $yearPlayerIsFreeAgent = $player->draftYear + $player->yearsOfExperience + $player->contractTotalYears - $player->contractCurrentYear;
+            
+            if ($yearPlayerIsFreeAgent == $season->endingYear):
+                $demands = $this->db->sql_fetchrow($player->getFreeAgencyDemands());
+        ?>
+        <tr>
+            <td><a href="modules.php?name=Free_Agency&pa=negotiate&pid=<?= htmlspecialchars($player->playerID) ?>">Negotiate</a></td>
+            <td><?= htmlspecialchars($player->position) ?></td>
+            <td><a href="modules.php?name=Player&pa=showpage&pid=<?= htmlspecialchars($player->playerID) ?>"><?= htmlspecialchars($player->name) ?></a></td>
+            <td><a href="modules.php?name=Team&op=team&teamID=<?= htmlspecialchars($player->teamID) ?>"><?= htmlspecialchars($player->teamName) ?></a></td>
+            <td><?= htmlspecialchars($player->age) ?></td>
+            <?= $this->renderPlayerRatings($player) ?>
+            <?= $this->renderPlayerDemands($player, $demands) ?>
+            <?= $this->renderPlayerPreferences($player) ?>
+        </tr>
+            <?php endif; ?>
+        <?php endforeach; ?>
+    </tbody>
+</table>
+        <?php
+        return ob_get_clean();
+    }
+
+    /**
+     * Render table header
+     * 
+     * @return string HTML table header
+     */
+    private function renderTableHeader(): string
+    {
+        return $this->viewHelper->renderPlayerRatings(new Player($this->db)); // Use existing method
+    }
+
+    /**
+     * Render player ratings cells
+     * 
+     * @param Player $player
+     * @return string HTML table cells
+     */
+    private function renderPlayerRatings(Player $player): string
+    {
+        ob_start();
+        ?>
+<td><?= htmlspecialchars($player->ratingFieldGoalAttempts) ?></td>
+<td><?= htmlspecialchars($player->ratingFieldGoalPercentage) ?></td>
+<td><?= htmlspecialchars($player->ratingFreeThrowAttempts) ?></td>
+<td><?= htmlspecialchars($player->ratingFreeThrowPercentage) ?></td>
+<td><?= htmlspecialchars($player->ratingThreePointAttempts) ?></td>
+<td><?= htmlspecialchars($player->ratingThreePointPercentage) ?></td>
+<td><?= htmlspecialchars($player->ratingOffensiveRebounds) ?></td>
+<td><?= htmlspecialchars($player->ratingDefensiveRebounds) ?></td>
+<td><?= htmlspecialchars($player->ratingAssists) ?></td>
+<td><?= htmlspecialchars($player->ratingSteals) ?></td>
+<td><?= htmlspecialchars($player->ratingTurnovers) ?></td>
+<td><?= htmlspecialchars($player->ratingBlocks) ?></td>
+<td><?= htmlspecialchars($player->ratingFouls) ?></td>
+<td><?= htmlspecialchars($player->ratingOutsideOffense) ?></td>
+<td><?= htmlspecialchars($player->ratingDriveOffense) ?></td>
+<td><?= htmlspecialchars($player->ratingPostOffense) ?></td>
+<td><?= htmlspecialchars($player->ratingTransitionOffense) ?></td>
+<td><?= htmlspecialchars($player->ratingOutsideDefense) ?></td>
+<td><?= htmlspecialchars($player->ratingDriveDefense) ?></td>
+<td><?= htmlspecialchars($player->ratingPostDefense) ?></td>
+<td><?= htmlspecialchars($player->ratingTransitionDefense) ?></td>
+<td><?= htmlspecialchars($player->ratingTalent) ?></td>
+<td><?= htmlspecialchars($player->ratingSkill) ?></td>
+<td><?= htmlspecialchars($player->ratingIntangibles) ?></td>
+        <?php
+        return ob_get_clean();
+    }
+
+    /**
+     * Render player preferences cells
+     * 
+     * @param Player $player
+     * @return string HTML table cells
+     */
+    private function renderPlayerPreferences(Player $player): string
+    {
+        ob_start();
+        ?>
+<td><?= htmlspecialchars($player->freeAgencyLoyalty) ?></td>
+<td><?= htmlspecialchars($player->freeAgencyPlayForWinner) ?></td>
+<td><?= htmlspecialchars($player->freeAgencyPlayingTime) ?></td>
+<td><?= htmlspecialchars($player->freeAgencySecurity) ?></td>
+<td><?= htmlspecialchars($player->freeAgencyTradition) ?></td>
+        <?php
+        return ob_get_clean();
+    }
+
+    /**
+     * Calculate future salaries for a player
+     * 
+     * @param Player $player
+     * @return array<int> Future salaries for years 1-6
+     */
+    private function calculateFutureSalaries(Player $player): array
+    {
+        $salaries = [0, 0, 0, 0, 0, 0];
+        
+        switch ($player->contractCurrentYear) {
+            case 0:
+                $salaries = [
+                    $player->contractYear1Salary,
+                    $player->contractYear2Salary,
+                    $player->contractYear3Salary,
+                    $player->contractYear4Salary,
+                    $player->contractYear5Salary,
+                    $player->contractYear6Salary,
+                ];
+                break;
+            case 1:
+                $salaries = [
+                    $player->contractYear2Salary,
+                    $player->contractYear3Salary,
+                    $player->contractYear4Salary,
+                    $player->contractYear5Salary,
+                    $player->contractYear6Salary,
+                    0,
+                ];
+                break;
+            case 2:
+                $salaries = [
+                    $player->contractYear3Salary,
+                    $player->contractYear4Salary,
+                    $player->contractYear5Salary,
+                    $player->contractYear6Salary,
+                    0,
+                    0,
+                ];
+                break;
+            case 3:
+                $salaries = [
+                    $player->contractYear4Salary,
+                    $player->contractYear5Salary,
+                    $player->contractYear6Salary,
+                    0,
+                    0,
+                    0,
+                ];
+                break;
+            case 4:
+                $salaries = [
+                    $player->contractYear5Salary,
+                    $player->contractYear6Salary,
+                    0,
+                    0,
+                    0,
+                    0,
+                ];
+                break;
+            case 5:
+                $salaries = [
+                    $player->contractYear6Salary,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                ];
+                break;
+        }
+        
+        return $salaries;
+    }
+
+    /**
+     * Render player demands cells
+     * 
+     * @param Player $player
+     * @param array<string, mixed> $demands
+     * @return string HTML table cells
+     */
+    private function renderPlayerDemands(Player $player, array $demands): string
+    {
+        ob_start();
+        
+        if ($player->yearsOfExperience > 0) {
+            // Veteran - show all years
+            echo htmlspecialchars($demands['dem1']);
+            if ($demands['dem2'] != 0) echo "</td><td>" . htmlspecialchars($demands['dem2']);
+            if ($demands['dem3'] != 0) echo "</td><td>" . htmlspecialchars($demands['dem3']);
+            if ($demands['dem4'] != 0) echo "</td><td>" . htmlspecialchars($demands['dem4']);
+            if ($demands['dem5'] != 0) echo "</td><td>" . htmlspecialchars($demands['dem5']);
+            if ($demands['dem6'] != 0) echo "</td><td>" . htmlspecialchars($demands['dem6']);
+            echo "</td><td></td>";
+        } else {
+            // Undrafted rookie - limit to years 3 and 4
+            echo htmlspecialchars($demands['dem3']);
+            if ($demands['dem4'] != 0) echo "</td><td>" . htmlspecialchars($demands['dem4']);
+            echo "</td><td></td>";
+        }
+        
+        return ob_get_clean();
+    }
+
+    /**
+     * Render cap space footer rows
+     * 
+     * @param \Team $team
+     * @param array<string, mixed> $capData
+     * @return string HTML table rows
+     */
+    private function renderCapSpaceFooter(\Team $team, array $capData): string
+    {
+        $MLEicon = ($team->hasMLE == "1") ? "\u{2705}" : "\u{274C}";
+        $LLEicon = ($team->hasLLE == "1") ? "\u{2705}" : "\u{274C}";
+        
+        ob_start();
+        ?>
+<tr bgcolor="#cc0000">
+    <td align="right"><font color="white"><b>MLE:</b></font></td>
+    <td align="center"><?= $MLEicon ?></td>
+    <td colspan="19" bgcolor="#eeeeee"></td>
+    <td colspan="8" align="right"><font color="white"><b>Soft Cap Space</b></font></td>
+    <?php for ($i = 1; $i <= 6; $i++): ?>
+        <td><?= htmlspecialchars($capData["year{$i}AvailableSoftCap"]) ?></td>
+    <?php endfor; ?>
+</tr>
+<tr bgcolor="#cc0000">
+    <td align="right"><font color="white"><b>LLE:</b></font></td>
+    <td align="center"><?= $LLEicon ?></td>
+    <td colspan="19" bgcolor="#eeeeee"></td>
+    <td colspan="8" align="right"><font color="white"><b>Hard Cap Space</b></font></td>
+    <?php for ($i = 1; $i <= 6; $i++): ?>
+        <td><?= htmlspecialchars($capData["year{$i}AvailableHardCap"]) ?></td>
+    <?php endfor; ?>
+</tr>
+<tr bgcolor="#cc0000">
+    <td colspan="21" bgcolor="#eeeeee"></td>
+    <td colspan="8" align="right"><font color="white"><b>Empty Roster Slots</b></font></td>
+    <?php for ($i = 1; $i <= 6; $i++): ?>
+        <td><?= htmlspecialchars($capData["rosterspots{$i}"]) ?></td>
+    <?php endfor; ?>
+</tr>
+        <?php
+        return ob_get_clean();
+    }
+}

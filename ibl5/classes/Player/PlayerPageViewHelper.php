@@ -218,89 +218,98 @@ class PlayerPageViewHelper
     {
         ob_start();
         ?>
+<style>
+.player-highs { border: 1px solid black; border-collapse: collapse; }
+.player-highs td { padding: 0; }
+.player-highs .header-main { background-color: #0000cc; color: white; text-align: center; font-weight: bold; }
+.player-highs .header-sub { background-color: #0000cc; color: white; text-align: center; }
+.player-highs .header-label { background-color: #0000cc; color: white; }
+.player-highs .stat-label { text-align: right; padding-left: 2px; padding-right: 2px; font-weight: bold; }
+.player-highs .stat-value { padding-left: 2px; padding-right: 2px; }
+</style>
 <td rowspan=3 style="vertical-align: top;">
     <table border=1 cellspacing=0 cellpadding=0 class="player-highs">
-        <tr style="background-color: #0000cc;">
-            <td style="text-align: center; color: white;" colspan=3><strong>PLAYER HIGHS</strong></td>
-        </tr>
-        <tr style="background-color: #0000cc;">
-            <td style="text-align: center; color: white;" colspan=3><strong>Regular-Season</strong></td>
-        </tr>
-        <tr style="background-color: #0000cc;">
-            <td></td>
-            <td style="color: white;"><strong>Ssn</strong></td>
-            <td style="color: white;"><strong>Car</strong></td>
+        <tr>
+            <td class="header-main" colspan=3>PLAYER HIGHS</td>
         </tr>
         <tr>
-            <td><strong>Points</strong></td>
-            <td><?= htmlspecialchars((string)$playerStats->seasonHighPoints) ?></td>
-            <td><?= htmlspecialchars((string)$playerStats->careerSeasonHighPoints) ?></td>
+            <td class="header-sub" colspan=3>Regular-Season</td>
         </tr>
         <tr>
-            <td><strong>Rebounds</strong></td>
-            <td><?= htmlspecialchars((string)$playerStats->seasonHighRebounds) ?></td>
-            <td><?= htmlspecialchars((string)$playerStats->careerSeasonHighRebounds) ?></td>
+            <td class="header-label"></td>
+            <td class="header-label"><strong>Ssn</strong></td>
+            <td class="header-label"><strong>Car</strong></td>
         </tr>
         <tr>
-            <td><strong>Assists</strong></td>
-            <td><?= htmlspecialchars((string)$playerStats->seasonHighAssists) ?></td>
-            <td><?= htmlspecialchars((string)$playerStats->careerSeasonHighAssists) ?></td>
+            <td class="stat-label">Points</td>
+            <td class="stat-value"><?= htmlspecialchars((string)$playerStats->seasonHighPoints) ?></td>
+            <td class="stat-value"><?= htmlspecialchars((string)$playerStats->careerSeasonHighPoints) ?></td>
         </tr>
         <tr>
-            <td><strong>Steals</strong></td>
-            <td><?= htmlspecialchars((string)$playerStats->seasonHighSteals) ?></td>
-            <td><?= htmlspecialchars((string)$playerStats->careerSeasonHighSteals) ?></td>
+            <td class="stat-label">Rebounds</td>
+            <td class="stat-value"><?= htmlspecialchars((string)$playerStats->seasonHighRebounds) ?></td>
+            <td class="stat-value"><?= htmlspecialchars((string)$playerStats->careerSeasonHighRebounds) ?></td>
         </tr>
         <tr>
-            <td><strong>Blocks</strong></td>
-            <td><?= htmlspecialchars((string)$playerStats->seasonHighBlocks) ?></td>
-            <td><?= htmlspecialchars((string)$playerStats->careerSeasonHighBlocks) ?></td>
+            <td class="stat-label">Assists</td>
+            <td class="stat-value"><?= htmlspecialchars((string)$playerStats->seasonHighAssists) ?></td>
+            <td class="stat-value"><?= htmlspecialchars((string)$playerStats->careerSeasonHighAssists) ?></td>
         </tr>
         <tr>
-            <td>Double-Doubles</td>
-            <td><?= htmlspecialchars((string)$playerStats->seasonDoubleDoubles) ?></td>
-            <td><?= htmlspecialchars((string)$playerStats->careerDoubleDoubles) ?></td>
+            <td class="stat-label">Steals</td>
+            <td class="stat-value"><?= htmlspecialchars((string)$playerStats->seasonHighSteals) ?></td>
+            <td class="stat-value"><?= htmlspecialchars((string)$playerStats->careerSeasonHighSteals) ?></td>
         </tr>
         <tr>
-            <td>Triple-Doubles</td>
-            <td><?= htmlspecialchars((string)$playerStats->seasonTripleDoubles) ?></td>
-            <td><?= htmlspecialchars((string)$playerStats->careerTripleDoubles) ?></td>
-        </tr>
-        <tr style="background-color: #0000cc;">
-            <td style="text-align: center; color: white;" colspan=3><strong>Playoffs</strong></td>
-        </tr>
-        <tr style="background-color: #0000cc;">
-            <td></td>
-            <td style="color: white;"><strong>Ssn</strong></td>
-            <td style="color: white;"><strong>Car</strong></td>
+            <td class="stat-label">Blocks</td>
+            <td class="stat-value"><?= htmlspecialchars((string)$playerStats->seasonHighBlocks) ?></td>
+            <td class="stat-value"><?= htmlspecialchars((string)$playerStats->careerSeasonHighBlocks) ?></td>
         </tr>
         <tr>
-            <td><strong>Points</strong></td>
-            <td><?= htmlspecialchars((string)$playerStats->seasonPlayoffHighPoints) ?></td>
-            <td><?= htmlspecialchars((string)$playerStats->careerPlayoffHighPoints) ?></td>
+            <td class="stat-label">Double-Doubles</td>
+            <td class="stat-value"><?= htmlspecialchars((string)$playerStats->seasonDoubleDoubles) ?></td>
+            <td class="stat-value"><?= htmlspecialchars((string)$playerStats->careerDoubleDoubles) ?></td>
         </tr>
         <tr>
-            <td><strong>Rebounds</strong></td>
-            <td><?= htmlspecialchars((string)$playerStats->seasonPlayoffHighRebounds) ?></td>
-            <td><?= htmlspecialchars((string)$playerStats->careerPlayoffHighRebounds) ?></td>
+            <td class="stat-label">Triple-Doubles</td>
+            <td class="stat-value"><?= htmlspecialchars((string)$playerStats->seasonTripleDoubles) ?></td>
+            <td class="stat-value"><?= htmlspecialchars((string)$playerStats->careerTripleDoubles) ?></td>
         </tr>
         <tr>
-            <td><strong>Assists</strong></td>
-            <td><?= htmlspecialchars((string)$playerStats->seasonPlayoffHighAssists) ?></td>
-            <td><?= htmlspecialchars((string)$playerStats->careerPlayoffHighAssists) ?></td>
+            <td class="header-main" colspan=3>Playoffs</td>
         </tr>
         <tr>
-            <td><strong>Steals</strong></td>
-            <td><?= htmlspecialchars((string)$playerStats->seasonPlayoffHighSteals) ?></td>
-            <td><?= htmlspecialchars((string)$playerStats->careerPlayoffHighSteals) ?></td>
+            <td class="header-label"></td>
+            <td class="header-label"><strong>Ssn</strong></td>
+            <td class="header-label"><strong>Car</strong></td>
         </tr>
         <tr>
-            <td><strong>Blocks</strong></td>
-            <td><?= htmlspecialchars((string)$playerStats->seasonPlayoffHighBlocks) ?></td>
-            <td><?= htmlspecialchars((string)$playerStats->careerPlayoffHighBlocks) ?></td>
+            <td class="stat-label">Points</td>
+            <td class="stat-value"><?= htmlspecialchars((string)$playerStats->seasonPlayoffHighPoints) ?></td>
+            <td class="stat-value"><?= htmlspecialchars((string)$playerStats->careerPlayoffHighPoints) ?></td>
         </tr>
-        <tr style="background-color: #0000cc;">
-            <td style="text-align: center; color: white;" colspan=3><strong>All-Star Activity</strong></td>
+        <tr>
+            <td class="stat-label">Rebounds</td>
+            <td class="stat-value"><?= htmlspecialchars((string)$playerStats->seasonPlayoffHighRebounds) ?></td>
+            <td class="stat-value"><?= htmlspecialchars((string)$playerStats->careerPlayoffHighRebounds) ?></td>
+        </tr>
+        <tr>
+            <td class="stat-label">Assists</td>
+            <td class="stat-value"><?= htmlspecialchars((string)$playerStats->seasonPlayoffHighAssists) ?></td>
+            <td class="stat-value"><?= htmlspecialchars((string)$playerStats->careerPlayoffHighAssists) ?></td>
+        </tr>
+        <tr>
+            <td class="stat-label">Steals</td>
+            <td class="stat-value"><?= htmlspecialchars((string)$playerStats->seasonPlayoffHighSteals) ?></td>
+            <td class="stat-value"><?= htmlspecialchars((string)$playerStats->careerPlayoffHighSteals) ?></td>
+        </tr>
+        <tr>
+            <td class="stat-label">Blocks</td>
+            <td class="stat-value"><?= htmlspecialchars((string)$playerStats->seasonPlayoffHighBlocks) ?></td>
+            <td class="stat-value"><?= htmlspecialchars((string)$playerStats->careerPlayoffHighBlocks) ?></td>
+        </tr>
+        <tr>
+            <td class="header-main" colspan=3>All-Star Activity</td>
         </tr>
         <tr>
             <td colspan=2><strong>All Star Games:</strong></td>
@@ -315,7 +324,7 @@ class PlayerPageViewHelper
             <td><?= htmlspecialchars((string)$dunkContests) ?></td>
         </tr>
         <tr>
-            <td colspan=2><strong>Rookie-Sophomore Challenges:</strong></td>
+            <td colspan=2><strong>Rookie-Soph Challenges:</strong></td>
             <td><?= htmlspecialchars((string)$rookieSophChallenges) ?></td>
         </tr>
     </table>

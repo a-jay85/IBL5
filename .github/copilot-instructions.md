@@ -11,6 +11,7 @@ This repository uses the Copilot coding agent to automate code changes, improvem
 - Write code that is clear, readable, maintainable, and extensible
 - Prioritize code quality over speed of delivery
 - Think about future developers who will work with this code
+- **Criticize design and technology decisions constructively** - When prompted, evaluate proposed approaches, identify trade-offs, and recommend modern or superior alternatives with clear justification
 
 ### Pull Request Standards
 - **Clarity**: PRs must be easy to understand at a glance

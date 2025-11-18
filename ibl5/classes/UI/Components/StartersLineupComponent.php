@@ -65,11 +65,13 @@ class StartersLineupComponent
         // Sanitize all output to prevent XSS
         $position = htmlspecialchars($position, ENT_QUOTES, 'UTF-8');
         $name = htmlspecialchars($name, ENT_QUOTES, 'UTF-8');
-        $pid = htmlspecialchars((string)$pid, ENT_QUOTES, 'UTF-8');
+        
+        // Use PlayerImageHelper to safely get the image URL
+        $playerImageUrl = \Player\PlayerImageHelper::getImageUrl($pid);
         
         return "<td><center><b>$position</b><br>" .
-               "<img src=\"./images/player/$pid.jpg\" height=\"90\" width=\"65\"><br>" .
-               "<a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a>" .
+               "<img src=\"{$playerImageUrl}\" height=\"90\" width=\"65\"><br>" .
+               "<a href=\"./modules.php?name=Player&pa=showpage&pid=" . htmlspecialchars((string)$pid, ENT_QUOTES, 'UTF-8') . "\">$name</a>" .
                "</td>";
     }
     

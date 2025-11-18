@@ -49,14 +49,10 @@ class WaiversRepositoryTest extends TestCase
             'salary' => 103
         ];
         
-        $mockSeason = $this->createMock(\Season::class);
-        $mockSeason->phase = 'Regular Season';
-        
         $result = $this->repository->signPlayerFromWaivers(
             123,
             $team,
-            $contractData,
-            $mockSeason
+            $contractData
         );
         
         $this->assertTrue($result);
@@ -88,14 +84,10 @@ class WaiversRepositoryTest extends TestCase
             'salary' => 500
         ];
         
-        $mockSeason = $this->createMock(\Season::class);
-        $mockSeason->phase = 'Regular Season';
-        
         $result = $this->repository->signPlayerFromWaivers(
             123,
             $team,
-            $contractData,
-            $mockSeason
+            $contractData
         );
         
         $this->assertTrue($result);
@@ -122,14 +114,10 @@ class WaiversRepositoryTest extends TestCase
             'salary' => 76
         ];
         
-        $mockSeason = $this->createMock(\Season::class);
-        $mockSeason->phase = 'Free Agency';
-        
         $result = $this->repository->signPlayerFromWaivers(
             456,
             $team,
-            $contractData,
-            $mockSeason
+            $contractData
         );
         
         $this->assertTrue($result);

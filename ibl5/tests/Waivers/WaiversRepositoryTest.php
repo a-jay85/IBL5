@@ -68,7 +68,8 @@ class WaiversRepositoryTest extends TestCase
         $this->assertStringContainsString('800', $queries[0]);
         $this->assertStringContainsString('cy1', $queries[0]);
         $this->assertStringContainsString('103', $queries[0]);
-        $this->assertStringContainsString('cy` = 1', $queries[0]);
+        $this->assertStringContainsString('`cy` = 0', $queries[0]);
+        $this->assertStringContainsString('`cyt` = 1', $queries[0]);
         $this->assertStringContainsString('droptime', $queries[0]);
         $this->assertStringContainsString('= 0', $queries[0]);
     }
@@ -138,10 +139,9 @@ class WaiversRepositoryTest extends TestCase
         $this->assertStringContainsString('UPDATE ibl_plr', $queries[0]);
         $this->assertStringContainsString('ordinal', $queries[0]);
         $this->assertStringContainsString('800', $queries[0]);
-        $this->assertStringContainsString('cy2', $queries[0]);
-        $this->assertStringContainsString('76', $queries[0]);
-        $this->assertStringContainsString('`cy` = 1', $queries[0]);
-        $this->assertStringContainsString('`cyt` = 2', $queries[0]);
+        $this->assertStringContainsString('`cy1` = 76', $queries[0]);
+        $this->assertStringContainsString('`cy` = 0', $queries[0]);
+        $this->assertStringContainsString('`cyt` = 1', $queries[0]);
         $this->assertStringContainsString('droptime', $queries[0]);
         $this->assertStringContainsString('= 0', $queries[0]);
     }

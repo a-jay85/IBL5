@@ -45,15 +45,18 @@ class WaiversRepositoryTest extends TestCase
         ];
         
         $contractData = [
-            'salary' => 103,
-            'contractYearField' => 'cy1',
-            'contractYear' => 1
+            'hasExistingContract' => false,
+            'salary' => 103
         ];
+        
+        $mockSeason = $this->createMock(\Season::class);
+        $mockSeason->phase = 'Regular Season';
         
         $result = $this->repository->signPlayerFromWaivers(
             123,
             $team,
-            $contractData
+            $contractData,
+            $mockSeason
         );
         
         $this->assertTrue($result);
@@ -79,12 +82,19 @@ class WaiversRepositoryTest extends TestCase
             'teamid' => 2
         ];
         
-        $contractData = []; // No new contract
+        $contractData = [
+            'hasExistingContract' => true,
+            'salary' => 500
+        ];
+        
+        $mockSeason = $this->createMock(\Season::class);
+        $mockSeason->phase = 'Regular Season';
         
         $result = $this->repository->signPlayerFromWaivers(
             123,
             $team,
-            $contractData
+            $contractData,
+            $mockSeason
         );
         
         $this->assertTrue($result);
@@ -107,15 +117,18 @@ class WaiversRepositoryTest extends TestCase
         ];
         
         $contractData = [
-            'salary' => 76,
-            'contractYearField' => 'cy2',
-            'contractYear' => 2
+            'hasExistingContract' => false,
+            'salary' => 76
         ];
+        
+        $mockSeason = $this->createMock(\Season::class);
+        $mockSeason->phase = 'Free Agency';
         
         $result = $this->repository->signPlayerFromWaivers(
             456,
             $team,
-            $contractData
+            $contractData,
+            $mockSeason
         );
         
         $this->assertTrue($result);
@@ -127,7 +140,8 @@ class WaiversRepositoryTest extends TestCase
         $this->assertStringContainsString('800', $queries[0]);
         $this->assertStringContainsString('cy2', $queries[0]);
         $this->assertStringContainsString('76', $queries[0]);
-        $this->assertStringContainsString('cy` = 2', $queries[0]);
+        $this->assertStringContainsString('`cy` = 1', $queries[0]);
+        $this->assertStringContainsString('`cyt` = 2', $queries[0]);
         $this->assertStringContainsString('droptime', $queries[0]);
         $this->assertStringContainsString('= 0', $queries[0]);
     }

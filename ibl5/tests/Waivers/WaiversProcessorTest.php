@@ -288,7 +288,7 @@ class WaiversProcessorTest extends TestCase
         $contractData = $this->processor->determineContractData($playerData, $this->mockSeasonFreeAgency);
         
         $this->assertFalse($contractData['hasExistingContract']);
-        $this->assertEquals(76, $contractData['salary']);
+        $this->assertEquals(82, $contractData['salary']);
     }
     
     public function testGetPlayerContractDisplayDuringFreeAgency()

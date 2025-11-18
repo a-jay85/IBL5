@@ -18,40 +18,7 @@ class OverviewView extends BaseView {
     }
 
     public function render() {
-        $escapedName = DatabaseService::escapeString($this->db, $this->player->name);
-        
-        $allstarquery = $this->db->sql_query("SELECT * FROM ibl_awards WHERE name='" . $escapedName . "' AND Award LIKE '%Conference All-Star'");
-        $asg = $this->db->sql_numrows($allstarquery);
-
-        $allstarquery2 = $this->db->sql_query("SELECT * FROM ibl_awards WHERE name='" . $escapedName . "' AND Award LIKE 'Three-Point Contest%'");
-        $threepointcontests = $this->db->sql_numrows($allstarquery2);
-
-        $allstarquery3 = $this->db->sql_query("SELECT * FROM ibl_awards WHERE name='" . $escapedName . "' AND Award LIKE 'Slam Dunk Competition%'");
-        $dunkcontests = $this->db->sql_numrows($allstarquery3);
-        
-        $allstarquery4 = $this->db->sql_query("SELECT * FROM ibl_awards WHERE name='" . $escapedName . "' AND Award LIKE 'Rookie-Sophomore Challenge'");
-        $rooksoph = $this->db->sql_numrows($allstarquery4);
-
-        echo "<table align=left cellspacing=1 cellpadding=0 border=1>
-            <th colspan=2><center>All-Star Activity</center></th>
-            <tr>
-                <td><b>All Star Games:</b></td>
-                <td>$asg</td>
-            </tr>
-            <tr>
-                <td><b>Three-Point<br>Contests:</b></td>
-                <td>$threepointcontests</td>
-            </tr>
-            <tr>
-                <td><b>Slam Dunk<br>Competitions:</b></td>
-                <td>$dunkcontests</td>
-            </tr>
-            <tr>
-                <td><b>Rookie-Sophomore<br>Challenges:</b></td>
-                <td>$rooksoph</td>
-            </tr>
-        </table>
-        <center>
+        echo "<center>
         <table>
             <tr align=center>
                 <td><b>Talent</b></td>

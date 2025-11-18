@@ -202,9 +202,19 @@ class PlayerPageViewHelper
      * Generate player highs table HTML
      * 
      * @param PlayerStats $playerStats The player's statistics
+     * @param int $allStarGames Number of All-Star Games
+     * @param int $threePointContests Number of Three-Point Contests
+     * @param int $dunkContests Number of Slam Dunk Competitions
+     * @param int $rookieSophChallenges Number of Rookie-Sophomore Challenges
      * @return string HTML for player highs table
      */
-    public function renderPlayerHighsTable(PlayerStats $playerStats): string
+    public function renderPlayerHighsTable(
+        PlayerStats $playerStats,
+        int $allStarGames = 0,
+        int $threePointContests = 0,
+        int $dunkContests = 0,
+        int $rookieSophChallenges = 0
+    ): string
     {
         ob_start();
         ?>
@@ -288,6 +298,25 @@ class PlayerPageViewHelper
             <td><strong>Blocks</strong></td>
             <td><?= htmlspecialchars((string)$playerStats->seasonPlayoffHighBlocks) ?></td>
             <td><?= htmlspecialchars((string)$playerStats->careerPlayoffHighBlocks) ?></td>
+        </tr>
+        <tr style="background-color: #0000cc;">
+            <td style="text-align: center; color: white;" colspan=3><strong>All-Star Activity</strong></td>
+        </tr>
+        <tr>
+            <td colspan=2><strong>All Star Games:</strong></td>
+            <td><?= htmlspecialchars((string)$allStarGames) ?></td>
+        </tr>
+        <tr>
+            <td colspan=2><strong>Three-Point Contests:</strong></td>
+            <td><?= htmlspecialchars((string)$threePointContests) ?></td>
+        </tr>
+        <tr>
+            <td colspan=2><strong>Slam Dunk Competitions:</strong></td>
+            <td><?= htmlspecialchars((string)$dunkContests) ?></td>
+        </tr>
+        <tr>
+            <td colspan=2><strong>Rookie-Sophomore Challenges:</strong></td>
+            <td><?= htmlspecialchars((string)$rookieSophChallenges) ?></td>
         </tr>
     </table>
 </td>

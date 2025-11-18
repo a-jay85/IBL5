@@ -124,7 +124,7 @@ class WaiversProcessor
      * 
      * @param array $playerData Player data array
      * @param Season $season Season instance to determine phase
-     * @return array Contract data with cy field, contract year, and final contract display
+     * @return array Contract data with cy field, contract year, salary, and final contract display
      */
     public function prepareContractData(array $playerData, Season $season): array
     {
@@ -160,6 +160,7 @@ class WaiversProcessor
         
         return [
             'isNewContract' => false,
+            'salary' => $currentSeasonSalary,
             'finalContract' => implode(" ", $contractParts)
         ];
     }

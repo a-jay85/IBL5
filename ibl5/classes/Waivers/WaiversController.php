@@ -189,17 +189,7 @@ class WaiversController
         
         $season = new \Season($this->db);
         $contractData = $this->processor->prepareContractData($player, $season);
-        $playerSalary = isset($contractData['salary']) ? (int) $contractData['salary'] : 0;
-        
-        // If no new contract, get salary using PlayerContractCalculator
-        if ($playerSalary === 0) {
-            $playerData = PlayerDataConverter::arrayToPlayerData($player);
-            if ($season->phase === 'Free Agency') {
-                $playerSalary = $this->contractCalculator->getNextSeasonSalary($playerData);
-            } else {
-                $playerSalary = $this->contractCalculator->getCurrentSeasonSalary($playerData);
-            }
-        }
+        $playerSalary = (int) ($contractData['salary'] ?? 0);
         
         if (!$this->validator->validateAdd($playerID, $healthyRosterSlots, $totalSalary, $playerSalary)) {
             return implode(' ', $this->validator->getErrors());

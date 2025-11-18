@@ -229,7 +229,6 @@ class WaiversProcessorTest extends TestCase
             'cy1' => 500,
             'cy' => 1,
             'cyt' => 3,
-            'cy1' => 500,
             'cy2' => 550,
             'cy3' => 600
         ];
@@ -237,7 +236,7 @@ class WaiversProcessorTest extends TestCase
         $contractData = $this->processor->prepareContractData($playerData, $this->mockSeasonRegular);
         
         $this->assertFalse($contractData['isNewContract']);
-        $this->assertArrayNotHasKey('salary', $contractData);
+        $this->assertEquals(500, $contractData['salary']);
         $this->assertEquals('500 550 600', $contractData['finalContract']);
     }
     

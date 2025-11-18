@@ -201,6 +201,16 @@ class PlayerRepository
         // Salary
         $playerData->salaryJSB = $plrRow['salary'];
 
+        // Initialize contract fields for historical data (values are snapshots, not current)
+        $playerData->contractCurrentYear = 0;
+        $playerData->contractTotalYears = 0;
+        $playerData->contractYear1Salary = 0;
+        $playerData->contractYear2Salary = 0;
+        $playerData->contractYear3Salary = 0;
+        $playerData->contractYear4Salary = 0;
+        $playerData->contractYear5Salary = 0;
+        $playerData->contractYear6Salary = 0;
+
         return $playerData;
     }
 

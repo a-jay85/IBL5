@@ -40,7 +40,7 @@ function main($user)
 
 function display()
 {
-    global $prefix, $db, $cookie;
+    global $db, $cookie;
     $commonRepository = new Services\CommonRepository($db);
     $season = new Season($db);
 
@@ -62,7 +62,7 @@ function display()
 
 function negotiate($pid)
 {
-    global $prefix, $db, $cookie;
+    global $db, $cookie;
     $commonRepository = new Services\CommonRepository($db);
 
     $pid = intval($pid);

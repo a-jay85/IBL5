@@ -113,6 +113,8 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
         <?= $this->renderLLERow($teamName, $player, $veteranMinimum, $amendedCapSpace, $capData) ?>
         <?= $this->renderVetMinRow($teamName, $player, $veteranMinimum, $amendedCapSpace, $capData) ?>
         
+        <?= $this->renderNotesReminders($maxContract, $veteranMinimum, $amendedCapSpace, $capData, $player->birdYears) ?>
+        
         <?php if (isset($existingOffer['offer1'])): ?>
         <tr>
             <td colspan="8">
@@ -379,5 +381,69 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
         if ($demands['dem3'] != 0) return 3;
         if ($demands['dem2'] != 0) return 2;
         return 1;
+    }
+
+    /**
+     * Render Notes/Reminders section
+     * 
+     * @param int $maxContract Maximum contract value
+     * @param int $veteranMinimum Veteran minimum salary
+     * @param int $amendedCapSpace Amended cap space for year 1
+     * @param array<string, mixed> $capData Cap space data
+     * @param int $birdYears Bird rights years
+     * @return string HTML table row
+     */
+    private function renderNotesReminders(
+        int $maxContract,
+        int $veteranMinimum,
+        int $amendedCapSpace,
+        array $capData,
+        int $birdYears
+    ): string {
+        $hardCapYear1 = $capData['hardCap']['year1'];
+        $hardCapYear2 = $capData['hardCap']['year2'];
+        $hardCapYear3 = $capData['hardCap']['year3'];
+        $hardCapYear4 = $capData['hardCap']['year4'];
+        $hardCapYear5 = $capData['hardCap']['year5'];
+        $hardCapYear6 = $capData['hardCap']['year6'];
+        
+        $softCapYear2 = $capData['softCap']['year2'];
+        $softCapYear3 = $capData['softCap']['year3'];
+        $softCapYear4 = $capData['softCap']['year4'];
+        $softCapYear5 = $capData['softCap']['year5'];
+        $softCapYear6 = $capData['softCap']['year6'];
+        
+        $birdRightsText = $birdYears >= 3
+            ? "<b>Bird Rights Player on Your Team:</b> You may add no more than 12.5% of the amount you offer in the first year as a raise between years (for instance, if you offer 500 in Year 1, you cannot offer a raise of more than 62 between any two subsequent years.)"
+            : "<b>For Players who do not have Bird Rights with your team:</b> You may add no more than 10% of the amount you offer in the first year as a raise between years (for instance, if you offer 500 in Year 1, you cannot offer a raise of more than 50 between any two subsequent years.)";
+        
+        ob_start();
+        ?>
+<tr>
+    <td colspan="8">
+        <b>Notes/Reminders:</b>
+        <ul>
+            <li>The maximum contract permitted for me (based on my years of service) starts at <?= htmlspecialchars($maxContract) ?> in Year 1.</li>
+            <li>You have <b><?= htmlspecialchars($amendedCapSpace) ?></b> in <b>soft cap</b> space available; the amount you offer in year 1 cannot exceed this unless you are using one of the exceptions.</li>
+            <li>You have <b><?= htmlspecialchars($softCapYear2) ?></b> in <b>soft cap</b> space available; the amount you offer in year 2 cannot exceed this unless you are using one of the exceptions.</li>
+            <li>You have <b><?= htmlspecialchars($softCapYear3) ?></b> in <b>soft cap</b> space available; the amount you offer in year 3 cannot exceed this unless you are using one of the exceptions.</li>
+            <li>You have <b><?= htmlspecialchars($softCapYear4) ?></b> in <b>soft cap</b> space available; the amount you offer in year 4 cannot exceed this unless you are using one of the exceptions.</li>
+            <li>You have <b><?= htmlspecialchars($softCapYear5) ?></b> in <b>soft cap</b> space available; the amount you offer in year 5 cannot exceed this unless you are using one of the exceptions.</li>
+            <li>You have <b><?= htmlspecialchars($softCapYear6) ?></b> in <b>soft cap</b> space available; the amount you offer in year 6 cannot exceed this unless you are using one of the exceptions.</li>
+            <li>You have <b><?= htmlspecialchars($hardCapYear1) ?></b> in <b>hard cap</b> space available; the amount you offer in year 1 cannot exceed this, period.</li>
+            <li>You have <b><?= htmlspecialchars($hardCapYear2) ?></b> in <b>hard cap</b> space available; the amount you offer in year 2 cannot exceed this, period.</li>
+            <li>You have <b><?= htmlspecialchars($hardCapYear3) ?></b> in <b>hard cap</b> space available; the amount you offer in year 3 cannot exceed this, period.</li>
+            <li>You have <b><?= htmlspecialchars($hardCapYear4) ?></b> in <b>hard cap</b> space available; the amount you offer in year 4 cannot exceed this, period.</li>
+            <li>You have <b><?= htmlspecialchars($hardCapYear5) ?></b> in <b>hard cap</b> space available; the amount you offer in year 5 cannot exceed this, period.</li>
+            <li>You have <b><?= htmlspecialchars($hardCapYear6) ?></b> in <b>hard cap</b> space available; the amount you offer in year 6 cannot exceed this, period.</li>
+            <li>Enter "0" for years you do not want to offer a contract.</li>
+            <li>The amounts offered each year must equal or exceed the previous year.</li>
+            <li>The first year of the contract must be at least the veteran's minimum (<?= htmlspecialchars($veteranMinimum) ?> for this player).</li>
+            <li><?= $birdRightsText ?></li>
+        </ul>
+    </td>
+</tr>
+        <?php
+        return ob_get_clean();
     }
 }

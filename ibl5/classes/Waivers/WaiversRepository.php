@@ -43,16 +43,16 @@ class WaiversRepository
      * Signs a player from waivers
      * 
      * @param int $playerID Player ID to sign
-     * @param string $teamName Team name
-     * @param int $teamID Team ID
+     * @param array $team Team data array with 'teamname' and 'teamid' keys
      * @param array $contractData Contract data including salary, contractYearField, and contractYear
      * @return bool Success status
      */
-    public function signPlayerFromWaivers(int $playerID, string $teamName, int $teamID, array $contractData): bool
+    public function signPlayerFromWaivers(int $playerID, array $team, array $contractData): bool
     {
         $playerID = (int) $playerID;
+        $teamName = $team['teamname'] ?? '';
+        $teamID = (int) ($team['teamid'] ?? 0);
         $teamNameEscaped = \Services\DatabaseService::escapeString($this->db, $teamName);
-        $teamID = (int) $teamID;
         
         $query = "UPDATE ibl_plr
                   SET `ordinal` = '800',

@@ -108,15 +108,15 @@ class PlayerPageViewHelperTest extends TestCase
         $this->assertStringContainsString('Regular-Season', $html);
         $this->assertStringContainsString('Playoffs', $html);
         
-        // Check regular season stats
-        $this->assertStringContainsString('<td>35</td>', $html); // seasonHighPoints
-        $this->assertStringContainsString('<td>42</td>', $html); // careerSeasonHighPoints
-        $this->assertStringContainsString('<td>15</td>', $html); // seasonHighRebounds
-        $this->assertStringContainsString('<td>18</td>', $html); // careerSeasonHighRebounds
+        // Check regular season stats (with stat-value class)
+        $this->assertStringContainsString('class="stat-value">35</td>', $html); // seasonHighPoints
+        $this->assertStringContainsString('class="stat-value">42</td>', $html); // careerSeasonHighPoints
+        $this->assertStringContainsString('class="stat-value">15</td>', $html); // seasonHighRebounds
+        $this->assertStringContainsString('class="stat-value">18</td>', $html); // careerSeasonHighRebounds
         
         // Check playoff stats
-        $this->assertStringContainsString('<td>40</td>', $html); // seasonPlayoffHighPoints
-        $this->assertStringContainsString('<td>45</td>', $html); // careerPlayoffHighPoints
+        $this->assertStringContainsString('class="stat-value">40</td>', $html); // seasonPlayoffHighPoints
+        $this->assertStringContainsString('class="stat-value">45</td>', $html); // careerPlayoffHighPoints
         
         // Check double/triple doubles
         $this->assertStringContainsString('Double-Doubles', $html);

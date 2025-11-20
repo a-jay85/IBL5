@@ -18,14 +18,14 @@ use Player\PlayerImageHelper;
 class FreeAgencyNegotiationHelper
 {
     /**
-     * Veteran minimum salary by years of experience for Free Agency signings
+     * Veteran minimum salary by years of experience for Free Agency and Waiver signings
      * 
-     * Note: These are the minimum salary tiers for Free Agency contract offers.
-     * Year 1 value (35) represents the first-year rookie contract minimum.
+     * These are the minimum salary tiers used for both Free Agency contract offers and
+     * Waiver signings. Year 1 value (35) represents the first-year rookie contract minimum.
      * Year 2+ values (51+) represent veteran and returning player minimums.
      * 
-     * For waiver signings, see WaiversProcessor::calculateVeteranMinimumSalary()
-     * which uses 51 as the minimum for all rookies.
+     * This is the authoritative source for veteran minimum salaries. Waivers module
+     * delegates to getVeteranMinimumSalary() to ensure consistent salary calculations.
      * 
      * @var array<int, int>
      */

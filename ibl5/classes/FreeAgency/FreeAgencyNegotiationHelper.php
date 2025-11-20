@@ -34,14 +34,12 @@ class FreeAgencyNegotiationHelper
      * Render complete negotiation page
      * 
      * @param int $playerID Player ID
-     * @param string $teamName User's team name
-     * @param int $teamID User's team ID
+     * @param \Team $team User's team
      * @return string HTML output
      */
-    public function renderNegotiationPage(int $playerID, string $teamName, int $teamID): string
+    public function renderNegotiationPage(int $playerID, \Team $team): string
     {
         $player = Player::withPlayerID($this->db, $playerID);
-        $team = \Team::initialize($this->db, $teamID);
         $capCalculator = new FreeAgencyCapCalculator($this->db);
         $capData = $capCalculator->calculateNegotiationCapSpace($team, $player->name);
         
@@ -50,7 +48,7 @@ class FreeAgencyNegotiationHelper
         $maxContract = $this->calculateMaxContract($player->yearsOfExperience);
         
         // Get existing offer if any
-        $existingOffer = $this->getExistingOffer($teamName, $player->name);
+        $existingOffer = $this->getExistingOffer($team->name, $player->name);
         
         // Adjust cap space to account for existing offer
         $amendedCapSpace = $capData['softCap']['year1'] + $existingOffer['offer1'];
@@ -97,7 +95,7 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
             <input type="hidden" name="demtot" value="<?= htmlspecialchars($this->calculateTotalDemands($demands)) ?>">
             <input type="hidden" name="demyrs" value="<?= htmlspecialchars($this->calculateDemandYears($demands)) ?>">
             <input type="hidden" name="max" value="<?= htmlspecialchars($maxContract) ?>">
-            <input type="hidden" name="teamname" value="<?= htmlspecialchars($teamName) ?>">
+            <input type="hidden" name="teamname" value="<?= htmlspecialchars($team->name) ?>">
             <input type="hidden" name="player_teamname" value="<?= htmlspecialchars($player->teamName) ?>">
             <input type="hidden" name="playername" value="<?= htmlspecialchars($player->name) ?>">
             <input type="hidden" name="bird" value="<?= htmlspecialchars($player->birdYears) ?>">
@@ -112,10 +110,10 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
             <td colspan="8"><center><b>MAX SALARY OFFERS:</b></center></td>
         </tr>
         
-        <?= $this->renderMaxContractRow($teamName, $player, $maxContract, $veteranMinimum, $amendedCapSpace, $capData) ?>
-        <?= $this->renderMLERow($teamName, $player, $veteranMinimum, $amendedCapSpace, $capData) ?>
-        <?= $this->renderLLERow($teamName, $player, $veteranMinimum, $amendedCapSpace, $capData) ?>
-        <?= $this->renderVetMinRow($teamName, $player, $veteranMinimum, $amendedCapSpace, $capData) ?>
+        <?= $this->renderMaxContractRow($team->name, $player, $maxContract, $veteranMinimum, $amendedCapSpace, $capData) ?>
+        <?= $this->renderMLERow($team->name, $player, $veteranMinimum, $amendedCapSpace, $capData) ?>
+        <?= $this->renderLLERow($team->name, $player, $veteranMinimum, $amendedCapSpace, $capData) ?>
+        <?= $this->renderVetMinRow($team->name, $player, $veteranMinimum, $amendedCapSpace, $capData) ?>
         
         <?= $this->renderNotesReminders($maxContract, $veteranMinimum, $amendedCapSpace, $capData, $player->birdYears) ?>
         
@@ -123,7 +121,7 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
         <tr>
             <td colspan="8">
                 <form method="post" action="modules.php?name=Free_Agency&pa=deleteoffer">
-                    <input type="hidden" name="teamname" value="<?= htmlspecialchars($teamName) ?>">
+                    <input type="hidden" name="teamname" value="<?= htmlspecialchars($team->name) ?>">
                     <input type="hidden" name="playername" value="<?= htmlspecialchars($player->name) ?>">
                     <center><input type="submit" value="DELETE this offer"></center>
                 </form>

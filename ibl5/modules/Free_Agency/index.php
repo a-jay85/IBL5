@@ -76,8 +76,9 @@ function negotiate($pid)
     Nuke\Header::header();
     OpenTable();
 
+    $team = \Team::initialize($db, $teamID);
     $negotiationHelper = new FreeAgencyNegotiationHelper($db);
-    echo $negotiationHelper->renderNegotiationPage($pid, $userTeamName, $teamID);
+    echo $negotiationHelper->renderNegotiationPage($pid, $team);
 
     CloseTable();
     Nuke\Footer::footer();

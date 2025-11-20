@@ -226,7 +226,7 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
         
         $formData = $this->buildFormData($teamName, $player, $veteranMinimum, $amendedCapSpace, $capData);
         
-        return $this->viewHelper->renderMaxContractButtons($formData, $maxSalaries, $player->yearsOfExperience);
+        return $this->viewHelper->renderMaxContractButtons($formData, $maxSalaries);
     }
 
     /**

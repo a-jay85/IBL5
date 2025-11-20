@@ -94,21 +94,13 @@ class FreeAgencyViewHelper
     {
         ob_start();
         
-        if ($playerExperience > 0) {
-            // Veteran - show all applicable years
-            echo htmlspecialchars($demands['dem1']);
-            if ($demands['dem2'] != 0) echo "</td><td>" . htmlspecialchars($demands['dem2']);
-            if ($demands['dem3'] != 0) echo "</td><td>" . htmlspecialchars($demands['dem3']);
-            if ($demands['dem4'] != 0) echo "</td><td>" . htmlspecialchars($demands['dem4']);
-            if ($demands['dem5'] != 0) echo "</td><td>" . htmlspecialchars($demands['dem5']);
-            if ($demands['dem6'] != 0) echo "</td><td>" . htmlspecialchars($demands['dem6']);
-            echo "</td><td></td>";
-        } else {
-            // Undrafted rookie - limit to 2 years (show dem3/dem4)
-            echo htmlspecialchars($demands['dem3']);
-            if ($demands['dem4'] != 0) echo "</td><td>" . htmlspecialchars($demands['dem4']);
-            echo "</td><td></td>";
-        }
+        echo htmlspecialchars($demands['dem1']);
+        if ($demands['dem2'] != 0) echo "</td><td>" . htmlspecialchars($demands['dem2']);
+        if ($demands['dem3'] != 0) echo "</td><td>" . htmlspecialchars($demands['dem3']);
+        if ($demands['dem4'] != 0) echo "</td><td>" . htmlspecialchars($demands['dem4']);
+        if ($demands['dem5'] != 0) echo "</td><td>" . htmlspecialchars($demands['dem5']);
+        if ($demands['dem6'] != 0) echo "</td><td>" . htmlspecialchars($demands['dem6']);
+        echo "</td><td></td>";
         
         return ob_get_clean();
     }
@@ -123,25 +115,14 @@ class FreeAgencyViewHelper
     public function renderOfferInputs(int $playerExperience, array $prefills): string
     {
         ob_start();
-        
-        if ($playerExperience > 0) {
-            // Veteran - 6 year offers allowed
-            ?>
+        ?>
 <input type="number" style="width: 4em" name="offeryear1" size="4" value="<?= htmlspecialchars($prefills['offer1'] ?: '') ?>"></td><td>
 <input type="number" style="width: 4em" name="offeryear2" size="4" value="<?= htmlspecialchars($prefills['offer2'] ?: '') ?>"></td><td>
 <input type="number" style="width: 4em" name="offeryear3" size="4" value="<?= htmlspecialchars($prefills['offer3'] ?: '') ?>"></td><td>
 <input type="number" style="width: 4em" name="offeryear4" size="4" value="<?= htmlspecialchars($prefills['offer4'] ?: '') ?>"></td><td>
 <input type="number" style="width: 4em" name="offeryear5" size="4" value="<?= htmlspecialchars($prefills['offer5'] ?: '') ?>"></td><td>
 <input type="number" style="width: 4em" name="offeryear6" size="4" value="<?= htmlspecialchars($prefills['offer6'] ?: '') ?>"></td>
-            <?php
-        } else {
-            // Undrafted rookie - limit to 2 years
-            ?>
-<input type="number" style="width: 4em" name="offeryear1" size="4" value="<?= htmlspecialchars($prefills['offer3'] ?: '') ?>"></td><td>
-<input type="number" style="width: 4em" name="offeryear2" size="4" value="<?= htmlspecialchars($prefills['offer4'] ?: '') ?>"></td>
-            <?php
-        }
-        
+        <?php
         return ob_get_clean();
     }
 
@@ -150,28 +131,25 @@ class FreeAgencyViewHelper
      * 
      * @param array<string, mixed> $formData Data for hidden form fields
      * @param array<int> $maxSalaries Maximum salaries per year
-     * @param int $playerExperience Years of experience
      * @return string HTML form buttons
      */
-    public function renderMaxContractButtons(array $formData, array $maxSalaries, int $playerExperience): string
+    public function renderMaxContractButtons(array $formData, array $maxSalaries): string
     {
-        ob_start();
-        ?>
-<td>Max Level Contract 10% (click the button that corresponds to the final year you wish to offer):</td>
-<td><?= $this->renderMaxContractForm($formData, [$maxSalaries[1]], 1) ?></td>
-<td><?= $this->renderMaxContractForm($formData, [$maxSalaries[1], $maxSalaries[2]], 2) ?></td>
-        <?php
+        $buttonConfigs = [
+            ['offers' => [$maxSalaries[1]]],
+            ['offers' => [$maxSalaries[1], $maxSalaries[2]]],
+            ['offers' => [$maxSalaries[1], $maxSalaries[2], $maxSalaries[3]]],
+            ['offers' => [$maxSalaries[1], $maxSalaries[2], $maxSalaries[3], $maxSalaries[4]]],
+            ['offers' => [$maxSalaries[1], $maxSalaries[2], $maxSalaries[3], $maxSalaries[4], $maxSalaries[5]]],
+            ['offers' => [$maxSalaries[1], $maxSalaries[2], $maxSalaries[3], $maxSalaries[4], $maxSalaries[5], $maxSalaries[6]]],
+        ];
         
-        if ($playerExperience > 0) {
-            echo "<td>{$this->renderMaxContractForm($formData, [$maxSalaries[1], $maxSalaries[2], $maxSalaries[3]], 3)}</td>";
-            echo "<td>{$this->renderMaxContractForm($formData, [$maxSalaries[1], $maxSalaries[2], $maxSalaries[3], $maxSalaries[4]], 4)}</td>";
-            echo "<td>{$this->renderMaxContractForm($formData, [$maxSalaries[1], $maxSalaries[2], $maxSalaries[3], $maxSalaries[4], $maxSalaries[5]], 5)}</td>";
-            echo "<td>{$this->renderMaxContractForm($formData, [$maxSalaries[1], $maxSalaries[2], $maxSalaries[3], $maxSalaries[4], $maxSalaries[5], $maxSalaries[6]], 6)}</td>";
-        }
-        
-        echo "<td></td>";
-        
-        return ob_get_clean();
+        return $this->renderButtonRow(
+            'Max Level Contract 10% (click the button that corresponds to the final year you wish to offer):',
+            $formData,
+            $buttonConfigs,
+            0
+        );
     }
 
     /**
@@ -252,16 +230,20 @@ class FreeAgencyViewHelper
      */
     private function renderMLEButtons(array $formData): void
     {
-        echo "<td>Mid-Level Exception (click the button that corresponds to the final year you wish to offer):</td>";
-        
-        // Generate buttons for 1-6 year MLE contracts
+        $buttonConfigs = [];
         for ($years = 1; $years <= 6; $years++) {
-            $offers = array_slice(FreeAgencyNegotiationHelper::MLE_OFFERS, 0, $years);
-            $formDataWithMLE = array_merge($formData, ['MLEyrs' => (string) $years]);
-            echo "<td>{$this->renderMaxContractForm($formDataWithMLE, $offers, $years)}</td>";
+            $buttonConfigs[] = [
+                'offers' => array_slice(FreeAgencyNegotiationHelper::MLE_OFFERS, 0, $years),
+                'MLEyrs' => (string) $years,
+            ];
         }
         
-        echo "<td></td>";
+        echo $this->renderButtonRow(
+            'Mid-Level Exception (click the button that corresponds to the final year you wish to offer):',
+            $formData,
+            $buttonConfigs,
+            0
+        );
     }
 
     /**
@@ -272,10 +254,19 @@ class FreeAgencyViewHelper
      */
     private function renderLLEButton(array $formData): void
     {
-        $formDataWithLLE = array_merge($formData, ['MLEyrs' => '7']);
-        echo "<td>Lower-Level Exception:</td>";
-        echo "<td>{$this->renderMaxContractForm($formDataWithLLE, [FreeAgencyNegotiationHelper::LLE_OFFER], 1)}</td>";
-        echo "<td colspan=\"6\"></td>";
+        $buttonConfigs = [
+            [
+                'offers' => [FreeAgencyNegotiationHelper::LLE_OFFER],
+                'MLEyrs' => '7',
+            ],
+        ];
+        
+        echo $this->renderButtonRow(
+            'Lower-Level Exception:',
+            $formData,
+            $buttonConfigs,
+            6
+        );
     }
 
     /**
@@ -286,11 +277,55 @@ class FreeAgencyViewHelper
      */
     private function renderVetMinButton(array $formData): void
     {
-        $formDataWithVet = array_merge($formData, ['MLEyrs' => '8']);
         // Use formData value if available, otherwise use rookie minimum from constants
         $vetMin = $formData['vetmin'] ?? FreeAgencyNegotiationHelper::getVeteranMinimumSalary(1);
-        echo "<td>Veterans Exception:</td>";
-        echo "<td>{$this->renderMaxContractForm($formDataWithVet, [(int) $vetMin], 1)}</td>";
-        echo "<td colspan=\"6\"></td>";
+        
+        $buttonConfigs = [
+            [
+                'offers' => [(int) $vetMin],
+                'MLEyrs' => '8',
+            ],
+        ];
+        
+        echo $this->renderButtonRow(
+            'Veterans Exception:',
+            $formData,
+            $buttonConfigs,
+            6
+        );
+    }
+
+    /**
+     * Render a row of contract offer buttons with label and fill cells
+     * 
+     * @param string $label Label text for the first cell
+     * @param array<string, mixed> $formData Base form data
+     * @param array<array{offers: array<int>, MLEyrs?: string}> $buttonConfigs Array of button configurations
+     * @param int $fillCells Number of empty cells to add at end
+     * @return string HTML table row content
+     */
+    private function renderButtonRow(string $label, array $formData, array $buttonConfigs, int $fillCells = 0): string
+    {
+        ob_start();
+        
+        echo "<td>" . htmlspecialchars($label) . "</td>";
+        
+        foreach ($buttonConfigs as $config) {
+            $configFormData = $formData;
+            if (isset($config['MLEyrs'])) {
+                $configFormData = array_merge($formData, ['MLEyrs' => $config['MLEyrs']]);
+            }
+            
+            $finalYear = count($config['offers']);
+            echo "<td>{$this->renderMaxContractForm($configFormData, $config['offers'], $finalYear)}</td>";
+        }
+        
+        if ($fillCells > 0) {
+            echo "<td colspan=\"{$fillCells}\"></td>";
+        } else {
+            echo "<td></td>";
+        }
+        
+        return ob_get_clean();
     }
 }

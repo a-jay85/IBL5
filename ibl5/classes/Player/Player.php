@@ -279,18 +279,7 @@ class Player
      */
     public function getFutureSalaries(): array
     {
-        $contractYears = [
-            $this->contractYear1Salary,
-            $this->contractYear2Salary,
-            $this->contractYear3Salary,
-            $this->contractYear4Salary,
-            $this->contractYear5Salary,
-            $this->contractYear6Salary,
-        ];
-        
-        // Slice from current year offset and pad with zeros to maintain 6-year array
-        $remainingYears = array_slice($contractYears, $this->contractCurrentYear);
-        return array_pad($remainingYears, 6, 0);
+        return $this->contractCalculator->getFutureSalaries($this->playerData);
     }
 
     public function canRenegotiateContract()

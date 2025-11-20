@@ -97,28 +97,16 @@ class FreeAgencyViewHelper
         if ($playerExperience > 0) {
             // Veteran - show all applicable years
             echo htmlspecialchars($demands['dem1']);
-            if ($demands['dem2'] != 0) {
-                echo "</td><td>" . htmlspecialchars($demands['dem2']);
-            }
-            if ($demands['dem3'] != 0) {
-                echo "</td><td>" . htmlspecialchars($demands['dem3']);
-            }
-            if ($demands['dem4'] != 0) {
-                echo "</td><td>" . htmlspecialchars($demands['dem4']);
-            }
-            if ($demands['dem5'] != 0) {
-                echo "</td><td>" . htmlspecialchars($demands['dem5']);
-            }
-            if ($demands['dem6'] != 0) {
-                echo "</td><td>" . htmlspecialchars($demands['dem6']);
-            }
+            if ($demands['dem2'] != 0) echo "</td><td>" . htmlspecialchars($demands['dem2']);
+            if ($demands['dem3'] != 0) echo "</td><td>" . htmlspecialchars($demands['dem3']);
+            if ($demands['dem4'] != 0) echo "</td><td>" . htmlspecialchars($demands['dem4']);
+            if ($demands['dem5'] != 0) echo "</td><td>" . htmlspecialchars($demands['dem5']);
+            if ($demands['dem6'] != 0) echo "</td><td>" . htmlspecialchars($demands['dem6']);
             echo "</td><td></td>";
         } else {
             // Undrafted rookie - limit to 2 years (show dem3/dem4)
             echo htmlspecialchars($demands['dem3']);
-            if ($demands['dem4'] != 0) {
-                echo "</td><td>" . htmlspecialchars($demands['dem4']);
-            }
+            if ($demands['dem4'] != 0) echo "</td><td>" . htmlspecialchars($demands['dem4']);
             echo "</td><td></td>";
         }
         

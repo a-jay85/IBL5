@@ -75,9 +75,8 @@ class FreeAgencyDisplayHelper
         <?php foreach ($team->getRosterUnderContractOrderedByOrdinalResult() as $playerRow): ?>
             <?php
             $player = Player::withPlrRow($this->db, $playerRow);
-            $yearPlayerIsFreeAgent = $player->draftYear + $player->yearsOfExperience + $player->contractTotalYears - $player->contractCurrentYear;
             
-            if ($yearPlayerIsFreeAgent != $season->endingYear):
+            if (!$player->isPlayerFreeAgent($season)):
                 $futureSalaries = $player->getFutureSalaries();
                 $playerName = $player->name;
                 if ($player->ordinal > \JSB::WAIVERS_ORDINAL) {
@@ -193,9 +192,8 @@ class FreeAgencyDisplayHelper
         <?php foreach ($team->getRosterUnderContractOrderedByOrdinalResult() as $playerRow): ?>
             <?php
             $player = Player::withPlrRow($this->db, $playerRow);
-            $yearPlayerIsFreeAgent = $player->draftYear + $player->yearsOfExperience + $player->contractTotalYears - $player->contractCurrentYear;
             
-            if ($yearPlayerIsFreeAgent == $season->endingYear):
+            if ($player->isPlayerFreeAgent($season)):
                 $demands = $this->db->sql_fetchrow($player->getFreeAgencyDemands());
             ?>
         <tr>
@@ -250,9 +248,8 @@ class FreeAgencyDisplayHelper
         
         foreach ($result as $playerRow):
             $player = Player::withPlrRow($this->db, $playerRow);
-            $yearPlayerIsFreeAgent = $player->draftYear + $player->yearsOfExperience + $player->contractTotalYears - $player->contractCurrentYear;
             
-            if ($yearPlayerIsFreeAgent == $season->endingYear):
+            if ($player->isPlayerFreeAgent($season)):
                 $demands = $this->db->sql_fetchrow($player->getFreeAgencyDemands());
         ?>
         <tr>

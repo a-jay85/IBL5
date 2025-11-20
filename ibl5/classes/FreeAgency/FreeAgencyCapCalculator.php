@@ -43,10 +43,7 @@ class FreeAgencyCapCalculator
         foreach ($team->getRosterUnderContractOrderedByOrdinalResult() as $playerRow) {
             $player = Player::withPlrRow($this->db, $playerRow);
             
-            $yearPlayerIsFreeAgent = $player->draftYear + $player->yearsOfExperience 
-                                    + $player->contractTotalYears - $player->contractCurrentYear;
-            
-            if ($yearPlayerIsFreeAgent != $season->endingYear) {
+            if (!$player->isPlayerFreeAgent($season)) {
                 $futureSalaries = $player->getFutureSalaries();
                 
                 $year1TotalSalary += $futureSalaries[0];

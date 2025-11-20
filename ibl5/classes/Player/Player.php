@@ -297,6 +297,11 @@ class Player
         return $this->contractValidator->getFinalYearRookieContractSalary($this->playerData);
     }
 
+    public function isPlayerFreeAgent($season)
+    {
+        return $this->contractValidator->isPlayerFreeAgent($this->playerData, $season);
+    }
+
     public function wasRookieOptioned()
     {
         return $this->contractValidator->wasRookieOptioned($this->playerData);

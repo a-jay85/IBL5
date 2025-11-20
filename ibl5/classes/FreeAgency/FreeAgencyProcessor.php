@@ -100,7 +100,7 @@ class FreeAgencyProcessor
             $offer6 = 0;
         } elseif ($mleYears == 7) {
             // Lower-Level Exception
-            $offer1 = 145;
+            $offer1 = FreeAgencyNegotiationHelper::LLE_OFFER;
             $offer2 = 0;
             $offer3 = 0;
             $offer4 = 0;
@@ -196,7 +196,7 @@ class FreeAgencyProcessor
         $result = $this->db->sql_query($insertQuery);
         
         // Post to Discord if significant offer
-        if ($result && $offerData['offer1'] > 145) {
+        if ($result && $offerData['offer1'] > FreeAgencyNegotiationHelper::LLE_OFFER) {
             $this->postOfferToDiscord($teamName, $playerName, $playerTeamName);
         }
         

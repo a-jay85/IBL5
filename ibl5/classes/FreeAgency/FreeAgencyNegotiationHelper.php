@@ -58,6 +58,16 @@ class FreeAgencyNegotiationHelper
     ];
 
     /**
+     * Lower-Level Exception offer amount (LLE)
+     * 
+     * This represents the maximum salary for a LLE contract offer.
+     * Available to teams with cap space and limited MLE eligibility.
+     * 
+     * @var int
+     */
+    public const LLE_OFFER = 145;
+
+    /**
      * Mid-Level Exception offer amounts by contract years
      * 
      * These represent the MLE salary amounts for each year of service.

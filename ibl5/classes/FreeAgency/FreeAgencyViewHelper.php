@@ -273,7 +273,7 @@ class FreeAgencyViewHelper
     {
         $formDataWithLLE = array_merge($formData, ['MLEyrs' => '7']);
         echo "<td>Lower-Level Exception:</td>";
-        echo "<td>{$this->renderMaxContractForm($formDataWithLLE, [145], 1)}</td>";
+        echo "<td>{$this->renderMaxContractForm($formDataWithLLE, [FreeAgencyNegotiationHelper::LLE_OFFER], 1)}</td>";
         echo "<td colspan=\"6\"></td>";
     }
 

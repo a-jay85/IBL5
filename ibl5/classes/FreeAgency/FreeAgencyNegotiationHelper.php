@@ -17,6 +17,31 @@ use Player\PlayerImageHelper;
  */
 class FreeAgencyNegotiationHelper
 {
+    /**
+     * Veteran minimum salary by years of experience for Free Agency signings
+     * 
+     * Note: These are the minimum salary tiers for Free Agency contract offers.
+     * Year 1 value (35) represents the first-year rookie contract minimum.
+     * Year 2+ values (51+) represent veteran and returning player minimums.
+     * 
+     * For waiver signings, see WaiversProcessor::calculateVeteranMinimumSalary()
+     * which uses 51 as the minimum for all rookies.
+     * 
+     * @var array<int, int>
+     */
+    private const VETERAN_MINIMUM_SALARIES = [
+        10 => 103,  // 10+ years
+        9  => 100,  // 9 years
+        8  => 89,   // 8 years
+        7  => 82,   // 7 years
+        6  => 76,   // 6 years
+        5  => 70,   // 5 years
+        4  => 64,   // 4 years
+        3  => 61,   // 3 years
+        2  => 51,   // 2 years (and above for waivers)
+        1  => 35,   // 1 year (first-year rookie contract minimum)
+    ];
+
     private $db;
     private \Services\DatabaseService $databaseService;
     private FreeAgencyViewHelper $viewHelper;
@@ -44,7 +69,7 @@ class FreeAgencyNegotiationHelper
         $capData = $capCalculator->calculateNegotiationCapSpace($team, $player->name);
         
         $demands = $this->calculator->getPlayerDemands($player->name);
-        $veteranMinimum = $this->calculateVeteranMinimum($player->yearsOfExperience);
+        $veteranMinimum = self::getVeteranMinimumSalary($player->yearsOfExperience);
         $maxContract = $this->calculateMaxContract($player->yearsOfExperience);
         
         // Get existing offer if any
@@ -286,23 +311,20 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
     }
 
     /**
-     * Calculate veteran minimum based on years of experience
+     * Get veteran minimum salary for a specific experience level
+     * Public static method for use by other classes (e.g., Waivers, view helpers)
      * 
      * @param int $experience Years of experience
      * @return int Veteran minimum salary
      */
-    private function calculateVeteranMinimum(int $experience): int
+    public static function getVeteranMinimumSalary(int $experience): int
     {
-        if ($experience > 9) return 103;
-        if ($experience > 8) return 100;
-        if ($experience > 7) return 89;
-        if ($experience > 6) return 82;
-        if ($experience > 5) return 76;
-        if ($experience > 4) return 70;
-        if ($experience > 3) return 64;
-        if ($experience > 2) return 61;
-        if ($experience > 1) return 51;
-        return 35;
+        foreach (self::VETERAN_MINIMUM_SALARIES as $years => $salary) {
+            if ($experience >= $years) {
+                return $salary;
+            }
+        }
+        return self::VETERAN_MINIMUM_SALARIES[1];
     }
 
     /**

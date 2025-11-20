@@ -20,43 +20,17 @@ class WaiversProcessor
     }
     
     /**
-     * Calculates veteran minimum salary based on years of experience
+     * Calculates veteran minimum salary based on years of experience for waiver signings
      * 
-     * Salary tiers are determined by the NBA collective bargaining agreement:
-     * - 10+ years: $103k (maximum veteran minimum)
-     * - 9 years: $100k
-     * - 8 years: $89k
-     * - 7 years: $82k
-     * - 6 years: $76k
-     * - 5 years: $70k
-     * - 4 years: $64k
-     * - 3 years: $61k
-     * - 0-2 years: $51k (rookie minimum)
+     * Delegates to FreeAgencyNegotiationHelper for consistent veteran minimum salaries
+     * across Free Agency and Waiver signings.
      * 
      * @param int $experience Years of experience
      * @return int Veteran minimum salary in thousands
      */
     public function calculateVeteranMinimumSalary(int $experience): int
     {
-        if ($experience > 9) {
-            return 103;
-        } elseif ($experience > 8) {
-            return 100;
-        } elseif ($experience > 7) {
-            return 89;
-        } elseif ($experience > 6) {
-            return 82;
-        } elseif ($experience > 5) {
-            return 76;
-        } elseif ($experience > 4) {
-            return 70;
-        } elseif ($experience > 3) {
-            return 64;
-        } elseif ($experience > 2) {
-            return 61;
-        } else {
-            return 51;
-        }
+        return \FreeAgency\FreeAgencyNegotiationHelper::getVeteranMinimumSalary($experience);
     }
     
     /**

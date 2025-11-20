@@ -312,7 +312,8 @@ class FreeAgencyViewHelper
     private function renderVetMinButton(array $formData): void
     {
         $formDataWithVet = array_merge($formData, ['MLEyrs' => '8']);
-        $vetMin = $formData['vetmin'] ?? 35;
+        // Use formData value if available, otherwise use rookie minimum from constants
+        $vetMin = $formData['vetmin'] ?? FreeAgencyNegotiationHelper::getVeteranMinimumSalary(1);
         echo "<td>Veterans Exception:</td>";
         echo "<td>{$this->renderMaxContractForm($formDataWithVet, [(int) $vetMin], 1)}</td>";
         echo "<td colspan=\"6\"></td>";

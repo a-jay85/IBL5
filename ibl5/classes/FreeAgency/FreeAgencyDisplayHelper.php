@@ -78,7 +78,7 @@ class FreeAgencyDisplayHelper
             $yearPlayerIsFreeAgent = $player->draftYear + $player->yearsOfExperience + $player->contractTotalYears - $player->contractCurrentYear;
             
             if ($yearPlayerIsFreeAgent != $season->endingYear):
-                $futureSalaries = $this->calculateFutureSalaries($player);
+                $futureSalaries = $player->getFutureSalaries();
                 $playerName = $player->name;
                 if ($player->ordinal > \JSB::WAIVERS_ORDINAL) {
                     $playerName .= "*";
@@ -394,28 +394,6 @@ class FreeAgencyDisplayHelper
 <td><?= htmlspecialchars($player->freeAgencyTradition) ?></td>
         <?php
         return ob_get_clean();
-    }
-
-    /**
-     * Calculate future salaries for a player
-     * 
-     * @param Player $player
-     * @return array<int> Future salaries for years 1-6
-     */
-    private function calculateFutureSalaries(Player $player): array
-    {
-        $contractYears = [
-            $player->contractYear1Salary,
-            $player->contractYear2Salary,
-            $player->contractYear3Salary,
-            $player->contractYear4Salary,
-            $player->contractYear5Salary,
-            $player->contractYear6Salary,
-        ];
-        
-        // Slice from current year offset and pad with zeros to maintain 6-year array
-        $remainingYears = array_slice($contractYears, $player->contractCurrentYear);
-        return array_pad($remainingYears, 6, 0);
     }
 
     /**

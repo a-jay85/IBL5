@@ -47,7 +47,7 @@ class FreeAgencyCapCalculator
                                     + $player->contractTotalYears - $player->contractCurrentYear;
             
             if ($yearPlayerIsFreeAgent != $season->endingYear) {
-                $futureSalaries = $this->calculatePlayerFutureSalaries($player);
+                $futureSalaries = $player->getFutureSalaries();
                 
                 $year1TotalSalary += $futureSalaries[0];
                 $year2TotalSalary += $futureSalaries[1];
@@ -220,75 +220,5 @@ class FreeAgencyCapCalculator
             ],
             'rosterSpots' => $rosterSpots,
         ];
-    }
-
-    /**
-     * Calculate player's future salaries based on current contract year
-     * 
-     * @param Player $player
-     * @return array<int> Salaries for years 1-6
-     */
-    private function calculatePlayerFutureSalaries(Player $player): array
-    {
-        $salaries = [0, 0, 0, 0, 0, 0];
-        
-        switch ($player->contractCurrentYear) {
-            case 0:
-                return [
-                    $player->contractYear1Salary,
-                    $player->contractYear2Salary,
-                    $player->contractYear3Salary,
-                    $player->contractYear4Salary,
-                    $player->contractYear5Salary,
-                    $player->contractYear6Salary,
-                ];
-            case 1:
-                return [
-                    $player->contractYear2Salary,
-                    $player->contractYear3Salary,
-                    $player->contractYear4Salary,
-                    $player->contractYear5Salary,
-                    $player->contractYear6Salary,
-                    0,
-                ];
-            case 2:
-                return [
-                    $player->contractYear3Salary,
-                    $player->contractYear4Salary,
-                    $player->contractYear5Salary,
-                    $player->contractYear6Salary,
-                    0,
-                    0,
-                ];
-            case 3:
-                return [
-                    $player->contractYear4Salary,
-                    $player->contractYear5Salary,
-                    $player->contractYear6Salary,
-                    0,
-                    0,
-                    0,
-                ];
-            case 4:
-                return [
-                    $player->contractYear5Salary,
-                    $player->contractYear6Salary,
-                    0,
-                    0,
-                    0,
-                    0,
-                ];
-            case 5:
-                return [
-                    $player->contractYear6Salary,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                ];
-        }
-        
-        return $salaries;
     }
 }

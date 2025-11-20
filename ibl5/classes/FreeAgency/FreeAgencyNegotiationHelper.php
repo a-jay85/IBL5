@@ -42,6 +42,21 @@ class FreeAgencyNegotiationHelper
         1  => 35,   // 1 year (first-year rookie contract minimum)
     ];
 
+    /**
+     * Maximum contract salary by years of experience (first year only)
+     * 
+     * These represent the maximum first-year contract salary for players
+     * based on their years of service. Additional years can have raises
+     * up to 12.5% (with bird rights) or 10% (without bird rights).
+     * 
+     * @var array<int, int>
+     */
+    private const MAX_CONTRACT_SALARIES = [
+        10 => 1451,  // 10+ years
+        7  => 1275,  // 7-9 years
+        0  => 1063,  // 0-6 years
+    ];
+
     private $db;
     private \Services\DatabaseService $databaseService;
     private FreeAgencyViewHelper $viewHelper;
@@ -70,7 +85,7 @@ class FreeAgencyNegotiationHelper
         
         $demands = $this->calculator->getPlayerDemands($player->name);
         $veteranMinimum = self::getVeteranMinimumSalary($player->yearsOfExperience);
-        $maxContract = $this->calculateMaxContract($player->yearsOfExperience);
+        $maxContract = self::getMaxContractSalary($player->yearsOfExperience);
         
         // Get existing offer if any
         $existingOffer = $this->getExistingOffer($team->name, $player->name);
@@ -289,7 +304,7 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
         array $capData
     ): array {
         $demands = $this->calculator->getPlayerDemands($player->name);
-        $maxContract = $this->calculateMaxContract($player->yearsOfExperience);
+        $maxContract = self::getMaxContractSalary($player->yearsOfExperience);
         
         return [
             'teamname' => $teamName,
@@ -328,17 +343,20 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
     }
 
     /**
-     * Calculate maximum contract value based on years of experience
+     * Get maximum contract salary for a specific experience level
+     * Public static method for use by other classes (e.g., Negotiation processors, view helpers)
      * 
      * @param int $experience Years of experience
-     * @return int Maximum first year salary
+     * @return int Maximum first-year contract salary
      */
-    private function calculateMaxContract(int $experience): int
+    public static function getMaxContractSalary(int $experience): int
     {
-        if ($experience > 9) return 1451;
-        if ($experience > 7) return 1275;
-        if ($experience > 5) return 1063;
-        return 1063;
+        foreach (self::MAX_CONTRACT_SALARIES as $years => $salary) {
+            if ($experience >= $years) {
+                return $salary;
+            }
+        }
+        return self::MAX_CONTRACT_SALARIES[0];
     }
 
     /**

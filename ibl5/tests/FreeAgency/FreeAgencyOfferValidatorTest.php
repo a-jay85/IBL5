@@ -137,7 +137,7 @@ class FreeAgencyOfferValidatorTest extends TestCase
         // Arrange
         $offerData = $this->createValidOffer();
         $offerData['offer1'] = 1500;
-        $offerData['year1Max'] = 1063;
+        $offerData['year1Max'] = \FreeAgency\FreeAgencyNegotiationHelper::getMaxContractSalary(0);
 
         // Act
         $result = $this->validator->validateOffer($offerData);
@@ -261,7 +261,7 @@ class FreeAgencyOfferValidatorTest extends TestCase
             'birdYears' => 3,
             'mleYears' => 0,
             'vetmin' => 35,
-            'year1Max' => 1063,
+            'year1Max' => \FreeAgency\FreeAgencyNegotiationHelper::getMaxContractSalary(0),
             'amendedCapSpaceYear1' => 1000,
         ];
     }

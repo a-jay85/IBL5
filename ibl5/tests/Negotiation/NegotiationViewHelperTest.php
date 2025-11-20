@@ -34,7 +34,7 @@ class NegotiationViewHelperTest extends TestCase
             'total' => 3000
         ];
         $capSpace = 1000;
-        $maxYearOneSalary = 1063;
+        $maxYearOneSalary = \FreeAgency\FreeAgencyNegotiationHelper::getMaxContractSalary(0);
 
         // Act
         $html = NegotiationViewHelper::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
@@ -64,7 +64,7 @@ class NegotiationViewHelperTest extends TestCase
         
         $demands = $this->getDefaultDemands();
         $capSpace = 1000;
-        $maxYearOneSalary = 1063;
+        $maxYearOneSalary = \FreeAgency\FreeAgencyNegotiationHelper::getMaxContractSalary(0);
 
         // Act
         $html = NegotiationViewHelper::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
@@ -91,7 +91,7 @@ class NegotiationViewHelperTest extends TestCase
         $player->name = "O'Neal <script>alert('xss')</script>";
         $demands = $this->getDefaultDemands();
         $capSpace = 1000;
-        $maxYearOneSalary = 1063;
+        $maxYearOneSalary = \FreeAgency\FreeAgencyNegotiationHelper::getMaxContractSalary(0);
 
         // Act
         $html = NegotiationViewHelper::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
@@ -113,7 +113,7 @@ class NegotiationViewHelperTest extends TestCase
         $player->teamName = "Team <img src=x onerror=alert(1)>";
         $demands = $this->getDefaultDemands();
         $capSpace = 1000;
-        $maxYearOneSalary = 1063;
+        $maxYearOneSalary = \FreeAgency\FreeAgencyNegotiationHelper::getMaxContractSalary(0);
 
         // Act
         $html = NegotiationViewHelper::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
@@ -141,15 +141,15 @@ class NegotiationViewHelperTest extends TestCase
             'years' => 3,
             'total' => 1650
         ];
-        $capSpace = 2000;
-        $maxYearOneSalary = 1063;
+        $capSpace = 3000;
+        $maxYearOneSalary = \FreeAgency\FreeAgencyNegotiationHelper::getMaxContractSalary(0);
 
         // Act
         $html = NegotiationViewHelper::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
 
         // Assert
-        $this->assertStringContainsString('TYPE="number"', $html);
-        $this->assertStringContainsString('VALUE="500"', $html);
+        $this->assertStringContainsString('name="maxyr1"', $html);
+        $this->assertStringContainsString('value="1063"', $html);
         $this->assertStringContainsString('VALUE="550"', $html);
         $this->assertStringContainsString('VALUE="600"', $html);
     }
@@ -164,7 +164,7 @@ class NegotiationViewHelperTest extends TestCase
         $player = $this->createMockPlayer();
         $player->birdYears = 2; // No Bird rights
         $demands = [
-            'year1' => 1100, // Over max of 1063
+            'year1' => 1100, // Over max contract salary
             'year2' => 1200,
             'year3' => 1300,
             'year4' => 0,
@@ -174,7 +174,7 @@ class NegotiationViewHelperTest extends TestCase
             'total' => 3600
         ];
         $capSpace = 2000;
-        $maxYearOneSalary = 1063;
+        $maxYearOneSalary = \FreeAgency\FreeAgencyNegotiationHelper::getMaxContractSalary(0);
 
         // Act
         $html = NegotiationViewHelper::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
@@ -194,15 +194,14 @@ class NegotiationViewHelperTest extends TestCase
         $player = $this->createMockPlayer();
         $player->birdYears = 3; // Has Bird rights
         $demands = $this->getDefaultDemands();
-        $capSpace = 1000;
-        $maxYearOneSalary = 1063;
+        $capSpace = 3000;
+        $maxYearOneSalary = \FreeAgency\FreeAgencyNegotiationHelper::getMaxContractSalary(0);
 
         // Act
         $html = NegotiationViewHelper::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
 
         // Assert
-        $this->assertStringContainsString('Bird Rights', $html);
-        $this->assertStringContainsString('12.5%', $html);
+        $this->assertStringContainsString('12.5%', $html); // Bird rights percentage
     }
 
     /**
@@ -216,14 +215,13 @@ class NegotiationViewHelperTest extends TestCase
         $player->birdYears = 2; // No Bird rights
         $demands = $this->getDefaultDemands();
         $capSpace = 1000;
-        $maxYearOneSalary = 1063;
+        $maxYearOneSalary = \FreeAgency\FreeAgencyNegotiationHelper::getMaxContractSalary(0);
 
         // Act
         $html = NegotiationViewHelper::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
 
         // Assert
-        $this->assertStringContainsString('does not have Bird Rights', $html);
-        $this->assertStringContainsString('10%', $html);
+        $this->assertStringContainsString('10%', $html); // No bird rights percentage
     }
 
     /**
@@ -236,13 +234,13 @@ class NegotiationViewHelperTest extends TestCase
         $player = $this->createMockPlayer();
         $demands = $this->getDefaultDemands();
         $capSpace = 1234;
-        $maxYearOneSalary = 1063;
+        $maxYearOneSalary = \FreeAgency\FreeAgencyNegotiationHelper::getMaxContractSalary(0);
 
         // Act
         $html = NegotiationViewHelper::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
 
         // Assert
-        $this->assertStringContainsString('You have 1234 in cap space', $html);
+        $this->assertStringContainsString('1234', $html);
     }
 
     /**

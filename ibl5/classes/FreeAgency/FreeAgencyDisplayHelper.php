@@ -404,72 +404,18 @@ class FreeAgencyDisplayHelper
      */
     private function calculateFutureSalaries(Player $player): array
     {
-        $salaries = [0, 0, 0, 0, 0, 0];
+        $contractYears = [
+            $player->contractYear1Salary,
+            $player->contractYear2Salary,
+            $player->contractYear3Salary,
+            $player->contractYear4Salary,
+            $player->contractYear5Salary,
+            $player->contractYear6Salary,
+        ];
         
-        switch ($player->contractCurrentYear) {
-            case 0:
-                $salaries = [
-                    $player->contractYear1Salary,
-                    $player->contractYear2Salary,
-                    $player->contractYear3Salary,
-                    $player->contractYear4Salary,
-                    $player->contractYear5Salary,
-                    $player->contractYear6Salary,
-                ];
-                break;
-            case 1:
-                $salaries = [
-                    $player->contractYear2Salary,
-                    $player->contractYear3Salary,
-                    $player->contractYear4Salary,
-                    $player->contractYear5Salary,
-                    $player->contractYear6Salary,
-                    0,
-                ];
-                break;
-            case 2:
-                $salaries = [
-                    $player->contractYear3Salary,
-                    $player->contractYear4Salary,
-                    $player->contractYear5Salary,
-                    $player->contractYear6Salary,
-                    0,
-                    0,
-                ];
-                break;
-            case 3:
-                $salaries = [
-                    $player->contractYear4Salary,
-                    $player->contractYear5Salary,
-                    $player->contractYear6Salary,
-                    0,
-                    0,
-                    0,
-                ];
-                break;
-            case 4:
-                $salaries = [
-                    $player->contractYear5Salary,
-                    $player->contractYear6Salary,
-                    0,
-                    0,
-                    0,
-                    0,
-                ];
-                break;
-            case 5:
-                $salaries = [
-                    $player->contractYear6Salary,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                ];
-                break;
-        }
-        
-        return $salaries;
+        // Slice from current year offset and pad with zeros to maintain 6-year array
+        $remainingYears = array_slice($contractYears, $player->contractCurrentYear);
+        return array_pad($remainingYears, 6, 0);
     }
 
     /**

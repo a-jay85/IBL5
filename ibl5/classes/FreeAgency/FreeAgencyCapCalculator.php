@@ -206,15 +206,17 @@ class FreeAgencyCapCalculator
             $rosterSpots--;
         }
         
+        $hardCapBuffer = \League::HARD_CAP_MAX - \League::SOFT_CAP_MAX;
+        
         return [
             'softCap' => $capSpace,
             'hardCap' => [
-                'year1' => $capSpace['year1'] + 2000,
-                'year2' => $capSpace['year2'] + 2000,
-                'year3' => $capSpace['year3'] + 2000,
-                'year4' => $capSpace['year4'] + 2000,
-                'year5' => $capSpace['year5'] + 2000,
-                'year6' => $capSpace['year6'] + 2000,
+                'year1' => $capSpace['year1'] + $hardCapBuffer,
+                'year2' => $capSpace['year2'] + $hardCapBuffer,
+                'year3' => $capSpace['year3'] + $hardCapBuffer,
+                'year4' => $capSpace['year4'] + $hardCapBuffer,
+                'year5' => $capSpace['year5'] + $hardCapBuffer,
+                'year6' => $capSpace['year6'] + $hardCapBuffer,
             ],
             'rosterSpots' => $rosterSpots,
         ];

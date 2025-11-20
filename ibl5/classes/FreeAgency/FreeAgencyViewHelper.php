@@ -253,24 +253,14 @@ class FreeAgencyViewHelper
      */
     private function renderMLEButtons(array $formData, int $playerExperience): void
     {
-        $mleOffers = [
-            1 => [450],
-            2 => [450, 495],
-            3 => [450, 495, 540],
-            4 => [450, 495, 540, 585],
-            5 => [450, 495, 540, 585, 630],
-            6 => [450, 495, 540, 585, 630, 675],
-        ];
-        
         echo "<td>Mid-Level Exception (click the button that corresponds to the final year you wish to offer):</td>";
         
-        foreach ($mleOffers as $years => $offers) {
+        foreach (FreeAgencyNegotiationHelper::getMLEOffersArray() as $years => $offers) {
             if ($playerExperience == 0 && $years > 2) {
                 continue; // Limit undrafted rookies to 2 years
             }
             
             $formDataWithMLE = array_merge($formData, ['MLEyrs' => (string) $years]);
-            $lastOffer = end($offers);
             echo "<td>{$this->renderMaxContractForm($formDataWithMLE, $offers, $years)}</td>";
         }
         

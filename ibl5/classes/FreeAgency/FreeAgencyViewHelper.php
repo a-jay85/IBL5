@@ -256,10 +256,6 @@ class FreeAgencyViewHelper
         echo "<td>Mid-Level Exception (click the button that corresponds to the final year you wish to offer):</td>";
         
         foreach (FreeAgencyNegotiationHelper::getMLEOffersArray() as $years => $offers) {
-            if ($playerExperience == 0 && $years > 2) {
-                continue; // Limit undrafted rookies to 2 years
-            }
-            
             $formDataWithMLE = array_merge($formData, ['MLEyrs' => (string) $years]);
             echo "<td>{$this->renderMaxContractForm($formDataWithMLE, $offers, $years)}</td>";
         }

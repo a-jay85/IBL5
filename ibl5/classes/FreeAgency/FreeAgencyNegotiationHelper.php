@@ -75,7 +75,7 @@ class FreeAgencyNegotiationHelper
      * 
      * @var array<int, array<int>>
      */
-    private const MLE_OFFERS = [
+    public const MLE_OFFERS = [
         1 => [450],
         2 => [450, 495],
         3 => [450, 495, 540],
@@ -384,29 +384,6 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
             }
         }
         return self::MAX_CONTRACT_SALARIES[0];
-    }
-
-    /**
-     * Get MLE offer amounts for a specific contract length
-     * Public static method for use by other classes
-     * 
-     * @param int $years Number of contract years
-     * @return array<int> MLE offer amounts per year
-     */
-    public static function getMLEOffers(int $years): array
-    {
-        return self::MLE_OFFERS[$years] ?? [];
-    }
-
-    /**
-     * Get the entire MLE_OFFERS array (for iteration)
-     * Used internally by view classes that need to iterate over all tiers
-     * 
-     * @return array<int, array<int>> All MLE offer tiers
-     */
-    public static function getMLEOffersArray(): array
-    {
-        return self::MLE_OFFERS;
     }
 
     /**

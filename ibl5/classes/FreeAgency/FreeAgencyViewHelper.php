@@ -255,7 +255,7 @@ class FreeAgencyViewHelper
     {
         echo "<td>Mid-Level Exception (click the button that corresponds to the final year you wish to offer):</td>";
         
-        foreach (FreeAgencyNegotiationHelper::getMLEOffersArray() as $years => $offers) {
+        foreach (FreeAgencyNegotiationHelper::MLE_OFFERS as $years => $offers) {
             $formDataWithMLE = array_merge($formData, ['MLEyrs' => (string) $years]);
             echo "<td>{$this->renderMaxContractForm($formDataWithMLE, $offers, $years)}</td>";
         }

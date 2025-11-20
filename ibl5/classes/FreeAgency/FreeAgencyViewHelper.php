@@ -234,7 +234,7 @@ class FreeAgencyViewHelper
         ob_start();
         
         if ($exceptionType === 'MLE') {
-            $this->renderMLEButtons($formData, $playerExperience);
+            $this->renderMLEButtons($formData);
         } elseif ($exceptionType === 'LLE') {
             $this->renderLLEButton($formData);
         } elseif ($exceptionType === 'VET') {
@@ -248,10 +248,9 @@ class FreeAgencyViewHelper
      * Render Mid-Level Exception buttons
      * 
      * @param array<string, mixed> $formData Form data
-     * @param int $playerExperience Years of experience
      * @return void
      */
-    private function renderMLEButtons(array $formData, int $playerExperience): void
+    private function renderMLEButtons(array $formData): void
     {
         echo "<td>Mid-Level Exception (click the button that corresponds to the final year you wish to offer):</td>";
         

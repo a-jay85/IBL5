@@ -68,21 +68,15 @@ class FreeAgencyNegotiationHelper
     public const LLE_OFFER = 145;
 
     /**
-     * Mid-Level Exception offer amounts by contract years
+     * Mid-Level Exception offer amounts for a 6-year contract
      * 
-     * These represent the MLE salary amounts for each year of service.
-     * Each year can have a raise of up to 10% (without bird rights) or 12.5% (with bird rights).
+     * These represent the MLE salary amounts for each year of a maximum 6-year contract.
+     * Each year has a 10% raise from the previous year.
+     * For contracts shorter than 6 years, use array_slice to get the appropriate years.
      * 
-     * @var array<int, array<int>>
+     * @var array<int>
      */
-    public const MLE_OFFERS = [
-        1 => [450],
-        2 => [450, 495],
-        3 => [450, 495, 540],
-        4 => [450, 495, 540, 585],
-        5 => [450, 495, 540, 585, 630],
-        6 => [450, 495, 540, 585, 630, 675],
-    ];
+    public const MLE_OFFERS = [450, 495, 540, 585, 630, 675];
 
     private $db;
     private \Services\DatabaseService $databaseService;

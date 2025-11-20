@@ -41,8 +41,9 @@ class FreeAgencyNegotiationHelper
     public function renderNegotiationPage(int $playerID, string $teamName, int $teamID): string
     {
         $player = Player::withPlayerID($this->db, $playerID);
+        $team = \Team::initialize($this->db, $teamID);
         $capCalculator = new FreeAgencyCapCalculator($this->db);
-        $capData = $capCalculator->calculateNegotiationCapSpace($teamID, $teamName, $player->name);
+        $capData = $capCalculator->calculateNegotiationCapSpace($team, $player->name);
         
         $demands = $this->calculator->getPlayerDemands($player->name);
         $veteranMinimum = $this->calculateVeteranMinimum($player->yearsOfExperience);

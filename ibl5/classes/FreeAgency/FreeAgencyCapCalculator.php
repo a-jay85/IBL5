@@ -118,12 +118,11 @@ class FreeAgencyCapCalculator
     /**
      * Calculate cap space for negotiation page
      * 
-     * @param int $teamID Team ID
-     * @param string $teamName Team name
+     * @param \Team $team Team object
      * @param string $playerName Player name to exclude from offers
      * @return array<string, mixed> Cap space data
      */
-    public function calculateNegotiationCapSpace(int $teamID, string $teamName, string $playerName): array
+    public function calculateNegotiationCapSpace(\Team $team, string $playerName): array
     {
         $capSpace = [
             'year1' => \League::SOFT_CAP_MAX,
@@ -137,8 +136,7 @@ class FreeAgencyCapCalculator
         $rosterSpots = \Team::ROSTER_SPOTS_MAX;
         
         // Subtract current contracts
-        $query = "SELECT * FROM ibl_plr WHERE (tid=$teamID AND retired='0') ORDER BY ordinal ASC";
-        $result = $this->db->sql_query($query);
+        $result = $team->getRosterUnderContractOrderedByOrdinalResult();
         
         foreach ($result as $row) {
             $ordinal = (int) $row['ordinal'];
@@ -187,7 +185,7 @@ class FreeAgencyCapCalculator
         }
         
         // Subtract existing offers (excluding the current player's offer)
-        $escapedTeamName = $this->databaseService->escapeString($this->db, $teamName);
+        $escapedTeamName = $this->databaseService->escapeString($this->db, $team->name);
         $escapedPlayerName = $this->databaseService->escapeString($this->db, $playerName);
         
         $query = "SELECT * FROM ibl_fa_offers WHERE team='$escapedTeamName' AND name!='$escapedPlayerName'";

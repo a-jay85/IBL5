@@ -14,8 +14,6 @@ use Player\Player;
  */
 class FreeAgencyCapCalculator
 {
-    private const ROSTER_SPOTS_MAX = 15;
-
     private $db;
     private \Services\DatabaseService $databaseService;
 
@@ -36,8 +34,8 @@ class FreeAgencyCapCalculator
         $year1TotalSalary = $year2TotalSalary = $year3TotalSalary = 0;
         $year4TotalSalary = $year5TotalSalary = $year6TotalSalary = 0;
         
-        $rosterspots1 = $rosterspots2 = $rosterspots3 = self::ROSTER_SPOTS_MAX;
-        $rosterspots4 = $rosterspots5 = $rosterspots6 = self::ROSTER_SPOTS_MAX;
+        $rosterspots1 = $rosterspots2 = $rosterspots3 = \Team::ROSTER_SPOTS_MAX;
+        $rosterspots4 = $rosterspots5 = $rosterspots6 = \Team::ROSTER_SPOTS_MAX;
 
         $season = new \Season($this->db);
 
@@ -139,7 +137,7 @@ class FreeAgencyCapCalculator
             'year6' => \League::SOFT_CAP_MAX,
         ];
         
-        $rosterSpots = self::ROSTER_SPOTS_MAX;
+        $rosterSpots = \Team::ROSTER_SPOTS_MAX;
         
         // Subtract current contracts
         $query = "SELECT * FROM ibl_plr WHERE (tid=$teamID AND retired='0') ORDER BY ordinal ASC";

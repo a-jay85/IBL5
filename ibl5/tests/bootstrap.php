@@ -396,3 +396,13 @@ class Season
 // This ensures mock classes take precedence over real classes
 require_once __DIR__ . '/../autoloader.php';
 
+// Set up $_SERVER variables needed by config.php
+if (!isset($_SERVER['SERVER_NAME'])) {
+    $_SERVER['SERVER_NAME'] = 'localhost';
+}
+if (!isset($_SERVER['SCRIPT_FILENAME'])) {
+    $_SERVER['SCRIPT_FILENAME'] = __DIR__ . '/../index.php';
+}
+
+// Load the configuration for database access
+require_once __DIR__ . '/../config.php';

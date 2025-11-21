@@ -54,8 +54,8 @@ function display()
 
     UI::displaytopmenu($db, $team->teamID);
 
-    $displayHelper = new FreeAgencyDisplayHelper($db);
-    echo $displayHelper->renderMainPage($team, $season);
+    $displayHelper = new FreeAgencyDisplayHelper($db, $team, $season);
+    echo $displayHelper->renderMainPage();
 
     CloseTable();
     Nuke\Footer::footer();

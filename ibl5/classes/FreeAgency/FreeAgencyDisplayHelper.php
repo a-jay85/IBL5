@@ -17,37 +17,49 @@ class FreeAgencyDisplayHelper
 {
     private $db;
     private \Services\DatabaseService $databaseService;
+    private array $capData;
+    private $team;
+    private $season;
 
-    public function __construct($db)
+    public function __construct($db, $team, $season)
     {
         $this->db = $db;
+        $this->team = $team;
+        $this->season = $season;
         $this->databaseService = new \Services\DatabaseService();
+        $this->initializeCapData();
+    }
+
+    /**
+     * Initialize cap data from the cap calculator
+     * 
+     * @return void
+     */
+    private function initializeCapData(): void
+    {
+        $capCalculator = new FreeAgencyCapCalculator($this->db);
+        $this->capData = $capCalculator->calculateTeamCapSpace($this->team);
     }
 
     /**
      * Render the complete free agency main page
      * 
-     * @param \Team $team User's team
-     * @param \Season $season Current season
      * @return string HTML output
      */
-    public function renderMainPage($team, $season): string
+    public function renderMainPage(): string
     {
-        $capCalculator = new FreeAgencyCapCalculator($this->db);
-        $capData = $capCalculator->calculateTeamCapSpace($team);
-
         ob_start();
         ?>
-<center><img src="images/logo/<?= htmlspecialchars($team->teamID) ?>.jpg"></center>
+<center><img src="images/logo/<?= htmlspecialchars($this->team->teamID) ?>.jpg"></center>
 <p>
-<?= $this->renderPlayersUnderContract($team, $season, $capData) ?>
+<?= $this->renderPlayersUnderContract() ?>
 <p>
-<?= $this->renderContractOffers($team, $capData) ?>
+<?= $this->renderContractOffers() ?>
 <p>
 <hr>
 <p>
-<?= $this->renderTeamFreeAgents($team, $season, $capData) ?>
-<?= $this->renderOtherFreeAgents($team, $season) ?>
+<?= $this->renderTeamFreeAgents() ?>
+<?= $this->renderOtherFreeAgents() ?>
         <?php
         return ob_get_clean();
     }
@@ -55,26 +67,23 @@ class FreeAgencyDisplayHelper
     /**
      * Render players under contract table
      * 
-     * @param \Team $team
-     * @param \Season $season
-     * @param array<string, mixed> $capData
      * @return string HTML table
      */
-    private function renderPlayersUnderContract($team, $season, array $capData): string
+    private function renderPlayersUnderContract(): string
     {
         ob_start();
         ?>
 <table border="1" cellspacing="0" class="sortable">
     <caption style="background-color: #0000cc">
-        <center><b><font color="white"><?= htmlspecialchars($team->name) ?> Players Under Contract</font></b></center>
+        <center><b><font color="white"><?= htmlspecialchars($this->team->name) ?> Players Under Contract</font></b></center>
     </caption>
     <?= $this->renderTableHeader() ?>
     <tbody>
-        <?php foreach ($team->getRosterUnderContractOrderedByOrdinalResult() as $playerRow): ?>
+        <?php foreach ($this->team->getRosterUnderContractOrderedByOrdinalResult() as $playerRow): ?>
             <?php
             $player = Player::withPlrRow($this->db, $playerRow);
             
-            if (!$player->isPlayerFreeAgent($season)):
+            if (!$player->isPlayerFreeAgent($this->season)):
                 $futureSalaries = $player->getFutureSalaries();
                 $playerName = $player->name;
                 if ($player->ordinal > \JSB::WAIVERS_ORDINAL) {
@@ -83,7 +92,7 @@ class FreeAgencyDisplayHelper
             ?>
         <tr>
             <td>
-                <?php if ($player->canRookieOption($season->phase)): ?>
+                <?php if ($player->canRookieOption($this->season->phase)): ?>
                     <a href="modules.php?name=Player&pa=rookieoption&pid=<?= htmlspecialchars($player->playerID) ?>">Rookie Option</a>
                 <?php endif; ?>
             </td>
@@ -102,9 +111,9 @@ class FreeAgencyDisplayHelper
     </tbody>
     <tfoot>
         <tr>
-            <td colspan="29" align="right"><b><i><?= htmlspecialchars($team->name) ?> Total Salary</i></b></td>
+            <td colspan="29" align="right"><b><i><?= htmlspecialchars($this->team->name) ?> Total Salary</i></b></td>
             <?php for ($i = 1; $i <= 6; $i++): ?>
-                <td><b><i><?= htmlspecialchars($capData["year{$i}TotalSalary"]) ?></i></b></td>
+                <td><b><i><?= htmlspecialchars($this->capData["year{$i}TotalSalary"]) ?></i></b></td>
             <?php endfor; ?>
         </tr>
     </tfoot>
@@ -116,11 +125,9 @@ class FreeAgencyDisplayHelper
     /**
      * Render contract offers table
      * 
-     * @param \Team $team
-     * @param array<string, mixed> $capData
      * @return string HTML table
      */
-    private function renderContractOffers($team, array $capData): string
+    private function renderContractOffers(): string
     {
         $commonRepository = new \Services\CommonRepository($this->db);
         
@@ -128,11 +135,11 @@ class FreeAgencyDisplayHelper
         ?>
 <table border="1" cellspacing="0" class="sortable">
     <caption style="background-color: #0000cc">
-        <center><b><font color="white"><?= htmlspecialchars($team->name) ?> Contract Offers</font></b></center>
+        <center><b><font color="white"><?= htmlspecialchars($this->team->name) ?> Contract Offers</font></b></center>
     </caption>
     <?= $this->renderTableHeader() ?>
     <tbody>
-        <?php foreach ($team->getFreeAgencyOffersResult() as $offerRow): ?>
+        <?php foreach ($this->team->getFreeAgencyOffersResult() as $offerRow): ?>
             <?php
             $playerID = $commonRepository->getPlayerIDFromPlayerName($offerRow['name']);
             $player = Player::withPlayerID($this->db, $playerID);
@@ -156,12 +163,12 @@ class FreeAgencyDisplayHelper
     </tbody>
     <tfoot>
         <tr>
-            <td colspan="29" align="right"><b><i><?= htmlspecialchars($team->name) ?> Total Salary Plus Contract Offers</i></b></td>
+            <td colspan="29" align="right"><b><i><?= htmlspecialchars($this->team->name) ?> Total Salary Plus Contract Offers</i></b></td>
             <?php for ($i = 1; $i <= 6; $i++): ?>
-                <td><b><i><?= htmlspecialchars($capData["year{$i}TotalSalary"]) ?></i></b></td>
+                <td><b><i><?= htmlspecialchars($this->capData["year{$i}TotalSalary"]) ?></i></b></td>
             <?php endfor; ?>
         </tr>
-        <?= $this->renderCapSpaceFooter($team, $capData) ?>
+        <?= $this->renderCapSpaceFooter() ?>
     </tfoot>
 </table>
         <?php
@@ -171,32 +178,29 @@ class FreeAgencyDisplayHelper
     /**
      * Render team free agents table
      * 
-     * @param \Team $team
-     * @param \Season $season
-     * @param array<string, mixed> $capData
      * @return string HTML table
      */
-    private function renderTeamFreeAgents($team, $season, array $capData): string
+    private function renderTeamFreeAgents(): string
     {
         ob_start();
         ?>
 <table border="1" cellspacing="0" class="sortable">
     <caption style="background-color: #0000cc">
-        <center><b><font color="white"><?= htmlspecialchars($team->name) ?> Unsigned Free Agents</b><br>
+        <center><b><font color="white"><?= htmlspecialchars($this->team->name) ?> Unsigned Free Agents</b><br>
         (Note: * and <i>italicized</i> indicates player has Bird Rights)</font></b></center>
     </caption>
     <?= $this->renderTableHeader() ?>
     <tbody>
-        <?php foreach ($team->getRosterUnderContractOrderedByOrdinalResult() as $playerRow): ?>
+        <?php foreach ($this->team->getRosterUnderContractOrderedByOrdinalResult() as $playerRow): ?>
             <?php
             $player = Player::withPlrRow($this->db, $playerRow);
             
-            if ($player->isPlayerFreeAgent($season)):
+            if ($player->isPlayerFreeAgent($this->season)):
                 $demands = $this->db->sql_fetchrow($player->getFreeAgencyDemands());
             ?>
         <tr>
             <td>
-                <?php if ($capData['rosterspots1'] > 0): ?>
+                <?php if ($this->capData['rosterspots1'] > 0): ?>
                     <a href="modules.php?name=Free_Agency&pa=negotiate&pid=<?= htmlspecialchars($player->playerID) ?>">Negotiate</a>
                 <?php endif; ?>
             </td>
@@ -225,11 +229,9 @@ class FreeAgencyDisplayHelper
     /**
      * Render other free agents table
      * 
-     * @param \Team $team
-     * @param \Season $season
      * @return string HTML table
      */
-    private function renderOtherFreeAgents($team, $season): string
+    private function renderOtherFreeAgents(): string
     {
         ob_start();
         ?>
@@ -240,14 +242,14 @@ class FreeAgencyDisplayHelper
     <?= $this->renderTableHeader() ?>
     <tbody>
         <?php
-        $escapedTeamName = $this->databaseService->escapeString($this->db, $team->name);
+        $escapedTeamName = $this->databaseService->escapeString($this->db, $this->team->name);
         $query = "SELECT * FROM ibl_plr WHERE teamname!='$escapedTeamName' AND retired='0' ORDER BY ordinal ASC";
         $result = $this->db->sql_query($query);
         
         foreach ($result as $playerRow):
             $player = Player::withPlrRow($this->db, $playerRow);
             
-            if ($player->isPlayerFreeAgent($season)):
+            if ($player->isPlayerFreeAgent($this->season)):
                 $demands = $this->db->sql_fetchrow($player->getFreeAgencyDemands());
         ?>
         <tr>
@@ -412,14 +414,12 @@ class FreeAgencyDisplayHelper
     /**
      * Render cap space footer rows
      * 
-     * @param \Team $team
-     * @param array<string, mixed> $capData
      * @return string HTML table rows
      */
-    private function renderCapSpaceFooter($team, array $capData): string
+    private function renderCapSpaceFooter(): string
     {
-        $MLEicon = ($team->hasMLE == "1") ? "\u{2705}" : "\u{274C}";
-        $LLEicon = ($team->hasLLE == "1") ? "\u{2705}" : "\u{274C}";
+        $MLEicon = ($this->team->hasMLE == "1") ? "\u{2705}" : "\u{274C}";
+        $LLEicon = ($this->team->hasLLE == "1") ? "\u{2705}" : "\u{274C}";
         
         ob_start();
         ?>
@@ -429,7 +429,7 @@ class FreeAgencyDisplayHelper
     <td colspan="19" bgcolor="#eeeeee"></td>
     <td colspan="8" align="right"><font color="white"><b>Soft Cap Space</b></font></td>
     <?php for ($i = 1; $i <= 6; $i++): ?>
-        <td><?= htmlspecialchars($capData["year{$i}AvailableSoftCap"]) ?></td>
+        <td><?= htmlspecialchars($this->capData["year{$i}AvailableSoftCap"]) ?></td>
     <?php endfor; ?>
 </tr>
 <tr bgcolor="#cc0000">
@@ -438,14 +438,14 @@ class FreeAgencyDisplayHelper
     <td colspan="19" bgcolor="#eeeeee"></td>
     <td colspan="8" align="right"><font color="white"><b>Hard Cap Space</b></font></td>
     <?php for ($i = 1; $i <= 6; $i++): ?>
-        <td><?= htmlspecialchars($capData["year{$i}AvailableHardCap"]) ?></td>
+        <td><?= htmlspecialchars($this->capData["year{$i}AvailableHardCap"]) ?></td>
     <?php endfor; ?>
 </tr>
 <tr bgcolor="#cc0000">
     <td colspan="21" bgcolor="#eeeeee"></td>
     <td colspan="8" align="right"><font color="white"><b>Empty Roster Slots</b></font></td>
     <?php for ($i = 1; $i <= 6; $i++): ?>
-        <td><?= htmlspecialchars($capData["rosterspots{$i}"]) ?></td>
+        <td><?= htmlspecialchars($this->capData["rosterspots{$i}"]) ?></td>
     <?php endfor; ?>
 </tr>
         <?php

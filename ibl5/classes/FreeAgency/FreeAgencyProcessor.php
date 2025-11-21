@@ -170,9 +170,7 @@ class FreeAgencyProcessor
         $perceivedValue = $this->calculator->calculatePerceivedValue(
             $offerAverage,
             $teamName,
-            $player->teamName,
-            $player->name,
-            $player->position,
+            $player,
             $yearsInOffer
         );
         

@@ -307,7 +307,7 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
         
         return [
             'teamname' => $teamName,
-            'playerID' => (string) $player->playerID,
+            'playerID' => $player->playerID,
             'bird' => (string) $player->birdYears,
             'vetmin' => (string) $veteranMinimum,
             'max' => (string) $maxContract,

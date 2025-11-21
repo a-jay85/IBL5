@@ -2,6 +2,8 @@
 
 namespace FreeAgency;
 
+use Player\Player;
+
 /**
  * Calculates player contract demands with team-specific modifiers
  * 
@@ -40,18 +42,14 @@ class FreeAgencyDemandCalculator
      * 
      * @param int $offerAverage Average salary offered per year
      * @param string $teamName Offering team name
-     * @param string $playerTeamName Player's current team name
-     * @param string $playerName Player name
-     * @param string $position Player position
+     * @param Player $player Player object with preferences
      * @param int $yearsInOffer Number of years in the offer
      * @return float Perceived value after modifiers
      */
     public function calculatePerceivedValue(
         int $offerAverage,
         string $teamName,
-        string $playerTeamName,
-        string $playerName,
-        string $position,
+        Player $player,
         int $yearsInOffer
     ): float {
         $databaseService = new \Services\DatabaseService();
@@ -67,20 +65,8 @@ class FreeAgencyDemandCalculator
         $tradWins = (int) $this->db->sql_result($teamResult, 0, "Contract_AvgW");
         $tradLosses = (int) $this->db->sql_result($teamResult, 0, "Contract_AvgL");
         
-        // Get player preferences
-        $escapedPlayerName = $databaseService->escapeString($this->db, $playerName);
-        $playerQuery = "SELECT winner, tradition, security, loyalty, playingTime 
-                        FROM ibl_plr WHERE name = '$escapedPlayerName'";
-        $playerResult = $this->db->sql_query($playerQuery);
-        
-        $playerWinner = (int) $this->db->sql_result($playerResult, 0, "winner");
-        $playerTradition = (int) $this->db->sql_result($playerResult, 0, "tradition");
-        $playerSecurity = (int) $this->db->sql_result($playerResult, 0, "security");
-        $playerLoyalty = (int) $this->db->sql_result($playerResult, 0, "loyalty");
-        $playerPlayingTime = (int) $this->db->sql_result($playerResult, 0, "playingTime");
-        
         // Calculate position salary
-        $positionSalary = $this->calculatePositionSalary($teamName, $position, $playerName);
+        $positionSalary = $this->calculatePositionSalary($teamName, $player);
         
         // Calculate modifiers
         $modifier = $this->calculateModifier(
@@ -88,13 +74,13 @@ class FreeAgencyDemandCalculator
             $teamLosses,
             $tradWins,
             $tradLosses,
-            $playerWinner,
-            $playerTradition,
-            $playerLoyalty,
-            $playerSecurity,
-            $playerPlayingTime,
+            $player->freeAgencyPlayForWinner,
+            $player->freeAgencyTradition,
+            $player->freeAgencyLoyalty,
+            $player->freeAgencySecurity,
+            $player->freeAgencyPlayingTime,
             $teamName,
-            $playerTeamName,
+            $player->teamName,
             $yearsInOffer,
             $positionSalary
         );
@@ -110,19 +96,17 @@ class FreeAgencyDemandCalculator
      * Calculate total salary committed to a position
      * 
      * @param string $teamName Team name
-     * @param string $position Player position
-     * @param string $excludePlayerName Player to exclude from calculation
+     * @param Player $player Player to exclude and get position from
      * @return int Total salary committed
      */
     private function calculatePositionSalary(
         string $teamName,
-        string $position,
-        string $excludePlayerName
+        Player $player
     ): int {
         $databaseService = new \Services\DatabaseService();
         $escapedTeamName = $databaseService->escapeString($this->db, $teamName);
-        $escapedPosition = $databaseService->escapeString($this->db, $position);
-        $escapedPlayerName = $databaseService->escapeString($this->db, $excludePlayerName);
+        $escapedPosition = $databaseService->escapeString($this->db, $player->position);
+        $escapedPlayerName = $databaseService->escapeString($this->db, $player->name);
         
         $query = "SELECT cy, cy1, cy2, cy3, cy4, cy5, cy6 
                   FROM ibl_plr 

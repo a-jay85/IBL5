@@ -186,23 +186,24 @@ class FreeAgencyOfferValidator
     /**
      * Check if player has already been signed during this free agency period
      * 
-     * @param string $playerName Player name to check
+     * @param int $playerId Player ID to check
      * @return bool True if player is already signed
      */
-    public function isPlayerAlreadySigned(string $playerName): bool
+    public function isPlayerAlreadySigned(int $playerId): bool
     {
-        $databaseService = new \Services\DatabaseService();
-        $escapedPlayerName = $databaseService->escapeString($this->db, $playerName);
+        $query = "SELECT cy, cy1 FROM ibl_plr WHERE pid = ?";
+        $stmt = $this->db->prepare($query);
+        $stmt->bind_param("i", $playerId);
+        $stmt->execute();
+        $result = $stmt->get_result();
         
-        $query = "SELECT cy, cy1 FROM ibl_plr WHERE name = '$escapedPlayerName'";
-        $result = $this->db->sql_query($query);
-        
-        if (!$result) {
+        if ($result->num_rows === 0) {
             return false;
         }
         
-        $currentContractYear = $this->db->sql_result($result, 0, "cy");
-        $year1Contract = $this->db->sql_result($result, 0, "cy1");
+        $row = $result->fetch_assoc();
+        $currentContractYear = $row['cy'] ?? 0;
+        $year1Contract = $row['cy1'] ?? '0';
         
         return ($currentContractYear == 0 && $year1Contract != "0");
     }

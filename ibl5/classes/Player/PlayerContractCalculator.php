@@ -47,6 +47,31 @@ class PlayerContractCalculator
     }
 
     /**
+     * Get future salaries for the next 6 contract years
+     * 
+     * Returns the remaining contract years starting from the current contract year,
+     * padded with zeros to always return a 6-element array.
+     * 
+     * @param PlayerData $playerData
+     * @return array<int> Future salaries for years 1-6
+     */
+    public function getFutureSalaries(PlayerData $playerData): array
+    {
+        $contractYears = [
+            $playerData->contractYear1Salary,
+            $playerData->contractYear2Salary,
+            $playerData->contractYear3Salary,
+            $playerData->contractYear4Salary,
+            $playerData->contractYear5Salary,
+            $playerData->contractYear6Salary,
+        ];
+        
+        // Slice from current year offset and pad with zeros to maintain 6-year array
+        $remainingYears = array_slice($contractYears, $playerData->contractCurrentYear);
+        return array_pad($remainingYears, 6, 0);
+    }
+
+    /**
      * Get an array of remaining contract years and salaries
      */
     public function getRemainingContractArray(PlayerData $playerData): array
@@ -54,7 +79,7 @@ class PlayerContractCalculator
         $contractCurrentYear = ($playerData->contractCurrentYear != 0) ? $playerData->contractCurrentYear : 1;
         $contractTotalYears = ($playerData->contractTotalYears != 0) ? $playerData->contractTotalYears : 1;
 
-        $contractArray = array();
+        $contractArray = [];
         $remainingContractYear = 1;
         for ($i = $contractCurrentYear; $i <= $contractTotalYears; $i++) {
             $salary = $this->getSalaryForYear($playerData, $i);
@@ -64,8 +89,8 @@ class PlayerContractCalculator
             $remainingContractYear++;
         }
 
-        $contractArray[1] = ($contractArray) ? $contractArray[1] : 0;
-        return $contractArray;
+        // Ensure year 1 always exists in array
+        return $contractArray ?: [1 => 0];
     }
 
     /**

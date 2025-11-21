@@ -68,7 +68,7 @@ class NegotiationProcessor
         $capSpace = $this->calculateCapSpace($userTeamName);
         
         // Determine max first year salary based on experience
-        $maxYearOneSalary = $this->getMaxYearOneSalary($player->yearsOfExperience ?? 0);
+        $maxYearOneSalary = \ContractRules::getMaxContractSalary($player->yearsOfExperience ?? 0);
         
         // Render negotiation form
         $output .= NegotiationViewHelper::renderNegotiationForm(
@@ -211,19 +211,4 @@ class NegotiationProcessor
         return $capSpace;
     }
     
-    /**
-     * Get maximum first year salary based on years of experience
-     * 
-     * @param int $yearsOfExperience Years of experience
-     * @return int Maximum salary
-     */
-    private function getMaxYearOneSalary(int $yearsOfExperience): int
-    {
-        if ($yearsOfExperience > 9) {
-            return 1451; // 10+ years
-        } elseif ($yearsOfExperience > 6) {
-            return 1275; // 7-9 years
-        }
-        return 1063; // 0-6 years
-    }
 }

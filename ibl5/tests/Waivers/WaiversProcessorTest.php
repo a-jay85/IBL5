@@ -117,10 +117,10 @@ class WaiversProcessorTest extends TestCase
     public function testCalculateVeteranMinimumSalaryForRookies()
     {
         $salary = $this->processor->calculateVeteranMinimumSalary(0);
-        $this->assertEquals(51, $salary);
+        $this->assertEquals(35, $salary);
         
         $salary = $this->processor->calculateVeteranMinimumSalary(1);
-        $this->assertEquals(51, $salary);
+        $this->assertEquals(35, $salary);
         
         $salary = $this->processor->calculateVeteranMinimumSalary(2);
         $this->assertEquals(51, $salary);
@@ -260,8 +260,8 @@ class WaiversProcessorTest extends TestCase
         ]);
         
         $contract = $this->processor->getPlayerContractDisplay($player, $this->mockSeasonRegular);
-        // With rookie experience (0), should return vet min for 0 experience = 51
-        $this->assertEquals('51', $contract);
+        // With rookie experience (0), should return vet min for 0 experience = 35 (first year minimum)
+        $this->assertEquals('35', $contract);
     }
     
     public function testGetPlayerContractDisplayWithEmptyContract()
@@ -274,7 +274,7 @@ class WaiversProcessorTest extends TestCase
         ]);
         
         $contract = $this->processor->getPlayerContractDisplay($player, $this->mockSeasonRegular);
-        $this->assertEquals('51', $contract); // Should use vet min calculation for rookie
+        $this->assertEquals('35', $contract); // Should use vet min calculation for rookie (first year minimum)
     }
     
     public function testDetermineContractDataForNewContractDuringFreeAgency()

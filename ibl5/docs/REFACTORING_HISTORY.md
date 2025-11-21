@@ -4,11 +4,50 @@ This document tracks the history of module refactoring efforts in the IBL5 codeb
 
 ## Overview
 
-**Current Status:** 13 of 23 IBL modules refactored (57% complete)  
-**Test Coverage:** ~40% (target: 80%)  
+**Current Status:** 14 of 23 IBL modules refactored (61% complete)  
+**Test Coverage:** ~45% (target: 80%)  
 **Architecture Pattern:** Repository/Service/View with comprehensive testing
 
 ## Completed Refactorings
+
+### 14. Free Agency Module (November 21, 2025)
+
+**Summary:** Refactored entire Free Agency module with 95.4% code reduction in module files (2,232 → 102 lines), extracting complex contract logic into 7 testable classes.
+
+**Key Improvements:**
+- Created 7 specialized classes with separation of concerns
+- Reduced module code from 2,232 to 102 lines (95.4% reduction)
+- Added 11 comprehensive unit tests covering validation, calculation, and processing
+- Implemented complete security hardening with prepared statements
+- All 476 tests passing without warnings or errors
+
+**Classes Created:**
+1. **FreeAgencyOfferValidator** - Contract offer validation rules
+2. **FreeAgencyDemandCalculator** - Perceived value calculations with team modifiers
+3. **FreeAgencyDemandRepository** - Team and player data access
+4. **FreeAgencyCapCalculator** - Salary cap space tracking for 6 years
+5. **FreeAgencyProcessor** - Offer submission workflow orchestration
+6. **FreeAgencyDisplayHelper** - Main free agency page table rendering
+7. **FreeAgencyNegotiationHelper** - Negotiation page with explanatory text
+
+**Files Refactored:**
+- `modules/Free_Agency/index.php`: 1,706 → 91 lines (-94.7%)
+- `modules/Free_Agency/freeagentoffer.php`: 504 → 6 lines (-98.8%)
+- `modules/Free_Agency/freeagentofferdelete.php`: 22 → 5 lines (-77.3%)
+
+**Security:**
+- All database operations via prepared statements
+- HTML escaping on all output with htmlspecialchars()
+- SQL injection prevention through parameterized queries
+- Input validation for all contract parameters
+
+**Benefits:**
+- Easier to test individual components
+- Clear separation between validation, calculation, and display
+- Reusable components for API development
+- Better maintainability and extensibility
+
+---
 
 ### 13. Leaderboards Module (November 14, 2025)
 

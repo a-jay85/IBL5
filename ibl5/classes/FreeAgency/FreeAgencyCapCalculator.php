@@ -116,13 +116,13 @@ class FreeAgencyCapCalculator
     }
 
     /**
-     * Calculate cap space for negotiation page
+     * Calculate cap space and remaining roster spots for negotiation page
      * 
      * @param \Team $team Team object
      * @param string $playerName Player name to exclude from offers
-     * @return array<string, mixed> Cap space data
+     * @return array<string, mixed> Cap space and roster spot data
      */
-    public function calculateNegotiationCapSpace(\Team $team, string $playerName): array
+    public function calculateNegotiationCapAndRosterData(\Team $team, string $playerName): array
     {
         $capSpace = [
             'year1' => \League::SOFT_CAP_MAX,

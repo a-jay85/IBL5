@@ -54,7 +54,7 @@ class FreeAgencyNegotiationHelper
         $this->viewHelper = new FreeAgencyViewHelper($team->name, $player);
         
         $capCalculator = new FreeAgencyCapCalculator($this->db);
-        $capData = $capCalculator->calculateNegotiationCapSpace($team, $player->name);
+        $capData = $capCalculator->calculateNegotiationCapAndRosterData($team, $player->name);
         
         $demands = $this->calculator->getPlayerDemands($player->name);
         $veteranMinimum = \ContractRules::getVeteranMinimumSalary($player->yearsOfExperience);

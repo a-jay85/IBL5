@@ -272,13 +272,13 @@ class FreeAgencyCapCalculatorTest extends TestCase
      * @group cap-calculator
      * @group negotiation
      */
-    public function testCalculateNegotiationCapSpaceReturnsAllRequiredKeys(): void
+    public function testCalculateNegotiationCapAndRosterDataReturnsAllRequiredKeys(): void
     {
         // Arrange
         $team = $this->createMockTeam();
         
         // Act
-        $result = $this->calculator->calculateNegotiationCapSpace($team, 'Test Player');
+        $result = $this->calculator->calculateNegotiationCapAndRosterData($team, 'Test Player');
         
         // Assert
         $this->assertArrayHasKey('softCap', $result);
@@ -295,13 +295,13 @@ class FreeAgencyCapCalculatorTest extends TestCase
      * @group cap-calculator
      * @group negotiation
      */
-    public function testCalculateNegotiationCapSpaceExcludesPlayerOffer(): void
+    public function testCalculateNegotiationCapAndRosterDataExcludesPlayerOffer(): void
     {
         // Arrange - Set up mock to return offer for specific player
         $team = $this->createMockTeamWithOfferToExclude('Test Player', 1000);
         
         // Act
-        $result = $this->calculator->calculateNegotiationCapSpace($team, 'Test Player');
+        $result = $this->calculator->calculateNegotiationCapAndRosterData($team, 'Test Player');
         
         // Assert - Cap space should not include the excluded player's offer
         $this->assertIsInt($result['softCap']['year1']);
@@ -318,7 +318,7 @@ class FreeAgencyCapCalculatorTest extends TestCase
         $team = $this->createMockTeam();
         
         // Act
-        $result = $this->calculator->calculateNegotiationCapSpace($team, 'Test Player');
+        $result = $this->calculator->calculateNegotiationCapAndRosterData($team, 'Test Player');
         
         // Assert
         $buffer = League::HARD_CAP_MAX - League::SOFT_CAP_MAX;

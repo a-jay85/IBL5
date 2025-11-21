@@ -97,7 +97,7 @@ class FreeAgencyProcessor
         // Reconstruct cap space data
         $team = \Team::initialize($this->db, $teamName);
         $capCalculator = new FreeAgencyCapCalculator($this->db);
-        $capData = $capCalculator->calculateNegotiationCapSpace($team, $player->name);
+        $capData = $capCalculator->calculateNegotiationCapAndRosterData($team, $player->name);
         
         // Get existing offer to calculate amended cap space
         $helper = new FreeAgencyNegotiationHelper($this->db);

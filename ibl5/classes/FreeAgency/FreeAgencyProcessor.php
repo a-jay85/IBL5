@@ -80,19 +80,16 @@ class FreeAgencyProcessor
     private function parseOfferData(array $postData, \Player\Player $player): array
     {
         $teamName = $postData['teamname'] ?? '';
-        $birdYears = (int) ($postData['bird'] ?? 0);
         
-        // Adjust Bird Rights if player not on offering team
-        if ($player->teamName != $teamName) {
-            $birdYears = 0;
-        }
+        // Bird rights only apply if player is currently on the offering team
+        $birdYears = $player->teamName == $teamName ? $player->birdYears : 0;
         
         $offerType = (int) ($postData['offerType'] ?? 0);
         
         // Parse offer amounts based on exception type
         if (OfferType::isVeteranMinimum($offerType)) {
             // Veteran's minimum
-            $offer1 = (int) ($postData['vetmin'] ?? 35);
+            $offer1 = (int) ($postData['vetmin'] ?? FreeAgencyNegotiationHelper::VETERAN_MINIMUM_SALARIES[$player->yearsOfExperience]);
             $offer2 = 0;
             $offer3 = 0;
             $offer4 = 0;

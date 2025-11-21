@@ -137,7 +137,6 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
             <input type="hidden" name="max" value="<?= htmlspecialchars($maxContract) ?>">
             <input type="hidden" name="teamname" value="<?= htmlspecialchars($team->name) ?>">
             <input type="hidden" name="playerID" value="<?= htmlspecialchars($player->playerID) ?>">
-            <input type="hidden" name="bird" value="<?= htmlspecialchars($player->birdYears) ?>">
             <input type="hidden" name="vetmin" value="<?= htmlspecialchars($veteranMinimum) ?>">
             <input type="hidden" name="offerType" value="0">
             
@@ -246,7 +245,6 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
         return [
             'teamname' => $teamName,
             'playerID' => $player->playerID,
-            'bird' => (string) $player->birdYears,
             'vetmin' => (string) $veteranMinimum,
             'max' => (string) $maxContract,
             'amendedCapSpaceYear1' => (string) $amendedCapSpace,

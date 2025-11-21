@@ -90,7 +90,7 @@ class FreeAgencyProcessor
         $maxContractYear1 = FreeAgencyNegotiationHelper::getMaxContractSalary($player->yearsOfExperience);
         
         // Reconstruct cap space data
-        $team = new \Team($this->db, $teamName);
+        $team = \Team::initialize($this->db, $teamName);
         $capCalculator = new FreeAgencyCapCalculator($this->db);
         $capData = $capCalculator->calculateNegotiationCapSpace($team, $player->name);
         

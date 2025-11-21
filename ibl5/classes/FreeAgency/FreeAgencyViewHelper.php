@@ -131,30 +131,6 @@ class FreeAgencyViewHelper
     }
 
     /**
-     * Render max contract offer buttons
-     * 
-     * @param array<int> $maxSalaries Maximum salaries per year
-     * @return string HTML form buttons
-     */
-    public function renderMaxContractButtons(array $maxSalaries): string
-    {
-        $buttonConfigs = [
-            ['offers' => [$maxSalaries[1]]],
-            ['offers' => [$maxSalaries[1], $maxSalaries[2]]],
-            ['offers' => [$maxSalaries[1], $maxSalaries[2], $maxSalaries[3]]],
-            ['offers' => [$maxSalaries[1], $maxSalaries[2], $maxSalaries[3], $maxSalaries[4]]],
-            ['offers' => [$maxSalaries[1], $maxSalaries[2], $maxSalaries[3], $maxSalaries[4], $maxSalaries[5]]],
-            ['offers' => [$maxSalaries[1], $maxSalaries[2], $maxSalaries[3], $maxSalaries[4], $maxSalaries[5], $maxSalaries[6]]],
-        ];
-        
-        return $this->renderButtonRow(
-            'Max Level Contract 10% (click the button that corresponds to the final year you wish to offer):',
-            $buttonConfigs,
-            0
-        );
-    }
-
-    /**
      * Render a single offer button form
      * 
      * Used for all contract offer types (max contract, MLE, LLE, vet min)
@@ -202,6 +178,28 @@ class FreeAgencyViewHelper
     }
 
     /**
+     * Render max contract offer buttons
+     * 
+     * @param array<int> $maxSalaries Maximum salaries per year
+     * @return string HTML form buttons
+     */
+    public function renderMaxContractButtons(array $maxSalaries): string
+    {
+        $contractOfferConfigs = [];
+        for ($years = 1; $years <= 6; $years++) {
+            $contractOfferConfigs[] = [
+                'offers' => array_slice($maxSalaries, 1, $years),
+            ];
+        }
+        
+        return $this->renderButtonRow(
+            'Max Level Contract 10% (click the button that corresponds to the final year you wish to offer):',
+            $contractOfferConfigs,
+            0
+        );
+    }
+
+    /**
      * Render exception offer buttons (MLE, LLE, Vet Min)
      * 
      * @param string $exceptionType Type of exception (MLE, LLE, VET)
@@ -229,9 +227,9 @@ class FreeAgencyViewHelper
      */
     private function renderMLEButtons(): void
     {
-        $buttonConfigs = [];
+        $contractOfferConfigs = [];
         for ($years = 1; $years <= 6; $years++) {
-            $buttonConfigs[] = [
+            $contractOfferConfigs[] = [
                 'offers' => \ContractRules::getMLEOffers($years),
                 'offerType' => (string) $years,
             ];
@@ -239,7 +237,7 @@ class FreeAgencyViewHelper
         
         echo $this->renderButtonRow(
             'Mid-Level Exception (click the button that corresponds to the final year you wish to offer):',
-            $buttonConfigs,
+            $contractOfferConfigs,
             0
         );
     }
@@ -251,7 +249,7 @@ class FreeAgencyViewHelper
      */
     private function renderLLEButton(): void
     {
-        $buttonConfigs = [
+        $contractOfferConfigs = [
             [
                 'offers' => [\ContractRules::LLE_OFFER],
                 'offerType' => (string) OfferType::LOWER_LEVEL_EXCEPTION,
@@ -260,7 +258,7 @@ class FreeAgencyViewHelper
         
         echo $this->renderButtonRow(
             'Lower-Level Exception:',
-            $buttonConfigs,
+            $contractOfferConfigs,
             6
         );
     }
@@ -272,7 +270,7 @@ class FreeAgencyViewHelper
      */
     private function renderVetMinButton(): void
     {
-        $buttonConfigs = [
+        $contractOfferConfigs = [
             [
                 'offers' => [\ContractRules::getVeteranMinimumSalary(1)],
                 'offerType' => (string) OfferType::VETERAN_MINIMUM,
@@ -281,7 +279,7 @@ class FreeAgencyViewHelper
         
         echo $this->renderButtonRow(
             'Veterans Exception:',
-            $buttonConfigs,
+            $contractOfferConfigs,
             6
         );
     }
@@ -290,17 +288,17 @@ class FreeAgencyViewHelper
      * Render a row of contract offer buttons with label and fill cells
      * 
      * @param string $label Label text for the first cell
-     * @param array<array{offers: array<int>, offerType?: string}> $buttonConfigs Array of button configurations
+     * @param array<array{offers: array<int>, offerType?: string}> $contractOfferConfigs Contract offer configurations by years
      * @param int $fillCells Number of empty cells to add at end
      * @return string HTML table row content
      */
-    private function renderButtonRow(string $label, array $buttonConfigs, int $fillCells = 0): string
+    private function renderButtonRow(string $label, array $contractOfferConfigs, int $fillCells = 0): string
     {
         ob_start();
         
         echo "<td>" . htmlspecialchars($label) . "</td>";
         
-        foreach ($buttonConfigs as $config) {
+        foreach ($contractOfferConfigs as $config) {
             $offerType = isset($config['offerType']) ? (int) $config['offerType'] : 0;
             $finalYear = count($config['offers']);
             echo "<td>{$this->renderOfferButtonForm($config['offers'], $finalYear, $offerType)}</td>";

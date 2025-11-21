@@ -236,7 +236,6 @@ Beyond module refactoring, consider these DX improvements:
 - Add PHPUnit configuration for parallel test execution
 - Create test data factories for consistent test setup
 - Add code coverage reporting (Codecov/Coveralls)
-- Re-enable static analysis (PHPStan) once errors are addressed
 
 **Estimated Effort for Enhancements:** 3-4 days
 
@@ -255,12 +254,12 @@ Beyond module refactoring, consider these DX improvements:
 **Estimated Effort for Enhancements:** 3-4 days
 
 ### 3. Code Quality Tools
-**Current State:** PHPStan configured  
-**Improvements:**
-- PHP_CodeSniffer for PSR-12 compliance
+**Current State:** PHP_CodeSniffer (PSR-12) configured  
+**Future Improvements:**
 - PHPMD for code complexity detection
 - SonarQube for continuous inspection
 - Automated security scanning (Snyk/SAST)
+- Static analysis (PHPStan) when more code is refactored
 
 **Estimated Effort:** 1 week
 
@@ -294,7 +293,7 @@ Beyond module refactoring, consider these DX improvements:
 **Month 3: Developer Experience** ✅ Partially Complete
 - ~~Week 1: CI/CD pipeline setup~~ ✅ Complete (.github/workflows/tests.yml)
 - ~~Week 2: Dependency caching~~ ✅ Complete (.github/workflows/cache-dependencies.yml)
-- Week 3: Code quality tools (PHPStan re-enablement, pre-commit hooks)
+- Week 3: Code quality tools (pre-commit hooks)
 - Week 4: Documentation improvements
 
 ### Long-Term Vision (6-12 Months)
@@ -445,7 +444,7 @@ The Player module refactoring is complete and represents a significant achieveme
 - Complete Free Agency refactoring
 - Refactor One-on-One and Season Leaders
 - ~~Implement developer experience improvements~~ ✅ CI/CD and dependency caching complete
-- Enhance code quality tools (PHPStan, coverage reporting)
+- Enhance code quality tools (coverage reporting)
 
 **Long-term (Next 6-12 Months):**
 - Batch-refactor stats modules

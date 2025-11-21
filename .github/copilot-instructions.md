@@ -384,8 +384,7 @@ public function logEvent(string $message, ?string $userId = null): void
 1. **Identify all function/method calls** in changed code
 2. **Verify argument count and types match** function parameters
 3. **Check return value usage matches** declared return type
-4. **Run static analysis** (PHPStan level 5+, Psalm strict mode)
-5. **Fix all errors and warnings** - zero tolerance
+4. **Fix all errors and warnings** - zero tolerance
 
 **Common error patterns to check:**
 - Argument count mismatches or type mismatches (e.g., `string` where `int` expected)
@@ -403,7 +402,7 @@ $result = logEvent("Injured");         → logEvent("Injured");  // void return
 if ($result) { ... }
 ```
 
-**Linter standards:** PHP_CodeSniffer (PSR-12), PHPStan, Psalm. All warnings/errors must be resolved before PR completion.
+**Linter standards:** PHP_CodeSniffer (PSR-12). All warnings/errors must be resolved before PR completion.
 
 #### Laravel Migration Compatibility
 - Use PHP 8 union types (compatible with Laravel 10+)
@@ -448,6 +447,56 @@ oldFunction($value);  →  NewClass::newMethod($value);
 - Create new code that uses deprecated functions
 - Skip testing after deprecation cleanup
 
+### 10. Refactoring Cleanup Checklist
+
+**After completing any refactoring, perform these cleanup tasks before finalizing the PR:**
+
+#### Unused Arguments
+1. **Identify unused method parameters** - Methods may no longer need arguments after refactoring
+2. **Remove unused parameters** from method signatures
+3. **Update ALL call sites** of the modified methods using `grep_search` or `semantic_search`
+4. **Update PHPDoc comments** to reflect removed parameters
+5. **Run tests** to verify no breakage
+
+**Example:**
+```php
+// Before refactoring
+public function renderDemandDisplay(array $demands, int $playerExperience): string
+// After - if $playerExperience is unused
+public function renderDemandDisplay(array $demands): string
+// Then update all calls: renderDemandDisplay($demands, $player->years) → renderDemandDisplay($demands)
+```
+
+#### Dead Code & Redundant Logic
+1. **Remove unused local variables** - Variables set but never read
+2. **Eliminate redundant parameters** - Arguments passed but never used
+3. **Delete unreachable code** - Code after `return`, `throw`, or impossible conditions
+4. **Remove duplicate logic** - Consolidate repeated code into helper methods
+5. **Clean up commented-out code** - Delete, don't leave commented blocks
+
+#### Method Signature Hygiene
+1. **Verify parameter order matches usage patterns** - Group related parameters together
+2. **Check for optional parameters that should be required** - Or vice versa
+3. **Ensure consistent parameter naming** across similar methods
+4. **Review parameter types** - Use most specific types, not `mixed`
+
+#### Documentation Accuracy
+1. **Update all PHPDoc comments** to match actual method signatures
+2. **Verify `@param` and `@return` type hints** are accurate and complete
+3. **Remove documentation for deleted parameters** or methods
+4. **Add documentation for new parameters** introduced during refactoring
+
+#### Run Comprehensive Validation
+1. **Run full test suite** - `phpunit` (all tests must pass)
+2. **Check code style** - `phpcs --standard=PSR12 ibl5/classes/`
+3. **Verify no new linter warnings** were introduced
+
+**DO NOT:**
+- Merge PRs with unused parameters in methods
+- Leave dead code commented out
+- Skip test validation after cleanup
+- Create technical debt with TODO comments instead of fixing issues
+
 ## Copilot Coding Agent Configuration
 
 ### Environment Setup (CRITICAL)
@@ -483,7 +532,7 @@ The `.github/workflows/cache-dependencies.yml` and `.github/workflows/tests.yml`
 - Runs daily to keep cache fresh
 - Runs when `composer.json` or `composer.lock` changes
 - Can be triggered manually
-- Pre-caches all PHP dependencies (PHPUnit, PHPStan, etc.)
+- Pre-caches all PHP dependencies (PHPUnit, etc.)
 
 **How it works:**
 1. Workflow runs `composer install` in GitHub Actions
@@ -521,7 +570,6 @@ phpunit --filter testRenderPlayerHeader    # Run specific test
 ```bash
 cd ibl5
 vendor/bin/phpunit --version               # Should show PHPUnit 12.4.3+
-vendor/bin/phpstan --version               # Should show PHPStan version
 vendor/bin/phpcs --version                 # Should show PHP_CodeSniffer version
 ```
 

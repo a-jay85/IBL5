@@ -597,6 +597,117 @@ The Copilot agent requires a pre-configured development environment to run tests
   - **Zero tolerance for warnings or errors**: PRs must pass all quality checks
 - The agent will **not** merge PRs automatically; human review is required
 
+## Local Database Connection (For Copilot Agent)
+
+### MAMP MySQL Database Access
+
+The Copilot agent can connect to your local MAMP MySQL database for test data and development purposes.
+
+#### Connection Details
+- **Host:** `localhost`
+- **Port:** `3306` (MAMP default)
+- **Database Name:** `iblhoops_ibl5`
+- **Socket:** `/Applications/MAMP/tmp/mysql/mysql.sock`
+- **Credentials Location:** See `ibl5/config.php` for actual database credentials (stored in `.gitignore`)
+
+#### Setting Up DatabaseConnection for Tests
+
+The `DatabaseConnection` class in `ibl5/classes/DatabaseConnection.php` provides unified database access for tests. To set it up:
+
+1. **Copy the template file:**
+   ```bash
+   cd ibl5/classes
+   cp DatabaseConnection.php.template DatabaseConnection.php
+   ```
+
+2. **Add your credentials:**
+   - Find your database credentials in `ibl5/config.php`
+   - Look for variables: `$dbuname`, `$dbpass`, `$dbname`
+   - Open `DatabaseConnection.php` and replace the `REPLACE_ME_*` placeholders
+
+3. **Verify .gitignore:**
+   - `DatabaseConnection.php` is in `.gitignore` and will never be committed
+   - Only the template file (`DatabaseConnection.php.template`) is version controlled
+
+#### PHP Connection Using DatabaseConnection Helper Class (For Tests)
+
+Once set up, use the `DatabaseConnection` class for easier database access:
+
+```php
+<?php
+// Use the helper class for database access in tests
+$player = DatabaseConnection::fetchRow("SELECT * FROM ibl_plr WHERE pid = ?", [123]);
+
+// Fetch multiple rows
+$players = DatabaseConnection::fetchAll("SELECT * FROM ibl_plr LIMIT 10");
+
+// Fetch a single value
+$playerCount = DatabaseConnection::fetchValue("SELECT COUNT(*) FROM ibl_plr");
+
+// Test connection
+if (DatabaseConnection::testConnection()) {
+    echo "Connected to database successfully";
+}
+
+// Get connection status
+$status = DatabaseConnection::getStatus();
+var_dump($status);
+?>
+```
+
+**Key Features:**
+- Automatically handles MAMP socket path: `/Applications/MAMP/tmp/mysql/mysql.sock`
+- Static methods for simple queries without managing connection state
+- Supports prepared statements with parameter binding for security
+- Includes error handling and connection validation
+- UTF-8 charset automatically set
+
+**Location:** `ibl5/classes/DatabaseConnection.php` (autoloaded, not committed)  
+**Template:** `ibl5/classes/DatabaseConnection.php.template` (for reference)
+
+#### Connecting via Command Line (Manual Verification)
+
+To manually verify MAMP database connection:
+
+```bash
+/Applications/MAMP/Library/bin/mysql80/bin/mysql \
+  -h localhost \
+  -u <username_from_config.php> \
+  -p'<password_from_config.php>' \
+  -D iblhoops_ibl5 \
+  -e "SELECT COUNT(*) as table_count FROM information_schema.TABLES WHERE TABLE_SCHEMA = 'iblhoops_ibl5';"
+```
+
+#### Important Security Notes
+- **Credentials in Code:** The `DatabaseConnection.php` file contains hardcoded credentials for development use only
+- **Git Protection:** `DatabaseConnection.php` is in `.gitignore` - it will NEVER be committed to the repository
+- **Never Share:** Do not copy this file or its credentials outside of your local development environment
+- **Template Only:** Only `DatabaseConnection.php.template` is version controlled; it contains placeholder values
+- **Production Data:** The local database contains production IBL data - be careful when running destructive queries
+
+#### For Test Development
+When writing tests that need database data:
+
+1. **Query actual data:** Use DatabaseConnection to fetch real player/team/game data
+2. **Use transactions:** Wrap test operations in transactions that rollback
+3. **Static data preferred:** Cache frequently-used test data rather than querying repeatedly
+4. **Example:**
+```php
+public function testPlayerFetch()
+{
+    global $mysqli_db;
+    
+    // Get a real player from the database
+    $result = $mysqli_db->query("SELECT * FROM ibl_plr LIMIT 1");
+    $player = $result->fetch_assoc();
+    
+    $this->assertIsArray($player);
+    $this->assertNotEmpty($player['pid']);
+}
+```
+
+---
+
 ## Development Environment Setup (For Copilot Agent)
 
 ### Problem Statement

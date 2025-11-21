@@ -38,11 +38,13 @@ class FreeAgencyProcessor
     {
         // Extract and sanitize input
         $teamName = $postData['teamname'] ?? '';
-        $playerName = $postData['playername'] ?? '';
-        $playerTeamName = $postData['player_teamname'] ?? '';
+        $playerID = (int) ($postData['playerID'] ?? 0);
+        
+        // Load player object
+        $player = \Player\Player::withPlayerID($this->db, $playerID);
         
         // Check if player already signed
-        if ($this->validator->isPlayerAlreadySigned($playerName)) {
+        if ($this->validator->isPlayerAlreadySigned($player->name)) {
             return $this->renderOfferResponse(
                 false,
                 "Sorry, this player was previously signed to a team this Free Agency period.<p>
@@ -51,7 +53,7 @@ class FreeAgencyProcessor
         }
         
         // Parse offer data
-        $offerData = $this->parseOfferData($postData);
+        $offerData = $this->parseOfferData($postData, $player);
         
         // Validate the offer
         $validationResult = $this->validator->validateOffer($offerData);
@@ -61,7 +63,7 @@ class FreeAgencyProcessor
         }
         
         // Save the offer
-        $saveResult = $this->saveOffer($teamName, $playerName, $playerTeamName, $offerData);
+        $saveResult = $this->saveOffer($teamName, $player, $offerData);
         
         return $this->renderOfferResponse($saveResult, 
             $saveResult 
@@ -74,16 +76,16 @@ class FreeAgencyProcessor
      * Parse offer data from POST array
      * 
      * @param array<string, mixed> $postData POST data
+     * @param \Player\Player $player Player object
      * @return array<string, mixed> Parsed offer data
      */
-    private function parseOfferData(array $postData): array
+    private function parseOfferData(array $postData, \Player\Player $player): array
     {
-        $playerTeamName = $postData['player_teamname'] ?? '';
         $teamName = $postData['teamname'] ?? '';
         $birdYears = (int) ($postData['bird'] ?? 0);
         
         // Adjust Bird Rights if player not on offering team
-        if ($playerTeamName != $teamName) {
+        if ($player->teamName != $teamName) {
             $birdYears = 0;
         }
         
@@ -145,15 +147,14 @@ class FreeAgencyProcessor
      * Save a validated offer to the database
      * 
      * @param string $teamName Offering team
-     * @param string $playerName Player name
-     * @param string $playerTeamName Player's current team
+     * @param \Player\Player $player Player object
      * @param array<string, mixed> $offerData Offer details
      * @return bool True if saved successfully
      */
-    private function saveOffer(string $teamName, string $playerName, string $playerTeamName, array $offerData): bool
+    private function saveOffer(string $teamName, \Player\Player $player, array $offerData): bool
     {
         $escapedTeamName = $this->databaseService->escapeString($this->db, $teamName);
-        $escapedPlayerName = $this->databaseService->escapeString($this->db, $playerName);
+        $escapedPlayerName = $this->databaseService->escapeString($this->db, $player->name);
         
         // Delete any existing offer from this team to this player
         $deleteQuery = "DELETE FROM ibl_fa_offers 
@@ -163,16 +164,15 @@ class FreeAgencyProcessor
         $this->db->sql_query($deleteQuery);
         
         // Calculate perceived value
-        $position = $this->getPlayerPosition($playerName);
         $yearsInOffer = $this->calculateYearsInOffer($offerData);
         $offerAverage = $this->calculateOfferAverage($offerData, $yearsInOffer);
         
         $perceivedValue = $this->calculator->calculatePerceivedValue(
             $offerAverage,
             $teamName,
-            $playerTeamName,
-            $playerName,
-            $position,
+            $player->teamName,
+            $player->name,
+            $player->position,
             $yearsInOffer
         );
         
@@ -198,24 +198,10 @@ class FreeAgencyProcessor
         
         // Post to Discord if significant offer
         if ($result && $offerData['offer1'] > OfferType::LLE_OFFER) {
-            $this->postOfferToDiscord($teamName, $playerName, $playerTeamName);
+            $this->postOfferToDiscord($teamName, $player);
         }
         
         return (bool) $result;
-    }
-
-    /**
-     * Get player's position
-     * 
-     * @param string $playerName Player name
-     * @return string Position
-     */
-    private function getPlayerPosition(string $playerName): string
-    {
-        $escapedPlayerName = $this->databaseService->escapeString($this->db, $playerName);
-        $query = "SELECT pos FROM ibl_plr WHERE name = '$escapedPlayerName'";
-        $result = $this->db->sql_query($query);
-        return $this->db->sql_result($result, 0, "pos") ?? '';
     }
 
     /**
@@ -256,11 +242,10 @@ class FreeAgencyProcessor
      * Post offer notification to Discord
      * 
      * @param string $teamName Offering team
-     * @param string $playerName Player name
-     * @param string $playerTeamName Player's current team
+     * @param \Player\Player $player Player object
      * @return void
      */
-    private function postOfferToDiscord(string $teamName, string $playerName, string $playerTeamName): void
+    private function postOfferToDiscord(string $teamName, \Player\Player $player): void
     {
         $season = new \Season($this->db);
         
@@ -268,14 +253,14 @@ class FreeAgencyProcessor
             return;
         }
         
-        $playerTeamDiscordID = \Discord::getDiscordIDFromTeamname($this->db, $playerTeamName);
+        $playerTeamDiscordID = \Discord::getDiscordIDFromTeamname($this->db, $player->teamName);
         
-        if ($teamName == $playerTeamName) {
-            $message = "Free agent **$playerName** has been offered a contract to _stay_ with the **$playerTeamName**.
-_**$playerTeamName** GM <@!$playerTeamDiscordID> could not be reached for comment._";
+        if ($teamName == $player->teamName) {
+            $message = "Free agent **{$player->name}** has been offered a contract to _stay_ with the **{$player->teamName}**.
+_**{$player->teamName}** GM <@!$playerTeamDiscordID> could not be reached for comment._";
         } else {
-            $message = "Free agent **$playerName** has been offered a contract to _leave_ the **$playerTeamName**.
-_**$playerTeamName** GM <@!$playerTeamDiscordID> could not be reached for comment._";
+            $message = "Free agent **{$player->name}** has been offered a contract to _leave_ the **{$player->teamName}**.
+_**{$player->teamName}** GM <@!$playerTeamDiscordID> could not be reached for comment._";
         }
         
         \Discord::postToChannel('#free-agency', $message);
@@ -315,13 +300,15 @@ _**$playerTeamName** GM <@!$playerTeamDiscordID> could not be reached for commen
      * Delete all offers from a team to a player
      * 
      * @param string $teamName Team name
-     * @param string $playerName Player name
+     * @param int $playerID Player ID
      * @return string HTML response
      */
-    public function deleteOffers(string $teamName, string $playerName): string
+    public function deleteOffers(string $teamName, int $playerID): string
     {
+        $player = \Player\Player::withPlayerID($this->db, $playerID);
+        
         $escapedTeamName = $this->databaseService->escapeString($this->db, $teamName);
-        $escapedPlayerName = $this->databaseService->escapeString($this->db, $playerName);
+        $escapedPlayerName = $this->databaseService->escapeString($this->db, $player->name);
         
         $query = "DELETE FROM ibl_fa_offers 
                   WHERE name = '$escapedPlayerName' 

@@ -95,7 +95,8 @@ function deleteOffer()
 {
     global $db;
     $processor = new FreeAgencyProcessor($db);
-    echo $processor->deleteOffers($_POST['teamname'], $_POST['playername']);
+    $playerID = (int) ($_POST['playerID'] ?? 0);
+    echo $processor->deleteOffers($_POST['teamname'], $playerID);
 }
 
 switch ($pa) {

@@ -120,12 +120,12 @@ class FreeAgencyViewHelper
     {
         ob_start();
         ?>
-<input type="number" style="width: 4em" name="offeryear1" size="4" value="<?= htmlspecialchars($prefills['offer1'] ?: '') ?>" min="0" max="2177"></td><td>
-<input type="number" style="width: 4em" name="offeryear2" size="4" value="<?= htmlspecialchars($prefills['offer2'] ?: '') ?>" min="0" max="2177"></td><td>
-<input type="number" style="width: 4em" name="offeryear3" size="4" value="<?= htmlspecialchars($prefills['offer3'] ?: '') ?>" min="0" max="2177"></td><td>
-<input type="number" style="width: 4em" name="offeryear4" size="4" value="<?= htmlspecialchars($prefills['offer4'] ?: '') ?>" min="0" max="2177"></td><td>
-<input type="number" style="width: 4em" name="offeryear5" size="4" value="<?= htmlspecialchars($prefills['offer5'] ?: '') ?>" min="0" max="2177"></td><td>
-<input type="number" style="width: 4em" name="offeryear6" size="4" value="<?= htmlspecialchars($prefills['offer6'] ?: '') ?>" min="0" max="2177"></td>
+<input type="number" style="width: 4em" name="offeryear1" size="4" value="<?= htmlspecialchars($prefills['offer1'] ?: '') ?>" min="0" max="9999"></td><td>
+<input type="number" style="width: 4em" name="offeryear2" size="4" value="<?= htmlspecialchars($prefills['offer2'] ?: '') ?>" min="0" max="9999"></td><td>
+<input type="number" style="width: 4em" name="offeryear3" size="4" value="<?= htmlspecialchars($prefills['offer3'] ?: '') ?>" min="0" max="9999"></td><td>
+<input type="number" style="width: 4em" name="offeryear4" size="4" value="<?= htmlspecialchars($prefills['offer4'] ?: '') ?>" min="0" max="9999"></td><td>
+<input type="number" style="width: 4em" name="offeryear5" size="4" value="<?= htmlspecialchars($prefills['offer5'] ?: '') ?>" min="0" max="9999"></td><td>
+<input type="number" style="width: 4em" name="offeryear6" size="4" value="<?= htmlspecialchars($prefills['offer6'] ?: '') ?>" min="0" max="9999"></td>
         <?php
         return ob_get_clean();
     }

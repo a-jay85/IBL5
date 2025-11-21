@@ -125,19 +125,8 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
             <td>Please enter your offer in this row:</td>
             <td><?= $this->viewHelper->renderOfferInputs($existingOffer) ?></td>
             
-            <input type="hidden" name="amendedCapSpaceYear1" value="<?= htmlspecialchars($amendedCapSpace) ?>">
-            <input type="hidden" name="capnumber" value="<?= htmlspecialchars($capData['softCap']['year1']) ?>">
-            <input type="hidden" name="capnumber2" value="<?= htmlspecialchars($capData['softCap']['year2']) ?>">
-            <input type="hidden" name="capnumber3" value="<?= htmlspecialchars($capData['softCap']['year3']) ?>">
-            <input type="hidden" name="capnumber4" value="<?= htmlspecialchars($capData['softCap']['year4']) ?>">
-            <input type="hidden" name="capnumber5" value="<?= htmlspecialchars($capData['softCap']['year5']) ?>">
-            <input type="hidden" name="capnumber6" value="<?= htmlspecialchars($capData['softCap']['year6']) ?>">
-            <input type="hidden" name="demtot" value="<?= htmlspecialchars($this->calculateTotalDemands($demands)) ?>">
-            <input type="hidden" name="demyrs" value="<?= htmlspecialchars($this->calculateDemandYears($demands)) ?>">
-            <input type="hidden" name="max" value="<?= htmlspecialchars($maxContract) ?>">
             <input type="hidden" name="teamname" value="<?= htmlspecialchars($team->name) ?>">
             <input type="hidden" name="playerID" value="<?= htmlspecialchars($player->playerID) ?>">
-            <input type="hidden" name="vetmin" value="<?= htmlspecialchars($veteranMinimum) ?>">
             <input type="hidden" name="offerType" value="0">
             
             <td><input type="submit" value="Offer/Amend Free Agent Contract!"></td>
@@ -148,7 +137,7 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
             <td colspan="8"><center><b>MAX SALARY OFFERS:</b></center></td>
         </tr>
         
-        <?= $this->renderOfferButtons($team->name, $player, $maxContract, $veteranMinimum, $amendedCapSpace, $capData) ?>
+        <?= $this->renderOfferButtons($team->name, $player) ?>
         
         <?= $this->renderNotesReminders($maxContract, $veteranMinimum, $amendedCapSpace, $capData, $player->birdYears) ?>
         
@@ -174,21 +163,16 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
      * 
      * @param string $teamName
      * @param Player $player
-     * @param int $maxContract
-     * @param int $veteranMinimum
-     * @param int $amendedCapSpace
-     * @param array<string, mixed> $capData
      * @return string HTML table rows
      */
     private function renderOfferButtons(
         string $teamName,
-        Player $player,
-        int $maxContract,
-        int $veteranMinimum,
-        int $amendedCapSpace,
-        array $capData
+        Player $player
     ): string {
-        $formData = $this->buildFormData($teamName, $player, $veteranMinimum, $amendedCapSpace, $capData);
+        $formData = $this->buildFormData($teamName, $player);
+        
+        // Calculate values for display purposes only (not posted)
+        $maxContract = self::getMaxContractSalary($player->yearsOfExperience);
         
         ob_start();
         
@@ -223,39 +207,26 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
     }
 
     /**
-     * Build form data array
+     * Build form data array with only essential fields
+     * 
+     * Only includes data that cannot be reconstructed on the server side.
+     * Fields like vetmin, max, cap space, and demands are derived from
+     * playerID and teamName in the processor.
      * 
      * @param string $teamName
      * @param Player $player
-     * @param int $veteranMinimum
-     * @param int $amendedCapSpace
-     * @param array<string, mixed> $capData
      * @return array<string, mixed>
      */
     private function buildFormData(
         string $teamName,
-        Player $player,
-        int $veteranMinimum,
-        int $amendedCapSpace,
-        array $capData
+        Player $player
     ): array {
-        $demands = $this->calculator->getPlayerDemands($player->name);
-        $maxContract = self::getMaxContractSalary($player->yearsOfExperience);
-        
+        // Only include essential fields that cannot be reconstructed
+        // All other data (vetmin, max, cap space, demands) will be
+        // reconstructed on the server side from playerID and teamName
         return [
             'teamname' => $teamName,
             'playerID' => $player->playerID,
-            'vetmin' => (string) $veteranMinimum,
-            'max' => (string) $maxContract,
-            'amendedCapSpaceYear1' => (string) $amendedCapSpace,
-            'capnumber' => (string) $capData['softCap']['year1'],
-            'capnumber2' => (string) $capData['softCap']['year2'],
-            'capnumber3' => (string) $capData['softCap']['year3'],
-            'capnumber4' => (string) $capData['softCap']['year4'],
-            'capnumber5' => (string) $capData['softCap']['year5'],
-            'capnumber6' => (string) $capData['softCap']['year6'],
-            'demtot' => (string) $this->calculateTotalDemands($demands),
-            'demyrs' => (string) $this->calculateDemandYears($demands),
         ];
     }
 
@@ -300,7 +271,7 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
      * @param string $playerName
      * @return array<string, int> Existing offer or empty array
      */
-    private function getExistingOffer(string $teamName, string $playerName): array
+    public function getExistingOffer(string $teamName, string $playerName): array
     {
         $escapedTeamName = $this->databaseService->escapeString($this->db, $teamName);
         $escapedPlayerName = $this->databaseService->escapeString($this->db, $playerName);

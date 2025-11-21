@@ -73,6 +73,9 @@ class FreeAgencyProcessor
     /**
      * Parse offer data from POST array
      * 
+     * Reconstructs all derived values (vetmin, max, cap space) from playerID and teamName.
+     * Only user input (offer amounts, offerType) comes from POST data.
+     * 
      * @param array<string, mixed> $postData POST data
      * @param \Player\Player $player Player object
      * @return array<string, mixed> Parsed offer data
@@ -81,15 +84,27 @@ class FreeAgencyProcessor
     {
         $teamName = $postData['teamname'] ?? '';
         
-        // Bird rights only apply if player is currently on the offering team
+        // Reconstruct derived values from player object
         $birdYears = $player->teamName == $teamName ? $player->birdYears : 0;
+        $veteranMinimum = FreeAgencyNegotiationHelper::getVeteranMinimumSalary($player->yearsOfExperience);
+        $maxContractYear1 = FreeAgencyNegotiationHelper::getMaxContractSalary($player->yearsOfExperience);
+        
+        // Reconstruct cap space data
+        $team = new \Team($this->db, $teamName);
+        $capCalculator = new FreeAgencyCapCalculator($this->db);
+        $capData = $capCalculator->calculateNegotiationCapSpace($team, $player->name);
+        
+        // Get existing offer to calculate amended cap space
+        $helper = new FreeAgencyNegotiationHelper($this->db);
+        $existingOffer = $helper->getExistingOffer($teamName, $player->name);
+        $amendedCapSpaceYear1 = $capData['softCap']['year1'] + $existingOffer['offer1'];
         
         $offerType = (int) ($postData['offerType'] ?? 0);
         
         // Parse offer amounts based on exception type
         if (OfferType::isVeteranMinimum($offerType)) {
             // Veteran's minimum
-            $offer1 = (int) ($postData['vetmin'] ?? FreeAgencyNegotiationHelper::VETERAN_MINIMUM_SALARIES[0]);
+            $offer1 = $veteranMinimum;
             $offer2 = 0;
             $offer3 = 0;
             $offer4 = 0;
@@ -132,9 +147,9 @@ class FreeAgencyProcessor
             'birdYears' => $birdYears,
             'mleYears' => $offerType,
             'offerType' => $offerType,
-            'vetmin' => (int) ($postData['vetmin'] ?? FreeAgencyNegotiationHelper::VETERAN_MINIMUM_SALARIES[0]),
-            'year1Max' => (int) ($postData['max'] ?? FreeAgencyNegotiationHelper::MAX_CONTRACT_SALARIES[0]),
-            'amendedCapSpaceYear1' => (int) ($postData['amendedCapSpaceYear1'] ?? 0),
+            'vetmin' => $veteranMinimum,
+            'year1Max' => $maxContractYear1,
+            'amendedCapSpaceYear1' => $amendedCapSpaceYear1,
         ];
     }
 

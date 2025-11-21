@@ -57,7 +57,7 @@ class FreeAgencyOfferValidator
         }
 
         // Check soft cap space (if no Bird Rights and not using exceptions)
-        if ($offerData['birdYears'] < self::BIRD_RIGHTS_THRESHOLD && $offerData['mleYears'] == 0) {
+        if ($offerData['birdYears'] < self::BIRD_RIGHTS_THRESHOLD && $offerData['offerType'] == 0) {
             $softCapValidation = $this->validateSoftCapSpace($offerData);
             if (!$softCapValidation['valid']) {
                 return $softCapValidation;

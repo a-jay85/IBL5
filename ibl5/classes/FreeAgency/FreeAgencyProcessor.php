@@ -145,7 +145,6 @@ class FreeAgencyProcessor
             'offer5' => $offer5,
             'offer6' => $offer6,
             'birdYears' => $birdYears,
-            'mleYears' => $offerType,
             'offerType' => $offerType,
             'vetmin' => $veteranMinimum,
             'year1Max' => $maxContractYear1,

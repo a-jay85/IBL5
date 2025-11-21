@@ -97,7 +97,7 @@ class FreeAgencyOfferValidatorTest extends TestCase
         $offerData['offer1'] = 600;
         $offerData['amendedCapSpaceYear1'] = 500;
         $offerData['birdYears'] = 2; // Less than 3, no Bird Rights
-        $offerData['mleYears'] = 0; // Not using exception
+        $offerData['offerType'] = 0; // Not using exception
 
         // Act
         $result = $this->validator->validateOffer($offerData);
@@ -259,7 +259,6 @@ class FreeAgencyOfferValidatorTest extends TestCase
             'offer5' => 0,
             'offer6' => 0,
             'birdYears' => 3,
-            'mleYears' => 0,
             'vetmin' => 35,
             'year1Max' => \FreeAgency\FreeAgencyNegotiationHelper::getMaxContractSalary(0),
             'amendedCapSpaceYear1' => 1000,

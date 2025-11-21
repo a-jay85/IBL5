@@ -48,7 +48,7 @@ class FreeAgencyProcessor
         $player = \Player\Player::withPlayerID($this->db, $playerID);
         
         // Check if player already signed
-        if ($this->validator->isPlayerAlreadySigned($player->name)) {
+        if ($this->validator->isPlayerAlreadySigned($playerID)) {
             return $this->renderOfferResponse(
                 false,
                 "Sorry, this player was previously signed to a team this Free Agency period.<p>

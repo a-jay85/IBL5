@@ -21,8 +21,9 @@ class FreeAgencyProcessor
     public function __construct($db)
     {
         $this->db = $db;
+        $repository = new FreeAgencyDemandRepository($db);
         $this->validator = new FreeAgencyOfferValidator($db);
-        $this->calculator = new FreeAgencyDemandCalculator($db);
+        $this->calculator = new FreeAgencyDemandCalculator($repository);
         $this->databaseService = new \Services\DatabaseService();
     }
 

@@ -28,7 +28,8 @@ class FreeAgencyNegotiationHelper
         $this->databaseService = new \Services\DatabaseService();
         // Placeholder - will be replaced with actual team/player in renderNegotiationPage
         $this->viewHelper = new FreeAgencyViewHelper('', 0);
-        $this->calculator = new FreeAgencyDemandCalculator($db);
+        $repository = new FreeAgencyDemandRepository($db);
+        $this->calculator = new FreeAgencyDemandCalculator($repository);
     }
 
     /**

@@ -30,11 +30,24 @@ class FreeAgencyDemandCalculator
     private const RANDOM_VARIANCE_MAX = 5;
     private const RANDOM_VARIANCE_BASE = 100;
 
-    private $db;
+    private FreeAgencyDemandRepositoryInterface $repository;
+    private ?int $randomFactor = null;
 
-    public function __construct($db)
+    public function __construct(FreeAgencyDemandRepositoryInterface $repository)
     {
-        $this->db = $db;
+        $this->repository = $repository;
+    }
+
+    /**
+     * Set a static random factor for testing (disables actual randomness)
+     * Pass null to re-enable actual random number generation
+     * 
+     * @param ?int $factor Random factor between -5 and 5, or null for actual randomness
+     * @return void
+     */
+    public function setRandomFactor(?int $factor): void
+    {
+        $this->randomFactor = $factor;
     }
 
     /**
@@ -52,28 +65,18 @@ class FreeAgencyDemandCalculator
         Player $player,
         int $yearsInOffer
     ): float {
-        $databaseService = new \Services\DatabaseService();
-        
         // Get team performance data
-        $escapedTeamName = $databaseService->escapeString($this->db, $teamName);
-        $teamQuery = "SELECT Contract_Wins, Contract_Losses, Contract_AvgW, Contract_AvgL 
-                      FROM ibl_team_info WHERE team_name = '$escapedTeamName'";
-        $teamResult = $this->db->sql_query($teamQuery);
-        
-        $teamWins = (int) $this->db->sql_result($teamResult, 0, "Contract_Wins");
-        $teamLosses = (int) $this->db->sql_result($teamResult, 0, "Contract_Losses");
-        $tradWins = (int) $this->db->sql_result($teamResult, 0, "Contract_AvgW");
-        $tradLosses = (int) $this->db->sql_result($teamResult, 0, "Contract_AvgL");
+        $teamPerformance = $this->repository->getTeamPerformance($teamName);
         
         // Calculate position salary
         $positionSalary = $this->calculatePositionSalary($teamName, $player);
         
         // Calculate modifiers
         $modifier = $this->calculateModifier(
-            $teamWins,
-            $teamLosses,
-            $tradWins,
-            $tradLosses,
+            $teamPerformance['wins'],
+            $teamPerformance['losses'],
+            $teamPerformance['tradWins'],
+            $teamPerformance['tradLosses'],
             $player->freeAgencyPlayForWinner,
             $player->freeAgencyTradition,
             $player->freeAgencyLoyalty,
@@ -86,10 +89,24 @@ class FreeAgencyDemandCalculator
         );
         
         // Apply random variance
-        $random = rand(self::RANDOM_VARIANCE_MIN, self::RANDOM_VARIANCE_MAX);
+        $random = $this->getRandomFactor();
         $modRandom = (self::RANDOM_VARIANCE_BASE + $random) / self::RANDOM_VARIANCE_BASE;
         
         return $offerAverage * $modifier * $modRandom;
+    }
+
+    /**
+     * Get random factor for variance calculation
+     * 
+     * @return int Random factor between -5 and 5
+     */
+    private function getRandomFactor(): int
+    {
+        if ($this->randomFactor !== null) {
+            return $this->randomFactor;
+        }
+        
+        return rand(self::RANDOM_VARIANCE_MIN, self::RANDOM_VARIANCE_MAX);
     }
 
     /**
@@ -97,50 +114,17 @@ class FreeAgencyDemandCalculator
      * 
      * @param string $teamName Team name
      * @param Player $player Player to exclude and get position from
-     * @return int Total salary committed
+     * @return int Total salary committed (capped at MAX_POSITION_SALARY_CAP)
      */
     private function calculatePositionSalary(
         string $teamName,
         Player $player
     ): int {
-        $query = "SELECT cy, cy1, cy2, cy3, cy4, cy5, cy6 
-                  FROM ibl_plr 
-                  WHERE teamname = ? 
-                    AND pos = ? 
-                    AND pid != ?";
-        
-        $stmt = $this->db->prepare($query);
-        $stmt->bind_param('ssi', $teamName, $player->position, $player->playerID);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        
-        $totalSalary = 0;
-        
-        while ($row = $result->fetch_assoc()) {
-            $currentYear = (int) $row['cy'];
-            
-            // Get salary for next year based on current contract year
-            switch ($currentYear) {
-                case 0:
-                    $totalSalary += (int) $row['cy1'];
-                    break;
-                case 1:
-                    $totalSalary += (int) $row['cy2'];
-                    break;
-                case 2:
-                    $totalSalary += (int) $row['cy3'];
-                    break;
-                case 3:
-                    $totalSalary += (int) $row['cy4'];
-                    break;
-                case 4:
-                    $totalSalary += (int) $row['cy5'];
-                    break;
-                case 5:
-                    $totalSalary += (int) $row['cy6'];
-                    break;
-            }
-        }
+        $totalSalary = $this->repository->getPositionSalaryCommitment(
+            $teamName,
+            $player->position,
+            $player->playerID
+        );
         
         // Cap at maximum
         return min($totalSalary, self::MAX_POSITION_SALARY_CAP);
@@ -153,11 +137,11 @@ class FreeAgencyDemandCalculator
      * @param int $teamLosses Team losses this season
      * @param int $tradWins Team tradition wins
      * @param int $tradLosses Team tradition losses
-     * @param int $playerWinner Player's desire to play for winner (1-10)
-     * @param int $playerTradition Player's value of team tradition (1-10)
-     * @param int $playerLoyalty Player's loyalty factor (1-10)
-     * @param int $playerSecurity Player's desire for security (1-10)
-     * @param int $playerPlayingTime Player's desire for playing time (1-10)
+     * @param int $playerWinner Player's desire to play for winner (1-5)
+     * @param int $playerTradition Player's value of team tradition (1-5)
+     * @param int $playerLoyalty Player's loyalty factor (1-5)
+     * @param int $playerSecurity Player's desire for security (1-5)
+     * @param int $playerPlayingTime Player's desire for playing time (1-5)
      * @param string $teamName Offering team
      * @param string $playerTeamName Player's current team
      * @param int $yearsInOffer Years in contract offer
@@ -214,22 +198,6 @@ class FreeAgencyDemandCalculator
      */
     public function getPlayerDemands(string $playerName): array
     {
-        $databaseService = new \Services\DatabaseService();
-        $escapedPlayerName = $databaseService->escapeString($this->db, $playerName);
-        
-        $query = "SELECT dem1, dem2, dem3, dem4, dem5, dem6 
-                  FROM ibl_demands 
-                  WHERE name='$escapedPlayerName'";
-        $result = $this->db->sql_query($query);
-        $demands = $this->db->sql_fetchrow($result);
-        
-        return [
-            'dem1' => (int) ($demands['dem1'] ?? 0),
-            'dem2' => (int) ($demands['dem2'] ?? 0),
-            'dem3' => (int) ($demands['dem3'] ?? 0),
-            'dem4' => (int) ($demands['dem4'] ?? 0),
-            'dem5' => (int) ($demands['dem5'] ?? 0),
-            'dem6' => (int) ($demands['dem6'] ?? 0),
-        ];
+        return $this->repository->getPlayerDemands($playerName);
     }
 }

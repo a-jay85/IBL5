@@ -17,7 +17,7 @@ class FreeAgencyDisplayHelper
 {
     private $db;
     private \Services\DatabaseService $databaseService;
-    private array $capData;
+    private array $capMetrics;
     private $team;
     private $season;
 
@@ -27,7 +27,7 @@ class FreeAgencyDisplayHelper
         $this->team = $team;
         $this->season = $season;
         $this->databaseService = new \Services\DatabaseService();
-        $this->initializeCapData();
+        $this->initializeCapMetrics();
     }
 
     /**
@@ -35,10 +35,10 @@ class FreeAgencyDisplayHelper
      * 
      * @return void
      */
-    private function initializeCapData(): void
+    private function initializeCapMetrics(): void
     {
-        $capCalculator = new FreeAgencyCapCalculator($this->db);
-        $this->capData = $capCalculator->calculateTeamCapSpace($this->team);
+        $capCalculator = new FreeAgencyCapCalculator($this->db, $this->team);
+        $this->capMetrics = $capCalculator->calculateTeamCapMetrics();
     }
 
     /**
@@ -112,9 +112,9 @@ class FreeAgencyDisplayHelper
     <tfoot>
         <tr>
             <td colspan="29" align="right"><b><i><?= htmlspecialchars($this->team->name) ?> Total Salary</i></b></td>
-            <?php for ($i = 1; $i <= 6; $i++): ?>
-                <td><b><i><?= htmlspecialchars($this->capData["year{$i}TotalSalary"]) ?></i></b></td>
-            <?php endfor; ?>
+            <?php foreach ($this->capMetrics['totalSalaries'] as $salary): ?>
+                <td><b><i><?= htmlspecialchars($salary) ?></i></b></td>
+            <?php endforeach; ?>
         </tr>
     </tfoot>
 </table>
@@ -164,9 +164,9 @@ class FreeAgencyDisplayHelper
     <tfoot>
         <tr>
             <td colspan="29" align="right"><b><i><?= htmlspecialchars($this->team->name) ?> Total Salary Plus Contract Offers</i></b></td>
-            <?php for ($i = 1; $i <= 6; $i++): ?>
-                <td><b><i><?= htmlspecialchars($this->capData["year{$i}TotalSalary"]) ?></i></b></td>
-            <?php endfor; ?>
+            <?php foreach ($this->capMetrics['totalSalaries'] as $salary): ?>
+                <td><b><i><?= htmlspecialchars($salary) ?></i></b></td>
+            <?php endforeach; ?>
         </tr>
         <?= $this->renderCapSpaceFooter() ?>
     </tfoot>
@@ -200,7 +200,7 @@ class FreeAgencyDisplayHelper
             ?>
         <tr>
             <td>
-                <?php if ($this->capData['rosterspots1'] > 0): ?>
+                <?php if ($this->capMetrics['rosterSpots'][0] > 0): ?>
                     <a href="modules.php?name=Free_Agency&pa=negotiate&pid=<?= htmlspecialchars($player->playerID) ?>">Negotiate</a>
                 <?php endif; ?>
             </td>
@@ -428,25 +428,25 @@ class FreeAgencyDisplayHelper
     <td align="center"><?= $MLEicon ?></td>
     <td colspan="19" bgcolor="#eeeeee"></td>
     <td colspan="8" align="right"><font color="white"><b>Soft Cap Space</b></font></td>
-    <?php for ($i = 1; $i <= 6; $i++): ?>
-        <td><?= htmlspecialchars($this->capData["year{$i}AvailableSoftCap"]) ?></td>
-    <?php endfor; ?>
+    <?php foreach ($this->capMetrics['softCapSpace'] as $capSpace): ?>
+        <td><?= htmlspecialchars($capSpace) ?></td>
+    <?php endforeach; ?>
 </tr>
 <tr bgcolor="#cc0000">
     <td align="right"><font color="white"><b>LLE:</b></font></td>
     <td align="center"><?= $LLEicon ?></td>
     <td colspan="19" bgcolor="#eeeeee"></td>
     <td colspan="8" align="right"><font color="white"><b>Hard Cap Space</b></font></td>
-    <?php for ($i = 1; $i <= 6; $i++): ?>
-        <td><?= htmlspecialchars($this->capData["year{$i}AvailableHardCap"]) ?></td>
-    <?php endfor; ?>
+    <?php foreach ($this->capMetrics['hardCapSpace'] as $capSpace): ?>
+        <td><?= htmlspecialchars($capSpace) ?></td>
+    <?php endforeach; ?>
 </tr>
 <tr bgcolor="#cc0000">
     <td colspan="21" bgcolor="#eeeeee"></td>
     <td colspan="8" align="right"><font color="white"><b>Empty Roster Slots</b></font></td>
-    <?php for ($i = 1; $i <= 6; $i++): ?>
-        <td><?= htmlspecialchars($this->capData["rosterspots{$i}"]) ?></td>
-    <?php endfor; ?>
+    <?php foreach ($this->capMetrics['rosterSpots'] as $spots): ?>
+        <td><?= htmlspecialchars($spots) ?></td>
+    <?php endforeach; ?>
 </tr>
         <?php
         return ob_get_clean();

@@ -53,8 +53,8 @@ class FreeAgencyNegotiationHelper
         // Initialize ViewHelper with actual team and player
         $this->viewHelper = new FreeAgencyViewHelper($team->name, $player);
         
-        $capCalculator = new FreeAgencyCapCalculator($this->db);
-        $capData = $capCalculator->calculateNegotiationCapAndRosterData($team, $player->name);
+        $capCalculator = new FreeAgencyCapCalculator($this->db, $team);
+        $capMetrics = $capCalculator->calculateTeamCapMetrics($player->name);
         
         $demands = $this->calculator->getPlayerDemands($player->name);
         $veteranMinimum = \ContractRules::getVeteranMinimumSalary($player->yearsOfExperience);
@@ -64,7 +64,7 @@ class FreeAgencyNegotiationHelper
         $existingOffer = $this->getExistingOffer($team->name, $player->name);
         
         // Adjust cap space to account for existing offer
-        $amendedCapSpace = $capData['softCap']['year1'] + $existingOffer['offer1'];
+        $amendedCapSpace = $capMetrics['softCapSpace'][0] + $existingOffer['offer1'];
         
         // Check if there's an existing offer
         $hasExistingOffer = $existingOffer['offer1'] > 0;
@@ -80,7 +80,7 @@ class FreeAgencyNegotiationHelper
 
 Here are my demands (note these are not adjusted for your team's attributes; I will adjust the offer you make to me accordingly):
 
-<?php if ($capData['rosterSpots'] < 1 && !$hasExistingOffer): ?>
+<?php if ($capMetrics['rosterSpots'][0] < 1 && !$hasExistingOffer): ?>
     <table cellspacing="0" border="1">
         <tr>
             <td colspan="8">Sorry, you have no roster spots remaining and cannot offer me a contract!</td>
@@ -112,7 +112,7 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
         
         <?= $this->renderOfferButtons($player) ?>
         
-        <?= $this->renderNotesReminders($maxContract, $veteranMinimum, $amendedCapSpace, $capData, $player->birdYears) ?>
+        <?= $this->renderNotesReminders($maxContract, $veteranMinimum, $amendedCapSpace, $capMetrics, $player->birdYears) ?>
         
         <?php if ($hasExistingOffer): ?>
         <tr>
@@ -219,7 +219,7 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
      * @param int $maxContract Maximum contract value
      * @param int $veteranMinimum Veteran minimum salary
      * @param int $amendedCapSpace Amended cap space for year 1
-     * @param array<string, mixed> $capData Cap space data
+     * @param array<string, mixed> $capMetrics Cap space data
      * @param int $birdYears Bird rights years
      * @return string HTML table row
      */
@@ -227,21 +227,11 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
         int $maxContract,
         int $veteranMinimum,
         int $amendedCapSpace,
-        array $capData,
+        array $capMetrics,
         int $birdYears
     ): string {
-        $hardCapYear1 = $capData['hardCap']['year1'];
-        $hardCapYear2 = $capData['hardCap']['year2'];
-        $hardCapYear3 = $capData['hardCap']['year3'];
-        $hardCapYear4 = $capData['hardCap']['year4'];
-        $hardCapYear5 = $capData['hardCap']['year5'];
-        $hardCapYear6 = $capData['hardCap']['year6'];
-        
-        $softCapYear2 = $capData['softCap']['year2'];
-        $softCapYear3 = $capData['softCap']['year3'];
-        $softCapYear4 = $capData['softCap']['year4'];
-        $softCapYear5 = $capData['softCap']['year5'];
-        $softCapYear6 = $capData['softCap']['year6'];
+        $softCapSpace = $capMetrics['softCapSpace'];
+        $hardCapSpace = $capMetrics['hardCapSpace'];
         
         // Calculate raise percentage and example based on bird years (matching validator logic)
         $raisePercentage = \ContractRules::getMaxRaisePercentage($birdYears);
@@ -264,17 +254,12 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
         <ul>
             <li>The maximum contract permitted for me (based on my years of service) starts at <?= htmlspecialchars($maxContract) ?> in Year 1.</li>
             <li>You have <b><?= htmlspecialchars($amendedCapSpace) ?></b> in <b>soft cap</b> space available; the amount you offer in year 1 cannot exceed this unless you are using one of the exceptions.</li>
-            <li>You have <b><?= htmlspecialchars($softCapYear2) ?></b> in <b>soft cap</b> space available; the amount you offer in year 2 cannot exceed this unless you are using one of the exceptions.</li>
-            <li>You have <b><?= htmlspecialchars($softCapYear3) ?></b> in <b>soft cap</b> space available; the amount you offer in year 3 cannot exceed this unless you are using one of the exceptions.</li>
-            <li>You have <b><?= htmlspecialchars($softCapYear4) ?></b> in <b>soft cap</b> space available; the amount you offer in year 4 cannot exceed this unless you are using one of the exceptions.</li>
-            <li>You have <b><?= htmlspecialchars($softCapYear5) ?></b> in <b>soft cap</b> space available; the amount you offer in year 5 cannot exceed this unless you are using one of the exceptions.</li>
-            <li>You have <b><?= htmlspecialchars($softCapYear6) ?></b> in <b>soft cap</b> space available; the amount you offer in year 6 cannot exceed this unless you are using one of the exceptions.</li>
-            <li>You have <b><?= htmlspecialchars($hardCapYear1) ?></b> in <b>hard cap</b> space available; the amount you offer in year 1 cannot exceed this.</li>
-            <li>You have <b><?= htmlspecialchars($hardCapYear2) ?></b> in <b>hard cap</b> space available; the amount you offer in year 2 cannot exceed this.</li>
-            <li>You have <b><?= htmlspecialchars($hardCapYear3) ?></b> in <b>hard cap</b> space available; the amount you offer in year 3 cannot exceed this.</li>
-            <li>You have <b><?= htmlspecialchars($hardCapYear4) ?></b> in <b>hard cap</b> space available; the amount you offer in year 4 cannot exceed this.</li>
-            <li>You have <b><?= htmlspecialchars($hardCapYear5) ?></b> in <b>hard cap</b> space available; the amount you offer in year 5 cannot exceed this.</li>
-            <li>You have <b><?= htmlspecialchars($hardCapYear6) ?></b> in <b>hard cap</b> space available; the amount you offer in year 6 cannot exceed this.</li>
+            <?php for ($year = 1; $year < 6; $year++): ?>
+            <li>You have <b><?= htmlspecialchars($softCapSpace[$year]) ?></b> in <b>soft cap</b> space available; the amount you offer in year <?= $year + 1 ?> cannot exceed this unless you are using one of the exceptions.</li>
+            <?php endfor; ?>
+            <?php for ($year = 0; $year < 6; $year++): ?>
+            <li>You have <b><?= htmlspecialchars($hardCapSpace[$year]) ?></b> in <b>hard cap</b> space available; the amount you offer in year <?= $year + 1 ?> cannot exceed this.</li>
+            <?php endfor; ?>
             <li>Enter "0" for years you do not want to offer a contract.</li>
             <li>The amounts offered each year must equal or exceed the previous year.</li>
             <li>The first year of the contract must be at least the veteran's minimum (<?= htmlspecialchars($veteranMinimum) ?> for this player).</li>

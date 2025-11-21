@@ -96,13 +96,13 @@ class FreeAgencyProcessor
         
         // Reconstruct cap space data
         $team = \Team::initialize($this->db, $teamName);
-        $capCalculator = new FreeAgencyCapCalculator($this->db);
-        $capData = $capCalculator->calculateNegotiationCapAndRosterData($team, $player->name);
+        $capCalculator = new FreeAgencyCapCalculator($this->db, $team);
+        $capMetrics = $capCalculator->calculateTeamCapMetrics($player->name);
         
         // Get existing offer to calculate amended cap space
         $helper = new FreeAgencyNegotiationHelper($this->db);
         $existingOffer = $helper->getExistingOffer($teamName, $player->name);
-        $amendedCapSpaceYear1 = $capData['softCap']['year1'] + $existingOffer['offer1'];
+        $amendedCapSpaceYear1 = $capMetrics['softCapSpace'][0] + $existingOffer['offer1'];
         
         $offerType = (int) ($postData['offerType'] ?? 0);
         

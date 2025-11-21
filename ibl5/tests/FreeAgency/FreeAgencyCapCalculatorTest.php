@@ -20,64 +20,59 @@ class FreeAgencyCapCalculatorTest extends TestCase
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
-        $this->calculator = new FreeAgencyCapCalculator($this->mockDb);
+        $mockTeam = $this->createMockTeam();
+        $this->calculator = new FreeAgencyCapCalculator($this->mockDb, $mockTeam);
     }
 
     /**
      * @group cap-calculator
      * @group cap-space
      */
-    public function testCalculateTeamCapSpaceReturnsAllRequiredKeys(): void
+    public function testCalculateTeamCapMetricsReturnsAllRequiredKeys(): void
     {
-        // Arrange
-        $team = $this->createMockTeam();
+        // Arrange - Team is already set up in setUp()
         
         // Act
-        $result = $this->calculator->calculateTeamCapSpace($team);
+        $result = $this->calculator->calculateTeamCapMetrics();
         
         // Assert - All required keys present
-        $this->assertArrayHasKey('year1TotalSalary', $result);
-        $this->assertArrayHasKey('year2TotalSalary', $result);
-        $this->assertArrayHasKey('year3TotalSalary', $result);
-        $this->assertArrayHasKey('year4TotalSalary', $result);
-        $this->assertArrayHasKey('year5TotalSalary', $result);
-        $this->assertArrayHasKey('year6TotalSalary', $result);
+        $this->assertArrayHasKey('totalSalaries', $result);
+        $this->assertArrayHasKey('softCapSpace', $result);
+        $this->assertArrayHasKey('hardCapSpace', $result);
+        $this->assertArrayHasKey('rosterSpots', $result);
         
-        $this->assertArrayHasKey('year1AvailableSoftCap', $result);
-        $this->assertArrayHasKey('year2AvailableSoftCap', $result);
-        $this->assertArrayHasKey('year3AvailableSoftCap', $result);
-        $this->assertArrayHasKey('year4AvailableSoftCap', $result);
-        $this->assertArrayHasKey('year5AvailableSoftCap', $result);
-        $this->assertArrayHasKey('year6AvailableSoftCap', $result);
-        
-        $this->assertArrayHasKey('year1AvailableHardCap', $result);
-        $this->assertArrayHasKey('rosterspots1', $result);
+        // Assert arrays contain 6 years
+        $this->assertCount(6, $result['totalSalaries']);
+        $this->assertCount(6, $result['softCapSpace']);
+        $this->assertCount(6, $result['hardCapSpace']);
+        $this->assertCount(6, $result['rosterSpots']);
     }
 
     /**
      * @group cap-calculator
      * @group cap-space
      */
-    public function testCalculateTeamCapSpaceWithNoPlayers(): void
+    public function testCalculateTeamCapMetricsWithNoPlayers(): void
     {
         // Arrange - Team with no players under contract
         $team = $this->createMockTeamWithPlayers([]);
+        $calculator = new FreeAgencyCapCalculator($this->mockDb, $team);
         
         // Act
-        $result = $this->calculator->calculateTeamCapSpace($team);
+        $result = $calculator->calculateTeamCapMetrics();
         
         // Assert - Should have full cap space and max roster spots
-        $this->assertEquals(0, $result['year1TotalSalary']);
-        $this->assertEquals(League::SOFT_CAP_MAX, $result['year1AvailableSoftCap']);
-        $this->assertEquals(League::HARD_CAP_MAX, $result['year1AvailableHardCap']);
-        $this->assertEquals(Team::ROSTER_SPOTS_MAX, $result['rosterspots1']);
+        $this->assertEquals(0, $result['totalSalaries'][0]);
+        $this->assertEquals(League::SOFT_CAP_MAX, $result['softCapSpace'][0]);
+        $this->assertEquals(League::HARD_CAP_MAX, $result['hardCapSpace'][0]);
+        $this->assertEquals(Team::ROSTER_SPOTS_MAX, $result['rosterSpots'][0]);
     }
 
     /**
      * @group cap-calculator
      * @group offers
      */
-    public function testCalculateTeamCapSpaceIncludesOffers(): void
+    public function testCalculateTeamCapMetricsIncludesOffers(): void
     {
         // Arrange
         $players = [];
@@ -93,19 +88,20 @@ class FreeAgencyCapCalculatorTest extends TestCase
         ];
         
         $team = $this->createMockTeamWithPlayersAndOffers($players, $offers);
+        $calculator = new FreeAgencyCapCalculator($this->mockDb, $team);
         
         // Act
-        $result = $this->calculator->calculateTeamCapSpace($team);
+        $result = $calculator->calculateTeamCapMetrics();
         
         // Assert - Offers should count toward cap and roster spots
-        $this->assertEquals(800, $result['year1TotalSalary']);
-        $this->assertEquals(850, $result['year2TotalSalary']);
-        $this->assertEquals(900, $result['year3TotalSalary']);
+        $this->assertEquals(800, $result['totalSalaries'][0]);
+        $this->assertEquals(850, $result['totalSalaries'][1]);
+        $this->assertEquals(900, $result['totalSalaries'][2]);
         
-        $this->assertEquals(Team::ROSTER_SPOTS_MAX - 1, $result['rosterspots1']);
-        $this->assertEquals(Team::ROSTER_SPOTS_MAX - 1, $result['rosterspots2']);
-        $this->assertEquals(Team::ROSTER_SPOTS_MAX - 1, $result['rosterspots3']);
-        $this->assertEquals(Team::ROSTER_SPOTS_MAX, $result['rosterspots4']);
+        $this->assertEquals(Team::ROSTER_SPOTS_MAX - 1, $result['rosterSpots'][0]);
+        $this->assertEquals(Team::ROSTER_SPOTS_MAX - 1, $result['rosterSpots'][1]);
+        $this->assertEquals(Team::ROSTER_SPOTS_MAX - 1, $result['rosterSpots'][2]);
+        $this->assertEquals(Team::ROSTER_SPOTS_MAX, $result['rosterSpots'][3]);
     }
 
     /**
@@ -114,18 +110,17 @@ class FreeAgencyCapCalculatorTest extends TestCase
      */
     public function testHardCapIsAlwaysGreaterThanSoftCap(): void
     {
-        // Arrange
-        $team = $this->createMockTeam();
+        // Arrange - Team is already set up in setUp()
         
         // Act
-        $result = $this->calculator->calculateTeamCapSpace($team);
+        $result = $this->calculator->calculateTeamCapMetrics();
         
         // Assert
-        for ($i = 1; $i <= 6; $i++) {
+        for ($i = 0; $i < 6; $i++) {
             $this->assertGreaterThan(
-                $result["year{$i}AvailableSoftCap"],
-                $result["year{$i}AvailableHardCap"],
-                "Hard cap should be greater than soft cap for year {$i}"
+                $result['softCapSpace'][$i],
+                $result['hardCapSpace'][$i],
+                "Hard cap should be greater than soft cap for year " . ($i + 1)
             );
         }
     }
@@ -134,65 +129,66 @@ class FreeAgencyCapCalculatorTest extends TestCase
      * @group cap-calculator
      * @group negotiation
      */
-    public function testCalculateNegotiationCapAndRosterDataReturnsAllRequiredKeys(): void
+    public function testCalculateTeamCapMetricsWithExcludedPlayerReturnsAllRequiredKeys(): void
     {
-        // Arrange
-        $team = $this->createMockTeam();
+        // Arrange - Team is already set up in setUp()
         
         // Act
-        $result = $this->calculator->calculateNegotiationCapAndRosterData($team, 'Test Player');
+        $result = $this->calculator->calculateTeamCapMetrics('Test Player');
         
         // Assert
-        $this->assertArrayHasKey('softCap', $result);
-        $this->assertArrayHasKey('hardCap', $result);
+        $this->assertArrayHasKey('totalSalaries', $result);
+        $this->assertArrayHasKey('softCapSpace', $result);
+        $this->assertArrayHasKey('hardCapSpace', $result);
         $this->assertArrayHasKey('rosterSpots', $result);
         
-        $this->assertArrayHasKey('year1', $result['softCap']);
-        $this->assertArrayHasKey('year6', $result['softCap']);
-        $this->assertArrayHasKey('year1', $result['hardCap']);
-        $this->assertArrayHasKey('year6', $result['hardCap']);
+        // Assert arrays contain 6 years
+        $this->assertCount(6, $result['totalSalaries']);
+        $this->assertCount(6, $result['softCapSpace']);
+        $this->assertCount(6, $result['hardCapSpace']);
+        $this->assertCount(6, $result['rosterSpots']);
     }
 
     /**
      * @group cap-calculator
      * @group negotiation
      */
-    public function testCalculateNegotiationCapAndRosterDataExcludesPlayerOffer(): void
+    public function testCalculateTeamCapMetricsExcludesPlayerOffer(): void
     {
-        // Arrange - Set up mock to return offer for specific player
+        // Arrange - Set up mock team with offer for specific player
         $team = $this->createMockTeamWithOfferToExclude('Test Player', 1000);
+        $calculator = new FreeAgencyCapCalculator($this->mockDb, $team);
         
         // Act
-        $result = $this->calculator->calculateNegotiationCapAndRosterData($team, 'Test Player');
+        $result = $calculator->calculateTeamCapMetrics('Test Player');
         
         // Assert - Cap space should not include the excluded player's offer
-        $this->assertIsInt($result['softCap']['year1']);
-        $this->assertIsInt($result['rosterSpots']);
+        $this->assertIsInt($result['softCapSpace'][0]);
+        $this->assertIsArray($result['rosterSpots']);
+        $this->assertCount(6, $result['rosterSpots']);
     }
 
     /**
      * @group cap-calculator
      * @group negotiation
      */
-    public function testNegotiationHardCapExceedsSoftCapByBuffer(): void
+    public function testCapSpaceHardCapExceedsSoftCapByBuffer(): void
     {
-        // Arrange
-        $team = $this->createMockTeam();
+        // Arrange - Team is already set up in setUp()
         
         // Act
-        $result = $this->calculator->calculateNegotiationCapAndRosterData($team, 'Test Player');
+        $result = $this->calculator->calculateTeamCapMetrics('Test Player');
         
         // Assert
         $buffer = League::HARD_CAP_MAX - League::SOFT_CAP_MAX;
         
-        for ($i = 1; $i <= 6; $i++) {
-            $yearKey = "year{$i}";
-            $expectedHardCap = $result['softCap'][$yearKey] + $buffer;
+        for ($i = 0; $i < 6; $i++) {
+            $expectedHardCap = $result['softCapSpace'][$i] + $buffer;
             
             $this->assertEquals(
                 $expectedHardCap,
-                $result['hardCap'][$yearKey],
-                "Hard cap should be soft cap + buffer for {$yearKey}"
+                $result['hardCapSpace'][$i],
+                "Hard cap should be soft cap + buffer for year " . ($i + 1)
             );
         }
     }
@@ -253,15 +249,15 @@ class FreeAgencyCapCalculatorTest extends TestCase
     /**
      * Create a mock team with an offer to exclude from negotiation cap space
      */
-    private function createMockTeamWithOfferToExclude(string $excludePlayerName, int $offerAmount)
+    private function createMockTeamWithOfferToExclude(string $excludePlayerName, int $offerAmount): \Team
     {
-        // Mock database to return empty result for excluded player query
-        $this->mockDb->setMockData([]);
-        
-        $team = $this->createMock(Team::class);
+        $team = $this->createMock(\Team::class);
         $team->name = 'Test Team';
         
         $team->method('getRosterUnderContractOrderedByOrdinalResult')
+            ->willReturn([]);
+        
+        $team->method('getFreeAgencyOffersResult')
             ->willReturn([]);
         
         return $team;

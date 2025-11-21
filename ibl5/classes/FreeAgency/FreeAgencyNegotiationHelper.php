@@ -149,10 +149,7 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
             <td colspan="8"><center><b>MAX SALARY OFFERS:</b></center></td>
         </tr>
         
-        <?= $this->renderMaxContractRow($team->name, $player, $maxContract, $veteranMinimum, $amendedCapSpace, $capData) ?>
-        <?= $this->renderMLERow($team->name, $player, $veteranMinimum, $amendedCapSpace, $capData) ?>
-        <?= $this->renderLLERow($team->name, $player, $veteranMinimum, $amendedCapSpace, $capData) ?>
-        <?= $this->renderVetMinRow($team->name, $player, $veteranMinimum, $amendedCapSpace, $capData) ?>
+        <?= $this->renderOfferButtons($team->name, $player, $maxContract, $veteranMinimum, $amendedCapSpace, $capData) ?>
         
         <?= $this->renderNotesReminders($maxContract, $veteranMinimum, $amendedCapSpace, $capData, $player->birdYears) ?>
         
@@ -174,7 +171,7 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
     }
 
     /**
-     * Render max contract offer row
+     * Render all offer button rows (Max Contract, MLE, LLE, Vet Min)
      * 
      * @param string $teamName
      * @param Player $player
@@ -182,9 +179,9 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
      * @param int $veteranMinimum
      * @param int $amendedCapSpace
      * @param array<string, mixed> $capData
-     * @return string HTML table row
+     * @return string HTML table rows
      */
-    private function renderMaxContractRow(
+    private function renderOfferButtons(
         string $teamName,
         Player $player,
         int $maxContract,
@@ -192,6 +189,11 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
         int $amendedCapSpace,
         array $capData
     ): string {
+        $formData = $this->buildFormData($teamName, $player, $veteranMinimum, $amendedCapSpace, $capData);
+        
+        ob_start();
+        
+        // Max Contract row
         $maxRaise = (int) round($maxContract * 0.1);
         $maxSalaries = [
             1 => $maxContract,
@@ -201,87 +203,23 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
             5 => $maxContract + ($maxRaise * 4),
             6 => $maxContract + ($maxRaise * 5),
         ];
+        echo $this->viewHelper->renderMaxContractButtons($formData, $maxSalaries);
         
-        $formData = $this->buildFormData($teamName, $player, $veteranMinimum, $amendedCapSpace, $capData);
-        
-        return $this->viewHelper->renderMaxContractButtons($formData, $maxSalaries);
-    }
-
-    /**
-     * Render MLE offer row
-     * 
-     * @param string $teamName
-     * @param Player $player
-     * @param int $veteranMinimum
-     * @param int $amendedCapSpace
-     * @param array<string, mixed> $capData
-     * @return string HTML table row
-     */
-    private function renderMLERow(
-        string $teamName,
-        Player $player,
-        int $veteranMinimum,
-        int $amendedCapSpace,
-        array $capData
-    ): string {
-        $formData = $this->buildFormData($teamName, $player, $veteranMinimum, $amendedCapSpace, $capData);
-        
-        ob_start();
+        // MLE row
         echo "<tr>";
         echo $this->viewHelper->renderExceptionButtons($formData, 'MLE');
         echo "</tr>";
-        return ob_get_clean();
-    }
-
-    /**
-     * Render LLE offer row
-     * 
-     * @param string $teamName
-     * @param Player $player
-     * @param int $veteranMinimum
-     * @param int $amendedCapSpace
-     * @param array<string, mixed> $capData
-     * @return string HTML table row
-     */
-    private function renderLLERow(
-        string $teamName,
-        Player $player,
-        int $veteranMinimum,
-        int $amendedCapSpace,
-        array $capData
-    ): string {
-        $formData = $this->buildFormData($teamName, $player, $veteranMinimum, $amendedCapSpace, $capData);
         
-        ob_start();
+        // LLE row
         echo "<tr>";
         echo $this->viewHelper->renderExceptionButtons($formData, 'LLE');
         echo "</tr>";
-        return ob_get_clean();
-    }
-
-    /**
-     * Render Vet Min offer row
-     * 
-     * @param string $teamName
-     * @param Player $player
-     * @param int $veteranMinimum
-     * @param int $amendedCapSpace
-     * @param array<string, mixed> $capData
-     * @return string HTML table row
-     */
-    private function renderVetMinRow(
-        string $teamName,
-        Player $player,
-        int $veteranMinimum,
-        int $amendedCapSpace,
-        array $capData
-    ): string {
-        $formData = $this->buildFormData($teamName, $player, $veteranMinimum, $amendedCapSpace, $capData);
         
-        ob_start();
+        // Vet Min row
         echo "<tr>";
         echo $this->viewHelper->renderExceptionButtons($formData, 'VET');
         echo "</tr>";
+        
         return ob_get_clean();
     }
 

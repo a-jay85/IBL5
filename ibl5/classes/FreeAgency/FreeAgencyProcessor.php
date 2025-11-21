@@ -16,7 +16,6 @@ class FreeAgencyProcessor
     private $db;
     private FreeAgencyOfferValidator $validator;
     private FreeAgencyDemandCalculator $calculator;
-    private FreeAgencyViewHelper $viewHelper;
     private \Services\DatabaseService $databaseService;
 
     public function __construct($db)
@@ -24,7 +23,6 @@ class FreeAgencyProcessor
         $this->db = $db;
         $this->validator = new FreeAgencyOfferValidator($db);
         $this->calculator = new FreeAgencyDemandCalculator($db);
-        $this->viewHelper = new FreeAgencyViewHelper();
         $this->databaseService = new \Services\DatabaseService();
     }
 
@@ -94,7 +92,7 @@ class FreeAgencyProcessor
         // Parse offer amounts based on exception type
         if (OfferType::isVeteranMinimum($offerType)) {
             // Veteran's minimum
-            $offer1 = (int) ($postData['vetmin'] ?? FreeAgencyNegotiationHelper::VETERAN_MINIMUM_SALARIES[$player->yearsOfExperience]);
+            $offer1 = (int) ($postData['vetmin'] ?? 35);
             $offer2 = 0;
             $offer3 = 0;
             $offer4 = 0;

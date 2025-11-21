@@ -211,7 +211,7 @@ class FreeAgencyDisplayHelper
             <td><a href="modules.php?name=Team&op=team&teamID=<?= htmlspecialchars($player->teamID) ?>"><?= htmlspecialchars($player->teamName) ?></a></td>
             <td><?= htmlspecialchars($player->age) ?></td>
             <?= $this->renderPlayerRatings($player) ?>
-            <?= $this->renderPlayerDemands($player, $demands) ?>
+            <?= $this->renderPlayerDemands($demands) ?>
             <?= $this->renderPlayerPreferences($player) ?>
         </tr>
             <?php endif; ?>
@@ -257,7 +257,7 @@ class FreeAgencyDisplayHelper
             <td><a href="modules.php?name=Team&op=team&teamID=<?= htmlspecialchars($player->teamID) ?>"><?= htmlspecialchars($player->teamName) ?></a></td>
             <td><?= htmlspecialchars($player->age) ?></td>
             <?= $this->renderPlayerRatings($player) ?>
-            <?= $this->renderPlayerDemands($player, $demands) ?>
+            <?= $this->renderPlayerDemands($demands) ?>
             <?= $this->renderPlayerPreferences($player) ?>
         </tr>
             <?php endif; ?>
@@ -394,11 +394,10 @@ class FreeAgencyDisplayHelper
     /**
      * Render player demands cells
      * 
-     * @param Player $player
      * @param array<string, mixed> $demands
      * @return string HTML table cells
      */
-    private function renderPlayerDemands(Player $player, array $demands): string
+    private function renderPlayerDemands(array $demands): string
     {
         ob_start();
         if ($demands['dem1'] != 0) echo "<td>" . htmlspecialchars($demands['dem1']) . "</td>"; else echo "<td></td>";

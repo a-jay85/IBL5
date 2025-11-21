@@ -171,7 +171,6 @@ class FreeAgencyOfferValidator
             
             if ($currentOffer > $previousOffer + $maxRaise) {
                 $legalOffer = $previousOffer + $maxRaise;
-                $raisePercentDisplay = ($raisePercentage * 100);
                 
                 return [
                     'valid' => false,

@@ -107,7 +107,7 @@ class FreeAgencyProcessor
         $capMetrics = $capCalculator->calculateTeamCapMetrics($player->name);
         
         // Get existing offer to calculate amended cap space
-        $helper = new FreeAgencyNegotiationHelper($this->db);
+        $helper = new FreeAgencyNegotiationHelper($this->db, $this->season);
         $existingOffer = $helper->getExistingOffer($team->name, $player->name);
         $amendedCapSpaceYear1 = $capMetrics['softCapSpace'][0] + $existingOffer['offer1'];
         

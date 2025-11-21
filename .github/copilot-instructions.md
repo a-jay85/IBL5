@@ -404,6 +404,85 @@ if ($result) { ... }
 
 **Linter standards:** PHP_CodeSniffer (PSR-12). All warnings/errors must be resolved before PR completion.
 
+#### Constructor Argument Validation (CRITICAL - ZERO TOLERANCE)
+
+**This is a frequent source of runtime errors. EVERY instantiation must be verified.**
+
+**Before any class instantiation in refactored code, the Copilot agent MUST:**
+
+1. **Find the class constructor** - Locate the `__construct()` method signature
+2. **Count required parameters** - Identify which parameters are mandatory vs optional
+3. **Verify argument count** - Ensure every instantiation passes the correct number of arguments
+4. **Check argument types** - Ensure each argument matches the declared type
+5. **Update all instantiations** - If a constructor changes, update EVERY call site
+6. **Document changes** - If modifying a constructor signature, search for all usages
+
+**Common Patterns to Check:**
+
+```php
+// ❌ WRONG - Missing required $season parameter
+$helper = new FreeAgencyNegotiationHelper($this->db);
+// Constructor expects: __construct($db, \Season $season, $mysqli_db = null)
+
+// ✅ CORRECT - All required parameters provided
+$helper = new FreeAgencyNegotiationHelper($this->db, $this->season);
+
+// ❌ WRONG - Wrong number of arguments
+$processor = new FreeAgencyProcessor($db, $mysqli_db, $extraParam);
+// Constructor expects: __construct($db, $mysqli_db = null)
+
+// ✅ CORRECT - Optional parameter handling
+$processor = new FreeAgencyProcessor($db);              // OK - $mysqli_db is optional
+$processor = new FreeAgencyProcessor($db, $mysqli_db);  // OK - provide it if needed
+```
+
+**Verification Checklist:**
+
+Before finalizing ANY refactoring:
+- [ ] Search for every instantiation of modified classes: `grep_search "new ClassName"`
+- [ ] For each match, verify the constructor signature at the class definition
+- [ ] Count required parameters vs arguments provided in each instantiation
+- [ ] Check that optional parameters (with defaults) are truly optional
+- [ ] Verify argument types match parameter types in PHPDoc and type hints
+- [ ] Run full test suite to catch runtime errors early
+- [ ] Check error logs for `ArgumentCountError` or `TypeError` exceptions
+
+**Error Pattern Recognition:**
+
+Watch for these exact error messages that indicate argument count mismatches:
+
+```
+ArgumentCountError: Too few arguments to function ClassName::__construct()
+ArgumentCountError: Too many arguments to function ClassName::__construct()
+TypeError: Argument X must be of type Y, Z given
+```
+
+**Search Strategy for Refactored Classes:**
+
+When modifying a class constructor, always follow this search pattern:
+```bash
+grep_search "new ClassName"  # Find all instantiations
+grep_search "ClassName::"    # Find all static method calls
+grep_search "ClassName->"    # Find all property accesses (less critical but verify types)
+```
+
+**Real-World Example - Free Agency Refactoring:**
+
+The error that was fixed:
+```
+// FreeAgencyNegotiationHelper::__construct($db, \Season $season, $mysqli_db = null)
+// ❌ WRONG - Called with 1 argument
+new FreeAgencyNegotiationHelper($this->db);
+
+// ✅ CORRECT - Called with 2 required arguments
+new FreeAgencyNegotiationHelper($this->db, $this->season);
+```
+
+This was caught because:
+1. Constructor signature requires `$season` parameter
+2. All instantiations must provide it
+3. The fix was applied to line 110 of FreeAgencyProcessor.php
+
 #### Laravel Migration Compatibility
 - Use PHP 8 union types (compatible with Laravel 10+)
 - Prefer PHP 8+ features over PHP 7.4 syntax
@@ -560,10 +639,57 @@ When dependencies are cached, tests run via:
 
 ```bash
 cd ibl5
-phpunit                                    # Run all tests
-phpunit tests/Player/                      # Run specific test suite
-phpunit --filter testRenderPlayerHeader    # Run specific test
+vendor/bin/phpunit                                    # Run all tests
+vendor/bin/phpunit tests/Player/                      # Run specific test suite
+vendor/bin/phpunit --filter testRenderPlayerHeader    # Run specific test
 ```
+
+#### PHPUnit Command Syntax (CRITICAL)
+
+**The version of PHPUnit in this project (12.4.3) has DIFFERENT command-line options than older versions.**
+
+**Common Command Syntax Errors to AVOID:**
+
+```bash
+# ❌ WRONG - These options don't exist in PHPUnit 12.4.3
+vendor/bin/phpunit -v                      # ❌ Unknown option "-v"
+vendor/bin/phpunit --verbose               # ❌ Unknown option "--verbose"
+vendor/bin/phpunit -c phpunit.xml          # ❌ Unknown option "-c"
+vendor/bin/phpunit --configuration file    # ❌ Unknown option "--configuration"
+vendor/bin/phpunit --coverage-html dir     # ❌ Unknown option "--coverage-html"
+vendor/bin/phpunit tests/ -v               # ❌ Combines invalid option with path
+
+# ✅ CORRECT - PHPUnit 12.4.3 compatible syntax
+vendor/bin/phpunit tests/Player/           # Run specific test suite
+vendor/bin/phpunit --filter testName       # Run tests matching filter
+vendor/bin/phpunit --help                  # Show available options
+```
+
+**Valid PHPUnit 12.4.3 Options:**
+
+```bash
+# Test selection
+vendor/bin/phpunit                         # Run all tests (default)
+vendor/bin/phpunit tests/Player/           # Run specific directory
+vendor/bin/phpunit tests/Player/PlayerTest.php  # Run specific file
+
+# Filtering and selection
+vendor/bin/phpunit --filter testMethodName # Run tests matching pattern
+vendor/bin/phpunit --testsuite suiteName   # Run specific test suite
+
+# Output control
+vendor/bin/phpunit --quiet                 # Minimal output
+vendor/bin/phpunit --debug                 # Debug output
+vendor/bin/phpunit --help                  # Show all available options
+```
+
+**Reference:** Check available options with `vendor/bin/phpunit --help` before using unknown flags.
+
+**DO NOT:**
+- Use short flags like `-v`, `-c`, `-d` without checking `--help`
+- Assume PHPUnit 12.4.3 accepts the same options as PHPUnit 9.x or 10.x
+- Combine invalid options with valid commands
+- Skip running `--help` when unsure about option syntax
 
 ### Verifying Setup
 

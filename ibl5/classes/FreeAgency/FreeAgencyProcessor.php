@@ -57,7 +57,7 @@ class FreeAgencyProcessor
         }
         
         // Parse offer data
-        $offerData = $this->parseOfferData($teamName, $player);
+        $offerData = $this->parseOfferData($teamName, $player, $postData);
         
         // Validate the offer
         $validationResult = $this->validator->validateOffer($offerData);
@@ -82,11 +82,12 @@ class FreeAgencyProcessor
      * Reconstructs all derived values (vetmin, max, cap space) from playerID and teamName.
      * Only user input (offer amounts, offerType) comes from POST data.
      * 
-     * @param array<string, mixed> $postData POST data
+     * @param string $teamName Team name
      * @param \Player\Player $player Player object
+     * @param array<string, mixed> $postData POST data from offer form
      * @return array<string, mixed> Parsed offer data
      */
-    private function parseOfferData(string $teamName, \Player\Player $player): array
+    private function parseOfferData(string $teamName, \Player\Player $player, array $postData): array
     {
         // Reconstruct derived values from player object
         $birdYears = $player->teamName == $teamName ? $player->birdYears : 0;

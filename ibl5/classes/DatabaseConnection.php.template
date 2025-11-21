@@ -1,0 +1,208 @@
+<?php
+/**
+ * DATABASE CONNECTION TEMPLATE
+ * 
+ * IMPORTANT: This is a TEMPLATE file. Before running tests, you must:
+ * 
+ * 1. Copy this file: cp DatabaseConnection.php.template DatabaseConnection.php
+ * 2. Replace the placeholder credentials with your actual MAMP database credentials
+ * 3. The actual DatabaseConnection.php file is in .gitignore and will never be committed
+ * 
+ * Location: ibl5/classes/DatabaseConnection.php
+ * 
+ * This file provides a unified interface for accessing the local MAMP MySQL database
+ * from tests and the codebase. It handles:
+ * - Connection pooling (singleton pattern)
+ * - Prepared statements
+ * - Error handling
+ * - Result fetching
+ */
+
+declare(strict_types=1);
+
+class DatabaseConnection
+{
+    private static ?mysqli $connection = null;
+    private static ?array $credentials = null;
+
+    /**
+     * Get database credentials for local MAMP database
+     * 
+     * NOTE: These credentials are hardcoded for test/development use only.
+     * This file is in .gitignore and MUST NEVER BE COMMITTED to the repository.
+     * 
+     * To set up this file:
+     * 1. Find your credentials in ibl5/config.php ($dbuname, $dbpass, $dbname)
+     * 2. Replace REPLACE_ME_* placeholders below with your credentials
+     * 3. Save as ibl5/classes/DatabaseConnection.php
+     * 
+     * @return array{user: string, pass: string, db: string}
+     */
+    private static function getCredentials(): array
+    {
+        // Return cached credentials if already loaded
+        if (self::$credentials !== null) {
+            return self::$credentials;
+        }
+        
+        // *** REPLACE THESE WITH YOUR MAMP DATABASE CREDENTIALS ***
+        // Get values from ibl5/config.php ($dbuname, $dbpass, $dbname)
+        self::$credentials = [
+            'user' => 'REPLACE_ME_USERNAME',      // Your MySQL username
+            'pass' => 'REPLACE_ME_PASSWORD',      // Your MySQL password
+            'db' => 'REPLACE_ME_DATABASE'         // Your database name
+        ];
+        
+        return self::$credentials;
+    }
+
+    /**
+     * Get the mysqli connection to the local MAMP database
+     * 
+     * Credentials are stored in this file (which is in .gitignore).
+     * 
+     * @return mysqli The database connection
+     * @throws RuntimeException If connection fails
+     */
+    public static function getConnection(): mysqli
+    {
+        if (self::$connection === null) {
+            $creds = self::getCredentials();
+            
+            self::$connection = new mysqli(
+                'localhost',
+                $creds['user'],
+                $creds['pass'],
+                $creds['db'],
+                3306,
+                '/Applications/MAMP/tmp/mysql/mysql.sock'
+            );
+
+            if (self::$connection->connect_error) {
+                throw new RuntimeException(
+                    "Database connection failed: " . self::$connection->connect_error
+                );
+            }
+
+            self::$connection->set_charset('utf8mb4');
+        }
+
+        return self::$connection;
+    }
+
+    /**
+     * Fetch a single row from the database
+     * 
+     * @param string $query SQL query with ? placeholders for prepared statements
+     * @param array $params Optional parameters to bind to the query
+     * @return array|null The row as an associative array, or null if not found
+     */
+    public static function fetchRow(string $query, array $params = []): ?array
+    {
+        $connection = self::getConnection();
+        
+        $stmt = $connection->prepare($query);
+        if ($stmt === false) {
+            throw new RuntimeException("Prepare failed: " . $connection->error);
+        }
+
+        if (!empty($params)) {
+            $types = str_repeat('s', count($params));
+            $stmt->bind_param($types, ...$params);
+        }
+
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        return $result->fetch_assoc();
+    }
+
+    /**
+     * Fetch multiple rows from the database
+     * 
+     * @param string $query SQL query with ? placeholders for prepared statements
+     * @param array $params Optional parameters to bind to the query
+     * @return array Array of rows as associative arrays
+     */
+    public static function fetchAll(string $query, array $params = []): array
+    {
+        $connection = self::getConnection();
+        
+        $stmt = $connection->prepare($query);
+        if ($stmt === false) {
+            throw new RuntimeException("Prepare failed: " . $connection->error);
+        }
+
+        if (!empty($params)) {
+            $types = str_repeat('s', count($params));
+            $stmt->bind_param($types, ...$params);
+        }
+
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        $rows = [];
+        while ($row = $result->fetch_assoc()) {
+            $rows[] = $row;
+        }
+        
+        return $rows;
+    }
+
+    /**
+     * Fetch a single value from the database
+     * 
+     * @param string $query SQL query that returns a single value
+     * @param array $params Optional parameters to bind to the query
+     * @return string|int|float|null The single value
+     */
+    public static function fetchValue(string $query, array $params = []): string|int|float|null
+    {
+        $row = self::fetchRow($query, $params);
+        if ($row === null) {
+            return null;
+        }
+        
+        return array_values($row)[0] ?? null;
+    }
+
+    /**
+     * Test the database connection
+     * 
+     * @return bool True if connection succeeds, false otherwise
+     */
+    public static function testConnection(): bool
+    {
+        try {
+            self::getConnection();
+            return true;
+        } catch (Exception) {
+            return false;
+        }
+    }
+
+    /**
+     * Get connection status information
+     * 
+     * @return array{connected: bool, host: string, database: string, version: string|null}
+     */
+    public static function getStatus(): array
+    {
+        try {
+            $connection = self::getConnection();
+            return [
+                'connected' => true,
+                'host' => $connection->get_server_info() ? 'localhost' : 'unknown',
+                'database' => $connection->get_server_info() ? 'iblhoops_ibl5' : 'unknown',
+                'version' => $connection->get_server_info()
+            ];
+        } catch (Exception $e) {
+            return [
+                'connected' => false,
+                'host' => 'localhost',
+                'database' => 'iblhoops_ibl5',
+                'version' => null
+            ];
+        }
+    }
+}

@@ -51,7 +51,7 @@ class FreeAgencyProcessor
         }
         
         // Parse offer data
-        $offerData = $this->parseOfferData($postData, $player);
+        $offerData = $this->parseOfferData($teamName, $player);
         
         // Validate the offer
         $validationResult = $this->validator->validateOffer($offerData);
@@ -80,10 +80,8 @@ class FreeAgencyProcessor
      * @param \Player\Player $player Player object
      * @return array<string, mixed> Parsed offer data
      */
-    private function parseOfferData(array $postData, \Player\Player $player): array
+    private function parseOfferData(string $teamName, \Player\Player $player): array
     {
-        $teamName = $postData['teamname'] ?? '';
-        
         // Reconstruct derived values from player object
         $birdYears = $player->teamName == $teamName ? $player->birdYears : 0;
         $veteranMinimum = \ContractRules::getVeteranMinimumSalary($player->yearsOfExperience);

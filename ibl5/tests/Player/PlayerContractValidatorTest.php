@@ -274,4 +274,59 @@ class PlayerContractValidatorTest extends TestCase
         
         $this->assertFalse($result, 'Players with exactly 4 years of experience (> 3) should not be eligible');
     }
+
+    public function testIsPlayerFreeAgentWhenFreeThisSeason()
+    {
+        $playerData = new PlayerData();
+        $playerData->draftYear = 2020;
+        $playerData->yearsOfExperience = 1;
+        $playerData->contractTotalYears = 2;
+        $playerData->contractCurrentYear = 1;
+        
+        // Free agent year = 2020 + 1 + 2 - 1 = 2022
+        $season = $this->createMockSeason(2022);
+        
+        $result = $this->validator->isPlayerFreeAgent($playerData, $season);
+        
+        $this->assertTrue($result, 'Player should be free agent when calculation equals season ending year');
+    }
+
+    public function testIsPlayerFreeAgentWhenNotFreeThisSeason()
+    {
+        $playerData = new PlayerData();
+        $playerData->draftYear = 2020;
+        $playerData->yearsOfExperience = 1;
+        $playerData->contractTotalYears = 2;
+        $playerData->contractCurrentYear = 1;
+        
+        // Free agent year = 2020 + 1 + 2 - 1 = 2022, but season is 2023
+        $season = $this->createMockSeason(2023);
+        
+        $result = $this->validator->isPlayerFreeAgent($playerData, $season);
+        
+        $this->assertFalse($result, 'Player should not be free agent when calculation does not equal season ending year');
+    }
+
+    public function testIsPlayerFreeAgentWithRookieContract()
+    {
+        $playerData = new PlayerData();
+        $playerData->draftYear = 2020;
+        $playerData->yearsOfExperience = 0;
+        $playerData->contractTotalYears = 3;
+        $playerData->contractCurrentYear = 0;
+        
+        // Free agent year = 2020 + 0 + 3 - 0 = 2023
+        $season = $this->createMockSeason(2023);
+        
+        $result = $this->validator->isPlayerFreeAgent($playerData, $season);
+        
+        $this->assertTrue($result, 'Rookie should become free agent after contract expires');
+    }
+
+    private function createMockSeason($endingYear)
+    {
+        $season = $this->createMock(\Season::class);
+        $season->endingYear = $endingYear;
+        return $season;
+    }
 }

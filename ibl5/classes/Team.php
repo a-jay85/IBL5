@@ -33,6 +33,7 @@ class Team
     public $seasonRecord;
 
     const BUYOUT_PERCENTAGE_MAX = 0.40;
+    const ROSTER_SPOTS_MAX = 15;
 
     public function __construct()
     {

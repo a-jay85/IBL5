@@ -269,6 +269,19 @@ class Player
         return $this->contractCalculator->getTotalRemainingSalary($this->playerData);
     }
 
+    /**
+     * Get future salaries for the next 6 contract years
+     * 
+     * Returns the remaining contract years starting from the current contract year,
+     * padded with zeros to always return a 6-element array.
+     * 
+     * @return array<int> Future salaries for years 1-6
+     */
+    public function getFutureSalaries(): array
+    {
+        return $this->contractCalculator->getFutureSalaries($this->playerData);
+    }
+
     public function canRenegotiateContract()
     {
         return $this->contractValidator->canRenegotiateContract($this->playerData);
@@ -282,6 +295,11 @@ class Player
     public function getFinalYearRookieContractSalary()
     {
         return $this->contractValidator->getFinalYearRookieContractSalary($this->playerData);
+    }
+
+    public function isPlayerFreeAgent($season)
+    {
+        return $this->contractValidator->isPlayerFreeAgent($this->playerData, $season);
     }
 
     public function wasRookieOptioned()

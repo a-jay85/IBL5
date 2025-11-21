@@ -1,72 +1,42 @@
 # Development Guide
 
-**Status:** 13/23 IBL modules refactored • 52 test files • ~40% coverage • Goal: 80%
+**Status:** 14/23 IBL modules refactored (61% complete) • 476+ tests • ~45% coverage • Goal: 80%
 
 ## Refactoring Status
 
-### ✅ Completed IBL Modules (13)
-1. ~~Player~~ ✅ Complete (9 classes, 6 tests) - Core player management & display
-2. ~~Statistics~~ ✅ Complete (6 classes, 5 tests) - Stats formatting & sanitization
-3. ~~Team~~ ✅ Complete (4 classes, 3 tests) - Team management
-4. ~~Draft~~ ✅ Complete (5 classes, 3 tests) - Draft operations
-5. ~~Waivers~~ ✅ Complete (5 classes, 3 tests) - Waiver system
-6. ~~Extension~~ ✅ Complete (4 classes, 4 tests) - Contract extensions
-7. ~~RookieOption~~ ✅ Complete (4 classes, 3 tests) - Rookie contract options
-8. ~~Trading~~ ✅ Complete (5 classes, 5 tests) - Trade processing
-9. ~~Negotiation~~ ✅ Complete (4 classes, 3 tests) - Contract negotiations
-10. ~~DepthChart~~ ✅ Complete (6 classes, 2 tests) - Depth chart management
-11. ~~Voting~~ ✅ Complete (3 classes, 0 tests) - Award voting
-12. ~~Schedule~~ ✅ Complete (2 classes, 0 tests) - Game scheduling
-13. ~~Season Leaders~~ ✅ Complete (3 classes, 2 tests) - Season-long statistical leaders
+### ✅ Completed IBL Modules (14)
+1. ~~Player~~ ✅ Complete (9 classes, 6 tests)
+2. ~~Statistics~~ ✅ Complete (6 classes, 5 tests)
+3. ~~Team~~ ✅ Complete (4 classes, 3 tests)
+4. ~~Draft~~ ✅ Complete (5 classes, 3 tests)
+5. ~~Waivers~~ ✅ Complete (5 classes, 3 tests)
+6. ~~Extension~~ ✅ Complete (4 classes, 4 tests)
+7. ~~RookieOption~~ ✅ Complete (4 classes, 3 tests)
+8. ~~Trading~~ ✅ Complete (5 classes, 5 tests)
+9. ~~Negotiation~~ ✅ Complete (4 classes, 3 tests)
+10. ~~DepthChart~~ ✅ Complete (6 classes, 2 tests)
+11. ~~Voting~~ ✅ Complete (3 classes, 0 tests)
+12. ~~Schedule~~ ✅ Complete (2 classes, 0 tests)
+13. ~~Season Leaders~~ ✅ Complete (3 classes, 2 tests)
+14. ~~Free Agency~~ ✅ Complete (7 classes, 11 tests) **NEW**
 
-### 🎯 Top Priorities (Next 3 Modules)
+### 🎯 Top Priorities (Next 3)
 
-1. **Free Agency** (2,206 lines) - Contract signing, FA offers, salary cap validation
-   - **Complexity:** Very High - Business logic for contract offers, salary cap, FA bidding
-   - **Business Value:** Critical - Core gameplay mechanic for team building
-   - **Tech Debt:** High - Legacy SQL, no prepared statements, mixed concerns
-   - **Estimated Effort:** 3-4 weeks
+1. **One-on-One** (887 lines) - Player comparison tool (1-2 weeks)
+2. **Leaderboards** (264 lines) - Statistical rankings (1 week)
+3. **Stats Modules** - Batch refactoring (3-5 weeks)
 
-2. **One-on-One** (887 lines) - Player comparison/matchup feature
-   - **Complexity:** Medium - Display logic, stats comparison
-   - **Business Value:** High - Frequently used by users
-   - **Tech Debt:** Medium - Legacy code patterns
-   - **Estimated Effort:** 1-2 weeks
+### 📋 Remaining IBL Modules (9)
 
-3. **Leaderboards** (264 lines) - Various statistical leaderboards
-   - **Complexity:** Medium - Stats queries, display formatting
-   - **Business Value:** High - Important for competitive engagement
-   - **Tech Debt:** Medium - Can leverage Statistics classes (similar to Season Leaders)
-   - **Estimated Effort:** 1 week
-
-### 📋 Remaining IBL Modules (10)
-
-**Medium Priority (Display/Stats):**
-- Chunk_Stats (462 lines) - Statistical chunks/periods
-- Player_Search (461 lines) - Player search functionality
-- Compare_Players (403 lines) - Player comparison tool
-- Searchable_Stats (370 lines) - Advanced stats search
-- League_Stats (351 lines) - League-wide statistics
-- Leaderboards (264 lines) - Various leaderboards
+**High Priority (Next After Top 3):**
+- Compare_Players (403 lines)
+- Player_Search (461 lines)
+- Searchable_Stats (370 lines)
+- League_Stats (351 lines)
+- Chunk_Stats (462 lines)
 
 **Lower Priority (Info/Display):**
-- Series_Records (179 lines) - Historical series data
-- Player_Awards (159 lines) - Award history display
-- Cap_Info (136 lines) - Salary cap information
-- Team_Schedule (129 lines) - Team schedule display
-- Franchise_History (103 lines) - Team history
-- Power_Rankings (101 lines) - Power rankings display
-- Next_Sim (94 lines) - Next simulation info
-- League_Starters (85 lines) - Starting lineups
-- Draft_Pick_Locator (79 lines) - Draft pick finder
-- Injuries (57 lines) - Injury reports
-- EOY_Results (40 lines) - End of year results
-- ASG_Results (40 lines) - All-star game results
-- ASG_Stats (221 lines) - All-star game statistics
-- Player_Movement (35 lines) - Transaction history
-
-**Not IBL-Specific (Lowest Priority - Generic PHP-Nuke):**
-- Web_Links, Your_Account, News, AutoTheme, Content, Donate, FAQ, Topics, Search, Submit_News, Members_List, Top, Stories_Archive, Recommend_Us, Feedback, AvantGo (81,000+ total lines)
+- Series_Records, Player_Awards, Cap_Info, Team_Schedule, Franchise_History, Power_Rankings, Next_Sim, League_Starters, Draft_Pick_Locator, Injuries, EOY_Results, ASG_Results, ASG_Stats, Player_Movement
 
 ## Quick Workflow
 

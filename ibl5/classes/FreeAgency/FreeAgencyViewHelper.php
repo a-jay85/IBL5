@@ -230,8 +230,8 @@ class FreeAgencyViewHelper
         $buttonConfigs = [];
         for ($years = 1; $years <= 6; $years++) {
             $buttonConfigs[] = [
-                'offers' => array_slice(FreeAgencyNegotiationHelper::MLE_OFFERS, 0, $years),
-                'MLEyrs' => (string) $years,
+                'offers' => array_slice(OfferType::MLE_OFFERS, 0, $years),
+                'offerType' => (string) $years,
             ];
         }
         
@@ -253,8 +253,8 @@ class FreeAgencyViewHelper
     {
         $buttonConfigs = [
             [
-                'offers' => [FreeAgencyNegotiationHelper::LLE_OFFER],
-                'MLEyrs' => '7',
+                'offers' => [OfferType::LLE_OFFER],
+                'offerType' => (string) OfferType::LOWER_LEVEL_EXCEPTION,
             ],
         ];
         
@@ -280,7 +280,7 @@ class FreeAgencyViewHelper
         $buttonConfigs = [
             [
                 'offers' => [(int) $vetMin],
-                'MLEyrs' => '8',
+                'offerType' => (string) OfferType::VETERAN_MINIMUM,
             ],
         ];
         
@@ -297,7 +297,7 @@ class FreeAgencyViewHelper
      * 
      * @param string $label Label text for the first cell
      * @param array<string, mixed> $formData Base form data
-     * @param array<array{offers: array<int>, MLEyrs?: string}> $buttonConfigs Array of button configurations
+     * @param array<array{offers: array<int>, offerType?: string}> $buttonConfigs Array of button configurations
      * @param int $fillCells Number of empty cells to add at end
      * @return string HTML table row content
      */
@@ -309,8 +309,8 @@ class FreeAgencyViewHelper
         
         foreach ($buttonConfigs as $config) {
             $configFormData = $formData;
-            if (isset($config['MLEyrs'])) {
-                $configFormData = array_merge($formData, ['MLEyrs' => $config['MLEyrs']]);
+            if (isset($config['offerType'])) {
+                $configFormData = array_merge($formData, ['offerType' => $config['offerType']]);
             }
             
             $finalYear = count($config['offers']);

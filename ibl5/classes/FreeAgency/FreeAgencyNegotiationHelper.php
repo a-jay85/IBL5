@@ -57,27 +57,6 @@ class FreeAgencyNegotiationHelper
         0  => 1063,  // 0-6 years
     ];
 
-    /**
-     * Lower-Level Exception offer amount (LLE)
-     * 
-     * This represents the maximum salary for a LLE contract offer.
-     * Available to teams with cap space and limited MLE eligibility.
-     * 
-     * @var int
-     */
-    public const LLE_OFFER = 145;
-
-    /**
-     * Mid-Level Exception offer amounts for a 6-year contract
-     * 
-     * These represent the MLE salary amounts for each year of a maximum 6-year contract.
-     * Each year has a 10% raise from the previous year.
-     * For contracts shorter than 6 years, use array_slice to get the appropriate years.
-     * 
-     * @var array<int>
-     */
-    public const MLE_OFFERS = [450, 495, 540, 585, 630, 675];
-
     private $db;
     private \Services\DatabaseService $databaseService;
     private FreeAgencyViewHelper $viewHelper;
@@ -161,7 +140,7 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
             <input type="hidden" name="playername" value="<?= htmlspecialchars($player->name) ?>">
             <input type="hidden" name="bird" value="<?= htmlspecialchars($player->birdYears) ?>">
             <input type="hidden" name="vetmin" value="<?= htmlspecialchars($veteranMinimum) ?>">
-            <input type="hidden" name="MLEyrs" value="0">
+            <input type="hidden" name="offerType" value="0">
             
             <td><input type="submit" value="Offer/Amend Free Agent Contract!"></td>
         </tr>

@@ -87,10 +87,10 @@ class FreeAgencyProcessor
             $birdYears = 0;
         }
         
-        $mleYears = (int) ($postData['MLEyrs'] ?? 0);
+        $offerType = (int) ($postData['offerType'] ?? 0);
         
         // Parse offer amounts based on exception type
-        if ($mleYears == 8) {
+        if (OfferType::isVeteranMinimum($offerType)) {
             // Veteran's minimum
             $offer1 = (int) ($postData['vetmin'] ?? 35);
             $offer2 = 0;
@@ -98,23 +98,23 @@ class FreeAgencyProcessor
             $offer4 = 0;
             $offer5 = 0;
             $offer6 = 0;
-        } elseif ($mleYears == 7) {
+        } elseif (OfferType::isLLE($offerType)) {
             // Lower-Level Exception
-            $offer1 = FreeAgencyNegotiationHelper::LLE_OFFER;
+            $offer1 = OfferType::LLE_OFFER;
             $offer2 = 0;
             $offer3 = 0;
             $offer4 = 0;
             $offer5 = 0;
             $offer6 = 0;
-        } elseif ($mleYears >= 1 && $mleYears <= 6) {
+        } elseif (OfferType::isMLE($offerType)) {
             // Mid-Level Exception
-            $mleOffers = [450, 495, 540, 585, 630, 675];
+            $mleOffers = OfferType::MLE_OFFERS;
             $offer1 = $mleOffers[0];
-            $offer2 = $mleYears >= 2 ? $mleOffers[1] : 0;
-            $offer3 = $mleYears >= 3 ? $mleOffers[2] : 0;
-            $offer4 = $mleYears >= 4 ? $mleOffers[3] : 0;
-            $offer5 = $mleYears >= 5 ? $mleOffers[4] : 0;
-            $offer6 = $mleYears >= 6 ? $mleOffers[5] : 0;
+            $offer2 = $offerType >= 2 ? $mleOffers[1] : 0;
+            $offer3 = $offerType >= 3 ? $mleOffers[2] : 0;
+            $offer4 = $offerType >= 4 ? $mleOffers[3] : 0;
+            $offer5 = $offerType >= 5 ? $mleOffers[4] : 0;
+            $offer6 = $offerType >= 6 ? $mleOffers[5] : 0;
         } else {
             // Custom offer
             $offer1 = (int) ($postData['offeryear1'] ?? 0);
@@ -133,7 +133,8 @@ class FreeAgencyProcessor
             'offer5' => $offer5,
             'offer6' => $offer6,
             'birdYears' => $birdYears,
-            'mleYears' => $mleYears,
+            'mleYears' => $offerType,
+            'offerType' => $offerType,
             'vetmin' => (int) ($postData['vetmin'] ?? 35),
             'year1Max' => (int) ($postData['max'] ?? 1063),
             'amendedCapSpaceYear1' => (int) ($postData['amendedCapSpaceYear1'] ?? 0),
@@ -176,8 +177,8 @@ class FreeAgencyProcessor
         );
         
         // Determine MLE/LLE flags
-        $mle = ($offerData['mleYears'] >= 1 && $offerData['mleYears'] <= 6) ? 1 : 0;
-        $lle = ($offerData['mleYears'] == 7) ? 1 : 0;
+        $mle = OfferType::isMLE($offerData['offerType']) ? 1 : 0;
+        $lle = OfferType::isLLE($offerData['offerType']) ? 1 : 0;
         
         // Calculate modifier and random for storage (extract from perceived value calculation)
         $modifier = $perceivedValue / $offerAverage; // Approximate
@@ -186,17 +187,17 @@ class FreeAgencyProcessor
         // Insert the new offer
         $insertQuery = "INSERT INTO ibl_fa_offers 
                         (name, team, offer1, offer2, offer3, offer4, offer5, offer6, 
-                         modifier, random, perceivedvalue, mle, lle) 
+                         modifier, random, perceivedvalue, mle, lle, offer_type) 
                         VALUES 
                         ('$escapedPlayerName', '$escapedTeamName', 
                          {$offerData['offer1']}, {$offerData['offer2']}, {$offerData['offer3']}, 
                          {$offerData['offer4']}, {$offerData['offer5']}, {$offerData['offer6']}, 
-                         $modifier, $random, $perceivedValue, $mle, $lle)";
+                         $modifier, $random, $perceivedValue, $mle, $lle, {$offerData['offerType']})";
         
         $result = $this->db->sql_query($insertQuery);
         
         // Post to Discord if significant offer
-        if ($result && $offerData['offer1'] > FreeAgencyNegotiationHelper::LLE_OFFER) {
+        if ($result && $offerData['offer1'] > OfferType::LLE_OFFER) {
             $this->postOfferToDiscord($teamName, $playerName, $playerTeamName);
         }
         

@@ -24,7 +24,7 @@ class FreeAgencyProcessor
         $this->db = $db;
         $this->validator = new FreeAgencyOfferValidator($db);
         $this->calculator = new FreeAgencyDemandCalculator($db);
-        $this->viewHelper = new FreeAgencyViewHelper($db);
+        $this->viewHelper = new FreeAgencyViewHelper();
         $this->databaseService = new \Services\DatabaseService();
     }
 

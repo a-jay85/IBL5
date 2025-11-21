@@ -10,13 +10,8 @@ namespace FreeAgency;
  */
 class FreeAgencyViewHelper
 {
-    private $db;
-    private \Services\DatabaseService $databaseService;
-
-    public function __construct($db)
+    public function __construct()
     {
-        $this->db = $db;
-        $this->databaseService = new \Services\DatabaseService();
     }
 
     /**

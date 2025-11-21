@@ -66,7 +66,7 @@ class FreeAgencyNegotiationHelper
     {
         $this->db = $db;
         $this->databaseService = new \Services\DatabaseService();
-        $this->viewHelper = new FreeAgencyViewHelper($db);
+        $this->viewHelper = new FreeAgencyViewHelper();
         $this->calculator = new FreeAgencyDemandCalculator($db);
     }
 

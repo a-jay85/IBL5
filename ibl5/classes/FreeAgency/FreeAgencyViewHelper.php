@@ -87,10 +87,9 @@ class FreeAgencyViewHelper
      * Render demand display for negotiation form
      * 
      * @param array{dem1: int, dem2: int, dem3: int, dem4: int, dem5: int, dem6: int} $demands Player demands
-     * @param int $playerExperience Years of experience
      * @return string HTML table cells
      */
-    public function renderDemandDisplay(array $demands, int $playerExperience): string
+    public function renderDemandDisplay(array $demands): string
     {
         ob_start();
         
@@ -108,11 +107,10 @@ class FreeAgencyViewHelper
     /**
      * Render offer input fields
      * 
-     * @param int $playerExperience Years of experience
      * @param array<string, int> $prefills Pre-filled offer values
      * @return string HTML input fields
      */
-    public function renderOfferInputs(int $playerExperience, array $prefills): string
+    public function renderOfferInputs(array $prefills): string
     {
         ob_start();
         ?>
@@ -204,10 +202,9 @@ class FreeAgencyViewHelper
      * 
      * @param array<string, mixed> $formData Form data
      * @param string $exceptionType Type of exception (MLE, LLE, VET)
-     * @param int $playerExperience Years of experience
      * @return string HTML form buttons
      */
-    public function renderExceptionButtons(array $formData, string $exceptionType, int $playerExperience): string
+    public function renderExceptionButtons(array $formData, string $exceptionType): string
     {
         ob_start();
         

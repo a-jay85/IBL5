@@ -138,13 +138,13 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
     <table cellspacing="0" border="1">
         <tr>
             <td>My demands are:</td>
-            <td><?= $this->viewHelper->renderDemandDisplay($demands, $player->yearsOfExperience) ?></td>
+            <td><?= $this->viewHelper->renderDemandDisplay($demands) ?></td>
         </tr>
         
         <form name="FAOffer" method="post" action="modules.php?name=Free_Agency&pa=processoffer">
         <tr>
             <td>Please enter your offer in this row:</td>
-            <td><?= $this->viewHelper->renderOfferInputs($player->yearsOfExperience, $existingOffer) ?></td>
+            <td><?= $this->viewHelper->renderOfferInputs($existingOffer) ?></td>
             
             <input type="hidden" name="amendedCapSpaceYear1" value="<?= htmlspecialchars($amendedCapSpace) ?>">
             <input type="hidden" name="capnumber" value="<?= htmlspecialchars($capData['softCap']['year1']) ?>">
@@ -250,7 +250,7 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
         
         ob_start();
         echo "<tr>";
-        echo $this->viewHelper->renderExceptionButtons($formData, 'MLE', $player->yearsOfExperience);
+        echo $this->viewHelper->renderExceptionButtons($formData, 'MLE');
         echo "</tr>";
         return ob_get_clean();
     }
@@ -276,7 +276,7 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
         
         ob_start();
         echo "<tr>";
-        echo $this->viewHelper->renderExceptionButtons($formData, 'LLE', $player->yearsOfExperience);
+        echo $this->viewHelper->renderExceptionButtons($formData, 'LLE');
         echo "</tr>";
         return ob_get_clean();
     }
@@ -302,7 +302,7 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
         
         ob_start();
         echo "<tr>";
-        echo $this->viewHelper->renderExceptionButtons($formData, 'VET', $player->yearsOfExperience);
+        echo $this->viewHelper->renderExceptionButtons($formData, 'VET');
         echo "</tr>";
         return ob_get_clean();
     }

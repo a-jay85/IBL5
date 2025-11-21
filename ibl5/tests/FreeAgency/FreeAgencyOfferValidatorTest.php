@@ -243,6 +243,7 @@ class FreeAgencyOfferValidatorTest extends TestCase
             'vetmin' => 35,
             'year1Max' => \ContractRules::getMaxContractSalary(0),
             'amendedCapSpaceYear1' => 1000,
+            'offerType' => 0,
         ];
     }
 }

@@ -237,12 +237,15 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
         
         // Calculate raise percentage and example based on bird years (matching validator logic)
         $raisePercentage = \ContractRules::getMaxRaisePercentage($birdYears);
-        $exampleRaise = (int) round(500 * $raisePercentage);
+        $raisePercentageDisplay = (int)($raisePercentage * 100);
+        $exampleSalary = 500;
+        $exampleRaise = (int) round($exampleSalary * $raisePercentage);
         
-        if ($raisePercentage >= 0.125) {
-            $birdRightsText = "<b>Bird Rights Player on Your Team:</b> You may add no more than 12.5% of the amount you offer in the first year as a raise between years (for instance, if you offer 500 in Year 1, you cannot offer a raise of more than {$exampleRaise} between any two subsequent years.)";
+        $hasBirdRights = \ContractRules::hasBirdRights($birdYears);
+        if ($hasBirdRights) {
+            $birdRightsText = "<b>Bird Rights Player on Your Team:</b> You may add no more than {$raisePercentageDisplay}% of the amount you offer in the first year as a raise between years (for instance, if you offer {$exampleSalary} in Year 1, you cannot offer a raise of more than {$exampleRaise} between any two subsequent years.)";
         } else {
-            $birdRightsText = "<b>For Players who do not have Bird Rights with your team:</b> You may add no more than 10% of the amount you offer in the first year as a raise between years (for instance, if you offer 500 in Year 1, you cannot offer a raise of more than {$exampleRaise} between any two subsequent years.)";
+            $birdRightsText = "<b>For Players who do not have Bird Rights with your team:</b> You may add no more than {$raisePercentageDisplay}% of the amount you offer in the first year as a raise between years (for instance, if you offer {$exampleSalary} in Year 1, you cannot offer a raise of more than {$exampleRaise} between any two subsequent years.)";
         }
         
         ob_start();

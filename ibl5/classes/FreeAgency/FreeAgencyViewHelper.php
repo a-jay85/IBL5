@@ -194,7 +194,6 @@ class FreeAgencyViewHelper
         }
         
         $raisePercentage = \ContractRules::getMaxRaisePercentage($birdYears);
-        var_dump($raisePercentage);
         $raisePercentageDisplay = (int)($raisePercentage * 100);
         $hasBirdRights = \ContractRules::hasBirdRights($birdYears);
         $birdRightsText = $hasBirdRights ? ' with Bird Rights' : '';

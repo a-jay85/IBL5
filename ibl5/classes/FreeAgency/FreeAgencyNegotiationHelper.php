@@ -18,17 +18,22 @@ use Player\PlayerImageHelper;
 class FreeAgencyNegotiationHelper
 {
     private $db;
+    private $mysqli_db;
     private \Services\DatabaseService $databaseService;
     private FreeAgencyViewHelper $viewHelper;
     private FreeAgencyDemandCalculator $calculator;
 
-    public function __construct($db)
+    public function __construct($db, $mysqli_db = null)
     {
+        global $mysqli_db;
+        
         $this->db = $db;
+        $this->mysqli_db = $mysqli_db ?? $GLOBALS['mysqli_db'] ?? null;
+        
         $this->databaseService = new \Services\DatabaseService();
         // Placeholder - will be replaced with actual team/player in renderNegotiationPage
         $this->viewHelper = new FreeAgencyViewHelper('', 0);
-        $repository = new FreeAgencyDemandRepository($db);
+        $repository = new FreeAgencyDemandRepository($db, $this->mysqli_db);
         $this->calculator = new FreeAgencyDemandCalculator($repository);
     }
 

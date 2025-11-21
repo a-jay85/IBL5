@@ -14,15 +14,20 @@ namespace FreeAgency;
 class FreeAgencyProcessor
 {
     private $db;
+    private $mysqli_db;
     private FreeAgencyOfferValidator $validator;
     private FreeAgencyDemandCalculator $calculator;
     private \Services\DatabaseService $databaseService;
 
-    public function __construct($db)
+    public function __construct($db, $mysqli_db = null)
     {
+        global $mysqli_db;
+        
         $this->db = $db;
-        $repository = new FreeAgencyDemandRepository($db);
-        $this->validator = new FreeAgencyOfferValidator($db);
+        $this->mysqli_db = $mysqli_db ?? $GLOBALS['mysqli_db'] ?? null;
+        
+        $repository = new FreeAgencyDemandRepository($db, $this->mysqli_db);
+        $this->validator = new FreeAgencyOfferValidator($db, $this->mysqli_db);
         $this->calculator = new FreeAgencyDemandCalculator($repository);
         $this->databaseService = new \Services\DatabaseService();
     }

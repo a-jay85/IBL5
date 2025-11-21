@@ -8,10 +8,12 @@ namespace FreeAgency;
 class FreeAgencyDemandRepository implements FreeAgencyDemandRepositoryInterface
 {
     private $db;
+    private $mysqli_db;
 
-    public function __construct($db)
+    public function __construct($db, $mysqli_db = null)
     {
         $this->db = $db;
+        $this->mysqli_db = $mysqli_db;
     }
 
     /**
@@ -26,7 +28,7 @@ class FreeAgencyDemandRepository implements FreeAgencyDemandRepositoryInterface
                   FROM ibl_team_info 
                   WHERE team_name = ?";
         
-        $stmt = $this->db->prepare($query);
+        $stmt = $this->mysqli_db->prepare($query);
         $stmt->bind_param('s', $teamName);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -61,7 +63,7 @@ class FreeAgencyDemandRepository implements FreeAgencyDemandRepositoryInterface
                     AND pos = ? 
                     AND pid != ?";
         
-        $stmt = $this->db->prepare($query);
+        $stmt = $this->mysqli_db->prepare($query);
         $stmt->bind_param('ssi', $teamName, $position, $excludePlayerID);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -109,7 +111,7 @@ class FreeAgencyDemandRepository implements FreeAgencyDemandRepositoryInterface
                   FROM ibl_demands 
                   WHERE name = ?";
         
-        $stmt = $this->db->prepare($query);
+        $stmt = $this->mysqli_db->prepare($query);
         $stmt->bind_param('s', $playerName);
         $stmt->execute();
         $result = $stmt->get_result();

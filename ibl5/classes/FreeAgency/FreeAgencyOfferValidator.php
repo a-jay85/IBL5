@@ -15,11 +15,13 @@ namespace FreeAgency;
 class FreeAgencyOfferValidator
 {
     private $db;
+    private $mysqli_db;
     private array $offerData = [];
 
-    public function __construct($db)
+    public function __construct($db, $mysqli_db = null)
     {
         $this->db = $db;
+        $this->mysqli_db = $mysqli_db;
     }
 
     /**
@@ -189,7 +191,7 @@ class FreeAgencyOfferValidator
     public function isPlayerAlreadySigned(int $playerId): bool
     {
         $query = "SELECT cy, cy1 FROM ibl_plr WHERE pid = ?";
-        $stmt = $this->db->prepare($query);
+        $stmt = $this->mysqli_db->prepare($query);
         $stmt->bind_param("i", $playerId);
         $stmt->execute();
         $result = $stmt->get_result();

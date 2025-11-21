@@ -15,6 +15,7 @@ namespace FreeAgency;
 class FreeAgencyOfferValidator
 {
     private $db;
+    private array $offerData = [];
 
     public function __construct($db)
     {
@@ -29,8 +30,10 @@ class FreeAgencyOfferValidator
      */
     public function validateOffer(array $offerData): array
     {
+        $this->offerData = $offerData;
+
         // Check for zero first year
-        if ($offerData['offer1'] == 0) {
+        if ($this->offerData['offer1'] == 0) {
             return [
                 'valid' => false,
                 'error' => 'Sorry, you must enter an amount greater than zero in the first year of a free agency offer. Your offer in Year 1 was zero, so this offer is not valid.'
@@ -38,35 +41,35 @@ class FreeAgencyOfferValidator
         }
 
         // Check veteran's minimum
-        if ($offerData['offer1'] < $offerData['vetmin']) {
+        if ($this->offerData['offer1'] < $this->offerData['vetmin']) {
             return [
                 'valid' => false,
-                'error' => "Sorry, you must enter an amount greater than the Veteran's Minimum in the first year of a free agency offer.<br>Your offer in Year 1 was <b>{$offerData['offer1']}</b>, but should be at least <b>{$offerData['vetmin']}</b>."
+                'error' => "Sorry, you must enter an amount greater than the Veteran's Minimum in the first year of a free agency offer.<br>Your offer in Year 1 was <b>{$this->offerData['offer1']}</b>, but should be at least <b>{$this->offerData['vetmin']}</b>."
             ];
         }
 
         // Check hard cap space
-        $hardCapValidation = $this->validateHardCapSpace($offerData);
+        $hardCapValidation = $this->validateHardCapSpace();
         if (!$hardCapValidation['valid']) {
             return $hardCapValidation;
         }
 
         // Check soft cap space (if no Bird Rights and not using exceptions)
-        if (!\ContractRules::hasBirdRights($offerData['birdYears']) && $offerData['offerType'] == 0) {
-            $softCapValidation = $this->validateSoftCapSpace($offerData);
+        if (!\ContractRules::hasBirdRights($this->offerData['birdYears']) && $this->offerData['offerType'] == 0) {
+            $softCapValidation = $this->validateSoftCapSpace();
             if (!$softCapValidation['valid']) {
                 return $softCapValidation;
             }
         }
 
         // Check maximum contract value
-        $maxContractValidation = $this->validateMaximumContract($offerData);
+        $maxContractValidation = $this->validateMaximumContract();
         if (!$maxContractValidation['valid']) {
             return $maxContractValidation;
         }
 
         // Check raises and contract continuity
-        $raiseValidation = $this->validateRaisesAndContinuity($offerData);
+        $raiseValidation = $this->validateRaisesAndContinuity();
         if (!$raiseValidation['valid']) {
             return $raiseValidation;
         }
@@ -77,17 +80,16 @@ class FreeAgencyOfferValidator
     /**
      * Validate hard cap space for all contract years
      * 
-     * @param array<string, mixed> $offerData
      * @return array{valid: bool, error?: string}
      */
-    private function validateHardCapSpace(array $offerData): array
+    private function validateHardCapSpace(): array
     {
-        $hardCapSpace1 = $offerData['amendedCapSpaceYear1'] + (\League::HARD_CAP_MAX - \League::SOFT_CAP_MAX);
+        $hardCapSpace1 = $this->offerData['amendedCapSpaceYear1'] + (\League::HARD_CAP_MAX - \League::SOFT_CAP_MAX);
         
-        if ($offerData['offer1'] > $hardCapSpace1) {
+        if ($this->offerData['offer1'] > $hardCapSpace1) {
             return [
                 'valid' => false,
-                'error' => "Sorry, you do not have sufficient cap space under the hard cap to make the offer. You offered {$offerData['offer1']} in the first year of the contract, which is more than {$hardCapSpace1}, the amount of hard cap space you have available."
+                'error' => "Sorry, you do not have sufficient cap space under the hard cap to make the offer. You offered {$this->offerData['offer1']} in the first year of the contract, which is more than {$hardCapSpace1}, the amount of hard cap space you have available."
             ];
         }
 
@@ -97,15 +99,14 @@ class FreeAgencyOfferValidator
     /**
      * Validate soft cap space for first year
      * 
-     * @param array<string, mixed> $offerData
      * @return array{valid: bool, error?: string}
      */
-    private function validateSoftCapSpace(array $offerData): array
+    private function validateSoftCapSpace(): array
     {
-        if ($offerData['offer1'] > $offerData['amendedCapSpaceYear1']) {
+        if ($this->offerData['offer1'] > $this->offerData['amendedCapSpaceYear1']) {
             return [
                 'valid' => false,
-                'error' => "Sorry, you do not have sufficient cap space under the soft cap to make the offer. You offered {$offerData['offer1']} in the first year of the contract, which is more than {$offerData['amendedCapSpaceYear1']}, the amount of soft cap space you have available."
+                'error' => "Sorry, you do not have sufficient cap space under the soft cap to make the offer. You offered {$this->offerData['offer1']} in the first year of the contract, which is more than {$this->offerData['amendedCapSpaceYear1']}, the amount of soft cap space you have available."
             ];
         }
 
@@ -115,15 +116,14 @@ class FreeAgencyOfferValidator
     /**
      * Validate maximum contract value
      * 
-     * @param array<string, mixed> $offerData
      * @return array{valid: bool, error?: string}
      */
-    private function validateMaximumContract(array $offerData): array
+    private function validateMaximumContract(): array
     {
-        if ($offerData['offer1'] > $offerData['year1Max']) {
+        if ($this->offerData['offer1'] > $this->offerData['year1Max']) {
             return [
                 'valid' => false,
-                'error' => "Sorry, you tried to offer a contract larger than the maximum allowed for this player based on their years of service. The maximum you are allowed to offer this player is {$offerData['year1Max']} in the first year of their contract."
+                'error' => "Sorry, you tried to offer a contract larger than the maximum allowed for this player based on their years of service. The maximum you are allowed to offer this player is {$this->offerData['year1Max']} in the first year of their contract."
             ];
         }
 
@@ -138,21 +138,20 @@ class FreeAgencyOfferValidator
      * - No salary decreases year-over-year
      * - No gaps in contract years (once a year is 0, all following years must be 0)
      * 
-     * @param array<string, mixed> $offerData
      * @return array{valid: bool, error?: string}
      */
-    private function validateRaisesAndContinuity(array $offerData): array
+    private function validateRaisesAndContinuity(): array
     {
         // Determine max raise percentage
-        $raisePercentage = \ContractRules::getMaxRaisePercentage($offerData['birdYears']);
+        $raisePercentage = \ContractRules::getMaxRaisePercentage($this->offerData['birdYears']);
         
-        $maxRaise = (int) round($offerData['offer1'] * $raisePercentage);
+        $maxRaise = (int) round($this->offerData['offer1'] * $raisePercentage);
         $contractEnded = false;
 
         // Check each year's raise and continuity
         for ($year = 2; $year <= 6; $year++) {
-            $currentOffer = $offerData["offer{$year}"];
-            $previousOffer = $offerData["offer" . ($year - 1)];
+            $currentOffer = $this->offerData["offer{$year}"];
+            $previousOffer = $this->offerData["offer" . ($year - 1)];
             
             // Check if contract ended
             if ($previousOffer == 0) {
@@ -173,7 +172,7 @@ class FreeAgencyOfferValidator
                 
                 return [
                     'valid' => false,
-                    'error' => "Sorry, you tried to offer a larger raise than is permitted. Your first year offer was {$offerData['offer1']} which means the maximum raise allowed each year is {$maxRaise}. Your offer in Year {$year} was {$currentOffer}, which is more than your Year " . ($year - 1) . " offer, {$previousOffer}, plus the max increase of {$maxRaise}. Given your offer in Year " . ($year - 1) . ", the most you can offer in Year {$year} is {$legalOffer}."
+                    'error' => "Sorry, you tried to offer a larger raise than is permitted. Your first year offer was {$this->offerData['offer1']} which means the maximum raise allowed each year is {$maxRaise}. Your offer in Year {$year} was {$currentOffer}, which is more than your Year " . ($year - 1) . " offer, {$previousOffer}, plus the max increase of {$maxRaise}. Given your offer in Year " . ($year - 1) . ", the most you can offer in Year {$year} is {$legalOffer}."
                 ];
             }
         }

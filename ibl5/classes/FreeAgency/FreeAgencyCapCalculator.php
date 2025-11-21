@@ -147,9 +147,20 @@ class FreeAgencyCapCalculator
      */
     public function calculateTeamCapMetrics(?string $excludeOfferPlayerName = null): array
     {
-        // Fetch roster and offers data once, pass to both calculation methods
-        $rosterData = $this->team->getRosterUnderContractOrderedByOrdinalResult();
-        $offersData = $this->team->getFreeAgencyOffersResult();
+        // Fetch roster and offers data once, convert results to arrays
+        $rosterResult = $this->team->getRosterUnderContractOrderedByOrdinalResult();
+        $offersResult = $this->team->getFreeAgencyOffersResult();
+        
+        // Convert mysqli_result to arrays
+        $rosterData = [];
+        foreach ($rosterResult as $row) {
+            $rosterData[] = $row;
+        }
+        
+        $offersData = [];
+        foreach ($offersResult as $row) {
+            $offersData[] = $row;
+        }
         
         $totalSalaries = $this->calculateTotalSalaries($rosterData, $offersData, $excludeOfferPlayerName);
         $rosterSpots = $this->calculateRosterSpots($rosterData, $offersData, $excludeOfferPlayerName);

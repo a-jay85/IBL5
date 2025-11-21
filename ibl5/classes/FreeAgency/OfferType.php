@@ -36,26 +36,6 @@ class OfferType
     public const VETERAN_MINIMUM = 8;
 
     /**
-     * Mid-Level Exception offer amounts for a 6-year contract
-     * 
-     * Each year has a 10% raise from the previous year.
-     * For contracts shorter than 6 years, use array_slice to get the appropriate years.
-     * 
-     * @var array<int>
-     */
-    public const MLE_OFFERS = [450, 495, 540, 585, 630, 675];
-
-    /**
-     * Lower-Level Exception offer amount
-     * 
-     * Maximum salary for a LLE contract offer.
-     * Available to teams with cap space and limited MLE eligibility.
-     * 
-     * @var int
-     */
-    public const LLE_OFFER = 145;
-
-    /**
      * Check if offer type is a Mid-Level Exception
      * 
      * @param int $offerType Offer type constant

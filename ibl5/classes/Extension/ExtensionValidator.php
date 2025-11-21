@@ -20,10 +20,6 @@ class ExtensionValidator
     const MAX_YEAR_ONE_0_TO_6_YEARS = 1063;
     const MAX_YEAR_ONE_7_TO_9_YEARS = 1275;
     const MAX_YEAR_ONE_10_PLUS_YEARS = 1451;
-    
-    const RAISE_PERCENTAGE_WITHOUT_BIRD = 0.10;
-    const RAISE_PERCENTAGE_WITH_BIRD = 0.125;
-    const BIRD_RIGHTS_THRESHOLD = 3;
 
     public function __construct($db)
     {
@@ -76,9 +72,7 @@ class ExtensionValidator
      */
     public function validateRaises($offer, $birdYears)
     {
-        $maxRaisePercentage = ($birdYears >= self::BIRD_RIGHTS_THRESHOLD) 
-            ? self::RAISE_PERCENTAGE_WITH_BIRD 
-            : self::RAISE_PERCENTAGE_WITHOUT_BIRD;
+        $maxRaisePercentage = \ContractRules::getMaxRaisePercentage($birdYears);
         $maxIncrease = floor($offer['year1'] * $maxRaisePercentage);
         
         if ($offer['year2'] > $offer['year1'] + $maxIncrease) {

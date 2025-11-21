@@ -15,9 +15,6 @@ namespace FreeAgency;
 class FreeAgencyOfferValidator
 {
     private const HARD_CAP_BUFFER = 2000;
-    private const BIRD_RIGHTS_RAISE_PERCENTAGE = 0.125;
-    private const STANDARD_RAISE_PERCENTAGE = 0.1;
-    private const BIRD_RIGHTS_THRESHOLD = 3;
 
     private $db;
 
@@ -57,7 +54,7 @@ class FreeAgencyOfferValidator
         }
 
         // Check soft cap space (if no Bird Rights and not using exceptions)
-        if ($offerData['birdYears'] < self::BIRD_RIGHTS_THRESHOLD && $offerData['offerType'] == 0) {
+        if (!\ContractRules::hasBirdRights($offerData['birdYears']) && $offerData['offerType'] == 0) {
             $softCapValidation = $this->validateSoftCapSpace($offerData);
             if (!$softCapValidation['valid']) {
                 return $softCapValidation;
@@ -149,9 +146,7 @@ class FreeAgencyOfferValidator
     private function validateRaisesAndContinuity(array $offerData): array
     {
         // Determine max raise percentage
-        $raisePercentage = $offerData['birdYears'] >= self::BIRD_RIGHTS_THRESHOLD 
-            ? self::BIRD_RIGHTS_RAISE_PERCENTAGE 
-            : self::STANDARD_RAISE_PERCENTAGE;
+        $raisePercentage = \ContractRules::getMaxRaisePercentage($offerData['birdYears']);
         
         $maxRaise = (int) round($offerData['offer1'] * $raisePercentage);
         $contractEnded = false;

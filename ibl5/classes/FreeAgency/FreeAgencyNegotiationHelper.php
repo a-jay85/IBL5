@@ -17,46 +17,6 @@ use Player\PlayerImageHelper;
  */
 class FreeAgencyNegotiationHelper
 {
-    /**
-     * Veteran minimum salary by years of experience for Free Agency and Waiver signings
-     * 
-     * These are the minimum salary tiers used for both Free Agency contract offers and
-     * Waiver signings. Year 1 value (35) represents the first-year rookie contract minimum.
-     * Year 2+ values (51+) represent veteran and returning player minimums.
-     * 
-     * This is the authoritative source for veteran minimum salaries. Waivers module
-     * delegates to getVeteranMinimumSalary() to ensure consistent salary calculations.
-     * 
-     * @var array<int, int>
-     */
-    public const VETERAN_MINIMUM_SALARIES = [
-        10 => 103,  // 10+ years
-        9  => 100,  // 9 years
-        8  => 89,   // 8 years
-        7  => 82,   // 7 years
-        6  => 76,   // 6 years
-        5  => 70,   // 5 years
-        4  => 64,   // 4 years
-        3  => 61,   // 3 years
-        2  => 51,   // 2 years (and above for waivers)
-        1  => 35,   // 1 year (first-year rookie contract minimum)
-    ];
-
-    /**
-     * Maximum contract salary by years of experience (first year only)
-     * 
-     * These represent the maximum first-year contract salary for players
-     * based on their years of service. Additional years can have raises
-     * up to 12.5% (with bird rights) or 10% (without bird rights).
-     * 
-     * @var array<int, int>
-     */
-    public const MAX_CONTRACT_SALARIES = [
-        10 => 1451,  // 10+ years
-        7  => 1275,  // 7-9 years
-        0  => 1063,  // 0-6 years
-    ];
-
     private $db;
     private \Services\DatabaseService $databaseService;
     private FreeAgencyViewHelper $viewHelper;
@@ -84,8 +44,8 @@ class FreeAgencyNegotiationHelper
         $capData = $capCalculator->calculateNegotiationCapSpace($team, $player->name);
         
         $demands = $this->calculator->getPlayerDemands($player->name);
-        $veteranMinimum = self::getVeteranMinimumSalary($player->yearsOfExperience);
-        $maxContract = self::getMaxContractSalary($player->yearsOfExperience);
+        $veteranMinimum = \ContractRules::getVeteranMinimumSalary($player->yearsOfExperience);
+        $maxContract = \ContractRules::getMaxContractSalary($player->yearsOfExperience);
         
         // Get existing offer if any
         $existingOffer = $this->getExistingOffer($team->name, $player->name);
@@ -172,7 +132,7 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
         $formData = $this->buildFormData($teamName, $player);
         
         // Calculate values for display purposes only (not posted)
-        $maxContract = self::getMaxContractSalary($player->yearsOfExperience);
+        $maxContract = \ContractRules::getMaxContractSalary($player->yearsOfExperience);
         
         ob_start();
         
@@ -232,36 +192,26 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
 
     /**
      * Get veteran minimum salary for a specific experience level
-     * Public static method for use by other classes (e.g., Waivers, view helpers)
      * 
+     * @deprecated Use ContractRules::getVeteranMinimumSalary() instead
      * @param int $experience Years of experience
      * @return int Veteran minimum salary
      */
     public static function getVeteranMinimumSalary(int $experience): int
     {
-        foreach (self::VETERAN_MINIMUM_SALARIES as $years => $salary) {
-            if ($experience >= $years) {
-                return $salary;
-            }
-        }
-        return self::VETERAN_MINIMUM_SALARIES[1];
+        return \ContractRules::getVeteranMinimumSalary($experience);
     }
 
     /**
      * Get maximum contract salary for a specific experience level
-     * Public static method for use by other classes (e.g., Negotiation processors, view helpers)
      * 
+     * @deprecated Use ContractRules::getMaxContractSalary() instead
      * @param int $experience Years of experience
      * @return int Maximum first-year contract salary
      */
     public static function getMaxContractSalary(int $experience): int
     {
-        foreach (self::MAX_CONTRACT_SALARIES as $years => $salary) {
-            if ($experience >= $years) {
-                return $salary;
-            }
-        }
-        return self::MAX_CONTRACT_SALARIES[0];
+        return \ContractRules::getMaxContractSalary($experience);
     }
 
     /**

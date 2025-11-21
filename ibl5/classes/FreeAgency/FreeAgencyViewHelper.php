@@ -227,7 +227,7 @@ class FreeAgencyViewHelper
         $buttonConfigs = [];
         for ($years = 1; $years <= 6; $years++) {
             $buttonConfigs[] = [
-                'offers' => array_slice(OfferType::MLE_OFFERS, 0, $years),
+                'offers' => \ContractRules::getMLEOffers($years),
                 'offerType' => (string) $years,
             ];
         }
@@ -250,7 +250,7 @@ class FreeAgencyViewHelper
     {
         $buttonConfigs = [
             [
-                'offers' => [OfferType::LLE_OFFER],
+                'offers' => [\ContractRules::LLE_OFFER],
                 'offerType' => (string) OfferType::LOWER_LEVEL_EXCEPTION,
             ],
         ];

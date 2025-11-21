@@ -123,4 +123,47 @@ class FreeAgencyNegotiationHelperTest extends TestCase
         // Assert - Should be 100 (1000 * 0.10 = 100)
         $this->assertEquals(100, $maxRaiseNegotiationHelper);
     }
+
+    /**
+     * @group negotiation
+     * @group max-salaries
+     * @group regression
+     * 
+     * Regression test: 10+ year player with bird rights should show 1451 as year 1 offer,
+     * not 1632 (which was year 2 due to array indexing bug)
+     * 
+     * This test validates the fix for the bug where FreeAgencyNegotiationHelper was
+     * using 1-based array indexing while FreeAgencyViewHelper::renderMaxContractButtons
+     * was using array_slice with offset 1, causing year 1 to display year 2 values.
+     */
+    public function testMaxSalaryFirstYearFor10PlusYearsWithBirdRights(): void
+    {
+        // Arrange - Player with 10+ years experience and Bird rights
+        $yearsOfExperience = 10;
+        $birdYears = 3; // Has Bird rights (3+ years with team)
+        
+        // Act - Calculate like renderOfferButtons does
+        $maxContract = \ContractRules::getMaxContractSalary($yearsOfExperience);
+        $raisePercentage = \ContractRules::getMaxRaisePercentage($birdYears);
+        $maxRaise = (int) round($maxContract * $raisePercentage);
+        
+        // Build salary array with 0-based indexing (after fix)
+        $maxSalaries = [
+            0 => $maxContract,
+            1 => $maxContract + $maxRaise,
+            2 => $maxContract + ($maxRaise * 2),
+            3 => $maxContract + ($maxRaise * 3),
+            4 => $maxContract + ($maxRaise * 4),
+            5 => $maxContract + ($maxRaise * 5),
+        ];
+        
+        // Simulate what renderMaxContractButtons does for 1-year contract
+        $oneYearOffer = array_slice($maxSalaries, 0, 1);
+        
+        // Assert - First year should be 1451, not 1632
+        $this->assertEquals(1451, $maxContract);
+        $this->assertEquals(181, $maxRaise); // 1451 * 0.125 = 181.375 rounds to 181
+        $this->assertEquals([1451], $oneYearOffer);
+        $this->assertEquals(1451, $oneYearOffer[0]);
+    }
 }

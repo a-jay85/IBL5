@@ -181,19 +181,28 @@ class FreeAgencyViewHelper
      * Render max contract offer buttons
      * 
      * @param array<int> $maxSalaries Maximum salaries per year
+     * @param int $birdYears Number of consecutive years with current team
      * @return string HTML form buttons
      */
-    public function renderMaxContractButtons(array $maxSalaries): string
+    public function renderMaxContractButtons(array $maxSalaries, int $birdYears = 0): string
     {
         $contractOfferConfigs = [];
         for ($years = 1; $years <= 6; $years++) {
             $contractOfferConfigs[] = [
-                'offers' => array_slice($maxSalaries, 1, $years),
+                'offers' => array_slice($maxSalaries, 0, $years),
             ];
         }
         
+        $raisePercentage = \ContractRules::getMaxRaisePercentage($birdYears);
+        var_dump($raisePercentage);
+        $raisePercentageDisplay = (int)($raisePercentage * 100);
+        $hasBirdRights = \ContractRules::hasBirdRights($birdYears);
+        $birdRightsText = $hasBirdRights ? ' with Bird Rights' : '';
+        
+        $label = "Max Level Contract {$raisePercentageDisplay}%{$birdRightsText} (click the button that corresponds to the final year you wish to offer):";
+        
         return $this->renderButtonRow(
-            'Max Level Contract 10% (click the button that corresponds to the final year you wish to offer):',
+            $label,
             $contractOfferConfigs,
             0
         );

@@ -137,17 +137,18 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
         $maxRaise = (int) round($maxContract * $raisePercentage);
         
         // Build max salaries for all 6 years using same raise logic as validator
+        // Use 0-based indexing for array_slice compatibility in FreeAgencyViewHelper
         $maxSalaries = [
-            1 => $maxContract,
-            2 => $maxContract + $maxRaise,
-            3 => $maxContract + ($maxRaise * 2),
-            4 => $maxContract + ($maxRaise * 3),
-            5 => $maxContract + ($maxRaise * 4),
-            6 => $maxContract + ($maxRaise * 5),
+            0 => $maxContract,
+            1 => $maxContract + $maxRaise,
+            2 => $maxContract + ($maxRaise * 2),
+            3 => $maxContract + ($maxRaise * 3),
+            4 => $maxContract + ($maxRaise * 4),
+            5 => $maxContract + ($maxRaise * 5),
         ];
         
         ob_start();
-        echo $this->viewHelper->renderMaxContractButtons($maxSalaries);
+        echo $this->viewHelper->renderMaxContractButtons($maxSalaries, $player->birdYears);
         
         // MLE row
         echo "<tr>";

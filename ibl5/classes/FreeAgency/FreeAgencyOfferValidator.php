@@ -14,8 +14,6 @@ namespace FreeAgency;
  */
 class FreeAgencyOfferValidator
 {
-    private const HARD_CAP_BUFFER = 2000;
-
     private $db;
 
     public function __construct($db)
@@ -84,7 +82,7 @@ class FreeAgencyOfferValidator
      */
     private function validateHardCapSpace(array $offerData): array
     {
-        $hardCapSpace1 = $offerData['amendedCapSpaceYear1'] + self::HARD_CAP_BUFFER;
+        $hardCapSpace1 = $offerData['amendedCapSpaceYear1'] + (\League::HARD_CAP_MAX - \League::SOFT_CAP_MAX);
         
         if ($offerData['offer1'] > $hardCapSpace1) {
             return [

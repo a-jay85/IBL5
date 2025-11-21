@@ -175,7 +175,7 @@ class FreeAgencyCapCalculator
         $query = "SELECT * FROM ibl_fa_offers WHERE team='$escapedTeamName' AND name!='$escapedPlayerName'";
         $result = $this->db->sql_query($query);
         
-        foreach ($result as $offer) {
+        while ($offer = $this->db->sql_fetchrow($result)) {
             $capSpace['year1'] -= (int) $offer['offer1'];
             $capSpace['year2'] -= (int) $offer['offer2'];
             $capSpace['year3'] -= (int) $offer['offer3'];

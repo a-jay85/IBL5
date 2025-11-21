@@ -131,6 +131,26 @@ class PlayerContractValidator
     }
 
     /**
+     * Check if player becomes a free agent in the specified season
+     * 
+     * A player becomes free agent when their contract ends.
+     * Free agency year = draftYear + yearsOfExperience + contractTotalYears - contractCurrentYear
+     * 
+     * @param PlayerData $playerData The player data
+     * @param \Season $season The season to check against
+     * @return bool True if player becomes free agent this season
+     */
+    public function isPlayerFreeAgent(PlayerData $playerData, \Season $season): bool
+    {
+        $yearPlayerIsFreeAgent = $playerData->draftYear 
+            + $playerData->yearsOfExperience 
+            + $playerData->contractTotalYears 
+            - $playerData->contractCurrentYear;
+        
+        return $yearPlayerIsFreeAgent == $season->endingYear;
+    }
+
+    /**
      * Check if a player's rookie option was previously exercised
      * Rookie options double the salary from the previous year
      */

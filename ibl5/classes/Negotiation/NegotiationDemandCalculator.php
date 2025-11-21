@@ -18,7 +18,6 @@ class NegotiationDemandCalculator
     // Constants for demand calculation
     private const RAW_SCORE_BASELINE = 700; // Sam Mack's baseline score
     private const DEMANDS_FACTOR = 3; // Trial-and-error multiplier
-    private const MAX_RAISE_PERCENTAGE = 0.1; // 10% max raise per year
     
     public function __construct($db)
     {
@@ -89,8 +88,8 @@ class NegotiationDemandCalculator
         // Calculate base (first year) demands
         $baseDemands = $totalDemands / 6;
         
-        // Calculate max raise per year
-        $maxRaise = floor($baseDemands * self::MAX_RAISE_PERCENTAGE);
+        // Calculate max raise per year (standard rate without bird rights)
+        $maxRaise = floor($baseDemands * \ContractRules::STANDARD_RAISE_PERCENTAGE);
         
         // Build yearly demands with raises
         return [

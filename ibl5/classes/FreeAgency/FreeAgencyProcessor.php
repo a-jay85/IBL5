@@ -47,6 +47,9 @@ class FreeAgencyProcessor
         // Load player object
         $player = \Player\Player::withPlayerID($this->db, $playerID);
         
+        // Load team object for validation
+        $team = \Team::initialize($this->db, $teamName);
+        
         // Check if player already signed
         if ($this->validator->isPlayerAlreadySigned($playerID)) {
             return $this->renderOfferResponse(
@@ -56,18 +59,21 @@ class FreeAgencyProcessor
             );
         }
         
-        // Parse offer data
-        $offerData = $this->parseOfferData($teamName, $player, $postData);
+        // Parse offer data (reuse team object to avoid duplicate DB query)
+        $offerData = $this->parseOfferData($player, $postData, $team);
+        
+        // Create validator with team data for MLE/LLE checks
+        $validator = new FreeAgencyOfferValidator($this->db, $this->mysqli_db, $team);
         
         // Validate the offer
-        $validationResult = $this->validator->validateOffer($offerData);
+        $validationResult = $validator->validateOffer($offerData);
         
         if (!$validationResult['valid']) {
             return $this->renderOfferResponse(false, $validationResult['error']);
         }
         
         // Save the offer
-        $saveResult = $this->saveOffer($teamName, $player, $offerData);
+        $saveResult = $this->saveOffer($team->name, $player, $offerData);
         
         return $this->renderOfferResponse($saveResult, 
             $saveResult 
@@ -79,29 +85,28 @@ class FreeAgencyProcessor
     /**
      * Parse offer data from POST array
      * 
-     * Reconstructs all derived values (vetmin, max, cap space) from playerID and teamName.
+     * Reconstructs all derived values (vetmin, max, cap space) from playerID and team.
      * Only user input (offer amounts, offerType) comes from POST data.
      * 
-     * @param string $teamName Team name
      * @param \Player\Player $player Player object
      * @param array<string, mixed> $postData POST data from offer form
+     * @param \Team $team Team object (provides team name and cap data)
      * @return array<string, mixed> Parsed offer data
      */
-    private function parseOfferData(string $teamName, \Player\Player $player, array $postData): array
+    private function parseOfferData(\Player\Player $player, array $postData, \Team $team): array
     {
         // Reconstruct derived values from player object
-        $birdYears = $player->teamName == $teamName ? $player->birdYears : 0;
+        $birdYears = $player->teamName == $team->name ? $player->birdYears : 0;
         $veteranMinimum = \ContractRules::getVeteranMinimumSalary($player->yearsOfExperience);
         $maxContractYear1 = \ContractRules::getMaxContractSalary($player->yearsOfExperience);
         
-        // Reconstruct cap space data
-        $team = \Team::initialize($this->db, $teamName);
+        // Reconstruct cap space data using provided team object
         $capCalculator = new FreeAgencyCapCalculator($this->db, $team);
         $capMetrics = $capCalculator->calculateTeamCapMetrics($player->name);
         
         // Get existing offer to calculate amended cap space
         $helper = new FreeAgencyNegotiationHelper($this->db);
-        $existingOffer = $helper->getExistingOffer($teamName, $player->name);
+        $existingOffer = $helper->getExistingOffer($team->name, $player->name);
         $amendedCapSpaceYear1 = $capMetrics['softCapSpace'][0] + $existingOffer['offer1'];
         
         $offerType = (int) ($postData['offerType'] ?? 0);

@@ -226,6 +226,138 @@ class FreeAgencyOfferValidatorTest extends TestCase
     }
 
     /**
+     * @group validation
+     * @group mle-lle
+     */
+    public function testRejectsMLEOfferWhenTeamOutOfMLE(): void
+    {
+        // Arrange
+        $mockTeam = (object)[
+            'hasMLE' => "0", // Team has already used MLE
+            'hasLLE' => "1"
+        ];
+        $validator = new FreeAgencyOfferValidator($this->mockDb, null, $mockTeam);
+        $offerData = $this->createValidOffer();
+        $offerData['offerType'] = \FreeAgency\OfferType::MLE_1_YEAR; // MLE offer
+
+        // Act
+        $result = $validator->validateOffer($offerData);
+
+        // Assert
+        $this->assertFalse($result['valid']);
+        $this->assertStringContainsString('Mid-Level Exception', $result['error']);
+        $this->assertStringContainsString('already used', $result['error']);
+    }
+
+    /**
+     * @group validation
+     * @group mle-lle
+     */
+    public function testRejectsLLEOfferWhenTeamOutOfLLE(): void
+    {
+        // Arrange
+        $mockTeam = (object)[
+            'hasMLE' => "1",
+            'hasLLE' => "0" // Team has already used LLE
+        ];
+        $validator = new FreeAgencyOfferValidator($this->mockDb, null, $mockTeam);
+        $offerData = $this->createValidOffer();
+        $offerData['offerType'] = \FreeAgency\OfferType::LOWER_LEVEL_EXCEPTION; // LLE offer
+
+        // Act
+        $result = $validator->validateOffer($offerData);
+
+        // Assert
+        $this->assertFalse($result['valid']);
+        $this->assertStringContainsString('Lower-Level Exception', $result['error']);
+        $this->assertStringContainsString('already used', $result['error']);
+    }
+
+    /**
+     * @group validation
+     * @group mle-lle
+     */
+    public function testAcceptsMLEOfferWhenTeamHasMLE(): void
+    {
+        // Arrange
+        $mockTeam = (object)[
+            'hasMLE' => "1", // Team has MLE available
+            'hasLLE' => "1"
+        ];
+        $validator = new FreeAgencyOfferValidator($this->mockDb, null, $mockTeam);
+        $offerData = $this->createValidOffer();
+        $offerData['offerType'] = \FreeAgency\OfferType::MLE_1_YEAR; // MLE offer
+
+        // Act
+        $result = $validator->validateOffer($offerData);
+
+        // Assert
+        $this->assertTrue($result['valid']);
+    }
+
+    /**
+     * @group validation
+     * @group mle-lle
+     */
+    public function testAcceptsLLEOfferWhenTeamHasLLE(): void
+    {
+        // Arrange
+        $mockTeam = (object)[
+            'hasMLE' => "1",
+            'hasLLE' => "1" // Team has LLE available
+        ];
+        $validator = new FreeAgencyOfferValidator($this->mockDb, null, $mockTeam);
+        $offerData = $this->createValidOffer();
+        $offerData['offerType'] = \FreeAgency\OfferType::LOWER_LEVEL_EXCEPTION; // LLE offer
+
+        // Act
+        $result = $validator->validateOffer($offerData);
+
+        // Assert
+        $this->assertTrue($result['valid']);
+    }
+
+    /**
+     * @group validation
+     * @group mle-lle
+     */
+    public function testSkipsMLECheckWhenNoTeamProvided(): void
+    {
+        // Arrange
+        $validator = new FreeAgencyOfferValidator($this->mockDb, null, null); // No team
+        $offerData = $this->createValidOffer();
+        $offerData['offerType'] = \FreeAgency\OfferType::MLE_1_YEAR; // MLE offer
+
+        // Act
+        $result = $validator->validateOffer($offerData);
+
+        // Assert - Should not be rejected for MLE check (passes through)
+        $this->assertTrue($result['valid']);
+    }
+
+    /**
+     * @group validation
+     * @group mle-lle
+     */
+    public function testSkipsMLECheckWhenCustomOfferType(): void
+    {
+        // Arrange
+        $mockTeam = (object)[
+            'hasMLE' => "0", // Team out of MLE
+            'hasLLE' => "1"
+        ];
+        $validator = new FreeAgencyOfferValidator($this->mockDb, null, $mockTeam);
+        $offerData = $this->createValidOffer();
+        $offerData['offerType'] = 0; // Custom offer, not MLE
+
+        // Act
+        $result = $validator->validateOffer($offerData);
+
+        // Assert - Should not check MLE for custom offers
+        $this->assertTrue($result['valid']);
+    }
+
+    /**
      * Helper to create a valid offer
      * 
      * @return array<string, mixed>

@@ -17,11 +17,13 @@ class FreeAgencyOfferValidator
     private $db;
     private $mysqli_db;
     private array $offerData = [];
+    private $team;
 
-    public function __construct($db, $mysqli_db = null)
+    public function __construct($db, $mysqli_db = null, $team = null)
     {
         $this->db = $db;
         $this->mysqli_db = $mysqli_db;
+        $this->team = $team;
     }
 
     /**
@@ -40,6 +42,17 @@ class FreeAgencyOfferValidator
                 'valid' => false,
                 'error' => 'Sorry, you must enter an amount greater than zero in the first year of a free agency offer. Your offer in Year 1 was zero, so this offer is not valid.'
             ];
+        }
+
+        // Check MLE/LLE availability
+        $mleCheckResult = $this->validateMLEAvailability();
+        if (!$mleCheckResult['valid']) {
+            return $mleCheckResult;
+        }
+
+        $lleCheckResult = $this->validateLLEAvailability();
+        if (!$lleCheckResult['valid']) {
+            return $lleCheckResult;
         }
 
         // Check veteran's minimum
@@ -74,6 +87,52 @@ class FreeAgencyOfferValidator
         $raiseValidation = $this->validateRaisesAndContinuity();
         if (!$raiseValidation['valid']) {
             return $raiseValidation;
+        }
+
+        return ['valid' => true];
+    }
+
+    /**
+     * Validate MLE (Mid-Level Exception) availability
+     * 
+     * @return array{valid: bool, error?: string}
+     */
+    private function validateMLEAvailability(): array
+    {
+        // Only check if using MLE offer type and team is provided
+        if (!$this->team || !OfferType::isMLE($this->offerData['offerType'])) {
+            return ['valid' => true];
+        }
+
+        // Check if team has already used their MLE
+        if ($this->team->hasMLE != "1") {
+            return [
+                'valid' => false,
+                'error' => "Sorry, your team has already used the Mid-Level Exception this free agency period. You cannot make another MLE offer."
+            ];
+        }
+
+        return ['valid' => true];
+    }
+
+    /**
+     * Validate LLE (Lower-Level Exception) availability
+     * 
+     * @return array{valid: bool, error?: string}
+     */
+    private function validateLLEAvailability(): array
+    {
+        // Only check if using LLE offer type and team is provided
+        if (!$this->team || !OfferType::isLLE($this->offerData['offerType'])) {
+            return ['valid' => true];
+        }
+
+        // Check if team has already used their LLE
+        if ($this->team->hasLLE != "1") {
+            return [
+                'valid' => false,
+                'error' => "Sorry, your team has already used the Lower-Level Exception this free agency period. You cannot make another LLE offer."
+            ];
         }
 
         return ['valid' => true];

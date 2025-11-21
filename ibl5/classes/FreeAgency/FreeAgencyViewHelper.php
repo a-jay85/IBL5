@@ -146,14 +146,16 @@ class FreeAgencyViewHelper
     }
 
     /**
-     * Render a single max contract form
+     * Render a single offer button form
+     * 
+     * Used for all contract offer types (max contract, MLE, LLE, vet min)
      * 
      * @param array<string, mixed> $formData Hidden field data
      * @param array<int> $offers Salary amounts for each year
      * @param int $finalYear Final year of contract
      * @return string HTML form
      */
-    private function renderMaxContractForm(array $formData, array $offers, int $finalYear): string
+    private function renderOfferButtonForm(array $formData, array $offers, int $finalYear): string
     {
         ob_start();
         ?>
@@ -309,7 +311,7 @@ class FreeAgencyViewHelper
             }
             
             $finalYear = count($config['offers']);
-            echo "<td>{$this->renderMaxContractForm($configFormData, $config['offers'], $finalYear)}</td>";
+            echo "<td>{$this->renderOfferButtonForm($configFormData, $config['offers'], $finalYear)}</td>";
         }
         
         if ($fillCells > 0) {

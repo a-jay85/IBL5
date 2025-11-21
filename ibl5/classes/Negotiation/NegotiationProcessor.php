@@ -68,7 +68,7 @@ class NegotiationProcessor
         $capSpace = $this->calculateCapSpace($userTeamName);
         
         // Determine max first year salary based on experience
-        $maxYearOneSalary = \FreeAgency\FreeAgencyNegotiationHelper::getMaxContractSalary($player->yearsOfExperience ?? 0);
+        $maxYearOneSalary = \ContractRules::getMaxContractSalary($player->yearsOfExperience ?? 0);
         
         // Render negotiation form
         $output .= NegotiationViewHelper::renderNegotiationForm(

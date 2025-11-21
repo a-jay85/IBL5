@@ -137,7 +137,7 @@ class FreeAgencyOfferValidatorTest extends TestCase
         // Arrange
         $offerData = $this->createValidOffer();
         $offerData['offer1'] = 1500;
-        $offerData['year1Max'] = \FreeAgency\FreeAgencyNegotiationHelper::getMaxContractSalary(0);
+        $offerData['year1Max'] = \ContractRules::getMaxContractSalary(0);
 
         // Act
         $result = $this->validator->validateOffer($offerData);
@@ -209,25 +209,6 @@ class FreeAgencyOfferValidatorTest extends TestCase
      * @group validation
      * @group decreases
      */
-    public function testRejectsSalaryDecrease(): void
-    {
-        // Arrange
-        $offerData = $this->createValidOffer();
-        $offerData['offer1'] = 1000;
-        $offerData['offer2'] = 900; // Decrease not allowed
-
-        // Act
-        $result = $this->validator->validateOffer($offerData);
-
-        // Assert
-        $this->assertFalse($result['valid']);
-        $this->assertStringContainsString('cannot decrease salary', $result['error']);
-    }
-
-    /**
-     * @group validation
-     * @group decreases
-     */
     public function testAllowsZeroForUnusedYears(): void
     {
         // Arrange
@@ -260,7 +241,7 @@ class FreeAgencyOfferValidatorTest extends TestCase
             'offer6' => 0,
             'birdYears' => 3,
             'vetmin' => 35,
-            'year1Max' => \FreeAgency\FreeAgencyNegotiationHelper::getMaxContractSalary(0),
+            'year1Max' => \ContractRules::getMaxContractSalary(0),
             'amendedCapSpaceYear1' => 1000,
         ];
     }

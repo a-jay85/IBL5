@@ -10,8 +10,19 @@ namespace FreeAgency;
  */
 class FreeAgencyViewHelper
 {
-    public function __construct()
+    private string $teamName;
+    private int $playerID;
+
+    /**
+     * Constructor
+     * 
+     * @param string $teamName Team name for hidden form fields
+     * @param int $playerID Player ID for hidden form fields
+     */
+    public function __construct(string $teamName, int $playerID)
     {
+        $this->teamName = $teamName;
+        $this->playerID = $playerID;
     }
 
     /**
@@ -122,11 +133,10 @@ class FreeAgencyViewHelper
     /**
      * Render max contract offer buttons
      * 
-     * @param array<string, mixed> $formData Data for hidden form fields
      * @param array<int> $maxSalaries Maximum salaries per year
      * @return string HTML form buttons
      */
-    public function renderMaxContractButtons(array $formData, array $maxSalaries): string
+    public function renderMaxContractButtons(array $maxSalaries): string
     {
         $buttonConfigs = [
             ['offers' => [$maxSalaries[1]]],
@@ -139,7 +149,6 @@ class FreeAgencyViewHelper
         
         return $this->renderButtonRow(
             'Max Level Contract 10% (click the button that corresponds to the final year you wish to offer):',
-            $formData,
             $buttonConfigs,
             0
         );
@@ -150,17 +159,17 @@ class FreeAgencyViewHelper
      * 
      * Used for all contract offer types (max contract, MLE, LLE, vet min)
      * 
-     * @param array<string, mixed> $formData Hidden field data
      * @param array<int> $offers Salary amounts for each year
      * @param int $finalYear Final year of contract
+     * @param int $offerType Offer type (0=normal, 1-6=MLE, 7=LLE, 8=VET)
      * @return string HTML form
      */
-    private function renderOfferButtonForm(array $formData, array $offers, int $finalYear): string
+    private function renderOfferButtonForm(array $offers, int $finalYear, int $offerType = 0): string
     {
         ob_start();
         ?>
 <form name="FAOffer" method="post" action="modules.php?name=Free_Agency&pa=processoffer">
-    <?= $this->renderHiddenFields($formData, $offers) ?>
+    <?= $this->renderHiddenFields($offers, $offerType) ?>
     <input type="submit" value="<?= htmlspecialchars($offers[$finalYear - 1]) ?>">
 </form>
         <?php
@@ -170,11 +179,11 @@ class FreeAgencyViewHelper
     /**
      * Render hidden form fields
      * 
-     * @param array<string, mixed> $formData Form data
      * @param array<int> $offers Offer amounts
+     * @param int $offerType Offer type (0=normal, 1-6=MLE, 7=LLE, 8=VET)
      * @return string HTML hidden inputs
      */
-    private function renderHiddenFields(array $formData, array $offers): string
+    private function renderHiddenFields(array $offers, int $offerType = 0): string
     {
         ob_start();
         
@@ -184,12 +193,10 @@ class FreeAgencyViewHelper
             echo "<input type=\"hidden\" name=\"offeryear{$yearNum}\" value=\"" . htmlspecialchars($offers[$i]) . "\">\n";
         }
         
-        // Other form data
-        foreach ($formData as $key => $value) {
-            $safeKey = htmlspecialchars($key);
-            $safeValue = htmlspecialchars($value);
-            echo "<input type=\"hidden\" name=\"{$safeKey}\" value=\"{$safeValue}\">\n";
-        }
+        // Essential form data - uses instance properties
+        echo "<input type=\"hidden\" name=\"teamname\" value=\"" . htmlspecialchars($this->teamName) . "\">\n";
+        echo "<input type=\"hidden\" name=\"playerID\" value=\"" . htmlspecialchars($this->playerID) . "\">\n";
+        echo "<input type=\"hidden\" name=\"offerType\" value=\"" . htmlspecialchars($offerType) . "\">\n";
         
         return ob_get_clean();
     }
@@ -197,20 +204,19 @@ class FreeAgencyViewHelper
     /**
      * Render exception offer buttons (MLE, LLE, Vet Min)
      * 
-     * @param array<string, mixed> $formData Form data
      * @param string $exceptionType Type of exception (MLE, LLE, VET)
      * @return string HTML form buttons
      */
-    public function renderExceptionButtons(array $formData, string $exceptionType): string
+    public function renderExceptionButtons(string $exceptionType): string
     {
         ob_start();
         
         if ($exceptionType === 'MLE') {
-            $this->renderMLEButtons($formData);
+            $this->renderMLEButtons();
         } elseif ($exceptionType === 'LLE') {
-            $this->renderLLEButton($formData);
+            $this->renderLLEButton();
         } elseif ($exceptionType === 'VET') {
-            $this->renderVetMinButton($formData);
+            $this->renderVetMinButton();
         }
         
         return ob_get_clean();
@@ -219,10 +225,9 @@ class FreeAgencyViewHelper
     /**
      * Render Mid-Level Exception buttons
      * 
-     * @param array<string, mixed> $formData Form data
      * @return void
      */
-    private function renderMLEButtons(array $formData): void
+    private function renderMLEButtons(): void
     {
         $buttonConfigs = [];
         for ($years = 1; $years <= 6; $years++) {
@@ -234,7 +239,6 @@ class FreeAgencyViewHelper
         
         echo $this->renderButtonRow(
             'Mid-Level Exception (click the button that corresponds to the final year you wish to offer):',
-            $formData,
             $buttonConfigs,
             0
         );
@@ -243,10 +247,9 @@ class FreeAgencyViewHelper
     /**
      * Render Lower-Level Exception button
      * 
-     * @param array<string, mixed> $formData Form data
      * @return void
      */
-    private function renderLLEButton(array $formData): void
+    private function renderLLEButton(): void
     {
         $buttonConfigs = [
             [
@@ -257,7 +260,6 @@ class FreeAgencyViewHelper
         
         echo $this->renderButtonRow(
             'Lower-Level Exception:',
-            $formData,
             $buttonConfigs,
             6
         );
@@ -266,24 +268,19 @@ class FreeAgencyViewHelper
     /**
      * Render Veteran's Minimum button
      * 
-     * @param array<string, mixed> $formData Form data
      * @return void
      */
-    private function renderVetMinButton(array $formData): void
+    private function renderVetMinButton(): void
     {
-        // Use formData value if available, otherwise use rookie minimum from constants
-        $vetMin = $formData['vetmin'] ?? FreeAgencyNegotiationHelper::getVeteranMinimumSalary(1);
-        
         $buttonConfigs = [
             [
-                'offers' => [(int) $vetMin],
+                'offers' => [\ContractRules::getVeteranMinimumSalary(1)],
                 'offerType' => (string) OfferType::VETERAN_MINIMUM,
             ],
         ];
         
         echo $this->renderButtonRow(
             'Veterans Exception:',
-            $formData,
             $buttonConfigs,
             6
         );
@@ -293,25 +290,20 @@ class FreeAgencyViewHelper
      * Render a row of contract offer buttons with label and fill cells
      * 
      * @param string $label Label text for the first cell
-     * @param array<string, mixed> $formData Base form data
      * @param array<array{offers: array<int>, offerType?: string}> $buttonConfigs Array of button configurations
      * @param int $fillCells Number of empty cells to add at end
      * @return string HTML table row content
      */
-    private function renderButtonRow(string $label, array $formData, array $buttonConfigs, int $fillCells = 0): string
+    private function renderButtonRow(string $label, array $buttonConfigs, int $fillCells = 0): string
     {
         ob_start();
         
         echo "<td>" . htmlspecialchars($label) . "</td>";
         
         foreach ($buttonConfigs as $config) {
-            $configFormData = $formData;
-            if (isset($config['offerType'])) {
-                $configFormData = array_merge($formData, ['offerType' => $config['offerType']]);
-            }
-            
+            $offerType = isset($config['offerType']) ? (int) $config['offerType'] : 0;
             $finalYear = count($config['offers']);
-            echo "<td>{$this->renderOfferButtonForm($configFormData, $config['offers'], $finalYear)}</td>";
+            echo "<td>{$this->renderOfferButtonForm($config['offers'], $finalYear, $offerType)}</td>";
         }
         
         if ($fillCells > 0) {

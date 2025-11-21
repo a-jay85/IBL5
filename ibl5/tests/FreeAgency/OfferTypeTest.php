@@ -33,8 +33,8 @@ class OfferTypeTest extends TestCase
     public function testMLEOffersConstant(): void
     {
         $expected = [450, 495, 540, 585, 630, 675];
-        $this->assertEquals($expected, OfferType::MLE_OFFERS);
-        $this->assertCount(6, OfferType::MLE_OFFERS);
+        $this->assertEquals($expected, \ContractRules::MLE_OFFERS);
+        $this->assertCount(6, \ContractRules::MLE_OFFERS);
     }
 
     /**
@@ -42,7 +42,7 @@ class OfferTypeTest extends TestCase
      */
     public function testLLEOfferConstant(): void
     {
-        $this->assertEquals(145, OfferType::LLE_OFFER);
+        $this->assertEquals(145, \ContractRules::LLE_OFFER);
     }
 
     /**
@@ -147,7 +147,7 @@ class OfferTypeTest extends TestCase
      */
     public function testMLEOffersHaveCorrectAmounts(): void
     {
-        $offers = OfferType::MLE_OFFERS;
+        $offers = \ContractRules::MLE_OFFERS;
         
         // Verify the exact MLE amounts
         $this->assertEquals(450, $offers[0], 'Year 1 MLE should be $450');

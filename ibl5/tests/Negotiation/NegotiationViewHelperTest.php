@@ -34,7 +34,7 @@ class NegotiationViewHelperTest extends TestCase
             'total' => 3000
         ];
         $capSpace = 1000;
-        $maxYearOneSalary = \FreeAgency\FreeAgencyNegotiationHelper::getMaxContractSalary(0);
+        $maxYearOneSalary = \ContractRules::getMaxContractSalary(0);
 
         // Act
         $html = NegotiationViewHelper::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
@@ -64,7 +64,7 @@ class NegotiationViewHelperTest extends TestCase
         
         $demands = $this->getDefaultDemands();
         $capSpace = 1000;
-        $maxYearOneSalary = \FreeAgency\FreeAgencyNegotiationHelper::getMaxContractSalary(0);
+        $maxYearOneSalary = \ContractRules::getMaxContractSalary(0);
 
         // Act
         $html = NegotiationViewHelper::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
@@ -91,7 +91,7 @@ class NegotiationViewHelperTest extends TestCase
         $player->name = "O'Neal <script>alert('xss')</script>";
         $demands = $this->getDefaultDemands();
         $capSpace = 1000;
-        $maxYearOneSalary = \FreeAgency\FreeAgencyNegotiationHelper::getMaxContractSalary(0);
+        $maxYearOneSalary = \ContractRules::getMaxContractSalary(0);
 
         // Act
         $html = NegotiationViewHelper::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
@@ -113,7 +113,7 @@ class NegotiationViewHelperTest extends TestCase
         $player->teamName = "Team <img src=x onerror=alert(1)>";
         $demands = $this->getDefaultDemands();
         $capSpace = 1000;
-        $maxYearOneSalary = \FreeAgency\FreeAgencyNegotiationHelper::getMaxContractSalary(0);
+        $maxYearOneSalary = \ContractRules::getMaxContractSalary(0);
 
         // Act
         $html = NegotiationViewHelper::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
@@ -142,7 +142,7 @@ class NegotiationViewHelperTest extends TestCase
             'total' => 1650
         ];
         $capSpace = 3000;
-        $maxYearOneSalary = \FreeAgency\FreeAgencyNegotiationHelper::getMaxContractSalary(0);
+        $maxYearOneSalary = \ContractRules::getMaxContractSalary(0);
 
         // Act
         $html = NegotiationViewHelper::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
@@ -174,7 +174,7 @@ class NegotiationViewHelperTest extends TestCase
             'total' => 3600
         ];
         $capSpace = 2000;
-        $maxYearOneSalary = \FreeAgency\FreeAgencyNegotiationHelper::getMaxContractSalary(0);
+        $maxYearOneSalary = \ContractRules::getMaxContractSalary(0);
 
         // Act
         $html = NegotiationViewHelper::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
@@ -195,7 +195,7 @@ class NegotiationViewHelperTest extends TestCase
         $player->birdYears = 3; // Has Bird rights
         $demands = $this->getDefaultDemands();
         $capSpace = 3000;
-        $maxYearOneSalary = \FreeAgency\FreeAgencyNegotiationHelper::getMaxContractSalary(0);
+        $maxYearOneSalary = \ContractRules::getMaxContractSalary(0);
 
         // Act
         $html = NegotiationViewHelper::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
@@ -215,7 +215,7 @@ class NegotiationViewHelperTest extends TestCase
         $player->birdYears = 2; // No Bird rights
         $demands = $this->getDefaultDemands();
         $capSpace = 1000;
-        $maxYearOneSalary = \FreeAgency\FreeAgencyNegotiationHelper::getMaxContractSalary(0);
+        $maxYearOneSalary = \ContractRules::getMaxContractSalary(0);
 
         // Act
         $html = NegotiationViewHelper::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
@@ -234,7 +234,7 @@ class NegotiationViewHelperTest extends TestCase
         $player = $this->createMockPlayer();
         $demands = $this->getDefaultDemands();
         $capSpace = 1234;
-        $maxYearOneSalary = \FreeAgency\FreeAgencyNegotiationHelper::getMaxContractSalary(0);
+        $maxYearOneSalary = \ContractRules::getMaxContractSalary(0);
 
         // Act
         $html = NegotiationViewHelper::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);

@@ -30,7 +30,7 @@ class WaiversProcessor
      */
     public function calculateVeteranMinimumSalary(int $experience): int
     {
-        return \FreeAgency\FreeAgencyNegotiationHelper::getVeteranMinimumSalary($experience);
+        return \ContractRules::getVeteranMinimumSalary($experience);
     }
     
     /**

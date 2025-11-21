@@ -86,8 +86,8 @@ class FreeAgencyProcessor
         
         // Reconstruct derived values from player object
         $birdYears = $player->teamName == $teamName ? $player->birdYears : 0;
-        $veteranMinimum = FreeAgencyNegotiationHelper::getVeteranMinimumSalary($player->yearsOfExperience);
-        $maxContractYear1 = FreeAgencyNegotiationHelper::getMaxContractSalary($player->yearsOfExperience);
+        $veteranMinimum = \ContractRules::getVeteranMinimumSalary($player->yearsOfExperience);
+        $maxContractYear1 = \ContractRules::getMaxContractSalary($player->yearsOfExperience);
         
         // Reconstruct cap space data
         $team = \Team::initialize($this->db, $teamName);
@@ -112,7 +112,7 @@ class FreeAgencyProcessor
             $offer6 = 0;
         } elseif (OfferType::isLLE($offerType)) {
             // Lower-Level Exception
-            $offer1 = OfferType::LLE_OFFER;
+            $offer1 = \ContractRules::LLE_OFFER;
             $offer2 = 0;
             $offer3 = 0;
             $offer4 = 0;
@@ -120,7 +120,7 @@ class FreeAgencyProcessor
             $offer6 = 0;
         } elseif (OfferType::isMLE($offerType)) {
             // Mid-Level Exception
-            $mleOffers = OfferType::MLE_OFFERS;
+            $mleOffers = \ContractRules::MLE_OFFERS;
             $offer1 = $mleOffers[0];
             $offer2 = $offerType >= 2 ? $mleOffers[1] : 0;
             $offer3 = $offerType >= 3 ? $mleOffers[2] : 0;
@@ -204,7 +204,7 @@ class FreeAgencyProcessor
         $result = $this->db->sql_query($insertQuery);
         
         // Post to Discord if significant offer
-        if ($result && $offerData['offer1'] > OfferType::LLE_OFFER) {
+        if ($result && $offerData['offer1'] > \ContractRules::LLE_OFFER) {
             $this->postOfferToDiscord($teamName, $player);
         }
         

@@ -26,7 +26,8 @@ class FreeAgencyNegotiationHelper
     {
         $this->db = $db;
         $this->databaseService = new \Services\DatabaseService();
-        $this->viewHelper = new FreeAgencyViewHelper();
+        // Placeholder - will be replaced with actual team/player in renderNegotiationPage
+        $this->viewHelper = new FreeAgencyViewHelper('', 0);
         $this->calculator = new FreeAgencyDemandCalculator($db);
     }
 
@@ -40,6 +41,10 @@ class FreeAgencyNegotiationHelper
     public function renderNegotiationPage(int $playerID, \Team $team): string
     {
         $player = Player::withPlayerID($this->db, $playerID);
+        
+        // Initialize ViewHelper with actual team and player context
+        $this->viewHelper = new FreeAgencyViewHelper($team->name, $playerID);
+        
         $capCalculator = new FreeAgencyCapCalculator($this->db);
         $capData = $capCalculator->calculateNegotiationCapSpace($team, $player->name);
         
@@ -97,7 +102,7 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
             <td colspan="8"><center><b>MAX SALARY OFFERS:</b></center></td>
         </tr>
         
-        <?= $this->renderOfferButtons($team->name, $player) ?>
+        <?= $this->renderOfferButtons($player) ?>
         
         <?= $this->renderNotesReminders($maxContract, $veteranMinimum, $amendedCapSpace, $capData, $player->birdYears) ?>
         
@@ -121,23 +126,17 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
     /**
      * Render all offer button rows (Max Contract, MLE, LLE, Vet Min)
      * 
-     * @param string $teamName
      * @param Player $player
      * @return string HTML table rows
      */
-    private function renderOfferButtons(
-        string $teamName,
-        Player $player
-    ): string {
-        $formData = $this->buildFormData($teamName, $player);
-        
-        // Calculate values for display purposes only (not posted)
+    private function renderOfferButtons(Player $player): string
+    {
+        // Calculate max contract salary and raises based on bird years
         $maxContract = \ContractRules::getMaxContractSalary($player->yearsOfExperience);
+        $raisePercentage = \ContractRules::getMaxRaisePercentage($player->birdYears);
+        $maxRaise = (int) round($maxContract * $raisePercentage);
         
-        ob_start();
-        
-        // Max Contract row
-        $maxRaise = (int) round($maxContract * 0.1);
+        // Build max salaries for all 6 years using same raise logic as validator
         $maxSalaries = [
             1 => $maxContract,
             2 => $maxContract + $maxRaise,
@@ -146,72 +145,26 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
             5 => $maxContract + ($maxRaise * 4),
             6 => $maxContract + ($maxRaise * 5),
         ];
-        echo $this->viewHelper->renderMaxContractButtons($formData, $maxSalaries);
+        
+        ob_start();
+        echo $this->viewHelper->renderMaxContractButtons($maxSalaries);
         
         // MLE row
         echo "<tr>";
-        echo $this->viewHelper->renderExceptionButtons($formData, 'MLE');
+        echo $this->viewHelper->renderExceptionButtons('MLE');
         echo "</tr>";
         
         // LLE row
         echo "<tr>";
-        echo $this->viewHelper->renderExceptionButtons($formData, 'LLE');
+        echo $this->viewHelper->renderExceptionButtons('LLE');
         echo "</tr>";
         
         // Vet Min row
         echo "<tr>";
-        echo $this->viewHelper->renderExceptionButtons($formData, 'VET');
+        echo $this->viewHelper->renderExceptionButtons('VET');
         echo "</tr>";
         
         return ob_get_clean();
-    }
-
-    /**
-     * Build form data array with only essential fields
-     * 
-     * Only includes data that cannot be reconstructed on the server side.
-     * Fields like vetmin, max, cap space, and demands are derived from
-     * playerID and teamName in the processor.
-     * 
-     * @param string $teamName
-     * @param Player $player
-     * @return array<string, mixed>
-     */
-    private function buildFormData(
-        string $teamName,
-        Player $player
-    ): array {
-        // Only include essential fields that cannot be reconstructed
-        // All other data (vetmin, max, cap space, demands) will be
-        // reconstructed on the server side from playerID and teamName
-        return [
-            'teamname' => $teamName,
-            'playerID' => $player->playerID,
-        ];
-    }
-
-    /**
-     * Get veteran minimum salary for a specific experience level
-     * 
-     * @deprecated Use ContractRules::getVeteranMinimumSalary() instead
-     * @param int $experience Years of experience
-     * @return int Veteran minimum salary
-     */
-    public static function getVeteranMinimumSalary(int $experience): int
-    {
-        return \ContractRules::getVeteranMinimumSalary($experience);
-    }
-
-    /**
-     * Get maximum contract salary for a specific experience level
-     * 
-     * @deprecated Use ContractRules::getMaxContractSalary() instead
-     * @param int $experience Years of experience
-     * @return int Maximum first-year contract salary
-     */
-    public static function getMaxContractSalary(int $experience): int
-    {
-        return \ContractRules::getMaxContractSalary($experience);
     }
 
     /**
@@ -281,9 +234,15 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
         $softCapYear5 = $capData['softCap']['year5'];
         $softCapYear6 = $capData['softCap']['year6'];
         
-        $birdRightsText = $birdYears >= 3
-            ? "<b>Bird Rights Player on Your Team:</b> You may add no more than 12.5% of the amount you offer in the first year as a raise between years (for instance, if you offer 500 in Year 1, you cannot offer a raise of more than 62 between any two subsequent years.)"
-            : "<b>For Players who do not have Bird Rights with your team:</b> You may add no more than 10% of the amount you offer in the first year as a raise between years (for instance, if you offer 500 in Year 1, you cannot offer a raise of more than 50 between any two subsequent years.)";
+        // Calculate raise percentage and example based on bird years (matching validator logic)
+        $raisePercentage = \ContractRules::getMaxRaisePercentage($birdYears);
+        $exampleRaise = (int) round(500 * $raisePercentage);
+        
+        if ($raisePercentage >= 0.125) {
+            $birdRightsText = "<b>Bird Rights Player on Your Team:</b> You may add no more than 12.5% of the amount you offer in the first year as a raise between years (for instance, if you offer 500 in Year 1, you cannot offer a raise of more than {$exampleRaise} between any two subsequent years.)";
+        } else {
+            $birdRightsText = "<b>For Players who do not have Bird Rights with your team:</b> You may add no more than 10% of the amount you offer in the first year as a raise between years (for instance, if you offer 500 in Year 1, you cannot offer a raise of more than {$exampleRaise} between any two subsequent years.)";
+        }
         
         ob_start();
         ?>

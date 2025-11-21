@@ -70,16 +70,10 @@ class FreeAgencyOfferValidator
             return $maxContractValidation;
         }
 
-        // Check raises
-        $raiseValidation = $this->validateRaises($offerData);
+        // Check raises and contract continuity
+        $raiseValidation = $this->validateRaisesAndContinuity($offerData);
         if (!$raiseValidation['valid']) {
             return $raiseValidation;
-        }
-
-        // Check for salary decreases
-        $decreaseValidation = $this->validateNoDecreases($offerData);
-        if (!$decreaseValidation['valid']) {
-            return $decreaseValidation;
         }
 
         return ['valid' => true];
@@ -142,12 +136,17 @@ class FreeAgencyOfferValidator
     }
 
     /**
-     * Validate contract raises comply with CBA rules
+     * Validate contract raises comply with CBA rules and contract has no gaps
+     * 
+     * Ensures:
+     * - Raises don't exceed allowed percentage (10% or 12.5% with Bird Rights)
+     * - No salary decreases year-over-year
+     * - No gaps in contract years (once a year is 0, all following years must be 0)
      * 
      * @param array<string, mixed> $offerData
      * @return array{valid: bool, error?: string}
      */
-    private function validateRaises(array $offerData): array
+    private function validateRaisesAndContinuity(array $offerData): array
     {
         // Determine max raise percentage
         $raisePercentage = $offerData['birdYears'] >= self::BIRD_RIGHTS_THRESHOLD 
@@ -155,58 +154,33 @@ class FreeAgencyOfferValidator
             : self::STANDARD_RAISE_PERCENTAGE;
         
         $maxRaise = (int) round($offerData['offer1'] * $raisePercentage);
+        $contractEnded = false;
 
-        // Check each year's raise
-        $years = [
-            ['current' => 'offer2', 'previous' => 'offer1', 'yearNum' => 2],
-            ['current' => 'offer3', 'previous' => 'offer2', 'yearNum' => 3],
-            ['current' => 'offer4', 'previous' => 'offer3', 'yearNum' => 4],
-            ['current' => 'offer5', 'previous' => 'offer4', 'yearNum' => 5],
-            ['current' => 'offer6', 'previous' => 'offer5', 'yearNum' => 6],
-        ];
-
-        foreach ($years as $year) {
-            $currentOffer = $offerData[$year['current']];
-            $previousOffer = $offerData[$year['previous']];
+        // Check each year's raise and continuity
+        for ($year = 2; $year <= 6; $year++) {
+            $currentOffer = $offerData["offer{$year}"];
+            $previousOffer = $offerData["offer" . ($year - 1)];
             
-            if ($currentOffer > $previousOffer + $maxRaise) {
+            // Check if contract ended
+            if ($previousOffer == 0) {
+                $contractEnded = true;
+            }
+            
+            // Cannot resume contract after it ends
+            if ($contractEnded && $currentOffer > 0) {
+                return [
+                    'valid' => false,
+                    'error' => "Sorry, you cannot have gaps in contract years. You offered 0 in year " . ($year - 1) . " but offered {$currentOffer} in year {$year}."
+                ];
+            }
+            
+            // Check raise amount
+            if ($currentOffer > 0 && $previousOffer > 0 && $currentOffer > $previousOffer + $maxRaise) {
                 $legalOffer = $previousOffer + $maxRaise;
                 
                 return [
                     'valid' => false,
-                    'error' => "Sorry, you tried to offer a larger raise than is permitted. Your first year offer was {$offerData['offer1']} which means the maximum raise allowed each year is {$maxRaise}. Your offer in Year {$year['yearNum']} was {$currentOffer}, which is more than your Year " . ($year['yearNum'] - 1) . " offer, {$previousOffer}, plus the max increase of {$maxRaise}. Given your offer in Year " . ($year['yearNum'] - 1) . ", the most you can offer in Year {$year['yearNum']} is {$legalOffer}."
-                ];
-            }
-        }
-
-        return ['valid' => true];
-    }
-
-    /**
-     * Validate no salary decreases year-over-year
-     * 
-     * @param array<string, mixed> $offerData
-     * @return array{valid: bool, error?: string}
-     */
-    private function validateNoDecreases(array $offerData): array
-    {
-        $years = [
-            ['current' => 'offer2', 'previous' => 'offer1', 'yearNum' => 2, 'yearName' => 'second', 'prevName' => 'first'],
-            ['current' => 'offer3', 'previous' => 'offer2', 'yearNum' => 3, 'yearName' => 'third', 'prevName' => 'second'],
-            ['current' => 'offer4', 'previous' => 'offer3', 'yearNum' => 4, 'yearName' => 'fourth', 'prevName' => 'third'],
-            ['current' => 'offer5', 'previous' => 'offer4', 'yearNum' => 5, 'yearName' => 'fifth', 'prevName' => 'fourth'],
-            ['current' => 'offer6', 'previous' => 'offer5', 'yearNum' => 6, 'yearName' => 'sixth', 'prevName' => 'fifth'],
-        ];
-
-        foreach ($years as $year) {
-            $currentOffer = $offerData[$year['current']];
-            $previousOffer = $offerData[$year['previous']];
-            
-            // Allow zero (no contract for that year), but not a decrease
-            if ($currentOffer > 0 && $previousOffer > 0 && $currentOffer < $previousOffer) {
-                return [
-                    'valid' => false,
-                    'error' => "Sorry, you cannot decrease salary in later years of a contract. You offered {$currentOffer} in the {$year['yearName']} year, which is less than you offered in the {$year['prevName']} year, {$previousOffer}."
+                    'error' => "Sorry, you tried to offer a larger raise than is permitted. Your first year offer was {$offerData['offer1']} which means the maximum raise allowed each year is {$maxRaise}. Your offer in Year {$year} was {$currentOffer}, which is more than your Year " . ($year - 1) . " offer, {$previousOffer}, plus the max increase of {$maxRaise}. Given your offer in Year " . ($year - 1) . ", the most you can offer in Year {$year} is {$legalOffer}."
                 ];
             }
         }

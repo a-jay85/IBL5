@@ -94,7 +94,7 @@ class FreeAgencyProcessor
         // Parse offer amounts based on exception type
         if (OfferType::isVeteranMinimum($offerType)) {
             // Veteran's minimum
-            $offer1 = (int) ($postData['vetmin'] ?? 35);
+            $offer1 = (int) ($postData['vetmin'] ?? FreeAgencyNegotiationHelper::VETERAN_MINIMUM_SALARIES[$player->yearsOfExperience]);
             $offer2 = 0;
             $offer3 = 0;
             $offer4 = 0;
@@ -137,8 +137,8 @@ class FreeAgencyProcessor
             'birdYears' => $birdYears,
             'mleYears' => $offerType,
             'offerType' => $offerType,
-            'vetmin' => (int) ($postData['vetmin'] ?? 35),
-            'year1Max' => (int) ($postData['max'] ?? 1063),
+            'vetmin' => (int) ($postData['vetmin'] ?? FreeAgencyNegotiationHelper::VETERAN_MINIMUM_SALARIES[$player->yearsOfExperience]),
+            'year1Max' => (int) ($postData['max'] ?? FreeAgencyNegotiationHelper::MAX_CONTRACT_SALARIES[$player->yearsOfExperience]),
             'amendedCapSpaceYear1' => (int) ($postData['amendedCapSpaceYear1'] ?? 0),
         ];
     }

@@ -29,7 +29,7 @@ class FreeAgencyNegotiationHelper
      * 
      * @var array<int, int>
      */
-    private const VETERAN_MINIMUM_SALARIES = [
+    public const VETERAN_MINIMUM_SALARIES = [
         10 => 103,  // 10+ years
         9  => 100,  // 9 years
         8  => 89,   // 8 years
@@ -51,7 +51,7 @@ class FreeAgencyNegotiationHelper
      * 
      * @var array<int, int>
      */
-    private const MAX_CONTRACT_SALARIES = [
+    public const MAX_CONTRACT_SALARIES = [
         10 => 1451,  // 10+ years
         7  => 1275,  // 7-9 years
         0  => 1063,  // 0-6 years

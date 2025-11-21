@@ -95,9 +95,6 @@ jobs:
           if [ -f "vendor/bin/phpunit" ]; then
             echo "- PHPUnit: $(vendor/bin/phpunit --version)" >> $GITHUB_STEP_SUMMARY
           fi
-          if [ -f "vendor/bin/phpstan" ]; then
-            echo "- PHPStan: $(vendor/bin/phpstan --version 2>&1 | head -n 1)" >> $GITHUB_STEP_SUMMARY
-          fi
           if [ -f "vendor/bin/phpcs" ]; then
             echo "- PHP_CodeSniffer: $(vendor/bin/phpcs --version)" >> $GITHUB_STEP_SUMMARY
           fi

@@ -129,10 +129,6 @@ runs:
           echo "✅ PHPUnit: $(vendor/bin/phpunit --version)"
         fi
         
-        if [ -f "vendor/bin/phpstan" ]; then
-          echo "✅ PHPStan: $(vendor/bin/phpstan --version 2>&1 | head -n 1)"
-        fi
-        
         if [ -f "vendor/bin/phpcs" ]; then
           echo "✅ PHP_CodeSniffer: $(vendor/bin/phpcs --version)"
         fi

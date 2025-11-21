@@ -42,5 +42,20 @@
         <testsuite name="Negotiation Module Tests">
             <directory>tests/Negotiation</directory>
         </testsuite>
+        <testsuite name="Leaderboards Module Tests">
+            <directory>tests/Leaderboards</directory>
+        </testsuite>
+        <testsuite name="Season Leaders Module Tests">
+            <directory>tests/SeasonLeaders</directory>
+        </testsuite>
+        <testsuite name="Voting Results Module Tests">
+            <directory>tests/VotingResults</directory>
+        </testsuite>
+        <testsuite name="FreeAgency Module Tests">
+            <file>tests/FreeAgency/FreeAgencyDemandCalculatorTest.php</file>
+            <file>tests/FreeAgency/FreeAgencyNegotiationHelperTest.php</file>
+            <file>tests/FreeAgency/FreeAgencyOfferValidatorTest.php</file>
+            <file>tests/FreeAgency/OfferTypeTest.php</file>
+        </testsuite>
     </testsuites>
 </phpunit>

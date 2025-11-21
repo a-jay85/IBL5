@@ -127,6 +127,15 @@ class MockDatabase
         // Simple escaping for mock - in production this would use mysqli_real_escape_string
         return addslashes($string);
     }
+
+    /**
+     * Mock prepared statement support
+     * Returns a MockPreparedStatement that supports bind_param and execute
+     */
+    public function prepare($query)
+    {
+        return new MockPreparedStatement($this, $query);
+    }
 }
 
 class MockDatabaseResult
@@ -175,6 +184,63 @@ class MockDatabaseResult
     public function numRows()
     {
         return count($this->data);
+    }
+}
+
+/**
+ * Mock prepared statement for testing mysqli-style prepared statements
+ */
+class MockPreparedStatement
+{
+    private $mockDb;
+    private $query;
+    private $boundParams = [];
+    private $paramTypes = [];
+
+    public function __construct($mockDb, $query)
+    {
+        $this->mockDb = $mockDb;
+        $this->query = $query;
+    }
+
+    /**
+     * Bind parameters to the prepared statement
+     * @param string $types Parameter types (s=string, i=integer, d=double, b=blob)
+     * @param mixed ...$params Parameters to bind
+     */
+    public function bind_param($types, &...$params)
+    {
+        $this->paramTypes = str_split($types);
+        foreach ($params as $index => $param) {
+            $this->boundParams[$index] = $param;
+        }
+        return true;
+    }
+
+    /**
+     * Execute the prepared statement
+     */
+    public function execute()
+    {
+        // Replace placeholders with bound values in the query
+        $query = $this->query;
+        foreach ($this->boundParams as $param) {
+            // Simple placeholder replacement (?) with the actual value
+            $value = is_string($param) ? "'" . addslashes($param) . "'" : $param;
+            $query = preg_replace('/\?/', $value, $query, 1);
+        }
+        
+        // Execute the query using the mock database
+        return $this->mockDb->sql_query($query);
+    }
+
+    /**
+     * Get the result of the prepared statement
+     */
+    public function get_result()
+    {
+        // Execute and return result
+        return $this->execute();
     }
 }
 

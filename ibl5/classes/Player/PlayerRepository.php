@@ -127,16 +127,16 @@ class PlayerRepository
      */
     private function mapContractFields(PlayerData $playerData, array $plrRow): void
     {
-        $playerData->yearsOfExperience = $plrRow['exp'];
-        $playerData->birdYears = $plrRow['bird'];
-        $playerData->contractCurrentYear = $plrRow['cy'];
-        $playerData->contractTotalYears = $plrRow['cyt'];
-        $playerData->contractYear1Salary = $plrRow['cy1'];
-        $playerData->contractYear2Salary = $plrRow['cy2'];
-        $playerData->contractYear3Salary = $plrRow['cy3'];
-        $playerData->contractYear4Salary = $plrRow['cy4'];
-        $playerData->contractYear5Salary = $plrRow['cy5'];
-        $playerData->contractYear6Salary = $plrRow['cy6'];
+        $playerData->yearsOfExperience = (int) $plrRow['exp'];
+        $playerData->birdYears = (int) $plrRow['bird'];
+        $playerData->contractCurrentYear = (int) $plrRow['cy'];
+        $playerData->contractTotalYears = (int) $plrRow['cyt'];
+        $playerData->contractYear1Salary = (int) $plrRow['cy1'];
+        $playerData->contractYear2Salary = (int) $plrRow['cy2'];
+        $playerData->contractYear3Salary = (int) $plrRow['cy3'];
+        $playerData->contractYear4Salary = (int) $plrRow['cy4'];
+        $playerData->contractYear5Salary = (int) $plrRow['cy5'];
+        $playerData->contractYear6Salary = (int) $plrRow['cy6'];
     }
 
     /**

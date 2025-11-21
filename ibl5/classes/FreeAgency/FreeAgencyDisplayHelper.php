@@ -17,13 +17,11 @@ class FreeAgencyDisplayHelper
 {
     private $db;
     private \Services\DatabaseService $databaseService;
-    private FreeAgencyViewHelper $viewHelper;
 
     public function __construct($db)
     {
         $this->db = $db;
         $this->databaseService = new \Services\DatabaseService();
-        $this->viewHelper = new FreeAgencyViewHelper();
     }
 
     /**

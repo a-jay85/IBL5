@@ -57,5 +57,8 @@
             <file>tests/FreeAgency/FreeAgencyOfferValidatorTest.php</file>
             <file>tests/FreeAgency/OfferTypeTest.php</file>
         </testsuite>
+        <testsuite name="Database Connection Tests">
+            <file>tests/DatabaseConnectionTest.php</file>
+        </testsuite>
     </testsuites>
 </phpunit>

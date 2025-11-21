@@ -302,35 +302,6 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
     }
 
     /**
-     * Calculate total demands in hundreds
-     * 
-     * @param array{dem1: int, dem2: int, dem3: int, dem4: int, dem5: int, dem6: int} $demands
-     * @return float Total in hundreds (divided by 100, rounded to 2 decimals)
-     */
-    private function calculateTotalDemands(array $demands): float
-    {
-        $total = $demands['dem1'] + $demands['dem2'] + $demands['dem3'] 
-               + $demands['dem4'] + $demands['dem5'] + $demands['dem6'];
-        return round($total / 100, 2);
-    }
-
-    /**
-     * Calculate number of years in demands
-     * 
-     * @param array{dem1: int, dem2: int, dem3: int, dem4: int, dem5: int, dem6: int} $demands
-     * @return int Number of years
-     */
-    private function calculateDemandYears(array $demands): int
-    {
-        if ($demands['dem6'] != 0) return 6;
-        if ($demands['dem5'] != 0) return 5;
-        if ($demands['dem4'] != 0) return 4;
-        if ($demands['dem3'] != 0) return 3;
-        if ($demands['dem2'] != 0) return 2;
-        return 1;
-    }
-
-    /**
      * Render Notes/Reminders section
      * 
      * @param int $maxContract Maximum contract value

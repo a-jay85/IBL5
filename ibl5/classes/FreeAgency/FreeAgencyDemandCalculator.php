@@ -103,21 +103,20 @@ class FreeAgencyDemandCalculator
         string $teamName,
         Player $player
     ): int {
-        $databaseService = new \Services\DatabaseService();
-        $escapedTeamName = $databaseService->escapeString($this->db, $teamName);
-        $escapedPosition = $databaseService->escapeString($this->db, $player->position);
-        $escapedPlayerName = $databaseService->escapeString($this->db, $player->name);
-        
         $query = "SELECT cy, cy1, cy2, cy3, cy4, cy5, cy6 
                   FROM ibl_plr 
-                  WHERE teamname='$escapedTeamName' 
-                    AND pos='$escapedPosition' 
-                    AND name!='$escapedPlayerName'";
-        $result = $this->db->sql_query($query);
+                  WHERE teamname = ? 
+                    AND pos = ? 
+                    AND pid != ?";
+        
+        $stmt = $this->db->prepare($query);
+        $stmt->bind_param('ssi', $teamName, $player->position, $player->playerID);
+        $stmt->execute();
+        $result = $stmt->get_result();
         
         $totalSalary = 0;
         
-        foreach ($result as $row) {
+        while ($row = $result->fetch_assoc()) {
             $currentYear = (int) $row['cy'];
             
             // Get salary for next year based on current contract year

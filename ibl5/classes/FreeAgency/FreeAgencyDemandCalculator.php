@@ -22,8 +22,8 @@ class FreeAgencyDemandCalculator
     private const LOYALTY_BONUS_PERCENTAGE = 0.025;
     private const SECURITY_BASE_FACTOR = -0.025;
     private const SECURITY_YEAR_FACTOR = 0.01;
-    private const PLAYING_TIME_BASE_FACTOR = -0.025;
-    private const PLAYING_TIME_MONEY_FACTOR = -0.0025;
+    private const PLAYING_TIME_BASE_FACTOR = 0.025;
+    private const PLAYING_TIME_MONEY_FACTOR = 0.0025;
     private const PLAYING_TIME_DIVISOR = 100;
     private const MAX_POSITION_SALARY_CAP = 2000;
     private const RANDOM_VARIANCE_MIN = -5;
@@ -199,8 +199,8 @@ class FreeAgencyDemandCalculator
                           * ($playerSecurity - 1);
         
         // Playing time factor (less money at position means more opportunity)
-        $factorPlayingTime = (self::PLAYING_TIME_MONEY_FACTOR * $positionSalary / self::PLAYING_TIME_DIVISOR 
-                              + self::PLAYING_TIME_BASE_FACTOR) 
+        $factorPlayingTime = -(self::PLAYING_TIME_MONEY_FACTOR * $positionSalary / self::PLAYING_TIME_DIVISOR 
+                              - self::PLAYING_TIME_BASE_FACTOR) 
                              * ($playerPlayingTime - 1);
         
         return 1 + $factorPlayForWinner + $factorTradition + $factorLoyalty + $factorSecurity + $factorPlayingTime;

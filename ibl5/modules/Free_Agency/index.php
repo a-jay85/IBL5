@@ -77,7 +77,8 @@ function negotiate($pid)
     OpenTable();
 
     $team = \Team::initialize($db, $teamID);
-    $negotiationHelper = new FreeAgencyNegotiationHelper($db);
+    $season = new Season($db);
+    $negotiationHelper = new FreeAgencyNegotiationHelper($db, $season);
     echo $negotiationHelper->renderNegotiationPage($pid, $team);
 
     CloseTable();

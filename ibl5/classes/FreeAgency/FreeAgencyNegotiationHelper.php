@@ -22,13 +22,15 @@ class FreeAgencyNegotiationHelper
     private \Services\DatabaseService $databaseService;
     private FreeAgencyViewHelper $viewHelper;
     private FreeAgencyDemandCalculator $calculator;
+    private \Season $season;
 
-    public function __construct($db, $mysqli_db = null)
+    public function __construct($db, \Season $season, $mysqli_db = null)
     {
         global $mysqli_db;
         
         $this->db = $db;
         $this->mysqli_db = $mysqli_db ?? $GLOBALS['mysqli_db'] ?? null;
+        $this->season = $season;
         
         $this->databaseService = new \Services\DatabaseService();
         // Placeholder - will be replaced with actual player in renderNegotiationPage
@@ -53,7 +55,7 @@ class FreeAgencyNegotiationHelper
         // Initialize ViewHelper with actual team and player
         $this->viewHelper = new FreeAgencyViewHelper($team->name, $player);
         
-        $capCalculator = new FreeAgencyCapCalculator($this->db, $team);
+        $capCalculator = new FreeAgencyCapCalculator($this->db, $team, $this->season);
         $capMetrics = $capCalculator->calculateTeamCapMetrics($player->name);
         
         $demands = $this->calculator->getPlayerDemands($player->name);

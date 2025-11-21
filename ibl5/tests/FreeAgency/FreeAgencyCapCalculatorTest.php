@@ -21,7 +21,8 @@ class FreeAgencyCapCalculatorTest extends TestCase
     {
         $this->mockDb = new MockDatabase();
         $mockTeam = $this->createMockTeam();
-        $this->calculator = new FreeAgencyCapCalculator($this->mockDb, $mockTeam);
+        $mockSeason = $this->createMock(\Season::class);
+        $this->calculator = new FreeAgencyCapCalculator($this->mockDb, $mockTeam, $mockSeason);
     }
 
     /**
@@ -56,7 +57,8 @@ class FreeAgencyCapCalculatorTest extends TestCase
     {
         // Arrange - Team with no players under contract
         $team = $this->createMockTeamWithPlayers([]);
-        $calculator = new FreeAgencyCapCalculator($this->mockDb, $team);
+        $mockSeason = $this->createMock(\Season::class);
+        $calculator = new FreeAgencyCapCalculator($this->mockDb, $team, $mockSeason);
         
         // Act
         $result = $calculator->calculateTeamCapMetrics();
@@ -88,7 +90,8 @@ class FreeAgencyCapCalculatorTest extends TestCase
         ];
         
         $team = $this->createMockTeamWithPlayersAndOffers($players, $offers);
-        $calculator = new FreeAgencyCapCalculator($this->mockDb, $team);
+        $mockSeason = $this->createMock(\Season::class);
+        $calculator = new FreeAgencyCapCalculator($this->mockDb, $team, $mockSeason);
         
         // Act
         $result = $calculator->calculateTeamCapMetrics();
@@ -157,7 +160,8 @@ class FreeAgencyCapCalculatorTest extends TestCase
     {
         // Arrange - Set up mock team with offer for specific player
         $team = $this->createMockTeamWithOfferToExclude('Test Player', 1000);
-        $calculator = new FreeAgencyCapCalculator($this->mockDb, $team);
+        $mockSeason = $this->createMock(\Season::class);
+        $calculator = new FreeAgencyCapCalculator($this->mockDb, $team, $mockSeason);
         
         // Act
         $result = $calculator->calculateTeamCapMetrics('Test Player');
@@ -246,9 +250,6 @@ class FreeAgencyCapCalculatorTest extends TestCase
         return $team;
     }
 
-    /**
-     * Create a mock team with an offer to exclude from negotiation cap space
-     */
     private function createMockTeamWithOfferToExclude(string $excludePlayerName, int $offerAmount): \Team
     {
         $team = $this->createMock(\Team::class);

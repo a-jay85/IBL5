@@ -18,6 +18,7 @@ class FreeAgencyProcessor
     private FreeAgencyOfferValidator $validator;
     private FreeAgencyDemandCalculator $calculator;
     private \Services\DatabaseService $databaseService;
+    private \Season $season;
 
     public function __construct($db, $mysqli_db = null)
     {
@@ -25,6 +26,7 @@ class FreeAgencyProcessor
         
         $this->db = $db;
         $this->mysqli_db = $mysqli_db ?? $GLOBALS['mysqli_db'] ?? null;
+        $this->season = new \Season($this->db);
         
         $repository = new FreeAgencyDemandRepository($db, $this->mysqli_db);
         $this->validator = new FreeAgencyOfferValidator($db, $this->mysqli_db);
@@ -101,7 +103,7 @@ class FreeAgencyProcessor
         $maxContractYear1 = \ContractRules::getMaxContractSalary($player->yearsOfExperience);
         
         // Reconstruct cap space data using provided team object
-        $capCalculator = new FreeAgencyCapCalculator($this->db, $team);
+        $capCalculator = new FreeAgencyCapCalculator($this->db, $team, $this->season);
         $capMetrics = $capCalculator->calculateTeamCapMetrics($player->name);
         
         // Get existing offer to calculate amended cap space

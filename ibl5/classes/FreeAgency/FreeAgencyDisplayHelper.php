@@ -37,7 +37,7 @@ class FreeAgencyDisplayHelper
      */
     private function initializeCapMetrics(): void
     {
-        $capCalculator = new FreeAgencyCapCalculator($this->db, $this->team);
+        $capCalculator = new FreeAgencyCapCalculator($this->db, $this->team, $this->season);
         $this->capMetrics = $capCalculator->calculateTeamCapMetrics();
     }
 

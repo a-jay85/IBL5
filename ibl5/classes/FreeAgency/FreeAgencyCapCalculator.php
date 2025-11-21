@@ -16,11 +16,13 @@ class FreeAgencyCapCalculator
 {
     private $db;
     private \Team $team;
+    private \Season $season;
 
-    public function __construct($db, \Team $team)
+    public function __construct($db, \Team $team, \Season $season)
     {
         $this->db = $db;
         $this->team = $team;
+        $this->season = $season;
     }
 
     /**
@@ -34,13 +36,12 @@ class FreeAgencyCapCalculator
     private function calculateTotalSalaries(array $rosterData, array $offersData, ?string $excludeOfferPlayerName = null): array
     {
         $totalSalaries = [0, 0, 0, 0, 0, 0];
-        $season = new \Season($this->db);
 
         // Add salaries from players under contract
         foreach ($rosterData as $playerRow) {
             $player = Player::withPlrRow($this->db, $playerRow);
             
-            if (!$player->isPlayerFreeAgent($season)) {
+            if (!$player->isPlayerFreeAgent($this->season)) {
                 $futureSalaries = $player->getFutureSalaries();
                 
                 for ($year = 0; $year < 6; $year++) {
@@ -84,13 +85,11 @@ class FreeAgencyCapCalculator
             \Team::ROSTER_SPOTS_MAX,
         ];
 
-        $season = new \Season($this->db);
-
         // Count players under contract
         foreach ($rosterData as $playerRow) {
             $player = Player::withPlrRow($this->db, $playerRow);
             
-            if (!$player->isPlayerFreeAgent($season)) {
+            if (!$player->isPlayerFreeAgent($this->season)) {
                 // Exclude players whose name starts with '|'
                 $firstChar = substr($player->name, 0, 1);
                 if ($player->teamName == $this->team->name && $firstChar !== '|') {

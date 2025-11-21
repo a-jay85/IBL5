@@ -138,45 +138,29 @@ class FreeAgencyCapCalculator
         // Subtract current contracts
         $result = $team->getRosterUnderContractOrderedByOrdinalResult();
         
+        // Map contract year to salary column offsets
+        // cy=0 means contract starts this year, so subtract cy1-cy6
+        // cy=1 means contract started last year, so subtract cy2-cy6, etc.
+        $salaryColumnMap = [
+            0 => ['cy1', 'cy2', 'cy3', 'cy4', 'cy5', 'cy6'],
+            1 => ['cy2', 'cy3', 'cy4', 'cy5', 'cy6'],
+            2 => ['cy3', 'cy4', 'cy5', 'cy6'],
+            3 => ['cy4', 'cy5', 'cy6'],
+            4 => ['cy5', 'cy6'],
+            5 => ['cy6'],
+        ];
+        
         foreach ($result as $row) {
             $ordinal = (int) $row['ordinal'];
             $cy = (int) $row['cy'];
             $cyt = (int) $row['cyt'];
             
-            switch ($cy) {
-                case 0:
-                    $capSpace['year1'] -= (int) $row['cy1'];
-                    $capSpace['year2'] -= (int) $row['cy2'];
-                    $capSpace['year3'] -= (int) $row['cy3'];
-                    $capSpace['year4'] -= (int) $row['cy4'];
-                    $capSpace['year5'] -= (int) $row['cy5'];
-                    $capSpace['year6'] -= (int) $row['cy6'];
-                    break;
-                case 1:
-                    $capSpace['year1'] -= (int) $row['cy2'];
-                    $capSpace['year2'] -= (int) $row['cy3'];
-                    $capSpace['year3'] -= (int) $row['cy4'];
-                    $capSpace['year4'] -= (int) $row['cy5'];
-                    $capSpace['year5'] -= (int) $row['cy6'];
-                    break;
-                case 2:
-                    $capSpace['year1'] -= (int) $row['cy3'];
-                    $capSpace['year2'] -= (int) $row['cy4'];
-                    $capSpace['year3'] -= (int) $row['cy5'];
-                    $capSpace['year4'] -= (int) $row['cy6'];
-                    break;
-                case 3:
-                    $capSpace['year1'] -= (int) $row['cy4'];
-                    $capSpace['year2'] -= (int) $row['cy5'];
-                    $capSpace['year3'] -= (int) $row['cy6'];
-                    break;
-                case 4:
-                    $capSpace['year1'] -= (int) $row['cy5'];
-                    $capSpace['year2'] -= (int) $row['cy6'];
-                    break;
-                case 5:
-                    $capSpace['year1'] -= (int) $row['cy6'];
-                    break;
+            // Apply salary deductions for remaining contract years
+            if (isset($salaryColumnMap[$cy])) {
+                foreach ($salaryColumnMap[$cy] as $index => $columnName) {
+                    $yearKey = 'year' . ($index + 1);
+                    $capSpace[$yearKey] -= (int) $row[$columnName];
+                }
             }
             
             if ($cy != $cyt && $ordinal <= \JSB::WAIVERS_ORDINAL) {

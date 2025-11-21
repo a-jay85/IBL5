@@ -16,13 +16,11 @@ class FreeAgencyCapCalculator
 {
     private $db;
     private \Team $team;
-    private \Services\DatabaseService $databaseService;
 
     public function __construct($db, \Team $team)
     {
         $this->db = $db;
         $this->team = $team;
-        $this->databaseService = new \Services\DatabaseService();
     }
 
     /**

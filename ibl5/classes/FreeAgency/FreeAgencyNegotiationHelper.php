@@ -31,8 +31,10 @@ class FreeAgencyNegotiationHelper
         $this->mysqli_db = $mysqli_db ?? $GLOBALS['mysqli_db'] ?? null;
         
         $this->databaseService = new \Services\DatabaseService();
-        // Placeholder - will be replaced with actual team/player in renderNegotiationPage
-        $this->viewHelper = new FreeAgencyViewHelper('', 0);
+        // Placeholder - will be replaced with actual player in renderNegotiationPage
+        // Using a dummy player object for initialization
+        $dummyPlayer = new Player();
+        $this->viewHelper = new FreeAgencyViewHelper('', $dummyPlayer);
         $repository = new FreeAgencyDemandRepository($db, $this->mysqli_db);
         $this->calculator = new FreeAgencyDemandCalculator($repository);
     }
@@ -48,8 +50,8 @@ class FreeAgencyNegotiationHelper
     {
         $player = Player::withPlayerID($this->db, $playerID);
         
-        // Initialize ViewHelper with actual team and player context
-        $this->viewHelper = new FreeAgencyViewHelper($team->name, $playerID);
+        // Initialize ViewHelper with actual team and player
+        $this->viewHelper = new FreeAgencyViewHelper($team->name, $player);
         
         $capCalculator = new FreeAgencyCapCalculator($this->db);
         $capData = $capCalculator->calculateNegotiationCapSpace($team, $player->name);
@@ -72,7 +74,7 @@ class FreeAgencyNegotiationHelper
 <b><?= htmlspecialchars($player->position) ?> <?= htmlspecialchars($player->name) ?></b> - Contract Demands:
 <br>
 
-<?= $this->viewHelper->renderPlayerRatings($player) ?>
+<?= $this->viewHelper->renderPlayerRatings() ?>
 
 <img align="left" src="<?= htmlspecialchars(PlayerImageHelper::getImageUrl($playerID)) ?>">
 

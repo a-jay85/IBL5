@@ -11,27 +11,26 @@ namespace FreeAgency;
 class FreeAgencyViewHelper
 {
     private string $teamName;
-    private int $playerID;
+    private \Player\Player $player;
 
     /**
      * Constructor
      * 
      * @param string $teamName Team name for hidden form fields
-     * @param int $playerID Player ID for hidden form fields
+     * @param \Player\Player $player Player object with all necessary data
      */
-    public function __construct(string $teamName, int $playerID)
+    public function __construct(string $teamName, \Player\Player $player)
     {
         $this->teamName = $teamName;
-        $this->playerID = $playerID;
+        $this->player = $player;
     }
 
     /**
      * Render player ratings table
      * 
-     * @param \Player\Player $player Player object with ratings
      * @return string HTML table
      */
-    public function renderPlayerRatings(\Player\Player $player): string
+    public function renderPlayerRatings(): string
     {
         ob_start();
         ?>
@@ -61,27 +60,27 @@ class FreeAgencyViewHelper
             <td align="center"><b>td</b></td>
         </tr>
         <tr>
-            <td align="center"><?= htmlspecialchars($player->ratingFieldGoalAttempts) ?></td>
-            <td align="center"><?= htmlspecialchars($player->ratingFieldGoalPercentage) ?></td>
-            <td align="center"><?= htmlspecialchars($player->ratingFreeThrowAttempts) ?></td>
-            <td align="center"><?= htmlspecialchars($player->ratingFreeThrowPercentage) ?></td>
-            <td align="center"><?= htmlspecialchars($player->ratingThreePointAttempts) ?></td>
-            <td align="center"><?= htmlspecialchars($player->ratingThreePointPercentage) ?></td>
-            <td align="center"><?= htmlspecialchars($player->ratingOffensiveRebounds) ?></td>
-            <td align="center"><?= htmlspecialchars($player->ratingDefensiveRebounds) ?></td>
-            <td align="center"><?= htmlspecialchars($player->ratingAssists) ?></td>
-            <td align="center"><?= htmlspecialchars($player->ratingSteals) ?></td>
-            <td align="center"><?= htmlspecialchars($player->ratingTurnovers) ?></td>
-            <td align="center"><?= htmlspecialchars($player->ratingBlocks) ?></td>
-            <td align="center"><?= htmlspecialchars($player->ratingFouls) ?></td>
-            <td align="center"><?= htmlspecialchars($player->ratingOutsideOffense) ?></td>
-            <td align="center"><?= htmlspecialchars($player->ratingDriveOffense) ?></td>
-            <td align="center"><?= htmlspecialchars($player->ratingPostOffense) ?></td>
-            <td align="center"><?= htmlspecialchars($player->ratingTransitionOffense) ?></td>
-            <td align="center"><?= htmlspecialchars($player->ratingOutsideDefense) ?></td>
-            <td align="center"><?= htmlspecialchars($player->ratingDriveDefense) ?></td>
-            <td align="center"><?= htmlspecialchars($player->ratingPostDefense) ?></td>
-            <td align="center"><?= htmlspecialchars($player->ratingTransitionDefense) ?></td>
+            <td align="center"><?= htmlspecialchars($this->player->ratingFieldGoalAttempts) ?></td>
+            <td align="center"><?= htmlspecialchars($this->player->ratingFieldGoalPercentage) ?></td>
+            <td align="center"><?= htmlspecialchars($this->player->ratingFreeThrowAttempts) ?></td>
+            <td align="center"><?= htmlspecialchars($this->player->ratingFreeThrowPercentage) ?></td>
+            <td align="center"><?= htmlspecialchars($this->player->ratingThreePointAttempts) ?></td>
+            <td align="center"><?= htmlspecialchars($this->player->ratingThreePointPercentage) ?></td>
+            <td align="center"><?= htmlspecialchars($this->player->ratingOffensiveRebounds) ?></td>
+            <td align="center"><?= htmlspecialchars($this->player->ratingDefensiveRebounds) ?></td>
+            <td align="center"><?= htmlspecialchars($this->player->ratingAssists) ?></td>
+            <td align="center"><?= htmlspecialchars($this->player->ratingSteals) ?></td>
+            <td align="center"><?= htmlspecialchars($this->player->ratingTurnovers) ?></td>
+            <td align="center"><?= htmlspecialchars($this->player->ratingBlocks) ?></td>
+            <td align="center"><?= htmlspecialchars($this->player->ratingFouls) ?></td>
+            <td align="center"><?= htmlspecialchars($this->player->ratingOutsideOffense) ?></td>
+            <td align="center"><?= htmlspecialchars($this->player->ratingDriveOffense) ?></td>
+            <td align="center"><?= htmlspecialchars($this->player->ratingPostOffense) ?></td>
+            <td align="center"><?= htmlspecialchars($this->player->ratingTransitionOffense) ?></td>
+            <td align="center"><?= htmlspecialchars($this->player->ratingOutsideDefense) ?></td>
+            <td align="center"><?= htmlspecialchars($this->player->ratingDriveDefense) ?></td>
+            <td align="center"><?= htmlspecialchars($this->player->ratingPostDefense) ?></td>
+            <td align="center"><?= htmlspecialchars($this->player->ratingTransitionDefense) ?></td>
         </tr>
     </table>
 </center>
@@ -169,9 +168,9 @@ class FreeAgencyViewHelper
             echo "<input type=\"hidden\" name=\"offeryear{$yearNum}\" value=\"" . htmlspecialchars($offers[$i]) . "\">\n";
         }
         
-        // Essential form data - uses instance properties
+        // Essential form data - uses player properties
         echo "<input type=\"hidden\" name=\"teamname\" value=\"" . htmlspecialchars($this->teamName) . "\">\n";
-        echo "<input type=\"hidden\" name=\"playerID\" value=\"" . htmlspecialchars($this->playerID) . "\">\n";
+        echo "<input type=\"hidden\" name=\"playerID\" value=\"" . htmlspecialchars($this->player->playerID) . "\">\n";
         echo "<input type=\"hidden\" name=\"offerType\" value=\"" . htmlspecialchars($offerType) . "\">\n";
         
         return ob_get_clean();
@@ -280,7 +279,7 @@ class FreeAgencyViewHelper
     {
         $contractOfferConfigs = [
             [
-                'offers' => [\ContractRules::getVeteranMinimumSalary(1)],
+                'offers' => [\ContractRules::getVeteranMinimumSalary($this->player->yearsOfExperience)],
                 'offerType' => (string) OfferType::VETERAN_MINIMUM,
             ],
         ];

@@ -73,8 +73,9 @@ if (!isset($_POST['confirmed'])) {
 
 require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
-// Set database connection to UTF-8 for proper encoding of accent marks
-$db->set_charset('utf8mb4');
+// The database connection is already configured for UTF-8 encoding in db.php
+// $db is the custom MySQL wrapper class
+// $mysqli_db is the MySQLi instance with UTF-8 charset already set
 
 $sharedFunctions = new Shared($db);
 $commonRepository = new Services\CommonRepository($db);

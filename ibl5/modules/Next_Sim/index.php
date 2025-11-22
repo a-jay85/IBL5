@@ -15,8 +15,8 @@ $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 $pagetitle = "- $module_name";
 
-$username = $cookie[1];
-$userTeam = Team::initialize($db, $commonRepository->getTeamnameFromUsername($username));
+ $username = strval($cookie[1] ?? '');
+ $userTeam = Team::initialize($db, $commonRepository->getTeamnameFromUsername($username));
 $userStartingPG = Player::withPlayerID($db, $userTeam->getCurrentlySetStarterPlayerIDForPosition('PG') ?? 4040404);
 $userStartingSG = Player::withPlayerID($db, $userTeam->getCurrentlySetStarterPlayerIDForPosition('SG') ?? 4040404);
 $userStartingSF = Player::withPlayerID($db, $userTeam->getCurrentlySetStarterPlayerIDForPosition('SF') ?? 4040404);

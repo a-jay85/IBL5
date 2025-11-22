@@ -48,7 +48,7 @@ function display()
     Nuke\Header::header();
     OpenTable();
 
-    $username = $cookie[1];
+    $username = strval($cookie[1] ?? '');
     $teamName = $commonRepository->getTeamnameFromUsername($username);
     $team = Team::initialize($db, $teamName);
 
@@ -69,7 +69,7 @@ function negotiate($pid)
     $pid = intval($pid);
 
     // Get user team information
-    $username = $cookie[1];
+    $username = strval($cookie[1] ?? '');
     $userTeamName = $commonRepository->getTeamnameFromUsername($username);
     $teamID = $commonRepository->getTidFromTeamname($userTeamName);
 

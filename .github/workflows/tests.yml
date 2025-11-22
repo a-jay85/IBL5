@@ -45,6 +45,45 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-vendor-
     
+    - name: Create config.php
+      working-directory: ibl5
+      env:
+        DB_HOST: ${{ secrets.DB_HOST }}
+        DB_USER: ${{ secrets.DB_USER }}
+        DB_PASS: ${{ secrets.DB_PASS }}
+        DB_NAME: ${{ secrets.DB_NAME }}
+        PREFIX: ${{ secrets.PREFIX }}
+        USER_PREFIX: ${{ secrets.USER_PREFIX }}
+        DB_TYPE: ${{ secrets.DB_TYPE }}
+      run: |
+        echo "Generating config.php from template with repository secrets..."
+        
+        # Read the template file
+        cp config.php.example config.php
+        
+        # Replace the placeholders with actual secret values
+        # Using sed with different delimiters to handle special characters in passwords
+        sed -i "s|\$dbhost = \"localhost\";|\$dbhost = \"${DB_HOST:-localhost}\";|g" config.php
+        sed -i "s|\$dbuname = \"iblhoops_\";|\$dbuname = \"${DB_USER:-iblhoops_}\";|g" config.php
+        sed -i "s|\$dbpass = \"password\";|\$dbpass = \"${DB_PASS:-password}\";|g" config.php
+        sed -i "s|\$dbname = \"iblhoops_\";|\$dbname = \"${DB_NAME:-iblhoops_}\";|g" config.php
+        sed -i "s|\$prefix = \"nuke\";|\$prefix = \"${PREFIX:-nuke}\";|g" config.php
+        sed -i "s|\$user_prefix = \"nuke\";|\$user_prefix = \"${USER_PREFIX:-nuke}\";|g" config.php
+        sed -i "s|\$dbtype = \"MySQL\";|\$dbtype = \"${DB_TYPE:-MySQL}\";|g" config.php
+        
+        echo "✓ config.php created with repository secrets"
+        echo ""
+        echo "Verifying config.php was created..."
+        if [ -f "config.php" ]; then
+          echo "✓ config.php exists"
+          echo ""
+          echo "Config file structure (secrets masked):"
+          grep -E '^\$db|^\$prefix|^\$user_prefix' config.php | sed 's/=.*/= "[MASKED]";/g'
+        else
+          echo "✗ config.php was not created!"
+          exit 1
+        fi
+    
     - name: Install dependencies
       working-directory: ibl5
       run: |
@@ -52,10 +91,11 @@ jobs:
         echo "Checking composer.json..."
         cat composer.json | head -20
         echo ""
-        echo "Running: composer install --prefer-dist --no-progress --no-interaction"
-        composer install --prefer-dist --no-progress --no-interaction || {
-          echo "First composer install attempt failed, trying again with verbose output..."
-          composer install --prefer-dist || exit 1
+        echo "Running: composer install --no-progress --no-interaction"
+        echo "Note: Composer will check GitHub Actions cache first, then Composer cache, then download if needed"
+        composer install --no-progress --no-interaction || {
+          echo "Composer install failed, trying again with verbose output..."
+          composer install || exit 1
         }
         echo ""
         echo "Verifying installation..."
@@ -79,10 +119,21 @@ jobs:
           --testdox \
           --no-coverage \
           --colors=always
+
+    - name: Check phpunit result cache
+      id: phpunit_cache_check
+      run: |
+        # Check whether the phpunit result cache file was produced
+        if [ -f ibl5/.phpunit.result.cache ]; then
+          echo "exists=true" >> $GITHUB_OUTPUT
+        else
+          echo "exists=false" >> $GITHUB_OUTPUT
+        fi
     
     - name: Upload test results
-      if: always()
+      if: always() && steps.phpunit_cache_check.outputs.exists == 'true'
       uses: actions/upload-artifact@v4
       with:
         name: test-results
         path: ibl5/.phpunit.result.cache
+

@@ -61,8 +61,8 @@ jobs:
         working-directory: ibl5
         run: |
           echo "Installing Composer dependencies..."
-          composer install --prefer-dist --no-progress --no-interaction || \
-          composer install --prefer-source --no-progress --no-interaction || \
+          # Prefer cache over network downloads to avoid timeouts
+          # The composer cache (@v4 above) will be checked first automatically
           composer install --no-progress --no-interaction
       
       - name: Verify PHPUnit

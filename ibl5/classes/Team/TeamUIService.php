@@ -74,26 +74,18 @@ class TeamUIService
      */
     private function buildTab(string $tabKey, string $tabLabel, string $display, int $teamID, string $insertyear): string
     {
-        $isActive = ($display === $tabKey) ? " bgcolor=#BBBBBB style=\"font-weight:bold\"" : "";
-        return "<td{$isActive}><a href=\"modules.php?name=Team&op=team&teamID=$teamID&display=$tabKey$insertyear\">$tabLabel</a></td>";
-    }
+        $team = \Team::initialize($this->db, $teamID);
 
-    /**
-     * Get the display title based on the current display type
-     */
-    public function getDisplayTitle(string $display): string
-    {
-        $titles = [
-            'ratings' => 'Player Ratings',
-            'total_s' => 'Season Totals',
-            'avg_s' => 'Season Averages',
-            'per36mins' => 'Per 36 Minutes',
-            'chunk' => 'Chunk Averages',
-            'playoffs' => 'Playoff Averages',
-            'contracts' => 'Contracts',
-        ];
+        if ($display === $tabKey) {
+            // Active tab: table cell uses team->color1, link text is bold and team->color2
+            $isActiveLink = ' style="font-weight:bold; color: black !important;"';
+            $isActiveTableCell = ' bgcolor="' . $team->color2 . '"';
+        } else {
+            $isActiveLink = '';
+            $isActiveTableCell = '';
+        }
 
-        return $titles[$display] ?? 'Player Ratings';
+        return "<td{$isActiveTableCell}><a href=\"modules.php?name=Team&op=team&teamID=$teamID&display=$tabKey$insertyear\"{$isActiveLink}>$tabLabel</a></td>";
     }
 
     /**

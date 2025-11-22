@@ -85,7 +85,6 @@ class TeamController
         $tabs = $this->uiService->renderTabs($teamID, $display, $insertyear, $season);
 
         // Get display content
-        $showing = $this->uiService->getDisplayTitle($display);
         $table_output = $this->uiService->getTableOutput($display, $this->db, $result, $team, $yr, $season, $sharedFunctions);
 
         // Get starters table if applicable
@@ -104,9 +103,6 @@ class TeamController
 
         echo "
         <table align=center>
-            <tr bgcolor=$team->color1>
-                <td><font color=$team->color2><b><center>$showing (Sortable by clicking on Column Heading)</center></b></font></td>
-            </tr>
             <tr>
                 <td align=center><table><tr>$tabs</tr></table></td>
             </tr>

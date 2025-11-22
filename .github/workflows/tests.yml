@@ -119,10 +119,21 @@ jobs:
           --testdox \
           --no-coverage \
           --colors=always
+
+    - name: Check phpunit result cache
+      id: phpunit_cache_check
+      run: |
+        # Check whether the phpunit result cache file was produced
+        if [ -f ibl5/.phpunit.result.cache ]; then
+          echo "exists=true" >> $GITHUB_OUTPUT
+        else
+          echo "exists=false" >> $GITHUB_OUTPUT
+        fi
     
     - name: Upload test results
-      if: always()
+      if: always() && steps.phpunit_cache_check.outputs.exists == 'true'
       uses: actions/upload-artifact@v4
       with:
         name: test-results
         path: ibl5/.phpunit.result.cache
+

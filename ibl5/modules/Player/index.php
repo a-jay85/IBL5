@@ -36,7 +36,7 @@ function showpage($playerID, $pageView)
     echo $viewHelper->renderPlayerHeader($player, $playerID);
 
     // Render action buttons based on business logic
-    $userTeamName = $commonRepository->getTeamnameFromUsername($cookie[1]);
+    $userTeamName = $commonRepository->getTeamnameFromUsername(strval($cookie[1] ?? ''));
     $userTeam = Team::initialize($db, $userTeamName);
 
     if ($pageService->shouldShowRookieOptionUsedMessage($player)) {
@@ -147,7 +147,7 @@ function negotiate($playerID)
     
     // Get user's team name using existing CommonRepository
     $commonRepository = new Services\CommonRepository($db);
-    $userTeamName = $commonRepository->getTeamnameFromUsername($cookie[1]);
+    $userTeamName = $commonRepository->getTeamnameFromUsername(strval($cookie[1] ?? ''));
 
     Nuke\Header::header();
     OpenTable();
@@ -172,7 +172,7 @@ function rookieoption($pid)
     $formView = new \RookieOption\RookieOptionFormView();
     
     // Get user's team name
-    $userTeamName = $commonRepository->getTeamnameFromUsername($cookie[1]);
+    $userTeamName = $commonRepository->getTeamnameFromUsername(strval($cookie[1] ?? ''));
     
     // Load player
     $player = Player::withPlayerID($db, $pid);

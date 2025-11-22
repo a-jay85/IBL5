@@ -7,8 +7,8 @@ $season = new Season($db);
 
 $userTeamID = intval($_GET['teamID']);
 if (!$userTeamID) {
-    if ($cookie[1]) {
-        $userTeamName = $commonRepository->getTeamnameFromUsername($cookie[1]);
+    if (!empty($cookie[1])) {
+        $userTeamName = $commonRepository->getTeamnameFromUsername(strval($cookie[1] ?? ''));
         $userTeamID = $commonRepository->getTidFromTeamname($userTeamName);
     } else {
         $userTeamID = 0;

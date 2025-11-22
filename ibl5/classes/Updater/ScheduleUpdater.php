@@ -46,6 +46,17 @@ class ScheduleUpdater {
         return ltrim(rtrim($boxHREF, '.htm'), 'box');
     }
 
+    private function generateUUID() {
+        return sprintf(
+            '%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
+            mt_rand(0, 0xffff), mt_rand(0, 0xffff),
+            mt_rand(0, 0xffff),
+            mt_rand(0, 0x0fff) | 0x4000,
+            mt_rand(0, 0x3fff) | 0x8000,
+            mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)
+        );
+    }
+
     public function update() {
         echo 'Updating the ibl_schedule database table...<p>';
 
@@ -113,6 +124,7 @@ class ScheduleUpdater {
                 }
 
                 if ($visitorTID !== null && $homeTID !== null) {
+                    $uuid = $this->generateUUID();
                     $sqlQueryString = "INSERT INTO ibl_schedule (
                         Year,
                         BoxID,
@@ -120,7 +132,8 @@ class ScheduleUpdater {
                         Visitor,
                         Vscore,
                         Home,
-                        Hscore
+                        Hscore,
+                        uuid
                     ) VALUES (
                         $year,
                         $boxID,
@@ -128,7 +141,8 @@ class ScheduleUpdater {
                         $visitorTID,
                         $vScore,
                         $homeTID,
-                        $hScore
+                        $hScore,
+                        '$uuid'
                     )";
 
                     if ($this->db->sql_query($sqlQueryString)) {

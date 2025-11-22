@@ -73,6 +73,9 @@ if (!isset($_POST['confirmed'])) {
 
 require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
+// Set database connection to UTF-8 for proper encoding of accent marks
+$db->set_charset('utf8mb4');
+
 $sharedFunctions = new Shared($db);
 $commonRepository = new Services\CommonRepository($db);
 $season = new Season($db);
@@ -85,7 +88,11 @@ $numRowsTeamIDsNames = $db->sql_numrows($resultTeamIDsNames);
 
 echo "Calculating foul baseline...<br>";
 
+// Open file with explicit Windows 1252 encoding detection
 $plrFile = fopen($_SERVER['DOCUMENT_ROOT'] . "/ibl5/IBL5.plr", "rb");
+if (!$plrFile) {
+    die('Error: Could not open IBL5.plr file');
+}
 $foulRatioArray = [];
 while (!feof($plrFile)) {
     $line = fgets($plrFile);
@@ -110,7 +117,9 @@ while (!feof($plrFile)) {
 
     // TODO: Refactor the parser to load all the data into a Player object.
     $ordinal = intval(substr($line, 0, 4));
-    $name = trim(addslashes(substr($line, 4, 32)));
+    // Extract name and convert from Windows 1252 to UTF-8 to preserve accent marks
+    $nameRaw = trim(substr($line, 4, 32));
+    $name = iconv('CP1252', 'UTF-8//IGNORE', $nameRaw);
     $age = intval(substr($line, 36, 2));
     $pid = intval(substr($line, 38, 6));
     $tid = intval(substr($line, 44, 2));
@@ -421,7 +430,7 @@ while (!feof($plrFile)) {
             )
         VALUES
             ($ordinal,
-            '$name',
+            '" . $db->escape_string($name) . "',
             $age,
             $pid,
             $tid,
@@ -542,7 +551,7 @@ while (!feof($plrFile)) {
             $ratingFOUL)
         ON DUPLICATE KEY UPDATE
             `ordinal` = $ordinal,
-            `name` = '$name',
+            `name` = '" . $db->escape_string($name) . "',
             `age` = $age,
             `pid` = $pid,
             `tid` = $tid,
@@ -707,9 +716,9 @@ while (!feof($plrFile)) {
             `salary`)
         VALUES
             ($pid,
-            '$name',
+            '" . $db->escape_string($name) . "',
             $season->endingYear,
-            '" . $commonRepository->getTeamnameFromTeamID($tid) . "',
+            '" . $db->escape_string($commonRepository->getTeamnameFromTeamID($tid)) . "',
             $tid,
             $seasonGamesPlayed,
             $seasonMIN,
@@ -749,7 +758,7 @@ while (!feof($plrFile)) {
             $ratingTD,
             $currentSeasonSalary)
         ON DUPLICATE KEY UPDATE
-            `team` = '" . $commonRepository->getTeamnameFromTeamID($tid) . "',
+            `team` = '" . $db->escape_string($commonRepository->getTeamnameFromTeamID($tid)) . "',
             `teamid` = $tid,
             `games` = $seasonGamesPlayed,
             `minutes` = $seasonMIN,

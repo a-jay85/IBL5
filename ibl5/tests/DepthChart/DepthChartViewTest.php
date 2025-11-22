@@ -69,4 +69,18 @@ class DepthChartViewTest extends TestCase
         // The Reset button should be type="button" to prevent form submission
         $this->assertStringContainsString('type="button" value="Reset"', $output);
     }
+
+    /**
+     * Test that the deprecated radio button is not present
+     */
+    public function testRadioButtonNotPresent()
+    {
+        ob_start();
+        $this->view->renderFormFooter();
+        $output = ob_get_clean();
+
+        // The deprecated "Submit Depth Chart?" radio button should not be present
+        $this->assertStringNotContainsString('Submit Depth Chart?', $output);
+        $this->assertStringNotContainsString('type="radio"', $output);
+    }
 }

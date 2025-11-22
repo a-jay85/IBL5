@@ -296,8 +296,7 @@ JAVASCRIPT;
         echo $resetScript;
         echo "<tr>
             <th colspan=14>
-                <input type=\"radio\" checked> Submit Depth Chart? 
-                <input type=\"button\" value=\"Reset\" onclick=\"resetDepthChart();\" style=\"margin-left: 10px;\">
+                <input type=\"button\" value=\"Reset\" onclick=\"resetDepthChart();\" style=\"margin-right: 10px;\">
                 <input type=\"submit\" value=\"Submit\" style=\"border-width: 4px;\">
             </th>
         </tr></form></table></center>";

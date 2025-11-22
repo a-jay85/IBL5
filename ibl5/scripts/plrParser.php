@@ -431,7 +431,7 @@ while (!feof($plrFile)) {
             )
         VALUES
             ($ordinal,
-            '" . $db->escape_string($name) . "',
+            '" . $mysqli_db->real_escape_string($name) . "',
             $age,
             $pid,
             $tid,
@@ -552,7 +552,7 @@ while (!feof($plrFile)) {
             $ratingFOUL)
         ON DUPLICATE KEY UPDATE
             `ordinal` = $ordinal,
-            `name` = '" . $db->escape_string($name) . "',
+            `name` = '" . $mysqli_db->real_escape_string($name) . "',
             `age` = $age,
             `pid` = $pid,
             `tid` = $tid,
@@ -717,9 +717,9 @@ while (!feof($plrFile)) {
             `salary`)
         VALUES
             ($pid,
-            '" . $db->escape_string($name) . "',
+            '" . $mysqli_db->real_escape_string($name) . "',
             $season->endingYear,
-            '" . $db->escape_string($commonRepository->getTeamnameFromTeamID($tid)) . "',
+            '" . $mysqli_db->real_escape_string($commonRepository->getTeamnameFromTeamID($tid)) . "',
             $tid,
             $seasonGamesPlayed,
             $seasonMIN,
@@ -759,7 +759,7 @@ while (!feof($plrFile)) {
             $ratingTD,
             $currentSeasonSalary)
         ON DUPLICATE KEY UPDATE
-            `team` = '" . $db->escape_string($commonRepository->getTeamnameFromTeamID($tid)) . "',
+            `team` = '" . $mysqli_db->real_escape_string($commonRepository->getTeamnameFromTeamID($tid)) . "',
             `teamid` = $tid,
             `games` = $seasonGamesPlayed,
             `minutes` = $seasonMIN,

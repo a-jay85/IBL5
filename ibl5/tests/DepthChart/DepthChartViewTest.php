@@ -31,10 +31,10 @@ class DepthChartViewTest extends TestCase
         $this->assertStringContainsString('onclick="resetDepthChart();"', $output);
 
         // Check that Submit button is still present
-        $this->assertStringContainsString('value="Submit"', $output);
+        $this->assertStringContainsString('value="Submit Depth Chart"', $output);
 
-        // Check that Submit button has doubled border width
-        $this->assertStringContainsString('border-width: 4px', $output);
+        // Check that buttons have visual differentiation
+        $this->assertStringContainsString('background-color', $output);
     }
 
     /**
@@ -49,6 +49,9 @@ class DepthChartViewTest extends TestCase
         // Check that the JavaScript function is included
         $this->assertStringContainsString('function resetDepthChart()', $output);
         $this->assertStringContainsString('document.forms[\'Depth_Chart\']', $output);
+
+        // Check that it includes confirmation dialog
+        $this->assertStringContainsString('confirm(', $output);
 
         // Check that it handles different field types correctly
         $this->assertStringContainsString('active', $output);

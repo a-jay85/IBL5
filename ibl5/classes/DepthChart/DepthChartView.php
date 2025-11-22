@@ -257,6 +257,11 @@ class DepthChartView
         $resetScript = <<<'JAVASCRIPT'
 <script type="text/javascript">
 function resetDepthChart() {
+    // Confirm before resetting to prevent accidental clicks
+    if (!confirm('Are you sure you want to reset all fields to their default values? This will discard any changes you have made.')) {
+        return false;
+    }
+    
     var form = document.forms['Depth_Chart'];
     if (!form) return;
     
@@ -296,8 +301,8 @@ JAVASCRIPT;
         echo $resetScript;
         echo "<tr>
             <th colspan=14>
-                <input type=\"button\" value=\"Reset\" onclick=\"resetDepthChart();\" style=\"margin-right: 10px;\">
-                <input type=\"submit\" value=\"Submit\" style=\"border-width: 4px;\">
+                <input type=\"button\" value=\"Reset\" onclick=\"resetDepthChart();\" style=\"margin-right: 20px; background-color: #f0f0f0; color: #666; border: 1px solid #999; padding: 6px 12px; cursor: pointer;\">
+                <input type=\"submit\" value=\"Submit Depth Chart\" style=\"background-color: #28a745; color: white; border: 2px solid #1e7e34; padding: 8px 20px; cursor: pointer; font-weight: bold;\">
             </th>
         </tr></form></table></center>";
     }

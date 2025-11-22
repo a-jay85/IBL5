@@ -716,33 +716,38 @@ The Copilot agent cannot install dependencies from scratch on every run due to p
 ### Solution Architecture
 
 #### **GitHub Actions Dependency Caching** (Active Solution)
-The `.github/workflows/cache-dependencies.yml` and `.github/workflows/tests.yml` workflows implement intelligent dependency caching:
+The `.github/workflows/cache-dependencies.yml` and `.github/workflows/tests.yml` workflows implement intelligent dependency caching with cache-first priority:
 
 **Cache Dependencies Workflow** (`.github/workflows/cache-dependencies.yml`):
 - Runs daily to keep cache fresh
 - Runs when `composer.json` or `composer.lock` changes
 - Can be triggered manually
 - Pre-caches all PHP dependencies (PHPUnit, etc.)
+- **Cache-first strategy**: Checks GitHub cache BEFORE attempting network downloads
 
 **How it works:**
-1. Workflow runs `composer install` in GitHub Actions
-2. Vendor directory is cached using `composer.lock` hash as cache key
-3. Subsequent test runs restore from cache instead of downloading
-4. Cache invalidates automatically when dependencies change
-5. PHPUnit and all dev tools available immediately from cache
+1. GitHub Actions cache is checked first using `composer.lock` hash as key
+2. If vendor cache exists, it's restored immediately (no network calls)
+3. If cache miss, Composer checks its own cache (`~/.composer/cache`) before downloading
+4. Only if both caches miss does Composer download from package repositories
+5. Downloaded packages are cached for future runs
+6. PHPUnit and all dev tools available immediately from cache
 
 **Benefits:**
-- ✅ No network calls to download dependencies
-- ✅ Fast test execution (dependencies cached)
+- ✅ **Cache-first priority** avoids network timeouts and authentication issues
+- ✅ No network calls needed when cache is available
+- ✅ Fast test execution (dependencies restored from cache)
 - ✅ Consistent PHP version and extensions (8.3)
 - ✅ Automatic cache refresh on dependency changes
 - ✅ Manual cache refresh available via workflow dispatch
 
 **Test Workflow Integration** (`.github/workflows/tests.yml`):
-- **Composer Cache**: Caches `~/.composer/cache` across runs
-- **Vendor Cache**: Restores `ibl5/vendor/` from cache
+- **Two-level caching**:
+  1. **Vendor Cache**: Restores `ibl5/vendor/` from GitHub Actions cache (checked FIRST)
+  2. **Composer Cache**: Restores `~/.composer/cache` for package downloads (fallback)
 - **Cache Key**: Uses `composer.lock` hash to invalidate cache when dependencies change
-- **Fallback**: If cache miss, runs `composer install` and caches result
+- **Optimized install**: Uses plain `composer install` which checks cache before network
+- **Fallback**: If both caches miss, downloads from repositories and caches result
 
 ### Testing from Command Line
 

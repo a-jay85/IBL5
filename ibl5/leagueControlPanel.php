@@ -175,7 +175,9 @@ switch ($season->phase) {
                 <option value = \"No\"" . ($season->allowWaivers == "No" ? " SELECTED" : "") . ">No</option>
             </select>
             <INPUT type='submit' name='query' value='Set Allow Waiver Moves Status'><p>
-            <INPUT type='submit' name='query' value='Set all players on waivers to Free Agents and reset their Bird years'><p>";
+            <INPUT type='submit' name='query' value='Set all players on waivers to Free Agents and reset their Bird years'><p>
+            <INPUT type='submit' name='query' value='Reset All Contract Extensions'><p>
+            <INPUT type='submit' name='query' value='Reset All MLEs/LLEs'><p>";
         break;
     case 'HEAT':
         echo "<A HREF=\"/ibl5/scripts/plrParser.php\">Run plrParser.php</A>

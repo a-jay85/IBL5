@@ -2,33 +2,74 @@
 error_reporting(E_ALL);
 libxml_use_internal_errors(true);
 
-require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
+// Set up error handler to catch all errors
+set_error_handler(function ($errno, $errstr, $errfile, $errline) {
+    echo "<p style='color: red;'><b>ERROR [$errno]:</b> $errstr in $errfile on line $errline</p>";
+    return false;
+});
 
-$commonRepository = new \Services\CommonRepository($db);
-$sharedFunctions = new Shared($db);
-$season = new Season($db);
+// Set up exception handler
+set_exception_handler(function ($exception) {
+    echo "<p style='color: red;'><b>EXCEPTION:</b> " . htmlspecialchars($exception->getMessage()) . " in " . htmlspecialchars($exception->getFile()) . " on line " . $exception->getLine() . "</p>";
+    echo "<pre style='color: red;'>" . htmlspecialchars($exception->getTraceAsString()) . "</pre>";
+});
 
-// Initialize components
-$scheduleUpdater = new Updater\ScheduleUpdater($db, $commonRepository, $season);
-$standingsUpdater = new Updater\StandingsUpdater($db, $commonRepository);
-$powerRankingsUpdater = new Updater\PowerRankingsUpdater($db, $season);
-$standingsHTMLGenerator = new Updater\StandingsHTMLGenerator($db);
+try {
+    require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
+    echo "<p>✓ mainfile.php loaded</p>";
+    
+    $commonRepository = new \Services\CommonRepository($db);
+    echo "<p>✓ CommonRepository initialized</p>";
+    
+    $sharedFunctions = new Shared($db);
+    echo "<p>✓ Shared functions initialized</p>";
+    
+    $season = new Season($db);
+    echo "<p>✓ Season initialized</p>";
 
-// Update schedule
-$scheduleUpdater->update();
+    // Initialize components
+    $scheduleUpdater = new Updater\ScheduleUpdater($db, $commonRepository, $season);
+    echo "<p>✓ ScheduleUpdater initialized</p>";
+    
+    $standingsUpdater = new Updater\StandingsUpdater($db, $commonRepository);
+    echo "<p>✓ StandingsUpdater initialized</p>";
+    
+    $powerRankingsUpdater = new Updater\PowerRankingsUpdater($db, $season);
+    echo "<p>✓ PowerRankingsUpdater initialized</p>";
+    
+    $standingsHTMLGenerator = new Updater\StandingsHTMLGenerator($db);
+    echo "<p>✓ StandingsHTMLGenerator initialized</p>";
 
-// Update standings
-$standingsUpdater->update();
+    // Update schedule
+    echo "<p>Updating schedule...</p>";
+    $scheduleUpdater->update();
+    echo "<p>✓ Schedule updated</p>";
 
-// Update power rankings
-$powerRankingsUpdater->update();
+    // Update standings
+    echo "<p>Updating standings...</p>";
+    $standingsUpdater->update();
+    echo "<p>✓ Standings updated</p>";
 
-// Generate standings HTML
-$standingsHTMLGenerator->generateStandingsPage();
+    // Update power rankings
+    echo "<p>Updating power rankings...</p>";
+    $powerRankingsUpdater->update();
+    echo "<p>✓ Power rankings updated</p>";
 
-// Reset extension attempts
-$sharedFunctions->resetSimContractExtensionAttempts();
+    // Generate standings HTML
+    echo "<p>Generating standings HTML...</p>";
+    $standingsHTMLGenerator->generateStandingsPage();
+    echo "<p>✓ Standings HTML generated</p>";
 
-echo '<p><b>All the things have been updated!</br><p>';
+    // Reset extension attempts
+    echo "<p>Resetting extension attempts...</p>";
+    $sharedFunctions->resetSimContractExtensionAttempts();
+    echo "<p>✓ Extension attempts reset</p>";
+
+    echo '<p><b>All the things have been updated!</b></p>';
+
+} catch (Exception $e) {
+    echo "<p style='color: red;'><b>CAUGHT EXCEPTION:</b> " . htmlspecialchars($e->getMessage()) . "</p>";
+    echo "<pre style='color: red;'>" . htmlspecialchars($e->getTraceAsString()) . "</pre>";
+}
 
 echo '<a href="index.php">Return to the IBL homepage</a>';

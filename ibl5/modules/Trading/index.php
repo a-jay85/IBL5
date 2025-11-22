@@ -372,7 +372,7 @@ function reviewtrade($user)
         if ($season->allowTrades == 'Yes') {
             global $cookie;
             cookiedecode($user);
-            tradereview($cookie[1]);
+            tradereview(strval($cookie[1] ?? ''));
         } else {
             Nuke\Header::header();
             OpenTable();
@@ -415,7 +415,7 @@ function offertrade($user)
     } elseif (is_user($user)) {
         global $cookie;
         cookiedecode($user);
-        tradeoffer($cookie[1]);
+        tradeoffer(strval($cookie[1] ?? ''));
     }
 }
 

@@ -52,10 +52,11 @@ jobs:
         echo "Checking composer.json..."
         cat composer.json | head -20
         echo ""
-        echo "Running: composer install --prefer-dist --no-progress --no-interaction"
-        composer install --prefer-dist --no-progress --no-interaction || {
-          echo "First composer install attempt failed, trying again with verbose output..."
-          composer install --prefer-dist || exit 1
+        echo "Running: composer install --no-progress --no-interaction"
+        echo "Note: Composer will check GitHub Actions cache first, then Composer cache, then download if needed"
+        composer install --no-progress --no-interaction || {
+          echo "Composer install failed, trying again with verbose output..."
+          composer install || exit 1
         }
         echo ""
         echo "Verifying installation..."

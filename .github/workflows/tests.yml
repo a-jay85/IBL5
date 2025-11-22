@@ -45,6 +45,45 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-vendor-
     
+    - name: Create config.php
+      working-directory: ibl5
+      env:
+        DB_HOST: ${{ secrets.DB_HOST }}
+        DB_USER: ${{ secrets.DB_USER }}
+        DB_PASS: ${{ secrets.DB_PASS }}
+        DB_NAME: ${{ secrets.DB_NAME }}
+        PREFIX: ${{ secrets.PREFIX }}
+        USER_PREFIX: ${{ secrets.USER_PREFIX }}
+        DB_TYPE: ${{ secrets.DB_TYPE }}
+      run: |
+        echo "Generating config.php from template with repository secrets..."
+        
+        # Read the template file
+        cp config.php.example config.php
+        
+        # Replace the placeholders with actual secret values
+        # Using sed with different delimiters to handle special characters in passwords
+        sed -i "s|\$dbhost = \"localhost\";|\$dbhost = \"${DB_HOST:-localhost}\";|g" config.php
+        sed -i "s|\$dbuname = \"iblhoops_\";|\$dbuname = \"${DB_USER:-iblhoops_}\";|g" config.php
+        sed -i "s|\$dbpass = \"password\";|\$dbpass = \"${DB_PASS:-password}\";|g" config.php
+        sed -i "s|\$dbname = \"iblhoops_\";|\$dbname = \"${DB_NAME:-iblhoops_}\";|g" config.php
+        sed -i "s|\$prefix = \"nuke\";|\$prefix = \"${PREFIX:-nuke}\";|g" config.php
+        sed -i "s|\$user_prefix = \"nuke\";|\$user_prefix = \"${USER_PREFIX:-nuke}\";|g" config.php
+        sed -i "s|\$dbtype = \"MySQL\";|\$dbtype = \"${DB_TYPE:-MySQL}\";|g" config.php
+        
+        echo "✓ config.php created with repository secrets"
+        echo ""
+        echo "Verifying config.php was created..."
+        if [ -f "config.php" ]; then
+          echo "✓ config.php exists"
+          echo ""
+          echo "Config file structure (secrets masked):"
+          grep -E '^\$db|^\$prefix|^\$user_prefix' config.php | sed 's/=.*/= "[MASKED]";/g'
+        else
+          echo "✗ config.php was not created!"
+          exit 1
+        fi
+    
     - name: Install dependencies
       working-directory: ibl5
       run: |

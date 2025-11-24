@@ -91,6 +91,12 @@ class UI
         <hr>";
     }
 
+    // Reusable CSS styles for tables with team-colored separators
+    public static function tableStyles($tableClass, $teamColor): string
+    {
+        return "<style>\n.{$tableClass} { --team-sep-color: #{$teamColor}; border-collapse: collapse; }\n.{$tableClass} th.sep-team, .{$tableClass} td.sep-team { border-right: 3px solid var(--team-sep-color); }\n.{$tableClass} th.sep-weak, .{$tableClass} td.sep-weak { border-right: 1px solid #CCCCCC; }\n</style>\n";
+    }
+
     public static function contracts($db, $result, $team, $sharedFunctions)
     {
         $season = new Season($db);
@@ -99,7 +105,7 @@ class UI
             $season->endingYear++;
         }
         
-        $table_contracts = "<table align=\"center\" class=\"sortable\">
+        $table_contracts = self::tableStyles('contracts', $team->color1) . "<table align=\"center\" class=\"sortable contracts\">
             <thead>
                 <tr bgcolor=$team->color1>
                     <th><font color=$team->color2>Pos</font></th>
@@ -107,18 +113,18 @@ class UI
                     <th><font color=$team->color2>Age</font></th>
                     <th><font color=$team->color2>Exp</font></th>
                     <th><font color=$team->color2>Bird</font></th>
-                    <td bgcolor=$team->color1 width=0></td>
-                    <th><font color=$team->color2>" . ($season->endingYear + -1) . "-<br>" . ($season->endingYear + 0) . "</font></th>
-                    <th><font color=$team->color2>" . ($season->endingYear + 0) . "-<br>" . ($season->endingYear + 1) . "</font></th>
-                    <th><font color=$team->color2>" . ($season->endingYear + 1) . "-<br>" . ($season->endingYear + 2) . "</font></th>
-                    <th><font color=$team->color2>" . ($season->endingYear + 2) . "-<br>" . ($season->endingYear + 3) . "</font></th>
-                    <th><font color=$team->color2>" . ($season->endingYear + 3) . "-<br>" . ($season->endingYear + 4) . "</font></th>
-                    <th><font color=$team->color2>" . ($season->endingYear + 4) . "-<br>" . ($season->endingYear + 5) . "</font></th>
-                    <td bgcolor=$team->color1 width=0></td>
+                    <th class=\"sep-team\"></th>
+                    <th><font color=$team->color2>" . substr(($season->endingYear + -1), -2) . "-" . substr(($season->endingYear + 0), -2) . "</font></th>
+                    <th><font color=$team->color2>" . substr(($season->endingYear + 0), -2) . "-" . substr(($season->endingYear + 1), -2) . "</font></th>
+                    <th><font color=$team->color2>" . substr(($season->endingYear + 1), -2) . "-" . substr(($season->endingYear + 2), -2) . "</font></th>
+                    <th><font color=$team->color2>" . substr(($season->endingYear + 2), -2) . "-" . substr(($season->endingYear + 3), -2) . "</font></th>
+                    <th><font color=$team->color2>" . substr(($season->endingYear + 3), -2) . "-" . substr(($season->endingYear + 4), -2) . "</font></th>
+                    <th><font color=$team->color2>" . substr(($season->endingYear + 4), -2) . "-" . substr(($season->endingYear + 5), -2) . "</font></th>
+                    <th class=\"sep-team\"></th>
                     <th><font color=$team->color2>Tal</font></th>
                     <th><font color=$team->color2>Skl</font></th>
                     <th><font color=$team->color2>Int</font></th>
-                    <td bgcolor=$team->color1 width=0></td>
+                    <th class=\"sep-team\"></th>
                     <th><font color=$team->color2>Loy</font></th>
                     <th><font color=$team->color2>PFW</font></th>
                     <th><font color=$team->color2>PT</font></th>
@@ -174,18 +180,18 @@ class UI
                 <td align=center>$player->age</td>
                 <td align=center>$player->yearsOfExperience</td>
                 <td align=center>$player->birdYears</td>
-                <td bgcolor=$team->color1></td>
+                <td class=\"sep-team\"></td>
                 <td>$con1</td>
                 <td>$con2</td>
                 <td>$con3</td>
                 <td>$con4</td>
                 <td>$con5</td>
                 <td>$con6</td>
-                <td bgcolor=$team->color1></td>
+                <td class=\"sep-team\"></td>
                 <td align=center>$player->ratingTalent</td>
                 <td align=center>$player->ratingSkill</td>
                 <td align=center>$player->ratingIntangibles</td>
-                <td bgcolor=$team->color1></td>
+                <td class=\"sep-team\"></td>
                 <td align=center>$player->freeAgencyLoyalty</td>
                 <td align=center>$player->freeAgencyPlayForWinner</td>
                 <td align=center>$player->freeAgencyPlayingTime</td>
@@ -210,14 +216,14 @@ class UI
                     <td></td>
                     <td></td>
                     <td></td>
-                    <td bgcolor=$team->color1></td>
+                    <td class=\"sep-team\"></td>
                     <td><b>$cap1</td>
                     <td><b>$cap2</td>
                     <td><b>$cap3</td>
                     <td><b>$cap4</td>
                     <td><b>$cap5</td>
                     <td><b>$cap6</td>
-                    <td bgcolor=$team->color1></td>
+                    <td class=\"sep-team\"></td>
                     <td></td>
                     <td></td>
                     <td></td>
@@ -239,7 +245,7 @@ class UI
 
     public static function per36Minutes($db, $result, $team, $yr)
     {
-        $table_per36Minutes = "<table align=\"center\" class=\"sortable\">
+        $table_per36Minutes = self::tableStyles('per36', $team->color1) . "<table align=\"center\" class=\"sortable per36\">
             <thead>
                 <tr bgcolor=$team->color1>
                     <th><font color=$team->color2>Pos</font></th>
@@ -248,19 +254,19 @@ class UI
                     <th><font color=$team->color2>gs</font></th>
                     <th><font color=$team->color2>mpg</font></th>
                     <th><font color=$team->color2>36min</font></th>
-                    <td bgcolor=$team->color1 width=0></td>
+                    <th class=\"sep-team\"></th>
                     <th><font color=$team->color2>fgm</font></th>
                     <th><font color=$team->color2>fga</font></th>
                     <th><font color=$team->color2>fgp</font></th>
-                    <td bgcolor=#CCCCCC width=0></td>
+                    <th class=\"sep-weak\"></th>
                     <th><font color=$team->color2>ftm</font></th>
                     <th><font color=$team->color2>fta</font></th>
                     <th><font color=$team->color2>ftp</font></th>
-                    <td bgcolor=#CCCCCC width=0></td>
+                    <th class=\"sep-weak\"></th>
                     <th><font color=$team->color2>3gm</font></th>
                     <th><font color=$team->color2>3ga</font></th>
                     <th><font color=$team->color2>3gp</font></th>
-                    <td bgcolor=$team->color1 width=0></td>
+                    <th class=\"sep-team\"></th>
                     <th><font color=$team->color2>orb</font></th>
                     <th><font color=$team->color2>reb</font></th>
                     <th><font color=$team->color2>ast</font></th>
@@ -317,19 +323,19 @@ class UI
                 <td><center>$playerStats->seasonGamesStarted</center></td>
                 <td><center>$stats_mpg</center></td>
                 <td><center>$stats_per36Min</center></td>
-                <td bgcolor=$team->color1 width=0></td>
+                <td class=\"sep-team\"></td>
                 <td><center>$stats_fgm</center></td>
                 <td><center>$stats_fga</center></td>
                 <td><center>$stats_fgp</center></td>
-                <td bgcolor=#CCCCCC width=0></td>
+                <td class=\"sep-weak\"></td>
                 <td><center>$stats_ftm</center></td>
                 <td><center>$stats_fta</center></td>
                 <td><center>$stats_ftp</center></td>
-                <td bgcolor=#CCCCCC width=0></td>
+                <td class=\"sep-weak\"></td>
                 <td><center>$stats_tgm</center></td>
                 <td><center>$stats_tga</center></td>
                 <td><center>$stats_tgp</center></td>
-                <td bgcolor=$team->color1 width=0></td>
+                <td class=\"sep-team\"></td>
                 <td><center>$stats_opg</center></td>
                 <td><center>$stats_rpg</center></td>
                 <td><center>$stats_apg</center></td>
@@ -351,10 +357,11 @@ class UI
     
     public static function ratings($db, $data, $team, $yr, $season, $moduleName = "")
     {
-        $table_ratings = "<table align=\"center\" class=\"sortable\">
-            <colgroup span=2><colgroup span=2><colgroup span=6><colgroup span=6><colgroup span=4><colgroup span=4><colgroup span=1>
+        $table_ratings = self::tableStyles('ratings', $team->color1) . "<table align=\"center\" class=\"sortable ratings\">
+        <colgroup span=2><colgroup span=2><colgroup span=6><colgroup span=6><colgroup span=4><colgroup span=4><colgroup span=1>
             <thead bgcolor=$team->color1>
                 <tr bgcolor=$team->color1>";
+
 
         if ($moduleName == "League_Starters") {
             $table_ratings .= "<th><font color=$team->color2>Team</font></th>";
@@ -364,16 +371,16 @@ class UI
                     <th><font color=$team->color2>Pos</font></th>
                     <th><font color=$team->color2>Player</font></th>
                     <th><font color=$team->color2>Age</font></th>
-                    <td bgcolor=$team->color1 width=0></td>
+                    <th class=\"sep-team\"></th>
                     <th><font color=$team->color2>2ga</font></th>
                     <th><font color=$team->color2>2g%</font></th>
-                    <td bgcolor=#CCCCCC width=0></td>
+                    <th class=\"sep-team\"></th>
                     <th><font color=$team->color2>fta</font></th>
                     <th><font color=$team->color2>ft%</font></th>
-                    <td bgcolor=#CCCCCC width=0></td>
+                    <th class=\"sep-team\"></th>
                     <th><font color=$team->color2>3ga</font></th>
                     <th><font color=$team->color2>3g%</font></th>
-                    <td bgcolor=$team->color1 width=0></td>
+                    <th class=\"sep-team\"></th>
                     <th><font color=$team->color2>orb</font></th>
                     <th><font color=$team->color2>drb</font></th>
                     <th><font color=$team->color2>ast</font></th>
@@ -381,21 +388,21 @@ class UI
                     <th><font color=$team->color2>tvr</font></th>
                     <th><font color=$team->color2>blk</font></th>
                     <th><font color=$team->color2>foul</font></th>
-                    <td bgcolor=$team->color1 width=0></td>
+                    <th class=\"sep-team\"></th>
                     <th><font color=$team->color2>oo</font></th>
                     <th><font color=$team->color2>do</font></th>
                     <th><font color=$team->color2>po</font></th>
                     <th><font color=$team->color2>to</font></th>
-                    <td bgcolor=#CCCCCC width=0></td>
+                    <th class=\"sep-team\"></th>
                     <th><font color=$team->color2>od</font></th>
                     <th><font color=$team->color2>dd</font></th>
                     <th><font color=$team->color2>pd</font></th>
                     <th><font color=$team->color2>td</font></th>
-                    <td bgcolor=$team->color1 width=0></td>
+                    <th class=\"sep-team\"></th>
                     <th><font color=$team->color2>Clu</font></th>
                     <th><font color=$team->color2>Con</font></th>
-                    <td bgcolor=$team->color1 width=0></td>
-                    <th><font color=$team->color2>Injury Return<br>Date (Days)</font></th>
+                    <th class=\"sep-team\"></th>
+                    <th><font color=$team->color2>Injury Return Date</font></th>
                 </tr>
             </thead>
         <tbody>";
@@ -429,7 +436,7 @@ class UI
     
             $injuryInfo = $player->getInjuryReturnDate($season->lastSimEndDate);
             if ($injuryInfo != "") {
-                $injuryInfo .= " ($player->daysRemainingForInjury)";
+                $injuryInfo .= " ($player->daysRemainingForInjury days)";
             }
 
             if (($i % 2) == 0 AND $moduleName == "Next_Sim") {
@@ -449,16 +456,16 @@ class UI
                 <td align=center>$player->position</td>
                 <td><a href=\"./modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->decoratedName</a></td>
                 <td align=center>$player->age</td>
-                <td bgcolor=$team->color1></td>
+                <td class=\"sep-team\"></td>
                 <td align=center>$player->ratingFieldGoalAttempts</td>
                 <td align=center>$player->ratingFieldGoalPercentage</td>
-                <td bgcolor=#CCCCCC width=0></td>
+                <td class=\"sep-weak\"></td>
                 <td align=center>$player->ratingFreeThrowAttempts</td>
                 <td align=center>$player->ratingFreeThrowPercentage</td>
-                <td bgcolor=#CCCCCC width=0></td>
+                <td class=\"sep-weak\"></td>
                 <td align=center>$player->ratingThreePointAttempts</td>
                 <td align=center>$player->ratingThreePointPercentage</td>
-                <td bgcolor=$team->color1></td>
+                <td class=\"sep-team\"></td>
                 <td align=center>$player->ratingOffensiveRebounds</td>
                 <td align=center>$player->ratingDefensiveRebounds</td>
                 <td align=center>$player->ratingAssists</td>
@@ -466,20 +473,20 @@ class UI
                 <td align=center>$player->ratingTurnovers</td>
                 <td align=center>$player->ratingBlocks</td>
                 <td align=center>$player->ratingFouls</td>
-                <td bgcolor=$team->color1></td>
+                <td class=\"sep-team\"></td>
                 <td align=center>$player->ratingOutsideOffense</td>
                 <td align=center>$player->ratingDriveOffense</td>
                 <td align=center>$player->ratingPostOffense</td>
                 <td align=center>$player->ratingTransitionOffense</td>
-                <td bgcolor=#CCCCCC width=0></td>
+                <td class=\"sep-weak\"></td>
                 <td align=center>$player->ratingOutsideDefense</td>
                 <td align=center>$player->ratingDriveDefense</td>
                 <td align=center>$player->ratingPostDefense</td>
                 <td align=center>$player->ratingTransitionDefense</td>
-                <td bgcolor=$team->color1></td>
+                <td class=\"sep-team\"></td>
                 <td align=center>$player->ratingClutch</td>
                 <td align=center>$player->ratingConsistency</td>
-                <td bgcolor=$team->color1></td>
+                <td class=\"sep-team\"></td>
                 <td align=center>$injuryInfo</td>
             </tr>";
 
@@ -493,7 +500,7 @@ class UI
 
     public static function seasonAverages($db, $result, $team, $yr)
     {
-        $table_averages = "<table align=\"center\" class=\"sortable\">
+        $table_averages = self::tableStyles('season-avg', $team->color1) . "<table align=\"center\" class=\"sortable season-avg\">
                 <thead>
                     <tr bgcolor=$team->color1>
                         <th><font color=$team->color2>Pos</font></th>
@@ -501,19 +508,19 @@ class UI
                         <th><font color=$team->color2>g</font></th>
                         <th><font color=$team->color2>gs</font></th>
                         <th><font color=$team->color2>min</font></th>
-                        <td bgcolor=$team->color1 width=0></td>
+                        <th class=\"sep-team\"></th>
                         <th><font color=$team->color2>fgm</font></th>
                         <th><font color=$team->color2>fga</font></th>
                         <th><font color=$team->color2>fgp</font></th>
-                        <td bgcolor=#CCCCCC width=0></td>
+                        <th class=\"sep-weak\"></th>
                         <th><font color=$team->color2>ftm</font></th>
                         <th><font color=$team->color2>fta</font></th>
                         <th><font color=$team->color2>ftp</font></th>
-                        <td bgcolor=#CCCCCC width=0></td>
+                        <th class=\"sep-weak\"></th>
                         <th><font color=$team->color2>3gm</font></th>
                         <th><font color=$team->color2>3ga</font></th>
                         <th><font color=$team->color2>3gp</font></th>
-                        <td bgcolor=$team->color1 width=0></td>
+                        <th class=\"sep-team\"></th>
                         <th><font color=$team->color2>orb</font></th>
                         <th><font color=$team->color2>reb</font></th>
                         <th><font color=$team->color2>ast</font></th>
@@ -551,19 +558,19 @@ class UI
                 <td><center>$playerStats->seasonGamesPlayed</center></td>
                 <td><center>$playerStats->seasonGamesStarted</center></td>
                 <td><center>$playerStats->seasonMinutesPerGame</center></td>
-                <td bgcolor=$team->color1 width=0></td>
+                <td class=\"sep-team\"></td>
                 <td><center>$playerStats->seasonFieldGoalsMadePerGame</center></td>
                 <td><center>$playerStats->seasonFieldGoalsAttemptedPerGame</center></td>
                 <td><center>$playerStats->seasonFieldGoalPercentage</center></td>
-                <td bgcolor=#CCCCCC width=0></td>
+                <td class=\"sep-weak\"></td>
                 <td><center>$playerStats->seasonFreeThrowsMadePerGame</center></td>
                 <td><center>$playerStats->seasonFreeThrowsAttemptedPerGame</center></td>
                 <td><center>$playerStats->seasonFreeThrowPercentage</center></td>
-                <td bgcolor=#CCCCCC width=0></td>
+                <td class=\"sep-weak\"></td>
                 <td><center>$playerStats->seasonThreePointersMadePerGame</center></td>
                 <td><center>$playerStats->seasonThreePointersAttemptedPerGame</center></td>
                 <td><center>$playerStats->seasonThreePointPercentage</center></td>
-                <td bgcolor=$team->color1 width=0></td>
+                <td class=\"sep-team\"></td>
                 <td><center>$playerStats->seasonOffensiveReboundsPerGame</center></td>
                 <td><center>$playerStats->seasonTotalReboundsPerGame</center></td>
                 <td><center>$playerStats->seasonAssistsPerGame</center></td>
@@ -590,19 +597,19 @@ class UI
                 <td><b><center>$teamStats->seasonOffenseGamesPlayed</center></td>
                 <td><b><center>$teamStats->seasonOffenseGamesPlayed</center></td>
                 <td></td>
-                <td bgcolor=$team->color1 width=0></td>
+                <td class=\"sep-team\"></td>
                 <td><center><b>$teamStats->seasonOffenseFieldGoalsMadePerGame</center></td>
                 <td><center><b>$teamStats->seasonOffenseFieldGoalsAttemptedPerGame</center></td>
                 <td><center><b>$teamStats->seasonOffenseFieldGoalPercentage</center></td>
-                <td bgcolor=#CCCCCC width=0></td>
+                <td class=\"sep-weak\"></td>
                 <td><center><b>$teamStats->seasonOffenseFreeThrowsMadePerGame</center></td>
                 <td><center><b>$teamStats->seasonOffenseFreeThrowsAttemptedPerGame</center></td>
                 <td><center><b>$teamStats->seasonOffenseFreeThrowPercentage</center></td>
-                <td bgcolor=#CCCCCC width=0></td>
+                <td class=\"sep-weak\"></td>
                 <td><center><b>$teamStats->seasonOffenseThreePointersMadePerGame</center></td>
                 <td><center><b>$teamStats->seasonOffenseThreePointersAttemptedPerGame</center></td>
                 <td><center><b>$teamStats->seasonOffenseThreePointPercentage</center></td>
-                <td bgcolor=$team->color1 width=0></td>
+                <td class=\"sep-team\"></td>
                 <td><center><b>$teamStats->seasonOffenseOffensiveReboundsPerGame</center></td>
                 <td><center><b>$teamStats->seasonOffenseTotalReboundsPerGame</center></td>
                 <td><center><b>$teamStats->seasonOffenseAssistsPerGame</center></td>
@@ -615,21 +622,21 @@ class UI
             <tr>
                 <td colspan=4><b>$team->name Defense</td>
                 <td><center><b>$teamStats->seasonDefenseGamesPlayed</center></td>
-                <td><b>$teamStats->seasonDefenseGamesPlayed</td>
+                <td><center><b>$teamStats->seasonDefenseGamesPlayed</center></td>
                 <td></td>
-                <td bgcolor=$team->color1 width=0></td>
+                <td class=\"sep-team\"></td>
                 <td><center><b>$teamStats->seasonDefenseFieldGoalsMadePerGame</center></td>
                 <td><center><b>$teamStats->seasonDefenseFieldGoalsAttemptedPerGame</center></td>
                 <td><center><b>$teamStats->seasonDefenseFieldGoalPercentage</center></td>
-                <td bgcolor=#CCCCCC width=0></td>
+                <td class=\"sep-weak\"></td>
                 <td><center><b>$teamStats->seasonDefenseFreeThrowsMadePerGame</center></td>
                 <td><center><b>$teamStats->seasonDefenseFreeThrowsAttemptedPerGame</center></td>
                 <td><center><b>$teamStats->seasonDefenseFreeThrowPercentage</center></td>
-                <td bgcolor=#CCCCCC width=0></td>
+                <td class=\"sep-weak\"></td>
                 <td><center><b>$teamStats->seasonDefenseThreePointersMadePerGame</center></td>
                 <td><center><b>$teamStats->seasonDefenseThreePointersAttemptedPerGame</center></td>
                 <td><center><b>$teamStats->seasonDefenseThreePointPercentage</center></td>
-                <td bgcolor=$team->color1 width=0></td>
+                <td class=\"sep-team\"></td>
                 <td><center><b>$teamStats->seasonDefenseOffensiveReboundsPerGame</center></td>
                 <td><center><b>$teamStats->seasonDefenseTotalReboundsPerGame</center></td>
                 <td><center><b>$teamStats->seasonDefenseAssistsPerGame</center></td>
@@ -649,7 +656,7 @@ class UI
 
     public static function seasonTotals($db, $result, $team, $yr)
     {
-        $table_totals = "<table align=\"center\" class=\"sortable\">
+        $table_totals = self::tableStyles('season-totals', $team->color1) . "<table align=\"center\" class=\"sortable season-totals\">
             <thead>
                 <tr bgcolor=$team->color1>
                     <th><font color=$team->color2>Pos</font></th>
@@ -657,16 +664,16 @@ class UI
                     <th><font color=$team->color2>g</font></th>
                     <th><font color=$team->color2>gs</font></th>
                     <th><font color=$team->color2>min</font></th>
-                    <td bgcolor=$team->color1 width=0></td>
+                    <th class=\"sep-team\"></th>
                     <th><font color=$team->color2>fgm</font></th>
                     <th><font color=$team->color2>fga</font></th>
-                    <td bgcolor=#CCCCCC width=0></td>
+                    <th class=\"sep-weak\"></th>
                     <th><font color=$team->color2>ftm</font></th>
                     <th><font color=$team->color2>fta</font></th>
-                    <td bgcolor=#CCCCCC width=0></td>
+                    <th class=\"sep-weak\"></th>
                     <th><font color=$team->color2>3gm</font></th>
                     <th><font color=$team->color2>3ga</font></th>
-                    <td bgcolor=$team->color1 width=0></td>
+                    <th class=\"sep-team\"></th>
                     <th><font color=$team->color2>orb</font></th>
                     <th><font color=$team->color2>reb</font></th>
                     <th><font color=$team->color2>ast</font></th>
@@ -702,16 +709,16 @@ class UI
                 <td><center>$playerStats->seasonGamesPlayed</center></td>
                 <td><center>$playerStats->seasonGamesStarted</center></td>
                 <td><center>$playerStats->seasonMinutes</center></td>
-                <td bgcolor=$team->color1 width=0></td>
+                <td class=\"sep-team\"></td>
                 <td><center>$playerStats->seasonFieldGoalsMade</center></td>
                 <td><center>$playerStats->seasonFieldGoalsAttempted</center></td>
-                    <td bgcolor=#CCCCCC width=0></td>
+                    <td class=\"sep-weak\"></td>
                 <td><center>$playerStats->seasonFreeThrowsMade</center></td>
                 <td><center>$playerStats->seasonFreeThrowsAttempted</center></td>
-                    <td bgcolor=#CCCCCC width=0></td>
+                    <td class=\"sep-weak\"></td>
                 <td><center>$playerStats->seasonThreePointersMade</center></td>
                 <td><center>$playerStats->seasonThreePointersAttempted</center></td>
-                <td bgcolor=$team->color1 width=0></td>
+                <td class=\"sep-team\"></td>
                 <td><center>$playerStats->seasonOffensiveRebounds</center></td>
                 <td><center>$playerStats->seasonTotalRebounds</center></td>
                 <td><center>$playerStats->seasonAssists</center></td>
@@ -735,26 +742,26 @@ class UI
         if ($yr == "") {
             $table_totals .= "<tr>
                 <td colspan=4><b>$team->name Offense</td>
-                <td><center><b>$teamStats->seasonOffenseGamesPlayed</center></td>
-                <td><center><b>$teamStats->seasonOffenseGamesPlayed</center></td>
+                <td><center><b>$teamStats->seasonOffenseGamesPlayed</b></center></td>
+                <td><center><b>$teamStats->seasonOffenseGamesPlayed</b></center></td>
                 <td></td>
-                <td bgcolor=$team->color1 width=0></td>
-                <td><center><b>$teamStats->seasonOffenseTotalFieldGoalsMade</center></td>
+                <td class='sep-team'></td>
+                <td><center><b>$teamStats->seasonOffenseTotalFieldGoalsMade</b></center></td>
                 <td><center><b>$teamStats->seasonOffenseTotalFieldGoalsAttempted</b></center></td>
-                <td bgcolor=#CCCCCC width=0></td>
-                <td><center><b>$teamStats->seasonOffenseTotalFreeThrowsMade</center></td>
+                <td class=\"sep-weak\"></td>
+                <td><center><b>$teamStats->seasonOffenseTotalFreeThrowsMade</b></center></td>
                 <td><center><b>$teamStats->seasonOffenseTotalFreeThrowsAttempted</b></center></td>
-                <td bgcolor=#CCCCCC width=0></td>
-                <td><center><b>$teamStats->seasonOffenseTotalThreePointersMade</center></td>
+                <td class='sep-weak'></td>
+                <td><center><b>$teamStats->seasonOffenseTotalThreePointersMade</b></center></td>
                 <td><center><b>$teamStats->seasonOffenseTotalThreePointersAttempted</b></center></td>
-                <td bgcolor=$team->color1 width=0></td>
-                <td><center><b>$teamStats->seasonOffenseTotalOffensiveRebounds</center></td>
-                <td><center><b>$teamStats->seasonOffenseTotalRebounds</center></td>
-                <td><center><b>$teamStats->seasonOffenseTotalAssists</center></td>
-                <td><center><b>$teamStats->seasonOffenseTotalSteals</center></td>
-                <td><center><b>$teamStats->seasonOffenseTotalTurnovers</center></td>
-                <td><center><b>$teamStats->seasonOffenseTotalBlocks</center></td>
-                <td><center><b>$teamStats->seasonOffenseTotalPersonalFouls</center></td>
+                <td class=\"sep-team\"></td>
+                <td><center><b>$teamStats->seasonOffenseTotalOffensiveRebounds</b></center></td>
+                <td><center><b>$teamStats->seasonOffenseTotalRebounds</b></center></td>
+                <td><center><b>$teamStats->seasonOffenseTotalAssists</b></center></td>
+                <td><center><b>$teamStats->seasonOffenseTotalSteals</b></center></td>
+                <td><center><b>$teamStats->seasonOffenseTotalTurnovers</b></center></td>
+                <td><center><b>$teamStats->seasonOffenseTotalBlocks</b></center></td>
+                <td><center><b>$teamStats->seasonOffenseTotalPersonalFouls</b></center></td>
                 <td><center><b>$teamStats->seasonOffenseTotalPoints</center></td>
             </tr>";
             
@@ -763,16 +770,16 @@ class UI
                 <td><center><b>$teamStats->seasonDefenseGamesPlayed</center></td>
                 <td><center><b>$teamStats->seasonDefenseGamesPlayed</center></td>
                 <td></td>
-                <td bgcolor=$team->color1 width=0></td>
-                <td><center><b>$teamStats->seasonDefenseTotalFieldGoalsMade</center></td>
+                <td class=\"sep-team\"></td>
+                <td><center><b>$teamStats->seasonDefenseTotalFieldGoalsMade</b></center></td>
                 <td><center><b>$teamStats->seasonDefenseTotalFieldGoalsAttempted</b></center></td>
-                <td bgcolor=#CCCCCC width=0></td>
-                <td><center><b>$teamStats->seasonDefenseTotalFreeThrowsMade</center></td>
+                <td class=\"sep-weak\"></td>
+                <td><center><b>$teamStats->seasonDefenseTotalFreeThrowsMade</b></center></td>
                 <td><center><b>$teamStats->seasonDefenseTotalFreeThrowsAttempted</b></center></td>
-                <td bgcolor=#CCCCCC width=0></td>
+                <td class=\"sep-weak\"></td>
                 <td><center><b>$teamStats->seasonDefenseTotalThreePointersMade</b></center></td>
                 <td><center><b>$teamStats->seasonDefenseTotalThreePointersAttempted</b></center></td>
-                <td bgcolor=$team->color1 width=0></td>
+                <td class=\"sep-team\"></td>
                 <td><center><b>$teamStats->seasonDefenseTotalOffensiveRebounds</center></td>
                 <td><center><b>$teamStats->seasonDefenseTotalRebounds</center></td>
                 <td><center><b>$teamStats->seasonDefenseTotalAssists</center></td>
@@ -806,26 +813,26 @@ class UI
             $endDate = $endDate->format('Y-m-d');
         }
 
-        $table_periodAverages = "<table align=\"center\" class=\"sortable\">
+        $table_periodAverages = self::tableStyles('sim-avg', $team->color1) . "<table align=\"center\" class=\"sortable sim-avg\">
             <thead>
                 <tr bgcolor=$team->color1>
                     <th><font color=$team->color2>Pos</font></th>
                     <th colspan=3><font color=$team->color2>Player</font></th>
                     <th><font color=$team->color2>g</font></th>
                     <th><font color=$team->color2>min</font></th>
-                    <td bgcolor=$team->color1 width=0></td>
+                    <th class=\"sep-team\"></th>
                     <th><font color=$team->color2>fgm</font></th>
                     <th><font color=$team->color2>fga</font></th>
                     <th><font color=$team->color2>fgp</font></th>
-                    <td bgcolor=#CCCCCC width=0></td>
+                    <th class=\"sep-weak\"></th>
                     <th><font color=$team->color2>ftm</font></th>
                     <th><font color=$team->color2>fta</font></th>
                     <th><font color=$team->color2>ftp</font></th>
-                    <td bgcolor=#CCCCCC width=0></td>
+                    <th class=\"sep-weak\"></th>
                     <th><font color=$team->color2>3gm</font></th>
                     <th><font color=$team->color2>3ga</font></th>
                     <th><font color=$team->color2>3gp</font></th>
-                    <td bgcolor=$team->color1 width=0></td>
+                    <th class=\"sep-team\"></th>
                     <th><font color=$team->color2>orb</font></th>
                     <th><font color=$team->color2>reb</font></th>
                     <th><font color=$team->color2>ast</font></th>
@@ -908,19 +915,19 @@ class UI
                 <td colspan=3><a href=\"./modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>
                 <td><center>$numberOfGamesPlayedInSim</center></td>
                 <td><center>$periodAverageMIN</center></td>
-                <td bgcolor=$team->color1 width=0></td>
+                <td class=\"sep-team\"></td>
                 <td><center>$periodAverageFGM</center></td>
                 <td><center>$periodAverageFGA</center></td>
                 <td><center>$periodAverageFGP</center></td>
-                <td bgcolor=#CCCCCC width=0></td>
+                <td class=\"sep-weak\"></td>
                 <td><center>$periodAverageFTM</center></td>
                 <td><center>$periodAverageFTA</center></td>
                 <td><center>$periodAverageFTP</center></td>
-                <td bgcolor=#CCCCCC width=0></td>
+                <td class=\"sep-weak\"></td>
                 <td><center>$periodAverage3GM</center></td>
                 <td><center>$periodAverage3GA</center></td>
                 <td><center>$periodAverage3GP</center></td>
-                <td bgcolor=$team->color1 width=0></td>
+                <td class=\"sep-team\"></td>
                 <td><center>$periodAverageORB</center></td>
                 <td><center>$periodAverageREB</center></td>
                 <td><center>$periodAverageAST</center></td>

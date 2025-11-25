@@ -92,9 +92,19 @@ class UI
     }
 
     // Reusable CSS styles for tables with team-colored separators
-    public static function tableStyles($tableClass, $teamColor): string
+    public static function tableStyles(string $tableClass, string $teamColor, string $teamColor2): string
     {
-        return "<style>\n.{$tableClass} { --team-sep-color: #{$teamColor}; border-collapse: collapse; }\n.{$tableClass} th.sep-team, .{$tableClass} td.sep-team { border-right: 3px solid var(--team-sep-color); }\n.{$tableClass} th.sep-weak, .{$tableClass} td.sep-weak { border-right: 1px solid #CCCCCC; }\n</style>\n";
+        ob_start();
+        ?>
+    <style>
+    .<?= $tableClass ?> { --team-sep-color: #<?= $teamColor ?>; color: #<?= $teamColor2 ?>; border-collapse: collapse; }
+    .<?= $tableClass ?> th { color: #<?= $teamColor2 ?>; }
+    .<?= $tableClass ?> td { color: #000; }
+    .<?= $tableClass ?> th.sep-team, .<?= $tableClass ?> td.sep-team { border-right: 3px solid var(--team-sep-color); }
+    .<?= $tableClass ?> th.sep-weak, .<?= $tableClass ?> td.sep-weak { border-right: 1px solid #CCCCCC; }
+    </style>
+        <?php
+        return ob_get_clean();
     }
 
     public static function contracts($db, $result, $team, $sharedFunctions)
@@ -105,31 +115,31 @@ class UI
             $season->endingYear++;
         }
         
-        $table_contracts = self::tableStyles('contracts', $team->color1) . "<table align=\"center\" class=\"sortable contracts\">
+        $table_contracts = self::tableStyles('contracts', $team->color1, $team->color2) . "<table align=\"center\" class=\"sortable contracts\">
             <thead>
                 <tr bgcolor=$team->color1>
-                    <th><font color=$team->color2>Pos</font></th>
-                    <th colspan=2><font color=$team->color2>Player</font></th>
-                    <th><font color=$team->color2>Age</font></th>
-                    <th><font color=$team->color2>Exp</font></th>
-                    <th><font color=$team->color2>Bird</font></th>
+                    <th>Pos</th>
+                    <th colspan=2>Player</th>
+                    <th>Age</th>
+                    <th>Exp</th>
+                    <th>Bird</th>
                     <th class=\"sep-team\"></th>
-                    <th><font color=$team->color2>" . substr(($season->endingYear + -1), -2) . "-" . substr(($season->endingYear + 0), -2) . "</font></th>
-                    <th><font color=$team->color2>" . substr(($season->endingYear + 0), -2) . "-" . substr(($season->endingYear + 1), -2) . "</font></th>
-                    <th><font color=$team->color2>" . substr(($season->endingYear + 1), -2) . "-" . substr(($season->endingYear + 2), -2) . "</font></th>
-                    <th><font color=$team->color2>" . substr(($season->endingYear + 2), -2) . "-" . substr(($season->endingYear + 3), -2) . "</font></th>
-                    <th><font color=$team->color2>" . substr(($season->endingYear + 3), -2) . "-" . substr(($season->endingYear + 4), -2) . "</font></th>
-                    <th><font color=$team->color2>" . substr(($season->endingYear + 4), -2) . "-" . substr(($season->endingYear + 5), -2) . "</font></th>
+                    <th>" . substr(($season->endingYear + -1), -2) . "-" . substr(($season->endingYear + 0), -2) . "</th>
+                    <th>" . substr(($season->endingYear + 0), -2) . "-" . substr(($season->endingYear + 1), -2) . "</th>
+                    <th>" . substr(($season->endingYear + 1), -2) . "-" . substr(($season->endingYear + 2), -2) . "</th>
+                    <th>" . substr(($season->endingYear + 2), -2) . "-" . substr(($season->endingYear + 3), -2) . "</th>
+                    <th>" . substr(($season->endingYear + 3), -2) . "-" . substr(($season->endingYear + 4), -2) . "</th>
+                    <th class=\"sep-team\">" . substr(($season->endingYear + 4), -2) . "-" . substr(($season->endingYear + 5), -2) . "</th>
                     <th class=\"sep-team\"></th>
-                    <th><font color=$team->color2>Tal</font></th>
-                    <th><font color=$team->color2>Skl</font></th>
-                    <th><font color=$team->color2>Int</font></th>
+                    <th>Tal</th>
+                    <th>Skl</th>
+                    <th>Int</th>
                     <th class=\"sep-team\"></th>
-                    <th><font color=$team->color2>Loy</font></th>
-                    <th><font color=$team->color2>PFW</font></th>
-                    <th><font color=$team->color2>PT</font></th>
-                    <th><font color=$team->color2>Sec</font></th>
-                    <th><font color=$team->color2>Trad</font></th>
+                    <th>Loy</th>
+                    <th>PFW</th>
+                    <th>PT</th>
+                    <th>Sec</th>
+                    <th>Trad</th>
                 </tr>
             </thead>
         <tbody>";
@@ -245,36 +255,36 @@ class UI
 
     public static function per36Minutes($db, $result, $team, $yr)
     {
-        $table_per36Minutes = self::tableStyles('per36', $team->color1) . "<table align=\"center\" class=\"sortable per36\">
+        $table_per36Minutes = self::tableStyles('per36', $team->color1, $team->color2) . "<table align=\"center\" class=\"sortable per36\">
             <thead>
                 <tr bgcolor=$team->color1>
-                    <th><font color=$team->color2>Pos</font></th>
-                    <th colspan=3><font color=$team->color2>Player</font></th>
-                    <th><font color=$team->color2>g</font></th>
-                    <th><font color=$team->color2>gs</font></th>
-                    <th><font color=$team->color2>mpg</font></th>
-                    <th><font color=$team->color2>36min</font></th>
+                    <th>Pos</th>
+                    <th colspan=3>Player</th>
+                    <th>g</th>
+                    <th>gs</th>
+                    <th>mpg</th>
+                    <th>36min</th>
                     <th class=\"sep-team\"></th>
-                    <th><font color=$team->color2>fgm</font></th>
-                    <th><font color=$team->color2>fga</font></th>
-                    <th><font color=$team->color2>fgp</font></th>
+                    <th>fgm</th>
+                    <th>fga</th>
+                    <th>fgp</th>
                     <th class=\"sep-weak\"></th>
-                    <th><font color=$team->color2>ftm</font></th>
-                    <th><font color=$team->color2>fta</font></th>
-                    <th><font color=$team->color2>ftp</font></th>
+                    <th>ftm</th>
+                    <th>fta</th>
+                    <th>ftp</th>
                     <th class=\"sep-weak\"></th>
-                    <th><font color=$team->color2>3gm</font></th>
-                    <th><font color=$team->color2>3ga</font></th>
-                    <th><font color=$team->color2>3gp</font></th>
+                    <th>3gm</th>
+                    <th>3ga</th>
+                    <th>3gp</th>
                     <th class=\"sep-team\"></th>
-                    <th><font color=$team->color2>orb</font></th>
-                    <th><font color=$team->color2>reb</font></th>
-                    <th><font color=$team->color2>ast</font></th>
-                    <th><font color=$team->color2>stl</font></th>
-                    <th><font color=$team->color2>to</font></th>
-                    <th><font color=$team->color2>blk</font></th>
-                    <th><font color=$team->color2>pf</font></th>
-                    <th><font color=$team->color2>pts</font></th>
+                    <th>orb</th>
+                    <th>reb</th>
+                    <th>ast</th>
+                    <th>stl</th>
+                    <th>to</th>
+                    <th>blk</th>
+                    <th>pf</th>
+                    <th>pts</th>
                 </tr>
             </thead>
         <tbody>";
@@ -357,52 +367,52 @@ class UI
     
     public static function ratings($db, $data, $team, $yr, $season, $moduleName = "")
     {
-        $table_ratings = self::tableStyles('ratings', $team->color1) . "<table align=\"center\" class=\"sortable ratings\">
+        $table_ratings = self::tableStyles('ratings', $team->color1, $team->color2) . "<table align=\"center\" class=\"sortable ratings\">
         <colgroup span=2><colgroup span=2><colgroup span=6><colgroup span=6><colgroup span=4><colgroup span=4><colgroup span=1>
             <thead bgcolor=$team->color1>
                 <tr bgcolor=$team->color1>";
 
 
         if ($moduleName == "League_Starters") {
-            $table_ratings .= "<th><font color=$team->color2>Team</font></th>";
+            $table_ratings .= "<th>Team</th>";
         }
 
         $table_ratings .= "
-                    <th><font color=$team->color2>Pos</font></th>
-                    <th><font color=$team->color2>Player</font></th>
-                    <th><font color=$team->color2>Age</font></th>
+                    <th>Pos</th>
+                    <th>Player</th>
+                    <th>Age</th>
                     <th class=\"sep-team\"></th>
-                    <th><font color=$team->color2>2ga</font></th>
-                    <th><font color=$team->color2>2g%</font></th>
+                    <th>2ga</th>
+                    <th>2g%</th>
                     <th class=\"sep-team\"></th>
-                    <th><font color=$team->color2>fta</font></th>
-                    <th><font color=$team->color2>ft%</font></th>
+                    <th>fta</th>
+                    <th>ft%</th>
                     <th class=\"sep-team\"></th>
-                    <th><font color=$team->color2>3ga</font></th>
-                    <th><font color=$team->color2>3g%</font></th>
+                    <th>3ga</th>
+                    <th>3g%</th>
                     <th class=\"sep-team\"></th>
-                    <th><font color=$team->color2>orb</font></th>
-                    <th><font color=$team->color2>drb</font></th>
-                    <th><font color=$team->color2>ast</font></th>
-                    <th><font color=$team->color2>stl</font></th>
-                    <th><font color=$team->color2>tvr</font></th>
-                    <th><font color=$team->color2>blk</font></th>
-                    <th><font color=$team->color2>foul</font></th>
+                    <th>orb</th>
+                    <th>drb</th>
+                    <th>ast</th>
+                    <th>stl</th>
+                    <th>tvr</th>
+                    <th>blk</th>
+                    <th>foul</th>
                     <th class=\"sep-team\"></th>
-                    <th><font color=$team->color2>oo</font></th>
-                    <th><font color=$team->color2>do</font></th>
-                    <th><font color=$team->color2>po</font></th>
-                    <th><font color=$team->color2>to</font></th>
+                    <th>oo</th>
+                    <th>do</th>
+                    <th>po</th>
+                    <th>to</th>
                     <th class=\"sep-team\"></th>
-                    <th><font color=$team->color2>od</font></th>
-                    <th><font color=$team->color2>dd</font></th>
-                    <th><font color=$team->color2>pd</font></th>
-                    <th><font color=$team->color2>td</font></th>
+                    <th>od</th>
+                    <th>dd</th>
+                    <th>pd</th>
+                    <th>td</th>
                     <th class=\"sep-team\"></th>
-                    <th><font color=$team->color2>Clu</font></th>
-                    <th><font color=$team->color2>Con</font></th>
+                    <th>Clu</th>
+                    <th>Con</th>
                     <th class=\"sep-team\"></th>
-                    <th><font color=$team->color2>Injury Return Date</font></th>
+                    <th>Injury Return Date</th>
                 </tr>
             </thead>
         <tbody>";
@@ -500,35 +510,35 @@ class UI
 
     public static function seasonAverages($db, $result, $team, $yr)
     {
-        $table_averages = self::tableStyles('season-avg', $team->color1) . "<table align=\"center\" class=\"sortable season-avg\">
+        $table_averages = self::tableStyles('season-avg', $team->color1, $team->color2) . "<table align=\"center\" class=\"sortable season-avg\">
                 <thead>
                     <tr bgcolor=$team->color1>
-                        <th><font color=$team->color2>Pos</font></th>
-                        <th colspan=3><font color=$team->color2>Player</font></th>
-                        <th><font color=$team->color2>g</font></th>
-                        <th><font color=$team->color2>gs</font></th>
-                        <th><font color=$team->color2>min</font></th>
+                        <th>Pos</th>
+                        <th colspan=3>Player</th>
+                        <th>g</th>
+                        <th>gs</th>
+                        <th>min</th>
                         <th class=\"sep-team\"></th>
-                        <th><font color=$team->color2>fgm</font></th>
-                        <th><font color=$team->color2>fga</font></th>
-                        <th><font color=$team->color2>fgp</font></th>
+                        <th>fgm</th>
+                        <th>fga</th>
+                        <th>fgp</th>
                         <th class=\"sep-weak\"></th>
-                        <th><font color=$team->color2>ftm</font></th>
-                        <th><font color=$team->color2>fta</font></th>
-                        <th><font color=$team->color2>ftp</font></th>
+                        <th>ftm</th>
+                        <th>fta</th>
+                        <th>ftp</th>
                         <th class=\"sep-weak\"></th>
-                        <th><font color=$team->color2>3gm</font></th>
-                        <th><font color=$team->color2>3ga</font></th>
-                        <th><font color=$team->color2>3gp</font></th>
+                        <th>3gm</th>
+                        <th>3ga</th>
+                        <th>3gp</th>
                         <th class=\"sep-team\"></th>
-                        <th><font color=$team->color2>orb</font></th>
-                        <th><font color=$team->color2>reb</font></th>
-                        <th><font color=$team->color2>ast</font></th>
-                        <th><font color=$team->color2>stl</font></th>
-                        <th><font color=$team->color2>to</font></th>
-                        <th><font color=$team->color2>blk</font></th>
-                        <th><font color=$team->color2>pf</font></th>
-                        <th><font color=$team->color2>pts</font></th>
+                        <th>orb</th>
+                        <th>reb</th>
+                        <th>ast</th>
+                        <th>stl</th>
+                        <th>to</th>
+                        <th>blk</th>
+                        <th>pf</th>
+                        <th>pts</th>
                     </tr>
                 </thead>
             <tbody>";
@@ -656,32 +666,32 @@ class UI
 
     public static function seasonTotals($db, $result, $team, $yr)
     {
-        $table_totals = self::tableStyles('season-totals', $team->color1) . "<table align=\"center\" class=\"sortable season-totals\">
+        $table_totals = self::tableStyles('season-totals', $team->color1, $team->color2) . "<table align=\"center\" class=\"sortable season-totals\">
             <thead>
                 <tr bgcolor=$team->color1>
-                    <th><font color=$team->color2>Pos</font></th>
-                    <th colspan=3><font color=$team->color2>Player</font></th>
-                    <th><font color=$team->color2>g</font></th>
-                    <th><font color=$team->color2>gs</font></th>
-                    <th><font color=$team->color2>min</font></th>
+                    <th>Pos</th>
+                    <th colspan=3>Player</th>
+                    <th>g</th>
+                    <th>gs</th>
+                    <th>min</th>
                     <th class=\"sep-team\"></th>
-                    <th><font color=$team->color2>fgm</font></th>
-                    <th><font color=$team->color2>fga</font></th>
+                    <th>fgm</th>
+                    <th>fga</th>
                     <th class=\"sep-weak\"></th>
-                    <th><font color=$team->color2>ftm</font></th>
-                    <th><font color=$team->color2>fta</font></th>
+                    <th>ftm</th>
+                    <th>fta</th>
                     <th class=\"sep-weak\"></th>
-                    <th><font color=$team->color2>3gm</font></th>
-                    <th><font color=$team->color2>3ga</font></th>
+                    <th>3gm</th>
+                    <th>3ga</th>
                     <th class=\"sep-team\"></th>
-                    <th><font color=$team->color2>orb</font></th>
-                    <th><font color=$team->color2>reb</font></th>
-                    <th><font color=$team->color2>ast</font></th>
-                    <th><font color=$team->color2>stl</font></th>
-                    <th><font color=$team->color2>to</font></th>
-                    <th><font color=$team->color2>blk</font></th>
-                    <th><font color=$team->color2>pf</font></th>
-                    <th><font color=$team->color2>pts</font></th>
+                    <th>orb</th>
+                    <th>reb</th>
+                    <th>ast</th>
+                    <th>stl</th>
+                    <th>to</th>
+                    <th>blk</th>
+                    <th>pf</th>
+                    <th>pts</th>
                 </tr>
             </thead>
         <tbody>";
@@ -813,34 +823,34 @@ class UI
             $endDate = $endDate->format('Y-m-d');
         }
 
-        $table_periodAverages = self::tableStyles('sim-avg', $team->color1) . "<table align=\"center\" class=\"sortable sim-avg\">
+        $table_periodAverages = self::tableStyles('sim-avg', $team->color1, $team->color2) . "<table align=\"center\" class=\"sortable sim-avg\">
             <thead>
                 <tr bgcolor=$team->color1>
-                    <th><font color=$team->color2>Pos</font></th>
-                    <th colspan=3><font color=$team->color2>Player</font></th>
-                    <th><font color=$team->color2>g</font></th>
-                    <th><font color=$team->color2>min</font></th>
+                    <th>Pos</th>
+                    <th colspan=3>Player</th>
+                    <th>g</th>
+                    <th>min</th>
                     <th class=\"sep-team\"></th>
-                    <th><font color=$team->color2>fgm</font></th>
-                    <th><font color=$team->color2>fga</font></th>
-                    <th><font color=$team->color2>fgp</font></th>
+                    <th>fgm</th>
+                    <th>fga</th>
+                    <th>fgp</th>
                     <th class=\"sep-weak\"></th>
-                    <th><font color=$team->color2>ftm</font></th>
-                    <th><font color=$team->color2>fta</font></th>
-                    <th><font color=$team->color2>ftp</font></th>
+                    <th>ftm</th>
+                    <th>fta</th>
+                    <th>ftp</th>
                     <th class=\"sep-weak\"></th>
-                    <th><font color=$team->color2>3gm</font></th>
-                    <th><font color=$team->color2>3ga</font></th>
-                    <th><font color=$team->color2>3gp</font></th>
+                    <th>3gm</th>
+                    <th>3ga</th>
+                    <th>3gp</th>
                     <th class=\"sep-team\"></th>
-                    <th><font color=$team->color2>orb</font></th>
-                    <th><font color=$team->color2>reb</font></th>
-                    <th><font color=$team->color2>ast</font></th>
-                    <th><font color=$team->color2>stl</font></th>
-                    <th><font color=$team->color2>to</font></th>
-                    <th><font color=$team->color2>blk</font></th>
-                    <th><font color=$team->color2>pf</font></th>
-                    <th><font color=$team->color2>pts</font></th>
+                    <th>orb</th>
+                    <th>reb</th>
+                    <th>ast</th>
+                    <th>stl</th>
+                    <th>to</th>
+                    <th>blk</th>
+                    <th>pf</th>
+                    <th>pts</th>
                 </tr>
             </thead>
         <tbody>";

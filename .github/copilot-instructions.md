@@ -713,6 +713,29 @@ public function testPlayerFetch()
 ### Problem Statement
 The Copilot agent cannot install dependencies from scratch on every run due to private repository access restrictions. Instead, it relies on pre-cached dependencies through GitHub Actions.
 
+### ⚠️ CRITICAL: ALWAYS Check for Cached Dependencies FIRST
+
+**Before running `composer install` or any PHPUnit commands, the Copilot Agent MUST:**
+
+1. **Check if vendor directory exists:**
+   ```bash
+   ls -la ibl5/vendor/bin/phpunit 2>/dev/null && echo "✅ PHPUnit cached - use directly"
+   ```
+
+2. **If vendor exists**, use PHPUnit directly WITHOUT running composer install:
+   ```bash
+   cd ibl5 && vendor/bin/phpunit
+   ```
+
+3. **If vendor does NOT exist**, run the bootstrap script which will:
+   - Try to restore from GitHub Actions cache first
+   - Fall back to composer install only if cache is unavailable
+   ```bash
+   bash bootstrap-phpunit.sh
+   ```
+
+**DO NOT** run `composer install` directly - always use the bootstrap script or check for existing dependencies first.
+
 ### Solution Architecture
 
 #### **GitHub Actions Dependency Caching** (Active Solution)
@@ -751,7 +774,21 @@ The `.github/workflows/cache-dependencies.yml` and `.github/workflows/tests.yml`
 
 ### Testing from Command Line
 
-When dependencies are cached, tests run via:
+**ALWAYS check for cached dependencies first:**
+
+```bash
+# Step 1: Check if dependencies are already cached
+if [ -f "ibl5/vendor/bin/phpunit" ]; then
+    echo "✅ Dependencies cached, running tests directly"
+    cd ibl5 && vendor/bin/phpunit
+else
+    echo "⚠️ No cached dependencies, running bootstrap script"
+    bash bootstrap-phpunit.sh
+    cd ibl5 && vendor/bin/phpunit
+fi
+```
+
+**Quick commands when dependencies are cached:**
 
 ```bash
 cd ibl5

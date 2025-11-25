@@ -29,13 +29,13 @@ class StartersLineupComponentTest extends TestCase
         
         $html = $this->component->render($starters, 'FF0000', '0000FF');
         
-        // Check structure
-        $this->assertStringContainsString('<table align="center" border="1" cellpadding="1" cellspacing="1">', $html);
+        // Check structure - now uses CSS margin for centering
+        $this->assertStringContainsString('<table style="margin: 0 auto;', $html);
         $this->assertStringContainsString('Last Sim\'s Starters', $html);
         
-        // Check team colors
-        $this->assertStringContainsString('bgcolor="FF0000"', $html);
-        $this->assertStringContainsString('color="0000FF"', $html);
+        // Check team colors - now uses CSS styling
+        $this->assertStringContainsString('background-color: #FF0000', $html);
+        $this->assertStringContainsString('color: #0000FF', $html);
         
         // Check all positions are rendered
         $this->assertStringContainsString('<b>PG</b>', $html);
@@ -53,9 +53,9 @@ class StartersLineupComponentTest extends TestCase
         
         // Check player images and links
         $this->assertStringContainsString('./images/player/1.jpg', $html);
-        $this->assertStringContainsString('modules.php?name=Player&pa=showpage&pid=1', $html);
+        $this->assertStringContainsString('modules.php?name=Player&amp;pa=showpage&amp;pid=1', $html);
         $this->assertStringContainsString('./images/player/5.jpg', $html);
-        $this->assertStringContainsString('modules.php?name=Player&pa=showpage&pid=5', $html);
+        $this->assertStringContainsString('modules.php?name=Player&amp;pa=showpage&amp;pid=5', $html);
     }
 
     public function testRenderWithPartialLineup()
@@ -117,8 +117,8 @@ class StartersLineupComponentTest extends TestCase
         // Test with different color scheme
         $html = $this->component->render($starters, '00FF00', 'FFFFFF');
         
-        $this->assertStringContainsString('bgcolor="00FF00"', $html);
-        $this->assertStringContainsString('color="FFFFFF"', $html);
+        $this->assertStringContainsString('background-color: #00FF00', $html);
+        $this->assertStringContainsString('color: #FFFFFF', $html);
     }
 
     public function testRenderSanitizesPlayerNames()
@@ -154,8 +154,8 @@ class StartersLineupComponentTest extends TestCase
         $html = $this->component->render($starters, 'invalid<script>', 'XYZ');
         
         // Should use default color for invalid values
-        $this->assertStringContainsString('bgcolor="000000"', $html);
-        $this->assertStringContainsString('color="000000"', $html);
+        $this->assertStringContainsString('background-color: #000000', $html);
+        $this->assertStringContainsString('color: #000000', $html);
     }
 
     public function testRenderAcceptsThreeCharacterHexColors()
@@ -171,8 +171,8 @@ class StartersLineupComponentTest extends TestCase
         // Test with 3-character hex colors
         $html = $this->component->render($starters, 'F00', 'FFF');
         
-        $this->assertStringContainsString('bgcolor="F00"', $html);
-        $this->assertStringContainsString('color="FFF"', $html);
+        $this->assertStringContainsString('background-color: #F00', $html);
+        $this->assertStringContainsString('color: #FFF', $html);
     }
 
     public function testRenderHandlesColorWithHashPrefix()
@@ -188,7 +188,7 @@ class StartersLineupComponentTest extends TestCase
         // Test with # prefix (should be stripped)
         $html = $this->component->render($starters, '#00FF00', '#FFFFFF');
         
-        $this->assertStringContainsString('bgcolor="00FF00"', $html);
-        $this->assertStringContainsString('color="FFFFFF"', $html);
+        $this->assertStringContainsString('background-color: #00FF00', $html);
+        $this->assertStringContainsString('color: #FFFFFF', $html);
     }
 }

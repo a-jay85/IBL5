@@ -35,12 +35,10 @@ class PeriodAverages
             $endDate = $endDate->format('Y-m-d');
         }
 
-        // Escape dates for SQL
-        $startDateEscaped = $db->sql_escape_string($startDate);
-        $endDateEscaped = $db->sql_escape_string($endDate);
         $teamID = (int)$team->teamID;
 
-        $resultPlayerSimBoxScores = $db->sql_query("SELECT name,
+        // Use prepared statement for date filtering
+        $query = "SELECT name,
             pos,
             pid,
             COUNT(DISTINCT `Date`) as games,
@@ -63,17 +61,29 @@ class PeriodAverages
             ROUND(SUM(gamePF)/COUNT(DISTINCT `Date`) , 1) as gamePFavg,
             ROUND(((2 * SUM(game2GM)) + SUM(gameFTM) + (3 * SUM(game3GM)))/COUNT(DISTINCT `Date`) , 1) as gamePTSavg
         FROM   ibl_box_scores
-        WHERE  date BETWEEN '$startDateEscaped' AND '$endDateEscaped'
-            AND ( hometid = $teamID
-                OR visitortid = $teamID )
+        WHERE  date BETWEEN ? AND ?
+            AND ( hometid = ?
+                OR visitortid = ? )
             AND gameMIN > 0
             AND pid IN (SELECT pid
                         FROM   ibl_plr
-                        WHERE  tid = $teamID
+                        WHERE  tid = ?
                             AND retired = 0
                             AND `name` NOT LIKE '%|%')
         GROUP  BY name, pos, pid
-        ORDER  BY name ASC;");
+        ORDER  BY name ASC";
+        
+        $stmt = $db->db_connect_id->prepare($query);
+        if ($stmt === false) {
+            throw new \Exception('Prepare failed: ' . $db->db_connect_id->error);
+        }
+        
+        $stmt->bind_param('sssii', $startDate, $endDate, $teamID, $teamID, $teamID);
+        if (!$stmt->execute()) {
+            throw new \Exception('Execute failed: ' . $stmt->error);
+        }
+        
+        $resultPlayerSimBoxScores = $stmt->get_result();
 
         $playerRows = [];
         $i = 0;

@@ -33,35 +33,22 @@ class Contracts
         foreach ($result as $plrRow) {
             $player = Player::withPlrRow($db, $plrRow);
 
-            if ($sharedFunctions->isFreeAgencyModuleActive() == 0) {
-                $year1 = $player->contractCurrentYear;
-                $year2 = $player->contractCurrentYear + 1;
-                $year3 = $player->contractCurrentYear + 2;
-                $year4 = $player->contractCurrentYear + 3;
-                $year5 = $player->contractCurrentYear + 4;
-                $year6 = $player->contractCurrentYear + 5;
-            } else {
-                $year1 = $player->contractCurrentYear + 1;
-                $year2 = $player->contractCurrentYear + 2;
-                $year3 = $player->contractCurrentYear + 3;
-                $year4 = $player->contractCurrentYear + 4;
-                $year5 = $player->contractCurrentYear + 5;
-                $year6 = $player->contractCurrentYear + 6;
-            }
-            if ($player->contractCurrentYear == 0) {
-                $con1 = $year1 < 7 ? $player->contractYear1Salary : 0;
-                $con2 = $year2 < 7 ? $player->contractYear2Salary : 0;
-                $con3 = $year3 < 7 ? $player->contractYear3Salary : 0;
-                $con4 = $year4 < 7 ? $player->contractYear4Salary : 0;
-                $con5 = $year5 < 7 ? $player->contractYear5Salary : 0;
-                $con6 = $year6 < 7 ? $player->contractYear6Salary : 0;
-            } else {
-                $con1 = $year1 < 7 ? $player->{'contractYear' . $year1 . 'Salary'} : 0;
-                $con2 = $year2 < 7 ? $player->{'contractYear' . $year2 . 'Salary'} : 0;
-                $con3 = $year3 < 7 ? $player->{'contractYear' . $year3 . 'Salary'} : 0;
-                $con4 = $year4 < 7 ? $player->{'contractYear' . $year4 . 'Salary'} : 0;
-                $con5 = $year5 < 7 ? $player->{'contractYear' . $year5 . 'Salary'} : 0;
-                $con6 = $year6 < 7 ? $player->{'contractYear' . $year6 . 'Salary'} : 0;
+            // Calculate contract year offset based on free agency status
+            $yearOffset = ($sharedFunctions->isFreeAgencyModuleActive() == 0) ? 0 : 1;
+            
+            // Calculate contract values for each year
+            $contracts = [];
+            for ($y = 1; $y <= 6; $y++) {
+                $yearNum = $player->contractCurrentYear + ($y - 1) + $yearOffset;
+                if ($yearNum < 7) {
+                    if ($player->contractCurrentYear == 0) {
+                        $contracts[$y] = $player->{'contractYear' . $y . 'Salary'};
+                    } else {
+                        $contracts[$y] = $player->{'contractYear' . $yearNum . 'Salary'};
+                    }
+                } else {
+                    $contracts[$y] = 0;
+                }
             }
 
             $bgcolor = (($i % 2) == 0) ? "FFFFFF" : "EEEEEE";
@@ -69,20 +56,20 @@ class Contracts
             $playerRows[] = [
                 'player' => $player,
                 'bgcolor' => $bgcolor,
-                'con1' => $con1,
-                'con2' => $con2,
-                'con3' => $con3,
-                'con4' => $con4,
-                'con5' => $con5,
-                'con6' => $con6,
+                'con1' => $contracts[1],
+                'con2' => $contracts[2],
+                'con3' => $contracts[3],
+                'con4' => $contracts[4],
+                'con5' => $contracts[5],
+                'con6' => $contracts[6],
             ];
 
-            $cap1 += $con1;
-            $cap2 += $con2;
-            $cap3 += $con3;
-            $cap4 += $con4;
-            $cap5 += $con5;
-            $cap6 += $con6;
+            $cap1 += $contracts[1];
+            $cap2 += $contracts[2];
+            $cap3 += $contracts[3];
+            $cap4 += $contracts[4];
+            $cap5 += $contracts[5];
+            $cap6 += $contracts[6];
             $i++;
         }
 

@@ -117,9 +117,11 @@ class Ratings
     <tbody>
 <?php foreach ($playerRows as $row):
     $player = $row['player'];
+    // Column count: 35 base + 1 optional Team column = 36 max
+    $colCount = ($moduleName == "League_Starters") ? 36 : 35;
     if ($row['addSeparator']): ?>
         <tr>
-        <td colspan="55" style="background-color: #<?= htmlspecialchars($team->color1) ?>;">
+        <td colspan="<?= $colCount ?>" style="background-color: #<?= htmlspecialchars($team->color1) ?>;">
         </td>
         </tr>
 <?php endif; ?>

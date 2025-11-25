@@ -18,12 +18,26 @@ class TopMenu
     {
         $team = \Team::initialize($db, $teamID);
 
-        $teamCityQuery = "SELECT `team_city`,`team_name`,`teamid` FROM `ibl_team_info` ORDER BY `team_city` ASC";
-        $teamCityResult = $db->sql_query($teamCityQuery);
-        $teamNameQuery = "SELECT `team_city`,`team_name`,`teamid` FROM `ibl_team_info` ORDER BY `team_name` ASC";
-        $teamNameResult = $db->sql_query($teamNameQuery);
-        $teamIDQuery = "SELECT `team_city`,`team_name`,`teamid` FROM `ibl_team_info` ORDER BY `teamid` ASC";
-        $teamIDResult = $db->sql_query($teamIDQuery);
+        // Fetch team data once and sort in PHP for each dropdown
+        $teamQuery = "SELECT `team_city`,`team_name`,`teamid` FROM `ibl_team_info`";
+        $teamResult = $db->sql_query($teamQuery);
+        
+        $teams = [];
+        while ($row = $db->sql_fetch_assoc($teamResult)) {
+            $teams[] = $row;
+        }
+        
+        // Sort by city for location dropdown
+        $teamsByCity = $teams;
+        usort($teamsByCity, fn($a, $b) => strcasecmp($a['team_city'], $b['team_city']));
+        
+        // Sort by name for namesake dropdown
+        $teamsByName = $teams;
+        usort($teamsByName, fn($a, $b) => strcasecmp($a['team_name'], $b['team_name']));
+        
+        // Sort by ID for ID dropdown
+        $teamsById = $teams;
+        usort($teamsById, fn($a, $b) => $a['teamid'] <=> $b['teamid']);
 
         // Button styles
         $buttonStyle = "font: bold 11px Helvetica; text-decoration: none; " .
@@ -41,23 +55,23 @@ class TopMenu
                     <b>Team Pages:</b>
                     <select name="teamSelectCity" onchange="location = this.options[this.selectedIndex].value;">
                         <option value="">Location</option>
-                        <?php while ($row = $db->sql_fetch_assoc($teamCityResult)): ?>
+                        <?php foreach ($teamsByCity as $row): ?>
                         <option value="./modules.php?name=Team&amp;op=team&amp;teamID=<?= (int)$row["teamid"] ?>"><?= htmlspecialchars($row["team_city"]) ?> <?= htmlspecialchars($row["team_name"]) ?></option>
-                        <?php endwhile; ?>
+                        <?php endforeach; ?>
                     </select>
 
                     <select name="teamSelectName" onchange="location = this.options[this.selectedIndex].value;">
                         <option value="">Namesake</option>
-                        <?php while ($row = $db->sql_fetch_assoc($teamNameResult)): ?>
+                        <?php foreach ($teamsByName as $row): ?>
                         <option value="./modules.php?name=Team&amp;op=team&amp;teamID=<?= (int)$row["teamid"] ?>"><?= htmlspecialchars($row["team_name"]) ?></option>
-                        <?php endwhile; ?>
+                        <?php endforeach; ?>
                     </select>
 
                     <select name="teamSelectID" onchange="location = this.options[this.selectedIndex].value;">
                         <option value="">ID#</option>
-                        <?php while ($row = $db->sql_fetch_assoc($teamIDResult)): ?>
+                        <?php foreach ($teamsById as $row): ?>
                         <option value="./modules.php?name=Team&amp;op=team&amp;teamID=<?= (int)$row["teamid"] ?>"><?= (int)$row["teamid"] ?> <?= htmlspecialchars($row["team_city"]) ?> <?= htmlspecialchars($row["team_name"]) ?></option>
-                        <?php endwhile; ?>
+                        <?php endforeach; ?>
                     </select>
                 </p>
             </td>

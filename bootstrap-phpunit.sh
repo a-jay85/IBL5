@@ -111,6 +111,25 @@ if [ "$IS_GITHUB_ACTIONS" = "true" ]; then
         warning "composer.lock not found, cannot determine cache key"
     fi
     
+    # Helper function to clean up failed cache extraction
+    cleanup_failed_cache() {
+        rm -rf vendor 2>/dev/null || true
+    }
+    
+    # Helper function to parse JSON (uses jq if available, falls back to grep)
+    parse_json_field() {
+        local json="$1"
+        local field="$2"
+        
+        if command -v jq &> /dev/null; then
+            # Use jq for reliable JSON parsing
+            echo "$json" | jq -r ".$field // empty" 2>/dev/null
+        else
+            # Fallback to grep (less reliable but works for simple cases)
+            echo "$json" | grep -oP "\"$field\"\s*:\s*\"\K[^\"]+'" 2>/dev/null || echo ""
+        fi
+    }
+    
     # Check if cache environment variables are available
     if [ -n "$ACTIONS_RUNTIME_TOKEN" ] && [ -n "$ACTIONS_CACHE_URL" ]; then
         info "GitHub Actions cache API available, attempting cache restore..."
@@ -118,37 +137,50 @@ if [ "$IS_GITHUB_ACTIONS" = "true" ]; then
         # Try to restore cache using the cache API
         # The actions/cache uses a specific protocol for cache restoration
         CACHE_VERSION="gzip"
-        CACHE_URL="${ACTIONS_CACHE_URL}_apis/artifactcache/cache?keys=${CACHE_KEY}&version=${CACHE_VERSION}"
+        
+        # Properly construct the cache URL (remove trailing slash if present, then append path)
+        BASE_URL="${ACTIONS_CACHE_URL%/}"
+        CACHE_URL="${BASE_URL}/_apis/artifactcache/cache?keys=${CACHE_KEY}&version=${CACHE_VERSION}"
         
         CACHE_RESPONSE=$(curl -s -H "Authorization: Bearer $ACTIONS_RUNTIME_TOKEN" \
             -H "Accept: application/json;api-version=6.0-preview.1" \
             "$CACHE_URL" 2>/dev/null || echo "")
         
         if echo "$CACHE_RESPONSE" | grep -q "archiveLocation"; then
-            ARCHIVE_URL=$(echo "$CACHE_RESPONSE" | grep -oP '"archiveLocation"\s*:\s*"\K[^"]+')
+            ARCHIVE_URL=$(parse_json_field "$CACHE_RESPONSE" "archiveLocation")
+            
+            # Security validation: Ensure the URL is from a trusted GitHub Actions domain
             if [ -n "$ARCHIVE_URL" ]; then
-                info "Cache found! Downloading and extracting..."
-                
-                # Download and extract the cache
-                mkdir -p vendor
-                if curl -sL "$ARCHIVE_URL" | tar -xzf - -C . 2>/dev/null; then
-                    if [ -f "vendor/bin/phpunit" ]; then
-                        success "Cache restored successfully!"
-                        success "PHPUnit ready: $(vendor/bin/phpunit --version)"
-                        success "Environment is ready! (Restored from GitHub Actions cache)"
-                        echo ""
-                        echo "Available commands:"
-                        echo "  cd ibl5 && vendor/bin/phpunit                     # Run all tests"
-                        echo "  cd ibl5 && vendor/bin/phpunit tests/Player/       # Run specific test suite"
-                        echo ""
-                        exit 0
+                # Validate the URL is from trusted GitHub Actions domains
+                if [[ "$ARCHIVE_URL" == https://pipelines.actions.githubusercontent.com/* ]] || \
+                   [[ "$ARCHIVE_URL" == https://results.actions.githubusercontent.com/* ]] || \
+                   [[ "$ARCHIVE_URL" == https://artifactcache.actions.githubusercontent.com/* ]]; then
+                    info "Cache found from trusted source, downloading and extracting..."
+                    
+                    # Download and extract the cache
+                    mkdir -p vendor
+                    if curl -sL "$ARCHIVE_URL" | tar -xzf - -C . 2>/dev/null; then
+                        if [ -f "vendor/bin/phpunit" ]; then
+                            success "Cache restored successfully!"
+                            success "PHPUnit ready: $(vendor/bin/phpunit --version)"
+                            success "Environment is ready! (Restored from GitHub Actions cache)"
+                            echo ""
+                            echo "Available commands:"
+                            echo "  cd ibl5 && vendor/bin/phpunit                     # Run all tests"
+                            echo "  cd ibl5 && vendor/bin/phpunit tests/Player/       # Run specific test suite"
+                            echo ""
+                            exit 0
+                        else
+                            warning "Cache extracted but PHPUnit not found, falling back to composer install"
+                            cleanup_failed_cache
+                        fi
                     else
-                        warning "Cache extracted but PHPUnit not found, falling back to composer install"
-                        rm -rf vendor 2>/dev/null || true
+                        warning "Failed to extract cache, falling back to composer install"
+                        cleanup_failed_cache
                     fi
                 else
-                    warning "Failed to extract cache, falling back to composer install"
-                    rm -rf vendor 2>/dev/null || true
+                    warning "Cache URL is from untrusted source, skipping cache restore for security"
+                    warning "URL: $ARCHIVE_URL"
                 fi
             fi
         else

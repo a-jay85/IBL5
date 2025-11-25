@@ -42,6 +42,10 @@ class TeamUIServiceTest extends TestCase
             'HasLLE' => 0,
             'leagueRecord' => '50-32'
         ];
+        
+        // Set up mock database to return team data for both array and ID-based lookups
+        $this->db->setMockData([$teamRow]);
+        
         $this->team = Team::initialize($this->db, $teamRow);
         
         // Create mock season

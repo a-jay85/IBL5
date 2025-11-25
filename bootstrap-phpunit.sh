@@ -2,6 +2,12 @@
 
 # Bootstrap PHPUnit for GitHub Copilot Agent
 # This script sets up the PHP development environment with proper caching and fallback strategies
+# 
+# CACHE-FIRST STRATEGY:
+# 1. Check if vendor directory already exists (from cache or previous install)
+# 2. In GitHub Actions: Try to restore from GitHub Actions cache
+# 3. Fall back to composer install only if cache is not available
+#
 # Run this before any PHPUnit tests: bash bootstrap-phpunit.sh
 
 set -e
@@ -73,22 +79,91 @@ fi
 COMPOSER_VERSION=$(composer --version 2>&1 | grep -oP '(?<=version )[0-9.]+' || echo "unknown")
 success "Composer $COMPOSER_VERSION detected"
 
-# Check if vendor directory already exists and is complete
+# ============================================================================
+# STEP 1: Check if vendor directory already exists and is complete
+# ============================================================================
 if [ -d "vendor" ] && [ -f "vendor/bin/phpunit" ]; then
     success "PHPUnit already installed: $(vendor/bin/phpunit --version)"
-    success "Environment is ready!"
+    success "Environment is ready! (Dependencies found in vendor/)"
     echo ""
     echo "Available commands:"
-    echo "  cd ibl5 && phpunit                     # Run all tests"
-    echo "  cd ibl5 && phpunit tests/Player/       # Run specific test suite"
+    echo "  cd ibl5 && vendor/bin/phpunit                     # Run all tests"
+    echo "  cd ibl5 && vendor/bin/phpunit tests/Player/       # Run specific test suite"
     if [ -f "vendor/bin/phpstan" ]; then
-        echo "  cd ibl5 && vendor/bin/phpstan analyse  # Run static analysis"
+        echo "  cd ibl5 && vendor/bin/phpstan analyse             # Run static analysis"
     fi
     echo ""
     exit 0
 fi
 
-# Need to install dependencies
+# ============================================================================
+# STEP 2: Try to restore from GitHub Actions cache (if in GitHub Actions)
+# ============================================================================
+if [ "$IS_GITHUB_ACTIONS" = "true" ]; then
+    info "Checking for GitHub Actions cached dependencies..."
+    
+    # Calculate cache key based on composer.lock hash (matches workflow cache key)
+    if [ -f "composer.lock" ]; then
+        LOCK_HASH=$(sha256sum composer.lock | cut -d' ' -f1)
+        CACHE_KEY="Linux-vendor-${LOCK_HASH}"
+        info "Cache key: $CACHE_KEY"
+    else
+        warning "composer.lock not found, cannot determine cache key"
+    fi
+    
+    # Check if cache environment variables are available
+    if [ -n "$ACTIONS_RUNTIME_TOKEN" ] && [ -n "$ACTIONS_CACHE_URL" ]; then
+        info "GitHub Actions cache API available, attempting cache restore..."
+        
+        # Try to restore cache using the cache API
+        # The actions/cache uses a specific protocol for cache restoration
+        CACHE_VERSION="gzip"
+        CACHE_URL="${ACTIONS_CACHE_URL}_apis/artifactcache/cache?keys=${CACHE_KEY}&version=${CACHE_VERSION}"
+        
+        CACHE_RESPONSE=$(curl -s -H "Authorization: Bearer $ACTIONS_RUNTIME_TOKEN" \
+            -H "Accept: application/json;api-version=6.0-preview.1" \
+            "$CACHE_URL" 2>/dev/null || echo "")
+        
+        if echo "$CACHE_RESPONSE" | grep -q "archiveLocation"; then
+            ARCHIVE_URL=$(echo "$CACHE_RESPONSE" | grep -oP '"archiveLocation"\s*:\s*"\K[^"]+')
+            if [ -n "$ARCHIVE_URL" ]; then
+                info "Cache found! Downloading and extracting..."
+                
+                # Download and extract the cache
+                mkdir -p vendor
+                if curl -sL "$ARCHIVE_URL" | tar -xzf - -C . 2>/dev/null; then
+                    if [ -f "vendor/bin/phpunit" ]; then
+                        success "Cache restored successfully!"
+                        success "PHPUnit ready: $(vendor/bin/phpunit --version)"
+                        success "Environment is ready! (Restored from GitHub Actions cache)"
+                        echo ""
+                        echo "Available commands:"
+                        echo "  cd ibl5 && vendor/bin/phpunit                     # Run all tests"
+                        echo "  cd ibl5 && vendor/bin/phpunit tests/Player/       # Run specific test suite"
+                        echo ""
+                        exit 0
+                    else
+                        warning "Cache extracted but PHPUnit not found, falling back to composer install"
+                        rm -rf vendor 2>/dev/null || true
+                    fi
+                else
+                    warning "Failed to extract cache, falling back to composer install"
+                    rm -rf vendor 2>/dev/null || true
+                fi
+            fi
+        else
+            info "No matching cache found for key: $CACHE_KEY"
+            info "Cache will be created after successful composer install"
+        fi
+    else
+        info "GitHub Actions cache API not available in this context"
+        info "Tip: Ensure the workflow includes the 'actions/cache' step before this script runs"
+    fi
+fi
+
+# ============================================================================
+# STEP 3: Fall back to composer install
+# ============================================================================
 info "Installing Composer dependencies..."
 echo ""
 
@@ -164,11 +239,12 @@ if [ "$INSTALL_SUCCESS" = "false" ]; then
     error "  4. Missing GITHUB_TOKEN for authentication"
     echo ""
     error "Possible solutions:"
-    error "  1. Wait a few minutes and try again (rate limiting)"
-    error "  2. Use a VPN or different network (firewall issues)"
-    error "  3. Set COMPOSER_AUTH env var with GitHub token"
-    error "  4. Run from a cached environment (GitHub Actions cache)"
-    error "  5. Manually trigger 'Cache PHP Dependencies' workflow"
+    error "  1. RECOMMENDED: Manually trigger 'Cache PHP Dependencies' workflow in GitHub Actions"
+    error "     This will pre-cache all dependencies for future runs"
+    error "  2. Ensure 'actions/cache' step runs BEFORE this script in your workflow"
+    error "  3. Wait a few minutes and try again (rate limiting)"
+    error "  4. Set COMPOSER_AUTH env var with GitHub token"
+    error "  5. Use a VPN or different network (firewall issues)"
     echo ""
     error "Full error log:"
     cat /tmp/composer-install.log | tail -50

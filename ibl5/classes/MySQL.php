@@ -29,6 +29,11 @@ if (!defined("SQL_LAYER")) {
         public $row = array();
         public $rowset = array();
         public $num_queries = 0;
+        public $persistency;
+        public $user;
+        public $password;
+        public $server;
+        public $dbname;
 
         //
         // Constructor

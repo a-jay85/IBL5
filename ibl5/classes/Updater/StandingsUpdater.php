@@ -74,7 +74,8 @@ class StandingsUpdater {
 
         foreach ($rowsByConference as $row) {
             if (!is_null($row->childNodes)) {
-                $teamName = $row->childNodes->item(0)->nodeValue;
+                $firstChild = $row->childNodes->item(0);
+                $teamName = $firstChild ? $firstChild->nodeValue : '';
                 if (in_array($teamName, array("Eastern", "Western"))) {
                     $conference = $teamName;
                 }
@@ -163,7 +164,8 @@ class StandingsUpdater {
 
         foreach ($rowsByDivision as $row) {
             if (!is_null($row->childNodes)) {
-                $teamName = $row->childNodes->item(0)->nodeValue;
+                $firstChild = $row->childNodes->item(0);
+                $teamName = $firstChild ? $firstChild->nodeValue : '';
                 
                 if (in_array($teamName, array("Atlantic", "Central", "Midwest", "Pacific"))) {
                     $division = $teamName;

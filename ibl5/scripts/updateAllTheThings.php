@@ -72,4 +72,4 @@ try {
     echo "<pre style='color: red;'>" . htmlspecialchars($e->getTraceAsString()) . "</pre>";
 }
 
-echo '<a href="index.php">Return to the IBL homepage</a>';
+echo '<a href="/ibl5/index.php">Return to the IBL homepage</a>';

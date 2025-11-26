@@ -42,13 +42,11 @@ class PowerRankingsUpdater {
         $query = "UPDATE ibl_team_history SET sim_depth = 'No Depth Chart'";
         $this->db->sql_query($query);
 
-        echo '<p>The ibl_power table has been updated.<p><br>';
+        echo '<p>The ibl_power table has been updated.<p>';
     }
 
     private function determineMonth() {
-        if ($this->season->phase == "Preseason") {
-            return \Season::IBL_PRESEASON_MONTH;
-        } elseif ($this->season->phase == "HEAT") {
+        if ($this->season->phase == "HEAT") {
             return \Season::IBL_HEAT_MONTH;
         } else {
             return \Season::IBL_REGULAR_SEASON_STARTING_MONTH;

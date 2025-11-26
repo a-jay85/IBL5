@@ -23,7 +23,7 @@ class ScheduleUpdater {
             $year = date('Y', strtotime($rawDate));
 
             if ($this->season->phase == "Preseason") {
-                $month = \Season::IBL_PRESEASON_MONTH;
+                $year = \Season::IBL_PRESEASON_YEAR;
             } elseif ($this->season->phase == "HEAT") {
                 if ($month == 11) {
                     $month = \Season::IBL_HEAT_MONTH;
@@ -156,6 +156,6 @@ class ScheduleUpdater {
         }
         \UI::displayDebugOutput($log, 'ibl_schedule SQL Queries');
 
-        echo 'The ibl_schedule database table has been updated.<p><br>';
+        echo 'The ibl_schedule database table has been updated.<p>';
     }
 }

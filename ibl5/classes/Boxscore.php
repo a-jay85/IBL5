@@ -128,9 +128,6 @@ class Boxscore
             if ($seasonPhase == "HEAT") {
                 $this->gameMonth = Season::IBL_HEAT_MONTH;
             }
-            if ($seasonPhase == "Preseason") {
-                $this->gameMonth = Season::IBL_PRESEASON_MONTH;
-            }
         }
 
         $this->gameDate = $this->gameYear . '-' . $this->gameMonth . '-' . $this->gameDay;
@@ -143,12 +140,12 @@ class Boxscore
         return $instance;
     }
 
-    public static function deletePreseasonBoxScores($db, $seasonStartingYear)
+    public static function deletePreseasonBoxScores($db)
     {
         $queryDeletePreseasonPlayersBoxScores = "DELETE FROM `ibl_box_scores`
-            WHERE `Date` BETWEEN '$seasonStartingYear-" . Season::IBL_PRESEASON_MONTH . "-01' AND '$seasonStartingYear-" . Season::IBL_PRESEASON_MONTH . "-30';";
+            WHERE `Date` BETWEEN '" . Season::IBL_PRESEASON_YEAR . "-11-01' AND '" . Season::IBL_PRESEASON_YEAR . "-11-30';";
         $queryDeletePreseasonTeamsBoxScores = "DELETE FROM `ibl_box_scores_teams`
-            WHERE `Date` BETWEEN '$seasonStartingYear-" . Season::IBL_PRESEASON_MONTH . "-01' AND '$seasonStartingYear-" . Season::IBL_PRESEASON_MONTH . "-30';";
+            WHERE `Date` BETWEEN '" . Season::IBL_PRESEASON_YEAR . "-11-01' AND '" . Season::IBL_PRESEASON_YEAR . "-11-30';";
 
         if (
             $db->sql_query($queryDeletePreseasonPlayersBoxScores, 0) 

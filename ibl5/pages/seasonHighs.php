@@ -49,10 +49,10 @@ function seasonHighTable($queryForStat, $statName, $playerOrTeam, $seasonPhase)
         $queryEndingYear = $season->endingYear;
         $queryEndingMonth = Season::IBL_PLAYOFF_MONTH;
     } elseif ($seasonPhase == "Preseason") {
-        $queryBeginningYear = $season->beginningYear;
-        $queryBeginningMonth = Season::IBL_PRESEASON_MONTH;
-        $queryEndingYear = $season->beginningYear;
-        $queryEndingMonth = Season::IBL_PRESEASON_MONTH;
+        $queryBeginningYear = Season::IBL_PRESEASON_YEAR;
+        $queryBeginningMonth = Season::IBL_REGULAR_SEASON_STARTING_MONTH;
+        $queryEndingYear = Season::IBL_PRESEASON_YEAR + 1;
+        $queryEndingMonth = Season::IBL_REGULAR_SEASON_ENDING_MONTH;
     } elseif ($seasonPhase == "HEAT") {
         $queryBeginningYear = $season->beginningYear;
         $queryBeginningMonth = Season::IBL_HEAT_MONTH;

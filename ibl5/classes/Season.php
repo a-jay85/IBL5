@@ -25,7 +25,7 @@ class Season
 
     public $freeAgencyNotificationsState;
 
-    const IBL_PRESEASON_MONTH = 9;
+    const IBL_PRESEASON_YEAR = 9998;
     const IBL_HEAT_MONTH = 10;
     const IBL_REGULAR_SEASON_STARTING_MONTH = 11;
     const IBL_ALL_STAR_MONTH = 02;

@@ -54,7 +54,7 @@ class OverviewView extends BaseView {
         </center>";
 
         if ($this->season->phase == "Preseason") {
-            $query = "SELECT * FROM ibl_box_scores WHERE Date BETWEEN '" . $this->season->beginningYear . "-" . Season::IBL_PRESEASON_MONTH . "-01' AND '" . $this->season->endingYear . "-07-01' AND pid = " . $this->player->playerID . " ORDER BY Date ASC";
+            $query = "SELECT * FROM ibl_box_scores WHERE Date BETWEEN '" . Season::IBL_PRESEASON_YEAR . "-" . Season::IBL_REGULAR_SEASON_STARTING_MONTH . "-01' AND '" . (Season::IBL_PRESEASON_YEAR + 1) . "-07-01' AND pid = " . $this->player->playerID . " ORDER BY Date ASC";
         } elseif ($this->season->phase == "HEAT") {
             $query = "SELECT * FROM ibl_box_scores WHERE Date BETWEEN '" . $this->season->beginningYear . "-" . Season::IBL_HEAT_MONTH . "-01' AND '" . $this->season->endingYear . "-07-01' AND pid = " . $this->player->playerID . " ORDER BY Date ASC";
         } else {

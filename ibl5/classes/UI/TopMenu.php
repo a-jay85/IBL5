@@ -47,44 +47,40 @@ class TopMenu
 
         ob_start();
         ?>
-<div style="text-align: center;">
-    <table style="width: 400px; margin: 0 auto; border: 0;">
-        <tr>
-            <td colspan="6">
-                <p>
-                    <b>Team Pages:</b>
-                    <select name="teamSelectCity" onchange="location = this.options[this.selectedIndex].value;">
-                        <option value="">Location</option>
-                        <?php foreach ($teamsByCity as $row): ?>
-                        <option value="./modules.php?name=Team&amp;op=team&amp;teamID=<?= (int)$row["teamid"] ?>"><?= htmlspecialchars($row["team_city"]) ?> <?= htmlspecialchars($row["team_name"]) ?></option>
-                        <?php endforeach; ?>
-                    </select>
+<div style="text-align: center; margin: 0 auto; margin-bottom: 1rem;">
+    <div style="margin-bottom: 1rem;">
+        <p style="margin: 0.5rem 0;">
+            <b>Team Pages:</b>
+            <select name="teamSelectCity" onchange="location = this.options[this.selectedIndex].value;">
+                <option value="">Location</option>
+                <?php foreach ($teamsByCity as $row): ?>
+                <option value="./modules.php?name=Team&amp;op=team&amp;teamID=<?= (int)$row["teamid"] ?>"><?= htmlspecialchars($row["team_city"]) ?> <?= htmlspecialchars($row["team_name"]) ?></option>
+                <?php endforeach; ?>
+            </select>
 
-                    <select name="teamSelectName" onchange="location = this.options[this.selectedIndex].value;">
-                        <option value="">Namesake</option>
-                        <?php foreach ($teamsByName as $row): ?>
-                        <option value="./modules.php?name=Team&amp;op=team&amp;teamID=<?= (int)$row["teamid"] ?>"><?= htmlspecialchars($row["team_name"]) ?></option>
-                        <?php endforeach; ?>
-                    </select>
+            <select name="teamSelectName" onchange="location = this.options[this.selectedIndex].value;">
+                <option value="">Namesake</option>
+                <?php foreach ($teamsByName as $row): ?>
+                <option value="./modules.php?name=Team&amp;op=team&amp;teamID=<?= (int)$row["teamid"] ?>"><?= htmlspecialchars($row["team_name"]) ?></option>
+                <?php endforeach; ?>
+            </select>
 
-                    <select name="teamSelectID" onchange="location = this.options[this.selectedIndex].value;">
-                        <option value="">ID#</option>
-                        <?php foreach ($teamsById as $row): ?>
-                        <option value="./modules.php?name=Team&amp;op=team&amp;teamID=<?= (int)$row["teamid"] ?>"><?= (int)$row["teamid"] ?> <?= htmlspecialchars($row["team_city"]) ?> <?= htmlspecialchars($row["team_name"]) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </p>
-            </td>
-        </tr>
-        <tr>
-            <td style="white-space: nowrap;"><a style="<?= $buttonStyle ?>" href="modules.php?name=Team&amp;op=team&amp;teamID=<?= $teamID ?>">Team Page</a></td>
-            <td style="white-space: nowrap;"><a style="<?= $buttonStyle ?>" href="modules.php?name=Team_Schedule&amp;teamID=<?= $teamID ?>">Team Schedule</a></td>
-            <td style="white-space: nowrap;"><a style="<?= $buttonStyle ?>" href="modules/Team/draftHistory.php?teamID=<?= $teamID ?>">Draft History</a></td>
-            <td style="white-space: nowrap; vertical-align: middle;"><span style="font: bold 14px Helvetica;"> | </span></td>
-            <td style="white-space: nowrap;"><a style="<?= $buttonStyle ?>" href="modules.php?name=Depth_Chart_Entry">Depth Chart Entry</a></td>
-            <td style="white-space: nowrap;"><a style="<?= $buttonStyle ?>" href="modules.php?name=Trading&amp;op=reviewtrade">Trades/Waivers</a></td>
-        </tr>
-    </table>
+            <select name="teamSelectID" onchange="location = this.options[this.selectedIndex].value;">
+                <option value="">ID#</option>
+                <?php foreach ($teamsById as $row): ?>
+                <option value="./modules.php?name=Team&amp;op=team&amp;teamID=<?= (int)$row["teamid"] ?>"><?= (int)$row["teamid"] ?> <?= htmlspecialchars($row["team_city"]) ?> <?= htmlspecialchars($row["team_name"]) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </p>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 0.25rem;">
+        <span style="white-space: nowrap;"><a style="<?= $buttonStyle ?>" href="modules.php?name=Team&amp;op=team&amp;teamID=<?= $teamID ?>">Team Page</a></span>
+        <span style="white-space: nowrap;"><a style="<?= $buttonStyle ?>" href="modules.php?name=Team_Schedule&amp;teamID=<?= $teamID ?>">Team Schedule</a></span>
+        <span style="white-space: nowrap;"><a style="<?= $buttonStyle ?>" href="modules/Team/draftHistory.php?teamID=<?= $teamID ?>">Draft History</a></span>
+        <span style="white-space: nowrap; display: flex; align-items: center;"><span style="font: bold 14px Helvetica;"> | </span></span>
+        <span style="white-space: nowrap;"><a style="<?= $buttonStyle ?>" href="modules.php?name=Depth_Chart_Entry">Depth Chart Entry</a></span>
+        <span style="white-space: nowrap;"><a style="<?= $buttonStyle ?>" href="modules.php?name=Trading&amp;op=reviewtrade">Trades/Waivers</a></span>
+    </div>
 </div>
 <hr>
         <?php

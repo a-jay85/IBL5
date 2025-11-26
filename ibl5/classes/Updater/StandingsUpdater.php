@@ -50,7 +50,7 @@ class StandingsUpdater {
         $this->updateMagicNumbers('Pacific');
         
         echo '<p>Magic numbers for all teams have been updated.<p>';
-        echo '<p>The ibl_standings table has been updated.<p><br>';
+        echo '<p>The ibl_standings table has been updated.<p>';
     }
 
     protected function extractStandingsValues() {

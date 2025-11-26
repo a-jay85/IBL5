@@ -32,24 +32,23 @@ class StartersLineupComponent
         // Sanitize color values to prevent HTML injection
         $color1 = $this->sanitizeColor($color1);
         $color2 = $this->sanitizeColor($color2);
-        
-        $headerRow = "<tr bgcolor=\"$color1\">
-            <td colspan=\"5\"><font color=\"$color2\"><center><b>Last Sim's Starters</b></center></font></td>
-        </tr>";
-        
-        $starterRow = "<tr>";
-        foreach ($positions as $position) {
-            $name = $starters[$position]['name'] ?? '';
-            $pid = $starters[$position]['pid'] ?? '';
-            
-            $starterRow .= $this->renderPlayerCell($position, $name, $pid);
-        }
-        $starterRow .= "</tr>";
-        
-        return "<table align=\"center\" border=\"1\" cellpadding=\"1\" cellspacing=\"1\">
-            $headerRow
-            $starterRow
-        </table>";
+
+        ob_start();
+        ?>
+<table style="margin: 0 auto; border-collapse: collapse;" border="1" cellpadding="1" cellspacing="1">
+    <tr style="background-color: #<?= $color1 ?>;">
+        <td colspan="5" style="text-align: center; color: #<?= $color2 ?>;"><b>Last Sim's Starters</b></td>
+    </tr>
+    <tr>
+<?php foreach ($positions as $position):
+    $name = $starters[$position]['name'] ?? '';
+    $pid = $starters[$position]['pid'] ?? '';
+    echo $this->renderPlayerCell($position, $name, $pid);
+endforeach; ?>
+    </tr>
+</table>
+        <?php
+        return ob_get_clean();
     }
     
     /**
@@ -71,15 +70,20 @@ class StartersLineupComponent
         
         $pidEscaped = htmlspecialchars((string)$pid, ENT_QUOTES, 'UTF-8');
         if ($name) {
-            $playerLink = "<a href=\"./modules.php?name=Player&pa=showpage&pid=$pidEscaped\">$name</a>";
+            $playerLink = "<a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid=$pidEscaped\">$name</a>";
         } else {
             $playerLink = '&nbsp;';
         }
-        
-        return "<td><center><b>$position</b><br>" .
-               "<img src=\"{$playerImageUrl}\" height=\"90\" width=\"65\"><br>" .
-               $playerLink .
-               "</td>";
+
+        ob_start();
+        ?>
+        <td style="text-align: center;">
+            <b><?= $position ?></b><br>
+            <img src="<?= $playerImageUrl ?>" height="90" width="65"><br>
+            <?= $playerLink ?>
+        </td>
+        <?php
+        return ob_get_clean();
     }
     
     /**

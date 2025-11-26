@@ -73,7 +73,7 @@ class ScheduleUpdaterTest extends TestCase
         $result = $method->invoke($this->scheduleUpdater, 'November 1, 2023');
         
         $this->assertIsArray($result);
-        $this->assertEquals(Season::IBL_PRESEASON_MONTH, $result['month']);
+        $this->assertEquals(Season::IBL_REGULAR_SEASON_STARTING_MONTH, $result['month']);
     }
 
     /**

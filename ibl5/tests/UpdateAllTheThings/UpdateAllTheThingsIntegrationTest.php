@@ -58,7 +58,7 @@ class UpdateAllTheThingsIntegrationTest extends TestCase
     public function testProductionConstantsAreAccessible()
     {
         // Season constants from production
-        $this->assertEquals(9, Season::IBL_PRESEASON_MONTH);
+        $this->assertEquals(9998, Season::IBL_PRESEASON_YEAR);
         $this->assertEquals(10, Season::IBL_HEAT_MONTH);
         $this->assertEquals(11, Season::IBL_REGULAR_SEASON_STARTING_MONTH);
         $this->assertEquals(2, Season::IBL_ALL_STAR_MONTH);

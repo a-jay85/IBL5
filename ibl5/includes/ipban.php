@@ -25,10 +25,14 @@ if ($numrow != 0) {
     die();
 }
 $ip_class = explode(".", $ip);
-$ip = "$ip_class[0].$ip_class[1].$ip_class[2].*";
-list($ip_address) = $db->sql_fetchrow($db->sql_query("SELECT ip_address FROM " . $prefix . "_banned_ip WHERE ip_address='$ip'"));
+$ip_class_0 = $ip_class[0] ?? '';
+$ip_class_1 = $ip_class[1] ?? '';
+$ip_class_2 = $ip_class[2] ?? '';
+$ip = "$ip_class_0.$ip_class_1.$ip_class_2.*";
+$row = $db->sql_fetchrow($db->sql_query("SELECT ip_address FROM " . $prefix . "_banned_ip WHERE ip_address='$ip'"));
+$ip_address = $row['ip_address'] ?? '';
 $ip_class_banned = explode(".", $ip_address);
-if ($ip_class_banned[3] == "*") {
+if (($ip_class_banned[3] ?? '') == "*") {
     if ($ip_class[0] == $ip_class_banned[0] && $ip_class[1] == $ip_class_banned[1] && $ip_class[2] == $ip_class_banned[2]) {
         echo "<br><br><center><img src='images/admin/ipban.gif'><br><br><b>You have been banned by the administrator</b></center>";
         die();

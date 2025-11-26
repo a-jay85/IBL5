@@ -50,7 +50,7 @@ class StandingsUpdater {
         $this->updateMagicNumbers('Pacific');
         
         echo '<p>Magic numbers for all teams have been updated.<p>';
-        echo '<p>The ibl_standings table has been updated.<p><br>';
+        echo '<p>The ibl_standings table has been updated.<p>';
     }
 
     protected function extractStandingsValues() {
@@ -74,7 +74,8 @@ class StandingsUpdater {
 
         foreach ($rowsByConference as $row) {
             if (!is_null($row->childNodes)) {
-                $teamName = $row->childNodes->item(0)->nodeValue;
+                $firstChild = $row->childNodes->item(0);
+                $teamName = $firstChild ? $firstChild->nodeValue : '';
                 if (in_array($teamName, array("Eastern", "Western"))) {
                     $conference = $teamName;
                 }
@@ -163,7 +164,8 @@ class StandingsUpdater {
 
         foreach ($rowsByDivision as $row) {
             if (!is_null($row->childNodes)) {
-                $teamName = $row->childNodes->item(0)->nodeValue;
+                $firstChild = $row->childNodes->item(0);
+                $teamName = $firstChild ? $firstChild->nodeValue : '';
                 
                 if (in_array($teamName, array("Atlantic", "Central", "Midwest", "Pacific"))) {
                     $division = $teamName;

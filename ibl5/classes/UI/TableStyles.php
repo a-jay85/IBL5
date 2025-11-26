@@ -25,12 +25,16 @@ class TableStyles
         ob_start();
         ?>
 <style>
-.<?= $tableClass ?> { --team-sep-color: #<?= $teamColor ?>; color: #<?= $teamColor2 ?>; border-collapse: collapse; }
-.<?= $tableClass ?> .salary { padding-left: 3px; }
+.<?= $tableClass ?> { --team-sep-color: #<?= $teamColor ?>; color: #<?= $teamColor2 ?>; border-collapse: collapse; border: 2px solid #<?= $teamColor ?>; border-top: none;}
 .<?= $tableClass ?> th { color: #<?= $teamColor2 ?>; }
 .<?= $tableClass ?> td { color: #000; }
-.<?= $tableClass ?> th.sep-team, .<?= $tableClass ?> td.sep-team { border-right: 3px solid var(--team-sep-color); }
-.<?= $tableClass ?> th.sep-weak, .<?= $tableClass ?> td.sep-weak { border-right: 1px solid #CCCCCC; }
+.<?= $tableClass ?> th:first-child, .<?= $tableClass ?> td:first-child { padding-left: 3px; }
+.<?= $tableClass ?> th:last-child, .<?= $tableClass ?> td:last-child { padding-right: 3px; }
+.<?= $tableClass ?> th:first-row, .<?= $tableClass ?> td:first-row { padding-top: 3px; }
+.<?= $tableClass ?> th.sep-team, .<?= $tableClass ?> td.sep-team { border-right: 2px solid var(--team-sep-color); padding-right: 3px; }
+.<?= $tableClass ?> th.sep-team + th, .<?= $tableClass ?> th.sep-team + td, .<?= $tableClass ?> td.sep-team + th, .<?= $tableClass ?> td.sep-team + td { padding-left: 3px; }
+.<?= $tableClass ?> th.sep-weak, .<?= $tableClass ?> td.sep-weak { border-right: 1px solid #CCCCCC; padding-right: 3px; }
+.<?= $tableClass ?> th.sep-weak + th, .<?= $tableClass ?> th.sep-weak + td, .<?= $tableClass ?> td.sep-weak + th, .<?= $tableClass ?> td.sep-weak + td { padding-left: 3px; }
 .<?= $tableClass ?> th.salary { text-align: left; }
 </style>
         <?php

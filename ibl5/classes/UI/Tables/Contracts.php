@@ -91,7 +91,6 @@ class Contracts
             <th class="salary"><?= substr(($season->endingYear + 2), -2) ?>-<?= substr(($season->endingYear + 3), -2) ?></th>
             <th class="salary"><?= substr(($season->endingYear + 3), -2) ?>-<?= substr(($season->endingYear + 4), -2) ?></th>
             <th class="sep-team salary"><?= substr(($season->endingYear + 4), -2) ?>-<?= substr(($season->endingYear + 5), -2) ?></th>
-            <th class="sep-team"></th>
             <th>Tal</th>
             <th>Skl</th>
             <th>Int</th>
@@ -120,8 +119,7 @@ class Contracts
             <td class="salary"><?= (int)$row['con3'] ?></td>
             <td class="salary"><?= (int)$row['con4'] ?></td>
             <td class="salary"><?= (int)$row['con5'] ?></td>
-            <td class="salary"><?= (int)$row['con6'] ?></td>
-            <td class="sep-team"></td>
+            <td class="sep-team salary"><?= (int)$row['con6'] ?></td>
             <td style="text-align: center;"><?= (int)$player->ratingTalent ?></td>
             <td style="text-align: center;"><?= (int)$player->ratingSkill ?></td>
             <td style="text-align: center;"><?= (int)$player->ratingIntangibles ?></td>
@@ -147,8 +145,7 @@ class Contracts
             <td class="salary"><b><?= (int)$cap3 ?></b></td>
             <td class="salary"><b><?= (int)$cap4 ?></b></td>
             <td class="salary"><b><?= (int)$cap5 ?></b></td>
-            <td class="salary"><b><?= (int)$cap6 ?></b></td>
-            <td class="sep-team"></td>
+            <td class="sep-team salary"><b><?= (int)$cap6 ?></b></td>
             <td></td>
             <td></td>
             <td></td>
@@ -160,7 +157,9 @@ class Contracts
             <td></td>
         </tr>
         <tr>
-            <td colspan="19"><i>Note:</i> Players whose names appear in parenthesis and with a trailing asterisk are waived players that still count against the salary cap.</td>
+            <td colspan="19">
+                Key:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<i>(Waived)*</i>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Becomes Free Agent^
+            </td>
         </tr>
     </tfoot>
 </table>

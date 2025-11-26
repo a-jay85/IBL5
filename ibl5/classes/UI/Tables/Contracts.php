@@ -85,12 +85,12 @@ class Contracts
             <th>Exp</th>
             <th>Bird</th>
             <th class="sep-team"></th>
-            <th><?= substr(($season->endingYear + -1), -2) ?>-<?= substr(($season->endingYear + 0), -2) ?></th>
-            <th><?= substr(($season->endingYear + 0), -2) ?>-<?= substr(($season->endingYear + 1), -2) ?></th>
-            <th><?= substr(($season->endingYear + 1), -2) ?>-<?= substr(($season->endingYear + 2), -2) ?></th>
-            <th><?= substr(($season->endingYear + 2), -2) ?>-<?= substr(($season->endingYear + 3), -2) ?></th>
-            <th><?= substr(($season->endingYear + 3), -2) ?>-<?= substr(($season->endingYear + 4), -2) ?></th>
-            <th class="sep-team"><?= substr(($season->endingYear + 4), -2) ?>-<?= substr(($season->endingYear + 5), -2) ?></th>
+            <th class="salary"><?= substr(($season->endingYear + -1), -2) ?>-<?= substr(($season->endingYear + 0), -2) ?></th>
+            <th class="salary"><?= substr(($season->endingYear + 0), -2) ?>-<?= substr(($season->endingYear + 1), -2) ?></th>
+            <th class="salary"><?= substr(($season->endingYear + 1), -2) ?>-<?= substr(($season->endingYear + 2), -2) ?></th>
+            <th class="salary"><?= substr(($season->endingYear + 2), -2) ?>-<?= substr(($season->endingYear + 3), -2) ?></th>
+            <th class="salary"><?= substr(($season->endingYear + 3), -2) ?>-<?= substr(($season->endingYear + 4), -2) ?></th>
+            <th class="sep-team salary"><?= substr(($season->endingYear + 4), -2) ?>-<?= substr(($season->endingYear + 5), -2) ?></th>
             <th class="sep-team"></th>
             <th>Tal</th>
             <th>Skl</th>
@@ -115,12 +115,12 @@ class Contracts
             <td style="text-align: center;"><?= (int)$player->yearsOfExperience ?></td>
             <td style="text-align: center;"><?= (int)$player->birdYears ?></td>
             <td class="sep-team"></td>
-            <td><?= (int)$row['con1'] ?></td>
-            <td><?= (int)$row['con2'] ?></td>
-            <td><?= (int)$row['con3'] ?></td>
-            <td><?= (int)$row['con4'] ?></td>
-            <td><?= (int)$row['con5'] ?></td>
-            <td><?= (int)$row['con6'] ?></td>
+            <td class="salary"><?= (int)$row['con1'] ?></td>
+            <td class="salary"><?= (int)$row['con2'] ?></td>
+            <td class="salary"><?= (int)$row['con3'] ?></td>
+            <td class="salary"><?= (int)$row['con4'] ?></td>
+            <td class="salary"><?= (int)$row['con5'] ?></td>
+            <td class="salary"><?= (int)$row['con6'] ?></td>
             <td class="sep-team"></td>
             <td style="text-align: center;"><?= (int)$player->ratingTalent ?></td>
             <td style="text-align: center;"><?= (int)$player->ratingSkill ?></td>
@@ -142,12 +142,12 @@ class Contracts
             <td></td>
             <td></td>
             <td class="sep-team"></td>
-            <td><b><?= (int)$cap1 ?></b></td>
-            <td><b><?= (int)$cap2 ?></b></td>
-            <td><b><?= (int)$cap3 ?></b></td>
-            <td><b><?= (int)$cap4 ?></b></td>
-            <td><b><?= (int)$cap5 ?></b></td>
-            <td><b><?= (int)$cap6 ?></b></td>
+            <td class="salary"><b><?= (int)$cap1 ?></b></td>
+            <td class="salary"><b><?= (int)$cap2 ?></b></td>
+            <td class="salary"><b><?= (int)$cap3 ?></b></td>
+            <td class="salary"><b><?= (int)$cap4 ?></b></td>
+            <td class="salary"><b><?= (int)$cap5 ?></b></td>
+            <td class="salary"><b><?= (int)$cap6 ?></b></td>
             <td class="sep-team"></td>
             <td></td>
             <td></td>

@@ -26,10 +26,12 @@ class TableStyles
         ?>
 <style>
 .<?= $tableClass ?> { --team-sep-color: #<?= $teamColor ?>; color: #<?= $teamColor2 ?>; border-collapse: collapse; }
+.<?= $tableClass ?> .salary { padding-left: 3px; }
 .<?= $tableClass ?> th { color: #<?= $teamColor2 ?>; }
 .<?= $tableClass ?> td { color: #000; }
 .<?= $tableClass ?> th.sep-team, .<?= $tableClass ?> td.sep-team { border-right: 3px solid var(--team-sep-color); }
 .<?= $tableClass ?> th.sep-weak, .<?= $tableClass ?> td.sep-weak { border-right: 1px solid #CCCCCC; }
+.<?= $tableClass ?> th.salary { text-align: left; }
 </style>
         <?php
         return ob_get_clean();

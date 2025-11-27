@@ -25,11 +25,18 @@ class ScheduleUpdater {
             $year = date('Y', strtotime($rawDate));
 
             if ($this->season->phase == "Preseason") {
-                $year = \Season::IBL_PRESEASON_YEAR;
+                $this->season->beginningYear = \Season::IBL_PRESEASON_YEAR;
+                $this->season->endingYear = \Season::IBL_PRESEASON_YEAR + 1;
             } elseif ($this->season->phase == "HEAT") {
                 if ($month == 11) {
                     $month = \Season::IBL_HEAT_MONTH;
                 }
+            }
+            
+            if ($month < \Season::IBL_REGULAR_SEASON_STARTING_MONTH) {
+                $year = $this->season->endingYear;
+            } else {
+                $year = $this->season->beginningYear;
             }
             
             $date = $year . "-" . $month . "-" . $day;

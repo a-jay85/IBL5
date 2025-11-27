@@ -2,6 +2,8 @@
 
 require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
+use Utilities\UuidGenerator;
+
 function scoParser($uploadedFilePath, $operatingSeasonEndingYear, $operatingSeasonPhase)
 {
     global $db, $mysqli_db;
@@ -79,8 +81,9 @@ function scoParser($uploadedFilePath, $operatingSeasonEndingYear, $operatingSeas
     );
 
     $playerStatement = $mysqli_db->prepare(Boxscore::PLAYERSTATEMENT_PREPARE);
-    $playerStatement->bind_param("sssiiiiiiiiiiiiiiiii",
+    $playerStatement->bind_param("ssssiiiiiiiiiiiiiiiii",
         $gameDate,
+        $playerUuid,
         $name,
         $position,
         $playerID,
@@ -135,7 +138,7 @@ function scoParser($uploadedFilePath, $operatingSeasonEndingYear, $operatingSeas
             $playerInfoLine = substr($line, 58 + $x, 53);
             $playerStats = PlayerStats::withBoxscoreInfoLine($db, $playerInfoLine);
 
-            $name = $playerStats->name;
+            $name = mb_convert_encoding($playerStats->name, 'UTF-8', 'ISO-8859-1');
             $position = $playerStats->position;
             $playerID = $playerStats->playerID;
             $gameMinutesPlayed = $playerStats->gameMinutesPlayed;
@@ -154,6 +157,9 @@ function scoParser($uploadedFilePath, $operatingSeasonEndingYear, $operatingSeas
             $gamePersonalFouls = $playerStats->gamePersonalFouls;
 
             if ($playerStats->name != null || $playerStats->name != '') {
+                // Generate UUID for player boxscore record (team scores don't use UUID)
+                $playerUuid = UuidGenerator::generateUuid();
+                
                 if ($playerID == 0) {
                     if ($teamStatement->execute()) {
                         $numberOfLinesProcessed++;

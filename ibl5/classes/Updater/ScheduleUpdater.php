@@ -1,6 +1,8 @@
 <?php
 namespace Updater;
 
+use Utilities\UuidGenerator;
+
 class ScheduleUpdater {
     private $db;
     private $commonRepository;
@@ -44,17 +46,6 @@ class ScheduleUpdater {
 
     private function extractBoxID($boxHREF) {
         return ltrim(rtrim($boxHREF, '.htm'), 'box');
-    }
-
-    private function generateUUID() {
-        return sprintf(
-            '%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
-            mt_rand(0, 0xffff), mt_rand(0, 0xffff),
-            mt_rand(0, 0xffff),
-            mt_rand(0, 0x0fff) | 0x4000,
-            mt_rand(0, 0x3fff) | 0x8000,
-            mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)
-        );
     }
 
     public function update() {
@@ -124,7 +115,7 @@ class ScheduleUpdater {
                 }
 
                 if ($visitorTID !== null && $homeTID !== null) {
-                    $uuid = $this->generateUUID();
+                    $uuid = UuidGenerator::generateUuid();
                     $sqlQueryString = "INSERT INTO ibl_schedule (
                         Year,
                         BoxID,

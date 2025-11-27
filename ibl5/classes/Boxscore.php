@@ -33,6 +33,7 @@ class Boxscore
 
     const PLAYERSTATEMENT_PREPARE = "INSERT INTO ibl_box_scores (
         Date,
+        uuid,
         name,
         pos,
         pid,
@@ -53,7 +54,7 @@ class Boxscore
         gameBLK,
         gamePF
     )
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"; 
 
     const TEAMSTATEMENT_PREPARE = "INSERT INTO ibl_box_scores_teams (
         Date,

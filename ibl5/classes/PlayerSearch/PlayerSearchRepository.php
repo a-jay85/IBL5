@@ -29,9 +29,9 @@ class PlayerSearchRepository
         
         // Experience
         'exp' => 'exp',
-        'exp_max' => 'exp',
+        'exp_max' => 'exp_max',
         'bird' => 'bird',
-        'bird_max' => 'bird',
+        'bird_max' => 'bird_max',
         
         // Ratings
         'r_fga' => 'r_fga',

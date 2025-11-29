@@ -4,11 +4,61 @@ This document tracks the history of module refactoring efforts in the IBL5 codeb
 
 ## Overview
 
-**Current Status:** 14 of 23 IBL modules refactored (61% complete)  
-**Test Coverage:** ~45% (target: 80%)  
+**Current Status:** 15 of 23 IBL modules refactored (65% complete)  
+**Test Coverage:** ~48% (target: 80%)  
 **Architecture Pattern:** Repository/Service/View with comprehensive testing
 
 ## Completed Refactorings
+
+### 15. Player_Search Module (November 28, 2025)
+
+**Summary:** Refactored Player_Search module to fix **critical SQL injection vulnerability**. Achieved 85% code reduction (462 → 69 lines) while adding comprehensive security and 54 unit tests.
+
+**Security Issue Fixed:**
+```php
+// BEFORE: SQL Injection Vulnerable (15+ injection points)
+$query .= " AND name LIKE '%$search_name%'";
+$query .= " AND oo >= '$oo'";
+
+// AFTER: Prepared Statements (100% secure)
+$conditions[] = 'name LIKE ?';
+$bindParams[] = '%' . $params['search_name'] . '%';
+$stmt->bind_param($bindTypes, ...$bindParams);
+```
+
+**Key Improvements:**
+- Created 4 specialized classes with separation of concerns
+- Reduced module code from 462 to 69 lines (85% reduction)
+- Added 54 comprehensive unit tests (210 assertions)
+- Eliminated all SQL injection vulnerabilities via prepared statements
+- Added XSS protection with htmlspecialchars() on all output
+- Input validation with whitelist for positions and type checking
+
+**Classes Created:**
+1. **PlayerSearchValidator** - Input validation, sanitization, whitelist enforcement
+2. **PlayerSearchRepository** - Database queries with 100% prepared statements
+3. **PlayerSearchService** - Business logic, data transformation, orchestration
+4. **PlayerSearchView** - HTML rendering with output buffering pattern
+
+**Files Refactored:**
+- `modules/Player_Search/index.php`: 462 → 69 lines (-85%)
+
+**Security Hardening:**
+- All database operations via prepared statements
+- Position whitelist validation (PG, SG, SF, PF, C, G, F, GF)
+- Integer validation rejects non-numeric and negative values
+- String length limits (64 characters max) prevent abuse
+- HTML escaping on all output with htmlspecialchars()
+
+**Test Coverage:**
+- PlayerSearchValidatorTest: 20 tests (validation, sanitization, security)
+- PlayerSearchRepositoryTest: 9 tests (query building, prepared statements)
+- PlayerSearchServiceTest: 7 tests (business logic, data transformation)
+- PlayerSearchViewTest: 18 tests (HTML rendering, XSS prevention)
+
+**Documentation:** `ibl5/classes/PlayerSearch/README.md`
+
+---
 
 ### 14. Free Agency Module (November 21, 2025)
 

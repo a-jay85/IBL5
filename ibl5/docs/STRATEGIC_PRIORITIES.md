@@ -5,7 +5,7 @@
 
 ## Executive Summary
 
-The Player_Search module is now **complete** ✅, fixing a **critical SQL injection vulnerability** and achieving 85% code reduction (462 → 69 lines). This security-critical refactoring adds 54 comprehensive tests and moves IBL5 toward the 80% test coverage goal.
+The Player_Search module is now **complete** ✅, fixing a **critical SQL injection vulnerability** and achieving 84% code reduction (462 → 73 lines). This security-critical refactoring adds 54 comprehensive tests and moves IBL5 toward the 80% test coverage goal.
 
 ### Progress
 - ✅ **15 modules refactored** (up from 14)
@@ -26,7 +26,7 @@ The Player_Search module is now **complete** ✅, fixing a **critical SQL inject
 
 **Achievements:**
 - 4 classes created with separation of concerns
-- Reduced module code: 462 → 69 lines (85% reduction)
+- Reduced module code: 462 → 73 lines (84% reduction)
 - 54 comprehensive tests (210 assertions)
 - **CRITICAL**: Fixed SQL injection vulnerability (15+ injection points)
 - Complete security hardening with prepared statements

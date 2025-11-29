@@ -12,7 +12,7 @@ This document tracks the history of module refactoring efforts in the IBL5 codeb
 
 ### 15. Player_Search Module (November 28, 2025)
 
-**Summary:** Refactored Player_Search module to fix **critical SQL injection vulnerability**. Achieved 85% code reduction (462 → 69 lines) while adding comprehensive security and 54 unit tests.
+**Summary:** Refactored Player_Search module to fix **critical SQL injection vulnerability**. Achieved 84% code reduction (462 → 73 lines) while adding comprehensive security and 54 unit tests.
 
 **Security Issue Fixed:**
 ```php
@@ -28,7 +28,7 @@ $stmt->bind_param($bindTypes, ...$bindParams);
 
 **Key Improvements:**
 - Created 4 specialized classes with separation of concerns
-- Reduced module code from 462 to 69 lines (85% reduction)
+- Reduced module code from 462 to 73 lines (84% reduction)
 - Added 54 comprehensive unit tests (210 assertions)
 - Eliminated all SQL injection vulnerabilities via prepared statements
 - Added XSS protection with htmlspecialchars() on all output
@@ -41,7 +41,7 @@ $stmt->bind_param($bindTypes, ...$bindParams);
 4. **PlayerSearchView** - HTML rendering with output buffering pattern
 
 **Files Refactored:**
-- `modules/Player_Search/index.php`: 462 → 69 lines (-85%)
+- `modules/Player_Search/index.php`: 462 → 73 lines (-84%)
 
 **Security Hardening:**
 - All database operations via prepared statements

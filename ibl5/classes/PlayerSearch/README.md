@@ -49,7 +49,7 @@ tests/PlayerSearch/
 ## Key Features
 
 ### Validator (`PlayerSearchValidator`)
-- **Position whitelist validation** - Only accepts valid positions (PG, SG, SF, PF, C, G, F, GF)
+- **Position whitelist validation** - Only accepts valid positions (PG, SG, SF, PF, C)
 - **Integer parameter validation** - Rejects negative numbers and non-numeric input
 - **String sanitization** - Trims whitespace, limits length to 64 characters
 - **Boolean validation** - Accepts only 0 or 1 values

@@ -45,7 +45,7 @@ $stmt->bind_param($bindTypes, ...$bindParams);
 
 **Security Hardening:**
 - All database operations via prepared statements
-- Position whitelist validation (PG, SG, SF, PF, C, G, F, GF)
+- Position whitelist validation (PG, SG, SF, PF, C)
 - Integer validation rejects non-numeric and negative values
 - String length limits (64 characters max) prevent abuse
 - HTML escaping on all output with htmlspecialchars()

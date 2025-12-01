@@ -111,6 +111,9 @@ class DepthChartSubmissionHandler
         $csvContent = $this->processor->generateCsvContent($playerData);
         $filename = 'depthcharts/' . $safeTeamName . '.txt';
         
+        // Convert content to windows1252 encoding
+        $csvContent = iconv('UTF-8', 'WINDOWS-1252//TRANSLIT', $csvContent);
+        
         // Verify the final path is within the expected directory
         $realPath = realpath(dirname($filename));
         $expectedPath = realpath('depthcharts');

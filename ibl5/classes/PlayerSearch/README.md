@@ -52,7 +52,7 @@ tests/PlayerSearch/
 - **Position whitelist validation** - Only accepts valid positions (PG, SG, SF, PF, C)
 - **Integer parameter validation** - Rejects negative numbers and non-numeric input
 - **String sanitization** - Trims whitespace, limits length to 64 characters
-- **Boolean validation** - Accepts only 0 or 1 values
+- **Boolean validation** - Accepts only 0 or 1 values for form submission and active filters
 
 ### Repository (`PlayerSearchRepository`)
 - **100% prepared statements** - No direct SQL injection possible
@@ -61,9 +61,10 @@ tests/PlayerSearch/
 - **Reserved word handling** - Properly escapes `do` and `to` column names
 
 ### Service (`PlayerSearchService`)
-- **Orchestrates search workflow** - Validates input, calls repository, returns results
-- **Data transformation** - Converts raw database rows to display-ready format
-- **Type casting** - Ensures all values have correct PHP types
+- **Orchestrates search workflow** - Validates input, calls repository, transforms data
+- **PlayerData integration** - Returns `PlayerData` objects instead of arrays for type safety
+- **Automatic data transformation** - Converts raw database rows to `PlayerData` via `PlayerRepository`
+- **No redundant processing** - Eliminates need for separate data processing methods
 
 ### View (`PlayerSearchView`)
 - **Output buffering pattern** - Clean, readable HTML templates
@@ -76,19 +77,20 @@ tests/PlayerSearch/
 // Initialize classes
 $validator = new \PlayerSearch\PlayerSearchValidator();
 $repository = new \PlayerSearch\PlayerSearchRepository($mysqli_db);
-$service = new \PlayerSearch\PlayerSearchService($validator, $repository);
+$playerRepository = new \Player\PlayerRepository($mysqli_db);
+$service = new \PlayerSearch\PlayerSearchService($validator, $repository, $playerRepository);
 $view = new \PlayerSearch\PlayerSearchView($service);
 
 // Execute search
 $searchResult = $service->search($_POST);
 
-// Render results
+// Render results - now using PlayerData objects
 echo $view->renderSearchForm($searchResult['params']);
 if ($searchResult['count'] > 0) {
     echo $view->renderTableHeader();
     foreach ($searchResult['players'] as $player) {
-        $processed = $service->processPlayerForDisplay($player);
-        echo $view->renderPlayerRow($processed, $rowIndex++);
+        // $player is now a PlayerData object, not an array
+        echo $view->renderPlayerRow($player, $rowIndex++);
     }
     echo $view->renderTableFooter();
 }
@@ -106,14 +108,14 @@ if ($searchResult['count'] > 0) {
 | `bird`, `bird_max` | Integer | Range | Bird years |
 | `oo`, `do`, `po`, `to` | Integer | `>=` | Offensive ratings |
 | `od`, `dd`, `pd`, `td` | Integer | `>=` | Defensive ratings |
-| `sta`, `talent`, `skill` | Integer | `>=` | Attribute ratings |
+| `talent`, `skill` | Integer | `>=` | Attribute ratings |
 | `r_fga`, `r_fgp`, etc. | Integer | `>=` | Shooting ratings |
 | `active` | Boolean | `=` | Include retired players (0=no, 1=yes) |
 
 ## Test Coverage
 
-- **54 total tests** covering all four classes
-- **210 assertions** verifying behavior
+- **52 total tests** covering all four classes
+- **208 assertions** verifying behavior
 - **SQL injection prevention tests** validate security
 - **XSS prevention tests** verify HTML escaping
 

@@ -49,7 +49,6 @@ class PlayerSearchRepository
         'r_foul' => 'r_foul',
         
         // Attributes
-        'sta' => 'sta',
         'Clutch' => 'Clutch',
         'Consistency' => 'Consistency',
         'talent' => 'talent',
@@ -147,7 +146,7 @@ class PlayerSearchRepository
 
         // Handle all "greater than or equal" integer filters
         $greaterThanFilters = [
-            'sta', 'Clutch', 'Consistency', 'talent', 'skill', 'intangibles',
+            'Clutch', 'Consistency', 'talent', 'skill', 'intangibles',
             'oo', 'do', 'po', 'to', 'od', 'dd', 'pd', 'td',
             'r_fga', 'r_fgp', 'r_fta', 'r_ftp', 'r_tga', 'r_tgp',
             'r_orb', 'r_drb', 'r_ast', 'r_stl', 'r_blk', 'r_to', 'r_foul'

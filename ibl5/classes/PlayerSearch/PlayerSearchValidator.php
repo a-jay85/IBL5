@@ -12,9 +12,6 @@ namespace PlayerSearch;
  */
 class PlayerSearchValidator
 {
-    /** @var array<string> Valid player positions */
-    private const VALID_POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C', 'G', 'F', 'GF'];
-
     /**
      * Validate and sanitize all search parameters from form submission
      * 
@@ -52,7 +49,6 @@ class PlayerSearchValidator
             'r_foul' => $this->validateIntegerParam($params['r_foul'] ?? null),
             
             // Attribute ratings
-            'sta' => $this->validateIntegerParam($params['sta'] ?? null),
             'Clutch' => $this->validateIntegerParam($params['Clutch'] ?? null),
             'Consistency' => $this->validateIntegerParam($params['Consistency'] ?? null),
             'talent' => $this->validateIntegerParam($params['talent'] ?? null),
@@ -161,14 +157,5 @@ class PlayerSearchValidator
         return in_array($value, [0, 1, '0', '1'], true) ? (int)$value : null;
     }
 
-    /**
-     * Check if form was submitted
-     * 
-     * @param array<string, mixed> $params Validated parameters
-     * @return bool True if form was submitted
-     */
-    public function isFormSubmitted(array $params): bool
-    {
-        return $params['submitted'] === 1;
-    }
+
 }

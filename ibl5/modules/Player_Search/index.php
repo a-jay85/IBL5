@@ -37,7 +37,8 @@ global $mysqli_db;
 // Initialize classes
 $validator = new \PlayerSearch\PlayerSearchValidator();
 $repository = new \PlayerSearch\PlayerSearchRepository($mysqli_db);
-$service = new \PlayerSearch\PlayerSearchService($validator, $repository);
+$playerRepository = new \Player\PlayerRepository($mysqli_db);
+$service = new \PlayerSearch\PlayerSearchService($validator, $repository, $playerRepository);
 $view = new \PlayerSearch\PlayerSearchView($service);
 
 // Get and validate search parameters from POST
@@ -57,13 +58,12 @@ if ($searchResult['count'] > 0) {
     
     $rowIndex = 0;
     foreach ($searchResult['players'] as $player) {
-        $processedPlayer = $service->processPlayerForDisplay($player);
-        echo $view->renderPlayerRow($processedPlayer, $rowIndex);
+        echo $view->renderPlayerRow($player, $rowIndex);
         $rowIndex++;
     }
     
     echo $view->renderTableFooter();
-} elseif ($validator->isFormSubmitted($searchResult['params'])) {
+} elseif ($searchResult['params']['submitted'] === 1) {
     // Form was submitted but no results found
     echo $view->renderTableHeader();
     echo $view->renderTableFooter();

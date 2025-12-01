@@ -37,7 +37,6 @@ class PlayerSearchView
         // Extract values with defaults
         $pos = $params['pos'] ?? '';
         $age = $params['age'] ?? '';
-        $sta = $params['sta'] ?? '';
         $talent = $params['talent'] ?? '';
         $skill = $params['skill'] ?? '';
         $intangibles = $params['intangibles'] ?? '';
@@ -92,7 +91,6 @@ class PlayerSearchView
                 <?php endforeach; ?>
             </select></td>
             <td>Age: <input type="text" name="age" size="2" value="<?= htmlspecialchars((string)$age) ?>"></td>
-            <td>Stamina: <input type="text" name="sta" size="2" value="<?= htmlspecialchars((string)$sta) ?>"></td>
             <td>Talent: <input type="text" name="talent" size="1" value="<?= htmlspecialchars((string)$talent) ?>"></td>
             <td>Skill: <input type="text" name="skill" size="1" value="<?= htmlspecialchars((string)$skill) ?>"></td>
             <td>Intangibles: <input type="text" name="intangibles" size="1" value="<?= htmlspecialchars((string)$intangibles) ?>"></td>
@@ -164,7 +162,6 @@ class PlayerSearchView
         <th>Pos</th>
         <th>Player</th>
         <th>Age</th>
-        <th>Stamina</th>
         <th>Team</th>
         <th>Exp</th>
         <th>Bird</th>
@@ -201,71 +198,64 @@ class PlayerSearchView
     }
 
     /**
-     * Render a single player row
+     * Render a single player row in the results table
      * 
-     * @param array<string, mixed> $player Processed player data
+     * @param \Player\PlayerData $player Player data object
      * @param int $rowIndex Row index for alternating colors
      * @return string HTML table row
      */
-    public function renderPlayerRow(array $player, int $rowIndex): string
+    public function renderPlayerRow(\Player\PlayerData $player, int $rowIndex): string
     {
         $bgColor = ($rowIndex % 2) ? '#ffffff' : '#e6e7e2';
-        $pid = (int)$player['pid'];
-        $name = htmlspecialchars($player['name']);
-        $pos = htmlspecialchars($player['pos']);
-        $tid = (int)$player['tid'];
-        $teamname = htmlspecialchars($player['teamname']);
-        $college = htmlspecialchars($player['college']);
-        $retired = (int)$player['retired'];
+        $retired = (int)$player->isRetired;
 
         ob_start();
         
         if ($retired === 1) {
             ?>
 <tr style="background-color: <?= $bgColor ?>;">
-    <td style="text-align: center;"><?= $pos ?></td>
-    <td style="text-align: center;"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= $pid ?>"><?= $name ?></a></td>
-    <td colspan="31" style="text-align: center;"> --- Retired --- </td>
-    <td><?= $college ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars($player->position) ?></td>
+    <td style="text-align: center;"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= $player->playerID ?>"><?= htmlspecialchars($player->name) ?></a></td>
+    <td colspan="30" style="text-align: center;"> --- Retired --- </td>
+    <td><?= htmlspecialchars((string)($player->collegeName ?? '')) ?></td>
 </tr>
             <?php
         } else {
             ?>
 <tr style="background-color: <?= $bgColor ?>;">
-    <td style="text-align: center;"><?= $pos ?></td>
-    <td style="text-align: center;"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= $pid ?>"><?= $name ?></a></td>
-    <td style="text-align: center;"><?= (int)$player['age'] ?></td>
-    <td style="text-align: center;"><?= (int)$player['sta'] ?></td>
-    <td style="text-align: center;"><a href="team.php?tid=<?= $tid ?>"><?= $teamname ?></a></td>
-    <td style="text-align: center;"><?= (int)$player['exp'] ?></td>
-    <td style="text-align: center;"><?= (int)$player['bird'] ?></td>
-    <td style="text-align: center;"><?= (int)$player['r_fga'] ?></td>
-    <td style="text-align: center;"><?= (int)$player['r_fgp'] ?></td>
-    <td style="text-align: center;"><?= (int)$player['r_fta'] ?></td>
-    <td style="text-align: center;"><?= (int)$player['r_ftp'] ?></td>
-    <td style="text-align: center;"><?= (int)$player['r_tga'] ?></td>
-    <td style="text-align: center;"><?= (int)$player['r_tgp'] ?></td>
-    <td style="text-align: center;"><?= (int)$player['r_orb'] ?></td>
-    <td style="text-align: center;"><?= (int)$player['r_drb'] ?></td>
-    <td style="text-align: center;"><?= (int)$player['r_ast'] ?></td>
-    <td style="text-align: center;"><?= (int)$player['r_stl'] ?></td>
-    <td style="text-align: center;"><?= (int)$player['r_tvr'] ?></td>
-    <td style="text-align: center;"><?= (int)$player['r_blk'] ?></td>
-    <td style="text-align: center;"><?= (int)$player['r_foul'] ?></td>
-    <td style="text-align: center;"><?= (int)$player['oo'] ?></td>
-    <td style="text-align: center;"><?= (int)$player['do'] ?></td>
-    <td style="text-align: center;"><?= (int)$player['po'] ?></td>
-    <td style="text-align: center;"><?= (int)$player['to'] ?></td>
-    <td style="text-align: center;"><?= (int)$player['od'] ?></td>
-    <td style="text-align: center;"><?= (int)$player['dd'] ?></td>
-    <td style="text-align: center;"><?= (int)$player['pd'] ?></td>
-    <td style="text-align: center;"><?= (int)$player['td'] ?></td>
-    <td style="text-align: center;"><?= (int)$player['talent'] ?></td>
-    <td style="text-align: center;"><?= (int)$player['skill'] ?></td>
-    <td style="text-align: center;"><?= (int)$player['intangibles'] ?></td>
-    <td style="text-align: center;"><?= (int)$player['Clutch'] ?></td>
-    <td style="text-align: center;"><?= (int)$player['Consistency'] ?></td>
-    <td><?= $college ?></td>
+    <td style="text-align: center;"><?= htmlspecialchars($player->position) ?></td>
+    <td style="text-align: center;"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= $player->playerID ?>"><?= htmlspecialchars($player->name) ?></a></td>
+    <td style="text-align: center;"><?= $player->age ?></td>
+    <td style="text-align: center;"><a href="team.php?tid=<?= $player->teamID ?>"><?= htmlspecialchars($player->teamName) ?></a></td>
+    <td style="text-align: center;"><?= $player->yearsOfExperience ?></td>
+    <td style="text-align: center;"><?= $player->birdYears ?></td>
+    <td style="text-align: center;"><?= $player->ratingFieldGoalAttempts ?></td>
+    <td style="text-align: center;"><?= $player->ratingFieldGoalPercentage ?></td>
+    <td style="text-align: center;"><?= $player->ratingFreeThrowAttempts ?></td>
+    <td style="text-align: center;"><?= $player->ratingFreeThrowPercentage ?></td>
+    <td style="text-align: center;"><?= $player->ratingThreePointAttempts ?></td>
+    <td style="text-align: center;"><?= $player->ratingThreePointPercentage ?></td>
+    <td style="text-align: center;"><?= $player->ratingOffensiveRebounds ?></td>
+    <td style="text-align: center;"><?= $player->ratingDefensiveRebounds ?></td>
+    <td style="text-align: center;"><?= $player->ratingAssists ?></td>
+    <td style="text-align: center;"><?= $player->ratingSteals ?></td>
+    <td style="text-align: center;"><?= $player->ratingTurnovers ?></td>
+    <td style="text-align: center;"><?= $player->ratingBlocks ?></td>
+    <td style="text-align: center;"><?= $player->ratingFouls ?></td>
+    <td style="text-align: center;"><?= $player->ratingOutsideOffense ?></td>
+    <td style="text-align: center;"><?= $player->ratingOutsideDefense ?></td>
+    <td style="text-align: center;"><?= $player->ratingDriveOffense ?></td>
+    <td style="text-align: center;"><?= $player->ratingDriveDefense ?></td>
+    <td style="text-align: center;"><?= $player->ratingPostOffense ?></td>
+    <td style="text-align: center;"><?= $player->ratingPostDefense ?></td>
+    <td style="text-align: center;"><?= $player->ratingTransitionOffense ?></td>
+    <td style="text-align: center;"><?= $player->ratingTransitionDefense ?></td>
+    <td style="text-align: center;"><?= $player->ratingTalent ?></td>
+    <td style="text-align: center;"><?= $player->ratingSkill ?></td>
+    <td style="text-align: center;"><?= $player->ratingIntangibles ?></td>
+    <td style="text-align: center;"><?= $player->ratingClutch ?></td>
+    <td style="text-align: center;"><?= $player->ratingConsistency ?></td>
+    <td><?= htmlspecialchars((string)($player->collegeName ?? '')) ?></td>
 </tr>
             <?php
         }

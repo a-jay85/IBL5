@@ -7,6 +7,8 @@ use PlayerSearch\PlayerSearchService;
 use PlayerSearch\PlayerSearchValidator;
 use PlayerSearch\PlayerSearchRepository;
 use PlayerSearch\PlayerSearchView;
+use Player\PlayerRepository;
+use Player\PlayerData;
 
 /**
  * Tests for PlayerSearchView
@@ -21,8 +23,9 @@ final class PlayerSearchViewTest extends TestCase
     protected function setUp(): void
     {
         $validator = new PlayerSearchValidator();
-        $mockRepository = $this->createMock(PlayerSearchRepository::class);
-        $this->service = new PlayerSearchService($validator, $mockRepository);
+        $mockSearchRepository = $this->createMock(PlayerSearchRepository::class);
+        $mockPlayerRepository = $this->createMock(PlayerRepository::class);
+        $this->service = new PlayerSearchService($validator, $mockSearchRepository, $mockPlayerRepository);
         $this->view = new PlayerSearchView($this->service);
     }
 
@@ -48,7 +51,6 @@ final class PlayerSearchViewTest extends TestCase
         
         // Check for main filters
         $this->assertStringContainsString('name="age"', $html);
-        $this->assertStringContainsString('name="sta"', $html);
         $this->assertStringContainsString('name="college"', $html);
         $this->assertStringContainsString('name="search_name"', $html);
         
@@ -134,7 +136,6 @@ final class PlayerSearchViewTest extends TestCase
         $this->assertStringContainsString('>Pos<', $html);
         $this->assertStringContainsString('>Player<', $html);
         $this->assertStringContainsString('>Age<', $html);
-        $this->assertStringContainsString('>Stamina<', $html);
         $this->assertStringContainsString('>Team<', $html);
         $this->assertStringContainsString('>Exp<', $html);
         $this->assertStringContainsString('>Bird<', $html);
@@ -192,7 +193,7 @@ final class PlayerSearchViewTest extends TestCase
     public function testRenderPlayerRowShowsRetiredStatus(): void
     {
         $player = $this->createTestPlayer();
-        $player['retired'] = 1;
+        $player->isRetired = 1;
 
         $html = $this->view->renderPlayerRow($player, 0);
 
@@ -203,7 +204,7 @@ final class PlayerSearchViewTest extends TestCase
     public function testRenderPlayerRowEscapesPlayerName(): void
     {
         $player = $this->createTestPlayer();
-        $player['name'] = '<script>alert("XSS")</script>';
+        $player->name = '<script>alert("XSS")</script>';
 
         $html = $this->view->renderPlayerRow($player, 0);
 
@@ -214,7 +215,7 @@ final class PlayerSearchViewTest extends TestCase
     public function testRenderPlayerRowEscapesTeamName(): void
     {
         $player = $this->createTestPlayer();
-        $player['teamname'] = '<img src=x onerror=alert(1)>';
+        $player->teamName = '<img src=x onerror=alert(1)>';
 
         $html = $this->view->renderPlayerRow($player, 0);
 
@@ -231,7 +232,6 @@ final class PlayerSearchViewTest extends TestCase
 
         // Check various stats are displayed
         $this->assertStringContainsString('>25<', $html); // age
-        $this->assertStringContainsString('>80<', $html); // sta/oo
         $this->assertStringContainsString('>5<', $html); // exp/tid
     }
 
@@ -247,50 +247,49 @@ final class PlayerSearchViewTest extends TestCase
     // ========== Helper Methods ==========
 
     /**
-     * Create a test player array with all required fields
-     * 
-     * @return array<string, mixed>
+     * Create a test PlayerData object with all required fields
      */
-    private function createTestPlayer(): array
+    private function createTestPlayer(): PlayerData
     {
-        return [
-            'pid' => 123,
-            'name' => 'Test Player',
-            'pos' => 'PG',
-            'tid' => 5,
-            'teamname' => 'Test Team',
-            'retired' => 0,
-            'age' => 25,
-            'sta' => 80,
-            'college' => 'UCLA',
-            'exp' => 5,
-            'bird' => 3,
-            'r_fga' => 60,
-            'r_fgp' => 55,
-            'r_fta' => 70,
-            'r_ftp' => 85,
-            'r_tga' => 40,
-            'r_tgp' => 38,
-            'r_orb' => 45,
-            'r_drb' => 50,
-            'r_ast' => 75,
-            'r_stl' => 65,
-            'r_tvr' => 30,
-            'r_blk' => 35,
-            'r_foul' => 40,
-            'oo' => 80,
-            'do' => 75,
-            'po' => 60,
-            'to' => 85,
-            'od' => 70,
-            'dd' => 65,
-            'pd' => 55,
-            'td' => 78,
-            'talent' => 85,
-            'skill' => 80,
-            'intangibles' => 75,
-            'Clutch' => 90,
-            'Consistency' => 85,
-        ];
+        $player = $this->createMock(PlayerData::class);
+        $player->playerID = 123;
+        $player->name = 'Test Player';
+        $player->position = 'PG';
+        $player->teamID = 5;
+        $player->teamName = 'Test Team';
+        $player->isRetired = 0;
+        $player->age = 25;
+        $player->yearsOfExperience = 5;
+        $player->collegeName = 'UCLA';
+        $player->birdYears = 3;
+        $player->ratingFieldGoalAttempts = 60;
+        $player->ratingFieldGoalPercentage = 55;
+        $player->ratingFreeThrowAttempts = 70;
+        $player->ratingFreeThrowPercentage = 85;
+        $player->ratingThreePointAttempts = 40;
+        $player->ratingThreePointPercentage = 38;
+        $player->ratingOffensiveRebounds = 45;
+        $player->ratingDefensiveRebounds = 50;
+        $player->ratingAssists = 75;
+        $player->ratingSteals = 65;
+        $player->ratingTurnovers = 30;
+        $player->ratingBlocks = 35;
+        $player->ratingFouls = 40;
+        $player->ratingOutsideOffense = 80;
+        $player->ratingOutsideDefense = 75;
+        $player->ratingDriveOffense = 60;
+        $player->ratingDriveDefense = 85;
+        $player->ratingPostOffense = 70;
+        $player->ratingPostDefense = 65;
+        $player->ratingTransitionOffense = 55;
+        $player->ratingTransitionDefense = 78;
+        $player->ratingTalent = 85;
+        $player->ratingSkill = 80;
+        $player->ratingIntangibles = 75;
+        $player->ratingClutch = 90;
+        $player->ratingConsistency = 85;
+        
+        return $player;
     }
 }
+

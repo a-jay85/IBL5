@@ -164,17 +164,7 @@ final class PlayerSearchValidatorTest extends TestCase
         $this->assertEquals(1, $params['submitted']);
     }
 
-    public function testIsFormSubmittedReturnsTrueWhenSubmitted(): void
-    {
-        $params = $this->validator->validateSearchParams(['submitted' => '1']);
-        $this->assertTrue($this->validator->isFormSubmitted($params));
-    }
 
-    public function testIsFormSubmittedReturnsFalseWhenNotSubmitted(): void
-    {
-        $params = $this->validator->validateSearchParams([]);
-        $this->assertFalse($this->validator->isFormSubmitted($params));
-    }
 
     // ========== SQL Injection Prevention Tests ==========
 

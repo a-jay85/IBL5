@@ -116,13 +116,4 @@ class PlayerSearchService
         ];
     }
 
-    /**
-     * Get valid positions for the search form
-     * 
-     * @return array<string> List of valid position codes
-     */
-    public function getValidPositions(): array
-    {
-        return $this->validator->getValidPositions();
-    }
 }

@@ -165,17 +165,4 @@ final class PlayerSearchServiceTest extends TestCase
         $this->assertIsInt($result['retired']);
     }
 
-    // ========== Get Valid Positions Tests ==========
-
-    public function testGetValidPositionsReturnsValidatorPositions(): void
-    {
-        $positions = $this->service->getValidPositions();
-
-        $this->assertIsArray($positions);
-        $this->assertContains('PG', $positions);
-        $this->assertContains('SG', $positions);
-        $this->assertContains('SF', $positions);
-        $this->assertContains('PF', $positions);
-        $this->assertContains('C', $positions);
-    }
 }

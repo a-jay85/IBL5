@@ -32,7 +32,7 @@ class PlayerSearchView
      */
     public function renderSearchForm(array $params): string
     {
-        $positions = $this->service->getValidPositions();
+        $positions = \JSB::PLAYER_POSITIONS;
         
         // Extract values with defaults
         $pos = $params['pos'] ?? '';

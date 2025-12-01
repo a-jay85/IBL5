@@ -89,7 +89,7 @@ class PlayerSearchValidator
         
         $position = strtoupper(trim((string)$value));
         
-        if (in_array($position, self::VALID_POSITIONS, true)) {
+        if (in_array($position, \JSB::PLAYER_POSITIONS, true)) {
             return $position;
         }
         
@@ -170,15 +170,5 @@ class PlayerSearchValidator
     public function isFormSubmitted(array $params): bool
     {
         return $params['submitted'] === 1;
-    }
-
-    /**
-     * Get list of valid positions
-     * 
-     * @return array<string> Valid position codes
-     */
-    public function getValidPositions(): array
-    {
-        return self::VALID_POSITIONS;
     }
 }

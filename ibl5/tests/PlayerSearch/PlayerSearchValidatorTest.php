@@ -197,15 +197,4 @@ final class PlayerSearchValidatorTest extends TestCase
         $this->assertNull($this->validator->validateIntegerParam("1 OR 1=1"));
     }
 
-    // ========== Get Valid Positions Test ==========
-
-    public function testGetValidPositionsReturnsArray(): void
-    {
-        $positions = $this->validator->getValidPositions();
-        
-        $this->assertIsArray($positions);
-        $this->assertContains('PG', $positions);
-        $this->assertContains('C', $positions);
-        $this->assertCount(8, $positions); // PG, SG, SF, PF, C, G, F, GF
-    }
 }

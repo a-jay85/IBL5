@@ -93,7 +93,7 @@ class PlayerSearchView
         <table border="0" cellpadding="2" cellspacing="0">
             <tr>
                 <td><label for="search_name">Name:</label></td>
-                <td><input id="search_name" type="text" name="search_name" size="32" value="<?= htmlspecialchars((string)$search_name) ?>"></td>
+                <td><input id="search_name" type="text" name="search_name" size="25" value="<?= htmlspecialchars((string)$search_name) ?>"></td>
                 <td><label for="pos">Position:</label></td>
                 <td>
                     <select id="pos" name="pos">

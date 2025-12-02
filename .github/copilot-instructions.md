@@ -186,6 +186,129 @@ public function testEscapesUserInput()
 
 **Reference**: See `ibl5/docs/TEST_REFACTORING_SUMMARY.md` for complete refactoring history and additional examples.
 
+#### PHPUnit Test Suite Registration (CRITICAL)
+
+**Every new test directory and test class MUST be registered in `ibl5/phpunit.xml`.**
+
+**After writing test files, the Copilot agent MUST:**
+
+1. **Verify test directory structure** - Tests should be in `ibl5/tests/ModuleName/`
+2. **Add test suite to phpunit.xml** - Register the directory or individual test files
+3. **Update testsuite name** - Use descriptive names (e.g., "Player Module Tests", "FreeAgency Module Tests")
+4. **Verify tests are discoverable** - Run `vendor/bin/phpunit --list-suites` to confirm registration
+
+**Example:** Adding a new module's tests:
+
+```xml
+<!-- ✅ CORRECT - Add test suite to phpunit.xml -->
+<testsuites>
+    <!-- ... existing suites ... -->
+    <testsuite name="Compare Players Module Tests">
+        <directory>tests/ComparePlayers</directory>
+    </testsuite>
+</testsuites>
+```
+
+**For individual files when directory registration is not appropriate:**
+
+```xml
+<testsuite name="FreeAgency Module Tests">
+    <file>tests/FreeAgency/FreeAgencyDemandCalculatorTest.php</file>
+    <file>tests/FreeAgency/FreeAgencyNegotiationHelperTest.php</file>
+</testsuite>
+```
+
+**DO NOT:**
+- Leave test files unregistered in phpunit.xml
+- Create tests without verifying they run via `vendor/bin/phpunit`
+- Assume tests will be discovered automatically - they must be explicitly registered
+
+### Documentation Updates During Refactoring (CRITICAL)
+
+**Documentation MUST be updated incrementally during the refactoring PR, not after merge.**
+
+**After completing each component (Repository/Service/View/etc.), the Copilot agent MUST:**
+
+1. **Update STRATEGIC_PRIORITIES.md** - Mark module as complete with brief summary
+2. **Update REFACTORING_HISTORY.md** - Add entry to "Completed Refactorings" section
+3. **Create component README.md** - In `ibl5/classes/ModuleName/README.md` if not already created
+4. **Update documentation cross-references** - Fix any links in related docs
+5. **Verify all links work** - Test internal documentation links before finalizing
+
+**Documentation Update Workflow (During PR):**
+
+**Step 1: Update STRATEGIC_PRIORITIES.md**
+```markdown
+### Priority X: Module_Name ✅ (Completed)
+
+**Achievements:**
+- N classes created with separation of concerns
+- Reduced module code: X → Y lines (Z% reduction)
+- N comprehensive tests
+- Security improvements: [list any security fixes]
+
+**Classes Created:**
+1. ModuleNameValidator - [purpose]
+2. ModuleNameRepository - [purpose]
+3. ModuleNameService - [purpose]
+4. ModuleNameView - [purpose]
+
+**Files Refactored:**
+- `modules/Module_Name/index.php`: X → Y lines (-Z%)
+```
+
+**Step 2: Update REFACTORING_HISTORY.md**
+Add new section in "Completed Refactorings" with same details as STRATEGIC_PRIORITIES entry.
+
+**Step 3: Create Component README.md**
+- Location: `ibl5/classes/ModuleName/README.md`
+- Document architecture, class responsibilities, usage patterns
+- Include usage examples and key design decisions
+- Link to test files if applicable
+
+**Step 4: Update DEVELOPMENT_GUIDE.md**
+- Move module from "Remaining IBL Modules" to "✅ Completed IBL Modules"
+- Update refactoring status count (e.g., "15/23" → "16/23")
+- Update test count if applicable
+
+**Step 5: Update ibl5/docs/README.md**
+- Update documentation index if new component README created
+- Verify all links in index are current and working
+
+**Important Timing:**
+- ✅ **DO** - Update docs as you complete each refactor in the PR
+- ✅ **DO** - Verify docs are current before requesting PR review
+- ✅ **DO** - Ensure all links work and references are accurate
+- ❌ **DON'T** - Wait until after merge to update documentation
+- ❌ **DON'T** - Leave "TODO" comments about updating docs
+- ❌ **DON'T** - Create separate documentation PRs for refactoring work
+
+**Example PR Progress (During Implementation):**
+
+```
+1. Complete PlayerSearch module refactoring ✅
+   - Created 4 classes, 54 tests
+   - Updated STRATEGIC_PRIORITIES.md ✅
+   - Updated REFACTORING_HISTORY.md ✅
+   - Created ibl5/classes/PlayerSearch/README.md ✅
+   - Updated DEVELOPMENT_GUIDE.md ✅
+   - Verified all documentation links ✅
+
+2. Ready for review - all tests passing, docs current ✅
+```
+
+**Verification Checklist Before PR Review:**
+
+- [ ] `STRATEGIC_PRIORITIES.md` updated with module completion summary
+- [ ] `REFACTORING_HISTORY.md` updated with detailed refactoring section
+- [ ] Component README.md created in `ibl5/classes/ModuleName/`
+- [ ] `DEVELOPMENT_GUIDE.md` updated (refactoring count, status)
+- [ ] `ibl5/docs/README.md` updated if new docs created
+- [ ] All internal documentation links verified and working
+- [ ] No "TODO" comments about documentation left in code or docs
+- [ ] Test suite registered in `ibl5/phpunit.xml`
+- [ ] All tests passing without warnings or errors
+
 ### Database Schema & Considerations
 
 #### Quick Reference

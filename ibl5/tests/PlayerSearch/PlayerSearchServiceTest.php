@@ -52,7 +52,7 @@ final class PlayerSearchServiceTest extends TestCase
             ->method('searchPlayers')
             ->willReturn(['results' => [], 'count' => 0]);
 
-        $result = $this->service->search(['submitted' => '1']);
+        $result = $this->service->search(['pos' => 'PG']);
 
         $this->assertArrayHasKey('players', $result);
         $this->assertArrayHasKey('count', $result);
@@ -81,7 +81,7 @@ final class PlayerSearchServiceTest extends TestCase
             ->method('fillFromCurrentRow')
             ->willReturnOnConsecutiveCalls($mockPlayerData1, $mockPlayerData2);
 
-        $result = $this->service->search(['submitted' => '1']);
+        $result = $this->service->search(['pos' => 'PG']);
 
         $this->assertCount(2, $result['players']);
         $this->assertInstanceOf(PlayerData::class, $result['players'][0]);
@@ -107,7 +107,7 @@ final class PlayerSearchServiceTest extends TestCase
             ->method('fillFromCurrentRow')
             ->willReturn($mockPlayerData);
 
-        $result = $this->service->search(['submitted' => '1']);
+        $result = $this->service->search(['age' => 25]);
 
         $this->assertCount(3, $result['players']);
     }

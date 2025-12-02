@@ -144,7 +144,7 @@ final class PlayerSearchValidatorTest extends TestCase
         $this->assertArrayHasKey('exp', $params);
         $this->assertArrayHasKey('r_fga', $params);
         $this->assertArrayHasKey('oo', $params);
-        $this->assertArrayHasKey('submitted', $params);
+        $this->assertArrayHasKey('active', $params);
     }
 
     public function testValidateSearchParamsValidatesEachField(): void
@@ -153,15 +153,13 @@ final class PlayerSearchValidatorTest extends TestCase
             'pos' => 'PG',
             'age' => '25',
             'search_name' => 'Jordan',
-            'oo' => '80',
-            'submitted' => '1'
+            'oo' => '80'
         ]);
 
         $this->assertEquals('PG', $params['pos']);
         $this->assertEquals(25, $params['age']);
         $this->assertEquals('Jordan', $params['search_name']);
         $this->assertEquals(80, $params['oo']);
-        $this->assertEquals(1, $params['submitted']);
     }
 
 

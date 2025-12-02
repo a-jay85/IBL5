@@ -47,8 +47,8 @@ class PlayerSearchService
         // Validate parameters
         $params = $this->validator->validateSearchParams($rawParams);
 
-        // Check if form was submitted
-        if ($params['submitted'] !== 1) {
+        // Check if form was submitted (POST data exists)
+        if (empty($rawParams)) {
             return [
                 'players' => [],
                 'count' => 0,

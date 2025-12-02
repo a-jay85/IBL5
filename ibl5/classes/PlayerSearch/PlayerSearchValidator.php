@@ -67,7 +67,6 @@ class PlayerSearchValidator
             
             // Meta filters
             'active' => $this->validateBooleanParam($params['active'] ?? null),
-            'submitted' => $this->validateBooleanParam($params['submitted'] ?? null),
         ];
     }
 

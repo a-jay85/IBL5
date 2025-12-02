@@ -53,19 +53,17 @@ UI::playerMenu();
 echo $view->renderSearchForm($searchResult['params']);
 
 // Render results if form was submitted
-if ($searchResult['count'] > 0) {
+if (!empty($_POST)) {
     echo $view->renderTableHeader();
     
-    $rowIndex = 0;
-    foreach ($searchResult['players'] as $player) {
-        echo $view->renderPlayerRow($player, $rowIndex);
-        $rowIndex++;
+    if ($searchResult['count'] > 0) {
+        $rowIndex = 0;
+        foreach ($searchResult['players'] as $player) {
+            echo $view->renderPlayerRow($player, $rowIndex);
+            $rowIndex++;
+        }
     }
     
-    echo $view->renderTableFooter();
-} elseif ($searchResult['params']['submitted'] === 1) {
-    // Form was submitted but no results found
-    echo $view->renderTableHeader();
     echo $view->renderTableFooter();
 }
 

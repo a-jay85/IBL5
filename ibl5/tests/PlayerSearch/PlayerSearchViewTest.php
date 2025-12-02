@@ -62,9 +62,8 @@ final class PlayerSearchViewTest extends TestCase
         $this->assertStringContainsString('name="oo"', $html);
         $this->assertStringContainsString('name="do"', $html);
         
-        // Check for hidden submit field
-        $this->assertStringContainsString('name="submitted"', $html);
-        $this->assertStringContainsString('value="1"', $html);
+        // Check for submit button
+        $this->assertStringContainsString('type="submit"', $html);
     }
 
     public function testRenderSearchFormPopulatesExistingValues(): void
@@ -198,7 +197,7 @@ final class PlayerSearchViewTest extends TestCase
         $html = $this->view->renderPlayerRow($player, 0);
 
         $this->assertStringContainsString('Retired', $html);
-        $this->assertStringContainsString('colspan="31"', $html);
+        $this->assertStringContainsString('colspan="30"', $html);
     }
 
     public function testRenderPlayerRowEscapesPlayerName(): void

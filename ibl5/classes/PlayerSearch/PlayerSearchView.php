@@ -216,7 +216,6 @@ class PlayerSearchView
         </table>
     </fieldset>
 
-    <input type="hidden" name="submitted" value="1">
     <input type="button" value="Reset" onclick="resetPlayerSearch();" style="margin-right: 20px; background-color: #f0f0f0; color: #666; border: 1px solid #999; padding: 6px 12px; cursor: pointer;">
     <input type="submit" value="Search for Player!" style="background-color: #28a745; color: white; border: 2px solid #1e7e34; padding: 8px 20px; cursor: pointer; font-weight: bold;">
 </form>

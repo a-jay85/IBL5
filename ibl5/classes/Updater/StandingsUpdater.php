@@ -62,8 +62,41 @@ class StandingsUpdater {
         $standings->preserveWhiteSpace = false;
 
         $getRows = $standings->getElementsByTagName('tr');
-        $rowsByConference = $getRows->item(0)->childNodes->item(0)->childNodes->item(0)->childNodes;
-        $rowsByDivision = $getRows->item(0)->childNodes->item(1)->childNodes->item(0)->childNodes;
+        
+        // Safely navigate the DOM tree with null checks
+        $firstRow = $getRows->item(0);
+        if (!$firstRow) {
+            echo '<p>Error: Unable to find standings table rows</p>';
+            return;
+        }
+        
+        $conferenceContainer = $firstRow->childNodes->item(0);
+        if (!$conferenceContainer || !$conferenceContainer->childNodes) {
+            echo '<p>Error: Unable to find conference container in standings</p>';
+            return;
+        }
+        
+        $conferenceContent = $conferenceContainer->childNodes->item(0);
+        if (!$conferenceContent || !$conferenceContent->childNodes) {
+            echo '<p>Error: Unable to find conference content in standings</p>';
+            return;
+        }
+        
+        $rowsByConference = $conferenceContent->childNodes;
+        
+        $divisionContainer = $firstRow->childNodes->item(1);
+        if (!$divisionContainer || !$divisionContainer->childNodes) {
+            echo '<p>Error: Unable to find division container in standings</p>';
+            return;
+        }
+        
+        $divisionContent = $divisionContainer->childNodes->item(0);
+        if (!$divisionContent || !$divisionContent->childNodes) {
+            echo '<p>Error: Unable to find division content in standings</p>';
+            return;
+        }
+        
+        $rowsByDivision = $divisionContent->childNodes;
 
         \UI::displayDebugOutput($this->processConferenceRows($rowsByConference), 'Conference Standings');
         \UI::displayDebugOutput($this->processDivisionRows($rowsByDivision), 'Division Standings');

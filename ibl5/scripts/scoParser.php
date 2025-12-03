@@ -27,6 +27,11 @@ function scoParser($uploadedFilePath, $operatingSeasonEndingYear, $operatingSeas
             echo "<b><font color=#F00>Failed to delete existing Preseason box scores!</font></b>";
         }
     } elseif ($operatingSeasonPhase == "HEAT") {
+        if (Boxscore::deletePreseasonBoxScores($db, $operatingSeasonStartingYear)) {
+            echo "Deleted any existing Preseason box scores." . "<p>";
+        } else {
+            echo "<b><font color=#F00>Failed to delete existing Preseason box scores!</font></b>";
+        }
         if (Boxscore::deleteHEATBoxScores($db, $operatingSeasonStartingYear)) {
             echo "Deleted any existing HEAT box scores." . "<p>";
         } else {

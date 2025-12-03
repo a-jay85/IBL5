@@ -2,16 +2,14 @@
 
 namespace Negotiation;
 
+use Negotiation\Contracts\NegotiationDemandCalculatorInterface;
 use Player\Player;
 use Services\DatabaseService;
 
 /**
- * Negotiation Demand Calculator
- * 
- * Calculates contract demands based on player ratings and statistics.
- * Uses market-based analysis to determine fair contract values.
+ * @see NegotiationDemandCalculatorInterface
  */
-class NegotiationDemandCalculator
+class NegotiationDemandCalculator implements NegotiationDemandCalculatorInterface
 {
     private $db;
     
@@ -25,11 +23,7 @@ class NegotiationDemandCalculator
     }
     
     /**
-     * Calculate contract demands for a player
-     * 
-     * @param Player $player The player object
-     * @param array $teamFactors Team factors affecting demands
-     * @return array Demand information including yearly amounts and modifiers
+     * @see NegotiationDemandCalculatorInterface::calculateDemands()
      */
     public function calculateDemands(Player $player, array $teamFactors): array
     {

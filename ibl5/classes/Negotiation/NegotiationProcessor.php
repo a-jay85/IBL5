@@ -2,16 +2,14 @@
 
 namespace Negotiation;
 
+use Negotiation\Contracts\NegotiationProcessorInterface;
 use Player\Player;
 use Services\DatabaseService;
 
 /**
- * Negotiation Processor
- * 
- * Orchestrates the complete contract negotiation workflow.
- * Coordinates validation, demand calculation, and view rendering.
+ * @see NegotiationProcessorInterface
  */
-class NegotiationProcessor
+class NegotiationProcessor implements NegotiationProcessorInterface
 {
     private $db;
     private $validator;
@@ -25,12 +23,7 @@ class NegotiationProcessor
     }
     
     /**
-     * Process a contract negotiation request
-     * 
-     * @param int $playerID Player ID
-     * @param string $userTeamName User's team name
-     * @param string $prefix Database table prefix
-     * @return string HTML output for the negotiation page
+     * @see NegotiationProcessorInterface::processNegotiation()
      */
     public function processNegotiation(int $playerID, string $userTeamName, string $prefix): string
     {

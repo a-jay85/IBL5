@@ -1,18 +1,18 @@
 <?php
 
+declare(strict_types=1);
+
 namespace DepthChart;
 
+use DepthChart\Contracts\DepthChartProcessorInterface;
+
 /**
- * Processes depth chart data and submissions
+ * @see DepthChartProcessorInterface
  */
-class DepthChartProcessor
+class DepthChartProcessor implements DepthChartProcessorInterface
 {
     /**
-     * Processes submitted depth chart data from POST request
-     * 
-     * @param array $postData POST data ($_POST)
-     * @param int $maxPlayers Maximum number of players (default 15)
-     * @return array Processed data with statistics
+     * @see DepthChartProcessorInterface::processSubmission()
      */
     public function processSubmission(array $postData, int $maxPlayers = 15): array
     {
@@ -34,7 +34,6 @@ class DepthChartProcessor
             $startingPositionCount = 0;
             $injury = (int) ($postData['Injury' . $i] ?? 0);
             
-            // Sanitize and validate all inputs
             $player = [
                 'name' => $this->sanitizePlayerName($postData['Name' . $i]),
                 'pg' => $this->sanitizeDepthValue($postData['pg' . $i] ?? 0),
@@ -54,12 +53,10 @@ class DepthChartProcessor
             
             $playerData[] = $player;
             
-            // Count active players
             if ($player['active'] == 1) {
                 $activePlayers++;
             }
             
-            // Count players at each position (excluding injured players)
             if ($player['pg'] > 0 && $injury == 0) {
                 $pos_1++;
             }
@@ -76,7 +73,6 @@ class DepthChartProcessor
                 $pos_5++;
             }
             
-            // Check if player is starting at multiple positions
             if ($player['pg'] == 1) $startingPositionCount++;
             if ($player['sg'] == 1) $startingPositionCount++;
             if ($player['sf'] == 1) $startingPositionCount++;
@@ -102,86 +98,42 @@ class DepthChartProcessor
         ];
     }
     
-    /**
-     * Sanitizes player name input
-     * 
-     * @param string $name Player name
-     * @return string Sanitized name
-     */
     private function sanitizePlayerName(string $name): string
     {
-        // Remove any HTML tags and trim whitespace
         return trim(strip_tags($name));
     }
     
-    /**
-     * Sanitizes depth value (0-5)
-     * 
-     * @param mixed $value Depth value
-     * @return int Sanitized value
-     */
     private function sanitizeDepthValue($value): int
     {
         $value = (int) $value;
-        // Depth values must be between 0 and 5
         return max(0, min(5, $value));
     }
     
-    /**
-     * Sanitizes active value (0 or 1)
-     * 
-     * @param mixed $value Active value
-     * @return int Sanitized value (0 or 1)
-     */
     private function sanitizeActiveValue($value): int
     {
         return ((int) $value) === 1 ? 1 : 0;
     }
     
-    /**
-     * Sanitizes minutes value (0-40)
-     * 
-     * @param mixed $value Minutes value
-     * @return int Sanitized value
-     */
     private function sanitizeMinutesValue($value): int
     {
         $value = (int) $value;
-        // Minutes must be between 0 and 40
         return max(0, min(40, $value));
     }
     
-    /**
-     * Sanitizes offensive/defensive focus value (0-3)
-     * 
-     * @param mixed $value Focus value
-     * @return int Sanitized value
-     */
     private function sanitizeFocusValue($value): int
     {
         $value = (int) $value;
-        // Focus values must be between 0 and 3
         return max(0, min(3, $value));
     }
     
-    /**
-     * Sanitizes OI/DI/BH setting value (-2 to 2)
-     * 
-     * @param mixed $value Setting value
-     * @return int Sanitized value
-     */
     private function sanitizeSettingValue($value): int
     {
         $value = (int) $value;
-        // Setting values must be between -2 and 2
         return max(-2, min(2, $value));
     }
     
     /**
-     * Generates CSV content from player data
-     * 
-     * @param array $playerData Array of player data
-     * @return string CSV content
+     * @see DepthChartProcessorInterface::generateCsvContent()
      */
     public function generateCsvContent(array $playerData): string
     {
@@ -208,6 +160,4 @@ class DepthChartProcessor
         
         return $csv;
     }
-    
-
 }

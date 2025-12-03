@@ -1,11 +1,15 @@
 <?php
 
+declare(strict_types=1);
+
 namespace DepthChart;
 
+use DepthChart\Contracts\DepthChartRepositoryInterface;
+
 /**
- * Handles database operations for depth chart data
+ * @see DepthChartRepositoryInterface
  */
-class DepthChartRepository
+class DepthChartRepository implements DepthChartRepositoryInterface
 {
     private $db;
     
@@ -13,36 +17,25 @@ class DepthChartRepository
     {
         $this->db = $db;
     }
-    
 
-    
     /**
-     * Gets players on a team
-     * 
-     * @param string $teamName Team name
-     * @param int $teamID Team ID
-     * @return mixed Database result
+     * @see DepthChartRepositoryInterface::getPlayersOnTeam()
      */
     public function getPlayersOnTeam(string $teamName, int $teamID)
     {
         $teamNameEscaped = \Services\DatabaseService::escapeString($this->db, $teamName);
-        $teamID = (int) $teamID; // Cast to int for safety
+        $teamID = (int) $teamID;
         $query = "SELECT * FROM ibl_plr WHERE teamname = '$teamNameEscaped' AND tid = $teamID AND retired = '0' AND ordinal <= " . \JSB::WAIVERS_ORDINAL . " ORDER BY ordinal ASC";
         return $this->db->sql_query($query);
     }
     
     /**
-     * Updates player depth chart data
-     * 
-     * @param string $playerName Player name
-     * @param array $depthChartValues Array of depth chart values
-     * @return bool Success status
+     * @see DepthChartRepositoryInterface::updatePlayerDepthChart()
      */
     public function updatePlayerDepthChart(string $playerName, array $depthChartValues): bool
     {
         $playerNameEscaped = \Services\DatabaseService::escapeString($this->db, $playerName);
         
-        // Sanitize and validate all numeric values
         $pg = (int) $depthChartValues['pg'];
         $sg = (int) $depthChartValues['sg'];
         $sf = (int) $depthChartValues['sf'];
@@ -81,10 +74,7 @@ class DepthChartRepository
     }
     
     /**
-     * Updates team history with depth chart submission timestamps
-     * 
-     * @param string $teamName Team name
-     * @return bool Success status
+     * @see DepthChartRepositoryInterface::updateTeamHistory()
      */
     public function updateTeamHistory(string $teamName): bool
     {

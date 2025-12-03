@@ -2,13 +2,12 @@
 
 namespace FreeAgency;
 
+use FreeAgency\Contracts\FreeAgencyViewHelperInterface;
+
 /**
- * Handles HTML rendering for Free Agency module
- * 
- * Uses output buffering pattern for clean, maintainable HTML generation.
- * All output is properly escaped to prevent XSS vulnerabilities.
+ * @see FreeAgencyViewHelperInterface
  */
-class FreeAgencyViewHelper
+class FreeAgencyViewHelper implements FreeAgencyViewHelperInterface
 {
     private string $teamName;
     private \Player\Player $player;
@@ -26,9 +25,7 @@ class FreeAgencyViewHelper
     }
 
     /**
-     * Render player ratings table
-     * 
-     * @return string HTML table
+     * @see FreeAgencyViewHelperInterface::renderPlayerRatings()
      */
     public function renderPlayerRatings(): string
     {
@@ -89,10 +86,7 @@ class FreeAgencyViewHelper
     }
 
     /**
-     * Render demand display for negotiation form
-     * 
-     * @param array{dem1: int, dem2: int, dem3: int, dem4: int, dem5: int, dem6: int} $demands Player demands
-     * @return string HTML table cells
+     * @see FreeAgencyViewHelperInterface::renderDemandDisplay()
      */
     public function renderDemandDisplay(array $demands): string
     {
@@ -110,10 +104,7 @@ class FreeAgencyViewHelper
     }
 
     /**
-     * Render offer input fields
-     * 
-     * @param array<string, int> $prefills Pre-filled offer values
-     * @return string HTML input fields
+     * @see FreeAgencyViewHelperInterface::renderOfferInputs()
      */
     public function renderOfferInputs(array $prefills): string
     {
@@ -177,11 +168,7 @@ class FreeAgencyViewHelper
     }
 
     /**
-     * Render max contract offer buttons
-     * 
-     * @param array<int> $maxSalaries Maximum salaries per year
-     * @param int $birdYears Number of consecutive years with current team
-     * @return string HTML form buttons
+     * @see FreeAgencyViewHelperInterface::renderMaxContractButtons()
      */
     public function renderMaxContractButtons(array $maxSalaries, int $birdYears = 0): string
     {
@@ -207,10 +194,7 @@ class FreeAgencyViewHelper
     }
 
     /**
-     * Render exception offer buttons (MLE, LLE, Vet Min)
-     * 
-     * @param string $exceptionType Type of exception (MLE, LLE, VET)
-     * @return string HTML form buttons
+     * @see FreeAgencyViewHelperInterface::renderExceptionButtons()
      */
     public function renderExceptionButtons(string $exceptionType): string
     {

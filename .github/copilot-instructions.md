@@ -223,6 +223,21 @@ class PlayerSearchValidator implements PlayerSearchValidatorInterface
 
 #### Database Implementation Flexibility
 
+**CRITICAL: IBL5 supports TWO different database implementations:**
+
+1. **Legacy MySQL Abstraction Layer** (`ibl5/classes/MySQL.php`)
+   - Provides phpBB-style abstraction layer over mysqli
+   - Methods: `sql_query()`, `sql_fetch_assoc()`, `sql_escape_string()`, etc.
+   - Does NOT have prepared statements built-in
+   - Uses string escaping via `sql_escape_string()` for SQL injection prevention
+   - Detection: Check `method_exists($db, 'sql_escape_string')`
+
+2. **Modern mysqli Implementation**
+   - Direct mysqli connection object (when MySQL class not used)
+   - Methods: `prepare()`, `execute()`, `bind_param()`, etc.
+   - Has native prepared statement support
+   - Detection: When `method_exists($db, 'sql_escape_string')` returns false
+
 **When a method uses the database, support both implementations:**
 
 ```php
@@ -230,16 +245,23 @@ public function getFreeAgencyDemands(string $playerName): array
 {
     // Detect which database implementation is available
     if (method_exists($this->db, 'sql_escape_string')) {
-        // Using MySQL abstraction layer (legacy)
-        $escapedName = $this->db->sql_escape_string($playerName);
-        $query = "SELECT * FROM ibl_demands WHERE name = '$escapedName'";
+        // LEGACY MySQL abstraction layer (phpBB-style)
+        // Note: sql_escape_string() is NOT available by default in the MySQL class
+        // This is only present if explicitly added or if using an extended version
+        // For safer legacy code, use the DatabaseService helper
+        $query = "SELECT * FROM ibl_demands WHERE name LIKE ?";
+        // Use DatabaseService::escapeString() for compatibility
+        $escapedName = \Services\DatabaseService::escapeString($this->db, $playerName);
+        $query = "SELECT * FROM ibl_demands WHERE name LIKE '%$escapedName%'";
         $result = $this->db->sql_query($query);
         $row = $this->db->sql_fetch_assoc($result);
     } else {
-        // Direct mysqli connection (modern)
-        $query = "SELECT * FROM ibl_demands WHERE name = ?";
+        // MODERN mysqli connection (preferred for new code)
+        // Use prepared statements for SQL injection prevention
+        $query = "SELECT * FROM ibl_demands WHERE name LIKE ?";
         $stmt = $this->db->prepare($query);
-        $stmt->bind_param('s', $playerName);
+        $searchTerm = '%' . $playerName . '%';
+        $stmt->bind_param('s', $searchTerm);
         $stmt->execute();
         $result = $stmt->get_result();
         $row = $result->fetch_assoc();
@@ -257,6 +279,66 @@ public function getFreeAgencyDemands(string $playerName): array
     return ['dem1' => 0, 'dem2' => 0, /* ... */];
 }
 ```
+
+**Database Implementation Detection Rules:**
+
+```php
+// ✅ CORRECT - Use method_exists() to detect capability
+if (method_exists($db, 'sql_escape_string')) {
+    // Legacy MySQL abstraction layer - use sql_* methods
+    $result = $db->sql_query($query);
+} else {
+    // Modern mysqli - use prepared statements directly
+    $stmt = $db->prepare($query);
+}
+
+// ❌ WRONG - Don't assume mysqli methods exist
+// $stmt = $db->prepare($query);  // May not exist in legacy implementation
+```
+
+**String Escaping for Legacy Implementation:**
+
+The legacy MySQL class (`ibl5/classes/MySQL.php`) does NOT include a `sql_escape_string()` method by default. To handle both implementations safely:
+
+```php
+// ✅ BEST - Use DatabaseService helper for escaping
+use Services\DatabaseService;
+
+$escapedString = DatabaseService::escapeString($db, $userInput);
+$query = "SELECT * FROM table WHERE name = '$escapedString'";
+$result = $db->sql_query($query);
+
+// ✅ ACCEPTABLE - Direct mysqli_real_escape_string
+if (isset($db->db_connect_id) && $db->db_connect_id) {
+    $escapedString = mysqli_real_escape_string($db->db_connect_id, $userInput);
+    $query = "SELECT * FROM table WHERE name = '$escapedString'";
+    $result = $db->sql_query($query);
+}
+```
+
+**Prepared Statements (Modern Implementation Preferred):**
+
+Always use prepared statements with modern mysqli connections:
+
+```php
+// ✅ MODERN mysqli - Prepared statements (preferred)
+$query = "SELECT * FROM ibl_plr WHERE tid = ? AND status = ?";
+$stmt = $db->prepare($query);
+$stmt->bind_param('is', $teamId, $status);  // 'is' = integer, string
+$stmt->execute();
+$result = $stmt->get_result();
+while ($row = $result->fetch_assoc()) {
+    // Process row
+}
+```
+
+**Migration Path:**
+
+As the codebase migrates toward Laravel/modern PHP, all database interactions should:
+1. Use prepared statements when possible
+2. Check for modern mysqli capability first: `!method_exists($db, 'sql_escape_string')`
+3. Fall back to legacy implementation only when necessary
+4. Use `DatabaseService::escapeString()` for cross-compatibility
 
 #### Benefits of Interface-Driven Architecture
 

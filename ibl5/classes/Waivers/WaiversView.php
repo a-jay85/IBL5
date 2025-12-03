@@ -2,21 +2,15 @@
 
 namespace Waivers;
 
+use Waivers\Contracts\WaiversViewInterface;
+
 /**
- * Renders waiver wire UI components
+ * @see WaiversViewInterface
  */
-class WaiversView
+class WaiversView implements WaiversViewInterface
 {
     /**
-     * Renders the waiver wire form
-     * 
-     * @param string $teamName Team name
-     * @param int $teamID Team ID
-     * @param string $action Action (add or drop)
-     * @param array $players Array of players to display in dropdown
-     * @param int $openRosterSpots Number of open roster spots
-     * @param int $healthyOpenRosterSpots Number of healthy open roster spots
-     * @param string $errorMessage Error message to display (if any)
+     * @see WaiversViewInterface::renderWaiverForm()
      */
     public function renderWaiverForm(
         string $teamName,
@@ -80,13 +74,7 @@ class WaiversView
     }
     
     /**
-     * Builds player option HTML for dropdown
-     * 
-     * @param int $playerID Player ID
-     * @param string $playerName Player name
-     * @param string $contract Contract display
-     * @param string $waitTime Wait time display (for waiver claims)
-     * @return string HTML option element
+     * @see WaiversViewInterface::buildPlayerOption()
      */
     public function buildPlayerOption(
         int $playerID,
@@ -107,9 +95,7 @@ class WaiversView
     }
     
     /**
-     * Renders the not logged in message
-     * 
-     * @param string $message Message to display
+     * @see WaiversViewInterface::renderNotLoggedIn()
      */
     public function renderNotLoggedIn(string $message): void
     {
@@ -123,7 +109,7 @@ class WaiversView
     }
     
     /**
-     * Renders the waivers closed message
+     * @see WaiversViewInterface::renderWaiversClosed()
      */
     public function renderWaiversClosed(): void
     {

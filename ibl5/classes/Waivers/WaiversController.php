@@ -5,11 +5,12 @@ namespace Waivers;
 use Player\Player;
 use Player\PlayerContractCalculator;
 use Services\PlayerDataConverter;
+use Waivers\Contracts\WaiversControllerInterface;
 
 /**
- * Main controller for waiver wire operations
+ * @see WaiversControllerInterface
  */
-class WaiversController
+class WaiversController implements WaiversControllerInterface
 {
     // Configuration constants
     private const DISCORD_BUGS_CHANNEL_URL = 'https://discord.com/channels/666986450889474053/671435182502576169';
@@ -40,10 +41,7 @@ class WaiversController
     }
     
     /**
-     * Main entry point for waiver operations
-     * 
-     * @param mixed $user Current user
-     * @param string $action Action to perform (add or drop)
+     * @see WaiversControllerInterface::handleWaiverRequest()
      */
     public function handleWaiverRequest($user, string $action): void
     {
@@ -63,9 +61,6 @@ class WaiversController
         $this->executeWaiverOperation($cookie[1], $action);
     }
     
-    /**
-     * Handles not logged in state
-     */
     private function handleNotLoggedIn(): void
     {
         global $stop;
@@ -75,10 +70,7 @@ class WaiversController
     }
     
     /**
-     * Executes waiver wire operations (add or drop)
-     * 
-     * @param string $username Username
-     * @param string $action Action to perform
+     * @see WaiversControllerInterface::executeWaiverOperation()
      */
     public function executeWaiverOperation(string $username, string $action): void
     {
@@ -100,12 +92,6 @@ class WaiversController
         $this->displayWaiverForm($userInfo, $action, $errorMessage);
     }
     
-    /**
-     * Processes a waiver wire submission
-     * 
-     * @param array $postData POST data
-     * @return string Error or success message
-     */
     private function processWaiverSubmission(array $postData): string
     {
         $teamName = $postData['Team_Name'] ?? '';
@@ -127,15 +113,6 @@ class WaiversController
         }
     }
     
-    /**
-     * Processes dropping a player to waivers
-     * 
-     * @param int|null $playerID Player ID
-     * @param string $teamName Team name
-     * @param int $rosterSlots Roster slots
-     * @param int $totalSalary Total salary
-     * @return string Status message
-     */
     private function processDrop(?int $playerID, string $teamName, int $rosterSlots, int $totalSalary): string
     {
         if (!$this->validator->validateDrop($rosterSlots, $totalSalary)) {
@@ -167,15 +144,6 @@ class WaiversController
         return "Your waiver move should now be processed. " . $player['name'] . " has been cut to waivers.";
     }
     
-    /**
-     * Processes adding a player from waivers
-     * 
-     * @param int|null $playerID Player ID
-     * @param string $teamName Team name
-     * @param int $healthyRosterSlots Healthy roster slots available
-     * @param int $totalSalary Total salary
-     * @return string Status message
-     */
     private function processAdd(?int $playerID, string $teamName, int $healthyRosterSlots, int $totalSalary): string
     {
         if ($playerID === null || $playerID === 0) {
@@ -218,14 +186,6 @@ class WaiversController
         return "Your waiver move should now be processed. " . $player['name'] . " has been signed from waivers and added to your roster.";
     }
     
-    /**
-     * Creates a news story for a waiver transaction
-     * 
-     * @param string $teamName Team name
-     * @param string $playerName Player name
-     * @param string $action Action (add or drop)
-     * @param string $contract Contract (for adds)
-     */
     private function createWaiverNewsStory(string $teamName, string $playerName, string $action, string $contract): void
     {
         $this->newsService->incrementCategoryCounter(self::WAIVER_POOL_MOVES_CATEGORY);
@@ -246,13 +206,6 @@ class WaiversController
         }
     }
     
-    /**
-     * Displays the waiver wire form
-     * 
-     * @param array $userInfo User information
-     * @param string $action Action (add or drop)
-     * @param string $errorMessage Error message to display
-     */
     private function displayWaiverForm(array $userInfo, string $action, string $errorMessage): void
     {
         \Nuke\Header::header();
@@ -296,13 +249,6 @@ class WaiversController
         \Nuke\Footer::footer();
     }
     
-    /**
-     * Gets players for dropdown based on action
-     * 
-     * @param object $team Team object
-     * @param string $action Action (add or drop)
-     * @return array Array of player option data
-     */
     private function getPlayersForAction($team, string $action): array
     {
         $league = new \League($this->db);

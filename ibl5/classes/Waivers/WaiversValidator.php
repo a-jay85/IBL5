@@ -2,17 +2,17 @@
 
 namespace Waivers;
 
+use Waivers\Contracts\WaiversValidatorInterface;
+
 /**
- * Validates waiver wire operations
+ * @see WaiversValidatorInterface
  */
-class WaiversValidator
+class WaiversValidator implements WaiversValidatorInterface
 {
     private array $errors = [];
     
     /**
-     * Gets validation errors
-     * 
-     * @return array Array of error messages
+     * @see WaiversValidatorInterface::getErrors()
      */
     public function getErrors(): array
     {
@@ -20,7 +20,7 @@ class WaiversValidator
     }
     
     /**
-     * Clears validation errors
+     * @see WaiversValidatorInterface::clearErrors()
      */
     public function clearErrors(): void
     {
@@ -28,11 +28,7 @@ class WaiversValidator
     }
     
     /**
-     * Validates a drop to waivers operation
-     * 
-     * @param int $rosterSlots Total roster slots filled
-     * @param int $totalSalary Total team salary
-     * @return bool True if valid, false otherwise
+     * @see WaiversValidatorInterface::validateDrop()
      */
     public function validateDrop(int $rosterSlots, int $totalSalary): bool
     {
@@ -47,13 +43,7 @@ class WaiversValidator
     }
     
     /**
-     * Validates an add from waivers operation
-     * 
-     * @param int|null $playerID Player ID being added
-     * @param int $healthyRosterSlots Number of healthy roster slots available
-     * @param int $totalSalary Current team salary
-     * @param int $playerSalary Salary of player being added
-     * @return bool True if valid, false otherwise
+     * @see WaiversValidatorInterface::validateAdd()
      */
     public function validateAdd(
         ?int $playerID,

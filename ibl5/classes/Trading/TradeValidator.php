@@ -1,6 +1,11 @@
 <?php
 
-class Trading_TradeValidator
+require_once __DIR__ . '/Contracts/Trading_TradeValidatorInterface.php';
+
+/**
+ * @see Trading_TradeValidatorInterface
+ */
+class Trading_TradeValidator implements Trading_TradeValidatorInterface
 {
     protected $db;
     protected $sharedFunctions;
@@ -14,10 +19,7 @@ class Trading_TradeValidator
     }
 
     /**
-     * Validate minimum cash amounts in a trade
-     * @param array $userSendsCash Array of cash amounts sent by user team
-     * @param array $partnerSendsCash Array of cash amounts sent by partner team
-     * @return array with 'valid' boolean and 'error' message
+     * @see Trading_TradeValidatorInterface::validateMinimumCashAmounts()
      */
     public function validateMinimumCashAmounts($userSendsCash, $partnerSendsCash)
     {
@@ -42,9 +44,7 @@ class Trading_TradeValidator
     }
 
     /**
-     * Calculate post-trade salary cap totals for both teams
-     * @param array $tradeData Array containing all trade information
-     * @return array with calculated cap totals and validation result
+     * @see Trading_TradeValidatorInterface::validateSalaryCaps()
      */
     public function validateSalaryCaps($tradeData)
     {
@@ -75,9 +75,7 @@ class Trading_TradeValidator
     }
 
     /**
-     * Check if a player can be traded (not waived, etc.)
-     * @param int $playerId
-     * @return bool
+     * @see Trading_TradeValidatorInterface::canPlayerBeTraded()
      */
     public function canPlayerBeTraded($playerId)
     {
@@ -97,10 +95,7 @@ class Trading_TradeValidator
     }
 
     /**
-     * Get cash considerations for current season based on phase
-     * @param array $userSendsCash Cash sent by user team
-     * @param array $partnerSendsCash Cash sent by partner team
-     * @return array Cash considerations for current season
+     * @see Trading_TradeValidatorInterface::getCurrentSeasonCashConsiderations()
      */
     public function getCurrentSeasonCashConsiderations($userSendsCash, $partnerSendsCash)
     {

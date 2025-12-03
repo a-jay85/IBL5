@@ -1,6 +1,11 @@
 <?php
 
-class Trading_TradeProcessor
+require_once __DIR__ . '/Contracts/Trading_TradeProcessorInterface.php';
+
+/**
+ * @see Trading_TradeProcessorInterface
+ */
+class Trading_TradeProcessor implements Trading_TradeProcessorInterface
 {
     protected $db;
     protected $commonRepository;
@@ -18,9 +23,7 @@ class Trading_TradeProcessor
     }
 
     /**
-     * Process a complete trade acceptance
-     * @param int $offerId Trade offer ID
-     * @return array Result with success status and story text
+     * @see Trading_TradeProcessorInterface::processTrade()
      */
     public function processTrade($offerId)
     {

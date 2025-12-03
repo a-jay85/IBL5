@@ -6,11 +6,12 @@ use Season;
 use Player\Player;
 use Player\PlayerContractCalculator;
 use Services\PlayerDataConverter;
+use Waivers\Contracts\WaiversProcessorInterface;
 
 /**
- * Processes waiver wire business logic
+ * @see WaiversProcessorInterface
  */
-class WaiversProcessor
+class WaiversProcessor implements WaiversProcessorInterface
 {
     private PlayerContractCalculator $contractCalculator;
     
@@ -20,13 +21,7 @@ class WaiversProcessor
     }
     
     /**
-     * Calculates veteran minimum salary based on years of experience for waiver signings
-     * 
-     * Delegates to FreeAgencyNegotiationHelper for consistent veteran minimum salaries
-     * across Free Agency and Waiver signings.
-     * 
-     * @param int $experience Years of experience
-     * @return int Veteran minimum salary in thousands
+     * @see WaiversProcessorInterface::calculateVeteranMinimumSalary()
      */
     public function calculateVeteranMinimumSalary(int $experience): int
     {
@@ -34,14 +29,10 @@ class WaiversProcessor
     }
     
     /**
-     * Gets the display contract for a player
-     * 
-     * @param Player $player Player object
-     * @return string Formatted contract display
+     * @see WaiversProcessorInterface::getPlayerContractDisplay()
      */
     public function getPlayerContractDisplay(Player $player, Season $season): string
     {
-        // Convert Player object properties to array for conversion to PlayerData
         $playerArray = [
             'cy' => $player->contractCurrentYear,
             'cyt' => $player->contractTotalYears,
@@ -72,11 +63,7 @@ class WaiversProcessor
     }
     
     /**
-     * Calculates wait time until a player clears waivers (24 hours)
-     * 
-     * @param int $dropTime Timestamp when player was dropped
-     * @param int $currentTime Current timestamp
-     * @return string Wait time display or empty if cleared
+     * @see WaiversProcessorInterface::getWaiverWaitTime()
      */
     public function getWaiverWaitTime(int $dropTime, int $currentTime): string
     {
@@ -96,15 +83,7 @@ class WaiversProcessor
     }
     
     /**
-     * Determines if a player has an existing contract for the current/next season
-     * 
-     * Clarifies contract responsibility when picking up a player from waivers:
-     * - If player HAS an existing contract: team inherits remaining contract obligations
-     * - If player has NO contract: team assigns veteran minimum based on experience
-     * 
-     * @param array $playerData Player data array with contract and experience fields
-     * @param Season $season Season instance to determine phase (affects which season we check)
-     * @return array ['hasExistingContract' => bool, 'salary' => int]
+     * @see WaiversProcessorInterface::determineContractData()
      */
     public function determineContractData(array $playerData, Season $season): array
     {

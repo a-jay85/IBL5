@@ -1,6 +1,11 @@
 <?php
 
-class Trading_TradeOffer
+require_once __DIR__ . '/Contracts/Trading_TradeOfferInterface.php';
+
+/**
+ * @see Trading_TradeOfferInterface
+ */
+class Trading_TradeOffer implements Trading_TradeOfferInterface
 {
     protected $db;
     protected $commonRepository;
@@ -18,9 +23,7 @@ class Trading_TradeOffer
     }
 
     /**
-     * Create a new trade offer
-     * @param array $tradeData Trade data from form submission
-     * @return array Result with success status and any errors
+     * @see Trading_TradeOfferInterface::createTradeOffer()
      */
     public function createTradeOffer($tradeData)
     {

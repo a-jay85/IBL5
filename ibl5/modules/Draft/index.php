@@ -22,6 +22,7 @@ function userinfo($username)
     $season = new Season($db);
     $repository = new DraftRepository($db);
     $view = new DraftView();
+    $sharedFunctions = new \Shared($db);
 
     $sql2 = "SELECT * FROM " . $user_prefix . "_users WHERE username = '$username'";
     $result2 = $db->sql_query($sql2);
@@ -39,11 +40,14 @@ function userinfo($username)
     // Get current draft pick information
     $currentPick = $repository->getCurrentDraftPick();
 
-    $draft_team = $currentPick['team'];
-    $draft_round = $currentPick['round'];
-    $draft_pick = $currentPick['pick'];
+    $draft_team = $currentPick['team'] ?? null;
+    $draft_round = $currentPick['round'] ?? null;
+    $draft_pick = $currentPick['pick'] ?? null;
 
-    $pickOwner = $sharedFunctions->getCurrentOwnerOfDraftPick($season->endingYear, $draft_round, $draft_team);
+    $pickOwner = null;
+    if ($draft_round !== null && $draft_team !== null) {
+        $pickOwner = $sharedFunctions->getCurrentOwnerOfDraftPick($season->endingYear, $draft_round, $draft_team);
+    }
 
     // Get all draft class players
     $players = $repository->getAllDraftClassPlayers();

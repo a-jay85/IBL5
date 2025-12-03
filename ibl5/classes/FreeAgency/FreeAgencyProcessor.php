@@ -2,16 +2,12 @@
 
 namespace FreeAgency;
 
+use FreeAgency\Contracts\FreeAgencyProcessorInterface;
+
 /**
- * Orchestrates free agency operations
- * 
- * Handles the complete workflow for:
- * - Displaying free agents and offers
- * - Processing contract negotiations
- * - Calculating cap space and roster spots
- * - Coordinating with specialized classes
+ * @see FreeAgencyProcessorInterface
  */
-class FreeAgencyProcessor
+class FreeAgencyProcessor implements FreeAgencyProcessorInterface
 {
     private $db;
     private $mysqli_db;
@@ -35,10 +31,7 @@ class FreeAgencyProcessor
     }
 
     /**
-     * Process a contract offer submission
-     * 
-     * @param array<string, mixed> $postData POST data from offer form
-     * @return string HTML response
+     * @see FreeAgencyProcessorInterface::processOfferSubmission()
      */
     public function processOfferSubmission(array $postData): string
     {
@@ -316,11 +309,7 @@ _**{$player->teamName}** GM <@!$playerTeamDiscordID> could not be reached for co
     }
 
     /**
-     * Delete all offers from a team to a player
-     * 
-     * @param string $teamName Team name
-     * @param int $playerID Player ID
-     * @return string HTML response
+     * @see FreeAgencyProcessorInterface::deleteOffers()
      */
     public function deleteOffers(string $teamName, int $playerID): string
     {

@@ -1,10 +1,10 @@
 # Development Guide
 
-**Status:** 14/23 IBL modules refactored (61% complete) • 476+ tests • ~45% coverage • Goal: 80%
+**Status:** 15/23 IBL modules refactored (65% complete) • 568+ tests • ~48% coverage • Goal: 80%
 
 ## Refactoring Status
 
-### ✅ Completed IBL Modules (14)
+### ✅ Completed IBL Modules (15)
 1. ~~Player~~ ✅ Complete (9 classes, 6 tests)
 2. ~~Statistics~~ ✅ Complete (6 classes, 5 tests)
 3. ~~Team~~ ✅ Complete (4 classes, 3 tests)
@@ -18,22 +18,25 @@
 11. ~~Voting~~ ✅ Complete (3 classes, 0 tests)
 12. ~~Schedule~~ ✅ Complete (2 classes, 0 tests)
 13. ~~Season Leaders~~ ✅ Complete (3 classes, 2 tests)
-14. ~~Free Agency~~ ✅ Complete (7 classes, 11 tests) **NEW**
+14. ~~Free Agency~~ ✅ Complete (7 classes, 11 tests)
+15. ~~Player_Search~~ ✅ Complete (4 classes, 4 tests) **NEW** - SQL injection fixed!
 
 ### 🎯 Top Priorities (Next 3)
 
-1. **One-on-One** (887 lines) - Player comparison tool (1-2 weeks)
-2. **Leaderboards** (264 lines) - Statistical rankings (1 week)
-3. **Stats Modules** - Batch refactoring (3-5 weeks)
+1. **Compare_Players** (403 lines) - Player comparison tool (1-2 weeks)
+2. **Searchable_Stats** (370 lines) - Advanced stats search (1 week)
+3. **Stats Modules** - League_Stats, Chunk_Stats batch refactoring (3-5 weeks)
 
-### 📋 Remaining IBL Modules (9)
+### 📋 Remaining IBL Modules (8)
 
 **High Priority (Next After Top 3):**
 - Compare_Players (403 lines)
-- Player_Search (461 lines)
 - Searchable_Stats (370 lines)
 - League_Stats (351 lines)
 - Chunk_Stats (462 lines)
+
+**Medium Priority:**
+- One-on-One (887 lines) - Side game, not core functionality
 
 **Lower Priority (Info/Display):**
 - Series_Records, Player_Awards, Cap_Info, Team_Schedule, Franchise_History, Power_Rankings, Next_Sim, League_Starters, Draft_Pick_Locator, Injuries, EOY_Results, ASG_Results, ASG_Stats, Player_Movement
@@ -41,9 +44,9 @@
 ## Quick Workflow
 
 **Before Starting:**
-- Review refactored modules: Player, Waivers, Draft, Team, Extension, Trading
+- Review refactored modules: Player, Waivers, Draft, Team, Extension, Trading, PlayerSearch
 - Check `ibl5/schema.sql` for database structure
-- See best practices in: `ibl5/classes/Player/README.md`, `ibl5/classes/DepthChart/SECURITY.md`
+- See best practices in: `ibl5/classes/Player/README.md`, `ibl5/classes/DepthChart/SECURITY.md`, `ibl5/classes/PlayerSearch/README.md`
 - Dependencies are cached via GitHub Actions (`.github/workflows/cache-dependencies.yml`)
 - Run tests: `cd ibl5 && vendor/bin/phpunit tests/`
 - CI/CD: Tests run automatically via GitHub Actions (`.github/workflows/tests.yml`)

@@ -1,26 +1,25 @@
 <?php
 
+declare(strict_types=1);
+
 namespace DepthChart;
 
+use DepthChart\Contracts\DepthChartValidatorInterface;
+
 /**
- * Validates depth chart submissions
+ * @see DepthChartValidatorInterface
  */
-class DepthChartValidator
+class DepthChartValidator implements DepthChartValidatorInterface
 {
     private $errors = [];
     
     /**
-     * Validates a depth chart submission
-     * 
-     * @param array $depthChartData Processed depth chart data
-     * @param string $phase Season phase (e.g., 'Playoffs', 'Regular Season')
-     * @return bool True if valid, false otherwise
+     * @see DepthChartValidatorInterface::validate()
      */
     public function validate(array $depthChartData, string $phase): bool
     {
         $this->errors = [];
         
-        // Set requirements based on season phase
         if ($phase === 'Playoffs') {
             $minActivePlayers = 10;
             $maxActivePlayers = 12;
@@ -31,14 +30,12 @@ class DepthChartValidator
             $minPositionDepth = 3;
         }
         
-        // Validate active player count
         $this->validateActivePlayerCount(
             $depthChartData['activePlayers'],
             $minActivePlayers,
             $maxActivePlayers
         );
         
-        // Validate position depths
         $positions = \JSB::PLAYER_POSITIONS;
         $this->validatePositionDepth($depthChartData['pos_1'], $positions[0], $minPositionDepth);
         $this->validatePositionDepth($depthChartData['pos_2'], $positions[1], $minPositionDepth);
@@ -46,7 +43,6 @@ class DepthChartValidator
         $this->validatePositionDepth($depthChartData['pos_4'], $positions[3], $minPositionDepth);
         $this->validatePositionDepth($depthChartData['pos_5'], $positions[4], $minPositionDepth);
         
-        // Validate no player is starting at multiple positions
         $this->validateNoMultipleStartingPositions(
             $depthChartData['hasStarterAtMultiplePositions'],
             $depthChartData['nameOfProblemStarter'] ?? ''
@@ -55,9 +51,6 @@ class DepthChartValidator
         return empty($this->errors);
     }
     
-    /**
-     * Validates active player count
-     */
     private function validateActivePlayerCount(int $activePlayers, int $min, int $max): void
     {
         if ($activePlayers < $min) {
@@ -77,9 +70,6 @@ class DepthChartValidator
         }
     }
     
-    /**
-     * Validates position depth
-     */
     private function validatePositionDepth(int $count, string $position, int $min): void
     {
         if ($count < $min) {
@@ -91,9 +81,6 @@ class DepthChartValidator
         }
     }
     
-    /**
-     * Validates that no player is starting at multiple positions
-     */
     private function validateNoMultipleStartingPositions(bool $hasMultiple, string $playerName): void
     {
         if ($hasMultiple) {
@@ -106,9 +93,7 @@ class DepthChartValidator
     }
     
     /**
-     * Gets validation errors
-     * 
-     * @return array Array of error arrays
+     * @see DepthChartValidatorInterface::getErrors()
      */
     public function getErrors(): array
     {
@@ -116,9 +101,7 @@ class DepthChartValidator
     }
     
     /**
-     * Gets formatted error messages for display
-     * 
-     * @return string HTML-formatted error messages
+     * @see DepthChartValidatorInterface::getErrorMessagesHtml()
      */
     public function getErrorMessagesHtml(): string
     {

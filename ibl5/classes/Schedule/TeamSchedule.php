@@ -1,10 +1,20 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Schedule;
 
-class TeamSchedule extends Schedule
+use Schedule\Contracts\TeamScheduleInterface;
+
+/**
+ * @see TeamScheduleInterface
+ */
+class TeamSchedule extends Schedule implements TeamScheduleInterface
 {
-    public static function getSchedule($db, $teamID)
+    /**
+     * @see TeamScheduleInterface::getSchedule()
+     */
+    public static function getSchedule($db, int $teamID)
     {
         $query = "SELECT *
             FROM `ibl_schedule`
@@ -14,7 +24,10 @@ class TeamSchedule extends Schedule
         return $db->sql_query($query);
     }
 
-    public static function getProjectedGamesNextSimResult($db, $teamID, $lastSimEndDate)
+    /**
+     * @see TeamScheduleInterface::getProjectedGamesNextSimResult()
+     */
+    public static function getProjectedGamesNextSimResult($db, int $teamID, string $lastSimEndDate)
     {
         $query = "SELECT *
             FROM `ibl_schedule`

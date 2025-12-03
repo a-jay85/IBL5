@@ -2,20 +2,13 @@
 
 namespace FreeAgency;
 
+use FreeAgency\Contracts\FreeAgencyDemandCalculatorInterface;
 use Player\Player;
 
 /**
- * Calculates player contract demands with team-specific modifiers
- * 
- * Factors affecting demands:
- * - Team season performance (wins/losses)
- * - Team tradition (historical wins/losses)
- * - Player loyalty to current team
- * - Contract security (years offered)
- * - Playing time opportunity
- * - Random variance for negotiation dynamics
+ * @see FreeAgencyDemandCalculatorInterface
  */
-class FreeAgencyDemandCalculator
+class FreeAgencyDemandCalculator implements FreeAgencyDemandCalculatorInterface
 {
     private const PLAY_FOR_WINNER_FACTOR = 0.000153;
     private const TRADITION_FACTOR = 0.000153;
@@ -39,11 +32,7 @@ class FreeAgencyDemandCalculator
     }
 
     /**
-     * Set a static random factor for testing (disables actual randomness)
-     * Pass null to re-enable actual random number generation
-     * 
-     * @param ?int $factor Random factor between -5 and 5, or null for actual randomness
-     * @return void
+     * @see FreeAgencyDemandCalculatorInterface::setRandomFactor()
      */
     public function setRandomFactor(?int $factor): void
     {
@@ -191,10 +180,7 @@ class FreeAgencyDemandCalculator
     }
 
     /**
-     * Get player demands from database
-     * 
-     * @param string $playerName Player name
-     * @return array{dem1: int, dem2: int, dem3: int, dem4: int, dem5: int, dem6: int}
+     * @see FreeAgencyDemandCalculatorInterface::getPlayerDemands()
      */
     public function getPlayerDemands(string $playerName): array
     {

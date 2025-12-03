@@ -1,21 +1,19 @@
 <?php
 
+declare(strict_types=1);
+
 namespace SeasonLeaders;
 
 use Statistics\StatsFormatter;
+use SeasonLeaders\Contracts\SeasonLeadersServiceInterface;
 
 /**
- * SeasonLeadersService - Business logic for season leaders data processing
- * 
- * Handles data transformation and calculations for season statistics.
+ * @see SeasonLeadersServiceInterface
  */
-class SeasonLeadersService
+class SeasonLeadersService implements SeasonLeadersServiceInterface
 {
     /**
-     * Process a player row from database into formatted statistics
-     * 
-     * @param array $row Database row from ibl_hist table
-     * @return array Formatted player statistics
+     * @see SeasonLeadersServiceInterface::processPlayerRow()
      */
     public function processPlayerRow(array $row): array
     {
@@ -78,10 +76,9 @@ class SeasonLeadersService
 
     /**
      * Calculate Quality Assessment metric
-     * Formula: (pts + reb + 2*ast + 2*stl + 2*blk - (fga-fgm) - (fta-ftm) - tvr - pf) / games
      * 
-     * @param array $stats Player statistics
-     * @return string Formatted QA value
+     * @param array $stats Player statistics array
+     * @return string Formatted QA value (1 decimal place)
      */
     private function calculateQualityAssessment(array $stats): string
     {
@@ -97,9 +94,7 @@ class SeasonLeadersService
     }
 
     /**
-     * Get sort option labels for display
-     * 
-     * @return array Array of sort option labels
+     * @see SeasonLeadersServiceInterface::getSortOptions()
      */
     public function getSortOptions(): array
     {

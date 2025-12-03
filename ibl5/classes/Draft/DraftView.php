@@ -28,7 +28,7 @@ class DraftView implements DraftViewInterface
     /**
      * @see DraftViewInterface::renderDraftInterface()
      */
-    public function renderDraftInterface(array $players, string $teamLogo, string $pickOwner, int $draftRound, int $draftPick, int $seasonYear, int $tid): string
+    public function renderDraftInterface(array $players, string $teamLogo, ?string $pickOwner, ?int $draftRound, ?int $draftPick, int $seasonYear, int $tid): string
     {
         $html = "<center><img src=\"images/logo/$tid.jpg\"><br>
 	<table>
@@ -57,7 +57,7 @@ class DraftView implements DraftViewInterface
     /**
      * @see DraftViewInterface::renderPlayerTable()
      */
-    public function renderPlayerTable(array $players, string $teamLogo, string $pickOwner): string
+    public function renderPlayerTable(array $players, string $teamLogo, ?string $pickOwner): string
     {
         $html = "<table class=\"sortable\">
     	<tr>

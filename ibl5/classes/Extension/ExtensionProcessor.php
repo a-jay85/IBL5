@@ -4,20 +4,12 @@ namespace Extension;
 
 use Player\Player;
 use Shared\SalaryConverter;
+use Extension\Contracts\ExtensionProcessorInterface;
 
 /**
- * Extension Processor Class
- * 
- * Orchestrates the complete contract extension workflow by coordinating:
- * - Validation (via ExtensionValidator)
- * - Evaluation (via ExtensionOfferEvaluator)
- * - Database operations (via ExtensionDatabaseOperations)
- * - Notifications (Discord, email)
- * 
- * This class provides the main entry point for processing extension offers
- * and returns structured results instead of echoing HTML directly.
+ * @see ExtensionProcessorInterface
  */
-class ExtensionProcessor
+class ExtensionProcessor implements ExtensionProcessorInterface
 {
     private $db;
     private $validator;
@@ -33,29 +25,12 @@ class ExtensionProcessor
     }
 
     /**
-     * Processes a contract extension offer through the complete workflow
-     * 
-     * @param array $extensionData Array containing:
-     *   - playerID: int (or Player object)
-     *   - teamName: string (or Team object)
-     *   - offer: array [year1, year2, year3, year4, year5]
-     *   - demands: array [total, years]
-     * @return array Result array with:
-     *   - success: bool
-     *   - accepted: bool (if successful)
-     *   - error: string (if not successful)
-     *   - message: string
-     *   - offerValue: float
-     *   - demandValue: float
-     *   - modifier: float
-     *   - extensionYears: int
+     * @see ExtensionProcessorInterface::processExtension()
      */
     public function processExtension($extensionData)
     {
         $offer = $extensionData['offer'];
         $demands = isset($extensionData['demands']) ? $extensionData['demands'] : null;
-
-        // Create Player and Team objects if not already provided
         $player = $this->getPlayerObject($extensionData);
         if (!$player) {
             return [
@@ -72,7 +47,6 @@ class ExtensionProcessor
             ];
         }
 
-        // Validate offer amounts
         $amountValidation = $this->validator->validateOfferAmounts($offer);
         if (!$amountValidation['valid']) {
             return [
@@ -81,7 +55,6 @@ class ExtensionProcessor
             ];
         }
 
-        // Check extension eligibility using Team object
         $eligibilityValidation = $this->validator->validateExtensionEligibility($team);
         if (!$eligibilityValidation['valid']) {
             return [
@@ -90,7 +63,6 @@ class ExtensionProcessor
             ];
         }
 
-        // Validate maximum offer using player's years of experience
         $maxOfferValidation = $this->validator->validateMaximumYearOneOffer($offer, $player->yearsOfExperience);
         if (!$maxOfferValidation['valid']) {
             return [
@@ -99,7 +71,6 @@ class ExtensionProcessor
             ];
         }
 
-        // Validate raises using player's bird years
         $raisesValidation = $this->validator->validateRaises($offer, $player->birdYears);
         if (!$raisesValidation['valid']) {
             return [
@@ -108,7 +79,6 @@ class ExtensionProcessor
             ];
         }
 
-        // Validate salary decreases
         $decreasesValidation = $this->validator->validateSalaryDecreases($offer);
         if (!$decreasesValidation['valid']) {
             return [
@@ -117,16 +87,10 @@ class ExtensionProcessor
             ];
         }
 
-        // Mark extension used for this sim (legal offer made)
         $this->dbOps->markExtensionUsedThisSim($team->name);
-
-        // Calculate money committed at player's position using Team object
         $moneyCommittedAtPosition = $this->calculateMoneyCommittedAtPosition($team, $player->position);
-
-        // Get tradition data (not available in Team object, requires separate query)
         $traditionData = $this->getTeamTraditionData($team->name);
 
-        // Build team factors using Team object properties
         $teamFactors = [
             'wins' => $traditionData['currentSeasonWins'],
             'losses' => $traditionData['currentSeasonLosses'],
@@ -135,7 +99,6 @@ class ExtensionProcessor
             'money_committed_at_position' => $moneyCommittedAtPosition
         ];
 
-        // Build player preferences using Player object properties
         $playerPreferences = [
             'winner' => $player->freeAgencyPlayForWinner ?? 3,
             'tradition' => $player->freeAgencyTradition ?? 3,
@@ -143,13 +106,10 @@ class ExtensionProcessor
             'playing_time' => $player->freeAgencyPlayingTime ?? 3
         ];
 
-        // Convert demands to array format if needed
         if (!$demands) {
-            // If no demands provided, use a default based on the offer (85% of offer)
-            // This allows modifiers to determine acceptance/rejection
             $offerData = $this->evaluator->calculateOfferValue($offer);
             $offerAvg = $offerData['averagePerYear'];
-            $demandAvg = $offerAvg * 0.85; // Player demands 85% of what's offered
+            $demandAvg = $offerAvg * 0.85;
             $demands = [
                 'year1' => $demandAvg,
                 'year2' => $demandAvg,
@@ -158,7 +118,6 @@ class ExtensionProcessor
                 'year5' => $offerData['years'] > 4 ? $demandAvg : 0
             ];
         } elseif (isset($demands['total']) && isset($demands['years'])) {
-            // Convert simple demands to array format
             $demandAvg = $demands['total'] / $demands['years'];
             $demands = [
                 'year1' => $demandAvg,
@@ -169,28 +128,18 @@ class ExtensionProcessor
             ];
         }
 
-        // Evaluate offer
         $evaluation = $this->evaluator->evaluateOffer($offer, $demands, $teamFactors, $playerPreferences);
 
-        // Calculate values for reporting
         $offerData = $this->evaluator->calculateOfferValue($offer);
         $offerTotal = $offerData['total'];
         $offerYears = $offerData['years'];
         $offerInMillions = SalaryConverter::convertToMillions($offerTotal);
         $offerDetails = $offer['year1'] . " " . $offer['year2'] . " " . $offer['year3'] . " " . $offer['year4'] . " " . $offer['year5'];
 
-        // Process based on acceptance
         if ($evaluation['accepted']) {
-            // Get current salary from Player object
             $currentSalary = $player->currentSeasonSalary ?? 0;
-
-            // Update player contract using player name and offer details
             $this->dbOps->updatePlayerContract($player->name, $offer, $currentSalary);
-            
-            // Mark extension used for season using team name
             $this->dbOps->markExtensionUsedThisSeason($team->name);
-            
-            // Create news story
             $this->dbOps->createAcceptedExtensionStory($player->name, $team->name, $offerInMillions, $offerYears, $offerDetails);
             
             // Send Discord notification
@@ -258,12 +207,6 @@ class ExtensionProcessor
         }
     }
 
-    /**
-     * Gets a Player object from extension data
-     * 
-     * @param array $extensionData Extension data array
-     * @return \Player|null Player object or null if not found
-     */
     private function getPlayerObject($extensionData)
     {
         // If Player object already provided, return it
@@ -284,13 +227,6 @@ class ExtensionProcessor
         return null;
     }
 
-    /**
-     * Gets a Team object from extension data
-     * 
-     * @param array $extensionData Extension data array
-     * @param \Player $player Player object
-     * @return \Team|null Team object or null if not found
-     */
     private function getTeamObject($extensionData, $player)
     {
         // If Team object already provided, return it
@@ -311,13 +247,6 @@ class ExtensionProcessor
         }
     }
 
-    /**
-     * Calculates the total money committed at a player's position using Team object
-     * 
-     * @param \Team $team Team object
-     * @param string $position Player position (C, PF, SF, SG, PG)
-     * @return int Total salary committed at that position for next season
-     */
     private function calculateMoneyCommittedAtPosition($team, $position)
     {
         try {
@@ -353,17 +282,6 @@ class ExtensionProcessor
         }
     }
 
-    /**
-     * Gets team play for winner (Contract_Wins and Contract_Losses) and tradition data (Contract_AvgW and Contract_AvgL)
-     * 
-     * @param string $teamName Team name
-     * @return array [
-     *     'currentSeasonWins' => int,
-     *     'currentSeasonLosses' => int,
-     *     'tradition_wins' => int,
-     *     'tradition_losses' => int
-     * ]
-     */
     private function getTeamTraditionData($teamName)
     {
         try {

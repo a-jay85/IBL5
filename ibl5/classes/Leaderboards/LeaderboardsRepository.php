@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 namespace Leaderboards;
 
+use Leaderboards\Contracts\LeaderboardsRepositoryInterface;
+
 /**
- * LeaderboardsRepository - Handles all database operations for leaderboards
- * 
- * Following the Repository pattern, this class encapsulates all SQL queries
- * and database interactions for career statistics across multiple table types.
+ * @see LeaderboardsRepositoryInterface
  */
-class LeaderboardsRepository
+class LeaderboardsRepository implements LeaderboardsRepositoryInterface
 {
     private $db;
 
@@ -39,13 +38,7 @@ class LeaderboardsRepository
     }
 
     /**
-     * Get leaderboard data based on filters
-     * 
-     * @param string $tableKey Key from the type array
-     * @param string $sortColumn Column name to sort by
-     * @param int $activeOnly 1 to exclude retired players, 0 to include all
-     * @param int $limit Maximum number of records to return (0 for unlimited)
-     * @return array Query result resource and row count
+     * @see LeaderboardsRepositoryInterface::getLeaderboards()
      */
     public function getLeaderboards(
         string $tableKey,
@@ -117,10 +110,7 @@ class LeaderboardsRepository
     }
 
     /**
-     * Check if a table contains totals or averages
-     * 
-     * @param string $tableKey Table name
-     * @return string 'totals' or 'averages'
+     * @see LeaderboardsRepositoryInterface::getTableType()
      */
     public function getTableType(string $tableKey): string
     {

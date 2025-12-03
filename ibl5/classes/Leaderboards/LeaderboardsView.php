@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 namespace Leaderboards;
 
+use Leaderboards\Contracts\LeaderboardsViewInterface;
+
 /**
- * LeaderboardsView - Handles HTML rendering for leaderboards
- * 
- * Separates presentation logic from business logic.
- * Uses output buffering pattern for cleaner, more maintainable HTML.
+ * @see LeaderboardsViewInterface
  */
-class LeaderboardsView
+class LeaderboardsView implements LeaderboardsViewInterface
 {
     private LeaderboardsService $service;
 
@@ -20,10 +19,7 @@ class LeaderboardsView
     }
 
     /**
-     * Render the filter form
-     * 
-     * @param array $currentFilters Current filter values
-     * @return string HTML for the filter form
+     * @see LeaderboardsViewInterface::renderFilterForm()
      */
     public function renderFilterForm(array $currentFilters): string
     {
@@ -77,9 +73,7 @@ class LeaderboardsView
     }
 
     /**
-     * Render the statistics table header
-     * 
-     * @return string HTML table header
+     * @see LeaderboardsViewInterface::renderTableHeader()
      */
     public function renderTableHeader(): string
     {
@@ -116,11 +110,7 @@ class LeaderboardsView
     }
 
     /**
-     * Render a single player statistics row
-     * 
-     * @param array $stats Formatted player statistics
-     * @param int $rank Player's rank in the leaderboard
-     * @return string HTML table row
+     * @see LeaderboardsViewInterface::renderPlayerRow()
      */
     public function renderPlayerRow(array $stats, int $rank): string
     {
@@ -154,9 +144,7 @@ class LeaderboardsView
     }
 
     /**
-     * Render the table footer
-     * 
-     * @return string HTML table closing tag
+     * @see LeaderboardsViewInterface::renderTableFooter()
      */
     public function renderTableFooter(): string
     {

@@ -4,22 +4,16 @@ declare(strict_types=1);
 
 namespace Player;
 
+use Player\Contracts\PlayerPageViewHelperInterface;
 use PlayerStats;
 
 /**
- * PlayerPageViewHelper - HTML generation for player page display
- * 
- * Handles all HTML rendering for the player page, keeping presentation
- * logic separate from business logic.
+ * @see PlayerPageViewHelperInterface
  */
-class PlayerPageViewHelper
+class PlayerPageViewHelper implements PlayerPageViewHelperInterface
 {
     /**
-     * Generate player header HTML (name, nickname, team)
-     * 
-     * @param Player $player The player to display
-     * @param int $playerID The player's ID
-     * @return string HTML for player header
+     * @see PlayerPageViewHelperInterface::renderPlayerHeader()
      */
     public function renderPlayerHeader(Player $player, int $playerID): string
     {
@@ -43,9 +37,7 @@ class PlayerPageViewHelper
     }
 
     /**
-     * Generate rookie option used message HTML
-     * 
-     * @return string HTML for rookie option used message
+     * @see PlayerPageViewHelperInterface::renderRookieOptionUsedMessage()
      */
     public function renderRookieOptionUsedMessage(): string
     {
@@ -61,10 +53,7 @@ class PlayerPageViewHelper
     }
 
     /**
-     * Generate renegotiation button HTML
-     * 
-     * @param int $playerID The player's ID
-     * @return string HTML for renegotiation button
+     * @see PlayerPageViewHelperInterface::renderRenegotiationButton()
      */
     public function renderRenegotiationButton(int $playerID): string
     {
@@ -80,10 +69,7 @@ class PlayerPageViewHelper
     }
 
     /**
-     * Generate rookie option button HTML
-     * 
-     * @param int $playerID The player's ID
-     * @return string HTML for rookie option button
+     * @see PlayerPageViewHelperInterface::renderRookieOptionButton()
      */
     public function renderRookieOptionButton(int $playerID): string
     {

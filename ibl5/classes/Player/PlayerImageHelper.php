@@ -4,19 +4,12 @@ declare(strict_types=1);
 
 namespace Player;
 
+use Player\Contracts\PlayerImageHelperInterface;
+
 /**
- * PlayerImageHelper - Safely generates player image URLs
- * 
- * Provides a centralized method to generate player image URLs with validation
- * to prevent 404 errors when playerID is missing, null, or invalid.
- * 
- * This helper ensures consistent handling of player images across the application.
- * When a playerID is invalid, returns a data URI for a 1x1 transparent pixel instead
- * of a URL that would result in a 404 error.
- * 
- * @package Player
+ * @see PlayerImageHelperInterface
  */
-class PlayerImageHelper
+class PlayerImageHelper implements PlayerImageHelperInterface
 {
     /**
      * Data URI for a 1x1 fully transparent PNG pixel (prevents 404 errors without needing a file)

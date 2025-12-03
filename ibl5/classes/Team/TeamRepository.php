@@ -1,16 +1,16 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Team;
 
 use Services\DatabaseService;
+use Team\Contracts\TeamRepositoryInterface;
 
 /**
- * TeamRepository - Handles all database operations related to teams
- * 
- * Following the Repository pattern, this class encapsulates all SQL queries
- * and database interactions for team-related data.
+ * @see TeamRepositoryInterface
  */
-class TeamRepository
+class TeamRepository implements TeamRepositoryInterface
 {
     private $db;
 
@@ -20,7 +20,7 @@ class TeamRepository
     }
 
     /**
-     * Get team power rankings data
+     * @see TeamRepositoryInterface::getTeamPowerData()
      */
     public function getTeamPowerData(string $teamName): ?array
     {
@@ -35,9 +35,9 @@ class TeamRepository
     }
 
     /**
-     * Get division standings for a specific division
+     * @see TeamRepositoryInterface::getDivisionStandings()
      */
-    public function getDivisionStandings(string $division)
+    public function getDivisionStandings(string $division): mixed
     {
         $division = DatabaseService::escapeString($this->db, $division);
         $query = "SELECT * FROM ibl_power WHERE Division = '$division' ORDER BY gb DESC";
@@ -45,9 +45,9 @@ class TeamRepository
     }
 
     /**
-     * Get conference standings for a specific conference
+     * @see TeamRepositoryInterface::getConferenceStandings()
      */
-    public function getConferenceStandings(string $conference)
+    public function getConferenceStandings(string $conference): mixed
     {
         $conference = DatabaseService::escapeString($this->db, $conference);
         $query = "SELECT * FROM ibl_power WHERE Conference = '$conference' ORDER BY gb DESC";
@@ -55,9 +55,9 @@ class TeamRepository
     }
 
     /**
-     * Get championship banners for a team
+     * @see TeamRepositoryInterface::getChampionshipBanners()
      */
-    public function getChampionshipBanners(string $teamName)
+    public function getChampionshipBanners(string $teamName): mixed
     {
         $teamName = DatabaseService::escapeString($this->db, $teamName);
         $query = "SELECT * FROM ibl_banners WHERE currentname = '$teamName' ORDER BY year ASC";
@@ -65,21 +65,19 @@ class TeamRepository
     }
 
     /**
-     * Get GM history for a team
-     * Format: "OwnerName (TeamName)" - matches ibl_gm_history table format
+     * @see TeamRepositoryInterface::getGMHistory()
      */
-    public function getGMHistory(string $ownerName, string $teamName)
+    public function getGMHistory(string $ownerName, string $teamName): mixed
     {
-        // The GM history table stores records in format: "Owner Name (Team Name)"
         $ownerAwardCode = DatabaseService::escapeString($this->db, $ownerName . " (" . $teamName . ")");
         $query = "SELECT * FROM ibl_gm_history WHERE name LIKE '$ownerAwardCode' ORDER BY year ASC";
         return $this->db->sql_query($query);
     }
 
     /**
-     * Get team accomplishments/awards
+     * @see TeamRepositoryInterface::getTeamAccomplishments()
      */
-    public function getTeamAccomplishments(string $teamName)
+    public function getTeamAccomplishments(string $teamName): mixed
     {
         $teamName = DatabaseService::escapeString($this->db, $teamName);
         $query = "SELECT * FROM ibl_team_awards WHERE name LIKE '$teamName' ORDER BY year DESC";
@@ -87,9 +85,9 @@ class TeamRepository
     }
 
     /**
-     * Get regular season win/loss history
+     * @see TeamRepositoryInterface::getRegularSeasonHistory()
      */
-    public function getRegularSeasonHistory(string $teamName)
+    public function getRegularSeasonHistory(string $teamName): mixed
     {
         $teamName = DatabaseService::escapeString($this->db, $teamName);
         $query = "SELECT * FROM ibl_team_win_loss WHERE currentname = '$teamName' ORDER BY year DESC";
@@ -97,9 +95,9 @@ class TeamRepository
     }
 
     /**
-     * Get HEAT tournament history
+     * @see TeamRepositoryInterface::getHEATHistory()
      */
-    public function getHEATHistory(string $teamName)
+    public function getHEATHistory(string $teamName): mixed
     {
         $teamName = DatabaseService::escapeString($this->db, $teamName);
         $query = "SELECT * FROM ibl_heat_win_loss WHERE currentname = '$teamName' ORDER BY year DESC";
@@ -107,18 +105,18 @@ class TeamRepository
     }
 
     /**
-     * Get playoff results for all teams
+     * @see TeamRepositoryInterface::getPlayoffResults()
      */
-    public function getPlayoffResults()
+    public function getPlayoffResults(): mixed
     {
         $query = "SELECT * FROM ibl_playoff_results ORDER BY year DESC";
         return $this->db->sql_query($query);
     }
 
     /**
-     * Get team roster for free agency (players whose contract year doesn't match current year)
+     * @see TeamRepositoryInterface::getFreeAgencyRoster()
      */
-    public function getFreeAgencyRoster(int $teamID)
+    public function getFreeAgencyRoster(int $teamID): mixed
     {
         $teamID = (int) $teamID;
         $query = "SELECT * 
@@ -131,9 +129,9 @@ class TeamRepository
     }
 
     /**
-     * Get team roster under contract
+     * @see TeamRepositoryInterface::getRosterUnderContract()
      */
-    public function getRosterUnderContract(int $teamID)
+    public function getRosterUnderContract(int $teamID): mixed
     {
         $teamID = (int) $teamID;
         $query = "SELECT * 
@@ -145,9 +143,9 @@ class TeamRepository
     }
 
     /**
-     * Get free agents (team 0, players with ordinal > 959)
+     * @see TeamRepositoryInterface::getFreeAgents()
      */
-    public function getFreeAgents(bool $includeFreeAgencyActive = false)
+    public function getFreeAgents(bool $includeFreeAgencyActive = false): mixed
     {
         if ($includeFreeAgencyActive) {
             $query = "SELECT * FROM ibl_plr WHERE ordinal > '959' AND retired = 0 AND cyt != cy ORDER BY ordinal ASC";
@@ -158,18 +156,18 @@ class TeamRepository
     }
 
     /**
-     * Get entire league roster
+     * @see TeamRepositoryInterface::getEntireLeagueRoster()
      */
-    public function getEntireLeagueRoster()
+    public function getEntireLeagueRoster(): mixed
     {
         $query = "SELECT * FROM ibl_plr WHERE retired = 0 AND name NOT LIKE '%Buyouts' ORDER BY ordinal ASC";
         return $this->db->sql_query($query);
     }
 
     /**
-     * Get historical roster for a specific year
+     * @see TeamRepositoryInterface::getHistoricalRoster()
      */
-    public function getHistoricalRoster(int $teamID, string $year)
+    public function getHistoricalRoster(int $teamID, string $year): mixed
     {
         $teamID = (int) $teamID;
 

@@ -1,16 +1,15 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Draft;
 
+use Draft\Contracts\DraftSelectionHandlerInterface;
+
 /**
- * Orchestrates the draft selection workflow
- * 
- * Responsibilities:
- * - Coordinate validation, database updates, and notifications
- * - Handle draft selection submissions
- * - Manage Discord notifications
+ * @see DraftSelectionHandlerInterface
  */
-class DraftSelectionHandler
+class DraftSelectionHandler implements DraftSelectionHandlerInterface
 {
     private $db;
     private $validator;
@@ -35,26 +34,15 @@ class DraftSelectionHandler
     }
 
     /**
-     * Handle a draft selection submission
-     * 
-     * @param string $teamName The name of the drafting team
-     * @param string|null $playerName The name of the player to draft
-     * @param int $draftRound The draft round
-     * @param int $draftPick The pick number
-     * @return string HTML response message
+     * @see DraftSelectionHandlerInterface::handleDraftSelection()
      */
-    public function handleDraftSelection($teamName, $playerName, $draftRound, $draftPick)
+    public function handleDraftSelection(string $teamName, ?string $playerName, int $draftRound, int $draftPick): string
     {
-        // Get current draft selection
         $currentDraftSelection = $this->repository->getCurrentDraftSelection($draftRound, $draftPick);
-
-        // Check if player is already drafted
         $isPlayerAlreadyDrafted = false;
         if ($playerName !== null && $playerName !== '') {
             $isPlayerAlreadyDrafted = $this->repository->isPlayerAlreadyDrafted($playerName);
         }
-
-        // Validate the draft selection
         if (!$this->validator->validateDraftSelection($playerName, $currentDraftSelection, $isPlayerAlreadyDrafted)) {
             $errors = $this->validator->getErrors();
             return $this->view->renderValidationError($errors[0]);
@@ -64,84 +52,47 @@ class DraftSelectionHandler
         return $this->processDraftSelection($teamName, $playerName, $draftRound, $draftPick);
     }
 
-    /**
-     * Process a validated draft selection
-     * 
-     * @param string $teamName The name of the drafting team
-     * @param string $playerName The name of the player to draft
-     * @param int $draftRound The draft round
-     * @param int $draftPick The pick number
-     * @return string HTML response message
-     */
-    private function processDraftSelection($teamName, $playerName, $draftRound, $draftPick)
+    private function processDraftSelection(string $teamName, string $playerName, int $draftRound, int $draftPick): string
     {
         $date = date('Y-m-d h:i:s');
-
-        // Update all three database tables
         $draftTableUpdated = $this->repository->updateDraftTable($playerName, $date, $draftRound, $draftPick);
         $rookieTableUpdated = $this->repository->updateRookieTable($playerName, $teamName);
         $playerCreated = $this->repository->createPlayerFromDraftClass($playerName, $teamName);
-
-        // Check if all updates succeeded
         if (!$draftTableUpdated || !$rookieTableUpdated || !$playerCreated) {
             return $this->processor->getDatabaseErrorMessage();
         }
-
-        // Send notifications and return success message
         return $this->sendNotifications($teamName, $playerName, $draftRound, $draftPick);
     }
 
-    /**
-     * Send Discord notifications and return success message
-     * 
-     * @param string $teamName The name of the drafting team
-     * @param string $playerName The name of the drafted player
-     * @param int $draftRound The draft round
-     * @param int $draftPick The pick number
-     * @return string HTML response message
-     */
-    private function sendNotifications($teamName, $playerName, $draftRound, $draftPick)
+    private function sendNotifications(string $teamName, string $playerName, int $draftRound, int $draftPick): string
     {
-        // Create base announcement message
         $message = $this->processor->createDraftAnnouncement(
-            $draftPick, 
-            $draftRound, 
-            $this->season->endingYear, 
-            $teamName, 
+            $draftPick,
+            $draftRound,
+            $this->season->endingYear,
+            $teamName,
             $playerName
         );
-
-        // Get next team on the clock
         $nextTeamDraftPick = $this->repository->getNextTeamOnClock();
         $teamOnTheClock = null;
         $discordIDOfTeamOnTheClock = null;
-
         if ($nextTeamDraftPick !== null) {
             $teamOnTheClock = $this->sharedFunctions->getCurrentOwnerOfDraftPick(
-                $this->season->endingYear, 
-                $draftRound, 
+                $this->season->endingYear,
+                $draftRound,
                 $nextTeamDraftPick
             );
-
             if ($teamOnTheClock !== null) {
                 $discordIDOfTeamOnTheClock = $this->commonRepository->getTeamDiscordID($teamOnTheClock);
             }
         }
-
-        // Post to general chat
         \Discord::postToChannel('#general-chat', $message);
-
-        // Create message with next team info
         $messageWithNextTeam = $this->processor->createNextTeamMessage(
-            $message, 
+            $message,
             $discordIDOfTeamOnTheClock,
             $this->season->endingYear
         );
-
-        // Post to draft-picks channel
         \Discord::postToChannel('#draft-picks', $messageWithNextTeam);
-
-        // Return success message
         return $this->processor->getSuccessMessage($message);
     }
 }

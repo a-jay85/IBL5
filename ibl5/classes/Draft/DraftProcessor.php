@@ -1,46 +1,33 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Draft;
 
+use Draft\Contracts\DraftProcessorInterface;
+
 /**
- * Handles business logic for draft operations
- * 
- * Responsibilities:
- * - Format draft announcement messages
- * - Build Discord notifications
- * - Process draft selection information
+ * @see DraftProcessorInterface
  */
-class DraftProcessor
+class DraftProcessor implements DraftProcessorInterface
 {
     // Configuration constants
     const DRAFT_MODULE_URL = 'https://www.iblhoops.net/ibl5/modules.php?name=Draft';
     const ADMIN_CONTACT = 'the administrator';
 
     /**
-     * Create a draft announcement message
-     * 
-     * @param int $draftPick The overall pick number
-     * @param int $draftRound The round number
-     * @param string $seasonYear The draft year
-     * @param string $teamName The drafting team
-     * @param string $playerName The drafted player
-     * @return string The formatted announcement message
+     * @see DraftProcessorInterface::createDraftAnnouncement()
      */
-    public function createDraftAnnouncement($draftPick, $draftRound, $seasonYear, $teamName, $playerName)
+    public function createDraftAnnouncement(int $draftPick, int $draftRound, string $seasonYear, string $teamName, string $playerName): string
     {
         return "With pick #$draftPick in round $draftRound of the $seasonYear IBL Draft, the **" 
             . $teamName . "** select **" . $playerName . "!**";
     }
 
     /**
-     * Create the message for the next team on the clock
-     * 
-     * @param string $baseMessage The base draft announcement
-     * @param string|null $discordID The Discord ID of the next team's owner (null if draft is complete)
-     * @param string|null $seasonYear The draft year (null if draft is complete)
-     * @return string The complete message with next team or draft completion notice
+     * @see DraftProcessorInterface::createNextTeamMessage()
      */
-    public function createNextTeamMessage($baseMessage, $discordID, $seasonYear)
+    public function createNextTeamMessage(string $baseMessage, ?string $discordID, ?string $seasonYear): string
     {
         if ($discordID !== null) {
             return $baseMessage . '
@@ -53,23 +40,18 @@ class DraftProcessor
     }
 
     /**
-     * Get the success message HTML for display
-     * 
-     * @param string $message The draft announcement message
-     * @return string HTML formatted success message
+     * @see DraftProcessorInterface::getSuccessMessage()
      */
-    public function getSuccessMessage($message)
+    public function getSuccessMessage(string $message): string
     {
         return "$message<p>
         <a href=\"/ibl5/modules.php?name=Draft\">Go back to the Draft module</a>";
     }
 
     /**
-     * Get the error message HTML for failed database update
-     * 
-     * @return string HTML formatted error message
+     * @see DraftProcessorInterface::getDatabaseErrorMessage()
      */
-    public function getDatabaseErrorMessage()
+    public function getDatabaseErrorMessage(): string
     {
         return "Oops, something went wrong, and at least one of the draft database tables wasn't updated.<p>
             Let " . self::ADMIN_CONTACT . " know what happened and they'll look into it.<p>

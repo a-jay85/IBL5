@@ -13,8 +13,8 @@ use PlayerSearch\Contracts\PlayerSearchRepositoryInterface;
 /**
  * PlayerSearchService - Business logic for player search
  * 
- * Orchestrates search workflow and data transformation.
- * Returns PlayerData objects for type-safe result handling.
+ * Implements the service contract defined in PlayerSearchServiceInterface.
+ * See the interface for detailed behavior documentation.
  */
 class PlayerSearchService implements PlayerSearchServiceInterface
 {
@@ -22,13 +22,6 @@ class PlayerSearchService implements PlayerSearchServiceInterface
     private PlayerSearchRepositoryInterface $repository;
     private PlayerRepository $playerRepository;
 
-    /**
-     * Constructor
-     * 
-     * @param PlayerSearchValidatorInterface $validator Validator instance
-     * @param PlayerSearchRepositoryInterface $repository Search repository instance
-     * @param PlayerRepository $playerRepository Player repository for data object population
-     */
     public function __construct(
         PlayerSearchValidatorInterface $validator,
         PlayerSearchRepositoryInterface $repository,
@@ -40,17 +33,12 @@ class PlayerSearchService implements PlayerSearchServiceInterface
     }
 
     /**
-     * Execute a player search based on form parameters
-     * 
-     * @param array<string, mixed> $rawParams Raw POST parameters
-     * @return array{players: array<PlayerData>, count: int, params: array<string, mixed>}
+     * @see PlayerSearchServiceInterface::search()
      */
     public function search(array $rawParams): array
     {
-        // Validate parameters
         $params = $this->validator->validateSearchParams($rawParams);
 
-        // Check if form was submitted (POST data exists)
         if (empty($rawParams)) {
             return [
                 'players' => [],
@@ -59,10 +47,8 @@ class PlayerSearchService implements PlayerSearchServiceInterface
             ];
         }
 
-        // Execute search
         $searchResult = $this->repository->searchPlayers($params);
 
-        // Convert raw player arrays to PlayerData objects
         $playerDataObjects = array_map(
             fn(array $playerRow) => $this->playerRepository->fillFromCurrentRow($playerRow),
             $searchResult['results']

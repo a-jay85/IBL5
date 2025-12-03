@@ -10,31 +10,22 @@ use PlayerSearch\Contracts\PlayerSearchRepositoryInterface;
 /**
  * PlayerSearchRepository - Database operations for player search
  * 
- * Handles all SQL queries using prepared statements to prevent SQL injection.
- * Builds dynamic WHERE clauses based on search criteria.
+ * Implements the repository contract defined in PlayerSearchRepositoryInterface.
+ * See the interface for detailed behavior documentation.
  */
 class PlayerSearchRepository implements PlayerSearchRepositoryInterface
 {
     private mysqli $db;
 
-    /**
-     * Whitelist of valid columns for filtering
-     * Maps param names to database column names
-     */
     private const COLUMN_MAP = [
-        // Basic filters
         'pos' => 'pos',
         'age' => 'age',
         'search_name' => 'name',
         'college' => 'college',
-        
-        // Experience
         'exp' => 'exp',
         'exp_max' => 'exp_max',
         'bird' => 'bird',
         'bird_max' => 'bird_max',
-        
-        // Ratings
         'r_fga' => 'r_fga',
         'r_fgp' => 'r_fgp',
         'r_fta' => 'r_fta',
@@ -48,40 +39,28 @@ class PlayerSearchRepository implements PlayerSearchRepositoryInterface
         'r_blk' => 'r_blk',
         'r_to' => 'r_to',
         'r_foul' => 'r_foul',
-        
-        // Attributes
         'Clutch' => 'Clutch',
         'Consistency' => 'Consistency',
         'talent' => 'talent',
         'skill' => 'skill',
         'intangibles' => 'intangibles',
-        
-        // Skills
         'oo' => 'oo',
-        'do' => '`do`', // Reserved word, needs backticks
+        'do' => '`do`',
         'po' => 'po',
-        'to' => '`to`', // Reserved word, needs backticks
+        'to' => '`to`',
         'od' => 'od',
         'dd' => 'dd',
         'pd' => 'pd',
         'td' => 'td',
     ];
 
-    /**
-     * Constructor
-     * 
-     * @param mysqli $db Database connection
-     */
     public function __construct(mysqli $db)
     {
         $this->db = $db;
     }
 
     /**
-     * Search for players based on validated criteria
-     * 
-     * @param array<string, mixed> $params Validated search parameters
-     * @return array{results: array<array<string, mixed>>, count: int}
+     * @see PlayerSearchRepositoryInterface::searchPlayers()
      */
     public function searchPlayers(array $params): array
     {
@@ -89,12 +68,10 @@ class PlayerSearchRepository implements PlayerSearchRepositoryInterface
         $bindParams = [];
         $bindTypes = '';
 
-        // Handle active/retired filter
         if ($params['active'] === 0) {
             $conditions[] = 'retired = 0';
         }
 
-        // Handle LIKE searches for name and college
         if ($params['search_name'] !== null) {
             $conditions[] = 'name LIKE ?';
             $bindParams[] = '%' . $params['search_name'] . '%';
@@ -107,21 +84,18 @@ class PlayerSearchRepository implements PlayerSearchRepositoryInterface
             $bindTypes .= 's';
         }
 
-        // Handle position (exact match)
         if ($params['pos'] !== null) {
             $conditions[] = 'pos = ?';
             $bindParams[] = $params['pos'];
             $bindTypes .= 's';
         }
 
-        // Handle age (less than or equal)
         if ($params['age'] !== null) {
             $conditions[] = 'age <= ?';
             $bindParams[] = $params['age'];
             $bindTypes .= 'i';
         }
 
-        // Handle experience range
         if ($params['exp'] !== null) {
             $conditions[] = 'exp >= ?';
             $bindParams[] = $params['exp'];
@@ -133,7 +107,6 @@ class PlayerSearchRepository implements PlayerSearchRepositoryInterface
             $bindTypes .= 'i';
         }
 
-        // Handle bird years range
         if ($params['bird'] !== null) {
             $conditions[] = 'bird >= ?';
             $bindParams[] = $params['bird'];
@@ -145,7 +118,6 @@ class PlayerSearchRepository implements PlayerSearchRepositoryInterface
             $bindTypes .= 'i';
         }
 
-        // Handle all "greater than or equal" integer filters
         $greaterThanFilters = [
             'Clutch', 'Consistency', 'talent', 'skill', 'intangibles',
             'oo', 'do', 'po', 'to', 'od', 'dd', 'pd', 'td',
@@ -162,13 +134,10 @@ class PlayerSearchRepository implements PlayerSearchRepositoryInterface
             }
         }
 
-        // Build query
         $whereClause = implode(' AND ', $conditions);
         $query = "SELECT * FROM ibl_plr WHERE $whereClause ORDER BY retired ASC, ordinal ASC";
 
-        // Execute query
         $stmt = $this->db->prepare($query);
-        
         if ($stmt === false) {
             throw new \RuntimeException('Failed to prepare search query: ' . $this->db->error);
         }
@@ -199,10 +168,7 @@ class PlayerSearchRepository implements PlayerSearchRepositoryInterface
     }
 
     /**
-     * Get a single player by ID
-     * 
-     * @param int $pid Player ID
-     * @return array<string, mixed>|null Player data or null if not found
+     * @see PlayerSearchRepositoryInterface::getPlayerById()
      */
     public function getPlayerById(int $pid): ?array
     {

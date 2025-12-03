@@ -4,31 +4,22 @@ declare(strict_types=1);
 
 namespace PlayerSearch;
 
+use PlayerSearch\Contracts\PlayerSearchViewInterface;
+
 /**
- * PlayerSearchView - HTML rendering for player search
- * 
- * Handles all presentation logic using output buffering pattern.
- * All output is properly escaped to prevent XSS attacks.
+ * @see PlayerSearchViewInterface
  */
-class PlayerSearchView
+class PlayerSearchView implements PlayerSearchViewInterface
 {
     private PlayerSearchService $service;
 
-    /**
-     * Constructor
-     * 
-     * @param PlayerSearchService $service Service instance
-     */
     public function __construct(PlayerSearchService $service)
     {
         $this->service = $service;
     }
 
     /**
-     * Render the search form
-     * 
-     * @param array<string, mixed> $params Current filter values for repopulating form
-     * @return string HTML for the search form
+     * @see PlayerSearchViewInterface::renderSearchForm()
      */
     public function renderSearchForm(array $params): string
     {
@@ -253,9 +244,7 @@ function resetPlayerSearch() {
     }
 
     /**
-     * Render the results table header
-     * 
-     * @return string HTML table header
+     * @see PlayerSearchViewInterface::renderTableHeader()
      */
     public function renderTableHeader(): string
     {
@@ -302,11 +291,7 @@ function resetPlayerSearch() {
     }
 
     /**
-     * Render a single player row in the results table
-     * 
-     * @param \Player\PlayerData $player Player data object
-     * @param int $rowIndex Row index for alternating colors
-     * @return string HTML table row
+     * @see PlayerSearchViewInterface::renderPlayerRow()
      */
     public function renderPlayerRow(\Player\PlayerData $player, int $rowIndex): string
     {
@@ -368,9 +353,7 @@ function resetPlayerSearch() {
     }
 
     /**
-     * Render table footer
-     * 
-     * @return string HTML table closing tag
+     * @see PlayerSearchViewInterface::renderTableFooter()
      */
     public function renderTableFooter(): string
     {

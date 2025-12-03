@@ -9,33 +9,27 @@ use PlayerSearch\Contracts\PlayerSearchValidatorInterface;
 /**
  * PlayerSearchValidator - Validates and sanitizes player search parameters
  * 
- * Provides input validation and sanitization for all search form fields.
- * Prevents SQL injection by validating input types and whitelisting values.
+ * Implements the validation contract defined in PlayerSearchValidatorInterface.
+ * See the interface for detailed behavior documentation.
  */
 class PlayerSearchValidator implements PlayerSearchValidatorInterface
 {
     /**
-     * Validate and sanitize all search parameters from form submission
-     * 
-     * @param array<string, mixed> $params Raw POST parameters
-     * @return array<string, mixed> Validated and sanitized parameters
+     * @see PlayerSearchValidatorInterface::validateSearchParams()
      */
     public function validateSearchParams(array $params): array
     {
         return [
-            // Basic filters
             'pos' => $this->validatePosition($params['pos'] ?? null),
             'age' => $this->validateIntegerParam($params['age'] ?? null),
             'search_name' => $this->validateStringParam($params['search_name'] ?? null),
             'college' => $this->validateStringParam($params['college'] ?? null),
             
-            // Experience filters
             'exp' => $this->validateIntegerParam($params['exp'] ?? null),
             'exp_max' => $this->validateIntegerParam($params['exp_max'] ?? null),
             'bird' => $this->validateIntegerParam($params['bird'] ?? null),
             'bird_max' => $this->validateIntegerParam($params['bird_max'] ?? null),
             
-            // Rating filters (r_ prefixed fields)
             'r_fga' => $this->validateIntegerParam($params['r_fga'] ?? null),
             'r_fgp' => $this->validateIntegerParam($params['r_fgp'] ?? null),
             'r_fta' => $this->validateIntegerParam($params['r_fta'] ?? null),
@@ -50,14 +44,12 @@ class PlayerSearchValidator implements PlayerSearchValidatorInterface
             'r_to' => $this->validateIntegerParam($params['r_to'] ?? null),
             'r_foul' => $this->validateIntegerParam($params['r_foul'] ?? null),
             
-            // Attribute ratings
             'Clutch' => $this->validateIntegerParam($params['Clutch'] ?? null),
             'Consistency' => $this->validateIntegerParam($params['Consistency'] ?? null),
             'talent' => $this->validateIntegerParam($params['talent'] ?? null),
             'skill' => $this->validateIntegerParam($params['skill'] ?? null),
             'intangibles' => $this->validateIntegerParam($params['intangibles'] ?? null),
             
-            // Offensive/defensive skill ratings
             'oo' => $this->validateIntegerParam($params['oo'] ?? null),
             'do' => $this->validateIntegerParam($params['do'] ?? null),
             'po' => $this->validateIntegerParam($params['po'] ?? null),
@@ -67,16 +59,12 @@ class PlayerSearchValidator implements PlayerSearchValidatorInterface
             'pd' => $this->validateIntegerParam($params['pd'] ?? null),
             'td' => $this->validateIntegerParam($params['td'] ?? null),
             
-            // Meta filters
             'active' => $this->validateBooleanParam($params['active'] ?? null),
         ];
     }
 
     /**
-     * Validate position parameter against whitelist
-     * 
-     * @param mixed $value Raw position value
-     * @return string|null Validated position or null
+     * @see PlayerSearchValidatorInterface::validatePosition()
      */
     public function validatePosition(mixed $value): ?string
     {
@@ -85,19 +73,11 @@ class PlayerSearchValidator implements PlayerSearchValidatorInterface
         }
         
         $position = strtoupper(trim((string)$value));
-        
-        if (in_array($position, \JSB::PLAYER_POSITIONS, true)) {
-            return $position;
-        }
-        
-        return null;
+        return in_array($position, \JSB::PLAYER_POSITIONS, true) ? $position : null;
     }
 
     /**
-     * Validate integer parameter
-     * 
-     * @param mixed $value Raw value
-     * @return int|null Validated integer or null if empty/invalid
+     * @see PlayerSearchValidatorInterface::validateIntegerParam()
      */
     public function validateIntegerParam(mixed $value): ?int
     {
@@ -105,26 +85,16 @@ class PlayerSearchValidator implements PlayerSearchValidatorInterface
             return null;
         }
         
-        // Check if it's a valid integer
         if (!is_numeric($value)) {
             return null;
         }
         
         $intValue = (int)$value;
-        
-        // Ensure non-negative for rating values (0-99 typical range)
-        if ($intValue < 0) {
-            return null;
-        }
-        
-        return $intValue;
+        return $intValue < 0 ? null : $intValue;
     }
 
     /**
-     * Validate string parameter for name/college searches
-     * 
-     * @param mixed $value Raw string value
-     * @return string|null Sanitized string or null if empty
+     * @see PlayerSearchValidatorInterface::validateStringParam()
      */
     public function validateStringParam(mixed $value): ?string
     {
@@ -132,22 +102,12 @@ class PlayerSearchValidator implements PlayerSearchValidatorInterface
             return null;
         }
         
-        // Trim and limit length to prevent abuse
         $sanitized = trim((string)$value);
-        
-        if ($sanitized === '') {
-            return null;
-        }
-        
-        // Limit to 64 characters to prevent excessively long searches
-        return mb_substr($sanitized, 0, 64);
+        return $sanitized === '' ? null : mb_substr($sanitized, 0, 64);
     }
 
     /**
-     * Validate boolean/flag parameter
-     * 
-     * @param mixed $value Raw value
-     * @return int|null 0, 1, or null
+     * @see PlayerSearchValidatorInterface::validateBooleanParam()
      */
     public function validateBooleanParam(mixed $value): ?int
     {

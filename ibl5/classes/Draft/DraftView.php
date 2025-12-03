@@ -1,25 +1,21 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Draft;
 
+use Draft\Contracts\DraftViewInterface;
 use Services\DatabaseService;
 
 /**
- * Handles rendering of draft-related error messages
- * 
- * Responsibilities:
- * - Render validation error messages
- * - Format user-facing error displays
+ * @see DraftViewInterface
  */
-class DraftView
+class DraftView implements DraftViewInterface
 {
     /**
-     * Render a validation error message
-     * 
-     * @param string $errorMessage The error message to display
-     * @return string HTML formatted error message
+     * @see DraftViewInterface::renderValidationError()
      */
-    public function renderValidationError($errorMessage)
+    public function renderValidationError(string $errorMessage): string
     {
         $errorMessage = DatabaseService::safeHtmlOutput($errorMessage);
         $retryInstructions = $this->getRetryInstructions($errorMessage);
@@ -30,18 +26,9 @@ class DraftView
     }
 
     /**
-     * Render the draft interface with player list
-     * 
-     * @param array $players Array of player records
-     * @param string $teamLogo The current user's team
-     * @param string $pickOwner The team that owns the current pick
-     * @param int $draftRound The current draft round
-     * @param int $draftPick The current draft pick number
-     * @param int $seasonYear The draft season year
-     * @param int $tid The team ID for logo display
-     * @return string HTML formatted draft interface
+     * @see DraftViewInterface::renderDraftInterface()
      */
-    public function renderDraftInterface($players, $teamLogo, $pickOwner, $draftRound, $draftPick, $seasonYear, $tid)
+    public function renderDraftInterface(array $players, string $teamLogo, string $pickOwner, int $draftRound, int $draftPick, int $seasonYear, int $tid): string
     {
         $html = "<center><img src=\"images/logo/$tid.jpg\"><br>
 	<table>
@@ -58,8 +45,6 @@ class DraftView
         $html .= "<input type='hidden' name='draft_pick' value='$draftPick'>";
 
         $html .= $this->renderPlayerTable($players, $teamLogo, $pickOwner);
-
-        // Show draft button if user's team owns the pick and there are undrafted players
         if ($teamLogo == $pickOwner && $this->hasUndraftedPlayers($players)) {
             $html .= "<center><input type='submit' style=\"height:100px; width:150px\" value='Draft' onclick=\"this.disabled=true;this.value='Submitting...'; this.form.submit();\"></center>";
         }
@@ -70,14 +55,9 @@ class DraftView
     }
 
     /**
-     * Render the player table for draft selection
-     * 
-     * @param array $players Array of player records
-     * @param string $teamLogo The current user's team
-     * @param string $pickOwner The team that owns the current pick
-     * @return string HTML formatted player table
+     * @see DraftViewInterface::renderPlayerTable()
      */
-    private function renderPlayerTable($players, $teamLogo, $pickOwner)
+    public function renderPlayerTable(array $players, string $teamLogo, string $pickOwner): string
     {
         $html = "<table class=\"sortable\">
     	<tr>
@@ -120,7 +100,6 @@ class DraftView
             $playerName = DatabaseService::safeHtmlOutput($player['name']);
 
             if ($teamLogo == $pickOwner && $isPlayerDrafted == 0) {
-                // NOTE: `value` in the following echo block is formatted with single quotes to allow for apostrophes in player names.
                 $html .= "
                 <tr bgcolor=$bgcolor>
                     <td align=center><input type='radio' name='player' value=\"" . htmlspecialchars($player['name'], ENT_QUOTES) . "\"></td>
@@ -173,12 +152,9 @@ class DraftView
     }
 
     /**
-     * Get the appropriate retry instructions based on the error message
-     * 
-     * @param string $errorMessage The error message
-     * @return string The retry instructions to append
+     * @see DraftViewInterface::getRetryInstructions()
      */
-    private function getRetryInstructions($errorMessage)
+    public function getRetryInstructions(string $errorMessage): string
     {
         if (strpos($errorMessage, "didn't select") !== false) {
             return " and please select a player before hitting the Draft button.";
@@ -188,12 +164,9 @@ class DraftView
     }
 
     /**
-     * Check if there are any undrafted players available
-     * 
-     * @param array $players Array of player records
-     * @return bool True if there is at least one undrafted player
+     * @see DraftViewInterface::hasUndraftedPlayers()
      */
-    private function hasUndraftedPlayers($players)
+    public function hasUndraftedPlayers(array $players): bool
     {
         foreach ($players as $player) {
             if ($player['drafted'] == 0) {

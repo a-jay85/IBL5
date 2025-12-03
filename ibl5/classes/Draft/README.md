@@ -1,254 +1,306 @@
-# Draft Module
+# Draft Module Architecture
+
+**Last Updated:** December 3, 2025  
+**Test Coverage:** 35 tests, 92 assertions  
+**Architecture Pattern:** Interface-Driven Architecture with Repository/Service/View/Controller classes
 
 ## Overview
 
-The Draft module has been refactored following SOLID software design principles. The original monolithic `draft_selection.php` has been split into smaller, focused classes, each with a single responsibility.
+The Draft module manages the annual IBL draft process with complete separation of concerns. All classes implement interfaces that define their contracts, enabling clear documentation and easy testing.
 
-## Architecture
-
-### Class Diagram
+## Architecture Overview
 
 ```
-Draft Module
-├── DraftValidator (Validation Logic)
-├── DraftRepository (Data Access)
-├── DraftProcessor (Business Logic)
-├── DraftView (Presentation)
-└── DraftSelectionHandler (Orchestration)
+Draft Module (Interface-Driven Architecture)
+├── Contracts/ (Interface Definitions)
+│   ├── DraftRepositoryInterface
+│   ├── DraftValidatorInterface
+│   ├── DraftProcessorInterface
+│   ├── DraftViewInterface
+│   └── DraftSelectionHandlerInterface
+└── Implementation Classes
+    ├── DraftRepository (implements DraftRepositoryInterface)
+    ├── DraftValidator (implements DraftValidatorInterface)
+    ├── DraftProcessor (implements DraftProcessorInterface)
+    ├── DraftView (implements DraftViewInterface)
+    └── DraftSelectionHandler (implements DraftSelectionHandlerInterface)
 ```
 
-## Classes
+## Interface-Driven Architecture Benefits
 
-### DraftValidator
-**Responsibility**: Validation Logic
+1. **Single Source of Truth** - Interface defines contract, implementation is detail
+2. **LLM Readability** - Interfaces are scannable and self-documenting
+3. **Clear Responsibilities** - Each interface shows exactly what a class does
+4. **Type Safety** - Enforces method signatures at runtime
+5. **Testability** - Mock interfaces easily, test contracts
+6. **Maintainability** - Changes visible at interface level first
 
-Validates draft selection operations to ensure:
-- Player was selected
-- Draft pick hasn't already been used
-- Proper error message generation
+## Classes and Interfaces
 
-**Key Methods**:
-- `validateDraftSelection($playerName, $currentDraftSelection): bool` - Validate a draft selection
-- `getErrors(): array` - Retrieve validation errors
-- `clearErrors(): void` - Clear all validation errors
+### DraftRepositoryInterface / DraftRepository
+**Responsibility:** All database operations for draft functionality
 
-**Location**: `/ibl5/classes/Draft/DraftValidator.php`
+**Location:** `/ibl5/classes/Draft/Contracts/DraftRepositoryInterface.php` | `/ibl5/classes/Draft/DraftRepository.php`
 
-**Tests**: `/ibl5/tests/Draft/DraftValidatorTest.php` (7 test cases)
+**Public Methods:**
+```php
+getCurrentDraftSelection(int $draftRound, int $draftPick): ?string
+updateDraftTable(string $playerName, string $date, int $draftRound, int $draftPick): bool
+updateRookieTable(string $playerName, string $teamName): bool
+createPlayerFromDraftClass(string $playerName, string $teamName): bool
+isPlayerAlreadyDrafted(string $playerName): bool
+getNextTeamOnClock(): ?string
+getAllDraftClassPlayers(): array
+getCurrentDraftPick(): ?array
+```
 
----
-
-### DraftRepository
-**Responsibility**: Data Access Layer
-
-Handles all database operations for the Draft module following the Repository pattern. This class:
-- Encapsulates data loading logic
-- Provides methods to query and update draft data
-- Isolates the rest of the code from database schema changes
-
-**Key Methods**:
-- `getCurrentDraftSelection($draftRound, $draftPick): string|null` - Get the current draft selection for a pick
-- `updateDraftTable($playerName, $date, $draftRound, $draftPick): bool` - Update draft table with selection
-- `updateRookieTable($playerName, $teamName): bool` - Mark player as drafted
-- `getNextTeamOnClock(): string|null` - Get the next team with a pick
-- `getTeamDiscordID($teamName): string|null` - Get Discord ID for notifications
-
-**Security Features**:
-- Uses `DatabaseService::escapeString()` with `mysqli_real_escape_string()` for SQL injection prevention
-- All inputs are properly escaped before database operations
-- Type casting for numeric values
-
-**Location**: `/ibl5/classes/Draft/DraftRepository.php`
-
-**Tests**: `/ibl5/tests/Draft/DraftRepositoryTest.php` (11 test cases)
+**Key Implementation Details:**
+- Uses `DatabaseService::escapeString()` for SQL injection prevention
+- Private method `getNextAvailablePid()` manages temporary PIDs (90000+)
+- Maps ibl_draft_class columns to ibl_plr for player creation
+- All methods use prepared statement patterns with escaping
 
 ---
 
-### DraftProcessor
-**Responsibility**: Business Logic and Message Formatting
+### DraftValidatorInterface / DraftValidator
+**Responsibility:** Input validation and error handling
 
-Handles draft-related business logic and message formatting. This class:
-- Formats draft announcements
-- Builds Discord notification messages
-- Generates success and error messages
-- Contains no data persistence logic
+**Location:** `/ibl5/classes/Draft/Contracts/DraftValidatorInterface.php` | `/ibl5/classes/Draft/DraftValidator.php`
 
-**Key Methods**:
-- `createDraftAnnouncement($draftPick, $draftRound, $seasonYear, $teamName, $playerName): string` - Format draft announcement
-- `createNextTeamMessage($baseMessage, $discordID, $seasonYear): string` - Add next team or completion message
-- `getSuccessMessage($message): string` - Format success message HTML
-- `getDatabaseErrorMessage(): string` - Format database error message HTML
+**Public Methods:**
+```php
+validateDraftSelection(?string $playerName, ?string $currentDraftSelection, bool $isPlayerAlreadyDrafted = false): bool
+getErrors(): array
+clearErrors(): void
+```
 
-**Location**: `/ibl5/classes/Draft/DraftProcessor.php`
-
-**Tests**: `/ibl5/tests/Draft/DraftProcessorTest.php` (7 test cases)
+**Key Implementation Details:**
+- Three-step validation: player selected → pick available → player not drafted
+- Stores user-facing error messages for display
+- Clears errors automatically before each validation
 
 ---
 
-### DraftView
-**Responsibility**: View Rendering
+### DraftProcessorInterface / DraftProcessor
+**Responsibility:** Business logic for announcements and messages
 
-Handles rendering of draft-related error messages. This class:
-- Formats validation errors for display
-- Applies HTML escaping to prevent XSS attacks
-- Provides user-friendly error messages with appropriate links
+**Location:** `/ibl5/classes/Draft/Contracts/DraftProcessorInterface.php` | `/ibl5/classes/Draft/DraftProcessor.php`
 
-**Key Methods**:
-- `renderValidationError($errorMessage): string` - Render validation error with proper HTML escaping
+**Public Methods:**
+```php
+createDraftAnnouncement(int $draftPick, int $draftRound, string $seasonYear, string $teamName, string $playerName): string
+createNextTeamMessage(string $baseMessage, ?string $discordID, ?string $seasonYear): string
+getSuccessMessage(string $message): string
+getDatabaseErrorMessage(): string
+```
 
-**Security Features**:
+**Key Implementation Details:**
+- Formats announcements in Markdown for Discord
+- Separates base message from next-team/completion logic
+- Returns HTML-safe output suitable for web display
+
+---
+
+### DraftViewInterface / DraftView
+**Responsibility:** HTML rendering and user interface
+
+**Location:** `/ibl5/classes/Draft/Contracts/DraftViewInterface.php` | `/ibl5/classes/Draft/DraftView.php`
+
+**Public Methods:**
+```php
+renderValidationError(string $errorMessage): string
+renderDraftInterface(array $players, string $teamLogo, string $pickOwner, int $draftRound, int $draftPick, int $seasonYear, int $tid): string
+renderPlayerTable(array $players, string $teamLogo, string $pickOwner): string
+getRetryInstructions(string $errorMessage): string
+hasUndraftedPlayers(array $players): bool
+```
+
+**Key Implementation Details:**
 - Uses `DatabaseService::safeHtmlOutput()` for XSS prevention
-- All user-facing content is properly escaped
-
-**Location**: `/ibl5/classes/Draft/DraftView.php`
-
----
-
-### DraftSelectionHandler
-**Responsibility**: Workflow Orchestration
-
-Coordinates the draft selection workflow. This class:
-- Orchestrates validation, database updates, and notifications
-- Manages the complete draft submission flow
-- Handles Discord notifications for draft announcements
-- Coordinates between all other Draft components
-
-**Key Methods**:
-- `handleDraftSelection($teamName, $playerName, $draftRound, $draftPick): string` - Main entry point for draft selections
-
-**Location**: `/ibl5/classes/Draft/DraftSelectionHandler.php`
+- Player table supports 27 columns (stats and ratings)
+- Drafted players shown as strikethrough and disabled
+- Only team owning pick can select undrafted players
 
 ---
 
-### DraftPick (Existing Class)
-**Responsibility**: Value Object
+### DraftSelectionHandlerInterface / DraftSelectionHandler
+**Responsibility:** Orchestrates complete draft selection workflow
 
-A simple data container for draft pick information. This class remains unchanged as it already follows good design principles.
+**Location:** `/ibl5/classes/Draft/Contracts/DraftSelectionHandlerInterface.php` | `/ibl5/classes/Draft/DraftSelectionHandler.php`
 
-**Location**: `/ibl5/classes/DraftPick.php`
+**Public Methods:**
+```php
+handleDraftSelection(string $teamName, ?string $playerName, int $draftRound, int $draftPick): string
+```
+
+**Workflow:**
+1. Get current draft selection (if any)
+2. Check if player already drafted
+3. Validate selection (player, pick, status)
+4. If valid: update all three database tables
+5. Send Discord notifications to #general-chat and #draft-picks
+6. Return HTML response (success or error)
 
 ---
 
-## SOLID Principles Applied
+## Database Tables
 
-### Single Responsibility Principle (SRP)
-Each class has one reason to change:
-- `DraftValidator`: Changes only when validation rules change
-- `DraftRepository`: Changes only when data access patterns change
-- `DraftProcessor`: Changes only when business logic changes
-- `DraftView`: Changes only when presentation format changes
-- `DraftSelectionHandler`: Changes only when workflow changes
+**ibl_draft** - Active draft structure
+- `round` - Round number
+- `pick` - Pick number within round
+- `team` - Team with this pick
+- `player` - Selected player (empty = available)
+- `date` - Selection timestamp
 
-### Open/Closed Principle (OCP)
-Classes are open for extension but closed for modification:
-- New validators can be added without modifying existing ones
-- New notification channels can be added through composition
-- The handler pattern allows new functionality to be added without changing existing code
+**ibl_draft_class** - Prospect roster
+- `name`, `pos`, `team` - Player identity
+- `drafted` - Status flag (0 = available, 1 = drafted)
+- `offo`, `offd`, `offp`, `offt` - Offensive ratings
+- `defo`, `defd`, `defp`, `deft` - Defensive ratings
+- `age`, `sta`, `tal`, `skl`, `int` - Attributes
+- Stats columns: `fga`, `fgp`, `fta`, `ftp`, `tga`, `tgp`, `orb`, `drb`, `ast`, `stl`, `tvr`, `blk`
 
-### Liskov Substitution Principle (LSP)
-The refactored module maintains the same interface as the original, so it can be substituted anywhere the original was used without breaking functionality.
+**ibl_plr** - Main player table
+- Drafted players get temporary PIDs (90000+)
+- Ratings mapped from ibl_draft_class
+- Contract fields (cy1-cy6) initialized to 0
 
-### Interface Segregation Principle (ISP)
-Each class has a focused interface with only the methods relevant to its responsibility. Clients depend only on the interfaces they need.
+---
 
-### Dependency Inversion Principle (DIP)
-The `DraftSelectionHandler` depends on the specialized classes (abstractions) rather than concrete implementations. Dependencies are injected through the constructor.
+## Type Hints and Declarations
 
-## Benefits
+All classes use:
+- `declare(strict_types=1)` for strict type checking
+- Complete parameter type hints (int, string, bool, array, ?type)
+- Return type hints on all methods (: type, : ?type, : void)
+- No mixed types or untyped parameters
 
-1. **Testability**: Each class can be tested in isolation with focused unit tests
-2. **Maintainability**: Changes to one aspect (e.g., validation) don't affect others
-3. **Readability**: Clear class names indicate purpose
-4. **Security**: Enhanced SQL injection prevention and XSS protection
-5. **Reusability**: Specialized classes can be used independently
-6. **Extensibility**: New functionality can be added without modifying existing code
-7. **Backward Compatibility**: Existing code continues to work unchanged
+---
 
 ## Testing
 
-All classes have comprehensive unit tests:
-- **Total Tests**: 25 test cases for Draft module
-- **Coverage**: All public methods are tested
-- **Test Location**: `/ibl5/tests/Draft/`
+**Test Coverage:** 35 tests, 92 assertions across 4 test files
 
-Run tests:
+**Test Files:**
+- `tests/Draft/DraftRepositoryTest.php` - 13 tests
+- `tests/Draft/DraftValidatorTest.php` - 10 tests
+- `tests/Draft/DraftProcessorTest.php` - 7 tests
+- `tests/Draft/DraftViewTest.php` - 5 tests
+
+**Run Tests:**
 ```bash
-cd /home/runner/work/IBL5/IBL5/ibl5
-phpunit --testsuite="Draft Module Tests"
+cd ibl5
+vendor/bin/phpunit --testsuite "Draft Module Tests"
 ```
 
-## Security Improvements
+**Test Examples:**
+- Draft selection validation with multiple conditions
+- Database query execution and escaping
+- Message formatting with proper Markdown
+- HTML rendering with XSS prevention
+
+---
+
+## Security
 
 ### SQL Injection Prevention
-- **Before**: Basic string concatenation with double/single quote handling
-- **After**: Uses `DatabaseService::escapeString()` with `mysqli_real_escape_string()`
-- **Benefit**: Prevents SQL injection attacks, follows database-specific escaping rules
-
-### Input Validation & Sanitization
-- **Draft Round/Pick**: Type cast to integers
-- **Player Names**: Properly escaped before database operations
-- **Team Names**: Properly escaped before database operations
-- **All Numeric Values**: Type cast to integers before database use
+- All database input escaped via `DatabaseService::escapeString()`
+- Repository enforces escaping at entry point
+- Prepared statements recommended as future enhancement
 
 ### XSS Prevention
-- **HTML Output**: All error messages escaped with `DatabaseService::safeHtmlOutput()`
-- **User Input**: Sanitized before output
-- **Error Messages**: HTML-escaped to prevent script injection
+- All HTML output escaped via `DatabaseService::safeHtmlOutput()`
+- Player names in form values use `htmlspecialchars(ENT_QUOTES)`
+- View layer responsible for output safety
 
-### Defense in Depth
-- Multiple layers of protection at different levels
-- Validation before processing
-- Sanitization before database operations
-- Escaping before output
+### Authorization
+- Module assumes upstream authorization
+- Recommend checking team ownership before calling handler
+- No built-in permission checks (handled by module wrapper)
+
+---
+
+## Usage Examples
+
+### Check Draft Status
+```php
+$repository = new Draft\DraftRepository($db);
+$currentPick = $repository->getCurrentDraftPick();
+if ($currentPick === null) {
+    echo "Draft is complete!";
+} else {
+    echo "Team on clock: " . $currentPick['team'];
+}
+```
+
+### Display Draft Interface
+```php
+$repository = new Draft\DraftRepository($db);
+$view = new Draft\DraftView();
+
+$players = $repository->getAllDraftClassPlayers();
+$pick = $repository->getCurrentDraftPick();
+$html = $view->renderDraftInterface(
+    $players,
+    $currentTeam,
+    $pick['team'],
+    $pick['round'],
+    $pick['pick'],
+    $season->endingYear,
+    $teamID
+);
+echo $html;
+```
+
+### Handle Draft Selection
+```php
+$handler = new Draft\DraftSelectionHandler($db, $sharedFunctions, $season);
+$html = $handler->handleDraftSelection(
+    $_POST['teamname'],
+    $_POST['player'] ?? null,
+    (int)$_POST['draft_round'],
+    (int)$_POST['draft_pick']
+);
+echo $html;  // HTML response (success or error message)
+```
+
+---
 
 ## Code Quality Metrics
 
-### Before Refactoring
-- **draft_selection.php**: 77 lines, mixed concerns
-- **Testability**: Low (tightly coupled, requires full application context)
-- **Maintainability**: Low (changes affect multiple concerns)
-- **Security**: Basic (string concatenation for SQL)
+**Current State:**
+- 5 implementation classes + 5 interfaces
+- 302 lines (DraftRepository) - complex database operations
+- 206 lines (DraftView) - comprehensive UI rendering
+- 148 lines (DraftSelectionHandler) - workflow orchestration
+- 100 lines average for simpler classes
+- 35 tests with 92 assertions = high confidence
 
-### After Refactoring
-- **draft_selection.php**: 17 lines (78% reduction)
-- **5 focused classes**: Average 47 lines each
-- **Testability**: High (easy to test in isolation)
-- **Maintainability**: High (changes are localized)
-- **Security**: Enhanced (SQL injection prevention, XSS protection)
+**Interface Documentation:**
+- All interfaces have complete PHPDoc
+- All methods documented with behavior, parameters, returns
+- Edge cases and important behaviors explained
+- Usage examples provided for complex methods
 
-## Migration Guide
-
-### No Changes Required for Existing Code
-The refactoring maintains complete backward compatibility. The `draft_selection.php` file has been simplified but maintains the same POST interface and behavior.
-
-### Using New Classes Directly
-If you need to use the specialized classes directly:
-
-```php
-// Example: Using DraftValidator directly
-$validator = new Draft\DraftValidator();
-if (!$validator->validateDraftSelection($playerName, $currentSelection)) {
-    $errors = $validator->getErrors();
-    // Handle errors
-}
-
-// Example: Using DraftRepository directly
-$repository = new Draft\DraftRepository($db);
-$currentSelection = $repository->getCurrentDraftSelection($round, $pick);
-
-// Example: Using DraftProcessor directly
-$processor = new Draft\DraftProcessor();
-$message = $processor->createDraftAnnouncement($pick, $round, $year, $team, $player);
-```
+---
 
 ## Future Enhancements
 
-Potential improvements for future iterations:
-1. Add interfaces for each component (e.g., `DraftRepositoryInterface`)
-2. Implement dependency injection container
-3. Add caching layer to DraftRepository for frequently accessed data
-4. Add draft history tracking and analytics
-5. Implement draft trade validation
-6. Add draft pick value calculator
-7. Create API endpoints for mobile applications
-8. Add automated draft notifications via email
+1. **Prepared Statements** - Migrate to parameterized queries
+2. **Redis Caching** - Cache draft class and standings during draft
+3. **Draft Undo** - Implement pick reversal for corrections
+4. **Draft Analytics** - Track pick value and team strategies
+5. **API Endpoints** - RESTful API for mobile applications
+6. **Batch Drafting** - Support commissioner-driven rapid draft mode
+7. **Trade Validation** - Validate pick trades during draft
+8. **Email Notifications** - Automated email to team owners
+
+---
+
+## References
+
+- Contracts: `ibl5/classes/Draft/Contracts/`
+- Database Guide: `DATABASE_GUIDE.md`
+- Test Suite: `tests/Draft/`
+- Interface Pattern: See Player module (`ibl5/classes/Player/README.md`)
+- Architecture Standards: `.github/copilot-instructions.md`

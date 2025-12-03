@@ -65,22 +65,15 @@ class SeasonLeadersView implements SeasonLeadersViewInterface
     {
         global $db;
         
-        ob_start();
-        ?>
-<option value="0">All</option>
-        <?php
+        $html = '<option value="0">All</option>' . "\n";
         $numTeams = $db->sql_numrows($teams);
         for ($i = 0; $i < $numTeams; $i++) {
             $tid = $db->sql_result($teams, $i, "TeamID");
             $teamName = $db->sql_result($teams, $i, "Team");
             $selected = ($selectedTeam == $tid) ? ' selected' : '';
-            ?>
-<option value="<?= htmlspecialchars($tid) ?>"<?= $selected ?>><?= htmlspecialchars($teamName) ?></option>
-            <?php
+            $html .= '<option value="' . htmlspecialchars($tid) . '"' . $selected . '>' . htmlspecialchars($teamName) . '</option>' . "\n";
         }
-        ?>
-        <?php
-        return ob_get_clean();
+        return $html;
     }
 
     /**
@@ -92,19 +85,12 @@ class SeasonLeadersView implements SeasonLeadersViewInterface
      */
     private function renderYearOptions(array $years, string $selectedYear): string
     {
-        ob_start();
-        ?>
-<option value="">All</option>
-        <?php
+        $html = '<option value="">All</option>' . "\n";
         foreach ($years as $year) {
             $selected = ($selectedYear == $year) ? ' selected' : '';
-            ?>
-<option value="<?= htmlspecialchars($year) ?>"<?= $selected ?>><?= htmlspecialchars($year) ?></option>
-            <?php
+            $html .= '<option value="' . htmlspecialchars($year) . '"' . $selected . '>' . htmlspecialchars($year) . '</option>' . "\n";
         }
-        ?>
-        <?php
-        return ob_get_clean();
+        return $html;
     }
 
     /**
@@ -115,17 +101,15 @@ class SeasonLeadersView implements SeasonLeadersViewInterface
      */
     private function renderSortOptions(string $selectedSort): string
     {
-        ob_start();
+        $html = '';
         $sortOptions = $this->service->getSortOptions();
         $i = 1;
         foreach ($sortOptions as $label) {
             $selected = ($i == (int)$selectedSort) ? ' selected' : '';
-            ?>
-<option value="<?= htmlspecialchars((string)$i) ?>"<?= $selected ?>><?= htmlspecialchars($label) ?></option>
-            <?php
+            $html .= '<option value="' . htmlspecialchars((string)$i) . '"' . $selected . '>' . htmlspecialchars($label) . '</option>' . "\n";
             $i++;
         }
-        return ob_get_clean();
+        return $html;
     }
 
     /**
@@ -176,29 +160,29 @@ class SeasonLeadersView implements SeasonLeadersViewInterface
         ?>
 <tr style="background-color: <?= $bgcolor; ?>">
     <td><?= htmlspecialchars((string)$rank) ?>.</td>
-    <td><?= htmlspecialchars($stats['year']) ?></td>
-    <td><a href="modules.php?name=Player&pa=showpage&pid=<?= htmlspecialchars($stats['pid']) ?>"><?= htmlspecialchars($stats['name']) ?></a></td>
-    <td><a href="modules.php?name=Team&op=team&teamID=<?= htmlspecialchars($stats['teamid']) ?>"><?= htmlspecialchars($stats['teamname']) ?></a></td>
-    <td><?= htmlspecialchars($stats['games']) ?></td>
-    <td style="text-align: right;"><?= htmlspecialchars($stats['mpg']) ?></td>
-    <td style="text-align: right;"><?= htmlspecialchars($stats['fgmpg']) ?></td>
-    <td style="text-align: right;"><?= htmlspecialchars($stats['fgapg']) ?></td>
-    <td style="text-align: right;"><?= htmlspecialchars($stats['fgp']) ?></td>
-    <td style="text-align: right;"><?= htmlspecialchars($stats['ftmpg']) ?></td>
-    <td style="text-align: right;"><?= htmlspecialchars($stats['ftapg']) ?></td>
-    <td style="text-align: right;"><?= htmlspecialchars($stats['ftp']) ?></td>
-    <td style="text-align: right;"><?= htmlspecialchars($stats['tgmpg']) ?></td>
-    <td style="text-align: right;"><?= htmlspecialchars($stats['tgapg']) ?></td>
-    <td style="text-align: right;"><?= htmlspecialchars($stats['tgp']) ?></td>
-    <td style="text-align: right;"><?= htmlspecialchars($stats['orbpg']) ?></td>
-    <td style="text-align: right;"><?= htmlspecialchars($stats['rpg']) ?></td>
-    <td style="text-align: right;"><?= htmlspecialchars($stats['apg']) ?></td>
-    <td style="text-align: right;"><?= htmlspecialchars($stats['spg']) ?></td>
-    <td style="text-align: right;"><?= htmlspecialchars($stats['tpg']) ?></td>
-    <td style="text-align: right;"><?= htmlspecialchars($stats['bpg']) ?></td>
-    <td style="text-align: right;"><?= htmlspecialchars($stats['fpg']) ?></td>
-    <td style="text-align: right;"><?= htmlspecialchars($stats['ppg']) ?></td>
-    <td style="text-align: right;"><?= htmlspecialchars($stats['qa']) ?></td>
+    <td><?= htmlspecialchars((string)$stats['year']) ?></td>
+    <td><a href="modules.php?name=Player&pa=showpage&pid=<?= htmlspecialchars((string)$stats['pid']) ?>"><?= htmlspecialchars($stats['name']) ?></a></td>
+    <td><a href="modules.php?name=Team&op=team&teamID=<?= htmlspecialchars((string)$stats['teamid']) ?>"><?= htmlspecialchars($stats['teamname']) ?></a></td>
+    <td><?= htmlspecialchars((string)$stats['games']) ?></td>
+    <td style="text-align: right;"><?= htmlspecialchars((string)$stats['mpg']) ?></td>
+    <td style="text-align: right;"><?= htmlspecialchars((string)$stats['fgmpg']) ?></td>
+    <td style="text-align: right;"><?= htmlspecialchars((string)$stats['fgapg']) ?></td>
+    <td style="text-align: right;"><?= htmlspecialchars((string)$stats['fgp']) ?></td>
+    <td style="text-align: right;"><?= htmlspecialchars((string)$stats['ftmpg']) ?></td>
+    <td style="text-align: right;"><?= htmlspecialchars((string)$stats['ftapg']) ?></td>
+    <td style="text-align: right;"><?= htmlspecialchars((string)$stats['ftp']) ?></td>
+    <td style="text-align: right;"><?= htmlspecialchars((string)$stats['tgmpg']) ?></td>
+    <td style="text-align: right;"><?= htmlspecialchars((string)$stats['tgapg']) ?></td>
+    <td style="text-align: right;"><?= htmlspecialchars((string)$stats['tgp']) ?></td>
+    <td style="text-align: right;"><?= htmlspecialchars((string)$stats['orbpg']) ?></td>
+    <td style="text-align: right;"><?= htmlspecialchars((string)$stats['rpg']) ?></td>
+    <td style="text-align: right;"><?= htmlspecialchars((string)$stats['apg']) ?></td>
+    <td style="text-align: right;"><?= htmlspecialchars((string)$stats['spg']) ?></td>
+    <td style="text-align: right;"><?= htmlspecialchars((string)$stats['tpg']) ?></td>
+    <td style="text-align: right;"><?= htmlspecialchars((string)$stats['bpg']) ?></td>
+    <td style="text-align: right;"><?= htmlspecialchars((string)$stats['fpg']) ?></td>
+    <td style="text-align: right;"><?= htmlspecialchars((string)$stats['ppg']) ?></td>
+    <td style="text-align: right;"><?= htmlspecialchars((string)$stats['qa']) ?></td>
 </tr>
         <?php
         return ob_get_clean();

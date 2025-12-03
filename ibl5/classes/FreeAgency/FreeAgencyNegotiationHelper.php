@@ -2,20 +2,14 @@
 
 namespace FreeAgency;
 
+use FreeAgency\Contracts\FreeAgencyNegotiationHelperInterface;
 use Player\Player;
 use Player\PlayerImageHelper;
 
 /**
- * Handles Free Agency negotiation page rendering
- * 
- * Renders the negotiation form with:
- * - Player ratings
- * - Player demands
- * - Offer input fields
- * - Max contract buttons
- * - Exception buttons (MLE, LLE, Vet Min)
+ * @see FreeAgencyNegotiationHelperInterface
  */
-class FreeAgencyNegotiationHelper
+class FreeAgencyNegotiationHelper implements FreeAgencyNegotiationHelperInterface
 {
     private $db;
     private $mysqli_db;
@@ -42,11 +36,7 @@ class FreeAgencyNegotiationHelper
     }
 
     /**
-     * Render complete negotiation page
-     * 
-     * @param int $playerID Player ID
-     * @param \Team $team User's team
-     * @return string HTML output
+     * @see FreeAgencyNegotiationHelperInterface::renderNegotiationPage()
      */
     public function renderNegotiationPage(int $playerID, \Team $team): string
     {
@@ -179,11 +169,7 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
     }
 
     /**
-     * Get existing offer for a player
-     * 
-     * @param string $teamName
-     * @param string $playerName
-     * @return array<string, int> Existing offer or empty array
+     * @see FreeAgencyNegotiationHelperInterface::getExistingOffer()
      */
     public function getExistingOffer(string $teamName, string $playerName): array
     {

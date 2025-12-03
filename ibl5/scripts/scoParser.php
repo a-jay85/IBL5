@@ -180,31 +180,35 @@ function scoParser($uploadedFilePath, $operatingSeasonEndingYear, $operatingSeas
 
     echo "<p>Number of .sco lines processed: $numberOfLinesProcessed";
 
-    $newSimEndDate = $season->getLastBoxScoreDate();
+    if ($operatingSeasonPhase != "Preseason") {
+        $newSimEndDate = $season->getLastBoxScoreDate();
 
-    if ($season->lastSimEndDate) {
-        if ($season->lastSimEndDate != $newSimEndDate) {
-            $dateObjectForNewSimEndDate = date_create($season->lastSimEndDate);
-            date_modify($dateObjectForNewSimEndDate, '+1 day');
-            $newSimStartDate = date_format($dateObjectForNewSimEndDate, 'Y-m-d');
+        if ($season->lastSimEndDate) {
+            if ($season->lastSimEndDate != $newSimEndDate) {
+                $dateObjectForNewSimEndDate = date_create($season->lastSimEndDate);
+                date_modify($dateObjectForNewSimEndDate, '+1 day');
+                $newSimStartDate = date_format($dateObjectForNewSimEndDate, 'Y-m-d');
 
-            $newSimNumber = $season->lastSimNumber + 1;
+                $newSimNumber = $season->lastSimNumber + 1;
 
-            $insertNewSimDates = $season->setLastSimDatesArray($newSimNumber, $newSimStartDate, $newSimEndDate);
+                $insertNewSimDates = $season->setLastSimDatesArray($newSimNumber, $newSimStartDate, $newSimEndDate);
+            } else {
+                echo "<p>Looks like new box scores haven't been added.
+                <br>Sim Start/End Dates will stay set to $season->lastSimStartDate and $season->lastSimEndDate.";
+                die();
+            }
         } else {
-            echo "<p>Looks like new box scores haven't been added.
-            <br>Sim Start/End Dates will stay set to $season->lastSimStartDate and $season->lastSimEndDate.";
-            die();
+            $newSimStartDate = $season->getFirstBoxScoreDate();
+            $insertNewSimDates = $season->setLastSimDatesArray(1, $newSimStartDate, $newSimEndDate);
+        }
+
+        if ($insertNewSimDates) {
+            echo "<p>Added box scores from $newSimStartDate through $newSimEndDate.";
+        } else {
+            die('Invalid query: ' . $db->sql_error());
         }
     } else {
-        $newSimStartDate = $season->getFirstBoxScoreDate();
-        $insertNewSimDates = $season->setLastSimDatesArray(1, $newSimStartDate, $newSimEndDate);
-    }
-
-    if ($insertNewSimDates) {
-        echo "<p>Added box scores from $newSimStartDate through $newSimEndDate.";
-    } else {
-        die('Invalid query: ' . $db->sql_error());
+        echo "<p>Preseason box scores added. Sim Start/End Dates not updated during Preseason.";
     }
 }
 

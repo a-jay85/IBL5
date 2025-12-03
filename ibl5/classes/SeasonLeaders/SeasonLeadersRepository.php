@@ -1,16 +1,16 @@
 <?php
 
+declare(strict_types=1);
+
 namespace SeasonLeaders;
 
 use Services\DatabaseService;
+use SeasonLeaders\Contracts\SeasonLeadersRepositoryInterface;
 
 /**
- * SeasonLeadersRepository - Handles all database operations for season leaders
- * 
- * Following the Repository pattern, this class encapsulates all SQL queries
- * and database interactions for historical season statistics.
+ * @see SeasonLeadersRepositoryInterface
  */
-class SeasonLeadersRepository
+class SeasonLeadersRepository implements SeasonLeadersRepositoryInterface
 {
     private $db;
 
@@ -20,10 +20,7 @@ class SeasonLeadersRepository
     }
 
     /**
-     * Get season leaders based on filters
-     * 
-     * @param array $filters Associative array with 'year', 'team', 'sortBy' keys
-     * @return array Query result resource and row count
+     * @see SeasonLeadersRepositoryInterface::getSeasonLeaders()
      */
     public function getSeasonLeaders(array $filters): array
     {
@@ -55,9 +52,7 @@ class SeasonLeadersRepository
     }
 
     /**
-     * Get all teams for dropdown
-     * 
-     * @return array Query result resource
+     * @see SeasonLeadersRepositoryInterface::getTeams()
      */
     public function getTeams()
     {
@@ -66,9 +61,7 @@ class SeasonLeadersRepository
     }
 
     /**
-     * Get all distinct years from history
-     * 
-     * @return array Array of years
+     * @see SeasonLeadersRepositoryInterface::getYears()
      */
     public function getYears(): array
     {
@@ -86,9 +79,9 @@ class SeasonLeadersRepository
     }
 
     /**
-     * Map sort option to database column/expression
+     * Map sort option to database column/expression for ORDER BY clause
      * 
-     * @param string $sortBy Sort option identifier
+     * @param string $sortBy Sort option identifier (1-20)
      * @return string SQL expression for sorting
      */
     private function getSortColumn(string $sortBy): string

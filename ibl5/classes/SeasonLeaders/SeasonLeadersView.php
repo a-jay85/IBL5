@@ -1,13 +1,15 @@
 <?php
 
+declare(strict_types=1);
+
 namespace SeasonLeaders;
 
+use SeasonLeaders\Contracts\SeasonLeadersViewInterface;
+
 /**
- * SeasonLeadersView - Handles HTML rendering for season leaders
- * 
- * Separates presentation logic from business logic.
+ * @see SeasonLeadersViewInterface
  */
-class SeasonLeadersView
+class SeasonLeadersView implements SeasonLeadersViewInterface
 {
     private $service;
 
@@ -17,12 +19,7 @@ class SeasonLeadersView
     }
 
     /**
-     * Render the filter form
-     * 
-     * @param array $teams Teams query result
-     * @param array $years Array of available years
-     * @param array $currentFilters Current filter values
-     * @return string HTML for the filter form
+     * @see SeasonLeadersViewInterface::renderFilterForm()
      */
     public function renderFilterForm($teams, array $years, array $currentFilters): string
     {
@@ -60,8 +57,8 @@ class SeasonLeadersView
     /**
      * Render team dropdown options
      * 
-     * @param resource $teams Database result with teams
-     * @param int $selectedTeam Currently selected team ID
+     * @param resource $teams Database result
+     * @param int $selectedTeam Selected team ID
      * @return string HTML options
      */
     private function renderTeamOptions($teams, int $selectedTeam): string
@@ -89,8 +86,8 @@ class SeasonLeadersView
     /**
      * Render year dropdown options
      * 
-     * @param array $years Array of available years
-     * @param string $selectedYear Currently selected year
+     * @param array $years Available years
+     * @param string $selectedYear Selected year
      * @return string HTML options
      */
     private function renderYearOptions(array $years, string $selectedYear): string
@@ -113,7 +110,7 @@ class SeasonLeadersView
     /**
      * Render sort by dropdown options
      * 
-     * @param string $selectedSort Currently selected sort option
+     * @param string $selectedSort Selected sort option
      * @return string HTML options
      */
     private function renderSortOptions(string $selectedSort): string
@@ -122,9 +119,9 @@ class SeasonLeadersView
         $sortOptions = $this->service->getSortOptions();
         $i = 1;
         foreach ($sortOptions as $label) {
-            $selected = ($i == $selectedSort) ? ' selected' : '';
+            $selected = ($i == (int)$selectedSort) ? ' selected' : '';
             ?>
-<option value="<?= htmlspecialchars($i) ?>"<?= $selected ?>><?= htmlspecialchars($label) ?></option>
+<option value="<?= htmlspecialchars((string)$i) ?>"<?= $selected ?>><?= htmlspecialchars($label) ?></option>
             <?php
             $i++;
         }
@@ -132,9 +129,7 @@ class SeasonLeadersView
     }
 
     /**
-     * Render the statistics table header
-     * 
-     * @return string HTML table header
+     * @see SeasonLeadersViewInterface::renderTableHeader()
      */
     public function renderTableHeader(): string
     {
@@ -172,11 +167,7 @@ class SeasonLeadersView
     }
 
     /**
-     * Render a single player statistics row
-     * 
-     * @param array $stats Formatted player statistics
-     * @param int $rank Player's rank in the leaderboard
-     * @return string HTML table row
+     * @see SeasonLeadersViewInterface::renderPlayerRow()
      */
     public function renderPlayerRow(array $stats, int $rank): string
     {
@@ -184,7 +175,7 @@ class SeasonLeadersView
         $bgcolor = ($rank % 2 == 0) ? "#FFFFFF" : "#DDDDDD";
         ?>
 <tr style="background-color: <?= $bgcolor; ?>">
-    <td><?= htmlspecialchars($rank) ?>.</td>
+    <td><?= htmlspecialchars((string)$rank) ?>.</td>
     <td><?= htmlspecialchars($stats['year']) ?></td>
     <td><a href="modules.php?name=Player&pa=showpage&pid=<?= htmlspecialchars($stats['pid']) ?>"><?= htmlspecialchars($stats['name']) ?></a></td>
     <td><a href="modules.php?name=Team&op=team&teamID=<?= htmlspecialchars($stats['teamid']) ?>"><?= htmlspecialchars($stats['teamname']) ?></a></td>
@@ -214,9 +205,7 @@ class SeasonLeadersView
     }
 
     /**
-     * Render the table footer
-     * 
-     * @return string HTML table closing tag
+     * @see SeasonLeadersViewInterface::renderTableFooter()
      */
     public function renderTableFooter(): string
     {

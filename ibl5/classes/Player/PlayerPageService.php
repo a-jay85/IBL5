@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 namespace Player;
 
+use Player\Contracts\PlayerPageServiceInterface;
+
 /**
- * PlayerPageService - Business logic for player page actions and visibility
- * 
- * Handles business rules for determining which action buttons should be displayed
- * and whether specific actions are available to the current user.
+ * @see PlayerPageServiceInterface
  */
-class PlayerPageService
+class PlayerPageService implements PlayerPageServiceInterface
 {
     private $db;
 
@@ -20,12 +19,7 @@ class PlayerPageService
     }
 
     /**
-     * Determine if renegotiation button should be shown
-     * 
-     * @param Player $player The player being viewed
-     * @param object $userTeam The viewing user's team
-     * @param object $season Current season information
-     * @return bool True if renegotiation button should be displayed
+     * @see PlayerPageServiceInterface::canShowRenegotiationButton()
      */
     public function canShowRenegotiationButton(Player $player, object $userTeam, object $season): bool
     {
@@ -42,10 +36,7 @@ class PlayerPageService
     }
 
     /**
-     * Determine if rookie option used message should be shown
-     * 
-     * @param Player $player The player being viewed
-     * @return bool True if message should be displayed
+     * @see PlayerPageServiceInterface::shouldShowRookieOptionUsedMessage()
      */
     public function shouldShowRookieOptionUsedMessage(Player $player): bool
     {
@@ -53,12 +44,7 @@ class PlayerPageService
     }
 
     /**
-     * Determine if rookie option button should be shown
-     * 
-     * @param Player $player The player being viewed
-     * @param object $userTeam The viewing user's team
-     * @param object $season Current season information
-     * @return bool True if rookie option button should be displayed
+     * @see PlayerPageServiceInterface::canShowRookieOptionButton()
      */
     public function canShowRookieOptionButton(Player $player, object $userTeam, object $season): bool
     {

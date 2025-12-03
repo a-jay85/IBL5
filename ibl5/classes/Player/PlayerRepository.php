@@ -2,13 +2,12 @@
 
 namespace Player;
 
+use Player\Contracts\PlayerRepositoryInterface;
+
 /**
- * PlayerRepository - Handles data loading and persistence for players
- * 
- * This class follows the Repository pattern, encapsulating data access logic.
- * It's responsible for loading player data from the database and populating PlayerData objects.
+ * @see PlayerRepositoryInterface
  */
-class PlayerRepository
+class PlayerRepository implements PlayerRepositoryInterface
 {
     protected $db;
 
@@ -242,13 +241,51 @@ class PlayerRepository
     }
 
     /**
-     * Query free agency demands for a player
+     * @see PlayerRepositoryInterface::getFreeAgencyDemands()
      */
-    public function getFreeAgencyDemands(string $playerName)
+    public function getFreeAgencyDemands(string $playerName): array
     {
-        $query = "SELECT *
-            FROM ibl_demands
-            WHERE name=\"$playerName\"";
-        return $this->db->sql_query($query);
+        // Escape player name for safe query execution
+        // Works with both legacy MySQL abstraction layer and modern mysqli
+        if (method_exists($this->db, 'sql_escape_string')) {
+            // Database abstraction layer - use legacy method
+            $escapedName = $this->db->sql_escape_string($playerName);
+            $query = "SELECT *
+                FROM ibl_demands
+                WHERE name = '$escapedName'";
+            $result = $this->db->sql_query($query);
+            $row = $this->db->sql_fetch_assoc($result);
+        } else {
+            // Direct mysqli connection - use prepared statement
+            $query = "SELECT *
+                FROM ibl_demands
+                WHERE name = ?";
+            $stmt = $this->db->prepare($query);
+            $stmt->bind_param('s', $playerName);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $row = $result->fetch_assoc();
+        }
+        
+        // Return demand array or empty array with all keys set to 0
+        if ($row) {
+            return [
+                'dem1' => (int) ($row['dem1'] ?? 0),
+                'dem2' => (int) ($row['dem2'] ?? 0),
+                'dem3' => (int) ($row['dem3'] ?? 0),
+                'dem4' => (int) ($row['dem4'] ?? 0),
+                'dem5' => (int) ($row['dem5'] ?? 0),
+                'dem6' => (int) ($row['dem6'] ?? 0),
+            ];
+        }
+        
+        return [
+            'dem1' => 0,
+            'dem2' => 0,
+            'dem3' => 0,
+            'dem4' => 0,
+            'dem5' => 0,
+            'dem6' => 0,
+        ];
     }
 }

@@ -1,16 +1,16 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Team;
 
 use UI\Components\StartersLineupComponent;
+use Team\Contracts\TeamStatsServiceInterface;
 
 /**
- * TeamStatsService - Handles statistical calculations for teams
- * 
- * This service processes player statistics and generates team-level statistics
- * and last sim's starting lineup information.
+ * @see TeamStatsServiceInterface
  */
-class TeamStatsService
+class TeamStatsService implements TeamStatsServiceInterface
 {
     private $db;
     private $startersComponent;
@@ -22,10 +22,7 @@ class TeamStatsService
     }
 
     /**
-     * Extract starting lineup data from database result
-     * 
-     * @param mixed $result Database result object
-     * @return array Array of starters keyed by position
+     * @see TeamStatsServiceInterface::extractStartersData()
      */
     public function extractStartersData($result): array
     {
@@ -54,12 +51,7 @@ class TeamStatsService
     }
 
     /**
-     * Get last sim's starting lineup for a team
-     * Returns HTML table with starting 5 players
-     * 
-     * @param mixed $result Database result object
-     * @param object $team Team object with color1 and color2 properties
-     * @return string HTML representation of starting lineup
+     * @see TeamStatsServiceInterface::getLastSimsStarters()
      */
     public function getLastSimsStarters($result, $team): string
     {

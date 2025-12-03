@@ -2,17 +2,12 @@
 
 namespace FreeAgency;
 
+use FreeAgency\Contracts\FreeAgencyOfferValidatorInterface;
+
 /**
- * Validates free agency contract offers
- * 
- * Ensures offers comply with:
- * - Salary cap constraints (soft cap, hard cap)
- * - Maximum contract values based on years of service
- * - Legal raise percentages (10% standard, 12.5% with Bird Rights)
- * - Minimum salary requirements (veteran's minimum)
- * - Contract year sequencing (no decreases allowed)
+ * @see FreeAgencyOfferValidatorInterface
  */
-class FreeAgencyOfferValidator
+class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
 {
     private $db;
     private $mysqli_db;
@@ -27,10 +22,7 @@ class FreeAgencyOfferValidator
     }
 
     /**
-     * Validate a complete free agency offer
-     * 
-     * @param array<string, mixed> $offerData Contract offer details
-     * @return array{valid: bool, error?: string} Validation result
+     * @see FreeAgencyOfferValidatorInterface::validateOffer()
      */
     public function validateOffer(array $offerData): array
     {
@@ -242,10 +234,7 @@ class FreeAgencyOfferValidator
     }
 
     /**
-     * Check if player has already been signed during this free agency period
-     * 
-     * @param int $playerId Player ID to check
-     * @return bool True if player is already signed
+     * @see FreeAgencyOfferValidatorInterface::isPlayerAlreadySigned()
      */
     public function isPlayerAlreadySigned(int $playerId): bool
     {

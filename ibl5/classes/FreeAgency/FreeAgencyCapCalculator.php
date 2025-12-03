@@ -2,17 +2,13 @@
 
 namespace FreeAgency;
 
+use FreeAgency\Contracts\FreeAgencyCapCalculatorInterface;
 use Player\Player;
 
 /**
- * Calculates cap space and roster spots for Free Agency
- * 
- * Handles:
- * - Soft cap and hard cap calculations
- * - Roster spot tracking
- * - Future year projections
+ * @see FreeAgencyCapCalculatorInterface
  */
-class FreeAgencyCapCalculator
+class FreeAgencyCapCalculator implements FreeAgencyCapCalculatorInterface
 {
     private $db;
     private \Team $team;
@@ -136,13 +132,7 @@ class FreeAgencyCapCalculator
     }
 
     /**
-     * Calculate team cap metrics and roster availability
-     * 
-     * Calculates soft cap space, hard cap space, total salaries, and available roster spots
-     * for all 6 contract years.
-     * 
-     * @param string|null $excludeOfferPlayerName Optional player name to exclude from offer calculations
-     * @return array<string, mixed> Team cap metrics: totalSalaries, softCapSpace, hardCapSpace, rosterSpots
+     * @see FreeAgencyCapCalculatorInterface::calculateTeamCapMetrics()
      */
     public function calculateTeamCapMetrics(?string $excludeOfferPlayerName = null): array
     {

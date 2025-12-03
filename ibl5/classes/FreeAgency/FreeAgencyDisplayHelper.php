@@ -2,18 +2,13 @@
 
 namespace FreeAgency;
 
+use FreeAgency\Contracts\FreeAgencyDisplayHelperInterface;
 use Player\Player;
 
 /**
- * Handles Free Agency main display page rendering
- * 
- * Renders tables for:
- * - Players under contract
- * - Contract offers
- * - Team free agents
- * - All other free agents
+ * @see FreeAgencyDisplayHelperInterface
  */
-class FreeAgencyDisplayHelper
+class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
 {
     private $db;
     private \Services\DatabaseService $databaseService;
@@ -42,9 +37,7 @@ class FreeAgencyDisplayHelper
     }
 
     /**
-     * Render the complete free agency main page
-     * 
-     * @return string HTML output
+     * @see FreeAgencyDisplayHelperInterface::renderMainPage()
      */
     public function renderMainPage(): string
     {

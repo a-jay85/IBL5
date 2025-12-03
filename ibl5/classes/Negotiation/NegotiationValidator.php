@@ -2,19 +2,16 @@
 
 namespace Negotiation;
 
+use Negotiation\Contracts\NegotiationValidatorInterface;
 use Player\Player;
 use Player\PlayerContractValidator;
 use Player\PlayerData;
 use Services\CommonValidator;
 
 /**
- * Negotiation Validator
- * 
- * Validates eligibility and business rules for contract negotiations.
- * Reuses existing PlayerContractValidator for contract eligibility checks.
- * Delegates common validations like player ownership to CommonValidator.
+ * @see NegotiationValidatorInterface
  */
-class NegotiationValidator
+class NegotiationValidator implements NegotiationValidatorInterface
 {
     private $db;
     private $contractValidator;
@@ -26,11 +23,7 @@ class NegotiationValidator
     }
     
     /**
-     * Validate if a player can negotiate a contract
-     * 
-     * @param Player $player The player to check
-     * @param string $userTeamName The user's team name
-     * @return array Validation result with 'valid' boolean and optional 'error' message
+     * @see NegotiationValidatorInterface::validateNegotiationEligibility()
      */
     public function validateNegotiationEligibility(Player $player, string $userTeamName): array
     {
@@ -55,10 +48,7 @@ class NegotiationValidator
     }
     
     /**
-     * Check if free agency module is active
-     * 
-     * @param string $prefix Database table prefix
-     * @return array Validation result
+     * @see NegotiationValidatorInterface::validateFreeAgencyNotActive()
      */
     public function validateFreeAgencyNotActive(string $prefix): array
     {   
@@ -80,9 +70,6 @@ class NegotiationValidator
     
     /**
      * Create a PlayerData object from Player for contract validation
-     * 
-     * @param Player $player The player object
-     * @return PlayerData Player data object
      */
     private function createPlayerData(Player $player): PlayerData
     {

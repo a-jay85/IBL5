@@ -2,25 +2,17 @@
 
 namespace Negotiation;
 
+use Negotiation\Contracts\NegotiationViewHelperInterface;
 use Player\Player;
 use Services\DatabaseService;
 
 /**
- * Negotiation View Helper
- * 
- * Handles HTML rendering for the negotiation page.
- * Separates presentation logic from business logic.
+ * @see NegotiationViewHelperInterface
  */
-class NegotiationViewHelper
+class NegotiationViewHelper implements NegotiationViewHelperInterface
 {
     /**
-     * Render the negotiation form
-     * 
-     * @param Player $player The player object
-     * @param array $demands Calculated demands
-     * @param int $capSpace Available cap space
-     * @param int $maxYearOneSalary Maximum first year salary based on experience
-     * @return string HTML output
+     * @see NegotiationViewHelperInterface::renderNegotiationForm()
      */
     public static function renderNegotiationForm(
         Player $player,
@@ -161,26 +153,20 @@ class NegotiationViewHelper
     }
     
     /**
-     * Render error message
-     * 
-     * @param string $error Error message to display
-     * @return string HTML output
+     * @see NegotiationViewHelperInterface::renderError()
      */
     public static function renderError(string $error): string
     {
         return "<p>" . DatabaseService::safeHtmlOutput($error) . "</p>";
     }
-    
+
     /**
-     * Render page header
-     * 
-     * @param Player $player The player object
-     * @return string HTML output
+     * @see NegotiationViewHelperInterface::renderHeader()
      */
     public static function renderHeader(Player $player): string
     {
-        $playerName = DatabaseService::safeHtmlOutput($player->name);
         $playerPos = DatabaseService::safeHtmlOutput($player->position);
+        $playerName = DatabaseService::safeHtmlOutput($player->name);
         
         return "<b>$playerPos $playerName</b> - Contract Demands:<br>";
     }

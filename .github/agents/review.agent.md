@@ -6,7 +6,7 @@ handoffs:
   - label: Start Next Module
     agent: IBL5-Refactoring
     prompt: Start refactoring the next priority module from DEVELOPMENT_GUIDE.md.
-    send: false
+    send: true
 ---
 
 # IBL5 Review Agent

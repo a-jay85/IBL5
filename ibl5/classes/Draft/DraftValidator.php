@@ -1,44 +1,32 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Draft;
 
+use Draft\Contracts\DraftValidatorInterface;
+
 /**
- * Validates draft selection operations
- * 
- * Responsibilities:
- * - Validate player selection
- * - Validate draft pick availability
- * - Generate validation error messages
+ * @see DraftValidatorInterface
  */
-class DraftValidator
+class DraftValidator implements DraftValidatorInterface
 {
     private $errors = [];
 
     /**
-     * Validate a draft selection
-     * 
-     * @param string|null $playerName The name of the player to draft
-     * @param string|null $currentDraftSelection The player already selected for this pick (if any)
-     * @param bool $isPlayerAlreadyDrafted Whether the player has already been drafted
-     * @return bool True if validation passes, false otherwise
+     * @see DraftValidatorInterface::validateDraftSelection()
      */
-    public function validateDraftSelection($playerName, $currentDraftSelection, $isPlayerAlreadyDrafted = false)
+    public function validateDraftSelection(?string $playerName, ?string $currentDraftSelection, bool $isPlayerAlreadyDrafted = false): bool
     {
         $this->clearErrors();
-
-        // Validate player was selected
         if ($playerName === null || $playerName === '') {
             $this->errors[] = "You didn't select a player.";
             return false;
         }
-
-        // Validate pick hasn't already been used
         if ($currentDraftSelection !== null && $currentDraftSelection !== '') {
             $this->errors[] = "It looks like you've already drafted a player with this draft pick.";
             return false;
         }
-
-        // Validate player hasn't already been drafted
         if ($isPlayerAlreadyDrafted) {
             $this->errors[] = "This player has already been drafted by another team.";
             return false;
@@ -48,19 +36,17 @@ class DraftValidator
     }
 
     /**
-     * Get validation errors
-     * 
-     * @return array Array of error messages
+     * @see DraftValidatorInterface::getErrors()
      */
-    public function getErrors()
+    public function getErrors(): array
     {
         return $this->errors;
     }
 
     /**
-     * Clear all validation errors
+     * @see DraftValidatorInterface::clearErrors()
      */
-    public function clearErrors()
+    public function clearErrors(): void
     {
         $this->errors = [];
     }

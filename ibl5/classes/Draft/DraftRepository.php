@@ -1,19 +1,16 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Draft;
 
+use Draft\Contracts\DraftRepositoryInterface;
 use Services\DatabaseService;
 
 /**
- * Handles all database operations for the Draft module
- * 
- * Responsibilities:
- * - Query draft picks and selections
- * - Update draft tables
- * - Query team and player information
- * - Retrieve Discord IDs
+ * @see DraftRepositoryInterface
  */
-class DraftRepository
+class DraftRepository implements DraftRepositoryInterface
 {
     private $db;
     private $commonRepository;
@@ -29,13 +26,9 @@ class DraftRepository
     }
 
     /**
-     * Get the current draft selection for a specific pick
-     * 
-     * @param int $draftRound The draft round
-     * @param int $draftPick The pick number
-     * @return string|null The player name already selected, or null if pick is available
+     * @see DraftRepositoryInterface::getCurrentDraftSelection()
      */
-    public function getCurrentDraftSelection($draftRound, $draftPick)
+    public function getCurrentDraftSelection(int $draftRound, int $draftPick): ?string
     {
         $draftRound = DatabaseService::escapeString($this->db, (string)$draftRound);
         $draftPick = DatabaseService::escapeString($this->db, (string)$draftPick);
@@ -55,15 +48,9 @@ class DraftRepository
     }
 
     /**
-     * Update the draft table with a player selection
-     * 
-     * @param string $playerName The name of the drafted player
-     * @param string $date The date/time of the selection
-     * @param int $draftRound The draft round
-     * @param int $draftPick The pick number
-     * @return bool True if update succeeded, false otherwise
+     * @see DraftRepositoryInterface::updateDraftTable()
      */
-    public function updateDraftTable($playerName, $date, $draftRound, $draftPick)
+    public function updateDraftTable(string $playerName, string $date, int $draftRound, int $draftPick): bool
     {
         $playerName = DatabaseService::escapeString($this->db, $playerName);
         $date = DatabaseService::escapeString($this->db, $date);
@@ -81,13 +68,9 @@ class DraftRepository
     }
 
     /**
-     * Update the rookie table to mark player as drafted
-     * 
-     * @param string $playerName The name of the drafted player
-     * @param string $teamName The name of the team that drafted the player
-     * @return bool True if update succeeded, false otherwise
+     * @see DraftRepositoryInterface::updateRookieTable()
      */
-    public function updateRookieTable($playerName, $teamName)
+    public function updateRookieTable(string $playerName, string $teamName): bool
     {
         $playerName = DatabaseService::escapeString($this->db, $playerName);
         $teamName = DatabaseService::escapeString($this->db, $teamName);
@@ -101,19 +84,8 @@ class DraftRepository
         return (bool)$result;
     }
 
-    /**
-     * Get the next available player ID for drafted players
-     * 
-     * Uses a high PID range (starting at 90000) to avoid conflicts with JSB-assigned PIDs.
-     * These are temporary PIDs that allow drafted players to appear in rosters immediately.
-     * When plrParser.php runs with an updated .plr file, it will create proper entries
-     * with JSB-assigned PIDs using INSERT ... ON DUPLICATE KEY UPDATE based on pid.
-     * 
-     * @return int Next available PID in the draft range (>= 90000)
-     */
-    private function getNextAvailablePid()
+    private function getNextAvailablePid(): int
     {
-        // Use PID range starting at 90000 for drafted players to avoid JSB conflicts
         $draftPidStart = 90000;
         
         $query = "SELECT MAX(pid) as max_pid FROM ibl_plr WHERE pid >= $draftPidStart";
@@ -130,53 +102,29 @@ class DraftRepository
     }
 
     /**
-     * Create a new player entry in ibl_plr from ibl_draft_class data
-     * 
-     * This method creates a new player record when they are drafted, mapping
-     * columns from ibl_draft_class to ibl_plr.
-     * 
-     * @param string $playerName The name of the drafted player (from ibl_draft_class)
-     * @param string $teamName The name of the team that drafted the player
-     * @return bool True if insert succeeded, false otherwise
+     * @see DraftRepositoryInterface::createPlayerFromDraftClass()
      */
-    public function createPlayerFromDraftClass($playerName, $teamName)
+    public function createPlayerFromDraftClass(string $playerName, string $teamName): bool
     {
-        // Get the team ID from team name
         $teamId = $this->commonRepository->getTidFromTeamname($teamName);
-        
         if ($teamId === null) {
-            // Team not found - this shouldn't happen but handle gracefully
             return false;
         }
-
-        // Ensure teamId is safely cast to int
         $teamId = (int) $teamId;
         
-        // Get player data from ibl_draft_class
         $playerNameEscaped = DatabaseService::escapeString($this->db, $playerName);
         $query = "SELECT * FROM ibl_draft_class WHERE name = '$playerNameEscaped' LIMIT 1";
         $result = $this->db->sql_query($query);
-        
         if (!$result || $this->db->sql_numrows($result) === 0) {
-            // Player not found in draft class
             return false;
         }
         
         $draftClassPlayer = $this->db->sql_fetchrow($result);
-        
-        // Get next available PID
         $pid = $this->getNextAvailablePid();
-        
-        // Map columns from ibl_draft_class to ibl_plr
-        // Truncate name to 32 characters to fit ibl_plr.name varchar(32)
         $name = substr($playerName, 0, self::IBL_PLR_NAME_MAX_LENGTH);
         $nameEscaped = DatabaseService::escapeString($this->db, $name);
         $teamNameEscaped = DatabaseService::escapeString($this->db, $teamName);
         $pos = DatabaseService::escapeString($this->db, $draftClassPlayer['pos']);
-        
-        // Map ratings from draft class to player table
-        // Offensive: offo->oo, offd->od, offp->po, offt->to
-        // Defensive: defo->do, defd->dd, defp->pd, deft->td
         $oo = (int) $draftClassPlayer['offo'];
         $od = (int) $draftClassPlayer['offd'];
         $po = (int) $draftClassPlayer['offp'];
@@ -210,12 +158,9 @@ class DraftRepository
     }
 
     /**
-     * Check if a player has already been drafted
-     * 
-     * @param string $playerName The name of the player to check
-     * @return bool True if player has been drafted, false otherwise
+     * @see DraftRepositoryInterface::isPlayerAlreadyDrafted()
      */
-    public function isPlayerAlreadyDrafted($playerName)
+    public function isPlayerAlreadyDrafted(string $playerName): bool
     {
         $playerName = DatabaseService::escapeString($this->db, $playerName);
 
@@ -235,11 +180,9 @@ class DraftRepository
     }
 
     /**
-     * Get the next team on the clock
-     * 
-     * @return string|null The team name with the next pick, or null if draft is complete
+     * @see DraftRepositoryInterface::getNextTeamOnClock()
      */
-    public function getNextTeamOnClock()
+    public function getNextTeamOnClock(): ?string
     {
         $query = "SELECT team 
             FROM ibl_draft 
@@ -257,11 +200,9 @@ class DraftRepository
     }
 
     /**
-     * Get all players in the draft class
-     * 
-     * @return array Array of player records from the draft class
+     * @see DraftRepositoryInterface::getAllDraftClassPlayers()
      */
-    public function getAllDraftClassPlayers()
+    public function getAllDraftClassPlayers(): array
     {
         $query = "SELECT * FROM ibl_draft_class ORDER BY drafted, name";
         
@@ -278,11 +219,9 @@ class DraftRepository
     }
 
     /**
-     * Get the current draft pick information (next available pick)
-     * 
-     * @return array|null Array with 'team', 'round', 'pick' keys, or null if draft is complete
+     * @see DraftRepositoryInterface::getCurrentDraftPick()
      */
-    public function getCurrentDraftPick()
+    public function getCurrentDraftPick(): ?array
     {
         $query = "SELECT * FROM ibl_draft WHERE player = '' ORDER BY round ASC, pick ASC LIMIT 1";
         

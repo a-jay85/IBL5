@@ -51,6 +51,9 @@
         <testsuite name="Voting Results Module Tests">
             <directory>tests/VotingResults</directory>
         </testsuite>
+        <testsuite name="Player Search Module Tests">
+            <directory>tests/PlayerSearch</directory>
+        </testsuite>
         <testsuite name="FreeAgency Module Tests">
             <file>tests/FreeAgency/FreeAgencyDemandCalculatorTest.php</file>
             <file>tests/FreeAgency/FreeAgencyNegotiationHelperTest.php</file>

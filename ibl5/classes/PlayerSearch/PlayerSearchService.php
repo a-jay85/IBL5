@@ -6,6 +6,9 @@ namespace PlayerSearch;
 
 use Player\PlayerRepository;
 use Player\PlayerData;
+use PlayerSearch\Contracts\PlayerSearchServiceInterface;
+use PlayerSearch\Contracts\PlayerSearchValidatorInterface;
+use PlayerSearch\Contracts\PlayerSearchRepositoryInterface;
 
 /**
  * PlayerSearchService - Business logic for player search
@@ -13,22 +16,22 @@ use Player\PlayerData;
  * Orchestrates search workflow and data transformation.
  * Returns PlayerData objects for type-safe result handling.
  */
-class PlayerSearchService
+class PlayerSearchService implements PlayerSearchServiceInterface
 {
-    private PlayerSearchValidator $validator;
-    private PlayerSearchRepository $repository;
+    private PlayerSearchValidatorInterface $validator;
+    private PlayerSearchRepositoryInterface $repository;
     private PlayerRepository $playerRepository;
 
     /**
      * Constructor
      * 
-     * @param PlayerSearchValidator $validator Validator instance
-     * @param PlayerSearchRepository $repository Search repository instance
+     * @param PlayerSearchValidatorInterface $validator Validator instance
+     * @param PlayerSearchRepositoryInterface $repository Search repository instance
      * @param PlayerRepository $playerRepository Player repository for data object population
      */
     public function __construct(
-        PlayerSearchValidator $validator,
-        PlayerSearchRepository $repository,
+        PlayerSearchValidatorInterface $validator,
+        PlayerSearchRepositoryInterface $repository,
         PlayerRepository $playerRepository
     ) {
         $this->validator = $validator;

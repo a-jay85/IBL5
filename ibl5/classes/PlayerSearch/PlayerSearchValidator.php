@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace PlayerSearch;
 
+use PlayerSearch\Contracts\PlayerSearchValidatorInterface;
+
 /**
  * PlayerSearchValidator - Validates and sanitizes player search parameters
  * 
  * Provides input validation and sanitization for all search form fields.
  * Prevents SQL injection by validating input types and whitelisting values.
  */
-class PlayerSearchValidator
+class PlayerSearchValidator implements PlayerSearchValidatorInterface
 {
     /**
      * Validate and sanitize all search parameters from form submission

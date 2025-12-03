@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PlayerSearch;
 
 use mysqli;
+use PlayerSearch\Contracts\PlayerSearchRepositoryInterface;
 
 /**
  * PlayerSearchRepository - Database operations for player search
@@ -12,7 +13,7 @@ use mysqli;
  * Handles all SQL queries using prepared statements to prevent SQL injection.
  * Builds dynamic WHERE clauses based on search criteria.
  */
-class PlayerSearchRepository
+class PlayerSearchRepository implements PlayerSearchRepositoryInterface
 {
     private mysqli $db;
 

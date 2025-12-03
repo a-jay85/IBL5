@@ -1,6 +1,11 @@
 <?php
 
-class Trading_UIHelper
+require_once __DIR__ . '/Contracts/Trading_UIHelperInterface.php';
+
+/**
+ * @see Trading_UIHelperInterface
+ */
+class Trading_UIHelper implements Trading_UIHelperInterface
 {
     protected $db;
     protected $sharedFunctions;
@@ -14,10 +19,7 @@ class Trading_UIHelper
     }
 
     /**
-     * Build team future salary data and HTML for trade form
-     * @param resource $resultTeamPlayers Database result for team players
-     * @param int $k Counter for form field numbering
-     * @return array Future salary array and updated counter
+     * @see Trading_UIHelperInterface::buildTeamFutureSalary()
      */
     public function buildTeamFutureSalary($resultTeamPlayers, $k)
     {
@@ -71,10 +73,7 @@ class Trading_UIHelper
     }
 
     /**
-     * Build team future draft picks data and HTML for trade form
-     * @param resource $resultTeamPicks Database result for team draft picks
-     * @param array $futureSalaryArray Existing future salary array
-     * @return array Updated future salary array
+     * @see Trading_UIHelperInterface::buildTeamFuturePicks()
      */
     public function buildTeamFuturePicks($resultTeamPicks, $futureSalaryArray)
     {
@@ -162,8 +161,7 @@ class Trading_UIHelper
     }
 
     /**
-     * Get list of all teams for partner selection dropdown
-     * @return array Array of team data
+     * @see Trading_UIHelperInterface::getAllTeamsForTrading()
      */
     public function getAllTeamsForTrading()
     {
@@ -188,9 +186,7 @@ class Trading_UIHelper
     }
 
     /**
-     * Render team selection links for trading
-     * @param array $teams Array of team data
-     * @return string HTML for team selection links
+     * @see Trading_UIHelperInterface::renderTeamSelectionLinks()
      */
     public function renderTeamSelectionLinks($teams)
     {

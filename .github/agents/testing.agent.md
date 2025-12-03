@@ -3,10 +3,10 @@ name: IBL5-Testing
 description: Write PHPUnit 12.4+ behavior-focused tests for IBL5 modules
 tools: ['search', 'edit']
 handoffs:
-  - label: Security Audit
-    agent: IBL5-Security
-    prompt: Perform a security audit on the module and tests I just created. Check for SQL injection and XSS vulnerabilities.
-    send: false
+    - label: Security Audit
+        agent: IBL5-Security
+        prompt: Perform a security audit on the module and tests I just created. Check for SQL injection and XSS vulnerabilities.
+        send: true
 ---
 
 # IBL5 Testing Agent

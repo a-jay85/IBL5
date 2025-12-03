@@ -6,7 +6,7 @@ handoffs:
   - label: Final Review
     agent: IBL5-Review
     prompt: Perform a final review of the refactored module, tests, and documentation before the PR is ready.
-    send: false
+    send: true
 ---
 
 # IBL5 Documentation Agent

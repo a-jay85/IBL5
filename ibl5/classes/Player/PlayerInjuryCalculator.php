@@ -2,12 +2,12 @@
 
 namespace Player;
 
+use Player\Contracts\PlayerInjuryCalculatorInterface;
+
 /**
- * PlayerInjuryCalculator - Handles injury-related date calculations
- * 
- * This class encapsulates injury-related calculations, making the logic easy to test.
+ * @see PlayerInjuryCalculatorInterface
  */
-class PlayerInjuryCalculator
+class PlayerInjuryCalculator implements PlayerInjuryCalculatorInterface
 {
     /**
      * Calculate when an injured player will return

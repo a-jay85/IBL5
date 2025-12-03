@@ -2,13 +2,12 @@
 
 namespace Player;
 
+use Player\Contracts\PlayerContractValidatorInterface;
+
 /**
- * PlayerContractValidator - Validates contract eligibility rules
- * 
- * This class encapsulates all contract validation logic, making it easy to test
- * and maintain. It follows the Single Responsibility Principle.
+ * @see PlayerContractValidatorInterface
  */
-class PlayerContractValidator
+class PlayerContractValidator implements PlayerContractValidatorInterface
 {
     // Rookie option experience requirements
     private const ROOKIE_OPTION_ROUND1_FA_EXPERIENCE = 2;
@@ -17,9 +16,7 @@ class PlayerContractValidator
     private const ROOKIE_OPTION_ROUND2_INSEASON_EXPERIENCE = 2;
 
     /**
-     * Check if a player can renegotiate their contract
-     * A player can renegotiate if they're in their last contract year or have no salary in the next year
-     * EXCEPT: A player cannot renegotiate if they were rookie optioned and are in the rookie option year
+     * @see PlayerContractValidatorInterface::canRenegotiateContract()
      */
     public function canRenegotiateContract(PlayerData $playerData): bool
     {
@@ -50,7 +47,7 @@ class PlayerContractValidator
     }
 
     /**
-     * Check if a player is eligible for rookie option
+     * @see PlayerContractValidatorInterface::canRookieOption()
      */
     public function canRookieOption(PlayerData $playerData, string $seasonPhase): bool
     {
@@ -76,10 +73,7 @@ class PlayerContractValidator
     }
     
     /**
-     * Gets the final year of rookie contract salary based on draft round
-     * 
-     * @param PlayerData $playerData The player data
-     * @return int Final year salary (0 if not a draft pick)
+     * @see PlayerContractValidatorInterface::getFinalYearRookieContractSalary()
      */
     public function getFinalYearRookieContractSalary(PlayerData $playerData): int
     {
@@ -131,14 +125,7 @@ class PlayerContractValidator
     }
 
     /**
-     * Check if player becomes a free agent in the specified season
-     * 
-     * A player becomes free agent when their contract ends.
-     * Free agency year = draftYear + yearsOfExperience + contractTotalYears - contractCurrentYear
-     * 
-     * @param PlayerData $playerData The player data
-     * @param \Season $season The season to check against
-     * @return bool True if player becomes free agent this season
+     * @see PlayerContractValidatorInterface::isPlayerFreeAgent()
      */
     public function isPlayerFreeAgent(PlayerData $playerData, \Season $season): bool
     {
@@ -151,8 +138,7 @@ class PlayerContractValidator
     }
 
     /**
-     * Check if a player's rookie option was previously exercised
-     * Rookie options double the salary from the previous year
+     * @see PlayerContractValidatorInterface::wasRookieOptioned()
      */
     public function wasRookieOptioned(PlayerData $playerData): bool
     {

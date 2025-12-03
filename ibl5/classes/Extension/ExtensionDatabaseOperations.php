@@ -2,16 +2,12 @@
 
 namespace Extension;
 
+use Extension\Contracts\ExtensionDatabaseOperationsInterface;
+
 /**
- * Extension Database Operations Class
- * 
- * Handles all database interactions for contract extensions including:
- * - Player contract updates
- * - Team extension flag updates
- * - News story creation
- * - Data retrieval
+ * @see ExtensionDatabaseOperationsInterface
  */
-class ExtensionDatabaseOperations
+class ExtensionDatabaseOperations implements ExtensionDatabaseOperationsInterface
 {
     private $db;
     private $newsService;
@@ -23,19 +19,12 @@ class ExtensionDatabaseOperations
     }
 
     /**
-     * Updates a player's contract with the new extension terms
-     * 
-     * @param string $playerName Player name
-     * @param array $offer Offer array with year1-year5
-     * @param int $currentSalary Player's current year salary
-     * @return bool Success status
+     * @see ExtensionDatabaseOperationsInterface::updatePlayerContract()
      */
     public function updatePlayerContract($playerName, $offer, $currentSalary)
     {
         $offerYears = $this->calculateOfferYears($offer);
         $totalYears = 1 + $offerYears;
-        
-        // Ensure year4 and year5 are set to 0 if empty
         $year4 = (isset($offer['year4']) && $offer['year4'] !== '' && $offer['year4'] !== null) ? $offer['year4'] : 0;
         $year5 = (isset($offer['year5']) && $offer['year5'] !== '' && $offer['year5'] !== null) ? $offer['year5'] : 0;
         
@@ -57,10 +46,7 @@ class ExtensionDatabaseOperations
     }
 
     /**
-     * Marks that a team has used their extension attempt for this sim
-     * 
-     * @param string $teamName Team name
-     * @return bool Success status
+     * @see ExtensionDatabaseOperationsInterface::markExtensionUsedThisSim()
      */
     public function markExtensionUsedThisSim($teamName)
     {
@@ -71,10 +57,7 @@ class ExtensionDatabaseOperations
     }
 
     /**
-     * Marks that a team has used their extension for this season
-     * 
-     * @param string $teamName Team name
-     * @return bool Success status
+     * @see ExtensionDatabaseOperationsInterface::markExtensionUsedThisSeason()
      */
     public function markExtensionUsedThisSeason($teamName)
     {
@@ -85,33 +68,22 @@ class ExtensionDatabaseOperations
     }
 
     /**
-     * Creates a news story for an accepted extension
-     * 
-     * @param string $playerName Player name
-     * @param string $teamName Team name
-     * @param float $offerInMillions Offer amount in millions
-     * @param int $offerYears Number of years
-     * @param string $offerDetails Details of the offer (year by year)
-     * @return bool Success status
+     * @see ExtensionDatabaseOperationsInterface::createAcceptedExtensionStory()
      */
     public function createAcceptedExtensionStory($playerName, $teamName, $offerInMillions, $offerYears, $offerDetails)
     {
-        // Get team's topic ID
         $topicID = $this->newsService->getTopicIDByTeamName($teamName);
         if ($topicID === null) {
             return false;
         }
         
-        // Get category ID
         $categoryID = $this->newsService->getCategoryIDByTitle('Contract Extensions');
         if ($categoryID === null) {
             return false;
         }
         
-        // Increment counter
         $this->newsService->incrementCategoryCounter('Contract Extensions');
         
-        // Create the story
         $playerNameEscaped = \Services\DatabaseService::escapeString($this->db, $playerName);
         $teamNameEscaped = \Services\DatabaseService::escapeString($this->db, $teamName);
         $title = "$playerNameEscaped extends their contract with the $teamNameEscaped";
@@ -125,32 +97,22 @@ class ExtensionDatabaseOperations
     }
 
     /**
-     * Creates a news story for a rejected extension
-     * 
-     * @param string $playerName Player name
-     * @param string $teamName Team name
-     * @param float $offerInMillions Offer amount in millions
-     * @param int $offerYears Number of years
-     * @return bool Success status
+     * @see ExtensionDatabaseOperationsInterface::createRejectedExtensionStory()
      */
     public function createRejectedExtensionStory($playerName, $teamName, $offerInMillions, $offerYears)
     {
-        // Get team's topic ID
         $topicID = $this->newsService->getTopicIDByTeamName($teamName);
         if ($topicID === null) {
             return false;
         }
         
-        // Get category ID
         $categoryID = $this->newsService->getCategoryIDByTitle('Contract Extensions');
         if ($categoryID === null) {
             return false;
         }
         
-        // Increment counter
         $this->newsService->incrementCategoryCounter('Contract Extensions');
         
-        // Create the story
         $playerNameEscaped = \Services\DatabaseService::escapeString($this->db, $playerName);
         $teamNameEscaped = \Services\DatabaseService::escapeString($this->db, $teamName);
         $title = "$playerNameEscaped turns down an extension offer from the $teamNameEscaped";
@@ -160,10 +122,7 @@ class ExtensionDatabaseOperations
     }
 
     /**
-     * Retrieves player preferences and info
-     * 
-     * @param string $playerName Player name
-     * @return array|null Player info array or null if not found
+     * @see ExtensionDatabaseOperationsInterface::getPlayerPreferences()
      */
     public function getPlayerPreferences($playerName)
     {
@@ -178,12 +137,6 @@ class ExtensionDatabaseOperations
         return $this->db->sql_fetchrow($result);
     }
 
-    /**
-     * Retrieves player's current contract information
-     * 
-     * @param string $playerName Player name
-     * @return array|null Contract info including current salary
-     */
     public function getPlayerCurrentContract($playerName)
     {
         $playerNameEscaped = \Services\DatabaseService::escapeString($this->db, $playerName);
@@ -204,12 +157,6 @@ class ExtensionDatabaseOperations
         return $contract;
     }
 
-    /**
-     * Calculates the number of years in an offer
-     * 
-     * @param array $offer Offer array
-     * @return int Number of years (3, 4, or 5)
-     */
     private function calculateOfferYears($offer)
     {
         $years = 5;
@@ -222,15 +169,6 @@ class ExtensionDatabaseOperations
         return $years;
     }
     
-    /**
-     * Process a complete accepted extension workflow
-     * 
-     * @param string $playerName Player name
-     * @param string $teamName Team name
-     * @param array $offer Offer array
-     * @param int $currentSalary Current salary
-     * @return array Success status
-     */
     public function processAcceptedExtension($playerName, $teamName, $offer, $currentSalary)
     {
         $this->updatePlayerContract($playerName, $offer, $currentSalary);
@@ -243,14 +181,6 @@ class ExtensionDatabaseOperations
         return ['success' => true];
     }
     
-    /**
-     * Process a complete rejected extension workflow
-     * 
-     * @param string $playerName Player name
-     * @param string $teamName Team name
-     * @param array $offer Offer array
-     * @return array Success status
-     */
     public function processRejectedExtension($playerName, $teamName, $offer)
     {
         $offerYears = $this->calculateOfferYears($offer);

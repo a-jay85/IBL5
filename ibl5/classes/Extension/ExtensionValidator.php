@@ -2,18 +2,12 @@
 
 namespace Extension;
 
+use Extension\Contracts\ExtensionValidatorInterface;
+
 /**
- * Extension Validator Class
- * 
- * Handles all validation logic for contract extension offers.
- * Encapsulates business rules for:
- * - Zero amount validation
- * - Extension eligibility
- * - Maximum offer validation
- * - Raise percentage validation
- * - Salary decrease validation
+ * @see ExtensionValidatorInterface
  */
-class ExtensionValidator
+class ExtensionValidator implements ExtensionValidatorInterface
 {
     private $db;
 
@@ -26,13 +20,8 @@ class ExtensionValidator
         $this->db = $db;
     }
 
-
-
     /**
-     * Validates that the first three years of the offer have non-zero amounts
-     * 
-     * @param array $offer Array with keys: year1, year2, year3, year4, year5
-     * @return array ['valid' => bool, 'error' => string|null]
+     * @see ExtensionValidatorInterface::validateOfferAmounts()
      */
     public function validateOfferAmounts($offer)
     {
@@ -48,11 +37,7 @@ class ExtensionValidator
     }
 
     /**
-     * Validates that the offer doesn't exceed the maximum allowed for player's experience
-     * 
-     * @param array $offer Offer array
-     * @param int $yearsExperience Player's years of experience
-     * @return array ['valid' => bool, 'error' => string|null]
+     * @see ExtensionValidatorInterface::validateMaximumYearOneOffer()
      */
     public function validateMaximumYearOneOffer($offer, $yearsExperience)
     {
@@ -64,11 +49,7 @@ class ExtensionValidator
     }
 
     /**
-     * Validates that raises between years don't exceed allowed percentages
-     * 
-     * @param array $offer Offer array
-     * @param int $birdYears Years with Bird rights
-     * @return array ['valid' => bool, 'error' => string|null]
+     * @see ExtensionValidatorInterface::validateRaises()
      */
     public function validateRaises($offer, $birdYears)
     {
@@ -107,10 +88,7 @@ class ExtensionValidator
     }
 
     /**
-     * Validates that salaries don't decrease in later years (except to zero)
-     * 
-     * @param array $offer Offer array
-     * @return array ['valid' => bool, 'error' => string|null]
+     * @see ExtensionValidatorInterface::validateSalaryDecreases()
      */
     public function validateSalaryDecreases($offer)
     {
@@ -126,12 +104,6 @@ class ExtensionValidator
         return ['valid' => true, 'error' => null];
     }
 
-    /**
-     * Gets the maximum offer allowed based on years of experience
-     * 
-     * @param int $yearsExperience Player's years of experience
-     * @return int Maximum offer amount
-     */
     private function getMaximumYearOneOffer($yearsExperience)
     {
         if ($yearsExperience > 9) {
@@ -144,10 +116,7 @@ class ExtensionValidator
     }
 
     /**
-     * Validates extension eligibility using a Team object
-     * 
-     * @param \Team $team Team object
-     * @return array ['valid' => bool, 'error' => string|null]
+     * @see ExtensionValidatorInterface::validateExtensionEligibility()
      */
     public function validateExtensionEligibility($team)
     {

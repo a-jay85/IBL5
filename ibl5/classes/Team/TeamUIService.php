@@ -1,14 +1,15 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Team;
 
+use Team\Contracts\TeamUIServiceInterface;
+
 /**
- * TeamUIService - Handles UI rendering for team pages
- * 
- * This service extracts UI/presentation logic from the controller,
- * generating HTML for various team information displays.
+ * @see TeamUIServiceInterface
  */
-class TeamUIService
+class TeamUIService implements TeamUIServiceInterface
 {
     private $db;
     private $repository;
@@ -20,8 +21,7 @@ class TeamUIService
     }
 
     /**
-     * Render team info right sidebar
-     * Returns array with [main content, rafters/banners]
+     * @see TeamUIServiceInterface::renderTeamInfoRight()
      */
     public function renderTeamInfoRight($team): array
     {
@@ -41,7 +41,7 @@ class TeamUIService
     }
 
     /**
-     * Render tab navigation for team displays
+     * @see TeamUIServiceInterface::renderTabs()
      */
     public function renderTabs(int $teamID, string $display, string $insertyear, $season): string
     {
@@ -53,12 +53,10 @@ class TeamUIService
             'chunk' => 'Sim Averages',
         ];
 
-        // Add playoff tab if in appropriate phase
         if (in_array($season->phase, ["Playoffs", "Draft", "Free Agency"])) {
             $tabDefinitions['playoffs'] = 'Playoffs Averages';
         }
 
-        // Contracts tab always comes last
         $tabDefinitions['contracts'] = 'Contracts';
 
         $tabs = "";
@@ -69,15 +67,11 @@ class TeamUIService
         return $tabs;
     }
 
-    /**
-     * Build a single tab HTML element
-     */
     private function buildTab(string $tabKey, string $tabLabel, string $display, int $teamID, string $insertyear): string
     {
         $team = \Team::initialize($this->db, $teamID);
 
         if ($display === $tabKey) {
-            // Active tab: table cell uses team->color1, link text is bold and team->color2
             $isActiveLink = ' style="font-weight:bold; color: black !important;"';
             $isActiveTableCell = ' bgcolor="' . $team->color2 . '"';
         } else {
@@ -89,9 +83,9 @@ class TeamUIService
     }
 
     /**
-     * Get the table output based on display type
+     * @see TeamUIServiceInterface::getTableOutput()
      */
-    public function getTableOutput(string $display, $db, $result, $team, ?string $yr, $season, $sharedFunctions): string
+    public function getTableOutput(string $display, object $db, mixed $result, object $team, ?string $yr, object $season, object $sharedFunctions): string
     {
         switch ($display) {
             case 'ratings':
@@ -113,3 +107,4 @@ class TeamUIService
         }
     }
 }
+

@@ -1,16 +1,16 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Team;
 
 use Player\Player;
+use Team\Contracts\TeamControllerInterface;
 
 /**
- * TeamController - Main controller for Team module
- * 
- * Coordinates between Repository, Services, and UI components
- * following the MVC pattern used in other refactored modules.
+ * @see TeamControllerInterface
  */
-class TeamController
+class TeamController implements TeamControllerInterface
 {
     private $db;
     private $repository;
@@ -26,7 +26,7 @@ class TeamController
     }
 
     /**
-     * Display team page with roster and stats
+     * @see TeamControllerInterface::displayTeamPage()
      */
     public function displayTeamPage(int $teamID): void
     {
@@ -47,16 +47,15 @@ class TeamController
 
         $isFreeAgencyModuleActive = $sharedFunctions->isFreeAgencyModuleActive();
 
-        // Get the appropriate roster based on team and conditions
-        if ($teamID == 0) { // Free Agents
+        if ($teamID == 0) {
             if ($isFreeAgencyModuleActive == 0) {
                 $result = $this->repository->getFreeAgents(false);
             } else {
                 $result = $this->repository->getFreeAgents(true);
             }
-        } else if ($teamID == "-1") { // Entire League
+        } else if ($teamID == "-1") {
             $result = $this->repository->getEntireLeagueRoster();
-        } else { // Specific team
+        } else {
             if ($yr != "") {
                 $result = $this->repository->getHistoricalRoster($teamID, $yr);
             } else if ($isFreeAgencyModuleActive == 1) {
@@ -81,22 +80,17 @@ class TeamController
             $insertyear = "";
         }
 
-        // Build tabs
         $tabs = $this->uiService->renderTabs($teamID, $display, $insertyear, $season);
 
-        // Get display content
         $table_output = $this->uiService->getTableOutput($display, $this->db, $result, $team, $yr, $season, $sharedFunctions);
 
-        // Get starters table if applicable
         $starters_table = "";
         if ($teamID > 0 AND $yr == "") {
             $starters_table = $this->statsService->getLastSimsStarters($result, $team);
         }
 
-        // Get draft picks
         $tableDraftPicks = $team ? \UI\Modules\Team::draftPicks($this->db, $team) : "";
 
-        // Get team info right sidebar
         $inforight = $this->uiService->renderTeamInfoRight($team);
         $team_info_right = $inforight[0];
         $rafters = $inforight[1];

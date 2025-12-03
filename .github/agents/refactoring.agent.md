@@ -3,10 +3,10 @@ name: IBL5-Refactoring
 description: Refactor IBL5 modules using Repository/Service/View pattern with interface contracts
 tools: ['search', 'usages', 'edit', 'fetch']
 handoffs:
-  - label: Write Tests
-    agent: IBL5-Testing
-    prompt: Write PHPUnit tests for the module I just refactored. Focus on behavior-focused tests through public APIs.
-    send: false
+    - label: Write Tests
+        agent: IBL5-Testing
+        prompt: Write PHPUnit tests for the module I just refactored. Focus on behavior-focused tests through public APIs.
+        send: true
 ---
 
 # IBL5 Module Refactoring Agent

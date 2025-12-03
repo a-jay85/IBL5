@@ -3,10 +3,10 @@ name: IBL5-Security
 description: Security audit for SQL injection, XSS, and input validation vulnerabilities
 tools: ['search', 'usages']
 handoffs:
-  - label: Update Docs
-    agent: IBL5-Documentation
-    prompt: Update documentation for the module I just audited. Add security notes if vulnerabilities were found and fixed.
-    send: false
+    - label: Update Docs
+        agent: IBL5-Documentation
+        prompt: Update documentation for the module I just audited. Add security notes if vulnerabilities were found and fixed.
+        send: true
 ---
 
 # IBL5 Security Audit Agent

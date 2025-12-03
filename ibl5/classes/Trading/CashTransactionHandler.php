@@ -1,6 +1,11 @@
 <?php
 
-class Trading_CashTransactionHandler
+require_once __DIR__ . '/Contracts/Trading_CashTransactionHandlerInterface.php';
+
+/**
+ * @see Trading_CashTransactionHandlerInterface
+ */
+class Trading_CashTransactionHandler implements Trading_CashTransactionHandlerInterface
 {
     protected $db;
     protected $commonRepository;
@@ -12,9 +17,7 @@ class Trading_CashTransactionHandler
     }
 
     /**
-     * Generate a unique PID that doesn't exist in the database
-     * @param int $pid Starting PID to check
-     * @return int Available PID
+     * @see Trading_CashTransactionHandlerInterface::generateUniquePid()
      */
     public function generateUniquePid($pid)
     {
@@ -31,9 +34,7 @@ class Trading_CashTransactionHandler
     }
 
     /**
-     * Calculate contract total years based on cash year data
-     * @param array $cashYear Array of cash amounts by year (1-6)
-     * @return int Total contract years
+     * @see Trading_CashTransactionHandlerInterface::calculateContractTotalYears()
      */
     public function calculateContractTotalYears($cashYear)
     {
@@ -53,18 +54,21 @@ class Trading_CashTransactionHandler
     }
 
     /**
-     * Create cash transaction entries in the database
-     * @param int $itemId Unique item ID for the transaction
-     * @param string $offeringTeamName Offering team name
-     * @param string $listeningTeamName Listening team name
-     * @param array $cashYear Cash amounts by year
-     * @return array Result with success status and trade line text
+     * @see Trading_CashTransactionHandlerInterface::createCashTransaction()
      */
     public function createCashTransaction($itemId, $offeringTeamName, $listeningTeamName, $cashYear)
     {
         $offeringTeamId = $this->commonRepository->getTidFromTeamname($offeringTeamName);
         $listeningTeamId = $this->commonRepository->getTidFromTeamname($listeningTeamName);
         
+        // Use null coalescing to default missing years to 0
+        $cy1 = $cashYear[1] ?? 0;
+        $cy2 = $cashYear[2] ?? 0;
+        $cy3 = $cashYear[3] ?? 0;
+        $cy4 = $cashYear[4] ?? 0;
+        $cy5 = $cashYear[5] ?? 0;
+        $cy6 = $cashYear[6] ?? 0;
+
         $contractCurrentYear = 1;
         $contractTotalYears = $this->calculateContractTotalYears($cashYear);
 
@@ -94,12 +98,12 @@ class Trading_CashTransactionHandler
             '$contractCurrentYear',
             '$contractCurrentYear',
             '$contractTotalYears',
-            '{$cashYear[1]}',
-            '{$cashYear[2]}',
-            '{$cashYear[3]}',
-            '{$cashYear[4]}',
-            '{$cashYear[5]}',
-            '{$cashYear[6]}')";
+            '$cy1',
+            '$cy2',
+            '$cy3',
+            '$cy4',
+            '$cy5',
+            '$cy6')";
 
         $resultInsertPositiveCashRow = $this->db->sql_query($queryInsertPositiveCashRow);
 
@@ -131,12 +135,12 @@ class Trading_CashTransactionHandler
             '$contractCurrentYear',
             '$contractCurrentYear',
             '$contractTotalYears',
-            '-{$cashYear[1]}',
-            '-{$cashYear[2]}',
-            '-{$cashYear[3]}',
-            '-{$cashYear[4]}',
-            '-{$cashYear[5]}',
-            '-{$cashYear[6]}')";
+            '-$cy1',
+            '-$cy2',
+            '-$cy3',
+            '-$cy4',
+            '-$cy5',
+            '-$cy6')";
 
         $resultInsertNegativeCashRow = $this->db->sql_query($queryInsertNegativeCashRow);
 
@@ -144,7 +148,7 @@ class Trading_CashTransactionHandler
         $tradeLine = "";
 
         if ($success) {
-            $tradeLine = "The $offeringTeamName send {$cashYear[1]} {$cashYear[2]} {$cashYear[3]} {$cashYear[4]} {$cashYear[5]} {$cashYear[6]} in cash to the $listeningTeamName.<br>";
+            $tradeLine = "The $offeringTeamName send $cy1 $cy2 $cy3 $cy4 $cy5 $cy6 in cash to the $listeningTeamName.<br>";
         }
 
         return [
@@ -154,19 +158,17 @@ class Trading_CashTransactionHandler
     }
 
     /**
-     * Insert cash trade data into ibl_trade_cash table
-     * @param int $tradeOfferId Trade offer ID
-     * @param string $offeringTeamName Offering team name
-     * @param string $listeningTeamName Listening team name
-     * @param array $cashAmounts Cash amounts by year (1-6)
-     * @return bool Success status
+     * @see Trading_CashTransactionHandlerInterface::insertCashTradeData()
      */
     public function insertCashTradeData($tradeOfferId, $offeringTeamName, $listeningTeamName, $cashAmounts)
     {
-        // Ensure all cash year values are set
-        for ($i = 1; $i <= 6; $i++) {
-            $cashAmounts[$i] = $cashAmounts[$i] ?? 0;
-        }
+        // Use null coalescing to default missing years to 0
+        $cy1 = $cashAmounts[1] ?? 0;
+        $cy2 = $cashAmounts[2] ?? 0;
+        $cy3 = $cashAmounts[3] ?? 0;
+        $cy4 = $cashAmounts[4] ?? 0;
+        $cy5 = $cashAmounts[5] ?? 0;
+        $cy6 = $cashAmounts[6] ?? 0;
 
         $query = "INSERT INTO ibl_trade_cash
           ( `tradeOfferID`,
@@ -181,25 +183,23 @@ class Trading_CashTransactionHandler
         VALUES    ( '$tradeOfferId',
             '$offeringTeamName',
             '$listeningTeamName',
-            '{$cashAmounts[1]}',
-            '{$cashAmounts[2]}',
-            '{$cashAmounts[3]}',
-            '{$cashAmounts[4]}',
-            '{$cashAmounts[5]}',
-            '{$cashAmounts[6]}' )";
+            '$cy1',
+            '$cy2',
+            '$cy3',
+            '$cy4',
+            '$cy5',
+            '$cy6' )";
 
-        return $this->db->sql_query($query);
+        return (bool)$this->db->sql_query($query);
     }
 
     /**
-     * Check if any cash is being sent in the trade
-     * @param array $cashAmounts Cash amounts by year
-     * @return bool True if any cash is being sent
+     * @see Trading_CashTransactionHandlerInterface::hasCashInTrade()
      */
     public function hasCashInTrade($cashAmounts)
     {
-        for ($i = 1; $i <= 6; $i++) {
-            if (($cashAmounts[$i] ?? 0) != 0) {
+        foreach ($cashAmounts as $amount) {
+            if (!empty($amount) && (int)$amount !== 0) {
                 return true;
             }
         }

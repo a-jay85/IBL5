@@ -2,13 +2,12 @@
 
 namespace Player;
 
+use Player\Contracts\PlayerInterface;
+
 /**
- * Player - Facade for player-related operations
- * 
- * This class now acts as a facade, delegating responsibilities to specialized classes
- * while maintaining backward compatibility with existing code.
+ * @see PlayerInterface
  */
-class Player
+class Player implements PlayerInterface
 {
     protected $db;
     protected $playerData;
@@ -270,12 +269,7 @@ class Player
     }
 
     /**
-     * Get future salaries for the next 6 contract years
-     * 
-     * Returns the remaining contract years starting from the current contract year,
-     * padded with zeros to always return a 6-element array.
-     * 
-     * @return array<int> Future salaries for years 1-6
+     * @see PlayerInterface::getFutureSalaries()
      */
     public function getFutureSalaries(): array
     {

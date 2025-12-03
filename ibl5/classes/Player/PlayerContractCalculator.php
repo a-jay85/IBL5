@@ -2,16 +2,15 @@
 
 namespace Player;
 
+use Player\Contracts\PlayerContractCalculatorInterface;
+
 /**
- * PlayerContractCalculator - Handles salary and contract calculations
- * 
- * This class follows the Single Responsibility Principle by focusing only on
- * contract and salary calculations. It contains no data persistence logic.
+ * @see PlayerContractCalculatorInterface
  */
-class PlayerContractCalculator
+class PlayerContractCalculator implements PlayerContractCalculatorInterface
 {
     /**
-     * Calculate the current season salary based on contract year
+     * @see PlayerContractCalculatorInterface::getCurrentSeasonSalary()
      */
     public function getCurrentSeasonSalary(PlayerData $playerData): int
     {
@@ -19,7 +18,7 @@ class PlayerContractCalculator
     }
 
     /**
-     * Calculate the next season's salary
+     * @see PlayerContractCalculatorInterface::getNextSeasonSalary()
      */
     public function getNextSeasonSalary(PlayerData $playerData): int
     {
@@ -47,13 +46,7 @@ class PlayerContractCalculator
     }
 
     /**
-     * Get future salaries for the next 6 contract years
-     * 
-     * Returns the remaining contract years starting from the current contract year,
-     * padded with zeros to always return a 6-element array.
-     * 
-     * @param PlayerData $playerData
-     * @return array<int> Future salaries for years 1-6
+     * @see PlayerContractCalculatorInterface::getFutureSalaries()
      */
     public function getFutureSalaries(PlayerData $playerData): array
     {
@@ -72,7 +65,7 @@ class PlayerContractCalculator
     }
 
     /**
-     * Get an array of remaining contract years and salaries
+     * @see PlayerContractCalculatorInterface::getRemainingContractArray()
      */
     public function getRemainingContractArray(PlayerData $playerData): array
     {
@@ -94,7 +87,7 @@ class PlayerContractCalculator
     }
 
     /**
-     * Calculate total remaining salary on the contract
+     * @see PlayerContractCalculatorInterface::getTotalRemainingSalary()
      */
     public function getTotalRemainingSalary(PlayerData $playerData): int
     {
@@ -103,7 +96,7 @@ class PlayerContractCalculator
     }
 
     /**
-     * Calculate long buyout terms (6 years)
+     * @see PlayerContractCalculatorInterface::getLongBuyoutArray()
      */
     public function getLongBuyoutArray(PlayerData $playerData): array
     {
@@ -111,7 +104,7 @@ class PlayerContractCalculator
     }
 
     /**
-     * Calculate short buyout terms (2 years)
+     * @see PlayerContractCalculatorInterface::getShortBuyoutArray()
      */
     public function getShortBuyoutArray(PlayerData $playerData): array
     {

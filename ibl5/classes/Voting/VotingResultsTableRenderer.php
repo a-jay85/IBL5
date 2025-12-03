@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Voting;
 
+use Voting\Contracts\VotingResultsTableRendererInterface;
+
 /**
- * Renders voting results tables using the legacy module styling
+ * @see VotingResultsTableRendererInterface
  */
-class VotingResultsTableRenderer
+class VotingResultsTableRenderer implements VotingResultsTableRendererInterface
 {
     private const METRIC_LABEL = 'Votes';
     private const TABLE_STYLE = 'width: min(100%, 420px); border-collapse: collapse; margin: 0 auto 1.5rem;';
@@ -16,10 +18,7 @@ class VotingResultsTableRenderer
     private const ROW_CELL_ALT_STYLE = 'border-bottom: 1px solid #eee; padding: 0.35rem 0.75rem; background-color: #f8f9fb;';
 
     /**
-     * Renders multiple voting result tables
-     * 
-     * @param array $tables Array of tables with title and rows
-     * @return string HTML output
+     * @see VotingResultsTableRendererInterface::renderTables()
      */
     public function renderTables(array $tables): string
     {
@@ -33,13 +32,6 @@ class VotingResultsTableRenderer
         return $output;
     }
 
-    /**
-     * Renders a single voting result table
-     * 
-     * @param string $title Table title
-     * @param array $rows Table rows with name and votes
-     * @return string HTML output
-     */
     private function renderTable(string $title, array $rows): string
     {
         $escapedTitle = htmlspecialchars($title, \ENT_QUOTES, 'UTF-8');

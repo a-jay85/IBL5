@@ -1,13 +1,16 @@
 <?php
 
+declare(strict_types=1);
+
 namespace DepthChart;
 
+use DepthChart\Contracts\DepthChartViewInterface;
 use Services\DatabaseService;
 
 /**
- * Renders depth chart views and forms
+ * @see DepthChartViewInterface
  */
-class DepthChartView
+class DepthChartView implements DepthChartViewInterface
 {
     private $processor;
 
@@ -17,10 +20,7 @@ class DepthChartView
     }
 
     /**
-     * Renders the team logo image for the given team ID.
-     *
-     * @param int $teamID The team ID used to locate the logo image.
-     * @return void Echoes the HTML for the team logo image.
+     * @see DepthChartViewInterface::renderTeamLogo()
      */
     public function renderTeamLogo(int $teamID): void
     {
@@ -28,10 +28,7 @@ class DepthChartView
     }
 
     /**
-     * Renders position depth select options
-     *
-     * @param int $selectedValue Currently selected value
-     * @return void Echoes HTML
+     * @see DepthChartViewInterface::renderPositionOptions()
      */
     public function renderPositionOptions(int $selectedValue): void
     {
@@ -51,10 +48,7 @@ class DepthChartView
     }
 
     /**
-     * Renders offensive/defensive focus options
-     *
-     * @param int $selectedValue Currently selected value
-     * @return void Echoes HTML
+     * @see DepthChartViewInterface::renderOffDefOptions()
      */
     public function renderOffDefOptions(int $selectedValue): void
     {
@@ -72,10 +66,7 @@ class DepthChartView
     }
 
     /**
-     * Renders OI/DI/BH setting options
-     *
-     * @param int $selectedValue Currently selected value
-     * @return void Echoes HTML
+     * @see DepthChartViewInterface::renderSettingOptions()
      */
     public function renderSettingOptions(int $selectedValue): void
     {
@@ -89,10 +80,7 @@ class DepthChartView
     }
 
     /**
-     * Renders active/inactive options
-     *
-     * @param int $selectedValue Currently selected value (1 or 0)
-     * @return void Echoes HTML
+     * @see DepthChartViewInterface::renderActiveOptions()
      */
     public function renderActiveOptions(int $selectedValue): void
     {
@@ -104,11 +92,7 @@ class DepthChartView
     }
 
     /**
-     * Renders minutes options based on stamina
-     *
-     * @param int $selectedValue Currently selected value
-     * @param int $staminaCap Stamina cap for player
-     * @return void Echoes HTML
+     * @see DepthChartViewInterface::renderMinutesOptions()
      */
     public function renderMinutesOptions(int $selectedValue, int $staminaCap): void
     {
@@ -121,12 +105,7 @@ class DepthChartView
     }
 
     /**
-     * Renders the depth chart form header
-     *
-     * @param string $teamLogo Team name
-     * @param int $teamID Team ID
-     * @param array $slotNames Names of the 5 position slots
-     * @return void Echoes HTML
+     * @see DepthChartViewInterface::renderFormHeader()
      */
     public function renderFormHeader(string $teamLogo, int $teamID, array $slotNames): void
     {
@@ -156,11 +135,7 @@ class DepthChartView
     }
 
     /**
-     * Renders a player row in the depth chart form
-     *
-     * @param array $player Player data from database
-     * @param int $depthCount Row counter
-     * @return void Echoes HTML
+     * @see DepthChartViewInterface::renderPlayerRow()
      */
     public function renderPlayerRow(array $player, int $depthCount): void
     {
@@ -169,10 +144,9 @@ class DepthChartView
         $player_name = $player['name'];
         $player_inj = $player['injured'];
 
-        // Safely escape player name for HTML attribute and display
         $player_name_html = DatabaseService::safeHtmlOutput($player_name);
 
-        $player_staminacap = $player['sta'] + 40;
+        $player_staminacap = (int)$player['sta'] + 40;
         if ($player_staminacap > 40) {
             $player_staminacap = 40;
         }
@@ -185,61 +159,45 @@ class DepthChartView
                 <a href=\"./modules.php?name=Player&pa=showpage&pid=$player_pid\">$player_name_html</a>
             </td>";
 
-        // Render each position slot - all players can play at all positions
         $positions = ['pg', 'sg', 'sf', 'pf', 'c'];
         foreach ($positions as $posKey) {
             $this->renderPositionCell($player, $posKey, $depthCount);
         }
 
-        // Render active dropdown
         echo "<td><select name=\"active$depthCount\">";
-        $this->renderActiveOptions($player['dc_active']);
+        $this->renderActiveOptions((int)$player['dc_active']);
         echo "</select></td>";
 
-        // Render minutes dropdown
         echo "<td><select name=\"min$depthCount\">";
-        $this->renderMinutesOptions($player['dc_minutes'], $player_staminacap);
+        $this->renderMinutesOptions((int)$player['dc_minutes'], $player_staminacap);
         echo "</select></td>";
 
-        // Render OF dropdown
         echo "<td><select name=\"OF$depthCount\">";
-        $this->renderOffDefOptions($player['dc_of']);
+        $this->renderOffDefOptions((int)$player['dc_of']);
         echo "</select></td>";
 
-        // Render DF dropdown
         echo "<td><select name=\"DF$depthCount\">";
-        $this->renderOffDefOptions($player['dc_df']);
+        $this->renderOffDefOptions((int)$player['dc_df']);
         echo "</select></td>";
 
-        // Render OI dropdown
         echo "<td><select name=\"OI$depthCount\">";
-        $this->renderSettingOptions($player['dc_oi']);
+        $this->renderSettingOptions((int)$player['dc_oi']);
         echo "</select></td>";
 
-        // Render DI dropdown
         echo "<td><select name=\"DI$depthCount\">";
-        $this->renderSettingOptions($player['dc_di']);
+        $this->renderSettingOptions((int)$player['dc_di']);
         echo "</select></td>";
 
-        // Render BH dropdown
         echo "<td><select name=\"BH$depthCount\">";
-        $this->renderSettingOptions($player['dc_bh']);
+        $this->renderSettingOptions((int)$player['dc_bh']);
         echo "</select></td></tr>";
     }
 
-    /**
-     * Renders a position cell with dropdown
-     *
-     * @param array $player Player data
-     * @param string $posKey Position key (pg, sg, sf, pf, c)
-     * @param int $depthCount Row counter
-     * @return void Echoes HTML
-     */
     private function renderPositionCell(array $player, string $posKey, int $depthCount): void
     {
         $fieldName = $posKey . $depthCount;
         $dcField = 'dc_' . strtoupper($posKey) . 'Depth';
-        $currentValue = $player[$dcField];
+        $currentValue = (int)$player[$dcField];
 
         echo "<td><select name=\"$fieldName\">";
         $this->renderPositionOptions($currentValue);
@@ -247,17 +205,13 @@ class DepthChartView
     }
 
     /**
-     * Renders the form footer with submit and reset buttons
-     *
-     * @return void Echoes HTML
+     * @see DepthChartViewInterface::renderFormFooter()
      */
     public function renderFormFooter(): void
     {
-        // JavaScript function to reset all dropdowns to default values
         $resetScript = <<<'JAVASCRIPT'
 <script type="text/javascript">
 function resetDepthChart() {
-    // Confirm before resetting to prevent accidental clicks
     if (!confirm('Are you sure you want to reset all fields to their default values? This will discard any changes you have made.')) {
         return false;
     }
@@ -265,35 +219,28 @@ function resetDepthChart() {
     var form = document.forms['Depth_Chart'];
     if (!form) return;
     
-    // Get all select elements in the form
     var selects = form.getElementsByTagName('select');
     
     for (var i = 0; i < selects.length; i++) {
         var select = selects[i];
         var name = select.name;
         
-        // Determine the default value based on field name pattern
-        var defaultValue = '0'; // Default for most fields
+        var defaultValue = '0';
         
         if (name.match(/^active\d+$/)) {
-            // Active should default to "Yes" (value 1)
             defaultValue = '1';
         } else if (name.match(/^(pg|sg|sf|pf|c)\d+$/)) {
-            // Position dropdowns should default to "No" (value 0)
             defaultValue = '0';
         } else if (name.match(/^(min|OF|DF)\d+$/)) {
-            // Minutes, OF, DF should default to "Auto" (value 0)
             defaultValue = '0';
         } else if (name.match(/^(OI|DI|BH)\d+$/)) {
-            // OI, DI, BH should default to "-" (value 0)
             defaultValue = '0';
         }
         
-        // Set the value
         select.value = defaultValue;
     }
     
-    return false; // Prevent default action
+    return false;
 }
 </script>
 JAVASCRIPT;
@@ -308,13 +255,7 @@ JAVASCRIPT;
     }
 
     /**
-     * Renders the submission result page
-     *
-     * @param string $teamName Team name
-     * @param array $playerData Player data
-     * @param bool $success Whether submission was successful
-     * @param string $errorHtml Error messages HTML (if any)
-     * @return void Echoes HTML
+     * @see DepthChartViewInterface::renderSubmissionResult()
      */
     public function renderSubmissionResult(
         string $teamName,
@@ -329,7 +270,6 @@ JAVASCRIPT;
             echo "<center><u>Your depth chart has been submitted and e-mailed successfully. Thank you.</u></center><p>";
         }
 
-        // Display submitted data
         echo "$teamName Depth Chart Submission<br><table>";
         echo "<tr>
             <td><b>Name</td>";

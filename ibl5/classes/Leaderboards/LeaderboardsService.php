@@ -5,20 +5,15 @@ declare(strict_types=1);
 namespace Leaderboards;
 
 use Statistics\StatsFormatter;
+use Leaderboards\Contracts\LeaderboardsServiceInterface;
 
 /**
- * LeaderboardsService - Business logic for leaderboards data processing
- * 
- * Handles data transformation and calculations for career statistics.
+ * @see LeaderboardsServiceInterface
  */
-class LeaderboardsService
+class LeaderboardsService implements LeaderboardsServiceInterface
 {
     /**
-     * Process a player row from database into formatted statistics
-     * 
-     * @param array $row Database row from statistics table
-     * @param string $tableType 'totals' or 'averages'
-     * @return array Formatted player statistics
+     * @see LeaderboardsServiceInterface::processPlayerRow()
      */
     public function processPlayerRow(array $row, string $tableType): array
     {
@@ -76,9 +71,7 @@ class LeaderboardsService
     }
 
     /**
-     * Get map of board types to table names
-     * 
-     * @return array Associative array of display names to table names
+     * @see LeaderboardsServiceInterface::getBoardTypes()
      */
     public function getBoardTypes(): array
     {
@@ -95,9 +88,7 @@ class LeaderboardsService
     }
 
     /**
-     * Get map of sort categories to column names
-     * 
-     * @return array Associative array of column names to display labels
+     * @see LeaderboardsServiceInterface::getSortCategories()
      */
     public function getSortCategories(): array
     {

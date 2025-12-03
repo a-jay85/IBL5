@@ -73,6 +73,212 @@ $player = new Player($db);
 - Once `mainfile.php` is included, all classes in `ibl5/classes/` are available
 - No additional require statements needed for class files
 
+### ⚠️ CRITICAL: Interface-Driven Architecture Pattern
+
+**Established Pattern (Implemented in PlayerSearch, FreeAgency, Player modules)**
+
+The codebase uses **interface contracts** as the single source of truth for class responsibilities. This pattern maximizes LLM readability and maintainability.
+
+#### Architecture Overview
+
+**For each refactored module, create interfaces in a `Contracts/` subdirectory:**
+
+```
+Module/
+├── Contracts/
+│   ├── ModuleInterface.php                    # Facade contract (if applicable)
+│   ├── ModuleRepositoryInterface.php          # Data access contract
+│   ├── ModuleValidatorInterface.php           # Validation contract
+│   ├── ModuleProcessorInterface.php           # Business logic contract
+│   ├── ModuleServiceInterface.php             # Service layer contract
+│   └── ModuleViewInterface.php                # View rendering contract
+├── Module.php                   # Facade (implements ModuleInterface)
+├── ModuleRepository.php         # Data access (implements ModuleRepositoryInterface)
+├── ModuleValidator.php          # Validation (implements ModuleValidatorInterface)
+├── ModuleProcessor.php          # Business logic (implements ModuleProcessorInterface)
+├── ModuleService.php            # Services (implements ModuleServiceInterface)
+└── ModuleView.php               # Views (implements ModuleViewInterface)
+```
+
+#### Interface Documentation Standards
+
+**Each interface MUST contain comprehensive PHPDoc documenting:**
+
+1. **Method Signatures** - All parameter types and return types
+2. **Behavioral Documentation** - What the method does and why
+3. **Parameter Constraints** - Valid ranges, required formats, constraints
+4. **Return Value Structure** - Describe arrays, objects, edge cases
+5. **Important Behaviors** - Edge cases, error conditions, side effects
+6. **Usage Examples** (optional) - For complex methods
+
+**Example Interface:**
+
+```php
+<?php
+
+namespace PlayerSearch\Contracts;
+
+/**
+ * PlayerSearchValidatorInterface - Validates player search input
+ * 
+ * Enforces whitelist validation and input sanitization for player search operations.
+ * All methods return true/false to indicate validation success/failure.
+ */
+interface PlayerSearchValidatorInterface
+{
+    /**
+     * Validate and sanitize player name search input
+     *
+     * @param string $playerName Raw player name from user input (max 64 characters)
+     * @return string Sanitized player name (whitespace trimmed, safe for queries)
+     * @throws InvalidArgumentException If playerName exceeds 64 characters
+     * 
+     * **Behaviors:**
+     * - Trims leading/trailing whitespace
+     * - Returns empty string if input is null or empty
+     * - Throws exception if name exceeds maximum length
+     * - Does NOT escape for SQL (use prepared statements instead)
+     */
+    public function validatePlayerName(string $playerName): string;
+
+    /**
+     * Validate player position against whitelist
+     *
+     * @param string $position Player position (e.g., "PG", "SG", "SF", "PF", "C")
+     * @return bool True if position is valid (in whitelist), false otherwise
+     * 
+     * **Valid Positions:** PG, SG, SF, PF, C
+     * **Behaviors:**
+     * - Case-insensitive validation (converts to uppercase)
+     * - Returns false for unknown positions
+     * - Returns false for null/empty position
+     */
+    public function validatePosition(string $position): bool;
+}
+```
+
+#### Implementation Pattern
+
+**All implementations MUST:**
+
+1. **Use `implements InterfaceType` clause** - Explicit contract declaration
+2. **Add `@see InterfaceNamespace\InterfaceName` docblock** - Point to contract
+3. **Replace redundant method docblocks with `@see` references** - Avoid duplication
+4. **Maintain type hints** - Match interface signatures exactly
+5. **Support both legacy and modern database implementations** - Use `method_exists()` to detect capability
+
+**Example Implementation:**
+
+```php
+<?php
+
+namespace PlayerSearch;
+
+use PlayerSearch\Contracts\PlayerSearchValidatorInterface;
+
+/**
+ * @see PlayerSearchValidatorInterface
+ */
+class PlayerSearchValidator implements PlayerSearchValidatorInterface
+{
+    private const VALID_POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];
+    private const MAX_NAME_LENGTH = 64;
+
+    /**
+     * @see PlayerSearchValidatorInterface::validatePlayerName()
+     */
+    public function validatePlayerName(string $playerName): string
+    {
+        $sanitized = trim($playerName);
+        if (strlen($sanitized) > self::MAX_NAME_LENGTH) {
+            throw new InvalidArgumentException('Player name exceeds maximum length');
+        }
+        return $sanitized;
+    }
+
+    /**
+     * @see PlayerSearchValidatorInterface::validatePosition()
+     */
+    public function validatePosition(string $position): bool
+    {
+        if (empty($position)) {
+            return false;
+        }
+        return in_array(strtoupper($position), self::VALID_POSITIONS, true);
+    }
+}
+```
+
+#### When to Add `@see` Instead of Full Docblock
+
+**Replace method docblocks with `@see InterfaceName::methodName()` when:**
+- The method is public and part of the interface contract
+- The interface provides complete documentation of behavior
+- The implementation is straightforward and self-explanatory (code is obvious-correct)
+
+**Keep full docblocks when:**
+- Implementation details differ from interface (rarely)
+- There are implementation-specific optimizations (rarely)
+- Complex internal logic needs explanation (keep minimal; prefer refactoring)
+
+#### Database Implementation Flexibility
+
+**When a method uses the database, support both implementations:**
+
+```php
+public function getFreeAgencyDemands(string $playerName): array
+{
+    // Detect which database implementation is available
+    if (method_exists($this->db, 'sql_escape_string')) {
+        // Using MySQL abstraction layer (legacy)
+        $escapedName = $this->db->sql_escape_string($playerName);
+        $query = "SELECT * FROM ibl_demands WHERE name = '$escapedName'";
+        $result = $this->db->sql_query($query);
+        $row = $this->db->sql_fetch_assoc($result);
+    } else {
+        // Direct mysqli connection (modern)
+        $query = "SELECT * FROM ibl_demands WHERE name = ?";
+        $stmt = $this->db->prepare($query);
+        $stmt->bind_param('s', $playerName);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $row = $result->fetch_assoc();
+    }
+    
+    // Standard return format
+    if ($row) {
+        return [
+            'dem1' => (int) ($row['dem1'] ?? 0),
+            'dem2' => (int) ($row['dem2'] ?? 0),
+            // ... more fields
+        ];
+    }
+    
+    return ['dem1' => 0, 'dem2' => 0, /* ... */];
+}
+```
+
+#### Benefits of Interface-Driven Architecture
+
+1. **LLM Readability** - Interfaces are scannable, contracts are obvious
+2. **Self-Documenting** - No need for verbose comments
+3. **Type Safety** - Enforces contracts at runtime and compile-time
+4. **Refactoring Safety** - Changes to signatures caught immediately
+5. **Testing** - Mock interfaces easily, test contracts
+6. **Onboarding** - New developers understand responsibilities instantly
+7. **Maintenance** - Single source of truth (interface) for all implementations
+
+#### Current Implementation Status
+
+**Modules with Complete Interface Architecture:**
+- ✅ **PlayerSearch** (4 interfaces, 4 implementations, 54 tests)
+- ✅ **FreeAgency** (7 interfaces, 6 implementations, 11 tests)
+- ✅ **Player** (9 interfaces, 8 implementations, 84 tests)
+
+**Pattern to Apply to Remaining Modules:**
+- Compare_Players, Leaderboards, Stats modules (Searchable_Stats, League_Stats, Chunk_Stats)
+- All new modules going forward
+
 ### Testing Requirements
 - **Framework**: PHPUnit 12.4+ compatibility required
 - **Test Location**: All tests in `ibl5/tests/` directory
@@ -430,6 +636,11 @@ public function renderExample(string $title): string
 - [ ] Database queries consider PostgreSQL compatibility
 - [ ] Changes support eventual Laravel migration where applicable
 - [ ] **All functions and methods have complete type hints** (parameters and return types)
+- [ ] **When refactoring modules, create comprehensive interfaces** in `Module/Contracts/` directory
+- [ ] **All public methods documented in interfaces with complete PHPDoc** (behavior, parameters, return values)
+- [ ] **Classes implement interfaces with `implements InterfaceType` and add `@see` docblock**
+- [ ] **Method docblocks replaced with `@see InterfaceName::methodName()`** (avoid redundancy)
+- [ ] **Database methods support both legacy and modern implementations** using `method_exists()` detection
 - [ ] Existing function calls verified for correctness and argument compatibility
 - [ ] All linter warnings and errors addressed and fixed
 - [ ] Strict types enabled where applicable (`declare(strict_types=1);`)

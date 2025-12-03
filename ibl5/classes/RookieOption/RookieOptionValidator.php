@@ -3,24 +3,15 @@
 namespace RookieOption;
 
 use Services\CommonValidator;
+use RookieOption\Contracts\RookieOptionValidatorInterface;
 
 /**
- * Rookie Option Validator
- * 
- * Validates eligibility and business rules for rookie option exercises.
- * Delegates contract validation to PlayerContractValidator via Player object.
+ * @see RookieOptionValidatorInterface
  */
-class RookieOptionValidator
+class RookieOptionValidator implements RookieOptionValidatorInterface
 {
     /**
-     * Validates that the player is on the user's team
-     * 
-     * Delegates to CommonValidator for consistent player ownership validation
-     * across the application.
-     * 
-     * @param object $player Player object with teamName property
-     * @param string $userTeamName The user's team name
-     * @return array Validation result with 'valid' boolean and optional 'error' message
+     * @see RookieOptionValidatorInterface::validatePlayerOwnership()
      */
     public function validatePlayerOwnership($player, string $userTeamName): array
     {
@@ -28,15 +19,10 @@ class RookieOptionValidator
     }
     
     /**
-     * Validates rookie option eligibility and returns final year salary if eligible
-     * 
-     * @param object $player Player object with canRookieOption and getFinalYearRookieContractSalary methods
-     * @param string $seasonPhase Current season phase
-     * @return array Validation result with 'valid' boolean, optional 'error' message, and 'finalYearSalary' if valid
+     * @see RookieOptionValidatorInterface::validateEligibilityAndGetSalary()
      */
     public function validateEligibilityAndGetSalary($player, string $seasonPhase): array
     {
-        // Check eligibility: must pass canRookieOption check AND have non-zero final year salary
         $canRookieOption = $player->canRookieOption($seasonPhase);
         $finalYearSalary = $canRookieOption ? $player->getFinalYearRookieContractSalary() : 0;
         
@@ -53,12 +39,6 @@ class RookieOptionValidator
         ];
     }
 
-    /**
-     * Returns the ineligibility error message for a player
-     * 
-     * @param object $player Player object with position and name properties
-     * @return string Formatted error message
-     */
     private function getIneligibilityError($player): string
     {
         return 'Sorry, ' . $player->position . ' ' . $player->name . ' is not eligible for a rookie option.' . "\n\n" .

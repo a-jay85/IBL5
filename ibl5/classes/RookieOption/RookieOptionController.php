@@ -4,11 +4,12 @@ namespace RookieOption;
 
 use Player\Player;
 use Shared\SalaryConverter;
+use RookieOption\Contracts\RookieOptionControllerInterface;
 
 /**
- * Main controller for rookie option operations
+ * @see RookieOptionControllerInterface
  */
-class RookieOptionController
+class RookieOptionController implements RookieOptionControllerInterface
 {
     // Configuration constants
     private const NOTIFICATION_EMAIL_RECIPIENT = 'ibldepthcharts@gmail.com';
@@ -30,19 +31,13 @@ class RookieOptionController
     }
     
     /**
-     * Main entry point for processing rookie option exercise
-     * 
-     * @param string $teamName Team name
-     * @param int $playerID Player ID
-     * @param int $extensionAmount Rookie option amount
+     * @see RookieOptionControllerInterface::processRookieOption()
      */
     public function processRookieOption(string $teamName, int $playerID, int $extensionAmount): void
     {
         $sharedFunctions = new \Shared($this->db);
         $commonRepository = new \Services\CommonRepository($this->db);
         $season = new \Season($this->db);
-        
-        // Load player
         $player = Player::withPlayerID($this->db, $playerID);
         
         // Validate player eligibility
@@ -81,13 +76,6 @@ class RookieOptionController
         $this->view->renderSuccessPage($teamName, $teamID, $season->phase, $emailSuccess);
     }
     
-    /**
-     * Creates a news story for a rookie option exercise
-     * 
-     * @param string $teamName Team name
-     * @param string $playerName Player name
-     * @param int $extensionAmount Extension amount in thousands
-     */
     private function createRookieOptionNewsStory(string $teamName, string $playerName, int $extensionAmount): void
     {
         $rookieOptionInMillions = SalaryConverter::convertToMillions($extensionAmount);

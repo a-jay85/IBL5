@@ -3,16 +3,15 @@
 namespace RookieOption;
 
 use Services\DatabaseService;
+use RookieOption\Contracts\RookieOptionFormViewInterface;
 
 /**
- * Handles rendering of the rookie option form
+ * @see RookieOptionFormViewInterface
  */
-class RookieOptionFormView
+class RookieOptionFormView implements RookieOptionFormViewInterface
 {
     /**
-     * Renders a generic error message with proper HTML escaping
-     * 
-     * @param string $errorMessage Error message to display
+     * @see RookieOptionFormViewInterface::renderError()
      */
     public function renderError(string $errorMessage): void
     {
@@ -23,15 +22,10 @@ class RookieOptionFormView
     }
     
     /**
-     * Renders the rookie option form for a player
-     * 
-     * @param object $player Player object with properties: playerID, position, name
-     * @param string $teamName User's team name
-     * @param int $rookieOptionValue Calculated rookie option value
+     * @see RookieOptionFormViewInterface::renderForm()
      */
     public function renderForm($player, string $teamName, int $rookieOptionValue): void
     {
-        // Escape all output for security
         $playerID = (int) $player->playerID;
         $playerPosition = DatabaseService::safeHtmlOutput($player->position);
         $playerName = DatabaseService::safeHtmlOutput($player->name);

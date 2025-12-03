@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Voting;
 
+use Voting\Contracts\VotingResultsControllerInterface;
+
 /**
- * Coordinates fetching and rendering of voting results based on the season phase
+ * @see VotingResultsControllerInterface
  */
-class VotingResultsController
+class VotingResultsController implements VotingResultsControllerInterface
 {
     public function __construct(
         private readonly VotingResultsService $service,
@@ -17,9 +19,7 @@ class VotingResultsController
     }
 
     /**
-     * Renders the appropriate voting results for the active season phase
-     * 
-     * @return string HTML output
+     * @see VotingResultsControllerInterface::render()
      */
     public function render(): string
     {
@@ -31,9 +31,7 @@ class VotingResultsController
     }
 
     /**
-     * Renders All-Star voting results regardless of season phase
-     * 
-     * @return string HTML output
+     * @see VotingResultsControllerInterface::renderAllStarView()
      */
     public function renderAllStarView(): string
     {
@@ -41,9 +39,7 @@ class VotingResultsController
     }
 
     /**
-     * Renders end-of-year awards voting results regardless of season phase
-     * 
-     * @return string HTML output
+     * @see VotingResultsControllerInterface::renderEndOfYearView()
      */
     public function renderEndOfYearView(): string
     {

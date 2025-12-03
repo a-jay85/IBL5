@@ -32,9 +32,7 @@ class TeamController implements TeamControllerInterface
     {
         $teamID = (int) $teamID;
         
-        if ($teamID > 0) {
-            $team = \Team::initialize($this->db, $teamID);
-        }
+        $team = \Team::initialize($this->db, $teamID);
         
         $sharedFunctions = new \Shared($this->db);
         $season = new \Season($this->db);
@@ -69,7 +67,7 @@ class TeamController implements TeamControllerInterface
             <tr>
                 <td align=center valign=top>";
                 
-        \UI::displaytopmenu($this->db, $team->teamID);
+        \UI::displaytopmenu($this->db, $teamID);
                 
         echo "<img src=\"./images/logo/$teamID.jpg\">";
                 

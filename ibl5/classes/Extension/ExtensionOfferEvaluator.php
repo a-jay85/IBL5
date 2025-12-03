@@ -2,18 +2,12 @@
 
 namespace Extension;
 
+use Extension\Contracts\ExtensionOfferEvaluatorInterface;
+
 /**
- * Extension Offer Evaluator Class
- * 
- * Handles offer evaluation logic including player preferences and modifiers.
- * Calculates whether a player will accept or reject an extension offer based on:
- * - Offer value relative to demands
- * - Team performance (wins/losses)
- * - Franchise tradition
- * - Player loyalty
- * - Playing time concerns (money committed at position)
+ * @see ExtensionOfferEvaluatorInterface
  */
-class ExtensionOfferEvaluator
+class ExtensionOfferEvaluator implements ExtensionOfferEvaluatorInterface
 {
     private $db;
 
@@ -23,10 +17,7 @@ class ExtensionOfferEvaluator
     }
 
     /**
-     * Calculates the total value, years, and average per year of an offer
-     * 
-     * @param array $offer Array with keys: year1, year2, year3, year4, year5
-     * @return array ['total' => int, 'years' => int, 'averagePerYear' => float]
+     * @see ExtensionOfferEvaluatorInterface::calculateOfferValue()
      */
     public function calculateOfferValue($offer)
     {
@@ -47,12 +38,7 @@ class ExtensionOfferEvaluator
     }
 
     /**
-     * Calculates the winner modifier based on team wins/losses and player preference
-     * Formula: 0.000153 * (wins - losses) * (player_winner - 1)
-     * 
-     * @param array $teamFactors ['wins' => int, 'losses' => int]
-     * @param array $playerPreferences ['winner' => int] (1-5 scale)
-     * @return float Modifier contribution
+     * @see ExtensionOfferEvaluatorInterface::calculateWinnerModifier()
      */
     public function calculateWinnerModifier($teamFactors, $playerPreferences)
     {
@@ -61,12 +47,7 @@ class ExtensionOfferEvaluator
     }
 
     /**
-     * Calculates the tradition modifier based on franchise history and player preference
-     * Formula: 0.000153 * (tradition_wins - tradition_losses) * (player_tradition - 1)
-     * 
-     * @param array $teamFactors ['tradition_wins' => int, 'tradition_losses' => int]
-     * @param array $playerPreferences ['tradition' => int] (1-5 scale)
-     * @return float Modifier contribution
+     * @see ExtensionOfferEvaluatorInterface::calculateTraditionModifier()
      */
     public function calculateTraditionModifier($teamFactors, $playerPreferences)
     {
@@ -75,11 +56,7 @@ class ExtensionOfferEvaluator
     }
 
     /**
-     * Calculates the loyalty modifier based on player's loyalty rating
-     * Formula: 0.025 * (player_loyalty - 1)
-     * 
-     * @param array $playerPreferences ['loyalty' => int] (1-5 scale)
-     * @return float Modifier contribution
+     * @see ExtensionOfferEvaluatorInterface::calculateLoyaltyModifier()
      */
     public function calculateLoyaltyModifier($playerPreferences)
     {
@@ -87,15 +64,7 @@ class ExtensionOfferEvaluator
     }
 
     /**
-     * Calculates the playing time modifier based on money committed at position
-     * Formula: -(.0025 * money_committed / 100 - 0.025) * (player_playingtime - 1)
-     * 
-     * Note: This corrects a bug in the original code where $tf_millions was undefined.
-     * Now properly uses money_committed_at_position from team info.
-     * 
-     * @param array $teamFactors ['money_committed_at_position' => int]
-     * @param array $playerPreferences ['playing_time' => int] (1-5 scale)
-     * @return float Modifier contribution
+     * @see ExtensionOfferEvaluatorInterface::calculatePlayingTimeModifier()
      */
     public function calculatePlayingTimeModifier($teamFactors, $playerPreferences)
     {
@@ -106,12 +75,7 @@ class ExtensionOfferEvaluator
     }
 
     /**
-     * Calculates the combined modifier from all factors
-     * Base modifier is 1.0, then add all individual modifiers
-     * 
-     * @param array $teamFactors Team information
-     * @param array $playerPreferences Player preferences
-     * @return float Combined modifier (typically 0.8 to 1.2)
+     * @see ExtensionOfferEvaluatorInterface::calculateCombinedModifier()
      */
     public function calculateCombinedModifier($teamFactors, $playerPreferences)
     {
@@ -124,13 +88,7 @@ class ExtensionOfferEvaluator
     }
 
     /**
-     * Evaluates whether a player will accept an extension offer
-     * 
-     * @param array $offer Offer array with year1-year5
-     * @param array $demands Player's demands array with year1-year5
-     * @param array $teamFactors Team information
-     * @param array $playerPreferences Player preferences
-     * @return array ['accepted' => bool, 'offerValue' => float, 'demandValue' => float, 'modifier' => float]
+     * @see ExtensionOfferEvaluatorInterface::evaluateOffer()
      */
     public function evaluateOffer($offer, $demands, $teamFactors, $playerPreferences)
     {
@@ -152,11 +110,7 @@ class ExtensionOfferEvaluator
     }
 
     /**
-     * Calculates player demands based on player value
-     * (Helper method for testing)
-     * 
-     * @param int $playerValue Player's value
-     * @return array Demands array with total and years
+     * @see ExtensionOfferEvaluatorInterface::calculatePlayerDemands()
      */
     public function calculatePlayerDemands($playerValue)
     {

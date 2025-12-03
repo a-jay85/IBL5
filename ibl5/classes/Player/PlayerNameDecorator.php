@@ -2,13 +2,12 @@
 
 namespace Player;
 
+use Player\Contracts\PlayerNameDecoratorInterface;
+
 /**
- * PlayerNameDecorator - Handles player name formatting and decoration
- * 
- * This class is responsible for formatting player names with special indicators
- * (free agency eligibility, waivers, etc.)
+ * @see PlayerNameDecoratorInterface
  */
-class PlayerNameDecorator
+class PlayerNameDecorator implements PlayerNameDecoratorInterface
 {
     /**
      * Decorate a player name with status indicators

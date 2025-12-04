@@ -60,5 +60,8 @@
             <file>tests/FreeAgency/FreeAgencyOfferValidatorTest.php</file>
             <file>tests/FreeAgency/OfferTypeTest.php</file>
         </testsuite>
+        <testsuite name="ComparePlayers Module Tests">
+            <directory>tests/ComparePlayers</directory>
+        </testsuite>
     </testsuites>
 </phpunit>

@@ -37,7 +37,9 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0): void
     global $user, $prefix, $user_prefix, $db;
     $commonRepository = new \Services\CommonRepository($db);
 
-    $sql2 = "SELECT * FROM " . $user_prefix . "_users WHERE username = '$username'";
+    // SECURITY: Escape username to prevent SQL injection
+    $escaped_username = \Services\DatabaseService::escapeString($db, $username);
+    $sql2 = "SELECT * FROM " . $user_prefix . "_users WHERE username = '$escaped_username'";
     $result2 = $db->sql_query($sql2);
     $userinfo = $db->sql_fetchrow($result2);
     if (!$bypass) {
@@ -63,9 +65,18 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0): void
         // Display search form
         echo $view->renderSearchForm($playerNames);
     } else {
-        // Process comparison
-        $player1Name = $_POST['Player1'] ?? '';
-        $player2Name = $_POST['Player2'] ?? '';
+        // Process comparison with input validation
+        $player1Name = filter_input(INPUT_POST, 'Player1', FILTER_SANITIZE_FULL_SPECIAL_CHARS) ?? '';
+        $player2Name = filter_input(INPUT_POST, 'Player2', FILTER_SANITIZE_FULL_SPECIAL_CHARS) ?? '';
+        
+        // Validate input length (max 100 characters for player names)
+        if (strlen($player1Name) > 100 || strlen($player2Name) > 100) {
+            echo '<p style="color: red; font-weight: bold;">Error: Player names must be 100 characters or less.</p>';
+            echo $view->renderSearchForm($playerNames);
+            CloseTable();
+            Nuke\Footer::footer();
+            return;
+        }
         
         $comparison = $service->comparePlayers($player1Name, $player2Name);
         

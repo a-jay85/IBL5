@@ -168,10 +168,10 @@ class PowerRankingsUpdater {
             last 10 = {$stats['winsInLast10Games']}-{$stats['lossesInLast10Games']}, 
             ranking score = $ranking<br>";
 
-        $this->updateSeasonRecords($teamName);
-        
         if ($this->season->phase == "HEAT" && $stats['wins'] != 0 && $stats['losses'] != 0) {
             $this->updateHeatRecords($teamName);
+        } elseif ($this->season->phase == "Regular Season") {
+            $this->updateSeasonRecords($teamName);
         }
 
         $this->updateHistoricalRecords();

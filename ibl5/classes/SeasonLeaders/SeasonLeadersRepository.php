@@ -33,13 +33,13 @@ class SeasonLeadersRepository implements SeasonLeadersRepositoryInterface
         }
         
         // Add team filter if specified and not "All"
-        if (!empty($filters['team']) && $filters['team'] != 0) {
-            $teamId = (int)$filters['team'];
+        $teamId = (int)($filters['team'] ?? 0);
+        if (!empty($teamId) && $teamId != 0) {
             $conditions[] = "teamid = $teamId";
         }
         
         $whereClause = implode(' AND ', $conditions);
-        $sortBy = $this->getSortColumn($filters['sortBy'] ?? '1');
+        $sortBy = $this->getSortColumn($filters['sortby'] ?? '1');
         
         $query = "SELECT * FROM ibl_hist WHERE $whereClause ORDER BY $sortBy DESC";
         $result = $this->db->sql_query($query);

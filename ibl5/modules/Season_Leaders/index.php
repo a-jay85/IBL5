@@ -21,7 +21,7 @@ $view = new SeasonLeadersView($service);
 // Get filter parameters from POST
 $filters = [
     'year' => $_POST['year'] ?? '',
-    'team' => $_POST['team'] ?? 0,
+    'team' => (int)($_POST['team'] ?? 0),
     'sortby' => $_POST['sortby'] ?? '1'
 ];
 

@@ -33,7 +33,7 @@ class ScheduleUpdater {
                 }
             }
             
-            if ($month < \Season::IBL_REGULAR_SEASON_STARTING_MONTH) {
+            if ($month < \Season::IBL_HEAT_MONTH) {
                 $year = $this->season->endingYear;
             } else {
                 $year = $this->season->beginningYear;

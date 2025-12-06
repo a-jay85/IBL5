@@ -1,124 +1,69 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Extension;
 
 use Extension\Contracts\ExtensionValidatorInterface;
+use Services\CommonContractValidator;
 
 /**
+ * ExtensionValidator - Validates contract extension offers
+ * 
+ * Delegates common validation logic to CommonContractValidator while
+ * handling Extension-specific validation (team eligibility flags).
+ * 
  * @see ExtensionValidatorInterface
  */
 class ExtensionValidator implements ExtensionValidatorInterface
 {
     private $db;
-
-    const MAX_YEAR_ONE_0_TO_6_YEARS = 1063;
-    const MAX_YEAR_ONE_7_TO_9_YEARS = 1275;
-    const MAX_YEAR_ONE_10_PLUS_YEARS = 1451;
+    private CommonContractValidator $contractValidator;
 
     public function __construct($db)
     {
         $this->db = $db;
+        $this->contractValidator = new CommonContractValidator();
     }
 
     /**
      * @see ExtensionValidatorInterface::validateOfferAmounts()
      */
-    public function validateOfferAmounts($offer)
+    public function validateOfferAmounts(array $offer): array
     {
-        foreach (['year1', 'year2', 'year3'] as $year) {
-            if (empty($offer[$year])) {
-            return [
-                'valid' => false,
-                'error' => "Sorry, you must enter an amount greater than zero for each of the first three contract years when making an extension offer. Your offer in " . ucfirst($year) . " was zero, so this offer is not valid."
-            ];
-            }
-        }
-        return ['valid' => true, 'error' => null];
+        return $this->contractValidator->validateOfferAmounts($offer);
     }
 
     /**
      * @see ExtensionValidatorInterface::validateMaximumYearOneOffer()
      */
-    public function validateMaximumYearOneOffer($offer, $yearsExperience)
+    public function validateMaximumYearOneOffer(array $offer, int $yearsExperience): array
     {
-        $maxYearOneOffer = $this->getMaximumYearOneOffer($yearsExperience);
-        if ($offer['year1'] > $maxYearOneOffer) {
-            return ['valid' => false, 'error' => 'Sorry, the first year of your offer is over the maximum allowed for a player with their years of service.'];
-        }
-        return ['valid' => true, 'error' => null];
+        return $this->contractValidator->validateMaximumYearOne($offer, $yearsExperience);
     }
 
     /**
      * @see ExtensionValidatorInterface::validateRaises()
      */
-    public function validateRaises($offer, $birdYears)
+    public function validateRaises(array $offer, int $birdYears): array
     {
-        $maxRaisePercentage = \ContractRules::getMaxRaisePercentage($birdYears);
-        $maxIncrease = floor($offer['year1'] * $maxRaisePercentage);
-        
-        if ($offer['year2'] > $offer['year1'] + $maxIncrease) {
-            $legalOffer = $offer['year1'] + $maxIncrease;
-            return [
-                'valid' => false, 
-                'error' => "Sorry, you tried to offer a larger raise than is permitted. Your first year offer was {$offer['year1']} which means the maximum raise allowed each year is $maxIncrease. Your offer in Year 2 was {$offer['year2']}, which is more than your Year 1 offer, {$offer['year1']}, plus the max increase of $maxIncrease. Given your offer in Year 1, the most you can offer in Year 2 is $legalOffer."
-            ];
-        }
-        if ($offer['year3'] > $offer['year2'] + $maxIncrease) {
-            $legalOffer = $offer['year2'] + $maxIncrease;
-            return [
-                'valid' => false, 
-                'error' => "Sorry, you tried to offer a larger raise than is permitted. Your first year offer was {$offer['year1']} which means the maximum raise allowed each year is $maxIncrease. Your offer in Year 3 was {$offer['year3']}, which is more than your Year 2 offer, {$offer['year2']}, plus the max increase of $maxIncrease. Given your offer in Year 2, the most you can offer in Year 3 is $legalOffer."
-            ];
-        }
-        if ($offer['year4'] > 0 && $offer['year4'] > $offer['year3'] + $maxIncrease) {
-            $legalOffer = $offer['year3'] + $maxIncrease;
-            return [
-                'valid' => false, 
-                'error' => "Sorry, you tried to offer a larger raise than is permitted. Your first year offer was {$offer['year1']} which means the maximum raise allowed each year is $maxIncrease. Your offer in Year 4 was {$offer['year4']}, which is more than your Year 3 offer, {$offer['year3']}, plus the max increase of $maxIncrease. Given your offer in Year 3, the most you can offer in Year 4 is $legalOffer."
-            ];
-        }
-        if ($offer['year5'] > 0 && $offer['year5'] > $offer['year4'] + $maxIncrease) {
-            $legalOffer = $offer['year4'] + $maxIncrease;
-            return [
-                'valid' => false, 
-                'error' => "Sorry, you tried to offer a larger raise than is permitted. Your first year offer was {$offer['year1']} which means the maximum raise allowed each year is $maxIncrease. Your offer in Year 5 was {$offer['year5']}, which is more than your Year 4 offer, {$offer['year4']}, plus the max increase of $maxIncrease. Given your offer in Year 4, the most you can offer in Year 5 is $legalOffer."
-            ];
-        }
-        return ['valid' => true, 'error' => null];
+        return $this->contractValidator->validateRaises($offer, $birdYears);
     }
 
     /**
      * @see ExtensionValidatorInterface::validateSalaryDecreases()
      */
-    public function validateSalaryDecreases($offer)
+    public function validateSalaryDecreases(array $offer): array
     {
-        $years = ['year1', 'year2', 'year3', 'year4', 'year5'];
-        for ($i = 1; $i < count($years); $i++) {
-            if ($offer[$years[$i]] < $offer[$years[$i - 1]] && $offer[$years[$i]] != 0) {
-            return [
-                'valid' => false,
-                'error' => "Sorry, you cannot decrease salary in later years of a contract. You offered {$offer[$years[$i]]} in the " . ($i + 1) . " year, which is less than you offered in the previous year, {$offer[$years[$i - 1]]}."
-            ];
-            }
-        }
-        return ['valid' => true, 'error' => null];
-    }
-
-    private function getMaximumYearOneOffer($yearsExperience)
-    {
-        if ($yearsExperience > 9) {
-            return self::MAX_YEAR_ONE_10_PLUS_YEARS;
-        }
-        if ($yearsExperience > 6) {
-            return self::MAX_YEAR_ONE_7_TO_9_YEARS;
-        }
-        return self::MAX_YEAR_ONE_0_TO_6_YEARS;
+        return $this->contractValidator->validateSalaryDecreases($offer);
     }
 
     /**
      * @see ExtensionValidatorInterface::validateExtensionEligibility()
+     * 
+     * Extension-specific validation - NOT delegated to CommonContractValidator
      */
-    public function validateExtensionEligibility($team)
+    public function validateExtensionEligibility(object $team): array
     {
         if ($team->hasUsedExtensionThisSeason == 1) {
             return [

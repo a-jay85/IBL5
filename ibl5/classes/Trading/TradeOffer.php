@@ -1,31 +1,40 @@
 <?php
 
-require_once __DIR__ . '/Contracts/Trading_TradeOfferInterface.php';
+declare(strict_types=1);
+
+namespace Trading;
+
+use Trading\Contracts\TradeOfferInterface;
 
 /**
- * @see Trading_TradeOfferInterface
+ * TradeOffer - Creates and manages trade offers
+ *
+ * Handles the creation of trade offers, validation of trade terms,
+ * and notification of trade proposals to receiving teams.
+ * 
+ * @see TradeOfferInterface
  */
-class Trading_TradeOffer implements Trading_TradeOfferInterface
+class TradeOffer implements TradeOfferInterface
 {
     protected $db;
-    protected $commonRepository;
-    protected $season;
-    protected $cashHandler;
-    protected $validator;
+    protected \Services\CommonRepository $commonRepository;
+    protected \Season $season;
+    protected CashTransactionHandler $cashHandler;
+    protected TradeValidator $validator;
 
     public function __construct($db)
     {
         $this->db = $db;
         $this->commonRepository = new \Services\CommonRepository($db);
-        $this->season = new Season($db);
-        $this->cashHandler = new Trading_CashTransactionHandler($db);
-        $this->validator = new Trading_TradeValidator($db);
+        $this->season = new \Season($db);
+        $this->cashHandler = new CashTransactionHandler($db);
+        $this->validator = new TradeValidator($db);
     }
 
     /**
-     * @see Trading_TradeOfferInterface::createTradeOffer()
+     * @see TradeOfferInterface::createTradeOffer()
      */
-    public function createTradeOffer($tradeData)
+    public function createTradeOffer(array $tradeData): array
     {
         // Generate new trade offer ID
         $tradeOfferId = $this->generateTradeOfferId();
@@ -66,7 +75,7 @@ class Trading_TradeOffer implements Trading_TradeOfferInterface
      * Generate a new unique trade offer ID
      * @return int New trade offer ID
      */
-    protected function generateTradeOfferId()
+    protected function generateTradeOfferId(): int
     {
         $query0 = "SELECT * FROM ibl_trade_autocounter ORDER BY `counter` DESC";
         $result0 = $this->db->sql_query($query0);
@@ -84,7 +93,7 @@ class Trading_TradeOffer implements Trading_TradeOfferInterface
      * @param array $tradeData Trade data
      * @return array Calculated cap data
      */
-    protected function calculateSalaryCapData($tradeData)
+    protected function calculateSalaryCapData(array $tradeData): array
     {
         $userCurrentSeasonCapTotal = 0;
         $partnerCurrentSeasonCapTotal = 0;
@@ -140,7 +149,7 @@ class Trading_TradeOffer implements Trading_TradeOfferInterface
      * @param array $tradeData Trade data
      * @return array Result with success status and trade text
      */
-    protected function insertTradeOfferData($tradeOfferId, $tradeData)
+    protected function insertTradeOfferData(int $tradeOfferId, array $tradeData): array
     {
         $tradeText = "";
         $offeringTeamName = $tradeData['offeringTeam'];
@@ -219,7 +228,7 @@ class Trading_TradeOffer implements Trading_TradeOfferInterface
      * @param string $approvalTeamName Name of team that needs to approve
      * @return array Result
      */
-    protected function insertTradeItem($tradeOfferId, $itemId, $assetType, $offeringTeamName, $listeningTeamName, $approvalTeamName)
+    protected function insertTradeItem(int $tradeOfferId, int $itemId, int $assetType, string $offeringTeamName, string $listeningTeamName, string $approvalTeamName): array
     {
         $query = "INSERT INTO ibl_trade_info 
           ( `tradeofferid`, 
@@ -254,7 +263,7 @@ class Trading_TradeOffer implements Trading_TradeOfferInterface
      * @param string $listeningTeamName Listening team name
      * @return string Trade text
      */
-    protected function getPickTradeText($pickId, $offeringTeamName, $listeningTeamName)
+    protected function getPickTradeText(int $pickId, string $offeringTeamName, string $listeningTeamName): string
     {
         $sqlgetpick = "SELECT * FROM ibl_draft_picks WHERE pickid = '$pickId'";
         $resultgetpick = $this->db->sql_query($sqlgetpick);
@@ -280,7 +289,7 @@ class Trading_TradeOffer implements Trading_TradeOfferInterface
      * @param string $listeningTeamName Listening team name
      * @return string Trade text
      */
-    protected function getPlayerTradeText($playerId, $offeringTeamName, $listeningTeamName)
+    protected function getPlayerTradeText(int $playerId, string $offeringTeamName, string $listeningTeamName): string
     {
         $sqlgetplyr = "SELECT * FROM ibl_plr WHERE pid = '$playerId'";
         $resultgetplyr = $this->db->sql_query($sqlgetplyr);
@@ -301,7 +310,7 @@ class Trading_TradeOffer implements Trading_TradeOfferInterface
      * @param string $approvalTeamName Team that needs to approve the trade (should always be the listening team of the overall trade)
      * @return array Result
      */
-    protected function insertCashTradeOffer($tradeOfferId, $offeringTeamName, $listeningTeamName, $cashAmounts, $approvalTeamName)
+    protected function insertCashTradeOffer(int $tradeOfferId, string $offeringTeamName, string $listeningTeamName, array $cashAmounts, string $approvalTeamName): array
     {
         // Insert cash data
         $this->cashHandler->insertCashTradeData($tradeOfferId, $offeringTeamName, $listeningTeamName, $cashAmounts);
@@ -337,13 +346,13 @@ class Trading_TradeOffer implements Trading_TradeOfferInterface
      * @param array $tradeData Trade data
      * @param string $tradeText Trade description text
      */
-    protected function sendTradeNotification($tradeData, $tradeText)
+    protected function sendTradeNotification(array $tradeData, string $tradeText): void
     {
         $offeringTeamName = $tradeData['offeringTeam'];
         $listeningTeamName = $tradeData['listeningTeam'];
 
-        $offeringUserDiscordID = Discord::getDiscordIDFromTeamname($this->db, $offeringTeamName);
-        $receivingUserDiscordID = Discord::getDiscordIDFromTeamname($this->db, $listeningTeamName);
+        $offeringUserDiscordID = \Discord::getDiscordIDFromTeamname($this->db, $offeringTeamName);
+        $receivingUserDiscordID = \Discord::getDiscordIDFromTeamname($this->db, $listeningTeamName);
 
         $cleanTradeText = str_replace(['<br>', '&nbsp;', '<i>', '</i>'], ["\n", " ", "_", "_"], $tradeText);
 
@@ -356,6 +365,6 @@ Go here to accept or decline: http://www.iblhoops.net/ibl5/modules.php?name=Trad
             'receivingUserDiscordID' => $receivingUserDiscordID,
         ];
 
-        // $response = Discord::sendCurlPOST('http://localhost:50000/discordDM', $arrayContent);
+        // $response = \Discord::sendCurlPOST('http://localhost:50000/discordDM', $arrayContent);
     }
 }

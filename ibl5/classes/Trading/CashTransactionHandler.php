@@ -1,14 +1,24 @@
 <?php
 
-require_once __DIR__ . '/Contracts/Trading_CashTransactionHandlerInterface.php';
+declare(strict_types=1);
+
+namespace Trading;
+
+use Trading\Contracts\CashTransactionHandlerInterface;
 
 /**
- * @see Trading_CashTransactionHandlerInterface
+ * CashTransactionHandler - Handles cash considerations in trades
+ *
+ * Manages the creation of cash entries in trades including generating unique
+ * player IDs for cash transactions and creating the paired positive/negative
+ * cash records for trading teams.
+ * 
+ * @see CashTransactionHandlerInterface
  */
-class Trading_CashTransactionHandler implements Trading_CashTransactionHandlerInterface
+class CashTransactionHandler implements CashTransactionHandlerInterface
 {
     protected $db;
-    protected $commonRepository;
+    protected \Services\CommonRepository $commonRepository;
 
     public function __construct($db)
     {
@@ -17,9 +27,9 @@ class Trading_CashTransactionHandler implements Trading_CashTransactionHandlerIn
     }
 
     /**
-     * @see Trading_CashTransactionHandlerInterface::generateUniquePid()
+     * @see CashTransactionHandlerInterface::generateUniquePid()
      */
-    public function generateUniquePid($pid)
+    public function generateUniquePid(int $pid): int
     {
         $queryCheckIfPidExists = "SELECT 1 FROM ibl_plr WHERE pid = $pid";
         $resultCheckIfPidExists = $this->db->sql_query($queryCheckIfPidExists);
@@ -34,19 +44,19 @@ class Trading_CashTransactionHandler implements Trading_CashTransactionHandlerIn
     }
 
     /**
-     * @see Trading_CashTransactionHandlerInterface::calculateContractTotalYears()
+     * @see CashTransactionHandlerInterface::calculateContractTotalYears()
      */
-    public function calculateContractTotalYears($cashYear)
+    public function calculateContractTotalYears(array $cashYear): int
     {
-        if ($cashYear[6] != 0) {
+        if (($cashYear[6] ?? 0) != 0) {
             return 6;
-        } elseif ($cashYear[5] != 0) {
+        } elseif (($cashYear[5] ?? 0) != 0) {
             return 5;
-        } elseif ($cashYear[4] != 0) {
+        } elseif (($cashYear[4] ?? 0) != 0) {
             return 4;
-        } elseif ($cashYear[3] != 0) {
+        } elseif (($cashYear[3] ?? 0) != 0) {
             return 3;
-        } elseif ($cashYear[2] != 0) {
+        } elseif (($cashYear[2] ?? 0) != 0) {
             return 2;
         } else {
             return 1;
@@ -54,9 +64,9 @@ class Trading_CashTransactionHandler implements Trading_CashTransactionHandlerIn
     }
 
     /**
-     * @see Trading_CashTransactionHandlerInterface::createCashTransaction()
+     * @see CashTransactionHandlerInterface::createCashTransaction()
      */
-    public function createCashTransaction($itemId, $offeringTeamName, $listeningTeamName, $cashYear)
+    public function createCashTransaction(int $itemId, string $offeringTeamName, string $listeningTeamName, array $cashYear): array
     {
         $offeringTeamId = $this->commonRepository->getTidFromTeamname($offeringTeamName);
         $listeningTeamId = $this->commonRepository->getTidFromTeamname($listeningTeamName);
@@ -158,9 +168,9 @@ class Trading_CashTransactionHandler implements Trading_CashTransactionHandlerIn
     }
 
     /**
-     * @see Trading_CashTransactionHandlerInterface::insertCashTradeData()
+     * @see CashTransactionHandlerInterface::insertCashTradeData()
      */
-    public function insertCashTradeData($tradeOfferId, $offeringTeamName, $listeningTeamName, $cashAmounts)
+    public function insertCashTradeData(int $tradeOfferId, string $offeringTeamName, string $listeningTeamName, array $cashAmounts): bool
     {
         // Use null coalescing to default missing years to 0
         $cy1 = $cashAmounts[1] ?? 0;
@@ -194,9 +204,9 @@ class Trading_CashTransactionHandler implements Trading_CashTransactionHandlerIn
     }
 
     /**
-     * @see Trading_CashTransactionHandlerInterface::hasCashInTrade()
+     * @see CashTransactionHandlerInterface::hasCashInTrade()
      */
-    public function hasCashInTrade($cashAmounts)
+    public function hasCashInTrade(array $cashAmounts): bool
     {
         foreach ($cashAmounts as $amount) {
             if (!empty($amount) && (int)$amount !== 0) {

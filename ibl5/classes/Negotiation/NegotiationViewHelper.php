@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Negotiation;
 
 use Negotiation\Contracts\NegotiationViewHelperInterface;
@@ -33,8 +35,8 @@ class NegotiationViewHelper implements NegotiationViewHelperInterface
         // Calculate max raises
         $birdYears = $player->birdYears ?? 0;
         $maxRaise = $birdYears >= 3 
-            ? round($maxYearOneSalary * 0.125) 
-            : round($maxYearOneSalary * 0.1);
+            ? (int) round($maxYearOneSalary * 0.125) 
+            : (int) round($maxYearOneSalary * 0.1);
         
         $output = "<form name=\"ExtensionOffer\" method=\"post\" action=\"modules/Player/extension.php\">";
         $output .= "<p>Note that if you offer the max and I refuse, it means I am opting for Free Agency at the end of the season:</p>";

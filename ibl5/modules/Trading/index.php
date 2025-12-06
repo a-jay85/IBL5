@@ -25,14 +25,14 @@ function menu()
 function buildTeamFutureSalary($resultTeamPlayers, $k)
 {
     global $db;
-    $uiHelper = new Trading_UIHelper($db);
+    $uiHelper = new Trading\UIHelper($db);
     return $uiHelper->buildTeamFutureSalary($resultTeamPlayers, $k);
 }
 
 function buildTeamFuturePicks($resultTeamPicks, $future_salary_array)
 {
     global $db;
-    $uiHelper = new Trading_UIHelper($db);
+    $uiHelper = new Trading\UIHelper($db);
     return $uiHelper->buildTeamFuturePicks($resultTeamPicks, $future_salary_array);
 }
 
@@ -133,7 +133,7 @@ function tradeoffer($username)
 				<tr>
 					<td valign=top><center><b><u>Make Trade Offer To...</u></b></center>";
 
-    $uiHelper = new Trading_UIHelper($db);
+    $uiHelper = new Trading\UIHelper($db);
     $teams = $uiHelper->getAllTeamsForTrading();
     echo $uiHelper->renderTeamSelectionLinks($teams);
 
@@ -327,7 +327,7 @@ function tradereview($username)
     echo "</td>
 		<td valign=top><center><b><u>Make Trade Offer To...</u></b></center>";
 
-    $uiHelper = new Trading_UIHelper($db);
+    $uiHelper = new Trading\UIHelper($db);
     $teams = $uiHelper->getAllTeamsForTrading();
     echo $uiHelper->renderTeamSelectionLinks($teams);
 

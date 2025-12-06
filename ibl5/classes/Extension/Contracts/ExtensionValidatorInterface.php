@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Extension\Contracts;
 
 /**
@@ -8,7 +10,11 @@ namespace Extension\Contracts;
  * Defines validation rules for contract extension offers. Enforces business rules
  * around offer amounts, maximum salaries, raise percentages, and team eligibility.
  * 
+ * Delegates common validation logic to Services\CommonContractValidator for
+ * consistency across Extension, FreeAgency, and Negotiation modules.
+ * 
  * @package Extension\Contracts
+ * @see \Services\Contracts\CommonContractValidatorInterface
  */
 interface ExtensionValidatorInterface
 {
@@ -17,55 +23,65 @@ interface ExtensionValidatorInterface
      * 
      * Extensions must include at least 3 guaranteed years. Years 4 and 5 are optional.
      * 
-     * @param array $offer Array with keys: year1, year2, year3, year4, year5
-     * @return array Validation result:
-     *   - 'valid': bool - True if all required years have amounts
-     *   - 'error': string|null - Error message if invalid, null if valid
+     * @param array{year1: int, year2: int, year3: int, year4?: int, year5?: int} $offer 
+     *        Contract offer with yearly salary amounts in thousands
+     * @return array{valid: bool, error: string|null} Validation result:
+     *         - 'valid': bool - True if all required years have amounts
+     *         - 'error': string|null - Error message if invalid, null if valid
      * 
-     * **Business Rules:**
-     * - year1, year2, year3 must all be greater than zero
-     * - year4 and year5 can be zero (for 3 or 4-year deals)
+     * IMPORTANT BEHAVIORS:
+     *  - Delegates to CommonContractValidator::validateOfferAmounts()
+     *  - year1, year2, year3 must all be greater than zero
+     *  - year4 and year5 can be zero (for 3 or 4-year deals)
+     * 
+     * @see \Services\CommonContractValidator::validateOfferAmounts()
      */
-    public function validateOfferAmounts($offer);
+    public function validateOfferAmounts(array $offer): array;
 
     /**
      * Validates that the offer doesn't exceed the maximum allowed for player's experience
      * 
      * Year-one salary is capped based on years of service.
      * 
-     * @param array $offer Offer array
+     * @param array{year1: int, year2?: int, year3?: int, year4?: int, year5?: int} $offer
+     *        Contract offer with yearly salary amounts in thousands
      * @param int $yearsExperience Player's years of experience
-     * @return array Validation result:
-     *   - 'valid': bool - True if year1 is within maximum
-     *   - 'error': string|null - Error message if over maximum
+     * @return array{valid: bool, error: string|null} Validation result:
+     *         - 'valid': bool - True if year1 is within maximum
+     *         - 'error': string|null - Error message if over maximum
      * 
-     * **Maximum Salary Tiers:**
-     * - 0-6 years: 1063 ($10.63M)
-     * - 7-9 years: 1275 ($12.75M)
-     * - 10+ years: 1451 ($14.51M)
+     * IMPORTANT BEHAVIORS:
+     *  - Delegates to CommonContractValidator::validateMaximumYearOne()
+     *  - Maximum Salary Tiers: 0-6 years = 1063, 7-9 years = 1275, 10+ years = 1451
+     * 
+     * @see \Services\CommonContractValidator::validateMaximumYearOne()
+     * @see \ContractRules::MAX_CONTRACT_SALARIES
      */
-    public function validateMaximumYearOneOffer($offer, $yearsExperience);
+    public function validateMaximumYearOneOffer(array $offer, int $yearsExperience): array;
 
     /**
      * Validates that raises between years don't exceed allowed percentages
      * 
      * Raises are limited based on Bird rights years and the first year salary.
      * 
-     * @param array $offer Offer array
+     * @param array{year1: int, year2: int, year3: int, year4?: int, year5?: int} $offer
+     *        Contract offer with yearly salary amounts in thousands
      * @param int $birdYears Years with Bird rights (affects max raise percentage)
-     * @return array Validation result:
-     *   - 'valid': bool - True if all raises are within limits
-     *   - 'error': string|null - Detailed error message if raise exceeded
+     * @return array{valid: bool, error: string|null} Validation result:
+     *         - 'valid': bool - True if all raises are within limits
+     *         - 'error': string|null - Detailed error message if raise exceeded
      * 
-     * **Raise Calculation:**
-     * - Max raise = year1 * maxRaisePercentage (from ContractRules)
-     * - Each year checked against previous year + max raise
-     * - Error includes specific year and amounts for user feedback
+     * IMPORTANT BEHAVIORS:
+     *  - Delegates to CommonContractValidator::validateRaises()
+     *  - Max raise = year1 * maxRaisePercentage (from ContractRules)
+     *  - Each year checked against previous year + max raise
+     *  - Error includes specific year and amounts for user feedback
+     *  - Bird Years Impact: 3+ years = 12.5% max raise, <3 years = 10% max raise
      * 
-     * **Bird Years Impact:**
-     * - More bird years = higher allowed raise percentage
+     * @see \Services\CommonContractValidator::validateRaises()
+     * @see \ContractRules::getMaxRaisePercentage()
      */
-    public function validateRaises($offer, $birdYears);
+    public function validateRaises(array $offer, int $birdYears): array;
 
     /**
      * Validates that salaries don't decrease in later years (except to zero)
@@ -73,16 +89,20 @@ interface ExtensionValidatorInterface
      * Contract salaries must be flat or increasing, except when a year is
      * set to zero (indicating end of contract).
      * 
-     * @param array $offer Offer array
-     * @return array Validation result:
-     *   - 'valid': bool - True if no invalid decreases
-     *   - 'error': string|null - Error message if salary decreased
+     * @param array{year1: int, year2: int, year3: int, year4?: int, year5?: int} $offer
+     *        Contract offer with yearly salary amounts in thousands
+     * @return array{valid: bool, error: string|null} Validation result:
+     *         - 'valid': bool - True if no invalid decreases
+     *         - 'error': string|null - Error message if salary decreased
      * 
-     * **Business Rules:**
-     * - year[n] < year[n-1] is invalid UNLESS year[n] == 0
-     * - Zero indicates contract ends, not a salary decrease
+     * IMPORTANT BEHAVIORS:
+     *  - Delegates to CommonContractValidator::validateSalaryDecreases()
+     *  - year[n] < year[n-1] is invalid UNLESS year[n] == 0
+     *  - Zero indicates contract ends, not a salary decrease
+     * 
+     * @see \Services\CommonContractValidator::validateSalaryDecreases()
      */
-    public function validateSalaryDecreases($offer);
+    public function validateSalaryDecreases(array $offer): array;
 
     /**
      * Validates extension eligibility using a Team object
@@ -90,14 +110,17 @@ interface ExtensionValidatorInterface
      * Checks if the team is allowed to make extension offers based on
      * usage flags for the current season and sim.
      * 
-     * @param \Team $team Team object with extension flags
-     * @return array Validation result:
-     *   - 'valid': bool - True if team can make offers
-     *   - 'error': string|null - Error message if not eligible
+     * @param object $team Team object with extension flags:
+     *        - hasUsedExtensionThisSeason: int (0 or 1)
+     *        - hasUsedExtensionThisSim: int (0 or 1)
+     * @return array{valid: bool, error: string|null} Validation result:
+     *         - 'valid': bool - True if team can make offers
+     *         - 'error': string|null - Error message if not eligible
      * 
-     * **Business Rules:**
-     * - Cannot extend if hasUsedExtensionThisSeason == 1
-     * - Cannot extend if hasUsedExtensionThisSim == 1
+     * IMPORTANT BEHAVIORS:
+     *  - This is Extension-specific logic (NOT delegated to CommonContractValidator)
+     *  - Cannot extend if hasUsedExtensionThisSeason == 1
+     *  - Cannot extend if hasUsedExtensionThisSim == 1
      */
-    public function validateExtensionEligibility($team);
+    public function validateExtensionEligibility(object $team): array;
 }

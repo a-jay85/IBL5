@@ -1,27 +1,36 @@
 <?php
 
-require_once __DIR__ . '/Contracts/Trading_UIHelperInterface.php';
+declare(strict_types=1);
+
+namespace Trading;
+
+use Trading\Contracts\UIHelperInterface;
 
 /**
- * @see Trading_UIHelperInterface
+ * UIHelper - Trade form UI rendering
+ *
+ * Handles rendering of trade form elements including player rows,
+ * draft pick rows, team selection, and future salary displays.
+ * 
+ * @see UIHelperInterface
  */
-class Trading_UIHelper implements Trading_UIHelperInterface
+class UIHelper implements UIHelperInterface
 {
     protected $db;
-    protected $sharedFunctions;
-    protected $season;
+    protected \Shared $sharedFunctions;
+    protected \Season $season;
 
     public function __construct($db)
     {
         $this->db = $db;
-        $this->sharedFunctions = new Shared($db);
-        $this->season = new Season($db);
+        $this->sharedFunctions = new \Shared($db);
+        $this->season = new \Season($db);
     }
 
     /**
-     * @see Trading_UIHelperInterface::buildTeamFutureSalary()
+     * @see UIHelperInterface::buildTeamFutureSalary()
      */
-    public function buildTeamFutureSalary($resultTeamPlayers, $k)
+    public function buildTeamFutureSalary($resultTeamPlayers, int $k): array
     {
         $futureSalaryArray = [
             'player' => [],
@@ -73,9 +82,9 @@ class Trading_UIHelper implements Trading_UIHelperInterface
     }
 
     /**
-     * @see Trading_UIHelperInterface::buildTeamFuturePicks()
+     * @see UIHelperInterface::buildTeamFuturePicks()
      */
-    public function buildTeamFuturePicks($resultTeamPicks, $futureSalaryArray)
+    public function buildTeamFuturePicks($resultTeamPicks, array $futureSalaryArray): array
     {
         $k = $futureSalaryArray['k'];
 
@@ -104,14 +113,14 @@ class Trading_UIHelper implements Trading_UIHelperInterface
      * @param int $playerOrdinal Player ordinal (waiver status)
      * @return string HTML for player row
      */
-    protected function renderPlayerRow($k, $playerPid, $playerContractAmount, $playerPosition, $playerName, $playerOrdinal)
+    protected function renderPlayerRow(int $k, int $playerPid, int $playerContractAmount, string $playerPosition, string $playerName, int $playerOrdinal): string
     {
         $html = "<tr>
             <input type=\"hidden\" name=\"index$k\" value=\"$playerPid\">
             <input type=\"hidden\" name=\"contract$k\" value=\"$playerContractAmount\">
             <input type=\"hidden\" name=\"type$k\" value=\"1\">";
 
-        if ($playerContractAmount != 0 && $playerOrdinal <= JSB::WAIVERS_ORDINAL) {
+        if ($playerContractAmount != 0 && $playerOrdinal <= \JSB::WAIVERS_ORDINAL) {
             // Player can be traded
             $html .= "<td align=\"center\"><input type=\"checkbox\" name=\"check$k\"></td>";
         } else {
@@ -135,10 +144,10 @@ class Trading_UIHelper implements Trading_UIHelperInterface
      * @param int $pickYear Pick year
      * @param string $pickTeam Original team
      * @param int $pickRound Pick round
-     * @param string $pickNotes Pick notes
+     * @param string|null $pickNotes Pick notes
      * @return string HTML for draft pick row
      */
-    protected function renderDraftPickRow($k, $pickId, $pickYear, $pickTeam, $pickRound, $pickNotes)
+    protected function renderDraftPickRow(int $k, int $pickId, int $pickYear, string $pickTeam, int $pickRound, ?string $pickNotes): string
     {
         $html = "<tr>
             <td align=\"center\">
@@ -161,9 +170,9 @@ class Trading_UIHelper implements Trading_UIHelperInterface
     }
 
     /**
-     * @see Trading_UIHelperInterface::getAllTeamsForTrading()
+     * @see UIHelperInterface::getAllTeamsForTrading()
      */
-    public function getAllTeamsForTrading()
+    public function getAllTeamsForTrading(): array
     {
         $teams = [];
         $queryListOfAllTeams = "SELECT team_name, team_city FROM ibl_team_info ORDER BY team_city ASC";
@@ -186,9 +195,9 @@ class Trading_UIHelper implements Trading_UIHelperInterface
     }
 
     /**
-     * @see Trading_UIHelperInterface::renderTeamSelectionLinks()
+     * @see UIHelperInterface::renderTeamSelectionLinks()
      */
-    public function renderTeamSelectionLinks($teams)
+    public function renderTeamSelectionLinks(array $teams): string
     {
         $html = '';
         foreach ($teams as $team) {

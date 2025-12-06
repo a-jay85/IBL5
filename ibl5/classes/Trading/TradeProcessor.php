@@ -1,31 +1,40 @@
 <?php
 
-require_once __DIR__ . '/Contracts/Trading_TradeProcessorInterface.php';
+declare(strict_types=1);
+
+namespace Trading;
+
+use Trading\Contracts\TradeProcessorInterface;
 
 /**
- * @see Trading_TradeProcessorInterface
+ * TradeProcessor - Executes trades
+ *
+ * Handles the complete trade execution process including player transfers,
+ * draft pick transfers, cash transactions, news creation, and notifications.
+ * 
+ * @see TradeProcessorInterface
  */
-class Trading_TradeProcessor implements Trading_TradeProcessorInterface
+class TradeProcessor implements TradeProcessorInterface
 {
     protected $db;
-    protected $commonRepository;
-    protected $season;
-    protected $cashHandler;
-    protected $newsService;
+    protected \Services\CommonRepository $commonRepository;
+    protected \Season $season;
+    protected CashTransactionHandler $cashHandler;
+    protected \Services\NewsService $newsService;
 
     public function __construct($db)
     {
         $this->db = $db;
         $this->commonRepository = new \Services\CommonRepository($db);
-        $this->season = new Season($db);
-        $this->cashHandler = new Trading_CashTransactionHandler($db);
+        $this->season = new \Season($db);
+        $this->cashHandler = new CashTransactionHandler($db);
         $this->newsService = new \Services\NewsService($db);
     }
 
     /**
-     * @see Trading_TradeProcessorInterface::processTrade()
+     * @see TradeProcessorInterface::processTrade()
      */
-    public function processTrade($offerId)
+    public function processTrade(int $offerId): array
     {
         $queryTradeRows = "SELECT * FROM ibl_trade_info WHERE tradeofferid = '$offerId'";
         $resultTradeRows = $this->db->sql_query($queryTradeRows);
@@ -223,12 +232,12 @@ class Trading_TradeProcessor implements Trading_TradeProcessorInterface
      */
     protected function sendNotifications($offeringTeamName, $listeningTeamName, $storytext)
     {
-        $fromDiscordId = Discord::getDiscordIDFromTeamname($this->db, $offeringTeamName);
-        $toDiscordId = Discord::getDiscordIDFromTeamname($this->db, $listeningTeamName);
+        $fromDiscordId = \Discord::getDiscordIDFromTeamname($this->db, $offeringTeamName);
+        $toDiscordId = \Discord::getDiscordIDFromTeamname($this->db, $listeningTeamName);
         $discordText = "<@!$fromDiscordId> and <@!$toDiscordId> agreed to a trade:<br>" . $storytext;
         
-        Discord::postToChannel('#trades', $discordText);
-        Discord::postToChannel('#general-chat', $storytext);
+        \Discord::postToChannel('#trades', $discordText);
+        \Discord::postToChannel('#general-chat', $storytext);
     }
 
     /**

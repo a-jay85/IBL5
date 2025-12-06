@@ -1,83 +1,78 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Extension;
 
 use Extension\Contracts\ExtensionOfferEvaluatorInterface;
+use Services\CommonContractValidator;
 
 /**
+ * ExtensionOfferEvaluator - Evaluates contract extension offers
+ * 
+ * Calculates whether a player will accept or reject an extension based on
+ * offer value, team factors, and player preferences.
+ * 
  * @see ExtensionOfferEvaluatorInterface
  */
 class ExtensionOfferEvaluator implements ExtensionOfferEvaluatorInterface
 {
     private $db;
+    private CommonContractValidator $contractValidator;
 
     public function __construct($db)
     {
         $this->db = $db;
+        $this->contractValidator = new CommonContractValidator();
     }
 
     /**
      * @see ExtensionOfferEvaluatorInterface::calculateOfferValue()
      */
-    public function calculateOfferValue($offer)
+    public function calculateOfferValue(array $offer): array
     {
-        $total = $offer['year1'] + $offer['year2'] + $offer['year3'] + $offer['year4'] + $offer['year5'];
-        $years = 5;
-        if ($offer['year5'] == 0) {
-            $years = 4;
-        }
-        if ($offer['year4'] == 0) {
-            $years = 3;
-        }
-        
-        return [
-            'total' => $total,
-            'years' => $years,
-            'averagePerYear' => $years > 0 ? $total / $years : 0
-        ];
+        return $this->contractValidator->calculateOfferValue($offer);
     }
 
     /**
      * @see ExtensionOfferEvaluatorInterface::calculateWinnerModifier()
      */
-    public function calculateWinnerModifier($teamFactors, $playerPreferences)
+    public function calculateWinnerModifier(array $teamFactors, array $playerPreferences): float
     {
-        $winDiff = $teamFactors['wins'] - $teamFactors['losses'];
-        return 0.000153 * $winDiff * ($playerPreferences['winner'] - 1);
+        $winDiff = ($teamFactors['wins'] ?? 0) - ($teamFactors['losses'] ?? 0);
+        return 0.000153 * $winDiff * (($playerPreferences['winner'] ?? 3) - 1);
     }
 
     /**
      * @see ExtensionOfferEvaluatorInterface::calculateTraditionModifier()
      */
-    public function calculateTraditionModifier($teamFactors, $playerPreferences)
+    public function calculateTraditionModifier(array $teamFactors, array $playerPreferences): float
     {
-        $tradDiff = $teamFactors['tradition_wins'] - $teamFactors['tradition_losses'];
-        return 0.000153 * $tradDiff * ($playerPreferences['tradition'] - 1);
+        $tradDiff = ($teamFactors['tradition_wins'] ?? 0) - ($teamFactors['tradition_losses'] ?? 0);
+        return 0.000153 * $tradDiff * (($playerPreferences['tradition'] ?? 3) - 1);
     }
 
     /**
      * @see ExtensionOfferEvaluatorInterface::calculateLoyaltyModifier()
      */
-    public function calculateLoyaltyModifier($playerPreferences)
+    public function calculateLoyaltyModifier(array $playerPreferences): float
     {
-        return 0.025 * ($playerPreferences['loyalty'] - 1);
+        return 0.025 * (($playerPreferences['loyalty'] ?? 3) - 1);
     }
 
     /**
      * @see ExtensionOfferEvaluatorInterface::calculatePlayingTimeModifier()
      */
-    public function calculatePlayingTimeModifier($teamFactors, $playerPreferences)
+    public function calculatePlayingTimeModifier(array $teamFactors, array $playerPreferences): float
     {
-        $moneyCommitted = isset($teamFactors['money_committed_at_position']) 
-            ? $teamFactors['money_committed_at_position'] 
-            : 0;
-        return -0.0025 * ($moneyCommitted / 100) * ($playerPreferences['playing_time'] - 1);
+        $moneyCommitted = $teamFactors['money_committed_at_position'] ?? 0;
+        return -0.0025 * ($moneyCommitted / 100) * (($playerPreferences['playing_time'] ?? 3) - 1);
     }
 
     /**
      * @see ExtensionOfferEvaluatorInterface::calculateCombinedModifier()
      */
-    public function calculateCombinedModifier($teamFactors, $playerPreferences)
+    public function calculateCombinedModifier(array $teamFactors, array $playerPreferences): float
     {
         $modifier = 1.0;
         $modifier += $this->calculateWinnerModifier($teamFactors, $playerPreferences);
@@ -90,7 +85,7 @@ class ExtensionOfferEvaluator implements ExtensionOfferEvaluatorInterface
     /**
      * @see ExtensionOfferEvaluatorInterface::evaluateOffer()
      */
-    public function evaluateOffer($offer, $demands, $teamFactors, $playerPreferences)
+    public function evaluateOffer(array $offer, array $demands, array $teamFactors, array $playerPreferences): array
     {
         $offerData = $this->calculateOfferValue($offer);
         $demandsData = $this->calculateOfferValue($demands);
@@ -112,7 +107,7 @@ class ExtensionOfferEvaluator implements ExtensionOfferEvaluatorInterface
     /**
      * @see ExtensionOfferEvaluatorInterface::calculatePlayerDemands()
      */
-    public function calculatePlayerDemands($playerValue)
+    public function calculatePlayerDemands(int $playerValue): array
     {
         return [
             'total' => $playerValue * 5,

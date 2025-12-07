@@ -17,14 +17,16 @@ use Trading\Contracts\TradeOfferInterface;
 class TradeOffer implements TradeOfferInterface
 {
     protected $db;
+    protected $mysqli_db;
     protected \Services\CommonRepository $commonRepository;
     protected \Season $season;
     protected CashTransactionHandler $cashHandler;
     protected TradeValidator $validator;
 
-    public function __construct($db)
+    public function __construct($db, $mysqli_db = null)
     {
         $this->db = $db;
+        $this->mysqli_db = $mysqli_db;
         $this->commonRepository = new \Services\CommonRepository($db);
         $this->season = new \Season($db);
         $this->cashHandler = new CashTransactionHandler($db);
@@ -230,21 +232,49 @@ class TradeOffer implements TradeOfferInterface
      */
     protected function insertTradeItem(int $tradeOfferId, int $itemId, int $assetType, string $offeringTeamName, string $listeningTeamName, string $approvalTeamName): array
     {
-        $query = "INSERT INTO ibl_trade_info 
-          ( `tradeofferid`, 
-            `itemid`, 
-            `itemtype`, 
-            `from`, 
-            `to`, 
-            `approval` ) 
-        VALUES        ( '$tradeOfferId', 
-            '$itemId', 
-            '$assetType', 
-            '$offeringTeamName', 
-            '$listeningTeamName', 
-            '$approvalTeamName' )";
-        
-        $this->db->sql_query($query);
+        // Use prepared statement if mysqli_db is available (preferred for security)
+        if ($this->mysqli_db) {
+            $query = "INSERT INTO ibl_trade_info 
+              ( `tradeofferid`, 
+                `itemid`, 
+                `itemtype`, 
+                `from`, 
+                `to`, 
+                `approval` ) 
+            VALUES (?, ?, ?, ?, ?, ?)";
+            
+            $stmt = $this->mysqli_db->prepare($query);
+            $stmt->bind_param('iiiiss', $tradeOfferId, $itemId, $assetType, $offeringTeamName, $listeningTeamName, $approvalTeamName);
+            $stmt->execute();
+        } else {
+            // Fallback: use mysqli_real_escape_string if available, otherwise addslashes
+            if (isset($this->db->db_connect_id) && $this->db->db_connect_id) {
+                $escapedOffering = mysqli_real_escape_string($this->db->db_connect_id, $offeringTeamName);
+                $escapedListening = mysqli_real_escape_string($this->db->db_connect_id, $listeningTeamName);
+                $escapedApproval = mysqli_real_escape_string($this->db->db_connect_id, $approvalTeamName);
+            } else {
+                // Final fallback if db_connect_id not available
+                $escapedOffering = addslashes($offeringTeamName);
+                $escapedListening = addslashes($listeningTeamName);
+                $escapedApproval = addslashes($approvalTeamName);
+            }
+            
+            $query = "INSERT INTO ibl_trade_info 
+              ( `tradeofferid`, 
+                `itemid`, 
+                `itemtype`, 
+                `from`, 
+                `to`, 
+                `approval` ) 
+            VALUES        ( '$tradeOfferId', 
+                '$itemId', 
+                '$assetType', 
+                '$escapedOffering', 
+                '$escapedListening', 
+                '$escapedApproval' )";
+            
+            $this->db->sql_query($query);
+        }
 
         $tradeText = "";
         if ($assetType == 0) {

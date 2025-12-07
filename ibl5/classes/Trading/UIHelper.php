@@ -149,20 +149,27 @@ class UIHelper implements UIHelperInterface
      */
     protected function renderDraftPickRow(int $k, int $pickId, int $pickYear, string $pickTeam, int $pickRound, ?string $pickNotes): string
     {
+        // Escape all dynamic values for HTML context to prevent XSS
+        $escapedPickYear = htmlspecialchars((string)$pickYear, ENT_QUOTES, 'UTF-8');
+        $escapedPickTeam = htmlspecialchars($pickTeam, ENT_QUOTES, 'UTF-8');
+        $escapedPickRound = htmlspecialchars((string)$pickRound, ENT_QUOTES, 'UTF-8');
+        $escapedPickId = htmlspecialchars((string)$pickId, ENT_QUOTES, 'UTF-8');
+        
         $html = "<tr>
             <td align=\"center\">
-                <input type=\"hidden\" name=\"index$k\" value=\"$pickId\">
+                <input type=\"hidden\" name=\"index$k\" value=\"$escapedPickId\">
                 <input type=\"hidden\" name=\"type$k\" value=\"0\">
                 <input type=\"checkbox\" name=\"check$k\">
             </td>
             <td colspan=3>
-                $pickYear $pickTeam Round $pickRound
+                $escapedPickYear $escapedPickTeam Round $escapedPickRound
             </td>
         </tr>";
 
         if ($pickNotes != NULL) {
+            $escapedPickNotes = htmlspecialchars($pickNotes, ENT_QUOTES, 'UTF-8');
             $html .= "<tr>
-                <td colspan=3 width=150>$pickNotes</td>
+                <td colspan=3 width=150>$escapedPickNotes</td>
             </tr>";
         }
 

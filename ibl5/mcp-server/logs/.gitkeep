@@ -1,0 +1,2 @@
+# This directory contains query logs and audit trails
+# All *.json and *.log files are ignored by git

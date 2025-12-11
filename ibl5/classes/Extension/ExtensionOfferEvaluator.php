@@ -40,7 +40,7 @@ class ExtensionOfferEvaluator implements ExtensionOfferEvaluatorInterface
     public function calculateWinnerModifier(array $teamFactors, array $playerPreferences): float
     {
         $winDiff = ($teamFactors['wins'] ?? 0) - ($teamFactors['losses'] ?? 0);
-        return 0.000153 * $winDiff * (($playerPreferences['winner'] ?? 3) - 1);
+        return 0.000153 * $winDiff * (($playerPreferences['winner'] ?? 1) - 1);
     }
 
     /**
@@ -49,7 +49,7 @@ class ExtensionOfferEvaluator implements ExtensionOfferEvaluatorInterface
     public function calculateTraditionModifier(array $teamFactors, array $playerPreferences): float
     {
         $tradDiff = ($teamFactors['tradition_wins'] ?? 0) - ($teamFactors['tradition_losses'] ?? 0);
-        return 0.000153 * $tradDiff * (($playerPreferences['tradition'] ?? 3) - 1);
+        return 0.000153 * $tradDiff * (($playerPreferences['tradition'] ?? 1) - 1);
     }
 
     /**
@@ -57,7 +57,7 @@ class ExtensionOfferEvaluator implements ExtensionOfferEvaluatorInterface
      */
     public function calculateLoyaltyModifier(array $playerPreferences): float
     {
-        return 0.025 * (($playerPreferences['loyalty'] ?? 3) - 1);
+        return 0.025 * (($playerPreferences['loyalty'] ?? 1) - 1);
     }
 
     /**
@@ -66,7 +66,7 @@ class ExtensionOfferEvaluator implements ExtensionOfferEvaluatorInterface
     public function calculatePlayingTimeModifier(array $teamFactors, array $playerPreferences): float
     {
         $moneyCommitted = $teamFactors['money_committed_at_position'] ?? 0;
-        return -0.0025 * ($moneyCommitted / 100) * (($playerPreferences['playing_time'] ?? 3) - 1);
+        return -0.0025 * ($moneyCommitted / 100) * (($playerPreferences['playing_time'] ?? 1) - 1);
     }
 
     /**

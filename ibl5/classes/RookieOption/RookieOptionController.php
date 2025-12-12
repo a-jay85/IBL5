@@ -53,7 +53,7 @@ class RookieOptionController implements RookieOptionControllerInterface
         }
         
         // Update player's contract
-        if (!$this->repository->updatePlayerRookieOption($playerID, $player->draftRound, $extensionAmount)) {
+        if (!$this->repository->updatePlayerRookieOption($playerID, (int) $player->draftRound, $extensionAmount)) {
             die("Failed to update player contract. Please contact the commissioner.");
         }
         

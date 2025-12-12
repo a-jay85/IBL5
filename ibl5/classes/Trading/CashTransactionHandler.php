@@ -72,12 +72,12 @@ class CashTransactionHandler implements CashTransactionHandlerInterface
         $listeningTeamId = $this->commonRepository->getTidFromTeamname($listeningTeamName);
         
         // Use null coalescing to default missing years to 0
-        $cy1 = $cashYear[1] ?? 0;
-        $cy2 = $cashYear[2] ?? 0;
-        $cy3 = $cashYear[3] ?? 0;
-        $cy4 = $cashYear[4] ?? 0;
-        $cy5 = $cashYear[5] ?? 0;
-        $cy6 = $cashYear[6] ?? 0;
+        $cy1 = (int) ($cashYear[1] ?? 0);
+        $cy2 = (int) ($cashYear[2] ?? 0);
+        $cy3 = (int) ($cashYear[3] ?? 0);
+        $cy4 = (int) ($cashYear[4] ?? 0);
+        $cy5 = (int) ($cashYear[5] ?? 0);
+        $cy6 = (int) ($cashYear[6] ?? 0);
 
         $contractCurrentYear = 1;
         $contractTotalYears = $this->calculateContractTotalYears($cashYear);
@@ -173,12 +173,12 @@ class CashTransactionHandler implements CashTransactionHandlerInterface
     public function insertCashTradeData(int $tradeOfferId, string $offeringTeamName, string $listeningTeamName, array $cashAmounts): bool
     {
         // Use null coalescing to default missing years to 0
-        $cy1 = $cashAmounts[1] ?? 0;
-        $cy2 = $cashAmounts[2] ?? 0;
-        $cy3 = $cashAmounts[3] ?? 0;
-        $cy4 = $cashAmounts[4] ?? 0;
-        $cy5 = $cashAmounts[5] ?? 0;
-        $cy6 = $cashAmounts[6] ?? 0;
+        $cy1 = (int) ($cashAmounts[1] ?? 0);
+        $cy2 = (int) ($cashAmounts[2] ?? 0);
+        $cy3 = (int) ($cashAmounts[3] ?? 0);
+        $cy4 = (int) ($cashAmounts[4] ?? 0);
+        $cy5 = (int) ($cashAmounts[5] ?? 0);
+        $cy6 = (int) ($cashAmounts[6] ?? 0);
 
         $query = "INSERT INTO ibl_trade_cash
           ( `tradeOfferID`,

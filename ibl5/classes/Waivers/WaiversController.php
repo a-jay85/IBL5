@@ -175,7 +175,7 @@ class WaiversController implements WaiversControllerInterface
         }
         
         // Create news story
-        $this->createWaiverNewsStory($teamName, $player['name'], 'add', $contractData['salary']);
+        $this->createWaiverNewsStory($teamName, $player['name'], 'add', (string) $contractData['salary']);
         
         // Send email notification
         $storytitle = $teamName . " make waiver additions";
@@ -272,11 +272,11 @@ class WaiversController implements WaiversControllerInterface
             $waitTime = '';
             
             if ($action === 'add' && $player->timeDroppedOnWaivers > 0) {
-                $waitTime = $this->processor->getWaiverWaitTime($player->timeDroppedOnWaivers, $timeNow);
+                $waitTime = $this->processor->getWaiverWaitTime((int) $player->timeDroppedOnWaivers, $timeNow);
             }
             
             $players[] = $this->view->buildPlayerOption(
-                $player->playerID,
+                (int) $player->playerID,
                 $player->name,
                 $contract,
                 $waitTime

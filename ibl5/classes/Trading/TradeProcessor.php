@@ -113,7 +113,7 @@ class TradeProcessor implements TradeProcessorInterface
      */
     protected function processCashTransaction($itemId, $offeringTeamName, $listeningTeamName, $offerId)
     {
-        $itemId = $this->cashHandler->generateUniquePid($itemId);
+        $itemId = $this->cashHandler->generateUniquePid((int) $itemId);
         
         // Use prepared statement if mysqli_db is available (preferred)
         if ($this->mysqli_db) {
@@ -155,6 +155,7 @@ class TradeProcessor implements TradeProcessorInterface
      */
     protected function processDraftPick($itemId, $offeringTeamName, $listeningTeamName)
     {
+        $itemId = (int) $itemId;
         // Use prepared statement if mysqli_db is available (preferred)
         if ($this->mysqli_db) {
             $query = "SELECT * FROM ibl_draft_picks WHERE `pickid` = ?";
@@ -197,6 +198,7 @@ class TradeProcessor implements TradeProcessorInterface
      */
     protected function processPlayer($itemId, $offeringTeamName, $listeningTeamName)
     {
+        $itemId = (int) $itemId;
         $listeningTeamId = $this->commonRepository->getTidFromTeamname($listeningTeamName);
 
         // Use prepared statement if mysqli_db is available (preferred)

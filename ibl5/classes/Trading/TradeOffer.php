@@ -163,8 +163,8 @@ class TradeOffer implements TradeOfferInterface
             if (($tradeData['check'][$k] ?? null) == "on") {
                 $result = $this->insertTradeItem(
                     $tradeOfferId,
-                    $tradeData['index'][$k],
-                    $tradeData['type'][$k],
+                    (int) $tradeData['index'][$k],
+                    (int) $tradeData['type'][$k],
                     $offeringTeamName,
                     $listeningTeamName,
                     $listeningTeamName
@@ -191,8 +191,8 @@ class TradeOffer implements TradeOfferInterface
             if (($tradeData['check'][$k] ?? null) == "on") {
                 $result = $this->insertTradeItem(
                     $tradeOfferId,
-                    $tradeData['index'][$k],
-                    $tradeData['type'][$k],
+                    (int) $tradeData['index'][$k],
+                    (int) $tradeData['type'][$k],
                     $listeningTeamName,
                     $offeringTeamName,
                     $listeningTeamName
@@ -244,7 +244,7 @@ class TradeOffer implements TradeOfferInterface
             VALUES (?, ?, ?, ?, ?, ?)";
             
             $stmt = $this->mysqli_db->prepare($query);
-            $stmt->bind_param('iiiiss', $tradeOfferId, $itemId, $assetType, $offeringTeamName, $listeningTeamName, $approvalTeamName);
+            $stmt->bind_param('iiisss', $tradeOfferId, $itemId, $assetType, $offeringTeamName, $listeningTeamName, $approvalTeamName);
             $stmt->execute();
         } else {
             // Fallback: use mysqli_real_escape_string if available, otherwise addslashes

@@ -73,7 +73,7 @@ class UIHelper implements UIHelperInterface
                 $i++;
             }
 
-            echo $this->renderPlayerRow($k, $playerPid, $playerContractAmount, $playerPosition, $playerName, $playerOrdinal);
+            echo $this->renderPlayerRow($k, (int) $playerPid, (int) $playerContractAmount, $playerPosition, $playerName, (int) $playerOrdinal);
             $k++;
         }
 
@@ -95,7 +95,7 @@ class UIHelper implements UIHelperInterface
             $pickNotes = $rowTeamDraftPicks["notes"];
             $pickId = $rowTeamDraftPicks["pickid"];
 
-            echo $this->renderDraftPickRow($k, $pickId, $pickYear, $pickTeam, $pickRound, $pickNotes);
+            echo $this->renderDraftPickRow($k, (int) $pickId, (int) $pickYear, $pickTeam, (int) $pickRound, $pickNotes);
             $k++;
         }
 

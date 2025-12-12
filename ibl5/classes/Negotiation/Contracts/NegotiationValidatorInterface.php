@@ -42,15 +42,14 @@ interface NegotiationValidatorInterface
      *
      * Contract extensions are not allowed during the free agency period.
      *
-     * @param string $prefix Database table prefix (e.g., 'nuke')
      * @return array Validation result with keys:
      *               - 'valid' (bool): True if free agency is NOT active
      *               - 'error' (string|null): Error message if free agency is active
      *
      * **Behaviors:**
-     * - Queries {prefix}_modules table for 'Free_Agency' module status
+     * - Queries nuke_modules table for 'Free_Agency' module status
      * - Returns invalid if module.active = 1
      * - Returns valid if module not found or active = 0
      */
-    public function validateFreeAgencyNotActive(string $prefix): array;
+    public function validateFreeAgencyNotActive(): array;
 }

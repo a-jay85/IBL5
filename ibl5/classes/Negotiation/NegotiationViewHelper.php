@@ -38,50 +38,52 @@ class NegotiationViewHelper implements NegotiationViewHelperInterface
             ? (int) round($maxYearOneSalary * 0.125) 
             : (int) round($maxYearOneSalary * 0.1);
         
-        $output = "<form name=\"ExtensionOffer\" method=\"post\" action=\"modules/Player/extension.php\">";
-        $output .= "<p>Note that if you offer the max and I refuse, it means I am opting for Free Agency at the end of the season:</p>";
-        $output .= "<table cellspacing=0 border=1>";
-        $output .= "<tr><td>My demands are:</td><td>$demandDisplay</td></tr>";
-        $output .= "<tr><td>Please enter your offer in this row:</td><td>";
-        
-        if (!$demandsExceedMax) {
-            // Player demands are below max - show editable fields with demands as defaults
-            $output .= self::renderEditableOfferFields($demands);
-        } else {
-            // Player demands exceed max - show max salary fields
-            $output .= self::renderMaxSalaryFields($maxYearOneSalary, $maxRaise, $demands);
-        }
-        
-        $output .= "</tr>";
-        $output .= "<tr><td colspan=6><b>Notes/Reminders:</b><ul>";
-        $output .= "<li>You have $capSpace in cap space available; the amount you offer in year 1 cannot exceed this.</li>";
-        $output .= "<li>Based on my years of service, the maximum amount you can offer me in year 1 is $maxYearOneSalary.</li>";
-        $output .= "<li>Enter \"0\" for years you do not want to offer a contract.</li>";
-        $output .= "<li>Contract extensions must be at least three years in length.</li>";
-        $output .= "<li>The amounts offered each year must equal or exceed the previous year.</li>";
-        
-        if ($birdYears >= 3) {
-            $raisePercent = '12.5%';
-            $output .= "<li>Because this player has Bird Rights, you may add no more than $raisePercent of the amount you offer in the first year as a raise between years (for instance, if you offer 500 in Year 1, you cannot offer a raise of more than 75 between any two subsequent years.)</li>";
-        } else {
-            $raisePercent = '10%';
-            $output .= "<li>Because this player does not have Bird Rights, you may add no more than $raisePercent of the amount you offer in the first year as a raise between years (for instance, if you offer 500 in Year 1, you cannot offer a raise of more than 50 between any two subsequent years.)</li>";
-        }
-        
-        $output .= "<li>When re-signing your own players, you can go over the soft cap and up to the hard cap (" . \League::HARD_CAP_MAX . ").</li>";
-        $output .= "</ul></td></tr>";
-        
-        // Hidden fields
-        $output .= "<input type=\"hidden\" name=\"maxyr1\" value=\"$maxYearOneSalary\">";
-        $output .= "<input type=\"hidden\" name=\"demandsTotal\" value=\"{$demands['total']}\">";
-        $output .= "<input type=\"hidden\" name=\"demandsYears\" value=\"{$demands['years']}\">";
-        $output .= "<input type=\"hidden\" name=\"teamName\" value=\"$teamName\">";
-        $output .= "<input type=\"hidden\" name=\"playerName\" value=\"$playerName\">";
-        $output .= "<input type=\"hidden\" name=\"playerID\" value=\"$playerID\">";
-        $output .= "</table>";
-        $output .= "<input type=\"submit\" value=\"Offer Extension!\"></form>";
-        
-        return $output;
+        ob_start();
+        ?>
+<form name="ExtensionOffer" method="post" action="modules/Player/extension.php">
+    <p>Note that if you offer the max and I refuse, it means I am opting for Free Agency at the end of the season:</p>
+    <table cellspacing="0" border="1">
+        <tr>
+            <td>My demands are:</td>
+            <?= $demandDisplay ?>
+        </tr>
+        <tr>
+            <td>Please enter your offer in this row:</td>
+            <?php if (!$demandsExceedMax): ?>
+                <?= self::renderEditableOfferFields($demands) ?>
+            <?php else: ?>
+                <?= self::renderMaxSalaryFields($maxYearOneSalary, $maxRaise, $demands) ?>
+            <?php endif; ?>
+        </tr>
+        <tr>
+            <td colspan="6">
+                <b>Notes/Reminders:</b>
+                <ul>
+                    <li>You have <?= $capSpace ?> in cap space available; the amount you offer in year 1 cannot exceed this.</li>
+                    <li>Based on my years of service, the maximum amount you can offer me in year 1 is <?= $maxYearOneSalary ?>.</li>
+                    <li>Enter "0" for years you do not want to offer a contract.</li>
+                    <li>Contract extensions must be at least three years in length.</li>
+                    <li>The amounts offered each year must equal or exceed the previous year.</li>
+                    <?php if ($birdYears >= 3): ?>
+                        <li>Because this player has Bird Rights, you may add no more than 12.5% of the amount you offer in the first year as a raise between years (for instance, if you offer 500 in Year 1, you cannot offer a raise of more than 75 between any two subsequent years.)</li>
+                    <?php else: ?>
+                        <li>Because this player does not have Bird Rights, you may add no more than 10% of the amount you offer in the first year as a raise between years (for instance, if you offer 500 in Year 1, you cannot offer a raise of more than 50 between any two subsequent years.)</li>
+                    <?php endif; ?>
+                    <li>When re-signing your own players, you can go over the soft cap and up to the hard cap (<?= \League::HARD_CAP_MAX ?>).</li>
+                </ul>
+            </td>
+        </tr>
+    </table>
+    <input type="hidden" name="maxyr1" value="<?= $maxYearOneSalary ?>">
+    <input type="hidden" name="demandsTotal" value="<?= $demands['total'] ?>">
+    <input type="hidden" name="demandsYears" value="<?= $demands['years'] ?>">
+    <input type="hidden" name="teamName" value="<?= $teamName ?>">
+    <input type="hidden" name="playerName" value="<?= $playerName ?>">
+    <input type="hidden" name="playerID" value="<?= $playerID ?>">
+    <input type="submit" value="Offer Extension!">
+</form>
+        <?php
+        return ob_get_clean();
     }
     
     /**
@@ -92,22 +94,22 @@ class NegotiationViewHelper implements NegotiationViewHelperInterface
      */
     private static function buildDemandDisplay(array $demands): string
     {
-        $display = (string)$demands['year1'];
+        $display = "<td>" . (string)$demands['year1'] . "</td>";
         
         if ($demands['year2'] != 0) {
-            $display .= "</td><td>" . $demands['year2'];
+            $display .= "<td>" . $demands['year2'] . "</td>";
         }
         if ($demands['year3'] != 0) {
-            $display .= "</td><td>" . $demands['year3'];
+            $display .= "<td>" . $demands['year3'] . "</td>";
         }
         if ($demands['year4'] != 0) {
-            $display .= "</td><td>" . $demands['year4'];
+            $display .= "<td>" . $demands['year4'] . "</td>";
         }
         if ($demands['year5'] != 0) {
-            $display .= "</td><td>" . $demands['year5'];
+            $display .= "<td>" . $demands['year5'] . "</td>";
         }
         if ($demands['year6'] != 0) {
-            $display .= "</td><td>" . $demands['year6'];
+            $display .= "<td>" . $demands['year6'] . "</td>";
         }
         
         return $display;
@@ -121,13 +123,15 @@ class NegotiationViewHelper implements NegotiationViewHelperInterface
      */
     private static function renderEditableOfferFields(array $demands): string
     {
-        $output = "<INPUT TYPE=\"number\" style=\"width: 4em\" NAME=\"offerYear1\" SIZE=\"4\" VALUE=\"{$demands['year1']}\"></td>";
-        $output .= "<td><INPUT TYPE=\"number\" style=\"width: 4em\" NAME=\"offerYear2\" SIZE=\"4\" VALUE=\"{$demands['year2']}\"></td>";
-        $output .= "<td><INPUT TYPE=\"number\" style=\"width: 4em\" NAME=\"offerYear3\" SIZE=\"4\" VALUE=\"{$demands['year3']}\"></td>";
-        $output .= "<td><INPUT TYPE=\"number\" style=\"width: 4em\" NAME=\"offerYear4\" SIZE=\"4\" VALUE=\"{$demands['year4']}\"></td>";
-        $output .= "<td><INPUT TYPE=\"number\" style=\"width: 4em\" NAME=\"offerYear5\" SIZE=\"4\" VALUE=\"{$demands['year5']}\"></td>";
-        
-        return $output;
+        ob_start();
+        ?>
+<td><input type="number" style="width: 4em" name="offerYear1" size="4" value="<?= $demands['year1'] ?>"></td>
+<td><input type="number" style="width: 4em" name="offerYear2" size="4" value="<?= $demands['year2'] ?>"></td>
+<td><input type="number" style="width: 4em" name="offerYear3" size="4" value="<?= $demands['year3'] ?>"></td>
+<td><input type="number" style="width: 4em" name="offerYear4" size="4" value="<?= $demands['year4'] ?>"></td>
+<td><input type="number" style="width: 4em" name="offerYear5" size="4" value="<?= $demands['year5'] ?>"></td>
+        <?php
+        return ob_get_clean();
     }
     
     /**
@@ -138,20 +142,22 @@ class NegotiationViewHelper implements NegotiationViewHelperInterface
      * @param array $demands Demand amounts (to determine which years to show)
      * @return string HTML for input fields
      */
-    private static function renderMaxSalaryFields(int $maxYearOne, int $maxRaise, array $demands): string
+    private static function renderMaxSalaryFields(int $maxYear1, int $maxRaise, array $demands): string
     {
-        $maxYr2 = ($demands['year2'] != 0) ? $maxYearOne + $maxRaise : 0;
-        $maxYr3 = ($demands['year3'] != 0) ? $maxYr2 + $maxRaise : 0;
-        $maxYr4 = ($demands['year4'] != 0) ? $maxYr3 + $maxRaise : 0;
-        $maxYr5 = ($demands['year5'] != 0) ? $maxYr4 + $maxRaise : 0;
+        $maxYear2 = ($demands['year2'] != 0) ? $maxYear1 + $maxRaise : 0;
+        $maxYear3 = ($demands['year3'] != 0) ? $maxYear2 + $maxRaise : 0;
+        $maxYear4 = ($demands['year4'] != 0) ? $maxYear3 + $maxRaise : 0;
+        $maxYear5 = ($demands['year5'] != 0) ? $maxYear4 + $maxRaise : 0;
         
-        $output = "<INPUT TYPE=\"text\" NAME=\"offerYear1\" SIZE=\"4\" VALUE=\"$maxYearOne\"></td>";
-        $output .= "<td><INPUT TYPE=\"text\" NAME=\"offerYear2\" SIZE=\"4\" VALUE=\"$maxYr2\"></td>";
-        $output .= "<td><INPUT TYPE=\"text\" NAME=\"offerYear3\" SIZE=\"4\" VALUE=\"$maxYr3\"></td>";
-        $output .= "<td><INPUT TYPE=\"text\" NAME=\"offerYear4\" SIZE=\"4\" VALUE=\"$maxYr4\"></td>";
-        $output .= "<td><INPUT TYPE=\"text\" NAME=\"offerYear5\" SIZE=\"4\" VALUE=\"$maxYr5\"></td>";
-        
-        return $output;
+        ob_start();
+        ?>
+<td><input type="text" name="offerYear1" size="4" value="<?= $maxYear1 ?>"></td>
+<td><input type="text" name="offerYear2" size="4" value="<?= $maxYear2 ?>"></td>
+<td><input type="text" name="offerYear3" size="4" value="<?= $maxYear3 ?>"></td>
+<td><input type="text" name="offerYear4" size="4" value="<?= $maxYear4 ?>"></td>
+<td><input type="text" name="offerYear5" size="4" value="<?= $maxYear5 ?>"></td>
+        <?php
+        return ob_get_clean();
     }
     
     /**

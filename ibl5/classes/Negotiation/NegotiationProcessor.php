@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Negotiation;
 
 use Negotiation\Contracts\NegotiationProcessorInterface;
@@ -40,7 +42,7 @@ class NegotiationProcessor implements NegotiationProcessorInterface
         $output = NegotiationViewHelper::renderHeader($player);
         
         // Validate free agency is not active
-        $freeAgencyValidation = $this->validator->validateFreeAgencyNotActive($prefix);
+        $freeAgencyValidation = $this->validator->validateFreeAgencyNotActive();
         if (!$freeAgencyValidation['valid']) {
             return $output . NegotiationViewHelper::renderError($freeAgencyValidation['error']);
         }

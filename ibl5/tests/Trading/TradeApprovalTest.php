@@ -24,7 +24,7 @@ class TradeApprovalTest extends TestCase
      */
     public function testApprovalAlwaysSetToListeningTeam()
     {
-        $tradeOffer = new Trading_TradeOffer($this->db);
+        $tradeOffer = new Trading\TradeOffer($this->db);
         
         // Prepare trade data: Team A offers to Team B
         // Team A sends cash only (no players or picks)
@@ -79,7 +79,7 @@ class TradeApprovalTest extends TestCase
      */
     public function testCashFromListeningTeamHasCorrectApproval()
     {
-        $tradeOffer = new Trading_TradeOffer($this->db);
+        $tradeOffer = new Trading\TradeOffer($this->db);
         
         // Team A offers cash to Team B
         // Team B sends cash back to Team A
@@ -128,7 +128,7 @@ class TradeApprovalTest extends TestCase
     public function testTradeWithOnlyPlayers()
     {
         $db = new QueryAwareMockDatabase();
-        $tradeOffer = new Trading_TradeOffer($db);
+        $tradeOffer = new Trading\TradeOffer($db);
         
         // Team A sends Player 1 to Team B
         // Team B sends Player 2 back to Team A
@@ -170,7 +170,7 @@ class TradeApprovalTest extends TestCase
     public function testTradeWithPlayersAndCash()
     {
         $db = new QueryAwareMockDatabase();
-        $tradeOffer = new Trading_TradeOffer($db);
+        $tradeOffer = new Trading\TradeOffer($db);
         
         // Team A sends Player 1 + cash to Team B
         // Team B sends Player 2 + cash back to Team A
@@ -219,7 +219,7 @@ class TradeApprovalTest extends TestCase
     public function testTradeWithOnlyDraftPicks()
     {
         $db = new QueryAwareMockDatabase();
-        $tradeOffer = new Trading_TradeOffer($db);
+        $tradeOffer = new Trading\TradeOffer($db);
         
         // Team A sends 2025 1st round pick to Team B
         // Team B sends 2026 1st round pick back to Team A

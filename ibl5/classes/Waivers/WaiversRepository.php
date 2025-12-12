@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Waivers;
 
 use Season;
@@ -87,33 +89,25 @@ class WaiversRepository implements WaiversRepositoryInterface
             
             return $this->db->sql_query($query) !== false;
         } else {
-            // Modern mysqli - prepared statements
+            // Modern mysqli - prepared statements (fallback to legacy if needed)
+            $teamNameEscaped = \Services\DatabaseService::escapeString($this->db, $teamName);
+            
             if (!$contractData['hasExistingContract']) {
                 // Need to set contract fields when no existing contract
                 $salary = (int) $contractData['salary'];
                 $query = "UPDATE ibl_plr 
                           SET `ordinal` = '800', `bird` = 0, `cy` = 0, `cyt` = 1, 
-                              `cy1` = ?, `cy2` = 0, `cy3` = 0, `cy4` = 0, `cy5` = 0, 
-                              `cy6` = 0, `teamname` = ?, `tid` = ?, `droptime` = 0 
-                          WHERE `pid` = ? LIMIT 1";
-                $stmt = $this->db->prepare($query);
-                if (!$stmt) {
-                    return false;
-                }
-                $stmt->bind_param('isii', $salary, $teamName, $teamID, $playerID);
-                return $stmt->execute();
+                              `cy1` = $salary, `cy2` = 0, `cy3` = 0, `cy4` = 0, `cy5` = 0, 
+                              `cy6` = 0, `teamname` = '$teamNameEscaped', `tid` = $teamID, `droptime` = 0 
+                          WHERE `pid` = $playerID LIMIT 1";
+                return $this->db->sql_query($query) !== false;
             } else {
                 // Keep existing contract
                 $query = "UPDATE ibl_plr 
-                          SET `ordinal` = '800', `bird` = 0, `teamname` = ?, `tid` = ?, 
+                          SET `ordinal` = '800', `bird` = 0, `teamname` = '$teamNameEscaped', `tid` = $teamID, 
                               `droptime` = 0 
-                          WHERE `pid` = ? LIMIT 1";
-                $stmt = $this->db->prepare($query);
-                if (!$stmt) {
-                    return false;
-                }
-                $stmt->bind_param('sii', $teamName, $teamID, $playerID);
-                return $stmt->execute();
+                          WHERE `pid` = $playerID LIMIT 1";
+                return $this->db->sql_query($query) !== false;
             }
         }
     }

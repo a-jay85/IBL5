@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Extension;
 
 use Player\Player;
@@ -7,14 +9,19 @@ use Shared\SalaryConverter;
 use Extension\Contracts\ExtensionProcessorInterface;
 
 /**
+ * ExtensionProcessor - Processes contract extension offers
+ * 
+ * Orchestrates the complete extension offer lifecycle: validation, evaluation,
+ * database updates, and notifications.
+ * 
  * @see ExtensionProcessorInterface
  */
 class ExtensionProcessor implements ExtensionProcessorInterface
 {
     private $db;
-    private $validator;
-    private $evaluator;
-    private $dbOps;
+    private ExtensionValidator $validator;
+    private ExtensionOfferEvaluator $evaluator;
+    private ExtensionDatabaseOperations $dbOps;
 
     public function __construct($db)
     {
@@ -30,7 +37,7 @@ class ExtensionProcessor implements ExtensionProcessorInterface
     public function processExtension($extensionData)
     {
         $offer = $extensionData['offer'];
-        $demands = isset($extensionData['demands']) ? $extensionData['demands'] : null;
+        $demands = $extensionData['demands'] ?? null;
         $player = $this->getPlayerObject($extensionData);
         if (!$player) {
             return [

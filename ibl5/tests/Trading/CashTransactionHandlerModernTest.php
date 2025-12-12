@@ -3,7 +3,7 @@
 use PHPUnit\Framework\TestCase;
 
 /**
- * Modern unit tests for Trading_CashTransactionHandler class
+ * Modern unit tests for Trading\CashTransactionHandler class
  * 
  * This demonstrates advanced testing patterns including:
  * - Comprehensive test coverage with edge cases
@@ -20,7 +20,7 @@ class CashTransactionHandlerModernTest extends TestCase
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
-        $this->cashHandler = new Trading_CashTransactionHandler($this->mockDb);
+        $this->cashHandler = new Trading\CashTransactionHandler($this->mockDb);
     }
 
     protected function tearDown(): void

@@ -13,7 +13,7 @@ class TradeProcessorIntegrationTest extends PHPUnit\Framework\TestCase
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
-        $this->processor = new Trading_TradeProcessor($this->mockDb);
+        $this->processor = new Trading\TradeProcessor($this->mockDb);
     }
 
     /**

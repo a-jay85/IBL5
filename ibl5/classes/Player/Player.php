@@ -137,7 +137,26 @@ class Player implements PlayerInterface
     protected function initialize($db): void
     {
         $this->db = $db;
-        $this->repository = new PlayerRepository($db);
+        
+        // Use mysqli connection for PlayerRepository
+        // If $db is mysqli, use it; otherwise get global $mysqli_db
+        // In tests, global $mysqli_db should be a proper mysqli mock
+        if ($db instanceof \mysqli) {
+            $this->repository = new PlayerRepository($db);
+        } else {
+            // Legacy path: try global mysqli_db
+            global $mysqli_db;
+            if (isset($mysqli_db) && $mysqli_db instanceof \mysqli) {
+                $this->repository = new PlayerRepository($mysqli_db);
+            } elseif (isset($mysqli_db)) {
+                // Test environment: global $mysqli_db exists but is a mock duck-type
+                // Temporarily accept duck-typed objects during mysqli migration
+                $this->repository = new PlayerRepository($mysqli_db);
+            } else {
+                // No mysqli connection available
+                throw new \RuntimeException('PlayerRepository requires a mysqli connection. Please set up global $mysqli_db in tests.');
+            }
+        }
     }
 
 

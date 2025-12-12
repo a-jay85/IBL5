@@ -2,31 +2,50 @@
 
 namespace Player;
 
+use BaseMysqliRepository;
 use Player\Contracts\PlayerRepositoryInterface;
 
 /**
- * @see PlayerRepositoryInterface
+ * PlayerRepository - Database operations for player data
+ * 
+ * Extends BaseMysqliRepository for standardized prepared statement handling.
+ * 
+ * @see PlayerRepositoryInterface For method contracts
+ * @see BaseMysqliRepository For base class documentation and error codes
  */
-class PlayerRepository implements PlayerRepositoryInterface
+class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryInterface
 {
-    protected $db;
-
-    public function __construct($db)
+    /**
+     * Constructor - inherits from BaseMysqliRepository
+     * 
+     * @param object $db Active mysqli connection (or duck-typed mock during migration)
+     * @throws \RuntimeException If connection is invalid (error code 1002)
+     * 
+     * TEMPORARY: Accepts duck-typed objects during mysqli migration for testing.
+     * Will be strictly \mysqli once migration completes.
+     */
+    public function __construct(object $db)
     {
-        $this->db = $db;
+        parent::__construct($db);
     }
 
     /**
      * Load a player by their ID from the current player table
+     * 
+     * Uses fetchOne from BaseMysqliRepository with prepared statement.
      */
     public function loadByID(int $playerID): PlayerData
     {
-        $query = "SELECT *
-            FROM ibl_plr
-            WHERE pid = $playerID
-            LIMIT 1;";
-        $result = $this->db->sql_query($query);
-        $plrRow = $this->db->sql_fetch_assoc($result);
+        $plrRow = $this->fetchOne(
+            "SELECT * FROM ibl_plr WHERE pid = ? LIMIT 1",
+            "i",
+            $playerID
+        );
+        
+        if ($plrRow === null) {
+            throw new \RuntimeException("Player with ID $playerID not found");
+        }
+        
         return $this->fillFromCurrentRow($plrRow);
     }
 
@@ -242,30 +261,16 @@ class PlayerRepository implements PlayerRepositoryInterface
 
     /**
      * @see PlayerRepositoryInterface::getFreeAgencyDemands()
+     * 
+     * Uses fetchOne from BaseMysqliRepository with prepared statement.
      */
     public function getFreeAgencyDemands(string $playerName): array
     {
-        // Escape player name for safe query execution
-        // Works with both legacy MySQL abstraction layer and modern mysqli
-        if (method_exists($this->db, 'sql_escape_string')) {
-            // Database abstraction layer - use legacy method
-            $escapedName = $this->db->sql_escape_string($playerName);
-            $query = "SELECT *
-                FROM ibl_demands
-                WHERE name = '$escapedName'";
-            $result = $this->db->sql_query($query);
-            $row = $this->db->sql_fetch_assoc($result);
-        } else {
-            // Direct mysqli connection - use prepared statement
-            $query = "SELECT *
-                FROM ibl_demands
-                WHERE name = ?";
-            $stmt = $this->db->prepare($query);
-            $stmt->bind_param('s', $playerName);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            $row = $result->fetch_assoc();
-        }
+        $row = $this->fetchOne(
+            "SELECT * FROM ibl_demands WHERE name = ?",
+            "s",
+            $playerName
+        );
         
         // Return demand array or empty array with all keys set to 0
         if ($row) {

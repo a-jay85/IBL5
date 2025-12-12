@@ -13,12 +13,14 @@ $pagetitle = "- Player Archives";
 
 function showpage($playerID, $pageView)
 {
-    global $db, $cookie;
+    global $db, $mysqli_db, $cookie;
     $sharedFunctions = new Shared($db);
     $commonRepository = new Services\CommonRepository($db);
     $season = new Season($db);
     
-    $player = Player::withPlayerID($db, $playerID);
+    // Player uses mysqli_db for PlayerRepository (refactored to use prepared statements)
+    // Other classes still use legacy $db for backward compatibility
+    $player = Player::withPlayerID($mysqli_db, $playerID);
     $playerStats = PlayerStats::withPlayerID($db, $playerID);
     $pageView = ($pageView !== null) ? intval($pageView) : null;
     

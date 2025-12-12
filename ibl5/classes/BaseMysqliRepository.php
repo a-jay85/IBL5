@@ -82,19 +82,27 @@ declare(strict_types=1);
 abstract class BaseMysqliRepository
 {
     /**
-     * @var \mysqli Database connection
+     * @var object Database connection (mysqli or duck-typed mock for testing)
+     * 
+     * TEMPORARY: During mysqli migration, we accept duck-typed objects in tests.
+     * This allows integration tests to work while we migrate from legacy MySQL to mysqli.
+     * Once migration is complete, this should be strictly typed as \mysqli only.
      */
-    protected \mysqli $db;
+    protected object $db;
 
     /**
      * Constructor with connection validation
      *
-     * @param \mysqli $db Active mysqli connection
+     * @param object $db Active mysqli connection (or duck-typed mock during migration)
      * @throws \RuntimeException If connection is invalid or closed (error code 1002)
+     * 
+     * TEMPORARY: Accepts duck-typed objects during migration for testing compatibility.
+     * Will be strictly \mysqli once migration completes.
      */
-    public function __construct(\mysqli $db)
+    public function __construct(object $db)
     {
-        if ($db->connect_errno) {
+        // For mysqli objects, validate connection
+        if ($db instanceof \mysqli && $db->connect_errno) {
             $this->logError('Connection error in constructor', $db->connect_error ?? 'Unknown error');
             throw new \RuntimeException(
                 'Invalid mysqli connection: ' . ($db->connect_error ?? 'Unknown error'),
@@ -132,7 +140,7 @@ abstract class BaseMysqliRepository
      * }
      * $stmt->close();
      */
-    protected function executeQuery(string $query, string $types = '', mixed ...$params): \mysqli_stmt
+    protected function executeQuery(string $query, string $types = '', mixed ...$params): object
     {
         // Validate parameter count matches type string length
         $typeCount = strlen($types);

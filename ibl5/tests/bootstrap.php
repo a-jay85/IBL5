@@ -189,6 +189,7 @@ class MockDatabaseResult
 
 /**
  * Mock prepared statement for testing mysqli-style prepared statements
+ * Duck-types mysqli_stmt without extending it to avoid type constraints
  */
 class MockPreparedStatement
 {
@@ -196,10 +197,13 @@ class MockPreparedStatement
     private $query;
     private $boundParams = [];
     private $paramTypes = [];
+    public string|int $affected_rows = 0;
+    public string $error = '';
+    public int $errno = 0;
 
-    public function __construct($mockDb, $query)
+    public function __construct($mockDb = null, $query = '')
     {
-        $this->mockDb = $mockDb;
+        $this->mockDb = $mockDb ?? new MockDatabase();
         $this->query = $query;
     }
 
@@ -208,7 +212,7 @@ class MockPreparedStatement
      * @param string $types Parameter types (s=string, i=integer, d=double, b=blob)
      * @param mixed ...$params Parameters to bind
      */
-    public function bind_param($types, &...$params)
+    public function bind_param($types, &...$params): bool
     {
         $this->paramTypes = str_split($types);
         foreach ($params as $index => $param) {
@@ -220,7 +224,7 @@ class MockPreparedStatement
     /**
      * Execute the prepared statement
      */
-    public function execute()
+    public function execute(?array $params = null): bool
     {
         // Replace placeholders with bound values in the query
         $query = $this->query;
@@ -231,16 +235,81 @@ class MockPreparedStatement
         }
         
         // Execute the query using the mock database
-        return $this->mockDb->sql_query($query);
+        $result = $this->mockDb->sql_query($query);
+        
+        // Set affected_rows if query was UPDATE/INSERT/DELETE
+        if (stripos($query, 'UPDATE') === 0 || 
+            stripos($query, 'INSERT') === 0 || 
+            stripos($query, 'DELETE') === 0) {
+            $this->affected_rows = $this->mockDb->sql_affectedrows();
+        }
+        
+        return $result !== false;
     }
 
     /**
      * Get the result of the prepared statement
+     * TEMPORARY: Returns object|false during migration to support MockMysqliResult
      */
-    public function get_result()
+    public function get_result(): object|false
     {
-        // Execute and return result
-        return $this->execute();
+        // Replace placeholders with bound values in the query
+        $query = $this->query;
+        foreach ($this->boundParams as $param) {
+            // Simple placeholder replacement (?) with the actual value
+            $value = is_string($param) ? "'" . addslashes($param) . "'" : $param;
+            $query = preg_replace('/\?/', $value, $query, 1);
+        }
+        
+        // Execute and return mock result wrapped to look like mysqli_result
+        $mockResult = $this->mockDb->sql_query($query);
+        
+        if ($mockResult instanceof MockDatabaseResult) {
+            return new MockMysqliResult($mockResult);
+        }
+        
+        return false;
+    }
+    
+    public function close(): bool
+    {
+        // Mock close - just return true
+        return true;
+    }
+}
+
+/**
+ * Mock mysqli_result class for testing
+ * Cannot extend mysqli_result directly due to readonly properties
+ */
+class MockMysqliResult
+{
+    private $mockResult;
+    public int $current_field = 0;
+    public int $field_count = 0;
+    public ?array $lengths = null;
+    public int|string $num_rows = 0;
+    public int $type = 0;
+    
+    public function __construct(MockDatabaseResult $mockResult)
+    {
+        $this->mockResult = $mockResult;
+        $this->num_rows = $mockResult->numRows();
+    }
+    
+    public function fetch_assoc(): array|null|false
+    {
+        return $this->mockResult->fetchAssoc();
+    }
+    
+    public function fetch_array(int $mode = MYSQLI_BOTH): array|null|false
+    {
+        return $this->mockResult->fetchAssoc();
+    }
+    
+    public function free(): void
+    {
+        // Mock free - do nothing
     }
 }
 
@@ -406,3 +475,9 @@ if (!isset($_SERVER['SCRIPT_FILENAME'])) {
 
 // Load the configuration for database access
 require_once __DIR__ . '/../config.php';
+
+// Set up global $mysqli_db mock for tests that use Player or other refactored classes
+// Note: Integration tests should set up their own $mysqli_db that shares the same MockDatabase
+// instance used by the test. See ExtensionIntegrationTest for example.
+//
+// Unit tests that directly mock Player/PlayerRepository don't need this global.

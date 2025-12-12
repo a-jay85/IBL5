@@ -20,6 +20,22 @@ class ExtensionIntegrationTest extends TestCase
     {
         $this->mockDb = new MockDatabase();
         $this->extensionProcessor = new ExtensionProcessor($this->mockDb);
+        
+        // Set up global $mysqli_db for Player/PlayerRepository
+        // Must use the SAME MockDatabase instance so test data is accessible
+        $GLOBALS['mysqli_db'] = new class($this->mockDb) {
+            private $mockDb;
+            public int $connect_errno = 0;
+            public ?string $connect_error = null;
+            
+            public function __construct($mockDb) {
+                $this->mockDb = $mockDb;
+            }
+            
+            public function prepare($query) {
+                return new MockPreparedStatement($this->mockDb, $query);
+            }
+        };
     }
 
     protected function tearDown(): void

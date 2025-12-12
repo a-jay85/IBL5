@@ -1,27 +1,36 @@
 <?php
 
-require_once __DIR__ . '/Contracts/Trading_TradeValidatorInterface.php';
+declare(strict_types=1);
+
+namespace Trading;
+
+use Trading\Contracts\TradeValidatorInterface;
 
 /**
- * @see Trading_TradeValidatorInterface
+ * TradeValidator - Validates trade legality
+ *
+ * Validates trade legality including minimum cash amounts, salary cap
+ * compliance, and player tradability status.
+ * 
+ * @see TradeValidatorInterface
  */
-class Trading_TradeValidator implements Trading_TradeValidatorInterface
+class TradeValidator implements TradeValidatorInterface
 {
     protected $db;
-    protected $sharedFunctions;
-    protected $season;
+    protected \Shared $sharedFunctions;
+    protected \Season $season;
 
     public function __construct($db)
     {
         $this->db = $db;
-        $this->sharedFunctions = new Shared($db);
-        $this->season = new Season($db);
+        $this->sharedFunctions = new \Shared($db);
+        $this->season = new \Season($db);
     }
 
     /**
-     * @see Trading_TradeValidatorInterface::validateMinimumCashAmounts()
+     * @see TradeValidatorInterface::validateMinimumCashAmounts()
      */
-    public function validateMinimumCashAmounts($userSendsCash, $partnerSendsCash)
+    public function validateMinimumCashAmounts(array $userSendsCash, array $partnerSendsCash): array
     {
         $filteredUserSendsCash = array_filter($userSendsCash);
         $filteredPartnerSendsCash = array_filter($partnerSendsCash);
@@ -44,9 +53,9 @@ class Trading_TradeValidator implements Trading_TradeValidatorInterface
     }
 
     /**
-     * @see Trading_TradeValidatorInterface::validateSalaryCaps()
+     * @see TradeValidatorInterface::validateSalaryCaps()
      */
-    public function validateSalaryCaps($tradeData)
+    public function validateSalaryCaps(array $tradeData): array
     {
         $userCurrentSeasonCapTotal = $tradeData['userCurrentSeasonCapTotal'] ?? 0;
         $partnerCurrentSeasonCapTotal = $tradeData['partnerCurrentSeasonCapTotal'] ?? 0;
@@ -58,11 +67,11 @@ class Trading_TradeValidator implements Trading_TradeValidatorInterface
 
         $errors = [];
 
-        if ($userPostTradeCapTotal > League::HARD_CAP_MAX) {
+        if ($userPostTradeCapTotal > \League::HARD_CAP_MAX) {
             $errors[] = 'This trade is illegal since it puts you over the hard cap.';
         }
 
-        if ($partnerPostTradeCapTotal > League::HARD_CAP_MAX) {
+        if ($partnerPostTradeCapTotal > \League::HARD_CAP_MAX) {
             $errors[] = 'This trade is illegal since it puts other team over the hard cap.';
         }
 
@@ -75,9 +84,9 @@ class Trading_TradeValidator implements Trading_TradeValidatorInterface
     }
 
     /**
-     * @see Trading_TradeValidatorInterface::canPlayerBeTraded()
+     * @see TradeValidatorInterface::canPlayerBeTraded()
      */
-    public function canPlayerBeTraded($playerId)
+    public function canPlayerBeTraded(int $playerId): bool
     {
         $result = $this->db->sql_query("SELECT ordinal, cy FROM ibl_plr WHERE pid = $playerId");
         $player = $this->db->sql_fetchrow($result);
@@ -87,17 +96,17 @@ class Trading_TradeValidator implements Trading_TradeValidatorInterface
         }
 
         // Extract ordinal and cy from the indexed array
-        $ordinal = isset($player[0]) ? $player[0] : 99999; // Default to high ordinal if missing
-        $cy = isset($player[1]) ? $player[1] : 0; // Default to 0 salary if missing
+        $ordinal = isset($player[0]) ? (int) $player[0] : 99999; // Default to high ordinal if missing
+        $cy = isset($player[1]) ? (int) $player[1] : 0; // Default to 0 salary if missing
 
         // Player cannot be traded if they are waived (ordinal > JSB::WAIVERS_ORDINAL) or have 0 salary
-        return $cy != 0 && $ordinal <= JSB::WAIVERS_ORDINAL;
+        return $cy != 0 && $ordinal <= \JSB::WAIVERS_ORDINAL;
     }
 
     /**
-     * @see Trading_TradeValidatorInterface::getCurrentSeasonCashConsiderations()
+     * @see TradeValidatorInterface::getCurrentSeasonCashConsiderations()
      */
-    public function getCurrentSeasonCashConsiderations($userSendsCash, $partnerSendsCash)
+    public function getCurrentSeasonCashConsiderations(array $userSendsCash, array $partnerSendsCash): array
     {
         // If the current season phase shifts cap situations to next season, evaluate next season's cap limits.
         if (

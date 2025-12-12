@@ -16,7 +16,7 @@ class SeasonPhaseTest extends PHPUnit\Framework\TestCase
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
-        $this->validator = new Trading_TradeValidator($this->mockDb);
+        $this->validator = new Trading\TradeValidator($this->mockDb);
     }
 
     /**

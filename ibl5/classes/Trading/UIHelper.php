@@ -17,12 +17,16 @@ use Trading\Contracts\UIHelperInterface;
 class UIHelper implements UIHelperInterface
 {
     protected $db;
+    protected TradingRepository $repository;
     protected \Shared $sharedFunctions;
     protected \Season $season;
 
-    public function __construct($db)
+    public function __construct($db, ?TradingRepository $repository = null)
     {
         $this->db = $db;
+        // Extract mysqli connection from legacy $db object for repositories
+        $mysqli = $db->db_connect_id ?? $db;
+        $this->repository = $repository ?? new TradingRepository($mysqli);
         $this->sharedFunctions = new \Shared($db);
         $this->season = new \Season($db);
     }
@@ -182,6 +186,9 @@ class UIHelper implements UIHelperInterface
     public function getAllTeamsForTrading(): array
     {
         $teams = [];
+        
+        // Note: TradingRepository->getAllTeams() returns only team_name
+        // We need team_city too - using legacy db temporarily
         $queryListOfAllTeams = "SELECT team_name, team_city FROM ibl_team_info ORDER BY team_city ASC";
         $resultListOfAllTeams = $this->db->sql_query($queryListOfAllTeams);
 

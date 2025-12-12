@@ -33,7 +33,7 @@ for ($j = 0; $j < $tradeData['fieldsCounter']; $j++) {
 }
 
 // Create trade offer using new class
-$tradeOffer = new Trading\TradeOffer($db, $mysqli_db ?? null);
+$tradeOffer = new Trading\TradeOffer($db);
 $result = $tradeOffer->createTradeOffer($tradeData);
 
 // Display trade cap details

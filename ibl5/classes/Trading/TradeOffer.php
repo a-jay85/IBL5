@@ -17,20 +17,22 @@ use Trading\Contracts\TradeOfferInterface;
 class TradeOffer implements TradeOfferInterface
 {
     protected $db;
-    protected $mysqli_db;
+    protected TradingRepository $repository;
     protected \Services\CommonRepository $commonRepository;
     protected \Season $season;
     protected CashTransactionHandler $cashHandler;
     protected TradeValidator $validator;
 
-    public function __construct($db, $mysqli_db = null)
+    public function __construct($db, ?TradingRepository $repository = null)
     {
         $this->db = $db;
-        $this->mysqli_db = $mysqli_db;
+        // Extract mysqli connection from legacy $db object for repositories
+        $mysqli = $db->db_connect_id ?? $db;
+        $this->repository = $repository ?? new TradingRepository($mysqli);
         $this->commonRepository = new \Services\CommonRepository($db);
         $this->season = new \Season($db);
-        $this->cashHandler = new CashTransactionHandler($db);
-        $this->validator = new TradeValidator($db);
+        $this->cashHandler = new CashTransactionHandler($db, $mysqli, $this->repository);
+        $this->validator = new TradeValidator($db, $mysqli);
     }
 
     /**
@@ -79,12 +81,14 @@ class TradeOffer implements TradeOfferInterface
      */
     protected function generateTradeOfferId(): int
     {
-        $query0 = "SELECT * FROM ibl_trade_autocounter ORDER BY `counter` DESC";
+        // Get current counter (fallback to legacy db if needed)
+        $query0 = "SELECT counter FROM ibl_trade_autocounter ORDER BY counter DESC LIMIT 1";
         $result0 = $this->db->sql_query($query0);
         $currentCounter = $this->db->sql_result($result0, 0, "counter");
         $tradeOfferId = ((int)$currentCounter) + 1;
 
-        $query0a = "INSERT INTO ibl_trade_autocounter ( `counter` ) VALUES ( '$tradeOfferId')";
+        // Insert new counter
+        $query0a = "INSERT INTO ibl_trade_autocounter (counter) VALUES ('$tradeOfferId')";
         $this->db->sql_query($query0a);
 
         return $tradeOfferId;
@@ -232,49 +236,15 @@ class TradeOffer implements TradeOfferInterface
      */
     protected function insertTradeItem(int $tradeOfferId, int $itemId, int $assetType, string $offeringTeamName, string $listeningTeamName, string $approvalTeamName): array
     {
-        // Use prepared statement if mysqli_db is available (preferred for security)
-        if ($this->mysqli_db) {
-            $query = "INSERT INTO ibl_trade_info 
-              ( `tradeofferid`, 
-                `itemid`, 
-                `itemtype`, 
-                `from`, 
-                `to`, 
-                `approval` ) 
-            VALUES (?, ?, ?, ?, ?, ?)";
-            
-            $stmt = $this->mysqli_db->prepare($query);
-            $stmt->bind_param('iiisss', $tradeOfferId, $itemId, $assetType, $offeringTeamName, $listeningTeamName, $approvalTeamName);
-            $stmt->execute();
-        } else {
-            // Fallback: use mysqli_real_escape_string if available, otherwise addslashes
-            if (isset($this->db->db_connect_id) && $this->db->db_connect_id) {
-                $escapedOffering = mysqli_real_escape_string($this->db->db_connect_id, $offeringTeamName);
-                $escapedListening = mysqli_real_escape_string($this->db->db_connect_id, $listeningTeamName);
-                $escapedApproval = mysqli_real_escape_string($this->db->db_connect_id, $approvalTeamName);
-            } else {
-                // Final fallback if db_connect_id not available
-                $escapedOffering = addslashes($offeringTeamName);
-                $escapedListening = addslashes($listeningTeamName);
-                $escapedApproval = addslashes($approvalTeamName);
-            }
-            
-            $query = "INSERT INTO ibl_trade_info 
-              ( `tradeofferid`, 
-                `itemid`, 
-                `itemtype`, 
-                `from`, 
-                `to`, 
-                `approval` ) 
-            VALUES        ( '$tradeOfferId', 
-                '$itemId', 
-                '$assetType', 
-                '$escapedOffering', 
-                '$escapedListening', 
-                '$escapedApproval' )";
-            
-            $this->db->sql_query($query);
-        }
+        // Use repository with prepared statements
+        $this->repository->insertTradeItem(
+            $tradeOfferId,
+            $itemId,
+            $assetType,
+            $offeringTeamName,
+            $listeningTeamName,
+            $approvalTeamName
+        );
 
         $tradeText = "";
         if ($assetType == 0) {

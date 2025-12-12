@@ -17,12 +17,24 @@ use Trading\Contracts\TradeValidatorInterface;
 class TradeValidator implements TradeValidatorInterface
 {
     protected $db;
+    protected object $mysqli_db;
+    protected TradingRepository $repository;
     protected \Shared $sharedFunctions;
     protected \Season $season;
 
-    public function __construct($db)
+    public function __construct($db, object $mysqli_db = null)
     {
         $this->db = $db;
+        
+        // Extract mysqli from provided parameter, or from legacy $db object, or fallback to global
+        if ($mysqli_db !== null) {
+            $this->mysqli_db = $mysqli_db;
+        } else {
+            // Try to extract from legacy $db object
+            $this->mysqli_db = $db->db_connect_id ?? $db;
+        }
+        
+        $this->repository = new TradingRepository($this->mysqli_db);
         $this->sharedFunctions = new \Shared($db);
         $this->season = new \Season($db);
     }
@@ -88,16 +100,15 @@ class TradeValidator implements TradeValidatorInterface
      */
     public function canPlayerBeTraded(int $playerId): bool
     {
-        $result = $this->db->sql_query("SELECT ordinal, cy FROM ibl_plr WHERE pid = $playerId");
-        $player = $this->db->sql_fetchrow($result);
+        $player = $this->repository->getPlayerForTradeValidation($playerId);
 
-        if (!$player || !is_array($player) || count($player) < 2) {
+        if (!$player) {
             return false;
         }
 
-        // Extract ordinal and cy from the indexed array
-        $ordinal = isset($player[0]) ? (int) $player[0] : 99999; // Default to high ordinal if missing
-        $cy = isset($player[1]) ? (int) $player[1] : 0; // Default to 0 salary if missing
+        // Extract ordinal and cy from the associative array
+        $ordinal = isset($player['ordinal']) ? (int) $player['ordinal'] : 99999;
+        $cy = isset($player['cy']) ? (int) $player['cy'] : 0;
 
         // Player cannot be traded if they are waived (ordinal > JSB::WAIVERS_ORDINAL) or have 0 salary
         return $cy != 0 && $ordinal <= \JSB::WAIVERS_ORDINAL;

@@ -18,11 +18,15 @@ use Trading\Contracts\CashTransactionHandlerInterface;
 class CashTransactionHandler implements CashTransactionHandlerInterface
 {
     protected $db;
+    protected TradingRepository $repository;
     protected \Services\CommonRepository $commonRepository;
 
-    public function __construct($db)
+    public function __construct($db, $mysqli = null, ?TradingRepository $repository = null)
     {
         $this->db = $db;
+        // Extract mysqli connection from legacy $db object if not provided
+        $mysqli = $mysqli ?? ($db->db_connect_id ?? $db);
+        $this->repository = $repository ?? new TradingRepository($mysqli);
         $this->commonRepository = new \Services\CommonRepository($db);
     }
 
@@ -31,16 +35,11 @@ class CashTransactionHandler implements CashTransactionHandlerInterface
      */
     public function generateUniquePid(int $pid): int
     {
-        $queryCheckIfPidExists = "SELECT 1 FROM ibl_plr WHERE pid = $pid";
-        $resultCheckIfPidExists = $this->db->sql_query($queryCheckIfPidExists);
-        $pidResult = $this->db->sql_result($resultCheckIfPidExists, 0);
-
-        if ($pidResult == NULL) {
+        if (!$this->repository->playerIdExists($pid)) {
             return $pid;
-        } else {
-            $pid += 2;
-            return $this->generateUniquePid($pid);
         }
+        
+        return $this->generateUniquePid($pid + 2);
     }
 
     /**

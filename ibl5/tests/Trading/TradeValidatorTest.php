@@ -16,17 +16,36 @@ class TradeValidatorTest extends TestCase
 {
     private $validator;
     private $mockDb;
+    private $mockMysqli;
 
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
-        $this->validator = new Trading\TradeValidator($this->mockDb);
+        
+        // Set up mock mysqli for Trading repository
+        $this->mockMysqli = new class($this->mockDb) {
+            private $mockDb;
+            public int $connect_errno = 0;
+            public ?string $connect_error = null;
+            public int $insert_id = 1;
+            
+            public function __construct($mockDb) {
+                $this->mockDb = $mockDb;
+            }
+            
+            public function prepare($query) {
+                return new MockPreparedStatement($this->mockDb, $query);
+            }
+        };
+        
+        $this->validator = new Trading\TradeValidator($this->mockDb, $this->mockMysqli);
     }
 
     protected function tearDown(): void
     {
         $this->validator = null;
         $this->mockDb = null;
+        $this->mockMysqli = null;
     }
 
     /**
@@ -130,7 +149,7 @@ class TradeValidatorTest extends TestCase
         // Arrange - Valid tradeable player
         $playerId = 12345;
         $this->mockDb->setMockData([
-            [500, 5000] // ordinal <= 960, cy (salary)
+            ['ordinal' => 500, 'cy' => 5000] // ordinal <= 960, cy (salary) > 0
         ]);
 
         // Act
@@ -211,12 +230,12 @@ class TradeValidatorTest extends TestCase
     {
         return [
             'Waived player' => [
-                [[1500, 5000]], // High ordinal > 960 (waived), has salary
+                [['ordinal' => 1500, 'cy' => 5000]], // High ordinal > 960 (waived), has salary
                 false,
                 'Waived players should not be tradeable'
             ],
             'Player with no salary' => [
-                [[500, 0]], // Low ordinal <= 960, no salary
+                [['ordinal' => 500, 'cy' => 0]], // Low ordinal <= 960, no salary
                 false,
                 'Players with zero salary should not be tradeable'
             ],

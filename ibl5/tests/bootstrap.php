@@ -31,11 +31,24 @@ class MockDatabase
         if (stripos($query, 'INSERT') === 0 || 
             stripos($query, 'UPDATE') === 0 || 
             stripos($query, 'DELETE') === 0) {
+            // Set affected rows for UPDATE/DELETE operations (default to 1 for successful operations)
+            if ($this->returnTrue) {
+                $this->affectedRows = 1;
+            }
             return $this->returnTrue;
         }
         
-        // Special handling for trade info queries
-        if (stripos($query, 'ibl_trade_info') !== false && !empty($this->mockTradeInfo)) {
+        // Special handling for PID existence checks (generateUniquePid)
+        // Return empty result to indicate PID is available unless explicitly configured
+        // Only match the specific "SELECT 1 FROM ibl_plr WHERE pid = X" pattern for existence checks
+        if (stripos($query, 'SELECT 1 FROM ibl_plr WHERE pid = ') !== false) {
+            return new MockDatabaseResult([]);
+        }
+        
+        // Special handling for trade info queries (support both direct and prepared statement patterns)
+        if (stripos($query, 'ibl_trade_info') !== false && 
+            stripos($query, 'tradeofferid') !== false &&
+            !empty($this->mockTradeInfo)) {
             return new MockDatabaseResult($this->mockTradeInfo);
         }
         

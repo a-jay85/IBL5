@@ -17,19 +17,21 @@ use Trading\Contracts\TradeProcessorInterface;
 class TradeProcessor implements TradeProcessorInterface
 {
     protected $db;
-    protected $mysqli_db;
+    protected TradingRepository $repository;
     protected \Services\CommonRepository $commonRepository;
     protected \Season $season;
     protected CashTransactionHandler $cashHandler;
     protected \Services\NewsService $newsService;
 
-    public function __construct($db, $mysqli_db = null)
+    public function __construct($db, ?TradingRepository $repository = null)
     {
         $this->db = $db;
-        $this->mysqli_db = $mysqli_db;
+        // Extract mysqli connection from legacy $db object for repositories
+        $mysqli = $db->db_connect_id ?? $db;
+        $this->repository = $repository ?? new TradingRepository($mysqli);
         $this->commonRepository = new \Services\CommonRepository($db);
         $this->season = new \Season($db);
-        $this->cashHandler = new CashTransactionHandler($db);
+        $this->cashHandler = new CashTransactionHandler($db, $mysqli, $this->repository);
         $this->newsService = new \Services\NewsService($db);
     }
 
@@ -38,11 +40,9 @@ class TradeProcessor implements TradeProcessorInterface
      */
     public function processTrade(int $offerId): array
     {
-        $queryTradeRows = "SELECT * FROM ibl_trade_info WHERE tradeofferid = '$offerId'";
-        $resultTradeRows = $this->db->sql_query($queryTradeRows);
-        $numTradeRows = $this->db->sql_numrows($resultTradeRows);
+        $tradeRows = $this->repository->getTradesByOfferId($offerId);
 
-        if ($numTradeRows == 0) {
+        if (empty($tradeRows)) {
             return [
                 'success' => false,
                 'error' => 'No trade data found for this offer ID'
@@ -50,21 +50,20 @@ class TradeProcessor implements TradeProcessorInterface
         }
 
         $storytext = "";
-        $i = 0;
+        $offeringTeamName = '';
+        $listeningTeamName = '';
 
-        while ($i < $numTradeRows) {
-            $itemId = $this->db->sql_result($resultTradeRows, $i, "itemid");
-            $itemType = $this->db->sql_result($resultTradeRows, $i, "itemtype");
-            $offeringTeamName = $this->db->sql_result($resultTradeRows, $i, "from");
-            $listeningTeamName = $this->db->sql_result($resultTradeRows, $i, "to");
+        foreach ($tradeRows as $tradeRow) {
+            $itemId = $tradeRow['itemid'];
+            $itemType = $tradeRow['itemtype'];
+            $offeringTeamName = $tradeRow['from'];
+            $listeningTeamName = $tradeRow['to'];
 
             $result = $this->processTradeItem($itemId, $itemType, $offeringTeamName, $listeningTeamName, $offerId);
             
             if ($result['success']) {
                 $storytext .= $result['tradeLine'];
             }
-
-            $i++;
         }
 
         // Create news story and notifications
@@ -115,24 +114,8 @@ class TradeProcessor implements TradeProcessorInterface
     {
         $itemId = $this->cashHandler->generateUniquePid((int) $itemId);
         
-        // Use prepared statement if mysqli_db is available (preferred)
-        if ($this->mysqli_db) {
-            $query = "SELECT * FROM ibl_trade_cash WHERE tradeOfferID = ? AND sendingTeam = ?";
-            $stmt = $this->mysqli_db->prepare($query);
-            $stmt->bind_param('is', $offerId, $offeringTeamName);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            $cashDetails = $result->fetch_assoc();
-        } else {
-            // Fallback: use mysqli_real_escape_string if available, otherwise addslashes
-            if (isset($this->db->db_connect_id) && $this->db->db_connect_id) {
-                $escapedTeam = mysqli_real_escape_string($this->db->db_connect_id, $offeringTeamName);
-            } else {
-                $escapedTeam = addslashes($offeringTeamName);
-            }
-            $queryCashDetails = "SELECT * FROM ibl_trade_cash WHERE tradeOfferID = $offerId AND sendingTeam = '$escapedTeam'";
-            $cashDetails = $this->db->sql_fetchrow($this->db->sql_query($queryCashDetails));
-        }
+        // Get cash details from repository
+        $cashDetails = $this->repository->getCashTransactionByOffer($offerId, $offeringTeamName);
 
         $cashYear = [
             1 => $cashDetails['cy1'],
@@ -156,35 +139,29 @@ class TradeProcessor implements TradeProcessorInterface
     protected function processDraftPick($itemId, $offeringTeamName, $listeningTeamName)
     {
         $itemId = (int) $itemId;
-        // Use prepared statement if mysqli_db is available (preferred)
-        if ($this->mysqli_db) {
-            $query = "SELECT * FROM ibl_draft_picks WHERE `pickid` = ?";
-            $stmt = $this->mysqli_db->prepare($query);
-            $stmt->bind_param('i', $itemId);
-            $stmt->execute();
-            $resultj = $stmt->get_result();
-        } else {
-            $queryj = "SELECT * FROM ibl_draft_picks WHERE `pickid` = '$itemId'";
-            $resultj = $this->db->sql_query($queryj);
+        
+        // Get pick details from repository
+        $pickData = $this->repository->getDraftPickById($itemId);
+        
+        if (!$pickData) {
+            return ['success' => false, 'tradeLine' => ''];
         }
         
         $tradeLine = "The $offeringTeamName send the " . 
-                    $this->db->sql_result($resultj, 0, "year") . " " . 
-                    $this->db->sql_result($resultj, 0, "teampick") . " Round " . 
-                    $this->db->sql_result($resultj, 0, "round") . " draft pick to the $listeningTeamName.<br>";
+                    $pickData['year'] . " " . 
+                    $pickData['teampick'] . " Round " . 
+                    $pickData['round'] . " draft pick to the $listeningTeamName.<br>";
 
-        if (isset($this->db->db_connect_id) && $this->db->db_connect_id) {
-            $escapedTeam = mysqli_real_escape_string($this->db->db_connect_id, $listeningTeamName);
-        } else {
-            $escapedTeam = addslashes($listeningTeamName);
-        }
-        $queryi = 'UPDATE ibl_draft_picks SET `ownerofpick` = "' . $escapedTeam . '" WHERE `pickid` = ' . $itemId . ' LIMIT 1';
-        $resulti = $this->db->sql_query($queryi);
+        // Update pick ownership using repository
+        $affectedRows = $this->repository->updateDraftPickOwnerById($itemId, $listeningTeamName);
+        
+        // Build query string for queue (if needed in certain phases)
+        $queryi = 'UPDATE ibl_draft_picks SET `ownerofpick` = "' . addslashes($listeningTeamName) . '" WHERE `pickid` = ' . $itemId . ' LIMIT 1';
 
         $this->queueTradeQuery($queryi, $tradeLine);
 
         return [
-            'success' => (bool)$resulti,
+            'success' => ($affectedRows > 0),
             'tradeLine' => $tradeLine
         ];
     }
@@ -201,34 +178,27 @@ class TradeProcessor implements TradeProcessorInterface
         $itemId = (int) $itemId;
         $listeningTeamId = $this->commonRepository->getTidFromTeamname($listeningTeamName);
 
-        // Use prepared statement if mysqli_db is available (preferred)
-        if ($this->mysqli_db) {
-            $query = "SELECT * FROM ibl_plr WHERE pid = ?";
-            $stmt = $this->mysqli_db->prepare($query);
-            $stmt->bind_param('i', $itemId);
-            $stmt->execute();
-            $resultk = $stmt->get_result();
-        } else {
-            $queryk = "SELECT * FROM ibl_plr WHERE pid = '$itemId'";
-            $resultk = $this->db->sql_query($queryk);
+        // Get full player data from repository
+        $playerData = $this->repository->getPlayerById($itemId);
+        
+        if (!$playerData) {
+            return ['success' => false, 'tradeLine' => ''];
         }
 
         $tradeLine = "The $offeringTeamName send " . 
-                    $this->db->sql_result($resultk, 0, "pos") . " " . 
-                    $this->db->sql_result($resultk, 0, "name") . " to the $listeningTeamName.<br>";
+                    $playerData['pos'] . " " . 
+                    $playerData['name'] . " to the $listeningTeamName.<br>";
 
-        if (isset($this->db->db_connect_id) && $this->db->db_connect_id) {
-            $escapedTeam = mysqli_real_escape_string($this->db->db_connect_id, $listeningTeamName);
-        } else {
-            $escapedTeam = addslashes($listeningTeamName);
-        }
-        $queryi = 'UPDATE ibl_plr SET `teamname` = "' . $escapedTeam . '", `tid` = ' . $listeningTeamId . ' WHERE `pid` = ' . $itemId . ' LIMIT 1';
-        $resulti = $this->db->sql_query($queryi);
+        // Update player team using repository
+        $affectedRows = $this->repository->updatePlayerTeam($itemId, $listeningTeamName, $listeningTeamId);
+        
+        // Build query string for queue (if needed in certain phases)
+        $queryi = 'UPDATE ibl_plr SET `teamname` = "' . addslashes($listeningTeamName) . '", `tid` = ' . $listeningTeamId . ' WHERE `pid` = ' . $itemId . ' LIMIT 1';
 
         $this->queueTradeQuery($queryi, $tradeLine);
 
         return [
-            'success' => (bool)$resulti,
+            'success' => ($affectedRows > 0),
             'tradeLine' => $tradeLine
         ];
     }
@@ -245,23 +215,7 @@ class TradeProcessor implements TradeProcessorInterface
             || $this->season->phase == "Draft"
             || $this->season->phase == "Free Agency"
         ) {
-            // Use prepared statement if mysqli_db is available (preferred)
-            if ($this->mysqli_db) {
-                $queryInsert = "INSERT INTO ibl_trade_queue (query, tradeline) VALUES (?, ?)";
-                $stmt = $this->mysqli_db->prepare($queryInsert);
-                $stmt->bind_param('ss', $query, $tradeLine);
-                $stmt->execute();
-            } else {
-                if (isset($this->db->db_connect_id) && $this->db->db_connect_id) {
-                    $escapedQuery = mysqli_real_escape_string($this->db->db_connect_id, $query);
-                    $escapedLine = mysqli_real_escape_string($this->db->db_connect_id, $tradeLine);
-                } else {
-                    $escapedQuery = addslashes($query);
-                    $escapedLine = addslashes($tradeLine);
-                }
-                $queryInsert = "INSERT INTO ibl_trade_queue (query, tradeline) VALUES ('$escapedQuery', '$escapedLine')";
-                $this->db->sql_query($queryInsert);
-            }
+            $this->repository->insertTradeQueue($query, $tradeLine);
         }
     }
 
@@ -309,23 +263,7 @@ class TradeProcessor implements TradeProcessorInterface
      */
     protected function cleanupTradeData($offerId)
     {
-        // $offerId is an int parameter, so it's safe - but use prepared statements for consistency
-        if ($this->mysqli_db) {
-            $queryClearInfo = "DELETE FROM ibl_trade_info WHERE `tradeofferid` = ?";
-            $stmt = $this->mysqli_db->prepare($queryClearInfo);
-            $stmt->bind_param('i', $offerId);
-            $stmt->execute();
-            
-            $queryClearCash = "DELETE FROM ibl_trade_cash WHERE `tradeOfferID` = ?";
-            $stmt = $this->mysqli_db->prepare($queryClearCash);
-            $stmt->bind_param('i', $offerId);
-            $stmt->execute();
-        } else {
-            $queryClearInfo = "DELETE FROM ibl_trade_info WHERE `tradeofferid` = '$offerId'";
-            $this->db->sql_query($queryClearInfo);
-            
-            $queryClearCash = "DELETE FROM ibl_trade_cash WHERE `tradeOfferID` = '$offerId'";
-            $this->db->sql_query($queryClearCash);
-        }
+        $this->repository->deleteTradeInfoByOfferId($offerId);
+        $this->repository->deleteTradeCashByOfferId($offerId);
     }
 }

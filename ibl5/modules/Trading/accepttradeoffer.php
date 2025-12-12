@@ -5,7 +5,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 $offerId = $_POST['offer'];
 
 if ($offerId != NULL) {
-    $tradeProcessor = new Trading\TradeProcessor($db, $mysqli_db ?? null);
+    $tradeProcessor = new Trading\TradeProcessor($db);
     $result = $tradeProcessor->processTrade((int)$offerId);
     
     if ($result['success']) {

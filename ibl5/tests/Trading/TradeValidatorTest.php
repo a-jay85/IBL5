@@ -3,7 +3,7 @@
 use PHPUnit\Framework\TestCase;
 
 /**
- * Comprehensive unit tests for Trading_TradeValidator class
+ * Comprehensive unit tests for Trading\TradeValidator class
  * 
  * This demonstrates modern PHP testing best practices including:
  * - Proper test structure with setUp/tearDown
@@ -20,7 +20,7 @@ class TradeValidatorTest extends TestCase
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
-        $this->validator = new Trading_TradeValidator($this->mockDb);
+        $this->validator = new Trading\TradeValidator($this->mockDb);
     }
 
     protected function tearDown(): void

@@ -1,16 +1,23 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Extension;
 
 use Extension\Contracts\ExtensionDatabaseOperationsInterface;
 
 /**
+ * ExtensionDatabaseOperations - Database operations for contract extensions
+ * 
+ * Handles all database operations related to updating player contracts,
+ * managing extension usage flags, and creating news stories.
+ * 
  * @see ExtensionDatabaseOperationsInterface
  */
 class ExtensionDatabaseOperations implements ExtensionDatabaseOperationsInterface
 {
     private $db;
-    private $newsService;
+    private \Services\NewsService $newsService;
 
     public function __construct($db)
     {

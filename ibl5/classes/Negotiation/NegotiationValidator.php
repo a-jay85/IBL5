@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Negotiation;
 
 use Negotiation\Contracts\NegotiationValidatorInterface;
@@ -50,9 +52,9 @@ class NegotiationValidator implements NegotiationValidatorInterface
     /**
      * @see NegotiationValidatorInterface::validateFreeAgencyNotActive()
      */
-    public function validateFreeAgencyNotActive(string $prefix): array
+    public function validateFreeAgencyNotActive(): array
     {   
-        $query = "SELECT active FROM {$prefix}_modules WHERE title = 'Free_Agency'";
+        $query = "SELECT active FROM nuke_modules WHERE title = 'Free_Agency'";
         $result = $this->db->sql_query($query);
         $row = $this->db->sql_fetchrow($result);
         

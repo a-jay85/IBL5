@@ -150,8 +150,8 @@ class NegotiationViewHelperTest extends TestCase
         // Assert
         $this->assertStringContainsString('name="maxyr1"', $html);
         $this->assertStringContainsString('value="1063"', $html);
-        $this->assertStringContainsString('VALUE="550"', $html);
-        $this->assertStringContainsString('VALUE="600"', $html);
+        $this->assertStringContainsString('value="550"', $html);
+        $this->assertStringContainsString('value="600"', $html);
     }
 
     /**
@@ -180,8 +180,8 @@ class NegotiationViewHelperTest extends TestCase
         $html = NegotiationViewHelper::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
 
         // Assert
-        $this->assertStringContainsString('VALUE="1063"', $html); // Max year 1
-        $this->assertStringContainsString('TYPE="text"', $html); // Text not number when showing max
+        $this->assertStringContainsString('value="1063"', $html); // Max year 1
+        $this->assertStringContainsString('type="text"', $html); // Text not number when showing max
     }
 
     /**

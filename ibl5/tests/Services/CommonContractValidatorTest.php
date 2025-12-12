@@ -21,117 +21,6 @@ class CommonContractValidatorTest extends TestCase
         $this->validator = new CommonContractValidator();
     }
 
-    // ==================== validateOfferAmounts Tests ====================
-
-    /**
-     * @group offer-amounts
-     */
-    public function testValidateOfferAmountsSucceedsWithValidOffer(): void
-    {
-        $offer = [
-            'year1' => 500,
-            'year2' => 550,
-            'year3' => 600,
-            'year4' => 0,
-            'year5' => 0,
-            'year6' => 0
-        ];
-
-        $result = $this->validator->validateOfferAmounts($offer);
-
-        $this->assertTrue($result['valid']);
-        $this->assertNull($result['error']);
-    }
-
-    /**
-     * @group offer-amounts
-     */
-    public function testValidateOfferAmountsFailsWhenYear1IsZero(): void
-    {
-        $offer = [
-            'year1' => 0,
-            'year2' => 550,
-            'year3' => 600
-        ];
-
-        $result = $this->validator->validateOfferAmounts($offer);
-
-        $this->assertFalse($result['valid']);
-        $this->assertStringContainsString('Year1', $result['error']);
-        $this->assertStringContainsString('zero', $result['error']);
-    }
-
-    /**
-     * @group offer-amounts
-     */
-    public function testValidateOfferAmountsFailsWhenYear2IsZero(): void
-    {
-        $offer = [
-            'year1' => 500,
-            'year2' => 0,
-            'year3' => 600
-        ];
-
-        $result = $this->validator->validateOfferAmounts($offer);
-
-        $this->assertFalse($result['valid']);
-        $this->assertStringContainsString('Year2', $result['error']);
-    }
-
-    /**
-     * @group offer-amounts
-     */
-    public function testValidateOfferAmountsFailsWhenYear3IsZero(): void
-    {
-        $offer = [
-            'year1' => 500,
-            'year2' => 550,
-            'year3' => 0
-        ];
-
-        $result = $this->validator->validateOfferAmounts($offer);
-
-        $this->assertFalse($result['valid']);
-        $this->assertStringContainsString('Year3', $result['error']);
-    }
-
-    /**
-     * @group offer-amounts
-     */
-    public function testValidateOfferAmountsSucceedsWithOptionalYearsZero(): void
-    {
-        // Year 4-6 can be zero - only 1-3 are required
-        $offer = [
-            'year1' => 500,
-            'year2' => 550,
-            'year3' => 600,
-            'year4' => 0,
-            'year5' => 0,
-            'year6' => 0
-        ];
-
-        $result = $this->validator->validateOfferAmounts($offer);
-
-        $this->assertTrue($result['valid']);
-        $this->assertNull($result['error']);
-    }
-
-    /**
-     * @group offer-amounts
-     */
-    public function testValidateOfferAmountsFailsWithNegativeYear1(): void
-    {
-        $offer = [
-            'year1' => -500,
-            'year2' => 550,
-            'year3' => 600
-        ];
-
-        $result = $this->validator->validateOfferAmounts($offer);
-
-        $this->assertFalse($result['valid']);
-    }
-
     // ==================== validateRaises Tests ====================
 
     /**
@@ -769,10 +658,6 @@ class CommonContractValidatorTest extends TestCase
             'year5' => 0,
             'year6' => 0
         ];
-
-        // Check amounts
-        $result = $this->validator->validateOfferAmounts($offer);
-        $this->assertTrue($result['valid']);
 
         // Check raises (without bird rights)
         $result = $this->validator->validateRaises($offer, 0);

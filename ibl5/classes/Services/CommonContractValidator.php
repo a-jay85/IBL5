@@ -11,33 +11,16 @@ use Services\Contracts\CommonContractValidatorInterface;
  * 
  * Provides reusable validation methods for contract offers used across
  * Extension, FreeAgency, and Negotiation modules. Centralizes CBA rules
- * for offer amount validation, raise calculations, and salary decreases.
+ * for raise calculations, salary decreases, and maximum contract limits.
+ * 
+ * Note: validateOfferAmounts() is NOT included here - it's Extension-specific
+ * because Free Agency, Rookie Options, and Waivers do not require the first
+ * three years to have non-zero amounts.
  * 
  * @see CommonContractValidatorInterface
  */
 class CommonContractValidator implements CommonContractValidatorInterface
 {
-    /**
-     * @see CommonContractValidatorInterface::validateOfferAmounts()
-     */
-    public function validateOfferAmounts(array $offer): array
-    {
-        $requiredYears = ['year1', 'year2', 'year3'];
-        
-        foreach ($requiredYears as $year) {
-            $value = $offer[$year] ?? 0;
-            if (empty($value) || $value <= 0) {
-                $yearLabel = ucfirst($year);
-                return [
-                    'valid' => false,
-                    'error' => "Sorry, you must enter an amount greater than zero for each of the first three contract years when making an extension offer. Your offer in {$yearLabel} was zero, so this offer is not valid."
-                ];
-            }
-        }
-        
-        return ['valid' => true, 'error' => null];
-    }
-
     /**
      * @see CommonContractValidatorInterface::validateRaises()
      */

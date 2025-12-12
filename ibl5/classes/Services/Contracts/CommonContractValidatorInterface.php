@@ -16,35 +16,6 @@ namespace Services\Contracts;
 interface CommonContractValidatorInterface
 {
     /**
-     * Validate that the first three years of a contract offer have non-zero amounts
-     * 
-     * All IBL contracts require a minimum of 3 guaranteed years.
-     * Years 4, 5, and 6 are optional (can be zero).
-     * 
-     * @param array{year1: int, year2: int, year3: int, year4?: int, year5?: int, year6?: int} $offer 
-     *        Contract offer with yearly salary amounts in thousands
-     * @return array{valid: bool, error: string|null} Validation result:
-     *         - 'valid': bool - True if years 1-3 all have amounts > 0
-     *         - 'error': string|null - Error message identifying which year failed, null if valid
-     * 
-     * IMPORTANT BEHAVIORS:
-     *  - Only checks year1, year2, year3 (required years)
-     *  - Zero or negative amounts in years 1-3 fail validation
-     *  - Years 4-6 are NOT validated by this method (can be zero)
-     *  - Returns specific error message identifying the failing year
-     * 
-     * @example
-     * // Valid: all required years present
-     * validateOfferAmounts(['year1' => 500, 'year2' => 550, 'year3' => 600]) 
-     * // Returns: ['valid' => true, 'error' => null]
-     * 
-     * // Invalid: year2 is zero
-     * validateOfferAmounts(['year1' => 500, 'year2' => 0, 'year3' => 600])
-     * // Returns: ['valid' => false, 'error' => 'Sorry, you must enter...Year2 was zero...']
-     */
-    public function validateOfferAmounts(array $offer): array;
-
-    /**
      * Validate that raises between contract years don't exceed allowed percentages
      * 
      * Raises are limited based on Bird Rights status. The maximum raise

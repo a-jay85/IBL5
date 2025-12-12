@@ -10,7 +10,11 @@ namespace Extension\Contracts;
  * Defines validation rules for contract extension offers. Enforces business rules
  * around offer amounts, maximum salaries, raise percentages, and team eligibility.
  * 
- * Delegates common validation logic to Services\CommonContractValidator for
+ * Note: validateOfferAmounts() is Extension-specific because other contract types
+ * (Free Agency, Rookie Options, Waivers) do not require the first three years to
+ * have non-zero amounts.
+ * 
+ * Delegates other validation logic to Services\CommonContractValidator for
  * consistency across Extension, FreeAgency, and Negotiation modules.
  * 
  * @package Extension\Contracts
@@ -21,6 +25,9 @@ interface ExtensionValidatorInterface
     /**
      * Validates that the first three years of the offer have non-zero amounts
      * 
+     * Extension-specific validation - ONLY applicable to extensions.
+     * Free Agency, Rookie Options, and Waivers do not have this requirement.
+     * 
      * Extensions must include at least 3 guaranteed years. Years 4 and 5 are optional.
      * 
      * @param array{year1: int, year2: int, year3: int, year4?: int, year5?: int} $offer 
@@ -30,11 +37,9 @@ interface ExtensionValidatorInterface
      *         - 'error': string|null - Error message if invalid, null if valid
      * 
      * IMPORTANT BEHAVIORS:
-     *  - Delegates to CommonContractValidator::validateOfferAmounts()
+     *  - Extension-specific rule - NOT shared with other contract types
      *  - year1, year2, year3 must all be greater than zero
      *  - year4 and year5 can be zero (for 3 or 4-year deals)
-     * 
-     * @see \Services\CommonContractValidator::validateOfferAmounts()
      */
     public function validateOfferAmounts(array $offer): array;
 

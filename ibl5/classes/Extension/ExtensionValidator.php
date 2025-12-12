@@ -28,10 +28,26 @@ class ExtensionValidator implements ExtensionValidatorInterface
 
     /**
      * @see ExtensionValidatorInterface::validateOfferAmounts()
+     * 
+     * Extension-specific validation - NOT delegated to CommonContractValidator
+     * because Free Agency, Rookie Options, and Waivers do not have this requirement
      */
     public function validateOfferAmounts(array $offer): array
     {
-        return $this->contractValidator->validateOfferAmounts($offer);
+        $requiredYears = ['year1', 'year2', 'year3'];
+        
+        foreach ($requiredYears as $year) {
+            $value = $offer[$year] ?? 0;
+            if (empty($value) || $value <= 0) {
+                $yearLabel = ucfirst($year);
+                return [
+                    'valid' => false,
+                    'error' => "Sorry, you must enter an amount greater than zero for each of the first three contract years when making an extension offer. Your offer in {$yearLabel} was zero, so this offer is not valid."
+                ];
+            }
+        }
+        
+        return ['valid' => true, 'error' => null];
     }
 
     /**

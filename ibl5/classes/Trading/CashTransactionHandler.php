@@ -98,7 +98,8 @@ class CashTransactionHandler implements CashTransactionHandlerInterface
             `cy3`, 
             `cy4`, 
             `cy5`, 
-            `cy6`) 
+            `cy6`,
+            `retired`) 
         VALUES
             ('100000',
             '$itemId',
@@ -113,7 +114,8 @@ class CashTransactionHandler implements CashTransactionHandlerInterface
             '$cy3',
             '$cy4',
             '$cy5',
-            '$cy6')";
+            '$cy6',
+            '0')";
 
         $resultInsertPositiveCashRow = $this->db->sql_query($queryInsertPositiveCashRow);
 
@@ -135,7 +137,8 @@ class CashTransactionHandler implements CashTransactionHandlerInterface
             `cy3`,
             `cy4`,
             `cy5`,
-            `cy6`)
+            `cy6`,
+            `retired`)
         VALUES
             ('100000',
             '$itemId',
@@ -150,7 +153,8 @@ class CashTransactionHandler implements CashTransactionHandlerInterface
             '-$cy3',
             '-$cy4',
             '-$cy5',
-            '-$cy6')";
+            '-$cy6',
+            '0')";
 
         $resultInsertNegativeCashRow = $this->db->sql_query($queryInsertNegativeCashRow);
 

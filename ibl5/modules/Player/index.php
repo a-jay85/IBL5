@@ -143,7 +143,7 @@ function showpage($playerID, $pageView)
 
 function negotiate($playerID)
 {
-    global $prefix, $db, $cookie;
+    global $prefix, $db, $mysqli_db, $cookie;
 
     $playerID = intval($playerID);
     
@@ -156,7 +156,7 @@ function negotiate($playerID)
     UI::playerMenu();
 
     // Use NegotiationProcessor to handle all business logic
-    $processor = new Negotiation\NegotiationProcessor($db);
+    $processor = new Negotiation\NegotiationProcessor($db, $mysqli_db);
     echo $processor->processNegotiation($playerID, $userTeamName, $prefix);
 
     CloseTable();

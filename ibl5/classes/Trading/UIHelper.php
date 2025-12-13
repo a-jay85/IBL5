@@ -109,12 +109,16 @@ class UIHelper implements UIHelperInterface
 
     /**
      * Render a player row in the trade form
-     * @param int $k Row number
+     * 
+     * Generates HTML row for player with checkbox (if tradeable), position, name, and contract.
+     * Players with 0 contract or on waivers are shown but not checkable.
+     * 
+     * @param int $k Row number for form field naming
      * @param int $playerPid Player ID
      * @param int $playerContractAmount Player contract amount
      * @param string $playerPosition Player position
      * @param string $playerName Player name
-     * @param int $playerOrdinal Player ordinal (waiver status)
+     * @param int $playerOrdinal Player ordinal (waiver status indicator)
      * @return string HTML for player row
      */
     protected function renderPlayerRow(int $k, int $playerPid, int $playerContractAmount, string $playerPosition, string $playerName, int $playerOrdinal): string
@@ -143,13 +147,17 @@ class UIHelper implements UIHelperInterface
 
     /**
      * Render a draft pick row in the trade form
-     * @param int $k Row number
+     * 
+     * Generates HTML row for draft pick with checkbox, year, team, and round.
+     * Includes separate row for pick notes if present. All values are HTML-escaped.
+     * 
+     * @param int $k Row number for form field naming
      * @param int $pickId Pick ID
      * @param int $pickYear Pick year
      * @param string $pickTeam Original team
      * @param int $pickRound Pick round
-     * @param string|null $pickNotes Pick notes
-     * @return string HTML for draft pick row
+     * @param string|null $pickNotes Optional pick notes
+     * @return string HTML for draft pick row(s)
      */
     protected function renderDraftPickRow(int $k, int $pickId, int $pickYear, string $pickTeam, int $pickRound, ?string $pickNotes): string
     {

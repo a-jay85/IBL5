@@ -33,10 +33,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     }
 
     /**
-     * Get player data for trade validation
-     * 
-     * @param int $playerId Player ID
-     * @return array|null Player data with 'ordinal' and 'cy' fields, or null if not found
+     * @see TradingRepositoryInterface::getPlayerForTradeValidation()
      */
     public function getPlayerForTradeValidation(int $playerId): ?array
     {
@@ -48,9 +45,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     }
 
     /**
-     * Get all teams for UI display
-     * 
-     * @return array<array> List of teams with 'team_name' field
+     * @see TradingRepositoryInterface::getAllTeams()
      */
     public function getAllTeams(): array
     {
@@ -60,9 +55,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     }
 
     /**
-     * Get trade rows from trade info table
-     * 
-     * @return array<array> Trade rows
+     * @see TradingRepositoryInterface::getTradeRows()
      */
     public function getTradeRows(): array
     {
@@ -72,11 +65,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     }
 
     /**
-     * Get cash transaction details for a specific team and row
-     * 
-     * @param string $teamName Team name
-     * @param int $row Row number
-     * @return array|null Cash details or null if not found
+     * @see TradingRepositoryInterface::getCashDetails()
      */
     public function getCashDetails(string $teamName, int $row): ?array
     {
@@ -89,11 +78,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     }
 
     /**
-     * Get players involved in a trade
-     * 
-     * @param string $teamName Team name
-     * @param int $row Row number
-     * @return array<array> Player data
+     * @see TradingRepositoryInterface::getTradePlayers()
      */
     public function getTradePlayers(string $teamName, int $row): array
     {
@@ -106,11 +91,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     }
 
     /**
-     * Get draft picks involved in a trade
-     * 
-     * @param string $teamName Team name
-     * @param int $row Row number
-     * @return array<array> Draft pick data
+     * @see TradingRepositoryInterface::getTradePicks()
      */
     public function getTradePicks(string $teamName, int $row): array
     {
@@ -123,12 +104,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     }
 
     /**
-     * Update player's team after trade
-     * 
-     * @param int $playerId Player ID
-     * @param string $newTeamName New team name
-     * @param int $newTeamId New team ID
-     * @return int Number of rows affected
+     * @see TradingRepositoryInterface::updatePlayerTeam()
      */
     public function updatePlayerTeam(int $playerId, string $newTeamName, int $newTeamId): int
     {
@@ -142,12 +118,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     }
 
     /**
-     * Update draft pick ownership after trade
-     * 
-     * @param int $year Draft year
-     * @param int $pick Draft pick number
-     * @param string $newOwner New owner team name
-     * @return int Number of rows affected
+     * @see TradingRepositoryInterface::updateDraftPickOwner()
      */
     public function updateDraftPickOwner(int $year, int $pick, string $newOwner): int
     {
@@ -161,9 +132,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     }
 
     /**
-     * Clear all trade info
-     * 
-     * @return int Number of rows affected
+     * @see TradingRepositoryInterface::clearTradeInfo()
      */
     public function clearTradeInfo(): int
     {
@@ -171,9 +140,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     }
 
     /**
-     * Clear all trade cash data
-     * 
-     * @return int Number of rows affected
+     * @see TradingRepositoryInterface::clearTradeCash()
      */
     public function clearTradeCash(): int
     {
@@ -181,10 +148,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     }
 
     /**
-     * Check if a player ID exists in trade players table
-     * 
-     * @param int $playerId Player ID
-     * @return bool True if exists
+     * @see TradingRepositoryInterface::playerExistsInTrade()
      */
     public function playerExistsInTrade(int $playerId): bool
     {
@@ -198,10 +162,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     }
 
     /**
-     * Insert positive cash transaction (team receiving cash)
-     * 
-     * @param array $data Cash transaction data
-     * @return int Number of rows affected
+     * @see TradingRepositoryInterface::insertPositiveCashTransaction()
      */
     public function insertPositiveCashTransaction(array $data): int
     {
@@ -221,10 +182,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     }
 
     /**
-     * Insert negative cash transaction (team sending cash)
-     * 
-     * @param array $data Cash transaction data
-     * @return int Number of rows affected
+     * @see TradingRepositoryInterface::insertNegativeCashTransaction()
      */
     public function insertNegativeCashTransaction(array $data): int
     {
@@ -244,11 +202,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     }
 
     /**
-     * Delete cash transaction for a team and row
-     * 
-     * @param string $teamName Team name
-     * @param int $row Row number
-     * @return int Number of rows affected
+     * @see TradingRepositoryInterface::deleteCashTransaction()
      */
     public function deleteCashTransaction(string $teamName, int $row): int
     {
@@ -261,15 +215,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     }
 
     /**
-     * Insert a trade item (player, pick, or cash consideration)
-     * 
-     * @param int $tradeOfferId Trade offer ID
-     * @param int $itemId Item ID (player pid, pick pickid, or composite for cash)
-     * @param int|string $itemType Item type (1=player, 0=pick, 'cash'=cash)
-     * @param string $fromTeam Offering team name
-     * @param string $toTeam Receiving team name
-     * @param string $approvalTeam Team that must approve (typically listening team)
-     * @return int Number of rows affected
+     * @see TradingRepositoryInterface::insertTradeItem()
      */
     public function insertTradeItem(int $tradeOfferId, int $itemId, $itemType, string $fromTeam, string $toTeam, string $approvalTeam): int
     {
@@ -289,10 +235,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     }
 
     /**
-     * Get trade items by offer ID
-     * 
-     * @param int $offerId Trade offer ID
-     * @return array<array> Trade items
+     * @see TradingRepositoryInterface::getTradesByOfferId()
      */
     public function getTradesByOfferId(int $offerId): array
     {
@@ -304,11 +247,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     }
 
     /**
-     * Get cash transaction by offer ID and sending team
-     * 
-     * @param int $offerId Trade offer ID
-     * @param string $sendingTeam Sending team name
-     * @return array|null Cash details or null if not found
+     * @see TradingRepositoryInterface::getCashTransactionByOffer()
      */
     public function getCashTransactionByOffer(int $offerId, string $sendingTeam): ?array
     {
@@ -321,10 +260,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     }
 
     /**
-     * Get draft pick by pick ID
-     * 
-     * @param int $pickId Pick ID
-     * @return array|null Pick data or null if not found
+     * @see TradingRepositoryInterface::getDraftPickById()
      */
     public function getDraftPickById(int $pickId): ?array
     {
@@ -336,10 +272,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     }
 
     /**
-     * Get player by player ID
-     * 
-     * @param int $playerId Player ID
-     * @return array|null Player data or null if not found
+     * @see TradingRepositoryInterface::getPlayerById()
      */
     public function getPlayerById(int $playerId): ?array
     {
@@ -351,10 +284,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     }
 
     /**
-     * Check if a player ID exists in the database
-     * 
-     * @param int $playerId Player ID to check
-     * @return bool True if player exists, false otherwise
+     * @see TradingRepositoryInterface::playerIdExists()
      */
     public function playerIdExists(int $playerId): bool
     {
@@ -367,11 +297,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     }
 
     /**
-     * Update draft pick owner by pick ID
-     * 
-     * @param int $pickId Pick ID
-     * @param string $newOwner New owner team name
-     * @return int Number of rows affected
+     * @see TradingRepositoryInterface::updateDraftPickOwnerById()
      */
     public function updateDraftPickOwnerById(int $pickId, string $newOwner): int
     {
@@ -384,11 +310,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     }
 
     /**
-     * Insert trade into queue for deferred execution
-     * 
-     * @param string $query SQL query to execute later
-     * @param string $tradeLine Trade description text
-     * @return int Number of rows affected
+     * @see TradingRepositoryInterface::insertTradeQueue()
      */
     public function insertTradeQueue(string $query, string $tradeLine): int
     {
@@ -401,10 +323,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     }
 
     /**
-     * Delete trade info by offer ID
-     * 
-     * @param int $offerId Trade offer ID
-     * @return int Number of rows affected
+     * @see TradingRepositoryInterface::deleteTradeInfoByOfferId()
      */
     public function deleteTradeInfoByOfferId(int $offerId): int
     {
@@ -416,10 +335,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     }
 
     /**
-     * Delete trade cash by offer ID
-     * 
-     * @param int $offerId Trade offer ID
-     * @return int Number of rows affected
+     * @see TradingRepositoryInterface::deleteTradeCashByOfferId()
      */
     public function deleteTradeCashByOfferId(int $offerId): int
     {
@@ -431,9 +347,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     }
 
     /**
-     * Get the last inserted ID
-     * 
-     * @return int Last insert ID
+     * @see TradingRepositoryInterface::getLastInsertId()
      */
     public function getLastInsertId(): int
     {

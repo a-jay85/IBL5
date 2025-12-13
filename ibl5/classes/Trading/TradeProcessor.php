@@ -71,7 +71,8 @@ class TradeProcessor implements TradeProcessorInterface
         
         $this->createNewsStory($storytitle, $storytext);
         $this->sendNotifications($offeringTeamName, $listeningTeamName, $storytext);
-        $this->cleanupTradeData($offerId);
+        $this->repository->deleteTradeInfoByOfferId($offerId);
+        $this->repository->deleteTradeCashByOfferId($offerId);
 
         return [
             'success' => true,
@@ -82,12 +83,15 @@ class TradeProcessor implements TradeProcessorInterface
 
     /**
      * Process a single trade item (player, pick, or cash)
-     * @param mixed $itemId Item ID
+     * 
+     * Routes the item to the appropriate handler based on type.
+     * 
+     * @param mixed $itemId Item ID (int for player/pick, composite string for cash)
      * @param mixed $itemType Item type (1=player, 0=pick, 'cash'=cash)
      * @param string $offeringTeamName Offering team
      * @param string $listeningTeamName Listening team
      * @param int $offerId Trade offer ID
-     * @return array Result with success status and trade line
+     * @return array Result with keys: success (bool), tradeLine (string)
      */
     protected function processTradeItem($itemId, $itemType, $offeringTeamName, $listeningTeamName, $offerId)
     {
@@ -104,11 +108,15 @@ class TradeProcessor implements TradeProcessorInterface
 
     /**
      * Process cash transaction
-     * @param int $itemId Item ID
+     * 
+     * Retrieves cash details from database and creates cash transaction records
+     * via CashTransactionHandler.
+     * 
+     * @param int $itemId Item ID for the transaction
      * @param string $offeringTeamName Offering team
      * @param string $listeningTeamName Listening team
      * @param int $offerId Trade offer ID
-     * @return array Result
+     * @return array Result with keys: success (bool), tradeLine (string)
      */
     protected function processCashTransaction($itemId, $offeringTeamName, $listeningTeamName, $offerId)
     {
@@ -131,10 +139,13 @@ class TradeProcessor implements TradeProcessorInterface
 
     /**
      * Process draft pick transfer
+     * 
+     * Updates pick ownership and queues the query if during certain season phases.
+     * 
      * @param int $itemId Pick ID
      * @param string $offeringTeamName Offering team
      * @param string $listeningTeamName Listening team
-     * @return array Result
+     * @return array Result with keys: success (bool), tradeLine (string)
      */
     protected function processDraftPick($itemId, $offeringTeamName, $listeningTeamName)
     {
@@ -168,10 +179,13 @@ class TradeProcessor implements TradeProcessorInterface
 
     /**
      * Process player transfer
+     * 
+     * Updates player's team assignment and queues the query if during certain season phases.
+     * 
      * @param int $itemId Player ID
      * @param string $offeringTeamName Offering team
      * @param string $listeningTeamName Listening team
-     * @return array Result
+     * @return array Result with keys: success (bool), tradeLine (string)
      */
     protected function processPlayer($itemId, $offeringTeamName, $listeningTeamName)
     {
@@ -205,8 +219,13 @@ class TradeProcessor implements TradeProcessorInterface
 
     /**
      * Queue trade query for later execution if in certain season phases
-     * @param string $query SQL query
-     * @param string $tradeLine Trade description
+     * 
+     * During Playoffs, Draft, or Free Agency phases, queries are queued
+     * instead of executed immediately to prevent roster conflicts.
+     * 
+     * @param string $query SQL query to execute later
+     * @param string $tradeLine Trade description for tracking
+     * @return void
      */
     protected function queueTradeQuery($query, $tradeLine)
     {
@@ -221,8 +240,13 @@ class TradeProcessor implements TradeProcessorInterface
 
     /**
      * Create news story for the trade
+     * 
+     * Creates a news story with category ID 2 (Trade News) and topic ID 31 (IBL News).
+     * Also sends email notification in production.
+     * 
      * @param string $storytitle Story title
-     * @param string $storytext Story text
+     * @param string $storytext Story text with full trade details
+     * @return void
      */
     protected function createNewsStory($storytitle, $storytext)
     {
@@ -243,9 +267,13 @@ class TradeProcessor implements TradeProcessorInterface
 
     /**
      * Send notifications (Discord, email) for the trade
+     * 
+     * Posts trade announcement to Discord #trades and #general-chat channels.
+     * 
      * @param string $offeringTeamName Offering team
      * @param string $listeningTeamName Listening team
-     * @param string $storytext Story text
+     * @param string $storytext Full story text with trade details
+     * @return void
      */
     protected function sendNotifications($offeringTeamName, $listeningTeamName, $storytext)
     {
@@ -255,15 +283,5 @@ class TradeProcessor implements TradeProcessorInterface
         
         \Discord::postToChannel('#trades', $discordText);
         \Discord::postToChannel('#general-chat', $storytext);
-    }
-
-    /**
-     * Clean up trade data after processing
-     * @param int $offerId Trade offer ID
-     */
-    protected function cleanupTradeData($offerId)
-    {
-        $this->repository->deleteTradeInfoByOfferId($offerId);
-        $this->repository->deleteTradeCashByOfferId($offerId);
     }
 }

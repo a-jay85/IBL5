@@ -77,6 +77,9 @@ class TradeOffer implements TradeOfferInterface
 
     /**
      * Generate a new unique trade offer ID
+     * 
+     * Queries the autocounter table and increments to get the next available ID.
+     * 
      * @return int New trade offer ID
      */
     protected function generateTradeOfferId(): int
@@ -96,8 +99,13 @@ class TradeOffer implements TradeOfferInterface
 
     /**
      * Calculate salary cap data for both teams
-     * @param array $tradeData Trade data
-     * @return array Calculated cap data
+     * 
+     * Computes current cap totals and amounts being sent/received for both teams,
+     * including cash considerations based on current season phase.
+     * 
+     * @param array $tradeData Trade data from form submission
+     * @return array Calculated cap data with keys: userCurrentSeasonCapTotal,
+     *         partnerCurrentSeasonCapTotal, userCapSentToPartner, partnerCapSentToUser
      */
     protected function calculateSalaryCapData(array $tradeData): array
     {
@@ -151,9 +159,13 @@ class TradeOffer implements TradeOfferInterface
 
     /**
      * Insert trade offer data into database
+     * 
+     * Processes all checked items from both teams and inserts them into trade_info.
+     * Handles players, picks, and cash considerations.
+     * 
      * @param int $tradeOfferId Trade offer ID
-     * @param array $tradeData Trade data
-     * @return array Result with success status and trade text
+     * @param array $tradeData Trade data from form submission
+     * @return array Result with keys: success (bool), tradeText (string), tradeOfferId (int)
      */
     protected function insertTradeOfferData(int $tradeOfferId, array $tradeData): array
     {
@@ -226,13 +238,16 @@ class TradeOffer implements TradeOfferInterface
 
     /**
      * Insert a single trade item (player or pick)
+     * 
+     * Inserts the trade item record and generates descriptive trade text.
+     * 
      * @param int $tradeOfferId Trade offer ID
-     * @param int $itemId Item ID
+     * @param int $itemId Item ID (player PID or pick ID)
      * @param int $assetType Asset type (0=pick, 1=player)
      * @param string $offeringTeamName Offering team name
      * @param string $listeningTeamName Listening team name
      * @param string $approvalTeamName Name of team that needs to approve
-     * @return array Result
+     * @return array Result with 'tradeText' key containing description
      */
     protected function insertTradeItem(int $tradeOfferId, int $itemId, int $assetType, string $offeringTeamName, string $listeningTeamName, string $approvalTeamName): array
     {
@@ -258,10 +273,13 @@ class TradeOffer implements TradeOfferInterface
 
     /**
      * Get trade text for a draft pick
+     * 
+     * Fetches pick details and formats a human-readable trade description.
+     * 
      * @param int $pickId Pick ID
      * @param string $offeringTeamName Offering team name
      * @param string $listeningTeamName Listening team name
-     * @return string Trade text
+     * @return string Formatted trade text (e.g., "The Lakers send the Bulls 2024 Round 1 draft pick...")
      */
     protected function getPickTradeText(int $pickId, string $offeringTeamName, string $listeningTeamName): string
     {
@@ -284,10 +302,13 @@ class TradeOffer implements TradeOfferInterface
 
     /**
      * Get trade text for a player
+     * 
+     * Fetches player details and formats a human-readable trade description.
+     * 
      * @param int $playerId Player ID
      * @param string $offeringTeamName Offering team name
      * @param string $listeningTeamName Listening team name
-     * @return string Trade text
+     * @return string Formatted trade text (e.g., "The Lakers send PG Michael Jordan...")
      */
     protected function getPlayerTradeText(int $playerId, string $offeringTeamName, string $listeningTeamName): string
     {
@@ -303,12 +324,16 @@ class TradeOffer implements TradeOfferInterface
 
     /**
      * Insert cash trade offer
+     * 
+     * Records cash consideration in trade_cash table and creates a trade_info record
+     * with a composite item ID representing the cash transaction.
+     * 
      * @param int $tradeOfferId Trade offer ID
      * @param string $offeringTeamName Offering team name
      * @param string $listeningTeamName Listening team name
-     * @param array $cashAmounts Cash amounts by year
-     * @param string $approvalTeamName Team that needs to approve the trade (should always be the listening team of the overall trade)
-     * @return array Result
+     * @param array $cashAmounts Cash amounts indexed by year (1-6)
+     * @param string $approvalTeamName Team that needs to approve (should be listening team)
+     * @return array Result with 'tradeText' key containing formatted description
      */
     protected function insertCashTradeOffer(int $tradeOfferId, string $offeringTeamName, string $listeningTeamName, array $cashAmounts, string $approvalTeamName): array
     {
@@ -343,8 +368,12 @@ class TradeOffer implements TradeOfferInterface
 
     /**
      * Send trade notification to receiving team
-     * @param array $tradeData Trade data
+     * 
+     * Sends Discord DM to the listening team with trade proposal details.
+     * 
+     * @param array $tradeData Trade data with offeringTeam and listeningTeam keys
      * @param string $tradeText Trade description text
+     * @return void
      */
     protected function sendTradeNotification(array $tradeData, string $tradeText): void
     {

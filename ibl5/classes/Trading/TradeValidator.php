@@ -26,12 +26,12 @@ class TradeValidator implements TradeValidatorInterface
     {
         $this->db = $db;
         
-        // Extract mysqli from provided parameter, or from legacy $db object, or fallback to global
+        // Use provided mysqli_db, or fallback to global, or use $db as last resort
         if ($mysqli_db !== null) {
             $this->mysqli_db = $mysqli_db;
         } else {
-            // Try to extract from legacy $db object
-            $this->mysqli_db = $db->db_connect_id ?? $db;
+            global $mysqli_db;
+            $this->mysqli_db = $mysqli_db ?? $db;
         }
         
         $this->repository = new TradingRepository($this->mysqli_db);

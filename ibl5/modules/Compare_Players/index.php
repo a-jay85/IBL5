@@ -34,27 +34,28 @@ get_lang($module_name);
  */
 function userinfo($username, $bypass = 0, $hid = 0, $url = 0): void
 {
-    global $user, $prefix, $user_prefix, $db;
-    $commonRepository = new \Services\CommonRepository($db);
+    global $user, $prefix, $user_prefix, $mysqli_db;
+    $commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
 
-    // SECURITY: Escape username to prevent SQL injection
-    $escaped_username = \Services\DatabaseService::escapeString($db, $username);
-    $sql2 = "SELECT * FROM " . $user_prefix . "_users WHERE username = '$escaped_username'";
-    $result2 = $db->sql_query($sql2);
-    $userinfo = $db->sql_fetchrow($result2);
+    // SECURITY: Use prepared statements for security
+    $stmt = $mysqli_db->prepare("SELECT * FROM " . $user_prefix . "_users WHERE username = ?");
+    $stmt->bind_param('s', $username);
+    $stmt->execute();
+    $result2 = $stmt->get_result();
+    $userinfo = $result2->fetch_assoc() ?? [];
     if (!$bypass) {
         cookiedecode($user);
     }
 
-    $teamlogo = $userinfo['user_ibl_team'];
+    $teamlogo = $userinfo['user_ibl_team'] ?? '';
     $tid = $commonRepository->getTidFromTeamname($teamlogo);
 
     Nuke\Header::header();
     OpenTable();
-    UI::displaytopmenu($db, $tid);
+    UI::displaytopmenu($mysqli_db, $tid);
 
     // Initialize compare players classes
-    $repository = new \ComparePlayers\ComparePlayersRepository($db);
+    $repository = new \ComparePlayers\ComparePlayersRepository($mysqli_db);
     $service = new \ComparePlayers\ComparePlayersService($repository);
     $view = new \ComparePlayers\ComparePlayersView();
 

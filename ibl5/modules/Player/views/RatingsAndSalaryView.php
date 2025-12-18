@@ -4,6 +4,8 @@ require_once __DIR__ . '/BaseView.php';
 
 class RatingsAndSalaryView extends BaseView {
     public function render() {
+        global $mysqli_db;
+        
         echo "<table border=1 cellspacing=0 class=\"sortable\" style='margin: 0 auto;'>
             <tr>
                 <td colspan=24 style='font-weight:bold;text-align:center;background-color:#00c;color:#fff;'>Ratings by Year</td>
@@ -37,8 +39,12 @@ class RatingsAndSalaryView extends BaseView {
 
         $totalsalary = 0;
 
-        $result44 = $this->db->sql_query("SELECT * FROM ibl_hist WHERE pid=" . $this->player->playerID . " ORDER BY year ASC");
-        while ($row44 = $this->db->sql_fetchrow($result44)) {
+        $stmt = $mysqli_db->prepare("SELECT * FROM ibl_hist WHERE pid=? ORDER BY year ASC");
+        $stmt->bind_param("i", $this->player->playerID);
+        $stmt->execute();
+        $result44 = $stmt->get_result();
+        
+        while ($row44 = $result44->fetch_assoc()) {
             $r_year = stripslashes(check_html($row44['year'], "nohtml"));
             $r_2ga = stripslashes(check_html($row44['r_2ga'], "nohtml"));
             $r_2gp = stripslashes(check_html($row44['r_2gp'], "nohtml"));

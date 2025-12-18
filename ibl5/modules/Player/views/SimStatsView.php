@@ -4,6 +4,8 @@ require_once __DIR__ . '/BaseView.php';
 
 class SimStatsView extends BaseView {
     public function render() {
+        global $mysqli_db;
+        
         echo "<table border=1 cellspacing=0 class=\"sortable\" style='margin: 0 auto;'>
             <tr>
                 <td colspan=16 style='font-weight:bold;text-align:center;background-color:#00c;color:#fff;'>Sim Averages</td>
@@ -25,25 +27,26 @@ class SimStatsView extends BaseView {
                 <th>pts</th>
             </tr>";
 
-        $resultSimDates = $this->db->sql_query("SELECT *
-            FROM ibl_sim_dates
-            ORDER BY sim DESC LIMIT 20");
-        while ($simDates = $this->db->sql_fetchrow($resultSimDates)) {
+        // Query ibl_sim_dates - 'Start Date' and 'End Date' are DATE type columns (returns YYYY-MM-DD format)
+        $stmt = $mysqli_db->prepare("SELECT * FROM ibl_sim_dates ORDER BY sim DESC LIMIT 20");
+        $stmt->execute();
+        $resultSimDates = $stmt->get_result();
+        
+        while ($simDates = $resultSimDates->fetch_assoc()) {
             $simNumber = $simDates['Sim'];
-            $simStartDate = $simDates['Start Date'];
-            $simEndDate = $simDates['End Date'];
+            $simStartDate = $simDates['Start Date']; // DATE column - YYYY-MM-DD format
+            $simEndDate = $simDates['End Date']; // DATE column - YYYY-MM-DD format
 
-            $resultPlayerSimBoxScores = $this->db->sql_query("SELECT *
-                FROM ibl_box_scores
-                WHERE pid = " . $this->player->playerID . "
-                AND Date BETWEEN '$simStartDate' AND '$simEndDate'
-                ORDER BY Date ASC");
+            $stmtBox = $mysqli_db->prepare("SELECT * FROM ibl_box_scores WHERE pid = ? AND Date BETWEEN ? AND ? ORDER BY Date ASC");
+            $stmtBox->bind_param("iss", $this->player->playerID, $simStartDate, $simEndDate);
+            $stmtBox->execute();
+            $resultPlayerSimBoxScores = $stmtBox->get_result();
 
-            $numberOfGamesPlayedInSim = $this->db->sql_numrows($resultPlayerSimBoxScores);
+            $numberOfGamesPlayedInSim = $resultPlayerSimBoxScores->num_rows;
             $simTotalMIN = $simTotal2GM = $simTotal2GA = $simTotalFTM = $simTotalFTA = $simTotal3GM = $simTotal3GA = 0;
             $simTotalORB = $simTotalDRB = $simTotalAST = $simTotalSTL = $simTotalTOV = $simTotalBLK = $simTotalPF = $simTotalPTS = 0;
 
-            while ($row = $this->db->sql_fetch_assoc($resultPlayerSimBoxScores)) {
+            while ($row = $resultPlayerSimBoxScores->fetch_assoc()) {
                 $simTotalMIN += $row['gameMIN'];
                 $simTotal2GM += $row['game2GM'];
                 $simTotal2GA += $row['game2GA'];

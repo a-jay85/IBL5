@@ -13,12 +13,12 @@ $pagetitle = "- Injured Players";
 
 $teamID = isset($teamID) ? (int) $teamID : 0;
 
-$league = new League($db);
+$league = new League($mysqli_db);
 
 Nuke\Header::header();
 OpenTable();
 
-UI::displaytopmenu($db, $teamID);
+UI::displaytopmenu($mysqli_db, $teamID);
 
 echo "<center><h2>INJURED PLAYERS</h2></center>
     <table>
@@ -34,8 +34,8 @@ echo "<center><h2>INJURED PLAYERS</h2></center>
 
 $i = 0;
 foreach ($league->getInjuredPlayersResult() as $injuredPlayer) {
-    $player = Player::withPlrRow($db, $injuredPlayer);
-    $team = Team::initialize($db, $player->teamID);
+    $player = Player::withPlrRow($mysqli_db, $injuredPlayer);
+    $team = Team::initialize($mysqli_db, $player->teamID);
 
     (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "DDDDDD";
 

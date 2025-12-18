@@ -17,13 +17,13 @@ class DepthChartController implements DepthChartControllerInterface
     private $view;
     private $commonRepository;
     
-    public function __construct($db)
+    public function __construct(\mysqli $db)
     {
         $this->db = $db;
         $this->repository = new DepthChartRepository($db);
         $this->processor = new DepthChartProcessor();
         $this->view = new DepthChartView($this->processor);
-        $this->commonRepository = new \Services\CommonRepository($db);
+        $this->commonRepository = new \Services\CommonMysqliRepository($db);
     }
     
     /**
@@ -53,8 +53,7 @@ class DepthChartController implements DepthChartControllerInterface
         $this->view->renderFormHeader($teamName, $teamID, $slotNames);
         
         $depthCount = 1;
-        mysqli_data_seek($playersResult, 0);
-        while ($player = $this->db->sql_fetchrow($playersResult)) {
+        foreach ($playersResult as $player) {
             $this->view->renderPlayerRow($player, $depthCount);
             $depthCount++;
         }

@@ -1,8 +1,9 @@
 <?php
 
-global $db, $cookie;
-$sharedFunctions = new Shared($db);
-$commonRepository = new Services\CommonRepository($db);
+global $cookie, $mysqli_db;
+
+$sharedFunctions = new Shared($mysqli_db);
+$commonRepository = new Services\CommonMysqliRepository($mysqli_db);
 
 if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
@@ -13,10 +14,11 @@ get_lang($module_name);
 $pagetitle = "- $module_name";
 
 $username = $cookie[1];
-$userTeam = Team::initialize($db, $commonRepository->getTeamnameFromUsername($username));
+$userTeam = Team::initialize($mysqli_db, $commonRepository->getTeamnameFromUsername($username));
 
-$resultAllTeams = League::getAllTeamsResult($db);
-$numteams = $db->sql_numrows($resultAllTeams);
+$league = new League($mysqli_db);
+$resultAllTeams = $league->getAllTeamsResult();
+$numteams = count($resultAllTeams);
 
 function trHighlight($userTeamID, $operatingTeamID)
 {
@@ -29,8 +31,8 @@ function trHighlight($userTeamID, $operatingTeamID)
 
 $t = 0;
 foreach ($resultAllTeams as $teamRow) {
-    $team = Team::initialize($db, $teamRow);
-    $teamStats = TeamStats::withTeamName($db, $team->name);
+    $team = Team::initialize($mysqli_db, $teamRow);
+    $teamStats = TeamStats::withTeamName($mysqli_db, $team->name);
 
     $trHighlight = trHighlight($userTeam->teamID, $team->teamID);
 

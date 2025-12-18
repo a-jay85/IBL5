@@ -3,6 +3,7 @@
 namespace FreeAgency;
 
 use FreeAgency\Contracts\FreeAgencyDemandCalculatorInterface;
+use FreeAgency\Contracts\FreeAgencyDemandRepositoryInterface;
 use Player\Player;
 
 /**

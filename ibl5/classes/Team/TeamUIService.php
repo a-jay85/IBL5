@@ -11,12 +11,10 @@ use Team\Contracts\TeamUIServiceInterface;
  */
 class TeamUIService implements TeamUIServiceInterface
 {
-    private $db;
     private $repository;
 
-    public function __construct($db, TeamRepository $repository)
+    public function __construct(TeamRepository $repository)
     {
-        $this->db = $db;
         $this->repository = $repository;
     }
 
@@ -27,13 +25,14 @@ class TeamUIService implements TeamUIServiceInterface
     {
         $output = "<table bgcolor=#eeeeee width=220>";
 
-        $output .= \UI\Modules\Team::currentSeason($this->db, $team);
-        $output .= \UI\Modules\Team::gmHistory($this->db, $team);
-        $rafters = \UI\Modules\Team::championshipBanners($this->db, $team);
-        $output .= \UI\Modules\Team::teamAccomplishments($this->db, $team);
-        $output .= \UI\Modules\Team::resultsRegularSeason($this->db, $team);
-        $output .= \UI\Modules\Team::resultsHEAT($this->db, $team);
-        $output .= \UI\Modules\Team::resultsPlayoffs($this->db, $team);
+        $teamModules = new \UI\Modules\Team($this->repository);
+        $output .= $teamModules->currentSeason($team);
+        $output .= $teamModules->gmHistory($team);
+        $rafters = $teamModules->championshipBanners($team);
+        $output .= $teamModules->teamAccomplishments($team);
+        $output .= $teamModules->resultsRegularSeason($team);
+        $output .= $teamModules->resultsHEAT($team);
+        $output .= $teamModules->resultsPlayoffs($team);
 
         $output .= "</table>";
 
@@ -69,11 +68,13 @@ class TeamUIService implements TeamUIServiceInterface
 
     private function buildTab(string $tabKey, string $tabLabel, string $display, int $teamID, string $insertyear): string
     {
-        $team = \Team::initialize($this->db, $teamID);
+        // Retrieve team data from repository
+        $teamData = $this->repository->getTeam($teamID);
+        $teamColor2 = $teamData['color2'] ?? '#FFFFFF';
 
         if ($display === $tabKey) {
             $isActiveLink = ' style="font-weight:bold; color: black !important;"';
-            $isActiveTableCell = ' bgcolor="' . $team->color2 . '"';
+            $isActiveTableCell = ' bgcolor="' . $teamColor2 . '"';
         } else {
             $isActiveLink = '';
             $isActiveTableCell = '';

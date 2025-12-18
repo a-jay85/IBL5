@@ -7,7 +7,7 @@ use Utilities\UuidGenerator;
 function scoParser($uploadedFilePath, $operatingSeasonEndingYear, $operatingSeasonPhase)
 {
     global $db, $mysqli_db;
-    $season = new Season($db);
+    $season = new Season($mysqli_db);
 
     $scoFilePath = ($uploadedFilePath) ? $uploadedFilePath : $_SERVER['DOCUMENT_ROOT'] . "/ibl5/IBL5.sco";
     $operatingSeasonEndingYear = ($operatingSeasonEndingYear) ? $operatingSeasonEndingYear : $season->endingYear;
@@ -191,6 +191,7 @@ function scoParser($uploadedFilePath, $operatingSeasonEndingYear, $operatingSeas
 
                 $newSimNumber = $season->lastSimNumber + 1;
 
+                // Insert new sim dates - columns are DATE type in schema (YYYY-MM-DD format)
                 $insertNewSimDates = $season->setLastSimDatesArray($newSimNumber, $newSimStartDate, $newSimEndDate);
             } else {
                 echo "<p>Looks like new box scores haven't been added.
@@ -199,6 +200,7 @@ function scoParser($uploadedFilePath, $operatingSeasonEndingYear, $operatingSeas
             }
         } else {
             $newSimStartDate = $season->getFirstBoxScoreDate();
+            // Insert initial sim dates - columns are DATE type in schema (YYYY-MM-DD format)
             $insertNewSimDates = $season->setLastSimDatesArray(1, $newSimStartDate, $newSimEndDate);
         }
 

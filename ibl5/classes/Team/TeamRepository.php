@@ -4,19 +4,29 @@ declare(strict_types=1);
 
 namespace Team;
 
-use Services\DatabaseService;
 use Team\Contracts\TeamRepositoryInterface;
 
 /**
  * @see TeamRepositoryInterface
+ * @extends \BaseMysqliRepository
  */
-class TeamRepository implements TeamRepositoryInterface
+class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInterface
 {
-    private $db;
-
-    public function __construct($db)
+    public function __construct(object $db)
     {
-        $this->db = $db;
+        parent::__construct($db);
+    }
+
+    /**
+     * @see TeamRepositoryInterface::getTeam()
+     */
+    public function getTeam(int $teamID): ?array
+    {
+        return $this->fetchOne(
+            "SELECT * FROM ibl_team_info WHERE teamid = ?",
+            "i",
+            $teamID
+        );
     }
 
     /**
@@ -24,155 +34,175 @@ class TeamRepository implements TeamRepositoryInterface
      */
     public function getTeamPowerData(string $teamName): ?array
     {
-        $teamName = DatabaseService::escapeString($this->db, $teamName);
-        $query = "SELECT * FROM ibl_power WHERE Team = '$teamName'";
-        $result = $this->db->sql_query($query);
-        
-        if ($this->db->sql_numrows($result) > 0) {
-            return $this->db->sql_fetch_assoc($result);
-        }
-        return null;
+        return $this->fetchOne(
+            "SELECT * FROM ibl_power WHERE Team = ?",
+            "s",
+            $teamName
+        );
     }
 
     /**
      * @see TeamRepositoryInterface::getDivisionStandings()
      */
-    public function getDivisionStandings(string $division): mixed
+    public function getDivisionStandings(string $division): array
     {
-        $division = DatabaseService::escapeString($this->db, $division);
-        $query = "SELECT * FROM ibl_power WHERE Division = '$division' ORDER BY gb DESC";
-        return $this->db->sql_query($query);
+        return $this->fetchAll(
+            "SELECT * FROM ibl_power WHERE Division = ? ORDER BY gb DESC",
+            "s",
+            $division
+        );
     }
 
     /**
      * @see TeamRepositoryInterface::getConferenceStandings()
      */
-    public function getConferenceStandings(string $conference): mixed
+    public function getConferenceStandings(string $conference): array
     {
-        $conference = DatabaseService::escapeString($this->db, $conference);
-        $query = "SELECT * FROM ibl_power WHERE Conference = '$conference' ORDER BY gb DESC";
-        return $this->db->sql_query($query);
+        return $this->fetchAll(
+            "SELECT * FROM ibl_power WHERE Conference = ? ORDER BY gb DESC",
+            "s",
+            $conference
+        );
     }
 
     /**
      * @see TeamRepositoryInterface::getChampionshipBanners()
      */
-    public function getChampionshipBanners(string $teamName): mixed
+    public function getChampionshipBanners(string $teamName): array
     {
-        $teamName = DatabaseService::escapeString($this->db, $teamName);
-        $query = "SELECT * FROM ibl_banners WHERE currentname = '$teamName' ORDER BY year ASC";
-        return $this->db->sql_query($query);
+        return $this->fetchAll(
+            "SELECT * FROM ibl_banners WHERE currentname = ? ORDER BY year ASC",
+            "s",
+            $teamName
+        );
     }
 
     /**
      * @see TeamRepositoryInterface::getGMHistory()
      */
-    public function getGMHistory(string $ownerName, string $teamName): mixed
+    public function getGMHistory(string $ownerName, string $teamName): array
     {
-        $ownerAwardCode = DatabaseService::escapeString($this->db, $ownerName . " (" . $teamName . ")");
-        $query = "SELECT * FROM ibl_gm_history WHERE name LIKE '$ownerAwardCode' ORDER BY year ASC";
-        return $this->db->sql_query($query);
+        $ownerAwardCode = $ownerName . " (" . $teamName . ")";
+        return $this->fetchAll(
+            "SELECT * FROM ibl_gm_history WHERE name LIKE ? ORDER BY year ASC",
+            "s",
+            $ownerAwardCode
+        );
     }
 
     /**
      * @see TeamRepositoryInterface::getTeamAccomplishments()
      */
-    public function getTeamAccomplishments(string $teamName): mixed
+    public function getTeamAccomplishments(string $teamName): array
     {
-        $teamName = DatabaseService::escapeString($this->db, $teamName);
-        $query = "SELECT * FROM ibl_team_awards WHERE name LIKE '$teamName' ORDER BY year DESC";
-        return $this->db->sql_query($query);
+        return $this->fetchAll(
+            "SELECT * FROM ibl_team_awards WHERE name LIKE ? ORDER BY year DESC",
+            "s",
+            $teamName
+        );
     }
 
     /**
      * @see TeamRepositoryInterface::getRegularSeasonHistory()
      */
-    public function getRegularSeasonHistory(string $teamName): mixed
+    public function getRegularSeasonHistory(string $teamName): array
     {
-        $teamName = DatabaseService::escapeString($this->db, $teamName);
-        $query = "SELECT * FROM ibl_team_win_loss WHERE currentname = '$teamName' ORDER BY year DESC";
-        return $this->db->sql_query($query);
+        return $this->fetchAll(
+            "SELECT * FROM ibl_team_win_loss WHERE currentname = ? ORDER BY year DESC",
+            "s",
+            $teamName
+        );
     }
 
     /**
      * @see TeamRepositoryInterface::getHEATHistory()
      */
-    public function getHEATHistory(string $teamName): mixed
+    public function getHEATHistory(string $teamName): array
     {
-        $teamName = DatabaseService::escapeString($this->db, $teamName);
-        $query = "SELECT * FROM ibl_heat_win_loss WHERE currentname = '$teamName' ORDER BY year DESC";
-        return $this->db->sql_query($query);
+        return $this->fetchAll(
+            "SELECT * FROM ibl_heat_win_loss WHERE currentname = ? ORDER BY year DESC",
+            "s",
+            $teamName
+        );
     }
 
     /**
      * @see TeamRepositoryInterface::getPlayoffResults()
      */
-    public function getPlayoffResults(): mixed
+    public function getPlayoffResults(): array
     {
-        $query = "SELECT * FROM ibl_playoff_results ORDER BY year DESC";
-        return $this->db->sql_query($query);
+        return $this->fetchAll("SELECT * FROM ibl_playoff_results ORDER BY year DESC");
     }
 
     /**
      * @see TeamRepositoryInterface::getFreeAgencyRoster()
      */
-    public function getFreeAgencyRoster(int $teamID): mixed
+    public function getFreeAgencyRoster(int $teamID): array
     {
-        $teamID = (int) $teamID;
-        $query = "SELECT * 
+        return $this->fetchAll(
+            "SELECT * 
             FROM ibl_plr 
-            WHERE tid = '$teamID' 
+            WHERE tid = ? 
               AND retired = 0 
               AND cyt != cy 
-            ORDER BY CASE WHEN ordinal > 960 THEN 1 ELSE 0 END, name ASC";
-        return $this->db->sql_query($query);
+            ORDER BY CASE WHEN ordinal > 960 THEN 1 ELSE 0 END, name ASC",
+            "i",
+            $teamID
+        );
     }
 
     /**
      * @see TeamRepositoryInterface::getRosterUnderContract()
      */
-    public function getRosterUnderContract(int $teamID): mixed
+    public function getRosterUnderContract(int $teamID): array
     {
-        $teamID = (int) $teamID;
-        $query = "SELECT * 
+        return $this->fetchAll(
+            "SELECT * 
             FROM ibl_plr 
-            WHERE tid = '$teamID' 
+            WHERE tid = ? 
               AND retired = 0 
-            ORDER BY CASE WHEN ordinal > 960 THEN 1 ELSE 0 END, name ASC";
-        return $this->db->sql_query($query);
+            ORDER BY CASE WHEN ordinal > 960 THEN 1 ELSE 0 END, name ASC",
+            "i",
+            $teamID
+        );
     }
 
     /**
      * @see TeamRepositoryInterface::getFreeAgents()
      */
-    public function getFreeAgents(bool $includeFreeAgencyActive = false): mixed
+    public function getFreeAgents(bool $includeFreeAgencyActive = false): array
     {
         if ($includeFreeAgencyActive) {
-            $query = "SELECT * FROM ibl_plr WHERE ordinal > '959' AND retired = 0 AND cyt != cy ORDER BY ordinal ASC";
+            return $this->fetchAll(
+                "SELECT * FROM ibl_plr WHERE ordinal > '959' AND retired = 0 AND cyt != cy ORDER BY ordinal ASC"
+            );
         } else {
-            $query = "SELECT * FROM ibl_plr WHERE ordinal > '959' AND retired = 0 ORDER BY ordinal ASC";
+            return $this->fetchAll(
+                "SELECT * FROM ibl_plr WHERE ordinal > '959' AND retired = 0 ORDER BY ordinal ASC"
+            );
         }
-        return $this->db->sql_query($query);
     }
 
     /**
      * @see TeamRepositoryInterface::getEntireLeagueRoster()
      */
-    public function getEntireLeagueRoster(): mixed
+    public function getEntireLeagueRoster(): array
     {
-        $query = "SELECT * FROM ibl_plr WHERE retired = 0 AND name NOT LIKE '%Buyouts' ORDER BY ordinal ASC";
-        return $this->db->sql_query($query);
+        return $this->fetchAll(
+            "SELECT * FROM ibl_plr WHERE retired = 0 AND name NOT LIKE '%Buyouts' ORDER BY ordinal ASC"
+        );
     }
 
     /**
      * @see TeamRepositoryInterface::getHistoricalRoster()
      */
-    public function getHistoricalRoster(int $teamID, string $year): mixed
+    public function getHistoricalRoster(int $teamID, string $year): array
     {
-        $teamID = (int) $teamID;
-
-        $year = DatabaseService::escapeString($this->db, $year);
-        $query = "SELECT * FROM ibl_hist WHERE teamid = '$teamID' AND year = '$year' ORDER BY name ASC";
-        return $this->db->sql_query($query);
+        return $this->fetchAll(
+            "SELECT * FROM ibl_hist WHERE teamid = ? AND year = ? ORDER BY name ASC",
+            "is",
+            $teamID,
+            $year
+        );
     }
 }

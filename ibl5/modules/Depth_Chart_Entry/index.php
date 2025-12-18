@@ -1,21 +1,5 @@
 <?php
 
-/************************************************************************/
-/* PHP-NUKE: Web Portal System                                          */
-/* ===========================                                          */
-/*                                                                      */
-/* Copyright (c) 2002 by Francisco Burzi                                */
-/* http://phpnuke.org                                                   */
-/*                                                                      */
-/* This program is free software. You can redistribute it and/or modify */
-/* it under the terms of the GNU General Public License as published by */
-/* the Free Software Foundation; either version 2 of the License.       */
-/*                                                                      */
-/* ibl College Scout Module added by Spencer Cooley                    */
-/* 2/2/2005                                                             */
-/*                                                                      */
-/************************************************************************/
-
 if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
     die("You can't access this file directly...");
 }
@@ -27,9 +11,9 @@ $pagetitle = " - Depth Chart Entry";
 
 function userinfo($username)
 {
-    global $db;
+    global $mysqli_db;
 
-    $controller = new DepthChart\DepthChartController($db);
+    $controller = new DepthChart\DepthChartController($mysqli_db);
     $controller->displayForm($username);
 }
 
@@ -57,12 +41,12 @@ function main($user)
 
 function submit()
 {
-    global $db;
+    global $mysqli_db;
 
     Nuke\Header::header();
     OpenTable();
 
-    $handler = new DepthChart\DepthChartSubmissionHandler($db);
+    $handler = new DepthChart\DepthChartSubmissionHandler($mysqli_db);
     $handler->handleSubmission($_POST);
 
     CloseTable();

@@ -2,6 +2,7 @@
 
 use PHPUnit\Framework\TestCase;
 use Services\DatabaseService;
+use Utilities\HtmlSanitizer;
 
 class DatabaseServiceTest extends TestCase
 {
@@ -10,7 +11,7 @@ class DatabaseServiceTest extends TestCase
         // Simulating data stored in database with addslashes()
         $dbValue = "Jermaine O\\'Neal";
         
-        $result = DatabaseService::safeHtmlOutput($dbValue);
+        $result = HtmlSanitizer::safeHtmlOutput($dbValue);
         
         // Should remove backslash and properly encode for HTML
         // Note: ENT_HTML5 encodes apostrophes as &apos; (both &apos; and &#039; are valid)
@@ -22,7 +23,7 @@ class DatabaseServiceTest extends TestCase
         // Simulating data stored in database with addslashes()
         $dbValue = 'John \\"The Rock\\" Johnson';
         
-        $result = DatabaseService::safeHtmlOutput($dbValue);
+        $result = HtmlSanitizer::safeHtmlOutput($dbValue);
         
         // Should remove backslash and properly encode for HTML
         $this->assertEquals("John &quot;The Rock&quot; Johnson", $result);
@@ -33,7 +34,7 @@ class DatabaseServiceTest extends TestCase
         // Simulating data stored in database with addslashes()
         $dbValue = "O\\'Brien & D\\'Angelo";
         
-        $result = DatabaseService::safeHtmlOutput($dbValue);
+        $result = HtmlSanitizer::safeHtmlOutput($dbValue);
         
         // Should handle both apostrophes and ampersands
         // Note: ENT_HTML5 encodes apostrophes as &apos;
@@ -45,7 +46,7 @@ class DatabaseServiceTest extends TestCase
         // Simulating malicious input stored in database
         $dbValue = "<script>alert(\\'xss\\')</script>";
         
-        $result = DatabaseService::safeHtmlOutput($dbValue);
+        $result = HtmlSanitizer::safeHtmlOutput($dbValue);
         
         // Should encode HTML tags and handle escaped quotes
         // Note: ENT_HTML5 encodes apostrophes as &apos;
@@ -57,7 +58,7 @@ class DatabaseServiceTest extends TestCase
         // Simulating data stored in database with addslashes()
         $dbValue = "Jermaine O\\'Neal";
         
-        $result = DatabaseService::safeHtmlOutput($dbValue);
+        $result = HtmlSanitizer::safeHtmlOutput($dbValue);
         
         // Should be safe for use in HTML attributes
         // Note: ENT_HTML5 encodes apostrophes as &apos;
@@ -74,7 +75,7 @@ class DatabaseServiceTest extends TestCase
         // Plain text without special characters
         $dbValue = "John Smith";
         
-        $result = DatabaseService::safeHtmlOutput($dbValue);
+        $result = HtmlSanitizer::safeHtmlOutput($dbValue);
         
         $this->assertEquals("John Smith", $result);
     }
@@ -84,7 +85,7 @@ class DatabaseServiceTest extends TestCase
         // Edge case: backslash before 'n' (not a newline escape)
         $dbValue = "Player\\nName";
         
-        $result = DatabaseService::safeHtmlOutput($dbValue);
+        $result = HtmlSanitizer::safeHtmlOutput($dbValue);
         
         // stripslashes will remove single backslash
         $this->assertEquals("PlayernName", $result);
@@ -95,7 +96,7 @@ class DatabaseServiceTest extends TestCase
         // UTF-8 characters should be preserved
         $dbValue = "José García";
         
-        $result = DatabaseService::safeHtmlOutput($dbValue);
+        $result = HtmlSanitizer::safeHtmlOutput($dbValue);
         
         $this->assertEquals("José García", $result);
     }
@@ -104,7 +105,7 @@ class DatabaseServiceTest extends TestCase
     {
         // Real-world scenario: name in hidden input
         $dbValue = "Shaquille O\\'Neal";
-        $safeName = DatabaseService::safeHtmlOutput($dbValue);
+        $safeName = HtmlSanitizer::safeHtmlOutput($dbValue);
         
         // Construct HTML like DepthChartView does
         $html = "<input type=\"hidden\" name=\"Name1\" value=\"$safeName\">";

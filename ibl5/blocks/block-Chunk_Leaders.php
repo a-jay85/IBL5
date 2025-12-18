@@ -7,11 +7,13 @@ if (!defined('BLOCK_FILE')) {
 
 use Player\PlayerImageHelper;
 
-global $db;
+global $mysqli_db;
 
-$queryLastSimDates = $db->sql_query("SELECT * FROM ibl_sim_dates ORDER BY Sim DESC LIMIT 1");
-$lastSimStartDate = $db->sql_result($queryLastSimDates, 0, "Start Date");
-$lastSimEndDate = $db->sql_result($queryLastSimDates, 0, "End Date");
+// Query ibl_sim_dates - 'Start Date' and 'End Date' are DATE type columns (returns YYYY-MM-DD format)
+$queryLastSimDates = $mysqli_db->query("SELECT * FROM ibl_sim_dates ORDER BY Sim DESC LIMIT 1");
+$rowLastSimDates = $queryLastSimDates->fetch_assoc();
+$lastSimStartDate = $rowLastSimDates['Start Date']; // DATE column - YYYY-MM-DD format
+$lastSimEndDate = $rowLastSimDates['End Date']; // DATE column - YYYY-MM-DD format
 
 $querySimStatLeaders = "SELECT *
 FROM (
@@ -90,7 +92,7 @@ FROM (
 ) t
 WHERE rn <= 5
 ORDER BY FIELD(stat_type, 'Points', 'Rebounds', 'Assists', 'Steals', 'Blocks'), rn;";
-$resultSimStatLeaders = $db->sql_query($querySimStatLeaders);
+$resultSimStatLeaders = $mysqli_db->query($querySimStatLeaders);
 
 $rows = $resultSimStatLeaders->fetch_all(MYSQLI_ASSOC);
 $rowNumber = 0;

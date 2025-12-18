@@ -35,9 +35,9 @@ if (!function_exists('str_contains')) {
 
 function userinfo($username)
 {
-    global $prefix, $db;
-    $commonRepository = new \Services\CommonRepository($db);
-    $season = new Season($db);
+    global $prefix, $db, $mysqli_db;
+    $commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
+    $season = new Season($mysqli_db);
 
     $sql2 = "SELECT * FROM " . $prefix . "_users WHERE username = '$username'";
     $result2 = $db->sql_query($sql2);
@@ -51,9 +51,9 @@ function userinfo($username)
 
     function getCandidates($votingCategory, $voterTeamName)
     {
-        global $db;
-        $league = new League($db);
-        $season = new Season($db);
+        global $db, $mysqli_db;
+        $league = new League($mysqli_db);
+        $season = new Season($mysqli_db);
 
         if ($season->phase == "Regular Season") {
             $result = $league->getAllStarCandidatesResult($votingCategory);
@@ -125,7 +125,7 @@ function userinfo($username)
         }
 
         $i = 0;
-        while ($row = $db->sql_fetch_assoc($result)) {
+        foreach ($result as $row) {
             if ($votingCategory != "GM") {
                 $player = Player::withPlrRow($db, $row);
                 $playerStats = PlayerStats::withPlrRow($db, $row);

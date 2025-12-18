@@ -45,7 +45,6 @@ class PowerRankingsUpdaterTest extends TestCase
         
         $reflection = new ReflectionClass($this->powerRankingsUpdater);
         $method = $reflection->getMethod('determineMonth');
-        $method->setAccessible(true);
 
         $result = $method->invoke($this->powerRankingsUpdater);
         
@@ -62,7 +61,6 @@ class PowerRankingsUpdaterTest extends TestCase
         
         $reflection = new ReflectionClass($this->powerRankingsUpdater);
         $method = $reflection->getMethod('determineMonth');
-        $method->setAccessible(true);
 
         $result = $method->invoke($this->powerRankingsUpdater);
         
@@ -79,7 +77,6 @@ class PowerRankingsUpdaterTest extends TestCase
         
         $reflection = new ReflectionClass($this->powerRankingsUpdater);
         $method = $reflection->getMethod('determineMonth');
-        $method->setAccessible(true);
 
         $result = $method->invoke($this->powerRankingsUpdater);
         
@@ -96,20 +93,23 @@ class PowerRankingsUpdaterTest extends TestCase
         $this->mockSeason->beginningYear = 2023;
         $this->mockSeason->endingYear = 2024;
         
+        // Mock database to return game data
+        $mockGames = [
+            ['Visitor' => 1, 'VScore' => 100, 'Home' => 2, 'HScore' => 95],
+            ['Visitor' => 3, 'VScore' => 88, 'Home' => 1, 'HScore' => 92]
+        ];
+        $this->mockDb->setMockData($mockGames);
+        
         $reflection = new ReflectionClass($this->powerRankingsUpdater);
         $method = $reflection->getMethod('buildGamesQuery');
-        $method->setAccessible(true);
 
         $tid = 1;
         $month = Season::IBL_REGULAR_SEASON_STARTING_MONTH;
         $result = $method->invoke($this->powerRankingsUpdater, $tid, $month);
         
-        $this->assertIsString($result);
-        $this->assertStringContainsString('SELECT', $result);
-        $this->assertStringContainsString('ibl_schedule', $result);
-        $this->assertStringContainsString("Visitor = $tid OR Home = $tid", $result);
-        $this->assertStringContainsString('2023', $result);
-        $this->assertStringContainsString('2024', $result);
+        // Now buildGamesQuery returns an array of games, not a query string
+        $this->assertIsArray($result);
+        $this->assertEquals($mockGames, $result);
     }
 
     /**
@@ -118,14 +118,13 @@ class PowerRankingsUpdaterTest extends TestCase
      */
     public function testCalculateTeamStatsInitializesCorrectly()
     {
-        // Mock empty result set
-        $mockResult = new MockDatabaseResult([]);
+        // Empty games array
+        $games = [];
         
         $reflection = new ReflectionClass($this->powerRankingsUpdater);
         $method = $reflection->getMethod('calculateTeamStats');
-        $method->setAccessible(true);
 
-        $result = $method->invoke($this->powerRankingsUpdater, $mockResult, 0, 1);
+        $result = $method->invoke($this->powerRankingsUpdater, $games, 1);
         
         $this->assertIsArray($result);
         $this->assertArrayHasKey('wins', $result);
@@ -151,13 +150,14 @@ class PowerRankingsUpdaterTest extends TestCase
         $mockGames = [
             ['Visitor' => 1, 'VScore' => 100, 'Home' => 2, 'HScore' => 95]
         ];
-        $mockResult = new MockDatabaseResult($mockGames);
+        
+        // Mock opponent's record
+        $this->mockDb->setMockData([['win' => 5, 'loss' => 3]]);
         
         $reflection = new ReflectionClass($this->powerRankingsUpdater);
         $method = $reflection->getMethod('calculateTeamStats');
-        $method->setAccessible(true);
 
-        $result = $method->invoke($this->powerRankingsUpdater, $mockResult, 1, 1);
+        $result = $method->invoke($this->powerRankingsUpdater, $mockGames, 1);
         
         $this->assertEquals(1, $result['wins']);
         $this->assertEquals(0, $result['losses']);
@@ -177,13 +177,14 @@ class PowerRankingsUpdaterTest extends TestCase
         $mockGames = [
             ['Visitor' => 1, 'VScore' => 85, 'Home' => 2, 'HScore' => 95]
         ];
-        $mockResult = new MockDatabaseResult($mockGames);
+        
+        // Mock opponent's record
+        $this->mockDb->setMockData([['win' => 5, 'loss' => 3]]);
         
         $reflection = new ReflectionClass($this->powerRankingsUpdater);
         $method = $reflection->getMethod('calculateTeamStats');
-        $method->setAccessible(true);
 
-        $result = $method->invoke($this->powerRankingsUpdater, $mockResult, 1, 1);
+        $result = $method->invoke($this->powerRankingsUpdater, $mockGames, 1);
         
         $this->assertEquals(0, $result['wins']);
         $this->assertEquals(1, $result['losses']);
@@ -203,13 +204,14 @@ class PowerRankingsUpdaterTest extends TestCase
         $mockGames = [
             ['Visitor' => 2, 'VScore' => 90, 'Home' => 1, 'HScore' => 100]
         ];
-        $mockResult = new MockDatabaseResult($mockGames);
+        
+        // Mock opponent's record
+        $this->mockDb->setMockData([['win' => 5, 'loss' => 3]]);
         
         $reflection = new ReflectionClass($this->powerRankingsUpdater);
         $method = $reflection->getMethod('calculateTeamStats');
-        $method->setAccessible(true);
 
-        $result = $method->invoke($this->powerRankingsUpdater, $mockResult, 1, 1);
+        $result = $method->invoke($this->powerRankingsUpdater, $mockGames, 1);
         
         $this->assertEquals(1, $result['wins']);
         $this->assertEquals(1, $result['homeWins']);
@@ -228,13 +230,14 @@ class PowerRankingsUpdaterTest extends TestCase
             ['Visitor' => 3, 'VScore' => 85, 'Home' => 1, 'HScore' => 90],
             ['Visitor' => 1, 'VScore' => 105, 'Home' => 4, 'HScore' => 100],
         ];
-        $mockResult = new MockDatabaseResult($mockGames);
+        
+        // Mock opponent records for each game
+        $this->mockDb->setMockData([['win' => 5, 'loss' => 3]]);
         
         $reflection = new ReflectionClass($this->powerRankingsUpdater);
         $method = $reflection->getMethod('calculateTeamStats');
-        $method->setAccessible(true);
 
-        $result = $method->invoke($this->powerRankingsUpdater, $mockResult, 3, 1);
+        $result = $method->invoke($this->powerRankingsUpdater, $mockGames, 1);
         
         $this->assertEquals(3, $result['wins']);
         $this->assertEquals('W', $result['streakType']);
@@ -252,13 +255,15 @@ class PowerRankingsUpdaterTest extends TestCase
             ['Visitor' => 1, 'VScore' => 80, 'Home' => 2, 'HScore' => 95],
             ['Visitor' => 3, 'VScore' => 100, 'Home' => 1, 'HScore' => 90],
         ];
-        $mockResult = new MockDatabaseResult($mockGames);
+        
+        // Mock opponent records
+        $this->mockDb->setMockData([['win' => 5, 'loss' => 3]]);
         
         $reflection = new ReflectionClass($this->powerRankingsUpdater);
         $method = $reflection->getMethod('calculateTeamStats');
-        $method->setAccessible(true);
 
-        $result = $method->invoke($this->powerRankingsUpdater, $mockResult, 2, 1);
+
+        $result = $method->invoke($this->powerRankingsUpdater, $mockGames, 1);
         
         $this->assertEquals(0, $result['wins']);
         $this->assertEquals(2, $result['losses']);
@@ -277,13 +282,14 @@ class PowerRankingsUpdaterTest extends TestCase
             ['Visitor' => 1, 'VScore' => 100, 'Home' => 2, 'HScore' => 95],
             ['Visitor' => 3, 'VScore' => 100, 'Home' => 1, 'HScore' => 90],
         ];
-        $mockResult = new MockDatabaseResult($mockGames);
+        
+        // Mock opponent records
+        $this->mockDb->setMockData([['win' => 5, 'loss' => 3]]);
         
         $reflection = new ReflectionClass($this->powerRankingsUpdater);
         $method = $reflection->getMethod('calculateTeamStats');
-        $method->setAccessible(true);
 
-        $result = $method->invoke($this->powerRankingsUpdater, $mockResult, 2, 1);
+        $result = $method->invoke($this->powerRankingsUpdater, $mockGames, 1);
         
         $this->assertEquals(1, $result['wins']);
         $this->assertEquals(1, $result['losses']);
@@ -301,13 +307,11 @@ class PowerRankingsUpdaterTest extends TestCase
         $mockGames = [
             ['Visitor' => 1, 'VScore' => 95, 'Home' => 2, 'HScore' => 95]
         ];
-        $mockResult = new MockDatabaseResult($mockGames);
         
         $reflection = new ReflectionClass($this->powerRankingsUpdater);
         $method = $reflection->getMethod('calculateTeamStats');
-        $method->setAccessible(true);
 
-        $result = $method->invoke($this->powerRankingsUpdater, $mockResult, 1, 1);
+        $result = $method->invoke($this->powerRankingsUpdater, $mockGames, 1);
         
         // Tie should not count as win or loss
         $this->assertEquals(0, $result['wins']);
@@ -320,19 +324,14 @@ class PowerRankingsUpdaterTest extends TestCase
      */
     public function testUpdateResetsDepthChartStatus()
     {
-        // Set up minimal mock data
-        $mockTeams = [
-            ['TeamID' => 1, 'Team' => 'Boston Celtics', 'streak_type' => 'W', 'streak' => 2]
-        ];
+        // Set up empty teams data to skip game processing and directly test depth chart reset
+        // This avoids undefined array key warnings from game processing
+        $mockTeams = [];
         $this->mockDb->setMockData($mockTeams);
         $this->mockDb->setReturnTrue(true);
         
         ob_start();
-        try {
-            $this->powerRankingsUpdater->update();
-        } catch (Exception $e) {
-            // May fail on subsequent queries, but we check the depth chart reset
-        }
+        $this->powerRankingsUpdater->update();
         ob_end_clean();
         
         $queries = $this->mockDb->getExecutedQueries();
@@ -360,13 +359,14 @@ class PowerRankingsUpdaterTest extends TestCase
                 $mockGames[] = ['Visitor' => 1, 'VScore' => 100, 'Home' => 2, 'HScore' => 90];
             }
         }
-        $mockResult = new MockDatabaseResult($mockGames);
+        
+        // Mock opponent records
+        $this->mockDb->setMockData([['win' => 5, 'loss' => 3]]);
         
         $reflection = new ReflectionClass($this->powerRankingsUpdater);
         $method = $reflection->getMethod('calculateTeamStats');
-        $method->setAccessible(true);
 
-        $result = $method->invoke($this->powerRankingsUpdater, $mockResult, 15, 1);
+        $result = $method->invoke($this->powerRankingsUpdater, $mockGames, 1);
         
         // Games 6-15 are the last 10, so: games 6-8 are losses (3), games 9-15 are wins (7)
         $this->assertEquals(7, $result['wins']);
@@ -399,7 +399,6 @@ class PowerRankingsUpdaterTest extends TestCase
         
         $reflection = new ReflectionClass($this->powerRankingsUpdater);
         $method = $reflection->getMethod('updateTeamStats');
-        $method->setAccessible(true);
 
         // Mock the database operations
         $this->mockDb->setReturnTrue(true);
@@ -443,7 +442,6 @@ class PowerRankingsUpdaterTest extends TestCase
         
         $reflection = new ReflectionClass($this->powerRankingsUpdater);
         $method = $reflection->getMethod('updateTeamStats');
-        $method->setAccessible(true);
 
         $this->mockDb->setReturnTrue(true);
         

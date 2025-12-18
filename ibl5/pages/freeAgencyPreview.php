@@ -1,9 +1,10 @@
 <?php
 
 use Services\DatabaseService;
+use Utilities\HtmlSanitizer;
 
 require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
-$season = new Season($db);
+$season = new Season($mysqli_db);
 
 $tid = $_REQUEST['tid'];
 $yr = $_REQUEST['yr'];
@@ -49,57 +50,58 @@ if ($tid == null) {
             </tr>";
 
         $query = "SELECT * FROM ibl_plr WHERE retired = 0 ORDER BY ordinal ASC";
-        $result = $db->sql_query($query);
-        $num = $db->sql_numrows($result);
+        $result = $mysqli_db->query($query);
+        $num = ($result instanceof mysqli_result) ? $result->num_rows : 0;
 
         $i = 0;
         $j = 0;
 
-        while ($i < $num) {
-            $draftyear = $db->sql_result($result, $i, "draftyear");
-            $exp = $db->sql_result($result, $i, "exp");
-            $cy = $db->sql_result($result, $i, "cy");
-            $cyt = $db->sql_result($result, $i, "cyt");
+        if ($result instanceof mysqli_result) {
+            while ($row = $result->fetch_assoc()) {
+                $draftyear = $row["draftyear"] ?? 0;
+                $exp = $row["exp"] ?? 0;
+                $cy = $row["cy"] ?? 0;
+                $cyt = $row["cyt"] ?? 0;
 
-            $yearoffreeagency = $draftyear + $exp + $cyt - $cy;
+                $yearoffreeagency = $draftyear + $exp + $cyt - $cy;
 
-            if ($yearoffreeagency == $season->endingYear) {
-                $name = DatabaseService::safeHtmlOutput($db->sql_result($result, $i, "name")); // Safely escape for HTML
-                $team = DatabaseService::safeHtmlOutput($db->sql_result($result, $i, "teamname")); // Safely escape for HTML
-                $tid = $db->sql_result($result, $i, "tid");
-                $pid = $db->sql_result($result, $i, "pid");
-                $pos = $db->sql_result($result, $i, "pos");
-                $age = $db->sql_result($result, $i, "age");
+                if ($yearoffreeagency == $season->endingYear) {
+                    $name = HtmlSanitizer::safeHtmlOutput($row["name"] ?? '');
+                    $team = HtmlSanitizer::safeHtmlOutput($row["teamname"] ?? '');
+                    $tid = $row["tid"] ?? '';
+                    $pid = $row["pid"] ?? '';
+                    $pos = $row["pos"] ?? '';
+                    $age = $row["age"] ?? '';
 
-                $r_2ga = $db->sql_result($result, $i, "r_fga");
-                $r_2gp = $db->sql_result($result, $i, "r_fgp");
-                $r_fta = $db->sql_result($result, $i, "r_fta");
-                $r_ftp = $db->sql_result($result, $i, "r_ftp");
-                $r_3ga = $db->sql_result($result, $i, "r_tga");
-                $r_3gp = $db->sql_result($result, $i, "r_tgp");
-                $r_orb = $db->sql_result($result, $i, "r_orb");
-                $r_drb = $db->sql_result($result, $i, "r_drb");
-                $r_ast = $db->sql_result($result, $i, "r_ast");
-                $r_stl = $db->sql_result($result, $i, "r_stl");
-                $r_blk = $db->sql_result($result, $i, "r_blk");
-                $r_tvr = $db->sql_result($result, $i, "r_to");
-                $r_foul = $db->sql_result($result, $i, "r_foul");
-                $r_totoff = $db->sql_result($result, $i, "oo") + $db->sql_result($result, $i, "do") + $db->sql_result($result, $i, "po") + $db->sql_result($result, $i, "to");
-                $r_totdef = $db->sql_result($result, $i, "od") + $db->sql_result($result, $i, "dd") + $db->sql_result($result, $i, "pd") + $db->sql_result($result, $i, "td");
-                $r_oo = $db->sql_result($result, $i, "oo");
-                $r_do = $db->sql_result($result, $i, "do");
-                $r_po = $db->sql_result($result, $i, "po");
-                $r_to = $db->sql_result($result, $i, "to");
-                $r_od = $db->sql_result($result, $i, "od");
-                $r_dd = $db->sql_result($result, $i, "dd");
-                $r_pd = $db->sql_result($result, $i, "pd");
-                $r_td = $db->sql_result($result, $i, "td");
-                $r_foul = $db->sql_result($result, $i, "r_foul");
-                $loyalty = $db->sql_result($result, $i, "loyalty");
-                $playForWinner = $db->sql_result($result, $i, "winner");
-                $playingTime = $db->sql_result($result, $i, "playingTime");
-                $security = $db->sql_result($result, $i, "security");
-                $tradition = $db->sql_result($result, $i, "tradition");
+                    $r_2ga = $row["r_fga"] ?? 0;
+                    $r_2gp = $row["r_fgp"] ?? 0;
+                    $r_fta = $row["r_fta"] ?? 0;
+                    $r_ftp = $row["r_ftp"] ?? 0;
+                    $r_3ga = $row["r_tga"] ?? 0;
+                    $r_3gp = $row["r_tgp"] ?? 0;
+                    $r_orb = $row["r_orb"] ?? 0;
+                    $r_drb = $row["r_drb"] ?? 0;
+                    $r_ast = $row["r_ast"] ?? 0;
+                    $r_stl = $row["r_stl"] ?? 0;
+                    $r_blk = $row["r_blk"] ?? 0;
+                    $r_tvr = $row["r_to"] ?? 0;
+                    $r_foul = $row["r_foul"] ?? 0;
+                    $r_totoff = ($row["oo"] ?? 0) + ($row["do"] ?? 0) + ($row["po"] ?? 0) + ($row["to"] ?? 0);
+                    $r_totdef = ($row["od"] ?? 0) + ($row["dd"] ?? 0) + ($row["pd"] ?? 0) + ($row["td"] ?? 0);
+                    $r_oo = $row["oo"] ?? 0;
+                    $r_do = $row["do"] ?? 0;
+                    $r_po = $row["po"] ?? 0;
+                    $r_to = $row["to"] ?? 0;
+                    $r_od = $row["od"] ?? 0;
+                    $r_dd = $row["dd"] ?? 0;
+                    $r_pd = $row["pd"] ?? 0;
+                    $r_td = $row["td"] ?? 0;
+                    $r_foul = $row["r_foul"] ?? 0;
+                    $loyalty = $row["loyalty"] ?? 0;
+                    $playForWinner = $row["winner"] ?? 0;
+                    $playingTime = $row["playingTime"] ?? 0;
+                    $security = $row["security"] ?? 0;
+                    $tradition = $row["tradition"] ?? 0;
 
                 if ($j == 0) {
                     echo "      <tr bgcolor=#ffffff align=center>";
@@ -140,10 +142,10 @@ if ($tid == null) {
                     <td>$tradition</td>
                 </tr>
                 ";
+                }
+
+                $i++;
             }
-
-            $i++;
-
         }
 
         echo "

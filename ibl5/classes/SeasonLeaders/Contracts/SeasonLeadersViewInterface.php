@@ -15,7 +15,7 @@ interface SeasonLeadersViewInterface
      *
      * Generates HTML form with dropdowns for team, year, and sort options.
      *
-     * @param mixed $teams Teams query result resource
+     * @param array $teams Array of team data with keys 'TeamID' and 'Team'
      * @param array $years Array of available years
      * @param array $currentFilters Current filter values with keys:
      *                              - 'team' (int): Selected team ID (0 for all)
@@ -33,7 +33,7 @@ interface SeasonLeadersViewInterface
      * - Pre-selects current filter values
      * - HTML-escapes all values for XSS protection
      */
-    public function renderFilterForm($teams, array $years, array $currentFilters): string;
+    public function renderFilterForm(array $teams, array $years, array $currentFilters): string;
 
     /**
      * Render the statistics table header

@@ -4,6 +4,8 @@ require_once __DIR__ . '/BaseView.php';
 
 class RegularSeasonTotalsView extends BaseView {
     public function render() {
+        global $mysqli_db;
+        
         echo "<table border=1 cellspacing=0 class=\"sortable\" style='margin: 0 auto;'>
             <tr>
                 <td colspan=15 style='font-weight:bold; text-align:center; background-color:#00c; color:#fff;'>Regular Season Totals</td>
@@ -28,9 +30,16 @@ class RegularSeasonTotalsView extends BaseView {
         
         $car_gm = $car_min = $car_fgm = $car_fga = $car_ftm = $car_fta = $car_3gm = $car_3ga = 0;
         $car_orb = $car_reb = $car_ast = $car_stl = $car_blk = $car_tvr = $car_pf = $car_pts = 0;
-        $result44 = $this->db->sql_query("SELECT * FROM ibl_hist WHERE pid=" . $this->player->playerID . " ORDER BY year ASC");
+        
+        $stmt = $mysqli_db->prepare("SELECT * FROM ibl_hist WHERE pid = ? ORDER BY year ASC");
+        if (!$stmt) {
+            throw new \RuntimeException("Prepare failed: " . $mysqli_db->error);
+        }
+        $stmt->bind_param("i", $this->player->playerID);
+        $stmt->execute();
+        $result44 = $stmt->get_result();
 
-        while ($row44 = $this->db->sql_fetchrow($result44)) {
+        while ($row44 = $result44->fetch_assoc()) {
             $hist_year = intval($row44['year']);
             $hist_team = $row44['team'];
             $hist_tid = intval($row44['teamid']);
@@ -86,6 +95,7 @@ class RegularSeasonTotalsView extends BaseView {
             $car_pf = $car_pf + $hist_pf;
             $car_pts = $car_pts + $hist_pts;
         }
+        $stmt->close();
 
         echo "<tr>
             <td colspan=2 style=\"font-weight:bold;\"><b>Career Totals</b></td>

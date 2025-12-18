@@ -1,10 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 use Statistics\StatsFormatter;
+use Statistics\StatisticsRepository;
 
 class PlayerStats
 {
-    protected $db;
+    protected StatisticsRepository $repository;
 
     public $playerID;
     public $plr;
@@ -114,54 +117,57 @@ class PlayerStats
     public $gameBlocks;
     public $gamePersonalFouls;
 
-    public function __construct()
+    public function __construct(StatisticsRepository $repository)
     {
+        $this->repository = $repository;
     }
 
-    public static function withPlayerID($db, int $playerID)
+    public static function withPlayerID($db, int $playerID): self
     {
-        $instance = new self();
-        $instance->loadByID($db, $playerID);
+        $repository = new StatisticsRepository($db);
+        $instance = new self($repository);
+        $instance->loadByID($playerID);
         return $instance;
     }
 
-    public static function withPlayerObject($db, Player $player)
+    public static function withPlayerObject($db, Player $player): self
     {
-        $instance = new self();
-        $instance->loadByID($db, $player->playerID);
+        $repository = new StatisticsRepository($db);
+        $instance = new self($repository);
+        $instance->loadByID($player->playerID);
         return $instance;
     }
 
-    public static function withPlrRow($db, array $plrRow)
+    public static function withPlrRow($db, array $plrRow): self
     {
-        $instance = new self();
+        $repository = new StatisticsRepository($db);
+        $instance = new self($repository);
         $instance->fill($plrRow);
         return $instance;
     }
 
-    public static function withHistoricalPlrRow($db, array $plrRow)
+    public static function withHistoricalPlrRow($db, array $plrRow): self
     {
-        $instance = new self();
+        $repository = new StatisticsRepository($db);
+        $instance = new self($repository);
         $instance->fillHistorical($plrRow);
         return $instance;
     }
 
-    public static function withBoxscoreInfoLine($db, string $playerInfoLine)
+    public static function withBoxscoreInfoLine($db, string $playerInfoLine): self
     {
-        $instance = new self();
+        $repository = new StatisticsRepository($db);
+        $instance = new self($repository);
         $instance->fillBoxscoreStats($playerInfoLine);
         return $instance;
     }
 
-    protected function loadByID($db, int $playerID)
+    protected function loadByID(int $playerID): void
     {
-        $query = "SELECT *
-            FROM ibl_plr
-            WHERE pid = $playerID
-            LIMIT 1;";
-        $result = $db->sql_query($query);
-        $plrRow = $db->sql_fetch_assoc($result);
-        $this->fill($plrRow);
+        $plrRow = $this->repository->getPlayerStats($playerID);
+        if ($plrRow) {
+            $this->fill($plrRow);
+        }
     }
 
     protected function fill(array $plrRow)

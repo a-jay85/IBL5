@@ -1,18 +1,7 @@
 <?php
 
-/************************************************************************/
-/* PHP-NUKE: Web Portal System                                          */
-/* ===========================                                          */
-/*                                                                      */
-/* Copyright (c) 2005 by Francisco Burzi                                */
-/* http://phpnuke.org                                                   */
-/*                                                                      */
-/* This program is free software. You can redistribute it and/or modify */
-/* it under the terms of the GNU General Public License as published by */
-/* the Free Software Foundation; either version 2 of the License.       */
-/************************************************************************/
-
-$season = new Season($db);
+global $mysqli_db;
+$season = new Season($mysqli_db);
 
 if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
@@ -30,8 +19,8 @@ echo "<center><font class=\"storytitle\">" . ($season->endingYear - 1) . "-$seas
 echo "<p>\n\n";
 
 $query = "SELECT * FROM ibl_power WHERE TeamID BETWEEN 1 AND 32 ORDER BY ranking DESC";
-$result = $db->sql_query($query);
-$num = $db->sql_numrows($result);
+$result = $mysqli_db->query($query);
+$num = ($result instanceof mysqli_result) ? $result->num_rows : 0;
 
 echo "<table width=\"500\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\" align=center>\n";
 echo "<tr>\n";
@@ -56,16 +45,16 @@ echo "\t</td>\n";
 echo "</tr>\n";
 
 $i = 0;
-while ($i < $num) {
-    $tid = $db->sql_result($result, $i, "TeamID");
-    $Team = $db->sql_result($result, $i, "Team");
-    $ranking = $db->sql_result($result, $i, "ranking");
-    $wins = $db->sql_result($result, $i, "win");
-    $losses = $db->sql_result($result, $i, "loss");
-    $homeWins = $db->sql_result($result, $i, "home_win");
-    $homeLosses = $db->sql_result($result, $i, "home_loss");
-    $awayWins = $db->sql_result($result, $i, "road_win");
-    $awayLosses = $db->sql_result($result, $i, "road_loss");
+while ($i < $num && $result instanceof mysqli_result && ($row = $result->fetch_assoc())) {
+    $tid = $row["TeamID"] ?? '';
+    $Team = $row["Team"] ?? '';
+    $ranking = $row["ranking"] ?? '';
+    $wins = $row["win"] ?? '';
+    $losses = $row["loss"] ?? '';
+    $homeWins = $row["home_win"] ?? '';
+    $homeLosses = $row["home_loss"] ?? '';
+    $awayWins = $row["road_win"] ?? '';
+    $awayLosses = $row["road_loss"] ?? '';
 
     $i++;
 

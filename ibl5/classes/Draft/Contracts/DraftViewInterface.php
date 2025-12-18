@@ -27,7 +27,7 @@ interface DraftViewInterface
      *    * If error contains "didn't select": suggests "select a player before hitting the Draft button"
      *    * Otherwise: suggests "try drafting again" if it's your turn
      *  - Includes clickable link to return to Draft module
-     *  - Escapes error message for safe HTML output using DatabaseService::safeHtmlOutput
+     *  - Escapes error message for safe HTML output using HtmlSanitizer::safeHtmlOutput
      *  - NEVER throws exceptions
      *
      * Return Value:
@@ -110,7 +110,7 @@ interface DraftViewInterface
      *    * If current user owns pick: shows radio button + clickable name
      *    * If user doesn't own pick: shows no radio button, locked appearance
      *  - Player names escaped with htmlspecialchars(ENT_QUOTES) for safe output
-     *  - Uses DatabaseService::safeHtmlOutput() for all numeric stats and ratings
+     *  - Uses HtmlSanitizer::safeHtmlOutput() for all numeric stats and ratings
      *  - Radio button value uses htmlspecialchars to handle apostrophes in names
      *  - Table uses "sortable" class for jQuery sorting functionality
      *  - NEVER throws exceptions

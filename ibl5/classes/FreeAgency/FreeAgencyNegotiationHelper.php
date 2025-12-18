@@ -11,28 +11,24 @@ use Player\PlayerImageHelper;
  */
 class FreeAgencyNegotiationHelper implements FreeAgencyNegotiationHelperInterface
 {
-    private $db;
-    private $mysqli_db;
-    private \Services\DatabaseService $databaseService;
+    private object $mysqli_db;
     private FreeAgencyViewHelper $viewHelper;
     private FreeAgencyDemandCalculator $calculator;
+    private FreeAgencyRepository $repository;
     private \Season $season;
 
-    public function __construct($db, \Season $season, $mysqli_db = null)
+    public function __construct(object $mysqli_db, \Season $season)
     {
-        global $mysqli_db;
-        
-        $this->db = $db;
-        $this->mysqli_db = $mysqli_db ?? $GLOBALS['mysqli_db'] ?? null;
+        $this->mysqli_db = $mysqli_db;
         $this->season = $season;
         
-        $this->databaseService = new \Services\DatabaseService();
         // Placeholder - will be replaced with actual player in renderNegotiationPage
         // Using a dummy player object for initialization
         $dummyPlayer = new Player();
         $this->viewHelper = new FreeAgencyViewHelper('', $dummyPlayer);
-        $repository = new FreeAgencyDemandRepository($db, $this->mysqli_db);
-        $this->calculator = new FreeAgencyDemandCalculator($repository);
+        $demandRepository = new FreeAgencyDemandRepository($this->mysqli_db);
+        $this->calculator = new FreeAgencyDemandCalculator($demandRepository);
+        $this->repository = new FreeAgencyRepository($this->mysqli_db);
     }
 
     /**
@@ -40,12 +36,12 @@ class FreeAgencyNegotiationHelper implements FreeAgencyNegotiationHelperInterfac
      */
     public function renderNegotiationPage(int $playerID, \Team $team): string
     {
-        $player = Player::withPlayerID($this->db, $playerID);
+        $player = Player::withPlayerID($this->mysqli_db, $playerID);
         
         // Initialize ViewHelper with actual team and player
         $this->viewHelper = new FreeAgencyViewHelper($team->name, $player);
         
-        $capCalculator = new FreeAgencyCapCalculator($this->db, $team, $this->season);
+        $capCalculator = new FreeAgencyCapCalculator($this->mysqli_db, $team, $this->season);
         $capMetrics = $capCalculator->calculateTeamCapMetrics($player->name);
         
         $demands = $this->calculator->getPlayerDemands($player->name);
@@ -173,14 +169,9 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
      */
     public function getExistingOffer(string $teamName, string $playerName): array
     {
-        $escapedTeamName = $this->databaseService->escapeString($this->db, $teamName);
-        $escapedPlayerName = $this->databaseService->escapeString($this->db, $playerName);
+        $offer = $this->repository->getExistingOffer($teamName, $playerName);
         
-        $query = "SELECT * FROM ibl_fa_offers WHERE team='$escapedTeamName' AND name='$escapedPlayerName'";
-        $result = $this->db->sql_query($query);
-        $offer = $this->db->sql_fetchrow($result);
-        
-        if (!$offer) {
+        if ($offer === null) {
             return [
                 'offer1' => 0,
                 'offer2' => 0,
@@ -192,12 +183,12 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
         }
         
         return [
-            'offer1' => (int) ($offer['offer1'] ?: 0),
-            'offer2' => (int) ($offer['offer2'] ?: 0),
-            'offer3' => (int) ($offer['offer3'] ?: 0),
-            'offer4' => (int) ($offer['offer4'] ?: 0),
-            'offer5' => (int) ($offer['offer5'] ?: 0),
-            'offer6' => (int) ($offer['offer6'] ?: 0),
+            'offer1' => (int) ($offer['offer1'] ?? 0),
+            'offer2' => (int) ($offer['offer2'] ?? 0),
+            'offer3' => (int) ($offer['offer3'] ?? 0),
+            'offer4' => (int) ($offer['offer4'] ?? 0),
+            'offer5' => (int) ($offer['offer5'] ?? 0),
+            'offer6' => (int) ($offer['offer6'] ?? 0),
         ];
     }
 

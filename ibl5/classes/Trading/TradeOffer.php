@@ -16,23 +16,23 @@ use Trading\Contracts\TradeOfferInterface;
  */
 class TradeOffer implements TradeOfferInterface
 {
-    protected $db;
+    protected object $db;
     protected TradingRepository $repository;
-    protected \Services\CommonRepository $commonRepository;
+    protected \Services\CommonMysqliRepository $commonRepository;
     protected \Season $season;
     protected CashTransactionHandler $cashHandler;
     protected TradeValidator $validator;
+    protected \Discord $discord;
 
-    public function __construct($db, ?TradingRepository $repository = null)
+    public function __construct(object $db, ?TradingRepository $repository = null)
     {
         $this->db = $db;
-        // Extract mysqli connection from legacy $db object for repositories
-        $mysqli = $db->db_connect_id ?? $db;
-        $this->repository = $repository ?? new TradingRepository($mysqli);
-        $this->commonRepository = new \Services\CommonRepository($db);
+        $this->repository = $repository ?? new TradingRepository($db);
+        $this->commonRepository = new \Services\CommonMysqliRepository($db);
         $this->season = new \Season($db);
-        $this->cashHandler = new CashTransactionHandler($db, $mysqli, $this->repository);
-        $this->validator = new TradeValidator($db, $mysqli);
+        $this->cashHandler = new CashTransactionHandler($db, $this->repository);
+        $this->validator = new TradeValidator($db);
+        $this->discord = new \Discord($db);
     }
 
     /**
@@ -84,15 +84,13 @@ class TradeOffer implements TradeOfferInterface
      */
     protected function generateTradeOfferId(): int
     {
-        // Get current counter (fallback to legacy db if needed)
-        $query0 = "SELECT counter FROM ibl_trade_autocounter ORDER BY counter DESC LIMIT 1";
-        $result0 = $this->db->sql_query($query0);
-        $currentCounter = $this->db->sql_result($result0, 0, "counter");
+        // Get current counter using repository
+        $currentCounterRow = $this->repository->getTradeAutocounter();
+        $currentCounter = $currentCounterRow['counter'] ?? 0;
         $tradeOfferId = ((int)$currentCounter) + 1;
 
-        // Insert new counter
-        $query0a = "INSERT INTO ibl_trade_autocounter (counter) VALUES ('$tradeOfferId')";
-        $this->db->sql_query($query0a);
+        // Insert new counter using prepared statement
+        $this->repository->insertTradeAutocounter($tradeOfferId);
 
         return $tradeOfferId;
     }
@@ -283,14 +281,16 @@ class TradeOffer implements TradeOfferInterface
      */
     protected function getPickTradeText(int $pickId, string $offeringTeamName, string $listeningTeamName): string
     {
-        $sqlgetpick = "SELECT * FROM ibl_draft_picks WHERE pickid = '$pickId'";
-        $resultgetpick = $this->db->sql_query($sqlgetpick);
-        $rowsgetpick = $this->db->sql_fetchrow($resultgetpick);
+        $pickData = $this->repository->getDraftPickById($pickId);
+        
+        if (!$pickData) {
+            return '';
+        }
 
-        $pickTeam = $rowsgetpick['teampick'];
-        $pickYear = $rowsgetpick['year'];
-        $pickRound = $rowsgetpick['round'];
-        $pickNotes = $rowsgetpick['notes'];
+        $pickTeam = $pickData['teampick'];
+        $pickYear = $pickData['year'];
+        $pickRound = $pickData['round'];
+        $pickNotes = $pickData['notes'];
 
         $tradeText = "The $offeringTeamName send the $pickTeam $pickYear Round $pickRound draft pick to the $listeningTeamName.<br>";
         if ($pickNotes != NULL) {
@@ -312,12 +312,14 @@ class TradeOffer implements TradeOfferInterface
      */
     protected function getPlayerTradeText(int $playerId, string $offeringTeamName, string $listeningTeamName): string
     {
-        $sqlgetplyr = "SELECT * FROM ibl_plr WHERE pid = '$playerId'";
-        $resultgetplyr = $this->db->sql_query($sqlgetplyr);
-        $rowsgetplyr = $this->db->sql_fetchrow($resultgetplyr);
+        $playerData = $this->repository->getPlayerById($playerId);
+        
+        if (!$playerData) {
+            return '';
+        }
 
-        $playerName = $rowsgetplyr['name'];
-        $playerPosition = $rowsgetplyr['pos'];
+        $playerName = $playerData['name'];
+        $playerPosition = $playerData['pos'];
 
         return "The $offeringTeamName send $playerPosition $playerName to the $listeningTeamName.<br>";
     }
@@ -344,21 +346,16 @@ class TradeOffer implements TradeOfferInterface
         $offeringTeamId = $this->commonRepository->getTidFromTeamname($offeringTeamName);
         $listeningTeamId = $this->commonRepository->getTidFromTeamname($listeningTeamName);
 
-        $query = "INSERT INTO ibl_trade_info
-          ( `tradeofferid`,
-            `itemid`,
-            `itemtype`,
-            `from`,
-            `to`,
-            `approval` )
-        VALUES    ( '$tradeOfferId',
-            '$offeringTeamId" . "0" . "$listeningTeamId" . "0',
-            'cash',
-            '$offeringTeamName',
-            '$listeningTeamName',
-            '$approvalTeamName' )";
+        $itemId = $offeringTeamId . "0" . $listeningTeamId . "0";
         
-        $this->db->sql_query($query);
+        $this->repository->insertTradeItem(
+            $tradeOfferId,
+            (int) $itemId,
+            'cash',
+            $offeringTeamName,
+            $listeningTeamName,
+            $approvalTeamName
+        );
 
         $cashText = implode(' ', array_filter($cashAmounts));
         $tradeText = "The $offeringTeamName send $cashText in cash to the $listeningTeamName.<br>";
@@ -379,9 +376,9 @@ class TradeOffer implements TradeOfferInterface
     {
         $offeringTeamName = $tradeData['offeringTeam'];
         $listeningTeamName = $tradeData['listeningTeam'];
-
-        $offeringUserDiscordID = \Discord::getDiscordIDFromTeamname($this->db, $offeringTeamName);
-        $receivingUserDiscordID = \Discord::getDiscordIDFromTeamname($this->db, $listeningTeamName);
+        
+        $offeringUserDiscordID = $this->discord->getDiscordIDFromTeamname($offeringTeamName);
+        $receivingUserDiscordID = $this->discord->getDiscordIDFromTeamname($listeningTeamName);
 
         $cleanTradeText = str_replace(['<br>', '&nbsp;', '<i>', '</i>'], ["\n", " ", "_", "_"], $tradeText);
 

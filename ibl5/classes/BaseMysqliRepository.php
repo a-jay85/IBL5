@@ -156,7 +156,6 @@ abstract class BaseMysqliRepository
             $this->logError($message, $query);
             throw new \RuntimeException($message, 1001);
         }
-
         // Prepare statement
         $stmt = $this->db->prepare($query);
         if ($stmt === false) {

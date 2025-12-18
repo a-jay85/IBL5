@@ -6,6 +6,7 @@ namespace Draft;
 
 use Draft\Contracts\DraftViewInterface;
 use Services\DatabaseService;
+use Utilities\HtmlSanitizer;
 
 /**
  * @see DraftViewInterface
@@ -17,7 +18,7 @@ class DraftView implements DraftViewInterface
      */
     public function renderValidationError(string $errorMessage): string
     {
-        $errorMessage = DatabaseService::safeHtmlOutput($errorMessage);
+        $errorMessage = HtmlSanitizer::safeHtmlOutput($errorMessage);
         $retryInstructions = $this->getRetryInstructions($errorMessage);
         
         return "Oops, $errorMessage<p>
@@ -40,7 +41,7 @@ class DraftView implements DraftViewInterface
 	</table>";
 
         $html .= "<form name='draft_form' action='/ibl5/modules/Draft/draft_selection.php' method='POST'>";
-        $html .= "<input type='hidden' name='teamname' value='" . DatabaseService::safeHtmlOutput($teamLogo) . "'>";
+        $html .= "<input type='hidden' name='teamname' value='" . HtmlSanitizer::safeHtmlOutput($teamLogo) . "'>";
         $html .= "<input type='hidden' name='draft_round' value='$draftRound'>";
         $html .= "<input type='hidden' name='draft_pick' value='$draftPick'>";
 
@@ -97,7 +98,7 @@ class DraftView implements DraftViewInterface
             $i++;
 
             $isPlayerDrafted = $player['drafted'];
-            $playerName = DatabaseService::safeHtmlOutput($player['name']);
+            $playerName = HtmlSanitizer::safeHtmlOutput($player['name']);
 
             if ($teamLogo == $pickOwner && $isPlayerDrafted == 0) {
                 $html .= "
@@ -117,32 +118,32 @@ class DraftView implements DraftViewInterface
             }
 
             $html .= "
-            <td>" . DatabaseService::safeHtmlOutput($player['pos']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['team']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['age']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['fga']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['fgp']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['fta']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['ftp']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['tga']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['tgp']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['orb']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['drb']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['ast']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['stl']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['tvr']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['blk']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['offo']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['offd']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['offp']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['offt']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['defo']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['defd']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['defp']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['deft']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['tal']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['skl']) . "</td>
-            <td>" . DatabaseService::safeHtmlOutput($player['int']) . "</td>";
+            <td>" . HtmlSanitizer::safeHtmlOutput($player['pos']) . "</td>
+            <td>" . HtmlSanitizer::safeHtmlOutput($player['team']) . "</td>
+            <td>" . HtmlSanitizer::safeHtmlOutput($player['age']) . "</td>
+            <td>" . HtmlSanitizer::safeHtmlOutput($player['fga']) . "</td>
+            <td>" . HtmlSanitizer::safeHtmlOutput($player['fgp']) . "</td>
+            <td>" . HtmlSanitizer::safeHtmlOutput($player['fta']) . "</td>
+            <td>" . HtmlSanitizer::safeHtmlOutput($player['ftp']) . "</td>
+            <td>" . HtmlSanitizer::safeHtmlOutput($player['tga']) . "</td>
+            <td>" . HtmlSanitizer::safeHtmlOutput($player['tgp']) . "</td>
+            <td>" . HtmlSanitizer::safeHtmlOutput($player['orb']) . "</td>
+            <td>" . HtmlSanitizer::safeHtmlOutput($player['drb']) . "</td>
+            <td>" . HtmlSanitizer::safeHtmlOutput($player['ast']) . "</td>
+            <td>" . HtmlSanitizer::safeHtmlOutput($player['stl']) . "</td>
+            <td>" . HtmlSanitizer::safeHtmlOutput($player['tvr']) . "</td>
+            <td>" . HtmlSanitizer::safeHtmlOutput($player['blk']) . "</td>
+            <td>" . HtmlSanitizer::safeHtmlOutput($player['offo']) . "</td>
+            <td>" . HtmlSanitizer::safeHtmlOutput($player['offd']) . "</td>
+            <td>" . HtmlSanitizer::safeHtmlOutput($player['offp']) . "</td>
+            <td>" . HtmlSanitizer::safeHtmlOutput($player['offt']) . "</td>
+            <td>" . HtmlSanitizer::safeHtmlOutput($player['defo']) . "</td>
+            <td>" . HtmlSanitizer::safeHtmlOutput($player['defd']) . "</td>
+            <td>" . HtmlSanitizer::safeHtmlOutput($player['defp']) . "</td>
+            <td>" . HtmlSanitizer::safeHtmlOutput($player['deft']) . "</td>
+            <td>" . HtmlSanitizer::safeHtmlOutput($player['tal']) . "</td>
+            <td>" . HtmlSanitizer::safeHtmlOutput($player['skl']) . "</td>
+            <td>" . HtmlSanitizer::safeHtmlOutput($player['int']) . "</td>";
             $html .= "</tr>";
         }
 

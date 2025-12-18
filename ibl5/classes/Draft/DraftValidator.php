@@ -24,6 +24,7 @@ class DraftValidator implements DraftValidatorInterface
             return false;
         }
         if ($currentDraftSelection !== null && $currentDraftSelection !== '') {
+            var_dump($currentDraftSelection);
             $this->errors[] = "It looks like you've already drafted a player with this draft pick.";
             return false;
         }

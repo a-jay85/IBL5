@@ -8,9 +8,9 @@ $teamID = isset($_GET['teamID']) ? (int) $_GET['teamID'] : 0;
 
 Nuke\Header::header();
 OpenTable();
-UI::displaytopmenu($db, $teamID);
+UI::displaytopmenu($mysqli_db, $teamID);
 
-$team = Team::initialize($db, $teamID);
+$team = Team::initialize($mysqli_db, $teamID);
 
 echo "$team->name Draft History
     <table class=\"sortable\">

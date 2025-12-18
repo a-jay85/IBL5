@@ -22,7 +22,7 @@ class StandingsUpdaterTest extends TestCase
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
-        $this->mockCommonRepository = new \Services\CommonRepository($this->mockDb);
+        $this->mockCommonRepository = new \Services\CommonMysqliRepository($this->mockDb);
         $this->standingsUpdater = new StandingsUpdater($this->mockDb, $this->mockCommonRepository);
     }
 
@@ -41,7 +41,6 @@ class StandingsUpdaterTest extends TestCase
     {
         $reflection = new ReflectionClass($this->standingsUpdater);
         $method = $reflection->getMethod('extractWins');
-        $method->setAccessible(true);
 
         $result = $method->invoke($this->standingsUpdater, '5-3');
         
@@ -56,7 +55,6 @@ class StandingsUpdaterTest extends TestCase
     {
         $reflection = new ReflectionClass($this->standingsUpdater);
         $method = $reflection->getMethod('extractWins');
-        $method->setAccessible(true);
 
         $result = $method->invoke($this->standingsUpdater, '45-37');
         
@@ -71,7 +69,6 @@ class StandingsUpdaterTest extends TestCase
     {
         $reflection = new ReflectionClass($this->standingsUpdater);
         $method = $reflection->getMethod('extractLosses');
-        $method->setAccessible(true);
 
         $result = $method->invoke($this->standingsUpdater, '5-3');
         
@@ -86,7 +83,6 @@ class StandingsUpdaterTest extends TestCase
     {
         $reflection = new ReflectionClass($this->standingsUpdater);
         $method = $reflection->getMethod('extractLosses');
-        $method->setAccessible(true);
 
         $result = $method->invoke($this->standingsUpdater, '45-37');
         
@@ -101,7 +97,6 @@ class StandingsUpdaterTest extends TestCase
     {
         $reflection = new ReflectionClass($this->standingsUpdater);
         $method = $reflection->getMethod('extractWins');
-        $method->setAccessible(true);
 
         // Test single digit wins with double digit losses
         $result1 = $method->invoke($this->standingsUpdater, '5-37');
@@ -120,7 +115,6 @@ class StandingsUpdaterTest extends TestCase
     {
         $reflection = new ReflectionClass($this->standingsUpdater);
         $method = $reflection->getMethod('assignGroupingsFor');
-        $method->setAccessible(true);
 
         $regions = ['Eastern', 'Western', 'Atlantic', 'Central', 'Midwest', 'Pacific'];
         
@@ -143,7 +137,6 @@ class StandingsUpdaterTest extends TestCase
     {
         $reflection = new ReflectionClass($this->standingsUpdater);
         $method = $reflection->getMethod('assignGroupingsFor');
-        $method->setAccessible(true);
 
         foreach (League::CONFERENCE_NAMES as $conference) {
             $result = $method->invoke($this->standingsUpdater, $conference);
@@ -162,7 +155,6 @@ class StandingsUpdaterTest extends TestCase
     {
         $reflection = new ReflectionClass($this->standingsUpdater);
         $method = $reflection->getMethod('assignGroupingsFor');
-        $method->setAccessible(true);
 
         foreach (League::DIVISION_NAMES as $division) {
             $result = $method->invoke($this->standingsUpdater, $division);
@@ -212,7 +204,9 @@ class StandingsUpdaterTest extends TestCase
                 'homeLosses' => 5,
                 'awayWins' => 20,
                 'awayLosses' => 10,
-                'conference' => 'Eastern'
+                'conference' => 'Eastern',
+                'wins' => 45,
+                'losses' => 15
             ],
             [
                 'tid' => 2,
@@ -221,7 +215,9 @@ class StandingsUpdaterTest extends TestCase
                 'homeLosses' => 10,
                 'awayWins' => 15,
                 'awayLosses' => 15,
-                'conference' => 'Eastern'
+                'conference' => 'Eastern',
+                'wins' => 35,
+                'losses' => 25
             ],
         ];
         
@@ -231,7 +227,6 @@ class StandingsUpdaterTest extends TestCase
         
         $reflection = new ReflectionClass($this->standingsUpdater);
         $method = $reflection->getMethod('updateMagicNumbers');
-        $method->setAccessible(true);
 
         ob_start();
         $method->invoke($this->standingsUpdater, 'Eastern');
@@ -252,7 +247,6 @@ class StandingsUpdaterTest extends TestCase
     {
         $reflection = new ReflectionClass($this->standingsUpdater);
         $method = $reflection->getMethod('extractWins');
-        $method->setAccessible(true);
 
         $result = $method->invoke($this->standingsUpdater, '0-82');
         
@@ -267,7 +261,6 @@ class StandingsUpdaterTest extends TestCase
     {
         $reflection = new ReflectionClass($this->standingsUpdater);
         $method = $reflection->getMethod('extractLosses');
-        $method->setAccessible(true);
 
         $result = $method->invoke($this->standingsUpdater, '82-0');
         
@@ -282,9 +275,7 @@ class StandingsUpdaterTest extends TestCase
     {
         $reflection = new ReflectionClass($this->standingsUpdater);
         $winsMethod = $reflection->getMethod('extractWins');
-        $winsMethod->setAccessible(true);
         $lossesMethod = $reflection->getMethod('extractLosses');
-        $lossesMethod->setAccessible(true);
 
         // Perfect 82-0 season
         $wins = $winsMethod->invoke($this->standingsUpdater, '82-0');
@@ -305,7 +296,6 @@ class StandingsUpdaterTest extends TestCase
         
         $reflection = new ReflectionClass($this->standingsUpdater);
         $method = $reflection->getMethod('updateMagicNumbers');
-        $method->setAccessible(true);
 
         $regions = ['Eastern', 'Western', 'Atlantic', 'Central', 'Midwest', 'Pacific'];
         

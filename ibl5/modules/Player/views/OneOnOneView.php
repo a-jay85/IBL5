@@ -1,11 +1,14 @@
 <?php
 
 use Services\DatabaseService;
+use Utilities\HtmlSanitizer;
 
 require_once __DIR__ . '/BaseView.php';
 
 class OneOnOneView extends BaseView {
     public function render() {
+        global $mysqli_db;
+        
         echo "<table style='margin: 0 auto;'>
             <tr>
                 <td bgcolor=#0000cc align=center><b><font color=#ffffff>ONE-ON-ONE RESULTS</font></b></td>
@@ -13,45 +16,45 @@ class OneOnOneView extends BaseView {
             <tr>
                 <td>";
 
-        $escapedPlayerName = DatabaseService::escapeString($this->db, str_replace("%20", " ", $this->player->name));
-
-        $query = "SELECT * FROM ibl_one_on_one WHERE winner = '$escapedPlayerName' ORDER BY gameid ASC";
-        $result = $this->db->sql_query($query);
-        $num = $this->db->sql_numrows($result);
+        $playerName = str_replace("%20", " ", $this->player->name);
 
         $wins = $losses = 0;
 
-        $i = 0;
-        while ($i < $num) {
-            $gameid = $this->db->sql_result($result, $i, "gameid");
-            $winner = DatabaseService::safeHtmlOutput($this->db->sql_result($result, $i, "winner"));
-            $loser = DatabaseService::safeHtmlOutput($this->db->sql_result($result, $i, "loser"));
-            $winscore = $this->db->sql_result($result, $i, "winscore");
-            $lossscore = $this->db->sql_result($result, $i, "lossscore");
+        // Query for wins (where player is the winner)
+        $stmt = $mysqli_db->prepare("SELECT gameid, winner, loser, winscore, lossscore FROM ibl_one_on_one WHERE winner = ? ORDER BY gameid ASC");
+        $stmt->bind_param("s", $playerName);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        while ($row = $result->fetch_assoc()) {
+            $gameid = $row['gameid'];
+            $winner = HtmlSanitizer::safeHtmlOutput($row['winner']);
+            $loser = HtmlSanitizer::safeHtmlOutput($row['loser']);
+            $winscore = $row['winscore'];
+            $lossscore = $row['lossscore'];
 
             echo "* def. $loser, $winscore-$lossscore (# $gameid)<br>";
-
             $wins++;
-            $i++;
         }
+        $stmt->close();
 
-        $query = "SELECT * FROM ibl_one_on_one WHERE loser = '$escapedPlayerName' ORDER BY gameid ASC";
-        $result = $this->db->sql_query($query);
-        $num = $this->db->sql_numrows($result);
-        $i = 0;
+        // Query for losses (where player is the loser)
+        $stmt = $mysqli_db->prepare("SELECT gameid, winner, loser, winscore, lossscore FROM ibl_one_on_one WHERE loser = ? ORDER BY gameid ASC");
+        $stmt->bind_param("s", $playerName);
+        $stmt->execute();
+        $result = $stmt->get_result();
 
-        while ($i < $num) {
-            $gameid = $this->db->sql_result($result, $i, "gameid");
-            $winner = DatabaseService::safeHtmlOutput($this->db->sql_result($result, $i, "winner"));
-            $loser = DatabaseService::safeHtmlOutput($this->db->sql_result($result, $i, "loser"));
-            $winscore = $this->db->sql_result($result, $i, "winscore");
-            $lossscore = $this->db->sql_result($result, $i, "lossscore");
+        while ($row = $result->fetch_assoc()) {
+            $gameid = $row['gameid'];
+            $winner = HtmlSanitizer::safeHtmlOutput($row['winner']);
+            $loser = HtmlSanitizer::safeHtmlOutput($row['loser']);
+            $winscore = $row['winscore'];
+            $lossscore = $row['lossscore'];
 
             echo "* lost to $winner, $lossscore-$winscore (# $gameid)<br>";
-
             $losses++;
-            $i++;
         }
+        $stmt->close();
 
         echo "<b><center>Record: $wins - $losses</center></b><br>
             </table>";

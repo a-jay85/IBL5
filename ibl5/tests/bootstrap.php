@@ -243,8 +243,13 @@ class MockPreparedStatement
         $query = $this->query;
         foreach ($this->boundParams as $param) {
             // Simple placeholder replacement (?) with the actual value
-            $value = is_string($param) ? "'" . addslashes($param) . "'" : $param;
-            $query = preg_replace('/\?/', $value, $query, 1);
+            // Handle null values to avoid PHP 8.3 deprecation warning
+            if ($param === null) {
+                $value = 'NULL';
+            } else {
+                $value = is_string($param) ? "'" . addslashes($param) . "'" : $param;
+            }
+            $query = preg_replace('/\?/', (string)$value, $query, 1);
         }
         
         // Execute the query using the mock database
@@ -270,8 +275,13 @@ class MockPreparedStatement
         $query = $this->query;
         foreach ($this->boundParams as $param) {
             // Simple placeholder replacement (?) with the actual value
-            $value = is_string($param) ? "'" . addslashes($param) . "'" : $param;
-            $query = preg_replace('/\?/', $value, $query, 1);
+            // Handle null values to avoid PHP 8.3 deprecation warning
+            if ($param === null) {
+                $value = 'NULL';
+            } else {
+                $value = is_string($param) ? "'" . addslashes($param) . "'" : $param;
+            }
+            $query = preg_replace('/\?/', (string)$value, $query, 1);
         }
         
         // Execute and return mock result wrapped to look like mysqli_result
@@ -328,7 +338,7 @@ class MockMysqliResult
 
 class Discord
 {
-    public static function getDiscordIDFromTeamname($db, $teamname)
+    public static function getDiscordIDFromTeamname($teamname)
     {
         return '123456789';
     }
@@ -347,7 +357,7 @@ class Shared
         public function __construct($db)
         {
             $this->db = $db;
-            $this->commonRepository = new \Services\CommonRepository($db);
+            $this->commonRepository = new \Services\CommonMysqliRepository($db);
         }
         
         public function getTidFromTeamname($teamname)
@@ -435,7 +445,12 @@ class Season
     
     protected $db;
     
-    public function __construct($db)
+    /**
+     * Mock constructor for testing - accepts mysqli or legacy db object
+     * 
+     * @param object $db Database connection (mysqli or legacy mock)
+     */
+    public function __construct(object $db)
     {
         $this->db = $db;
         // Initialize properties without database calls for testing
@@ -449,14 +464,14 @@ class Season
     }
     
     // Mock the methods that would normally query the database
-    private function getSeasonPhase()
+    public function getSeasonPhase(): string
     {
         return $this->phase;
     }
     
-    private function getSeasonEndingYear()
+    public function getSeasonEndingYear(): string
     {
-        return $this->endingYear;
+        return (string)$this->endingYear;
     }
     
     private function getLastSimDatesArray()

@@ -9,9 +9,11 @@ get_lang($module_name);
 
 $pagetitle = "- Team Pages";
 
+global $mysqli_db;
+
 $teamID = isset($teamID) ? (int) $teamID : 0;
 
-$controller = new Team\TeamController($db);
+$controller = new Team\TeamController($mysqli_db);
 
 switch ($op) {
     case "team":

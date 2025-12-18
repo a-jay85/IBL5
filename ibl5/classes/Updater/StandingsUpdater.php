@@ -1,12 +1,11 @@
 <?php
 namespace Updater;
 
-class StandingsUpdater {
-    private $db;
+class StandingsUpdater extends \BaseMysqliRepository {
     private $commonRepository;
 
-    public function __construct($db, $commonRepository) {
-        $this->db = $db;
+    public function __construct(object $db, $commonRepository) {
+        parent::__construct($db);
         $this->commonRepository = $commonRepository;
     }
 
@@ -36,9 +35,8 @@ class StandingsUpdater {
 
     public function update() {
         echo '<p>Updating the ibl_standings database table...<p>';
-        if ($this->db->sql_query('TRUNCATE TABLE ibl_standings')) {
-            echo 'TRUNCATE TABLE ibl_standings<p>';
-        }
+        $this->execute('TRUNCATE TABLE ibl_standings', '');
+        echo 'TRUNCATE TABLE ibl_standings<p>';
 
         $this->extractStandingsValues();
         
@@ -144,51 +142,51 @@ class StandingsUpdater {
 
         $gamesUnplayed = 82 - $homeWins - $homeLosses - $awayWins - $awayLosses;
 
-        $sqlQueryString = "INSERT INTO ibl_standings (
-            tid,
-            team_name,
-            leagueRecord,
-            pct,
-            gamesUnplayed,
-            conference,
-            confGB,
-            confRecord,
-            divRecord,
-            homeRecord,
-            awayRecord,
-            confWins,
-            confLosses,
-            divWins,
-            divLosses,
-            homeWins,
-            homeLosses,
-            awayWins,
-            awayLosses
-        ) VALUES (
-            '$teamID',
-            '" . rtrim($row->childNodes->item(0)->nodeValue) . "',
-            '$leagueRecord',
-            '$pct',
-            '$gamesUnplayed',
-            '$conference',
-            '$confGB',
-            '$confRecord',
-            '$divRecord',
-            '$homeRecord',
-            '$awayRecord',
-            '$confWins',
-            '$confLosses',
-            '$divWins',
-            '$divLosses',
-            '$homeWins',
-            '$homeLosses',
-            '$awayWins',
-            '$awayLosses'
-        )";
+        $this->execute(
+            "INSERT INTO ibl_standings (
+                tid,
+                team_name,
+                leagueRecord,
+                pct,
+                gamesUnplayed,
+                conference,
+                confGB,
+                confRecord,
+                divRecord,
+                homeRecord,
+                awayRecord,
+                confWins,
+                confLosses,
+                divWins,
+                divLosses,
+                homeWins,
+                homeLosses,
+                awayWins,
+                awayLosses
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "isssissssssiiiiiiiii",
+            $teamID,
+            rtrim($row->childNodes->item(0)->nodeValue),
+            $leagueRecord,
+            $pct,
+            $gamesUnplayed,
+            $conference,
+            $confGB,
+            $confRecord,
+            $divRecord,
+            $homeRecord,
+            $awayRecord,
+            $confWins,
+            $confLosses,
+            $divWins,
+            $divLosses,
+            $homeWins,
+            $homeLosses,
+            $awayWins,
+            $awayLosses
+        );
 
-        if ($this->db->sql_query($sqlQueryString)) {
-            $log .= $sqlQueryString . '<br>';
-        }
+        $log .= "Inserted standings for team: " . rtrim($row->childNodes->item(0)->nodeValue) . '<br>';
         return $log;
     }
 
@@ -219,14 +217,15 @@ class StandingsUpdater {
         $teamID = $this->commonRepository->getTidFromTeamname($teamName);
         $divGB = $row->childNodes->item(3)->nodeValue;
 
-        $sqlQueryString = "UPDATE ibl_standings 
-            SET division = '$division',
-                divGB = '$divGB'
-            WHERE tid = '$teamID'";
+        $this->execute(
+            "UPDATE ibl_standings SET division = ?, divGB = ? WHERE tid = ?",
+            "ssi",
+            $division,
+            $divGB,
+            $teamID
+        );
 
-        if ($this->db->sql_query($sqlQueryString)) {
-            $log .= $sqlQueryString . '<br>';
-        }
+        $log .= "Updated division for team: {$teamName}<br>";
         return $log;
     }
 
@@ -234,23 +233,25 @@ class StandingsUpdater {
         echo "<p>Updating the magic numbers for the $region...<br>";
         list($grouping, $groupingGB, $groupingMagicNumber) = $this->assignGroupingsFor($region);
 
-        $query = "SELECT tid, team_name, homeWins, homeLosses, awayWins, awayLosses
+        $teams = $this->fetchAll(
+            "SELECT tid, team_name, homeWins, homeLosses, awayWins, awayLosses
             FROM ibl_standings
-            WHERE $grouping = '$region'
-            ORDER BY pct DESC";
-        
-        $result = $this->db->sql_query($query);
-        $limit = $this->db->sql_numrows($result);
+            WHERE $grouping = ?
+            ORDER BY pct DESC",
+            "s",
+            $region
+        );
 
         $log = '';
+        $numTeams = count($teams);
 
-        for ($i = 0; $i < $limit; $i++) {
-            $teamID = $this->db->sql_result($result, $i, 0);
-            $teamName = $this->db->sql_result($result, $i, 1);
-            $teamTotalWins = $this->db->sql_result($result, $i, 2) + $this->db->sql_result($result, $i, 4);
+        for ($i = 0; $i < $numTeams; $i++) {
+            $teamID = $teams[$i]['tid'];
+            $teamName = $teams[$i]['team_name'];
+            $teamTotalWins = $teams[$i]['homeWins'] + $teams[$i]['awayWins'];
             
-            if ($i + 1 != $limit) {
-                $belowTeamTotalLosses = $this->db->sql_result($result, $i + 1, 3) + $this->db->sql_result($result, $i + 1, 5);
+            if ($i + 1 != $numTeams) {
+                $belowTeamTotalLosses = $teams[$i + 1]['homeLosses'] + $teams[$i + 1]['awayLosses'];
             } else {
                 $belowTeamTotalLosses = 0;
             }
@@ -271,13 +272,14 @@ class StandingsUpdater {
     private function updateTeamMagicNumber($teamID, $teamName, $magicNumber, $groupingMagicNumber) {
         $log = '';
 
-        $sqlQueryString = "UPDATE ibl_standings 
-            SET $groupingMagicNumber = '$magicNumber'
-            WHERE tid = '$teamID'";
+        $this->execute(
+            "UPDATE ibl_standings SET $groupingMagicNumber = ? WHERE tid = ?",
+            "ii",
+            $magicNumber,
+            $teamID
+        );
 
-        if ($this->db->sql_query($sqlQueryString)) {
-            $log .= $sqlQueryString . '<br>';
-        }
+        $log .= "Updated {$groupingMagicNumber} for {$teamName} to {$magicNumber}<br>";
 
         return $log;
     }
@@ -286,65 +288,91 @@ class StandingsUpdater {
         list($grouping, $groupingGB, $groupingMagicNumber) = $this->assignGroupingsFor($region);
         echo "<p>Checking if the $region $grouping has been clinched...<br>";
 
-        $queryWinningestTeam = "SELECT team_name, homeWins + awayWins AS wins
+        $winningestTeam = $this->fetchOne(
+            "SELECT team_name, homeWins + awayWins AS wins
             FROM ibl_standings
-            WHERE $grouping = '$region'
+            WHERE $grouping = ?
             ORDER BY wins DESC
-            LIMIT 1;";
+            LIMIT 1",
+            "s",
+            $region
+        );
         
-        $resultWinningestTeam = $this->db->sql_query($queryWinningestTeam);
-        $winningestTeamName = $this->db->sql_result($resultWinningestTeam, 0, "team_name");
-        $winningestTeamWins = $this->db->sql_result($resultWinningestTeam, 0, "wins");
+        if (!$winningestTeam) {
+            return;
+        }
+        
+        $winningestTeamName = $winningestTeam['team_name'];
+        $winningestTeamWins = $winningestTeam['wins'];
 
-        $queryLeastLosingestTeam = "SELECT homeLosses + awayLosses AS losses
+        $leastLosingestTeam = $this->fetchOne(
+            "SELECT homeLosses + awayLosses AS losses
             FROM ibl_standings
-            WHERE $grouping = '$region'
-                AND team_name != '$winningestTeamName'
+            WHERE $grouping = ?
+                AND team_name != ?
             ORDER BY losses ASC
-            LIMIT 1;";
+            LIMIT 1",
+            "ss",
+            $region,
+            $winningestTeamName
+        );
         
-        $resultLeastLosingestTeam = $this->db->sql_query($queryLeastLosingestTeam);
-        $leastLosingestTeamLosses = $this->db->sql_result($resultLeastLosingestTeam, 0, "losses");
+        if (!$leastLosingestTeam) {
+            return;
+        }
+        
+        $leastLosingestTeamLosses = $leastLosingestTeam['losses'];
 
         $magicNumber = 82 + 1 - $winningestTeamWins - $leastLosingestTeamLosses;
 
         if ($magicNumber <= 0) {
-            $querySetTeamToClinched = "UPDATE ibl_standings
-                SET clinched" . ucfirst($grouping) . " = 1
-                WHERE team_name = '$winningestTeamName';";
-
-            if ($this->db->sql_query($querySetTeamToClinched)) {
-                echo "The $winningestTeamName have clinched the $region $grouping!";
-            }
+            $this->execute(
+                "UPDATE ibl_standings SET clinched" . ucfirst($grouping) . " = 1 WHERE team_name = ?",
+                "s",
+                $winningestTeamName
+            );
+            echo "The $winningestTeamName have clinched the $region $grouping!";
         }
     }
 
     private function checkIfPlayoffsClinched($conference) {
         echo "<p>Checking if any teams have clinched playoff spots in the $conference Conference...<br>";
 
-        $queryEightWinningestTeams = "SELECT team_name, homeWins + awayWins AS wins
+        $eightWinningestTeams = $this->fetchAll(
+            "SELECT team_name, homeWins + awayWins AS wins
             FROM ibl_standings
-            WHERE conference = '$conference'
+            WHERE conference = ?
             ORDER BY wins DESC
-            LIMIT 8;";
-        
-        $resultEightWinningestTeams = $this->db->sql_query($queryEightWinningestTeams);
+            LIMIT 8",
+            "s",
+            $conference
+        );
 
-        $querySixLosingestTeams = "SELECT homeLosses + awayLosses AS losses
+        $sixLosingestTeams = $this->fetchAll(
+            "SELECT homeLosses + awayLosses AS losses
             FROM ibl_standings
-            WHERE conference = '$conference'
+            WHERE conference = ?
             ORDER BY losses DESC
-            LIMIT 6;";
-        
-        $resultSixLosingestTeams = $this->db->sql_query($querySixLosingestTeams);
+            LIMIT 6",
+            "s",
+            $conference
+        );
 
         for ($i = 0; $i < 8; $i++) {
-            $contendingTeamName = $this->db->sql_result($resultEightWinningestTeams, $i, "team_name");
-            $contendingTeamWins = $this->db->sql_result($resultEightWinningestTeams, $i, "wins");
+            if (!isset($eightWinningestTeams[$i])) {
+                continue;
+            }
+            
+            $contendingTeamName = $eightWinningestTeams[$i]['team_name'];
+            $contendingTeamWins = $eightWinningestTeams[$i]['wins'];
             $teamsEliminated = 0;
 
             for ($j = 0; $j < 6; $j++) {
-                $bottomTeamLosses = $this->db->sql_result($resultSixLosingestTeams, $j, "losses");
+                if (!isset($sixLosingestTeams[$j])) {
+                    continue;
+                }
+                
+                $bottomTeamLosses = $sixLosingestTeams[$j]['losses'];
                 $magicNumber = 82 + 1 - $contendingTeamWins - $bottomTeamLosses;
 
                 if ($magicNumber <= 0) {
@@ -353,13 +381,12 @@ class StandingsUpdater {
             }
 
             if ($teamsEliminated == 6) {
-                $querySetTeamToClinched = "UPDATE ibl_standings
-                    SET clinchedPlayoffs = 1
-                    WHERE team_name = '$contendingTeamName';";
-
-                if ($this->db->sql_query($querySetTeamToClinched)) {
-                    echo "The $contendingTeamName have clinched a playoff spot!<br>";
-                }
+                $this->execute(
+                    "UPDATE ibl_standings SET clinchedPlayoffs = 1 WHERE team_name = ?",
+                    "s",
+                    $contendingTeamName
+                );
+                echo "The $contendingTeamName have clinched a playoff spot!<br>";
             }
         }
     }

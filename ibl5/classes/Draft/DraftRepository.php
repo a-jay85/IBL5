@@ -5,24 +5,23 @@ declare(strict_types=1);
 namespace Draft;
 
 use Draft\Contracts\DraftRepositoryInterface;
-use Services\DatabaseService;
 
 /**
  * @see DraftRepositoryInterface
+ * @extends \BaseMysqliRepository
  */
-class DraftRepository implements DraftRepositoryInterface
+class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryInterface
 {
-    private $db;
     private $commonRepository;
 
     // Constants for player name matching
     const IBL_PLR_NAME_MAX_LENGTH = 32;  // Matches varchar(32) in ibl_plr.name
     const PARTIAL_NAME_MATCH_LENGTH = 30;  // For LIKE queries with diacritical differences
 
-    public function __construct($db)
+    public function __construct(object $db)
     {
-        $this->db = $db;
-        $this->commonRepository = new \Services\CommonRepository($db);
+        parent::__construct($db);
+        $this->commonRepository = new \Services\CommonMysqliRepository($db);
     }
 
     /**
@@ -30,21 +29,14 @@ class DraftRepository implements DraftRepositoryInterface
      */
     public function getCurrentDraftSelection(int $draftRound, int $draftPick): ?string
     {
-        $draftRound = DatabaseService::escapeString($this->db, (string)$draftRound);
-        $draftPick = DatabaseService::escapeString($this->db, (string)$draftPick);
-
-        $query = "SELECT `player`
-            FROM ibl_draft
-            WHERE `round` = '$draftRound' 
-               AND `pick` = '$draftPick'";
+        $row = $this->fetchOne(
+            "SELECT `player` FROM ibl_draft WHERE `round` = ? AND `pick` = ?",
+            "ii",
+            $draftRound,
+            $draftPick
+        );
         
-        $result = $this->db->sql_query($query);
-        
-        if ($result && $this->db->sql_numrows($result) > 0) {
-            return $this->db->sql_result($result, 0, 'player');
-        }
-        
-        return null;
+        return $row ? $row['player'] : null;
     }
 
     /**
@@ -52,19 +44,16 @@ class DraftRepository implements DraftRepositoryInterface
      */
     public function updateDraftTable(string $playerName, string $date, int $draftRound, int $draftPick): bool
     {
-        $playerName = DatabaseService::escapeString($this->db, $playerName);
-        $date = DatabaseService::escapeString($this->db, $date);
-        $draftRound = DatabaseService::escapeString($this->db, (string)$draftRound);
-        $draftPick = DatabaseService::escapeString($this->db, (string)$draftPick);
-
-        $query = "UPDATE ibl_draft 
-             SET `player` = '$playerName', 
-                   `date` = '$date' 
-            WHERE `round` = '$draftRound' 
-               AND `pick` = '$draftPick'";
+        $affected = $this->execute(
+            "UPDATE ibl_draft SET `player` = ?, `date` = ? WHERE `round` = ? AND `pick` = ?",
+            "ssii",
+            $playerName,
+            $date,
+            $draftRound,
+            $draftPick
+        );
         
-        $result = $this->db->sql_query($query);
-        return (bool)$result;
+        return $affected > 0;
     }
 
     /**
@@ -72,30 +61,29 @@ class DraftRepository implements DraftRepositoryInterface
      */
     public function updateRookieTable(string $playerName, string $teamName): bool
     {
-        $playerName = DatabaseService::escapeString($this->db, $playerName);
-        $teamName = DatabaseService::escapeString($this->db, $teamName);
-
-        $query = "UPDATE `ibl_draft_class`
-              SET `team` = '$teamName', 
-               `drafted` = '1'
-            WHERE `name` = '$playerName'";
+        $affected = $this->execute(
+            "UPDATE `ibl_draft_class` SET `team` = ?, `drafted` = '1' WHERE `name` = ?",
+            "ss",
+            $teamName,
+            $playerName
+        );
         
-        $result = $this->db->sql_query($query);
-        return (bool)$result;
+        return $affected > 0;
     }
 
     private function getNextAvailablePid(): int
     {
         $draftPidStart = 90000;
         
-        $query = "SELECT MAX(pid) as max_pid FROM ibl_plr WHERE pid >= $draftPidStart";
-        $result = $this->db->sql_query($query);
+        $row = $this->fetchOne(
+            "SELECT MAX(pid) as max_pid FROM ibl_plr WHERE pid >= ?",
+            "i",
+            $draftPidStart
+        );
         
-        if ($result && $this->db->sql_numrows($result) > 0) {
-            $maxPid = $this->db->sql_result($result, 0, 'max_pid');
-            if ($maxPid !== null && $maxPid !== '' && $maxPid >= $draftPidStart) {
-                return (int) $maxPid + 1;
-            }
+        $maxPid = $row['max_pid'] ?? null;
+        if ($row && $maxPid !== null && $maxPid !== '' && $maxPid >= $draftPidStart) {
+            return (int) $maxPid + 1;
         }
         
         return $draftPidStart; // Start at 90000 if no draft PIDs exist yet
@@ -112,19 +100,19 @@ class DraftRepository implements DraftRepositoryInterface
         }
         $teamId = (int) $teamId;
         
-        $playerNameEscaped = DatabaseService::escapeString($this->db, $playerName);
-        $query = "SELECT * FROM ibl_draft_class WHERE name = '$playerNameEscaped' LIMIT 1";
-        $result = $this->db->sql_query($query);
-        if (!$result || $this->db->sql_numrows($result) === 0) {
+        $draftClassPlayer = $this->fetchOne(
+            "SELECT * FROM ibl_draft_class WHERE name = ? LIMIT 1",
+            "s",
+            $playerName
+        );
+        
+        if (!$draftClassPlayer) {
             return false;
         }
         
-        $draftClassPlayer = $this->db->sql_fetchrow($result);
         $pid = $this->getNextAvailablePid();
         $name = substr($playerName, 0, self::IBL_PLR_NAME_MAX_LENGTH);
-        $nameEscaped = DatabaseService::escapeString($this->db, $name);
-        $teamNameEscaped = DatabaseService::escapeString($this->db, $teamName);
-        $pos = DatabaseService::escapeString($this->db, $draftClassPlayer['pos']);
+        $pos = $draftClassPlayer['pos'];
         $oo = (int) $draftClassPlayer['offo'];
         $od = (int) $draftClassPlayer['offd'];
         $po = (int) $draftClassPlayer['offp'];
@@ -141,20 +129,25 @@ class DraftRepository implements DraftRepositoryInterface
         $intangibles = (int) $draftClassPlayer['int'];
         
         // Insert new player into ibl_plr
-        $query = "INSERT INTO ibl_plr (
-            pid, name, age, tid, teamname, pos,
-            sta, oo, od, po, `to`, `do`, dd, pd, td,
-            talent, skill, intangibles,
-            active, bird, exp, cy, cyt
-        ) VALUES (
-            $pid, '$nameEscaped', $age, $teamId, '$teamNameEscaped', '$pos',
+        $affected = $this->execute(
+            "INSERT INTO ibl_plr (
+                pid, name, age, tid, teamname, pos,
+                sta, oo, od, po, `to`, `do`, dd, pd, td,
+                talent, skill, intangibles,
+                active, bird, exp, cy, cyt
+            ) VALUES (
+                ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?,
+                1, 0, 0, 0, 0
+            )",
+            "isiissiiiiiiiiiiii",
+            $pid, $name, $age, $teamId, $teamName, $pos,
             $sta, $oo, $od, $po, $to, $do, $dd, $pd, $td,
-            $talent, $skill, $intangibles,
-            1, 0, 0, 0, 0
-        )";
+            $talent, $skill, $intangibles
+        );
         
-        $result = $this->db->sql_query($query);
-        return (bool)$result;
+        return $affected > 0;
     }
 
     /**
@@ -162,18 +155,14 @@ class DraftRepository implements DraftRepositoryInterface
      */
     public function isPlayerAlreadyDrafted(string $playerName): bool
     {
-        $playerName = DatabaseService::escapeString($this->db, $playerName);
-
-        $query = "SELECT drafted 
-            FROM ibl_draft_class 
-            WHERE name = '$playerName' 
-            LIMIT 1";
+        $row = $this->fetchOne(
+            "SELECT drafted FROM ibl_draft_class WHERE name = ? LIMIT 1",
+            "s",
+            $playerName
+        );
         
-        $result = $this->db->sql_query($query);
-        
-        if ($result && $this->db->sql_numrows($result) > 0) {
-            $drafted = $this->db->sql_result($result, 0, 'drafted');
-            return $drafted == '1' || $drafted === 1;
+        if ($row) {
+            return $row['drafted'] == '1' || $row['drafted'] === 1;
         }
         
         return false;
@@ -184,19 +173,11 @@ class DraftRepository implements DraftRepositoryInterface
      */
     public function getNextTeamOnClock(): ?string
     {
-        $query = "SELECT team 
-            FROM ibl_draft 
-            WHERE player = '' 
-            ORDER BY round ASC, pick ASC 
-            LIMIT 1";
+        $row = $this->fetchOne(
+            "SELECT team FROM ibl_draft WHERE player = '' ORDER BY round ASC, pick ASC LIMIT 1"
+        );
         
-        $result = $this->db->sql_query($query);
-        
-        if ($result && $this->db->sql_numrows($result) > 0) {
-            return $this->db->sql_result($result, 0, 'team');
-        }
-        
-        return null;
+        return $row ? $row['team'] : null;
     }
 
     /**
@@ -204,18 +185,7 @@ class DraftRepository implements DraftRepositoryInterface
      */
     public function getAllDraftClassPlayers(): array
     {
-        $query = "SELECT * FROM ibl_draft_class ORDER BY drafted, name";
-        
-        $result = $this->db->sql_query($query);
-        $players = [];
-        
-        if ($result) {
-            while ($row = $this->db->sql_fetchrow($result)) {
-                $players[] = $row;
-            }
-        }
-        
-        return $players;
+        return $this->fetchAll("SELECT * FROM ibl_draft_class ORDER BY drafted, name");
     }
 
     /**
@@ -223,15 +193,15 @@ class DraftRepository implements DraftRepositoryInterface
      */
     public function getCurrentDraftPick(): ?array
     {
-        $query = "SELECT * FROM ibl_draft WHERE player = '' ORDER BY round ASC, pick ASC LIMIT 1";
+        $row = $this->fetchOne(
+            "SELECT * FROM ibl_draft WHERE player = '' ORDER BY round ASC, pick ASC LIMIT 1"
+        );
         
-        $result = $this->db->sql_query($query);
-        
-        if ($result && $this->db->sql_numrows($result) > 0) {
+        if ($row) {
             return [
-                'team' => $this->db->sql_result($result, 0, 'team'),
-                'round' => $this->db->sql_result($result, 0, 'round'),
-                'pick' => $this->db->sql_result($result, 0, 'pick')
+                'team' => $row['team'],
+                'round' => $row['round'],
+                'pick' => $row['pick']
             ];
         }
         

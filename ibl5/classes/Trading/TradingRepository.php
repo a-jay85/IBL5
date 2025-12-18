@@ -169,7 +169,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
         return $this->execute(
             "INSERT INTO ibl_trade_cash (teamname, year1, year2, year3, year4, year5, year6, row) 
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            "siiiiii",
+            "siiiiiii",
             $data['teamname'],
             $data['year1'],
             $data['year2'],
@@ -189,7 +189,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
         return $this->execute(
             "INSERT INTO ibl_trade_cash (teamname, year1, year2, year3, year4, year5, year6, row) 
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            "siiiiii",
+            "siiiiiii",
             $data['teamname'],
             -$data['year1'],
             -$data['year2'],
@@ -352,5 +352,108 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     public function getLastInsertId(): int
     {
         return $this->db->insert_id;
+    }
+
+    /**
+     * Get the current trade autocounter value
+     * 
+     * @return array|null Row with 'counter' column, or null if no rows
+     */
+    public function getTradeAutocounter(): ?array
+    {
+        return $this->fetchOne(
+            "SELECT counter FROM ibl_trade_autocounter ORDER BY counter DESC LIMIT 1"
+        );
+    }
+
+    /**
+     * Insert a new trade autocounter value
+     * 
+     * @param int $counter Counter value to insert
+     * @return int Number of affected rows
+     */
+    public function insertTradeAutocounter(int $counter): int
+    {
+        return $this->execute(
+            "INSERT INTO ibl_trade_autocounter (counter) VALUES (?)",
+            "i",
+            $counter
+        );
+    }
+
+    /**
+     * Insert a cash player record (positive or negative cash transaction)
+     * 
+     * @param array $data Associative array with keys: ordinal, pid, name, tid, teamname, exp, cy, cyt, cy1-cy6, retired
+     * @return int Number of affected rows
+     */
+    public function insertCashPlayerRecord(array $data): int
+    {
+        return $this->execute(
+            "INSERT INTO `ibl_plr` 
+                (`ordinal`, `pid`, `name`, `tid`, `teamname`, `exp`, `cy`, `cyt`, `cy1`, `cy2`, `cy3`, `cy4`, `cy5`, `cy6`, `retired`) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "iisisissiiiiiii",
+            $data['ordinal'],
+            $data['pid'],
+            $data['name'],
+            $data['tid'],
+            $data['teamname'],
+            $data['exp'],
+            $data['cy'],
+            $data['cyt'],
+            $data['cy1'],
+            $data['cy2'],
+            $data['cy3'],
+            $data['cy4'],
+            $data['cy5'],
+            $data['cy6'],
+            $data['retired']
+        );
+    }
+
+    /**
+     * Insert cash trade offer into ibl_trade_cash
+     * 
+     * @param int $tradeOfferId Trade offer ID
+     * @param string $sendingTeam Sending team name
+     * @param string $receivingTeam Receiving team name
+     * @param int $cy1 Cash year 1
+     * @param int $cy2 Cash year 2
+     * @param int $cy3 Cash year 3
+     * @param int $cy4 Cash year 4
+     * @param int $cy5 Cash year 5
+     * @param int $cy6 Cash year 6
+     * @return int Number of affected rows
+     */
+    public function insertCashTradeOffer(int $tradeOfferId, string $sendingTeam, string $receivingTeam, int $cy1, int $cy2, int $cy3, int $cy4, int $cy5, int $cy6): int
+    {
+        return $this->execute(
+            "INSERT INTO ibl_trade_cash 
+                (`tradeOfferID`, `sendingTeam`, `receivingTeam`, `cy1`, `cy2`, `cy3`, `cy4`, `cy5`, `cy6`) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "issiiiiii",
+            $tradeOfferId,
+            $sendingTeam,
+            $receivingTeam,
+            $cy1,
+            $cy2,
+            $cy3,
+            $cy4,
+            $cy5,
+            $cy6
+        );
+    }
+
+    /**
+     * Get all teams with city and name for trading UI
+     * 
+     * @return array Array of team rows ordered by city
+     */
+    public function getAllTeamsWithCity(): array
+    {
+        return $this->fetchAll(
+            "SELECT team_name, team_city FROM ibl_team_info ORDER BY team_city ASC"
+        );
     }
 }

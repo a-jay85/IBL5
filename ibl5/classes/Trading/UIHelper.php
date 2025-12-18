@@ -16,17 +16,15 @@ use Trading\Contracts\UIHelperInterface;
  */
 class UIHelper implements UIHelperInterface
 {
-    protected $db;
+    protected object $db;
     protected TradingRepository $repository;
     protected \Shared $sharedFunctions;
     protected \Season $season;
 
-    public function __construct($db, ?TradingRepository $repository = null)
+    public function __construct(object $db, ?TradingRepository $repository = null)
     {
         $this->db = $db;
-        // Extract mysqli connection from legacy $db object for repositories
-        $mysqli = $db->db_connect_id ?? $db;
-        $this->repository = $repository ?? new TradingRepository($mysqli);
+        $this->repository = $repository ?? new TradingRepository($db);
         $this->sharedFunctions = new \Shared($db);
         $this->season = new \Season($db);
     }
@@ -34,15 +32,15 @@ class UIHelper implements UIHelperInterface
     /**
      * @see UIHelperInterface::buildTeamFutureSalary()
      */
-    public function buildTeamFutureSalary($resultTeamPlayers, int $k): array
+    public function buildTeamFutureSalary(object $resultTeamPlayers, int $k): array
     {
         $futureSalaryArray = [
             'player' => [],
             'hold' => [],
             'picks' => []
         ];
-        
-        while ($rowTeamPlayers = $this->db->sql_fetch_assoc($resultTeamPlayers)) {
+
+        while ($rowTeamPlayers = $resultTeamPlayers->fetch_assoc()) {
             $playerPosition = $rowTeamPlayers["pos"];
             $playerName = $rowTeamPlayers["name"];
             $playerPid = $rowTeamPlayers["pid"];
@@ -88,11 +86,11 @@ class UIHelper implements UIHelperInterface
     /**
      * @see UIHelperInterface::buildTeamFuturePicks()
      */
-    public function buildTeamFuturePicks($resultTeamPicks, array $futureSalaryArray): array
+    public function buildTeamFuturePicks(object $resultTeamPicks, array $futureSalaryArray): array
     {
         $k = $futureSalaryArray['k'];
 
-        while ($rowTeamDraftPicks = $this->db->sql_fetch_assoc($resultTeamPicks)) {
+        while ($rowTeamDraftPicks = $resultTeamPicks->fetch_assoc()) {
             $pickYear = $rowTeamDraftPicks["year"];
             $pickTeam = $rowTeamDraftPicks["teampick"];
             $pickRound = $rowTeamDraftPicks["round"];
@@ -195,14 +193,12 @@ class UIHelper implements UIHelperInterface
     {
         $teams = [];
         
-        // Note: TradingRepository->getAllTeams() returns only team_name
-        // We need team_city too - using legacy db temporarily
-        $queryListOfAllTeams = "SELECT team_name, team_city FROM ibl_team_info ORDER BY team_city ASC";
-        $resultListOfAllTeams = $this->db->sql_query($queryListOfAllTeams);
+        // Fetch teams using repository
+        $allTeams = $this->repository->getAllTeamsWithCity();
 
-        while ($rowInListOfAllTeams = $this->db->sql_fetchrow($resultListOfAllTeams)) {
-            $teamName = $rowInListOfAllTeams['team_name'];
-            $teamCity = $rowInListOfAllTeams['team_city'];
+        foreach ($allTeams as $row) {
+            $teamName = $row['team_name'];
+            $teamCity = $row['team_city'];
 
             if ($teamName != 'Free Agents') {
                 $teams[] = [

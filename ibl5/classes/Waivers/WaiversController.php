@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace Waivers;
 
 use Player\Player;
-use Player\PlayerContractCalculator;
-use Services\PlayerDataConverter;
 use Waivers\Contracts\WaiversControllerInterface;
 
 /**
@@ -21,25 +19,28 @@ class WaiversController implements WaiversControllerInterface
     public const WAIVER_POOL_MOVES_CATEGORY_ID = 1;
     private const WAIVER_POOL_MOVES_CATEGORY = 'Waiver Pool Moves';
     
-    private $db;
-    private $repository;
-    private $commonRepository;
-    private $processor;
-    private $validator;
-    private $view;
+    private \mysqli $db;
+    private WaiversRepository $repository;
+    private \Services\CommonMysqliRepository $commonRepository;
+    private WaiversProcessor $processor;
+    private WaiversValidator $validator;
+    private WaiversView $view;
     private $newsService;
-    private PlayerContractCalculator $contractCalculator;
     
-    public function __construct($db)
+    /**
+     * Constructor
+     * 
+     * @param \mysqli $mysqli_db Modern mysqli connection
+     */
+    public function __construct(\mysqli $db)
     {
         $this->db = $db;
         $this->repository = new WaiversRepository($db);
-        $this->commonRepository = new \Services\CommonRepository($db);
+        $this->commonRepository = new \Services\CommonMysqliRepository($db);
         $this->processor = new WaiversProcessor();
         $this->validator = new WaiversValidator();
         $this->view = new WaiversView();
         $this->newsService = new \Services\NewsService($db);
-        $this->contractCalculator = new PlayerContractCalculator();
     }
     
     /**
@@ -219,8 +220,8 @@ class WaiversController implements WaiversControllerInterface
         $season = new \Season($this->db);
         $players = $this->getPlayersForAction($team, $action);
         
-        $openRosterSpots = 15 - $team->getHealthyAndInjuredPlayersOrderedByNameResult($season)->num_rows;
-        $healthyOpenRosterSpots = 15 - $team->getHealthyPlayersOrderedByNameResult($season)->num_rows;
+        $openRosterSpots = 15 - count($team->getHealthyAndInjuredPlayersOrderedByNameResult($season));
+        $healthyOpenRosterSpots = 15 - count($team->getHealthyPlayersOrderedByNameResult($season));
         
         $this->view->renderWaiverForm(
             $team->name,
@@ -266,7 +267,7 @@ class WaiversController implements WaiversControllerInterface
             $result = $league->getWaivedPlayersResult();
         }
         
-        while ($playerRow = $this->db->sql_fetchrow($result)) {
+        foreach ($result as $playerRow) {
             $player = Player::withPlrRow($this->db, $playerRow);
             $contract = $this->processor->getPlayerContractDisplay($player, $season);
             $waitTime = '';

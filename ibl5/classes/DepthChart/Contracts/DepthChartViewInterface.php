@@ -180,7 +180,7 @@ interface DepthChartViewInterface
      * 
      * **Important Behaviors:**
      * - Directly echoes HTML (called repeatedly to build table rows)
-     * - Player name is HTML-escaped via DatabaseService::safeHtmlOutput()
+     * - Player name is HTML-escaped via HtmlSanitizer::safeHtmlOutput()
      * - All dropdown values are prefilled with player's current settings
      * - Minute ceiling is capped at 40 (stamina + 40, then max 40)
      * - Renders dropdowns for all 5 position slots (even if not eligible)

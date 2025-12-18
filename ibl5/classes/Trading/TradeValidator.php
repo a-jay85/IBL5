@@ -16,25 +16,15 @@ use Trading\Contracts\TradeValidatorInterface;
  */
 class TradeValidator implements TradeValidatorInterface
 {
-    protected $db;
-    protected object $mysqli_db;
+    protected object $db;
     protected TradingRepository $repository;
     protected \Shared $sharedFunctions;
     protected \Season $season;
 
-    public function __construct($db, object $mysqli_db = null)
+    public function __construct(object $db)
     {
         $this->db = $db;
-        
-        // Use provided mysqli_db, or fallback to global, or use $db as last resort
-        if ($mysqli_db !== null) {
-            $this->mysqli_db = $mysqli_db;
-        } else {
-            global $mysqli_db;
-            $this->mysqli_db = $mysqli_db ?? $db;
-        }
-        
-        $this->repository = new TradingRepository($this->mysqli_db);
+        $this->repository = new TradingRepository($db);
         $this->sharedFunctions = new \Shared($db);
         $this->season = new \Season($db);
     }

@@ -10,20 +10,20 @@ class TopMenu
     /**
      * Display the top menu with team navigation
      *
-     * @param object $db Database connection
+     * @param \mysqli $db Mysqli database connection
      * @param int $teamID Current team ID (defaults to Free Agents)
      * @return void
      */
-    public static function display($db, int $teamID = \League::FREE_AGENTS_TEAMID): void
+    public static function display(\mysqli $db, int $teamID = \League::FREE_AGENTS_TEAMID): void
     {
         $team = \Team::initialize($db, $teamID);
 
         // Fetch team data once and sort in PHP for each dropdown
         $teamQuery = "SELECT `team_city`,`team_name`,`teamid` FROM `ibl_team_info`";
-        $teamResult = $db->sql_query($teamQuery);
+        $teamResult = $db->query($teamQuery);
         
         $teams = [];
-        while ($row = $db->sql_fetch_assoc($teamResult)) {
+        while ($row = $teamResult->fetch_assoc()) {
             $teams[] = $row;
         }
         

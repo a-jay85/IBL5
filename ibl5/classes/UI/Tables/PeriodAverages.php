@@ -3,6 +3,7 @@
 namespace UI\Tables;
 
 use Services\DatabaseService;
+use Utilities\HtmlSanitizer;
 
 /**
  * PeriodAverages - Displays period (simulation) averages statistics table
@@ -12,14 +13,15 @@ class PeriodAverages
     /**
      * Render the period averages table
      *
-     * @param object $db Database connection
+     * @param \mysqli $db Modern mysqli database connection (required)
      * @param object $team Team object
      * @param object $season Season object
      * @param string|null|\DateTime $startDate Start date for the period (defaults to last sim)
      * @param string|null|\DateTime $endDate End date for the period (defaults to last sim)
      * @return string HTML table
+     * @throws \Exception If database connection is invalid
      */
-    public static function render($db, $team, $season, $startDate = null, $endDate = null): string
+    public static function render(\mysqli $db, $team, $season, $startDate = null, $endDate = null): string
     {
         if ($startDate === null && $endDate === null) {
             // default to last simulated period
@@ -73,9 +75,10 @@ class PeriodAverages
         GROUP  BY name, pos, pid
         ORDER  BY name ASC";
         
-        $stmt = $db->db_connect_id->prepare($query);
+        // Use mysqli prepared statement directly
+        $stmt = $db->prepare($query);
         if ($stmt === false) {
-            throw new \Exception('Prepare failed: ' . $db->db_connect_id->error);
+            throw new \Exception('Prepare failed: ' . $db->error);
         }
         
         $stmt->bind_param('sssii', $startDate, $endDate, $teamID, $teamID, $teamID);
@@ -84,15 +87,16 @@ class PeriodAverages
         }
         
         $resultPlayerSimBoxScores = $stmt->get_result();
+        $stmt->close();
 
         $playerRows = [];
         $i = 0;
 
-        while ($row = $db->sql_fetch_assoc($resultPlayerSimBoxScores)) {
+        while ($row = $resultPlayerSimBoxScores->fetch_assoc()) {
             $bgcolor = (($i % 2) == 0) ? "FFFFFF" : "EEEEEE";
 
             $playerRows[] = [
-                'name' => DatabaseService::safeHtmlOutput($row['name']),
+                'name' => HtmlSanitizer::safeHtmlOutput($row['name']),
                 'pos' => $row['pos'],
                 'pid' => $row['pid'],
                 'games' => $row['games'],

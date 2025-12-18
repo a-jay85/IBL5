@@ -16,23 +16,23 @@ use Trading\Contracts\TradeProcessorInterface;
  */
 class TradeProcessor implements TradeProcessorInterface
 {
-    protected $db;
+    protected object $db;
     protected TradingRepository $repository;
-    protected \Services\CommonRepository $commonRepository;
+    protected \Services\CommonMysqliRepository $commonRepository;
     protected \Season $season;
     protected CashTransactionHandler $cashHandler;
     protected \Services\NewsService $newsService;
+    protected \Discord $discord;
 
-    public function __construct($db, ?TradingRepository $repository = null)
+    public function __construct(object $db, ?TradingRepository $repository = null)
     {
         $this->db = $db;
-        // Extract mysqli connection from legacy $db object for repositories
-        $mysqli = $db->db_connect_id ?? $db;
-        $this->repository = $repository ?? new TradingRepository($mysqli);
-        $this->commonRepository = new \Services\CommonRepository($db);
+        $this->repository = $repository ?? new TradingRepository($db);
+        $this->commonRepository = new \Services\CommonMysqliRepository($db);
         $this->season = new \Season($db);
-        $this->cashHandler = new CashTransactionHandler($db, $mysqli, $this->repository);
+        $this->cashHandler = new CashTransactionHandler($db, $this->repository);
         $this->newsService = new \Services\NewsService($db);
+        $this->discord = new \Discord($db);
     }
 
     /**
@@ -167,7 +167,13 @@ class TradeProcessor implements TradeProcessorInterface
         $affectedRows = $this->repository->updateDraftPickOwnerById($itemId, $listeningTeamName);
         
         // Build query string for queue (if needed in certain phases)
-        $queryi = 'UPDATE ibl_draft_picks SET `ownerofpick` = "' . addslashes($listeningTeamName) . '" WHERE `pickid` = ' . $itemId . ' LIMIT 1';
+        // Note: Query is built for queue storage only - actual execution uses prepared statements in repository
+        if (method_exists($this->db, 'real_escape_string')) {
+            $escapedTeamName = $this->db->real_escape_string($listeningTeamName);
+        } else {
+            $escapedTeamName = \Services\DatabaseService::escapeString($this->db, $listeningTeamName);
+        }
+        $queryi = 'UPDATE ibl_draft_picks SET `ownerofpick` = "' . $escapedTeamName . '" WHERE `pickid` = ' . $itemId . ' LIMIT 1';
 
         $this->queueTradeQuery($queryi, $tradeLine);
 
@@ -207,7 +213,13 @@ class TradeProcessor implements TradeProcessorInterface
         $affectedRows = $this->repository->updatePlayerTeam($itemId, $listeningTeamName, $listeningTeamId);
         
         // Build query string for queue (if needed in certain phases)
-        $queryi = 'UPDATE ibl_plr SET `teamname` = "' . addslashes($listeningTeamName) . '", `tid` = ' . $listeningTeamId . ' WHERE `pid` = ' . $itemId . ' LIMIT 1';
+        // Note: Query is built for queue storage only - actual execution uses prepared statements in repository
+        if (method_exists($this->db, 'real_escape_string')) {
+            $escapedTeamName = $this->db->real_escape_string($listeningTeamName);
+        } else {
+            $escapedTeamName = \Services\DatabaseService::escapeString($this->db, $listeningTeamName);
+        }
+        $queryi = 'UPDATE ibl_plr SET `teamname` = "' . $escapedTeamName . '", `tid` = ' . $listeningTeamId . ' WHERE `pid` = ' . $itemId . ' LIMIT 1';
 
         $this->queueTradeQuery($queryi, $tradeLine);
 
@@ -277,11 +289,11 @@ class TradeProcessor implements TradeProcessorInterface
      */
     protected function sendNotifications($offeringTeamName, $listeningTeamName, $storytext)
     {
-        $fromDiscordId = \Discord::getDiscordIDFromTeamname($this->db, $offeringTeamName);
-        $toDiscordId = \Discord::getDiscordIDFromTeamname($this->db, $listeningTeamName);
+        $fromDiscordId = $this->discord->getDiscordIDFromTeamname($offeringTeamName);
+        $toDiscordId = $this->discord->getDiscordIDFromTeamname($listeningTeamName);
         $discordText = "<@!$fromDiscordId> and <@!$toDiscordId> agreed to a trade:<br>" . $storytext;
         
-        \Discord::postToChannel('#trades', $discordText);
-        \Discord::postToChannel('#general-chat', $storytext);
+        $this->discord->postToChannel('#trades', $discordText);
+        $this->discord->postToChannel('#general-chat', $storytext);
     }
 }

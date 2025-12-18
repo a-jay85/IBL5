@@ -16,6 +16,29 @@ namespace Team\Contracts;
 interface TeamRepositoryInterface
 {
     /**
+     * Get team information by team ID
+     * 
+     * @param int $teamID Team ID from ibl_team_info
+     * @return array<string, mixed>|null Team data or null if not found
+     * 
+     * **Return Structure (if found):**
+     * - teamid: Team ID
+     * - team_city: City name
+     * - team_name: Team name
+     * - color1, color2: Team colors
+     * - arena: Arena name
+     * - capacity: Arena capacity
+     * - owner_name: Owner/GM name
+     * - And other team fields from ibl_team_info
+     * 
+     * **Behaviors:**
+     * - Returns null if team not found
+     * - Never throws exceptions
+     * - Uses prepared statements for safety
+     */
+    public function getTeam(int $teamID): ?array;
+
+    /**
      * Get team power ranking data
      * 
      * @param string $teamName Team name to search for (e.g., "Chicago Bulls")

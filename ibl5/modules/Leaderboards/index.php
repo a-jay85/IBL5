@@ -11,8 +11,10 @@ get_lang($module_name);
 
 $pagetitle = "- Player Archives";
 
+global $mysqli_db;
+
 // Initialize classes
-$repository = new \Leaderboards\LeaderboardsRepository($db);
+$repository = new \Leaderboards\LeaderboardsRepository($mysqli_db);
 $service = new Leaderboards\LeaderboardsService();
 $view = new \Leaderboards\LeaderboardsView($service);
 
@@ -57,7 +59,7 @@ if ($filters['submitted'] != null) {
         
         // Render player rows
         $rank = 1;
-        while ($row = $db->sql_fetchrow($leadersData['result'])) {
+        foreach ($leadersData['result'] as $row) {
             $stats = $service->processPlayerRow($row, $tableType);
             echo $view->renderPlayerRow($stats, $rank);
             $rank++;

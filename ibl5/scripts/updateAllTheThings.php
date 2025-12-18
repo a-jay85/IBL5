@@ -18,13 +18,13 @@ try {
     require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
     echo "<p>✓ mainfile.php loaded</p>";
     
-    $commonRepository = new \Services\CommonRepository($db);
+    $commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
     echo "<p>✓ CommonRepository initialized</p>";
     
     $sharedFunctions = new Shared($db);
     echo "<p>✓ Shared functions initialized</p>";
     
-    $season = new Season($db);
+    $season = new Season($mysqli_db);
     echo "<p>✓ Season initialized</p>";
 
     // Initialize components

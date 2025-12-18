@@ -2,6 +2,8 @@
 
 use Player\Player;
 
+global $mysqli_db;
+
 if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
     die("You can't access this file directly...");
 }
@@ -15,17 +17,17 @@ function showpage($playerID, $pageView)
 {
     global $db, $mysqli_db, $cookie;
     $sharedFunctions = new Shared($db);
-    $commonRepository = new Services\CommonRepository($db);
-    $season = new Season($db);
+    $commonRepository = new Services\CommonMysqliRepository($mysqli_db);
+    $season = new Season($mysqli_db);
     
     // Player uses mysqli_db for PlayerRepository (refactored to use prepared statements)
     // Other classes still use legacy $db for backward compatibility
     $player = Player::withPlayerID($mysqli_db, $playerID);
-    $playerStats = PlayerStats::withPlayerID($db, $playerID);
+    $playerStats = PlayerStats::withPlayerID($mysqli_db, $playerID);
     $pageView = ($pageView !== null) ? intval($pageView) : null;
     
     // Initialize service and view helper
-    $pageService = new \Player\PlayerPageService($db);
+    $pageService = new \Player\PlayerPageService($mysqli_db);
     $viewHelper = new \Player\PlayerPageViewHelper();
 
     // DISPLAY PAGE
@@ -39,7 +41,7 @@ function showpage($playerID, $pageView)
 
     // Render action buttons based on business logic
     $userTeamName = $commonRepository->getTeamnameFromUsername(strval($cookie[1] ?? ''));
-    $userTeam = Team::initialize($db, $userTeamName);
+    $userTeam = Team::initialize($mysqli_db, $userTeamName);
 
     if ($pageService->shouldShowRookieOptionUsedMessage($player)) {
         echo $viewHelper->renderRookieOptionUsedMessage();
@@ -55,20 +57,30 @@ function showpage($playerID, $pageView)
     $contract_display = implode("/", $player->getRemainingContractArray());
     echo $viewHelper->renderPlayerBioSection($player, $contract_display);
 
-    // Query All-Star Activity data
-    $escapedName = Services\DatabaseService::escapeString($db, $player->name);
     
-    $allstarquery = $db->sql_query("SELECT * FROM ibl_awards WHERE name='" . $escapedName . "' AND Award LIKE '%Conference All-Star'");
-    $asg = $db->sql_numrows($allstarquery);
+    $stmt = $mysqli_db->prepare("SELECT * FROM ibl_awards WHERE name = ? AND Award LIKE '%Conference All-Star'");
+    $stmt->bind_param('s', $player->name);
+    $stmt->execute();
+    $allstarquery = $stmt->get_result();
+    $asg = $allstarquery->num_rows;
 
-    $allstarquery2 = $db->sql_query("SELECT * FROM ibl_awards WHERE name='" . $escapedName . "' AND Award LIKE 'Three-Point Contest%'");
-    $threepointcontests = $db->sql_numrows($allstarquery2);
+    $stmt2 = $mysqli_db->prepare("SELECT * FROM ibl_awards WHERE name = ? AND Award LIKE 'Three-Point Contest%'");
+    $stmt2->bind_param('s', $player->name);
+    $stmt2->execute();
+    $allstarquery2 = $stmt2->get_result();
+    $threepointcontests = $allstarquery2->num_rows;
 
-    $allstarquery3 = $db->sql_query("SELECT * FROM ibl_awards WHERE name='" . $escapedName . "' AND Award LIKE 'Slam Dunk Competition%'");
-    $dunkcontests = $db->sql_numrows($allstarquery3);
+    $stmt3 = $mysqli_db->prepare("SELECT * FROM ibl_awards WHERE name = ? AND Award LIKE 'Slam Dunk Competition%'");
+    $stmt3->bind_param('s', $player->name);
+    $stmt3->execute();
+    $allstarquery3 = $stmt3->get_result();
+    $dunkcontests = $allstarquery3->num_rows;
     
-    $allstarquery4 = $db->sql_query("SELECT * FROM ibl_awards WHERE name='" . $escapedName . "' AND Award LIKE 'Rookie-Sophomore Challenge'");
-    $rooksoph = $db->sql_numrows($allstarquery4);
+    $stmt4 = $mysqli_db->prepare("SELECT * FROM ibl_awards WHERE name = ? AND Award LIKE 'Rookie-Sophomore Challenge'");
+    $stmt4->bind_param('s', $player->name);
+    $stmt4->execute();
+    $allstarquery4 = $stmt4->get_result();
+    $rooksoph = $allstarquery4->num_rows;
 
     // Render player highs table with All-Star Activity data
     echo $viewHelper->renderPlayerHighsTable($playerStats, $asg, $threepointcontests, $dunkcontests, $rooksoph);
@@ -148,7 +160,7 @@ function negotiate($playerID)
     $playerID = intval($playerID);
     
     // Get user's team name using existing CommonRepository
-    $commonRepository = new Services\CommonRepository($db);
+    $commonRepository = new Services\CommonMysqliRepository($mysqli_db);
     $userTeamName = $commonRepository->getTeamnameFromUsername(strval($cookie[1] ?? ''));
 
     Nuke\Header::header();
@@ -165,11 +177,11 @@ function negotiate($playerID)
 
 function rookieoption($pid)
 {
-    global $db, $cookie;
+    global $db, $cookie, $mysqli_db;
     
     // Initialize dependencies
-    $commonRepository = new \Services\CommonRepository($db);
-    $season = new Season($db);
+    $commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
+    $season = new Season($mysqli_db);
     $validator = new \RookieOption\RookieOptionValidator();
     $formView = new \RookieOption\RookieOptionFormView();
     

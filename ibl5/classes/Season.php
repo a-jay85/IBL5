@@ -1,9 +1,17 @@
 <?php
 
-class Season
-{
-    protected $db;
+declare(strict_types=1);
 
+/**
+ * Season - IBL season information and configuration
+ * 
+ * Extends BaseMysqliRepository for standardized database access.
+ * Provides season phase, dates, settings, and configuration.
+ * 
+ * @see BaseMysqliRepository For base class documentation and error codes
+ */
+class Season extends BaseMysqliRepository
+{
     public $phase;
 
     public $beginningYear;
@@ -32,9 +40,15 @@ class Season
     const IBL_REGULAR_SEASON_ENDING_MONTH = 05;
     const IBL_PLAYOFF_MONTH = 06;
 
-    public function __construct($db)
+    /**
+     * Constructor - initializes season data from database
+     * 
+     * @param \mysqli $db Active mysqli connection
+     * @throws \RuntimeException If connection is invalid (error code 1002)
+     */
+    public function __construct(object $db)
     {
-        $this->db = $db;
+        parent::__construct($db);
 
         $this->phase = $this->getSeasonPhase();
 
@@ -51,7 +65,7 @@ class Season
         $this->lastSimStartDate = $arrayLastSimDates["Start Date"];
         $this->lastSimEndDate = $arrayLastSimDates["End Date"];
 
-        $this->projectedNextSimEndDate = $this->getProjectedNextSimEndDate($db, $this->lastSimEndDate);
+        $this->projectedNextSimEndDate = $this->getProjectedNextSimEndDate($this->lastSimEndDate);
 
         $this->allowTrades = $this->getAllowTradesStatus();
         $this->allowWaivers = $this->getAllowWaiversStatus();
@@ -59,120 +73,169 @@ class Season
         $this->freeAgencyNotificationsState = $this->getFreeAgencyNotificationsState();
     }
 
-    public function getSeasonPhase()
+    /**
+     * Get current season phase
+     * 
+     * @return string Current season phase (e.g., 'Regular Season', 'Playoffs', 'Free Agency')
+     */
+    public function getSeasonPhase(): string
     {
-        $querySeasonPhase = $this->db->sql_query("SELECT value
-            FROM ibl_settings
-            WHERE name = 'Current Season Phase'
-            LIMIT 1");
+        $result = $this->fetchOne(
+            "SELECT value FROM ibl_settings WHERE name = ? LIMIT 1",
+            "s",
+            "Current Season Phase"
+        );
 
-        return $this->db->sql_result($querySeasonPhase, 0, 'value');
+        return $result['value'] ?? '';
     }
 
-    public function getSeasonEndingYear()
+    /**
+     * Get season ending year
+     * 
+     * @return string Season ending year (e.g., '2024')
+     */
+    public function getSeasonEndingYear(): string
     {
-        $querySeasonEndingYear = $this->db->sql_query("SELECT value
-            FROM ibl_settings
-            WHERE name = 'Current Season Ending Year'
-            LIMIT 1");
+        $result = $this->fetchOne(
+            "SELECT value FROM ibl_settings WHERE name = ? LIMIT 1",
+            "s",
+            "Current Season Ending Year"
+        );
 
-        return $this->db->sql_result($querySeasonEndingYear, 0, 'value');
+        return $result['value'] ?? '';
     }
 
-    public function getFirstBoxScoreDate()
+    /**
+     * Get first box score date
+     * 
+     * @return string First box score date from database
+     */
+    public function getFirstBoxScoreDate(): string
     {
-        $queryFirstBoxScoreDate = $this->db->sql_query("SELECT Date
-            FROM ibl_box_scores
-            ORDER BY Date ASC
-            LIMIT 1");
+        $result = $this->fetchOne(
+            "SELECT Date FROM ibl_box_scores ORDER BY Date ASC LIMIT 1"
+        );
 
-        return $this->db->sql_result($queryFirstBoxScoreDate, 0, 'Date');
+        return $result['Date'] ?? '';
     }
 
-    public function getLastBoxScoreDate()
+    /**
+     * Get last box score date
+     * 
+     * @return string Last box score date from database
+     */
+    public function getLastBoxScoreDate(): string
     {
-        $queryLastBoxScoreDate = $this->db->sql_query("SELECT Date
-            FROM ibl_box_scores
-            ORDER BY Date DESC
-            LIMIT 1");
+        $result = $this->fetchOne(
+            "SELECT Date FROM ibl_box_scores ORDER BY Date DESC LIMIT 1"
+        );
 
-        return $this->db->sql_result($queryLastBoxScoreDate, 0, 'Date');
+        return $result['Date'] ?? '';
     }
 
-    public function getLastSimDatesArray()
+    /**
+     * Get last sim dates array
+     * 
+     * @return array Array with keys: Sim, Start Date, End Date
+     */
+    public function getLastSimDatesArray(): array
     {
-        $queryLastSimDates = $this->db->sql_query("SELECT *
-            FROM ibl_sim_dates
-            ORDER BY sim DESC
-            LIMIT 1");
+        $result = $this->fetchOne(
+            "SELECT * FROM ibl_sim_dates ORDER BY sim DESC LIMIT 1"
+        );
 
-        return $this->db->sql_fetch_assoc($queryLastSimDates);
+        return $result ?? [];
     }
 
-    public function setLastSimDatesArray($newSimNumber, $newSimStartDate, $newSimEndDate)
+    /**
+     * Set last sim dates array
+     * 
+     * @param string $newSimNumber New sim number
+     * @param string $newSimStartDate New sim start date
+     * @param string $newSimEndDate New sim end date
+     * @return int Number of affected rows
+     */
+    public function setLastSimDatesArray(string $newSimNumber, string $newSimStartDate, string $newSimEndDate): int
     {
-        $querySimDates = $this->db->sql_query("INSERT INTO ibl_sim_dates
-                    (`Sim`,
-                    `Start Date`,
-                    `End Date`)
-            VALUES  ('$newSimNumber',
-                    '$newSimStartDate',
-                    '$newSimEndDate'); ");
-
-        return $querySimDates;
+        return $this->execute(
+            "INSERT INTO ibl_sim_dates (`Sim`, `Start Date`, `End Date`) VALUES (?, ?, ?)",
+            "sss",
+            $newSimNumber,
+            $newSimStartDate,
+            $newSimEndDate
+        );
     }
 
-    public function getProjectedNextSimEndDate($db, $lastSimEndDate)
+    /**
+     * Get projected next sim end date
+     * 
+     * @param string $lastSimEndDate Last sim end date
+     * @return \DateTimeInterface Projected next sim end date
+     */
+    public function getProjectedNextSimEndDate(string $lastSimEndDate): \DateTimeInterface
     {
+        $league = new League($this->db);
+        $simLengthInDays = $league->getSimLengthInDays();
+        
         $lastSimEndDate = date_create($lastSimEndDate);
-        $projectedNextSimEndDate = date_add($lastSimEndDate, date_interval_create_from_date_string(League::getSimLengthInDays($db) . ' days'));
-
-        // override $projectedNextSimEndDate to account for the blank week at end of HEAT
-        if (
-            $projectedNextSimEndDate > date_create("$this->beginningYear-10-21")
-            AND $projectedNextSimEndDate < date_create("$this->beginningYear-11-02")
-        ) {
-            $projectedNextSimEndDate = date_add($this->regularSeasonStartDate, date_interval_create_from_date_string(League::getSimLengthInDays($db) . ' days'));
-        }
+        $projectedNextSimEndDate = date_add($lastSimEndDate, date_interval_create_from_date_string($simLengthInDays . ' days'));
     
         // override $projectedNextSimEndDate to account for the All-Star Break
         if (
             $projectedNextSimEndDate > date_create("$this->endingYear-01-31")
             AND $projectedNextSimEndDate <= date_create("$this->endingYear-02-05")
         ) {
-            $projectedNextSimEndDate = date_add($this->postAllStarStartDate, date_interval_create_from_date_string(League::getSimLengthInDays($db) . ' days'));
+            $projectedNextSimEndDate = date_add($this->postAllStarStartDate, date_interval_create_from_date_string($simLengthInDays . ' days'));
         }
 
         return $projectedNextSimEndDate;
     }
 
-    public function getAllowTradesStatus()
+    /**
+     * Get allow trades status
+     * 
+     * @return string Status of allowing trades ('Yes' or 'No')
+     */
+    public function getAllowTradesStatus(): string
     {
-        $queryAllowTradesStatus = $this->db->sql_query("SELECT value
-            FROM ibl_settings
-            WHERE name = 'Allow Trades'
-            LIMIT 1");
+        $result = $this->fetchOne(
+            "SELECT value FROM ibl_settings WHERE name = ? LIMIT 1",
+            "s",
+            "Allow Trades"
+        );
 
-        return $this->db->sql_result($queryAllowTradesStatus, 0, 'value');
+        return $result['value'] ?? '';
     }
 
-    public function getAllowWaiversStatus()
+    /**
+     * Get allow waivers status
+     * 
+     * @return string Status of allowing waivers ('Yes' or 'No')
+     */
+    public function getAllowWaiversStatus(): string
     {
-        $queryAllowWaiversStatus = $this->db->sql_query("SELECT value
-            FROM ibl_settings
-            WHERE name = 'Allow Waiver Moves'
-            LIMIT 1");
+        $result = $this->fetchOne(
+            "SELECT value FROM ibl_settings WHERE name = ? LIMIT 1",
+            "s",
+            "Allow Waiver Moves"
+        );
 
-        return $this->db->sql_result($queryAllowWaiversStatus, 0, 'value');
+        return $result['value'] ?? '';
     }
 
-    public function getFreeAgencyNotificationsState()
+    /**
+     * Get free agency notifications state
+     * 
+     * @return string State of free agency notifications ('On' or 'Off')
+     */
+    public function getFreeAgencyNotificationsState(): string
     {
-        $queryFreeAgencyNotificationsState = $this->db->sql_query("SELECT value
-            FROM ibl_settings
-            WHERE name = 'Free Agency Notifications'
-            LIMIT 1");
+        $result = $this->fetchOne(
+            "SELECT value FROM ibl_settings WHERE name = ? LIMIT 1",
+            "s",
+            "Free Agency Notifications"
+        );
 
-        return $this->db->sql_result($queryFreeAgencyNotificationsState, 0, 'value');
+        return $result['value'] ?? '';
     }
 }

@@ -37,4 +37,21 @@ interface NegotiationRepositoryInterface
      * @return int Available cap space
      */
     public function getTeamCapSpaceNextSeason(string $teamName): int;
+
+    /**
+     * Check if the Free Agency module is currently active
+     * 
+     * @return bool True if free agency is active, false otherwise
+     */
+    public function isFreeAgencyActive(): bool;
+
+    /**
+     * Get market maximum values for player rating categories
+     * 
+     * Used for contract demand calculation - normalizes player ratings
+     * against league-wide maximums.
+     * 
+     * @return array{fga: int, fgp: int, fta: int, ftp: int, tga: int, tgp: int, orb: int, drb: int, ast: int, stl: int, to: int, blk: int, foul: int, oo: int, od: int, do: int, dd: int, po: int, pd: int, to: int, td: int}
+     */
+    public function getMarketMaximums(): array;
 }

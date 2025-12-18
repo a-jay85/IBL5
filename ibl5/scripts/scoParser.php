@@ -7,7 +7,7 @@ use Utilities\UuidGenerator;
 function scoParser($uploadedFilePath, $operatingSeasonEndingYear, $operatingSeasonPhase)
 {
     global $db, $mysqli_db;
-    $season = new Season($db);
+    $season = new Season($mysqli_db);
 
     $scoFilePath = ($uploadedFilePath) ? $uploadedFilePath : $_SERVER['DOCUMENT_ROOT'] . "/ibl5/IBL5.sco";
     $operatingSeasonEndingYear = ($operatingSeasonEndingYear) ? $operatingSeasonEndingYear : $season->endingYear;

@@ -1,27 +1,14 @@
 <?php
 
-/************************************************************************/
-/* PHP-NUKE: Web Portal System                                          */
-/* ===========================                                          */
-/*                                                                      */
-/* Copyright (c) 2006 by Francisco Burzi                                */
-/* http://phpnuke.org                                                   */
-/*                                                                      */
-/* This program is free software. You can redistribute it and/or modify */
-/* it under the terms of the GNU General Public License as published by */
-/* the Free Software Foundation; either version 2 of the License.       */
-/************************************************************************/
-
 if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
     die("You can't access this file directly...");
 }
 
-$sharedFunctions = new Shared($db);
-$season = new Season($db);
+global $mysqli_db;
+$sharedFunctions = new Shared($mysqli_db);
+$season = new Season($mysqli_db);
 
 Nuke\Header::header();
-
-$fiveSeasonsAgoEndingYear = $season->endingYear - 4;
 
 $query2 = "SELECT *,
 	SUM(ibl_team_win_loss.wins) as five_season_wins,
@@ -30,54 +17,67 @@ $query2 = "SELECT *,
 	ROUND((SUM(ibl_team_win_loss.wins) / (SUM(ibl_team_win_loss.wins) + SUM(ibl_team_win_loss.losses))), 3) as five_season_winpct
 FROM ibl_team_history
 INNER JOIN ibl_team_win_loss ON ibl_team_win_loss.currentname = ibl_team_history.team_name
-WHERE teamid != " . League::FREE_AGENTS_TEAMID . "
-AND year BETWEEN $fiveSeasonsAgoEndingYear AND $season->endingYear
+WHERE teamid != ?
+AND year BETWEEN ? AND ?
 GROUP BY currentname
-ORDER BY teamid ASC;";
-$result2 = $db->sql_query($query2);
-$num2 = $db->sql_numrows($result2);
+ORDER BY teamid ASC";
+
+$stmt = $mysqli_db->prepare($query2);
+if ($stmt === false) {
+    throw new \RuntimeException('Failed to prepare query: ' . $mysqli_db->error);
+}
+
+$freeAgentsTeamId = \League::FREE_AGENTS_TEAMID;
+$fiveSeasonsAgoEndingYear = $season->endingYear - 4;
+$endingYear = $season->endingYear;
+$stmt->bind_param('iii', $freeAgentsTeamId, $fiveSeasonsAgoEndingYear, $endingYear);
+$stmt->execute();
+$result2 = $stmt->get_result();
 
 OpenTable();
 
 $k = 0;
-while ($k < $num2) {
-    $teamid[$k] = $db->sql_result($result2, $k, "teamid");
-    $teamname[$k] = $db->sql_result($result2, $k, "team_name");
-    $teamcity[$k] = $db->sql_result($result2, $k, "team_city");
-    $teamcolor1[$k] = $db->sql_result($result2, $k, "color1");
-    $teamcolor2[$k] = $db->sql_result($result2, $k, "color2");
+$table_echo = '';
+while ($row = $result2->fetch_assoc()) {
+    $teamid[$k] = $row["teamid"];
+    $teamname[$k] = $row["team_name"];
+    $teamcity[$k] = $row["team_city"];
+    $teamcolor1[$k] = $row["color1"];
+    $teamcolor2[$k] = $row["color2"];
 
-    $totwins[$k] = $db->sql_result($result2, $k, "totwins");
-    $totloss[$k] = $db->sql_result($result2, $k, "totloss");
-    $pct[$k] = $db->sql_result($result2, $k, "winpct");
+    $totwins[$k] = $row["totwins"];
+    $totloss[$k] = $row["totloss"];
+    $pct[$k] = $row["winpct"];
 
-    $lastFiveSeasonsWins[$k] = $db->sql_result($result2, $k, "five_season_wins");
-    $lastFiveSeasonsLosses[$k] = $db->sql_result($result2, $k, "five_season_losses");
-    $lastFiveSeasonsWinPct[$k] = $db->sql_result($result2, $k, "five_season_winpct");
+    $lastFiveSeasonsWins[$k] = $row["five_season_wins"];
+    $lastFiveSeasonsLosses[$k] = $row["five_season_losses"];
+    $lastFiveSeasonsWinPct[$k] = $row["five_season_winpct"];
 
-    $playoffs[$k] = $db->sql_result($result2, $k, "playoffs");
-    $heat[$k] = $db->sql_result($result2, $k, "heat_titles");
-    $div[$k] = $db->sql_result($result2, $k, "div_titles");
-    $conf[$k] = $db->sql_result($result2, $k, "conf_titles");
-    $ibl[$k] = $db->sql_result($result2, $k, "ibl_titles");
+    $playoffs[$k] = $row["playoffs"];
+    $heat[$k] = $row["heat_titles"];
+    $div[$k] = $row["div_titles"];
+    $conf[$k] = $row["conf_titles"];
+    $ibl[$k] = $row["ibl_titles"];
 
     $table_echo .= "<tr>
-		<td bgcolor=#" . $teamcolor1[$k] . "><a href=\"modules.php?name=Team&op=team&teamID=" . $teamid[$k] . "\"><font color=#" . $teamcolor2[$k] . ">" . $teamcity[$k] . " " . $teamname[$k] . "</a></td>
-		<td>" . $totwins[$k] . "</td>
-		<td>" . $totloss[$k] . "</td>
-		<td>" . $pct[$k] . "</td>
-		<td bgcolor=#ddd>" . $lastFiveSeasonsWins[$k] . "</td>
-		<td bgcolor=#ddd>" . $lastFiveSeasonsLosses[$k] . "</td>
-		<td bgcolor=#ddd>" . $lastFiveSeasonsWinPct[$k] . "</td>
-		<td>" . $playoffs[$k] . "</td>
-		<td>" . $sharedFunctions->getNumberOfTitles($teamname[$k], 'HEAT') . "</td>
-		<td>" . $sharedFunctions->getNumberOfTitles($teamname[$k], 'Division') . "</td>
-		<td>" . $sharedFunctions->getNumberOfTitles($teamname[$k], 'Conference') . "</td>
-		<td>" . $sharedFunctions->getNumberOfTitles($teamname[$k], 'IBL Champions') . "</td>
+		<td bgcolor=#" . htmlspecialchars($teamcolor1[$k]) . "><a href=\"modules.php?name=Team&op=team&teamID=" . htmlspecialchars($teamid[$k]) . "\"><font color=#" . htmlspecialchars($teamcolor2[$k]) . ">" . htmlspecialchars($teamcity[$k]) . " " . htmlspecialchars($teamname[$k]) . "</a></td>
+		<td>" . htmlspecialchars($totwins[$k]) . "</td>
+		<td>" . htmlspecialchars($totloss[$k]) . "</td>
+		<td>" . htmlspecialchars($pct[$k]) . "</td>
+		<td bgcolor=#ddd>" . htmlspecialchars($lastFiveSeasonsWins[$k]) . "</td>
+		<td bgcolor=#ddd>" . htmlspecialchars($lastFiveSeasonsLosses[$k]) . "</td>
+		<td bgcolor=#ddd>" . htmlspecialchars($lastFiveSeasonsWinPct[$k]) . "</td>
+		<td>" . htmlspecialchars($playoffs[$k]) . "</td>
+		<td>" . htmlspecialchars($sharedFunctions->getNumberOfTitles($teamname[$k], 'HEAT')) . "</td>
+		<td>" . htmlspecialchars($sharedFunctions->getNumberOfTitles($teamname[$k], 'Division')) . "</td>
+		<td>" . htmlspecialchars($sharedFunctions->getNumberOfTitles($teamname[$k], 'Conference')) . "</td>
+		<td>" . htmlspecialchars($sharedFunctions->getNumberOfTitles($teamname[$k], 'IBL Champions')) . "</td>
 	</tr>";
 
     $k++;
 }
+
+$stmt->close();
 
 $text .= "
 	<table class=\"sortable\" border=1>

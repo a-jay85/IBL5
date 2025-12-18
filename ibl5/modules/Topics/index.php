@@ -22,11 +22,11 @@ $pagetitle = "- " . _ACTIVETOPICS . "";
 Nuke\Header::header();
 OpenTable();
 
-global $db, $prefix, $tipath;
+global $mysqli_db, $prefix, $tipath;
 $ThemeSel = get_theme();
 $sql = "SELECT t.topicid, t.topicimage, t.topictext, COUNT(s.sid) AS stories, COALESCE(SUM(s.counter), 0) AS total_reads FROM " . $prefix . "_topics t LEFT JOIN " . $prefix . "_stories s ON (s.topic = t.topicid) GROUP BY t.topicid, t.topicimage, t.topictext ORDER BY t.topictext";
-$result = $db->sql_query($sql);
-if ($db->sql_numrows($result) > 0) {
+$result = $mysqli_db->query($sql);
+if ($result instanceof mysqli_result && $result->num_rows > 0) {
     $output = "<center><font class=\"title\"><b>" . _ACTIVETOPICS . "</b></font><br>\n";
     $output .= "<font class=\"content\">" . _CLICK2LIST . "</font><br><br>\n";
     $output .= "<form action=\"modules.php?name=Search\" method=\"post\">";
@@ -34,7 +34,7 @@ if ($db->sql_numrows($result) > 0) {
     $output .= "<input type=\"submit\" value=\"" . _SEARCH . "\">";
     $output .= "</form></center><br><br>";
     echo $output;
-    while ($row = $db->sql_fetchrow($result)) {
+    while ($row = $result->fetch_assoc()) {
         $topicid = intval($row['topicid']);
         $topicimage = stripslashes($row['topicimage']);
         $topictext = stripslashes(check_html($row['topictext'], "nohtml"));

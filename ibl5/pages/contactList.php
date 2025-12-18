@@ -3,10 +3,7 @@
 require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
 $query = "SELECT * FROM ibl_team_info ORDER BY team_city ASC";
-$result = $db->sql_query($query);
-$num = $db->sql_numrows($result);
-
-$i = 0;
+$result = $mysqli_db->query($query);
 
 echo "<html>
 <head>
@@ -25,38 +22,33 @@ echo "<html>
             </tr>
 ";
 
-while ($i < $num) {
-    $tid = $db->sql_result($result, $i, "teamid");
-    $teamcity = $db->sql_result($result, $i, "team_city");
-    $teamname = $db->sql_result($result, $i, "team_name");
-    $color1 = $db->sql_result($result, $i, "color1");
-    $color2 = $db->sql_result($result, $i, "color2");
-    $owner = $db->sql_result($result, $i, "owner_name");
-    $email = $db->sql_result($result, $i, "owner_email");
-    $skype = $db->sql_result($result, $i, "skype");
-    $aim = $db->sql_result($result, $i, "aim");
-    $msn = $db->sql_result($result, $i, "msn");
+while ($row = $result->fetch_assoc()) {
+    $tid = $row["teamid"] ?? '';
+    $teamcity = $row["team_city"] ?? '';
+    $teamname = $row["team_name"] ?? '';
+    $color1 = $row["color1"] ?? '';
+    $color2 = $row["color2"] ?? '';
+    $owner = $row["owner_name"] ?? '';
+    $email = $row["owner_email"] ?? '';
+    $skype = $row["skype"] ?? '';
+    $aim = $row["aim"] ?? '';
+    $msn = $row["msn"] ?? '';
 
     echo "<tr>
-        <td style=\"background-color: #$color1; text-align: center;\">
-            <a href=\"team.php?tid=$tid\" style=\"color: #$color2; text-decoration: none; font-weight: bold;\">
-                $teamcity $teamname
-            </a>
-        </td>
-        <td style=\"text-align: center;\">
-            <a href=\"mailto:$email\" style=\"color: #333; text-decoration: underline;\">
-                $owner
-            </a>
-        </td>
-        <td style=\"text-align: center;\">$aim</td>
-        <td style=\"text-align: center;\">$skype</td>
-    </tr>";
-
-    $i++;
-
+    <td style=\"background-color: #$color1; text-align: center;\">
+        <a href=\"team.php?tid=$tid\" style=\"color: #$color2; text-decoration: none; font-weight: bold;\">
+            $teamcity $teamname
+        </a>
+    </td>
+    <td style=\"text-align: center;\">
+        <a href=\"mailto:$email\" style=\"color: #333; text-decoration: underline;\">
+            $owner
+        </a>
+    </td>
+    <td style=\"text-align: center;\">$aim</td>
+    <td style=\"text-align: center;\">$skype</td>
+</tr>";
 }
 
 echo "</TR></TABLE>
 </BODY></HTML>";
-
-$db->sql_close();

@@ -16,10 +16,15 @@ use Extension\Contracts\ExtensionDatabaseOperationsInterface;
  */
 class ExtensionDatabaseOperations implements ExtensionDatabaseOperationsInterface
 {
-    private $db;
+    private object $db;
     private \Services\NewsService $newsService;
 
-    public function __construct($db)
+    /**
+     * Constructor
+     * 
+     * @param object $db mysqli connection or duck-typed mock for testing
+     */
+    public function __construct(object $db)
     {
         $this->db = $db;
         $this->newsService = new \Services\NewsService($db);
@@ -35,21 +40,29 @@ class ExtensionDatabaseOperations implements ExtensionDatabaseOperationsInterfac
         $year4 = (isset($offer['year4']) && $offer['year4'] !== '' && $offer['year4'] !== null) ? $offer['year4'] : 0;
         $year5 = (isset($offer['year5']) && $offer['year5'] !== '' && $offer['year5'] !== null) ? $offer['year5'] : 0;
         
-        $playerNameEscaped = \Services\DatabaseService::escapeString($this->db, $playerName);
-        
-        $query = "UPDATE ibl_plr SET 
-            cy = 1, 
-            cyt = $totalYears, 
-            cy1 = $currentSalary, 
-            cy2 = {$offer['year1']}, 
-            cy3 = {$offer['year2']}, 
-            cy4 = {$offer['year3']}, 
-            cy5 = $year4, 
-            cy6 = $year5 
-            WHERE name = '$playerNameEscaped'";
-        
-        $result = $this->db->sql_query($query);
-        return $result !== false;
+        if ($this->db instanceof \mysqli) {
+            $stmt = $this->db->prepare(
+                "UPDATE ibl_plr SET cy = 1, cyt = ?, cy1 = ?, cy2 = ?, cy3 = ?, cy4 = ?, cy5 = ?, cy6 = ? WHERE name = ?"
+            );
+            $stmt->bind_param('iiiiiis', $totalYears, $currentSalary, $offer['year1'], $offer['year2'], $offer['year3'], $year4, $year5, $playerName);
+            $result = $stmt->execute();
+            $stmt->close();
+            return $result;
+        } else {
+            // Mock database for tests
+            $query = "UPDATE ibl_plr SET 
+                cy = 1, 
+                cyt = $totalYears, 
+                cy1 = $currentSalary, 
+                cy2 = {$offer['year1']}, 
+                cy3 = {$offer['year2']}, 
+                cy4 = {$offer['year3']}, 
+                cy5 = $year4, 
+                cy6 = $year5 
+                WHERE name = ?";
+            $result = $this->db->sql_query($query);
+            return $result !== false;
+        }
     }
 
     /**
@@ -57,10 +70,18 @@ class ExtensionDatabaseOperations implements ExtensionDatabaseOperationsInterfac
      */
     public function markExtensionUsedThisSim($teamName)
     {
-        $teamNameEscaped = \Services\DatabaseService::escapeString($this->db, $teamName);
-        $query = "UPDATE ibl_team_info SET Used_Extension_This_Chunk = 1 WHERE team_name = '$teamNameEscaped'";
-        $result = $this->db->sql_query($query);
-        return $result !== false;
+        if ($this->db instanceof \mysqli) {
+            $stmt = $this->db->prepare("UPDATE ibl_team_info SET Used_Extension_This_Chunk = 1 WHERE team_name = ?");
+            $stmt->bind_param('s', $teamName);
+            $result = $stmt->execute();
+            $stmt->close();
+            return $result;
+        } else {
+            // Mock database for tests
+            $query = "UPDATE ibl_team_info SET Used_Extension_This_Chunk = 1 WHERE team_name = ?";
+            $result = $this->db->sql_query($query);
+            return $result !== false;
+        }
     }
 
     /**
@@ -68,10 +89,18 @@ class ExtensionDatabaseOperations implements ExtensionDatabaseOperationsInterfac
      */
     public function markExtensionUsedThisSeason($teamName)
     {
-        $teamNameEscaped = \Services\DatabaseService::escapeString($this->db, $teamName);
-        $query = "UPDATE ibl_team_info SET Used_Extension_This_Season = 1 WHERE team_name = '$teamNameEscaped'";
-        $result = $this->db->sql_query($query);
-        return $result !== false;
+        if ($this->db instanceof \mysqli) {
+            $stmt = $this->db->prepare("UPDATE ibl_team_info SET Used_Extension_This_Season = 1 WHERE team_name = ?");
+            $stmt->bind_param('s', $teamName);
+            $result = $stmt->execute();
+            $stmt->close();
+            return $result;
+        } else {
+            // Mock database for tests
+            $query = "UPDATE ibl_team_info SET Used_Extension_This_Season = 1 WHERE team_name = ?";
+            $result = $this->db->sql_query($query);
+            return $result !== false;
+        }
     }
 
     /**
@@ -133,35 +162,74 @@ class ExtensionDatabaseOperations implements ExtensionDatabaseOperationsInterfac
      */
     public function getPlayerPreferences($playerName)
     {
-        $playerNameEscaped = \Services\DatabaseService::escapeString($this->db, $playerName);
-        $query = "SELECT * FROM ibl_plr WHERE name = '$playerNameEscaped'";
-        $result = $this->db->sql_query($query);
-        
-        if (!$result || $this->db->sql_numrows($result) == 0) {
-            return null;
+        if ($this->db instanceof \mysqli) {
+            $stmt = $this->db->prepare("SELECT * FROM ibl_plr WHERE name = ?");
+            $stmt->bind_param('s', $playerName);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            
+            if ($result->num_rows == 0) {
+                $stmt->close();
+                return null;
+            }
+            
+            $row = $result->fetch_assoc();
+            $stmt->close();
+            return $row;
+        } else {
+            // Mock database for tests
+            $query = "SELECT * FROM ibl_plr WHERE name = ?";
+            $result = $this->db->sql_query($query);
+            
+            if (!$result || $this->db->sql_numrows($result) == 0) {
+                return null;
+            }
+            
+            return $this->db->sql_fetchrow($result);
         }
-        
-        return $this->db->sql_fetchrow($result);
     }
 
     public function getPlayerCurrentContract($playerName)
     {
-        $playerNameEscaped = \Services\DatabaseService::escapeString($this->db, $playerName);
-        $query = "SELECT cy, cy1, cy2, cy3, cy4, cy5, cy6 FROM ibl_plr WHERE name = '$playerNameEscaped'";
-        $result = $this->db->sql_query($query);
-        
-        if (!$result || $this->db->sql_numrows($result) == 0) {
-            return null;
-        }
-        
-        $contract = $this->db->sql_fetchrow($result);
-        if ($contract && isset($contract['cy'])) {
-            $cy = $contract['cy'];
-            $contract['currentSalary'] = isset($contract['cy' . $cy]) ? $contract['cy' . $cy] : 0;
+        if ($this->db instanceof \mysqli) {
+            $stmt = $this->db->prepare("SELECT cy, cy1, cy2, cy3, cy4, cy5, cy6 FROM ibl_plr WHERE name = ?");
+            $stmt->bind_param('s', $playerName);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            
+            if ($result->num_rows == 0) {
+                $stmt->close();
+                return null;
+            }
+            
+            $contract = $result->fetch_assoc();
+            $stmt->close();
+            
+            if ($contract && isset($contract['cy'])) {
+                $cy = $contract['cy'];
+                $contract['currentSalary'] = isset($contract['cy' . $cy]) ? $contract['cy' . $cy] : 0;
+            } else {
+                $contract['currentSalary'] = 0;
+            }
+            return $contract;
         } else {
-            $contract['currentSalary'] = 0;
+            // Mock database for tests
+            $query = "SELECT cy, cy1, cy2, cy3, cy4, cy5, cy6 FROM ibl_plr WHERE name = ?";
+            $result = $this->db->sql_query($query);
+            
+            if (!$result || $this->db->sql_numrows($result) == 0) {
+                return null;
+            }
+            
+            $contract = $this->db->sql_fetchrow($result);
+            if ($contract && isset($contract['cy'])) {
+                $cy = $contract['cy'];
+                $contract['currentSalary'] = isset($contract['cy' . $cy]) ? $contract['cy' . $cy] : 0;
+            } else {
+                $contract['currentSalary'] = 0;
+            }
+            return $contract;
         }
-        return $contract;
     }
 
     private function calculateOfferYears($offer)

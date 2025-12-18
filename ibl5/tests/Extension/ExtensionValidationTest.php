@@ -15,19 +15,16 @@ use Extension\ExtensionValidator;
  */
 class ExtensionValidationTest extends TestCase
 {
-    private $mockDb;
     private $extensionValidator;
 
     protected function setUp(): void
     {
-        $this->mockDb = new MockDatabase();
-        $this->extensionValidator = new ExtensionValidator($this->mockDb);
+        $this->extensionValidator = new ExtensionValidator();
     }
 
     protected function tearDown(): void
     {
         $this->extensionValidator = null;
-        $this->mockDb = null;
     }
 
     /**
@@ -128,16 +125,11 @@ class ExtensionValidationTest extends TestCase
      */
     public function testRejectsExtensionWhenAlreadyUsedThisSeason()
     {
-        // Arrange
-        $teamName = 'Test Team';
-        $this->mockDb->setMockData([
-            array_merge($this->getBaseTeamData(), [
-                'team_name' => $teamName,
-                'Used_Extension_This_Season' => 1,
-                'Used_Extension_This_Chunk' => 0
-            ])
-        ]);
-        $team = \Team::initialize($this->mockDb, $teamName);
+        // Arrange - Create a mock team object with used extension flag
+        $team = (object) [
+            'hasUsedExtensionThisSeason' => 1,
+            'hasUsedExtensionThisSim' => 0
+        ];
 
         // Act
         $result = $this->extensionValidator->validateExtensionEligibility($team);
@@ -153,16 +145,11 @@ class ExtensionValidationTest extends TestCase
      */
     public function testRejectsExtensionWhenAlreadyUsedThisSim()
     {
-        // Arrange
-        $teamName = 'Test Team';
-        $this->mockDb->setMockData([
-            array_merge($this->getBaseTeamData(), [
-                'team_name' => $teamName,
-                'Used_Extension_This_Season' => 0,
-                'Used_Extension_This_Chunk' => 1
-            ])
-        ]);
-        $team = \Team::initialize($this->mockDb, $teamName);
+        // Arrange - Create a mock team object with used extension flag
+        $team = (object) [
+            'hasUsedExtensionThisSeason' => 0,
+            'hasUsedExtensionThisSim' => 1
+        ];
 
         // Act
         $result = $this->extensionValidator->validateExtensionEligibility($team);
@@ -178,16 +165,11 @@ class ExtensionValidationTest extends TestCase
      */
     public function testAcceptsExtensionWhenNotYetUsed()
     {
-        // Arrange
-        $teamName = 'Test Team';
-        $this->mockDb->setMockData([
-            array_merge($this->getBaseTeamData(), [
-                'team_name' => $teamName,
-                'Used_Extension_This_Season' => 0,
-                'Used_Extension_This_Chunk' => 0
-            ])
-        ]);
-        $team = \Team::initialize($this->mockDb, $teamName);
+        // Arrange - Create a mock team object with no extensions used
+        $team = (object) [
+            'hasUsedExtensionThisSeason' => 0,
+            'hasUsedExtensionThisSim' => 0
+        ];
 
         // Act
         $result = $this->extensionValidator->validateExtensionEligibility($team);

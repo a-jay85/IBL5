@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Negotiation;
 
 use Negotiation\Contracts\NegotiationValidatorInterface;
+use Negotiation\Contracts\NegotiationRepositoryInterface;
 use Player\Player;
 use Player\PlayerContractValidator;
 use Player\PlayerData;
@@ -15,12 +16,14 @@ use Services\CommonValidator;
  */
 class NegotiationValidator implements NegotiationValidatorInterface
 {
-    private $db;
-    private $contractValidator;
+    private object $db;
+    private NegotiationRepositoryInterface $repository;
+    private PlayerContractValidator $contractValidator;
     
-    public function __construct($db)
+    public function __construct(object $db)
     {
         $this->db = $db;
+        $this->repository = new NegotiationRepository($db);
         $this->contractValidator = new PlayerContractValidator();
     }
     
@@ -54,11 +57,7 @@ class NegotiationValidator implements NegotiationValidatorInterface
      */
     public function validateFreeAgencyNotActive(): array
     {   
-        $query = "SELECT active FROM nuke_modules WHERE title = 'Free_Agency'";
-        $result = $this->db->sql_query($query);
-        $row = $this->db->sql_fetchrow($result);
-        
-        $isActive = isset($row['active']) && (int)$row['active'] === 1;
+        $isActive = $this->repository->isFreeAgencyActive();
         
         if ($isActive) {
             return [

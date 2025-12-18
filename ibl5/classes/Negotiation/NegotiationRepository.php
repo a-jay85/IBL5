@@ -134,4 +134,57 @@ class NegotiationRepository extends BaseMysqliRepository implements NegotiationR
         
         return $capSpace;
     }
+
+    /**
+     * @see NegotiationRepositoryInterface::isFreeAgencyActive()
+     */
+    public function isFreeAgencyActive(): bool
+    {
+        $result = $this->fetchOne(
+            "SELECT active FROM nuke_modules WHERE title = ?",
+            "s",
+            "Free_Agency"
+        );
+        
+        return isset($result['active']) && (int)$result['active'] === 1;
+    }
+    /**
+     * @see NegotiationRepositoryInterface::getMarketMaximums()
+     */
+    public function getMarketMaximums(): array
+    {
+        $stats = [
+            'r_fga' => 'fga',
+            'r_fgp' => 'fgp',
+            'r_fta' => 'fta',
+            'r_ftp' => 'ftp',
+            'r_tga' => 'tga',
+            'r_tgp' => 'tgp',
+            'r_orb' => 'orb',
+            'r_drb' => 'drb',
+            'r_ast' => 'ast',
+            'r_stl' => 'stl',
+            'r_to' => 'to',
+            'r_blk' => 'blk',
+            'r_foul' => 'foul',
+            'oo' => 'oo',
+            'od' => 'od',
+            'do' => 'do',
+            'dd' => 'dd',
+            'po' => 'po',
+            'pd' => 'pd',
+            'to' => 'to',
+            'td' => 'td'
+        ];
+        
+        $maximums = [];
+        foreach ($stats as $dbColumn => $key) {
+            $result = $this->fetchOne(
+                "SELECT MAX(`$dbColumn`) as max_value FROM ibl_plr"
+            );
+            $maximums[$key] = (int)($result['max_value'] ?? 1); // Avoid division by zero
+        }
+        
+        return $maximums;
+    }
 }

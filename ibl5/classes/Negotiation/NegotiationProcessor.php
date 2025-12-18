@@ -13,19 +13,19 @@ use Player\Player;
  */
 class NegotiationProcessor implements NegotiationProcessorInterface
 {
-    private $db;
+    private object $db;
     private object $mysqli_db;
     private NegotiationRepositoryInterface $repository;
-    private $validator;
-    private $demandCalculator;
+    private NegotiationValidator $validator;
+    private NegotiationDemandCalculator $demandCalculator;
     
     public function __construct($db, object $mysqli_db)
     {
         $this->db = $db;
         $this->mysqli_db = $mysqli_db;
         $this->repository = new NegotiationRepository($mysqli_db);
-        $this->validator = new NegotiationValidator($db);
-        $this->demandCalculator = new NegotiationDemandCalculator($db);
+        $this->validator = new NegotiationValidator($mysqli_db);
+        $this->demandCalculator = new NegotiationDemandCalculator($mysqli_db);
     }
     
     /**

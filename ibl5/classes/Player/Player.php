@@ -113,7 +113,7 @@ class Player implements PlayerInterface
         return $instance;
     }
 
-    public static function withPlrRow($db, array $plrRow)
+    public static function withPlrRow($db, $plrRow)
     {
         $instance = new self();
         $instance->initialize($db);

@@ -23,7 +23,7 @@ class ScheduleUpdaterTest extends TestCase
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
-        $this->mockCommonRepository = new \Services\CommonRepository($this->mockDb);
+        $this->mockCommonRepository = new \Services\CommonMysqliRepository($this->mockDb);
         $this->mockSeason = new Season($this->mockDb);
         $this->scheduleUpdater = new ScheduleUpdater($this->mockDb, $this->mockCommonRepository, $this->mockSeason);
     }
@@ -44,7 +44,6 @@ class ScheduleUpdaterTest extends TestCase
     {
         $reflection = new ReflectionClass($this->scheduleUpdater);
         $method = $reflection->getMethod('extractDate');
-        $method->setAccessible(true);
 
         $result = $method->invoke($this->scheduleUpdater, 'Post 15, 2024');
         
@@ -67,7 +66,6 @@ class ScheduleUpdaterTest extends TestCase
         
         $reflection = new ReflectionClass($this->scheduleUpdater);
         $method = $reflection->getMethod('extractDate');
-        $method->setAccessible(true);
 
         // Month should be overridden to preseason month
         $result = $method->invoke($this->scheduleUpdater, 'November 1, 2023');
@@ -86,7 +84,6 @@ class ScheduleUpdaterTest extends TestCase
         
         $reflection = new ReflectionClass($this->scheduleUpdater);
         $method = $reflection->getMethod('extractDate');
-        $method->setAccessible(true);
 
         // Month should be overridden to HEAT month
         $result = $method->invoke($this->scheduleUpdater, 'November 1, 2023');
@@ -103,7 +100,6 @@ class ScheduleUpdaterTest extends TestCase
     {
         $reflection = new ReflectionClass($this->scheduleUpdater);
         $method = $reflection->getMethod('extractDate');
-        $method->setAccessible(true);
 
         $result = $method->invoke($this->scheduleUpdater, false);
         
@@ -118,7 +114,6 @@ class ScheduleUpdaterTest extends TestCase
     {
         $reflection = new ReflectionClass($this->scheduleUpdater);
         $method = $reflection->getMethod('extractBoxID');
-        $method->setAccessible(true);
 
         $result = $method->invoke($this->scheduleUpdater, 'box12345.htm');
         
@@ -133,7 +128,6 @@ class ScheduleUpdaterTest extends TestCase
     {
         $reflection = new ReflectionClass($this->scheduleUpdater);
         $method = $reflection->getMethod('extractBoxID');
-        $method->setAccessible(true);
 
         $result = $method->invoke($this->scheduleUpdater, 'box999999.htm');
         
@@ -196,7 +190,6 @@ class ScheduleUpdaterTest extends TestCase
     {
         $reflection = new ReflectionClass($this->scheduleUpdater);
         $method = $reflection->getMethod('extractDate');
-        $method->setAccessible(true);
 
         $result = $method->invoke($this->scheduleUpdater, 'January 15, 2024');
         
@@ -215,7 +208,6 @@ class ScheduleUpdaterTest extends TestCase
     {
         $reflection = new ReflectionClass($this->scheduleUpdater);
         $method = $reflection->getMethod('extractDate');
-        $method->setAccessible(true);
 
         $result = $method->invoke($this->scheduleUpdater, 'January 05, 2024');
         
@@ -231,7 +223,6 @@ class ScheduleUpdaterTest extends TestCase
     {
         $reflection = new ReflectionClass($this->scheduleUpdater);
         $method = $reflection->getMethod('extractBoxID');
-        $method->setAccessible(true);
 
         // Test with .htm
         $result1 = $method->invoke($this->scheduleUpdater, 'box54321.htm');
@@ -246,7 +237,6 @@ class ScheduleUpdaterTest extends TestCase
     {
         $reflection = new ReflectionClass($this->scheduleUpdater);
         $method = $reflection->getMethod('extractDate');
-        $method->setAccessible(true);
 
         // Test various date formats
         $dates = [

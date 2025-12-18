@@ -1,22 +1,25 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Statistics;
 
 /**
  * Repository for site statistics data access
  * Handles database operations for traffic counters and stats tables
+ * 
+ * @extends \BaseMysqliRepository
  */
-class StatisticsRepository
+class StatisticsRepository extends \BaseMysqliRepository
 {
-    private $db;
     private string $prefix;
     private string $userPrefix;
 
-    public function __construct($db)
+    public function __construct(object $db)
     {
-        global $prefix, $user_prefix;
+        parent::__construct($db);
         
-        $this->db = $db;
+        global $prefix, $user_prefix;
         $this->prefix = $prefix;
         $this->userPrefix = $user_prefix;
     }
@@ -34,11 +37,11 @@ class StatisticsRepository
             'os' => []
         ];
 
-        $result = $this->db->sql_query(
+        $rows = $this->fetchAll(
             "SELECT type, var, count FROM {$this->prefix}_counter ORDER BY type DESC"
         );
 
-        while ($row = $this->db->sql_fetchrow($result)) {
+        foreach ($rows as $row) {
             $type = $this->sanitizeString($row['type']);
             $var = $this->sanitizeString($row['var']);
             $count = intval($row['count']);
@@ -77,11 +80,14 @@ class StatisticsRepository
      */
     public function getTotalHits(): int
     {
-        $result = $this->db->sql_query(
-            "SELECT count FROM {$this->prefix}_counter WHERE type = 'total' AND var = 'hits'"
+        $row = $this->fetchOne(
+            "SELECT count FROM {$this->prefix}_counter WHERE type = ? AND var = ?",
+            "ss",
+            "total",
+            "hits"
         );
         
-        if ($row = $this->db->sql_fetchrow($result)) {
+        if ($row) {
             return intval($row['count']);
         }
         
@@ -95,12 +101,12 @@ class StatisticsRepository
      */
     public function getHighestTrafficMonth(): ?array
     {
-        $result = $this->db->sql_query(
+        $row = $this->fetchOne(
             "SELECT year, month, hits FROM {$this->prefix}_stats_month 
              ORDER BY hits DESC LIMIT 1"
         );
         
-        if ($row = $this->db->sql_fetchrow($result)) {
+        if ($row) {
             return [
                 'year' => intval($row['year']),
                 'month' => intval($row['month']),
@@ -118,12 +124,12 @@ class StatisticsRepository
      */
     public function getHighestTrafficDay(): ?array
     {
-        $result = $this->db->sql_query(
+        $row = $this->fetchOne(
             "SELECT year, month, date, hits FROM {$this->prefix}_stats_date 
              ORDER BY hits DESC LIMIT 1"
         );
         
-        if ($row = $this->db->sql_fetchrow($result)) {
+        if ($row) {
             return [
                 'year' => intval($row['year']),
                 'month' => intval($row['month']),
@@ -142,12 +148,12 @@ class StatisticsRepository
      */
     public function getHighestTrafficHour(): ?array
     {
-        $result = $this->db->sql_query(
+        $row = $this->fetchOne(
             "SELECT year, month, date, hour, hits FROM {$this->prefix}_stats_hour 
              ORDER BY hits DESC LIMIT 1"
         );
         
-        if ($row = $this->db->sql_fetchrow($result)) {
+        if ($row) {
             return [
                 'year' => intval($row['year']),
                 'month' => intval($row['month']),
@@ -171,29 +177,29 @@ class StatisticsRepository
         $linksActive = function_exists('is_active') ? is_active("Web_Links") : false;
         
         return [
-            'users' => $this->db->sql_numrows(
-                $this->db->sql_query("SELECT user_id FROM {$this->userPrefix}_users")
+            'users' => count(
+                $this->fetchAll("SELECT user_id FROM {$this->userPrefix}_users")
             ),
-            'authors' => $this->db->sql_numrows(
-                $this->db->sql_query("SELECT * FROM {$this->prefix}_authors")
+            'authors' => count(
+                $this->fetchAll("SELECT * FROM {$this->prefix}_authors")
             ),
-            'stories' => $this->db->sql_numrows(
-                $this->db->sql_query("SELECT sid FROM {$this->prefix}_stories")
+            'stories' => count(
+                $this->fetchAll("SELECT sid FROM {$this->prefix}_stories")
             ),
-            'comments' => $this->db->sql_numrows(
-                $this->db->sql_query("SELECT tid FROM {$this->prefix}_comments")
+            'comments' => count(
+                $this->fetchAll("SELECT tid FROM {$this->prefix}_comments")
             ),
-            'submissions' => $this->db->sql_numrows(
-                $this->db->sql_query("SELECT * FROM {$this->prefix}_queue")
+            'submissions' => count(
+                $this->fetchAll("SELECT * FROM {$this->prefix}_queue")
             ),
-            'topics' => $topicsActive ? $this->db->sql_numrows(
-                $this->db->sql_query("SELECT * FROM {$this->prefix}_topics")
+            'topics' => $topicsActive ? count(
+                $this->fetchAll("SELECT * FROM {$this->prefix}_topics")
             ) : 0,
-            'links' => $linksActive ? $this->db->sql_numrows(
-                $this->db->sql_query("SELECT * FROM {$this->prefix}_links_links")
+            'links' => $linksActive ? count(
+                $this->fetchAll("SELECT * FROM {$this->prefix}_links_links")
             ) : 0,
-            'linkCategories' => $linksActive ? $this->db->sql_numrows(
-                $this->db->sql_query("SELECT * FROM {$this->prefix}_links_categories")
+            'linkCategories' => $linksActive ? count(
+                $this->fetchAll("SELECT * FROM {$this->prefix}_links_categories")
             ) : 0
         ];
     }
@@ -205,12 +211,12 @@ class StatisticsRepository
      */
     public function getYearlyStats(): array
     {
-        $stats = [];
-        $result = $this->db->sql_query(
+        $rows = $this->fetchAll(
             "SELECT year, hits FROM {$this->prefix}_stats_year ORDER BY year"
         );
         
-        while ($row = $this->db->sql_fetchrow($result)) {
+        $stats = [];
+        foreach ($rows as $row) {
             $stats[] = [
                 'year' => intval($row['year']),
                 'hits' => intval($row['hits'])
@@ -227,11 +233,11 @@ class StatisticsRepository
      */
     public function getTotalYearlyHits(): int
     {
-        $result = $this->db->sql_query(
+        $row = $this->fetchOne(
             "SELECT SUM(hits) as total FROM {$this->prefix}_stats_year"
         );
         
-        if ($row = $this->db->sql_fetchrow($result)) {
+        if ($row) {
             return intval($row['total']);
         }
         
@@ -246,13 +252,14 @@ class StatisticsRepository
      */
     public function getMonthlyStats(int $year): array
     {
-        $stats = [];
-        $result = $this->db->sql_query(
-            "SELECT month, hits FROM {$this->prefix}_stats_month 
-             WHERE year = " . intval($year)
+        $rows = $this->fetchAll(
+            "SELECT month, hits FROM {$this->prefix}_stats_month WHERE year = ?",
+            "i",
+            $year
         );
         
-        while ($row = $this->db->sql_fetchrow($result)) {
+        $stats = [];
+        foreach ($rows as $row) {
             $stats[] = [
                 'month' => intval($row['month']),
                 'hits' => intval($row['hits'])
@@ -270,12 +277,13 @@ class StatisticsRepository
      */
     public function getTotalMonthlyHits(int $year): int
     {
-        $result = $this->db->sql_query(
-            "SELECT SUM(hits) as total FROM {$this->prefix}_stats_month 
-             WHERE year = " . intval($year)
+        $row = $this->fetchOne(
+            "SELECT SUM(hits) as total FROM {$this->prefix}_stats_month WHERE year = ?",
+            "i",
+            $year
         );
         
-        if ($row = $this->db->sql_fetchrow($result)) {
+        if ($row) {
             return intval($row['total']);
         }
         
@@ -291,14 +299,17 @@ class StatisticsRepository
      */
     public function getDailyStats(int $year, int $month): array
     {
-        $stats = [];
-        $result = $this->db->sql_query(
+        $rows = $this->fetchAll(
             "SELECT year, month, date, hits FROM {$this->prefix}_stats_date 
-             WHERE year = " . intval($year) . " AND month = " . intval($month) . " 
-             ORDER BY date"
+             WHERE year = ? AND month = ? 
+             ORDER BY date",
+            "ii",
+            $year,
+            $month
         );
         
-        while ($row = $this->db->sql_fetchrow($result)) {
+        $stats = [];
+        foreach ($rows as $row) {
             $stats[] = [
                 'year' => intval($row['year']),
                 'month' => intval($row['month']),
@@ -319,12 +330,15 @@ class StatisticsRepository
      */
     public function getTotalDailyHits(int $year, int $month): int
     {
-        $result = $this->db->sql_query(
+        $row = $this->fetchOne(
             "SELECT SUM(hits) as total FROM {$this->prefix}_stats_date 
-             WHERE year = " . intval($year) . " AND month = " . intval($month)
+             WHERE year = ? AND month = ?",
+            "ii",
+            $year,
+            $month
         );
         
-        if ($row = $this->db->sql_fetchrow($result)) {
+        if ($row) {
             return intval($row['total']);
         }
         
@@ -344,15 +358,17 @@ class StatisticsRepository
         $stats = array_fill(0, 24, 0);
         
         for ($hour = 0; $hour <= 23; $hour++) {
-            $result = $this->db->sql_query(
+            $row = $this->fetchOne(
                 "SELECT hour, hits FROM {$this->prefix}_stats_hour 
-                 WHERE year = " . intval($year) . " 
-                 AND month = " . intval($month) . " 
-                 AND date = " . intval($date) . " 
-                 AND hour = " . intval($hour)
+                 WHERE year = ? AND month = ? AND date = ? AND hour = ?",
+                "iiii",
+                $year,
+                $month,
+                $date,
+                $hour
             );
             
-            if ($row = $this->db->sql_fetchrow($result)) {
+            if ($row) {
                 $stats[$hour] = intval($row['hits']);
             }
         }
@@ -370,17 +386,64 @@ class StatisticsRepository
      */
     public function getTotalHourlyHits(int $year, int $month, int $date): int
     {
-        $result = $this->db->sql_query(
+        $row = $this->fetchOne(
             "SELECT SUM(hits) as total FROM {$this->prefix}_stats_hour 
-             WHERE year = " . intval($year) . " 
-             AND month = " . intval($month) . " 
-             AND date = " . intval($date)
+             WHERE year = ? AND month = ? AND date = ?",
+            "iii",
+            $year,
+            $month,
+            $date
         );
         
-        if ($row = $this->db->sql_fetchrow($result)) {
+        if ($row) {
             return intval($row['total']);
         }
         
         return 0;
+    }
+
+    /**
+     * Get team offense statistics by team name
+     * 
+     * @param string $teamName Team name
+     * @return array|null Team offense statistics
+     */
+    public function getTeamOffenseStats(string $teamName): ?array
+    {
+        return $this->fetchOne(
+            "SELECT * FROM ibl_team_offense_stats WHERE name = ? LIMIT 1",
+            "s",
+            $teamName
+        );
+    }
+
+    /**
+     * Get team defense statistics by team name
+     * 
+     * @param string $teamName Team name
+     * @return array|null Team defense statistics
+     */
+    public function getTeamDefenseStats(string $teamName): ?array
+    {
+        return $this->fetchOne(
+            "SELECT * FROM ibl_team_defense_stats WHERE name = ? LIMIT 1",
+            "s",
+            $teamName
+        );
+    }
+
+    /**
+     * Get player statistics by player ID
+     * 
+     * @param int $playerID Player ID
+     * @return array|null Player statistics
+     */
+    public function getPlayerStats(int $playerID): ?array
+    {
+        return $this->fetchOne(
+            "SELECT * FROM ibl_plr WHERE pid = ? LIMIT 1",
+            "i",
+            $playerID
+        );
     }
 }

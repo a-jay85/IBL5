@@ -1,12 +1,11 @@
 <?php
 namespace Updater;
 
-class StandingsHTMLGenerator {
-    private $db;
+class StandingsHTMLGenerator extends \BaseMysqliRepository {
     private $standingsHTML;
 
-    public function __construct($db) {
-        $this->db = $db;
+    public function __construct(object $db) {
+        parent::__construct($db);
         $this->standingsHTML = "<script src=\"sorttable.js\"></script>";
     }
 
@@ -36,19 +35,26 @@ class StandingsHTMLGenerator {
         $this->displayStandings('Midwest');
         $this->displayStandings('Pacific');
 
-        $sqlQueryString = "UPDATE nuke_pages SET text = '$this->standingsHTML' WHERE pid = 4";
-        if ($this->db->sql_query($sqlQueryString)) {
-            \UI::displayDebugOutput($sqlQueryString, 'Standings HTML SQL Query');
+        try {
+            $this->execute(
+                "UPDATE nuke_pages SET text = ? WHERE pid = 4",
+                "s",
+                $this->standingsHTML
+            );
+            \UI::displayDebugOutput("Updated nuke_pages with standings HTML", 'Standings HTML SQL Query');
             echo '<p>Full standings page has been updated.<p>';
-        } else {
-            die('Invalid query: ' . $this->db->sql_error());
+        } catch (\Exception $e) {
+            $errorMessage = 'Failed to update standings page: ' . $e->getMessage();
+            error_log("[StandingsHTMLGenerator] Database error: {$errorMessage}");
+            throw new \RuntimeException($errorMessage, 1002);
         }
     }
 
     private function displayStandings($region) {
         list($grouping, $groupingGB, $groupingMagicNumber) = $this->assignGroupingsFor($region);
 
-        $query = "SELECT
+        $standings = $this->fetchAll(
+            "SELECT
             tid,
             team_name,
             leagueRecord,
@@ -66,12 +72,13 @@ class StandingsHTMLGenerator {
             (homeWins + homeLosses) AS homeGames,
             (awayWins + awayLosses) AS awayGames
             FROM ibl_standings
-            WHERE $grouping = '$region' ORDER BY $groupingGB ASC";
-        
-        $result = $this->db->sql_query($query);
+            WHERE $grouping = ? ORDER BY $groupingGB ASC",
+            "s",
+            $region
+        );
 
         $this->standingsHTML .= $this->generateStandingsHeader($region, $grouping);
-        $this->standingsHTML .= $this->generateStandingsRows($result, $region);
+        $this->standingsHTML .= $this->generateStandingsRows($standings, $region);
         $this->standingsHTML .= '<tr><td colspan=10><hr></td></tr></table><p>';
     }
 
@@ -97,9 +104,9 @@ class StandingsHTMLGenerator {
         return $html;
     }
 
-    private function generateStandingsRows($result, $region) {
+    private function generateStandingsRows($standings, $region) {
         $html = '';
-        foreach ($result as $row) {
+        foreach ($standings as $row) {
             $tid = $row['tid'];
             $team_name = $row['team_name'];
 
@@ -111,16 +118,24 @@ class StandingsHTMLGenerator {
                 $team_name = "<b>X</b>-" . $team_name;
             }
 
-            $queryLast10Games = "SELECT last_win, last_loss, streak_type, streak FROM ibl_power WHERE TeamID = $tid";
-            $resultLast10Games = $this->db->sql_query($queryLast10Games);
+            $last10Games = $this->fetchOne(
+                "SELECT last_win, last_loss, streak_type, streak FROM ibl_power WHERE TeamID = ?",
+                "i",
+                $tid
+            );
             
-            $html .= $this->generateTeamRow($row, $tid, $team_name, $resultLast10Games, $region);
+            $html .= $this->generateTeamRow($row, $tid, $team_name, $last10Games, $region);
         }
         return $html;
     }
 
-    private function generateTeamRow($row, $tid, $team_name, $resultLast10Games, $region) {
+    private function generateTeamRow($row, $tid, $team_name, $last10Games, $region) {
         list($grouping, $groupingGB, $groupingMagicNumber) = $this->assignGroupingsFor($region);
+
+        $lastWin = $last10Games['last_win'] ?? 0;
+        $lastLoss = $last10Games['last_loss'] ?? 0;
+        $streakType = $last10Games['streak_type'] ?? '';
+        $streak = $last10Games['streak'] ?? 0;
 
         return '<tr><td><a href="modules.php?name=Team&op=team&teamID=' . $tid . '">' . $team_name . '</td>
             <td>' . $row['leagueRecord'] . '</td>
@@ -134,7 +149,7 @@ class StandingsHTMLGenerator {
             <td>' . $row['awayRecord'] . '</td>
             <td><center>' . $row['homeGames'] . '</center></td>
             <td><center>' . $row['awayGames'] . '</center></td>
-            <td>' . $this->db->sql_result($resultLast10Games, 0, 'last_win') . '-' . $this->db->sql_result($resultLast10Games, 0, 'last_loss') . '</td>
-            <td>' . $this->db->sql_result($resultLast10Games, 0, 'streak_type') . ' ' . $this->db->sql_result($resultLast10Games, 0, 'streak') . '</td></tr>';
+            <td>' . $lastWin . '-' . $lastLoss . '</td>
+            <td>' . $streakType . ' ' . $streak . '</td></tr>';
     }
 }

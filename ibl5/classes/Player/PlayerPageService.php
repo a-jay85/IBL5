@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Player;
 
 use Player\Contracts\PlayerPageServiceInterface;
+use Player\Views\PlayerViewFactory;
 
 /**
  * @see PlayerPageServiceInterface
@@ -12,10 +13,34 @@ use Player\Contracts\PlayerPageServiceInterface;
 class PlayerPageService implements PlayerPageServiceInterface
 {
     private $db;
+    private PlayerRepository $repository;
+    private PlayerViewFactory $viewFactory;
 
     public function __construct($db)
     {
         $this->db = $db;
+        $this->repository = new PlayerRepository($db);
+        $this->viewFactory = new PlayerViewFactory($this->repository);
+    }
+
+    /**
+     * Get the view factory for creating view instances
+     * 
+     * @return PlayerViewFactory
+     */
+    public function getViewFactory(): PlayerViewFactory
+    {
+        return $this->viewFactory;
+    }
+
+    /**
+     * Get the player repository
+     * 
+     * @return PlayerRepository
+     */
+    public function getRepository(): PlayerRepository
+    {
+        return $this->repository;
     }
 
     /**

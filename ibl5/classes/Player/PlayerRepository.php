@@ -293,4 +293,175 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
             'dem6' => 0,
         ];
     }
+
+    /**
+     * Get All-Star Game appearances count for a player
+     * 
+     * @param string $playerName Player name to search for
+     * @return int Number of All-Star Game appearances
+     */
+    public function getAllStarGameCount(string $playerName): int
+    {
+        $rows = $this->fetchAll(
+            "SELECT * FROM ibl_awards WHERE name = ? AND Award LIKE '%Conference All-Star'",
+            "s",
+            $playerName
+        );
+        return count($rows);
+    }
+
+    /**
+     * Get Three-Point Contest appearances count for a player
+     * 
+     * @param string $playerName Player name to search for
+     * @return int Number of Three-Point Contest appearances
+     */
+    public function getThreePointContestCount(string $playerName): int
+    {
+        $rows = $this->fetchAll(
+            "SELECT * FROM ibl_awards WHERE name = ? AND Award LIKE 'Three-Point Contest%'",
+            "s",
+            $playerName
+        );
+        return count($rows);
+    }
+
+    /**
+     * Get Slam Dunk Competition appearances count for a player
+     * 
+     * @param string $playerName Player name to search for
+     * @return int Number of Slam Dunk Competition appearances
+     */
+    public function getDunkContestCount(string $playerName): int
+    {
+        $rows = $this->fetchAll(
+            "SELECT * FROM ibl_awards WHERE name = ? AND Award LIKE 'Slam Dunk Competition%'",
+            "s",
+            $playerName
+        );
+        return count($rows);
+    }
+
+    /**
+     * Get Rookie-Sophomore Challenge appearances count for a player
+     * 
+     * @param string $playerName Player name to search for
+     * @return int Number of Rookie-Sophomore Challenge appearances
+     */
+    public function getRookieSophChallengeCount(string $playerName): int
+    {
+        $rows = $this->fetchAll(
+            "SELECT * FROM ibl_awards WHERE name = ? AND Award LIKE 'Rookie-Sophomore Challenge'",
+            "s",
+            $playerName
+        );
+        return count($rows);
+    }
+
+    /**
+     * Get all sim dates ordered by sim number
+     * 
+     * @return array Array of sim date records
+     */
+    public function getAllSimDates(): array
+    {
+        return $this->fetchAll(
+            "SELECT * FROM ibl_sim_dates ORDER BY sim ASC",
+            ""
+        );
+    }
+
+    /**
+     * Get box scores for a player between specific dates
+     * 
+     * @param int $playerID Player ID
+     * @param string $startDate Start date (YYYY-MM-DD)
+     * @param string $endDate End date (YYYY-MM-DD)
+     * @return array Array of box score records
+     */
+    public function getBoxScoresBetweenDates(int $playerID, string $startDate, string $endDate): array
+    {
+        return $this->fetchAll(
+            "SELECT * FROM ibl_box_scores WHERE pid = ? AND Date BETWEEN ? AND ? ORDER BY Date ASC",
+            "iss",
+            $playerID,
+            $startDate,
+            $endDate
+        );
+    }
+
+    /**
+     * Get historical stats for a player ordered by year
+     * 
+     * @param int $playerID Player ID
+     * @return array Array of historical stat records
+     */
+    public function getHistoricalStats(int $playerID): array
+    {
+        return $this->fetchAll(
+            "SELECT * FROM ibl_hist WHERE pid = ? ORDER BY year ASC",
+            "i",
+            $playerID
+        );
+    }
+
+    /**
+     * Get playoff stats for a player ordered by year
+     * 
+     * @param string $playerName Player name
+     * @return array Array of playoff stat records
+     */
+    public function getPlayoffStats(string $playerName): array
+    {
+        return $this->fetchAll(
+            "SELECT * FROM ibl_playoff_stats WHERE name = ? ORDER BY year ASC",
+            "s",
+            $playerName
+        );
+    }
+
+    /**
+     * Get heat stats for a player ordered by year
+     * 
+     * @param string $playerName Player name
+     * @return array Array of heat stat records
+     */
+    public function getHeatStats(string $playerName): array
+    {
+        return $this->fetchAll(
+            "SELECT * FROM ibl_heat_stats WHERE name = ? ORDER BY year ASC",
+            "s",
+            $playerName
+        );
+    }
+
+    /**
+     * Get Olympics stats for a player ordered by year
+     * 
+     * @param string $playerName Player name
+     * @return array Array of Olympics stat records
+     */
+    public function getOlympicsStats(string $playerName): array
+    {
+        return $this->fetchAll(
+            "SELECT * FROM ibl_olympics_stats WHERE name = ? ORDER BY year ASC",
+            "s",
+            $playerName
+        );
+    }
+
+    /**
+     * Get all awards for a player ordered by year
+     * 
+     * @param string $playerName Player name
+     * @return array Array of award records
+     */
+    public function getAwards(string $playerName): array
+    {
+        return $this->fetchAll(
+            "SELECT * FROM ibl_awards WHERE name = ? ORDER BY year ASC",
+            "s",
+            $playerName
+        );
+    }
 }

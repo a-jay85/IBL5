@@ -28,9 +28,9 @@ foreach ($team->getDraftHistoryResult() as $playerRow) {
     echo "<tr>";
 
     if ($player->isRetired) {
-        echo "<td><a href=\"./modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->name</a> (retired)</td>";
+        echo "<td><a href=\"/ibl5/modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->name</a> (retired)</td>";
     } else {
-        echo "<td><a href=\"./modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->name</a></td>";
+        echo "<td><a href=\"/ibl5/modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->name</a></td>";
     }
 
     echo "

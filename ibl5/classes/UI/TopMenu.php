@@ -68,18 +68,18 @@ class TopMenu
             <select name="teamSelectID" onchange="location = this.options[this.selectedIndex].value;">
                 <option value="">ID#</option>
                 <?php foreach ($teamsById as $row): ?>
-                <option value="./modules.php?name=Team&amp;op=team&amp;teamID=<?= (int)$row["teamid"] ?>"><?= (int)$row["teamid"] ?> <?= htmlspecialchars($row["team_city"]) ?> <?= htmlspecialchars($row["team_name"]) ?></option>
+                <option value="/ibl5/modules.php?name=Team&amp;op=team&amp;teamID=<?= (int)$row["teamid"] ?>"><?= (int)$row["teamid"] ?> <?= htmlspecialchars($row["team_city"]) ?> <?= htmlspecialchars($row["team_name"]) ?></option>
                 <?php endforeach; ?>
             </select>
         </p>
     </div>
     <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 0.25rem;">
-        <span style="white-space: nowrap;"><a style="<?= $buttonStyle ?>" href="modules.php?name=Team&amp;op=team&amp;teamID=<?= $teamID ?>">Team Page</a></span>
-        <span style="white-space: nowrap;"><a style="<?= $buttonStyle ?>" href="modules.php?name=Team_Schedule&amp;teamID=<?= $teamID ?>">Team Schedule</a></span>
-        <span style="white-space: nowrap;"><a style="<?= $buttonStyle ?>" href="modules/Team/draftHistory.php?teamID=<?= $teamID ?>">Draft History</a></span>
+        <span style="white-space: nowrap;"><a style="<?= $buttonStyle ?>" href="/ibl5/modules.php?name=Team&amp;op=team&amp;teamID=<?= $teamID ?>">Team Page</a></span>
+        <span style="white-space: nowrap;"><a style="<?= $buttonStyle ?>" href="/ibl5/modules.php?name=Team_Schedule&amp;teamID=<?= $teamID ?>">Team Schedule</a></span>
+        <span style="white-space: nowrap;"><a style="<?= $buttonStyle ?>" href="/ibl5/modules/Team/draftHistory.php?teamID=<?= $teamID ?>">Draft History</a></span>
         <span style="white-space: nowrap; display: flex; align-items: center;"><span style="font: bold 14px Helvetica;"> | </span></span>
-        <span style="white-space: nowrap;"><a style="<?= $buttonStyle ?>" href="modules.php?name=Depth_Chart_Entry">Depth Chart Entry</a></span>
-        <span style="white-space: nowrap;"><a style="<?= $buttonStyle ?>" href="modules.php?name=Trading&amp;op=reviewtrade">Trades/Waivers</a></span>
+        <span style="white-space: nowrap;"><a style="<?= $buttonStyle ?>" href="/ibl5/modules.php?name=Depth_Chart_Entry">Depth Chart Entry</a></span>
+        <span style="white-space: nowrap;"><a style="<?= $buttonStyle ?>" href="/ibl5/modules.php?name=Trading&amp;op=reviewtrade">Trades/Waivers</a></span>
     </div>
 </div>
 <hr>

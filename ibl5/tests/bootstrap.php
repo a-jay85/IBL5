@@ -214,7 +214,14 @@ class MockPreparedStatement
     public string $error = '';
     public int $errno = 0;
 
-    public function __construct($mockDb = null, $query = '')
+    /**  
+     * @param MockDatabase|null $mockDb Mock database instance to use.  
+     *                                  If null (or omitted), a new MockDatabase  
+     *                                  instance will be created for this statement,  
+     *                                  rather than using any shared instance.  
+     * @param string $query             The SQL query string for this mock statement.  
+     */  
+    public function __construct(?MockDatabase $mockDb, $query = '')
     {
         $this->mockDb = $mockDb ?? new MockDatabase();
         $this->query = $query;

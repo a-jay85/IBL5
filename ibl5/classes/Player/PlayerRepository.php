@@ -361,7 +361,10 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     /**
      * Get all sim dates ordered by sim number
      * 
-     * @return array Array of sim date records
+     * Returns all simulation date ranges from ibl_sim_dates table.
+     * Note: 'Start Date' and 'End Date' columns are DATE type in schema.
+     * 
+     * @return array Array of sim date records with keys: Sim (int), 'Start Date' (string YYYY-MM-DD), 'End Date' (string YYYY-MM-DD)
      */
     public function getAllSimDates(): array
     {

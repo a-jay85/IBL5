@@ -474,12 +474,19 @@ class Season
         return (string)$this->endingYear;
     }
     
+    /**
+     * Get last sim dates array (mock implementation)
+     * 
+     * Note: 'Start Date' and 'End Date' mimic DATE column format (YYYY-MM-DD)
+     * 
+     * @return array Array with keys: Sim, 'Start Date', 'End Date'
+     */
     private function getLastSimDatesArray()
     {
         return [
             'Sim' => $this->lastSimNumber,
-            'Start Date' => $this->lastSimStartDate,
-            'End Date' => $this->lastSimEndDate
+            'Start Date' => $this->lastSimStartDate, // Mocks DATE column format
+            'End Date' => $this->lastSimEndDate // Mocks DATE column format
         ];
     }
     

@@ -8,6 +8,21 @@ declare(strict_types=1);
  * Extends BaseMysqliRepository for standardized database access.
  * Provides season phase, dates, settings, and configuration.
  * 
+ * @property string $phase Current season phase
+ * @property int $beginningYear Season beginning year
+ * @property int $endingYear Season ending year
+ * @property \DateTimeInterface $regularSeasonStartDate Regular season start date
+ * @property \DateTimeInterface $postAllStarStartDate Post All-Star start date
+ * @property \DateTimeInterface $playoffsStartDate Playoffs start date
+ * @property \DateTimeInterface $playoffsEndDate Playoffs end date
+ * @property int $lastSimNumber Last simulation number
+ * @property string $lastSimStartDate Last sim start date (YYYY-MM-DD from DATE column)
+ * @property string $lastSimEndDate Last sim end date (YYYY-MM-DD from DATE column)
+ * @property \DateTimeInterface $projectedNextSimEndDate Projected next sim end date
+ * @property string $allowTrades Allow trades status
+ * @property string $allowWaivers Allow waivers status
+ * @property string $freeAgencyNotificationsState Free agency notifications state
+ * 
  * @see BaseMysqliRepository For base class documentation and error codes
  */
 class Season extends BaseMysqliRepository
@@ -136,7 +151,10 @@ class Season extends BaseMysqliRepository
     /**
      * Get last sim dates array
      * 
-     * @return array Array with keys: Sim, Start Date, End Date
+     * Returns the most recent simulation date range from ibl_sim_dates.
+     * Note: 'Start Date' and 'End Date' columns are DATE type in schema.
+     * 
+     * @return array Array with keys: Sim (int), 'Start Date' (string YYYY-MM-DD), 'End Date' (string YYYY-MM-DD)
      */
     public function getLastSimDatesArray(): array
     {
@@ -150,9 +168,12 @@ class Season extends BaseMysqliRepository
     /**
      * Set last sim dates array
      * 
+     * Inserts a new simulation date range into ibl_sim_dates.
+     * Note: 'Start Date' and 'End Date' columns are DATE type in schema.
+     * 
      * @param string $newSimNumber New sim number
-     * @param string $newSimStartDate New sim start date
-     * @param string $newSimEndDate New sim end date
+     * @param string $newSimStartDate New sim start date (YYYY-MM-DD format)
+     * @param string $newSimEndDate New sim end date (YYYY-MM-DD format)
      * @return int Number of affected rows
      */
     public function setLastSimDatesArray(string $newSimNumber, string $newSimStartDate, string $newSimEndDate): int
@@ -169,7 +190,7 @@ class Season extends BaseMysqliRepository
     /**
      * Get projected next sim end date
      * 
-     * @param string $lastSimEndDate Last sim end date
+     * @param string $lastSimEndDate Last sim end date (YYYY-MM-DD format from DATE column)
      * @return \DateTimeInterface Projected next sim end date
      */
     public function getProjectedNextSimEndDate(string $lastSimEndDate): \DateTimeInterface

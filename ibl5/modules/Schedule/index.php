@@ -74,8 +74,8 @@ function chunk($chunk_start_date, $chunk_end_date, $j)
     $teamSeasonRecordsResult = $db->sql_query($teamSeasonRecordsQuery);
 
     $league = new League($mysqli_db);
-    $season->lastSimEndDate = date_create($season->lastSimEndDate);
-    $projectedNextSimEndDate = date_add($season->lastSimEndDate, date_interval_create_from_date_string($league->getSimLengthInDays() . ' days'));
+    $lastSimEndDate = date_create($season->lastSimEndDate);
+    $projectedNextSimEndDate = date_add($lastSimEndDate, date_interval_create_from_date_string($league->getSimLengthInDays() . ' days'));
 
     echo "<table width=\"500\" cellpadding=\"6\" cellspacing=\"0\" border=\"1\" align=center>";
 

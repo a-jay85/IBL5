@@ -9,10 +9,11 @@ use Player\PlayerImageHelper;
 
 global $mysqli_db;
 
+// Query ibl_sim_dates - 'Start Date' and 'End Date' are DATE type columns (returns YYYY-MM-DD format)
 $queryLastSimDates = $mysqli_db->query("SELECT * FROM ibl_sim_dates ORDER BY Sim DESC LIMIT 1");
 $rowLastSimDates = $queryLastSimDates->fetch_assoc();
-$lastSimStartDate = $rowLastSimDates['Start Date'];
-$lastSimEndDate = $rowLastSimDates['End Date'];
+$lastSimStartDate = $rowLastSimDates['Start Date']; // DATE column - YYYY-MM-DD format
+$lastSimEndDate = $rowLastSimDates['End Date']; // DATE column - YYYY-MM-DD format
 
 $querySimStatLeaders = "SELECT *
 FROM (

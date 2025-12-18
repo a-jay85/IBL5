@@ -27,14 +27,15 @@ class SimStatsView extends BaseView {
                 <th>pts</th>
             </tr>";
 
+        // Query ibl_sim_dates - 'Start Date' and 'End Date' are DATE type columns (returns YYYY-MM-DD format)
         $stmt = $mysqli_db->prepare("SELECT * FROM ibl_sim_dates ORDER BY sim DESC LIMIT 20");
         $stmt->execute();
         $resultSimDates = $stmt->get_result();
         
         while ($simDates = $resultSimDates->fetch_assoc()) {
             $simNumber = $simDates['Sim'];
-            $simStartDate = $simDates['Start Date'];
-            $simEndDate = $simDates['End Date'];
+            $simStartDate = $simDates['Start Date']; // DATE column - YYYY-MM-DD format
+            $simEndDate = $simDates['End Date']; // DATE column - YYYY-MM-DD format
 
             $stmtBox = $mysqli_db->prepare("SELECT * FROM ibl_box_scores WHERE pid = ? AND Date BETWEEN ? AND ? ORDER BY Date ASC");
             $stmtBox->bind_param("iss", $this->player->playerID, $simStartDate, $simEndDate);

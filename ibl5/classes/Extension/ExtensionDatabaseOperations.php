@@ -44,7 +44,7 @@ class ExtensionDatabaseOperations implements ExtensionDatabaseOperationsInterfac
             $stmt = $this->db->prepare(
                 "UPDATE ibl_plr SET cy = 1, cyt = ?, cy1 = ?, cy2 = ?, cy3 = ?, cy4 = ?, cy5 = ?, cy6 = ? WHERE name = ?"
             );
-            $stmt->bind_param('iiiiiis', $totalYears, $currentSalary, $offer['year1'], $offer['year2'], $offer['year3'], $year4, $year5, $playerName);
+            $stmt->bind_param('iiiiiiis', $totalYears, $currentSalary, $offer['year1'], $offer['year2'], $offer['year3'], $year4, $year5, $playerName);
             $result = $stmt->execute();
             $stmt->close();
             return $result;

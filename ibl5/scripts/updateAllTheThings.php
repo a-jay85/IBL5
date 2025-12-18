@@ -16,28 +16,31 @@ set_exception_handler(function ($exception) {
 
 try {
     require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
+
+    global $mysqli_db;
+
     echo "<p>✓ mainfile.php loaded</p>";
     
     $commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
     echo "<p>✓ CommonRepository initialized</p>";
     
-    $sharedFunctions = new Shared($db);
+    $sharedFunctions = new Shared($mysqli_db);
     echo "<p>✓ Shared functions initialized</p>";
     
     $season = new Season($mysqli_db);
     echo "<p>✓ Season initialized</p>";
 
     // Initialize components
-    $scheduleUpdater = new Updater\ScheduleUpdater($db, $commonRepository, $season);
+    $scheduleUpdater = new Updater\ScheduleUpdater($mysqli_db, $commonRepository, $season);
     echo "<p>✓ ScheduleUpdater initialized</p>";
     
-    $standingsUpdater = new Updater\StandingsUpdater($db, $commonRepository);
+    $standingsUpdater = new Updater\StandingsUpdater($mysqli_db, $commonRepository);
     echo "<p>✓ StandingsUpdater initialized</p>";
     
-    $powerRankingsUpdater = new Updater\PowerRankingsUpdater($db, $season);
+    $powerRankingsUpdater = new Updater\PowerRankingsUpdater($mysqli_db, $season);
     echo "<p>✓ PowerRankingsUpdater initialized</p>";
     
-    $standingsHTMLGenerator = new Updater\StandingsHTMLGenerator($db);
+    $standingsHTMLGenerator = new Updater\StandingsHTMLGenerator($mysqli_db);
     echo "<p>✓ StandingsHTMLGenerator initialized</p>";
 
     // Update schedule

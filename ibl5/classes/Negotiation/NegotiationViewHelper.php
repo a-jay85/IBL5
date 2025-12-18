@@ -7,6 +7,7 @@ namespace Negotiation;
 use Negotiation\Contracts\NegotiationViewHelperInterface;
 use Player\Player;
 use Services\DatabaseService;
+use Utilities\HtmlSanitizer;
 
 /**
  * @see NegotiationViewHelperInterface
@@ -22,9 +23,9 @@ class NegotiationViewHelper implements NegotiationViewHelperInterface
         int $capSpace,
         int $maxYearOneSalary
     ): string {
-        $playerName = DatabaseService::safeHtmlOutput($player->name);
+        $playerName = HtmlSanitizer::safeHtmlOutput($player->name);
         $playerID = (int)$player->playerID;
-        $teamName = DatabaseService::safeHtmlOutput($player->teamName);
+        $teamName = HtmlSanitizer::safeHtmlOutput($player->teamName);
         
         // Build demand display
         $demandDisplay = self::buildDemandDisplay($demands);
@@ -165,7 +166,7 @@ class NegotiationViewHelper implements NegotiationViewHelperInterface
      */
     public static function renderError(string $error): string
     {
-        return "<p>" . DatabaseService::safeHtmlOutput($error) . "</p>";
+        return "<p>" . HtmlSanitizer::safeHtmlOutput($error) . "</p>";
     }
 
     /**
@@ -173,8 +174,8 @@ class NegotiationViewHelper implements NegotiationViewHelperInterface
      */
     public static function renderHeader(Player $player): string
     {
-        $playerPos = DatabaseService::safeHtmlOutput($player->position);
-        $playerName = DatabaseService::safeHtmlOutput($player->name);
+        $playerPos = HtmlSanitizer::safeHtmlOutput($player->position);
+        $playerName = HtmlSanitizer::safeHtmlOutput($player->name);
         
         return "<b>$playerPos $playerName</b> - Contract Demands:<br>";
     }

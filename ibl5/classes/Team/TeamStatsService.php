@@ -12,12 +12,10 @@ use Team\Contracts\TeamStatsServiceInterface;
  */
 class TeamStatsService implements TeamStatsServiceInterface
 {
-    private $db;
     private $startersComponent;
 
-    public function __construct($db)
+    public function __construct()
     {
-        $this->db = $db;
         $this->startersComponent = new StartersLineupComponent();
     }
 
@@ -26,7 +24,26 @@ class TeamStatsService implements TeamStatsServiceInterface
      */
     public function extractStartersData($result): array
     {
-        $num = $this->db->sql_numrows($result);
+        // Handle different types of input
+        if (is_array($result)) {
+            $players = $result;
+        } elseif (method_exists($result, 'fetchAssoc')) {
+            // MockDatabaseResult in tests
+            $players = [];
+            while ($row = $result->fetchAssoc()) {
+                $players[] = $row;
+            }
+        } elseif ($result instanceof \mysqli_result) {
+            // Real mysqli result
+            $players = [];
+            while ($row = $result->fetch_assoc()) {
+                $players[] = $row;
+            }
+        } else {
+            // Fallback to array
+            $players = [];
+        }
+        
         $starters = [
             'PG' => ['name' => null, 'pid' => null],
             'SG' => ['name' => null, 'pid' => null],
@@ -37,12 +54,12 @@ class TeamStatsService implements TeamStatsServiceInterface
         
         $positions = ['PG', 'SG', 'SF', 'PF', 'C'];
         
-        for ($i = 0; $i < $num; $i++) {
+        foreach ($players as $player) {
             foreach ($positions as $position) {
                 $depthField = $position . 'Depth';
-                if ($this->db->sql_result($result, $i, $depthField) == 1) {
-                    $starters[$position]['name'] = $this->db->sql_result($result, $i, "name");
-                    $starters[$position]['pid'] = $this->db->sql_result($result, $i, "pid");
+                if (isset($player[$depthField]) && $player[$depthField] == 1) {
+                    $starters[$position]['name'] = $player['name'] ?? null;
+                    $starters[$position]['pid'] = $player['pid'] ?? null;
                 }
             }
         }

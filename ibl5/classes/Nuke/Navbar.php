@@ -17,7 +17,7 @@ class Navbar
 
     public static function nav($main_up = 0)
     {
-        global $module_name, $articlecomm, $db, $prefix;
+        global $articlecomm, $db, $prefix;
         get_lang("Your_Account");
         $row = $db->sql_fetchrow($db->sql_query("SELECT overwrite_theme from " . $prefix . "_config"));
         $overwrite_theme = intval($row['overwrite_theme']);

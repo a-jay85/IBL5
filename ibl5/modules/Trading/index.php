@@ -11,12 +11,12 @@ $pagetitle = "- Team Pages";
 
 function menu()
 {
-    global $db;
+    global $mysqli_db;
 
     Nuke\Header::header();
     OpenTable();
 
-    UI::displaytopmenu($db, 0);
+    UI::displaytopmenu($mysqli_db, 0);
 
     CloseTable();
     Nuke\Footer::footer();
@@ -24,23 +24,23 @@ function menu()
 
 function buildTeamFutureSalary($resultTeamPlayers, $k)
 {
-    global $db;
-    $uiHelper = new Trading\UIHelper($db);
+    global $mysqli_db;
+    $uiHelper = new Trading\UIHelper($mysqli_db);
     return $uiHelper->buildTeamFutureSalary($resultTeamPlayers, $k);
 }
 
 function buildTeamFuturePicks($resultTeamPicks, $future_salary_array)
 {
-    global $db;
-    $uiHelper = new Trading\UIHelper($db);
+    global $mysqli_db;
+    $uiHelper = new Trading\UIHelper($mysqli_db);
     return $uiHelper->buildTeamFuturePicks($resultTeamPicks, $future_salary_array);
 }
 
 function tradeoffer($username)
 {
-    global $db, $partner;
-    $commonRepository = new \Services\CommonRepository($db);
-    $season = new Season($db);
+    global $partner, $mysqli_db;
+    $commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
+    $season = new Season($mysqli_db);
 
     $teamlogo = $commonRepository->getTeamnameFromUsername($username);
     $teamID = $commonRepository->getTidFromTeamname($teamlogo);
@@ -48,20 +48,20 @@ function tradeoffer($username)
 
     Nuke\Header::header();
     OpenTable();
-    UI::displaytopmenu($db, $teamID);
+    UI::displaytopmenu($mysqli_db, $teamID);
 
     $queryUserTeamPlayers = "SELECT pos, name, pid, ordinal, cy, cy1, cy2, cy3, cy4, cy5, cy6
 		FROM ibl_plr
 		WHERE tid = $teamID
 		AND retired = '0'
 		ORDER BY ordinal ASC ";
-    $resultUserTeamPlayers = $db->sql_query($queryUserTeamPlayers);
+    $resultUserTeamPlayers = $mysqli_db->query($queryUserTeamPlayers);
 
     $queryUserTeamDraftPicks = "SELECT *
 		FROM ibl_draft_picks
 		WHERE ownerofpick = '$teamlogo'
 		ORDER BY year, round ASC ";
-    $resultUserTeamDraftPicks = $db->sql_query($queryUserTeamDraftPicks);
+    $resultUserTeamDraftPicks = $mysqli_db->query($queryUserTeamDraftPicks);
 
     echo "<form name=\"Trade_Offer\" method=\"post\" action=\"/ibl5/modules/Trading/maketradeoffer.php\">
 		<input type=\"hidden\" name=\"offeringTeam\" value=\"$teamlogo\">
@@ -113,13 +113,13 @@ function tradeoffer($username)
 		WHERE tid = $partnerTeamID
 		AND retired = '0'
 		ORDER BY ordinal ASC ";
-    $resultPartnerTeamPlayers = $db->sql_query($queryPartnerTeamPlayers);
+    $resultPartnerTeamPlayers = $mysqli_db->query($queryPartnerTeamPlayers);
 
     $queryPartnerTeamDraftPicks = "SELECT *
 		FROM ibl_draft_picks
 		WHERE ownerofpick = '$partner'
 		ORDER BY year, round ASC ";
-    $resultPartnerTeamDraftPicks = $db->sql_query($queryPartnerTeamDraftPicks);
+    $resultPartnerTeamDraftPicks = $mysqli_db->query($queryPartnerTeamDraftPicks);
 
     $future_salary_arrayb = buildTeamFutureSalary($resultPartnerTeamPlayers, $k);
     $future_salary_arrayb = buildTeamFuturePicks($resultPartnerTeamDraftPicks, $future_salary_arrayb);
@@ -133,7 +133,7 @@ function tradeoffer($username)
 				<tr>
 					<td valign=top><center><b><u>Make Trade Offer To...</u></b></center>";
 
-    $uiHelper = new Trading\UIHelper($db);
+    $uiHelper = new Trading\UIHelper($mysqli_db);
     $teams = $uiHelper->getAllTeamsForTrading();
     echo $uiHelper->renderTeamSelectionLinks($teams);
 
@@ -200,20 +200,20 @@ function tradeoffer($username)
 
 function tradereview($username)
 {
-    global $db;
-    $commonRepository = new \Services\CommonRepository($db);
+    global $mysqli_db;
+    $commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
 
     $teamlogo = $commonRepository->getTeamnameFromUsername($username);
     $teamID = $commonRepository->getTidFromTeamname($teamlogo);
 
     Nuke\Header::header();
     OpenTable();
-    UI::displaytopmenu($db, $teamID);
+    UI::displaytopmenu($mysqli_db, $teamID);
 
     echo "<center><img src=\"images/logo/$teamID.jpg\"><br>";
 
     $sql3 = "SELECT * FROM ibl_trade_info ORDER BY tradeofferid ASC";
-    $result3 = $db->sql_query($sql3);
+    $result3 = $mysqli_db->query($sql3);
 
     $tradeworkingonnow = 0;
 
@@ -222,7 +222,7 @@ function tradereview($username)
 			<tr>
 				<td valign=top>REVIEW TRADE OFFERS";
 
-    while ($row3 = $db->sql_fetchrow($result3)) {
+    while ($row3 = $result3->fetch_assoc()) {
         $isinvolvedintrade = 0;
         $hashammer = 0;
         $offerid = $row3['tradeofferid'];
@@ -283,7 +283,9 @@ function tradereview($username)
 
             if ($itemtype == 'cash') {
                 $queryCashDetails = "SELECT * FROM ibl_trade_cash WHERE tradeOfferID = $offerid AND sendingTeam = '$from';";
-                $cashDetails = $db->sql_fetchrow($db->sql_query($queryCashDetails));
+                $stmt = $mysqli_db->prepare($queryCashDetails);
+                $stmt->execute();
+                $cashDetails = $stmt->get_result()->fetch_assoc();
 
                 $cashYear[1] = $cashDetails['cy1'];
                 $cashYear[2] = $cashDetails['cy2'];
@@ -297,8 +299,8 @@ function tradereview($username)
                 in cash to the $to.<br>";
             } elseif ($itemtype == 0) {
                 $sqlgetpick = "SELECT * FROM ibl_draft_picks WHERE pickid = '$itemid'";
-                $resultgetpick = $db->sql_query($sqlgetpick);
-                $rowsgetpick = $db->sql_fetchrow($resultgetpick);
+                $resultgetpick = $mysqli_db->query($sqlgetpick);
+                $rowsgetpick = $resultgetpick->fetch_assoc();
 
                 $pickteam = $rowsgetpick['teampick'];
                 $pickyear = $rowsgetpick['year'];
@@ -311,8 +313,8 @@ function tradereview($username)
                 }
             } elseif ($itemtype == 1) {
                 $sqlgetplyr = "SELECT * FROM ibl_plr WHERE pid = '$itemid'";
-                $resultgetplyr = $db->sql_query($sqlgetplyr);
-                $rowsgetplyr = $db->sql_fetchrow($resultgetplyr);
+                $resultgetplyr = $mysqli_db->query($sqlgetplyr);
+                $rowsgetplyr = $resultgetplyr->fetch_assoc();
 
                 $plyrname = $rowsgetplyr['name'];
                 $plyrpos = $rowsgetplyr['pos'];
@@ -327,7 +329,7 @@ function tradereview($username)
     echo "</td>
 		<td valign=top><center><b><u>Make Trade Offer To...</u></b></center>";
 
-    $uiHelper = new Trading\UIHelper($db);
+    $uiHelper = new Trading\UIHelper($mysqli_db);
     $teams = $uiHelper->getAllTeamsForTrading();
     echo $uiHelper->renderTeamSelectionLinks($teams);
 
@@ -347,8 +349,8 @@ function tradereview($username)
 
 function reviewtrade($user)
 {
-    global $db, $stop;
-    $season = new Season($db);
+    global $stop, $mysqli_db;
+    $season = new Season($mysqli_db);
 
     if (!is_user($user)) {
         Nuke\Header::header();
@@ -363,7 +365,7 @@ function reviewtrade($user)
         }
         if (!is_user($user)) {
             OpenTable();
-            UI::displaytopmenu($db, 0);
+            UI::displaytopmenu($mysqli_db, 0);
             loginbox();
             CloseTable();
         }
@@ -376,7 +378,7 @@ function reviewtrade($user)
         } else {
             Nuke\Header::header();
             OpenTable();
-            UI::displaytopmenu($db, 0);
+            UI::displaytopmenu($mysqli_db, 0);
             echo "Sorry, but trades are not allowed right now.";
             if ($season->allowWaivers == 'Yes') {
                 echo "<br>
@@ -392,7 +394,7 @@ function reviewtrade($user)
 
 function offertrade($user)
 {
-    global $db, $stop;
+    global $mysqli_db, $stop;
 
     if (!is_user($user)) {
         Nuke\Header::header();
@@ -407,7 +409,7 @@ function offertrade($user)
         }
         if (!is_user($user)) {
             OpenTable();
-            UI::displaytopmenu($db, 0); // Default to Free Agents for login screen
+            UI::displaytopmenu($mysqli_db, 0); // Default to Free Agents for login screen
             loginbox();
             CloseTable();
         }

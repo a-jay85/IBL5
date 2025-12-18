@@ -70,7 +70,7 @@ interface NegotiationViewHelperInterface
      *
      * **Behaviors:**
      * - Wraps message in <p> tags
-     * - Escapes message using DatabaseService::safeHtmlOutput()
+     * - Escapes message using HtmlSanitizer::safeHtmlOutput()
      */
     public static function renderError(string $error): string;
 

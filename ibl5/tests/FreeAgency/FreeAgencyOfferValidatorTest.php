@@ -21,7 +21,7 @@ class FreeAgencyOfferValidatorTest extends TestCase
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
-        $this->validator = new FreeAgencyOfferValidator($this->mockDb);
+        $this->validator = new FreeAgencyOfferValidator($this->mockDb, null);
     }
 
     protected function tearDown(): void
@@ -236,7 +236,7 @@ class FreeAgencyOfferValidatorTest extends TestCase
             'hasMLE' => "0", // Team has already used MLE
             'hasLLE' => "1"
         ];
-        $validator = new FreeAgencyOfferValidator($this->mockDb, null, $mockTeam);
+        $validator = new FreeAgencyOfferValidator($this->mockDb, $mockTeam);
         $offerData = $this->createValidOffer();
         $offerData['offerType'] = \FreeAgency\OfferType::MLE_1_YEAR; // MLE offer
 
@@ -260,7 +260,7 @@ class FreeAgencyOfferValidatorTest extends TestCase
             'hasMLE' => "1",
             'hasLLE' => "0" // Team has already used LLE
         ];
-        $validator = new FreeAgencyOfferValidator($this->mockDb, null, $mockTeam);
+        $validator = new FreeAgencyOfferValidator($this->mockDb, $mockTeam);
         $offerData = $this->createValidOffer();
         $offerData['offerType'] = \FreeAgency\OfferType::LOWER_LEVEL_EXCEPTION; // LLE offer
 
@@ -284,7 +284,7 @@ class FreeAgencyOfferValidatorTest extends TestCase
             'hasMLE' => "1", // Team has MLE available
             'hasLLE' => "1"
         ];
-        $validator = new FreeAgencyOfferValidator($this->mockDb, null, $mockTeam);
+        $validator = new FreeAgencyOfferValidator($this->mockDb, $mockTeam);
         $offerData = $this->createValidOffer();
         $offerData['offerType'] = \FreeAgency\OfferType::MLE_1_YEAR; // MLE offer
 
@@ -306,7 +306,7 @@ class FreeAgencyOfferValidatorTest extends TestCase
             'hasMLE' => "1",
             'hasLLE' => "1" // Team has LLE available
         ];
-        $validator = new FreeAgencyOfferValidator($this->mockDb, null, $mockTeam);
+        $validator = new FreeAgencyOfferValidator($this->mockDb, $mockTeam);
         $offerData = $this->createValidOffer();
         $offerData['offerType'] = \FreeAgency\OfferType::LOWER_LEVEL_EXCEPTION; // LLE offer
 
@@ -324,7 +324,7 @@ class FreeAgencyOfferValidatorTest extends TestCase
     public function testSkipsMLECheckWhenNoTeamProvided(): void
     {
         // Arrange
-        $validator = new FreeAgencyOfferValidator($this->mockDb, null, null); // No team
+        $validator = new FreeAgencyOfferValidator($this->mockDb, null); // No team
         $offerData = $this->createValidOffer();
         $offerData['offerType'] = \FreeAgency\OfferType::MLE_1_YEAR; // MLE offer
 
@@ -346,7 +346,7 @@ class FreeAgencyOfferValidatorTest extends TestCase
             'hasMLE' => "0", // Team out of MLE
             'hasLLE' => "1"
         ];
-        $validator = new FreeAgencyOfferValidator($this->mockDb, null, $mockTeam);
+        $validator = new FreeAgencyOfferValidator($this->mockDb, $mockTeam);
         $offerData = $this->createValidOffer();
         $offerData['offerType'] = 0; // Custom offer, not MLE
 

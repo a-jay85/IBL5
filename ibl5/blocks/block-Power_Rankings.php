@@ -16,26 +16,25 @@ if (!defined('BLOCK_FILE')) {
     die();
 }
 
-global $db;
+global $mysqli_db;
 
 $query = "SELECT TeamID, Team, ranking, win, loss, color1, color2
     FROM ibl_power
     INNER JOIN ibl_team_info info USING (teamid)
     ORDER BY ranking DESC;";
-$result = $db->sql_query($query);
-$num = $db->sql_numrows($result);
+$result = $mysqli_db->query($query);
 
 $content .= "<table width=150>";
 
 $i = 0;
-while ($i < $num) {
-    $tid = $db->sql_result($result, $i, "TeamID");
-    $Team = $db->sql_result($result, $i, "Team");
-    $ranking = $db->sql_result($result, $i, "ranking");
-    $wins = $db->sql_result($result, $i, "win");
-    $losses = $db->sql_result($result, $i, "loss");
-    $teamcolor1 = $db->sql_result($result, $i, "color1");
-    $teamcolor2 = $db->sql_result($result, $i, "color2");
+while ($row = $result->fetch_assoc()) {
+    $tid = $row['TeamID'];
+    $Team = $row['Team'];
+    $ranking = $row['ranking'];
+    $wins = $row['win'];
+    $losses = $row['loss'];
+    $teamcolor1 = $row['color1'];
+    $teamcolor2 = $row['color2'];
 
     $bgcolor = "$teamcolor1";
 

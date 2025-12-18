@@ -16,9 +16,12 @@ namespace Services;
  */
 class NewsService
 {
-    private $db;
+    private object $db;
     
-    public function __construct($db)
+    /**
+     * @param object $db mysqli connection or duck-typed mock for testing
+     */
+    public function __construct(object $db)
     {
         $this->db = $db;
     }
@@ -40,11 +43,6 @@ class NewsService
         string $hometext,
         string $aid = 'Associated Press'
     ): bool {
-        $categoryID = (int) $categoryID;
-        $topicID = (int) $topicID;
-        $titleEscaped = DatabaseService::escapeString($this->db, $title);
-        $hometextEscaped = DatabaseService::escapeString($this->db, $hometext);
-        $aidEscaped = DatabaseService::escapeString($this->db, $aid);
         $timestamp = date('Y-m-d H:i:s', time());
         
         $query = "INSERT INTO nuke_stories
@@ -57,18 +55,19 @@ class NewsService
                    informant,
                    counter,
                    alanguage)
-                  VALUES
-                  ($categoryID,
-                   '$aidEscaped',
-                   '$titleEscaped',
-                   '$timestamp',
-                   '$hometextEscaped',
-                   $topicID,
-                   '$aidEscaped',
-                   0,
-                   'english')";
+                  VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'english')";
         
-        return $this->db->sql_query($query) !== false;
+        $stmt = $this->db->prepare($query);
+        if ($stmt === false) {
+            error_log("NewsService: Failed to prepare createNewsStory: " . $this->db->error);
+            return false;
+        }
+        
+        $stmt->bind_param('issssss', $categoryID, $aid, $title, $timestamp, $hometext, $topicID, $aid);
+        $result = $stmt->execute();
+        $stmt->close();
+        
+        return $result;
     }
     
     /**
@@ -79,15 +78,30 @@ class NewsService
      */
     public function getTopicIDByTeamName(string $teamName): ?int
     {
-        $teamNameEscaped = DatabaseService::escapeString($this->db, $teamName);
-        $query = "SELECT topicid FROM nuke_topics WHERE topicname = '$teamNameEscaped'";
-        $result = $this->db->sql_query($query);
-        
-        if (!$result || $this->db->sql_numrows($result) === 0) {
+        $query = "SELECT topicid FROM nuke_topics WHERE topicname = ?";
+        $stmt = $this->db->prepare($query);
+        if ($stmt === false) {
+            error_log("NewsService: Failed to prepare getTopicIDByTeamName: " . $this->db->error);
             return null;
         }
         
-        return (int) $this->db->sql_result($result, 0, 'topicid');
+        $stmt->bind_param('s', $teamName);
+        if (!$stmt->execute()) {
+            error_log("NewsService: Failed to execute getTopicIDByTeamName: " . $stmt->error);
+            $stmt->close();
+            return null;
+        }
+        
+        $result = $stmt->get_result();
+        if ($result === false || $result->num_rows === 0) {
+            $stmt->close();
+            return null;
+        }
+        
+        $row = $result->fetch_assoc();
+        $stmt->close();
+        
+        return isset($row['topicid']) ? (int) $row['topicid'] : null;
     }
     
     /**
@@ -98,15 +112,30 @@ class NewsService
      */
     public function getCategoryIDByTitle(string $categoryTitle): ?int
     {
-        $categoryTitleEscaped = DatabaseService::escapeString($this->db, $categoryTitle);
-        $query = "SELECT catid FROM nuke_stories_cat WHERE title = '$categoryTitleEscaped'";
-        $result = $this->db->sql_query($query);
-        
-        if (!$result || $this->db->sql_numrows($result) === 0) {
+        $query = "SELECT catid FROM nuke_stories_cat WHERE title = ?";
+        $stmt = $this->db->prepare($query);
+        if ($stmt === false) {
+            error_log("NewsService: Failed to prepare getCategoryIDByTitle: " . $this->db->error);
             return null;
         }
         
-        return (int) $this->db->sql_result($result, 0, 'catid');
+        $stmt->bind_param('s', $categoryTitle);
+        if (!$stmt->execute()) {
+            error_log("NewsService: Failed to execute getCategoryIDByTitle: " . $stmt->error);
+            $stmt->close();
+            return null;
+        }
+        
+        $result = $stmt->get_result();
+        if ($result === false || $result->num_rows === 0) {
+            $stmt->close();
+            return null;
+        }
+        
+        $row = $result->fetch_assoc();
+        $stmt->close();
+        
+        return isset($row['catid']) ? (int) $row['catid'] : null;
     }
     
     /**
@@ -117,11 +146,20 @@ class NewsService
      */
     public function incrementCategoryCounter(string $categoryTitle): bool
     {
-        $categoryTitleEscaped = DatabaseService::escapeString($this->db, $categoryTitle);
         $query = "UPDATE nuke_stories_cat 
                   SET counter = counter + 1 
-                  WHERE title = '$categoryTitleEscaped'";
+                  WHERE title = ?";
         
-        return $this->db->sql_query($query) !== false;
+        $stmt = $this->db->prepare($query);
+        if ($stmt === false) {
+            error_log("NewsService: Failed to prepare incrementCategoryCounter: " . $this->db->error);
+            return false;
+        }
+        
+        $stmt->bind_param('s', $categoryTitle);
+        $result = $stmt->execute();
+        $stmt->close();
+        
+        return $result;
     }
 }

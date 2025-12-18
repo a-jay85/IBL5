@@ -7,14 +7,16 @@ if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
-function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
+function userinfo($username, $bypass = 0)
 {
-    global $user, $prefix, $user_prefix, $db;
-    $commonRepository = new \Services\CommonRepository($db);
+    global $user, $user_prefix, $mysqli_db;
+    $commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
 
-    $sql2 = "SELECT * FROM " . $user_prefix . "_users WHERE username = '$username'";
-    $result2 = $db->sql_query($sql2);
-    $userinfo = $db->sql_fetchrow($result2);
+    $stmt = $mysqli_db->prepare("SELECT * FROM " . $user_prefix . "_users WHERE username = ?");
+    $stmt->bind_param('s', $username);
+    $stmt->execute();
+    $result2 = $stmt->get_result();
+    $userinfo = $result2->fetch_assoc();
     if (!$bypass) {
         cookiedecode($user);
     }
@@ -24,7 +26,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
 
     Nuke\Header::header();
     OpenTable();
-    UI::displaytopmenu($db, $tid);
+    UI::displaytopmenu($mysqli_db, $tid);
 
     displaySeriesRecords($tid);
 
@@ -56,19 +58,19 @@ function main($user)
 
 function queryTeamInfo()
 {
-    global $db;
+    global $mysqli_db;
 
     $query = "SELECT teamid, team_city, team_name, color1, color2
 		FROM ibl_team_info
 		WHERE teamid != 99 AND teamid != " . League::FREE_AGENTS_TEAMID . "
 		ORDER BY teamid ASC;";
-    $result = $db->sql_query($query);
+    $result = $mysqli_db->query($query);
     return $result;
 }
 
 function querySeriesRecords()
 {
-    global $db;
+    global $mysqli_db;
 
     $query = "SELECT self, opponent, SUM(wins) AS wins, SUM(losses) AS losses
 				FROM (
@@ -98,16 +100,19 @@ function querySeriesRecords()
 					WHERE VScore < HScore
 					GROUP BY self, opponent
 				) t
-				GROUP BY self, opponent;";
-    $result = $db->sql_query($query);
+				GROUP BY self, opponent
+                ORDER BY self, opponent;";
+    $result = $mysqli_db->query($query);
     return $result;
 }
 
 function displaySeriesRecords($tid)
 {
-    global $db;
+    global $mysqli_db;
 
-    $numteams = $db->sql_result($db->sql_query("SELECT MAX(Visitor) FROM ibl_schedule;"), 0);
+    $result = $mysqli_db->query("SELECT MAX(Visitor) as max_visitor FROM ibl_schedule");
+    $row = $result->fetch_assoc();
+    $numteams = $row['max_visitor'];
 
     echo "<table border=1 class=\"sortable\">
 		<tr>
@@ -129,7 +134,7 @@ function displaySeriesRecords($tid)
     $pointer = 0;
     $tidRow = 1;
     while ($tidRow <= $numteams) {
-        $team = $db->sql_fetch_assoc($resultTeamInfo);
+        $team = $resultTeamInfo->fetch_assoc();
         echo "<tr>
 			<td bgcolor=$team[color1]>
 				<a href=\"modules.php?name=Team&op=team&teamID=$team[teamid]\">
@@ -143,7 +148,7 @@ function displaySeriesRecords($tid)
             if ($tidRow == $tidColumn) {
                 echo "<td align=\"center\">", ($tid == $tidRow ? "<b>" : ""), "x", ($tid == $tidRow ? "</b>" : ""), "</td>";
             } else {
-                $row = $db->sql_fetch_assoc($resultSeriesRecords);
+                $row = $resultSeriesRecords->fetch_assoc();
                 if ($row['self'] == $tidRow and $row['opponent'] == $tidColumn) {
                     if ($row['wins'] > $row['losses']) {
                         $bgcolor = "#8f8";
@@ -160,7 +165,7 @@ function displaySeriesRecords($tid)
                     $pointer++;
                 } else {
                     echo "<td align=\"center\">0 - 0</td>";
-                    mysqli_data_seek($resultSeriesRecords, $pointer); // Bring the pointer back since no record was found
+                    $resultSeriesRecords->data_seek($pointer); // Bring the pointer back since no record was found
                 }
             }
             $tidColumn++;

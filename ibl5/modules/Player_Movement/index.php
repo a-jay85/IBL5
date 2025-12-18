@@ -1,12 +1,22 @@
 <?php
 
-$season = new Season($db);
+global $mysqli_db;
+$season = new Season($mysqli_db);
 
 $previousSeasonEndingYear = $season->endingYear - 1;
 
-$query = "SELECT a.name, a.teamid, a.team, b.tid, b.teamname FROM ibl_hist a, ibl_plr b WHERE a.pid = b.pid AND a.year = $previousSeasonEndingYear AND a.teamid != b.tid ORDER BY b.teamname";
-$result = $db->sql_query($query);
-$num = $db->sql_numrows($result);
+$stmt = $mysqli_db->prepare("SELECT a.name, a.teamid, a.team, b.tid, b.teamname
+	FROM ibl_hist a, ibl_plr b
+	WHERE a.pid = b.pid
+	AND a.year = ?
+	AND a.teamid != b.tid
+	ORDER BY b.teamname");
+if (!$stmt) {
+    throw new RuntimeException("Prepare failed: " . $mysqli_db->error);
+}
+$stmt->bind_param("i", $previousSeasonEndingYear);
+$stmt->execute();
+$result = $stmt->get_result();
 
 echo "<script src=\"http://www.iblhoops.net/jslib/sorttable.js\"></script>
 <center>
@@ -19,17 +29,17 @@ echo "<script src=\"http://www.iblhoops.net/jslib/sorttable.js\"></script>
 		<th><b>Old Team</b></th>
 	</tr>";
 
-$i = 0;
-while ($i < $num) {
-    $playername = $db->sql_result($result, $i, "name");
-    $oldteam = $db->sql_result($result, $i, "team");
-    $newteam = $db->sql_result($result, $i, "teamname");
+while ($row = $result->fetch_assoc()) {
+    $playername = htmlspecialchars($row['name'], ENT_QUOTES, 'UTF-8');
+    $oldteam = htmlspecialchars($row['team'], ENT_QUOTES, 'UTF-8');
+    $newteam = htmlspecialchars($row['teamname'], ENT_QUOTES, 'UTF-8');
     echo "<tr>
 		<td>$playername</td>
 		<td>$newteam</td>
 		<td>$oldteam</td>
 	</tr>";
-    $i++;
 }
+
+$stmt->close();
 
 echo "</table></center>";

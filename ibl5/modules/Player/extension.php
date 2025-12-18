@@ -2,6 +2,8 @@
 
 require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
+global $mysqli_db;
+
 echo "<HTML><HEAD><TITLE>Contract Extension Offer Result</TITLE></HEAD><BODY>";
 
 // Collect input data
@@ -36,7 +38,7 @@ $extensionData = [
 ];
 
 // Process extension using new architecture
-$processor = new \Extension\ExtensionProcessor($db);
+$processor = new \Extension\ExtensionProcessor($mysqli_db);
 $result = $processor->processExtension($extensionData);
 
 // Display results

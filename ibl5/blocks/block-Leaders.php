@@ -7,7 +7,7 @@ if (!defined('BLOCK_FILE')) {
 
 use Player\PlayerImageHelper;
 
-global $db;
+global $mysqli_db;
 
 $queryTopFiveInSeasonStatAverages = "SELECT *
     FROM (
@@ -76,7 +76,7 @@ $queryTopFiveInSeasonStatAverages = "SELECT *
     ) t
     WHERE rn <= 5
     ORDER BY FIELD(stat_type, 'Points', 'Rebounds', 'Assists', 'Steals', 'Blocks'), rn;";
-$resultTopFiveInSeasonStatAverages = $db->sql_query($queryTopFiveInSeasonStatAverages);
+$resultTopFiveInSeasonStatAverages = $mysqli_db->query($queryTopFiveInSeasonStatAverages);
 
 $rows = $resultTopFiveInSeasonStatAverages->fetch_all(MYSQLI_ASSOC);
 $rowNumber = 0;

@@ -11,7 +11,6 @@ use Draft\Contracts\DraftSelectionHandlerInterface;
  */
 class DraftSelectionHandler implements DraftSelectionHandlerInterface
 {
-    private $db;
     private $validator;
     private $repository;
     private $commonRepository;
@@ -20,15 +19,15 @@ class DraftSelectionHandler implements DraftSelectionHandlerInterface
     private $sharedFunctions;
     private $season;
 
-    public function __construct($db, $sharedFunctions, $season)
+    public function __construct(object $db, $sharedFunctions, $season)
     {
-        $this->db = $db;
+        global $mysqli_db;
         $this->sharedFunctions = $sharedFunctions;
         $this->season = $season;
         
         $this->validator = new DraftValidator();
         $this->repository = new DraftRepository($db);
-        $this->commonRepository = new \Services\CommonRepository($db);
+        $this->commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
         $this->processor = new DraftProcessor();
         $this->view = new DraftView();
     }

@@ -14,15 +14,17 @@ oneonone();
 
 function oneonone()
 {
-    global $prefix, $db, $user, $cookie;
+    global $prefix, $mysqli_db, $user, $cookie;
     Nuke\Header::header();
 
     cookiedecode($user);
 
-    $sql2 = "SELECT * FROM " . $prefix . "_users WHERE username='$cookie[1]'";
-    $result2 = $db->sql_query($sql2);
-    $num2 = $db->sql_numrows($result2);
-    $userinfo = $db->sql_fetchrow($result2);
+    $stmt = $mysqli_db->prepare("SELECT * FROM " . $prefix . "_users WHERE username = ?");
+    $stmt->bind_param('s', $cookie[1]);
+    $stmt->execute();
+    $result2 = $stmt->get_result();
+    $num2 = $result2->num_rows;
+    $userinfo = $result2->fetch_assoc();
 
     $ownerplaying = stripslashes(check_html($userinfo['username'], "nohtml"));
 
@@ -41,13 +43,14 @@ function oneonone()
     Player One: <select name=\"pid1\">";
 
     $query = "SELECT * FROM ibl_plr WHERE retired = '0' ORDER BY name ASC";
-    $result = $db->sql_query($query);
-    $num = $db->sql_numrows($result);
+    $result = $mysqli_db->query($query);
+    $num = $result->num_rows;
 
     $i = 0;
     while ($i < $num) {
-        $playername = $db->sql_result($result, $i, "name");
-        $pida = $db->sql_result($result, $i, "pid");
+        $row = $result->fetch_assoc();
+        $playername = $row['name'];
+        $pida = $row['pid'];
         if ($pida == $player1) {
             echo "<option value=\"$pida\" SELECTED>$playername</option>";
         } else {
@@ -58,9 +61,11 @@ function oneonone()
 
     echo "</select> | Player Two: <select name=\"pid2\">";
     $i = 0;
+    $result->data_seek(0);  // Reset pointer
     while ($i < $num) {
-        $playername = $db->sql_result($result, $i, "name");
-        $pida = $db->sql_result($result, $i, "pid");
+        $row = $result->fetch_assoc();
+        $playername = $row["name"];
+        $pida = $row["pid"];
         if ($pida == $player2) {
             echo "<option value=\"$pida\" SELECTED>$playername</option>";
         } else {
@@ -517,52 +522,58 @@ function stealtext()
 
 function rungame($p1, $p2, $owner)
 {
-    global $db;
+    global $mysqli_db;
 
-    $query1 = "SELECT * FROM ibl_plr WHERE pid = $p1";
-    $result1 = $db->sql_query($query1);
+    $stmt1 = $mysqli_db->prepare("SELECT * FROM ibl_plr WHERE pid = ?");
+    $stmt1->bind_param('i', $p1);
+    $stmt1->execute();
+    $result1 = $stmt1->get_result();
+    $row1 = $result1->fetch_assoc();
 
-    $p1_name = $db->sql_result($result1, 0, "name");
-    $p1_oo = $db->sql_result($result1, 0, "oo");
-    $p1_do = $db->sql_result($result1, 0, "do");
-    $p1_po = $db->sql_result($result1, 0, "po");
-    $p1_od = $db->sql_result($result1, 0, "od");
-    $p1_dd = $db->sql_result($result1, 0, "dd");
-    $p1_pd = $db->sql_result($result1, 0, "pd");
+    $p1_name = $row1['name'];
+    $p1_oo = $row1['oo'];
+    $p1_do = $row1['do'];
+    $p1_po = $row1['po'];
+    $p1_od = $row1['od'];
+    $p1_dd = $row1['dd'];
+    $p1_pd = $row1['pd'];
 
-    $p1_2ga = $db->sql_result($result1, 0, "r_fga");
-    $p1_2gp = $db->sql_result($result1, 0, "r_fgp");
-    $p1_fta = $db->sql_result($result1, 0, "r_fta");
-    $p1_3ga = $db->sql_result($result1, 0, "r_tga");
-    $p1_3gp = $db->sql_result($result1, 0, "r_tgp");
-    $p1_orb = $db->sql_result($result1, 0, "r_orb");
-    $p1_drb = $db->sql_result($result1, 0, "r_drb");
-    $p1_stl = $db->sql_result($result1, 0, "r_stl");
-    $p1_tvr = $db->sql_result($result1, 0, "r_to");
-    $p1_blk = $db->sql_result($result1, 0, "r_blk");
-    $p1_foul = $db->sql_result($result1, 0, "r_foul");
+    $p1_2ga = $row1['r_fga'];
+    $p1_2gp = $row1['r_fgp'];
+    $p1_fta = $row1['r_fta'];
+    $p1_3ga = $row1['r_tga'];
+    $p1_3gp = $row1['r_tgp'];
+    $p1_orb = $row1['r_orb'];
+    $p1_drb = $row1['r_drb'];
+    $p1_stl = $row1['r_stl'];
+    $p1_tvr = $row1['r_to'];
+    $p1_blk = $row1['r_blk'];
+    $p1_foul = $row1['r_foul'];
 
-    $query2 = "SELECT * FROM ibl_plr WHERE pid = $p2";
-    $result2 = $db->sql_query($query2);
+    $stmt2 = $mysqli_db->prepare("SELECT * FROM ibl_plr WHERE pid = ?");
+    $stmt2->bind_param('i', $p2);
+    $stmt2->execute();
+    $result2 = $stmt2->get_result();
+    $row2 = $result2->fetch_assoc();
 
-    $p2_name = $db->sql_result($result2, 0, "name");
-    $p2_oo = $db->sql_result($result2, 0, "oo");
-    $p2_do = $db->sql_result($result2, 0, "do");
-    $p2_po = $db->sql_result($result2, 0, "po");
-    $p2_od = $db->sql_result($result2, 0, "od");
-    $p2_dd = $db->sql_result($result2, 0, "dd");
-    $p2_pd = $db->sql_result($result2, 0, "pd");
-    $p2_2ga = $db->sql_result($result2, 0, "r_fga");
-    $p2_2gp = $db->sql_result($result2, 0, "r_fgp");
-    $p2_3ga = $db->sql_result($result2, 0, "r_tga");
-    $p2_3gp = $db->sql_result($result2, 0, "r_tgp");
-    $p2_fta = $db->sql_result($result2, 0, "r_fta");
-    $p2_orb = $db->sql_result($result2, 0, "r_orb");
-    $p2_drb = $db->sql_result($result2, 0, "r_drb");
-    $p2_stl = $db->sql_result($result2, 0, "r_stl");
-    $p2_tvr = $db->sql_result($result2, 0, "r_to");
-    $p2_blk = $db->sql_result($result2, 0, "r_blk");
-    $p2_foul = $db->sql_result($result2, 0, "r_foul");
+    $p2_name = $row2['name'];
+    $p2_oo = $row2['oo'];
+    $p2_do = $row2['do'];
+    $p2_po = $row2['po'];
+    $p2_od = $row2['od'];
+    $p2_dd = $row2['dd'];
+    $p2_pd = $row2['pd'];
+    $p2_2ga = $row2['r_fga'];
+    $p2_2gp = $row2['r_fgp'];
+    $p2_3ga = $row2['r_tga'];
+    $p2_3gp = $row2['r_tgp'];
+    $p2_fta = $row2['r_fta'];
+    $p2_orb = $row2['r_orb'];
+    $p2_drb = $row2['r_drb'];
+    $p2_stl = $row2['r_stl'];
+    $p2_tvr = $row2['r_to'];
+    $p2_blk = $row2['r_blk'];
+    $p2_foul = $row2['r_foul'];
 
     $p1_stats_fgm = 0;
     $p1_stats_fga = 0;
@@ -822,25 +833,31 @@ function rungame($p1, $p2, $owner)
     echo "$playbyplay";
 
     $queryGetHighestGameID = "SELECT gameid FROM ibl_one_on_one ORDER BY gameid DESC LIMIT 1;";
-    $resultGetHighestGameID = $db->sql_query($queryGetHighestGameID);
-    $newGameID = $db->sql_result($resultGetHighestGameID, 0, 'gameid') + 1;
+    $resultGetHighestGameID = $mysqli_db->query($queryGetHighestGameID);
+    $gidRow = $resultGetHighestGameID instanceof mysqli_result ? $resultGetHighestGameID->fetch_assoc() : null;
+    $newGameID = ($gidRow ? $gidRow['gameid'] : 0) + 1;
 
+    // Determine winner and loser
     if ($score1 > $score2) {
-        $winner = addslashes($p1_name);
-        $loser = addslashes($p2_name);
+        $winner = $p1_name;
+        $loser = $p2_name;
         $winscore = $score1;
         $lossscore = $score2;
     } else {
-        $winner = addslashes($p2_name);
-        $loser = addslashes($p1_name);
+        $winner = $p2_name;
+        $loser = $p1_name;
         $winscore = $score2;
         $lossscore = $score1;
     }
 
-    $playbyplay2 = addslashes($playbyplay);
-
-    $queryinsertgame = "INSERT INTO ibl_one_on_one (gameid, playbyplay, winner, loser, winscore, lossscore, owner) VALUES ('$newGameID', '$playbyplay2', '$winner', '$loser', '$winscore', '$lossscore', '$owner')";
-    $resultinsert = $db->sql_query($queryinsertgame);
+    // Use prepared statements for SQL injection protection
+    $stmt = $mysqli_db->prepare("INSERT INTO ibl_one_on_one (gameid, playbyplay, winner, loser, winscore, lossscore, owner) VALUES (?, ?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param('isssiss', $newGameID, $playbyplay, $winner, $loser, $winscore, $lossscore, $owner);
+    if (!$stmt->execute()) {
+        $errorMessage = "Failed to insert One-on-One game result: " . $stmt->error;
+        error_log("[One-on-One] Database insert error: {$errorMessage}");
+        throw new RuntimeException($errorMessage, 1002);
+    }
 
     echo "GAME ID: $newGameID";
 
@@ -868,17 +885,20 @@ function rungame($p1, $p2, $owner)
 
 function printgame($gameid)
 {
-    global $db;
+    global $mysqli_db;
 
-    $querygetgameid = "SELECT * FROM ibl_one_on_one WHERE gameid = '$gameid'";
-    $resultgetgameid = $db->sql_query($querygetgameid);
+    $stmt = $mysqli_db->prepare("SELECT * FROM ibl_one_on_one WHERE gameid = ?");
+    $stmt->bind_param('i', $gameid);
+    $stmt->execute();
+    $resultgetgameid = $stmt->get_result();
 
-    $gametext = stripslashes($db->sql_result($resultgetgameid, 0, "playbyplay"));
-    $gamewinner = stripslashes($db->sql_result($resultgetgameid, 0, "winner"));
-    $gameloser = stripslashes($db->sql_result($resultgetgameid, 0, "loser"));
-    $gamewinscore = stripslashes($db->sql_result($resultgetgameid, 0, "winscore"));
-    $gamelossscore = stripslashes($db->sql_result($resultgetgameid, 0, "lossscore"));
-    $owner = stripslashes($db->sql_result($resultgetgameid, 0, "owner"));
+    $row = $resultgetgameid->fetch_assoc();
+    $gametext = stripslashes($row['playbyplay']);
+    $gamewinner = stripslashes($row['winner']);
+    $gameloser = stripslashes($row['loser']);
+    $gamewinscore = stripslashes($row['winscore']);
+    $gamelossscore = stripslashes($row['lossscore']);
+    $owner = stripslashes($row['owner']);
 
     echo "<center><h2>Replay of Game Number $gameid<br>$gamewinner $gamewinscore, $gameloser $gamelossscore<br><small>(Game played by $owner)</small></h2></center> $gametext";
 }

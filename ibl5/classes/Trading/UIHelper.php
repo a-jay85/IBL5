@@ -16,13 +16,15 @@ use Trading\Contracts\UIHelperInterface;
  */
 class UIHelper implements UIHelperInterface
 {
-    protected $db;
+    protected object $db;
+    protected TradingRepository $repository;
     protected \Shared $sharedFunctions;
     protected \Season $season;
 
-    public function __construct($db)
+    public function __construct(object $db, ?TradingRepository $repository = null)
     {
         $this->db = $db;
+        $this->repository = $repository ?? new TradingRepository($db);
         $this->sharedFunctions = new \Shared($db);
         $this->season = new \Season($db);
     }
@@ -30,15 +32,15 @@ class UIHelper implements UIHelperInterface
     /**
      * @see UIHelperInterface::buildTeamFutureSalary()
      */
-    public function buildTeamFutureSalary($resultTeamPlayers, int $k): array
+    public function buildTeamFutureSalary(object $resultTeamPlayers, int $k): array
     {
         $futureSalaryArray = [
             'player' => [],
             'hold' => [],
             'picks' => []
         ];
-        
-        while ($rowTeamPlayers = $this->db->sql_fetch_assoc($resultTeamPlayers)) {
+
+        while ($rowTeamPlayers = $resultTeamPlayers->fetch_assoc()) {
             $playerPosition = $rowTeamPlayers["pos"];
             $playerName = $rowTeamPlayers["name"];
             $playerPid = $rowTeamPlayers["pid"];
@@ -84,11 +86,11 @@ class UIHelper implements UIHelperInterface
     /**
      * @see UIHelperInterface::buildTeamFuturePicks()
      */
-    public function buildTeamFuturePicks($resultTeamPicks, array $futureSalaryArray): array
+    public function buildTeamFuturePicks(object $resultTeamPicks, array $futureSalaryArray): array
     {
         $k = $futureSalaryArray['k'];
 
-        while ($rowTeamDraftPicks = $this->db->sql_fetch_assoc($resultTeamPicks)) {
+        while ($rowTeamDraftPicks = $resultTeamPicks->fetch_assoc()) {
             $pickYear = $rowTeamDraftPicks["year"];
             $pickTeam = $rowTeamDraftPicks["teampick"];
             $pickRound = $rowTeamDraftPicks["round"];
@@ -105,12 +107,16 @@ class UIHelper implements UIHelperInterface
 
     /**
      * Render a player row in the trade form
-     * @param int $k Row number
+     * 
+     * Generates HTML row for player with checkbox (if tradeable), position, name, and contract.
+     * Players with 0 contract or on waivers are shown but not checkable.
+     * 
+     * @param int $k Row number for form field naming
      * @param int $playerPid Player ID
      * @param int $playerContractAmount Player contract amount
      * @param string $playerPosition Player position
      * @param string $playerName Player name
-     * @param int $playerOrdinal Player ordinal (waiver status)
+     * @param int $playerOrdinal Player ordinal (waiver status indicator)
      * @return string HTML for player row
      */
     protected function renderPlayerRow(int $k, int $playerPid, int $playerContractAmount, string $playerPosition, string $playerName, int $playerOrdinal): string
@@ -139,13 +145,17 @@ class UIHelper implements UIHelperInterface
 
     /**
      * Render a draft pick row in the trade form
-     * @param int $k Row number
+     * 
+     * Generates HTML row for draft pick with checkbox, year, team, and round.
+     * Includes separate row for pick notes if present. All values are HTML-escaped.
+     * 
+     * @param int $k Row number for form field naming
      * @param int $pickId Pick ID
      * @param int $pickYear Pick year
      * @param string $pickTeam Original team
      * @param int $pickRound Pick round
-     * @param string|null $pickNotes Pick notes
-     * @return string HTML for draft pick row
+     * @param string|null $pickNotes Optional pick notes
+     * @return string HTML for draft pick row(s)
      */
     protected function renderDraftPickRow(int $k, int $pickId, int $pickYear, string $pickTeam, int $pickRound, ?string $pickNotes): string
     {
@@ -182,12 +192,13 @@ class UIHelper implements UIHelperInterface
     public function getAllTeamsForTrading(): array
     {
         $teams = [];
-        $queryListOfAllTeams = "SELECT team_name, team_city FROM ibl_team_info ORDER BY team_city ASC";
-        $resultListOfAllTeams = $this->db->sql_query($queryListOfAllTeams);
+        
+        // Fetch teams using repository
+        $allTeams = $this->repository->getAllTeamsWithCity();
 
-        while ($rowInListOfAllTeams = $this->db->sql_fetchrow($resultListOfAllTeams)) {
-            $teamName = $rowInListOfAllTeams['team_name'];
-            $teamCity = $rowInListOfAllTeams['team_city'];
+        foreach ($allTeams as $row) {
+            $teamName = $row['team_name'];
+            $teamCity = $row['team_city'];
 
             if ($teamName != 'Free Agents') {
                 $teams[] = [

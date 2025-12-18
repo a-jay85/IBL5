@@ -14,6 +14,7 @@ final class SeasonLeadersViewTest extends TestCase
     protected function setUp(): void
     {
         $this->service = new SeasonLeadersService();
+        
         $this->view = new SeasonLeadersView($this->service);
     }
 

@@ -1,10 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
-$season = new Season($db);
+$season = new Season($mysqli_db);
 
 $queryString = "";
 $successText = "";
+$querySuccessful = false;
 
 if (isset($_POST['query'])) {
     switch ($_POST['query']) {
@@ -18,23 +21,33 @@ if (isset($_POST['query'])) {
             break;
         case 'Insert new `ibl_heat_win_loss` database entries':
             $currentSeasonHEATYear = $season->beginningYear;
-            $queryHEATEntriesAlreadyExist = "SELECT currentname FROM ibl_heat_win_loss WHERE year = $currentSeasonHEATYear;";
-            $resultHEATEntriesAlreadyExist = $db->sql_query($queryHEATEntriesAlreadyExist);
+            // Check if entries already exist for this season
+            $stmtCheck = $mysqli_db->prepare("SELECT currentname FROM ibl_heat_win_loss WHERE year = ?");
+            $stmtCheck->bind_param("i", $currentSeasonHEATYear);
+            $stmtCheck->execute();
+            $resultCheck = $stmtCheck->get_result();
+            $stmtCheck->close();
 
-            if ($db->sql_numrows($resultHEATEntriesAlreadyExist) == 0) {
-                $queryTeamNames = "SELECT team_name FROM ibl_team_info WHERE teamid != " . League::FREE_AGENTS_TEAMID . " ORDER BY teamid ASC;";
-                $resultTeamNames = $db->sql_query($queryTeamNames);
-                $numTeamNames = $db->sql_numrows($resultTeamNames);
-    
+            if ($resultCheck->num_rows == 0) {
+                // Fetch all team names
+                $stmtTeams = $mysqli_db->prepare("SELECT team_name FROM ibl_team_info WHERE teamid != ? ORDER BY teamid ASC");
+                $freeAgentsTeamId = League::FREE_AGENTS_TEAMID;
+                $stmtTeams->bind_param("i", $freeAgentsTeamId);
+                $stmtTeams->execute();
+                $resultTeams = $stmtTeams->get_result();
+                $stmtTeams->close();
+
+                $values = '';
                 $i = 0;
-                while ($i < $numTeamNames) {
-                    $values .= "($currentSeasonHEATYear, '" . $db->sql_result($resultTeamNames, $i, 'team_name') . "', '" . $db->sql_result($resultTeamNames, $i, 'team_name') . "', 0, 0)";
-                    if ($i < $numTeamNames - 1) {
+                while ($row = $resultTeams->fetch_assoc()) {
+                    $teamName = $row['team_name'];
+                    $values .= "($currentSeasonHEATYear, '$teamName', '$teamName', 0, 0)";
+                    if ($resultTeams->num_rows > $i + 1) {
                         $values .= ", ";
                     }
                     $i++;
                 }
-    
+
                 $queryString = "INSERT INTO ibl_heat_win_loss (`year`, `currentname`, `namethatyear`, `wins`, `losses`) VALUES $values;";
                 $successText = "New `ibl_heat_win_loss` database entries were inserted for each team for the $currentSeasonHEATYear season.";
             } else {
@@ -50,24 +63,42 @@ if (isset($_POST['query'])) {
             $successText = "All teams' MLEs and LLEs have been reset.";
             break;
         case 'Reset All-Star Voting':
-            $multiQueryString = "UPDATE ibl_votes_ASG 
-                SET East_F1 = NULL, East_F2 = NULL, East_F3 = NULL, East_F4 = NULL,
-                    West_F1 = NULL, West_F2 = NULL, West_F3 = NULL, West_F4 = NULL,
-                    East_B1 = NULL, East_B2 = NULL, East_B3 = NULL, East_B4 = NULL,
-                    West_B1 = NULL, West_B2 = NULL, West_B3 = NULL, West_B4 = NULL;
-                UPDATE ibl_settings SET value = 'Yes' where name = 'ASG Voting';
-                UPDATE ibl_team_history SET asg_vote = 'No Vote';";
+            $stmtASG = $mysqli_db->prepare("UPDATE ibl_votes_ASG SET East_F1 = NULL, East_F2 = NULL, East_F3 = NULL, East_F4 = NULL,
+                West_F1 = NULL, West_F2 = NULL, West_F3 = NULL, West_F4 = NULL,
+                East_B1 = NULL, East_B2 = NULL, East_B3 = NULL, East_B4 = NULL,
+                West_B1 = NULL, West_B2 = NULL, West_B3 = NULL, West_B4 = NULL");
+            $stmtASG->execute();
+            $stmtASG->close();
+            
+            $stmtSettings = $mysqli_db->prepare("UPDATE ibl_settings SET value = 'Yes' WHERE name = 'ASG Voting'");
+            $stmtSettings->execute();
+            $stmtSettings->close();
+            
+            $stmtTeamHistory = $mysqli_db->prepare("UPDATE ibl_team_history SET asg_vote = 'No Vote'");
+            $stmtTeamHistory->execute();
+            $stmtTeamHistory->close();
+            
             $successText = "ASG Voting has been reset!";
+            $querySuccessful = true;
             break;
         case 'Reset End of the Year Voting':
-            $multiQueryString = "UPDATE ibl_votes_EOY
-                SET MVP_1 = NULL, MVP_2 = NULL, MVP_3 = NULL,
-                    Six_1 = NULL, Six_2 = NULL, Six_3 = NULL,
-                    ROY_1 = NULL, ROY_2 = NULL, ROY_3 = NULL,
-                    GM_1 = NULL, GM_2 = NULL, GM_3 = NULL;
-                UPDATE ibl_settings SET value = 'Yes' where name = 'EOY Voting';
-                UPDATE ibl_team_history SET eoy_vote = 'No Vote';";
+            $stmtEOY = $mysqli_db->prepare("UPDATE ibl_votes_EOY SET MVP_1 = NULL, MVP_2 = NULL, MVP_3 = NULL,
+                Six_1 = NULL, Six_2 = NULL, Six_3 = NULL,
+                ROY_1 = NULL, ROY_2 = NULL, ROY_3 = NULL,
+                GM_1 = NULL, GM_2 = NULL, GM_3 = NULL");
+            $stmtEOY->execute();
+            $stmtEOY->close();
+            
+            $stmtSettings2 = $mysqli_db->prepare("UPDATE ibl_settings SET value = 'Yes' WHERE name = 'EOY Voting'");
+            $stmtSettings2->execute();
+            $stmtSettings2->close();
+            
+            $stmtTeamHistory2 = $mysqli_db->prepare("UPDATE ibl_team_history SET eoy_vote = 'No Vote'");
+            $stmtTeamHistory2->execute();
+            $stmtTeamHistory2->close();
+            
             $successText = "EOY Voting has been reset!";
+            $querySuccessful = true;
             break;
         case 'Set all players on waivers to Free Agents and reset their Bird years':
             $queryString = "UPDATE ibl_plr SET teamname = 'Free Agents', bird = 0 WHERE retired != 1 AND ordinal > " . JSB::WAIVERS_ORDINAL . ";";
@@ -75,73 +106,85 @@ if (isset($_POST['query'])) {
             break;
         case 'Set Allow Trades Status':
             if (isset($_POST['Trades'])) {
-                $queryString = "UPDATE ibl_settings SET value = '{$_POST['Trades']}' WHERE name = 'Allow Trades';";
+                $trades = $_POST['Trades'];
+                $stmtTrades = $mysqli_db->prepare("UPDATE ibl_settings SET value = ? WHERE name = 'Allow Trades'");
+                $stmtTrades->bind_param("s", $trades);
+                $stmtTrades->execute();
+                $stmtTrades->close();
+                $querySuccessful = true;
             }
             $successText = "Allow Trades Status has been set to {$_POST['Trades']}.";
             break;
         case 'Set Free Agency factors for PFW':
             if ($season->phase == 'Draft' or $season->phase == 'Free Agency') {
-                $queryString = "UPDATE ibl_team_info info, ibl_power power
-                    SET Contract_Wins = power.win,
-                        Contract_Losses = power.loss
-                    WHERE power.TeamID = info.teamid;";
+                $queryString = "UPDATE ibl_team_info info, ibl_power power SET Contract_Wins = power.win, Contract_Losses = power.loss WHERE power.TeamID = info.teamid;";
                 $successText = "The columns that affect each team's Play For Winner demand factor have been updated to match this past season's ($season->endingYear) win/loss records.";
             } else {
-                $failureText = "Sorry, that button can only be used during the Draft or Free Agency.<br>
-                    The FA demands formula requires the current season to be finished before calculating factors.";
+                $failureText = "Sorry, that button can only be used during the Draft or Free Agency.<br>The FA demands formula requires the current season to be finished before calculating factors.";
             }
             break;
         case 'Set Season Phase':
             if (isset($_POST['SeasonPhase'])) {
-                $queryString = "UPDATE ibl_settings SET value = '{$_POST['SeasonPhase']}' WHERE name = 'Current Season Phase';";
+                $phase = $_POST['SeasonPhase'];
+                $stmtPhase = $mysqli_db->prepare("UPDATE ibl_settings SET value = ? WHERE name = 'Current Season Phase'");
+                $stmtPhase->bind_param("s", $phase);
+                $stmtPhase->execute();
+                $stmtPhase->close();
+                $querySuccessful = true;
             }
             $successText = "Season Phase has been set to {$_POST['SeasonPhase']}.";
             break;
         case 'Set Sim Length in Days':
             if (isset($_POST['SimLengthInDays'])) {
-                $queryString = "UPDATE ibl_settings SET value = '{$_POST['SimLengthInDays']}' WHERE name = 'Sim Length in Days';";
+                $simLength = (int)$_POST['SimLengthInDays'];
+                $stmtSim = $mysqli_db->prepare("UPDATE ibl_settings SET value = ? WHERE name = 'Sim Length in Days'");
+                $stmtSim->bind_param("i", $simLength);
+                $stmtSim->execute();
+                $stmtSim->close();
+                $querySuccessful = true;
             }
             $successText = "Sim Length in Days has been set to {$_POST['SimLengthInDays']}.";
             break;
         case 'Set Allow Waiver Moves Status':
             if (isset($_POST['Waivers'])) {
-                $queryString = "UPDATE ibl_settings SET value = '{$_POST['Waivers']}' WHERE name = 'Allow Waiver Moves';";
+                $waivers = $_POST['Waivers'];
+                $stmtWaivers = $mysqli_db->prepare("UPDATE ibl_settings SET value = ? WHERE name = 'Allow Waiver Moves'");
+                $stmtWaivers->bind_param("s", $waivers);
+                $stmtWaivers->execute();
+                $stmtWaivers->close();
+                $querySuccessful = true;
             }
             $successText = "Allow Waiver Moves Status has been set to {$_POST['Waivers']}.";
             break;
         case 'Toggle Free Agency Notifications':
             if (isset($_POST['FANotifs'])) {
-                $queryString = "UPDATE ibl_settings SET value = '{$_POST['FANotifs']}' WHERE name = 'Free Agency Notifications';";
+                $notifs = $_POST['FANotifs'];
+                $stmtNotifs = $mysqli_db->prepare("UPDATE ibl_settings SET value = ? WHERE name = 'Free Agency Notifications'");
+                $stmtNotifs->bind_param("s", $notifs);
+                $stmtNotifs->execute();
+                $stmtNotifs->close();
+                $querySuccessful = true;
             }
             $successText = "Free Agency Notifications are now {$_POST['FANotifs']}.";
             break;
     }
 
     if ($queryString != NULL) {
-        if ($db->sql_query($queryString)) {
-            $querySuccessful = true;
-            if (isset($_POST['SeasonPhase'])) {
-                $season->phase = $_POST['SeasonPhase'];
-            }
-            if (isset($_POST['Waivers'])) {
-                $season->allowWaivers = $_POST['Waivers'];
-            }
-            if (isset($_POST['Trades'])) {
-                $season->allowTrades = $_POST['Trades'];
-            }
-            if (isset($_POST['FANotifs'])) {
-                $season->freeAgencyNotificationsState = $_POST['FANotifs'];
-                Discord::postToChannel('#free-agency', $successText);
-            }
-        } else {
+        $stmt = $mysqli_db->prepare($queryString);
+        if ($stmt === false) {
             $querySuccessful = false;
-        }
-    } elseif ($multiQueryString != NULL) {
-        if (mysqli_multi_query($db->db_connect_id, $multiQueryString)) {
-            $querySuccessful = true;
         } else {
-            $querySuccessful = false;
+            $querySuccessful = $stmt->execute();
+            $stmt->close();
         }
+    }
+    
+    // Reload the season object to reflect the updated database values
+    if ($querySuccessful) {
+        if (isset($_POST['FANotifs'])) {
+            Discord::postToChannel('#free-agency', $successText);
+        }
+        $season = new Season($mysqli_db);
     }
 }
 
@@ -192,8 +235,9 @@ switch ($season->phase) {
         echo "<A HREF=\"/ibl5/scripts/plrParser.php\">Run plrParser.php</A>
                 <br><b>(but make sure you've uploaded the updated PLR file before you run this!)</b><p>
             <A HREF=\"/ibl5/scripts/updateAllTheThings.php\">Update All The Things</A><p>
-            <A HREF=\"/ibl5/scripts/scoParser.php\">Run scoParser.php</A><p>
-            <INPUT type='number' name='SimLengthInDays' min=1 max=180 size=3 value='" . League::getSimLengthInDays($db) . "'>
+            <A HREF=\"/ibl5/scripts/scoParser.php\">Run scoParser.php</A><p>";
+        $league = new League($mysqli_db);
+        echo "<INPUT type='number' name='SimLengthInDays' min=1 max=180 size=3 value='" . $league->getSimLengthInDays() . "'>
             <INPUT type='submit' name='query' value='Set Sim Length in Days'> <i>
                 <br>(you HAVE to CLICK to set the days – you unfortunately can't just hit Return/Enter)<p>
             <INPUT type='submit' name='query' value='Reset All-Star Voting'><p>
@@ -251,7 +295,6 @@ echo "<INPUT type='submit' name='query' value='Deactivate Player and Season Lead
     </FORM><p><hr><p>";
 
 if ($querySuccessful == true) {
-    $queryString = $queryString ?: $multiQueryString;
     echo "<code>" . $queryString . "</code>";
     echo "<p>";
     echo "<b>" . $successText . "</b>";

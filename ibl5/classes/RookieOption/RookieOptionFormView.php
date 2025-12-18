@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace RookieOption;
 
 use Services\DatabaseService;
+use Utilities\HtmlSanitizer;
 use RookieOption\Contracts\RookieOptionFormViewInterface;
 
 /**
@@ -17,7 +18,7 @@ class RookieOptionFormView implements RookieOptionFormViewInterface
      */
     public function renderError(string $errorMessage): void
     {
-        $errorMessageEscaped = nl2br(DatabaseService::safeHtmlOutput($errorMessage));
+        $errorMessageEscaped = nl2br(HtmlSanitizer::safeHtmlOutput($errorMessage));
         
         echo "{$errorMessageEscaped}<p>
             <a href=\"javascript:history.back()\">Go Back</a>";
@@ -29,10 +30,10 @@ class RookieOptionFormView implements RookieOptionFormViewInterface
     public function renderForm($player, string $teamName, int $rookieOptionValue): void
     {
         $playerID = (int) $player->playerID;
-        $playerPosition = DatabaseService::safeHtmlOutput($player->position);
-        $playerName = DatabaseService::safeHtmlOutput($player->name);
-        $teamNameEscaped = DatabaseService::safeHtmlOutput($teamName);
-        $rookieOptionValueEscaped = DatabaseService::safeHtmlOutput((string) $rookieOptionValue);
+        $playerPosition = HtmlSanitizer::safeHtmlOutput($player->position);
+        $playerName = HtmlSanitizer::safeHtmlOutput($player->name);
+        $teamNameEscaped = HtmlSanitizer::safeHtmlOutput($teamName);
+        $rookieOptionValueEscaped = HtmlSanitizer::safeHtmlOutput((string) $rookieOptionValue);
         $playerImageUrl = \Player\PlayerImageHelper::getImageUrl($playerID);
         
         echo "<img align=left src=\"{$playerImageUrl}\"><p>

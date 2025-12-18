@@ -46,7 +46,7 @@ function negotiate($playerID)
     UI::playerMenu();
 
     // Use NegotiationProcessor to handle all business logic
-    $processor = new Negotiation\NegotiationProcessor($db);
+    $processor = new Negotiation\NegotiationProcessor($db, $mysqli_db);
     echo $processor->processNegotiation($playerID, $userTeamName, $prefix);
 
     CloseTable();

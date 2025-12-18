@@ -1,11 +1,19 @@
 <?php
 
+declare(strict_types=1);
+
 use Player\Player;
 
-class Team
+/**
+ * Team - IBL team information and operations
+ * 
+ * Extends BaseMysqliRepository for standardized database access.
+ * Provides team data, roster queries, and cap calculations.
+ * 
+ * @see BaseMysqliRepository For base class documentation and error codes
+ */
+class Team extends BaseMysqliRepository
 {
-    protected $db;
-
     public $teamID;
 
     public $city;
@@ -35,47 +43,84 @@ class Team
     const BUYOUT_PERCENTAGE_MAX = 0.40;
     const ROSTER_SPOTS_MAX = 15;
 
-    public function __construct()
+    /**
+     * Constructor - inherits from BaseMysqliRepository
+     * 
+     * @param object $db Active mysqli connection (or duck-typed mock during migration)
+     * @throws \RuntimeException If connection is invalid (error code 1002)
+     */
+    public function __construct(object $db)
     {
+        parent::__construct($db);
     }
 
-    public static function initialize($db, $identifier)
+    /**
+     * Factory method to initialize a Team instance
+     * 
+     * @param object $db Active mysqli connection
+     * @param int|string|array $identifier Team ID (int), team name (string), or team data array
+     * @return self Initialized Team instance
+     */
+    public static function initialize(object $db, $identifier): self
     {
-        $instance = new self();
-        $instance->load($db, $identifier);
+        $instance = new self($db);
+        $instance->load($identifier);
         return $instance;
     }
 
-    protected function load($db, $identifier)
+    /**
+     * Load team data from database
+     * 
+     * @param int|string|array $identifier Team ID (int), team name (string), or team data array
+     * @return void
+     */
+    protected function load($identifier): void
     {
         ($identifier) ? $identifier : $identifier = League::FREE_AGENTS_TEAMID;
 
-        if (is_numeric($identifier)) {
-            $teamID = (int) $identifier; // Ensure teamID is an integer
-            $joinWhereCondition = "ibl_team_info.teamid = $teamID";
-        } elseif (is_string($identifier)) {
-            $joinWhereCondition = "ibl_team_info.team_name = '$identifier'";
-        } elseif (is_array($identifier)) {
-            $this->fill($db, $identifier);
-            return $this;
+        if (is_array($identifier)) {
+            $this->fill($identifier);
+            return;
         }
 
-        $query = "SELECT * 
-            FROM ibl_team_info
-                LEFT JOIN ibl_standings
-                ON ibl_team_info.teamid = ibl_standings.tid
-            WHERE $joinWhereCondition
-            LIMIT 1;";
-        $result = $db->sql_query($query);
-        $teamRow = $db->sql_fetch_assoc($result);
-        $this->fill($db, $teamRow);
+        if (is_numeric($identifier)) {
+            $teamID = (int) $identifier;
+            $query = "SELECT ibl_team_info.*,
+                     ibl_standings.leagueRecord 
+                FROM ibl_team_info
+                    LEFT JOIN ibl_standings
+                    ON ibl_team_info.teamid = ibl_standings.tid
+                WHERE ibl_team_info.teamid = ?
+                LIMIT 1";
+            $teamRow = $this->fetchOne($query, "i", $teamID);
+        } elseif (is_string($identifier)) {
+            $query = "SELECT ibl_team_info.*,
+                     ibl_standings.leagueRecord
+                FROM ibl_team_info
+                    LEFT JOIN ibl_standings
+                    ON ibl_team_info.teamid = ibl_standings.tid
+                WHERE ibl_team_info.team_name = ?
+                LIMIT 1";
+            $teamRow = $this->fetchOne($query, "s", $identifier);
+        }
+
+        if ($teamRow === null) {
+            throw new \RuntimeException("Team not found: " . $identifier);
+        }
+
+        $this->fill($teamRow);
     }
 
-    protected function fill($db, array $teamRow)
-    {
-        $this->db = $db;
 
-        $this->teamID = (int) $teamRow['teamid']; // Ensure teamID is an integer
+    /**
+     * Fill team properties from array data
+     * 
+     * @param array $teamRow Team data from database
+     * @return void
+     */
+    protected function fill(array $teamRow): void
+    {
+        $this->teamID = (int) $teamRow['teamid'];
 
         $this->city = $teamRow['team_city'];
         $this->name = $teamRow['team_name'];
@@ -94,71 +139,111 @@ class Team
         $this->hasMLE = $teamRow['HasMLE'];
         $this->hasLLE = $teamRow['HasLLE'];
 
-        $this->seasonRecord = $teamRow['leagueRecord']; // only available if the object is not loaded from an array
+        $this->seasonRecord = $teamRow['leagueRecord'] ?? null;
     }
 
-    public function getBuyoutsResult()
+    /**
+     * Get buyout players for this team
+     * 
+     * @return array<int, array> Array of buyout player rows
+     */
+    public function getBuyoutsResult(): array
     {
-        $query = "SELECT *
+        return $this->fetchAll(
+            "SELECT *
             FROM ibl_plr
-            WHERE tid = '$this->teamID'
+            WHERE tid = ?
               AND name LIKE '%Buyout%'
-            ORDER BY name ASC";
-        $result = $this->db->sql_query($query);
-        return $result;
+            ORDER BY name ASC",
+            "i",
+            $this->teamID
+        );
     }
     
-    public function getDraftHistoryResult()
+    /**
+     * Get draft history for this team
+     * 
+     * @return array<int, array> Array of drafted player rows
+     */
+    public function getDraftHistoryResult(): array
     {
-        $query = "SELECT *
+        return $this->fetchAll(
+            "SELECT *
             FROM ibl_plr
-            WHERE draftedby
-             LIKE '$this->name'
+            WHERE draftedby LIKE ?
             ORDER BY draftyear DESC,
                      draftround,
-                     draftpickno ASC";
-        $result = $this->db->sql_query($query);
-        return $result;
+                     draftpickno ASC",
+            "s",
+            $this->name
+        );
     }
 
-    public function getDraftPicksResult()
+    /**
+     * Get draft picks owned by this team
+     * 
+     * @return array<int, array> Array of draft pick rows
+     */
+    public function getDraftPicksResult(): array
     {
-        $query = "SELECT *
+        return $this->fetchAll(
+            "SELECT *
             FROM ibl_draft_picks
-            WHERE ownerofpick = '$this->name'
-            ORDER BY year, round, teampick ASC;";
-        $result = $this->db->sql_query($query);
-        return $result;
+            WHERE ownerofpick = ?
+            ORDER BY year, round, teampick ASC",
+            "s",
+            $this->name
+        );
     }
 
-    public function getFreeAgencyOffersResult()
+    /**
+     * Get free agency offers made by this team
+     * 
+     * @return array<int, array> Array of offer rows
+     */
+    public function getFreeAgencyOffersResult(): array
     {
-        $query = "SELECT *
+        return $this->fetchAll(
+            "SELECT *
             FROM ibl_fa_offers
-            WHERE team = '$this->name'
-            ORDER BY name ASC";
-        $result = $this->db->sql_query($query);
-        return $result;
+            WHERE team = ?
+            ORDER BY name ASC",
+            "s",
+            $this->name
+        );
     }
 
-    public function getFreeAgencyRosterOrderedByNameResult()
+    /**
+     * Get free agency roster ordered by name
+     * 
+     * @return array<int, array> Array of player rows
+     */
+    public function getFreeAgencyRosterOrderedByNameResult(): array
     {
-        $query = "SELECT *
+        return $this->fetchAll(
+            "SELECT *
             FROM ibl_plr
-            WHERE tid = '$this->teamID'
+            WHERE tid = ?
               AND retired = 0
               AND cyt != cy
-            ORDER BY name ASC";
-        $result = $this->db->sql_query($query);
-        return $result;
+            ORDER BY name ASC",
+            "i",
+            $this->teamID
+        );
     }
 
-    public function getHealthyAndInjuredPlayersOrderedByNameResult($season = null)
+
+    /**
+     * Get healthy and injured players ordered by name
+     * 
+     * @param Season|null $season Season object for free agency filtering
+     * @return array<int, array> Array of player rows
+     */
+    public function getHealthyAndInjuredPlayersOrderedByNameResult($season = null): array
     {
         $freeAgencyCondition = '';
         if ($season && $season->phase === 'Free Agency') {
             // During Free Agency, only count players who have a salary for next year
-            // This is calculated as cy + 1 (if cy=1, check cy2; if cy=4, check cy5, etc.)
             $freeAgencyCondition = " AND (
                 (cy = 0 AND cy1 > 0) OR
                 (cy = 0 AND cy2 > 0) OR
@@ -170,23 +255,31 @@ class Team
             )";
         }
         
-        $query = "SELECT *
+        return $this->fetchAll(
+            "SELECT *
             FROM ibl_plr
-            WHERE teamname = '$this->name'
-              AND tid = '$this->teamID'
+            WHERE teamname = ?
+              AND tid = ?
               AND retired = '0'
               AND ordinal <= '" . JSB::WAIVERS_ORDINAL . "'" . $freeAgencyCondition . "
-            ORDER BY name ASC";
-        $result = $this->db->sql_query($query);
-        return $result;
+            ORDER BY name ASC",
+            "si",
+            $this->name,
+            $this->teamID
+        );
     }
 
-    public function getHealthyPlayersOrderedByNameResult($season = null)
+    /**
+     * Get healthy players ordered by name
+     * 
+     * @param Season|null $season Season object for free agency filtering
+     * @return array<int, array> Array of player rows
+     */
+    public function getHealthyPlayersOrderedByNameResult($season = null): array
     {
         $freeAgencyCondition = '';
         if ($season && $season->phase === 'Free Agency') {
             // During Free Agency, only count players who have a salary for next year
-            // This is calculated as cy + 1 (if cy=1, check cy2; if cy=4, check cy5, etc.)
             $freeAgencyCondition = " AND (
                 (cy = 0 AND cy1 > 0) OR
                 (cy = 0 AND cy2 > 0) OR
@@ -198,75 +291,126 @@ class Team
             )";
         }
         
-        $query = "SELECT *
+        return $this->fetchAll(
+            "SELECT *
             FROM ibl_plr
-            WHERE teamname = '$this->name'
-              AND tid = '$this->teamID'
+            WHERE teamname = ?
+              AND tid = ?
               AND retired = '0'
               AND ordinal <= '" . JSB::WAIVERS_ORDINAL ."'" . $freeAgencyCondition . "
               AND injured = '0'
-            ORDER BY name ASC";
-        $result = $this->db->sql_query($query);
-        return $result;
+            ORDER BY name ASC",
+            "si",
+            $this->name,
+            $this->teamID
+        );
     }
 
-    public function getLastSimStarterPlayerIDForPosition(string $position)
+    /**
+     * Get player ID of last sim starter for a position
+     * 
+     * @param string $position Position code (e.g., 'PG', 'SG', 'SF', 'PF', 'C')
+     * @return int Player ID
+     */
+    public function getLastSimStarterPlayerIDForPosition(string $position): int
     {
-        $query = "SELECT pid
+        $result = $this->fetchOne(
+            "SELECT pid
             FROM ibl_plr
-            WHERE tid = $this->teamID
+            WHERE tid = ?
               AND retired = 0
-              AND " . $position . "Depth = 1";
-        $result = $this->db->sql_query($query);
-        return $this->db->sql_result($result, 0, 'pid');
+              AND " . $position . "Depth = 1",
+            "i",
+            $this->teamID
+        );
+        return $result ? (int) $result['pid'] : 0;
     }
 
-    public function getCurrentlySetStarterPlayerIDForPosition(string $position)
+    /**
+     * Get player ID of currently set starter for a position
+     * 
+     * @param string $position Position code (e.g., 'PG', 'SG', 'SF', 'PF', 'C')
+     * @return int Player ID
+     */
+    public function getCurrentlySetStarterPlayerIDForPosition(string $position): int
     {
-        $query = "SELECT pid
+        $result = $this->fetchOne(
+            "SELECT pid
             FROM ibl_plr
-            WHERE tid = $this->teamID
+            WHERE tid = ?
               AND retired = 0
-              AND dc_" . $position . "Depth = 1";
-        $result = $this->db->sql_query($query);
-        return $this->db->sql_result($result, 0, 'pid');
+              AND dc_" . $position . "Depth = 1",
+            "i",
+            $this->teamID
+        );
+        return $result ? (int) $result['pid'] : 0;
     }
 
-    public function getPlayersUnderContractByPositionResult($position)
+    /**
+     * Get players under contract by position
+     * 
+     * @param string $position Position code (e.g., 'PG', 'SG', 'SF', 'PF', 'C')
+     * @return array<int, array> Array of player rows
+     */
+    public function getPlayersUnderContractByPositionResult(string $position): array
     {
-        $query = "SELECT * 
+        return $this->fetchAll(
+            "SELECT * 
             FROM ibl_plr
-            WHERE teamname = '$this->name'
-              AND pos = '$position'
+            WHERE teamname = ?
+              AND pos = ?
               AND cy1 != 0
-              AND retired = 0";
-        $result = $this->db->sql_query($query);
-        return $result;
+              AND retired = 0",
+            "ss",
+            $this->name,
+            $position
+        );
     }
 
-    public function getRosterUnderContractOrderedByNameResult()
+    /**
+     * Get roster under contract ordered by name
+     * 
+     * @return array<int, array> Array of player rows
+     */
+    public function getRosterUnderContractOrderedByNameResult(): array
     {
-        $query = "SELECT *
+        return $this->fetchAll(
+            "SELECT *
             FROM ibl_plr
-            WHERE tid = '$this->teamID'
+            WHERE tid = ?
               AND retired = 0
-            ORDER BY name ASC";
-        $result = $this->db->sql_query($query);
-        return $result;
+            ORDER BY name ASC",
+            "i",
+            $this->teamID
+        );
     }
 
-    public function getRosterUnderContractOrderedByOrdinalResult()
+    /**
+     * Get roster under contract ordered by ordinal
+     * 
+     * @return array<int, array> Array of player rows
+     */
+    public function getRosterUnderContractOrderedByOrdinalResult(): array
     {
-        $query = "SELECT *
+        return $this->fetchAll(
+            "SELECT *
             FROM ibl_plr
-            WHERE tid = '$this->teamID'
+            WHERE tid = ?
               AND retired = 0
-            ORDER BY ordinal ASC";
-        $result = $this->db->sql_query($query);
-        return $result;
+            ORDER BY ordinal ASC",
+            "i",
+            $this->teamID
+        );
     }
 
-    public function getSalaryCapArray(Season $season)
+
+    /**
+     * Get salary cap array for all contract years
+     * 
+     * @param Season $season Season object for free agency handling
+     * @return array<string, int> Array of salary cap spent by year
+     */
+    public function getSalaryCapArray(Season $season): array
     {  
         $salaryCapSpent[] = 0;
         $resultContracts = $this->getRosterUnderContractOrderedByNameResult();
@@ -289,7 +433,13 @@ class Team
         return $salaryCapSpent;
     }
 
-    public function getTotalCurrentSeasonSalariesFromPlrResult($result)
+    /**
+     * Get total current season salaries from player result array
+     * 
+     * @param array<int, array> $result Array of player rows
+     * @return int Total current season salaries
+     */
+    public function getTotalCurrentSeasonSalariesFromPlrResult(array $result): int
     {
         $totalCurrentSeasonSalaries = 0;
 
@@ -300,7 +450,13 @@ class Team
         return $totalCurrentSeasonSalaries;
     }
 
-    public function getTotalNextSeasonSalariesFromPlrResult($result)
+    /**
+     * Get total next season salaries from player result array
+     * 
+     * @param array<int, array> $result Array of player rows
+     * @return int Total next season salaries
+     */
+    public function getTotalNextSeasonSalariesFromPlrResult(array $result): int
     {
         $totalNextSeasonSalaries = 0;
 
@@ -311,7 +467,13 @@ class Team
         return $totalNextSeasonSalaries;
     }
 
-    public function canAddContractWithoutGoingOverHardCap($currentSeasonContractValueToBeAdded)
+    /**
+     * Check if team can add contract without going over hard cap
+     * 
+     * @param int $currentSeasonContractValueToBeAdded Contract value to add
+     * @return bool True if under hard cap, false otherwise
+     */
+    public function canAddContractWithoutGoingOverHardCap(int $currentSeasonContractValueToBeAdded): bool
     {
         $teamResult = $this->getRosterUnderContractOrderedByNameResult();
         $totalCurrentSeasonSalaries = $this->getTotalCurrentSeasonSalariesFromPlrResult($teamResult);
@@ -323,7 +485,13 @@ class Team
         return FALSE;
     }
 
-    public function canAddBuyoutWithoutExceedingBuyoutLimit($currentSeasonBuyoutValueToBeAdded)
+    /**
+     * Check if team can add buyout without exceeding buyout limit
+     * 
+     * @param int $currentSeasonBuyoutValueToBeAdded Buyout value to add
+     * @return bool True if under buyout limit, false otherwise
+     */
+    public function canAddBuyoutWithoutExceedingBuyoutLimit(int $currentSeasonBuyoutValueToBeAdded): bool
     {
         $buyoutsResult = $this->getBuyoutsResult();
         $totalCurrentSeasonBuyouts = $this->getTotalCurrentSeasonSalariesFromPlrResult($buyoutsResult);
@@ -336,7 +504,13 @@ class Team
         return FALSE;
     }
 
-    public function convertPlrResultIntoPlayerArray($result)
+    /**
+     * Convert player result array into Player objects
+     * 
+     * @param array<int, array> $result Array of player rows
+     * @return array<int, Player> Array of Player objects indexed by player ID
+     */
+    public function convertPlrResultIntoPlayerArray(array $result): array
     {
         $array = array();
         foreach ($result as $plrRow) {

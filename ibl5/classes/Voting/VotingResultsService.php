@@ -111,13 +111,53 @@ class VotingResultsService implements VotingResultsServiceInterface
 
     private function executeVoteQuery(string $query): array
     {
-        $result = $this->db->sql_query($query);
+        // Support both legacy and modern database connections
+        if (method_exists($this->db, 'sql_query')) {
+            // LEGACY: mysql class with sql_* methods
+            $result = $this->db->sql_query($query);
+            if ($result === false) {
+                return [];
+            }
+
+            $rows = [];
+            while ($record = $result->fetch_assoc()) {
+                $name = trim((string) ($record['name'] ?? ''));
+                if ($name === '') {
+                    $name = self::BLANK_BALLOT_LABEL;
+                }
+
+                $votes = (int) ($record['votes'] ?? 0);
+                $rows[] = [
+                    'name' => $name,
+                    'votes' => $votes,
+                ];
+            }
+
+            return $rows;
+        }
+
+        // MODERN: mysqli with prepared statements (no parameters needed for these queries)
+        $stmt = $this->db->prepare($query);
+        if ($stmt === false) {
+            error_log("VotingResultsService: Failed to prepare query: " . $this->db->error);
+            return [];
+        }
+
+        if (!$stmt->execute()) {
+            error_log("VotingResultsService: Failed to execute query: " . $stmt->error);
+            $stmt->close();
+            return [];
+        }
+
+        $result = $stmt->get_result();
         if ($result === false) {
+            error_log("VotingResultsService: Failed to get result: " . $stmt->error);
+            $stmt->close();
             return [];
         }
 
         $rows = [];
-        while ($record = $this->db->sql_fetch_assoc($result)) {
+        while ($record = $result->fetch_assoc()) {
             $name = trim((string) ($record['name'] ?? ''));
             if ($name === '') {
                 $name = self::BLANK_BALLOT_LABEL;
@@ -130,6 +170,7 @@ class VotingResultsService implements VotingResultsServiceInterface
             ];
         }
 
+        $stmt->close();
         return $rows;
     }
 }

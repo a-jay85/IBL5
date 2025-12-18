@@ -58,10 +58,10 @@ function chunk($chunk_start_date, $chunk_end_date, $j)
 {
     //TODO: unify this code with the Team module's boxscore function
 
-    global $db;
+    global $db, $mysqli_db;
     $sharedFunctions = new Shared($db);
-    $commonRepository = new Services\CommonRepository($db);
-    $season = new Season($db);
+    $commonRepository = new Services\CommonMysqliRepository($mysqli_db);
+    $season = new Season($mysqli_db);
 
     $query = "SELECT *
 		FROM ibl_schedule
@@ -73,13 +73,9 @@ function chunk($chunk_start_date, $chunk_end_date, $j)
     $teamSeasonRecordsQuery = "SELECT tid, leagueRecord FROM ibl_standings ORDER BY tid ASC;";
     $teamSeasonRecordsResult = $db->sql_query($teamSeasonRecordsQuery);
 
-    $season->lastSimEndDate = date_create($season->lastSimEndDate);
-    $projectedNextSimEndDate = date_add($season->lastSimEndDate, date_interval_create_from_date_string(League::getSimLengthInDays($db) . ' days'));
-
-    // override $projectedNextSimEndDate to account for the blank week at end of HEAT
-    if ($projectedNextSimEndDate >= date_create("$season->beginningYear-10-23") and $projectedNextSimEndDate < date_create("$season->beginningYear-11-01")) {
-        $projectedNextSimEndDate = date_create("$season->beginningYear-11-08");
-    }
+    $league = new League($mysqli_db);
+    $lastSimEndDate = date_create($season->lastSimEndDate);
+    $projectedNextSimEndDate = date_add($lastSimEndDate, date_interval_create_from_date_string($league->getSimLengthInDays() . ' days'));
 
     echo "<table width=\"500\" cellpadding=\"6\" cellspacing=\"0\" border=\"1\" align=center>";
 

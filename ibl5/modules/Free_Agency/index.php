@@ -41,20 +41,20 @@ function main($user)
 
 function display()
 {
-    global $db, $cookie;
-    $commonRepository = new Services\CommonRepository($db);
-    $season = new Season($db);
+    global $db, $mysqli_db, $cookie;
+    $commonRepository = new Services\CommonMysqliRepository($mysqli_db);
+    $season = new Season($mysqli_db);
 
     Nuke\Header::header();
     OpenTable();
 
     $username = strval($cookie[1] ?? '');
     $teamName = $commonRepository->getTeamnameFromUsername($username);
-    $team = Team::initialize($db, $teamName);
+    $team = Team::initialize($mysqli_db, $teamName);
 
-    UI::displaytopmenu($db, $team->teamID);
+    UI::displaytopmenu($mysqli_db, $team->teamID);
 
-    $displayHelper = new FreeAgencyDisplayHelper($db, $team, $season);
+    $displayHelper = new FreeAgencyDisplayHelper($mysqli_db, $team, $season);
     echo $displayHelper->renderMainPage();
 
     CloseTable();
@@ -63,8 +63,8 @@ function display()
 
 function negotiate($pid)
 {
-    global $db, $cookie;
-    $commonRepository = new Services\CommonRepository($db);
+    global $db, $cookie, $mysqli_db;
+    $commonRepository = new Services\CommonMysqliRepository($mysqli_db);
 
     $pid = intval($pid);
 
@@ -76,9 +76,9 @@ function negotiate($pid)
     Nuke\Header::header();
     OpenTable();
 
-    $team = \Team::initialize($db, $teamID);
-    $season = new Season($db);
-    $negotiationHelper = new FreeAgencyNegotiationHelper($db, $season);
+    $team = \Team::initialize($mysqli_db, $teamID);
+    $season = new Season($mysqli_db);
+    $negotiationHelper = new FreeAgencyNegotiationHelper($mysqli_db, $season);
     echo $negotiationHelper->renderNegotiationPage($pid, $team);
 
     CloseTable();
@@ -87,15 +87,15 @@ function negotiate($pid)
 
 function processOffer()
 {
-    global $db;
-    $processor = new FreeAgencyProcessor($db);
+    global $mysqli_db;
+    $processor = new FreeAgencyProcessor($mysqli_db);
     echo $processor->processOfferSubmission($_POST);
 }
 
 function deleteOffer()
 {
-    global $db;
-    $processor = new FreeAgencyProcessor($db);
+    global $mysqli_db;
+    $processor = new FreeAgencyProcessor($mysqli_db);
     $playerID = (int) ($_POST['playerID'] ?? 0);
     echo $processor->deleteOffers($_POST['teamname'], $playerID);
 }

@@ -23,7 +23,7 @@ class UpdateAllTheThingsIntegrationTest extends TestCase
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
-        $this->mockCommonRepository = new \Services\CommonRepository($this->mockDb);
+        $this->mockCommonRepository = new \Services\CommonMysqliRepository($this->mockDb);
         $this->mockSeason = new Season($this->mockDb);
     }
 

@@ -25,7 +25,7 @@ $result2 = $db->sql_query($query2);
 $num2 = $db->sql_numrows($result2);
 
 OpenTable();
-UI::displaytopmenu($db, 0);
+UI::displaytopmenu($mysqli_db, 0);
 
 $k = 0;
 while ($k < $num2) {

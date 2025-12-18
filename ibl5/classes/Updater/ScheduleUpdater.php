@@ -3,13 +3,12 @@ namespace Updater;
 
 use Utilities\UuidGenerator;
 
-class ScheduleUpdater {
-    private $db;
+class ScheduleUpdater extends \BaseMysqliRepository {
     private $commonRepository;
     private $season;
 
-    public function __construct($db, $commonRepository, $season) {
-        $this->db = $db;
+    public function __construct(object $db, $commonRepository, $season) {
+        parent::__construct($db);
         $this->commonRepository = $commonRepository;
         $this->season = $season;
     }
@@ -60,9 +59,8 @@ class ScheduleUpdater {
 
         $log = '';
 
-        if ($this->db->sql_query('TRUNCATE TABLE ibl_schedule')) {
-            $log .= 'TRUNCATE TABLE ibl_schedule<p>';
-        }
+        $this->execute('TRUNCATE TABLE ibl_schedule', '');
+        $log .= 'TRUNCATE TABLE ibl_schedule<p>';
 
         $scheduleFilePath = $_SERVER['DOCUMENT_ROOT'] . '/ibl5/ibl/IBL/Schedule.htm';
         $schedule = new \DOMDocument();
@@ -116,38 +114,43 @@ class ScheduleUpdater {
                 $homeTID = $this->commonRepository->getTidFromTeamname($homeName);
 
                 if ($vScore != 0 && $hScore != 0 && $boxID == null) {
-                    echo "<b><font color=red>Script Error: box scores for games haven't been generated.<br>
-                        Please delete and reupload the JSB HTML export with the box scores, then try again.</font></b>";
-                    die();
+                    $errorMessage = "Script Error: box scores for games haven't been generated. Please delete and reupload the JSB HTML export with the box scores, then try again.";
+                    error_log("[ScheduleUpdater] Box scores missing for game between {$visitorName} and {$homeName}");
+                    echo "<b><font color=red>{$errorMessage}</font></b>";
+                    throw new \RuntimeException($errorMessage, 1003);
                 }
 
                 if ($visitorTID !== null && $homeTID !== null) {
                     $uuid = UuidGenerator::generateUuid();
-                    $sqlQueryString = "INSERT INTO ibl_schedule (
-                        Year,
-                        BoxID,
-                        Date,
-                        Visitor,
-                        Vscore,
-                        Home,
-                        Hscore,
-                        uuid
-                    ) VALUES (
-                        $year,
-                        $boxID,
-                        '$date',
-                        $visitorTID,
-                        $vScore,
-                        $homeTID,
-                        $hScore,
-                        '$uuid'
-                    )";
-
-                    if ($this->db->sql_query($sqlQueryString)) {
-                        $log .= $sqlQueryString . '<br>';
-                    } else {
-                        echo "<b><font color=red>Script Error: Failed to insert schedule data for game between $visitorName and $homeName.</font></b>";
-                        die();
+                    
+                    try {
+                        $this->execute(
+                            "INSERT INTO ibl_schedule (
+                                Year,
+                                BoxID,
+                                Date,
+                                Visitor,
+                                Vscore,
+                                Home,
+                                Hscore,
+                                uuid
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                            "iisiiiis",
+                            $year,
+                            $boxID,
+                            $date,
+                            $visitorTID,
+                            $vScore,
+                            $homeTID,
+                            $hScore,
+                            $uuid
+                        );
+                        $log .= "Inserted game: {$visitorName} @ {$homeName} on {$date}<br>";
+                    } catch (\Exception $e) {
+                        $errorMessage = "Failed to insert schedule data for game between {$visitorName} and {$homeName}: " . $e->getMessage();
+                        error_log("[ScheduleUpdater] Database insert error: {$errorMessage}");
+                        echo "<b><font color=red>Script Error: Failed to insert schedule data for game between {$visitorName} and {$homeName}.</font></b>";
+                        throw new \RuntimeException($errorMessage, 1002);
                     }
                 }
             }

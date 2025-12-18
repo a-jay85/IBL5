@@ -28,7 +28,7 @@ class DebugOutput
          onclick="toggleDebug<?= $id ?>()">
         <span id="debugIcon<?= $id ?>">▶</span> <?= htmlspecialchars($title) ?>
     </div>
-    <pre id="debugContent<?= $id ?>" style="display: none; margin: 0; padding: 8px; background-color: #fff; overflow: auto;"><?= htmlspecialchars($content) ?></pre>
+    <pre id="debugContent<?= $id ?>" style="display: none; margin: 0; padding: 8px; background-color: #fff; overflow: auto;"><?= $content //unescaped for proper visual formatting ?></pre>
 </div>
 <script>
     function toggleDebug<?= $id ?>() {

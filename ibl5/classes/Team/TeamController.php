@@ -17,12 +17,12 @@ class TeamController implements TeamControllerInterface
     private $statsService;
     private $uiService;
 
-    public function __construct($db)
+    public function __construct(object $db)
     {
         $this->db = $db;
         $this->repository = new TeamRepository($db);
-        $this->statsService = new TeamStatsService($db);
-        $this->uiService = new TeamUIService($db, $this->repository);
+        $this->statsService = new TeamStatsService();
+        $this->uiService = new TeamUIService($this->repository);
     }
 
     /**
@@ -33,7 +33,7 @@ class TeamController implements TeamControllerInterface
         $teamID = (int) $teamID;
         
         $team = \Team::initialize($this->db, $teamID);
-        
+
         $sharedFunctions = new \Shared($this->db);
         $season = new \Season($this->db);
 
@@ -87,7 +87,8 @@ class TeamController implements TeamControllerInterface
             $starters_table = $this->statsService->getLastSimsStarters($result, $team);
         }
 
-        $tableDraftPicks = $team ? \UI\Modules\Team::draftPicks($this->db, $team) : "";
+        $teamModules = new \UI\Modules\Team($this->repository);
+        $tableDraftPicks = $team ? $teamModules->draftPicks($team) : "";
 
         $inforight = $this->uiService->renderTeamInfoRight($team);
         $team_info_right = $inforight[0];

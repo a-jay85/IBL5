@@ -114,74 +114,7 @@ class ComparePlayersRepositoryTest extends TestCase
 
     private function createMockDatabase(): object
     {
-        // Return a mock object that simulates the database interface
-        // This allows tests to run without actual database connection
-        $mock = new class {
-            public function sql_query(string $query): object
-            {
-                return new class {
-                    public function fetch_assoc(): ?array
-                    {
-                        return null;
-                    }
-                };
-            }
-
-            public function sql_numrows(object $result): int
-            {
-                return 0;
-            }
-
-            public function sql_result(object $result, int $row, string $field): string
-            {
-                return '';
-            }
-
-            public function sql_fetch_assoc(object $result): ?array
-            {
-                return null;
-            }
-
-            public function query(string $query): object|false
-            {
-                return new class {
-                    public int $num_rows = 0;
-                    
-                    public function fetch_assoc(): ?array
-                    {
-                        return null;
-                    }
-                };
-            }
-
-            public function prepare(string $query): object|false
-            {
-                return new class {
-                    public function bind_param(string $types, mixed &...$vars): bool
-                    {
-                        return true;
-                    }
-
-                    public function execute(): bool
-                    {
-                        return true;
-                    }
-
-                    public function get_result(): object
-                    {
-                        return new class {
-                            public int $num_rows = 0;
-
-                            public function fetch_assoc(): ?array
-                            {
-                                return null;
-                            }
-                        };
-                    }
-                };
-            }
-        };
-
-        return $mock;
+        // Use the centralized MockDatabase that supports both legacy and mysqli interfaces
+        return new \MockDatabase();
     }
 }

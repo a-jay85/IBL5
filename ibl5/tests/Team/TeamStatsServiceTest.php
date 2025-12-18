@@ -17,7 +17,7 @@ class TeamStatsServiceTest extends TestCase
     protected function setUp(): void
     {
         $this->db = new MockDatabase();
-        $this->service = new TeamStatsService($this->db);
+        $this->service = new TeamStatsService();
         
         // Create mock team
         $this->team = new stdClass();

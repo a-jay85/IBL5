@@ -9,12 +9,15 @@ class OverviewView extends BaseView {
     private $season;
     private $sharedFunctions;
     private $commonRepository;
+    private $mysqli_db;
 
     public function __construct($db, Player $player, PlayerStats $playerStats, Season $season, Shared $sharedFunctions) {
         parent::__construct($db, $player, $playerStats);
         $this->season = $season;
         $this->sharedFunctions = $sharedFunctions;
-        $this->commonRepository = new Services\CommonRepository($db);
+        global $mysqli_db;
+        $this->mysqli_db = $mysqli_db;
+        $this->commonRepository = new Services\CommonMysqliRepository($mysqli_db);
     }
 
     public function render() {
@@ -54,13 +57,20 @@ class OverviewView extends BaseView {
         </center>";
 
         if ($this->season->phase == "Preseason") {
-            $query = "SELECT * FROM ibl_box_scores WHERE Date BETWEEN '" . Season::IBL_PRESEASON_YEAR . "-" . Season::IBL_REGULAR_SEASON_STARTING_MONTH . "-01' AND '" . (Season::IBL_PRESEASON_YEAR + 1) . "-07-01' AND pid = " . $this->player->playerID . " ORDER BY Date ASC";
+            $startDate = Season::IBL_PRESEASON_YEAR . "-" . Season::IBL_REGULAR_SEASON_STARTING_MONTH . "-01";
+            $endDate = (Season::IBL_PRESEASON_YEAR + 1) . "-07-01";
         } elseif ($this->season->phase == "HEAT") {
-            $query = "SELECT * FROM ibl_box_scores WHERE Date BETWEEN '" . $this->season->beginningYear . "-" . Season::IBL_HEAT_MONTH . "-01' AND '" . $this->season->endingYear . "-07-01' AND pid = " . $this->player->playerID . " ORDER BY Date ASC";
+            $startDate = $this->season->beginningYear . "-" . Season::IBL_HEAT_MONTH . "-01";
+            $endDate = $this->season->endingYear . "-07-01";
         } else {
-            $query = "SELECT * FROM ibl_box_scores WHERE Date BETWEEN '" . $this->season->beginningYear . "-" . Season::IBL_REGULAR_SEASON_STARTING_MONTH . "-01' AND '" . $this->season->endingYear . "-07-01' AND pid = " . $this->player->playerID . " ORDER BY Date ASC";
+            $startDate = $this->season->beginningYear . "-" . Season::IBL_REGULAR_SEASON_STARTING_MONTH . "-01";
+            $endDate = $this->season->endingYear . "-07-01";
         }
-        $result = $this->db->sql_query($query);
+        
+        $stmt = $this->mysqli_db->prepare("SELECT * FROM ibl_box_scores WHERE Date BETWEEN ? AND ? AND pid = ? ORDER BY Date ASC");
+        $stmt->bind_param("ssi", $startDate, $endDate, $this->player->playerID);
+        $stmt->execute();
+        $result = $stmt->get_result();
 
         echo "<p>
             <H1><center>GAME LOG</center></H1>
@@ -96,7 +106,7 @@ class OverviewView extends BaseView {
             .gamelog {text-align: center;}
         </style>";
 
-        while ($row = $this->db->sql_fetch_assoc($result)) {
+        while ($row = $result->fetch_assoc()) {
             $fieldGoalPercentage = ($row['game2GA'] + $row['game3GA']) ? number_format(($row['game2GM'] + $row['game3GM']) / ($row['game2GA'] + $row['game3GA']), 3, '.', '') : "0.000";
             $freeThrowPercentage = ($row['gameFTA']) ? number_format($row['gameFTM'] / $row['gameFTA'], 3, '.', '') : "0.000";
             $threePointPercentage = ($row['game3GA']) ? number_format($row['game3GM'] / $row['game3GA'], 3, '.', '') : "0.000";

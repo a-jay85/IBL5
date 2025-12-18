@@ -34,11 +34,11 @@ class UI
     /**
      * Display the top menu with team navigation
      *
-     * @param object $db Database connection
+     * @param \mysqli $db Mysqli database connection
      * @param int $teamID Current team ID (defaults to Free Agents)
      * @return void
      */
-    public static function displaytopmenu($db, $teamID = League::FREE_AGENTS_TEAMID): void
+    public static function displaytopmenu(\mysqli $db, $teamID = League::FREE_AGENTS_TEAMID): void
     {
         UI\TopMenu::display($db, $teamID);
     }
@@ -141,14 +141,14 @@ class UI
     /**
      * Render the period averages table
      *
-     * @param object $db Database connection
+     * @param \mysqli $db Modern mysqli database connection (required)
      * @param object $team Team object
      * @param object $season Season object
      * @param string|null|\DateTime $startDate Start date for the period
      * @param string|null|\DateTime $endDate End date for the period
      * @return string HTML table
      */
-    public static function periodAverages($db, $team, $season, $startDate = null, $endDate = null): string
+    public static function periodAverages(\mysqli $db, $team, $season, $startDate = null, $endDate = null): string
     {
         return UI\Tables\PeriodAverages::render($db, $team, $season, $startDate, $endDate);
     }

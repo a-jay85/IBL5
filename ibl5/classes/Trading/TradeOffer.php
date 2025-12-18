@@ -16,21 +16,23 @@ use Trading\Contracts\TradeOfferInterface;
  */
 class TradeOffer implements TradeOfferInterface
 {
-    protected $db;
-    protected $mysqli_db;
-    protected \Services\CommonRepository $commonRepository;
+    protected object $db;
+    protected TradingRepository $repository;
+    protected \Services\CommonMysqliRepository $commonRepository;
     protected \Season $season;
     protected CashTransactionHandler $cashHandler;
     protected TradeValidator $validator;
+    protected \Discord $discord;
 
-    public function __construct($db, $mysqli_db = null)
+    public function __construct(object $db, ?TradingRepository $repository = null)
     {
         $this->db = $db;
-        $this->mysqli_db = $mysqli_db;
-        $this->commonRepository = new \Services\CommonRepository($db);
+        $this->repository = $repository ?? new TradingRepository($db);
+        $this->commonRepository = new \Services\CommonMysqliRepository($db);
         $this->season = new \Season($db);
-        $this->cashHandler = new CashTransactionHandler($db);
+        $this->cashHandler = new CashTransactionHandler($db, $this->repository);
         $this->validator = new TradeValidator($db);
+        $this->discord = new \Discord($db);
     }
 
     /**
@@ -75,25 +77,33 @@ class TradeOffer implements TradeOfferInterface
 
     /**
      * Generate a new unique trade offer ID
+     * 
+     * Queries the autocounter table and increments to get the next available ID.
+     * 
      * @return int New trade offer ID
      */
     protected function generateTradeOfferId(): int
     {
-        $query0 = "SELECT * FROM ibl_trade_autocounter ORDER BY `counter` DESC";
-        $result0 = $this->db->sql_query($query0);
-        $currentCounter = $this->db->sql_result($result0, 0, "counter");
+        // Get current counter using repository
+        $currentCounterRow = $this->repository->getTradeAutocounter();
+        $currentCounter = $currentCounterRow['counter'] ?? 0;
         $tradeOfferId = ((int)$currentCounter) + 1;
 
-        $query0a = "INSERT INTO ibl_trade_autocounter ( `counter` ) VALUES ( '$tradeOfferId')";
-        $this->db->sql_query($query0a);
+        // Insert new counter using prepared statement
+        $this->repository->insertTradeAutocounter($tradeOfferId);
 
         return $tradeOfferId;
     }
 
     /**
      * Calculate salary cap data for both teams
-     * @param array $tradeData Trade data
-     * @return array Calculated cap data
+     * 
+     * Computes current cap totals and amounts being sent/received for both teams,
+     * including cash considerations based on current season phase.
+     * 
+     * @param array $tradeData Trade data from form submission
+     * @return array Calculated cap data with keys: userCurrentSeasonCapTotal,
+     *         partnerCurrentSeasonCapTotal, userCapSentToPartner, partnerCapSentToUser
      */
     protected function calculateSalaryCapData(array $tradeData): array
     {
@@ -147,9 +157,13 @@ class TradeOffer implements TradeOfferInterface
 
     /**
      * Insert trade offer data into database
+     * 
+     * Processes all checked items from both teams and inserts them into trade_info.
+     * Handles players, picks, and cash considerations.
+     * 
      * @param int $tradeOfferId Trade offer ID
-     * @param array $tradeData Trade data
-     * @return array Result with success status and trade text
+     * @param array $tradeData Trade data from form submission
+     * @return array Result with keys: success (bool), tradeText (string), tradeOfferId (int)
      */
     protected function insertTradeOfferData(int $tradeOfferId, array $tradeData): array
     {
@@ -222,59 +236,28 @@ class TradeOffer implements TradeOfferInterface
 
     /**
      * Insert a single trade item (player or pick)
+     * 
+     * Inserts the trade item record and generates descriptive trade text.
+     * 
      * @param int $tradeOfferId Trade offer ID
-     * @param int $itemId Item ID
+     * @param int $itemId Item ID (player PID or pick ID)
      * @param int $assetType Asset type (0=pick, 1=player)
      * @param string $offeringTeamName Offering team name
      * @param string $listeningTeamName Listening team name
      * @param string $approvalTeamName Name of team that needs to approve
-     * @return array Result
+     * @return array Result with 'tradeText' key containing description
      */
     protected function insertTradeItem(int $tradeOfferId, int $itemId, int $assetType, string $offeringTeamName, string $listeningTeamName, string $approvalTeamName): array
     {
-        // Use prepared statement if mysqli_db is available (preferred for security)
-        if ($this->mysqli_db) {
-            $query = "INSERT INTO ibl_trade_info 
-              ( `tradeofferid`, 
-                `itemid`, 
-                `itemtype`, 
-                `from`, 
-                `to`, 
-                `approval` ) 
-            VALUES (?, ?, ?, ?, ?, ?)";
-            
-            $stmt = $this->mysqli_db->prepare($query);
-            $stmt->bind_param('iiisss', $tradeOfferId, $itemId, $assetType, $offeringTeamName, $listeningTeamName, $approvalTeamName);
-            $stmt->execute();
-        } else {
-            // Fallback: use mysqli_real_escape_string if available, otherwise addslashes
-            if (isset($this->db->db_connect_id) && $this->db->db_connect_id) {
-                $escapedOffering = mysqli_real_escape_string($this->db->db_connect_id, $offeringTeamName);
-                $escapedListening = mysqli_real_escape_string($this->db->db_connect_id, $listeningTeamName);
-                $escapedApproval = mysqli_real_escape_string($this->db->db_connect_id, $approvalTeamName);
-            } else {
-                // Final fallback if db_connect_id not available
-                $escapedOffering = addslashes($offeringTeamName);
-                $escapedListening = addslashes($listeningTeamName);
-                $escapedApproval = addslashes($approvalTeamName);
-            }
-            
-            $query = "INSERT INTO ibl_trade_info 
-              ( `tradeofferid`, 
-                `itemid`, 
-                `itemtype`, 
-                `from`, 
-                `to`, 
-                `approval` ) 
-            VALUES        ( '$tradeOfferId', 
-                '$itemId', 
-                '$assetType', 
-                '$escapedOffering', 
-                '$escapedListening', 
-                '$escapedApproval' )";
-            
-            $this->db->sql_query($query);
-        }
+        // Use repository with prepared statements
+        $this->repository->insertTradeItem(
+            $tradeOfferId,
+            $itemId,
+            $assetType,
+            $offeringTeamName,
+            $listeningTeamName,
+            $approvalTeamName
+        );
 
         $tradeText = "";
         if ($assetType == 0) {
@@ -288,21 +271,26 @@ class TradeOffer implements TradeOfferInterface
 
     /**
      * Get trade text for a draft pick
+     * 
+     * Fetches pick details and formats a human-readable trade description.
+     * 
      * @param int $pickId Pick ID
      * @param string $offeringTeamName Offering team name
      * @param string $listeningTeamName Listening team name
-     * @return string Trade text
+     * @return string Formatted trade text (e.g., "The Lakers send the Bulls 2024 Round 1 draft pick...")
      */
     protected function getPickTradeText(int $pickId, string $offeringTeamName, string $listeningTeamName): string
     {
-        $sqlgetpick = "SELECT * FROM ibl_draft_picks WHERE pickid = '$pickId'";
-        $resultgetpick = $this->db->sql_query($sqlgetpick);
-        $rowsgetpick = $this->db->sql_fetchrow($resultgetpick);
+        $pickData = $this->repository->getDraftPickById($pickId);
+        
+        if (!$pickData) {
+            return '';
+        }
 
-        $pickTeam = $rowsgetpick['teampick'];
-        $pickYear = $rowsgetpick['year'];
-        $pickRound = $rowsgetpick['round'];
-        $pickNotes = $rowsgetpick['notes'];
+        $pickTeam = $pickData['teampick'];
+        $pickYear = $pickData['year'];
+        $pickRound = $pickData['round'];
+        $pickNotes = $pickData['notes'];
 
         $tradeText = "The $offeringTeamName send the $pickTeam $pickYear Round $pickRound draft pick to the $listeningTeamName.<br>";
         if ($pickNotes != NULL) {
@@ -314,31 +302,40 @@ class TradeOffer implements TradeOfferInterface
 
     /**
      * Get trade text for a player
+     * 
+     * Fetches player details and formats a human-readable trade description.
+     * 
      * @param int $playerId Player ID
      * @param string $offeringTeamName Offering team name
      * @param string $listeningTeamName Listening team name
-     * @return string Trade text
+     * @return string Formatted trade text (e.g., "The Lakers send PG Michael Jordan...")
      */
     protected function getPlayerTradeText(int $playerId, string $offeringTeamName, string $listeningTeamName): string
     {
-        $sqlgetplyr = "SELECT * FROM ibl_plr WHERE pid = '$playerId'";
-        $resultgetplyr = $this->db->sql_query($sqlgetplyr);
-        $rowsgetplyr = $this->db->sql_fetchrow($resultgetplyr);
+        $playerData = $this->repository->getPlayerById($playerId);
+        
+        if (!$playerData) {
+            return '';
+        }
 
-        $playerName = $rowsgetplyr['name'];
-        $playerPosition = $rowsgetplyr['pos'];
+        $playerName = $playerData['name'];
+        $playerPosition = $playerData['pos'];
 
         return "The $offeringTeamName send $playerPosition $playerName to the $listeningTeamName.<br>";
     }
 
     /**
      * Insert cash trade offer
+     * 
+     * Records cash consideration in trade_cash table and creates a trade_info record
+     * with a composite item ID representing the cash transaction.
+     * 
      * @param int $tradeOfferId Trade offer ID
      * @param string $offeringTeamName Offering team name
      * @param string $listeningTeamName Listening team name
-     * @param array $cashAmounts Cash amounts by year
-     * @param string $approvalTeamName Team that needs to approve the trade (should always be the listening team of the overall trade)
-     * @return array Result
+     * @param array $cashAmounts Cash amounts indexed by year (1-6)
+     * @param string $approvalTeamName Team that needs to approve (should be listening team)
+     * @return array Result with 'tradeText' key containing formatted description
      */
     protected function insertCashTradeOffer(int $tradeOfferId, string $offeringTeamName, string $listeningTeamName, array $cashAmounts, string $approvalTeamName): array
     {
@@ -349,21 +346,16 @@ class TradeOffer implements TradeOfferInterface
         $offeringTeamId = $this->commonRepository->getTidFromTeamname($offeringTeamName);
         $listeningTeamId = $this->commonRepository->getTidFromTeamname($listeningTeamName);
 
-        $query = "INSERT INTO ibl_trade_info
-          ( `tradeofferid`,
-            `itemid`,
-            `itemtype`,
-            `from`,
-            `to`,
-            `approval` )
-        VALUES    ( '$tradeOfferId',
-            '$offeringTeamId" . "0" . "$listeningTeamId" . "0',
-            'cash',
-            '$offeringTeamName',
-            '$listeningTeamName',
-            '$approvalTeamName' )";
+        $itemId = $offeringTeamId . "0" . $listeningTeamId . "0";
         
-        $this->db->sql_query($query);
+        $this->repository->insertTradeItem(
+            $tradeOfferId,
+            (int) $itemId,
+            'cash',
+            $offeringTeamName,
+            $listeningTeamName,
+            $approvalTeamName
+        );
 
         $cashText = implode(' ', array_filter($cashAmounts));
         $tradeText = "The $offeringTeamName send $cashText in cash to the $listeningTeamName.<br>";
@@ -373,16 +365,20 @@ class TradeOffer implements TradeOfferInterface
 
     /**
      * Send trade notification to receiving team
-     * @param array $tradeData Trade data
+     * 
+     * Sends Discord DM to the listening team with trade proposal details.
+     * 
+     * @param array $tradeData Trade data with offeringTeam and listeningTeam keys
      * @param string $tradeText Trade description text
+     * @return void
      */
     protected function sendTradeNotification(array $tradeData, string $tradeText): void
     {
         $offeringTeamName = $tradeData['offeringTeam'];
         $listeningTeamName = $tradeData['listeningTeam'];
-
-        $offeringUserDiscordID = \Discord::getDiscordIDFromTeamname($this->db, $offeringTeamName);
-        $receivingUserDiscordID = \Discord::getDiscordIDFromTeamname($this->db, $listeningTeamName);
+        
+        $offeringUserDiscordID = $this->discord->getDiscordIDFromTeamname($offeringTeamName);
+        $receivingUserDiscordID = $this->discord->getDiscordIDFromTeamname($listeningTeamName);
 
         $cleanTradeText = str_replace(['<br>', '&nbsp;', '<i>', '</i>'], ["\n", " ", "_", "_"], $tradeText);
 

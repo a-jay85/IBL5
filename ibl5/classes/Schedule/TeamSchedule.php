@@ -11,17 +11,33 @@ use Schedule\Contracts\TeamScheduleInterface;
  */
 class TeamSchedule extends Schedule implements TeamScheduleInterface
 {
+    private object $db;
+
+    public function __construct(object $db)
+    {
+        $this->db = $db;
+    }
+
     /**
      * @see TeamScheduleInterface::getSchedule()
      */
     public static function getSchedule($db, int $teamID)
     {
-        $query = "SELECT *
-            FROM `ibl_schedule`
-            WHERE Visitor = $teamID
-               OR Home = $teamID
-            ORDER BY Date ASC;";
-        return $db->sql_query($query);
+        $stmt = $db->prepare(
+            "SELECT * FROM `ibl_schedule` WHERE Visitor = ? OR Home = ? ORDER BY Date ASC"
+        );
+        if ($stmt === false) {
+            throw new \Exception('Prepare failed: ' . $db->error);
+        }
+        
+        $stmt->bind_param('ii', $teamID, $teamID);
+        if (!$stmt->execute()) {
+            throw new \Exception('Execute failed: ' . $stmt->error);
+        }
+        
+        $result = $stmt->get_result();
+        $stmt->close();
+        return $result;
     }
 
     /**
@@ -29,11 +45,26 @@ class TeamSchedule extends Schedule implements TeamScheduleInterface
      */
     public static function getProjectedGamesNextSimResult($db, int $teamID, string $lastSimEndDate)
     {
-        $query = "SELECT *
-            FROM `ibl_schedule`
-            WHERE (Visitor = $teamID OR Home = $teamID)
-              AND Date BETWEEN ADDDATE('$lastSimEndDate', 1) AND ADDDATE('$lastSimEndDate', " . \League::getSimLengthInDays($db) . ")
-            ORDER BY Date ASC;";
-        return $db->sql_query($query);
+        $league = new \League($db);
+        $simLengthInDays = $league->getSimLengthInDays();
+        
+        $stmt = $db->prepare(
+            "SELECT * FROM `ibl_schedule` 
+             WHERE (Visitor = ? OR Home = ?)
+               AND Date BETWEEN ADDDATE(?, 1) AND ADDDATE(?, ?)
+             ORDER BY Date ASC"
+        );
+        if ($stmt === false) {
+            throw new \Exception('Prepare failed: ' . $db->error);
+        }
+        
+        $stmt->bind_param('iissi', $teamID, $teamID, $lastSimEndDate, $lastSimEndDate, $simLengthInDays);
+        if (!$stmt->execute()) {
+            throw new \Exception('Execute failed: ' . $stmt->error);
+        }
+        
+        $result = $stmt->get_result();
+        $stmt->close();
+        return $result;
     }
 }

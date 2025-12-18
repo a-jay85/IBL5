@@ -1,24 +1,12 @@
 <?php
 
-/************************************************************************/
-/* PHP-NUKE: Web Portal System                                          */
-/* ===========================                                          */
-/*                                                                      */
-/* Copyright (c) 2005 by Francisco Burzi                                */
-/* http://phpnuke.org                                                   */
-/*                                                                      */
-/* This program is free software. You can redistribute it and/or modify */
-/* it under the terms of the GNU General Public License as published by */
-/* the Free Software Foundation; either version 2 of the License.       */
-/************************************************************************/
-
 if (!defined('BLOCK_FILE')) {
     Header("Location: ../index.php");
     die();
 }
 
-global $db;
-$season = new Season($db);
+global $mysqli_db;
+$season = new Season($mysqli_db);
 
 $content .= "
     <center>
@@ -46,8 +34,7 @@ $queryEasternConference = "SELECT tid, team_name, leagueRecord, confGB, clinched
     FROM ibl_standings
     WHERE conference = 'Eastern'
     ORDER BY confGB ASC";
-$resultEasternConference = $db->sql_query($queryEasternConference);
-$limitEasternConference = $db->sql_numrows($resultEasternConference);
+$resultEasternConference = $mysqli_db->query($queryEasternConference);
 
 $content .= "
     <tr>
@@ -67,15 +54,14 @@ $content .= "
         </td>
     </tr>";
 
-$i = 0;
-while ($i < $limitEasternConference) {
-    $tid = $db->sql_result($resultEasternConference, $i, 'tid');
-    $team_name = trim($db->sql_result($resultEasternConference, $i, 'team_name'));
-    $leagueRecord = $db->sql_result($resultEasternConference, $i, 'leagueRecord');
-    $confGB = $db->sql_result($resultEasternConference, $i, 'confGB');
-    $clinchedConference = $db->sql_result($resultEasternConference, $i, 'clinchedConference');
-    $clinchedDivision = $db->sql_result($resultEasternConference, $i, 'clinchedDivision');
-    $clinchedPlayoffs = $db->sql_result($resultEasternConference, $i, 'clinchedPlayoffs');
+while ($row = $resultEasternConference->fetch_assoc()) {
+    $tid = $row['tid'];
+    $team_name = trim($row['team_name']);
+    $leagueRecord = $row['leagueRecord'];
+    $confGB = $row['confGB'];
+    $clinchedConference = $row['clinchedConference'];
+    $clinchedDivision = $row['clinchedDivision'];
+    $clinchedPlayoffs = $row['clinchedPlayoffs'];
     if ($clinchedConference == 1) {
         $team_name = "<b>Z</b>-" . $team_name;
     } elseif ($clinchedDivision == 1) {
@@ -84,27 +70,25 @@ while ($i < $limitEasternConference) {
         $team_name = "<b>X</b>-" . $team_name;
     }
 
-    $content .= "
-        <tr>
-            <td style=\"white-space: nowrap;\">
-                <a href=\"modules.php?name=Team&op=team&teamID=$tid\">$team_name</a>
-            </td>
-            <td style=\"text-align: left;\">
-                $leagueRecord
-            </td>
-            <td style=\"text-align: right;\">
-                $confGB
-            </td>
-        </tr>";
-    $i++;
+$content .= "
+    <tr>
+        <td style=\"white-space: nowrap;\">
+            <a href=\"modules.php?name=Team&op=team&teamID=$tid\">$team_name</a>
+        </td>
+        <td style=\"text-align: left;\">
+            $leagueRecord
+        </td>
+        <td style=\"text-align: right;\">
+            $confGB
+        </td>
+    </tr>";
 }
 
 $queryWesternConference = "SELECT tid, team_name, leagueRecord, confGB, clinchedConference, clinchedDivision, clinchedPlayoffs
     FROM ibl_standings
     WHERE conference = 'Western'
     ORDER BY confGB ASC";
-$resultWesternConference = $db->sql_query($queryWesternConference);
-$limitWesternConference = $db->sql_numrows($resultWesternConference);
+$resultWesternConference = $mysqli_db->query($queryWesternConference);
 
 $content .= "
     <tr>
@@ -129,15 +113,14 @@ $content .= "
         </td>
     </tr>";
 
-$i = 0;
-while ($i < $limitWesternConference) {
-    $tid = $db->sql_result($resultWesternConference, $i, 'tid');
-    $team_name = trim($db->sql_result($resultWesternConference, $i, 'team_name'));
-    $leagueRecord = $db->sql_result($resultWesternConference, $i, 'leagueRecord');
-    $confGB = $db->sql_result($resultWesternConference, $i, 'confGB');
-    $clinchedConference = $db->sql_result($resultWesternConference, $i, 'clinchedConference');
-    $clinchedDivision = $db->sql_result($resultWesternConference, $i, 'clinchedDivision');
-    $clinchedPlayoffs = $db->sql_result($resultWesternConference, $i, 'clinchedPlayoffs');
+while ($row = $resultWesternConference->fetch_assoc()) {
+    $tid = $row['tid'];
+    $team_name = trim($row['team_name']);
+    $leagueRecord = $row['leagueRecord'];
+    $confGB = $row['confGB'];
+    $clinchedConference = $row['clinchedConference'];
+    $clinchedDivision = $row['clinchedDivision'];
+    $clinchedPlayoffs = $row['clinchedPlayoffs'];
     if ($clinchedConference == 1) {
         $team_name = "<b>Z</b>-" . $team_name;
     } elseif ($clinchedDivision == 1) {
@@ -158,7 +141,6 @@ while ($i < $limitWesternConference) {
                 $confGB
             </td>
         </tr>";
-    $i++;
 }
 
 $content .= "

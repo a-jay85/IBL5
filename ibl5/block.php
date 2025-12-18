@@ -2,11 +2,14 @@
 
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
+global $mysqli_db;
+
 use Player\Player;
 use Services\DatabaseService;
+use Utilities\HtmlSanitizer;
 
-$sharedFunctions = new Shared($db);
-$commonRepository = new Services\CommonRepository($db);
+$sharedFunctions = new Shared($mysqli_db);
+$commonRepository = new Services\CommonMysqliRepository($mysqli_db);
 
 // Handle POST requests for button actions
 $actionMessage = '';
@@ -25,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 foreach ($queryArray as $query) {
                     if (!empty($query)) {
-                        if ($db->sql_query($query)) {
+                        if ($mysqli_db->query($query)) {
                             $successCount++;
                         } else {
                             $errorCount++;
@@ -33,27 +36,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
                 
-                // Add news story INSERT query
+                // Add news story INSERT query using prepared statement
                 if ($successCount > 0 && isset($_POST['news_hometext']) && isset($_POST['news_bodytext']) && isset($_POST['day'])) {
-                    // Escape the text content for SQL
-                    $hometext = Services\DatabaseService::escapeString($db, $_POST['news_hometext']);
-                    $bodytext = Services\DatabaseService::escapeString($db, $_POST['news_bodytext']);
+                    $hometext = $_POST['news_hometext'];
+                    $bodytext = $_POST['news_bodytext'];
                     $day = (int)$_POST['day'];
                     
                     // Get current timestamp in MySQL format
                     $currentTime = date('Y-m-d H:i:s');
+                    $title = '2006 IBL Free Agency, Days ' . ($day-1) . '-' . $day;
                     
-                    // Build the INSERT query (sid will auto-increment)
-                    $newsInsertQuery = "INSERT INTO `nuke_stories` 
+                    // Use prepared statement for INSERT
+                    $stmtNews = $mysqli_db->prepare(
+                        "INSERT INTO `nuke_stories` 
                         (`catid`, `aid`, `title`, `time`, `hometext`, `bodytext`, `comments`, `counter`, `topic`, `informant`, `notes`, `ihome`, `alanguage`, `acomm`, `haspoll`, `pollID`, `score`, `ratings`, `rating_ip`, `associated`)
-                        VALUES
-                        (8, 'chibul', '2006 IBL Free Agency, Days " . ($day-1) . "-$day', '$currentTime', '$hometext', '$bodytext', 0, 0, 29, 'chibul', '', 0, 'english', 0, 0, 0, 0, 0, '0', '29-')";
+                        VALUES (8, 'chibul', ?, ?, ?, ?, 0, 0, 29, 'chibul', '', 0, 'english', 0, 0, 0, 0, 0, '0', '29-')"
+                    );
+                    $stmtNews->bind_param('ssss', $title, $currentTime, $hometext, $bodytext);
                     
-                    if ($db->sql_query($newsInsertQuery)) {
+                    if ($stmtNews->execute()) {
                         $successCount++;
                     } else {
                         $errorCount++;
                     }
+                    $stmtNews->close();
                 }
                 
                 if ($errorCount === 0 && $successCount > 0) {
@@ -70,10 +76,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($_POST['action'] === 'clear_offers') {
             // Truncate the ibl_fa_offers table
             $truncateQuery = "TRUNCATE TABLE ibl_fa_offers";
-            if ($db->sql_query($truncateQuery)) {
+            if ($mysqli_db->query($truncateQuery)) {
                 $actionMessage = "Successfully cleared all free agency offers from the database.";
             } else {
-                $actionMessage = "Error: Failed to clear free agency offers - " . $db->sql_error();
+                $actionMessage = "Error: Failed to clear free agency offers - " . $mysqli_db->error;
             }
         }
     }
@@ -85,8 +91,8 @@ $query = "SELECT ibl_fa_offers.*, ibl_plr.bird
 FROM ibl_fa_offers
 JOIN ibl_plr ON ibl_fa_offers.name = ibl_plr.name
 ORDER BY ibl_fa_offers.name ASC, ibl_fa_offers.perceivedvalue DESC";
-$result = $db->sql_query($query);
-$num = $db->sql_numrows($result);
+$result = $mysqli_db->query($query);
+$num = $result->num_rows;
 
 echo "<HTML>
 	<HEAD>
@@ -179,15 +185,21 @@ $offerText = "";
 $outcomeText = "";
 $autoRejectedText = "These offers have been **auto-rejected** for being under half of the player's demands:";
 $lastPlayerIteratedOn = "";
+$result->data_seek(0); // Reset result pointer to beginning
+$allRows = [];
+while ($row = $result->fetch_assoc()) {
+    $allRows[] = $row;
+}
 $i = 0;
 while ($i < $num) {
-    $name = $db->sql_result($result, $i, "name");
+    $row = $allRows[$i];
+    $name = $row['name'];
     $playerID = $commonRepository->getPlayerIDFromPlayerName($name);
-    $player = Player::withPlayerID($db, $playerID);
-    $teamOfPlayer = Team::initialize($db, $player->teamName);
-    $offeringTeamName = $db->sql_result($result, $i, "team");
-    $offeringTeam = Team::initialize($db, $offeringTeamName);
-    $perceivedvalue = $db->sql_result($result, $i, "perceivedvalue");
+    $player = Player::withPlayerID($mysqli_db, $playerID);
+    $teamOfPlayer = Team::initialize($mysqli_db, $player->teamName);
+    $offeringTeamName = $row['team'];
+    $offeringTeam = Team::initialize($mysqli_db, $offeringTeamName);
+    $perceivedvalue = $row['perceivedvalue'];
 
     if ($lastPlayerIteratedOn != $player->name) {
         $discordText .= $offerText;
@@ -201,29 +213,32 @@ while ($i < $num) {
         $discordText .= "**" . strtoupper("$player->name, $teamOfPlayer->city $player->teamName") . "** <@!$teamOfPlayer->discordID>\n";
     }
 
-    $offer1 = $db->sql_result($result, $i, "offer1");
-    $offer2 = $db->sql_result($result, $i, "offer2");
-    $offer3 = $db->sql_result($result, $i, "offer3");
-    $offer4 = $db->sql_result($result, $i, "offer4");
-    $offer5 = $db->sql_result($result, $i, "offer5");
-    $offer6 = $db->sql_result($result, $i, "offer6");
+    $offer1 = $row['offer1'];
+    $offer2 = $row['offer2'];
+    $offer3 = $row['offer3'];
+    $offer4 = $row['offer4'];
+    $offer5 = $row['offer5'];
+    $offer6 = $row['offer6'];
 
-    $birdYears = $db->sql_result($result, $i, "bird");
-    $MLE = $db->sql_result($result, $i, "MLE");
-    $LLE = $db->sql_result($result, $i, "LLE");
-    $random = $db->sql_result($result, $i, "random");
+    $birdYears = $row['bird'];
+    $MLE = $row['MLE'];
+    $LLE = $row['LLE'];
+    $random = $row['random'];
 
-    $escaped_name = DatabaseService::escapeString($db, $name);
-    $query2 = "SELECT * FROM `ibl_demands` WHERE name = '$escaped_name'";
-    $result2 = $db->sql_query($query2);
-    $num2 = $db->sql_numrows($result2);
+    $stmt2 = $mysqli_db->prepare("SELECT * FROM `ibl_demands` WHERE name = ?");
+    $stmt2->bind_param('s', $name);
+    $stmt2->execute();
+    $result2 = $stmt2->get_result();
+    $num2 = $result2->num_rows;
 
-    $dem1 = $db->sql_result($result2, 0, "dem1");
-    $dem2 = $db->sql_result($result2, 0, "dem2");
-    $dem3 = $db->sql_result($result2, 0, "dem3");
-    $dem4 = $db->sql_result($result2, 0, "dem4");
-    $dem5 = $db->sql_result($result2, 0, "dem5");
-    $dem6 = $db->sql_result($result2, 0, "dem6");
+    $demRow = $result2->fetch_assoc();
+    $stmt2->close();
+    $dem1 = $demRow['dem1'];
+    $dem2 = $demRow['dem2'];
+    $dem3 = $demRow['dem3'];
+    $dem4 = $demRow['dem4'];
+    $dem5 = $demRow['dem5'];
+    $dem6 = $demRow['dem6'];
 
     $offeryears = 6;
     if ($offer6 == 0) {
@@ -282,7 +297,7 @@ while ($i < $num) {
     if ($lastPlayerIteratedOn != $name) {
         if ($perceivedvalue > $demands) {
             echo " <TR>
-                <TD>" . DatabaseService::safeHtmlOutput($name) . "</TD>
+                <TD>" . HtmlSanitizer::safeHtmlOutput($name) . "</TD>
                 <TD>$offeringTeamName</TD>
                 <TD>$offer1</TD>
                 <TD>$offer2</TD>
@@ -299,28 +314,27 @@ while ($i < $num) {
             $outcomeText = $name . " accepts the " . $offeringTeamName . " offer of a " . $offeryears . "-year deal worth a total of " . $offertotal . " million dollars.";
             $text .= $outcomeText . "<br>\n";
             
-            // Escape variables for SQL
-            $escaped_offeringTeamName = DatabaseService::escapeString($db, $offeringTeamName);
-            $escaped_name = DatabaseService::escapeString($db, $name);
-            
-            $code .= "UPDATE `ibl_plr`
-				SET `cy` = '0',
-					`cy1` = '" . $offer1 . "',
-					`cy2` = '" . $offer2 . "',
-					`cy3` = '" . $offer3 . "',
-					`cy4` = '" . $offer4 . "',
-					`cy5` = '" . $offer5 . "',
-					`cy6` = '" . $offer6 . "',
-					`teamname` = '" . $escaped_offeringTeamName . "',
-					`cyt` = '" . $offeryears . "',
-					`tid` = $offeringTeam->teamID
-				WHERE `name` = '" . $escaped_name . "'
-				LIMIT 1;";
+            // Note: These SQL queries are built for display and manual review before execution
+            // They will be executed via the POST handler using the existing query execution method
+            $code .= "
+UPDATE `ibl_plr`
+SET `cy` = '0',
+    `cy1` = '" . $mysqli_db->real_escape_string($offer1) . "',
+    `cy2` = '" . $mysqli_db->real_escape_string($offer2) . "',
+    `cy3` = '" . $mysqli_db->real_escape_string($offer3) . "',
+    `cy4` = '" . $mysqli_db->real_escape_string($offer4) . "',
+    `cy5` = '" . $mysqli_db->real_escape_string($offer5) . "',
+    `cy6` = '" . $mysqli_db->real_escape_string($offer6) . "',
+    `teamname` = '" . $mysqli_db->real_escape_string($offeringTeamName) . "',
+    `cyt` = '" . $mysqli_db->real_escape_string($offeryears) . "',
+    `tid` = " . (int)$offeringTeam->teamID . "
+WHERE `name` = '" . $mysqli_db->real_escape_string($name) . "'
+LIMIT 1;\n";
             if ($MLE == 1) {
-                $code .= "UPDATE `ibl_team_info` SET `HasMLE` = '0' WHERE `team_name` = '" . $escaped_offeringTeamName . "' LIMIT 1;";
+                $code .= "UPDATE `ibl_team_info` SET `HasMLE` = '0' WHERE `team_name` = '" . $mysqli_db->real_escape_string($offeringTeamName) . "' LIMIT 1;";
             }
             if ($LLE == 1) {
-                $code .= "UPDATE `ibl_team_info` SET `HasLLE` = '0' WHERE `team_name` = '" . $escaped_offeringTeamName . "' LIMIT 1;";
+                $code .= "UPDATE `ibl_team_info` SET `HasLLE` = '0' WHERE `team_name` = '" . $mysqli_db->real_escape_string($offeringTeamName) . "' LIMIT 1;";
             }
         } else {
             $outcomeText = "**REJECTED**\n\n";
@@ -349,25 +363,26 @@ echo "<TR style=\"font-weight:bold\">
 </TR> ";
 
 while ($i < $num) {
-    $name = $db->sql_result($result, $i, "name");
-    $perceivedvalue = $db->sql_result($result, $i, "perceivedvalue");
-    $offeringTeamName = $db->sql_result($result, $i, "team");
-    $offeringTeam = Team::initialize($db, $offeringTeamName);
+    $row = $allRows[$i];
+    $name = $row['name'];
+    $perceivedvalue = $row['perceivedvalue'];
+    $offeringTeamName = $row['team'];
+    $offeringTeam = Team::initialize($mysqli_db, $offeringTeamName);
 
-    $offer1 = $db->sql_result($result, $i, "offer1");
-    $offer2 = $db->sql_result($result, $i, "offer2");
-    $offer3 = $db->sql_result($result, $i, "offer3");
-    $offer4 = $db->sql_result($result, $i, "offer4");
-    $offer5 = $db->sql_result($result, $i, "offer5");
-    $offer6 = $db->sql_result($result, $i, "offer6");
+    $offer1 = $row['offer1'];
+    $offer2 = $row['offer2'];
+    $offer3 = $row['offer3'];
+    $offer4 = $row['offer4'];
+    $offer5 = $row['offer5'];
+    $offer6 = $row['offer6'];
 
-    $birdYears = $db->sql_result($result, $i, "bird");
-    $MLE = $db->sql_result($result, $i, "MLE");
-    $LLE = $db->sql_result($result, $i, "LLE");
-    $random = $db->sql_result($result, $i, "random");
+    $birdYears = $row['bird'];
+    $MLE = $row['MLE'];
+    $LLE = $row['LLE'];
+    $random = $row['random'];
 
     echo "<TR>
-        <TD>" . DatabaseService::safeHtmlOutput($name) . "</TD>
+        <TD>" . HtmlSanitizer::safeHtmlOutput($name) . "</TD>
         <TD>$offeringTeamName</TD>
         <TD>$offer1</TD>
         <TD>$offer2</TD>
@@ -399,7 +414,7 @@ while ($i < $num) {
     }
     $offertotal = ($offer1 + $offer2 + $offer3 + $offer4 + $offer5 + $offer6) / 100;
 
-    $exttext .= "The " . $offeringTeamName . " offered " . DatabaseService::safeHtmlOutput($name) . " a " . $offeryears . "-year deal worth a total of " . $offertotal . " million dollars.<br>\n";
+    $exttext .= "The " . $offeringTeamName . " offered " . HtmlSanitizer::safeHtmlOutput($name) . " a " . $offeryears . "-year deal worth a total of " . $offertotal . " million dollars.<br>\n";
     $i++;
 }
 

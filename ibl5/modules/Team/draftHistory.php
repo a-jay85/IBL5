@@ -8,9 +8,9 @@ $teamID = isset($_GET['teamID']) ? (int) $_GET['teamID'] : 0;
 
 Nuke\Header::header();
 OpenTable();
-UI::displaytopmenu($db, $teamID);
+UI::displaytopmenu($mysqli_db, $teamID);
 
-$team = Team::initialize($db, $teamID);
+$team = Team::initialize($mysqli_db, $teamID);
 
 echo "$team->name Draft History
     <table class=\"sortable\">
@@ -28,9 +28,9 @@ foreach ($team->getDraftHistoryResult() as $playerRow) {
     echo "<tr>";
 
     if ($player->isRetired) {
-        echo "<td><a href=\"./modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->name</a> (retired)</td>";
+        echo "<td><a href=\"/ibl5/modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->name</a> (retired)</td>";
     } else {
-        echo "<td><a href=\"./modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->name</a></td>";
+        echo "<td><a href=\"/ibl5/modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->name</a></td>";
     }
 
     echo "

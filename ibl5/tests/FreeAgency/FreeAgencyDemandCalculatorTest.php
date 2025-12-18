@@ -2,7 +2,7 @@
 
 use PHPUnit\Framework\TestCase;
 use FreeAgency\FreeAgencyDemandCalculator;
-use FreeAgency\FreeAgencyDemandRepositoryInterface;
+use FreeAgency\Contracts\FreeAgencyDemandRepositoryInterface;
 use Player\Player;
 
 /**

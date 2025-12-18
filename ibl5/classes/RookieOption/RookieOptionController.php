@@ -24,7 +24,7 @@ class RookieOptionController implements RookieOptionControllerInterface
     private $view;
     private $newsService;
     
-    public function __construct($db)
+    public function __construct(\mysqli $db)
     {
         $this->db = $db;
         $this->repository = new RookieOptionRepository($db);
@@ -37,24 +37,29 @@ class RookieOptionController implements RookieOptionControllerInterface
      */
     public function processRookieOption(string $teamName, int $playerID, int $extensionAmount): void
     {
-        $sharedFunctions = new \Shared($this->db);
-        $commonRepository = new \Services\CommonRepository($this->db);
+        $commonRepository = new \Services\CommonMysqliRepository($this->db);
         $season = new \Season($this->db);
         $player = Player::withPlayerID($this->db, $playerID);
         
         // Validate player eligibility
         if (!$player->canRookieOption($season->phase)) {
-            die("This player's experience doesn't match their rookie status; please let the commish know about this error.");
+            $errorMessage = "This player's experience doesn't match their rookie status; please let the commish know about this error.";
+            error_log("[RookieOption] Validation error for player ID {$playerID}: {$errorMessage}");
+            throw new \RuntimeException($errorMessage, 1001);
         }
         
         // Determine which contract year to update based on draft round
         if ($player->draftRound != 1 && $player->draftRound != 2) {
-            die("This player's experience doesn't match their rookie status; please let the commish know about this error.");
+            $errorMessage = "This player's experience doesn't match their rookie status; please let the commish know about this error.";
+            error_log("[RookieOption] Draft round validation error for player ID {$playerID}: Draft round {$player->draftRound} is invalid");
+            throw new \RuntimeException($errorMessage, 1001);
         }
         
         // Update player's contract
         if (!$this->repository->updatePlayerRookieOption($playerID, (int) $player->draftRound, $extensionAmount)) {
-            die("Failed to update player contract. Please contact the commissioner.");
+            $errorMessage = "Failed to update player contract. Please contact the commissioner.";
+            error_log("[RookieOption] Database update failed for player ID {$playerID}, draft round {$player->draftRound}, extension amount {$extensionAmount}");
+            throw new \RuntimeException($errorMessage, 1002);
         }
         
         // Get team ID for redirect link

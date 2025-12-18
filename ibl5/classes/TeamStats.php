@@ -1,10 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 use Statistics\StatsFormatter;
+use Statistics\StatisticsRepository;
 
 class TeamStats
 {
-    protected $db;
+    protected StatisticsRepository $repository;
 
     public $seasonOffenseGamesPlayed;
     public $seasonOffenseTotalFieldGoalsMade;
@@ -80,34 +83,30 @@ class TeamStats
     public $seasonDefenseFreeThrowPercentage;
     public $seasonDefenseThreePointPercentage;
 
-    public function __construct()
+    public function __construct(StatisticsRepository $repository)
     {
+        $this->repository = $repository;
     }
 
-    public static function withTeamName($db, string $teamName)
+    public static function withTeamName($db, string $teamName): self
     {
-        $instance = new self();
-        $instance->loadByTeamName($db, $teamName);
+        $repository = new StatisticsRepository($db);
+        $instance = new self($repository);
+        $instance->loadByTeamName($teamName);
         return $instance;
     }
 
-    protected function loadByTeamName($db, string $teamName)
+    protected function loadByTeamName(string $teamName): void
     {
-        $queryOffenseTotals = "SELECT *
-            FROM ibl_team_offense_stats
-            WHERE name = '$teamName'
-            LIMIT 1;";
-        $resulOffenseTotals = $db->sql_query($queryOffenseTotals);
-        $offenseTotalsRow = $db->sql_fetch_assoc($resulOffenseTotals);
-        $this->fillOffenseTotals($offenseTotalsRow);
+        $offenseTotalsRow = $this->repository->getTeamOffenseStats($teamName);
+        if ($offenseTotalsRow) {
+            $this->fillOffenseTotals($offenseTotalsRow);
+        }
 
-        $queryDefenseTotals = "SELECT *
-            FROM ibl_team_defense_stats
-            WHERE name = '$teamName'
-            LIMIT 1;";
-        $resulDefenseTotals = $db->sql_query($queryDefenseTotals);
-        $defenseTotalsRow = $db->sql_fetch_assoc($resulDefenseTotals);
-        $this->fillDefenseTotals($defenseTotalsRow);
+        $defenseTotalsRow = $this->repository->getTeamDefenseStats($teamName);
+        if ($defenseTotalsRow) {
+            $this->fillDefenseTotals($defenseTotalsRow);
+        }
     }
 
     protected function fillOffenseTotals(array $offenseTotalsRow)

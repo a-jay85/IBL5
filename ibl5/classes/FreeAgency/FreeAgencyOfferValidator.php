@@ -9,14 +9,12 @@ use FreeAgency\Contracts\FreeAgencyOfferValidatorInterface;
  */
 class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
 {
-    private $db;
-    private $mysqli_db;
+    private object $mysqli_db;
     private array $offerData = [];
     private $team;
 
-    public function __construct($db, $mysqli_db = null, $team = null)
+    public function __construct(object $mysqli_db, $team = null)
     {
-        $this->db = $db;
         $this->mysqli_db = $mysqli_db;
         $this->team = $team;
     }
@@ -240,9 +238,17 @@ class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
     {
         $query = "SELECT cy, cy1 FROM ibl_plr WHERE pid = ?";
         $stmt = $this->mysqli_db->prepare($query);
+        if ($stmt === false) {
+            throw new \Exception('Prepare failed: ' . $this->mysqli_db->error);
+        }
+        
         $stmt->bind_param("i", $playerId);
-        $stmt->execute();
+        if (!$stmt->execute()) {
+            throw new \Exception('Execute failed: ' . $stmt->error);
+        }
+        
         $result = $stmt->get_result();
+        $stmt->close();
         
         if ($result->num_rows === 0) {
             return false;

@@ -15,19 +15,16 @@ use Shared\SalaryConverter;
  */
 class ExtensionOfferEvaluationTest extends TestCase
 {
-    private $mockDb;
     private $offerEvaluator;
 
     protected function setUp(): void
     {
-        $this->mockDb = new MockDatabase();
-        $this->offerEvaluator = new ExtensionOfferEvaluator($this->mockDb);
+        $this->offerEvaluator = new ExtensionOfferEvaluator();
     }
 
     protected function tearDown(): void
     {
         $this->offerEvaluator = null;
-        $this->mockDb = null;
     }
 
     /**

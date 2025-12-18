@@ -23,6 +23,7 @@ class RookieOptionRepositoryTest extends TestCase
     public function testUpdatePlayerRookieOptionFirstRound()
     {
         $this->mockDb->setReturnTrue(true);
+        $this->mockDb->setAffectedRows(1);
         
         $result = $this->repository->updatePlayerRookieOption(123, 1, 200);
         
@@ -42,6 +43,7 @@ class RookieOptionRepositoryTest extends TestCase
     public function testUpdatePlayerRookieOptionSecondRound()
     {
         $this->mockDb->setReturnTrue(true);
+        $this->mockDb->setAffectedRows(1);
         
         $result = $this->repository->updatePlayerRookieOption(456, 2, 150);
         

@@ -14,6 +14,20 @@ jobs:
       matrix:
         php-version: ['8.3']
     
+    services:
+      mariadb:
+        image: mariadb:10.6
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: ibl5_test
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -u root -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+        ports:
+          - 3306:3306
+    
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -24,6 +38,25 @@ jobs:
         php-version: ${{ matrix.php-version }}
         extensions: mbstring, intl, pdo, pdo_mysql
         coverage: xdebug
+    
+    - name: Wait for MariaDB
+      run: |
+        echo "Waiting for MariaDB to be ready..."
+        until mysqladmin ping -h 127.0.0.1 -u root -proot --silent; do
+          echo "MariaDB is unavailable - sleeping"
+          sleep 2
+        done
+        echo "✓ MariaDB is ready"
+    
+    - name: Initialize test database
+      run: |
+        echo "Creating test database schema..."
+        mysql -h 127.0.0.1 -u root -proot ibl5_test < ibl5/schema.sql
+        echo "✓ Test database initialized"
+        echo ""
+        echo "Verifying database tables..."
+        TABLE_COUNT=$(mysql -h 127.0.0.1 -u root -proot -s -N -e "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = 'ibl5_test';")
+        echo "✓ Created $TABLE_COUNT tables"
     
     - name: Cache vendor directory
       uses: actions/cache@v4
@@ -102,6 +135,12 @@ jobs:
     
     - name: Run PHPUnit tests
       working-directory: ibl5
+      env:
+        DB_HOST: 127.0.0.1
+        DB_USER: root
+        DB_PASS: root
+        DB_NAME: ibl5_test
+        DB_PORT: 3306
       run: |
         vendor/bin/phpunit \
           --testdox \

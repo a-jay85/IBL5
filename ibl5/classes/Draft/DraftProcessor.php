@@ -18,7 +18,7 @@ class DraftProcessor implements DraftProcessorInterface
     /**
      * @see DraftProcessorInterface::createDraftAnnouncement()
      */
-    public function createDraftAnnouncement(int $draftPick, int $draftRound, string $seasonYear, string $teamName, string $playerName): string
+    public function createDraftAnnouncement(int $draftPick, int $draftRound, int $seasonYear, string $teamName, string $playerName): string
     {
         return "With pick #$draftPick in round $draftRound of the $seasonYear IBL Draft, the **" 
             . $teamName . "** select **" . $playerName . "!**";
@@ -27,7 +27,7 @@ class DraftProcessor implements DraftProcessorInterface
     /**
      * @see DraftProcessorInterface::createNextTeamMessage()
      */
-    public function createNextTeamMessage(string $baseMessage, ?string $discordID, ?string $seasonYear): string
+    public function createNextTeamMessage(string $baseMessage, ?int $discordID, ?int $seasonYear): string
     {
         if ($discordID !== null) {
             return $baseMessage . '

@@ -18,16 +18,21 @@ use Extension\Contracts\ExtensionProcessorInterface;
  */
 class ExtensionProcessor implements ExtensionProcessorInterface
 {
-    private $db;
+    private object $db;
     private ExtensionValidator $validator;
     private ExtensionOfferEvaluator $evaluator;
     private ExtensionDatabaseOperations $dbOps;
 
-    public function __construct($db)
+    /**
+     * Constructor
+     * 
+     * @param object $db mysqli connection or duck-typed mock for testing
+     */
+    public function __construct(object $db)
     {
         $this->db = $db;
-        $this->validator = new ExtensionValidator($db);
-        $this->evaluator = new ExtensionOfferEvaluator($db);
+        $this->validator = new ExtensionValidator();
+        $this->evaluator = new ExtensionOfferEvaluator();
         $this->dbOps = new ExtensionDatabaseOperations($db);
     }
 
@@ -259,15 +264,39 @@ class ExtensionProcessor implements ExtensionProcessorInterface
         try {
             // First, try to get from mock database (for tests)
             // Check if team_info has money_committed_at_position field
-            $teamNameEscaped = \Services\DatabaseService::escapeString($this->db, $team->name);
-            $query = "SELECT money_committed_at_position FROM ibl_team_info WHERE team_name = '$teamNameEscaped' LIMIT 1";
-            $result = $this->db->sql_query($query);
-            
-            if ($this->db->sql_numrows($result) > 0) {
-                $row = $this->db->sql_fetch_assoc($result);
-                if (isset($row['money_committed_at_position']) && $row['money_committed_at_position'] > 0) {
-                    // Mock data is available, use it
-                    return (int) $row['money_committed_at_position'];
+            if ($this->db instanceof \mysqli) {
+                $stmt = $this->db->prepare("SELECT money_committed_at_position FROM ibl_team_info WHERE team_name = ? LIMIT 1");
+                $stmt->bind_param('s', $team->name);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                
+                if ($result->num_rows > 0) {
+                    $row = $result->fetch_assoc();
+                    $stmt->close();
+                    if (isset($row['money_committed_at_position']) && $row['money_committed_at_position'] > 0) {
+                        // Mock data is available, use it
+                        return (int) $row['money_committed_at_position'];
+                    }
+                }
+                $stmt->close();
+            } else {
+                // Mock database for tests
+                $query = "SELECT money_committed_at_position FROM ibl_team_info WHERE team_name = ? LIMIT 1";
+                $stmt = $this->db->prepare($query);
+                if ($stmt) {
+                    $stmt->bind_param('s', $team->name);
+                    $stmt->execute();
+                    $result = $stmt->get_result();
+                    
+                    if ($result->num_rows > 0) {
+                        $row = $result->fetch_assoc();
+                        if (isset($row['money_committed_at_position']) && $row['money_committed_at_position'] > 0) {
+                            // Mock data is available, use it
+                            $stmt->close();
+                            return (int) $row['money_committed_at_position'];
+                        }
+                    }
+                    $stmt->close();
                 }
             }
             
@@ -292,18 +321,44 @@ class ExtensionProcessor implements ExtensionProcessorInterface
     private function getTeamTraditionData($teamName)
     {
         try {
-            $teamNameEscaped = \Services\DatabaseService::escapeString($this->db, $teamName);
-            $query = "SELECT Contract_Wins, Contract_Losses, Contract_AvgW, Contract_AvgL FROM ibl_team_info WHERE team_name = '$teamNameEscaped' LIMIT 1";
-            $result = $this->db->sql_query($query);
-            
-            if ($this->db->sql_numrows($result) > 0) {
-                $row = $this->db->sql_fetch_assoc($result);
-                return [
-                    'currentSeasonWins' => isset($row['Contract_Wins']) ? (int) $row['Contract_Wins'] : 41,
-                    'currentSeasonLosses' => isset($row['Contract_Losses']) ? (int) $row['Contract_Losses'] : 41,
-                    'tradition_wins' => isset($row['Contract_AvgW']) ? (int) $row['Contract_AvgW'] : 41,
-                    'tradition_losses' => isset($row['Contract_AvgL']) ? (int) $row['Contract_AvgL'] : 41
-                ];
+            if ($this->db instanceof \mysqli) {
+                $stmt = $this->db->prepare("SELECT Contract_Wins, Contract_Losses, Contract_AvgW, Contract_AvgL FROM ibl_team_info WHERE team_name = ? LIMIT 1");
+                $stmt->bind_param('s', $teamName);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                
+                if ($result->num_rows > 0) {
+                    $row = $result->fetch_assoc();
+                    $stmt->close();
+                    return [
+                        'currentSeasonWins' => isset($row['Contract_Wins']) ? (int) $row['Contract_Wins'] : 41,
+                        'currentSeasonLosses' => isset($row['Contract_Losses']) ? (int) $row['Contract_Losses'] : 41,
+                        'tradition_wins' => isset($row['Contract_AvgW']) ? (int) $row['Contract_AvgW'] : 41,
+                        'tradition_losses' => isset($row['Contract_AvgL']) ? (int) $row['Contract_AvgL'] : 41
+                    ];
+                }
+                $stmt->close();
+            } else {
+                // Mock database for tests
+                $query = "SELECT Contract_Wins, Contract_Losses, Contract_AvgW, Contract_AvgL FROM ibl_team_info WHERE team_name = ? LIMIT 1";
+                $stmt = $this->db->prepare($query);
+                if ($stmt) {
+                    $stmt->bind_param('s', $teamName);
+                    $stmt->execute();
+                    $result = $stmt->get_result();
+                    
+                    if ($result->num_rows > 0) {
+                        $row = $result->fetch_assoc();
+                        $stmt->close();
+                        return [
+                            'currentSeasonWins' => isset($row['Contract_Wins']) ? (int) $row['Contract_Wins'] : 41,
+                            'currentSeasonLosses' => isset($row['Contract_Losses']) ? (int) $row['Contract_Losses'] : 41,
+                            'tradition_wins' => isset($row['Contract_AvgW']) ? (int) $row['Contract_AvgW'] : 41,
+                            'tradition_losses' => isset($row['Contract_AvgL']) ? (int) $row['Contract_AvgL'] : 41
+                        ];
+                    }
+                    $stmt->close();
+                }
             }
         } catch (\Exception $e) {
             // Log error if needed

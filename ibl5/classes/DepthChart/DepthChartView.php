@@ -6,6 +6,7 @@ namespace DepthChart;
 
 use DepthChart\Contracts\DepthChartViewInterface;
 use Services\DatabaseService;
+use Utilities\HtmlSanitizer;
 
 /**
  * @see DepthChartViewInterface
@@ -144,7 +145,7 @@ class DepthChartView implements DepthChartViewInterface
         $player_name = $player['name'];
         $player_inj = $player['injured'];
 
-        $player_name_html = DatabaseService::safeHtmlOutput($player_name);
+        $player_name_html = HtmlSanitizer::safeHtmlOutput($player_name);
 
         $player_staminacap = (int)$player['sta'] + 40;
         if ($player_staminacap > 40) {

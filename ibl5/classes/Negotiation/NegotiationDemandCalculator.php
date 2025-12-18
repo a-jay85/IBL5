@@ -5,23 +5,25 @@ declare(strict_types=1);
 namespace Negotiation;
 
 use Negotiation\Contracts\NegotiationDemandCalculatorInterface;
+use Negotiation\Contracts\NegotiationRepositoryInterface;
 use Player\Player;
-use Services\DatabaseService;
 
 /**
  * @see NegotiationDemandCalculatorInterface
  */
 class NegotiationDemandCalculator implements NegotiationDemandCalculatorInterface
 {
-    private $db;
+    private object $db;
+    private NegotiationRepositoryInterface $repository;
     
     // Constants for demand calculation
     private const RAW_SCORE_BASELINE = 700; // Sam Mack's baseline score
     private const DEMANDS_FACTOR = 3; // Trial-and-error multiplier
     
-    public function __construct($db)
+    public function __construct(object $db)
     {
         $this->db = $db;
+        $this->repository = new NegotiationRepository($db);
     }
     
     /**
@@ -138,20 +140,7 @@ class NegotiationDemandCalculator implements NegotiationDemandCalculatorInterfac
      */
     private function getMarketMaximums(): array
     {
-        $stats = [
-            'r_fga', 'r_fgp', 'r_fta', 'r_ftp', 'r_tga', 'r_tgp',
-            'r_orb', 'r_drb', 'r_ast', 'r_stl', 'r_to', 'r_blk', 'r_foul',
-            'oo', 'od', 'do', 'dd', 'po', 'pd', 'to', 'td'
-        ];
-        
-        $maximums = [];
-        foreach ($stats as $stat) {
-            $result = $this->db->sql_fetchrow($this->db->sql_query("SELECT MAX(`$stat`) as max_value FROM ibl_plr"));
-            $key = str_replace('r_', '', $stat);
-            $maximums[$key] = (int)($result['max_value'] ?? 1); // Avoid division by zero
-        }
-        
-        return $maximums;
+        return $this->repository->getMarketMaximums();
     }
     
     /**

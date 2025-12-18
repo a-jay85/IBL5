@@ -21,7 +21,7 @@ class TeamUIServiceTest extends TestCase
     {
         $this->db = new MockDatabase();
         $this->repository = new TeamRepository($this->db);
-        $this->service = new TeamUIService($this->db, $this->repository);
+        $this->service = new TeamUIService($this->repository);
         
         // Create mock team
         $teamRow = [

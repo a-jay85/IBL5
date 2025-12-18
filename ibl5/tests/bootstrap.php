@@ -31,11 +31,24 @@ class MockDatabase
         if (stripos($query, 'INSERT') === 0 || 
             stripos($query, 'UPDATE') === 0 || 
             stripos($query, 'DELETE') === 0) {
+            // Set affected rows for UPDATE/DELETE operations (default to 1 for successful operations)
+            if ($this->returnTrue) {
+                $this->affectedRows = 1;
+            }
             return $this->returnTrue;
         }
         
-        // Special handling for trade info queries
-        if (stripos($query, 'ibl_trade_info') !== false && !empty($this->mockTradeInfo)) {
+        // Special handling for PID existence checks (generateUniquePid)
+        // Return empty result to indicate PID is available unless explicitly configured
+        // Only match the specific "SELECT 1 FROM ibl_plr WHERE pid = X" pattern for existence checks
+        if (stripos($query, 'SELECT 1 FROM ibl_plr WHERE pid = ') !== false) {
+            return new MockDatabaseResult([]);
+        }
+        
+        // Special handling for trade info queries (support both direct and prepared statement patterns)
+        if (stripos($query, 'ibl_trade_info') !== false && 
+            stripos($query, 'tradeofferid') !== false &&
+            !empty($this->mockTradeInfo)) {
             return new MockDatabaseResult($this->mockTradeInfo);
         }
         
@@ -189,6 +202,7 @@ class MockDatabaseResult
 
 /**
  * Mock prepared statement for testing mysqli-style prepared statements
+ * Duck-types mysqli_stmt without extending it to avoid type constraints
  */
 class MockPreparedStatement
 {
@@ -196,10 +210,20 @@ class MockPreparedStatement
     private $query;
     private $boundParams = [];
     private $paramTypes = [];
+    public string|int $affected_rows = 0;
+    public string $error = '';
+    public int $errno = 0;
 
-    public function __construct($mockDb, $query)
+    /**  
+     * @param MockDatabase|null $mockDb Mock database instance to use.  
+     *                                  If null (or omitted), a new MockDatabase  
+     *                                  instance will be created for this statement,  
+     *                                  rather than using any shared instance.  
+     * @param string $query             The SQL query string for this mock statement.  
+     */  
+    public function __construct(?MockDatabase $mockDb, $query = '')
     {
-        $this->mockDb = $mockDb;
+        $this->mockDb = $mockDb ?? new MockDatabase();
         $this->query = $query;
     }
 
@@ -208,7 +232,7 @@ class MockPreparedStatement
      * @param string $types Parameter types (s=string, i=integer, d=double, b=blob)
      * @param mixed ...$params Parameters to bind
      */
-    public function bind_param($types, &...$params)
+    public function bind_param($types, &...$params): bool
     {
         $this->paramTypes = str_split($types);
         foreach ($params as $index => $param) {
@@ -220,33 +244,108 @@ class MockPreparedStatement
     /**
      * Execute the prepared statement
      */
-    public function execute()
+    public function execute(?array $params = null): bool
     {
         // Replace placeholders with bound values in the query
         $query = $this->query;
         foreach ($this->boundParams as $param) {
             // Simple placeholder replacement (?) with the actual value
-            $value = is_string($param) ? "'" . addslashes($param) . "'" : $param;
-            $query = preg_replace('/\?/', $value, $query, 1);
+            // Handle null values to avoid PHP 8.3 deprecation warning
+            if ($param === null) {
+                $value = 'NULL';
+            } else {
+                $value = is_string($param) ? "'" . addslashes($param) . "'" : $param;
+            }
+            $query = preg_replace('/\?/', (string)$value, $query, 1);
         }
         
         // Execute the query using the mock database
-        return $this->mockDb->sql_query($query);
+        $result = $this->mockDb->sql_query($query);
+        
+        // Set affected_rows if query was UPDATE/INSERT/DELETE
+        if (stripos($query, 'UPDATE') === 0 || 
+            stripos($query, 'INSERT') === 0 || 
+            stripos($query, 'DELETE') === 0) {
+            $this->affected_rows = $this->mockDb->sql_affectedrows();
+        }
+        
+        return $result !== false;
     }
 
     /**
      * Get the result of the prepared statement
+     * TEMPORARY: Returns object|false during migration to support MockMysqliResult
      */
-    public function get_result()
+    public function get_result(): object|false
     {
-        // Execute and return result
-        return $this->execute();
+        // Replace placeholders with bound values in the query
+        $query = $this->query;
+        foreach ($this->boundParams as $param) {
+            // Simple placeholder replacement (?) with the actual value
+            // Handle null values to avoid PHP 8.3 deprecation warning
+            if ($param === null) {
+                $value = 'NULL';
+            } else {
+                $value = is_string($param) ? "'" . addslashes($param) . "'" : $param;
+            }
+            $query = preg_replace('/\?/', (string)$value, $query, 1);
+        }
+        
+        // Execute and return mock result wrapped to look like mysqli_result
+        $mockResult = $this->mockDb->sql_query($query);
+        
+        if ($mockResult instanceof MockDatabaseResult) {
+            return new MockMysqliResult($mockResult);
+        }
+        
+        return false;
+    }
+    
+    public function close(): bool
+    {
+        // Mock close - just return true
+        return true;
+    }
+}
+
+/**
+ * Mock mysqli_result class for testing
+ * Cannot extend mysqli_result directly due to readonly properties
+ */
+class MockMysqliResult
+{
+    private $mockResult;
+    public int $current_field = 0;
+    public int $field_count = 0;
+    public ?array $lengths = null;
+    public int|string $num_rows = 0;
+    public int $type = 0;
+    
+    public function __construct(MockDatabaseResult $mockResult)
+    {
+        $this->mockResult = $mockResult;
+        $this->num_rows = $mockResult->numRows();
+    }
+    
+    public function fetch_assoc(): array|null|false
+    {
+        return $this->mockResult->fetchAssoc();
+    }
+    
+    public function fetch_array(int $mode = MYSQLI_BOTH): array|null|false
+    {
+        return $this->mockResult->fetchAssoc();
+    }
+    
+    public function free(): void
+    {
+        // Mock free - do nothing
     }
 }
 
 class Discord
 {
-    public static function getDiscordIDFromTeamname($db, $teamname)
+    public static function getDiscordIDFromTeamname($teamname)
     {
         return '123456789';
     }
@@ -265,7 +364,7 @@ class Shared
         public function __construct($db)
         {
             $this->db = $db;
-            $this->commonRepository = new \Services\CommonRepository($db);
+            $this->commonRepository = new \Services\CommonMysqliRepository($db);
         }
         
         public function getTidFromTeamname($teamname)
@@ -353,7 +452,12 @@ class Season
     
     protected $db;
     
-    public function __construct($db)
+    /**
+     * Mock constructor for testing - accepts mysqli or legacy db object
+     * 
+     * @param object $db Database connection (mysqli or legacy mock)
+     */
+    public function __construct(object $db)
     {
         $this->db = $db;
         // Initialize properties without database calls for testing
@@ -367,22 +471,29 @@ class Season
     }
     
     // Mock the methods that would normally query the database
-    private function getSeasonPhase()
+    public function getSeasonPhase(): string
     {
         return $this->phase;
     }
     
-    private function getSeasonEndingYear()
+    public function getSeasonEndingYear(): string
     {
-        return $this->endingYear;
+        return (string)$this->endingYear;
     }
     
+    /**
+     * Get last sim dates array (mock implementation)
+     * 
+     * Note: 'Start Date' and 'End Date' mimic DATE column format (YYYY-MM-DD)
+     * 
+     * @return array Array with keys: Sim, 'Start Date', 'End Date'
+     */
     private function getLastSimDatesArray()
     {
         return [
             'Sim' => $this->lastSimNumber,
-            'Start Date' => $this->lastSimStartDate,
-            'End Date' => $this->lastSimEndDate
+            'Start Date' => $this->lastSimStartDate, // Mocks DATE column format
+            'End Date' => $this->lastSimEndDate // Mocks DATE column format
         ];
     }
     
@@ -406,3 +517,9 @@ if (!isset($_SERVER['SCRIPT_FILENAME'])) {
 
 // Load the configuration for database access
 require_once __DIR__ . '/../config.php';
+
+// Set up global $mysqli_db mock for tests that use Player or other refactored classes
+// Note: Integration tests should set up their own $mysqli_db that shares the same MockDatabase
+// instance used by the test. See ExtensionIntegrationTest for example.
+//
+// Unit tests that directly mock Player/PlayerRepository don't need this global.

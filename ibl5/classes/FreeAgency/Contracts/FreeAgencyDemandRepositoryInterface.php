@@ -1,6 +1,6 @@
 <?php
 
-namespace FreeAgency;
+namespace FreeAgency\Contracts;
 
 /**
  * Interface for retrieving free agency demand-related data from the database

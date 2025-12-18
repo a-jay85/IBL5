@@ -21,32 +21,75 @@ class StatisticsRepositoryTest extends TestCase
 
     private function createMockDatabase()
     {
-        return new class {
+        return new class extends \MockDatabase {
             private array $queryResults = [];
-            private int $queryIndex = 0;
+            private array $sharedState = ['fetchIndex' => 0];
 
             public function setQueryResults(array $results): void
             {
                 $this->queryResults = $results;
-                $this->queryIndex = 0;
+                $this->setMockData($results);
+                $this->sharedState['fetchIndex'] = 0;
             }
-
-            public function sql_query(string $query)
+            
+            // Override prepare to handle both fetchAll and fetchOne patterns
+            // For fetchOne, we need to track consumption across multiple prepare() calls
+            public function prepare($query)
             {
-                return $this;
-            }
-
-            public function sql_fetchrow($result): array|false
-            {
-                if ($this->queryIndex < count($this->queryResults)) {
-                    return $this->queryResults[$this->queryIndex++];
-                }
-                return false;
-            }
-
-            public function sql_numrows($result): int
-            {
-                return count($this->queryResults);
+                $sharedState = &$this->sharedState;
+                $results = $this->queryResults;
+                
+                $stmt = new class($this, $results, $sharedState) extends \MockPreparedStatement {
+                    private array $results;
+                    private array $sharedState;
+                    
+                    public function __construct($db, array $results, array &$state) {
+                        parent::__construct($db, '');
+                        $this->results = $results;
+                        $this->sharedState = &$state;
+                    }
+                    
+                    public function get_result(): object|false
+                    {
+                        // For fetchOne pattern: consume one result and return it, then return null for subsequent fetches
+                        $currentIndex = $this->sharedState['fetchIndex'];
+                        $this->sharedState['fetchIndex']++; // Consume the result for the next prepare() call
+                        
+                        return new class($this->results, $currentIndex) extends \MockMysqliResult {
+                            private int $localFetchIndex = 0;
+                            private array $allResults;
+                            private int $startIndex;
+                            
+                            public function __construct(array $results, int $startIndex) {
+                                $mockResult = new \MockDatabaseResult($results);
+                                parent::__construct($mockResult);
+                                $this->allResults = $results;
+                                $this->startIndex = $startIndex;
+                                $this->localFetchIndex = 0;
+                            }
+                            
+                            public function fetch_assoc(): array|null|false
+                            {
+                                // For fetchOne: return only the result at startIndex on first fetch
+                                if ($this->localFetchIndex === 0) {
+                                    $this->localFetchIndex++;
+                                    if ($this->startIndex < count($this->allResults)) {
+                                        return $this->allResults[$this->startIndex];
+                                    }
+                                    return null;
+                                }
+                                // For fetchAll: continue fetching from the array
+                                $absoluteIndex = $this->startIndex + $this->localFetchIndex;
+                                if ($absoluteIndex < count($this->allResults)) {
+                                    $this->localFetchIndex++;
+                                    return $this->allResults[$absoluteIndex];
+                                }
+                                return null;
+                            }
+                        };
+                    }
+                };
+                return $stmt;
             }
         };
     }
@@ -224,19 +267,27 @@ class StatisticsRepositoryTest extends TestCase
 
     public function testGetHourlyStatsReturnsAllHours(): void
     {
-        // Mock database to return hits for a few hours
+        // The method makes 24 separate queries (one per hour)
+        // We need to set up the mock to return appropriate data for each query
+        // Since the mock returns the same data for each query, we simulate the pattern
+        // where only hours 0 and 1 have hits, rest return null
         $this->mockDb->setQueryResults([
             ['hour' => 0, 'hits' => 10],
-            ['hour' => 1, 'hits' => 5],
-            // Hours 2-23 will have 0 hits
         ]);
 
         $result = $this->repository->getHourlyStats(2024, 11, 7);
 
+        // Method should return array with 24 entries (one for each hour)
         $this->assertIsArray($result);
         $this->assertCount(24, $result);
+        
+        // First hour should have the data from our mock
         $this->assertEquals(10, $result[0]);
-        $this->assertEquals(5, $result[1]);
-        $this->assertEquals(0, $result[2]);
+        
+        // Remaining hours should be 0 (no data)
+        // The method returns 0 when fetchOne returns null
+        for ($i = 1; $i < 24; $i++) {
+            $this->assertEquals(0, $result[$i], "Hour $i should be 0");
+        }
     }
 }

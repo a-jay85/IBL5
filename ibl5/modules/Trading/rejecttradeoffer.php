@@ -2,19 +2,25 @@
 
 require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
+global $mysqli_db;
+
 $offer_id = $_POST['offer'];
 $teamRejecting = $_POST['teamRejecting'];
 $teamReceiving = $_POST['teamReceiving'];
 
-$queryClearInfo = "DELETE FROM ibl_trade_info WHERE `tradeOfferID` = '$offer_id'";
-$resultClearInfo = $db->sql_query($queryClearInfo);
-$queryClearCash = "DELETE FROM ibl_trade_cash WHERE `tradeOfferID` = '$offer_id'";
-$resultClearCash = $db->sql_query($queryClearCash);
+$stmtClearInfo = $mysqli_db->prepare("DELETE FROM ibl_trade_info WHERE tradeOfferID = ?");
+$stmtClearInfo->bind_param("i", $offer_id);
+$resultClearInfo = $stmtClearInfo->execute();
+$stmtClearInfo->close();
 
-$rejectingUserDiscordID = Discord::getDiscordIDFromTeamname($db, $teamRejecting);
-$receivingUserDiscordID = Discord::getDiscordIDFromTeamname($db, $teamReceiving);
+$stmtClearCash = $mysqli_db->prepare("DELETE FROM ibl_trade_cash WHERE tradeOfferID = ?");
+$stmtClearCash->bind_param("i", $offer_id);
+$resultClearCash = $stmtClearCash->execute();
+$stmtClearCash->close();
+
+$rejectingUserDiscordID = Discord::getDiscordIDFromTeamname($teamRejecting);
+$receivingUserDiscordID = Discord::getDiscordIDFromTeamname($teamReceiving);
 $discordDMmessage = 'Sorry, trade proposal declined by <@!' . $rejectingUserDiscordID . '>.
-
 Go here to make another offer: http://www.iblhoops.net/ibl5/modules.php?name=Trading&op=reviewtrade';
 $arrayContent = array(
         'message' => $discordDMmessage,

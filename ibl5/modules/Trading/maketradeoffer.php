@@ -2,6 +2,8 @@
 
 require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
+global $mysqli_db;
+
 // Prepare trade data from POST
 $tradeData = [
     'offeringTeam' => $_POST['offeringTeam'],
@@ -33,7 +35,7 @@ for ($j = 0; $j < $tradeData['fieldsCounter']; $j++) {
 }
 
 // Create trade offer using new class
-$tradeOffer = new Trading\TradeOffer($db, $mysqli_db ?? null);
+$tradeOffer = new Trading\TradeOffer($mysqli_db);
 $result = $tradeOffer->createTradeOffer($tradeData);
 
 // Display trade cap details

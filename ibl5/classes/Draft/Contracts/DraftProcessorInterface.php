@@ -42,7 +42,7 @@ interface DraftProcessorInterface
      *  $msg = $processor->createDraftAnnouncement(5, 1, '2026', 'New York', 'John Smith');
      *  // Returns: "With pick #5 in round 1 of the 2026 IBL Draft, the **New York** select **John Smith!**"
      */
-    public function createDraftAnnouncement(int $draftPick, int $draftRound, string $seasonYear, string $teamName, string $playerName): string;
+    public function createDraftAnnouncement(int $draftPick, int $draftRound, int $seasonYear, string $teamName, string $playerName): string;
 
     /**
      * Create the message for the next team on the clock
@@ -77,7 +77,7 @@ interface DraftProcessorInterface
      *  $msg = $processor->createNextTeamMessage($base, null, '2026');
      *  // Returns: "With pick #5...John Smith!\n**🏁 __The 2026 IBL Draft has officially concluded!__ 🏁**"
      */
-    public function createNextTeamMessage(string $baseMessage, ?string $discordID, ?string $seasonYear): string;
+    public function createNextTeamMessage(string $baseMessage, ?int $discordID, ?int $seasonYear): string;
 
     /**
      * Get the success message HTML for display

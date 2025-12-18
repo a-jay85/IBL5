@@ -3,8 +3,7 @@
 require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
 $query = "SELECT * FROM ibl_plr WHERE retired = 0 ORDER BY ordinal ASC";
-$result = $db->sql_query($query);
-$num = $db->sql_numrows($result);
+$result = $mysqli_db->query($query);
 
 echo "<html><head><title>Master Contract List</title></head><body><table>
    <tr><th colspan=18><center>Contracts</center></th></tr>
@@ -20,14 +19,14 @@ $cap4 = 0;
 $cap5 = 0;
 $cap6 = 0;
 
-while ($i < $num) {
+while ($row = $result->fetch_assoc()) {
 
-    $team = $db->sql_result($result, $i, "teamname");
-    $name = $db->sql_result($result, $i, "name");
-    $pos = $db->sql_result($result, $i, "pos");
+    $team = $row['teamname'];
+    $name = $row['name'];
+    $pos = $row['pos'];
 
-    $cy = $db->sql_result($result, $i, "cy");
-    $cyt = $db->sql_result($result, $i, "cyt");
+    $cy = $row['cy'];
+    $cyt = $row['cyt'];
 
     if ($faon == 0) {
         $year1 = $cy;
@@ -48,80 +47,80 @@ while ($i < $num) {
     if ($cy == 0) {
 
         if ($year1 < 7) {
-            $con1 = $db->sql_result($result, $i, "cy1");
+            $con1 = $row["cy1"];
         } else {
             $con1 = 0;
         }
 
         if ($year2 < 7) {
-            $con2 = $db->sql_result($result, $i, "cy2");
+            $con2 = $row["cy2"];
         } else {
             $con2 = 0;
         }
 
         if ($year3 < 7) {
-            $con3 = $db->sql_result($result, $i, "cy3");
+            $con3 = $row["cy3"];
         } else {
             $con3 = 0;
         }
 
         if ($year4 < 7) {
-            $con4 = $db->sql_result($result, $i, "cy4");
+            $con4 = $row["cy4"];
         } else {
             $con4 = 0;
         }
 
         if ($year5 < 7) {
-            $con5 = $db->sql_result($result, $i, "cy5");
+            $con5 = $row["cy5"];
         } else {
             $con5 = 0;
         }
 
         if ($year6 < 7) {
-            $con6 = $db->sql_result($result, $i, "cy6");
+            $con6 = $row["cy6"];
         } else {
             $con6 = 0;
         }
 
     } else {
         if ($year1 < 7) {
-            $con1 = $db->sql_result($result, $i, "cy$year1");
+            $con1 = $row["cy$year1"];
         } else {
             $con1 = 0;
         }
 
         if ($year2 < 7) {
-            $con2 = $db->sql_result($result, $i, "cy$year2");
+            $con2 = $row["cy$year2"];
         } else {
             $con2 = 0;
         }
 
         if ($year3 < 7) {
-            $con3 = $db->sql_result($result, $i, "cy$year3");
+            $con3 = $row["cy$year3"];
         } else {
             $con3 = 0;
         }
 
         if ($year4 < 7) {
-            $con4 = $db->sql_result($result, $i, "cy$year4");
+            $con4 = $row["cy$year4"];
         } else {
             $con4 = 0;
         }
 
         if ($year5 < 7) {
-            $con5 = $db->sql_result($result, $i, "cy$year5");
+            $con5 = $row["cy$year5"];
         } else {
             $con5 = 0;
         }
 
         if ($year6 < 7) {
-            $con6 = $db->sql_result($result, $i, "cy$year6");
+            $con6 = $row["cy$year6"];
         } else {
             $con6 = 0;
         }
     }
 
-    $bird = $db->sql_result($result, $i, "bird");
+    $bird = $row["bird"];
 
     if ($i % 2) {
         echo "      <tr bgcolor=#ffffff align=center>";
@@ -136,9 +135,6 @@ while ($i < $num) {
     $cap4 = $cap4 + $con4;
     $cap5 = $cap5 + $con5;
     $cap6 = $cap6 + $con6;
-
-    $i++;
-
 }
 
 $acap1 = $cap1 / 2800;
@@ -186,5 +182,3 @@ printf('%01.2f', $acap6);
 echo "</td><td></td></tr>
 </table>
 </body></html>";
-
-$db->sql_close();

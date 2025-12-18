@@ -9,25 +9,21 @@ use FreeAgency\Contracts\FreeAgencyProcessorInterface;
  */
 class FreeAgencyProcessor implements FreeAgencyProcessorInterface
 {
-    private $db;
-    private $mysqli_db;
+    private object $mysqli_db;
     private FreeAgencyOfferValidator $validator;
     private FreeAgencyDemandCalculator $calculator;
-    private \Services\DatabaseService $databaseService;
+    private FreeAgencyRepository $repository;
     private \Season $season;
 
-    public function __construct($db, $mysqli_db = null)
+    public function __construct(object $mysqli_db)
     {
-        global $mysqli_db;
+        $this->mysqli_db = $mysqli_db;
+        $this->season = new \Season($this->mysqli_db);
         
-        $this->db = $db;
-        $this->mysqli_db = $mysqli_db ?? $GLOBALS['mysqli_db'] ?? null;
-        $this->season = new \Season($this->db);
-        
-        $repository = new FreeAgencyDemandRepository($db, $this->mysqli_db);
-        $this->validator = new FreeAgencyOfferValidator($db, $this->mysqli_db);
-        $this->calculator = new FreeAgencyDemandCalculator($repository);
-        $this->databaseService = new \Services\DatabaseService();
+        $demandRepository = new FreeAgencyDemandRepository($this->mysqli_db);
+        $this->validator = new FreeAgencyOfferValidator($this->mysqli_db);
+        $this->calculator = new FreeAgencyDemandCalculator($demandRepository);
+        $this->repository = new FreeAgencyRepository($this->mysqli_db);
     }
 
     /**
@@ -40,10 +36,10 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
         $playerID = (int) ($postData['playerID'] ?? 0);
         
         // Load player object
-        $player = \Player\Player::withPlayerID($this->db, $playerID);
+        $player = \Player\Player::withPlayerID($this->mysqli_db, $playerID);
         
         // Load team object for validation
-        $team = \Team::initialize($this->db, $teamName);
+        $team = \Team::initialize($this->mysqli_db, $teamName);
         
         // Check if player already signed
         if ($this->validator->isPlayerAlreadySigned($playerID)) {
@@ -58,7 +54,7 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
         $offerData = $this->parseOfferData($player, $postData, $team);
         
         // Create validator with team data for MLE/LLE checks
-        $validator = new FreeAgencyOfferValidator($this->db, $this->mysqli_db, $team);
+        $validator = new FreeAgencyOfferValidator($this->mysqli_db, $team);
         
         // Validate the offer
         $validationResult = $validator->validateOffer($offerData);
@@ -96,11 +92,11 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
         $maxContractYear1 = \ContractRules::getMaxContractSalary($player->yearsOfExperience);
         
         // Reconstruct cap space data using provided team object
-        $capCalculator = new FreeAgencyCapCalculator($this->db, $team, $this->season);
+        $capCalculator = new FreeAgencyCapCalculator($this->mysqli_db, $team, $this->season);
         $capMetrics = $capCalculator->calculateTeamCapMetrics($player->name);
         
         // Get existing offer to calculate amended cap space
-        $helper = new FreeAgencyNegotiationHelper($this->db, $this->season);
+        $helper = new FreeAgencyNegotiationHelper($this->mysqli_db, $this->season);
         $existingOffer = $helper->getExistingOffer($team->name, $player->name);
         $amendedCapSpaceYear1 = $capMetrics['softCapSpace'][0] + $existingOffer['offer1'];
         
@@ -167,16 +163,6 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
      */
     private function saveOffer(string $teamName, \Player\Player $player, array $offerData): bool
     {
-        $escapedTeamName = $this->databaseService->escapeString($this->db, $teamName);
-        $escapedPlayerName = $this->databaseService->escapeString($this->db, $player->name);
-        
-        // Delete any existing offer from this team to this player
-        $deleteQuery = "DELETE FROM ibl_fa_offers 
-                        WHERE name = '$escapedPlayerName' 
-                          AND team = '$escapedTeamName' 
-                        LIMIT 1";
-        $this->db->sql_query($deleteQuery);
-        
         // Calculate perceived value
         $yearsInOffer = $this->calculateYearsInOffer($offerData);
         $offerAverage = $this->calculateOfferAverage($offerData, $yearsInOffer);
@@ -196,24 +182,30 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
         $modifier = $perceivedValue / $offerAverage; // Approximate
         $random = 0; // Will be recalculated on acceptance
         
-        // Insert the new offer
-        $insertQuery = "INSERT INTO ibl_fa_offers 
-                        (name, team, offer1, offer2, offer3, offer4, offer5, offer6, 
-                         modifier, random, perceivedvalue, mle, lle, offer_type) 
-                        VALUES 
-                        ('$escapedPlayerName', '$escapedTeamName', 
-                         {$offerData['offer1']}, {$offerData['offer2']}, {$offerData['offer3']}, 
-                         {$offerData['offer4']}, {$offerData['offer5']}, {$offerData['offer6']}, 
-                         $modifier, $random, $perceivedValue, $mle, $lle, {$offerData['offerType']})";
-        
-        $result = $this->db->sql_query($insertQuery);
+        // Save the offer using repository
+        $saved = $this->repository->saveOffer([
+            'teamName' => $teamName,
+            'playerName' => $player->name,
+            'offer1' => $offerData['offer1'],
+            'offer2' => $offerData['offer2'],
+            'offer3' => $offerData['offer3'],
+            'offer4' => $offerData['offer4'],
+            'offer5' => $offerData['offer5'],
+            'offer6' => $offerData['offer6'],
+            'modifier' => $modifier,
+            'random' => $random,
+            'perceivedValue' => $perceivedValue,
+            'mle' => $mle,
+            'lle' => $lle,
+            'offerType' => $offerData['offerType'],
+        ]);
         
         // Post to Discord if significant offer
-        if ($result && $offerData['offer1'] > \ContractRules::LLE_OFFER) {
+        if ($saved && $offerData['offer1'] > \ContractRules::LLE_OFFER) {
             $this->postOfferToDiscord($teamName, $player);
         }
         
-        return (bool) $result;
+        return $saved;
     }
 
     /**
@@ -259,13 +251,14 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
      */
     private function postOfferToDiscord(string $teamName, \Player\Player $player): void
     {
-        $season = new \Season($this->db);
+        $season = new \Season($this->mysqli_db);
         
         if ($season->freeAgencyNotificationsState != "On") {
             return;
         }
         
-        $playerTeamDiscordID = \Discord::getDiscordIDFromTeamname($this->db, $player->teamName);
+        $discord = new \Discord($this->mysqli_db);
+        $playerTeamDiscordID = $discord->getDiscordIDFromTeamname($player->teamName);
         
         if ($teamName == $player->teamName) {
             $message = "Free agent **{$player->name}** has been offered a contract to _stay_ with the **{$player->teamName}**.
@@ -313,15 +306,9 @@ _**{$player->teamName}** GM <@!$playerTeamDiscordID> could not be reached for co
      */
     public function deleteOffers(string $teamName, int $playerID): string
     {
-        $player = \Player\Player::withPlayerID($this->db, $playerID);
+        $player = \Player\Player::withPlayerID($this->mysqli_db, $playerID);
         
-        $escapedTeamName = $this->databaseService->escapeString($this->db, $teamName);
-        $escapedPlayerName = $this->databaseService->escapeString($this->db, $player->name);
-        
-        $query = "DELETE FROM ibl_fa_offers 
-                  WHERE name = '$escapedPlayerName' 
-                    AND team = '$escapedTeamName'";
-        $this->db->sql_query($query);
+        $this->repository->deleteOffer($teamName, $player->name);
         
         ob_start();
         ?>

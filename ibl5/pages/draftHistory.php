@@ -1,22 +1,28 @@
 <?php
 
-use Services\DatabaseService;
+use Utilities\HtmlSanitizer;
 
 require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
+global $mysqli_db;
+
 $queryfirstyear = "SELECT draftyear FROM ibl_plr ORDER BY draftyear ASC";
-$resultfirstyear = $db->sql_query($queryfirstyear);
-$startyear = $db->sql_result($resultfirstyear, 0, "draftyear");
+$resultfirstyear = $mysqli_db->query($queryfirstyear);
+$rowfirst = $resultfirstyear->fetch_assoc();
+$startyear = $rowfirst['draftyear'];
 
 $querylastyear = "SELECT draftyear FROM ibl_plr ORDER BY draftyear DESC";
-$resultlastyear = $db->sql_query($querylastyear);
-$endyear = $db->sql_result($resultlastyear, 0, "draftyear");
+$resultlastyear = $mysqli_db->query($querylastyear);
+$rowlast = $resultlastyear->fetch_assoc();
+$endyear = $rowlast['draftyear'];
 
 $year = $_REQUEST['year'];
 
-$query = "SELECT * FROM ibl_plr WHERE draftyear = '$year' AND draftround > 0 ORDER BY draftround, draftpickno ASC";
-$result = $db->sql_query($query);
-$num = $db->sql_numrows($result);
+$stmt = $mysqli_db->prepare("SELECT * FROM ibl_plr WHERE draftyear = ? AND draftround > 0 ORDER BY draftround, draftpickno ASC");
+$stmt->bind_param('i', $year);
+$stmt->execute();
+$result = $stmt->get_result();
+$num = $result->num_rows;
 
 echo "<html><head><title>Overview of $year IBL Draft</title></head><body>
 <style>th{ font-size: 9pt; font-family:Arial; color:white; background-color: navy}td      { text-align: Left; font-size: 9pt; font-family:Arial; color:black; }.tdp { font-weight: bold; text-align: Left; font-size: 9pt; color:black; } </style>
@@ -42,13 +48,13 @@ if ($num == 0) {
 
     $i = 0;
 
-    while ($i < $num) {
-        $draftedby = DatabaseService::safeHtmlOutput($db->sql_result($result, $i, "draftedby")); // Safely escape for HTML
-        $name = DatabaseService::safeHtmlOutput($db->sql_result($result, $i, "name")); // Safely escape for HTML
-        $pid = $db->sql_result($result, $i, "pid");
-        $round = $db->sql_result($result, $i, "draftround");
-        $draftpickno = $db->sql_result($result, $i, "draftpickno");
-        $college = DatabaseService::safeHtmlOutput($db->sql_result($result, $i, "college")); // Safely escape for HTML
+    while ($row = $result->fetch_assoc()) {
+        $draftedby = HtmlSanitizer::safeHtmlOutput($row['draftedby']); // Safely escape for HTML
+        $name = HtmlSanitizer::safeHtmlOutput($row['name']); // Safely escape for HTML
+        $pid = $row['pid'];
+        $round = $row['draftround'];
+        $draftpickno = $row['draftpickno'];
+        $college = HtmlSanitizer::safeHtmlOutput($row['college']); // Safely escape for HTML
 
         if ($i % 2) {
             echo "<tr bgcolor=#ffffff>";
@@ -64,11 +70,7 @@ if ($num == 0) {
             <td>$college</td>
         </tr>
 ";
-
-        $i++;
     }
 }
-
-$db->sql_close();
 
 echo "</table></center></body></html>";

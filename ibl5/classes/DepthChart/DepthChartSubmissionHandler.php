@@ -17,7 +17,7 @@ class DepthChartSubmissionHandler implements DepthChartSubmissionHandlerInterfac
     private $validator;
     private $view;
     
-    public function __construct($db)
+    public function __construct(\mysqli $db)
     {
         $this->db = $db;
         $this->repository = new DepthChartRepository($db);

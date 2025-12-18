@@ -1,12 +1,11 @@
 <?php
 namespace Updater;
 
-class PowerRankingsUpdater {
-    private $db;
+class PowerRankingsUpdater extends \BaseMysqliRepository {
     private $season;
 
-    public function __construct($db, $season) {
-        $this->db = $db;
+    public function __construct(object $db, $season) {
+        parent::__construct($db);
         $this->season = $season;
     }
 
@@ -15,32 +14,32 @@ class PowerRankingsUpdater {
 
         $log = '';
 
-        $queryTeams = "SELECT TeamID, Team, streak_type, streak
+        $teams = $this->fetchAll(
+            "SELECT TeamID, Team, streak_type, streak
             FROM ibl_power
-            WHERE TeamID
-            BETWEEN 1 AND 32
-            ORDER BY TeamID ASC";
-        $resultTeams = $this->db->sql_query($queryTeams);
-        $numTeams = $this->db->sql_numrows($resultTeams);
+            WHERE TeamID BETWEEN 1 AND 32
+            ORDER BY TeamID ASC",
+            ""
+        );
 
-        for ($i = 0; $i < $numTeams; $i++) {
-            $tid = $this->db->sql_result($resultTeams, $i, "TeamID");
-            $teamName = $this->db->sql_result($resultTeams, $i, "Team");
+        for ($i = 0; $i < count($teams); $i++) {
+            $tid = $teams[$i]['TeamID'];
+            $teamName = $teams[$i]['Team'];
 
             $month = $this->determineMonth();
-            $queryGames = $this->buildGamesQuery($tid, $month);
-            $resultGames = $this->db->sql_query($queryGames);
-            $numGames = $this->db->sql_numrows($resultGames);
+            $games = $this->buildGamesQuery($tid, $month);
 
-            $stats = $this->calculateTeamStats($resultGames, $numGames, $tid);
+            $stats = $this->calculateTeamStats($games, $tid);
             $log .= $this->updateTeamStats($tid, $teamName, $stats);
         }
 
         \UI::displayDebugOutput($log, 'Power Rankings Update Log');
 
         // Reset the sim's Depth Chart sent status
-        $query = "UPDATE ibl_team_history SET sim_depth = 'No Depth Chart'";
-        $this->db->sql_query($query);
+        $this->execute(
+            "UPDATE ibl_team_history SET sim_depth = 'No Depth Chart'",
+            ""
+        );
 
         echo '<p>The ibl_power table has been updated.<p>';
     }
@@ -54,15 +53,25 @@ class PowerRankingsUpdater {
     }
 
     private function buildGamesQuery($tid, $month) {
-        return "SELECT Visitor, VScore, Home, HScore
+        $startDate = $this->season->beginningYear . "-$month-01";
+        $endDate = $this->season->endingYear . "-05-30";
+        
+        return $this->fetchAll(
+            "SELECT Visitor, VScore, Home, HScore
             FROM ibl_schedule
-            WHERE (Visitor = $tid OR Home = $tid)
+            WHERE (Visitor = ? OR Home = ?)
             AND (VScore > 0 AND HScore > 0)
-            AND Date BETWEEN '" . ($this->season->beginningYear) . "-$month-01' AND '" . $this->season->endingYear . "-05-30'
-            ORDER BY Date ASC";
+            AND Date BETWEEN ? AND ?
+            ORDER BY Date ASC",
+            "iiss",
+            $tid,
+            $tid,
+            $startDate,
+            $endDate
+        );
     }
 
-    private function calculateTeamStats($resultGames, $numGames, $tid) {
+    private function calculateTeamStats($games, $tid) {
         $stats = array(
             'wins' => 0, 'losses' => 0,
             'homeWins' => 0, 'homeLosses' => 0,
@@ -72,16 +81,16 @@ class PowerRankingsUpdater {
             'streak' => 0, 'streakType' => ''
         );
 
-        for ($j = 0; $j < $numGames; $j++) {
+        for ($j = 0; $j < count($games); $j++) {
             $game = array(
-                'awayTeam' => $this->db->sql_result($resultGames, $j, "Visitor"),
-                'awayScore' => $this->db->sql_result($resultGames, $j, "VScore"),
-                'homeTeam' => $this->db->sql_result($resultGames, $j, "Home"),
-                'homeScore' => $this->db->sql_result($resultGames, $j, "HScore")
+                'awayTeam' => $games[$j]['Visitor'],
+                'awayScore' => $games[$j]['VScore'],
+                'homeTeam' => $games[$j]['Home'],
+                'homeScore' => $games[$j]['HScore']
             );
 
             if ($game['awayScore'] !== $game['homeScore']) {
-                $this->updateGameStats($stats, $game, $j, $numGames, $tid);
+                $this->updateGameStats($stats, $game, $j, count($games), $tid);
             }
         }
 
@@ -99,10 +108,13 @@ class PowerRankingsUpdater {
             $isHome = true;
         }
 
-        $queryOpponentWinLoss = "SELECT win, loss FROM ibl_power WHERE TeamID = $opponentTeam";
-        $resultOpponentWinLoss = $this->db->sql_query($queryOpponentWinLoss);
-        $opponentWins = $this->db->sql_result($resultOpponentWinLoss, 0, "win");
-        $opponentLosses = $this->db->sql_result($resultOpponentWinLoss, 0, "loss");
+        $opponentRecord = $this->fetchOne(
+            "SELECT win, loss FROM ibl_power WHERE TeamID = ?",
+            "i",
+            $opponentTeam
+        );
+        $opponentWins = $opponentRecord['win'] ?? 0;
+        $opponentLosses = $opponentRecord['loss'] ?? 0;
 
         if ($isWin) {
             $stats['wins']++;
@@ -144,22 +156,36 @@ class PowerRankingsUpdater {
             : 0;
 
         // Update ibl_power
-        $query = "UPDATE ibl_power SET
-            win = {$stats['wins']},
-            loss = {$stats['losses']},
-            gb = $gb,
-            home_win = {$stats['homeWins']},
-            home_loss = {$stats['homeLosses']},
-            road_win = {$stats['awayWins']},
-            road_loss = {$stats['awayLosses']},
-            last_win = {$stats['winsInLast10Games']},
-            last_loss = {$stats['lossesInLast10Games']},
-            streak_type = '{$stats['streakType']}',
-            streak = {$stats['streak']},
-            ranking = $ranking
-            WHERE TeamID = $tid";
-        
-        $this->db->sql_query($query);
+        $this->execute(
+            "UPDATE ibl_power SET
+            win = ?,
+            loss = ?,
+            gb = ?,
+            home_win = ?,
+            home_loss = ?,
+            road_win = ?,
+            road_loss = ?,
+            last_win = ?,
+            last_loss = ?,
+            streak_type = ?,
+            streak = ?,
+            ranking = ?
+            WHERE TeamID = ?",
+            "iidiiiiiisidi",
+            $stats['wins'],
+            $stats['losses'],
+            $gb,
+            $stats['homeWins'],
+            $stats['homeLosses'],
+            $stats['awayWins'],
+            $stats['awayLosses'],
+            $stats['winsInLast10Games'],
+            $stats['lossesInLast10Games'],
+            $stats['streakType'],
+            $stats['streak'],
+            $ranking,
+            $tid
+        );
 
         $log .= "Updating $teamName: {$stats['wins']} wins, {$stats['losses']} losses, $gb games back, 
             {$stats['homeWins']} home wins, {$stats['homeLosses']} home losses, 
@@ -180,53 +206,65 @@ class PowerRankingsUpdater {
     }
 
     private function updateSeasonRecords($teamName) {
-        $query = "UPDATE ibl_team_win_loss a, ibl_power b
+        $this->execute(
+            "UPDATE ibl_team_win_loss a, ibl_power b
             SET a.wins = b.win,
                 a.losses = b.loss
             WHERE a.currentname = b.Team 
-            AND a.year = '{$this->season->endingYear}'";
-        $this->db->sql_query($query);
+            AND a.year = ?",
+            "i",
+            $this->season->endingYear
+        );
     }
 
     private function updateHeatRecords($teamName) {
-        $query = "UPDATE ibl_heat_win_loss a, ibl_power b
-            SET a.wins = b.win,
-                a.losses = b.loss
-            WHERE a.currentname = b.Team 
-            AND a.year = '{$this->season->beginningYear}'";
-        
-        if ($this->db->sql_query($query)) {
-            echo $query . "<p>";
-        } else {
+        try {
+            $this->execute(
+                "UPDATE ibl_heat_win_loss a, ibl_power b
+                SET a.wins = b.win,
+                    a.losses = b.loss
+                WHERE a.currentname = b.Team 
+                AND a.year = ?",
+                "i",
+                $this->season->beginningYear
+            );
+            echo "Updated HEAT records for {$this->season->beginningYear}<p>";
+        } catch (\Exception $e) {
             echo "<b>`ibl_heat_win_loss` update FAILED for $teamName! Have you <A HREF=\"leagueControlPanel.php\">inserted new database rows</A> for the new HEAT season?</b><p>";
         }
     }
 
     private function updateHistoricalRecords() {
         // Update total wins
-        $query = "UPDATE ibl_team_history a
+        $this->execute(
+            "UPDATE ibl_team_history a
             SET totwins = (
                 SELECT SUM(b.wins)
                 FROM ibl_team_win_loss AS b
                 WHERE a.team_name = b.currentname
             )
-            WHERE a.team_name != 'Free Agents'";
-        $this->db->sql_query($query);
+            WHERE a.team_name != 'Free Agents'",
+            ""
+        );
 
         // Update total losses
-        $query = "UPDATE ibl_team_history a
+        $this->execute(
+            "UPDATE ibl_team_history a
             SET totloss = (
                 SELECT SUM(b.losses)
                 FROM ibl_team_win_loss AS b
                 WHERE a.team_name = b.currentname
             )
-            WHERE a.team_name != 'Free Agents'";
-        $this->db->sql_query($query);
+            WHERE a.team_name != 'Free Agents'",
+            ""
+        );
 
         // Update win percentage
-        $query = "UPDATE ibl_team_history a 
+        $this->execute(
+            "UPDATE ibl_team_history a 
             SET winpct = a.totwins / (a.totwins + a.totloss)
-            WHERE a.team_name != 'Free Agents'";
-        $this->db->sql_query($query);
+            WHERE a.team_name != 'Free Agents'",
+            ""
+        );
     }
 }

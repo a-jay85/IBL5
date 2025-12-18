@@ -21,7 +21,7 @@ class SeasonLeadersView implements SeasonLeadersViewInterface
     /**
      * @see SeasonLeadersViewInterface::renderFilterForm()
      */
-    public function renderFilterForm($teams, array $years, array $currentFilters): string
+    public function renderFilterForm(array $teams, array $years, array $currentFilters): string
     {
         ob_start();
         ?>
@@ -57,21 +57,18 @@ class SeasonLeadersView implements SeasonLeadersViewInterface
     /**
      * Render team dropdown options
      * 
-     * @param resource $teams Database result
+     * @param array $teams Array of team data
      * @param int $selectedTeam Selected team ID
      * @return string HTML options
      */
-    private function renderTeamOptions($teams, int $selectedTeam): string
+    private function renderTeamOptions(array $teams, int $selectedTeam): string
     {
-        global $db;
-        
         $html = '<option value="0">All</option>' . "\n";
-        $numTeams = $db->sql_numrows($teams);
-        for ($i = 0; $i < $numTeams; $i++) {
-            $tid = $db->sql_result($teams, $i, "TeamID");
-            $teamName = $db->sql_result($teams, $i, "Team");
+        foreach ($teams as $team) {
+            $tid = (int) ($team['TeamID'] ?? 0);
+            $teamName = $team['Team'] ?? '';
             $selected = ($selectedTeam == $tid) ? ' selected' : '';
-            $html .= '<option value="' . htmlspecialchars($tid) . '"' . $selected . '>' . htmlspecialchars($teamName) . '</option>' . "\n";
+            $html .= '<option value="' . htmlspecialchars((string) $tid) . '"' . $selected . '>' . htmlspecialchars($teamName) . '</option>' . "\n";
         }
         return $html;
     }
@@ -87,8 +84,9 @@ class SeasonLeadersView implements SeasonLeadersViewInterface
     {
         $html = '<option value="">All</option>' . "\n";
         foreach ($years as $year) {
+            $escapedYear = is_int($year) ? (string)$year : htmlspecialchars((string)$year);
             $selected = ($selectedYear == $year) ? ' selected' : '';
-            $html .= '<option value="' . htmlspecialchars($year) . '"' . $selected . '>' . htmlspecialchars($year) . '</option>' . "\n";
+            $html .= '<option value="' . $escapedYear . '"' . $selected . '>' . $escapedYear . '</option>' . "\n";
         }
         return $html;
     }

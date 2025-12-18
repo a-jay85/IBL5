@@ -1,9 +1,11 @@
 <?php
 
-$season = new Season($db);
+global $mysqli_db;
 
-$result = League::getAllTeamsResult($db);
-$num = $db->sql_numrows($result);
+$season = new Season($mysqli_db);
+$league = new League($mysqli_db);
+
+$result = $league->getAllTeamsResult();
 
 echo "<HTML><HEAD><TITLE>Draft Pick Matrix</TITLE></HEAD>
     <BODY>
@@ -38,12 +40,12 @@ echo "<HTML><HEAD><TITLE>Draft Pick Matrix</TITLE></HEAD>
 
 $i = 0;
 
-while ($i < $num) {
-    $teamID = (int) $db->sql_result($result, $i, "teamid"); // Ensure teamID is an integer
-    $team_city = $db->sql_result($result, $i, "team_city");
-    $team_name = $db->sql_result($result, $i, "team_name");
-    $color1 = $db->sql_result($result, $i, "color1");
-    $color2 = $db->sql_result($result, $i, "color2");
+foreach ($result as $teamRow) {
+    $teamID = (int) $teamRow['teamid']; // Ensure teamID is an integer
+    $team_city = $teamRow['team_city'];
+    $team_name = $teamRow['team_name'];
+    $color1 = $teamRow['color1'];
+    $color2 = $teamRow['color2'];
 
     $j = 0;
     $k = 0;

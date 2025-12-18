@@ -134,8 +134,8 @@ final class PlayerSearchRepositoryTest extends TestCase
 
     public function testSearchPlayersUsesLikeForNameSearch(): void
     {
-        $mockStmt = $this->createMock(mysqli_stmt::class);
         $mockResult = $this->createMock(mysqli_result::class);
+        $mockStmt = $this->createMockStmt($mockResult, 's');
 
         $this->mockDb->expects($this->once())
             ->method('prepare')
@@ -144,24 +144,9 @@ final class PlayerSearchRepositoryTest extends TestCase
             }))
             ->willReturn($mockStmt);
 
-        $mockStmt->expects($this->once())
-            ->method('bind_param')
-            ->with('s', $this->anything());
-
-        $mockStmt->expects($this->once())
-            ->method('execute')
-            ->willReturn(true);
-
-        $mockStmt->expects($this->once())
-            ->method('get_result')
-            ->willReturn($mockResult);
-
         $mockResult->expects($this->once())
             ->method('fetch_assoc')
             ->willReturn(null);
-
-        $mockStmt->expects($this->once())
-            ->method('close');
 
         $params = $this->createEmptyParams();
         $params['search_name'] = 'Jordan';
@@ -171,8 +156,8 @@ final class PlayerSearchRepositoryTest extends TestCase
 
     public function testSearchPlayersUsesLikeForCollegeSearch(): void
     {
-        $mockStmt = $this->createMock(mysqli_stmt::class);
         $mockResult = $this->createMock(mysqli_result::class);
+        $mockStmt = $this->createMockStmt($mockResult, 's');
 
         $this->mockDb->expects($this->once())
             ->method('prepare')
@@ -181,24 +166,9 @@ final class PlayerSearchRepositoryTest extends TestCase
             }))
             ->willReturn($mockStmt);
 
-        $mockStmt->expects($this->once())
-            ->method('bind_param')
-            ->with('s', $this->anything());
-
-        $mockStmt->expects($this->once())
-            ->method('execute')
-            ->willReturn(true);
-
-        $mockStmt->expects($this->once())
-            ->method('get_result')
-            ->willReturn($mockResult);
-
         $mockResult->expects($this->once())
             ->method('fetch_assoc')
             ->willReturn(null);
-
-        $mockStmt->expects($this->once())
-            ->method('close');
 
         $params = $this->createEmptyParams();
         $params['college'] = 'UCLA';
@@ -208,8 +178,8 @@ final class PlayerSearchRepositoryTest extends TestCase
 
     public function testSearchPlayersUsesExactMatchForPosition(): void
     {
-        $mockStmt = $this->createMock(mysqli_stmt::class);
         $mockResult = $this->createMock(mysqli_result::class);
+        $mockStmt = $this->createMockStmt($mockResult, 's');
 
         $this->mockDb->expects($this->once())
             ->method('prepare')
@@ -218,23 +188,9 @@ final class PlayerSearchRepositoryTest extends TestCase
             }))
             ->willReturn($mockStmt);
 
-        $mockStmt->expects($this->once())
-            ->method('bind_param');
-
-        $mockStmt->expects($this->once())
-            ->method('execute')
-            ->willReturn(true);
-
-        $mockStmt->expects($this->once())
-            ->method('get_result')
-            ->willReturn($mockResult);
-
         $mockResult->expects($this->once())
             ->method('fetch_assoc')
             ->willReturn(null);
-
-        $mockStmt->expects($this->once())
-            ->method('close');
 
         $params = $this->createEmptyParams();
         $params['pos'] = 'PG';
@@ -244,8 +200,8 @@ final class PlayerSearchRepositoryTest extends TestCase
 
     public function testSearchPlayersUsesLessThanOrEqualForAge(): void
     {
-        $mockStmt = $this->createMock(mysqli_stmt::class);
         $mockResult = $this->createMock(mysqli_result::class);
+        $mockStmt = $this->createMockStmt($mockResult, 'i');
 
         $this->mockDb->expects($this->once())
             ->method('prepare')
@@ -254,23 +210,9 @@ final class PlayerSearchRepositoryTest extends TestCase
             }))
             ->willReturn($mockStmt);
 
-        $mockStmt->expects($this->once())
-            ->method('bind_param');
-
-        $mockStmt->expects($this->once())
-            ->method('execute')
-            ->willReturn(true);
-
-        $mockStmt->expects($this->once())
-            ->method('get_result')
-            ->willReturn($mockResult);
-
         $mockResult->expects($this->once())
             ->method('fetch_assoc')
             ->willReturn(null);
-
-        $mockStmt->expects($this->once())
-            ->method('close');
 
         $params = $this->createEmptyParams();
         $params['age'] = 25;
@@ -280,8 +222,8 @@ final class PlayerSearchRepositoryTest extends TestCase
 
     public function testSearchPlayersUsesGreaterThanOrEqualForRatings(): void
     {
-        $mockStmt = $this->createMock(mysqli_stmt::class);
         $mockResult = $this->createMock(mysqli_result::class);
+        $mockStmt = $this->createMockStmt($mockResult, 'i');
 
         $this->mockDb->expects($this->once())
             ->method('prepare')
@@ -290,23 +232,9 @@ final class PlayerSearchRepositoryTest extends TestCase
             }))
             ->willReturn($mockStmt);
 
-        $mockStmt->expects($this->once())
-            ->method('bind_param');
-
-        $mockStmt->expects($this->once())
-            ->method('execute')
-            ->willReturn(true);
-
-        $mockStmt->expects($this->once())
-            ->method('get_result')
-            ->willReturn($mockResult);
-
         $mockResult->expects($this->once())
             ->method('fetch_assoc')
             ->willReturn(null);
-
-        $mockStmt->expects($this->once())
-            ->method('close');
 
         $params = $this->createEmptyParams();
         $params['oo'] = 80;
@@ -322,8 +250,8 @@ final class PlayerSearchRepositoryTest extends TestCase
 
     public function testGetPlayerByIdReturnsPlayerWhenFound(): void
     {
-        $mockStmt = $this->createMock(mysqli_stmt::class);
         $mockResult = $this->createMock(mysqli_result::class);
+        $mockStmt = $this->createMockStmt($mockResult, 'i');
 
         $this->mockDb->expects($this->once())
             ->method('prepare')
@@ -332,25 +260,10 @@ final class PlayerSearchRepositoryTest extends TestCase
             }))
             ->willReturn($mockStmt);
 
-        $mockStmt->expects($this->once())
-            ->method('bind_param')
-            ->with('i', 123);
-
-        $mockStmt->expects($this->once())
-            ->method('execute')
-            ->willReturn(true);
-
-        $mockStmt->expects($this->once())
-            ->method('get_result')
-            ->willReturn($mockResult);
-
         $playerData = ['pid' => 123, 'name' => 'Test Player'];
         $mockResult->expects($this->once())
             ->method('fetch_assoc')
             ->willReturn($playerData);
-
-        $mockStmt->expects($this->once())
-            ->method('close');
 
         $result = $this->repository->getPlayerById(123);
 
@@ -359,15 +272,50 @@ final class PlayerSearchRepositoryTest extends TestCase
 
     public function testGetPlayerByIdReturnsNullWhenNotFound(): void
     {
-        $mockStmt = $this->createMock(mysqli_stmt::class);
         $mockResult = $this->createMock(mysqli_result::class);
+        $mockStmt = $this->createMockStmt($mockResult, 'i');
 
         $this->mockDb->expects($this->once())
             ->method('prepare')
             ->willReturn($mockStmt);
 
-        $mockStmt->expects($this->once())
-            ->method('bind_param');
+        $mockResult->expects($this->once())
+            ->method('fetch_assoc')
+            ->willReturn(null);
+
+        $result = $this->repository->getPlayerById(999);
+
+        $this->assertNull($result);
+    }
+
+    // ========== Helper Methods ==========
+
+    /**
+     * Create a mock mysqli_stmt that properly handles the BaseMysqliRepository flow
+     * 
+     * BaseMysqliRepository calls: prepare -> bind_param -> execute -> get_result -> close
+     * PHPUnit's mysqli_stmt mock tracks "closed" state, so we need to configure
+     * the mock to not enforce strict ordering.
+     * 
+     * @param mysqli_result&\PHPUnit\Framework\MockObject\MockObject $mockResult
+     * @param string|null $expectedBindTypes Expected type string for bind_param
+     * @return mysqli_stmt&\PHPUnit\Framework\MockObject\MockObject
+     */
+    private function createMockStmt(
+        \PHPUnit\Framework\MockObject\MockObject $mockResult,
+        ?string $expectedBindTypes = null
+    ): \PHPUnit\Framework\MockObject\MockObject {
+        $mockStmt = $this->getMockBuilder(mysqli_stmt::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['bind_param', 'execute', 'get_result', 'close'])
+            ->getMock();
+
+        if ($expectedBindTypes !== null) {
+            $mockStmt->expects($this->once())
+                ->method('bind_param')
+                ->with($expectedBindTypes, $this->anything())
+                ->willReturn(true);
+        }
 
         $mockStmt->expects($this->once())
             ->method('execute')
@@ -377,19 +325,12 @@ final class PlayerSearchRepositoryTest extends TestCase
             ->method('get_result')
             ->willReturn($mockResult);
 
-        $mockResult->expects($this->once())
-            ->method('fetch_assoc')
-            ->willReturn(null);
-
         $mockStmt->expects($this->once())
-            ->method('close');
+            ->method('close')
+            ->willReturn(true);
 
-        $result = $this->repository->getPlayerById(999);
-
-        $this->assertNull($result);
+        return $mockStmt;
     }
-
-    // ========== Helper Methods ==========
 
     /**
      * Create empty params array for testing

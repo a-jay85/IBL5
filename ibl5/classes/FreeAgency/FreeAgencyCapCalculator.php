@@ -10,13 +10,13 @@ use Player\Player;
  */
 class FreeAgencyCapCalculator implements FreeAgencyCapCalculatorInterface
 {
-    private $db;
+    private object $mysqli_db;
     private \Team $team;
     private \Season $season;
 
-    public function __construct($db, \Team $team, \Season $season)
+    public function __construct(object $mysqli_db, \Team $team, \Season $season)
     {
-        $this->db = $db;
+        $this->mysqli_db = $mysqli_db;
         $this->team = $team;
         $this->season = $season;
     }
@@ -35,7 +35,7 @@ class FreeAgencyCapCalculator implements FreeAgencyCapCalculatorInterface
 
         // Add salaries from players under contract
         foreach ($rosterData as $playerRow) {
-            $player = Player::withPlrRow($this->db, $playerRow);
+            $player = Player::withPlrRow($this->mysqli_db, $playerRow);
             
             if (!$player->isPlayerFreeAgent($this->season)) {
                 $futureSalaries = $player->getFutureSalaries();
@@ -83,7 +83,7 @@ class FreeAgencyCapCalculator implements FreeAgencyCapCalculatorInterface
 
         // Count players under contract
         foreach ($rosterData as $playerRow) {
-            $player = Player::withPlrRow($this->db, $playerRow);
+            $player = Player::withPlrRow($this->mysqli_db, $playerRow);
             
             if (!$player->isPlayerFreeAgent($this->season)) {
                 // Exclude players whose name starts with '|'

@@ -487,7 +487,7 @@ CREATE TABLE `ibl_heat_win_loss` (
   `losses` tinyint(2) unsigned NOT NULL DEFAULT 0,
   `table_ID` int(11) NOT NULL AUTO_INCREMENT,
   PRIMARY KEY (`table_ID`)
-) ENGINE=InnoDB AUTO_INCREMENT=539 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=595 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -551,7 +551,7 @@ CREATE TABLE `ibl_hist` (
   KEY `idx_year` (`year`),
   KEY `idx_pid_year_team` (`pid`,`year`,`team`),
   CONSTRAINT `fk_hist_player` FOREIGN KEY (`pid`) REFERENCES `ibl_plr` (`pid`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=12647 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=18560 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1159,10 +1159,10 @@ DROP TABLE IF EXISTS `ibl_sim_dates`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `ibl_sim_dates` (
   `Sim` int(10) unsigned NOT NULL AUTO_INCREMENT,
-  `Start Date` varchar(11) DEFAULT NULL,
-  `End Date` varchar(11) DEFAULT NULL,
+  `Start Date` date DEFAULT NULL,
+  `End Date` date DEFAULT NULL,
   PRIMARY KEY (`Sim`)
-) ENGINE=InnoDB AUTO_INCREMENT=664 DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=669 DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1393,7 +1393,7 @@ DROP TABLE IF EXISTS `ibl_trade_autocounter`;
 CREATE TABLE `ibl_trade_autocounter` (
   `counter` int(11) NOT NULL AUTO_INCREMENT,
   PRIMARY KEY (`counter`)
-) ENGINE=InnoDB AUTO_INCREMENT=11940 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=11968 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -2362,7 +2362,7 @@ CREATE TABLE `nuke_referer` (
   `rid` int(11) NOT NULL AUTO_INCREMENT,
   `url` varchar(100) NOT NULL DEFAULT '',
   PRIMARY KEY (`rid`)
-) ENGINE=MyISAM AUTO_INCREMENT=40242 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=40287 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -2490,7 +2490,7 @@ CREATE TABLE `nuke_stories` (
   KEY `catid` (`catid`),
   KEY `counter` (`counter`),
   KEY `topic` (`topic`)
-) ENGINE=MyISAM AUTO_INCREMENT=4226 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=4242 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -2637,7 +2637,7 @@ CREATE TABLE `nuke_users_temp` (
   `check_num` varchar(50) NOT NULL DEFAULT '',
   `time` varchar(14) NOT NULL DEFAULT '',
   PRIMARY KEY (`user_id`)
-) ENGINE=MyISAM AUTO_INCREMENT=10969 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=10984 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -2812,4 +2812,4 @@ CREATE TABLE `users` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2025-11-30 18:47:11
+-- Dump completed on 2025-12-17 16:12:50

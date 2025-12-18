@@ -1,9 +1,9 @@
 <?php
 
-global $db, $cookie;
+global $db, $cookie, $mysqli_db;
 
-$commonRepository = new \Services\CommonRepository($db);
-$season = new Season($db);
+$commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
+$season = new Season($mysqli_db);
 
 $userTeamID = intval($_GET['teamID']);
 if (!$userTeamID) {
@@ -14,12 +14,12 @@ if (!$userTeamID) {
         $userTeamID = 0;
     }
 }
-$userTeam = Team::initialize($db, $userTeamID);
+$userTeam = Team::initialize($mysqli_db, $userTeamID);
 $wins = $losses = $winStreak = $lossStreak = 0;
 
 //TODO: unify this code with the Schedule module's chunk function
 
-$teamSchedule = Schedule\TeamSchedule::getSchedule($db, $userTeam->teamID);
+$teamSchedule = Schedule\TeamSchedule::getSchedule($mysqli_db, $userTeam->teamID);
 
 $rows = array();
 $lastMonthIteratedOver = "";
@@ -29,7 +29,7 @@ foreach ($teamSchedule as $row) {
 
     $rows[$i]['currentMonthBeingIteratedOver'] = strval($rows[$i]['game']->dateObject->format('F'));
 
-    $rows[$i]['opposingTeam'] = Team::initialize($db, $rows[$i]['game']->getOpposingTeamID($userTeamID));
+    $rows[$i]['opposingTeam'] = Team::initialize($mysqli_db, $rows[$i]['game']->getOpposingTeamID($userTeamID));
     $rows[$i]['opponentText'] = $rows[$i]['game']->getUserTeamLocationPrefix($userTeamID) . " " . $rows[$i]['opposingTeam']->name . " (" . $rows[$i]['opposingTeam']->seasonRecord . ")";
     
     $rows[$i]['highlight'] = "";
@@ -64,19 +64,20 @@ foreach ($teamSchedule as $row) {
 <?php
     Nuke\Header::header();
     OpenTable();
-    UI::displaytopmenu($db, $userTeamID);
+    UI::displaytopmenu($mysqli_db, $userTeamID);
 ?>
 
 <div style="text-align: center;">
     <img src="./images/logo/<?= $userTeamID ?>.jpg">
 </div>
 
+    <?php $league = new League($mysqli_db); ?>
     <table width=400 border=1 align=center>
         <tr bgcolor=<?= $userTeam->color1 ?> style="color:#<?= $userTeam->color2 ?>; text-align:center;">
             <td colspan=5>
                 <h1>Team Schedule</h1>
                 <p>
-                <i>games highlighted in yellow are projected to be run next sim (<?= League::getSimLengthInDays($db) ?> days)</i>
+                <i>games highlighted in yellow are projected to be run next sim (<?= $league->getSimLengthInDays() ?> days)</i>
             </td>
         </tr>
 

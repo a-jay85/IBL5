@@ -1,9 +1,17 @@
 <?php
 
-class League
-{
-    protected $db;
+declare(strict_types=1);
 
+/**
+ * League - IBL league-wide operations and queries
+ * 
+ * Extends BaseMysqliRepository for standardized database access.
+ * Provides league configuration, voting candidates, and team operations.
+ * 
+ * @see BaseMysqliRepository For base class documentation and error codes
+ */
+class League extends BaseMysqliRepository
+{
     const CONFERENCE_NAMES = array('Eastern', 'Western');
     const DIVISION_NAMES = array('Atlantic', 'Central', 'Midwest', 'Pacific');
 
@@ -18,28 +26,52 @@ class League
 
     const FREE_AGENTS_TEAMID = 0;
 
-    public function __construct($db)
+    /**
+     * Constructor - inherits from BaseMysqliRepository
+     * 
+     * @param object $db Active mysqli connection (or duck-typed mock during migration)
+     * @throws \RuntimeException If connection is invalid (error code 1002)
+     */
+    public function __construct(object $db)
     {
-        $this->db = $db;
+        parent::__construct($db);
     }
 
-    public function formatTidsForSqlQuery($conferenceTids)
+    /**
+     * Format team IDs for SQL IN clause
+     * 
+     * @param array $conferenceTids Array of team IDs
+     * @return string Formatted string for SQL IN clause
+     */
+    public function formatTidsForSqlQuery(array $conferenceTids): string
     {
         $tidsFormattedForQuery = join("','", $conferenceTids);
         return $tidsFormattedForQuery;
     }
 
-    public static function getSimLengthInDays($db)
+    /**
+     * Get sim length in days from settings
+     * 
+     * @return int Sim length in days
+     */
+    public function getSimLengthInDays(): int
     {
-        $querySimLengthInDays = $db->sql_query("SELECT value
-            FROM ibl_settings
-            WHERE name = 'Sim Length in Days'
-            LIMIT 1");
+        $result = $this->fetchOne(
+            "SELECT value FROM ibl_settings WHERE name = ? LIMIT 1",
+            "s",
+            "Sim Length in Days"
+        );
 
-        return $db->sql_result($querySimLengthInDays, 0, 'value');
+        return (int)($result['value'] ?? 0);
     }
 
-    public function getAllStarCandidatesResult($votingCategory)
+    /**
+     * Get All-Star voting candidates for a conference/position
+     * 
+     * @param string $votingCategory Voting category (e.g., 'EC-CF', 'WC-CB')
+     * @return array All matching players
+     */
+    public function getAllStarCandidatesResult(string $votingCategory): array
     {
         if (strpos($votingCategory, 'EC') !== false) {
             $conferenceTids = $this::EASTERN_CONFERENCE_TEAMIDS;
@@ -60,98 +92,147 @@ class League
           AND retired != 1
           AND stats_gm > '14'
         ORDER BY name";
-        $result = $this->db->sql_query($query);
-        return $result;
+        
+        return $this->fetchAll($query);
     }
 
-    public function getInjuredPlayersResult()
+    /**
+     * Get all injured players
+     * 
+     * @return array All injured players
+     */
+    public function getInjuredPlayersResult(): array
     {
-        $query = "SELECT *
+        return $this->fetchAll(
+            "SELECT *
             FROM ibl_plr
             WHERE injured > 0
               AND retired = 0
-            ORDER BY ordinal ASC";
-        $result = $this->db->sql_query($query);
-        return $result;
+            ORDER BY ordinal ASC"
+        );
     }
 
-    public function getFreeAgentsResult(Season $season)
+    /**
+     * Get all free agents for the season
+     * 
+     * @param Season $season Current season
+     * @return array All free agent players
+     */
+    public function getFreeAgentsResult(Season $season): array
     {
-        $query = "SELECT *
+        return $this->fetchAll(
+            "SELECT *
             FROM ibl_plr
             WHERE retired = '0'
-              AND draftyear + exp + cyt - cy = " . $season->endingYear . "
-            ORDER BY name ASC";
-        $result = $this->db->sql_query($query);
-        return $result;
+              AND draftyear + exp + cyt - cy = ?
+            ORDER BY name ASC",
+            "i",
+            $season->endingYear
+        );
     }
 
-    public function getWaivedPlayersResult()
+    /**
+     * Get all waived players
+     * 
+     * @return array All waived players
+     */
+    public function getWaivedPlayersResult(): array
     {
-        $query = "SELECT *
+        return $this->fetchAll(
+            "SELECT *
             FROM ibl_plr
-            WHERE ordinal > '" . JSB::WAIVERS_ORDINAL . "'
+            WHERE ordinal > ?
               AND retired = '0'
               AND name NOT LIKE '%|%'
-            ORDER BY name ASC";
-        $result = $this->db->sql_query($query);
-        return $result;
+            ORDER BY name ASC",
+            "i",
+            JSB::WAIVERS_ORDINAL
+        );
     }
 
-    public function getMVPCandidatesResult()
+    /**
+     * Get MVP award candidates
+     * 
+     * @return array All MVP candidates
+     */
+    public function getMVPCandidatesResult(): array
     {
-        $query = "SELECT *
+        return $this->fetchAll(
+            "SELECT *
             FROM ibl_plr
             WHERE retired != 1
               AND stats_gm >= '41'
               AND stats_min / stats_gm >= '30'
-            ORDER BY name";
-        $result = $this->db->sql_query($query);
-        return $result;
+            ORDER BY name"
+        );
     }
 
-    public function getSixthPersonOfTheYearCandidatesResult()
+    /**
+     * Get Sixth Person of the Year award candidates
+     * 
+     * @return array All Sixth Person candidates
+     */
+    public function getSixthPersonOfTheYearCandidatesResult(): array
     {
-        $query = "SELECT *
+        return $this->fetchAll(
+            "SELECT *
             FROM ibl_plr
             WHERE retired != 1
               AND stats_min / stats_gm >= 15
               AND stats_gs / stats_gm <= '.5'
               AND stats_gm >= '41'
-            ORDER BY name";
-        $result = $this->db->sql_query($query);
-        return $result;
+            ORDER BY name"
+        );
     }
 
-    public function getRookieOfTheYearCandidatesResult()
+    /**
+     * Get Rookie of the Year award candidates
+     * 
+     * @return array All Rookie of the Year candidates
+     */
+    public function getRookieOfTheYearCandidatesResult(): array
     {
-        $query = "SELECT *
+        return $this->fetchAll(
+            "SELECT *
             FROM ibl_plr
             WHERE retired != 1
               AND exp = '1'
               AND stats_gm >= '41'
-            ORDER BY name";
-        $result = $this->db->sql_query($query);
-        return $result;
+            ORDER BY name"
+        );
     }
 
-    public function getGMOfTheYearCandidatesResult()
+    /**
+     * Get GM of the Year award candidates
+     * 
+     * @return array All GM candidates
+     */
+    public function getGMOfTheYearCandidatesResult(): array
     {
-        $query = "SELECT owner_name, team_city, team_name
+        return $this->fetchAll(
+            "SELECT owner_name, team_city, team_name
             FROM ibl_team_info
-            WHERE teamid != " . League::FREE_AGENTS_TEAMID . "
-            ORDER BY owner_name";
-        $result = $this->db->sql_query($query);
-        return $result;
+            WHERE teamid != ?
+            ORDER BY owner_name",
+            "i",
+            League::FREE_AGENTS_TEAMID
+        );
     }
 
-    public static function getAllTeamsResult($db)
+    /**
+     * Get all teams
+     * 
+     * @return array All teams except free agents
+     */
+    public function getAllTeamsResult(): array
     {
-        $query = "SELECT *
+        return $this->fetchAll(
+            "SELECT *
             FROM ibl_team_info
-            WHERE teamid != " . League::FREE_AGENTS_TEAMID . "
-            ORDER BY teamid ASC;";
-        $result = $db->sql_query($query);
-        return $result;
+            WHERE teamid != ?
+            ORDER BY teamid ASC",
+            "i",
+            League::FREE_AGENTS_TEAMID
+        );
     }
 }

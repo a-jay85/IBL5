@@ -17,16 +17,18 @@ get_lang($module_name);
 
 function userinfo($username)
 {
-    global $user_prefix, $db;
-    $commonRepository = new \Services\CommonRepository($db);
-    $season = new Season($db);
-    $repository = new DraftRepository($db);
+    global $user_prefix, $mysqli_db;
+    $commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
+    $season = new Season($mysqli_db);
+    $repository = new DraftRepository($mysqli_db);
     $view = new DraftView();
-    $sharedFunctions = new \Shared($db);
+    $sharedFunctions = new \Shared($mysqli_db);
 
-    $sql2 = "SELECT * FROM " . $user_prefix . "_users WHERE username = '$username'";
-    $result2 = $db->sql_query($sql2);
-    $userinfo = $db->sql_fetchrow($result2);
+    $stmt = $mysqli_db->prepare("SELECT * FROM " . $user_prefix . "_users WHERE username = ?");
+    $stmt->bind_param('s', $username);
+    $stmt->execute();
+    $result2 = $stmt->get_result();
+    $userinfo = $result2->fetch_assoc();
 
     Nuke\Header::header();
 
@@ -35,7 +37,7 @@ function userinfo($username)
     $teamlogo = $userinfo['user_ibl_team'];
     $tid = $commonRepository->getTidFromTeamname($teamlogo);
 
-    UI::displaytopmenu($db, $tid);
+    UI::displaytopmenu($mysqli_db, $tid);
 
     // Get current draft pick information
     $currentPick = $repository->getCurrentDraftPick();

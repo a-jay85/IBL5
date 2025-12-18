@@ -8,25 +8,27 @@ use DepthChart\Contracts\DepthChartRepositoryInterface;
 
 /**
  * @see DepthChartRepositoryInterface
+ * @extends \BaseMysqliRepository
  */
-class DepthChartRepository implements DepthChartRepositoryInterface
+class DepthChartRepository extends \BaseMysqliRepository implements DepthChartRepositoryInterface
 {
-    private $db;
-    
-    public function __construct($db)
+    public function __construct(object $db)
     {
-        $this->db = $db;
+        parent::__construct($db);
     }
 
     /**
      * @see DepthChartRepositoryInterface::getPlayersOnTeam()
      */
-    public function getPlayersOnTeam(string $teamName, int $teamID)
+    public function getPlayersOnTeam(string $teamName, int $teamID): array
     {
-        $teamNameEscaped = \Services\DatabaseService::escapeString($this->db, $teamName);
-        $teamID = (int) $teamID;
-        $query = "SELECT * FROM ibl_plr WHERE teamname = '$teamNameEscaped' AND tid = $teamID AND retired = '0' AND ordinal <= " . \JSB::WAIVERS_ORDINAL . " ORDER BY ordinal ASC";
-        return $this->db->sql_query($query);
+        return $this->fetchAll(
+            "SELECT * FROM ibl_plr WHERE teamname = ? AND tid = ? AND retired = '0' AND ordinal <= ? ORDER BY ordinal ASC",
+            "sii",
+            $teamName,
+            $teamID,
+            \JSB::WAIVERS_ORDINAL
+        );
     }
     
     /**
@@ -34,8 +36,6 @@ class DepthChartRepository implements DepthChartRepositoryInterface
      */
     public function updatePlayerDepthChart(string $playerName, array $depthChartValues): bool
     {
-        $playerNameEscaped = \Services\DatabaseService::escapeString($this->db, $playerName);
-        
         $pg = (int) $depthChartValues['pg'];
         $sg = (int) $depthChartValues['sg'];
         $sf = (int) $depthChartValues['sf'];
@@ -49,23 +49,32 @@ class DepthChartRepository implements DepthChartRepositoryInterface
         $di = (int) $depthChartValues['di'];
         $bh = (int) $depthChartValues['bh'];
         
-        $queries = [
-            "UPDATE ibl_plr SET dc_PGDepth = $pg WHERE name = '$playerNameEscaped'",
-            "UPDATE ibl_plr SET dc_SGDepth = $sg WHERE name = '$playerNameEscaped'",
-            "UPDATE ibl_plr SET dc_SFDepth = $sf WHERE name = '$playerNameEscaped'",
-            "UPDATE ibl_plr SET dc_PFDepth = $pf WHERE name = '$playerNameEscaped'",
-            "UPDATE ibl_plr SET dc_CDepth = $c WHERE name = '$playerNameEscaped'",
-            "UPDATE ibl_plr SET dc_active = $active WHERE name = '$playerNameEscaped'",
-            "UPDATE ibl_plr SET dc_minutes = $min WHERE name = '$playerNameEscaped'",
-            "UPDATE ibl_plr SET dc_of = $of WHERE name = '$playerNameEscaped'",
-            "UPDATE ibl_plr SET dc_df = $df WHERE name = '$playerNameEscaped'",
-            "UPDATE ibl_plr SET dc_oi = $oi WHERE name = '$playerNameEscaped'",
-            "UPDATE ibl_plr SET dc_di = $di WHERE name = '$playerNameEscaped'",
-            "UPDATE ibl_plr SET dc_bh = $bh WHERE name = '$playerNameEscaped'"
+        // Execute each update as a prepared statement
+        $updates = [
+            ['dc_PGDepth', $pg],
+            ['dc_SGDepth', $sg],
+            ['dc_SFDepth', $sf],
+            ['dc_PFDepth', $pf],
+            ['dc_CDepth', $c],
+            ['dc_active', $active],
+            ['dc_minutes', $min],
+            ['dc_of', $of],
+            ['dc_df', $df],
+            ['dc_oi', $oi],
+            ['dc_di', $di],
+            ['dc_bh', $bh]
         ];
         
-        foreach ($queries as $query) {
-            if (!$this->db->sql_query($query)) {
+        foreach ($updates as [$column, $value]) {
+            $affected = $this->execute(
+                "UPDATE ibl_plr SET $column = ? WHERE name = ?",
+                "is",
+                $value,
+                $playerName
+            );
+            
+            if ($affected === 0) {
+                // If no rows were affected, the player might not exist
                 return false;
             }
         }
@@ -78,19 +87,20 @@ class DepthChartRepository implements DepthChartRepositoryInterface
      */
     public function updateTeamHistory(string $teamName): bool
     {
-        $teamNameEscaped = \Services\DatabaseService::escapeString($this->db, $teamName);
+        // Execute both updates with prepared statements
+        $affected1 = $this->execute(
+            "UPDATE ibl_team_history SET depth = NOW() WHERE team_name = ?",
+            "s",
+            $teamName
+        );
         
-        $queries = [
-            "UPDATE ibl_team_history SET depth = NOW() WHERE team_name = '$teamNameEscaped'",
-            "UPDATE ibl_team_history SET sim_depth = NOW() WHERE team_name = '$teamNameEscaped'"
-        ];
+        $affected2 = $this->execute(
+            "UPDATE ibl_team_history SET sim_depth = NOW() WHERE team_name = ?",
+            "s",
+            $teamName
+        );
         
-        foreach ($queries as $query) {
-            if (!$this->db->sql_query($query)) {
-                return false;
-            }
-        }
-        
-        return true;
+        // Return true if at least one update succeeded
+        return ($affected1 > 0 || $affected2 > 0);
     }
 }

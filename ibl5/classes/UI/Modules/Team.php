@@ -1,14 +1,24 @@
 <?php
 
+declare(strict_types=1);
+
 namespace UI\Modules;
+
+use Team\TeamRepository;
 
 class Team
 {
-    public static function championshipBanners($db, $team)
+    private TeamRepository $repository;
+
+    public function __construct(TeamRepository $repository)
     {
-        $querybanner = "SELECT * FROM ibl_banners WHERE currentname = '$team->name' ORDER BY year ASC";
-        $resultbanner = $db->sql_query($querybanner);
-        $numbanner = $db->sql_numrows($resultbanner);
+        $this->repository = $repository;
+    }
+
+    public function championshipBanners($team): string
+    {
+        $banners = $this->repository->getChampionshipBanners($team->name);
+        $numbanner = count($banners);
 
         $j = 0;
 
@@ -24,10 +34,10 @@ class Team
         $conf_banner = "";
         $div_banner = "";
 
-        while ($j < $numbanner) {
-            $banneryear = $db->sql_result($resultbanner, $j, "year");
-            $bannername = $db->sql_result($resultbanner, $j, "bannername");
-            $bannertype = $db->sql_result($resultbanner, $j, "bannertype");
+        foreach ($banners as $banner) {
+            $banneryear = $banner['year'] ?? '';
+            $bannername = $banner['bannername'] ?? '';
+            $bannertype = $banner['bannertype'] ?? 0;
 
             if ($bannertype == 1) {
                 if ($championships % 5 == 0) {
@@ -151,47 +161,44 @@ class Team
         return $ultimate_output[1];
     }
 
-    public static function currentSeason($db, $team)
+    public function currentSeason($team): string
     {
-        $query = "SELECT * FROM ibl_power WHERE Team = '$team->name'";
-        $result = $db->sql_query($query);
-        $num = $db->sql_numrows($result);
-        $win = $db->sql_result($result, 0, "win");
-        $loss = $db->sql_result($result, 0, "loss");
-        $gb = $db->sql_result($result, 0, "gb");
-        $division = $db->sql_result($result, 0, "Division");
-        $conference = $db->sql_result($result, 0, "Conference");
-        $home_win = $db->sql_result($result, 0, "home_win");
-        $home_loss = $db->sql_result($result, 0, "home_loss");
-        $road_win = $db->sql_result($result, 0, "road_win");
-        $road_loss = $db->sql_result($result, 0, "road_loss");
-        $last_win = $db->sql_result($result, 0, "last_win");
-        $last_loss = $db->sql_result($result, 0, "last_loss");
-
-        $query2 = "SELECT * FROM ibl_power WHERE Division = '$division' ORDER BY gb DESC";
-        $result2 = $db->sql_query($query2);
-        $num = $db->sql_numrows($result2);
-        $i = 0;
-        $gbbase = $db->sql_result($result2, $i, "gb");
-        $gb = $gbbase - $gb;
-        while ($i < $num) {
-            $Team2 = $db->sql_result($result2, $i, "Team");
-            if ($Team2 == $team->name) {
-                $Div_Pos = $i + 1;
-            }
-            $i++;
+        $powerData = $this->repository->getTeamPowerData($team->name);
+        if (!$powerData) {
+            return '';
         }
 
-        $query3 = "SELECT * FROM ibl_power WHERE Conference = '$conference' ORDER BY gb DESC";
-        $result3 = $db->sql_query($query3);
-        $num = $db->sql_numrows($result3);
-        $i = 0;
-        while ($i < $num) {
-            $Team3 = $db->sql_result($result3, $i, "Team");
-            if ($Team3 == $team->name) {
-                $Conf_Pos = $i + 1;
+        $win = $powerData['win'] ?? 0;
+        $loss = $powerData['loss'] ?? 0;
+        $gb = $powerData['gb'] ?? 0;
+        $division = $powerData['Division'] ?? '';
+        $conference = $powerData['Conference'] ?? '';
+        $home_win = $powerData['home_win'] ?? 0;
+        $home_loss = $powerData['home_loss'] ?? 0;
+        $road_win = $powerData['road_win'] ?? 0;
+        $road_loss = $powerData['road_loss'] ?? 0;
+        $last_win = $powerData['last_win'] ?? 0;
+        $last_loss = $powerData['last_loss'] ?? 0;
+
+        $divisionStandings = $this->repository->getDivisionStandings($division);
+        $gbbase = $divisionStandings[0]['gb'] ?? 0;
+        $gb = $gbbase - $gb;
+        
+        $Div_Pos = 1;
+        foreach ($divisionStandings as $index => $standing) {
+            if ($standing['Team'] == $team->name) {
+                $Div_Pos = $index + 1;
+                break;
             }
-            $i++;
+        }
+
+        $conferenceStandings = $this->repository->getConferenceStandings($conference);
+        $Conf_Pos = 1;
+        foreach ($conferenceStandings as $index => $standing) {
+            if ($standing['Team'] == $team->name) {
+                $Conf_Pos = $index + 1;
+                break;
+            }
         }
 
         $output = "<tr bgcolor=\"#$team->color1\">
@@ -265,14 +272,17 @@ class Team
         return $output;
     }
 
-    public static function draftPicks($db, \Team $team)
+    public function draftPicks(\Team $team): string
     {
+        global $mysqli_db;
+        
         $resultPicks = $team->getDraftPicksResult();
     
-        $allTeamsResult = \League::getAllTeamsResult($db);
+        $league = new \League($mysqli_db);
+        $allTeamsResult = $league->getAllTeamsResult();
     
         foreach ($allTeamsResult as $teamRow) {
-            $teamsArray[$teamRow['team_name']] = \Team::initialize($db, $teamRow);
+            $teamsArray[$teamRow['team_name']] = \Team::initialize($mysqli_db, $teamRow);
         }
     
         $tableDraftPicks = "<table align=\"center\">";
@@ -299,15 +309,9 @@ class Team
         return $tableDraftPicks;
     }
 
-    public static function gmHistory($db, $team)
+    public function gmHistory($team): string
     {
-        $owner_award_code = $team->ownerName . " (" . $team->name . ")";
-        $querydec = "SELECT * FROM ibl_gm_history WHERE name LIKE '$owner_award_code' ORDER BY year ASC";
-        $resultdec = $db->sql_query($querydec);
-        $numdec = $db->sql_numrows($resultdec);
-        if ($numdec > 0) {
-            $dec = 0;
-        }
+        $gmHistory = $this->repository->getGMHistory($team->ownerName, $team->name);
 
         $output = "<tr bgcolor=\"#$team->color1\">
             <td align=\"center\">
@@ -317,15 +321,14 @@ class Team
         <tr>
             <td>";
 
-        while ($dec < $numdec) {
-            $dec_year = $db->sql_result($resultdec, $dec, "year");
-            $dec_Award = $db->sql_result($resultdec, $dec, "Award");
+        foreach ($gmHistory as $record) {
+            $dec_year = $record['year'] ?? '';
+            $dec_Award = $record['Award'] ?? '';
             $output .= "<table border=0 cellpadding=0 cellspacing=0>
                 <tr>
                     <td>$dec_year $dec_Award</td>
                 </tr>
             </table>";
-            $dec++;
         }
 
         $output .= "</td>
@@ -334,12 +337,9 @@ class Team
         return $output;
     }
 
-    public static function resultsHEAT($db, $team)
+    public function resultsHEAT($team): string
     {
-        $querywl = "SELECT * FROM ibl_heat_win_loss WHERE currentname = '$team->name' ORDER BY year DESC";
-        $resultwl = $db->sql_query($querywl);
-        $numwl = $db->sql_numrows($resultwl);
-        $h = 0;
+        $heatHistory = $this->repository->getHEATHistory($team->name);
         $wintot = 0;
         $lostot = 0;
         
@@ -352,17 +352,15 @@ class Team
             <td>
                 <div id=\"History-R\" style=\"overflow:auto\">";
         
-        while ($h < $numwl) {
-            $yearwl = $db->sql_result($resultwl, $h, "year");
-            $namewl = $db->sql_result($resultwl, $h, "namethatyear");
-            $wins = $db->sql_result($resultwl, $h, "wins");
-            $losses = $db->sql_result($resultwl, $h, "losses");
+        foreach ($heatHistory as $record) {
+            $yearwl = $record['year'] ?? '';
+            $namewl = $record['namethatyear'] ?? '';
+            $wins = $record['wins'] ?? 0;
+            $losses = $record['losses'] ?? 0;
             $wintot += $wins;
             $lostot += $losses;
             $winpct = ($wins + $losses) ? number_format($wins / ($wins + $losses), 3) : "0.000";
             $output .= "<a href=\"./modules.php?name=Team&op=team&teamID=$team->teamID&yr=$yearwl\">$yearwl $namewl</a>: $wins-$losses ($winpct)<br>";
-        
-            $h++;
         }
         
         $wlpct = ($wintot + $lostot) ? number_format($wintot / ($wintot + $lostot), 3) : "0.000";
@@ -379,13 +377,9 @@ class Team
         return $output;
     }
 
-    public static function resultsPlayoffs($db, $team)
+    public function resultsPlayoffs($team): string
     {
-        $queryplayoffs = "SELECT * FROM ibl_playoff_results ORDER BY year DESC";
-        $resultplayoffs = $db->sql_query($queryplayoffs);
-        $numplayoffs = $db->sql_numrows($resultplayoffs);
-
-        $pp = 0;
+        $playoffResults = $this->repository->getPlayoffResults();
         $totalplayoffwins = $totalplayofflosses = 0;
         $first_round_victories = $second_round_victories = $third_round_victories = $fourth_round_victories = 0;
         $first_round_losses = $second_round_losses = $third_round_losses = $fourth_round_losses = 0;
@@ -393,12 +387,12 @@ class Team
         $first_wins = $second_wins = $third_wins = $fourth_wins = 0;
         $first_losses = $second_losses = $third_losses = $fourth_losses = 0;
 
-        while ($pp < $numplayoffs) {
-            $playoffround = $db->sql_result($resultplayoffs, $pp, "round");
-            $playoffyear = $db->sql_result($resultplayoffs, $pp, "year");
-            $playoffwinner = $db->sql_result($resultplayoffs, $pp, "winner");
-            $playoffloser = $db->sql_result($resultplayoffs, $pp, "loser");
-            $playoffloser_games = $db->sql_result($resultplayoffs, $pp, "loser_games");
+        foreach ($playoffResults as $playoff) {
+            $playoffround = $playoff['round'] ?? 0;
+            $playoffyear = $playoff['year'] ?? '';
+            $playoffwinner = $playoff['winner'] ?? '';
+            $playoffloser = $playoff['loser'] ?? '';
+            $playoffloser_games = $playoff['loser_games'] ?? 0;
 
             if ($playoffround == 1) {
                 if ($playoffwinner == $team->name) {
@@ -465,7 +459,6 @@ class Team
                     $round_four_output .= "$playoffyear - $playoffwinner 4, $team->name $playoffloser_games<br>";
                 }
             }
-            $pp++;
         }
 
         $pwlpct = ($totalplayoffwins + $totalplayofflosses != 0) ? number_format($totalplayoffwins / ($totalplayoffwins + $totalplayofflosses), 3) : "0.000";
@@ -574,13 +567,9 @@ class Team
         return $output;
     }
 
-    public static function resultsRegularSeason($db, $team)
+    public function resultsRegularSeason($team): string
     {
-        $querywl = "SELECT * FROM ibl_team_win_loss WHERE currentname = '$team->name' ORDER BY year DESC";
-        $resultwl = $db->sql_query($querywl);
-        $numwl = $db->sql_numrows($resultwl);
-
-        $h = 0;
+        $regularSeasonHistory = $this->repository->getRegularSeasonHistory($team->name);
         $wintot = 0;
         $lostot = 0;
 
@@ -593,17 +582,15 @@ class Team
             <td>
                 <div id=\"History-R\" style=\"overflow:auto\">";
 
-        while ($h < $numwl) {
-            $yearwl = $db->sql_result($resultwl, $h, "year");
-            $namewl = $db->sql_result($resultwl, $h, "namethatyear");
-            $wins = $db->sql_result($resultwl, $h, "wins");
-            $losses = $db->sql_result($resultwl, $h, "losses");
+        foreach ($regularSeasonHistory as $record) {
+            $yearwl = $record['year'] ?? 0;
+            $namewl = $record['namethatyear'] ?? '';
+            $wins = $record['wins'] ?? 0;
+            $losses = $record['losses'] ?? 0;
             $wintot += $wins;
             $lostot += $losses;
             $winpct = ($wins + $losses) ? number_format($wins / ($wins + $losses), 3) : "0.000";
             $output .= "<a href=\"./modules.php?name=Team&op=team&teamID=$team->teamID&yr=$yearwl\">" . ($yearwl - 1) . "-$yearwl $namewl</a>: $wins-$losses ($winpct)<br>";
-
-            $h++;
         }
 
         $wlpct = ($wintot + $lostot) ? number_format($wintot / ($wintot + $lostot), 3) : "0.000";
@@ -620,15 +607,9 @@ class Team
         return $output;
     }
 
-    public static function teamAccomplishments($db, $team)
+    public function teamAccomplishments($team): string
     {
-        $owner_award_code = $team->name . "";
-        $querydec = "SELECT * FROM ibl_team_awards WHERE name LIKE '$owner_award_code' ORDER BY year DESC";
-        $resultdec = $db->sql_query($querydec);
-        $numdec = $db->sql_numrows($resultdec);
-        if ($numdec > 0) {
-            $dec = 0;
-        }
+        $teamAccomplishments = $this->repository->getTeamAccomplishments($team->name);
 
         $output = "<tr bgcolor=\"#$team->color1\">
             <td align=\"center\">
@@ -638,15 +619,14 @@ class Team
         <tr>
             <td>";
 
-        while ($dec < $numdec) {
-            $dec_year = $db->sql_result($resultdec, $dec, "year");
-            $dec_Award = $db->sql_result($resultdec, $dec, "Award");
+        foreach ($teamAccomplishments as $record) {
+            $dec_year = $record['year'] ?? '';
+            $dec_Award = $record['Award'] ?? '';
             $output .= "<table border=0 cellpadding=0 cellspacing=0>
                 <tr>
                     <td>$dec_year $dec_Award</td>
                 </tr>
             </table>";
-            $dec++;
         }
 
         $output .= "</td>

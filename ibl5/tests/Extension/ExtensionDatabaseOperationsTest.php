@@ -133,10 +133,11 @@ class ExtensionDatabaseOperationsTest extends TestCase
         $offerYears = 5;
         $offerDetails = '1000 1100 1200 1300 1400';
         
-        // Mock the topic query, category query, and queries from NewsService
+        // Mock expects: getTopicIDByTeamName and getCategoryIDByTitle queries
+        // Both queries return data with all fields needed
         $this->mockDb->setMockData([
-            ['topicid' => 5],  // getTopicIDByTeamName
-            ['catid' => 1],    // getCategoryIDByTitle
+            ['topicid' => 5, 'catid' => 1],
+            ['topicid' => 5, 'catid' => 1]
         ]);
         $this->mockDb->setNumRows(1);
         $this->mockDb->setReturnTrue(true);
@@ -202,10 +203,11 @@ class ExtensionDatabaseOperationsTest extends TestCase
         $offerInMillions = 100;
         $offerYears = 5;
         
-        // Mock the topic and category queries
+        // Mock expects: getTopicIDByTeamName and getCategoryIDByTitle queries
+        // Both queries return data with all fields needed
         $this->mockDb->setMockData([
-            ['topicid' => 5],  // getTopicIDByTeamName
-            ['catid' => 1],    // getCategoryIDByTitle
+            ['topicid' => 5, 'catid' => 1],
+            ['topicid' => 5, 'catid' => 1]
         ]);
         $this->mockDb->setNumRows(1);
         $this->mockDb->setReturnTrue(true);
@@ -316,8 +318,8 @@ class ExtensionDatabaseOperationsTest extends TestCase
         $currentSalary = 800;
         
         $this->mockDb->setMockData([
-            ['topicid' => 5],  // getTopicIDByTeamName
-            ['catid' => 1],    // getCategoryIDByTitle
+            ['topicid' => 5, 'catid' => 1],
+            ['topicid' => 5, 'catid' => 1]
         ]);
         $this->mockDb->setReturnTrue(true);
 
@@ -370,8 +372,8 @@ class ExtensionDatabaseOperationsTest extends TestCase
         ];
         
         $this->mockDb->setMockData([
-            ['topicid' => 5],  // getTopicIDByTeamName
-            ['catid' => 1],    // getCategoryIDByTitle
+            ['topicid' => 5, 'catid' => 1],
+            ['topicid' => 5, 'catid' => 1]
         ]);
         $this->mockDb->setReturnTrue(true);
 

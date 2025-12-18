@@ -1,5 +1,7 @@
 <?php
 
+global $mysqli_db;
+
 // Sanitize input to prevent SQL injection
 $player = isset($_REQUEST['player']) ? trim($_REQUEST['player']) : '';
 
@@ -9,9 +11,9 @@ if (empty($player)) {
 }
 
 // Use prepared statement to prevent SQL injection
-$searchTerm = '%' . $db->real_escape_string($player) . '%';
+$searchTerm = '%' . $mysqli_db->real_escape_string($player) . '%';
 $query = "SELECT sid, title, time FROM nuke_stories WHERE hometext LIKE ? OR bodytext LIKE ? ORDER BY time DESC";
-$stmt = $db->prepare($query);
+$stmt = $mysqli_db->prepare($query);
 
 if ($stmt === false) {
     echo "<small>Error searching for articles.</small>";

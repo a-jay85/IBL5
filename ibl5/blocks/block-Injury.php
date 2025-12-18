@@ -16,11 +16,10 @@ if (!defined('BLOCK_FILE')) {
     die();
 }
 
-global $db;
+global $mysqli_db;
 
 $queryActiveTeamAccounts = "SELECT * FROM nuke_users WHERE user_ibl_team != '' ORDER BY user_ibl_team ASC";
-$resultActiveTeamAccounts = $db->sql_query($queryActiveTeamAccounts);
-$numberOfActiveTeamAccounts = $db->sql_numrows($resultActiveTeamAccounts);
+$resultActiveTeamAccounts = $mysqli_db->query($queryActiveTeamAccounts);
 
 $content = "<table border=0>
     <tr>
@@ -43,9 +42,8 @@ $content = "<table border=0>
         </td>
     </tr>";
 
-$i = 0;
-while ($i < $numberOfActiveTeamAccounts) {
-    $teamname = $db->sql_result($resultActiveTeamAccounts, $i, "user_ibl_team");
+while ($accountRow = $resultActiveTeamAccounts->fetch_assoc()) {
+    $teamname = $accountRow['user_ibl_team'];
 
     $queryHealthyPlayersOnTeam = "SELECT *
         FROM ibl_plr
@@ -54,8 +52,8 @@ while ($i < $numberOfActiveTeamAccounts) {
         AND injured < 7
         AND ordinal <= " . JSB::WAIVERS_ORDINAL . "
         AND name NOT LIKE '%|%'";
-    $resultHealthyPlayersOnTeam = $db->sql_query($queryHealthyPlayersOnTeam);
-    $numberOfHealthyPlayersOnTeam = $db->sql_numrows($resultHealthyPlayersOnTeam);
+    $resultHealthyPlayersOnTeam = $mysqli_db->query($queryHealthyPlayersOnTeam);
+    $numberOfHealthyPlayersOnTeam = $resultHealthyPlayersOnTeam->num_rows;
 
     $queryInjuredActivePlayersOnTeam = "SELECT *
         FROM ibl_plr
@@ -63,8 +61,8 @@ while ($i < $numberOfActiveTeamAccounts) {
         AND retired = '0'
         AND injured > 7
         AND active = '1'";
-    $resultInjuredActivePlayersOnTeam = $db->sql_query($queryInjuredActivePlayersOnTeam);
-    $numberOfInjuredActivePlayersOnTeam = $db->sql_numrows($resultInjuredActivePlayersOnTeam);
+    $resultInjuredActivePlayersOnTeam = $mysqli_db->query($queryInjuredActivePlayersOnTeam);
+    $numberOfInjuredActivePlayersOnTeam = $resultInjuredActivePlayersOnTeam->num_rows;
 
     $waiversNeeded = 12;
     $waiversNeeded -= $numberOfHealthyPlayersOnTeam;
@@ -76,14 +74,13 @@ while ($i < $numberOfActiveTeamAccounts) {
     }
   
     $querySimDepthChartTimestamp = "SELECT sim_depth FROM ibl_team_history WHERE team_name = '$teamname'";
-    $resultSimDepthChartTimestamp = $db->sql_query($querySimDepthChartTimestamp);
-    $simDepthChartTimestamp = $db->sql_result($resultSimDepthChartTimestamp, 0, "sim_depth");
+    $resultSimDepthChartTimestamp = $mysqli_db->query($querySimDepthChartTimestamp);
+    $depthRow = $resultSimDepthChartTimestamp->fetch_assoc();
+    $simDepthChartTimestamp = $depthRow['sim_depth'];
 
     if ($waiversNeeded > 0 || $newDepthChartNeeded == 'Yes' && $simDepthChartTimestamp == "No Depth Chart") {
         $content .= "<tr><td>$teamname</td><td>$numberOfHealthyPlayersOnTeam</td><td>$waiversNeeded</td><td>$newDepthChartNeeded</td></tr>";
     }
-
-    $i++;
 }
 
 $content .= "</table>";

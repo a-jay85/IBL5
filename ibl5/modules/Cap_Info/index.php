@@ -4,28 +4,27 @@ if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
     die("You can't access this file directly...");
 }
 
-global $db, $cookie;
-$sharedFunctions = new Shared($db);
-$commonRepository = new Services\CommonRepository($db);
-$season = new Season($db);
+global $cookie, $mysqli_db;
+$commonRepository = new Services\CommonMysqliRepository($mysqli_db);
+$season = new Season($mysqli_db);
 
  $username = strval($cookie[1] ?? '');
- $userTeam = Team::initialize($db, $commonRepository->getTeamnameFromUsername($username));
+ $userTeam = Team::initialize($mysqli_db, $commonRepository->getTeamnameFromUsername($username));
 
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
 Nuke\Header::header();
 
-$resultTeamInfo = League::getAllTeamsResult($db);
-$numberOfTeams = $db->sql_numrows($resultTeamInfo);
+$league = new League($mysqli_db);
+$resultTeamInfo = $league->getAllTeamsResult();
+$numberOfTeams = count($resultTeamInfo);
 
 OpenTable();
 
 $i = 0;
-while ($i < $numberOfTeams) {
-    $teamRow = $db->sql_fetch_assoc($resultTeamInfo);
-    $team = Team::initialize($db, $teamRow);
+foreach ($resultTeamInfo as $teamRow) {
+    $team = Team::initialize($mysqli_db, $teamRow);
 
     $teamTotalAvailableSalaryYear1[$i] = $teamTotalAvailableSalaryYear2[$i] = $teamTotalAvailableSalaryYear3[$i] = 0;
     $teamTotalAvailableSalaryYear4[$i] = $teamTotalAvailableSalaryYear5[$i] = $teamTotalAvailableSalaryYear6[$i] = 0;
@@ -112,17 +111,17 @@ Nuke\Footer::footer();
 
 function get_salary1($tid)
 {
-    global $db;
+    global $mysqli_db;
 
     $queryPlayersUnderContractAfterThisSeason = "SELECT * FROM ibl_plr WHERE retired = 0 AND tid = $tid AND cy <> cyt AND name NOT LIKE '%|%'";
-    $resultPlayersUnderContractAfterThisSeason = $db->sql_query($queryPlayersUnderContractAfterThisSeason);
-    $numberOfPlayersUnderContractAfterThisSeason = $db->sql_numrows($resultPlayersUnderContractAfterThisSeason);
+    $resultPlayersUnderContractAfterThisSeason = $mysqli_db->query($queryPlayersUnderContractAfterThisSeason);
+    $numberOfPlayersUnderContractAfterThisSeason = $resultPlayersUnderContractAfterThisSeason->num_rows;
 
     $contract_amt[][] = 0;
     $i = 0;
-    while ($i < $numberOfPlayersUnderContractAfterThisSeason) {
-        $yearUnderContract = $db->sql_result($resultPlayersUnderContractAfterThisSeason, $i, "cy");
-        $totalYearsUnderContract = $db->sql_result($resultPlayersUnderContractAfterThisSeason, $i, "cyt");
+    while ($row = $resultPlayersUnderContractAfterThisSeason->fetch_assoc()) {
+        $yearUnderContract = $row["cy"];
+        $totalYearsUnderContract = $row["cyt"];
 
         $j = 1;
         while ($yearUnderContract < $totalYearsUnderContract) {
@@ -130,7 +129,6 @@ function get_salary1($tid)
             $contract_amt[$j]["roster"]++;
             $j++;
         }
-        $i++;
     }
     return $contract_amt;
 }

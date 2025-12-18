@@ -6,6 +6,8 @@ require_once __DIR__ . '/BaseView.php';
 
 class OlympicTotalsView extends BaseView {
     public function render() {
+        global $mysqli_db;
+        
         $car_gm = $car_min = $car_fgm = $car_fga = $car_ftm = $car_fta = $car_3gm = $car_3ga = 0;
         $car_orb = $car_reb = $car_ast = $car_stl = $car_blk = $car_tvr = $car_pf = $car_pts = 0;
 
@@ -31,9 +33,12 @@ class OlympicTotalsView extends BaseView {
                 <th>pts</th>
             </tr>";
 
-        $escapedName = DatabaseService::escapeString($this->db, $this->player->name);
-        $resultplayoff4 = $this->db->sql_query("SELECT * FROM ibl_olympics_stats WHERE name='" . $escapedName . "' ORDER BY year ASC");
-        while ($rowplayoff4 = $this->db->sql_fetchrow($resultplayoff4)) {
+        $stmt = $mysqli_db->prepare("SELECT * FROM ibl_olympics_stats WHERE name=? ORDER BY year ASC");
+        $stmt->bind_param("s", $this->player->name);
+        $stmt->execute();
+        $resultplayoff4 = $stmt->get_result();
+        
+        while ($rowplayoff4 = $resultplayoff4->fetch_assoc()) {
             $hist_year = stripslashes(check_html($rowplayoff4['year'], "nohtml"));
             $hist_team = stripslashes(check_html($rowplayoff4['team'], "nohtml"));
             $hist_gm = stripslashes(check_html($rowplayoff4['games'], "nohtml"));

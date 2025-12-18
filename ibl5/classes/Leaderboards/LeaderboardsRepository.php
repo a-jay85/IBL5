@@ -8,11 +8,10 @@ use Leaderboards\Contracts\LeaderboardsRepositoryInterface;
 
 /**
  * @see LeaderboardsRepositoryInterface
+ * @extends \BaseMysqliRepository
  */
-class LeaderboardsRepository implements LeaderboardsRepositoryInterface
+class LeaderboardsRepository extends \BaseMysqliRepository implements LeaderboardsRepositoryInterface
 {
-    private $db;
-
     // Whitelist of valid table names to prevent SQL injection
     private const VALID_TABLES = [
         'ibl_hist',
@@ -32,13 +31,17 @@ class LeaderboardsRepository implements LeaderboardsRepositoryInterface
         'orb', 'reb', 'ast', 'stl', 'tvr', 'blk', 'pf'
     ];
 
-    public function __construct($db)
+    public function __construct(object $db)
     {
-        $this->db = $db;
+        parent::__construct($db);
     }
 
     /**
      * @see LeaderboardsRepositoryInterface::getLeaderboards()
+     * 
+     * SECURITY NOTE: $tableKey and $sortColumn are validated against whitelists
+     * (VALID_TABLES and VALID_SORT_COLUMNS) before being used in SQL.
+     * String concatenation is acceptable here because all values are validated.
      */
     public function getLeaderboards(
         string $tableKey,
@@ -64,6 +67,7 @@ class LeaderboardsRepository implements LeaderboardsRepositoryInterface
         $whereClause = implode(' AND ', $conditions);
 
         // Special handling for ibl_hist table (aggregated by player)
+        // NOTE: Table name and sort column are whitelisted above
         if ($tableKey == 'ibl_hist') {
             $query = "SELECT
                 h.pid,
@@ -100,12 +104,11 @@ class LeaderboardsRepository implements LeaderboardsRepositoryInterface
                 . ($limit > 0 ? " LIMIT $limit" : "") . ";";
         }
 
-        $result = $this->db->sql_query($query);
-        $numRows = $this->db->sql_numrows($result);
+        $rows = $this->fetchAll($query);
 
         return [
-            'result' => $result,
-            'count' => $numRows
+            'result' => $rows,
+            'count' => count($rows)
         ];
     }
 

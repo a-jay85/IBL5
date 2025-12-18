@@ -20,7 +20,7 @@ interface UIHelperInterface
      * Iterates through team players, calculates future salary commitments,
      * and outputs HTML rows for each player in the trade form.
      *
-     * @param resource $resultTeamPlayers Database result from player query
+     * @param \mysqli_result|object $resultTeamPlayers Database result from player query
      * @param int $k Starting counter for form field numbering
      * @return array{player: array<int, int>, hold: array<int, int>, picks: array, k: int}
      *         Future salary data:
@@ -40,7 +40,7 @@ interface UIHelperInterface
      *  Each player row includes hidden fields for index, contract, and type,
      *  plus visible fields for position, name, and contract amount.
      */
-    public function buildTeamFutureSalary($resultTeamPlayers, int $k): array;
+    public function buildTeamFutureSalary(object $resultTeamPlayers, int $k): array;
 
     /**
      * Build team future draft picks data and HTML for trade form
@@ -48,7 +48,7 @@ interface UIHelperInterface
      * Iterates through team draft picks and outputs HTML rows for each
      * pick in the trade form.
      *
-     * @param resource $resultTeamPicks Database result from picks query
+     * @param \mysqli_result|object $resultTeamPicks Database result from picks query
      * @param array{player: array, hold: array, picks: array, k: int} $futureSalaryArray Existing future salary array to update
      * @return array{player: array, hold: array, picks: array, k: int} Updated future salary array with 'k' counter incremented
      *
@@ -62,7 +62,7 @@ interface UIHelperInterface
      *  Each pick row includes hidden fields for index and type,
      *  plus visible fields showing year, team, and round.
      */
-    public function buildTeamFuturePicks($resultTeamPicks, array $futureSalaryArray): array;
+    public function buildTeamFuturePicks(object $resultTeamPicks, array $futureSalaryArray): array;
 
     /**
      * Get list of all teams for partner selection dropdown

@@ -2,10 +2,10 @@
 
 use Player\Player;
 
-global $db, $cookie;
+global $db, $cookie, $mysqli_db;
 $sharedFunctions = new Shared($db);
-$commonRepository = new Services\CommonRepository($db);
-$season = new Season($db);
+$commonRepository = new Services\CommonMysqliRepository($mysqli_db);
+$season = new Season($mysqli_db);
 
 if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
@@ -16,14 +16,14 @@ get_lang($module_name);
 $pagetitle = "- $module_name";
 
  $username = strval($cookie[1] ?? '');
- $userTeam = Team::initialize($db, $commonRepository->getTeamnameFromUsername($username));
+ $userTeam = Team::initialize($mysqli_db, $commonRepository->getTeamnameFromUsername($username));
 $userStartingPG = Player::withPlayerID($db, $userTeam->getCurrentlySetStarterPlayerIDForPosition('PG') ?? 4040404);
 $userStartingSG = Player::withPlayerID($db, $userTeam->getCurrentlySetStarterPlayerIDForPosition('SG') ?? 4040404);
 $userStartingSF = Player::withPlayerID($db, $userTeam->getCurrentlySetStarterPlayerIDForPosition('SF') ?? 4040404);
 $userStartingPF = Player::withPlayerID($db, $userTeam->getCurrentlySetStarterPlayerIDForPosition('PF') ?? 4040404);
 $userStartingC = Player::withPlayerID($db, $userTeam->getCurrentlySetStarterPlayerIDForPosition('C') ?? 4040404);
 
-$resultUserTeamProjectedGamesNextSim = Schedule\TeamSchedule::getProjectedGamesNextSimResult($db, $userTeam->teamID, $season->lastSimEndDate);
+$resultUserTeamProjectedGamesNextSim = Schedule\TeamSchedule::getProjectedGamesNextSimResult($mysqli_db, $userTeam->teamID, $season->lastSimEndDate);
 $lastSimEndDateObject = new DateTime($season->lastSimEndDate);
 
 $i = 0;
@@ -31,7 +31,7 @@ foreach ($resultUserTeamProjectedGamesNextSim as $gameRow) {
     $rows[$i]['game'] = new Game($gameRow);
     $rows[$i]['date'] = new DateTime($rows[$i]['game']->date);
     $rows[$i]['day'] = $rows[$i]['date']->diff($lastSimEndDateObject)->format("%a");
-    $rows[$i]['opposingTeam'] = Team::initialize($db, $rows[$i]['game']->getOpposingTeamID($userTeam->teamID));
+    $rows[$i]['opposingTeam'] = Team::initialize($mysqli_db, $rows[$i]['game']->getOpposingTeamID($userTeam->teamID));
     $rows[$i]['opposingStartingPG'] = Player::withPlayerID($db, $rows[$i]['opposingTeam']->getLastSimStarterPlayerIDForPosition('PG') ?? 4040404);
     $rows[$i]['userStartingPG'] = $userStartingPG ?? 4040404;
     $rows[$i]['opposingStartingSG'] = Player::withPlayerID($db, $rows[$i]['opposingTeam']->getLastSimStarterPlayerIDForPosition('SG') ?? 4040404);
@@ -58,8 +58,9 @@ foreach ($resultUserTeamProjectedGamesNextSim as $gameRow) {
 <?php if (mysqli_num_rows($resultUserTeamProjectedGamesNextSim) == 0) : ?>
     No games projected next sim!
 <?php else : ?>
+    <?php $league = new League($mysqli_db); ?>
     <table width=100% align=center>
-        <?php for ($i = 0; $i <= League::getSimLengthInDays($db) - 1; $i++) : ?>
+        <?php for ($i = 0; $i <= $league->getSimLengthInDays() - 1; $i++) : ?>
             <?php if (isset($rows[$i]['game']) && $rows[$i]['game'] != NULL) : ?>
                 <tr>
                     <td>

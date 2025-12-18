@@ -16,9 +16,9 @@ $pagetitle = "- Team Pages";
  */
 function waivers($user)
 {
-    global $db, $action;
+    global $mysqli_db, $action;
     
-    $controller = new Waivers\WaiversController($db);
+    $controller = new Waivers\WaiversController($mysqli_db);
     $controller->handleWaiverRequest($user, $action);
 }
 

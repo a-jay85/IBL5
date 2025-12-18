@@ -119,7 +119,16 @@ class TradeProcessorIntegrationTest extends PHPUnit\Framework\TestCase
             ['itemid' => 2001, 'itemtype' => 0, 'from' => 'Knicks', 'to' => 'Nets']
         ]);
         $this->mockDb->setMockData([
-            ['year' => 2024, 'teampick' => 'Knicks', 'round' => 1]
+            [
+                'pickid' => 2001,
+                'year' => 2024, 
+                'teampick' => 'Knicks', 
+                'round' => 1, 
+                'pick' => 1,
+                'ownerofpick' => 'Knicks',
+                'currentteam' => 'Knicks',
+                'notes' => null
+            ]
         ]);
 
         // Act

@@ -144,4 +144,13 @@ final class FakeVotingResult
 
         return $this->rows[$this->position++];
     }
+
+    /**
+     * Legacy snake_case method for compatibility with legacy database code
+     * @return array|false
+     */
+    public function fetch_assoc()
+    {
+        return $this->fetchAssoc();
+    }
 }

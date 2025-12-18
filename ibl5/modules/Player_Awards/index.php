@@ -21,7 +21,7 @@ get_lang($module_name);
 
 $pagetitle = "- $module_name";
 
-global $db;
+global $mysqli_db;
 
 Nuke\Header::header();
 OpenTable();
@@ -118,8 +118,8 @@ $query .= " ORDER BY $orderby ASC";
 
 // =============== EXECUTE QUERY
 
-$result = $db->sql_query($query);
-@$num = $db->sql_numrows($result);
+$result = $mysqli_db->query($query);
+@$num = $result->num_rows;
 
 echo "<table border=1 cellpadding=0 cellspacing=0>
     <tr>
@@ -136,9 +136,10 @@ echo "<table border=1 cellpadding=0 cellspacing=0>
 $i = 0;
 
 while ($i < $num) {
-    $a_name = $db->sql_result($result, $i, "name");
-    $a_Award = $db->sql_result($result, $i, "Award");
-    $a_year = $db->sql_result($result, $i, "year");
+    $row = $result->fetch_assoc();
+    $a_name = $row['name'];
+    $a_Award = $row['Award'];
+    $a_year = $row['year'];
     if ($i % 2) {
         echo "<tr bgcolor=#ffffff>";
     } else {

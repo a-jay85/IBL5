@@ -21,16 +21,13 @@ class Ratings
      * @return string HTML table
      */
     public static function render($db, $data, $team, string $yr, $season, string $moduleName = ""): string
+    // TODO: simplify this by refactoring Player initialization logic out of this method
     {
         $playerRows = [];
         $i = 0;
-
         foreach ($data as $plrRow) {
             if ($yr == "") {
-                if (is_object($data)) {
-                    $player = Player::withPlrRow($db, $plrRow);
-                    $bgcolor = (($i % 2) == 0) ? "FFFFFF" : "EEEEEE";
-                } elseif ($plrRow instanceof Player) {
+                if ($plrRow instanceof Player) {
                     $player = $plrRow;
                     if ($moduleName == "Next_Sim") {
                         $bgcolor = (($i % 2) == 0) ? "FFFFFF" : "FFFFAA";
@@ -39,6 +36,12 @@ class Ratings
                     } else {
                         $bgcolor = (($i % 2) == 0) ? "FFFFFF" : "EEEEEE";
                     }
+                } elseif (is_array($data) AND $plrRow instanceof Player) {
+                    $player = Player::withPlrRow($db, $plrRow);
+                    $bgcolor = (($i % 2) == 0) ? "FFFFFF" : "EEEEEE";
+                } elseif (is_array($plrRow)) {
+                    $player = Player::withPlrRow($db, $plrRow);
+                    $bgcolor = (($i % 2) == 0) ? "FFFFFF" : "EEEEEE";
                 } else {
                     continue;
                 }

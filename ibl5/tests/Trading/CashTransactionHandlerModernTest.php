@@ -36,8 +36,8 @@ class CashTransactionHandlerModernTest extends TestCase
     {
         // Arrange
         $requestedPid = 99999;
-        $this->mockDb->setMockData([]); // No existing PID found
-        $this->mockDb->setReturnTrue(false); // SELECT returns empty result
+        // Mock repository to return null (PID doesn't exist)
+        $this->mockDb->setMockData([]);
 
         // Act
         $result = $this->cashHandler->generateUniquePid($requestedPid);

@@ -4,60 +4,67 @@ declare(strict_types=1);
 
 namespace SeasonLeaders;
 
-use Services\DatabaseService;
 use SeasonLeaders\Contracts\SeasonLeadersRepositoryInterface;
 
 /**
  * @see SeasonLeadersRepositoryInterface
+ * @extends \BaseMysqliRepository
  */
-class SeasonLeadersRepository implements SeasonLeadersRepositoryInterface
+class SeasonLeadersRepository extends \BaseMysqliRepository implements SeasonLeadersRepositoryInterface
 {
-    private $db;
-
-    public function __construct($db)
+    public function __construct(object $db)
     {
-        $this->db = $db;
+        parent::__construct($db);
     }
 
     /**
      * @see SeasonLeadersRepositoryInterface::getSeasonLeaders()
+     * 
+     * SECURITY NOTE: $sortBy is validated and mapped to whitelisted SQL expressions
+     * in getSortColumn() method. Dynamic ORDER BY clause is acceptable here because
+     * the sort expression is generated from a strict whitelist.
      */
     public function getSeasonLeaders(array $filters): array
     {
         $conditions = ["name IS NOT NULL"];
+        $params = [];
+        $types = "";
         
         // Add year filter if specified
         if (!empty($filters['year'])) {
-            $year = DatabaseService::escapeString($this->db, $filters['year']);
-            $conditions[] = "year = '$year'";
+            $conditions[] = "year = ?";
+            $types .= "s";
+            $params[] = $filters['year'];
         }
         
         // Add team filter if specified and not "All"
         $teamId = (int)($filters['team'] ?? 0);
         if (!empty($teamId) && $teamId != 0) {
-            $conditions[] = "teamid = $teamId";
+            $conditions[] = "teamid = ?";
+            $types .= "i";
+            $params[] = $teamId;
         }
         
         $whereClause = implode(' AND ', $conditions);
         $sortBy = $this->getSortColumn($filters['sortby'] ?? '1');
         
+        // NOTE: $sortBy is validated in getSortColumn() against a strict whitelist
         $query = "SELECT * FROM ibl_hist WHERE $whereClause ORDER BY $sortBy DESC";
-        $result = $this->db->sql_query($query);
-        $numRows = $this->db->sql_numrows($result);
+        
+        $rows = $this->fetchAll($query, $types, ...$params);
         
         return [
-            'result' => $result,
-            'count' => $numRows
+            'result' => $rows,
+            'count' => count($rows)
         ];
     }
 
     /**
      * @see SeasonLeadersRepositoryInterface::getTeams()
      */
-    public function getTeams()
+    public function getTeams(): array
     {
-        $query = "SELECT * FROM ibl_power WHERE TeamID BETWEEN 1 AND 32 ORDER BY TeamID ASC";
-        return $this->db->sql_query($query);
+        return $this->fetchAll("SELECT * FROM ibl_power WHERE TeamID BETWEEN 1 AND 32 ORDER BY TeamID ASC");
     }
 
     /**
@@ -65,14 +72,11 @@ class SeasonLeadersRepository implements SeasonLeadersRepositoryInterface
      */
     public function getYears(): array
     {
-        $query = "SELECT DISTINCT year FROM ibl_hist ORDER BY year DESC";
-        $result = $this->db->sql_query($query);
-        $years = [];
+        $rows = $this->fetchAll("SELECT DISTINCT year FROM ibl_hist ORDER BY year DESC");
         
-        $i = 0;
-        while ($i < $this->db->sql_numrows($result)) {
-            $years[] = $this->db->sql_result($result, $i, 'year');
-            $i++;
+        $years = [];
+        foreach ($rows as $row) {
+            $years[] = $row['year'];
         }
         
         return $years;
@@ -80,6 +84,11 @@ class SeasonLeadersRepository implements SeasonLeadersRepositoryInterface
 
     /**
      * Map sort option to database column/expression for ORDER BY clause
+     * 
+     * SECURITY NOTE: This method acts as a whitelist for ORDER BY expressions.
+     * All possible sort options (1-20) are mapped to pre-defined SQL expressions.
+     * String concatenation in ORDER BY clauses is acceptable because values come
+     * from this strict whitelist, not user input.
      * 
      * @param string $sortBy Sort option identifier (1-20)
      * @return string SQL expression for sorting

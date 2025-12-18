@@ -10,6 +10,7 @@ class WaiversRepositoryTest extends TestCase
     
     protected function setUp(): void
     {
+        // Create MockDatabase that duck-types mysqli for testing
         $this->mockDb = new MockDatabase();
         $this->repository = new WaiversRepository($this->mockDb);
     }

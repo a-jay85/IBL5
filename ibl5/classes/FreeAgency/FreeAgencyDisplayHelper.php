@@ -10,18 +10,18 @@ use Player\Player;
  */
 class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
 {
-    private $db;
-    private \Services\DatabaseService $databaseService;
+    private object $mysqli_db;
+    private FreeAgencyRepository $repository;
     private array $capMetrics;
     private $team;
     private $season;
 
-    public function __construct($db, $team, $season)
+    public function __construct(object $mysqli_db, $team, $season)
     {
-        $this->db = $db;
+        $this->mysqli_db = $mysqli_db;
         $this->team = $team;
         $this->season = $season;
-        $this->databaseService = new \Services\DatabaseService();
+        $this->repository = new FreeAgencyRepository($mysqli_db);
         $this->initializeCapMetrics();
     }
 
@@ -32,7 +32,7 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
      */
     private function initializeCapMetrics(): void
     {
-        $capCalculator = new FreeAgencyCapCalculator($this->db, $this->team, $this->season);
+        $capCalculator = new FreeAgencyCapCalculator($this->mysqli_db, $this->team, $this->season);
         $this->capMetrics = $capCalculator->calculateTeamCapMetrics();
     }
 
@@ -74,7 +74,7 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
     <tbody>
         <?php foreach ($this->team->getRosterUnderContractOrderedByOrdinalResult() as $playerRow): ?>
             <?php
-            $player = Player::withPlrRow($this->db, $playerRow);
+            $player = Player::withPlrRow($this->mysqli_db, $playerRow);
             
             if (!$player->isPlayerFreeAgent($this->season)):
                 $futureSalaries = $player->getFutureSalaries();
@@ -122,7 +122,7 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
      */
     private function renderContractOffers(): string
     {
-        $commonRepository = new \Services\CommonRepository($this->db);
+        $commonRepository = new \Services\CommonMysqliRepository($this->mysqli_db);
         
         ob_start();
         ?>
@@ -135,7 +135,7 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
         <?php foreach ($this->team->getFreeAgencyOffersResult() as $offerRow): ?>
             <?php
             $playerID = $commonRepository->getPlayerIDFromPlayerName($offerRow['name']);
-            $player = Player::withPlayerID($this->db, $playerID);
+            $player = Player::withPlayerID($this->mysqli_db, $playerID);
             ?>
         <tr>
             <td><a href="modules.php?name=Free_Agency&pa=negotiate&pid=<?= htmlspecialchars($player->playerID) ?>">Negotiate</a></td>
@@ -186,10 +186,10 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
     <tbody>
         <?php foreach ($this->team->getRosterUnderContractOrderedByOrdinalResult() as $playerRow): ?>
             <?php
-            $player = Player::withPlrRow($this->db, $playerRow);
+            $player = Player::withPlrRow($this->mysqli_db, $playerRow);
             
             if ($player->isPlayerFreeAgent($this->season)):
-                $demands = $this->db->sql_fetchrow($player->getFreeAgencyDemands());
+                $demands = $player->getFreeAgencyDemands();
             ?>
         <tr>
             <td>
@@ -235,15 +235,13 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
     <?= $this->renderTableHeader() ?>
     <tbody>
         <?php
-        $escapedTeamName = $this->databaseService->escapeString($this->db, $this->team->name);
-        $query = "SELECT * FROM ibl_plr WHERE teamname!='$escapedTeamName' AND retired='0' ORDER BY ordinal ASC";
-        $result = $this->db->sql_query($query);
+        $allPlayers = $this->repository->getAllPlayersExcludingTeam($this->team->name);
         
-        foreach ($result as $playerRow):
-            $player = Player::withPlrRow($this->db, $playerRow);
+        foreach ($allPlayers as $playerRow):
+            $player = Player::withPlrRow($this->mysqli_db, $playerRow);
             
             if ($player->isPlayerFreeAgent($this->season)):
-                $demands = $this->db->sql_fetchrow($player->getFreeAgencyDemands());
+                $demands = $player->getFreeAgencyDemands();
         ?>
         <tr>
             <td><a href="modules.php?name=Free_Agency&pa=negotiate&pid=<?= htmlspecialchars($player->playerID) ?>">Negotiate</a></td>

@@ -17,12 +17,10 @@ use Services\CommonContractValidator;
  */
 class ExtensionOfferEvaluator implements ExtensionOfferEvaluatorInterface
 {
-    private $db;
     private CommonContractValidator $contractValidator;
 
-    public function __construct($db)
+    public function __construct()
     {
-        $this->db = $db;
         $this->contractValidator = new CommonContractValidator();
     }
 

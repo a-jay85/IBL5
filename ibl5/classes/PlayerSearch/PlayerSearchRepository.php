@@ -4,19 +4,21 @@ declare(strict_types=1);
 
 namespace PlayerSearch;
 
-use mysqli;
+use BaseMysqliRepository;
 use PlayerSearch\Contracts\PlayerSearchRepositoryInterface;
 
 /**
  * PlayerSearchRepository - Database operations for player search
  * 
+ * Extends BaseMysqliRepository for standardized prepared statement handling.
  * Implements the repository contract defined in PlayerSearchRepositoryInterface.
  * See the interface for detailed behavior documentation.
+ * 
+ * @see BaseMysqliRepository For base class documentation and error codes
+ * @see PlayerSearchRepositoryInterface For method contracts
  */
-class PlayerSearchRepository implements PlayerSearchRepositoryInterface
+class PlayerSearchRepository extends BaseMysqliRepository implements PlayerSearchRepositoryInterface
 {
-    private mysqli $db;
-
     private const COLUMN_MAP = [
         'pos' => 'pos',
         'age' => 'age',
@@ -54,9 +56,15 @@ class PlayerSearchRepository implements PlayerSearchRepositoryInterface
         'td' => 'td',
     ];
 
-    public function __construct(mysqli $db)
+    /**
+     * Constructor - inherits from BaseMysqliRepository
+     * 
+     * @param \mysqli $db Active mysqli connection
+     * @throws \RuntimeException If connection is invalid (error code 1002)
+     */
+    public function __construct(\mysqli $db)
     {
-        $this->db = $db;
+        parent::__construct($db);
     }
 
     /**
@@ -137,20 +145,14 @@ class PlayerSearchRepository implements PlayerSearchRepositoryInterface
         $whereClause = implode(' AND ', $conditions);
         $query = "SELECT * FROM ibl_plr WHERE $whereClause ORDER BY retired ASC, ordinal ASC";
 
-        $stmt = $this->db->prepare($query);
-        if ($stmt === false) {
-            throw new \RuntimeException('Failed to prepare search query: ' . $this->db->error);
-        }
-
-        if (!empty($bindParams)) {
-            $stmt->bind_param($bindTypes, ...$bindParams);
-        }
-
-        $stmt->execute();
+        // Use executeQuery from BaseMysqliRepository for dynamic parameter binding
+        // executeQuery handles prepare, bind_param, execute, and error logging
+        $stmt = $this->executeQuery($query, $bindTypes, ...$bindParams);
         $result = $stmt->get_result();
 
         if ($result === false) {
-            throw new \RuntimeException('Failed to execute search query: ' . $stmt->error);
+            $stmt->close();
+            throw new \RuntimeException('Failed to get search results');
         }
 
         $players = [];
@@ -172,24 +174,11 @@ class PlayerSearchRepository implements PlayerSearchRepositoryInterface
      */
     public function getPlayerById(int $pid): ?array
     {
-        $query = "SELECT * FROM ibl_plr WHERE pid = ?";
-        $stmt = $this->db->prepare($query);
-        
-        if ($stmt === false) {
-            throw new \RuntimeException('Failed to prepare player query: ' . $this->db->error);
-        }
-
-        $stmt->bind_param('i', $pid);
-        $stmt->execute();
-        $result = $stmt->get_result();
-
-        if ($result === false) {
-            throw new \RuntimeException('Failed to execute player query: ' . $stmt->error);
-        }
-
-        $player = $result->fetch_assoc();
-        $stmt->close();
-
-        return $player ?: null;
+        // Use fetchOne from BaseMysqliRepository for single-row queries
+        return $this->fetchOne(
+            "SELECT * FROM ibl_plr WHERE pid = ?",
+            "i",
+            $pid
+        );
     }
 }

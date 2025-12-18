@@ -22,6 +22,22 @@
 if (!defined("SQL_LAYER")) {
     define("SQL_LAYER", "mysql");
 
+    /**
+     * @deprecated Use mysqli with prepared statements instead.
+     * 
+     * This legacy wrapper will be removed once all code is migrated.
+     * For new code, use $mysqli_db global with prepared statements:
+     * 
+     * Example:
+     *   $stmt = $mysqli_db->prepare("SELECT * FROM table WHERE id = ?");
+     *   $stmt->bind_param("i", $id);
+     *   $stmt->execute();
+     *   $result = $stmt->get_result();
+     * 
+     * Or extend BaseMysqliRepository for repository classes.
+     * 
+     * @see \Repositories\BaseMysqliRepository
+     */
     class MySQL
     {
         public $db_connect_id;
@@ -46,9 +62,7 @@ if (!defined("SQL_LAYER")) {
             $this->server = $sqlserver;
             $this->dbname = $database;
 
-            if ($this->persistency) {
-                $this->db_connect_id = @mysqli_pconnect($this->server, $this->user, $this->password);
-            } else {
+            if (!$this->persistency) {
                 $this->db_connect_id = @mysqli_connect($this->server, $this->user, $this->password);
             }
             if ($this->db_connect_id) {
@@ -174,11 +188,18 @@ if (!defined("SQL_LAYER")) {
                 $query_id = $this->query_result;
             }
             if ($query_id) {
+                // If $query_id is already an array (from refactored methods), return it directly
+                if (is_array($query_id)) {
+                    return $query_id;
+                }
                 // Original PHP-Nuke implementation method is commented out.
                 // It has been simplified for PHP 7+ since mysqli_fetch_array always returns objects and not resources.
                 // $this->row[$query_id] = @mysqli_fetch_array($query_id);
                 // return $this->row[$query_id];
-                return mysqli_fetch_array($query_id);
+                if ($query_id instanceof \mysqli_result) {
+                    return mysqli_fetch_array($query_id);
+                }
+                return false;
             } else {
                 return false;
             }
@@ -190,12 +211,20 @@ if (!defined("SQL_LAYER")) {
                 $query_id = $this->query_result;
             }
             if ($query_id) {
+                // If $query_id is already an array (from refactored methods), wrap it in result array
+                if (is_array($query_id)) {
+                    return [$query_id];
+                }
                 unset($this->rowset[$query_id]);
                 unset($this->row[$query_id]);
-                while ($this->rowset[$query_id] = @mysqli_fetch_array($query_id)) {
-                    $result[] = $this->rowset[$query_id];
+                if ($query_id instanceof \mysqli_result) {
+                    $result = [];
+                    while ($this->rowset[$query_id] = @mysqli_fetch_array($query_id)) {
+                        $result[] = $this->rowset[$query_id];
+                    }
+                    return $result;
                 }
-                return $result;
+                return false;
             } else {
                 return false;
             }
@@ -207,34 +236,14 @@ if (!defined("SQL_LAYER")) {
                 $query_id = $this->query_result;
             }
             if ($query_id) {
-                return mysqli_fetch_assoc($query_id);
-            } else {
-                return false;
-            }
-        }
-
-        public function sql_fetchfield($field, $rownum = -1, $query_id = 0)
-        {
-            if (!$query_id) {
-                $query_id = $this->query_result;
-            }
-            if ($query_id) {
-                if ($rownum > -1) {
-                    $result = @mysqli_result($query_id, $rownum, $field);
-                } else {
-                    if (empty($this->row[$query_id]) && empty($this->rowset[$query_id])) {
-                        if ($this->sql_fetchrow()) {
-                            $result = $this->row[$query_id][$field];
-                        }
-                    } else {
-                        if ($this->rowset[$query_id]) {
-                            $result = $this->rowset[$query_id][$field];
-                        } elseif ($this->row[$query_id]) {
-                            $result = $this->row[$query_id][$field];
-                        }
-                    }
+                // If $query_id is already an array (from refactored methods), return it directly
+                if (is_array($query_id)) {
+                    return $query_id;
                 }
-                return $result;
+                if ($query_id instanceof \mysqli_result) {
+                    return mysqli_fetch_assoc($query_id);
+                }
+                return false;
             } else {
                 return false;
             }

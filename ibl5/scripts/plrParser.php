@@ -78,8 +78,8 @@ require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 // $mysqli_db is the MySQLi instance with UTF-8 charset already set
 
 $sharedFunctions = new Shared($db);
-$commonRepository = new Services\CommonRepository($db);
-$season = new Season($db);
+$commonRepository = new Services\CommonMysqliRepository($mysqli_db);
+$season = new Season($mysqli_db);
 
 $tidOffenseStats = $tidDefenseStats = 0;
 

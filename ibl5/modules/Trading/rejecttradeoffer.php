@@ -18,11 +18,9 @@ $stmtClearCash->bind_param("i", $offer_id);
 $resultClearCash = $stmtClearCash->execute();
 $stmtClearCash->close();
 
-$discord = new Discord($mysqli_db);
-$rejectingUserDiscordID = $discord->getDiscordIDFromTeamname($teamRejecting);
-$receivingUserDiscordID = $discord->getDiscordIDFromTeamname($teamReceiving);
+$rejectingUserDiscordID = Discord::getDiscordIDFromTeamname($teamRejecting);
+$receivingUserDiscordID = Discord::getDiscordIDFromTeamname($teamReceiving);
 $discordDMmessage = 'Sorry, trade proposal declined by <@!' . $rejectingUserDiscordID . '>.
-
 Go here to make another offer: http://www.iblhoops.net/ibl5/modules.php?name=Trading&op=reviewtrade';
 $arrayContent = array(
         'message' => $discordDMmessage,

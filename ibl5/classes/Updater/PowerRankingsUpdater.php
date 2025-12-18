@@ -171,7 +171,7 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
             streak = ?,
             ranking = ?
             WHERE TeamID = ?",
-            "iidiiiiiiisdi",
+            "iidiiiiiisidi",
             $stats['wins'],
             $stats['losses'],
             $gb,

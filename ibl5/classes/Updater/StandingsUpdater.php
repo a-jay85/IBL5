@@ -164,7 +164,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
                 awayWins,
                 awayLosses
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            "isssissssssiiiiiiiii",
+            "isssissssssiiiiiiii",
             $teamID,
             rtrim($row->childNodes->item(0)->nodeValue),
             $leagueRecord,

@@ -291,9 +291,13 @@ class TradeProcessor implements TradeProcessorInterface
     {
         $fromDiscordId = $this->discord->getDiscordIDFromTeamname($offeringTeamName);
         $toDiscordId = $this->discord->getDiscordIDFromTeamname($listeningTeamName);
-        $discordText = "<@!$fromDiscordId> and <@!$toDiscordId> agreed to a trade:<br>" . $storytext;
         
-        $this->discord->postToChannel('#trades', $discordText);
-        $this->discord->postToChannel('#general-chat', $storytext);
+        // Build Discord mention text only if both IDs exist
+        if (!empty($fromDiscordId) && !empty($toDiscordId)) {
+            $discordText = "<@!$fromDiscordId> and <@!$toDiscordId> agreed to a trade:\n" . $storytext;
+        } else {
+            $discordText = "$offeringTeamName and $listeningTeamName agreed to a trade:\n" . $storytext;
+        }
+
     }
 }

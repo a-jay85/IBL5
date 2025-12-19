@@ -345,7 +345,7 @@ class MockMysqliResult
 
 class Discord
 {
-    public static function getDiscordIDFromTeamname($teamname)
+    public function getDiscordIDFromTeamname(string $teamname): string
     {
         return '123456789';
     }

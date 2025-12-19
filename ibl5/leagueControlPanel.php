@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use League\LeagueContext;
+
 require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 $season = new Season($mysqli_db);
 
@@ -192,10 +194,49 @@ echo "
 <HTML>
 <HEAD>
     <TITLE>IBLv5 Control Panel</TITLE>
+    <style>
+        .league-switcher-admin {
+            background-color: #f0f0f0;
+            border: 2px solid #333;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+        .league-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 3px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .league-badge-ibl {
+            background-color: #336699;
+            color: white;
+        }
+        .league-badge-olympics {
+            background-color: #d4af37;
+            color: black;
+        }
+    </style>
 </HEAD>
 <BODY>";
 
-echo "<FORM action=\"leagueControlPanel.php\" method=\"POST\">
+// League switcher
+$leagueConfig = LeagueContext::getConfig();
+$currentLeague = LeagueContext::getCurrentLeague();
+$leagueBadgeClass = $currentLeague === 'ibl' ? 'league-badge-ibl' : 'league-badge-olympics';
+
+echo "<div class='league-switcher-admin'>";
+echo "<strong>Current League:</strong> ";
+echo "<span class='league-badge $leagueBadgeClass'>" . strtoupper($leagueConfig['short_name']) . "</span>";
+echo "<span style='margin-left: 20px;'>Switch to: </span>";
+echo "<select onchange='window.location.href=this.value' style='padding: 5px; font-size: 14px;'>";
+echo "<option value='leagueControlPanel.php?league=ibl'" . ($currentLeague === 'ibl' ? ' selected' : '') . ">IBL</option>";
+echo "<option value='leagueControlPanel.php?league=olympics'" . ($currentLeague === 'olympics' ? ' selected' : '') . ">Olympics</option>";
+echo "</select>";
+echo "</div>";
+
+echo "<FORM action=\"leagueControlPanel.php\" method=\"POST\">"
     <select name=\"SeasonPhase\">
         <option value = \"Preseason\"" . ($season->phase == "Preseason" ? " SELECTED" : "") . ">Preseason</option>
         <option value = \"HEAT\"" . ($season->phase == "HEAT" ? " SELECTED" : "") . ">HEAT</option>

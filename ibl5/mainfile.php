@@ -99,6 +99,19 @@ if ($phpver >= '4.0.4pl1' && isset($_SERVER['HTTP_USER_AGENT']) && strstr($_SERV
     }
 }
 
+// League context session initialization
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Hydrate session from cookie if not set
+if (!isset($_SESSION['current_league']) && isset($_COOKIE['ibl_league'])) {
+    $cookieLeague = $_COOKIE['ibl_league'];
+    if (in_array($cookieLeague, ['ibl', 'olympics'], true)) {
+        $_SESSION['current_league'] = $cookieLeague;
+    }
+}
+
 $sanitize_rules = array("newlang" => "/[a-z][a-z]/i", "redirect" => "/[a-z0-9]*/i");
 foreach ($_REQUEST as $key => $value) {
     if (!isset($sanitize_rules[$key]) || preg_match($sanitize_rules[$key], $value)) {

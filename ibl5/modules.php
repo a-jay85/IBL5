@@ -1,5 +1,7 @@
 <?php
 
+use League\LeagueContext;
+
 /************************************************************************/
 /* PHP-NUKE: Web Portal System                                          */
 /* ===========================                                          */
@@ -44,6 +46,14 @@ if (isset($name) && $name == $_REQUEST['name']) {
 
         if (stripos_clone($file, "..") or stripos_clone($mop, "..")) {
             die("You are so cool...");
+        }
+
+        // Check if module is enabled for current league
+        $leagueContext = new LeagueContext();
+        if (!$leagueContext->isModuleEnabled($name)) {
+            // Redirect to homepage if module not available for current league
+            header('Location: index.php');
+            exit;
         }
 
         $ThemeSel = get_theme();

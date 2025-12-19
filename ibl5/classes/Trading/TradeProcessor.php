@@ -60,7 +60,7 @@ class TradeProcessor implements TradeProcessorInterface
             $listeningTeamName = $tradeRow['to'];
 
             $result = $this->processTradeItem($itemId, $itemType, $offeringTeamName, $listeningTeamName, $offerId);
-            
+
             if ($result['success']) {
                 $storytext .= $result['tradeLine'];
             }
@@ -200,7 +200,7 @@ class TradeProcessor implements TradeProcessorInterface
 
         // Get full player data from repository
         $playerData = $this->repository->getPlayerById($itemId);
-        
+
         if (!$playerData) {
             return ['success' => false, 'tradeLine' => ''];
         }
@@ -299,5 +299,12 @@ class TradeProcessor implements TradeProcessorInterface
             $discordText = "$offeringTeamName and $listeningTeamName agreed to a trade:\n" . $storytext;
         }
 
+        try {
+            \Discord::postToChannel('#trades', $discordText);
+            \Discord::postToChannel('#general-chat', $storytext);
+        } catch (\Exception $e) {
+            // Log the error but don't fail the trade
+            error_log('Discord notification failed: ' . $e->getMessage());
+        }
     }
 }

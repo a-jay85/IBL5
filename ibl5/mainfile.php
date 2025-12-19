@@ -99,21 +99,24 @@ if ($phpver >= '4.0.4pl1' && isset($_SERVER['HTTP_USER_AGENT']) && strstr($_SERV
     }
 }
 
+// Load the autoloader for IBL5 classes (must be before League\LeagueContext usage)
+require_once __DIR__ . '/autoloader.php';
+
 // League context session initialization
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
 // Hydrate session from cookie if not set
-if (!isset($_SESSION['current_league']) && isset($_COOKIE[League\LeagueContext::COOKIE_NAME])) {
-    $cookieLeague = $_COOKIE[League\LeagueContext::COOKIE_NAME];
-    if (in_array($cookieLeague, [League\LeagueContext::LEAGUE_IBL, League\LeagueContext::LEAGUE_OLYMPICS], true)) {
+if (!isset($_SESSION['current_league']) && isset($_COOKIE[\League\LeagueContext::COOKIE_NAME])) {
+    $cookieLeague = $_COOKIE[\League\LeagueContext::COOKIE_NAME];
+    if (in_array($cookieLeague, [\League\LeagueContext::LEAGUE_IBL, \League\LeagueContext::LEAGUE_OLYMPICS], true)) {
         $_SESSION['current_league'] = $cookieLeague;
     }
 }
 
 // Initialize global LeagueContext instance for application-wide use
-$leagueContext = new League\LeagueContext();
+$leagueContext = new \League\LeagueContext();
 
 $sanitize_rules = array("newlang" => "/[a-z][a-z]/i", "redirect" => "/[a-z0-9]*/i");
 foreach ($_REQUEST as $key => $value) {
@@ -228,9 +231,6 @@ if (!defined('ADMIN_FILE')) {
 if (!$dbname) {
     die("<br><br><center><img src=images/logo.gif><br><br><b>There seems that PHP-Nuke isn't installed yet.<br>(The values in config.php file are the default ones)<br><br>You can proceed with the <a href='./install/index.php'>web installation</a> now.</center></b>");
 }
-
-// Load the autoloader for IBL5 classes
-require_once __DIR__ . '/autoloader.php';
 
 @require_once __DIR__ . "/db/db.php";
 

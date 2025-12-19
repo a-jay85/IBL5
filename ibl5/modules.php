@@ -49,7 +49,7 @@ if (isset($name) && $name == $_REQUEST['name']) {
         }
 
         // Check if module is enabled for current league
-        $leagueContext = new LeagueContext();
+        global $leagueContext;
         if (!$leagueContext->isModuleEnabled($name)) {
             // Redirect to homepage if module not available for current league
             header('Location: index.php');

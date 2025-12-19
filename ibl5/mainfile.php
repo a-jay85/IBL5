@@ -105,12 +105,15 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // Hydrate session from cookie if not set
-if (!isset($_SESSION['current_league']) && isset($_COOKIE['ibl_league'])) {
-    $cookieLeague = $_COOKIE['ibl_league'];
-    if (in_array($cookieLeague, ['ibl', 'olympics'], true)) {
+if (!isset($_SESSION['current_league']) && isset($_COOKIE[League\LeagueContext::COOKIE_NAME])) {
+    $cookieLeague = $_COOKIE[League\LeagueContext::COOKIE_NAME];
+    if (in_array($cookieLeague, [League\LeagueContext::LEAGUE_IBL, League\LeagueContext::LEAGUE_OLYMPICS], true)) {
         $_SESSION['current_league'] = $cookieLeague;
     }
 }
+
+// Initialize global LeagueContext instance for application-wide use
+$leagueContext = new League\LeagueContext();
 
 $sanitize_rules = array("newlang" => "/[a-z][a-z]/i", "redirect" => "/[a-z0-9]*/i");
 foreach ($_REQUEST as $key => $value) {

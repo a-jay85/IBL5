@@ -14,6 +14,7 @@ class LeagueContext
 {
     const LEAGUE_IBL = 'ibl';
     const LEAGUE_OLYMPICS = 'olympics';
+    const COOKIE_NAME = 'ibl_league';
 
     /**
      * Get the current active league
@@ -39,8 +40,8 @@ class LeagueContext
         }
 
         // Check cookie
-        if (isset($_COOKIE['ibl_league']) && $this->isValidLeague($_COOKIE['ibl_league'])) {
-            return $_COOKIE['ibl_league'];
+        if (isset($_COOKIE[self::COOKIE_NAME]) && $this->isValidLeague($_COOKIE[self::COOKIE_NAME])) {
+            return $_COOKIE[self::COOKIE_NAME];
         }
 
         // Default to IBL
@@ -68,7 +69,7 @@ class LeagueContext
         // Set cookie with 30-day expiry (skip in CLI/test mode to avoid header errors)
         if (php_sapi_name() !== 'cli' && !headers_sent()) {
             $expiry = time() + (30 * 24 * 60 * 60);
-            setcookie('ibl_league', $league, $expiry, '/');
+            setcookie(self::COOKIE_NAME, $league, $expiry, '/');
         }
     }
 

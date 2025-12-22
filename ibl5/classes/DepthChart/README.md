@@ -4,6 +4,18 @@
 The Depth Chart Entry module has been refactored to follow best practices for testability, maintainability, and separation of concerns.
 
 ## Recent Updates (2025)
+
+**Bug Fix: Depth Chart Settings Not Persisting (December 2025)**
+- Fixed critical bug where depth chart settings were not being saved to the database
+- **Root Cause**: `updatePlayerDepthChart()` returned `false` when MySQL reported 0 affected rows
+- **Issue**: MySQL returns 0 affected rows when updating to the same value, which is not an error
+- **Fix**: 
+  - Refactored `updatePlayerDepthChart()` to use a single UPDATE statement (more efficient)
+  - Changed both `updatePlayerDepthChart()` and `updateTeamHistory()` to return `true` on successful query execution
+  - Only return `false` if an exception is thrown (e.g., player/team doesn't exist)
+  - Added 9 comprehensive unit tests to prevent regression
+- **Verified**: Modern mysqli prepared statements are being used correctly throughout
+
 **Offensive Sets and Position Restrictions Removed**
 - The site no longer uses offensive sets (previously allowed 3 different offensive set configurations per team)
 - Position restrictions have been removed - all players can now play at all positions regardless of their natural position
@@ -122,10 +134,13 @@ vendor/bin/phpunit
 ```
 
 ### Test Coverage
-- **20 tests** covering validation and processing logic
+- **33 tests** covering validation, processing, and repository logic
+- **DepthChartProcessorTest**: 8 tests for data processing and CSV generation
+- **DepthChartValidatorTest**: 16 tests for validation rules
+- **DepthChartRepositoryTest**: 9 tests for database operations (including bug fix verification)
 - Tests for regular season and playoff validation rules
-- Tests for CSV generation
 - Tests for detecting invalid configurations
+- Tests for 0 affected rows scenario (critical bug fix)
 - All tests passing (100% success rate)
 
 ## Usage
@@ -156,9 +171,11 @@ POST to modules.php?name=Depth_Chart_Entry&op=submit
 The refactored module includes comprehensive security improvements:
 
 ### SQL Injection Prevention
-- **mysqli_real_escape_string**: All user input passed to SQL queries is properly escaped using `mysqli_real_escape_string()`
-- **Type Casting**: Numeric values are cast to integers before use in queries
-- **Parameterized Values**: All database queries use escaped and validated parameters
+- **Modern mysqli Prepared Statements**: All database queries use modern mysqli prepared statements via `BaseMysqliRepository`
+- **Type-Safe Parameters**: Parameter types are declared in type specification strings (e.g., "iiiiiiiiiiiis")
+- **Automatic Escaping**: mysqli's `bind_param()` automatically handles escaping and type conversion
+- **Type Casting**: Numeric values are cast to integers before binding to ensure type safety
+- **No String Concatenation**: All queries use ? placeholders, eliminating SQL injection vectors
 
 ### Input Validation & Sanitization
 - **Player Names**: HTML tags stripped, whitespace trimmed

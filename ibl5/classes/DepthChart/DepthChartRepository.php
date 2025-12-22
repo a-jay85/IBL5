@@ -49,37 +49,48 @@ class DepthChartRepository extends \BaseMysqliRepository implements DepthChartRe
         $di = (int) $depthChartValues['di'];
         $bh = (int) $depthChartValues['bh'];
         
-        // Execute each update as a prepared statement
-        $updates = [
-            ['dc_PGDepth', $pg],
-            ['dc_SGDepth', $sg],
-            ['dc_SFDepth', $sf],
-            ['dc_PFDepth', $pf],
-            ['dc_CDepth', $c],
-            ['dc_active', $active],
-            ['dc_minutes', $min],
-            ['dc_of', $of],
-            ['dc_df', $df],
-            ['dc_oi', $oi],
-            ['dc_di', $di],
-            ['dc_bh', $bh]
-        ];
-        
-        foreach ($updates as [$column, $value]) {
-            $affected = $this->execute(
-                "UPDATE ibl_plr SET $column = ? WHERE name = ?",
-                "is",
-                $value,
+        // Use a single UPDATE statement to update all depth chart columns at once
+        // This is more efficient and handles the case where values don't change
+        // (MySQL returns 0 affected rows when updating to the same value, which is not an error)
+        try {
+            $this->execute(
+                "UPDATE ibl_plr SET 
+                    dc_PGDepth = ?, 
+                    dc_SGDepth = ?, 
+                    dc_SFDepth = ?, 
+                    dc_PFDepth = ?, 
+                    dc_CDepth = ?, 
+                    dc_active = ?, 
+                    dc_minutes = ?, 
+                    dc_of = ?, 
+                    dc_df = ?, 
+                    dc_oi = ?, 
+                    dc_di = ?, 
+                    dc_bh = ? 
+                WHERE name = ?",
+                "iiiiiiiiiiiis",
+                $pg,
+                $sg,
+                $sf,
+                $pf,
+                $c,
+                $active,
+                $min,
+                $of,
+                $df,
+                $oi,
+                $di,
+                $bh,
                 $playerName
             );
             
-            if ($affected === 0) {
-                // If no rows were affected, the player might not exist
-                return false;
-            }
+            // Success: the query executed without throwing an exception
+            // Note: We don't check affected_rows because it returns 0 when values don't change
+            return true;
+        } catch (\RuntimeException $e) {
+            // If an exception was thrown, the query failed (e.g., player doesn't exist)
+            return false;
         }
-        
-        return true;
     }
     
     /**
@@ -87,20 +98,20 @@ class DepthChartRepository extends \BaseMysqliRepository implements DepthChartRe
      */
     public function updateTeamHistory(string $teamName): bool
     {
-        // Execute both updates with prepared statements
-        $affected1 = $this->execute(
-            "UPDATE ibl_team_history SET depth = NOW() WHERE team_name = ?",
-            "s",
-            $teamName
-        );
-        
-        $affected2 = $this->execute(
-            "UPDATE ibl_team_history SET sim_depth = NOW() WHERE team_name = ?",
-            "s",
-            $teamName
-        );
-        
-        // Return true if at least one update succeeded
-        return ($affected1 > 0 || $affected2 > 0);
+        // Update both depth and sim_depth timestamps in a single statement
+        // We don't check affected_rows because MySQL returns 0 when NOW() equals the existing timestamp
+        try {
+            $this->execute(
+                "UPDATE ibl_team_history SET depth = NOW(), sim_depth = NOW() WHERE team_name = ?",
+                "s",
+                $teamName
+            );
+            
+            // Success: the query executed without throwing an exception
+            return true;
+        } catch (\RuntimeException $e) {
+            // If an exception was thrown, the query failed (e.g., team doesn't exist)
+            return false;
+        }
     }
 }

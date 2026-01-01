@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Services;
 
+use League\LeagueContext;
+
 /**
  * CommonMysqliRepository - Centralized repository for common database queries using mysqli
  * 
@@ -21,6 +23,14 @@ namespace Services;
  */
 class CommonMysqliRepository extends \BaseMysqliRepository
 {
+    private ?LeagueContext $leagueContext;
+
+    public function __construct(object $db, ?LeagueContext $leagueContext = null)
+    {
+        parent::__construct($db);
+        $this->leagueContext = $leagueContext;
+    }
+
     /**
      * Gets complete user information by username
      * 
@@ -65,8 +75,9 @@ class CommonMysqliRepository extends \BaseMysqliRepository
      */
     public function getTeamByName(string $teamName): ?array
     {
+        $table = $this->leagueContext ? $this->leagueContext->getTableName('ibl_team_info') : 'ibl_team_info';
         return $this->fetchOne(
-            "SELECT * FROM ibl_team_info WHERE team_name = ?",
+            "SELECT * FROM {$table} WHERE team_name = ?",
             "s",
             $teamName
         );
@@ -80,8 +91,9 @@ class CommonMysqliRepository extends \BaseMysqliRepository
      */
     public function getTidFromTeamname(string $teamName): ?int
     {
+        $table = $this->leagueContext ? $this->leagueContext->getTableName('ibl_team_info') : 'ibl_team_info';
         $result = $this->fetchOne(
-            "SELECT teamid FROM ibl_team_info WHERE team_name = ? LIMIT 1",
+            "SELECT teamid FROM {$table} WHERE team_name = ? LIMIT 1",
             "s",
             $teamName
         );
@@ -97,8 +109,9 @@ class CommonMysqliRepository extends \BaseMysqliRepository
      */
     public function getTeamnameFromTeamID(int $teamID): ?string
     {
+        $table = $this->leagueContext ? $this->leagueContext->getTableName('ibl_team_info') : 'ibl_team_info';
         $result = $this->fetchOne(
-            "SELECT team_name FROM ibl_team_info WHERE teamid = ? LIMIT 1",
+            "SELECT team_name FROM {$table} WHERE teamid = ? LIMIT 1",
             "i",
             $teamID
         );
@@ -114,8 +127,9 @@ class CommonMysqliRepository extends \BaseMysqliRepository
      */
     public function getTeamDiscordID(string $teamName): int
     {
+        $table = $this->leagueContext ? $this->leagueContext->getTableName('ibl_team_info') : 'ibl_team_info';
         $result = $this->fetchOne(
-            "SELECT discordID FROM ibl_team_info WHERE team_name = ? LIMIT 1",
+            "SELECT discordID FROM {$table} WHERE team_name = ? LIMIT 1",
             "s",
             $teamName
         );

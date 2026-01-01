@@ -2,9 +2,8 @@
 
 declare(strict_types=1);
 
-use League\LeagueContext;
-
 require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
+global $leagueContext;
 $season = new Season($mysqli_db);
 
 $queryString = "";
@@ -222,8 +221,8 @@ echo "
 <BODY>";
 
 // League switcher
-$leagueConfig = LeagueContext::getConfig();
-$currentLeague = LeagueContext::getCurrentLeague();
+$leagueConfig = $leagueContext->getConfig();
+$currentLeague = $leagueContext->getCurrentLeague();
 $leagueBadgeClass = $currentLeague === 'ibl' ? 'league-badge-ibl' : 'league-badge-olympics';
 
 ob_start();
@@ -240,7 +239,7 @@ ob_start();
 <?php
 echo ob_get_clean();
 
-echo "<FORM action=\"leagueControlPanel.php\" method=\"POST\">"
+echo "<FORM action=\"leagueControlPanel.php\" method=\"POST\">
     <select name=\"SeasonPhase\">
         <option value = \"Preseason\"" . ($season->phase == "Preseason" ? " SELECTED" : "") . ">Preseason</option>
         <option value = \"HEAT\"" . ($season->phase == "HEAT" ? " SELECTED" : "") . ">HEAT</option>

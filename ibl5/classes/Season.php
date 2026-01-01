@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use League\LeagueContext;
+
 /**
  * Season - IBL season information and configuration
  * 
@@ -27,6 +29,8 @@ declare(strict_types=1);
  */
 class Season extends BaseMysqliRepository
 {
+    private ?LeagueContext $leagueContext = null;
+
     public $phase;
 
     public $beginningYear;
@@ -59,11 +63,13 @@ class Season extends BaseMysqliRepository
      * Constructor - initializes season data from database
      * 
      * @param \mysqli $db Active mysqli connection
+     * @param LeagueContext|null $leagueContext Optional league context for multi-league support
      * @throws \RuntimeException If connection is invalid (error code 1002)
      */
-    public function __construct(object $db)
+    public function __construct(object $db, ?LeagueContext $leagueContext = null)
     {
         parent::__construct($db);
+        $this->leagueContext = $leagueContext;
 
         $this->phase = $this->getSeasonPhase();
 

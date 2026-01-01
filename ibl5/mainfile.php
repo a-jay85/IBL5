@@ -118,6 +118,11 @@ if (!isset($_SESSION['current_league']) && isset($_COOKIE[\League\LeagueContext:
 // Initialize global LeagueContext instance for application-wide use
 $leagueContext = new \League\LeagueContext();
 
+// Persist league selection when user switches leagues via URL parameter
+if (isset($_GET['league']) && in_array($_GET['league'], [\League\LeagueContext::LEAGUE_IBL, \League\LeagueContext::LEAGUE_OLYMPICS], true)) {
+    $leagueContext->setLeague($_GET['league']);
+}
+
 $sanitize_rules = array("newlang" => "/[a-z][a-z]/i", "redirect" => "/[a-z0-9]*/i");
 foreach ($_REQUEST as $key => $value) {
     if (!isset($sanitize_rules[$key]) || preg_match($sanitize_rules[$key], $value)) {

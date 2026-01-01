@@ -226,15 +226,19 @@ $leagueConfig = LeagueContext::getConfig();
 $currentLeague = LeagueContext::getCurrentLeague();
 $leagueBadgeClass = $currentLeague === 'ibl' ? 'league-badge-ibl' : 'league-badge-olympics';
 
-echo "<div class='league-switcher-admin'>";
-echo "<strong>Current League:</strong> ";
-echo "<span class='league-badge $leagueBadgeClass'>" . strtoupper($leagueConfig['short_name']) . "</span>";
-echo "<span style='margin-left: 20px;'>Switch to: </span>";
-echo "<select onchange='window.location.href=this.value' style='padding: 5px; font-size: 14px;'>";
-echo "<option value='leagueControlPanel.php?league=ibl'" . ($currentLeague === 'ibl' ? ' selected' : '') . ">IBL</option>";
-echo "<option value='leagueControlPanel.php?league=olympics'" . ($currentLeague === 'olympics' ? ' selected' : '') . ">Olympics</option>";
-echo "</select>";
-echo "</div>";
+ob_start();
+?>
+<div class='league-switcher-admin'>
+    <strong>Current League:</strong>
+    <span class='league-badge <?= $leagueBadgeClass ?>'><?= strtoupper($leagueConfig['short_name']) ?></span>
+    <span style='margin-left: 20px;'>Switch to: </span>
+    <select onchange='window.location.href=this.value' style='padding: 5px; font-size: 14px;'>
+        <option value='leagueControlPanel.php?league=ibl'<?= $currentLeague === 'ibl' ? ' selected' : '' ?>>IBL</option>
+        <option value='leagueControlPanel.php?league=olympics'<?= $currentLeague === 'olympics' ? ' selected' : '' ?>>Olympics</option>
+    </select>
+</div>
+<?php
+echo ob_get_clean();
 
 echo "<FORM action=\"leagueControlPanel.php\" method=\"POST\">"
     <select name=\"SeasonPhase\">

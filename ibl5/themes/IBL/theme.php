@@ -1,7 +1,5 @@
 <?php
 
-use League\LeagueContext;
-
 $lnkcolor = "#336699";
 if ($_SERVER['SERVER_NAME'] != "localhost") {
     $bgcolor1 = "#EEEEEE";
@@ -62,7 +60,7 @@ function FormatStory($thetext, $notes, $aid, $informant)
 
 function themeheader()
 {
-    global $prefix, $db, $user, $cookie, $bgcolor1, $bgcolor2, $user;
+    global $user, $cookie, $bgcolor1, $bgcolor2, $user, $leagueContext;
     echo "<body bgcolor=\"$bgcolor1\">";
     if (is_user($user)) {
         cookiedecode($user);
@@ -73,8 +71,7 @@ function themeheader()
     }
     
     // League switcher
-    $leagueConfig = LeagueContext::getConfig();
-    $currentLeague = LeagueContext::getCurrentLeague();
+    $currentLeague = $leagueContext->getCurrentLeague();
     $leagueSwitcher = "<span style='margin-left: 10px;'>League: </span><select onchange='window.location.href=this.value' style='font-size: 11px;'>";
     $leagueSwitcher .= "<option value='index.php?league=ibl'" . ($currentLeague === 'ibl' ? ' selected' : '') . ">IBL</option>";
     $leagueSwitcher .= "<option value='index.php?league=olympics'" . ($currentLeague === 'olympics' ? ' selected' : '') . ">Olympics</option>";

@@ -138,8 +138,7 @@ class LeagueContext
                 'Voting',
                 'Voting_Results',
                 'Cap_Info',
-                'Franchise_History',
-                'Power_Rankings'
+                'Franchise_History'
             ];
 
             return !in_array($moduleName, $iblOnlyModules, true);

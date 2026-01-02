@@ -2,7 +2,10 @@
 
 require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
-$query = "SELECT * FROM ibl_team_info ORDER BY team_city ASC";
+global $leagueContext;
+$teamInfoTable = isset($leagueContext) ? $leagueContext->getTableName('ibl_team_info') : 'ibl_team_info';
+
+$query = "SELECT * FROM {$teamInfoTable} ORDER BY team_city ASC";
 $result = $mysqli_db->query($query);
 
 echo "<html>

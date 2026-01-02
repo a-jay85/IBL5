@@ -12,6 +12,8 @@ declare(strict_types=1);
  */
 class League extends BaseMysqliRepository
 {
+    private \League\LeagueContext $leagueContext;
+
     const CONFERENCE_NAMES = array('Eastern', 'Western');
     const DIVISION_NAMES = array('Atlantic', 'Central', 'Midwest', 'Pacific');
 
@@ -30,11 +32,13 @@ class League extends BaseMysqliRepository
      * Constructor - inherits from BaseMysqliRepository
      * 
      * @param object $db Active mysqli connection (or duck-typed mock during migration)
+     * @param \League\LeagueContext $leagueContext League context for multi-league support
      * @throws \RuntimeException If connection is invalid (error code 1002)
      */
-    public function __construct(object $db)
+    public function __construct(object $db, \League\LeagueContext $leagueContext)
     {
         parent::__construct($db);
+        $this->leagueContext = $leagueContext;
     }
 
     /**
@@ -209,9 +213,10 @@ class League extends BaseMysqliRepository
      */
     public function getGMOfTheYearCandidatesResult(): array
     {
+        $table = $this->leagueContext->getTableName('ibl_team_info');
         return $this->fetchAll(
             "SELECT owner_name, team_city, team_name
-            FROM ibl_team_info
+            FROM {$table}
             WHERE teamid != ?
             ORDER BY owner_name",
             "i",
@@ -226,9 +231,10 @@ class League extends BaseMysqliRepository
      */
     public function getAllTeamsResult(): array
     {
+        $table = $this->leagueContext->getTableName('ibl_team_info');
         return $this->fetchAll(
             "SELECT *
-            FROM ibl_team_info
+            FROM {$table}
             WHERE teamid != ?
             ORDER BY teamid ASC",
             "i",

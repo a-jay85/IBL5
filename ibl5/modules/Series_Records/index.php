@@ -7,6 +7,10 @@ if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
+global $leagueContext;
+$teamInfoTable = isset($leagueContext) ? $leagueContext->getTableName('ibl_team_info') : 'ibl_team_info';
+$scheduleTable = isset($leagueContext) ? $leagueContext->getTableName('ibl_schedule') : 'ibl_schedule';
+
 function userinfo($username, $bypass = 0)
 {
     global $user, $user_prefix, $mysqli_db;
@@ -58,10 +62,10 @@ function main($user)
 
 function queryTeamInfo()
 {
-    global $mysqli_db;
+    global $mysqli_db, $teamInfoTable;
 
     $query = "SELECT teamid, team_city, team_name, color1, color2
-		FROM ibl_team_info
+		FROM {$teamInfoTable}
 		WHERE teamid != 99 AND teamid != " . League::FREE_AGENTS_TEAMID . "
 		ORDER BY teamid ASC;";
     $result = $mysqli_db->query($query);
@@ -70,33 +74,33 @@ function queryTeamInfo()
 
 function querySeriesRecords()
 {
-    global $mysqli_db;
+    global $mysqli_db, $scheduleTable;
 
     $query = "SELECT self, opponent, SUM(wins) AS wins, SUM(losses) AS losses
 				FROM (
 					SELECT home AS self, visitor AS opponent, COUNT(*) AS wins, 0 AS losses
-					FROM ibl_schedule
+					FROM {$scheduleTable}
 					WHERE HScore > VScore
 					GROUP BY self, opponent
 
 					UNION ALL
 
 					SELECT visitor AS self, home AS opponent, COUNT(*) AS wins, 0 AS losses
-					FROM ibl_schedule
+					FROM {$scheduleTable}
 					WHERE VScore > HScore
 					GROUP BY self, opponent
 
 					UNION ALL
 
 					SELECT home AS self, visitor AS opponent, 0 AS wins, COUNT(*) AS losses
-					FROM ibl_schedule
+					FROM {$scheduleTable}
 					WHERE HScore < VScore
 					GROUP BY self, opponent
 
 					UNION ALL
 
 					SELECT visitor AS self, home AS opponent, 0 AS wins, COUNT(*) AS losses
-					FROM ibl_schedule
+					FROM {$scheduleTable}
 					WHERE VScore < HScore
 					GROUP BY self, opponent
 				) t
@@ -108,9 +112,9 @@ function querySeriesRecords()
 
 function displaySeriesRecords($tid)
 {
-    global $mysqli_db;
+    global $mysqli_db, $scheduleTable;
 
-    $result = $mysqli_db->query("SELECT MAX(Visitor) as max_visitor FROM ibl_schedule");
+    $result = $mysqli_db->query("SELECT MAX(Visitor) as max_visitor FROM {$scheduleTable}");
     $row = $result->fetch_assoc();
     $numteams = $row['max_visitor'];
 

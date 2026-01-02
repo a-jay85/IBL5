@@ -215,7 +215,7 @@ class League extends BaseMysqliRepository
      */
     public function getGMOfTheYearCandidatesResult(): array
     {
-        $table = $this->leagueContext->getTableName('ibl_team_info');
+        $table = $this->leagueContext ? $this->leagueContext->getTableName('ibl_team_info') : 'ibl_team_info';
         return $this->fetchAll(
             "SELECT owner_name, team_city, team_name
             FROM {$table}
@@ -233,7 +233,7 @@ class League extends BaseMysqliRepository
      */
     public function getAllTeamsResult(): array
     {
-        $table = $this->leagueContext->getTableName('ibl_team_info');
+        $table = $this->leagueContext ? $this->leagueContext->getTableName('ibl_team_info') : 'ibl_team_info';
         return $this->fetchAll(
             "SELECT *
             FROM {$table}

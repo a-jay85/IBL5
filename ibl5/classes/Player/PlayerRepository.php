@@ -394,7 +394,7 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
      */
     public function getBoxScoresBetweenDates(int $playerID, string $startDate, string $endDate): array
     {
-        $table = $this->leagueContext->getTableName('ibl_box_scores');
+        $table = $this->leagueContext ? $this->leagueContext->getTableName('ibl_box_scores') : 'ibl_box_scores';
         return $this->fetchAll(
             "SELECT * FROM {$table} WHERE pid = ? AND Date BETWEEN ? AND ? ORDER BY Date ASC",
             "iss",

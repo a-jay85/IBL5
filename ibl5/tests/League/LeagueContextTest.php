@@ -320,13 +320,16 @@ class LeagueContextTest extends TestCase
     }
 
     /**
-     * Test isModuleEnabled returns false for Power_Rankings in Olympics
+     * Test isModuleEnabled returns true for Power_Rankings in Olympics
+     * 
+     * Power_Rankings is enabled for Olympics because the ibl_olympics_power
+     * table exists and LeagueContext maps ibl_power to it.
      */
-    public function testIsModuleEnabledOlympicsDisablesPowerRankings(): void
+    public function testIsModuleEnabledOlympicsEnablesPowerRankings(): void
     {
         $_SESSION['current_league'] = 'olympics';
         
-        $this->assertFalse($this->leagueContext->isModuleEnabled('Power_Rankings'));
+        $this->assertTrue($this->leagueContext->isModuleEnabled('Power_Rankings'));
     }
 
     /**

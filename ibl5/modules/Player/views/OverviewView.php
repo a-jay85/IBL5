@@ -67,10 +67,7 @@ class OverviewView extends BaseView {
             $endDate = $this->season->endingYear . "-07-01";
         }
         
-        global $leagueContext;
-        $table = isset($leagueContext) ? $leagueContext->getTableName('ibl_box_scores') : 'ibl_box_scores';
-        
-        $stmt = $this->mysqli_db->prepare("SELECT * FROM {$table} WHERE Date BETWEEN ? AND ? AND pid = ? ORDER BY Date ASC");
+        $stmt = $this->mysqli_db->prepare("SELECT * FROM ibl_box_scores WHERE Date BETWEEN ? AND ? AND pid = ? ORDER BY Date ASC");
         $stmt->bind_param("ssi", $startDate, $endDate, $this->player->playerID);
         $stmt->execute();
         $result = $stmt->get_result();

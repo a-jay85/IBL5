@@ -3,8 +3,6 @@
 declare(strict_types=1);
 
 require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
-global $leagueContext;
-$teamInfoTable = isset($leagueContext) ? $leagueContext->getTableName('ibl_team_info') : 'ibl_team_info';
 $season = new Season($mysqli_db);
 
 $queryString = "";
@@ -32,7 +30,7 @@ if (isset($_POST['query'])) {
 
             if ($resultCheck->num_rows == 0) {
                 // Fetch all team names
-                $stmtTeams = $mysqli_db->prepare("SELECT team_name FROM {$teamInfoTable} WHERE teamid != ? ORDER BY teamid ASC");
+                $stmtTeams = $mysqli_db->prepare("SELECT team_name FROM ibl_team_info WHERE teamid != ? ORDER BY teamid ASC");
                 $freeAgentsTeamId = League::FREE_AGENTS_TEAMID;
                 $stmtTeams->bind_param("i", $freeAgentsTeamId);
                 $stmtTeams->execute();
@@ -57,11 +55,11 @@ if (isset($_POST['query'])) {
             }
             break;
         case 'Reset All Contract Extensions':
-            $queryString = "UPDATE {$teamInfoTable} SET Used_Extension_This_Season = 0;";
+            $queryString = "UPDATE ibl_team_info SET Used_Extension_This_Season = 0;";
             $successText = "All teams' contract extensions have been reset.";
             break;
         case 'Reset All MLEs/LLEs':
-            $queryString = "UPDATE {$teamInfoTable} SET HasMLE = 1, HasLLE = 1;";
+            $queryString = "UPDATE ibl_team_info SET HasMLE = 1, HasLLE = 1;";
             $successText = "All teams' MLEs and LLEs have been reset.";
             break;
         case 'Reset All-Star Voting':
@@ -119,7 +117,7 @@ if (isset($_POST['query'])) {
             break;
         case 'Set Free Agency factors for PFW':
             if ($season->phase == 'Draft' or $season->phase == 'Free Agency') {
-                $queryString = "UPDATE {$teamInfoTable} info, ibl_power power SET Contract_Wins = power.win, Contract_Losses = power.loss WHERE power.TeamID = info.teamid;";
+                $queryString = "UPDATE ibl_team_info info, ibl_power power SET Contract_Wins = power.win, Contract_Losses = power.loss WHERE power.TeamID = info.teamid;";
                 $successText = "The columns that affect each team's Play For Winner demand factor have been updated to match this past season's ($season->endingYear) win/loss records.";
             } else {
                 $failureText = "Sorry, that button can only be used during the Draft or Free Agency.<br>The FA demands formula requires the current season to be finished before calculating factors.";

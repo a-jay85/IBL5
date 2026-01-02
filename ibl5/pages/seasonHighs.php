@@ -36,9 +36,8 @@ if ($_GET['seasonPhase'] == null) {
 
 function seasonHighTable($queryForStat, $statName, $playerOrTeam, $seasonPhase)
 {
-    global $mysqli_db, $leagueContext;
+    global $mysqli_db;
     $season = new Season($mysqli_db);
-    $table = isset($leagueContext) ? $leagueContext->getTableName('ibl_box_scores') : 'ibl_box_scores';
 
     if ($playerOrTeam == 'team') {
         $isTeam = '_teams';
@@ -67,7 +66,7 @@ function seasonHighTable($queryForStat, $statName, $playerOrTeam, $seasonPhase)
     }
 
     $query = "SELECT `name`, `date`, " . $queryForStat . " AS `" . $statName . "`
-            FROM {$table}" . $isTeam . "
+            FROM ibl_box_scores" . $isTeam . "
             WHERE date BETWEEN '" . $queryBeginningYear . "-" . $queryBeginningMonth . "-01' AND '" . $queryEndingYear . "-" . $queryEndingMonth . "-30'
             ORDER BY `" . $statName . "` DESC, date ASC LIMIT 15;";
     $result = $mysqli_db->query($query);

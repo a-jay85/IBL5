@@ -81,12 +81,9 @@ $sharedFunctions = new Shared($db);
 $commonRepository = new Services\CommonMysqliRepository($mysqli_db);
 $season = new Season($mysqli_db);
 
-global $leagueContext;
-$teamInfoTable = isset($leagueContext) ? $leagueContext->getTableName('ibl_team_info') : 'ibl_team_info';
-
 $tidOffenseStats = $tidDefenseStats = 0;
 
-$queryTeamIDsNames = "SELECT teamid, team_name FROM {$teamInfoTable} ORDER BY teamid ASC;";
+$queryTeamIDsNames = "SELECT teamid, team_name FROM ibl_team_info ORDER BY teamid ASC;";
 $resultTeamIDsNames = $db->sql_query($queryTeamIDsNames);
 $numRowsTeamIDsNames = $db->sql_numrows($resultTeamIDsNames);
 

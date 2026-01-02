@@ -1,9 +1,6 @@
 <?php
 
-global $db, $cookie, $mysqli_db, $leagueContext;
-
-// Multi-league table name support
-$scheduleTable = isset($leagueContext) ? $leagueContext->getTableName('ibl_schedule') : 'ibl_schedule';
+global $db, $cookie, $mysqli_db;
 
 $commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
 $season = new Season($mysqli_db);
@@ -22,7 +19,7 @@ $wins = $losses = $winStreak = $lossStreak = 0;
 
 //TODO: unify this code with the Schedule module's chunk function
 
-$teamSchedule = Schedule\TeamSchedule::getSchedule($mysqli_db, $userTeam->teamID, $scheduleTable);
+$teamSchedule = Schedule\TeamSchedule::getSchedule($mysqli_db, $userTeam->teamID, 'ibl_schedule');
 
 $rows = array();
 $lastMonthIteratedOver = "";

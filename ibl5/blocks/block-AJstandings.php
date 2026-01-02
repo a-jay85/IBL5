@@ -5,11 +5,8 @@ if (!defined('BLOCK_FILE')) {
     die();
 }
 
-global $mysqli_db, $leagueContext;
+global $mysqli_db;
 $season = new Season($mysqli_db);
-
-// Multi-league support: use $leagueContext to get the appropriate standings table
-$standingsTable = isset($leagueContext) ? $leagueContext->getTableName('ibl_standings') : 'ibl_standings';
 
 $content .= "
     <center>
@@ -34,7 +31,7 @@ $content .= "
             </tr>";
 
 $queryEasternConference = "SELECT tid, team_name, leagueRecord, confGB, clinchedConference, clinchedDivision, clinchedPlayoffs
-    FROM $standingsTable
+    FROM ibl_standings
     WHERE conference = 'Eastern'
     ORDER BY confGB ASC";
 $resultEasternConference = $mysqli_db->query($queryEasternConference);
@@ -88,7 +85,7 @@ $content .= "
 }
 
 $queryWesternConference = "SELECT tid, team_name, leagueRecord, confGB, clinchedConference, clinchedDivision, clinchedPlayoffs
-    FROM $standingsTable
+    FROM ibl_standings
     WHERE conference = 'Western'
     ORDER BY confGB ASC";
 $resultWesternConference = $mysqli_db->query($queryWesternConference);

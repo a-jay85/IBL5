@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Negotiation;
 
 use BaseMysqliRepository;
+use League\LeagueContext;
 use Negotiation\Contracts\NegotiationRepositoryInterface;
 
 /**
@@ -13,9 +14,12 @@ use Negotiation\Contracts\NegotiationRepositoryInterface;
  */
 class NegotiationRepository extends BaseMysqliRepository implements NegotiationRepositoryInterface
 {
-    public function __construct(object $db)
+    private ?LeagueContext $leagueContext;
+
+    public function __construct(object $db, ?LeagueContext $leagueContext = null)
     {
         parent::__construct($db);
+        $this->leagueContext = $leagueContext;
     }
 
     /**
@@ -23,9 +27,10 @@ class NegotiationRepository extends BaseMysqliRepository implements NegotiationR
      */
     public function getTeamPerformance(string $teamName): array
     {
+        $teamTable = $this->leagueContext ? $this->leagueContext->getTableName('ibl_team_info') : 'ibl_team_info';
         $result = $this->fetchOne(
             "SELECT Contract_Wins, Contract_Losses, Contract_AvgW, Contract_AvgL 
-             FROM ibl_team_info 
+             FROM {$teamTable} 
              WHERE team_name = ?",
             "s",
             $teamName

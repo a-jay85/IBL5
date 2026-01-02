@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FreeAgency;
 
 use BaseMysqliRepository;
+use League\LeagueContext;
 use FreeAgency\Contracts\FreeAgencyDemandRepositoryInterface;
 
 /**
@@ -18,18 +19,22 @@ use FreeAgency\Contracts\FreeAgencyDemandRepositoryInterface;
  */
 class FreeAgencyDemandRepository extends BaseMysqliRepository implements FreeAgencyDemandRepositoryInterface
 {
+    private ?LeagueContext $leagueContext;
+
     /**
      * Constructor - inherits from BaseMysqliRepository
      * 
      * @param object $db Active mysqli connection (or duck-typed mock during migration)
+     * @param LeagueContext|null $leagueContext Optional league context for multi-league support
      * @throws \RuntimeException If connection is invalid (error code 1002)
      * 
      * TEMPORARY: Accepts duck-typed objects during mysqli migration for testing.
      * Will be strictly \mysqli once migration completes.
      */
-    public function __construct(object $db)
+    public function __construct(object $db, ?LeagueContext $leagueContext = null)
     {
         parent::__construct($db);
+        $this->leagueContext = $leagueContext;
     }
 
     /**
@@ -37,9 +42,10 @@ class FreeAgencyDemandRepository extends BaseMysqliRepository implements FreeAge
      */
     public function getTeamPerformance(string $teamName): array
     {
+        $teamTable = $this->leagueContext ? $this->leagueContext->getTableName('ibl_team_info') : 'ibl_team_info';
         $result = $this->fetchOne(
             "SELECT Contract_Wins, Contract_Losses, Contract_AvgW, Contract_AvgL 
-             FROM ibl_team_info 
+             FROM {$teamTable} 
              WHERE team_name = ?",
             "s",
             $teamName

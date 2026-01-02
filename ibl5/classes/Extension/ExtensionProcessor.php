@@ -6,6 +6,7 @@ namespace Extension;
 
 use Player\Player;
 use Shared\SalaryConverter;
+use League\LeagueContext;
 use Extension\Contracts\ExtensionProcessorInterface;
 
 /**
@@ -19,6 +20,7 @@ use Extension\Contracts\ExtensionProcessorInterface;
 class ExtensionProcessor implements ExtensionProcessorInterface
 {
     private object $db;
+    private ?LeagueContext $leagueContext;
     private ExtensionValidator $validator;
     private ExtensionOfferEvaluator $evaluator;
     private ExtensionDatabaseOperations $dbOps;
@@ -27,10 +29,12 @@ class ExtensionProcessor implements ExtensionProcessorInterface
      * Constructor
      * 
      * @param object $db mysqli connection or duck-typed mock for testing
+     * @param LeagueContext|null $leagueContext Optional league context for multi-league support
      */
-    public function __construct(object $db)
+    public function __construct(object $db, ?LeagueContext $leagueContext = null)
     {
         $this->db = $db;
+        $this->leagueContext = $leagueContext;
         $this->validator = new ExtensionValidator();
         $this->evaluator = new ExtensionOfferEvaluator();
         $this->dbOps = new ExtensionDatabaseOperations($db);
@@ -261,11 +265,12 @@ class ExtensionProcessor implements ExtensionProcessorInterface
 
     private function calculateMoneyCommittedAtPosition($team, $position)
     {
+        $teamTable = $this->leagueContext ? $this->leagueContext->getTableName('ibl_team_info') : 'ibl_team_info';
         try {
             // First, try to get from mock database (for tests)
             // Check if team_info has money_committed_at_position field
             if ($this->db instanceof \mysqli) {
-                $stmt = $this->db->prepare("SELECT money_committed_at_position FROM ibl_team_info WHERE team_name = ? LIMIT 1");
+                $stmt = $this->db->prepare("SELECT money_committed_at_position FROM {$teamTable} WHERE team_name = ? LIMIT 1");
                 $stmt->bind_param('s', $team->name);
                 $stmt->execute();
                 $result = $stmt->get_result();
@@ -281,7 +286,7 @@ class ExtensionProcessor implements ExtensionProcessorInterface
                 $stmt->close();
             } else {
                 // Mock database for tests
-                $query = "SELECT money_committed_at_position FROM ibl_team_info WHERE team_name = ? LIMIT 1";
+                $query = "SELECT money_committed_at_position FROM {$teamTable} WHERE team_name = ? LIMIT 1";
                 $stmt = $this->db->prepare($query);
                 if ($stmt) {
                     $stmt->bind_param('s', $team->name);
@@ -320,9 +325,10 @@ class ExtensionProcessor implements ExtensionProcessorInterface
 
     private function getTeamTraditionData($teamName)
     {
+        $teamTable = $this->leagueContext ? $this->leagueContext->getTableName('ibl_team_info') : 'ibl_team_info';
         try {
             if ($this->db instanceof \mysqli) {
-                $stmt = $this->db->prepare("SELECT Contract_Wins, Contract_Losses, Contract_AvgW, Contract_AvgL FROM ibl_team_info WHERE team_name = ? LIMIT 1");
+                $stmt = $this->db->prepare("SELECT Contract_Wins, Contract_Losses, Contract_AvgW, Contract_AvgL FROM {$teamTable} WHERE team_name = ? LIMIT 1");
                 $stmt->bind_param('s', $teamName);
                 $stmt->execute();
                 $result = $stmt->get_result();
@@ -340,7 +346,7 @@ class ExtensionProcessor implements ExtensionProcessorInterface
                 $stmt->close();
             } else {
                 // Mock database for tests
-                $query = "SELECT Contract_Wins, Contract_Losses, Contract_AvgW, Contract_AvgL FROM ibl_team_info WHERE team_name = ? LIMIT 1";
+                $query = "SELECT Contract_Wins, Contract_Losses, Contract_AvgW, Contract_AvgL FROM {$teamTable} WHERE team_name = ? LIMIT 1";
                 $stmt = $this->db->prepare($query);
                 if ($stmt) {
                     $stmt->bind_param('s', $teamName);

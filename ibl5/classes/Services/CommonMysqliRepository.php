@@ -21,11 +21,6 @@ namespace Services;
  */
 class CommonMysqliRepository extends \BaseMysqliRepository
 {
-    public function __construct(object $db)
-    {
-        parent::__construct($db);
-    }
-
     /**
      * Gets complete user information by username
      * 
@@ -86,7 +81,7 @@ class CommonMysqliRepository extends \BaseMysqliRepository
     public function getTidFromTeamname(string $teamName): ?int
     {
         $result = $this->fetchOne(
-            "SELECT teamid FROM ibl_team_info WHERE team_name = ?",
+            "SELECT teamid FROM ibl_team_info WHERE team_name = ? LIMIT 1",
             "s",
             $teamName
         );
@@ -103,7 +98,7 @@ class CommonMysqliRepository extends \BaseMysqliRepository
     public function getTeamnameFromTeamID(int $teamID): ?string
     {
         $result = $this->fetchOne(
-            "SELECT team_name FROM ibl_team_info WHERE teamid = ?",
+            "SELECT team_name FROM ibl_team_info WHERE teamid = ? LIMIT 1",
             "i",
             $teamID
         );
@@ -120,7 +115,7 @@ class CommonMysqliRepository extends \BaseMysqliRepository
     public function getTeamDiscordID(string $teamName): int
     {
         $result = $this->fetchOne(
-            "SELECT discordID FROM ibl_team_info WHERE team_name = ?",
+            "SELECT discordID FROM ibl_team_info WHERE team_name = ? LIMIT 1",
             "s",
             $teamName
         );

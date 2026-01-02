@@ -59,8 +59,8 @@ class ScheduleUpdater extends \BaseMysqliRepository {
 
         $log = '';
 
-        $this->execute("TRUNCATE TABLE ibl_schedule", '');
-        $log .= "TRUNCATE TABLE ibl_schedule<p>";
+        $this->execute('TRUNCATE TABLE ibl_schedule', '');
+        $log .= 'TRUNCATE TABLE ibl_schedule<p>';
 
         $scheduleFilePath = $_SERVER['DOCUMENT_ROOT'] . '/ibl5/ibl/IBL/Schedule.htm';
         $schedule = new \DOMDocument();
@@ -147,7 +147,7 @@ class ScheduleUpdater extends \BaseMysqliRepository {
                         );
                         $log .= "Inserted game: {$visitorName} @ {$homeName} on {$date}<br>";
                     } catch (\Exception $e) {
-                        $errorMessage = "Failed to insert schedule data into ibl_schedule for game between {$visitorName} and {$homeName}: " . $e->getMessage();
+                        $errorMessage = "Failed to insert schedule data for game between {$visitorName} and {$homeName}: " . $e->getMessage();
                         error_log("[ScheduleUpdater] Database insert error: {$errorMessage}");
                         echo "<b><font color=red>Script Error: Failed to insert schedule data for game between {$visitorName} and {$homeName}.</font></b>";
                         throw new \RuntimeException($errorMessage, 1002);
@@ -155,7 +155,7 @@ class ScheduleUpdater extends \BaseMysqliRepository {
                 }
             }
         }
-        \UI::displayDebugOutput($log, "ibl_schedule SQL Queries");
+        \UI::displayDebugOutput($log, 'ibl_schedule SQL Queries');
 
         echo 'The ibl_schedule database table has been updated.<p>';
     }

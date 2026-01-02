@@ -19,7 +19,7 @@ $wins = $losses = $winStreak = $lossStreak = 0;
 
 //TODO: unify this code with the Schedule module's chunk function
 
-$teamSchedule = Schedule\TeamSchedule::getSchedule($mysqli_db, $userTeam->teamID, 'ibl_schedule');
+$teamSchedule = Schedule\TeamSchedule::getSchedule($mysqli_db, $userTeam->teamID);
 
 $rows = array();
 $lastMonthIteratedOver = "";

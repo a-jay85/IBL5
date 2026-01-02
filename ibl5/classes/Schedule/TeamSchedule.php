@@ -21,10 +21,10 @@ class TeamSchedule extends Schedule implements TeamScheduleInterface
     /**
      * @see TeamScheduleInterface::getSchedule()
      */
-    public static function getSchedule($db, int $teamID, string $scheduleTable = 'ibl_schedule')
+    public static function getSchedule($db, int $teamID)
     {
         $stmt = $db->prepare(
-            "SELECT * FROM `{$scheduleTable}` WHERE Visitor = ? OR Home = ? ORDER BY Date ASC"
+            "SELECT * FROM `ibl_schedule` WHERE Visitor = ? OR Home = ? ORDER BY Date ASC"
         );
         if ($stmt === false) {
             throw new \Exception('Prepare failed: ' . $db->error);
@@ -43,13 +43,13 @@ class TeamSchedule extends Schedule implements TeamScheduleInterface
     /**
      * @see TeamScheduleInterface::getProjectedGamesNextSimResult()
      */
-    public static function getProjectedGamesNextSimResult($db, int $teamID, string $lastSimEndDate, string $scheduleTable = 'ibl_schedule')
+    public static function getProjectedGamesNextSimResult($db, int $teamID, string $lastSimEndDate)
     {
         $league = new \League($db);
         $simLengthInDays = $league->getSimLengthInDays();
         
         $stmt = $db->prepare(
-            "SELECT * FROM `{$scheduleTable}` 
+            "SELECT * FROM `ibl_schedule` 
              WHERE (Visitor = ? OR Home = ?)
                AND Date BETWEEN ADDDATE(?, 1) AND ADDDATE(?, ?)
              ORDER BY Date ASC"

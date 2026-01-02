@@ -230,8 +230,13 @@ if (!defined('ADMIN_FILE')) {
     }
 }
 
-// Include the required files
-@require_once __DIR__ . '/config.php';
+// Include the required files - Load appropriate config based on league selection
+$currentLeague = $_SESSION['current_league'] ?? $_COOKIE[\League\LeagueContext::COOKIE_NAME] ?? 'ibl';
+if ($currentLeague === 'olympics') {
+    @require_once __DIR__ . '/configOlympics.php';
+} else {
+    @require_once __DIR__ . '/config.php';
+}
 
 if (!$dbname) {
     die("<br><br><center><img src=images/logo.gif><br><br><b>There seems that PHP-Nuke isn't installed yet.<br>(The values in config.php file are the default ones)<br><br>You can proceed with the <a href='./install/index.php'>web installation</a> now.</center></b>");

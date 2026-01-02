@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use League\LeagueContext;
+
 /**
  * League - IBL league-wide operations and queries
  * 
@@ -12,7 +14,7 @@ declare(strict_types=1);
  */
 class League extends BaseMysqliRepository
 {
-    private \League\LeagueContext $leagueContext;
+    private ?LeagueContext $leagueContext;
 
     const CONFERENCE_NAMES = array('Eastern', 'Western');
     const DIVISION_NAMES = array('Atlantic', 'Central', 'Midwest', 'Pacific');
@@ -35,7 +37,7 @@ class League extends BaseMysqliRepository
      * @param \League\LeagueContext $leagueContext League context for multi-league support
      * @throws \RuntimeException If connection is invalid (error code 1002)
      */
-    public function __construct(object $db, \League\LeagueContext $leagueContext)
+    public function __construct(object $db, ?LeagueContext $leagueContext = null)
     {
         parent::__construct($db);
         $this->leagueContext = $leagueContext;

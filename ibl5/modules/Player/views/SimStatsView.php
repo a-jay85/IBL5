@@ -37,7 +37,10 @@ class SimStatsView extends BaseView {
             $simStartDate = $simDates['Start Date']; // DATE column - YYYY-MM-DD format
             $simEndDate = $simDates['End Date']; // DATE column - YYYY-MM-DD format
 
-            $stmtBox = $mysqli_db->prepare("SELECT * FROM ibl_box_scores WHERE pid = ? AND Date BETWEEN ? AND ? ORDER BY Date ASC");
+            global $leagueContext;
+            $table = isset($leagueContext) ? $leagueContext->getTableName('ibl_box_scores') : 'ibl_box_scores';
+            
+            $stmtBox = $mysqli_db->prepare("SELECT * FROM {$table} WHERE pid = ? AND Date BETWEEN ? AND ? ORDER BY Date ASC");
             $stmtBox->bind_param("iss", $this->player->playerID, $simStartDate, $simEndDate);
             $stmtBox->execute();
             $resultPlayerSimBoxScores = $stmtBox->get_result();

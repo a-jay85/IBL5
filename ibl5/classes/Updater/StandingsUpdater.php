@@ -1,12 +1,16 @@
 <?php
 namespace Updater;
 
+use League\LeagueContext;
+
 class StandingsUpdater extends \BaseMysqliRepository {
     private $commonRepository;
+    private ?LeagueContext $leagueContext;
 
-    public function __construct(object $db, $commonRepository) {
+    public function __construct(object $db, $commonRepository, ?LeagueContext $leagueContext = null) {
         parent::__construct($db);
         $this->commonRepository = $commonRepository;
+        $this->leagueContext = $leagueContext;
     }
 
     private function extractWins($var) {
@@ -34,9 +38,11 @@ class StandingsUpdater extends \BaseMysqliRepository {
     }
 
     public function update() {
-        echo '<p>Updating the ibl_standings database table...<p>';
-        $this->execute('TRUNCATE TABLE ibl_standings', '');
-        echo 'TRUNCATE TABLE ibl_standings<p>';
+        $standingsTable = $this->leagueContext ? $this->leagueContext->getTableName('ibl_standings') : 'ibl_standings';
+        
+        echo '<p>Updating the ' . $standingsTable . ' database table...<p>';
+        $this->execute('TRUNCATE TABLE ' . $standingsTable, '');
+        echo 'TRUNCATE TABLE ' . $standingsTable . '<p>';
 
         $this->extractStandingsValues();
         
@@ -48,7 +54,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
         $this->updateMagicNumbers('Pacific');
         
         echo '<p>Magic numbers for all teams have been updated.<p>';
-        echo '<p>The ibl_standings table has been updated.<p>';
+        echo '<p>The ' . $standingsTable . ' table has been updated.<p>';
     }
 
     protected function extractStandingsValues() {
@@ -121,6 +127,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
 
     private function processTeamStandings($row, $conference) {
         $log = '';
+        $standingsTable = $this->leagueContext ? $this->leagueContext->getTableName('ibl_standings') : 'ibl_standings';
 
         $teamID = $this->commonRepository->getTidFromTeamname($row->childNodes->item(0)->nodeValue); // This function now returns an integer
         $leagueRecord = $row->childNodes->item(1)->nodeValue;
@@ -143,7 +150,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
         $gamesUnplayed = 82 - $homeWins - $homeLosses - $awayWins - $awayLosses;
 
         $this->execute(
-            "INSERT INTO ibl_standings (
+            "INSERT INTO " . $standingsTable . " (
                 tid,
                 team_name,
                 leagueRecord,
@@ -212,13 +219,14 @@ class StandingsUpdater extends \BaseMysqliRepository {
 
     private function updateTeamDivision($row, $division) {
         $log = '';
+        $standingsTable = $this->leagueContext ? $this->leagueContext->getTableName('ibl_standings') : 'ibl_standings';
         
         $teamName = $row->childNodes->item(0)->nodeValue;
         $teamID = $this->commonRepository->getTidFromTeamname($teamName);
         $divGB = $row->childNodes->item(3)->nodeValue;
 
         $this->execute(
-            "UPDATE ibl_standings SET division = ?, divGB = ? WHERE tid = ?",
+            "UPDATE " . $standingsTable . " SET division = ?, divGB = ? WHERE tid = ?",
             "ssi",
             $division,
             $divGB,
@@ -231,11 +239,12 @@ class StandingsUpdater extends \BaseMysqliRepository {
 
     private function updateMagicNumbers($region) {
         echo "<p>Updating the magic numbers for the $region...<br>";
+        $standingsTable = $this->leagueContext ? $this->leagueContext->getTableName('ibl_standings') : 'ibl_standings';
         list($grouping, $groupingGB, $groupingMagicNumber) = $this->assignGroupingsFor($region);
 
         $teams = $this->fetchAll(
             "SELECT tid, team_name, homeWins, homeLosses, awayWins, awayLosses
-            FROM ibl_standings
+            FROM " . $standingsTable . "
             WHERE $grouping = ?
             ORDER BY pct DESC",
             "s",
@@ -271,9 +280,10 @@ class StandingsUpdater extends \BaseMysqliRepository {
 
     private function updateTeamMagicNumber($teamID, $teamName, $magicNumber, $groupingMagicNumber) {
         $log = '';
+        $standingsTable = $this->leagueContext ? $this->leagueContext->getTableName('ibl_standings') : 'ibl_standings';
 
         $this->execute(
-            "UPDATE ibl_standings SET $groupingMagicNumber = ? WHERE tid = ?",
+            "UPDATE " . $standingsTable . " SET $groupingMagicNumber = ? WHERE tid = ?",
             "ii",
             $magicNumber,
             $teamID
@@ -285,12 +295,13 @@ class StandingsUpdater extends \BaseMysqliRepository {
     }
 
     private function checkIfRegionIsClinched($region) {
+        $standingsTable = $this->leagueContext ? $this->leagueContext->getTableName('ibl_standings') : 'ibl_standings';
         list($grouping, $groupingGB, $groupingMagicNumber) = $this->assignGroupingsFor($region);
         echo "<p>Checking if the $region $grouping has been clinched...<br>";
 
         $winningestTeam = $this->fetchOne(
             "SELECT team_name, homeWins + awayWins AS wins
-            FROM ibl_standings
+            FROM " . $standingsTable . "
             WHERE $grouping = ?
             ORDER BY wins DESC
             LIMIT 1",
@@ -307,7 +318,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
 
         $leastLosingestTeam = $this->fetchOne(
             "SELECT homeLosses + awayLosses AS losses
-            FROM ibl_standings
+            FROM " . $standingsTable . "
             WHERE $grouping = ?
                 AND team_name != ?
             ORDER BY losses ASC
@@ -327,7 +338,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
 
         if ($magicNumber <= 0) {
             $this->execute(
-                "UPDATE ibl_standings SET clinched" . ucfirst($grouping) . " = 1 WHERE team_name = ?",
+                "UPDATE " . $standingsTable . " SET clinched" . ucfirst($grouping) . " = 1 WHERE team_name = ?",
                 "s",
                 $winningestTeamName
             );
@@ -336,11 +347,12 @@ class StandingsUpdater extends \BaseMysqliRepository {
     }
 
     private function checkIfPlayoffsClinched($conference) {
+        $standingsTable = $this->leagueContext ? $this->leagueContext->getTableName('ibl_standings') : 'ibl_standings';
         echo "<p>Checking if any teams have clinched playoff spots in the $conference Conference...<br>";
 
         $eightWinningestTeams = $this->fetchAll(
             "SELECT team_name, homeWins + awayWins AS wins
-            FROM ibl_standings
+            FROM " . $standingsTable . "
             WHERE conference = ?
             ORDER BY wins DESC
             LIMIT 8",
@@ -350,7 +362,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
 
         $sixLosingestTeams = $this->fetchAll(
             "SELECT homeLosses + awayLosses AS losses
-            FROM ibl_standings
+            FROM " . $standingsTable . "
             WHERE conference = ?
             ORDER BY losses DESC
             LIMIT 6",
@@ -382,7 +394,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
 
             if ($teamsEliminated == 6) {
                 $this->execute(
-                    "UPDATE ibl_standings SET clinchedPlayoffs = 1 WHERE team_name = ?",
+                    "UPDATE " . $standingsTable . " SET clinchedPlayoffs = 1 WHERE team_name = ?",
                     "s",
                     $contendingTeamName
                 );

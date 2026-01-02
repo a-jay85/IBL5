@@ -24,12 +24,16 @@ $pagetitle = "- $module_name";
 Nuke\Header::header();
 OpenTable();
 
-$min_date_query = "SELECT MIN(Date) as mindate FROM ibl_schedule";
+global $leagueContext;
+$scheduleTable = isset($leagueContext) ? $leagueContext->getTableName('ibl_schedule') : 'ibl_schedule';
+$standingsTable = isset($leagueContext) ? $leagueContext->getTableName('ibl_standings') : 'ibl_standings';
+
+$min_date_query = "SELECT MIN(Date) as mindate FROM {$scheduleTable}";
 $min_date_result = $db->sql_query($min_date_query);
 $row = $db->sql_fetch_assoc($min_date_result);
 $min_date = $row['mindate'];
 
-$max_date_query = "SELECT MAX(Date) as maxdate FROM ibl_schedule";
+$max_date_query = "SELECT MAX(Date) as maxdate FROM {$scheduleTable}";
 $max_date_result = $db->sql_query($max_date_query);
 $row2 = $db->sql_fetch_assoc($max_date_result);
 $max_date = $row2['maxdate'];
@@ -58,19 +62,19 @@ function chunk($chunk_start_date, $chunk_end_date, $j)
 {
     //TODO: unify this code with the Team module's boxscore function
 
-    global $db, $mysqli_db;
+    global $db, $mysqli_db, $scheduleTable, $standingsTable;
     $sharedFunctions = new Shared($db);
     $commonRepository = new Services\CommonMysqliRepository($mysqli_db);
     $season = new Season($mysqli_db);
 
     $query = "SELECT *
-		FROM ibl_schedule
+		FROM {$scheduleTable}
 		WHERE Date BETWEEN '$chunk_start_date' AND '$chunk_end_date'
 		ORDER BY SchedID ASC";
     $result = $db->sql_query($query);
     $num = $db->sql_numrows($result);
 
-    $teamSeasonRecordsQuery = "SELECT tid, leagueRecord FROM ibl_standings ORDER BY tid ASC;";
+    $teamSeasonRecordsQuery = "SELECT tid, leagueRecord FROM {$standingsTable} ORDER BY tid ASC;";
     $teamSeasonRecordsResult = $db->sql_query($teamSeasonRecordsQuery);
 
     $league = new League($mysqli_db);

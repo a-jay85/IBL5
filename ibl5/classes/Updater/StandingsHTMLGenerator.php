@@ -1,14 +1,11 @@
 <?php
 namespace Updater;
-use League\LeagueContext;
 
 class StandingsHTMLGenerator extends \BaseMysqliRepository {
     private $standingsHTML;
-    private ?LeagueContext $leagueContext;
 
-    public function __construct(object $db, ?LeagueContext $leagueContext = null) {
+    public function __construct(object $db) {
         parent::__construct($db);
-        $this->leagueContext = $leagueContext;
         $this->standingsHTML = "<script src=\"sorttable.js\"></script>";
     }
 
@@ -55,7 +52,6 @@ class StandingsHTMLGenerator extends \BaseMysqliRepository {
 
     private function displayStandings($region) {
         list($grouping, $groupingGB, $groupingMagicNumber) = $this->assignGroupingsFor($region);
-        $standingsTable = $this->leagueContext ? $this->leagueContext->getTableName('ibl_standings') : 'ibl_standings';
 
         $standings = $this->fetchAll(
             "SELECT
@@ -75,7 +71,7 @@ class StandingsHTMLGenerator extends \BaseMysqliRepository {
             clinchedPlayoffs,
             (homeWins + homeLosses) AS homeGames,
             (awayWins + awayLosses) AS awayGames
-            FROM {$standingsTable}
+            FROM ibl_standings
             WHERE $grouping = ? ORDER BY $groupingGB ASC",
             "s",
             $region

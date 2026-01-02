@@ -1,16 +1,12 @@
 <?php
 namespace Updater;
 
-use League\LeagueContext;
-
 class PowerRankingsUpdater extends \BaseMysqliRepository {
     private $season;
-    private ?LeagueContext $leagueContext;
 
-    public function __construct(object $db, $season, ?LeagueContext $leagueContext = null) {
+    public function __construct(object $db, $season) {
         parent::__construct($db);
         $this->season = $season;
-        $this->leagueContext = $leagueContext;
     }
 
     public function update() {
@@ -59,11 +55,10 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
     private function buildGamesQuery($tid, $month) {
         $startDate = $this->season->beginningYear . "-$month-01";
         $endDate = $this->season->endingYear . "-05-30";
-        $scheduleTable = $this->leagueContext ? $this->leagueContext->getTableName('ibl_schedule') : 'ibl_schedule';
         
         return $this->fetchAll(
             "SELECT Visitor, VScore, Home, HScore
-            FROM {$scheduleTable}
+            FROM ibl_schedule
             WHERE (Visitor = ? OR Home = ?)
             AND (VScore > 0 AND HScore > 0)
             AND Date BETWEEN ? AND ?

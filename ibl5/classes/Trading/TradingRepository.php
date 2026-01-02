@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Trading;
 
 use BaseMysqliRepository;
-use League\LeagueContext;
 use Trading\Contracts\TradingRepositoryInterface;
 
 /**
@@ -19,22 +18,18 @@ use Trading\Contracts\TradingRepositoryInterface;
  */
 class TradingRepository extends BaseMysqliRepository implements TradingRepositoryInterface
 {
-    private ?LeagueContext $leagueContext;
-
     /**
      * Constructor - inherits from BaseMysqliRepository
      * 
      * @param object $db Active mysqli connection (or duck-typed mock during migration)
-     * @param LeagueContext|null $leagueContext Optional league context for multi-league support
      * @throws \RuntimeException If connection is invalid (error code 1002)
      * 
      * TEMPORARY: Accepts duck-typed objects during mysqli migration for testing.
      * Will be strictly \mysqli once migration completes.
      */
-    public function __construct(object $db, ?LeagueContext $leagueContext = null)
+    public function __construct(object $db)
     {
         parent::__construct($db);
-        $this->leagueContext = $leagueContext;
     }
 
     /**
@@ -54,9 +49,8 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
      */
     public function getAllTeams(): array
     {
-        $teamTable = $this->leagueContext ? $this->leagueContext->getTableName('ibl_team_info') : 'ibl_team_info';
         return $this->fetchAll(
-            "SELECT team_name FROM {$teamTable} ORDER BY team_name"
+            "SELECT team_name FROM ibl_team_info ORDER BY team_name"
         );
     }
 
@@ -458,9 +452,8 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
      */
     public function getAllTeamsWithCity(): array
     {
-        $teamTable = $this->leagueContext ? $this->leagueContext->getTableName('ibl_team_info') : 'ibl_team_info';
         return $this->fetchAll(
-            "SELECT team_name, team_city FROM {$teamTable} ORDER BY team_city ASC"
+            "SELECT team_name, team_city FROM ibl_team_info ORDER BY team_city ASC"
         );
     }
 }

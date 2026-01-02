@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use Player\Player;
-use League\LeagueContext;
 
 /**
  * Team - IBL team information and operations
@@ -15,8 +14,6 @@ use League\LeagueContext;
  */
 class Team extends BaseMysqliRepository
 {
-    private static ?LeagueContext $leagueContext = null;
-
     public $teamID;
 
     public $city;
@@ -81,9 +78,6 @@ class Team extends BaseMysqliRepository
     {
         ($identifier) ? $identifier : $identifier = League::FREE_AGENTS_TEAMID;
 
-        $teamTable = self::$leagueContext ? self::$leagueContext->getTableName('ibl_team_info') : 'ibl_team_info';
-        $standingsTable = self::$leagueContext ? self::$leagueContext->getTableName('ibl_standings') : 'ibl_standings';
-
         if (is_array($identifier)) {
             $this->fill($identifier);
             return;
@@ -91,21 +85,21 @@ class Team extends BaseMysqliRepository
 
         if (is_numeric($identifier)) {
             $teamID = (int) $identifier;
-            $query = "SELECT {$teamTable}.*,
-                     {$standingsTable}.leagueRecord 
-                FROM {$teamTable}
-                    LEFT JOIN {$standingsTable}
-                    ON {$teamTable}.teamid = {$standingsTable}.tid
-                WHERE {$teamTable}.teamid = ?
+            $query = "SELECT ibl_team_info.*,
+                     ibl_standings.leagueRecord 
+                FROM ibl_team_info
+                    LEFT JOIN ibl_standings
+                    ON ibl_team_info.teamid = ibl_standings.tid
+                WHERE ibl_team_info.teamid = ?
                 LIMIT 1";
             $teamRow = $this->fetchOne($query, "i", $teamID);
         } elseif (is_string($identifier)) {
-            $query = "SELECT {$teamTable}.*,
-                     {$standingsTable}.leagueRecord
-                FROM {$teamTable}
-                    LEFT JOIN {$standingsTable}
-                    ON {$teamTable}.teamid = {$standingsTable}.tid
-                WHERE {$teamTable}.team_name = ?
+            $query = "SELECT ibl_team_info.*,
+                     ibl_standings.leagueRecord
+                FROM ibl_team_info
+                    LEFT JOIN ibl_standings
+                    ON ibl_team_info.teamid = ibl_standings.tid
+                WHERE ibl_team_info.team_name = ?
                 LIMIT 1";
             $teamRow = $this->fetchOne($query, "s", $identifier);
         }

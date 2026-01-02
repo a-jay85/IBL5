@@ -2,8 +2,6 @@
 
 declare(strict_types=1);
 
-use League\LeagueContext;
-
 /**
  * Season - IBL season information and configuration
  * 
@@ -29,8 +27,6 @@ use League\LeagueContext;
  */
 class Season extends BaseMysqliRepository
 {
-    private ?LeagueContext $leagueContext;
-
     public $phase;
 
     public $beginningYear;
@@ -63,13 +59,11 @@ class Season extends BaseMysqliRepository
      * Constructor - initializes season data from database
      * 
      * @param \mysqli $db Active mysqli connection
-     * @param LeagueContext|null $leagueContext Optional league context for multi-league support
      * @throws \RuntimeException If connection is invalid (error code 1002)
      */
-    public function __construct(object $db, ?LeagueContext $leagueContext = null)
+    public function __construct(object $db)
     {
         parent::__construct($db);
-        $this->leagueContext = $leagueContext;
 
         $this->phase = $this->getSeasonPhase();
 
@@ -133,9 +127,8 @@ class Season extends BaseMysqliRepository
      */
     public function getFirstBoxScoreDate(): string
     {
-        $table = $this->leagueContext ? $this->leagueContext->getTableName('ibl_box_scores') : 'ibl_box_scores';
         $result = $this->fetchOne(
-            "SELECT Date FROM {$table} ORDER BY Date ASC LIMIT 1"
+            "SELECT Date FROM ibl_box_scores ORDER BY Date ASC LIMIT 1"
         );
 
         return $result['Date'] ?? '';
@@ -148,9 +141,8 @@ class Season extends BaseMysqliRepository
      */
     public function getLastBoxScoreDate(): string
     {
-        $table = $this->leagueContext ? $this->leagueContext->getTableName('ibl_box_scores') : 'ibl_box_scores';
         $result = $this->fetchOne(
-            "SELECT Date FROM {$table} ORDER BY Date DESC LIMIT 1"
+            "SELECT Date FROM ibl_box_scores ORDER BY Date DESC LIMIT 1"
         );
 
         return $result['Date'] ?? '';

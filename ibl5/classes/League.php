@@ -2,8 +2,6 @@
 
 declare(strict_types=1);
 
-use League\LeagueContext;
-
 /**
  * League - IBL league-wide operations and queries
  * 
@@ -14,8 +12,6 @@ use League\LeagueContext;
  */
 class League extends BaseMysqliRepository
 {
-    private ?LeagueContext $leagueContext;
-
     const CONFERENCE_NAMES = array('Eastern', 'Western');
     const DIVISION_NAMES = array('Atlantic', 'Central', 'Midwest', 'Pacific');
 
@@ -34,13 +30,11 @@ class League extends BaseMysqliRepository
      * Constructor - inherits from BaseMysqliRepository
      * 
      * @param object $db Active mysqli connection (or duck-typed mock during migration)
-     * @param \League\LeagueContext $leagueContext League context for multi-league support
      * @throws \RuntimeException If connection is invalid (error code 1002)
      */
-    public function __construct(object $db, ?LeagueContext $leagueContext = null)
+    public function __construct(object $db)
     {
         parent::__construct($db);
-        $this->leagueContext = $leagueContext;
     }
 
     /**
@@ -215,10 +209,9 @@ class League extends BaseMysqliRepository
      */
     public function getGMOfTheYearCandidatesResult(): array
     {
-        $table = $this->leagueContext ? $this->leagueContext->getTableName('ibl_team_info') : 'ibl_team_info';
         return $this->fetchAll(
             "SELECT owner_name, team_city, team_name
-            FROM {$table}
+            FROM ibl_team_info
             WHERE teamid != ?
             ORDER BY owner_name",
             "i",
@@ -233,10 +226,9 @@ class League extends BaseMysqliRepository
      */
     public function getAllTeamsResult(): array
     {
-        $table = $this->leagueContext ? $this->leagueContext->getTableName('ibl_team_info') : 'ibl_team_info';
         return $this->fetchAll(
             "SELECT *
-            FROM {$table}
+            FROM ibl_team_info
             WHERE teamid != ?
             ORDER BY teamid ASC",
             "i",

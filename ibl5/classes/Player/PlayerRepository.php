@@ -3,7 +3,6 @@
 namespace Player;
 
 use BaseMysqliRepository;
-use League\LeagueContext;
 use Player\Contracts\PlayerRepositoryInterface;
 
 /**
@@ -17,26 +16,17 @@ use Player\Contracts\PlayerRepositoryInterface;
 class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryInterface
 {
     /**
-     * League context for multi-league support
-     * 
-     * @var LeagueContext|null
-     */
-    private ?LeagueContext $leagueContext;
-
-    /**
      * Constructor - inherits from BaseMysqliRepository
      * 
      * @param object $db Active mysqli connection (or duck-typed mock during migration)
-     * @param LeagueContext|null $leagueContext Optional league context for multi-league support
      * @throws \RuntimeException If connection is invalid (error code 1002)
      * 
      * TEMPORARY: Accepts duck-typed objects during mysqli migration for testing.
      * Will be strictly \mysqli once migration completes.
      */
-    public function __construct(object $db, ?LeagueContext $leagueContext = null)
+    public function __construct(object $db)
     {
         parent::__construct($db);
-        $this->leagueContext = $leagueContext;
     }
 
     /**
@@ -394,9 +384,8 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
      */
     public function getBoxScoresBetweenDates(int $playerID, string $startDate, string $endDate): array
     {
-        $table = $this->leagueContext ? $this->leagueContext->getTableName('ibl_box_scores') : 'ibl_box_scores';
         return $this->fetchAll(
-            "SELECT * FROM {$table} WHERE pid = ? AND Date BETWEEN ? AND ? ORDER BY Date ASC",
+            "SELECT * FROM ibl_box_scores WHERE pid = ? AND Date BETWEEN ? AND ? ORDER BY Date ASC",
             "iss",
             $playerID,
             $startDate,

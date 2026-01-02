@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Team;
 
-use League\LeagueContext;
 use Team\Contracts\TeamRepositoryInterface;
 
 /**
@@ -13,12 +12,9 @@ use Team\Contracts\TeamRepositoryInterface;
  */
 class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInterface
 {
-    private ?LeagueContext $leagueContext;
-
-    public function __construct(object $db, ?LeagueContext $leagueContext = null)
+    public function __construct(object $db)
     {
         parent::__construct($db);
-        $this->leagueContext = $leagueContext;
     }
 
     /**
@@ -26,9 +22,8 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
      */
     public function getTeam(int $teamID): ?array
     {
-        $table = $this->leagueContext ? $this->leagueContext->getTableName('ibl_team_info') : 'ibl_team_info';
         return $this->fetchOne(
-            "SELECT * FROM {$table} WHERE teamid = ?",
+            "SELECT * FROM ibl_team_info WHERE teamid = ?",
             "i",
             $teamID
         );

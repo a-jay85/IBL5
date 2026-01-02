@@ -7,8 +7,8 @@ namespace League;
 /**
  * LeagueContext - Multi-league support for IBL5
  * 
- * Handles league selection, table name mapping, module availability,
- * and league-specific configuration for IBL and Olympics leagues.
+ * Handles league selection, module availability, and league-specific
+ * configuration for IBL and Olympics leagues.
  */
 class LeagueContext
 {
@@ -71,43 +71,6 @@ class LeagueContext
             $expiry = time() + (30 * 24 * 60 * 60);
             setcookie(self::COOKIE_NAME, $league, $expiry, '/');
         }
-    }
-
-    /**
-     * Get the actual table name for the current league
-     * 
-     * For Olympics league, maps certain tables to Olympics-specific tables.
-     * For IBL league, returns the original table name.
-     * Shared tables return unchanged for both leagues.
-     * 
-     * @param string $baseTable Base table name
-     * @return string Actual table name for the current league
-     */
-    public function getTableName(string $baseTable): string
-    {
-        $currentLeague = $this->getCurrentLeague();
-
-        // For IBL league, always return original table name
-        if ($currentLeague === self::LEAGUE_IBL) {
-            return $baseTable;
-        }
-
-        // For Olympics league, map specific tables
-        if ($currentLeague === self::LEAGUE_OLYMPICS) {
-            return match ($baseTable) {
-                'ibl_team_info' => 'ibl_olympics_team_info',
-                'ibl_standings' => 'ibl_olympics_standings',
-                'ibl_schedule' => 'ibl_olympics_schedule',
-                'ibl_box_scores' => 'ibl_olympics_box_scores',
-                'ibl_box_scores_teams' => 'ibl_olympics_box_scores_teams',
-                // Shared tables remain unchanged
-                'ibl_plr', 'ibl_hist', 'nuke_users', 'nuke_authors' => $baseTable,
-                // All other tables remain unchanged
-                default => $baseTable
-            };
-        }
-
-        return $baseTable;
     }
 
     /**

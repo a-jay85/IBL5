@@ -124,19 +124,22 @@ class LeagueContext
                 'title' => 'Internet Basketball League',
                 'short_name' => 'IBL',
                 'primary_color' => '#1a365d',
-                'logo_path' => 'images/ibl/logo.png'
+                'logo_path' => 'images/ibl/logo.png',
+                'images_path' => 'images/'
             ],
             self::LEAGUE_OLYMPICS => [
                 'title' => 'IBL Olympics',
                 'short_name' => 'Olympics',
                 'primary_color' => '#c53030',
-                'logo_path' => 'images/olympics/logo.png'
+                'logo_path' => 'images/olympics/logo.png',
+                'images_path' => 'images/olympics/'
             ],
             default => [
                 'title' => 'Internet Basketball League',
                 'short_name' => 'IBL',
                 'primary_color' => '#1a365d',
-                'logo_path' => 'images/ibl/logo.png'
+                'logo_path' => 'images/ibl/logo.png',
+                'images_path' => 'images/'
             ]
         };
     }

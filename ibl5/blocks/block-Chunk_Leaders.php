@@ -7,7 +7,10 @@ if (!defined('BLOCK_FILE')) {
 
 use Player\PlayerImageHelper;
 
-global $mysqli_db;
+global $mysqli_db, $leagueContext;
+
+$leagueConfig = $leagueContext->getConfig();
+$imagesPath = $leagueConfig['images_path'];
 
 // Query ibl_sim_dates - 'Start Date' and 'End Date' are DATE type columns (returns YYYY-MM-DD format)
 $queryLastSimDates = $mysqli_db->query("SELECT * FROM ibl_sim_dates ORDER BY Sim DESC LIMIT 1");
@@ -107,7 +110,7 @@ for ($i = 1; $i <= 5; $i++) {
                         <td style="min-width:155px;" colspan=2>
                             <div style="text-align:center;">
                                 <img src="' . PlayerImageHelper::getImageUrl($rows[$rowNumber]['pid']) . '" height="90" width="65">
-                                <img src="./images/logo/new' . $rows[$rowNumber]['tid'] . '.png" height="75" width="75">
+                                <img src="./' . $imagesPath . 'logo/new' . $rows[$rowNumber]['tid'] . '.png" height="75" width="75">
                             </div>
                         </td>
                     </tr>

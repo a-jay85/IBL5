@@ -1,2 +1,0 @@
-<SCRIPT charset="utf-8" type="text/javascript" src="http://ws.amazon.com/widgets/q?ServiceVersion=20070822&MarketPlace=US&ID=V20070822/US/ti0689-20/8002/e919fdb0-1a2b-4b9c-9ef0-7e447a286164"> </SCRIPT> <NOSCRIPT><A HREF="http://ws.amazon.com/widgets/q?ServiceVersion=20070822&MarketPlace=US&ID=V20070822%2FUS%2Fti0689-20%2F8002%2Fe919fdb0-1a2b-4b9c-9ef0-7e447a286164&Operation=NoScript">Amazon.com Widgets</A></NOSCRIPT>
-<P>Please use the above tool whenever you are purchasing products from Amazon.com to help out the IBL website!

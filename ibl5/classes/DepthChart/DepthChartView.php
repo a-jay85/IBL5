@@ -25,7 +25,14 @@ class DepthChartView implements DepthChartViewInterface
      */
     public function renderTeamLogo(int $teamID): void
     {
-        echo "<center><img src=\"images/logo/$teamID.jpg\"></center><br>";
+        global $leagueContext;
+        
+        $leagueConfig = $leagueContext->getConfig();
+        $imagesPath = $leagueConfig['images_path'];
+
+        echo "<center><img src=\"./{$imagesPath}logo/$teamID.jpg\"></center><br>";
+
+        return;
     }
 
     /**

@@ -30,6 +30,11 @@ class TeamController implements TeamControllerInterface
      */
     public function displayTeamPage(int $teamID): void
     {
+        global $leagueContext;
+        
+        $leagueConfig = $leagueContext->getConfig();
+        $imagesPath = $leagueConfig['images_path'];
+
         $teamID = (int) $teamID;
         
         $team = \Team::initialize($this->db, $teamID);
@@ -69,7 +74,7 @@ class TeamController implements TeamControllerInterface
                 
         \UI::displaytopmenu($this->db, $teamID);
                 
-        echo "<img src=\"./images/logo/$teamID.jpg\">";
+        echo "<img src=\"./{$imagesPath}logo/$teamID.jpg\">";
                 
         if ($yr != "") {
             echo "<center><h1>$yr $team->name</h1></center>";

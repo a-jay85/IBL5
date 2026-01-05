@@ -99,6 +99,30 @@ if ($phpver >= '4.0.4pl1' && isset($_SERVER['HTTP_USER_AGENT']) && strstr($_SERV
     }
 }
 
+// Load the autoloader for IBL5 classes (must be before League\LeagueContext usage)
+require_once __DIR__ . '/autoloader.php';
+
+// League context session initialization
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Hydrate session from cookie if not set
+if (!isset($_SESSION['current_league']) && isset($_COOKIE[\League\LeagueContext::COOKIE_NAME])) {
+    $cookieLeague = $_COOKIE[\League\LeagueContext::COOKIE_NAME];
+    if (in_array($cookieLeague, [\League\LeagueContext::LEAGUE_IBL, \League\LeagueContext::LEAGUE_OLYMPICS], true)) {
+        $_SESSION['current_league'] = $cookieLeague;
+    }
+}
+
+// Initialize global LeagueContext instance for application-wide use
+$leagueContext = new \League\LeagueContext();
+
+// Persist league selection when user switches leagues via URL parameter
+if (isset($_GET['league']) && in_array($_GET['league'], [\League\LeagueContext::LEAGUE_IBL, \League\LeagueContext::LEAGUE_OLYMPICS], true)) {
+    $leagueContext->setLeague($_GET['league']);
+}
+
 $sanitize_rules = array("newlang" => "/[a-z][a-z]/i", "redirect" => "/[a-z0-9]*/i");
 foreach ($_REQUEST as $key => $value) {
     if (!isset($sanitize_rules[$key]) || preg_match($sanitize_rules[$key], $value)) {
@@ -206,15 +230,17 @@ if (!defined('ADMIN_FILE')) {
     }
 }
 
-// Include the required files
-@require_once __DIR__ . '/config.php';
+// Include the required files - Load appropriate config based on league selection
+$currentLeague = $_SESSION['current_league'] ?? $_COOKIE[\League\LeagueContext::COOKIE_NAME] ?? 'ibl';
+if ($currentLeague === 'olympics') {
+    @require_once __DIR__ . '/configOlympics.php';
+} else {
+    @require_once __DIR__ . '/config.php';
+}
 
 if (!$dbname) {
     die("<br><br><center><img src=images/logo.gif><br><br><b>There seems that PHP-Nuke isn't installed yet.<br>(The values in config.php file are the default ones)<br><br>You can proceed with the <a href='./install/index.php'>web installation</a> now.</center></b>");
 }
-
-// Load the autoloader for IBL5 classes
-require_once __DIR__ . '/autoloader.php';
 
 @require_once __DIR__ . "/db/db.php";
 

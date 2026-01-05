@@ -43,6 +43,11 @@ if (method_exists($this->db, 'sql_escape_string')) {
 - Register in `ibl5/phpunit.xml`
 - No `markTestSkipped()` - delete instead
 - Zero warnings or failures
+- **Mock objects**: Use PHPDoc annotations for IDE support
+  ```php
+  /** @var InterfaceName&\PHPUnit\Framework\MockObject\MockObject */
+  private InterfaceName $mockObject;
+  ```
 
 ---
 

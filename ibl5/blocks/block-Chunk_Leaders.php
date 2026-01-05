@@ -100,7 +100,6 @@ $resultSimStatLeaders = $mysqli_db->query($querySimStatLeaders);
 $rows = $resultSimStatLeaders->fetch_all(MYSQLI_ASSOC);
 $rowNumber = 0;
 
-$content = "<center><a href=modules.php?name=Chunk_Stats&op=chunk>Sim Stats Search Engine</a></center><br>";
 $content .= '<table style="border:1px solid #000066; margin: 0 auto;">
     <tr>';
 for ($i = 1; $i <= 5; $i++) {

@@ -34,8 +34,6 @@ if ($currentLeague === 'ibl') {
 <li><a href="modules.php?name=Free_Agency">Free Agency</a></li>
 
 <li><a href="modules.php?name=Player_Movement">Player Movement</a></li>
-
-<li><a href="http://www.iblhoops.net/2003olympics">Olympic Games</a></li>
 </ul>
 ';
 } else if ($currentLeague === 'olympics') {

@@ -14,6 +14,9 @@ class ScheduleUpdater extends \BaseMysqliRepository {
     }
 
     private function extractDate($rawDate) {
+        global $leagueContext;
+        $currentLeague = $leagueContext->getCurrentLeague();
+
         if ($rawDate != false) {
             if (substr($rawDate, 0, 4) === "Post") {
                 $rawDate = substr_replace($rawDate, 'June', 0, 4);
@@ -32,6 +35,10 @@ class ScheduleUpdater extends \BaseMysqliRepository {
                 }
             }
             
+            if ($currentLeague === 'olympics') {
+                $month = \Season::IBL_OLYMPICS_MONTH;
+            }
+
             if ($month < \Season::IBL_HEAT_MONTH) {
                 $year = $this->season->endingYear;
             } else {

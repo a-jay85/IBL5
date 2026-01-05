@@ -46,6 +46,14 @@ if (isset($name) && $name == $_REQUEST['name']) {
             die("You are so cool...");
         }
 
+        // Check if module is enabled for current league
+        global $leagueContext;
+        if (isset($leagueContext) && !$leagueContext->isModuleEnabled($name)) {
+            // Redirect to homepage if module not available for current league
+            header('Location: index.php');
+            exit;
+        }
+
         $ThemeSel = get_theme();
         if (file_exists("themes/$ThemeSel/modules/$name/" . $file . ".php")) {
             $modpath = "themes/$ThemeSel/";

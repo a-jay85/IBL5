@@ -2,6 +2,7 @@
 
 use PHPUnit\Framework\TestCase;
 use Updater\ScheduleUpdater;
+use League\LeagueContext;
 
 /**
  * Comprehensive tests for ScheduleUpdater class
@@ -19,9 +20,23 @@ class ScheduleUpdaterTest extends TestCase
     private $mockCommonRepository;
     private $mockSeason;
     private $scheduleUpdater;
+    private $leagueContext;
 
     protected function setUp(): void
     {
+        // Initialize session for LeagueContext
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        
+        // Initialize global LeagueContext for ScheduleUpdater
+        global $leagueContext;
+        $this->leagueContext = new LeagueContext();
+        $leagueContext = $this->leagueContext;
+        
+        // Set default league to IBL for tests
+        $_SESSION['current_league'] = LeagueContext::LEAGUE_IBL;
+        
         $this->mockDb = new MockDatabase();
         $this->mockCommonRepository = new \Services\CommonMysqliRepository($this->mockDb);
         $this->mockSeason = new Season($this->mockDb);
@@ -30,10 +45,20 @@ class ScheduleUpdaterTest extends TestCase
 
     protected function tearDown(): void
     {
+        // Clean up global LeagueContext
+        global $leagueContext;
+        $leagueContext = null;
+        
         $this->scheduleUpdater = null;
         $this->mockDb = null;
         $this->mockCommonRepository = null;
         $this->mockSeason = null;
+        $this->leagueContext = null;
+        
+        // Clean up session
+        if (isset($_SESSION['current_league'])) {
+            unset($_SESSION['current_league']);
+        }
     }
 
     /**

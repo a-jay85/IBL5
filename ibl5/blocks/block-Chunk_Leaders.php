@@ -7,7 +7,10 @@ if (!defined('BLOCK_FILE')) {
 
 use Player\PlayerImageHelper;
 
-global $mysqli_db;
+global $mysqli_db, $leagueContext;
+
+$leagueConfig = $leagueContext->getConfig();
+$imagesPath = $leagueConfig['images_path'];
 
 // Query ibl_sim_dates - 'Start Date' and 'End Date' are DATE type columns (returns YYYY-MM-DD format)
 $queryLastSimDates = $mysqli_db->query("SELECT * FROM ibl_sim_dates ORDER BY Sim DESC LIMIT 1");
@@ -97,7 +100,6 @@ $resultSimStatLeaders = $mysqli_db->query($querySimStatLeaders);
 $rows = $resultSimStatLeaders->fetch_all(MYSQLI_ASSOC);
 $rowNumber = 0;
 
-$content = "<center><a href=modules.php?name=Chunk_Stats&op=chunk>Sim Stats Search Engine</a></center><br>";
 $content .= '<table style="border:1px solid #000066; margin: 0 auto;">
     <tr>';
 for ($i = 1; $i <= 5; $i++) {
@@ -106,8 +108,11 @@ for ($i = 1; $i <= 5; $i++) {
                     <tr>
                         <td style="min-width:155px;" colspan=2>
                             <div style="text-align:center;">
-                                <img src="' . PlayerImageHelper::getImageUrl($rows[$rowNumber]['pid']) . '" height="90" width="65">
-                                <img src="./images/logo/new' . $rows[$rowNumber]['tid'] . '.png" height="75" width="75">
+                                <img src="' . PlayerImageHelper::getImageUrl($rows[$rowNumber]['pid']) . '" height="90" width="65">';
+    if ($rows[$rowNumber]['tid']) {
+        $content .= '<img src="./' . $imagesPath . 'logo/new' . $rows[$rowNumber]['tid'] . '.png" height="75" width="75">';
+    }
+    $content .= '
                             </div>
                         </td>
                     </tr>

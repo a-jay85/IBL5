@@ -60,7 +60,7 @@ class TradeProcessor implements TradeProcessorInterface
             $listeningTeamName = $tradeRow['to'];
 
             $result = $this->processTradeItem($itemId, $itemType, $offeringTeamName, $listeningTeamName, $offerId);
-            
+
             if ($result['success']) {
                 $storytext .= $result['tradeLine'];
             }
@@ -200,7 +200,7 @@ class TradeProcessor implements TradeProcessorInterface
 
         // Get full player data from repository
         $playerData = $this->repository->getPlayerById($itemId);
-        
+
         if (!$playerData) {
             return ['success' => false, 'tradeLine' => ''];
         }
@@ -291,9 +291,20 @@ class TradeProcessor implements TradeProcessorInterface
     {
         $fromDiscordId = $this->discord->getDiscordIDFromTeamname($offeringTeamName);
         $toDiscordId = $this->discord->getDiscordIDFromTeamname($listeningTeamName);
-        $discordText = "<@!$fromDiscordId> and <@!$toDiscordId> agreed to a trade:<br>" . $storytext;
         
-        $this->discord->postToChannel('#trades', $discordText);
-        $this->discord->postToChannel('#general-chat', $storytext);
+        // Build Discord mention text only if both IDs exist
+        if (!empty($fromDiscordId) && !empty($toDiscordId)) {
+            $discordText = "<@!$fromDiscordId> and <@!$toDiscordId> agreed to a trade:\n" . $storytext;
+        } else {
+            $discordText = "$offeringTeamName and $listeningTeamName agreed to a trade:\n" . $storytext;
+        }
+
+        try {
+            \Discord::postToChannel('#trades', $discordText);
+            \Discord::postToChannel('#general-chat', $storytext);
+        } catch (\Exception $e) {
+            // Log the error but don't fail the trade
+            error_log('Discord notification failed: ' . $e->getMessage());
+        }
     }
 }

@@ -66,6 +66,9 @@
         <testsuite name="ComparePlayers Module Tests">
             <directory>tests/ComparePlayers</directory>
         </testsuite>
+        <testsuite name="Discord Module Tests">
+            <directory>tests/Discord</directory>
+        </testsuite>
         <testsuite name="League Module Tests">
             <directory>tests/League</directory>
         </testsuite>

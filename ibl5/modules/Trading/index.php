@@ -260,7 +260,7 @@ function tradereview($username)
 								<table align=right border=1 cellspacing=0 cellpadding=0>
 									<tr>
 										<td valign=center>";
-                if ($hashammer == 1) {
+                if ($hashammer == 1 | $approval == 'test') {
                     echo "<form name=\"tradeaccept\" method=\"post\" action=\"/ibl5/modules/Trading/accepttradeoffer.php\">
 						<input type=\"hidden\" name=\"offer\" value=\"$offerid\">
 						<input type=\"submit\" value=\"Accept\" onclick=\"this.disabled=true;this.value='Submitting...'; this.form.submit();\">

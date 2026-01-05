@@ -220,8 +220,12 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     public function insertTradeItem(int $tradeOfferId, int $itemId, $itemType, string $fromTeam, string $toTeam, string $approvalTeam): int
     {
         // Determine parameter type string based on itemType type
-        $typeString = is_string($itemType) ? "isssss" : "isssss";
+        $typeString = is_string($itemType) ? "iissss" : "iiisss";
         
+        if ($_SERVER['SERVER_NAME'] === "localhost") {
+            $approvalTeam = 'test';
+        }
+
         return $this->execute(
             "INSERT INTO ibl_trade_info (tradeofferid, itemid, itemtype, `from`, `to`, approval) VALUES (?, ?, ?, ?, ?, ?)",
             $typeString,

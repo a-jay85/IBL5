@@ -79,7 +79,7 @@ function themeheader()
     
     echo "<table border=\"0 cellpadding=\"4\" cellspacing=\"0\" width=\"100%\" align=\"center\">\n"
         . "<tr><td bgcolor=\"$bgcolor2\" align=\"left\" width=\"20%\">&nbsp;$bienvenida</td>"
-        . "<td bgcolor=\"$bgcolor2\" align=\"center\" width=\"60%\"><a href=\"index.php\">Home</a> | <a href=\"modules.php?name=Submit_News\">Submit News</a> | <a href=\"modules.php?name=Your_Account\">Your Account</a> | <a href=\"modules.php?name=Content\">Content</a> | <a href=\"modules.php?name=Topics\">Topics</a> | <a href=\"modules.php?name=Top\">Top 10</a>$leagueSwitcher</td>\n"
+        . "<td bgcolor=\"$bgcolor2\" align=\"center\" width=\"60%\"><a href=\"index.php\">Home</a> | <a href=\"modules.php?name=Your_Account\">Your Account</a> | <a href=\"modules.php?name=Topics\">Topics</a> $leagueSwitcher</td>\n"
         . "<td bgcolor=\"$bgcolor2\" align=\"right\" width=\"20%\">"
         . "<b><script type=\"text/javascript\">\n\n"
         . "<!--   // Array ofmonth Names\n"

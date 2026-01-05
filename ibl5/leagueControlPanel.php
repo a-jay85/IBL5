@@ -238,8 +238,10 @@ ob_start();
 <?php
 echo ob_get_clean();
 
-echo "<FORM action=\"leagueControlPanel.php\" method=\"POST\">
-    <select name=\"SeasonPhase\">
+echo "<FORM action=\"leagueControlPanel.php\" method=\"POST\">";
+
+if ($currentLeague === 'ibl') {
+    echo "<select name=\"SeasonPhase\">
         <option value = \"Preseason\"" . ($season->phase == "Preseason" ? " SELECTED" : "") . ">Preseason</option>
         <option value = \"HEAT\"" . ($season->phase == "HEAT" ? " SELECTED" : "") . ">HEAT</option>
         <option value = \"Regular Season\"" . ($season->phase == "Regular Season" ? " SELECTED" : "") . ">Regular Season</option>
@@ -247,8 +249,10 @@ echo "<FORM action=\"leagueControlPanel.php\" method=\"POST\">
         <option value = \"Draft\"" . ($season->phase == "Draft" ? " SELECTED" : "") . ">Draft</option>
         <option value = \"Free Agency\"" . ($season->phase == "Free Agency" ? " SELECTED" : "") . ">Free Agency</option>
     </select>
-    <INPUT type='submit' name='query' value='Set Season Phase'><p>
-    <A HREF=\"/ibl5/pages/seasonHighs.php\">Season Highs</A><p>";
+    <INPUT type='submit' name='query' value='Set Season Phase'><p>";
+}
+
+echo "<A HREF=\"/ibl5/pages/seasonHighs.php\">Season Highs</A><p>";
 
 switch ($season->phase) {
     case 'Preseason':
@@ -282,14 +286,18 @@ switch ($season->phase) {
         $league = new League($mysqli_db);
         echo "<INPUT type='number' name='SimLengthInDays' min=1 max=180 size=3 value='" . $league->getSimLengthInDays() . "'>
             <INPUT type='submit' name='query' value='Set Sim Length in Days'> <i>
-                <br>(you HAVE to CLICK to set the days – you unfortunately can't just hit Return/Enter)<p>
-            <INPUT type='submit' name='query' value='Reset All-Star Voting'><p>
-            <INPUT type='submit' name='query' value='Reset End of the Year Voting'><p>
-            <select name=\"Trades\">
-                <option value = \"Yes\"" . ($season->allowTrades == "Yes" ? " SELECTED" : "") . ">Yes</option>
-                <option value = \"No\"" . ($season->allowTrades == "No" ? " SELECTED" : "") . ">No</option>
-            </select>
-            <INPUT type='submit' name='query' value='Set Allow Trades Status'><p>";
+                <br>(you HAVE to CLICK to set the days – you unfortunately can't just hit Return/Enter)<p>";
+
+        if ($currentLeague === 'ibl') {
+            echo "<INPUT type='submit' name='query' value='Reset All-Star Voting'><p>
+                <INPUT type='submit' name='query' value='Reset End of the Year Voting'><p>
+                <select name=\"Trades\">
+                    <option value = \"Yes\"" . ($season->allowTrades == "Yes" ? " SELECTED" : "") . ">Yes</option>
+                    <option value = \"No\"" . ($season->allowTrades == "No" ? " SELECTED" : "") . ">No</option>
+                </select>
+                <INPUT type='submit' name='query' value='Set Allow Trades Status'><p>";
+        }
+
         break;
     case 'Playoffs':
         echo "<A HREF=\"/ibl5/scripts/plrParser.php\">Run plrParser.php</A>

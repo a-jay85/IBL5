@@ -12,6 +12,7 @@ nohup.out
 
 config.json
 config.php
+configOlympics.php
 config.inc.php
 database_dump_*.sql
 discordWebhooks (not CURL).php

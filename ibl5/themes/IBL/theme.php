@@ -60,7 +60,7 @@ function FormatStory($thetext, $notes, $aid, $informant)
 
 function themeheader()
 {
-    global $prefix, $db, $user, $cookie, $bgcolor1, $bgcolor2, $user;
+    global $user, $cookie, $bgcolor1, $bgcolor2, $user, $leagueContext;
     echo "<body bgcolor=\"$bgcolor1\">";
     if (is_user($user)) {
         cookiedecode($user);
@@ -69,9 +69,17 @@ function themeheader()
     } else {
         $bienvenida = "<a href=\"modules.php?name=Your_Account&amp;op=new_user\">Create an Account</a>";
     }
+    
+    // League switcher
+    $currentLeague = $leagueContext->getCurrentLeague();
+    $leagueSwitcher = "<span style='margin-left: 10px;'>League: </span><select onchange='window.location.href=this.value' style='font-size: 11px;'>";
+    $leagueSwitcher .= "<option value='index.php?league=ibl'" . ($currentLeague === 'ibl' ? ' selected' : '') . ">IBL</option>";
+    $leagueSwitcher .= "<option value='index.php?league=olympics'" . ($currentLeague === 'olympics' ? ' selected' : '') . ">Olympics</option>";
+    $leagueSwitcher .= "</select>";
+    
     echo "<table border=\"0 cellpadding=\"4\" cellspacing=\"0\" width=\"100%\" align=\"center\">\n"
         . "<tr><td bgcolor=\"$bgcolor2\" align=\"left\" width=\"20%\">&nbsp;$bienvenida</td>"
-        . "<td bgcolor=\"$bgcolor2\" align=\"center\" width=\"60%\"><a href=\"index.php\">Home</a> | <a href=\"modules.php?name=Submit_News\">Submit News</a> | <a href=\"modules.php?name=Your_Account\">Your Account</a> | <a href=\"modules.php?name=Content\">Content</a> | <a href=\"modules.php?name=Topics\">Topics</a> | <a href=\"modules.php?name=Top\">Top 10</a></td>\n"
+        . "<td bgcolor=\"$bgcolor2\" align=\"center\" width=\"60%\"><a href=\"index.php\">Home</a> | <a href=\"modules.php?name=Submit_News\">Submit News</a> | <a href=\"modules.php?name=Your_Account\">Your Account</a> | <a href=\"modules.php?name=Content\">Content</a> | <a href=\"modules.php?name=Topics\">Topics</a> | <a href=\"modules.php?name=Top\">Top 10</a>$leagueSwitcher</td>\n"
         . "<td bgcolor=\"$bgcolor2\" align=\"right\" width=\"20%\">"
         . "<b><script type=\"text/javascript\">\n\n"
         . "<!--   // Array ofmonth Names\n"

@@ -36,6 +36,7 @@ class StandingsView implements StandingsViewInterface
     public function render(): string
     {
         $html = '<script src="sorttable.js"></script>';
+        $html .= $this->getStyleBlock();
 
         // Conference standings
         $html .= $this->renderRegion('Eastern');
@@ -52,6 +53,47 @@ class StandingsView implements StandingsViewInterface
     }
 
     /**
+     * Generate consolidated CSS styles for standings tables
+     *
+     * @return string CSS style block
+     */
+    private function getStyleBlock(): string
+    {
+        return '<style>
+            .standings-title {
+                color: #fd004d;
+                font-weight: bold;
+            }
+            
+            .standings-table {
+                border-collapse: collapse;
+            }
+            
+            .standings-header-row {
+                background-color: #006cb3;
+            }
+            
+            .standings-header-cell {
+                text-align: center;
+                color: #ffffff;
+                font-weight: bold;
+            }
+            
+            .standings-cell {
+                text-align: center;
+            }
+            
+            .standings-team-cell {
+                text-align: left;
+            }
+            
+            .standings-divider {
+                text-align: center;
+            }
+        </style>';
+    }
+
+    /**
      * {@inheritdoc}
      */
     public function renderRegion(string $region): string
@@ -61,7 +103,7 @@ class StandingsView implements StandingsViewInterface
 
         $html = $this->renderHeader($region, $groupingType);
         $html .= $this->renderRows($standings);
-        $html .= '<tr><td colspan=10><hr></td></tr></table><p>';
+        $html .= '<tr><td class="standings-divider" colspan="14"><hr></td></tr></table><p>';
 
         return $html;
     }
@@ -92,24 +134,28 @@ class StandingsView implements StandingsViewInterface
     {
         $title = htmlspecialchars($region . ' ' . $groupingType, ENT_QUOTES, 'UTF-8');
 
-        return '<font color=#fd004d><b>' . $title . '</b></font>'
-            . '<table class="sortable">'
-            . '<tr bgcolor=#006cb3>'
-            . '<td><font color=#ffffff><b>Team</b></font></td>'
-            . '<td><font color=#ffffff><b>W-L</b></font></td>'
-            . '<td><font color=#ffffff><b>Pct</b></font></td>'
-            . '<td><center><font color=#ffffff><b>GB</b></font></center></td>'
-            . '<td><center><font color=#ffffff><b>Magic#</b></font></center></td>'
-            . '<td><font color=#ffffff><b>Left</b></font></td>'
-            . '<td><font color=#ffffff><b>Conf.</b></font></td>'
-            . '<td><font color=#ffffff><b>Div.</b></font></td>'
-            . '<td><font color=#ffffff><b>Home</b></font></td>'
-            . '<td><font color=#ffffff><b>Away</b></font></td>'
-            . '<td><center><font color=#ffffff><b>Home<br>Played</b></font></center></td>'
-            . '<td><center><font color=#ffffff><b>Away<br>Played</b></font></center></td>'
-            . '<td><font color=#ffffff><b>Last 10</b></font></td>'
-            . '<td><font color=#ffffff><b>Streak</b></font></td>'
-            . '</tr>';
+        ob_start();
+        ?>
+        <div class="standings-title"><?php echo $title; ?></div>
+        <table class="sortable standings-table">
+            <tr class="standings-header-row">
+            <td class="standings-header-cell">Team</td>
+            <td class="standings-header-cell">W-L</td>
+            <td class="standings-header-cell">Pct</td>
+            <td class="standings-header-cell">GB</td>
+            <td class="standings-header-cell">Magic#</td>
+            <td class="standings-header-cell">Left</td>
+            <td class="standings-header-cell">Conf.</td>
+            <td class="standings-header-cell">Div.</td>
+            <td class="standings-header-cell">Home</td>
+            <td class="standings-header-cell">Away</td>
+            <td class="standings-header-cell">Home<br>Played</td>
+            <td class="standings-header-cell">Away<br>Played</td>
+            <td class="standings-header-cell">Last 10</td>
+            <td class="standings-header-cell">Streak</td>
+            </tr>
+        <?php
+        return ob_get_clean();
     }
 
     /**
@@ -147,20 +193,20 @@ class StandingsView implements StandingsViewInterface
         $streak = $streakData['streak'] ?? 0;
 
         return '<tr>'
-            . '<td><a href="modules.php?name=Team&op=team&teamID=' . $teamId . '">' . $teamName . '</td>'
-            . '<td>' . htmlspecialchars($team['leagueRecord'], ENT_QUOTES, 'UTF-8') . '</td>'
-            . '<td>' . htmlspecialchars((string) $team['pct'], ENT_QUOTES, 'UTF-8') . '</td>'
-            . '<td><center>' . htmlspecialchars((string) $team['gamesBack'], ENT_QUOTES, 'UTF-8') . '</center></td>'
-            . '<td><center>' . htmlspecialchars((string) $team['magicNumber'], ENT_QUOTES, 'UTF-8') . '</center></td>'
-            . '<td>' . htmlspecialchars((string) $team['gamesUnplayed'], ENT_QUOTES, 'UTF-8') . '</td>'
-            . '<td>' . htmlspecialchars($team['confRecord'], ENT_QUOTES, 'UTF-8') . '</td>'
-            . '<td>' . htmlspecialchars($team['divRecord'], ENT_QUOTES, 'UTF-8') . '</td>'
-            . '<td>' . htmlspecialchars($team['homeRecord'], ENT_QUOTES, 'UTF-8') . '</td>'
-            . '<td>' . htmlspecialchars($team['awayRecord'], ENT_QUOTES, 'UTF-8') . '</td>'
-            . '<td><center>' . htmlspecialchars((string) $team['homeGames'], ENT_QUOTES, 'UTF-8') . '</center></td>'
-            . '<td><center>' . htmlspecialchars((string) $team['awayGames'], ENT_QUOTES, 'UTF-8') . '</center></td>'
-            . '<td>' . $lastWin . '-' . $lastLoss . '</td>'
-            . '<td>' . $streakType . ' ' . $streak . '</td>'
+            . '<td class="standings-team-cell"><a href="modules.php?name=Team&op=team&teamID=' . $teamId . '">' . $teamName . '</a></td>'
+            . '<td class="standings-cell">' . htmlspecialchars($team['leagueRecord'], ENT_QUOTES, 'UTF-8') . '</td>'
+            . '<td class="standings-cell">' . htmlspecialchars((string) $team['pct'], ENT_QUOTES, 'UTF-8') . '</td>'
+            . '<td class="standings-cell">' . htmlspecialchars((string) $team['gamesBack'], ENT_QUOTES, 'UTF-8') . '</td>'
+            . '<td class="standings-cell">' . htmlspecialchars((string) $team['magicNumber'], ENT_QUOTES, 'UTF-8') . '</td>'
+            . '<td class="standings-cell">' . htmlspecialchars((string) $team['gamesUnplayed'], ENT_QUOTES, 'UTF-8') . '</td>'
+            . '<td class="standings-cell">' . htmlspecialchars($team['confRecord'], ENT_QUOTES, 'UTF-8') . '</td>'
+            . '<td class="standings-cell">' . htmlspecialchars($team['divRecord'], ENT_QUOTES, 'UTF-8') . '</td>'
+            . '<td class="standings-cell">' . htmlspecialchars($team['homeRecord'], ENT_QUOTES, 'UTF-8') . '</td>'
+            . '<td class="standings-cell">' . htmlspecialchars($team['awayRecord'], ENT_QUOTES, 'UTF-8') . '</td>'
+            . '<td class="standings-cell">' . htmlspecialchars((string) $team['homeGames'], ENT_QUOTES, 'UTF-8') . '</td>'
+            . '<td class="standings-cell">' . htmlspecialchars((string) $team['awayGames'], ENT_QUOTES, 'UTF-8') . '</td>'
+            . '<td class="standings-cell">' . $lastWin . '-' . $lastLoss . '</td>'
+            . '<td class="standings-cell">' . $streakType . ' ' . $streak . '</td>'
             . '</tr>';
     }
 

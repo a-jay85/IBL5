@@ -98,6 +98,11 @@ See `.github/copilot-instructions.md` **Interface-Driven Architecture Pattern** 
 - Business rule validation
 - Database operations
 - Security (SQL injection, XSS)
+- **Mock objects**: Use PHPDoc annotations for IDE support:
+  ```php
+  /** @var InterfaceName&\PHPUnit\Framework\MockObject\MockObject */
+  private InterfaceName $mockRepository;
+  ```
 
 ## Code Quality
 

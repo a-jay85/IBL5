@@ -132,6 +132,69 @@ public function testEscapesUserInput()
 
 ---
 
+## PHPUnit Mock Objects - PHPDoc Annotations Required
+
+**When using PHPUnit mock objects in tests, ALWAYS add PHPDoc annotations for IDE/static analysis support.**
+
+### ❌ BAD - No PHPDoc annotation
+```php
+class MyServiceTest extends TestCase
+{
+    private MyRepositoryInterface $mockRepository;
+    
+    protected function setUp(): void
+    {
+        $this->mockRepository = $this->createMock(MyRepositoryInterface::class);
+    }
+    
+    public function testSomething(): void
+    {
+        // IDE/Intelephense will flag this as undefined method:
+        $this->mockRepository->method('getData')->willReturn([]);
+    }
+}
+```
+
+### ✅ GOOD - PHPDoc annotation with intersection type
+```php
+class MyServiceTest extends TestCase
+{
+    /** @var MyRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject */
+    private MyRepositoryInterface $mockRepository;
+    
+    protected function setUp(): void
+    {
+        $this->mockRepository = $this->createMock(MyRepositoryInterface::class);
+    }
+    
+    public function testSomething(): void
+    {
+        // IDE now understands both interface methods AND PHPUnit mock methods:
+        $this->mockRepository->method('getData')->willReturn([]);
+    }
+}
+```
+
+**Why this is required:**
+- The mock object is both the interface AND a PHPUnit MockObject
+- PHPDoc intersection type (`Interface&MockObject`) tells IDEs the mock has both:
+  - All interface methods (from your interface)
+  - All PHPUnit methods (`method()`, `expects()`, `willReturn()`, etc.)
+- Without this annotation, IDEs will flag `method()` and other PHPUnit methods as "undefined"
+
+**Pattern to follow:**
+```php
+/** @var InterfaceName&\PHPUnit\Framework\MockObject\MockObject */
+private InterfaceName $mockObject;
+```
+
+**Examples in codebase:**
+- `tests/PlayerSearch/PlayerSearchServiceTest.php` (lines 21-24)
+- `tests/Shared/SharedTest.php` (line 17)
+- `tests/Standings/StandingsViewTest.php` (line 21)
+
+---
+
 ## PHPUnit Test Suite Registration
 
 **Every new test directory and test class MUST be registered in `ibl5/phpunit.xml`.**

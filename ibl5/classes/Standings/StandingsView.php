@@ -66,7 +66,8 @@ class StandingsView implements StandingsViewInterface
             }
             
             .standings-table {
-                border-collapse: collapse;
+                border-collapse: separate;
+                border-spacing: 2px;
             }
             
             .standings-header-row {
@@ -139,20 +140,20 @@ class StandingsView implements StandingsViewInterface
         <div class="standings-title"><?php echo $title; ?></div>
         <table class="sortable standings-table">
             <tr class="standings-header-row">
-            <td class="standings-header-cell">Team</td>
-            <td class="standings-header-cell">W-L</td>
-            <td class="standings-header-cell">Pct</td>
-            <td class="standings-header-cell">GB</td>
-            <td class="standings-header-cell">Magic#</td>
-            <td class="standings-header-cell">Left</td>
-            <td class="standings-header-cell">Conf.</td>
-            <td class="standings-header-cell">Div.</td>
-            <td class="standings-header-cell">Home</td>
-            <td class="standings-header-cell">Away</td>
-            <td class="standings-header-cell">Home<br>Played</td>
-            <td class="standings-header-cell">Away<br>Played</td>
-            <td class="standings-header-cell">Last 10</td>
-            <td class="standings-header-cell">Streak</td>
+                <td class="standings-header-cell">Team</td>
+                <td class="standings-header-cell">W-L</td>
+                <td class="standings-header-cell">Pct</td>
+                <td class="standings-header-cell">GB</td>
+                <td class="standings-header-cell">Magic#</td>
+                <td class="standings-header-cell">Left</td>
+                <td class="standings-header-cell">Conf.</td>
+                <td class="standings-header-cell">Div.</td>
+                <td class="standings-header-cell">Home</td>
+                <td class="standings-header-cell">Away</td>
+                <td class="standings-header-cell">Home<br>Played</td>
+                <td class="standings-header-cell">Away<br>Played</td>
+                <td class="standings-header-cell">Last 10</td>
+                <td class="standings-header-cell">Streak</td>
             </tr>
         <?php
         return ob_get_clean();
@@ -192,22 +193,26 @@ class StandingsView implements StandingsViewInterface
         $streakType = \Utilities\HtmlSanitizer::safeHtmlOutput($streakData['streak_type'] ?? '');
         $streak = $streakData['streak'] ?? 0;
 
-        return '<tr>'
-            . '<td class="standings-team-cell"><a href="modules.php?name=Team&op=team&teamID=' . $teamId . '">' . $teamName . '</a></td>'
-            . '<td class="standings-cell">' . $team['leagueRecord'] . '</td>'
-            . '<td class="standings-cell">' . $team['pct'] . '</td>'
-            . '<td class="standings-cell">' . $team['gamesBack'] . '</td>'
-            . '<td class="standings-cell">' . $team['magicNumber'] . '</td>'
-            . '<td class="standings-cell">' . $team['gamesUnplayed'] . '</td>'
-            . '<td class="standings-cell">' . $team['confRecord'] . '</td>'
-            . '<td class="standings-cell">' . $team['divRecord'] . '</td>'
-            . '<td class="standings-cell">' . $team['homeRecord'] . '</td>'
-            . '<td class="standings-cell">' . $team['awayRecord'] . '</td>'
-            . '<td class="standings-cell">' . $team['homeGames'] . '</td>'
-            . '<td class="standings-cell">' . $team['awayGames'] . '</td>'
-            . '<td class="standings-cell">' . $lastWin . '-' . $lastLoss . '</td>'
-            . '<td class="standings-cell">' . $streakType . ' ' . $streak . '</td>'
-            . '</tr>';
+        ob_start();
+        ?>
+        <tr>
+            <td class="standings-team-cell"><a href="modules.php?name=Team&op=team&teamID=<?= $teamId; ?>"><?= $teamName; ?></a></td>
+            <td class="standings-cell"><?= $team['leagueRecord']; ?></td>
+            <td class="standings-cell"><?= $team['pct']; ?></td>
+            <td class="standings-cell"><?= $team['gamesBack']; ?></td>
+            <td class="standings-cell"><?= $team['magicNumber']; ?></td>
+            <td class="standings-cell"><?= $team['gamesUnplayed']; ?></td>
+            <td class="standings-cell"><?= $team['confRecord']; ?></td>
+            <td class="standings-cell"><?= $team['divRecord']; ?></td>
+            <td class="standings-cell"><?= $team['homeRecord']; ?></td>
+            <td class="standings-cell"><?= $team['awayRecord']; ?></td>
+            <td class="standings-cell"><?= $team['homeGames']; ?></td>
+            <td class="standings-cell"><?= $team['awayGames']; ?></td>
+            <td class="standings-cell"><?= $lastWin; ?>-<?= $lastLoss; ?></td>
+            <td class="standings-cell"><?= $streakType; ?> <?= $streak; ?></td>
+        </tr>
+        <?php
+        return ob_get_clean();
     }
 
     /**

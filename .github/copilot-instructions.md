@@ -35,7 +35,7 @@ if (method_exists($this->db, 'sql_escape_string')) {
 
 ### 4. Security
 - **SQL**: Prepared statements or escaped strings
-- **XSS**: `htmlspecialchars()` on ALL output
+- **XSS**: Use `Utilities\HtmlSanitizer::safeHtmlOutput()` on ALL output (handles multiple types, removes SQL escaping)
 - **Validation**: Whitelist for enumerated values
 
 ### 5. Testing

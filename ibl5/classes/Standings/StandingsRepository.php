@@ -55,7 +55,7 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
     }
 
     /**
-     * {@inheritdoc}
+     * @see StandingsRepositoryInterface::getStandingsByRegion()
      */
     public function getStandingsByRegion(string $region): array
     {
@@ -86,7 +86,7 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
     }
 
     /**
-     * {@inheritdoc}
+    * @see StandingsRepositoryInterface::getTeamStreakData()
      */
     public function getTeamStreakData(int $teamId): ?array
     {

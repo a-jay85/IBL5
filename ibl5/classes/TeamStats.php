@@ -3,11 +3,11 @@
 declare(strict_types=1);
 
 use Statistics\StatsFormatter;
-use Statistics\StatisticsRepository;
+use LeagueStats\LeagueStatsRepository;
 
 class TeamStats
 {
-    protected StatisticsRepository $repository;
+    protected LeagueStatsRepository $repository;
 
     public $seasonOffenseGamesPlayed;
     public $seasonOffenseTotalFieldGoalsMade;
@@ -83,14 +83,14 @@ class TeamStats
     public $seasonDefenseFreeThrowPercentage;
     public $seasonDefenseThreePointPercentage;
 
-    public function __construct(StatisticsRepository $repository)
+    public function __construct(LeagueStatsRepository $repository)
     {
         $this->repository = $repository;
     }
 
     public static function withTeamName($db, string $teamName): self
     {
-        $repository = new StatisticsRepository($db);
+        $repository = new LeagueStatsRepository($db);
         $instance = new self($repository);
         $instance->loadByTeamName($teamName);
         return $instance;

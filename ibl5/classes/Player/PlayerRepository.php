@@ -467,4 +467,20 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
             $playerName
         );
     }
+
+    /**
+     * Get player statistics by player ID
+     *
+     * @see PlayerRepositoryInterface::getPlayerStats()
+     * @param int $playerID Player ID
+     * @return array|null Player statistics
+     */
+    public function getPlayerStats(int $playerID): ?array
+    {
+        return $this->fetchOne(
+            "SELECT * FROM ibl_plr WHERE pid = ? LIMIT 1",
+            "i",
+            $playerID
+        );
+    }
 }

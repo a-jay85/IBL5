@@ -104,7 +104,7 @@ class StandingsView implements StandingsViewInterface
 
         $html = $this->renderHeader($region, $groupingType);
         $html .= $this->renderRows($standings);
-        $html .= '<tr><td class="standings-divider" colspan="14"><hr></td></tr></table><p>';
+        $html .= '</table><p>';
 
         return $html;
     }

@@ -137,7 +137,7 @@ class StandingsView implements StandingsViewInterface
 
         ob_start();
         ?>
-        <div class="standings-title"><?php echo $title; ?></div>
+        <div class="standings-title"><?= $title; ?></div>
         <table class="sortable standings-table">
             <tr class="standings-header-row">
                 <td class="standings-header-cell">Team</td>

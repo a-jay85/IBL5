@@ -78,4 +78,36 @@ class LeagueStatsRepository extends \BaseMysqliRepository implements LeagueStats
 
         return $this->fetchAll($query);
     }
+
+    /**
+     * Get team offense statistics by team name
+     *
+     * @see LeagueStatsRepositoryInterface::getTeamOffenseStats()
+     * @param string $teamName Team name
+     * @return array|null Team offense statistics
+     */
+    public function getTeamOffenseStats(string $teamName): ?array
+    {
+        return $this->fetchOne(
+            "SELECT * FROM ibl_team_offense_stats WHERE name = ? LIMIT 1",
+            "s",
+            $teamName
+        );
+    }
+
+    /**
+     * Get team defense statistics by team name
+     *
+     * @see LeagueStatsRepositoryInterface::getTeamDefenseStats()
+     * @param string $teamName Team name
+     * @return array|null Team defense statistics
+     */
+    public function getTeamDefenseStats(string $teamName): ?array
+    {
+        return $this->fetchOne(
+            "SELECT * FROM ibl_team_defense_stats WHERE name = ? LIMIT 1",
+            "s",
+            $teamName
+        );
+    }
 }

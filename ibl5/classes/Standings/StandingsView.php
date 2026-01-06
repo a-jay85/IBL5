@@ -31,7 +31,7 @@ class StandingsView implements StandingsViewInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @see StandingsViewInterface::render()
      */
     public function render(): string
     {
@@ -95,7 +95,7 @@ class StandingsView implements StandingsViewInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @see StandingsViewInterface::renderRegion()
      */
     public function renderRegion(string $region): string
     {

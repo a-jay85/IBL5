@@ -16,7 +16,7 @@ $pagetitle = "- Player Archives";
 function showpage($playerID, $pageView)
 {
     global $db, $mysqli_db, $cookie;
-    $sharedFunctions = new Shared($db);
+    $sharedFunctions = new Shared($mysqli_db);
     $commonRepository = new Services\CommonMysqliRepository($mysqli_db);
     $season = new Season($mysqli_db);
     

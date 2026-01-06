@@ -119,7 +119,7 @@ $content .= "<img src=\"images/blocks/ur-anony.gif\" height=\"14\" width=\"17\">
 $content .= "<img src=\"images/blocks/ur-member.gif\" height=\"14\" width=\"17\"> " . _BMEM . ": <b>$member_online_num</b><br>\n";
 $content .= "<img src=\"images/blocks/ur-registered.gif\" height=\"14\" width=\"17\"> " . _BTT . ": <b>$who_online_num</b><br>\n";
 
-$sharedFunctions = new Shared($db);
+$sharedFunctions = new Shared($mysqli_db);
 
 if ($member_online_num > 0 AND !$sharedFunctions->isFreeAgencyModuleActive()) {
     $content .= "<hr>\n<img src=\"images/blocks/group-1.gif\" height=\"14\" width=\"17\"> <b><u>" . _BON . ":</u></b><br>$who_online_now";

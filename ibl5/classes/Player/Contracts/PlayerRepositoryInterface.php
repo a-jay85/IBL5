@@ -63,4 +63,15 @@ interface PlayerRepositoryInterface
      * @return array{dem1: int, dem2: int, dem3: int, dem4: int, dem5: int, dem6: int} Base demands by year
      */
     public function getFreeAgencyDemands(string $playerName): array;
+
+    /**
+     * Get player statistics by player ID
+     *
+     * Queries ibl_plr table for all player data by ID.
+     * Returns raw database row with all statistics columns.
+     *
+     * @param int $playerID Player ID
+     * @return array|null Player statistics row or null if not found
+     */
+    public function getPlayerStats(int $playerID): ?array;
 }

@@ -401,49 +401,4 @@ class StatisticsRepository extends \BaseMysqliRepository
         
         return 0;
     }
-
-    /**
-     * Get team offense statistics by team name
-     * 
-     * @param string $teamName Team name
-     * @return array|null Team offense statistics
-     */
-    public function getTeamOffenseStats(string $teamName): ?array
-    {
-        return $this->fetchOne(
-            "SELECT * FROM ibl_team_offense_stats WHERE name = ? LIMIT 1",
-            "s",
-            $teamName
-        );
-    }
-
-    /**
-     * Get team defense statistics by team name
-     * 
-     * @param string $teamName Team name
-     * @return array|null Team defense statistics
-     */
-    public function getTeamDefenseStats(string $teamName): ?array
-    {
-        return $this->fetchOne(
-            "SELECT * FROM ibl_team_defense_stats WHERE name = ? LIMIT 1",
-            "s",
-            $teamName
-        );
-    }
-
-    /**
-     * Get player statistics by player ID
-     * 
-     * @param int $playerID Player ID
-     * @return array|null Player statistics
-     */
-    public function getPlayerStats(int $playerID): ?array
-    {
-        return $this->fetchOne(
-            "SELECT * FROM ibl_plr WHERE pid = ? LIMIT 1",
-            "i",
-            $playerID
-        );
-    }
 }

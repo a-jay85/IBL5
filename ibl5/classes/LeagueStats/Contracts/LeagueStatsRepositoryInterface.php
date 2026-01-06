@@ -59,4 +59,20 @@ interface LeagueStatsRepositoryInterface
      * }> Array of team statistics rows ordered by team city
      */
     public function getAllTeamStats(): array;
+
+    /**
+     * Get team offense statistics by team name
+     *
+     * @param string $teamName Team name
+     * @return array|null Team offense statistics
+     */
+    public function getTeamOffenseStats(string $teamName): ?array;
+
+    /**
+     * Get team defense statistics by team name
+     *
+     * @param string $teamName Team name
+     * @return array|null Team defense statistics
+     */
+    public function getTeamDefenseStats(string $teamName): ?array;
 }

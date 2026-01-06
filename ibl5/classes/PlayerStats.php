@@ -3,11 +3,12 @@
 declare(strict_types=1);
 
 use Statistics\StatsFormatter;
-use Statistics\StatisticsRepository;
+use Player\PlayerRepository;
+use Player\Player;
 
 class PlayerStats
 {
-    protected StatisticsRepository $repository;
+    protected PlayerRepository $repository;
 
     public $playerID;
     public $plr;
@@ -117,14 +118,14 @@ class PlayerStats
     public $gameBlocks;
     public $gamePersonalFouls;
 
-    public function __construct(StatisticsRepository $repository)
+    public function __construct(PlayerRepository $repository)
     {
         $this->repository = $repository;
     }
 
     public static function withPlayerID($db, int $playerID): self
     {
-        $repository = new StatisticsRepository($db);
+        $repository = new PlayerRepository($db);
         $instance = new self($repository);
         $instance->loadByID($playerID);
         return $instance;
@@ -132,7 +133,7 @@ class PlayerStats
 
     public static function withPlayerObject($db, Player $player): self
     {
-        $repository = new StatisticsRepository($db);
+        $repository = new PlayerRepository($db);
         $instance = new self($repository);
         $instance->loadByID($player->playerID);
         return $instance;
@@ -140,7 +141,7 @@ class PlayerStats
 
     public static function withPlrRow($db, array $plrRow): self
     {
-        $repository = new StatisticsRepository($db);
+        $repository = new PlayerRepository($db);
         $instance = new self($repository);
         $instance->fill($plrRow);
         return $instance;
@@ -148,7 +149,7 @@ class PlayerStats
 
     public static function withHistoricalPlrRow($db, array $plrRow): self
     {
-        $repository = new StatisticsRepository($db);
+        $repository = new PlayerRepository($db);
         $instance = new self($repository);
         $instance->fillHistorical($plrRow);
         return $instance;
@@ -156,7 +157,7 @@ class PlayerStats
 
     public static function withBoxscoreInfoLine($db, string $playerInfoLine): self
     {
-        $repository = new StatisticsRepository($db);
+        $repository = new PlayerRepository($db);
         $instance = new self($repository);
         $instance->fillBoxscoreStats($playerInfoLine);
         return $instance;

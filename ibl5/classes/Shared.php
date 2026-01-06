@@ -26,15 +26,14 @@ class Shared
     /**
      * Creates a new Shared instance
      *
-     * @param mixed $db Legacy database object (deprecated, kept for backward compatibility)
+     * @param mixed $db Active mysqli connection
      * @param SharedRepositoryInterface|null $sharedRepository Optional repository injection (for testing)
      */
     public function __construct($db, ?SharedRepositoryInterface $sharedRepository = null)
     {
-        global $mysqli_db;
         $this->db = $db;
-        $this->sharedRepository = $sharedRepository ?? new SharedRepository($mysqli_db);
-        $this->commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
+        $this->sharedRepository = $sharedRepository ?? new SharedRepository($db);
+        $this->commonRepository = new \Services\CommonMysqliRepository($db);
     }
 
     /**

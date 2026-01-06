@@ -1,7 +1,7 @@
 ---
 name: IBL5-Refactoring
 description: Refactor IBL5 modules using Repository/Service/View pattern with interface contracts
-tools: ['search', 'usages', 'edit', 'fetch']
+tools: ['search', 'search/usages', 'edit', 'web/fetch']
 handoffs:
     - label: Write Tests
         agent: IBL5-Testing

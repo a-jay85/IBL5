@@ -124,7 +124,7 @@ public function getPlayer($playerId)
 
 **Security Checklist:**
 - [ ] Prepared statements (SQL injection)
-- [ ] HTML escaping (XSS)
+- [ ] HTML escaping (XSS) - Use `Utilities\HtmlSanitizer::safeHtmlOutput()` instead of `htmlspecialchars()`
 - [ ] Input validation
 - [ ] Authorization checks
 - [ ] CSRF protection

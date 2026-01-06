@@ -1,6 +1,6 @@
 # IBL5 Database Guide
 
-**Last Updated:** November 6, 2025  
+**Last Updated:** January 5, 2026  
 **Schema Version:** v1.4 - Production Ready
 
 ## Quick Reference

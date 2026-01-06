@@ -39,9 +39,6 @@ try {
     
     $powerRankingsUpdater = new Updater\PowerRankingsUpdater($mysqli_db, $season);
     echo "<p>✓ PowerRankingsUpdater initialized</p>";
-    
-    $standingsHTMLGenerator = new Updater\StandingsHTMLGenerator($mysqli_db);
-    echo "<p>✓ StandingsHTMLGenerator initialized</p>";
 
     // Update schedule
     echo "<p>Updating schedule...</p>";
@@ -57,11 +54,6 @@ try {
     echo "<p>Updating power rankings...</p>";
     $powerRankingsUpdater->update();
     echo "<p>✓ Power rankings updated</p>";
-
-    // Generate standings HTML
-    echo "<p>Generating standings HTML...</p>";
-    $standingsHTMLGenerator->generateStandingsPage();
-    echo "<p>✓ Standings HTML generated</p>";
 
     // Reset extension attempts
     echo "<p>Resetting extension attempts...</p>";

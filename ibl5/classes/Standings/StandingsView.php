@@ -132,7 +132,7 @@ class StandingsView implements StandingsViewInterface
      */
     private function renderHeader(string $region, string $groupingType): string
     {
-        $title = htmlspecialchars($region . ' ' . $groupingType, ENT_QUOTES, 'UTF-8');
+        $title = \Utilities\HtmlSanitizer::safeHtmlOutput($region . ' ' . $groupingType);
 
         ob_start();
         ?>
@@ -189,7 +189,7 @@ class StandingsView implements StandingsViewInterface
 
         $lastWin = $streakData['last_win'] ?? 0;
         $lastLoss = $streakData['last_loss'] ?? 0;
-        $streakType = htmlspecialchars($streakData['streak_type'] ?? '', ENT_QUOTES, 'UTF-8');
+        $streakType = \Utilities\HtmlSanitizer::safeHtmlOutput($streakData['streak_type'] ?? '');
         $streak = $streakData['streak'] ?? 0;
 
         return '<tr>'
@@ -218,7 +218,7 @@ class StandingsView implements StandingsViewInterface
      */
     private function formatTeamName(array $team): string
     {
-        $teamName = htmlspecialchars($team['team_name'], ENT_QUOTES, 'UTF-8');
+        $teamName = \Utilities\HtmlSanitizer::safeHtmlOutput($team['team_name']);
 
         if ($team['clinchedConference'] == 1) {
             return '<b>Z</b>-' . $teamName;

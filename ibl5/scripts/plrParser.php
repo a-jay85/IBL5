@@ -77,7 +77,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 // $db is the custom MySQL wrapper class
 // $mysqli_db is the MySQLi instance with UTF-8 charset already set
 
-$sharedFunctions = new Shared($db);
+$sharedFunctions = new Shared($mysqli_db);
 $commonRepository = new Services\CommonMysqliRepository($mysqli_db);
 $season = new Season($mysqli_db);
 

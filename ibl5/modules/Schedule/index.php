@@ -59,7 +59,7 @@ function chunk($chunk_start_date, $chunk_end_date, $j)
     //TODO: unify this code with the Team module's boxscore function
 
     global $db, $mysqli_db;
-    $sharedFunctions = new Shared($db);
+    $sharedFunctions = new Shared($mysqli_db);
     $commonRepository = new Services\CommonMysqliRepository($mysqli_db);
     $season = new Season($mysqli_db);
 

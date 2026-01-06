@@ -3,7 +3,7 @@
 use Player\Player;
 
 global $db, $cookie, $mysqli_db;
-$sharedFunctions = new Shared($db);
+$sharedFunctions = new Shared($mysqli_db);
 $commonRepository = new Services\CommonMysqliRepository($mysqli_db);
 $season = new Season($mysqli_db);
 

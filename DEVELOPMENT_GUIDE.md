@@ -1,10 +1,10 @@
 # Development Guide
 
-**Status:** 15/23 IBL modules refactored (65% complete) • 568+ tests • ~48% coverage • Goal: 80%
+**Status:** 18/23 IBL modules refactored (78% complete) • 738 tests • ~52% coverage • Goal: 80%
 
 ## Refactoring Status
 
-### ✅ Completed IBL Modules (15)
+### ✅ Completed IBL Modules (18)
 1. ~~Player~~ ✅ Complete (9 classes, 9 interfaces, 84 tests)
 2. ~~Statistics~~ ✅ Complete (6 classes, 5 tests)
 3. ~~Team~~ ✅ Complete (4 classes, 3 tests)
@@ -20,31 +20,31 @@
 13. ~~Season Leaders~~ ✅ Complete (3 classes, 2 tests)
 14. ~~Free Agency~~ ✅ Complete (7 classes, 7 interfaces, 11 tests)
 15. ~~Player_Search~~ ✅ Complete (4 classes, 4 interfaces, 54 tests) **SQL injection fixed!**
+16. ~~Compare_Players~~ ✅ Complete (3 classes, 3 interfaces, 42 tests)
+17. ~~Leaderboards~~ ✅ Complete (3 classes, 3 interfaces, 22 tests)
+18. ~~Standings~~ ✅ Complete (2 classes, 2 interfaces, 17 tests)
 
 ### 🎯 Top Priorities (Next 3)
 
-1. **Compare_Players** (403 lines) - Player comparison tool (1-2 weeks)
-2. **Searchable_Stats** (370 lines) - Advanced stats search (1 week)
-3. **Stats Modules** - League_Stats, Chunk_Stats batch refactoring (3-5 weeks)
+1. **League_Stats** (229 lines) - League-wide statistics display (1 week)
+2. **One-on-One** (907 lines) - Player matchup game/comparison (2-3 weeks)
+3. **Display Modules Batch** - Series_Records, Player_Awards, Cap_Info (2 weeks)
 
-### 📋 Remaining IBL Modules (8)
+### 📋 Remaining IBL Modules (5)
 
-**High Priority (Next After Top 3):**
-- Compare_Players (403 lines)
-- Searchable_Stats (370 lines)
-- League_Stats (351 lines)
-- Chunk_Stats (462 lines)
-
-**Medium Priority:**
-- One-on-One (887 lines) - Side game, not core functionality
+**High Priority:**
+- League_Stats (229 lines) - League-wide statistics
+- One-on-One (907 lines) - Side game/matchup feature
 
 **Lower Priority (Info/Display):**
-- Series_Records, Player_Awards, Cap_Info, Team_Schedule, Franchise_History, Power_Rankings, Next_Sim, League_Starters, Draft_Pick_Locator, Injuries, EOY_Results, ASG_Results, ASG_Stats, Player_Movement
+- Series_Records (184 lines), Player_Awards (160 lines), Cap_Info (134 lines)
+- Team_Schedule (130 lines), Franchise_History (103 lines), Power_Rankings (90 lines)
+- Next_Sim (95 lines), League_Starters (85 lines), Draft_Pick_Locator (81 lines), Injuries (57 lines)
 
 ## Quick Workflow
 
 **Before Starting:**
-- Review refactored modules with interface pattern: PlayerSearch, FreeAgency, Player
+- Review refactored modules with interface pattern: PlayerSearch, FreeAgency, Player, ComparePlayers, Standings
 - Check `.github/copilot-instructions.md` - **Interface-Driven Architecture Pattern** section
 - Review interfaces in: `ibl5/classes/PlayerSearch/Contracts/`, `ibl5/classes/FreeAgency/Contracts/`, `ibl5/classes/Player/Contracts/`
 - Check `ibl5/schema.sql` for database structure
@@ -83,7 +83,7 @@ See `.github/copilot-instructions.md` **Interface-Driven Architecture Pattern** 
 
 ## Testing Standards
 
-**Coverage:** Current 35% → Phase 1: 60% → Phase 2: 75% → Goal: 80%
+**Coverage:** Current ~52% → Phase 1: 60% → Phase 2: 75% → Goal: 80%
 
 **Test Pyramid:** Few E2E tests → Some integration → Many unit tests
 

@@ -4,11 +4,63 @@ This document tracks the history of module refactoring efforts in the IBL5 codeb
 
 ## Overview
 
-**Current Status:** 15 of 23 IBL modules refactored (65% complete)  
-**Test Coverage:** ~48% (target: 80%)  
+**Current Status:** 18 of 23 IBL modules refactored (78% complete)  
+**Test Coverage:** ~52% (target: 80%)  
 **Architecture Pattern:** Repository/Service/View with comprehensive testing
 
 ## Completed Refactorings
+
+### 18. Standings Module (December 2025)
+
+**Summary:** Refactored Standings module with interface-driven architecture.
+
+**Key Improvements:**
+- Created 2 classes + 2 interfaces with separation of concerns
+- Reduced index.php from 160+ → 39 lines
+- Added 17 comprehensive unit tests
+
+**Classes Created:**
+1. **StandingsRepository** - Database access for conference/division standings
+2. **StandingsView** - HTML rendering with output buffering
+
+**Documentation:** `ibl5/classes/Standings/README.md`
+
+---
+
+### 17. Leaderboards Module (December 2025)
+
+**Summary:** Refactored Leaderboards module with interface-driven architecture.
+
+**Key Improvements:**
+- Created 3 classes + 3 interfaces with separation of concerns
+- Added 22 comprehensive unit tests
+- Integrated StatsFormatter for consistent display
+
+**Classes Created:**
+1. **LeaderboardsRepository** - Database queries for leader data
+2. **LeaderboardsService** - Business logic and data transformation
+3. **LeaderboardsView** - HTML rendering
+
+---
+
+### 16. Compare_Players Module (December 2025)
+
+**Summary:** Refactored Compare_Players module with interface-driven architecture. Achieved 69% code reduction (403 → 127 lines).
+
+**Key Improvements:**
+- Created 3 classes + 3 interfaces with separation of concerns
+- Added 42 comprehensive unit tests
+- SQL injection protection via prepared statements
+- XSS protection via htmlspecialchars
+
+**Classes Created:**
+1. **ComparePlayersRepository** - Database access with dual-implementation
+2. **ComparePlayersService** - Business logic and validation
+3. **ComparePlayersView** - HTML rendering with autocomplete
+
+**Documentation:** `ibl5/classes/ComparePlayers/README.md`
+
+---
 
 ### 15. Player_Search Module (November 28, 2025)
 
@@ -337,33 +389,26 @@ public function renderExample(string $title): string
 
 ---
 
-## Remaining IBL Modules (10)
+## Remaining IBL Modules (5)
 
 ### High Priority
-1. **Free Agency** (2,206 lines) - Contract signing, FA offers, salary cap
-2. **One-on-One** (887 lines) - Player comparison/matchup
-3. **Chunk_Stats** (462 lines) - Statistical chunks/periods
-4. **Player_Search** (461 lines) - Player search functionality
+1. **League_Stats** (229 lines) - League-wide statistics display
+2. **One-on-One** (907 lines) - Player matchup game/comparison
 
-### Medium Priority
-5. **Compare_Players** (403 lines) - Player comparison tool
-6. **Searchable_Stats** (370 lines) - Advanced stats search
-7. **League_Stats** (351 lines) - League-wide statistics
+### Lower Priority (Info/Display)
+3. **Series_Records** (184 lines) - Historical series data
+4. **Player_Awards** (160 lines) - Award history display
+5. **Cap_Info** (134 lines) - Salary cap information
 
-### Lower Priority
-8. **Series_Records** (179 lines) - Historical series data
-9. **Player_Awards** (159 lines) - Award history display
-10. **Cap_Info** (136 lines) - Salary cap information
-
-Plus 18 additional information/display modules.
+Plus 7 additional smaller display modules: Team_Schedule, Franchise_History, Power_Rankings, Next_Sim, League_Starters, Draft_Pick_Locator, Injuries.
 
 ---
 
 ## Testing Progress
 
-**Total Test Files:** 52  
-**Total Tests:** 450+ tests  
-**Test Coverage:** ~40% (target: 80%)
+**Total Test Files:** 77  
+**Total Tests:** 738 tests  
+**Test Coverage:** ~52% (target: 80%)
 
 **Test Frameworks:**
 - PHPUnit 12.4+ for unit testing
@@ -396,19 +441,20 @@ Plus 18 additional information/display modules.
 
 | Metric | Current | Target |
 |--------|---------|--------|
-| Modules Refactored | 13/23 | 23/23 |
-| Test Coverage | ~40% | 80% |
-| Test Files | 52 | 100+ |
-| Refactored Classes | 89 | 150+ |
+| Modules Refactored | 18/23 | 23/23 |
+| Test Coverage | ~52% | 80% |
+| Test Files | 77 | 100+ |
+| Refactored Classes | 100+ | 150+ |
 | Security Vulnerabilities | Low | Zero |
 
 ---
 
 ## Timeline
 
-- **November 2025:** Player, Season Leaders, Leaderboards modules complete
-- **Q4 2025:** 13 modules refactored (57% complete)
-- **Target:** All IBL modules refactored within 5-7 months
+- **November 2025:** Player, Season Leaders, Free Agency, Player_Search modules complete
+- **December 2025:** Compare_Players, Leaderboards, Standings modules complete
+- **Q4 2025 - Q1 2026:** 18 modules refactored (78% complete)
+- **Target:** All IBL modules refactored within 3-4 months
 
 ---
 
@@ -423,6 +469,8 @@ Plus 18 additional information/display modules.
 - [Statistics README](../classes/Statistics/README.md) - StatsFormatter usage
 - [Player README](../classes/Player/README.md) - Player module architecture
 - [DepthChart SECURITY](../classes/DepthChart/SECURITY.md) - Security patterns
+- [ComparePlayers README](../classes/ComparePlayers/README.md) - Compare module architecture
+- [Standings README](../classes/Standings/README.md) - Standings module architecture
 
 ### Archived Summaries
 - `.archive/PLAYER_PAGE_REFACTORING_SUMMARY.md`
@@ -434,5 +482,5 @@ Plus 18 additional information/display modules.
 
 ---
 
-**Last Updated:** November 17, 2025  
+**Last Updated:** January 5, 2026  
 **Maintained By:** Copilot Coding Agent

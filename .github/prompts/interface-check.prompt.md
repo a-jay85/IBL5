@@ -2,7 +2,7 @@
 name: interface-compliance-check
 description: Validate that implementations match their interface contracts
 agent: IBL5-Review
-tools: ['search', 'usages']
+tools: ['search', 'search/usages']
 ---
 
 # Interface Compliance Check

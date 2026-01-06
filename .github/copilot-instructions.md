@@ -48,6 +48,7 @@ if (method_exists($this->db, 'sql_escape_string')) {
   /** @var InterfaceName&\PHPUnit\Framework\MockObject\MockObject */
   private InterfaceName $mockObject;
   ```
+- Use @see instead of {@inheritdoc} in PHPDoc
 
 ---
 

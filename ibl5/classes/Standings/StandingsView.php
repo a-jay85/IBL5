@@ -133,7 +133,8 @@ class StandingsView implements StandingsViewInterface
      */
     private function renderHeader(string $region, string $groupingType): string
     {
-        $title = \Utilities\HtmlSanitizer::safeHtmlOutput($region . ' ' . $groupingType);
+        $safeRegion = \Utilities\HtmlSanitizer::safeHtmlOutput($region);
+        $title = $safeRegion . ' ' . $groupingType;
 
         ob_start();
         ?>

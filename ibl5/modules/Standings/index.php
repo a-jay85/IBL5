@@ -12,7 +12,7 @@ declare(strict_types=1);
  * @see \Standings\StandingsView For HTML rendering
  */
 
-if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
+if (!preg_match('/modules\.php/i', $_SERVER['PHP_SELF'])) {
     die("You can't access this file directly...");
 }
 

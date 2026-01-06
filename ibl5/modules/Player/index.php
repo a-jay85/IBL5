@@ -145,8 +145,6 @@ function showpage($playerID, $pageView)
         $view->render();
     }
 
-    echo "</table>";
-
     CloseTable();
     Nuke\Footer::footer();
 

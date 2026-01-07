@@ -24,7 +24,22 @@ public function getTeamRoster(int $teamId): array
 ```
 - `declare(strict_types=1);` in every file
 
-### 3. Database Dual-Implementation
+### 3. Database Object Preference
+**Always use the global `$mysqli_db` object (modern MySQLi)** whenever a class requires a database object.
+**Avoid the legacy `$db` object** whenever possible.
+
+```php
+// ✅ CORRECT - Use the global mysqli_db
+global $mysqli_db;
+$stmt = $mysqli_db->prepare('SELECT * FROM ibl_plr WHERE pid = ?');
+$stmt->bind_param('i', $playerId);
+$stmt->execute();
+
+// ❌ AVOID - Legacy $db object
+// if (method_exists($this->db, 'sql_escape_string')) { ... }
+```
+
+**For Dual-Implementation (if needed):**
 ```php
 if (method_exists($this->db, 'sql_escape_string')) {
     // LEGACY: sql_* methods + DatabaseService::escapeString()

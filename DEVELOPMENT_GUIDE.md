@@ -122,6 +122,12 @@ public function getPlayer($playerId)
 - Never use `require()` for classes
 - Reference: `$player = new Player($db);`
 
+**Database Object Preference:**
+- **Always use the global `$mysqli_db` object** (modern MySQLi with prepared statements)
+- **Avoid the legacy `$db` object** whenever possible
+- Example: `global $mysqli_db;` then use prepared statements with `$mysqli_db->prepare()`, `bind_param()`, and `execute()`
+- Only use legacy `$db` when refactoring legacy code that hasn't yet been updated
+
 **Security Checklist:**
 - [ ] Prepared statements (SQL injection)
 - [ ] HTML escaping (XSS) - Use `Utilities\HtmlSanitizer::safeHtmlOutput()` instead of `htmlspecialchars()`

@@ -4,15 +4,14 @@ declare(strict_types=1);
 
 namespace Player\Views;
 
+use Player\Contracts\PlayerHeatStatsViewInterface;
 use Player\PlayerRepository;
 use Statistics\StatsFormatter;
 
 /**
- * PlayerHeatStatsView - Renders Heat tournament statistics
- * 
- * Pure rendering with no database logic - all data fetched via PlayerRepository
+ * @see PlayerHeatStatsViewInterface
  */
-class PlayerHeatStatsView
+class PlayerHeatStatsView implements PlayerHeatStatsViewInterface
 {
     private PlayerRepository $repository;
 

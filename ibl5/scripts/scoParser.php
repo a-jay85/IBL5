@@ -2,6 +2,7 @@
 
 require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
+use Player\PlayerStats;
 use Utilities\UuidGenerator;
 
 function scoParser($uploadedFilePath, $operatingSeasonEndingYear, $operatingSeasonPhase)

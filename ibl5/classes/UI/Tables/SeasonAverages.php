@@ -3,6 +3,7 @@
 namespace UI\Tables;
 
 use Player\Player;
+use Player\PlayerStats;
 
 /**
  * SeasonAverages - Displays season averages statistics table
@@ -25,7 +26,7 @@ class SeasonAverages
         foreach ($result as $plrRow) {
             if ($yr == "") {
                 $player = Player::withPlrRow($db, $plrRow);
-                $playerStats = \PlayerStats::withPlrRow($db, $plrRow);
+                $playerStats = PlayerStats::withPlrRow($db, $plrRow);
 
                 $firstCharacterOfPlayerName = substr($player->name, 0, 1);
                 if ($firstCharacterOfPlayerName == '|') {
@@ -33,7 +34,7 @@ class SeasonAverages
                 }
             } else {
                 $player = Player::withHistoricalPlrRow($db, $plrRow);
-                $playerStats = \PlayerStats::withHistoricalPlrRow($db, $plrRow);
+                $playerStats = PlayerStats::withHistoricalPlrRow($db, $plrRow);
             }
 
             $bgcolor = (($i % 2) == 0) ? "FFFFFF" : "EEEEEE";

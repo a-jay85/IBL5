@@ -4,15 +4,14 @@ declare(strict_types=1);
 
 namespace Player\Views;
 
+use Player\Contracts\PlayerPlayoffStatsViewInterface;
 use Player\PlayerRepository;
 use Statistics\StatsFormatter;
 
 /**
- * PlayerPlayoffStatsView - Renders playoff statistics (totals/averages)
- * 
- * Pure rendering with no database logic - all data fetched via PlayerRepository
+ * @see PlayerPlayoffStatsViewInterface
  */
-class PlayerPlayoffStatsView
+class PlayerPlayoffStatsView implements PlayerPlayoffStatsViewInterface
 {
     private PlayerRepository $repository;
 

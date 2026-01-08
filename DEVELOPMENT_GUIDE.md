@@ -47,7 +47,7 @@
 - Review refactored modules with interface pattern: PlayerSearch, FreeAgency, Player, ComparePlayers, Standings
 - Check `.github/copilot-instructions.md` - **Interface-Driven Architecture Pattern** section
 - Review interfaces in: `ibl5/classes/PlayerSearch/Contracts/`, `ibl5/classes/FreeAgency/Contracts/`, `ibl5/classes/Player/Contracts/`
-- Check `ibl5/schema.sql` for database structure
+- **VERIFY DATABASE STRUCTURE: Cross-reference `ibl5/schema.sql` for ALL table names, columns, and relationships before writing queries**
 - See best practices in: `ibl5/classes/Player/README.md`, `ibl5/classes/DepthChart/SECURITY.md`, `ibl5/classes/PlayerSearch/README.md`
 - Dependencies are cached via GitHub Actions (`.github/workflows/cache-dependencies.yml`)
 - Run tests: `cd ibl5 && vendor/bin/phpunit tests/`

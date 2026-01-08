@@ -48,12 +48,20 @@ if (method_exists($this->db, 'sql_escape_string')) {
 }
 ```
 
-### 4. Security
+### 4. Database Schema Verification
+**CRITICAL: Always verify table/column names in `ibl5/schema.sql` before implementing database queries.**
+- Reference `ibl5/schema.sql` for all table names, columns, and data types
+- Never assume table or column names exist without verification
+- Cross-check foreign key relationships in schema.sql
+- Validate indexes and constraints before optimization
+- This prevents hallucination of non-existent database structures
+
+### 5. Security
 - **SQL**: Prepared statements or escaped strings
 - **XSS**: Use `Utilities\HtmlSanitizer::safeHtmlOutput()` on ALL output (handles multiple types, removes SQL escaping)
 - **Validation**: Whitelist for enumerated values
 
-### 5. Testing
+### 6. Testing
 - PHPUnit 12.4+ in `ibl5/tests/`
 - Register in `ibl5/phpunit.xml`
 - No `markTestSkipped()` - delete instead

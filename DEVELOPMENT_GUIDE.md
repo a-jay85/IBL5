@@ -61,7 +61,11 @@
 5. Implement Interfaces (1 day) - Add interface implementations and @see docblocks
 6. Test (1 week) - Unit + integration tests
 7. Audit (2-3 days) - Security review
-8. Review (2-3 days) - Code review, performance
+8. **Production Validation (1-2 days)** - Compare localhost against iblhoops.net
+   - Verify all output (text, data, ordering, formatting) matches exactly
+   - If mismatches found, debug and iterate until perfect match
+   - This is the final verification gate before merge
+9. Review (2-3 days) - Code review, performance
 
 **Class Pattern with Interface Architecture:**
 ```

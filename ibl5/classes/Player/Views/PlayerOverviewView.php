@@ -67,7 +67,7 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
         ob_start();
         
         // Render ratings table
-        echo $this->renderRatingsTable($player);
+        echo $this->renderMiscRatingsTable($player);
         
         // Render free agency preferences table
         echo $this->renderFreeAgencyPreferences($player);
@@ -81,11 +81,11 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
     /**
      * Render player ratings table
      */
-    private function renderRatingsTable(Player $player): string
+    private function renderMiscRatingsTable(Player $player): string
     {
         ob_start();
         ?>
-<table class="ratings-table">
+<table class="misc-ratings-table">
     <tr class="header-row">
         <td>Talent</td>
         <td>Skill</td>
@@ -101,6 +101,7 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
         <td><?= HtmlSanitizer::safeHtmlOutput((string)$player->ratingConsistency) ?></td>
     </tr>
 </table>
+<p>
         <?php
         return ob_get_clean();
     }
@@ -112,7 +113,7 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
     {
         ob_start();
         ?>
-<table class="ratings-table">
+<table class="misc-ratings-table">
     <tr class="header-row">
         <td>Loyalty</td>
         <td>Play for Winner</td>

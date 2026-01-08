@@ -130,18 +130,18 @@ class PlayerViewStyles
    ============================================ */
 
 /* Ratings table - player overview */
-.ratings-table {
+.misc-ratings-table {
     margin: 0 auto;
     border-collapse: separate;
-    border-spacing: 8px 4px;
+    border-spacing: 0px 0px;
 }
 
-.ratings-table td {
+.misc-ratings-table td {
     text-align: center;
-    padding: 4px 12px;
+    padding: 0px 8px;
 }
 
-.ratings-table .header-row td {
+.misc-ratings-table .header-row td {
     font-weight: bold;
 }
 

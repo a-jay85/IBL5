@@ -6,7 +6,7 @@ namespace Player\Views;
 
 use Player\PlayerStatsRepository;
 use Player\Contracts\PlayerRegularSeasonAveragesViewInterface;
-use Statistics\StatsFormatter;
+use BasketballStats\StatsFormatter;
 
 /**
  * PlayerRegularSeasonAveragesView - Renders regular season averages table

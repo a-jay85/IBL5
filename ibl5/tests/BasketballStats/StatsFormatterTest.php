@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use PHPUnit\Framework\TestCase;
-use Statistics\StatsFormatter;
+use BasketballStats\StatsFormatter;
 
 final class StatsFormatterTest extends TestCase
 {

@@ -4,7 +4,7 @@ namespace UI\Tables;
 
 use Player\Player;
 use Player\PlayerStats;
-use Statistics\StatsFormatter;
+use BasketballStats\StatsFormatter;
 
 /**
  * Per36Minutes - Displays per-36-minute statistics table

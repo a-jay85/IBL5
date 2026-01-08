@@ -96,7 +96,7 @@ if (method_exists($this->db, 'sql_escape_string')) {
 | Run tests | `cd ibl5 && vendor/bin/phpunit` |
 | Run specific | `vendor/bin/phpunit tests/Module/` |
 | Schema | `ibl5/schema.sql` |
-| Stats formatting | `Statistics\StatsFormatter` |
+| Stats formatting | `BasketballStats\StatsFormatter` |
 
 ---
 

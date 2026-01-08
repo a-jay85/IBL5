@@ -1,6 +1,6 @@
 <?php
 
-namespace Statistics;
+namespace SiteStatistics;
 
 /**
  * View class for rendering statistics HTML output

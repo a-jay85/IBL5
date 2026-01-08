@@ -1,6 +1,6 @@
 <?php
 
-namespace Statistics;
+namespace BasketballStats;
 
 /**
  * StatsSanitizer - Unified input sanitization for basketball statistics

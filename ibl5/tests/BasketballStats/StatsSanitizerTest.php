@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use PHPUnit\Framework\TestCase;
-use Statistics\StatsSanitizer;
+use BasketballStats\StatsSanitizer;
 
 final class StatsSanitizerTest extends TestCase
 {

@@ -114,7 +114,7 @@ ORDER BY ti.team_city
 
 ## Statistics Formatting
 
-Uses `Statistics\StatsFormatter` for consistent number formatting:
+Uses `BasketballStats\StatsFormatter` for consistent number formatting:
 
 | Method | Output | Example |
 |--------|--------|---------|
@@ -158,7 +158,7 @@ vendor/bin/phpunit tests/LeagueStats/
 
 ## Dependencies
 
-- `Statistics\StatsFormatter` - Number formatting utilities
+- `BasketballStats\StatsFormatter` - Number formatting utilities
 - `Utilities\HtmlSanitizer` - XSS protection
 - `BaseMysqliRepository` - Database access base class
 

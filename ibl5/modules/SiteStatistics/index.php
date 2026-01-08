@@ -27,7 +27,7 @@ $pagetitle = "- " . _STATS;
 $ThemeSel = get_theme();
 
 // Initialize controller
-$controller = new Statistics\StatisticsController($mysqli_db, $module_name, $ThemeSel);
+$controller = new SiteStatistics\StatisticsController($mysqli_db, $module_name, $ThemeSel);
 
 // Handle routing based on operation
 $op = $_GET['op'] ?? '';

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Player;
 
-use Statistics\StatsFormatter;
+use BasketballStats\StatsFormatter;
 use Player\Contracts\PlayerStatsInterface;
 use Player\Contracts\PlayerStatsRepositoryInterface;
 

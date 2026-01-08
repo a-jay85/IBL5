@@ -1,6 +1,6 @@
 <?php
 
-namespace Statistics;
+namespace BasketballStats;
 
 /**
  * StatsFormatter - Unified formatting for basketball statistics

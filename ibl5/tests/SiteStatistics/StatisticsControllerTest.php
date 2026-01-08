@@ -1,6 +1,6 @@
 <?php
 
-namespace Statistics;
+namespace SiteStatistics;
 
 use PHPUnit\Framework\TestCase;
 
@@ -17,7 +17,7 @@ class StatisticsControllerTest extends TestCase
         $startdate = '2024-01-01';
         
         $this->mockDb = $this->createMockDatabase();
-        $this->controller = new StatisticsController($this->mockDb, 'Statistics', 'TestTheme');
+        $this->controller = new StatisticsController($this->mockDb, 'SiteStatistics', 'TestTheme');
     }
 
     private function createMockDatabase()

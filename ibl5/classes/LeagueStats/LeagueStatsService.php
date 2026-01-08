@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace LeagueStats;
 
 use LeagueStats\Contracts\LeagueStatsServiceInterface;
-use Statistics\StatsFormatter;
+use BasketballStats\StatsFormatter;
 
 /**
  * Service for processing league-wide team statistics

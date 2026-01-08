@@ -10,7 +10,7 @@
  * - LeagueStats\LeagueStatsRepository for bulk data fetching (1 query vs 30)
  * - LeagueStats\LeagueStatsService for statistics processing
  * - LeagueStats\LeagueStatsView for HTML rendering
- * - Statistics\StatsFormatter for consistent number formatting
+ * - BasketballStats\StatsFormatter for consistent number formatting
  * - Utilities\HtmlSanitizer for XSS protection
  */
 

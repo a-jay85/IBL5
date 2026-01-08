@@ -6,7 +6,7 @@ namespace Player\Views;
 
 use Player\PlayerStatsRepository;
 use Player\Contracts\PlayerSimStatsViewInterface;
-use Statistics\StatsFormatter;
+use BasketballStats\StatsFormatter;
 
 /**
  * PlayerSimStatsView - Renders sim-by-sim statistics

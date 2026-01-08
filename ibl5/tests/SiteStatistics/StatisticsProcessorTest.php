@@ -1,6 +1,6 @@
 <?php
 
-namespace Statistics;
+namespace SiteStatistics;
 
 use PHPUnit\Framework\TestCase;
 

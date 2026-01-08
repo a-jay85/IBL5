@@ -6,7 +6,7 @@ namespace Player\Views;
 
 use Player\PlayerRepository;
 use Player\Contracts\PlayerHeatStatsViewInterface;
-use Statistics\StatsFormatter;
+use BasketballStats\StatsFormatter;
 
 /**
  * PlayerHeatStatsView - Renders Heat tournament statistics

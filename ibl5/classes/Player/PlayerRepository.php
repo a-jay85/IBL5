@@ -483,4 +483,55 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
             $playerID
         );
     }
+
+    /**
+     * Get news articles mentioning a player
+     * 
+     * @see PlayerRepositoryInterface::getPlayerNews()
+     */
+    public function getPlayerNews(string $playerName): array
+    {
+        $searchPattern = '%' . $playerName . '%';
+        $searchPatternII = '%' . $playerName . ' II%';
+        
+        return $this->fetchAll(
+            "SELECT sid, title, time FROM nuke_stories 
+             WHERE (hometext LIKE ? OR bodytext LIKE ?) 
+             AND (hometext NOT LIKE ? OR bodytext NOT LIKE ?) 
+             ORDER BY time DESC",
+            "ssss",
+            $searchPattern,
+            $searchPattern,
+            $searchPatternII,
+            $searchPatternII
+        );
+    }
+
+    /**
+     * Get one-on-one game wins for a player
+     * 
+     * @see PlayerRepositoryInterface::getOneOnOneWins()
+     */
+    public function getOneOnOneWins(string $playerName): array
+    {
+        return $this->fetchAll(
+            "SELECT gameid, winner, loser, winscore, lossscore FROM ibl_one_on_one WHERE winner = ? ORDER BY gameid ASC",
+            "s",
+            $playerName
+        );
+    }
+
+    /**
+     * Get one-on-one game losses for a player
+     * 
+     * @see PlayerRepositoryInterface::getOneOnOneLosses()
+     */
+    public function getOneOnOneLosses(string $playerName): array
+    {
+        return $this->fetchAll(
+            "SELECT gameid, winner, loser, winscore, lossscore FROM ibl_one_on_one WHERE loser = ? ORDER BY gameid ASC",
+            "s",
+            $playerName
+        );
+    }
 }

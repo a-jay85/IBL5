@@ -74,4 +74,121 @@ interface PlayerRepositoryInterface
      * @return array|null Player statistics row or null if not found
      */
     public function getPlayerStats(int $playerID): ?array;
+
+    /**
+     * Get All-Star Game appearances count for a player
+     * 
+     * Counts awards where Award contains 'Conference All-Star'.
+     * 
+     * @param string $playerName Player name (exact match)
+     * @return int Number of All-Star Game appearances
+     */
+    public function getAllStarGameCount(string $playerName): int;
+
+    /**
+     * Get Three-Point Contest appearances count for a player
+     * 
+     * Counts awards where Award starts with 'Three-Point Contest'.
+     * 
+     * @param string $playerName Player name (exact match)
+     * @return int Number of Three-Point Contest appearances
+     */
+    public function getThreePointContestCount(string $playerName): int;
+
+    /**
+     * Get Slam Dunk Competition appearances count for a player
+     * 
+     * Counts awards where Award starts with 'Slam Dunk Competition'.
+     * 
+     * @param string $playerName Player name (exact match)
+     * @return int Number of Slam Dunk Competition appearances
+     */
+    public function getDunkContestCount(string $playerName): int;
+
+    /**
+     * Get Rookie-Sophomore Challenge appearances count for a player
+     * 
+     * Counts awards where Award is exactly 'Rookie-Sophomore Challenge'.
+     * 
+     * @param string $playerName Player name (exact match)
+     * @return int Number of Rookie-Sophomore Challenge appearances
+     */
+    public function getRookieSophChallengeCount(string $playerName): int;
+
+    /**
+     * Get all awards for a player ordered by year
+     * 
+     * @param string $playerName Player name (exact match)
+     * @return array<array<string, mixed>> Array of award records ordered by year ASC
+     */
+    public function getAwards(string $playerName): array;
+
+    /**
+     * Get historical stats for a player ordered by year
+     * 
+     * @param int $playerID Player ID
+     * @return array<array<string, mixed>> Array of historical stat records ordered by year ASC
+     */
+    public function getHistoricalStats(int $playerID): array;
+
+    /**
+     * Get box scores for a player between specific dates
+     * 
+     * @param int $playerID Player ID
+     * @param string $startDate Start date (YYYY-MM-DD)
+     * @param string $endDate End date (YYYY-MM-DD)
+     * @return array<array<string, mixed>> Array of box score records ordered by Date ASC
+     */
+    public function getBoxScoresBetweenDates(int $playerID, string $startDate, string $endDate): array;
+
+    /**
+     * Get playoff stats for a player ordered by year
+     * 
+     * @param string $playerName Player name (exact match)
+     * @return array<array<string, mixed>> Array of playoff stat records ordered by year ASC
+     */
+    public function getPlayoffStats(string $playerName): array;
+
+    /**
+     * Get HEAT stats for a player ordered by year
+     * 
+     * @param string $playerName Player name (exact match)
+     * @return array<array<string, mixed>> Array of HEAT stat records ordered by year ASC
+     */
+    public function getHeatStats(string $playerName): array;
+
+    /**
+     * Get Olympics stats for a player ordered by year
+     * 
+     * @param string $playerName Player name (exact match)
+     * @return array<array<string, mixed>> Array of Olympics stat records ordered by year ASC
+     */
+    public function getOlympicsStats(string $playerName): array;
+
+    /**
+     * Get news articles mentioning a player
+     * 
+     * Searches nuke_stories for articles mentioning the player name.
+     * Excludes articles that mention "player II" to avoid false matches.
+     * 
+     * @param string $playerName Player name (exact match)
+     * @return array<array<string, mixed>> Array of article records (sid, title, time) ordered by time DESC
+     */
+    public function getPlayerNews(string $playerName): array;
+
+    /**
+     * Get one-on-one game wins for a player
+     * 
+     * @param string $playerName Player name (exact match)
+     * @return array<array<string, mixed>> Array of one-on-one game records where player won
+     */
+    public function getOneOnOneWins(string $playerName): array;
+
+    /**
+     * Get one-on-one game losses for a player
+     * 
+     * @param string $playerName Player name (exact match)
+     * @return array<array<string, mixed>> Array of one-on-one game records where player lost
+     */
+    public function getOneOnOneLosses(string $playerName): array;
 }

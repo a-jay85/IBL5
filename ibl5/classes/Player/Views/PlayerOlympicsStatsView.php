@@ -5,14 +5,17 @@ declare(strict_types=1);
 namespace Player\Views;
 
 use Player\PlayerRepository;
+use Player\Contracts\PlayerOlympicsStatsViewInterface;
 use Statistics\StatsFormatter;
 
 /**
  * PlayerOlympicsStatsView - Renders Olympics tournament statistics
  * 
  * Pure rendering with no database logic - all data fetched via PlayerRepository
+ * 
+ * @see PlayerOlympicsStatsViewInterface
  */
-class PlayerOlympicsStatsView
+class PlayerOlympicsStatsView implements PlayerOlympicsStatsViewInterface
 {
     private PlayerRepository $repository;
 
@@ -22,10 +25,7 @@ class PlayerOlympicsStatsView
     }
 
     /**
-     * Render Olympics totals table
-     * 
-     * @param string $playerName Player name to fetch stats for
-     * @return string HTML for Olympics totals table
+     * @see PlayerOlympicsStatsViewInterface::renderOlympicsTotals()
      */
     public function renderOlympicsTotals(string $playerName): string
     {

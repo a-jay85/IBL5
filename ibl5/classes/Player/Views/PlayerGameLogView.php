@@ -5,13 +5,16 @@ declare(strict_types=1);
 namespace Player\Views;
 
 use Player\PlayerRepository;
+use Player\Contracts\PlayerGameLogViewInterface;
 
 /**
  * PlayerGameLogView - Renders player game logs by sim
  * 
  * Pure rendering with no database logic - all data fetched via PlayerRepository
+ * 
+ * @see PlayerGameLogViewInterface
  */
-class PlayerGameLogView
+class PlayerGameLogView implements PlayerGameLogViewInterface
 {
     private PlayerRepository $repository;
 
@@ -21,10 +24,7 @@ class PlayerGameLogView
     }
 
     /**
-     * Render sim-by-sim statistics table
-     * 
-     * @param int $playerID Player ID to fetch stats for
-     * @return string HTML for sim stats table
+     * @see PlayerGameLogViewInterface::renderSimStats()
      */
     public function renderSimStats(int $playerID): string
     {
@@ -135,6 +135,79 @@ class PlayerGameLogView
         <td><?= htmlspecialchars($avgBLK) ?></td>
         <td><?= htmlspecialchars($avgPF) ?></td>
         <td><?= htmlspecialchars($avgPTS) ?></td>
+    </tr>
+            <?php
+        }
+        ?>
+</table>
+        <?php
+        return ob_get_clean();
+    }
+
+    /**
+     * @see PlayerGameLogViewInterface::renderGameLog()
+     */
+    public function renderGameLog(int $playerID, string $startDate, string $endDate): string
+    {
+        $boxScores = $this->repository->getBoxScoresBetweenDates($playerID, $startDate, $endDate);
+
+        ob_start();
+        ?>
+<table class="sortable">
+    <tr>
+        <th>Date</th>
+        <th>MIN</th>
+        <th>PTS</th>
+        <th>FGM</th>
+        <th>FGA</th>
+        <th>FG%</th>
+        <th>FTM</th>
+        <th>FTA</th>
+        <th>FT%</th>
+        <th>3GM</th>
+        <th>3GA</th>
+        <th>3G%</th>
+        <th>ORB</th>
+        <th>DRB</th>
+        <th>REB</th>
+        <th>AST</th>
+        <th>STL</th>
+        <th>TO</th>
+        <th>BLK</th>
+        <th>PF</th>
+    </tr>
+        <?php
+        foreach ($boxScores as $row) {
+            $fgm = $row['game2GM'] + $row['game3GM'];
+            $fga = $row['game2GA'] + $row['game3GA'];
+            $pts = (2 * $row['game2GM']) + (3 * $row['game3GM']) + $row['gameFTM'];
+            $reb = $row['gameORB'] + $row['gameDRB'];
+            
+            $fgPct = $fga > 0 ? number_format($fgm / $fga, 3) : '0.000';
+            $ftPct = $row['gameFTA'] > 0 ? number_format($row['gameFTM'] / $row['gameFTA'], 3) : '0.000';
+            $tgPct = $row['game3GA'] > 0 ? number_format($row['game3GM'] / $row['game3GA'], 3) : '0.000';
+            ?>
+    <tr>
+        <td class="gamelog"><?= htmlspecialchars($row['Date']) ?></td>
+        <td class="gamelog"><?= htmlspecialchars((string)$row['gameMIN']) ?></td>
+        <td class="gamelog"><?= htmlspecialchars((string)$pts) ?></td>
+        <td class="gamelog"><?= htmlspecialchars((string)$fgm) ?></td>
+        <td class="gamelog"><?= htmlspecialchars((string)$fga) ?></td>
+        <td class="gamelog"><?= htmlspecialchars($fgPct) ?></td>
+        <td class="gamelog"><?= htmlspecialchars((string)$row['gameFTM']) ?></td>
+        <td class="gamelog"><?= htmlspecialchars((string)$row['gameFTA']) ?></td>
+        <td class="gamelog"><?= htmlspecialchars($ftPct) ?></td>
+        <td class="gamelog"><?= htmlspecialchars((string)$row['game3GM']) ?></td>
+        <td class="gamelog"><?= htmlspecialchars((string)$row['game3GA']) ?></td>
+        <td class="gamelog"><?= htmlspecialchars($tgPct) ?></td>
+        <td class="gamelog"><?= htmlspecialchars((string)$row['gameORB']) ?></td>
+        <td class="gamelog"><?= htmlspecialchars((string)$row['gameDRB']) ?></td>
+        <td class="gamelog"><?= htmlspecialchars((string)$reb) ?></td>
+        <td class="gamelog"><?= htmlspecialchars((string)$row['gameAST']) ?></td>
+        <td class="gamelog"><?= htmlspecialchars((string)$row['gameSTL']) ?></td>
+        <td class="gamelog"><?= htmlspecialchars((string)$row['gameTOV']) ?></td>
+        <td class="gamelog"><?= htmlspecialchars((string)$row['gameBLK']) ?></td>
+        <td class="gamelog"><?= htmlspecialchars((string)$row['gamePF']) ?></td>
     </tr>
             <?php
         }

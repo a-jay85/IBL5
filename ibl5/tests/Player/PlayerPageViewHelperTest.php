@@ -5,6 +5,7 @@ declare(strict_types=1);
 use PHPUnit\Framework\TestCase;
 use Player\PlayerPageViewHelper;
 use Player\Player;
+use Player\PlayerStats;
 
 class PlayerPageViewHelperTest extends TestCase
 {

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Player;
 
 use Player\Contracts\PlayerPageViewHelperInterface;
-use PlayerStats;
+use Player\PlayerStats;
 
 /**
  * @see PlayerPageViewHelperInterface

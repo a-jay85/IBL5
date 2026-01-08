@@ -5,13 +5,16 @@ declare(strict_types=1);
 namespace Player\Views;
 
 use Player\PlayerRepository;
+use Player\Contracts\PlayerAwardsViewInterface;
 
 /**
  * PlayerAwardsView - Renders player awards and All-Star activity
  * 
  * Pure rendering with no database logic - all data fetched via PlayerRepository
+ * 
+ * @see PlayerAwardsViewInterface
  */
-class PlayerAwardsView
+class PlayerAwardsView implements PlayerAwardsViewInterface
 {
     private PlayerRepository $repository;
 
@@ -21,10 +24,7 @@ class PlayerAwardsView
     }
 
     /**
-     * Render All-Star activity table
-     * 
-     * @param string $playerName Player name to fetch awards for
-     * @return string HTML for All-Star activity table
+     * @see PlayerAwardsViewInterface::renderAllStarActivity()
      */
     public function renderAllStarActivity(string $playerName): string
     {
@@ -62,10 +62,7 @@ class PlayerAwardsView
     }
 
     /**
-     * Render full awards list
-     * 
-     * @param string $playerName Player name to fetch awards for
-     * @return string HTML for awards list
+     * @see PlayerAwardsViewInterface::renderAwardsList()
      */
     public function renderAwardsList(string $playerName): string
     {

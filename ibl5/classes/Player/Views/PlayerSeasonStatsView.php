@@ -5,14 +5,17 @@ declare(strict_types=1);
 namespace Player\Views;
 
 use Player\PlayerRepository;
+use Player\Contracts\PlayerSeasonStatsViewInterface;
 use Statistics\StatsFormatter;
 
 /**
  * PlayerSeasonStatsView - Renders regular season statistics (totals/averages)
  * 
  * Pure rendering with no database logic - all data fetched via PlayerRepository
+ * 
+ * @see PlayerSeasonStatsViewInterface
  */
-class PlayerSeasonStatsView
+class PlayerSeasonStatsView implements PlayerSeasonStatsViewInterface
 {
     private PlayerRepository $repository;
 
@@ -22,10 +25,7 @@ class PlayerSeasonStatsView
     }
 
     /**
-     * Render regular season totals table
-     * 
-     * @param int $playerID Player ID to fetch stats for
-     * @return string HTML for season totals table
+     * @see PlayerSeasonStatsViewInterface::renderSeasonTotals()
      */
     public function renderSeasonTotals(int $playerID): string
     {
@@ -120,10 +120,7 @@ class PlayerSeasonStatsView
     }
 
     /**
-     * Render regular season averages table
-     * 
-     * @param int $playerID Player ID to fetch stats for
-     * @return string HTML for season averages table
+     * @see PlayerSeasonStatsViewInterface::renderSeasonAverages()
      */
     public function renderSeasonAverages(int $playerID): string
     {

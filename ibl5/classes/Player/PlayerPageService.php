@@ -14,13 +14,15 @@ class PlayerPageService implements PlayerPageServiceInterface
 {
     private $db;
     private PlayerRepository $repository;
+    private PlayerStatsRepository $statsRepository;
     private PlayerViewFactory $viewFactory;
 
     public function __construct($db)
     {
         $this->db = $db;
         $this->repository = new PlayerRepository($db);
-        $this->viewFactory = new PlayerViewFactory($this->repository);
+        $this->statsRepository = new PlayerStatsRepository($db);
+        $this->viewFactory = new PlayerViewFactory($this->repository, $this->statsRepository);
     }
 
     /**

@@ -2,6 +2,7 @@
 <?php
 
 use Player\Player;
+use Player\PlayerStats;
 
 /************************************************************************/
 /* PHP-NUKE: Web Portal System                                          */

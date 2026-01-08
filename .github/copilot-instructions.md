@@ -73,6 +73,20 @@ if (method_exists($this->db, 'sql_escape_string')) {
   ```
 - Use @see instead of {@inheritdoc} in PHPDoc
 
+### 7. Production Validation Harness
+**CRITICAL: Use production (iblhoops.net) as verification during refactoring.**
+- After completing refactoring work, compare localhost against iblhoops.net
+- Verify that **text and data output exactly match** between both environments
+- Check:
+  - Page rendering and layout
+  - Data values (stats, names, dates, calculations)
+  - List ordering and sorting
+  - Form submissions and responses
+  - Error messages and validation
+- If output does **NOT** match exactly, refactoring is incomplete
+- Continue iterating until localhost output matches production exactly
+- This ensures no functionality was broken or altered during refactoring
+
 ---
 
 ## Quick Reference

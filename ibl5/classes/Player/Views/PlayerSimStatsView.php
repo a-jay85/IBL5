@@ -6,6 +6,7 @@ namespace Player\Views;
 
 use Player\PlayerStatsRepository;
 use Player\Contracts\PlayerSimStatsViewInterface;
+use Statistics\StatsFormatter;
 
 /**
  * PlayerSimStatsView - Renders sim-by-sim statistics
@@ -80,9 +81,9 @@ class PlayerSimStatsView implements PlayerSimStatsViewInterface
             
             // Calculate averages
             $avgMinutes = sprintf('%01.1f', $totals['minutes'] / $numberOfGames);
-            $avgFGP = $this->formatPercentage($totals['fgm'], $totals['fga']);
-            $avgFTP = $this->formatPercentage($totals['ftm'], $totals['fta']);
-            $avg3GP = $this->formatPercentage($totals['tgm'], $totals['tga']);
+            $avgFGP = StatsFormatter::formatPercentageWithDecimals($totals['fgm'], $totals['fga']);
+            $avgFTP = StatsFormatter::formatPercentageWithDecimals($totals['ftm'], $totals['fta']);
+            $avg3GP = StatsFormatter::formatPercentageWithDecimals($totals['tgm'], $totals['tga']);
             $avgORB = sprintf('%01.1f', $totals['orb'] / $numberOfGames);
             $avgREB = sprintf('%01.1f', ($totals['orb'] + $totals['drb']) / $numberOfGames);
             $avgAST = sprintf('%01.1f', $totals['ast'] / $numberOfGames);
@@ -147,16 +148,5 @@ class PlayerSimStatsView implements PlayerSimStatsViewInterface
         }
 
         return $totals;
-    }
-
-    /**
-     * Format percentage
-     */
-    private function formatPercentage(int $made, int $attempted): string
-    {
-        if ($attempted === 0) {
-            return '0.000';
-        }
-        return sprintf('%01.3f', $made / $attempted);
     }
 }

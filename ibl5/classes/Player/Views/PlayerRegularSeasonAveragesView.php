@@ -6,6 +6,7 @@ namespace Player\Views;
 
 use Player\PlayerStatsRepository;
 use Player\Contracts\PlayerRegularSeasonAveragesViewInterface;
+use Statistics\StatsFormatter;
 
 /**
  * PlayerRegularSeasonAveragesView - Renders regular season averages table
@@ -80,13 +81,13 @@ class PlayerRegularSeasonAveragesView implements PlayerRegularSeasonAveragesView
                 $min = number_format((float)$row['minutes'] / $gm, 1);
                 $fgm = number_format((float)$row['fgm'] / $gm, 1);
                 $fga = number_format((float)$row['fga'] / $gm, 1);
-                $fgp = $this->formatPercentage((int)$row['fgm'], (int)$row['fga']);
+                $fgp = StatsFormatter::formatPercentageWithDecimals((int)$row['fgm'], (int)$row['fga']);
                 $ftm = number_format((float)$row['ftm'] / $gm, 1);
                 $fta = number_format((float)$row['fta'] / $gm, 1);
-                $ftp = $this->formatPercentage((int)$row['ftm'], (int)$row['fta']);
+                $ftp = StatsFormatter::formatPercentageWithDecimals((int)$row['ftm'], (int)$row['fta']);
                 $tgm = number_format((float)$row['tgm'] / $gm, 1);
                 $tga = number_format((float)$row['tga'] / $gm, 1);
-                $tgp = $this->formatPercentage((int)$row['tgm'], (int)$row['tga']);
+                $tgp = StatsFormatter::formatPercentageWithDecimals((int)$row['tgm'], (int)$row['tga']);
                 $orb = number_format((float)$row['orb'] / $gm, 1);
                 $reb = number_format((float)$row['reb'] / $gm, 1);
                 $ast = number_format((float)$row['ast'] / $gm, 1);
@@ -128,9 +129,9 @@ class PlayerRegularSeasonAveragesView implements PlayerRegularSeasonAveragesView
 
         // Career averages row
         if ($careerAverages) {
-            $carFgp = $this->formatPercentage((int)round((float)$careerAverages['fgm']), (int)round((float)$careerAverages['fga']));
-            $carFtp = $this->formatPercentage((int)round((float)$careerAverages['ftm']), (int)round((float)$careerAverages['fta']));
-            $carTgp = $this->formatPercentage((int)round((float)$careerAverages['tgm']), (int)round((float)$careerAverages['tga']));
+            $carFgp = StatsFormatter::formatPercentageWithDecimals((int)round((float)$careerAverages['fgm']), (int)round((float)$careerAverages['fga']));
+            $carFtp = StatsFormatter::formatPercentageWithDecimals((int)round((float)$careerAverages['ftm']), (int)round((float)$careerAverages['fta']));
+            $carTgp = StatsFormatter::formatPercentageWithDecimals((int)round((float)$careerAverages['tgm']), (int)round((float)$careerAverages['tga']));
             ?>
     <tr style="font-weight: bold;">
         <td colspan=2><center>Career</center></td>
@@ -160,16 +161,5 @@ class PlayerRegularSeasonAveragesView implements PlayerRegularSeasonAveragesView
 </table>
         <?php
         return ob_get_clean();
-    }
-
-    /**
-     * Calculate percentage from made and attempted values
-     */
-    private function formatPercentage(int $made, int $attempted): string
-    {
-        if ($attempted === 0) {
-            return '0.000';
-        }
-        return sprintf('%01.3f', $made / $attempted);
     }
 }

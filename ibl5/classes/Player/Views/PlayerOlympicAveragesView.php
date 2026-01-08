@@ -67,7 +67,6 @@ class PlayerOlympicAveragesView implements PlayerOlympicAveragesViewInterface
         <th>blk</th>
         <th>pf</th>
         <th>pts</th>
-        <th>eff</th>
     </tr>
         <?php
         foreach ($olympicsStats as $row) {
@@ -88,9 +87,8 @@ class PlayerOlympicAveragesView implements PlayerOlympicAveragesViewInterface
                 $blk = StatsFormatter::formatPerGameAverage((float)$row['blk'], $gm);
                 $pf = StatsFormatter::formatPerGameAverage((float)$row['pf'], $gm);
                 $pts = StatsFormatter::formatPerGameAverage((float)$row['pts'], $gm);
-                $eff = isset($row['eff']) ? StatsFormatter::formatPerGameAverage((float)$row['eff'], $gm) : '0.0';
             } else {
-                $min = $fgp = $ftp = $tgp = $orb = $reb = $ast = $stl = $tvr = $blk = $pf = $pts = $eff = '0.0';
+                $min = $fgp = $ftp = $tgp = $orb = $reb = $ast = $stl = $tvr = $blk = $pf = $pts = '0.0';
             }
             ?>
     <tr>
@@ -109,7 +107,6 @@ class PlayerOlympicAveragesView implements PlayerOlympicAveragesViewInterface
         <td><center><?= $blk ?></center></td>
         <td><center><?= $pf ?></center></td>
         <td><center><?= $pts ?></center></td>
-        <td><center><?= $eff ?></center></td>
     </tr>
             <?php
         }
@@ -135,7 +132,6 @@ class PlayerOlympicAveragesView implements PlayerOlympicAveragesViewInterface
         <td><center><?= StatsFormatter::formatWithDecimals((float)$careerAverages['blk'], 1) ?></center></td>
         <td><center><?= StatsFormatter::formatWithDecimals((float)$careerAverages['pf'], 1) ?></center></td>
         <td><center><?= StatsFormatter::formatWithDecimals((float)$careerAverages['pts'], 1) ?></center></td>
-        <td><center><?= StatsFormatter::formatWithDecimals((float)($careerAverages['eff'] ?? 0), 1) ?></center></td>
     </tr>
             <?php
         }

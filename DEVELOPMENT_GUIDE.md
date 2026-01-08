@@ -141,6 +141,13 @@ public function getPlayer($playerId)
   - `formatAverage()` for general 2-decimal averages
 - [ ] Use `BasketballStats\StatsSanitizer` for input validation
 
+**HTML & CSS Standards:**
+- [ ] Convert deprecated styling tags (`<font>`, `<center>`, `<b>`, `<i>`, `<u>`) to semantic HTML + inline CSS
+- [ ] Extract repeated inline styles (2+ occurrences) into `<style>` blocks with CSS classes
+- [ ] Use semantic HTML (`<strong>`, `<em>`, `<div>`) instead of presentation tags
+- [ ] Keep `<style>` blocks at top of file for maintainability
+- [ ] Follow deprecation guidelines in `.github/copilot-instructions.md` **HTML & CSS Refactoring** section
+
 **Security Checklist:**
 - [ ] Prepared statements (SQL injection)
 - [ ] HTML escaping (XSS) - Use `Utilities\HtmlSanitizer::safeHtmlOutput()` instead of `htmlspecialchars()`

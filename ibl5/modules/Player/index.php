@@ -12,6 +12,7 @@ use Player\Views\PlayerBioView;
 use Player\Views\PlayerStatsView;
 use Player\Views\PlayerMenuView;
 use Player\Views\PlayerViewFactory;
+use Player\Views\PlayerRatingsView;
 use RookieOption\RookieOptionValidator;
 use RookieOption\RookieOptionFormView;
 use Services\CommonMysqliRepository;
@@ -73,8 +74,14 @@ function showpage($playerID, $pageView)
 
     // Render player bio section
     $contract_display = implode("/", $player->getRemainingContractArray());
-    echo PlayerBioView::render($player, $contract_display);
-
+    echo PlayerBioView::render($player, $contract_display);  
+    
+    // Render misc ratings table
+    echo PlayerRatingsView::renderMiscRatingsTable($player);
+    
+    // Render free agency preferences table
+    echo PlayerRatingsView::renderFreeAgencyPreferences($player);
+    
     // Get All-Star Activity data using PlayerRepository
     $playerRepository = new PlayerRepository($mysqli_db);
     $asg = $playerRepository->getAllStarGameCount($player->name);
@@ -85,9 +92,6 @@ function showpage($playerID, $pageView)
     // Render player highs table with All-Star Activity data
     echo PlayerStatsView::renderPlayerHighsTable($playerStats, $asg, $threepointcontests, $dunkcontests, $rooksoph);
     
-    // Close the outer row started in renderPlayerHeader
-    echo "</tr>";
-
     // Render player menu
     echo PlayerMenuView::render($playerID);
 

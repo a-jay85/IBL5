@@ -8,6 +8,7 @@ use Player\Player;
 use Player\PlayerRepository;
 use Player\PlayerStats;
 use Player\Contracts\PlayerOverviewViewInterface;
+use Player\Views\PlayerRatingsView;
 use Services\CommonMysqliRepository;
 use BasketballStats\StatsFormatter;
 use Utilities\HtmlSanitizer;
@@ -66,70 +67,9 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
         
         ob_start();
         
-        // Render ratings table
-        echo $this->renderMiscRatingsTable($player);
-        
-        // Render free agency preferences table
-        echo $this->renderFreeAgencyPreferences($player);
-        
         // Render game log
         echo $this->renderGameLog($playerID, $startDate, $endDate);
         
-        return ob_get_clean();
-    }
-
-    /**
-     * Render player ratings table
-     */
-    private function renderMiscRatingsTable(Player $player): string
-    {
-        ob_start();
-        ?>
-<table class="misc-ratings-table">
-    <tr class="header-row">
-        <td>Talent</td>
-        <td>Skill</td>
-        <td>Intangibles</td>
-        <td>Clutch</td>
-        <td>Consistency</td>
-    </tr>
-    <tr>
-        <td><?= HtmlSanitizer::safeHtmlOutput((string)$player->ratingTalent) ?></td>
-        <td><?= HtmlSanitizer::safeHtmlOutput((string)$player->ratingSkill) ?></td>
-        <td><?= HtmlSanitizer::safeHtmlOutput((string)$player->ratingIntangibles) ?></td>
-        <td><?= HtmlSanitizer::safeHtmlOutput((string)$player->ratingClutch) ?></td>
-        <td><?= HtmlSanitizer::safeHtmlOutput((string)$player->ratingConsistency) ?></td>
-    </tr>
-</table>
-<p>
-        <?php
-        return ob_get_clean();
-    }
-
-    /**
-     * Render free agency preferences table
-     */
-    private function renderFreeAgencyPreferences(Player $player): string
-    {
-        ob_start();
-        ?>
-<table class="misc-ratings-table">
-    <tr class="header-row">
-        <td>Loyalty</td>
-        <td>Play for Winner</td>
-        <td>Playing Time</td>
-        <td>Security</td>
-        <td>Tradition</td>
-    </tr>
-    <tr>
-        <td><?= HtmlSanitizer::safeHtmlOutput((string)$player->freeAgencyLoyalty) ?></td>
-        <td><?= HtmlSanitizer::safeHtmlOutput((string)$player->freeAgencyPlayForWinner) ?></td>
-        <td><?= HtmlSanitizer::safeHtmlOutput((string)$player->freeAgencyPlayingTime) ?></td>
-        <td><?= HtmlSanitizer::safeHtmlOutput((string)$player->freeAgencySecurity) ?></td>
-        <td><?= HtmlSanitizer::safeHtmlOutput((string)$player->freeAgencyTradition) ?></td>
-    </tr>
-</table>
-        <?php
         return ob_get_clean();
     }
 

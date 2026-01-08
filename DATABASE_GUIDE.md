@@ -5,6 +5,9 @@
 
 ## Quick Reference
 
+### ⚠️ SCHEMA VERIFICATION REQUIREMENT
+**Always reference `ibl5/schema.sql` for table/column names and relationships.** Never assume database structures exist without verification. This prevents hallucination of non-existent tables.
+
 ### Current Status
 - **Total Tables:** 136 (52 InnoDB, 84 MyISAM legacy)
 - **Foreign Keys:** 24 constraints implemented
@@ -64,6 +67,15 @@ Core data integrity constraints implemented:
 - Implement ETags using `updated_at` timestamps
 - Query database views instead of joining multiple tables
 - Follow REST best practices (see API_GUIDE.md)
+
+### For Refactoring Validation
+- **Always verify refactored code against production (iblhoops.net)**
+- Compare database queries and output between localhost and production
+- Ensure query results return identical data (same rows, same order, same values)
+- Check that data transformations produce identical output
+- If results don't match exactly, refactoring is not complete
+- Use database tools (e.g., query comparison, row diffing) to identify discrepancies
+- This prevents unintended behavior changes from refactoring
 
 ## Character Sets & Collation
 - **Legacy tables:** latin1_swedish_ci (PhpNuke)

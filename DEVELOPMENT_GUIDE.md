@@ -47,21 +47,25 @@
 - Review refactored modules with interface pattern: PlayerSearch, FreeAgency, Player, ComparePlayers, Standings
 - Check `.github/copilot-instructions.md` - **Interface-Driven Architecture Pattern** section
 - Review interfaces in: `ibl5/classes/PlayerSearch/Contracts/`, `ibl5/classes/FreeAgency/Contracts/`, `ibl5/classes/Player/Contracts/`
-- Check `ibl5/schema.sql` for database structure
+- **VERIFY DATABASE STRUCTURE: Cross-reference `ibl5/schema.sql` for ALL table names, columns, and relationships before writing queries**
 - See best practices in: `ibl5/classes/Player/README.md`, `ibl5/classes/DepthChart/SECURITY.md`, `ibl5/classes/PlayerSearch/README.md`
 - Dependencies are cached via GitHub Actions (`.github/workflows/cache-dependencies.yml`)
 - Run tests: `cd ibl5 && vendor/bin/phpunit tests/`
 - CI/CD: Tests run automatically via GitHub Actions (`.github/workflows/tests.yml`)
 
 **Refactoring Steps:**
-1. Analyze (1-2 days) - Identify responsibilities
-2. Design (1-2 days) - Plan class structure & interfaces
-3. Create Interfaces (1-2 days) - Document contracts with PHPDoc
-4. Extract (1-2 weeks) - Repository → Validator → Processor → View → Controller
-5. Implement Interfaces (1 day) - Add interface implementations and @see docblocks
-6. Test (1 week) - Unit + integration tests
-7. Audit (2-3 days) - Security review
-8. Review (2-3 days) - Code review, performance
+1. Analyze - Identify responsibilities
+2. Design - Plan class structure & interfaces
+3. Create Interfaces - Document contracts with PHPDoc
+4. Extract - Repository → Validator → Processor → View → Controller
+5. Implement Interfaces - Add interface implementations and @see docblocks
+6. Test - Unit + integration tests
+7. Audit - Security review
+8. **Production Validation** - Compare localhost against iblhoops.net
+   - Verify all output (text, data, ordering, formatting) matches exactly
+   - If mismatches found, debug and iterate until perfect match
+   - This is the final verification gate before merge
+9. Review - Code review, performance
 
 **Class Pattern with Interface Architecture:**
 ```

@@ -99,7 +99,54 @@ Use `BasketballStats\StatsSanitizer` for input validation (sanitizeInt, sanitize
   ```
 - Use @see instead of {@inheritdoc} in PHPDoc
 
-### 8. Production Validation Harness
+### 8. HTML & CSS Refactoring
+**Convert deprecated styling tags into modern CSS patterns.**
+
+**Step 1: Replace Deprecated Tags**
+```html
+<!-- ❌ WRONG - Deprecated tags -->
+<font color="#ff0000">Error</font>
+<center>Centered text</center>
+<b>Bold</b> and <i>Italic</i>
+<u>Underlined</u>
+
+<!-- ✅ CORRECT - Use semantic HTML + inline styles -->
+<span style="color: #ff0000;">Error</span>
+<div style="text-align: center;">Centered text</div>
+<strong style="font-weight: bold;">Bold</strong> and <em style="font-style: italic;">Italic</em>
+<span style="text-decoration: underline;">Underlined</span>
+```
+
+**Step 2: Centralize Repeated Styles**
+When the same inline styles appear 2+ times, extract them to a `<style>` block:
+```html
+<!-- BEFORE: Repetitive inline styles -->
+<div style="color: #333; font-size: 14px; margin: 10px 0; padding: 8px;">Item 1</div>
+<div style="color: #333; font-size: 14px; margin: 10px 0; padding: 8px;">Item 2</div>
+<div style="color: #333; font-size: 14px; margin: 10px 0; padding: 8px;">Item 3</div>
+
+<!-- AFTER: Centralized styles -->
+<style>
+  .list-item {
+    color: #333;
+    font-size: 14px;
+    margin: 10px 0;
+    padding: 8px;
+  }
+</style>
+<div class="list-item">Item 1</div>
+<div class="list-item">Item 2</div>
+<div class="list-item">Item 3</div>
+```
+
+**Rules:**
+- Convert `<b>`, `<i>`, `<u>`, `<font>`, `<center>`, etc. to semantic HTML + inline styles
+- Use `<style>` blocks (inline or scoped) for styles applied 2+ times
+- Prefer semantic HTML (`<strong>`, `<em>`, `<div>`) over presentation tags
+- Use CSS classes for reusable styling patterns
+- Keep `<style>` blocks near the top of the file for maintainability
+
+### 9. Production Validation Harness
 **CRITICAL: Use production (iblhoops.net) as verification during refactoring.**
 - After completing refactoring work, compare localhost against iblhoops.net
 - Verify that **text and data output exactly match** between both environments

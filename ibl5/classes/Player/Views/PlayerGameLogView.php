@@ -7,6 +7,7 @@ namespace Player\Views;
 use Player\PlayerRepository;
 use Player\Contracts\PlayerGameLogViewInterface;
 use BasketballStats\StatsFormatter;
+use Utilities\HtmlSanitizer;
 
 /**
  * PlayerGameLogView - Renders player game logs by sim
@@ -122,20 +123,20 @@ class PlayerGameLogView implements PlayerGameLogViewInterface
 
             ?>
     <tr>
-        <td><?= htmlspecialchars((string)$simNumber) ?></td>
-        <td><?= htmlspecialchars((string)$numberOfGames) ?></td>
-        <td><?= htmlspecialchars($avgMinutes) ?></td>
-        <td><?= htmlspecialchars($avgFGP) ?></td>
-        <td><?= htmlspecialchars($avgFTP) ?></td>
-        <td><?= htmlspecialchars($avg3GP) ?></td>
-        <td><?= htmlspecialchars($avgORB) ?></td>
-        <td><?= htmlspecialchars($avgREB) ?></td>
-        <td><?= htmlspecialchars($avgAST) ?></td>
-        <td><?= htmlspecialchars($avgSTL) ?></td>
-        <td><?= htmlspecialchars($avgTO) ?></td>
-        <td><?= htmlspecialchars($avgBLK) ?></td>
-        <td><?= htmlspecialchars($avgPF) ?></td>
-        <td><?= htmlspecialchars($avgPTS) ?></td>
+        <td><?= HtmlSanitizer::safeHtmlOutput((string)$simNumber) ?></td>
+        <td><?= HtmlSanitizer::safeHtmlOutput((string)$numberOfGames) ?></td>
+        <td><?= HtmlSanitizer::safeHtmlOutput($avgMinutes) ?></td>
+        <td><?= HtmlSanitizer::safeHtmlOutput($avgFGP) ?></td>
+        <td><?= HtmlSanitizer::safeHtmlOutput($avgFTP) ?></td>
+        <td><?= HtmlSanitizer::safeHtmlOutput($avg3GP) ?></td>
+        <td><?= HtmlSanitizer::safeHtmlOutput($avgORB) ?></td>
+        <td><?= HtmlSanitizer::safeHtmlOutput($avgREB) ?></td>
+        <td><?= HtmlSanitizer::safeHtmlOutput($avgAST) ?></td>
+        <td><?= HtmlSanitizer::safeHtmlOutput($avgSTL) ?></td>
+        <td><?= HtmlSanitizer::safeHtmlOutput($avgTO) ?></td>
+        <td><?= HtmlSanitizer::safeHtmlOutput($avgBLK) ?></td>
+        <td><?= HtmlSanitizer::safeHtmlOutput($avgPF) ?></td>
+        <td><?= HtmlSanitizer::safeHtmlOutput($avgPTS) ?></td>
     </tr>
             <?php
         }
@@ -189,26 +190,26 @@ class PlayerGameLogView implements PlayerGameLogViewInterface
             $tgPct = StatsFormatter::formatPercentage($row['game3GM'], $row['game3GA']);
             ?>
     <tr>
-        <td class="gamelog"><?= htmlspecialchars($row['Date']) ?></td>
-        <td class="gamelog"><?= htmlspecialchars((string)$row['gameMIN']) ?></td>
-        <td class="gamelog"><?= htmlspecialchars((string)$pts) ?></td>
-        <td class="gamelog"><?= htmlspecialchars((string)$fgm) ?></td>
-        <td class="gamelog"><?= htmlspecialchars((string)$fga) ?></td>
-        <td class="gamelog"><?= htmlspecialchars($fgPct) ?></td>
-        <td class="gamelog"><?= htmlspecialchars((string)$row['gameFTM']) ?></td>
-        <td class="gamelog"><?= htmlspecialchars((string)$row['gameFTA']) ?></td>
-        <td class="gamelog"><?= htmlspecialchars($ftPct) ?></td>
-        <td class="gamelog"><?= htmlspecialchars((string)$row['game3GM']) ?></td>
-        <td class="gamelog"><?= htmlspecialchars((string)$row['game3GA']) ?></td>
-        <td class="gamelog"><?= htmlspecialchars($tgPct) ?></td>
-        <td class="gamelog"><?= htmlspecialchars((string)$row['gameORB']) ?></td>
-        <td class="gamelog"><?= htmlspecialchars((string)$row['gameDRB']) ?></td>
-        <td class="gamelog"><?= htmlspecialchars((string)$reb) ?></td>
-        <td class="gamelog"><?= htmlspecialchars((string)$row['gameAST']) ?></td>
-        <td class="gamelog"><?= htmlspecialchars((string)$row['gameSTL']) ?></td>
-        <td class="gamelog"><?= htmlspecialchars((string)$row['gameTOV']) ?></td>
-        <td class="gamelog"><?= htmlspecialchars((string)$row['gameBLK']) ?></td>
-        <td class="gamelog"><?= htmlspecialchars((string)$row['gamePF']) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput($row['Date']) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$row['gameMIN']) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$pts) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$fgm) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$fga) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput($fgPct) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$row['gameFTM']) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$row['gameFTA']) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput($ftPct) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$row['game3GM']) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$row['game3GA']) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput($tgPct) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$row['gameORB']) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$row['gameDRB']) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$reb) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$row['gameAST']) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$row['gameSTL']) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$row['gameTOV']) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$row['gameBLK']) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$row['gamePF']) ?></td>
     </tr>
             <?php
         }

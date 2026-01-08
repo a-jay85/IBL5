@@ -7,6 +7,7 @@ namespace Player\Views;
 use Player\PlayerStatsRepository;
 use Player\Contracts\PlayerRegularSeasonAveragesViewInterface;
 use BasketballStats\StatsFormatter;
+use Utilities\HtmlSanitizer;
 
 /**
  * PlayerRegularSeasonAveragesView - Renders regular season averages table
@@ -73,7 +74,7 @@ class PlayerRegularSeasonAveragesView implements PlayerRegularSeasonAveragesView
         <?php
         foreach ($historicalStats as $row) {
             $year = (int)$row['year'];
-            $team = htmlspecialchars($row['team']);
+            $team = HtmlSanitizer::safeHtmlOutput($row['team']);
             $teamId = (int)$row['teamid'];
             $gm = (int)$row['games'];
             

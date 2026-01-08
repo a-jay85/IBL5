@@ -6,6 +6,7 @@ namespace Player\Views;
 
 use Player\PlayerStatsRepository;
 use Player\Contracts\PlayerRegularSeasonTotalsViewInterface;
+use Utilities\HtmlSanitizer;
 
 /**
  * PlayerRegularSeasonTotalsView - Renders regular season totals table
@@ -72,7 +73,7 @@ class PlayerRegularSeasonTotalsView implements PlayerRegularSeasonTotalsViewInte
         <?php
         foreach ($historicalStats as $row) {
             $year = (int)$row['year'];
-            $team = htmlspecialchars($row['team']);
+            $team = HtmlSanitizer::safeHtmlOutput($row['team']);
             $teamId = (int)$row['teamid'];
             $gm = (int)$row['games'];
             $min = (int)$row['minutes'];

@@ -6,6 +6,7 @@ namespace Player\Views;
 
 use Player\PlayerRepository;
 use Player\Contracts\PlayerHeatTotalsViewInterface;
+use Utilities\HtmlSanitizer;
 
 /**
  * PlayerHeatTotalsView - Renders H.E.A.T. totals table
@@ -72,7 +73,7 @@ class PlayerHeatTotalsView implements PlayerHeatTotalsViewInterface
         <?php
         foreach ($heatStats as $row) {
             $year = (int)$row['year'];
-            $team = htmlspecialchars($row['team']);
+            $team = HtmlSanitizer::safeHtmlOutput($row['team']);
             $gm = (int)$row['games'];
             $min = (int)$row['minutes'];
             $fgm = (int)$row['fgm'];

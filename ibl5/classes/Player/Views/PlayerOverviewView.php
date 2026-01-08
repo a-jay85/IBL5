@@ -10,6 +10,7 @@ use Player\PlayerStats;
 use Player\Contracts\PlayerOverviewViewInterface;
 use Services\CommonMysqliRepository;
 use BasketballStats\StatsFormatter;
+use Utilities\HtmlSanitizer;
 
 /**
  * PlayerOverviewView - Renders the player overview page
@@ -94,11 +95,11 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
         <td><b>Consistency</b></td>
     </tr>
     <tr align=center>
-        <td><?= htmlspecialchars((string)$player->ratingTalent) ?></td>
-        <td><?= htmlspecialchars((string)$player->ratingSkill) ?></td>
-        <td><?= htmlspecialchars((string)$player->ratingIntangibles) ?></td>
-        <td><?= htmlspecialchars((string)$player->ratingClutch) ?></td>
-        <td><?= htmlspecialchars((string)$player->ratingConsistency) ?></td>
+        <td><?= HtmlSanitizer::safeHtmlOutput((string)$player->ratingTalent) ?></td>
+        <td><?= HtmlSanitizer::safeHtmlOutput((string)$player->ratingSkill) ?></td>
+        <td><?= HtmlSanitizer::safeHtmlOutput((string)$player->ratingIntangibles) ?></td>
+        <td><?= HtmlSanitizer::safeHtmlOutput((string)$player->ratingClutch) ?></td>
+        <td><?= HtmlSanitizer::safeHtmlOutput((string)$player->ratingConsistency) ?></td>
     </tr>
 </table>
         <?php
@@ -121,11 +122,11 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
         <td><b>Tradition</b></td>
     </tr>
     <tr align=center>
-        <td><?= htmlspecialchars((string)$player->freeAgencyLoyalty) ?></td>
-        <td><?= htmlspecialchars((string)$player->freeAgencyPlayForWinner) ?></td>
-        <td><?= htmlspecialchars((string)$player->freeAgencyPlayingTime) ?></td>
-        <td><?= htmlspecialchars((string)$player->freeAgencySecurity) ?></td>
-        <td><?= htmlspecialchars((string)$player->freeAgencyTradition) ?></td>
+        <td><?= HtmlSanitizer::safeHtmlOutput((string)$player->freeAgencyLoyalty) ?></td>
+        <td><?= HtmlSanitizer::safeHtmlOutput((string)$player->freeAgencyPlayForWinner) ?></td>
+        <td><?= HtmlSanitizer::safeHtmlOutput((string)$player->freeAgencyPlayingTime) ?></td>
+        <td><?= HtmlSanitizer::safeHtmlOutput((string)$player->freeAgencySecurity) ?></td>
+        <td><?= HtmlSanitizer::safeHtmlOutput((string)$player->freeAgencyTradition) ?></td>
     </tr>
 </table>
 </center>
@@ -188,28 +189,28 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
             $homeTeam = $this->commonRepository->getTeamnameFromTeamID($row['visitorTID']);
             ?>
     <tr>
-        <td class="gamelog"><?= htmlspecialchars($row['Date']) ?></td>
-        <td class="gamelog"><?= htmlspecialchars($awayTeam) ?></td>
-        <td class="gamelog"><?= htmlspecialchars($homeTeam) ?></td>
-        <td class="gamelog"><?= htmlspecialchars((string)$row['gameMIN']) ?></td>
-        <td class="gamelog"><?= htmlspecialchars((string)$pts) ?></td>
-        <td class="gamelog"><?= htmlspecialchars((string)$fgm) ?></td>
-        <td class="gamelog"><?= htmlspecialchars((string)$fga) ?></td>
-        <td class="gamelog"><?= htmlspecialchars($fgPct) ?></td>
-        <td class="gamelog"><?= htmlspecialchars((string)$row['gameFTM']) ?></td>
-        <td class="gamelog"><?= htmlspecialchars((string)$row['gameFTA']) ?></td>
-        <td class="gamelog"><?= htmlspecialchars($ftPct) ?></td>
-        <td class="gamelog"><?= htmlspecialchars((string)$row['game3GM']) ?></td>
-        <td class="gamelog"><?= htmlspecialchars((string)$row['game3GA']) ?></td>
-        <td class="gamelog"><?= htmlspecialchars($tgPct) ?></td>
-        <td class="gamelog"><?= htmlspecialchars((string)$row['gameORB']) ?></td>
-        <td class="gamelog"><?= htmlspecialchars((string)$row['gameDRB']) ?></td>
-        <td class="gamelog"><?= htmlspecialchars((string)$reb) ?></td>
-        <td class="gamelog"><?= htmlspecialchars((string)$row['gameAST']) ?></td>
-        <td class="gamelog"><?= htmlspecialchars((string)$row['gameSTL']) ?></td>
-        <td class="gamelog"><?= htmlspecialchars((string)$row['gameTOV']) ?></td>
-        <td class="gamelog"><?= htmlspecialchars((string)$row['gameBLK']) ?></td>
-        <td class="gamelog"><?= htmlspecialchars((string)$row['gamePF']) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput($row['Date']) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput($awayTeam) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput($homeTeam) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$row['gameMIN']) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$pts) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$fgm) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$fga) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput($fgPct) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$row['gameFTM']) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$row['gameFTA']) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput($ftPct) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$row['game3GM']) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$row['game3GA']) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput($tgPct) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$row['gameORB']) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$row['gameDRB']) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$reb) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$row['gameAST']) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$row['gameSTL']) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$row['gameTOV']) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$row['gameBLK']) ?></td>
+        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$row['gamePF']) ?></td>
     </tr>
             <?php
         }

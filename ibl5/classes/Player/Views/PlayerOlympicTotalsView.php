@@ -6,6 +6,7 @@ namespace Player\Views;
 
 use Player\PlayerRepository;
 use Player\Contracts\PlayerOlympicTotalsViewInterface;
+use Utilities\HtmlSanitizer;
 
 /**
  * PlayerOlympicTotalsView - Renders Olympics totals table
@@ -72,7 +73,7 @@ class PlayerOlympicTotalsView implements PlayerOlympicTotalsViewInterface
         <?php
         foreach ($olympicsStats as $row) {
             $year = (int)$row['year'];
-            $team = htmlspecialchars($row['team']);
+            $team = HtmlSanitizer::safeHtmlOutput($row['team']);
             $gm = (int)$row['games'];
             $min = (int)$row['minutes'];
             $fgm = (int)$row['fgm'];

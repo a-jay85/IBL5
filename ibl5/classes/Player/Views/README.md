@@ -199,7 +199,7 @@ include "footer.php";
 
 ### 1. **Security**
 - ✅ All queries use prepared statements via PlayerRepository
-- ✅ Automatic HTML escaping via htmlspecialchars()
+- ✅ Automatic HTML escaping via `HtmlSanitizer::safeHtmlOutput()`
 - ✅ No SQL injection vulnerabilities
 
 ### 2. **Maintainability**

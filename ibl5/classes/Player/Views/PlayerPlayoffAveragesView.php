@@ -8,6 +8,7 @@ use Player\PlayerRepository;
 use Player\PlayerStatsRepository;
 use Player\Contracts\PlayerPlayoffAveragesViewInterface;
 use BasketballStats\StatsFormatter;
+use Utilities\HtmlSanitizer;
 
 /**
  * PlayerPlayoffAveragesView - Renders playoff averages table
@@ -71,7 +72,7 @@ class PlayerPlayoffAveragesView implements PlayerPlayoffAveragesViewInterface
         <?php
         foreach ($playoffStats as $row) {
             $year = (int)$row['year'];
-            $team = htmlspecialchars($row['team']);
+            $team = HtmlSanitizer::safeHtmlOutput($row['team']);
             $gm = (int)$row['games'];
             
             if ($gm > 0) {

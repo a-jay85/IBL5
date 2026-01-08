@@ -7,6 +7,7 @@ namespace Player\Views;
 use Player\PlayerRepository;
 use Player\Contracts\PlayerSeasonStatsViewInterface;
 use BasketballStats\StatsFormatter;
+use Utilities\HtmlSanitizer;
 
 /**
  * PlayerSeasonStatsView - Renders regular season statistics (totals/averages)
@@ -57,38 +58,38 @@ class PlayerSeasonStatsView implements PlayerSeasonStatsViewInterface
     </tr>
         <?php
         foreach ($historicalStats as $stats) {
-            $team = htmlspecialchars(stripslashes($stats['team']));
-            $year = htmlspecialchars($stats['year']);
-            $games = htmlspecialchars($stats['games']);
-            $minutes = htmlspecialchars($stats['minutes']);
+            $team = HtmlSanitizer::safeHtmlOutput($stats['team']);
+            $year = HtmlSanitizer::safeHtmlOutput($stats['year']);
+            $games = HtmlSanitizer::safeHtmlOutput($stats['games']);
+            $minutes = HtmlSanitizer::safeHtmlOutput($stats['minutes']);
             
             $fgm = $stats['fgm'];
             $fga = $stats['fga'];
-            $fgMade = htmlspecialchars($fgm);
-            $fgAttempted = htmlspecialchars($fga);
+            $fgMade = HtmlSanitizer::safeHtmlOutput($fgm);
+            $fgAttempted = HtmlSanitizer::safeHtmlOutput($fga);
             $fgPercent = StatsFormatter::formatPercentage($fgm, $fga);
             
             $ftm = $stats['ftm'];
             $fta = $stats['fta'];
-            $ftMade = htmlspecialchars($ftm);
-            $ftAttempted = htmlspecialchars($fta);
+            $ftMade = HtmlSanitizer::safeHtmlOutput($ftm);
+            $ftAttempted = HtmlSanitizer::safeHtmlOutput($fta);
             $ftPercent = StatsFormatter::formatPercentage($ftm, $fta);
             
             $tgm = $stats['tgm'];
             $tga = $stats['tga'];
-            $tgMade = htmlspecialchars($tgm);
-            $tgAttempted = htmlspecialchars($tga);
+            $tgMade = HtmlSanitizer::safeHtmlOutput($tgm);
+            $tgAttempted = HtmlSanitizer::safeHtmlOutput($tga);
             $tgPercent = StatsFormatter::formatPercentage($tgm, $tga);
             
-            $orb = htmlspecialchars($stats['orb']);
-            $drb = htmlspecialchars($stats['drb']);
-            $reb = htmlspecialchars($stats['reb']);
-            $ast = htmlspecialchars($stats['ast']);
-            $stl = htmlspecialchars($stats['stl']);
-            $to = htmlspecialchars($stats['tovr']);
-            $blk = htmlspecialchars($stats['blk']);
-            $pf = htmlspecialchars($stats['pf']);
-            $pts = htmlspecialchars($stats['pts']);
+            $orb = HtmlSanitizer::safeHtmlOutput($stats['orb']);
+            $drb = HtmlSanitizer::safeHtmlOutput($stats['drb']);
+            $reb = HtmlSanitizer::safeHtmlOutput($stats['reb']);
+            $ast = HtmlSanitizer::safeHtmlOutput($stats['ast']);
+            $stl = HtmlSanitizer::safeHtmlOutput($stats['stl']);
+            $to = HtmlSanitizer::safeHtmlOutput($stats['tovr']);
+            $blk = HtmlSanitizer::safeHtmlOutput($stats['blk']);
+            $pf = HtmlSanitizer::safeHtmlOutput($stats['pf']);
+            $pts = HtmlSanitizer::safeHtmlOutput($stats['pts']);
             ?>
     <tr align=center>
         <td><?= $team ?></td>
@@ -154,9 +155,9 @@ class PlayerSeasonStatsView implements PlayerSeasonStatsViewInterface
                 continue;
             }
 
-            $team = htmlspecialchars(stripslashes($stats['team']));
-            $year = htmlspecialchars($stats['year']);
-            $gamesDisplay = htmlspecialchars($games);
+            $team = HtmlSanitizer::safeHtmlOutput($stats['team']);
+            $year = HtmlSanitizer::safeHtmlOutput($stats['year']);
+            $gamesDisplay = HtmlSanitizer::safeHtmlOutput($games);
             
             $avgMinutes = StatsFormatter::formatAverage($stats['minutes'], $games);
             $fgPercent = StatsFormatter::formatPercentage($stats['fgm'], $stats['fga']);

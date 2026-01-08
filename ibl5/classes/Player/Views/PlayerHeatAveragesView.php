@@ -8,6 +8,7 @@ use Player\PlayerRepository;
 use Player\PlayerStatsRepository;
 use Player\Contracts\PlayerHeatAveragesViewInterface;
 use BasketballStats\StatsFormatter;
+use Utilities\HtmlSanitizer;
 
 /**
  * PlayerHeatAveragesView - Renders H.E.A.T. averages table
@@ -71,7 +72,7 @@ class PlayerHeatAveragesView implements PlayerHeatAveragesViewInterface
         <?php
         foreach ($heatStats as $row) {
             $year = (int)$row['year'];
-            $team = htmlspecialchars($row['team']);
+            $team = HtmlSanitizer::safeHtmlOutput($row['team']);
             $gm = (int)$row['games'];
             
             if ($gm > 0) {

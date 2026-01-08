@@ -6,6 +6,7 @@ namespace Player\Views;
 
 use Player\PlayerRepository;
 use Player\Contracts\PlayerAwardsViewInterface;
+use Utilities\HtmlSanitizer;
 
 /**
  * PlayerAwardsView - Renders player awards and All-Star activity
@@ -42,19 +43,19 @@ class PlayerAwardsView implements PlayerAwardsViewInterface
 </tr>
 <tr>
     <td><b>All Star Games:</b></td>
-    <td><?= htmlspecialchars((string)$allStarGames) ?></td>
+    <td><?= HtmlSanitizer::safeHtmlOutput((string)$allStarGames) ?></td>
 </tr>
 <tr>
     <td><b>Three-Point<br>Contests:</b></td>
-    <td><?= htmlspecialchars((string)$threePointContests) ?></td>
+    <td><?= HtmlSanitizer::safeHtmlOutput((string)$threePointContests) ?></td>
 </tr>
 <tr>
     <td><b>Slam Dunk<br>Competitions:</b></td>
-    <td><?= htmlspecialchars((string)$dunkContests) ?></td>
+    <td><?= HtmlSanitizer::safeHtmlOutput((string)$dunkContests) ?></td>
 </tr>
 <tr>
     <td><b>Rookie-Sophomore<br>Challenges:</b></td>
-    <td><?= htmlspecialchars((string)$rookieSophChallenges) ?></td>
+    <td><?= HtmlSanitizer::safeHtmlOutput((string)$rookieSophChallenges) ?></td>
 </tr>
         </table>
         <?php
@@ -77,8 +78,8 @@ class PlayerAwardsView implements PlayerAwardsViewInterface
     </tr>
         <?php
         foreach ($awards as $award) {
-            $year = htmlspecialchars($award['year']);
-            $awardName = htmlspecialchars($award['Award']);
+            $year = HtmlSanitizer::safeHtmlOutput($award['year']);
+            $awardName = HtmlSanitizer::safeHtmlOutput($award['Award']);
             ?>
     <tr>
         <td align=center><?= $year ?></td>

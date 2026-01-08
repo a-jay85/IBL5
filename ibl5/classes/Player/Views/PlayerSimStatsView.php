@@ -7,6 +7,7 @@ namespace Player\Views;
 use Player\PlayerStatsRepository;
 use Player\Contracts\PlayerSimStatsViewInterface;
 use BasketballStats\StatsFormatter;
+use Utilities\HtmlSanitizer;
 
 /**
  * PlayerSimStatsView - Renders sim-by-sim statistics
@@ -94,20 +95,20 @@ class PlayerSimStatsView implements PlayerSimStatsViewInterface
             $avgPTS = sprintf('%01.1f', $totals['pts'] / $numberOfGames);
             ?>
     <tr>
-        <td><?= htmlspecialchars((string)$simNumber) ?></td>
-        <td><?= htmlspecialchars((string)$numberOfGames) ?></td>
-        <td><?= htmlspecialchars($avgMinutes) ?></td>
-        <td><?= htmlspecialchars($avgFGP) ?></td>
-        <td><?= htmlspecialchars($avgFTP) ?></td>
-        <td><?= htmlspecialchars($avg3GP) ?></td>
-        <td><?= htmlspecialchars($avgORB) ?></td>
-        <td><?= htmlspecialchars($avgREB) ?></td>
-        <td><?= htmlspecialchars($avgAST) ?></td>
-        <td><?= htmlspecialchars($avgSTL) ?></td>
-        <td><?= htmlspecialchars($avgTO) ?></td>
-        <td><?= htmlspecialchars($avgBLK) ?></td>
-        <td><?= htmlspecialchars($avgPF) ?></td>
-        <td><?= htmlspecialchars($avgPTS) ?></td>
+        <td><?= HtmlSanitizer::safeHtmlOutput((string)$simNumber) ?></td>
+        <td><?= HtmlSanitizer::safeHtmlOutput((string)$numberOfGames) ?></td>
+        <td><?= HtmlSanitizer::safeHtmlOutput($avgMinutes) ?></td>
+        <td><?= HtmlSanitizer::safeHtmlOutput($avgFGP) ?></td>
+        <td><?= HtmlSanitizer::safeHtmlOutput($avgFTP) ?></td>
+        <td><?= HtmlSanitizer::safeHtmlOutput($avg3GP) ?></td>
+        <td><?= HtmlSanitizer::safeHtmlOutput($avgORB) ?></td>
+        <td><?= HtmlSanitizer::safeHtmlOutput($avgREB) ?></td>
+        <td><?= HtmlSanitizer::safeHtmlOutput($avgAST) ?></td>
+        <td><?= HtmlSanitizer::safeHtmlOutput($avgSTL) ?></td>
+        <td><?= HtmlSanitizer::safeHtmlOutput($avgTO) ?></td>
+        <td><?= HtmlSanitizer::safeHtmlOutput($avgBLK) ?></td>
+        <td><?= HtmlSanitizer::safeHtmlOutput($avgPF) ?></td>
+        <td><?= HtmlSanitizer::safeHtmlOutput($avgPTS) ?></td>
     </tr>
             <?php
         }

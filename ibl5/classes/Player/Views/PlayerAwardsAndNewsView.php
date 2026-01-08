@@ -49,8 +49,8 @@ class PlayerAwardsAndNewsView implements PlayerAwardsAndNewsViewInterface
     </tr>
         <?php
         foreach ($awards as $award) {
-            $year = htmlspecialchars((string)$award['year']);
-            $type = htmlspecialchars($award['Award']);
+            $year = HtmlSanitizer::safeHtmlOutput((string)$award['year']);
+            $type = HtmlSanitizer::safeHtmlOutput($award['Award']);
             ?>
     <tr>
         <td><?= $year ?> <?= $type ?></td>

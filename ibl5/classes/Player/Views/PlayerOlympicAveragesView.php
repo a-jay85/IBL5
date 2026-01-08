@@ -8,6 +8,7 @@ use Player\PlayerRepository;
 use Player\PlayerStatsRepository;
 use Player\Contracts\PlayerOlympicAveragesViewInterface;
 use BasketballStats\StatsFormatter;
+use Utilities\HtmlSanitizer;
 
 /**
  * PlayerOlympicAveragesView - Renders Olympics averages table
@@ -71,7 +72,7 @@ class PlayerOlympicAveragesView implements PlayerOlympicAveragesViewInterface
         <?php
         foreach ($olympicsStats as $row) {
             $year = (int)$row['year'];
-            $team = htmlspecialchars($row['team']);
+            $team = HtmlSanitizer::safeHtmlOutput($row['team']);
             $gm = (int)$row['games'];
             
             if ($gm > 0) {

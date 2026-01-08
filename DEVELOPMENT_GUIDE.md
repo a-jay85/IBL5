@@ -54,18 +54,18 @@
 - CI/CD: Tests run automatically via GitHub Actions (`.github/workflows/tests.yml`)
 
 **Refactoring Steps:**
-1. Analyze (1-2 days) - Identify responsibilities
-2. Design (1-2 days) - Plan class structure & interfaces
-3. Create Interfaces (1-2 days) - Document contracts with PHPDoc
-4. Extract (1-2 weeks) - Repository → Validator → Processor → View → Controller
-5. Implement Interfaces (1 day) - Add interface implementations and @see docblocks
-6. Test (1 week) - Unit + integration tests
-7. Audit (2-3 days) - Security review
-8. **Production Validation (1-2 days)** - Compare localhost against iblhoops.net
+1. Analyze - Identify responsibilities
+2. Design - Plan class structure & interfaces
+3. Create Interfaces - Document contracts with PHPDoc
+4. Extract - Repository → Validator → Processor → View → Controller
+5. Implement Interfaces - Add interface implementations and @see docblocks
+6. Test - Unit + integration tests
+7. Audit - Security review
+8. **Production Validation** - Compare localhost against iblhoops.net
    - Verify all output (text, data, ordering, formatting) matches exactly
    - If mismatches found, debug and iterate until perfect match
    - This is the final verification gate before merge
-9. Review (2-3 days) - Code review, performance
+9. Review - Code review, performance
 
 **Class Pattern with Interface Architecture:**
 ```

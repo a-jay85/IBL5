@@ -2,6 +2,20 @@
 
 use Player\Player;
 use Player\PlayerStats;
+use Player\PlayerPageService;
+use Player\PlayerRepository;
+use Player\PlayerStatsRepository;
+use Player\Views\PlayerViewStyles;
+use Player\Views\PlayerHeaderView;
+use Player\Views\PlayerButtonsView;
+use Player\Views\PlayerBioView;
+use Player\Views\PlayerStatsView;
+use Player\Views\PlayerMenuView;
+use Player\Views\PlayerViewFactory;
+use RookieOption\RookieOptionValidator;
+use RookieOption\RookieOptionFormView;
+use Services\CommonMysqliRepository;
+use Negotiation\NegotiationProcessor;
 
 global $mysqli_db;
 
@@ -27,9 +41,8 @@ function showpage($playerID, $pageView)
     $playerStats = PlayerStats::withPlayerID($mysqli_db, $playerID);
     $pageView = ($pageView !== null) ? intval($pageView) : null;
     
-    // Initialize service and view helper
-    $pageService = new \Player\PlayerPageService($mysqli_db);
-    $viewHelper = new \Player\PlayerPageViewHelper();
+    // Initialize service
+    $pageService = new PlayerPageService($mysqli_db);
 
     // DISPLAY PAGE
 
@@ -37,50 +50,50 @@ function showpage($playerID, $pageView)
     OpenTable();
     
     // Include centralized player view styles
-    echo \Player\Views\PlayerViewStyles::getStyles();
+    echo PlayerViewStyles::getStyles();
     
     UI::playerMenu();
 
     // Render player header
-    echo $viewHelper->renderPlayerHeader($player, $playerID);
+    echo PlayerHeaderView::render($player, $playerID);
 
     // Render action buttons based on business logic
     $userTeamName = $commonRepository->getTeamnameFromUsername(strval($cookie[1] ?? ''));
     $userTeam = Team::initialize($mysqli_db, $userTeamName);
 
     if ($pageService->shouldShowRookieOptionUsedMessage($player)) {
-        echo $viewHelper->renderRookieOptionUsedMessage();
+        echo PlayerButtonsView::renderRookieOptionUsedMessage();
     } elseif ($pageService->canShowRenegotiationButton($player, $userTeam, $season)) {
-        echo $viewHelper->renderRenegotiationButton($playerID);
+        echo PlayerButtonsView::renderRenegotiationButton($playerID);
     }
 
     if ($pageService->canShowRookieOptionButton($player, $userTeam, $season)) {
-        echo $viewHelper->renderRookieOptionButton($playerID);
+        echo PlayerButtonsView::renderRookieOptionButton($playerID);
     }
 
     // Render player bio section
     $contract_display = implode("/", $player->getRemainingContractArray());
-    echo $viewHelper->renderPlayerBioSection($player, $contract_display);
+    echo PlayerBioView::render($player, $contract_display);
 
     // Get All-Star Activity data using PlayerRepository
-    $playerRepository = new \Player\PlayerRepository($mysqli_db);
+    $playerRepository = new PlayerRepository($mysqli_db);
     $asg = $playerRepository->getAllStarGameCount($player->name);
     $threepointcontests = $playerRepository->getThreePointContestCount($player->name);
     $dunkcontests = $playerRepository->getDunkContestCount($player->name);
     $rooksoph = $playerRepository->getRookieSophChallengeCount($player->name);
 
     // Render player highs table with All-Star Activity data
-    echo $viewHelper->renderPlayerHighsTable($playerStats, $asg, $threepointcontests, $dunkcontests, $rooksoph);
+    echo PlayerStatsView::renderPlayerHighsTable($playerStats, $asg, $threepointcontests, $dunkcontests, $rooksoph);
     
     // Close the outer row started in renderPlayerHeader
     echo "</tr>";
 
     // Render player menu
-    echo $viewHelper->renderPlayerMenu($playerID);
+    echo PlayerMenuView::render($playerID);
 
     // Create view factory with all required dependencies
-    $statsRepository = new \Player\PlayerStatsRepository($mysqli_db);
-    $viewFactory = new \Player\Views\PlayerViewFactory($playerRepository, $statsRepository, $commonRepository);
+    $statsRepository = new PlayerStatsRepository($mysqli_db);
+    $viewFactory = new PlayerViewFactory($playerRepository, $statsRepository, $commonRepository);
 
     // Render the appropriate view using the factory
     $view = $viewFactory->createView($pageView);
@@ -129,7 +142,7 @@ function negotiate($playerID)
     $playerID = intval($playerID);
     
     // Get user's team name using existing CommonRepository
-    $commonRepository = new Services\CommonMysqliRepository($mysqli_db);
+    $commonRepository = new CommonMysqliRepository($mysqli_db);
     $userTeamName = $commonRepository->getTeamnameFromUsername(strval($cookie[1] ?? ''));
 
     Nuke\Header::header();
@@ -137,7 +150,7 @@ function negotiate($playerID)
     UI::playerMenu();
 
     // Use NegotiationProcessor to handle all business logic
-    $processor = new Negotiation\NegotiationProcessor($db, $mysqli_db);
+    $processor = new NegotiationProcessor($db, $mysqli_db);
     echo $processor->processNegotiation($playerID, $userTeamName, $prefix);
 
     CloseTable();
@@ -149,10 +162,10 @@ function rookieoption($pid)
     global $db, $cookie, $mysqli_db;
     
     // Initialize dependencies
-    $commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
+    $commonRepository = new CommonMysqliRepository($mysqli_db);
     $season = new Season($mysqli_db);
-    $validator = new \RookieOption\RookieOptionValidator();
-    $formView = new \RookieOption\RookieOptionFormView();
+    $validator = new RookieOptionValidator();
+    $formView = new RookieOptionFormView();
     
     // Get user's team name
     $userTeamName = $commonRepository->getTeamnameFromUsername(strval($cookie[1] ?? ''));

@@ -80,6 +80,8 @@ class PlayerStats implements PlayerStatsInterface
     public $seasonPlayoffHighAssists;
     public $seasonPlayoffHighSteals;
     public $seasonPlayoffHighBlocks;
+    public $seasonPlayoffDoubleDoubles;
+    public $seasonPlayoffTripleDoubles;
 
     public $careerSeasonHighPoints;
     public $careerSeasonHighRebounds;
@@ -94,6 +96,8 @@ class PlayerStats implements PlayerStatsInterface
     public $careerPlayoffHighAssists;
     public $careerPlayoffHighSteals;
     public $careerPlayoffHighBlocks;
+    public $careerPlayoffDoubleDoubles;
+    public $careerPlayoffTripleDoubles;
 
     public $careerGamesPlayed;
     public $careerMinutesPlayed;

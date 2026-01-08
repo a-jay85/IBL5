@@ -231,6 +231,171 @@ class PlayerViewStyles
 .sortable.player-table {
     margin: 0 auto;
 }
+
+/* ============================================
+   Player Header Components
+   ============================================ */
+
+.player-header-table {
+    width: 100%;
+}
+
+.player-header-cell {
+    vertical-align: top;
+}
+
+.player-title {
+    font-size: 1.5em;
+    font-weight: bold;
+    margin: 0.5em 0;
+}
+
+/* ============================================
+   Player Action Buttons
+   ============================================ */
+
+.player-button {
+    float: right;
+    border: 1px solid #000;
+    text-align: center;
+    padding: 8px;
+}
+
+.player-button td {
+    text-align: center;
+    padding: 8px;
+}
+
+.rookie-option-used {
+    background-color: #ff0000;
+    color: #ffffff;
+}
+
+.renegotiation-button {
+    background-color: #ff0000;
+}
+
+.renegotiation-button a {
+    color: #ffffff;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+.rookie-option-button {
+    background-color: #ffbb00;
+}
+
+.rookie-option-button a {
+    color: #000000;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+/* ============================================
+   Player Bio Section
+   ============================================ */
+
+.player-bio {
+    line-height: 1.6;
+}
+
+.player-info,
+.player-draft-info,
+.player-contract-info {
+    margin: 8px 0;
+}
+
+.player-ratings-container {
+    text-align: center;
+    margin: 12px 0;
+}
+
+.player-ratings-table {
+    margin: 0 auto;
+    border-collapse: separate;
+    border-spacing: 0px 0px;
+}
+
+.player-ratings-table td,
+.player-ratings-table th {
+    text-align: center;
+    padding: 2px 8px;
+}
+
+.player-ratings-table .ratings-header-row th {
+    font-weight: bold;
+}
+
+/* ============================================
+   Player Highs Table
+   ============================================ */
+
+.player-highs-container {
+    vertical-align: top;
+}
+
+.player-highs-table {
+    border: 1px solid #000;
+    border-collapse: collapse;
+    width: 100%;
+}
+
+.player-highs-table td,
+.player-highs-table th {
+    border: 1px solid #000;
+    padding: 4px 8px;
+}
+
+.highs-main-header {
+    background-color: #0000cc;
+    color: #ffffff;
+    text-align: center;
+    font-weight: bold;
+}
+
+.highs-section-header {
+    background-color: #0000cc;
+    color: #ffffff;
+    text-align: center;
+}
+
+.highs-column-header {
+    background-color: #0000cc;
+    color: #ffffff;
+    font-weight: bold;
+    text-align: center;
+}
+
+.player-highs-table .stat-label {
+    text-align: right;
+    padding-left: 2px;
+    padding-right: 2px;
+    font-weight: bold;
+}
+
+.player-highs-table .stat-value {
+    text-align: center;
+    padding-left: 2px;
+    padding-right: 2px;
+}
+
+/* ============================================
+   Player Menu Navigation
+   ============================================ */
+
+.player-menu-container {
+    text-align: center;
+}
+
+.player-menu-title {
+    font-weight: bold;
+    margin-bottom: 8px;
+}
+
+.player-menu-links {
+    text-align: center;
+    line-height: 1.8;
+}
 </style>
 CSS;
     }

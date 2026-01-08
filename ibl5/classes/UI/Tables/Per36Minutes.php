@@ -3,7 +3,6 @@
 namespace UI\Tables;
 
 use Player\Player;
-use Player\PlayerStats;
 use Statistics\StatsFormatter;
 
 /**
@@ -27,7 +26,7 @@ class Per36Minutes
         foreach ($result as $plrRow) {
             if ($yr == "") {
                 $player = Player::withPlrRow($db, $plrRow);
-                $playerStats = PlayerStats::withPlrRow($db, $plrRow);
+                $playerStats = \PlayerStats::withPlrRow($db, $plrRow);
 
                 $firstCharacterOfPlayerName = substr($player->name, 0, 1);
                 if ($firstCharacterOfPlayerName == '|') {
@@ -35,7 +34,7 @@ class Per36Minutes
                 }
             } else {
                 $player = Player::withHistoricalPlrRow($db, $plrRow);
-                $playerStats = PlayerStats::withHistoricalPlrRow($db, $plrRow);
+                $playerStats = \PlayerStats::withHistoricalPlrRow($db, $plrRow);
             }
 
             $bgcolor = (($i % 2) == 0) ? "FFFFFF" : "EEEEEE";

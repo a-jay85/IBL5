@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace Player\Views;
 
-use Player\Contracts\PlayerAwardsViewInterface;
 use Player\PlayerRepository;
 
 /**
- * @see PlayerAwardsViewInterface
+ * PlayerAwardsView - Renders player awards and All-Star activity
+ * 
+ * Pure rendering with no database logic - all data fetched via PlayerRepository
  */
-class PlayerAwardsView implements PlayerAwardsViewInterface
+class PlayerAwardsView
 {
     private PlayerRepository $repository;
 

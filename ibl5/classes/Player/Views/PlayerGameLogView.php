@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace Player\Views;
 
-use Player\Contracts\PlayerGameLogViewInterface;
 use Player\PlayerRepository;
 
 /**
- * @see PlayerGameLogViewInterface
+ * PlayerGameLogView - Renders player game logs by sim
+ * 
+ * Pure rendering with no database logic - all data fetched via PlayerRepository
  */
-class PlayerGameLogView implements PlayerGameLogViewInterface
+class PlayerGameLogView
 {
     private PlayerRepository $repository;
 

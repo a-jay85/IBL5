@@ -4,14 +4,15 @@ declare(strict_types=1);
 
 namespace Player\Views;
 
-use Player\Contracts\PlayerOlympicsStatsViewInterface;
 use Player\PlayerRepository;
 use Statistics\StatsFormatter;
 
 /**
- * @see PlayerOlympicsStatsViewInterface
+ * PlayerOlympicsStatsView - Renders Olympics tournament statistics
+ * 
+ * Pure rendering with no database logic - all data fetched via PlayerRepository
  */
-class PlayerOlympicsStatsView implements PlayerOlympicsStatsViewInterface
+class PlayerOlympicsStatsView
 {
     private PlayerRepository $repository;
 

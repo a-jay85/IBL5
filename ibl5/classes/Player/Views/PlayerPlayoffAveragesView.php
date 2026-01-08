@@ -7,6 +7,7 @@ namespace Player\Views;
 use Player\PlayerRepository;
 use Player\PlayerStatsRepository;
 use Player\Contracts\PlayerPlayoffAveragesViewInterface;
+use BasketballStats\StatsFormatter;
 
 /**
  * PlayerPlayoffAveragesView - Renders playoff averages table
@@ -74,19 +75,19 @@ class PlayerPlayoffAveragesView implements PlayerPlayoffAveragesViewInterface
             $gm = (int)$row['games'];
             
             if ($gm > 0) {
-                $min = number_format((float)$row['minutes'] / $gm, 1);
-                $fgp = $this->formatPercentage((int)$row['fgm'], (int)$row['fga']);
-                $ftp = $this->formatPercentage((int)$row['ftm'], (int)$row['fta']);
-                $tgp = $this->formatPercentage((int)$row['tgm'], (int)$row['tga']);
-                $orb = number_format((float)$row['orb'] / $gm, 1);
-                $reb = number_format((float)$row['reb'] / $gm, 1);
-                $ast = number_format((float)$row['ast'] / $gm, 1);
-                $stl = number_format((float)$row['stl'] / $gm, 1);
-                $tvr = number_format((float)$row['tvr'] / $gm, 1);
-                $blk = number_format((float)$row['blk'] / $gm, 1);
-                $pf = number_format((float)$row['pf'] / $gm, 1);
-                $pts = number_format((float)$row['pts'] / $gm, 1);
-                $eff = isset($row['eff']) ? number_format((float)$row['eff'] / $gm, 1) : '0.0';
+                $min = StatsFormatter::formatPerGameAverage((float)$row['minutes'], $gm);
+                $fgp = StatsFormatter::formatPercentage((int)$row['fgm'], (int)$row['fga']);
+                $ftp = StatsFormatter::formatPercentage((int)$row['ftm'], (int)$row['fta']);
+                $tgp = StatsFormatter::formatPercentage((int)$row['tgm'], (int)$row['tga']);
+                $orb = StatsFormatter::formatPerGameAverage((float)$row['orb'], $gm);
+                $reb = StatsFormatter::formatPerGameAverage((float)$row['reb'], $gm);
+                $ast = StatsFormatter::formatPerGameAverage((float)$row['ast'], $gm);
+                $stl = StatsFormatter::formatPerGameAverage((float)$row['stl'], $gm);
+                $tvr = StatsFormatter::formatPerGameAverage((float)$row['tvr'], $gm);
+                $blk = StatsFormatter::formatPerGameAverage((float)$row['blk'], $gm);
+                $pf = StatsFormatter::formatPerGameAverage((float)$row['pf'], $gm);
+                $pts = StatsFormatter::formatPerGameAverage((float)$row['pts'], $gm);
+                $eff = isset($row['eff']) ? StatsFormatter::formatPerGameAverage((float)$row['eff'], $gm) : '0.0';
             } else {
                 $min = $fgp = $ftp = $tgp = $orb = $reb = $ast = $stl = $tvr = $blk = $pf = $pts = $eff = '0.0';
             }
@@ -114,26 +115,26 @@ class PlayerPlayoffAveragesView implements PlayerPlayoffAveragesViewInterface
 
         // Career averages row
         if ($careerAverages) {
-            $carFgp = $this->formatPercentage((int)$careerAverages['fgm'], (int)$careerAverages['fga']);
-            $carFtp = $this->formatPercentage((int)$careerAverages['ftm'], (int)$careerAverages['fta']);
-            $carTgp = $this->formatPercentage((int)$careerAverages['tgm'], (int)$careerAverages['tga']);
+            $carFgp = StatsFormatter::formatPercentage((int)$careerAverages['fgm'], (int)$careerAverages['fga']);
+            $carFtp = StatsFormatter::formatPercentage((int)$careerAverages['ftm'], (int)$careerAverages['fta']);
+            $carTgp = StatsFormatter::formatPercentage((int)$careerAverages['tgm'], (int)$careerAverages['tga']);
             ?>
     <tr style="font-weight: bold;">
         <td colspan=2><center>Playoff Career</center></td>
         <td><center><?= (int)$careerAverages['games'] ?></center></td>
-        <td><center><?= number_format((float)$careerAverages['min'], 1) ?></center></td>
+        <td><center><?= StatsFormatter::formatWithDecimals((float)$careerAverages['min'], 1) ?></center></td>
         <td><center><?= $carFgp ?></center></td>
         <td><center><?= $carFtp ?></center></td>
         <td><center><?= $carTgp ?></center></td>
-        <td><center><?= number_format((float)$careerAverages['orb'], 1) ?></center></td>
-        <td><center><?= number_format((float)$careerAverages['reb'], 1) ?></center></td>
-        <td><center><?= number_format((float)$careerAverages['ast'], 1) ?></center></td>
-        <td><center><?= number_format((float)$careerAverages['stl'], 1) ?></center></td>
-        <td><center><?= number_format((float)$careerAverages['tvr'], 1) ?></center></td>
-        <td><center><?= number_format((float)$careerAverages['blk'], 1) ?></center></td>
-        <td><center><?= number_format((float)$careerAverages['pf'], 1) ?></center></td>
-        <td><center><?= number_format((float)$careerAverages['pts'], 1) ?></center></td>
-        <td><center><?= number_format((float)($careerAverages['eff'] ?? 0), 1) ?></center></td>
+        <td><center><?= StatsFormatter::formatWithDecimals((float)$careerAverages['orb'], 1) ?></center></td>
+        <td><center><?= StatsFormatter::formatWithDecimals((float)$careerAverages['reb'], 1) ?></center></td>
+        <td><center><?= StatsFormatter::formatWithDecimals((float)$careerAverages['ast'], 1) ?></center></td>
+        <td><center><?= StatsFormatter::formatWithDecimals((float)$careerAverages['stl'], 1) ?></center></td>
+        <td><center><?= StatsFormatter::formatWithDecimals((float)$careerAverages['tvr'], 1) ?></center></td>
+        <td><center><?= StatsFormatter::formatWithDecimals((float)$careerAverages['blk'], 1) ?></center></td>
+        <td><center><?= StatsFormatter::formatWithDecimals((float)$careerAverages['pf'], 1) ?></center></td>
+        <td><center><?= StatsFormatter::formatWithDecimals((float)$careerAverages['pts'], 1) ?></center></td>
+        <td><center><?= StatsFormatter::formatWithDecimals((float)($careerAverages['eff'] ?? 0), 1) ?></center></td>
     </tr>
             <?php
         }
@@ -141,16 +142,5 @@ class PlayerPlayoffAveragesView implements PlayerPlayoffAveragesViewInterface
 </table>
         <?php
         return ob_get_clean();
-    }
-
-    /**
-     * Calculate percentage from made and attempted values
-     */
-    private function formatPercentage(int $made, int $attempted): string
-    {
-        if ($attempted === 0) {
-            return '0.000';
-        }
-        return sprintf('%01.3f', $made / $attempted);
     }
 }

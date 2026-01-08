@@ -6,6 +6,7 @@ namespace Player\Views;
 
 use Player\PlayerRepository;
 use Player\Contracts\PlayerGameLogViewInterface;
+use BasketballStats\StatsFormatter;
 
 /**
  * PlayerGameLogView - Renders player game logs by sim
@@ -106,18 +107,18 @@ class PlayerGameLogView implements PlayerGameLogViewInterface
             }
 
             // Calculate averages
-            $avgMinutes = number_format($totalMinutes / $numberOfGames, 1);
-            $avgFGP = $totalFGA > 0 ? number_format(($totalFGM / $totalFGA) * 100, 1) : '0.0';
-            $avgFTP = $totalFTA > 0 ? number_format(($totalFTM / $totalFTA) * 100, 1) : '0.0';
-            $avg3GP = $total3GA > 0 ? number_format(($total3GM / $total3GA) * 100, 1) : '0.0';
-            $avgORB = number_format($totalORB / $numberOfGames, 1);
-            $avgREB = number_format(($totalORB + $totalDRB) / $numberOfGames, 1);
-            $avgAST = number_format($totalAST / $numberOfGames, 1);
-            $avgSTL = number_format($totalSTL / $numberOfGames, 1);
-            $avgTO = number_format($totalTO / $numberOfGames, 1);
-            $avgBLK = number_format($totalBLK / $numberOfGames, 1);
-            $avgPF = number_format($totalPF / $numberOfGames, 1);
-            $avgPTS = number_format($totalPTS / $numberOfGames, 1);
+            $avgMinutes = StatsFormatter::formatPerGameAverage($totalMinutes, $numberOfGames);
+            $avgFGP = $totalFGA > 0 ? StatsFormatter::formatWithDecimals(($totalFGM / $totalFGA) * 100, 1) : '0.0';
+            $avgFTP = $totalFTA > 0 ? StatsFormatter::formatWithDecimals(($totalFTM / $totalFTA) * 100, 1) : '0.0';
+            $avg3GP = $total3GA > 0 ? StatsFormatter::formatWithDecimals(($total3GM / $total3GA) * 100, 1) : '0.0';
+            $avgORB = StatsFormatter::formatPerGameAverage($totalORB, $numberOfGames);
+            $avgREB = StatsFormatter::formatPerGameAverage($totalORB + $totalDRB, $numberOfGames);
+            $avgAST = StatsFormatter::formatPerGameAverage($totalAST, $numberOfGames);
+            $avgSTL = StatsFormatter::formatPerGameAverage($totalSTL, $numberOfGames);
+            $avgTO = StatsFormatter::formatPerGameAverage($totalTO, $numberOfGames);
+            $avgBLK = StatsFormatter::formatPerGameAverage($totalBLK, $numberOfGames);
+            $avgPF = StatsFormatter::formatPerGameAverage($totalPF, $numberOfGames);
+            $avgPTS = StatsFormatter::formatPerGameAverage($totalPTS, $numberOfGames);
 
             ?>
     <tr>
@@ -183,9 +184,9 @@ class PlayerGameLogView implements PlayerGameLogViewInterface
             $pts = (2 * $row['game2GM']) + (3 * $row['game3GM']) + $row['gameFTM'];
             $reb = $row['gameORB'] + $row['gameDRB'];
             
-            $fgPct = $fga > 0 ? number_format($fgm / $fga, 3) : '0.000';
-            $ftPct = $row['gameFTA'] > 0 ? number_format($row['gameFTM'] / $row['gameFTA'], 3) : '0.000';
-            $tgPct = $row['game3GA'] > 0 ? number_format($row['game3GM'] / $row['game3GA'], 3) : '0.000';
+            $fgPct = StatsFormatter::formatPercentage($fgm, $fga);
+            $ftPct = StatsFormatter::formatPercentage($row['gameFTM'], $row['gameFTA']);
+            $tgPct = StatsFormatter::formatPercentage($row['game3GM'], $row['game3GA']);
             ?>
     <tr>
         <td class="gamelog"><?= htmlspecialchars($row['Date']) ?></td>

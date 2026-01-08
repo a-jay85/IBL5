@@ -9,6 +9,7 @@ use Player\PlayerRepository;
 use Player\PlayerStats;
 use Player\Contracts\PlayerOverviewViewInterface;
 use Services\CommonMysqliRepository;
+use BasketballStats\StatsFormatter;
 
 /**
  * PlayerOverviewView - Renders the player overview page
@@ -179,9 +180,9 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
             $pts = (2 * $row['game2GM']) + (3 * $row['game3GM']) + $row['gameFTM'];
             $reb = $row['gameORB'] + $row['gameDRB'];
             
-            $fgPct = $fga > 0 ? number_format($fgm / $fga, 3, '.', '') : '0.000';
-            $ftPct = $row['gameFTA'] > 0 ? number_format($row['gameFTM'] / $row['gameFTA'], 3, '.', '') : '0.000';
-            $tgPct = $row['game3GA'] > 0 ? number_format($row['game3GM'] / $row['game3GA'], 3, '.', '') : '0.000';
+            $fgPct = StatsFormatter::formatPercentage($fgm, $fga);
+            $ftPct = StatsFormatter::formatPercentage($row['gameFTM'], $row['gameFTA']);
+            $tgPct = StatsFormatter::formatPercentage($row['game3GM'], $row['game3GA']);
             
             $awayTeam = $this->commonRepository->getTeamnameFromTeamID($row['homeTID']);
             $homeTeam = $this->commonRepository->getTeamnameFromTeamID($row['visitorTID']);

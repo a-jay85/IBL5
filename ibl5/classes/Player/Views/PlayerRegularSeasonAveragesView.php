@@ -78,24 +78,24 @@ class PlayerRegularSeasonAveragesView implements PlayerRegularSeasonAveragesView
             $gm = (int)$row['games'];
             
             if ($gm > 0) {
-                $min = number_format((float)$row['minutes'] / $gm, 1);
-                $fgm = number_format((float)$row['fgm'] / $gm, 1);
-                $fga = number_format((float)$row['fga'] / $gm, 1);
+                $min = StatsFormatter::formatPerGameAverage((float)$row['minutes'], $gm);
+                $fgm = StatsFormatter::formatPerGameAverage((float)$row['fgm'], $gm);
+                $fga = StatsFormatter::formatPerGameAverage((float)$row['fga'], $gm);
                 $fgp = StatsFormatter::formatPercentageWithDecimals((int)$row['fgm'], (int)$row['fga']);
-                $ftm = number_format((float)$row['ftm'] / $gm, 1);
-                $fta = number_format((float)$row['fta'] / $gm, 1);
+                $ftm = StatsFormatter::formatPerGameAverage((float)$row['ftm'], $gm);
+                $fta = StatsFormatter::formatPerGameAverage((float)$row['fta'], $gm);
                 $ftp = StatsFormatter::formatPercentageWithDecimals((int)$row['ftm'], (int)$row['fta']);
-                $tgm = number_format((float)$row['tgm'] / $gm, 1);
-                $tga = number_format((float)$row['tga'] / $gm, 1);
+                $tgm = StatsFormatter::formatPerGameAverage((float)$row['tgm'], $gm);
+                $tga = StatsFormatter::formatPerGameAverage((float)$row['tga'], $gm);
                 $tgp = StatsFormatter::formatPercentageWithDecimals((int)$row['tgm'], (int)$row['tga']);
-                $orb = number_format((float)$row['orb'] / $gm, 1);
-                $reb = number_format((float)$row['reb'] / $gm, 1);
-                $ast = number_format((float)$row['ast'] / $gm, 1);
-                $stl = number_format((float)$row['stl'] / $gm, 1);
-                $tvr = number_format((float)$row['tvr'] / $gm, 1);
-                $blk = number_format((float)$row['blk'] / $gm, 1);
-                $pf = number_format((float)$row['pf'] / $gm, 1);
-                $pts = number_format((float)$row['pts'] / $gm, 1);
+                $orb = StatsFormatter::formatPerGameAverage((float)$row['orb'], $gm);
+                $reb = StatsFormatter::formatPerGameAverage((float)$row['reb'], $gm);
+                $ast = StatsFormatter::formatPerGameAverage((float)$row['ast'], $gm);
+                $stl = StatsFormatter::formatPerGameAverage((float)$row['stl'], $gm);
+                $tvr = StatsFormatter::formatPerGameAverage((float)$row['tvr'], $gm);
+                $blk = StatsFormatter::formatPerGameAverage((float)$row['blk'], $gm);
+                $pf = StatsFormatter::formatPerGameAverage((float)$row['pf'], $gm);
+                $pts = StatsFormatter::formatPerGameAverage((float)$row['pts'], $gm);
             } else {
                 $min = $fgm = $fga = $fgp = $ftm = $fta = $ftp = $tgm = $tga = $tgp = '0.0';
                 $orb = $reb = $ast = $stl = $tvr = $blk = $pf = $pts = '0.0';
@@ -136,24 +136,24 @@ class PlayerRegularSeasonAveragesView implements PlayerRegularSeasonAveragesView
     <tr style="font-weight: bold;">
         <td colspan=2><center>Career</center></td>
         <td><center><?= (int)$careerAverages['games'] ?></center></td>
-        <td><center><?= number_format((float)$careerAverages['minutes'], 1) ?></center></td>
-        <td><center><?= number_format((float)$careerAverages['fgm'], 1) ?></center></td>
-        <td><center><?= number_format((float)$careerAverages['fga'], 1) ?></center></td>
+        <td><center><?= StatsFormatter::formatWithDecimals((float)$careerAverages['minutes'], 1) ?></center></td>
+        <td><center><?= StatsFormatter::formatWithDecimals((float)$careerAverages['fgm'], 1) ?></center></td>
+        <td><center><?= StatsFormatter::formatWithDecimals((float)$careerAverages['fga'], 1) ?></center></td>
         <td><center><?= $carFgp ?></center></td>
-        <td><center><?= number_format((float)$careerAverages['ftm'], 1) ?></center></td>
-        <td><center><?= number_format((float)$careerAverages['fta'], 1) ?></center></td>
+        <td><center><?= StatsFormatter::formatWithDecimals((float)$careerAverages['ftm'], 1) ?></center></td>
+        <td><center><?= StatsFormatter::formatWithDecimals((float)$careerAverages['fta'], 1) ?></center></td>
         <td><center><?= $carFtp ?></center></td>
-        <td><center><?= number_format((float)$careerAverages['tgm'], 1) ?></center></td>
-        <td><center><?= number_format((float)$careerAverages['tga'], 1) ?></center></td>
+        <td><center><?= StatsFormatter::formatWithDecimals((float)$careerAverages['tgm'], 1) ?></center></td>
+        <td><center><?= StatsFormatter::formatWithDecimals((float)$careerAverages['tga'], 1) ?></center></td>
         <td><center><?= $carTgp ?></center></td>
-        <td><center><?= number_format((float)$careerAverages['orb'], 1) ?></center></td>
-        <td><center><?= number_format((float)$careerAverages['reb'], 1) ?></center></td>
-        <td><center><?= number_format((float)$careerAverages['ast'], 1) ?></center></td>
-        <td><center><?= number_format((float)$careerAverages['stl'], 1) ?></center></td>
-        <td><center><?= number_format((float)$careerAverages['tvr'], 1) ?></center></td>
-        <td><center><?= number_format((float)$careerAverages['blk'], 1) ?></center></td>
-        <td><center><?= number_format((float)$careerAverages['pf'], 1) ?></center></td>
-        <td><center><?= number_format((float)$careerAverages['pts'], 1) ?></center></td>
+        <td><center><?= StatsFormatter::formatWithDecimals((float)$careerAverages['orb'], 1) ?></center></td>
+        <td><center><?= StatsFormatter::formatWithDecimals((float)$careerAverages['reb'], 1) ?></center></td>
+        <td><center><?= StatsFormatter::formatWithDecimals((float)$careerAverages['ast'], 1) ?></center></td>
+        <td><center><?= StatsFormatter::formatWithDecimals((float)$careerAverages['stl'], 1) ?></center></td>
+        <td><center><?= StatsFormatter::formatWithDecimals((float)$careerAverages['tvr'], 1) ?></center></td>
+        <td><center><?= StatsFormatter::formatWithDecimals((float)$careerAverages['blk'], 1) ?></center></td>
+        <td><center><?= StatsFormatter::formatWithDecimals((float)$careerAverages['pf'], 1) ?></center></td>
+        <td><center><?= StatsFormatter::formatWithDecimals((float)$careerAverages['pts'], 1) ?></center></td>
     </tr>
             <?php
         }

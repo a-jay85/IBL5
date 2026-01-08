@@ -132,6 +132,15 @@ public function getPlayer($playerId)
 - Example: `global $mysqli_db;` then use prepared statements with `$mysqli_db->prepare()`, `bind_param()`, and `execute()`
 - Only use legacy `$db` when refactoring legacy code that hasn't yet been updated
 
+**Statistics Formatting:**
+- [ ] Use `BasketballStats\StatsFormatter` for ALL statistics (never `number_format()`)
+  - `formatPercentage()` for shooting/field goal percentages
+  - `formatPerGameAverage()` for per-game stats (PPG, APG, RPG, etc.)
+  - `formatPer36Stat()` for per-36-minute stats
+  - `formatTotal()` for counting stats with comma separators
+  - `formatAverage()` for general 2-decimal averages
+- [ ] Use `BasketballStats\StatsSanitizer` for input validation
+
 **Security Checklist:**
 - [ ] Prepared statements (SQL injection)
 - [ ] HTML escaping (XSS) - Use `Utilities\HtmlSanitizer::safeHtmlOutput()` instead of `htmlspecialchars()`
@@ -149,7 +158,7 @@ public function getPlayer($playerId)
 
 **Code:**
 - Reuse repositories
-- Use formatters: StatsFormatter, StatsSanitizer
+- **Use `BasketballStats\StatsFormatter` and `BasketballStats\StatsSanitizer` for all statistics** (never `number_format()`)
 - Avoid N+1 queries
 - Cache expensive operations
 

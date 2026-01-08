@@ -184,16 +184,6 @@ class PlayerViewFactory
     }
 
     /**
-     * Create PlayerGameLogView instance
-     * 
-     * @return PlayerGameLogView
-     */
-    public function createGameLogView(): PlayerGameLogView
-    {
-        return new PlayerGameLogView($this->repository);
-    }
-
-    /**
      * Create PlayerSeasonStatsView instance
      * 
      * @return PlayerSeasonStatsView

@@ -5,6 +5,9 @@
 
 ## Quick Reference
 
+### ⚠️ SCHEMA VERIFICATION REQUIREMENT
+**Always reference `ibl5/schema.sql` for table/column names and relationships.** Never assume database structures exist without verification. This prevents hallucination of non-existent tables.
+
 ### Current Status
 - **Total Tables:** 136 (52 InnoDB, 84 MyISAM legacy)
 - **Foreign Keys:** 24 constraints implemented

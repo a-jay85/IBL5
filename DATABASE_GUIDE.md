@@ -68,6 +68,15 @@ Core data integrity constraints implemented:
 - Query database views instead of joining multiple tables
 - Follow REST best practices (see API_GUIDE.md)
 
+### For Refactoring Validation
+- **Always verify refactored code against production (iblhoops.net)**
+- Compare database queries and output between localhost and production
+- Ensure query results return identical data (same rows, same order, same values)
+- Check that data transformations produce identical output
+- If results don't match exactly, refactoring is not complete
+- Use database tools (e.g., query comparison, row diffing) to identify discrepancies
+- This prevents unintended behavior changes from refactoring
+
 ## Character Sets & Collation
 - **Legacy tables:** latin1_swedish_ci (PhpNuke)
 - **Modern tables:** utf8mb4_unicode_ci (Laravel, new features)

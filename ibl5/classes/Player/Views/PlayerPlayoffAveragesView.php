@@ -86,7 +86,9 @@ class PlayerPlayoffAveragesView implements PlayerPlayoffAveragesViewInterface
                 $tvr = StatsFormatter::formatPerGameAverage((float)$row['tvr'], $gm);
                 $blk = StatsFormatter::formatPerGameAverage((float)$row['blk'], $gm);
                 $pf = StatsFormatter::formatPerGameAverage((float)$row['pf'], $gm);
-                $pts = StatsFormatter::formatPerGameAverage((float)$row['pts'], $gm);
+                // Calculate points: pts = 2*fgm + ftm + tgm
+                $totalPts = StatsFormatter::calculatePoints((int)$row['fgm'], (int)$row['ftm'], (int)$row['tgm']);
+                $pts = StatsFormatter::formatPerGameAverage((float)$totalPts, $gm);
             } else {
                 $min = $fgp = $ftp = $tgp = $orb = $reb = $ast = $stl = $tvr = $blk = $pf = $pts = '0.0';
             }

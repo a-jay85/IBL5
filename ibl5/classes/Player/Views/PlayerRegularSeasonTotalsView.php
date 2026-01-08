@@ -91,6 +91,12 @@ class PlayerRegularSeasonTotalsView implements PlayerRegularSeasonTotalsViewInte
             $blk = (int)$row['blk'];
             $pf = (int)$row['pf'];
             $pts = (int)$row['pts'];
+            
+            // Calculate points if pts is 0 (e.g., 2006 season)
+            // Formula: 2*fgm + ftm + tgm (fgm includes all field goals, tgm adds the extra point for 3-pointers)
+            if ($pts === 0) {
+                $pts = (2 * $fgm) + $ftm + $tgm;
+            }
 
             // Accumulate career totals
             $carTotals['gm'] += $gm;
@@ -129,6 +135,9 @@ class PlayerRegularSeasonTotalsView implements PlayerRegularSeasonTotalsViewInte
     </tr>
             <?php
         }
+        
+        // Recalculate career total points to ensure accuracy
+        $carTotals['pts'] = (2 * $carTotals['fgm']) + $carTotals['ftm'] + $carTotals['tgm'];
         ?>
     <tr style="font-weight: bold;">
         <td colspan=2><center>Career</center></td>

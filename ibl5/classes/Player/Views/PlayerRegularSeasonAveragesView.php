@@ -79,6 +79,13 @@ class PlayerRegularSeasonAveragesView implements PlayerRegularSeasonAveragesView
             $gm = (int)$row['games'];
             
             if ($gm > 0) {
+                // Calculate points if pts is 0 (e.g., 2006 season)
+                // Formula: 2*fgm + ftm + tgm
+                $ptsTotal = (int)$row['pts'];
+                if ($ptsTotal === 0) {
+                    $ptsTotal = (2 * (int)$row['fgm']) + (int)$row['ftm'] + (int)$row['tgm'];
+                }
+                
                 $min = StatsFormatter::formatPerGameAverage((float)$row['minutes'], $gm);
                 $fgm = StatsFormatter::formatPerGameAverage((float)$row['fgm'], $gm);
                 $fga = StatsFormatter::formatPerGameAverage((float)$row['fga'], $gm);
@@ -96,7 +103,7 @@ class PlayerRegularSeasonAveragesView implements PlayerRegularSeasonAveragesView
                 $tvr = StatsFormatter::formatPerGameAverage((float)$row['tvr'], $gm);
                 $blk = StatsFormatter::formatPerGameAverage((float)$row['blk'], $gm);
                 $pf = StatsFormatter::formatPerGameAverage((float)$row['pf'], $gm);
-                $pts = StatsFormatter::formatPerGameAverage((float)$row['pts'], $gm);
+                $pts = StatsFormatter::formatPerGameAverage((float)$ptsTotal, $gm);
             } else {
                 $min = $fgm = $fga = $fgp = $ftm = $fta = $ftp = $tgm = $tga = $tgp = '0.0';
                 $orb = $reb = $ast = $stl = $tvr = $blk = $pf = $pts = '0.0';

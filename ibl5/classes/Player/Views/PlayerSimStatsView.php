@@ -44,11 +44,11 @@ class PlayerSimStatsView implements PlayerSimStatsViewInterface
         
         ob_start();
         ?>
-<table border=1 cellspacing=0 class="sortable" style='margin: 0 auto;'>
+<table class="sortable player-table sim-stats-table">
     <tr>
-        <td colspan=16 style='font-weight:bold;text-align:center;background-color:#00c;color:#fff;'>Sim Averages</td>
+        <td colspan=16 class="player-table-header">Sim Averages</td>
     </tr>
-    <tr style="font-weight: bold">
+    <tr class="text-bold">
         <th>sim</th>
         <th>g</th>
         <th>min</th>

@@ -43,9 +43,9 @@ class PlayerAwardsAndNewsView implements PlayerAwardsAndNewsViewInterface
 
         ob_start();
         ?>
-<table border=1 cellspacing=0 cellpadding=0 valign=top style='margin: 0 auto;'>
+<table class="awards-table">
     <tr>
-        <td bgcolor=#0000cc align=center><b><font color=#ffffff>AWARDS</font></b></td>
+        <td class="player-table-header">AWARDS</td>
     </tr>
         <?php
         foreach ($awards as $award) {
@@ -59,7 +59,7 @@ class PlayerAwardsAndNewsView implements PlayerAwardsAndNewsViewInterface
         }
         ?>
     <tr>
-        <td bgcolor=#0000cc align=center><b><font color=#ffffff>ARTICLES MENTIONING THIS PLAYER</font></b></td>
+        <td class="player-table-header">ARTICLES MENTIONING THIS PLAYER</td>
     </tr>
     <tr>
         <td>

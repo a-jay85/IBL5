@@ -34,27 +34,27 @@ class PlayerSeasonStatsView implements PlayerSeasonStatsViewInterface
 
         ob_start();
         ?>
-<table border=1 cellspacing=1 cellpadding=0>
+<table class="stats-table">
     <tr>
-        <td><center><b><font class="content">Team</font></b></center></td>
-        <td><center><b><font class="content">Year</font></b></center></td>
-        <td><center><b><font class="content">Games</font></b></center></td>
-        <td><center><b><font class="content">Min</font></b></center></td>
-        <td><center><b><font class="content">FGM-FGA</font></b></center></td>
-        <td><center><b><font class="content">FG%</font></b></center></td>
-        <td><center><b><font class="content">FTM-FTA</font></b></center></td>
-        <td><center><b><font class="content">FT%</font></b></center></td>
-        <td><center><b><font class="content">3GM-3GA</font></b></center></td>
-        <td><center><b><font class="content">3G%</font></b></center></td>
-        <td><center><b><font class="content">ORB</font></b></center></td>
-        <td><center><b><font class="content">DRB</font></b></center></td>
-        <td><center><b><font class="content">REB</font></b></center></td>
-        <td><center><b><font class="content">AST</font></b></center></td>
-        <td><center><b><font class="content">STL</font></b></center></td>
-        <td><center><b><font class="content">TO</font></b></center></td>
-        <td><center><b><font class="content">BLK</font></b></center></td>
-        <td><center><b><font class="content">PF</font></b></center></td>
-        <td><center><b><font class="content">PTS</font></b></center></td>
+        <td class="content-header">Team</td>
+        <td class="content-header">Year</td>
+        <td class="content-header">Games</td>
+        <td class="content-header">Min</td>
+        <td class="content-header">FGM-FGA</td>
+        <td class="content-header">FG%</td>
+        <td class="content-header">FTM-FTA</td>
+        <td class="content-header">FT%</td>
+        <td class="content-header">3GM-3GA</td>
+        <td class="content-header">3G%</td>
+        <td class="content-header">ORB</td>
+        <td class="content-header">DRB</td>
+        <td class="content-header">REB</td>
+        <td class="content-header">AST</td>
+        <td class="content-header">STL</td>
+        <td class="content-header">TO</td>
+        <td class="content-header">BLK</td>
+        <td class="content-header">PF</td>
+        <td class="content-header">PTS</td>
     </tr>
         <?php
         foreach ($historicalStats as $stats) {
@@ -91,7 +91,7 @@ class PlayerSeasonStatsView implements PlayerSeasonStatsViewInterface
             $pf = HtmlSanitizer::safeHtmlOutput($stats['pf']);
             $pts = HtmlSanitizer::safeHtmlOutput($stats['pts']);
             ?>
-    <tr align=center>
+    <tr>
         <td><?= $team ?></td>
         <td><?= $year ?></td>
         <td><?= $games ?></td>
@@ -129,24 +129,24 @@ class PlayerSeasonStatsView implements PlayerSeasonStatsViewInterface
 
         ob_start();
         ?>
-<table border=1 cellspacing=1 cellpadding=0>
+<table class="stats-table">
     <tr>
-        <td><center><b><font class="content">Team</font></b></center></td>
-        <td><center><b><font class="content">Year</font></b></center></td>
-        <td><center><b><font class="content">Games</font></b></center></td>
-        <td><center><b><font class="content">Min</font></b></center></td>
-        <td><center><b><font class="content">FG%</font></b></center></td>
-        <td><center><b><font class="content">FT%</font></b></center></td>
-        <td><center><b><font class="content">3G%</font></b></center></td>
-        <td><center><b><font class="content">ORB</font></b></center></td>
-        <td><center><b><font class="content">DRB</font></b></center></td>
-        <td><center><b><font class="content">REB</font></b></center></td>
-        <td><center><b><font class="content">AST</font></b></center></td>
-        <td><center><b><font class="content">STL</font></b></center></td>
-        <td><center><b><font class="content">TO</font></b></center></td>
-        <td><center><b><font class="content">BLK</font></b></center></td>
-        <td><center><b><font class="content">PF</font></b></center></td>
-        <td><center><b><font class="content">PTS</font></b></center></td>
+        <td class="content-header">Team</td>
+        <td class="content-header">Year</td>
+        <td class="content-header">Games</td>
+        <td class="content-header">Min</td>
+        <td class="content-header">FG%</td>
+        <td class="content-header">FT%</td>
+        <td class="content-header">3G%</td>
+        <td class="content-header">ORB</td>
+        <td class="content-header">DRB</td>
+        <td class="content-header">REB</td>
+        <td class="content-header">AST</td>
+        <td class="content-header">STL</td>
+        <td class="content-header">TO</td>
+        <td class="content-header">BLK</td>
+        <td class="content-header">PF</td>
+        <td class="content-header">PTS</td>
     </tr>
         <?php
         foreach ($historicalStats as $stats) {
@@ -173,7 +173,7 @@ class PlayerSeasonStatsView implements PlayerSeasonStatsViewInterface
             $avgPf = StatsFormatter::formatAverage($stats['pf'], $games);
             $avgPts = StatsFormatter::formatAverage($stats['pts'], $games);
             ?>
-    <tr align=center>
+    <tr>
         <td><?= $team ?></td>
         <td><?= $year ?></td>
         <td><?= $gamesDisplay ?></td>

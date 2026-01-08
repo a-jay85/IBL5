@@ -43,9 +43,9 @@ class PlayerRatingsAndSalaryView implements PlayerRatingsAndSalaryViewInterface
 
         ob_start();
         ?>
-<table border=1 cellspacing=0 class="sortable" style='margin: 0 auto;'>
+<table class="sortable player-table">
     <tr>
-        <td colspan=24 style='font-weight:bold;text-align:center;background-color:#00c;color:#fff;'>Ratings by Year</td>
+        <td colspan=24 class="player-table-header">Ratings by Year</td>
     </tr>
     <tr>
         <th>year</th>
@@ -104,30 +104,30 @@ class PlayerRatingsAndSalaryView implements PlayerRatingsAndSalaryViewInterface
             $totalSalary += $salary;
             ?>
     <tr>
-        <td><center><?= $year ?></center></td>
-        <td><center><?= $r_2ga ?></center></td>
-        <td><center><?= $r_2gp ?></center></td>
-        <td><center><?= $r_fta ?></center></td>
-        <td><center><?= $r_ftp ?></center></td>
-        <td><center><?= $r_3ga ?></center></td>
-        <td><center><?= $r_3gp ?></center></td>
-        <td><center><?= $r_orb ?></center></td>
-        <td><center><?= $r_drb ?></center></td>
-        <td><center><?= $r_ast ?></center></td>
-        <td><center><?= $r_stl ?></center></td>
-        <td><center><?= $r_blk ?></center></td>
-        <td><center><?= $r_tvr ?></center></td>
-        <td><center><?= $r_oo ?></center></td>
-        <td><center><?= $r_do ?></center></td>
-        <td><center><?= $r_po ?></center></td>
-        <td><center><?= $r_to ?></center></td>
-        <td><center><?= $r_od ?></center></td>
-        <td><center><?= $r_dd ?></center></td>
-        <td><center><?= $r_pd ?></center></td>
-        <td><center><?= $r_td ?></center></td>
-        <td><center><?= $r_Off ?></center></td>
-        <td><center><?= $r_Def ?></center></td>
-        <td><center><?= $salary ?></center></td>
+        <td><?= $year ?></td>
+        <td><?= $r_2ga ?></td>
+        <td><?= $r_2gp ?></td>
+        <td><?= $r_fta ?></td>
+        <td><?= $r_ftp ?></td>
+        <td><?= $r_3ga ?></td>
+        <td><?= $r_3gp ?></td>
+        <td><?= $r_orb ?></td>
+        <td><?= $r_drb ?></td>
+        <td><?= $r_ast ?></td>
+        <td><?= $r_stl ?></td>
+        <td><?= $r_blk ?></td>
+        <td><?= $r_tvr ?></td>
+        <td><?= $r_oo ?></td>
+        <td><?= $r_do ?></td>
+        <td><?= $r_po ?></td>
+        <td><?= $r_to ?></td>
+        <td><?= $r_od ?></td>
+        <td><?= $r_dd ?></td>
+        <td><?= $r_pd ?></td>
+        <td><?= $r_td ?></td>
+        <td><?= $r_Off ?></td>
+        <td><?= $r_Def ?></td>
+        <td><?= $salary ?></td>
     </tr>
             <?php
         }
@@ -135,7 +135,7 @@ class PlayerRatingsAndSalaryView implements PlayerRatingsAndSalaryViewInterface
         $totalSalaryMillion = $totalSalary / 100;
         ?>
     <tr>
-        <td colspan=24><center><b>Total Career Salary Earned:</b> <?= $totalSalaryMillion ?> million dollars</td>
+        <td colspan=24 class="text-center text-bold">Total Career Salary Earned: <?= $totalSalaryMillion ?> million dollars</td>
     </tr>
 </table>
         <?php

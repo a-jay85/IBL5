@@ -85,16 +85,15 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
     {
         ob_start();
         ?>
-<center>
-<table>
-    <tr align=center>
-        <td><b>Talent</b></td>
-        <td><b>Skill</b></td>
-        <td><b>Intangibles</b></td>
-        <td><b>Clutch</b></td>
-        <td><b>Consistency</b></td>
+<table class="ratings-table">
+    <tr class="header-row">
+        <td>Talent</td>
+        <td>Skill</td>
+        <td>Intangibles</td>
+        <td>Clutch</td>
+        <td>Consistency</td>
     </tr>
-    <tr align=center>
+    <tr>
         <td><?= HtmlSanitizer::safeHtmlOutput((string)$player->ratingTalent) ?></td>
         <td><?= HtmlSanitizer::safeHtmlOutput((string)$player->ratingSkill) ?></td>
         <td><?= HtmlSanitizer::safeHtmlOutput((string)$player->ratingIntangibles) ?></td>
@@ -113,15 +112,15 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
     {
         ob_start();
         ?>
-<table>
-    <tr>
-        <td><b>Loyalty</b></td>
-        <td><b>Play for Winner</b></td>
-        <td><b>Playing Time</b></td>
-        <td><b>Security</b></td>
-        <td><b>Tradition</b></td>
+<table class="ratings-table">
+    <tr class="header-row">
+        <td>Loyalty</td>
+        <td>Play for Winner</td>
+        <td>Playing Time</td>
+        <td>Security</td>
+        <td>Tradition</td>
     </tr>
-    <tr align=center>
+    <tr>
         <td><?= HtmlSanitizer::safeHtmlOutput((string)$player->freeAgencyLoyalty) ?></td>
         <td><?= HtmlSanitizer::safeHtmlOutput((string)$player->freeAgencyPlayForWinner) ?></td>
         <td><?= HtmlSanitizer::safeHtmlOutput((string)$player->freeAgencyPlayingTime) ?></td>
@@ -129,7 +128,6 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
         <td><?= HtmlSanitizer::safeHtmlOutput((string)$player->freeAgencyTradition) ?></td>
     </tr>
 </table>
-</center>
         <?php
         return ob_get_clean();
     }
@@ -144,9 +142,9 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
         ob_start();
         ?>
 <p>
-<H1><center>GAME LOG</center></H1>
+<h1 class="section-title">GAME LOG</h1>
 <p>
-<table class="sortable">
+<table class="sortable player-table">
     <tr>
         <th>Date</th>
         <th>Away</th>

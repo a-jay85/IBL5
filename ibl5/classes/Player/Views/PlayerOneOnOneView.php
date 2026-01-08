@@ -49,9 +49,9 @@ class PlayerOneOnOneView implements PlayerOneOnOneViewInterface
 
         ob_start();
         ?>
-<table style='margin: 0 auto;'>
+<table class="oneonone-table">
     <tr>
-        <td bgcolor=#0000cc align=center><b><font color=#ffffff>ONE-ON-ONE RESULTS</font></b></td>
+        <td class="player-table-header">ONE-ON-ONE RESULTS</td>
     </tr>
     <tr>
         <td>
@@ -74,7 +74,7 @@ class PlayerOneOnOneView implements PlayerOneOnOneViewInterface
             echo "* lost to {$winner}, {$lossScore}-{$winScore} (# {$gameId})<br>";
         }
         ?>
-        <b><center>Record: <?= $winCount ?> - <?= $lossCount ?></center></b><br>
+        <div class="text-center text-bold">Record: <?= $winCount ?> - <?= $lossCount ?></div><br>
         </td>
     </tr>
 </table>

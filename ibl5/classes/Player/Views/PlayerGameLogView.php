@@ -32,11 +32,11 @@ class PlayerGameLogView implements PlayerGameLogViewInterface
     {
         ob_start();
         ?>
-<table align=center border=1 cellpadding=3 cellspacing=0 style="text-align: center">
+<table class="player-table sim-stats-table">
     <tr>
-        <td colspan=16><b><font class="content">Sim Averages</font></b></td>
+        <td colspan=16 class="player-table-header">Sim Averages</td>
     </tr>
-    <tr style="font-weight: bold">
+    <tr class="text-bold">
         <td>sim</td>
         <td>g</td>
         <td>min</td>
@@ -155,7 +155,7 @@ class PlayerGameLogView implements PlayerGameLogViewInterface
 
         ob_start();
         ?>
-<table class="sortable">
+<table class="sortable player-table">
     <tr>
         <th>Date</th>
         <th>MIN</th>

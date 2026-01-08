@@ -35,6 +35,10 @@ function showpage($playerID, $pageView)
 
     Nuke\Header::header();
     OpenTable();
+    
+    // Include centralized player view styles
+    echo \Player\Views\PlayerViewStyles::getStyles();
+    
     UI::playerMenu();
 
     // Render player header

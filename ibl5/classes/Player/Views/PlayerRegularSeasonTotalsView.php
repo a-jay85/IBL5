@@ -49,9 +49,9 @@ class PlayerRegularSeasonTotalsView implements PlayerRegularSeasonTotalsViewInte
 
         ob_start();
         ?>
-<table border=1 cellspacing=0 class="sortable" style='margin: 0 auto;'>
+<table class="sortable player-table">
     <tr>
-        <td colspan=15 style='font-weight:bold; text-align:center; background-color:#00c; color:#fff;'>Regular Season Totals</td>
+        <td colspan=15 class="player-table-header">Regular Season Totals</td>
     </tr>
     <tr>
         <th>year</th>
@@ -117,21 +117,21 @@ class PlayerRegularSeasonTotalsView implements PlayerRegularSeasonTotalsViewInte
             $carTotals['pts'] += $pts;
             ?>
     <tr>
-        <td><center><?= $year ?></center></td>
-        <td><center><a href="modules.php?name=Team&op=team&teamID=<?= $teamId ?>&yr=<?= $year ?>"><?= $team ?></a></center></td>
-        <td><center><?= $gm ?></center></td>
-        <td><center><?= $min ?></center></td>
-        <td><center><?= $fgm ?>-<?= $fga ?></center></td>
-        <td><center><?= $ftm ?>-<?= $fta ?></center></td>
-        <td><center><?= $tgm ?>-<?= $tga ?></center></td>
-        <td><center><?= $orb ?></center></td>
-        <td><center><?= $reb ?></center></td>
-        <td><center><?= $ast ?></center></td>
-        <td><center><?= $stl ?></center></td>
-        <td><center><?= $tvr ?></center></td>
-        <td><center><?= $blk ?></center></td>
-        <td><center><?= $pf ?></center></td>
-        <td><center><?= $pts ?></center></td>
+        <td><?= $year ?></td>
+        <td><a href="modules.php?name=Team&op=team&teamID=<?= $teamId ?>&yr=<?= $year ?>"><?= $team ?></a></td>
+        <td><?= $gm ?></td>
+        <td><?= $min ?></td>
+        <td><?= $fgm ?>-<?= $fga ?></td>
+        <td><?= $ftm ?>-<?= $fta ?></td>
+        <td><?= $tgm ?>-<?= $tga ?></td>
+        <td><?= $orb ?></td>
+        <td><?= $reb ?></td>
+        <td><?= $ast ?></td>
+        <td><?= $stl ?></td>
+        <td><?= $tvr ?></td>
+        <td><?= $blk ?></td>
+        <td><?= $pf ?></td>
+        <td><?= $pts ?></td>
     </tr>
             <?php
         }
@@ -139,21 +139,21 @@ class PlayerRegularSeasonTotalsView implements PlayerRegularSeasonTotalsViewInte
         // Recalculate career total points to ensure accuracy
         $carTotals['pts'] = (2 * $carTotals['fgm']) + $carTotals['ftm'] + $carTotals['tgm'];
         ?>
-    <tr style="font-weight: bold;">
-        <td colspan=2><center>Career</center></td>
-        <td><center><?= $carTotals['gm'] ?></center></td>
-        <td><center><?= $carTotals['min'] ?></center></td>
-        <td><center><?= $carTotals['fgm'] ?>-<?= $carTotals['fga'] ?></center></td>
-        <td><center><?= $carTotals['ftm'] ?>-<?= $carTotals['fta'] ?></center></td>
-        <td><center><?= $carTotals['tgm'] ?>-<?= $carTotals['tga'] ?></center></td>
-        <td><center><?= $carTotals['orb'] ?></center></td>
-        <td><center><?= $carTotals['reb'] ?></center></td>
-        <td><center><?= $carTotals['ast'] ?></center></td>
-        <td><center><?= $carTotals['stl'] ?></center></td>
-        <td><center><?= $carTotals['tvr'] ?></center></td>
-        <td><center><?= $carTotals['blk'] ?></center></td>
-        <td><center><?= $carTotals['pf'] ?></center></td>
-        <td><center><?= $carTotals['pts'] ?></center></td>
+    <tr class="player-table-row-bold">
+        <td colspan=2>Career</td>
+        <td><?= $carTotals['gm'] ?></td>
+        <td><?= $carTotals['min'] ?></td>
+        <td><?= $carTotals['fgm'] ?>-<?= $carTotals['fga'] ?></td>
+        <td><?= $carTotals['ftm'] ?>-<?= $carTotals['fta'] ?></td>
+        <td><?= $carTotals['tgm'] ?>-<?= $carTotals['tga'] ?></td>
+        <td><?= $carTotals['orb'] ?></td>
+        <td><?= $carTotals['reb'] ?></td>
+        <td><?= $carTotals['ast'] ?></td>
+        <td><?= $carTotals['stl'] ?></td>
+        <td><?= $carTotals['tvr'] ?></td>
+        <td><?= $carTotals['blk'] ?></td>
+        <td><?= $carTotals['pf'] ?></td>
+        <td><?= $carTotals['pts'] ?></td>
     </tr>
 </table>
         <?php

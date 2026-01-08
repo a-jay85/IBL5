@@ -142,9 +142,10 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
         ob_start();
         ?>
 <p>
-<h1 class="section-title">GAME LOG</h1>
-<p>
 <table class="sortable player-table">
+    <tr>
+        <td colspan=22 class="player-table-header">Game Log</td>
+    </tr>
     <tr>
         <th>Date</th>
         <th>Away</th>

@@ -56,12 +56,38 @@ if (method_exists($this->db, 'sql_escape_string')) {
 - Validate indexes and constraints before optimization
 - This prevents hallucination of non-existent database structures
 
-### 5. Security
+### 5. Basketball Statistics Formatting
+**CRITICAL: Use `BasketballStats\StatsFormatter` for ALL statistic formatting, never use `number_format()` directly.**
+```php
+// ✅ CORRECT - Use StatsFormatter methods
+use BasketballStats\StatsFormatter;
+echo StatsFormatter::formatPercentage($made, $attempted);  // FG%, FT%, 3P%
+echo StatsFormatter::formatPerGameAverage($total, $games); // PPG, APG, etc.
+echo StatsFormatter::formatPer36Stat($total, $minutes);    // Per-36 stats
+echo StatsFormatter::formatTotal($value);                  // Counting stats with commas
+echo StatsFormatter::formatAverage($value);                // General averages
+
+// ❌ WRONG - NEVER use number_format directly for stats
+echo number_format($percentage, 3);
+echo number_format($average, 2);
+```
+Available methods in `StatsFormatter`:
+- `formatPercentage()` - Shooting percentages (3 decimals)
+- `formatPerGameAverage()` - Per-game stats (1 decimal)
+- `formatPer36Stat()` - Per-36-minute stats (1 decimal)
+- `formatTotal()` - Totals with comma separators
+- `formatAverage()` - General averages (2 decimals)
+- `calculatePoints()` - Calculate point totals
+- `safeDivide()` - Safe division with zero-division handling
+
+Use `BasketballStats\StatsSanitizer` for input validation (sanitizeInt, sanitizeFloat, sanitizeString).
+
+### 6. Security
 - **SQL**: Prepared statements or escaped strings
 - **XSS**: Use `Utilities\HtmlSanitizer::safeHtmlOutput()` on ALL output (handles multiple types, removes SQL escaping)
 - **Validation**: Whitelist for enumerated values
 
-### 6. Testing
+### 7. Testing
 - PHPUnit 12.4+ in `ibl5/tests/`
 - Register in `ibl5/phpunit.xml`
 - No `markTestSkipped()` - delete instead
@@ -73,7 +99,7 @@ if (method_exists($this->db, 'sql_escape_string')) {
   ```
 - Use @see instead of {@inheritdoc} in PHPDoc
 
-### 7. Production Validation Harness
+### 8. Production Validation Harness
 **CRITICAL: Use production (iblhoops.net) as verification during refactoring.**
 - After completing refactoring work, compare localhost against iblhoops.net
 - Verify that **text and data output exactly match** between both environments

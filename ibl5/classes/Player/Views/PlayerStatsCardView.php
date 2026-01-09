@@ -16,27 +16,42 @@ namespace Player\Views;
 class PlayerStatsCardView
 {
     /**
-     * Get scoped custom styles for stats cards (no external dependencies)
+     * Get scoped custom styles for stats cards with team colors
      * 
+     * @param array|null $colorScheme Optional color scheme from TeamColorHelper
      * @return string HTML style tag with scoped CSS
      */
-    public static function getStyles(): string
+    public static function getStyles(?array $colorScheme = null): string
     {
-        return <<<'HTML'
+        // Use default colors if no scheme provided
+        if ($colorScheme === null) {
+            $colorScheme = TeamColorHelper::getDefaultColorScheme();
+        }
+        
+        $gradStart = $colorScheme['gradient_start'];
+        $gradMid = $colorScheme['gradient_mid'];
+        $gradEnd = $colorScheme['gradient_end'];
+        $border = $colorScheme['border'];
+        $borderRgb = $colorScheme['border_rgb'];
+        $accent = $colorScheme['accent'];
+        $text = $colorScheme['text'];
+        $textMuted = $colorScheme['text_muted'];
+        
+        return <<<HTML
 <style>
 /* Player Stats Card - Horizontal Layout
    Uses !important to override legacy .player-table styles */
 .player-stats-card {
-    background: linear-gradient(145deg, #1e3a5f 0%, #0f1419 50%, #1e3a5f 100%) !important;
-    border: 3px solid #D4AF37 !important;
+    background: linear-gradient(145deg, #{$gradStart} 0%, #{$gradMid} 50%, #{$gradEnd} 100%) !important;
+    border: 3px solid #{$border} !important;
     border-radius: 12px !important;
     box-shadow: 
-        0 0 0 1px #1e3a5f,
-        0 0 0 3px #D4AF37,
+        0 0 0 1px #{$gradMid},
+        0 0 0 3px #{$border},
         0 8px 32px rgba(0,0,0,0.3) !important;
     margin: 16px auto !important;
     padding: 16px !important;
-    color: #fff !important;
+    color: #{$text} !important;
     overflow-x: auto;
     position: relative;
 }
@@ -64,8 +79,8 @@ class PlayerStatsCardView
 .player-stats-card .player-table-header,
 .player-stats-card td.player-table-header,
 .player-stats-card td.stats-table-header {
-    background: linear-gradient(135deg, #D4AF37 0%, #b8972e 100%) !important;
-    color: #0f1419 !important;
+    background: linear-gradient(135deg, #{$border} 0%, #{$accent} 100%) !important;
+    color: #{$gradMid} !important;
     font-weight: 700 !important;
     font-size: 14px !important;
     text-transform: uppercase !important;
@@ -79,8 +94,8 @@ class PlayerStatsCardView
 /* Column headers */
 .player-stats-card table th,
 .player-stats-card .stats-table th {
-    background: rgba(212, 175, 55, 0.15) !important;
-    color: #D4AF37 !important;
+    background: rgba({$borderRgb}, 0.15) !important;
+    color: #{$accent} !important;
     font-weight: 600 !important;
     font-size: 11px !important;
     text-transform: uppercase !important;
@@ -88,7 +103,7 @@ class PlayerStatsCardView
     padding: 8px 6px !important;
     text-align: center !important;
     border: none !important;
-    border-bottom: 1px solid rgba(212, 175, 55, 0.3) !important;
+    border-bottom: 1px solid rgba({$borderRgb}, 0.3) !important;
     white-space: nowrap;
 }
 
@@ -99,7 +114,7 @@ class PlayerStatsCardView
     text-align: center !important;
     border: none !important;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
-    color: #e5e7eb !important;
+    color: #{$textMuted} !important;
     font-family: 'Monaco', 'Menlo', 'Consolas', monospace !important;
     font-size: 12px !important;
     white-space: nowrap;
@@ -109,7 +124,7 @@ class PlayerStatsCardView
 /* Row hover effect */
 .player-stats-card table tbody tr:hover td,
 .player-stats-card .stats-table tbody tr:hover td {
-    background: rgba(212, 175, 55, 0.08) !important;
+    background: rgba({$borderRgb}, 0.08) !important;
 }
 
 /* Alternating row colors */
@@ -120,7 +135,7 @@ class PlayerStatsCardView
 
 .player-stats-card table tbody tr:nth-child(even):hover td,
 .player-stats-card .stats-table tbody tr:nth-child(even):hover td {
-    background: rgba(212, 175, 55, 0.12) !important;
+    background: rgba({$borderRgb}, 0.12) !important;
 }
 
 /* Career/Total Row Styling */
@@ -128,35 +143,35 @@ class PlayerStatsCardView
 .player-stats-card tr.player-table-row-bold td,
 .player-stats-card .stats-table .career-row td,
 .player-stats-card .stats-table tr.player-table-row-bold td {
-    background: linear-gradient(90deg, rgba(212, 175, 55, 0.2) 0%, rgba(212, 175, 55, 0.1) 100%) !important;
+    background: linear-gradient(90deg, rgba({$borderRgb}, 0.2) 0%, rgba({$borderRgb}, 0.1) 100%) !important;
     font-weight: 700 !important;
-    color: #fff !important;
-    border-top: 2px solid #D4AF37 !important;
+    color: #{$text} !important;
+    border-top: 2px solid #{$border} !important;
 }
 
 /* Footer Row (e.g., Total Salary) */
 .player-stats-card .footer-row td,
 .player-stats-card .stats-table .footer-row td {
     background: rgba(0, 0, 0, 0.3) !important;
-    color: #D4AF37 !important;
+    color: #{$accent} !important;
     font-weight: 600 !important;
     font-style: italic;
     padding: 12px !important;
     text-align: center !important;
-    border-top: 2px solid rgba(212, 175, 55, 0.3) !important;
+    border-top: 2px solid rgba({$borderRgb}, 0.3) !important;
 }
 
 /* Team Links */
 .player-stats-card table a,
 .player-stats-card .stats-table a {
-    color: #60a5fa !important;
+    color: #{$accent} !important;
     text-decoration: none !important;
     transition: color 0.2s ease;
 }
 
 .player-stats-card table a:hover,
 .player-stats-card .stats-table a:hover {
-    color: #D4AF37 !important;
+    color: #{$text} !important;
     text-decoration: underline !important;
 }
 
@@ -206,8 +221,8 @@ class PlayerStatsCardView
     position: absolute;
     top: 8px;
     right: 8px;
-    background: rgba(212, 175, 55, 0.9);
-    color: #0f1419;
+    background: rgba({$borderRgb}, 0.9);
+    color: #{$gradMid};
     font-size: 9px;
     font-weight: 700;
     padding: 3px 8px;
@@ -226,9 +241,10 @@ HTML;
      * @param string $tableContent The inner table HTML content
      * @param string $title Optional card title (overrides table header)
      * @param string $statsType Optional stats type badge (e.g., "Averages", "Totals")
+     * @param array|null $colorScheme Optional color scheme from TeamColorHelper
      * @return string Complete HTML for the stats card
      */
-    public static function wrap(string $tableContent, string $title = '', string $statsType = ''): string
+    public static function wrap(string $tableContent, string $title = '', string $statsType = '', ?array $colorScheme = null): string
     {
         ob_start();
         ?>
@@ -288,10 +304,11 @@ HTML;
      * 
      * @param string $tableHtml Raw table HTML from a stats view
      * @param string $statsType Optional stats type indicator
+     * @param array|null $colorScheme Optional color scheme from TeamColorHelper
      * @return string Complete styled stats card HTML
      */
-    public static function render(string $tableHtml, string $statsType = ''): string
+    public static function render(string $tableHtml, string $statsType = '', ?array $colorScheme = null): string
     {
-        return self::wrap(self::styleTable($tableHtml), '', $statsType);
+        return self::wrap(self::styleTable($tableHtml), '', $statsType, $colorScheme);
     }
 }

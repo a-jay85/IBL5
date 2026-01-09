@@ -189,6 +189,7 @@ HTML;
      * @param int $threePointContests Number of Three-Point Contests
      * @param int $dunkContests Number of Slam Dunk Competitions
      * @param int $rookieSophChallenges Number of Rookie-Sophomore Challenges
+     * @param \mysqli|null $db Optional database connection for team colors
      * @return string HTML for flippable trading card
      */
     public static function render(
@@ -199,7 +200,8 @@ HTML;
         int $allStarGames = 0,
         int $threePointContests = 0,
         int $dunkContests = 0,
-        int $rookieSophChallenges = 0
+        int $rookieSophChallenges = 0,
+        ?\mysqli $db = null
     ): string {
         ob_start();
         ?>
@@ -207,7 +209,7 @@ HTML;
     <div class="card-flip-inner">
         <!-- Front of Card -->
         <div class="card-front">
-            <?= PlayerTradingCardFrontView::render($player, $playerID, $contractDisplay) ?>
+            <?= PlayerTradingCardFrontView::render($player, $playerID, $contractDisplay, $db) ?>
             
             <!-- Flip Icon -->
             <div class="flip-icon pulse" title="Click to see stats">
@@ -226,7 +228,8 @@ HTML;
                 $allStarGames,
                 $threePointContests,
                 $dunkContests,
-                $rookieSophChallenges
+                $rookieSophChallenges,
+                $db
             ) ?>
             
             <!-- Flip Icon (back side) -->

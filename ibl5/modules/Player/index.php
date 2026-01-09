@@ -53,7 +53,8 @@ function showpage($playerID, $pageView)
     // Include centralized player view styles
     echo PlayerViewStyles::getStyles();
     
-    UI::playerMenu();
+    // Render player menu with current page selected
+    echo PlayerMenuView::render($playerID, $pageView);
 
     // Render player header
     echo PlayerHeaderView::render($player, $playerID);
@@ -91,9 +92,6 @@ function showpage($playerID, $pageView)
 
     // Render player highs table with All-Star Activity data
     echo PlayerStatsView::renderPlayerHighsTable($playerStats, $asg, $threepointcontests, $dunkcontests, $rooksoph);
-    
-    // Render player menu
-    echo PlayerMenuView::render($playerID);
 
     // Create view factory with all required dependencies
     $statsRepository = new PlayerStatsRepository($mysqli_db);

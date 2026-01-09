@@ -4,6 +4,45 @@
 
 The Player View classes provide clean separation between data fetching (via PlayerRepository) and rendering. All database queries are encapsulated in the repository, while views focus purely on HTML generation.
 
+## Centralized Styles
+
+All Player Views use a centralized CSS stylesheet defined in `PlayerViewStyles.php`. This replaces deprecated HTML tags (`<center>`, `<font>`, `<b>`, `align=`, `bgcolor=`) with modern CSS classes.
+
+### Including Styles
+
+Add the styles block at the top of your page before any player view output:
+
+```php
+use Player\Views\PlayerViewStyles;
+
+// Include centralized styles
+echo PlayerViewStyles::getStyles();
+
+// Then render views
+echo $viewFactory->createAwardsView()->renderAwardsList($player->name);
+```
+
+### Available CSS Classes
+
+| Class | Purpose | Replaces |
+|-------|---------|----------|
+| `.player-table` | Auto-centered table with borders | `align="center"`, `border="1"` |
+| `.player-table-header` | Blue header row with white text | `bgcolor=#0000cc`, `<font color=#ffffff>` |
+| `.player-table-row-bold` | Bold row for totals/career | `style="font-weight:bold"` |
+| `.content-header` | Bold centered column header | `<center><b><font class="content">` |
+| `.stats-table` | Statistics table with centered cells | `border=1 cellspacing=1` |
+| `.ratings-table` | Player ratings table | `<center><table>` |
+| `.allstar-table` | All-Star activity table | `align=left` |
+| `.awards-table` | Awards list table | `border=1` |
+| `.gamelog` | Game log cell styling | Custom game log styling |
+| `.sim-stats-table` | Sim statistics table | `align=center` |
+| `.oneonone-table` | One-on-one results | Custom styling |
+| `.section-title` | Page section title | `<H1><center>` |
+| `.text-center` | Center text | `<center>`, `align=center` |
+| `.text-bold` | Bold text | `<b>` |
+| `.text-white` | White text | `<font color=#ffffff>` |
+| `.bg-blue` | Blue background | `bgcolor=#0000cc` |
+
 ## Architecture
 
 ```
@@ -27,6 +66,10 @@ PlayerPageService
 // In your module (e.g., 2003olympics/modules/Player/index.php)
 
 use Player\PlayerPageService;
+use Player\Views\PlayerViewStyles;
+
+// Include centralized styles first
+echo PlayerViewStyles::getStyles();
 
 // Initialize service (automatically creates repository and view factory)
 $playerService = new PlayerPageService($db);
@@ -199,7 +242,7 @@ include "footer.php";
 
 ### 1. **Security**
 - ✅ All queries use prepared statements via PlayerRepository
-- ✅ Automatic HTML escaping via htmlspecialchars()
+- ✅ Automatic HTML escaping via `HtmlSanitizer::safeHtmlOutput()`
 - ✅ No SQL injection vulnerabilities
 
 ### 2. **Maintainability**

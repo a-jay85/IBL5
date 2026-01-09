@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Leaderboards;
 
-use Statistics\StatsFormatter;
+use BasketballStats\StatsFormatter;
 use Leaderboards\Contracts\LeaderboardsServiceInterface;
 
 /**

@@ -169,7 +169,7 @@ When the same inline styles appear 2+ times, extract them to a `<style>` block:
 | Run tests | `cd ibl5 && vendor/bin/phpunit` |
 | Run specific | `vendor/bin/phpunit tests/Module/` |
 | Schema | `ibl5/schema.sql` |
-| Stats formatting | `Statistics\StatsFormatter` |
+| Stats formatting | `BasketballStats\StatsFormatter` |
 
 ---
 

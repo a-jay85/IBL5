@@ -5,14 +5,18 @@ declare(strict_types=1);
 namespace Player\Views;
 
 use Player\PlayerRepository;
-use Statistics\StatsFormatter;
+use Player\Contracts\PlayerSeasonStatsViewInterface;
+use BasketballStats\StatsFormatter;
+use Utilities\HtmlSanitizer;
 
 /**
  * PlayerSeasonStatsView - Renders regular season statistics (totals/averages)
  * 
  * Pure rendering with no database logic - all data fetched via PlayerRepository
+ * 
+ * @see PlayerSeasonStatsViewInterface
  */
-class PlayerSeasonStatsView
+class PlayerSeasonStatsView implements PlayerSeasonStatsViewInterface
 {
     private PlayerRepository $repository;
 
@@ -22,10 +26,7 @@ class PlayerSeasonStatsView
     }
 
     /**
-     * Render regular season totals table
-     * 
-     * @param int $playerID Player ID to fetch stats for
-     * @return string HTML for season totals table
+     * @see PlayerSeasonStatsViewInterface::renderSeasonTotals()
      */
     public function renderSeasonTotals(int $playerID): string
     {
@@ -33,64 +34,64 @@ class PlayerSeasonStatsView
 
         ob_start();
         ?>
-<table border=1 cellspacing=1 cellpadding=0>
+<table class="stats-table">
     <tr>
-        <td><center><b><font class="content">Team</font></b></center></td>
-        <td><center><b><font class="content">Year</font></b></center></td>
-        <td><center><b><font class="content">Games</font></b></center></td>
-        <td><center><b><font class="content">Min</font></b></center></td>
-        <td><center><b><font class="content">FGM-FGA</font></b></center></td>
-        <td><center><b><font class="content">FG%</font></b></center></td>
-        <td><center><b><font class="content">FTM-FTA</font></b></center></td>
-        <td><center><b><font class="content">FT%</font></b></center></td>
-        <td><center><b><font class="content">3GM-3GA</font></b></center></td>
-        <td><center><b><font class="content">3G%</font></b></center></td>
-        <td><center><b><font class="content">ORB</font></b></center></td>
-        <td><center><b><font class="content">DRB</font></b></center></td>
-        <td><center><b><font class="content">REB</font></b></center></td>
-        <td><center><b><font class="content">AST</font></b></center></td>
-        <td><center><b><font class="content">STL</font></b></center></td>
-        <td><center><b><font class="content">TO</font></b></center></td>
-        <td><center><b><font class="content">BLK</font></b></center></td>
-        <td><center><b><font class="content">PF</font></b></center></td>
-        <td><center><b><font class="content">PTS</font></b></center></td>
+        <td class="content-header">Team</td>
+        <td class="content-header">Year</td>
+        <td class="content-header">Games</td>
+        <td class="content-header">Min</td>
+        <td class="content-header">FGM-FGA</td>
+        <td class="content-header">FG%</td>
+        <td class="content-header">FTM-FTA</td>
+        <td class="content-header">FT%</td>
+        <td class="content-header">3GM-3GA</td>
+        <td class="content-header">3G%</td>
+        <td class="content-header">ORB</td>
+        <td class="content-header">DRB</td>
+        <td class="content-header">REB</td>
+        <td class="content-header">AST</td>
+        <td class="content-header">STL</td>
+        <td class="content-header">TO</td>
+        <td class="content-header">BLK</td>
+        <td class="content-header">PF</td>
+        <td class="content-header">PTS</td>
     </tr>
         <?php
         foreach ($historicalStats as $stats) {
-            $team = htmlspecialchars(stripslashes($stats['team']));
-            $year = htmlspecialchars($stats['year']);
-            $games = htmlspecialchars($stats['games']);
-            $minutes = htmlspecialchars($stats['minutes']);
+            $team = HtmlSanitizer::safeHtmlOutput($stats['team']);
+            $year = HtmlSanitizer::safeHtmlOutput($stats['year']);
+            $games = HtmlSanitizer::safeHtmlOutput($stats['games']);
+            $minutes = HtmlSanitizer::safeHtmlOutput($stats['minutes']);
             
             $fgm = $stats['fgm'];
             $fga = $stats['fga'];
-            $fgMade = htmlspecialchars($fgm);
-            $fgAttempted = htmlspecialchars($fga);
+            $fgMade = HtmlSanitizer::safeHtmlOutput($fgm);
+            $fgAttempted = HtmlSanitizer::safeHtmlOutput($fga);
             $fgPercent = StatsFormatter::formatPercentage($fgm, $fga);
             
             $ftm = $stats['ftm'];
             $fta = $stats['fta'];
-            $ftMade = htmlspecialchars($ftm);
-            $ftAttempted = htmlspecialchars($fta);
+            $ftMade = HtmlSanitizer::safeHtmlOutput($ftm);
+            $ftAttempted = HtmlSanitizer::safeHtmlOutput($fta);
             $ftPercent = StatsFormatter::formatPercentage($ftm, $fta);
             
             $tgm = $stats['tgm'];
             $tga = $stats['tga'];
-            $tgMade = htmlspecialchars($tgm);
-            $tgAttempted = htmlspecialchars($tga);
+            $tgMade = HtmlSanitizer::safeHtmlOutput($tgm);
+            $tgAttempted = HtmlSanitizer::safeHtmlOutput($tga);
             $tgPercent = StatsFormatter::formatPercentage($tgm, $tga);
             
-            $orb = htmlspecialchars($stats['orb']);
-            $drb = htmlspecialchars($stats['drb']);
-            $reb = htmlspecialchars($stats['reb']);
-            $ast = htmlspecialchars($stats['ast']);
-            $stl = htmlspecialchars($stats['stl']);
-            $to = htmlspecialchars($stats['tovr']);
-            $blk = htmlspecialchars($stats['blk']);
-            $pf = htmlspecialchars($stats['pf']);
-            $pts = htmlspecialchars($stats['pts']);
+            $orb = HtmlSanitizer::safeHtmlOutput($stats['orb']);
+            $drb = HtmlSanitizer::safeHtmlOutput($stats['drb']);
+            $reb = HtmlSanitizer::safeHtmlOutput($stats['reb']);
+            $ast = HtmlSanitizer::safeHtmlOutput($stats['ast']);
+            $stl = HtmlSanitizer::safeHtmlOutput($stats['stl']);
+            $to = HtmlSanitizer::safeHtmlOutput($stats['tovr']);
+            $blk = HtmlSanitizer::safeHtmlOutput($stats['blk']);
+            $pf = HtmlSanitizer::safeHtmlOutput($stats['pf']);
+            $pts = HtmlSanitizer::safeHtmlOutput($stats['pts']);
             ?>
-    <tr align=center>
+    <tr>
         <td><?= $team ?></td>
         <td><?= $year ?></td>
         <td><?= $games ?></td>
@@ -120,10 +121,7 @@ class PlayerSeasonStatsView
     }
 
     /**
-     * Render regular season averages table
-     * 
-     * @param int $playerID Player ID to fetch stats for
-     * @return string HTML for season averages table
+     * @see PlayerSeasonStatsViewInterface::renderSeasonAverages()
      */
     public function renderSeasonAverages(int $playerID): string
     {
@@ -131,24 +129,24 @@ class PlayerSeasonStatsView
 
         ob_start();
         ?>
-<table border=1 cellspacing=1 cellpadding=0>
+<table class="stats-table">
     <tr>
-        <td><center><b><font class="content">Team</font></b></center></td>
-        <td><center><b><font class="content">Year</font></b></center></td>
-        <td><center><b><font class="content">Games</font></b></center></td>
-        <td><center><b><font class="content">Min</font></b></center></td>
-        <td><center><b><font class="content">FG%</font></b></center></td>
-        <td><center><b><font class="content">FT%</font></b></center></td>
-        <td><center><b><font class="content">3G%</font></b></center></td>
-        <td><center><b><font class="content">ORB</font></b></center></td>
-        <td><center><b><font class="content">DRB</font></b></center></td>
-        <td><center><b><font class="content">REB</font></b></center></td>
-        <td><center><b><font class="content">AST</font></b></center></td>
-        <td><center><b><font class="content">STL</font></b></center></td>
-        <td><center><b><font class="content">TO</font></b></center></td>
-        <td><center><b><font class="content">BLK</font></b></center></td>
-        <td><center><b><font class="content">PF</font></b></center></td>
-        <td><center><b><font class="content">PTS</font></b></center></td>
+        <td class="content-header">Team</td>
+        <td class="content-header">Year</td>
+        <td class="content-header">Games</td>
+        <td class="content-header">Min</td>
+        <td class="content-header">FG%</td>
+        <td class="content-header">FT%</td>
+        <td class="content-header">3G%</td>
+        <td class="content-header">ORB</td>
+        <td class="content-header">DRB</td>
+        <td class="content-header">REB</td>
+        <td class="content-header">AST</td>
+        <td class="content-header">STL</td>
+        <td class="content-header">TO</td>
+        <td class="content-header">BLK</td>
+        <td class="content-header">PF</td>
+        <td class="content-header">PTS</td>
     </tr>
         <?php
         foreach ($historicalStats as $stats) {
@@ -157,9 +155,9 @@ class PlayerSeasonStatsView
                 continue;
             }
 
-            $team = htmlspecialchars(stripslashes($stats['team']));
-            $year = htmlspecialchars($stats['year']);
-            $gamesDisplay = htmlspecialchars($games);
+            $team = HtmlSanitizer::safeHtmlOutput($stats['team']);
+            $year = HtmlSanitizer::safeHtmlOutput($stats['year']);
+            $gamesDisplay = HtmlSanitizer::safeHtmlOutput($games);
             
             $avgMinutes = StatsFormatter::formatAverage($stats['minutes'], $games);
             $fgPercent = StatsFormatter::formatPercentage($stats['fgm'], $stats['fga']);
@@ -175,7 +173,7 @@ class PlayerSeasonStatsView
             $avgPf = StatsFormatter::formatAverage($stats['pf'], $games);
             $avgPts = StatsFormatter::formatAverage($stats['pts'], $games);
             ?>
-    <tr align=center>
+    <tr>
         <td><?= $team ?></td>
         <td><?= $year ?></td>
         <td><?= $gamesDisplay ?></td>

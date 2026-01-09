@@ -1,10 +1,10 @@
 # Development Guide
 
-**Status:** 21/23 IBL modules refactored (91% complete) • 781 tests • ~56% coverage • Goal: 80%
+**Status:** 22/23 IBL modules refactored (96% complete) • 787 tests • ~56% coverage • Goal: 80%
 
 ## Refactoring Status
 
-### ✅ Completed IBL Modules (18)
+### ✅ Completed IBL Modules (22)
 1. ~~Player~~ ✅ Complete (9 classes, 9 interfaces, 84 tests)
 2. ~~Statistics~~ ✅ Complete (6 classes, 5 tests)
 3. ~~Team~~ ✅ Complete (4 classes, 3 tests)
@@ -26,21 +26,41 @@
 19. ~~League_Stats~~ ✅ Complete (3 classes, 3 interfaces, 33 tests)
 20. ~~Player_Awards~~ ✅ Complete (4 classes, 4 interfaces, 55 tests)
 21. ~~Series_Records~~ ✅ Complete (5 classes, 4 interfaces, 29 tests)
+22. ~~One-on-One~~ ✅ Complete (7 classes, 4 interfaces, 75 tests)
 
-### 🎯 Top Priorities (Next 2)
+### 🎯 Final IBL Module (1 Remaining)
 
-1. **One-on-One** (907 lines) - Player matchup game/comparison (2-3 weeks)
-2. **Cap_Info** (134 lines) - Salary cap information display (1 week)
+**Cap_Info** (134 lines) - Salary cap information display (~1 week)
 
-### 📋 Remaining IBL Modules (2)
+### 📋 Additional Display Modules (Low Priority - Optional)
 
-**High Priority:**
-- One-on-One (907 lines) - Side game/matchup feature
-
-**Lower Priority (Info/Display):**
-- Cap_Info (134 lines)
+These are simple information display modules that may not require full refactoring:
 - Team_Schedule (130 lines), Franchise_History (103 lines), Power_Rankings (90 lines)
 - Next_Sim (95 lines), League_Starters (85 lines), Draft_Pick_Locator (81 lines), Injuries (57 lines)
+
+### 🚀 NEW Top Priorities (Post-Refactoring Phase)
+
+With IBL module refactoring 96% complete, focus shifts to:
+
+1. **Test Coverage Push to 80%** ⭐⭐⭐⭐⭐
+   - Current: ~56%, Target: 80%
+   - Add integration tests for refactored modules
+   - Focus on Voting (0 tests), Schedule (0 tests), DepthChart (2 tests)
+   - Estimated: 2-3 weeks
+
+2. **API Development** ⭐⭐⭐⭐⭐
+   - REST API for refactored modules (Player, Team, Stats, Trading)
+   - Use existing database views and UUIDs
+   - JWT authentication, rate limiting
+   - OpenAPI documentation
+   - Estimated: 3-4 weeks
+
+3. **Security Audit & Hardening** ⭐⭐⭐⭐
+   - Complete XSS audit of all remaining legacy code
+   - CSRF protection implementation
+   - Security headers (CSP, HSTS, X-Frame-Options)
+   - Dependency vulnerability scanning
+   - Estimated: 1-2 weeks
 
 ## 🔍 Mandatory Code Review (Always Apply)
 

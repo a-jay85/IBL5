@@ -4,11 +4,74 @@ This document tracks the history of module refactoring efforts in the IBL5 codeb
 
 ## Overview
 
-**Current Status:** 19 of 23 IBL modules refactored (83% complete)  
-**Test Coverage:** ~54% (target: 80%)  
+**Current Status:** 22 of 23 IBL modules refactored (96% complete)  
+**Test Coverage:** ~56% (target: 80%)  
 **Architecture Pattern:** Repository/Service/View with comprehensive testing
 
 ## Completed Refactorings
+
+### 22. One-on-One Module (January 2026)
+
+**Summary:** Refactored One-on-One module with interface-driven architecture for player matchup simulation game.
+
+**Key Improvements:**
+- Created 7 classes + 4 interfaces with separation of concerns
+- Reduced index.php from 907 → 112 lines (88% reduction)
+- Added 75 comprehensive unit tests with 168 assertions
+- Complete game simulation engine with realistic basketball mechanics
+- Play-by-play text generation with randomized commentary
+- Discord integration for game result announcements
+- Integrated HtmlSanitizer for XSS protection
+
+**Classes Created:**
+1. **OneOnOneRepository** - Database operations for game history storage
+2. **OneOnOneGameEngine** - Basketball simulation (shooting, blocking, rebounding, fouls)
+3. **OneOnOneService** - Game orchestration and workflow
+4. **OneOnOneView** - HTML rendering with forms and game results
+5. **OneOnOneTextGenerator** - Randomized play-by-play commentary
+6. **OneOnOneGameResult** - Game result DTO
+7. **OneOnOnePlayerStats** - Player statistics DTO
+
+**Game Mechanics:**
+- Four shot types: three-pointer, outside two, drive, post
+- Defensive actions: blocking, stealing
+- Rebounding: offensive and defensive
+- Fouls and turnovers
+- Games played to 21 points
+
+**Test Coverage:**
+- OneOnOneGameEngineTest: 21 tests (core game simulation)
+- OneOnOneServiceTest: 13 tests (workflow orchestration)
+- OneOnOneViewTest: 15 tests (HTML rendering)
+- OneOnOneTextGeneratorTest: 18 tests (commentary generation)
+- OneOnOneGameResultTest: 4 tests (DTO validation)
+- OneOnOnePlayerStatsTest: 4 tests (stats tracking)
+
+**Documentation:** `ibl5/classes/OneOnOne/README.md`
+
+---
+
+### 21. Series_Records Module (January 2026)
+
+**Summary:** Refactored Series_Records module with interface-driven architecture.
+
+**Key Improvements:**
+- Created 5 classes + 4 interfaces
+- Added 29 comprehensive tests
+- Historical series data display
+
+---
+
+### 20. Player_Awards Module (January 2026)
+
+**Summary:** Refactored Player_Awards module with interface-driven architecture.
+
+**Key Improvements:**
+- Created 4 classes + 4 interfaces
+- Added 55 comprehensive tests
+- Award history display and management
+
+---
 
 ### 19. League_Stats Module (January 2026)
 
@@ -415,25 +478,23 @@ public function renderExample(string $title): string
 
 ---
 
-## Remaining IBL Modules (4)
+## Remaining IBL Modules (1)
 
-### High Priority
-1. **One-on-One** (907 lines) - Player matchup game/comparison
+### Final Core Module
+1. **Cap_Info** (134 lines) - Salary cap information display
 
-### Lower Priority (Info/Display)
-2. **Series_Records** (184 lines) - Historical series data
-3. **Player_Awards** (160 lines) - Award history display
-4. **Cap_Info** (134 lines) - Salary cap information
-
-Plus 7 additional smaller display modules: Team_Schedule, Franchise_History, Power_Rankings, Next_Sim, League_Starters, Draft_Pick_Locator, Injuries.
+### Optional Display Modules (Low Priority)
+These simple information display modules may not require full refactoring:
+- Team_Schedule (130 lines), Franchise_History (103 lines), Power_Rankings (90 lines)
+- Next_Sim (95 lines), League_Starters (85 lines), Draft_Pick_Locator (81 lines), Injuries (57 lines)
 
 ---
 
 ## Testing Progress
 
-**Total Test Files:** 80  
-**Total Tests:** 771 tests  
-**Test Coverage:** ~54% (target: 80%)
+**Total Test Files:** 95  
+**Total Tests:** 787 tests (20 skipped)  
+**Test Coverage:** ~56% (target: 80%)
 
 **Test Frameworks:**
 - PHPUnit 12.4+ for unit testing

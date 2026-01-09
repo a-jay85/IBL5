@@ -42,6 +42,38 @@
 - Team_Schedule (130 lines), Franchise_History (103 lines), Power_Rankings (90 lines)
 - Next_Sim (95 lines), League_Starters (85 lines), Draft_Pick_Locator (81 lines), Injuries (57 lines)
 
+## 🔍 Mandatory Code Review (Always Apply)
+
+**CRITICAL: Every code change must pass these security and standards checks BEFORE completion:**
+
+### Security Audit (Non-Negotiable)
+1. **XSS Protection**
+   - [ ] All database-sourced content wrapped in `Utilities\HtmlSanitizer::safeHtmlOutput()`
+   - [ ] All user inputs sanitized before output (player names, game text, form data)
+   - [ ] Play-by-play text, error messages, and dynamic content properly escaped
+   - [ ] HTML generated in business logic classes sanitized before embedding in output
+   - **Detection:** Search for database queries, `$_POST`, `$_GET`, or string interpolation in HTML context
+   - **Action:** Fix immediately - do not defer or mark as "future work"
+
+2. **SQL Injection Protection**
+   - [ ] All database queries use prepared statements via `BaseMysqliRepository`
+   - [ ] No raw SQL string concatenation with variables
+   - [ ] User inputs validated before database operations
+
+### Standards Compliance (Non-Negotiable)
+3. **HTML/CSS Modernization**
+   - [ ] No deprecated tags: `<b>`, `<i>`, `<u>`, `<font>`, `<center>`
+   - [ ] Replace with semantic HTML: `<strong style="font-weight: bold;">`, `<em style="font-style: italic;">`
+   - [ ] No `border=` attributes - use `style="border: 1px solid #000; border-collapse: collapse;"`
+   - [ ] Table cells with borders need `style="border: 1px solid #000; padding: 4px;"`
+   - [ ] Extract repeated inline styles (2+ uses) to `<style>` blocks with CSS classes
+   - **Detection:** Grep for `<b>`, `<font`, `border=`, or inspect HTML output in view classes
+   - **Action:** Fix immediately - modernization is mandatory, not optional
+
+**When to Apply:** During refactoring, feature development, bug fixes, testing, code review, or ANY file modification. These checks are mandatory regardless of the task's primary focus.
+
+**Why This Matters:** XSS vulnerabilities expose users to attacks. Deprecated HTML violates web standards and makes code harder to maintain. Both must be fixed when detected, not deferred.
+
 ## Quick Workflow
 
 **Before Starting:**
@@ -61,7 +93,12 @@
 4. Extract - Repository → Validator → Processor → View → Controller
 5. Implement Interfaces - Add interface implementations and @see docblocks
 6. Test - Unit + integration tests
-7. Audit - Security review
+7. **Security & Standards Audit** (MANDATORY)
+   - [ ] XSS: All output wrapped in `HtmlSanitizer::safeHtmlOutput()` (scan database results, form data, play-by-play text)
+   - [ ] SQL: All queries use prepared statements
+   - [ ] HTML: No deprecated tags (`<b>`, `<font>`, `border=`) - convert to semantic HTML + inline CSS
+   - [ ] CSS: Extract repeated styles (2+ uses) to classes
+   - **Must be 100% compliant before proceeding** - no exceptions
 8. **Production Validation** - Compare localhost against iblhoops.net
    - Verify all output (text, data, ordering, formatting) matches exactly
    - If mismatches found, debug and iterate until perfect match

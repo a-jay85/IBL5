@@ -15,6 +15,7 @@ use Player\Views\PlayerViewFactory;
 use Player\Views\PlayerRatingsView;
 use Player\Views\PlayerTradingCardView;
 use Player\Views\PlayerTradingCardBackView;
+use Player\Views\PlayerTradingCardFlipView;
 use RookieOption\RookieOptionValidator;
 use RookieOption\RookieOptionFormView;
 use Services\CommonMysqliRepository;
@@ -52,8 +53,10 @@ function showpage($playerID, $pageView)
     Nuke\Header::header();
     OpenTable();
     
-    // Include trading card styles (Tailwind CDN + custom CSS)
+    // Include trading card styles (both front and back)
     echo PlayerTradingCardView::getStyles();
+    echo PlayerTradingCardBackView::getStyles();
+    echo PlayerTradingCardFlipView::getFlipStyles();
     
     // Include legacy player view styles for other components
     echo PlayerViewStyles::getStyles();
@@ -61,10 +64,26 @@ function showpage($playerID, $pageView)
     // Render player menu with current page selected
     echo PlayerMenuView::render($playerID, $pageView);
 
-    // Render player as trading card (combines header, bio, ratings)
+    // Get All-Star Activity data using PlayerRepository
+    $playerRepository = new PlayerRepository($mysqli_db);
+    $asg = $playerRepository->getAllStarGameCount($player->name);
+    $threepointcontests = $playerRepository->getThreePointContestCount($player->name);
+    $dunkcontests = $playerRepository->getDunkContestCount($player->name);
+    $rooksoph = $playerRepository->getRookieSophChallengeCount($player->name);
+
+    // Render flippable trading card (combines front and back with flip animation)
     $contract_display = implode("/", $player->getRemainingContractArray());
     echo '<tr><td colspan="2">';
-    echo PlayerTradingCardView::render($player, $playerID, $contract_display);
+    echo PlayerTradingCardFlipView::render(
+        $player,
+        $playerStats,
+        $playerID,
+        $contract_display,
+        $asg,
+        $threepointcontests,
+        $dunkcontests,
+        $rooksoph
+    );
     echo '</td></tr>';
 
     // Render action buttons based on business logic
@@ -80,29 +99,6 @@ function showpage($playerID, $pageView)
     if ($pageService->canShowRookieOptionButton($player, $userTeam, $season)) {
         echo PlayerButtonsView::renderRookieOptionButton($playerID);
     }
-    
-    // Get All-Star Activity data using PlayerRepository
-    $playerRepository = new PlayerRepository($mysqli_db);
-    $asg = $playerRepository->getAllStarGameCount($player->name);
-    $threepointcontests = $playerRepository->getThreePointContestCount($player->name);
-    $dunkcontests = $playerRepository->getDunkContestCount($player->name);
-    $rooksoph = $playerRepository->getRookieSophChallengeCount($player->name);
-
-    // Include styles
-    echo PlayerTradingCardBackView::getStyles();
-
-    // Render the back of the card
-    echo '<tr><td colspan="2">';
-    echo PlayerTradingCardBackView::render(
-        $player,
-        $playerStats,
-        $playerID,
-        $asg,
-        $threepointcontests,
-        $dunkcontests,
-        $rooksoph
-    );
-    echo '</td></tr>';
 
     // Create view factory with all required dependencies
     $statsRepository = new PlayerStatsRepository($mysqli_db);

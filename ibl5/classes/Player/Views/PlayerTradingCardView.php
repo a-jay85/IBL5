@@ -38,7 +38,7 @@ class PlayerTradingCardView
         0 10px 40px rgba(0,0,0,0.4);
     max-width: 420px;
     margin: 0 auto;
-    padding: 16px;
+    padding: 16px 16px 50px 16px;
     color: #fff;
 }
 

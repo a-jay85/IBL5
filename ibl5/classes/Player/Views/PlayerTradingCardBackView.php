@@ -40,7 +40,7 @@ class PlayerTradingCardBackView
         0 10px 40px rgba(0,0,0,0.4);
     max-width: 420px;
     margin: 0 auto;
-    padding: 16px;
+    padding: 16px 16px 50px 16px;
     color: #fff;
 }
 
@@ -169,6 +169,7 @@ class PlayerTradingCardBackView
     padding: 8px;
     margin-bottom: 12px;
     border-collapse: collapse;
+    table-layout: fixed;
 }
 
 .trading-card-back .highs-table th,
@@ -176,6 +177,11 @@ class PlayerTradingCardBackView
     padding: 4px 6px;
     text-align: center;
     font-size: 12px;
+    width: 18%;
+}
+
+.trading-card-back .highs-table .stat-label {
+    width: 28%;
 }
 
 .trading-card-back .highs-table .highs-header {
@@ -421,13 +427,13 @@ HTML;
                 $playerStats->seasonPlayoffHighBlocks,
                 $playerStats->careerPlayoffHighBlocks
             ) ?>
-            <?= self::renderHighsRow('Dbl-Dbl', 
+            <?= self::renderHighsRow('Double-Doubles', 
                 $playerStats->seasonDoubleDoubles, 
                 $playerStats->careerDoubleDoubles,
                 $playerStats->seasonPlayoffDoubleDoubles,
                 $playerStats->careerPlayoffDoubleDoubles
             ) ?>
-            <?= self::renderHighsRow('Trpl-Dbl', 
+            <?= self::renderHighsRow('Triple-Doubles', 
                 $playerStats->seasonTripleDoubles, 
                 $playerStats->careerTripleDoubles,
                 $playerStats->seasonPlayoffTripleDoubles,
@@ -445,11 +451,6 @@ HTML;
             <?= self::renderAllStarPill('Dunk Contest', $dunkContests) ?>
             <?= self::renderAllStarPill('Rookie-Soph', $rookieSophChallenges) ?>
         </div>
-    </div>
-
-    <!-- Card Footer -->
-    <div class="card-footer">
-        Career Statistics Card
     </div>
 </div>
         <?php

@@ -483,4 +483,63 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
             $playerID
         );
     }
+
+    /**
+     * Get news articles mentioning a player
+     * 
+     * @see PlayerRepositoryInterface::getPlayerNews()
+     */
+    public function getPlayerNews(string $playerName): array
+    {
+        $searchPattern = '%' . $playerName . '%';
+        $searchPatternII = '%' . $playerName . ' II%';
+        
+        return $this->fetchAll(
+            "SELECT sid, title, time FROM nuke_stories 
+             WHERE (hometext LIKE ? OR bodytext LIKE ?) 
+             AND (hometext NOT LIKE ? OR bodytext NOT LIKE ?) 
+             ORDER BY time DESC",
+            "ssss",
+            $searchPattern,
+            $searchPattern,
+            $searchPatternII,
+            $searchPatternII
+        );
+    }
+
+    /**
+     * Get one-on-one game wins for a player
+     * 
+     * @see PlayerRepositoryInterface::getOneOnOneWins()
+     */
+    public function getOneOnOneWins(string $playerName): array
+    {
+        return $this->fetchAll(
+            "SELECT o.gameid, o.winner, o.loser, o.winscore, o.lossscore, p.pid as loser_pid 
+             FROM ibl_one_on_one o 
+             LEFT JOIN ibl_plr p ON o.loser = p.name 
+             WHERE o.winner = ? 
+             ORDER BY o.gameid ASC",
+            "s",
+            $playerName
+        );
+    }
+
+    /**
+     * Get one-on-one game losses for a player
+     * 
+     * @see PlayerRepositoryInterface::getOneOnOneLosses()
+     */
+    public function getOneOnOneLosses(string $playerName): array
+    {
+        return $this->fetchAll(
+            "SELECT o.gameid, o.winner, o.loser, o.winscore, o.lossscore, p.pid as winner_pid 
+             FROM ibl_one_on_one o 
+             LEFT JOIN ibl_plr p ON o.winner = p.name 
+             WHERE o.loser = ? 
+             ORDER BY o.gameid ASC",
+            "s",
+            $playerName
+        );
+    }
 }

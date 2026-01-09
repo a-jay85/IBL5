@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace SeasonLeaders;
 
-use Statistics\StatsFormatter;
+use BasketballStats\StatsFormatter;
 use SeasonLeaders\Contracts\SeasonLeadersServiceInterface;
 
 /**

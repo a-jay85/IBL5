@@ -7,7 +7,7 @@ namespace Tests\LeagueStats;
 use PHPUnit\Framework\TestCase;
 use LeagueStats\LeagueStatsService;
 use LeagueStats\Contracts\LeagueStatsServiceInterface;
-use Statistics\StatsFormatter;
+use BasketballStats\StatsFormatter;
 
 /**
  * Tests for LeagueStatsService

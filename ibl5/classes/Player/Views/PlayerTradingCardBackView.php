@@ -46,7 +46,7 @@ class PlayerTradingCardBackView
 <style>
 /* Trading Card Back Custom Styles - Scoped to .trading-card-back */
 .trading-card-back {
-    background: linear-gradient(145deg, #{$gradStart} 0%, #{$gradMid} 25%, #{$gradMid} 75%, #{$gradEnd} 100%);
+    background: linear-gradient(145deg, #{$gradStart} 0%, #{$gradMid} 20%, #{$gradMid} 80%, #{$gradEnd} 100%);
     border: 4px solid #{$border};
     border-radius: 16px;
     box-shadow: 

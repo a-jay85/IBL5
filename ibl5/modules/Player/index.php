@@ -62,7 +62,9 @@ function showpage($playerID, $pageView)
 
     // Render player as trading card (combines header, bio, ratings)
     $contract_display = implode("/", $player->getRemainingContractArray());
+    echo '<tr><td colspan="2">';
     echo PlayerTradingCardView::render($player, $playerID, $contract_display);
+    echo '</td></tr>';
 
     // Render action buttons based on business logic
     $userTeamName = $commonRepository->getTeamnameFromUsername(strval($cookie[1] ?? ''));

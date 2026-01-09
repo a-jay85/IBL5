@@ -19,29 +19,15 @@ use Utilities\HtmlSanitizer;
 class PlayerTradingCardView
 {
     /**
-     * Get Tailwind CSS CDN and custom styles for trading card
+     * Get scoped custom styles for trading card (no external dependencies)
      * 
-     * @return string HTML style and script tags
+     * @return string HTML style tag with scoped CSS
      */
     public static function getStyles(): string
     {
         return <<<'HTML'
-<script src="https://cdn.tailwindcss.com"></script>
-<script>
-tailwind.config = {
-    theme: {
-        extend: {
-            colors: {
-                'card-gold': '#D4AF37',
-                'card-navy': '#1e3a5f',
-                'card-dark': '#0f1419',
-            }
-        }
-    }
-}
-</script>
 <style>
-/* Trading Card Custom Styles */
+/* Trading Card Custom Styles - Scoped to .trading-card */
 .trading-card {
     background: linear-gradient(145deg, #1e3a5f 0%, #0f1419 50%, #1e3a5f 100%);
     border: 4px solid #D4AF37;
@@ -52,56 +38,37 @@ tailwind.config = {
         0 10px 40px rgba(0,0,0,0.4);
     max-width: 420px;
     margin: 0 auto;
-}
-
-.player-photo-frame {
-    border: 3px solid #D4AF37;
-    border-radius: 8px;
-    background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
-}
-
-.stat-pill {
-    background: rgba(212, 175, 55, 0.15);
-    border: 1px solid rgba(212, 175, 55, 0.3);
-    border-radius: 6px;
-    padding: 2px 6px;
-    font-family: 'Monaco', 'Menlo', monospace;
-}
-
-.rating-row {
-    display: grid;
-    gap: 4px;
-    background: rgba(0,0,0,0.3);
-    border-radius: 8px;
-    padding: 8px;
-    margin-bottom: 6px;
-}
-
-.rating-row.shooting { grid-template-columns: repeat(6, 1fr); }
-.rating-row.rebounding { grid-template-columns: repeat(7, 1fr); }
-.rating-row.offense-defense { grid-template-columns: repeat(8, 1fr); }
-
-.rating-cell {
-    text-align: center;
-    padding: 4px 2px;
-}
-
-.rating-label {
-    font-size: 9px;
-    font-weight: 600;
-    text-transform: uppercase;
-    color: #D4AF37;
-    letter-spacing: 0.5px;
-}
-
-.rating-value {
-    font-size: 14px;
-    font-weight: 700;
+    padding: 16px;
     color: #fff;
-    font-family: 'Monaco', 'Menlo', monospace;
 }
 
-.meta-badge {
+.trading-card * {
+    box-sizing: border-box;
+}
+
+.trading-card .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.trading-card .card-header h2 {
+    font-size: 20px;
+    font-weight: bold;
+    color: #fff;
+    line-height: 1.2;
+    margin: 0;
+}
+
+.trading-card .card-header .nickname {
+    color: #D4AF37;
+    font-size: 14px;
+    font-style: italic;
+    margin: 2px 0 0 0;
+}
+
+.trading-card .meta-badge {
     background: linear-gradient(135deg, #D4AF37 0%, #b8972e 100%);
     color: #0f1419;
     font-weight: 700;
@@ -110,11 +77,185 @@ tailwind.config = {
     font-size: 11px;
 }
 
-.contract-bar {
+.trading-card .photo-stats-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.trading-card .player-photo-frame {
+    border: 3px solid #D4AF37;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
+    padding: 4px;
+    flex-shrink: 0;
+}
+
+.trading-card .player-photo-frame img {
+    width: 96px;
+    height: 112px;
+    object-fit: cover;
+    border-radius: 4px;
+    display: block;
+}
+
+.trading-card .quick-stats {
+    flex: 1;
+    font-size: 14px;
+}
+
+.trading-card .stats-grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 4px 8px;
+    color: #d1d5db;
+}
+
+.trading-card .stats-grid .label {
+    color: #D4AF37;
+    font-weight: 600;
+}
+
+.trading-card .stats-grid .value {
+    color: #fff;
+}
+
+.trading-card .stats-grid a {
+    color: #fff;
+    text-decoration: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.trading-card .stats-grid a:hover {
+    color: #D4AF37;
+}
+
+.trading-card .draft-info {
+    text-align: center;
+    font-size: 12px;
+    color: #9ca3af;
+    margin-bottom: 12px;
+    font-style: italic;
+}
+
+.trading-card .draft-info a {
+    color: #D4AF37;
+    text-decoration: none;
+}
+
+.trading-card .draft-info a:hover {
+    text-decoration: underline;
+}
+
+.trading-card .section-title {
+    color: #D4AF37;
+    font-size: 12px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 8px;
+    text-align: center;
+}
+
+.trading-card .rating-row {
+    display: grid;
+    gap: 4px;
+    background: rgba(0,0,0,0.3);
+    border-radius: 8px;
+    padding: 8px;
+    margin-bottom: 6px;
+}
+
+.trading-card .rating-row.shooting { grid-template-columns: repeat(6, 1fr); }
+.trading-card .rating-row.rebounding { grid-template-columns: repeat(7, 1fr); }
+.trading-card .rating-row.offense-defense { grid-template-columns: repeat(8, 1fr); }
+
+.trading-card .rating-cell {
+    text-align: center;
+    padding: 4px 2px;
+}
+
+.trading-card .rating-label {
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #D4AF37;
+    letter-spacing: 0.5px;
+}
+
+.trading-card .rating-value {
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+    font-family: 'Monaco', 'Menlo', monospace;
+}
+
+.trading-card .stat-pill {
+    background: rgba(212, 175, 55, 0.15);
+    border: 1px solid rgba(212, 175, 55, 0.3);
+    border-radius: 6px;
+    padding: 2px 6px;
+    font-family: 'Monaco', 'Menlo', monospace;
+    display: inline-block;
+}
+
+.trading-card .pills-row {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 12px;
+    font-size: 12px;
+    flex-wrap: wrap;
+}
+
+.trading-card .stat-pill .pill-label {
+    color: #D4AF37;
+}
+
+.trading-card .stat-pill .pill-value {
+    color: #fff;
+    font-weight: bold;
+}
+
+.trading-card .stat-pill.intangible .pill-label {
+    color: #D4AF37;
+}
+
+.trading-card .stat-pill.preference .pill-label {
+    color: #9ca3af;
+}
+
+.trading-card .contract-bar {
     background: linear-gradient(90deg, rgba(212,175,55,0.2) 0%, rgba(212,175,55,0.05) 100%);
     border-left: 3px solid #D4AF37;
     padding: 8px 12px;
     border-radius: 0 8px 8px 0;
+    margin-top: 8px;
+}
+
+.trading-card .contract-bar .contract-flex {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+}
+
+.trading-card .contract-bar .contract-label {
+    color: #9ca3af;
+}
+
+.trading-card .contract-bar .contract-value {
+    color: #fff;
+    font-weight: bold;
+    margin-left: 4px;
+}
+
+.trading-card .contract-bar .contract-amount {
+    color: #D4AF37;
+    font-weight: bold;
+    margin-left: 4px;
 }
 
 /* Mobile responsiveness */
@@ -123,10 +264,20 @@ tailwind.config = {
         max-width: 100%;
         margin: 8px;
         border-radius: 12px;
+        padding: 12px;
     }
     
-    .rating-label { font-size: 8px; }
-    .rating-value { font-size: 12px; }
+    .trading-card .rating-label { font-size: 8px; }
+    .trading-card .rating-value { font-size: 12px; }
+    
+    .trading-card .photo-stats-row {
+        gap: 12px;
+    }
+    
+    .trading-card .player-photo-frame img {
+        width: 80px;
+        height: 96px;
+    }
 }
 </style>
 HTML;
@@ -163,56 +314,54 @@ HTML;
 
         ob_start();
         ?>
-<div class="trading-card p-4">
+<div class="trading-card">
     <!-- Card Header: Name & Position -->
-    <div class="flex items-center justify-between mb-3">
+    <div class="card-header">
         <div>
-            <h2 class="text-xl font-bold text-white leading-tight"><?= $name ?></h2>
+            <h2><?= $name ?></h2>
             <?php if (!empty($nickname)): ?>
-            <p class="text-card-gold text-sm italic">"<?= $nickname ?>"</p>
+            <p class="nickname">"<?= $nickname ?>"</p>
             <?php endif; ?>
         </div>
         <span class="meta-badge"><?= $position ?></span>
     </div>
 
     <!-- Player Photo & Quick Stats -->
-    <div class="flex gap-4 mb-4">
-        <div class="player-photo-frame p-1 flex-shrink-0">
+    <div class="photo-stats-row">
+        <div class="player-photo-frame">
             <img src="<?= HtmlSanitizer::safeHtmlOutput($imageUrl) ?>" 
-                 alt="<?= $name ?>" 
-                 class="w-24 h-28 object-cover rounded"
+                 alt="<?= $name ?>"
                  onerror="this.style.display='none'">
         </div>
-        <div class="flex-1 text-sm">
-            <div class="grid grid-cols-2 gap-y-1 text-gray-300">
-                <span class="text-card-gold font-semibold">Team</span>
-                <a href="modules.php?name=Team&op=team&teamID=<?= $teamID ?>" 
-                   class="text-white hover:text-card-gold truncate"><?= $teamName ?></a>
+        <div class="quick-stats">
+            <div class="stats-grid">
+                <span class="label">Team</span>
+                <a href="modules.php?name=Team&op=team&teamID=<?= $teamID ?>"><?= $teamName ?></a>
                 
-                <span class="text-card-gold font-semibold">Age</span>
-                <span class="text-white"><?= $age ?></span>
+                <span class="label">Age</span>
+                <span class="value"><?= $age ?></span>
                 
-                <span class="text-card-gold font-semibold">Height</span>
-                <span class="text-white"><?= $height ?></span>
+                <span class="label">Height</span>
+                <span class="value"><?= $height ?></span>
                 
-                <span class="text-card-gold font-semibold">Weight</span>
-                <span class="text-white"><?= $weight ?> lbs</span>
+                <span class="label">Weight</span>
+                <span class="value"><?= $weight ?> lbs</span>
                 
-                <span class="text-card-gold font-semibold">College</span>
-                <span class="text-white truncate"><?= $college ?></span>
+                <span class="label">College</span>
+                <span class="value"><?= $college ?></span>
             </div>
         </div>
     </div>
 
     <!-- Draft Info -->
-    <div class="text-center text-xs text-gray-400 mb-3 italic">
+    <div class="draft-info">
         Drafted by <?= $draftTeam ?> · Rd <?= $draftRound ?>, Pick #<?= $draftPick ?> · 
-        <a href="/ibl5/pages/draftHistory.php?year=<?= $player->draftYear ?>" class="text-card-gold hover:underline"><?= $draftYear ?></a>
+        <a href="/ibl5/pages/draftHistory.php?year=<?= $player->draftYear ?>"><?= $draftYear ?></a>
     </div>
 
     <!-- RATINGS SECTION -->
-    <div class="mb-3">
-        <h3 class="text-card-gold text-xs font-bold uppercase tracking-wider mb-2 text-center">Player Ratings</h3>
+    <div>
+        <h3 class="section-title">Player Ratings</h3>
         
         <!-- Row 1: Shooting (2ga 2gp fta ftp 3ga 3gp) -->
         <div class="rating-row shooting">
@@ -249,66 +398,66 @@ HTML;
     </div>
 
     <!-- Intangibles Row -->
-    <div class="flex justify-center gap-3 mb-3 text-xs">
-        <div class="stat-pill">
-            <span class="text-card-gold">TAL</span> 
-            <span class="text-white font-bold"><?= HtmlSanitizer::safeHtmlOutput((string)$player->ratingTalent) ?></span>
+    <div class="pills-row">
+        <div class="stat-pill intangible">
+            <span class="pill-label">TAL</span> 
+            <span class="pill-value"><?= HtmlSanitizer::safeHtmlOutput((string)$player->ratingTalent) ?></span>
         </div>
-        <div class="stat-pill">
-            <span class="text-card-gold">SKL</span> 
-            <span class="text-white font-bold"><?= HtmlSanitizer::safeHtmlOutput((string)$player->ratingSkill) ?></span>
+        <div class="stat-pill intangible">
+            <span class="pill-label">SKL</span> 
+            <span class="pill-value"><?= HtmlSanitizer::safeHtmlOutput((string)$player->ratingSkill) ?></span>
         </div>
-        <div class="stat-pill">
-            <span class="text-card-gold">INT</span> 
-            <span class="text-white font-bold"><?= HtmlSanitizer::safeHtmlOutput((string)$player->ratingIntangibles) ?></span>
+        <div class="stat-pill intangible">
+            <span class="pill-label">INT</span> 
+            <span class="pill-value"><?= HtmlSanitizer::safeHtmlOutput((string)$player->ratingIntangibles) ?></span>
         </div>
-        <div class="stat-pill">
-            <span class="text-card-gold">CLU</span> 
-            <span class="text-white font-bold"><?= HtmlSanitizer::safeHtmlOutput((string)$player->ratingClutch) ?></span>
+        <div class="stat-pill intangible">
+            <span class="pill-label">CLU</span> 
+            <span class="pill-value"><?= HtmlSanitizer::safeHtmlOutput((string)$player->ratingClutch) ?></span>
         </div>
-        <div class="stat-pill">
-            <span class="text-card-gold">CON</span> 
-            <span class="text-white font-bold"><?= HtmlSanitizer::safeHtmlOutput((string)$player->ratingConsistency) ?></span>
+        <div class="stat-pill intangible">
+            <span class="pill-label">CON</span> 
+            <span class="pill-value"><?= HtmlSanitizer::safeHtmlOutput((string)$player->ratingConsistency) ?></span>
         </div>
     </div>
 
     <!-- Free Agency Preferences -->
-    <div class="mb-3">
-        <h3 class="text-card-gold text-xs font-bold uppercase tracking-wider mb-2 text-center">FA Preferences</h3>
-        <div class="flex justify-center gap-2 text-xs flex-wrap">
-            <div class="stat-pill">
-                <span class="text-gray-400">LOY</span> 
-                <span class="text-white font-bold"><?= HtmlSanitizer::safeHtmlOutput((string)$player->freeAgencyLoyalty) ?></span>
+    <div>
+        <h3 class="section-title">FA Preferences</h3>
+        <div class="pills-row">
+            <div class="stat-pill preference">
+                <span class="pill-label">LOY</span> 
+                <span class="pill-value"><?= HtmlSanitizer::safeHtmlOutput((string)$player->freeAgencyLoyalty) ?></span>
             </div>
-            <div class="stat-pill">
-                <span class="text-gray-400">WIN</span> 
-                <span class="text-white font-bold"><?= HtmlSanitizer::safeHtmlOutput((string)$player->freeAgencyPlayForWinner) ?></span>
+            <div class="stat-pill preference">
+                <span class="pill-label">WIN</span> 
+                <span class="pill-value"><?= HtmlSanitizer::safeHtmlOutput((string)$player->freeAgencyPlayForWinner) ?></span>
             </div>
-            <div class="stat-pill">
-                <span class="text-gray-400">PT</span> 
-                <span class="text-white font-bold"><?= HtmlSanitizer::safeHtmlOutput((string)$player->freeAgencyPlayingTime) ?></span>
+            <div class="stat-pill preference">
+                <span class="pill-label">PT</span> 
+                <span class="pill-value"><?= HtmlSanitizer::safeHtmlOutput((string)$player->freeAgencyPlayingTime) ?></span>
             </div>
-            <div class="stat-pill">
-                <span class="text-gray-400">SEC</span> 
-                <span class="text-white font-bold"><?= HtmlSanitizer::safeHtmlOutput((string)$player->freeAgencySecurity) ?></span>
+            <div class="stat-pill preference">
+                <span class="pill-label">SEC</span> 
+                <span class="pill-value"><?= HtmlSanitizer::safeHtmlOutput((string)$player->freeAgencySecurity) ?></span>
             </div>
-            <div class="stat-pill">
-                <span class="text-gray-400">TRD</span> 
-                <span class="text-white font-bold"><?= HtmlSanitizer::safeHtmlOutput((string)$player->freeAgencyTradition) ?></span>
+            <div class="stat-pill preference">
+                <span class="pill-label">TRD</span> 
+                <span class="pill-value"><?= HtmlSanitizer::safeHtmlOutput((string)$player->freeAgencyTradition) ?></span>
             </div>
         </div>
     </div>
 
     <!-- Contract Info Footer -->
-    <div class="contract-bar mt-2">
-        <div class="flex justify-between items-center text-xs">
+    <div class="contract-bar">
+        <div class="contract-flex">
             <div>
-                <span class="text-gray-400">Bird Years:</span>
-                <span class="text-white font-bold ml-1"><?= $birdYears ?></span>
+                <span class="contract-label">Bird Years:</span>
+                <span class="contract-value"><?= $birdYears ?></span>
             </div>
             <div>
-                <span class="text-gray-400">Contract:</span>
-                <span class="text-card-gold font-bold ml-1"><?= $contractSafe ?></span>
+                <span class="contract-label">Contract:</span>
+                <span class="contract-amount"><?= $contractSafe ?></span>
             </div>
         </div>
     </div>

@@ -36,8 +36,11 @@
         <testsuite name="RookieOption Module Tests">
             <directory>tests/RookieOption</directory>
         </testsuite>
-        <testsuite name="Statistics Module Tests">
-            <directory>tests/Statistics</directory>
+        <testsuite name="SiteStatistics Module Tests">
+            <directory>tests/SiteStatistics</directory>
+        </testsuite>
+        <testsuite name="BasketballStats Module Tests">
+            <directory>tests/BasketballStats</directory>
         </testsuite>
         <testsuite name="Negotiation Module Tests">
             <directory>tests/Negotiation</directory>

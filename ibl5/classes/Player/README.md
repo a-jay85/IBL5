@@ -269,3 +269,65 @@ Potential improvements for future iterations:
 4. Extract database connection logic to a separate service
 5. Add value validation to PlayerData
 6. Consider immutability patterns for PlayerData
+
+## View Architecture (Latest Update)
+
+The Player module now includes a complete interface-driven view architecture with 20 view interfaces and implementations:
+
+### View Classes (in `Player/Views/`)
+
+| View Class | Interface | Description |
+|------------|-----------|-------------|
+| PlayerOverviewView | PlayerOverviewViewInterface | Main player page with ratings and game log |
+| PlayerSimStatsView | PlayerSimStatsViewInterface | Sim-by-sim season statistics |
+| PlayerRegularSeasonTotalsView | PlayerRegularSeasonTotalsViewInterface | Season totals table |
+| PlayerRegularSeasonAveragesView | PlayerRegularSeasonAveragesViewInterface | Season averages table |
+| PlayerPlayoffTotalsView | PlayerPlayoffTotalsViewInterface | Playoff totals by year |
+| PlayerPlayoffAveragesView | PlayerPlayoffAveragesViewInterface | Playoff per-game averages |
+| PlayerHeatTotalsView | PlayerHeatTotalsViewInterface | H.E.A.T. competition totals |
+| PlayerHeatAveragesView | PlayerHeatAveragesViewInterface | H.E.A.T. per-game averages |
+| PlayerOlympicTotalsView | PlayerOlympicTotalsViewInterface | Olympics totals by year |
+| PlayerOlympicAveragesView | PlayerOlympicAveragesViewInterface | Olympics per-game averages |
+| PlayerRatingsAndSalaryView | PlayerRatingsAndSalaryViewInterface | Rating history and salary |
+| PlayerAwardsAndNewsView | PlayerAwardsAndNewsViewInterface | Awards list and news articles |
+| PlayerOneOnOneView | PlayerOneOnOneViewInterface | One-on-one game results |
+
+### PlayerViewFactory
+
+Central factory for creating view instances with proper dependency injection:
+
+```php
+// Create factory with repositories
+$factory = new PlayerViewFactory($playerRepository, $statsRepository, $commonRepository);
+
+// Create view by page type
+$view = $factory->createView(PlayerPageType::PLAYOFF_TOTALS);
+
+// Render the view
+echo $view->renderTotals($playerName);
+```
+
+### PlayerStatsRepository
+
+New repository for player statistics data access:
+
+```php
+$statsRepository = new PlayerStatsRepository($mysqli_db);
+
+// Get historical stats by season
+$history = $statsRepository->getHistoricalStats($playerID);
+
+// Get playoff stats
+$playoffs = $statsRepository->getPlayoffStats($playerName);
+
+// Get career averages
+$careerAvg = $statsRepository->getSeasonCareerAverages($playerName);
+```
+
+### Test Coverage
+
+The view architecture includes comprehensive unit tests:
+- `PlayerViewFactoryTest.php` - 15 tests for factory pattern
+- `PlayerStatsRepositoryTest.php` - 11 tests for stats repository
+
+**Total Player Module Tests**: 110 tests, 180 assertions

@@ -170,7 +170,7 @@ class PlayerTradingCardView
 
 .trading-card .rating-row.shooting { grid-template-columns: repeat(6, 1fr); }
 .trading-card .rating-row.rebounding { grid-template-columns: repeat(7, 1fr); }
-.trading-card .rating-row.offense-defense { grid-template-columns: repeat(8, 1fr); }
+.trading-card .rating-row.offense-defense { grid-template-columns: repeat(9, 1fr); }
 
 .trading-card .rating-cell {
     text-align: center;
@@ -391,6 +391,7 @@ HTML;
             <?= self::renderRatingCell('do', $player->ratingDriveOffense) ?>
             <?= self::renderRatingCell('po', $player->ratingPostOffense) ?>
             <?= self::renderRatingCell('to', $player->ratingTransitionOffense) ?>
+            <div class="rating-cell"></div>
             <?= self::renderRatingCell('od', $player->ratingOutsideDefense) ?>
             <?= self::renderRatingCell('dd', $player->ratingDriveDefense) ?>
             <?= self::renderRatingCell('pd', $player->ratingPostDefense) ?>

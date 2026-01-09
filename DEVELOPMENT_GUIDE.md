@@ -108,6 +108,16 @@ See `.github/copilot-instructions.md` **Interface-Driven Architecture Pattern** 
   private InterfaceName $mockRepository;
   ```
 
+**No Unused Convenience Methods:**
+- ❌ DO NOT create "helper" or "utility" methods that aren't immediately used
+- ✅ Only implement methods that are **actively called** in the refactored code
+- Each method must have:
+  - At least one direct caller
+  - Unit tests
+  - Clear, documented purpose
+- If a method seems "useful later", add it later with tests when it's actually needed
+- Dead code confuses developers and increases maintenance burden
+
 ## Code Quality
 
 **Type Hints Required:**

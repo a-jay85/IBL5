@@ -56,4 +56,21 @@ interface SeriesRecordsServiceInterface
      * @return string Hex color code with # prefix
      */
     public function getRecordBackgroundColor(int $wins, int $losses): string;
+
+    /**
+     * Safely retrieve a single series record from the matrix
+     * 
+     * This provides a consistent way to access matchup data from the
+     * matrix created by buildSeriesMatrix().
+     * 
+     * If the matchup does not exist in the matrix, implementations
+     * should return a default record of:
+     * ['wins' => 0, 'losses' => 0]
+     * 
+     * @param array<int, array<int, array<string, int>>> $matrix Series matrix from buildSeriesMatrix()
+     * @param int $selfTeamId The ID of the "row" team
+     * @param int $opponentTeamId The ID of the "column" team
+     * @return array<string, int> Record array with at least 'wins' and 'losses' keys
+     */
+    public function getRecordFromMatrix(array $matrix, int $selfTeamId, int $opponentTeamId): array;
 }

@@ -69,9 +69,11 @@ ibl5/modules/Compare_Players/
 
 #### ComparePlayersRepository
 **Purpose**: Database access layer  
-**Methods**:
-- `getAllPlayerNames(): array` - Get all active player names for autocomplete
-- `getPlayerByName(string $name): ?array` - Get complete player data by name
+**Methods** (Only methods actively used in refactored code):
+- `getAllPlayerNames(): array` - Get all active player names for autocomplete (used by ComparePlayersView form)
+- `getPlayerByName(string $name): ?array` - Get complete player data by name (used by ComparePlayersService comparison)
+
+**Important**: No convenience methods. Only implement what the refactored code actively calls. If other methods seem useful, they can be added later when actually needed with tests.
 
 **Security**:
 - Dual-implementation (prepared statements + escaped queries)

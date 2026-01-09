@@ -1,10 +1,10 @@
 # Development Guide
 
-**Status:** 15/23 IBL modules refactored (65% complete) • 568+ tests • ~48% coverage • Goal: 80%
+**Status:** 19/23 IBL modules refactored (83% complete) • 771 tests • ~54% coverage • Goal: 80%
 
 ## Refactoring Status
 
-### ✅ Completed IBL Modules (15)
+### ✅ Completed IBL Modules (18)
 1. ~~Player~~ ✅ Complete (9 classes, 9 interfaces, 84 tests)
 2. ~~Statistics~~ ✅ Complete (6 classes, 5 tests)
 3. ~~Team~~ ✅ Complete (4 classes, 3 tests)
@@ -20,48 +20,52 @@
 13. ~~Season Leaders~~ ✅ Complete (3 classes, 2 tests)
 14. ~~Free Agency~~ ✅ Complete (7 classes, 7 interfaces, 11 tests)
 15. ~~Player_Search~~ ✅ Complete (4 classes, 4 interfaces, 54 tests) **SQL injection fixed!**
+16. ~~Compare_Players~~ ✅ Complete (3 classes, 3 interfaces, 42 tests)
+17. ~~Leaderboards~~ ✅ Complete (3 classes, 3 interfaces, 22 tests)
+18. ~~Standings~~ ✅ Complete (2 classes, 2 interfaces, 17 tests)
+19. ~~League_Stats~~ ✅ Complete (3 classes, 3 interfaces, 33 tests)
 
 ### 🎯 Top Priorities (Next 3)
 
-1. **Compare_Players** (403 lines) - Player comparison tool (1-2 weeks)
-2. **Searchable_Stats** (370 lines) - Advanced stats search (1 week)
-3. **Stats Modules** - League_Stats, Chunk_Stats batch refactoring (3-5 weeks)
+1. **One-on-One** (907 lines) - Player matchup game/comparison (2-3 weeks)
+2. **Series_Records** (184 lines) - Historical series data (1 week)
+3. **Player_Awards** (160 lines) - Award history display (1 week)
 
-### 📋 Remaining IBL Modules (8)
+### 📋 Remaining IBL Modules (4)
 
-**High Priority (Next After Top 3):**
-- Compare_Players (403 lines)
-- Searchable_Stats (370 lines)
-- League_Stats (351 lines)
-- Chunk_Stats (462 lines)
-
-**Medium Priority:**
-- One-on-One (887 lines) - Side game, not core functionality
+**High Priority:**
+- One-on-One (907 lines) - Side game/matchup feature
 
 **Lower Priority (Info/Display):**
-- Series_Records, Player_Awards, Cap_Info, Team_Schedule, Franchise_History, Power_Rankings, Next_Sim, League_Starters, Draft_Pick_Locator, Injuries, EOY_Results, ASG_Results, ASG_Stats, Player_Movement
+- Series_Records (184 lines), Player_Awards (160 lines), Cap_Info (134 lines)
+- Team_Schedule (130 lines), Franchise_History (103 lines), Power_Rankings (90 lines)
+- Next_Sim (95 lines), League_Starters (85 lines), Draft_Pick_Locator (81 lines), Injuries (57 lines)
 
 ## Quick Workflow
 
 **Before Starting:**
-- Review refactored modules with interface pattern: PlayerSearch, FreeAgency, Player
+- Review refactored modules with interface pattern: PlayerSearch, FreeAgency, Player, ComparePlayers, Standings
 - Check `.github/copilot-instructions.md` - **Interface-Driven Architecture Pattern** section
 - Review interfaces in: `ibl5/classes/PlayerSearch/Contracts/`, `ibl5/classes/FreeAgency/Contracts/`, `ibl5/classes/Player/Contracts/`
-- Check `ibl5/schema.sql` for database structure
+- **VERIFY DATABASE STRUCTURE: Cross-reference `ibl5/schema.sql` for ALL table names, columns, and relationships before writing queries**
 - See best practices in: `ibl5/classes/Player/README.md`, `ibl5/classes/DepthChart/SECURITY.md`, `ibl5/classes/PlayerSearch/README.md`
 - Dependencies are cached via GitHub Actions (`.github/workflows/cache-dependencies.yml`)
 - Run tests: `cd ibl5 && vendor/bin/phpunit tests/`
 - CI/CD: Tests run automatically via GitHub Actions (`.github/workflows/tests.yml`)
 
 **Refactoring Steps:**
-1. Analyze (1-2 days) - Identify responsibilities
-2. Design (1-2 days) - Plan class structure & interfaces
-3. Create Interfaces (1-2 days) - Document contracts with PHPDoc
-4. Extract (1-2 weeks) - Repository → Validator → Processor → View → Controller
-5. Implement Interfaces (1 day) - Add interface implementations and @see docblocks
-6. Test (1 week) - Unit + integration tests
-7. Audit (2-3 days) - Security review
-8. Review (2-3 days) - Code review, performance
+1. Analyze - Identify responsibilities
+2. Design - Plan class structure & interfaces
+3. Create Interfaces - Document contracts with PHPDoc
+4. Extract - Repository → Validator → Processor → View → Controller
+5. Implement Interfaces - Add interface implementations and @see docblocks
+6. Test - Unit + integration tests
+7. Audit - Security review
+8. **Production Validation** - Compare localhost against iblhoops.net
+   - Verify all output (text, data, ordering, formatting) matches exactly
+   - If mismatches found, debug and iterate until perfect match
+   - This is the final verification gate before merge
+9. Review - Code review, performance
 
 **Class Pattern with Interface Architecture:**
 ```
@@ -83,7 +87,7 @@ See `.github/copilot-instructions.md` **Interface-Driven Architecture Pattern** 
 
 ## Testing Standards
 
-**Coverage:** Current 35% → Phase 1: 60% → Phase 2: 75% → Goal: 80%
+**Coverage:** Current ~52% → Phase 1: 60% → Phase 2: 75% → Goal: 80%
 
 **Test Pyramid:** Few E2E tests → Some integration → Many unit tests
 
@@ -98,6 +102,11 @@ See `.github/copilot-instructions.md` **Interface-Driven Architecture Pattern** 
 - Business rule validation
 - Database operations
 - Security (SQL injection, XSS)
+- **Mock objects**: Use PHPDoc annotations for IDE support:
+  ```php
+  /** @var InterfaceName&\PHPUnit\Framework\MockObject\MockObject */
+  private InterfaceName $mockRepository;
+  ```
 
 ## Code Quality
 
@@ -117,9 +126,31 @@ public function getPlayer($playerId)
 - Never use `require()` for classes
 - Reference: `$player = new Player($db);`
 
+**Database Object Preference:**
+- **Always use the global `$mysqli_db` object** (modern MySQLi with prepared statements)
+- **Avoid the legacy `$db` object** whenever possible
+- Example: `global $mysqli_db;` then use prepared statements with `$mysqli_db->prepare()`, `bind_param()`, and `execute()`
+- Only use legacy `$db` when refactoring legacy code that hasn't yet been updated
+
+**Statistics Formatting:**
+- [ ] Use `BasketballStats\StatsFormatter` for ALL statistics (never `number_format()`)
+  - `formatPercentage()` for shooting/field goal percentages
+  - `formatPerGameAverage()` for per-game stats (PPG, APG, RPG, etc.)
+  - `formatPer36Stat()` for per-36-minute stats
+  - `formatTotal()` for counting stats with comma separators
+  - `formatAverage()` for general 2-decimal averages
+- [ ] Use `BasketballStats\StatsSanitizer` for input validation
+
+**HTML & CSS Standards:**
+- [ ] Convert deprecated styling tags (`<font>`, `<center>`, `<b>`, `<i>`, `<u>`) to semantic HTML + inline CSS
+- [ ] Extract repeated inline styles (2+ occurrences) into `<style>` blocks with CSS classes
+- [ ] Use semantic HTML (`<strong>`, `<em>`, `<div>`) instead of presentation tags
+- [ ] Keep `<style>` blocks at top of file for maintainability
+- [ ] Follow deprecation guidelines in `.github/copilot-instructions.md` **HTML & CSS Refactoring** section
+
 **Security Checklist:**
 - [ ] Prepared statements (SQL injection)
-- [ ] HTML escaping (XSS)
+- [ ] HTML escaping (XSS) - Use `Utilities\HtmlSanitizer::safeHtmlOutput()` instead of `htmlspecialchars()`
 - [ ] Input validation
 - [ ] Authorization checks
 - [ ] CSRF protection
@@ -134,7 +165,7 @@ public function getPlayer($playerId)
 
 **Code:**
 - Reuse repositories
-- Use formatters: StatsFormatter, StatsSanitizer
+- **Use `BasketballStats\StatsFormatter` and `BasketballStats\StatsSanitizer` for all statistics** (never `number_format()`)
 - Avoid N+1 queries
 - Cache expensive operations
 

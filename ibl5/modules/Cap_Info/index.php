@@ -14,7 +14,7 @@ declare(strict_types=1);
  * @see CapInfo\CapInfoView For HTML rendering
  */
 
-if (!defined('MODULE_FILE') && !mb_eregi('modules.php', $_SERVER['PHP_SELF'])) {
+if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 

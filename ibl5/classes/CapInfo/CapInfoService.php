@@ -80,17 +80,8 @@ class CapInfoService
 
         // Calculate roster slots used
         $contractData = $this->repository->getPlayersUnderContractAfterSeason($team->teamID);
-        foreach ($contractData as $contract) {
-            $yearUnderContract = (int)$contract['cy'];
-            $totalYearsUnderContract = (int)$contract['cyt'];
-            
-            while ($yearUnderContract < $totalYearsUnderContract) {
-                $yearUnderContract++;
-                // Each player with years remaining takes a slot
-            }
-        }
         
-        // Calculate FA slots from roster
+        // Calculate FA slots from roster - players with contracts beyond current season take up slots
         $freeAgencySlots = $freeAgencySlots - count($contractData);
 
         return [

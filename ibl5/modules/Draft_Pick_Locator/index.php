@@ -1,81 +1,38 @@
 <?php
 
+declare(strict_types=1);
+
+/**
+ * Draft_Pick_Locator Module - Display draft pick ownership matrix
+ *
+ * Shows which teams own which draft picks across multiple years.
+ *
+ * Refactored to use the interface-driven architecture pattern.
+ *
+ * @see DraftPickLocator\DraftPickLocatorRepository For database operations
+ * @see DraftPickLocator\DraftPickLocatorService For business logic
+ * @see DraftPickLocator\DraftPickLocatorView For HTML rendering
+ */
+
+if (!defined('MODULE_FILE')) {
+    die("You can't access this file directly...");
+}
+
+use DraftPickLocator\DraftPickLocatorRepository;
+use DraftPickLocator\DraftPickLocatorService;
+use DraftPickLocator\DraftPickLocatorView;
+
 global $mysqli_db;
 
 $season = new Season($mysqli_db);
-$league = new League($mysqli_db);
 
-$result = $league->getAllTeamsResult();
+// Initialize services
+$repository = new DraftPickLocatorRepository($mysqli_db);
+$service = new DraftPickLocatorService($repository);
+$view = new DraftPickLocatorView();
 
-echo "<HTML><HEAD><TITLE>Draft Pick Matrix</TITLE></HEAD>
-    <BODY>
-        <CENTER>
-            <H2>Dude, Where's My Pick?</H2>
-            Use this locator to see exactly who has your draft pick.
-            <TABLE BORDER=1>
-                <TR>
-                    <TD ROWSPAN=2><CENTER>Team</CENTER></TD>
-                    <TD COLSPAN=2><CENTER>$season->endingYear</CENTER></TD>
-                    <TD COLSPAN=2><CENTER>" . ($season->endingYear + 1) . "</CENTER></TD>
-                    <TD COLSPAN=2><CENTER>" . ($season->endingYear + 2) . "</CENTER></TD>
-                    <TD COLSPAN=2><CENTER>" . ($season->endingYear + 3) . "</CENTER></TD>
-                    <TD COLSPAN=2><CENTER>" . ($season->endingYear + 4) . "</CENTER></TD>
-                    <TD COLSPAN=2><CENTER>" . ($season->endingYear + 5) . "</CENTER></TD>
-                </TR>
-                <TR>
-                    <TD><CENTER>Round 1</CENTER></TD>
-                    <TD><CENTER>Round 2</CENTER></TD>
-                    <TD><CENTER>Round 1</CENTER></TD>
-                    <TD><CENTER>Round 2</CENTER></TD>
-                    <TD><CENTER>Round 1</CENTER></TD>
-                    <TD><CENTER>Round 2</CENTER></TD>
-                    <TD><CENTER>Round 1</CENTER></TD>
-                    <TD><CENTER>Round 2</CENTER></TD>
-                    <TD><CENTER>Round 1</CENTER></TD>
-                    <TD><CENTER>Round 2</CENTER></TD>
-                    <TD><CENTER>Round 1</CENTER></TD>
-                    <TD><CENTER>Round 2</CENTER></TD>
-                </TR>
-";
+// Get teams with their draft picks
+$teamsWithPicks = $service->getAllTeamsWithPicks();
 
-$i = 0;
-
-foreach ($result as $teamRow) {
-    $teamID = (int) $teamRow['teamid']; // Ensure teamID is an integer
-    $team_city = $teamRow['team_city'];
-    $team_name = $teamRow['team_name'];
-    $color1 = $teamRow['color1'];
-    $color2 = $teamRow['color2'];
-
-    $j = 0;
-    $k = 0;
-
-    $query2 = "SELECT * FROM ibl_draft_picks WHERE teampick = '$team_name' ORDER BY year, round ASC";
-    $result2 = $db->sql_query($query2);
-    $num2 = $db->sql_numrows($result2);
-
-    echo "<TR><TD bgcolor=#$color1><CENTER><a href=\"../modules.php?name=Team&op=team&teamID=$teamID\"><font color=#$color2>$team_city $team_name</font></a></CENTER></TD>";
-
-    while ($j < $num2) {
-
-        $ownerofpick = $db->sql_result($result2, $j, "ownerofpick");
-        $year = $db->sql_result($result2, $j, "year");
-        $round = $db->sql_result($result2, $j, "round");
-
-        if ($ownerofpick != $team_name) {
-            echo "<TD bgcolor=#FF0000><center>$ownerofpick</center></TD>";
-        } else {
-            echo "<TD bgcolor=#cccccc><center>$ownerofpick</center></TD>";
-        }
-
-        $j++;
-    }
-
-    echo "</TR>
-    ";
-    $i++;
-}
-
-echo "</TABLE></CENTER></HTML>";
-
-$db->sql_close();
+// Render output
+echo $view->render($teamsWithPicks, $season->endingYear);

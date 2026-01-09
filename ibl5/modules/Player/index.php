@@ -13,6 +13,7 @@ use Player\Views\PlayerStatsView;
 use Player\Views\PlayerMenuView;
 use Player\Views\PlayerViewFactory;
 use Player\Views\PlayerRatingsView;
+use Player\Views\PlayerTradingCardView;
 use RookieOption\RookieOptionValidator;
 use RookieOption\RookieOptionFormView;
 use Services\CommonMysqliRepository;
@@ -50,14 +51,18 @@ function showpage($playerID, $pageView)
     Nuke\Header::header();
     OpenTable();
     
-    // Include centralized player view styles
+    // Include trading card styles (Tailwind CDN + custom CSS)
+    echo PlayerTradingCardView::getStyles();
+    
+    // Include legacy player view styles for other components
     echo PlayerViewStyles::getStyles();
     
     // Render player menu with current page selected
     echo PlayerMenuView::render($playerID, $pageView);
 
-    // Render player header
-    echo PlayerHeaderView::render($player, $playerID);
+    // Render player as trading card (combines header, bio, ratings)
+    $contract_display = implode("/", $player->getRemainingContractArray());
+    echo PlayerTradingCardView::render($player, $playerID, $contract_display);
 
     // Render action buttons based on business logic
     $userTeamName = $commonRepository->getTeamnameFromUsername(strval($cookie[1] ?? ''));
@@ -72,16 +77,6 @@ function showpage($playerID, $pageView)
     if ($pageService->canShowRookieOptionButton($player, $userTeam, $season)) {
         echo PlayerButtonsView::renderRookieOptionButton($playerID);
     }
-
-    // Render player bio section
-    $contract_display = implode("/", $player->getRemainingContractArray());
-    echo PlayerBioView::render($player, $contract_display);  
-    
-    // Render misc ratings table
-    echo PlayerRatingsView::renderMiscRatingsTable($player);
-    
-    // Render free agency preferences table
-    echo PlayerRatingsView::renderFreeAgencyPreferences($player);
     
     // Get All-Star Activity data using PlayerRepository
     $playerRepository = new PlayerRepository($mysqli_db);

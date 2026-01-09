@@ -52,4 +52,17 @@ interface SeriesRecordsControllerInterface
      * @return void Outputs HTML directly
      */
     public function displayForUser(string $username): void;
+
+    /**
+     * Main controller entry point for the Series Records module.
+     *
+     * This method is intended to be called from index.php and is responsible for:
+     * - Determining whether the user is authenticated
+     * - Delegating to displayLoginPrompt() for unauthenticated users
+     * - Delegating to displayForUser() / displaySeriesRecords() for authenticated users
+     *
+     * @param mixed $user The global $user cookie array
+     * @return void Outputs HTML directly
+     */
+    public function main($user): void;
 }

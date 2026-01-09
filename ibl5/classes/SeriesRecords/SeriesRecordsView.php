@@ -98,7 +98,7 @@ class SeriesRecordsView implements SeriesRecordsViewInterface
     public function renderHeaderCell(int $teamId): string
     {
         $safeTeamId = HtmlSanitizer::safeHtmlOutput($teamId);
-        return '<th align="center"><img src="images/logo/new' . $safeTeamId . '.png" width="50" height="50"></th>';
+        return '<th align="center"><img src="images/logo/new' . $safeTeamId . '.png" width="50" height="50" alt="Team ' . $safeTeamId . ' logo"></th>';
     }
 
     /**

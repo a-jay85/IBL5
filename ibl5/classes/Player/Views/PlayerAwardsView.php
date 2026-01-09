@@ -5,13 +5,17 @@ declare(strict_types=1);
 namespace Player\Views;
 
 use Player\PlayerRepository;
+use Player\Contracts\PlayerAwardsViewInterface;
+use Utilities\HtmlSanitizer;
 
 /**
  * PlayerAwardsView - Renders player awards and All-Star activity
  * 
  * Pure rendering with no database logic - all data fetched via PlayerRepository
+ * 
+ * @see PlayerAwardsViewInterface
  */
-class PlayerAwardsView
+class PlayerAwardsView implements PlayerAwardsViewInterface
 {
     private PlayerRepository $repository;
 
@@ -21,10 +25,7 @@ class PlayerAwardsView
     }
 
     /**
-     * Render All-Star activity table
-     * 
-     * @param string $playerName Player name to fetch awards for
-     * @return string HTML for All-Star activity table
+     * @see PlayerAwardsViewInterface::renderAllStarActivity()
      */
     public function renderAllStarActivity(string $playerName): string
     {
@@ -37,35 +38,33 @@ class PlayerAwardsView
         ?>
 <tr>
     <td colspan=3>
-        <table align=left cellspacing=1 cellpadding=0 border=1>
-            <th colspan=2><center>All-Star Activity</center></th>
-</tr>
-<tr>
-    <td><b>All Star Games:</b></td>
-    <td><?= htmlspecialchars((string)$allStarGames) ?></td>
-</tr>
-<tr>
-    <td><b>Three-Point<br>Contests:</b></td>
-    <td><?= htmlspecialchars((string)$threePointContests) ?></td>
-</tr>
-<tr>
-    <td><b>Slam Dunk<br>Competitions:</b></td>
-    <td><?= htmlspecialchars((string)$dunkContests) ?></td>
-</tr>
-<tr>
-    <td><b>Rookie-Sophomore<br>Challenges:</b></td>
-    <td><?= htmlspecialchars((string)$rookieSophChallenges) ?></td>
-</tr>
+        <table class="allstar-table">
+            <tr>
+                <th colspan=2>All-Star Activity</th>
+            </tr>
+            <tr>
+                <td class="text-bold">All Star Games:</td>
+                <td><?= HtmlSanitizer::safeHtmlOutput((string)$allStarGames) ?></td>
+            </tr>
+            <tr>
+                <td class="text-bold">Three-Point<br>Contests:</td>
+                <td><?= HtmlSanitizer::safeHtmlOutput((string)$threePointContests) ?></td>
+            </tr>
+            <tr>
+                <td class="text-bold">Slam Dunk<br>Competitions:</td>
+                <td><?= HtmlSanitizer::safeHtmlOutput((string)$dunkContests) ?></td>
+            </tr>
+            <tr>
+                <td class="text-bold">Rookie-Sophomore<br>Challenges:</td>
+                <td><?= HtmlSanitizer::safeHtmlOutput((string)$rookieSophChallenges) ?></td>
+            </tr>
         </table>
         <?php
         return ob_get_clean();
     }
 
     /**
-     * Render full awards list
-     * 
-     * @param string $playerName Player name to fetch awards for
-     * @return string HTML for awards list
+     * @see PlayerAwardsViewInterface::renderAwardsList()
      */
     public function renderAwardsList(string $playerName): string
     {
@@ -73,18 +72,18 @@ class PlayerAwardsView
 
         ob_start();
         ?>
-<table border=1 cellspacing=1 cellpadding=0>
+<table class="awards-table">
     <tr>
-        <td><center><b><font class="content">Year</font></b></center></td>
-        <td><center><b><font class="content">Award</font></b></center></td>
+        <td class="content-header">Year</td>
+        <td class="content-header">Award</td>
     </tr>
         <?php
         foreach ($awards as $award) {
-            $year = htmlspecialchars($award['year']);
-            $awardName = htmlspecialchars($award['Award']);
+            $year = HtmlSanitizer::safeHtmlOutput($award['year']);
+            $awardName = HtmlSanitizer::safeHtmlOutput($award['Award']);
             ?>
     <tr>
-        <td align=center><?= $year ?></td>
+        <td class="year-cell"><?= $year ?></td>
         <td><?= $awardName ?></td>
     </tr>
             <?php

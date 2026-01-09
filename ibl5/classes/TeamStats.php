@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use Statistics\StatsFormatter;
+use BasketballStats\StatsFormatter;
 use LeagueStats\LeagueStatsRepository;
 
 class TeamStats

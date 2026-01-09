@@ -1,6 +1,6 @@
 # Development Guide
 
-**Status:** 19/23 IBL modules refactored (83% complete) • 771 tests • ~54% coverage • Goal: 80%
+**Status:** 21/23 IBL modules refactored (91% complete) • 781 tests • ~56% coverage • Goal: 80%
 
 ## Refactoring Status
 
@@ -24,20 +24,21 @@
 17. ~~Leaderboards~~ ✅ Complete (3 classes, 3 interfaces, 22 tests)
 18. ~~Standings~~ ✅ Complete (2 classes, 2 interfaces, 17 tests)
 19. ~~League_Stats~~ ✅ Complete (3 classes, 3 interfaces, 33 tests)
+20. ~~Player_Awards~~ ✅ Complete (4 classes, 4 interfaces, 55 tests)
+21. ~~Series_Records~~ ✅ Complete (5 classes, 4 interfaces, 29 tests)
 
-### 🎯 Top Priorities (Next 3)
+### 🎯 Top Priorities (Next 2)
 
 1. **One-on-One** (907 lines) - Player matchup game/comparison (2-3 weeks)
-2. **Series_Records** (184 lines) - Historical series data (1 week)
-3. **Player_Awards** (160 lines) - Award history display (1 week)
+2. **Cap_Info** (134 lines) - Salary cap information display (1 week)
 
-### 📋 Remaining IBL Modules (4)
+### 📋 Remaining IBL Modules (2)
 
 **High Priority:**
 - One-on-One (907 lines) - Side game/matchup feature
 
 **Lower Priority (Info/Display):**
-- Series_Records (184 lines), Player_Awards (160 lines), Cap_Info (134 lines)
+- Cap_Info (134 lines)
 - Team_Schedule (130 lines), Franchise_History (103 lines), Power_Rankings (90 lines)
 - Next_Sim (95 lines), League_Starters (85 lines), Draft_Pick_Locator (81 lines), Injuries (57 lines)
 
@@ -107,6 +108,16 @@ See `.github/copilot-instructions.md` **Interface-Driven Architecture Pattern** 
   /** @var InterfaceName&\PHPUnit\Framework\MockObject\MockObject */
   private InterfaceName $mockRepository;
   ```
+
+**No Unused Convenience Methods:**
+- ❌ DO NOT create "helper" or "utility" methods that aren't immediately used
+- ✅ Only implement methods that are **actively called** in the refactored code
+- Each method must have:
+  - At least one direct caller
+  - Unit tests
+  - Clear, documented purpose
+- If a method seems "useful later", add it later with tests when it's actually needed
+- Dead code confuses developers and increases maintenance burden
 
 ## Code Quality
 

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /************************************************************************/
 /* PHP-NUKE: Web Portal System                                          */
 /* ===========================                                          */
@@ -12,6 +14,15 @@
 /* the Free Software Foundation; either version 2 of the License.       */
 /************************************************************************/
 
+/**
+ * Player Awards Module
+ * 
+ * Provides search functionality for player award history.
+ * Security: All inputs are validated and queries use prepared statements.
+ * 
+ * Refactored January 2026 to use Repository/Service/View pattern.
+ */
+
 if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
@@ -23,138 +34,35 @@ $pagetitle = "- $module_name";
 
 global $mysqli_db;
 
+// Initialize classes
+$validator = new \PlayerAwards\PlayerAwardsValidator();
+$repository = new \PlayerAwards\PlayerAwardsRepository($mysqli_db);
+$service = new \PlayerAwards\PlayerAwardsService($validator, $repository);
+$view = new \PlayerAwards\PlayerAwardsView($service);
+
+// Get and validate search parameters from POST
+$searchResult = $service->search($_POST);
+
+// Render page
 Nuke\Header::header();
 OpenTable();
 UI::playerMenu();
 
-// ============== GET POST DATA
+// Render search form with current parameters
+echo $view->renderSearchForm($searchResult['params']);
 
-$as_name = stripslashes(check_html($_POST['aw_name'], "nohtml"));
-$as_Award = stripslashes(check_html($_POST['aw_Award'], "nohtml"));
-$as_year = stripslashes(check_html($_POST['aw_year'], "nohtml"));
-$as_sortby = stripslashes(check_html($_POST['aw_sortby'], "nohtml"));
+// Render results table
+echo $view->renderTableHeader();
 
-// ========= SEARCH PARAMETERS
-
-echo "Partial matches on a name or award are okay and are <b>not</b> case sensitive (e.g., entering \"Dard\" will match with \"Darden\" and \"Bedard\").<p>
-
-    <form name=\"Search\" method=\"post\" action=\"modules.php?name=Player_Awards\">
-    <table border=1>
-        <tr>
-            <td>NAME: <input type=\"text\" name=\"aw_name\" size=\"32\" value=\"$as_name\"></td>
-            <td>AWARD: <input type=\"text\" name=\"aw_Award\" size=\"32\" value=\"$as_Award\"></td>
-            <td>Year: <input type=\"text\" name=\"aw_year\" size=\"4\" value=\"$as_year\"></td>
-        </tr>
-        <tr>
-            <td colspan=3>SORT BY:";
-
-if ($as_sortby == 1) {
-    echo "<input type=\"radio\" name=\"aw_sortby\" value=\"1\" checked> Name |";
-} else {
-    echo "<input type=\"radio\" name=\"aw_sortby\" value=\"1\"> Name |";
-}
-
-if ($as_sortby == 2) {
-    echo "<input type=\"radio\" name=\"aw_sortby\" value=\"2\" checked> Award Name |";
-} else {
-    echo "<input type=\"radio\" name=\"aw_sortby\" value=\"2\"> Award Name |";
-}
-
-if ($as_sortby == 3) {
-    echo "<input type=\"radio\" name=\"aw_sortby\" value=\"3\" checked> Year |";
-} else {
-    echo "<input type=\"radio\" name=\"aw_sortby\" value=\"3\"> Year |";
-}
-
-echo "</td></tr></table>
-    <input type=\"submit\" value=\"Search for Matches!\">
-</form>";
-
-// ========= SET QUERY BASED ON SEARCH PARAMETERS
-
-$continuequery = 0;
-$query = "SELECT * FROM ibl_awards";
-
-if ($as_year != null) {
-    $query .= " WHERE year = '$as_year'";
-    $continuequery = 1;
-}
-
-if ($continuequery == 0) {
-    if ($as_Award != null) {
-        $query .= " WHERE Award LIKE '%$as_Award%'";
-        $continuequery = 1;
-    }
-} else {
-    if ($as_Award != null) {
-        $query .= " AND Award LIKE '%$as_Award%'";
+if ($searchResult['count'] > 0) {
+    $rowIndex = 0;
+    foreach ($searchResult['awards'] as $award) {
+        echo $view->renderAwardRow($award, $rowIndex);
+        $rowIndex++;
     }
 }
 
-if ($continuequery == 0) {
-    if ($as_name != null) {
-        $query .= " WHERE name LIKE '%$as_name%'";
-        $continuequery = 1;
-    }
-} else {
-    if ($as_name != null) {
-        $query .= " AND name LIKE '%$as_name%'";
-    }
-}
-
-$orderby = 'Year';
-
-if ($as_sortby == 1) {
-    $orderby = 'name';
-}
-if ($as_sortby == 2) {
-    $orderby = 'Award';
-}
-if ($as_sortby == 3) {
-    $orderby = 'year';
-}
-
-$query .= " ORDER BY $orderby ASC";
-
-// =============== EXECUTE QUERY
-
-$result = $mysqli_db->query($query);
-@$num = $result->num_rows;
-
-echo "<table border=1 cellpadding=0 cellspacing=0>
-    <tr>
-        <td colspan=3><center><i>Search Results</i></center></td>
-    </tr>
-    <tr>
-        <th>Year</th>
-        <th>Player</th>
-        <th>Award</th>
-    </tr>";
-
-// ========== FILL RESULTS
-
-$i = 0;
-
-while ($i < $num) {
-    $row = $result->fetch_assoc();
-    $a_name = $row['name'];
-    $a_Award = $row['Award'];
-    $a_year = $row['year'];
-    if ($i % 2) {
-        echo "<tr bgcolor=#ffffff>";
-    } else {
-        echo "<tr bgcolor=#e6e7e2>";
-    }
-    echo "<tr>
-        <td><center>$a_year</center></td>
-        <td><center>$a_name</a></center></td>
-        <td><center>$a_Award</center></td>
-    </tr>";
-
-    $i++;
-}
-
-echo "</table></center>";
+echo $view->renderTableFooter();
 
 CloseTable();
 Nuke\Footer::footer();

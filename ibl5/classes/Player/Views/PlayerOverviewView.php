@@ -8,7 +8,6 @@ use Player\Player;
 use Player\PlayerRepository;
 use Player\PlayerStats;
 use Player\Contracts\PlayerOverviewViewInterface;
-use Player\Views\PlayerRatingsView;
 use Services\CommonMysqliRepository;
 use BasketballStats\StatsFormatter;
 use Utilities\HtmlSanitizer;

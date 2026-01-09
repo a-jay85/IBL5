@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace CapInfo;
 
 use CapInfo\Contracts\CapInfoRepositoryInterface;
-use Utilities\HtmlSanitizer;
 
 /**
  * CapInfoService - Business logic for salary cap information

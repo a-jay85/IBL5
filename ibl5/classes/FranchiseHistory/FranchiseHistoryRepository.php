@@ -44,19 +44,4 @@ class FranchiseHistoryRepository extends \BaseMysqliRepository implements Franch
             $currentEndingYear
         );
     }
-
-    /**
-     * @see FranchiseHistoryRepositoryInterface::getNumberOfTitles()
-     */
-    public function getNumberOfTitles(string $teamName, string $titleType): int
-    {
-        $result = $this->fetchOne(
-            "SELECT COUNT(*) as count FROM ibl_champions WHERE champion = ? AND title = ?",
-            "ss",
-            $teamName,
-            $titleType
-        );
-
-        return (int)($result['count'] ?? 0);
-    }
 }

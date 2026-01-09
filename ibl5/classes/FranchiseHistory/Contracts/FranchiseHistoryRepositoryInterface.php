@@ -20,13 +20,4 @@ interface FranchiseHistoryRepositoryInterface
      * @return array Array of franchise history data
      */
     public function getAllFranchiseHistory(int $currentEndingYear): array;
-
-    /**
-     * Get number of titles for a team
-     *
-     * @param string $teamName Team name
-     * @param string $titleType Type of title (HEAT, Division, Conference, IBL Champions)
-     * @return int Number of titles
-     */
-    public function getNumberOfTitles(string $teamName, string $titleType): int;
 }

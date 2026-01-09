@@ -101,7 +101,7 @@ Review Old Game (Input Game ID): <input type="text" name="gameid" size="11"><inp
         $winScore = (int) $gameData['winscore'];
         $lossScore = (int) $gameData['lossscore'];
         $owner = HtmlSanitizer::safeHtmlOutput($gameData['owner']);
-        $playByPlay = $gameData['playbyplay'];
+        $playByPlay = HtmlSanitizer::safeHtmlOutput($gameData['playbyplay']);
         
         return '<div style="text-align: center;"><h2>Replay of Game Number ' . $gameId . '<br>'
             . $winner . ' ' . $winScore . ', ' . $loser . ' ' . $lossScore . '<br>'

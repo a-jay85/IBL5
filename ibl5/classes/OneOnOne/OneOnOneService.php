@@ -110,7 +110,12 @@ class OneOnOneService implements OneOnOneServiceInterface
         $discordText = "";
         $bang = "";
         
+        // Sanitize names for Discord to prevent formatting exploits
+        $player1Name = str_replace(['*', '_', '~', '`'], '', $result->player1Name);
+        $player2Name = str_replace(['*', '_', '~', '`'], '', $result->player2Name);
+        $owner = str_replace(['*', '_', '~', '`'], '', $result->owner);
         $gamewinner = strtoupper($result->getWinnerName());
+        $gamewinner = str_replace(['*', '_', '~', '`'], '', $gamewinner);
         
         if ($result->isCloseGame()) {
             $bang = "__**BANG! BANG! OH WHAT A SHOT FROM $gamewinner!!!**__\n";
@@ -119,12 +124,12 @@ class OneOnOneService implements OneOnOneServiceInterface
         $discordText .= $bang;
         
         if ($result->didPlayer1Win()) {
-            $discordText .= "**{$result->player1Name} {$result->player1Score}**, {$result->player2Name} {$result->player2Score}";
+            $discordText .= "**{$player1Name} {$result->player1Score}**, {$player2Name} {$result->player2Score}";
         } else {
-            $discordText .= "{$result->player1Name} {$result->player1Score}, **{$result->player2Name} {$result->player2Score}**";
+            $discordText .= "{$player1Name} {$result->player1Score}, **{$player2Name} {$result->player2Score}**";
         }
         
-        $discordText .= "\n\t*(Game played by {$result->owner})*\n";
+        $discordText .= "\n\t*(Game played by {$owner})*\n";
         $discordText .= $this->getGameUrl($gameId);
 
         \Discord::postToChannel('#1v1-games', $discordText);
@@ -132,12 +137,18 @@ class OneOnOneService implements OneOnOneServiceInterface
 
     /**
      * Generate the URL for a game replay
+     * 
+     * Uses a static, trusted application origin to prevent host header injection
      */
     private function getGameUrl(int $gameId): string
     {
-        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-        $script = $_SERVER['PHP_SELF'] ?? '/modules.php';
+        // Use static, trusted application origin to prevent host header injection
+        $baseUrl = 'https://iblhoops.net/modules.php';
+        $query = http_build_query([
+            'name'   => 'One-on-One',
+            'gameid' => $gameId,
+        ]);
         
-        return "http://$host$script?name=One-on-One&gameid=$gameId";
+        return $baseUrl . '?' . $query;
     }
 }

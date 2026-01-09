@@ -66,19 +66,40 @@ class CapInfoViewTest extends TestCase
         $teams = [
             [
                 'teamID' => 1,
+                'teamId' => 1,
                 'teamCity' => 'Test<script>',
                 'teamName' => 'Team&Name',
                 'color1' => '000000',
                 'color2' => 'FFFFFF',
                 'mle' => false,
                 'lle' => false,
-                'capData' => [],
+                'hasMLE' => false,
+                'hasLLE' => false,
+                'freeAgencySlots' => 0,
+                'availableSalary' => [
+                    'year1' => 0,
+                    'year2' => 0,
+                    'year3' => 0,
+                    'year4' => 0,
+                    'year5' => 0,
+                    'year6' => 0,
+                ],
+                'positionSalaries' => [
+                    'PG' => 0,
+                    'SG' => 0,
+                    'SF' => 0,
+                    'PF' => 0,
+                    'C' => 0,
+                ],
             ],
         ];
 
         $result = $this->view->render($teams, 2024, 2025, null);
 
-        // Should escape HTML entities
+        // Should escape HTML entities - verify the escaped versions appear
+        $this->assertStringContainsString('Test&lt;script&gt;', $result);
+        $this->assertStringContainsString('Team&amp;Name', $result);
+        // Should NOT contain the raw dangerous characters
         $this->assertStringNotContainsString('<script>', $result);
     }
 }

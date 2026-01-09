@@ -69,19 +69,29 @@ class FranchiseHistoryViewTest extends TestCase
                 'color2' => 'FFFFFF',
                 'wins' => 0,
                 'losses' => 0,
+                'totwins' => 0,
+                'totloss' => 0,
+                'winpct' => 0.0,
                 'five_season_wins' => 0,
                 'five_season_losses' => 0,
                 'five_season_winpct' => 0.0,
                 'playoff_appearances' => 0,
+                'playoffs' => 0,
                 'heat_titles' => 0,
                 'division_titles' => 0,
+                'div_titles' => 0,
                 'conference_titles' => 0,
+                'conf_titles' => 0,
                 'ibl_titles' => 0,
             ],
         ];
 
         $result = $this->view->render($franchises);
 
+        // Should escape HTML entities - verify the escaped versions appear
+        $this->assertStringContainsString('Test&lt;script&gt;', $result);
+        $this->assertStringContainsString('Team&amp;Name', $result);
+        // Should NOT contain the raw dangerous characters
         $this->assertStringNotContainsString('<script>', $result);
     }
 }

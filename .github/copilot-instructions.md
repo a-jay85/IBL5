@@ -160,6 +160,18 @@ When the same inline styles appear 2+ times, extract them to a `<style>` block:
 - Continue iterating until localhost output matches production exactly
 - This ensures no functionality was broken or altered during refactoring
 
+### 10. No Unused Convenience Methods
+**CRITICAL: Do NOT create "convenience" or "helper" methods that are not immediately used by the refactored code.**
+- Only implement methods that are **actively called** within the refactored codebase
+- Avoid "future-proofing" with unused utility methods
+- Avoid over-engineering interfaces with methods that don't have callers
+- Dead code increases maintenance burden and confuses developers
+- If a method is genuinely useful later, add it at that time with tests
+- Every public method must have:
+  - At least one active caller in the refactored code
+  - Corresponding unit tests
+  - Clear purpose and documentation
+
 ---
 
 ## Quick Reference

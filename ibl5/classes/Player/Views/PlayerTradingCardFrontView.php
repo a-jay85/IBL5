@@ -19,27 +19,42 @@ use Utilities\HtmlSanitizer;
 class PlayerTradingCardFrontView
 {
     /**
-     * Get scoped custom styles for trading card (no external dependencies)
+     * Get scoped custom styles for trading card with team colors
      * 
+     * @param array|null $colorScheme Optional color scheme from TeamColorHelper
      * @return string HTML style tag with scoped CSS
      */
-    public static function getStyles(): string
+    public static function getStyles(?array $colorScheme = null): string
     {
-        return <<<'HTML'
+        // Use default colors if no scheme provided
+        if ($colorScheme === null) {
+            $colorScheme = TeamColorHelper::getDefaultColorScheme();
+        }
+        
+        $gradStart = $colorScheme['gradient_start'];
+        $gradMid = $colorScheme['gradient_mid'];
+        $gradEnd = $colorScheme['gradient_end'];
+        $border = $colorScheme['border'];
+        $borderRgb = $colorScheme['border_rgb'];
+        $accent = $colorScheme['accent'];
+        $text = $colorScheme['text'];
+        $textMuted = $colorScheme['text_muted'];
+        
+        return <<<HTML
 <style>
 /* Trading Card Custom Styles - Scoped to .trading-card */
 .trading-card {
-    background: linear-gradient(145deg, #1e3a5f 0%, #0f1419 50%, #1e3a5f 100%);
-    border: 4px solid #D4AF37;
+    background: linear-gradient(145deg, #{$gradStart} 0%, #{$gradMid} 50%, #{$gradEnd} 100%);
+    border: 4px solid #{$border};
     border-radius: 16px;
     box-shadow: 
-        0 0 0 2px #1e3a5f,
-        0 0 0 4px #D4AF37,
+        0 0 0 2px #{$gradMid},
+        0 0 0 4px #{$border},
         0 10px 40px rgba(0,0,0,0.4);
     max-width: 420px;
     margin: 0 auto;
     padding: 16px 16px 50px 16px;
-    color: #fff;
+    color: #{$text};
 }
 
 .trading-card * {
@@ -56,21 +71,21 @@ class PlayerTradingCardFrontView
 .trading-card .card-header h2 {
     font-size: 20px;
     font-weight: bold;
-    color: #fff;
+    color: #{$text};
     line-height: 1.2;
     margin: 0;
 }
 
 .trading-card .card-header .nickname {
-    color: #D4AF37;
+    color: #{$accent};
     font-size: 14px;
     font-style: italic;
     margin: 2px 0 0 0;
 }
 
 .trading-card .meta-badge {
-    background: linear-gradient(135deg, #D4AF37 0%, #b8972e 100%);
-    color: #0f1419;
+    background: linear-gradient(135deg, #{$border} 0%, #{$accent} 100%);
+    color: #{$gradMid};
     font-weight: 700;
     padding: 2px 8px;
     border-radius: 4px;
@@ -84,9 +99,9 @@ class PlayerTradingCardFrontView
 }
 
 .trading-card .player-photo-frame {
-    border: 3px solid #D4AF37;
+    border: 3px solid #{$border};
     border-radius: 8px;
-    background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
+    background: linear-gradient(135deg, #{$gradMid} 0%, #{$gradStart} 100%);
     padding: 4px;
     flex-shrink: 0;
 }
@@ -108,20 +123,20 @@ class PlayerTradingCardFrontView
     display: grid;
     grid-template-columns: auto 1fr;
     gap: 4px 8px;
-    color: #d1d5db;
+    color: #{$textMuted};
 }
 
 .trading-card .stats-grid .label {
-    color: #D4AF37;
+    color: #{$accent};
     font-weight: 600;
 }
 
 .trading-card .stats-grid .value {
-    color: #fff;
+    color: #{$text};
 }
 
 .trading-card .stats-grid a {
-    color: #fff;
+    color: #{$text};
     text-decoration: none;
     white-space: nowrap;
     overflow: hidden;
@@ -129,19 +144,19 @@ class PlayerTradingCardFrontView
 }
 
 .trading-card .stats-grid a:hover {
-    color: #D4AF37;
+    color: #{$accent};
 }
 
 .trading-card .draft-info {
     text-align: center;
     font-size: 12px;
-    color: #9ca3af;
+    color: #{$textMuted};
     margin-bottom: 12px;
     font-style: italic;
 }
 
 .trading-card .draft-info a {
-    color: #D4AF37;
+    color: #{$accent};
     text-decoration: none;
 }
 
@@ -150,7 +165,7 @@ class PlayerTradingCardFrontView
 }
 
 .trading-card .section-title {
-    color: #D4AF37;
+    color: #{$accent};
     font-size: 12px;
     font-weight: bold;
     text-transform: uppercase;
@@ -181,20 +196,20 @@ class PlayerTradingCardFrontView
     font-size: 9px;
     font-weight: 600;
     text-transform: uppercase;
-    color: #D4AF37;
+    color: #{$accent};
     letter-spacing: 0.5px;
 }
 
 .trading-card .rating-value {
     font-size: 14px;
     font-weight: 700;
-    color: #fff;
+    color: #{$text};
     font-family: 'Monaco', 'Menlo', monospace;
 }
 
 .trading-card .stat-pill {
-    background: rgba(212, 175, 55, 0.15);
-    border: 1px solid rgba(212, 175, 55, 0.3);
+    background: rgba({$borderRgb}, 0.15);
+    border: 1px solid rgba({$borderRgb}, 0.3);
     border-radius: 6px;
     padding: 2px 6px;
     font-family: 'Monaco', 'Menlo', monospace;
@@ -211,25 +226,25 @@ class PlayerTradingCardFrontView
 }
 
 .trading-card .stat-pill .pill-label {
-    color: #D4AF37;
+    color: #{$accent};
 }
 
 .trading-card .stat-pill .pill-value {
-    color: #fff;
+    color: #{$text};
     font-weight: bold;
 }
 
 .trading-card .stat-pill.intangible .pill-label {
-    color: #D4AF37;
+    color: #{$accent};
 }
 
 .trading-card .stat-pill.preference .pill-label {
-    color: #9ca3af;
+    color: #{$textMuted};
 }
 
 .trading-card .contract-bar {
-    background: linear-gradient(90deg, rgba(212,175,55,0.2) 0%, rgba(212,175,55,0.05) 100%);
-    border-left: 3px solid #D4AF37;
+    background: linear-gradient(90deg, rgba({$borderRgb}, 0.2) 0%, rgba({$borderRgb}, 0.05) 100%);
+    border-left: 3px solid #{$border};
     padding: 8px 12px;
     border-radius: 0 8px 8px 0;
     margin-top: 8px;
@@ -243,17 +258,17 @@ class PlayerTradingCardFrontView
 }
 
 .trading-card .contract-bar .contract-label {
-    color: #9ca3af;
+    color: #{$textMuted};
 }
 
 .trading-card .contract-bar .contract-value {
-    color: #fff;
+    color: #{$text};
     font-weight: bold;
     margin-left: 4px;
 }
 
 .trading-card .contract-bar .contract-amount {
-    color: #D4AF37;
+    color: #{$accent};
     font-weight: bold;
     margin-left: 4px;
 }
@@ -289,10 +304,18 @@ HTML;
      * @param Player $player The player object
      * @param int $playerID The player's ID
      * @param string $contractDisplay Formatted contract string
+     * @param \mysqli|null $db Optional database connection for team colors
      * @return string HTML for trading card
      */
-    public static function render(Player $player, int $playerID, string $contractDisplay): string
+    public static function render(Player $player, int $playerID, string $contractDisplay, ?\mysqli $db = null): string
     {
+        // Fetch team colors if database connection provided
+        $colorScheme = null;
+        if ($db !== null && $player->teamID > 0) {
+            $teamColors = TeamColorHelper::getTeamColors($db, $player->teamID);
+            $colorScheme = TeamColorHelper::generateColorScheme($teamColors['color1'], $teamColors['color2']);
+        }
+        
         $imageUrl = PlayerImageHelper::getImageUrl($playerID);
         
         // Sanitize all output values

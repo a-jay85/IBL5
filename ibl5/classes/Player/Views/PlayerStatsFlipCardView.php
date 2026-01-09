@@ -32,11 +32,22 @@ class PlayerStatsFlipCardView
      * 
      * Uses separate class names to avoid conflicts with PlayerTradingCardFlipView
      * 
+     * @param array|null $colorScheme Optional color scheme from TeamColorHelper
      * @return string HTML with CSS and JavaScript
      */
-    public static function getFlipStyles(): string
+    public static function getFlipStyles(?array $colorScheme = null): string
     {
-        return <<<'HTML'
+        // Use default colors if no scheme provided
+        if ($colorScheme === null) {
+            $colorScheme = TeamColorHelper::getDefaultColorScheme();
+        }
+        
+        $border = $colorScheme['border'];
+        $borderRgb = $colorScheme['border_rgb'];
+        $accent = $colorScheme['accent'];
+        $gradMid = $colorScheme['gradient_mid'];
+        
+        return <<<HTML
 <style>
 /* Stats Card Flip Container - Horizontal Layout */
 .stats-flip-container {
@@ -83,8 +94,8 @@ class PlayerStatsFlipCardView
     display: flex;
     align-items: center;
     gap: 6px;
-    background: rgba(212, 175, 55, 0.95);
-    color: #0f1419;
+    background: rgba({$borderRgb}, 0.95);
+    color: #{$gradMid};
     font-size: 11px;
     font-weight: 700;
     padding: 6px 12px;
@@ -99,15 +110,15 @@ class PlayerStatsFlipCardView
 }
 
 .stats-flip-toggle:hover {
-    background: rgba(212, 175, 55, 1);
+    background: rgba({$borderRgb}, 1);
     transform: scale(1.05);
-    box-shadow: 0 4px 12px rgba(212, 175, 55, 0.5);
+    box-shadow: 0 4px 12px rgba({$borderRgb}, 0.5);
 }
 
 .stats-flip-toggle svg {
     width: 14px;
     height: 14px;
-    fill: #0f1419;
+    fill: #{$gradMid};
     transition: transform 0.3s ease;
 }
 
@@ -134,7 +145,7 @@ class PlayerStatsFlipCardView
     top: 8px;
     left: 8px;
     background: rgba(0, 0, 0, 0.6);
-    color: #D4AF37;
+    color: #{$accent};
     font-size: 10px;
     font-weight: 600;
     padding: 4px 8px;
@@ -153,7 +164,7 @@ class PlayerStatsFlipCardView
     margin-top: 8px;
     padding: 4px 8px;
     background: rgba(0, 0, 0, 0.9);
-    color: #D4AF37;
+    color: #{$accent};
     font-size: 10px;
     font-weight: 400;
     text-transform: none;
@@ -174,7 +185,7 @@ class PlayerStatsFlipCardView
         box-shadow: 0 2px 8px rgba(0,0,0,0.3);
     }
     50% {
-        box-shadow: 0 2px 16px rgba(212, 175, 55, 0.7);
+        box-shadow: 0 2px 16px rgba({$borderRgb}, 0.7);
     }
 }
 
@@ -266,15 +277,17 @@ HTML;
      * @param string $totalsHtml HTML content for the totals view
      * @param string $statsCategory Category name (e.g., "Regular Season", "Playoffs")
      * @param bool $showAveragesFirst Whether to show averages first (default: true)
+     * @param array|null $colorScheme Optional color scheme from TeamColorHelper
      * @return string Complete HTML for flippable stats card
      */
     public static function render(
         string $averagesHtml,
         string $totalsHtml,
         string $statsCategory = '',
-        bool $showAveragesFirst = true
+        bool $showAveragesFirst = true,
+        ?array $colorScheme = null
     ): string {
-        // Style both tables using PlayerStatsCardView
+        // Style tables using PlayerStatsCardView (don't wrap yet)
         $styledAverages = PlayerStatsCardView::styleTable($averagesHtml);
         $styledTotals = PlayerStatsCardView::styleTable($totalsHtml);
         
@@ -327,17 +340,28 @@ HTML;
      * @param PlayerRegularSeasonAveragesView $averagesView The averages view instance
      * @param PlayerRegularSeasonTotalsView $totalsView The totals view instance
      * @param int $playerID The player's ID
+     * @param \mysqli|null $db Optional database connection for team colors
+     * @param int $teamID Optional team ID for color lookup
      * @return string HTML for flippable regular season stats card
      */
     public static function renderRegularSeason(
         PlayerRegularSeasonAveragesView $averagesView,
         PlayerRegularSeasonTotalsView $totalsView,
-        int $playerID
+        int $playerID,
+        ?\mysqli $db = null,
+        int $teamID = 0
     ): string {
         $averagesHtml = $averagesView->renderAverages($playerID);
         $totalsHtml = $totalsView->renderTotals($playerID);
         
-        return self::render($averagesHtml, $totalsHtml, 'Regular Season');
+        // Fetch team colors if database connection and team ID provided
+        $colorScheme = null;
+        if ($db !== null && $teamID > 0) {
+            $teamColors = TeamColorHelper::getTeamColors($db, $teamID);
+            $colorScheme = TeamColorHelper::generateColorScheme($teamColors['color1'], $teamColors['color2']);
+        }
+        
+        return self::render($averagesHtml, $totalsHtml, 'Regular Season', true, $colorScheme);
     }
 
     /**
@@ -346,17 +370,28 @@ HTML;
      * @param PlayerPlayoffAveragesView $averagesView The averages view instance
      * @param PlayerPlayoffTotalsView $totalsView The totals view instance
      * @param string $playerName The player's name
+     * @param \mysqli|null $db Optional database connection for team colors
+     * @param int $teamID Optional team ID for color lookup
      * @return string HTML for flippable playoff stats card
      */
     public static function renderPlayoffs(
         PlayerPlayoffAveragesView $averagesView,
         PlayerPlayoffTotalsView $totalsView,
-        string $playerName
+        string $playerName,
+        ?\mysqli $db = null,
+        int $teamID = 0
     ): string {
         $averagesHtml = $averagesView->renderAverages($playerName);
         $totalsHtml = $totalsView->renderTotals($playerName);
         
-        return self::render($averagesHtml, $totalsHtml, 'Playoffs');
+        // Fetch team colors if database connection and team ID provided
+        $colorScheme = null;
+        if ($db !== null && $teamID > 0) {
+            $teamColors = TeamColorHelper::getTeamColors($db, $teamID);
+            $colorScheme = TeamColorHelper::generateColorScheme($teamColors['color1'], $teamColors['color2']);
+        }
+        
+        return self::render($averagesHtml, $totalsHtml, 'Playoffs', true, $colorScheme);
     }
 
     /**
@@ -365,17 +400,28 @@ HTML;
      * @param PlayerOlympicAveragesView $averagesView The averages view instance
      * @param PlayerOlympicTotalsView $totalsView The totals view instance
      * @param string $playerName The player's name
+     * @param \mysqli|null $db Optional database connection for team colors
+     * @param int $teamID Optional team ID for color lookup
      * @return string HTML for flippable Olympics stats card
      */
     public static function renderOlympics(
         PlayerOlympicAveragesView $averagesView,
         PlayerOlympicTotalsView $totalsView,
-        string $playerName
+        string $playerName,
+        ?\mysqli $db = null,
+        int $teamID = 0
     ): string {
         $averagesHtml = $averagesView->renderAverages($playerName);
         $totalsHtml = $totalsView->renderTotals($playerName);
         
-        return self::render($averagesHtml, $totalsHtml, 'Olympics');
+        // Fetch team colors if database connection and team ID provided
+        $colorScheme = null;
+        if ($db !== null && $teamID > 0) {
+            $teamColors = TeamColorHelper::getTeamColors($db, $teamID);
+            $colorScheme = TeamColorHelper::generateColorScheme($teamColors['color1'], $teamColors['color2']);
+        }
+        
+        return self::render($averagesHtml, $totalsHtml, 'Olympics', true, $colorScheme);
     }
 
     /**
@@ -384,16 +430,27 @@ HTML;
      * @param PlayerHeatAveragesView $averagesView The averages view instance
      * @param PlayerHeatTotalsView $totalsView The totals view instance
      * @param string $playerName The player's name
+     * @param \mysqli|null $db Optional database connection for team colors
+     * @param int $teamID Optional team ID for color lookup
      * @return string HTML for flippable H.E.A.T. stats card
      */
     public static function renderHeat(
         PlayerHeatAveragesView $averagesView,
         PlayerHeatTotalsView $totalsView,
-        string $playerName
+        string $playerName,
+        ?\mysqli $db = null,
+        int $teamID = 0
     ): string {
         $averagesHtml = $averagesView->renderAverages($playerName);
         $totalsHtml = $totalsView->renderTotals($playerName);
         
-        return self::render($averagesHtml, $totalsHtml, 'H.E.A.T.');
+        // Fetch team colors if database connection and team ID provided
+        $colorScheme = null;
+        if ($db !== null && $teamID > 0) {
+            $teamColors = TeamColorHelper::getTeamColors($db, $teamID);
+            $colorScheme = TeamColorHelper::generateColorScheme($teamColors['color1'], $teamColors['color2']);
+        }
+        
+        return self::render($averagesHtml, $totalsHtml, 'H.E.A.T.', true, $colorScheme);
     }
 }

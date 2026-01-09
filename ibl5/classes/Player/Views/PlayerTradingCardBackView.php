@@ -13,9 +13,9 @@ use Utilities\HtmlSanitizer;
  * PlayerTradingCardBackView - Renders the back side of the player trading card
  * 
  * Shows player highs, career statistics, and All-Star activities.
- * Uses the same styling as PlayerTradingCardView for visual consistency.
+ * Uses the same styling as PlayerTradingCardFrontView for visual consistency.
  * 
- * @see PlayerTradingCardView for the front side of the card
+ * @see PlayerTradingCardFrontView for the front side of the card
  * @since 2026-01-08
  */
 class PlayerTradingCardBackView

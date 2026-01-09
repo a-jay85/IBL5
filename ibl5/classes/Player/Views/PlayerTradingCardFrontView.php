@@ -9,14 +9,14 @@ use Player\PlayerImageHelper;
 use Utilities\HtmlSanitizer;
 
 /**
- * PlayerTradingCardView - Renders player info as a basketball trading card
+ * PlayerTradingCardFrontView - Renders the front side of player trading card
  * 
  * Modern, mobile-first layout optimized for readability and information density.
  * Uses Tailwind CSS via CDN for rapid prototyping.
  * 
  * @since 2026-01-08
  */
-class PlayerTradingCardView
+class PlayerTradingCardFrontView
 {
     /**
      * Get scoped custom styles for trading card (no external dependencies)

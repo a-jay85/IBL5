@@ -207,7 +207,7 @@ HTML;
     <div class="card-flip-inner">
         <!-- Front of Card -->
         <div class="card-front">
-            <?= PlayerTradingCardView::render($player, $playerID, $contractDisplay) ?>
+            <?= PlayerTradingCardFrontView::render($player, $playerID, $contractDisplay) ?>
             
             <!-- Flip Icon -->
             <div class="flip-icon pulse" title="Click to see stats">

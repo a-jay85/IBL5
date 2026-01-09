@@ -9,7 +9,7 @@ use Player\Views\PlayerViewStyles;
 use Player\Views\PlayerButtonsView;
 use Player\Views\PlayerMenuView;
 use Player\Views\PlayerViewFactory;
-use Player\Views\PlayerTradingCardView;
+use Player\Views\PlayerTradingCardFrontView;
 use Player\Views\PlayerTradingCardBackView;
 use Player\Views\PlayerTradingCardFlipView;
 use RookieOption\RookieOptionValidator;
@@ -50,7 +50,7 @@ function showpage($playerID, $pageView)
     OpenTable();
     
     // Include trading card styles (both front and back)
-    echo PlayerTradingCardView::getStyles();
+    echo PlayerTradingCardFrontView::getStyles();
     echo PlayerTradingCardBackView::getStyles();
     echo PlayerTradingCardFlipView::getFlipStyles();
     

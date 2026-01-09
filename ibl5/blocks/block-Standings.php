@@ -146,7 +146,7 @@ while ($row = $resultWesternConference->fetch_assoc()) {
 $content .= "
     <tr>
         <td colspan=3>
-            <center><a href=\"modules.php?name=Content&pa=showpage&pid=4\"><font color=#aaaaaa><i>-- Full Standings --</i></font></a></center>
+            <center><a href=\"modules.php?name=Standings\"><font color=#aaaaaa><i>-- Full Standings --</i></font></a></center>
         </td>
     </tr>
 </table>";

@@ -42,7 +42,7 @@ class PlayerStatsCardView
 /* Player Stats Card - Horizontal Layout
    Uses !important to override legacy .player-table styles */
 .player-stats-card {
-    background: linear-gradient(145deg, #{$gradStart} 0%, #{$gradMid} 25%, #{$gradMid} 75%, #{$gradEnd} 100%) !important;
+    background: linear-gradient(145deg, #{$gradStart} 0%, #{$gradMid} 20%, #{$gradMid} 80%, #{$gradEnd} 100%) !important;
     border: 3px solid #{$border} !important;
     border-radius: 12px !important;
     box-shadow: 

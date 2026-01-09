@@ -40,7 +40,7 @@ class PlayerMenuView
         ?>
 <tr>
     <td colspan="2" class="player-menu-container">
-        <select class="player-menu-dropdown" onchange="if(this.value) window.location.href=this.value;" style="width: 100%; padding: 5px; font-size: 14px;">
+        <select class="player-menu-dropdown" onchange="if(this.value) window.location.href=this.value;" style="width: 50%; padding: 5px; font-size: 14px;">
             <option value="">-- Select a Page --</option>
             <?php foreach ($pageTypes as $pageType): 
                 $isSelected = ($currentPageType === $pageType) || ($currentPageType === null && $pageType === \PlayerPageType::OVERVIEW);

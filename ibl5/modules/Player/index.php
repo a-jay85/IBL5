@@ -12,6 +12,8 @@ use Player\Views\PlayerViewFactory;
 use Player\Views\PlayerTradingCardFrontView;
 use Player\Views\PlayerTradingCardBackView;
 use Player\Views\PlayerTradingCardFlipView;
+use Player\Views\PlayerStatsCardView;
+use Player\Views\PlayerStatsFlipCardView;
 use RookieOption\RookieOptionValidator;
 use RookieOption\RookieOptionFormView;
 use Services\CommonMysqliRepository;
@@ -57,6 +59,10 @@ function showpage($playerID, $pageView)
     // Include legacy player view styles for other components
     echo PlayerViewStyles::getStyles();
     
+    // Include stats card styles AFTER legacy styles to ensure they override
+    echo PlayerStatsCardView::getStyles();
+    echo PlayerStatsFlipCardView::getFlipStyles();
+    
     // Render player menu with current page selected
     echo PlayerMenuView::render($playerID, $pageView);
 
@@ -100,37 +106,91 @@ function showpage($playerID, $pageView)
     $statsRepository = new PlayerStatsRepository($mysqli_db);
     $viewFactory = new PlayerViewFactory($playerRepository, $statsRepository, $commonRepository);
 
-    // Render the appropriate view using the factory
-    $view = $viewFactory->createView($pageView);
+    // Render the appropriate view using the factory with stats card styling
+    // For views with Averages/Totals pairs, use flip cards
+    // For single views, use the stats card wrapper
+    // All card outputs are wrapped in <tr><td> for table-based page layout
     
     if ($pageView === PlayerPageType::OVERVIEW) {
+        $view = $viewFactory->createView($pageView);
         echo $view->renderOverview($playerID, $player, $playerStats, $season, $sharedFunctions);
     } elseif ($pageView === PlayerPageType::SIM_STATS) {
-        echo $view->renderSimStats($playerID);
-    } elseif ($pageView === PlayerPageType::REGULAR_SEASON_TOTALS) {
-        echo $view->renderTotals($playerID);
-    } elseif ($pageView === PlayerPageType::REGULAR_SEASON_AVERAGES) {
-        echo $view->renderAverages($playerID);
-    } elseif ($pageView === PlayerPageType::PLAYOFF_TOTALS) {
-        echo $view->renderTotals($player->name);
-    } elseif ($pageView === PlayerPageType::PLAYOFF_AVERAGES) {
-        echo $view->renderAverages($player->name);
-    } elseif ($pageView === PlayerPageType::HEAT_TOTALS) {
-        echo $view->renderTotals($player->name);
-    } elseif ($pageView === PlayerPageType::HEAT_AVERAGES) {
-        echo $view->renderAverages($player->name);
-    } elseif ($pageView === PlayerPageType::OLYMPIC_TOTALS) {
-        echo $view->renderTotals($player->name);
-    } elseif ($pageView === PlayerPageType::OLYMPIC_AVERAGES) {
-        echo $view->renderAverages($player->name);
+        // Sim stats - single view with stats card wrapper
+        $view = $viewFactory->createSimStatsView();
+        echo '<tr><td colspan="2">';
+        echo PlayerStatsCardView::render($view->renderSimStats($playerID));
+        echo '</td></tr>';
+    } elseif ($pageView === PlayerPageType::REGULAR_SEASON_TOTALS || $pageView === PlayerPageType::REGULAR_SEASON_AVERAGES) {
+        // Regular Season - flip card with Averages/Totals toggle
+        $averagesView = $viewFactory->createRegularSeasonAveragesView();
+        $totalsView = $viewFactory->createRegularSeasonTotalsView();
+        $showAveragesFirst = ($pageView === PlayerPageType::REGULAR_SEASON_AVERAGES);
+        echo '<tr><td colspan="2">';
+        echo PlayerStatsFlipCardView::render(
+            $averagesView->renderAverages($playerID),
+            $totalsView->renderTotals($playerID),
+            'Regular Season',
+            $showAveragesFirst
+        );
+        echo '</td></tr>';
+    } elseif ($pageView === PlayerPageType::PLAYOFF_TOTALS || $pageView === PlayerPageType::PLAYOFF_AVERAGES) {
+        // Playoffs - flip card with Averages/Totals toggle
+        $averagesView = $viewFactory->createPlayoffAveragesView();
+        $totalsView = $viewFactory->createPlayoffTotalsView();
+        $showAveragesFirst = ($pageView === PlayerPageType::PLAYOFF_AVERAGES);
+        echo '<tr><td colspan="2">';
+        echo PlayerStatsFlipCardView::render(
+            $averagesView->renderAverages($player->name),
+            $totalsView->renderTotals($player->name),
+            'Playoffs',
+            $showAveragesFirst
+        );
+        echo '</td></tr>';
+    } elseif ($pageView === PlayerPageType::HEAT_TOTALS || $pageView === PlayerPageType::HEAT_AVERAGES) {
+        // H.E.A.T. - flip card with Averages/Totals toggle
+        $averagesView = $viewFactory->createHeatAveragesView();
+        $totalsView = $viewFactory->createHeatTotalsView();
+        $showAveragesFirst = ($pageView === PlayerPageType::HEAT_AVERAGES);
+        echo '<tr><td colspan="2">';
+        echo PlayerStatsFlipCardView::render(
+            $averagesView->renderAverages($player->name),
+            $totalsView->renderTotals($player->name),
+            'H.E.A.T.',
+            $showAveragesFirst
+        );
+        echo '</td></tr>';
+    } elseif ($pageView === PlayerPageType::OLYMPIC_TOTALS || $pageView === PlayerPageType::OLYMPIC_AVERAGES) {
+        // Olympics - flip card with Averages/Totals toggle
+        $averagesView = $viewFactory->createOlympicAveragesView();
+        $totalsView = $viewFactory->createOlympicTotalsView();
+        $showAveragesFirst = ($pageView === PlayerPageType::OLYMPIC_AVERAGES);
+        echo '<tr><td colspan="2">';
+        echo PlayerStatsFlipCardView::render(
+            $averagesView->renderAverages($player->name),
+            $totalsView->renderTotals($player->name),
+            'Olympics',
+            $showAveragesFirst
+        );
+        echo '</td></tr>';
     } elseif ($pageView === PlayerPageType::RATINGS_AND_SALARY) {
-        echo $view->renderRatingsAndSalary($playerID);
+        // Ratings and Salary - single view with stats card wrapper
+        $view = $viewFactory->createRatingsAndSalaryView();
+        echo '<tr><td colspan="2">';
+        echo PlayerStatsCardView::render($view->renderRatingsAndSalary($playerID));
+        echo '</td></tr>';
     } elseif ($pageView === PlayerPageType::AWARDS_AND_NEWS) {
-        echo $view->renderAwardsAndNews($player->name);
+        $view = $viewFactory->createView($pageView);
+        echo '<tr><td colspan="2">';
+        echo PlayerStatsCardView::render($view->renderAwardsAndNews($player->name));
+        echo '</td></tr>';
     } elseif ($pageView === PlayerPageType::ONE_ON_ONE) {
-        echo $view->renderOneOnOneResults($player->name);
+        $view = $viewFactory->createView($pageView);
+        echo '<tr><td colspan="2">';
+        echo PlayerStatsCardView::render($view->renderOneOnOneResults($player->name));
+        echo '</td></tr>';
     } else {
         // Default to overview
+        $view = $viewFactory->createOverviewView();
         echo $view->renderOverview($playerID, $player, $playerStats, $season, $sharedFunctions);
     }
 

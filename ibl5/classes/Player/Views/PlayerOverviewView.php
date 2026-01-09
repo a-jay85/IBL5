@@ -66,8 +66,10 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
         
         ob_start();
         
-        // Render game log
-        echo $this->renderGameLog($playerID, $startDate, $endDate);
+        // Render game log with stats card styling
+        echo '<tr><td colspan="2">';
+        echo PlayerStatsCardView::render($this->renderGameLog($playerID, $startDate, $endDate));
+        echo '</td></tr>';
         
         return ob_get_clean();
     }
@@ -81,7 +83,6 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
 
         ob_start();
         ?>
-<p>
 <table class="sortable player-table">
     <tr>
         <td colspan=22 class="player-table-header">Game Log</td>

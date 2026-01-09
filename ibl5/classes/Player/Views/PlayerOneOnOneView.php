@@ -49,7 +49,7 @@ class PlayerOneOnOneView implements PlayerOneOnOneViewInterface
 
         ob_start();
         ?>
-<table class="oneonone-table">
+<table class="sortable player-table">
     <tr>
         <td class="player-table-header">ONE-ON-ONE RESULTS</td>
     </tr>
@@ -60,18 +60,38 @@ class PlayerOneOnOneView implements PlayerOneOnOneViewInterface
         foreach ($wins as $game) {
             $gameId = (int)$game['gameid'];
             $loser = HtmlSanitizer::safeHtmlOutput($game['loser']);
+            $loserPid = isset($game['loser_pid']) ? (int)$game['loser_pid'] : null;
             $winScore = (int)$game['winscore'];
             $lossScore = (int)$game['lossscore'];
-            echo "* def. {$loser}, {$winScore}-{$lossScore} (# {$gameId})<br>";
+            
+            // Create game link
+            $gameLink = "modules.php?name=One-on-One&amp;gameid={$gameId}";
+            
+            // Create opponent link if we have a player ID
+            $opponentLink = $loserPid 
+                ? "<a href=\"modules.php?name=Player&amp;pa=showpage&amp;pid={$loserPid}\" style=\"font-family: inherit; font-size: inherit;\">{$loser}</a>"
+                : $loser;
+            
+            echo "* def. {$opponentLink}, {$winScore}-{$lossScore} (<a href=\"{$gameLink}\" style=\"font-family: inherit; font-size: inherit;\">Game #{$gameId}</a>)<br>";
         }
         
         // Show losses
         foreach ($losses as $game) {
             $gameId = (int)$game['gameid'];
             $winner = HtmlSanitizer::safeHtmlOutput($game['winner']);
+            $winnerPid = isset($game['winner_pid']) ? (int)$game['winner_pid'] : null;
             $winScore = (int)$game['winscore'];
             $lossScore = (int)$game['lossscore'];
-            echo "* lost to {$winner}, {$lossScore}-{$winScore} (# {$gameId})<br>";
+            
+            // Create game link
+            $gameLink = "modules.php?name=One-on-One&amp;gameid={$gameId}";
+            
+            // Create opponent link if we have a player ID
+            $opponentLink = $winnerPid 
+                ? "<a href=\"modules.php?name=Player&amp;pa=showpage&amp;pid={$winnerPid}\" style=\"font-family: inherit; font-size: inherit;\">{$winner}</a>"
+                : $winner;
+            
+            echo "* lost to {$opponentLink}, {$lossScore}-{$winScore} (<a href=\"{$gameLink}\" style=\"font-family: inherit; font-size: inherit;\">Game #{$gameId}</a>)<br>";
         }
         ?>
         <div class="text-center text-bold">Record: <?= $winCount ?> - <?= $lossCount ?></div><br>

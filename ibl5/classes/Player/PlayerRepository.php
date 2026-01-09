@@ -515,7 +515,11 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     public function getOneOnOneWins(string $playerName): array
     {
         return $this->fetchAll(
-            "SELECT gameid, winner, loser, winscore, lossscore FROM ibl_one_on_one WHERE winner = ? ORDER BY gameid ASC",
+            "SELECT o.gameid, o.winner, o.loser, o.winscore, o.lossscore, p.pid as loser_pid 
+             FROM ibl_one_on_one o 
+             LEFT JOIN ibl_plr p ON o.loser = p.name 
+             WHERE o.winner = ? 
+             ORDER BY o.gameid ASC",
             "s",
             $playerName
         );
@@ -529,7 +533,11 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     public function getOneOnOneLosses(string $playerName): array
     {
         return $this->fetchAll(
-            "SELECT gameid, winner, loser, winscore, lossscore FROM ibl_one_on_one WHERE loser = ? ORDER BY gameid ASC",
+            "SELECT o.gameid, o.winner, o.loser, o.winscore, o.lossscore, p.pid as winner_pid 
+             FROM ibl_one_on_one o 
+             LEFT JOIN ibl_plr p ON o.winner = p.name 
+             WHERE o.loser = ? 
+             ORDER BY o.gameid ASC",
             "s",
             $playerName
         );

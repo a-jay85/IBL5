@@ -43,7 +43,7 @@ class PlayerAwardsAndNewsView implements PlayerAwardsAndNewsViewInterface
 
         ob_start();
         ?>
-<table class="awards-table">
+<table class="sortable player-table">
     <tr>
         <td class="player-table-header">AWARDS</td>
     </tr>

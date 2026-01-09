@@ -5,15 +5,16 @@ declare(strict_types=1);
 namespace Player\Views;
 
 use Player\Player;
-use Player\PlayerImageHelper;
 use Utilities\HtmlSanitizer;
 
 /**
  * PlayerTradingCardFrontView - Renders the front side of player trading card
  * 
- * Modern, mobile-first layout optimized for readability and information density.
- * Uses Tailwind CSS via CDN for rapid prototyping.
+ * Shows player ratings, intangibles, free agency preferences, and contract info.
+ * Uses CardBaseStyles for shared styling with PlayerTradingCardBackView.
  * 
+ * @see CardBaseStyles for shared CSS
+ * @see PlayerTradingCardBackView for the back side of the card
  * @since 2026-01-08
  */
 class PlayerTradingCardFrontView
@@ -26,154 +27,22 @@ class PlayerTradingCardFrontView
      */
     public static function getStyles(?array $colorScheme = null): string
     {
-        // Use default colors if no scheme provided
         if ($colorScheme === null) {
             $colorScheme = TeamColorHelper::getDefaultColorScheme();
         }
         
-        $gradStart = $colorScheme['gradient_start'];
-        $gradMid = $colorScheme['gradient_mid'];
-        $gradEnd = $colorScheme['gradient_end'];
-        $border = $colorScheme['border'];
+        // Get shared base styles from CardBaseStyles
+        $baseStyles = CardBaseStyles::getStyles($colorScheme);
+        
+        // Add front-card-specific styles only
         $borderRgb = $colorScheme['border_rgb'];
         $accent = $colorScheme['accent'];
         $text = $colorScheme['text'];
         $textMuted = $colorScheme['text_muted'];
         
-        return <<<HTML
+        $frontStyles = <<<HTML
 <style>
-/* Trading Card Custom Styles - Scoped to .trading-card */
-.trading-card {
-    background: linear-gradient(145deg, #{$gradStart} 0%, #{$gradMid} 20%, #{$gradMid} 80%, #{$gradEnd} 100%);
-    border: 4px solid #{$border};
-    border-radius: 16px;
-    box-shadow: 
-        0 0 0 2px #{$gradMid},
-        0 0 0 4px #{$border},
-        0 10px 40px rgba(0,0,0,0.4);
-    max-width: 420px;
-    margin: 0 auto;
-    padding: 16px 16px 50px 16px;
-    color: #{$text};
-}
-
-.trading-card * {
-    box-sizing: border-box;
-}
-
-.trading-card .card-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 12px;
-}
-
-.trading-card .card-header h2 {
-    font-size: 20px;
-    font-weight: bold;
-    color: #{$text};
-    line-height: 1.2;
-    margin: 0;
-}
-
-.trading-card .card-header .nickname {
-    color: #{$accent};
-    font-size: 14px;
-    font-style: italic;
-    margin: 2px 0 0 0;
-}
-
-.trading-card .meta-badge {
-    background: linear-gradient(135deg, #{$border} 0%, #{$accent} 100%);
-    color: #{$gradMid};
-    font-weight: 700;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 11px;
-}
-
-.trading-card .photo-stats-row {
-    display: flex;
-    gap: 16px;
-    margin-bottom: 16px;
-}
-
-.trading-card .player-photo-frame {
-    border: 3px solid #{$border};
-    border-radius: 8px;
-    background: linear-gradient(135deg, #{$gradMid} 0%, #{$gradStart} 100%);
-    padding: 4px;
-    flex-shrink: 0;
-}
-
-.trading-card .player-photo-frame img {
-    width: 96px;
-    height: 112px;
-    object-fit: cover;
-    border-radius: 4px;
-    display: block;
-}
-
-.trading-card .quick-stats {
-    flex: 1;
-    font-size: 14px;
-}
-
-.trading-card .stats-grid {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 4px 8px;
-    color: #{$textMuted};
-}
-
-.trading-card .stats-grid .label {
-    color: #{$accent};
-    font-weight: 600;
-}
-
-.trading-card .stats-grid .value {
-    color: #{$text};
-}
-
-.trading-card .stats-grid a {
-    color: #{$text};
-    text-decoration: none;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.trading-card .stats-grid a:hover {
-    color: #{$accent};
-}
-
-.trading-card .draft-info {
-    text-align: center;
-    font-size: 12px;
-    color: #{$textMuted};
-    margin-bottom: 12px;
-    font-style: italic;
-}
-
-.trading-card .draft-info a {
-    color: #{$accent};
-    text-decoration: none;
-}
-
-.trading-card .draft-info a:hover {
-    text-decoration: underline;
-}
-
-.trading-card .section-title {
-    color: #{$accent};
-    font-size: 12px;
-    font-weight: bold;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 8px;
-    text-align: center;
-}
-
+/* Trading Card Front - Unique Styles (ratings, contract bar) */
 .trading-card .rating-row {
     display: grid;
     gap: 4px;
@@ -207,44 +76,9 @@ class PlayerTradingCardFrontView
     font-family: 'Monaco', 'Menlo', monospace;
 }
 
-.trading-card .stat-pill {
-    background: rgba({$borderRgb}, 0.15);
-    border: 1px solid rgba({$borderRgb}, 0.3);
-    border-radius: 6px;
-    padding: 2px 6px;
-    font-family: 'Monaco', 'Menlo', monospace;
-    display: inline-block;
-}
-
-.trading-card .pills-row {
-    display: flex;
-    justify-content: center;
-    gap: 12px;
-    margin-bottom: 12px;
-    font-size: 12px;
-    flex-wrap: wrap;
-}
-
-.trading-card .stat-pill .pill-label {
-    color: #{$accent};
-}
-
-.trading-card .stat-pill .pill-value {
-    color: #{$text};
-    font-weight: bold;
-}
-
-.trading-card .stat-pill.intangible .pill-label {
-    color: #{$accent};
-}
-
-.trading-card .stat-pill.preference .pill-label {
-    color: #{$textMuted};
-}
-
 .trading-card .contract-bar {
     background: linear-gradient(90deg, rgba({$borderRgb}, 0.2) 0%, rgba({$borderRgb}, 0.05) 100%);
-    border-left: 3px solid #{$border};
+    border-left: 3px solid #{$colorScheme['border']};
     padding: 8px 12px;
     border-radius: 0 8px 8px 0;
     margin-top: 8px;
@@ -273,115 +107,40 @@ class PlayerTradingCardFrontView
     margin-left: 4px;
 }
 
-/* Mobile responsiveness */
 @media (max-width: 480px) {
-    .trading-card {
-        max-width: 100%;
-        margin: 8px;
-        border-radius: 12px;
-        padding: 12px;
-    }
-    
     .trading-card .rating-label { font-size: 8px; }
     .trading-card .rating-value { font-size: 12px; }
-    
-    .trading-card .photo-stats-row {
-        gap: 12px;
-    }
-    
-    .trading-card .player-photo-frame img {
-        width: 80px;
-        height: 96px;
-    }
 }
 </style>
 HTML;
+
+        return $baseStyles . $frontStyles;
     }
 
     /**
-     * Render the complete trading card
+     * Render the complete trading card front
      * 
      * @param Player $player The player object
      * @param int $playerID The player's ID
      * @param string $contractDisplay Formatted contract string
      * @param \mysqli|null $db Optional database connection for team colors
-     * @return string HTML for trading card
+     * @return string HTML for trading card front
      */
     public static function render(Player $player, int $playerID, string $contractDisplay, ?\mysqli $db = null): string
     {
-        // Fetch team colors if database connection provided
-        $colorScheme = null;
-        if ($db !== null && $player->teamID > 0) {
-            $teamColors = TeamColorHelper::getTeamColors($db, $player->teamID);
-            $colorScheme = TeamColorHelper::generateColorScheme($teamColors['color1'], $teamColors['color2']);
-        }
+        // Get color scheme and prepare player data
+        $colorScheme = CardBaseStyles::getColorSchemeForTeam($db, (int)$player->teamID);
+        $playerData = CardBaseStyles::preparePlayerData($player, $playerID);
         
-        $imageUrl = PlayerImageHelper::getImageUrl($playerID);
-        
-        // Sanitize all output values
-        $name = HtmlSanitizer::safeHtmlOutput($player->name);
-        $nickname = HtmlSanitizer::safeHtmlOutput($player->nickname ?? '');
-        $position = HtmlSanitizer::safeHtmlOutput($player->position);
-        $teamName = HtmlSanitizer::safeHtmlOutput($player->teamName);
-        $age = HtmlSanitizer::safeHtmlOutput((string)$player->age);
-        $height = HtmlSanitizer::safeHtmlOutput($player->heightFeet . "'" . $player->heightInches . '"');
-        $weight = HtmlSanitizer::safeHtmlOutput((string)$player->weightPounds);
-        $college = HtmlSanitizer::safeHtmlOutput($player->collegeName ?? 'N/A');
-        $draftYear = HtmlSanitizer::safeHtmlOutput((string)$player->draftYear);
-        $draftRound = HtmlSanitizer::safeHtmlOutput((string)$player->draftRound);
-        $draftPick = HtmlSanitizer::safeHtmlOutput((string)$player->draftPickNumber);
-        $draftTeam = HtmlSanitizer::safeHtmlOutput($player->draftTeamOriginalName ?? '');
+        // Additional front-card specific data
         $expYears = HtmlSanitizer::safeHtmlOutput((string)$player->yearsOfExperience);
         $birdYears = HtmlSanitizer::safeHtmlOutput((string)$player->birdYears);
         $contractSafe = HtmlSanitizer::safeHtmlOutput($contractDisplay);
-        $teamID = (int)$player->teamID;
 
         ob_start();
         ?>
 <div class="trading-card">
-    <!-- Card Header: Name & Position -->
-    <div class="card-header">
-        <div>
-            <h2><?= $name ?></h2>
-            <?php if (!empty($nickname)): ?>
-            <p class="nickname">"<?= $nickname ?>"</p>
-            <?php endif; ?>
-        </div>
-        <span class="meta-badge"><?= $position ?></span>
-    </div>
-
-    <!-- Player Photo & Quick Stats -->
-    <div class="photo-stats-row">
-        <div class="player-photo-frame">
-            <img src="<?= HtmlSanitizer::safeHtmlOutput($imageUrl) ?>" 
-                 alt="<?= $name ?>"
-                 onerror="this.style.display='none'">
-        </div>
-        <div class="quick-stats">
-            <div class="stats-grid">
-                <span class="label">Team</span>
-                <a href="modules.php?name=Team&op=team&teamID=<?= $teamID ?>"><?= $teamName ?></a>
-                
-                <span class="label">Age</span>
-                <span class="value"><?= $age ?></span>
-                
-                <span class="label">Height</span>
-                <span class="value"><?= $height ?></span>
-                
-                <span class="label">Weight</span>
-                <span class="value"><?= $weight ?> lbs</span>
-                
-                <span class="label">College</span>
-                <span class="value"><?= $college ?></span>
-            </div>
-        </div>
-    </div>
-
-    <!-- Draft Info -->
-    <div class="draft-info">
-        Drafted by <?= $draftTeam ?> · Rd <?= $draftRound ?>, Pick #<?= $draftPick ?> · 
-        <a href="/ibl5/pages/draftHistory.php?year=<?= $player->draftYear ?>"><?= $draftYear ?></a>
-    </div>
+<?= CardBaseStyles::renderCardTop($playerData) ?>
 
     <!-- RATINGS SECTION -->
     <div>
@@ -424,52 +183,22 @@ HTML;
 
     <!-- Intangibles Row -->
     <div class="pills-row">
-        <div class="stat-pill intangible">
-            <span class="pill-label">TAL</span> 
-            <span class="pill-value"><?= HtmlSanitizer::safeHtmlOutput((string)$player->ratingTalent) ?></span>
-        </div>
-        <div class="stat-pill intangible">
-            <span class="pill-label">SKL</span> 
-            <span class="pill-value"><?= HtmlSanitizer::safeHtmlOutput((string)$player->ratingSkill) ?></span>
-        </div>
-        <div class="stat-pill intangible">
-            <span class="pill-label">INT</span> 
-            <span class="pill-value"><?= HtmlSanitizer::safeHtmlOutput((string)$player->ratingIntangibles) ?></span>
-        </div>
-        <div class="stat-pill intangible">
-            <span class="pill-label">CLU</span> 
-            <span class="pill-value"><?= HtmlSanitizer::safeHtmlOutput((string)$player->ratingClutch) ?></span>
-        </div>
-        <div class="stat-pill intangible">
-            <span class="pill-label">CON</span> 
-            <span class="pill-value"><?= HtmlSanitizer::safeHtmlOutput((string)$player->ratingConsistency) ?></span>
-        </div>
+        <?= self::renderPill('TAL', $player->ratingTalent) ?>
+        <?= self::renderPill('SKL', $player->ratingSkill) ?>
+        <?= self::renderPill('INT', $player->ratingIntangibles) ?>
+        <?= self::renderPill('CLU', $player->ratingClutch) ?>
+        <?= self::renderPill('CON', $player->ratingConsistency) ?>
     </div>
 
     <!-- Free Agency Preferences -->
     <div>
         <h3 class="section-title">Free Agency Preferences</h3>
         <div class="pills-row">
-            <div class="stat-pill preference">
-                <span class="pill-label">LOY</span> 
-                <span class="pill-value"><?= HtmlSanitizer::safeHtmlOutput((string)$player->freeAgencyLoyalty) ?></span>
-            </div>
-            <div class="stat-pill preference">
-                <span class="pill-label">WIN</span> 
-                <span class="pill-value"><?= HtmlSanitizer::safeHtmlOutput((string)$player->freeAgencyPlayForWinner) ?></span>
-            </div>
-            <div class="stat-pill preference">
-                <span class="pill-label">PT</span> 
-                <span class="pill-value"><?= HtmlSanitizer::safeHtmlOutput((string)$player->freeAgencyPlayingTime) ?></span>
-            </div>
-            <div class="stat-pill preference">
-                <span class="pill-label">SEC</span> 
-                <span class="pill-value"><?= HtmlSanitizer::safeHtmlOutput((string)$player->freeAgencySecurity) ?></span>
-            </div>
-            <div class="stat-pill preference">
-                <span class="pill-label">TRD</span> 
-                <span class="pill-value"><?= HtmlSanitizer::safeHtmlOutput((string)$player->freeAgencyTradition) ?></span>
-            </div>
+            <?= self::renderPill('LOY', $player->freeAgencyLoyalty, true) ?>
+            <?= self::renderPill('WIN', $player->freeAgencyPlayForWinner, true) ?>
+            <?= self::renderPill('PT', $player->freeAgencyPlayingTime, true) ?>
+            <?= self::renderPill('SEC', $player->freeAgencySecurity, true) ?>
+            <?= self::renderPill('TRD', $player->freeAgencyTradition, true) ?>
         </div>
     </div>
 
@@ -493,10 +222,6 @@ HTML;
 
     /**
      * Render a single rating cell
-     * 
-     * @param string $label The rating abbreviation
-     * @param mixed $value The rating value
-     * @return string HTML for rating cell
      */
     private static function renderRatingCell(string $label, $value): string
     {
@@ -505,6 +230,21 @@ HTML;
 <div class="rating-cell">
     <div class="rating-label">{$label}</div>
     <div class="rating-value">{$safeValue}</div>
+</div>
+HTML;
+    }
+
+    /**
+     * Render a stat pill
+     */
+    private static function renderPill(string $label, $value, bool $isPreference = false): string
+    {
+        $safeValue = HtmlSanitizer::safeHtmlOutput((string)$value);
+        $class = $isPreference ? 'stat-pill preference' : 'stat-pill intangible';
+        return <<<HTML
+<div class="{$class}">
+    <span class="pill-label">{$label}</span> 
+    <span class="pill-value">{$safeValue}</span>
 </div>
 HTML;
     }

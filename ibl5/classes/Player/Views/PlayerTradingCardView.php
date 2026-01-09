@@ -308,6 +308,7 @@ HTML;
         $draftRound = HtmlSanitizer::safeHtmlOutput((string)$player->draftRound);
         $draftPick = HtmlSanitizer::safeHtmlOutput((string)$player->draftPickNumber);
         $draftTeam = HtmlSanitizer::safeHtmlOutput($player->draftTeamOriginalName ?? '');
+        $expYears = HtmlSanitizer::safeHtmlOutput((string)$player->yearsOfExperience);
         $birdYears = HtmlSanitizer::safeHtmlOutput((string)$player->birdYears);
         $contractSafe = HtmlSanitizer::safeHtmlOutput($contractDisplay);
         $teamID = (int)$player->teamID;
@@ -423,7 +424,7 @@ HTML;
 
     <!-- Free Agency Preferences -->
     <div>
-        <h3 class="section-title">FA Preferences</h3>
+        <h3 class="section-title">Free Agency Preferences</h3>
         <div class="pills-row">
             <div class="stat-pill preference">
                 <span class="pill-label">LOY</span> 
@@ -452,8 +453,8 @@ HTML;
     <div class="contract-bar">
         <div class="contract-flex">
             <div>
-                <span class="contract-label">Bird Years:</span>
-                <span class="contract-value"><?= $birdYears ?></span>
+                <span class="contract-label">Exp:Bird Years:</span>
+                <span class="contract-value"><?= $expYears ?>:<?= $birdYears ?></span>
             </div>
             <div>
                 <span class="contract-label">Contract:</span>

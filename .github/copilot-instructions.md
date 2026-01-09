@@ -4,6 +4,27 @@
 
 ---
 
+## 🔍 ALWAYS VERIFY (Mandatory Code Review)
+
+**CRITICAL: Regardless of the task or prompt focus, ALWAYS check for and fix these violations:**
+
+1. **XSS Protection (Rule #6)**
+   - Scan ALL code for user-generated or database-sourced content in HTML output
+   - Verify `Utilities\HtmlSanitizer::safeHtmlOutput()` wraps ALL dynamic content
+   - Check: form inputs, database query results, play-by-play text, player names, error messages
+   - **Never skip this check** - even if prompt is focused on architecture, testing, or other concerns
+
+2. **HTML/CSS Modernization (Rule #8)**
+   - Scan for deprecated tags: `<b>`, `<i>`, `<u>`, `<font>`, `<center>`, `border=` attribute
+   - Convert to semantic HTML (`<strong>`, `<em>`) + inline CSS styles
+   - Replace `<table border=1>` with `<table style="border: 1px solid #000; border-collapse: collapse;">`
+   - Add `style="border: 1px solid #000; padding: 4px;"` to table cells when borders present
+   - **Fix these immediately upon detection** - don't defer to future work
+
+**When to Apply:** During ANY code work - refactoring, feature development, bug fixes, testing, documentation updates. These are not optional enhancements; they are mandatory security and standards compliance.
+
+---
+
 ## ⚠️ CRITICAL RULES (Always Apply)
 
 ### 1. Class Autoloading - NO Manual Requires

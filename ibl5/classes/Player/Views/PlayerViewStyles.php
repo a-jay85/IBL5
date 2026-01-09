@@ -330,14 +330,10 @@ class PlayerViewStyles
    Player Highs Table
    ============================================ */
 
-.player-highs-container {
-    vertical-align: top;
-}
-
 .player-highs-table {
+    margin: 0 auto;
     border: 1px solid #000;
     border-collapse: collapse;
-    width: 100%;
 }
 
 .player-highs-table td,

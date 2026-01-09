@@ -14,6 +14,7 @@ use Player\Views\PlayerMenuView;
 use Player\Views\PlayerViewFactory;
 use Player\Views\PlayerRatingsView;
 use Player\Views\PlayerTradingCardView;
+use Player\Views\PlayerTradingCardBackView;
 use RookieOption\RookieOptionValidator;
 use RookieOption\RookieOptionFormView;
 use Services\CommonMysqliRepository;
@@ -87,8 +88,21 @@ function showpage($playerID, $pageView)
     $dunkcontests = $playerRepository->getDunkContestCount($player->name);
     $rooksoph = $playerRepository->getRookieSophChallengeCount($player->name);
 
-    // Render player highs table with All-Star Activity data
-    echo PlayerStatsView::renderPlayerHighsTable($playerStats, $asg, $threepointcontests, $dunkcontests, $rooksoph);
+    // Include styles
+    echo PlayerTradingCardBackView::getStyles();
+
+    // Render the back of the card
+    echo '<tr><td colspan="2">';
+    echo PlayerTradingCardBackView::render(
+        $player,
+        $playerStats,
+        $playerID,
+        $asg,
+        $threepointcontests,
+        $dunkcontests,
+        $rooksoph
+    );
+    echo '</td></tr>';
 
     // Create view factory with all required dependencies
     $statsRepository = new PlayerStatsRepository($mysqli_db);

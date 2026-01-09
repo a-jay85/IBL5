@@ -14,6 +14,7 @@ use Player\Views\PlayerTradingCardBackView;
 use Player\Views\PlayerTradingCardFlipView;
 use Player\Views\PlayerStatsCardView;
 use Player\Views\PlayerStatsFlipCardView;
+use Player\Views\TeamColorHelper;
 use RookieOption\RookieOptionValidator;
 use RookieOption\RookieOptionFormView;
 use Services\CommonMysqliRepository;
@@ -51,17 +52,21 @@ function showpage($playerID, $pageView)
     Nuke\Header::header();
     OpenTable();
     
-    // Include trading card styles (both front and back)
-    echo PlayerTradingCardFrontView::getStyles();
-    echo PlayerTradingCardBackView::getStyles();
+    // Generate team color scheme once for the entire page
+    $teamColors = TeamColorHelper::getTeamColors($mysqli_db, $player->teamID);
+    $colorScheme = TeamColorHelper::generateColorScheme($teamColors['color1'], $teamColors['color2']);
+    
+    // Include trading card styles with team colors (both front and back)
+    echo PlayerTradingCardFrontView::getStyles($colorScheme);
+    echo PlayerTradingCardBackView::getStyles($colorScheme);
     echo PlayerTradingCardFlipView::getFlipStyles();
     
     // Include legacy player view styles for other components
     echo PlayerViewStyles::getStyles();
     
     // Include stats card styles AFTER legacy styles to ensure they override
-    echo PlayerStatsCardView::getStyles();
-    echo PlayerStatsFlipCardView::getFlipStyles();
+    echo PlayerStatsCardView::getStyles($colorScheme);
+    echo PlayerStatsFlipCardView::getFlipStyles($colorScheme);
     
     // Render player menu with current page selected
     echo PlayerMenuView::render($playerID, $pageView);
@@ -84,7 +89,8 @@ function showpage($playerID, $pageView)
         $asg,
         $threepointcontests,
         $dunkcontests,
-        $rooksoph
+        $rooksoph,
+        $mysqli_db  // Pass database connection for team colors
     );
     echo '</td></tr>';
 
@@ -130,7 +136,8 @@ function showpage($playerID, $pageView)
             $averagesView->renderAverages($playerID),
             $totalsView->renderTotals($playerID),
             'Regular Season',
-            $showAveragesFirst
+            $showAveragesFirst,
+            $colorScheme  // Pass the pre-generated color scheme
         );
         echo '</td></tr>';
     } elseif ($pageView === PlayerPageType::PLAYOFF_TOTALS || $pageView === PlayerPageType::PLAYOFF_AVERAGES) {
@@ -143,7 +150,8 @@ function showpage($playerID, $pageView)
             $averagesView->renderAverages($player->name),
             $totalsView->renderTotals($player->name),
             'Playoffs',
-            $showAveragesFirst
+            $showAveragesFirst,
+            $colorScheme  // Pass the pre-generated color scheme
         );
         echo '</td></tr>';
     } elseif ($pageView === PlayerPageType::HEAT_TOTALS || $pageView === PlayerPageType::HEAT_AVERAGES) {
@@ -156,7 +164,8 @@ function showpage($playerID, $pageView)
             $averagesView->renderAverages($player->name),
             $totalsView->renderTotals($player->name),
             'H.E.A.T.',
-            $showAveragesFirst
+            $showAveragesFirst,
+            $colorScheme  // Pass the pre-generated color scheme
         );
         echo '</td></tr>';
     } elseif ($pageView === PlayerPageType::OLYMPIC_TOTALS || $pageView === PlayerPageType::OLYMPIC_AVERAGES) {
@@ -169,14 +178,15 @@ function showpage($playerID, $pageView)
             $averagesView->renderAverages($player->name),
             $totalsView->renderTotals($player->name),
             'Olympics',
-            $showAveragesFirst
+            $showAveragesFirst,
+            $colorScheme  // Pass the pre-generated color scheme
         );
         echo '</td></tr>';
     } elseif ($pageView === PlayerPageType::RATINGS_AND_SALARY) {
         // Ratings and Salary - single view with stats card wrapper
         $view = $viewFactory->createRatingsAndSalaryView();
         echo '<tr><td colspan="2">';
-        echo PlayerStatsCardView::render($view->renderRatingsAndSalary($playerID));
+        echo PlayerStatsCardView::wrap($view->renderRatingsAndSalary($playerID));
         echo '</td></tr>';
     } elseif ($pageView === PlayerPageType::AWARDS_AND_NEWS) {
         $view = $viewFactory->createView($pageView);

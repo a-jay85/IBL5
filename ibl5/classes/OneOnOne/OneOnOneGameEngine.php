@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OneOnOne;
 
 use OneOnOne\Contracts\OneOnOneGameEngineInterface;
+use Utilities\HtmlSanitizer;
 
 /**
  * OneOnOneGameEngine - Simulates One-on-One basketball games
@@ -58,9 +59,9 @@ class OneOnOneGameEngine implements OneOnOneGameEngineInterface
     public function simulateGame(array $player1Data, array $player2Data, string $owner): OneOnOneGameResult
     {
         $result = new OneOnOneGameResult();
-        $result->owner = $owner;
-        $result->player1Name = (string) $player1Data['name'];
-        $result->player2Name = (string) $player2Data['name'];
+        $result->owner = HtmlSanitizer::safeHtmlOutput($owner);
+        $result->player1Name = HtmlSanitizer::safeHtmlOutput((string) $player1Data['name']);
+        $result->player2Name = HtmlSanitizer::safeHtmlOutput((string) $player2Data['name']);
 
         // Coin flip to determine starting possession
         $coinFlip = rand(1, 2);
@@ -134,8 +135,8 @@ class OneOnOneGameEngine implements OneOnOneGameEngineInterface
         bool $isPlayer1OnOffense,
         int $possession
     ): void {
-        $offenseName = (string) $offenseData['name'];
-        $defenseName = (string) $defenseData['name'];
+        $offenseName = HtmlSanitizer::safeHtmlOutput((string) $offenseData['name']);
+        $defenseName = HtmlSanitizer::safeHtmlOutput((string) $defenseData['name']);
         
         $possessionResult = $this->calculatePossessionResult($offenseData, $defenseData);
         
@@ -559,9 +560,9 @@ class OneOnOneGameEngine implements OneOnOneGameEngineInterface
         $p1Stats = $result->player1Stats;
         $p2Stats = $result->player2Stats;
         
-        // Sanitize player names to prevent XSS
-        $p1Name = \Utilities\HtmlSanitizer::safeHtmlOutput($result->player1Name);
-        $p2Name = \Utilities\HtmlSanitizer::safeHtmlOutput($result->player2Name);
+        // Player names are already sanitized in simulateGame()
+        $p1Name = $result->player1Name;
+        $p2Name = $result->player2Name;
         
         return "<table style=\"border: 1px solid #000; border-collapse: collapse;\"><tr><td colspan=11 style=\"border: 1px solid #000; padding: 4px;\"><span style=\"color: #ff0000;\"><strong style=\"font-weight: bold;\">FINAL SCORE: {$p1Name} {$result->player1Score}, {$p2Name} {$result->player2Score}</strong></span></td></tr>
 <tr><td style=\"border: 1px solid #000; padding: 4px;\">Name</td><td style=\"border: 1px solid #000; padding: 4px;\">FGM</td><td style=\"border: 1px solid #000; padding: 4px;\">FGA</td><td style=\"border: 1px solid #000; padding: 4px;\">3GM</td><td style=\"border: 1px solid #000; padding: 4px;\">3GA</td><td style=\"border: 1px solid #000; padding: 4px;\">ORB</td><td style=\"border: 1px solid #000; padding: 4px;\">REB</td><td style=\"border: 1px solid #000; padding: 4px;\">STL</td><td style=\"border: 1px solid #000; padding: 4px;\">BLK</td><td style=\"border: 1px solid #000; padding: 4px;\">TVR</td><td style=\"border: 1px solid #000; padding: 4px;\">FOUL</td></tr>

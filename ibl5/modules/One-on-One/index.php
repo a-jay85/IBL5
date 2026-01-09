@@ -47,7 +47,11 @@ function oneonone(): void
     $userinfo = $result->fetch_assoc();
     $stmt->close();
 
-    $ownerplaying = stripslashes(check_html($userinfo['username'] ?? '', "nohtml"));
+    if (is_array($userinfo) && isset($userinfo['username'])) {
+        $ownerplaying = stripslashes(check_html($userinfo['username'], "nohtml"));
+    } else {
+        $ownerplaying = '';
+    }
 
     OpenTable();
     UI::playerMenu();

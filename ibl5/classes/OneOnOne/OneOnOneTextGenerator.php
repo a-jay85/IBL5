@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace OneOnOne;
 
+use Utilities\HtmlSanitizer;
+
 /**
  * OneOnOneTextGenerator - Generates play-by-play text for One-on-One games
  * 
@@ -194,6 +196,9 @@ class OneOnOneTextGenerator
      */
     public function getCoinFlipText(bool $isHeads, string $player1Name, string $player2Name): string
     {
+        $player1Name = HtmlSanitizer::safeHtmlOutput($player1Name);
+        $player2Name = HtmlSanitizer::safeHtmlOutput($player2Name);
+        
         if ($isHeads) {
             return "The opening coin flip is heads, so $player1Name gets the ball to start.<br>";
         }
@@ -211,7 +216,10 @@ class OneOnOneTextGenerator
      */
     public function getScoreText(string $player1Name, int $player1Score, string $player2Name, int $player2Score): string
     {
-        return "<B>SCORE: $player1Name $player1Score, $player2Name $player2Score</B><p>";
+        $player1Name = HtmlSanitizer::safeHtmlOutput($player1Name);
+        $player2Name = HtmlSanitizer::safeHtmlOutput($player2Name);
+        
+        return "<strong style=\"font-weight: bold;\">SCORE: $player1Name $player1Score, $player2Name $player2Score</strong><p>";
     }
 
     /**
@@ -219,6 +227,9 @@ class OneOnOneTextGenerator
      */
     public function getFoulText(string $defender, string $attacker): string
     {
+        $defender = HtmlSanitizer::safeHtmlOutput($defender);
+        $attacker = HtmlSanitizer::safeHtmlOutput($attacker);
+        
         return "$defender fouls $attacker.<br>";
     }
 
@@ -227,6 +238,9 @@ class OneOnOneTextGenerator
      */
     public function getStealPlayText(string $defender, string $attacker): string
     {
+        $defender = HtmlSanitizer::safeHtmlOutput($defender);
+        $attacker = HtmlSanitizer::safeHtmlOutput($attacker);
+        
         return "$defender " . $this->getStealText() . " $attacker.<br>";
     }
 
@@ -235,6 +249,8 @@ class OneOnOneTextGenerator
      */
     public function getReboundText(string $playerName, bool $isOffensive): string
     {
+        $playerName = HtmlSanitizer::safeHtmlOutput($playerName);
+        
         if ($isOffensive) {
             return "$playerName gets the (offensive) rebound.<br>";
         }

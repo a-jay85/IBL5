@@ -135,4 +135,34 @@ final class StatsFormatterTest extends TestCase
         // Test rounding
         $this->assertEquals("10.6", StatsFormatter::formatWithDecimals(10.567, 1));
     }
+
+    public function testCalculatePythagoreanWinPercentage(): void
+    {
+        // Test normal cases
+        // Equal points scored and allowed should give ~0.500
+        $this->assertEquals("0.500", StatsFormatter::calculatePythagoreanWinPercentage(1000, 1000));
+        
+        // More points scored should give > 0.500
+        $result = StatsFormatter::calculatePythagoreanWinPercentage(2000, 1500);
+        $this->assertStringMatchesFormat("%f", $result);
+        $pct = floatval($result);
+        $this->assertGreaterThan(0.5, $pct);
+        $this->assertLessThan(1.0, $pct);
+        
+        // Fewer points scored should give < 0.500
+        $result = StatsFormatter::calculatePythagoreanWinPercentage(1500, 2000);
+        $this->assertStringMatchesFormat("%f", $result);
+        $pct = floatval($result);
+        $this->assertLessThan(0.5, $pct);
+        $this->assertGreaterThan(0.0, $pct);
+        
+        // Test edge cases
+        $this->assertEquals("0.000", StatsFormatter::calculatePythagoreanWinPercentage(0, 0));
+        $this->assertEquals("1.000", StatsFormatter::calculatePythagoreanWinPercentage(1000, 0));
+        $this->assertEquals("0.000", StatsFormatter::calculatePythagoreanWinPercentage(0, 1000));
+        
+        // Test that result is always formatted with 3 decimals
+        $result = StatsFormatter::calculatePythagoreanWinPercentage(1800, 1600);
+        $this->assertMatchesRegularExpression('/^\d\.\d{3}$/', $result);
+    }
 }

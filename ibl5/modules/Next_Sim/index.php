@@ -1,96 +1,66 @@
 <?php
 
-use Player\Player;
+declare(strict_types=1);
 
-global $db, $cookie, $mysqli_db;
-$sharedFunctions = new Shared($mysqli_db);
-$commonRepository = new Services\CommonMysqliRepository($mysqli_db);
-$season = new Season($mysqli_db);
+/**
+ * Next_Sim Module - Display upcoming simulation games
+ *
+ * Shows the user's upcoming games with matchup information.
+ *
+ * Refactored to use the interface-driven architecture pattern.
+ *
+ * @see NextSim\NextSimService For business logic
+ * @see NextSim\NextSimView For HTML rendering
+ */
 
 if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
+use NextSim\NextSimService;
+use NextSim\NextSimView;
+
+global $db, $cookie, $mysqli_db;
+
+$commonRepository = new Services\CommonMysqliRepository($mysqli_db);
+$season = new Season($mysqli_db);
+
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 $pagetitle = "- $module_name";
 
- $username = strval($cookie[1] ?? '');
- $userTeam = Team::initialize($mysqli_db, $commonRepository->getTeamnameFromUsername($username));
-$userStartingPG = Player::withPlayerID($db, $userTeam->getCurrentlySetStarterPlayerIDForPosition('PG') ?? 4040404);
-$userStartingSG = Player::withPlayerID($db, $userTeam->getCurrentlySetStarterPlayerIDForPosition('SG') ?? 4040404);
-$userStartingSF = Player::withPlayerID($db, $userTeam->getCurrentlySetStarterPlayerIDForPosition('SF') ?? 4040404);
-$userStartingPF = Player::withPlayerID($db, $userTeam->getCurrentlySetStarterPlayerIDForPosition('PF') ?? 4040404);
-$userStartingC = Player::withPlayerID($db, $userTeam->getCurrentlySetStarterPlayerIDForPosition('C') ?? 4040404);
+$username = strval($cookie[1] ?? '');
+$userTeamName = $commonRepository->getTeamnameFromUsername($username);
+$userTeam = Team::initialize($mysqli_db, $userTeamName);
+$league = new League($mysqli_db);
 
-$resultUserTeamProjectedGamesNextSim = Schedule\TeamSchedule::getProjectedGamesNextSimResult($mysqli_db, $userTeam->teamID, $season->lastSimEndDate);
-$lastSimEndDateObject = new DateTime($season->lastSimEndDate);
+// Initialize services
+$service = new NextSimService($mysqli_db);
+$view = new NextSimView($mysqli_db, $season, $module_name);
 
-$i = 0;
-foreach ($resultUserTeamProjectedGamesNextSim as $gameRow) {
-    $rows[$i]['game'] = new Game($gameRow);
-    $rows[$i]['date'] = new DateTime($rows[$i]['game']->date);
-    $rows[$i]['day'] = $rows[$i]['date']->diff($lastSimEndDateObject)->format("%a");
-    $rows[$i]['opposingTeam'] = Team::initialize($mysqli_db, $rows[$i]['game']->getOpposingTeamID($userTeam->teamID));
-    $rows[$i]['opposingStartingPG'] = Player::withPlayerID($db, $rows[$i]['opposingTeam']->getLastSimStarterPlayerIDForPosition('PG') ?? 4040404);
-    $rows[$i]['userStartingPG'] = $userStartingPG ?? 4040404;
-    $rows[$i]['opposingStartingSG'] = Player::withPlayerID($db, $rows[$i]['opposingTeam']->getLastSimStarterPlayerIDForPosition('SG') ?? 4040404);
-    $rows[$i]['userStartingSG'] = $userStartingSG ?? 4040404;
-    $rows[$i]['opposingStartingSF'] = Player::withPlayerID($db, $rows[$i]['opposingTeam']->getLastSimStarterPlayerIDForPosition('SF') ?? 4040404);
-    $rows[$i]['userStartingSF'] = $userStartingSF ?? 4040404;
-    $rows[$i]['opposingStartingPF'] = Player::withPlayerID($db, $rows[$i]['opposingTeam']->getLastSimStarterPlayerIDForPosition('PF') ?? 4040404);
-    $rows[$i]['userStartingPF'] = $userStartingPF ?? 4040404;
-    $rows[$i]['opposingStartingC'] = Player::withPlayerID($db, $rows[$i]['opposingTeam']->getLastSimStarterPlayerIDForPosition('C') ?? 4040404);
-    $rows[$i]['userStartingC'] = $userStartingC ?? 4040404;
+// Get next sim games
+$games = $service->getNextSimGames($userTeam->teamID, $season);
 
-    $i++;
+// Add user starters to each game for comparison
+$userStarters = $service->getUserStartingLineup($userTeam);
+foreach ($games as $index => $game) {
+    $games[$index]['userStartingPG'] = $userStarters['PG'];
+    $games[$index]['userStartingSG'] = $userStarters['SG'];
+    $games[$index]['userStartingSF'] = $userStarters['SF'];
+    $games[$index]['userStartingPF'] = $userStarters['PF'];
+    $games[$index]['userStartingC'] = $userStarters['C'];
+    $games[$index]['opposingStartingPG'] = $game['opposingStarters']['PG'];
+    $games[$index]['opposingStartingSG'] = $game['opposingStarters']['SG'];
+    $games[$index]['opposingStartingSF'] = $game['opposingStarters']['SF'];
+    $games[$index]['opposingStartingPF'] = $game['opposingStarters']['PF'];
+    $games[$index]['opposingStartingC'] = $game['opposingStarters']['C'];
 }
 
-?>
+// Render page
+Nuke\Header::header();
+OpenTable();
 
-<?php
-    Nuke\Header::header();
-    OpenTable();
-?>
+echo $view->render($games, $league->getSimLengthInDays());
 
-<center>
-    <h1>Next Sim</h1>
-<?php if (mysqli_num_rows($resultUserTeamProjectedGamesNextSim) == 0) : ?>
-    No games projected next sim!
-<?php else : ?>
-    <?php $league = new League($mysqli_db); ?>
-    <table width=100% align=center>
-        <?php for ($i = 0; $i <= $league->getSimLengthInDays() - 1; $i++) : ?>
-            <?php if (isset($rows[$i]['game']) && $rows[$i]['game'] != NULL) : ?>
-                <tr>
-                    <td>
-                        <table align=center>
-                            <tr>
-                                <td style="text-align: right;" width=150>
-                                    <h2 title="<?= $rows[$i]['game']->date ?>"><?= "Day " . $rows[$i]['day'] . " " . $rows[$i]['game']->getUserTeamLocationPrefix($userTeam->teamID) ?></h2>
-                                </td>
-                                <td style="text-align: center; padding-left: 4px; padding-right: 4px">
-                                    <a href="modules.php?name=Team&op=team&teamID=<?= $rows[$i]['opposingTeam']->teamID ?>">
-                                        <img src="./images/logo/<?= $rows[$i]['opposingTeam']->teamID ?>.jpg">
-                                    </a>
-                                </td>
-                                <td style="text-align: left;" width=150>
-                                    <h2><?= $rows[$i]['opposingTeam']->seasonRecord ?></h2>
-                                </td>
-                            </tr>
-                        </table>
-                    </td>
-                </tr>
-                <tr>
-                    <td>
-                        <?= UI::ratings($db, $rows[$i], $rows[$i]['opposingTeam'], "", $season, $module_name) ?>
-                    </td>
-                </tr>
-            <?php endif; ?>
-            <tr style="height: 15px"></tr>
-        <?php endfor; ?>
-    </table>
-<?php endif ?>
-<?php
-    CloseTable();
-    Nuke\Footer::footer();
+CloseTable();
+Nuke\Footer::footer();

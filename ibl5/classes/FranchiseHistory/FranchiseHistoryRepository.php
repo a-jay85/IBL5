@@ -36,12 +36,43 @@ class FranchiseHistoryRepository extends \BaseMysqliRepository implements Franch
             GROUP BY currentname
             ORDER BY teamid ASC";
 
-        return $this->fetchAll(
+        $teams = $this->fetchAll(
             $query,
             "iii",
             \League::FREE_AGENTS_TEAMID,
             $fiveSeasonsAgoEndingYear,
             $currentEndingYear
         );
+
+        // Dynamically calculate title counts from ibl_team_awards table
+        foreach ($teams as &$team) {
+            $team['heat_titles'] = $this->getNumberOfTitles($team['team_name'], 'HEAT');
+            $team['div_titles'] = $this->getNumberOfTitles($team['team_name'], 'Division');
+            $team['conf_titles'] = $this->getNumberOfTitles($team['team_name'], 'Conference');
+            $team['ibl_titles'] = $this->getNumberOfTitles($team['team_name'], 'IBL Champions');
+        }
+
+        return $teams;
+    }
+
+    /**
+     * Get the number of titles for a team by title type
+     *
+     * Queries the ibl_team_awards table to count awards matching the team and title pattern.
+     *
+     * @param string $teamName Team name to look up
+     * @param string $titleName Award name to search for (uses LIKE pattern)
+     * @return int Number of titles matching the criteria
+     */
+    private function getNumberOfTitles(string $teamName, string $titleName): int
+    {
+        $result = $this->fetchOne(
+            "SELECT COUNT(name) as count FROM ibl_team_awards WHERE name = ? AND Award LIKE ?",
+            "ss",
+            $teamName,
+            "%{$titleName}%"
+        );
+
+        return $result ? (int) ($result['count'] ?? 0) : 0;
     }
 }

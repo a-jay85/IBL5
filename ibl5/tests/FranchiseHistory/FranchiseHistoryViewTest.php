@@ -94,4 +94,67 @@ class FranchiseHistoryViewTest extends TestCase
         // Should NOT contain the raw dangerous characters
         $this->assertStringNotContainsString('<script>', $result);
     }
+
+    public function testRenderDisplaysTitleCounts(): void
+    {
+        $franchises = [
+            [
+                'teamid' => 1,
+                'team_city' => 'Los Angeles',
+                'team_name' => 'Lakers',
+                'color1' => '552583',
+                'color2' => 'FDB927',
+                'totwins' => 100,
+                'totloss' => 50,
+                'winpct' => 0.667,
+                'five_season_wins' => 50,
+                'five_season_losses' => 25,
+                'five_season_winpct' => 0.667,
+                'playoffs' => 10,
+                'heat_titles' => 2,
+                'div_titles' => 3,
+                'conf_titles' => 4,
+                'ibl_titles' => 1,
+            ],
+        ];
+
+        $result = $this->view->render($franchises);
+
+        // Verify all title types are rendered
+        $this->assertStringContainsString('>2<', $result, 'HEAT titles should be displayed');
+        $this->assertStringContainsString('>3<', $result, 'Division titles should be displayed');
+        $this->assertStringContainsString('>4<', $result, 'Conference titles should be displayed');
+        $this->assertStringContainsString('>1<', $result, 'IBL titles should be displayed');
+    }
+
+    public function testRenderHandlesZeroTitles(): void
+    {
+        $franchises = [
+            [
+                'teamid' => 2,
+                'team_city' => 'Charlotte',
+                'team_name' => 'Bobcats',
+                'color1' => '000000',
+                'color2' => 'FFFFFF',
+                'totwins' => 20,
+                'totloss' => 60,
+                'winpct' => 0.250,
+                'five_season_wins' => 10,
+                'five_season_losses' => 30,
+                'five_season_winpct' => 0.250,
+                'playoffs' => 0,
+                'heat_titles' => 0,
+                'div_titles' => 0,
+                'conf_titles' => 0,
+                'ibl_titles' => 0,
+            ],
+        ];
+
+        $result = $this->view->render($franchises);
+
+        // Verify zeros are displayed (not empty cells)
+        // The HTML should contain '>0<' for each title type
+        $zeroCount = substr_count($result, '>0<');
+        $this->assertGreaterThanOrEqual(4, $zeroCount, 'All four title types should display zero');
+    }
 }

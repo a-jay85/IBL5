@@ -79,7 +79,7 @@ class StandingsViewTest extends TestCase
 
         $result = $this->view->renderRegion('Eastern');
 
-        $this->assertStringContainsString('<table class="sortable">', $result);
+        $this->assertStringContainsString('<table class="sortable standings-table">', $result);
         $this->assertStringContainsString('Team', $result);
         $this->assertStringContainsString('W-L', $result);
         $this->assertStringContainsString('Pct', $result);

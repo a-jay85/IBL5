@@ -161,8 +161,11 @@ class SharedTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Database error');
 
-        ob_start();
-        $this->shared->resetSimContractExtensionAttempts();
-        ob_get_clean();
+        try {
+            ob_start();
+            $this->shared->resetSimContractExtensionAttempts();
+        } finally {
+            ob_end_clean();
+        }
     }
 }

@@ -1,12 +1,17 @@
 <?php
 namespace Updater;
 
+use Statistics\TeamStatsCalculator;
+use Utilities\SeasonPhaseHelper;
+
 class PowerRankingsUpdater extends \BaseMysqliRepository {
     private $season;
+    private TeamStatsCalculator $statsCalculator;
 
-    public function __construct(object $db, $season) {
+    public function __construct(object $db, $season, ?TeamStatsCalculator $statsCalculator = null) {
         parent::__construct($db);
         $this->season = $season;
+        $this->statsCalculator = $statsCalculator ?? new TeamStatsCalculator($db);
     }
 
     public function update() {
@@ -44,12 +49,8 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
         echo '<p>The ibl_power table has been updated.<p>';
     }
 
-    private function determineMonth() {
-        if ($this->season->phase == "HEAT") {
-            return \Season::IBL_HEAT_MONTH;
-        } else {
-            return \Season::IBL_REGULAR_SEASON_STARTING_MONTH;
-        }
+    protected function determineMonth(): int {
+        return SeasonPhaseHelper::getMonthForPhase($this->season->phase);
     }
 
     private function buildGamesQuery($tid, $month) {
@@ -71,78 +72,8 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
         );
     }
 
-    private function calculateTeamStats($games, $tid) {
-        $stats = array(
-            'wins' => 0, 'losses' => 0,
-            'homeWins' => 0, 'homeLosses' => 0,
-            'awayWins' => 0, 'awayLosses' => 0,
-            'winPoints' => 0, 'lossPoints' => 0,
-            'winsInLast10Games' => 0, 'lossesInLast10Games' => 0,
-            'streak' => 0, 'streakType' => ''
-        );
-
-        for ($j = 0; $j < count($games); $j++) {
-            $game = array(
-                'awayTeam' => $games[$j]['Visitor'],
-                'awayScore' => $games[$j]['VScore'],
-                'homeTeam' => $games[$j]['Home'],
-                'homeScore' => $games[$j]['HScore']
-            );
-
-            if ($game['awayScore'] !== $game['homeScore']) {
-                $this->updateGameStats($stats, $game, $j, count($games), $tid);
-            }
-        }
-
-        return $stats;
-    }
-
-    private function updateGameStats(&$stats, $game, $currentGame, $totalGames, $tid) {
-        if ($tid == $game['awayTeam']) {
-            $opponentTeam = $game['homeTeam'];
-            $isWin = $game['awayScore'] > $game['homeScore'];
-            $isHome = false;
-        } else {
-            $opponentTeam = $game['awayTeam'];
-            $isWin = $game['homeScore'] > $game['awayScore'];
-            $isHome = true;
-        }
-
-        $opponentRecord = $this->fetchOne(
-            "SELECT win, loss FROM ibl_power WHERE TeamID = ?",
-            "i",
-            $opponentTeam
-        );
-        $opponentWins = $opponentRecord['win'] ?? 0;
-        $opponentLosses = $opponentRecord['loss'] ?? 0;
-
-        if ($isWin) {
-            $stats['wins']++;
-            $stats['winPoints'] += $opponentWins;
-            if ($isHome) {
-                $stats['homeWins']++;
-            } else {
-                $stats['awayWins']++;
-            }
-            if ($currentGame >= $totalGames - 10) {
-                $stats['winsInLast10Games']++;
-            }
-            $stats['streak'] = ($stats['streakType'] == "W") ? ++$stats['streak'] : 1;
-            $stats['streakType'] = "W";
-        } else {
-            $stats['losses']++;
-            $stats['lossPoints'] += $opponentLosses;
-            if ($isHome) {
-                $stats['homeLosses']++;
-            } else {
-                $stats['awayLosses']++;
-            }
-            if ($currentGame >= $totalGames - 10) {
-                $stats['lossesInLast10Games']++;
-            }
-            $stats['streak'] = ($stats['streakType'] == "L") ? ++$stats['streak'] : 1;
-            $stats['streakType'] = "L";
-        }
+    protected function calculateTeamStats(array $games, int $tid): array {
+        return $this->statsCalculator->calculate($games, $tid);
     }
 
     private function updateTeamStats($tid, $teamName, $stats) {

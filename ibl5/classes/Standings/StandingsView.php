@@ -144,6 +144,7 @@ class StandingsView implements StandingsViewInterface
                 <td class="standings-header-cell">Team</td>
                 <td class="standings-header-cell">W-L</td>
                 <td class="standings-header-cell">Pct</td>
+                <td class="standings-header-cell">Pyth<br>W-L%</td>
                 <td class="standings-header-cell">GB</td>
                 <td class="standings-header-cell">Magic#</td>
                 <td class="standings-header-cell">Left</td>
@@ -194,12 +195,23 @@ class StandingsView implements StandingsViewInterface
         $streakType = \Utilities\HtmlSanitizer::safeHtmlOutput($streakData['streak_type'] ?? '');
         $streak = $streakData['streak'] ?? 0;
 
+        // Get Pythagorean win percentage
+        $pythagoreanStats = $this->repository->getTeamPythagoreanStats($teamId);
+        $pythagoreanPct = '0.000';
+        if ($pythagoreanStats !== null) {
+            $pythagoreanPct = \BasketballStats\StatsFormatter::calculatePythagoreanWinPercentage(
+                $pythagoreanStats['pointsScored'],
+                $pythagoreanStats['pointsAllowed']
+            );
+        }
+
         ob_start();
         ?>
         <tr>
             <td class="standings-team-cell"><a href="modules.php?name=Team&op=team&teamID=<?= $teamId; ?>"><?= $teamName; ?></a></td>
             <td class="standings-cell"><?= $team['leagueRecord']; ?></td>
             <td class="standings-cell"><?= $team['pct']; ?></td>
+            <td class="standings-cell"><?= $pythagoreanPct; ?></td>
             <td class="standings-cell"><?= $team['gamesBack']; ?></td>
             <td class="standings-cell"><?= $team['magicNumber']; ?></td>
             <td class="standings-cell"><?= $team['gamesUnplayed']; ?></td>

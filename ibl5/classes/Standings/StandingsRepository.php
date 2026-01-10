@@ -96,4 +96,46 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
             $teamId
         );
     }
+
+    /**
+     * @see StandingsRepositoryInterface::getTeamPythagoreanStats()
+     */
+    public function getTeamPythagoreanStats(int $teamId): ?array
+    {
+        // Get points scored from offense stats
+        $offenseStats = $this->fetchOne(
+            "SELECT fgm, ftm, tgm FROM ibl_team_offense_stats WHERE teamID = ?",
+            "i",
+            $teamId
+        );
+
+        // Get points allowed from defense stats
+        $defenseStats = $this->fetchOne(
+            "SELECT fgm, ftm, tgm FROM ibl_team_defense_stats WHERE teamID = ?",
+            "i",
+            $teamId
+        );
+
+        if ($offenseStats === null || $defenseStats === null) {
+            return null;
+        }
+
+        // Calculate points using BasketballStats\StatsFormatter
+        $pointsScored = \BasketballStats\StatsFormatter::calculatePoints(
+            $offenseStats['fgm'],
+            $offenseStats['ftm'],
+            $offenseStats['tgm']
+        );
+
+        $pointsAllowed = \BasketballStats\StatsFormatter::calculatePoints(
+            $defenseStats['fgm'],
+            $defenseStats['ftm'],
+            $defenseStats['tgm']
+        );
+
+        return [
+            'pointsScored' => $pointsScored,
+            'pointsAllowed' => $pointsAllowed,
+        ];
+    }
 }

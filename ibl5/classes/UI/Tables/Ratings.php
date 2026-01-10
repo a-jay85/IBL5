@@ -64,7 +64,7 @@ class Ratings
                 'player' => $player,
                 'bgcolor' => $bgcolor,
                 'injuryInfo' => $injuryInfo,
-                'addSeparator' => (($i % 2) == 0 && $moduleName == "Next_Sim"),
+                'addSeparator' => (($i % 2) == 0 && $moduleName == "Next_Sim" && $i > 0),
             ];
 
             $i++;

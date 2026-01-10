@@ -81,6 +81,47 @@ class StandingsRepositoryTest extends TestCase
         $this->assertEquals($expectedData, $result);
     }
 
+    public function testGetTeamPythagoreanStatsReturnsNullWhenOffenseStatsNotFound(): void
+    {
+        $mockDb = $this->createMockDatabaseWithPreparedStatement(null);
+        $repository = new StandingsRepository($mockDb);
+
+        $result = $repository->getTeamPythagoreanStats(999);
+
+        $this->assertNull($result);
+    }
+
+    public function testGetTeamPythagoreanStatsReturnsArrayWhenFound(): void
+    {
+        $offenseData = ['fgm' => 1000, 'ftm' => 500, 'tgm' => 300];
+        $defenseData = ['fgm' => 900, 'ftm' => 450, 'tgm' => 250];
+
+        // Expected points: offense = 2*1000 + 500 + 300 = 2800
+        // Expected points allowed: defense = 2*900 + 450 + 250 = 2500
+
+        $mockResult = $this->createMock(\mysqli_result::class);
+        $mockResult->method('fetch_assoc')
+            ->willReturnOnConsecutiveCalls($offenseData, $defenseData);
+
+        $mockStmt = $this->createMock(\mysqli_stmt::class);
+        $mockStmt->method('bind_param')->willReturn(true);
+        $mockStmt->method('execute')->willReturn(true);
+        $mockStmt->method('get_result')->willReturn($mockResult);
+        $mockStmt->method('close')->willReturn(true);
+
+        $mockDb = $this->createMock(\mysqli::class);
+        $mockDb->method('prepare')->willReturn($mockStmt);
+
+        $repository = new StandingsRepository($mockDb);
+        $result = $repository->getTeamPythagoreanStats(1);
+
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('pointsScored', $result);
+        $this->assertArrayHasKey('pointsAllowed', $result);
+        $this->assertEquals(2800, $result['pointsScored']);
+        $this->assertEquals(2500, $result['pointsAllowed']);
+    }
+
     /**
      * Create a basic mock database object
      */

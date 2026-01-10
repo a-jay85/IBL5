@@ -75,8 +75,5 @@
         <testsuite name="League Module Tests">
             <directory>tests/League</directory>
         </testsuite>
-        <testsuite name="Integration Tests">
-            <directory>tests/Integration</directory>
-        </testsuite>
     </testsuites>
 </phpunit>

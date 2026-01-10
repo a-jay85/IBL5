@@ -66,6 +66,15 @@ With IBL module refactoring 96% complete, focus shifts to:
 
 **CRITICAL: Every code change must pass these security and standards checks BEFORE completion:**
 
+### Pull Request Implementation (Non-Negotiable)
+**When implementing pull request feedback:**
+- Read through ALL comments on the PR to understand the complete feedback scope
+- For each comment, search the entire PR's changed files for similar patterns
+- Fix all instances of the identified issue, not just the lines with comments
+- Example: If a review comment flags an XSS vulnerability on line 45, search the same file and related files for other similar unprotected outputs
+- Use grep or semantic search to ensure you catch all variations of the pattern
+- This prevents follow-up comments on the same implementation
+
 ### Security Audit (Non-Negotiable)
 1. **XSS Protection**
    - [ ] All database-sourced content wrapped in `Utilities\HtmlSanitizer::safeHtmlOutput()`

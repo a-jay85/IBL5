@@ -1,10 +1,25 @@
 <?php
 
-use Player\Player;
+declare(strict_types=1);
 
-if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
+/**
+ * Injuries Module - Display all injured players
+ *
+ * Shows a table of all currently injured players with their position,
+ * team, and days remaining for injury.
+ *
+ * Refactored to use the interface-driven architecture pattern.
+ *
+ * @see Injuries\InjuriesService For business logic
+ * @see Injuries\InjuriesView For HTML rendering
+ */
+
+if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
+
+use Injuries\InjuriesService;
+use Injuries\InjuriesView;
 
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
@@ -13,45 +28,22 @@ $pagetitle = "- Injured Players";
 
 $teamID = isset($teamID) ? (int) $teamID : 0;
 
-$league = new League($mysqli_db);
+global $mysqli_db;
 
+// Initialize services
+$service = new InjuriesService($mysqli_db);
+$view = new InjuriesView();
+
+// Get injured players data
+$injuredPlayers = $service->getInjuredPlayersWithTeams();
+
+// Render page
 Nuke\Header::header();
 OpenTable();
 
 UI::displaytopmenu($mysqli_db, $teamID);
 
-echo "<center><h2>INJURED PLAYERS</h2></center>
-    <table>
-        <tr>
-            <td valign=top>
-                <table class=\"sortable\">
-                    <tr>
-                        <th>Pos</th>
-                        <th>Player</th>
-                        <th>Team</th>
-                        <th>Days Injured</th>
-                    </tr>";
-
-$i = 0;
-foreach ($league->getInjuredPlayersResult() as $injuredPlayer) {
-    $player = Player::withPlrRow($mysqli_db, $injuredPlayer);
-    $team = Team::initialize($mysqli_db, $player->teamID);
-
-    (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "DDDDDD";
-
-    echo "<tr bgcolor=$bgcolor>
-        <td>$player->position</td>
-        <td><a href=\"./modules.php?name=Player&pa=showpage&pid=$player->playerID\">$player->name</a></td>
-        <td bgcolor=\"#$team->color1\">
-            <font color=\"#$team->color2\"><a href=\"./modules.php?name=Team&op=team&teamID=$player->teamID\">$team->city $team->name</a></font>
-        </td>
-        <td>$player->daysRemainingForInjury</td>
-    </tr>";
-
-    $i++;
-}
-
-echo "</table></table>";
+echo $view->render($injuredPlayers);
 
 CloseTable();
 Nuke\Footer::footer();

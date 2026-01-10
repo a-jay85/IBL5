@@ -120,9 +120,38 @@ class NextSimView implements NextSimViewInterface
 
         // Render matchup ratings
         $html .= '<tr><td>';
-        $html .= \UI::ratings($this->db, $gameData, $opposingTeam, '', $this->season, $this->moduleName);
+        $matchupPlayers = $this->prepareMatchupPlayers($gameData);
+        $html .= \UI::ratings($this->db, $matchupPlayers, $opposingTeam, '', $this->season, $this->moduleName);
         $html .= '</td></tr>';
 
         return $html;
+    }
+
+    /**
+     * Prepare player matchup data in alternating order
+     *
+     * Formats players as: Opponent PG, User PG, Opponent SG, User SG, etc.
+     *
+     * @param array $gameData Game data containing starting lineups
+     * @return array Alternating opponent and user starters
+     */
+    private function prepareMatchupPlayers(array $gameData): array
+    {
+        $positions = ['PG', 'SG', 'SF', 'PF', 'C'];
+        $matchupPlayers = [];
+
+        foreach ($positions as $position) {
+            $userKey = 'userStarting' . $position;
+            $oppKey = 'opposingStarting' . $position;
+
+            if (isset($gameData[$oppKey])) {
+                $matchupPlayers[] = $gameData[$oppKey];
+            }
+            if (isset($gameData[$userKey])) {
+                $matchupPlayers[] = $gameData[$userKey];
+            }
+        }
+
+        return $matchupPlayers;
     }
 }

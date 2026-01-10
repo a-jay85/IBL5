@@ -151,10 +151,10 @@ class PowerRankingsView implements PowerRankingsViewInterface
                     <img src="images/logo/' . $teamId . '.jpg" alt="Team Logo">
                 </a>
             </td>
-            <td class="power-data-cell">' . $wins . '-' . $losses . '</td>
+            <td class="power-data-cell"><strong style="font-weight: bold;">' . $wins . '-' . $losses . '</strong></td>
             <td class="power-data-cell">' . $homeWins . '-' . $homeLosses . '</td>
             <td class="power-data-cell">' . $awayWins . '-' . $awayLosses . '</td>
-            <td class="power-data-cell">' . $ranking . '</td>
+            <td class="power-data-cell"><strong style="font-weight: bold;">' . $ranking . '</strong></td>
         </tr>';
     }
 }

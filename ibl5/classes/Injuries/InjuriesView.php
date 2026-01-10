@@ -54,7 +54,7 @@ class InjuriesView implements InjuriesViewInterface
         background-color: #DDDDDD;
     }
     .team-cell a {
-        text-decoration: none;
+        text-decoration: underline;
     }
 </style>
 HTML;

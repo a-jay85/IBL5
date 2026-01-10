@@ -66,12 +66,30 @@ Internet-based fantasy basketball site powered by Jump Shot Basketball simulatio
 ### Historical Documents (.archive/)
 Previous completion summaries and detailed reports preserved for reference.
 
+## 🤖 Skills Architecture (Progressive Loading)
+
+Context-aware skills auto-load when relevant, reducing token usage by 50-85%.
+
+**Path-Conditional** (`.claude/rules/`):
+- Edit `classes/**/*.php` → loads [php-classes.md](.claude/rules/php-classes.md)
+- Edit `tests/**/*.php` → loads [phpunit-tests.md](.claude/rules/phpunit-tests.md)
+- Edit `*View.php` → loads [view-rendering.md](.claude/rules/view-rendering.md)
+
+**Task-Discovery** (`.github/skills/`):
+- Refactoring → [refactoring-workflow/](.github/skills/refactoring-workflow/)
+- Security audit → [security-audit/](.github/skills/security-audit/)
+- Testing → [phpunit-testing/](.github/skills/phpunit-testing/)
+- Stats formatting → [basketball-stats/](.github/skills/basketball-stats/)
+- Code review → [code-review/](.github/skills/code-review/)
+
+**Creating Skills:** See [SKILLS_GUIDE.md](.github/SKILLS_GUIDE.md) for the validation checklist.
+
 ## 🔍 Common Tasks
 
-**"How do I refactor a module using interfaces?"** → [Interface-Driven Architecture Pattern](.github/copilot-instructions.md#%EF%B8%8F-critical-interface-driven-architecture-pattern)  
+**"How do I refactor a module using interfaces?"** → [refactoring-workflow/](.github/skills/refactoring-workflow/)  
 **"How do I deploy to production?"** → [PRODUCTION_DEPLOYMENT_GUIDE.md](PRODUCTION_DEPLOYMENT_GUIDE.md)  
 **"How do I query the database?"** → [DATABASE_GUIDE.md](DATABASE_GUIDE.md)  
-**"What should I work on next?"** → [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md) or [STRATEGIC_PRIORITIES.md](ibl5/docs/STRATEGIC_PRIORITIES.md)  
+**"What should I work on next?"** → [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md)  
 **"How do I build an API endpoint?"** → [API_GUIDE.md](API_GUIDE.md)  
-**"How do I format statistics?"** → [STATISTICS_FORMATTING_GUIDE.md](ibl5/docs/STATISTICS_FORMATTING_GUIDE.md)  
+**"How do I format statistics?"** → [basketball-stats/](.github/skills/basketball-stats/)  
 **"What's been refactored?"** → [REFACTORING_HISTORY.md](ibl5/docs/REFACTORING_HISTORY.md)

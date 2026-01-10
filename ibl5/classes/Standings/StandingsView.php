@@ -144,6 +144,7 @@ class StandingsView implements StandingsViewInterface
                 <td class="standings-header-cell">Team</td>
                 <td class="standings-header-cell">W-L</td>
                 <td class="standings-header-cell">Pct</td>
+                <td class="standings-header-cell">Pyth<br>W-L%</td>
                 <td class="standings-header-cell">GB</td>
                 <td class="standings-header-cell">Magic#</td>
                 <td class="standings-header-cell">Left</td>
@@ -155,7 +156,6 @@ class StandingsView implements StandingsViewInterface
                 <td class="standings-header-cell">Away<br>Played</td>
                 <td class="standings-header-cell">Last 10</td>
                 <td class="standings-header-cell">Streak</td>
-                <td class="standings-header-cell">Pyth W-L%</td>
             </tr>
         <?php
         return ob_get_clean();
@@ -211,6 +211,7 @@ class StandingsView implements StandingsViewInterface
             <td class="standings-team-cell"><a href="modules.php?name=Team&op=team&teamID=<?= $teamId; ?>"><?= $teamName; ?></a></td>
             <td class="standings-cell"><?= $team['leagueRecord']; ?></td>
             <td class="standings-cell"><?= $team['pct']; ?></td>
+            <td class="standings-cell"><?= $pythagoreanPct; ?></td>
             <td class="standings-cell"><?= $team['gamesBack']; ?></td>
             <td class="standings-cell"><?= $team['magicNumber']; ?></td>
             <td class="standings-cell"><?= $team['gamesUnplayed']; ?></td>
@@ -222,7 +223,6 @@ class StandingsView implements StandingsViewInterface
             <td class="standings-cell"><?= $team['awayGames']; ?></td>
             <td class="standings-cell"><?= $lastWin; ?>-<?= $lastLoss; ?></td>
             <td class="standings-cell"><?= $streakType; ?> <?= $streak; ?></td>
-            <td class="standings-cell"><?= $pythagoreanPct; ?></td>
         </tr>
         <?php
         return ob_get_clean();

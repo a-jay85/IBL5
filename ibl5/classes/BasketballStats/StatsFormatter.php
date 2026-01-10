@@ -164,4 +164,40 @@ class StatsFormatter
         $value = $value ?? 0;
         return number_format($value, $decimals);
     }
+
+    /**
+     * Calculate Pythagorean win percentage using Daryl Morey's formula
+     * 
+     * Formula: Win% = Points^13.91 / (Points^13.91 + PointsAllowed^13.91)
+     * 
+     * @param int $pointsScored Team's total points scored
+     * @param int $pointsAllowed Team's total points allowed
+     * @return string Formatted win percentage (e.g., "0.625")
+     */
+    public static function calculatePythagoreanWinPercentage(int $pointsScored, int $pointsAllowed): string
+    {
+        // Handle edge cases
+        if ($pointsScored <= 0 && $pointsAllowed <= 0) {
+            return "0.000";
+        }
+        
+        if ($pointsAllowed <= 0) {
+            return "1.000";
+        }
+        
+        if ($pointsScored <= 0) {
+            return "0.000";
+        }
+
+        // Daryl Morey's exponent for basketball
+        $exponent = 13.91;
+
+        // Calculate using the Pythagorean formula
+        $pointsScoredExp = pow($pointsScored, $exponent);
+        $pointsAllowedExp = pow($pointsAllowed, $exponent);
+
+        $winPercentage = $pointsScoredExp / ($pointsScoredExp + $pointsAllowedExp);
+
+        return number_format($winPercentage, 3);
+    }
 }

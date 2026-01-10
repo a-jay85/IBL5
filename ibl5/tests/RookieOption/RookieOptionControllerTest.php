@@ -1,0 +1,134 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\RookieOption;
+
+use PHPUnit\Framework\TestCase;
+use RookieOption\RookieOptionController;
+use RookieOption\Contracts\RookieOptionControllerInterface;
+
+/**
+ * RookieOptionControllerTest - Tests for RookieOptionController
+ */
+class RookieOptionControllerTest extends TestCase
+{
+    private object $mockDb;
+
+    protected function setUp(): void
+    {
+        $this->mockDb = $this->createMockDatabase();
+    }
+
+    private function createMockDatabase(): object
+    {
+        return new class extends \mysqli {
+            public array $mockData = [];
+
+            public function __construct()
+            {
+                // Don't call parent constructor
+            }
+
+            #[\ReturnTypeWillChange]
+            public function prepare(string $query)
+            {
+                $mockData = $this->mockData;
+                return new class($mockData) {
+                    private array $mockData;
+                    public function __construct(array $mockData)
+                    {
+                        $this->mockData = $mockData;
+                    }
+                    public function bind_param(string $types, mixed &...$vars): bool
+                    {
+                        return true;
+                    }
+                    public function execute(): bool
+                    {
+                        return true;
+                    }
+                    public function get_result(): object
+                    {
+                        $data = $this->mockData;
+                        return new class($data) {
+                            private array $rows;
+                            private int $index = 0;
+                            public function __construct(array $rows)
+                            {
+                                $this->rows = $rows;
+                            }
+                            public function fetch_assoc(): ?array
+                            {
+                                return $this->rows[$this->index++] ?? null;
+                            }
+                            public function fetch_object(): ?object
+                            {
+                                $row = $this->rows[$this->index++] ?? null;
+                                return $row ? (object) $row : null;
+                            }
+                        };
+                    }
+                    public function close(): void
+                    {
+                    }
+                };
+            }
+
+            #[\ReturnTypeWillChange]
+            public function query(string $query, int $result_mode = MYSQLI_STORE_RESULT): \mysqli_result|bool
+            {
+                $data = $this->mockData;
+                $mockResult = new class($data) {
+                    private array $rows;
+                    private int $index = 0;
+                    public int $num_rows = 0;
+                    public function __construct(array $rows)
+                    {
+                        $this->rows = $rows;
+                        $this->num_rows = count($rows);
+                    }
+                    public function fetch_assoc(): ?array
+                    {
+                        return $this->rows[$this->index++] ?? null;
+                    }
+                    public function fetch_object(): ?object
+                    {
+                        $row = $this->rows[$this->index++] ?? null;
+                        return $row ? (object) $row : null;
+                    }
+                };
+                return $mockResult;
+            }
+        };
+    }
+
+    // ============================================
+    // INSTANTIATION TESTS
+    // ============================================
+
+    public function testCanBeInstantiated(): void
+    {
+        $controller = new RookieOptionController($this->mockDb);
+
+        $this->assertInstanceOf(RookieOptionController::class, $controller);
+    }
+
+    public function testImplementsInterface(): void
+    {
+        $controller = new RookieOptionController($this->mockDb);
+
+        $this->assertInstanceOf(RookieOptionControllerInterface::class, $controller);
+    }
+
+    // ============================================
+    // METHOD EXISTENCE TESTS
+    // ============================================
+
+    public function testHasProcessRookieOptionMethod(): void
+    {
+        $controller = new RookieOptionController($this->mockDb);
+
+        $this->assertTrue(method_exists($controller, 'processRookieOption'));
+    }
+}

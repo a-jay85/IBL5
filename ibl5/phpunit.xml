@@ -61,10 +61,7 @@
             <directory>tests/PlayerSearch</directory>
         </testsuite>
         <testsuite name="FreeAgency Module Tests">
-            <file>tests/FreeAgency/FreeAgencyDemandCalculatorTest.php</file>
-            <file>tests/FreeAgency/FreeAgencyNegotiationHelperTest.php</file>
-            <file>tests/FreeAgency/FreeAgencyOfferValidatorTest.php</file>
-            <file>tests/FreeAgency/OfferTypeTest.php</file>
+            <directory>tests/FreeAgency</directory>
         </testsuite>
         <testsuite name="ComparePlayers Module Tests">
             <directory>tests/ComparePlayers</directory>
@@ -74,6 +71,61 @@
         </testsuite>
         <testsuite name="League Module Tests">
             <directory>tests/League</directory>
+        </testsuite>
+        <testsuite name="Root Tests">
+            <file>tests/ContractRulesTest.php</file>
+            <file>tests/GameTest.php</file>
+            <file>tests/DraftPickTest.php</file>
+            <file>tests/LeagueTest.php</file>
+            <file>tests/DatabaseConnectionTest.php</file>
+            <file>tests/SeasonTest.php</file>
+            <file>tests/TeamTest.php</file>
+            <file>tests/BoxscoreTest.php</file>
+        </testsuite>
+        <testsuite name="SeriesRecords Module Tests">
+            <directory>tests/SeriesRecords</directory>
+        </testsuite>
+        <testsuite name="OneOnOne Module Tests">
+            <directory>tests/OneOnOne</directory>
+        </testsuite>
+        <testsuite name="DraftPickLocator Module Tests">
+            <directory>tests/DraftPickLocator</directory>
+        </testsuite>
+        <testsuite name="TeamSchedule Module Tests">
+            <directory>tests/TeamSchedule</directory>
+        </testsuite>
+        <testsuite name="NextSim Module Tests">
+            <directory>tests/NextSim</directory>
+        </testsuite>
+        <testsuite name="LeagueStarters Module Tests">
+            <directory>tests/LeagueStarters</directory>
+        </testsuite>
+        <testsuite name="Injuries Module Tests">
+            <directory>tests/Injuries</directory>
+        </testsuite>
+        <testsuite name="CapInfo Module Tests">
+            <directory>tests/CapInfo</directory>
+        </testsuite>
+        <testsuite name="PlayerAwards Module Tests">
+            <directory>tests/PlayerAwards</directory>
+        </testsuite>
+        <testsuite name="Standings Module Tests">
+            <directory>tests/Standings</directory>
+        </testsuite>
+        <testsuite name="FranchiseHistory Module Tests">
+            <directory>tests/FranchiseHistory</directory>
+        </testsuite>
+        <testsuite name="PowerRankings Module Tests">
+            <directory>tests/PowerRankings</directory>
+        </testsuite>
+        <testsuite name="Shared Module Tests">
+            <directory>tests/Shared</directory>
+        </testsuite>
+        <testsuite name="Statistics Module Tests">
+            <directory>tests/Statistics</directory>
+        </testsuite>
+        <testsuite name="Integration Tests">
+            <directory>tests/Integration</directory>
         </testsuite>
     </testsuites>
 </phpunit>

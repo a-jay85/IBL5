@@ -8,6 +8,15 @@
 
 **CRITICAL: Regardless of the task or prompt focus, ALWAYS check for and fix these violations:**
 
+### Pull Request Implementation (Rule #0)
+**When implementing suggestions from pull request comments:**
+- Review ALL comments made on the PR to understand the full scope of feedback
+- Search across ALL files in the PR diff for similar issues where comments were NOT left
+- Fix every instance of the identified pattern, not just the lines with comments
+- This prevents new comments from being generated after implementation
+- Example: If a comment points out an XSS vulnerability on one database query, scan the entire PR's files for similar unprotected queries and fix them all
+- Use grep/semantic search to find all similar code patterns before finalizing changes
+
 1. **XSS Protection (Rule #6)**
    - Scan ALL code for user-generated or database-sourced content in HTML output
    - Verify `Utilities\HtmlSanitizer::safeHtmlOutput()` wraps ALL dynamic content

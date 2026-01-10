@@ -1,86 +1,51 @@
 <?php
 
-use Player\Player;
+declare(strict_types=1);
 
-global $cookie, $mysqli_db;
-$sharedFunctions = new Shared($mysqli_db);
-$commonRepository = new Services\CommonMysqliRepository($mysqli_db);
-$season = new Season($mysqli_db);
+/**
+ * League_Starters Module - Display starting lineups for all teams
+ *
+ * Shows all team starters organized by position.
+ *
+ * Refactored to use the interface-driven architecture pattern.
+ *
+ * @see LeagueStarters\LeagueStartersService For business logic
+ * @see LeagueStarters\LeagueStartersView For HTML rendering
+ */
 
 if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
+use LeagueStarters\LeagueStartersService;
+use LeagueStarters\LeagueStartersView;
+
+global $cookie, $mysqli_db;
+
+$commonRepository = new Services\CommonMysqliRepository($mysqli_db);
+$season = new Season($mysqli_db);
+
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 $pagetitle = "- $module_name";
 
-$username = $cookie[1];
-$userTeam = Team::initialize($mysqli_db, $commonRepository->getTeamnameFromUsername($username));
-
+$username = strval($cookie[1] ?? '');
+$userTeamName = $commonRepository->getTeamnameFromUsername($username);
+$userTeam = Team::initialize($mysqli_db, $userTeamName);
 $league = new League($mysqli_db);
-$teams = $league->getAllTeamsResult();
-$i = 0;
-foreach ($teams as $team) {
-    $rows['team'][$i] = Team::initialize($mysqli_db, $team);
-    $rows['startingPG'][$i] = Player::withPlayerID($mysqli_db, $rows['team'][$i]->getLastSimStarterPlayerIDForPosition('PG') ?: 4040404);
-    $rows['startingSG'][$i] = Player::withPlayerID($mysqli_db, $rows['team'][$i]->getLastSimStarterPlayerIDForPosition('SG') ?: 4040404);
-    $rows['startingSF'][$i] = Player::withPlayerID($mysqli_db, $rows['team'][$i]->getLastSimStarterPlayerIDForPosition('SF') ?: 4040404);
-    $rows['startingPF'][$i] = Player::withPlayerID($mysqli_db, $rows['team'][$i]->getLastSimStarterPlayerIDForPosition('PF') ?: 4040404);
-    $rows['startingC'][$i] = Player::withPlayerID($mysqli_db, $rows['team'][$i]->getLastSimStarterPlayerIDForPosition('C') ?: 4040404);
-    
-    $rows['startingPG'][$i]->teamName = $rows['startingSG'][$i]->teamName = $rows['startingSF'][$i]->teamName = 
-        $rows['startingPF'][$i]->teamName = $rows['startingC'][$i]->teamName = $rows['team'][$i]->name;
-        
-    $i++;
-}
 
-?>
+// Initialize services
+$service = new LeagueStartersService($mysqli_db, $league);
+$view = new LeagueStartersView($mysqli_db, $season, $module_name);
 
-<?php
-    Nuke\Header::header();
-    OpenTable();
-?>
+// Get starters by position
+$startersByPosition = $service->getAllStartersByPosition();
 
-<center>
-    <h1>League Starters</h1>
-    <table width=100% align=center>
-        <tr>
-            <td>
-            <h2 style="text-align:center">Point Guards</h2>
-                <?= UI::ratings($mysqli_db, $rows['startingPG'], $userTeam, "", $season, $module_name) ?>
-            </td>
-        </tr>
-        <tr style="height: 15px"></tr>
-        <tr>
-            <td>
-            <h2 style="text-align:center">Shooting Guards</h2>
-                <?= UI::ratings($mysqli_db, $rows['startingSG'], $userTeam, "", $season, $module_name) ?>
-            </td>
-        </tr>
-        <tr style="height: 15px"></tr>
-        <tr>
-            <td>
-            <h2 style="text-align:center">Small Forwards</h2>
-                <?= UI::ratings($mysqli_db, $rows['startingSF'], $userTeam, "", $season, $module_name) ?>
-            </td>
-        </tr>
-        <tr style="height: 15px"></tr>
-        <tr>
-            <td>
-            <h2 style="text-align:center">Power Forwards</h2>
-                <?= UI::ratings($mysqli_db, $rows['startingPF'], $userTeam, "", $season, $module_name) ?>
-            </td>
-        </tr>
-        <tr style="height: 15px"></tr>
-        <tr>
-            <td>
-            <h2 style="text-align:center">Centers</h2>
-                <?= UI::ratings($mysqli_db, $rows['startingC'], $userTeam, "", $season, $module_name) ?>
-            </td>
-        </tr>
-        <tr style="height: 15px"></tr>
-    </table>
-<?php
-    CloseTable();
-    Nuke\Footer::footer();
+// Render page
+Nuke\Header::header();
+OpenTable();
+
+echo $view->render($startersByPosition, $userTeam);
+
+CloseTable();
+Nuke\Footer::footer();

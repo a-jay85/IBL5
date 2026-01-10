@@ -60,13 +60,13 @@ class TeamScheduleView implements TeamScheduleViewInterface
             .next-sim-highlight {
                 background-color: #DDDD00;
             }
-            .game-result-win {
-                color: green;
+            a.game-result-win {
+                color: green !important;
                 font-weight: bold;
                 font-family: monospace, monospace;
             }
-            .game-result-loss {
-                color: red;
+            a.game-result-loss {
+                color: red !important;
                 font-weight: bold;
                 font-family: monospace, monospace;
             }

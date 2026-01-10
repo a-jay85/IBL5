@@ -155,6 +155,7 @@ class StandingsView implements StandingsViewInterface
                 <td class="standings-header-cell">Away<br>Played</td>
                 <td class="standings-header-cell">Last 10</td>
                 <td class="standings-header-cell">Streak</td>
+                <td class="standings-header-cell">Pyth W-L%</td>
             </tr>
         <?php
         return ob_get_clean();
@@ -194,6 +195,16 @@ class StandingsView implements StandingsViewInterface
         $streakType = \Utilities\HtmlSanitizer::safeHtmlOutput($streakData['streak_type'] ?? '');
         $streak = $streakData['streak'] ?? 0;
 
+        // Get Pythagorean win percentage
+        $pythagoreanStats = $this->repository->getTeamPythagoreanStats($teamId);
+        $pythagoreanPct = '0.000';
+        if ($pythagoreanStats !== null) {
+            $pythagoreanPct = \BasketballStats\StatsFormatter::calculatePythagoreanWinPercentage(
+                $pythagoreanStats['pointsScored'],
+                $pythagoreanStats['pointsAllowed']
+            );
+        }
+
         ob_start();
         ?>
         <tr>
@@ -211,6 +222,7 @@ class StandingsView implements StandingsViewInterface
             <td class="standings-cell"><?= $team['awayGames']; ?></td>
             <td class="standings-cell"><?= $lastWin; ?>-<?= $lastLoss; ?></td>
             <td class="standings-cell"><?= $streakType; ?> <?= $streak; ?></td>
+            <td class="standings-cell"><?= $pythagoreanPct; ?></td>
         </tr>
         <?php
         return ob_get_clean();

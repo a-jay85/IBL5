@@ -152,20 +152,35 @@ class TeamScheduleViewTest extends TestCase
 
     /**
      * Create a mock game row for testing
+     * 
+     * Returns the full data structure expected by TeamScheduleView::renderGameRow
      */
     private function createMockGame(string $month, ?string $boxId = null): array
     {
+        // Create mock Game object
+        $game = new \stdClass();
+        $game->date = '2025-01-15';
+        $game->visitorScore = 105;
+        $game->homeScore = 98;
+        $game->boxScoreID = $boxId ? (int) filter_var($boxId, FILTER_SANITIZE_NUMBER_INT) : 12345;
+
+        // Create mock opposing Team object
+        $opposingTeam = new \stdClass();
+        $opposingTeam->teamID = 2;
+        $opposingTeam->name = 'Boston';
+
         return [
             'currentMonth' => $month,
-            'DayDate' => '2025-01-15',
-            'versus' => 'at',
-            'opponent' => 'Boston',
-            'oppTeamID' => 2,
-            'nextSim' => false,
-            'box' => $boxId ?? 'box12345.htm',
-            'result' => 'W',
-            'score' => '105-98',
-            'record' => '10-5',
+            'game' => $game,
+            'opposingTeam' => $opposingTeam,
+            'highlight' => '',
+            'opponentText' => 'at Boston',
+            'isUnplayed' => false,
+            'winLossColor' => 'green',
+            'gameResult' => 'W',
+            'wins' => 10,
+            'losses' => 5,
+            'streak' => 'W3',
         ];
     }
 }

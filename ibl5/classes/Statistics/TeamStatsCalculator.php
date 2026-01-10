@@ -142,21 +142,14 @@ class TeamStatsCalculator
      */
     private function getOpponentRecord(int $teamId): array
     {
-        if ($this->db instanceof \BaseMysqliRepository) {
-            return $this->db->fetchOne(
-                "SELECT win, loss FROM ibl_power WHERE TeamID = ?",
-                "i",
-                $teamId
-            ) ?? ['win' => 0, 'loss' => 0];
-        }
-
-        // For MockDatabase in tests
+        // Use method_exists for duck-typing compatibility with MockDatabase and real db
         if (method_exists($this->db, 'fetchOne')) {
-            return $this->db->fetchOne(
+            $result = $this->db->fetchOne(
                 "SELECT win, loss FROM ibl_power WHERE TeamID = ?",
                 "i",
                 $teamId
-            ) ?? ['win' => 0, 'loss' => 0];
+            );
+            return $result ?? ['win' => 0, 'loss' => 0];
         }
 
         return ['win' => 0, 'loss' => 0];

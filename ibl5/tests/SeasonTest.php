@@ -97,7 +97,7 @@ class SeasonTest extends \PHPUnit\Framework\TestCase
             }
 
             #[\ReturnTypeWillChange]
-            public function query(string $query, int $result_mode = MYSQLI_STORE_RESULT): \mysqli_result|bool
+            public function query(string $query, int $result_mode = MYSQLI_STORE_RESULT)
             {
                 $data = $this->mockData;
                 $mockResult = new class($data) {
@@ -117,6 +117,7 @@ class SeasonTest extends \PHPUnit\Framework\TestCase
                         return (object) ['value' => $this->rows['phase']];
                     }
                 };
+                /** @phpstan-ignore-next-line */
                 return $mockResult;
             }
         };

@@ -85,7 +85,7 @@ class CashTransactionHandlerTest extends TestCase
             }
 
             #[\ReturnTypeWillChange]
-            public function query(string $query, int $result_mode = MYSQLI_STORE_RESULT): \mysqli_result|bool
+            public function query(string $query, int $result_mode = MYSQLI_STORE_RESULT)
             {
                 $data = $this->mockData;
                 $mockResult = new class($data) {
@@ -107,6 +107,7 @@ class CashTransactionHandlerTest extends TestCase
                         return $row ? (object) $row : null;
                     }
                 };
+                /** @phpstan-ignore-next-line */
                 return $mockResult;
             }
         };

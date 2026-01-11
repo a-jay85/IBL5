@@ -21,7 +21,6 @@ class Shared
 {
     protected $db;
     protected SharedRepositoryInterface $sharedRepository;
-    protected \Services\CommonMysqliRepository $commonRepository;
 
     /**
      * Creates a new Shared instance
@@ -33,7 +32,6 @@ class Shared
     {
         $this->db = $db;
         $this->sharedRepository = $sharedRepository ?? new SharedRepository($db);
-        $this->commonRepository = new \Services\CommonMysqliRepository($db);
     }
 
     /**

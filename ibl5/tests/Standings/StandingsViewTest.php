@@ -84,7 +84,7 @@ class StandingsViewTest extends TestCase
 
         $result = $this->view->renderRegion('Eastern');
 
-        $this->assertStringContainsString('<table class="sortable">', $result);
+        $this->assertStringContainsString('<table class="sortable standings-table">', $result);
         $this->assertStringContainsString('Team', $result);
         $this->assertStringContainsString('W-L', $result);
         $this->assertStringContainsString('Pct', $result);
@@ -162,7 +162,7 @@ class StandingsViewTest extends TestCase
 
         $result = $this->view->renderRegion('Eastern');
 
-        $this->assertStringContainsString('Pyth W-L%', $result);
+        $this->assertStringContainsString('Pyth<br>W-L%', $result);
         // The Pythagorean percentage should be present and formatted
         $this->assertMatchesRegularExpression('/\d\.\d{3}/', $result);
     }

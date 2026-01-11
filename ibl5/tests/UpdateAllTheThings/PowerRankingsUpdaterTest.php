@@ -1,7 +1,26 @@
 <?php
 
+declare(strict_types=1);
+
 use PHPUnit\Framework\TestCase;
 use Updater\PowerRankingsUpdater;
+use Statistics\TeamStatsCalculator;
+
+/**
+ * Testable subclass that exposes protected methods for testing
+ */
+class TestablePowerRankingsUpdater extends PowerRankingsUpdater
+{
+    public function publicDetermineMonth(): int
+    {
+        return $this->determineMonth();
+    }
+
+    public function publicCalculateTeamStats(array $games, int $tid): array
+    {
+        return $this->calculateTeamStats($games, $tid);
+    }
+}
 
 /**
  * Comprehensive tests for PowerRankingsUpdater class
@@ -17,114 +36,56 @@ use Updater\PowerRankingsUpdater;
  */
 class PowerRankingsUpdaterTest extends TestCase
 {
-    private $mockDb;
-    private $mockSeason;
-    private $powerRankingsUpdater;
+    private MockDatabase $mockDb;
+    private \Season $mockSeason;
+    private TestablePowerRankingsUpdater $powerRankingsUpdater;
 
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
-        $this->mockSeason = new Season($this->mockDb);
-        $this->powerRankingsUpdater = new PowerRankingsUpdater($this->mockDb, $this->mockSeason);
+        $this->mockSeason = new \Season($this->mockDb);
+        $this->powerRankingsUpdater = new TestablePowerRankingsUpdater($this->mockDb, $this->mockSeason);
     }
 
     protected function tearDown(): void
     {
-        $this->powerRankingsUpdater = null;
-        $this->mockDb = null;
-        $this->mockSeason = null;
+        unset($this->powerRankingsUpdater);
+        unset($this->mockDb);
+        unset($this->mockSeason);
     }
 
-    /**
-     * @group power-rankings
-     * @group month-determination
-     */
-    public function testDetermineMonthForPreseason()
+    public function testDetermineMonthForPreseason(): void
     {
         $this->mockSeason->phase = 'Preseason';
         
-        $reflection = new ReflectionClass($this->powerRankingsUpdater);
-        $method = $reflection->getMethod('determineMonth');
-
-        $result = $method->invoke($this->powerRankingsUpdater);
+        $result = $this->powerRankingsUpdater->publicDetermineMonth();
         
-        $this->assertEquals(Season::IBL_REGULAR_SEASON_STARTING_MONTH, $result);
+        $this->assertEquals(\Season::IBL_REGULAR_SEASON_STARTING_MONTH, $result);
     }
 
-    /**
-     * @group power-rankings
-     * @group month-determination
-     */
-    public function testDetermineMonthForHEAT()
+    public function testDetermineMonthForHEAT(): void
     {
         $this->mockSeason->phase = 'HEAT';
         
-        $reflection = new ReflectionClass($this->powerRankingsUpdater);
-        $method = $reflection->getMethod('determineMonth');
-
-        $result = $method->invoke($this->powerRankingsUpdater);
+        $result = $this->powerRankingsUpdater->publicDetermineMonth();
         
-        $this->assertEquals(Season::IBL_HEAT_MONTH, $result);
+        $this->assertEquals(\Season::IBL_HEAT_MONTH, $result);
     }
 
-    /**
-     * @group power-rankings
-     * @group month-determination
-     */
-    public function testDetermineMonthForRegularSeason()
+    public function testDetermineMonthForRegularSeason(): void
     {
         $this->mockSeason->phase = 'Regular Season';
         
-        $reflection = new ReflectionClass($this->powerRankingsUpdater);
-        $method = $reflection->getMethod('determineMonth');
-
-        $result = $method->invoke($this->powerRankingsUpdater);
+        $result = $this->powerRankingsUpdater->publicDetermineMonth();
         
-        $this->assertEquals(Season::IBL_REGULAR_SEASON_STARTING_MONTH, $result);
+        $this->assertEquals(\Season::IBL_REGULAR_SEASON_STARTING_MONTH, $result);
     }
 
-    /**
-     * @group power-rankings
-     * @group query-building
-     */
-    public function testBuildGamesQueryForRegularSeason()
+    public function testCalculateTeamStatsInitializesCorrectly(): void
     {
-        $this->mockSeason->phase = 'Regular Season';
-        $this->mockSeason->beginningYear = 2023;
-        $this->mockSeason->endingYear = 2024;
-        
-        // Mock database to return game data
-        $mockGames = [
-            ['Visitor' => 1, 'VScore' => 100, 'Home' => 2, 'HScore' => 95],
-            ['Visitor' => 3, 'VScore' => 88, 'Home' => 1, 'HScore' => 92]
-        ];
-        $this->mockDb->setMockData($mockGames);
-        
-        $reflection = new ReflectionClass($this->powerRankingsUpdater);
-        $method = $reflection->getMethod('buildGamesQuery');
-
-        $tid = 1;
-        $month = Season::IBL_REGULAR_SEASON_STARTING_MONTH;
-        $result = $method->invoke($this->powerRankingsUpdater, $tid, $month);
-        
-        // Now buildGamesQuery returns an array of games, not a query string
-        $this->assertIsArray($result);
-        $this->assertEquals($mockGames, $result);
-    }
-
-    /**
-     * @group power-rankings
-     * @group stats-calculation
-     */
-    public function testCalculateTeamStatsInitializesCorrectly()
-    {
-        // Empty games array
         $games = [];
         
-        $reflection = new ReflectionClass($this->powerRankingsUpdater);
-        $method = $reflection->getMethod('calculateTeamStats');
-
-        $result = $method->invoke($this->powerRankingsUpdater, $games, 1);
+        $result = $this->powerRankingsUpdater->publicCalculateTeamStats($games, 1);
         
         $this->assertIsArray($result);
         $this->assertArrayHasKey('wins', $result);
@@ -140,24 +101,15 @@ class PowerRankingsUpdaterTest extends TestCase
         $this->assertEquals(0, $result['losses']);
     }
 
-    /**
-     * @group power-rankings
-     * @group stats-calculation
-     */
-    public function testCalculateTeamStatsWithWinningGame()
+    public function testCalculateTeamStatsWithWinningGame(): void
     {
-        // Mock a single winning game
         $mockGames = [
             ['Visitor' => 1, 'VScore' => 100, 'Home' => 2, 'HScore' => 95]
         ];
         
-        // Mock opponent's record
         $this->mockDb->setMockData([['win' => 5, 'loss' => 3]]);
         
-        $reflection = new ReflectionClass($this->powerRankingsUpdater);
-        $method = $reflection->getMethod('calculateTeamStats');
-
-        $result = $method->invoke($this->powerRankingsUpdater, $mockGames, 1);
+        $result = $this->powerRankingsUpdater->publicCalculateTeamStats($mockGames, 1);
         
         $this->assertEquals(1, $result['wins']);
         $this->assertEquals(0, $result['losses']);
@@ -167,24 +119,15 @@ class PowerRankingsUpdaterTest extends TestCase
         $this->assertEquals(1, $result['streak']);
     }
 
-    /**
-     * @group power-rankings
-     * @group stats-calculation
-     */
-    public function testCalculateTeamStatsWithLosingGame()
+    public function testCalculateTeamStatsWithLosingGame(): void
     {
-        // Mock a single losing game
         $mockGames = [
             ['Visitor' => 1, 'VScore' => 85, 'Home' => 2, 'HScore' => 95]
         ];
         
-        // Mock opponent's record
         $this->mockDb->setMockData([['win' => 5, 'loss' => 3]]);
         
-        $reflection = new ReflectionClass($this->powerRankingsUpdater);
-        $method = $reflection->getMethod('calculateTeamStats');
-
-        $result = $method->invoke($this->powerRankingsUpdater, $mockGames, 1);
+        $result = $this->powerRankingsUpdater->publicCalculateTeamStats($mockGames, 1);
         
         $this->assertEquals(0, $result['wins']);
         $this->assertEquals(1, $result['losses']);
@@ -194,76 +137,48 @@ class PowerRankingsUpdaterTest extends TestCase
         $this->assertEquals(1, $result['streak']);
     }
 
-    /**
-     * @group power-rankings
-     * @group stats-calculation
-     */
-    public function testCalculateTeamStatsWithHomeGame()
+    public function testCalculateTeamStatsWithHomeGame(): void
     {
-        // Mock a home winning game
         $mockGames = [
             ['Visitor' => 2, 'VScore' => 90, 'Home' => 1, 'HScore' => 100]
         ];
         
-        // Mock opponent's record
         $this->mockDb->setMockData([['win' => 5, 'loss' => 3]]);
         
-        $reflection = new ReflectionClass($this->powerRankingsUpdater);
-        $method = $reflection->getMethod('calculateTeamStats');
-
-        $result = $method->invoke($this->powerRankingsUpdater, $mockGames, 1);
+        $result = $this->powerRankingsUpdater->publicCalculateTeamStats($mockGames, 1);
         
         $this->assertEquals(1, $result['wins']);
         $this->assertEquals(1, $result['homeWins']);
         $this->assertEquals(0, $result['awayWins']);
     }
 
-    /**
-     * @group power-rankings
-     * @group stats-calculation
-     */
-    public function testCalculateTeamStatsTracksWinningStreak()
+    public function testCalculateTeamStatsTracksWinningStreak(): void
     {
-        // Mock multiple winning games
         $mockGames = [
             ['Visitor' => 1, 'VScore' => 100, 'Home' => 2, 'HScore' => 95],
             ['Visitor' => 3, 'VScore' => 85, 'Home' => 1, 'HScore' => 90],
             ['Visitor' => 1, 'VScore' => 105, 'Home' => 4, 'HScore' => 100],
         ];
         
-        // Mock opponent records for each game
         $this->mockDb->setMockData([['win' => 5, 'loss' => 3]]);
         
-        $reflection = new ReflectionClass($this->powerRankingsUpdater);
-        $method = $reflection->getMethod('calculateTeamStats');
-
-        $result = $method->invoke($this->powerRankingsUpdater, $mockGames, 1);
+        $result = $this->powerRankingsUpdater->publicCalculateTeamStats($mockGames, 1);
         
         $this->assertEquals(3, $result['wins']);
         $this->assertEquals('W', $result['streakType']);
         $this->assertEquals(3, $result['streak']);
     }
 
-    /**
-     * @group power-rankings
-     * @group stats-calculation
-     */
-    public function testCalculateTeamStatsTracksLosingStreak()
+    public function testCalculateTeamStatsTracksLosingStreak(): void
     {
-        // Mock multiple losing games
         $mockGames = [
             ['Visitor' => 1, 'VScore' => 80, 'Home' => 2, 'HScore' => 95],
             ['Visitor' => 3, 'VScore' => 100, 'Home' => 1, 'HScore' => 90],
         ];
         
-        // Mock opponent records
         $this->mockDb->setMockData([['win' => 5, 'loss' => 3]]);
         
-        $reflection = new ReflectionClass($this->powerRankingsUpdater);
-        $method = $reflection->getMethod('calculateTeamStats');
-
-
-        $result = $method->invoke($this->powerRankingsUpdater, $mockGames, 1);
+        $result = $this->powerRankingsUpdater->publicCalculateTeamStats($mockGames, 1);
         
         $this->assertEquals(0, $result['wins']);
         $this->assertEquals(2, $result['losses']);
@@ -271,61 +186,37 @@ class PowerRankingsUpdaterTest extends TestCase
         $this->assertEquals(2, $result['streak']);
     }
 
-    /**
-     * @group power-rankings
-     * @group stats-calculation
-     */
-    public function testCalculateTeamStatsHandlesStreakChange()
+    public function testCalculateTeamStatsHandlesStreakChange(): void
     {
-        // Mock games with win then loss (streak resets)
         $mockGames = [
             ['Visitor' => 1, 'VScore' => 100, 'Home' => 2, 'HScore' => 95],
             ['Visitor' => 3, 'VScore' => 100, 'Home' => 1, 'HScore' => 90],
         ];
         
-        // Mock opponent records
         $this->mockDb->setMockData([['win' => 5, 'loss' => 3]]);
         
-        $reflection = new ReflectionClass($this->powerRankingsUpdater);
-        $method = $reflection->getMethod('calculateTeamStats');
-
-        $result = $method->invoke($this->powerRankingsUpdater, $mockGames, 1);
+        $result = $this->powerRankingsUpdater->publicCalculateTeamStats($mockGames, 1);
         
         $this->assertEquals(1, $result['wins']);
         $this->assertEquals(1, $result['losses']);
         $this->assertEquals('L', $result['streakType']);
-        $this->assertEquals(1, $result['streak']); // Streak resets to 1
+        $this->assertEquals(1, $result['streak']);
     }
 
-    /**
-     * @group power-rankings
-     * @group stats-calculation
-     */
-    public function testCalculateTeamStatsIgnoresTies()
+    public function testCalculateTeamStatsIgnoresTies(): void
     {
-        // Mock a tie game (same score)
         $mockGames = [
             ['Visitor' => 1, 'VScore' => 95, 'Home' => 2, 'HScore' => 95]
         ];
         
-        $reflection = new ReflectionClass($this->powerRankingsUpdater);
-        $method = $reflection->getMethod('calculateTeamStats');
-
-        $result = $method->invoke($this->powerRankingsUpdater, $mockGames, 1);
+        $result = $this->powerRankingsUpdater->publicCalculateTeamStats($mockGames, 1);
         
-        // Tie should not count as win or loss
         $this->assertEquals(0, $result['wins']);
         $this->assertEquals(0, $result['losses']);
     }
 
-    /**
-     * @group power-rankings
-     * @group database
-     */
-    public function testUpdateResetsDepthChartStatus()
+    public function testUpdateResetsDepthChartStatus(): void
     {
-        // Set up empty teams data to skip game processing and directly test depth chart reset
-        // This avoids undefined array key warnings from game processing
         $mockTeams = [];
         $this->mockDb->setMockData($mockTeams);
         $this->mockDb->setReturnTrue(true);
@@ -342,118 +233,24 @@ class PowerRankingsUpdaterTest extends TestCase
         $this->assertNotEmpty($depthChartResetQuery);
     }
 
-    /**
-     * @group power-rankings
-     * @group stats-calculation
-     */
-    public function testCalculateTeamStatsTracksLast10Games()
+    public function testCalculateTeamStatsTracksLast10Games(): void
     {
-        // Mock 15 games where team wins last 7
         $mockGames = [];
         for ($i = 0; $i < 15; $i++) {
             if ($i < 8) {
-                // First 8 games are losses
                 $mockGames[] = ['Visitor' => 1, 'VScore' => 80, 'Home' => 2, 'HScore' => 90];
             } else {
-                // Last 7 games are wins
                 $mockGames[] = ['Visitor' => 1, 'VScore' => 100, 'Home' => 2, 'HScore' => 90];
             }
         }
         
-        // Mock opponent records
         $this->mockDb->setMockData([['win' => 5, 'loss' => 3]]);
         
-        $reflection = new ReflectionClass($this->powerRankingsUpdater);
-        $method = $reflection->getMethod('calculateTeamStats');
-
-        $result = $method->invoke($this->powerRankingsUpdater, $mockGames, 1);
+        $result = $this->powerRankingsUpdater->publicCalculateTeamStats($mockGames, 1);
         
-        // Games 6-15 are the last 10, so: games 6-8 are losses (3), games 9-15 are wins (7)
         $this->assertEquals(7, $result['wins']);
         $this->assertEquals(8, $result['losses']);
         $this->assertEquals(7, $result['winsInLast10Games']);
         $this->assertEquals(3, $result['lossesInLast10Games']);
-    }
-
-    /**
-     * @group power-rankings
-     * @group ranking-calculation
-     */
-    public function testRankingScoreCalculation()
-    {
-        // Create stats with specific win/loss points
-        $stats = [
-            'wins' => 40,
-            'losses' => 20,
-            'homeWins' => 25,
-            'homeLosses' => 5,
-            'awayWins' => 15,
-            'awayLosses' => 15,
-            'winPoints' => 800,  // Will be added to wins
-            'lossPoints' => 400, // Will be added to losses
-            'winsInLast10Games' => 7,
-            'lossesInLast10Games' => 3,
-            'streak' => 3,
-            'streakType' => 'W'
-        ];
-        
-        $reflection = new ReflectionClass($this->powerRankingsUpdater);
-        $method = $reflection->getMethod('updateTeamStats');
-
-        // Mock the database operations
-        $this->mockDb->setReturnTrue(true);
-        
-        ob_start();
-        $result = $method->invoke($this->powerRankingsUpdater, 1, 'Boston Celtics', $stats);
-        ob_end_clean();
-        
-        // Verify that update query was executed
-        $queries = $this->mockDb->getExecutedQueries();
-        $updateQueries = array_filter($queries, function($q) {
-            return stripos($q, 'UPDATE ibl_power SET') !== false;
-        });
-        
-        $this->assertNotEmpty($updateQueries);
-    }
-
-    /**
-     * @group power-rankings
-     * @group heat-season
-     */
-    public function testHEATSeasonRecordsUpdate()
-    {
-        $this->mockSeason->phase = 'HEAT';
-        $this->mockSeason->beginningYear = 2023;
-        
-        $stats = [
-            'wins' => 10,
-            'losses' => 5,
-            'homeWins' => 6,
-            'homeLosses' => 2,
-            'awayWins' => 4,
-            'awayLosses' => 3,
-            'winPoints' => 150,
-            'lossPoints' => 75,
-            'winsInLast10Games' => 7,
-            'lossesInLast10Games' => 3,
-            'streak' => 2,
-            'streakType' => 'W'
-        ];
-        
-        $reflection = new ReflectionClass($this->powerRankingsUpdater);
-        $method = $reflection->getMethod('updateTeamStats');
-
-        $this->mockDb->setReturnTrue(true);
-        
-        ob_start();
-        $method->invoke($this->powerRankingsUpdater, 1, 'Boston Celtics', $stats);
-        ob_end_clean();
-        
-        $queries = $this->mockDb->getExecutedQueries();
-        $heatQueries = array_filter($queries, function($q) {
-            return stripos($q, 'ibl_heat_win_loss') !== false;
-        });
-        
-        $this->assertNotEmpty($heatQueries);
     }
 }

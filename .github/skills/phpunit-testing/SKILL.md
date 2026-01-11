@@ -98,7 +98,10 @@ class ModuleServiceTest extends TestCase
 
 ## Test Registration
 
-Add to `ibl5/phpunit.xml`:
+Register new tests in **BOTH** configuration files:
+
+### Standard Tests (Run Locally & CI/CD)
+Add to **both** `ibl5/phpunit.xml` and `ibl5/phpunit.ci.xml`:
 ```xml
 <testsuites>
     <testsuite name="ModuleName Tests">
@@ -107,10 +110,24 @@ Add to `ibl5/phpunit.xml`:
 </testsuites>
 ```
 
+### Local-Only Tests (Requires Credentials)
+Add **only** to `ibl5/phpunit.xml` (not CI/CD):
+```xml
+<!-- Example: DatabaseConnectionTest.php -->
+<testsuite name="Root Tests">
+    <file>tests/DatabaseConnectionTest.php</file>
+</testsuite>
+```
+
+**Why Two Configs?**
+- `phpunit.xml` - runs locally (includes tests requiring MAMP credentials)
+- `phpunit.ci.xml` - runs in CI/CD pipeline (excludes local-only tests)
+- CI/CD uses: `vendor/bin/phpunit --configuration phpunit.ci.xml`
+
 ## Completion Criteria
 
 - [ ] All tests pass: `vendor/bin/phpunit tests/ModuleName/`
-- [ ] Tests registered in `ibl5/phpunit.xml`
+- [ ] Tests registered in **both** `ibl5/phpunit.xml` and `ibl5/phpunit.ci.xml` (unless local-only)
 - [ ] No `markTestSkipped()` calls
 - [ ] No ReflectionClass for private methods
 - [ ] Zero warnings, zero failures

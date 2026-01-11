@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit bootstrap="tests/bootstrap.php"
+         colors="true"
+         testdox="true">
+    <testsuites>
+        <testsuite name="Services Tests">
+            <directory>tests/Services</directory>
+        </testsuite>
+        <testsuite name="Player Module Tests">
+            <directory>tests/Player</directory>
+        </testsuite>
+        <testsuite name="Team Module Tests">
+            <directory>tests/Team</directory>
+        </testsuite>
+        <testsuite name="Trading Module Tests">
+            <directory>tests/Trading</directory>
+        </testsuite>
+        <testsuite name="Extension Module Tests">
+            <directory>tests/Extension</directory>
+        </testsuite>
+        <testsuite name="UpdateAllTheThings Tests">
+            <directory>tests/UpdateAllTheThings</directory>
+        </testsuite>
+        <testsuite name="DepthChart Module Tests">
+            <directory>tests/DepthChart</directory>
+        </testsuite>
+        <testsuite name="Waivers Module Tests">
+            <directory>tests/Waivers</directory>
+        </testsuite>
+        <testsuite name="Draft Module Tests">
+            <directory>tests/Draft</directory>
+        </testsuite>
+        <testsuite name="UI Component Tests">
+            <directory>tests/UI</directory>
+        </testsuite>
+        <testsuite name="RookieOption Module Tests">
+            <directory>tests/RookieOption</directory>
+        </testsuite>
+        <testsuite name="SiteStatistics Module Tests">
+            <directory>tests/SiteStatistics</directory>
+        </testsuite>
+        <testsuite name="BasketballStats Module Tests">
+            <directory>tests/BasketballStats</directory>
+        </testsuite>
+        <testsuite name="Negotiation Module Tests">
+            <directory>tests/Negotiation</directory>
+        </testsuite>
+        <testsuite name="Leaderboards Module Tests">
+            <directory>tests/Leaderboards</directory>
+        </testsuite>
+        <testsuite name="Season Leaders Module Tests">
+            <directory>tests/SeasonLeaders</directory>
+        </testsuite>
+        <testsuite name="Utilities Tests">
+            <directory>tests/Utilities</directory>
+        </testsuite>
+        <testsuite name="Voting Results Module Tests">
+            <directory>tests/VotingResults</directory>
+        </testsuite>
+        <testsuite name="Player Search Module Tests">
+            <directory>tests/PlayerSearch</directory>
+        </testsuite>
+        <testsuite name="FreeAgency Module Tests">
+            <directory>tests/FreeAgency</directory>
+        </testsuite>
+        <testsuite name="ComparePlayers Module Tests">
+            <directory>tests/ComparePlayers</directory>
+        </testsuite>
+        <testsuite name="Discord Module Tests">
+            <directory>tests/Discord</directory>
+        </testsuite>
+        <testsuite name="League Module Tests">
+            <directory>tests/League</directory>
+        </testsuite>
+        <testsuite name="Root Tests">
+            <!-- DatabaseConnectionTest.php excluded for CI/CD - requires local MAMP credentials -->
+            <file>tests/ContractRulesTest.php</file>
+            <file>tests/GameTest.php</file>
+            <file>tests/DraftPickTest.php</file>
+            <file>tests/LeagueTest.php</file>
+            <file>tests/SeasonTest.php</file>
+            <file>tests/TeamTest.php</file>
+            <file>tests/BoxscoreTest.php</file>
+        </testsuite>
+        <testsuite name="SeriesRecords Module Tests">
+            <directory>tests/SeriesRecords</directory>
+        </testsuite>
+        <testsuite name="OneOnOne Module Tests">
+            <directory>tests/OneOnOne</directory>
+        </testsuite>
+        <testsuite name="DraftPickLocator Module Tests">
+            <directory>tests/DraftPickLocator</directory>
+        </testsuite>
+        <testsuite name="TeamSchedule Module Tests">
+            <directory>tests/TeamSchedule</directory>
+        </testsuite>
+        <testsuite name="NextSim Module Tests">
+            <directory>tests/NextSim</directory>
+        </testsuite>
+        <testsuite name="LeagueStarters Module Tests">
+            <directory>tests/LeagueStarters</directory>
+        </testsuite>
+        <testsuite name="Injuries Module Tests">
+            <directory>tests/Injuries</directory>
+        </testsuite>
+        <testsuite name="CapInfo Module Tests">
+            <directory>tests/CapInfo</directory>
+        </testsuite>
+        <testsuite name="PlayerAwards Module Tests">
+            <directory>tests/PlayerAwards</directory>
+        </testsuite>
+        <testsuite name="Standings Module Tests">
+            <directory>tests/Standings</directory>
+        </testsuite>
+        <testsuite name="FranchiseHistory Module Tests">
+            <directory>tests/FranchiseHistory</directory>
+        </testsuite>
+        <testsuite name="PowerRankings Module Tests">
+            <directory>tests/PowerRankings</directory>
+        </testsuite>
+        <testsuite name="Shared Module Tests">
+            <directory>tests/Shared</directory>
+        </testsuite>
+        <testsuite name="Statistics Module Tests">
+            <directory>tests/Statistics</directory>
+        </testsuite>
+        <testsuite name="Integration Tests">
+            <directory>tests/Integration</directory>
+        </testsuite>
+    </testsuites>
+</phpunit>

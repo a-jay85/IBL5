@@ -1,6 +1,9 @@
 <?php
 namespace Updater;
 
+use Utilities\RecordParser;
+use Utilities\StandingsGrouper;
+
 class StandingsUpdater extends \BaseMysqliRepository {
     private $commonRepository;
 
@@ -9,28 +12,18 @@ class StandingsUpdater extends \BaseMysqliRepository {
         $this->commonRepository = $commonRepository;
     }
 
-    private function extractWins($var) {
-        $var = rtrim(substr($var, 0, 2), '-');
-        return $var;
+    protected function extractWins(string $record): int {
+        return RecordParser::extractWins($record);
     }
 
-    private function extractLosses($var) {
-        $var = ltrim(substr($var, -2, 2), '-');
-        return $var;
+    protected function extractLosses(string $record): int {
+        return RecordParser::extractLosses($record);
     }
 
-    private function assignGroupingsFor($region) {
-        if (in_array($region, array("Eastern", "Western"))) {
-            $grouping = 'conference';
-            $groupingGB = 'confGB';
-            $groupingMagicNumber = 'confMagicNumber';
-        }
-        if (in_array($region, array("Atlantic", "Central", "Midwest", "Pacific"))) {
-            $grouping = 'division';
-            $groupingGB = 'divGB';
-            $groupingMagicNumber = 'divMagicNumber';
-        }
-        return array($grouping, $groupingGB, $groupingMagicNumber);
+    protected function assignGroupingsFor(string $region): array {
+        $groupings = StandingsGrouper::getGroupingsFor($region);
+        // Return as indexed array for backwards compatibility with list() destructuring
+        return [$groupings['grouping'], $groupings['groupingGB'], $groupings['groupingMagicNumber']];
     }
 
     public function update() {

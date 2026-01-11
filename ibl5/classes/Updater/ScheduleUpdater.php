@@ -2,6 +2,8 @@
 namespace Updater;
 
 use Utilities\UuidGenerator;
+use Utilities\ScheduleParser;
+use Utilities\DateParser;
 
 class ScheduleUpdater extends \BaseMysqliRepository {
     private $commonRepository;
@@ -13,52 +15,31 @@ class ScheduleUpdater extends \BaseMysqliRepository {
         $this->season = $season;
     }
 
-    private function extractDate($rawDate) {
+    protected function extractDate(string $rawDate): ?array {
         global $leagueContext;
-        $currentLeague = $leagueContext->getCurrentLeague();
+        $currentLeague = $leagueContext ? $leagueContext->getCurrentLeague() : 'IBL';
 
-        if ($rawDate != false) {
-            if (substr($rawDate, 0, 4) === "Post") {
-                $rawDate = substr_replace($rawDate, 'June', 0, 4);
-            }
-            
-            $month = ltrim(date('m', strtotime($rawDate)), '0');
-            $day = ltrim(date('d', strtotime($rawDate)), '0');
-            $year = date('Y', strtotime($rawDate));
-
-            if ($this->season->phase == "Preseason") {
-                $this->season->beginningYear = \Season::IBL_PRESEASON_YEAR;
-                $this->season->endingYear = \Season::IBL_PRESEASON_YEAR + 1;
-            } elseif ($this->season->phase == "HEAT") {
-                if ($month == 11) {
-                    $month = \Season::IBL_HEAT_MONTH;
-                }
-            }
-            
-            if ($currentLeague === 'olympics') {
-                $month = \Season::IBL_OLYMPICS_MONTH;
-            }
-
-            if ($month < \Season::IBL_HEAT_MONTH) {
-                $year = $this->season->endingYear;
-            } else {
-                $year = $this->season->beginningYear;
-            }
-            
-            $date = $year . "-" . $month . "-" . $day;
-            
-            return array(
-                "date" => $date,
-                "year" => $year,
-                "month" => $month,
-                "day" => $day
-            );
+        if (empty($rawDate)) {
+            return null;
         }
-        return null;
+
+        // Handle Preseason year adjustments
+        if ($this->season->phase === "Preseason") {
+            $this->season->beginningYear = \Season::IBL_PRESEASON_YEAR;
+            $this->season->endingYear = \Season::IBL_PRESEASON_YEAR + 1;
+        }
+
+        return DateParser::extractDate(
+            $rawDate,
+            $this->season->phase,
+            $this->season->beginningYear,
+            $this->season->endingYear,
+            $currentLeague
+        );
     }
 
-    private function extractBoxID($boxHREF) {
-        return ltrim(rtrim($boxHREF, '.htm'), 'box');
+    protected function extractBoxID(string $boxHREF): string {
+        return ScheduleParser::extractBoxID($boxHREF);
     }
 
     public function update() {

@@ -9,6 +9,17 @@ use CapInfo\CapInfoService;
 use CapInfo\Contracts\CapInfoRepositoryInterface;
 
 /**
+ * Testable subclass that exposes protected methods for testing
+ */
+class TestableCapInfoService extends CapInfoService
+{
+    public function publicProcessTeamCapData(\Team $team, \Season $season): array
+    {
+        return $this->processTeamCapData($team, $season);
+    }
+}
+
+/**
  * CapInfoServiceTest - Tests for CapInfoService business logic
  *
  * @covers \CapInfo\CapInfoService
@@ -21,13 +32,13 @@ class CapInfoServiceTest extends TestCase
     /** @var object&\PHPUnit\Framework\MockObject\MockObject */
     private object $mockDb;
 
-    private CapInfoService $service;
+    private TestableCapInfoService $service;
 
     protected function setUp(): void
     {
         $this->mockRepository = $this->createMock(CapInfoRepositoryInterface::class);
         $this->mockDb = $this->createMock(\mysqli::class);
-        $this->service = new CapInfoService($this->mockRepository, $this->mockDb);
+        $this->service = new TestableCapInfoService($this->mockRepository, $this->mockDb);
     }
 
     /**
@@ -41,15 +52,10 @@ class CapInfoServiceTest extends TestCase
         // Create a mock Team object with integer MLE/LLE values (as stored in database)
         $mockTeam = $this->createMockTeamWithMleLle(1, 1);
         
-        // Use reflection to call the private processTeamCapData method
-        $reflection = new \ReflectionClass($this->service);
-        $method = $reflection->getMethod('processTeamCapData');
-        $method->setAccessible(true);
-        
         $mockSeason = $this->createMockSeason();
         $this->mockRepository->method('getPlayersUnderContractAfterSeason')->willReturn([]);
         
-        $result = $method->invoke($this->service, $mockTeam, $mockSeason);
+        $result = $this->service->publicProcessTeamCapData($mockTeam, $mockSeason);
         
         // Verify boolean conversion works correctly with integer 1
         $this->assertIsBool($result['hasMLE'], 'hasMLE should be a boolean');
@@ -62,14 +68,10 @@ class CapInfoServiceTest extends TestCase
     {
         $mockTeam = $this->createMockTeamWithMleLle(0, 0);
         
-        $reflection = new \ReflectionClass($this->service);
-        $method = $reflection->getMethod('processTeamCapData');
-        $method->setAccessible(true);
-        
         $mockSeason = $this->createMockSeason();
         $this->mockRepository->method('getPlayersUnderContractAfterSeason')->willReturn([]);
         
-        $result = $method->invoke($this->service, $mockTeam, $mockSeason);
+        $result = $this->service->publicProcessTeamCapData($mockTeam, $mockSeason);
         
         $this->assertFalse($result['hasMLE'], 'hasMLE should be false when team has MLE=0');
         $this->assertFalse($result['hasLLE'], 'hasLLE should be false when team has LLE=0');
@@ -79,14 +81,10 @@ class CapInfoServiceTest extends TestCase
     {
         $mockTeam = $this->createMockTeamWithMleLle(1, 0);
         
-        $reflection = new \ReflectionClass($this->service);
-        $method = $reflection->getMethod('processTeamCapData');
-        $method->setAccessible(true);
-        
         $mockSeason = $this->createMockSeason();
         $this->mockRepository->method('getPlayersUnderContractAfterSeason')->willReturn([]);
         
-        $result = $method->invoke($this->service, $mockTeam, $mockSeason);
+        $result = $this->service->publicProcessTeamCapData($mockTeam, $mockSeason);
         
         $this->assertTrue($result['hasMLE'], 'hasMLE should be true when team has MLE=1');
         $this->assertFalse($result['hasLLE'], 'hasLLE should be false when team has LLE=0');
@@ -126,17 +124,13 @@ class CapInfoServiceTest extends TestCase
     {
         $mockTeam = $this->createMockTeamWithMleLle(1, 1);
         
-        $reflection = new \ReflectionClass($this->service);
-        $method = $reflection->getMethod('processTeamCapData');
-        $method->setAccessible(true);
-        
         $mockSeason = $this->createMockSeason();
         
         // Mock 5 players under contract (15 total slots - 5 = 10 FA slots)
         $contractedPlayers = array_fill(0, 5, ['cy' => 2024, 'cyt' => 2025]);
         $this->mockRepository->method('getPlayersUnderContractAfterSeason')->willReturn($contractedPlayers);
         
-        $result = $method->invoke($this->service, $mockTeam, $mockSeason);
+        $result = $this->service->publicProcessTeamCapData($mockTeam, $mockSeason);
         
         $this->assertEquals(10, $result['freeAgencySlots']);
     }
@@ -145,14 +139,10 @@ class CapInfoServiceTest extends TestCase
     {
         $mockTeam = $this->createMockTeamWithMleLle(1, 1);
         
-        $reflection = new \ReflectionClass($this->service);
-        $method = $reflection->getMethod('processTeamCapData');
-        $method->setAccessible(true);
-        
         $mockSeason = $this->createMockSeason();
         $this->mockRepository->method('getPlayersUnderContractAfterSeason')->willReturn([]);
         
-        $result = $method->invoke($this->service, $mockTeam, $mockSeason);
+        $result = $this->service->publicProcessTeamCapData($mockTeam, $mockSeason);
         
         // Should have availableSalary for 6 years
         $this->assertArrayHasKey('availableSalary', $result);
@@ -165,14 +155,10 @@ class CapInfoServiceTest extends TestCase
     {
         $mockTeam = $this->createMockTeamWithMleLle(1, 1);
         
-        $reflection = new \ReflectionClass($this->service);
-        $method = $reflection->getMethod('processTeamCapData');
-        $method->setAccessible(true);
-        
         $mockSeason = $this->createMockSeason();
         $this->mockRepository->method('getPlayersUnderContractAfterSeason')->willReturn([]);
         
-        $result = $method->invoke($this->service, $mockTeam, $mockSeason);
+        $result = $this->service->publicProcessTeamCapData($mockTeam, $mockSeason);
         
         $this->assertArrayHasKey('positionSalaries', $result);
         $positions = ['PG', 'SG', 'SF', 'PF', 'C'];

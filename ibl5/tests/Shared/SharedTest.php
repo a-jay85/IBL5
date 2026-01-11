@@ -14,12 +14,15 @@ use Shared\Contracts\SharedRepositoryInterface;
 class SharedTest extends TestCase
 {
     private \Shared $shared;
+    /** @var SharedRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject */
     private \PHPUnit\Framework\MockObject\MockObject $mockRepository;
 
     protected function setUp(): void
     {
         // Create mock repository for testing Shared wrapper
-        $this->mockRepository = $this->createMock(SharedRepositoryInterface::class);
+        /** @var SharedRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject $mock */
+        $mock = $this->createMock(SharedRepositoryInterface::class);
+        $this->mockRepository = $mock;
         
         // Create Shared with null db and injected mock repository
         $this->shared = new \Shared(null, $this->mockRepository);
@@ -161,8 +164,11 @@ class SharedTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Database error');
 
-        ob_start();
-        $this->shared->resetSimContractExtensionAttempts();
-        ob_get_clean();
+        try {
+            ob_start();
+            $this->shared->resetSimContractExtensionAttempts();
+        } finally {
+            ob_end_clean();
+        }
     }
 }

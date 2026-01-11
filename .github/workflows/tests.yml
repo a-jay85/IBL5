@@ -143,6 +143,7 @@ jobs:
         DB_PORT: 3306
       run: |
         vendor/bin/phpunit \
+          --configuration phpunit.ci.xml \
           --testdox \
           --no-coverage \
           --colors=always

@@ -356,38 +356,8 @@ class Discord
     }
 }
 
-class Shared
-{
-        protected $db;
-        protected $commonRepository;
-        
-        public function __construct($db)
-        {
-            $this->db = $db;
-            $this->commonRepository = new \Services\CommonMysqliRepository($db);
-        }
-        
-        public function getTidFromTeamname($teamname)
-        {
-            return $this->commonRepository->getTidFromTeamname($teamname);
-        }
-        
-        public function resetSimContractExtensionAttempts()
-        {
-            echo '<p>Resetting sim contract extension attempts...</p>';
-            $sqlQueryString = "UPDATE ibl_team_info SET Used_Extension_This_Chunk = 0;";
-            if ($this->db->sql_query($sqlQueryString)) {
-                echo '<p>Sim contract extension attempts have been reset.</p>';
-                return;
-            }
-        }
-        
-        public function getCurrentOwnerOfDraftPick($draftYear, $draftRound, $teamNameOfDraftPickOrigin)
-        {
-            // Mock implementation for testing
-            return $teamNameOfDraftPickOrigin;
-        }
-}
+// Shared class is now properly mockable via repository injection
+// Tests use the real Shared class with mock repositories
 
 class UI
 {
@@ -444,6 +414,7 @@ class Season
     public $freeAgencyNotificationsState = 'Off';
     
     const IBL_PRESEASON_YEAR = 9998;
+    const IBL_OLYMPICS_MONTH = 8;
     const IBL_HEAT_MONTH = 10;
     const IBL_REGULAR_SEASON_STARTING_MONTH = 11;
     const IBL_ALL_STAR_MONTH = 2;

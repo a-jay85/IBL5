@@ -73,11 +73,11 @@
             <directory>tests/League</directory>
         </testsuite>
         <testsuite name="Root Tests">
+            <!-- DatabaseConnectionTest.php excluded for CI/CD - requires local MAMP credentials -->
             <file>tests/ContractRulesTest.php</file>
             <file>tests/GameTest.php</file>
             <file>tests/DraftPickTest.php</file>
             <file>tests/LeagueTest.php</file>
-            <file>tests/DatabaseConnectionTest.php</file>
             <file>tests/SeasonTest.php</file>
             <file>tests/TeamTest.php</file>
             <file>tests/BoxscoreTest.php</file>

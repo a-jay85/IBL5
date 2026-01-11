@@ -56,7 +56,7 @@ class CapInfoService
      * @param \Season $season Current season
      * @return array Processed cap data for the team
      */
-    private function processTeamCapData(\Team $team, \Season $season): array
+    protected function processTeamCapData(\Team $team, \Season $season): array
     {
         $salaryCapSpent = $team->getSalaryCapArray($season);
         $freeAgencySlots = 15;

@@ -29,4 +29,12 @@ interface StandingsRepositoryInterface
      * @return array|null Streak data or null if not found
      */
     public function getTeamStreakData(int $teamId): ?array;
+
+    /**
+     * Get team offensive and defensive stats for Pythagorean calculation
+     *
+     * @param int $teamId Team ID
+     * @return array|null Array with 'pointsScored' and 'pointsAllowed' or null if not found
+     */
+    public function getTeamPythagoreanStats(int $teamId): ?array;
 }

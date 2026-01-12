@@ -36,7 +36,7 @@ vendor/bin/phpunit -c phpunit.xml
 - **NEVER** check SQL query structure (except security tests)
 - **NEVER** assert on method call counts (except caching tests)
 
-## Test File Structure
+## Unit Test File Structure
 
 ```php
 <?php
@@ -96,6 +96,113 @@ class ModuleServiceTest extends TestCase
 }
 ```
 
+## Integration Test File Structure
+
+Integration tests use `IntegrationTestCase` base class with `TestDataFactory` for complete workflow testing:
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Integration\ModuleName;
+
+use Tests\Integration\IntegrationTestCase;
+use Tests\Integration\Mocks\TestDataFactory;
+use ModuleName\ModuleHandler;
+
+class ModuleIntegrationTest extends IntegrationTestCase
+{
+    private ModuleHandler $handler;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        
+        // Create real or mock dependencies
+        $this->handler = new ModuleHandler($this->mockDb);
+        
+        // Prevent external notifications
+        $_SERVER['SERVER_NAME'] = 'localhost';
+    }
+
+    protected function tearDown(): void
+    {
+        unset($this->handler);
+        unset($_SERVER['SERVER_NAME']);
+        parent::tearDown();
+    }
+
+    public function testCompleteWorkflow(): void
+    {
+        // Arrange - Use TestDataFactory for consistent fixtures
+        $player = TestDataFactory::createPlayer(['pid' => 1]);
+        $team = TestDataFactory::createTeam(['teamid' => 1]);
+        
+        $this->mockDb->setQueryResult(
+            'SELECT * FROM ibl_plr WHERE pid = 1',
+            [$player]
+        );
+
+        // Act
+        $result = $this->handler->processWorkflow(1);
+
+        // Assert - Both outcome and database operations
+        $this->assertTrue($result->isSuccessful());
+        $this->assertQueryExecuted('INSERT INTO ibl_module');
+        $this->assertQueryNotExecuted('DELETE FROM ibl_plr');
+    }
+}
+```
+
+## TestDataFactory
+
+Factory methods provide consistent mock data with optional overrides:
+
+```php
+// Create player with defaults
+$player = TestDataFactory::createPlayer();
+
+// Override specific fields
+$player = TestDataFactory::createPlayer(['pid' => 99, 'name' => 'John Doe']);
+
+// Create team and season similarly
+$team = TestDataFactory::createTeam(['teamid' => 2]);
+$season = TestDataFactory::createSeason(['Beginning_Year' => 2026]);
+```
+
+Factory includes **all** fields required by `PlayerRepository`, including rating fields (r_fga, r_fgp, etc.) and positional data (oo, od, do, dd).
+
+## MockDatabase Framework
+
+The integration test suite includes a complete mock database system in `tests/Integration/Mocks/`:
+
+- **MockDatabase** - Main mock database class with query tracking
+- **MockPreparedStatement** - Mock prepared statements with parameter binding
+- **MockDatabaseResult** - Mock result sets with row fetching
+- **TestDataFactory** - Fixture creation factory for players, teams, seasons
+
+Key features:
+- Tracks all executed queries for assertion
+- Simulates prepared statement behavior with parameter binding
+- Automatically injects into global `$mysqli_db` for legacy code
+- No real database required - all operations are in-memory
+
+Example usage:
+```php
+// Set expected result for a query
+$this->mockDb->setQueryResult('SELECT * FROM ibl_plr WHERE pid = ?', [
+    ['pid' => 1, 'name' => 'Player One'],
+    ['pid' => 2, 'name' => 'Player Two']
+]);
+
+// Mock prepared statement with automatic injection
+$stmt = $GLOBALS['mysqli_db']->prepare('SELECT * FROM ibl_plr WHERE pid = ?');
+$stmt->bind_param('i', $playerId);
+$stmt->execute();
+$result = $stmt->get_result();
+```
+
 ## Test Registration
 
 Register new tests in **BOTH** configuration files:
@@ -126,11 +233,20 @@ Add **only** to `ibl5/phpunit.xml` (not CI/CD):
 
 ## Completion Criteria
 
+**Unit Tests:**
 - [ ] All tests pass: `vendor/bin/phpunit tests/ModuleName/`
 - [ ] Tests registered in **both** `ibl5/phpunit.xml` and `ibl5/phpunit.ci.xml` (unless local-only)
 - [ ] No `markTestSkipped()` calls
 - [ ] No ReflectionClass for private methods
 - [ ] Zero warnings, zero failures
+
+**Integration Tests:**
+- [ ] Extends `IntegrationTestCase` for database interaction tests
+- [ ] Uses `TestDataFactory` for consistent fixture creation
+- [ ] Tests complete workflows, not isolated components
+- [ ] Asserts both outcomes and database operations (`assertQueryExecuted`, etc.)
+- [ ] Prevents external notifications (`$_SERVER['SERVER_NAME'] = 'localhost'`)
+- [ ] Registered in **both** `phpunit.xml` and `phpunit.ci.xml`
 
 ## Templates
 
@@ -138,6 +254,14 @@ See [templates/BaseTestCase.php](./templates/BaseTestCase.php) for starter templ
 
 ## Reference Test Suites
 
+### Unit Tests
 - `tests/PlayerSearch/` - 54 tests, comprehensive validation
 - `tests/Player/` - 84 tests, service and calculator coverage
 - `tests/Waivers/` - Good edge case coverage
+
+### Integration Tests
+- `tests/Integration/Draft/` - Draft selection workflows with player creation
+- `tests/Integration/Extension/` - Contract extension complete workflows
+- `tests/Integration/Negotiation/` - Free agent negotiation processes
+- `tests/Integration/Trading/` - Trade validation and processing
+- `tests/Integration/FreeAgency/` - Free agency offer workflows

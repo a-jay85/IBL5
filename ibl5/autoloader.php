@@ -9,6 +9,7 @@
  * - Classes are stored in the classes/ directory
  * - Namespaces map to subdirectories (e.g., Draft\DraftRepository -> classes/Draft/DraftRepository.php)
  * - Underscores in class names map to subdirectories (e.g., Trading_Manager -> classes/Trading/Manager.php)
+ * - Tests\ namespace maps to tests/ directory (for integration test helpers)
  */
 
 function mlaphp_autoloader($class)
@@ -33,8 +34,16 @@ function mlaphp_autoloader($class)
     // convert underscores in the class name to directory separators
     $subpath .= str_replace('_', DIRECTORY_SEPARATOR, $class);
 
-    // the path to our central class directory location
-    $dir = __DIR__ . DIRECTORY_SEPARATOR . 'classes';
+    // Determine base directory based on namespace
+    if (strpos($subpath, 'Tests' . DIRECTORY_SEPARATOR) === 0) {
+        // Tests namespace - load from tests/ directory
+        $dir = __DIR__ . DIRECTORY_SEPARATOR . 'tests';
+        // Remove 'Tests/' prefix from subpath
+        $subpath = substr($subpath, 6); // strlen('Tests/')
+    } else {
+        // All other classes - load from classes/ directory
+        $dir = __DIR__ . DIRECTORY_SEPARATOR . 'classes';
+    }
 
     // Build the file path and require it if it exists
     $file = $dir . DIRECTORY_SEPARATOR . $subpath . '.php';

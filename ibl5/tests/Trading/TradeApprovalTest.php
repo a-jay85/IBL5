@@ -15,6 +15,15 @@ class TradeApprovalTest extends TestCase
             ['counter' => 1000],
             ['name' => 'Test Player', 'pos' => 'PG']
         ]);
+        
+        // Prevent Discord notifications and set SERVER_NAME for TradingRepository
+        $_SERVER['SERVER_NAME'] = 'localhost';
+    }
+    
+    protected function tearDown(): void
+    {
+        unset($_SERVER['SERVER_NAME']);
+        parent::tearDown();
     }
     
     /**

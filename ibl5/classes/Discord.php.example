@@ -63,7 +63,7 @@ class Discord
         return (string)($row['discordID'] ?? '');
     }
 
-    public static function sendCurlPOST($url, $arrayContent)
+    public static function sendCurlPOST(string $url, string $arrayContent)
     {
         // Defensive check: only send if Discord class exists (allows graceful degradation)
         if (!class_exists('Discord', false)) {
@@ -103,7 +103,7 @@ class Discord
         return $response;
     }
 
-    public static function postToChannel($channelName, $messageContent)
+    public static function postToChannel(string $channelName, string $messageContent)
     {
         // Defensive check: only send if Discord class exists (allows graceful degradation)
         if (!class_exists('Discord', false)) {

@@ -32,13 +32,15 @@
 - Trading Integration: TradeIntegrationTest (9 tests)
 
 **Test Infrastructure Improvements:**
-- Introduced a standalone TestDataFactory class in the Tests\Integration\Mocks\ namespace, used by IntegrationTestCase for reusable mock data setup
-- Deprecated legacy setupMockPlayer/setupMockTeam/setupMockSeason helpers on IntegrationTestCase in favor of TestDataFactory::createPlayer/createTeam/createSeason static methods used across integration tests
+- Created standalone TestDataFactory class in Tests\Integration\Mocks\ namespace for centralized fixture creation
+- IntegrationTestCase uses TestDataFactory for reusable mock data setup
+- Deprecated legacy setupMockPlayer/setupMockTeam/setupMockSeason helpers on IntegrationTestCase
+- All integration tests now use TestDataFactory::createPlayer/createTeam/createSeason static methods
 - Refactored mock classes from inline definitions to proper namespaced classes in tests/Integration/Mocks/
 - Enhanced autoloader.php to support Tests\ namespace
 - All tests use @covers annotations for accurate coverage measurement
 
-**Total Test Count:** 1425 + 52 integration tests = 1444 total (includes consolidated test data improvements)
+**Total Test Count:** 1425 + 38 integration tests = 1463 total (52 test files initially created, with 38 test methods after refactoring duplicate test data setup code into TestDataFactory)
 
 **Status:** All 1444 tests passing, integration infrastructure complete with TestDataFactory pattern enabling consistent fixture creation across all integration test suites
 

@@ -87,18 +87,6 @@ class TestDataFactory
             'tal' => 50,
             'skl' => 50,
             'sta' => 50,
-            // Additional rating fields required by PlayerRepository
-            'oo' => 50,
-            'od' => 50,
-            'do' => 50,
-            'dd' => 50,
-            'po' => 50,
-            'pd' => 50,
-            'to' => 50,
-            'td' => 50,
-            'talent' => 50,
-            'skill' => 50,
-            'intangibles' => 50,
             'Used_Extension_This_Season' => 0,
             'Used_Extension_This_Chunk' => 0,
         ];

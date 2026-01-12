@@ -16,7 +16,8 @@ class UI
         }
         
         // Otherwise, output normally (though this shouldn't happen in tests)
-        // Use XSS protection for all dynamic content
+        // Note: Using htmlspecialchars directly in test mock for simplicity.
+        // In production code, use Utilities\HtmlSanitizer::safeHtmlOutput() per coding guidelines.
         static $debugId = 0;
         $debugId++;
         

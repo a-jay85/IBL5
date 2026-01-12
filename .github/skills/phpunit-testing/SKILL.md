@@ -139,10 +139,7 @@ class ModuleIntegrationTest extends IntegrationTestCase
         $player = TestDataFactory::createPlayer(['pid' => 1]);
         $team = TestDataFactory::createTeam(['teamid' => 1]);
         
-        $this->mockDb->setQueryResult(
-            'SELECT * FROM ibl_plr WHERE pid = 1',
-            [$player]
-        );
+        $this->mockDb->setMockData([$player]);
 
         // Act
         $result = $this->handler->processWorkflow(1);
@@ -171,7 +168,7 @@ $team = TestDataFactory::createTeam(['teamid' => 2]);
 $season = TestDataFactory::createSeason(['Beginning_Year' => 2026]);
 ```
 
-Factory includes **all** fields required by `PlayerRepository`, including rating fields (r_fga, r_fgp, etc.) and positional data (offo, offd, offp, offt, defo, defd, defp, deft).
+Factory includes **all** fields required by `PlayerRepository`, including rating fields (r_fga, r_fgp, etc.) and positional data (offo, offd, offp, offt, defo, defd, defp, deft), plus player attributes (tal, skl, int, sta).
 
 ## MockDatabase Framework
 

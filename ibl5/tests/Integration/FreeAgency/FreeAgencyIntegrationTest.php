@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Integration\FreeAgency;
 
 use Tests\Integration\IntegrationTestCase;
+use Tests\Integration\Mocks\TestDataFactory;
 use FreeAgency\FreeAgencyProcessor;
 
 /**
@@ -367,7 +368,7 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
      */
     private function getBaseFreeAgentData(): array
     {
-        return array_merge($this->setupMockPlayer([
+        return array_merge(TestDataFactory::createPlayer([
             'pid' => 1,
             'name' => 'Test FreeAgent',
             'tid' => 0,
@@ -379,10 +380,10 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
             // Free agent contract status (not signed)
             'cy' => 0,  // Current year = 0 (not in contract)
             'cy1' => '0',  // Year 1 salary = '0' (unsigned)
-        ]), $this->setupMockTeam([
+        ]), TestDataFactory::createTeam([
             'teamid' => 1,
             'team_name' => 'Miami Cyclones',
-        ]), $this->setupMockSeason([
+        ]), TestDataFactory::createSeason([
             'Phase' => 'Free Agency',
         ]), [
             // Free agency specific fields

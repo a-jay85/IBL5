@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Integration\Negotiation;
 
 use Tests\Integration\IntegrationTestCase;
+use Tests\Integration\Mocks\TestDataFactory;
 use Negotiation\NegotiationProcessor;
 
 /**
@@ -183,7 +184,7 @@ class NegotiationIntegrationTest extends IntegrationTestCase
      */
     private function getBaseNegotiationData(): array
     {
-        return array_merge($this->setupMockPlayer([
+        return array_merge(TestDataFactory::createPlayer([
             'pid' => 1,
             'name' => 'Test Player',
             'tid' => 1,
@@ -191,10 +192,10 @@ class NegotiationIntegrationTest extends IntegrationTestCase
             'position' => 'SG',
             'exp' => 5,
             'bird_years' => 2,
-        ]), $this->setupMockTeam([
+        ]), TestDataFactory::createTeam([
             'teamid' => 1,
             'team_name' => 'Miami Cyclones',
-        ]), $this->setupMockSeason([
+        ]), TestDataFactory::createSeason([
             'Phase' => 'Regular Season',
         ]), [
             // Contract fields

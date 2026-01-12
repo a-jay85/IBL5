@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Integration\Draft;
 
 use Tests\Integration\IntegrationTestCase;
+use Tests\Integration\Mocks\TestDataFactory;
 use Draft\DraftSelectionHandler;
 
 /**
@@ -276,7 +277,7 @@ class DraftIntegrationTest extends IntegrationTestCase
      */
     private function getBaseDraftData(): array
     {
-        return array_merge($this->setupMockTeam([
+        return array_merge(TestDataFactory::createTeam([
             'teamid' => 1,
             'team_name' => 'Miami Cyclones',
         ]), [

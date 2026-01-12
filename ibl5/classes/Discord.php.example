@@ -31,9 +31,13 @@ class Discord
     private const CHANNEL_WAIVER_WIRE = 'INSERTWEBHOOKURLHERE';
     private const CHANNEL_TESTING = 'INSERTWEBHOOKURLHERE';
 
-    private \mysqli $db;
+    /** @var \mysqli|MockDatabase Database connection (mysqli in production, MockDatabase in tests) */
+    private $db;
 
-    public function __construct(\mysqli $db)
+    /**
+     * @param \mysqli|object $db Database connection (accepts MockDatabase for testing)
+     */
+    public function __construct($db)
     {
         $this->db = $db;
     }
@@ -63,6 +67,11 @@ class Discord
     {
         // Defensive check: only send if Discord class exists (allows graceful degradation)
         if (!class_exists('Discord', false)) {
+            return null;
+        }
+
+        // Skip actual HTTP calls during PHPUnit testing
+        if (defined('PHPUNIT_RUNNING') || (defined('PHPUNIT_COMPOSER_INSTALL') && PHPUNIT_COMPOSER_INSTALL)) {
             return null;
         }
 
@@ -98,6 +107,11 @@ class Discord
     {
         // Defensive check: only send if Discord class exists (allows graceful degradation)
         if (!class_exists('Discord', false)) {
+            return;
+        }
+
+        // Skip Discord posting during PHPUnit testing
+        if (defined('PHPUNIT_RUNNING') || (defined('PHPUNIT_COMPOSER_INSTALL') && PHPUNIT_COMPOSER_INSTALL)) {
             return;
         }
 

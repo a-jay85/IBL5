@@ -6,6 +6,11 @@
  * without requiring the full IBL5 application context.
  */
 
+// Define that we're running in PHPUnit - prevents Discord HTTP calls, etc.
+if (!defined('PHPUNIT_RUNNING')) {
+    define('PHPUNIT_RUNNING', true);
+}
+
 // Define constants that might be needed
 if (!defined('DIRECTORY_SEPARATOR')) {
     define('DIRECTORY_SEPARATOR', '/');
@@ -21,7 +26,6 @@ class_alias('Tests\\Integration\\Mocks\\MockDatabase', 'MockDatabase');
 class_alias('Tests\\Integration\\Mocks\\MockDatabaseResult', 'MockDatabaseResult');
 class_alias('Tests\\Integration\\Mocks\\MockPreparedStatement', 'MockPreparedStatement');
 class_alias('Tests\\Integration\\Mocks\\MockMysqliResult', 'MockMysqliResult');
-class_alias('Tests\\Integration\\Mocks\\Discord', 'Discord');
 class_alias('Tests\\Integration\\Mocks\\UI', 'UI');
 class_alias('Tests\\Integration\\Mocks\\Season', 'Season');
 

@@ -8,15 +8,15 @@ namespace Tests\Integration\Mocks;
  */
 class MockDatabaseResult
 {
-    private $data;
-    private $position = 0;
+    private array $data;
+    private int $position = 0;
     
-    public function __construct($data = [])
+    public function __construct(array $data = [])
     {
-        $this->data = is_array($data) ? $data : [];
+        $this->data = $data;
     }
     
-    public function getResult($row, $field)
+    public function getResult(int $row, int|string|null $field): mixed
     {
         // Handle numeric field access
         if (is_numeric($field)) {
@@ -27,7 +27,7 @@ class MockDatabaseResult
         return isset($this->data[$row][$field]) ? $this->data[$row][$field] : null;
     }
     
-    public function fetchRow()
+    public function fetchRow(): array|false
     {
         if ($this->position < count($this->data)) {
             $row = $this->data[$this->position++];
@@ -41,7 +41,7 @@ class MockDatabaseResult
         return false;
     }
     
-    public function fetchAssoc()
+    public function fetchAssoc(): array|false
     {
         if ($this->position < count($this->data)) {
             return $this->data[$this->position++];
@@ -49,7 +49,7 @@ class MockDatabaseResult
         return false;
     }
     
-    public function numRows()
+    public function numRows(): int
     {
         return count($this->data);
     }

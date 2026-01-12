@@ -7,20 +7,20 @@ namespace Tests\Integration\Mocks;
  */
 class Season
 {
-    public $phase = 'Regular Season';
-    public $endingYear = 2024;
-    public $beginningYear = 2023;
-    public $regularSeasonStartDate;
-    public $postAllStarStartDate;
-    public $playoffsStartDate;
-    public $playoffsEndDate;
-    public $lastSimNumber = 1;
-    public $lastSimStartDate = '2024-01-01';
-    public $lastSimEndDate = '2024-01-02';
-    public $projectedNextSimEndDate = '2024-01-03';
-    public $allowTrades = 'Yes';
-    public $allowWaivers = 'Yes';
-    public $freeAgencyNotificationsState = 'Off';
+    public string $phase = 'Regular Season';
+    public int $endingYear = 2024;
+    public int $beginningYear = 2023;
+    public ?\DateTime $regularSeasonStartDate = null;
+    public ?\DateTime $postAllStarStartDate = null;
+    public ?\DateTime $playoffsStartDate = null;
+    public ?\DateTime $playoffsEndDate = null;
+    public int $lastSimNumber = 1;
+    public string $lastSimStartDate = '2024-01-01';
+    public string $lastSimEndDate = '2024-01-02';
+    public string $projectedNextSimEndDate = '2024-01-03';
+    public string $allowTrades = 'Yes';
+    public string $allowWaivers = 'Yes';
+    public string $freeAgencyNotificationsState = 'Off';
     
     const IBL_PRESEASON_YEAR = 9998;
     const IBL_OLYMPICS_MONTH = 8;
@@ -30,7 +30,7 @@ class Season
     const IBL_REGULAR_SEASON_ENDING_MONTH = 5;
     const IBL_PLAYOFF_MONTH = 6;
     
-    protected $db;
+    protected object $db;
     
     /**
      * Mock constructor for testing - accepts mysqli or legacy db object
@@ -68,7 +68,7 @@ class Season
      * 
      * @return array Array with keys: Sim, 'Start Date', 'End Date'
      */
-    private function getLastSimDatesArray()
+    private function getLastSimDatesArray(): array
     {
         return [
             'Sim' => $this->lastSimNumber,
@@ -77,7 +77,7 @@ class Season
         ];
     }
     
-    private function getProjectedNextSimEndDate($db, $lastSimEndDate)
+    private function getProjectedNextSimEndDate(object $db, string $lastSimEndDate): string
     {
         return $this->projectedNextSimEndDate;
     }

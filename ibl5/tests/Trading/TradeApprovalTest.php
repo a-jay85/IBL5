@@ -260,7 +260,7 @@ class TradeApprovalTest extends TestCase
  */
 class QueryAwareMockDatabase extends MockDatabase
 {
-    public function sql_query($query)
+    public function sql_query(string $query): object|bool
     {
         // Track all executed queries
         $queries = $this->getExecutedQueries();

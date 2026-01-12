@@ -38,8 +38,8 @@ function mlaphp_autoloader($class)
     if (strpos($subpath, 'Tests' . DIRECTORY_SEPARATOR) === 0) {
         // Tests namespace - load from tests/ directory
         $dir = __DIR__ . DIRECTORY_SEPARATOR . 'tests';
-        // Remove 'Tests/' prefix from subpath
-        $subpath = substr($subpath, 6); // strlen('Tests/')
+        // Remove 'Tests' . DIRECTORY_SEPARATOR prefix from subpath
+        $subpath = substr($subpath, strlen('Tests' . DIRECTORY_SEPARATOR));
     } else {
         // All other classes - load from classes/ directory
         $dir = __DIR__ . DIRECTORY_SEPARATOR . 'classes';

@@ -8,10 +8,10 @@ namespace Tests\Integration\Mocks;
  */
 class MockPreparedStatement
 {
-    private $mockDb;
-    private $query;
-    private $boundParams = [];
-    private $paramTypes = [];
+    private ?MockDatabase $mockDb;
+    private string $query;
+    private array $boundParams = [];
+    private array $paramTypes = [];
     public string|int $affected_rows = 0;
     public string $error = '';
     public int $errno = 0;
@@ -23,7 +23,7 @@ class MockPreparedStatement
      *                                  rather than using any shared instance.  
      * @param string $query             The SQL query string for this mock statement.  
      */  
-    public function __construct(?MockDatabase $mockDb, $query = '')
+    public function __construct(?MockDatabase $mockDb, string $query = '')
     {
         $this->mockDb = $mockDb ?? new MockDatabase();
         $this->query = $query;
@@ -34,7 +34,7 @@ class MockPreparedStatement
      * @param string $types Parameter types (s=string, i=integer, d=double, b=blob)
      * @param mixed ...$params Parameters to bind
      */
-    public function bind_param($types, &...$params): bool
+    public function bind_param(string $types, &...$params): bool
     {
         $this->paramTypes = str_split($types);
         foreach ($params as $index => $param) {
@@ -48,18 +48,7 @@ class MockPreparedStatement
      */
     public function execute(?array $params = null): bool
     {
-        // Replace placeholders with bound values in the query
-        $query = $this->query;
-        foreach ($this->boundParams as $param) {
-            // Simple placeholder replacement (?) with the actual value
-            // Handle null values to avoid PHP 8.3 deprecation warning
-            if ($param === null) {
-                $value = 'NULL';
-            } else {
-                $value = is_string($param) ? "'" . addslashes($param) . "'" : $param;
-            }
-            $query = preg_replace('/\?/', (string)$value, $query, 1);
-        }
+        $query = $this->replacePlaceholders($this->query);
         
         // Execute the query using the mock database
         $result = $this->mockDb->sql_query($query);
@@ -80,18 +69,7 @@ class MockPreparedStatement
      */
     public function get_result(): object|false
     {
-        // Replace placeholders with bound values in the query
-        $query = $this->query;
-        foreach ($this->boundParams as $param) {
-            // Simple placeholder replacement (?) with the actual value
-            // Handle null values to avoid PHP 8.3 deprecation warning
-            if ($param === null) {
-                $value = 'NULL';
-            } else {
-                $value = is_string($param) ? "'" . addslashes($param) . "'" : $param;
-            }
-            $query = preg_replace('/\?/', (string)$value, $query, 1);
-        }
+        $query = $this->replacePlaceholders($this->query);
         
         // Execute the query using the mock database (this tracks the query)
         $mockResult = $this->mockDb->sql_query($query);
@@ -107,5 +85,24 @@ class MockPreparedStatement
     {
         // Mock close - just return true
         return true;
+    }
+    
+    /**
+     * Replace placeholders with bound values in the query
+     * Extracted to avoid code duplication between execute() and get_result()
+     */
+    private function replacePlaceholders(string $query): string
+    {
+        foreach ($this->boundParams as $param) {
+            // Simple placeholder replacement (?) with the actual value
+            // Handle null values to avoid PHP 8.3 deprecation warning
+            if ($param === null) {
+                $value = 'NULL';
+            } else {
+                $value = is_string($param) ? "'" . addslashes($param) . "'" : $param;
+            }
+            $query = preg_replace('/\?/', (string)$value, $query, 1);
+        }
+        return $query;
     }
 }

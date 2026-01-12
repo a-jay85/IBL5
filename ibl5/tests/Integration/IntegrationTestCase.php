@@ -6,6 +6,7 @@ namespace Tests\Integration;
 
 use PHPUnit\Framework\TestCase;
 use Tests\Integration\Mocks\TestDataFactory;
+use Tests\Integration\Mocks\MockDatabase;
 
 /**
  * Base class for integration tests
@@ -26,12 +27,12 @@ use Tests\Integration\Mocks\TestDataFactory;
  */
 abstract class IntegrationTestCase extends TestCase
 {
-    protected ?\MockDatabase $mockDb = null;
+    protected ?MockDatabase $mockDb = null;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->mockDb = new \MockDatabase();
+        $this->mockDb = new MockDatabase();
         $this->injectGlobalMockDb();
     }
 

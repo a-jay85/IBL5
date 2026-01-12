@@ -8,14 +8,14 @@ namespace Tests\Integration\Mocks;
  */
 class MockDatabase
 {
-    private $mockData = [];
-    private $mockTradeInfo = [];
-    private $numRows = null;
-    private $returnTrue = true;
-    private $executedQueries = [];
-    private $affectedRows = 0;
+    private array $mockData = [];
+    private array $mockTradeInfo = [];
+    private ?int $numRows = null;
+    private bool $returnTrue = true;
+    private array $executedQueries = [];
+    private int $affectedRows = 0;
     
-    public function sql_query($query)
+    public function sql_query(string $query): bool|object
     {
         // Track all executed queries for verification
         $this->executedQueries[] = $query;
@@ -72,7 +72,7 @@ class MockDatabase
         return new MockDatabaseResult($this->mockData);
     }
     
-    public function sql_result($result, $row, $field = null)
+    public function sql_result(object $result, int $row, int|string|null $field = null): mixed
     {
         if ($result instanceof MockDatabaseResult) {
             return $result->getResult($row, $field);
@@ -80,7 +80,7 @@ class MockDatabase
         return null;
     }
     
-    public function sql_fetchrow($result)
+    public function sql_fetchrow(object $result): array|false
     {
         if ($result instanceof MockDatabaseResult) {
             return $result->fetchRow();
@@ -88,7 +88,7 @@ class MockDatabase
         return false;
     }
     
-    public function sql_fetch_assoc($result)
+    public function sql_fetch_assoc(object $result): array|false
     {
         if ($result instanceof MockDatabaseResult) {
             return $result->fetchAssoc();
@@ -96,7 +96,7 @@ class MockDatabase
         return false;
     }
     
-    public function sql_numrows($result)
+    public function sql_numrows(object $result): int
     {
         // Allow manual override for testing
         if ($this->numRows !== null) {
@@ -109,49 +109,49 @@ class MockDatabase
         return 0;
     }
     
-    public function sql_affectedrows()
+    public function sql_affectedrows(): int
     {
         return $this->affectedRows;
     }
     
-    public function setMockData($data)
+    public function setMockData(array $data): void
     {
         $this->mockData = $data;
     }
     
-    public function setMockTradeInfo($data)
+    public function setMockTradeInfo(array $data): void
     {
         $this->mockTradeInfo = $data;
         // Also set numRows to match trade info count
         $this->numRows = count($data);
     }
     
-    public function setNumRows($numRows)
+    public function setNumRows(int $numRows): void
     {
         $this->numRows = $numRows;
     }
     
-    public function setAffectedRows($affectedRows)
+    public function setAffectedRows(int $affectedRows): void
     {
         $this->affectedRows = $affectedRows;
     }
     
-    public function setReturnTrue($returnTrue = true)
+    public function setReturnTrue(bool $returnTrue = true): void
     {
         $this->returnTrue = $returnTrue;
     }
     
-    public function getExecutedQueries()
+    public function getExecutedQueries(): array
     {
         return $this->executedQueries;
     }
     
-    public function clearQueries()
+    public function clearQueries(): void
     {
         $this->executedQueries = [];
     }
     
-    public function sql_escape_string($string)
+    public function sql_escape_string(string $string): string
     {
         // Simple escaping for mock - in production this would use mysqli_real_escape_string
         return addslashes($string);
@@ -161,7 +161,7 @@ class MockDatabase
      * Mock prepared statement support
      * Returns a MockPreparedStatement that supports bind_param and execute
      */
-    public function prepare($query)
+    public function prepare(string $query): MockPreparedStatement
     {
         return new MockPreparedStatement($this, $query);
     }

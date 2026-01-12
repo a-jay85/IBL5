@@ -171,7 +171,7 @@ $team = TestDataFactory::createTeam(['teamid' => 2]);
 $season = TestDataFactory::createSeason(['Beginning_Year' => 2026]);
 ```
 
-Factory includes **all** fields required by `PlayerRepository`, including rating fields (r_fga, r_fgp, etc.) and positional data (oo, od, do, dd).
+Factory includes **all** fields required by `PlayerRepository`, including rating fields (r_fga, r_fgp, etc.) and positional data (offo, offd, offp, offt, defo, defd, defp, deft).
 
 ## MockDatabase Framework
 
@@ -191,7 +191,7 @@ Key features:
 Example usage:
 ```php
 // Set expected result for a query
-$this->mockDb->setQueryResult('SELECT * FROM ibl_plr WHERE pid = ?', [
+$this->mockDb->setMockData([
     ['pid' => 1, 'name' => 'Player One'],
     ['pid' => 2, 'name' => 'Player Two']
 ]);

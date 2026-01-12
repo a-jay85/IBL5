@@ -7,7 +7,7 @@ namespace Tests\Integration\Mocks;
  */
 class UI
 {
-    public static function displayDebugOutput($content, $title = 'Debug Output')
+    public static function displayDebugOutput(string $content, string $title = 'Debug Output'): void
     {
         // In test mode, don't output anything
         // This prevents test output pollution
@@ -16,15 +16,19 @@ class UI
         }
         
         // Otherwise, output normally (though this shouldn't happen in tests)
+        // Use XSS protection for all dynamic content
         static $debugId = 0;
         $debugId++;
+        
+        $safeTitle = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
+        $safeContent = htmlspecialchars($content, ENT_QUOTES, 'UTF-8');
         
         echo "<div style='margin: 10px 0; border: 1px solid #ccc; border-radius: 4px;'>
             <div style='padding: 8px; background-color: #f5f5f5; border-bottom: 1px solid #ccc; cursor: pointer;'
                  onclick='toggleDebug$debugId()'>
-                <span id='debugIcon$debugId'>▶</span> $title
+                <span id='debugIcon$debugId'>▶</span> $safeTitle
             </div>
-            <pre id='debugContent$debugId' style='display: none; margin: 0; padding: 8px; background-color: #fff; overflow: auto;'>$content</pre>
+            <pre id='debugContent$debugId' style='display: none; margin: 0; padding: 8px; background-color: #fff; overflow: auto;'>$safeContent</pre>
         </div>
         <script>
             function toggleDebug$debugId() {

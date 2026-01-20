@@ -49,17 +49,17 @@ To avoid collisions with `plrParser.php`, drafted players are assigned PIDs in a
 | `age` | `age` | Player age |
 | `team` | `teamname`, `tid` | Team name and ID |
 | `sta` | `sta` | Stamina |
-| `offo` | `oo` | Offensive Outside |
-| `offd` | `od` | Offensive Drive |
-| `offp` | `po` | Offensive Post |
-| `offt` | `to` | Offensive Transition |
-| `defo` | `do` | Defensive Outside |
-| `defd` | `dd` | Defensive Drive |
-| `defp` | `pd` | Defensive Post |
-| `deft` | `td` | Defensive Transition |
-| `tal` | `talent` | Talent rating |
-| `skl` | `skill` | Skill rating |
-| `int` | `intangibles` | Intangibles rating |
+| `oo` | `oo` | Offensive Outside |
+| `do` | `do` | Offensive Drive |
+| `po` | `po` | Offensive Post |
+| `to` | `to` | Offensive Transition |
+| `od` | `od` | Defensive Outside |
+| `dd` | `dd` | Defensive Drive |
+| `pd` | `pd` | Defensive Post |
+| `td` | `td` | Defensive Transition |
+| `talent` | `talent` | Talent rating |
+| `skill` | `skill` | Skill rating |
+| `intangibles` | `intangibles` | Intangibles rating |
 
 ### Default Values Set
 - `pid`: Auto-generated (MAX(pid) + 1)

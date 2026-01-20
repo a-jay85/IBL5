@@ -3,6 +3,8 @@
 namespace SiteStatistics;
 
 use PHPUnit\Framework\TestCase;
+use Tests\Integration\Mocks\MockPreparedStatement;
+use Tests\Integration\Mocks\MockDatabaseResult;
 
 class StatisticsRepositoryTest extends TestCase
 {
@@ -34,12 +36,12 @@ class StatisticsRepositoryTest extends TestCase
             
             // Override prepare to handle both fetchAll and fetchOne patterns
             // For fetchOne, we need to track consumption across multiple prepare() calls
-            public function prepare($query)
+            public function prepare(string $query): MockPreparedStatement
             {
                 $sharedState = &$this->sharedState;
                 $results = $this->queryResults;
                 
-                $stmt = new class($this, $results, $sharedState) extends \MockPreparedStatement {
+                $stmt = new class($this, $results, $sharedState) extends MockPreparedStatement {
                     private array $results;
                     private array $sharedState;
                     
@@ -55,14 +57,13 @@ class StatisticsRepositoryTest extends TestCase
                         $currentIndex = $this->sharedState['fetchIndex'];
                         $this->sharedState['fetchIndex']++; // Consume the result for the next prepare() call
                         
-                        return new class($this->results, $currentIndex) extends \MockMysqliResult {
+                        return new class($this->results, $currentIndex) extends MockDatabaseResult {
                             private int $localFetchIndex = 0;
                             private array $allResults;
                             private int $startIndex;
                             
                             public function __construct(array $results, int $startIndex) {
-                                $mockResult = new \MockDatabaseResult($results);
-                                parent::__construct($mockResult);
+                                parent::__construct($results);
                                 $this->allResults = $results;
                                 $this->startIndex = $startIndex;
                                 $this->localFetchIndex = 0;

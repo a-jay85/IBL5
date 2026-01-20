@@ -201,17 +201,17 @@ class DraftRepositoryTest extends TestCase
             'pos' => 'PG',
             'age' => 22,
             'sta' => 85,
-            'offo' => 75,
-            'offd' => 70,
-            'offp' => 65,
-            'offt' => 60,
-            'defo' => 80,
-            'defd' => 75,
-            'defp' => 70,
-            'deft' => 65,
-            'tal' => 80,
-            'skl' => 75,
-            'int' => 70
+            'oo' => 75,
+            'do' => 70,
+            'po' => 65,
+            'to' => 60,
+            'od' => 80,
+            'dd' => 75,
+            'pd' => 70,
+            'td' => 65,
+            'talent' => 80,
+            'skill' => 75,
+            'intangibles' => 70
         ];
         
         // The mock will return the draft class data for SELECT queries
@@ -256,17 +256,17 @@ class DraftRepositoryTest extends TestCase
             'pos' => 'PG',
             'age' => 21,
             'sta' => 80,
-            'offo' => 70,
-            'offd' => 65,
-            'offp' => 60,
-            'offt' => 55,
-            'defo' => 75,
-            'defd' => 70,
-            'defp' => 65,
-            'deft' => 60,
-            'tal' => 75,
-            'skl' => 70,
-            'int' => 65
+            'oo' => 70,
+            'do' => 65,
+            'po' => 60,
+            'to' => 55,
+            'od' => 75,
+            'dd' => 70,
+            'pd' => 65,
+            'td' => 60,
+            'talent' => 75,
+            'skill' => 70,
+            'intangibles' => 65
         ];
         
         $this->mockDb->setMockData([$draftClassData]);
@@ -298,17 +298,17 @@ class DraftRepositoryTest extends TestCase
             'pos' => 'PG',
             'age' => 23,
             'sta' => 90,
-            'offo' => 80,
-            'offd' => 75,
-            'offp' => 70,
-            'offt' => 65,
-            'defo' => 85,
-            'defd' => 80,
-            'defp' => 75,
-            'deft' => 70,
-            'tal' => 85,
-            'skl' => 80,
-            'int' => 75
+            'oo' => 80,
+            'do' => 75,
+            'po' => 70,
+            'to' => 65,
+            'od' => 85,
+            'dd' => 80,
+            'pd' => 75,
+            'td' => 70,
+            'talent' => 85,
+            'skill' => 80,
+            'intangibles' => 75
         ];
         
         $this->mockDb->setMockData([$draftClassData]);

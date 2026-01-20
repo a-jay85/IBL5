@@ -1,38 +1,42 @@
 <?php
 
+declare(strict_types=1);
+
 require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
+
+use Utilities\HtmlSanitizer;
 
 Nuke\Header::header();
 
 echo "<HTML><HEAD><TITLE>End of Year Voting Result</TITLE></HEAD><BODY>";
 
-$Team_Name = $_POST['teamname'];
-$MVP1 = $_POST['MVP'][1];
-$MVP2 = $_POST['MVP'][2];
-$MVP3 = $_POST['MVP'][3];
-$Six1 = $_POST['Six'][1];
-$Six2 = $_POST['Six'][2];
-$Six3 = $_POST['Six'][3];
-$ROY1 = $_POST['ROY'][1];
-$ROY2 = $_POST['ROY'][2];
-$ROY3 = $_POST['ROY'][3];
-$GM1 = $_POST['GM'][1];
-$GM2 = $_POST['GM'][2];
-$GM3 = $_POST['GM'][3];
+$Team_Name = $_POST['teamname'] ?? '';
+$MVP1 = $_POST['MVP'][1] ?? '';
+$MVP2 = $_POST['MVP'][2] ?? '';
+$MVP3 = $_POST['MVP'][3] ?? '';
+$Six1 = $_POST['Six'][1] ?? '';
+$Six2 = $_POST['Six'][2] ?? '';
+$Six3 = $_POST['Six'][3] ?? '';
+$ROY1 = $_POST['ROY'][1] ?? '';
+$ROY2 = $_POST['ROY'][2] ?? '';
+$ROY3 = $_POST['ROY'][3] ?? '';
+$GM1 = $_POST['GM'][1] ?? '';
+$GM2 = $_POST['GM'][2] ?? '';
+$GM3 = $_POST['GM'][3] ?? '';
 
 echo "
-    MVP Choice 1: $MVP1<br>
-    MVP Choice 2: $MVP2<br>
-    MVP Choice 3: $MVP3<br><br>
-    6th Man Choice 1: $Six1<br>
-    6th Man Choice 2: $Six2<br>
-    6th Man Choice 3: $Six3<br><br>
-    ROY Choice 1: $ROY1<br>
-    ROY Choice 2: $ROY2<br>
-    ROY Choice 3: $ROY3<br><br>
-    GM Choice 1: $GM1<br>
-    GM Choice 2: $GM2<br>
-    GM Choice 3: $GM3<br><br>";
+    MVP Choice 1: " . HtmlSanitizer::safeHtmlOutput($MVP1) . "<br>
+    MVP Choice 2: " . HtmlSanitizer::safeHtmlOutput($MVP2) . "<br>
+    MVP Choice 3: " . HtmlSanitizer::safeHtmlOutput($MVP3) . "<br><br>
+    6th Man Choice 1: " . HtmlSanitizer::safeHtmlOutput($Six1) . "<br>
+    6th Man Choice 2: " . HtmlSanitizer::safeHtmlOutput($Six2) . "<br>
+    6th Man Choice 3: " . HtmlSanitizer::safeHtmlOutput($Six3) . "<br><br>
+    ROY Choice 1: " . HtmlSanitizer::safeHtmlOutput($ROY1) . "<br>
+    ROY Choice 2: " . HtmlSanitizer::safeHtmlOutput($ROY2) . "<br>
+    ROY Choice 3: " . HtmlSanitizer::safeHtmlOutput($ROY3) . "<br><br>
+    GM Choice 1: " . HtmlSanitizer::safeHtmlOutput($GM1) . "<br>
+    GM Choice 2: " . HtmlSanitizer::safeHtmlOutput($GM2) . "<br>
+    GM Choice 3: " . HtmlSanitizer::safeHtmlOutput($GM3) . "<br><br>";
 
 echo "<font color=red>";
 if (strpos($MVP1, $Team_Name) !== false) {
@@ -108,48 +112,40 @@ if (strpos($MVP1, $Team_Name) !== false) {
 } else if ($GM2 == $GM3) {
     echo "Sorry, you have selected the same player for multiple GM of the Year slots. Try again.<br>";
 } else {
-    echo "</font><b>Thank you for voting - the $Team_Name vote has been recorded!<b>";
+    echo "</font><strong style=\"font-weight: bold;\">Thank you for voting - the " . HtmlSanitizer::safeHtmlOutput($Team_Name) . " vote has been recorded!</strong>";
 
 // ==== UPDATE SELECTED VOTES IN DATABASE ====
 
-    $query1 = "UPDATE ibl_votes_EOY SET MVP_1 = '$MVP1' WHERE team_name = '$Team_Name'";
-    $result1 = $db->sql_query($query1);
+    $stmt = $mysqli_db->prepare("UPDATE ibl_votes_EOY
+        SET MVP_1 = ?,
+            MVP_2 = ?,
+            MVP_3 = ?,
+            Six_1 = ?,
+            Six_2 = ?,
+            Six_3 = ?,
+            ROY_1 = ?,
+            ROY_2 = ?,
+            ROY_3 = ?,
+            GM_1 = ?,
+            GM_2 = ?,
+            GM_3 = ?
+        WHERE team_name = ?");
 
-    $query2 = "UPDATE ibl_votes_EOY SET MVP_2 = '$MVP2' WHERE team_name = '$Team_Name'";
-    $result2 = $db->sql_query($query2);
+    $stmt->bind_param('sssssssssssss',
+        $MVP1, $MVP2, $MVP3,
+        $Six1, $Six2, $Six3,
+        $ROY1, $ROY2, $ROY3,
+        $GM1, $GM2, $GM3,
+        $Team_Name
+    );
 
-    $query3 = "UPDATE ibl_votes_EOY SET MVP_3 = '$MVP3' WHERE team_name = '$Team_Name'";
-    $result3 = $db->sql_query($query3);
+    $stmt->execute();
+    $stmt->close();
 
-    $query4 = "UPDATE ibl_votes_EOY SET Six_1 = '$Six1' WHERE team_name = '$Team_Name'";
-    $result4 = $db->sql_query($query4);
-
-    $query5 = "UPDATE ibl_votes_EOY SET Six_2 = '$Six2' WHERE team_name = '$Team_Name'";
-    $result5 = $db->sql_query($query5);
-
-    $query6 = "UPDATE ibl_votes_EOY SET Six_3 = '$Six3' WHERE team_name = '$Team_Name'";
-    $result6 = $db->sql_query($query6);
-
-    $query7 = "UPDATE ibl_votes_EOY SET ROY_1 = '$ROY1' WHERE team_name = '$Team_Name'";
-    $result7 = $db->sql_query($query7);
-
-    $query8 = "UPDATE ibl_votes_EOY SET ROY_2 = '$ROY2' WHERE team_name = '$Team_Name'";
-    $result8 = $db->sql_query($query8);
-
-    $query9 = "UPDATE ibl_votes_EOY SET ROY_3 = '$ROY3' WHERE team_name = '$Team_Name'";
-    $result9 = $db->sql_query($query9);
-
-    $query10 = "UPDATE ibl_votes_EOY SET GM_1 = '$GM1' WHERE team_name = '$Team_Name'";
-    $result10 = $db->sql_query($query10);
-
-    $query11 = "UPDATE ibl_votes_EOY SET GM_2 = '$GM2' WHERE team_name = '$Team_Name'";
-    $result11 = $db->sql_query($query11);
-
-    $query12 = "UPDATE ibl_votes_EOY SET GM_3 = '$GM3' WHERE team_name = '$Team_Name'";
-    $result12 = $db->sql_query($query12);
-
-    $query13 = "UPDATE ibl_team_history SET eoy_vote = NOW() + INTERVAL 2 HOUR WHERE team_name = '$Team_Name'";
-    $result13 = $db->sql_query($query13);
+    $stmtUpdateTime = $mysqli_db->prepare("UPDATE ibl_team_history SET eoy_vote = NOW() + INTERVAL 2 HOUR WHERE team_name = ?");
+    $stmtUpdateTime->bind_param('s', $Team_Name);
+    $stmtUpdateTime->execute();
+    $stmtUpdateTime->close();
 
 }
 Nuke\Footer::footer();

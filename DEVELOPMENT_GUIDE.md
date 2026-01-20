@@ -1,6 +1,6 @@
 # Development Guide
 
-**Status:** 30/30 IBL modules refactored (100% complete) ✅ • 1444+ tests • ~68% coverage • Goal: 80%
+**Status:** 30/30 IBL modules refactored (100% complete) ✅ • 1444 tests • ~68% coverage • Goal: 80%
 
 > 📘 **Progressive Loading:** Detailed workflows are in `.claude/rules/` and `.github/skills/`. See [SKILLS_GUIDE.md](.github/SKILLS_GUIDE.md).
 
@@ -12,7 +12,17 @@
 
 ### 🚀 Post-Refactoring Phase
 
-1. **Test Coverage → 80%** - Progressing well with PR #158 (+365 unit tests) + integration tests (52+ integration tests). Continue expanding edge case coverage and achieving 80% threshold. **Next Steps:** Add 50+ more integration tests focusing on edge cases, error conditions, and multi-module workflows to reach 80% coverage goal.
+1. **Test Coverage → 80%** - Strong progress with 1444 tests (~68% coverage). PR #158 added 365 unit tests, PR #159 added 38 integration test methods across 5 critical workflows. **Next Steps:** Add 15-20 integration tests for high-priority user workflows (Waivers, DepthChart, RookieOption) and expand edge case coverage in existing modules to reach 80% goal.
+
+   **Priority Integration Tests Needed:**
+   - **HIGH**: Waivers (add/drop workflow with cap validation, waiver wire timing)
+   - **MEDIUM**: DepthChart (submission with position validation, injured player handling)
+   - **MEDIUM**: RookieOption (option exercise with eligibility checks, contract updates)
+   - **MEDIUM**: Standings/Schedule (calculation accuracy, tie-breaking logic)
+   - **LOW**: Voting (All-star/awards voting submission)
+
+   **Unit Test Gaps:** Discord (1 test), Shared (1 test), League (1 test), Injuries (2 tests), Standings (2 tests)
+
 2. **API Development** - REST API with JWT, rate limiting, OpenAPI docs
 3. **Security Hardening** - XSS audit, CSRF, security headers
 
@@ -20,29 +30,26 @@
 
 ## Recent Updates
 
-### Integration Tests Added (Jan 12, 2026)
+### Integration Tests Added (Jan 12, 2026 - PR #159)
 
-**Impact:** Added 52 integration tests across 5 critical workflow directories, with refactored test infrastructure using TestDataFactory pattern
+**Impact:** Added 38 integration test methods across 5 critical workflow suites, with refactored test infrastructure using TestDataFactory pattern
 
 **Integration Test Coverage:**
-- Draft Integration: DraftIntegrationTest (6 tests)
-- Extension Integration: ExtensionIntegrationTest (12 tests) ✅ All passing
-- FreeAgency Integration: FreeAgencyIntegrationTest (7 tests) ✅ All passing
-- Negotiation Integration: NegotiationIntegrationTest (4 tests)
-- Trading Integration: TradeIntegrationTest (9 tests)
+- **Draft Integration:** DraftIntegrationTest (6 test methods) - Player creation, pick ownership, validation failures
+- **Extension Integration:** ExtensionIntegrationTest (12 test methods) - Extension offers, CBA validation, player preferences, Bird rights
+- **FreeAgency Integration:** FreeAgencyIntegrationTest (7 test methods) - Custom/MLE/LLE/VetMin offers, cap space validation, offer deletion
+- **Negotiation Integration:** NegotiationIntegrationTest (4 test methods) - Demand calculation, cap space, eligibility checks
+- **Trading Integration:** TradeIntegrationTest (9 test methods) - Player/pick/cash trades, news stories, cleanup workflows
 
 **Test Infrastructure Improvements:**
 - Created standalone TestDataFactory class in Tests\Integration\Mocks\ namespace for centralized fixture creation
-- IntegrationTestCase uses TestDataFactory for reusable mock data setup
-- Deprecated legacy setupMockPlayer/setupMockTeam/setupMockSeason helpers on IntegrationTestCase
-- All integration tests now use TestDataFactory::createPlayer/createTeam/createSeason static methods
+- IntegrationTestCase base class provides transaction rollback, mock database, and helper assertions
+- All integration tests use TestDataFactory::createPlayer/createTeam/createSeason static methods
 - Refactored mock classes from inline definitions to proper namespaced classes in tests/Integration/Mocks/
 - Enhanced autoloader.php to support Tests\ namespace
 - All tests use @covers annotations for accurate coverage measurement
 
-**Total Test Count:** 1425 + 38 integration tests = 1463 total (52 test files initially created, with 38 test methods after refactoring duplicate test data setup code into TestDataFactory)
-
-**Status:** All 1444 tests passing, integration infrastructure complete with TestDataFactory pattern enabling consistent fixture creation across all integration test suites
+**Status:** All 1444 tests passing ✅ Integration infrastructure complete with TestDataFactory pattern enabling consistent fixture creation across all integration test suites
 
 ---
 

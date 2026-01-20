@@ -133,17 +133,17 @@ class DraftView implements DraftViewInterface
             <td>" . HtmlSanitizer::safeHtmlOutput($player['stl']) . "</td>
             <td>" . HtmlSanitizer::safeHtmlOutput($player['tvr']) . "</td>
             <td>" . HtmlSanitizer::safeHtmlOutput($player['blk']) . "</td>
-            <td>" . HtmlSanitizer::safeHtmlOutput($player['offo']) . "</td>
-            <td>" . HtmlSanitizer::safeHtmlOutput($player['offd']) . "</td>
-            <td>" . HtmlSanitizer::safeHtmlOutput($player['offp']) . "</td>
-            <td>" . HtmlSanitizer::safeHtmlOutput($player['offt']) . "</td>
-            <td>" . HtmlSanitizer::safeHtmlOutput($player['defo']) . "</td>
-            <td>" . HtmlSanitizer::safeHtmlOutput($player['defd']) . "</td>
-            <td>" . HtmlSanitizer::safeHtmlOutput($player['defp']) . "</td>
-            <td>" . HtmlSanitizer::safeHtmlOutput($player['deft']) . "</td>
-            <td>" . HtmlSanitizer::safeHtmlOutput($player['tal']) . "</td>
-            <td>" . HtmlSanitizer::safeHtmlOutput($player['skl']) . "</td>
-            <td>" . HtmlSanitizer::safeHtmlOutput($player['int']) . "</td>";
+            <td>" . HtmlSanitizer::safeHtmlOutput($player['oo']) . "</td>
+            <td>" . HtmlSanitizer::safeHtmlOutput($player['do']) . "</td>
+            <td>" . HtmlSanitizer::safeHtmlOutput($player['po']) . "</td>
+            <td>" . HtmlSanitizer::safeHtmlOutput($player['to']) . "</td>
+            <td>" . HtmlSanitizer::safeHtmlOutput($player['od']) . "</td>
+            <td>" . HtmlSanitizer::safeHtmlOutput($player['dd']) . "</td>
+            <td>" . HtmlSanitizer::safeHtmlOutput($player['pd']) . "</td>
+            <td>" . HtmlSanitizer::safeHtmlOutput($player['td']) . "</td>
+            <td>" . HtmlSanitizer::safeHtmlOutput($player['talent']) . "</td>
+            <td>" . HtmlSanitizer::safeHtmlOutput($player['skill']) . "</td>
+            <td>" . HtmlSanitizer::safeHtmlOutput($player['intangibles']) . "</td>";
             $html .= "</tr>";
         }
 

@@ -105,6 +105,26 @@ jobs:
           exit 1
         fi
     
+    - name: Create Discord.php for tests
+      working-directory: ibl5/classes
+      run: |
+        echo "Generating Discord.php from template for CI/CD testing..."
+        
+        # Copy template to Discord.php (uses placeholder webhook URLs)
+        cp Discord.php.example Discord.php
+        
+        echo "✓ Discord.php created from template"
+        echo ""
+        echo "Verifying Discord.php was created..."
+        if [ -f "Discord.php" ]; then
+          echo "✓ Discord.php exists"
+          echo "  This allows tests to instantiate Discord class without real webhooks"
+          echo "  Placeholder URLs prevent actual Discord API calls in CI/CD"
+        else
+          echo "✗ Discord.php was not created!"
+          exit 1
+        fi
+    
     - name: Install dependencies
       working-directory: ibl5
       run: |

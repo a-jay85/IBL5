@@ -168,7 +168,7 @@ $team = TestDataFactory::createTeam(['teamid' => 2]);
 $season = TestDataFactory::createSeason(['Beginning_Year' => 2026]);
 ```
 
-Factory includes **all** fields required by `PlayerRepository`, including rating fields (r_fga, r_fgp, etc.) and positional data (offo, offd, offp, offt, defo, defd, defp, deft), plus player attributes (tal, skl, int, sta).
+Factory includes **all** fields required by `PlayerRepository`, including rating fields (r_fga, r_fgp, etc.) and positional data (oo, do, po, to, od, dd, pd, td), plus player attributes (talent, skill, intangibles, sta).
 
 ## MockDatabase Framework
 

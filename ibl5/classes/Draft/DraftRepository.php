@@ -113,20 +113,20 @@ class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryIn
         $pid = $this->getNextAvailablePid();
         $name = substr($playerName, 0, self::IBL_PLR_NAME_MAX_LENGTH);
         $pos = $draftClassPlayer['pos'];
-        $oo = (int) $draftClassPlayer['offo'];
-        $od = (int) $draftClassPlayer['offd'];
-        $po = (int) $draftClassPlayer['offp'];
-        $to = (int) $draftClassPlayer['offt'];
-        $do = (int) $draftClassPlayer['defo'];
-        $dd = (int) $draftClassPlayer['defd'];
-        $pd = (int) $draftClassPlayer['defp'];
-        $td = (int) $draftClassPlayer['deft'];
+        $oo = (int) $draftClassPlayer['oo'];
+        $od = (int) $draftClassPlayer['od'];
+        $po = (int) $draftClassPlayer['po'];
+        $to = (int) $draftClassPlayer['to'];
+        $do = (int) $draftClassPlayer['do'];
+        $dd = (int) $draftClassPlayer['dd'];
+        $pd = (int) $draftClassPlayer['pd'];
+        $td = (int) $draftClassPlayer['td'];
         
         $age = (int) $draftClassPlayer['age'];
         $sta = (int) $draftClassPlayer['sta'];
-        $talent = (int) $draftClassPlayer['tal'];
-        $skill = (int) $draftClassPlayer['skl'];
-        $intangibles = (int) $draftClassPlayer['int'];
+        $talent = (int) $draftClassPlayer['talent'];
+        $skill = (int) $draftClassPlayer['skill'];
+        $intangibles = (int) $draftClassPlayer['intangibles'];
         
         // Insert new player into ibl_plr
         $affected = $this->execute(

@@ -155,9 +155,9 @@ handleDraftSelection(string $teamName, ?string $playerName, int $draftRound, int
 **ibl_draft_class** - Prospect roster
 - `name`, `pos`, `team` - Player identity
 - `drafted` - Status flag (0 = available, 1 = drafted)
-- `offo`, `offd`, `offp`, `offt` - Offensive ratings
-- `defo`, `defd`, `defp`, `deft` - Defensive ratings
-- `age`, `sta`, `tal`, `skl`, `int` - Attributes
+- `oo`, `do`, `po`, `to` - Offensive ratings (outside, drive, post, transition)
+- `od`, `dd`, `pd`, `td` - Defensive ratings (outside, drive, post, transition)
+- `age`, `sta`, `talent`, `skill`, `intangibles` - Attributes
 - Stats columns: `fga`, `fgp`, `fta`, `ftp`, `tga`, `tgp`, `orb`, `drb`, `ast`, `stl`, `tvr`, `blk`
 
 **ibl_plr** - Main player table

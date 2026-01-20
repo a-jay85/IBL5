@@ -100,9 +100,9 @@ interface DraftRepositoryInterface
      * the data using the player name and creates permanent JSB-assigned PIDs.
      *
      * Maps columns from ibl_draft_class to ibl_plr:
-     *  - offo/offd/offp/offt -> oo/od/po/to (offensive ratings)
-     *  - defo/defd/defp/deft -> do/dd/pd/td (defensive ratings)
-     *  - age, sta, tal, skl, int -> age, sta, talent, skill, intangibles
+     *  - oo/do/po/to -> oo/do/po/to (offensive ratings)
+     *  - od/dd/pd/td -> od/dd/pd/td (defensive ratings)
+     *  - age, sta, talent, skill, intangibles -> age, sta, talent, skill, intangibles
      *
      * @param string $playerName The name of the drafted player (from ibl_draft_class)
      * @param string $teamName The name of the team that drafted the player

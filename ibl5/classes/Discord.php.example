@@ -1,8 +1,80 @@
 <?php
+
+declare(strict_types=1);
+
+/**
+ * Discord Webhook Integration - CI/CD Template
+ * 
+ * This is a template file for CI/CD environments where actual Discord webhook URLs
+ * are not available. For local development:
+ * 
+ * 1. Copy this file to Discord.php in the same directory
+ * 2. Replace 'INSERTWEBHOOKURLHERE' placeholders with actual Discord webhook URLs
+ * 3. The real Discord.php is gitignored to protect webhook secrets
+ * 
+ * In CI/CD, this template is automatically copied to Discord.php, allowing tests
+ * to instantiate the class without making actual HTTP calls to Discord (webhook
+ * URLs are invalid placeholders).
+ * 
+ * Pattern follows: DatabaseConnection.php.template (another gitignored config file)
+ */
 class Discord
 {
-    public static function sendCurlPOST($url, $arrayContent)
+    // Discord channel webhook URLs as class constants
+    private const CHANNEL_1V1_GAMES = 'INSERTWEBHOOKURLHERE';
+    private const CHANNEL_DRAFT_PICKS = 'INSERTWEBHOOKURLHERE';
+    private const CHANNEL_EXTENSIONS = 'INSERTWEBHOOKURLHERE';
+    private const CHANNEL_FREE_AGENCY = 'INSERTWEBHOOKURLHERE';
+    private const CHANNEL_GENERAL_CHAT = 'INSERTWEBHOOKURLHERE';
+    private const CHANNEL_ROOKIE_OPTIONS = 'INSERTWEBHOOKURLHERE';
+    private const CHANNEL_TRADES = 'INSERTWEBHOOKURLHERE';
+    private const CHANNEL_WAIVER_WIRE = 'INSERTWEBHOOKURLHERE';
+    private const CHANNEL_TESTING = 'INSERTWEBHOOKURLHERE';
+
+    /** @var \mysqli|MockDatabase Database connection (mysqli in production, MockDatabase in tests) */
+    private $db;
+
+    /**
+     * @param \mysqli|object $db Database connection (accepts MockDatabase for testing)
+     */
+    public function __construct($db)
     {
+        $this->db = $db;
+    }
+
+    public function getDiscordIDFromTeamname(string $teamname): string
+    {
+        $stmt = $this->db->prepare(
+            "SELECT discordID FROM nuke_users WHERE user_ibl_team = ? LIMIT 1"
+        );
+        if ($stmt === false) {
+            throw new \Exception('Prepare failed: ' . $this->db->error);
+        }
+        
+        $stmt->bind_param('s', $teamname);
+        if (!$stmt->execute()) {
+            throw new \Exception('Execute failed: ' . $stmt->error);
+        }
+        
+        $result = $stmt->get_result();
+        $row = $result->fetch_assoc();
+        $stmt->close();
+        
+        return (string)($row['discordID'] ?? '');
+    }
+
+    public static function sendCurlPOST(string $url, string $arrayContent): string|false|null
+    {
+        // Defensive check: only send if Discord class exists (allows graceful degradation)
+        if (!class_exists('Discord', false)) {
+            return null;
+        }
+
+        // Skip actual HTTP calls during PHPUnit testing
+        if (defined('PHPUNIT_RUNNING') || (defined('PHPUNIT_COMPOSER_INSTALL') && PHPUNIT_COMPOSER_INSTALL)) {
+            return null;
+        }
+
         $payload = json_encode(array("content" => $arrayContent));
         
         $curl = curl_init();
@@ -10,53 +82,75 @@ class Discord
         curl_setopt_array($curl, array(
             CURLOPT_URL => $url,
             CURLOPT_POSTFIELDS => $payload,
-            CURLOPT_HEADER => true,
+            CURLOPT_HEADER => false,
             CURLOPT_HTTPHEADER => array('Content-Type: application/json'),
             CURLOPT_RETURNTRANSFER => true,
         ));
 
         $response = curl_exec($curl);
+        $httpCode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
 
         if ($error = curl_error($curl)) {
-            throw new Exception($error);
+            throw new \Exception('cURL error: ' . $error);
         }
-
-        curl_close($curl);
-        $response = json_decode($response, true);
+        
+        // Discord webhook should return 204 No Content on success
+        if ($httpCode < 200 || $httpCode >= 300) {
+            throw new \Exception('Discord webhook failed with HTTP ' . $httpCode . ': ' . $response);
+        }
+        
+        // Note: curl_close() is deprecated in PHP 8.0+ - handle is automatically closed
+        return $response;
     }
 
-    public static function postToChannel($channelName, $messageContent)
+    public static function postToChannel(string $channelName, string $messageContent): void
     {
+        // Defensive check: only send if Discord class exists (allows graceful degradation)
+        if (!class_exists('Discord', false)) {
+            return;
+        }
+
+        // Skip Discord posting during PHPUnit testing
+        if (defined('PHPUNIT_RUNNING') || (defined('PHPUNIT_COMPOSER_INSTALL') && PHPUNIT_COMPOSER_INSTALL)) {
+            return;
+        }
+
         if ($_SERVER['SERVER_NAME'] != "localhost") {
             switch ($channelName) {
                 case '#1v1-games':
-                    $url = 'INSERTWEBHOOKURLHERE';
+                    $url = self::CHANNEL_1V1_GAMES;
                     break;
                 case '#draft-picks':
-                    $url = 'INSERTWEBHOOKURLHERE';
+                    $url = self::CHANNEL_DRAFT_PICKS;
                     break;
                 case '#extensions':
-                    $url = 'INSERTWEBHOOKURLHERE';
+                    $url = self::CHANNEL_EXTENSIONS;
                     break;
                 case '#free-agency':
-                    $url = 'INSERTWEBHOOKURLHERE';
+                    $url = self::CHANNEL_FREE_AGENCY;
+                    break;
+                case '#general-chat':
+                    $url = self::CHANNEL_GENERAL_CHAT;
                     break;
                 case '#rookie-options':
-                    $url = 'INSERTWEBHOOKURLHERE';
+                    $url = self::CHANNEL_ROOKIE_OPTIONS;
                     break;
                 case '#trades':
-                    $url = 'INSERTWEBHOOKURLHERE';
+                    $url = self::CHANNEL_TRADES;
                     break;
                 case '#waiver-wire':
-                    $url = 'INSERTWEBHOOKURLHERE';
+                    $url = self::CHANNEL_WAIVER_WIRE;
                     break;
+                default:
+                    $url = null;
             }
         } else {
-            $url = 'INSERTWEBHOOKURLHERE';
+            $url = self::CHANNEL_TESTING;
         }
 
-        $messageContent = str_replace('<br>', "\n", $messageContent);
-
-        Discord::sendCurlPOST($url, $messageContent);
+        if ($url) {
+            $messageContent = str_replace('<br>', "\n", $messageContent);
+            Discord::sendCurlPOST($url, $messageContent);
+        }
     }
 }

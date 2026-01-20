@@ -15,6 +15,15 @@ class TradeApprovalTest extends TestCase
             ['counter' => 1000],
             ['name' => 'Test Player', 'pos' => 'PG']
         ]);
+        
+        // Prevent Discord notifications and set SERVER_NAME for TradingRepository
+        $_SERVER['SERVER_NAME'] = 'localhost';
+    }
+    
+    protected function tearDown(): void
+    {
+        unset($_SERVER['SERVER_NAME']);
+        parent::tearDown();
     }
     
     /**
@@ -260,7 +269,7 @@ class TradeApprovalTest extends TestCase
  */
 class QueryAwareMockDatabase extends MockDatabase
 {
-    public function sql_query($query)
+    public function sql_query(string $query): object|bool
     {
         // Track all executed queries
         $queries = $this->getExecutedQueries();

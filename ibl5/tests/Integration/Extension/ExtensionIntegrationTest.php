@@ -1,6 +1,10 @@
 <?php
 
-use PHPUnit\Framework\TestCase;
+declare(strict_types=1);
+
+namespace Tests\Integration\Extension;
+
+use Tests\Integration\IntegrationTestCase;
 use Extension\ExtensionProcessor;
 
 /**
@@ -10,52 +14,40 @@ use Extension\ExtensionProcessor;
  * - Successful extension scenarios
  * - Failed extension scenarios
  * - Edge cases and special conditions
+ * 
+ * @covers \Extension\ExtensionProcessor
+ * @covers \Extension\ExtensionValidator
+ * @covers \Extension\ExtensionOfferEvaluator
+ * @covers \Extension\ExtensionDatabaseOperations
  */
-class ExtensionIntegrationTest extends TestCase
+class ExtensionIntegrationTest extends IntegrationTestCase
 {
-    private $mockDb;
-    private $extensionProcessor;
+    private ExtensionProcessor $extensionProcessor;
 
     protected function setUp(): void
     {
-        $this->mockDb = new MockDatabase();
+        parent::setUp();
         $this->extensionProcessor = new ExtensionProcessor($this->mockDb);
-        
-        // Set up global $mysqli_db for Player/PlayerRepository
-        // Must use the SAME MockDatabase instance so test data is accessible
-        $GLOBALS['mysqli_db'] = new class($this->mockDb) {
-            private $mockDb;
-            public int $connect_errno = 0;
-            public ?string $connect_error = null;
-            
-            public function __construct($mockDb) {
-                $this->mockDb = $mockDb;
-            }
-            
-            public function prepare($query) {
-                return new MockPreparedStatement($this->mockDb, $query);
-            }
-        };
     }
 
     protected function tearDown(): void
     {
-        $this->extensionProcessor = null;
-        $this->mockDb = null;
+        unset($this->extensionProcessor);
+        parent::tearDown();
     }
 
     /**
      * @group integration
      * @group success-scenarios
      */
-    public function testCompleteSuccessfulExtensionWorkflow()
+    public function testCompleteSuccessfulExtensionWorkflow(): void
     {
         // Arrange - Setup complete player and team data
         $this->setupSuccessfulExtensionScenario();
         
         $extensionData = [
             'teamName' => 'Miami Cyclones',
-            'playerID' => 1, // 'playerName' => 'Test Player',
+            'playerID' => 1,
             'offer' => [
                 'year1' => 1000,
                 'year2' => 1100,
@@ -74,7 +66,7 @@ class ExtensionIntegrationTest extends TestCase
         $this->assertStringContainsString('accept', $result['message']);
         
         // Verify database operations were performed
-        $queries = $this->mockDb->getExecutedQueries();
+        $queries = $this->getExecutedQueries();
         $this->assertGreaterThan(0, count($queries));
         
         $allQueries = implode(' ', $queries);
@@ -86,21 +78,21 @@ class ExtensionIntegrationTest extends TestCase
         $this->assertStringContainsString('Used_Extension_This_Season = 1', $allQueries);
         
         // Verify player contract was updated
-        $this->assertStringContainsString('UPDATE ibl_plr', $allQueries);
+        $this->assertQueryExecuted('UPDATE ibl_plr');
     }
 
     /**
      * @group integration
      * @group rejection-scenarios
      */
-    public function testCompleteRejectedExtensionWorkflow()
+    public function testCompleteRejectedExtensionWorkflow(): void
     {
         // Arrange - Setup player who will reject
         $this->setupRejectedExtensionScenario();
         
         $extensionData = [
             'teamName' => 'Seattle SuperSonics',
-            'playerID' => 1, // 'playerName' => 'Demanding Player',
+            'playerID' => 1,
             'offer' => [
                 'year1' => 800,
                 'year2' => 850,
@@ -119,7 +111,7 @@ class ExtensionIntegrationTest extends TestCase
         $this->assertStringContainsString('refuse', $result['message']);
         
         // Verify sim flag was set but NOT season flag
-        $queries = $this->mockDb->getExecutedQueries();
+        $queries = $this->getExecutedQueries();
         $allQueries = implode(' ', $queries);
         $this->assertStringContainsString('Used_Extension_This_Chunk = 1', $allQueries);
         $this->assertStringNotContainsString('Used_Extension_This_Season = 1', $allQueries);
@@ -129,14 +121,14 @@ class ExtensionIntegrationTest extends TestCase
      * @group integration
      * @group validation-failures
      */
-    public function testRejectsExtensionWithZeroAmountInYear1()
+    public function testRejectsExtensionWithZeroAmountInYear1(): void
     {
         // Arrange
         $this->setupBasicExtensionScenario();
         
         $extensionData = [
             'teamName' => 'Miami Cyclones',
-            'playerID' => 1, // 'playerName' => 'Test Player',
+            'playerID' => 1,
             'offer' => [
                 'year1' => 0, // Invalid!
                 'year2' => 1000,
@@ -155,23 +147,21 @@ class ExtensionIntegrationTest extends TestCase
         $this->assertStringContainsString('zero', $result['error']);
         
         // Verify NO database changes were made
-        $queries = $this->mockDb->getExecutedQueries();
-        $allQueries = implode(' ', $queries);
-        $this->assertStringNotContainsString('Used_Extension_This_Chunk', $allQueries);
+        $this->assertQueryNotExecuted('Used_Extension_This_Chunk');
     }
 
     /**
      * @group integration
      * @group validation-failures
      */
-    public function testRejectsExtensionWhenAlreadyUsedThisSeason()
+    public function testRejectsExtensionWhenAlreadyUsedThisSeason(): void
     {
         // Arrange
         $this->setupAlreadyExtendedScenario();
         
         $extensionData = [
             'teamName' => 'Miami Cyclones',
-            'playerID' => 1, // 'playerName' => 'Test Player',
+            'playerID' => 1,
             'offer' => [
                 'year1' => 1000,
                 'year2' => 1100,
@@ -189,26 +179,24 @@ class ExtensionIntegrationTest extends TestCase
         $this->assertStringContainsString('already used your extension for this season', $result['error']);
         
         // Verify only eligibility check query was made, no extension processing
-        $queries = $this->mockDb->getExecutedQueries();
-        // Should have at least one query for eligibility check
+        $queries = $this->getExecutedQueries();
         $this->assertGreaterThanOrEqual(1, count($queries));
-        // But should NOT have marked sim as used or updated contract
-        $allQueries = implode(' ', $queries);
-        $this->assertStringNotContainsString('UPDATE ibl_plr', $allQueries);
+        // But should NOT have updated contract
+        $this->assertQueryNotExecuted('UPDATE ibl_plr');
     }
 
     /**
      * @group integration
      * @group validation-failures
      */
-    public function testRejectsExtensionWithExcessiveRaise()
+    public function testRejectsExtensionWithExcessiveRaise(): void
     {
         // Arrange
         $this->setupBasicExtensionScenario();
         
         $extensionData = [
             'teamName' => 'Miami Cyclones',
-            'playerID' => 1, // 'playerName' => 'Test Player',
+            'playerID' => 1,
             'offer' => [
                 'year1' => 1000,
                 'year2' => 1200, // 20% raise, but max is 10% without Bird rights
@@ -230,14 +218,14 @@ class ExtensionIntegrationTest extends TestCase
      * @group integration
      * @group validation-failures
      */
-    public function testRejectsExtensionOverMaximumSalary()
+    public function testRejectsExtensionOverMaximumSalary(): void
     {
         // Arrange
         $this->setupBasicExtensionScenario();
         
         $extensionData = [
             'teamName' => 'Miami Cyclones',
-            'playerID' => 1, // 'playerName' => 'Young Player', // Only 3 years experience
+            'playerID' => 1,
             'offer' => [
                 'year1' => 1500, // Over max of 1063 for 0-6 years exp
                 'year2' => 1600,
@@ -259,14 +247,14 @@ class ExtensionIntegrationTest extends TestCase
      * @group integration
      * @group bird-rights
      */
-    public function testAllowsHigherRaisesWithBirdRights()
+    public function testAllowsHigherRaisesWithBirdRights(): void
     {
         // Arrange - Player with Bird rights
         $this->setupBirdRightsExtensionScenario();
         
         $extensionData = [
             'teamName' => 'Miami Cyclones',
-            'playerID' => 1, // 'playerName' => 'Veteran Player',
+            'playerID' => 1,
             'offer' => [
                 'year1' => 1000,
                 'year2' => 1125, // 12.5% raise allowed with Bird rights
@@ -288,14 +276,14 @@ class ExtensionIntegrationTest extends TestCase
      * @group integration
      * @group player-preferences
      */
-    public function testPlayerWithHighLoyaltyAcceptsLowerOffer()
+    public function testPlayerWithHighLoyaltyAcceptsLowerOffer(): void
     {
         // Arrange - Player with high loyalty to current team
         $this->setupHighLoyaltyPlayerScenario();
         
         $extensionData = [
             'teamName' => 'Miami Cyclones',
-            'playerID' => 1, // 'playerName' => 'Loyal Player',
+            'playerID' => 1,
             'offer' => [
                 'year1' => 900,
                 'year2' => 950,
@@ -319,14 +307,14 @@ class ExtensionIntegrationTest extends TestCase
      * @group integration
      * @group player-preferences
      */
-    public function testPlayerRejectsOfferDueToLackOfPlayingTime()
+    public function testPlayerRejectsOfferDueToLackOfPlayingTime(): void
     {
         // Arrange - Player values playing time, team has lots of money at position
         $this->setupPlayingTimeScenario();
         
         $extensionData = [
             'teamName' => 'Stacked Team',
-            'playerID' => 1, // 'playerName' => 'Rotation Player',
+            'playerID' => 1,
             'offer' => [
                 'year1' => 950,  // Under max of 1063 for 4 years exp
                 'year2' => 1000, // Small raises
@@ -348,14 +336,14 @@ class ExtensionIntegrationTest extends TestCase
      * @group integration
      * @group edge-cases
      */
-    public function testHandles3YearMinimumExtension()
+    public function testHandles3YearMinimumExtension(): void
     {
         // Arrange
         $this->setupSuccessfulExtensionScenario();
         
         $extensionData = [
             'teamName' => 'Miami Cyclones',
-            'playerID' => 1, // 'playerName' => 'Test Player',
+            'playerID' => 1,
             'offer' => [
                 'year1' => 1000,
                 'year2' => 1100,
@@ -377,14 +365,14 @@ class ExtensionIntegrationTest extends TestCase
      * @group integration
      * @group edge-cases
      */
-    public function testHandles5YearMaximumExtension()
+    public function testHandles5YearMaximumExtension(): void
     {
         // Arrange
         $this->setupSuccessfulExtensionScenario();
         
         $extensionData = [
             'teamName' => 'Miami Cyclones',
-            'playerID' => 1, // 'playerName' => 'Test Player',
+            'playerID' => 1,
             'offer' => [
                 'year1' => 1000,
                 'year2' => 1100,
@@ -406,14 +394,14 @@ class ExtensionIntegrationTest extends TestCase
      * @group integration
      * @group notifications
      */
-    public function testSendsDiscordNotificationOnAcceptedExtension()
+    public function testSendsDiscordNotificationOnAcceptedExtension(): void
     {
         // Arrange
         $this->setupSuccessfulExtensionScenario();
         
         $extensionData = [
             'teamName' => 'Miami Cyclones',
-            'playerID' => 1, // 'playerName' => 'Test Player',
+            'playerID' => 1,
             'offer' => [
                 'year1' => 1000,
                 'year2' => 1100,
@@ -434,9 +422,8 @@ class ExtensionIntegrationTest extends TestCase
 
     // ==== HELPER METHODS TO SET UP TEST SCENARIOS ====
 
-    private function setupSuccessfulExtensionScenario()
+    private function setupSuccessfulExtensionScenario(): void
     {
-        // Combined data that works for all queries in the scenario
         $this->mockDb->setMockData([
             array_merge($this->getBasePlayerData(), [
                 // Team info fields
@@ -476,9 +463,8 @@ class ExtensionIntegrationTest extends TestCase
         ]);
     }
 
-    private function setupRejectedExtensionScenario()
+    private function setupRejectedExtensionScenario(): void
     {
-        // Combined data that works for all queries in the scenario
         $this->mockDb->setMockData([
             array_merge($this->getBasePlayerData(), [
                 // Team info fields - losing team
@@ -551,9 +537,8 @@ class ExtensionIntegrationTest extends TestCase
         ]);
     }
 
-    private function setupBasicExtensionScenario()
+    private function setupBasicExtensionScenario(): void
     {
-        // Combined data that works for all queries in the scenario
         $this->mockDb->setMockData([
             array_merge($this->getBasePlayerData(), [
                 'Used_Extension_This_Season' => 0,
@@ -577,7 +562,7 @@ class ExtensionIntegrationTest extends TestCase
         ]);
     }
 
-    private function setupAlreadyExtendedScenario()
+    private function setupAlreadyExtendedScenario(): void
     {
         $this->mockDb->setMockData([
             array_merge($this->getBasePlayerData(), [
@@ -592,9 +577,8 @@ class ExtensionIntegrationTest extends TestCase
         ]);
     }
 
-    private function setupBirdRightsExtensionScenario()
+    private function setupBirdRightsExtensionScenario(): void
     {
-        // Combined data that works for all queries in the scenario
         $this->mockDb->setMockData([
             array_merge($this->getBasePlayerData(), [
                 // Team info fields
@@ -634,9 +618,8 @@ class ExtensionIntegrationTest extends TestCase
         ]);
     }
 
-    private function setupHighLoyaltyPlayerScenario()
+    private function setupHighLoyaltyPlayerScenario(): void
     {
-        // Combined data that works for all queries in the scenario
         $this->mockDb->setMockData([
             array_merge($this->getBasePlayerData(), [
                 // Team info fields
@@ -676,9 +659,8 @@ class ExtensionIntegrationTest extends TestCase
         ]);
     }
 
-    private function setupPlayingTimeScenario()
+    private function setupPlayingTimeScenario(): void
     {
-        // Combined data that works for all queries in the scenario
         $this->mockDb->setMockData([
             array_merge($this->getBasePlayerData(), [
                 // Team info fields
@@ -723,7 +705,7 @@ class ExtensionIntegrationTest extends TestCase
      * Helper method that returns base Player data fields to avoid duplication
      * and ensure all required fields are present in mock data
      */
-    private function getBasePlayerData()
+    private function getBasePlayerData(): array
     {
         return [
             // Basic info

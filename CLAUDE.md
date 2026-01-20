@@ -1,37 +1,95 @@
-# IBL5 - Internet Basketball League
+# CLAUDE.md
 
-See @README.md for project overview and @DATABASE_GUIDE.md for schema reference.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Skills Architecture
+## Project Overview
 
-This project uses progressive loading to reduce context tokens by 50-85%.
+IBL5 is an Internet Basketball League fantasy basketball site powered by Jump Shot Basketball simulation engine. PHP 8+ with MariaDB 10.6, using interface-driven architecture.
 
-### Path-Conditional Rules (`.claude/rules/`)
-Rules auto-load when working with matching files:
-- `core-coding.md` - Always loaded (universal rules)
-- `php-classes.md` - PHP class development
-- `phpunit-tests.md` - Test writing
-- `view-rendering.md` - View/HTML rendering
-- `schema-reference.md` - Database schema
+## Commands
 
-### Task-Discovery Skills (`.github/skills/`)
-Skills auto-load based on task intent:
-- `refactoring-workflow` - Module refactoring
-- `security-audit` - XSS/SQL injection auditing
-- `phpunit-testing` - PHPUnit test writing
-- `documentation-updates` - Doc updates
-- `code-review` - PR validation
-- `basketball-stats` - Stats formatting
-- `contract-rules` - CBA salary rules
-- `database-repository` - Repository patterns
+```bash
+# Run all tests
+cd ibl5 && vendor/bin/phpunit
 
-## Quick Reference
+# Run single test file
+cd ibl5 && vendor/bin/phpunit tests/Player/PlayerRepositoryTest.php
 
-| Task | Resource |
-|------|----------|
-| Run tests | `cd ibl5 && vendor/bin/phpunit` |
+# Run single test method
+cd ibl5 && vendor/bin/phpunit --filter testMethodName
+
+# Run specific test suite
+cd ibl5 && vendor/bin/phpunit --testsuite "Player Module Tests"
+```
+
+## Architecture
+
+### Interface-Driven Modules
+All 30 modules follow Repository/Service/View pattern with interfaces in `Contracts/` subdirectories:
+```
+ibl5/classes/
+├── Player/
+│   ├── Contracts/           # Interfaces (PlayerRepositoryInterface, etc.)
+│   ├── PlayerRepository.php # Database operations
+│   ├── PlayerService.php    # Business logic
+│   └── PlayerView.php       # HTML rendering
+├── FreeAgency/
+├── Trading/
+└── ... (30 modules total)
+```
+
+### Key Patterns
+- **Repository:** Database queries via prepared statements
+- **Service:** Business logic, validation, calculations
+- **View:** HTML generation with XSS protection
+- **Controller:** Request handling (where applicable)
+
+### Class Autoloading
+Classes autoload from `ibl5/classes/`. Never use `require_once`.
+
+### Database
+- Schema: `ibl5/schema.sql` - **always verify table/column names here**
+- Use `$mysqli_db` (modern MySQLi) over legacy `$db`
+- 52 InnoDB tables with foreign keys, 84 legacy MyISAM tables
+
+## Mandatory Rules
+
+### XSS Protection
+Use `Utilities\HtmlSanitizer::safeHtmlOutput()` on ALL output (database results, user input, error messages).
+
+### Type Hints
+`declare(strict_types=1);` in every file. Full type hints on all methods.
+
+### Statistics Formatting
+Use `BasketballStats\StatsFormatter` for all stats - never `number_format()` directly.
+
+### HTML Modernization
+Replace deprecated tags: `<b>` → `<strong>`, `<font>` → `<span>`, `<center>` → `<div style="text-align: center;">`.
+
+### Production Validation
+After refactoring, compare output against iblhoops.net. Results must match exactly.
+
+## Progressive Loading
+
+Context-aware rules auto-load when relevant:
+
+**Path-Conditional** (`.claude/rules/`):
+- `php-classes.md` → editing `ibl5/classes/**/*.php`
+- `phpunit-tests.md` → editing `ibl5/tests/**/*.php`
+- `view-rendering.md` → editing `**/*View.php`
+
+**Task-Discovery** (`.github/skills/`):
+- `refactoring-workflow/` - Module refactoring with templates
+- `security-audit/` - XSS/SQL injection patterns
+- `phpunit-testing/` - Test patterns and mocking
+- `basketball-stats/` - StatsFormatter usage
+
+## Key References
+
+| Resource | Location |
+|----------|----------|
 | Schema | `ibl5/schema.sql` |
-| Stats formatting | `BasketballStats\StatsFormatter` |
-| Creating skills | `.github/SKILLS_GUIDE.md` |
-
-Use `/memory` to see currently loaded rules and skills.
+| Development status | `DEVELOPMENT_GUIDE.md` |
+| Database guide | `DATABASE_GUIDE.md` |
+| API patterns | `API_GUIDE.md` |
+| Interface examples | `classes/Player/Contracts/`, `classes/FreeAgency/Contracts/` |

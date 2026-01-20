@@ -60,6 +60,18 @@ class TestDataFactory
             'draftpickno' => 15,
             'formerly_known_as' => null,
             // Rating fields (required by PlayerRepository)
+            // ibl_plr table uses these field names
+            'oo' => 50,
+            'od' => 50,
+            'do' => 50,
+            'dd' => 50,
+            'po' => 50,
+            'pd' => 50,
+            'to' => 50,
+            'td' => 50,
+            'talent' => 50,
+            'skill' => 50,
+            'intangibles' => 50,
             'r_fga' => 50,
             'r_fgp' => 50,
             'r_fta' => 50,

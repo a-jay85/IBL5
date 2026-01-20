@@ -275,17 +275,17 @@ CREATE TABLE `ibl_draft_class` (
   `stl` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Steals rating',
   `tvr` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Turnovers rating',
   `blk` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Blocks rating',
-  `offo` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Off outside rating',
-  `offd` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Off drive rating',
-  `offp` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Off post rating',
-  `offt` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Off transition rating',
-  `defo` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Def outside rating',
-  `defd` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Def drive rating',
-  `defp` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Def post rating',
-  `deft` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Def transition rating',
-  `tal` int(11) NOT NULL DEFAULT 0,
-  `skl` int(11) NOT NULL DEFAULT 0,
-  `int` int(11) NOT NULL DEFAULT 0,
+  `oo` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Off outside rating',
+  `do` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Off drive rating',
+  `po` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Off post rating',
+  `to` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Off transition rating',
+  `od` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Def outside rating',
+  `dd` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Def drive rating',
+  `pd` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Def post rating',
+  `td` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Def transition rating',
+  `talent` int(11) NOT NULL DEFAULT 0,
+  `skill` int(11) NOT NULL DEFAULT 0,
+  `intangibles` int(11) NOT NULL DEFAULT 0,
   `ranking` float DEFAULT 0,
   `invite` mediumtext DEFAULT NULL,
   `drafted` int(11) DEFAULT 0,
@@ -469,7 +469,7 @@ CREATE TABLE `ibl_heat_stats` (
   UNIQUE KEY `id` (`id`),
   KEY `fk_heat_stats_name` (`name`),
   CONSTRAINT `fk_heat_stats_name` FOREIGN KEY (`name`) REFERENCES `ibl_plr` (`name`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=7481 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=7858 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -551,7 +551,7 @@ CREATE TABLE `ibl_hist` (
   KEY `idx_year` (`year`),
   KEY `idx_pid_year_team` (`pid`,`year`,`team`),
   CONSTRAINT `fk_hist_player` FOREIGN KEY (`pid`) REFERENCES `ibl_plr` (`pid`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=19874 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=25787 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1162,7 +1162,7 @@ CREATE TABLE `ibl_sim_dates` (
   `Start Date` date DEFAULT NULL,
   `End Date` date DEFAULT NULL,
   PRIMARY KEY (`Sim`)
-) ENGINE=InnoDB AUTO_INCREMENT=671 DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=676 DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1393,7 +1393,7 @@ DROP TABLE IF EXISTS `ibl_trade_autocounter`;
 CREATE TABLE `ibl_trade_autocounter` (
   `counter` int(11) NOT NULL AUTO_INCREMENT,
   PRIMARY KEY (`counter`)
-) ENGINE=InnoDB AUTO_INCREMENT=11974 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=11976 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -2184,7 +2184,7 @@ CREATE TABLE `nuke_modules` (
   PRIMARY KEY (`mid`),
   KEY `title` (`title`(250)),
   KEY `custom_title` (`custom_title`(250))
-) ENGINE=MyISAM AUTO_INCREMENT=140 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=141 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -2362,7 +2362,7 @@ CREATE TABLE `nuke_referer` (
   `rid` int(11) NOT NULL AUTO_INCREMENT,
   `url` varchar(100) NOT NULL DEFAULT '',
   PRIMARY KEY (`rid`)
-) ENGINE=MyISAM AUTO_INCREMENT=40338 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=40370 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -2637,7 +2637,7 @@ CREATE TABLE `nuke_users_temp` (
   `check_num` varchar(50) NOT NULL DEFAULT '',
   `time` varchar(14) NOT NULL DEFAULT '',
   PRIMARY KEY (`user_id`)
-) ENGINE=MyISAM AUTO_INCREMENT=10989 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=10993 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -2812,4 +2812,4 @@ CREATE TABLE `users` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-01-05 17:35:11
+-- Dump completed on 2026-01-20 13:47:07

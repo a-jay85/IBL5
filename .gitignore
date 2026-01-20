@@ -9,6 +9,7 @@ vendor/
 nohup.out
 /phpmyadmin
 *.phar
+settings.local.json
 
 config.json
 config.php

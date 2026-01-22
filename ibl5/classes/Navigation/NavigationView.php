@@ -7,9 +7,9 @@ namespace Navigation;
 use Utilities\HtmlSanitizer;
 
 /**
- * Renders the main navigation bar with Tailwind CSS
- * Desktop: Hover dropdowns
- * Mobile: Full-screen hamburger menu
+ * Renders the main navigation bar with premium sports editorial design
+ * Desktop: Elegant hover dropdowns with staggered animations
+ * Mobile: Full-height sliding panel with refined aesthetics
  */
 class NavigationView
 {
@@ -26,12 +26,13 @@ class NavigationView
 
     /**
      * Get the navigation menu structure
-     * @return array<string, array{links: array}>
+     * @return array<string, array{links: array, icon?: string}>
      */
     private function getMenuStructure(): array
     {
         return [
             'Season' => [
+                'icon' => '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>',
                 'links' => [
                     ['label' => 'Standings', 'url' => 'modules.php?name=Standings'],
                     ['label' => 'Schedule', 'url' => 'modules.php?name=Schedule'],
@@ -45,6 +46,7 @@ class NavigationView
                 ],
             ],
             'Stats' => [
+                'icon' => '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>',
                 'links' => [
                     ['label' => 'League Leaders', 'url' => 'modules.php?name=Chunk_Stats&op=season'],
                     ['label' => 'League Starters', 'url' => 'modules.php?name=League_Starters', 'badge' => 'NEW'],
@@ -56,6 +58,7 @@ class NavigationView
                 ],
             ],
             'History' => [
+                'icon' => '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>',
                 'links' => [
                     ['label' => 'Season Archive', 'url' => 'modules.php?name=Content&pa=showpage&pid=5'],
                     ['label' => 'Franchise History', 'url' => 'modules.php?name=Franchise_History'],
@@ -71,6 +74,7 @@ class NavigationView
                 ],
             ],
             'Community' => [
+                'icon' => '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>',
                 'links' => [
                     ['label' => 'Discord Server', 'url' => 'https://discord.com/invite/QXwBQxR', 'external' => true],
                     ['label' => 'GM Contact List', 'url' => '/ibl5/pages/contactList.php'],
@@ -78,6 +82,7 @@ class NavigationView
                 ],
             ],
             'Games' => [
+                'icon' => '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>',
                 'links' => [
                     ['label' => '1-On-1 Game', 'url' => 'modules.php?name=One-on-One'],
                 ],
@@ -106,7 +111,7 @@ class NavigationView
     }
 
     /**
-     * Render a dropdown link item
+     * Render a dropdown link item with stagger animation class
      */
     private function renderDropdownLink(array $link): string
     {
@@ -116,46 +121,74 @@ class NavigationView
         $badge = $link['badge'] ?? null;
 
         $target = $external ? ' target="_blank" rel="noopener noreferrer"' : '';
-        $externalIcon = $external ? ' <span class="text-xs opacity-60">↗</span>' : '';
-        $badgeHtml = $badge ? ' <span class="bg-red-500 text-white text-xs px-1.5 py-0.5 rounded ml-1">' . HtmlSanitizer::safeHtmlOutput($badge) . '</span>' : '';
+        $externalIcon = $external ? ' <svg class="w-3 h-3 opacity-40 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>' : '';
+        $badgeHtml = $badge ? ' <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-accent-500 text-white ml-2 tracking-wide">' . HtmlSanitizer::safeHtmlOutput($badge) . '</span>' : '';
 
-        return '<a href="' . $url . '"' . $target . ' class="block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors">'
-            . $label . $badgeHtml . $externalIcon
+        return '<a href="' . $url . '"' . $target . ' class="nav-dropdown-item block px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 transition-all duration-150 border-l-2 border-transparent hover:border-accent-500">'
+            . '<span class="flex items-center justify-between">'
+            . '<span>' . $label . $badgeHtml . '</span>'
+            . $externalIcon
+            . '</span>'
             . '</a>';
     }
 
     /**
      * Render a desktop dropdown menu
      */
-    private function renderDesktopDropdown(string $title, array $links): string
+    private function renderDesktopDropdown(string $title, array $data): string
     {
-        $html = '<div class="relative group">';
-        $html .= '<button class="flex items-center gap-1 px-3 py-4 text-white font-medium hover:bg-blue-800 transition-colors">';
-        $html .= HtmlSanitizer::safeHtmlOutput($title);
-        $html .= ' <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>';
-        $html .= '</button>';
-        $html .= '<div class="absolute left-0 top-full min-w-48 bg-white shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 z-50">';
+        $links = $data['links'];
+        $icon = $data['icon'] ?? '';
 
+        $html = '<div class="relative group">';
+        $html .= '<button class="flex items-center gap-2 px-3 py-5 text-sm font-medium text-gray-300 hover:text-white transition-colors duration-200">';
+        if ($icon) {
+            $html .= '<span class="text-accent-500 group-hover:text-accent-400 transition-colors">' . $icon . '</span>';
+        }
+        $html .= '<span>' . HtmlSanitizer::safeHtmlOutput($title) . '</span>';
+        $html .= '<svg class="w-3 h-3 opacity-50 group-hover:opacity-100 transition-all duration-200 group-hover:translate-y-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>';
+        $html .= '</button>';
+
+        // Dropdown panel
+        $html .= '<div class="absolute left-0 top-full pt-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">';
+        $html .= '<div class="min-w-[220px] bg-navy-800/95 backdrop-blur-xl rounded-lg shadow-2xl shadow-black/30 border border-white/10 overflow-hidden">';
+
+        // Header
+        $html .= '<div class="px-4 py-2.5 border-b border-white/5">';
+        $html .= '<span class="text-[11px] font-semibold tracking-widest uppercase text-accent-500">' . HtmlSanitizer::safeHtmlOutput($title) . '</span>';
+        $html .= '</div>';
+
+        // Links
+        $html .= '<div class="py-1">';
         foreach ($links as $link) {
             $html .= $this->renderDropdownLink($link);
         }
+        $html .= '</div>';
 
-        $html .= '</div></div>';
+        $html .= '</div></div></div>';
         return $html;
     }
 
     /**
      * Render the mobile menu dropdown section
      */
-    private function renderMobileDropdown(string $title, array $links): string
+    private function renderMobileDropdown(string $title, array $data, int $index): string
     {
-        $html = '<div class="border-b border-blue-800">';
-        $html .= '<button class="mobile-dropdown-btn w-full flex items-center justify-between px-4 py-3 text-white font-medium hover:bg-blue-800">';
-        $html .= HtmlSanitizer::safeHtmlOutput($title);
-        $html .= ' <svg class="dropdown-arrow w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>';
-        $html .= '</button>';
-        $html .= '<div class="hidden bg-blue-800">';
+        $links = $data['links'];
+        $icon = $data['icon'] ?? '';
 
+        $html = '<div class="mobile-section">';
+        $html .= '<button class="mobile-dropdown-btn w-full flex items-center justify-between px-5 py-4 text-white hover:bg-white/5 transition-colors">';
+        $html .= '<span class="flex items-center gap-3">';
+        if ($icon) {
+            $html .= '<span class="text-accent-500">' . $icon . '</span>';
+        }
+        $html .= '<span class="font-medium">' . HtmlSanitizer::safeHtmlOutput($title) . '</span>';
+        $html .= '</span>';
+        $html .= '<svg class="dropdown-arrow w-4 h-4 text-gray-500 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>';
+        $html .= '</button>';
+
+        $html .= '<div class="hidden bg-black/20">';
         foreach ($links as $link) {
             $label = HtmlSanitizer::safeHtmlOutput($link['label']);
             $url = HtmlSanitizer::safeHtmlOutput($link['url']);
@@ -163,15 +196,16 @@ class NavigationView
             $badge = $link['badge'] ?? null;
 
             $target = $external ? ' target="_blank" rel="noopener noreferrer"' : '';
-            $externalIcon = $external ? ' <span class="text-xs opacity-60">↗</span>' : '';
-            $badgeHtml = $badge ? ' <span class="bg-red-500 text-white text-xs px-1.5 py-0.5 rounded ml-1">' . HtmlSanitizer::safeHtmlOutput($badge) . '</span>' : '';
+            $externalIcon = $external ? ' <svg class="w-3 h-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>' : '';
+            $badgeHtml = $badge ? ' <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-accent-500 text-white ml-2">' . HtmlSanitizer::safeHtmlOutput($badge) . '</span>' : '';
 
-            $html .= '<a href="' . $url . '"' . $target . ' class="block px-6 py-2 text-blue-100 hover:bg-blue-900 hover:text-white">'
-                . $label . $badgeHtml . $externalIcon
+            $html .= '<a href="' . $url . '"' . $target . ' class="flex items-center justify-between px-5 py-3 pl-12 text-sm text-gray-400 hover:text-white hover:bg-white/5 border-l-2 border-transparent hover:border-accent-500 transition-all">'
+                . '<span>' . $label . $badgeHtml . '</span>'
+                . $externalIcon
                 . '</a>';
         }
-
         $html .= '</div></div>';
+
         return $html;
     }
 
@@ -183,10 +217,13 @@ class NavigationView
         $iblSelected = $this->currentLeague === 'ibl' ? ' selected' : '';
         $olympicsSelected = $this->currentLeague === 'olympics' ? ' selected' : '';
 
-        return '<select onchange="window.location.href=this.value" class="bg-blue-800 text-white text-sm border border-blue-600 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-400">'
-            . '<option value="index.php?league=ibl"' . $iblSelected . '>IBL</option>'
-            . '<option value="index.php?league=olympics"' . $olympicsSelected . '>Olympics</option>'
-            . '</select>';
+        return '<div class="relative">'
+            . '<select onchange="window.location.href=this.value" class="appearance-none bg-white/10 text-white text-sm font-medium border border-white/20 rounded-lg px-3 py-2 pr-8 cursor-pointer hover:bg-white/15 hover:border-white/30 focus:outline-none focus:ring-2 focus:ring-accent-500/50 focus:border-accent-500 transition-all">'
+            . '<option value="index.php?league=ibl"' . $iblSelected . ' class="bg-navy-800 text-white">IBL</option>'
+            . '<option value="index.php?league=olympics"' . $olympicsSelected . ' class="bg-navy-800 text-white">Olympics</option>'
+            . '</select>'
+            . '<svg class="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>'
+            . '</div>';
     }
 
     /**
@@ -200,68 +237,130 @@ class NavigationView
         ob_start();
         ?>
         <!-- Navigation Bar -->
-        <nav class="fixed top-0 left-0 right-0 z-50 bg-blue-700 shadow-lg">
-            <div class="max-w-7xl mx-auto px-4">
+        <nav class="fixed top-0 left-0 right-0 z-50 nav-grain">
+            <!-- Background with gradient -->
+            <div class="absolute inset-0 bg-gradient-to-r from-navy-900 via-navy-800 to-navy-900"></div>
+            <!-- Bottom accent line -->
+            <div class="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-accent-500/50 to-transparent"></div>
+
+            <div class="relative max-w-7xl mx-auto px-4 sm:px-6">
                 <div class="flex items-center justify-between">
-                    <!-- Logo / Home -->
-                    <a href="index.php" class="flex items-center py-3 text-white font-bold text-lg hover:text-blue-200 transition-colors">
-                        IBL
+                    <!-- Logo -->
+                    <a href="index.php" class="flex items-center gap-3 py-4 group">
+                        <!-- Basketball icon -->
+                        <div class="relative">
+                            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-accent-500 to-orange-600 flex items-center justify-center shadow-lg shadow-accent-500/25 group-hover:shadow-accent-500/40 transition-shadow">
+                                <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+                                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                                    <path d="M12 2C12 12 12 12 12 22" stroke="currentColor" stroke-width="1.5"/>
+                                    <path d="M2 12C12 12 12 12 22 12" stroke="currentColor" stroke-width="1.5"/>
+                                    <path d="M4.5 4.5C8 8 8 16 4.5 19.5" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                                    <path d="M19.5 4.5C16 8 16 16 19.5 19.5" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <!-- Text logo -->
+                        <div class="flex flex-col">
+                            <span class="font-display text-2xl tracking-wider text-white leading-none">IBL</span>
+                            <span class="text-[9px] tracking-[0.2em] text-accent-500 font-semibold uppercase">Fantasy League</span>
+                        </div>
                     </a>
 
                     <!-- Desktop Navigation -->
-                    <div class="hidden md:flex items-center">
+                    <div class="hidden lg:flex items-center">
                         <!-- Home link -->
-                        <a href="index.php" class="px-3 py-4 text-white font-medium hover:bg-blue-800 transition-colors">Home</a>
+                        <a href="index.php" class="flex items-center gap-2 px-3 py-5 text-sm font-medium text-gray-300 hover:text-white transition-colors">
+                            <svg class="w-4 h-4 text-accent-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                            <span>Home</span>
+                        </a>
 
                         <?php foreach ($menus as $title => $menu): ?>
-                            <?= $this->renderDesktopDropdown($title, $menu['links']) ?>
+                            <?= $this->renderDesktopDropdown($title, $menu) ?>
                         <?php endforeach; ?>
 
+                        <!-- Divider -->
+                        <div class="w-px h-6 bg-white/10 mx-2"></div>
+
                         <!-- Account dropdown -->
-                        <?= $this->renderDesktopDropdown($this->isLoggedIn ? 'Account' : 'Login', $accountMenu) ?>
+                        <?= $this->renderDesktopDropdown(
+                            $this->isLoggedIn ? ($this->username ?? 'Account') : 'Login',
+                            [
+                                'icon' => '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>',
+                                'links' => $accountMenu
+                            ]
+                        ) ?>
 
                         <!-- League switcher -->
-                        <div class="px-3 py-2">
+                        <div class="pl-3">
                             <?= $this->renderLeagueSwitcher() ?>
                         </div>
                     </div>
 
                     <!-- Mobile hamburger button -->
-                    <button id="nav-hamburger" class="md:hidden p-2 text-white hover:bg-blue-800 rounded" aria-label="Toggle menu" aria-expanded="false">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
-                        </svg>
+                    <button id="nav-hamburger" class="lg:hidden relative w-10 h-10 flex items-center justify-center text-white hover:bg-white/10 rounded-lg transition-colors" aria-label="Toggle menu" aria-expanded="false">
+                        <div class="w-5 h-4 flex flex-col justify-between">
+                            <span class="block h-0.5 w-full bg-current rounded-full transition-transform origin-center" id="hamburger-top"></span>
+                            <span class="block h-0.5 w-full bg-current rounded-full transition-opacity" id="hamburger-middle"></span>
+                            <span class="block h-0.5 w-full bg-current rounded-full transition-transform origin-center" id="hamburger-bottom"></span>
+                        </div>
                     </button>
                 </div>
             </div>
         </nav>
 
         <!-- Mobile menu overlay -->
-        <div id="nav-overlay" class="hidden fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"></div>
+        <div id="nav-overlay" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden transition-opacity duration-300"></div>
 
         <!-- Mobile menu -->
-        <nav id="nav-mobile-menu" class="fixed top-14 left-0 bottom-0 w-72 bg-blue-700 z-50 transform -translate-x-full transition-transform duration-300 ease-in-out md:hidden overflow-y-auto">
-            <!-- Home link -->
-            <a href="index.php" class="block px-4 py-3 text-white font-medium border-b border-blue-800 hover:bg-blue-800">Home</a>
+        <nav id="nav-mobile-menu" class="fixed top-16 right-0 bottom-0 w-[300px] max-w-[85vw] z-50 transform translate-x-full transition-transform duration-300 ease-out lg:hidden">
+            <!-- Background -->
+            <div class="absolute inset-0 bg-gradient-to-b from-navy-800 to-navy-900"></div>
+            <!-- Left accent line -->
+            <div class="absolute top-0 left-0 bottom-0 w-[1px] bg-gradient-to-b from-accent-500/50 via-accent-500/20 to-transparent"></div>
 
-            <?php foreach ($menus as $title => $menu): ?>
-                <?= $this->renderMobileDropdown($title, $menu['links']) ?>
-            <?php endforeach; ?>
+            <div class="relative h-full flex flex-col mobile-menu-scroll overflow-y-auto">
+                <!-- User greeting -->
+                <?php if ($this->isLoggedIn && $this->username): ?>
+                    <div class="mobile-section px-5 py-4 border-b border-white/5">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-accent-500/20 flex items-center justify-center">
+                                <svg class="w-5 h-5 text-accent-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                            </div>
+                            <div>
+                                <div class="text-xs text-gray-500 uppercase tracking-wide">Welcome back</div>
+                                <div class="text-white font-semibold"><?= HtmlSanitizer::safeHtmlOutput($this->username) ?></div>
+                            </div>
+                        </div>
+                    </div>
+                <?php endif; ?>
 
-            <!-- Account section -->
-            <?= $this->renderMobileDropdown($this->isLoggedIn ? 'Account' : 'Login', $accountMenu) ?>
+                <!-- Home link -->
+                <a href="index.php" class="mobile-section flex items-center gap-3 px-5 py-4 text-white hover:bg-white/5 transition-colors border-b border-white/5">
+                    <svg class="w-4 h-4 text-accent-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                    <span class="font-medium">Home</span>
+                </a>
 
-            <!-- League switcher in mobile -->
-            <div class="px-4 py-3 border-t border-blue-800">
-                <label class="block text-blue-200 text-sm mb-1">League</label>
-                <?= $this->renderLeagueSwitcher() ?>
-            </div>
+                <!-- Menu sections -->
+                <?php $index = 2; foreach ($menus as $title => $menu): ?>
+                    <?= $this->renderMobileDropdown($title, $menu, $index++) ?>
+                <?php endforeach; ?>
 
-            <?php if ($this->isLoggedIn && $this->username): ?>
-                <div class="px-4 py-3 border-t border-blue-800 text-blue-200 text-sm">
-                    Logged in as <strong class="text-white"><?= HtmlSanitizer::safeHtmlOutput($this->username) ?></strong>
+                <!-- Account section -->
+                <?= $this->renderMobileDropdown(
+                    $this->isLoggedIn ? 'Account' : 'Login',
+                    [
+                        'icon' => '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>',
+                        'links' => $accountMenu
+                    ],
+                    $index++
+                ) ?>
+
+                <!-- League switcher -->
+                <div class="mobile-section mt-auto px-5 py-4 border-t border-white/5 bg-black/20">
+                    <label class="block text-xs text-gray-500 uppercase tracking-wide mb-2">League</label>
+                    <?= $this->renderLeagueSwitcher() ?>
                 </div>
-            <?php endif; ?>
+            </div>
         </nav>
         <?php
         return ob_get_clean();

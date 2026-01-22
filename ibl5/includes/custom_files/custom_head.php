@@ -66,6 +66,54 @@ body {
     font-family: "Plus Jakarta Sans", system-ui, sans-serif;
 }
 
+/* Navigation link colors for accessibility - override browser defaults */
+/* Main nav links (Home, top-level items) */
+nav > div > div > div > a:link {
+    color: #d1d5db; /* gray-300 */
+}
+
+nav > div > div > div > a:visited {
+    color: #d1d5db; /* Keep same color for top-level nav */
+}
+
+/* Desktop dropdown links */
+.nav-dropdown-item:link {
+    color: #e5e7eb; /* gray-200 - brighter for better contrast */
+}
+
+.nav-dropdown-item:visited {
+    color: #fdba74; /* accent-300 - warm orange for visited state */
+}
+
+.nav-dropdown-item:hover {
+    color: #ffffff !important;
+    background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Mobile menu links */
+#nav-mobile-menu a:link {
+    color: #e5e7eb; /* gray-200 */
+}
+
+#nav-mobile-menu a:visited {
+    color: #fdba74; /* accent-300 - warm orange */
+}
+
+#nav-mobile-menu a:hover {
+    color: #ffffff !important;
+}
+
+/* Mobile section buttons (not links) */
+#nav-mobile-menu .mobile-dropdown-btn {
+    color: #ffffff; /* Keep section headers white */
+}
+
+/* Mobile home link */
+#nav-mobile-menu > div > a:link,
+#nav-mobile-menu > div > a:visited {
+    color: #ffffff; /* Keep home link white */
+}
+
 /* Navigation dropdown items - staggered reveal with transitions */
 .nav-dropdown-item {
     opacity: 0;

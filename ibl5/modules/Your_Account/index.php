@@ -210,7 +210,7 @@ function activate($username, $check_num)
         $row = $db->sql_fetchrow($result);
         $user_password = htmlspecialchars(stripslashes($row['user_password']));
         if ($check_num == $row['check_num']) {
-            $db->sql_query("INSERT INTO " . $user_prefix . "_users (user_id, username, user_email, user_password, user_avatar, user_avatar_type, user_regdate, user_lang) VALUES (NULL, '" . $row['username'] . "', '" . $row['user_email'] . "', '$user_password', 'gallery/blank.gif', '3', '" . $row['user_regdate'] . "', '$language')");
+            $db->sql_query("INSERT INTO " . $user_prefix . "_users (user_id, username, user_email, user_password, user_avatar, user_avatar_type, user_regdate, user_lang) VALUES (NULL, '" . $row['username'] . "', '" . $row['user_email'] . "', '$user_password', '', '3', '" . $row['user_regdate'] . "', '$language')");
             $db->sql_query("DELETE FROM " . $user_prefix . "_users_temp WHERE username='$username' AND check_num='$check_num'");
             Nuke\Header::header();
             title("" . _ACTIVATIONYES . "");
@@ -284,13 +284,8 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
         }
     }
     // Avatar display - simplified without forum config
-    if ($userinfo['user_avatar_type'] == 2) {
-        // Remote URL - use as-is
-        $userinfo['user_avatar'] = $userinfo['user_avatar'];
-    } elseif (!empty($userinfo['user_avatar'])) {
-        // Local avatar - assume in modules/Forums/images/avatars (may not exist after forum removal)
-        $userinfo['user_avatar'] = "modules/Forums/images/avatars/" . $userinfo['user_avatar'];
-    }
+    $userinfo['user_avatar'] = "images/pix.gif";
+    
     if (($num == 1) && ($userinfo['user_website'] || $userinfo['femail'] || $userinfo['bio'] || $userinfo['user_avatar'] || $userinfo['user_icq'] || $userinfo['user_aim'] || $userinfo['user_yim'] || $userinfo['user_msnm'] || $userinfo['user_location'] || $userinfo['user_occ'] || $userinfo['user_interests'] || $userinfo['user_sig'])) {
         echo "<center><font class=\"content\">";
         echo "<img src=\"" . $userinfo['user_avatar'] . "\"><br><br>\n";
@@ -1114,13 +1109,7 @@ function edituser()
         }
         $s_categories .= '</select>';
         // Avatar display - simplified without forum config
-        if ($userinfo['user_avatar_type'] == 2) {
-            // Remote URL - use as-is
-            $userinfo['user_avatar'] = $userinfo['user_avatar'];
-        } elseif (!empty($userinfo['user_avatar'])) {
-            // Local avatar - assume in modules/Forums/images/avatars (may not exist after forum removal)
-            $userinfo['user_avatar'] = "modules/Forums/images/avatars/" . $userinfo['user_avatar'];
-        }
+        $userinfo['user_avatar'] = "images/pix.gif";
         echo "<tr><td bgcolor='$bgcolor3' colspan='2' align='center'>"
         . "<BR><b><h5>Avatar control panel</h5></b>"
         . "<tr><td bgcolor='$bgcolor2'>Displays a small graphic image below your details in forum posts and on your profile.</td>";

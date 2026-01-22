@@ -49,7 +49,7 @@ function create_first($name, $url, $email, $pwd, $user_new)
         $db->sql_query("INSERT INTO " . $prefix . "_authors VALUES ('" . addslashes($name) . "', '$the_adm', '" . addslashes($url) . "', '" . addslashes($email) . "', '$pwd', '0', '1', '')");
         if ($user_new == 1) {
             $user_regdate = date("M d, Y");
-            $user_avatar = "gallery/blank.gif";
+            $user_avatar = "";
             $commentlimit = 4096;
             if ($url == "http://") {$url = "";}
             $db->sql_query("INSERT INTO " . $user_prefix . "_users (user_id, username, user_email, user_website, user_avatar, user_regdate, user_password, theme, commentmax, user_level, user_lang, user_dateformat) VALUES (NULL,'" . addslashes($name) . "','" . addslashes($email) . "','" . addslashes($url) . "','$user_avatar','$user_regdate','$pwd','$Default_Theme','$commentlimit', '2', 'english','D M d, Y g:i a')");

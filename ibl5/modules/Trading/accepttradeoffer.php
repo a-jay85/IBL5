@@ -1,21 +1,44 @@
 <?php
 
-require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
+// Enable error reporting for debugging
+error_reporting(E_ALL);
+ini_set('display_errors', '1');
+ini_set('log_errors', '1');
+ini_set('error_log', dirname(__FILE__) . '/accept_trade_errors.log');
+
+try {
+    require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
+} catch (Exception $e) {
+    error_log("Failed to load mainfile.php: " . $e->getMessage());
+    die("Error loading system files. Please contact the administrator.");
+}
 
 global $mysqli_db;
 
-$offerId = $_POST['offer'];
+// Check database connection
+if (!isset($mysqli_db) || !($mysqli_db instanceof mysqli)) {
+    error_log("Database connection not available");
+    die("Error: Database connection failed");
+}
+
+$offerId = $_POST['offer'] ?? null;
 
 if ($offerId != NULL) {
-    $tradeProcessor = new Trading\TradeProcessor($mysqli_db);
-    $result = $tradeProcessor->processTrade((int)$offerId);
-    
-    if ($result['success']) {
-        // Trade processed successfully
-        echo "Trade accepted!<p>";
-    } else {
-        echo "Error processing trade: " . ($result['error'] ?? 'Unknown error');
-        exit;
+    try {
+        $tradeProcessor = new Trading\TradeProcessor($mysqli_db);
+        $result = $tradeProcessor->processTrade((int)$offerId);
+
+        if ($result['success']) {
+            // Trade processed successfully
+            echo "Trade accepted!<p>";
+        } else {
+            echo "Error processing trade: " . htmlspecialchars($result['error'] ?? 'Unknown error');
+            exit;
+        }
+    } catch (Exception $e) {
+        error_log("Failed to process trade: " . $e->getMessage());
+        error_log("Stack trace: " . $e->getTraceAsString());
+        die("Error processing trade: " . htmlspecialchars($e->getMessage()));
     }
 } else {
     echo "Nothing to see here!";

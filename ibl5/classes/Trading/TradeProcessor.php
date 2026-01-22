@@ -22,7 +22,7 @@ class TradeProcessor implements TradeProcessorInterface
     protected \Season $season;
     protected CashTransactionHandler $cashHandler;
     protected \Services\NewsService $newsService;
-    protected \Discord $discord;
+    protected ?\Discord $discord;
 
     public function __construct(object $db, ?TradingRepository $repository = null)
     {
@@ -32,7 +32,15 @@ class TradeProcessor implements TradeProcessorInterface
         $this->season = new \Season($db);
         $this->cashHandler = new CashTransactionHandler($db, $this->repository);
         $this->newsService = new \Services\NewsService($db);
-        $this->discord = new \Discord($db);
+
+        // Initialize Discord with error handling
+        try {
+            $this->discord = new \Discord($db);
+        } catch (\Exception $e) {
+            // Discord unavailable - will skip notifications
+            error_log("Discord initialization failed in TradeProcessor: " . $e->getMessage());
+            $this->discord = null;
+        }
     }
 
     /**
@@ -289,17 +297,22 @@ class TradeProcessor implements TradeProcessorInterface
      */
     protected function sendNotifications($offeringTeamName, $listeningTeamName, $storytext)
     {
-        $fromDiscordId = $this->discord->getDiscordIDFromTeamname($offeringTeamName);
-        $toDiscordId = $this->discord->getDiscordIDFromTeamname($listeningTeamName);
-        
-        // Build Discord mention text only if both IDs exist
-        if (!empty($fromDiscordId) && !empty($toDiscordId)) {
-            $discordText = "<@!$fromDiscordId> and <@!$toDiscordId> agreed to a trade:\n" . $storytext;
-        } else {
-            $discordText = "$offeringTeamName and $listeningTeamName agreed to a trade:\n" . $storytext;
+        // Skip notifications if Discord is not available
+        if ($this->discord === null) {
+            return;
         }
 
         try {
+            $fromDiscordId = $this->discord->getDiscordIDFromTeamname($offeringTeamName);
+            $toDiscordId = $this->discord->getDiscordIDFromTeamname($listeningTeamName);
+
+            // Build Discord mention text only if both IDs exist
+            if (!empty($fromDiscordId) && !empty($toDiscordId)) {
+                $discordText = "<@!$fromDiscordId> and <@!$toDiscordId> agreed to a trade:\n" . $storytext;
+            } else {
+                $discordText = "$offeringTeamName and $listeningTeamName agreed to a trade:\n" . $storytext;
+            }
+
             \Discord::postToChannel('#trades', $discordText);
             \Discord::postToChannel('#general-chat', $storytext);
         } catch (\Exception $e) {

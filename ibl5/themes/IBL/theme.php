@@ -61,43 +61,26 @@ function FormatStory($thetext, $notes, $aid, $informant)
 function themeheader()
 {
     global $user, $cookie, $bgcolor1, $bgcolor2, $user, $leagueContext;
-    echo "<body bgcolor=\"$bgcolor1\">";
-    if (is_user($user)) {
+
+    // Determine login state
+    $isLoggedIn = is_user($user);
+    $username = null;
+    if ($isLoggedIn) {
         cookiedecode($user);
         $username = $cookie[1];
-        $bienvenida = "Hello $username! [ <a href=\"modules.php?name=Your_Account&amp;op=logout\"><b>Logout</b></a> ]";
-    } else {
-        $bienvenida = "<a href=\"modules.php?name=Your_Account&amp;op=new_user\">Create an Account</a>";
     }
-    
-    // League switcher
+
+    // Get current league for switcher
     $currentLeague = $leagueContext->getCurrentLeague();
-    $leagueSwitcher = "<span style='margin-left: 10px;'>League: </span><select onchange='window.location.href=this.value' style='font-size: 11px;'>";
-    $leagueSwitcher .= "<option value='index.php?league=ibl'" . ($currentLeague === 'ibl' ? ' selected' : '') . ">IBL</option>";
-    $leagueSwitcher .= "<option value='index.php?league=olympics'" . ($currentLeague === 'olympics' ? ' selected' : '') . ">Olympics</option>";
-    $leagueSwitcher .= "</select>";
-    
-    echo "<table border=\"0 cellpadding=\"4\" cellspacing=\"0\" width=\"100%\" align=\"center\">\n"
-        . "<tr><td bgcolor=\"$bgcolor2\" align=\"left\" width=\"20%\">&nbsp;$bienvenida</td>"
-        . "<td bgcolor=\"$bgcolor2\" align=\"center\" width=\"60%\"><a href=\"index.php\">Home</a> | <a href=\"modules.php?name=Your_Account\">Your Account</a> | <a href=\"modules.php?name=Topics\">Topics</a> $leagueSwitcher</td>\n"
-        . "<td bgcolor=\"$bgcolor2\" align=\"right\" width=\"20%\">"
-        . "<b><script type=\"text/javascript\">\n\n"
-        . "<!--   // Array ofmonth Names\n"
-        . "var monthNames = new Array( \"" . _JANUARY . "\",\"" . _FEBRUARY . "\",\"" . _MARCH . "\",\"" . _APRIL . "\",\"" . _MAY . "\",\"" . _JUNE . "\",\"" . _JULY . "\",\"" . _AUGUST . "\",\"" . _SEPTEMBER . "\",\"" . _OCTOBER . "\",\"" . _NOVEMBER . "\",\"" . _DECEMBER . "\");\n"
-        . "var now = new Date();\n"
-        . "thisYear = now.getYear();\n"
-        . "if(thisYear < 1900) {thisYear += 1900}; // corrections if Y2K display problem\n"
-        . "document.write(monthNames[now.getMonth()] + \" \" + now.getDate() + \", \" + thisYear);\n"
-        . "// -->\n\n"
-        . "</script></b>&nbsp;\n"
-        . "</td></tr>\n"
-        . "<tr><td valign=\"top\" width=\"100%\" colspan=3>\n"
-    ;
-    // $public_msg = public_message();
-    // echo "$public_msg<br>";
-    // echo "<table border=\"0\" cellspacing=\"0\" cellpadding=\"2\" width=\"100%\"><tr><td valign=\"top\" width=\"150\" bgcolor=$bgcolor1>";
-    // blocks("left");
-    // echo "</td><td>&nbsp;&nbsp;</td><td width=\"100%\" valign=\"top\">";
+
+    // Render the floating navigation bar
+    $navView = new \Navigation\NavigationView($isLoggedIn, $username, $currentLeague);
+    echo $navView->render();
+
+    // Body tag and main content wrapper
+    echo "<body bgcolor=\"$bgcolor1\">";
+    echo "<table border=\"0\" cellpadding=\"4\" cellspacing=\"0\" width=\"100%\" align=\"center\">\n"
+        . "<tr><td valign=\"top\" width=\"100%\" colspan=\"3\">\n";
 }
 
 function themefooter()

@@ -93,21 +93,21 @@ function themeheader()
         . "</td></tr>\n"
         . "<tr><td valign=\"top\" width=\"100%\" colspan=3>\n"
     ;
-    $public_msg = public_message();
-    echo "$public_msg<br>";
-    echo "<table border=\"0\" cellspacing=\"0\" cellpadding=\"2\" width=\"100%\"><tr><td valign=\"top\" width=\"150\" bgcolor=$bgcolor1>";
-    blocks("left");
-    echo "</td><td>&nbsp;&nbsp;</td><td width=\"100%\" valign=\"top\">";
+    // $public_msg = public_message();
+    // echo "$public_msg<br>";
+    // echo "<table border=\"0\" cellspacing=\"0\" cellpadding=\"2\" width=\"100%\"><tr><td valign=\"top\" width=\"150\" bgcolor=$bgcolor1>";
+    // blocks("left");
+    // echo "</td><td>&nbsp;&nbsp;</td><td width=\"100%\" valign=\"top\">";
 }
 
 function themefooter()
 {
     global $bgcolor1;
-    // if (defined('INDEX_FILE')) {
-    echo "</td><td>&nbsp;&nbsp;</td><td valign=\"top\" bgcolor=$bgcolor1>";
-    blocks("right");
-    echo "</td>";
-    // }
+    // // if (defined('INDEX_FILE')) {
+    // echo "</td><td>&nbsp;&nbsp;</td><td valign=\"top\" bgcolor=$bgcolor1>";
+    // blocks("right");
+    // echo "</td>";
+    // // }
     echo "</td></tr></table></td></tr></table>";
     echo "<center>";
     Nuke\Footer::footmsg();

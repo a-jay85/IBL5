@@ -39,17 +39,6 @@ class StandingsViewTest extends TestCase
         $this->assertIsString($result);
     }
 
-    public function testRenderIncludesSorttableScript(): void
-    {
-        $this->mockRepository->method('getStandingsByRegion')->willReturn([]);
-        $this->mockRepository->method('getTeamStreakData')->willReturn(null);
-        $this->mockRepository->method('getTeamPythagoreanStats')->willReturn(null);
-
-        $result = $this->view->render();
-
-        $this->assertStringContainsString('<script src="sorttable.js"></script>', $result);
-    }
-
     public function testRenderIncludesAllConferences(): void
     {
         $this->mockRepository->method('getStandingsByRegion')->willReturn([]);

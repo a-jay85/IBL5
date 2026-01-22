@@ -707,7 +707,7 @@ function new_user()
         $sql = "SELECT custom_title FROM " . $prefix . "_modules WHERE active='1' AND view='1' AND inmenu='1'";
         $result = $db->sql_query($sql);
         while ($row = $db->sql_fetchrow($result)) {
-            $custom_title = filter($row[custom_title], "nohtml");
+            $custom_title = filter($row['custom_title'], "nohtml");
             if (!empty($custom_title)) {
                 echo "<li>" . _ACCESSTO . " $custom_title\n";
             }
@@ -715,7 +715,7 @@ function new_user()
         $sql = "SELECT title FROM " . $prefix . "_blocks WHERE active='1' AND view='1'";
         $result = $db->sql_query($sql);
         while ($row = $db->sql_fetchrow($result)) {
-            $b_title = filter($row[title], "nohtml");
+            $b_title = filter($row['title'], "nohtml");
             if (!empty($b_title)) {
                 echo "<li>" . _ACCESSTO . " $b_title\n";
             }

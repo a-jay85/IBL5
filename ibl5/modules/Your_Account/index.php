@@ -655,7 +655,7 @@ function main($user)
 
 function new_user()
 {
-    global $my_headlines, $module_name, $db, $gfx_chk, $user;
+    global $my_headlines, $module_name, $db, $gfx_chk, $user, $prefix;
     if (!is_user($user)) {
         mt_srand((double) microtime() * 1000000);
         $maxran = 1000000;

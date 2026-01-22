@@ -35,8 +35,7 @@ class StandingsView implements StandingsViewInterface
      */
     public function render(): string
     {
-        $html = '<script src="sorttable.js"></script>';
-        $html .= $this->getStyleBlock();
+        $html = $this->getStyleBlock();
 
         // Conference standings
         $html .= $this->renderRegion('Eastern');

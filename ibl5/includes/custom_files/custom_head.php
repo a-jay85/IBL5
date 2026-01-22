@@ -67,13 +67,16 @@ body {
 }
 
 /* Navigation link colors for accessibility - override browser defaults */
-/* Main nav links (Home, top-level items) */
-nav > div > div > div > a:link {
-    color: #d1d5db; /* gray-300 */
+/* Main nav links (Home link specifically and any other direct links) */
+nav .group > a:link,
+nav .group > a:visited {
+    color: #e5e7eb !important; /* gray-200 - match dropdown text brightness */
+    font-size: 0.875rem !important; /* 14px - match button text-sm */
+    font-weight: 500 !important; /* match button font-medium */
 }
 
-nav > div > div > div > a:visited {
-    color: #d1d5db; /* Keep same color for top-level nav */
+nav .group > a:hover {
+    color: #ffffff !important;
 }
 
 /* Desktop dropdown links */

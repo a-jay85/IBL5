@@ -1650,7 +1650,7 @@ if (isset($gfx)) {
             $text_color = ImageColorAllocate($image, 80, 80, 80);
             Header("Content-type: image/jpeg");
             ImageString($image, 5, 12, 2, $code, $text_color);
-            ImageJPEG($image, '', 75);
+            ImageJPEG($image, null, 75);
             ImageDestroy($image);
             die();
             break;
@@ -1668,7 +1668,7 @@ if (isset($gfx)) {
             $text_color = ImageColorAllocate($image, 80, 80, 80);
             Header("Content-type: image/jpeg");
             ImageString($image, 5, 12, 2, $code, $text_color);
-            ImageJPEG($image, '', 75);
+            ImageJPEG($image, null, 75);
             ImageDestroy($image);
             die();
             break;

@@ -18,7 +18,7 @@ $stmt->bind_param("i", $previousSeasonEndingYear);
 $stmt->execute();
 $result = $stmt->get_result();
 
-echo "<script src=\"http://www.iblhoops.net/jslib/sorttable.js\"></script>
+echo "<script src=\"/ibl5/jslib/sorttable.js\"></script>
 <center>
 <h1> PLAYER TRANSACTIONS SINCE LAST SEASON</h1>
 <i>Click the headings to sort the table</i>

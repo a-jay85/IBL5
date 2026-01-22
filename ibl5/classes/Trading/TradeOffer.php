@@ -22,7 +22,7 @@ class TradeOffer implements TradeOfferInterface
     protected \Season $season;
     protected CashTransactionHandler $cashHandler;
     protected TradeValidator $validator;
-    protected \Discord $discord;
+    protected ?\Discord $discord;
 
     public function __construct(object $db, ?TradingRepository $repository = null)
     {
@@ -32,7 +32,15 @@ class TradeOffer implements TradeOfferInterface
         $this->season = new \Season($db);
         $this->cashHandler = new CashTransactionHandler($db, $this->repository);
         $this->validator = new TradeValidator($db);
-        $this->discord = new \Discord($db);
+
+        // Initialize Discord with error handling (may fail if column doesn't exist)
+        try {
+            $this->discord = new \Discord($db);
+        } catch (\Exception $e) {
+            // Discord unavailable - will skip notifications
+            error_log("Discord initialization failed in TradeOffer: " . $e->getMessage());
+            $this->discord = null;
+        }
     }
 
     /**
@@ -374,23 +382,33 @@ class TradeOffer implements TradeOfferInterface
      */
     protected function sendTradeNotification(array $tradeData, string $tradeText): void
     {
-        $offeringTeamName = $tradeData['offeringTeam'];
-        $listeningTeamName = $tradeData['listeningTeam'];
-        
-        $offeringUserDiscordID = $this->discord->getDiscordIDFromTeamname($offeringTeamName);
-        $receivingUserDiscordID = $this->discord->getDiscordIDFromTeamname($listeningTeamName);
+        // Skip notification if Discord is not available
+        if ($this->discord === null) {
+            return;
+        }
 
-        $cleanTradeText = str_replace(['<br>', '&nbsp;', '<i>', '</i>'], ["\n", " ", "_", "_"], $tradeText);
+        try {
+            $offeringTeamName = $tradeData['offeringTeam'];
+            $listeningTeamName = $tradeData['listeningTeam'];
 
-        $discordDMmessage = 'New trade proposal from <@!' . $offeringUserDiscordID . '>!
+            $offeringUserDiscordID = $this->discord->getDiscordIDFromTeamname($offeringTeamName);
+            $receivingUserDiscordID = $this->discord->getDiscordIDFromTeamname($listeningTeamName);
+
+            $cleanTradeText = str_replace(['<br>', '&nbsp;', '<i>', '</i>'], ["\n", " ", "_", "_"], $tradeText);
+
+            $discordDMmessage = 'New trade proposal from <@!' . $offeringUserDiscordID . '>!
 ' . $cleanTradeText . '
 Go here to accept or decline: http://www.iblhoops.net/ibl5/modules.php?name=Trading&op=reviewtrade';
 
-        $arrayContent = [
-            'message' => $discordDMmessage,
-            'receivingUserDiscordID' => $receivingUserDiscordID,
-        ];
+            $arrayContent = [
+                'message' => $discordDMmessage,
+                'receivingUserDiscordID' => $receivingUserDiscordID,
+            ];
 
-        // $response = \Discord::sendCurlPOST('http://localhost:50000/discordDM', $arrayContent);
+            // $response = \Discord::sendCurlPOST('http://localhost:50000/discordDM', $arrayContent);
+        } catch (\Exception $e) {
+            // Log error but don't fail the trade offer
+            error_log("Discord notification failed in sendTradeNotification: " . $e->getMessage());
+        }
     }
 }

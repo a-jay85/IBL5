@@ -16,10 +16,9 @@ config.php
 configOlympics.php
 config.inc.php
 database_dump_*.sql
-discordWebhooks (not CURL).php
-Discord.php
 localDbUpdate.sh
 ibl5/classes/DatabaseConnection.php
+ibl5/config/discord.config.php
 
 backups
 depthcharts

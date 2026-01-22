@@ -90,7 +90,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
             . "<td><textarea name=\"add_user_sig\" rows=\"15\" cols=\"70\"></textarea></td></tr>"
             . "<tr><td>" . _PASSWORD . "</td>"
             . "<td><input type=\"password\" name=\"add_pass\" size=\"12\" maxlength=\"12\"> <font class=\"tiny\">" . _REQUIRED . "</font></td></tr>"
-            . "<input type=\"hidden\" name=\"add_avatar\" value=\"blank.gif\">"
+            . "<input type=\"hidden\" name=\"add_avatar\" value=\"\">"
             . "<input type=\"hidden\" name=\"op\" value=\"addUser\">"
             . "<tr><td><input type=\"submit\" value=\"" . _ADDUSERBUT . "\"></form></td></tr>"
             . "</table>";

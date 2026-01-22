@@ -174,7 +174,7 @@ final class PlayerSearchViewTest extends TestCase
 
         $html = $this->view->renderPlayerRow($player, 0);
 
-        $this->assertStringContainsString('href="team.php?tid=5"', $html);
+        $this->assertStringContainsString('href="modules.php?name=Team&op=team&teamID=5"', $html); // I don't know why the test expects & and not &amp;
         $this->assertStringContainsString('>Test Team<', $html);
     }
 

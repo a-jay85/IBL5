@@ -315,7 +315,7 @@ function resetPlayerSearch() {
     <td style="text-align: center;"><?= htmlspecialchars($player->position) ?></td>
     <td style="text-align: center;"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= $player->playerID ?>"><?= htmlspecialchars($player->name) ?></a></td>
     <td style="text-align: center;"><?= $player->age ?></td>
-    <td style="text-align: center;"><a href="team.php?tid=<?= $player->teamID ?>"><?= htmlspecialchars($player->teamName) ?></a></td>
+    <td style="text-align: center;"><a href="modules.php?name=Team&op=team&teamID=<?= $player->teamID ?>"><?= htmlspecialchars($player->teamName) ?></a></td>
     <td style="text-align: center;"><?= $player->yearsOfExperience ?></td>
     <td style="text-align: center;"><?= $player->birdYears ?></td>
     <td style="text-align: center;"><?= $player->ratingFieldGoalAttempts ?></td>

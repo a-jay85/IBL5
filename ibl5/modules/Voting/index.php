@@ -117,7 +117,7 @@ function userinfo($username)
 						<th>pf</th>
 						<th>pts</th>
 						<th>2x2</th>
-						<th>3x3</th>
+						<th>3x2</th>
 					</tr>";
         } else {
             $output .= "<th>Name</th>

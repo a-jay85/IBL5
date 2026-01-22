@@ -60,21 +60,52 @@ function FormatStory($thetext, $notes, $aid, $informant)
 
 function themeheader()
 {
-    global $user, $cookie, $bgcolor1, $bgcolor2, $user, $leagueContext;
+    global $user, $cookie, $bgcolor1, $bgcolor2, $user, $leagueContext, $mysqli_db;
 
     // Determine login state
     $isLoggedIn = is_user($user);
     $username = null;
+    $teamId = null;
+
     if ($isLoggedIn) {
         cookiedecode($user);
         $username = $cookie[1];
+
+        // Fetch user's team name and then lookup team ID
+        if ($mysqli_db && $username) {
+            // First get the team name from nuke_users
+            $stmt = $mysqli_db->prepare("SELECT user_ibl_team FROM nuke_users WHERE username = ?");
+            if ($stmt) {
+                $stmt->bind_param('s', $username);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                if ($row = $result->fetch_assoc()) {
+                    $teamName = trim($row['user_ibl_team']);
+
+                    // If team name exists, lookup the team ID from ibl_team_info
+                    if ($teamName !== '' && $teamName !== '0') {
+                        $stmt2 = $mysqli_db->prepare("SELECT teamid FROM ibl_team_info WHERE team_name = ?");
+                        if ($stmt2) {
+                            $stmt2->bind_param('s', $teamName);
+                            $stmt2->execute();
+                            $result2 = $stmt2->get_result();
+                            if ($row2 = $result2->fetch_assoc()) {
+                                $teamId = (int)$row2['teamid'];
+                            }
+                            $stmt2->close();
+                        }
+                    }
+                }
+                $stmt->close();
+            }
+        }
     }
 
     // Get current league for switcher
     $currentLeague = $leagueContext->getCurrentLeague();
 
     // Render the floating navigation bar
-    $navView = new \Navigation\NavigationView($isLoggedIn, $username, $currentLeague);
+    $navView = new \Navigation\NavigationView($isLoggedIn, $username, $currentLeague, $teamId);
     echo $navView->render();
 
     // Body tag and main content wrapper

@@ -16,12 +16,14 @@ class NavigationView
     private bool $isLoggedIn;
     private ?string $username;
     private string $currentLeague;
+    private ?int $teamId;
 
-    public function __construct(bool $isLoggedIn, ?string $username, string $currentLeague)
+    public function __construct(bool $isLoggedIn, ?string $username, string $currentLeague, ?int $teamId = null)
     {
         $this->isLoggedIn = $isLoggedIn;
         $this->username = $username;
         $this->currentLeague = $currentLeague;
+        $this->teamId = $teamId;
     }
 
     /**
@@ -32,7 +34,7 @@ class NavigationView
     {
         return [
             'Season' => [
-                'icon' => '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>',
+                'icon' => '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>',
                 'links' => [
                     ['label' => 'Standings', 'url' => 'modules.php?name=Standings'],
                     ['label' => 'Schedule', 'url' => 'modules.php?name=Schedule'],
@@ -46,7 +48,7 @@ class NavigationView
                 ],
             ],
             'Stats' => [
-                'icon' => '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>',
+                'icon' => '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>',
                 'links' => [
                     ['label' => 'League Leaders', 'url' => 'modules.php?name=Chunk_Stats&op=season'],
                     ['label' => 'League Starters', 'url' => 'modules.php?name=League_Starters', 'badge' => 'NEW'],
@@ -58,7 +60,7 @@ class NavigationView
                 ],
             ],
             'History' => [
-                'icon' => '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>',
+                'icon' => '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>',
                 'links' => [
                     ['label' => 'Season Archive', 'url' => 'modules.php?name=Content&pa=showpage&pid=5'],
                     ['label' => 'Franchise History', 'url' => 'modules.php?name=Franchise_History'],
@@ -74,16 +76,11 @@ class NavigationView
                 ],
             ],
             'Community' => [
-                'icon' => '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>',
+                'icon' => '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>',
                 'links' => [
                     ['label' => 'Discord Server', 'url' => 'https://discord.com/invite/QXwBQxR', 'external' => true],
                     ['label' => 'GM Contact List', 'url' => '/ibl5/pages/contactList.php'],
                     ['label' => 'Prime Time Football', 'url' => 'http://www.thakfu.com/ptf/index.php', 'external' => true],
-                ],
-            ],
-            'Games' => [
-                'icon' => '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>',
-                'links' => [
                     ['label' => '1-On-1 Game', 'url' => 'modules.php?name=One-on-One'],
                 ],
             ],
@@ -108,6 +105,45 @@ class NavigationView
             ['label' => 'Topics', 'url' => 'modules.php?name=Topics'],
             ['label' => 'Create Account', 'url' => 'modules.php?name=Your_Account&op=new_user'],
         ];
+    }
+
+    /**
+     * Get My Team menu based on current league
+     * @return array|null
+     */
+    private function getMyTeamMenu(): ?array
+    {
+        if (!$this->isLoggedIn || !$this->teamId) {
+            return null;
+        }
+
+        if ($this->currentLeague === 'ibl') {
+            return [
+                'icon' => '<img src="/ibl5/images/logo/new' . $this->teamId . '.png" alt="Team Logo" class="w-6 h-6 object-contain">',
+                'links' => [
+                    ['label' => 'Next Sim', 'url' => 'modules.php?name=Next_Sim', 'badge' => 'NEW'],
+                    ['label' => 'Depth Chart Form', 'url' => 'modules.php?name=Depth_Chart_Entry'],
+                    ['label' => 'Depth Chart Tracker', 'url' => 'modules.php?name=Depth_Record'],
+                    ['label' => 'Offer Trade', 'url' => 'modules.php?name=Trading&op=reviewtrade'],
+                    ['label' => 'Waiver Wire', 'url' => 'modules.php?name=Waivers&action=add'],
+                    ['label' => 'Waive Player', 'url' => 'modules.php?name=Waivers&action=drop'],
+                    ['label' => 'ASG/Award Voting', 'url' => 'modules.php?name=Voting'],
+                    ['label' => 'Draft Scout/Select', 'url' => 'modules.php?name=Draft'],
+                    ['label' => 'Free Agency', 'url' => 'modules.php?name=Free_Agency'],
+                    ['label' => 'Player Movement', 'url' => 'modules.php?name=Player_Movement'],
+                ]
+            ];
+        } elseif ($this->currentLeague === 'olympics') {
+            return [
+                'icon' => '<img src="/ibl5/images/logo/new' . $this->teamId . '.png" alt="Team Logo" class="w-6 h-6 object-contain">',
+                'links' => [
+                    ['label' => 'Depth Chart Form', 'url' => 'modules.php?name=Depth_Chart_Entry'],
+                    ['label' => 'Depth Chart Tracker', 'url' => 'modules.php?name=Depth_Record'],
+                ]
+            ];
+        }
+
+        return null;
     }
 
     /**
@@ -232,6 +268,7 @@ class NavigationView
     public function render(): string
     {
         $menus = $this->getMenuStructure();
+        $myTeamMenu = $this->getMyTeamMenu();
         $accountMenu = $this->getAccountMenu();
 
         ob_start();
@@ -272,6 +309,11 @@ class NavigationView
                             <?= $this->renderDesktopDropdown($title, $menu) ?>
                         <?php endforeach; ?>
 
+                        <!-- My Team dropdown (if user has a team) -->
+                        <?php if ($myTeamMenu): ?>
+                            <?= $this->renderDesktopDropdown('My Team', $myTeamMenu) ?>
+                        <?php endif; ?>
+
                         <!-- Divider -->
                         <div class="w-px h-6 bg-white/10 mx-2"></div>
 
@@ -279,7 +321,7 @@ class NavigationView
                         <?= $this->renderDesktopDropdown(
                             $this->isLoggedIn ? ($this->username ?? 'Account') : 'Login',
                             [
-                                'icon' => '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>',
+                                'icon' => '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>',
                                 'links' => $accountMenu
                             ]
                         ) ?>
@@ -333,11 +375,16 @@ class NavigationView
                     <?= $this->renderMobileDropdown($title, $menu, $index++) ?>
                 <?php endforeach; ?>
 
+                <!-- My Team section (if user has a team) -->
+                <?php if ($myTeamMenu): ?>
+                    <?= $this->renderMobileDropdown('My Team', $myTeamMenu, $index++) ?>
+                <?php endif; ?>
+
                 <!-- Account section -->
                 <?= $this->renderMobileDropdown(
                     $this->isLoggedIn ? 'Account' : 'Login',
                     [
-                        'icon' => '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>',
+                        'icon' => '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>',
                         'links' => $accountMenu
                     ],
                     $index++

@@ -1,0 +1,1251 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * IBL Court Side Design System
+ * Mobile-first, athletic, data-driven
+ */
+
+/* ============================================
+   GOOGLE FONTS
+   ============================================ */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+/* ============================================
+   BASE LAYER - Foundation styles
+   ============================================ */
+@layer base {
+  html {
+    @apply scroll-smooth;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-surface-50 text-surface-700 font-body antialiased;
+    @apply text-base leading-relaxed;
+    /* Safe area padding for notched devices */
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  /* Typography hierarchy */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display font-semibold text-surface-800 leading-tight;
+  }
+
+  h1 { @apply text-2xl sm:text-3xl md:text-4xl; }
+  h2 { @apply text-xl sm:text-2xl md:text-3xl; }
+  h3 { @apply text-lg sm:text-xl md:text-2xl; }
+  h4 { @apply text-base sm:text-lg md:text-xl; }
+
+  /* Links */
+  a {
+    @apply text-ibl-primary hover:text-ibl-primary-light;
+    @apply transition-colors duration-150;
+    @apply touch-manipulation;
+  }
+
+  /* Focus states for accessibility */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-ibl-primary;
+  }
+
+  /* Remove default focus ring, use focus-visible instead */
+  :focus:not(:focus-visible) {
+    @apply outline-none;
+  }
+
+  /* Selection color */
+  ::selection {
+    @apply bg-ibl-primary/20 text-ibl-primary;
+  }
+
+  /* ----------------------------------------
+     Global Legacy Element Styling
+     These styles apply to all elements, including
+     legacy modules that don't use new classes
+     ---------------------------------------- */
+
+  /* All tables get basic responsive styling */
+  table {
+    @apply w-full border-collapse;
+    @apply text-xs sm:text-sm;
+  }
+
+  /* Table headers - compact on mobile */
+  table th {
+    @apply px-1.5 py-1.5 sm:px-2 sm:py-2;
+    @apply text-left font-semibold text-xs uppercase tracking-wide;
+    @apply bg-surface-200 text-surface-700;
+    @apply border-b border-surface-300;
+    @apply whitespace-nowrap;
+  }
+
+  /* Table cells - compact on mobile */
+  table td {
+    @apply px-1.5 py-1.5 sm:px-2 sm:py-2;
+    @apply border-b border-surface-100;
+    @apply text-surface-700;
+  }
+
+  /* Alternating row colors */
+  table tbody tr:nth-child(even) {
+    @apply bg-surface-50;
+  }
+
+  /* Table hover */
+  table tbody tr:hover {
+    @apply bg-surface-100;
+  }
+
+  /* Legacy sortable tables */
+  table.sortable th {
+    @apply cursor-pointer;
+    @apply hover:bg-surface-300;
+  }
+
+  /* ----------------------------------------
+     Global table scroll wrapper
+     All tables inside .ibl-card-body scroll horizontally
+     ---------------------------------------- */
+  .ibl-card-body {
+    @apply overflow-x-auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Stats tables (ratings, season totals, etc.) */
+  table.sortable,
+  table.ratings {
+    min-width: 800px;
+  }
+
+  /* Player stats tables need more width */
+  table.sortable th,
+  table.sortable td,
+  table.ratings th,
+  table.ratings td {
+    @apply px-1 py-1 sm:px-2 sm:py-1.5;
+    @apply text-center;
+    font-size: 11px;
+  }
+
+  @media (min-width: 640px) {
+    table.sortable th,
+    table.sortable td,
+    table.ratings th,
+    table.ratings td {
+      font-size: 12px;
+    }
+  }
+
+  /* Player name column should be left-aligned and not wrap */
+  table.sortable td:nth-child(2),
+  table.ratings td:nth-child(2) {
+    @apply text-left whitespace-nowrap;
+  }
+
+  /* ----------------------------------------
+     Team Page Mobile Enhancements
+     ---------------------------------------- */
+
+  /* Mobile Team Actions Bar */
+  .team-actions-mobile {
+    @apply lg:hidden;
+    @apply mb-4 -mx-3 sm:-mx-4;
+    @apply bg-surface-100 border-y border-surface-200;
+  }
+
+  .team-actions-scroll {
+    @apply flex gap-2 px-3 py-2;
+    @apply overflow-x-auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .team-actions-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  .team-action-btn {
+    @apply flex-shrink-0;
+    @apply inline-flex items-center gap-1.5;
+    @apply px-3 py-2;
+    @apply bg-white text-surface-700;
+    @apply rounded-lg shadow-sm;
+    @apply text-sm font-medium;
+    @apply border border-surface-200;
+    @apply hover:bg-surface-50 hover:border-ibl-primary;
+    @apply transition-colors;
+  }
+
+  .team-action-icon {
+    @apply text-base;
+  }
+
+  .team-action-label {
+    @apply whitespace-nowrap;
+  }
+
+  /* Team Logo Container */
+  .team-logo-container {
+    @apply flex justify-center my-3;
+  }
+
+  .team-logo {
+    @apply max-w-[120px] sm:max-w-[150px] md:max-w-[200px] h-auto;
+  }
+
+  /* Team Page Tabs - make scrollable on mobile */
+  .ibl-card-body table:first-child tr:first-child td {
+    @apply whitespace-nowrap;
+  }
+
+  /* Form elements get touch-friendly sizing */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="search"],
+  input[type="tel"],
+  input[type="url"],
+  textarea {
+    @apply block w-full px-3 py-2;
+    @apply bg-white border border-surface-300 rounded;
+    @apply text-surface-700 text-base;
+    @apply min-h-[44px];
+    @apply focus:border-ibl-primary focus:ring-1 focus:ring-ibl-primary/30;
+  }
+
+  select {
+    @apply block w-full px-3 py-2 pr-8;
+    @apply bg-white border border-surface-300 rounded;
+    @apply text-surface-700 text-base;
+    @apply min-h-[44px];
+    @apply focus:border-ibl-primary focus:ring-1 focus:ring-ibl-primary/30;
+    @apply appearance-none cursor-pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E");
+    background-position: right 0.5rem center;
+    background-repeat: no-repeat;
+    background-size: 1.5em 1.5em;
+  }
+
+  /* Submit buttons get primary styling */
+  input[type="submit"],
+  input[type="button"],
+  button {
+    @apply inline-flex items-center justify-center;
+    @apply px-4 py-2 min-h-[44px];
+    @apply bg-ibl-primary text-white font-semibold text-sm;
+    @apply rounded cursor-pointer;
+    @apply hover:bg-ibl-primary-light;
+    @apply active:scale-[0.98];
+    @apply transition-all duration-150;
+    @apply touch-manipulation;
+  }
+
+  /* Reset button style */
+  input[type="reset"] {
+    @apply bg-surface-200 text-surface-700;
+    @apply hover:bg-surface-300;
+  }
+
+  /* Checkbox and radio buttons */
+  input[type="checkbox"],
+  input[type="radio"] {
+    @apply w-5 h-5;
+    @apply border-2 border-surface-300;
+    @apply text-ibl-primary;
+    @apply focus:ring-2 focus:ring-ibl-primary/30;
+    @apply cursor-pointer;
+  }
+
+  input[type="radio"] {
+    @apply rounded-full;
+  }
+
+  /* Labels */
+  label {
+    @apply block text-sm font-medium text-surface-700 mb-1;
+  }
+
+  /* Strong and bold */
+  strong, b {
+    @apply font-semibold text-surface-800;
+  }
+
+  /* Emphasis */
+  em, i {
+    @apply italic;
+  }
+
+  /* Paragraphs spacing */
+  p {
+    @apply mb-3;
+  }
+
+  p:last-child {
+    @apply mb-0;
+  }
+
+  /* Lists */
+  ul, ol {
+    @apply pl-5 mb-3;
+  }
+
+  li {
+    @apply mb-1;
+  }
+
+  /* Horizontal rule */
+  hr {
+    @apply border-t border-surface-200 my-4;
+  }
+
+  /* Images */
+  img {
+    @apply max-w-full h-auto;
+  }
+
+  /* Legacy font tags - override with modern styling */
+  font {
+    font-family: inherit !important;
+  }
+
+  /* Screen reader only utility */
+  .sr-only {
+    @apply absolute w-px h-px p-0 -m-px overflow-hidden whitespace-nowrap border-0;
+    clip: rect(0, 0, 0, 0);
+  }
+}
+
+/* ============================================
+   COMPONENTS LAYER - Reusable UI components
+   ============================================ */
+@layer components {
+  /* ----------------------------------------
+     Layout: Main page container
+     ---------------------------------------- */
+  .ibl-layout {
+    @apply min-h-screen flex flex-col;
+  }
+
+  .ibl-main {
+    @apply flex-1 w-full;
+    @apply px-3 py-4 sm:px-4 md:px-6 lg:px-8;
+    @apply max-w-7xl mx-auto;
+  }
+
+  /* ----------------------------------------
+     Header: Top navigation bar
+     ---------------------------------------- */
+  .ibl-header {
+    @apply sticky top-0 z-40;
+    @apply bg-white/95 backdrop-blur-sm;
+    @apply border-b border-surface-200;
+    @apply shadow-top-bar;
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .ibl-header-inner {
+    @apply flex items-center justify-between;
+    @apply h-14 sm:h-16;
+    @apply px-3 sm:px-4 md:px-6;
+    @apply max-w-7xl mx-auto;
+  }
+
+  .ibl-logo {
+    @apply flex items-center gap-2;
+    @apply font-display font-bold text-lg sm:text-xl;
+    @apply text-ibl-primary;
+  }
+
+  .ibl-logo img {
+    @apply h-8 w-auto;
+  }
+
+  /* ----------------------------------------
+     Navigation: Mobile drawer menu
+     ---------------------------------------- */
+  .ibl-menu-btn {
+    display: flex;
+    @apply items-center justify-center;
+    @apply w-11 h-11;
+    @apply -mr-2;
+    @apply bg-ibl-primary text-white;
+    @apply rounded-lg;
+    @apply hover:bg-ibl-primary-light;
+    @apply active:scale-95;
+    @apply transition-all duration-150;
+    @apply shadow-sm;
+  }
+
+  /* Hide menu button on large screens */
+  @media (min-width: 1024px) {
+    .ibl-menu-btn {
+      display: none;
+    }
+  }
+
+  .ibl-menu-btn svg {
+    @apply w-6 h-6;
+  }
+
+  /* Mobile drawer overlay */
+  .ibl-drawer-overlay {
+    @apply fixed inset-0 z-50;
+    @apply bg-black/40 backdrop-blur-sm;
+    @apply transition-opacity duration-300;
+  }
+
+  .ibl-drawer-overlay[data-state="closed"] {
+    @apply opacity-0 pointer-events-none;
+  }
+
+  /* Mobile drawer panel */
+  .ibl-drawer {
+    @apply fixed top-0 right-0 bottom-0 z-50;
+    @apply w-[85vw] max-w-sm;
+    @apply bg-white shadow-drawer;
+    @apply flex flex-col;
+    @apply transform transition-transform duration-300 ease-bounce-out;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .ibl-drawer[data-state="closed"] {
+    @apply translate-x-full;
+  }
+
+  .ibl-drawer-header {
+    @apply flex items-center justify-between;
+    @apply px-4 py-3;
+    @apply border-b border-surface-200;
+  }
+
+  .ibl-drawer-title {
+    @apply font-display font-semibold text-lg text-surface-800;
+  }
+
+  .ibl-drawer-close {
+    @apply flex items-center justify-center;
+    @apply w-touch h-touch min-w-touch min-h-touch;
+    @apply -mr-2;
+    @apply text-surface-500 hover:text-surface-700;
+    @apply rounded-full;
+    @apply active:bg-surface-100;
+    @apply transition-colors;
+  }
+
+  .ibl-drawer-body {
+    @apply flex-1 overflow-y-auto overscroll-contain;
+    @apply px-2 py-3;
+  }
+
+  .ibl-drawer-footer {
+    @apply px-4 py-3;
+    @apply border-t border-surface-200;
+    @apply bg-surface-50;
+  }
+
+  /* Navigation groups in drawer */
+  .ibl-nav-group {
+    @apply mb-4;
+  }
+
+  .ibl-nav-group-title {
+    @apply px-3 py-2;
+    @apply font-display font-semibold text-xs uppercase tracking-wider;
+    @apply text-surface-500;
+  }
+
+  .ibl-nav-link {
+    @apply flex items-center gap-3;
+    @apply px-3 py-3;
+    @apply text-surface-700 font-medium;
+    @apply rounded-button;
+    @apply active:bg-surface-100;
+    @apply transition-colors duration-150;
+    @apply min-h-touch;
+  }
+
+  .ibl-nav-link:hover {
+    @apply bg-surface-50 text-ibl-primary;
+  }
+
+  .ibl-nav-link.active {
+    @apply bg-ibl-primary/10 text-ibl-primary;
+  }
+
+  .ibl-nav-link svg {
+    @apply w-5 h-5 text-surface-400;
+    @apply flex-shrink-0;
+  }
+
+  .ibl-nav-link:hover svg,
+  .ibl-nav-link.active svg {
+    @apply text-ibl-primary;
+  }
+
+  /* Desktop navigation */
+  .ibl-desktop-nav {
+    @apply hidden lg:flex items-center gap-1;
+  }
+
+  .ibl-desktop-nav-link {
+    @apply px-3 py-2;
+    @apply text-sm font-medium text-surface-600;
+    @apply rounded-button;
+    @apply hover:bg-surface-100 hover:text-surface-900;
+    @apply transition-colors duration-150;
+  }
+
+  .ibl-desktop-nav-link.active {
+    @apply bg-ibl-primary/10 text-ibl-primary;
+  }
+
+  /* ----------------------------------------
+     Cards: Content containers
+     ---------------------------------------- */
+  .ibl-card {
+    @apply bg-white rounded-card shadow-card;
+    @apply overflow-hidden;
+    @apply mb-4;
+  }
+
+  .ibl-card-header {
+    @apply px-4 py-3 sm:px-5 sm:py-4;
+    @apply border-b border-surface-200;
+    @apply flex items-center justify-between gap-3;
+  }
+
+  .ibl-card-title {
+    @apply font-display font-semibold text-base sm:text-lg;
+    @apply text-surface-800;
+    @apply truncate;
+  }
+
+  .ibl-card-body {
+    @apply p-3 sm:p-4 md:p-5;
+    @apply overflow-x-auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Scroll hint shadow on right edge when content overflows */
+  .ibl-card-body:has(table) {
+    position: relative;
+  }
+
+  /* Mobile scroll hint */
+  @media (max-width: 767px) {
+    .ibl-card-body:has(table)::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: 20px;
+      background: linear-gradient(to right, transparent, rgba(255,255,255,0.9));
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .ibl-card-body:has(table):not(:hover)::after {
+      opacity: 1;
+    }
+  }
+
+  .ibl-card-body-flush {
+    @apply p-0;
+  }
+
+  .ibl-card-footer {
+    @apply px-4 py-3 sm:px-5 sm:py-4;
+    @apply border-t border-surface-200;
+    @apply bg-surface-50;
+  }
+
+  /* Sidebar box (for sidebars) */
+  .ibl-sidebar-box {
+    @apply bg-white rounded-card shadow-card overflow-hidden mb-4;
+  }
+
+  .ibl-sidebar-box-title {
+    @apply px-3 py-2;
+    @apply bg-ibl-primary text-white;
+    @apply font-display font-semibold text-sm;
+  }
+
+  .ibl-sidebar-box-content {
+    @apply p-3 text-sm;
+  }
+
+  .ibl-sidebar-box-content a {
+    @apply block py-1.5;
+    @apply hover:text-ibl-accent;
+  }
+
+  /* Sidebar section headings */
+  .ibl-sidebar-box-content strong {
+    @apply block mt-4 mb-2 first:mt-0;
+    @apply text-xs font-bold uppercase tracking-wider;
+    @apply text-ibl-primary;
+    @apply pb-1 border-b border-surface-200;
+  }
+
+  /* Sidebar lists */
+  .ibl-sidebar-box-content ul {
+    @apply list-none p-0 m-0 mb-3;
+  }
+
+  .ibl-sidebar-box-content ul li {
+    @apply m-0 p-0;
+  }
+
+  .ibl-sidebar-box-content ul li a {
+    @apply py-1.5 px-2;
+    @apply -mx-2;
+    @apply rounded;
+    @apply hover:bg-surface-100;
+  }
+
+  /* Hide legacy center and br tags in sidebar */
+  .ibl-sidebar-box-content center {
+    @apply block mb-3 pb-3 border-b border-surface-200;
+  }
+
+  .ibl-sidebar-box-content center img {
+    @apply h-8 w-auto inline-block mx-1;
+  }
+
+  /* ----------------------------------------
+     Tables: Responsive data tables
+     ---------------------------------------- */
+  /* Table wrapper for horizontal scroll on mobile */
+  .ibl-table-wrapper {
+    @apply w-full overflow-x-auto;
+    @apply -mx-4 px-4 sm:mx-0 sm:px-0;
+    /* Smooth scrolling */
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: theme('colors.surface.300') transparent;
+  }
+
+  .ibl-table-wrapper::-webkit-scrollbar {
+    @apply h-2;
+  }
+
+  .ibl-table-wrapper::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  .ibl-table-wrapper::-webkit-scrollbar-thumb {
+    @apply bg-surface-300 rounded-full;
+  }
+
+  /* Base table */
+  .ibl-table {
+    @apply w-full text-sm;
+    @apply border-collapse;
+    min-width: 600px; /* Ensures table scrolls on mobile */
+  }
+
+  .ibl-table th {
+    @apply px-3 py-2.5;
+    @apply bg-ibl-primary text-white;
+    @apply font-display font-semibold text-xs uppercase tracking-wide;
+    @apply text-left;
+    @apply whitespace-nowrap;
+    @apply sticky top-0;
+  }
+
+  .ibl-table th:first-child {
+    @apply rounded-tl-lg;
+  }
+
+  .ibl-table th:last-child {
+    @apply rounded-tr-lg;
+  }
+
+  /* Centered stat columns */
+  .ibl-table th.stat,
+  .ibl-table td.stat {
+    @apply text-center;
+  }
+
+  .ibl-table td {
+    @apply px-3 py-2.5;
+    @apply border-b border-surface-100;
+    @apply text-surface-700;
+  }
+
+  .ibl-table tbody tr:hover {
+    @apply bg-surface-50;
+  }
+
+  .ibl-table tbody tr:last-child td {
+    @apply border-b-0;
+  }
+
+  /* Alternating rows */
+  .ibl-table-striped tbody tr:nth-child(even) {
+    @apply bg-surface-50;
+  }
+
+  /* Compact table for dense data */
+  .ibl-table-compact th,
+  .ibl-table-compact td {
+    @apply px-2 py-1.5 text-xs;
+  }
+
+  /* Sortable table header */
+  .ibl-table th.sortable {
+    @apply cursor-pointer select-none;
+    @apply hover:bg-ibl-primary-light;
+    @apply transition-colors duration-150;
+  }
+
+  .ibl-table th.sortable::after {
+    @apply ml-1 opacity-50;
+    content: '↕';
+  }
+
+  .ibl-table th.sortable.asc::after {
+    @apply opacity-100;
+    content: '↑';
+  }
+
+  .ibl-table th.sortable.desc::after {
+    @apply opacity-100;
+    content: '↓';
+  }
+
+  /* ----------------------------------------
+     Mobile Card View: Alternative to tables
+     ---------------------------------------- */
+  .ibl-data-cards {
+    @apply space-y-3;
+  }
+
+  .ibl-data-card {
+    @apply bg-white rounded-card shadow-card;
+    @apply p-4;
+    @apply border-l-4 border-ibl-primary;
+  }
+
+  .ibl-data-card-header {
+    @apply flex items-start justify-between gap-3 mb-3;
+  }
+
+  .ibl-data-card-title {
+    @apply font-display font-semibold text-surface-800;
+  }
+
+  .ibl-data-card-subtitle {
+    @apply text-sm text-surface-500;
+  }
+
+  .ibl-data-card-badge {
+    @apply inline-flex items-center;
+    @apply px-2 py-0.5;
+    @apply text-xs font-semibold;
+    @apply rounded-pill;
+    @apply bg-surface-100 text-surface-600;
+  }
+
+  .ibl-data-card-stats {
+    @apply grid grid-cols-3 gap-3;
+  }
+
+  .ibl-data-card-stat {
+    @apply text-center;
+  }
+
+  .ibl-data-card-stat-value {
+    @apply font-display font-bold text-lg text-surface-800;
+  }
+
+  .ibl-data-card-stat-label {
+    @apply text-xs text-surface-500 uppercase tracking-wide;
+  }
+
+  /* ----------------------------------------
+     Stats display components
+     ---------------------------------------- */
+  .ibl-stat-grid {
+    @apply grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 gap-3 sm:gap-4;
+  }
+
+  .ibl-stat-box {
+    @apply bg-surface-50 rounded-lg p-3 text-center;
+  }
+
+  .ibl-stat-value {
+    @apply font-display font-bold text-xl sm:text-2xl text-surface-800;
+  }
+
+  .ibl-stat-label {
+    @apply text-xs text-surface-500 uppercase tracking-wide mt-0.5;
+  }
+
+  /* Large hero stat */
+  .ibl-stat-hero {
+    @apply bg-ibl-primary rounded-card p-4 sm:p-6 text-center;
+  }
+
+  .ibl-stat-hero-value {
+    @apply font-display font-bold text-3xl sm:text-4xl text-white;
+  }
+
+  .ibl-stat-hero-label {
+    @apply text-sm text-white/80 uppercase tracking-wide mt-1;
+  }
+
+  /* Win/Loss styling */
+  .stat-win { @apply text-ibl-success; }
+  .stat-loss { @apply text-ibl-danger; }
+
+  /* ----------------------------------------
+     Buttons
+     ---------------------------------------- */
+  .ibl-btn {
+    @apply inline-flex items-center justify-center gap-2;
+    @apply px-4 py-2.5;
+    @apply text-sm font-semibold;
+    @apply rounded-button;
+    @apply transition-all duration-150;
+    @apply min-h-touch;
+    @apply select-none touch-manipulation;
+    @apply disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .ibl-btn-primary {
+    @apply bg-ibl-primary text-white;
+    @apply hover:bg-ibl-primary-light;
+    @apply active:scale-[0.98];
+  }
+
+  .ibl-btn-secondary {
+    @apply bg-surface-100 text-surface-700;
+    @apply hover:bg-surface-200;
+    @apply active:scale-[0.98];
+  }
+
+  .ibl-btn-accent {
+    @apply bg-ibl-accent text-white;
+    @apply hover:bg-ibl-accent-muted;
+    @apply active:scale-[0.98];
+  }
+
+  .ibl-btn-ghost {
+    @apply bg-transparent text-surface-600;
+    @apply hover:bg-surface-100 hover:text-surface-900;
+  }
+
+  .ibl-btn-sm {
+    @apply px-3 py-1.5 text-xs min-h-[36px];
+  }
+
+  .ibl-btn-lg {
+    @apply px-6 py-3 text-base;
+  }
+
+  .ibl-btn-icon {
+    @apply w-touch h-touch min-w-touch p-0;
+  }
+
+  /* Button group */
+  .ibl-btn-group {
+    @apply inline-flex;
+  }
+
+  .ibl-btn-group .ibl-btn {
+    @apply rounded-none;
+  }
+
+  .ibl-btn-group .ibl-btn:first-child {
+    @apply rounded-l-button;
+  }
+
+  .ibl-btn-group .ibl-btn:last-child {
+    @apply rounded-r-button;
+  }
+
+  .ibl-btn-group .ibl-btn:not(:last-child) {
+    @apply border-r border-white/20;
+  }
+
+  /* ----------------------------------------
+     Forms
+     ---------------------------------------- */
+  .ibl-form-group {
+    @apply mb-4;
+  }
+
+  .ibl-label {
+    @apply block mb-1.5;
+    @apply text-sm font-medium text-surface-700;
+  }
+
+  .ibl-input {
+    @apply block w-full;
+    @apply px-3 py-2.5;
+    @apply bg-white;
+    @apply border border-surface-300 rounded-button;
+    @apply text-surface-700 placeholder:text-surface-400;
+    @apply transition-colors duration-150;
+    @apply min-h-touch;
+    @apply focus:border-ibl-primary focus:ring-2 focus:ring-ibl-primary/20;
+  }
+
+  .ibl-select {
+    @apply ibl-input;
+    @apply pr-10;
+    @apply bg-no-repeat bg-right;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E");
+    background-position: right 0.5rem center;
+    background-size: 1.5em 1.5em;
+  }
+
+  .ibl-checkbox,
+  .ibl-radio {
+    @apply w-5 h-5;
+    @apply border-2 border-surface-300 rounded;
+    @apply text-ibl-primary;
+    @apply focus:ring-2 focus:ring-ibl-primary/20;
+    @apply transition-colors duration-150;
+  }
+
+  .ibl-radio {
+    @apply rounded-full;
+  }
+
+  /* Form inline (for filters) */
+  .ibl-form-inline {
+    @apply flex flex-wrap items-end gap-3;
+  }
+
+  .ibl-form-inline .ibl-form-group {
+    @apply mb-0 flex-1 min-w-[150px];
+  }
+
+  /* ----------------------------------------
+     Badges & Tags
+     ---------------------------------------- */
+  .ibl-badge {
+    @apply inline-flex items-center;
+    @apply px-2 py-0.5;
+    @apply text-xs font-semibold;
+    @apply rounded-pill;
+  }
+
+  .ibl-badge-default {
+    @apply bg-surface-100 text-surface-600;
+  }
+
+  .ibl-badge-primary {
+    @apply bg-ibl-primary/10 text-ibl-primary;
+  }
+
+  .ibl-badge-success {
+    @apply bg-ibl-success/10 text-ibl-success;
+  }
+
+  .ibl-badge-danger {
+    @apply bg-ibl-danger/10 text-ibl-danger;
+  }
+
+  .ibl-badge-warning {
+    @apply bg-ibl-warning/10 text-ibl-warning;
+  }
+
+  /* ----------------------------------------
+     Footer
+     ---------------------------------------- */
+  .ibl-footer {
+    @apply bg-surface-800 text-surface-300;
+    @apply mt-auto;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .ibl-footer-inner {
+    @apply max-w-7xl mx-auto;
+    @apply px-4 py-6 sm:py-8;
+    @apply text-center text-sm;
+  }
+
+  .ibl-footer a {
+    @apply text-surface-300 hover:text-white;
+    @apply underline underline-offset-2;
+  }
+
+  /* ----------------------------------------
+     Standings-specific styles
+     ---------------------------------------- */
+  .standings-title {
+    @apply font-display font-bold text-lg sm:text-xl;
+    @apply text-ibl-accent mb-2;
+  }
+
+  .standings-table {
+    @apply w-full text-xs border-collapse;
+    min-width: 700px;
+  }
+
+  .standings-table th,
+  .standings-table td {
+    @apply px-2 py-1.5;
+  }
+
+  .standings-header-row {
+    @apply bg-ibl-primary;
+  }
+
+  .standings-header-row th,
+  .standings-header-row td {
+    @apply text-white font-semibold text-xs;
+  }
+
+  .standings-header-cell {
+    @apply px-2 py-2 text-center text-white font-semibold text-xs;
+  }
+
+  .standings-cell {
+    @apply px-2 py-2 text-center text-sm;
+  }
+
+  .standings-team-cell {
+    @apply px-2 py-2 text-left font-medium;
+    @apply whitespace-nowrap;
+  }
+
+  .standings-table tbody tr:hover {
+    @apply bg-surface-100;
+  }
+
+  /* ----------------------------------------
+     Player table styles
+     ---------------------------------------- */
+  .player-table {
+    @apply w-full text-sm border-collapse;
+    min-width: 600px;
+  }
+
+  .player-table th {
+    @apply px-3 py-2.5;
+    @apply bg-ibl-primary text-white;
+    @apply font-display font-semibold text-xs uppercase tracking-wide;
+    @apply text-left whitespace-nowrap;
+  }
+
+  .player-table td {
+    @apply px-3 py-2.5;
+    @apply border-b border-surface-100;
+    @apply text-surface-700;
+  }
+
+  .player-table tbody tr:hover {
+    @apply bg-surface-50;
+  }
+
+  .player-table-header {
+    @apply bg-ibl-primary text-white;
+    @apply font-display font-bold text-base;
+    @apply px-3 py-2;
+  }
+
+  .gamelog {
+    @apply text-center text-sm;
+  }
+
+  /* Sortable table class from sorttable.js */
+  table.sortable th {
+    @apply cursor-pointer select-none;
+  }
+
+  table.sortable th:hover {
+    @apply bg-ibl-primary-light;
+  }
+
+  /* ----------------------------------------
+     Legacy support classes
+     ---------------------------------------- */
+  /* Nav link from legacy ThemeComponents (alias to ibl-nav-link) */
+  .nav-link {
+    @apply flex items-center gap-3 px-3 py-3 text-surface-700 font-medium rounded-button;
+    @apply transition-colors duration-150 min-h-touch;
+  }
+
+  .nav-link:hover {
+    @apply bg-surface-50 text-ibl-primary;
+  }
+
+  .nav-group {
+    @apply mb-4;
+  }
+
+  .nav-group-title {
+    @apply px-3 py-2 font-display font-semibold text-xs uppercase tracking-wider text-surface-500;
+  }
+}
+
+/* ============================================
+   UTILITIES LAYER - Helper classes
+   ============================================ */
+@layer utilities {
+  /* Container with IBL max-width */
+  .container-ibl {
+    @apply w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  /* Hide on mobile, show on desktop */
+  .mobile-hidden {
+    @apply hidden md:block;
+  }
+
+  /* Show on mobile, hide on desktop */
+  .mobile-only {
+    @apply block md:hidden;
+  }
+
+  /* Touch target enforcement */
+  .touch-target {
+    @apply min-h-touch min-w-touch;
+  }
+
+  /* Smooth scrolling container */
+  .scroll-smooth-x {
+    @apply overflow-x-auto;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+
+  /* Truncate with ellipsis */
+  .truncate-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .truncate-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* No tap highlight on mobile */
+  .no-tap-highlight {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Pull-to-refresh prevention */
+  .overscroll-none {
+    overscroll-behavior: none;
+  }
+
+  /* Horizontal scroll shadow indicators */
+  .scroll-shadow-x {
+    background:
+      linear-gradient(to right, white 30%, rgba(255, 255, 255, 0)),
+      linear-gradient(to right, rgba(255, 255, 255, 0), white 70%) 0 100%,
+      radial-gradient(farthest-side at 0% 50%, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0)),
+      radial-gradient(farthest-side at 100% 50%, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0)) 0 100%;
+    background-repeat: no-repeat;
+    background-color: white;
+    background-size: 40px 100%, 40px 100%, 14px 100%, 14px 100%;
+    background-position: 0 0, 100%, 0 0, 100%;
+    background-attachment: local, local, scroll, scroll;
+  }
+
+  /* Safe area utilities */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .pl-safe {
+    padding-left: env(safe-area-inset-left);
+  }
+
+  .pr-safe {
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+/* ============================================
+   RESPONSIVE TABLE CARD VIEW
+   Shows cards on mobile, table on desktop
+   ============================================ */
+@media (max-width: 767px) {
+  /* Hide table view, show card view on mobile */
+  .responsive-table .ibl-table {
+    @apply hidden;
+  }
+
+  .responsive-table .ibl-data-cards {
+    @apply block;
+  }
+}
+
+@media (min-width: 768px) {
+  /* Show table view, hide card view on desktop */
+  .responsive-table .ibl-data-cards {
+    @apply hidden;
+  }
+
+  .responsive-table .ibl-table {
+    @apply table;
+  }
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+@media (prefers-reduced-motion: no-preference) {
+  .animate-in {
+    animation: fadeIn 0.2s ease-out, scaleIn 0.2s ease-out;
+  }
+
+  .slide-in-from-right {
+    animation: slideInRight 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  .slide-out-to-right {
+    animation: slideOutRight 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+}
+
+/* Respect reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================
+   DARK MODE SUPPORT (Future)
+   ============================================ */
+@media (prefers-color-scheme: dark) {
+  /* Placeholder for dark mode styles */
+  /* Enable when ready by uncommenting and implementing */
+  /*
+  :root {
+    --bg-primary: theme('colors.surface.900');
+    --text-primary: theme('colors.surface.100');
+  }
+  */
+}

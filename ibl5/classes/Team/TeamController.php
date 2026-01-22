@@ -68,13 +68,19 @@ class TeamController implements TeamControllerInterface
             }
         }
 
+        // Mobile Team Functions Bar (visible only on mobile/tablet)
+        if ($teamID > 0) {
+            echo $this->renderMobileTeamActions($teamID, $team);
+        }
+
         echo "<table>
             <tr>
                 <td align=center valign=top>";
-                
+
         \UI::displaytopmenu($this->db, $teamID);
-                
-        echo "<img src=\"./{$imagesPath}logo/$teamID.jpg\">";
+
+        // Team logo with responsive sizing
+        echo "<div class=\"team-logo-container\"><img src=\"./{$imagesPath}logo/$teamID.jpg\" class=\"team-logo\" alt=\"" . htmlspecialchars($team->name ?? 'Team', ENT_QUOTES) . " logo\"></div>";
                 
         if ($yr != "") {
             echo "<center><h1>$yr $team->name</h1></center>";
@@ -139,5 +145,36 @@ class TeamController implements TeamControllerInterface
 
         CloseTable();
         \Nuke\Footer::footer();
+    }
+
+    /**
+     * Render mobile-friendly team actions bar
+     * Shows key team management functions as horizontal scrollable buttons on mobile
+     */
+    private function renderMobileTeamActions(int $teamID, $team): string
+    {
+        $teamColor = $team->color1 ?? '1E3A5F';
+
+        $actions = [
+            ['label' => 'Depth Chart', 'url' => "modules.php?name=Depth_Chart&teamID=$teamID", 'icon' => '📋'],
+            ['label' => 'Schedule', 'url' => "modules.php?name=Schedule&teamID=$teamID", 'icon' => '📅'],
+            ['label' => 'Trade', 'url' => "modules.php?name=Trading&op=offer&teamID=$teamID", 'icon' => '🔄'],
+            ['label' => 'Waivers', 'url' => "modules.php?name=Team&op=team&teamID=0", 'icon' => '📝'],
+        ];
+
+        $html = '<div class="team-actions-mobile">';
+        $html .= '<div class="team-actions-scroll">';
+
+        foreach ($actions as $action) {
+            $html .= '<a href="' . htmlspecialchars($action['url'], ENT_QUOTES) . '" class="team-action-btn">';
+            $html .= '<span class="team-action-icon">' . $action['icon'] . '</span>';
+            $html .= '<span class="team-action-label">' . htmlspecialchars($action['label'], ENT_QUOTES) . '</span>';
+            $html .= '</a>';
+        }
+
+        $html .= '</div>';
+        $html .= '</div>';
+
+        return $html;
     }
 }

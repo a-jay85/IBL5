@@ -28,6 +28,52 @@
 
 ---
 
+## Laravel Auth Migration (Jan 2026)
+
+### Overview
+PHP-Nuke authentication is being replaced with Laravel Auth + bcrypt passwords. The migration uses a bridge pattern allowing both systems to operate during transition.
+
+### Key Components
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| LaravelAuthBridge | `classes/Auth/LaravelAuthBridge.php` | Main auth facade |
+| User Model | `classes/Auth/User.php` | User entity with roles |
+| ModuleMiddleware | `classes/Middleware/ModuleMiddleware.php` | Module access control |
+| UserMigrationService | `classes/Auth/UserMigrationService.php` | Nuke→Laravel sync |
+| NukeAuthCompat | `classes/Auth/NukeAuthCompat.php` | Legacy function wrapper |
+
+### User Roles
+- `spectator` - Read-only access
+- `owner` - Team owner (can manage assigned teams)
+- `commissioner` - Full admin access (manages all teams)
+
+### Password Migration
+- Existing MD5 passwords in `legacy_password` column
+- On first login: verify MD5 → rehash to bcrypt → clear legacy_password
+- `migrated_at` timestamp tracks migration completion
+
+### Migration Commands
+```bash
+# Run database migration
+php ibl5/migrations/run.php
+
+# Sync users from nuke_users (dry run)
+# Add UserMigrationService call to scripts as needed
+
+# Cutover (forces all users to re-login)
+php ibl5/scripts/migration-cutover.php --dry-run
+php ibl5/scripts/migration-cutover.php --force
+```
+
+### Mobile-First Theme
+- Tailwind CSS in `themes/IBL/input.css`
+- Build: `cd ibl5 && npm run build:css`
+- Alpine.js for mobile menu interactivity
+- Responsive grid: mobile → tablet (2-col) → desktop (3-col)
+
+---
+
 ## Recent Updates
 
 ### Integration Tests Added (Jan 12, 2026 - PR #159)

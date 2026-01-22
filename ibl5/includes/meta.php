@@ -23,6 +23,7 @@ global $commercial_license, $sitename, $slogan;
 ##################################################
 
 $metastring = "<META HTTP-EQUIV=\"Content-Type\" CONTENT=\"text/html; charset=" . _CHARSET . "\">\n";
+$metastring .= "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n";
 $metastring .= "<META HTTP-EQUIV=\"EXPIRES\" CONTENT=\"0\">\n";
 $metastring .= "<META NAME=\"RESOURCE-TYPE\" CONTENT=\"DOCUMENT\">\n";
 $metastring .= "<META NAME=\"DISTRIBUTION\" CONTENT=\"GLOBAL\">\n";

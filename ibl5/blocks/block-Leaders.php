@@ -6,6 +6,7 @@ if (!defined('BLOCK_FILE')) {
 }
 
 use Player\PlayerImageHelper;
+use Utilities\HtmlSanitizer;
 
 global $mysqli_db, $leagueContext;
 
@@ -82,62 +83,116 @@ $queryTopFiveInSeasonStatAverages = "SELECT *
 $resultTopFiveInSeasonStatAverages = $mysqli_db->query($queryTopFiveInSeasonStatAverages);
 
 $rows = $resultTopFiveInSeasonStatAverages->fetch_all(MYSQLI_ASSOC);
-$rowNumber = 0;
 
-$content = '<table style="border:1px solid #000066; margin: 0 auto;">
-    <tr>';
-for ($i = 1; $i <= 5; $i++) {
-    $content .= '<td style="border:1px solid #000066;">
-                <table>
-                    <tr>
-                        <td style="min-width:155px;" colspan=2>
-                            <div style="text-align:center;">
-                                <img src="' . PlayerImageHelper::getImageUrl($rows[$rowNumber]['pid']) . '" height="90" width="65">
-                                <img src="./' . $imagesPath . 'logo/new' . $rows[$rowNumber]['tid'] . '.png" height="75" width="75">
-                            </div>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td colspan="2" style="background-color:#000066; color:#ffffff; font-weight:bold;">
-                            ' . $rows[$rowNumber]['stat_type'] . ' Per Game
-                        </td>
-                    </tr>
-                    <tr>
-                        <td style="font-weight:bold;">
-                            <a href="modules.php?name=Player&pa=showpage&pid=' . $rows[$rowNumber]['pid'] . '" style="color:#000066;">
-                                ' . $rows[$rowNumber]['name'] . '
-                            </a>
-                            <br>
-                            <a href="modules.php?name=Team&op=team&teamID=' . $rows[$rowNumber]['tid'] . '" style="color:#000066;">
-                                ' . $rows[$rowNumber]['teamname'] . '
-                            </a>
-                        </td>
-                        <td valign="top" style="font-weight:bold;">
-                            ' . $rows[$rowNumber]['stat_value'] . '
-                        </td>
-                    </tr>';
-    $rowNumber++;
-    for ($j = 2; $j <= 5; $j++) {
-        $content .= '<tr>
-                        <td>
-                            <a href="modules.php?name=Player&pa=showpage&pid=' . $rows[$rowNumber]['pid'] . '" style="color:#000066;">
-                                ' . $rows[$rowNumber]['name'] . '
-                            </a>
-                            <br>
-                            <a href="modules.php?name=Team&op=team&teamID=' . $rows[$rowNumber]['tid'] . '" style="color:#000066;">
-                                ' . $rows[$rowNumber]['teamname'] . '
-                            </a>
-                        </td>
-                        <td valign="top">
-                            ' . $rows[$rowNumber]['stat_value'] . '
-                        </td>
-                    </tr>';
-        $rowNumber++;
-    }
-    $content .= '</table>
-            </td>';
+// Group rows by stat type
+$statCategories = [];
+foreach ($rows as $row) {
+    $statCategories[$row['stat_type']][] = $row;
 }
-$content .= '</tr>
-</table>';
+
+// Tab labels
+$tabLabels = [
+    'Points' => 'PTS',
+    'Rebounds' => 'REB',
+    'Assists' => 'AST',
+    'Steals' => 'STL',
+    'Blocks' => 'BLK',
+];
+
+$blockId = 'season-leaders-' . uniqid();
+$categories = array_keys($statCategories);
+$firstCategory = $categories[0] ?? 'Points';
+
+// Compact tabbed layout - no header, just tabs + content
+$content = '<div class="leaders-tabbed" id="' . $blockId . '">
+    <div class="leaders-tabbed__tabs" role="tablist">';
+
+// Generate tabs
+foreach ($categories as $index => $category) {
+    $tabId = $blockId . '-tab-' . $index;
+    $panelId = $blockId . '-panel-' . $index;
+    $isActive = ($category === $firstCategory) ? ' leaders-tabbed__tab--active' : '';
+    $ariaSelected = ($category === $firstCategory) ? 'true' : 'false';
+    $tabLabel = $tabLabels[$category] ?? HtmlSanitizer::safeHtmlOutput($category);
+
+    $content .= '<button class="leaders-tabbed__tab' . $isActive . '" id="' . $tabId . '" role="tab" aria-selected="' . $ariaSelected . '" aria-controls="' . $panelId . '">' . $tabLabel . '</button>';
+}
+
+$content .= '</div>
+    <div class="leaders-tabbed__panels">';
+
+// Generate panels
+foreach ($categories as $index => $category) {
+    $players = $statCategories[$category];
+    $tabId = $blockId . '-tab-' . $index;
+    $panelId = $blockId . '-panel-' . $index;
+    $isActive = ($category === $firstCategory) ? ' leaders-tabbed__panel--active' : '';
+
+    // Leader (first player)
+    $leader = $players[0];
+    $leaderPid = (int)$leader['pid'];
+    $leaderTid = (int)$leader['tid'];
+    $leaderName = HtmlSanitizer::safeHtmlOutput($leader['name']);
+    $leaderTeam = HtmlSanitizer::safeHtmlOutput($leader['teamname']);
+    $leaderValue = HtmlSanitizer::safeHtmlOutput($leader['stat_value']);
+    $leaderImgUrl = PlayerImageHelper::getImageUrl($leaderPid);
+
+    $content .= '<div class="leaders-tabbed__panel' . $isActive . '" id="' . $panelId . '" role="tabpanel" aria-labelledby="' . $tabId . '">
+        <div class="leaders-tabbed__leader">
+            <div class="leaders-tabbed__leader-images">
+                <img src="' . HtmlSanitizer::safeHtmlOutput($leaderImgUrl) . '" alt="' . $leaderName . '" class="leaders-tabbed__leader-img" loading="lazy">';
+
+    if ($leaderTid) {
+        $content .= '<img src="./' . HtmlSanitizer::safeHtmlOutput($imagesPath) . 'logo/new' . $leaderTid . '.png" alt="' . $leaderTeam . '" class="leaders-tabbed__leader-team-img" loading="lazy">';
+    }
+
+    $content .= '</div>
+            <div class="leaders-tabbed__leader-info">
+                <a href="modules.php?name=Player&pa=showpage&pid=' . $leaderPid . '" class="leaders-tabbed__leader-name">' . $leaderName . '</a>
+                <a href="modules.php?name=Team&op=team&teamID=' . $leaderTid . '" class="leaders-tabbed__leader-team">' . $leaderTeam . '</a>
+            </div>
+            <div class="leaders-tabbed__leader-value">' . $leaderValue . '</div>
+        </div>
+        <ul class="leaders-tabbed__runners">';
+
+    // Runners-up (positions 2-5)
+    for ($i = 1; $i < count($players); $i++) {
+        $player = $players[$i];
+        $pid = (int)$player['pid'];
+        $name = HtmlSanitizer::safeHtmlOutput($player['name']);
+        $value = HtmlSanitizer::safeHtmlOutput($player['stat_value']);
+        $rank = $i + 1;
+
+        $content .= '<li class="leaders-tabbed__runner">
+            <span class="leaders-tabbed__runner-rank">#' . $rank . '</span>
+            <a href="modules.php?name=Player&pa=showpage&pid=' . $pid . '" class="leaders-tabbed__runner-name">' . $name . '</a>
+            <span class="leaders-tabbed__runner-value">' . $value . '</span>
+        </li>';
+    }
+
+    $content .= '</ul>
+    </div>';
+}
+
+$content .= '</div>
+</div>
+<script>
+(function() {
+    var block = document.getElementById("' . $blockId . '");
+    if (!block) return;
+    var tabs = block.querySelectorAll(".leaders-tabbed__tab");
+    var panels = block.querySelectorAll(".leaders-tabbed__panel");
+    tabs.forEach(function(tab) {
+        tab.addEventListener("click", function() {
+            tabs.forEach(function(t) { t.classList.remove("leaders-tabbed__tab--active"); t.setAttribute("aria-selected", "false"); });
+            panels.forEach(function(p) { p.classList.remove("leaders-tabbed__panel--active"); });
+            tab.classList.add("leaders-tabbed__tab--active");
+            tab.setAttribute("aria-selected", "true");
+            var panel = document.getElementById(tab.getAttribute("aria-controls"));
+            if (panel) panel.classList.add("leaders-tabbed__panel--active");
+        });
+    });
+})();
+</script>';
 
 ?>

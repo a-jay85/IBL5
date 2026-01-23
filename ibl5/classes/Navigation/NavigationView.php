@@ -306,8 +306,10 @@ class NavigationView
      * @param string $title Menu title
      * @param array $data Menu data with links and optional icon
      * @param bool $includeLoginForm Whether to include login form at top (for Login menu when logged out)
+     * @param bool $includeLeagueSwitcher Whether to include league switcher at bottom
+     * @param bool $alignRight Whether to align dropdown to the right edge (for rightmost menu items)
      */
-    private function renderDesktopDropdown(string $title, array $data, bool $includeLoginForm = false): string
+    private function renderDesktopDropdown(string $title, array $data, bool $includeLoginForm = false, bool $includeLeagueSwitcher = false, bool $alignRight = false): string
     {
         $links = $data['links'];
         $icon = $data['icon'] ?? '';
@@ -321,9 +323,10 @@ class NavigationView
         $html .= '<svg class="w-3 h-3 opacity-50 group-hover:opacity-100 transition-all duration-200 group-hover:translate-y-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>';
         $html .= '</button>';
 
-        // Dropdown panel - wider when login form is included
+        // Dropdown panel - wider when login form is included, align right for edge menus
         $minWidth = $includeLoginForm ? 'min-w-[280px]' : 'min-w-[220px]';
-        $html .= '<div class="absolute left-0 top-full pt-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">';
+        $alignment = $alignRight ? 'right-0' : 'left-0';
+        $html .= '<div class="absolute ' . $alignment . ' top-full pt-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">';
         $html .= '<div class="' . $minWidth . ' bg-navy-800/95 backdrop-blur-xl rounded-lg shadow-2xl shadow-black/30 border border-white/10 overflow-hidden">';
 
         // Login form at top (if not logged in and this is the Login dropdown)
@@ -343,8 +346,33 @@ class NavigationView
         }
         $html .= '</div>';
 
+        // League switcher at bottom (for Season menu)
+        if ($includeLeagueSwitcher) {
+            $html .= $this->renderDropdownLeagueSwitcher();
+        }
+
         $html .= '</div></div></div>';
         return $html;
+    }
+
+    /**
+     * Render the league switcher for inside a dropdown menu
+     */
+    private function renderDropdownLeagueSwitcher(): string
+    {
+        $iblSelected = $this->currentLeague === 'ibl' ? ' selected' : '';
+        $olympicsSelected = $this->currentLeague === 'olympics' ? ' selected' : '';
+
+        return '<div class="px-4 py-3 border-t border-white/10 bg-black/20">'
+            . '<label class="block text-[10px] font-semibold tracking-widest uppercase text-gray-500 mb-2">League</label>'
+            . '<div class="relative">'
+            . '<select onchange="window.location.href=this.value" class="w-full appearance-none bg-white/10 text-white text-sm font-medium border border-white/20 rounded-lg px-3 py-2 pr-8 cursor-pointer hover:bg-white/15 hover:border-white/30 focus:outline-none focus:ring-2 focus:ring-accent-500/50 focus:border-accent-500 transition-all">'
+            . '<option value="index.php?league=ibl"' . $iblSelected . ' class="bg-navy-800 text-white">IBL</option>'
+            . '<option value="index.php?league=olympics"' . $olympicsSelected . ' class="bg-navy-800 text-white">Olympics</option>'
+            . '</select>'
+            . '<svg class="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>'
+            . '</div>'
+            . '</div>';
     }
 
     /**
@@ -353,8 +381,9 @@ class NavigationView
      * @param array $data Menu data with links and optional icon
      * @param int $index Stagger animation index
      * @param bool $includeLoginForm Whether to include login form at top (for Login menu when logged out)
+     * @param bool $includeLeagueSwitcher Whether to include league switcher at bottom
      */
-    private function renderMobileDropdown(string $title, array $data, int $index, bool $includeLoginForm = false): string
+    private function renderMobileDropdown(string $title, array $data, int $index, bool $includeLoginForm = false, bool $includeLeagueSwitcher = false): string
     {
         $links = $data['links'];
         $icon = $data['icon'] ?? '';
@@ -394,25 +423,34 @@ class NavigationView
                 . $externalIcon
                 . '</a>';
         }
+
+        // League switcher at bottom (for Season menu)
+        if ($includeLeagueSwitcher) {
+            $html .= $this->renderMobileDropdownLeagueSwitcher();
+        }
+
         $html .= '</div></div>';
 
         return $html;
     }
 
     /**
-     * Render the league switcher dropdown
+     * Render the league switcher for inside a mobile dropdown menu
      */
-    private function renderLeagueSwitcher(): string
+    private function renderMobileDropdownLeagueSwitcher(): string
     {
         $iblSelected = $this->currentLeague === 'ibl' ? ' selected' : '';
         $olympicsSelected = $this->currentLeague === 'olympics' ? ' selected' : '';
 
-        return '<div class="relative">'
-            . '<select onchange="window.location.href=this.value" class="appearance-none bg-white/10 text-white text-sm font-medium border border-white/20 rounded-lg px-3 py-2 pr-8 cursor-pointer hover:bg-white/15 hover:border-white/30 focus:outline-none focus:ring-2 focus:ring-accent-500/50 focus:border-accent-500 transition-all">'
+        return '<div class="px-5 py-3 border-t border-white/10 mt-1">'
+            . '<label class="block text-[10px] font-semibold tracking-widest uppercase text-gray-500 mb-2">League</label>'
+            . '<div class="relative">'
+            . '<select onchange="window.location.href=this.value" class="w-full appearance-none bg-white/10 text-white text-sm font-medium border border-white/20 rounded-xl px-3 py-2.5 pr-8 cursor-pointer hover:bg-white/15 hover:border-white/30 focus:outline-none focus:ring-2 focus:ring-accent-500/50 focus:border-accent-500 transition-all">'
             . '<option value="index.php?league=ibl"' . $iblSelected . ' class="bg-navy-800 text-white">IBL</option>'
             . '<option value="index.php?league=olympics"' . $olympicsSelected . ' class="bg-navy-800 text-white">Olympics</option>'
             . '</select>'
             . '<svg class="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>'
+            . '</div>'
             . '</div>';
     }
 
@@ -457,10 +495,15 @@ class NavigationView
                         </div>
                     </a>
 
-                    <!-- Desktop Navigation -->
-                    <div class="hidden lg:flex items-center">
+                    <!-- Desktop Navigation (right-aligned) -->
+                    <div class="hidden lg:flex items-center ml-auto">
                         <?php foreach ($menus as $title => $menu): ?>
-                            <?= $this->renderDesktopDropdown($title, $menu) ?>
+                            <?= $this->renderDesktopDropdown(
+                                $title,
+                                $menu,
+                                false, // no login form
+                                $title === 'Season' // include league switcher only for Season menu
+                            ) ?>
                         <?php endforeach; ?>
 
                         <!-- My Team dropdown (if user has a team) -->
@@ -471,20 +514,17 @@ class NavigationView
                         <!-- Divider -->
                         <div class="w-px h-6 bg-white/10 mx-2"></div>
 
-                        <!-- Account dropdown -->
+                        <!-- Account dropdown (right-aligned to stay within viewport) -->
                         <?= $this->renderDesktopDropdown(
                             $this->isLoggedIn ? ($this->username ?? 'Account') : 'Login',
                             [
                                 'icon' => '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>',
                                 'links' => $accountMenu
                             ],
-                            !$this->isLoggedIn // Include login form when not logged in
+                            !$this->isLoggedIn, // Include login form when not logged in
+                            false, // No league switcher
+                            true // Align dropdown to right edge
                         ) ?>
-
-                        <!-- League switcher -->
-                        <div class="pl-3">
-                            <?= $this->renderLeagueSwitcher() ?>
-                        </div>
                     </div>
 
                     <!-- Mobile hamburger button -->
@@ -527,7 +567,13 @@ class NavigationView
 
                 <!-- Menu sections -->
                 <?php $index = 2; foreach ($menus as $title => $menu): ?>
-                    <?= $this->renderMobileDropdown($title, $menu, $index++) ?>
+                    <?= $this->renderMobileDropdown(
+                        $title,
+                        $menu,
+                        $index++,
+                        false, // no login form
+                        $title === 'Season' // include league switcher only for Season menu
+                    ) ?>
                 <?php endforeach; ?>
 
                 <!-- My Team section (if user has a team) -->
@@ -545,12 +591,6 @@ class NavigationView
                     $index++,
                     !$this->isLoggedIn // Include login form when not logged in
                 ) ?>
-
-                <!-- League switcher -->
-                <div class="mobile-section mt-auto px-5 py-4 border-t border-white/5 bg-black/20">
-                    <label class="block text-xs text-gray-500 uppercase tracking-wide mb-2">League</label>
-                    <?= $this->renderLeagueSwitcher() ?>
-                </div>
             </div>
         </nav>
         <?php

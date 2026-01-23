@@ -50,9 +50,7 @@ class NavigationView
             'Stats' => [
                 'icon' => '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>',
                 'links' => [
-                    ['label' => 'League Leaders', 'url' => 'modules.php?name=Chunk_Stats&op=season'],
                     ['label' => 'League Starters', 'url' => 'modules.php?name=League_Starters', 'badge' => 'NEW'],
-                    ['label' => 'Sim Leaders', 'url' => 'modules.php?name=Chunk_Stats&op=chunk'],
                     ['label' => 'Compare Players', 'url' => 'modules.php?name=Compare_Players'],
                     ['label' => 'Season Highs', 'url' => '/ibl5/pages/seasonHighs.php'],
                     ['label' => 'Series Records', 'url' => 'modules.php?name=Series_Records'],

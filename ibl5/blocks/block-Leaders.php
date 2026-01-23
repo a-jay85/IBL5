@@ -103,8 +103,11 @@ $blockId = 'season-leaders-' . uniqid();
 $categories = array_keys($statCategories);
 $firstCategory = $categories[0] ?? 'Points';
 
-// Compact tabbed layout - no header, just tabs + content
+// Compact tabbed layout with header
 $content = '<div class="leaders-tabbed" id="' . $blockId . '">
+    <div class="leaders-tabbed__header">
+        <h3 class="leaders-tabbed__title">League Leaders</h3>
+    </div>
     <div class="leaders-tabbed__tabs" role="tablist">';
 
 // Generate tabs
@@ -159,12 +162,17 @@ foreach ($categories as $index => $category) {
     for ($i = 1; $i < count($players); $i++) {
         $player = $players[$i];
         $pid = (int)$player['pid'];
+        $tid = (int)$player['tid'];
         $name = HtmlSanitizer::safeHtmlOutput($player['name']);
+        $team = HtmlSanitizer::safeHtmlOutput($player['teamname']);
         $value = HtmlSanitizer::safeHtmlOutput($player['stat_value']);
         $rank = $i + 1;
 
+        $teamLogo = $tid ? '<img src="./' . HtmlSanitizer::safeHtmlOutput($imagesPath) . 'logo/new' . $tid . '.png" alt="' . $team . '" class="leaders-tabbed__runner-logo" loading="lazy">' : '';
+
         $content .= '<li class="leaders-tabbed__runner">
             <span class="leaders-tabbed__runner-rank">#' . $rank . '</span>
+            ' . $teamLogo . '
             <a href="modules.php?name=Player&pa=showpage&pid=' . $pid . '" class="leaders-tabbed__runner-name">' . $name . '</a>
             <span class="leaders-tabbed__runner-value">' . $value . '</span>
         </li>';

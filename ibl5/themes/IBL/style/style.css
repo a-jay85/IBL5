@@ -430,7 +430,29 @@ img {
     }
 }
 
-/* Tabs Bar - Compact, no redundant title */
+/* Header */
+.leaders-tabbed__header {
+    background: var(--navy-800);
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.leaders-tabbed__title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: white;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Orange variant header */
+.leaders-tabbed--chunk .leaders-tabbed__header {
+    background: linear-gradient(135deg, var(--accent-500), var(--accent-600));
+}
+
+/* Tabs Bar */
 .leaders-tabbed__tabs {
     display: flex;
     background: var(--navy-800);
@@ -612,6 +634,13 @@ img {
     font-weight: 700;
     color: var(--gray-400);
     line-height: 1;
+}
+
+.leaders-tabbed__runner-logo {
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+    flex-shrink: 0;
 }
 
 .leaders-tabbed__runner-name {

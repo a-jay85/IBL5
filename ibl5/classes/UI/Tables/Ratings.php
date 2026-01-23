@@ -70,13 +70,16 @@ class Ratings
             $i++;
         }
 
+        // Use unique class name per team to avoid CSS conflicts in multi-table views (e.g., Next_Sim)
+        $tableClass = 'ratings-' . ((int)($team->teamID ?? 0));
+
         ob_start();
-        echo \UI\TableStyles::render('ratings', $team->color1, $team->color2);
+        echo \UI\TableStyles::render($tableClass, $team->color1, $team->color2);
         ?>
-<table style="margin: 0 auto;" class="sortable ratings">
+<table style="margin: 0 auto;" class="sortable <?= $tableClass ?>">
 <colgroup span="2"></colgroup><colgroup span="2"></colgroup><colgroup span="6"></colgroup><colgroup span="6"></colgroup><colgroup span="4"></colgroup><colgroup span="4"></colgroup><colgroup span="1"></colgroup>
-    <thead style="background-color: #<?= htmlspecialchars($team->color1) ?>;">
-        <tr style="background-color: #<?= htmlspecialchars($team->color1) ?>;">
+    <thead>
+        <tr>
 <?php if ($moduleName == "League_Starters"): ?>
             <th>Team</th>
 <?php endif; ?>
@@ -123,12 +126,12 @@ class Ratings
     // Column count: 35 base + 1 optional Team column = 36 max
     $colCount = ($moduleName == "League_Starters") ? 36 : 35;
     if ($row['addSeparator']): ?>
-        <tr>
-        <td colspan="<?= $colCount ?>" style="background-color: #<?= htmlspecialchars($team->color1) ?>;">
+        <tr class="ratings-separator">
+        <td colspan="<?= $colCount ?>" style="background-color: #<?= htmlspecialchars($team->color1) ?>; height: 3px; padding: 0;">
         </td>
         </tr>
 <?php endif; ?>
-        <tr style="background-color: #<?= $row['bgcolor'] ?>;">
+        <tr<?= ($moduleName == "League_Starters" && $player->teamID == $team->teamID) ? ' class="ratings-highlight"' : '' ?><?= ($moduleName == "Next_Sim" && $row['bgcolor'] == 'FFFFAA') ? ' class="ratings-highlight"' : '' ?>>
 <?php if ($moduleName == "League_Starters"): ?>
             <td><?= htmlspecialchars($player->teamName ?? '') ?></td>
 <?php endif; ?>

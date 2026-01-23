@@ -104,20 +104,21 @@ class RatingsTest extends TestCase
         $afterTbody = substr($html, $tableStart);
 
         // The first element after <tbody> should be a <tr> with player data, NOT an empty separator
+        // Player rows don't have the "ratings-separator" class
         $firstRowMatch = preg_match(
-            '/<tbody>\\s*<tr[^>]*style="background-color:/',
+            '/<tbody>\\s*<tr(?![^>]*class="ratings-separator")/',
             $afterTbody
         );
 
         $this->assertEquals(
             1,
             $firstRowMatch,
-            'First row after <tbody> should be a player row (with bgcolor), not an empty separator'
+            'First row after <tbody> should be a player row, not an empty separator'
         );
 
-        // Verify no colspan="35" or colspan="36" at the start of tbody (those are separator rows)
+        // Verify no separator row at the start of tbody (those have class="ratings-separator")
         $emptyRowMatch = preg_match(
-            '/<tbody>\\s*<tr>\\s*<td colspan="(?:35|36)"/',
+            '/<tbody>\\s*<tr[^>]*class="ratings-separator"/',
             $afterTbody
         );
 
@@ -149,9 +150,9 @@ class RatingsTest extends TestCase
 
         $html = Ratings::render($mockDb, $players, $team, '', $mockSeason, 'Next_Sim');
 
-        // Count separator rows (empty colspan rows)
+        // Count separator rows (rows with class="ratings-separator")
         $separatorCount = preg_match_all(
-            '/<tr>\\s*<td colspan="35"/',
+            '/<tr[^>]*class="ratings-separator"/',
             $html
         );
 
@@ -183,9 +184,9 @@ class RatingsTest extends TestCase
 
         $html = Ratings::render($mockDb, $players, $team, '', $mockSeason, '');
 
-        // Count separator rows
+        // Count separator rows (rows with class="ratings-separator")
         $separatorCount = preg_match_all(
-            '/<tr>\\s*<td colspan="35"/',
+            '/<tr[^>]*class="ratings-separator"/',
             $html
         );
 

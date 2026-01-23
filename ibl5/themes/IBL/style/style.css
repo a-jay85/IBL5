@@ -963,6 +963,18 @@ img {
     color: var(--accent-500);
 }
 
+.news-category {
+    color: var(--accent-500);
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.75em;
+    letter-spacing: 0.05em;
+}
+
+.news-article--transaction .news-category {
+    color: var(--accent-400);
+}
+
 .news-article__meta {
     display: flex;
     flex-wrap: wrap;

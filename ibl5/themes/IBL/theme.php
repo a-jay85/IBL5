@@ -164,7 +164,9 @@ function themeindex($aid, $informant, $time, $title, $counter, $topic, $thetext,
     }
 
     // Sanitize output
-    $safeTitle = \Utilities\HtmlSanitizer::safeHtmlOutput($title);
+    // Note: $title may contain trusted HTML links from News module (already filtered there)
+    // We strip the deprecated <font> tags but preserve the links
+    $safeTitle = str_replace(['<font class="storycat">', '</font>'], ['<span class="news-category">', '</span>'], $title);
     $safeTime = \Utilities\HtmlSanitizer::safeHtmlOutput($time);
     $safeTopictext = \Utilities\HtmlSanitizer::safeHtmlOutput($topictext);
     $safeCounter = (int)$counter;

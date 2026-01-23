@@ -411,6 +411,27 @@ img {
 }
 
 /* ==========================================================================
+   Leaders Grid Layout (Side-by-Side on Desktop)
+   ========================================================================== */
+
+/* Use CSS Grid to display leaders blocks side-by-side on desktop */
+@media (min-width: 1024px) {
+    /* Target consecutive leaders-grid-item elements */
+    .leaders-grid-item {
+        display: inline-block;
+        vertical-align: top;
+        width: calc(50% - 0.5rem);
+        margin-right: 0.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .leaders-grid-item:nth-of-type(2n) {
+        margin-right: 0;
+        margin-left: 0.5rem;
+    }
+}
+
+/* ==========================================================================
    Tabbed Leaders Component (Ultra-Compact Layout)
    ========================================================================== */
 
@@ -504,11 +525,12 @@ img {
     display: block;
 }
 
-/* Leader Row - Compact inline layout */
+/* Leader Row - Compact centered layout */
 .leaders-tabbed__leader {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
+    justify-content: center;
+    gap: var(--space-3);
     padding: var(--space-2) var(--space-3);
     background: var(--gray-50);
     border-bottom: 1px solid var(--gray-100);
@@ -545,7 +567,6 @@ img {
 }
 
 .leaders-tabbed__leader-info {
-    flex: 1;
     min-width: 0;
     overflow: hidden;
 }

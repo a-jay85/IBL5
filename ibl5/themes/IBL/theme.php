@@ -330,7 +330,10 @@ function themecenterbox($title, $content)
 
     if ($hasModernStyling) {
         // Content has its own styling, output directly
-        echo '<div style="margin-bottom: 1rem; max-width: 100%; overflow: hidden;">'
+        // Add specific class for leaders blocks to enable side-by-side layout
+        $isLeadersBlock = strpos($content, 'leaders-tabbed') !== false;
+        $wrapperClass = $isLeadersBlock ? 'leaders-grid-item' : '';
+        echo '<div class="' . $wrapperClass . '" style="margin-bottom: 1rem; max-width: 100%; overflow: hidden;">'
             . $content
             . '</div>';
     } else {

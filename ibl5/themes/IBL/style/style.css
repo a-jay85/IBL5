@@ -440,6 +440,7 @@ img {
     max-width: 100vw;
     font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
     background: white;
+    border: 1px solid var(--gray-100);
     border-radius: 0.5rem;
     -webkit-border-radius: 0.5rem;
     -moz-border-radius: 0.5rem;

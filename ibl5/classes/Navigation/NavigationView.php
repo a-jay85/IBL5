@@ -108,6 +108,139 @@ class NavigationView
     }
 
     /**
+     * Render the inline login form for the dropdown
+     * Premium sports editorial design with clean, modern aesthetics
+     */
+    private function renderLoginForm(): string
+    {
+        return '
+        <div class="px-4 pt-4 pb-3">
+            <form action="modules.php?name=Your_Account" method="post" class="space-y-3">
+                <!-- Username field -->
+                <div>
+                    <label for="nav-username" class="block text-[10px] font-semibold tracking-widest uppercase text-gray-400 mb-1.5">Username</label>
+                    <div class="relative">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                            </svg>
+                        </span>
+                        <input
+                            type="text"
+                            name="username"
+                            id="nav-username"
+                            maxlength="25"
+                            required
+                            placeholder="Enter username"
+                            class="w-full bg-white/5 border border-white/10 rounded-lg py-2.5 pl-10 pr-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-accent-500 focus:ring-1 focus:ring-accent-500/50 transition-all"
+                        >
+                    </div>
+                </div>
+
+                <!-- Password field -->
+                <div>
+                    <label for="nav-password" class="block text-[10px] font-semibold tracking-widest uppercase text-gray-400 mb-1.5">Password</label>
+                    <div class="relative">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                            </svg>
+                        </span>
+                        <input
+                            type="password"
+                            name="user_password"
+                            id="nav-password"
+                            maxlength="20"
+                            required
+                            placeholder="Enter password"
+                            class="w-full bg-white/5 border border-white/10 rounded-lg py-2.5 pl-10 pr-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-accent-500 focus:ring-1 focus:ring-accent-500/50 transition-all"
+                        >
+                    </div>
+                </div>
+
+                <input type="hidden" name="op" value="login">
+
+                <!-- Submit button -->
+                <button
+                    type="submit"
+                    class="w-full bg-gradient-to-r from-accent-500 to-orange-600 hover:from-accent-400 hover:to-orange-500 text-white font-semibold py-2.5 px-4 rounded-lg shadow-lg shadow-accent-500/25 hover:shadow-accent-500/40 transition-all duration-200 text-sm tracking-wide"
+                >
+                    Login
+                </button>
+            </form>
+        </div>
+
+        <!-- Divider -->
+        <div class="border-t border-white/10 mx-4"></div>
+        ';
+    }
+
+    /**
+     * Render the mobile login form
+     * Full-width design optimized for touch interactions
+     */
+    private function renderMobileLoginForm(): string
+    {
+        return '
+        <div class="px-5 pt-4 pb-4 bg-gradient-to-b from-accent-500/10 to-transparent">
+            <form action="modules.php?name=Your_Account" method="post" class="space-y-3">
+                <!-- Username field -->
+                <div>
+                    <label for="mobile-nav-username" class="block text-[10px] font-semibold tracking-widest uppercase text-gray-400 mb-2">Username</label>
+                    <div class="relative">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                            </svg>
+                        </span>
+                        <input
+                            type="text"
+                            name="username"
+                            id="mobile-nav-username"
+                            maxlength="25"
+                            required
+                            placeholder="Enter username"
+                            class="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-11 pr-4 text-base text-white placeholder-gray-500 focus:outline-none focus:border-accent-500 focus:ring-2 focus:ring-accent-500/30 transition-all"
+                        >
+                    </div>
+                </div>
+
+                <!-- Password field -->
+                <div>
+                    <label for="mobile-nav-password" class="block text-[10px] font-semibold tracking-widest uppercase text-gray-400 mb-2">Password</label>
+                    <div class="relative">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                            </svg>
+                        </span>
+                        <input
+                            type="password"
+                            name="user_password"
+                            id="mobile-nav-password"
+                            maxlength="20"
+                            required
+                            placeholder="Enter password"
+                            class="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-11 pr-4 text-base text-white placeholder-gray-500 focus:outline-none focus:border-accent-500 focus:ring-2 focus:ring-accent-500/30 transition-all"
+                        >
+                    </div>
+                </div>
+
+                <input type="hidden" name="op" value="login">
+
+                <!-- Submit button -->
+                <button
+                    type="submit"
+                    class="w-full bg-gradient-to-r from-accent-500 to-orange-600 hover:from-accent-400 hover:to-orange-500 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-accent-500/25 hover:shadow-accent-500/40 transition-all duration-200 text-base tracking-wide active:scale-[0.98]"
+                >
+                    Login
+                </button>
+            </form>
+        </div>
+        ';
+    }
+
+    /**
      * Get My Team menu based on current league
      * @return array|null
      */
@@ -170,8 +303,11 @@ class NavigationView
 
     /**
      * Render a desktop dropdown menu
+     * @param string $title Menu title
+     * @param array $data Menu data with links and optional icon
+     * @param bool $includeLoginForm Whether to include login form at top (for Login menu when logged out)
      */
-    private function renderDesktopDropdown(string $title, array $data): string
+    private function renderDesktopDropdown(string $title, array $data, bool $includeLoginForm = false): string
     {
         $links = $data['links'];
         $icon = $data['icon'] ?? '';
@@ -185,14 +321,20 @@ class NavigationView
         $html .= '<svg class="w-3 h-3 opacity-50 group-hover:opacity-100 transition-all duration-200 group-hover:translate-y-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>';
         $html .= '</button>';
 
-        // Dropdown panel
+        // Dropdown panel - wider when login form is included
+        $minWidth = $includeLoginForm ? 'min-w-[280px]' : 'min-w-[220px]';
         $html .= '<div class="absolute left-0 top-full pt-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">';
-        $html .= '<div class="min-w-[220px] bg-navy-800/95 backdrop-blur-xl rounded-lg shadow-2xl shadow-black/30 border border-white/10 overflow-hidden">';
+        $html .= '<div class="' . $minWidth . ' bg-navy-800/95 backdrop-blur-xl rounded-lg shadow-2xl shadow-black/30 border border-white/10 overflow-hidden">';
 
-        // Header
-        $html .= '<div class="px-4 py-2.5 border-b border-white/5">';
-        $html .= '<span class="text-[11px] font-semibold tracking-widest uppercase text-accent-500">' . HtmlSanitizer::safeHtmlOutput($title) . '</span>';
-        $html .= '</div>';
+        // Login form at top (if not logged in and this is the Login dropdown)
+        if ($includeLoginForm) {
+            $html .= $this->renderLoginForm();
+        } else {
+            // Header (only show if no login form)
+            $html .= '<div class="px-4 py-2.5 border-b border-white/5">';
+            $html .= '<span class="text-[11px] font-semibold tracking-widest uppercase text-accent-500">' . HtmlSanitizer::safeHtmlOutput($title) . '</span>';
+            $html .= '</div>';
+        }
 
         // Links
         $html .= '<div class="py-1">';
@@ -207,8 +349,12 @@ class NavigationView
 
     /**
      * Render the mobile menu dropdown section
+     * @param string $title Menu title
+     * @param array $data Menu data with links and optional icon
+     * @param int $index Stagger animation index
+     * @param bool $includeLoginForm Whether to include login form at top (for Login menu when logged out)
      */
-    private function renderMobileDropdown(string $title, array $data, int $index): string
+    private function renderMobileDropdown(string $title, array $data, int $index, bool $includeLoginForm = false): string
     {
         $links = $data['links'];
         $icon = $data['icon'] ?? '';
@@ -225,6 +371,14 @@ class NavigationView
         $html .= '</button>';
 
         $html .= '<div class="hidden bg-black/20">';
+
+        // Login form at top (if not logged in and this is the Login dropdown)
+        if ($includeLoginForm) {
+            $html .= $this->renderMobileLoginForm();
+            // Divider before other links
+            $html .= '<div class="border-t border-white/10 mx-5 my-2"></div>';
+        }
+
         foreach ($links as $link) {
             $label = HtmlSanitizer::safeHtmlOutput($link['label']);
             $url = HtmlSanitizer::safeHtmlOutput($link['url']);
@@ -323,7 +477,8 @@ class NavigationView
                             [
                                 'icon' => '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>',
                                 'links' => $accountMenu
-                            ]
+                            ],
+                            !$this->isLoggedIn // Include login form when not logged in
                         ) ?>
 
                         <!-- League switcher -->
@@ -387,7 +542,8 @@ class NavigationView
                         'icon' => '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>',
                         'links' => $accountMenu
                     ],
-                    $index++
+                    $index++,
+                    !$this->isLoggedIn // Include login form when not logged in
                 ) ?>
 
                 <!-- League switcher -->

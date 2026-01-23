@@ -299,7 +299,7 @@ class NavigationView
                         <!-- Text logo -->
                         <div class="flex flex-col">
                             <span class="font-display text-2xl tracking-wider text-white leading-none">IBL</span>
-                            <span class="text-[9px] tracking-[0.2em] text-accent-500 font-semibold uppercase">Fantasy League</span>
+                            <span class="text-[9px] tracking-[0.2em] text-accent-500 font-semibold uppercase">Sim League</span>
                         </div>
                     </a>
 

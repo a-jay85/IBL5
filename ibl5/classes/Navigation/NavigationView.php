@@ -315,7 +315,7 @@ class NavigationView
         $icon = $data['icon'] ?? '';
 
         $html = '<div class="relative group">';
-        $html .= '<button class="flex items-center gap-2 px-3 py-5 text-sm font-medium text-gray-300 hover:text-white transition-colors duration-200">';
+        $html .= '<button class="flex items-center gap-2 px-3 py-3 text-sm font-medium text-gray-300 hover:text-white transition-colors duration-200">';
         if ($icon) {
             $html .= '<span class="text-accent-500 group-hover:text-accent-400 transition-colors">' . $icon . '</span>';
         }
@@ -475,7 +475,7 @@ class NavigationView
             <div class="relative max-w-7xl mx-auto px-4 sm:px-6">
                 <div class="flex items-center justify-between">
                     <!-- Logo -->
-                    <a href="index.php" class="flex items-center gap-3 py-4 group">
+                    <a href="index.php" class="flex items-center gap-3 py-2 group">
                         <!-- Basketball icon -->
                         <div class="relative">
                             <div class="w-10 h-10 rounded-full bg-gradient-to-br from-accent-500 to-orange-600 flex items-center justify-center shadow-lg shadow-accent-500/25 group-hover:shadow-accent-500/40 transition-shadow">
@@ -543,7 +543,7 @@ class NavigationView
         <div id="nav-overlay" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden transition-opacity duration-300"></div>
 
         <!-- Mobile menu -->
-        <nav id="nav-mobile-menu" class="fixed top-16 right-0 bottom-0 w-[300px] max-w-[85vw] z-50 transform translate-x-full transition-transform duration-300 ease-out lg:hidden">
+        <nav id="nav-mobile-menu" class="fixed top-12 right-0 bottom-0 w-[300px] max-w-[85vw] z-50 transform translate-x-full transition-transform duration-300 ease-out lg:hidden">
             <!-- Background -->
             <div class="absolute inset-0 bg-gradient-to-b from-navy-800 to-navy-900"></div>
             <!-- Left accent line -->

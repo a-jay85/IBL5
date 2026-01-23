@@ -100,28 +100,32 @@ class TeamController implements TeamControllerInterface
         $rafters = $inforight[1];
 
         echo "
-        <table align=center>
-            <tr>
-                <td align=center><table><tr>$tabs</tr></table></td>
-            </tr>
-            <tr>
-                <td align=center>$table_output</td>
-            </tr>
-            <tr>
-                <td align=center>$starters_table</td>
-            </tr>
-            <tr bgcolor=$team->color1>
-                <td><font color=$team->color2><b><center>Draft Picks</center></b></font></td>
-            </tr>
-            <tr>
-                <td>$tableDraftPicks</td>
-            </tr>
-            <tr>
-                <td>$rafters</td>
-            </tr>
-        </table>";
+        <div class=\"team-page-layout\">
+            <div class=\"team-page-main\">
+                <table align=center>
+                    <tr>
+                        <td align=center><table><tr>$tabs</tr></table></td>
+                    </tr>
+                    <tr>
+                        <td align=center>$table_output</td>
+                    </tr>
+                    <tr>
+                        <td align=center>$starters_table</td>
+                    </tr>
+                    <tr bgcolor=$team->color1>
+                        <td><span style=\"color: $team->color2; font-weight: bold; display: block; text-align: center;\">Draft Picks</span></td>
+                    </tr>
+                    <tr>
+                        <td>$tableDraftPicks</td>
+                    </tr>
+                </table>
+                <div class=\"team-page-sidebar-mobile\">$team_info_right</div>
+                <div class=\"team-page-rafters\">$rafters</div>
+            </div>
+            <div class=\"team-page-sidebar\">$team_info_right</div>
+        </div>";
 
-        echo "</td><td valign=top>$team_info_right</td></tr></table>";
+        echo "</td></tr></table>";
 
         CloseTable();
         \Nuke\Footer::footer();

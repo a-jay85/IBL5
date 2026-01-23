@@ -1118,3 +1118,60 @@ img {
 .ibl-empty-state__text {
     font-size: 0.875rem;
 }
+
+/* ==========================================================================
+   Team Page Responsive Layout
+   ========================================================================== */
+
+.team-page-layout {
+    display: flex;
+    gap: var(--space-4);
+    align-items: flex-start;
+    width: 100%;
+    max-width: 100%;
+}
+
+.team-page-main {
+    flex: 1;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.team-page-sidebar {
+    flex-shrink: 0;
+    width: 220px;
+}
+
+/* Mobile sidebar is hidden on desktop, shown on mobile */
+.team-page-sidebar-mobile {
+    display: none;
+}
+
+.team-page-rafters {
+    margin-top: var(--space-4);
+}
+
+/* Mobile: Stack columns and reorder */
+@media (max-width: 768px) {
+    .team-page-layout {
+        flex-direction: column;
+    }
+
+    /* Hide desktop sidebar on mobile */
+    .team-page-sidebar {
+        display: none;
+    }
+
+    /* Show mobile sidebar (appears after Draft Picks) */
+    .team-page-sidebar-mobile {
+        display: block;
+        width: 100%;
+        margin-top: var(--space-4);
+    }
+
+    /* Ensure the sidebar table fits mobile */
+    .team-page-sidebar-mobile > table {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+}

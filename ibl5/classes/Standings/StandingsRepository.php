@@ -91,7 +91,7 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
     public function getTeamStreakData(int $teamId): ?array
     {
         return $this->fetchOne(
-            "SELECT last_win, last_loss, streak_type, streak FROM ibl_power WHERE TeamID = ?",
+            "SELECT last_win, last_loss, streak_type, streak, ranking FROM ibl_power WHERE TeamID = ?",
             "i",
             $teamId
         );

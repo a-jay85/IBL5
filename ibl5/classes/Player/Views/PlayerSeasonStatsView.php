@@ -35,27 +35,30 @@ class PlayerSeasonStatsView implements PlayerSeasonStatsViewInterface
         ob_start();
         ?>
 <table class="stats-table">
-    <tr>
-        <td class="content-header">Team</td>
-        <td class="content-header">Year</td>
-        <td class="content-header">Games</td>
-        <td class="content-header">Min</td>
-        <td class="content-header">FGM-FGA</td>
-        <td class="content-header">FG%</td>
-        <td class="content-header">FTM-FTA</td>
-        <td class="content-header">FT%</td>
-        <td class="content-header">3GM-3GA</td>
-        <td class="content-header">3G%</td>
-        <td class="content-header">ORB</td>
-        <td class="content-header">DRB</td>
-        <td class="content-header">REB</td>
-        <td class="content-header">AST</td>
-        <td class="content-header">STL</td>
-        <td class="content-header">TO</td>
-        <td class="content-header">BLK</td>
-        <td class="content-header">PF</td>
-        <td class="content-header">PTS</td>
-    </tr>
+    <thead>
+        <tr>
+            <th>Team</th>
+            <th>Year</th>
+            <th>Games</th>
+            <th>Min</th>
+            <th>FGM-FGA</th>
+            <th>FG%</th>
+            <th>FTM-FTA</th>
+            <th>FT%</th>
+            <th>3GM-3GA</th>
+            <th>3G%</th>
+            <th>ORB</th>
+            <th>DRB</th>
+            <th>REB</th>
+            <th>AST</th>
+            <th>STL</th>
+            <th>TO</th>
+            <th>BLK</th>
+            <th>PF</th>
+            <th>PTS</th>
+        </tr>
+    </thead>
+    <tbody>
         <?php
         foreach ($historicalStats as $stats) {
             $team = HtmlSanitizer::safeHtmlOutput($stats['team']);
@@ -115,6 +118,7 @@ class PlayerSeasonStatsView implements PlayerSeasonStatsViewInterface
             <?php
         }
         ?>
+    </tbody>
 </table>
         <?php
         return ob_get_clean();
@@ -130,24 +134,27 @@ class PlayerSeasonStatsView implements PlayerSeasonStatsViewInterface
         ob_start();
         ?>
 <table class="stats-table">
-    <tr>
-        <td class="content-header">Team</td>
-        <td class="content-header">Year</td>
-        <td class="content-header">Games</td>
-        <td class="content-header">Min</td>
-        <td class="content-header">FG%</td>
-        <td class="content-header">FT%</td>
-        <td class="content-header">3G%</td>
-        <td class="content-header">ORB</td>
-        <td class="content-header">DRB</td>
-        <td class="content-header">REB</td>
-        <td class="content-header">AST</td>
-        <td class="content-header">STL</td>
-        <td class="content-header">TO</td>
-        <td class="content-header">BLK</td>
-        <td class="content-header">PF</td>
-        <td class="content-header">PTS</td>
-    </tr>
+    <thead>
+        <tr>
+            <th>Team</th>
+            <th>Year</th>
+            <th>Games</th>
+            <th>Min</th>
+            <th>FG%</th>
+            <th>FT%</th>
+            <th>3G%</th>
+            <th>ORB</th>
+            <th>DRB</th>
+            <th>REB</th>
+            <th>AST</th>
+            <th>STL</th>
+            <th>TO</th>
+            <th>BLK</th>
+            <th>PF</th>
+            <th>PTS</th>
+        </tr>
+    </thead>
+    <tbody>
         <?php
         foreach ($historicalStats as $stats) {
             $games = $stats['games'];
@@ -194,6 +201,7 @@ class PlayerSeasonStatsView implements PlayerSeasonStatsViewInterface
             <?php
         }
         ?>
+    </tbody>
 </table>
         <?php
         return ob_get_clean();

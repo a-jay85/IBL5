@@ -73,7 +73,7 @@ class StandingsViewTest extends TestCase
 
         $result = $this->view->renderRegion('Eastern');
 
-        $this->assertStringContainsString('<table class="sortable standings-table">', $result);
+        $this->assertStringContainsString('<table class="sortable standings-table responsive-table">', $result);
         $this->assertStringContainsString('Team', $result);
         $this->assertStringContainsString('W-L', $result);
         $this->assertStringContainsString('Pct', $result);
@@ -224,7 +224,7 @@ class StandingsViewTest extends TestCase
 
         $result = $this->view->renderRegion('Eastern');
 
-        $this->assertStringContainsString('<b>Z</b>-Celtics', $result);
+        $this->assertStringContainsString('<strong>Z</strong>-Celtics', $result);
     }
 
     public function testRenderRegionDisplaysClinchedDivisionIndicator(): void
@@ -259,7 +259,7 @@ class StandingsViewTest extends TestCase
 
         $result = $this->view->renderRegion('Eastern');
 
-        $this->assertStringContainsString('<b>Y</b>-Celtics', $result);
+        $this->assertStringContainsString('<strong>Y</strong>-Celtics', $result);
     }
 
     public function testRenderRegionDisplaysClinchedPlayoffsIndicator(): void
@@ -294,7 +294,7 @@ class StandingsViewTest extends TestCase
 
         $result = $this->view->renderRegion('Eastern');
 
-        $this->assertStringContainsString('<b>X</b>-Celtics', $result);
+        $this->assertStringContainsString('<strong>X</strong>-Celtics', $result);
     }
 
     public function testRenderRegionHandlesMissingStreakData(): void

@@ -1,7 +1,24 @@
 <?php
 
+declare(strict_types=1);
+
+/**
+ * Player_Movement Module - Display player transactions since last season
+ *
+ * Shows players who changed teams between seasons.
+ */
+
+if (!defined('MODULE_FILE')) {
+    die("You can't access this file directly...");
+}
+
+$module_name = basename(dirname(__FILE__));
+get_lang($module_name);
+
 global $mysqli_db;
 $season = new Season($mysqli_db);
+
+$pagetitle = "- Player Movement";
 
 $previousSeasonEndingYear = $season->endingYear - 1;
 
@@ -18,15 +35,19 @@ $stmt->bind_param("i", $previousSeasonEndingYear);
 $stmt->execute();
 $result = $stmt->get_result();
 
+// Render page
+Nuke\Header::header();
+OpenTable();
+
 echo "<script src=\"/ibl5/jslib/sorttable.js\"></script>
-<center>
-<h1> PLAYER TRANSACTIONS SINCE LAST SEASON</h1>
-<i>Click the headings to sort the table</i>
-<table border=1 class=\"sortable\">
+<div style=\"text-align: center;\">
+<h1>Player Transactions Since Last Season</h1>
+<p><em>Click the headings to sort the table</em></p>
+<table style=\"border: 1px solid #000; border-collapse: collapse;\" class=\"sortable\">
 	<tr>
-		<th><b>Player</b></th>
-		<th><b>New Team</b></th>
-		<th><b>Old Team</b></th>
+		<th><strong>Player</strong></th>
+		<th><strong>New Team</strong></th>
+		<th><strong>Old Team</strong></th>
 	</tr>";
 
 while ($row = $result->fetch_assoc()) {
@@ -42,4 +63,7 @@ while ($row = $result->fetch_assoc()) {
 
 $stmt->close();
 
-echo "</table></center>";
+echo "</table></div>";
+
+CloseTable();
+Nuke\Footer::footer();

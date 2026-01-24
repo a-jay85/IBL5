@@ -24,6 +24,14 @@ $pagetitle = "- $module_name";
 Nuke\Header::header();
 OpenTable();
 
+global $mysqli_db;
+$season = new Season($mysqli_db);
+$league = new League($mysqli_db);
+
+// Find current week for "jump to" functionality
+$lastSimEndDate = $season->lastSimEndDate;
+$simLengthDays = $league->getSimLengthInDays();
+
 $min_date_query = "SELECT MIN(Date) as mindate FROM ibl_schedule";
 $min_date_result = $db->sql_query($min_date_query);
 $row = $db->sql_fetch_assoc($min_date_result);
@@ -35,13 +43,42 @@ $row2 = $db->sql_fetch_assoc($max_date_result);
 $max_date = $row2['maxdate'];
 $max_date = fnc_date_calc($max_date, 0);
 
+// Calculate which week number contains the last sim date
+$currentWeek = 1;
+$chunk_start = $min_date;
+$weekNum = 0;
+while ($chunk_start < $max_date) {
+    $weekNum++;
+    if (strtotime($lastSimEndDate) >= strtotime($chunk_start) &&
+        strtotime($lastSimEndDate) <= strtotime(fnc_date_calc($chunk_start, 6))) {
+        $currentWeek = $weekNum;
+    }
+    if ($weekNum == 13) {
+        $chunk_start = fnc_date_calc($chunk_start, 11);
+    } else {
+        $chunk_start = fnc_date_calc($chunk_start, 7);
+    }
+}
+
+// Output schedule container
+echo '<div class="schedule-container">';
+
+// Header with jump button
+echo '<div class="schedule-header">';
+echo '<h1 class="schedule-title">Schedule</h1>';
+echo '<a href="#week-' . $currentWeek . '" class="schedule-jump-btn" onclick="smoothScrollToWeek(event, ' . $currentWeek . ')">';
+echo '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12l7 7 7-7"/></svg>';
+echo 'Current Week';
+echo '</a>';
+echo '</div>';
+
 $chunk_start_date = $min_date;
 $chunk_end_date = fnc_date_calc($min_date, 6);
 
 $i = 0;
 while ($chunk_start_date < $max_date) {
     $i++;
-    chunk($chunk_start_date, $chunk_end_date, $i);
+    chunk($chunk_start_date, $chunk_end_date, $i, $currentWeek, $lastSimEndDate, $simLengthDays);
     if ($i == 13) {
         $chunk_start_date = fnc_date_calc($chunk_start_date, 11);
         $chunk_end_date = fnc_date_calc($chunk_start_date, 6);
@@ -51,17 +88,26 @@ while ($chunk_start_date < $max_date) {
     }
 }
 
+echo '</div>'; // Close schedule-container
+
+// Smooth scroll script
+echo '<script>
+function smoothScrollToWeek(e, weekNum) {
+    e.preventDefault();
+    var el = document.getElementById("week-" + weekNum);
+    if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+}
+</script>';
+
 CloseTable();
 Nuke\Footer::footer();
 
-function chunk($chunk_start_date, $chunk_end_date, $j)
+function chunk($chunk_start_date, $chunk_end_date, $j, $currentWeek, $lastSimEndDate, $simLengthDays)
 {
-    //TODO: unify this code with the Team module's boxscore function
-
     global $db, $mysqli_db;
-    $sharedFunctions = new Shared($mysqli_db);
     $commonRepository = new Services\CommonMysqliRepository($mysqli_db);
-    $season = new Season($mysqli_db);
 
     $query = "SELECT *
 		FROM ibl_schedule
@@ -70,17 +116,34 @@ function chunk($chunk_start_date, $chunk_end_date, $j)
     $result = $db->sql_query($query);
     $num = $db->sql_numrows($result);
 
+    if ($num == 0) {
+        return;
+    }
+
     $teamSeasonRecordsQuery = "SELECT tid, leagueRecord FROM ibl_standings ORDER BY tid ASC;";
     $teamSeasonRecordsResult = $db->sql_query($teamSeasonRecordsQuery);
 
-    $league = new League($mysqli_db);
-    $lastSimEndDate = date_create($season->lastSimEndDate);
-    $projectedNextSimEndDate = date_add($lastSimEndDate, date_interval_create_from_date_string($league->getSimLengthInDays() . ' days'));
+    $projectedNextSimEnd = date('Y/m/d', strtotime($lastSimEndDate . ' + ' . $simLengthDays . ' days'));
 
-    echo "<table width=\"500\" cellpadding=\"6\" cellspacing=\"0\" border=\"1\" align=center>";
+    // Format week dates for header
+    $weekStart = date('n/j', strtotime($chunk_start_date));
+    $weekEnd = date('n/j', strtotime($chunk_end_date));
+
+    $isCurrentWeek = ($j == $currentWeek);
+    $weekClass = 'schedule-week' . ($isCurrentWeek ? ' schedule-week--current' : '');
+
+    echo '<div class="' . $weekClass . '" id="week-' . $j . '">';
+    echo '<div class="schedule-week__header">';
+    echo '<span class="schedule-week__label">Wk ' . $j . '</span>';
+    echo '<span class="schedule-week__dates">' . $weekStart . '–' . $weekEnd . '</span>';
+    if ($isCurrentWeek) {
+        echo '<span class="schedule-week__current-badge">Current</span>';
+    }
+    echo '</div>';
+
+    echo '<div class="schedule-week__grid">';
 
     $i = 0;
-    $z = 0;
     while ($i < $num) {
         $date = $db->sql_result($result, $i, "Date");
         $visitor = $db->sql_result($result, $i, "Visitor");
@@ -94,76 +157,49 @@ function chunk($chunk_start_date, $chunk_end_date, $j)
         $visitorRecord = $db->sql_result($teamSeasonRecordsResult, $visitor - 1, "leagueRecord");
         $homeRecord = $db->sql_result($teamSeasonRecordsResult, $home - 1, "leagueRecord");
 
-        if (($i % 2) == 0) {
-            $bgcolor = "FFFFFF";
-        } else {
-            $bgcolor = "DDDDDD";
+        // Determine game state
+        $isUnplayed = ($visitorScore == $homeScore && strtotime($date) <= strtotime($projectedNextSimEnd));
+        $visitorWon = ($visitorScore > $homeScore);
+        $homeWon = ($homeScore > $visitorScore);
+
+        // Game card classes
+        $gameClass = 'schedule-game';
+        if ($isUnplayed) {
+            $gameClass .= ' schedule-game--upcoming';
         }
 
-        if (($z % 2) == 0) {
-            $bgcolor2 = "0070C0";
-        } else {
-            $bgcolor2 = "C00000";
-        }
+        echo '<a href="ibl/IBL/box' . \Utilities\HtmlSanitizer::safeHtmlOutput($boxid) . '.htm" class="' . $gameClass . '">';
 
-        if ($visitorScore == $homeScore and date_create($date) <= $projectedNextSimEndDate) {
-            $bgcolor = "DDDD00";
-        }
+        // Compact date
+        $shortDate = date('n/j', strtotime($date));
+        echo '<span class="schedule-game__date">' . $shortDate . '</span>';
 
-        if ($visitorScore > $homeScore) {
-            $visitorTeamname = '<b>' . $visitorTeamname . '</b>';
-            $visitorRecord = '<b>' . $visitorRecord . '</b>';
-            $visitorScore = '<b>' . $visitorScore . '</b>';
-        } elseif ($homeScore > $visitorScore) {
-            $homeTeamname = '<b>' . $homeTeamname . '</b>';
-            $homeRecord = '<b>' . $homeRecord . '</b>';
-            $homeScore = '<b>' . $homeScore . '</b>';
-        }
+        // Visitor
+        $vClass = $visitorWon ? ' schedule-game__team--win' : '';
+        echo '<span class="schedule-game__team' . $vClass . '">' . \Utilities\HtmlSanitizer::safeHtmlOutput($visitorTeamname) . '</span>';
+        echo '<span class="schedule-game__score' . $vClass . '">' . ($isUnplayed ? '-' : \Utilities\HtmlSanitizer::safeHtmlOutput($visitorScore)) . '</span>';
 
-        if ($date == $datebase) {
-            echo "<tr bgcolor=$bgcolor>
-				<td>$date</td>
-				<td><a href=\"modules.php?name=Team&op=team&teamID=$visitor\">$visitorTeamname ($visitorRecord)</a></td>
-				<td align=right>$visitorScore</td>
-				<td><a href=\"modules.php?name=Team&op=team&teamID=$home\">$homeTeamname ($homeRecord)</a></td>
-				<td align=right>$homeScore</td>
-				<td><a href=\"ibl/IBL/box$boxid.htm\">View</a></td>
-			</tr>";
-        } else {
-            echo "<tr>
-				<td></td><td></td><td></td><td></td><td></td><td></td>
-			</tr>";
-            echo "<tr bgcolor=$bgcolor2>
-				<td><font color=\"FFFFFF\"><b>Date</td>
-				<td><font color=\"FFFFFF\"><b>Visitor</td>
-				<td><font color=\"FFFFFF\"><b>Score</td>
-				<td><font color=\"FFFFFF\"><b>Home</td>
-				<td><font color=\"FFFFFF\"><b>Score</td>
-				<td><font color=\"FFFFFF\"><b>Box Score</td>
-			</tr>";
-            echo "<tr bgcolor=$bgcolor>
-				<td>$date</td>
-				<td><a href=\"modules.php?name=Team&op=team&teamID=$visitor\">$visitorTeamname ($visitorRecord)</a></td>
-				<td align=right>$visitorScore</td>
-				<td><a href=\"modules.php?name=Team&op=team&teamID=$home\">$homeTeamname ($homeRecord)</a></td>
-				<td align=right>$homeScore</td>
-				<td><a href=\"ibl/IBL/box$boxid.htm\">View</a></td>
-			</tr>";
-            $datebase = $date;
-            $z++;
-        }
+        echo '<span class="schedule-game__vs">@</span>';
+
+        // Home
+        $hClass = $homeWon ? ' schedule-game__team--win' : '';
+        echo '<span class="schedule-game__score' . $hClass . '">' . ($isUnplayed ? '-' : \Utilities\HtmlSanitizer::safeHtmlOutput($homeScore)) . '</span>';
+        echo '<span class="schedule-game__team' . $hClass . '">' . \Utilities\HtmlSanitizer::safeHtmlOutput($homeTeamname) . '</span>';
+
+        echo '</a>';
+
         $i++;
     }
-    echo "</table>";
-    //return array($homewin, $homeloss, $visitorwin, $visitorloss);
+
+    echo '</div>'; // Close grid
+    echo '</div>'; // Close week
 }
 
 function fnc_date_calc($this_date, $num_days)
 {
+    $my_time = strtotime($this_date);
+    $timestamp = $my_time + ($num_days * 86400);
+    $return_date = date("Y/m/d", $timestamp);
 
-    $my_time = strtotime($this_date); //converts date string to UNIX timestamp
-    $timestamp = $my_time + ($num_days * 86400); //calculates # of days passed ($num_days) * # seconds in a day (86400)
-    $return_date = date("Y/m/d", $timestamp); //puts the UNIX timestamp back into string format
-
-    return $return_date; //exit function and return string
+    return $return_date;
 }

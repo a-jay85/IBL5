@@ -1,3 +1,6 @@
+/* Load Google Fonts - must be at top of stylesheet */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap');
+
 /* ==========================================================================
    IBL5 Design System - Modern Sports Editorial Theme
    ========================================================================== */
@@ -65,9 +68,6 @@
     --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Load Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap');
-
 /* Legacy Base Styles */
 FONT		{FONT-FAMILY: Verdana,Helvetica; FONT-SIZE: 10px}
 TD		{FONT-FAMILY: Verdana,Helvetica; FONT-SIZE: 10px}
@@ -102,22 +102,56 @@ A:hover         {BACKGROUND: none; COLOR: #363636; FONT-SIZE: 10px; FONT-FAMILY:
 
 html {
     overflow-x: hidden;
+    overscroll-behavior-x: none;
 }
 
 body {
-    overflow-x: hidden;
-    max-width: 100vw;
+    overscroll-behavior-x: none;
     width: 100%;
+    max-width: 100%;
+    position: relative;
 }
 
+/* Hide mobile nav menu when closed to prevent overflow */
+@media (max-width: 1023px) {
+    #nav-mobile-menu {
+        /* Use clip to hide overflow from translated element */
+        right: 0;
+    }
+    #nav-mobile-menu.translate-x-full {
+        display: none;
+    }
+    #nav-mobile-menu.translate-x-0 {
+        display: block;
+    }
+}
+
+
 /* Fix legacy layout tables causing overflow */
-body > table,
-body > table > tbody,
-body > table > tbody > tr,
-body > table > tbody > tr > td {
-    display: block !important;
-    width: 100% !important;
-    max-width: 100vw !important;
+@media (max-width: 768px) {
+    body > table,
+    body > table > tbody,
+    body > table > tbody > tr,
+    body > table > tbody > tr > td {
+        display: block !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+
+    /* Clip overflow from nested legacy layout tables */
+    body > table > tbody > tr > td > table,
+    body > table > tbody > tr > td > table > tbody,
+    body > table > tbody > tr > td > table > tbody > tr,
+    body > table > tbody > tr > td > table > tbody > tr > td {
+        display: block !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow-x: hidden !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
 }
 
 table, center, .center-block {
@@ -437,7 +471,7 @@ img {
 
 .leaders-tabbed {
     width: 100%;
-    max-width: 100vw;
+    max-width: 100%;
     font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
     background: white;
     border: 1px solid var(--gray-100);
@@ -862,7 +896,7 @@ img {
 /* Mobile Cards for Injury Table */
 @media (max-width: 640px) {
     .injury-block {
-        max-width: 100vw;
+        max-width: 100%;
         overflow: hidden;
     }
 
@@ -1120,6 +1154,198 @@ img {
 }
 
 /* ==========================================================================
+   Mobile Table Responsiveness
+   ========================================================================== */
+
+/* Prevent line breaks on hyphens in record data (W-L, etc.) */
+.responsive-table td {
+    white-space: nowrap;
+}
+
+/* Wrapper for scroll container - holds the fixed shadow */
+.table-scroll-wrapper {
+    position: relative;
+    margin-bottom: 1rem;
+}
+
+/* Scroll container for wide tables on mobile */
+.table-scroll-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+    width: 100%;
+}
+
+/* On mobile, constrain scroll container to viewport */
+@media (max-width: 768px) {
+    .table-scroll-wrapper {
+        width: 100%;
+        max-width: 100%;
+        padding-left: 0;
+        padding-right: 0;
+        margin-left: 0;
+        margin-right: 0;
+    }
+
+    .table-scroll-container {
+        display: block;
+        overflow-x: scroll !important;
+        overflow-y: visible;
+        -webkit-overflow-scrolling: touch;
+        touch-action: pan-x pan-y;
+        padding: 0 !important;
+        /* Width set by JavaScript for iOS compatibility */
+    }
+
+    /* Remove border-radius and padding on mobile for edge-to-edge tables */
+    .standings-table-container {
+        border-radius: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    .table-scroll-wrapper {
+        padding: 0 !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+
+    .standings-table {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+}
+
+/* Scroll indicator shadow on right edge - on wrapper so it doesn't scroll */
+.table-scroll-wrapper::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 24px;
+    background: linear-gradient(to right, transparent, rgba(0, 0, 0, 0.08));
+    pointer-events: none;
+    opacity: 1;
+    transition: opacity 0.3s ease;
+    z-index: 2;
+}
+
+/* Hide scroll indicator when scrolled to the end */
+.table-scroll-wrapper.scrolled-end::after {
+    opacity: 0;
+}
+
+@media (max-width: 768px) {
+    /* Sticky first column(s) for context while scrolling */
+    .responsive-table th.sticky-col,
+    .responsive-table td.sticky-col {
+        position: sticky;
+        left: 0;
+        z-index: 1;
+        background: inherit;
+    }
+
+    /* Ensure sticky cells maintain their background on hover */
+    .responsive-table tbody tr:nth-child(odd) td.sticky-col {
+        background-color: white;
+    }
+    .responsive-table tbody tr:nth-child(even) td.sticky-col {
+        background-color: var(--gray-50, #f9fafb);
+    }
+    .responsive-table tbody tr:hover td.sticky-col {
+        background-color: var(--gray-100, #f3f4f6);
+    }
+
+    /* Header sticky cells */
+    .responsive-table thead th.sticky-col {
+        background: linear-gradient(135deg, var(--navy-800, #1e293b), var(--navy-900, #0f172a));
+        z-index: 3;
+    }
+
+    /* Shadow on sticky column edge */
+    .responsive-table th.sticky-col,
+    .responsive-table td.sticky-col {
+        box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
+    }
+
+    /* Reduce font sizes on mobile for density */
+    .responsive-table th {
+        font-size: 0.5625rem;
+        padding: 0.5rem 0.25rem;
+    }
+    .responsive-table td {
+        font-size: 0.625rem;
+        padding: 0.375rem 0.25rem;
+    }
+
+    /* Ensure minimum width for scrollable tables */
+    .table-scroll-container table {
+        min-width: 600px;
+    }
+}
+
+/* Second sticky column (for rank + name patterns) */
+@media (max-width: 768px) {
+    .responsive-table th.sticky-col-2,
+    .responsive-table td.sticky-col-2 {
+        position: sticky;
+        z-index: 1;
+        background: inherit;
+    }
+
+    /* First sticky column */
+    .responsive-table th.sticky-col-1,
+    .responsive-table td.sticky-col-1 {
+        left: 0;
+    }
+
+    /* Second sticky column - offset by first column width */
+    .responsive-table th.sticky-col-2,
+    .responsive-table td.sticky-col-2 {
+        left: 40px; /* Approximate width of rank column */
+    }
+
+    /* Backgrounds for multi-sticky columns */
+    .responsive-table tbody tr:nth-child(odd) td.sticky-col-1,
+    .responsive-table tbody tr:nth-child(odd) td.sticky-col-2 {
+        background-color: white;
+    }
+    .responsive-table tbody tr:nth-child(even) td.sticky-col-1,
+    .responsive-table tbody tr:nth-child(even) td.sticky-col-2 {
+        background-color: var(--gray-50, #f9fafb);
+    }
+    .responsive-table tbody tr:hover td.sticky-col-1,
+    .responsive-table tbody tr:hover td.sticky-col-2 {
+        background-color: var(--gray-100, #f3f4f6);
+    }
+
+    /* Header backgrounds for multi-sticky */
+    .responsive-table thead th.sticky-col-1,
+    .responsive-table thead th.sticky-col-2 {
+        background: linear-gradient(135deg, var(--navy-800, #1e293b), var(--navy-900, #0f172a));
+        z-index: 3;
+    }
+
+    /* Shadow only on the rightmost sticky column */
+    .responsive-table th.sticky-col-1,
+    .responsive-table td.sticky-col-1 {
+        box-shadow: none;
+    }
+    .responsive-table th.sticky-col-2,
+    .responsive-table td.sticky-col-2 {
+        box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
+    }
+}
+
+/* Hide less important columns on very small screens */
+@media (max-width: 480px) {
+    .hide-mobile {
+        display: none !important;
+    }
+}
+
+/* ==========================================================================
    Team Page Responsive Layout
    ========================================================================== */
 
@@ -1173,5 +1399,265 @@ img {
     .team-page-sidebar-mobile > table {
         width: 100% !important;
         max-width: 100% !important;
+    }
+}
+
+/* ==========================================================================
+   Schedule Page - Ultra-Compact Grid Layout
+   ========================================================================== */
+
+.schedule-container {
+    width: 100%;
+    max-width: 720px;
+    margin: 0 auto;
+    font-family: var(--font-sans);
+}
+
+/* Header with Jump Button */
+.schedule-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-4);
+    padding-bottom: var(--space-3);
+    border-bottom: 2px solid var(--gray-200);
+    position: relative;
+}
+
+.schedule-header::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 60px;
+    height: 2px;
+    background: var(--accent-500);
+}
+
+.schedule-title {
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--navy-900);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 0;
+}
+
+.schedule-jump-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--accent-500);
+    color: white;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    text-decoration: none;
+    border-radius: var(--radius-full);
+    transition: all var(--transition-fast);
+    box-shadow: 0 2px 8px rgb(249 115 22 / 0.3);
+}
+
+.schedule-jump-btn:hover {
+    background: var(--accent-600);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgb(249 115 22 / 0.4);
+}
+
+.schedule-jump-btn svg {
+    flex-shrink: 0;
+}
+
+/* Week Container - Compact */
+.schedule-week {
+    margin-bottom: var(--space-3);
+    background: white;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    border: 1px solid var(--gray-200);
+}
+
+.schedule-week--current {
+    border-color: var(--accent-400);
+    box-shadow: 0 0 0 1px var(--accent-400), 0 4px 12px rgb(249 115 22 / 0.15);
+}
+
+.schedule-week__header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: 6px 10px;
+    background: var(--navy-800);
+}
+
+.schedule-week--current .schedule-week__header {
+    background: linear-gradient(135deg, var(--accent-500), var(--accent-600));
+}
+
+.schedule-week__label {
+    font-family: var(--font-display);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    color: white;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.schedule-week__dates {
+    font-size: 0.625rem;
+    color: rgba(255, 255, 255, 0.6);
+    font-weight: 500;
+}
+
+.schedule-week__current-badge {
+    margin-left: auto;
+    padding: 2px 8px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: var(--radius-full);
+    font-size: 0.5625rem;
+    font-weight: 700;
+    color: white;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Games Grid - Multiple per row */
+.schedule-week__grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1px;
+    background: var(--gray-100);
+}
+
+/* Game Card - Inline compact format */
+.schedule-game {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 8px;
+    background: white;
+    text-decoration: none;
+    color: inherit;
+    transition: background var(--transition-fast);
+    font-size: 0.6875rem;
+}
+
+.schedule-game:hover {
+    background: var(--gray-50);
+}
+
+/* Upcoming game styling */
+.schedule-game--upcoming {
+    background: #fffbeb;
+}
+
+.schedule-game--upcoming:hover {
+    background: #fef3c7;
+}
+
+/* Date label */
+.schedule-game__date {
+    flex-shrink: 0;
+    width: 28px;
+    font-size: 0.5625rem;
+    font-weight: 600;
+    color: var(--gray-400);
+}
+
+/* Team name */
+.schedule-game__team {
+    font-weight: 500;
+    color: var(--navy-700);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    flex: 1;
+}
+
+/* Winner styling */
+.schedule-game__team--win {
+    font-weight: 700;
+    color: var(--navy-900);
+}
+
+/* Score */
+.schedule-game__score {
+    font-family: var(--font-display);
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--navy-600);
+    min-width: 20px;
+    text-align: center;
+}
+
+.schedule-game__score.schedule-game__team--win {
+    color: var(--accent-600);
+}
+
+/* @ symbol */
+.schedule-game__vs {
+    font-size: 0.5625rem;
+    font-weight: 600;
+    color: var(--gray-300);
+    flex-shrink: 0;
+}
+
+/* Single column on smaller screens */
+@media (max-width: 540px) {
+    .schedule-week__grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Mobile Responsive */
+@media (max-width: 640px) {
+    .schedule-container {
+        margin: 0;
+    }
+
+    .schedule-header {
+        flex-wrap: wrap;
+        gap: var(--space-2);
+    }
+
+    .schedule-title {
+        font-size: 1rem;
+    }
+
+    .schedule-jump-btn {
+        padding: 5px 10px;
+        font-size: 0.625rem;
+    }
+
+    .schedule-week {
+        border-radius: 0;
+        margin-left: -8px;
+        margin-right: -8px;
+        width: calc(100% + 16px);
+        border-left: none;
+        border-right: none;
+    }
+
+    .schedule-game {
+        padding: 4px 8px;
+        font-size: 0.625rem;
+    }
+
+    .schedule-game__date {
+        width: 24px;
+        font-size: 0.5rem;
+    }
+
+    .schedule-game__score {
+        font-size: 0.6875rem;
+        min-width: 18px;
+    }
+
+    .schedule-game__vs {
+        font-size: 0.5rem;
     }
 }

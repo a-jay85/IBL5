@@ -45,11 +45,22 @@ Replace deprecated tags immediately:
 - `<center>` → `<div style="text-align: center;">`
 - `border=1` → `style="border: 1px solid #000; border-collapse: collapse;"`
 
+## Local Database Command Line Access
+**Always use MAMP's mysql client** (Homebrew's client has auth plugin incompatibility):
+```bash
+/Applications/MAMP/Library/bin/mysql80/bin/mysql \
+  --socket=/Applications/MAMP/tmp/mysql/mysql.sock \
+  -u root -p'root' \
+  iblhoops_ibl5 \
+  -e "YOUR SQL QUERY HERE"
+```
+
 ## Quick Reference
 | Task | Command |
 |------|---------|
 | Run tests | `cd ibl5 && vendor/bin/phpunit` |
 | Schema | `ibl5/schema.sql` |
 | Stats formatting | `BasketballStats\StatsFormatter` |
+| MySQL CLI | `/Applications/MAMP/Library/bin/mysql80/bin/mysql --socket=/Applications/MAMP/tmp/mysql/mysql.sock -u root -p'root' iblhoops_ibl5` |
 
 **Detailed specifications in `.github/skills/` (auto-loaded by task).**

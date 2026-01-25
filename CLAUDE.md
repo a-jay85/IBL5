@@ -52,6 +52,44 @@ Classes autoload from `ibl5/classes/`. Never use `require_once`.
 - Use `$mysqli_db` (modern MySQLi) over legacy `$db`
 - 52 InnoDB tables with foreign keys, 84 legacy MyISAM tables
 
+### Local MAMP Database Connection
+
+**Connection Details:**
+- Host: `localhost` or `127.0.0.1`
+- Port: `3306`
+- Database: `iblhoops_ibl5`
+- Socket: `/Applications/MAMP/tmp/mysql/mysql.sock`
+- Credentials: See `ibl5/config.php` (`$dbuname`, `$dbpass`)
+
+**PHP Connection (app standard):**
+```php
+// Via app bootstrap (standard way)
+require_once 'autoloader.php';
+include 'config.php';
+include 'db/db.php';
+// $mysqli_db and $db are now available globally
+```
+
+**PHP Connection (for tests/standalone):**
+```php
+// Use DatabaseConnection helper class
+require_once 'classes/DatabaseConnection.php';
+$player = DatabaseConnection::fetchRow("SELECT * FROM ibl_plr WHERE pid = ?", [123]);
+$players = DatabaseConnection::fetchAll("SELECT * FROM ibl_plr LIMIT 10");
+$count = DatabaseConnection::fetchValue("SELECT COUNT(*) FROM ibl_plr");
+```
+
+**Command Line Access:**
+```bash
+# IMPORTANT: Use MAMP's mysql client, NOT Homebrew mysql
+/Applications/MAMP/Library/bin/mysql80/bin/mysql \
+  --socket=/Applications/MAMP/tmp/mysql/mysql.sock \
+  -u root -p'root' \
+  iblhoops_ibl5
+```
+
+**Why MAMP's client?** Homebrew's mysql client has authentication plugin incompatibility with MAMP's MySQL 8.0 server. Always use `/Applications/MAMP/Library/bin/mysql80/bin/mysql`.
+
 ## Mandatory Rules
 
 ### XSS Protection
@@ -91,5 +129,6 @@ Context-aware rules auto-load when relevant:
 | Schema | `ibl5/schema.sql` |
 | Development status | `DEVELOPMENT_GUIDE.md` |
 | Database guide | `DATABASE_GUIDE.md` |
+| MAMP connection | `ibl5/MAMP_DATABASE_CONNECTION.md` |
 | API patterns | `API_GUIDE.md` |
 | Interface examples | `classes/Player/Contracts/`, `classes/FreeAgency/Contracts/` |

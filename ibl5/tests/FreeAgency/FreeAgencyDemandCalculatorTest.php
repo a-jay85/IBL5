@@ -1,5 +1,6 @@
 <?php
 
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use FreeAgency\FreeAgencyDemandCalculator;
 use FreeAgency\Contracts\FreeAgencyDemandRepositoryInterface;
@@ -40,6 +41,7 @@ class MockDemandRepository implements FreeAgencyDemandRepositoryInterface
  * - Position salary commitment
  * - Random variance
  */
+#[AllowMockObjectsWithoutExpectations]
 class FreeAgencyDemandCalculatorTest extends TestCase
 {
     private MockDemandRepository $mockRepository;

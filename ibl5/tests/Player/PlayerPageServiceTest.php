@@ -180,20 +180,15 @@ class PlayerPageServiceTest extends TestCase
         string $teamName = 'Test Team',
         bool $canRookieOpt = false
     ): Player {
-        $player = new Player();
-        $player->teamName = $teamName;
-        
-        // Set up mock behavior by creating a test double
-        $testDouble = $this->getMockBuilder(Player::class)
-            ->onlyMethods(['wasRookieOptioned', 'canRenegotiateContract', 'canRookieOption'])
-            ->getMock();
-        
-        $testDouble->method('wasRookieOptioned')->willReturn($wasRookieOptioned);
-        $testDouble->method('canRenegotiateContract')->willReturn($canRenegotiate);
-        $testDouble->method('canRookieOption')->willReturn($canRookieOpt);
-        $testDouble->teamName = $teamName;
-        
-        return $testDouble;
+        // Use createStub since we're only configuring return values, not verifying expectations
+        $stub = $this->createStub(Player::class);
+
+        $stub->method('wasRookieOptioned')->willReturn($wasRookieOptioned);
+        $stub->method('canRenegotiateContract')->willReturn($canRenegotiate);
+        $stub->method('canRookieOption')->willReturn($canRookieOpt);
+        $stub->teamName = $teamName;
+
+        return $stub;
     }
 
     private function createMockTeam(string $name, int $hasUsedExtension): object

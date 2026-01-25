@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\NextSim;
 
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use NextSim\NextSimView;
 use NextSim\Contracts\NextSimViewInterface;
@@ -15,6 +16,7 @@ use NextSim\Contracts\NextSimViewInterface;
  *
  * @covers \NextSim\NextSimView
  */
+#[AllowMockObjectsWithoutExpectations]
 class NextSimViewTest extends TestCase
 {
     public function testImplementsNextSimViewInterface(): void

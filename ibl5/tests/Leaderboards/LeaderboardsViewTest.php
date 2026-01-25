@@ -42,7 +42,7 @@ final class LeaderboardsViewTest extends TestCase
         
         // Check that selected values are marked
         $this->assertStringContainsString('value="50"', $html);
-        $this->assertStringContainsString('SELECTED', $html);
+        $this->assertStringContainsString('selected', $html);
         
         // Check that HTML is properly escaped
         $this->assertStringNotContainsString('<script>', $html);
@@ -67,7 +67,7 @@ final class LeaderboardsViewTest extends TestCase
         $this->assertStringContainsString('<h2', $html);
         $this->assertStringContainsString('Leaderboards Display', $html);
         $this->assertStringContainsString('<table', $html);
-        $this->assertStringContainsString('class="sortable"', $html);
+        $this->assertStringContainsString('sortable', $html);
         
         // Check that all stat columns are present
         $this->assertStringContainsString('>Rank<', $html);
@@ -115,8 +115,8 @@ final class LeaderboardsViewTest extends TestCase
         // Check that rank is displayed
         $this->assertStringContainsString('>1<', $html);
         
-        // Check that player link is created
-        $this->assertStringContainsString('href="modules.php?name=Player&pa=showpage&pid=123"', $html);
+        // Check that player link is created (& properly encoded as &amp; in HTML)
+        $this->assertStringContainsString('href="modules.php?name=Player&amp;pa=showpage&amp;pid=123"', $html);
         $this->assertStringContainsString('>Test Player<', $html);
         
         // Check that stats are displayed
@@ -163,10 +163,10 @@ final class LeaderboardsViewTest extends TestCase
     {
         $html = $this->view->renderTableFooter();
 
-        // Check that table is closed
+        // Check that table is closed (footer only closes tbody, table, and container div)
+        $this->assertStringContainsString('</tbody>', $html);
         $this->assertStringContainsString('</table>', $html);
-        $this->assertStringContainsString('</td>', $html);
-        $this->assertStringContainsString('</tr>', $html);
+        $this->assertStringContainsString('</div>', $html);
     }
 
     public function testRenderPlayerRowHandlesRetiredPlayer(): void

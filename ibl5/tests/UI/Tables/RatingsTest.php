@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\UI\Tables;
 
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use UI\Tables\Ratings;
 use Player\Player;
@@ -16,6 +17,7 @@ use Player\Player;
  *
  * @covers \UI\Tables\Ratings
  */
+#[AllowMockObjectsWithoutExpectations]
 class RatingsTest extends TestCase
 {
     /**

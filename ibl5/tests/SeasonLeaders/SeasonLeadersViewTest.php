@@ -22,15 +22,15 @@ final class SeasonLeadersViewTest extends TestCase
     {
         $html = $this->view->renderTableHeader();
 
-        // Check for essential column headers (now using <strong> tags)
-        $this->assertStringContainsString('<strong>Rank</strong>', $html);
-        $this->assertStringContainsString('<strong>Year</strong>', $html);
-        $this->assertStringContainsString('<strong>Name</strong>', $html);
-        $this->assertStringContainsString('<strong>Team</strong>', $html);
-        $this->assertStringContainsString('<strong>ppg</strong>', $html);
-        $this->assertStringContainsString('<strong>qa</strong>', $html);
-        // Check for CSS background color instead of deprecated bgcolor attribute
-        $this->assertStringContainsString('background-color: #C2D69A', $html);
+        // Check for essential column headers (modern <th> tags)
+        $this->assertStringContainsString('>Rank<', $html);
+        $this->assertStringContainsString('>Year<', $html);
+        $this->assertStringContainsString('>Name<', $html);
+        $this->assertStringContainsString('>Team<', $html);
+        $this->assertStringContainsString('>ppg<', $html);
+        $this->assertStringContainsString('>qa<', $html);
+        // Check for sortable table class
+        $this->assertStringContainsString('sortable', $html);
     }
 
     public function testRenderPlayerRowFormatsCorrectly(): void
@@ -65,15 +65,15 @@ final class SeasonLeadersViewTest extends TestCase
 
         $html = $this->view->renderPlayerRow($stats, 1);
 
-        // Check rank
-        $this->assertStringContainsString('<td>1.</td>', $html);
+        // Check rank (with class attribute)
+        $this->assertStringContainsString('>1.</td>', $html);
 
-        // Check player link
-        $this->assertStringContainsString('modules.php?name=Player&pa=showpage&pid=123', $html);
+        // Check player link (& properly encoded as &amp; in HTML)
+        $this->assertStringContainsString('modules.php?name=Player&amp;pa=showpage&amp;pid=123', $html);
         $this->assertStringContainsString('Test Player', $html);
 
-        // Check team link
-        $this->assertStringContainsString('modules.php?name=Team&op=team&teamID=1', $html);
+        // Check team link (& properly encoded as &amp; in HTML)
+        $this->assertStringContainsString('modules.php?name=Team&amp;op=team&amp;teamID=1', $html);
         $this->assertStringContainsString('Test Team', $html);
 
         // Check some stats are displayed
@@ -82,48 +82,20 @@ final class SeasonLeadersViewTest extends TestCase
         $this->assertStringContainsString('0.500', $html); // FG%
     }
 
-    public function testRenderPlayerRowAlternatesBackgroundColors(): void
+    public function testRenderTableHeaderUsesNthChildForRowAlternation(): void
     {
-        $stats = [
-            'pid' => 123,
-            'name' => 'Test Player',
-            'year' => 2024,
-            'teamname' => 'Test Team',
-            'teamid' => 1,
-            'games' => 10,
-            'mpg' => '30.0',
-            'fgmpg' => '5.0',
-            'fgapg' => '10.0',
-            'fgp' => '0.500',
-            'ftmpg' => '2.0',
-            'ftapg' => '2.5',
-            'ftp' => '0.800',
-            'tgmpg' => '1.5',
-            'tgapg' => '4.0',
-            'tgp' => '0.375',
-            'orbpg' => '3.0',
-            'rpg' => '8.0',
-            'apg' => '4.0',
-            'spg' => '1.0',
-            'tpg' => '1.5',
-            'bpg' => '0.5',
-            'fpg' => '2.0',
-            'ppg' => '13.5',
-            'qa' => '23.5'
-        ];
-
-        // Odd rank should have DDDDDD background (CSS style instead of bgcolor)
-        $html1 = $this->view->renderPlayerRow($stats, 1);
-        $this->assertStringContainsString('background-color: #DDDDDD', $html1);
-
-        // Even rank should have FFFFFF background (CSS style instead of bgcolor)
-        $html2 = $this->view->renderPlayerRow($stats, 2);
-        $this->assertStringContainsString('background-color: #FFFFFF', $html2);
+        // Row alternation is handled via CSS nth-child in the style block
+        $html = $this->view->renderTableHeader();
+        $this->assertStringContainsString('nth-child(odd)', $html);
+        $this->assertStringContainsString('nth-child(even)', $html);
     }
 
-    public function testRenderTableFooterReturnsClosingTag(): void
+    public function testRenderTableFooterReturnsClosingTags(): void
     {
         $html = $this->view->renderTableFooter();
-        $this->assertEquals('</table>', $html);
+        // Footer closes tbody, table, and container div
+        $this->assertStringContainsString('</tbody>', $html);
+        $this->assertStringContainsString('</table>', $html);
+        $this->assertStringContainsString('</div>', $html);
     }
 }

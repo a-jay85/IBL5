@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\PowerRankings;
 
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use PowerRankings\PowerRankingsRepository;
 use PowerRankings\Contracts\PowerRankingsRepositoryInterface;
@@ -16,6 +17,7 @@ use PowerRankings\Contracts\PowerRankingsRepositoryInterface;
  *
  * @covers \PowerRankings\PowerRankingsRepository
  */
+#[AllowMockObjectsWithoutExpectations]
 class PowerRankingsRepositoryTest extends TestCase
 {
     public function testImplementsPowerRankingsRepositoryInterface(): void

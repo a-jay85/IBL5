@@ -1,17 +1,19 @@
 <?php
 
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use FreeAgency\FreeAgencyCapCalculator;
 
 /**
  * Comprehensive tests for FreeAgencyCapCalculator
- * 
+ *
  * Tests salary cap and roster spot calculations for free agency:
  * - Multi-year cap space calculations
  * - Soft cap and hard cap tracking
  * - Roster spot availability
  * - Contract offers impact on cap space
  */
+#[AllowMockObjectsWithoutExpectations]
 class FreeAgencyCapCalculatorTest extends TestCase
 {
     private $mockDb;

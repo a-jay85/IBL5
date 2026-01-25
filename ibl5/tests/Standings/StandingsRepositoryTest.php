@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Standings;
 
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use Standings\StandingsRepository;
 use Standings\Contracts\StandingsRepositoryInterface;
@@ -13,6 +14,7 @@ use Standings\Contracts\StandingsRepositoryInterface;
  *
  * @covers \Standings\StandingsRepository
  */
+#[AllowMockObjectsWithoutExpectations]
 class StandingsRepositoryTest extends TestCase
 {
     public function testImplementsStandingsRepositoryInterface(): void

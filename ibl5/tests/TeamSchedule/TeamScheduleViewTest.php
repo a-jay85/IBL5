@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\TeamSchedule;
 
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use TeamSchedule\TeamScheduleView;
 
@@ -16,6 +17,7 @@ use TeamSchedule\TeamScheduleView;
  * - Game rows with win/loss formatting
  * - Month headers
  */
+#[AllowMockObjectsWithoutExpectations]
 class TeamScheduleViewTest extends TestCase
 {
     private TeamScheduleView $view;

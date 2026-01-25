@@ -46,7 +46,7 @@ class InjuriesViewTest extends TestCase
     {
         $result = $this->view->render([]);
 
-        $this->assertStringContainsString('INJURED PLAYERS', $result);
+        $this->assertStringContainsString('Injured Players', $result);
     }
 
     public function testRenderContainsTableHeaders(): void
@@ -56,7 +56,7 @@ class InjuriesViewTest extends TestCase
         $this->assertStringContainsString('Pos', $result);
         $this->assertStringContainsString('Player', $result);
         $this->assertStringContainsString('Team', $result);
-        $this->assertStringContainsString('Days Injured', $result);
+        $this->assertStringContainsString('>Days<', $result);
     }
 
     public function testRenderWithInjuredPlayersData(): void
@@ -148,9 +148,9 @@ class InjuriesViewTest extends TestCase
 
         $result = $this->view->render($injuredPlayers);
 
-        // Should contain alternating row classes
-        $this->assertStringContainsString('injuries-row-even', $result);
-        $this->assertStringContainsString('injuries-row-odd', $result);
+        // CSS nth-child selectors in style block handle row alternation
+        $this->assertStringContainsString('nth-child(odd)', $result);
+        $this->assertStringContainsString('nth-child(even)', $result);
     }
 
     public function testRenderEscapesHtmlEntities(): void

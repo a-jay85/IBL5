@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\FranchiseHistory;
 
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use FranchiseHistory\FranchiseHistoryRepository;
 use FranchiseHistory\Contracts\FranchiseHistoryRepositoryInterface;
@@ -16,6 +17,7 @@ use FranchiseHistory\Contracts\FranchiseHistoryRepositoryInterface;
  *
  * @covers \FranchiseHistory\FranchiseHistoryRepository
  */
+#[AllowMockObjectsWithoutExpectations]
 class FranchiseHistoryRepositoryTest extends TestCase
 {
     private FranchiseHistoryRepository $repository;

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\DepthChart;
 
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use DepthChart\DepthChartRepository;
 use DepthChart\DepthChartProcessor;
@@ -15,6 +16,7 @@ use DepthChart\DepthChartView;
  * 2. Database storage (after submission)
  * 3. CSV/TXT export (generated file content)
  */
+#[AllowMockObjectsWithoutExpectations]
 class DepthChartIntegrationTest extends TestCase
 {
     private $mockDb;

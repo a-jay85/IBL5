@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use PlayerAwards\PlayerAwardsView;
 use PlayerAwards\PlayerAwardsService;
@@ -10,9 +11,10 @@ use PlayerAwards\Contracts\PlayerAwardsRepositoryInterface;
 
 /**
  * Tests for PlayerAwardsView
- * 
+ *
  * Verifies HTML rendering for player awards search interface.
  */
+#[AllowMockObjectsWithoutExpectations]
 final class PlayerAwardsViewTest extends TestCase
 {
     private PlayerAwardsView $view;

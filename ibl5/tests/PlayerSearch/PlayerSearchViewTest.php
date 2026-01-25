@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use PlayerSearch\PlayerSearchService;
 use PlayerSearch\PlayerSearchValidator;
@@ -12,9 +13,10 @@ use Player\PlayerData;
 
 /**
  * Tests for PlayerSearchView
- * 
+ *
  * Tests HTML rendering functionality for player search.
  */
+#[AllowMockObjectsWithoutExpectations]
 final class PlayerSearchViewTest extends TestCase
 {
     private PlayerSearchView $view;

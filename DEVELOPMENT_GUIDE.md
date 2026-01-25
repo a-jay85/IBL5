@@ -1,6 +1,6 @@
 # Development Guide
 
-**Status:** 30/30 IBL modules refactored (100% complete) ✅ • 1444 tests • ~68% coverage • Goal: 80%
+**Status:** 30/30 IBL modules refactored (100% complete) ✅ • 1484 tests • ~69% coverage • Goal: 80%
 
 > 📘 **Progressive Loading:** Detailed workflows are in `.claude/rules/` and `.github/skills/`. See [SKILLS_GUIDE.md](.github/SKILLS_GUIDE.md).
 
@@ -12,10 +12,10 @@
 
 ### 🚀 Post-Refactoring Phase
 
-1. **Test Coverage → 80%** - Strong progress with 1444 tests (~68% coverage). PR #158 added 365 unit tests, PR #159 added 38 integration test methods across 5 critical workflows. **Next Steps:** Add 15-20 integration tests for high-priority user workflows (Waivers, DepthChart, RookieOption) and expand edge case coverage in existing modules to reach 80% goal.
+1. **Test Coverage → 80%** - Strong progress with 1484 tests (~69% coverage). PR #158 added 365 unit tests, PR #159 added 38 integration test methods across 5 critical workflows. Waivers integration tests completed with 25 test methods. **Next Steps:** Add integration tests for remaining high-priority workflows (DepthChart, RookieOption) and expand edge case coverage in existing modules to reach 80% goal.
 
    **Priority Integration Tests Needed:**
-   - **HIGH**: Waivers (add/drop workflow with cap validation, waiver wire timing)
+   - ~~**HIGH**: Waivers (add/drop workflow with cap validation, waiver wire timing)~~ ✅ Complete
    - **MEDIUM**: DepthChart (submission with position validation, injured player handling)
    - **MEDIUM**: RookieOption (option exercise with eligibility checks, contract updates)
    - **MEDIUM**: Standings/Schedule (calculation accuracy, tie-breaking logic)
@@ -29,6 +29,33 @@
 ---
 
 ## Recent Updates
+
+### Waivers Integration Tests Added (Jan 25, 2026)
+
+**Impact:** Added 25 integration test methods for complete waiver wire workflow coverage
+
+**Integration Test Coverage:**
+- **Waivers Integration:** WaiversIntegrationTest (25 test methods)
+  - Drop to waivers: Success scenarios, validation failures, database error handling
+  - Add from waivers: Existing contract preservation, veteran minimum assignment
+  - Validation: Cap violations (hard cap limits), roster slot constraints, player ID validation
+  - Contract determination: Existing contract detection, Free Agency phase handling
+  - Waiver timing: 24-hour wait period calculations, countdown formatting
+  - Veteran minimum: Salary calculation based on experience
+
+**Test Categories:**
+- Drop success scenarios (3 tests)
+- Drop failure scenarios (2 tests)
+- Add success scenarios (4 tests)
+- Add failure scenarios (5 tests)
+- Contract determination (3 tests)
+- Waiver wait time (4 tests)
+- Veteran minimum calculation (2 tests)
+- Validator error handling (2 tests)
+
+**Status:** All 1484 tests passing ✅ Waivers module now has comprehensive integration test coverage following TestDataFactory pattern
+
+---
 
 ### Integration Tests Added (Jan 12, 2026 - PR #159)
 
@@ -49,7 +76,7 @@
 - Enhanced autoloader.php to support Tests\ namespace
 - All tests use @covers annotations for accurate coverage measurement
 
-**Status:** All 1444 tests passing ✅ Integration infrastructure complete with TestDataFactory pattern enabling consistent fixture creation across all integration test suites
+**Status:** Integration infrastructure complete with TestDataFactory pattern enabling consistent fixture creation across all integration test suites
 
 ---
 

@@ -292,7 +292,7 @@ class NavigationView
         $externalIcon = $external ? ' <svg class="w-3 h-3 opacity-40 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>' : '';
         $badgeHtml = $badge ? ' <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-accent-500 text-white ml-2 tracking-wide">' . HtmlSanitizer::safeHtmlOutput($badge) . '</span>' : '';
 
-        return '<a href="' . $url . '"' . $target . ' class="nav-dropdown-item block px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 transition-all duration-150 border-l-2 border-transparent hover:border-accent-500">'
+        return '<a href="' . $url . '"' . $target . ' class="nav-dropdown-item block px-4 py-2 text-[13px] text-gray-300 hover:text-white hover:bg-white/5 transition-all duration-150 border-l-2 border-transparent hover:border-accent-500">'
             . '<span class="flex items-center justify-between">'
             . '<span>' . $label . $badgeHtml . '</span>'
             . $externalIcon
@@ -314,7 +314,7 @@ class NavigationView
         $icon = $data['icon'] ?? '';
 
         $html = '<div class="relative group">';
-        $html .= '<button class="flex items-center gap-2 px-3 py-3 text-sm font-medium text-gray-300 hover:text-white transition-colors duration-200">';
+        $html .= '<button class="flex items-center gap-2 px-3 py-2.5 text-[15px] font-semibold font-display text-gray-300 hover:text-white transition-colors duration-200">';
         if ($icon) {
             $html .= '<span class="text-accent-500 group-hover:text-accent-400 transition-colors">' . $icon . '</span>';
         }
@@ -388,12 +388,12 @@ class NavigationView
         $icon = $data['icon'] ?? '';
 
         $html = '<div class="mobile-section">';
-        $html .= '<button class="mobile-dropdown-btn w-full flex items-center justify-between px-5 py-4 text-white hover:bg-white/5 transition-colors">';
+        $html .= '<button class="mobile-dropdown-btn w-full flex items-center justify-between px-5 py-3.5 text-white hover:bg-white/5 transition-colors">';
         $html .= '<span class="flex items-center gap-3">';
         if ($icon) {
             $html .= '<span class="text-accent-500">' . $icon . '</span>';
         }
-        $html .= '<span class="font-medium">' . HtmlSanitizer::safeHtmlOutput($title) . '</span>';
+        $html .= '<span class="font-display text-base font-semibold">' . HtmlSanitizer::safeHtmlOutput($title) . '</span>';
         $html .= '</span>';
         $html .= '<svg class="dropdown-arrow w-4 h-4 text-gray-500 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>';
         $html .= '</button>';
@@ -417,7 +417,7 @@ class NavigationView
             $externalIcon = $external ? ' <svg class="w-3 h-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>' : '';
             $badgeHtml = $badge ? ' <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-accent-500 text-white ml-2">' . HtmlSanitizer::safeHtmlOutput($badge) . '</span>' : '';
 
-            $html .= '<a href="' . $url . '"' . $target . ' class="flex items-center justify-between px-5 py-3 pl-12 text-sm text-gray-400 hover:text-white hover:bg-white/5 border-l-2 border-transparent hover:border-accent-500 transition-all">'
+            $html .= '<a href="' . $url . '"' . $target . ' class="flex items-center justify-between px-5 py-2.5 pl-14 text-[13px] text-gray-400 hover:text-white hover:bg-white/5 border-l-2 border-transparent hover:border-accent-500 transition-all">'
                 . '<span>' . $label . $badgeHtml . '</span>'
                 . $externalIcon
                 . '</a>';

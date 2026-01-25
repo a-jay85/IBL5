@@ -4,10 +4,10 @@
  * Loaded by Nuke\Header::head() in the <head> section
  */
 
-// Google Fonts - Bebas Neue for logo, Plus Jakarta Sans for body
+// Google Fonts - Barlow Condensed for display, Barlow for body
 echo '<link rel="preconnect" href="https://fonts.googleapis.com">';
 echo '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>';
-echo '<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">';
+echo '<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">';
 
 // Tailwind CSS via CDN with custom config
 echo '<script src="https://cdn.tailwindcss.com"></script>';
@@ -16,8 +16,8 @@ tailwind.config = {
     theme: {
         extend: {
             fontFamily: {
-                display: ["Bebas Neue", "sans-serif"],
-                sans: ["Plus Jakarta Sans", "system-ui", "sans-serif"],
+                display: ["Barlow Condensed", "sans-serif"],
+                sans: ["Barlow", "system-ui", "sans-serif"],
             },
             colors: {
                 navy: {
@@ -63,7 +63,7 @@ echo '<script src="' . ($relativePath ?? '') . 'jslib/navigation.js" defer></scr
 echo '<style>
 body {
     padding-top: 64px !important;
-    font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+    font-family: "Barlow", system-ui, sans-serif;
 }
 
 /* Navigation link colors for accessibility - override browser defaults */

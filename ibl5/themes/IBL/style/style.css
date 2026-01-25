@@ -1,5 +1,5 @@
 /* Load Google Fonts - must be at top of stylesheet */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=swap');
 
 /* ==========================================================================
    IBL5 Design System - Modern Sports Editorial Theme
@@ -32,8 +32,8 @@
     --gray-900: #111827;
 
     /* Typography */
-    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    --font-display: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-sans: 'Barlow', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-display: 'Barlow Condensed', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 
     /* Spacing */

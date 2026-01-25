@@ -27,179 +27,166 @@ OpenTable();
 global $mysqli_db;
 $season = new Season($mysqli_db);
 $league = new League($mysqli_db);
+$commonRepository = new Services\CommonMysqliRepository($mysqli_db);
 
-// Find current week for "jump to" functionality
 $lastSimEndDate = $season->lastSimEndDate;
 $simLengthDays = $league->getSimLengthInDays();
+$projectedNextSimEnd = date('Y-m-d', strtotime($lastSimEndDate . ' + ' . $simLengthDays . ' days'));
 
-$min_date_query = "SELECT MIN(Date) as mindate FROM ibl_schedule";
-$min_date_result = $db->sql_query($min_date_query);
-$row = $db->sql_fetch_assoc($min_date_result);
-$min_date = $row['mindate'];
+// Get all games
+$query = "SELECT * FROM ibl_schedule ORDER BY Date ASC, SchedID ASC";
+$result = $db->sql_query($query);
+$num = $db->sql_numrows($result);
 
-$max_date_query = "SELECT MAX(Date) as maxdate FROM ibl_schedule";
-$max_date_result = $db->sql_query($max_date_query);
-$row2 = $db->sql_fetch_assoc($max_date_result);
-$max_date = $row2['maxdate'];
-$max_date = fnc_date_calc($max_date, 0);
+// Get team records
+$teamRecordsQuery = "SELECT tid, leagueRecord FROM ibl_standings ORDER BY tid ASC";
+$teamRecordsResult = $db->sql_query($teamRecordsQuery);
+$teamRecords = [];
+while ($row = $db->sql_fetch_assoc($teamRecordsResult)) {
+    $teamRecords[$row['tid']] = $row['leagueRecord'];
+}
 
-// Calculate which week number contains the last sim date
-$currentWeek = 1;
-$chunk_start = $min_date;
-$weekNum = 0;
-while ($chunk_start < $max_date) {
-    $weekNum++;
-    if (strtotime($lastSimEndDate) >= strtotime($chunk_start) &&
-        strtotime($lastSimEndDate) <= strtotime(fnc_date_calc($chunk_start, 6))) {
-        $currentWeek = $weekNum;
+// Organize games by month and date
+$gamesByMonth = [];
+$months = [];
+$firstUnplayedId = null;
+
+$i = 0;
+while ($i < $num) {
+    $date = $db->sql_result($result, $i, "Date");
+    $visitor = $db->sql_result($result, $i, "Visitor");
+    $visitorScore = $db->sql_result($result, $i, "VScore");
+    $home = $db->sql_result($result, $i, "Home");
+    $homeScore = $db->sql_result($result, $i, "HScore");
+    $boxid = $db->sql_result($result, $i, "BoxID");
+
+    $monthKey = date('Y-m', strtotime($date));
+    $monthLabel = date('F', strtotime($date));
+
+    if (!isset($gamesByMonth[$monthKey])) {
+        $gamesByMonth[$monthKey] = [];
+        $months[$monthKey] = $monthLabel;
     }
-    if ($weekNum == 13) {
-        $chunk_start = fnc_date_calc($chunk_start, 11);
-    } else {
-        $chunk_start = fnc_date_calc($chunk_start, 7);
+
+    if (!isset($gamesByMonth[$monthKey][$date])) {
+        $gamesByMonth[$monthKey][$date] = [];
     }
+
+    $isUnplayed = ($visitorScore == $homeScore && strtotime($date) <= strtotime($projectedNextSimEnd));
+
+    // Track first unplayed game
+    if ($isUnplayed && $firstUnplayedId === null) {
+        $firstUnplayedId = 'game-' . $boxid;
+    }
+
+    $gamesByMonth[$monthKey][$date][] = [
+        'date' => $date,
+        'visitor' => $visitor,
+        'visitorScore' => $visitorScore,
+        'visitorTeam' => $commonRepository->getTeamnameFromTeamID($visitor),
+        'visitorRecord' => $teamRecords[$visitor] ?? '',
+        'home' => $home,
+        'homeScore' => $homeScore,
+        'homeTeam' => $commonRepository->getTeamnameFromTeamID($home),
+        'homeRecord' => $teamRecords[$home] ?? '',
+        'boxid' => $boxid,
+        'isUnplayed' => $isUnplayed,
+        'visitorWon' => ($visitorScore > $homeScore),
+        'homeWon' => ($homeScore > $visitorScore),
+    ];
+
+    $i++;
 }
 
 // Output schedule container
 echo '<div class="schedule-container">';
 
-// Header with jump button
+// Header with month nav and jump button
 echo '<div class="schedule-header">';
 echo '<h1 class="schedule-title">Schedule</h1>';
-echo '<a href="#week-' . $currentWeek . '" class="schedule-jump-btn" onclick="smoothScrollToWeek(event, ' . $currentWeek . ')">';
-echo '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12l7 7 7-7"/></svg>';
-echo 'Current Week';
-echo '</a>';
+if ($firstUnplayedId) {
+    echo '<a href="#' . $firstUnplayedId . '" class="schedule-jump-btn" onclick="scrollToNextGames(event)">';
+    echo '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12l7 7 7-7"/></svg>';
+    echo 'Next Games';
+    echo '</a>';
+}
 echo '</div>';
 
-$chunk_start_date = $min_date;
-$chunk_end_date = fnc_date_calc($min_date, 6);
+// Month navigation
+echo '<nav class="schedule-months">';
+foreach ($months as $key => $label) {
+    $abbrev = date('M', strtotime($key . '-01')); // 3-letter abbreviation
+    echo '<a href="#month-' . $key . '" class="schedule-months__link">';
+    echo '<span class="schedule-months__full">' . $label . '</span>';
+    echo '<span class="schedule-months__abbr">' . $abbrev . '</span>';
+    echo '</a>';
+}
+echo '</nav>';
 
-$i = 0;
-while ($chunk_start_date < $max_date) {
-    $i++;
-    chunk($chunk_start_date, $chunk_end_date, $i, $currentWeek, $lastSimEndDate, $simLengthDays);
-    if ($i == 13) {
-        $chunk_start_date = fnc_date_calc($chunk_start_date, 11);
-        $chunk_end_date = fnc_date_calc($chunk_start_date, 6);
-    } else {
-        $chunk_start_date = fnc_date_calc($chunk_start_date, 7);
-        $chunk_end_date = fnc_date_calc($chunk_start_date, 6);
+// Output games by month
+foreach ($gamesByMonth as $monthKey => $dates) {
+    $monthLabel = $months[$monthKey];
+
+    echo '<div class="schedule-month" id="month-' . $monthKey . '">';
+    echo '<div class="schedule-month__header">' . $monthLabel . '</div>';
+
+    foreach ($dates as $date => $games) {
+        $dayName = date('D', strtotime($date));
+        $dayNum = date('j', strtotime($date));
+
+        echo '<div class="schedule-day">';
+        echo '<div class="schedule-day__header">';
+        echo '<span class="schedule-day__name">' . $dayName . '</span>';
+        echo '<span class="schedule-day__num">' . $dayNum . '</span>';
+        echo '</div>';
+
+        echo '<div class="schedule-day__games">';
+        foreach ($games as $game) {
+            $gameClass = 'schedule-game';
+            if ($game['isUnplayed']) {
+                $gameClass .= ' schedule-game--upcoming';
+            }
+
+            $gameId = 'game-' . $game['boxid'];
+
+            echo '<a href="ibl/IBL/box' . \Utilities\HtmlSanitizer::safeHtmlOutput($game['boxid']) . '.htm" class="' . $gameClass . '" id="' . $gameId . '">';
+
+            // Visitor
+            $vClass = $game['visitorWon'] ? ' schedule-game__team--win' : '';
+            echo '<span class="schedule-game__team' . $vClass . '">' . \Utilities\HtmlSanitizer::safeHtmlOutput($game['visitorTeam']) . '</span>';
+            echo '<span class="schedule-game__score' . $vClass . '">' . ($game['isUnplayed'] ? '–' : \Utilities\HtmlSanitizer::safeHtmlOutput($game['visitorScore'])) . '</span>';
+
+            echo '<span class="schedule-game__vs">@</span>';
+
+            // Home
+            $hClass = $game['homeWon'] ? ' schedule-game__team--win' : '';
+            echo '<span class="schedule-game__score' . $hClass . '">' . ($game['isUnplayed'] ? '–' : \Utilities\HtmlSanitizer::safeHtmlOutput($game['homeScore'])) . '</span>';
+            echo '<span class="schedule-game__team' . $hClass . '">' . \Utilities\HtmlSanitizer::safeHtmlOutput($game['homeTeam']) . '</span>';
+
+            echo '</a>';
+        }
+        echo '</div>'; // day__games
+        echo '</div>'; // day
     }
+
+    echo '</div>'; // month
 }
 
-echo '</div>'; // Close schedule-container
+echo '</div>'; // schedule-container
 
-// Smooth scroll script
+// Scroll script - centers the first unplayed game
 echo '<script>
-function smoothScrollToWeek(e, weekNum) {
+function scrollToNextGames(e) {
     e.preventDefault();
-    var el = document.getElementById("week-" + weekNum);
+    var el = document.getElementById("' . ($firstUnplayedId ?? '') . '");
     if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "start" });
+        var rect = el.getBoundingClientRect();
+        var scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        var targetY = scrollTop + rect.top - (window.innerHeight / 2) + (rect.height / 2);
+        window.scrollTo({ top: targetY, behavior: "smooth" });
     }
 }
 </script>';
 
 CloseTable();
 Nuke\Footer::footer();
-
-function chunk($chunk_start_date, $chunk_end_date, $j, $currentWeek, $lastSimEndDate, $simLengthDays)
-{
-    global $db, $mysqli_db;
-    $commonRepository = new Services\CommonMysqliRepository($mysqli_db);
-
-    $query = "SELECT *
-		FROM ibl_schedule
-		WHERE Date BETWEEN '$chunk_start_date' AND '$chunk_end_date'
-		ORDER BY SchedID ASC";
-    $result = $db->sql_query($query);
-    $num = $db->sql_numrows($result);
-
-    if ($num == 0) {
-        return;
-    }
-
-    $teamSeasonRecordsQuery = "SELECT tid, leagueRecord FROM ibl_standings ORDER BY tid ASC;";
-    $teamSeasonRecordsResult = $db->sql_query($teamSeasonRecordsQuery);
-
-    $projectedNextSimEnd = date('Y/m/d', strtotime($lastSimEndDate . ' + ' . $simLengthDays . ' days'));
-
-    // Format week dates for header
-    $weekStart = date('n/j', strtotime($chunk_start_date));
-    $weekEnd = date('n/j', strtotime($chunk_end_date));
-
-    $isCurrentWeek = ($j == $currentWeek);
-    $weekClass = 'schedule-week' . ($isCurrentWeek ? ' schedule-week--current' : '');
-
-    echo '<div class="' . $weekClass . '" id="week-' . $j . '">';
-    echo '<div class="schedule-week__header">';
-    echo '<span class="schedule-week__label">Wk ' . $j . '</span>';
-    echo '<span class="schedule-week__dates">' . $weekStart . '–' . $weekEnd . '</span>';
-    if ($isCurrentWeek) {
-        echo '<span class="schedule-week__current-badge">Current</span>';
-    }
-    echo '</div>';
-
-    echo '<div class="schedule-week__grid">';
-
-    $i = 0;
-    while ($i < $num) {
-        $date = $db->sql_result($result, $i, "Date");
-        $visitor = $db->sql_result($result, $i, "Visitor");
-        $visitorScore = $db->sql_result($result, $i, "VScore");
-        $home = $db->sql_result($result, $i, "Home");
-        $homeScore = $db->sql_result($result, $i, "HScore");
-        $boxid = $db->sql_result($result, $i, "BoxID");
-
-        $visitorTeamname = $commonRepository->getTeamnameFromTeamID($visitor);
-        $homeTeamname = $commonRepository->getTeamnameFromTeamID($home);
-        $visitorRecord = $db->sql_result($teamSeasonRecordsResult, $visitor - 1, "leagueRecord");
-        $homeRecord = $db->sql_result($teamSeasonRecordsResult, $home - 1, "leagueRecord");
-
-        // Determine game state
-        $isUnplayed = ($visitorScore == $homeScore && strtotime($date) <= strtotime($projectedNextSimEnd));
-        $visitorWon = ($visitorScore > $homeScore);
-        $homeWon = ($homeScore > $visitorScore);
-
-        // Game card classes
-        $gameClass = 'schedule-game';
-        if ($isUnplayed) {
-            $gameClass .= ' schedule-game--upcoming';
-        }
-
-        echo '<a href="ibl/IBL/box' . \Utilities\HtmlSanitizer::safeHtmlOutput($boxid) . '.htm" class="' . $gameClass . '">';
-
-        // Compact date
-        $shortDate = date('n/j', strtotime($date));
-        echo '<span class="schedule-game__date">' . $shortDate . '</span>';
-
-        // Visitor
-        $vClass = $visitorWon ? ' schedule-game__team--win' : '';
-        echo '<span class="schedule-game__team' . $vClass . '">' . \Utilities\HtmlSanitizer::safeHtmlOutput($visitorTeamname) . '</span>';
-        echo '<span class="schedule-game__score' . $vClass . '">' . ($isUnplayed ? '-' : \Utilities\HtmlSanitizer::safeHtmlOutput($visitorScore)) . '</span>';
-
-        echo '<span class="schedule-game__vs">@</span>';
-
-        // Home
-        $hClass = $homeWon ? ' schedule-game__team--win' : '';
-        echo '<span class="schedule-game__score' . $hClass . '">' . ($isUnplayed ? '-' : \Utilities\HtmlSanitizer::safeHtmlOutput($homeScore)) . '</span>';
-        echo '<span class="schedule-game__team' . $hClass . '">' . \Utilities\HtmlSanitizer::safeHtmlOutput($homeTeamname) . '</span>';
-
-        echo '</a>';
-
-        $i++;
-    }
-
-    echo '</div>'; // Close grid
-    echo '</div>'; // Close week
-}
-
-function fnc_date_calc($this_date, $num_days)
-{
-    $my_time = strtotime($this_date);
-    $timestamp = $my_time + ($num_days * 86400);
-    $return_date = date("Y/m/d", $timestamp);
-
-    return $return_date;
-}

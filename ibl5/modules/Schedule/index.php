@@ -148,22 +148,32 @@ foreach ($gamesByMonth as $monthKey => $dates) {
             }
 
             $gameId = 'game-' . $game['boxid'];
+            $boxScoreUrl = 'ibl/IBL/box' . \Utilities\HtmlSanitizer::safeHtmlOutput($game['boxid']) . '.htm';
+            $visitorTeamUrl = 'modules.php?name=Team&amp;op=team&amp;teamID=' . \Utilities\HtmlSanitizer::safeHtmlOutput($game['visitor']);
+            $homeTeamUrl = 'modules.php?name=Team&amp;op=team&amp;teamID=' . \Utilities\HtmlSanitizer::safeHtmlOutput($game['home']);
 
-            echo '<a href="ibl/IBL/box' . \Utilities\HtmlSanitizer::safeHtmlOutput($game['boxid']) . '.htm" class="' . $gameClass . '" id="' . $gameId . '">';
+            echo '<div class="' . $gameClass . '" id="' . $gameId . '">';
 
-            // Visitor
+            // Visitor team + logo (links to team page)
             $vClass = $game['visitorWon'] ? ' schedule-game__team--win' : '';
-            echo '<span class="schedule-game__team' . $vClass . '">' . \Utilities\HtmlSanitizer::safeHtmlOutput($game['visitorTeam']) . '</span>';
-            echo '<span class="schedule-game__score' . $vClass . '">' . ($game['isUnplayed'] ? '–' : \Utilities\HtmlSanitizer::safeHtmlOutput($game['visitorScore'])) . '</span>';
-
-            echo '<span class="schedule-game__vs">@</span>';
-
-            // Home
-            $hClass = $game['homeWon'] ? ' schedule-game__team--win' : '';
-            echo '<span class="schedule-game__score' . $hClass . '">' . ($game['isUnplayed'] ? '–' : \Utilities\HtmlSanitizer::safeHtmlOutput($game['homeScore'])) . '</span>';
-            echo '<span class="schedule-game__team' . $hClass . '">' . \Utilities\HtmlSanitizer::safeHtmlOutput($game['homeTeam']) . '</span>';
-
+            echo '<a href="' . $visitorTeamUrl . '" class="schedule-game__team-link">';
+            echo '<span class="schedule-game__team' . $vClass . '">' . \Utilities\HtmlSanitizer::safeHtmlOutput($game['visitorTeam']) . ' <span class="schedule-game__record">(' . \Utilities\HtmlSanitizer::safeHtmlOutput($game['visitorRecord']) . ')</span></span>';
             echo '</a>';
+            echo '<a href="' . $visitorTeamUrl . '" class="schedule-game__logo-link"><img class="schedule-game__logo" src="images/logo/new' . \Utilities\HtmlSanitizer::safeHtmlOutput($game['visitor']) . '.png" alt=""></a>';
+
+            // Scores + @ (links to box score)
+            echo '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link' . $vClass . '">' . ($game['isUnplayed'] ? '–' : \Utilities\HtmlSanitizer::safeHtmlOutput($game['visitorScore'])) . '</a>';
+            echo '<a href="' . $boxScoreUrl . '" class="schedule-game__vs">@</a>';
+            $hClass = $game['homeWon'] ? ' schedule-game__team--win' : '';
+            echo '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link' . $hClass . '">' . ($game['isUnplayed'] ? '–' : \Utilities\HtmlSanitizer::safeHtmlOutput($game['homeScore'])) . '</a>';
+
+            // Home logo + team (links to team page)
+            echo '<a href="' . $homeTeamUrl . '" class="schedule-game__logo-link"><img class="schedule-game__logo" src="images/logo/new' . \Utilities\HtmlSanitizer::safeHtmlOutput($game['home']) . '.png" alt=""></a>';
+            echo '<a href="' . $homeTeamUrl . '" class="schedule-game__team-link">';
+            echo '<span class="schedule-game__team' . $hClass . '">' . \Utilities\HtmlSanitizer::safeHtmlOutput($game['homeTeam']) . ' <span class="schedule-game__record">(' . \Utilities\HtmlSanitizer::safeHtmlOutput($game['homeRecord']) . ')</span></span>';
+            echo '</a>';
+
+            echo '</div>';
         }
         echo '</div>'; // day__games
         echo '</div>'; // day

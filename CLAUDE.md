@@ -20,7 +20,23 @@ cd ibl5 && vendor/bin/phpunit --filter testMethodName
 
 # Run specific test suite
 cd ibl5 && vendor/bin/phpunit --testsuite "Player Module Tests"
+
+# Show ALL issues (deprecations, warnings, notices, risky tests, etc.)
+cd ibl5 && vendor/bin/phpunit --display-all-issues
+
+# Use specific config (e.g., CI config without local-only tests)
+cd ibl5 && vendor/bin/phpunit -c phpunit.ci.xml
 ```
+
+### PHPUnit 12.x Display Options
+By default, PHPUnit 12.x only shows summary counts for non-failures. Use these flags to see details:
+- `--display-all-issues` - Show ALL issue details (recommended)
+- `--display-deprecations` - Show deprecation details
+- `--display-warnings` - Show warning details
+- `--display-notices` - Show notice details
+- `--display-phpunit-deprecations` - Show PHPUnit deprecation details
+
+**Note:** `-v`/`--verbose` do NOT exist in PHPUnit 12.x. Use `--display-all-issues` instead.
 
 ## Architecture
 

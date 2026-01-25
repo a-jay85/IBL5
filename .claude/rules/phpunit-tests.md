@@ -9,11 +9,18 @@ paths: ibl5/tests/**/*.php
 # ✅ CORRECT commands
 vendor/bin/phpunit tests/Module/
 vendor/bin/phpunit --filter testMethodName
+vendor/bin/phpunit -c phpunit.ci.xml        # Use specific config
+vendor/bin/phpunit --display-all-issues     # Show ALL issues (deprecations, warnings, etc.)
 
-# ❌ WRONG - These options don't exist
+# ❌ WRONG - These options don't exist in PHPUnit 12.x
 vendor/bin/phpunit -v
-vendor/bin/phpunit -c phpunit.xml
+vendor/bin/phpunit --verbose
 ```
+
+## Display Issue Details
+PHPUnit 12.x only shows summary counts by default. To see full details:
+- `--display-all-issues` - **Recommended:** shows everything
+- `--display-deprecations`, `--display-warnings`, `--display-notices` - specific types
 
 ## Test File Structure
 ```php

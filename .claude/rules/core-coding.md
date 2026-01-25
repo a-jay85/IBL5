@@ -59,6 +59,7 @@ Replace deprecated tags immediately:
 | Task | Command |
 |------|---------|
 | Run tests | `cd ibl5 && vendor/bin/phpunit` |
+| Run tests with all issues shown | `cd ibl5 && vendor/bin/phpunit --display-all-issues` |
 | Schema | `ibl5/schema.sql` |
 | Stats formatting | `BasketballStats\StatsFormatter` |
 | MySQL CLI | `/Applications/MAMP/Library/bin/mysql80/bin/mysql --socket=/Applications/MAMP/tmp/mysql/mysql.sock -u root -p'root' iblhoops_ibl5` |
